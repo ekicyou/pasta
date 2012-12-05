@@ -1,0 +1,8 @@
+<project name="hxunicode" url="http://gitorious.org/hxunicode/" license="BSD">
+    <user name="mandel59"/>
+    <tag v="cross"/>
+    <tag v="text"/>
+    <description>hxUnicode is a library
+    for manipulating several kinds of Unicode strings.</description>
+    <version name="0.1.1">fixed issues and changed specifications</version>
+</project>

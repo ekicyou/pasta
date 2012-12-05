@@ -1,0 +1,832 @@
+<haxe>
+	<enum path="Void" params="" file="/usr/local/share/haxe/std/StdTypes.hx" module="StdTypes"><haxe_doc>
+	The standard Void type. Only [null] values can be of the type [Void].
+</haxe_doc></enum>
+	<class path="Float" params="" file="/usr/local/share/haxe/std/StdTypes.hx" module="StdTypes" extern="1"><haxe_doc>
+	The standard Float type, this is a double-precision IEEE 64bit float.
+</haxe_doc></class>
+	<class path="Int" params="" file="/usr/local/share/haxe/std/StdTypes.hx" module="StdTypes" extern="1">
+		<extends path="Float"/>
+		<haxe_doc>
+	The standard Int type. Its precision depends on the platform.
+</haxe_doc>
+	</class>
+	<typedef path="Null" params="T" file="/usr/local/share/haxe/std/StdTypes.hx" module="StdTypes">
+		<c path="Null.T"/>
+		<haxe_doc>
+	[Null] can be useful in two cases. In order to document some methods
+	that accepts or can return a [null] value, or for the Flash9 compiler and AS3
+	generator to distinguish between base values that can be null and others that
+	can't.
+</haxe_doc>
+	</typedef>
+	<enum path="Bool" params="" file="/usr/local/share/haxe/std/StdTypes.hx" module="StdTypes">
+		<true/>
+		<false/>
+		<haxe_doc>
+	The standard Boolean type is represented as an enum with two choices.
+</haxe_doc>
+	</enum>
+	<class path="Dynamic" params="T" file="/usr/local/share/haxe/std/StdTypes.hx" module="StdTypes" extern="1"><haxe_doc>
+	Dynamic is an internal compiler type which has special behavior.
+	See the haXe language reference for more informations.
+</haxe_doc></class>
+	<typedef path="Iterator" params="T" file="/usr/local/share/haxe/std/StdTypes.hx" module="StdTypes">
+		<a>
+			<next><f a=""><c path="Iterator.T"/></f></next>
+			<hasNext><f a=""><e path="Bool"/></f></hasNext>
+		</a>
+		<haxe_doc>
+	An Iterator is a structure that permits to list a given container
+	values. It can be used by your own data structures. See the haXe
+	documentation for more informations.
+</haxe_doc>
+	</typedef>
+	<typedef path="Iterable" params="T" file="/usr/local/share/haxe/std/StdTypes.hx" module="StdTypes">
+		<a><iterator><f a=""><t path="Iterator"><c path="Iterable.T"/></t></f></iterator></a>
+		<haxe_doc>
+	An Iterable is a data structure which has an iterator() method.
+	See [Lambda] for generic functions on iterable structures.
+</haxe_doc>
+	</typedef>
+	<class path="ArrayAccess" params="T" file="/usr/local/share/haxe/std/StdTypes.hx" module="StdTypes" extern="1" interface="1"><haxe_doc>
+	ArrayAccess is used to indicate a class that can be accessed using brackets.
+	The type parameter represent the type of the elements stored.
+</haxe_doc></class>
+	<class path="String" params="" file="/usr/local/share/haxe/std/String.hx" extern="1">
+		<fromCharCode public="1" set="method" static="1"><f a="code">
+	<c path="Int"/>
+	<c path="String"/>
+</f></fromCharCode>
+		<length public="1" set="null">
+			<c path="Int"/>
+			<haxe_doc>
+		The number of characters in the String.
+	</haxe_doc>
+		</length>
+		<toUpperCase public="1" set="method">
+			<f a=""><c path="String"/></f>
+			<haxe_doc>
+		Returns an String where all characters have been uppercased.
+	</haxe_doc>
+		</toUpperCase>
+		<toLowerCase public="1" set="method">
+			<f a=""><c path="String"/></f>
+			<haxe_doc>
+		Returns an String where all characters have been lowercased.
+	</haxe_doc>
+		</toLowerCase>
+		<charAt public="1" set="method">
+			<f a="index">
+				<c path="Int"/>
+				<c path="String"/>
+			</f>
+			<haxe_doc>
+		Returns the character at the given position.
+		Returns the empty String if outside of String bounds.
+	</haxe_doc>
+		</charAt>
+		<charCodeAt public="1" set="method">
+			<f a="index">
+				<c path="Int"/>
+				<t path="Null"><c path="Int"/></t>
+			</f>
+			<haxe_doc>
+		Returns the character code at the given position.
+		Returns [null] if outside of String bounds.
+	</haxe_doc>
+		</charCodeAt>
+		<indexOf public="1" set="method">
+			<f a="value:?startIndex">
+				<c path="String"/>
+				<c path="Int"/>
+				<c path="Int"/>
+			</f>
+			<haxe_doc>
+		Returns the index of first occurence of [value]
+		Returns [1-1] if [value] is not found.
+		The optional [startIndex] parameter allows you to specify at which character to start searching.
+		The position returned is still relative to the beginning of the string.
+	</haxe_doc>
+		</indexOf>
+		<lastIndexOf public="1" set="method">
+			<f a="value:?startIndex">
+				<c path="String"/>
+				<c path="Int"/>
+				<c path="Int"/>
+			</f>
+			<haxe_doc>
+		Similar to [indexOf] but returns the latest index.
+	</haxe_doc>
+		</lastIndexOf>
+		<split public="1" set="method">
+			<f a="delimiter">
+				<c path="String"/>
+				<c path="Array"><c path="String"/></c>
+			</f>
+			<haxe_doc>
+		Split the string using the specified delimiter.
+	</haxe_doc>
+		</split>
+		<substr public="1" set="method">
+			<f a="pos:?len">
+				<c path="Int"/>
+				<c path="Int"/>
+				<c path="String"/>
+			</f>
+			<haxe_doc>
+		Returns a part of the String, taking [len] characters starting from [pos].
+		If [len] is not specified, it takes all the remaining characters.
+	</haxe_doc>
+		</substr>
+		<toString public="1" set="method">
+			<f a=""><c path="String"/></f>
+			<haxe_doc>
+		Returns the String itself.
+	</haxe_doc>
+		</toString>
+		<cca set="method"><f a="pos">
+	<c path="Int"/>
+	<c path="Int"/>
+</f></cca>
+		<new public="1" set="method">
+			<f a="string">
+				<c path="String"/>
+				<e path="Void"/>
+			</f>
+			<haxe_doc>
+		Creates a copy from a given String.
+	</haxe_doc>
+		</new>
+		<haxe_doc>
+	The basic String class.
+</haxe_doc>
+	</class>
+	<class path="unicode.CombiningTools" params="" file="./unicode/CombiningTools.hx">
+		<ucIter public="1" get="inline" set="null" line="10" static="1"><f a="str">
+	<c path="String"/>
+	<t path="Iterator"><c path="Array"><c path="Int"/></c></t>
+</f></ucIter>
+		<ucLength public="1" set="method" line="17" static="1">
+			<f a="str">
+				<c path="String"/>
+				<c path="Int"/>
+			</f>
+			<haxe_doc>
+        Returns the number of Combining Character Sequences in the String.
+    </haxe_doc>
+		</ucLength>
+		<ucOrdering public="1" set="method" line="26" static="1"><f a="str">
+	<c path="String"/>
+	<c path="String"/>
+</f></ucOrdering>
+		<ucSubstr public="1" set="method" line="44" static="1"><f a="str:pos:?len">
+	<c path="String"/>
+	<c path="Int"/>
+	<c path="Int"/>
+	<c path="String"/>
+</f></ucSubstr>
+		<haxe_doc>
+    The UnicodeTools class contains some functionalities for Unicode [String]
+    manipulation related to combining characters.
+    This class needs the CombiningClassData class and you should notice
+    that the executable file gets large.
+</haxe_doc>
+	</class>
+	<class path="Std" params="" file="/usr/local/share/haxe/std/Std.hx">
+		<is public="1" set="method" line="34" static="1">
+			<f a="v:t">
+				<d/>
+				<d/>
+				<e path="Bool"/>
+			</f>
+			<haxe_doc>
+		Tells if a value v is of the type t.
+	</haxe_doc>
+		</is>
+		<string public="1" set="method" line="54" static="1">
+			<f a="s">
+				<d/>
+				<c path="String"/>
+			</f>
+			<haxe_doc>
+		Convert any value to a String
+	</haxe_doc>
+		</string>
+		<int public="1" set="method" line="74" static="1">
+			<f a="x">
+				<c path="Float"/>
+				<c path="Int"/>
+			</f>
+			<haxe_doc>
+		Convert a Float to an Int, rounded down.
+	</haxe_doc>
+		</int>
+		<parseInt public="1" set="method" line="90" static="1">
+			<f a="x">
+				<c path="String"/>
+				<t path="Null"><c path="Int"/></t>
+			</f>
+			<haxe_doc>
+		Convert a String to an Int, parsing different possible representations. Returns [null] if could not be parsed.
+	</haxe_doc>
+		</parseInt>
+		<parseFloat public="1" set="method" line="131" static="1">
+			<f a="x">
+				<c path="String"/>
+				<c path="Float"/>
+			</f>
+			<haxe_doc>
+		Convert a String to a Float, parsing different possible reprensations.
+	</haxe_doc>
+		</parseFloat>
+		<random public="1" set="method" line="153" static="1">
+			<f a="x">
+				<c path="Int"/>
+				<c path="Int"/>
+			</f>
+			<haxe_doc>
+		Return a random integer between 0 included and x excluded.
+	</haxe_doc>
+		</random>
+		<haxe_doc>
+	The Std class provides standard methods for manipulating basic types.
+</haxe_doc>
+	</class>
+	<class path="IntHash" params="T" file="/usr/local/share/haxe/std/IntHash.hx">
+		<h><d/></h>
+		<set public="1" set="method" line="60">
+			<f a="key:value">
+				<c path="Int"/>
+				<c path="IntHash.T"/>
+				<e path="Void"/>
+			</f>
+			<haxe_doc>
+		Set a value for the given key.
+	</haxe_doc>
+		</set>
+		<get public="1" set="method" line="75">
+			<f a="key">
+				<c path="Int"/>
+				<t path="Null"><c path="IntHash.T"/></t>
+			</f>
+			<haxe_doc>
+		Get a value for the given key.
+	</haxe_doc>
+		</get>
+		<exists public="1" set="method" line="97">
+			<f a="key">
+				<c path="Int"/>
+				<e path="Bool"/>
+			</f>
+			<haxe_doc>
+		Tells if a value exists for the given key.
+		In particular, it's useful to tells if a key has
+		a [null] value versus no value.
+	</haxe_doc>
+		</exists>
+		<remove public="1" set="method" line="119">
+			<f a="key">
+				<c path="Int"/>
+				<e path="Bool"/>
+			</f>
+			<haxe_doc>
+		Removes a hashtable entry. Returns [true] if
+		there was such entry.
+	</haxe_doc>
+		</remove>
+		<keys public="1" set="method" line="148">
+			<f a=""><t path="Iterator"><c path="Int"/></t></f>
+			<haxe_doc>
+		Returns an iterator of all keys in the hashtable.
+	</haxe_doc>
+		</keys>
+		<iterator public="1" set="method" line="180">
+			<f a=""><t path="Iterator"><c path="IntHash.T"/></t></f>
+			<haxe_doc>
+		Returns an iterator of all values in the hashtable.
+	</haxe_doc>
+		</iterator>
+		<toString public="1" set="method" line="220">
+			<f a=""><c path="String"/></f>
+			<haxe_doc>
+		Returns an displayable representation of the hashtable content.
+	</haxe_doc>
+		</toString>
+		<new public="1" set="method" line="37">
+			<f a=""><e path="Void"/></f>
+			<haxe_doc>
+		Creates a new empty hashtable.
+	</haxe_doc>
+		</new>
+		<haxe_doc>
+	Hashtable over a set of elements, using [Int] as keys.
+	On Flash and Javascript, the underlying structure is an Object.
+</haxe_doc>
+	</class>
+	<class path="Math" params="" file="/usr/local/share/haxe/std/Math.hx" extern="1">
+		<PI public="1" set="null" static="1"><c path="Float"/></PI>
+		<NaN public="1" set="null" static="1"><c path="Float"/></NaN>
+		<NEGATIVE_INFINITY public="1" set="null" static="1"><c path="Float"/></NEGATIVE_INFINITY>
+		<POSITIVE_INFINITY public="1" set="null" static="1"><c path="Float"/></POSITIVE_INFINITY>
+		<abs public="1" set="method" static="1"><f a="value">
+	<c path="Float"/>
+	<c path="Float"/>
+</f></abs>
+		<min public="1" set="method" static="1"><f a="value1:value2">
+	<c path="Float"/>
+	<c path="Float"/>
+	<c path="Float"/>
+</f></min>
+		<max public="1" set="method" static="1"><f a="value1:value2">
+	<c path="Float"/>
+	<c path="Float"/>
+	<c path="Float"/>
+</f></max>
+		<sin public="1" set="method" static="1"><f a="value">
+	<c path="Float"/>
+	<c path="Float"/>
+</f></sin>
+		<cos public="1" set="method" static="1"><f a="value">
+	<c path="Float"/>
+	<c path="Float"/>
+</f></cos>
+		<atan2 public="1" set="method" static="1"><f a="value1:value2">
+	<c path="Float"/>
+	<c path="Float"/>
+	<c path="Float"/>
+</f></atan2>
+		<tan public="1" set="method" static="1"><f a="value">
+	<c path="Float"/>
+	<c path="Float"/>
+</f></tan>
+		<exp public="1" set="method" static="1"><f a="value">
+	<c path="Float"/>
+	<c path="Float"/>
+</f></exp>
+		<log public="1" set="method" static="1"><f a="value">
+	<c path="Float"/>
+	<c path="Float"/>
+</f></log>
+		<sqrt public="1" set="method" static="1"><f a="value">
+	<c path="Float"/>
+	<c path="Float"/>
+</f></sqrt>
+		<round public="1" set="method" static="1"><f a="value">
+	<c path="Float"/>
+	<c path="Int"/>
+</f></round>
+		<floor public="1" set="method" static="1"><f a="value">
+	<c path="Float"/>
+	<c path="Int"/>
+</f></floor>
+		<ceil public="1" set="method" static="1"><f a="value">
+	<c path="Float"/>
+	<c path="Int"/>
+</f></ceil>
+		<atan public="1" set="method" static="1"><f a="value">
+	<c path="Float"/>
+	<c path="Float"/>
+</f></atan>
+		<asin public="1" set="method" static="1"><f a="value">
+	<c path="Float"/>
+	<c path="Float"/>
+</f></asin>
+		<acos public="1" set="method" static="1"><f a="value">
+	<c path="Float"/>
+	<c path="Float"/>
+</f></acos>
+		<pow public="1" set="method" static="1"><f a="value1:value2">
+	<c path="Float"/>
+	<c path="Float"/>
+	<c path="Float"/>
+</f></pow>
+		<random public="1" set="method" static="1"><f a=""><c path="Float"/></f></random>
+		<isFinite public="1" set="method" static="1"><f a="f">
+	<c path="Float"/>
+	<e path="Bool"/>
+</f></isFinite>
+		<isNaN public="1" set="method" static="1"><f a="f">
+	<c path="Float"/>
+	<e path="Bool"/>
+</f></isNaN>
+		<haxe_doc>
+	This class defines mathematical functions and constants.
+</haxe_doc>
+	</class>
+	<class path="unicode.Unicode" params="" file="./unicode/Unicode.hx">
+		<version public="1" get="inline" set="null" line="4" static="1"><c path="String"/></version>
+		<maxUnicodeChar public="1" get="inline" set="null" line="5" static="1"><c path="Int"/></maxUnicodeChar>
+		<replacementChar public="1" get="inline" set="null" line="6" static="1"><c path="Int"/></replacementChar>
+		<minHighSurrogates public="1" get="inline" set="null" line="7" static="1"><c path="Int"/></minHighSurrogates>
+		<maxHighSurrogates public="1" get="inline" set="null" line="8" static="1"><c path="Int"/></maxHighSurrogates>
+		<minLowSurrogates public="1" get="inline" set="null" line="9" static="1"><c path="Int"/></minLowSurrogates>
+		<maxLowSurrogates public="1" get="inline" set="null" line="10" static="1"><c path="Int"/></maxLowSurrogates>
+		<decodeSurrogate public="1" get="inline" set="null" line="12" static="1"><f a="c:d">
+	<c path="Int"/>
+	<c path="Int"/>
+	<c path="Int"/>
+</f></decodeSurrogate>
+		<encodeHighSurrogate public="1" get="inline" set="null" line="15" static="1"><f a="c">
+	<c path="Int"/>
+	<c path="Int"/>
+</f></encodeHighSurrogate>
+		<encodeLowSurrogate public="1" get="inline" set="null" line="18" static="1"><f a="c">
+	<c path="Int"/>
+	<c path="Int"/>
+</f></encodeLowSurrogate>
+		<stringIsUtf32 public="1" get="inline" set="null" line="36" static="1"><e path="Bool"/></stringIsUtf32>
+	</class>
+	<class path="StringBuf" params="" file="/usr/local/share/haxe/std/StringBuf.hx">
+		<add public="1" get="inline" set="null" line="48">
+			<f a="?x">
+				<d/>
+				<e path="Void"/>
+			</f>
+			<haxe_doc>
+		Adds the representation of any value to the string buffer.
+	</haxe_doc>
+		</add>
+		<addSub public="1" get="inline" set="null" line="61">
+			<f a="s:pos:?len">
+				<c path="String"/>
+				<c path="Int"/>
+				<c path="Int"/>
+				<e path="Void"/>
+			</f>
+			<haxe_doc>
+		Adds a part of a string to the string buffer.
+	</haxe_doc>
+		</addSub>
+		<addChar public="1" get="inline" set="null" line="79">
+			<f a="c">
+				<c path="Int"/>
+				<e path="Void"/>
+			</f>
+			<haxe_doc>
+		Adds a character to the string buffer.
+	</haxe_doc>
+		</addChar>
+		<toString public="1" get="inline" set="null" line="95">
+			<f a=""><c path="String"/></f>
+			<haxe_doc>
+		Returns the content of the string buffer.
+		The buffer is not emptied by this operation.
+	</haxe_doc>
+		</toString>
+		<b><c path="String"/></b>
+		<new public="1" set="method" line="35">
+			<f a=""><e path="Void"/></f>
+			<haxe_doc>
+		Creates a new string buffer.
+	</haxe_doc>
+		</new>
+		<haxe_doc>
+	A String buffer is an efficient way to build a big string by
+	appending small elements together.
+</haxe_doc>
+	</class>
+	<enum path="unicode.UnicodeException" params="" file="./unicode/UnicodeException.hx"><InvalidUtfStream/></enum>
+	<class path="unicode.UnicodeIter" params="" file="./unicode/UnicodeIter.hx">
+		<str><c path="String"/></str>
+		<pos><c path="Int"/></pos>
+		<hasNext public="1" set="method" line="10"><f a=""><e path="Bool"/></f></hasNext>
+		<next public="1" set="method" line="34"><f a=""><t path="Null"><c path="Int"/></t></f></next>
+		<new public="1" set="method" line="6"><f a="s">
+	<c path="String"/>
+	<e path="Void"/>
+</f></new>
+	</class>
+	<class path="Array" params="T" file="/usr/local/share/haxe/std/Array.hx" extern="1">
+		<length public="1" set="null">
+			<c path="Int"/>
+			<haxe_doc>
+		The length of the Array
+	</haxe_doc>
+		</length>
+		<concat public="1" set="method">
+			<f a="a">
+				<c path="Array"><c path="Array.T"/></c>
+				<c path="Array"><c path="Array.T"/></c>
+			</f>
+			<haxe_doc>
+		Returns a new Array by appending [a] to [this].
+	</haxe_doc>
+		</concat>
+		<join public="1" set="method">
+			<f a="sep">
+				<c path="String"/>
+				<c path="String"/>
+			</f>
+			<haxe_doc>
+		Returns a representation of an array with [sep] for separating each element.
+	</haxe_doc>
+		</join>
+		<pop public="1" set="method">
+			<f a=""><t path="Null"><c path="Array.T"/></t></f>
+			<haxe_doc>
+		Removes the last element of the array and returns it.
+	</haxe_doc>
+		</pop>
+		<push public="1" set="method">
+			<f a="x">
+				<c path="Array.T"/>
+				<c path="Int"/>
+			</f>
+			<haxe_doc>
+		Adds the element [x] at the end of the array.
+	</haxe_doc>
+		</push>
+		<reverse public="1" set="method">
+			<f a=""><e path="Void"/></f>
+			<haxe_doc>
+		Reverse the order of elements of the Array.
+	</haxe_doc>
+		</reverse>
+		<shift public="1" set="method">
+			<f a=""><t path="Null"><c path="Array.T"/></t></f>
+			<haxe_doc>
+		Removes the first element and returns it.
+	</haxe_doc>
+		</shift>
+		<slice public="1" set="method">
+			<f a="pos:?end">
+				<c path="Int"/>
+				<c path="Int"/>
+				<c path="Array"><c path="Array.T"/></c>
+			</f>
+			<haxe_doc>
+		Copies the range of the array starting at [pos] up to,
+		but not including, [end]. Both [pos] and [end] can be
+		negative to count from the end: -1 is the last item in
+		the array.
+	</haxe_doc>
+		</slice>
+		<sort public="1" set="method">
+			<f a="f">
+				<f a=":">
+					<c path="Array.T"/>
+					<c path="Array.T"/>
+					<c path="Int"/>
+				</f>
+				<e path="Void"/>
+			</f>
+			<haxe_doc><![CDATA[
+		Sort the Array according to the comparison function [f].
+		[f(x,y)] should return [0] if [x == y], [>0] if [x > y]
+		and [<0] if [x < y].
+	]]></haxe_doc>
+		</sort>
+		<splice public="1" set="method">
+			<f a="pos:len">
+				<c path="Int"/>
+				<c path="Int"/>
+				<c path="Array"><c path="Array.T"/></c>
+			</f>
+			<haxe_doc>
+		Removes [len] elements starting from [pos] an returns them.
+	</haxe_doc>
+		</splice>
+		<toString public="1" set="method">
+			<f a=""><c path="String"/></f>
+			<haxe_doc>
+		Returns a displayable representation of the Array content.
+	</haxe_doc>
+		</toString>
+		<unshift public="1" set="method">
+			<f a="x">
+				<c path="Array.T"/>
+				<e path="Void"/>
+			</f>
+			<haxe_doc>
+		Adds the element [x] at the start of the array.
+	</haxe_doc>
+		</unshift>
+		<insert public="1" set="method">
+			<f a="pos:x">
+				<c path="Int"/>
+				<c path="Array.T"/>
+				<e path="Void"/>
+			</f>
+			<haxe_doc>
+		Inserts the element [x] at the position [pos].
+		All elements after [pos] are moved one index ahead.
+	</haxe_doc>
+		</insert>
+		<remove public="1" set="method">
+			<f a="x">
+				<c path="Array.T"/>
+				<e path="Bool"/>
+			</f>
+			<haxe_doc>
+		Removes the first occurence of [x].
+		Returns false if [x] was not present.
+		Elements are compared by using standard equality.
+	</haxe_doc>
+		</remove>
+		<copy public="1" set="method">
+			<f a=""><c path="Array"><c path="Array.T"/></c></f>
+			<haxe_doc>
+		Returns a copy of the Array. The values are not
+		copied, only the Array structure.
+	</haxe_doc>
+		</copy>
+		<iterator public="1" set="method">
+			<f a=""><t path="Iterator"><t path="Null"><c path="Array.T"/></t></t></f>
+			<haxe_doc>
+		Returns an iterator of the Array values.
+	</haxe_doc>
+		</iterator>
+		<new public="1" set="method">
+			<f a=""><e path="Void"/></f>
+			<haxe_doc>
+		Creates a new Array.
+	</haxe_doc>
+		</new>
+		<haxe_doc>
+	An Array is a storage for values. You can access it using indexes or
+	with its API. On the server side, it's often better to use a [List] which
+	is less memory and CPU consuming, unless you really need indexed access.
+</haxe_doc>
+	</class>
+	<class path="unicode.UnicodeTools" params="" file="./unicode/UnicodeTools.hx">
+		<uIsValidChar public="1" set="method" line="8" static="1"><f a="code">
+	<c path="Int"/>
+	<e path="Bool"/>
+</f></uIsValidChar>
+		<uIsHighSurrogate public="1" get="inline" set="null" line="15" static="1"><f a="code">
+	<c path="Int"/>
+	<e path="Bool"/>
+</f></uIsHighSurrogate>
+		<uIsLowSurrogate public="1" get="inline" set="null" line="18" static="1"><f a="code">
+	<c path="Int"/>
+	<e path="Bool"/>
+</f></uIsLowSurrogate>
+		<uLength public="1" get="inline" set="null" line="25" static="1">
+			<f a="s">
+				<c path="String"/>
+				<c path="Int"/>
+			</f>
+			<haxe_doc>
+        Returns the number of Unicode characters in the String.
+    </haxe_doc>
+		</uLength>
+		<uCodeAt public="1" set="method" line="43" static="1">
+			<f a="s:index">
+				<c path="String"/>
+				<c path="Int"/>
+				<t path="Null"><c path="Int"/></t>
+			</f>
+			<haxe_doc>
+        Returns the Unicode Code Point at the given position.
+        Returns [null] if outside of String bounds.
+    </haxe_doc>
+		</uCodeAt>
+		<uCharAt public="1" set="method" line="64" static="1">
+			<f a="s:index">
+				<c path="String"/>
+				<c path="Int"/>
+				<c path="String"/>
+			</f>
+			<haxe_doc>
+        Returns the Unicode character at the given position.
+        Returns the empty String if outside of String bounds.
+    </haxe_doc>
+		</uCharAt>
+		<uValidate public="1" get="inline" set="null" line="71" static="1"><f a="s">
+	<c path="String"/>
+	<c path="String"/>
+</f></uValidate>
+		<uIsValid public="1" set="method" line="77" static="1"><f a="s">
+	<c path="String"/>
+	<e path="Bool"/>
+</f></uIsValid>
+		<uSubstr public="1" set="method" line="90" static="1"><f a="s:pos:?len">
+	<c path="String"/>
+	<c path="Int"/>
+	<c path="Int"/>
+	<c path="String"/>
+</f></uSubstr>
+		<uIndexOf public="1" set="method" line="107" static="1"><f a="s:value:?startIndex">
+	<c path="String"/>
+	<c path="String"/>
+	<c path="Int"/>
+	<c path="Int"/>
+</f></uIndexOf>
+		<uLastIndexOf public="1" set="method" line="110" static="1"><f a="s:value:?startIndex">
+	<c path="String"/>
+	<c path="String"/>
+	<c path="Int"/>
+	<c path="Int"/>
+</f></uLastIndexOf>
+		<uIter public="1" get="inline" set="null" line="114" static="1"><f a="s">
+	<c path="String"/>
+	<t path="Iterator"><c path="Int"/></t>
+</f></uIter>
+		<uCodeToString public="1" set="method" line="118" static="1"><f a="code">
+	<c path="Int"/>
+	<c path="String"/>
+</f></uCodeToString>
+		<uToString public="1" set="method" line="137" static="1"><f a="code">
+	<t path="Iterable"><c path="Int"/></t>
+	<c path="String"/>
+</f></uToString>
+		<_posToUpos get="inline" set="null" line="147" static="1"><f a="s:pos">
+	<c path="String"/>
+	<c path="Int"/>
+	<c path="Int"/>
+</f></_posToUpos>
+		<_uposToPos get="inline" set="null" line="160" static="1"><f a="s:upos">
+	<c path="String"/>
+	<c path="Int"/>
+	<c path="Int"/>
+</f></_uposToPos>
+		<_utf16length set="method" line="175" static="1"><f a="s">
+	<c path="String"/>
+	<c path="Int"/>
+</f></_utf16length>
+		<_utf16charCodeAt set="method" line="189" static="1"><f a="s:index">
+	<c path="String"/>
+	<c path="Int"/>
+	<t path="Null"><c path="Int"/></t>
+</f></_utf16charCodeAt>
+		<_utf32validate set="method" line="206" static="1"><f a="s">
+	<a>
+		<length><c path="Int"/></length>
+		<charCodeAt><f a="">
+	<c path="Int"/>
+	<c path="Int"/>
+</f></charCodeAt>
+	</a>
+	<e path="Bool"/>
+</f></_utf32validate>
+		<_utf16validate set="method" line="215" static="1"><f a="s">
+	<a>
+		<length><c path="Int"/></length>
+		<charCodeAt><f a="">
+	<c path="Int"/>
+	<c path="Int"/>
+</f></charCodeAt>
+	</a>
+	<e path="Bool"/>
+</f></_utf16validate>
+		<_utf16substr set="method" line="235" static="1"><f a="s:pos:len">
+	<c path="String"/>
+	<c path="Int"/>
+	<t path="Null"><c path="Int"/></t>
+	<c path="String"/>
+</f></_utf16substr>
+		<haxe_doc>
+    The UnicodeTools class contains some functionalities for Unicode [String]
+    manipulation.
+</haxe_doc>
+	</class>
+	<class path="unicode.CombiningClassData" params="" file="./unicode/CombiningClassData.hx">
+		<ccctable line="6" static="1"><c path="IntHash"><c path="Int"/></c></ccctable>
+		<get public="1" set="method" line="7" static="1"><f a="key">
+	<c path="Int"/>
+	<t path="Null"><c path="Int"/></t>
+</f></get>
+		<initCccTable set="method" line="10" static="1"><f a=""><c path="IntHash"><c path="Int"/></c></f></initCccTable>
+	</class>
+	<class path="IntIter" params="" file="/usr/local/share/haxe/std/IntIter.hx">
+		<min><c path="Int"/></min>
+		<max><c path="Int"/></max>
+		<hasNext public="1" set="method" line="46">
+			<f a=""><e path="Bool"/></f>
+			<haxe_doc>
+		Returns true if the iterator has other items, false otherwise.
+	</haxe_doc>
+		</hasNext>
+		<next public="1" set="method" line="53">
+			<f a=""><c path="Int"/></f>
+			<haxe_doc>
+		Moves to the next item of the iterator.
+	</haxe_doc>
+		</next>
+		<new public="1" set="method" line="38">
+			<f a="min:max">
+				<c path="Int"/>
+				<c path="Int"/>
+				<e path="Void"/>
+			</f>
+			<haxe_doc><![CDATA[
+		Iterate from [min] (inclusive) to [max] (exclusive).
+		If [max <= min], the iterator will not act as a countdown.
+	]]></haxe_doc>
+		</new>
+		<haxe_doc>
+	Integer iterator. Used for interval implementation.
+</haxe_doc>
+	</class>
+	<class path="unicode.CombiningIter" params="" file="./unicode/CombiningIter.hx">
+		<uiter><c path="unicode.UnicodeIter"/></uiter>
+		<buffer><c path="Int"/></buffer>
+		<hasNext public="1" set="method" line="14"><f a=""><e path="Bool"/></f></hasNext>
+		<next public="1" set="method" line="17"><f a=""><c path="Array"><c path="Int"/></c></f></next>
+		<new public="1" set="method" line="6"><f a="s">
+	<c path="String"/>
+	<e path="Void"/>
+</f></new>
+	</class>
+</haxe>

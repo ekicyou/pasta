@@ -1,0 +1,249 @@
+﻿@import "./common.less";
+
+//=====================================================
+// 一般
+//=====================================================
+body{
+    overflow: hidden;
+    pointer-events: none;
+    background-color: transparent;
+
+    
+}
+
+.bottom{
+    position: absolute;
+    bottom: 0px;
+}
+
+.absolute *{ position: absolute; }
+
+div#mainArea{
+    position: absolute;
+    right: 0px;
+    width: 320px;
+    height: 100%;
+}
+
+//=====================================================
+// アクター領域
+//=====================================================
+
+div#actor{
+    z-index: 0;
+    left: 0px;
+    width: 320px;
+    img{  z-index: -10; }
+    div.ie     { display: none; }
+    div.webkit { display: none; }
+}
+
+html.webkit #actor div.webkit { display: block; }
+html.ie8_   #actor div.ie     { display: block; }
+
+
+
+//=====================================================
+// サーフェス切り替え制御
+//=====================================================
+
+// 差分画像のデフォルト非表示
+.diff{ display: none; }
+
+// 表示
+div#surface.x1 .x1{ display: block; }
+div#surface.x2 .x2{ display: block; }
+div#surface.x3 .x3{ display: block; }
+div#surface.x4 .x4{ display: block; }
+div#surface.x5 .x5{ display: block; }
+div#surface.y1 .y1{ display: block; }
+div#surface.y2 .y2{ display: block; }
+div#surface.y3 .y3{ display: block; }
+div#surface.y4 .y4{ display: block; }
+div#surface.y5 .y5{ display: block; }
+div#surface.y6 .y6{ display: block; }
+div#surface.z1 .z1{ display: block; }
+div#surface.z2 .z2{ display: block; }
+
+
+//=====================================================
+// テキストエリア
+//=====================================================
+div#scrapArea div.scrap{
+    position: absolute;
+    pointer-events: none;
+    bottom: 0px;
+    width: 320px;
+    height: 420px;
+
+    font-family: '@メイリオ','Hiragino Kaku Gothic ProN' ,'Hiragino Kaku Gothic Pro' ,Verdana,'@ＭＳ Ｐゴシック',sans-serif;
+    font-size: 16px;
+    color: rgba(150, 100, 63, 0.9);
+    text-shadow: 0px 0px 1px #FFF, 0px 0px 2px #FFF, 0px 0px 2px #FFF, 0px 0px 5px #FFF, 0px 0px 5px #FFF, 0px 0px 5px #FFF, 0px 0px 5px #FFF, 0px 0px 5px #FFF, 0px 0px 5px #FFF, 0px 0px 5px #FFF, 0px 0px 5px #FFF;
+
+    div.section{
+        position: absolute;
+        z-index: 10;
+
+        // 縦書き
+        writing-mode      : tb-rl;
+        direction         : ltr;
+        block-progression:t rl;
+
+        -moz-writing-mode: vertical-rl;
+        -webkit-writing-mode: vertical-rl;
+        -o-writing-mode: vertical-rl;
+
+
+        .pasta { color: rgba(150, 100,  63, 0.9); }
+        .coffee{ color: rgba( 63, 109, 147, 0.9); }
+
+        // パスタの色
+        p.pasta    { color: @color01; }
+        p.pasta.p1 { color: @color01; }
+        p.pasta.p2 { color: @color07; }
+        p.pasta.p3 { color: @color11; }
+
+        // ソルトの色
+        p.solt    { color: @color08; }
+        p.solt.p1 { color: @color08; }
+        p.solt.p2 { color: @color02; }
+        p.solt.p3 { color: @color12; }
+
+        // おじさんの色
+        p.mister    { color: @color08; }
+        p.mister.p1 { color: @color08; }
+        p.mister.p2 { color: @color02; }
+        p.mister.p3 { color: @color12; }
+
+        // ソルト、おじさんのインデント。
+        p.solt      { text-indent: 16px; }
+        p.mister    { text-indent: 16px; }
+    }
+
+    // 文字表示位置
+    div.section.area1{  left: 222px; p{ .margin_right(6px); .margin_left(0)  ; }}
+    div.section.area2{ right: 262px; p{ .margin_right(0)  ; .margin_left(6px); }}
+}
+
+//=====================================================
+// テキストアニメーション制御
+//=====================================================
+div#mainArea        div.text span{
+    opacity: 0.0;
+}
+
+div#mainArea.show   div.text span{
+    opacity: 1.0;
+}
+div#mainArea.flush  div.text span{
+    opacity: 1.0;
+    .transition(opacity, 0s, linear);
+    .transition_delay(0s);
+}
+
+
+
+
+//=====================================================
+// その他
+//=====================================================
+
+
+.hittest{ 
+    z-index: 10;
+    pointer-events: all;
+    cursor: pointer;
+    //border: solid 1px red;
+}
+
+.hittest.hi{ z-index: 3;}
+.hittest.lo{ z-index: 1;}
+
+
+
+
+
+
+//=====================================================
+// 表情試験用画面(design.html)
+//=====================================================
+div.navi{
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    z-index: -1;
+
+    img{
+        width: 57px;
+        height: 57px;
+    }
+}
+
+
+div.navi {
+    pointer-events: all;
+    list-style-type: none;
+    margin: 0 0 1em;
+    padding: 0;
+    font-size: 14px;
+
+    li {
+        pointer-events: all;
+        display: block;
+        margin-bottom: 1px;
+        padding: 2px 0 2px 10px;
+        width: 165px;
+        text-decoration: none;
+        border-left: 5px solid #888888;
+        background-color: #eeeeee;
+        color: #000000;
+    }
+    li.ui-selectee{
+        border-left: 5px solid #000000;
+    }
+    li.ui-selecting{
+        border-left: 5px solid #880000;
+    }
+
+    li.ui-selected {
+        background-color: #999999;
+        color: #ff0000;
+        border-left: 5px solid #ff0000;
+    }
+}
+
+
+//=====================================================
+// 表情試験用画面(design.html)
+//=====================================================
+div.edit{
+    position: absolute;
+    pointer-events: all;
+    top: 0;
+    left: 0;
+    z-index: -1;
+
+    textarea
+    {
+        display: static;
+    }
+
+    .message.info
+    {
+        background-color: #C0FFC0;
+    }
+    .message {
+        border-radius: .5em;
+        -moz-border-radius: .5em;
+        padding: .5em 1em;
+    }
+
+
+}
+
+#script_input{
+    width: 400px;
+    height: 120px;
+}
+

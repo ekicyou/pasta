@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+    <id>RxJS-Main</id>
+    <version>2.0.20921</version>
+    <title>Reactive Extensions for JavaScript - Main Library</title>
+    <authors>Microsoft Corporation</authors>
+    <owners>Microsoft Corporation</owners>
+    <licenseUrl>http://go.microsoft.com/fwlink/?LinkID=265024</licenseUrl>
+    <projectUrl>http://go.microsoft.com/fwlink/?LinkID=179929</projectUrl>
+    <iconUrl>http://go.microsoft.com/fwlink/?LinkId=261274</iconUrl>
+    <requireLicenseAcceptance>true</requireLicenseAcceptance>
+    <description>Reactive Extensions for JavaScript main library used to express complex event processing queries over observable sequences.</description>
+    <language>en-US</language>
+    <tags>Rx RxJS Reactive Extensions Observable</tags>
+  </metadata>
+</package>

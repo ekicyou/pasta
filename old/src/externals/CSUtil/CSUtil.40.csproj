@@ -1,0 +1,166 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>9.0.30729</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{B5385976-C31F-42DF-B1DB-54EA0F98FDC3}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>CSUtil</RootNamespace>
+    <AssemblyName>CSUtil</AssemblyName>
+    <FileUpgradeFlags>
+    </FileUpgradeFlags>
+    <UpgradeBackupLocation>
+    </UpgradeBackupLocation>
+    <OldToolsVersion>2.0</OldToolsVersion>
+    <ExpressionBlendVersion>4.0.20901.0</ExpressionBlendVersion>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <TargetFrameworkProfile>Client</TargetFrameworkProfile>
+    <PublishUrl>publish\</PublishUrl>
+    <Install>true</Install>
+    <InstallFrom>Disk</InstallFrom>
+    <UpdateEnabled>false</UpdateEnabled>
+    <UpdateMode>Foreground</UpdateMode>
+    <UpdateInterval>7</UpdateInterval>
+    <UpdateIntervalUnits>Days</UpdateIntervalUnits>
+    <UpdatePeriodically>false</UpdatePeriodically>
+    <UpdateRequired>false</UpdateRequired>
+    <MapFileExtensions>true</MapFileExtensions>
+    <ApplicationRevision>0</ApplicationRevision>
+    <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
+    <IsWebBootstrapper>false</IsWebBootstrapper>
+    <UseApplicationTrust>false</UseApplicationTrust>
+    <BootstrapperEnabled>true</BootstrapperEnabled>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug40|AnyCPU'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\Debug40\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DocumentationFile>CSUtil.xml</DocumentationFile>
+    <DebugType>full</DebugType>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisIgnoreBuiltInRuleSets>true</CodeAnalysisIgnoreBuiltInRuleSets>
+    <CodeAnalysisIgnoreBuiltInRules>true</CodeAnalysisIgnoreBuiltInRules>
+    <CodeAnalysisFailOnMissingRules>false</CodeAnalysisFailOnMissingRules>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release40|AnyCPU'">
+    <OutputPath>bin\Release40\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <DocumentationFile>CSUtil.xml</DocumentationFile>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisIgnoreBuiltInRuleSets>true</CodeAnalysisIgnoreBuiltInRuleSets>
+    <CodeAnalysisIgnoreBuiltInRules>true</CodeAnalysisIgnoreBuiltInRules>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Microsoft.VisualBasic" />
+    <Reference Include="System" />
+    <Reference Include="System.configuration" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Management" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Bool2DimCollection.cs" />
+    <Compile Include="Collections\Deque.cs" />
+    <Compile Include="Collections\Generic\Deque.cs" />
+    <Compile Include="Collections\Generic\GenericDeque.IQueue.cs" />
+    <Compile Include="Collections\Generic\IQueue.cs" />
+    <Compile Include="Collections\Generic\SyncQueue.cs" />
+    <Compile Include="Configuration\AppConfigUtil.cs" />
+    <Compile Include="ArrayUtil.cs" />
+    <Compile Include="BCDConverter.cs" />
+    <Compile Include="BigEndianBitConverter.cs" />
+    <Compile Include="Configuration\IniFile.cs" />
+    <Compile Include="DateTimeUtil.cs" />
+    <Compile Include="Forms\CheckCopyKey.cs" />
+    <Compile Include="Forms\FormUtil.cs" />
+    <Compile Include="Forms\ILoggingForm.cs" />
+    <Compile Include="Forms\ILogItem.cs" />
+    <Compile Include="Forms\LogItem.cs" />
+    <Compile Include="Forms\LogItemCollection.cs" />
+    <Compile Include="IO\BigEndianWriter.cs" />
+    <Compile Include="BoolCollection.cs" />
+    <Compile Include="IO\MailSlotBase.cs" />
+    <Compile Include="IO\MailSlotReader.cs" />
+    <Compile Include="IO\Pushd.cs" />
+    <Compile Include="IO\UnmanagedTempFile.cs" />
+    <Compile Include="Management\QueryUtil.cs" />
+    <Compile Include="Profile\EventProfiler.cs" />
+    <Compile Include="Profile\CallMonitor.cs" />
+    <Compile Include="Profile\ProfileUtil.cs" />
+    <Compile Include="Profile\StopwatchEx.cs" />
+    <Compile Include="Random\CompatilizedRandom.cs" />
+    <Compile Include="Random\LCG.cs" />
+    <Compile Include="Random\MersenneTwister.cs" />
+    <Compile Include="Random\MotherOfAll.cs" />
+    <Compile Include="Random\RandomBase.cs" />
+    <Compile Include="Random\RanrotB.cs" />
+    <Compile Include="Random\SFMT.cs" />
+    <Compile Include="Random\Well.cs" />
+    <Compile Include="Random\Xorshift.cs" />
+    <Compile Include="Range.cs" />
+    <Compile Include="Reflection\AssemblyUtil.cs" />
+    <Compile Include="Reflection\AssemblyUtil40.cs" />
+    <Compile Include="StringItem.cs" />
+    <Compile Include="Text\Diff.cs" />
+    <Compile Include="Threading\ClockSyncTimer.cs" />
+    <Compile Include="Security\Cryptography\CRC16.cs" />
+    <Compile Include="CsvUtil.cs" />
+    <Compile Include="DisposableObject.cs" />
+    <Compile Include="Threading\EventQueueThread.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="ReentryLock.cs" />
+    <Compile Include="Management\Shutdown.cs" />
+    <Compile Include="Collections\Generic\SyncWaitQueue.cs" />
+    <Compile Include="Threading\AsyncUtil.cs" />
+    <Compile Include="Threading\WaitedThreadStartRunner.cs" />
+    <Compile Include="Tuple.cs" />
+    <Compile Include="ValueUtil.cs" />
+    <Compile Include="WeakReference.cs" />
+    <Compile Include="WeakValue.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Service Include="{967B4E0D-AD0C-4609-AB67-0FA40C0206D8}" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Collections\Generic\GenericDeque.Enumerator.cs" />
+    <Compile Include="Collections\Generic\GenericDeque.Node.cs" />
+    <Compile Include="Collections\Generic\GenericDeque.Synchronized.cs" />
+    <Compile Include="Collections\Generic\KVUtil.cs" />
+    <Compile Include="ObjectUtil.cs" />
+    <Compile Include="Threading\ReentryCounter.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <BootstrapperPackage Include="Microsoft.Net.Client.3.5">
+      <Visible>False</Visible>
+      <ProductName>.NET Framework 3.5 SP1 Client Profile</ProductName>
+      <Install>false</Install>
+    </BootstrapperPackage>
+    <BootstrapperPackage Include="Microsoft.Net.Framework.3.5.SP1">
+      <Visible>False</Visible>
+      <ProductName>.NET Framework 3.5 SP1</ProductName>
+      <Install>true</Install>
+    </BootstrapperPackage>
+    <BootstrapperPackage Include="Microsoft.Windows.Installer.3.1">
+      <Visible>False</Visible>
+      <ProductName>Windows インストーラー 3.1</ProductName>
+      <Install>true</Install>
+    </BootstrapperPackage>
+  </ItemGroup>
+  <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>
