@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>8.0.50727</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{1E968B9F-A9A1-4477-B92F-AAFA683CC233}</ProjectGuid>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>src-csharp-native</AssemblyName>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug</OutputPath>
+    <DefineConstants>DEBUG</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>none</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Release</OutputPath>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Main.cs" />
+    <Compile Include="AssemblyInfo.cs" />
+    <Compile Include="NeoDatis\Odb\Core\Server\Layers\Layer3\Engine\ServerAdmin.cs" />
+    <Compile Include="NeoDatis\Odb\Impl\Core\Layers\Layer3\Engine\DefaultByteArrayConverter.cs" />
+    <Compile Include="NeoDatis\Odb\Impl\Core\Layers\Layer3\Engine\MessageStreamer.cs" />
+    <Compile Include="NeoDatis\Tool\Wrappers\ClassLoader.cs" />
+    <Compile Include="NeoDatis\Tool\Wrappers\ConstantWrapper.cs" />
+    <Compile Include="NeoDatis\Tool\Wrappers\OdbDateFormat.cs" />
+    <Compile Include="NeoDatis\Tool\Wrappers\OdbRunnable.cs" />
+    <Compile Include="NeoDatis\Tool\Wrappers\OdbThread.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="NeoDatis\Odb\Core\Layers\Layer3\Engine\FileSystemInterface.old" />
+    <None Include="NeoDatis\Odb\Core\Layers\Layer3\Engine\IFileSystemInterface.old" />
+    <None Include="NeoDatis\Tool\.DS_Store" />
+  </ItemGroup>
+  <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
+</Project>

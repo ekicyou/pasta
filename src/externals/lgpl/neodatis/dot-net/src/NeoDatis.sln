@@ -1,0 +1,26 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 10.00
+# Visual Studio 2008
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NeoDatis", "src\NeoDatis.csproj", "{4B6993D5-995D-4AAA-BBCE-423D1B5451F6}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Test", "test\Test.csproj", "{3D8C4A93-468D-4CB6-9359-B5DEE09C4ABC}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{4B6993D5-995D-4AAA-BBCE-423D1B5451F6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4B6993D5-995D-4AAA-BBCE-423D1B5451F6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4B6993D5-995D-4AAA-BBCE-423D1B5451F6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4B6993D5-995D-4AAA-BBCE-423D1B5451F6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3D8C4A93-468D-4CB6-9359-B5DEE09C4ABC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3D8C4A93-468D-4CB6-9359-B5DEE09C4ABC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3D8C4A93-468D-4CB6-9359-B5DEE09C4ABC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3D8C4A93-468D-4CB6-9359-B5DEE09C4ABC}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

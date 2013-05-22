@@ -1,0 +1,301 @@
+using NUnit.Framework;
+using NeoDatis.Odb.Test.VO.Login;
+using NeoDatis.Odb.Core.Query.NQ;
+namespace NeoDatis.Odb.Test.Query.NQ
+{
+	[TestFixture]
+    public class TestNQQuery2 : NeoDatis.Odb.Test.ODBTest
+	{
+		public static int NbObjects = 10;
+
+		/// <exception cref="System.Exception"></exception>
+		public override void SetUp()
+		{
+			base.SetUp();
+			DeleteBase("get.neodatis");
+			// println("TestNQQuery.setUp");
+			NeoDatis.Odb.ODB odb = Open("get.neodatis");
+			for (int i = 0; i < NbObjects; i++)
+			{
+				odb.Store(new NeoDatis.Odb.Test.VO.Login.Function("function " + i));
+				odb.Store(new NeoDatis.Odb.Test.VO.Login.User("olivier " + i, "olivier@neodatis.org "
+					 + "1", new NeoDatis.Odb.Test.VO.Login.Profile("profile " + i, new NeoDatis.Odb.Test.VO.Login.Function
+					("inner function " + i))));
+				odb.Store(new NeoDatis.Odb.Test.VO.Login.User("olivier " + i, "olivier@neodatis.org "
+					 + "2", new NeoDatis.Odb.Test.VO.Login.Profile("profile " + i, new NeoDatis.Odb.Test.VO.Login.Function
+					("inner function " + i))));
+				odb.Store(new NeoDatis.Odb.Test.VO.Login.User("olivier " + i, "olivier@neodatis.org "
+					 + "3", new NeoDatis.Odb.Test.VO.Login.Profile("profile " + i, new NeoDatis.Odb.Test.VO.Login.Function
+					("inner function " + i))));
+			}
+			odb.Close();
+		}
+
+		// println("NbFunctions " + odb.count(Function.class));
+		// println("NbUsers " + odb.count(User.class));
+		/// <exception cref="System.Exception"></exception>
+		[Test]
+        public virtual void Test1()
+		{
+			if (!isLocal)
+			{
+				return;
+			}
+			NeoDatis.Odb.ODB odb = Open("get.neodatis");
+			odb.GetObjects<Function>(true);
+			odb.Close();
+			odb = Open("get.neodatis");
+			// println("TestNQQuery.test1:"+odb.getObjects (Function.class,true));
+			NeoDatis.Odb.Objects<Function> l = odb.GetObjects<Function>(new _SimpleNativeQuery_70());
+			odb.Close();
+			AssertFalse(l.Count==0);
+			AssertEquals(NbObjects * 4, l.Count);
+		}
+
+		private sealed class _SimpleNativeQuery_70 : SimpleNativeQuery
+		{
+			public _SimpleNativeQuery_70()
+			{
+			}
+
+			public bool Match(NeoDatis.Odb.Test.VO.Login.Function function)
+			{
+				return true;
+			}
+		}
+
+		/// <exception cref="System.Exception"></exception>
+		[Test]
+        public virtual void Test2()
+		{
+			if (!isLocal)
+			{
+				return;
+			}
+			NeoDatis.Odb.ODB odb = Open("get.neodatis");
+			// println("++++TestNQQuery.test2:"+odb.getObjects
+			// (Function.class,true));
+			NeoDatis.Odb.Objects<Function> l = odb.GetObjects<Function>(new _SimpleNativeQuery_89());
+			odb.Close();
+			AssertFalse(l.Count==0);
+			AssertEquals(1, l.Count);
+		}
+
+		private sealed class _SimpleNativeQuery_89 : SimpleNativeQuery
+		{
+			public bool Match(NeoDatis.Odb.Test.VO.Login.Function function)
+			{
+				return function.GetName().Equals("function 5");
+			}
+		}
+
+		/// <exception cref="System.Exception"></exception>
+		[Test]
+        public virtual void Test3()
+		{
+			if (!isLocal)
+			{
+				return;
+			}
+			NeoDatis.Odb.ODB odb = Open("get.neodatis");
+			NeoDatis.Odb.Objects<User> l = odb.GetObjects<User>(new _SimpleNativeQuery_105());
+			odb.Close();
+			AssertFalse(l.Count==0);
+			AssertEquals(3, l.Count);
+		}
+
+		private sealed class _SimpleNativeQuery_105 : SimpleNativeQuery
+		{
+			public bool Match(NeoDatis.Odb.Test.VO.Login.User user)
+			{
+				return user.GetProfile().GetName().Equals("profile 5");
+			}
+		}
+
+		/// <exception cref="System.Exception"></exception>
+		[Test]
+        public virtual void Test4()
+		{
+			if (!isLocal)
+			{
+				return;
+			}
+			NeoDatis.Odb.ODB odb = Open("get.neodatis");
+			SimpleNativeQuery query = new _SimpleNativeQuery_121();
+			NeoDatis.Odb.Objects<User> l = odb.GetObjects<User>(query, true, 0, 5);
+			odb.Close();
+			AssertFalse(l.Count==0);
+			AssertEquals(5, l.Count);
+		}
+
+		private sealed class _SimpleNativeQuery_121 : SimpleNativeQuery
+		{
+			public bool Match(NeoDatis.Odb.Test.VO.Login.User user)
+			{
+				return user.GetProfile().GetName().StartsWith("profile");
+			}
+		}
+
+		/// <exception cref="System.Exception"></exception>
+		[Test]
+        public virtual void Test5()
+		{
+			if (!isLocal)
+			{
+				return;
+			}
+			NeoDatis.Odb.ODB odb = Open("get.neodatis");
+			SimpleNativeQuery query = new _SimpleNativeQuery_139();
+			NeoDatis.Odb.Objects<User> l = odb.GetObjects<User>(query, true, 5, 6);
+			odb.Close();
+			AssertFalse(l.Count==0);
+			AssertEquals(1, l.Count);
+		}
+
+		private sealed class _SimpleNativeQuery_139 : SimpleNativeQuery
+		{
+			public bool Match(NeoDatis.Odb.Test.VO.Login.User user)
+			{
+				return user.GetProfile().GetName().StartsWith("profile");
+			}
+		}
+
+		/// <exception cref="System.Exception"></exception>
+		[Test]
+        public virtual void Test6Ordering()
+		{
+			if (!isLocal)
+			{
+				return;
+			}
+			NeoDatis.Odb.ODB odb = Open("get.neodatis");
+			SimpleNativeQuery query = new _SimpleNativeQuery_158();
+			query.OrderByAsc("name");
+			NeoDatis.Odb.Objects<User> l = odb.GetObjects<User>(query, true);
+			int i = 0;
+            AssertFalse(l.Count == 0);
+			while (l.HasNext())
+			{
+				NeoDatis.Odb.Test.VO.Login.User user = (NeoDatis.Odb.Test.VO.Login.User)l.Next();
+				AssertEquals("olivier " + i, user.GetName());
+				// println(user.getName());
+				i++;
+			}
+			odb.Close();
+		}
+
+		private sealed class _SimpleNativeQuery_158 : SimpleNativeQuery
+		{
+			public bool Match(NeoDatis.Odb.Test.VO.Login.User user)
+			{
+				return user.GetProfile().GetName().StartsWith("profile") && user.GetEmail().StartsWith
+					("olivier@neodatis.org 1");
+			}
+		}
+
+		/// <exception cref="System.Exception"></exception>
+		[Test]
+        public virtual void Test7Ordering()
+		{
+			if (!isLocal)
+			{
+				return;
+			}
+			NeoDatis.Odb.ODB odb = Open("get.neodatis");
+			SimpleNativeQuery query = new _SimpleNativeQuery_183();
+			query.OrderByDesc("name");
+			NeoDatis.Odb.Objects<User> l = odb.GetObjects<User>(query, true);
+			int i = l.Count - 1;
+            AssertFalse(l.Count == 0);
+			while (l.HasNext())
+			{
+				NeoDatis.Odb.Test.VO.Login.User user = (NeoDatis.Odb.Test.VO.Login.User)l.Next();
+				AssertEquals("olivier " + i, user.GetName());
+				// println(user.getName());
+				i--;
+			}
+			odb.Close();
+		}
+
+		private sealed class _SimpleNativeQuery_183 : SimpleNativeQuery
+		{
+			public bool Match(NeoDatis.Odb.Test.VO.Login.User user)
+			{
+				return user.GetProfile().GetName().StartsWith("profile") && user.GetEmail().StartsWith
+					("olivier@neodatis.org 2");
+			}
+		}
+
+		/// <exception cref="System.Exception"></exception>
+		[Test]
+        public virtual void Test8Ordering()
+		{
+			if (!isLocal)
+			{
+				return;
+			}
+			NeoDatis.Odb.ODB odb = Open("get.neodatis");
+			SimpleNativeQuery query = new _SimpleNativeQuery_208();
+			query.OrderByAsc("name,email");
+			NeoDatis.Odb.Objects<User> l = odb.GetObjects<User>(query, true);
+			int i = 0;
+            AssertFalse(l.Count == 0);
+			while (l.HasNext())
+			{
+				NeoDatis.Odb.Test.VO.Login.User user = (NeoDatis.Odb.Test.VO.Login.User)l.Next();
+				// println(user.getName() + " / " + user.getEmail());
+				AssertEquals("olivier " + i / 3, user.GetName());
+				AssertEquals("olivier@neodatis.org " + ((i % 3) + 1), user.GetEmail());
+				i++;
+			}
+			odb.Close();
+		}
+
+		private sealed class _SimpleNativeQuery_208 : SimpleNativeQuery
+		{
+			public bool Match(NeoDatis.Odb.Test.VO.Login.User user)
+			{
+				return user.GetProfile().GetName().StartsWith("profile");
+			}
+		}
+
+		/// <exception cref="System.Exception"></exception>
+		[Test]
+        public virtual void Test9Ordering()
+		{
+			if (!isLocal)
+			{
+				return;
+			}
+			NeoDatis.Odb.ODB odb = Open("get.neodatis");
+			SimpleNativeQuery query = new _SimpleNativeQuery_235();
+			query.OrderByDesc("name,email");
+			NeoDatis.Odb.Objects<User> l = odb.GetObjects<User>(query, true);
+			int i = l.Count - 1;
+            AssertFalse(l.Count == 0);
+			while (l.HasNext())
+			{
+				NeoDatis.Odb.Test.VO.Login.User user = (NeoDatis.Odb.Test.VO.Login.User)l.Next();
+				// println(user.getName() + " / " + user.getEmail());
+				AssertEquals("olivier " + i / 3, user.GetName());
+				AssertEquals("olivier@neodatis.org " + ((i % 3) + 1), user.GetEmail());
+				i--;
+			}
+			odb.Close();
+		}
+
+		private sealed class _SimpleNativeQuery_235 : SimpleNativeQuery
+		{
+			public bool Match(NeoDatis.Odb.Test.VO.Login.User user)
+			{
+				return user.GetProfile().GetName().StartsWith("profile");
+			}
+		}
+
+		/// <exception cref="System.Exception"></exception>
+		public override void TearDown()
+		{
+			DeleteBase("get.neodatis");
+		}
+	}
+}
