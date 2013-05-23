@@ -32,31 +32,43 @@ namespace Pasta.Logging
         /// <summary>FileIOオブジェクト。</summary>
         private IFileIO FileIO { get; set; }
 
-        /// <summary>現在保存対象になっているログストリーム。</summary>
-        private Stream SaveStream { get; set; }
-
-
         #endregion
         #region 初期化・開放
 
         /// <summary>
         /// コンストラクタ。
         /// </summary>
+        public PastaStore()
+        {
+        }
+
+        /// <summary>
+        /// 初期化処理。
+        /// </summary>
         /// <param name="token"></param>
-        public PastaStore(CancellationToken token, IFileIO io)
+        /// <param name="io"></param>
+        /// <returns></returns>
+        public void Init(CancellationToken token, IFileIO io)
         {
             token.Register(Dispose);
+            FileIO = io;
 
             var opt = new DataflowBlockOptions
             {
                 CancellationToken = token,
             };
-
             var buffer = new BufferBlock<PastaLog>(opt);
-            var act = new ActionBlock<PastaLog>(Save, opt);
+
+            var actOpt = new ExecutionDataflowBlockOptions()
+            {
+                CancellationToken = token,
+                SingleProducerConstrained = true,
+            };
+            var act = new ActionBlock<PastaLog>(async (a) => await Save(a), actOpt);
             buffer.LinkTo(act);
             Input = buffer;
         }
+
 
 
         #endregion
@@ -64,20 +76,67 @@ namespace Pasta.Logging
 
         public void Dispose()
         {
-            if (SaveStream != null)
-            {
-                SaveStream.Dispose();
-                SaveStream = null;
-            }
+            CloseSaveStream();
         }
 
 
         #endregion
-        #region メソッド
+        #region メソッド：保存関係
 
-        private async void Save(PastaLog log)
+        private async Task Save(PastaLog item)
         {
+            var st = await GetSaveStream(item.UTC);
+            Serializer.SerializeWithLengthPrefix<PastaLog>(st, item, PrefixStyle.Base128);
         }
+
+
+        /// <summary>現在保存対象になっているログストリーム。</summary>
+        private Stream SaveStream { get; set; }
+
+        /// <summary>現在保存対象になっているログストリームの保存日付。</summary>
+        private DateTime SaveDay { get; set; }
+
+
+        private async Task<Stream> GetSaveStream(DateTime time)
+        {
+            // 日付不一致ならクローズ
+            var day = time.Date;
+            if (SaveDay != day)
+            {
+                CloseSaveStream();
+                SaveDay = day;
+            }
+
+            // クローズされているなら開く
+            if (SaveStream == null)
+            {
+                var path = GetSavePath();
+                SaveStream = await FileIO.OpenWrite(path);
+            }
+
+            return SaveStream;
+        }
+
+        private string GetSavePath()
+        {
+            var dir = "";
+            var t1 = SaveDay.ToString("yyyy-MM");
+            var t2 = SaveDay.ToString("-dd");
+            var path = Path.Combine(dir, t1, t1 + t2 + ".log");
+            return path;
+        }
+
+
+        private void CloseSaveStream()
+        {
+            if (SaveStream == null) return;
+            SaveStream.Close();
+            SaveStream = null;
+        }
+
+
+
+
 
 
 

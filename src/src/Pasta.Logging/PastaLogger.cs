@@ -38,8 +38,15 @@ namespace Pasta.Logging
         /// <summary>
         /// コンストラクタ。
         /// </summary>
+        public PastaLogger()
+        {
+        }
+
+        /// <summary>
+        /// 初期化処理。
+        /// </summary>
         /// <param name="token"></param>
-        public PastaLogger(CancellationToken token)
+        public void Init(CancellationToken token)
         {
             var opt = new DataflowBlockOptions
             {
@@ -51,6 +58,7 @@ namespace Pasta.Logging
             Input = buffer;
             Output = bloadcast;
         }
+
         #endregion
         #region メソッド
 
