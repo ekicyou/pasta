@@ -7,9 +7,13 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pasta.Model.Test.net45", "n
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pasta.Logging.net45", "net45\Pasta.Logging\Pasta.Logging.net45.csproj", "{399105E5-C7A1-477B-9582-4ED142C5D980}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Community.CsharpSqlite.11", "externals\mit\csharp-sqlite\Community.CsharpSqlite\Community.CsharpSqlite.11.csproj", "{F1653F20-D47D-4F29-8C55-3C835542AF5F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Community.CsharpSqlite.net45", "externals\mit\csharp-sqlite\Community.CsharpSqlite\Community.CsharpSqlite.net45.csproj", "{F1653F20-D47D-4F29-8C55-3C835542AF5F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Community.CsharpSqlite.SQLiteClient.11", "externals\mit\csharp-sqlite\Community.CsharpSqlite.SQLiteClient\Community.CsharpSqlite.SQLiteClient.11.csproj", "{7BC68E61-C64C-488C-975F-1E2248383B80}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Community.CsharpSqlite.SQLiteClient.net45", "externals\mit\csharp-sqlite\Community.CsharpSqlite.SQLiteClient\Community.CsharpSqlite.SQLiteClient.net45.csproj", "{7BC68E61-C64C-488C-975F-1E2248383B80}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pasta.TinyClient.net45", "net45\Pasta.TinyClient\Pasta.TinyClient.net45.csproj", "{0F1FBF28-8C7D-49BC-8061-32D47ABED968}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mnow.Windows.Library.JapaneseTextBlock.net45", "net45\Mnow.Windows.Library.JapaneseTextBlock\Mnow.Windows.Library.JapaneseTextBlock.net45.csproj", "{B329E75F-6362-403C-BB48-69B5731E6B05}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -53,6 +57,18 @@ Global
 		{7BC68E61-C64C-488C-975F-1E2248383B80}.Release|Any CPU.Build.0 = Release|Any CPU
 		{7BC68E61-C64C-488C-975F-1E2248383B80}.Release|x86.ActiveCfg = Release|x86
 		{7BC68E61-C64C-488C-975F-1E2248383B80}.Release|x86.Build.0 = Release|x86
+		{0F1FBF28-8C7D-49BC-8061-32D47ABED968}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0F1FBF28-8C7D-49BC-8061-32D47ABED968}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0F1FBF28-8C7D-49BC-8061-32D47ABED968}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{0F1FBF28-8C7D-49BC-8061-32D47ABED968}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0F1FBF28-8C7D-49BC-8061-32D47ABED968}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0F1FBF28-8C7D-49BC-8061-32D47ABED968}.Release|x86.ActiveCfg = Release|Any CPU
+		{B329E75F-6362-403C-BB48-69B5731E6B05}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B329E75F-6362-403C-BB48-69B5731E6B05}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B329E75F-6362-403C-BB48-69B5731E6B05}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{B329E75F-6362-403C-BB48-69B5731E6B05}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B329E75F-6362-403C-BB48-69B5731E6B05}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B329E75F-6362-403C-BB48-69B5731E6B05}.Release|x86.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -146,9 +146,9 @@
     </BootstrapperPackage>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Community.CsharpSqlite\Community.CsharpSqlite.11.csproj">
+    <ProjectReference Include="..\Community.CsharpSqlite\Community.CsharpSqlite.net45.csproj">
       <Project>{F1653F20-D47D-4F29-8C55-3C835542AF5F}</Project>
-      <Name>Community.CsharpSqlite.11</Name>
+      <Name>Community.CsharpSqlite.net45</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
