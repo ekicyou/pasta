@@ -20,9 +20,22 @@ namespace Pasta.TinyClient
     /// </summary>
     public partial class MainWindow : Window
     {
+        private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
+
+
         public MainWindow()
         {
             InitializeComponent();
+        }
+
+        private void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            DataContext = App.Core;
+        }
+
+        private void Window_Closed(object sender, EventArgs e)
+        {
+            logger.Trace("Window_Closed");
         }
     }
 }

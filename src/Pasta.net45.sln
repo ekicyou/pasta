@@ -15,6 +15,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pasta.TinyClient.net45", "n
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Mnow.Windows.Library.JapaneseTextBlock.net45", "net45\Mnow.Windows.Library.JapaneseTextBlock\Mnow.Windows.Library.JapaneseTextBlock.net45.csproj", "{B329E75F-6362-403C-BB48-69B5731E6B05}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pasta.Core.net45", "net45\Pasta.Core\Pasta.Core.net45.csproj", "{BE87A6BC-AD0E-4BC8-95DF-FC2A485F23C5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -69,6 +71,12 @@ Global
 		{B329E75F-6362-403C-BB48-69B5731E6B05}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B329E75F-6362-403C-BB48-69B5731E6B05}.Release|Any CPU.Build.0 = Release|Any CPU
 		{B329E75F-6362-403C-BB48-69B5731E6B05}.Release|x86.ActiveCfg = Release|Any CPU
+		{BE87A6BC-AD0E-4BC8-95DF-FC2A485F23C5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BE87A6BC-AD0E-4BC8-95DF-FC2A485F23C5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BE87A6BC-AD0E-4BC8-95DF-FC2A485F23C5}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{BE87A6BC-AD0E-4BC8-95DF-FC2A485F23C5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BE87A6BC-AD0E-4BC8-95DF-FC2A485F23C5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BE87A6BC-AD0E-4BC8-95DF-FC2A485F23C5}.Release|x86.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -39,6 +39,10 @@
     <Reference Include="Hardcodet.Wpf.TaskbarNotification">
       <HintPath>..\..\packages\Hardcodet.Wpf.TaskbarNotification.1.0.4.0\lib\net40\Hardcodet.Wpf.TaskbarNotification.dll</HintPath>
     </Reference>
+    <Reference Include="NLog, Version=2.0.1.0, Culture=neutral, PublicKeyToken=5120e14c03d0593c, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\packages\NLog.2.0.1.2\lib\net45\NLog.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
@@ -89,6 +93,9 @@
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
     </EmbeddedResource>
+    <Content Include="NLog.config">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <None Include="packages.config" />
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
@@ -100,6 +107,10 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Pasta.Core\Pasta.Core.net45.csproj">
+      <Project>{be87a6bc-ad0e-4bc8-95df-fc2a485f23c5}</Project>
+      <Name>Pasta.Core.net45</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Pasta.Logging\Pasta.Logging.net45.csproj">
       <Project>{399105e5-c7a1-477b-9582-4ed142c5d980}</Project>
       <Name>Pasta.Logging.net45</Name>

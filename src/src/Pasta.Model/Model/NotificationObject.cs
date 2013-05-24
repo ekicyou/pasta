@@ -10,8 +10,6 @@ namespace Pasta.Model
 {
     public abstract class NotificationObject : INotifyPropertyChanged
     {
-        protected NotificationObject() { }
-
         public event PropertyChangedEventHandler PropertyChanged;
         internal void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
