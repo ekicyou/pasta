@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Composition;
 using System.Composition.Hosting;
 using Pasta.Model;
+using Pasta.API;
 
 namespace Pasta
 {
@@ -42,10 +43,34 @@ namespace Pasta
 
             // モジュールのロード
 
+            var configuration = new ContainerConfiguration()
+                .WithAssembly(this.GetType().Assembly);
+
+
+            var catalog = new AggregateCatalog();
+            catalog.Catalogs.Add(new AssemblyCatalog(typeof(Program).Assembly));
+
+            //Create the CompositionContainer with the parts in the catalog
+            _container = new CompositionContainer(catalog);
+
+            //Fill the imports of this object
+            try
+            {
+                this._container.ComposeParts(this);
+            }
+            catch (CompositionException compositionException)
+            {
+                Console.WriteLine(compositionException.ToString());
+            }
 
 
             logger.Trace("Init End");
         }
+
+
+        [Import("PastaLogger")]
+        public IPastaLogger PastaLogger { get; set; }
+
 
     }
 }
