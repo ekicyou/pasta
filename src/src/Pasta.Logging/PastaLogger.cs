@@ -38,6 +38,7 @@ namespace Pasta.Logging
         /// <summary>
         /// コンストラクタ。
         /// </summary>
+        [ImportingConstructor]
         public PastaLogger()
         {
         }

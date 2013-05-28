@@ -11,60 +11,34 @@ using Pasta.API;
 
 namespace Pasta
 {
-    public class AppCore : NotificationObject, IDisposable
+    [Export]
+    public class AppCore : NotificationObject
     {
         private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
 
-
-        private CancellationTokenSource CTS { get; set; }
-
-        public void Dispose()
-        {
-            logger.Trace("Dispose Start");
-            CTS.Cancel();
-            CTS.Dispose();
-            logger.Trace("Dispose End");
-            logger.Trace("AppCore End");
-        }
-
-
+        [ImportingConstructor]
         public AppCore()
         {
-            Thread.CurrentThread.Name = "UI";
-            logger.Trace("AppCore Start");
-            CTS = new CancellationTokenSource();
-            var fact = new TaskFactory(CTS.Token);
-            fact.StartNew(Init);
+            logger.Trace("AppCore Load");
         }
 
-        private void Init()
+        /// <summary>
+        /// 遅延初期化処理。
+        /// </summary>
+        /// <param name="token"></param>
+        public void Init(CancellationToken token)
         {
-            logger.Trace("Init Start");
-
-            // モジュールのロード
-
-            var configuration = new ContainerConfiguration()
-                .WithAssembly(this.GetType().Assembly);
-
-
-            var catalog = new AggregateCatalog();
-            catalog.Catalogs.Add(new AssemblyCatalog(typeof(Program).Assembly));
-
-            //Create the CompositionContainer with the parts in the catalog
-            _container = new CompositionContainer(catalog);
-
-            //Fill the imports of this object
             try
             {
-                this._container.ComposeParts(this);
+                logger.Trace("Init Start");
+                PastaLogger.Init(token);
+                logger.Trace("Init Start");
             }
-            catch (CompositionException compositionException)
+            catch (Exception ex)
             {
-                Console.WriteLine(compositionException.ToString());
+                logger.Error(ex);
             }
-
-
-            logger.Trace("Init End");
+                
         }
 
 

@@ -16,17 +16,17 @@ namespace Pasta.TinyClient
     {
         private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
 
-        public static AppCore Core { get; private set; }
+        public static AppLoader Loader { get; private set; }
 
 
         private void Application_Startup(object sender, StartupEventArgs e)
         {
-            Core = new AppCore();
+            Loader = new AppLoader();
             this.Exit += (s, args) =>
             {
                 logger.Trace("Exit Start");
-                Core.Dispose();
-                Core = null;
+                Loader.Dispose();
+                Loader = null;
                 logger.Trace("Exit End");
             };
         }

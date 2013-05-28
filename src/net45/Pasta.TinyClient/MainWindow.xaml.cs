@@ -30,7 +30,7 @@ namespace Pasta.TinyClient
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            DataContext = App.Core;
+            DataContext = App.Loader;
         }
 
         private void Window_Closed(object sender, EventArgs e)
