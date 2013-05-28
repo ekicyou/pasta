@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Threading.Tasks.Dataflow;
 using System.Composition;
 using System.Composition.Hosting;
 using Pasta.Model;
@@ -32,9 +33,9 @@ namespace Pasta
             {
                 logger.Trace("Init Start");
 
-
-                PastaStore.Init(token, FileIO);
+                PastaStore.Init(token);
                 PastaLogger.Init(token);
+                PastaStore.Input.LinkTo(PastaLogger.Output);
 
                 logger.Trace("Init Start");
             }

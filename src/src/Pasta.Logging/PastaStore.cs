@@ -29,8 +29,9 @@ namespace Pasta.Logging
         /// <summary>受信ターゲットを接続します。</summary>
         public ISourceBlock<PastaLog> Input { get; private set; }
 
-        /// <summary>FileIOオブジェクト。</summary>
-        private IFileIO FileIO { get; set; }
+        /// <summary>File IO オブジェクト。</summary>
+        [Import]
+        public IFileIO FileIO { get; set; }
 
         #endregion
         #region 初期化・開放
@@ -46,12 +47,10 @@ namespace Pasta.Logging
         /// 初期化処理。
         /// </summary>
         /// <param name="token"></param>
-        /// <param name="io"></param>
         /// <returns></returns>
-        public void Init(CancellationToken token, IFileIO io)
+        public void Init(CancellationToken token)
         {
             token.Register(Dispose);
-            FileIO = io;
 
             var opt = new DataflowBlockOptions
             {

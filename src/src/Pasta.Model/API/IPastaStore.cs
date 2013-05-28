@@ -22,7 +22,7 @@ namespace Pasta.API
         /// <param name="token"></param>
         /// <param name="io"></param>
         /// <returns></returns>
-        void Init(CancellationToken token, IFileIO io);
+        void Init(CancellationToken token);
 
         /// <summary>受信ターゲットを接続します。</summary>
         ISourceBlock<PastaLog> Input { get; }
