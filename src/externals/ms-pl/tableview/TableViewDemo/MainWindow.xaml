@@ -1,0 +1,61 @@
+﻿<Window x:Class="TableViewDemo.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:src="clr-namespace:TableViewDemo"
+        xmlns:tv="clr-namespace:TableView;assembly=TableView"
+        Title="MainWindow"
+        Height="800"
+        Width="1024">
+    <Window.Resources>
+
+        <!-- style used to alter the Field background color depending on the value of the State property -->
+        <Style x:Key="fieldStyle"
+           TargetType="{x:Type TextBlock}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding State}"
+                     Value="1">
+                    <Setter Property="Background"
+                      Value="LightGreen" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding State}"
+                     Value="2">
+                    <Setter Property="Background"
+                      Value="LightBlue" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+
+        <!-- Data Template used to display the Field data in the TableView cells -->
+        <DataTemplate DataType="{x:Type src:Field}">
+            <TextBlock Text="{Binding FieldValue}"
+                 Style="{StaticResource fieldStyle}">
+            </TextBlock>
+        </DataTemplate>
+
+    </Window.Resources>
+    
+
+    <Border Margin="10">
+
+        <!-- TableView with 2 xaml defined columns. Additional columns added in code behind 
+        Uses row selection, shows both horisontal and vertical grid lines using a dark gray brush.
+        First 2 columns are fixed and wont scroll sideways.-->
+        <tv:TableView x:Name="tableView"
+                  CellNavigation="False"
+                  ShowHorizontalGridLines="True"
+                  ShowVerticalGridLines="True"
+                  GridLinesBrush="DarkGray"
+                  ItemsSource="{Binding MyRows}"
+                  FixedColumnCount="2">
+            <tv:TableView.Columns>
+                <tv:TableViewColumn Title="AAA" 
+                                    ContextBindingPath="AAA" />
+                <tv:TableViewColumn Title="BBB" 
+                                    HorizontalContentAlignment="Center"
+                                    ContextBindingPath="BBB" />
+            </tv:TableView.Columns>
+        </tv:TableView>
+        
+    </Border>
+</Window>
