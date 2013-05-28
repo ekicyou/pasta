@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Composition;
@@ -40,22 +41,22 @@ namespace Pasta
             logger.Trace("MEFLoader Load");
             CTS = new CancellationTokenSource();
             var fact = new TaskFactory(CTS.Token);
-            fact.StartNew(() => Init(CTS.Token));
+            var callerAssembly = Assembly.GetCallingAssembly();
+            fact.StartNew(() => Init(CTS.Token, callerAssembly));
         }
 
         /// <summary>
         /// 遅延初期化処理。
         /// </summary>
         /// <param name="token"></param>
-        private void Init(CancellationToken token)
+        private void Init(CancellationToken token,Assembly callerAssembly)
         {
             logger.Trace("Init Start");
             try
             {
                 // MEFの構成
                 var configuration = new ContainerConfiguration()
-                    .WithAssembly(this.GetType().Assembly)
-                    .WithAssembly(typeof(Pasta.Logging.PastaLogger).Assembly)
+                    .WithAssemblies(new[] { this.GetType().Assembly, callerAssembly, typeof(Pasta.Logging.PastaLogger).Assembly })
                     ;
                 var host = configuration.CreateContainer();
                 token.Register(() => host.Dispose());

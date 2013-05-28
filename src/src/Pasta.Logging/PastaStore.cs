@@ -64,7 +64,7 @@ namespace Pasta.Logging
                 CancellationToken = token,
                 SingleProducerConstrained = true,
             };
-            var act = new ActionBlock<PastaLog>(async (a) => await Save(a), actOpt);
+            var act = new ActionBlock<PastaLog>((a) => Save(a), actOpt);
             buffer.LinkTo(act);
             Input = buffer;
         }
@@ -83,9 +83,9 @@ namespace Pasta.Logging
         #endregion
         #region メソッド：保存関係
 
-        private async Task Save(PastaLog item)
+        private void Save(PastaLog item)
         {
-            var st = await GetSaveStream(item.UTC);
+            var st = GetSaveStream(item.UTC);
             Serializer.SerializeWithLengthPrefix<PastaLog>(st, item, PrefixStyle.Base128);
         }
 
@@ -97,7 +97,7 @@ namespace Pasta.Logging
         private DateTime SaveDay { get; set; }
 
 
-        private async Task<Stream> GetSaveStream(DateTime time)
+        private Stream GetSaveStream(DateTime time)
         {
             // 日付不一致ならクローズ
             var day = time.Date;
@@ -111,7 +111,7 @@ namespace Pasta.Logging
             if (SaveStream == null)
             {
                 var path = GetSavePath();
-                SaveStream = await FileIO.OpenWrite(path);
+                SaveStream = FileIO.OpenAppend(path);
             }
 
             return SaveStream;

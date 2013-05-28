@@ -31,7 +31,11 @@ namespace Pasta
             try
             {
                 logger.Trace("Init Start");
+
+
+                PastaStore.Init(token, FileIO);
                 PastaLogger.Init(token);
+
                 logger.Trace("Init Start");
             }
             catch (Exception ex)
@@ -41,9 +45,14 @@ namespace Pasta
                 
         }
 
+        [Import]
+        public IFileIO FileIO { get; set; }
 
         [Import("PastaLogger")]
         public IPastaLogger PastaLogger { get; set; }
+
+        [Import("PastaStore")]
+        public IPastaStore PastaStore { get; set; }
 
 
     }
