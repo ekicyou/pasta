@@ -17,7 +17,7 @@ namespace Pasta.Logging
     /// ロガー。
     /// 解析の呼び出し、及びファイルへの保管処理を行う。
     /// </summary>
-    [Export("PastaLogger", typeof(IPastaLogger))]
+    [Export("PastaLogger", typeof(IPastaLogger)), Shared]
     public sealed class PastaLogger : IPastaLogger
     {
         #region プロパティ
@@ -25,10 +25,10 @@ namespace Pasta.Logging
         private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
 
         /// <summary>受信ターゲットを接続します。</summary>
-        public ISourceBlock<PastaLog> Input { get; private set; }
+        public ITargetBlock<PastaLog> Target { get; private set; }
 
         /// <summary>送信ソースを接続します。</summary>
-        public ITargetBlock<PastaLog> Output { get; private set; }
+        public ISourceBlock<PastaLog> Source { get; private set; }
 
 
 
@@ -41,6 +41,7 @@ namespace Pasta.Logging
         [ImportingConstructor]
         public PastaLogger()
         {
+            logger.Trace("Load");
         }
 
         /// <summary>
@@ -49,6 +50,7 @@ namespace Pasta.Logging
         /// <param name="token"></param>
         public void Init(CancellationToken token)
         {
+            logger.Trace("Init Start");
             var opt = new DataflowBlockOptions
             {
                 CancellationToken = token,
@@ -56,8 +58,9 @@ namespace Pasta.Logging
             var buffer = new BufferBlock<PastaLog>(opt);
             var bloadcast = new BroadcastBlock<PastaLog>(CloneLog, opt);
             buffer.LinkTo(bloadcast);
-            Input = buffer;
-            Output = bloadcast;
+            Target = buffer;
+            Source = bloadcast;
+            logger.Trace("Init End");
         }
 
         #endregion

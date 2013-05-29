@@ -28,7 +28,6 @@ namespace Pasta
             CTS.Cancel();
             CTS.Dispose();
             logger.Trace("Dispose End");
-            logger.Trace("AppCore End");
         }
 
 
@@ -38,7 +37,7 @@ namespace Pasta
         public AppLoader()
         {
             Thread.CurrentThread.Name = "UI";
-            logger.Trace("MEFLoader Load");
+            logger.Trace("Load");
             CTS = new CancellationTokenSource();
             var fact = new TaskFactory(CTS.Token);
             var callerAssembly = Assembly.GetCallingAssembly();
@@ -49,14 +48,22 @@ namespace Pasta
         /// 遅延初期化処理。
         /// </summary>
         /// <param name="token"></param>
-        private void Init(CancellationToken token,Assembly callerAssembly)
+        private void Init(CancellationToken token, Assembly callerAssembly)
         {
             logger.Trace("Init Start");
             try
             {
                 // MEFの構成
+                var qAssm = new[] { 
+                    this.GetType().Assembly,
+                    Assembly.GetEntryAssembly(),
+                    callerAssembly, 
+                    typeof(Pasta.Logging.PastaLogger).Assembly,
+                }
+                    .Where(a => a != null)
+                    .Distinct();
                 var configuration = new ContainerConfiguration()
-                    .WithAssemblies(new[] { this.GetType().Assembly, callerAssembly, typeof(Pasta.Logging.PastaLogger).Assembly })
+                    .WithAssemblies(qAssm)
                     ;
                 var host = configuration.CreateContainer();
                 token.Register(() => host.Dispose());

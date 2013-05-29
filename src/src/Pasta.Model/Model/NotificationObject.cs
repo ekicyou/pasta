@@ -1,21 +1,32 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Linq;
+﻿using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Pasta.Model
 {
+    /// <summary>
+    /// 通知オブジェクトの基礎実装。
+    /// </summary>
     public abstract class NotificationObject : INotifyPropertyChanged
     {
+        /// <summary>
+        /// 通知イベント。
+        /// </summary>
         public event PropertyChangedEventHandler PropertyChanged;
-        internal void OnPropertyChanged([CallerMemberName] string propertyName = null)
+
+        /// <summary>
+        /// プロパティ変更を通知します。
+        /// </summary>
+        /// <param name="propertyName"></param>
+        protected void OnPropertyChanged([CallerMemberName]string propertyName = null)
         {
-            var h = this.PropertyChanged;
-            if (h != null) {
-                h(this, new PropertyChangedEventArgs(propertyName));
+            OnPropertyChangedImpl(propertyName);
+        }
+
+        internal void OnPropertyChangedImpl(string propertyName)
+        {
+            if (PropertyChanged != null)
+            {
+                PropertyChanged(this, new PropertyChangedEventArgs(propertyName));
             }
         }
 

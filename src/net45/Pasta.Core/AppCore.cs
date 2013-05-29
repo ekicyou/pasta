@@ -12,7 +12,7 @@ using Pasta.API;
 
 namespace Pasta
 {
-    [Export]
+    [Export, Shared]
     public class AppCore : NotificationObject
     {
         private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
@@ -20,7 +20,7 @@ namespace Pasta
         [ImportingConstructor]
         public AppCore()
         {
-            logger.Trace("AppCore Load");
+            logger.Trace("Load");
         }
 
         /// <summary>
@@ -35,7 +35,7 @@ namespace Pasta
 
                 PastaStore.Init(token);
                 PastaLogger.Init(token);
-                PastaStore.Input.LinkTo(PastaLogger.Output);
+                PastaLogger.Source.LinkTo(PastaStore.Target);
 
                 logger.Trace("Init Start");
             }
@@ -43,7 +43,7 @@ namespace Pasta
             {
                 logger.Error(ex);
             }
-                
+
         }
 
         [Import]

@@ -19,7 +19,7 @@ namespace Pasta.Logging
     /// ロガー。
     /// 解析の呼び出し、及びファイルへの保管処理を行う。
     /// </summary>
-    [Export("PastaStore", typeof(IPastaStore))]
+    [Export("PastaStore", typeof(IPastaStore)), Shared]
     public sealed class PastaStore : IPastaStore, IDisposable
     {
         private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
@@ -27,7 +27,7 @@ namespace Pasta.Logging
         #region プロパティ
 
         /// <summary>受信ターゲットを接続します。</summary>
-        public ISourceBlock<PastaLog> Input { get; private set; }
+        public ITargetBlock<PastaLog> Target { get; private set; }
 
         /// <summary>File IO オブジェクト。</summary>
         [Import]
@@ -41,6 +41,7 @@ namespace Pasta.Logging
         /// </summary>
         public PastaStore()
         {
+            logger.Trace("Load");
         }
 
         /// <summary>
@@ -50,6 +51,7 @@ namespace Pasta.Logging
         /// <returns></returns>
         public void Init(CancellationToken token)
         {
+            logger.Trace("Init Start");
             token.Register(Dispose);
 
             var opt = new DataflowBlockOptions
@@ -65,7 +67,8 @@ namespace Pasta.Logging
             };
             var act = new ActionBlock<PastaLog>((a) => Save(a), actOpt);
             buffer.LinkTo(act);
-            Input = buffer;
+            Target = buffer;
+            logger.Trace("Init End");
         }
 
 

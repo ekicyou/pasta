@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
 namespace Pasta.Model
@@ -16,9 +12,22 @@ namespace Pasta.Model
         /// <summary>値。default(T)で初期化されます。</summary>
         private T store;
 
+        /// <summary>
+        /// コンストラクタ。
+        /// </summary>
+        /// <param name="initValue"></param>
         public NotificationStore(T initValue)
         {
             store = initValue;
+        }
+
+        /// <summary>
+        /// 値の取得。getterで利用してください。
+        /// </summary>
+        /// <returns></returns>
+        public T Get()
+        {
+            return store;
         }
 
         /// <summary>
@@ -28,7 +37,7 @@ namespace Pasta.Model
         /// <returns></returns>
         public static implicit operator T(NotificationStore<T> i)
         {
-            return i.store;
+            return i.Get();
         }
 
         /// <summary>
@@ -39,12 +48,12 @@ namespace Pasta.Model
         /// <param name="THIS"></param>
         /// <param name="propertyName"></param>
         /// <returns></returns>
-        public bool Set<TO>(T value, TO THIS, [CallerMemberName] string propertyName = null)
+        public bool Set<TO>(T value, TO THIS, [CallerMemberName]string propertyName = null)
             where TO : NotificationObject
         {
-            if (EQ.Equals(store, value)) return false;
+            if(EQ.Equals(store, value)) return false;
             store = value;
-            THIS.OnPropertyChanged(propertyName);
+            THIS.OnPropertyChangedImpl(propertyName);
             return true;
         }
 

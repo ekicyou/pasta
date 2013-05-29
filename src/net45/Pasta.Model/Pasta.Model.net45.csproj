@@ -35,8 +35,9 @@
     <Reference Include="NLog">
       <HintPath>..\..\packages\NLog.2.0.1.2\lib\net45\NLog.dll</HintPath>
     </Reference>
-    <Reference Include="protobuf-net">
-      <HintPath>..\..\packages\protobuf-net.2.0.0.621\lib\net40\protobuf-net.dll</HintPath>
+    <Reference Include="protobuf-net, Version=2.0.0.638, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\packages\protobuf-net.2.0.0.638\lib\net40\protobuf-net.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -54,11 +55,23 @@
     <Compile Include="..\..\src\Pasta.Model\API\IFileIO.cs">
       <Link>API\IFileIO.cs</Link>
     </Compile>
+    <Compile Include="..\..\src\Pasta.Model\API\IPastaGleaner.cs">
+      <Link>API\IPastaGleaner.cs</Link>
+    </Compile>
     <Compile Include="..\..\src\Pasta.Model\API\IPastaLogger.cs">
       <Link>API\IPastaLogger.cs</Link>
     </Compile>
+    <Compile Include="..\..\src\Pasta.Model\API\IPastaModule.cs">
+      <Link>API\IPastaModule.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\Pasta.Model\API\IPastaSource.cs">
+      <Link>API\IPastaSource.cs</Link>
+    </Compile>
     <Compile Include="..\..\src\Pasta.Model\API\IPastaStore.cs">
       <Link>API\IPastaStore.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\Pasta.Model\API\IPastaTarget.cs">
+      <Link>API\IPastaTarget.cs</Link>
     </Compile>
     <Compile Include="..\..\src\Pasta.Model\Model\NotificationObject.cs">
       <Link>Model\NotificationObject.cs</Link>

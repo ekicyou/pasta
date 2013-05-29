@@ -19,6 +19,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pasta.Core.net45", "net45\P
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TableView.net45", "externals\ms-pl\tableview\TableView\TableView.net45.csproj", "{BA0FBF16-225E-4F9A-9DD3-4700633DC724}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pasta.Gleaners.net45", "net45\Pasta.Gleaners\Pasta.Gleaners.net45.csproj", "{CD26F170-3F85-4D2C-9980-0BEC9D9AD125}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -87,6 +89,12 @@ Global
 		{BA0FBF16-225E-4F9A-9DD3-4700633DC724}.Release|Any CPU.Build.0 = Release|Any CPU
 		{BA0FBF16-225E-4F9A-9DD3-4700633DC724}.Release|x86.ActiveCfg = Release|x86
 		{BA0FBF16-225E-4F9A-9DD3-4700633DC724}.Release|x86.Build.0 = Release|x86
+		{CD26F170-3F85-4D2C-9980-0BEC9D9AD125}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CD26F170-3F85-4D2C-9980-0BEC9D9AD125}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CD26F170-3F85-4D2C-9980-0BEC9D9AD125}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{CD26F170-3F85-4D2C-9980-0BEC9D9AD125}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CD26F170-3F85-4D2C-9980-0BEC9D9AD125}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CD26F170-3F85-4D2C-9980-0BEC9D9AD125}.Release|x86.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
