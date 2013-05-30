@@ -37,18 +37,20 @@ namespace Pasta
         public AppLoader()
         {
             Thread.CurrentThread.Name = "UI";
-            logger.Trace("Load");
+            logger.Trace("Load Start");
             CTS = new CancellationTokenSource();
+            var uiSyncContext = TaskScheduler.FromCurrentSynchronizationContext();
             var fact = new TaskFactory(CTS.Token);
             var callerAssembly = Assembly.GetCallingAssembly();
-            fact.StartNew(() => Init(CTS.Token, callerAssembly));
+            fact.StartNew(() => Init(CTS.Token, uiSyncContext, callerAssembly));
+            logger.Trace("Load End");
         }
 
         /// <summary>
         /// 遅延初期化処理。
         /// </summary>
         /// <param name="token"></param>
-        private void Init(CancellationToken token, Assembly callerAssembly)
+        private void Init(CancellationToken token, TaskScheduler uiSyncContext, Assembly callerAssembly)
         {
             logger.Trace("Init Start");
             try
@@ -59,6 +61,7 @@ namespace Pasta
                     Assembly.GetEntryAssembly(),
                     callerAssembly, 
                     typeof(Pasta.Logging.PastaLogger).Assembly,
+                    typeof(Pasta.Gleaners.Net.MailGleaner).Assembly,
                 }
                     .Where(a => a != null)
                     .Distinct();
@@ -70,7 +73,7 @@ namespace Pasta
 
                 // appの取得と構成
                 var app = host.GetExport<AppCore>();
-                app.Init(token);
+                app.Init(token,uiSyncContext);
                 Application = app;
                 logger.Trace("Init End");
             }

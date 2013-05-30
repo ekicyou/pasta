@@ -12,5 +12,7 @@ namespace Pasta.API
     /// </summary>
     public interface IPastaGleaner : IPastaModule, IPastaSource
     {
+        /// <summary>設定情報</summary>
+        string Setting { get; }
     }
 }

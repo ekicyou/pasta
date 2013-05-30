@@ -21,6 +21,7 @@ namespace Pasta.TinyClient
 
         private void Application_Startup(object sender, StartupEventArgs e)
         {
+            logger.Trace("Application_Startup Start");
             Loader = new AppLoader();
             this.Exit += (s, args) =>
             {

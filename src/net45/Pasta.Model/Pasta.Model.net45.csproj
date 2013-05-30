@@ -35,9 +35,9 @@
     <Reference Include="NLog">
       <HintPath>..\..\packages\NLog.2.0.1.2\lib\net45\NLog.dll</HintPath>
     </Reference>
-    <Reference Include="protobuf-net, Version=2.0.0.638, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
+    <Reference Include="protobuf-net, Version=2.0.0.640, Culture=neutral, PublicKeyToken=257b51d87d2e4d67, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\packages\protobuf-net.2.0.0.638\lib\net40\protobuf-net.dll</HintPath>
+      <HintPath>..\..\packages\protobuf-net.2.0.0.640\lib\net40\protobuf-net.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -57,6 +57,9 @@
     </Compile>
     <Compile Include="..\..\src\Pasta.Model\API\IPastaGleaner.cs">
       <Link>API\IPastaGleaner.cs</Link>
+    </Compile>
+    <Compile Include="..\..\src\Pasta.Model\API\IPastaGleanerFactory.cs">
+      <Link>API\IPastaGleanerFactory.cs</Link>
     </Compile>
     <Compile Include="..\..\src\Pasta.Model\API\IPastaLogger.cs">
       <Link>API\IPastaLogger.cs</Link>

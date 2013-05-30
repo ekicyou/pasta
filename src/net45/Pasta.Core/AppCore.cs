@@ -27,11 +27,15 @@ namespace Pasta
         /// 遅延初期化処理。
         /// </summary>
         /// <param name="token"></param>
-        public void Init(CancellationToken token)
+        /// <param name="uiSyncContext"></param>
+        public void Init(CancellationToken token, TaskScheduler uiSyncContext)
         {
             try
             {
                 logger.Trace("Init Start");
+
+                UISyncContext = uiSyncContext;
+                GleanerFactoryDic = GleanerFactories.ToDictionary(a => a.GleanerName);
 
                 PastaStore.Init(token);
                 PastaLogger.Init(token);
@@ -46,15 +50,27 @@ namespace Pasta
 
         }
 
+        /// <summary>UIスケジューラ</summary>
+        public TaskScheduler UISyncContext { get; private set; }
+
+        /// <summary>FileIOモジュール</summary>
         [Import]
         public IFileIO FileIO { get; set; }
 
-        [Import("PastaLogger")]
-        public IPastaLogger PastaLogger { get; set; }
-
+        /// <summary>ログストア</summary>
         [Import("PastaStore")]
         public IPastaStore PastaStore { get; set; }
 
+        /// <summary>ログ管理モジュール</summary>
+        [Import("PastaLogger")]
+        public IPastaLogger PastaLogger { get; set; }
+
+        /// <summary>ログ収集モジュールのファクトリ</summary>
+        [ImportMany]
+        public IEnumerable<IPastaGleanerFactory> GleanerFactories { get; set; }
+
+        /// <summary>ログ収集モジュールのファクトリ辞書</summary>
+        public IDictionary<string, IPastaGleanerFactory> GleanerFactoryDic { get; private set; }
 
     }
 }

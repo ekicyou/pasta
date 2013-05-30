@@ -76,6 +76,10 @@
       <Project>{f1653f20-d47d-4f29-8c55-3c835542af5f}</Project>
       <Name>Community.CsharpSqlite.net45</Name>
     </ProjectReference>
+    <ProjectReference Include="..\Pasta.Gleaners\Pasta.Gleaners.net45.csproj">
+      <Project>{cd26f170-3f85-4d2c-9980-0bec9d9ad125}</Project>
+      <Name>Pasta.Gleaners.net45</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Pasta.Logging\Pasta.Logging.net45.csproj">
       <Project>{399105e5-c7a1-477b-9582-4ed142c5d980}</Project>
       <Name>Pasta.Logging.net45</Name>
