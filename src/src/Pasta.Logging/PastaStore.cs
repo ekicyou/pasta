@@ -47,9 +47,10 @@ namespace Pasta.Logging
         /// <summary>
         /// 初期化処理。
         /// </summary>
+        /// <param name="settingObject"></param>
         /// <param name="token"></param>
         /// <returns></returns>
-        public void Init(CancellationToken token)
+        public void Init(dynamic settingObject, CancellationToken token)
         {
             logger.Trace("Init Start");
             token.Register(Dispose);
@@ -85,9 +86,9 @@ namespace Pasta.Logging
         #endregion
         #region メソッド：保存関係
 
-        private void Save(PastaLog item)
+        private async Task Save(PastaLog item)
         {
-            var st = GetSaveStream(item.UTC);
+            var st = await GetSaveStream(item.UTC);
             Serializer.SerializeWithLengthPrefix<PastaLog>(st, item, PrefixStyle.Base128);
         }
 
@@ -99,7 +100,7 @@ namespace Pasta.Logging
         private DateTime SaveDay { get; set; }
 
 
-        private Stream GetSaveStream(DateTime time)
+        private async Task<Stream> GetSaveStream(DateTime time)
         {
             // 日付不一致ならクローズ
             var day = time.Date;
@@ -113,7 +114,7 @@ namespace Pasta.Logging
             if (SaveStream == null)
             {
                 var path = GetSavePath();
-                SaveStream = FileIO.OpenAppend(path);
+                SaveStream = await FileIO.OpenAppendAsync(path);
             }
 
             return SaveStream;

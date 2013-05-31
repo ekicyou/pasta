@@ -33,6 +33,7 @@ namespace Pasta
 
         /// <summary>
         /// コンストラクタ。
+        /// モデルロードのための最低限の初期化を行い、遅延初期化処理の起動を予約する。
         /// </summary>
         public AppLoader()
         {

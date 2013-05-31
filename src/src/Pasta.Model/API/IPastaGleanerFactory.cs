@@ -16,10 +16,30 @@ namespace Pasta.API
         string GleanerName { get; }
 
         /// <summary>
-        /// 与えられた設定パラメータにより、ログ収集モジュールを作成します。
+        /// デフォルト設定情報を取得します。
+        /// </summary>
+        /// <param name="data"></param>
+        /// <returns></returns>
+        dynamic CreateDefaultSetting();
+
+        /// <summary>
+        /// 設定情報バイナリを設定オブジェクトに変換します。
+        /// </summary>
+        /// <param name="data"></param>
+        /// <returns></returns>
+        dynamic AsSettingObject(byte[] data);
+
+        /// <summary>
+        /// 設定オブジェクトを設定情報バイナリに変換します。
         /// </summary>
         /// <param name="setting"></param>
         /// <returns></returns>
-        IPastaGleaner CreateGleaner(string setting);
+        byte[] AsSettingBytes(dynamic setting);
+
+        /// <summary>
+        /// ログ収集モジュールを作成します。
+        /// </summary>
+        /// <returns></returns>
+        IPastaGleaner CreateGleaner();
     }
 }

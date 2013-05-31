@@ -37,8 +37,8 @@ namespace Pasta
                 UISyncContext = uiSyncContext;
                 GleanerFactoryDic = GleanerFactories.ToDictionary(a => a.GleanerName);
 
-                PastaStore.Init(token);
-                PastaLogger.Init(token);
+                PastaStore.Init(null, token);
+                PastaLogger.Init(null, token);
                 PastaLogger.Source.LinkTo(PastaStore.Target);
 
                 logger.Trace("Init Start");

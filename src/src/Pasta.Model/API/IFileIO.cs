@@ -17,7 +17,7 @@ namespace Pasta.API
         /// </summary>
         /// <param name="path"></param>
         /// <returns></returns>
-        Stream OpenRead(string path);
+        Task<Stream> OpenReadAsync(string path);
 
         /// <summary>
         /// 追記書き込み用ファイルをオープンします。
@@ -25,7 +25,7 @@ namespace Pasta.API
         /// </summary>
         /// <param name="path"></param>
         /// <returns></returns>
-        Stream OpenAppend(string path);
+        Task<Stream> OpenAppendAsync(string path);
 
         /// <summary>
         /// 読み書き用ファイルをオープンします。
@@ -33,7 +33,7 @@ namespace Pasta.API
         /// </summary>
         /// <param name="path"></param>
         /// <returns></returns>
-        Stream OpenReadWrite(string path);
+        Task<Stream> OpenReadWriteAsync(string path);
 
     }
 }

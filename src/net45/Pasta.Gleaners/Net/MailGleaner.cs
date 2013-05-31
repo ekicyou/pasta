@@ -2,64 +2,93 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.IO;
 using System.Threading.Tasks;
 using System.Composition;
 using Pasta.API;
 using Pasta.Model;
 using System.Threading;
 using System.Threading.Tasks.Dataflow;
+using ProtoBuf;
 
 namespace Pasta.Gleaners.Net
 {
     /// <summary>
+    /// メール監視の設定情報。
+    /// </summary>
+    [ProtoContract]
+    public class MailGleanerSetting
+    {
+        /// <summary>監視間隔</summary>
+        [ProtoMember(1)]
+        public TimeSpan DieTime { get; set; }
+
+
+        internal static MailGleanerSetting CreateDefault()
+        {
+            return new MailGleanerSetting
+            {
+
+            };
+        }
+    }
+
+    /// <summary>
     /// メール監視。
     /// </summary>
-    public class MailGleaner : IPastaGleaner
+    public class MailGleaner : BasePastaGleaner<MailGleanerSetting>
     {
         private static readonly NLog.Logger logger = NLog.LogManager.GetCurrentClassLogger();
         private const string Name = "メール";
+
+
 
         /// <summary>
         /// メールリスナのファクトリ。
         /// </summary>
         [Export(typeof(IPastaGleanerFactory))]
-        public class Factory : IPastaGleanerFactory
+        public class Factory : BasePastaGleanerFactory<MailGleaner, MailGleanerSetting>
         {
             /// <summary>リスナ名</summary>
-            public string GleanerName { get { return Name; } }
+            public override string GleanerName { get { return Name; } }
 
-            /// <summary>
-            /// コンストラクタ。
-            /// </summary>
-            /// <param name="setting"></param>
-            /// <returns></returns>
-            public IPastaGleaner CreateGleaner(string setting) { return new MailGleaner(setting); }
+
+            public override dynamic CreateDefaultSetting()
+            {
+                return MailGleanerSetting.CreateDefault();
+            }
         }
 
-        /// <summary>
-        /// コンストラクタ。
-        /// </summary>
-        public MailGleaner(string setting)
-        {
-            Setting = setting;
-        }
+        #region プロパティ
 
 
-        public void Init(CancellationToken token)
+        #endregion
+        #region 初期化：開放関係
+
+        protected override void Init2(CancellationToken token, ITargetBlock<PastaLog> target)
         {
-            logger.Trace("Init Start");
             throw new NotImplementedException();
         }
 
-        public ISourceBlock<PastaLog> Source
+
+        #endregion
+        #region 開始・停止処理
+
+        protected override void Start()
         {
-            get { throw new NotImplementedException(); }
+            throw new NotImplementedException();
         }
 
-        /// <summary>
-        /// 設定情報。
-        /// </summary>
-        public string Setting { get; private set; }
+        protected override void Stop()
+        {
+            throw new NotImplementedException();
+        }
+
+
+        #endregion
+
+
+
     }
 
 }
