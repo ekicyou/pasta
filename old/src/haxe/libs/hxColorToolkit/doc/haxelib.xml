@@ -1,8 +1,0 @@
-<project name="hxColorToolkit" url="http://github.com/andyli/hxColorToolkit" license="BSD">
-    <user name="andyli"/>
-    <tag v="cross"/>
-    <tag v="graphics"/>
-    <tag v="color"/>
-    <description>Color conversion and color scheme generation.</description>
-    <version name="1.5.1">hue values of HSB and HSL are now looped instead of clamped.</version>
-</project>
