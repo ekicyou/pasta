@@ -3,8 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Security.Cryptography;
 
-namespace UuiDB
+namespace Util
 {
     /// <summary>
     /// Guid拡張。
@@ -144,5 +145,73 @@ namespace UuiDB
             return guid;
         }
 
+
+        /// <summary>
+        /// Guid Version 5を生成します。
+        /// </summary>
+        /// <param name="namespaceId"></param>
+        /// <param name="name"></param>
+        /// <returns></returns>
+        public static Guid CreateGuid5(this Guid namespaceId, string name)
+        {
+            return Create(namespaceId, name, 5);
+        }
+
+        /// <summary>
+        /// 文字列を利用してGuidを生成します。
+        /// </summary>
+        /// <param name="namespaceId"></param>
+        /// <param name="name"></param>
+        /// <param name="version"></param>
+        /// <returns></returns>
+        private static Guid Create(Guid namespaceId, string name, int version)
+        {
+            if (name == null)
+                throw new ArgumentNullException("名前を指定してください。");
+            if (version != 3 && version != 5)
+                throw new ArgumentOutOfRangeException("version", "バージョンは3または5限定です。");
+
+            var hash = CreateHash(version, namespaceId, name);
+            var newGuid = new byte[16];
+            Array.Copy(hash, 0, newGuid, 0, 16);
+            newGuid[6] = (byte)((newGuid[6] & 0x0F) | (version << 4));
+            newGuid[8] = (byte)((newGuid[8] & 0x3F) | 0x80);
+            SwapByteOrder(newGuid);
+            return new Guid(newGuid);
+        }
+
+        public static readonly Guid DnsNamespace = new Guid("6ba7b810-9dad-11d1-80b4-00c04fd430c8");
+        public static readonly Guid UrlNamespace = new Guid("6ba7b811-9dad-11d1-80b4-00c04fd430c8");
+        public static readonly Guid IsoOidNamespace = new Guid("6ba7b812-9dad-11d1-80b4-00c04fd430c8");
+
+
+
+        private static byte[] CreateHash(int version, Guid namespaceId, string name)
+        {
+            var nameBytes = Encoding.UTF8.GetBytes(name);
+            var namespaceBytes = namespaceId.ToByteArray();
+            SwapByteOrder(namespaceBytes);
+            using (var algorithm = version == 3 ? (HashAlgorithm)MD5.Create() : SHA1.Create())
+            {
+                algorithm.TransformBlock(namespaceBytes, 0, namespaceBytes.Length, null, 0);
+                algorithm.TransformFinalBlock(nameBytes, 0, nameBytes.Length);
+                return algorithm.Hash;
+            }
+        }
+
+        private static void SwapByteOrder(byte[] guid)
+        {
+            SwapBytes(guid, 0, 3);
+            SwapBytes(guid, 1, 2);
+            SwapBytes(guid, 4, 5);
+            SwapBytes(guid, 6, 7);
+        }
+
+        private static void SwapBytes(byte[] guid, int left, int right)
+        {
+            var temp = guid[left];
+            guid[left] = guid[right];
+            guid[right] = temp;
+        }
     }
 }

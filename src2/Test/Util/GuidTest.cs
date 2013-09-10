@@ -2,10 +2,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using UuiDB;
+using Util;
 using System.Diagnostics;
 
-namespace Test.UuiDB
+namespace Test.Util
 {
     [TestClass]
     public class GuidTest
