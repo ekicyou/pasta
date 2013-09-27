@@ -13,6 +13,7 @@ namespace UuiDB
     /// </summary>
     public sealed class Card
     {
+        #region プロパティ：情報
         /// <summary>一意なID(GUID)</summary>
         public Guid ID { get; set; }
 
@@ -24,6 +25,24 @@ namespace UuiDB
 
         /// <summary>Blob情報</summary>
         public byte[] Blob { get; set; }
+
+
+        #endregion
+        #region プロパティ：保存管理
+
+        /// <summary>カード情報が保存されるパス</summary>
+        public string CardPath { get; set; }
+
+        /// <summary>バイナリ情報が保存されるパス</summary>
+        public string BlobPath { get; set; }
+
+        /// <summary>Blob拡張子</summary>
+        public string BlobExt { get; set; }
+
+        /// <summary>保存が必要ならtrue</summary>
+        public bool HasSave { get;private set; }
+
+        #endregion
 
 
 
