@@ -8,3 +8,4 @@ TestResults
 /src2/packages
 *.sdf
 ipch
+*.opensdf

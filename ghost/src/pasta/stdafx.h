@@ -19,9 +19,4 @@
 
 // TODO: プログラムに必要な追加ヘッダーをここで参照してください。
 
-// PSL Setting  (https://github.com/Silica/PSL/wiki/compile-option)
-#define PSL_OPTIMIZE_TAILCALL	// 末尾呼び出し最適化
-#define PSL_OPTIMIZE_IN_COMPILE	// コンパイル時最適化(これ以下)を有効にする
-#define PSL_USE_VARIABLE_MEMORY_MANAGER	// メモリマネージャを使う
-
-#include "..\\..\\..\\..\\PSL\\PSL\\PSL.h"
+#include "squirrel.h"
