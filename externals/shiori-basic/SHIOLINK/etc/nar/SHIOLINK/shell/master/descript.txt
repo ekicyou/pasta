@@ -1,0 +1,9 @@
+charset,Shift_JIS
+
+craftman,gahaku & dot-station
+craftmanw,‰æ”Œ•‚¦‚¿‚å
+id,marubatupekesannkaku
+name,›~¢ 
+sakura.name,›~¢ 
+kero.name,~
+type,shell

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="Shift_JIS" standalone="yes" ?>
+<job id="main">
+<?job error="True" debug="True" ?>
+
+<script language="VBScript" src="include.vbs"/>
+
+<script language="VBScript">
+<![CDATA[
+
+MsgBox fnTest(3)
+
+]]>
+</script>
+</job>
+

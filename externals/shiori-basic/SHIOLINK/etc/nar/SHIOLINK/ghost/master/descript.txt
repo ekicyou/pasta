@@ -1,0 +1,13 @@
+charset,Shift_JIS
+
+craftman,Dot-Station Master
+craftmanw,ドットステーション駅長
+craftmanurl,http://code.google.com/p/shiori-basic/
+
+name,しおリンク！
+type,ghost
+
+sakura.name,○×△□
+kero.name,×
+
+shiori,SHIOLINK.dll

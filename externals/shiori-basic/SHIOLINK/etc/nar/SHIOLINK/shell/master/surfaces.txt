@@ -1,0 +1,15 @@
+charset,Shift_JIS
+
+descript
+{
+version,1
+}
+
+surface00
+{
+}
+
+surface10
+{
+}
+

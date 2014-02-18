@@ -1,0 +1,31 @@
+*L:loaddir
+*S:59B5F4D5-57D8-418a-AC61-0BF4678CF1D0
+GET Version SHIORI/2.6
+Charset: UTF-8
+Sender: SSP
+
+*S:E8BEC7F4-B645-4cf1-90E1-66006253E698
+GET SHIORI/3.0
+ID: version
+Charset: UTF-8
+SecurityLevel: local
+Sender: SSP
+
+*S:775F7483-0CFB-44a9-BAF6-81EF2A29173D
+GET SHIORI/3.0
+Sender: SSP
+Charset: UTF-8
+SecurityLevel: local
+ID: OnBoot
+Reference0: ÇµÇ®ÉäÉìÉNÅI
+
+*S:950A94CC-EFCB-49b7-9BDA-5AB8006E6D88
+NOTIFY SHIORI/3.0
+Sender: SSP
+Charset: UTF-8
+SecurityLevel: local
+ID: OnDestroy
+Reference0: 
+Reference1: 1
+
+*U:
