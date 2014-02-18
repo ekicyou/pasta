@@ -22,6 +22,6 @@
 // PSL Setting  (https://github.com/Silica/PSL/wiki/compile-option)
 #define PSL_OPTIMIZE_TAILCALL	// 末尾呼び出し最適化
 #define PSL_OPTIMIZE_IN_COMPILE	// コンパイル時最適化(これ以下)を有効にする
-#define PSL_THREAD_SAFE	// 上のオプションを無効にし、ローカルstatic変数を使わなくなる
+#define PSL_USE_VARIABLE_MEMORY_MANAGER	// メモリマネージャを使う
 
 #include "..\\..\\..\\..\\PSL\\PSL\\PSL.h"

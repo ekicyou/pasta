@@ -7,3 +7,4 @@ TestResults
 *.user
 /src2/packages
 *.sdf
+ipch
