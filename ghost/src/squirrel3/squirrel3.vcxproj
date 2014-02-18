@@ -83,6 +83,14 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\..\externals\SQUIRREL3\sqstdlib\sqstdaux.cpp" />
+    <ClCompile Include="..\..\..\externals\SQUIRREL3\sqstdlib\sqstdblob.cpp" />
+    <ClCompile Include="..\..\..\externals\SQUIRREL3\sqstdlib\sqstdio.cpp" />
+    <ClCompile Include="..\..\..\externals\SQUIRREL3\sqstdlib\sqstdmath.cpp" />
+    <ClCompile Include="..\..\..\externals\SQUIRREL3\sqstdlib\sqstdrex.cpp" />
+    <ClCompile Include="..\..\..\externals\SQUIRREL3\sqstdlib\sqstdstream.cpp" />
+    <ClCompile Include="..\..\..\externals\SQUIRREL3\sqstdlib\sqstdstring.cpp" />
+    <ClCompile Include="..\..\..\externals\SQUIRREL3\sqstdlib\sqstdsystem.cpp" />
     <ClCompile Include="..\..\..\externals\SQUIRREL3\squirrel\sqapi.cpp" />
     <ClCompile Include="..\..\..\externals\SQUIRREL3\squirrel\sqbaselib.cpp" />
     <ClCompile Include="..\..\..\externals\SQUIRREL3\squirrel\sqclass.cpp" />

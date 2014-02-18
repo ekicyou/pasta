@@ -9,6 +9,9 @@
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
+    <Filter Include="sqstdlib">
+      <UniqueIdentifier>{0ec09293-bc7c-45be-9792-f3d2b0ce87fc}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
@@ -49,6 +52,30 @@
     </ClCompile>
     <ClCompile Include="..\..\..\externals\SQUIRREL3\squirrel\sqvm.cpp">
       <Filter>squirrel</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\externals\SQUIRREL3\sqstdlib\sqstdaux.cpp">
+      <Filter>sqstdlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\externals\SQUIRREL3\sqstdlib\sqstdblob.cpp">
+      <Filter>sqstdlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\externals\SQUIRREL3\sqstdlib\sqstdio.cpp">
+      <Filter>sqstdlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\externals\SQUIRREL3\sqstdlib\sqstdmath.cpp">
+      <Filter>sqstdlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\externals\SQUIRREL3\sqstdlib\sqstdrex.cpp">
+      <Filter>sqstdlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\externals\SQUIRREL3\sqstdlib\sqstdstream.cpp">
+      <Filter>sqstdlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\externals\SQUIRREL3\sqstdlib\sqstdstring.cpp">
+      <Filter>sqstdlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\externals\SQUIRREL3\sqstdlib\sqstdsystem.cpp">
+      <Filter>sqstdlib</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
