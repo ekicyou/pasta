@@ -2,5 +2,11 @@
 //
 
 #include "stdafx.h"
+#include "pasta.h"
+
+namespace pasta{
 
 
+
+
+}
