@@ -1,4 +1,0 @@
-type,ghost
-name,ÇµÇ®ÇËÇÒÇ≠ÅI
-directory,SHIOLINK
-
