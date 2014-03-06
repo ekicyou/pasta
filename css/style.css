@@ -118,7 +118,7 @@ img
   border: 0;
   width: 320px;
   height: 420px;
-  position: relative;
+  position: fixed;
   top: 0px;
-  left: -100px;
+  right: 0px;
 }
