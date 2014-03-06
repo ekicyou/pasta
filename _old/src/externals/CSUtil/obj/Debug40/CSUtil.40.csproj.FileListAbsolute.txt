@@ -1,0 +1,6 @@
+C:\home\maz\git\pasta-site\_old\src\externals\CSUtil\bin\Debug40\CSUtil.dll
+C:\home\maz\git\pasta-site\_old\src\externals\CSUtil\bin\Debug40\CSUtil.pdb
+C:\home\maz\git\pasta-site\_old\src\externals\CSUtil\bin\Debug40\CSUtil.xml
+C:\home\maz\git\pasta-site\_old\src\externals\CSUtil\obj\Debug40\CSUtil.40.csprojResolveAssemblyReference.cache
+C:\home\maz\git\pasta-site\_old\src\externals\CSUtil\obj\Debug40\CSUtil.dll
+C:\home\maz\git\pasta-site\_old\src\externals\CSUtil\obj\Debug40\CSUtil.pdb

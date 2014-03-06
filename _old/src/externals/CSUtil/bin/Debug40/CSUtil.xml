@@ -1,0 +1,3468 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>CSUtil</name>
+    </assembly>
+    <members>
+        <member name="T:CSUtil.Bool2DimCollection">
+            <summary>
+            bool値の２次元配列を管理します。
+            特定行を指定した時の操作が高速になるように設計されています。
+            サイズは64の倍数で丸められます。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Bool2DimCollection.#ctor(System.Int32,System.Int32)">
+            <summary>
+            コンストラクタ。
+            </summary>
+            <param name="columnCapacity"></param>
+            <param name="rowCapacity"></param>
+        </member>
+        <member name="M:CSUtil.Bool2DimCollection.#ctor(System.Int32)">
+            <summary>
+            正方配列を作成するコンストラクタ。
+            </summary>
+            <param name="capacity"></param>
+        </member>
+        <member name="M:CSUtil.Bool2DimCollection.EnRowDataItems(System.Int32)">
+            <summary>
+            指定した行のデータを列挙します。
+            </summary>
+            <param name="rowIndex"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.Bool2DimCollection.EnRowTrueIndex(System.Int32)">
+            <summary>
+            指定した行のうち、要素がtrueである列の場所を列挙します。
+            </summary>
+            <param name="rowIndex"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.Bool2DimCollection.SetColmunItemsInRow(System.Int32,System.Collections.Generic.IEnumerable{System.Int32})">
+            <summary>
+            指令された行の指定列の要素にtrueを設定します。
+            </summary>
+            <param name="rowIndex"></param>
+            <param name="colmunIndexSet"></param>
+        </member>
+        <member name="M:CSUtil.Bool2DimCollection.ResetColmunItemsInRow(System.Int32,System.Collections.Generic.IEnumerable{System.Int32})">
+            <summary>
+            指令された行の指定列の要素にfalseを設定します。
+            </summary>
+            <param name="rowIndex"></param>
+            <param name="colmunIndexSet"></param>
+        </member>
+        <member name="M:CSUtil.Bool2DimCollection.EnChangeColmunItemsInRow(System.Int32,System.Collections.Generic.IEnumerable{System.Int32})">
+            <summary>
+            変更する必要がある場所とbitマスクを列挙します。
+            </summary>
+            <param name="rowIndex"></param>
+            <param name="colmunIndexSet"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.Bool2DimCollection.Clear">
+            <summary>
+            要素を全てfalseでクリアします。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Bool2DimCollection.ClearRow(System.Int32)">
+            <summary>
+            指定した行の要素をfalseでクリアします。
+            </summary>
+            <param name="rowIndex"></param>
+        </member>
+        <member name="M:CSUtil.Bool2DimCollection.ClearColmun(System.Int32)">
+            <summary>
+            指定した列をクリアします。
+            </summary>
+            <param name="index"></param>
+        </member>
+        <member name="M:CSUtil.Bool2DimCollection.ClearRowColmun(System.Int32)">
+            <summary>
+            指定した位置の行・列の値をクリアします。
+            </summary>
+            <param name="index"></param>
+        </member>
+        <member name="P:CSUtil.Bool2DimCollection.RowCount">
+            <summary>行数</summary>
+        </member>
+        <member name="P:CSUtil.Bool2DimCollection.ColmunCount">
+            <summary>列数</summary>
+        </member>
+        <member name="P:CSUtil.Bool2DimCollection.DataRowOffset">
+            <summary>データ配列へのアクセスオフセット</summary>
+        </member>
+        <member name="T:System.Collections.Deque">
+            <summary>
+            Represents a simple double-ended-queue collection of objects.
+            </summary>
+        </member>
+        <member name="M:System.Collections.Deque.#ctor">
+            <summary>
+            Initializes a new instance of the Deque class.
+            </summary>
+        </member>
+        <member name="M:System.Collections.Deque.#ctor(System.Collections.ICollection)">
+            <summary>
+            Initializes a new instance of the Deque class that contains 
+            elements copied from the specified collection.
+            </summary>
+            <param name="col">
+            The ICollection to copy elements from.
+            </param>
+        </member>
+        <member name="M:System.Collections.Deque.Clear">
+            <summary>
+            Removes all objects from the Deque.
+            </summary>
+        </member>
+        <member name="M:System.Collections.Deque.Contains(System.Object)">
+            <summary>
+            Determines whether or not an element is in the Deque.
+            </summary>
+            <param name="obj">
+            The Object to locate in the Deque.
+            </param>
+            <returns>
+            <b>true</b> if <i>obj</i> if found in the Deque; otherwise, 
+            <b>false</b>.
+            </returns>
+        </member>
+        <member name="M:System.Collections.Deque.PushFront(System.Object)">
+            <summary>
+            Inserts an object at the front of the Deque.
+            </summary>
+            <param name="obj">
+            The object to push onto the deque;
+            </param>
+        </member>
+        <member name="M:System.Collections.Deque.PushBack(System.Object)">
+            <summary>
+            Inserts an object at the back of the Deque.
+            </summary>
+            <param name="obj">
+            The object to push onto the deque;
+            </param>
+        </member>
+        <member name="M:System.Collections.Deque.PopFront">
+            <summary>
+            Removes and returns the object at the front of the Deque.
+            </summary>
+            <returns>
+            The object at the front of the Deque.
+            </returns>
+            <exception cref="T:System.InvalidOperationException">
+            The Deque is empty.
+            </exception>
+        </member>
+        <member name="M:System.Collections.Deque.PopBack">
+            <summary>
+            Removes and returns the object at the back of the Deque.
+            </summary>
+            <returns>
+            The object at the back of the Deque.
+            </returns>
+            <exception cref="T:System.InvalidOperationException">
+            The Deque is empty.
+            </exception>
+        </member>
+        <member name="M:System.Collections.Deque.PeekFront">
+            <summary>
+            Returns the object at the front of the Deque without removing it.
+            </summary>
+            <returns>
+            The object at the front of the Deque.
+            </returns>
+            <exception cref="T:System.InvalidOperationException">
+            The Deque is empty.
+            </exception>
+        </member>
+        <member name="M:System.Collections.Deque.PeekBack">
+            <summary>
+            Returns the object at the back of the Deque without removing it.
+            </summary>
+            <returns>
+            The object at the back of the Deque.
+            </returns>
+            <exception cref="T:System.InvalidOperationException">
+            The Deque is empty.
+            </exception>
+        </member>
+        <member name="M:System.Collections.Deque.ToArray">
+            <summary>
+            Copies the Deque to a new array.
+            </summary>
+            <returns>
+            A new array containing copies of the elements of the Deque.
+            </returns>
+        </member>
+        <member name="M:System.Collections.Deque.Synchronized(System.Collections.Deque)">
+            <summary>
+            Returns a synchronized (thread-safe) wrapper for the Deque.
+            </summary>
+            <param name="deque">
+            The Deque to synchronize.
+            </param>
+            <returns>
+            A synchronized wrapper around the Deque.
+            </returns>
+        </member>
+        <member name="M:System.Collections.Deque.CopyTo(System.Array,System.Int32)">
+            <summary>
+            Copies the Deque elements to an existing one-dimensional Array, 
+            starting at the specified array index.
+            </summary>
+            <param name="array">
+            The one-dimensional Array that is the destination of the elements 
+            copied from Deque. The Array must have zero-based indexing. 
+            </param>
+            <param name="index">
+            The zero-based index in array at which copying begins. 
+            </param>
+        </member>
+        <member name="M:System.Collections.Deque.GetEnumerator">
+            <summary>
+            Returns an enumerator that can iterate through the Deque.
+            </summary>
+            <returns>
+            An IEnumerator for the Deque.
+            </returns>
+        </member>
+        <member name="M:System.Collections.Deque.Clone">
+            <summary>
+            Creates a shallow copy of the Deque.
+            </summary>
+            <returns>
+            A shallow copy of the Deque.
+            </returns>
+        </member>
+        <member name="P:System.Collections.Deque.IsSynchronized">
+            <summary>
+            Gets a value indicating whether access to the Deque is synchronized 
+            (thread-safe).
+            </summary>
+        </member>
+        <member name="P:System.Collections.Deque.Count">
+            <summary>
+            Gets the number of elements contained in the Deque.
+            </summary>
+        </member>
+        <member name="P:System.Collections.Deque.SyncRoot">
+            <summary>
+            Gets an object that can be used to synchronize access to the Deque.
+            </summary>
+        </member>
+        <member name="T:System.Collections.Generic.Deque`1">
+            <summary>
+            Represents a simple double-ended-queue collection of objects.
+            </summary>
+        </member>
+        <member name="M:System.Collections.Generic.Deque`1.#ctor">
+            <summary>
+            Initializes a new instance of the Deque class.
+            </summary>
+        </member>
+        <member name="M:System.Collections.Generic.Deque`1.#ctor(System.Collections.Generic.IEnumerable{`0})">
+            <summary>
+            Initializes a new instance of the Deque class that contains 
+            elements copied from the specified collection.
+            </summary>
+            <param name="collection">
+            The collection whose elements are copied to the new Deque.
+            </param>
+        </member>
+        <member name="M:System.Collections.Generic.Deque`1.Clear">
+            <summary>
+            Removes all objects from the Deque.
+            </summary>
+        </member>
+        <member name="M:System.Collections.Generic.Deque`1.Contains(`0)">
+            <summary>
+            Determines whether or not an element is in the Deque.
+            </summary>
+            <param name="obj">
+            The Object to locate in the Deque.
+            </param>
+            <returns>
+            <b>true</b> if <i>obj</i> if found in the Deque; otherwise, 
+            <b>false</b>.
+            </returns>
+        </member>
+        <member name="M:System.Collections.Generic.Deque`1.PushFront(`0)">
+            <summary>
+            Inserts an object at the front of the Deque.
+            </summary>
+            <param name="item">
+            The object to push onto the deque;
+            </param>
+        </member>
+        <member name="M:System.Collections.Generic.Deque`1.PushBack(`0)">
+            <summary>
+            Inserts an object at the back of the Deque.
+            </summary>
+            <param name="item">
+            The object to push onto the deque;
+            </param>
+        </member>
+        <member name="M:System.Collections.Generic.Deque`1.PopFront">
+            <summary>
+            Removes and returns the object at the front of the Deque.
+            </summary>
+            <returns>
+            The object at the front of the Deque.
+            </returns>
+            <exception cref="T:System.InvalidOperationException">
+            The Deque is empty.
+            </exception>
+        </member>
+        <member name="M:System.Collections.Generic.Deque`1.PopBack">
+            <summary>
+            Removes and returns the object at the back of the Deque.
+            </summary>
+            <returns>
+            The object at the back of the Deque.
+            </returns>
+            <exception cref="T:System.InvalidOperationException">
+            The Deque is empty.
+            </exception>
+        </member>
+        <member name="M:System.Collections.Generic.Deque`1.PeekFront">
+            <summary>
+            Returns the object at the front of the Deque without removing it.
+            </summary>
+            <returns>
+            The object at the front of the Deque.
+            </returns>
+            <exception cref="T:System.InvalidOperationException">
+            The Deque is empty.
+            </exception>
+        </member>
+        <member name="M:System.Collections.Generic.Deque`1.PeekBack">
+            <summary>
+            Returns the object at the back of the Deque without removing it.
+            </summary>
+            <returns>
+            The object at the back of the Deque.
+            </returns>
+            <exception cref="T:System.InvalidOperationException">
+            The Deque is empty.
+            </exception>
+        </member>
+        <member name="M:System.Collections.Generic.Deque`1.ToArray">
+            <summary>
+            Copies the Deque to a new array.
+            </summary>
+            <returns>
+            A new array containing copies of the elements of the Deque.
+            </returns>
+        </member>
+        <member name="M:System.Collections.Generic.Deque`1.Synchronized(System.Collections.Generic.Deque{`0})">
+            <summary>
+            Returns a synchronized (thread-safe) wrapper for the Deque.
+            </summary>
+            <param name="deque">
+            The Deque to synchronize.
+            </param>
+            <returns>
+            A synchronized wrapper around the Deque.
+            </returns>
+        </member>
+        <member name="M:System.Collections.Generic.Deque`1.CopyTo(System.Array,System.Int32)">
+            <summary>
+            Copies the Deque elements to an existing one-dimensional Array, 
+            starting at the specified array index.
+            </summary>
+            <param name="array">
+            The one-dimensional Array that is the destination of the elements 
+            copied from Deque. The Array must have zero-based indexing. 
+            </param>
+            <param name="index">
+            The zero-based index in array at which copying begins. 
+            </param>
+        </member>
+        <member name="M:System.Collections.Generic.Deque`1.System#Collections#IEnumerable#GetEnumerator">
+            <summary>
+            Returns an enumerator that can iterate through the Deque.
+            </summary>
+            <returns>
+            An IEnumerator for the Deque.
+            </returns>
+        </member>
+        <member name="M:System.Collections.Generic.Deque`1.Clone">
+            <summary>
+            Creates a shallow copy of the Deque.
+            </summary>
+            <returns>
+            A shallow copy of the Deque.
+            </returns>
+        </member>
+        <member name="M:System.Collections.Generic.Deque`1.GetEnumerator">
+            <summary>
+            ジェネレータを返します。
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:System.Collections.Generic.Deque`1.GetFrontEnumerator">
+            <summary>
+            先頭から要素を列挙するジェネレータを返します。
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:System.Collections.Generic.Deque`1.GetBackEnumerator">
+            <summary>
+            後ろから要素を列挙するジェネレータを返します。
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:System.Collections.Generic.Deque`1.InitQueue">
+            <summary>
+            キュー初期化
+            </summary>
+        </member>
+        <member name="P:System.Collections.Generic.Deque`1.IsSynchronized">
+            <summary>
+            Gets a value indicating whether access to the Deque is synchronized 
+            (thread-safe).
+            </summary>
+        </member>
+        <member name="P:System.Collections.Generic.Deque`1.Count">
+            <summary>
+            Gets the number of elements contained in the Deque.
+            </summary>
+        </member>
+        <member name="P:System.Collections.Generic.Deque`1.SyncRoot">
+            <summary>
+            Gets an object that can be used to synchronize access to the Deque.
+            </summary>
+        </member>
+        <member name="P:System.Collections.Generic.Deque`1.FrontQueue">
+            <summary>
+            先頭から読み出すキューを取得します。
+            </summary>
+        </member>
+        <member name="P:System.Collections.Generic.Deque`1.BackQueue">
+            <summary>
+            後方から読み出すキューを取得します。
+            </summary>
+        </member>
+        <member name="M:System.Collections.Generic.Deque`1.SynchronizedDeque.System#Collections#IEnumerable#GetEnumerator">
+            <summary>
+            Returns an enumerator that can iterate through the Deque.
+            </summary>
+            <returns>
+            An IEnumerator for the Deque.
+            </returns>
+        </member>
+        <member name="T:System.Collections.Generic.IQueue`1">
+            <summary>
+            Queueのインターフェースです。
+            </summary>
+            <typeparam name="T"></typeparam>
+        </member>
+        <member name="M:System.Collections.Generic.IQueue`1.Clear">
+            <summary>
+            キュー からすべてのオブジェクトを削除します。
+            </summary>
+        </member>
+        <member name="M:System.Collections.Generic.IQueue`1.Contains(`0)">
+            <summary>
+            ある要素が キュー  内に存在するかどうかを判断します。
+            </summary>
+            <param name="item">キュー  内で検索するオブジェクト。参照型の場合、null の値を使用できます。</param>
+            <returns>item が キュー  に存在する場合は true。それ以外の場合は false。</returns>
+        </member>
+        <member name="M:System.Collections.Generic.IQueue`1.Dequeue">
+            <summary>
+            キュー  の先頭にあるオブジェクトを削除し、返します。
+            </summary>
+            <returns>キュー  の先頭から削除されたオブジェクト。</returns>
+            <exception cref="T:System.InvalidOperationException">キュー  が空です。</exception>
+        </member>
+        <member name="M:System.Collections.Generic.IQueue`1.Enqueue(`0)">
+            <summary>
+            キュー  の末尾にオブジェクトを追加します。
+            </summary>
+            <param name="item">キュー  に追加するオブジェクト。参照型の場合、null の値を使用できます。</param>
+        </member>
+        <member name="M:System.Collections.Generic.IQueue`1.Peek">
+            <summary>
+            キュー  の先頭にあるオブジェクトを削除せずに返します。
+            </summary>
+            <returns>キュー  の先頭にあるオブジェクト。</returns>
+            <exception cref="T:System.InvalidOperationException">キュー  が空です。</exception>
+        </member>
+        <member name="M:System.Collections.Generic.IQueue`1.ToArray">
+            <summary>
+            キュー  の要素を新しい配列にコピーします。
+            </summary>
+            <returns>キュー  からコピーした要素を格納する新しい配列。</returns>
+        </member>
+        <member name="T:CSUtil.Collections.Generic.SyncQueue`1">
+            <summary>
+            キューの遅延状況をTraceログに出力するQueue
+            </summary>
+            <typeparam name="T"></typeparam>
+        </member>
+        <member name="F:CSUtil.Collections.Generic.SyncQueue`1.Name">
+            <summary>
+            キューの名前（デバッグログ出力用）
+            </summary>
+        </member>
+        <member name="M:CSUtil.Collections.Generic.SyncQueue`1.#ctor(System.String)">
+            <summary>
+            コンストラクタ。
+            </summary>
+            <param name="name"></param>
+        </member>
+        <member name="M:CSUtil.Collections.Generic.SyncQueue`1.GetEnumerator">
+            <summary>
+            キューを全て取り出す列挙子を返します。
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.Collections.Generic.SyncQueue`1.ToArray">
+            <summary>
+            現在のキューの内容を配列にして返します。
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.Collections.Generic.SyncQueue`1.Enqueue(`0)">
+            <summary>
+            キューの末尾にオブジェクトを追加します。
+            </summary>
+            <param name="item"></param>
+        </member>
+        <member name="M:CSUtil.Collections.Generic.SyncQueue`1.FixSize(System.Int32)">
+            <summary>
+            要素数が指定サイズを超えたときに、指定サイズまで古い要素を捨てます。
+            </summary>
+            <param name="count"></param>
+        </member>
+        <member name="P:CSUtil.Collections.Generic.SyncQueue`1.Count">
+            <summary>
+            キューに格納されている要素の数を返します。
+            </summary>
+        </member>
+        <member name="P:CSUtil.Collections.Generic.SyncQueue`1.SyncRoot">
+            <summary>
+            同期オブジェクトを返します。
+            </summary>
+        </member>
+        <member name="T:CSUtil.Configuration.AppConfigUtil">
+            <summary>
+            アプリケーション設定ファイルの読み込みに使うユーティリティ関数。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Configuration.AppConfigUtil.GetValueString(System.String)">
+            <summary>
+            App.configより、文字列を取得します。
+            </summary>
+            <param name="key"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.Configuration.AppConfigUtil.GetValueInt(System.String)">
+            <summary>
+            App.configより、数字を取得します。
+            </summary>
+            <param name="key"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.Configuration.AppConfigUtil.GetValueBool(System.String)">
+            <summary>
+            App.configより、BOOL値を取得します。
+            </summary>
+            <param name="key"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.Configuration.AppConfigUtil.GetValueDirectory(System.String)">
+            <summary>
+            App.configより、有効なディレクトリ名を取得します。
+            ディレクトリが存在しない場合は例外を返します。
+            (デバッグモードの場合はディレクトリを作成します)
+            </summary>
+            <param name="key"></param>
+            <returns></returns>
+        </member>
+        <member name="P:CSUtil.Configuration.AppConfigUtil.AppConfigName">
+            <summary>
+            アプリケーションコンフィグファイルの名前を取得します。
+            </summary>
+        </member>
+        <member name="T:CSUtil.ArrayUtil`1">
+            <summary>
+            値値の配列走査のためのジェネリックユーティティです。
+            </summary>
+            <typeparam name="T"></typeparam>
+        </member>
+        <member name="M:CSUtil.ArrayUtil`1.Equals(`0[],`0[])">
+            <summary>
+            お互いの要素がすべて一致したときにtrueを返します。
+            いずれかがnullの場合は常にfalseを返します。
+            </summary>
+            <param name="src"></param>
+            <param name="dest"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.ArrayUtil`1.Equals(System.Collections.Generic.ICollection{`0},System.Collections.Generic.ICollection{`0})">
+            <summary>
+            お互いの要素がすべて一致したときにtrueを返します。
+            いずれかがnullの場合は常にfalseを返します。
+            </summary>
+            <param name="src"></param>
+            <param name="dest"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.ArrayUtil`1.Equals(System.Collections.Generic.IEnumerable{`0},System.Collections.Generic.IEnumerable{`0})">
+            <summary>
+            お互いの要素がすべて一致したときにtrueを返します。
+            いずれかがnullの場合は常にfalseを返します。
+            </summary>
+            <param name="src"></param>
+            <param name="dest"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.ArrayUtil`1.DumpText(System.Collections.Generic.IEnumerable{`0},CSUtil.ArrayUtil{`0}.ToStringDelgate,System.Int32,System.String)">
+            <summary>
+            列挙要素をダンプしてテキストに変換します。
+            </summary>
+            <param name="values"></param>
+            <param name="toString"></param>
+            <param name="lineFeedSpan"></param>
+            <param name="lineHeaderFormat"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.ArrayUtil`1.DumpHexText(System.Collections.Generic.IEnumerable{`0})">
+            <summary>
+            １６進ダンプのテキストを作成します。
+            </summary>
+            <param name="values"></param>
+            <returns></returns>
+        </member>
+        <member name="T:CSUtil.ArrayUtil`1.ToStringDelgate">
+            <summary>
+            値を文字列に変換するデリゲート
+            </summary>
+            <param name="value"></param>
+            <returns></returns>
+        </member>
+        <member name="T:CSUtil.BCDConverter">
+            <summary>
+            リトルエンディアン配置のBCDバイト列を変換するコンバータです。
+            </summary>
+        </member>
+        <member name="M:CSUtil.BCDConverter.GetBytes(System.UInt32,System.Int32)">
+            <summary>
+            uint値をbyte配列に変換します。
+            </summary>
+            <param name="value"></param>
+            <param name="length"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.BCDConverter.GetBytes(System.DateTime)">
+            <summary>
+            DateTime値を8byteのBSD表現に変換した配列を返します。
+            </summary>
+            <param name="value">DateTime値。</param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.BCDConverter.ToInt32(System.Byte[],System.Int32,System.Int32)">
+            <summary>
+            指定長byte配列より、UInt32値を返します。
+            </summary>
+            <param name="value">byte配列</param>
+            <param name="startIndex">走査開始位置</param>
+            <param name="length">配列長</param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.BCDConverter.ToDateTime(System.Byte[],System.Int32)">
+            <summary>
+            BCD表現の8byte配列よりDateTime値を取得します。
+            変換に失敗した場合、DateTime.MinValueを返します。
+            </summary>
+            <param name="value">byte配列</param>
+            <param name="startIndex">走査開始位置</param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.BCDConverter.CalcYear(System.Int32)">
+            <summary>
+            ２桁年号を４桁に換算します。
+            入力される２桁年号は過去３０年より未来が指定されているとみなします。
+            </summary>
+            <param name="yy">２桁年号。</param>
+            <returns></returns>
+        </member>
+        <member name="T:CSUtil.BigEndianBitConverter">
+            <summary>
+            ビックエンディアンバイト列の相互変換。
+            </summary>
+        </member>
+        <member name="M:CSUtil.BigEndianBitConverter.GetBytes(System.Boolean)">
+            <summary>
+            指定したbool値をbyte配列として返します。
+            </summary>
+            <param name="value"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.BigEndianBitConverter.GetBytes(System.Char)">
+            <summary>
+            指定したchar値をbyte配列として返します。
+            </summary>
+            <param name="value"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.BigEndianBitConverter.GetBytes(System.Int16)">
+            <summary>
+            指定したshort値をbyte配列として返します。
+            </summary>
+            <param name="value"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.BigEndianBitConverter.GetBytes(System.UInt16)">
+            <summary>
+            指定したushort値をbyte配列として返します。
+            </summary>
+            <param name="value"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.BigEndianBitConverter.GetBytes(System.Int32)">
+            <summary>
+            指定したint値をbyte配列として返します。
+            </summary>
+            <param name="value"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.BigEndianBitConverter.GetBytes(System.UInt32)">
+            <summary>
+            指定したuint値をbyte配列として返します。
+            </summary>
+            <param name="value"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.BigEndianBitConverter.GetBytes(System.Int64)">
+            <summary>
+            指定したlong値をbyte配列として返します。
+            </summary>
+            <param name="value"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.BigEndianBitConverter.GetBytes(System.UInt64)">
+            <summary>
+            指定したulong値をbyte配列として返します。
+            </summary>
+            <param name="value"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.BigEndianBitConverter.GetBytes(System.Single)">
+            <summary>
+            指定したfloat値をbyte配列として返します。
+            </summary>
+            <param name="value"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.BigEndianBitConverter.GetBytes(System.Double)">
+            <summary>
+            指定したdouble値をbyte配列として返します。
+            </summary>
+            <param name="value"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.BigEndianBitConverter.ToBoolean(System.Byte[],System.Int32)">
+            <summary>
+            byte配列の指定位置から始まる1byteのデータをbool値として返します。
+            </summary>
+            <param name="value"></param>
+            <param name="startIndex"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.BigEndianBitConverter.ToChar(System.Byte[],System.Int32)">
+            <summary>
+            byte配列の指定位置から始まる2byteのデータをchar値として返します。
+            </summary>
+            <param name="value"></param>
+            <param name="startIndex"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.BigEndianBitConverter.ToDouble(System.Byte[],System.Int32)">
+            <summary>
+            byte配列の指定位置から始まる8byteのデータをdouble値として返します。
+            </summary>
+            <param name="value"></param>
+            <param name="startIndex"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.BigEndianBitConverter.ToInt16(System.Byte[],System.Int32)">
+            <summary>
+            byte配列の指定位置から始まる2byteのデータをshort値として返します。
+            </summary>
+            <param name="value"></param>
+            <param name="startIndex"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.BigEndianBitConverter.ToInt32(System.Byte[],System.Int32)">
+            <summary>
+            byte配列の指定位置から始まる4byteのデータをint値として返します。
+            </summary>
+            <param name="value"></param>
+            <param name="startIndex"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.BigEndianBitConverter.ToInt64(System.Byte[],System.Int32)">
+            <summary>
+            byte配列の指定位置から始まる8byteのデータをlong値として返します。
+            </summary>
+            <param name="value"></param>
+            <param name="startIndex"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.BigEndianBitConverter.ToSingle(System.Byte[],System.Int32)">
+            <summary>
+            byte配列の指定位置から始まる4byteのデータをfloat値として返します。
+            </summary>
+            <param name="value"></param>
+            <param name="startIndex"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.BigEndianBitConverter.ToUInt16(System.Byte[],System.Int32)">
+            <summary>
+            byte配列の指定位置から始まる2byteのデータをushort値として返します。
+            </summary>
+            <param name="value"></param>
+            <param name="startIndex"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.BigEndianBitConverter.ToUInt32(System.Byte[],System.Int32)">
+            <summary>
+            byte配列の指定位置から始まる4byteのデータをuint値として返します。
+            </summary>
+            <param name="value"></param>
+            <param name="startIndex"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.BigEndianBitConverter.ToUInt64(System.Byte[],System.Int32)">
+            <summary>
+            byte配列の指定位置から始まる8byteのデータをulong値として返します。
+            </summary>
+            <param name="value"></param>
+            <param name="startIndex"></param>
+            <returns></returns>
+        </member>
+        <member name="T:CSUtil.Configuration.IniFile">
+            <summary>
+            IniFileにアクセスします。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Configuration.IniFile.GetPrivateProfileString(System.String,System.String,System.String,System.Text.StringBuilder,System.UInt32,System.String)">
+            <summary>
+            API宣言
+            * iniﾌｧｲﾙ読込み関数宣言
+            </summary>
+        </member>
+        <member name="M:CSUtil.Configuration.IniFile.WritePrivateProfileString(System.String,System.String,System.String,System.String)">
+            <summary>
+            API宣言
+            * iniﾌｧｲﾙ書込み関数宣言
+            </summary>
+        </member>
+        <member name="M:CSUtil.Configuration.IniFile.#ctor(System.String)">
+            <summary>
+            コンストラクタ。
+            </summary>
+            <param name="iniFileName">iniFile名</param>
+        </member>
+        <member name="M:CSUtil.Configuration.IniFile.GetIniString(System.String,System.String,System.String)">
+            <summary>
+            指定したsection,keyの情報を取得します。
+            情報が存在しない場合、defaultValue値を返します。
+            </summary>
+            <param name="section">セクション名</param>
+            <param name="key">Key名</param>
+            <param name="defaultValue">デフォルト値</param>
+            <returns>IniFile値</returns>
+        </member>
+        <member name="M:CSUtil.Configuration.IniFile.GetIniString(System.String,System.String)">
+            <summary>
+            指定したsection,keyの情報を取得します。
+            情報が存在しない場合、""を返します。
+            </summary>
+            <param name="section">セクション名</param>
+            <param name="key">Key名</param>
+            <returns>IniFile値</returns>
+        </member>
+        <member name="M:CSUtil.Configuration.IniFile.SetIniString(System.String,System.String,System.String)">
+            <summary>
+            指定したsection,keyに値を書き込みます。
+            </summary>
+            <param name="section">セクション名</param>
+            <param name="key">Key名</param>
+            <param name="value"></param>
+            <returns>書き込みが行えたらtrue</returns>
+        </member>
+        <member name="M:CSUtil.Configuration.IniFile.GetBool(System.String)">
+            <summary>
+            文字列値をbool値に変換します。
+            </summary>
+            <param name="s">文字列</param>
+            <returns>trueと判別されるべき文字列の場合true</returns>
+        </member>
+        <member name="M:CSUtil.Configuration.IniFile.GetInt32(System.String,System.Int32)">
+            <summary>
+            文字列値をint値に変換します。
+            </summary>
+            <param name="s">文字列</param>
+            <param name="defaultValue">変換できなかったときのデフォルト値</param>
+            <returns>trueと判別されるべき文字列の場合true</returns>
+        </member>
+        <member name="M:CSUtil.Configuration.IniFile.GetDouble(System.String,System.Int32)">
+            <summary>
+            文字列値をdouble値に変換します。
+            </summary>
+            <param name="s">文字列</param>
+            <param name="defaultValue">変換できなかったときのデフォルト値</param>
+            <returns>trueと判別されるべき文字列の場合true</returns>
+        </member>
+        <member name="P:CSUtil.Configuration.IniFile.Item(System.String,System.String)">
+            <summary>
+            IniFileメンバにアクセスするためのインデックスです。
+            </summary>
+            <param name="section">セクション名</param>
+            <param name="key">Key名</param>
+            <returns></returns>
+        </member>
+        <member name="T:CSUtil.DateTimeUtil">
+            <summary>
+            日付のコンバータ。
+            </summary>
+        </member>
+        <member name="M:CSUtil.DateTimeUtil.ToDate(System.Int32,System.Int32,System.DayOfWeek)">
+            <summary>
+            月・日・曜日より、年月日を求めてDateTimeを作成します。
+            180日先の年より過去にさかのぼり、最初に曜日が一致した年にします。
+            </summary>
+            <param name="month"></param>
+            <param name="day"></param>
+            <param name="week"></param>
+            <returns></returns>
+        </member>
+        <member name="T:CSUtil.Forms.CheckCopyKey">
+            <summary>
+            CTRL+Cボタンを監視し、TRUEになったときにイベントを実行します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Forms.CheckCopyKey.#ctor">
+            <summary>
+            コンストラクタ
+            </summary>
+        </member>
+        <member name="M:CSUtil.Forms.CheckCopyKey.#ctor(System.Windows.Forms.Control,System.EventHandler)">
+            <summary>
+            コンストラクタ。
+            </summary>
+            <param name="control"></param>
+            <param name="copyKeyPressEvent"></param>
+        </member>
+        <member name="M:CSUtil.Forms.CheckCopyKey.OnKeyDown(System.Object,System.Windows.Forms.KeyEventArgs)">
+            <summary>
+            KeyDownイベントを監視します。
+            </summary>
+            <param name="sender"></param>
+            <param name="e"></param>
+        </member>
+        <member name="M:CSUtil.Forms.CheckCopyKey.OnKeyUp(System.Object,System.Windows.Forms.KeyEventArgs)">
+            <summary>
+            KeyUpイベントを監視します。
+            </summary>
+            <param name="sender"></param>
+            <param name="e"></param>
+        </member>
+        <member name="E:CSUtil.Forms.CheckCopyKey.CopyKeyPress">
+            <summary>
+            コピーキーが押されたときのイベント。
+            </summary>
+        </member>
+        <member name="T:CSUtil.Forms.FormUtil">
+            <summary>
+            Formに関するユーティティです。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Forms.FormUtil.RemoveCloseButton(CSUtil.Forms.ILoggingForm)">
+            <summary>
+            フォームのクローズボタンを無効化します。
+            OnLoadが実行される前に行なう必要があります。
+            </summary>
+            <param name="form"></param>
+        </member>
+        <member name="T:CSUtil.Forms.ILoggingForm">
+            <summary>
+            ロギングを行うFormで共通に利用するインターフェースを定義します。
+            </summary>
+        </member>
+        <member name="T:CSUtil.Forms.IRmsLogging">
+            <summary>
+            RMSロギング処理を行っているモジュールのインターフェースです。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Forms.IRmsLogging.OnWriteCloseLog">
+            <summary>
+            ログバッファを一旦吐き出し、ログファイルを閉じます。
+            </summary>
+        </member>
+        <member name="T:CSUtil.Forms.IBaseLoggingForm">
+            <summary>
+            ロギングを行うフォームのForm互換インターフェースを定義します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Forms.IBaseLoggingForm.BringToFront">
+            <summary>
+            コントロールを z オーダーの最前面へ移動します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Forms.IBaseLoggingForm.SuspendLayout">
+            <summary>
+            コントロールのレイアウト ロジックを一時的に中断します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Forms.IBaseLoggingForm.ResumeLayout">
+            <summary>
+            通常のレイアウト ロジックを再開します。 
+            </summary>
+        </member>
+        <member name="M:CSUtil.Forms.IBaseLoggingForm.CreateControl">
+            <summary>
+            ハンドルおよび子コントロールの作成を含めて、強制的にコントロールを作成します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Forms.IBaseLoggingForm.Show">
+            <summary>
+            コントロールをユーザーに対して表示します。 
+            </summary>
+        </member>
+        <member name="P:CSUtil.Forms.IBaseLoggingForm.WindowState">
+            <summary>
+            フォームのウィンドウ状態を取得または設定します。
+            </summary>
+        </member>
+        <member name="E:CSUtil.Forms.IBaseLoggingForm.Load">
+            <summary>
+            フォームが初めて表示される直前に発生します。 
+            </summary>
+        </member>
+        <member name="P:CSUtil.Forms.IBaseLoggingForm.Icon">
+            <summary>
+            フォームのアイコンを取得または設定します。 
+            </summary>
+        </member>
+        <member name="P:CSUtil.Forms.IBaseLoggingForm.MdiParent">
+            <summary>
+            対象となるフォームの現在のマルチ ドキュメント インターフェイス (MDI) 親フォームを取得または設定します。 
+            </summary>
+        </member>
+        <member name="E:CSUtil.Forms.IBaseLoggingForm.Activated">
+            <summary>
+            フォームがコード内またはユーザーの操作によってアクティブになると発生します。
+            </summary>
+        </member>
+        <member name="E:CSUtil.Forms.IBaseLoggingForm.FormClosing">
+            <summary>
+            フォームが閉じる前に発生します。
+            </summary>
+        </member>
+        <member name="T:CSUtil.Forms.ILogItem">
+            <summary>
+            ログアイテムを取得するインターフェースを定義します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Forms.ILogItem.GetLogItem">
+            <summary>
+            ログアイテムを取得します。
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="T:CSUtil.Forms.LogItem">
+            <summary>
+            アイテム情報構造体。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Forms.LogItem.TimeStamp">
+            <summary>
+            タイムスタンプ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Forms.LogItem.Text">
+            <summary>
+            表示テキスト。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Forms.LogItem.ForeColor">
+            <summary>
+            文字色。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Forms.LogItem.BackColor">
+            <summary>
+            背景色。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Forms.LogItem.#ctor(System.DateTime,System.String,System.Drawing.Color,System.Drawing.Color)">
+            <summary>
+            コンストラクタ。
+            </summary>
+            <param name="timeStamp"></param>
+            <param name="text"></param>
+            <param name="foreColor"></param>
+            <param name="backColor"></param>
+        </member>
+        <member name="M:CSUtil.Forms.LogItem.ToString">
+            <summary>
+            オブジェクトの文字列表現を返します。
+            </summary>
+            <returns>オブジェクトの文字列表現</returns>
+        </member>
+        <member name="T:CSUtil.Forms.LogItemCollection`1">
+            <summary>
+            ILogItemインターフェースを持つ要素を管理するリストです。
+            </summary>
+            <typeparam name="T"></typeparam>
+        </member>
+        <member name="F:CSUtil.Forms.LogItemCollection`1.DIV_ARRAYS">
+            <summary>
+            子要素配列の大きさを決定する定数
+            </summary>
+        </member>
+        <member name="F:CSUtil.Forms.LogItemCollection`1.Name">
+            <summary>
+            アイテム名称（ロギング用）
+            </summary>
+        </member>
+        <member name="F:CSUtil.Forms.LogItemCollection`1.LimitCount">
+            <summary>
+            列削除を行なう閾値。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Forms.LogItemCollection`1.Arrays">
+            <summary>
+            データ管理オブジェクト。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Forms.LogItemCollection`1.ChildMaxCount">
+            <summary>
+            子要素配列の最大値。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Forms.LogItemCollection`1.ArraysIndex">
+            <summary>
+            現在参照している親領域。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Forms.LogItemCollection`1.ChildNextIndex">
+            <summary>
+            現在参照している子領域。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Forms.LogItemCollection`1.count">
+            <summary>
+            全体の要素数。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Forms.LogItemCollection`1.lockAdd">
+            <summary>
+            追加処理専用の同期オブジェクト。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Forms.LogItemCollection`1.#ctor(System.String,System.Int32)">
+            <summary>
+            コンストラクタ。
+            </summary>
+            <param name="name"></param>
+            <param name="maxCount"></param>
+        </member>
+        <member name="M:CSUtil.Forms.LogItemCollection`1.Add(`0)">
+            <summary>
+            要素を追加します。
+            要素数がリミット値を超えた場合、trueを返します。
+            </summary>
+            <param name="item"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.Forms.LogItemCollection`1.RemoveLimit">
+            <summary>
+            要素数をリミット値以下に縮小します。
+            縮小数を返します。
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.Forms.LogItemCollection`1.GetLogItem(System.Int32)">
+            <summary>
+            要素を取得します。
+            </summary>
+            <param name="index"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.Forms.LogItemCollection`1.EnLogItem(System.DateTime,System.DateTime)">
+            <summary>
+            指定日時範囲のデータを列挙します。
+            </summary>
+            <param name="from"></param>
+            <param name="to"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.Forms.LogItemCollection`1.FindText(System.String,System.Int32,System.Int32,System.Boolean)">
+            <summary>
+            指定位置の間に文字列が存在するかどうかを検索し、場所をindexで返します。
+            存在しない場合は-1を返します。
+            </summary>
+            <param name="text">検索文字列</param>
+            <param name="from">開始Index</param>
+            <param name="to">終了Index</param>
+            <param name="isNext">後方検索の場合true</param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.Forms.LogItemCollection`1.FindText(System.String,System.Int32,System.Boolean)">
+            <summary>
+            指定位置から最後までの間に文字列が存在するかどうかを検索し、場所をindexで返します。
+            存在しない場合は-1を返します。
+            </summary>
+            <param name="text">検索文字列</param>
+            <param name="offset">開始index</param>
+            <param name="isNext">後方検索の場合true</param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.Forms.LogItemCollection`1.FindText(System.String,System.Boolean)">
+            <summary>
+            先頭から最後までの間に文字列が存在するかどうかを検索し、場所をindexで返します。
+            存在しない場合は-1を返します。
+            </summary>
+            <param name="text"></param>
+            <param name="isNext">後方検索の場合true</param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.Forms.LogItemCollection`1.IndexOf(CSUtil.Forms.LogItem)">
+            <summary>
+            このメソッドは実装されません。
+            </summary>
+            <param name="item"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.Forms.LogItemCollection`1.Insert(System.Int32,CSUtil.Forms.LogItem)">
+            <summary>
+            このメソッドは実装されません。
+            </summary>
+            <param name="index"></param>
+            <param name="item"></param>
+        </member>
+        <member name="M:CSUtil.Forms.LogItemCollection`1.RemoveAt(System.Int32)">
+            <summary>
+            このメソッドは実装されません。
+            </summary>
+            <param name="index"></param>
+        </member>
+        <member name="M:CSUtil.Forms.LogItemCollection`1.Add(CSUtil.Forms.LogItem)">
+            <summary>
+            このメソッドは実装されません。
+            </summary>
+            <param name="item"></param>
+        </member>
+        <member name="M:CSUtil.Forms.LogItemCollection`1.Clear">
+            <summary>
+            このメソッドは実装されません。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Forms.LogItemCollection`1.Contains(CSUtil.Forms.LogItem)">
+            <summary>
+            このメソッドは実装されません。
+            </summary>
+            <param name="item"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.Forms.LogItemCollection`1.CopyTo(CSUtil.Forms.LogItem[],System.Int32)">
+            <summary>
+            このメソッドは実装されません。
+            </summary>
+            <param name="array"></param>
+            <param name="arrayIndex"></param>
+        </member>
+        <member name="M:CSUtil.Forms.LogItemCollection`1.Remove(CSUtil.Forms.LogItem)">
+            <summary>
+            このメソッドは実装されません。
+            </summary>
+            <param name="item"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.Forms.LogItemCollection`1.GetEnumerator">
+            <summary>
+            列挙子を返します。
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.Forms.LogItemCollection`1.System#Collections#IEnumerable#GetEnumerator">
+            <summary>
+            列挙子を返します。
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="P:CSUtil.Forms.LogItemCollection`1.SyncRoot">
+            <summary>
+            外部参照同期オブジェクト。
+            </summary>
+        </member>
+        <member name="P:CSUtil.Forms.LogItemCollection`1.Count">
+            <summary>
+            要素数を返します。
+            </summary>
+        </member>
+        <member name="P:CSUtil.Forms.LogItemCollection`1.Item(System.Int32)">
+            <summary>
+            要素へアクセスします。
+            </summary>
+            <param name="index"></param>
+            <returns></returns>
+        </member>
+        <member name="P:CSUtil.Forms.LogItemCollection`1.IsReadOnly">
+            <summary>
+            読み込み専用ならtrue。常にtrueを返します。
+            </summary>
+        </member>
+        <member name="T:CSUtil.IO.BigEndianWriter">
+            <summary>
+            ビックエンディアンのBinaryWriter。
+            </summary>
+        </member>
+        <member name="M:CSUtil.IO.BigEndianWriter.#ctor">
+            <summary>
+            コンストラクタ。
+            </summary>
+        </member>
+        <member name="M:CSUtil.IO.BigEndianWriter.#ctor(System.IO.Stream)">
+            <summary>
+            コンストラクタ。
+            </summary>
+            <param name="output"></param>
+        </member>
+        <member name="M:CSUtil.IO.BigEndianWriter.#ctor(System.IO.Stream,System.Text.Encoding)">
+            <summary>
+            コンストラクタ。
+            </summary>
+            <param name="output"></param>
+            <param name="encoding"></param>
+        </member>
+        <member name="M:CSUtil.IO.BigEndianWriter.Write(System.Int64)">
+            <summary>
+            8byteのlong値を書き込みます。
+            </summary>
+            <param name="value"></param>
+        </member>
+        <member name="M:CSUtil.IO.BigEndianWriter.Write(System.UInt64)">
+            <summary>
+            8byteのulong値を書き込みます。
+            </summary>
+            <param name="value"></param>
+        </member>
+        <member name="M:CSUtil.IO.BigEndianWriter.Write(System.Int32)">
+            <summary>
+            4byteのint値を書き込みます。
+            </summary>
+            <param name="value"></param>
+        </member>
+        <member name="M:CSUtil.IO.BigEndianWriter.Write(System.UInt32)">
+            <summary>
+            4byteのuint値を書き込みます。
+            </summary>
+            <param name="value"></param>
+        </member>
+        <member name="M:CSUtil.IO.BigEndianWriter.Write(System.Int16)">
+            <summary>
+            2byteのshort値を書き込みます。
+            </summary>
+            <param name="value"></param>
+        </member>
+        <member name="M:CSUtil.IO.BigEndianWriter.Write(System.UInt16)">
+            <summary>
+            2byteのushort値を書き込みます。
+            </summary>
+            <param name="value"></param>
+        </member>
+        <member name="M:CSUtil.IO.BigEndianWriter.Write(System.Single)">
+            <summary>
+            4byteのfloat値を書き込みます。
+            </summary>
+            <param name="value"></param>
+        </member>
+        <member name="M:CSUtil.IO.BigEndianWriter.Write(System.Double)">
+            <summary>
+            8byteのdouble値を書き込みます。
+            </summary>
+            <param name="value"></param>
+        </member>
+        <member name="M:CSUtil.IO.BigEndianWriter.WriteBCD(System.Int32,System.Int32)">
+            <summary>
+            数値をBCD（２進可１６進数）に変換して書き込みます。
+            </summary>
+            <param name="value">値</param>
+            <param name="byteSize">byte数</param>
+        </member>
+        <member name="T:CSUtil.BoolCollection">
+            <summary>
+            Byte配列をbool値の集合として扱います。
+            </summary>
+        </member>
+        <member name="M:CSUtil.BoolCollection.#ctor(System.Byte[],System.Int32,System.Int32)">
+            <summary>
+            コンストラクタ。
+            与えられた配列をbool値の集合として取り扱います。
+            </summary>
+            <param name="data">byte配列。</param>
+            <param name="startIndex">開始index</param>
+            <param name="length">配列長</param>
+        </member>
+        <member name="M:CSUtil.BoolCollection.#ctor(System.Byte[])">
+            <summary>
+            コンストラクタ。
+            与えられた配列をbool値の集合として取り扱います。
+            </summary>
+            <param name="data">byte配列。</param>
+        </member>
+        <member name="M:CSUtil.BoolCollection.EnumBitChange(CSUtil.BoolCollection,CSUtil.BoolCollection)">
+            <summary>
+            BitチェンジがあったIndexの情報を列挙します。
+            </summary>
+            <param name="old">旧BoolCollection</param>
+            <param name="now">新BoolCollection</param>
+            <returns>key/valueのペア。keyがIndex値、valueがbit値。</returns>
+        </member>
+        <member name="M:CSUtil.BoolCollection.EnumBitChange(System.Byte[],System.Byte[])">
+            <summary>
+            BitチェンジがあったIndexの情報を列挙します。
+            </summary>
+            <param name="old">旧byte配列</param>
+            <param name="now">新byte配列</param>
+            <returns>key/valueのペア。keyがIndex値、valueがbit値。</returns>
+        </member>
+        <member name="M:CSUtil.BoolCollection.IndexOf(System.Boolean)">
+            <summary>
+            このメソッドはサポートしません。
+            </summary>
+            <param name="item"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.BoolCollection.Insert(System.Int32,System.Boolean)">
+            <summary>
+            このメソッドはサポートしません。
+            </summary>
+            <param name="index"></param>
+            <param name="item"></param>
+        </member>
+        <member name="M:CSUtil.BoolCollection.RemoveAt(System.Int32)">
+            <summary>
+            このメソッドはサポートしません。
+            </summary>
+            <param name="index"></param>
+        </member>
+        <member name="M:CSUtil.BoolCollection.Add(System.Boolean)">
+            <summary>
+            このメソッドはサポートしません。
+            </summary>
+            <param name="item"></param>
+        </member>
+        <member name="M:CSUtil.BoolCollection.Clear">
+            <summary>
+            このメソッドはサポートしません。
+            </summary>
+        </member>
+        <member name="M:CSUtil.BoolCollection.Contains(System.Boolean)">
+            <summary>
+            このメソッドはサポートしません。
+            </summary>
+            <param name="item"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.BoolCollection.CopyTo(System.Boolean[],System.Int32)">
+            <summary>
+            要素を Array にコピーします。Array の特定のインデックスからコピーが開始されます。 
+            </summary>
+            <param name="array"></param>
+            <param name="arrayIndex"></param>
+        </member>
+        <member name="M:CSUtil.BoolCollection.Remove(System.Boolean)">
+            <summary>
+            このメソッドはサポートしません。
+            </summary>
+            <param name="item"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.BoolCollection.GetEnumerator">
+            <summary>
+            boolコレクションを反復処理する列挙子を返します。 
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.BoolCollection.System#Collections#IEnumerable#GetEnumerator">
+            <summary>
+            objectコレクションを反復処理する列挙子を返します。 
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="P:CSUtil.BoolCollection.Count">
+            <summary>
+            配列のサイズを取得します。
+            </summary>
+        </member>
+        <member name="P:CSUtil.BoolCollection.Item(System.Int32)">
+            <summary>
+            指定されたインデックスのbool値を取得または設定します。
+            </summary>
+            <param name="index"></param>
+            <returns></returns>
+        </member>
+        <member name="P:CSUtil.BoolCollection.IsReadOnly">
+            <summary>
+            読み取り専用かどうかを示す値を取得します。常にtrueを返します。
+            </summary>
+        </member>
+        <member name="T:CSUtil.IO.MailSlotBase">
+            <summary>
+            メールスロット管理基本クラス。
+            </summary>
+        </member>
+        <member name="M:CSUtil.IO.MailSlotBase.#ctor(System.String,System.Int32)">
+            <summary>
+            コンストラクタです。
+            </summary>
+            <param name="name">メールスロット名</param>
+            <param name="maxMessageSize">最大メッセージバッファ長</param>
+        </member>
+        <member name="M:CSUtil.IO.MailSlotBase.Dispose">
+            <summary>
+            オブジェクトを破棄します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.IO.MailSlotBase.ReadOpen(System.TimeSpan)">
+            <summary>
+            読み込み用にメールスロットを開きます。
+            </summary>
+        </member>
+        <member name="P:CSUtil.IO.MailSlotBase.Handle">
+            <summary>メールスロットハンドルを取得します。</summary>
+        </member>
+        <member name="P:CSUtil.IO.MailSlotBase.Name">
+            <summary>スロット名称を取得します。 </summary>
+        </member>
+        <member name="P:CSUtil.IO.MailSlotBase.MaxMessageSize">
+            <summary>最大メッセージバッファ長(ANSI文字長)を取得します。 </summary>
+        </member>
+        <member name="P:CSUtil.IO.MailSlotBase.NextMessageSize">
+            <summary>次のメッセージサイズを取得します。存在しない場合-1を返します。 </summary>
+        </member>
+        <member name="T:CSUtil.IO.MailSlotReader">
+            <summary>
+            メールスロットの読込クラスです。
+            </summary>
+        </member>
+        <member name="M:CSUtil.IO.MailSlotReader.#ctor(System.String,System.Int32)">
+            <summary>
+            コンストラクタ。
+            </summary>
+            <param name="name">メールスロット名</param>
+            <param name="maxMessageSize">最大メッセージバッファ長</param>
+        </member>
+        <member name="M:CSUtil.IO.MailSlotReader.#ctor(System.String)">
+            <summary>
+            コンストラクタ。
+            </summary>
+            <param name="name">メールスロット名</param>
+        </member>
+        <member name="M:CSUtil.IO.MailSlotReader.Dispose">
+            <summary>
+            開放処理を行います。
+            </summary>
+        </member>
+        <member name="M:CSUtil.IO.MailSlotReader.Clear">
+            <summary>
+            残っているメッセージを全て読み出します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.IO.MailSlotReader.EnBytes">
+            <summary>
+            メッセージがなくなるまで列挙します。
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.IO.MailSlotReader.GetEnumerator">
+            <summary>
+            メッセージが無くなるまで列挙します。
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.IO.MailSlotReader.System#Collections#IEnumerable#GetEnumerator">
+            <summary>
+            メッセージが無くなるまで列挙します。
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="T:CSUtil.IO.Pushd">
+            <summary>
+            現在のディレクトリを保管し、カレントディレクトリを変更します。
+            Dispose時に元に戻します。
+            </summary>
+        </member>
+        <member name="F:CSUtil.IO.Pushd.OrgPath">
+            <summary>
+            元のディレクトリ。
+            </summary>
+        </member>
+        <member name="M:CSUtil.IO.Pushd.#ctor">
+            <summary>
+            デフォルトコンストラクタ。
+            </summary>
+        </member>
+        <member name="M:CSUtil.IO.Pushd.#ctor(System.String)">
+            <summary>
+            コンストラクタ。
+            </summary>
+            <param name="newPath"></param>
+        </member>
+        <member name="M:CSUtil.IO.Pushd.Dispose">
+            <summary>
+            開放処理。
+            </summary>
+        </member>
+        <member name="M:CSUtil.IO.Pushd.Execute(System.String,System.Threading.ThreadStart)">
+            <summary>
+            ディレクトリを移動し、関数を実行します。
+            関数実行後、ディレクトリを元に戻します。
+            </summary>
+            <param name="newPath"></param>
+            <param name="func"></param>
+        </member>
+        <member name="T:CSUtil.IO.UnmanagedTempFile">
+            <summary>
+            アンマネージリソースに渡される可能性がある一時ファイルの
+            生成、削除に関するユーティリティ関数郡です。
+            任意のタイミングで一時ファイルをまとめて削除できます。
+            マネージのみで利用される一時ファイルの作成に、
+            この関数郡を利用する必要はありません。
+            </summary>
+        </member>
+        <member name="T:CSUtil.DisposableObject">
+            <summary>
+            IDisposableの基本実装を行ないます。
+            </summary>
+        </member>
+        <member name="M:CSUtil.DisposableObject.Dispose">
+            <summary>
+            リソースの開放を行ないます。
+            </summary>
+        </member>
+        <member name="M:CSUtil.DisposableObject.Finalize">
+            <summary>
+            デストラクタ。アンマネージリソースのみ開放します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.DisposableObject.DisposeManage">
+            <summary>
+            マネージリソースの開放処理を行ないます。
+            Disposeメソッドが呼び出されたときにのみ実行します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.DisposableObject.DisposeUnManage">
+            <summary>
+            アンマネージリソースの開放処理を行ないます。
+            Dispose、及びデストラクタにて実行します。
+            </summary>
+        </member>
+        <member name="P:CSUtil.DisposableObject.IsDisposed">
+            <summary>
+            既に破棄処理が行なわれていればtrueを返します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.IO.UnmanagedTempFile.GetTempFileName">
+            <summary>
+            一意な名前を持つ 0 バイトの一時ファイルをディスク上に作成し、
+            そのファイルの完全パスを返します。
+            作成したファイル名は記憶され、RemoveTempFile関数の実行時に削除されます。
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.IO.UnmanagedTempFile.ClearTempFile">
+            <summary>
+            これまでに作成した一時ファイルについて、
+            削除可能なものをすべて削除します。削除できなかったものは次回の
+            削除タイミングに持ち越されます。
+            削除可能性を高めるため、実行に先立ちガベージコレクトを実行します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.IO.UnmanagedTempFile.DisposeUnManage">
+            <summary>
+            アンマネージリソースを開放します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.IO.UnmanagedTempFile.Create">
+            <summary>
+            一意な名前を持つ 0 バイトの一時ファイルをディスク上に作成し、
+            そのファイルの完全パスを返します。 
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.IO.UnmanagedTempFile.Clear">
+            <summary>
+            削除可能な一時ファイルについて全て削除します。
+            </summary>
+        </member>
+        <member name="T:CSUtil.Management.QueryUtil">
+            <summary>
+            システムへの問い合わせ処理サブルーチン集。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Management.QueryUtil.GetDickFreeSpace(System.String)">
+            <summary>
+            指定されたPathに属するHDDのフリースペースを取得します。
+            </summary>
+            <param name="driveName"></param>
+            <returns></returns>
+        </member>
+        <member name="T:CSUtil.Profile.EventProfiler`1">
+            <summary>
+            イベントの実行時間を計測し、警告を出すためのプロファイラです。
+            </summary>
+            <typeparam name="T"></typeparam>
+        </member>
+        <member name="M:CSUtil.Profile.EventProfiler`1.#ctor(System.String,System.EventHandler{`0})">
+            <summary>
+            コンストラクタ。
+            </summary>
+            <param name="name"></param>
+            <param name="profileEvent"></param>
+        </member>
+        <member name="M:CSUtil.Profile.EventProfiler`1.#ctor(System.EventHandler{`0})">
+            <summary>
+            コンストラクタ。
+            </summary>
+            <param name="profileEvent"></param>
+        </member>
+        <member name="M:CSUtil.Profile.EventProfiler`1.OnProfile(System.Object,`0)">
+            <summary>
+            イベントを実行します。
+            実行時間を計測し、最高処理時間を更新した場合にログを出力します。
+            </summary>
+            <param name="sender"></param>
+            <param name="args"></param>
+        </member>
+        <member name="T:CSUtil.Profile.CallMonitor">
+            <summary>
+            関数の呼び出し状況を1000回呼出し単位で通知します。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Profile.CallMonitor.Name">
+            <summary>
+            モニタの名前。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Profile.CallMonitor.#ctor(System.String)">
+            <summary>
+            コンストラクタ。
+            </summary>
+            <param name="name"></param>
+        </member>
+        <member name="M:CSUtil.Profile.CallMonitor.CallOne">
+            <summary>
+            １回の呼び出しをカウントします。
+            </summary>
+        </member>
+        <member name="T:CSUtil.Profile.ProfileUtil">
+            <summary>
+            プロファイルユーティリティ。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Profile.ProfileUtil.WrapEvent``1(System.EventHandler{``0})">
+            <summary>
+            与えられたイベントにプロファイル処理をラップします。
+            </summary>
+            <param name="profileEvent"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.Profile.ProfileUtil.WrapInvoke(CSUtil.Profile.ProfileUtil.InvoleMethod)">
+            <summary>
+            MethodInvokerにプロファイルをラップして返します。
+            </summary>
+            <param name="func"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.Profile.ProfileUtil.WrapFunction(CSUtil.Profile.ProfileUtil.InvoleMethod)">
+            <summary>
+            プロファイルを実行します。
+            </summary>
+            <param name="func"></param>
+            <returns></returns>
+        </member>
+        <member name="T:CSUtil.Profile.ProfileUtil.InvoleMethod">
+            <summary>
+            引数のないデリゲート。
+            </summary>
+        </member>
+        <member name="T:CSUtil.Profile.StopwatchEx">
+            <summary>
+            メッセージ出力つきのストップウォッチ
+            </summary>
+        </member>
+        <member name="M:CSUtil.Profile.StopwatchEx.#ctor">
+            <summary>
+            コンストラクタ。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Profile.StopwatchEx.StartNew">
+            <summary>
+            ストップウォッチを作成し、スタートします。
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.Profile.StopwatchEx.CheckAndRestart(System.String)">
+            <summary>
+            経過時間を取得し、遅延が大きければログを出力後、時間をリセットし再起動します。
+            </summary>
+            <param name="text"></param>
+        </member>
+        <member name="T:CSUtil.Random.CompatilizedRandom">
+            <summary>
+            CSUtil.Random.RandomBaseをSystem.Random互換にするアダプタクラス。
+            各メンバ関数の入力・出力はSystem.Randomと同じ範囲になります。
+            CSUtil.Random.RandomBase派生クラスをSystem.Randomとして使いたい場合に用います。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.CompatilizedRandom.#ctor(CSUtil.Random.RandomBase)">
+            <summary>
+            randをソースとしてアダプタクラスを初期化します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.CompatilizedRandom.Next">
+            <summary>
+            [0,Int32.MaxValue)の擬似乱数を取得します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.CompatilizedRandom.Next(System.Int32)">
+            <summary>
+            [0,maxValue)の擬似乱数を取得します。
+            但しmaxValue=0の場合は0を返します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.CompatilizedRandom.Next(System.Int32,System.Int32)">
+            <summary>
+            [minValue,maxValue)の擬似乱数を取得します。
+            ただし、minValue=maxValueのときはminValueを返します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.CompatilizedRandom.Sample">
+            <summary>
+            [0,1)の擬似乱数を取得します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.CompatilizedRandom.NextBytes(System.Byte[])">
+            <summary>
+            バイト配列に擬似乱数を格納します。
+            </summary>
+        </member>
+        <member name="T:CSUtil.Random.LCG">
+            <summary>
+            LCGの擬似乱数ジェネレータークラス。
+            </summary>
+        </member>
+        <member name="T:CSUtil.Random.RandomBase">
+            <summary>
+            各種擬似乱数ジェネレーター用基底クラス。
+            派生クラスはNextUInt32を実装する必要があります。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.RandomBase.NextUInt32">
+            <summary>
+            派生クラスで符号なし32bitの擬似乱数を生成する必要があります。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.RandomBase.NextInt32">
+            <summary>
+            符号あり32bitの擬似乱数を取得します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.RandomBase.NextUInt64">
+            <summary>
+            符号なし64bitの擬似乱数を取得します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.RandomBase.NextInt64">
+            <summary>
+            符号あり64bitの擬似乱数を取得します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.RandomBase.NextBytes(System.Byte[])">
+            <summary>
+            擬似乱数列を生成し、バイト配列に順に格納します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.RandomBase.NextDouble">
+            <summary>
+            [0,1)の擬似乱数を取得します。
+            [0,1)を2^53個に均等にわけ、そのうち一つを返します。
+            NextUInt32を2回呼び出します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.RandomBase.NextFloat">
+            <summary>
+            [0,1)の擬似乱数を取得します。
+            [0,1)を2^32個に均等にわけ、そのうち一つを返します。
+            NextUInt32を1回呼び出します。
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="F:CSUtil.Random.LCG.A">
+            <summary>
+            LCGのパラメーターの一つ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.LCG.C">
+            <summary>
+            LCGのパラメーターの一つ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.LCG.x">
+            <summary>
+            内部状態。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.LCG.#ctor">
+            <summary>
+            現在時刻を種とした、LCG擬似乱数ジェネレーターを初期化します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.LCG.#ctor(System.Int32)">
+            <summary>
+            seedを種とした、LCG擬似乱数ジェネレーターを初期化します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.LCG.#ctor(System.Int32,System.UInt32,System.UInt32)">
+            <summary>
+            seedを種とし、paramAとparamCで表されるLCG擬似乱数ジェネレーターを初期化します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.LCG.NextUInt32">
+            <summary>
+            符号なし32bitの擬似乱数を取得します。
+            </summary>
+        </member>
+        <member name="T:CSUtil.Random.MersenneTwister">
+            <summary>
+            MersenneTwisterの擬似乱数ジェネレータークラス。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.MersenneTwister.N">
+            <summary>
+            内部状態ベクトル総数
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.MersenneTwister.M">
+            <summary>
+            MTを決定するパラメーターの一つ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.MersenneTwister.MATRIX_A">
+            <summary>
+            MTを決定するパラメーターの一つ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.MersenneTwister.UPPER_MASK">
+            <summary>
+            MTを決定するパラメーターの一つ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.MersenneTwister.LOWER_MASK">
+            <summary>
+            MTを決定するパラメーターの一つ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.MersenneTwister.TEMPER1">
+            <summary>
+            MTを決定するパラメーターの一つ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.MersenneTwister.TEMPER2">
+            <summary>
+            MTを決定するパラメーターの一つ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.MersenneTwister.TEMPER3">
+            <summary>
+            MTを決定するパラメーターの一つ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.MersenneTwister.TEMPER4">
+            <summary>
+            MTを決定するパラメーターの一つ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.MersenneTwister.TEMPER5">
+            <summary>
+            MTを決定するパラメーターの一つ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.MersenneTwister.TEMPER6">
+            <summary>
+            MTを決定するパラメーターの一つ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.MersenneTwister.mt">
+            <summary>
+            内部状態ベクトル。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.MersenneTwister.mti">
+            <summary>
+            内部状態ベクトルのうち、次に乱数として使用するインデックス。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.MersenneTwister.#ctor">
+            <summary>
+            現在時刻を種とした、MersenneTwister擬似乱数ジェネレーターを初期化します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.MersenneTwister.#ctor(System.Int32)">
+            <summary>
+            seedを種とした、MersenneTwister擬似乱数ジェネレーターを初期化します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.MersenneTwister.NextUInt32">
+            <summary>
+            符号なし32bitの擬似乱数を取得します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.MersenneTwister.gen_rand_all">
+            <summary>
+            内部状態ベクトルを更新します。
+            </summary>
+        </member>
+        <member name="T:CSUtil.Random.MotherOfAll">
+            <summary>
+            Mother-of-Allの擬似乱数ジェネレータークラス。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.MotherOfAll.x">
+            <summary>
+            内部状態ベクトル。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.MotherOfAll.y">
+            <summary>
+            内部状態ベクトル。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.MotherOfAll.z">
+            <summary>
+            内部状態ベクトル。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.MotherOfAll.w">
+            <summary>
+            内部状態ベクトル。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.MotherOfAll.v">
+            <summary>
+            内部状態ベクトル。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.MotherOfAll.#ctor">
+            <summary>
+            現在時刻を種とした、Mother-Of-All擬似乱数ジェネレーターを初期化します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.MotherOfAll.#ctor(System.Int32)">
+            <summary>
+            seedを種とした、Mother-Of-All擬似乱数ジェネレーターを初期化します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.MotherOfAll.NextUInt32">
+            <summary>
+            符号なし32bitの擬似乱数を取得します。
+            </summary>
+        </member>
+        <member name="T:CSUtil.Random.RanrotB">
+            <summary>
+            Ranrotの擬似乱数ジェネレータークラス。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.RanrotB.KK">
+            <summary>
+            内部状態ベクトルの個数。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.RanrotB.JJ">
+            <summary>
+            RanrotBのパラメーターの一つ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.RanrotB.R1">
+            <summary>
+            RanrotBのパラメーターの一つ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.RanrotB.R2">
+            <summary>
+            RanrotBのパラメーターの一つ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.RanrotB.randbuffer">
+            <summary>
+            内部状態ベクトル。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.RanrotB.p1">
+            <summary>
+            リングバッファのインデックス。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.RanrotB.p2">
+            <summary>
+            リングバッファのインデックス。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.RanrotB.#ctor">
+            <summary>
+            現在時刻を種とした、Well擬似乱数ジェネレーターを初期化します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.RanrotB.#ctor(System.Int32)">
+            <summary>
+            seedを種とした、Well擬似乱数ジェネレーターを初期化します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.RanrotB.NextUInt32">
+            <summary>
+            符号なし32bitの擬似乱数を取得します。
+            </summary>
+        </member>
+        <member name="T:CSUtil.Random.SFMT">
+            <summary>
+            SFMTの擬似乱数ジェネレータークラス。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.SFMT.MEXP">
+            <summary>
+            周期を表す指数。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.SFMT.POS1">
+            <summary>
+            MTを決定するパラメーターの一つ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.SFMT.SL1">
+            <summary>
+            MTを決定するパラメーターの一つ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.SFMT.SL2">
+            <summary>
+            MTを決定するパラメーターの一つ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.SFMT.SR1">
+            <summary>
+            MTを決定するパラメーターの一つ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.SFMT.SR2">
+            <summary>
+            MTを決定するパラメーターの一つ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.SFMT.MSK1">
+            <summary>
+            MTを決定するパラメーターの一つ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.SFMT.MSK2">
+            <summary>
+            MTを決定するパラメーターの一つ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.SFMT.MSK3">
+            <summary>
+            MTを決定するパラメーターの一つ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.SFMT.MSK4">
+            <summary>
+            MTを決定するパラメーターの一つ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.SFMT.PARITY1">
+            <summary>
+            MTの周期を保証するための確認に用いるパラメーターの一つ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.SFMT.PARITY2">
+            <summary>
+            MTの周期を保証するための確認に用いるパラメーターの一つ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.SFMT.PARITY3">
+            <summary>
+            MTの周期を保証するための確認に用いるパラメーターの一つ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.SFMT.PARITY4">
+            <summary>
+            MTの周期を保証するための確認に用いるパラメーターの一つ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.SFMT.N">
+            <summary>
+            各要素を128bitとしたときの内部状態ベクトルの個数。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.SFMT.N32">
+            <summary>
+            各要素を32bitとしたときの内部状態ベクトルの個数。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.SFMT.SL2_x8">
+            <summary>
+            計算の高速化用。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.SFMT.SR2_x8">
+            <summary>
+            計算の高速化用。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.SFMT.SL2_ix8">
+            <summary>
+            計算の高速化用。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.SFMT.SR2_ix8">
+            <summary>
+            計算の高速化用。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.SFMT.sfmt">
+            <summary>
+            内部状態ベクトル。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.SFMT.idx">
+            <summary>
+            内部状態ベクトルのうち、次に乱数として使用するインデックス。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.SFMT.#ctor">
+            <summary>
+            現在時刻を種とした、(2^19937-1)周期のSFMT擬似乱数ジェネレーターを初期化します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.SFMT.#ctor(System.Int32)">
+            <summary>
+            seedを種とした、(2^19937-1)周期の擬似乱数ジェネレーターを初期化します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.SFMT.#ctor(System.Int32,CSUtil.Random.MTPeriodType)">
+            <summary>
+            seedを種とした、periodで表される周期の擬似乱数ジェネレーターを初期化します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.SFMT.#ctor(System.Int32,System.Int32)">
+            <summary>
+            seedを種とした、(2^mexp-1)周期の擬似乱数ジェネレーターを初期化します。
+            mexpは607,1279,2281,4253,11213,19937,44497,86243,132049,216091のいずれかである必要があります。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.SFMT.NextUInt32">
+            <summary>
+            符号なし32bitの擬似乱数を取得します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.SFMT.init_gen_rand(System.Int32)">
+            <summary>
+            ジェネレーターを初期化します。
+            </summary>
+            <param name="seed"></param>
+        </member>
+        <member name="M:CSUtil.Random.SFMT.period_certification">
+            <summary>
+            内部状態ベクトルが適切か確認し、必要であれば調節します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.SFMT.gen_rand_all">
+            <summary>
+            内部状態ベクトルを更新します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.SFMT.gen_rand_all_19937">
+            <summary>
+            gen_rand_allの(2^19937-1)周期用。
+            </summary>
+        </member>
+        <member name="T:CSUtil.Random.MTPeriodType">
+            <summary>
+            メルセンヌツイスターで用いる周期をあらわす列挙型。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.MTPeriodType.MT607">
+            <summary>
+            2^607-1周期のMT。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.MTPeriodType.MT1279">
+            <summary>
+            2^1279-1周期のMT。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.MTPeriodType.MT2281">
+            <summary>
+            2^2281-1周期のMT。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.MTPeriodType.MT4253">
+            <summary>
+            2^4253-1周期のMT。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.MTPeriodType.MT11213">
+            <summary>
+            2^11213-1周期のMT。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.MTPeriodType.MT19937">
+            <summary>
+            2^19937-1周期のMT。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.MTPeriodType.MT44497">
+            <summary>
+            2^44497-1周期のMT。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.MTPeriodType.MT86243">
+            <summary>
+            2^86243-1周期のMT。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.MTPeriodType.MT132049">
+            <summary>
+            2^132049-1周期のMT。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.MTPeriodType.MT216091">
+            <summary>
+            2^216091-1周期のMT。
+            </summary>
+        </member>
+        <member name="T:CSUtil.Random.Well">
+            <summary>
+            Wellの擬似乱数ジェネレータークラス。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.Well.W">
+            <summary>
+            Wellのパラメーターの一つ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.Well.R">
+            <summary>
+            内部状態ベクトルの個数。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.Well.P">
+            <summary>
+            Wellのパラメーターの一つ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.Well.MASKU">
+            <summary>
+            Wellのパラメーターの一つ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.Well.MASKL">
+            <summary>
+            Wellのパラメーターの一つ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.Well.M1">
+            <summary>
+            Wellのパラメーターの一つ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.Well.M2">
+            <summary>
+            Wellのパラメーターの一つ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.Well.M3">
+            <summary>
+            Wellのパラメーターの一つ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.Well.TEMPERB">
+            <summary>
+            Wellのパラメーターの一つ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.Well.TEMPERC">
+            <summary>
+            Wellのパラメーターの一つ。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.Well.state">
+            <summary>
+            内部状態ベクトル。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.Well.state_i">
+            <summary>
+            内部状態ベクトルのうち、次に乱数として使用するインデックス。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.Well.#ctor">
+            <summary>
+            現在時刻を種とした、Well擬似乱数ジェネレーターを初期化します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.Well.#ctor(System.Int32)">
+            <summary>
+            seedを種とした、Well擬似乱数ジェネレーターを初期化します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.Well.NextUInt32">
+            <summary>
+            符号なし32bitの擬似乱数を取得します。
+            </summary>
+        </member>
+        <member name="T:CSUtil.Random.Xorshift">
+            <summary>
+            Xorshiftの擬似乱数ジェネレータークラス。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.Xorshift.x">
+            <summary>
+            内部状態ベクトル。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.Xorshift.y">
+            <summary>
+            内部状態ベクトル。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.Xorshift.z">
+            <summary>
+            内部状態ベクトル。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Random.Xorshift.w">
+            <summary>
+            内部状態ベクトル。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.Xorshift.#ctor">
+            <summary>
+            現在時刻を種とした、Xorshift擬似乱数ジェネレーターを初期化します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.Xorshift.#ctor(System.Int32)">
+            <summary>
+            seedを種とした、Xorshift擬似乱数ジェネレーターを初期化します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Random.Xorshift.#ctor(System.UInt32,System.UInt32,System.UInt32,System.UInt32)">
+            <summary>
+            seedを種とした、Xorshift擬似乱数ジェネレーターを初期化します。
+            George Marsagliaによるオリジナルはseed1=123456789,seed2=362436069,seed3=521288629,seed4=88675123を用いています。
+            </summary>
+            <param name="seed1"></param>
+            <param name="seed2"></param>
+            <param name="seed3"></param>
+            <param name="seed4"></param>
+        </member>
+        <member name="M:CSUtil.Random.Xorshift.NextUInt32">
+            <summary>
+            符号なし32bitの擬似乱数を取得します。
+            </summary>
+        </member>
+        <member name="T:CSUtil.Range">
+            <summary>
+            範囲指定した値のジェネレータ
+            </summary>
+        </member>
+        <member name="M:CSUtil.Range.Gen(System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            ２次元値範囲を列挙します。
+            </summary>
+            <param name="r1s"></param>
+            <param name="r1e"></param>
+            <param name="r2s"></param>
+            <param name="r2e"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.Range.Gen(System.Int32,System.Int32,System.Int32,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            ３次元値範囲を列挙します。
+            </summary>
+            <param name="r1s"></param>
+            <param name="r1e"></param>
+            <param name="r2s"></param>
+            <param name="r2e"></param>
+            <param name="r3s"></param>
+            <param name="r3e"></param>
+            <returns></returns>
+        </member>
+        <member name="T:CSUtil.Reflection.AssemblyUtil">
+            <summary>
+            アセンブリ操作ユーティリティ。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Reflection.AssemblyUtil.GetAssemblyPath(System.Reflection.Assembly)">
+            <summary>
+            指定されたアセンブリのPathを返します。
+            返すPathはシャドーコピーではなく、本体のPathです。
+            </summary>
+            <param name="assembly"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.Reflection.AssemblyUtil.GetCallingAssemblyPath">
+            <summary>
+            呼び出し元のアセンブリのPathを返します。
+            返すPathはシャドーコピーではなく、本体のPathです。
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.Reflection.AssemblyUtil.GetAssemblyDirctory(System.Reflection.Assembly)">
+            <summary>
+            指定されたアセンブリのDirecryPathを返します。
+            返すPathはシャドーコピーではなく、本体のPathです。
+            </summary>
+            <param name="assembly"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.Reflection.AssemblyUtil.GetCallingAssemblyDirctory">
+            <summary>
+            呼び出し元のアセンブリの DirecryPathを返します。
+            返すPathはシャドーコピーではなく、本体のPathです。
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.Reflection.AssemblyUtil.AddCurrentAssemblyResolvePath(System.String)">
+            <summary>
+            パスをアセンブリ参照対象に追加します。
+            </summary>
+            <param name="path"></param>
+        </member>
+        <member name="M:CSUtil.Reflection.AssemblyUtil.GetMethodName(System.Int32)">
+            <summary>
+            スタックを指定した階層を遡ってメソッド名を取得します。
+            </summary>
+            <param name="skipFrames">遡るカウント。０のとき呼び出したメソッド。</param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.Reflection.AssemblyUtil.GetMethodName">
+            <summary>
+            呼び出し元メソッドのメソッド名を取得します。
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="T:CSUtil.Reflection.AssemblyUtil40">
+            <summary>
+            アセンブリ操作ユーティリティ。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Reflection.AssemblyUtil40.InitX86X64AssemblyResolver">
+            <summary>
+            アセンブリパスの解決に、64bit環境かどうかに応じてこのDLLのパス+ x86 or x64 を追加します。
+            dllのみ検索対象とします。
+            </summary>
+        </member>
+        <member name="T:CSUtil.StringItem`1">
+            <summary>
+            ToString値としてコンストラクタで与えられた文字列を返す構造体。
+            </summary>
+            <typeparam name="T"></typeparam>
+        </member>
+        <member name="M:CSUtil.StringItem`1.#ctor(`0,System.String)">
+            <summary>
+            コンストラクタ。
+            </summary>
+            <param name="value">値</param>
+            <param name="text">文字列</param>
+        </member>
+        <member name="M:CSUtil.StringItem`1.ToString">
+            <summary>
+            コンストラクタで設定された文字列を返します。
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="P:CSUtil.StringItem`1.Value">
+            <summary>
+            値。
+            </summary>
+        </member>
+        <member name="T:CSUtil.Text.Diff">
+            <summary>
+            This Class implements the Difference Algorithm published in
+            "An O(ND) Difference Algorithm and its Variations" by Eugene Myers
+            Algorithmica Vol. 1 No. 2, 1986, p 251.  
+            
+            There are many C, Java, Lisp implementations public available but they all seem to come
+            from the same source (diffutils) that is under the (unfree) GNU public License
+            and cannot be reused as a sourcecode for a commercial application.
+            There are very old C implementations that use other (worse) algorithms.
+            Microsoft also published sourcecode of a diff-tool (windiff) that uses some tree data.
+            Also, a direct transfer from a C source to C# is not easy because there is a lot of pointer
+            arithmetic in the typical C solutions and i need a managed solution.
+            These are the reasons why I implemented the original published algorithm from the scratch and
+            make it avaliable without the GNU license limitations.
+            I do not need a high performance diff tool because it is used only sometimes.
+            I will do some performace tweaking when needed.
+            
+            The algorithm itself is comparing 2 arrays of numbers so when comparing 2 text documents
+            each line is converted into a (hash) number. See DiffText(). 
+            
+            Some chages to the original algorithm:
+            The original algorithm was described using a recursive approach and comparing zero indexed arrays.
+            Extracting sub-arrays and rejoining them is very performance and memory intensive so the same
+            (readonly) data arrays are passed arround together with their lower and upper bounds.
+            This circumstance makes the LCS and SMS functions more complicate.
+            I added some code to the LCS function to get a fast response on sub-arrays that are identical,
+            completely deleted or inserted.
+            
+            The result from a comparisation is stored in 2 arrays that flag for modified (deleted or inserted)
+            lines in the 2 data arrays. These bits are then analysed to produce a array of Item objects.
+            
+            Further possible optimizations:
+            (first rule: don't do it; second: don't do it yet)
+            The arrays DataA and DataB are passed as parameters, but are never changed after the creation
+            so they can be members of the class to avoid the paramter overhead.
+            In SMS is a lot of boundary arithmetic in the for-D and for-k loops that can be done by increment
+            and decrement of local variables.
+            The DownVector and UpVector arrays are alywas created and destroyed each time the SMS gets called.
+            It is possible to reuse tehm when transfering them to members of the class.
+            See TODO: hints.
+            
+            diff.cs: A port of the algorythm to C#
+            Copyright (c) by Matthias Hertel, http://www.mathertel.de
+            This work is licensed under a BSD style license. See http://www.mathertel.de/License.aspx
+            
+            Changes:
+            2002.09.20 There was a "hang" in some situations.
+            Now I undestand a little bit more of the SMS algorithm. 
+            There have been overlapping boxes; that where analyzed partial differently.
+            One return-point is enough.
+            A assertion was added in CreateDiffs when in debug-mode, that counts the number of equal (no modified) lines in both arrays.
+            They must be identical.
+            
+            2003.02.07 Out of bounds error in the Up/Down vector arrays in some situations.
+            The two vetors are now accessed using different offsets that are adjusted using the start k-Line. 
+            A test case is added. 
+            
+            2006.03.05 Some documentation and a direct Diff entry point.
+            
+            2006.03.08 Refactored the API to static methods on the Diff class to make usage simpler.
+            2006.03.10 using the standard Debug class for self-test now.
+                       compile with: csc /target:exe /out:diffTest.exe /d:DEBUG /d:TRACE /d:SELFTEST Diff.cs
+            2007.01.06 license agreement changed to a BSD style license.
+            2007.06.03 added the Optimize method.
+            2007.09.23 UpVector and DownVector optimization by Jan Stoklasa ().
+            2008.05.31 Adjusted the testing code that failed because of the Optimize method (not a bug in the diff algorithm).
+            2008.10.08 Fixing a test case and adding a new test case.
+            </summary>
+        </member>
+        <member name="M:CSUtil.Text.Diff.DiffText(System.String,System.String)">
+            <summary>
+            Find the difference in 2 texts, comparing by textlines.
+            </summary>
+            <param name="TextA">A-version of the text (usualy the old one)</param>
+            <param name="TextB">B-version of the text (usualy the new one)</param>
+            <returns>Returns a array of Items that describe the differences.</returns>
+        </member>
+        <member name="M:CSUtil.Text.Diff.DiffText(System.String,System.String,System.Boolean,System.Boolean,System.Boolean)">
+            <summary>
+            Find the difference in 2 text documents, comparing by textlines.
+            The algorithm itself is comparing 2 arrays of numbers so when comparing 2 text documents
+            each line is converted into a (hash) number. This hash-value is computed by storing all
+            textlines into a common hashtable so i can find dublicates in there, and generating a 
+            new number each time a new textline is inserted.
+            </summary>
+            <param name="TextA">A-version of the text (usualy the old one)</param>
+            <param name="TextB">B-version of the text (usualy the new one)</param>
+            <param name="trimSpace">When set to true, all leading and trailing whitespace characters are stripped out before the comparation is done.</param>
+            <param name="ignoreSpace">When set to true, all whitespace characters are converted to a single space character before the comparation is done.</param>
+            <param name="ignoreCase">When set to true, all characters are converted to their lowercase equivivalence before the comparation is done.</param>
+            <returns>Returns a array of Items that describe the differences.</returns>
+        </member>
+        <member name="M:CSUtil.Text.Diff.Optimize(CSUtil.Text.DiffData)">
+            <summary>
+            If a sequence of modified lines starts with a line that contains the same content
+            as the line that appends the changes, the difference sequence is modified so that the
+            appended line and not the starting line is marked as modified.
+            This leads to more readable diff sequences when comparing text files.
+            </summary>
+            <param name="Data">A Diff data buffer containing the identified changes.</param>
+        </member>
+        <member name="M:CSUtil.Text.Diff.DiffInt(System.Int32[],System.Int32[])">
+            <summary>
+            Find the difference in 2 arrays of integers.
+            </summary>
+            <param name="ArrayA">A-version of the numbers (usualy the old one)</param>
+            <param name="ArrayB">B-version of the numbers (usualy the new one)</param>
+            <returns>Returns a array of Items that describe the differences.</returns>
+        </member>
+        <member name="M:CSUtil.Text.Diff.DiffCodes(System.String,System.Collections.Hashtable,System.Boolean,System.Boolean,System.Boolean)">
+            <summary>
+            This function converts all textlines of the text into unique numbers for every unique textline
+            so further work can work only with simple numbers.
+            </summary>
+            <param name="aText">the input text</param>
+            <param name="h">This extern initialized hashtable is used for storing all ever used textlines.</param>
+            <param name="trimSpace">ignore leading and trailing space characters</param>
+            <param name="ignoreSpace">When set to true, all whitespace characters are converted to a single space character before the comparation is done.</param>
+            <param name="ignoreCase">When set to true, all characters are converted to their lowercase equivivalence before the comparation is done.</param>
+            <returns>a array of integers.</returns>
+        </member>
+        <member name="M:CSUtil.Text.Diff.SMS(CSUtil.Text.DiffData,System.Int32,System.Int32,CSUtil.Text.DiffData,System.Int32,System.Int32,System.Int32[],System.Int32[])">
+            <summary>
+            This is the algorithm to find the Shortest Middle Snake (SMS).
+            </summary>
+            <param name="DataA">sequence A</param>
+            <param name="LowerA">lower bound of the actual range in DataA</param>
+            <param name="UpperA">upper bound of the actual range in DataA (exclusive)</param>
+            <param name="DataB">sequence B</param>
+            <param name="LowerB">lower bound of the actual range in DataB</param>
+            <param name="UpperB">upper bound of the actual range in DataB (exclusive)</param>
+            <param name="DownVector">a vector for the (0,0) to (x,y) search. Passed as a parameter for speed reasons.</param>
+            <param name="UpVector">a vector for the (u,v) to (N,M) search. Passed as a parameter for speed reasons.</param>
+            <returns>a MiddleSnakeData record containing x,y and u,v</returns>
+        </member>
+        <member name="M:CSUtil.Text.Diff.LCS(CSUtil.Text.DiffData,System.Int32,System.Int32,CSUtil.Text.DiffData,System.Int32,System.Int32,System.Int32[],System.Int32[])">
+            <summary>
+            This is the divide-and-conquer implementation of the longes common-subsequence (LCS) 
+            algorithm.
+            The published algorithm passes recursively parts of the A and B sequences.
+            To avoid copying these arrays the lower and upper bounds are passed while the sequences stay constant.
+            </summary>
+            <param name="DataA">sequence A</param>
+            <param name="LowerA">lower bound of the actual range in DataA</param>
+            <param name="UpperA">upper bound of the actual range in DataA (exclusive)</param>
+            <param name="DataB">sequence B</param>
+            <param name="LowerB">lower bound of the actual range in DataB</param>
+            <param name="UpperB">upper bound of the actual range in DataB (exclusive)</param>
+            <param name="DownVector">a vector for the (0,0) to (x,y) search. Passed as a parameter for speed reasons.</param>
+            <param name="UpVector">a vector for the (u,v) to (N,M) search. Passed as a parameter for speed reasons.</param>
+        </member>
+        <member name="M:CSUtil.Text.Diff.CreateDiffs(CSUtil.Text.DiffData,CSUtil.Text.DiffData)">
+            <summary>Scan the tables of which lines are inserted and deleted,
+            producing an edit script in forward order.  
+            </summary>
+            dynamic array
+        </member>
+        <member name="T:CSUtil.Text.Diff.Item">
+            <summary>details of one difference.</summary>
+        </member>
+        <member name="F:CSUtil.Text.Diff.Item.StartA">
+            <summary>Start Line number in Data A.</summary>
+        </member>
+        <member name="F:CSUtil.Text.Diff.Item.StartB">
+            <summary>Start Line number in Data B.</summary>
+        </member>
+        <member name="F:CSUtil.Text.Diff.Item.deletedA">
+            <summary>Number of changes in Data A.</summary>
+        </member>
+        <member name="F:CSUtil.Text.Diff.Item.insertedB">
+            <summary>Number of changes in Data B.</summary>
+        </member>
+        <member name="T:CSUtil.Text.Diff.SMSRD">
+            <summary>
+            Shortest Middle Snake Return Data
+            </summary>
+        </member>
+        <member name="T:CSUtil.Text.DiffData">
+            <summary>Data on one input file being compared.  
+            </summary>
+        </member>
+        <member name="F:CSUtil.Text.DiffData.Length">
+            <summary>Number of elements (lines).</summary>
+        </member>
+        <member name="F:CSUtil.Text.DiffData.data">
+            <summary>Buffer of numbers that will be compared.</summary>
+        </member>
+        <member name="F:CSUtil.Text.DiffData.modified">
+            <summary>
+            Array of booleans that flag for modified data.
+            This is the result of the diff.
+            This means deletedA in the first Data or inserted in the second Data.
+            </summary>
+        </member>
+        <member name="M:CSUtil.Text.DiffData.#ctor(System.Int32[])">
+            <summary>
+            Initialize the Diff-Data buffer.
+            </summary>
+            <param name="initData">reference to the buffer</param>
+        </member>
+        <member name="T:CSUtil.Threading.ClockSyncTimer">
+            <summary>
+            時計に同期して定期的な処理を行なうためのタイマーです。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Threading.ClockSyncTimer.thread">
+            <summary>
+            イベントを発生させるためのスレッド。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Threading.ClockSyncTimer.#ctor">
+            <summary>
+            時計同期タイマーを作成します。
+            バックグラウンドスレッドとして動作します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Threading.ClockSyncTimer.Start">
+            <summary>
+            タイマーをスタートします。
+            </summary>
+        </member>
+        <member name="P:CSUtil.Threading.ClockSyncTimer.Interval">
+            <summary>
+            時計に対する同期間隔。
+            </summary>
+        </member>
+        <member name="E:CSUtil.Threading.ClockSyncTimer.Elapsed">
+            <summary>
+            間隔が経過すると発生します。
+            </summary>
+        </member>
+        <member name="T:CSUtil.Security.Cryptography.CRC16">
+            <summary>
+            CRC16計算用クラス。
+            テーブル換算方法
+            
+            計算前のCRC [CH][CL]（上位8bit / 下位8bit）
+            入力値  B
+            
+            換算：[CRCの下位８bit][入力値のビット列を逆転させた値]
+            
+            換算値に、[CRC上位8bitから求めたXOR演算値]をXOR
+            
+            →bit反転の配列と、XOR配列をそれぞれ作成して利用
+            </summary>
+        </member>
+        <member name="M:CSUtil.Security.Cryptography.CRC16.CreateXorTable">
+            <summary>
+            CRC上位8bitの値によるXOR演算の基準値テーブルを生成します。
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.Security.Cryptography.CRC16.CreateReverseTable">
+            <summary>
+            BYTE値のビット列反転テーブルを生成します。
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.Security.Cryptography.CRC16.#ctor">
+            <summary> CRC16オブジェクトを生成します。</summary>
+        </member>
+        <member name="M:CSUtil.Security.Cryptography.CRC16.Update(System.Byte)">
+            <summary> CRC16の値を１バイトの引数で更新します。</summary>
+            <param name="b">CRC16を計算するデータ
+            </param>
+        </member>
+        <member name="M:CSUtil.Security.Cryptography.CRC16.Update(System.Byte[],System.Int32,System.Int32)">
+            <summary>
+            CRC16の値をバイトの配列で更新します。
+            </summary>
+            <param name="buf">CRC16を計算するデータの配列</param>
+            <param name="off">データの開始位置を示す配列上のインデックス</param>
+            <param name="len">実際に計算するデータのバイト数</param>
+        </member>
+        <member name="M:CSUtil.Security.Cryptography.CRC16.Update(System.Byte[])">
+            <summary> CRCの値をbyteの配列で更新します。
+            
+            </summary>
+            <param name="b">CRC16を計算するbyteの配列
+            </param>
+        </member>
+        <member name="M:CSUtil.Security.Cryptography.CRC16.Reset">
+            <summary> CRC16の値を０にリセットします</summary>
+        </member>
+        <member name="P:CSUtil.Security.Cryptography.CRC16.Value">
+            <summary> CRC16の値を取得します.</summary>
+        </member>
+        <member name="T:CSUtil.CsvUtil">
+            <summary>
+            CSVファイルを処理するためのユーティリティです。
+            </summary>
+        </member>
+        <member name="M:CSUtil.CsvUtil.MakeCsvLine(System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            列挙データ文字列をCSVの１行に編集した文字列を作成します。
+            要素に応じてエスケープ処理を行ないます。
+            文字列には改行コードを含みません。
+            </summary>
+            <param name="args"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.CsvUtil.MakeTabLine(System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            列挙データ文字列をタブ区切りの１行に編集した文字列を作成します。
+            要素に応じてエスケープ処理を行ないます。
+            文字列には改行コードを含みません。
+            </summary>
+            <param name="args"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.CsvUtil.MakeEscLine(System.Collections.Generic.IEnumerable{System.String},System.Char[],System.Char)">
+            <summary>
+            エスケープ処理を行ないます。
+            </summary>
+            <param name="args"></param>
+            <param name="escChars"></param>
+            <param name="sepChar"></param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.CsvUtil.ReadCsv(System.String)">
+            <summary>
+            CSVファイルを読み込むジェネレータを返します。
+            </summary>
+            <param name="path">読み込むファイルのPath</param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.CsvUtil.ReadCsv(System.IO.TextReader)">
+            <summary>
+            CSVファイルを読み込むジェネレータを返します。
+            </summary>
+            <param name="reader">読み込むテキストリーダ</param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.CsvUtil.ReadCsv(System.String,System.Int32,System.Char,System.String)">
+            <summary>
+            CSVファイルを読み込むジェネレータを返します。
+            コメント行、及び最低必要な列数に満たない行を飛ばします。
+            </summary>
+            <param name="path">読み込むファイルのPath</param>
+            <param name="length">１行に必要な列数</param>
+            <param name="commentChar">コメントとみなす行頭文字</param>
+            <param name="endMark">終了と見なす文字列</param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.CsvUtil.ReadCsv(System.String,System.Int32,System.Char)">
+            <summary>
+            CSVファイルを読み込むジェネレータを返します。
+            コメント行、及び最低必要な列数に満たない行を飛ばします。
+            </summary>
+            <param name="path">読み込むファイルのPath</param>
+            <param name="length">１行に必要な列数</param>
+            <param name="commentChar">コメントとみなす行頭文字</param>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.CsvUtil.ReadCsv(System.String,System.Data.DataTable)">
+            <summary>
+            CSVファイルをDataTableに読み込みます。
+            コメント行、及び最低必要な列数に満たない行を飛ばします。
+            </summary>
+            <param name="path">読み込むファイルのPath</param>
+            <param name="table">入力するDataTable</param>
+        </member>
+        <member name="M:CSUtil.CsvUtil.ReadCsv(System.String,System.Data.DataTable,System.Int32)">
+            <summary>
+            CSVファイルをDataTableに読み込みます。
+            コメント行、及び最低必要な列数に満たない行を飛ばします。
+            </summary>
+            <param name="path">読み込むファイルのPath</param>
+            <param name="table">入力するDataTable</param>
+            <param name="minColumnCount">最低限必要な列数</param>
+        </member>
+        <member name="M:CSUtil.CsvUtil.WriteCsv(System.String,System.Collections.Generic.IEnumerable{System.Collections.Generic.IEnumerable{System.String}})">
+            <summary>
+            与えられた文字列リストをcsv形式で出力します。
+            </summary>
+            <param name="path">書き込むファイルのPath</param>
+            <param name="csvLines">出力する文字列リスト</param>
+        </member>
+        <member name="M:CSUtil.CsvUtil.WriteCsv(System.String,System.Data.DataTable)">
+            <summary>
+            DataTableの全ての行をcsv形式で出力します。
+            </summary>
+            <param name="path">書き込むファイルのPath</param>
+            <param name="table">出力するDataTable</param>
+        </member>
+        <member name="M:CSUtil.CsvUtil.CreateCsvHeader(System.Data.DataTable)">
+            <summary>
+            DataTableよりCsvヘッダ行の情報を作成します。
+            </summary>
+            <param name="table"></param>
+            <returns></returns>
+        </member>
+        <member name="T:CSUtil.Threading.EventQueueThread`1">
+            <summary>
+            イベントをキューにためて別スレッドで実行するためのクラスです。
+            </summary>
+            <typeparam name="T">EventArgsの派生クラス</typeparam>
+        </member>
+        <member name="M:CSUtil.Threading.EventQueueThread`1.StartUp">
+            <summary>
+            スレッドのスタートアップコードを設定するメソッドです。
+            オーバーライドしてください。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Threading.EventQueueThread`1.Dequeue(System.Object,`0)">
+            <summary>
+            キューから値を受け取ったときの処理を記載するメソッドです。
+            オーバーライドしてください。
+            </summary>
+            <param name="sender"></param>
+            <param name="ev"></param>
+        </member>
+        <member name="F:CSUtil.Threading.EventQueueThread`1.queue">
+            <summary>
+            イベントを保管している同期キューを取得します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Threading.EventQueueThread`1.#ctor">
+            <summary>
+            コンストラクタ。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Threading.EventQueueThread`1.DisposeManage">
+            <summary>
+            マネージオブジェクトのDispose処理を行ないます。
+            スレッドの停止要求を発行します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Threading.EventQueueThread`1.Join">
+            <summary>
+            スレッドの停止を待ちます。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Threading.EventQueueThread`1.Start">
+            <summary>
+            スレッドを開始します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Threading.EventQueueThread`1.Enqueue(System.Object,`0)">
+            <summary>
+            キューの最後にイベントを登録します。
+            </summary>
+            <param name="sender"></param>
+            <param name="ev"></param>
+        </member>
+        <member name="M:CSUtil.Threading.EventQueueThread`1.ThreadMain">
+            <summary>
+            スレッド本体です。
+            キューから値を取り出し、イベントハンドラに渡します。
+            </summary>
+        </member>
+        <member name="P:CSUtil.Threading.EventQueueThread`1.Count">
+            <summary>
+            キューの現在容量を取得します。
+            </summary>
+        </member>
+        <member name="P:CSUtil.Threading.EventQueueThread`1.MaxCount">
+            <summary>
+            キューの最大容量を取得または設定します。
+            </summary>
+        </member>
+        <member name="P:CSUtil.Threading.EventQueueThread`1.Thread">
+            <summary>
+            スレッドを取得します。
+            </summary>
+        </member>
+        <member name="T:CSUtil.ReEntryLock">
+            <summary>
+            再入防止ロック。
+            最初に呼び出されたときだけRunメソッドのデリゲートを実行します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.ReEntryLock.Run(CSUtil.ReEntryLock.EnterFunc)">
+            <summary>
+            最初の呼び出し（再入呼び出しではない）の時だけ、
+            指定したデリゲートを実行します。
+            </summary>
+            <param name="enterFunc"></param>
+        </member>
+        <member name="T:CSUtil.ReEntryLock.EnterFunc">
+            <summary>
+            Runメソッドで実行するデリゲートです。
+            </summary>
+        </member>
+        <member name="T:CSUtil.Management.Shutdown">
+            <summary>
+            シャットダウンを行なうための静的メソッドを実装します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Management.Shutdown.OnShutDown">
+            <summary>
+            電源切断を行ないます。
+            このメソッドからの制御は返らない前提でプログラムを作成してください。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Management.Shutdown.OnReboot">
+            <summary>
+            リブートを行ないます。
+            このメソッドからの制御は返らない前提でプログラムを作成してください。
+            </summary>
+        </member>
+        <member name="T:CSUtil.Collections.Generic.SyncWaitQueue`1">
+            <summary>
+            キューが存在しない場合にスレッドを停止して待機するキューです。
+            </summary>
+            <typeparam name="T"></typeparam>
+        </member>
+        <member name="M:CSUtil.Collections.Generic.SyncWaitQueue`1.DisposeManage">
+            <summary>
+            Dispose処理を実装します。以下のモードに切り替わります。
+            ・Enqueueを無視
+            ・DequeueでキューがなくなったときにObjectDisposedException例外
+            ・Dequeueのロックを解除する
+            </summary>
+        </member>
+        <member name="M:CSUtil.Collections.Generic.SyncWaitQueue`1.Dequeue">
+            <summary>
+            SyncWaitQueue の先頭にあるオブジェクトを削除し、返します。
+            データが無い場合、データが追加されるまでロックします。
+            オブジェクトが破棄され、かつキューが０になった場合、
+            ObjectDisposedException例外をスローします。
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.Collections.Generic.SyncWaitQueue`1.WaitEnqueue">
+            <summary>
+            SyncWaitQueue に値が設定されるまで待機します。
+            キューにストックが無く、オブジェクトが破棄された場合、
+            ObjectDisposedException例外をスローします。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Collections.Generic.SyncWaitQueue`1.Enqueue(`0)">
+            <summary>
+            SyncWaitQueue の末尾にオブジェクトを追加します。。
+            取り出し処理がロックされている場合、解除します。
+            </summary>
+            <param name="item"></param>
+        </member>
+        <member name="P:CSUtil.Collections.Generic.SyncWaitQueue`1.Count">
+            <summary>
+            SyncWaitQueue に格納されている要素の数を取得します。
+            </summary>
+        </member>
+        <member name="P:CSUtil.Collections.Generic.SyncWaitQueue`1.MaxCount">
+            <summary>
+            キュー要素の最大値を設定または取得します。
+            ０の場合、サイズに制限はありません。
+            </summary>
+        </member>
+        <member name="T:CSUtil.Threading.AsyncUtil">
+            <summary>
+            非同期呼び出しユーティリティ関数。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Threading.AsyncUtil.Call(System.Threading.ThreadStart)">
+            <summary>
+            カレントスレッドプールで非同期に関数を実行します。
+            </summary>
+            <param name="start"></param>
+        </member>
+        <member name="T:CSUtil.Threading.WaitedThreadStartRunner">
+            <summary>
+            スレッドの起動待機を行うための処理クラスです。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Threading.WaitedThreadStartRunner.#ctor(System.Threading.ThreadStart)">
+            <summary>
+            コンストラクタ。
+            </summary>
+            <param name="start"></param>
+        </member>
+        <member name="M:CSUtil.Threading.WaitedThreadStartRunner.#ctor(System.Threading.ThreadStart,System.Int32)">
+            <summary>
+            コンストラクタ。
+            </summary>
+            <param name="start"></param>
+            <param name="maxStackSize"></param>
+        </member>
+        <member name="M:CSUtil.Threading.WaitedThreadStartRunner.#ctor(System.Threading.ParameterizedThreadStart)">
+            <summary>
+            コンストラクタ。
+            </summary>
+            <param name="start"></param>
+        </member>
+        <member name="M:CSUtil.Threading.WaitedThreadStartRunner.#ctor(System.Threading.ParameterizedThreadStart,System.Int32)">
+            <summary>
+            コンストラクタ。
+            </summary>
+            <param name="start"></param>
+            <param name="maxStackSize"></param>
+        </member>
+        <member name="M:CSUtil.Threading.WaitedThreadStartRunner.Start">
+            <summary>
+            スレッドを開始し、スレッドが実際に開始するまで待機します。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Threading.WaitedThreadStartRunner.Start(System.Object)">
+            <summary>
+            スレッドを開始し、スレッドが実際に開始するまで待機します。
+            </summary>
+            <param name="parameter"></param>
+        </member>
+        <member name="P:CSUtil.Threading.WaitedThreadStartRunner.Thread">
+            <summary>
+            新しく作成したスレッド。
+            </summary>
+        </member>
+        <member name="T:CSUtil.Tuple2`2">
+            <summary>
+            ２値のタプルをあらわします。
+            </summary>
+            <typeparam name="TA"></typeparam>
+            <typeparam name="TB"></typeparam>
+        </member>
+        <member name="F:CSUtil.Tuple2`2.A">
+            <summary>
+            要素A。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Tuple2`2.B">
+            <summary>
+            要素B。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Tuple2`2.#ctor(`0,`1)">
+            <summary>
+            コンストラクタ。
+            </summary>
+            <param name="a"></param>
+            <param name="b"></param>
+        </member>
+        <member name="M:CSUtil.Tuple2`2.ToString">
+            <summary>
+            文字列表現を返します。
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="P:CSUtil.Tuple2`2.X">
+            <summary>
+            要素X(=A)
+            </summary>
+        </member>
+        <member name="P:CSUtil.Tuple2`2.Y">
+            <summary>
+            要素Y(=B)
+            </summary>
+        </member>
+        <member name="T:CSUtil.Tuple3`3">
+            <summary>
+            ３値のタプルをあらわします。
+            </summary>
+            <typeparam name="TA"></typeparam>
+            <typeparam name="TB"></typeparam>
+            <typeparam name="TC"></typeparam>
+        </member>
+        <member name="F:CSUtil.Tuple3`3.A">
+            <summary>
+            要素A。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Tuple3`3.B">
+            <summary>
+            要素B。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Tuple3`3.C">
+            <summary>
+            要素C。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Tuple3`3.#ctor(`0,`1,`2)">
+            <summary>
+            コンストラクタ。
+            </summary>
+            <param name="a"></param>
+            <param name="b"></param>
+            <param name="c"></param>
+        </member>
+        <member name="M:CSUtil.Tuple3`3.ToString">
+            <summary>
+            文字列表現を返します。
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="P:CSUtil.Tuple3`3.X">
+            <summary>
+            要素X(=A)
+            </summary>
+        </member>
+        <member name="P:CSUtil.Tuple3`3.Y">
+            <summary>
+            要素Y(=B)
+            </summary>
+        </member>
+        <member name="P:CSUtil.Tuple3`3.Z">
+            <summary>
+            要素Z(=C)
+            </summary>
+        </member>
+        <member name="T:CSUtil.Tuple4`4">
+            <summary>
+            ４値のタプルをあらわします。
+            </summary>
+            <typeparam name="TA"></typeparam>
+            <typeparam name="TB"></typeparam>
+            <typeparam name="TC"></typeparam>
+            <typeparam name="TD"></typeparam>
+        </member>
+        <member name="F:CSUtil.Tuple4`4.A">
+            <summary>
+            要素A。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Tuple4`4.B">
+            <summary>
+            要素B。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Tuple4`4.C">
+            <summary>
+            要素C。
+            </summary>
+        </member>
+        <member name="F:CSUtil.Tuple4`4.D">
+            <summary>
+            要素D。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Tuple4`4.#ctor(`0,`1,`2,`3)">
+            <summary>
+            コンストラクタ。
+            </summary>
+            <param name="a"></param>
+            <param name="b"></param>
+            <param name="c"></param>
+            <param name="d"></param>
+        </member>
+        <member name="M:CSUtil.Tuple4`4.ToString">
+            <summary>
+            文字列表現を返します。
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="T:CSUtil.ValueUtil">
+            <summary>
+            値型に関するユーティリティ。
+            </summary>
+        </member>
+        <member name="M:CSUtil.ValueUtil.Swap``1(``0@,``0@)">
+            <summary>
+            値型の２値を入れ替えます。
+            </summary>
+            <typeparam name="T"></typeparam>
+            <param name="a"></param>
+            <param name="b"></param>
+        </member>
+        <member name="T:CSUtil.WeakReference`1">
+            <summary>
+            "弱い参照" を現すジェネリッククラスです。
+            </summary>
+            <typeparam name="T"></typeparam>
+        </member>
+        <member name="M:CSUtil.WeakReference`1.#ctor(`0)">
+            <summary>
+            コンストラクタ
+            </summary>
+            <param name="target"></param>
+        </member>
+        <member name="P:CSUtil.WeakReference`1.Target">
+            <summary>
+            現在の WeakReference オブジェクトが参照するオブジェクトを、その終了後に追跡するかどうかを示す値を取得します。
+            </summary>
+        </member>
+        <member name="T:CSUtil.WeakValue`1">
+            <summary>
+            Weak値を保持します。
+            </summary>
+            <typeparam name="T"></typeparam>
+        </member>
+        <member name="M:CSUtil.WeakValue`1.#ctor">
+            <summary>
+            コンストラクタ。
+            </summary>
+        </member>
+        <member name="M:CSUtil.WeakValue`1.#ctor(`0)">
+            <summary>
+            コンストラクタ。
+            </summary>
+            <param name="value"></param>
+        </member>
+        <member name="P:CSUtil.WeakValue`1.Value">
+            <summary>値を取得又は返します。</summary>
+        </member>
+        <member name="T:System.Collections.Generic.KVUtil">
+            <summary>
+            KeyValuePairユーティリティ。
+            </summary>
+        </member>
+        <member name="M:System.Collections.Generic.KVUtil.Create``2(``0,``1)">
+            <summary>
+            KeyValuePairを作成します。
+            </summary>
+            <typeparam name="TKey"></typeparam>
+            <typeparam name="TValue"></typeparam>
+            <param name="key"></param>
+            <param name="value"></param>
+            <returns></returns>
+        </member>
+        <member name="T:CSUtil.ObjectUtil">
+            <summary>
+            オブジェクト操作ユーティリティ。
+            </summary>
+        </member>
+        <member name="M:CSUtil.ObjectUtil.Swap``1(``0@,``0@)">
+            <summary>
+            値型の２値を入れ替えます。
+            </summary>
+            <param name="a"></param>
+            <param name="b"></param>
+        </member>
+        <member name="M:CSUtil.ObjectUtil.CheckDispose``1(``0@)">
+            <summary>
+            Disposeを行い、変数を初期化します。
+            </summary>
+            <typeparam name="T"></typeparam>
+            <param name="obj"></param>
+        </member>
+        <member name="T:CSUtil.Threading.ReentryCounter">
+            <summary>
+            再入実行かどうかを判定するカウンタ。
+            Interlockedを利用していますが、lockは行っていません。
+            マルチスレッドには対応して居ません。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Threading.ReentryCounter.Increment">
+            <summary>
+            インクリメント。
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.Threading.ReentryCounter.Decrement">
+            <summary>
+            デクリメント。０になったときに再入フラグをリセットします。
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.Threading.ReentryCounter.Reset">
+            <summary>
+            カウンタをリセットする。
+            </summary>
+        </member>
+        <member name="M:CSUtil.Threading.ReentryCounter.IsFirstEntry">
+            <summary>
+            １回目の実行ならtrue。
+            </summary>
+            <returns></returns>
+        </member>
+        <member name="M:CSUtil.Threading.ReentryCounter.Act(System.Threading.ThreadStart)">
+            <summary>
+            アクションの実行。
+            </summary>
+            <param name="act"></param>
+        </member>
+        <member name="P:CSUtil.Threading.ReentryCounter.Count">
+            <summary>再入カウント。値が０にデクリメントされたときに再入フラグをリセットする。</summary>
+        </member>
+    </members>
+</doc>
