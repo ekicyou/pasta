@@ -115,6 +115,7 @@ img
 
 #pasta {
   background-color: transparent;
+  border: 0;
   width: 320px;
   height: 420px;
   position: relative;
