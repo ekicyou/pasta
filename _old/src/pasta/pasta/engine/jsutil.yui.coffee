@@ -50,6 +50,7 @@
     ### 簡易ブラウザ判定 ###
     checkBrowser = ->
         userAgent = window.navigator.userAgent.toLowerCase()
+        return 'ie11' if userAgent.indexOf('trident') != -1
         return 'opera' if userAgent.indexOf('opera') != -1
         if userAgent.indexOf('msie') != -1
             appVersion = window.navigator.appVersion.toLowerCase()
@@ -58,11 +59,6 @@
             return 'ie8'  if appVersion.indexOf("msie 8.") != -1
             return 'ie9'  if appVersion.indexOf("msie 9.") != -1
             return 'ie10' if appVersion.indexOf("msie 10.") != -1
-            return 'ie11' if appVersion.indexOf("msie 11.") != -1
-            return 'ie12' if appVersion.indexOf("msie 12.") != -1
-            return 'ie13' if appVersion.indexOf("msie 13.") != -1
-            return 'ie14' if appVersion.indexOf("msie 14.") != -1
-            return 'ie15' if appVersion.indexOf("msie 15.") != -1
             return 'ie'
         
         return 'chrome' if userAgent.indexOf('chrome') != -1
