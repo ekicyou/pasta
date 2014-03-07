@@ -1,0 +1,45 @@
+inherit(lib::test);
+
+class OpAssignTest{
+	str_cat_assign#Test{
+		str : "aaa";
+		str ~= "bbb";
+		assert str=="aaabbb";
+	}
+
+	int_add_assign#Test{
+		i : 10;
+		i += 20;
+		assert i==30;
+		
+		i *= 5;
+		assert i==150;
+	}
+
+	array_int_add_assign#Test{
+		i : [10];
+		i[0] += 20;
+		assert i[0]==30;
+		
+		i[0] *= 5;
+		assert i[0]==150;
+	}
+
+	property_int_add_assign#Test{
+		C : class{
+			+ _x;	
+			+ _y;	
+		}
+		
+		c : C();
+		c.x = 100;
+		
+		c.x += 50;
+		assert c.x==150;
+		
+		c.x *= 10;
+		assert c.x==1500;
+	}
+}
+
+

@@ -1,0 +1,45 @@
+inherit(lib::test);
+
+class ThreadTest{
+	test#Test{
+		ret: [];
+		t1: Thread();
+		t2: Thread();
+		
+		t1.start(fun(){
+			1000.times{
+				ret.push_back(it);
+			}
+		});
+		
+		t2.start(fun(){
+			1000.times{
+				ret.push_back(it);
+			}
+		});
+		
+		t1.join;
+		t2.join;
+		
+		assert ret.p.size==2000;		
+	}
+	
+	mee#Test{
+		thread1 : Thread(); 
+		thread2 : Thread(); 
+		ret : []; 
+		fun foo(str){ 
+		  100.times{ 
+			ret.push_back(%f[%s](str)); 
+		  } 
+		} 
+
+		thread1.start(fun(){foo("sub");}); 
+		thread2.start(fun(){foo("sub2");}); 
+		thread1.join(); 
+		thread2.join(); 
+		assert ret.length==200; 
+	}
+}
+
+

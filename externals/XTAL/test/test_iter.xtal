@@ -1,0 +1,81 @@
+inherit(lib::test);
+
+class IterTest{
+
+	throwe#Test{
+		try{
+			[10,20,30].each{
+				throw "e";
+			}
+		}
+		catch(e){
+		
+		}
+	}
+	
+	times#Test{
+		n : 0;
+		10.times{ |v|
+			n += v;
+		}
+		assert n==45;
+	}
+	
+	tims2#Test{
+		assert 3.times.with_index.map(|x, y| x+y).join=="024";
+	}
+	
+	tims22#Test{
+		assert 3.times.with_index("").join && false catch(e) true;
+	}
+	
+	range_each_collect_join#Test{
+		ret : range(5, 10)[].collect(|x| x*2).join(",");
+		assert ret=="10,12,14,16,18";
+	}
+
+	each_select_join#Test{
+		ret : [5, 8, 7, 3, 2].select(|x| x%2 != 0).join(",");
+		assert ret=="5,7,3";
+	}
+
+	block#Test{
+		str : "";
+		[5, 8, 7, 3, 2]{ str ~= it.to_s; }
+		assert str=="58732";
+	}
+
+	times_times#Test{
+		n : 0;
+		outer : 10.times{
+			20.times{
+				n++;
+				break outer;
+			}
+		}
+		assert n==1;
+	}
+
+	try_iter#Test{
+		foo: fun(iter, fn){
+			try{
+				iter{
+					return fn(it);
+				}
+			}finally{
+		
+			}
+		}
+		
+		assert foo(100.times, |x|x+5)==5;
+		assert foo([5, 2, 8], |x|x*2)==10;
+	}
+
+	with_index_find#Test{
+		assert [5, 7, 66, 8, 2].with_index.find(|x|x[][1]>10)[][1]==66;
+	}
+
+	with_index_find2#Test{
+		assert [5, 7, 66, 8, 2].with_index.find(|x,dummy|x==2)[][1]==66;
+	}
+}

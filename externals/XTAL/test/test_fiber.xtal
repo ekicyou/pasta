@@ -1,0 +1,123 @@
+
+inherit(lib::test);
+
+class TestFiber{
+	
+	yield_expr#Test{
+		fib: fiber(a){
+			b: yield a;
+			c: yield b+5;
+			yield c*7;
+		}	
+		
+		assert fib(10)==10;
+		assert fib(20)==25;
+		assert fib(30)==210;
+	}
+
+	yield_expr_values#Test{
+		fib: fiber(a){
+			b: yield a, a;
+			c: yield b, a;
+			yield c, a;
+		}	
+		
+		assert fib(10)==(10, 10);
+		assert fib(20, 40)==((20, 40), 10);
+		assert fib(30, 50)==((30, 50), 10);
+	}
+	
+	except#Test{
+		fib: fiber{
+			yield;
+			a: Array("a");
+		}
+		
+		fib();
+		assert fib() catch(e) true;
+	}
+	
+	except0#Test{
+		fib: fiber{
+			a: Array("a");
+			yield;
+		}
+		
+		assert fib().p catch(e) true;
+	}
+		
+	simple#Test{
+		fib : fiber(n){
+			for(i : 0; i<n; ++i){
+				yield i;
+			}
+		}
+		 
+		assert fib(5)==0;
+		assert fib()==1;
+		assert fib()==2;
+		assert fib()==3;
+		assert fib()==4;
+	}
+
+	each_join#Test{
+		fib : fiber{
+			for(i : 0; i<5; ++i){
+				yield i;
+			}
+		}
+		assert fib.each.join(",")=="0,1,2,3,4";
+	}
+
+	fib#Test{
+		fib : fiber(n){
+			f : 1;
+			i : 1;
+			j : 0;
+			for(k : 0; k < n; ++k){
+				yield f;
+				f = i + j;
+				j, i = i, f;
+			}
+		}
+		
+		assert fib.is_alive;
+		
+		assert fib(10)==1;
+		
+		assert fib.is_alive;
+		
+		assert fib()==1;
+		assert fib()==2;
+		assert fib()==3;
+		assert fib()==5;
+		assert fib()==8;
+		assert fib()==13;
+		assert fib()==21;
+		assert fib()==34;
+		assert fib()==55;
+		
+	}
+
+	isalive#Test{
+		fib : fiber(){
+			yield 1;
+			yield 2;
+		}
+		
+		assert fib.is_alive;
+		
+		assert fib()==1;
+		
+		assert fib.is_alive;
+		
+		assert fib()==2;
+
+		assert fib.is_alive;
+		
+		fib();
+		
+		assert !fib.is_alive;
+	}
+}
+

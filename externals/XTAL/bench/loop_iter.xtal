@@ -1,0 +1,11 @@
+Foo: class{
+  bar: method(){
+	10000000.times{
+
+	}
+	return 0;
+  }
+}
+
+
+Foo().bar.p;

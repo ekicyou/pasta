@@ -1,0 +1,13 @@
+
+ary: [];
+for(i: 0; i<3000000; ++i){
+	ary.push_back(i);
+}
+
+ret: 0;
+for(i: 0; i<3000000; ++i){
+	ret = ary[i];
+}
+
+ret.p;
+

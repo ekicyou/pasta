@@ -1,0 +1,29 @@
+inherit(lib::test);
+
+class MapTest{
+	
+	setkey#Test{
+		a: [:];
+		a[1] = 10;
+		a["test"] = "aaa";
+		assert a[1] == 10;
+		assert a["test"] == "aaa";
+		assert a.size == 2;
+	}
+
+	size_zero#Test{
+		assert Map().size == 0;
+	}
+	
+	literal#Test{
+		["a": 10, "b": 20, "c": 30];
+	}
+	
+	clone#Test{
+		a: [5:10, 6:20, 7:30, 8:40];
+		b: a.clone;
+		b[5] = 0;
+		assert b[5] == 0;
+		assert a[5] == 10;
+	}
+}

@@ -1,0 +1,139 @@
+inherit(lib::test);
+inherit(xpeg);
+
+class TestXpeg{
+
+	com#Test{
+		assert "a".match(~"b");
+		assert !"b".match(~"b");
+		assert "awerawer".match(bos >> ~set("()")*0 >> eos);
+		assert !"awer(awer".match(bos >> ~set("()")*0 >> eos);
+	}
+
+	balance#Test{
+		balance: decl();
+		balance.body = "(" >> (empty | ~set("()")*1 | balance*1) >> ")";
+		pattern: bos >> balance >> eos;
+		assert "(())".match(pattern);
+		assert !"(()".match(pattern);
+		assert "((ewerwer))".match(pattern);
+		assert "((((((((((((((((((((a)(a)))(aaaaa))))()))))))))))))))".match(pattern);
+		assert !"((((((((((((((((((((a)(a)))(aaaaa))))())))()))))))))))".match(pattern);
+	}
+		
+	tinyxml#Test{
+		tag_name: word*0;
+		tag_start: "<" >> tag_name >> ">";
+		tag_end: "</" >> tag_name >> ">";
+		text: (word | " " | "\t" | "\n")*1;
+		tag: decl();
+		tag.body = tag_start >> (tag | text)*0 >> tag_end;
+		
+		peg: bos >> tag >> eos;
+		
+		assert "<test>test</test>".match(peg);
+		assert !"<test>test<test>".match(peg);
+		assert "<test><a>te<b>s</b>t</a></test>".match(peg);
+		assert !"<test><a>te<b>s<b>t</a></test>".match(peg);
+	}
+	
+	tee#Test{
+		pattern: ">" >> cap(test: any/0) >> (eol | eos);
+
+		assert ">test\n>aaa".scan(pattern).map(|it| it["test"])[].size==2;
+	}
+	
+	nov#Test{
+		pattern: ">" >> leaf(alpha*0) >> (eol | eos);
+		ret: ">test\n>aaa".parse(pattern);
+
+		assert ret;
+	}
+	
+	bind{
+		source: "/**
+		 * \brief test
+		 * \xbind
+		 */
+		 void foo();";
+		 
+		balance: decl();
+		balance.body = "(" >> (~set("()")*0|balance*0) >> ")";
+		
+		ws: set(" \t");
+		mlcomment: "/*" >> cap(comment: any/0) >> "*/" >> ws*0 >> eol;
+		slcomment: "//" >> cap(comment: any/0) >> eol;
+		
+		funpattern: any/0 >> cap(name: word*1) >> "(";
+		
+		exe: xpeg::Executor(source);
+		while(exe.match(mlcomment | slcomment)){
+			exe2: xpeg::Executor(exe["comment"]);
+			if(exe2.match("xbind")){
+				if(exe.match(funpattern)){
+					exe["name"].p;
+				}
+			}
+		}
+	}
+				
+	expr#Test{
+		add_expr: decl();
+		mul_expr: decl();
+		number: leaf(degit*1);
+		primary: number | ("(" >> add_expr >> ")");
+		add_expr.body = node( (mul_expr >> "+" >> add_expr) | (mul_expr >> "-" >> add_expr) ) | mul_expr;
+		mul_expr.body = node( (primary >> "*" >> mul_expr)  | (primary >> "/" >> mul_expr) ) | primary;
+		
+		expr: bos >> add_expr >> eos;
+		
+		assert "10+20".match(expr);
+		assert !"10-*20".match(expr);
+		assert "(((((((((1)))))))))+(((((((((1)))))))))".match(expr);
+		assert "10+20*(50*80)".match(expr);
+	}
+	
+	bos_alpha0_eos#Test{
+		pattern: bos >> alpha*0 >> eos;
+		assert "ttestt".match(pattern);
+		assert "aewrrrrrrrrrrrrrrrrweraweaer".match(pattern);
+		assert !"aewrrrrrrrrrr_rrrrrrweraweaer".match(pattern);
+	}
+
+	mail#Test{		
+		bs: "\\";
+		dq: "\"";
+		atom: (alpha | degit | set("!#$%&'*+-/=?^_`{|}~"))*1;
+		quotedpair: bs >> set(" \\\"");
+		quoted: dq >> (atom | set("()<>[]:;@,.") | quotedpair)*0 >> dq;
+		dot_atom: atom >> ("." >> atom)*0;
+		local: dot_atom | quoted;
+		domain: local; // fixme
+		mail: bos >> local >> "@" >> domain >> eos;
+				    
+		ok: [
+			"Abc@example.com", 
+			"Abc.123@example.com", 
+			"user+mailbox/department=shipping@example.com", 
+			"!#$%&'*+-/=?^_`.{|}~@example.com", 
+			%!"Abc@def"@example.com!, 
+			%!"Fred\\ Bloggs"@example.com!, 
+			%!"Joe.\\\\Blow"@example.com!, 
+		];
+		
+		ng: [
+			"Abc.@example.com",
+			"Abc..123@example.com",
+			%!ewr"esre"@example.com!,
+			"Abc@example.com.", 
+		];
+		
+		ok.each{
+			assert it.match(mail), it;
+		}
+		
+		ng.each{
+			assert !it.match(mail), it;
+		}
+	}
+}

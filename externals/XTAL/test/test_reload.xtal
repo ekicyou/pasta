@@ -1,0 +1,364 @@
+inherit(lib::test);
+
+class lib::ReloadTestClass{
+	public _test;
+}
+
+class ReloadTest{
+	test#Test{
+		rc: lib::ReloadTestClass();
+		rc.test = 10;
+		
+		assert rc.test ==10;
+		
+		lib::ReloadTestClass.overwrite(
+			class{
+				public _add;
+				public _test;
+				_add2;
+				
+				foo{
+					return _test + _add + _add2;
+				}
+				
+				reloaded{
+					_add2 = 20;
+				}
+			}
+		);
+		
+		rc.add = 20;
+		
+		assert rc.foo==50;
+	}
+	
+	test_repeat#Test{
+		class global::ReloadTestClass{
+			public _test;
+			
+			foo(){
+				return 200;
+			}
+			
+			bar(){
+				return 99;
+			}
+		}
+		
+		rc: global::ReloadTestClass();
+		rc.test = 10;
+		
+		assert rc.test == 10;
+		
+		1000.times{ |nnn|
+			class global::ReloadTestClass{
+				public _add;
+				public _test;
+				_add2;
+				
+				foo{
+					return _test + _add + _add2 + this.bar;
+				}
+				
+				reloaded{
+					_add2 = nnn;
+				}
+			}
+			
+			rc.add = 20;
+			
+			assert rc.foo==10+20+nnn+99;
+		}
+	}
+	
+	testtest#Test{
+		"ReloadTest start".p;
+
+		class global::Test{
+			initialize(){    // コンストラクタ。Class::callではこれが呼ばれる
+				"..init".p;
+			}
+			reloaded(){
+				 "class Test1 is rerloaded.".p;
+			}
+		}
+
+		global::test : global::Test();
+
+
+		class global::Test{
+			hoge(){
+				"hoge".p;
+			}
+			initialize(){    // コンストラクタ。Class::callではこれが呼ばれる
+				"..init".p;
+			}
+			reloaded(){
+				 "class Test2 is rerloaded.".p;
+			}
+		}
+		global::test.hoge();
+
+		class global::Test{
+			hoge(){
+				"hoge".p;
+			}
+			foo(){
+				"foo".p;
+			}
+			initialize(){    // コンストラクタ。Class::callではこれが呼ばれる
+				"..init".p;
+			}
+			reloaded(){
+				 "class Test3 is rerloaded.".p;
+			}
+		}
+		
+		global::test.?foo().p;
+		global::test.foo();
+
+		"...ReloadTest end".p;
+
+		class global::Test{
+			initialize(){    // コンストラクタ。Class::callではこれが呼ばれる
+				"..init".p;
+			}
+			reloaded(){
+				 "class Test1 is rerloaded1.".p;
+			}
+		}
+		class global::Test{
+			initialize(){    // コンストラクタ。Class::callではこれが呼ばれる
+				"..init".p;
+			}
+			reloaded(){
+				 "class Test1 is rerloaded1.".p;
+			}
+		}
+		class global::Test{
+			initialize(){    // コンストラクタ。Class::callではこれが呼ばれる
+				"..init".p;
+			}
+			reloaded(){
+				 "class Test1 is rerloaded1.".p;
+			}
+		}
+		class global::Test{
+			initialize(){    // コンストラクタ。Class::callではこれが呼ばれる
+				"..init".p;
+			}
+			reloaded(){
+				 "class Test1 is rerloaded1.".p;
+			}
+		}
+		class global::Test{
+			initialize(){    // コンストラクタ。Class::callではこれが呼ばれる
+				"..init".p;
+			}
+			reloaded(){
+				 "class Test1 is rerloaded1.".p;
+			}
+		}
+		class global::Test{
+			initialize(){    // コンストラクタ。Class::callではこれが呼ばれる
+				"..init".p;
+			}
+			reloaded(){
+				 "class Test1 is rerloaded1.".p;
+			}
+		}
+		class global::Test{
+			initialize(){    // コンストラクタ。Class::callではこれが呼ばれる
+				"..init".p;
+			}
+			reloaded(){
+				 "class Test1 is rerloaded1.".p;
+			}
+		}
+		class global::Test{
+			initialize(){    // コンストラクタ。Class::callではこれが呼ばれる
+				"..init".p;
+			}
+			reloaded(){
+				 "class Test1 is rerloaded1.".p;
+			}
+		}
+		class global::Test{
+			initialize(){    // コンストラクタ。Class::callではこれが呼ばれる
+				"..init".p;
+			}
+			reloaded(){
+				 "class Test1 is rerloaded1.".p;
+			}
+		}
+		class global::Test{
+			initialize(){    // コンストラクタ。Class::callではこれが呼ばれる
+				"..init".p;
+			}
+			reloaded(){
+				 "class Test1 is rerloaded1.".p;
+			}
+		}
+		class global::Test{
+			initialize(){    // コンストラクタ。Class::callではこれが呼ばれる
+				"..init".p;
+			}
+			reloaded(){
+				 "class Test1 is rerloaded1.".p;
+			}
+		}
+		class global::Test{
+			initialize(){    // コンストラクタ。Class::callではこれが呼ばれる
+				"..init".p;
+			}
+			reloaded(){
+				 "class Test1 is rerloaded1.".p;
+			}
+		}
+		class global::Test{
+			initialize(){    // コンストラクタ。Class::callではこれが呼ばれる
+				"..init".p;
+			}
+			reloaded(){
+				 "class Test1 is rerloaded1.".p;
+			}
+		}
+		class global::Test{
+			initialize(){    // コンストラクタ。Class::callではこれが呼ばれる
+				"..init".p;
+			}
+			reloaded(){
+				 "class Test1 is rerloaded1.".p;
+			}
+		}
+		class global::Test{
+			initialize(){    // コンストラクタ。Class::callではこれが呼ばれる
+				"..init".p;
+			}
+			reloaded(){
+				 "class Test1 is rerloaded1.".p;
+			}
+		}
+		class global::Test{
+			initialize(){    // コンストラクタ。Class::callではこれが呼ばれる
+				"..init".p;
+			}
+			reloaded(){
+				 "class Test1 is rerloaded1.".p;
+			}
+		}
+		class global::Test{
+			initialize(){    // コンストラクタ。Class::callではこれが呼ばれる
+				"..init".p;
+			}
+			reloaded(){
+				 "class Test1 is rerloaded1.".p;
+			}
+		}
+		class global::Test{
+			initialize(){    // コンストラクタ。Class::callではこれが呼ばれる
+				"..init".p;
+			}
+			reloaded(){
+				 "class Test1 is rerloaded1.".p;
+			}
+		}
+		class global::Test{
+			initialize(){    // コンストラクタ。Class::callではこれが呼ばれる
+				"..init".p;
+			}
+			reloaded(){
+				 "class Test1 is rerloaded1.".p;
+			}
+		}
+		class global::Test{
+			initialize(){    // コンストラクタ。Class::callではこれが呼ばれる
+				"..init".p;
+			}
+			reloaded(){
+				 "class Test1 is rerloaded1.".p;
+			}
+		}
+		class global::Test{
+			initialize(){    // コンストラクタ。Class::callではこれが呼ばれる
+				"..init".p;
+			}
+			reloaded(){
+				 "class Test1 is rerloaded1.".p;
+			}
+		}
+		class global::Test{
+			initialize(){    // コンストラクタ。Class::callではこれが呼ばれる
+				"..init".p;
+			}
+			reloaded(){
+				 "class Test1 is rerloaded1.".p;
+			}
+		}
+		class global::Test{
+			initialize(){    // コンストラクタ。Class::callではこれが呼ばれる
+				"..init".p;
+			}
+			reloaded(){
+				 "class Test1 is rerloaded1.".p;
+			}
+		}
+		class global::Test{
+			initialize(){    // コンストラクタ。Class::callではこれが呼ばれる
+				"..init".p;
+			}
+			reloaded(){
+				 "class Test1 is rerloaded1.".p;
+			}
+		}
+		class global::Test{
+			initialize(){    // コンストラクタ。Class::callではこれが呼ばれる
+				"..init".p;
+			}
+			reloaded(){
+				 "class Test1 is rerloaded1.".p;
+			}
+		}
+		class global::Test{
+			initialize(){    // コンストラクタ。Class::callではこれが呼ばれる
+				"..init".p;
+			}
+			reloaded(){
+				 "class Test1 is rerloaded1.".p;
+			}
+		}
+		class global::Test{
+			initialize(){    // コンストラクタ。Class::callではこれが呼ばれる
+				"..init".p;
+			}
+			reloaded(){
+				 "class Test1 is rerloaded1.".p;
+			}
+		}
+		class global::Test{
+			initialize(){    // コンストラクタ。Class::callではこれが呼ばれる
+				"..init".p;
+			}
+			reloaded(){
+				 "class Test1 is rerloaded1.".p;
+			}
+		}
+		class global::Test{
+			initialize(){    // コンストラクタ。Class::callではこれが呼ばれる
+				"..init".p;
+			}
+			reloaded(){
+				 "class Test1 is rerloaded1.".p;
+			}
+		}
+		class global::Test{
+			initialize(){    // コンストラクタ。Class::callではこれが呼ばれる
+				"..init".p;
+			}
+			reloaded(){
+				 "class Test1 is rerloaded1.".p;
+			}
+		}
+
+	}
+}

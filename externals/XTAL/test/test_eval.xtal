@@ -1,0 +1,181 @@
+inherit(lib::test);
+
+class EvalTest{
+
+	local_var#Test{
+		n, m: 10, 20;
+		a: 10;
+		assert eval("a")==a;
+		assert eval("dofun a")==a;
+		assert eval("dofun n + m")==n+m;
+	}
+		
+	local_scope_var#Test{
+		{
+			n, m: 10, 20;
+			a: 10;
+			assert eval("a")==a;
+			assert eval("dofun a")==a;
+			assert eval("dofun n + m")==n+m;
+		}
+	}
+	
+	compile_test#Test{
+		assert compile("return 5;")()==5;
+		assert compile("return 5+10;")()==15;
+	}
+	
+	instance_var#Test{
+		n, m: 10, 20;
+		class A{
+			_e: 11;
+			
+			foo{
+				assert eval("_e")==_e;
+				assert eval("_e+m")==_e+m;
+				assert eval("_e+n")==_e+n;
+			}
+		}
+		
+		A().foo;
+	}
+	
+	nested_loops#Test(){
+		n: 3;
+		x: 0;
+		for(a: 0; a<n; a++){
+			for(b: 0; b<n; b++)
+				for(c: 0; c<n; c++)
+					for(d: 0; d<n; d++)
+						for(e: 0; e<n; e++)
+							for(f: 0; f<n; f++){
+								x++;
+								
+								assert eval("x")==x;
+							}
+		}
+		
+		assert x==729;
+	}
+
+	nested_loops2#Test(){
+		n: 2;
+		x: 0;
+		for(a: 0; a<n; a++){
+			for(b: 0; b<n; b++)
+				for(c: 0; c<n; c++)
+					for(d: 0; d<n; d++)
+						for(e: 0; e<n; e++)
+							for(f: 0; f<n; f++){
+								x++;
+								
+								ss: 0;
+								try{
+									eval("xx");
+								}
+								catch(e){
+									ss = 1;
+								}
+								
+								assert ss==1;
+							}
+		}
+		
+		assert x==64;
+	}
+	
+	class_loop#Test(){
+		Foo: class{
+			+_inst1: 0;
+			+_inst2: 0;
+			+_inst3: 0;
+			+_inst4: 0;
+
+			bar: method(){
+				for(i: 0; i<100; ++i){
+					_inst1 += 1;
+					_inst2 += 2;
+					try{ eval("kb"); }catch(e){}
+						
+					_inst3 += 3;
+					_inst4 += 4;
+				}
+				return _inst1;
+			}
+		}
+		
+		foo: Foo();
+		foo.bar;
+		
+		assert foo.inst1==100;
+		assert foo.inst2==200;
+		assert foo.inst3==300;
+		assert foo.inst4==400;
+	}
+	
+	local_instance_var#Test{
+		n, m: 10, 20;
+		a: 10;
+		
+		class A{
+			_e: 11;
+			
+			foo{
+				assert eval("_e + a") == _e + a;
+				
+				eval("_e = 19;");
+				eval("a = 22;");
+				
+				assert eval("_e + a") == 19 + 22;				
+				assert eval("_e + m") == 19 + 20;				
+			}
+		}
+		
+		A().foo;
+	}
+	
+	set_local_var#Test{
+		n, m: 10, 20;
+		a: 10;
+		eval("a = 1;");
+		assert a==1;
+	}
+	
+	
+	instance_var#Test{
+		n, m: 10, 20;
+		class A{
+			_e: 11;
+			
+			foo{
+				eval("_e = 22;");
+				assert _e==22;
+			}
+		}
+		
+		A().foo;
+	}
+	
+	catch_except#Test{
+		n, m: 10, 20;
+		aa: 10;
+		aa = 15;
+		assert eval("unknown") && false catch(e) true;
+		assert eval("aa") && true catch(e) false;
+	}
+	
+	fiber_var#Test{
+		n, m: 10, 20;
+		f: fiber{
+			for(i: 0; i<10; ++i){
+				yield i;
+				assert eval("i")==i;
+			}
+		}
+		
+		f{
+			assert eval("it")==it;
+		}
+	}
+}
+

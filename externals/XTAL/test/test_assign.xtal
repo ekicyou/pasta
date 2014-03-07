@@ -1,0 +1,64 @@
+inherit(lib::test);
+
+class AssignTest{
+
+	local#Test{
+		i, j : 5, 8;
+		assert i==5;
+		assert j==8;
+		
+		k, l : j, i;
+		assert k==8;
+		assert l==5;
+		
+		l, k = k, l;
+		assert k==5;
+		assert l==8;
+		
+		l, k = dofun{ return 77, 88; }
+		assert l==77;
+		assert k==88;
+			
+	}
+
+	array#Test{
+		a : [0, 0];
+		
+		a[0], a[1] = 99, 150;
+		assert a[0]==99;
+		assert a[1]==150;
+			
+		a[0], a[1] = a[1], a[0];
+		assert a[0]==150;
+		assert a[1]==99;
+		
+		a[0], a[1] = dofun{ return 77, 88; }
+		assert a[0]==77;
+		assert a[1]==88;
+	}
+
+	propety#Test{
+		C : class{
+			+ _x;	
+			+ _y;	
+		}
+		
+		c : C();
+		c.x = 100;
+		assert c.x==100;
+		
+		c.x, c.y = 50, 200;
+		assert c.x==50;
+		assert c.y==200;
+		
+		c.x, c.y = c.y, c.x;
+		assert c.x==200;
+		assert c.y==50;
+		
+		c.x, c.y = dofun{ return 77, 88; }
+		assert c.x==77;
+		assert c.y==88;
+	}
+}
+
+

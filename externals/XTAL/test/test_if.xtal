@@ -1,0 +1,343 @@
+inherit(lib::test);
+
+class IfTest{
+
+	test1#Test{
+		a : 10;
+		b : fun(){
+			return 20;
+		}
+		c : 0;
+
+		if(a < b()){
+			c = 10;
+		}else{
+			assert false;
+		}
+		assert c==10;
+
+		if(a > b()){
+			assert false;
+		}else{
+			c = 55;
+		}
+		assert c==55;
+
+		if(5 <= 20){
+			c = 78;
+		}else{
+			assert false;
+		}
+		assert c==78;
+
+		if(10 >= a){
+			c = 980;
+		}else{
+			assert false;
+		}
+		assert c==980;
+
+		if(11 >= a){
+			c = "true";
+		}else{
+			assert false;
+		}
+		assert c=="true";
+	}
+
+	test2#Test{
+		a : 10;
+		b : fun(){
+			return 1111111;
+		}
+		c : 0;
+
+		if(a < b()){
+			c = 10;
+		}else{
+			assert false;
+		}
+		assert c==10;
+
+		if(a > b()){
+			assert false;
+		}else{
+			c = 55;
+		}
+		assert c==55;
+
+		if(178 <= 178){
+			c = 78;
+		}else{
+			assert false;
+		}
+		assert c==78;
+
+		if(55 >= a){
+			c = 980;
+		}else{
+			assert false;
+		}
+		assert c==980;
+
+		if(9999 >= a){
+			c = "true";
+		}else{
+			assert false;
+		}
+		assert c=="true";
+	}
+
+	test3#Test{
+		temp: 0;
+		A: class{}
+		B: class(A){}
+		
+		if(A() is A){
+			temp = 100;
+		}else{
+			assert false;
+		}
+		assert temp==100;
+		
+		
+		if(B() is A){
+			temp = 200;
+		}else{
+			assert false;
+		}
+		assert temp==200;
+		
+		if(A() !is B){
+			temp = 300;
+		}else{
+			assert false;
+		}
+		assert temp==300;
+		
+		f: fun(a) a;
+		 
+		if(A === f(A)){
+			temp = 400;
+		}else{
+			assert false;
+		}
+		assert temp==400;
+		
+		if(A !== f(B)){
+			temp = 500;
+		}else{
+			assert false;
+		}
+		assert temp==500;
+		
+		if(1!=2){
+			temp = 1;
+		}
+		assert(temp==1);
+		
+		if(1!=2){
+			temp = 3;
+		}
+		else{
+			temp = 10;
+		}
+		assert(temp==3);
+			
+		if(2>=2){
+			temp = 2;
+		}
+		assert(temp==2);
+		
+		if(3<=2){
+			temp = 5;
+		}
+		else{
+			temp = 7;
+		}
+		assert(temp==7);
+			
+	}
+	
+	test_switch#Test{
+		a: 0;
+		
+		fun foo(b){
+			switch(b){
+				case(10){
+					a = 9;
+				}
+				
+				case(9){
+					a = 8;
+				}
+				
+				default{
+					a = 7;
+				}			
+			}
+			
+			return a;
+		}
+		
+		assert foo(10)==9;
+		assert foo(9)==8;
+		assert foo(8)==7;
+	}
+	
+	test_switch2#Test{
+		a: 0;
+		
+		fun foo(b){
+			a = 9999;
+			
+			switch(b){
+				case(0){ a = -1; } 
+				case(1){ a = 0; } 
+				case(2){ a = 1; } 
+				case(3){ a = 2; } 
+				case(4){ a = 3; } 
+				case(5){ a = 4; } 
+				case(6){ a = 5; } 
+				case(7){ a = 6; } 
+				case(8){ a = 7; } 
+				case(9){ a = 8; } 
+				case(10){ a = 9; } 
+				case(11){ a = 10; } 
+				case(12){ a = 11; } 
+				case(13){ a = 12; } 
+				case(14){ a = 13; } 
+				case(15){ a = 14; } 
+				case(16){ a = 15; } 
+				case(17){ a = 16; } 
+				case(18){ a = 17; } 
+				case(19){ a = 18; } 
+				case(20){ a = 19; } 
+				case(21){ a = 20; } 
+				case(22){ a = 21; } 
+				case(23){ a = 22; } 
+				case(24){ a = 23; } 
+				case(25){ a = 24; } 
+				case(26){ a = 25; } 
+				case(27){ a = 26; } 
+				case(28){ a = 27; } 
+				case(29){ a = 28; } 
+				case(30){ a = 29; } 
+				case(31){ a = 30; } 
+				case(32){ a = 31; } 
+				case(33){ a = 32; } 
+				case(34){ a = 33; } 
+				case(35){ a = 34; } 
+				case(36){ a = 35; } 
+				case(37){ a = 36; } 
+				case(38){ a = 37; } 
+				case(39){ a = 38; } 
+				case(40){ a = 39; } 
+				case(41){ a = 40; } 
+				case(42){ a = 41; } 
+				case(43){ a = 42; } 
+				case(44){ a = 43; } 
+				case(45){ a = 44; } 
+				case(46){ a = 45; } 
+				case(47){ a = 46; } 
+				case(48){ a = 47; } 
+				case(49){ a = 48; } 
+				case(50){ a = 49; } 
+				case(51){ a = 50; } 
+				case(52){ a = 51; } 
+				case(53){ a = 52; } 
+				case(54){ a = 53; } 
+				case(55){ a = 54; } 
+				case(56){ a = 55; } 
+				case(57){ a = 56; } 
+				case(58){ a = 57; } 
+				case(59){ a = 58; } 
+				case(60){ a = 59; } 
+				case(61){ a = 60; } 
+				case(62){ a = 61; } 
+				case(63){ a = 62; } 
+				case(64){ a = 63; } 
+				case(65){ a = 64; } 
+				case(66){ a = 65; } 
+				case(67){ a = 66; } 
+				case(68){ a = 67; } 
+				case(69){ a = 68; } 
+				case(70){ a = 69; } 
+				case(71){ a = 70; } 
+				case(72){ a = 71; } 
+				case(73){ a = 72; } 
+				case(74){ a = 73; } 
+				case(75){ a = 74; } 
+				case(76){ a = 75; } 
+				case(77){ a = 76; } 
+				case(78){ a = 77; } 
+				case(79){ a = 78; } 
+				case(80){ a = 79; } 
+				case(81){ a = 80; } 
+				case(82){ a = 81; } 
+				case(83){ a = 82; } 
+				case(84){ a = 83; } 
+				case(85){ a = 84; } 
+				case(86){ a = 85; } 
+				case(87){ a = 86; } 
+				case(88){ a = 87; } 
+				case(89){ a = 88; } 
+				case(90){ a = 89; } 
+				case(91){ a = 90; } 
+				case(92){ a = 91; } 
+				case(93){ a = 92; } 
+				case(94){ a = 93; } 
+				case(95){ a = 94; } 
+				case(96){ a = 95; } 
+				case(97){ a = 96; } 
+				case(98){ a = 97; } 
+				case(99){ a = 98; } 
+				default{ a = 100; }			
+			}
+			
+			return a;
+		}
+		
+		100.times{
+			assert foo(it)==it-1;
+		}
+		
+		10.times{
+			assert foo(it+100)==100;
+		}		
+	}
+	
+	test_if_var#Test{
+		fun foo(b){
+			if(a: b){
+				return a+b;
+			}
+		}
+		
+		assert foo(1)==2;
+		assert foo(null)===undefined;
+	}
+	
+	test_switch_var#Test{
+		fun foo(b){
+			switch(a: b){
+				case(10){
+					return a;
+				}
+				
+				case(9){
+					return a+1;
+				}
+				
+				default{
+					return a+2;
+				}			
+			}
+		}
+		
+		assert foo(10)==10;
+		assert foo(9)==10;
+		assert foo(8)==10;
+		assert foo(0)==2;
+	}
+}

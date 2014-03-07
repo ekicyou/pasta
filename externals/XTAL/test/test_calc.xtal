@@ -1,0 +1,98 @@
+inherit(lib::test);
+
+class Calc{
+
+	calc#Test{
+		assert 10+20 == 30;
+		assert 50-100 == -50;
+		assert 10*5 == 50;
+		assert 50/10 == 5;
+		assert 66%60 == 6;
+		assert (7&3) == 3;
+		assert (1|2) == 3;
+		assert (3^1) == 2;
+		assert 10>>1 == 5;
+		assert 20>>2 == 5;
+		assert 1<<3 == 8;
+	}
+	
+	calc2#Test{
+		assert 10>5;
+		assert !(5>5);
+		assert 10<20;
+		assert !(20<20);
+		assert !(51<=50);
+		assert 50<=50;
+		assert 49<=50;
+		assert !(65>=66);
+		assert 66>=66;
+		assert 67>=66;
+		assert 5==5;
+		assert 5!=4;
+		assert 1===1;
+	}
+
+	calc3#Test{
+		assert 1 is Int;
+		assert 2!==1;
+		assert "Test" is String;
+		assert 150 !is String;
+		assert 0xff==255;
+		assert 0x10==16;
+		assert 0b11==3;
+		assert 1!=null;
+		assert !(2==null);
+	}
+
+	calc4#Test{
+		isa: false;
+		assert !isa;
+
+		i: 0;
+		assert i==0;
+
+		i-=5;
+		assert i==-5;
+
+		i*=19;
+		assert i==-95;
+
+		i/=-5;
+		assert i==19;
+
+		i&=1; 
+		assert i==1;
+
+		i|=2;
+		assert i==3;
+
+		i^=1;
+		assert i==2; 
+
+		i+=5;
+		assert i==7;
+
+		i *= 5.0;
+		assert i is Float;
+		assert i in ((35.0-0.01)..(35.0+0.01));
+	}
+		
+	calc5#Test{
+		assert (1||false)==1;
+		assert 1+1 == 2;
+		assert 8*5 == 40;
+		assert ("foo"&&null)===null;
+		assert ("eee"&&"aaa")=="aaa";
+	}
+	
+	calc6#Test{
+		a: undefined;
+		b: null;
+		assert a==undefined;
+		assert b!=undefined;
+		assert b==null;
+		assert a!=null;
+	}
+}
+
+

@@ -1,0 +1,84 @@
+
+lib::test: singleton{
+	Test: "Test";
+	Before: "Before";
+	After: "After";
+	
+	_ok: 0;
+	_fail: 0;
+	
+	run_dir: fun(dir){			
+		run_files(
+			//[dir ~ "/" ~ "test_thread.xtal"].each
+			filesystem::entries(dir)
+				.select(|x| x.match(once xpeg::bos >> "test_" >> xpeg::word*0 >> ".xtal" >> xpeg::eos))
+				.map(|x| dir ~ "/" ~ x)
+		);
+	}
+	
+	run_files: fun(files){
+		_ok = 0;
+		_fail = 0;
+		
+		files.each{
+			println(it);
+			
+			try{
+				run_file(it);
+			}
+			catch(e){
+				printf("\tfail %s:%s\n", it, e);
+			}
+		}
+			
+		print_result();
+	}
+	
+	run_file: fun(file){
+		debug::scope{
+			printf("file %s\n", file);
+			
+			code: compile_file(file);
+			code();
+			
+			code.members{ |name, name2, mem|
+				if(mem is Class){
+					tests: [];
+					befores: [];
+					afters: [];
+					
+					mem.members{ |name, name2, mem|
+						if(name2 === Test){ tests.push_back(name); }
+						if(name2 === Before){ befores.push_back(name); }
+						if(name2 === After){ afters.push_back(name); }
+					}
+					
+					if(!tests.is_empty){
+						obj: mem();
+						tests{
+							try{
+								befores{ obj.(it)#Before; }
+								
+								printf("\tdo %s", it);
+								obj.(it)#Test;
+								
+								afters{ obj.(it)#After; }
+								print(" ok\n");
+								_ok++;
+							}
+							catch(e){
+								printf(" fail\n%s\n", e);
+								_fail++;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	print_result{
+		printf("ok=%d, fail=%d\n", _ok, _fail);
+	}
+}
+

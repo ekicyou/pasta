@@ -1,0 +1,60 @@
+inherit(lib::test);
+
+class FunTest{
+
+	named#Test{
+		aa, bb, cc, dd, : null, null, null, null;
+
+		foo: fun(a, b:10, c:20, d:30, k:0){
+			assert a==aa;
+			assert b==bb;
+			assert c==cc;
+			assert d==dd;
+		}
+
+		aa, bb, cc, dd, = 55, 44, 33, 22;
+		foo(aa, bb, cc, dd);
+
+		aa, bb, cc, dd, = 55, 44, 20, 30;
+		foo(aa, bb);
+
+		aa, bb, cc, dd, = 55, 77, 99, 14;
+		foo(aa, d:dd, b:bb, c:cc);
+
+		aa, bb, cc, dd, = 55, 44, 20, 99;
+		foo(aa, bb, d:dd);
+
+	}
+
+	args#Test{
+		foo: fun(...args){
+			boo: fun(){
+				args{
+				
+				}
+				return args[0], args[1];
+			}
+			return boo();
+		}
+		
+		assert [5,6]==foo(5, 6)[];
+		assert foo(7, 8)[][1]==8;
+	}
+
+	a_args#Test{
+		foo: fun(a, ...args){
+			return a;
+		}
+
+		assert foo(5, 6, 7)==5;
+	}
+
+	putargs#Test{
+		foo: fun(...args){
+			return args[0];
+		}
+
+		assert foo(...Arguments([5, 6, 7]))==5;
+	}
+
+}

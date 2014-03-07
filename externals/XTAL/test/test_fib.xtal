@@ -1,0 +1,70 @@
+inherit(lib::test);
+
+class FibTest{
+	fib: fun(i){
+		if(i<2){
+			return 1;
+		}
+		else{
+			return callee(i-2) + callee(i-1);
+		}
+	}
+
+	fib2: fun fiber{
+	  i: 1; 
+	  j: 1;
+	  while(true){
+	    yield i;
+	    i, j = j, i + j;
+	  }
+	}
+	
+	fib6#Test{
+		fib3: fib2();
+		for(it: 0; it<10; ++it){
+			a: fib(it);
+			b: fib3(); 
+			assert a==b;
+		}
+	}
+	
+	fib_zip#Test{
+		zip(fib2(), 10.times){ |v, i|
+			assert fib(i) == v;
+		}
+	}
+
+	foo#Test{
+		f: fiber{
+			i: 0;
+			while(true){
+				i += yield i;
+			}
+		}
+		
+		assert f()==0;
+		assert f(1)==1;
+		assert f(1)==2;
+		assert f(1)==3;
+		assert f(1)==4;
+		assert f(2)==6;
+	}
+	
+	bar#Test{
+		f: fiber{
+			while(true){
+				a, b: yield;
+				yield a, b;
+			}
+		}
+		
+		assert (2, 3)==(2, 3);
+		assert (2, 4)!=(2, 3);
+		
+		f();
+		assert f(2, 3)==(2, 3);
+		f();
+		assert f(2, 4)!=(2, 3);
+	}	
+}
+

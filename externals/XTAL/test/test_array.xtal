@@ -1,0 +1,164 @@
+inherit(lib::test);
+
+class ArrayTest{
+	_obj;
+	
+	setup#Before: method{
+		_obj = [];
+	}
+	
+	is_empty#Test{
+		assert _obj.is_empty;
+	}
+	
+	literal#Test{
+		[10, 20, 30];
+	}
+		
+	indexerror#Test{
+		a: [];
+		ret: "";
+		
+		try{
+			a[5] = 10;
+		}catch(e){
+			ret = "catched";
+		}
+				
+		assert ret == "catched";
+	}
+		
+	named#Test{
+		obj: Array(size: 10);
+		assert obj.size==10;
+	}
+
+	push_back#Test: method{
+		_obj.push_back(10);
+		assert _obj.size==1;
+		assert _obj.length==1;
+		
+		_obj.push_back(20);
+		assert _obj.size==2;
+		assert _obj[0]==10;
+		assert _obj[1]==20;
+	}
+	
+	insert#Test: method{
+		_obj.assign(3.times);
+		_obj.insert(1, 20);
+		assert _obj==[0, 20, 1, 2];
+		
+		_obj.insert(-1, 90);
+		assert _obj==[0, 20, 1, 2, 90];
+	}
+	
+	join#Test: method{
+		_obj.assign(3.times);
+		assert _obj.join()=="012";
+		assert _obj.join(",")=="0,1,2";	
+	}	
+	
+	front#Test: method{
+		assert _obj.front && false catch(e) true;
+		_obj.assign(4.times.map(|x|x+5));
+		assert(_obj.front==5);
+	}
+	
+	back#Test: method{
+		assert _obj.back && false catch(e) true;
+		_obj.assign(4.times.map(|x|x*5));
+		assert(_obj.back==15);
+	}
+	
+	at#Test: method{
+		assert _obj[0] && false catch(e) true;
+		_obj.assign(4.times.map(|x|x*5));
+		assert _obj[0]==_obj.front;
+		assert _obj[-1]==_obj.back;
+		assert _obj[2]==_obj[2-_obj.size];
+	}
+	
+	set_at#Test: method{
+		assert (dofun{_obj[0]=10;}) && false catch(e) true;
+		_obj.resize(4);
+		assert (dofun{_obj[0]=10;}) || true catch(e) false;
+		assert (dofun{_obj[1]=10;}) || true catch(e) false;
+		assert (dofun{_obj[2]=10;}) || true catch(e) false;
+		assert (dofun{_obj[3]=10;}) || true catch(e) false;
+		assert (dofun{_obj[4]=10;}) && false catch(e) true;
+	}
+	
+	set_at2#Test: method{
+		_obj.resize(4);
+		_obj[0]=1;
+		_obj[1]=6;
+		_obj[2]=4;
+		_obj[3]=2;
+		assert _obj.join(",")=="1,6,4,2";
+	}
+	
+	push_back#Test{
+		a: [];
+		a.push_back(1);
+		a.push_back(2);
+		assert a==[1, 2];
+	}
+	
+	swap#Test{
+		a: [10, 20];
+		assert a[0]==10;
+		assert a[1]==20;
+		a[0], a[1] = a[1], a[0];
+		assert a[1]==10;
+		assert a[0]==20;
+	}
+	
+	swap2#Test{
+		class Temp{
+			i: 0;
+			j: 1;
+		}
+		
+		a: [10, 20];
+		assert a[0]==10;
+		assert a[1]==20;
+		a[Temp::i], a[Temp::j] = a[Temp::j], a[Temp::i];
+		assert a[1]==10;
+		assert a[0]==20;
+	}
+	
+	swap3#Test{
+		a: [10, 20];
+		b: 30;
+		a[0], b = b, a[0];
+		assert a[0]==30;
+		assert b==10;
+	}
+		
+	except#Test{
+		a: [];
+		ret: "";
+		
+		try{
+			a[5] = 10;
+		}catch(e){
+			ret = "catched";
+		}
+		assert ret=="catched";
+	}
+	
+	ct#Test{
+		assert Array().size==0;
+		assert Array(5).size==5;
+	}
+	
+	clone#Test{
+		a: [5, 6, 7, 8];
+		b: a.clone;
+		b[0] = 10;
+		assert b[0]==10;
+		assert a[0]==5;
+	}
+}
+

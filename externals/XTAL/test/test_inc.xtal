@@ -1,0 +1,108 @@
+inherit(lib::test);
+
+TestInc: class{
+	
+	inc_local#Test{
+		i : 0;
+		i++;
+		assert i==1;
+		
+		++i;
+		assert i==2;
+		
+		i--;
+		assert i==1;
+		
+		--i;
+		assert i==0;		
+	}
+	
+	inc_local2#Test{
+		i : 0;
+		
+		dofun{
+			assert i==0;
+			
+			i++;
+			assert i==1;
+			
+			++i;
+			assert i==2;
+			
+			i--;
+			assert i==1;
+			
+			--i;
+			assert i==0;
+		}
+	}
+	
+	inc_array#Test{
+		a : [0];
+		a[0]++;
+		assert a[0]==1;
+		
+		++a[0];
+		assert a[0]==2;
+		
+		a[0]--;
+		assert a[0]==1;
+		
+		--a[0];
+		assert a[0]==0;
+	}
+	
+	inc_property#Test{
+		C : class{
+			+ _x;	
+			+ _y;	
+		}
+		
+		c : C();
+		c.x = 0;
+		
+		c.x++;
+		assert c.x==1;
+		
+		++c.x;
+		assert c.x==2;
+		
+		c.x--;
+		assert c.x==1;
+		
+		--c.x;
+		assert c.x==0;
+	}
+	
+	inc_obj#Test{
+		class A{
+			public _i: 0;
+			
+			op_inc{
+				_i++;
+				return this;
+			}
+			
+			op_dec{
+				_i--;
+				return this;
+			}
+		}
+		
+		a: A();
+		a++;
+		assert a.i==1;
+		
+		--a;
+		assert a.i==0;
+	}
+	
+	float_inc#Test{
+		f: 0;
+		100.times{
+			f++;
+		}
+		assert (f+0.5).to_i==100;
+	}
+}
+

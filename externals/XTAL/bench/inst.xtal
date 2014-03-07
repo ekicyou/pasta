@@ -1,0 +1,19 @@
+Foo: class{
+  _inst1: 0;
+  _inst2: 0;
+  _inst3: 0;
+  _inst4: 0;
+
+  bar: method(){
+	for(i: 0; i<10000000; ++i){
+		_inst1 += 1;
+		_inst2 += 2;
+		_inst3 += 3;
+		_inst4 += 4;
+	}
+	return _inst1;
+  }
+}
+
+
+Foo().bar.p;
