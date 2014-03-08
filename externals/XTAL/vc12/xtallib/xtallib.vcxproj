@@ -1,0 +1,197 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{68590069-97DE-4287-BFDF-053C7A788F8D}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v120</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <WholeProgramOptimization>false</WholeProgramOptimization>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v120</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="$(VCTargetsPath)Microsoft.CPP.UpgradeFromVC70.props" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="$(VCTargetsPath)Microsoft.CPP.UpgradeFromVC70.props" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>12.0.21005.1</_ProjectFileVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <OutDir>..\..\lib\</OutDir>
+    <IntDir>$(TEMP)/$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <OutDir>..\..\lib\</OutDir>
+    <IntDir>Release\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <InlineFunctionExpansion>Default</InlineFunctionExpansion>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ExceptionHandling />
+      <SmallerTypeCheck>false</SmallerTypeCheck>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <DisableLanguageExtensions>false</DisableLanguageExtensions>
+      <AdditionalOptions />
+      <RuntimeTypeInfo>true</RuntimeTypeInfo>
+      <PrecompiledHeader>Create</PrecompiledHeader>
+      <PrecompiledHeaderFile>xtal.h</PrecompiledHeaderFile>
+      <WarningLevel>Level4</WarningLevel>
+      <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+    </ClCompile>
+    <Lib>
+      <OutputFile>$(OutDir)xtallib.lib</OutputFile>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <Optimization>MaxSpeed</Optimization>
+      <InlineFunctionExpansion>OnlyExplicitInline</InlineFunctionExpansion>
+      <FavorSizeOrSpeed>Neither</FavorSizeOrSpeed>
+      <OmitFramePointers>false</OmitFramePointers>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;_SECURE_SCL=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <StringPooling>true</StringPooling>
+      <ExceptionHandling />
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <RuntimeTypeInfo>false</RuntimeTypeInfo>
+      <PrecompiledHeader>Create</PrecompiledHeader>
+      <PrecompiledHeaderFile>xtal.h</PrecompiledHeaderFile>
+      <WarningLevel>Level3</WarningLevel>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <Lib>
+      <OutputFile>$(OutDir)xtallib.lib</OutputFile>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\src\xtal\xtal_allocator.cpp" />
+    <ClCompile Include="..\..\src\xtal\xtal_any.cpp" />
+    <ClCompile Include="..\..\src\xtal\xtal_anyptr.cpp" />
+    <ClCompile Include="..\..\src\xtal\xtal_array.cpp" />
+    <ClCompile Include="..\..\src\xtal\xtal_base.cpp" />
+    <ClCompile Include="..\..\src\xtal\xtal_basictype.cpp" />
+    <ClCompile Include="..\..\src\xtal\xtal_bind.cpp" />
+    <ClCompile Include="..\..\src\xtal\xtal_cast.cpp" />
+    <ClCompile Include="..\..\src\xtal\xtal_cfun.cpp" />
+    <ClCompile Include="..\..\src\xtal\xtal_ch.cpp" />
+    <ClCompile Include="..\..\src\xtal\xtal_class.cpp" />
+    <ClCompile Include="..\..\src\xtal\xtal_code.cpp" />
+    <ClCompile Include="..\..\src\xtal\xtal_codebuilder.cpp" />
+    <ClCompile Include="..\..\src\xtal\xtal_codebuilder2.cpp" />
+    <ClCompile Include="..\..\src\xtal\xtal_debug.cpp" />
+    <ClCompile Include="..\..\src\xtal\xtal_environment.cpp" />
+    <ClCompile Include="..\..\src\xtal\xtal_except.cpp" />
+    <ClCompile Include="..\..\src\xtal\xtal_expr.cpp" />
+    <ClCompile Include="..\..\src\xtal\xtal_filesystem.cpp" />
+    <ClCompile Include="..\..\src\xtal\xtal_frame.cpp" />
+    <ClCompile Include="..\..\src\xtal\xtal_fun.cpp" />
+    <ClCompile Include="..\..\src\xtal\xtal_inst.cpp" />
+    <ClCompile Include="..\..\src\xtal\xtal_iterator.cpp" />
+    <ClCompile Include="..\..\src\xtal\xtal_lib.cpp" />
+    <ClCompile Include="..\..\src\xtal\xtal_map.cpp" />
+    <ClCompile Include="..\..\src\xtal\xtal_objectspace.cpp" />
+    <ClCompile Include="..\..\src\xtal\xtal_parser.cpp" />
+    <ClCompile Include="..\..\src\xtal\xtal_serializer.cpp" />
+    <ClCompile Include="..\..\src\xtal\xtal_stack.cpp" />
+    <ClCompile Include="..\..\src\xtal\xtal_stream.cpp" />
+    <ClCompile Include="..\..\src\xtal\xtal_string.cpp" />
+    <ClCompile Include="..\..\src\xtal\xtal_stringspace.cpp" />
+    <ClCompile Include="..\..\src\xtal\xtal_text.cpp" />
+    <ClCompile Include="..\..\src\xtal\xtal_thread.cpp" />
+    <ClCompile Include="..\..\src\xtal\xtal_vmachine.cpp" />
+    <ClCompile Include="..\..\src\xtal\xtal_vmachine2.cpp" />
+    <ClCompile Include="..\..\src\xtal\xtal_xpeg.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\src\xtal\xtal.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_all_src.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_allocator.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_any.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_anyinline.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_anyptr.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_array.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_base.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_basictype.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_bind.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_cache.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_cast.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_cfun.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_ch.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_class.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_code.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_codebuilder.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_debug.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_details.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_environment.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_except.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_expr.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_filesystem.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_frame.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_fun.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_hashtable.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_inst.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_iterator.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_lib.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_macro.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_map.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_objectspace.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_parser.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_serializer.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_setting.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_smartptr.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_stack.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_stream.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_string.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_stringspace.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_text.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_thread.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_threadspace.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_utility.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_vmachine.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_xpeg.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_lib\xtal_chcode.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_lib\xtal_cstdiostream.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_lib\xtal_errormessage.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_lib\xtal_errormessage_jp_sjis.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_lib\xtal_errormessage_jp_utf8.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_lib\xtal_posixfilesystem.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_lib\xtal_pthread.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_lib\xtal_tcpstream.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_lib\xtal_winfilesystem.h" />
+    <ClInclude Include="..\..\src\xtal\xtal_lib\xtal_winthread.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="ReadMe.txt" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

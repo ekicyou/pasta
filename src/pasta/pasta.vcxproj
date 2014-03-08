@@ -43,13 +43,13 @@
     <LinkIncremental>true</LinkIncremental>
     <OutDir>bin\$(Configuration)\</OutDir>
     <IntDir>obj\$(Configuration)\</IntDir>
-    <IncludePath>$(SolutionDir)..\..\externals\SQUIRREL3\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)..\externals\XTAL\src\xtal;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>bin\$(Configuration)\</OutDir>
     <IntDir>obj\$(Configuration)\</IntDir>
-    <IncludePath>$(SolutionDir)..\..\externals\SQUIRREL3\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)..\externals\XTAL\src\xtal;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
