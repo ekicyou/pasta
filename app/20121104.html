@@ -1,0 +1,312 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:xlink="http://www.w3.org/1999/xlink"
+      lang="ja"
+>
+<head>
+    <meta charset="utf-8" />
+    <title>デスクトップは衰退しました</title>
+
+    <link href="20121104.css" rel="stylesheet" type="text/css" />
+    <link href="basic-animations.css" rel="stylesheet" type="text/css" />
+    <meta name="viewport" content="width=device-width, maximum-scale=1.0, initial-scale=1.0, user-scalable=yes" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+    <meta http-equiv="expires" content="0">
+    <meta property="og:title" content="jmpress.js - a jQuery plugin to build a website on the infinite canvas" />
+    <meta property="og:site_name" content="jmpress.js" />
+    <meta property="og:image" content="http://dontkry.com/img/jmpress/jmpress.png" />
+
+    <script src="Scripts/jquery-1.8.1.min.js" type="text/javascript"></script>
+    <script src="Scripts/jmpress.all.min.js" type="text/javascript"></script>
+</head>
+<body>
+<div id="simple">
+
+<div id="home" class="step">
+<h1>デスクトップは衰退しました</h1>
+<h2>Windowsストアアプリ流の開発計画の立て方</h2>
+</div>
+
+
+
+
+<div class="step" data-x="1000">
+<h2>今から前置きです</h2>
+<ul>
+<li>今日は開発の初期計画の話をします。</li>
+<li>今回、期間が無かったので手抜きです、ごめんなさい＞＜</li>
+</ul>
+<ul>
+<li>まずは、開発計画の前段階、思い付きの話。</li>
+</ul>
+</div>
+
+
+
+
+<div class="step" data-x="800"  data-y="200" data-scale="0.4" >
+<h2>Windows8が発売されました</h2><div>・タッチパネルUIのOSの勢力が広がる<br></div><div>　→マイクロソフト押されぎみ</div><div>　→逆転の一手としてWindows8が開発された</div><div><br>・タブレットに対応する新しいUIのアプリ<br></div><div>　→Windowsストアアプリ</div><div><br></div><div>・特徴</div><div>　→全画面占有型</div><div>　→タッチ操作が基本</div>
+</div>
+
+
+
+<div class="step" data-x="1100"  data-y="200" data-scale="0.4" >
+<h2>デスクトップは衰退しました？</h2>
+<div>・デスクトップアプリの価値は相対的に下がった？<br /></div>
+<div>　→そんなことは無いと思われるが、話が進まないので前提条件<br /></div>
+<div data-jmpress="fade">・では、デスクトップマスコットはどうなるのか？</div>
+<div data-jmpress="fade after 500ms">　→画面の一部を間借りする事でユーザーとの距離感を保っている</div>
+<div data-jmpress="fade after 500ms">　→そもそも画面占有型アプリではない</div><div></div>
+<div data-jmpress="fade after 500ms">　→全画面表示のアプリ以外は認めない？</div><div><br /></div>
+<div data-jmpress="fade">　→まさに横暴、ゴースト権の侵害！</div>
+</div>
+
+
+
+
+
+<div class="step" data-x="1400"  data-y="200" data-scale="0.4" >
+<h2>Windowsストアアプリでマスコットアプリは作れるか？</h2>
+<div>　・画面占有しないことが絶対条件</div>
+<div>　・「スナップビュー」という機能がある</div>
+<div><br></div>
+<div>　→「スナップビュー」前提のマスコットアプリを作ればいい？</div>
+</div>
+
+
+
+
+<div class="step" data-x="1100"  data-y="500" data-scale="0.4" >
+<h2>320pxの楽園</h2>
+<div>・スナップビューとは、画面の左右いずれか320pxの領域に、</div>
+<div>　アプリを縮小表示する機能</div>
+    <img src="20121104/320px.jpg" /><br />
+<div>・メインアプリ以外に、スナップビュー状態でもう一つ</div>
+<div>　アプリが表示可能</div>
+<div>・従来の意味に近いマスコットアプリを作るなら、</div>
+<div>　横320pxのフォーマットに合わせて画面を作ればOK</div>
+<div><br /></div>
+<div data-jmpress="fade">・すげぇ、いけるんじゃね？</div>
+<div data-jmpress="fade after 500ms">　→地獄の始まりだ！</div>
+</div>
+
+
+
+
+<div class="step" data-x="1000"  data-y="1000" data-scale="1" >
+<h2>前置き終了</h2>
+<div>‥‥という「思い付き」を元に、とりあえずアプリを作るための<br></div>
+<div>とっかかりの計画をそろえる手法の一つを紹介します。</div>
+<div><br></div>
+<div><br></div>
+<div>・マイクロソフトの開発の手引きである</div>
+<div>　「Windows ストア アプリの計画」を参考書にします。</div>
+<div>　<a rel="nofollow" target="_blank" href="http://msdn.microsoft.com/ja-jp/library/windows/apps/hh465427">http://msdn.microsoft.com/ja-jp/library/windows/apps/hh465427</a></div>
+</div>
+
+
+
+
+<div class="step" data-x="2000"  data-y="0000" data-scale="1" >
+<h2>アジェンダ</h2>
+<div>1. アプリの長所を決める</div>
+<div>2. サポートするユーザーのアクティビティを決める</div>
+<div>3. アプリに含める機能を決める</div>
+<div>4. アプリで収益を得る方法を決定する</div>
+<div>5. アプリの UI を設計する</div>
+<div>6. 第一印象を良くする</div>
+<div>7. デザインのプロトタイプを作成して検証する</div>
+</div>
+
+
+
+
+<div class="step" data-x="2500"  data-y="000" data-scale="0.4" >
+<h2>1. アプリの長所を決める（１）</h2>
+<div>最も重要なのは、アプリの特徴。<br></div>
+<div>何を作りたいのか？</div>
+<div><br></div>
+<div data-jmpress="fade">・アイデアを並べてみる</div>
+<div data-jmpress="fade after 500ms">　・スナップビューをメイン画面とする</div>
+<div data-jmpress="fade after 500ms">　・可愛い女の子に癒されたい</div>
+<div data-jmpress="fade after 500ms">　・2次元の嫁が欲しい</div>
+<div data-jmpress="fade after 500ms">　・ゴースト辞書をウェブサービス連携したい</div>
+<div data-jmpress="fade after 500ms">　・縦書きがいいかもしれない</div>
+<div data-jmpress="fade after 500ms">　・女の子は「パスタさん」という名前にしてみよう</div>
+</div>
+
+
+
+<div class="step" data-x="2500"  data-y="200" data-scale="0.4" >
+<h2>1. アプリの長所を決める（２）</h2>
+<div>・１番の特徴を考える<br></div>
+<div>　→アイデアを見ながら、１文でアプリの特徴をまとめる</div>
+<div>　</div>
+<div>　「窓のすきまからパスタさんの生活を覗きます」</div>
+<div><br></div>
+<div><br></div>
+<div>・ゴーストというキーワードはちょっと通じない</div>
+<div>・とりあえずは「パスタ」という１ゴーストが動けばいい？</div>
+<div><br></div>
+<div data-jmpress="fade after 500ms">最大の特徴を決めることで、妥協すべき点もはっきりする。</div>
+<div data-jmpress="fade after 500ms">伺かのように切り替えできることは何れ目指したいが、</div>
+<div data-jmpress="fade after 500ms">アプリはリリースすることが最も重要。</div>
+</div>
+
+
+
+
+<div class="step" data-x="2800"  data-y="000" data-scale="0.4" >
+<h2>2. サポートするユーザーのアクティビティを決める</h2>
+<div>・目的に沿って、ユーザーが行う一連の操作の流れを定義</div>
+<div><br></div>
+<div>　・スナップビューにしてもらう（必須）</div>
+<div>　・パスタさんを可愛がる</div>
+<div>　・パスタさんの会話を眺める</div>
+<div>　・パスタさんを触る</div>
+<div><br></div>
+<div>必須項目（ここではスナップビューの説明）を漏らさないことが重要！</div>
+</div>
+
+
+
+
+<div class="step" data-x="3200"  data-y="000" data-scale="0.4" >
+<h2>3. アプリに含める機能を決める（１）</h2>
+<div>ユーザーの目的を理解し、その目的を助ける方法もわかったら、</div>
+<div>次にすることは、それを実現するための機能を探すことです。</div>
+<div><br></div>
+<div>～「Windows ストア アプリの計画」より抜粋～</div>
+<div><br></div>
+<div>・開発環境を調べ、実現できる機能を決定する</div>
+<div><br></div>
+<div>・まずは言語、ネイティブかHTML</div>
+<div>　・マスコットアプリならHTML/JavaScriptで十分か？</div>
+<div>　・Windows以外でも動かせる可能性があるし‥‥</div>
+</div>
+
+
+
+
+<div class="step" data-x="3200"  data-y="200" data-scale="0.4" >
+<h2>3. アプリに含める機能を決める（２）</h2>
+<div>・操作系や表現で今回重要視した機能<br></div>
+<div>　・タッチの検出方法</div>
+<div>　・縦書き表現</div>
+<div><br></div>
+<div>（余談）</div>
+<div>　Webkitでは縦書きバグってます。</div>
+<div>　アニメーションさせると表示が死ぬ（涙）</div>
+<div>　ゆえに、今回IE9限定というものすごい縛りのHTML</div>
+</div>
+
+
+
+
+<div class="step" data-x="3600"  data-y="000" data-scale="0.4" >
+<h2>4. アプリで収益を得る方法を決定する</h2>
+<div>・対価は必ず必要</div>
+<div>・対価がお金である必要は無い</div>
+<div>・なんでもいいから、</div>
+<div>　モチベーション維持が出来る対価があることを意識する</div>
+</div>
+
+
+
+
+<div class="step" data-x="4000"  data-y="000" data-scale="0.4" >
+<h2>5. アプリの UI を設計する</h2>
+<div>
+    <img src="shell/base.png" style="float:right;" />
+<div>・マスコットアプリです</div>
+<div>　→ぶっちゃけ「かわいらしい立ち絵」大事</div>
+<div><br></div>
+<div>・絵心が無い場合、フリーシェルや絵師さんへの発注となる</div>
+<div>　→今回、「今日のタンブラー」さんが公開していた</div>
+<div>　フリーシェル候補を使わせていただきました</div>
+</div>
+</div>
+
+
+
+
+<div class="step" data-x="4400"  data-y="000" data-scale="0.4" >
+<h2>6. 第一印象を良くする</h2>
+<div>・「この絵に縦書きの恥ずかしいメッセージが流れまくったら<br></div>
+<div>　　絶対萌えるだろう！」</div>
+<div><br></div>
+<div>　　→この辺は勢いが大事</div>
+<div><br></div>
+<div>・一般的な注意事項</div>
+<div>　・最低限の操作以外は説明しない</div>
+<div>　　→「ユーザーに発見させる」UIであること</div>
+<div>　　　無理にすべての機能を使わせる必要は無い</div>
+<div><br></div>
+<div>　・ユーザーは常に見てはいない</div>
+<div>　　マスコットアプリはチラ見が基本。</div>
+<div>　　選択肢を出す場合でも必須にならない工夫が必要</div>
+</div>
+
+
+
+
+<div class="step" data-x="4800"  data-y="000" data-scale="0.4" >
+<h2>7. デザインのプロトタイプを作成して検証する</h2>
+<div>・<a href="index.html" target="_blank">こんな感じになりました</a><br /></div>
+<div>・<a href="design.html" target="_blank">(デバッグモード)</a><br /></div>
+</div>
+
+
+
+
+<div class="step" data-x="2000"  data-y="1000" data-scale="1" >
+<h2>まとめ</h2>
+<div>・計画がそろっていれば、開発のぶれを抑えられる</div>
+<div>・７つの項目の考える順はこの通りじゃなくても大丈夫</div>
+<div>・「ゴースト」の開発でも使える</div>
+<div>・分りやすい資料なので一読おすすめ</div>
+</div>
+
+
+
+
+<div class="step" data-x="3000"  data-y="1000" data-scale="1" >
+<h2>あと作る必要があるもの</h2>
+<div>　・まともな栞システム</div>
+<div>　・ちゃんとしたタッチ反応</div>
+<div>　・辞書をなるべく多く</div>
+<div>　→えちょの冒険は始まったばかりだ！</div>
+</div>
+
+
+
+
+<div class="step" data-x="4000"  data-y="1000" data-scale="1" >
+<h2>参考文献</h2>
+<div>・MSDN「Windows ストア アプリの計画」</div>
+<div>　<a rel="nofollow" target="_blank" href="http://msdn.microsoft.com/ja-jp/library/windows/apps/hh465427">http://msdn.microsoft.com/ja-jp/library/windows/apps/hh465427</a></div>
+<div><br></div>
+<div>・MSDN「さまざまな画面への対応」</div>
+<div>　<a rel="nofollow" target="_blank" href="http://blogs.msdn.com/b/b8_ja/archive/2012/03/29/10289089.aspx">http://blogs.msdn.com/b/b8_ja/archive/2012/03/29/10289089.aspx</a></div>
+<div><br></div>
+<div>・パスタのレシピ（開発blog）</div>
+<div>　<a rel="nofollow" target="_blank" href="http://pasta.hatenablog.com/">http://pasta.hatenablog.com/</div>
+<div><br></div>
+<div>・発表資料URL</div>
+<div>　<a rel="nofollow" target="_blank" href="http://pasta-chan.googlecode.com/hg/src/pasta/pasta/20121104.html">http://pasta-chan.googlecode.com/hg/src/pasta/pasta/20121104.html</div>
+
+
+
+
+</div>
+
+  
+<script type="text/javascript">
+    $(function () {
+        $('#simple').jmpress();
+    });
+</script>
+
+</body>
+</html>
