@@ -1,13 +1,24 @@
-/**
-* @preserve Copyright (c) Microsoft Corporation.  All rights reserved.
-* This code is licensed by Microsoft Corporation under the terms
-* of the Microsoft Reference Source License (MS-RSL).
-* http://referencesource.microsoft.com/referencesourcelicense.aspx.
-*/
+// Copyright (c) Microsoft Open Technologies, Inc. All rights reserved. See License.txt in the project root for license information.
 
-(function (root, factory) {
-    var freeExports = typeof exports == 'object' && exports &&
-    (typeof root == 'object' && root && root == root.global && (window = root), exports);
+;(function (factory) {
+    var objectTypes = {
+        'boolean': false,
+        'function': true,
+        'object': true,
+        'number': false,
+        'string': false,
+        'undefined': false
+    };
+
+    var root = (objectTypes[typeof window] && window) || this,
+        freeExports = objectTypes[typeof exports] && exports && !exports.nodeType && exports,
+        freeModule = objectTypes[typeof module] && module && !module.nodeType && module,
+        moduleExports = freeModule && freeModule.exports === freeExports && freeExports,
+        freeGlobal = objectTypes[typeof global] && global;
+    
+    if (freeGlobal && (freeGlobal.global === freeGlobal || freeGlobal.window === freeGlobal)) {
+        root = freeGlobal;
+    }
 
     // Because of build optimizers
     if (typeof define === 'function' && define.amd) {
@@ -15,32 +26,38 @@
             root.Rx = factory(root, exports, Rx);
             return root.Rx;
         });
-    } else if (typeof module == 'object' && module && module.exports == freeExports) {
+    } else if (typeof module === 'object' && module && module.exports === freeExports) {
         module.exports = factory(root, module.exports, require('./rx'));
     } else {
         root.Rx = factory(root, {}, root.Rx);
     }
-}(this, function (global, exp, root, undefined) {
+}.call(this, function (root, exp, Rx, undefined) {
     
     // Aliases
-    var Observable = root.Observable,
+    var Observable = Rx.Observable,
         observableProto = Observable.prototype,
-        observableCreateWithDisposable = Observable.createWithDisposable,
+        AnonymousObservable = Rx.Internals.AnonymousObservable,
         observableConcat = Observable.concat,
         observableDefer = Observable.defer,
         observableEmpty = Observable.empty,
-        disposableEmpty = root.Disposable.empty,
-        BinaryObserver = root.Internals.BinaryObserver,
-        CompositeDisposable = root.CompositeDisposable,
-        SerialDisposable = root.SerialDisposable,
-        SingleAssignmentDisposable = root.SingleAssignmentDisposable,
-        enumeratorCreate = root.Internals.Enumerator.create,
-        Enumerable = root.Internals.Enumerable,
+        disposableEmpty = Rx.Disposable.empty,
+        BinaryObserver = Rx.Internals.BinaryObserver,
+        CompositeDisposable = Rx.CompositeDisposable,
+        SerialDisposable = Rx.SerialDisposable,
+        SingleAssignmentDisposable = Rx.SingleAssignmentDisposable,
+        enumeratorCreate = Rx.Internals.Enumerator.create,
+        Enumerable = Rx.Internals.Enumerable,
         enumerableForEach = Enumerable.forEach,
-        immediateScheduler = root.Scheduler.immediate,
-        slice = Array.prototype.slice;
+        immediateScheduler = Rx.Scheduler.immediate,
+        currentThreadScheduler = Rx.Scheduler.currentThread,
+        slice = Array.prototype.slice,
+        AsyncSubject = Rx.AsyncSubject,
+        Observer = Rx.Observer,
+        inherits = Rx.Internals.inherits,
+        addProperties = Rx.Internals.addProperties;
 
     // Utilities
+    function nothing () { }
     function argsOrArray(args, idx) {
         return args.length === 1 && Array.isArray(args[idx]) ?
             args[idx] :
@@ -60,11 +77,30 @@
         });
     }
 
-    observableProto.letBind = function (func) {
+     /**
+     *  Returns an observable sequence that is the result of invoking the selector on the source sequence, without sharing subscriptions.
+     *  This operator allows for a fluent style of writing queries that use the same sequence multiple times.
+     *
+     * @param {Function} selector Selector function which can use the source sequence as many times as needed, without sharing subscriptions to the source sequence.
+     * @returns {Observable} An observable sequence that contains the elements of a sequence produced by multicasting the source sequence within a selector function.
+     */
+    observableProto.letBind = observableProto['let'] = function (func) {
         return func(this);
     };
 
-    Observable.ifThen = function (condition, thenSource, elseSourceOrScheduler) {
+     /**
+     *  Determines whether an observable collection contains values. There is an alias for this method called 'ifThen' for browsers <IE9
+     *  
+     * @example
+     *  1 - res = Rx.Observable.if(condition, obs1);
+     *  2 - res = Rx.Observable.if(condition, obs1, obs2);
+     *  3 - res = Rx.Observable.if(condition, obs1, scheduler);
+     * @param {Function} condition The condition which determines if the thenSource or elseSource will be run.
+     * @param {Observable} thenSource The observable sequence that will be run if the condition function returns true.
+     * @param {Observable} [elseSource] The observable sequence that will be run if the condition function returns false. If this is not provided, it defaults to Rx.Observabe.Empty with the specified scheduler.  
+     * @returns {Observable} An observable sequence which is either the thenSource or elseSource.
+     */
+    Observable['if'] = Observable.ifThen = function (condition, thenSource, elseSourceOrScheduler) {
         return observableDefer(function () {
             elseSourceOrScheduler || (elseSourceOrScheduler = observableEmpty());
             if (elseSourceOrScheduler.now) {
@@ -75,19 +111,56 @@
         });
     };
 
-    Observable.forIn = function (sources, resultSelector) {
+     /**
+     *  Concatenates the observable sequences obtained by running the specified result selector for each element in source.
+     * There is an alias for this method called 'forIn' for browsers <IE9
+     * @param {Array} sources An array of values to turn into an observable sequence.
+     * @param {Function} resultSelector A function to apply to each item in the sources array to turn it into an observable sequence.
+     * @returns {Observable} An observable sequence from the concatenated observable sequences.  
+     */ 
+    Observable['for'] = Observable.forIn = function (sources, resultSelector) {
         return enumerableForEach(sources, resultSelector).concat();
     };
 
-    var observableWhileDo = Observable.whileDo = function (condition, source) {
+     /**
+     *  Repeats source as long as condition holds emulating a while loop.
+     * There is an alias for this method called 'whileDo' for browsers <IE9
+     *
+     * @param {Function} condition The condition which determines if the source will be repeated.
+     * @param {Observable} source The observable sequence that will be run if the condition function returns true.
+     * @returns {Observable} An observable sequence which is repeated as long as the condition holds.  
+     */
+    var observableWhileDo = Observable['while'] = Observable.whileDo = function (condition, source) {
         return enumerableWhile(condition, source).concat();
     };
 
+     /**
+     *  Repeats source as long as condition holds emulating a do while loop.
+     *
+     * @param {Function} condition The condition which determines if the source will be repeated.
+     * @param {Observable} source The observable sequence that will be run if the condition function returns true.
+     * @returns {Observable} An observable sequence which is repeated as long as the condition holds. 
+     */ 
     observableProto.doWhile = function (condition) {
         return observableConcat([this, observableWhileDo(condition, this)]);
     };
 
-    Observable.switchCase = function (selector, sources, defaultSourceOrScheduler) {
+     /**
+     *  Uses selector to determine which source in sources to use.
+     *  There is an alias 'switchCase' for browsers <IE9.
+     *  
+     * @example
+     *  1 - res = Rx.Observable.case(selector, { '1': obs1, '2': obs2 });
+     *  1 - res = Rx.Observable.case(selector, { '1': obs1, '2': obs2 }, obs0);
+     *  1 - res = Rx.Observable.case(selector, { '1': obs1, '2': obs2 }, scheduler);
+     * 
+     * @param {Function} selector The function which extracts the value for to test in a case statement.
+     * @param {Array} sources A object which has keys which correspond to the case statement labels.
+     * @param {Observable} [elseSource] The observable sequence that will be run if the sources are not matched. If this is not provided, it defaults to Rx.Observabe.Empty with the specified scheduler.
+     *       
+     * @returns {Observable} An observable sequence which is determined by a case statement.  
+     */
+    Observable['case'] = Observable.switchCase = function (selector, sources, defaultSourceOrScheduler) {
         return observableDefer(function () {
             defaultSourceOrScheduler || (defaultSourceOrScheduler = observableEmpty());
             if (defaultSourceOrScheduler.now) {
@@ -99,10 +172,17 @@
         });
     };
 
+     /**
+     *  Expands an observable sequence by recursively invoking selector.
+     *  
+     * @param {Function} selector Selector function to invoke for each produced element, resulting in another sequence to which the selector will be invoked recursively again.
+     * @param {Scheduler} [scheduler] Scheduler on which to perform the expansion. If not provided, this defaults to the current thread scheduler.
+     * @returns {Observable} An observable sequence containing all the elements produced by the recursive expansion.
+     */
     observableProto.expand = function (selector, scheduler) {
         scheduler || (scheduler = immediateScheduler);
         var source = this;
-        return observableCreateWithDisposable(function (observer) {
+        return new AnonymousObservable(function (observer) {
             var q = [],
                 m = new SerialDisposable(),
                 d = new CompositeDisposable(m),
@@ -156,9 +236,17 @@
         });
     };
 
+     /**
+     *  Runs all observable sequences in parallel and collect their last elements.
+     *  
+     * @example
+     *  1 - res = Rx.Observable.forkJoin([obs1, obs2]);
+     *  1 - res = Rx.Observable.forkJoin(obs1, obs2, ...);  
+     * @returns {Observable} An observable sequence with an array collecting the last elements of all the input sequences.
+     */
     Observable.forkJoin = function () {
         var allSources = argsOrArray(arguments, 0);
-        return observableCreateWithDisposable(function (subscriber) {
+        return new AnonymousObservable(function (subscriber) {
             var count = allSources.length;
             if (count === 0) {
                 subscriber.onCompleted();
@@ -206,10 +294,17 @@
         });
     };
 
+     /**
+     *  Runs two observable sequences in parallel and combines their last elemenets.
+     *
+     * @param {Observable} second Second observable sequence.
+     * @param {Function} resultSelector Result selector function to invoke with the last elements of both sequences.
+     * @returns {Observable} An observable sequence with the result of calling the selector function with the last elements of both input sequences.
+     */
     observableProto.forkJoin = function (second, resultSelector) {
         var first = this;
 
-        return observableCreateWithDisposable(function (observer) {
+        return new AnonymousObservable(function (observer) {
             var leftStopped = false, rightStopped = false,
                 hasLeft = false, hasRight = false,
                 lastLeft, lastRight,
@@ -277,5 +372,82 @@
         });
     };
 
-    return root;
+    /**
+     * Comonadic bind operator.
+     * @param {Function} selector A transform function to apply to each element.
+     * @param {Object} scheduler Scheduler used to execute the operation. If not specified, defaults to the ImmediateScheduler.
+     * @returns {Observable} An observable sequence which results from the comonadic bind operation.
+     */
+    observableProto.manySelect = function (selector, scheduler) {
+        scheduler || (scheduler = immediateScheduler);
+        var source = this;
+        return observableDefer(function () {
+            var chain;
+
+            return source
+                .select(
+                    function (x) {
+                        var curr = new ChainObservable(x);
+                        if (chain) {
+                            chain.onNext(x);
+                        }
+                        chain = curr;
+
+                        return curr;
+                    })
+                .doAction(
+                    nothing,
+                    function (e) {
+                        if (chain) {
+                            chain.onError(e);
+                        }
+                    },
+                    function () {
+                        if (chain) {
+                            chain.onCompleted();
+                        }
+                    })
+                .observeOn(scheduler)
+                .select(function (x, i, o) { return selector(x, i, o); });
+        });
+    };
+
+    var ChainObservable = (function (_super) {
+
+        function subscribe (observer) {
+            var self = this, g = new CompositeDisposable();
+            g.add(currentThreadScheduler.schedule(function () {
+                observer.onNext(self.head);
+                g.add(self.tail.mergeObservable().subscribe(observer));
+            }));
+
+            return g;
+        }
+
+        inherits(ChainObservable, _super);
+
+        function ChainObservable(head) {
+            _super.call(this, subscribe);
+            this.head = head;
+            this.tail = new AsyncSubject();
+        }
+
+        addProperties(ChainObservable.prototype, Observer, {
+            onCompleted: function () {
+                this.onNext(Observable.empty());
+            },
+            onError: function (e) {
+                this.onNext(Observable.throwException(e));
+            },
+            onNext: function (v) {
+                this.tail.onNext(v);
+                this.tail.onCompleted();
+            }
+        });
+
+        return ChainObservable;
+
+    }(Observable));
+
+    return Rx;
 }));

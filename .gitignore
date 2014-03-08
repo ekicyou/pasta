@@ -1,2 +1,13 @@
 /_site
 /_out
+/_old/src/pasta/pasta/bin
+/_old/src/pasta/pasta/obj
+/_old/src/pasta/packages
+/_old/src/pasta/Pasta.Image.Test/bin
+/_old/src/pasta/Pasta.Image.Test/obj
+/_old/src/pasta/pasta2/obj
+/_old/src/pasta/pasta2/bin
+/_old/src/pasta/sabun/obj
+/_old/src/pasta/sabun/bin
+/_old/src/pasta/UnitTest/obj
+/_old/src/pasta/UnitTest/bin

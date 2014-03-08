@@ -52,10 +52,6 @@
       <Project>{4168E853-7FAB-4C0A-BADD-9A3F47C05E20}</Project>
       <Name>UnitTestRunner_40</Name>
     </ProjectReference>
-    <ProjectReference Include="..\Pasta.EverNote.Test\Pasta.EverNote.Test.csproj">
-      <Project>{0929531F-D422-4579-BF2E-0EF639809A02}</Project>
-      <Name>Pasta.EverNote.Test</Name>
-    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <Content Include="NLog.config">
