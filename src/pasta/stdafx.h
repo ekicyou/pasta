@@ -20,4 +20,11 @@
 // TODO: プログラムに必要な追加ヘッダーをここで参照してください。
 #include <string>
 
-#include "xtal.h"
+#include <xtal.h>
+#include <xtal_macro.h>
+#include <xtal_details.h>
+#include <xtal_lib/xtal_cstdiostream.h>    // CStdioStdStreamLibのため
+#include <xtal_lib/xtal_winthread.h>       // WinThreadLibのため
+#include <xtal_lib/xtal_winfilesystem.h>   // WinFilesystemLibのため
+#include <xtal_lib/xtal_chcode.h>          // SJISChCodeLibのため
+#include <xtal_lib/xtal_errormessage.h>    // bind_error_messageのため

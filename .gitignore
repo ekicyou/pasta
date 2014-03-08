@@ -15,3 +15,4 @@ ipch
 /externals/XTAL/vc12/test/Release
 /externals/XTAL/vc12/xtal/Release
 /externals/XTAL/vc12/xtallib/Release
+/src/lib
