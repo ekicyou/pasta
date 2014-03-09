@@ -79,7 +79,7 @@ SHIORI_API HGLOBAL __cdecl request(HGLOBAL hGlobal_request, long& len)
 	std::string response;
 	bool rc = app->request(request, response);
 	if (!rc) {
-		CreateBatRequestResponse(response, "RequestCLIPS return false");
+		CreateBatRequestResponse(response, "Request return false");
 	}
 	return AllocString(response, len);
 }

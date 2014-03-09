@@ -26,7 +26,6 @@ namespace pasta{
 		xtal::WinFilesystemLib filesystem_lib;       // Windowsのファイルシステムを使う
 		xtal::UTF8ChCodeLib ch_code_lib;             // UTF8を使う
 		xtal::Setting setting;
-		xtal::Environment* env;
 
 	public:
 		App(const HINSTANCE hinst, const std::string& loaddir);
