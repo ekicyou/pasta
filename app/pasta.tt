@@ -1,0 +1,47 @@
+﻿<#@ template debug="false" hostspecific="false" language="C#" #>
+<#@ output extension=".appcache" encoding="utf-8" #>
+<#@ assembly name="System.Core.dll" #>
+<#@ assembly name="$(TargetDir)CSUtil.dll" #>
+<#@ import namespace="System.Collections.Generic" #>
+<#@ import namespace="System.Linq" #>
+<#@ import namespace="System.Text" #>
+<#@ import namespace="System.Text.RegularExpressions" #>
+<#@ import namespace="System.IO" #>
+<#@ import namespace="System" #>
+<#@ import namespace="CSUtil.Reflection" #>
+<#
+var timestamp = DateTime.Now;
+var network="";
+var cache="";
+var dir = Directory.GetCurrentDirectory();
+dir = Path.Combine("pasta");
+dir = Path.GetFullPath(dir);
+var baseURI =  new Uri(dir + @"\");
+
+var reNoDir = new Regex(@"\\((bin|obj|org|old|Properties|jquery\.globalize|node_modules)\\|Content\\.+\.png)");
+var reFile = new Regex(@"((index\.html)|(\.(css|png|jpg|js)))$");
+
+var files = Directory.EnumerateFiles(dir, "*.*", SearchOption.AllDirectories)
+    .Where(a => !reNoDir.IsMatch(a))
+    .Where(a => reFile.IsMatch(a))
+    .Select(a=>new Uri(Path.GetFullPath(a)))
+    .Select(a=>baseURI.MakeRelativeUri(a))
+    ;
+
+var buf=new StringBuilder();
+foreach(var item in files){
+    buf.AppendLine(item.ToString());
+}
+cache = buf.ToString();
+
+#>
+CACHE MANIFEST
+# $Id: pasta.appcache fc4c2cb55ff9 2012/07/24 12:26:54 dot-station $
+# tt create <#= timestamp.ToString("o") #>
+
+NETWORK:
+<#= network #>
+
+CACHE:
+<#= cache #>
+

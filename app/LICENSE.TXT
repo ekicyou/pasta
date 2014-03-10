@@ -1,0 +1,32 @@
+﻿■開発者
+ソフトウェアの主開発は「どっとステーション駅長/dot-station」です。
+
+
+■ソフトウェアLICENSEについて
+ソフトウェアライセンスはMIT LICENSEとします。
+組み込みで利用しているライブラリについてはそれぞれのLICENSEを参照してください。
+
+
+■「パスタ」辞書データについて
+MIT LICENSEとします。
+
+これはお願いですが、
+ゴーストですので「完全に同じはNG」としてください。
+アイデンティティまで全部コピーはさすがにあれかと(^^;
+
+
+■シェルについて
+「今日のタンブラー」TH様作成のシェル候補をご提供いただきました。
+Browser表示用に改変しています。
+
+
+■マイクアイコンのLICENSE
+URL
+http://www.freebievectors.com/ja/illustration/282/microphones-and-headphones-icons/
+
+作成者
+Jussray
+
+ライセンス
+Attribution
+
