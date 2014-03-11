@@ -1,9 +1,6 @@
-bin
-obj
 *.suo
 TestResults
 /src/packages
-
 *.user
 /src2/packages
 *.sdf
@@ -16,3 +13,4 @@ ipch
 /externals/XTAL/vc12/xtal/Release
 /externals/XTAL/vc12/xtallib/Release
 /src/lib
+/src/build
