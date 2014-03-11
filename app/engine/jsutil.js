@@ -85,6 +85,9 @@
     checkBrowser = function() {
       var appVersion, userAgent;
       userAgent = window.navigator.userAgent.toLowerCase();
+      if (userAgent.indexOf('trident') !== -1) {
+        return 'ie11';
+      }
       if (userAgent.indexOf('opera') !== -1) {
         return 'opera';
       }
@@ -312,7 +315,7 @@
         });
         return dfd.promise();
       },
-      /* timestampの契約を返す 
+      /* timestampの契約を返す
               timestamp: 発動希望時刻
               isSleepWait: trueなら、間にスリープが入った場合に発動を遅らせる
       */
