@@ -114,7 +114,7 @@ img
 }
 
 @media screen and (max-width: 400px) {
-  @-ms-viewport { width: 320px; }
+  @-ms-viewport { width: device-width; }
   /* CSS for 320px width Modern taskbar layout goes here */
 }
 
