@@ -113,10 +113,7 @@ img
     h1 { margin-top: -0px;}
 }
 
-@media screen and (max-width: 400px) {
-  @-ms-viewport { width: 320px; }
-  /* CSS for 320px width Modern taskbar layout goes here */
-}
+@-ms-viewport { width: device-width; }
 
 #pasta {
   background-color: transparent;
