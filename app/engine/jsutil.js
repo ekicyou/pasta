@@ -84,6 +84,8 @@
 
     checkBrowser = function() {
       var appVersion, userAgent;
+      return 'chrome';
+
       userAgent = window.navigator.userAgent.toLowerCase();
       if (userAgent.indexOf('trident') !== -1) {
         return 'ie11';
