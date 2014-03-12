@@ -11,3 +11,5 @@
 /_old/src/pasta/sabun/bin
 /_old/src/pasta/UnitTest/obj
 /_old/src/pasta/UnitTest/bin
+*.suo
+*.user
