@@ -4,12 +4,59 @@
   <title>Feed Name</title>
   <link href="http://domain/"/>
   <link type="application/atom+xml" rel="self" href="http://domain/atom.xml"/>
-  <updated>0001-01-01T00:00:00+09:00</updated>
+  <updated>2014-03-13T00:00:00+09:00</updated>
   <id>http://domain/</id>
   <author>
     <name>Author</name>
     <email>Email</email>
   </author>
 
+  
+  <entry>
+    <id>http://domain//2014/03/13/the-first-spring-storm.html</id>
+    <link type="text/html" rel="alternate" href="http://domain//2014/03/13/the-first-spring-storm.html"/>
+    <title>春の嵐</title>
+    <updated>2014-03-13T00:00:00+09:00</updated>
+    <author>
+      <name>Author</name>
+      <uri>http://domain/</uri>
+    </author>
+    <content type="html">&lt;h2&gt;春の嵐&lt;/h2&gt;
+&lt;p&gt;冬将軍。&lt;/p&gt;
+</content>
+  </entry>
+  
+  <entry>
+    <id>http://domain//2014/03/13/the-first-spring-storm_a2ecbd478975ccf534ff8aca5358cb23.html</id>
+    <link type="text/html" rel="alternate" href="http://domain//2014/03/13/the-first-spring-storm_a2ecbd478975ccf534ff8aca5358cb23.html"/>
+    <title>this is a post</title>
+    <updated>2014-03-13T00:00:00+09:00</updated>
+    <author>
+      <name>Author</name>
+      <uri>http://domain/</uri>
+    </author>
+    <content type="html">&lt;!DOCTYPE HTML PUBLIC &apos;-//W3C//DTD HTML 4.01//EN&apos; &apos;http://www.w3.org/TR/html4/strict.dtd&apos;&gt;
+&lt;html&gt;
+&lt;head&gt;
+&lt;meta http-equiv=&apos;Content-Type&apos; content=&apos;text/html; charset=utf-8&apos; /&gt;
+&lt;link rel=&apos;stylesheet&apos; href=&apos;C:\Users\maz\AppData\Roaming\MarkDownSharpEditor\css\github.css&apos; type=&apos;text/css&apos; /&gt;
+&lt;style type=&apos;text/css&apos;&gt;
+	 ._mk {background-color:#FFFFC8}
+&lt;/style&gt;
+&lt;title&gt;2014-03-13-the-first-spring-storm.md&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;hr /&gt;
+&lt;p&gt;layout: post
+title:  春の嵐
+comments: true&lt;/p&gt;
+&lt;hr /&gt;
+&lt;div class=&apos;_mk&apos;&gt;&lt;!-- edit --&gt;&lt;h2&gt;春の嵐&lt;/h2&gt;&lt;/div&gt;
+&lt;p&gt;冬将軍。&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+
+</content>
+  </entry>
   
 </feed>

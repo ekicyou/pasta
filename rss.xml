@@ -7,9 +7,50 @@
     <atom:link href="http://domain/rss.xml" rel="self" type="application/rss+xml" />
     <description></description>
     <language>en-au</language>
-    <pubDate></pubDate>
-    <lastBuildDate></lastBuildDate>
+    <pubDate>木, 13 3 2014 00:00:00 +0900</pubDate>
+    <lastBuildDate>木, 13 3 2014 00:00:00 +0900</lastBuildDate>
 
+    
+    <item>
+      <title>春の嵐</title>
+      <link>http://domain/2014/03/13/the-first-spring-storm.html</link>
+      <pubDate>木, 13 3 2014 00:00:00 +0900</pubDate>
+      <author>Author</author>
+      <guid>http://domain/2014/03/13/the-first-spring-storm.html</guid>
+      <description>&lt;h2&gt;春の嵐&lt;/h2&gt;
+&lt;p&gt;冬将軍。&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>this is a post</title>
+      <link>http://domain/2014/03/13/the-first-spring-storm_a2ecbd478975ccf534ff8aca5358cb23.html</link>
+      <pubDate>木, 13 3 2014 00:00:00 +0900</pubDate>
+      <author>Author</author>
+      <guid>http://domain/2014/03/13/the-first-spring-storm_a2ecbd478975ccf534ff8aca5358cb23.html</guid>
+      <description>&lt;!DOCTYPE HTML PUBLIC &apos;-//W3C//DTD HTML 4.01//EN&apos; &apos;http://www.w3.org/TR/html4/strict.dtd&apos;&gt;
+&lt;html&gt;
+&lt;head&gt;
+&lt;meta http-equiv=&apos;Content-Type&apos; content=&apos;text/html; charset=utf-8&apos; /&gt;
+&lt;link rel=&apos;stylesheet&apos; href=&apos;C:\Users\maz\AppData\Roaming\MarkDownSharpEditor\css\github.css&apos; type=&apos;text/css&apos; /&gt;
+&lt;style type=&apos;text/css&apos;&gt;
+	 ._mk {background-color:#FFFFC8}
+&lt;/style&gt;
+&lt;title&gt;2014-03-13-the-first-spring-storm.md&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;hr /&gt;
+&lt;p&gt;layout: post
+title:  春の嵐
+comments: true&lt;/p&gt;
+&lt;hr /&gt;
+&lt;div class=&apos;_mk&apos;&gt;&lt;!-- edit --&gt;&lt;h2&gt;春の嵐&lt;/h2&gt;&lt;/div&gt;
+&lt;p&gt;冬将軍。&lt;/p&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+
+</description>
+    </item>
     
 
   </channel>
