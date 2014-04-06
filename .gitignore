@@ -14,3 +14,7 @@ ipch
 /externals/XTAL/vc12/xtallib/Release
 /src/lib
 /src/build
+/Peep/Peep/Peep.Windows/obj
+/Peep/Peep/Peep.Windows/bin
+/Peep/Peep/Peep.WindowsPhone/obj
+/Peep/Peep/Peep.WindowsPhone/bin
