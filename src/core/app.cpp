@@ -33,11 +33,34 @@ inline std::string ToMultStr(const std::wstring &wstr, int cp)
 }
 
 
+// エラーのコールバック関数（returnしない→例外に変換して戻す）
+static void FatalFunc(duk_context *ctx, int code, const char *msg){
+	USES_CONVERSION;
+	std::wstring mes(L"duktape FATAL! code=(");
+	mes += code;
+	mes += L") ";
+	mes += A2CW_CP(msg, CP_UTF8);
+
+	OutputDebugString(L"[FatalFunc]");
+	OutputDebugString(mes.c_str());
+	OutputDebugString(L"\n");
+
+	throw std::exception(W2CA(mes.c_str()));
+}
+
+#define duk_create_heap_pasta()  (duk_create_heap(NULL, NULL, NULL, NULL, FatalFunc))
 
 
+// デストラクタ
+pasta::App::~App(void){
+	OutputDebugString(L"[pasta::App::~App]開始！\n");
+	// VMの解放
+	duk_destroy_heap(ctx);
+	OutputDebugString(L"[pasta::App::~App]終了！\n");
+}
 
 
-
+// コンストラクタ
 pasta::App::App(const HINSTANCE hinst, const std::string& loaddir)
 	:hinst(hinst), loaddir(ToWideStr(loaddir)), cp(CP_UTF8)
 {
@@ -53,7 +76,7 @@ pasta::App::App(const HINSTANCE hinst, const std::string& loaddir)
 #endif
 
 	// VM作成
-	ctx = duk_create_heap_default();
+	ctx = duk_create_heap_pasta();
 	if (!ctx) { throw std::exception("FAIL duk_create_heap_default"); }
 
 	// メインスクリプトの読み込み
@@ -78,15 +101,10 @@ pasta::App::App(const HINSTANCE hinst, const std::string& loaddir)
 	OutputDebugString(L"[pasta::App::App]終了！\n");
 }
 
-pasta::App::~App(void){
-	OutputDebugString(L"[pasta::App::~App]開始！\n");
-	// VMの解放
-	duk_destroy_heap(ctx);
-	OutputDebugString(L"[pasta::App::~App]終了！\n");
-}
 
-
+// リクエスト処理
 bool pasta::App::request(const std::string& request, std::string& response){
+	USES_CONVERSION;
 
 	return false;
 }
