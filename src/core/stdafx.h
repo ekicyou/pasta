@@ -13,5 +13,7 @@
 
 // TODO: プログラムに必要な追加ヘッダーをここで参照してください。
 #include <string>
+#include <atlbase.h>
+#include <atlconv.h>
 #include <filesystem>
 #include <duktape.h>

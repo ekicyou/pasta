@@ -19,7 +19,7 @@ namespace pasta{
 	private:
 		HINSTANCE hinst;
 		std::wstring loaddir;
-		CharMode charMode;
+		int cp;
 
 		duk_context *ctx;
 
