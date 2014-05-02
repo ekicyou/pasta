@@ -83,7 +83,7 @@ pasta::App::App(const HINSTANCE hinst, const std::string& loaddir)
 	{
 		std::tr2::sys::wpath p(this->loaddir);
 		p /= L"js";
-		p /= L"pasta.js";
+		p /= L"shiori.js";
 #ifdef DEBUG
 		{
 			std::wstring mes(L"[pasta::App::App](");
@@ -93,8 +93,7 @@ pasta::App::App(const HINSTANCE hinst, const std::string& loaddir)
 		}
 #endif
 		auto utf8 = W2CA_CP(p.string().c_str(), cp);
-		duk_eval_file(ctx, utf8);
-		duk_pop(ctx);  /* pop eval result */
+		duk_eval_file_noresult(ctx, utf8);
 	}
 
 
