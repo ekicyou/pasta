@@ -1,19 +1,19 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
-VisualStudioVersion = 12.0.30110.0
+VisualStudioVersion = 12.0.30324.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "pasta", "pasta\pasta.vcxproj", "{D300A8D9-796D-4B99-84AB-C50096200395}"
 	ProjectSection(ProjectDependencies) = postProject
 		{4960124D-F153-4F35-992B-B43DB480F754} = {4960124D-F153-4F35-992B-B43DB480F754}
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "xtallib", "..\externals\XTAL\vc12\xtallib\xtallib.vcxproj", "{68590069-97DE-4287-BFDF-053C7A788F8D}"
-EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "core", "core\core.vcxproj", "{4960124D-F153-4F35-992B-B43DB480F754}"
 	ProjectSection(ProjectDependencies) = postProject
-		{68590069-97DE-4287-BFDF-053C7A788F8D} = {68590069-97DE-4287-BFDF-053C7A788F8D}
+		{681C55C0-8208-44AD-B5C7-8782E448F041} = {681C55C0-8208-44AD-B5C7-8782E448F041}
 	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "duktape", "duktape\duktape.vcxproj", "{681C55C0-8208-44AD-B5C7-8782E448F041}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -25,14 +25,14 @@ Global
 		{D300A8D9-796D-4B99-84AB-C50096200395}.Debug|Win32.Build.0 = Debug|Win32
 		{D300A8D9-796D-4B99-84AB-C50096200395}.Release|Win32.ActiveCfg = Release|Win32
 		{D300A8D9-796D-4B99-84AB-C50096200395}.Release|Win32.Build.0 = Release|Win32
-		{68590069-97DE-4287-BFDF-053C7A788F8D}.Debug|Win32.ActiveCfg = Debug|Win32
-		{68590069-97DE-4287-BFDF-053C7A788F8D}.Debug|Win32.Build.0 = Debug|Win32
-		{68590069-97DE-4287-BFDF-053C7A788F8D}.Release|Win32.ActiveCfg = Release|Win32
-		{68590069-97DE-4287-BFDF-053C7A788F8D}.Release|Win32.Build.0 = Release|Win32
 		{4960124D-F153-4F35-992B-B43DB480F754}.Debug|Win32.ActiveCfg = Debug|Win32
 		{4960124D-F153-4F35-992B-B43DB480F754}.Debug|Win32.Build.0 = Debug|Win32
 		{4960124D-F153-4F35-992B-B43DB480F754}.Release|Win32.ActiveCfg = Release|Win32
 		{4960124D-F153-4F35-992B-B43DB480F754}.Release|Win32.Build.0 = Release|Win32
+		{681C55C0-8208-44AD-B5C7-8782E448F041}.Debug|Win32.ActiveCfg = Debug|Win32
+		{681C55C0-8208-44AD-B5C7-8782E448F041}.Debug|Win32.Build.0 = Debug|Win32
+		{681C55C0-8208-44AD-B5C7-8782E448F041}.Release|Win32.ActiveCfg = Release|Win32
+		{681C55C0-8208-44AD-B5C7-8782E448F041}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
