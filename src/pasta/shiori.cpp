@@ -7,7 +7,8 @@
 
 #define SHIORI_API_IMPLEMENTS
 #include "shiori.h"
-#include "pasta.h"
+#include "util.h"
+#include "app.h"
 
 /**----------------------------------------------------------------------------
  * グローバルインスタンス
@@ -53,8 +54,16 @@ SHIORI_API BOOL __cdecl load(HGLOBAL hGlobal_loaddir, long loaddir_len)
 		app = NULL;
 	}
 	std::string loaddir((const char*)hGlobal_loaddir, (size_t)loaddir_len);
-	app = new pasta::App(hinst, loaddir);
-	return true;
+	try{
+		app = new pasta::App(hinst, loaddir);
+		return true;
+	}
+	catch (const std::exception& e){
+		return false;
+	}
+	catch(...){
+		return false;
+	}
 }
 
 /* ----------------------------------------------------------------------------
@@ -77,10 +86,19 @@ SHIORI_API HGLOBAL __cdecl request(HGLOBAL hGlobal_request, long& len)
 	AutoGrobalFree autoFree(hGlobal_request);
 	std::string request((const char *)hGlobal_request, len);
 	std::string response;
-	bool rc = app->request(request, response);
-	if (!rc) {
-		CreateBatRequestResponse(response, "Request return false");
+	try{
+		bool rc = app->request(request, response);
+		if (!rc) {
+			CreateBatRequestResponse(response, "Request return false");
+		}
 	}
+	catch (const std::exception& e){
+		CreateBatRequestResponse(response, e.what());
+	}
+	catch (...){
+		CreateBatRequestResponse(response, "Unnone Exception");
+	}
+
 	return AllocString(response, len);
 }
 

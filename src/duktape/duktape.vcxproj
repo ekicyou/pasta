@@ -10,6 +10,128 @@
       <Platform>Win32</Platform>
     </ProjectConfiguration>
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_alloc_default.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_alloc_torture.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_api.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_buffer.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_call.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_codec.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_compile.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_logging.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_memory.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_object.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_string.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_thread.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_var.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_bi_array.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_bi_boolean.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_bi_buffer.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_bi_date.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_bi_duktape.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_bi_error.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_bi_function.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_bi_global.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_bi_json.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_bi_logger.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_bi_math.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_bi_number.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_bi_object.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_bi_pointer.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_bi_regexp.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_bi_string.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_bi_thread.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_bi_thrower.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_builtins.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_debug_fixedbuffer.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_debug_heap.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_debug_hobject.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_debug_macros.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_debug_vsnprintf.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_error_augment.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_error_longjmp.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_error_macros.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_error_misc.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_error_throw.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_hbuffer_alloc.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_hbuffer_ops.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_heap_alloc.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_heap_hashstring.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_heap_markandsweep.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_heap_memory.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_heap_misc.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_heap_refcount.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_heap_stringcache.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_heap_stringtable.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_hobject_alloc.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_hobject_class.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_hobject_enum.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_hobject_finalizer.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_hobject_misc.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_hobject_pc2line.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_hobject_props.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_hstring_misc.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_hthread_alloc.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_hthread_builtins.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_hthread_misc.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_hthread_stacks.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_js_call.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_js_compiler.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_js_executor.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_js_ops.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_js_var.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_lexer.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_numconv.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_regexp_compiler.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_regexp_executor.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_replacements.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_selftest.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_unicode_support.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_unicode_tables.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_util_bitdecoder.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_util_bitencoder.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_util_hashbytes.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_util_hashprime.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_util_misc.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_util_tinyrandom.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\externals\duktape\src-separate\duktape.h" />
+    <ClInclude Include="..\..\externals\duktape\src-separate\duk_api_internal.h" />
+    <ClInclude Include="..\..\externals\duktape\src-separate\duk_bi_protos.h" />
+    <ClInclude Include="..\..\externals\duktape\src-separate\duk_builtins.h" />
+    <ClInclude Include="..\..\externals\duktape\src-separate\duk_dblunion.h" />
+    <ClInclude Include="..\..\externals\duktape\src-separate\duk_debug.h" />
+    <ClInclude Include="..\..\externals\duktape\src-separate\duk_error.h" />
+    <ClInclude Include="..\..\externals\duktape\src-separate\duk_features.h" />
+    <ClInclude Include="..\..\externals\duktape\src-separate\duk_features_sanity.h" />
+    <ClInclude Include="..\..\externals\duktape\src-separate\duk_forwdecl.h" />
+    <ClInclude Include="..\..\externals\duktape\src-separate\duk_hbuffer.h" />
+    <ClInclude Include="..\..\externals\duktape\src-separate\duk_hcompiledfunction.h" />
+    <ClInclude Include="..\..\externals\duktape\src-separate\duk_heap.h" />
+    <ClInclude Include="..\..\externals\duktape\src-separate\duk_heaphdr.h" />
+    <ClInclude Include="..\..\externals\duktape\src-separate\duk_hnativefunction.h" />
+    <ClInclude Include="..\..\externals\duktape\src-separate\duk_hobject.h" />
+    <ClInclude Include="..\..\externals\duktape\src-separate\duk_hstring.h" />
+    <ClInclude Include="..\..\externals\duktape\src-separate\duk_hthread.h" />
+    <ClInclude Include="..\..\externals\duktape\src-separate\duk_internal.h" />
+    <ClInclude Include="..\..\externals\duktape\src-separate\duk_jmpbuf.h" />
+    <ClInclude Include="..\..\externals\duktape\src-separate\duk_js.h" />
+    <ClInclude Include="..\..\externals\duktape\src-separate\duk_json.h" />
+    <ClInclude Include="..\..\externals\duktape\src-separate\duk_js_bytecode.h" />
+    <ClInclude Include="..\..\externals\duktape\src-separate\duk_js_compiler.h" />
+    <ClInclude Include="..\..\externals\duktape\src-separate\duk_lexer.h" />
+    <ClInclude Include="..\..\externals\duktape\src-separate\duk_numconv.h" />
+    <ClInclude Include="..\..\externals\duktape\src-separate\duk_regexp.h" />
+    <ClInclude Include="..\..\externals\duktape\src-separate\duk_replacements.h" />
+    <ClInclude Include="..\..\externals\duktape\src-separate\duk_selftest.h" />
+    <ClInclude Include="..\..\externals\duktape\src-separate\duk_tval.h" />
+    <ClInclude Include="..\..\externals\duktape\src-separate\duk_unicode.h" />
+    <ClInclude Include="..\..\externals\duktape\src-separate\duk_util.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\externals\duktape\src-separate\duk_initjs_min.js" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{681C55C0-8208-44AD-B5C7-8782E448F041}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
@@ -42,12 +164,10 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <OutDir>$(SolutionDir)build\$(Configuration)\lib\</OutDir>
     <IntDir>$(SolutionDir)build\$(Configuration)\obj\$(ProjectName)\</IntDir>
-    <IncludePath>$(SolutionDir)..\..\duktape\src;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <OutDir>$(SolutionDir)build\$(Configuration)\lib\</OutDir>
     <IntDir>$(SolutionDir)build\$(Configuration)\obj\$(ProjectName)\</IntDir>
-    <IncludePath>$(SolutionDir)..\..\duktape\src;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -57,6 +177,7 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PrecompiledHeaderFile />
       <PrecompiledHeaderOutputFile />
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -73,6 +194,7 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PrecompiledHeaderFile />
       <PrecompiledHeaderOutputFile />
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
