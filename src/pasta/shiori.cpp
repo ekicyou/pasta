@@ -8,7 +8,6 @@
 #define SHIORI_API_IMPLEMENTS
 #include "shiori.h"
 #include "util.h"
-#include "app.h"
 
 /**----------------------------------------------------------------------------
  * グローバルインスタンス

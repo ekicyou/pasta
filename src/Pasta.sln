@@ -16,6 +16,12 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "core", "core\core.vcxproj",
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "duktape", "duktape\duktape.vcxproj", "{681C55C0-8208-44AD-B5C7-8782E448F041}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "test", "test\test.vcxproj", "{9C882858-C76C-4E01-A23F-DF0E4CA34476}"
+	ProjectSection(ProjectDependencies) = postProject
+		{4960124D-F153-4F35-992B-B43DB480F754} = {4960124D-F153-4F35-992B-B43DB480F754}
+		{681C55C0-8208-44AD-B5C7-8782E448F041} = {681C55C0-8208-44AD-B5C7-8782E448F041}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -34,6 +40,10 @@ Global
 		{681C55C0-8208-44AD-B5C7-8782E448F041}.Debug|Win32.Build.0 = Debug|Win32
 		{681C55C0-8208-44AD-B5C7-8782E448F041}.Release|Win32.ActiveCfg = Release|Win32
 		{681C55C0-8208-44AD-B5C7-8782E448F041}.Release|Win32.Build.0 = Release|Win32
+		{9C882858-C76C-4E01-A23F-DF0E4CA34476}.Debug|Win32.ActiveCfg = Debug|Win32
+		{9C882858-C76C-4E01-A23F-DF0E4CA34476}.Debug|Win32.Build.0 = Debug|Win32
+		{9C882858-C76C-4E01-A23F-DF0E4CA34476}.Release|Win32.ActiveCfg = Release|Win32
+		{9C882858-C76C-4E01-A23F-DF0E4CA34476}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
