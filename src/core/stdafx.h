@@ -12,8 +12,11 @@
 
 
 // TODO: プログラムに必要な追加ヘッダーをここで参照してください。
-#include <string>
 #include <atlbase.h>
 #include <atlconv.h>
+#include <string>
+#include <vector>
 #include <filesystem>
 #include <duktape.h>
+#include "biscuit/algorithm.hpp"
+#include "biscuit/parser.hpp"
