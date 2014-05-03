@@ -1,0 +1,21 @@
+Microsoft Visual Studio Solution File, Format Version 8.00
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cpp_to_xhtml", "cpp_to_xhtml.vcproj", "{ED2DDF8B-3E3C-445A-896E-D59316ABDBFD}"
+	ProjectSection(ProjectDependencies) = postProject
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfiguration) = preSolution
+		Debug = Debug
+		Release = Release
+	EndGlobalSection
+	GlobalSection(ProjectConfiguration) = postSolution
+		{ED2DDF8B-3E3C-445A-896E-D59316ABDBFD}.Debug.ActiveCfg = Debug|Win32
+		{ED2DDF8B-3E3C-445A-896E-D59316ABDBFD}.Debug.Build.0 = Debug|Win32
+		{ED2DDF8B-3E3C-445A-896E-D59316ABDBFD}.Release.ActiveCfg = Release|Win32
+		{ED2DDF8B-3E3C-445A-896E-D59316ABDBFD}.Release.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+	EndGlobalSection
+	GlobalSection(ExtensibilityAddIns) = postSolution
+	EndGlobalSection
+EndGlobal

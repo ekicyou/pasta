@@ -1,0 +1,736 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="Docutils 0.3.10: http://docutils.sourceforge.net/" />
+<title>The biscuit parser library</title>
+<meta name="author" content="MB and Christopher Diggins(original)" />
+<style type="text/css">
+
+@import "doc/default.css";
+@import "doc/private.css";
+
+</style>
+</head>
+<body>
+<div class="document" id="the-biscuit-parser-library">
+<h1 class="title">The biscuit parser library</h1>
+<table class="docinfo" frame="void" rules="none">
+<col class="docinfo-name" />
+<col class="docinfo-content" />
+<tbody valign="top">
+<tr><th class="docinfo-name">Author:</th>
+<td>MB and Christopher Diggins(original)</td></tr>
+<tr><th class="docinfo-name">Contact:</th>
+<td><a class="first last reference" href="mailto:mb2act&#64;yahoo.co.jp">mb2act&#64;yahoo.co.jp</a></td></tr>
+<tr class="field"><th class="docinfo-name">License:</th><td class="field-body">Distributed under the <a class="reference" href="http://www.boost.org/LICENSE_1_0.txt">Boost Software License</a>, Version 1.0</td>
+</tr>
+<tr><th class="docinfo-name">Version:</th>
+<td>0.9xx</td></tr>
+</tbody>
+</table>
+<div class="contents topic" id="contents">
+<p class="topic-title first"><a name="contents">Contents</a></p>
+<ul class="simple">
+<li><a class="reference" href="#preface" id="id7" name="id7">Preface</a></li>
+<li><a class="reference" href="#introduction" id="id8" name="id8">Introduction</a></li>
+<li><a class="reference" href="#quick-start" id="id9" name="id9">Quick Start</a></li>
+<li><a class="reference" href="#basic-concepts" id="id10" name="id10">Basic Concepts</a><ul>
+<li><a class="reference" href="#parser" id="id11" name="id11">Parser</a></li>
+<li><a class="reference" href="#user-state" id="id12" name="id12">User State</a></li>
+<li><a class="reference" href="#forward-range" id="id13" name="id13">Forward Range</a></li>
+<li><a class="reference" href="#semantic-action-class" id="id14" name="id14">Semantic Action Class</a></li>
+</ul>
+</li>
+<li><a class="reference" href="#predefined-parsers" id="id15" name="id15">Predefined Parsers</a><ul>
+<li><a class="reference" href="#primitives" id="id16" name="id16">Primitives</a></li>
+<li><a class="reference" href="#actor" id="id17" name="id17">Actor</a></li>
+<li><a class="reference" href="#directives" id="id18" name="id18">Directives</a></li>
+</ul>
+</li>
+<li><a class="reference" href="#algorithms" id="id19" name="id19">Algorithms</a><ul>
+<li><a class="reference" href="#match" id="id20" name="id20">match</a></li>
+<li><a class="reference" href="#search" id="id21" name="id21">search</a></li>
+</ul>
+</li>
+<li><a class="reference" href="#ranges" id="id22" name="id22">Ranges</a><ul>
+<li><a class="reference" href="#filter-range" id="id23" name="id23">filter_range</a></li>
+<li><a class="reference" href="#match-results" id="id24" name="id24">match_results</a></li>
+</ul>
+</li>
+<li><a class="reference" href="#grammar" id="id25" name="id25">Grammar</a><ul>
+<li><a class="reference" href="#full-example" id="id26" name="id26">Full Example</a></li>
+</ul>
+</li>
+<li><a class="reference" href="#debugger" id="id27" name="id27">Debugger</a></li>
+<li><a class="reference" href="#points-of-interest" id="id28" name="id28">Points of Interest</a></li>
+<li><a class="reference" href="#references" id="id29" name="id29">References</a></li>
+<li><a class="reference" href="#release-notes" id="id30" name="id30">Release Notes</a></li>
+</ul>
+</div>
+<div class="section" id="preface">
+<h1><a class="toc-backref" href="#id7" name="preface">Preface</a></h1>
+<p>I was looking for a light and unstrict xml parser.
+<a class="reference" href="http://spirit.sourceforge.net/">Boost.Spirit</a> and <a class="reference" href="http://boost-sandbox.sourceforge.net/libs/xpressive/doc/html/index.html">Boost.Xpressive</a> were big and not good at compile-time performance.
+I suspected that they were not <em>static</em>, but <a class="reference" href="http://www.ootl.org/yard/">YARD</a> written by <a class="reference" href="http://www.cdiggins.com">Christopher Diggins</a>
+was really static, small and fast.
+In time, I noticed that the lazy instantiation of templates could allow us to write
+recursive grammars, and I found that <a class="reference" href="http://www.ootl.org/yard/">YARD</a> and the finite state machine found at
+<a class="reference" href="http://www.boost-consulting.com/metaprogramming-book.html">C++ Template Metaprogramming</a>, could be binded. It was named <a class="reference" href="http://sourceforge.net/projects/p-stade/">biscuit</a>.</p>
+</div>
+<div class="section" id="introduction">
+<h1><a class="toc-backref" href="#id8" name="introduction">Introduction</a></h1>
+<p><a class="reference" href="http://sourceforge.net/projects/p-stade/">biscuit</a> is an object-oriented recursive-descent parser generator framework
+implemented using class templates. The templates allow us to author
+Extended Backus-Normal Form (EBNF) in C++. Technical informations are available at <a class="reference" href="http://www.ootl.org/yard/">YARD</a>.</p>
+<p>A simple EBNF grammar snippet:</p>
+<pre class="literal-block">
+group      ::= '(' expression ')'
+factor     ::= integer | group
+term       ::= factor (('*' factor) | ('/' factor))*
+expression ::= term (('+' term) | ('-' term))*
+</pre>
+<p>is approximated using <a class="reference" href="http://sourceforge.net/projects/p-stade/">biscuit</a>'s facilities as seen in this code snippet:</p>
+<pre class="cpp_source">
+<span class="cpp_keyword">struct </span>expression ;
+<span class="cpp_keyword">struct </span>group      : seq&lt; str&lt;<span class="cpp_string_literal">'('</span>&gt;, expression, str&lt;<span class="cpp_string_literal">')'</span>&gt; &gt; { };
+<span class="cpp_keyword">struct </span>factor     : or_&lt; integer, group &gt; { };
+<span class="cpp_keyword">struct </span>term       : seq&lt; factor, star&lt; or_&lt; seq&lt; str&lt;<span class="cpp_string_literal">'*'</span>&gt;, factor &gt;, seq&lt; str&lt;<span class="cpp_string_literal">'/'</span>&gt;, factor &gt; &gt; &gt; &gt; { };
+<span class="cpp_keyword">struct </span>expression : seq&lt; term, star&lt; or_&lt; seq&lt; str&lt;<span class="cpp_string_literal">'+'</span>&gt;, term &gt;, seq&lt; str&lt;<span class="cpp_string_literal">'-'</span>&gt;, term &gt; &gt; &gt; &gt; { };
+</pre>
+
+<p>Through the magic of the lazy <em>template instantiation</em>, they are the perfectly valid types.
+The production rule <strong>expression</strong> is in fact a type that has a <em>static member function</em> <strong>parse</strong>.
+As <strong>parse</strong> will be instantiated later by <a class="reference" href="#algorithms">algorithms</a>, all you have to do is not to <em>define</em> but to <em>declare</em> a type:</p>
+<pre class="cpp_source">
+<span class="cpp_keyword">struct </span>element; <span class="cpp_comment">// forward declaration
+
+</span><span class="cpp_keyword">struct </span>content :
+  seq&lt;
+    opt&lt;CharData&gt;,
+    star&lt;
+      seq&lt;
+        or_&lt;
+          element, <span class="cpp_comment">// the magical recursion!
+          </span>Reference,
+          CDSect,
+          PI,
+          Comment
+        &gt;,
+        opt&lt;CharData&gt;
+      &gt;
+    &gt;
+  &gt;
+{ };
+
+<span class="cpp_keyword">struct </span>element :
+  or_&lt;
+    EmptyElemTag, 
+    seq&lt;STag, content, ETag&gt;
+  &gt;
+{ };
+</pre>
+
+</div>
+<div class="section" id="quick-start">
+<h1><a class="toc-backref" href="#id9" name="quick-start">Quick Start</a></h1>
+<ol class="arabic">
+<li><p class="first">Get and install the latest release of the <a class="reference" href="http://www.boost.org/">Boost C++ Libraries</a>. (<a class="reference" href="http://sourceforge.net/projects/p-stade/">biscuit</a> uses only their headers.)</p>
+</li>
+<li><p class="first">Include headers of <a class="reference" href="http://sourceforge.net/projects/p-stade/">biscuit</a>:</p>
+<pre class="cpp_source">
+<span class="cpp_pp_directive">#include </span><span class="cpp_string_literal">&quot;biscuit/algorithm.hpp&quot;</span>
+<span class="cpp_pp_directive">#include </span><span class="cpp_string_literal">&quot;biscuit/parser.hpp&quot;</span>
+<span class="cpp_keyword">using </span><span class="cpp_keyword">namespace </span>biscuit;
+</pre>
+
+</li>
+<li><p class="first">Define your own <a class="reference" href="#parser">parser</a> type:</p>
+<pre class="cpp_source">
+<span class="cpp_keyword">typedef </span>seq&lt;
+  str&lt;<span class="cpp_string_literal">'/'</span>,<span class="cpp_string_literal">'*'</span>&gt;,
+  star_until&lt; any, str&lt;<span class="cpp_string_literal">'*'</span>,<span class="cpp_string_literal">'/'</span>&gt; &gt;
+&gt; c_comment;
+</pre>
+
+</li>
+<li><p class="first">Call <a class="reference" href="#algorithms">algorithms</a>:</p>
+<pre class="cpp_source">
+<span class="cpp_keyword">if </span>(match&lt;c_comment&gt;(<span class="cpp_string_literal">&quot;/* hello, biscuit */&quot;</span>)) {
+  <span class="cpp_comment">//...
+</span>}</pre>
+
+</li>
+<li><p class="first">If you build test project, it is required to build <a class="reference" href="http://www.boost.org/libs/test/doc/">Boost.Test</a>:</p>
+<pre class="literal-block">
+bjam -sTOOLS=vc-7_1 --with-test install
+</pre>
+</li>
+</ol>
+</div>
+<div class="section" id="basic-concepts">
+<h1><a class="toc-backref" href="#id10" name="basic-concepts">Basic Concepts</a></h1>
+<div class="section" id="parser">
+<h2><a class="toc-backref" href="#id11" name="parser">Parser</a></h2>
+<p>A <a class="reference" href="#parser">parser</a> is any type that has the <em>static member function</em>:</p>
+<pre class="cpp_source">
+<span class="cpp_keyword">template</span>&lt; <span class="cpp_keyword">class </span>State, <span class="cpp_keyword">class </span>UserState &gt;
+<span class="cpp_keyword">static </span><span class="cpp_keyword">bool </span>parse(State&amp; s, UserState&amp; us);</pre>
+
+<p>As a <a class="reference" href="#parser">parser</a> is a type, it can't have any runtime-state.
+But you can pass any <em>UserState</em> object to <a class="reference" href="#algorithms">algorithms</a>, and the object is
+passed to the <strong>parse</strong>.</p>
+</div>
+<div class="section" id="user-state">
+<h2><a class="toc-backref" href="#id12" name="user-state">User State</a></h2>
+<p>Any type.</p>
+</div>
+<div class="section" id="forward-range">
+<h2><a class="toc-backref" href="#id13" name="forward-range">Forward Range</a></h2>
+<p>A <em>Forward Range</em> is a concept similar to the STL <em>Container</em> concept.
+A further document is available at <a class="reference" href="http://www.boost.org/libs/range/">Boost.Range</a>.</p>
+</div>
+<div class="section" id="semantic-action-class">
+<h2><a class="toc-backref" href="#id14" name="semantic-action-class">Semantic Action Class</a></h2>
+<p>A <a class="reference" href="#semantic-action-class">semantic action class</a> can be any class of <em>Function Object</em>
+that has the <em>member function</em>:</p>
+<pre class="cpp_source">
+<span class="cpp_keyword">void </span><span class="cpp_keyword">operator</span>()(ForwardIter first, ForwardIter last, UserState&amp; us);</pre>
+
+</div>
+</div>
+<div class="section" id="predefined-parsers">
+<h1><a class="toc-backref" href="#id15" name="predefined-parsers">Predefined Parsers</a></h1>
+<p>Some <a class="reference" href="#parser">parser</a> templates are predefined as a means for <a class="reference" href="#parser">parser</a> composition and embedding.</p>
+<div class="section" id="primitives">
+<h2><a class="toc-backref" href="#id16" name="primitives">Primitives</a></h2>
+<p>The table below lists EBNF and their equivalents in <a class="reference" href="http://sourceforge.net/projects/p-stade/">biscuit</a>.</p>
+<blockquote>
+<table border="1" class="docutils">
+<colgroup>
+<col width="16%" />
+<col width="44%" />
+<col width="40%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head">EBNF (or Perl)</th>
+<th class="head">biscuit</th>
+<th class="head">Meaning</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td>.</td>
+<td>any</td>
+<td>any object</td>
+</tr>
+<tr><td>A | B</td>
+<td>or_&lt;A, B&gt;</td>
+<td>alternation of A and B</td>
+</tr>
+<tr><td>A B</td>
+<td>seq&lt;A, B&gt;</td>
+<td>sequence of A and B</td>
+</tr>
+<tr><td>A*</td>
+<td>star&lt;A&gt;</td>
+<td>zero or more times, greedy</td>
+</tr>
+<tr><td>A+</td>
+<td>plus&lt;A&gt;</td>
+<td>one or more times, greedy</td>
+</tr>
+<tr><td>A?</td>
+<td>opt&lt;A&gt;</td>
+<td>zero or one time, greedy</td>
+</tr>
+<tr><td>A - B</td>
+<td>minus&lt;A, B&gt;</td>
+<td>match A, but the sub-match of A doesn't match B</td>
+</tr>
+<tr><td>A{n,m}</td>
+<td>repeat&lt;A, n, m&gt;</td>
+<td>between n and m times, greedy</td>
+</tr>
+<tr><td>A*? B</td>
+<td>star_until&lt;A, B&gt;</td>
+<td>zero or more As and B</td>
+</tr>
+<tr><td>&quot;Diggins&quot;</td>
+<td>str&lt;'D','i','g','g','i','n','s'&gt;</td>
+<td>string</td>
+</tr>
+<tr><td>^</td>
+<td>begin</td>
+<td>beginning of sequence</td>
+</tr>
+<tr><td>$</td>
+<td>end</td>
+<td>end of sequence</td>
+</tr>
+<tr><td>\n</td>
+<td>eol</td>
+<td>end of line</td>
+</tr>
+<tr><td>\d</td>
+<td>digit</td>
+<td>a digit</td>
+</tr>
+<tr><td>\D</td>
+<td>not_&lt;digit&gt;</td>
+<td>not a digit</td>
+</tr>
+<tr><td>\s</td>
+<td>space</td>
+<td>a space</td>
+</tr>
+<tr><td>\S</td>
+<td>not_&lt;space&gt;</td>
+<td>not a space</td>
+</tr>
+<tr><td>[0-9]</td>
+<td>char_range&lt;'0','9'&gt;</td>
+<td>characters in range '0' through '9'</td>
+</tr>
+<tr><td>[abc]</td>
+<td>char_set&lt;'a','b','c'&gt;</td>
+<td>characters 'a','b', or 'c'</td>
+</tr>
+<tr><td>[0-9abc]</td>
+<td>or_&lt; char_range&lt;'0','9'&gt;, char_set&lt;'a','b','c'&gt; &gt;</td>
+<td>characters 'a','b','c' or in range '0' though '9'</td>
+</tr>
+<tr><td>[^abc]</td>
+<td>not_&lt; char_set&lt;'a','b','c'&gt; &gt;</td>
+<td>not characters 'a','b', or 'c'</td>
+</tr>
+<tr><td>(?=A)</td>
+<td>before&lt;A&gt;</td>
+<td>positive look-ahead assertion</td>
+</tr>
+<tr><td>(?!A)</td>
+<td>not_&lt; before&lt;A&gt; &gt;</td>
+<td>negative look-ahead assertion</td>
+</tr>
+</tbody>
+</table>
+</blockquote>
+<p><a class="reference" href="http://www.ootl.org/yard/">YARD</a> and <a class="reference" href="http://sourceforge.net/projects/p-stade/">biscuit</a> have no back-tracking on star operations.
+The maximum supported arity of parsers is now twenty.</p>
+</div>
+<div class="section" id="actor">
+<h2><a class="toc-backref" href="#id17" name="actor">Actor</a></h2>
+<p><a class="reference" href="#actor">actor</a> is a <a class="reference" href="#parser">parser</a> that triggers a <a class="reference" href="#semantic-action-class">semantic action class</a> object:</p>
+<pre class="cpp_source">
+<span class="cpp_keyword">struct </span>decorate_action
+{
+  <span class="cpp_keyword">template</span>&lt; <span class="cpp_keyword">class </span>ForwardIter, <span class="cpp_keyword">class </span>Stream &gt;
+  <span class="cpp_keyword">void </span><span class="cpp_keyword">operator</span>()(ForwardIter first, ForwardIter last, Stream&amp; out)
+  {
+    out &lt;&lt; <span class="cpp_string_literal">&quot;[&quot;</span>;
+    out &lt;&lt; std::string(first, last);
+    out &lt;&lt; <span class="cpp_string_literal">&quot;]&quot;</span>;
+  }
+};
+
+<span class="cpp_keyword">struct </span>xml_comment :
+  seq&lt;
+    str&lt;<span class="cpp_string_literal">'&lt;'</span>,<span class="cpp_string_literal">'!'</span>,<span class="cpp_string_literal">'-'</span>,<span class="cpp_string_literal">'-'</span>&gt;,
+    star&lt;
+      or_&lt;
+        minus&lt; any, str&lt;<span class="cpp_string_literal">'-'</span>&gt; &gt;,
+        seq&lt;
+          str&lt;<span class="cpp_string_literal">'-'</span>&gt;,
+          minus&lt; any, str&lt;<span class="cpp_string_literal">'-'</span>&gt; &gt;
+        &gt;
+      &gt;
+    &gt;,
+    str&lt;<span class="cpp_string_literal">'-'</span>,<span class="cpp_string_literal">'-'</span>,<span class="cpp_string_literal">'&gt;'</span>&gt;
+  &gt;
+{ };
+
+<span class="cpp_keyword">struct </span>xml_comment_action : actor&lt; xml_comment, decorate_action &gt;
+{ };
+
+std::stringstream out;
+std::string s0(<span class="cpp_string_literal">&quot;&lt;!-- xml comment no.1 --&gt;&quot;</span>);
+match&lt;xml_comment_action&gt;(s0, out);
+BOOST_CHECK( std::string(<span class="cpp_string_literal">&quot;[&lt;!-- xml comment no.1 --&gt;]&quot;</span>) == out.str() );
+</pre>
+
+<p>You can pass a <a class="reference" href="#semantic-action-class">semantic action class</a> to <a class="reference" href="#actor">actor</a>, but cannot pass a <em>function pointer</em>.
+This trouble is fixed by <a class="reference" href="#grammar">grammar</a> below.</p>
+</div>
+<div class="section" id="directives">
+<h2><a class="toc-backref" href="#id18" name="directives">Directives</a></h2>
+<p><a class="reference" href="#directives">Directives</a> are also parsers, some ports of <a class="reference" href="http://spirit.sourceforge.net/">Boost.Spirit</a>'s <a class="reference" href="http://spirit.sourceforge.net/distrib/spirit_1_8_2/libs/spirit/doc/directives.html">directives</a>.</p>
+<blockquote>
+<table border="1" class="docutils">
+<colgroup>
+<col width="16%" />
+<col width="44%" />
+<col width="40%" />
+</colgroup>
+<thead valign="bottom">
+<tr><th class="head">Boost.Spirit</th>
+<th class="head">biscuit</th>
+<th class="head">Meaning</th>
+</tr>
+</thead>
+<tbody valign="top">
+<tr><td>lexeme_d[A]</td>
+<td>impossible</td>
+<td>turn off white space skipping</td>
+</tr>
+<tr><td>as_lower_d[A]</td>
+<td>as_lower&lt;A&gt;</td>
+<td>convert inputs to lower-case</td>
+</tr>
+<tr><td>no_actions[A]</td>
+<td>no_actions&lt;A&gt;</td>
+<td>all semantic actions not fire</td>
+</tr>
+<tr><td>???</td>
+<td>definitive_actions&lt;A&gt;</td>
+<td>parse twice and suppress non-intended actions</td>
+</tr>
+<tr><td>longest_d[A|B]</td>
+<td>longest&lt;A, B&gt;</td>
+<td>choose the longest match</td>
+</tr>
+<tr><td>shortest_d[A|B]</td>
+<td>shortest&lt;A, B&gt;</td>
+<td>choose the shortest match</td>
+</tr>
+<tr><td>limit_d[A]</td>
+<td>requires&lt;A, PredicateClass&gt;</td>
+<td>ensure the result of a parser is constrained</td>
+</tr>
+<tr><td>???</td>
+<td>transform&lt;A, FunctorClass&gt;</td>
+<td>convert inputs using functor</td>
+</tr>
+</tbody>
+</table>
+</blockquote>
+</div>
+</div>
+<div class="section" id="algorithms">
+<h1><a class="toc-backref" href="#id19" name="algorithms">Algorithms</a></h1>
+<p><a class="reference" href="#algorithms">Algorithms</a> of <a class="reference" href="http://sourceforge.net/projects/p-stade/">biscuit</a> work with <em>Forward Range</em>. Bear in mind that
+parsers don't know <em>value_type</em> of the range.
+For instance, a <a class="reference" href="#parser">parser</a> <strong>str</strong> works fine if <em>value_type</em> of the
+range is comparable with <em>char</em>.</p>
+<div class="section" id="match">
+<h2><a class="toc-backref" href="#id20" name="match">match</a></h2>
+<p><strong>match</strong> returns <em>true</em> if a <a class="reference" href="#parser">parser</a> run through the range; otherwise <em>false</em>:</p>
+<pre class="cpp_source">
+BOOST_CHECK( match&lt;xml_comment&gt;(<span class="cpp_string_literal">&quot;&lt;!-- hello, xml comment --&gt;&quot;</span>) );
+BOOST_CHECK( !match&lt;xml_comment&gt;(<span class="cpp_string_literal">&quot;&lt;!-- not well-formed comment -- --&gt;&quot;</span>) );
+</pre>
+
+</div>
+<div class="section" id="search">
+<h2><a class="toc-backref" href="#id21" name="search">search</a></h2>
+<p><strong>search</strong> returns the first sub matched <strong>boost::iterator_range</strong>; otherwise an <em>empty</em> range:</p>
+<pre class="cpp_source">
+std::string s0(<span class="cpp_string_literal">&quot;  /* c comment no.1 */x int i; /* c comment no.2 */ i = 1; /* c comment no.3 */ ++i;  &quot;</span>);
+boost::sub_range&lt;std::string&gt; sr = search&lt;c_comment&gt;(s0);
+BOOST_CHECK( std::string(boost::begin(sr), boost::end(sr)) == <span class="cpp_string_literal">&quot;/* c comment no.1 */&quot;</span> );
+</pre>
+
+</div>
+</div>
+<div class="section" id="ranges">
+<h1><a class="toc-backref" href="#id22" name="ranges">Ranges</a></h1>
+<div class="section" id="filter-range">
+<h2><a class="toc-backref" href="#id23" name="filter-range">filter_range</a></h2>
+<p><strong>filter_range</strong> is a filtered <strong>boost::iterator_range</strong> by a <a class="reference" href="#parser">parser</a>:</p>
+<pre class="cpp_source">
+<span class="cpp_keyword">typedef </span>filter_range&lt; c_comment, std::string &gt; fr_t;
+std::string s0(<span class="cpp_string_literal">&quot;  /* c comment no.1 */ int i; /* c comment no.2 */ i = 1; /* c comment no.3 */ ++i;  &quot;</span>);
+fr_t fr(s0);
+BOOST_CHECK(( match&lt; repeat&lt; c_comment, <span class="cpp_number_literal">3 </span>&gt; &gt;(fr) ));
+</pre>
+
+<p>There is no reason why chains of <strong>filter_range</strong> do not work:</p>
+<pre class="cpp_source">
+BOOST_CHECK((
+  match&lt; str&lt;<span class="cpp_string_literal">'x'</span>,<span class="cpp_string_literal">'y'</span>,<span class="cpp_string_literal">'z'</span>&gt; &gt;(
+    make_filter_range&lt; alpha &gt;(
+      make_filter_range&lt; not_&lt;space&gt; &gt;(
+        make_filter_range&lt; not_&lt;digit&gt; &gt;(<span class="cpp_string_literal">&quot;x &amp; 4 y . 125 %  z&quot;</span>)
+      )
+    )
+  )
+));
+</pre>
+
+</div>
+<div class="section" id="match-results">
+<h2><a class="toc-backref" href="#id24" name="match-results">match_results</a></h2>
+<p><strong>match_results</strong> is a <em>Forward Range</em> of <strong>boost::iterator_range</strong>:</p>
+<pre class="cpp_source">
+<span class="cpp_keyword">typedef </span>match_results&lt;c_comment, std::string&gt; mrs_t;
+<span class="cpp_keyword">typedef </span>boost::range_const_iterator&lt;mrs_t&gt;::type iter_t;
+
+std::string s0(<span class="cpp_string_literal">&quot;  /* c comment no.1 */int i; /* c comment no.2 */i = 1; /* c comment no.3 */ ++i;  &quot;</span>);
+mrs_t mrs(s0);
+<span class="cpp_keyword">for </span>(iter_t it = boost::const_begin(mrs); it != boost::const_end(mrs); ++it)
+{
+  std::cout &lt;&lt; std::string(boost::begin(*it), boost::end(*it)) &lt;&lt; std::endl;
+}
+</pre>
+
+<p>Outputs:</p>
+<pre class="literal-block">
+/* c comment no.1 */
+/* c comment no.2 */
+/* c comment no.3 */
+</pre>
+</div>
+</div>
+<div class="section" id="grammar">
+<h1><a class="toc-backref" href="#id25" name="grammar">Grammar</a></h1>
+<p>As parsers are just types, they has no runtime-state. 
+Nontype template argument is farely limited. 
+If <em>value_type</em> of <em>Forward Range</em> is not <em>Integral Constants</em> like <em>char</em>, 
+what can we do?
+But <a class="reference" href="http://www.boost-consulting.com/metaprogramming-book.html">C++ Template Metaprogramming</a> says that <em>member function pointers</em> are available.
+They can bind templates and objects.
+<a class="reference" href="http://spirit.sourceforge.net/">Boost.Spirit</a> makes a <em>expression templates object</em> from <em>expression templates objects</em>,
+but you can make <em>expression type</em> from <em>expression templates</em> using <a class="reference" href="http://sourceforge.net/projects/p-stade/">biscuit</a>.</p>
+<p><a class="reference" href="#grammar">grammar</a> binds parsers and objects:</p>
+<pre class="cpp_source">
+<span class="cpp_keyword">struct </span>my_grammar : grammar&lt; my_grammar, std::vector&lt;std::string&gt; &gt;
+{
+  std::string text0() { <span class="cpp_keyword">return </span><span class="cpp_string_literal">&quot;hello&quot;</span>; };
+  std::string text1() { <span class="cpp_keyword">return </span><span class="cpp_string_literal">&quot;grammar&quot;</span>; };
+  std::string text2() { <span class="cpp_keyword">return </span><span class="cpp_string_literal">&quot;value&quot;</span>; };
+
+  <span class="cpp_keyword">struct </span>start :
+    seq&lt;
+      value_&lt;&amp;my_grammar::text0&gt;,
+      value_&lt;&amp;my_grammar::text1&gt;,
+      value_&lt;&amp;my_grammar::text2&gt;
+    &gt;
+  { };
+};
+
+<span class="cpp_keyword">void </span>grm_value_test()
+{
+  std::cout &lt;&lt; <span class="cpp_string_literal">&quot;grm_value_test ing...&quot;</span> &lt;&lt; std::endl;
+
+  std::vector&lt;std::string&gt; texts;
+  texts.push_back(std::string(<span class="cpp_string_literal">&quot;hello&quot;</span>));
+  texts.push_back(std::string(<span class="cpp_string_literal">&quot;grammar&quot;</span>));
+  texts.push_back(std::string(<span class="cpp_string_literal">&quot;value&quot;</span>));
+  
+  my_grammar the_grammar;
+  BOOST_CHECK( match&lt; <span class="cpp_keyword">typename </span>grammar_start&lt;my_grammar&gt;::type &gt;(texts, the_grammar) );
+}
+</pre>
+
+<p>Now that <a class="reference" href="http://sourceforge.net/projects/p-stade/">biscuit</a> has no limitation of <em>value_type</em> of <em>Forward Range</em> parsed. 
+As <strong>std::vector&lt;std::string&gt;</strong> is a <em>Forward Range</em> of <strong>std::string</strong>, it works.
+Keep in mind that <em>UserState</em> object is now your grammar object.</p>
+<div class="section" id="full-example">
+<h2><a class="toc-backref" href="#id26" name="full-example">Full Example</a></h2>
+<p>Here is a port of <a class="reference" href="http://spirit.sourceforge.net/">Boost.Spirit</a>'s <a class="reference" href="http://spirit.sourceforge.net/distrib/spirit_1_8_2/libs/spirit/doc/semantic_actions.html">calculator</a>:</p>
+<pre class="cpp_source">
+<span class="cpp_keyword">struct </span>calculator : grammar&lt; calculator, std::string &gt;
+{
+  <span class="cpp_keyword">void </span>do_int(iterator_type str, iterator_type end)
+  {
+    std::string s(str, end);
+    std::cout &lt;&lt; <span class="cpp_string_literal">&quot;PUSH(&quot;</span> &lt;&lt; s &lt;&lt; <span class="cpp_string_literal">')'</span> &lt;&lt; std::endl;
+  }
+
+  <span class="cpp_keyword">void </span>do_add(iterator_type, iterator_type)   { std::cout &lt;&lt; <span class="cpp_string_literal">&quot;ADD\n&quot;</span>; }
+  <span class="cpp_keyword">void </span>do_subt(iterator_type, iterator_type)  { std::cout &lt;&lt; <span class="cpp_string_literal">&quot;SUBTRACT\n&quot;</span>; }
+  <span class="cpp_keyword">void </span>do_mult(iterator_type, iterator_type)  { std::cout &lt;&lt; <span class="cpp_string_literal">&quot;MULTIPLY\n&quot;</span>; }
+  <span class="cpp_keyword">void </span>do_div(iterator_type, iterator_type)   { std::cout &lt;&lt; <span class="cpp_string_literal">&quot;DIVIDE\n&quot;</span>; }
+  <span class="cpp_keyword">void </span>do_neg(iterator_type, iterator_type)   { std::cout &lt;&lt; <span class="cpp_string_literal">&quot;NEGATE\n&quot;</span>; }
+
+  <span class="cpp_keyword">struct </span>expression;
+  <span class="cpp_keyword">struct </span>term;
+  <span class="cpp_keyword">struct </span>factor;
+
+  <span class="cpp_keyword">struct </span>expression :
+    seq&lt;
+      term,
+      star&lt;
+        or_&lt;
+          actor_&lt; seq&lt; str&lt;<span class="cpp_string_literal">'+'</span>&gt;, term &gt;, &amp;calculator::do_add &gt;,
+          actor_&lt; seq&lt; str&lt;<span class="cpp_string_literal">'-'</span>&gt;, term &gt;, &amp;calculator::do_subt &gt;
+        &gt;
+      &gt;
+    &gt;
+  { };
+  
+  <span class="cpp_keyword">struct </span>term :
+    seq&lt;
+      factor,
+      star&lt;
+        or_&lt;
+          actor_&lt; seq&lt; str&lt;<span class="cpp_string_literal">'*'</span>&gt;, factor &gt;, &amp;calculator::do_mult &gt;,
+          actor_&lt; seq&lt; str&lt;<span class="cpp_string_literal">'/'</span>&gt;, factor &gt;, &amp;calculator::do_div &gt;
+        &gt;
+      &gt;
+    &gt;
+  { };
+
+  <span class="cpp_keyword">struct </span>factor :
+    or_&lt;
+      actor_&lt; plus&lt;digit&gt;, &amp;calculator::do_int &gt;,
+      seq&lt; str&lt;<span class="cpp_string_literal">'('</span>&gt;, expression, str&lt;<span class="cpp_string_literal">')'</span>&gt; &gt;,
+      actor_&lt; seq&lt; str&lt;<span class="cpp_string_literal">'-'</span>&gt;, factor &gt;, &amp;calculator::do_neg &gt;,
+      seq&lt; str&lt;<span class="cpp_string_literal">'+'</span>&gt;, factor &gt;
+    &gt;
+  { };
+
+  <span class="cpp_keyword">struct </span>start : expression { };
+};
+</pre>
+
+<p><strong>actor_</strong> makes <a class="reference" href="#actor">actor</a> from the <em>member function pointer</em>.
+Enjoy the simplicity, compile-time performance and smaller-size of the executable.</p>
+</div>
+</div>
+<div class="section" id="debugger">
+<h1><a class="toc-backref" href="#id27" name="debugger">Debugger</a></h1>
+<p><a class="reference" href="http://sourceforge.net/projects/p-stade/">biscuit</a> emulates <a class="reference" href="http://spirit.sourceforge.net/">Boost.Spirit</a>'s <a class="reference" href="http://spirit.sourceforge.net/distrib/spirit_1_8_2/libs/spirit/doc/debugging.html">debugging</a>:</p>
+<pre class="cpp_source">
+<span class="cpp_keyword">struct </span>start_tag { };
+<span class="cpp_keyword">struct </span>integer_tag { };
+<span class="cpp_keyword">struct </span>factor_tag { };
+<span class="cpp_keyword">struct </span>term_tag { };
+<span class="cpp_keyword">struct </span>expression_tag { };
+
+<span class="cpp_keyword">template</span>&lt; <span class="cpp_keyword">class </span>ForwardRange &gt;
+<span class="cpp_keyword">struct </span>calculator_debug :
+  grammar&lt; calculator_debug, ForwardRange &gt;, <span class="cpp_keyword">private </span>boost::noncopyable
+{
+  calculator_debug(std::stack&lt;<span class="cpp_keyword">long</span>&gt;&amp; eval_) : eval(eval_) { }
+
+  <span class="cpp_keyword">void </span>push_int(iterator_type first, iterator_type last)
+  {
+    std::string s(first, last);
+    <span class="cpp_keyword">long </span>n = boost::lexical_cast&lt;<span class="cpp_keyword">long</span>&gt;(s); <span class="cpp_comment">// std::strtol(str, 0, 10);
+    </span>eval.push(n);
+    std::cout &lt;&lt; <span class="cpp_string_literal">&quot;push\t&quot;</span> &lt;&lt; <span class="cpp_keyword">long</span>(n) &lt;&lt; std::endl;
+  }
+
+  <span class="cpp_comment">// ...
+
+  </span><span class="cpp_keyword">struct </span>integer;
+  <span class="cpp_keyword">struct </span>factor;
+  <span class="cpp_keyword">struct </span>term;
+  <span class="cpp_keyword">struct </span>expression;
+
+  <span class="cpp_comment">// struct start : debugger&lt;start,
+  </span><span class="cpp_comment">//  also ok, but long...
+  </span><span class="cpp_keyword">struct </span>start : debugger&lt;start_tag, 
+    expression
+  &gt;
+  { };
+
+  <span class="cpp_keyword">struct </span>integer : debugger&lt;integer_tag,
+    actor_&lt; plus&lt;digit&gt;, &amp;calculator_debug::push_int &gt;
+  &gt;
+  { };
+  
+  <span class="cpp_comment">// ...
+</span></pre>
+
+<p><a class="reference" href="#debugger">debugger</a> uses type-name of the first argument for outputs.
+If your <a class="reference" href="#grammar">grammar</a> is a <em>class template</em> like above,
+type-name can be very long. So I think that you want to
+define start_tag etc. 
+Well, <a class="reference" href="#debugger">debugger</a> automatically disappears on release-compile.</p>
+<p>Outputs:</p>
+<pre class="literal-block">
+1 + 2
+struct start_tag: &quot;1+2&quot;
+  struct expression_tag: &quot;1+2&quot;
+    struct term_tag: &quot;1+2&quot;
+      struct factor_tag: &quot;1+2&quot;
+        struct integer_tag: &quot;1+2&quot;
+push    1
+        /struct integer_tag: &quot;+2&quot;
+      /struct factor_tag: &quot;+2&quot;
+    /struct term_tag: &quot;+2&quot;
+    struct term_tag: &quot;2&quot;
+      struct factor_tag: &quot;2&quot;
+        struct integer_tag: &quot;2&quot;
+push    2
+        /struct integer_tag: &quot;&quot;
+      /struct factor_tag: &quot;&quot;
+    /struct term_tag: &quot;&quot;
+popped 1 and 2 from the stack. pushing 3 onto the stack.
+  /struct expression_tag: &quot;&quot;
+/struct start_tag: &quot;&quot;
+-------------------------
+Parsing succeeded
+result = 3
+-------------------------
+</pre>
+</div>
+<div class="section" id="points-of-interest">
+<h1><a class="toc-backref" href="#id28" name="points-of-interest">Points of Interest</a></h1>
+<p>You can find the idea of <em>composing inlined algorithms</em> from <a class="reference" href="http://www.crystalclearsoftware.com/cgi-bin/boost_wiki/wiki.pl?MPL_TODO_List">Boost.MPL TODO list</a>.
+<a class="reference" href="http://www.ootl.org/yard/">YARD</a> and <a class="reference" href="http://sourceforge.net/projects/p-stade/">biscuit</a> seem to be the example of it. 
+By the way, this article was the hopeless war, vs <a class="reference" href="http://spirit.sourceforge.net/">Boost.Spirit</a>. 
+But don't you think another war will break out?</p>
+<p>A snippet:</p>
+<pre class="cpp_source">
+<span class="cpp_keyword">using </span><span class="cpp_keyword">namespace </span>cranberry;
+
+<span class="cpp_keyword">int </span>x = <span class="cpp_number_literal">7</span>;
+<span class="cpp_keyword">int </span>a = apply&lt; plus&lt; _1, _2 &gt; &gt;(x)(<span class="cpp_number_literal">8</span>);
+<span class="cpp_keyword">int </span>b = apply&lt; plus&lt; _1, _2 &gt; &gt;()(<span class="cpp_number_literal">7</span>, <span class="cpp_number_literal">8</span>);
+<span class="cpp_keyword">int </span>c = apply&lt; plus&lt; _1, _2 &gt; &gt;(<span class="cpp_number_literal">7</span>, <span class="cpp_number_literal">8</span>)();
+<span class="cpp_keyword">int </span>d = apply&lt; plus&lt; _1, int_&lt;<span class="cpp_number_literal">8</span>&gt; &gt; &gt;(<span class="cpp_number_literal">7</span>)();
+<span class="cpp_keyword">int </span>e = apply&lt; bind&lt; _1, _2, _3 &gt; &gt;(std::plus&lt;<span class="cpp_keyword">int</span>&gt;())(<span class="cpp_number_literal">7</span>, <span class="cpp_number_literal">8</span>);
+<span class="cpp_keyword">int </span>f = apply&lt; bind&lt; _1, _2, _3 &gt; &gt;(&amp;free_plus)(<span class="cpp_number_literal">7</span>, <span class="cpp_number_literal">8</span>);
+
+<span class="cpp_keyword">int </span>ar[<span class="cpp_number_literal">5</span>] = {<span class="cpp_number_literal">1</span>,<span class="cpp_number_literal">2</span>,<span class="cpp_number_literal">3</span>,<span class="cpp_number_literal">4</span>,<span class="cpp_number_literal">5</span>};
+std::transform(ar, ar+<span class="cpp_number_literal">5</span>, ar, apply&lt; plus&lt; _1, _2 &gt;, <span class="cpp_keyword">int </span><span class="cpp_keyword">const</span>&amp; &gt;(x));
+std::transform(ar, ar+<span class="cpp_number_literal">5</span>, ar, apply&lt; bind&lt; _1, _2, _3 &gt; &gt;(std::plus&lt;<span class="cpp_keyword">int</span>&gt;(), x));
+std::transform(ar, ar+<span class="cpp_number_literal">5</span>, ar, apply&lt; bind&lt; _1, _2, int_&lt;<span class="cpp_number_literal">7</span>&gt; &gt; &gt;(&amp;free_plus));
+std::for_each(ar, ar+<span class="cpp_number_literal">5</span>, apply&lt; std_cout&lt; _1 &gt; &gt;());
+</pre>
+
+</div>
+<div class="section" id="references">
+<h1><a class="toc-backref" href="#id29" name="references">References</a></h1>
+<ul class="simple">
+<li><a class="reference" href="http://p-stade.sourceforge.net/">p-stade</a></li>
+<li><a class="reference" href="http://www.cdiggins.com">Christopher Diggins</a></li>
+<li><a class="reference" href="http://www.ootl.org/yard/">YARD</a></li>
+<li><a class="reference" href="http://www.codeproject.com/cpp/yard-tokenizer.asp">A Regular Expression Tokenizer using the YARD Parser</a></li>
+<li><a class="reference" href="http://www.codeproject.com/cpp/yard-xml-parser.asp">Parsing XML in C++ using the YARD Parser</a></li>
+<li><a class="reference" href="http://www.boost-consulting.com/metaprogramming-book.html">C++ Template Metaprogramming</a></li>
+<li><a class="reference" href="http://www.boost.org/">Boost C++ Libraries</a></li>
+<li><a class="reference" href="http://www.boost.org/libs/mpl/doc/">Boost.MPL</a></li>
+<li><a class="reference" href="http://www.boost.org/libs/range/">Boost.Range</a></li>
+<li><a class="reference" href="http://spirit.sourceforge.net/">Boost.Spirit</a></li>
+<li><a class="reference" href="http://boost-sandbox.sourceforge.net/libs/xpressive/doc/html/index.html">Boost.Xpressive</a></li>
+</ul>
+</div>
+<div class="section" id="release-notes">
+<h1><a class="toc-backref" href="#id30" name="release-notes">Release Notes</a></h1>
+<ul class="simple">
+<li>Fixed the name confusion between limit and <strong>repeat</strong>.</li>
+<li><a class="reference" href="#directives">Directives</a> became first-class parsers.</li>
+<li>Added <a class="reference" href="#debugger">debugger</a> <a class="reference" href="#parser">parser</a>.</li>
+</ul>
+</div>
+</div>
+<div class="footer">
+<hr class="footer" />
+This document was generated by <a class="reference" href="http://docutils.sourceforge.net/index.html">Docutils</a> from <a class="reference" href="http://docutils.sourceforge.net/rst.html">reStructuredText</a> source and
+syntax-highlighted using <a class="reference" href="http://sourceforge.net/projects/p-stade/">biscuit</a> itself.
+</div>
+</body>
+</html>

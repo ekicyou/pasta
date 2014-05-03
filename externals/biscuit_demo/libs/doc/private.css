@@ -1,0 +1,72 @@
+
+body {
+}
+
+table.docinfo {
+	margin: 2em 4em 0em 4em;
+}
+
+h1 a {
+	font-size: 85%;
+	border-bottom: 0px;
+}
+
+h2 a {
+	font-size: 85%;
+	border-bottom: 0px;
+}
+
+a{
+	text-decoration: none;
+	color: #333333;
+	border-bottom:solid 1px #333333;
+}
+
+a:hover  { 
+	color: #ff0000;
+}
+  
+a:active  {  }
+
+table.docutils {
+	border: solid 1px #333333;
+	border-collapse: collapse;
+}
+
+ol.arabic {
+  list-style-type: decimal;
+}
+
+pre.literal-block, pre.cpp_source {
+	margin-left: 2em ;
+	margin-right: 2em ;
+	font-size: 85%;
+	overflow: hidden;
+	line-height: 110%;
+	border: solid 1px #cccccc;
+	padding: 0.2em;
+	background-color: white;
+	font-family: monospace;
+}
+
+span.cpp_keyword {
+	color: #7F0055;
+}
+span.cpp_string_literal {
+	color: #2A00FF;
+}
+span.cpp_number_literal {
+}
+span.cpp_pp_directive {
+	color: #7F9FBF;
+	font-weight: bolder;
+}
+span.cpp_pp_include_path {
+	color: gray;
+}
+span.cpp_pp_pragma_token {
+	color: #7F0055;
+}
+span.cpp_comment {
+	color: #3F7F5F;
+}

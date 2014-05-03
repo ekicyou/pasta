@@ -1,0 +1,1 @@
+void operator()(ForwardIter first, ForwardIter last, UserState& us);

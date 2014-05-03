@@ -42,13 +42,13 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <OutDir>$(SolutionDir)build\$(Configuration)\lib\</OutDir>
     <IntDir>$(SolutionDir)build\$(Configuration)\obj\$(ProjectName)\</IntDir>
-    <IncludePath>$(SolutionDir)..\externals\duktape\src;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)core;$(SolutionDir)..\externals\duktape\src;$(SolutionDir)..\externals\biscuit_demo;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)build\$(Configuration)\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <OutDir>$(SolutionDir)build\$(Configuration)\lib\</OutDir>
     <IntDir>$(SolutionDir)build\$(Configuration)\obj\$(ProjectName)\</IntDir>
-    <IncludePath>$(SolutionDir)..\externals\duktape\src;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)core;$(SolutionDir)..\externals\duktape\src;$(SolutionDir)..\externals\biscuit_demo;$(IncludePath)</IncludePath>
     <LibraryPath>$(SolutionDir)build\$(Configuration)\lib;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
