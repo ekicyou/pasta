@@ -28,6 +28,8 @@ namespace pasta{
 		App(const HINSTANCE hinst, const std::string& loaddir);
 		~App(void);
 		bool request(const std::string& request, std::string& response);
+
+		std::string eval(const char *utf8text);
 	};
 
 }

@@ -105,5 +105,31 @@ pasta::App::App(const HINSTANCE hinst, const std::string& loaddir)
 bool pasta::App::request(const std::string& request, std::string& response){
 	USES_CONVERSION;
 
+
+
 	return false;
 }
+
+// eval
+
+static int eval_raw(duk_context *ctx) {
+	duk_eval(ctx);
+	return 1;
+}
+
+static int tostring_raw(duk_context *ctx) {
+	duk_to_string(ctx, -1);
+	return 1;
+}
+
+
+std::string pasta::App::eval(const char * utf8text){
+	duk_push_string(ctx, utf8text);
+	duk_safe_call(ctx, eval_raw    , 1 /*nargs*/, 1 /*nrets*/);
+	duk_safe_call(ctx, tostring_raw, 1 /*nargs*/, 1 /*nrets*/);
+	auto text = duk_get_string(ctx, -1);
+	std::string rc(text);
+	duk_pop(ctx);
+	return rc;
+}
+
