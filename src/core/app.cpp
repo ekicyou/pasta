@@ -101,6 +101,10 @@ pasta::App::App(const HINSTANCE hinst, const std::string& loaddir)
 }
 
 
+int pasta::App::CP(){ return cp; }
+
+
+
 // リクエスト処理
 bool pasta::App::request(const std::string& request, std::string& response){
 	USES_CONVERSION;
@@ -121,7 +125,6 @@ static int tostring_raw(duk_context *ctx) {
 	duk_to_string(ctx, -1);
 	return 1;
 }
-
 
 std::string pasta::App::eval(const char * utf8text){
 	duk_push_string(ctx, utf8text);

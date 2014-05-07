@@ -15,10 +15,16 @@ void CreateBatRequestResponse(std::string& response, const char* reason)
    response =
       "SHIORI/3.0 400 Bad Request\r\n"
       "Charset: UTF-8\r\n"
-      "Sender: SHIORI-BASIC\r\n"
-      "X-SHIORI-BASIC-Reason: ";
+      "Sender: PASTA\r\n"
+      "X-PASTA-Reason: ";
    response += reason;
    response += "\r\n\r\n";
+}
+
+void CreateBatRequestResponse(std::string& response, const char* reason, const int cp){
+	USES_CONVERSION;
+	auto message = W2A(A2W_CP(reason, cp));
+	CreateBatRequestResponse(response, reason);
 }
 
 

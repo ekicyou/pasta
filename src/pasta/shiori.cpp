@@ -33,7 +33,7 @@ public:
 };
 
 // std::string ¨ HGLOBAL
-static HGLOBAL AllocString(const std::string& test, long& len)
+inline HGLOBAL AllocString(const std::string& test, long& len)
 {
 	HGLOBAL hText = GlobalAlloc(GMEM_FIXED, test.length());
 	CopyMemory(hText, test.data(), test.length());
@@ -57,7 +57,7 @@ SHIORI_API BOOL __cdecl load(HGLOBAL hGlobal_loaddir, long loaddir_len)
 		app = new pasta::App(hinst, loaddir);
 		return true;
 	}
-	catch (const std::exception& e){
+	catch (const std::exception&){
 		return false;
 	}
 	catch(...){
@@ -70,11 +70,16 @@ SHIORI_API BOOL __cdecl load(HGLOBAL hGlobal_loaddir, long loaddir_len)
  */
 SHIORI_API BOOL __cdecl unload(void)
 {
-	if (app != NULL) {
-		delete app;
-		app = NULL;
+	try{
+		if (app != NULL) {
+			delete app;
+			app = NULL;
+		}
+		return true;
 	}
-	return true;
+	catch (...){
+		return false;
+	}
 }
 
 /* ----------------------------------------------------------------------------
@@ -92,7 +97,10 @@ SHIORI_API HGLOBAL __cdecl request(HGLOBAL hGlobal_request, long& len)
 		}
 	}
 	catch (const std::exception& e){
-		CreateBatRequestResponse(response, e.what());
+		CreateBatRequestResponse(response, e.what(), app->CP());
+	}
+	catch (const char* e){
+		CreateBatRequestResponse(response, e, app->CP());
 	}
 	catch (...){
 		CreateBatRequestResponse(response, "Unnone Exception");

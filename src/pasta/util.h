@@ -6,6 +6,7 @@
 #pragma once
 
 void CreateBatRequestResponse(std::string& response, const char* reason);
+void CreateBatRequestResponse(std::string& response, const char* reason, const int cp);
 
 
 class Pushd
