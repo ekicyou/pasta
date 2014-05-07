@@ -17,7 +17,7 @@ namespace test
 			auto app = pasta::App(NULL, loaddir.string());
 		}
 
-		TEST_METHOD(JsRunTest){
+		TEST_METHOD(EvalTest){
 			USES_CONVERSION;
 
 			auto loaddir = current_path<path>();
