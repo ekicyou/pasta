@@ -4,33 +4,37 @@
 
 #include "duk_internal.h"
 
-int duk_bi_function_constructor(duk_context *ctx) {
+/* FIXME: shared string */
+const char *duk__str_anon = "anon";
+
+duk_ret_t duk_bi_function_constructor(duk_context *ctx) {
 	duk_hthread *thr = (duk_hthread *) ctx;
-	int num_args;
-	int i;
-	int comp_flags;
+	duk_hstring *h_sourcecode;
+	duk_idx_t nargs;
+	duk_idx_t i;
+	duk_small_uint_t comp_flags;
 	duk_hcompiledfunction *func;
 	duk_hobject *outer_lex_env;
 	duk_hobject *outer_var_env;
 
 	/* normal and constructor calls have identical semantics */
 
-	num_args = duk_get_top(ctx);
-
-	for (i = 0; i < num_args; i++) {
+	nargs = duk_get_top(ctx);
+	for (i = 0; i < nargs; i++) {
 		duk_to_string(ctx, i);
 	}
 
-	if (num_args == 0) {
+	if (nargs == 0) {
 		duk_push_string(ctx, "");
 		duk_push_string(ctx, "");
-	} else if (num_args == 1) {
+	} else if (nargs == 1) {
+		/* XXX: cover this with the generic >1 case? */
 		duk_push_string(ctx, "");
 	} else {
 		duk_insert(ctx, 0);   /* [ arg1 ... argN-1 body] -> [body arg1 ... argN-1] */
 		duk_push_string(ctx, ",");
 		duk_insert(ctx, 1);
-		duk_join(ctx, num_args - 1);
+		duk_join(ctx, nargs - 1);
 	}
 
 	/* [ body formals ], formals is comma separated list that needs to be parsed */
@@ -47,18 +51,24 @@ int duk_bi_function_constructor(duk_context *ctx) {
 	duk_push_string(ctx, "}");
 	duk_concat(ctx, 5);
 
-	DUK_ASSERT_TOP(ctx, 3);
+	/* [ body formals source ] */
 
-	/* FIXME: uses internal API */
+	DUK_ASSERT_TOP(ctx, 3);
 
 	/* strictness is not inherited, intentional */
 	comp_flags = DUK_JS_COMPILE_FLAG_FUNCEXPR;
 
-	duk_push_hstring_stridx(ctx, DUK_STRIDX_COMPILE);  /* XXX: copy from caller? */
-	duk_js_compile(thr, comp_flags);
+	duk_push_hstring_stridx(ctx, DUK_STRIDX_COMPILE);  /* XXX: copy from caller? */  /* FIXME: ignored now */
+	h_sourcecode = duk_require_hstring(ctx, -2);
+	duk_js_compile(thr,
+	               (const duk_uint8_t *) DUK_HSTRING_GET_DATA(h_sourcecode),
+	               (duk_size_t) DUK_HSTRING_GET_BYTELEN(h_sourcecode),
+	               comp_flags);
 	func = (duk_hcompiledfunction *) duk_get_hobject(ctx, -1);
 	DUK_ASSERT(func != NULL);
 	DUK_ASSERT(DUK_HOBJECT_IS_COMPILEDFUNCTION((duk_hobject *) func));
+
+	/* [ body formals source template ] */
 
 	/* only outer_lex_env matters, as functions always get a new
 	 * variable declaration environment.
@@ -69,16 +79,18 @@ int duk_bi_function_constructor(duk_context *ctx) {
 
 	duk_js_push_closure(thr, func, outer_var_env, outer_lex_env);
 
+	/* [ body formals source template closure ] */
+
 	return 1;
 }
 
-int duk_bi_function_prototype(duk_context *ctx) {
+duk_ret_t duk_bi_function_prototype(duk_context *ctx) {
 	/* ignore arguments, return undefined (E5 Section 15.3.4) */
 	DUK_UNREF(ctx);
 	return 0;
 }
 
-int duk_bi_function_prototype_to_string(duk_context *ctx) {
+duk_ret_t duk_bi_function_prototype_to_string(duk_context *ctx) {
 	duk_tval *tv;
 
 	/*
@@ -105,7 +117,7 @@ int duk_bi_function_prototype_to_string(duk_context *ctx) {
 
 	if (DUK_TVAL_IS_OBJECT(tv)) {
 		duk_hobject *obj = DUK_TVAL_GET_OBJECT(tv);
-		const char *func_name = "anonymous";
+		const char *func_name = duk__str_anon;
 
 		/* FIXME: rework, it would be nice to avoid C formatting functions to
 		 * ensure there are no Unicode issues.
@@ -117,17 +129,17 @@ int duk_bi_function_prototype_to_string(duk_context *ctx) {
 			DUK_ASSERT(func_name != NULL);
 
 			if (func_name[0] == (char) 0) {
-				func_name = "empty";
+				func_name = duk__str_anon;
 			}
 		}
 
 		if (DUK_HOBJECT_HAS_COMPILEDFUNCTION(obj)) {
-			/* FIXME: actual source, if available */
-			duk_push_sprintf(ctx, "function %s() {/* source code */}", func_name);
+			/* XXX: actual source, if available */
+			duk_push_sprintf(ctx, "function %s() {/* source code */}", (const char *) func_name);
 		} else if (DUK_HOBJECT_HAS_NATIVEFUNCTION(obj)) {
-			duk_push_sprintf(ctx, "function %s() {/* native code */}", func_name);
+			duk_push_sprintf(ctx, "function %s() {/* native code */}", (const char *) func_name);
 		} else if (DUK_HOBJECT_HAS_BOUND(obj)) {
-			duk_push_sprintf(ctx, "function %s() {/* bound */}", func_name);
+			duk_push_sprintf(ctx, "function %s() {/* bound */}", (const char *) func_name);
 		} else {
 			goto type_error;
 		}
@@ -141,43 +153,43 @@ int duk_bi_function_prototype_to_string(duk_context *ctx) {
 	return DUK_RET_TYPE_ERROR;
 }
 
-int duk_bi_function_prototype_apply(duk_context *ctx) {
-	unsigned int len;
-	unsigned int i;
-
-	/* FIXME: stack checks */
+duk_ret_t duk_bi_function_prototype_apply(duk_context *ctx) {
+	duk_idx_t len;
+	duk_idx_t i;
 
 	DUK_ASSERT_TOP(ctx, 2);  /* not a vararg function */
 
 	duk_push_this(ctx);
 	if (!duk_is_callable(ctx, -1)) {
-		DUK_DDDPRINT("func is not callable");
+		DUK_DDD(DUK_DDDPRINT("func is not callable"));
 		goto type_error;
 	}
 	duk_insert(ctx, 0);
 	DUK_ASSERT_TOP(ctx, 3);
 
-	DUK_DDDPRINT("func=%!iT, thisArg=%!iT, argArray=%!iT",
-	             duk_get_tval(ctx, 0), duk_get_tval(ctx, 1), duk_get_tval(ctx, 2));
+	DUK_DDD(DUK_DDDPRINT("func=%!iT, thisArg=%!iT, argArray=%!iT",
+	                     (duk_tval *) duk_get_tval(ctx, 0),
+	                     (duk_tval *) duk_get_tval(ctx, 1),
+	                     (duk_tval *) duk_get_tval(ctx, 2)));
 
 	/* [ func thisArg argArray ] */
 
 	if (duk_is_null_or_undefined(ctx, 2)) {
-		DUK_DDDPRINT("argArray is null/undefined, no args");
+		DUK_DDD(DUK_DDDPRINT("argArray is null/undefined, no args"));
 		len = 0;
 	} else if (!duk_is_object(ctx, 2)) {
 		goto type_error;
 	} else {
-		DUK_DDDPRINT("argArray is an object");
+		DUK_DDD(DUK_DDDPRINT("argArray is an object"));
 
 		/* FIXME: make this an internal helper */
 		duk_get_prop_stridx(ctx, 2, DUK_STRIDX_LENGTH);
-		len = duk_to_uint32(ctx, -1);
+		len = (duk_idx_t) duk_to_uint32(ctx, -1);  /* ToUint32() coercion required */
 		duk_pop(ctx);
 
-		duk_require_stack(ctx, len);  /* FIXME: more? */
+		duk_require_stack(ctx, len);
 
-		DUK_DDDPRINT("argArray length is %d", len);
+		DUK_DDD(DUK_DDDPRINT("argArray length is %ld", (long) len));
 		for (i = 0; i < len; i++) {
 			duk_get_prop_index(ctx, 2, i);
 		}
@@ -187,8 +199,10 @@ int duk_bi_function_prototype_apply(duk_context *ctx) {
 
 	/* [ func thisArg arg1 ... argN ] */
 	
-	DUK_DDDPRINT("apply, func=%!iT, thisArg=%!iT, len=%d",
-	             duk_get_tval(ctx, 0), duk_get_tval(ctx, 1), len);
+	DUK_DDD(DUK_DDDPRINT("apply, func=%!iT, thisArg=%!iT, len=%ld",
+	                     (duk_tval *) duk_get_tval(ctx, 0),
+	                     (duk_tval *) duk_get_tval(ctx, 1),
+	                     (long) len));
 	duk_call_method(ctx, len);
 	return 1;
 
@@ -196,8 +210,8 @@ int duk_bi_function_prototype_apply(duk_context *ctx) {
 	return DUK_RET_TYPE_ERROR;
 }
 
-int duk_bi_function_prototype_call(duk_context *ctx) {
-	int nargs;
+duk_ret_t duk_bi_function_prototype_call(duk_context *ctx) {
+	duk_idx_t nargs;
 
 	/* Step 1 is not necessary because duk_call_method() will take
 	 * care of it.
@@ -218,8 +232,11 @@ int duk_bi_function_prototype_call(duk_context *ctx) {
 
 	/* [ func thisArg arg1 ... argN ] */
 
-	DUK_DDDPRINT("func=%!iT, thisArg=%!iT, argcount=%d, top=%d",
-	             duk_get_tval(ctx, 0), duk_get_tval(ctx, 1), nargs - 1, duk_get_top(ctx));
+	DUK_DDD(DUK_DDDPRINT("func=%!iT, thisArg=%!iT, argcount=%ld, top=%ld",
+	                     (duk_tval *) duk_get_tval(ctx, 0),
+	                     (duk_tval *) duk_get_tval(ctx, 1),
+	                     (long) (nargs - 1),
+	                     (long) duk_get_top(ctx)));
 	duk_call_method(ctx, nargs - 1);	
 	return 1;
 }
@@ -230,12 +247,10 @@ int duk_bi_function_prototype_call(duk_context *ctx) {
  * function) would require a "collapsing" implementation which
  * merges argument lists etc here.
  */
-int duk_bi_function_prototype_bind(duk_context *ctx) {
+duk_ret_t duk_bi_function_prototype_bind(duk_context *ctx) {
 	duk_hobject *h_target;
-	int nargs;
-	int i;
-
-	/* FIXME: stack checks */
+	duk_idx_t nargs;
+	duk_idx_t i;
 
 	/* vararg function, careful arg handling (e.g. thisArg may not be present) */
 	nargs = duk_get_top(ctx);  /* = 1 + arg count */
@@ -247,7 +262,7 @@ int duk_bi_function_prototype_bind(duk_context *ctx) {
 
 	duk_push_this(ctx);
 	if (!duk_is_callable(ctx, -1)) {
-		DUK_DDDPRINT("func is not callable");
+		DUK_DDD(DUK_DDDPRINT("func is not callable"));
 		goto type_error;
 	}
 
@@ -287,7 +302,7 @@ int duk_bi_function_prototype_bind(duk_context *ctx) {
 	h_target = duk_get_hobject(ctx, -2);
 	DUK_ASSERT(h_target != NULL);
 	if (DUK_HOBJECT_GET_CLASS_NUMBER(h_target) == DUK_HOBJECT_CLASS_FUNCTION) {
-		int tmp;
+		duk_int_t tmp;
 		duk_get_prop_stridx(ctx, -2, DUK_STRIDX_LENGTH);
 		tmp = duk_to_int(ctx, -1) - (nargs - 1);  /* step 15.a */
 		duk_pop(ctx);
@@ -302,17 +317,16 @@ int duk_bi_function_prototype_bind(duk_context *ctx) {
 	duk_def_prop_stridx_thrower(ctx, -1, DUK_STRIDX_LC_ARGUMENTS, DUK_PROPDESC_FLAGS_NONE);
 
 	/* these non-standard properties are copied for convenience */
-	/* FIXME: 'copy properties' API call? */
+	/* XXX: 'copy properties' API call? */
 	duk_get_prop_stridx(ctx, -2, DUK_STRIDX_NAME);
 	duk_def_prop_stridx(ctx, -2, DUK_STRIDX_NAME, DUK_PROPDESC_FLAGS_WC);
 	duk_get_prop_stridx(ctx, -2, DUK_STRIDX_FILE_NAME);
 	duk_def_prop_stridx(ctx, -2, DUK_STRIDX_FILE_NAME, DUK_PROPDESC_FLAGS_WC);
 
-	DUK_DDDPRINT("created bound function: %!iT", duk_get_tval(ctx, -1));
+	DUK_DDD(DUK_DDDPRINT("created bound function: %!iT", (duk_tval *) duk_get_tval(ctx, -1)));
 
 	return 1;
 
  type_error:
 	return DUK_RET_TYPE_ERROR;
 }
-

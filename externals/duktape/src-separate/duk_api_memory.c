@@ -4,7 +4,7 @@
 
 #include "duk_internal.h"
 
-void *duk_alloc_raw(duk_context *ctx, size_t size) {
+void *duk_alloc_raw(duk_context *ctx, duk_size_t size) {
 	duk_hthread *thr = (duk_hthread *) ctx;
 
 	DUK_ASSERT(ctx != NULL);
@@ -20,7 +20,7 @@ void duk_free_raw(duk_context *ctx, void *ptr) {
 	DUK_FREE_RAW(thr->heap, ptr);
 }
 
-void *duk_realloc_raw(duk_context *ctx, void *ptr, size_t size) {
+void *duk_realloc_raw(duk_context *ctx, void *ptr, duk_size_t size) {
 	duk_hthread *thr = (duk_hthread *) ctx;
 
 	DUK_ASSERT(ctx != NULL);
@@ -28,7 +28,7 @@ void *duk_realloc_raw(duk_context *ctx, void *ptr, size_t size) {
 	return DUK_REALLOC_RAW(thr->heap, ptr, size);
 }
 
-void *duk_alloc(duk_context *ctx, size_t size) {
+void *duk_alloc(duk_context *ctx, duk_size_t size) {
 	duk_hthread *thr = (duk_hthread *) ctx;
 
 	DUK_ASSERT(ctx != NULL);
@@ -44,7 +44,7 @@ void duk_free(duk_context *ctx, void *ptr) {
 	DUK_FREE(thr->heap, ptr);
 }
 
-void *duk_realloc(duk_context *ctx, void *ptr, size_t size) {
+void *duk_realloc(duk_context *ctx, void *ptr, duk_size_t size) {
 	duk_hthread *thr = (duk_hthread *) ctx;
 
 	DUK_ASSERT(ctx != NULL);
@@ -78,7 +78,7 @@ void duk_get_memory_functions(duk_context *ctx, duk_memory_functions *out_funcs)
 	out_funcs->udata = heap->alloc_udata;
 }
 
-void duk_gc(duk_context *ctx, int flags) {
+void duk_gc(duk_context *ctx, duk_uint_t flags) {
 #ifdef DUK_USE_MARK_AND_SWEEP
 	duk_hthread *thr = (duk_hthread *) ctx;
 	duk_heap *heap;
@@ -91,12 +91,11 @@ void duk_gc(duk_context *ctx, int flags) {
 	heap = thr->heap;
 	DUK_ASSERT(heap != NULL);
 
-	DUK_DPRINT("mark-and-sweep requested by application");
+	DUK_D(DUK_DPRINT("mark-and-sweep requested by application"));
 	duk_heap_mark_and_sweep(heap, 0);
 #else
-	DUK_DPRINT("mark-and-sweep requested by application but mark-and-sweep not enabled, ignoring");
+	DUK_D(DUK_DPRINT("mark-and-sweep requested by application but mark-and-sweep not enabled, ignoring"));
 	DUK_UNREF(ctx);
 	DUK_UNREF(flags);
 #endif
 }
-

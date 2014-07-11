@@ -34,6 +34,49 @@ typedef union {
 } duk__test_u32_union;
 
 /*
+ *  Various sanity checks for typing
+ */
+
+static void duk__selftest_types(void) {
+	if (!(sizeof(duk_int8_t) == 1 &&
+	      sizeof(duk_uint8_t) == 1 &&
+	      sizeof(duk_int16_t) == 2 &&
+	      sizeof(duk_uint16_t) == 2 &&
+	      sizeof(duk_int32_t) == 4 &&
+	      sizeof(duk_uint32_t) == 4)) {
+		DUK_PANIC(DUK_ERR_INTERNAL_ERROR, "self test failed: duk_(u)int{8,16,32}_t size");
+	}
+#if defined(DUK_USE_64BIT_OPS)
+	if (!(sizeof(duk_int64_t) == 8 &&
+	      sizeof(duk_uint64_t) == 8)) {
+		DUK_PANIC(DUK_ERR_INTERNAL_ERROR, "self test failed: duk_(u)int64_t size");
+	}
+#endif
+
+	if (!(sizeof(duk_size_t) >= sizeof(duk_uint_t))) {
+		/* Some internal code now assumes that all duk_uint_t values
+		 * can be expressed with a duk_size_t.
+		 */
+		DUK_PANIC(DUK_ERR_INTERNAL_ERROR, "self test failed: duk_size_t is smaller than duk_uint_t");
+	}
+	if (!(sizeof(duk_int_t) >= 4)) {
+		DUK_PANIC(DUK_ERR_INTERNAL_ERROR, "self test failed: duk_int_t is not 32 bits");
+	}
+}
+
+/*
+ *  Packed tval sanity
+ */
+
+static void duk__selftest_packed_tval(void) {
+#if defined(DUK_USE_PACKED_TVAL)
+	if (sizeof(void *) > 4) {
+		DUK_PANIC(DUK_ERR_INTERNAL_ERROR, "self test failed: packed duk_tval in use but sizeof(void *) > 4");
+	}
+#endif
+}
+
+/*
  *  Two's complement arithmetic.
  */
 
@@ -108,6 +151,17 @@ static void duk__selftest_double_union_size(void) {
 static void duk__selftest_double_aliasing(void) {
 	duk__test_double_union a, b;
 
+	/* This testcase fails when Emscripten-generated code runs on Firefox.
+	 * It's not an issue because the failure should only affect packed
+	 * duk_tval representation, which is not used with Emscripten.
+	 */
+#if defined(DUK_USE_NO_DOUBLE_ALIASING_SELFTEST)
+#if defined(DUK_USE_PACKED_TVAL)
+#error inconsistent defines: skipping double aliasing selftest when using packed duk_tval
+#endif
+	return;
+#endif
+
 	/* Test signaling NaN and alias assignment in all
 	 * endianness combinations.
 	 */
@@ -169,6 +223,8 @@ static void duk__selftest_struct_align(void) {
  */
 
 void duk_selftest_run_tests(void) {
+	duk__selftest_types();
+	duk__selftest_packed_tval();
 	duk__selftest_twos_complement();
 	duk__selftest_byte_order();
 	duk__selftest_double_union_size();

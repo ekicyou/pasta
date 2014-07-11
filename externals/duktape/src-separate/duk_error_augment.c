@@ -45,8 +45,8 @@
  *  a DoubleError which is not ideal).  This would be easy to change and
  *  even signal to the caller.
  *
- *  The user error handler is stored in 'Duktape.errcreate' or
- *  'Duktape.errthrow' depending on whether we're augmenting the error at
+ *  The user error handler is stored in 'Duktape.errCreate' or
+ *  'Duktape.errThrow' depending on whether we're augmenting the error at
  *  creation or throw time.  There are several alternatives to this approach,
  *  see doc/error-objects.txt for discussion.
  *
@@ -59,18 +59,19 @@
  */
 
 #if defined(DUK_USE_ERRTHROW) || defined(DUK_USE_ERRCREATE)
-static void duk__err_augment_user(duk_hthread *thr, int stridx_cb) {
+static void duk__err_augment_user(duk_hthread *thr, duk_small_uint_t stridx_cb) {
 	duk_context *ctx = (duk_context *) thr;
 	duk_tval *tv_hnd;
-	int call_flags;
-	int rc;
+	duk_small_uint_t call_flags;
+	duk_int_t rc;
 
 	DUK_ASSERT(thr != NULL);
 	DUK_ASSERT(thr->heap != NULL);
-	DUK_ASSERT(stridx_cb >= 0 && stridx_cb < DUK_HEAP_NUM_STRINGS);
+	DUK_ASSERT_DISABLE(stridx_cb >= 0);  /* unsigned */
+	DUK_ASSERT(stridx_cb < DUK_HEAP_NUM_STRINGS);
 
 	if (DUK_HEAP_HAS_ERRHANDLER_RUNNING(thr->heap)) {
-		DUK_DDPRINT("recursive call to error handler, ignore");
+		DUK_DD(DUK_DDPRINT("recursive call to error handler, ignore"));
 		return;
 	}
 
@@ -92,16 +93,18 @@ static void duk__err_augment_user(duk_hthread *thr, int stridx_cb) {
 		/* When creating built-ins, some of the built-ins may not be set
 		 * and we want to tolerate that when throwing errors.
 		 */
-		DUK_DDPRINT("error occurred when DUK_BIDX_DUKTAPE is NULL, ignoring");
+		DUK_DD(DUK_DDPRINT("error occurred when DUK_BIDX_DUKTAPE is NULL, ignoring"));
 		return;
 	}
 	tv_hnd = duk_hobject_find_existing_entry_tval_ptr(thr->builtins[DUK_BIDX_DUKTAPE],
 	                                                  thr->strs[stridx_cb]);
 	if (tv_hnd == NULL) {
-		DUK_DDPRINT("error handler does not exist or is not a plain value: %!T", tv_hnd);
+		DUK_DD(DUK_DDPRINT("error handler does not exist or is not a plain value: %!T",
+		                   (duk_tval *) tv_hnd));
 		return;
 	}
-	DUK_DDDPRINT("error handler dump (callability not checked): %!T", tv_hnd);
+	DUK_DDD(DUK_DDDPRINT("error handler dump (callability not checked): %!T",
+	                     (duk_tval *) tv_hnd));
 	duk_push_tval(ctx, tv_hnd);
 
 	/* [ ... errval errhandler ] */
@@ -152,12 +155,12 @@ static void duk__err_augment_user(duk_hthread *thr, int stridx_cb) {
  */
 
 #ifdef DUK_USE_TRACEBACKS
-static void duk__add_traceback(duk_hthread *thr, duk_hthread *thr_callstack, const char *filename, int line, int noblame_fileline) {
+static void duk__add_traceback(duk_hthread *thr, duk_hthread *thr_callstack, const char *filename, duk_int_t line, duk_bool_t noblame_fileline) {
 	duk_context *ctx = (duk_context *) thr;
-	int depth;
-	int i, i_min;
-	int arr_idx;
-	double d;
+	duk_small_uint_t depth;
+	duk_int_t i, i_min;
+	duk_uarridx_t arr_idx;
+	duk_double_t d;
 
 	DUK_ASSERT(thr != NULL);
 	DUK_ASSERT(thr_callstack != NULL);
@@ -173,7 +176,8 @@ static void duk__add_traceback(duk_hthread *thr, duk_hthread *thr_callstack, con
 	 *  See doc/error-objects.txt.
 	 */
 
-	DUK_DDDPRINT("adding traceback to object: %!T", duk_get_tval(ctx, -1));
+	DUK_DDD(DUK_DDDPRINT("adding traceback to object: %!T",
+	                     (duk_tval *) duk_get_tval(ctx, -1)));
 
 	duk_push_array(ctx);  /* XXX: specify array size, as we know it */
 	arr_idx = 0;
@@ -183,30 +187,28 @@ static void duk__add_traceback(duk_hthread *thr, duk_hthread *thr_callstack, con
 	 * the line and flags.
 	 */
 
-	/* FIXME: optimize: allocate an array part to the necessary size (upwards
+	/* XXX: optimize: allocate an array part to the necessary size (upwards
 	 * estimate) and fill in the values directly into the array part; finally
 	 * update 'length'.
 	 */
 
-	/* FIXME: using duk_put_prop_index() would cause obscure error cases when Array.prototype
+	/* XXX: using duk_put_prop_index() would cause obscure error cases when Array.prototype
 	 * has write-protected array index named properties.  This was seen as DoubleErrors
-	 * in e.g. some test262 test cases.  Using duk_def_prop_index() is better but currently
-	 * there is no fast path variant for that; the current implementation interns the array
-	 * index as a string.  This can be fixed directly, or perhaps the traceback can be fixed
-	 * altogether to fill in the tracedata directly into the array part.
+	 * in e.g. some test262 test cases.  Using duk_def_prop_index() is better but heavier.
+	 * The best fix is to fill in the tracedata directly into the array part.
 	 */
 
 	/* [ ... error arr ] */
 
 	if (filename) {
 		duk_push_string(ctx, filename);
-		duk_def_prop_index(ctx, -2, arr_idx, DUK_PROPDESC_FLAGS_WEC);
+		duk_def_prop_index_wec(ctx, -2, arr_idx);
 		arr_idx++;
 
-		d = (noblame_fileline ? ((double) DUK_TB_FLAG_NOBLAME_FILELINE) * DUK_DOUBLE_2TO32 : 0.0) +
-		    (double) line;
+		d = (noblame_fileline ? ((duk_double_t) DUK_TB_FLAG_NOBLAME_FILELINE) * DUK_DOUBLE_2TO32 : 0.0) +
+		    (duk_double_t) line;
 		duk_push_number(ctx, d);
-		duk_def_prop_index(ctx, -2, arr_idx, DUK_PROPDESC_FLAGS_WEC);
+		duk_def_prop_index_wec(ctx, -2, arr_idx);
 		arr_idx++;
 	}
 
@@ -214,13 +216,14 @@ static void duk__add_traceback(duk_hthread *thr, duk_hthread *thr_callstack, con
 	 * special handling above (intentional)
 	 */
 	depth = DUK_USE_TRACEBACK_DEPTH;
-	i_min = (thr_callstack->callstack_top > (size_t) depth ? (int) (thr_callstack->callstack_top - depth) : 0);
+	i_min = (thr_callstack->callstack_top > (duk_size_t) depth ? (duk_int_t) (thr_callstack->callstack_top - depth) : 0);
 	DUK_ASSERT(i_min >= 0);
 
 	/* [ ... error arr ] */
 
-	for (i = thr_callstack->callstack_top - 1; i >= i_min; i--) {
-		int pc;
+	DUK_ASSERT(thr_callstack->callstack_top <= DUK_INT_MAX);  /* callstack limits */
+	for (i = (duk_int_t) (thr_callstack->callstack_top - 1); i >= i_min; i--) {
+		duk_uint32_t pc;
 
 		/*
 		 *  Note: each API operation potentially resizes the callstack,
@@ -233,11 +236,11 @@ static void duk__add_traceback(duk_hthread *thr, duk_hthread *thr_callstack, con
 		/* [... arr] */
 
 		DUK_ASSERT(thr_callstack->callstack[i].func != NULL);
-		DUK_ASSERT(thr_callstack->callstack[i].pc >= 0);
+		DUK_ASSERT_DISABLE(thr_callstack->callstack[i].pc >= 0);  /* unsigned */
 
 		/* add function */
 		duk_push_hobject(ctx, thr_callstack->callstack[i].func);  /* -> [... arr func] */
-		duk_def_prop_index(ctx, -2, arr_idx, DUK_PROPDESC_FLAGS_WEC);
+		duk_def_prop_index_wec(ctx, -2, arr_idx);
 		arr_idx++;
 
 		/* add a number containing: pc, activation flags */
@@ -251,25 +254,26 @@ static void duk__add_traceback(duk_hthread *thr, duk_hthread *thr_callstack, con
 		if (pc > 0) {
 			pc--;
 		}
-		DUK_ASSERT(pc >= 0 && (double) pc < DUK_DOUBLE_2TO32);  /* assume PC is at most 32 bits and non-negative */
-		d = ((double) thr_callstack->callstack[i].flags) * DUK_DOUBLE_2TO32 + (double) pc;
+		DUK_ASSERT_DISABLE(pc >= 0);  /* unsigned */
+		DUK_ASSERT((duk_double_t) pc < DUK_DOUBLE_2TO32);  /* assume PC is at most 32 bits and non-negative */
+		d = ((duk_double_t) thr_callstack->callstack[i].flags) * DUK_DOUBLE_2TO32 + (duk_double_t) pc;
 		duk_push_number(ctx, d);  /* -> [... arr num] */
-		duk_def_prop_index(ctx, -2, arr_idx, DUK_PROPDESC_FLAGS_WEC);
+		duk_def_prop_index_wec(ctx, -2, arr_idx);
 		arr_idx++;
 	}
 
-	/* FIXME: set with duk_hobject_set_length() when tracedata is filled directly */
-	duk_push_int(ctx, (int) arr_idx);
+	/* XXX: set with duk_hobject_set_length() when tracedata is filled directly */
+	duk_push_uint(ctx, (duk_uint_t) arr_idx);
 	duk_def_prop_stridx(ctx, -2, DUK_STRIDX_LENGTH, DUK_PROPDESC_FLAGS_WC);
 
 	/* [ ... error arr ] */
 
-	duk_def_prop_stridx(ctx, -2, DUK_STRIDX_TRACEDATA, DUK_PROPDESC_FLAGS_WEC);  /* -> [ ... error ] */
+	duk_def_prop_stridx_wec(ctx, -2, DUK_STRIDX_TRACEDATA);  /* -> [ ... error ] */
 }
 #endif  /* DUK_USE_TRACEBACKS */
 
 #if defined(DUK_USE_AUGMENT_ERROR_CREATE)
-static void duk__err_augment_builtin_throw(duk_hthread *thr, duk_hthread *thr_callstack, const char *filename, int line, int noblame_fileline, duk_hobject *obj) {
+static void duk__err_augment_builtin_throw(duk_hthread *thr, duk_hthread *thr_callstack, const char *filename, duk_int_t line, duk_small_int_t noblame_fileline, duk_hobject *obj) {
 	duk_context *ctx = (duk_context *) thr;
 #ifdef DUK_USE_ASSERTIONS
 	duk_int_t entry_top;
@@ -291,7 +295,7 @@ static void duk__err_augment_builtin_throw(duk_hthread *thr, duk_hthread *thr_ca
 	 */
 
 	if (duk_hobject_hasprop_raw(thr, obj, DUK_HTHREAD_STRING_TRACEDATA(thr))) {
-		DUK_DDDPRINT("error value already has a 'tracedata' property, not modifying it");
+		DUK_DDD(DUK_DDDPRINT("error value already has a 'tracedata' property, not modifying it"));
 	} else {
 		duk__add_traceback(thr, thr_callstack, filename, line, noblame_fileline);
 	}
@@ -305,7 +309,7 @@ static void duk__err_augment_builtin_throw(duk_hthread *thr, duk_hthread *thr_ca
 	 */
 
 	if (filename && !noblame_fileline) {
-		/* FIXME: file/line is disabled in minimal builds, so disable this too
+		/* XXX: file/line is disabled in minimal builds, so disable this too
 		 * when appropriate.
 		 */
 		duk_push_string(ctx, filename);
@@ -315,13 +319,12 @@ static void duk__err_augment_builtin_throw(duk_hthread *thr, duk_hthread *thr_ca
 	} else if (thr_callstack->callstack_top > 0) {
 		duk_activation *act;
 		duk_hobject *func;
-		duk_hbuffer *pc2line;
 
 		act = thr_callstack->callstack + thr_callstack->callstack_top - 1;
 		DUK_ASSERT(act >= thr_callstack->callstack && act < thr_callstack->callstack + thr_callstack->callstack_size);
 		func = act->func;
 		if (func) {
-			int pc;
+			duk_uint32_t pc;
 			duk_uint32_t line;
 
 			/* PC points to next instruction, find offending PC.  Note that
@@ -331,7 +334,8 @@ static void duk__err_augment_builtin_throw(duk_hthread *thr, duk_hthread *thr_ca
 			if (pc > 0) {
 				pc--;
 			}
-			DUK_ASSERT(pc >= 0 && (double) pc < DUK_DOUBLE_2TO32);  /* assume PC is at most 32 bits and non-negative */
+			DUK_ASSERT_DISABLE(pc >= 0);  /* unsigned */
+			DUK_ASSERT((duk_double_t) pc < DUK_DOUBLE_2TO32);  /* assume PC is at most 32 bits and non-negative */
 			act = NULL;  /* invalidated by pushes, so get out of the way */
 
 			duk_push_hobject(ctx, func);
@@ -345,17 +349,11 @@ static void duk__err_augment_builtin_throw(duk_hthread *thr, duk_hthread *thr_ca
 				duk_push_number(ctx, pc);
 				duk_def_prop_stridx(ctx, -3, DUK_STRIDX_PC, DUK_PROPDESC_FLAGS_WC | DUK_PROPDESC_FLAGS_NO_OVERWRITE);
 #endif
-
-				duk_get_prop_stridx(ctx, -1, DUK_STRIDX_INT_PC2LINE);
-				if (duk_is_buffer(ctx, -1)) {
-					pc2line = duk_get_hbuffer(ctx, -1);
-					DUK_ASSERT(pc2line != NULL);
-					DUK_ASSERT(!DUK_HBUFFER_HAS_DYNAMIC(pc2line));
-					line = duk_hobject_pc2line_query((duk_hbuffer_fixed *) pc2line, (duk_uint_fast32_t) pc);
-					duk_push_number(ctx, (double) line); /* -> [ ... error func pc2line line ] */  /* FIXME: u32 */
-					duk_def_prop_stridx(ctx, -4, DUK_STRIDX_LINE_NUMBER, DUK_PROPDESC_FLAGS_WC | DUK_PROPDESC_FLAG_NO_OVERWRITE);
+				line = duk_hobject_pc2line_query(ctx, -1, (duk_uint_fast32_t) pc);
+				if (line > 0) {
+					duk_push_u32(ctx, (duk_uint32_t) line); /* -> [ ... error func line ] */
+					duk_def_prop_stridx(ctx, -3, DUK_STRIDX_LINE_NUMBER, DUK_PROPDESC_FLAGS_WC | DUK_PROPDESC_FLAG_NO_OVERWRITE);
 				}
-				duk_pop(ctx);
 			} else {
 				/* Native function, no relevant lineNumber. */
 			}
@@ -389,7 +387,7 @@ static void duk__err_augment_builtin_throw(duk_hthread *thr, duk_hthread *thr_ca
  */
 
 #if defined(DUK_USE_AUGMENT_ERROR_CREATE)
-void duk_err_augment_error_create(duk_hthread *thr, duk_hthread *thr_callstack, const char *filename, int line, int noblame_fileline) {
+void duk_err_augment_error_create(duk_hthread *thr, duk_hthread *thr_callstack, const char *filename, duk_int_t line, duk_bool_t noblame_fileline) {
 	duk_context *ctx = (duk_context *) thr;
 	duk_hobject *obj;
 
@@ -413,25 +411,25 @@ void duk_err_augment_error_create(duk_hthread *thr, duk_hthread *thr_callstack, 
 
 	obj = duk_get_hobject(ctx, -1);
 	if (!obj) {
-		DUK_DDDPRINT("value is not an object, skip both built-in and user augment");
+		DUK_DDD(DUK_DDDPRINT("value is not an object, skip both built-in and user augment"));
 		return;
 	}
 	if (!duk_hobject_prototype_chain_contains(thr, obj, thr->builtins[DUK_BIDX_ERROR_PROTOTYPE])) {
-		DUK_DDDPRINT("value is not an error instance, skip both built-in and user augment");
+		DUK_DDD(DUK_DDDPRINT("value is not an error instance, skip both built-in and user augment"));
 		return;
 	}
 
 	if (DUK_HOBJECT_HAS_EXTENSIBLE(obj)) {
-		DUK_DDDPRINT("error meets criteria, built-in augment");
+		DUK_DDD(DUK_DDDPRINT("error meets criteria, built-in augment"));
 		duk__err_augment_builtin_throw(thr, thr_callstack, filename, line, noblame_fileline, obj);
 	} else {
-		DUK_DDDPRINT("error does not meet criteria, no built-in augment");
+		DUK_DDD(DUK_DDDPRINT("error does not meet criteria, no built-in augment"));
 	}
 
 	/* [ ... error ] */
 
 #if defined(DUK_USE_ERRCREATE)
-	duk__err_augment_user(thr, DUK_STRIDX_ERRCREATE);
+	duk__err_augment_user(thr, DUK_STRIDX_ERR_CREATE);
 #endif
 }
 #endif  /* DUK_USE_AUGMENT_ERROR_CREATE */
@@ -445,7 +443,7 @@ void duk_err_augment_error_create(duk_hthread *thr, duk_hthread *thr_callstack, 
 #if defined(DUK_USE_AUGMENT_ERROR_THROW)
 void duk_err_augment_error_throw(duk_hthread *thr) {
 #if defined(DUK_USE_ERRTHROW)
-	duk__err_augment_user(thr, DUK_STRIDX_ERRTHROW);
+	duk__err_augment_user(thr, DUK_STRIDX_ERR_THROW);
 #endif  /* DUK_USE_ERRTHROW */
 }
 #endif  /* DUK_USE_AUGMENT_ERROR_THROW */

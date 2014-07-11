@@ -41,7 +41,7 @@ duk_ret_t duk_bi_duktape_object_info(duk_context *ctx) {
 
 	/* refcount */
 #ifdef DUK_USE_REFERENCE_COUNTING
-	duk_push_int(ctx, DUK_HEAPHDR_GET_REFCOUNT(h));
+	duk_push_size_t(ctx, DUK_HEAPHDR_GET_REFCOUNT(h));
 #else
 	duk_push_undefined(ctx);
 #endif
@@ -49,36 +49,36 @@ duk_ret_t duk_bi_duktape_object_info(duk_context *ctx) {
 	/* heaphdr size and additional allocation size, followed by
 	 * type specific stuff (with varying value count)
 	 */
-	switch (DUK_HEAPHDR_GET_TYPE(h)) {
+	switch ((duk_small_int_t) DUK_HEAPHDR_GET_TYPE(h)) {
 	case DUK_HTYPE_STRING: {
 		duk_hstring *h_str = (duk_hstring *) h;
-		duk_push_int(ctx, (int) (sizeof(duk_hstring) + DUK_HSTRING_GET_BYTELEN(h_str) + 1));
+		duk_push_uint(ctx, (duk_uint_t) (sizeof(duk_hstring) + DUK_HSTRING_GET_BYTELEN(h_str) + 1));
 		break;
 	}
 	case DUK_HTYPE_OBJECT: {
 		duk_hobject *h_obj = (duk_hobject *) h;
-		duk_int_t hdr_size;
+		duk_small_uint_t hdr_size;
 		if (DUK_HOBJECT_IS_COMPILEDFUNCTION(h_obj)) {
-			hdr_size = (duk_int_t) sizeof(duk_hcompiledfunction);
+			hdr_size = (duk_small_uint_t) sizeof(duk_hcompiledfunction);
 		} else if (DUK_HOBJECT_IS_NATIVEFUNCTION(h_obj)) {
-			hdr_size = (duk_int_t) sizeof(duk_hnativefunction);
+			hdr_size = (duk_small_uint_t) sizeof(duk_hnativefunction);
 		} else if (DUK_HOBJECT_IS_THREAD(h_obj)) {
-			hdr_size = (duk_int_t) sizeof(duk_hthread);
+			hdr_size = (duk_small_uint_t) sizeof(duk_hthread);
 		} else {
-			hdr_size = (duk_int_t) sizeof(duk_hobject);
+			hdr_size = (duk_small_uint_t) sizeof(duk_hobject);
 		}
-		duk_push_int(ctx, (int) hdr_size);
-		duk_push_int(ctx, (int) DUK_HOBJECT_E_ALLOC_SIZE(h_obj));
-		duk_push_int(ctx, (int) h_obj->e_size);
-		duk_push_int(ctx, (int) h_obj->e_used);
-		duk_push_int(ctx, (int) h_obj->a_size);
-		duk_push_int(ctx, (int) h_obj->h_size);
+		duk_push_uint(ctx, (duk_uint_t) hdr_size);
+		duk_push_uint(ctx, (duk_uint_t) DUK_HOBJECT_E_ALLOC_SIZE(h_obj));
+		duk_push_uint(ctx, (duk_uint_t) h_obj->e_size);
+		duk_push_uint(ctx, (duk_uint_t) h_obj->e_used);
+		duk_push_uint(ctx, (duk_uint_t) h_obj->a_size);
+		duk_push_uint(ctx, (duk_uint_t) h_obj->h_size);
 		if (DUK_HOBJECT_IS_COMPILEDFUNCTION(h_obj)) {
 			duk_hbuffer *h_data = ((duk_hcompiledfunction *) h_obj)->data;
 			if (h_data) {
-				duk_push_int(ctx, DUK_HBUFFER_GET_SIZE(h_data));
+				duk_push_uint(ctx, (duk_uint_t) DUK_HBUFFER_GET_SIZE(h_data));
 			} else {
-				duk_push_int(ctx, 0);
+				duk_push_uint(ctx, 0);
 			}
 		}
 		break;
@@ -90,10 +90,10 @@ duk_ret_t duk_bi_duktape_object_info(duk_context *ctx) {
 			 * the second allocation does not exist.
 			 */
 			duk_hbuffer_dynamic *h_dyn = (duk_hbuffer_dynamic *) h;
-			duk_push_int(ctx, (int) (sizeof(duk_hbuffer_dynamic)));
-			duk_push_int(ctx, (int) (DUK_HBUFFER_DYNAMIC_GET_ALLOC_SIZE(h_dyn)));
+			duk_push_uint(ctx, (duk_uint_t) (sizeof(duk_hbuffer_dynamic)));
+			duk_push_uint(ctx, (duk_uint_t) (DUK_HBUFFER_DYNAMIC_GET_ALLOC_SIZE(h_dyn)));
 		} else {
-			duk_push_int(ctx, (int) (sizeof(duk_hbuffer_fixed) + DUK_HBUFFER_GET_SIZE(h_buf) + 1));
+			duk_push_uint(ctx, (duk_uint_t) (sizeof(duk_hbuffer_fixed) + DUK_HBUFFER_GET_SIZE(h_buf) + 1));
 		}
 		break;
 
@@ -112,53 +112,10 @@ duk_ret_t duk_bi_duktape_object_info(duk_context *ctx) {
 	return 1;
 }
 
-#if defined(DUK_USE_PC2LINE)
-duk_ret_t duk_bi_duktape_object_line(duk_context *ctx) {
-	duk_hthread *thr = (duk_hthread *) ctx;
-	duk_activation *act_caller;
-	duk_hobject *h_func;
-	duk_hbuffer_fixed *pc2line;
-	duk_uint_fast32_t pc;
-	duk_uint_fast32_t line;
-
-	if (thr->callstack_top < 2) {
-		return 0;
-	}
-	act_caller = thr->callstack + thr->callstack_top - 2;
-
-	h_func = act_caller->func;
-	DUK_ASSERT(h_func != NULL);
-	if (!DUK_HOBJECT_HAS_COMPILEDFUNCTION(h_func)) {
-		return 0;
-	}
-
-	/* FIXME: shared helper */
-	duk_push_hobject(ctx, h_func);
-	duk_get_prop_stridx(ctx, -1, DUK_STRIDX_INT_PC2LINE);
-	if (duk_is_buffer(ctx, -1)) {
-		pc2line = (duk_hbuffer_fixed *) duk_get_hbuffer(ctx, -1);
-		DUK_ASSERT(!DUK_HBUFFER_HAS_DYNAMIC((duk_hbuffer *) pc2line));
-		pc = (duk_uint_fast32_t) act_caller->pc;
-		line = duk_hobject_pc2line_query(pc2line, (duk_uint_fast32_t) pc);
-	} else {
-		line = 0;
-	}
-
-	duk_push_int(ctx, (int) line);  /* FIXME: typing */
-	return 1;
-}
-#else  /* DUK_USE_PC2LINE */
-duk_ret_t duk_bi_duktape_object_line(duk_context *ctx) {
-	DUK_UNREF(ctx);
-	return 0;
-}
-#endif  /* DUK_USE_PC2LINE */
-
 duk_ret_t duk_bi_duktape_object_act(duk_context *ctx) {
 	duk_hthread *thr = (duk_hthread *) ctx;
 	duk_activation *act;
 	duk_hobject *h_func;
-	duk_hbuffer_fixed *pc2line;
 	duk_uint_fast32_t pc;
 	duk_uint_fast32_t line;
 	duk_int_t level;
@@ -180,20 +137,10 @@ duk_ret_t duk_bi_duktape_object_act(duk_context *ctx) {
 	duk_push_hobject(ctx, h_func);
 
 	pc = (duk_uint_fast32_t) act->pc;
-	duk_push_int(ctx, (int) pc);  /* FIXME: typing */
+	duk_push_uint(ctx, (duk_uint_t) pc);
 
-	duk_get_prop_stridx(ctx, -2, DUK_STRIDX_INT_PC2LINE);
-	if (duk_is_buffer(ctx, -1)) {
-		pc2line = (duk_hbuffer_fixed *) duk_get_hbuffer(ctx, -1);
-		DUK_ASSERT(!DUK_HBUFFER_HAS_DYNAMIC((duk_hbuffer *) pc2line));
-		pc = (duk_uint_fast32_t) act->pc;
-		line = duk_hobject_pc2line_query(pc2line, (duk_uint_fast32_t) pc);
-	} else {
-		line = 0;
-	}
-	duk_pop(ctx);
-
-	duk_push_int(ctx, (int) line);  /* FIXME: typing */
+	line = duk_hobject_pc2line_query(ctx, -2, pc);
+	duk_push_uint(ctx, (duk_uint_t) line);
 
 	/* Providing access to e.g. act->lex_env would be dangerous: these
 	 * internal structures must never be accessible to the application.
@@ -204,21 +151,21 @@ duk_ret_t duk_bi_duktape_object_act(duk_context *ctx) {
 	/* [ level obj func pc line ] */
 
 	/* FIXME: version specific array format instead? */
-	duk_def_prop_stridx(ctx, -4, DUK_STRIDX_LINE_NUMBER, DUK_PROPDESC_FLAGS_WEC);
-	duk_def_prop_stridx(ctx, -3, DUK_STRIDX_PC, DUK_PROPDESC_FLAGS_WEC);
-	duk_def_prop_stridx(ctx, -2, DUK_STRIDX_LC_FUNCTION, DUK_PROPDESC_FLAGS_WEC);
+	duk_def_prop_stridx_wec(ctx, -4, DUK_STRIDX_LINE_NUMBER);
+	duk_def_prop_stridx_wec(ctx, -3, DUK_STRIDX_PC);
+	duk_def_prop_stridx_wec(ctx, -2, DUK_STRIDX_LC_FUNCTION);
 	return 1;
 }
 
 duk_ret_t duk_bi_duktape_object_gc(duk_context *ctx) {
 #ifdef DUK_USE_MARK_AND_SWEEP
 	duk_hthread *thr = (duk_hthread *) ctx;
-	int flags;
-	int rc;
+	duk_small_uint_t flags;
+	duk_bool_t rc;
 
-	flags = duk_get_int(ctx, 0);
+	flags = (duk_small_uint_t) duk_get_uint(ctx, 0);
 	rc = duk_heap_mark_and_sweep(thr->heap, flags);
-	duk_push_int(ctx, rc);
+	duk_push_boolean(ctx, rc);
 	return 1;
 #else
 	DUK_UNREF(ctx);
@@ -266,8 +213,8 @@ duk_ret_t duk_bi_duktape_object_enc(duk_context *ctx) {
 		duk_set_top(ctx, 2);
 		duk_base64_encode(ctx, 1);
 		DUK_ASSERT_TOP(ctx, 2);
-#ifdef DUK_USE_JSONX
-	} else if (h_str == DUK_HTHREAD_STRING_JSONX(thr)) {
+#ifdef DUK_USE_JX
+	} else if (h_str == DUK_HTHREAD_STRING_JX(thr)) {
 		duk_bi_json_stringify_helper(ctx,
 		                             1 /*idx_value*/,
 		                             2 /*idx_replacer*/,
@@ -276,8 +223,8 @@ duk_ret_t duk_bi_duktape_object_enc(duk_context *ctx) {
 		                             DUK_JSON_FLAG_ASCII_ONLY |
 		                             DUK_JSON_FLAG_AVOID_KEY_QUOTES /*flags*/);
 #endif
-#ifdef DUK_USE_JSONC
-	} else if (h_str == DUK_HTHREAD_STRING_JSONC(thr)) {
+#ifdef DUK_USE_JC
+	} else if (h_str == DUK_HTHREAD_STRING_JC(thr)) {
 		duk_bi_json_stringify_helper(ctx,
 		                             1 /*idx_value*/,
 		                             2 /*idx_replacer*/,
@@ -311,15 +258,15 @@ duk_ret_t duk_bi_duktape_object_dec(duk_context *ctx) {
 		duk_set_top(ctx, 2);
 		duk_base64_decode(ctx, 1);
 		DUK_ASSERT_TOP(ctx, 2);
-#ifdef DUK_USE_JSONX
-	} else if (h_str == DUK_HTHREAD_STRING_JSONX(thr)) {
+#ifdef DUK_USE_JX
+	} else if (h_str == DUK_HTHREAD_STRING_JX(thr)) {
 		duk_bi_json_parse_helper(ctx,
 		                         1 /*idx_value*/,
 		                         2 /*idx_replacer*/,
 		                         DUK_JSON_FLAG_EXT_CUSTOM /*flags*/);
 #endif
-#ifdef DUK_USE_JSONC
-	} else if (h_str == DUK_HTHREAD_STRING_JSONC(thr)) {
+#ifdef DUK_USE_JC
+	} else if (h_str == DUK_HTHREAD_STRING_JC(thr)) {
 		duk_bi_json_parse_helper(ctx,
 		                         1 /*idx_value*/,
 		                         2 /*idx_replacer*/,
@@ -336,7 +283,7 @@ duk_ret_t duk_bi_duktape_object_dec(duk_context *ctx) {
  */
 
 duk_ret_t duk_bi_duktape_object_compact(duk_context *ctx) {
+	DUK_ASSERT_TOP(ctx, 1);
 	duk_compact(ctx, 0);
 	return 1;  /* return the argument object */
 }
-

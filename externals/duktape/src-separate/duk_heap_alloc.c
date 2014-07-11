@@ -58,7 +58,7 @@ static void duk__free_hbuffer_inner(duk_heap *heap, duk_hbuffer *h) {
 
 	if (DUK_HBUFFER_HAS_DYNAMIC(h)) {
 		duk_hbuffer_dynamic *g = (duk_hbuffer_dynamic *) h;
-		DUK_DDDPRINT("free dynamic buffer %p", g->curr_alloc);
+		DUK_DDD(DUK_DDDPRINT("free dynamic buffer %p", (void *) g->curr_alloc));
 		DUK_FREE(heap, g->curr_alloc);
 	}
 }
@@ -67,9 +67,9 @@ void duk_heap_free_heaphdr_raw(duk_heap *heap, duk_heaphdr *hdr) {
 	DUK_ASSERT(heap);
 	DUK_ASSERT(hdr);
 
-	DUK_DDDPRINT("free heaphdr %p, htype %d", (void *) hdr, (int) DUK_HEAPHDR_GET_TYPE(hdr));
+	DUK_DDD(DUK_DDDPRINT("free heaphdr %p, htype %ld", (void *) hdr, (long) DUK_HEAPHDR_GET_TYPE(hdr)));
 
-	switch (DUK_HEAPHDR_GET_TYPE(hdr)) {
+	switch ((int) DUK_HEAPHDR_GET_TYPE(hdr)) {
 	case DUK_HTYPE_STRING:
 		/* no inner refs to free */
 		break;
@@ -109,7 +109,8 @@ static void duk__free_allocated(duk_heap *heap) {
 		 * because they may happen with finalizer processing.
 		 */
 
-		DUK_DDDPRINT("FINALFREE (allocated): %!iO", curr);
+		DUK_DDD(DUK_DDDPRINT("FINALFREE (allocated): %!iO",
+		                     (duk_heaphdr *) curr));
 		next = DUK_HEAPHDR_GET_NEXT(curr);
 		duk_heap_free_heaphdr_raw(heap, curr);
 		curr = next;
@@ -123,7 +124,8 @@ static void duk__free_refzero_list(duk_heap *heap) {
 
 	curr = heap->refzero_list;
 	while (curr) {
-		DUK_DDDPRINT("FINALFREE (refzero_list): %!iO", curr);
+		DUK_DDD(DUK_DDDPRINT("FINALFREE (refzero_list): %!iO",
+		                     (duk_heaphdr *) curr));
 		next = DUK_HEAPHDR_GET_NEXT(curr);
 		duk_heap_free_heaphdr_raw(heap, curr);
 		curr = next;
@@ -138,7 +140,8 @@ static void duk__free_markandsweep_finalize_list(duk_heap *heap) {
 
 	curr = heap->finalize_list;
 	while (curr) {
-		DUK_DDDPRINT("FINALFREE (finalize_list): %!iO", curr);
+		DUK_DDD(DUK_DDDPRINT("FINALFREE (finalize_list): %!iO",
+		                     (duk_heaphdr *) curr));
 		next = DUK_HEAPHDR_GET_NEXT(curr);
 		duk_heap_free_heaphdr_raw(heap, curr);
 		curr = next;
@@ -151,14 +154,15 @@ static void duk__free_stringtable(duk_heap *heap) {
 
 	/* strings are only tracked by stringtable */
 	if (heap->st) {
-		for (i = 0; i < heap->st_size; i++) {
+		for (i = 0; i < (duk_uint_fast32_t) heap->st_size; i++) {
 			duk_hstring *e = heap->st[i];
 			if (e == DUK_STRTAB_DELETED_MARKER(heap)) {
 				continue;
 			}
 
 			/* strings have no inner allocations so free directly */
-			DUK_DDDPRINT("FINALFREE (string): %!iO", e);
+			DUK_DDD(DUK_DDDPRINT("FINALFREE (string): %!iO",
+			                     (duk_heaphdr *) e));
 			DUK_FREE(heap, e);
 #if 0  /* not strictly necessary */
 			heap->st[i] = NULL;
@@ -206,12 +210,12 @@ static void duk__free_run_finalizers(duk_heap *heap) {
 
 	/* Note: count includes all objects, not only those with an actual finalizer. */
 #ifdef DUK_USE_DEBUG
-	DUK_DPRINT("checked %d objects for finalizers before freeing heap", (int) count_obj);
+	DUK_D(DUK_DPRINT("checked %ld objects for finalizers before freeing heap", (long) count_obj));
 #endif
 }
 
 void duk_heap_free(duk_heap *heap) {
-	DUK_DPRINT("free heap: %p", heap);
+	DUK_D(DUK_DPRINT("free heap: %p", (void *) heap));
 
 	/* Execute finalizers before freeing the heap, even for reachable
 	 * objects, and regardless of whether or not mark-and-sweep is
@@ -221,7 +225,7 @@ void duk_heap_free(duk_heap *heap) {
 	 *
 	 * FIXME: this perhaps requires an execution time limit.
 	 */
-	DUK_DPRINT("execute finalizers before freeing heap");
+	DUK_D(DUK_DPRINT("execute finalizers before freeing heap"));
 #ifdef DUK_USE_MARK_AND_SWEEP
 	/* run mark-and-sweep a few times just in case (unreachable
 	 * object finalizers run already here)
@@ -235,23 +239,23 @@ void duk_heap_free(duk_heap *heap) {
 	 * and heap->log_buffer are on the heap allocated list.
 	 */
 
-	DUK_DPRINT("freeing heap objects of heap: %p", heap);
+	DUK_D(DUK_DPRINT("freeing heap objects of heap: %p", (void *) heap));
 	duk__free_allocated(heap);
 
 #ifdef DUK_USE_REFERENCE_COUNTING
-	DUK_DPRINT("freeing refzero list of heap: %p", heap);
+	DUK_D(DUK_DPRINT("freeing refzero list of heap: %p", (void *) heap));
 	duk__free_refzero_list(heap);
 #endif
 
 #ifdef DUK_USE_MARK_AND_SWEEP
-	DUK_DPRINT("freeing mark-and-sweep finalize list of heap: %p", heap);
+	DUK_D(DUK_DPRINT("freeing mark-and-sweep finalize list of heap: %p", (void *) heap));
 	duk__free_markandsweep_finalize_list(heap);
 #endif
 
-	DUK_DPRINT("freeing string table of heap: %p", heap);
+	DUK_D(DUK_DPRINT("freeing string table of heap: %p", (void *) heap));
 	duk__free_stringtable(heap);
 
-	DUK_DPRINT("freeing heap structure: %p", heap);
+	DUK_D(DUK_DPRINT("freeing heap structure: %p", (void *) heap));
 	heap->free_func(heap->alloc_udata, heap);
 }
 
@@ -265,7 +269,7 @@ void duk_heap_free(duk_heap *heap) {
 static int duk__init_heap_strings(duk_heap *heap) {
 	duk_bitdecoder_ctx bd_ctx;
 	duk_bitdecoder_ctx *bd = &bd_ctx;  /* convenience */
-	int i, j;
+	duk_small_uint_t i, j;
 
 	DUK_MEMZERO(&bd_ctx, sizeof(bd_ctx));
 	bd->data = (const duk_uint8_t *) duk_strings_data;
@@ -274,39 +278,41 @@ static int duk__init_heap_strings(duk_heap *heap) {
 	for (i = 0; i < DUK_HEAP_NUM_STRINGS; i++) {
 		duk_uint8_t tmp[DUK_STRDATA_MAX_STRLEN];
 		duk_hstring *h;
-		int len;
-		int mode;
-		int t;
+		duk_small_uint_t len;
+		duk_small_uint_t mode;
+		duk_small_uint_t t;
 
 		len = duk_bd_decode(bd, 5);
 		mode = 32;		/* 0 = uppercase, 32 = lowercase (= 'a' - 'A') */
 		for (j = 0; j < len; j++) {
 			t = duk_bd_decode(bd, 5);
 			if (t < DUK__BITPACK_LETTER_LIMIT) {
-				t = t + 'A' + mode;
+				t = t + DUK_ASC_UC_A + mode;
 			} else if (t == DUK__BITPACK_UNDERSCORE) {
-				t = (int) '_';
+				t = DUK_ASC_UNDERSCORE;
 			} else if (t == DUK__BITPACK_FF) {
 				/* Internal keys are prefixed with 0xFF in the stringtable
 				 * (which makes them invalid UTF-8 on purpose).
 				 */
-				t = (int) 0xff;
+				t = 0xff;
 			} else if (t == DUK__BITPACK_SWITCH1) {
 				t = duk_bd_decode(bd, 5);
-				DUK_ASSERT(t >= 0 && t <= 25);
-				t = t + 'A' + (mode ^ 32);
+				DUK_ASSERT_DISABLE(t >= 0);  /* unsigned */
+				DUK_ASSERT(t <= 25);
+				t = t + DUK_ASC_UC_A + (mode ^ 32);
 			} else if (t == DUK__BITPACK_SWITCH) {
 				mode = mode ^ 32;
 				t = duk_bd_decode(bd, 5);
-				DUK_ASSERT(t >= 0 && t <= 25);
-				t = t + 'A' + mode;
+				DUK_ASSERT_DISABLE(t >= 0);
+				DUK_ASSERT(t <= 25);
+				t = t + DUK_ASC_UC_A + mode;
 			} else if (t == DUK__BITPACK_SEVENBIT) {
 				t = duk_bd_decode(bd, 7);
 			}
 			tmp[j] = (duk_uint8_t) t;
 		}
 
-		DUK_DDDPRINT("intern built-in string %d", i);
+		DUK_DDD(DUK_DDDPRINT("intern built-in string %ld", (long) i));
 		h = duk_heap_string_intern(heap, tmp, len);
 		if (!h) {
 			goto error;
@@ -314,7 +320,7 @@ static int duk__init_heap_strings(duk_heap *heap) {
 
 		/* special flags */
 
-		if (len > 0 && tmp[0] == 0xff) {
+		if (len > 0 && tmp[0] == (duk_uint8_t) 0xff) {
 			DUK_HSTRING_SET_INTERNAL(h);
 		}
 		if (i == DUK_STRIDX_EVAL || i == DUK_STRIDX_LC_ARGUMENTS) {
@@ -327,10 +333,10 @@ static int duk__init_heap_strings(duk_heap *heap) {
 			}
 		}
 
-		DUK_DDDPRINT("interned: %!O", h);
+		DUK_DDD(DUK_DDDPRINT("interned: %!O", (duk_heaphdr *) h));
 
-		/* The incref macro takes a thread pointer but doesn't use it
-		 * right now.
+		/* XXX: The incref macro takes a thread pointer but doesn't
+		 * use it right now.
 		 */
 		DUK_HSTRING_INCREF(_never_referenced_, h);
 
@@ -346,13 +352,13 @@ static int duk__init_heap_strings(duk_heap *heap) {
 static int duk__init_heap_thread(duk_heap *heap) {
 	duk_hthread *thr;
 	
-	DUK_DDPRINT("heap init: alloc heap thread");
+	DUK_DD(DUK_DDPRINT("heap init: alloc heap thread"));
 	thr = duk_hthread_alloc(heap,
 	                        DUK_HOBJECT_FLAG_EXTENSIBLE |
 	                        DUK_HOBJECT_FLAG_THREAD |
 	                        DUK_HOBJECT_CLASS_AS_FLAGS(DUK_HOBJECT_CLASS_THREAD));
 	if (!thr) {
-		DUK_DPRINT("failed to alloc heap_thread");
+		DUK_D(DUK_DPRINT("failed to alloc heap_thread"));
 		return 0;
 	}
 	thr->state = DUK_HTHREAD_STATE_INACTIVE;
@@ -378,11 +384,33 @@ static int duk__init_heap_thread(duk_heap *heap) {
 
 #ifdef DUK_USE_DEBUG
 #define DUK__DUMPSZ(t)  do { \
-		DUK_DPRINT("" #t "=%d", (int) sizeof(t)); \
+		DUK_D(DUK_DPRINT("" #t "=%ld", (long) sizeof(t))); \
 	} while (0)
 
+/* These is not 100% because format would need to be non-portable "long long".
+ * Also print out as doubles to catch cases where the "long" type is not wide
+ * enough; the limits will then not be printed accurately but the magnitude
+ * will be correct.
+ */
+#define DUK__DUMPLM_SIGNED_RAW(t,a,b)  do { \
+		DUK_D(DUK_DPRINT(t "=[%ld,%ld]=[%lf,%lf]", \
+		                 (long) (a), (long) (b), \
+		                 (double) (a), (double) (b))); \
+	} while(0)
+#define DUK__DUMPLM_UNSIGNED_RAW(t,a,b)  do { \
+		DUK_D(DUK_DPRINT(t "=[%lu,%lu]=[%lf,%lf]", \
+		                 (unsigned long) (a), (unsigned long) (b), \
+		                 (double) (a), (double) (b))); \
+	} while(0)
+#define DUK__DUMPLM_SIGNED(t)  do { \
+		DUK__DUMPLM_SIGNED_RAW("DUK_" #t "_{MIN,MAX}", DUK_##t##_MIN, DUK_##t##_MAX); \
+	} while(0)
+#define DUK__DUMPLM_UNSIGNED(t)  do { \
+		DUK__DUMPLM_UNSIGNED_RAW("DUK_" #t "_{MIN,MAX}", DUK_##t##_MIN, DUK_##t##_MAX); \
+	} while(0)
+
 static void duk__dump_type_sizes(void) {
-	DUK_DPRINT("sizeofs()");
+	DUK_D(DUK_DPRINT("sizeof()"));
 
 	/* basic platform types */
 	DUK__DUMPSZ(char);
@@ -394,39 +422,56 @@ static void duk__dump_type_sizes(void) {
 	DUK__DUMPSZ(size_t);
 
 	/* basic types from duk_features.h */
-	DUK__DUMPSZ(uint8_t);
-	DUK__DUMPSZ(int8_t);
-	DUK__DUMPSZ(uint16_t);
-	DUK__DUMPSZ(int16_t);
-	DUK__DUMPSZ(uint32_t);
-	DUK__DUMPSZ(int32_t);
-	DUK__DUMPSZ(uint64_t);
-	DUK__DUMPSZ(int64_t);
-	DUK__DUMPSZ(uint_least8_t);
-	DUK__DUMPSZ(int_least8_t);
-	DUK__DUMPSZ(uint_least16_t);
-	DUK__DUMPSZ(int_least16_t);
-	DUK__DUMPSZ(uint_least32_t);
-	DUK__DUMPSZ(int_least32_t);
-	DUK__DUMPSZ(uint_least64_t);
-	DUK__DUMPSZ(int_least64_t);
-	DUK__DUMPSZ(uint_fast8_t);
-	DUK__DUMPSZ(int_fast8_t);
-	DUK__DUMPSZ(uint_fast16_t);
-	DUK__DUMPSZ(int_fast16_t);
-	DUK__DUMPSZ(uint_fast32_t);
-	DUK__DUMPSZ(int_fast32_t);
-	DUK__DUMPSZ(uint_fast64_t);
-	DUK__DUMPSZ(int_fast64_t);
-	DUK__DUMPSZ(uintptr_t);
-	DUK__DUMPSZ(intptr_t);
-	DUK__DUMPSZ(uintmax_t);
-	DUK__DUMPSZ(intmax_t);
+	DUK__DUMPSZ(duk_uint8_t);
+	DUK__DUMPSZ(duk_int8_t);
+	DUK__DUMPSZ(duk_uint16_t);
+	DUK__DUMPSZ(duk_int16_t);
+	DUK__DUMPSZ(duk_uint32_t);
+	DUK__DUMPSZ(duk_int32_t);
+	DUK__DUMPSZ(duk_uint64_t);
+	DUK__DUMPSZ(duk_int64_t);
+	DUK__DUMPSZ(duk_uint_least8_t);
+	DUK__DUMPSZ(duk_int_least8_t);
+	DUK__DUMPSZ(duk_uint_least16_t);
+	DUK__DUMPSZ(duk_int_least16_t);
+	DUK__DUMPSZ(duk_uint_least32_t);
+	DUK__DUMPSZ(duk_int_least32_t);
+#if defined(DUK_USE_64BIT_OPS)
+	DUK__DUMPSZ(duk_uint_least64_t);
+	DUK__DUMPSZ(duk_int_least64_t);
+#endif
+	DUK__DUMPSZ(duk_uint_fast8_t);
+	DUK__DUMPSZ(duk_int_fast8_t);
+	DUK__DUMPSZ(duk_uint_fast16_t);
+	DUK__DUMPSZ(duk_int_fast16_t);
+	DUK__DUMPSZ(duk_uint_fast32_t);
+	DUK__DUMPSZ(duk_int_fast32_t);
+#if defined(DUK_USE_64BIT_OPS)
+	DUK__DUMPSZ(duk_uint_fast64_t);
+	DUK__DUMPSZ(duk_int_fast64_t);
+#endif
+	DUK__DUMPSZ(duk_uintptr_t);
+	DUK__DUMPSZ(duk_intptr_t);
+	DUK__DUMPSZ(duk_uintmax_t);
+	DUK__DUMPSZ(duk_intmax_t);
+	DUK__DUMPSZ(duk_double_t);
+
+	/* important chosen base types */
+	DUK__DUMPSZ(duk_int_t);
+	DUK__DUMPSZ(duk_uint_t);
+	DUK__DUMPSZ(duk_int_fast_t);
+	DUK__DUMPSZ(duk_uint_fast_t);
 	DUK__DUMPSZ(duk_small_int_t);
 	DUK__DUMPSZ(duk_small_uint_t);
+	DUK__DUMPSZ(duk_small_int_fast_t);
+	DUK__DUMPSZ(duk_small_uint_fast_t);
+
+	/* some derived types */
 	DUK__DUMPSZ(duk_codepoint_t);
 	DUK__DUMPSZ(duk_ucodepoint_t);
-	DUK__DUMPSZ(duk_double_t);
+	DUK__DUMPSZ(duk_idx_t);
+	DUK__DUMPSZ(duk_errcode_t);
+	DUK__DUMPSZ(duk_uarridx_t);
 
 	/* tval */
 	DUK__DUMPSZ(duk_double_union);
@@ -465,7 +510,56 @@ static void duk__dump_type_sizes(void) {
 	DUK__DUMPSZ(duk_re_matcher_ctx);
 	DUK__DUMPSZ(duk_re_compiler_ctx);
 }
+static void duk__dump_type_limits(void) {
+	DUK_D(DUK_DPRINT("limits"));
+
+	/* basic types */
+	DUK__DUMPLM_SIGNED(INT8);
+	DUK__DUMPLM_UNSIGNED(UINT8);
+	DUK__DUMPLM_SIGNED(INT_FAST8);
+	DUK__DUMPLM_UNSIGNED(UINT_FAST8);
+	DUK__DUMPLM_SIGNED(INT_LEAST8);
+	DUK__DUMPLM_UNSIGNED(UINT_LEAST8);
+	DUK__DUMPLM_SIGNED(INT16);
+	DUK__DUMPLM_UNSIGNED(UINT16);
+	DUK__DUMPLM_SIGNED(INT_FAST16);
+	DUK__DUMPLM_UNSIGNED(UINT_FAST16);
+	DUK__DUMPLM_SIGNED(INT_LEAST16);
+	DUK__DUMPLM_UNSIGNED(UINT_LEAST16);
+	DUK__DUMPLM_SIGNED(INT32);
+	DUK__DUMPLM_UNSIGNED(UINT32);
+	DUK__DUMPLM_SIGNED(INT_FAST32);
+	DUK__DUMPLM_UNSIGNED(UINT_FAST32);
+	DUK__DUMPLM_SIGNED(INT_LEAST32);
+	DUK__DUMPLM_UNSIGNED(UINT_LEAST32);
+#if defined(DUK_USE_64BIT_OPS)
+	DUK__DUMPLM_SIGNED(INT64);
+	DUK__DUMPLM_UNSIGNED(UINT64);
+	DUK__DUMPLM_SIGNED(INT_FAST64);
+	DUK__DUMPLM_UNSIGNED(UINT_FAST64);
+	DUK__DUMPLM_SIGNED(INT_LEAST64);
+	DUK__DUMPLM_UNSIGNED(UINT_LEAST64);
+#endif
+	DUK__DUMPLM_SIGNED(INTPTR);
+	DUK__DUMPLM_UNSIGNED(UINTPTR);
+	DUK__DUMPLM_SIGNED(INTMAX);
+	DUK__DUMPLM_UNSIGNED(UINTMAX);
+
+	/* derived types */
+	DUK__DUMPLM_SIGNED(INT);
+	DUK__DUMPLM_UNSIGNED(UINT);
+	DUK__DUMPLM_SIGNED(INT_FAST);
+	DUK__DUMPLM_UNSIGNED(UINT_FAST);
+	DUK__DUMPLM_SIGNED(SMALL_INT);
+	DUK__DUMPLM_UNSIGNED(SMALL_UINT);
+	DUK__DUMPLM_SIGNED(SMALL_INT_FAST);
+	DUK__DUMPLM_UNSIGNED(SMALL_UINT_FAST);
+}
 #undef DUK__DUMPSZ
+#undef DUK__DUMPLM_SIGNED_RAW
+#undef DUK__DUMPLM_UNSIGNED_RAW
+#undef DUK__DUMPLM_SIGNED
+#undef DUK__DUMPLM_UNSIGNED
 #endif  /* DUK_USE_DEBUG */
 
 duk_heap *duk_heap_alloc(duk_alloc_function alloc_func,
@@ -475,18 +569,19 @@ duk_heap *duk_heap_alloc(duk_alloc_function alloc_func,
                          duk_fatal_function fatal_func) {
 	duk_heap *res = NULL;
 
-	DUK_DPRINT("allocate heap");
+	DUK_D(DUK_DPRINT("allocate heap"));
 
 	/* Debug dump type sizes */
 #ifdef DUK_USE_DEBUG
 	duk__dump_type_sizes();
+	duk__dump_type_limits();
 #endif
 
 	/* If selftests enabled, run them as early as possible. */
 #ifdef DUK_USE_SELF_TESTS
-	DUK_DPRINT("running self tests");
+	DUK_D(DUK_DPRINT("running self tests"));
 	duk_selftest_run_tests();
-	DUK_DPRINT("self tests passed");
+	DUK_D(DUK_DPRINT("self tests passed"));
 #endif
 
 #ifdef DUK_USE_COMPUTED_NAN
@@ -540,7 +635,7 @@ duk_heap *duk_heap_alloc(duk_alloc_function alloc_func,
 	res->log_buffer = NULL;
 	res->st = NULL;
 	{
-		int i;
+		duk_small_uint_t i;
 	        for (i = 0; i < DUK_HEAP_NUM_STRINGS; i++) {
         	        res->strs[i] = NULL;
 	        }
@@ -561,9 +656,11 @@ duk_heap *duk_heap_alloc(duk_alloc_function alloc_func,
 
 	/* FIXME: use the pointer as a seed for now: mix in time at least */
 
-	/* cast through C99 intptr_t to avoid GCC warning:
+	/* The casts through duk_intr_pt is to avoid the following GCC warning:
 	 *
 	 *   warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
+	 *
+	 * This still generates a /Wp64 warning on VS2010 when compiling for x86.
 	 */
 	res->hash_seed = (duk_uint32_t) (duk_intptr_t) res;
 	res->rnd_state = (duk_uint32_t) (duk_intptr_t) res;
@@ -593,8 +690,9 @@ duk_heap *duk_heap_alloc(duk_alloc_function alloc_func,
 	res->st_size = DUK_STRTAB_INITIAL_SIZE;
 #ifdef DUK_USE_EXPLICIT_NULL_INIT
 	{
-		duk_uint_fast32_t i;
-	        for (i = 0; i < res->st_size; i++) {
+		duk_small_uint_t i;
+		DUK_ASSERT(res->st_size == DUK_STRTAB_INITIAL_SIZE);
+	        for (i = 0; i < DUK_STRTAB_INITIAL_SIZE; i++) {
         	        res->st[i] = NULL;
 	        }
 	}
@@ -605,7 +703,7 @@ duk_heap *duk_heap_alloc(duk_alloc_function alloc_func,
 	/* strcache init */
 #ifdef DUK_USE_EXPLICIT_NULL_INIT
 	{
-		int i;
+		duk_small_uint_t i;
 		for (i = 0; i < DUK_HEAP_STRCACHE_SIZE; i++) {
 			res->strcache[i].h = NULL;
 		}
@@ -619,19 +717,19 @@ duk_heap *duk_heap_alloc(duk_alloc_function alloc_func,
 	 */
 
 	/* built-in strings */
-	DUK_DDPRINT("HEAP: INIT STRINGS");
+	DUK_DD(DUK_DDPRINT("HEAP: INIT STRINGS"));
 	if (!duk__init_heap_strings(res)) {
 		goto error;
 	}
 
 	/* heap thread */
-	DUK_DDPRINT("HEAP: INIT HEAP THREAD");
+	DUK_DD(DUK_DDPRINT("HEAP: INIT HEAP THREAD"));
 	if (!duk__init_heap_thread(res)) {
 		goto error;
 	}
 
 	/* heap object */
-	DUK_DDPRINT("HEAP: INIT HEAP OBJECT");
+	DUK_DD(DUK_DDPRINT("HEAP: INIT HEAP OBJECT"));
 	DUK_ASSERT(res->heap_thread != NULL);
 	res->heap_object = duk_hobject_alloc(res, DUK_HOBJECT_FLAG_EXTENSIBLE |
 	                                          DUK_HOBJECT_CLASS_AS_FLAGS(DUK_HOBJECT_CLASS_OBJECT));
@@ -641,7 +739,7 @@ duk_heap *duk_heap_alloc(duk_alloc_function alloc_func,
 	DUK_HOBJECT_INCREF(res->heap_thread, res->heap_object);
 
 	/* log buffer */
-	DUK_DDPRINT("HEAP: INIT LOG BUFFER");
+	DUK_DD(DUK_DDPRINT("HEAP: INIT LOG BUFFER"));
 	res->log_buffer = (duk_hbuffer_dynamic *) duk_hbuffer_alloc(res,
 	                                                            DUK_BI_LOGGER_SHORT_MSG_LIMIT,
 	                                                            1 /*dynamic*/);
@@ -650,11 +748,11 @@ duk_heap *duk_heap_alloc(duk_alloc_function alloc_func,
 	}
 	DUK_HBUFFER_INCREF(res->heap_thread, res->log_buffer);
 
-	DUK_DPRINT("allocated heap: %p", res);
+	DUK_D(DUK_DPRINT("allocated heap: %p", (void *) res));
 	return res;
 
  error:
-	DUK_DPRINT("heap allocation failed");
+	DUK_D(DUK_DPRINT("heap allocation failed"));
 
 	if (res) {
 		/* assumes that allocated pointers and alloc funcs are valid
@@ -667,4 +765,3 @@ duk_heap *duk_heap_alloc(duk_alloc_function alloc_func,
 	}
 	return NULL;
 }
-

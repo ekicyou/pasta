@@ -8,7 +8,7 @@
 #if defined(DUK_USE_DOUBLE_LE)
 extern const duk_uint8_t duk_strings_data[];
 
-#define DUK_STRDATA_DATA_LENGTH                                       1854
+#define DUK_STRDATA_DATA_LENGTH                                       1931
 #define DUK_STRDATA_MAX_STRLEN                                        24
 
 #define DUK_STRIDX_UC_LOGGER                                          0                              /* 'Logger' */
@@ -31,309 +31,322 @@ extern const duk_uint8_t duk_strings_data[];
 #define DUK_STRIDX_ARRAY                                              17                             /* 'Array' */
 #define DUK_STRIDX_UC_FUNCTION                                        18                             /* 'Function' */
 #define DUK_STRIDX_UC_OBJECT                                          19                             /* 'Object' */
-#define DUK_STRIDX_JSON_EXT_FUNCTION2                                 20                             /* '{_func:true}' */
-#define DUK_STRIDX_JSON_EXT_FUNCTION1                                 21                             /* '{"_func":true}' */
-#define DUK_STRIDX_JSON_EXT_NEGINF                                    22                             /* '{"_ninf":true}' */
-#define DUK_STRIDX_JSON_EXT_POSINF                                    23                             /* '{"_inf":true}' */
-#define DUK_STRIDX_JSON_EXT_NAN                                       24                             /* '{"_nan":true}' */
-#define DUK_STRIDX_JSON_EXT_UNDEFINED                                 25                             /* '{"_undef":true}' */
-#define DUK_STRIDX_TO_LOG_STRING                                      26                             /* 'toLogString' */
-#define DUK_STRIDX_CLOG                                               27                             /* 'clog' */
-#define DUK_STRIDX_LC_L                                               28                             /* 'l' */
-#define DUK_STRIDX_LC_N                                               29                             /* 'n' */
-#define DUK_STRIDX_LC_FATAL                                           30                             /* 'fatal' */
-#define DUK_STRIDX_LC_ERROR                                           31                             /* 'error' */
-#define DUK_STRIDX_LC_WARN                                            32                             /* 'warn' */
-#define DUK_STRIDX_LC_DEBUG                                           33                             /* 'debug' */
-#define DUK_STRIDX_LC_TRACE                                           34                             /* 'trace' */
-#define DUK_STRIDX_RAW                                                35                             /* 'raw' */
-#define DUK_STRIDX_FMT                                                36                             /* 'fmt' */
-#define DUK_STRIDX_CURRENT                                            37                             /* 'current' */
-#define DUK_STRIDX_RESUME                                             38                             /* 'resume' */
-#define DUK_STRIDX_COMPACT                                            39                             /* 'compact' */
-#define DUK_STRIDX_JSONC                                              40                             /* 'jsonc' */
-#define DUK_STRIDX_JSONX                                              41                             /* 'jsonx' */
-#define DUK_STRIDX_BASE64                                             42                             /* 'base64' */
-#define DUK_STRIDX_HEX                                                43                             /* 'hex' */
-#define DUK_STRIDX_DEC                                                44                             /* 'dec' */
-#define DUK_STRIDX_ENC                                                45                             /* 'enc' */
-#define DUK_STRIDX_FIN                                                46                             /* 'fin' */
-#define DUK_STRIDX_GC                                                 47                             /* 'gc' */
-#define DUK_STRIDX_ACT                                                48                             /* 'act' */
-#define DUK_STRIDX_LINE                                               49                             /* 'line' */
-#define DUK_STRIDX_LC_INFO                                            50                             /* 'info' */
-#define DUK_STRIDX_VERSION                                            51                             /* 'version' */
-#define DUK_STRIDX_ENV                                                52                             /* 'env' */
-#define DUK_STRIDX_ERRTHROW                                           53                             /* 'errthrow' */
-#define DUK_STRIDX_ERRCREATE                                          54                             /* 'errcreate' */
-#define DUK_STRIDX_COMPILE                                            55                             /* 'compile' */
-#define DUK_STRIDX_INT_REGBASE                                        56                             /* '\x00regbase' */
-#define DUK_STRIDX_INT_THREAD                                         57                             /* '\x00thread' */
-#define DUK_STRIDX_INT_FINALIZER                                      58                             /* '\x00finalizer' */
-#define DUK_STRIDX_INT_CALLEE                                         59                             /* '\x00callee' */
-#define DUK_STRIDX_INT_MAP                                            60                             /* '\x00map' */
-#define DUK_STRIDX_INT_ARGS                                           61                             /* '\x00args' */
-#define DUK_STRIDX_INT_THIS                                           62                             /* '\x00this' */
-#define DUK_STRIDX_INT_PC2LINE                                        63                             /* '\x00pc2line' */
-#define DUK_STRIDX_INT_SOURCE                                         64                             /* '\x00source' */
-#define DUK_STRIDX_INT_VARENV                                         65                             /* '\x00varenv' */
-#define DUK_STRIDX_INT_LEXENV                                         66                             /* '\x00lexenv' */
-#define DUK_STRIDX_INT_VARMAP                                         67                             /* '\x00varmap' */
-#define DUK_STRIDX_INT_FORMALS                                        68                             /* '\x00formals' */
-#define DUK_STRIDX_INT_BYTECODE                                       69                             /* '\x00bytecode' */
-#define DUK_STRIDX_INT_NEXT                                           70                             /* '\x00next' */
-#define DUK_STRIDX_INT_TARGET                                         71                             /* '\x00target' */
-#define DUK_STRIDX_INT_VALUE                                          72                             /* '\x00value' */
-#define DUK_STRIDX_LC_POINTER                                         73                             /* 'pointer' */
-#define DUK_STRIDX_LC_BUFFER                                          74                             /* 'buffer' */
-#define DUK_STRIDX_TRACEDATA                                          75                             /* 'tracedata' */
-#define DUK_STRIDX_LINE_NUMBER                                        76                             /* 'lineNumber' */
-#define DUK_STRIDX_FILE_NAME                                          77                             /* 'fileName' */
-#define DUK_STRIDX_PC                                                 78                             /* 'pc' */
-#define DUK_STRIDX_STACK                                              79                             /* 'stack' */
-#define DUK_STRIDX_THROW_TYPE_ERROR                                   80                             /* 'ThrowTypeError' */
-#define DUK_STRIDX_DUKTAPE                                            81                             /* 'Duktape' */
-#define DUK_STRIDX_CALLEE                                             82                             /* 'callee' */
-#define DUK_STRIDX_INVALID_DATE                                       83                             /* 'Invalid Date' */
-#define DUK_STRIDX_BRACKETED_ELLIPSIS                                 84                             /* '[...]' */
-#define DUK_STRIDX_NEWLINE_TAB                                        85                             /* '\n\t' */
-#define DUK_STRIDX_SPACE                                              86                             /* ' ' */
-#define DUK_STRIDX_COMMA                                              87                             /* ',' */
-#define DUK_STRIDX_MINUS_ZERO                                         88                             /* '-0' */
-#define DUK_STRIDX_PLUS_ZERO                                          89                             /* '+0' */
-#define DUK_STRIDX_ZERO                                               90                             /* '0' */
-#define DUK_STRIDX_MINUS_INFINITY                                     91                             /* '-Infinity' */
-#define DUK_STRIDX_PLUS_INFINITY                                      92                             /* '+Infinity' */
-#define DUK_STRIDX_INFINITY                                           93                             /* 'Infinity' */
-#define DUK_STRIDX_LC_OBJECT                                          94                             /* 'object' */
-#define DUK_STRIDX_LC_STRING                                          95                             /* 'string' */
-#define DUK_STRIDX_LC_NUMBER                                          96                             /* 'number' */
-#define DUK_STRIDX_LC_BOOLEAN                                         97                             /* 'boolean' */
-#define DUK_STRIDX_UNDEFINED                                          98                             /* 'undefined' */
-#define DUK_STRIDX_STRINGIFY                                          99                             /* 'stringify' */
-#define DUK_STRIDX_TAN                                                100                            /* 'tan' */
-#define DUK_STRIDX_SQRT                                               101                            /* 'sqrt' */
-#define DUK_STRIDX_SIN                                                102                            /* 'sin' */
-#define DUK_STRIDX_ROUND                                              103                            /* 'round' */
-#define DUK_STRIDX_RANDOM                                             104                            /* 'random' */
-#define DUK_STRIDX_POW                                                105                            /* 'pow' */
-#define DUK_STRIDX_MIN                                                106                            /* 'min' */
-#define DUK_STRIDX_MAX                                                107                            /* 'max' */
-#define DUK_STRIDX_LOG                                                108                            /* 'log' */
-#define DUK_STRIDX_FLOOR                                              109                            /* 'floor' */
-#define DUK_STRIDX_EXP                                                110                            /* 'exp' */
-#define DUK_STRIDX_COS                                                111                            /* 'cos' */
-#define DUK_STRIDX_CEIL                                               112                            /* 'ceil' */
-#define DUK_STRIDX_ATAN2                                              113                            /* 'atan2' */
-#define DUK_STRIDX_ATAN                                               114                            /* 'atan' */
-#define DUK_STRIDX_ASIN                                               115                            /* 'asin' */
-#define DUK_STRIDX_ACOS                                               116                            /* 'acos' */
-#define DUK_STRIDX_ABS                                                117                            /* 'abs' */
-#define DUK_STRIDX_SQRT2                                              118                            /* 'SQRT2' */
-#define DUK_STRIDX_SQRT1_2                                            119                            /* 'SQRT1_2' */
-#define DUK_STRIDX_PI                                                 120                            /* 'PI' */
-#define DUK_STRIDX_LOG10E                                             121                            /* 'LOG10E' */
-#define DUK_STRIDX_LOG2E                                              122                            /* 'LOG2E' */
-#define DUK_STRIDX_LN2                                                123                            /* 'LN2' */
-#define DUK_STRIDX_LN10                                               124                            /* 'LN10' */
-#define DUK_STRIDX_E                                                  125                            /* 'E' */
-#define DUK_STRIDX_MESSAGE                                            126                            /* 'message' */
-#define DUK_STRIDX_NAME                                               127                            /* 'name' */
-#define DUK_STRIDX_INPUT                                              128                            /* 'input' */
-#define DUK_STRIDX_INDEX                                              129                            /* 'index' */
-#define DUK_STRIDX_ESCAPED_EMPTY_REGEXP                               130                            /* '(?:)' */
-#define DUK_STRIDX_LAST_INDEX                                         131                            /* 'lastIndex' */
-#define DUK_STRIDX_MULTILINE                                          132                            /* 'multiline' */
-#define DUK_STRIDX_IGNORE_CASE                                        133                            /* 'ignoreCase' */
-#define DUK_STRIDX_SOURCE                                             134                            /* 'source' */
-#define DUK_STRIDX_TEST                                               135                            /* 'test' */
-#define DUK_STRIDX_EXEC                                               136                            /* 'exec' */
-#define DUK_STRIDX_TO_GMT_STRING                                      137                            /* 'toGMTString' */
-#define DUK_STRIDX_SET_YEAR                                           138                            /* 'setYear' */
-#define DUK_STRIDX_GET_YEAR                                           139                            /* 'getYear' */
-#define DUK_STRIDX_TO_JSON                                            140                            /* 'toJSON' */
-#define DUK_STRIDX_TO_ISO_STRING                                      141                            /* 'toISOString' */
-#define DUK_STRIDX_TO_UTC_STRING                                      142                            /* 'toUTCString' */
-#define DUK_STRIDX_SET_UTC_FULL_YEAR                                  143                            /* 'setUTCFullYear' */
-#define DUK_STRIDX_SET_FULL_YEAR                                      144                            /* 'setFullYear' */
-#define DUK_STRIDX_SET_UTC_MONTH                                      145                            /* 'setUTCMonth' */
-#define DUK_STRIDX_SET_MONTH                                          146                            /* 'setMonth' */
-#define DUK_STRIDX_SET_UTC_DATE                                       147                            /* 'setUTCDate' */
-#define DUK_STRIDX_SET_DATE                                           148                            /* 'setDate' */
-#define DUK_STRIDX_SET_UTC_HOURS                                      149                            /* 'setUTCHours' */
-#define DUK_STRIDX_SET_HOURS                                          150                            /* 'setHours' */
-#define DUK_STRIDX_SET_UTC_MINUTES                                    151                            /* 'setUTCMinutes' */
-#define DUK_STRIDX_SET_MINUTES                                        152                            /* 'setMinutes' */
-#define DUK_STRIDX_SET_UTC_SECONDS                                    153                            /* 'setUTCSeconds' */
-#define DUK_STRIDX_SET_SECONDS                                        154                            /* 'setSeconds' */
-#define DUK_STRIDX_SET_UTC_MILLISECONDS                               155                            /* 'setUTCMilliseconds' */
-#define DUK_STRIDX_SET_MILLISECONDS                                   156                            /* 'setMilliseconds' */
-#define DUK_STRIDX_SET_TIME                                           157                            /* 'setTime' */
-#define DUK_STRIDX_GET_TIMEZONE_OFFSET                                158                            /* 'getTimezoneOffset' */
-#define DUK_STRIDX_GET_UTC_MILLISECONDS                               159                            /* 'getUTCMilliseconds' */
-#define DUK_STRIDX_GET_MILLISECONDS                                   160                            /* 'getMilliseconds' */
-#define DUK_STRIDX_GET_UTC_SECONDS                                    161                            /* 'getUTCSeconds' */
-#define DUK_STRIDX_GET_SECONDS                                        162                            /* 'getSeconds' */
-#define DUK_STRIDX_GET_UTC_MINUTES                                    163                            /* 'getUTCMinutes' */
-#define DUK_STRIDX_GET_MINUTES                                        164                            /* 'getMinutes' */
-#define DUK_STRIDX_GET_UTC_HOURS                                      165                            /* 'getUTCHours' */
-#define DUK_STRIDX_GET_HOURS                                          166                            /* 'getHours' */
-#define DUK_STRIDX_GET_UTC_DAY                                        167                            /* 'getUTCDay' */
-#define DUK_STRIDX_GET_DAY                                            168                            /* 'getDay' */
-#define DUK_STRIDX_GET_UTC_DATE                                       169                            /* 'getUTCDate' */
-#define DUK_STRIDX_GET_DATE                                           170                            /* 'getDate' */
-#define DUK_STRIDX_GET_UTC_MONTH                                      171                            /* 'getUTCMonth' */
-#define DUK_STRIDX_GET_MONTH                                          172                            /* 'getMonth' */
-#define DUK_STRIDX_GET_UTC_FULL_YEAR                                  173                            /* 'getUTCFullYear' */
-#define DUK_STRIDX_GET_FULL_YEAR                                      174                            /* 'getFullYear' */
-#define DUK_STRIDX_GET_TIME                                           175                            /* 'getTime' */
-#define DUK_STRIDX_TO_LOCALE_TIME_STRING                              176                            /* 'toLocaleTimeString' */
-#define DUK_STRIDX_TO_LOCALE_DATE_STRING                              177                            /* 'toLocaleDateString' */
-#define DUK_STRIDX_TO_TIME_STRING                                     178                            /* 'toTimeString' */
-#define DUK_STRIDX_TO_DATE_STRING                                     179                            /* 'toDateString' */
-#define DUK_STRIDX_NOW                                                180                            /* 'now' */
-#define DUK_STRIDX_UTC                                                181                            /* 'UTC' */
-#define DUK_STRIDX_PARSE                                              182                            /* 'parse' */
-#define DUK_STRIDX_TO_PRECISION                                       183                            /* 'toPrecision' */
-#define DUK_STRIDX_TO_EXPONENTIAL                                     184                            /* 'toExponential' */
-#define DUK_STRIDX_TO_FIXED                                           185                            /* 'toFixed' */
-#define DUK_STRIDX_POSITIVE_INFINITY                                  186                            /* 'POSITIVE_INFINITY' */
-#define DUK_STRIDX_NEGATIVE_INFINITY                                  187                            /* 'NEGATIVE_INFINITY' */
-#define DUK_STRIDX_NAN                                                188                            /* 'NaN' */
-#define DUK_STRIDX_MIN_VALUE                                          189                            /* 'MIN_VALUE' */
-#define DUK_STRIDX_MAX_VALUE                                          190                            /* 'MAX_VALUE' */
-#define DUK_STRIDX_SUBSTR                                             191                            /* 'substr' */
-#define DUK_STRIDX_TRIM                                               192                            /* 'trim' */
-#define DUK_STRIDX_TO_LOCALE_UPPER_CASE                               193                            /* 'toLocaleUpperCase' */
-#define DUK_STRIDX_TO_UPPER_CASE                                      194                            /* 'toUpperCase' */
-#define DUK_STRIDX_TO_LOCALE_LOWER_CASE                               195                            /* 'toLocaleLowerCase' */
-#define DUK_STRIDX_TO_LOWER_CASE                                      196                            /* 'toLowerCase' */
-#define DUK_STRIDX_SUBSTRING                                          197                            /* 'substring' */
-#define DUK_STRIDX_SPLIT                                              198                            /* 'split' */
-#define DUK_STRIDX_SEARCH                                             199                            /* 'search' */
-#define DUK_STRIDX_REPLACE                                            200                            /* 'replace' */
-#define DUK_STRIDX_MATCH                                              201                            /* 'match' */
-#define DUK_STRIDX_LOCALE_COMPARE                                     202                            /* 'localeCompare' */
-#define DUK_STRIDX_CHAR_CODE_AT                                       203                            /* 'charCodeAt' */
-#define DUK_STRIDX_CHAR_AT                                            204                            /* 'charAt' */
-#define DUK_STRIDX_FROM_CHAR_CODE                                     205                            /* 'fromCharCode' */
-#define DUK_STRIDX_REDUCE_RIGHT                                       206                            /* 'reduceRight' */
-#define DUK_STRIDX_REDUCE                                             207                            /* 'reduce' */
-#define DUK_STRIDX_FILTER                                             208                            /* 'filter' */
-#define DUK_STRIDX_MAP                                                209                            /* 'map' */
-#define DUK_STRIDX_FOR_EACH                                           210                            /* 'forEach' */
-#define DUK_STRIDX_SOME                                               211                            /* 'some' */
-#define DUK_STRIDX_EVERY                                              212                            /* 'every' */
-#define DUK_STRIDX_LAST_INDEX_OF                                      213                            /* 'lastIndexOf' */
-#define DUK_STRIDX_INDEX_OF                                           214                            /* 'indexOf' */
-#define DUK_STRIDX_UNSHIFT                                            215                            /* 'unshift' */
-#define DUK_STRIDX_SPLICE                                             216                            /* 'splice' */
-#define DUK_STRIDX_SORT                                               217                            /* 'sort' */
-#define DUK_STRIDX_SLICE                                              218                            /* 'slice' */
-#define DUK_STRIDX_SHIFT                                              219                            /* 'shift' */
-#define DUK_STRIDX_REVERSE                                            220                            /* 'reverse' */
-#define DUK_STRIDX_PUSH                                               221                            /* 'push' */
-#define DUK_STRIDX_POP                                                222                            /* 'pop' */
-#define DUK_STRIDX_JOIN                                               223                            /* 'join' */
-#define DUK_STRIDX_CONCAT                                             224                            /* 'concat' */
-#define DUK_STRIDX_IS_ARRAY                                           225                            /* 'isArray' */
-#define DUK_STRIDX_LC_ARGUMENTS                                       226                            /* 'arguments' */
-#define DUK_STRIDX_CALLER                                             227                            /* 'caller' */
-#define DUK_STRIDX_BIND                                               228                            /* 'bind' */
-#define DUK_STRIDX_CALL                                               229                            /* 'call' */
-#define DUK_STRIDX_APPLY                                              230                            /* 'apply' */
-#define DUK_STRIDX_PROPERTY_IS_ENUMERABLE                             231                            /* 'propertyIsEnumerable' */
-#define DUK_STRIDX_IS_PROTOTYPE_OF                                    232                            /* 'isPrototypeOf' */
-#define DUK_STRIDX_HAS_OWN_PROPERTY                                   233                            /* 'hasOwnProperty' */
-#define DUK_STRIDX_VALUE_OF                                           234                            /* 'valueOf' */
-#define DUK_STRIDX_TO_LOCALE_STRING                                   235                            /* 'toLocaleString' */
-#define DUK_STRIDX_TO_STRING                                          236                            /* 'toString' */
-#define DUK_STRIDX_CONSTRUCTOR                                        237                            /* 'constructor' */
-#define DUK_STRIDX_SET                                                238                            /* 'set' */
-#define DUK_STRIDX_GET                                                239                            /* 'get' */
-#define DUK_STRIDX_ENUMERABLE                                         240                            /* 'enumerable' */
-#define DUK_STRIDX_CONFIGURABLE                                       241                            /* 'configurable' */
-#define DUK_STRIDX_WRITABLE                                           242                            /* 'writable' */
-#define DUK_STRIDX_VALUE                                              243                            /* 'value' */
-#define DUK_STRIDX_KEYS                                               244                            /* 'keys' */
-#define DUK_STRIDX_IS_EXTENSIBLE                                      245                            /* 'isExtensible' */
-#define DUK_STRIDX_IS_FROZEN                                          246                            /* 'isFrozen' */
-#define DUK_STRIDX_IS_SEALED                                          247                            /* 'isSealed' */
-#define DUK_STRIDX_PREVENT_EXTENSIONS                                 248                            /* 'preventExtensions' */
-#define DUK_STRIDX_FREEZE                                             249                            /* 'freeze' */
-#define DUK_STRIDX_SEAL                                               250                            /* 'seal' */
-#define DUK_STRIDX_DEFINE_PROPERTIES                                  251                            /* 'defineProperties' */
-#define DUK_STRIDX_DEFINE_PROPERTY                                    252                            /* 'defineProperty' */
-#define DUK_STRIDX_CREATE                                             253                            /* 'create' */
-#define DUK_STRIDX_GET_OWN_PROPERTY_NAMES                             254                            /* 'getOwnPropertyNames' */
-#define DUK_STRIDX_GET_OWN_PROPERTY_DESCRIPTOR                        255                            /* 'getOwnPropertyDescriptor' */
-#define DUK_STRIDX_GET_PROTOTYPE_OF                                   256                            /* 'getPrototypeOf' */
-#define DUK_STRIDX_PROTOTYPE                                          257                            /* 'prototype' */
-#define DUK_STRIDX_LENGTH                                             258                            /* 'length' */
-#define DUK_STRIDX_ALERT                                              259                            /* 'alert' */
-#define DUK_STRIDX_PRINT                                              260                            /* 'print' */
-#define DUK_STRIDX_UNESCAPE                                           261                            /* 'unescape' */
-#define DUK_STRIDX_ESCAPE                                             262                            /* 'escape' */
-#define DUK_STRIDX_ENCODE_URI_COMPONENT                               263                            /* 'encodeURIComponent' */
-#define DUK_STRIDX_ENCODE_URI                                         264                            /* 'encodeURI' */
-#define DUK_STRIDX_DECODE_URI_COMPONENT                               265                            /* 'decodeURIComponent' */
-#define DUK_STRIDX_DECODE_URI                                         266                            /* 'decodeURI' */
-#define DUK_STRIDX_IS_FINITE                                          267                            /* 'isFinite' */
-#define DUK_STRIDX_IS_NAN                                             268                            /* 'isNaN' */
-#define DUK_STRIDX_PARSE_FLOAT                                        269                            /* 'parseFloat' */
-#define DUK_STRIDX_PARSE_INT                                          270                            /* 'parseInt' */
-#define DUK_STRIDX_EVAL                                               271                            /* 'eval' */
-#define DUK_STRIDX_URI_ERROR                                          272                            /* 'URIError' */
-#define DUK_STRIDX_TYPE_ERROR                                         273                            /* 'TypeError' */
-#define DUK_STRIDX_SYNTAX_ERROR                                       274                            /* 'SyntaxError' */
-#define DUK_STRIDX_REFERENCE_ERROR                                    275                            /* 'ReferenceError' */
-#define DUK_STRIDX_RANGE_ERROR                                        276                            /* 'RangeError' */
-#define DUK_STRIDX_EVAL_ERROR                                         277                            /* 'EvalError' */
-#define DUK_STRIDX_BREAK                                              278                            /* 'break' */
-#define DUK_STRIDX_CASE                                               279                            /* 'case' */
-#define DUK_STRIDX_CATCH                                              280                            /* 'catch' */
-#define DUK_STRIDX_CONTINUE                                           281                            /* 'continue' */
-#define DUK_STRIDX_DEBUGGER                                           282                            /* 'debugger' */
-#define DUK_STRIDX_DEFAULT                                            283                            /* 'default' */
-#define DUK_STRIDX_DELETE                                             284                            /* 'delete' */
-#define DUK_STRIDX_DO                                                 285                            /* 'do' */
-#define DUK_STRIDX_ELSE                                               286                            /* 'else' */
-#define DUK_STRIDX_FINALLY                                            287                            /* 'finally' */
-#define DUK_STRIDX_FOR                                                288                            /* 'for' */
-#define DUK_STRIDX_LC_FUNCTION                                        289                            /* 'function' */
-#define DUK_STRIDX_IF                                                 290                            /* 'if' */
-#define DUK_STRIDX_IN                                                 291                            /* 'in' */
-#define DUK_STRIDX_INSTANCEOF                                         292                            /* 'instanceof' */
-#define DUK_STRIDX_NEW                                                293                            /* 'new' */
-#define DUK_STRIDX_RETURN                                             294                            /* 'return' */
-#define DUK_STRIDX_SWITCH                                             295                            /* 'switch' */
-#define DUK_STRIDX_THIS                                               296                            /* 'this' */
-#define DUK_STRIDX_THROW                                              297                            /* 'throw' */
-#define DUK_STRIDX_TRY                                                298                            /* 'try' */
-#define DUK_STRIDX_TYPEOF                                             299                            /* 'typeof' */
-#define DUK_STRIDX_VAR                                                300                            /* 'var' */
-#define DUK_STRIDX_VOID                                               301                            /* 'void' */
-#define DUK_STRIDX_WHILE                                              302                            /* 'while' */
-#define DUK_STRIDX_WITH                                               303                            /* 'with' */
-#define DUK_STRIDX_CLASS                                              304                            /* 'class' */
-#define DUK_STRIDX_CONST                                              305                            /* 'const' */
-#define DUK_STRIDX_ENUM                                               306                            /* 'enum' */
-#define DUK_STRIDX_EXPORT                                             307                            /* 'export' */
-#define DUK_STRIDX_EXTENDS                                            308                            /* 'extends' */
-#define DUK_STRIDX_IMPORT                                             309                            /* 'import' */
-#define DUK_STRIDX_SUPER                                              310                            /* 'super' */
-#define DUK_STRIDX_NULL                                               311                            /* 'null' */
-#define DUK_STRIDX_TRUE                                               312                            /* 'true' */
-#define DUK_STRIDX_FALSE                                              313                            /* 'false' */
-#define DUK_STRIDX_IMPLEMENTS                                         314                            /* 'implements' */
-#define DUK_STRIDX_INTERFACE                                          315                            /* 'interface' */
-#define DUK_STRIDX_LET                                                316                            /* 'let' */
-#define DUK_STRIDX_PACKAGE                                            317                            /* 'package' */
-#define DUK_STRIDX_PRIVATE                                            318                            /* 'private' */
-#define DUK_STRIDX_PROTECTED                                          319                            /* 'protected' */
-#define DUK_STRIDX_PUBLIC                                             320                            /* 'public' */
-#define DUK_STRIDX_STATIC                                             321                            /* 'static' */
-#define DUK_STRIDX_YIELD                                              322                            /* 'yield' */
+#define DUK_STRIDX_UC_NULL                                            20                             /* 'Null' */
+#define DUK_STRIDX_UC_UNDEFINED                                       21                             /* 'Undefined' */
+#define DUK_STRIDX_JSON_EXT_FUNCTION2                                 22                             /* '{_func:true}' */
+#define DUK_STRIDX_JSON_EXT_FUNCTION1                                 23                             /* '{"_func":true}' */
+#define DUK_STRIDX_JSON_EXT_NEGINF                                    24                             /* '{"_ninf":true}' */
+#define DUK_STRIDX_JSON_EXT_POSINF                                    25                             /* '{"_inf":true}' */
+#define DUK_STRIDX_JSON_EXT_NAN                                       26                             /* '{"_nan":true}' */
+#define DUK_STRIDX_JSON_EXT_UNDEFINED                                 27                             /* '{"_undef":true}' */
+#define DUK_STRIDX_TO_LOG_STRING                                      28                             /* 'toLogString' */
+#define DUK_STRIDX_CLOG                                               29                             /* 'clog' */
+#define DUK_STRIDX_LC_L                                               30                             /* 'l' */
+#define DUK_STRIDX_LC_N                                               31                             /* 'n' */
+#define DUK_STRIDX_LC_FATAL                                           32                             /* 'fatal' */
+#define DUK_STRIDX_LC_ERROR                                           33                             /* 'error' */
+#define DUK_STRIDX_LC_WARN                                            34                             /* 'warn' */
+#define DUK_STRIDX_LC_DEBUG                                           35                             /* 'debug' */
+#define DUK_STRIDX_LC_TRACE                                           36                             /* 'trace' */
+#define DUK_STRIDX_RAW                                                37                             /* 'raw' */
+#define DUK_STRIDX_FMT                                                38                             /* 'fmt' */
+#define DUK_STRIDX_CURRENT                                            39                             /* 'current' */
+#define DUK_STRIDX_RESUME                                             40                             /* 'resume' */
+#define DUK_STRIDX_COMPACT                                            41                             /* 'compact' */
+#define DUK_STRIDX_JC                                                 42                             /* 'jc' */
+#define DUK_STRIDX_JX                                                 43                             /* 'jx' */
+#define DUK_STRIDX_BASE64                                             44                             /* 'base64' */
+#define DUK_STRIDX_HEX                                                45                             /* 'hex' */
+#define DUK_STRIDX_DEC                                                46                             /* 'dec' */
+#define DUK_STRIDX_ENC                                                47                             /* 'enc' */
+#define DUK_STRIDX_FIN                                                48                             /* 'fin' */
+#define DUK_STRIDX_GC                                                 49                             /* 'gc' */
+#define DUK_STRIDX_ACT                                                50                             /* 'act' */
+#define DUK_STRIDX_LC_INFO                                            51                             /* 'info' */
+#define DUK_STRIDX_VERSION                                            52                             /* 'version' */
+#define DUK_STRIDX_ENV                                                53                             /* 'env' */
+#define DUK_STRIDX_MOD_LOADED                                         54                             /* 'modLoaded' */
+#define DUK_STRIDX_MOD_SEARCH                                         55                             /* 'modSearch' */
+#define DUK_STRIDX_ERR_THROW                                          56                             /* 'errThrow' */
+#define DUK_STRIDX_ERR_CREATE                                         57                             /* 'errCreate' */
+#define DUK_STRIDX_COMPILE                                            58                             /* 'compile' */
+#define DUK_STRIDX_INT_REGBASE                                        59                             /* '\x00regbase' */
+#define DUK_STRIDX_INT_THREAD                                         60                             /* '\x00thread' */
+#define DUK_STRIDX_INT_HANDLER                                        61                             /* '\x00handler' */
+#define DUK_STRIDX_INT_FINALIZER                                      62                             /* '\x00finalizer' */
+#define DUK_STRIDX_INT_CALLEE                                         63                             /* '\x00callee' */
+#define DUK_STRIDX_INT_MAP                                            64                             /* '\x00map' */
+#define DUK_STRIDX_INT_ARGS                                           65                             /* '\x00args' */
+#define DUK_STRIDX_INT_THIS                                           66                             /* '\x00this' */
+#define DUK_STRIDX_INT_PC2LINE                                        67                             /* '\x00pc2line' */
+#define DUK_STRIDX_INT_SOURCE                                         68                             /* '\x00source' */
+#define DUK_STRIDX_INT_VARENV                                         69                             /* '\x00varenv' */
+#define DUK_STRIDX_INT_LEXENV                                         70                             /* '\x00lexenv' */
+#define DUK_STRIDX_INT_VARMAP                                         71                             /* '\x00varmap' */
+#define DUK_STRIDX_INT_FORMALS                                        72                             /* '\x00formals' */
+#define DUK_STRIDX_INT_BYTECODE                                       73                             /* '\x00bytecode' */
+#define DUK_STRIDX_INT_NEXT                                           74                             /* '\x00next' */
+#define DUK_STRIDX_INT_TARGET                                         75                             /* '\x00target' */
+#define DUK_STRIDX_INT_VALUE                                          76                             /* '\x00value' */
+#define DUK_STRIDX_LC_POINTER                                         77                             /* 'pointer' */
+#define DUK_STRIDX_LC_BUFFER                                          78                             /* 'buffer' */
+#define DUK_STRIDX_TRACEDATA                                          79                             /* 'tracedata' */
+#define DUK_STRIDX_LINE_NUMBER                                        80                             /* 'lineNumber' */
+#define DUK_STRIDX_FILE_NAME                                          81                             /* 'fileName' */
+#define DUK_STRIDX_PC                                                 82                             /* 'pc' */
+#define DUK_STRIDX_STACK                                              83                             /* 'stack' */
+#define DUK_STRIDX_THROW_TYPE_ERROR                                   84                             /* 'ThrowTypeError' */
+#define DUK_STRIDX_DUKTAPE                                            85                             /* 'Duktape' */
+#define DUK_STRIDX_ID                                                 86                             /* 'id' */
+#define DUK_STRIDX_REQUIRE                                            87                             /* 'require' */
+#define DUK_STRIDX___PROTO__                                          88                             /* '__proto__' */
+#define DUK_STRIDX_SET_PROTOTYPE_OF                                   89                             /* 'setPrototypeOf' */
+#define DUK_STRIDX_OWN_KEYS                                           90                             /* 'ownKeys' */
+#define DUK_STRIDX_ENUMERATE                                          91                             /* 'enumerate' */
+#define DUK_STRIDX_DELETE_PROPERTY                                    92                             /* 'deleteProperty' */
+#define DUK_STRIDX_HAS                                                93                             /* 'has' */
+#define DUK_STRIDX_PROXY                                              94                             /* 'Proxy' */
+#define DUK_STRIDX_CALLEE                                             95                             /* 'callee' */
+#define DUK_STRIDX_INVALID_DATE                                       96                             /* 'Invalid Date' */
+#define DUK_STRIDX_BRACKETED_ELLIPSIS                                 97                             /* '[...]' */
+#define DUK_STRIDX_NEWLINE_TAB                                        98                             /* '\n\t' */
+#define DUK_STRIDX_SPACE                                              99                             /* ' ' */
+#define DUK_STRIDX_COMMA                                              100                            /* ',' */
+#define DUK_STRIDX_MINUS_ZERO                                         101                            /* '-0' */
+#define DUK_STRIDX_PLUS_ZERO                                          102                            /* '+0' */
+#define DUK_STRIDX_ZERO                                               103                            /* '0' */
+#define DUK_STRIDX_MINUS_INFINITY                                     104                            /* '-Infinity' */
+#define DUK_STRIDX_PLUS_INFINITY                                      105                            /* '+Infinity' */
+#define DUK_STRIDX_INFINITY                                           106                            /* 'Infinity' */
+#define DUK_STRIDX_LC_OBJECT                                          107                            /* 'object' */
+#define DUK_STRIDX_LC_STRING                                          108                            /* 'string' */
+#define DUK_STRIDX_LC_NUMBER                                          109                            /* 'number' */
+#define DUK_STRIDX_LC_BOOLEAN                                         110                            /* 'boolean' */
+#define DUK_STRIDX_LC_UNDEFINED                                       111                            /* 'undefined' */
+#define DUK_STRIDX_STRINGIFY                                          112                            /* 'stringify' */
+#define DUK_STRIDX_TAN                                                113                            /* 'tan' */
+#define DUK_STRIDX_SQRT                                               114                            /* 'sqrt' */
+#define DUK_STRIDX_SIN                                                115                            /* 'sin' */
+#define DUK_STRIDX_ROUND                                              116                            /* 'round' */
+#define DUK_STRIDX_RANDOM                                             117                            /* 'random' */
+#define DUK_STRIDX_POW                                                118                            /* 'pow' */
+#define DUK_STRIDX_MIN                                                119                            /* 'min' */
+#define DUK_STRIDX_MAX                                                120                            /* 'max' */
+#define DUK_STRIDX_LOG                                                121                            /* 'log' */
+#define DUK_STRIDX_FLOOR                                              122                            /* 'floor' */
+#define DUK_STRIDX_EXP                                                123                            /* 'exp' */
+#define DUK_STRIDX_COS                                                124                            /* 'cos' */
+#define DUK_STRIDX_CEIL                                               125                            /* 'ceil' */
+#define DUK_STRIDX_ATAN2                                              126                            /* 'atan2' */
+#define DUK_STRIDX_ATAN                                               127                            /* 'atan' */
+#define DUK_STRIDX_ASIN                                               128                            /* 'asin' */
+#define DUK_STRIDX_ACOS                                               129                            /* 'acos' */
+#define DUK_STRIDX_ABS                                                130                            /* 'abs' */
+#define DUK_STRIDX_SQRT2                                              131                            /* 'SQRT2' */
+#define DUK_STRIDX_SQRT1_2                                            132                            /* 'SQRT1_2' */
+#define DUK_STRIDX_PI                                                 133                            /* 'PI' */
+#define DUK_STRIDX_LOG10E                                             134                            /* 'LOG10E' */
+#define DUK_STRIDX_LOG2E                                              135                            /* 'LOG2E' */
+#define DUK_STRIDX_LN2                                                136                            /* 'LN2' */
+#define DUK_STRIDX_LN10                                               137                            /* 'LN10' */
+#define DUK_STRIDX_E                                                  138                            /* 'E' */
+#define DUK_STRIDX_MESSAGE                                            139                            /* 'message' */
+#define DUK_STRIDX_NAME                                               140                            /* 'name' */
+#define DUK_STRIDX_INPUT                                              141                            /* 'input' */
+#define DUK_STRIDX_INDEX                                              142                            /* 'index' */
+#define DUK_STRIDX_ESCAPED_EMPTY_REGEXP                               143                            /* '(?:)' */
+#define DUK_STRIDX_LAST_INDEX                                         144                            /* 'lastIndex' */
+#define DUK_STRIDX_MULTILINE                                          145                            /* 'multiline' */
+#define DUK_STRIDX_IGNORE_CASE                                        146                            /* 'ignoreCase' */
+#define DUK_STRIDX_SOURCE                                             147                            /* 'source' */
+#define DUK_STRIDX_TEST                                               148                            /* 'test' */
+#define DUK_STRIDX_EXEC                                               149                            /* 'exec' */
+#define DUK_STRIDX_TO_GMT_STRING                                      150                            /* 'toGMTString' */
+#define DUK_STRIDX_SET_YEAR                                           151                            /* 'setYear' */
+#define DUK_STRIDX_GET_YEAR                                           152                            /* 'getYear' */
+#define DUK_STRIDX_TO_JSON                                            153                            /* 'toJSON' */
+#define DUK_STRIDX_TO_ISO_STRING                                      154                            /* 'toISOString' */
+#define DUK_STRIDX_TO_UTC_STRING                                      155                            /* 'toUTCString' */
+#define DUK_STRIDX_SET_UTC_FULL_YEAR                                  156                            /* 'setUTCFullYear' */
+#define DUK_STRIDX_SET_FULL_YEAR                                      157                            /* 'setFullYear' */
+#define DUK_STRIDX_SET_UTC_MONTH                                      158                            /* 'setUTCMonth' */
+#define DUK_STRIDX_SET_MONTH                                          159                            /* 'setMonth' */
+#define DUK_STRIDX_SET_UTC_DATE                                       160                            /* 'setUTCDate' */
+#define DUK_STRIDX_SET_DATE                                           161                            /* 'setDate' */
+#define DUK_STRIDX_SET_UTC_HOURS                                      162                            /* 'setUTCHours' */
+#define DUK_STRIDX_SET_HOURS                                          163                            /* 'setHours' */
+#define DUK_STRIDX_SET_UTC_MINUTES                                    164                            /* 'setUTCMinutes' */
+#define DUK_STRIDX_SET_MINUTES                                        165                            /* 'setMinutes' */
+#define DUK_STRIDX_SET_UTC_SECONDS                                    166                            /* 'setUTCSeconds' */
+#define DUK_STRIDX_SET_SECONDS                                        167                            /* 'setSeconds' */
+#define DUK_STRIDX_SET_UTC_MILLISECONDS                               168                            /* 'setUTCMilliseconds' */
+#define DUK_STRIDX_SET_MILLISECONDS                                   169                            /* 'setMilliseconds' */
+#define DUK_STRIDX_SET_TIME                                           170                            /* 'setTime' */
+#define DUK_STRIDX_GET_TIMEZONE_OFFSET                                171                            /* 'getTimezoneOffset' */
+#define DUK_STRIDX_GET_UTC_MILLISECONDS                               172                            /* 'getUTCMilliseconds' */
+#define DUK_STRIDX_GET_MILLISECONDS                                   173                            /* 'getMilliseconds' */
+#define DUK_STRIDX_GET_UTC_SECONDS                                    174                            /* 'getUTCSeconds' */
+#define DUK_STRIDX_GET_SECONDS                                        175                            /* 'getSeconds' */
+#define DUK_STRIDX_GET_UTC_MINUTES                                    176                            /* 'getUTCMinutes' */
+#define DUK_STRIDX_GET_MINUTES                                        177                            /* 'getMinutes' */
+#define DUK_STRIDX_GET_UTC_HOURS                                      178                            /* 'getUTCHours' */
+#define DUK_STRIDX_GET_HOURS                                          179                            /* 'getHours' */
+#define DUK_STRIDX_GET_UTC_DAY                                        180                            /* 'getUTCDay' */
+#define DUK_STRIDX_GET_DAY                                            181                            /* 'getDay' */
+#define DUK_STRIDX_GET_UTC_DATE                                       182                            /* 'getUTCDate' */
+#define DUK_STRIDX_GET_DATE                                           183                            /* 'getDate' */
+#define DUK_STRIDX_GET_UTC_MONTH                                      184                            /* 'getUTCMonth' */
+#define DUK_STRIDX_GET_MONTH                                          185                            /* 'getMonth' */
+#define DUK_STRIDX_GET_UTC_FULL_YEAR                                  186                            /* 'getUTCFullYear' */
+#define DUK_STRIDX_GET_FULL_YEAR                                      187                            /* 'getFullYear' */
+#define DUK_STRIDX_GET_TIME                                           188                            /* 'getTime' */
+#define DUK_STRIDX_TO_LOCALE_TIME_STRING                              189                            /* 'toLocaleTimeString' */
+#define DUK_STRIDX_TO_LOCALE_DATE_STRING                              190                            /* 'toLocaleDateString' */
+#define DUK_STRIDX_TO_TIME_STRING                                     191                            /* 'toTimeString' */
+#define DUK_STRIDX_TO_DATE_STRING                                     192                            /* 'toDateString' */
+#define DUK_STRIDX_NOW                                                193                            /* 'now' */
+#define DUK_STRIDX_UTC                                                194                            /* 'UTC' */
+#define DUK_STRIDX_PARSE                                              195                            /* 'parse' */
+#define DUK_STRIDX_TO_PRECISION                                       196                            /* 'toPrecision' */
+#define DUK_STRIDX_TO_EXPONENTIAL                                     197                            /* 'toExponential' */
+#define DUK_STRIDX_TO_FIXED                                           198                            /* 'toFixed' */
+#define DUK_STRIDX_POSITIVE_INFINITY                                  199                            /* 'POSITIVE_INFINITY' */
+#define DUK_STRIDX_NEGATIVE_INFINITY                                  200                            /* 'NEGATIVE_INFINITY' */
+#define DUK_STRIDX_NAN                                                201                            /* 'NaN' */
+#define DUK_STRIDX_MIN_VALUE                                          202                            /* 'MIN_VALUE' */
+#define DUK_STRIDX_MAX_VALUE                                          203                            /* 'MAX_VALUE' */
+#define DUK_STRIDX_SUBSTR                                             204                            /* 'substr' */
+#define DUK_STRIDX_TRIM                                               205                            /* 'trim' */
+#define DUK_STRIDX_TO_LOCALE_UPPER_CASE                               206                            /* 'toLocaleUpperCase' */
+#define DUK_STRIDX_TO_UPPER_CASE                                      207                            /* 'toUpperCase' */
+#define DUK_STRIDX_TO_LOCALE_LOWER_CASE                               208                            /* 'toLocaleLowerCase' */
+#define DUK_STRIDX_TO_LOWER_CASE                                      209                            /* 'toLowerCase' */
+#define DUK_STRIDX_SUBSTRING                                          210                            /* 'substring' */
+#define DUK_STRIDX_SPLIT                                              211                            /* 'split' */
+#define DUK_STRIDX_SEARCH                                             212                            /* 'search' */
+#define DUK_STRIDX_REPLACE                                            213                            /* 'replace' */
+#define DUK_STRIDX_MATCH                                              214                            /* 'match' */
+#define DUK_STRIDX_LOCALE_COMPARE                                     215                            /* 'localeCompare' */
+#define DUK_STRIDX_CHAR_CODE_AT                                       216                            /* 'charCodeAt' */
+#define DUK_STRIDX_CHAR_AT                                            217                            /* 'charAt' */
+#define DUK_STRIDX_FROM_CHAR_CODE                                     218                            /* 'fromCharCode' */
+#define DUK_STRIDX_REDUCE_RIGHT                                       219                            /* 'reduceRight' */
+#define DUK_STRIDX_REDUCE                                             220                            /* 'reduce' */
+#define DUK_STRIDX_FILTER                                             221                            /* 'filter' */
+#define DUK_STRIDX_MAP                                                222                            /* 'map' */
+#define DUK_STRIDX_FOR_EACH                                           223                            /* 'forEach' */
+#define DUK_STRIDX_SOME                                               224                            /* 'some' */
+#define DUK_STRIDX_EVERY                                              225                            /* 'every' */
+#define DUK_STRIDX_LAST_INDEX_OF                                      226                            /* 'lastIndexOf' */
+#define DUK_STRIDX_INDEX_OF                                           227                            /* 'indexOf' */
+#define DUK_STRIDX_UNSHIFT                                            228                            /* 'unshift' */
+#define DUK_STRIDX_SPLICE                                             229                            /* 'splice' */
+#define DUK_STRIDX_SORT                                               230                            /* 'sort' */
+#define DUK_STRIDX_SLICE                                              231                            /* 'slice' */
+#define DUK_STRIDX_SHIFT                                              232                            /* 'shift' */
+#define DUK_STRIDX_REVERSE                                            233                            /* 'reverse' */
+#define DUK_STRIDX_PUSH                                               234                            /* 'push' */
+#define DUK_STRIDX_POP                                                235                            /* 'pop' */
+#define DUK_STRIDX_JOIN                                               236                            /* 'join' */
+#define DUK_STRIDX_CONCAT                                             237                            /* 'concat' */
+#define DUK_STRIDX_IS_ARRAY                                           238                            /* 'isArray' */
+#define DUK_STRIDX_LC_ARGUMENTS                                       239                            /* 'arguments' */
+#define DUK_STRIDX_CALLER                                             240                            /* 'caller' */
+#define DUK_STRIDX_BIND                                               241                            /* 'bind' */
+#define DUK_STRIDX_CALL                                               242                            /* 'call' */
+#define DUK_STRIDX_APPLY                                              243                            /* 'apply' */
+#define DUK_STRIDX_PROPERTY_IS_ENUMERABLE                             244                            /* 'propertyIsEnumerable' */
+#define DUK_STRIDX_IS_PROTOTYPE_OF                                    245                            /* 'isPrototypeOf' */
+#define DUK_STRIDX_HAS_OWN_PROPERTY                                   246                            /* 'hasOwnProperty' */
+#define DUK_STRIDX_VALUE_OF                                           247                            /* 'valueOf' */
+#define DUK_STRIDX_TO_LOCALE_STRING                                   248                            /* 'toLocaleString' */
+#define DUK_STRIDX_TO_STRING                                          249                            /* 'toString' */
+#define DUK_STRIDX_CONSTRUCTOR                                        250                            /* 'constructor' */
+#define DUK_STRIDX_SET                                                251                            /* 'set' */
+#define DUK_STRIDX_GET                                                252                            /* 'get' */
+#define DUK_STRIDX_ENUMERABLE                                         253                            /* 'enumerable' */
+#define DUK_STRIDX_CONFIGURABLE                                       254                            /* 'configurable' */
+#define DUK_STRIDX_WRITABLE                                           255                            /* 'writable' */
+#define DUK_STRIDX_VALUE                                              256                            /* 'value' */
+#define DUK_STRIDX_KEYS                                               257                            /* 'keys' */
+#define DUK_STRIDX_IS_EXTENSIBLE                                      258                            /* 'isExtensible' */
+#define DUK_STRIDX_IS_FROZEN                                          259                            /* 'isFrozen' */
+#define DUK_STRIDX_IS_SEALED                                          260                            /* 'isSealed' */
+#define DUK_STRIDX_PREVENT_EXTENSIONS                                 261                            /* 'preventExtensions' */
+#define DUK_STRIDX_FREEZE                                             262                            /* 'freeze' */
+#define DUK_STRIDX_SEAL                                               263                            /* 'seal' */
+#define DUK_STRIDX_DEFINE_PROPERTIES                                  264                            /* 'defineProperties' */
+#define DUK_STRIDX_DEFINE_PROPERTY                                    265                            /* 'defineProperty' */
+#define DUK_STRIDX_CREATE                                             266                            /* 'create' */
+#define DUK_STRIDX_GET_OWN_PROPERTY_NAMES                             267                            /* 'getOwnPropertyNames' */
+#define DUK_STRIDX_GET_OWN_PROPERTY_DESCRIPTOR                        268                            /* 'getOwnPropertyDescriptor' */
+#define DUK_STRIDX_GET_PROTOTYPE_OF                                   269                            /* 'getPrototypeOf' */
+#define DUK_STRIDX_PROTOTYPE                                          270                            /* 'prototype' */
+#define DUK_STRIDX_LENGTH                                             271                            /* 'length' */
+#define DUK_STRIDX_ALERT                                              272                            /* 'alert' */
+#define DUK_STRIDX_PRINT                                              273                            /* 'print' */
+#define DUK_STRIDX_UNESCAPE                                           274                            /* 'unescape' */
+#define DUK_STRIDX_ESCAPE                                             275                            /* 'escape' */
+#define DUK_STRIDX_ENCODE_URI_COMPONENT                               276                            /* 'encodeURIComponent' */
+#define DUK_STRIDX_ENCODE_URI                                         277                            /* 'encodeURI' */
+#define DUK_STRIDX_DECODE_URI_COMPONENT                               278                            /* 'decodeURIComponent' */
+#define DUK_STRIDX_DECODE_URI                                         279                            /* 'decodeURI' */
+#define DUK_STRIDX_IS_FINITE                                          280                            /* 'isFinite' */
+#define DUK_STRIDX_IS_NAN                                             281                            /* 'isNaN' */
+#define DUK_STRIDX_PARSE_FLOAT                                        282                            /* 'parseFloat' */
+#define DUK_STRIDX_PARSE_INT                                          283                            /* 'parseInt' */
+#define DUK_STRIDX_EVAL                                               284                            /* 'eval' */
+#define DUK_STRIDX_URI_ERROR                                          285                            /* 'URIError' */
+#define DUK_STRIDX_TYPE_ERROR                                         286                            /* 'TypeError' */
+#define DUK_STRIDX_SYNTAX_ERROR                                       287                            /* 'SyntaxError' */
+#define DUK_STRIDX_REFERENCE_ERROR                                    288                            /* 'ReferenceError' */
+#define DUK_STRIDX_RANGE_ERROR                                        289                            /* 'RangeError' */
+#define DUK_STRIDX_EVAL_ERROR                                         290                            /* 'EvalError' */
+#define DUK_STRIDX_BREAK                                              291                            /* 'break' */
+#define DUK_STRIDX_CASE                                               292                            /* 'case' */
+#define DUK_STRIDX_CATCH                                              293                            /* 'catch' */
+#define DUK_STRIDX_CONTINUE                                           294                            /* 'continue' */
+#define DUK_STRIDX_DEBUGGER                                           295                            /* 'debugger' */
+#define DUK_STRIDX_DEFAULT                                            296                            /* 'default' */
+#define DUK_STRIDX_DELETE                                             297                            /* 'delete' */
+#define DUK_STRIDX_DO                                                 298                            /* 'do' */
+#define DUK_STRIDX_ELSE                                               299                            /* 'else' */
+#define DUK_STRIDX_FINALLY                                            300                            /* 'finally' */
+#define DUK_STRIDX_FOR                                                301                            /* 'for' */
+#define DUK_STRIDX_LC_FUNCTION                                        302                            /* 'function' */
+#define DUK_STRIDX_IF                                                 303                            /* 'if' */
+#define DUK_STRIDX_IN                                                 304                            /* 'in' */
+#define DUK_STRIDX_INSTANCEOF                                         305                            /* 'instanceof' */
+#define DUK_STRIDX_NEW                                                306                            /* 'new' */
+#define DUK_STRIDX_RETURN                                             307                            /* 'return' */
+#define DUK_STRIDX_SWITCH                                             308                            /* 'switch' */
+#define DUK_STRIDX_THIS                                               309                            /* 'this' */
+#define DUK_STRIDX_THROW                                              310                            /* 'throw' */
+#define DUK_STRIDX_TRY                                                311                            /* 'try' */
+#define DUK_STRIDX_TYPEOF                                             312                            /* 'typeof' */
+#define DUK_STRIDX_VAR                                                313                            /* 'var' */
+#define DUK_STRIDX_VOID                                               314                            /* 'void' */
+#define DUK_STRIDX_WHILE                                              315                            /* 'while' */
+#define DUK_STRIDX_WITH                                               316                            /* 'with' */
+#define DUK_STRIDX_CLASS                                              317                            /* 'class' */
+#define DUK_STRIDX_CONST                                              318                            /* 'const' */
+#define DUK_STRIDX_ENUM                                               319                            /* 'enum' */
+#define DUK_STRIDX_EXPORT                                             320                            /* 'export' */
+#define DUK_STRIDX_EXTENDS                                            321                            /* 'extends' */
+#define DUK_STRIDX_IMPORT                                             322                            /* 'import' */
+#define DUK_STRIDX_SUPER                                              323                            /* 'super' */
+#define DUK_STRIDX_LC_NULL                                            324                            /* 'null' */
+#define DUK_STRIDX_TRUE                                               325                            /* 'true' */
+#define DUK_STRIDX_FALSE                                              326                            /* 'false' */
+#define DUK_STRIDX_IMPLEMENTS                                         327                            /* 'implements' */
+#define DUK_STRIDX_INTERFACE                                          328                            /* 'interface' */
+#define DUK_STRIDX_LET                                                329                            /* 'let' */
+#define DUK_STRIDX_PACKAGE                                            330                            /* 'package' */
+#define DUK_STRIDX_PRIVATE                                            331                            /* 'private' */
+#define DUK_STRIDX_PROTECTED                                          332                            /* 'protected' */
+#define DUK_STRIDX_PUBLIC                                             333                            /* 'public' */
+#define DUK_STRIDX_STATIC                                             334                            /* 'static' */
+#define DUK_STRIDX_YIELD                                              335                            /* 'yield' */
 
 #define DUK_HEAP_STRING_UC_LOGGER(heap)                               DUK_HEAP_GET_STRING((heap),DUK_STRIDX_UC_LOGGER)
 #define DUK_HTHREAD_STRING_UC_LOGGER(thr)                             DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_UC_LOGGER)
@@ -375,6 +388,10 @@ extern const duk_uint8_t duk_strings_data[];
 #define DUK_HTHREAD_STRING_UC_FUNCTION(thr)                           DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_UC_FUNCTION)
 #define DUK_HEAP_STRING_UC_OBJECT(heap)                               DUK_HEAP_GET_STRING((heap),DUK_STRIDX_UC_OBJECT)
 #define DUK_HTHREAD_STRING_UC_OBJECT(thr)                             DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_UC_OBJECT)
+#define DUK_HEAP_STRING_UC_NULL(heap)                                 DUK_HEAP_GET_STRING((heap),DUK_STRIDX_UC_NULL)
+#define DUK_HTHREAD_STRING_UC_NULL(thr)                               DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_UC_NULL)
+#define DUK_HEAP_STRING_UC_UNDEFINED(heap)                            DUK_HEAP_GET_STRING((heap),DUK_STRIDX_UC_UNDEFINED)
+#define DUK_HTHREAD_STRING_UC_UNDEFINED(thr)                          DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_UC_UNDEFINED)
 #define DUK_HEAP_STRING_JSON_EXT_FUNCTION2(heap)                      DUK_HEAP_GET_STRING((heap),DUK_STRIDX_JSON_EXT_FUNCTION2)
 #define DUK_HTHREAD_STRING_JSON_EXT_FUNCTION2(thr)                    DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_JSON_EXT_FUNCTION2)
 #define DUK_HEAP_STRING_JSON_EXT_FUNCTION1(heap)                      DUK_HEAP_GET_STRING((heap),DUK_STRIDX_JSON_EXT_FUNCTION1)
@@ -415,10 +432,10 @@ extern const duk_uint8_t duk_strings_data[];
 #define DUK_HTHREAD_STRING_RESUME(thr)                                DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_RESUME)
 #define DUK_HEAP_STRING_COMPACT(heap)                                 DUK_HEAP_GET_STRING((heap),DUK_STRIDX_COMPACT)
 #define DUK_HTHREAD_STRING_COMPACT(thr)                               DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_COMPACT)
-#define DUK_HEAP_STRING_JSONC(heap)                                   DUK_HEAP_GET_STRING((heap),DUK_STRIDX_JSONC)
-#define DUK_HTHREAD_STRING_JSONC(thr)                                 DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_JSONC)
-#define DUK_HEAP_STRING_JSONX(heap)                                   DUK_HEAP_GET_STRING((heap),DUK_STRIDX_JSONX)
-#define DUK_HTHREAD_STRING_JSONX(thr)                                 DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_JSONX)
+#define DUK_HEAP_STRING_JC(heap)                                      DUK_HEAP_GET_STRING((heap),DUK_STRIDX_JC)
+#define DUK_HTHREAD_STRING_JC(thr)                                    DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_JC)
+#define DUK_HEAP_STRING_JX(heap)                                      DUK_HEAP_GET_STRING((heap),DUK_STRIDX_JX)
+#define DUK_HTHREAD_STRING_JX(thr)                                    DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_JX)
 #define DUK_HEAP_STRING_BASE64(heap)                                  DUK_HEAP_GET_STRING((heap),DUK_STRIDX_BASE64)
 #define DUK_HTHREAD_STRING_BASE64(thr)                                DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_BASE64)
 #define DUK_HEAP_STRING_HEX(heap)                                     DUK_HEAP_GET_STRING((heap),DUK_STRIDX_HEX)
@@ -433,24 +450,28 @@ extern const duk_uint8_t duk_strings_data[];
 #define DUK_HTHREAD_STRING_GC(thr)                                    DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_GC)
 #define DUK_HEAP_STRING_ACT(heap)                                     DUK_HEAP_GET_STRING((heap),DUK_STRIDX_ACT)
 #define DUK_HTHREAD_STRING_ACT(thr)                                   DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_ACT)
-#define DUK_HEAP_STRING_LINE(heap)                                    DUK_HEAP_GET_STRING((heap),DUK_STRIDX_LINE)
-#define DUK_HTHREAD_STRING_LINE(thr)                                  DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_LINE)
 #define DUK_HEAP_STRING_LC_INFO(heap)                                 DUK_HEAP_GET_STRING((heap),DUK_STRIDX_LC_INFO)
 #define DUK_HTHREAD_STRING_LC_INFO(thr)                               DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_LC_INFO)
 #define DUK_HEAP_STRING_VERSION(heap)                                 DUK_HEAP_GET_STRING((heap),DUK_STRIDX_VERSION)
 #define DUK_HTHREAD_STRING_VERSION(thr)                               DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_VERSION)
 #define DUK_HEAP_STRING_ENV(heap)                                     DUK_HEAP_GET_STRING((heap),DUK_STRIDX_ENV)
 #define DUK_HTHREAD_STRING_ENV(thr)                                   DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_ENV)
-#define DUK_HEAP_STRING_ERRTHROW(heap)                                DUK_HEAP_GET_STRING((heap),DUK_STRIDX_ERRTHROW)
-#define DUK_HTHREAD_STRING_ERRTHROW(thr)                              DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_ERRTHROW)
-#define DUK_HEAP_STRING_ERRCREATE(heap)                               DUK_HEAP_GET_STRING((heap),DUK_STRIDX_ERRCREATE)
-#define DUK_HTHREAD_STRING_ERRCREATE(thr)                             DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_ERRCREATE)
+#define DUK_HEAP_STRING_MOD_LOADED(heap)                              DUK_HEAP_GET_STRING((heap),DUK_STRIDX_MOD_LOADED)
+#define DUK_HTHREAD_STRING_MOD_LOADED(thr)                            DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_MOD_LOADED)
+#define DUK_HEAP_STRING_MOD_SEARCH(heap)                              DUK_HEAP_GET_STRING((heap),DUK_STRIDX_MOD_SEARCH)
+#define DUK_HTHREAD_STRING_MOD_SEARCH(thr)                            DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_MOD_SEARCH)
+#define DUK_HEAP_STRING_ERR_THROW(heap)                               DUK_HEAP_GET_STRING((heap),DUK_STRIDX_ERR_THROW)
+#define DUK_HTHREAD_STRING_ERR_THROW(thr)                             DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_ERR_THROW)
+#define DUK_HEAP_STRING_ERR_CREATE(heap)                              DUK_HEAP_GET_STRING((heap),DUK_STRIDX_ERR_CREATE)
+#define DUK_HTHREAD_STRING_ERR_CREATE(thr)                            DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_ERR_CREATE)
 #define DUK_HEAP_STRING_COMPILE(heap)                                 DUK_HEAP_GET_STRING((heap),DUK_STRIDX_COMPILE)
 #define DUK_HTHREAD_STRING_COMPILE(thr)                               DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_COMPILE)
 #define DUK_HEAP_STRING_INT_REGBASE(heap)                             DUK_HEAP_GET_STRING((heap),DUK_STRIDX_INT_REGBASE)
 #define DUK_HTHREAD_STRING_INT_REGBASE(thr)                           DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_INT_REGBASE)
 #define DUK_HEAP_STRING_INT_THREAD(heap)                              DUK_HEAP_GET_STRING((heap),DUK_STRIDX_INT_THREAD)
 #define DUK_HTHREAD_STRING_INT_THREAD(thr)                            DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_INT_THREAD)
+#define DUK_HEAP_STRING_INT_HANDLER(heap)                             DUK_HEAP_GET_STRING((heap),DUK_STRIDX_INT_HANDLER)
+#define DUK_HTHREAD_STRING_INT_HANDLER(thr)                           DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_INT_HANDLER)
 #define DUK_HEAP_STRING_INT_FINALIZER(heap)                           DUK_HEAP_GET_STRING((heap),DUK_STRIDX_INT_FINALIZER)
 #define DUK_HTHREAD_STRING_INT_FINALIZER(thr)                         DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_INT_FINALIZER)
 #define DUK_HEAP_STRING_INT_CALLEE(heap)                              DUK_HEAP_GET_STRING((heap),DUK_STRIDX_INT_CALLEE)
@@ -499,6 +520,24 @@ extern const duk_uint8_t duk_strings_data[];
 #define DUK_HTHREAD_STRING_THROW_TYPE_ERROR(thr)                      DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_THROW_TYPE_ERROR)
 #define DUK_HEAP_STRING_DUKTAPE(heap)                                 DUK_HEAP_GET_STRING((heap),DUK_STRIDX_DUKTAPE)
 #define DUK_HTHREAD_STRING_DUKTAPE(thr)                               DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_DUKTAPE)
+#define DUK_HEAP_STRING_ID(heap)                                      DUK_HEAP_GET_STRING((heap),DUK_STRIDX_ID)
+#define DUK_HTHREAD_STRING_ID(thr)                                    DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_ID)
+#define DUK_HEAP_STRING_REQUIRE(heap)                                 DUK_HEAP_GET_STRING((heap),DUK_STRIDX_REQUIRE)
+#define DUK_HTHREAD_STRING_REQUIRE(thr)                               DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_REQUIRE)
+#define DUK_HEAP_STRING___PROTO__(heap)                               DUK_HEAP_GET_STRING((heap),DUK_STRIDX___PROTO__)
+#define DUK_HTHREAD_STRING___PROTO__(thr)                             DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX___PROTO__)
+#define DUK_HEAP_STRING_SET_PROTOTYPE_OF(heap)                        DUK_HEAP_GET_STRING((heap),DUK_STRIDX_SET_PROTOTYPE_OF)
+#define DUK_HTHREAD_STRING_SET_PROTOTYPE_OF(thr)                      DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_SET_PROTOTYPE_OF)
+#define DUK_HEAP_STRING_OWN_KEYS(heap)                                DUK_HEAP_GET_STRING((heap),DUK_STRIDX_OWN_KEYS)
+#define DUK_HTHREAD_STRING_OWN_KEYS(thr)                              DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_OWN_KEYS)
+#define DUK_HEAP_STRING_ENUMERATE(heap)                               DUK_HEAP_GET_STRING((heap),DUK_STRIDX_ENUMERATE)
+#define DUK_HTHREAD_STRING_ENUMERATE(thr)                             DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_ENUMERATE)
+#define DUK_HEAP_STRING_DELETE_PROPERTY(heap)                         DUK_HEAP_GET_STRING((heap),DUK_STRIDX_DELETE_PROPERTY)
+#define DUK_HTHREAD_STRING_DELETE_PROPERTY(thr)                       DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_DELETE_PROPERTY)
+#define DUK_HEAP_STRING_HAS(heap)                                     DUK_HEAP_GET_STRING((heap),DUK_STRIDX_HAS)
+#define DUK_HTHREAD_STRING_HAS(thr)                                   DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_HAS)
+#define DUK_HEAP_STRING_PROXY(heap)                                   DUK_HEAP_GET_STRING((heap),DUK_STRIDX_PROXY)
+#define DUK_HTHREAD_STRING_PROXY(thr)                                 DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_PROXY)
 #define DUK_HEAP_STRING_CALLEE(heap)                                  DUK_HEAP_GET_STRING((heap),DUK_STRIDX_CALLEE)
 #define DUK_HTHREAD_STRING_CALLEE(thr)                                DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_CALLEE)
 #define DUK_HEAP_STRING_INVALID_DATE(heap)                            DUK_HEAP_GET_STRING((heap),DUK_STRIDX_INVALID_DATE)
@@ -531,8 +570,8 @@ extern const duk_uint8_t duk_strings_data[];
 #define DUK_HTHREAD_STRING_LC_NUMBER(thr)                             DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_LC_NUMBER)
 #define DUK_HEAP_STRING_LC_BOOLEAN(heap)                              DUK_HEAP_GET_STRING((heap),DUK_STRIDX_LC_BOOLEAN)
 #define DUK_HTHREAD_STRING_LC_BOOLEAN(thr)                            DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_LC_BOOLEAN)
-#define DUK_HEAP_STRING_UNDEFINED(heap)                               DUK_HEAP_GET_STRING((heap),DUK_STRIDX_UNDEFINED)
-#define DUK_HTHREAD_STRING_UNDEFINED(thr)                             DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_UNDEFINED)
+#define DUK_HEAP_STRING_LC_UNDEFINED(heap)                            DUK_HEAP_GET_STRING((heap),DUK_STRIDX_LC_UNDEFINED)
+#define DUK_HTHREAD_STRING_LC_UNDEFINED(thr)                          DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_LC_UNDEFINED)
 #define DUK_HEAP_STRING_STRINGIFY(heap)                               DUK_HEAP_GET_STRING((heap),DUK_STRIDX_STRINGIFY)
 #define DUK_HTHREAD_STRING_STRINGIFY(thr)                             DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_STRINGIFY)
 #define DUK_HEAP_STRING_TAN(heap)                                     DUK_HEAP_GET_STRING((heap),DUK_STRIDX_TAN)
@@ -957,8 +996,8 @@ extern const duk_uint8_t duk_strings_data[];
 #define DUK_HTHREAD_STRING_IMPORT(thr)                                DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_IMPORT)
 #define DUK_HEAP_STRING_SUPER(heap)                                   DUK_HEAP_GET_STRING((heap),DUK_STRIDX_SUPER)
 #define DUK_HTHREAD_STRING_SUPER(thr)                                 DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_SUPER)
-#define DUK_HEAP_STRING_NULL(heap)                                    DUK_HEAP_GET_STRING((heap),DUK_STRIDX_NULL)
-#define DUK_HTHREAD_STRING_NULL(thr)                                  DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_NULL)
+#define DUK_HEAP_STRING_LC_NULL(heap)                                 DUK_HEAP_GET_STRING((heap),DUK_STRIDX_LC_NULL)
+#define DUK_HTHREAD_STRING_LC_NULL(thr)                               DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_LC_NULL)
 #define DUK_HEAP_STRING_TRUE(heap)                                    DUK_HEAP_GET_STRING((heap),DUK_STRIDX_TRUE)
 #define DUK_HTHREAD_STRING_TRUE(thr)                                  DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_TRUE)
 #define DUK_HEAP_STRING_FALSE(heap)                                   DUK_HEAP_GET_STRING((heap),DUK_STRIDX_FALSE)
@@ -982,22 +1021,22 @@ extern const duk_uint8_t duk_strings_data[];
 #define DUK_HEAP_STRING_YIELD(heap)                                   DUK_HEAP_GET_STRING((heap),DUK_STRIDX_YIELD)
 #define DUK_HTHREAD_STRING_YIELD(thr)                                 DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_YIELD)
 
-#define DUK_HEAP_NUM_STRINGS                                          323
+#define DUK_HEAP_NUM_STRINGS                                          336
 
-#define DUK_STRIDX_START_RESERVED                                     278
-#define DUK_STRIDX_START_STRICT_RESERVED                              314
-#define DUK_STRIDX_END_RESERVED                                       323                            /* exclusive endpoint */
+#define DUK_STRIDX_START_RESERVED                                     291
+#define DUK_STRIDX_START_STRICT_RESERVED                              327
+#define DUK_STRIDX_END_RESERVED                                       336                            /* exclusive endpoint */
 
 extern const duk_c_function duk_bi_native_functions[];
 extern const duk_uint8_t duk_builtins_data[];
-#ifdef DUK_USE_INITJS
+#ifdef DUK_USE_BUILTIN_INITJS
 extern const duk_uint8_t duk_initjs_data[];
-#endif  /* DUK_USE_INITJS */
+#endif  /* DUK_USE_BUILTIN_INITJS */
 
-#define DUK_BUILTINS_DATA_LENGTH                                      1314
-#ifdef DUK_USE_INITJS
-#define DUK_INITJS_DATA_LENGTH                                        148
-#endif  /* DUK_USE_INITJS */
+#define DUK_BUILTINS_DATA_LENGTH                                      1336
+#ifdef DUK_USE_BUILTIN_INITJS
+#define DUK_BUILTIN_INITJS_DATA_LENGTH                                187
+#endif  /* DUK_USE_BUILTIN_INITJS */
 
 #define DUK_BIDX_GLOBAL                                               0
 #define DUK_BIDX_GLOBAL_ENV                                           1
@@ -1034,23 +1073,24 @@ extern const duk_uint8_t duk_initjs_data[];
 #define DUK_BIDX_MATH                                                 32
 #define DUK_BIDX_JSON                                                 33
 #define DUK_BIDX_TYPE_ERROR_THROWER                                   34
-#define DUK_BIDX_DUKTAPE                                              35
-#define DUK_BIDX_THREAD_CONSTRUCTOR                                   36
-#define DUK_BIDX_THREAD_PROTOTYPE                                     37
-#define DUK_BIDX_BUFFER_CONSTRUCTOR                                   38
-#define DUK_BIDX_BUFFER_PROTOTYPE                                     39
-#define DUK_BIDX_POINTER_CONSTRUCTOR                                  40
-#define DUK_BIDX_POINTER_PROTOTYPE                                    41
-#define DUK_BIDX_LOGGER_CONSTRUCTOR                                   42
-#define DUK_BIDX_LOGGER_PROTOTYPE                                     43
-#define DUK_BIDX_DOUBLE_ERROR                                         44
+#define DUK_BIDX_PROXY_CONSTRUCTOR                                    35
+#define DUK_BIDX_DUKTAPE                                              36
+#define DUK_BIDX_THREAD_CONSTRUCTOR                                   37
+#define DUK_BIDX_THREAD_PROTOTYPE                                     38
+#define DUK_BIDX_BUFFER_CONSTRUCTOR                                   39
+#define DUK_BIDX_BUFFER_PROTOTYPE                                     40
+#define DUK_BIDX_POINTER_CONSTRUCTOR                                  41
+#define DUK_BIDX_POINTER_PROTOTYPE                                    42
+#define DUK_BIDX_LOGGER_CONSTRUCTOR                                   43
+#define DUK_BIDX_LOGGER_PROTOTYPE                                     44
+#define DUK_BIDX_DOUBLE_ERROR                                         45
 
-#define DUK_NUM_BUILTINS                                              45
+#define DUK_NUM_BUILTINS                                              46
 
 #elif defined(DUK_USE_DOUBLE_BE)
 extern const duk_uint8_t duk_strings_data[];
 
-#define DUK_STRDATA_DATA_LENGTH                                       1854
+#define DUK_STRDATA_DATA_LENGTH                                       1931
 #define DUK_STRDATA_MAX_STRLEN                                        24
 
 #define DUK_STRIDX_UC_LOGGER                                          0                              /* 'Logger' */
@@ -1073,309 +1113,322 @@ extern const duk_uint8_t duk_strings_data[];
 #define DUK_STRIDX_ARRAY                                              17                             /* 'Array' */
 #define DUK_STRIDX_UC_FUNCTION                                        18                             /* 'Function' */
 #define DUK_STRIDX_UC_OBJECT                                          19                             /* 'Object' */
-#define DUK_STRIDX_JSON_EXT_FUNCTION2                                 20                             /* '{_func:true}' */
-#define DUK_STRIDX_JSON_EXT_FUNCTION1                                 21                             /* '{"_func":true}' */
-#define DUK_STRIDX_JSON_EXT_NEGINF                                    22                             /* '{"_ninf":true}' */
-#define DUK_STRIDX_JSON_EXT_POSINF                                    23                             /* '{"_inf":true}' */
-#define DUK_STRIDX_JSON_EXT_NAN                                       24                             /* '{"_nan":true}' */
-#define DUK_STRIDX_JSON_EXT_UNDEFINED                                 25                             /* '{"_undef":true}' */
-#define DUK_STRIDX_TO_LOG_STRING                                      26                             /* 'toLogString' */
-#define DUK_STRIDX_CLOG                                               27                             /* 'clog' */
-#define DUK_STRIDX_LC_L                                               28                             /* 'l' */
-#define DUK_STRIDX_LC_N                                               29                             /* 'n' */
-#define DUK_STRIDX_LC_FATAL                                           30                             /* 'fatal' */
-#define DUK_STRIDX_LC_ERROR                                           31                             /* 'error' */
-#define DUK_STRIDX_LC_WARN                                            32                             /* 'warn' */
-#define DUK_STRIDX_LC_DEBUG                                           33                             /* 'debug' */
-#define DUK_STRIDX_LC_TRACE                                           34                             /* 'trace' */
-#define DUK_STRIDX_RAW                                                35                             /* 'raw' */
-#define DUK_STRIDX_FMT                                                36                             /* 'fmt' */
-#define DUK_STRIDX_CURRENT                                            37                             /* 'current' */
-#define DUK_STRIDX_RESUME                                             38                             /* 'resume' */
-#define DUK_STRIDX_COMPACT                                            39                             /* 'compact' */
-#define DUK_STRIDX_JSONC                                              40                             /* 'jsonc' */
-#define DUK_STRIDX_JSONX                                              41                             /* 'jsonx' */
-#define DUK_STRIDX_BASE64                                             42                             /* 'base64' */
-#define DUK_STRIDX_HEX                                                43                             /* 'hex' */
-#define DUK_STRIDX_DEC                                                44                             /* 'dec' */
-#define DUK_STRIDX_ENC                                                45                             /* 'enc' */
-#define DUK_STRIDX_FIN                                                46                             /* 'fin' */
-#define DUK_STRIDX_GC                                                 47                             /* 'gc' */
-#define DUK_STRIDX_ACT                                                48                             /* 'act' */
-#define DUK_STRIDX_LINE                                               49                             /* 'line' */
-#define DUK_STRIDX_LC_INFO                                            50                             /* 'info' */
-#define DUK_STRIDX_VERSION                                            51                             /* 'version' */
-#define DUK_STRIDX_ENV                                                52                             /* 'env' */
-#define DUK_STRIDX_ERRTHROW                                           53                             /* 'errthrow' */
-#define DUK_STRIDX_ERRCREATE                                          54                             /* 'errcreate' */
-#define DUK_STRIDX_COMPILE                                            55                             /* 'compile' */
-#define DUK_STRIDX_INT_REGBASE                                        56                             /* '\x00regbase' */
-#define DUK_STRIDX_INT_THREAD                                         57                             /* '\x00thread' */
-#define DUK_STRIDX_INT_FINALIZER                                      58                             /* '\x00finalizer' */
-#define DUK_STRIDX_INT_CALLEE                                         59                             /* '\x00callee' */
-#define DUK_STRIDX_INT_MAP                                            60                             /* '\x00map' */
-#define DUK_STRIDX_INT_ARGS                                           61                             /* '\x00args' */
-#define DUK_STRIDX_INT_THIS                                           62                             /* '\x00this' */
-#define DUK_STRIDX_INT_PC2LINE                                        63                             /* '\x00pc2line' */
-#define DUK_STRIDX_INT_SOURCE                                         64                             /* '\x00source' */
-#define DUK_STRIDX_INT_VARENV                                         65                             /* '\x00varenv' */
-#define DUK_STRIDX_INT_LEXENV                                         66                             /* '\x00lexenv' */
-#define DUK_STRIDX_INT_VARMAP                                         67                             /* '\x00varmap' */
-#define DUK_STRIDX_INT_FORMALS                                        68                             /* '\x00formals' */
-#define DUK_STRIDX_INT_BYTECODE                                       69                             /* '\x00bytecode' */
-#define DUK_STRIDX_INT_NEXT                                           70                             /* '\x00next' */
-#define DUK_STRIDX_INT_TARGET                                         71                             /* '\x00target' */
-#define DUK_STRIDX_INT_VALUE                                          72                             /* '\x00value' */
-#define DUK_STRIDX_LC_POINTER                                         73                             /* 'pointer' */
-#define DUK_STRIDX_LC_BUFFER                                          74                             /* 'buffer' */
-#define DUK_STRIDX_TRACEDATA                                          75                             /* 'tracedata' */
-#define DUK_STRIDX_LINE_NUMBER                                        76                             /* 'lineNumber' */
-#define DUK_STRIDX_FILE_NAME                                          77                             /* 'fileName' */
-#define DUK_STRIDX_PC                                                 78                             /* 'pc' */
-#define DUK_STRIDX_STACK                                              79                             /* 'stack' */
-#define DUK_STRIDX_THROW_TYPE_ERROR                                   80                             /* 'ThrowTypeError' */
-#define DUK_STRIDX_DUKTAPE                                            81                             /* 'Duktape' */
-#define DUK_STRIDX_CALLEE                                             82                             /* 'callee' */
-#define DUK_STRIDX_INVALID_DATE                                       83                             /* 'Invalid Date' */
-#define DUK_STRIDX_BRACKETED_ELLIPSIS                                 84                             /* '[...]' */
-#define DUK_STRIDX_NEWLINE_TAB                                        85                             /* '\n\t' */
-#define DUK_STRIDX_SPACE                                              86                             /* ' ' */
-#define DUK_STRIDX_COMMA                                              87                             /* ',' */
-#define DUK_STRIDX_MINUS_ZERO                                         88                             /* '-0' */
-#define DUK_STRIDX_PLUS_ZERO                                          89                             /* '+0' */
-#define DUK_STRIDX_ZERO                                               90                             /* '0' */
-#define DUK_STRIDX_MINUS_INFINITY                                     91                             /* '-Infinity' */
-#define DUK_STRIDX_PLUS_INFINITY                                      92                             /* '+Infinity' */
-#define DUK_STRIDX_INFINITY                                           93                             /* 'Infinity' */
-#define DUK_STRIDX_LC_OBJECT                                          94                             /* 'object' */
-#define DUK_STRIDX_LC_STRING                                          95                             /* 'string' */
-#define DUK_STRIDX_LC_NUMBER                                          96                             /* 'number' */
-#define DUK_STRIDX_LC_BOOLEAN                                         97                             /* 'boolean' */
-#define DUK_STRIDX_UNDEFINED                                          98                             /* 'undefined' */
-#define DUK_STRIDX_STRINGIFY                                          99                             /* 'stringify' */
-#define DUK_STRIDX_TAN                                                100                            /* 'tan' */
-#define DUK_STRIDX_SQRT                                               101                            /* 'sqrt' */
-#define DUK_STRIDX_SIN                                                102                            /* 'sin' */
-#define DUK_STRIDX_ROUND                                              103                            /* 'round' */
-#define DUK_STRIDX_RANDOM                                             104                            /* 'random' */
-#define DUK_STRIDX_POW                                                105                            /* 'pow' */
-#define DUK_STRIDX_MIN                                                106                            /* 'min' */
-#define DUK_STRIDX_MAX                                                107                            /* 'max' */
-#define DUK_STRIDX_LOG                                                108                            /* 'log' */
-#define DUK_STRIDX_FLOOR                                              109                            /* 'floor' */
-#define DUK_STRIDX_EXP                                                110                            /* 'exp' */
-#define DUK_STRIDX_COS                                                111                            /* 'cos' */
-#define DUK_STRIDX_CEIL                                               112                            /* 'ceil' */
-#define DUK_STRIDX_ATAN2                                              113                            /* 'atan2' */
-#define DUK_STRIDX_ATAN                                               114                            /* 'atan' */
-#define DUK_STRIDX_ASIN                                               115                            /* 'asin' */
-#define DUK_STRIDX_ACOS                                               116                            /* 'acos' */
-#define DUK_STRIDX_ABS                                                117                            /* 'abs' */
-#define DUK_STRIDX_SQRT2                                              118                            /* 'SQRT2' */
-#define DUK_STRIDX_SQRT1_2                                            119                            /* 'SQRT1_2' */
-#define DUK_STRIDX_PI                                                 120                            /* 'PI' */
-#define DUK_STRIDX_LOG10E                                             121                            /* 'LOG10E' */
-#define DUK_STRIDX_LOG2E                                              122                            /* 'LOG2E' */
-#define DUK_STRIDX_LN2                                                123                            /* 'LN2' */
-#define DUK_STRIDX_LN10                                               124                            /* 'LN10' */
-#define DUK_STRIDX_E                                                  125                            /* 'E' */
-#define DUK_STRIDX_MESSAGE                                            126                            /* 'message' */
-#define DUK_STRIDX_NAME                                               127                            /* 'name' */
-#define DUK_STRIDX_INPUT                                              128                            /* 'input' */
-#define DUK_STRIDX_INDEX                                              129                            /* 'index' */
-#define DUK_STRIDX_ESCAPED_EMPTY_REGEXP                               130                            /* '(?:)' */
-#define DUK_STRIDX_LAST_INDEX                                         131                            /* 'lastIndex' */
-#define DUK_STRIDX_MULTILINE                                          132                            /* 'multiline' */
-#define DUK_STRIDX_IGNORE_CASE                                        133                            /* 'ignoreCase' */
-#define DUK_STRIDX_SOURCE                                             134                            /* 'source' */
-#define DUK_STRIDX_TEST                                               135                            /* 'test' */
-#define DUK_STRIDX_EXEC                                               136                            /* 'exec' */
-#define DUK_STRIDX_TO_GMT_STRING                                      137                            /* 'toGMTString' */
-#define DUK_STRIDX_SET_YEAR                                           138                            /* 'setYear' */
-#define DUK_STRIDX_GET_YEAR                                           139                            /* 'getYear' */
-#define DUK_STRIDX_TO_JSON                                            140                            /* 'toJSON' */
-#define DUK_STRIDX_TO_ISO_STRING                                      141                            /* 'toISOString' */
-#define DUK_STRIDX_TO_UTC_STRING                                      142                            /* 'toUTCString' */
-#define DUK_STRIDX_SET_UTC_FULL_YEAR                                  143                            /* 'setUTCFullYear' */
-#define DUK_STRIDX_SET_FULL_YEAR                                      144                            /* 'setFullYear' */
-#define DUK_STRIDX_SET_UTC_MONTH                                      145                            /* 'setUTCMonth' */
-#define DUK_STRIDX_SET_MONTH                                          146                            /* 'setMonth' */
-#define DUK_STRIDX_SET_UTC_DATE                                       147                            /* 'setUTCDate' */
-#define DUK_STRIDX_SET_DATE                                           148                            /* 'setDate' */
-#define DUK_STRIDX_SET_UTC_HOURS                                      149                            /* 'setUTCHours' */
-#define DUK_STRIDX_SET_HOURS                                          150                            /* 'setHours' */
-#define DUK_STRIDX_SET_UTC_MINUTES                                    151                            /* 'setUTCMinutes' */
-#define DUK_STRIDX_SET_MINUTES                                        152                            /* 'setMinutes' */
-#define DUK_STRIDX_SET_UTC_SECONDS                                    153                            /* 'setUTCSeconds' */
-#define DUK_STRIDX_SET_SECONDS                                        154                            /* 'setSeconds' */
-#define DUK_STRIDX_SET_UTC_MILLISECONDS                               155                            /* 'setUTCMilliseconds' */
-#define DUK_STRIDX_SET_MILLISECONDS                                   156                            /* 'setMilliseconds' */
-#define DUK_STRIDX_SET_TIME                                           157                            /* 'setTime' */
-#define DUK_STRIDX_GET_TIMEZONE_OFFSET                                158                            /* 'getTimezoneOffset' */
-#define DUK_STRIDX_GET_UTC_MILLISECONDS                               159                            /* 'getUTCMilliseconds' */
-#define DUK_STRIDX_GET_MILLISECONDS                                   160                            /* 'getMilliseconds' */
-#define DUK_STRIDX_GET_UTC_SECONDS                                    161                            /* 'getUTCSeconds' */
-#define DUK_STRIDX_GET_SECONDS                                        162                            /* 'getSeconds' */
-#define DUK_STRIDX_GET_UTC_MINUTES                                    163                            /* 'getUTCMinutes' */
-#define DUK_STRIDX_GET_MINUTES                                        164                            /* 'getMinutes' */
-#define DUK_STRIDX_GET_UTC_HOURS                                      165                            /* 'getUTCHours' */
-#define DUK_STRIDX_GET_HOURS                                          166                            /* 'getHours' */
-#define DUK_STRIDX_GET_UTC_DAY                                        167                            /* 'getUTCDay' */
-#define DUK_STRIDX_GET_DAY                                            168                            /* 'getDay' */
-#define DUK_STRIDX_GET_UTC_DATE                                       169                            /* 'getUTCDate' */
-#define DUK_STRIDX_GET_DATE                                           170                            /* 'getDate' */
-#define DUK_STRIDX_GET_UTC_MONTH                                      171                            /* 'getUTCMonth' */
-#define DUK_STRIDX_GET_MONTH                                          172                            /* 'getMonth' */
-#define DUK_STRIDX_GET_UTC_FULL_YEAR                                  173                            /* 'getUTCFullYear' */
-#define DUK_STRIDX_GET_FULL_YEAR                                      174                            /* 'getFullYear' */
-#define DUK_STRIDX_GET_TIME                                           175                            /* 'getTime' */
-#define DUK_STRIDX_TO_LOCALE_TIME_STRING                              176                            /* 'toLocaleTimeString' */
-#define DUK_STRIDX_TO_LOCALE_DATE_STRING                              177                            /* 'toLocaleDateString' */
-#define DUK_STRIDX_TO_TIME_STRING                                     178                            /* 'toTimeString' */
-#define DUK_STRIDX_TO_DATE_STRING                                     179                            /* 'toDateString' */
-#define DUK_STRIDX_NOW                                                180                            /* 'now' */
-#define DUK_STRIDX_UTC                                                181                            /* 'UTC' */
-#define DUK_STRIDX_PARSE                                              182                            /* 'parse' */
-#define DUK_STRIDX_TO_PRECISION                                       183                            /* 'toPrecision' */
-#define DUK_STRIDX_TO_EXPONENTIAL                                     184                            /* 'toExponential' */
-#define DUK_STRIDX_TO_FIXED                                           185                            /* 'toFixed' */
-#define DUK_STRIDX_POSITIVE_INFINITY                                  186                            /* 'POSITIVE_INFINITY' */
-#define DUK_STRIDX_NEGATIVE_INFINITY                                  187                            /* 'NEGATIVE_INFINITY' */
-#define DUK_STRIDX_NAN                                                188                            /* 'NaN' */
-#define DUK_STRIDX_MIN_VALUE                                          189                            /* 'MIN_VALUE' */
-#define DUK_STRIDX_MAX_VALUE                                          190                            /* 'MAX_VALUE' */
-#define DUK_STRIDX_SUBSTR                                             191                            /* 'substr' */
-#define DUK_STRIDX_TRIM                                               192                            /* 'trim' */
-#define DUK_STRIDX_TO_LOCALE_UPPER_CASE                               193                            /* 'toLocaleUpperCase' */
-#define DUK_STRIDX_TO_UPPER_CASE                                      194                            /* 'toUpperCase' */
-#define DUK_STRIDX_TO_LOCALE_LOWER_CASE                               195                            /* 'toLocaleLowerCase' */
-#define DUK_STRIDX_TO_LOWER_CASE                                      196                            /* 'toLowerCase' */
-#define DUK_STRIDX_SUBSTRING                                          197                            /* 'substring' */
-#define DUK_STRIDX_SPLIT                                              198                            /* 'split' */
-#define DUK_STRIDX_SEARCH                                             199                            /* 'search' */
-#define DUK_STRIDX_REPLACE                                            200                            /* 'replace' */
-#define DUK_STRIDX_MATCH                                              201                            /* 'match' */
-#define DUK_STRIDX_LOCALE_COMPARE                                     202                            /* 'localeCompare' */
-#define DUK_STRIDX_CHAR_CODE_AT                                       203                            /* 'charCodeAt' */
-#define DUK_STRIDX_CHAR_AT                                            204                            /* 'charAt' */
-#define DUK_STRIDX_FROM_CHAR_CODE                                     205                            /* 'fromCharCode' */
-#define DUK_STRIDX_REDUCE_RIGHT                                       206                            /* 'reduceRight' */
-#define DUK_STRIDX_REDUCE                                             207                            /* 'reduce' */
-#define DUK_STRIDX_FILTER                                             208                            /* 'filter' */
-#define DUK_STRIDX_MAP                                                209                            /* 'map' */
-#define DUK_STRIDX_FOR_EACH                                           210                            /* 'forEach' */
-#define DUK_STRIDX_SOME                                               211                            /* 'some' */
-#define DUK_STRIDX_EVERY                                              212                            /* 'every' */
-#define DUK_STRIDX_LAST_INDEX_OF                                      213                            /* 'lastIndexOf' */
-#define DUK_STRIDX_INDEX_OF                                           214                            /* 'indexOf' */
-#define DUK_STRIDX_UNSHIFT                                            215                            /* 'unshift' */
-#define DUK_STRIDX_SPLICE                                             216                            /* 'splice' */
-#define DUK_STRIDX_SORT                                               217                            /* 'sort' */
-#define DUK_STRIDX_SLICE                                              218                            /* 'slice' */
-#define DUK_STRIDX_SHIFT                                              219                            /* 'shift' */
-#define DUK_STRIDX_REVERSE                                            220                            /* 'reverse' */
-#define DUK_STRIDX_PUSH                                               221                            /* 'push' */
-#define DUK_STRIDX_POP                                                222                            /* 'pop' */
-#define DUK_STRIDX_JOIN                                               223                            /* 'join' */
-#define DUK_STRIDX_CONCAT                                             224                            /* 'concat' */
-#define DUK_STRIDX_IS_ARRAY                                           225                            /* 'isArray' */
-#define DUK_STRIDX_LC_ARGUMENTS                                       226                            /* 'arguments' */
-#define DUK_STRIDX_CALLER                                             227                            /* 'caller' */
-#define DUK_STRIDX_BIND                                               228                            /* 'bind' */
-#define DUK_STRIDX_CALL                                               229                            /* 'call' */
-#define DUK_STRIDX_APPLY                                              230                            /* 'apply' */
-#define DUK_STRIDX_PROPERTY_IS_ENUMERABLE                             231                            /* 'propertyIsEnumerable' */
-#define DUK_STRIDX_IS_PROTOTYPE_OF                                    232                            /* 'isPrototypeOf' */
-#define DUK_STRIDX_HAS_OWN_PROPERTY                                   233                            /* 'hasOwnProperty' */
-#define DUK_STRIDX_VALUE_OF                                           234                            /* 'valueOf' */
-#define DUK_STRIDX_TO_LOCALE_STRING                                   235                            /* 'toLocaleString' */
-#define DUK_STRIDX_TO_STRING                                          236                            /* 'toString' */
-#define DUK_STRIDX_CONSTRUCTOR                                        237                            /* 'constructor' */
-#define DUK_STRIDX_SET                                                238                            /* 'set' */
-#define DUK_STRIDX_GET                                                239                            /* 'get' */
-#define DUK_STRIDX_ENUMERABLE                                         240                            /* 'enumerable' */
-#define DUK_STRIDX_CONFIGURABLE                                       241                            /* 'configurable' */
-#define DUK_STRIDX_WRITABLE                                           242                            /* 'writable' */
-#define DUK_STRIDX_VALUE                                              243                            /* 'value' */
-#define DUK_STRIDX_KEYS                                               244                            /* 'keys' */
-#define DUK_STRIDX_IS_EXTENSIBLE                                      245                            /* 'isExtensible' */
-#define DUK_STRIDX_IS_FROZEN                                          246                            /* 'isFrozen' */
-#define DUK_STRIDX_IS_SEALED                                          247                            /* 'isSealed' */
-#define DUK_STRIDX_PREVENT_EXTENSIONS                                 248                            /* 'preventExtensions' */
-#define DUK_STRIDX_FREEZE                                             249                            /* 'freeze' */
-#define DUK_STRIDX_SEAL                                               250                            /* 'seal' */
-#define DUK_STRIDX_DEFINE_PROPERTIES                                  251                            /* 'defineProperties' */
-#define DUK_STRIDX_DEFINE_PROPERTY                                    252                            /* 'defineProperty' */
-#define DUK_STRIDX_CREATE                                             253                            /* 'create' */
-#define DUK_STRIDX_GET_OWN_PROPERTY_NAMES                             254                            /* 'getOwnPropertyNames' */
-#define DUK_STRIDX_GET_OWN_PROPERTY_DESCRIPTOR                        255                            /* 'getOwnPropertyDescriptor' */
-#define DUK_STRIDX_GET_PROTOTYPE_OF                                   256                            /* 'getPrototypeOf' */
-#define DUK_STRIDX_PROTOTYPE                                          257                            /* 'prototype' */
-#define DUK_STRIDX_LENGTH                                             258                            /* 'length' */
-#define DUK_STRIDX_ALERT                                              259                            /* 'alert' */
-#define DUK_STRIDX_PRINT                                              260                            /* 'print' */
-#define DUK_STRIDX_UNESCAPE                                           261                            /* 'unescape' */
-#define DUK_STRIDX_ESCAPE                                             262                            /* 'escape' */
-#define DUK_STRIDX_ENCODE_URI_COMPONENT                               263                            /* 'encodeURIComponent' */
-#define DUK_STRIDX_ENCODE_URI                                         264                            /* 'encodeURI' */
-#define DUK_STRIDX_DECODE_URI_COMPONENT                               265                            /* 'decodeURIComponent' */
-#define DUK_STRIDX_DECODE_URI                                         266                            /* 'decodeURI' */
-#define DUK_STRIDX_IS_FINITE                                          267                            /* 'isFinite' */
-#define DUK_STRIDX_IS_NAN                                             268                            /* 'isNaN' */
-#define DUK_STRIDX_PARSE_FLOAT                                        269                            /* 'parseFloat' */
-#define DUK_STRIDX_PARSE_INT                                          270                            /* 'parseInt' */
-#define DUK_STRIDX_EVAL                                               271                            /* 'eval' */
-#define DUK_STRIDX_URI_ERROR                                          272                            /* 'URIError' */
-#define DUK_STRIDX_TYPE_ERROR                                         273                            /* 'TypeError' */
-#define DUK_STRIDX_SYNTAX_ERROR                                       274                            /* 'SyntaxError' */
-#define DUK_STRIDX_REFERENCE_ERROR                                    275                            /* 'ReferenceError' */
-#define DUK_STRIDX_RANGE_ERROR                                        276                            /* 'RangeError' */
-#define DUK_STRIDX_EVAL_ERROR                                         277                            /* 'EvalError' */
-#define DUK_STRIDX_BREAK                                              278                            /* 'break' */
-#define DUK_STRIDX_CASE                                               279                            /* 'case' */
-#define DUK_STRIDX_CATCH                                              280                            /* 'catch' */
-#define DUK_STRIDX_CONTINUE                                           281                            /* 'continue' */
-#define DUK_STRIDX_DEBUGGER                                           282                            /* 'debugger' */
-#define DUK_STRIDX_DEFAULT                                            283                            /* 'default' */
-#define DUK_STRIDX_DELETE                                             284                            /* 'delete' */
-#define DUK_STRIDX_DO                                                 285                            /* 'do' */
-#define DUK_STRIDX_ELSE                                               286                            /* 'else' */
-#define DUK_STRIDX_FINALLY                                            287                            /* 'finally' */
-#define DUK_STRIDX_FOR                                                288                            /* 'for' */
-#define DUK_STRIDX_LC_FUNCTION                                        289                            /* 'function' */
-#define DUK_STRIDX_IF                                                 290                            /* 'if' */
-#define DUK_STRIDX_IN                                                 291                            /* 'in' */
-#define DUK_STRIDX_INSTANCEOF                                         292                            /* 'instanceof' */
-#define DUK_STRIDX_NEW                                                293                            /* 'new' */
-#define DUK_STRIDX_RETURN                                             294                            /* 'return' */
-#define DUK_STRIDX_SWITCH                                             295                            /* 'switch' */
-#define DUK_STRIDX_THIS                                               296                            /* 'this' */
-#define DUK_STRIDX_THROW                                              297                            /* 'throw' */
-#define DUK_STRIDX_TRY                                                298                            /* 'try' */
-#define DUK_STRIDX_TYPEOF                                             299                            /* 'typeof' */
-#define DUK_STRIDX_VAR                                                300                            /* 'var' */
-#define DUK_STRIDX_VOID                                               301                            /* 'void' */
-#define DUK_STRIDX_WHILE                                              302                            /* 'while' */
-#define DUK_STRIDX_WITH                                               303                            /* 'with' */
-#define DUK_STRIDX_CLASS                                              304                            /* 'class' */
-#define DUK_STRIDX_CONST                                              305                            /* 'const' */
-#define DUK_STRIDX_ENUM                                               306                            /* 'enum' */
-#define DUK_STRIDX_EXPORT                                             307                            /* 'export' */
-#define DUK_STRIDX_EXTENDS                                            308                            /* 'extends' */
-#define DUK_STRIDX_IMPORT                                             309                            /* 'import' */
-#define DUK_STRIDX_SUPER                                              310                            /* 'super' */
-#define DUK_STRIDX_NULL                                               311                            /* 'null' */
-#define DUK_STRIDX_TRUE                                               312                            /* 'true' */
-#define DUK_STRIDX_FALSE                                              313                            /* 'false' */
-#define DUK_STRIDX_IMPLEMENTS                                         314                            /* 'implements' */
-#define DUK_STRIDX_INTERFACE                                          315                            /* 'interface' */
-#define DUK_STRIDX_LET                                                316                            /* 'let' */
-#define DUK_STRIDX_PACKAGE                                            317                            /* 'package' */
-#define DUK_STRIDX_PRIVATE                                            318                            /* 'private' */
-#define DUK_STRIDX_PROTECTED                                          319                            /* 'protected' */
-#define DUK_STRIDX_PUBLIC                                             320                            /* 'public' */
-#define DUK_STRIDX_STATIC                                             321                            /* 'static' */
-#define DUK_STRIDX_YIELD                                              322                            /* 'yield' */
+#define DUK_STRIDX_UC_NULL                                            20                             /* 'Null' */
+#define DUK_STRIDX_UC_UNDEFINED                                       21                             /* 'Undefined' */
+#define DUK_STRIDX_JSON_EXT_FUNCTION2                                 22                             /* '{_func:true}' */
+#define DUK_STRIDX_JSON_EXT_FUNCTION1                                 23                             /* '{"_func":true}' */
+#define DUK_STRIDX_JSON_EXT_NEGINF                                    24                             /* '{"_ninf":true}' */
+#define DUK_STRIDX_JSON_EXT_POSINF                                    25                             /* '{"_inf":true}' */
+#define DUK_STRIDX_JSON_EXT_NAN                                       26                             /* '{"_nan":true}' */
+#define DUK_STRIDX_JSON_EXT_UNDEFINED                                 27                             /* '{"_undef":true}' */
+#define DUK_STRIDX_TO_LOG_STRING                                      28                             /* 'toLogString' */
+#define DUK_STRIDX_CLOG                                               29                             /* 'clog' */
+#define DUK_STRIDX_LC_L                                               30                             /* 'l' */
+#define DUK_STRIDX_LC_N                                               31                             /* 'n' */
+#define DUK_STRIDX_LC_FATAL                                           32                             /* 'fatal' */
+#define DUK_STRIDX_LC_ERROR                                           33                             /* 'error' */
+#define DUK_STRIDX_LC_WARN                                            34                             /* 'warn' */
+#define DUK_STRIDX_LC_DEBUG                                           35                             /* 'debug' */
+#define DUK_STRIDX_LC_TRACE                                           36                             /* 'trace' */
+#define DUK_STRIDX_RAW                                                37                             /* 'raw' */
+#define DUK_STRIDX_FMT                                                38                             /* 'fmt' */
+#define DUK_STRIDX_CURRENT                                            39                             /* 'current' */
+#define DUK_STRIDX_RESUME                                             40                             /* 'resume' */
+#define DUK_STRIDX_COMPACT                                            41                             /* 'compact' */
+#define DUK_STRIDX_JC                                                 42                             /* 'jc' */
+#define DUK_STRIDX_JX                                                 43                             /* 'jx' */
+#define DUK_STRIDX_BASE64                                             44                             /* 'base64' */
+#define DUK_STRIDX_HEX                                                45                             /* 'hex' */
+#define DUK_STRIDX_DEC                                                46                             /* 'dec' */
+#define DUK_STRIDX_ENC                                                47                             /* 'enc' */
+#define DUK_STRIDX_FIN                                                48                             /* 'fin' */
+#define DUK_STRIDX_GC                                                 49                             /* 'gc' */
+#define DUK_STRIDX_ACT                                                50                             /* 'act' */
+#define DUK_STRIDX_LC_INFO                                            51                             /* 'info' */
+#define DUK_STRIDX_VERSION                                            52                             /* 'version' */
+#define DUK_STRIDX_ENV                                                53                             /* 'env' */
+#define DUK_STRIDX_MOD_LOADED                                         54                             /* 'modLoaded' */
+#define DUK_STRIDX_MOD_SEARCH                                         55                             /* 'modSearch' */
+#define DUK_STRIDX_ERR_THROW                                          56                             /* 'errThrow' */
+#define DUK_STRIDX_ERR_CREATE                                         57                             /* 'errCreate' */
+#define DUK_STRIDX_COMPILE                                            58                             /* 'compile' */
+#define DUK_STRIDX_INT_REGBASE                                        59                             /* '\x00regbase' */
+#define DUK_STRIDX_INT_THREAD                                         60                             /* '\x00thread' */
+#define DUK_STRIDX_INT_HANDLER                                        61                             /* '\x00handler' */
+#define DUK_STRIDX_INT_FINALIZER                                      62                             /* '\x00finalizer' */
+#define DUK_STRIDX_INT_CALLEE                                         63                             /* '\x00callee' */
+#define DUK_STRIDX_INT_MAP                                            64                             /* '\x00map' */
+#define DUK_STRIDX_INT_ARGS                                           65                             /* '\x00args' */
+#define DUK_STRIDX_INT_THIS                                           66                             /* '\x00this' */
+#define DUK_STRIDX_INT_PC2LINE                                        67                             /* '\x00pc2line' */
+#define DUK_STRIDX_INT_SOURCE                                         68                             /* '\x00source' */
+#define DUK_STRIDX_INT_VARENV                                         69                             /* '\x00varenv' */
+#define DUK_STRIDX_INT_LEXENV                                         70                             /* '\x00lexenv' */
+#define DUK_STRIDX_INT_VARMAP                                         71                             /* '\x00varmap' */
+#define DUK_STRIDX_INT_FORMALS                                        72                             /* '\x00formals' */
+#define DUK_STRIDX_INT_BYTECODE                                       73                             /* '\x00bytecode' */
+#define DUK_STRIDX_INT_NEXT                                           74                             /* '\x00next' */
+#define DUK_STRIDX_INT_TARGET                                         75                             /* '\x00target' */
+#define DUK_STRIDX_INT_VALUE                                          76                             /* '\x00value' */
+#define DUK_STRIDX_LC_POINTER                                         77                             /* 'pointer' */
+#define DUK_STRIDX_LC_BUFFER                                          78                             /* 'buffer' */
+#define DUK_STRIDX_TRACEDATA                                          79                             /* 'tracedata' */
+#define DUK_STRIDX_LINE_NUMBER                                        80                             /* 'lineNumber' */
+#define DUK_STRIDX_FILE_NAME                                          81                             /* 'fileName' */
+#define DUK_STRIDX_PC                                                 82                             /* 'pc' */
+#define DUK_STRIDX_STACK                                              83                             /* 'stack' */
+#define DUK_STRIDX_THROW_TYPE_ERROR                                   84                             /* 'ThrowTypeError' */
+#define DUK_STRIDX_DUKTAPE                                            85                             /* 'Duktape' */
+#define DUK_STRIDX_ID                                                 86                             /* 'id' */
+#define DUK_STRIDX_REQUIRE                                            87                             /* 'require' */
+#define DUK_STRIDX___PROTO__                                          88                             /* '__proto__' */
+#define DUK_STRIDX_SET_PROTOTYPE_OF                                   89                             /* 'setPrototypeOf' */
+#define DUK_STRIDX_OWN_KEYS                                           90                             /* 'ownKeys' */
+#define DUK_STRIDX_ENUMERATE                                          91                             /* 'enumerate' */
+#define DUK_STRIDX_DELETE_PROPERTY                                    92                             /* 'deleteProperty' */
+#define DUK_STRIDX_HAS                                                93                             /* 'has' */
+#define DUK_STRIDX_PROXY                                              94                             /* 'Proxy' */
+#define DUK_STRIDX_CALLEE                                             95                             /* 'callee' */
+#define DUK_STRIDX_INVALID_DATE                                       96                             /* 'Invalid Date' */
+#define DUK_STRIDX_BRACKETED_ELLIPSIS                                 97                             /* '[...]' */
+#define DUK_STRIDX_NEWLINE_TAB                                        98                             /* '\n\t' */
+#define DUK_STRIDX_SPACE                                              99                             /* ' ' */
+#define DUK_STRIDX_COMMA                                              100                            /* ',' */
+#define DUK_STRIDX_MINUS_ZERO                                         101                            /* '-0' */
+#define DUK_STRIDX_PLUS_ZERO                                          102                            /* '+0' */
+#define DUK_STRIDX_ZERO                                               103                            /* '0' */
+#define DUK_STRIDX_MINUS_INFINITY                                     104                            /* '-Infinity' */
+#define DUK_STRIDX_PLUS_INFINITY                                      105                            /* '+Infinity' */
+#define DUK_STRIDX_INFINITY                                           106                            /* 'Infinity' */
+#define DUK_STRIDX_LC_OBJECT                                          107                            /* 'object' */
+#define DUK_STRIDX_LC_STRING                                          108                            /* 'string' */
+#define DUK_STRIDX_LC_NUMBER                                          109                            /* 'number' */
+#define DUK_STRIDX_LC_BOOLEAN                                         110                            /* 'boolean' */
+#define DUK_STRIDX_LC_UNDEFINED                                       111                            /* 'undefined' */
+#define DUK_STRIDX_STRINGIFY                                          112                            /* 'stringify' */
+#define DUK_STRIDX_TAN                                                113                            /* 'tan' */
+#define DUK_STRIDX_SQRT                                               114                            /* 'sqrt' */
+#define DUK_STRIDX_SIN                                                115                            /* 'sin' */
+#define DUK_STRIDX_ROUND                                              116                            /* 'round' */
+#define DUK_STRIDX_RANDOM                                             117                            /* 'random' */
+#define DUK_STRIDX_POW                                                118                            /* 'pow' */
+#define DUK_STRIDX_MIN                                                119                            /* 'min' */
+#define DUK_STRIDX_MAX                                                120                            /* 'max' */
+#define DUK_STRIDX_LOG                                                121                            /* 'log' */
+#define DUK_STRIDX_FLOOR                                              122                            /* 'floor' */
+#define DUK_STRIDX_EXP                                                123                            /* 'exp' */
+#define DUK_STRIDX_COS                                                124                            /* 'cos' */
+#define DUK_STRIDX_CEIL                                               125                            /* 'ceil' */
+#define DUK_STRIDX_ATAN2                                              126                            /* 'atan2' */
+#define DUK_STRIDX_ATAN                                               127                            /* 'atan' */
+#define DUK_STRIDX_ASIN                                               128                            /* 'asin' */
+#define DUK_STRIDX_ACOS                                               129                            /* 'acos' */
+#define DUK_STRIDX_ABS                                                130                            /* 'abs' */
+#define DUK_STRIDX_SQRT2                                              131                            /* 'SQRT2' */
+#define DUK_STRIDX_SQRT1_2                                            132                            /* 'SQRT1_2' */
+#define DUK_STRIDX_PI                                                 133                            /* 'PI' */
+#define DUK_STRIDX_LOG10E                                             134                            /* 'LOG10E' */
+#define DUK_STRIDX_LOG2E                                              135                            /* 'LOG2E' */
+#define DUK_STRIDX_LN2                                                136                            /* 'LN2' */
+#define DUK_STRIDX_LN10                                               137                            /* 'LN10' */
+#define DUK_STRIDX_E                                                  138                            /* 'E' */
+#define DUK_STRIDX_MESSAGE                                            139                            /* 'message' */
+#define DUK_STRIDX_NAME                                               140                            /* 'name' */
+#define DUK_STRIDX_INPUT                                              141                            /* 'input' */
+#define DUK_STRIDX_INDEX                                              142                            /* 'index' */
+#define DUK_STRIDX_ESCAPED_EMPTY_REGEXP                               143                            /* '(?:)' */
+#define DUK_STRIDX_LAST_INDEX                                         144                            /* 'lastIndex' */
+#define DUK_STRIDX_MULTILINE                                          145                            /* 'multiline' */
+#define DUK_STRIDX_IGNORE_CASE                                        146                            /* 'ignoreCase' */
+#define DUK_STRIDX_SOURCE                                             147                            /* 'source' */
+#define DUK_STRIDX_TEST                                               148                            /* 'test' */
+#define DUK_STRIDX_EXEC                                               149                            /* 'exec' */
+#define DUK_STRIDX_TO_GMT_STRING                                      150                            /* 'toGMTString' */
+#define DUK_STRIDX_SET_YEAR                                           151                            /* 'setYear' */
+#define DUK_STRIDX_GET_YEAR                                           152                            /* 'getYear' */
+#define DUK_STRIDX_TO_JSON                                            153                            /* 'toJSON' */
+#define DUK_STRIDX_TO_ISO_STRING                                      154                            /* 'toISOString' */
+#define DUK_STRIDX_TO_UTC_STRING                                      155                            /* 'toUTCString' */
+#define DUK_STRIDX_SET_UTC_FULL_YEAR                                  156                            /* 'setUTCFullYear' */
+#define DUK_STRIDX_SET_FULL_YEAR                                      157                            /* 'setFullYear' */
+#define DUK_STRIDX_SET_UTC_MONTH                                      158                            /* 'setUTCMonth' */
+#define DUK_STRIDX_SET_MONTH                                          159                            /* 'setMonth' */
+#define DUK_STRIDX_SET_UTC_DATE                                       160                            /* 'setUTCDate' */
+#define DUK_STRIDX_SET_DATE                                           161                            /* 'setDate' */
+#define DUK_STRIDX_SET_UTC_HOURS                                      162                            /* 'setUTCHours' */
+#define DUK_STRIDX_SET_HOURS                                          163                            /* 'setHours' */
+#define DUK_STRIDX_SET_UTC_MINUTES                                    164                            /* 'setUTCMinutes' */
+#define DUK_STRIDX_SET_MINUTES                                        165                            /* 'setMinutes' */
+#define DUK_STRIDX_SET_UTC_SECONDS                                    166                            /* 'setUTCSeconds' */
+#define DUK_STRIDX_SET_SECONDS                                        167                            /* 'setSeconds' */
+#define DUK_STRIDX_SET_UTC_MILLISECONDS                               168                            /* 'setUTCMilliseconds' */
+#define DUK_STRIDX_SET_MILLISECONDS                                   169                            /* 'setMilliseconds' */
+#define DUK_STRIDX_SET_TIME                                           170                            /* 'setTime' */
+#define DUK_STRIDX_GET_TIMEZONE_OFFSET                                171                            /* 'getTimezoneOffset' */
+#define DUK_STRIDX_GET_UTC_MILLISECONDS                               172                            /* 'getUTCMilliseconds' */
+#define DUK_STRIDX_GET_MILLISECONDS                                   173                            /* 'getMilliseconds' */
+#define DUK_STRIDX_GET_UTC_SECONDS                                    174                            /* 'getUTCSeconds' */
+#define DUK_STRIDX_GET_SECONDS                                        175                            /* 'getSeconds' */
+#define DUK_STRIDX_GET_UTC_MINUTES                                    176                            /* 'getUTCMinutes' */
+#define DUK_STRIDX_GET_MINUTES                                        177                            /* 'getMinutes' */
+#define DUK_STRIDX_GET_UTC_HOURS                                      178                            /* 'getUTCHours' */
+#define DUK_STRIDX_GET_HOURS                                          179                            /* 'getHours' */
+#define DUK_STRIDX_GET_UTC_DAY                                        180                            /* 'getUTCDay' */
+#define DUK_STRIDX_GET_DAY                                            181                            /* 'getDay' */
+#define DUK_STRIDX_GET_UTC_DATE                                       182                            /* 'getUTCDate' */
+#define DUK_STRIDX_GET_DATE                                           183                            /* 'getDate' */
+#define DUK_STRIDX_GET_UTC_MONTH                                      184                            /* 'getUTCMonth' */
+#define DUK_STRIDX_GET_MONTH                                          185                            /* 'getMonth' */
+#define DUK_STRIDX_GET_UTC_FULL_YEAR                                  186                            /* 'getUTCFullYear' */
+#define DUK_STRIDX_GET_FULL_YEAR                                      187                            /* 'getFullYear' */
+#define DUK_STRIDX_GET_TIME                                           188                            /* 'getTime' */
+#define DUK_STRIDX_TO_LOCALE_TIME_STRING                              189                            /* 'toLocaleTimeString' */
+#define DUK_STRIDX_TO_LOCALE_DATE_STRING                              190                            /* 'toLocaleDateString' */
+#define DUK_STRIDX_TO_TIME_STRING                                     191                            /* 'toTimeString' */
+#define DUK_STRIDX_TO_DATE_STRING                                     192                            /* 'toDateString' */
+#define DUK_STRIDX_NOW                                                193                            /* 'now' */
+#define DUK_STRIDX_UTC                                                194                            /* 'UTC' */
+#define DUK_STRIDX_PARSE                                              195                            /* 'parse' */
+#define DUK_STRIDX_TO_PRECISION                                       196                            /* 'toPrecision' */
+#define DUK_STRIDX_TO_EXPONENTIAL                                     197                            /* 'toExponential' */
+#define DUK_STRIDX_TO_FIXED                                           198                            /* 'toFixed' */
+#define DUK_STRIDX_POSITIVE_INFINITY                                  199                            /* 'POSITIVE_INFINITY' */
+#define DUK_STRIDX_NEGATIVE_INFINITY                                  200                            /* 'NEGATIVE_INFINITY' */
+#define DUK_STRIDX_NAN                                                201                            /* 'NaN' */
+#define DUK_STRIDX_MIN_VALUE                                          202                            /* 'MIN_VALUE' */
+#define DUK_STRIDX_MAX_VALUE                                          203                            /* 'MAX_VALUE' */
+#define DUK_STRIDX_SUBSTR                                             204                            /* 'substr' */
+#define DUK_STRIDX_TRIM                                               205                            /* 'trim' */
+#define DUK_STRIDX_TO_LOCALE_UPPER_CASE                               206                            /* 'toLocaleUpperCase' */
+#define DUK_STRIDX_TO_UPPER_CASE                                      207                            /* 'toUpperCase' */
+#define DUK_STRIDX_TO_LOCALE_LOWER_CASE                               208                            /* 'toLocaleLowerCase' */
+#define DUK_STRIDX_TO_LOWER_CASE                                      209                            /* 'toLowerCase' */
+#define DUK_STRIDX_SUBSTRING                                          210                            /* 'substring' */
+#define DUK_STRIDX_SPLIT                                              211                            /* 'split' */
+#define DUK_STRIDX_SEARCH                                             212                            /* 'search' */
+#define DUK_STRIDX_REPLACE                                            213                            /* 'replace' */
+#define DUK_STRIDX_MATCH                                              214                            /* 'match' */
+#define DUK_STRIDX_LOCALE_COMPARE                                     215                            /* 'localeCompare' */
+#define DUK_STRIDX_CHAR_CODE_AT                                       216                            /* 'charCodeAt' */
+#define DUK_STRIDX_CHAR_AT                                            217                            /* 'charAt' */
+#define DUK_STRIDX_FROM_CHAR_CODE                                     218                            /* 'fromCharCode' */
+#define DUK_STRIDX_REDUCE_RIGHT                                       219                            /* 'reduceRight' */
+#define DUK_STRIDX_REDUCE                                             220                            /* 'reduce' */
+#define DUK_STRIDX_FILTER                                             221                            /* 'filter' */
+#define DUK_STRIDX_MAP                                                222                            /* 'map' */
+#define DUK_STRIDX_FOR_EACH                                           223                            /* 'forEach' */
+#define DUK_STRIDX_SOME                                               224                            /* 'some' */
+#define DUK_STRIDX_EVERY                                              225                            /* 'every' */
+#define DUK_STRIDX_LAST_INDEX_OF                                      226                            /* 'lastIndexOf' */
+#define DUK_STRIDX_INDEX_OF                                           227                            /* 'indexOf' */
+#define DUK_STRIDX_UNSHIFT                                            228                            /* 'unshift' */
+#define DUK_STRIDX_SPLICE                                             229                            /* 'splice' */
+#define DUK_STRIDX_SORT                                               230                            /* 'sort' */
+#define DUK_STRIDX_SLICE                                              231                            /* 'slice' */
+#define DUK_STRIDX_SHIFT                                              232                            /* 'shift' */
+#define DUK_STRIDX_REVERSE                                            233                            /* 'reverse' */
+#define DUK_STRIDX_PUSH                                               234                            /* 'push' */
+#define DUK_STRIDX_POP                                                235                            /* 'pop' */
+#define DUK_STRIDX_JOIN                                               236                            /* 'join' */
+#define DUK_STRIDX_CONCAT                                             237                            /* 'concat' */
+#define DUK_STRIDX_IS_ARRAY                                           238                            /* 'isArray' */
+#define DUK_STRIDX_LC_ARGUMENTS                                       239                            /* 'arguments' */
+#define DUK_STRIDX_CALLER                                             240                            /* 'caller' */
+#define DUK_STRIDX_BIND                                               241                            /* 'bind' */
+#define DUK_STRIDX_CALL                                               242                            /* 'call' */
+#define DUK_STRIDX_APPLY                                              243                            /* 'apply' */
+#define DUK_STRIDX_PROPERTY_IS_ENUMERABLE                             244                            /* 'propertyIsEnumerable' */
+#define DUK_STRIDX_IS_PROTOTYPE_OF                                    245                            /* 'isPrototypeOf' */
+#define DUK_STRIDX_HAS_OWN_PROPERTY                                   246                            /* 'hasOwnProperty' */
+#define DUK_STRIDX_VALUE_OF                                           247                            /* 'valueOf' */
+#define DUK_STRIDX_TO_LOCALE_STRING                                   248                            /* 'toLocaleString' */
+#define DUK_STRIDX_TO_STRING                                          249                            /* 'toString' */
+#define DUK_STRIDX_CONSTRUCTOR                                        250                            /* 'constructor' */
+#define DUK_STRIDX_SET                                                251                            /* 'set' */
+#define DUK_STRIDX_GET                                                252                            /* 'get' */
+#define DUK_STRIDX_ENUMERABLE                                         253                            /* 'enumerable' */
+#define DUK_STRIDX_CONFIGURABLE                                       254                            /* 'configurable' */
+#define DUK_STRIDX_WRITABLE                                           255                            /* 'writable' */
+#define DUK_STRIDX_VALUE                                              256                            /* 'value' */
+#define DUK_STRIDX_KEYS                                               257                            /* 'keys' */
+#define DUK_STRIDX_IS_EXTENSIBLE                                      258                            /* 'isExtensible' */
+#define DUK_STRIDX_IS_FROZEN                                          259                            /* 'isFrozen' */
+#define DUK_STRIDX_IS_SEALED                                          260                            /* 'isSealed' */
+#define DUK_STRIDX_PREVENT_EXTENSIONS                                 261                            /* 'preventExtensions' */
+#define DUK_STRIDX_FREEZE                                             262                            /* 'freeze' */
+#define DUK_STRIDX_SEAL                                               263                            /* 'seal' */
+#define DUK_STRIDX_DEFINE_PROPERTIES                                  264                            /* 'defineProperties' */
+#define DUK_STRIDX_DEFINE_PROPERTY                                    265                            /* 'defineProperty' */
+#define DUK_STRIDX_CREATE                                             266                            /* 'create' */
+#define DUK_STRIDX_GET_OWN_PROPERTY_NAMES                             267                            /* 'getOwnPropertyNames' */
+#define DUK_STRIDX_GET_OWN_PROPERTY_DESCRIPTOR                        268                            /* 'getOwnPropertyDescriptor' */
+#define DUK_STRIDX_GET_PROTOTYPE_OF                                   269                            /* 'getPrototypeOf' */
+#define DUK_STRIDX_PROTOTYPE                                          270                            /* 'prototype' */
+#define DUK_STRIDX_LENGTH                                             271                            /* 'length' */
+#define DUK_STRIDX_ALERT                                              272                            /* 'alert' */
+#define DUK_STRIDX_PRINT                                              273                            /* 'print' */
+#define DUK_STRIDX_UNESCAPE                                           274                            /* 'unescape' */
+#define DUK_STRIDX_ESCAPE                                             275                            /* 'escape' */
+#define DUK_STRIDX_ENCODE_URI_COMPONENT                               276                            /* 'encodeURIComponent' */
+#define DUK_STRIDX_ENCODE_URI                                         277                            /* 'encodeURI' */
+#define DUK_STRIDX_DECODE_URI_COMPONENT                               278                            /* 'decodeURIComponent' */
+#define DUK_STRIDX_DECODE_URI                                         279                            /* 'decodeURI' */
+#define DUK_STRIDX_IS_FINITE                                          280                            /* 'isFinite' */
+#define DUK_STRIDX_IS_NAN                                             281                            /* 'isNaN' */
+#define DUK_STRIDX_PARSE_FLOAT                                        282                            /* 'parseFloat' */
+#define DUK_STRIDX_PARSE_INT                                          283                            /* 'parseInt' */
+#define DUK_STRIDX_EVAL                                               284                            /* 'eval' */
+#define DUK_STRIDX_URI_ERROR                                          285                            /* 'URIError' */
+#define DUK_STRIDX_TYPE_ERROR                                         286                            /* 'TypeError' */
+#define DUK_STRIDX_SYNTAX_ERROR                                       287                            /* 'SyntaxError' */
+#define DUK_STRIDX_REFERENCE_ERROR                                    288                            /* 'ReferenceError' */
+#define DUK_STRIDX_RANGE_ERROR                                        289                            /* 'RangeError' */
+#define DUK_STRIDX_EVAL_ERROR                                         290                            /* 'EvalError' */
+#define DUK_STRIDX_BREAK                                              291                            /* 'break' */
+#define DUK_STRIDX_CASE                                               292                            /* 'case' */
+#define DUK_STRIDX_CATCH                                              293                            /* 'catch' */
+#define DUK_STRIDX_CONTINUE                                           294                            /* 'continue' */
+#define DUK_STRIDX_DEBUGGER                                           295                            /* 'debugger' */
+#define DUK_STRIDX_DEFAULT                                            296                            /* 'default' */
+#define DUK_STRIDX_DELETE                                             297                            /* 'delete' */
+#define DUK_STRIDX_DO                                                 298                            /* 'do' */
+#define DUK_STRIDX_ELSE                                               299                            /* 'else' */
+#define DUK_STRIDX_FINALLY                                            300                            /* 'finally' */
+#define DUK_STRIDX_FOR                                                301                            /* 'for' */
+#define DUK_STRIDX_LC_FUNCTION                                        302                            /* 'function' */
+#define DUK_STRIDX_IF                                                 303                            /* 'if' */
+#define DUK_STRIDX_IN                                                 304                            /* 'in' */
+#define DUK_STRIDX_INSTANCEOF                                         305                            /* 'instanceof' */
+#define DUK_STRIDX_NEW                                                306                            /* 'new' */
+#define DUK_STRIDX_RETURN                                             307                            /* 'return' */
+#define DUK_STRIDX_SWITCH                                             308                            /* 'switch' */
+#define DUK_STRIDX_THIS                                               309                            /* 'this' */
+#define DUK_STRIDX_THROW                                              310                            /* 'throw' */
+#define DUK_STRIDX_TRY                                                311                            /* 'try' */
+#define DUK_STRIDX_TYPEOF                                             312                            /* 'typeof' */
+#define DUK_STRIDX_VAR                                                313                            /* 'var' */
+#define DUK_STRIDX_VOID                                               314                            /* 'void' */
+#define DUK_STRIDX_WHILE                                              315                            /* 'while' */
+#define DUK_STRIDX_WITH                                               316                            /* 'with' */
+#define DUK_STRIDX_CLASS                                              317                            /* 'class' */
+#define DUK_STRIDX_CONST                                              318                            /* 'const' */
+#define DUK_STRIDX_ENUM                                               319                            /* 'enum' */
+#define DUK_STRIDX_EXPORT                                             320                            /* 'export' */
+#define DUK_STRIDX_EXTENDS                                            321                            /* 'extends' */
+#define DUK_STRIDX_IMPORT                                             322                            /* 'import' */
+#define DUK_STRIDX_SUPER                                              323                            /* 'super' */
+#define DUK_STRIDX_LC_NULL                                            324                            /* 'null' */
+#define DUK_STRIDX_TRUE                                               325                            /* 'true' */
+#define DUK_STRIDX_FALSE                                              326                            /* 'false' */
+#define DUK_STRIDX_IMPLEMENTS                                         327                            /* 'implements' */
+#define DUK_STRIDX_INTERFACE                                          328                            /* 'interface' */
+#define DUK_STRIDX_LET                                                329                            /* 'let' */
+#define DUK_STRIDX_PACKAGE                                            330                            /* 'package' */
+#define DUK_STRIDX_PRIVATE                                            331                            /* 'private' */
+#define DUK_STRIDX_PROTECTED                                          332                            /* 'protected' */
+#define DUK_STRIDX_PUBLIC                                             333                            /* 'public' */
+#define DUK_STRIDX_STATIC                                             334                            /* 'static' */
+#define DUK_STRIDX_YIELD                                              335                            /* 'yield' */
 
 #define DUK_HEAP_STRING_UC_LOGGER(heap)                               DUK_HEAP_GET_STRING((heap),DUK_STRIDX_UC_LOGGER)
 #define DUK_HTHREAD_STRING_UC_LOGGER(thr)                             DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_UC_LOGGER)
@@ -1417,6 +1470,10 @@ extern const duk_uint8_t duk_strings_data[];
 #define DUK_HTHREAD_STRING_UC_FUNCTION(thr)                           DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_UC_FUNCTION)
 #define DUK_HEAP_STRING_UC_OBJECT(heap)                               DUK_HEAP_GET_STRING((heap),DUK_STRIDX_UC_OBJECT)
 #define DUK_HTHREAD_STRING_UC_OBJECT(thr)                             DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_UC_OBJECT)
+#define DUK_HEAP_STRING_UC_NULL(heap)                                 DUK_HEAP_GET_STRING((heap),DUK_STRIDX_UC_NULL)
+#define DUK_HTHREAD_STRING_UC_NULL(thr)                               DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_UC_NULL)
+#define DUK_HEAP_STRING_UC_UNDEFINED(heap)                            DUK_HEAP_GET_STRING((heap),DUK_STRIDX_UC_UNDEFINED)
+#define DUK_HTHREAD_STRING_UC_UNDEFINED(thr)                          DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_UC_UNDEFINED)
 #define DUK_HEAP_STRING_JSON_EXT_FUNCTION2(heap)                      DUK_HEAP_GET_STRING((heap),DUK_STRIDX_JSON_EXT_FUNCTION2)
 #define DUK_HTHREAD_STRING_JSON_EXT_FUNCTION2(thr)                    DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_JSON_EXT_FUNCTION2)
 #define DUK_HEAP_STRING_JSON_EXT_FUNCTION1(heap)                      DUK_HEAP_GET_STRING((heap),DUK_STRIDX_JSON_EXT_FUNCTION1)
@@ -1457,10 +1514,10 @@ extern const duk_uint8_t duk_strings_data[];
 #define DUK_HTHREAD_STRING_RESUME(thr)                                DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_RESUME)
 #define DUK_HEAP_STRING_COMPACT(heap)                                 DUK_HEAP_GET_STRING((heap),DUK_STRIDX_COMPACT)
 #define DUK_HTHREAD_STRING_COMPACT(thr)                               DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_COMPACT)
-#define DUK_HEAP_STRING_JSONC(heap)                                   DUK_HEAP_GET_STRING((heap),DUK_STRIDX_JSONC)
-#define DUK_HTHREAD_STRING_JSONC(thr)                                 DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_JSONC)
-#define DUK_HEAP_STRING_JSONX(heap)                                   DUK_HEAP_GET_STRING((heap),DUK_STRIDX_JSONX)
-#define DUK_HTHREAD_STRING_JSONX(thr)                                 DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_JSONX)
+#define DUK_HEAP_STRING_JC(heap)                                      DUK_HEAP_GET_STRING((heap),DUK_STRIDX_JC)
+#define DUK_HTHREAD_STRING_JC(thr)                                    DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_JC)
+#define DUK_HEAP_STRING_JX(heap)                                      DUK_HEAP_GET_STRING((heap),DUK_STRIDX_JX)
+#define DUK_HTHREAD_STRING_JX(thr)                                    DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_JX)
 #define DUK_HEAP_STRING_BASE64(heap)                                  DUK_HEAP_GET_STRING((heap),DUK_STRIDX_BASE64)
 #define DUK_HTHREAD_STRING_BASE64(thr)                                DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_BASE64)
 #define DUK_HEAP_STRING_HEX(heap)                                     DUK_HEAP_GET_STRING((heap),DUK_STRIDX_HEX)
@@ -1475,24 +1532,28 @@ extern const duk_uint8_t duk_strings_data[];
 #define DUK_HTHREAD_STRING_GC(thr)                                    DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_GC)
 #define DUK_HEAP_STRING_ACT(heap)                                     DUK_HEAP_GET_STRING((heap),DUK_STRIDX_ACT)
 #define DUK_HTHREAD_STRING_ACT(thr)                                   DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_ACT)
-#define DUK_HEAP_STRING_LINE(heap)                                    DUK_HEAP_GET_STRING((heap),DUK_STRIDX_LINE)
-#define DUK_HTHREAD_STRING_LINE(thr)                                  DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_LINE)
 #define DUK_HEAP_STRING_LC_INFO(heap)                                 DUK_HEAP_GET_STRING((heap),DUK_STRIDX_LC_INFO)
 #define DUK_HTHREAD_STRING_LC_INFO(thr)                               DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_LC_INFO)
 #define DUK_HEAP_STRING_VERSION(heap)                                 DUK_HEAP_GET_STRING((heap),DUK_STRIDX_VERSION)
 #define DUK_HTHREAD_STRING_VERSION(thr)                               DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_VERSION)
 #define DUK_HEAP_STRING_ENV(heap)                                     DUK_HEAP_GET_STRING((heap),DUK_STRIDX_ENV)
 #define DUK_HTHREAD_STRING_ENV(thr)                                   DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_ENV)
-#define DUK_HEAP_STRING_ERRTHROW(heap)                                DUK_HEAP_GET_STRING((heap),DUK_STRIDX_ERRTHROW)
-#define DUK_HTHREAD_STRING_ERRTHROW(thr)                              DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_ERRTHROW)
-#define DUK_HEAP_STRING_ERRCREATE(heap)                               DUK_HEAP_GET_STRING((heap),DUK_STRIDX_ERRCREATE)
-#define DUK_HTHREAD_STRING_ERRCREATE(thr)                             DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_ERRCREATE)
+#define DUK_HEAP_STRING_MOD_LOADED(heap)                              DUK_HEAP_GET_STRING((heap),DUK_STRIDX_MOD_LOADED)
+#define DUK_HTHREAD_STRING_MOD_LOADED(thr)                            DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_MOD_LOADED)
+#define DUK_HEAP_STRING_MOD_SEARCH(heap)                              DUK_HEAP_GET_STRING((heap),DUK_STRIDX_MOD_SEARCH)
+#define DUK_HTHREAD_STRING_MOD_SEARCH(thr)                            DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_MOD_SEARCH)
+#define DUK_HEAP_STRING_ERR_THROW(heap)                               DUK_HEAP_GET_STRING((heap),DUK_STRIDX_ERR_THROW)
+#define DUK_HTHREAD_STRING_ERR_THROW(thr)                             DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_ERR_THROW)
+#define DUK_HEAP_STRING_ERR_CREATE(heap)                              DUK_HEAP_GET_STRING((heap),DUK_STRIDX_ERR_CREATE)
+#define DUK_HTHREAD_STRING_ERR_CREATE(thr)                            DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_ERR_CREATE)
 #define DUK_HEAP_STRING_COMPILE(heap)                                 DUK_HEAP_GET_STRING((heap),DUK_STRIDX_COMPILE)
 #define DUK_HTHREAD_STRING_COMPILE(thr)                               DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_COMPILE)
 #define DUK_HEAP_STRING_INT_REGBASE(heap)                             DUK_HEAP_GET_STRING((heap),DUK_STRIDX_INT_REGBASE)
 #define DUK_HTHREAD_STRING_INT_REGBASE(thr)                           DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_INT_REGBASE)
 #define DUK_HEAP_STRING_INT_THREAD(heap)                              DUK_HEAP_GET_STRING((heap),DUK_STRIDX_INT_THREAD)
 #define DUK_HTHREAD_STRING_INT_THREAD(thr)                            DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_INT_THREAD)
+#define DUK_HEAP_STRING_INT_HANDLER(heap)                             DUK_HEAP_GET_STRING((heap),DUK_STRIDX_INT_HANDLER)
+#define DUK_HTHREAD_STRING_INT_HANDLER(thr)                           DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_INT_HANDLER)
 #define DUK_HEAP_STRING_INT_FINALIZER(heap)                           DUK_HEAP_GET_STRING((heap),DUK_STRIDX_INT_FINALIZER)
 #define DUK_HTHREAD_STRING_INT_FINALIZER(thr)                         DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_INT_FINALIZER)
 #define DUK_HEAP_STRING_INT_CALLEE(heap)                              DUK_HEAP_GET_STRING((heap),DUK_STRIDX_INT_CALLEE)
@@ -1541,6 +1602,24 @@ extern const duk_uint8_t duk_strings_data[];
 #define DUK_HTHREAD_STRING_THROW_TYPE_ERROR(thr)                      DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_THROW_TYPE_ERROR)
 #define DUK_HEAP_STRING_DUKTAPE(heap)                                 DUK_HEAP_GET_STRING((heap),DUK_STRIDX_DUKTAPE)
 #define DUK_HTHREAD_STRING_DUKTAPE(thr)                               DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_DUKTAPE)
+#define DUK_HEAP_STRING_ID(heap)                                      DUK_HEAP_GET_STRING((heap),DUK_STRIDX_ID)
+#define DUK_HTHREAD_STRING_ID(thr)                                    DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_ID)
+#define DUK_HEAP_STRING_REQUIRE(heap)                                 DUK_HEAP_GET_STRING((heap),DUK_STRIDX_REQUIRE)
+#define DUK_HTHREAD_STRING_REQUIRE(thr)                               DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_REQUIRE)
+#define DUK_HEAP_STRING___PROTO__(heap)                               DUK_HEAP_GET_STRING((heap),DUK_STRIDX___PROTO__)
+#define DUK_HTHREAD_STRING___PROTO__(thr)                             DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX___PROTO__)
+#define DUK_HEAP_STRING_SET_PROTOTYPE_OF(heap)                        DUK_HEAP_GET_STRING((heap),DUK_STRIDX_SET_PROTOTYPE_OF)
+#define DUK_HTHREAD_STRING_SET_PROTOTYPE_OF(thr)                      DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_SET_PROTOTYPE_OF)
+#define DUK_HEAP_STRING_OWN_KEYS(heap)                                DUK_HEAP_GET_STRING((heap),DUK_STRIDX_OWN_KEYS)
+#define DUK_HTHREAD_STRING_OWN_KEYS(thr)                              DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_OWN_KEYS)
+#define DUK_HEAP_STRING_ENUMERATE(heap)                               DUK_HEAP_GET_STRING((heap),DUK_STRIDX_ENUMERATE)
+#define DUK_HTHREAD_STRING_ENUMERATE(thr)                             DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_ENUMERATE)
+#define DUK_HEAP_STRING_DELETE_PROPERTY(heap)                         DUK_HEAP_GET_STRING((heap),DUK_STRIDX_DELETE_PROPERTY)
+#define DUK_HTHREAD_STRING_DELETE_PROPERTY(thr)                       DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_DELETE_PROPERTY)
+#define DUK_HEAP_STRING_HAS(heap)                                     DUK_HEAP_GET_STRING((heap),DUK_STRIDX_HAS)
+#define DUK_HTHREAD_STRING_HAS(thr)                                   DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_HAS)
+#define DUK_HEAP_STRING_PROXY(heap)                                   DUK_HEAP_GET_STRING((heap),DUK_STRIDX_PROXY)
+#define DUK_HTHREAD_STRING_PROXY(thr)                                 DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_PROXY)
 #define DUK_HEAP_STRING_CALLEE(heap)                                  DUK_HEAP_GET_STRING((heap),DUK_STRIDX_CALLEE)
 #define DUK_HTHREAD_STRING_CALLEE(thr)                                DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_CALLEE)
 #define DUK_HEAP_STRING_INVALID_DATE(heap)                            DUK_HEAP_GET_STRING((heap),DUK_STRIDX_INVALID_DATE)
@@ -1573,8 +1652,8 @@ extern const duk_uint8_t duk_strings_data[];
 #define DUK_HTHREAD_STRING_LC_NUMBER(thr)                             DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_LC_NUMBER)
 #define DUK_HEAP_STRING_LC_BOOLEAN(heap)                              DUK_HEAP_GET_STRING((heap),DUK_STRIDX_LC_BOOLEAN)
 #define DUK_HTHREAD_STRING_LC_BOOLEAN(thr)                            DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_LC_BOOLEAN)
-#define DUK_HEAP_STRING_UNDEFINED(heap)                               DUK_HEAP_GET_STRING((heap),DUK_STRIDX_UNDEFINED)
-#define DUK_HTHREAD_STRING_UNDEFINED(thr)                             DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_UNDEFINED)
+#define DUK_HEAP_STRING_LC_UNDEFINED(heap)                            DUK_HEAP_GET_STRING((heap),DUK_STRIDX_LC_UNDEFINED)
+#define DUK_HTHREAD_STRING_LC_UNDEFINED(thr)                          DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_LC_UNDEFINED)
 #define DUK_HEAP_STRING_STRINGIFY(heap)                               DUK_HEAP_GET_STRING((heap),DUK_STRIDX_STRINGIFY)
 #define DUK_HTHREAD_STRING_STRINGIFY(thr)                             DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_STRINGIFY)
 #define DUK_HEAP_STRING_TAN(heap)                                     DUK_HEAP_GET_STRING((heap),DUK_STRIDX_TAN)
@@ -1999,8 +2078,8 @@ extern const duk_uint8_t duk_strings_data[];
 #define DUK_HTHREAD_STRING_IMPORT(thr)                                DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_IMPORT)
 #define DUK_HEAP_STRING_SUPER(heap)                                   DUK_HEAP_GET_STRING((heap),DUK_STRIDX_SUPER)
 #define DUK_HTHREAD_STRING_SUPER(thr)                                 DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_SUPER)
-#define DUK_HEAP_STRING_NULL(heap)                                    DUK_HEAP_GET_STRING((heap),DUK_STRIDX_NULL)
-#define DUK_HTHREAD_STRING_NULL(thr)                                  DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_NULL)
+#define DUK_HEAP_STRING_LC_NULL(heap)                                 DUK_HEAP_GET_STRING((heap),DUK_STRIDX_LC_NULL)
+#define DUK_HTHREAD_STRING_LC_NULL(thr)                               DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_LC_NULL)
 #define DUK_HEAP_STRING_TRUE(heap)                                    DUK_HEAP_GET_STRING((heap),DUK_STRIDX_TRUE)
 #define DUK_HTHREAD_STRING_TRUE(thr)                                  DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_TRUE)
 #define DUK_HEAP_STRING_FALSE(heap)                                   DUK_HEAP_GET_STRING((heap),DUK_STRIDX_FALSE)
@@ -2024,22 +2103,22 @@ extern const duk_uint8_t duk_strings_data[];
 #define DUK_HEAP_STRING_YIELD(heap)                                   DUK_HEAP_GET_STRING((heap),DUK_STRIDX_YIELD)
 #define DUK_HTHREAD_STRING_YIELD(thr)                                 DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_YIELD)
 
-#define DUK_HEAP_NUM_STRINGS                                          323
+#define DUK_HEAP_NUM_STRINGS                                          336
 
-#define DUK_STRIDX_START_RESERVED                                     278
-#define DUK_STRIDX_START_STRICT_RESERVED                              314
-#define DUK_STRIDX_END_RESERVED                                       323                            /* exclusive endpoint */
+#define DUK_STRIDX_START_RESERVED                                     291
+#define DUK_STRIDX_START_STRICT_RESERVED                              327
+#define DUK_STRIDX_END_RESERVED                                       336                            /* exclusive endpoint */
 
 extern const duk_c_function duk_bi_native_functions[];
 extern const duk_uint8_t duk_builtins_data[];
-#ifdef DUK_USE_INITJS
+#ifdef DUK_USE_BUILTIN_INITJS
 extern const duk_uint8_t duk_initjs_data[];
-#endif  /* DUK_USE_INITJS */
+#endif  /* DUK_USE_BUILTIN_INITJS */
 
-#define DUK_BUILTINS_DATA_LENGTH                                      1314
-#ifdef DUK_USE_INITJS
-#define DUK_INITJS_DATA_LENGTH                                        148
-#endif  /* DUK_USE_INITJS */
+#define DUK_BUILTINS_DATA_LENGTH                                      1336
+#ifdef DUK_USE_BUILTIN_INITJS
+#define DUK_BUILTIN_INITJS_DATA_LENGTH                                187
+#endif  /* DUK_USE_BUILTIN_INITJS */
 
 #define DUK_BIDX_GLOBAL                                               0
 #define DUK_BIDX_GLOBAL_ENV                                           1
@@ -2076,23 +2155,24 @@ extern const duk_uint8_t duk_initjs_data[];
 #define DUK_BIDX_MATH                                                 32
 #define DUK_BIDX_JSON                                                 33
 #define DUK_BIDX_TYPE_ERROR_THROWER                                   34
-#define DUK_BIDX_DUKTAPE                                              35
-#define DUK_BIDX_THREAD_CONSTRUCTOR                                   36
-#define DUK_BIDX_THREAD_PROTOTYPE                                     37
-#define DUK_BIDX_BUFFER_CONSTRUCTOR                                   38
-#define DUK_BIDX_BUFFER_PROTOTYPE                                     39
-#define DUK_BIDX_POINTER_CONSTRUCTOR                                  40
-#define DUK_BIDX_POINTER_PROTOTYPE                                    41
-#define DUK_BIDX_LOGGER_CONSTRUCTOR                                   42
-#define DUK_BIDX_LOGGER_PROTOTYPE                                     43
-#define DUK_BIDX_DOUBLE_ERROR                                         44
+#define DUK_BIDX_PROXY_CONSTRUCTOR                                    35
+#define DUK_BIDX_DUKTAPE                                              36
+#define DUK_BIDX_THREAD_CONSTRUCTOR                                   37
+#define DUK_BIDX_THREAD_PROTOTYPE                                     38
+#define DUK_BIDX_BUFFER_CONSTRUCTOR                                   39
+#define DUK_BIDX_BUFFER_PROTOTYPE                                     40
+#define DUK_BIDX_POINTER_CONSTRUCTOR                                  41
+#define DUK_BIDX_POINTER_PROTOTYPE                                    42
+#define DUK_BIDX_LOGGER_CONSTRUCTOR                                   43
+#define DUK_BIDX_LOGGER_PROTOTYPE                                     44
+#define DUK_BIDX_DOUBLE_ERROR                                         45
 
-#define DUK_NUM_BUILTINS                                              45
+#define DUK_NUM_BUILTINS                                              46
 
 #elif defined(DUK_USE_DOUBLE_ME)
 extern const duk_uint8_t duk_strings_data[];
 
-#define DUK_STRDATA_DATA_LENGTH                                       1854
+#define DUK_STRDATA_DATA_LENGTH                                       1931
 #define DUK_STRDATA_MAX_STRLEN                                        24
 
 #define DUK_STRIDX_UC_LOGGER                                          0                              /* 'Logger' */
@@ -2115,309 +2195,322 @@ extern const duk_uint8_t duk_strings_data[];
 #define DUK_STRIDX_ARRAY                                              17                             /* 'Array' */
 #define DUK_STRIDX_UC_FUNCTION                                        18                             /* 'Function' */
 #define DUK_STRIDX_UC_OBJECT                                          19                             /* 'Object' */
-#define DUK_STRIDX_JSON_EXT_FUNCTION2                                 20                             /* '{_func:true}' */
-#define DUK_STRIDX_JSON_EXT_FUNCTION1                                 21                             /* '{"_func":true}' */
-#define DUK_STRIDX_JSON_EXT_NEGINF                                    22                             /* '{"_ninf":true}' */
-#define DUK_STRIDX_JSON_EXT_POSINF                                    23                             /* '{"_inf":true}' */
-#define DUK_STRIDX_JSON_EXT_NAN                                       24                             /* '{"_nan":true}' */
-#define DUK_STRIDX_JSON_EXT_UNDEFINED                                 25                             /* '{"_undef":true}' */
-#define DUK_STRIDX_TO_LOG_STRING                                      26                             /* 'toLogString' */
-#define DUK_STRIDX_CLOG                                               27                             /* 'clog' */
-#define DUK_STRIDX_LC_L                                               28                             /* 'l' */
-#define DUK_STRIDX_LC_N                                               29                             /* 'n' */
-#define DUK_STRIDX_LC_FATAL                                           30                             /* 'fatal' */
-#define DUK_STRIDX_LC_ERROR                                           31                             /* 'error' */
-#define DUK_STRIDX_LC_WARN                                            32                             /* 'warn' */
-#define DUK_STRIDX_LC_DEBUG                                           33                             /* 'debug' */
-#define DUK_STRIDX_LC_TRACE                                           34                             /* 'trace' */
-#define DUK_STRIDX_RAW                                                35                             /* 'raw' */
-#define DUK_STRIDX_FMT                                                36                             /* 'fmt' */
-#define DUK_STRIDX_CURRENT                                            37                             /* 'current' */
-#define DUK_STRIDX_RESUME                                             38                             /* 'resume' */
-#define DUK_STRIDX_COMPACT                                            39                             /* 'compact' */
-#define DUK_STRIDX_JSONC                                              40                             /* 'jsonc' */
-#define DUK_STRIDX_JSONX                                              41                             /* 'jsonx' */
-#define DUK_STRIDX_BASE64                                             42                             /* 'base64' */
-#define DUK_STRIDX_HEX                                                43                             /* 'hex' */
-#define DUK_STRIDX_DEC                                                44                             /* 'dec' */
-#define DUK_STRIDX_ENC                                                45                             /* 'enc' */
-#define DUK_STRIDX_FIN                                                46                             /* 'fin' */
-#define DUK_STRIDX_GC                                                 47                             /* 'gc' */
-#define DUK_STRIDX_ACT                                                48                             /* 'act' */
-#define DUK_STRIDX_LINE                                               49                             /* 'line' */
-#define DUK_STRIDX_LC_INFO                                            50                             /* 'info' */
-#define DUK_STRIDX_VERSION                                            51                             /* 'version' */
-#define DUK_STRIDX_ENV                                                52                             /* 'env' */
-#define DUK_STRIDX_ERRTHROW                                           53                             /* 'errthrow' */
-#define DUK_STRIDX_ERRCREATE                                          54                             /* 'errcreate' */
-#define DUK_STRIDX_COMPILE                                            55                             /* 'compile' */
-#define DUK_STRIDX_INT_REGBASE                                        56                             /* '\x00regbase' */
-#define DUK_STRIDX_INT_THREAD                                         57                             /* '\x00thread' */
-#define DUK_STRIDX_INT_FINALIZER                                      58                             /* '\x00finalizer' */
-#define DUK_STRIDX_INT_CALLEE                                         59                             /* '\x00callee' */
-#define DUK_STRIDX_INT_MAP                                            60                             /* '\x00map' */
-#define DUK_STRIDX_INT_ARGS                                           61                             /* '\x00args' */
-#define DUK_STRIDX_INT_THIS                                           62                             /* '\x00this' */
-#define DUK_STRIDX_INT_PC2LINE                                        63                             /* '\x00pc2line' */
-#define DUK_STRIDX_INT_SOURCE                                         64                             /* '\x00source' */
-#define DUK_STRIDX_INT_VARENV                                         65                             /* '\x00varenv' */
-#define DUK_STRIDX_INT_LEXENV                                         66                             /* '\x00lexenv' */
-#define DUK_STRIDX_INT_VARMAP                                         67                             /* '\x00varmap' */
-#define DUK_STRIDX_INT_FORMALS                                        68                             /* '\x00formals' */
-#define DUK_STRIDX_INT_BYTECODE                                       69                             /* '\x00bytecode' */
-#define DUK_STRIDX_INT_NEXT                                           70                             /* '\x00next' */
-#define DUK_STRIDX_INT_TARGET                                         71                             /* '\x00target' */
-#define DUK_STRIDX_INT_VALUE                                          72                             /* '\x00value' */
-#define DUK_STRIDX_LC_POINTER                                         73                             /* 'pointer' */
-#define DUK_STRIDX_LC_BUFFER                                          74                             /* 'buffer' */
-#define DUK_STRIDX_TRACEDATA                                          75                             /* 'tracedata' */
-#define DUK_STRIDX_LINE_NUMBER                                        76                             /* 'lineNumber' */
-#define DUK_STRIDX_FILE_NAME                                          77                             /* 'fileName' */
-#define DUK_STRIDX_PC                                                 78                             /* 'pc' */
-#define DUK_STRIDX_STACK                                              79                             /* 'stack' */
-#define DUK_STRIDX_THROW_TYPE_ERROR                                   80                             /* 'ThrowTypeError' */
-#define DUK_STRIDX_DUKTAPE                                            81                             /* 'Duktape' */
-#define DUK_STRIDX_CALLEE                                             82                             /* 'callee' */
-#define DUK_STRIDX_INVALID_DATE                                       83                             /* 'Invalid Date' */
-#define DUK_STRIDX_BRACKETED_ELLIPSIS                                 84                             /* '[...]' */
-#define DUK_STRIDX_NEWLINE_TAB                                        85                             /* '\n\t' */
-#define DUK_STRIDX_SPACE                                              86                             /* ' ' */
-#define DUK_STRIDX_COMMA                                              87                             /* ',' */
-#define DUK_STRIDX_MINUS_ZERO                                         88                             /* '-0' */
-#define DUK_STRIDX_PLUS_ZERO                                          89                             /* '+0' */
-#define DUK_STRIDX_ZERO                                               90                             /* '0' */
-#define DUK_STRIDX_MINUS_INFINITY                                     91                             /* '-Infinity' */
-#define DUK_STRIDX_PLUS_INFINITY                                      92                             /* '+Infinity' */
-#define DUK_STRIDX_INFINITY                                           93                             /* 'Infinity' */
-#define DUK_STRIDX_LC_OBJECT                                          94                             /* 'object' */
-#define DUK_STRIDX_LC_STRING                                          95                             /* 'string' */
-#define DUK_STRIDX_LC_NUMBER                                          96                             /* 'number' */
-#define DUK_STRIDX_LC_BOOLEAN                                         97                             /* 'boolean' */
-#define DUK_STRIDX_UNDEFINED                                          98                             /* 'undefined' */
-#define DUK_STRIDX_STRINGIFY                                          99                             /* 'stringify' */
-#define DUK_STRIDX_TAN                                                100                            /* 'tan' */
-#define DUK_STRIDX_SQRT                                               101                            /* 'sqrt' */
-#define DUK_STRIDX_SIN                                                102                            /* 'sin' */
-#define DUK_STRIDX_ROUND                                              103                            /* 'round' */
-#define DUK_STRIDX_RANDOM                                             104                            /* 'random' */
-#define DUK_STRIDX_POW                                                105                            /* 'pow' */
-#define DUK_STRIDX_MIN                                                106                            /* 'min' */
-#define DUK_STRIDX_MAX                                                107                            /* 'max' */
-#define DUK_STRIDX_LOG                                                108                            /* 'log' */
-#define DUK_STRIDX_FLOOR                                              109                            /* 'floor' */
-#define DUK_STRIDX_EXP                                                110                            /* 'exp' */
-#define DUK_STRIDX_COS                                                111                            /* 'cos' */
-#define DUK_STRIDX_CEIL                                               112                            /* 'ceil' */
-#define DUK_STRIDX_ATAN2                                              113                            /* 'atan2' */
-#define DUK_STRIDX_ATAN                                               114                            /* 'atan' */
-#define DUK_STRIDX_ASIN                                               115                            /* 'asin' */
-#define DUK_STRIDX_ACOS                                               116                            /* 'acos' */
-#define DUK_STRIDX_ABS                                                117                            /* 'abs' */
-#define DUK_STRIDX_SQRT2                                              118                            /* 'SQRT2' */
-#define DUK_STRIDX_SQRT1_2                                            119                            /* 'SQRT1_2' */
-#define DUK_STRIDX_PI                                                 120                            /* 'PI' */
-#define DUK_STRIDX_LOG10E                                             121                            /* 'LOG10E' */
-#define DUK_STRIDX_LOG2E                                              122                            /* 'LOG2E' */
-#define DUK_STRIDX_LN2                                                123                            /* 'LN2' */
-#define DUK_STRIDX_LN10                                               124                            /* 'LN10' */
-#define DUK_STRIDX_E                                                  125                            /* 'E' */
-#define DUK_STRIDX_MESSAGE                                            126                            /* 'message' */
-#define DUK_STRIDX_NAME                                               127                            /* 'name' */
-#define DUK_STRIDX_INPUT                                              128                            /* 'input' */
-#define DUK_STRIDX_INDEX                                              129                            /* 'index' */
-#define DUK_STRIDX_ESCAPED_EMPTY_REGEXP                               130                            /* '(?:)' */
-#define DUK_STRIDX_LAST_INDEX                                         131                            /* 'lastIndex' */
-#define DUK_STRIDX_MULTILINE                                          132                            /* 'multiline' */
-#define DUK_STRIDX_IGNORE_CASE                                        133                            /* 'ignoreCase' */
-#define DUK_STRIDX_SOURCE                                             134                            /* 'source' */
-#define DUK_STRIDX_TEST                                               135                            /* 'test' */
-#define DUK_STRIDX_EXEC                                               136                            /* 'exec' */
-#define DUK_STRIDX_TO_GMT_STRING                                      137                            /* 'toGMTString' */
-#define DUK_STRIDX_SET_YEAR                                           138                            /* 'setYear' */
-#define DUK_STRIDX_GET_YEAR                                           139                            /* 'getYear' */
-#define DUK_STRIDX_TO_JSON                                            140                            /* 'toJSON' */
-#define DUK_STRIDX_TO_ISO_STRING                                      141                            /* 'toISOString' */
-#define DUK_STRIDX_TO_UTC_STRING                                      142                            /* 'toUTCString' */
-#define DUK_STRIDX_SET_UTC_FULL_YEAR                                  143                            /* 'setUTCFullYear' */
-#define DUK_STRIDX_SET_FULL_YEAR                                      144                            /* 'setFullYear' */
-#define DUK_STRIDX_SET_UTC_MONTH                                      145                            /* 'setUTCMonth' */
-#define DUK_STRIDX_SET_MONTH                                          146                            /* 'setMonth' */
-#define DUK_STRIDX_SET_UTC_DATE                                       147                            /* 'setUTCDate' */
-#define DUK_STRIDX_SET_DATE                                           148                            /* 'setDate' */
-#define DUK_STRIDX_SET_UTC_HOURS                                      149                            /* 'setUTCHours' */
-#define DUK_STRIDX_SET_HOURS                                          150                            /* 'setHours' */
-#define DUK_STRIDX_SET_UTC_MINUTES                                    151                            /* 'setUTCMinutes' */
-#define DUK_STRIDX_SET_MINUTES                                        152                            /* 'setMinutes' */
-#define DUK_STRIDX_SET_UTC_SECONDS                                    153                            /* 'setUTCSeconds' */
-#define DUK_STRIDX_SET_SECONDS                                        154                            /* 'setSeconds' */
-#define DUK_STRIDX_SET_UTC_MILLISECONDS                               155                            /* 'setUTCMilliseconds' */
-#define DUK_STRIDX_SET_MILLISECONDS                                   156                            /* 'setMilliseconds' */
-#define DUK_STRIDX_SET_TIME                                           157                            /* 'setTime' */
-#define DUK_STRIDX_GET_TIMEZONE_OFFSET                                158                            /* 'getTimezoneOffset' */
-#define DUK_STRIDX_GET_UTC_MILLISECONDS                               159                            /* 'getUTCMilliseconds' */
-#define DUK_STRIDX_GET_MILLISECONDS                                   160                            /* 'getMilliseconds' */
-#define DUK_STRIDX_GET_UTC_SECONDS                                    161                            /* 'getUTCSeconds' */
-#define DUK_STRIDX_GET_SECONDS                                        162                            /* 'getSeconds' */
-#define DUK_STRIDX_GET_UTC_MINUTES                                    163                            /* 'getUTCMinutes' */
-#define DUK_STRIDX_GET_MINUTES                                        164                            /* 'getMinutes' */
-#define DUK_STRIDX_GET_UTC_HOURS                                      165                            /* 'getUTCHours' */
-#define DUK_STRIDX_GET_HOURS                                          166                            /* 'getHours' */
-#define DUK_STRIDX_GET_UTC_DAY                                        167                            /* 'getUTCDay' */
-#define DUK_STRIDX_GET_DAY                                            168                            /* 'getDay' */
-#define DUK_STRIDX_GET_UTC_DATE                                       169                            /* 'getUTCDate' */
-#define DUK_STRIDX_GET_DATE                                           170                            /* 'getDate' */
-#define DUK_STRIDX_GET_UTC_MONTH                                      171                            /* 'getUTCMonth' */
-#define DUK_STRIDX_GET_MONTH                                          172                            /* 'getMonth' */
-#define DUK_STRIDX_GET_UTC_FULL_YEAR                                  173                            /* 'getUTCFullYear' */
-#define DUK_STRIDX_GET_FULL_YEAR                                      174                            /* 'getFullYear' */
-#define DUK_STRIDX_GET_TIME                                           175                            /* 'getTime' */
-#define DUK_STRIDX_TO_LOCALE_TIME_STRING                              176                            /* 'toLocaleTimeString' */
-#define DUK_STRIDX_TO_LOCALE_DATE_STRING                              177                            /* 'toLocaleDateString' */
-#define DUK_STRIDX_TO_TIME_STRING                                     178                            /* 'toTimeString' */
-#define DUK_STRIDX_TO_DATE_STRING                                     179                            /* 'toDateString' */
-#define DUK_STRIDX_NOW                                                180                            /* 'now' */
-#define DUK_STRIDX_UTC                                                181                            /* 'UTC' */
-#define DUK_STRIDX_PARSE                                              182                            /* 'parse' */
-#define DUK_STRIDX_TO_PRECISION                                       183                            /* 'toPrecision' */
-#define DUK_STRIDX_TO_EXPONENTIAL                                     184                            /* 'toExponential' */
-#define DUK_STRIDX_TO_FIXED                                           185                            /* 'toFixed' */
-#define DUK_STRIDX_POSITIVE_INFINITY                                  186                            /* 'POSITIVE_INFINITY' */
-#define DUK_STRIDX_NEGATIVE_INFINITY                                  187                            /* 'NEGATIVE_INFINITY' */
-#define DUK_STRIDX_NAN                                                188                            /* 'NaN' */
-#define DUK_STRIDX_MIN_VALUE                                          189                            /* 'MIN_VALUE' */
-#define DUK_STRIDX_MAX_VALUE                                          190                            /* 'MAX_VALUE' */
-#define DUK_STRIDX_SUBSTR                                             191                            /* 'substr' */
-#define DUK_STRIDX_TRIM                                               192                            /* 'trim' */
-#define DUK_STRIDX_TO_LOCALE_UPPER_CASE                               193                            /* 'toLocaleUpperCase' */
-#define DUK_STRIDX_TO_UPPER_CASE                                      194                            /* 'toUpperCase' */
-#define DUK_STRIDX_TO_LOCALE_LOWER_CASE                               195                            /* 'toLocaleLowerCase' */
-#define DUK_STRIDX_TO_LOWER_CASE                                      196                            /* 'toLowerCase' */
-#define DUK_STRIDX_SUBSTRING                                          197                            /* 'substring' */
-#define DUK_STRIDX_SPLIT                                              198                            /* 'split' */
-#define DUK_STRIDX_SEARCH                                             199                            /* 'search' */
-#define DUK_STRIDX_REPLACE                                            200                            /* 'replace' */
-#define DUK_STRIDX_MATCH                                              201                            /* 'match' */
-#define DUK_STRIDX_LOCALE_COMPARE                                     202                            /* 'localeCompare' */
-#define DUK_STRIDX_CHAR_CODE_AT                                       203                            /* 'charCodeAt' */
-#define DUK_STRIDX_CHAR_AT                                            204                            /* 'charAt' */
-#define DUK_STRIDX_FROM_CHAR_CODE                                     205                            /* 'fromCharCode' */
-#define DUK_STRIDX_REDUCE_RIGHT                                       206                            /* 'reduceRight' */
-#define DUK_STRIDX_REDUCE                                             207                            /* 'reduce' */
-#define DUK_STRIDX_FILTER                                             208                            /* 'filter' */
-#define DUK_STRIDX_MAP                                                209                            /* 'map' */
-#define DUK_STRIDX_FOR_EACH                                           210                            /* 'forEach' */
-#define DUK_STRIDX_SOME                                               211                            /* 'some' */
-#define DUK_STRIDX_EVERY                                              212                            /* 'every' */
-#define DUK_STRIDX_LAST_INDEX_OF                                      213                            /* 'lastIndexOf' */
-#define DUK_STRIDX_INDEX_OF                                           214                            /* 'indexOf' */
-#define DUK_STRIDX_UNSHIFT                                            215                            /* 'unshift' */
-#define DUK_STRIDX_SPLICE                                             216                            /* 'splice' */
-#define DUK_STRIDX_SORT                                               217                            /* 'sort' */
-#define DUK_STRIDX_SLICE                                              218                            /* 'slice' */
-#define DUK_STRIDX_SHIFT                                              219                            /* 'shift' */
-#define DUK_STRIDX_REVERSE                                            220                            /* 'reverse' */
-#define DUK_STRIDX_PUSH                                               221                            /* 'push' */
-#define DUK_STRIDX_POP                                                222                            /* 'pop' */
-#define DUK_STRIDX_JOIN                                               223                            /* 'join' */
-#define DUK_STRIDX_CONCAT                                             224                            /* 'concat' */
-#define DUK_STRIDX_IS_ARRAY                                           225                            /* 'isArray' */
-#define DUK_STRIDX_LC_ARGUMENTS                                       226                            /* 'arguments' */
-#define DUK_STRIDX_CALLER                                             227                            /* 'caller' */
-#define DUK_STRIDX_BIND                                               228                            /* 'bind' */
-#define DUK_STRIDX_CALL                                               229                            /* 'call' */
-#define DUK_STRIDX_APPLY                                              230                            /* 'apply' */
-#define DUK_STRIDX_PROPERTY_IS_ENUMERABLE                             231                            /* 'propertyIsEnumerable' */
-#define DUK_STRIDX_IS_PROTOTYPE_OF                                    232                            /* 'isPrototypeOf' */
-#define DUK_STRIDX_HAS_OWN_PROPERTY                                   233                            /* 'hasOwnProperty' */
-#define DUK_STRIDX_VALUE_OF                                           234                            /* 'valueOf' */
-#define DUK_STRIDX_TO_LOCALE_STRING                                   235                            /* 'toLocaleString' */
-#define DUK_STRIDX_TO_STRING                                          236                            /* 'toString' */
-#define DUK_STRIDX_CONSTRUCTOR                                        237                            /* 'constructor' */
-#define DUK_STRIDX_SET                                                238                            /* 'set' */
-#define DUK_STRIDX_GET                                                239                            /* 'get' */
-#define DUK_STRIDX_ENUMERABLE                                         240                            /* 'enumerable' */
-#define DUK_STRIDX_CONFIGURABLE                                       241                            /* 'configurable' */
-#define DUK_STRIDX_WRITABLE                                           242                            /* 'writable' */
-#define DUK_STRIDX_VALUE                                              243                            /* 'value' */
-#define DUK_STRIDX_KEYS                                               244                            /* 'keys' */
-#define DUK_STRIDX_IS_EXTENSIBLE                                      245                            /* 'isExtensible' */
-#define DUK_STRIDX_IS_FROZEN                                          246                            /* 'isFrozen' */
-#define DUK_STRIDX_IS_SEALED                                          247                            /* 'isSealed' */
-#define DUK_STRIDX_PREVENT_EXTENSIONS                                 248                            /* 'preventExtensions' */
-#define DUK_STRIDX_FREEZE                                             249                            /* 'freeze' */
-#define DUK_STRIDX_SEAL                                               250                            /* 'seal' */
-#define DUK_STRIDX_DEFINE_PROPERTIES                                  251                            /* 'defineProperties' */
-#define DUK_STRIDX_DEFINE_PROPERTY                                    252                            /* 'defineProperty' */
-#define DUK_STRIDX_CREATE                                             253                            /* 'create' */
-#define DUK_STRIDX_GET_OWN_PROPERTY_NAMES                             254                            /* 'getOwnPropertyNames' */
-#define DUK_STRIDX_GET_OWN_PROPERTY_DESCRIPTOR                        255                            /* 'getOwnPropertyDescriptor' */
-#define DUK_STRIDX_GET_PROTOTYPE_OF                                   256                            /* 'getPrototypeOf' */
-#define DUK_STRIDX_PROTOTYPE                                          257                            /* 'prototype' */
-#define DUK_STRIDX_LENGTH                                             258                            /* 'length' */
-#define DUK_STRIDX_ALERT                                              259                            /* 'alert' */
-#define DUK_STRIDX_PRINT                                              260                            /* 'print' */
-#define DUK_STRIDX_UNESCAPE                                           261                            /* 'unescape' */
-#define DUK_STRIDX_ESCAPE                                             262                            /* 'escape' */
-#define DUK_STRIDX_ENCODE_URI_COMPONENT                               263                            /* 'encodeURIComponent' */
-#define DUK_STRIDX_ENCODE_URI                                         264                            /* 'encodeURI' */
-#define DUK_STRIDX_DECODE_URI_COMPONENT                               265                            /* 'decodeURIComponent' */
-#define DUK_STRIDX_DECODE_URI                                         266                            /* 'decodeURI' */
-#define DUK_STRIDX_IS_FINITE                                          267                            /* 'isFinite' */
-#define DUK_STRIDX_IS_NAN                                             268                            /* 'isNaN' */
-#define DUK_STRIDX_PARSE_FLOAT                                        269                            /* 'parseFloat' */
-#define DUK_STRIDX_PARSE_INT                                          270                            /* 'parseInt' */
-#define DUK_STRIDX_EVAL                                               271                            /* 'eval' */
-#define DUK_STRIDX_URI_ERROR                                          272                            /* 'URIError' */
-#define DUK_STRIDX_TYPE_ERROR                                         273                            /* 'TypeError' */
-#define DUK_STRIDX_SYNTAX_ERROR                                       274                            /* 'SyntaxError' */
-#define DUK_STRIDX_REFERENCE_ERROR                                    275                            /* 'ReferenceError' */
-#define DUK_STRIDX_RANGE_ERROR                                        276                            /* 'RangeError' */
-#define DUK_STRIDX_EVAL_ERROR                                         277                            /* 'EvalError' */
-#define DUK_STRIDX_BREAK                                              278                            /* 'break' */
-#define DUK_STRIDX_CASE                                               279                            /* 'case' */
-#define DUK_STRIDX_CATCH                                              280                            /* 'catch' */
-#define DUK_STRIDX_CONTINUE                                           281                            /* 'continue' */
-#define DUK_STRIDX_DEBUGGER                                           282                            /* 'debugger' */
-#define DUK_STRIDX_DEFAULT                                            283                            /* 'default' */
-#define DUK_STRIDX_DELETE                                             284                            /* 'delete' */
-#define DUK_STRIDX_DO                                                 285                            /* 'do' */
-#define DUK_STRIDX_ELSE                                               286                            /* 'else' */
-#define DUK_STRIDX_FINALLY                                            287                            /* 'finally' */
-#define DUK_STRIDX_FOR                                                288                            /* 'for' */
-#define DUK_STRIDX_LC_FUNCTION                                        289                            /* 'function' */
-#define DUK_STRIDX_IF                                                 290                            /* 'if' */
-#define DUK_STRIDX_IN                                                 291                            /* 'in' */
-#define DUK_STRIDX_INSTANCEOF                                         292                            /* 'instanceof' */
-#define DUK_STRIDX_NEW                                                293                            /* 'new' */
-#define DUK_STRIDX_RETURN                                             294                            /* 'return' */
-#define DUK_STRIDX_SWITCH                                             295                            /* 'switch' */
-#define DUK_STRIDX_THIS                                               296                            /* 'this' */
-#define DUK_STRIDX_THROW                                              297                            /* 'throw' */
-#define DUK_STRIDX_TRY                                                298                            /* 'try' */
-#define DUK_STRIDX_TYPEOF                                             299                            /* 'typeof' */
-#define DUK_STRIDX_VAR                                                300                            /* 'var' */
-#define DUK_STRIDX_VOID                                               301                            /* 'void' */
-#define DUK_STRIDX_WHILE                                              302                            /* 'while' */
-#define DUK_STRIDX_WITH                                               303                            /* 'with' */
-#define DUK_STRIDX_CLASS                                              304                            /* 'class' */
-#define DUK_STRIDX_CONST                                              305                            /* 'const' */
-#define DUK_STRIDX_ENUM                                               306                            /* 'enum' */
-#define DUK_STRIDX_EXPORT                                             307                            /* 'export' */
-#define DUK_STRIDX_EXTENDS                                            308                            /* 'extends' */
-#define DUK_STRIDX_IMPORT                                             309                            /* 'import' */
-#define DUK_STRIDX_SUPER                                              310                            /* 'super' */
-#define DUK_STRIDX_NULL                                               311                            /* 'null' */
-#define DUK_STRIDX_TRUE                                               312                            /* 'true' */
-#define DUK_STRIDX_FALSE                                              313                            /* 'false' */
-#define DUK_STRIDX_IMPLEMENTS                                         314                            /* 'implements' */
-#define DUK_STRIDX_INTERFACE                                          315                            /* 'interface' */
-#define DUK_STRIDX_LET                                                316                            /* 'let' */
-#define DUK_STRIDX_PACKAGE                                            317                            /* 'package' */
-#define DUK_STRIDX_PRIVATE                                            318                            /* 'private' */
-#define DUK_STRIDX_PROTECTED                                          319                            /* 'protected' */
-#define DUK_STRIDX_PUBLIC                                             320                            /* 'public' */
-#define DUK_STRIDX_STATIC                                             321                            /* 'static' */
-#define DUK_STRIDX_YIELD                                              322                            /* 'yield' */
+#define DUK_STRIDX_UC_NULL                                            20                             /* 'Null' */
+#define DUK_STRIDX_UC_UNDEFINED                                       21                             /* 'Undefined' */
+#define DUK_STRIDX_JSON_EXT_FUNCTION2                                 22                             /* '{_func:true}' */
+#define DUK_STRIDX_JSON_EXT_FUNCTION1                                 23                             /* '{"_func":true}' */
+#define DUK_STRIDX_JSON_EXT_NEGINF                                    24                             /* '{"_ninf":true}' */
+#define DUK_STRIDX_JSON_EXT_POSINF                                    25                             /* '{"_inf":true}' */
+#define DUK_STRIDX_JSON_EXT_NAN                                       26                             /* '{"_nan":true}' */
+#define DUK_STRIDX_JSON_EXT_UNDEFINED                                 27                             /* '{"_undef":true}' */
+#define DUK_STRIDX_TO_LOG_STRING                                      28                             /* 'toLogString' */
+#define DUK_STRIDX_CLOG                                               29                             /* 'clog' */
+#define DUK_STRIDX_LC_L                                               30                             /* 'l' */
+#define DUK_STRIDX_LC_N                                               31                             /* 'n' */
+#define DUK_STRIDX_LC_FATAL                                           32                             /* 'fatal' */
+#define DUK_STRIDX_LC_ERROR                                           33                             /* 'error' */
+#define DUK_STRIDX_LC_WARN                                            34                             /* 'warn' */
+#define DUK_STRIDX_LC_DEBUG                                           35                             /* 'debug' */
+#define DUK_STRIDX_LC_TRACE                                           36                             /* 'trace' */
+#define DUK_STRIDX_RAW                                                37                             /* 'raw' */
+#define DUK_STRIDX_FMT                                                38                             /* 'fmt' */
+#define DUK_STRIDX_CURRENT                                            39                             /* 'current' */
+#define DUK_STRIDX_RESUME                                             40                             /* 'resume' */
+#define DUK_STRIDX_COMPACT                                            41                             /* 'compact' */
+#define DUK_STRIDX_JC                                                 42                             /* 'jc' */
+#define DUK_STRIDX_JX                                                 43                             /* 'jx' */
+#define DUK_STRIDX_BASE64                                             44                             /* 'base64' */
+#define DUK_STRIDX_HEX                                                45                             /* 'hex' */
+#define DUK_STRIDX_DEC                                                46                             /* 'dec' */
+#define DUK_STRIDX_ENC                                                47                             /* 'enc' */
+#define DUK_STRIDX_FIN                                                48                             /* 'fin' */
+#define DUK_STRIDX_GC                                                 49                             /* 'gc' */
+#define DUK_STRIDX_ACT                                                50                             /* 'act' */
+#define DUK_STRIDX_LC_INFO                                            51                             /* 'info' */
+#define DUK_STRIDX_VERSION                                            52                             /* 'version' */
+#define DUK_STRIDX_ENV                                                53                             /* 'env' */
+#define DUK_STRIDX_MOD_LOADED                                         54                             /* 'modLoaded' */
+#define DUK_STRIDX_MOD_SEARCH                                         55                             /* 'modSearch' */
+#define DUK_STRIDX_ERR_THROW                                          56                             /* 'errThrow' */
+#define DUK_STRIDX_ERR_CREATE                                         57                             /* 'errCreate' */
+#define DUK_STRIDX_COMPILE                                            58                             /* 'compile' */
+#define DUK_STRIDX_INT_REGBASE                                        59                             /* '\x00regbase' */
+#define DUK_STRIDX_INT_THREAD                                         60                             /* '\x00thread' */
+#define DUK_STRIDX_INT_HANDLER                                        61                             /* '\x00handler' */
+#define DUK_STRIDX_INT_FINALIZER                                      62                             /* '\x00finalizer' */
+#define DUK_STRIDX_INT_CALLEE                                         63                             /* '\x00callee' */
+#define DUK_STRIDX_INT_MAP                                            64                             /* '\x00map' */
+#define DUK_STRIDX_INT_ARGS                                           65                             /* '\x00args' */
+#define DUK_STRIDX_INT_THIS                                           66                             /* '\x00this' */
+#define DUK_STRIDX_INT_PC2LINE                                        67                             /* '\x00pc2line' */
+#define DUK_STRIDX_INT_SOURCE                                         68                             /* '\x00source' */
+#define DUK_STRIDX_INT_VARENV                                         69                             /* '\x00varenv' */
+#define DUK_STRIDX_INT_LEXENV                                         70                             /* '\x00lexenv' */
+#define DUK_STRIDX_INT_VARMAP                                         71                             /* '\x00varmap' */
+#define DUK_STRIDX_INT_FORMALS                                        72                             /* '\x00formals' */
+#define DUK_STRIDX_INT_BYTECODE                                       73                             /* '\x00bytecode' */
+#define DUK_STRIDX_INT_NEXT                                           74                             /* '\x00next' */
+#define DUK_STRIDX_INT_TARGET                                         75                             /* '\x00target' */
+#define DUK_STRIDX_INT_VALUE                                          76                             /* '\x00value' */
+#define DUK_STRIDX_LC_POINTER                                         77                             /* 'pointer' */
+#define DUK_STRIDX_LC_BUFFER                                          78                             /* 'buffer' */
+#define DUK_STRIDX_TRACEDATA                                          79                             /* 'tracedata' */
+#define DUK_STRIDX_LINE_NUMBER                                        80                             /* 'lineNumber' */
+#define DUK_STRIDX_FILE_NAME                                          81                             /* 'fileName' */
+#define DUK_STRIDX_PC                                                 82                             /* 'pc' */
+#define DUK_STRIDX_STACK                                              83                             /* 'stack' */
+#define DUK_STRIDX_THROW_TYPE_ERROR                                   84                             /* 'ThrowTypeError' */
+#define DUK_STRIDX_DUKTAPE                                            85                             /* 'Duktape' */
+#define DUK_STRIDX_ID                                                 86                             /* 'id' */
+#define DUK_STRIDX_REQUIRE                                            87                             /* 'require' */
+#define DUK_STRIDX___PROTO__                                          88                             /* '__proto__' */
+#define DUK_STRIDX_SET_PROTOTYPE_OF                                   89                             /* 'setPrototypeOf' */
+#define DUK_STRIDX_OWN_KEYS                                           90                             /* 'ownKeys' */
+#define DUK_STRIDX_ENUMERATE                                          91                             /* 'enumerate' */
+#define DUK_STRIDX_DELETE_PROPERTY                                    92                             /* 'deleteProperty' */
+#define DUK_STRIDX_HAS                                                93                             /* 'has' */
+#define DUK_STRIDX_PROXY                                              94                             /* 'Proxy' */
+#define DUK_STRIDX_CALLEE                                             95                             /* 'callee' */
+#define DUK_STRIDX_INVALID_DATE                                       96                             /* 'Invalid Date' */
+#define DUK_STRIDX_BRACKETED_ELLIPSIS                                 97                             /* '[...]' */
+#define DUK_STRIDX_NEWLINE_TAB                                        98                             /* '\n\t' */
+#define DUK_STRIDX_SPACE                                              99                             /* ' ' */
+#define DUK_STRIDX_COMMA                                              100                            /* ',' */
+#define DUK_STRIDX_MINUS_ZERO                                         101                            /* '-0' */
+#define DUK_STRIDX_PLUS_ZERO                                          102                            /* '+0' */
+#define DUK_STRIDX_ZERO                                               103                            /* '0' */
+#define DUK_STRIDX_MINUS_INFINITY                                     104                            /* '-Infinity' */
+#define DUK_STRIDX_PLUS_INFINITY                                      105                            /* '+Infinity' */
+#define DUK_STRIDX_INFINITY                                           106                            /* 'Infinity' */
+#define DUK_STRIDX_LC_OBJECT                                          107                            /* 'object' */
+#define DUK_STRIDX_LC_STRING                                          108                            /* 'string' */
+#define DUK_STRIDX_LC_NUMBER                                          109                            /* 'number' */
+#define DUK_STRIDX_LC_BOOLEAN                                         110                            /* 'boolean' */
+#define DUK_STRIDX_LC_UNDEFINED                                       111                            /* 'undefined' */
+#define DUK_STRIDX_STRINGIFY                                          112                            /* 'stringify' */
+#define DUK_STRIDX_TAN                                                113                            /* 'tan' */
+#define DUK_STRIDX_SQRT                                               114                            /* 'sqrt' */
+#define DUK_STRIDX_SIN                                                115                            /* 'sin' */
+#define DUK_STRIDX_ROUND                                              116                            /* 'round' */
+#define DUK_STRIDX_RANDOM                                             117                            /* 'random' */
+#define DUK_STRIDX_POW                                                118                            /* 'pow' */
+#define DUK_STRIDX_MIN                                                119                            /* 'min' */
+#define DUK_STRIDX_MAX                                                120                            /* 'max' */
+#define DUK_STRIDX_LOG                                                121                            /* 'log' */
+#define DUK_STRIDX_FLOOR                                              122                            /* 'floor' */
+#define DUK_STRIDX_EXP                                                123                            /* 'exp' */
+#define DUK_STRIDX_COS                                                124                            /* 'cos' */
+#define DUK_STRIDX_CEIL                                               125                            /* 'ceil' */
+#define DUK_STRIDX_ATAN2                                              126                            /* 'atan2' */
+#define DUK_STRIDX_ATAN                                               127                            /* 'atan' */
+#define DUK_STRIDX_ASIN                                               128                            /* 'asin' */
+#define DUK_STRIDX_ACOS                                               129                            /* 'acos' */
+#define DUK_STRIDX_ABS                                                130                            /* 'abs' */
+#define DUK_STRIDX_SQRT2                                              131                            /* 'SQRT2' */
+#define DUK_STRIDX_SQRT1_2                                            132                            /* 'SQRT1_2' */
+#define DUK_STRIDX_PI                                                 133                            /* 'PI' */
+#define DUK_STRIDX_LOG10E                                             134                            /* 'LOG10E' */
+#define DUK_STRIDX_LOG2E                                              135                            /* 'LOG2E' */
+#define DUK_STRIDX_LN2                                                136                            /* 'LN2' */
+#define DUK_STRIDX_LN10                                               137                            /* 'LN10' */
+#define DUK_STRIDX_E                                                  138                            /* 'E' */
+#define DUK_STRIDX_MESSAGE                                            139                            /* 'message' */
+#define DUK_STRIDX_NAME                                               140                            /* 'name' */
+#define DUK_STRIDX_INPUT                                              141                            /* 'input' */
+#define DUK_STRIDX_INDEX                                              142                            /* 'index' */
+#define DUK_STRIDX_ESCAPED_EMPTY_REGEXP                               143                            /* '(?:)' */
+#define DUK_STRIDX_LAST_INDEX                                         144                            /* 'lastIndex' */
+#define DUK_STRIDX_MULTILINE                                          145                            /* 'multiline' */
+#define DUK_STRIDX_IGNORE_CASE                                        146                            /* 'ignoreCase' */
+#define DUK_STRIDX_SOURCE                                             147                            /* 'source' */
+#define DUK_STRIDX_TEST                                               148                            /* 'test' */
+#define DUK_STRIDX_EXEC                                               149                            /* 'exec' */
+#define DUK_STRIDX_TO_GMT_STRING                                      150                            /* 'toGMTString' */
+#define DUK_STRIDX_SET_YEAR                                           151                            /* 'setYear' */
+#define DUK_STRIDX_GET_YEAR                                           152                            /* 'getYear' */
+#define DUK_STRIDX_TO_JSON                                            153                            /* 'toJSON' */
+#define DUK_STRIDX_TO_ISO_STRING                                      154                            /* 'toISOString' */
+#define DUK_STRIDX_TO_UTC_STRING                                      155                            /* 'toUTCString' */
+#define DUK_STRIDX_SET_UTC_FULL_YEAR                                  156                            /* 'setUTCFullYear' */
+#define DUK_STRIDX_SET_FULL_YEAR                                      157                            /* 'setFullYear' */
+#define DUK_STRIDX_SET_UTC_MONTH                                      158                            /* 'setUTCMonth' */
+#define DUK_STRIDX_SET_MONTH                                          159                            /* 'setMonth' */
+#define DUK_STRIDX_SET_UTC_DATE                                       160                            /* 'setUTCDate' */
+#define DUK_STRIDX_SET_DATE                                           161                            /* 'setDate' */
+#define DUK_STRIDX_SET_UTC_HOURS                                      162                            /* 'setUTCHours' */
+#define DUK_STRIDX_SET_HOURS                                          163                            /* 'setHours' */
+#define DUK_STRIDX_SET_UTC_MINUTES                                    164                            /* 'setUTCMinutes' */
+#define DUK_STRIDX_SET_MINUTES                                        165                            /* 'setMinutes' */
+#define DUK_STRIDX_SET_UTC_SECONDS                                    166                            /* 'setUTCSeconds' */
+#define DUK_STRIDX_SET_SECONDS                                        167                            /* 'setSeconds' */
+#define DUK_STRIDX_SET_UTC_MILLISECONDS                               168                            /* 'setUTCMilliseconds' */
+#define DUK_STRIDX_SET_MILLISECONDS                                   169                            /* 'setMilliseconds' */
+#define DUK_STRIDX_SET_TIME                                           170                            /* 'setTime' */
+#define DUK_STRIDX_GET_TIMEZONE_OFFSET                                171                            /* 'getTimezoneOffset' */
+#define DUK_STRIDX_GET_UTC_MILLISECONDS                               172                            /* 'getUTCMilliseconds' */
+#define DUK_STRIDX_GET_MILLISECONDS                                   173                            /* 'getMilliseconds' */
+#define DUK_STRIDX_GET_UTC_SECONDS                                    174                            /* 'getUTCSeconds' */
+#define DUK_STRIDX_GET_SECONDS                                        175                            /* 'getSeconds' */
+#define DUK_STRIDX_GET_UTC_MINUTES                                    176                            /* 'getUTCMinutes' */
+#define DUK_STRIDX_GET_MINUTES                                        177                            /* 'getMinutes' */
+#define DUK_STRIDX_GET_UTC_HOURS                                      178                            /* 'getUTCHours' */
+#define DUK_STRIDX_GET_HOURS                                          179                            /* 'getHours' */
+#define DUK_STRIDX_GET_UTC_DAY                                        180                            /* 'getUTCDay' */
+#define DUK_STRIDX_GET_DAY                                            181                            /* 'getDay' */
+#define DUK_STRIDX_GET_UTC_DATE                                       182                            /* 'getUTCDate' */
+#define DUK_STRIDX_GET_DATE                                           183                            /* 'getDate' */
+#define DUK_STRIDX_GET_UTC_MONTH                                      184                            /* 'getUTCMonth' */
+#define DUK_STRIDX_GET_MONTH                                          185                            /* 'getMonth' */
+#define DUK_STRIDX_GET_UTC_FULL_YEAR                                  186                            /* 'getUTCFullYear' */
+#define DUK_STRIDX_GET_FULL_YEAR                                      187                            /* 'getFullYear' */
+#define DUK_STRIDX_GET_TIME                                           188                            /* 'getTime' */
+#define DUK_STRIDX_TO_LOCALE_TIME_STRING                              189                            /* 'toLocaleTimeString' */
+#define DUK_STRIDX_TO_LOCALE_DATE_STRING                              190                            /* 'toLocaleDateString' */
+#define DUK_STRIDX_TO_TIME_STRING                                     191                            /* 'toTimeString' */
+#define DUK_STRIDX_TO_DATE_STRING                                     192                            /* 'toDateString' */
+#define DUK_STRIDX_NOW                                                193                            /* 'now' */
+#define DUK_STRIDX_UTC                                                194                            /* 'UTC' */
+#define DUK_STRIDX_PARSE                                              195                            /* 'parse' */
+#define DUK_STRIDX_TO_PRECISION                                       196                            /* 'toPrecision' */
+#define DUK_STRIDX_TO_EXPONENTIAL                                     197                            /* 'toExponential' */
+#define DUK_STRIDX_TO_FIXED                                           198                            /* 'toFixed' */
+#define DUK_STRIDX_POSITIVE_INFINITY                                  199                            /* 'POSITIVE_INFINITY' */
+#define DUK_STRIDX_NEGATIVE_INFINITY                                  200                            /* 'NEGATIVE_INFINITY' */
+#define DUK_STRIDX_NAN                                                201                            /* 'NaN' */
+#define DUK_STRIDX_MIN_VALUE                                          202                            /* 'MIN_VALUE' */
+#define DUK_STRIDX_MAX_VALUE                                          203                            /* 'MAX_VALUE' */
+#define DUK_STRIDX_SUBSTR                                             204                            /* 'substr' */
+#define DUK_STRIDX_TRIM                                               205                            /* 'trim' */
+#define DUK_STRIDX_TO_LOCALE_UPPER_CASE                               206                            /* 'toLocaleUpperCase' */
+#define DUK_STRIDX_TO_UPPER_CASE                                      207                            /* 'toUpperCase' */
+#define DUK_STRIDX_TO_LOCALE_LOWER_CASE                               208                            /* 'toLocaleLowerCase' */
+#define DUK_STRIDX_TO_LOWER_CASE                                      209                            /* 'toLowerCase' */
+#define DUK_STRIDX_SUBSTRING                                          210                            /* 'substring' */
+#define DUK_STRIDX_SPLIT                                              211                            /* 'split' */
+#define DUK_STRIDX_SEARCH                                             212                            /* 'search' */
+#define DUK_STRIDX_REPLACE                                            213                            /* 'replace' */
+#define DUK_STRIDX_MATCH                                              214                            /* 'match' */
+#define DUK_STRIDX_LOCALE_COMPARE                                     215                            /* 'localeCompare' */
+#define DUK_STRIDX_CHAR_CODE_AT                                       216                            /* 'charCodeAt' */
+#define DUK_STRIDX_CHAR_AT                                            217                            /* 'charAt' */
+#define DUK_STRIDX_FROM_CHAR_CODE                                     218                            /* 'fromCharCode' */
+#define DUK_STRIDX_REDUCE_RIGHT                                       219                            /* 'reduceRight' */
+#define DUK_STRIDX_REDUCE                                             220                            /* 'reduce' */
+#define DUK_STRIDX_FILTER                                             221                            /* 'filter' */
+#define DUK_STRIDX_MAP                                                222                            /* 'map' */
+#define DUK_STRIDX_FOR_EACH                                           223                            /* 'forEach' */
+#define DUK_STRIDX_SOME                                               224                            /* 'some' */
+#define DUK_STRIDX_EVERY                                              225                            /* 'every' */
+#define DUK_STRIDX_LAST_INDEX_OF                                      226                            /* 'lastIndexOf' */
+#define DUK_STRIDX_INDEX_OF                                           227                            /* 'indexOf' */
+#define DUK_STRIDX_UNSHIFT                                            228                            /* 'unshift' */
+#define DUK_STRIDX_SPLICE                                             229                            /* 'splice' */
+#define DUK_STRIDX_SORT                                               230                            /* 'sort' */
+#define DUK_STRIDX_SLICE                                              231                            /* 'slice' */
+#define DUK_STRIDX_SHIFT                                              232                            /* 'shift' */
+#define DUK_STRIDX_REVERSE                                            233                            /* 'reverse' */
+#define DUK_STRIDX_PUSH                                               234                            /* 'push' */
+#define DUK_STRIDX_POP                                                235                            /* 'pop' */
+#define DUK_STRIDX_JOIN                                               236                            /* 'join' */
+#define DUK_STRIDX_CONCAT                                             237                            /* 'concat' */
+#define DUK_STRIDX_IS_ARRAY                                           238                            /* 'isArray' */
+#define DUK_STRIDX_LC_ARGUMENTS                                       239                            /* 'arguments' */
+#define DUK_STRIDX_CALLER                                             240                            /* 'caller' */
+#define DUK_STRIDX_BIND                                               241                            /* 'bind' */
+#define DUK_STRIDX_CALL                                               242                            /* 'call' */
+#define DUK_STRIDX_APPLY                                              243                            /* 'apply' */
+#define DUK_STRIDX_PROPERTY_IS_ENUMERABLE                             244                            /* 'propertyIsEnumerable' */
+#define DUK_STRIDX_IS_PROTOTYPE_OF                                    245                            /* 'isPrototypeOf' */
+#define DUK_STRIDX_HAS_OWN_PROPERTY                                   246                            /* 'hasOwnProperty' */
+#define DUK_STRIDX_VALUE_OF                                           247                            /* 'valueOf' */
+#define DUK_STRIDX_TO_LOCALE_STRING                                   248                            /* 'toLocaleString' */
+#define DUK_STRIDX_TO_STRING                                          249                            /* 'toString' */
+#define DUK_STRIDX_CONSTRUCTOR                                        250                            /* 'constructor' */
+#define DUK_STRIDX_SET                                                251                            /* 'set' */
+#define DUK_STRIDX_GET                                                252                            /* 'get' */
+#define DUK_STRIDX_ENUMERABLE                                         253                            /* 'enumerable' */
+#define DUK_STRIDX_CONFIGURABLE                                       254                            /* 'configurable' */
+#define DUK_STRIDX_WRITABLE                                           255                            /* 'writable' */
+#define DUK_STRIDX_VALUE                                              256                            /* 'value' */
+#define DUK_STRIDX_KEYS                                               257                            /* 'keys' */
+#define DUK_STRIDX_IS_EXTENSIBLE                                      258                            /* 'isExtensible' */
+#define DUK_STRIDX_IS_FROZEN                                          259                            /* 'isFrozen' */
+#define DUK_STRIDX_IS_SEALED                                          260                            /* 'isSealed' */
+#define DUK_STRIDX_PREVENT_EXTENSIONS                                 261                            /* 'preventExtensions' */
+#define DUK_STRIDX_FREEZE                                             262                            /* 'freeze' */
+#define DUK_STRIDX_SEAL                                               263                            /* 'seal' */
+#define DUK_STRIDX_DEFINE_PROPERTIES                                  264                            /* 'defineProperties' */
+#define DUK_STRIDX_DEFINE_PROPERTY                                    265                            /* 'defineProperty' */
+#define DUK_STRIDX_CREATE                                             266                            /* 'create' */
+#define DUK_STRIDX_GET_OWN_PROPERTY_NAMES                             267                            /* 'getOwnPropertyNames' */
+#define DUK_STRIDX_GET_OWN_PROPERTY_DESCRIPTOR                        268                            /* 'getOwnPropertyDescriptor' */
+#define DUK_STRIDX_GET_PROTOTYPE_OF                                   269                            /* 'getPrototypeOf' */
+#define DUK_STRIDX_PROTOTYPE                                          270                            /* 'prototype' */
+#define DUK_STRIDX_LENGTH                                             271                            /* 'length' */
+#define DUK_STRIDX_ALERT                                              272                            /* 'alert' */
+#define DUK_STRIDX_PRINT                                              273                            /* 'print' */
+#define DUK_STRIDX_UNESCAPE                                           274                            /* 'unescape' */
+#define DUK_STRIDX_ESCAPE                                             275                            /* 'escape' */
+#define DUK_STRIDX_ENCODE_URI_COMPONENT                               276                            /* 'encodeURIComponent' */
+#define DUK_STRIDX_ENCODE_URI                                         277                            /* 'encodeURI' */
+#define DUK_STRIDX_DECODE_URI_COMPONENT                               278                            /* 'decodeURIComponent' */
+#define DUK_STRIDX_DECODE_URI                                         279                            /* 'decodeURI' */
+#define DUK_STRIDX_IS_FINITE                                          280                            /* 'isFinite' */
+#define DUK_STRIDX_IS_NAN                                             281                            /* 'isNaN' */
+#define DUK_STRIDX_PARSE_FLOAT                                        282                            /* 'parseFloat' */
+#define DUK_STRIDX_PARSE_INT                                          283                            /* 'parseInt' */
+#define DUK_STRIDX_EVAL                                               284                            /* 'eval' */
+#define DUK_STRIDX_URI_ERROR                                          285                            /* 'URIError' */
+#define DUK_STRIDX_TYPE_ERROR                                         286                            /* 'TypeError' */
+#define DUK_STRIDX_SYNTAX_ERROR                                       287                            /* 'SyntaxError' */
+#define DUK_STRIDX_REFERENCE_ERROR                                    288                            /* 'ReferenceError' */
+#define DUK_STRIDX_RANGE_ERROR                                        289                            /* 'RangeError' */
+#define DUK_STRIDX_EVAL_ERROR                                         290                            /* 'EvalError' */
+#define DUK_STRIDX_BREAK                                              291                            /* 'break' */
+#define DUK_STRIDX_CASE                                               292                            /* 'case' */
+#define DUK_STRIDX_CATCH                                              293                            /* 'catch' */
+#define DUK_STRIDX_CONTINUE                                           294                            /* 'continue' */
+#define DUK_STRIDX_DEBUGGER                                           295                            /* 'debugger' */
+#define DUK_STRIDX_DEFAULT                                            296                            /* 'default' */
+#define DUK_STRIDX_DELETE                                             297                            /* 'delete' */
+#define DUK_STRIDX_DO                                                 298                            /* 'do' */
+#define DUK_STRIDX_ELSE                                               299                            /* 'else' */
+#define DUK_STRIDX_FINALLY                                            300                            /* 'finally' */
+#define DUK_STRIDX_FOR                                                301                            /* 'for' */
+#define DUK_STRIDX_LC_FUNCTION                                        302                            /* 'function' */
+#define DUK_STRIDX_IF                                                 303                            /* 'if' */
+#define DUK_STRIDX_IN                                                 304                            /* 'in' */
+#define DUK_STRIDX_INSTANCEOF                                         305                            /* 'instanceof' */
+#define DUK_STRIDX_NEW                                                306                            /* 'new' */
+#define DUK_STRIDX_RETURN                                             307                            /* 'return' */
+#define DUK_STRIDX_SWITCH                                             308                            /* 'switch' */
+#define DUK_STRIDX_THIS                                               309                            /* 'this' */
+#define DUK_STRIDX_THROW                                              310                            /* 'throw' */
+#define DUK_STRIDX_TRY                                                311                            /* 'try' */
+#define DUK_STRIDX_TYPEOF                                             312                            /* 'typeof' */
+#define DUK_STRIDX_VAR                                                313                            /* 'var' */
+#define DUK_STRIDX_VOID                                               314                            /* 'void' */
+#define DUK_STRIDX_WHILE                                              315                            /* 'while' */
+#define DUK_STRIDX_WITH                                               316                            /* 'with' */
+#define DUK_STRIDX_CLASS                                              317                            /* 'class' */
+#define DUK_STRIDX_CONST                                              318                            /* 'const' */
+#define DUK_STRIDX_ENUM                                               319                            /* 'enum' */
+#define DUK_STRIDX_EXPORT                                             320                            /* 'export' */
+#define DUK_STRIDX_EXTENDS                                            321                            /* 'extends' */
+#define DUK_STRIDX_IMPORT                                             322                            /* 'import' */
+#define DUK_STRIDX_SUPER                                              323                            /* 'super' */
+#define DUK_STRIDX_LC_NULL                                            324                            /* 'null' */
+#define DUK_STRIDX_TRUE                                               325                            /* 'true' */
+#define DUK_STRIDX_FALSE                                              326                            /* 'false' */
+#define DUK_STRIDX_IMPLEMENTS                                         327                            /* 'implements' */
+#define DUK_STRIDX_INTERFACE                                          328                            /* 'interface' */
+#define DUK_STRIDX_LET                                                329                            /* 'let' */
+#define DUK_STRIDX_PACKAGE                                            330                            /* 'package' */
+#define DUK_STRIDX_PRIVATE                                            331                            /* 'private' */
+#define DUK_STRIDX_PROTECTED                                          332                            /* 'protected' */
+#define DUK_STRIDX_PUBLIC                                             333                            /* 'public' */
+#define DUK_STRIDX_STATIC                                             334                            /* 'static' */
+#define DUK_STRIDX_YIELD                                              335                            /* 'yield' */
 
 #define DUK_HEAP_STRING_UC_LOGGER(heap)                               DUK_HEAP_GET_STRING((heap),DUK_STRIDX_UC_LOGGER)
 #define DUK_HTHREAD_STRING_UC_LOGGER(thr)                             DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_UC_LOGGER)
@@ -2459,6 +2552,10 @@ extern const duk_uint8_t duk_strings_data[];
 #define DUK_HTHREAD_STRING_UC_FUNCTION(thr)                           DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_UC_FUNCTION)
 #define DUK_HEAP_STRING_UC_OBJECT(heap)                               DUK_HEAP_GET_STRING((heap),DUK_STRIDX_UC_OBJECT)
 #define DUK_HTHREAD_STRING_UC_OBJECT(thr)                             DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_UC_OBJECT)
+#define DUK_HEAP_STRING_UC_NULL(heap)                                 DUK_HEAP_GET_STRING((heap),DUK_STRIDX_UC_NULL)
+#define DUK_HTHREAD_STRING_UC_NULL(thr)                               DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_UC_NULL)
+#define DUK_HEAP_STRING_UC_UNDEFINED(heap)                            DUK_HEAP_GET_STRING((heap),DUK_STRIDX_UC_UNDEFINED)
+#define DUK_HTHREAD_STRING_UC_UNDEFINED(thr)                          DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_UC_UNDEFINED)
 #define DUK_HEAP_STRING_JSON_EXT_FUNCTION2(heap)                      DUK_HEAP_GET_STRING((heap),DUK_STRIDX_JSON_EXT_FUNCTION2)
 #define DUK_HTHREAD_STRING_JSON_EXT_FUNCTION2(thr)                    DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_JSON_EXT_FUNCTION2)
 #define DUK_HEAP_STRING_JSON_EXT_FUNCTION1(heap)                      DUK_HEAP_GET_STRING((heap),DUK_STRIDX_JSON_EXT_FUNCTION1)
@@ -2499,10 +2596,10 @@ extern const duk_uint8_t duk_strings_data[];
 #define DUK_HTHREAD_STRING_RESUME(thr)                                DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_RESUME)
 #define DUK_HEAP_STRING_COMPACT(heap)                                 DUK_HEAP_GET_STRING((heap),DUK_STRIDX_COMPACT)
 #define DUK_HTHREAD_STRING_COMPACT(thr)                               DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_COMPACT)
-#define DUK_HEAP_STRING_JSONC(heap)                                   DUK_HEAP_GET_STRING((heap),DUK_STRIDX_JSONC)
-#define DUK_HTHREAD_STRING_JSONC(thr)                                 DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_JSONC)
-#define DUK_HEAP_STRING_JSONX(heap)                                   DUK_HEAP_GET_STRING((heap),DUK_STRIDX_JSONX)
-#define DUK_HTHREAD_STRING_JSONX(thr)                                 DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_JSONX)
+#define DUK_HEAP_STRING_JC(heap)                                      DUK_HEAP_GET_STRING((heap),DUK_STRIDX_JC)
+#define DUK_HTHREAD_STRING_JC(thr)                                    DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_JC)
+#define DUK_HEAP_STRING_JX(heap)                                      DUK_HEAP_GET_STRING((heap),DUK_STRIDX_JX)
+#define DUK_HTHREAD_STRING_JX(thr)                                    DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_JX)
 #define DUK_HEAP_STRING_BASE64(heap)                                  DUK_HEAP_GET_STRING((heap),DUK_STRIDX_BASE64)
 #define DUK_HTHREAD_STRING_BASE64(thr)                                DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_BASE64)
 #define DUK_HEAP_STRING_HEX(heap)                                     DUK_HEAP_GET_STRING((heap),DUK_STRIDX_HEX)
@@ -2517,24 +2614,28 @@ extern const duk_uint8_t duk_strings_data[];
 #define DUK_HTHREAD_STRING_GC(thr)                                    DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_GC)
 #define DUK_HEAP_STRING_ACT(heap)                                     DUK_HEAP_GET_STRING((heap),DUK_STRIDX_ACT)
 #define DUK_HTHREAD_STRING_ACT(thr)                                   DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_ACT)
-#define DUK_HEAP_STRING_LINE(heap)                                    DUK_HEAP_GET_STRING((heap),DUK_STRIDX_LINE)
-#define DUK_HTHREAD_STRING_LINE(thr)                                  DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_LINE)
 #define DUK_HEAP_STRING_LC_INFO(heap)                                 DUK_HEAP_GET_STRING((heap),DUK_STRIDX_LC_INFO)
 #define DUK_HTHREAD_STRING_LC_INFO(thr)                               DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_LC_INFO)
 #define DUK_HEAP_STRING_VERSION(heap)                                 DUK_HEAP_GET_STRING((heap),DUK_STRIDX_VERSION)
 #define DUK_HTHREAD_STRING_VERSION(thr)                               DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_VERSION)
 #define DUK_HEAP_STRING_ENV(heap)                                     DUK_HEAP_GET_STRING((heap),DUK_STRIDX_ENV)
 #define DUK_HTHREAD_STRING_ENV(thr)                                   DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_ENV)
-#define DUK_HEAP_STRING_ERRTHROW(heap)                                DUK_HEAP_GET_STRING((heap),DUK_STRIDX_ERRTHROW)
-#define DUK_HTHREAD_STRING_ERRTHROW(thr)                              DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_ERRTHROW)
-#define DUK_HEAP_STRING_ERRCREATE(heap)                               DUK_HEAP_GET_STRING((heap),DUK_STRIDX_ERRCREATE)
-#define DUK_HTHREAD_STRING_ERRCREATE(thr)                             DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_ERRCREATE)
+#define DUK_HEAP_STRING_MOD_LOADED(heap)                              DUK_HEAP_GET_STRING((heap),DUK_STRIDX_MOD_LOADED)
+#define DUK_HTHREAD_STRING_MOD_LOADED(thr)                            DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_MOD_LOADED)
+#define DUK_HEAP_STRING_MOD_SEARCH(heap)                              DUK_HEAP_GET_STRING((heap),DUK_STRIDX_MOD_SEARCH)
+#define DUK_HTHREAD_STRING_MOD_SEARCH(thr)                            DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_MOD_SEARCH)
+#define DUK_HEAP_STRING_ERR_THROW(heap)                               DUK_HEAP_GET_STRING((heap),DUK_STRIDX_ERR_THROW)
+#define DUK_HTHREAD_STRING_ERR_THROW(thr)                             DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_ERR_THROW)
+#define DUK_HEAP_STRING_ERR_CREATE(heap)                              DUK_HEAP_GET_STRING((heap),DUK_STRIDX_ERR_CREATE)
+#define DUK_HTHREAD_STRING_ERR_CREATE(thr)                            DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_ERR_CREATE)
 #define DUK_HEAP_STRING_COMPILE(heap)                                 DUK_HEAP_GET_STRING((heap),DUK_STRIDX_COMPILE)
 #define DUK_HTHREAD_STRING_COMPILE(thr)                               DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_COMPILE)
 #define DUK_HEAP_STRING_INT_REGBASE(heap)                             DUK_HEAP_GET_STRING((heap),DUK_STRIDX_INT_REGBASE)
 #define DUK_HTHREAD_STRING_INT_REGBASE(thr)                           DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_INT_REGBASE)
 #define DUK_HEAP_STRING_INT_THREAD(heap)                              DUK_HEAP_GET_STRING((heap),DUK_STRIDX_INT_THREAD)
 #define DUK_HTHREAD_STRING_INT_THREAD(thr)                            DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_INT_THREAD)
+#define DUK_HEAP_STRING_INT_HANDLER(heap)                             DUK_HEAP_GET_STRING((heap),DUK_STRIDX_INT_HANDLER)
+#define DUK_HTHREAD_STRING_INT_HANDLER(thr)                           DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_INT_HANDLER)
 #define DUK_HEAP_STRING_INT_FINALIZER(heap)                           DUK_HEAP_GET_STRING((heap),DUK_STRIDX_INT_FINALIZER)
 #define DUK_HTHREAD_STRING_INT_FINALIZER(thr)                         DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_INT_FINALIZER)
 #define DUK_HEAP_STRING_INT_CALLEE(heap)                              DUK_HEAP_GET_STRING((heap),DUK_STRIDX_INT_CALLEE)
@@ -2583,6 +2684,24 @@ extern const duk_uint8_t duk_strings_data[];
 #define DUK_HTHREAD_STRING_THROW_TYPE_ERROR(thr)                      DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_THROW_TYPE_ERROR)
 #define DUK_HEAP_STRING_DUKTAPE(heap)                                 DUK_HEAP_GET_STRING((heap),DUK_STRIDX_DUKTAPE)
 #define DUK_HTHREAD_STRING_DUKTAPE(thr)                               DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_DUKTAPE)
+#define DUK_HEAP_STRING_ID(heap)                                      DUK_HEAP_GET_STRING((heap),DUK_STRIDX_ID)
+#define DUK_HTHREAD_STRING_ID(thr)                                    DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_ID)
+#define DUK_HEAP_STRING_REQUIRE(heap)                                 DUK_HEAP_GET_STRING((heap),DUK_STRIDX_REQUIRE)
+#define DUK_HTHREAD_STRING_REQUIRE(thr)                               DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_REQUIRE)
+#define DUK_HEAP_STRING___PROTO__(heap)                               DUK_HEAP_GET_STRING((heap),DUK_STRIDX___PROTO__)
+#define DUK_HTHREAD_STRING___PROTO__(thr)                             DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX___PROTO__)
+#define DUK_HEAP_STRING_SET_PROTOTYPE_OF(heap)                        DUK_HEAP_GET_STRING((heap),DUK_STRIDX_SET_PROTOTYPE_OF)
+#define DUK_HTHREAD_STRING_SET_PROTOTYPE_OF(thr)                      DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_SET_PROTOTYPE_OF)
+#define DUK_HEAP_STRING_OWN_KEYS(heap)                                DUK_HEAP_GET_STRING((heap),DUK_STRIDX_OWN_KEYS)
+#define DUK_HTHREAD_STRING_OWN_KEYS(thr)                              DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_OWN_KEYS)
+#define DUK_HEAP_STRING_ENUMERATE(heap)                               DUK_HEAP_GET_STRING((heap),DUK_STRIDX_ENUMERATE)
+#define DUK_HTHREAD_STRING_ENUMERATE(thr)                             DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_ENUMERATE)
+#define DUK_HEAP_STRING_DELETE_PROPERTY(heap)                         DUK_HEAP_GET_STRING((heap),DUK_STRIDX_DELETE_PROPERTY)
+#define DUK_HTHREAD_STRING_DELETE_PROPERTY(thr)                       DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_DELETE_PROPERTY)
+#define DUK_HEAP_STRING_HAS(heap)                                     DUK_HEAP_GET_STRING((heap),DUK_STRIDX_HAS)
+#define DUK_HTHREAD_STRING_HAS(thr)                                   DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_HAS)
+#define DUK_HEAP_STRING_PROXY(heap)                                   DUK_HEAP_GET_STRING((heap),DUK_STRIDX_PROXY)
+#define DUK_HTHREAD_STRING_PROXY(thr)                                 DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_PROXY)
 #define DUK_HEAP_STRING_CALLEE(heap)                                  DUK_HEAP_GET_STRING((heap),DUK_STRIDX_CALLEE)
 #define DUK_HTHREAD_STRING_CALLEE(thr)                                DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_CALLEE)
 #define DUK_HEAP_STRING_INVALID_DATE(heap)                            DUK_HEAP_GET_STRING((heap),DUK_STRIDX_INVALID_DATE)
@@ -2615,8 +2734,8 @@ extern const duk_uint8_t duk_strings_data[];
 #define DUK_HTHREAD_STRING_LC_NUMBER(thr)                             DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_LC_NUMBER)
 #define DUK_HEAP_STRING_LC_BOOLEAN(heap)                              DUK_HEAP_GET_STRING((heap),DUK_STRIDX_LC_BOOLEAN)
 #define DUK_HTHREAD_STRING_LC_BOOLEAN(thr)                            DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_LC_BOOLEAN)
-#define DUK_HEAP_STRING_UNDEFINED(heap)                               DUK_HEAP_GET_STRING((heap),DUK_STRIDX_UNDEFINED)
-#define DUK_HTHREAD_STRING_UNDEFINED(thr)                             DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_UNDEFINED)
+#define DUK_HEAP_STRING_LC_UNDEFINED(heap)                            DUK_HEAP_GET_STRING((heap),DUK_STRIDX_LC_UNDEFINED)
+#define DUK_HTHREAD_STRING_LC_UNDEFINED(thr)                          DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_LC_UNDEFINED)
 #define DUK_HEAP_STRING_STRINGIFY(heap)                               DUK_HEAP_GET_STRING((heap),DUK_STRIDX_STRINGIFY)
 #define DUK_HTHREAD_STRING_STRINGIFY(thr)                             DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_STRINGIFY)
 #define DUK_HEAP_STRING_TAN(heap)                                     DUK_HEAP_GET_STRING((heap),DUK_STRIDX_TAN)
@@ -3041,8 +3160,8 @@ extern const duk_uint8_t duk_strings_data[];
 #define DUK_HTHREAD_STRING_IMPORT(thr)                                DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_IMPORT)
 #define DUK_HEAP_STRING_SUPER(heap)                                   DUK_HEAP_GET_STRING((heap),DUK_STRIDX_SUPER)
 #define DUK_HTHREAD_STRING_SUPER(thr)                                 DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_SUPER)
-#define DUK_HEAP_STRING_NULL(heap)                                    DUK_HEAP_GET_STRING((heap),DUK_STRIDX_NULL)
-#define DUK_HTHREAD_STRING_NULL(thr)                                  DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_NULL)
+#define DUK_HEAP_STRING_LC_NULL(heap)                                 DUK_HEAP_GET_STRING((heap),DUK_STRIDX_LC_NULL)
+#define DUK_HTHREAD_STRING_LC_NULL(thr)                               DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_LC_NULL)
 #define DUK_HEAP_STRING_TRUE(heap)                                    DUK_HEAP_GET_STRING((heap),DUK_STRIDX_TRUE)
 #define DUK_HTHREAD_STRING_TRUE(thr)                                  DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_TRUE)
 #define DUK_HEAP_STRING_FALSE(heap)                                   DUK_HEAP_GET_STRING((heap),DUK_STRIDX_FALSE)
@@ -3066,22 +3185,22 @@ extern const duk_uint8_t duk_strings_data[];
 #define DUK_HEAP_STRING_YIELD(heap)                                   DUK_HEAP_GET_STRING((heap),DUK_STRIDX_YIELD)
 #define DUK_HTHREAD_STRING_YIELD(thr)                                 DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_YIELD)
 
-#define DUK_HEAP_NUM_STRINGS                                          323
+#define DUK_HEAP_NUM_STRINGS                                          336
 
-#define DUK_STRIDX_START_RESERVED                                     278
-#define DUK_STRIDX_START_STRICT_RESERVED                              314
-#define DUK_STRIDX_END_RESERVED                                       323                            /* exclusive endpoint */
+#define DUK_STRIDX_START_RESERVED                                     291
+#define DUK_STRIDX_START_STRICT_RESERVED                              327
+#define DUK_STRIDX_END_RESERVED                                       336                            /* exclusive endpoint */
 
 extern const duk_c_function duk_bi_native_functions[];
 extern const duk_uint8_t duk_builtins_data[];
-#ifdef DUK_USE_INITJS
+#ifdef DUK_USE_BUILTIN_INITJS
 extern const duk_uint8_t duk_initjs_data[];
-#endif  /* DUK_USE_INITJS */
+#endif  /* DUK_USE_BUILTIN_INITJS */
 
-#define DUK_BUILTINS_DATA_LENGTH                                      1314
-#ifdef DUK_USE_INITJS
-#define DUK_INITJS_DATA_LENGTH                                        148
-#endif  /* DUK_USE_INITJS */
+#define DUK_BUILTINS_DATA_LENGTH                                      1336
+#ifdef DUK_USE_BUILTIN_INITJS
+#define DUK_BUILTIN_INITJS_DATA_LENGTH                                187
+#endif  /* DUK_USE_BUILTIN_INITJS */
 
 #define DUK_BIDX_GLOBAL                                               0
 #define DUK_BIDX_GLOBAL_ENV                                           1
@@ -3118,18 +3237,19 @@ extern const duk_uint8_t duk_initjs_data[];
 #define DUK_BIDX_MATH                                                 32
 #define DUK_BIDX_JSON                                                 33
 #define DUK_BIDX_TYPE_ERROR_THROWER                                   34
-#define DUK_BIDX_DUKTAPE                                              35
-#define DUK_BIDX_THREAD_CONSTRUCTOR                                   36
-#define DUK_BIDX_THREAD_PROTOTYPE                                     37
-#define DUK_BIDX_BUFFER_CONSTRUCTOR                                   38
-#define DUK_BIDX_BUFFER_PROTOTYPE                                     39
-#define DUK_BIDX_POINTER_CONSTRUCTOR                                  40
-#define DUK_BIDX_POINTER_PROTOTYPE                                    41
-#define DUK_BIDX_LOGGER_CONSTRUCTOR                                   42
-#define DUK_BIDX_LOGGER_PROTOTYPE                                     43
-#define DUK_BIDX_DOUBLE_ERROR                                         44
+#define DUK_BIDX_PROXY_CONSTRUCTOR                                    35
+#define DUK_BIDX_DUKTAPE                                              36
+#define DUK_BIDX_THREAD_CONSTRUCTOR                                   37
+#define DUK_BIDX_THREAD_PROTOTYPE                                     38
+#define DUK_BIDX_BUFFER_CONSTRUCTOR                                   39
+#define DUK_BIDX_BUFFER_PROTOTYPE                                     40
+#define DUK_BIDX_POINTER_CONSTRUCTOR                                  41
+#define DUK_BIDX_POINTER_PROTOTYPE                                    42
+#define DUK_BIDX_LOGGER_CONSTRUCTOR                                   43
+#define DUK_BIDX_LOGGER_PROTOTYPE                                     44
+#define DUK_BIDX_DOUBLE_ERROR                                         45
 
-#define DUK_NUM_BUILTINS                                              45
+#define DUK_NUM_BUILTINS                                              46
 
 #else
 #error invalid endianness defines

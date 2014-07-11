@@ -4,12 +4,6 @@
 
 #include "duk_internal.h"
 
-/* FIXME: separate "executor" thread and "target" thread for DECREF?
- * This function is a bit dangerous because we free the built-ins and
- * DECREF.  If a built-in gets DECREF'd to zero and has a finalizer,
- * we might have some problems in the finalizer.
- */
-
 void duk_hthread_terminate(duk_hthread *thr) {
 	DUK_ASSERT(thr != NULL);
 
@@ -48,4 +42,3 @@ duk_activation *duk_hthread_get_current_activation(duk_hthread *thr) {
 		return NULL;
 	}
 }
-

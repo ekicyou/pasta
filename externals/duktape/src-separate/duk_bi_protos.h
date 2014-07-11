@@ -18,6 +18,12 @@
  */
 #define  DUK_BI_LOGGER_SHORT_MSG_LIMIT  256
 
+/* Maximum length of CommonJS module identifier to resolve.  Length includes
+ * both current module ID, requested (possibly relative) module ID, and a
+ * slash in between.
+ */
+#define  DUK_BI_COMMONJS_MODULE_ID_LIMIT  256
+
 duk_ret_t duk_bi_array_constructor(duk_context *ctx);
 duk_ret_t duk_bi_array_constructor_is_array(duk_context *ctx);
 duk_ret_t duk_bi_array_prototype_to_string(duk_context *ctx);
@@ -58,7 +64,6 @@ duk_double_t duk_bi_date_get_now(duk_context *ctx);
 void duk_bi_date_format_timeval(duk_double_t timeval, duk_uint8_t *out_buf);
 
 duk_ret_t duk_bi_duktape_object_info(duk_context *ctx);
-duk_ret_t duk_bi_duktape_object_line(duk_context *ctx);
 duk_ret_t duk_bi_duktape_object_act(duk_context *ctx);
 duk_ret_t duk_bi_duktape_object_gc(duk_context *ctx);
 duk_ret_t duk_bi_duktape_object_fin(duk_context *ctx);
@@ -90,25 +95,21 @@ duk_ret_t duk_bi_global_object_decode_uri(duk_context *ctx);
 duk_ret_t duk_bi_global_object_decode_uri_component(duk_context *ctx);
 duk_ret_t duk_bi_global_object_encode_uri(duk_context *ctx);
 duk_ret_t duk_bi_global_object_encode_uri_component(duk_context *ctx);
-#ifdef DUK_USE_SECTION_B
 duk_ret_t duk_bi_global_object_escape(duk_context *ctx);
 duk_ret_t duk_bi_global_object_unescape(duk_context *ctx);
-#endif
-#ifdef DUK_USE_BROWSER_LIKE
 duk_ret_t duk_bi_global_object_print(duk_context *ctx);
 duk_ret_t duk_bi_global_object_alert(duk_context *ctx);
-#endif
+duk_ret_t duk_bi_global_object_require(duk_context *ctx);
 
-/* FIXME: typing */
 void duk_bi_json_parse_helper(duk_context *ctx,
-                              int idx_value,
-                              int idx_reviver,
-                              int flags);
+                              duk_idx_t idx_value,
+                              duk_idx_t idx_reviver,
+                              duk_small_uint_t flags);
 void duk_bi_json_stringify_helper(duk_context *ctx,
-                                  int idx_value,
-                                  int idx_replacer,
-                                  int idx_space,
-                                  int flags);
+                                  duk_idx_t idx_value,
+                                  duk_idx_t idx_replacer,
+                                  duk_idx_t idx_space,
+                                  duk_small_uint_t flags);
 duk_ret_t duk_bi_json_object_parse(duk_context *ctx);
 duk_ret_t duk_bi_json_object_stringify(duk_context *ctx);
 
@@ -126,10 +127,10 @@ duk_ret_t duk_bi_number_prototype_to_fixed(duk_context *ctx);
 duk_ret_t duk_bi_number_prototype_to_exponential(duk_context *ctx);
 duk_ret_t duk_bi_number_prototype_to_precision(duk_context *ctx);
 
+duk_ret_t duk_bi_object_getprototype_shared(duk_context *ctx);
+duk_ret_t duk_bi_object_setprototype_shared(duk_context *ctx);
 duk_ret_t duk_bi_object_constructor(duk_context *ctx);
-duk_ret_t duk_bi_object_constructor_get_prototype_of(duk_context *ctx);
 duk_ret_t duk_bi_object_constructor_get_own_property_descriptor(duk_context *ctx);
-duk_ret_t duk_bi_object_constructor_get_own_property_names(duk_context *ctx);
 duk_ret_t duk_bi_object_constructor_create(duk_context *ctx);
 duk_ret_t duk_bi_object_constructor_define_property(duk_context *ctx);
 duk_ret_t duk_bi_object_constructor_define_properties(duk_context *ctx);
@@ -137,7 +138,7 @@ duk_ret_t duk_bi_object_constructor_seal_freeze_shared(duk_context *ctx);
 duk_ret_t duk_bi_object_constructor_prevent_extensions(duk_context *ctx);
 duk_ret_t duk_bi_object_constructor_is_sealed_frozen_shared(duk_context *ctx);
 duk_ret_t duk_bi_object_constructor_is_extensible(duk_context *ctx);
-duk_ret_t duk_bi_object_constructor_keys(duk_context *ctx);
+duk_ret_t duk_bi_object_constructor_keys_shared(duk_context *ctx);
 duk_ret_t duk_bi_object_prototype_to_string(duk_context *ctx);
 duk_ret_t duk_bi_object_prototype_to_locale_string(duk_context *ctx);
 duk_ret_t duk_bi_object_prototype_value_of(duk_context *ctx);
@@ -173,6 +174,12 @@ duk_ret_t duk_bi_string_prototype_trim(duk_context *ctx);
 #ifdef DUK_USE_SECTION_B
 duk_ret_t duk_bi_string_prototype_substr(duk_context *ctx);
 #endif
+
+duk_ret_t duk_bi_proxy_constructor(duk_context *ctx);
+#if 0  /* unimplemented now */
+duk_ret_t duk_bi_proxy_constructor_revocable(duk_context *ctx);
+#endif
+
 duk_ret_t duk_bi_thread_constructor(duk_context *ctx);
 duk_ret_t duk_bi_thread_resume(duk_context *ctx);
 duk_ret_t duk_bi_thread_yield(duk_context *ctx);
@@ -186,4 +193,3 @@ duk_ret_t duk_bi_logger_prototype_log_shared(duk_context *ctx);
 duk_ret_t duk_bi_type_error_thrower(duk_context *ctx);
 
 #endif  /* DUK_BUILTIN_PROTOS_H_INCLUDED */
-

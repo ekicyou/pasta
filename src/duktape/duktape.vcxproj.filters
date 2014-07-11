@@ -255,6 +255,15 @@
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_util_tinyrandom.c">
       <Filter>src-separate</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_debug.c">
+      <Filter>src-separate</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_bi_proxy.c">
+      <Filter>src-separate</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_strings.c">
+      <Filter>src-separate</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\externals\duktape\src-separate\duk_api_internal.h">
@@ -351,6 +360,9 @@
       <Filter>src-separate</Filter>
     </ClInclude>
     <ClInclude Include="..\..\externals\duktape\src-separate\duktape.h">
+      <Filter>src-separate</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\externals\duktape\src-separate\duk_strings.h">
       <Filter>src-separate</Filter>
     </ClInclude>
   </ItemGroup>

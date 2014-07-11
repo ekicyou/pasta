@@ -8,7 +8,7 @@
  *  Constructor
  */
 
-int duk_bi_buffer_constructor(duk_context *ctx) {
+duk_ret_t duk_bi_buffer_constructor(duk_context *ctx) {
 	duk_size_t buf_size;
 	duk_small_int_t buf_dynamic;
 	duk_uint8_t *buf_data;
@@ -41,7 +41,7 @@ int duk_bi_buffer_constructor(duk_context *ctx) {
 		/* new buffer with string contents */
 		src_data = (const duk_uint8_t *) duk_get_lstring(ctx, 0, &buf_size);
 		DUK_ASSERT(src_data != NULL);  /* even for zero-length string */
-		buf_data = duk_push_buffer(ctx, buf_size, buf_dynamic);
+		buf_data = (duk_uint8_t *) duk_push_buffer(ctx, buf_size, buf_dynamic);
 		DUK_MEMCPY((void *) buf_data, (const void *) src_data, (size_t) buf_size);
 		break;
 	case DUK_TYPE_OBJECT:
@@ -67,7 +67,7 @@ int duk_bi_buffer_constructor(duk_context *ctx) {
 	if (duk_is_constructor_call(ctx)) {
 		duk_push_object_helper(ctx,
 		                       DUK_HOBJECT_FLAG_EXTENSIBLE |
-		                       DUK_HOBJECT_FLAG_SPECIAL_BUFFEROBJ |
+		                       DUK_HOBJECT_FLAG_EXOTIC_BUFFEROBJ |
 		                       DUK_HOBJECT_CLASS_AS_FLAGS(DUK_HOBJECT_CLASS_BUFFER),
 		                       DUK_BIDX_BUFFER_PROTOTYPE);
 
@@ -84,9 +84,9 @@ int duk_bi_buffer_constructor(duk_context *ctx) {
  *  toString(), valueOf()
  */
 
-int duk_bi_buffer_prototype_tostring_shared(duk_context *ctx) {
+duk_ret_t duk_bi_buffer_prototype_tostring_shared(duk_context *ctx) {
 	duk_tval *tv;
-	int to_string = duk_get_magic(ctx);
+	duk_small_int_t to_string = duk_get_magic(ctx);
 
 	duk_push_this(ctx);
 	tv = duk_require_tval(ctx, -1);
@@ -116,4 +116,3 @@ int duk_bi_buffer_prototype_tostring_shared(duk_context *ctx) {
  type_error:
 	return DUK_RET_TYPE_ERROR;
 }
-

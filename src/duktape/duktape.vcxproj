@@ -18,6 +18,7 @@
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_call.c" />
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_codec.c" />
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_compile.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_debug.c" />
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_logging.c" />
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_memory.c" />
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_object.c" />
@@ -38,6 +39,7 @@
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_bi_number.c" />
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_bi_object.c" />
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_bi_pointer.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_bi_proxy.c" />
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_bi_regexp.c" />
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_bi_string.c" />
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_bi_thread.c" />
@@ -86,6 +88,7 @@
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_regexp_executor.c" />
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_replacements.c" />
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_selftest.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_strings.c" />
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_unicode_support.c" />
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_unicode_tables.c" />
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_util_bitdecoder.c" />
@@ -125,6 +128,7 @@
     <ClInclude Include="..\..\externals\duktape\src-separate\duk_regexp.h" />
     <ClInclude Include="..\..\externals\duktape\src-separate\duk_replacements.h" />
     <ClInclude Include="..\..\externals\duktape\src-separate\duk_selftest.h" />
+    <ClInclude Include="..\..\externals\duktape\src-separate\duk_strings.h" />
     <ClInclude Include="..\..\externals\duktape\src-separate\duk_tval.h" />
     <ClInclude Include="..\..\externals\duktape\src-separate\duk_unicode.h" />
     <ClInclude Include="..\..\externals\duktape\src-separate\duk_util.h" />

@@ -8,8 +8,8 @@
  *  Get prototype object for an integer error code.
  */
 
-duk_hobject *duk_error_prototype_from_code(duk_hthread *thr, int err_code) {
-	switch (err_code) {
+duk_hobject *duk_error_prototype_from_code(duk_hthread *thr, duk_errcode_t code) {
+	switch (code) {
 	case DUK_ERR_EVAL_ERROR:
 		return thr->builtins[DUK_BIDX_EVAL_ERROR_PROTOTYPE];
 	case DUK_ERR_RANGE_ERROR:
@@ -39,7 +39,7 @@ duk_hobject *duk_error_prototype_from_code(duk_hthread *thr, int err_code) {
  *  Exposed helper for setting up heap longjmp state.
  */
 
-void duk_err_setup_heap_ljstate(duk_hthread *thr, int lj_type) {
+void duk_err_setup_heap_ljstate(duk_hthread *thr, duk_small_int_t lj_type) {
 	duk_tval tv_tmp;
 
 	thr->heap->lj.type = lj_type;
