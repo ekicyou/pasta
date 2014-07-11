@@ -27,8 +27,8 @@ function setTimeout(func, delay) {
         throw new TypeError('callback is not a function/string');
     } else if (arguments.length > 2) {
         // Special case: callback arguments are provided.
-        bind_args = arguments.slice(2);  // [ arg1, arg2, ... ]
-        bind_args = bind_args.unshift(this);  // [ global(this), arg1, arg2, ... ]
+        bind_args = Array.prototype.slice.call(arguments, 2);  // [ arg1, arg2, ... ]
+        bind_args.unshift(this);  // [ global(this), arg1, arg2, ... ]
         cb_func = func.bind.apply(func, bind_args);
     } else {
         // Normal case: callback given as a function without arguments.
@@ -63,8 +63,8 @@ function setInterval(func, delay) {
         throw new TypeError('callback is not a function/string');
     } else if (arguments.length > 2) {
         // Special case: callback arguments are provided.
-        bind_args = arguments.slice(2);  // [ arg1, arg2, ... ]
-        bind_args = bind_args.unshift(this);  // [ global(this), arg1, arg2, ... ]
+        bind_args = Array.prototype.slice.call(arguments, 2);  // [ arg1, arg2, ... ]
+        bind_args.unshift(this);  // [ global(this), arg1, arg2, ... ]
         cb_func = func.bind.apply(func, bind_args);
     } else {
         // Normal case: callback given as a function without arguments.
@@ -115,7 +115,7 @@ EventLoop.fdPollHandler = function(fd, revents) {
         cb = this.socketReading[fd];
         if (cb) {
             data = Socket.read(fd);  // no size control now
-            //print('READ', Duktape.enc('jsonx', data));
+            //print('READ', Duktape.enc('jx', data));
             if (data.length === 0) {
                 this.close(fd);
                 return;
@@ -125,7 +125,7 @@ EventLoop.fdPollHandler = function(fd, revents) {
             cb = this.socketListening[fd];
             if (cb) {
                 acc_res = Socket.accept(fd);
-                //print('ACCEPT:', Duktape.enc('jsonx', acc_res));
+                //print('ACCEPT:', Duktape.enc('jx', acc_res));
                 cb(acc_res.fd, acc_res.addr, acc_res.port);
             } else {
                 //print('UNKNOWN');

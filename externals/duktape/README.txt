@@ -51,8 +51,11 @@ Duktape itself is widely portable, some of the examples are Linux only.
 For instance the ``eventloop`` example illustrates how ``setTimeout()``
 and other standard timer functions could be implemented on Unix/Linux.
 
-This distributable contains Duktape version 0.10.0, created from git
-commit 78c73a152c35749ff5fe237209c353503ea6534d (v0.9.0-664-g78c73a1).
+The ``polyfills/`` directory provides a few replacement suggestions for
+non-standard Javascript functions provided by other implementations.
+
+This distributable contains Duktape version 0.11.0, created from git
+commit 621b545c474dd7a3def7aefed0557b1a825a4578 (v0.10.0-827-g621b545).
 
 Duktape is copyrighted by its authors (see ``AUTHORS.txt``) and licensed
 under the MIT license (see ``LICENSE.txt``).  MurmurHash2 is used internally;
