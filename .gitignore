@@ -17,3 +17,5 @@ ipch
 /Peep/Peep/Peep.Windows/bin
 /Peep/Peep/Peep.WindowsPhone/obj
 /Peep/Peep/Peep.WindowsPhone/bin
+/src/script/obj
+/src/script/bin
