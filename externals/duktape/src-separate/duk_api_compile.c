@@ -16,13 +16,17 @@ duk_int_t duk_eval_raw(duk_context *ctx, const char *src_buffer, duk_size_t src_
 	duk_uint_t comp_flags;
 	duk_int_t rc;
 
+	/* Note: strictness is *not* inherited from the current Duktape/C.
+	 * This would be confusing because the current strictness state
+	 * depends on whether we're running inside a Duktape/C activation
+	 * (= strict mode) or outside of any activation (= non-strict mode).
+	 * See api-testcases/test-eval-strictness.c for more discussion.
+	 */
+
 	/* [ ... source? filename ] (depends on flags) */
 
 	comp_flags = flags;
 	comp_flags |= DUK_COMPILE_EVAL;
-	if (duk_is_strict_call(ctx)) {
-		comp_flags |= DUK_COMPILE_STRICT;
-	}
 	rc = duk_compile_raw(ctx, src_buffer, src_length, comp_flags);  /* may be safe, or non-safe depending on flags */
 
 	/* [ ... closure/error ] */
@@ -57,6 +61,13 @@ static duk_ret_t duk__do_compile(duk_context *ctx) {
 	duk_small_uint_t comp_flags;
 	duk_hcompiledfunction *h_templ;
 
+	/* Note: strictness is not inherited from the current Duktape/C
+	 * context.  Otherwise it would not be possible to compile
+	 * non-strict code inside a Duktape/C activation (which is
+	 * always strict now).  See api-testcases/test-eval-strictness.c
+	 * for discussion.
+	 */
+
 	/* [ ... source? filename &comp_args ] (depends on flags) */
 
 	comp_args = (duk__compile_raw_args *) duk_require_pointer(ctx, -1);
@@ -69,7 +80,7 @@ static duk_ret_t duk__do_compile(duk_context *ctx) {
 		duk_hstring *h_sourcecode;
 
 		if (flags & DUK_COMPILE_NOSOURCE) {
-			DUK_ERROR(thr, DUK_ERR_API_ERROR, "no sourcecode");
+			DUK_ERROR(thr, DUK_ERR_API_ERROR, DUK_STR_NO_SOURCECODE);
 		}
 		h_sourcecode = duk_require_hstring(ctx, -2);
 		comp_args->src_buffer = (const duk_uint8_t *) DUK_HSTRING_GET_DATA(h_sourcecode);

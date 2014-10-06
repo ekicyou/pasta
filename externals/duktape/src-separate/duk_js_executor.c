@@ -24,7 +24,7 @@ static duk_hobject *duk__find_nonbound_function(duk_hthread *thr, duk_hobject *f
 	DUK_ASSERT(DUK_HOBJECT_HAS_BOUND(func));
 
 	sanity = DUK_HOBJECT_BOUND_CHAIN_SANITY;
-	do {	
+	do {
 		if (!DUK_HOBJECT_HAS_BOUND(func)) {
 			break;
 		}
@@ -220,7 +220,7 @@ static void duk__vm_arith_binary_op(duk_hthread *thr, duk_tval *tv_x, duk_tval *
 	/* important to use normalized NaN with 8-byte tagged types */
 	DUK_DBLUNION_NORMALIZE_NAN_CHECK(&du);
 	DUK_ASSERT(DUK_DBLUNION_IS_NORMALIZED(&du));
-	
+
 	tv_z = thr->valstack_bottom + idx_z;
 	DUK_TVAL_SET_TVAL(&tv_tmp, tv_z);
 	DUK_TVAL_SET_NUMBER(tv_z, du.d);
@@ -434,6 +434,8 @@ static void duk__vm_logical_not(duk_hthread *thr, duk_tval *tv_x, duk_tval *tv_z
 	DUK_ASSERT(tv_x != NULL);  /* may be reg or const */
 	DUK_ASSERT(tv_z != NULL);  /* reg */
 
+	DUK_UNREF(thr);  /* w/o refcounts */
+
 	/* ToBoolean() does not require any operations with side effects so
 	 * we can do it efficiently.  For footprint it would be better to use
 	 * duk_js_toboolean() and then push+replace to the result slot.
@@ -484,7 +486,7 @@ static void duk__reconfig_valstack(duk_hthread *thr, duk_size_t act_idx, duk_sma
 	/* clamp so that retval is at the top (retval_count == 1) or register just before
 	 * intended retval is at the top (retval_count == 0, happens e.g. with 'finally').
 	 */
-	duk_set_top((duk_context *) thr, 
+	duk_set_top((duk_context *) thr,
 	            (duk_idx_t) (thr->callstack[act_idx].idx_retval -
 	                         thr->callstack[act_idx].idx_bottom +
 	                         retval_count));
@@ -496,11 +498,13 @@ static void duk__reconfig_valstack(duk_hthread *thr, duk_size_t act_idx, duk_sma
 
 	h_func = (duk_hcompiledfunction *) thr->callstack[act_idx].func;
 
-	duk_require_valstack_resize((duk_context *) thr,
-	                            (thr->valstack_bottom - thr->valstack) +          /* bottom of current func */
-	                                h_func->nregs +                               /* reg count */
-	                                DUK_VALSTACK_INTERNAL_EXTRA,                  /* + spare */
-	                            1);                                               /* allow_shrink */
+	(void) duk_valstack_resize_raw((duk_context *) thr,
+	                               (thr->valstack_bottom - thr->valstack) +      /* bottom of current func */
+	                                   h_func->nregs +                           /* reg count */
+	                                   DUK_VALSTACK_INTERNAL_EXTRA,              /* + spare */
+	                               DUK_VSRESIZE_FLAG_SHRINK |                    /* flags */
+	                               0 /* no compact */ |
+	                               DUK_VSRESIZE_FLAG_THROW);
 
 	duk_set_top((duk_context *) thr, h_func->nregs);
 }
@@ -641,14 +645,31 @@ static void duk__handle_catch_or_finally(duk_hthread *thr, duk_size_t cat_idx, d
 }
 
 static void duk__handle_label(duk_hthread *thr, duk_size_t cat_idx) {
+	duk_activation *act;
+
 	/* no callstack changes, no value stack changes */
 
+	DUK_ASSERT(thr != NULL);
+	DUK_ASSERT(thr->callstack_top >= 1);
+
+	act = thr->callstack + thr->callstack_top - 1;
+
+	DUK_ASSERT(act->func != NULL);
+	DUK_ASSERT(DUK_HOBJECT_HAS_COMPILEDFUNCTION(act->func));
+
 	/* +0 = break, +1 = continue */
-	(thr->callstack + thr->callstack_top - 1)->pc =
-		thr->catchstack[cat_idx].pc_base + (thr->heap->lj.type == DUK_LJ_TYPE_CONTINUE ? 1 : 0);
+	act->pc = thr->catchstack[cat_idx].pc_base + (thr->heap->lj.type == DUK_LJ_TYPE_CONTINUE ? 1 : 0);
+	act = NULL;  /* invalidated */
 
 	duk_hthread_catchstack_unwind(thr, cat_idx + 1);  /* keep label catcher */
 	/* no need to unwind callstack */
+
+	/* valstack should not need changes */
+#if defined(DUK_USE_ASSERTIONS)
+	act = thr->callstack + thr->callstack_top - 1;
+	DUK_ASSERT((duk_size_t) (thr->valstack_top - thr->valstack_bottom) ==
+	           (duk_size_t) ((duk_hcompiledfunction *) act->func)->nregs);
+#endif
 }
 
 /* Note: called for DUK_LJ_TYPE_YIELD and for DUK_LJ_TYPE_RETURN, when a
@@ -781,7 +802,7 @@ static duk_small_uint_t duk__handle_longjmp(duk_hthread *thr,
 
 			resumee->resumer = thr;
 			resumee->state = DUK_HTHREAD_STATE_RUNNING;
-			thr->state = DUK_HTHREAD_STATE_RESUMED;	
+			thr->state = DUK_HTHREAD_STATE_RESUMED;
 			DUK_HEAP_SWITCH_THREAD(thr->heap, resumee);
 			thr = resumee;
 
@@ -1022,7 +1043,7 @@ static duk_small_uint_t duk__handle_longjmp(duk_hthread *thr,
 			retval = DUK__LONGJMP_RESTART;
 			goto wipe_and_return;
 		}
-	
+
 		DUK_DD(DUK_DDPRINT("no calling activation, thread finishes (similar to yield)"));
 
 		DUK_ASSERT(thr->resumer != NULL);
@@ -1060,7 +1081,7 @@ static duk_small_uint_t duk__handle_longjmp(duk_hthread *thr,
 		/*
 		 *  Find a matching label catcher or 'finally' catcher in
 		 *  the same function.
-		 *  
+		 *
 		 *  A label catcher must always exist and will match unless
 		 *  a 'finally' captures the break/continue first.  It is the
 		 *  compiler's responsibility to ensure that labels are used
@@ -1105,8 +1126,6 @@ static duk_small_uint_t duk__handle_longjmp(duk_hthread *thr,
 				/* found label */
 				duk__handle_label(thr,
 				                  cat - thr->catchstack);
-
-				/* FIXME: reset valstack to 'nregs' (or assert it) */
 
 				DUK_DD(DUK_DDPRINT("-> break/continue caught by a label catcher (in the same function), restart execution"));
 				retval = DUK__LONGJMP_RESTART;
@@ -1170,8 +1189,6 @@ static duk_small_uint_t duk__handle_longjmp(duk_hthread *thr,
 				duk__handle_catch_or_finally(thr,
 				                             cat - thr->catchstack,
 				                             1); /* is_finally */
-
-				/* FIXME: reset valstack to 'nregs' (or assert it) */
 
 				DUK_DD(DUK_DDPRINT("-> throw caught by a 'finally' clause, restart execution"));
 				retval = DUK__LONGJMP_RESTART;
@@ -1267,6 +1284,63 @@ static duk_small_uint_t duk__handle_longjmp(duk_hthread *thr,
 	DUK_UNREACHABLE();
 	return retval;
 }
+
+/* XXX: Disabled for 1.0 release.  This needs to handle unwinding for label
+ * sites (which are created for explicit labels but also for control statements
+ * like for-loops).  At that point it's quite close to the "slow return" handler
+ * except for longjmp().  Perhaps all returns could initially be handled as fast
+ * returns and only converted to longjmp()s when basic handling won't do?
+ */
+#if 0
+/* Try a fast return.  Return false if fails, so that a slow return can be done
+ * instead.
+ */
+static duk_bool_t duk__handle_fast_return(duk_hthread *thr,
+                                          duk_tval *tv_retval,
+                                          duk_hthread *entry_thread,
+                                          duk_size_t entry_callstack_top) {
+	duk_tval tv_tmp;
+	duk_tval *tv1;
+
+	/* retval == NULL indicates 'undefined' return value */
+
+	if (thr == entry_thread && thr->callstack_top == entry_callstack_top) {
+		DUK_DDD(DUK_DDDPRINT("reject fast return: return would exit bytecode executor to caller"));
+		return 0;
+	}
+	if (thr->callstack_top <= 1) {
+		DUK_DDD(DUK_DDDPRINT("reject fast return: there is no caller in this callstack (thread yield)"));
+		return 0;
+	}
+
+	/* There is a caller, and it must be an Ecmascript caller (otherwise
+	 * it would have matched the entry level check).
+	 */
+	DUK_ASSERT(thr->callstack_top >= 2);
+	DUK_ASSERT(DUK_HOBJECT_IS_COMPILEDFUNCTION((thr->callstack + thr->callstack_top - 2)->func));   /* must be ecmascript */
+
+	tv1 = thr->valstack + (thr->callstack + thr->callstack_top - 2)->idx_retval;
+	DUK_TVAL_SET_TVAL(&tv_tmp, tv1);
+	if (tv_retval) {
+		DUK_TVAL_SET_TVAL(tv1, tv_retval);
+		DUK_TVAL_INCREF(thr, tv1);
+	} else {
+		DUK_TVAL_SET_UNDEFINED_ACTUAL(tv1);
+		/* no need to incref */
+	}
+	DUK_TVAL_DECREF(thr, &tv_tmp);  /* side effects */
+
+	/* No catchstack to unwind. */
+#if 0
+	duk_hthread_catchstack_unwind(thr, (cat - thr->catchstack) + 1);  /* leave 'cat' as top catcher (also works if catchstack exhausted) */
+#endif
+	duk_hthread_callstack_unwind(thr, thr->callstack_top - 1);
+	duk__reconfig_valstack(thr, thr->callstack_top - 1, 1);    /* new top, i.e. callee */
+
+	DUK_DDD(DUK_DDDPRINT("fast return accepted"));
+	return 1;
+}
+#endif
 
 /*
  *  Executor interrupt handling
@@ -2332,7 +2406,10 @@ void duk_js_execute_bytecode(duk_hthread *entry_thread) {
 			/* E5 Section 11.2.3, step 6.a.i */
 			/* E5 Section 10.4.3 */
 
-			/* FIXME: allow object to be a const, e.g. in 'foo'.toString() */
+			/* XXX: allow object to be a const, e.g. in 'foo'.toString()?
+			 * On the other hand, DUK_REGCONSTP() is slower and generates
+			 * more code.
+			 */
 
 			tv_obj = DUK__REGP(b);
 			tv_key = DUK__REGCONSTP(c);
@@ -2599,28 +2676,42 @@ void duk_js_execute_bytecode(duk_hthread *entry_thread) {
 			 * C -> currently unused
 			 */
 
-			/* FIXME: fast return not implemented, always do a slow return now */
-			/* FIXME: limit fast return to the case with no catchstack at all (not even labels)?) */
-			if (a & DUK_BC_RETURN_FLAG_FAST && 0 /*FIXME*/) {
-				/* fast return: no TCF catchers (but may have e.g. labels) */
-				DUK__INTERNAL_ERROR("FIXME: fast return unimplemented");
-			} else {
-				/* slow return */
+			/* A fast return avoids full longjmp handling for a set of
+			 * scenarios which hopefully represents the common cases.
+			 * The compiler is responsible for emitting fast returns
+			 * only when they are safe.  Currently this means that there
+			 * is nothing on the catch stack (not even label catchers).
+			 * The speed advantage of fast returns (avoiding longjmp) is
+			 * not very high, around 10-15%.
+			 */
+#if 0  /* XXX: Disabled for 1.0 release */
+			if (a & DUK_BC_RETURN_FLAG_FAST) {
+				DUK_DDD(DUK_DDDPRINT("FASTRETURN attempt a=%ld b=%ld", (long) a, (long) b));
 
-				DUK_DDD(DUK_DDDPRINT("SLOWRETURN a=%ld b=%ld", (long) a, (long) b));
-
-				if (a & DUK_BC_RETURN_FLAG_HAVE_RETVAL) {
-					duk_push_tval(ctx, DUK__REGCONSTP(b));
-				} else {
-					duk_push_undefined(ctx);
+				if (duk__handle_fast_return(thr,
+				                            (a & DUK_BC_RETURN_FLAG_HAVE_RETVAL) ? DUK__REGCONSTP(b) : NULL,
+				                            entry_thread,
+				                            entry_callstack_top)) {
+					DUK_DDD(DUK_DDDPRINT("FASTRETURN success a=%ld b=%ld", (long) a, (long) b));
+					goto restart_execution;
 				}
-
-				duk_err_setup_heap_ljstate(thr, DUK_LJ_TYPE_RETURN);
-
-				DUK_ASSERT(thr->heap->lj.jmpbuf_ptr != NULL);  /* in bytecode executor, should always be set */
-				duk_err_longjmp(thr);
-				DUK_UNREACHABLE();
 			}
+#endif
+
+			/* No fast return, slow path. */
+			DUK_DDD(DUK_DDDPRINT("SLOWRETURN a=%ld b=%ld", (long) a, (long) b));
+
+			if (a & DUK_BC_RETURN_FLAG_HAVE_RETVAL) {
+				duk_push_tval(ctx, DUK__REGCONSTP(b));
+			} else {
+				duk_push_undefined(ctx);
+			}
+
+			duk_err_setup_heap_ljstate(thr, DUK_LJ_TYPE_RETURN);
+
+			DUK_ASSERT(thr->heap->lj.jmpbuf_ptr != NULL);  /* in bytecode executor, should always be set */
+			duk_err_longjmp(thr);
+			DUK_UNREACHABLE();
 			break;
 		}
 
@@ -2677,7 +2768,7 @@ void duk_js_execute_bytecode(duk_hthread *entry_thread) {
 			 *  This overhead only affects bound functions (in particular, helper
 			 *  functions should not be called if the immediate target function is
 			 *  not bound).
-			 * 
+			 *
 			 *  Even so, this awkward solution could be avoided by e.g. replicating
 			 *  final, non-bound target function flags to the bound function objects
 			 *  (so that a bound function would e.g. have both a "BOUND" flag and
@@ -2751,7 +2842,7 @@ void duk_js_execute_bytecode(duk_hthread *entry_thread) {
 				                c,            /* num_stack_args */
 				                call_flags);  /* call_flags */
 
-				/* FIXME: who should restore? */
+				/* XXX: who should restore? */
 				duk_require_stack_top(ctx, (duk_idx_t) fun->nregs);  /* may have shrunk by inner calls, must recheck */
 				duk_set_top(ctx, (duk_idx_t) fun->nregs);
 
@@ -3118,7 +3209,7 @@ void duk_js_execute_bytecode(duk_hthread *entry_thread) {
 				 * C -> constant index of identifier name
 				 */
 
-				tv = DUK__REGCONSTP(c);  /* FIXME: this could be a DUK__CONSTP instead */
+				tv = DUK__REGCONSTP(c);  /* XXX: this could be a DUK__CONSTP instead */
 				DUK_ASSERT(DUK_TVAL_IS_STRING(tv));
 				name = DUK_TVAL_GET_STRING(tv);
 				if (duk_js_getvar_activation(thr, act, name, 0 /*throw*/)) {
@@ -3213,7 +3304,7 @@ void duk_js_execute_bytecode(duk_hthread *entry_thread) {
 					DUK_ASSERT(duk_is_null(ctx, (duk_idx_t) c));
 					DUK_DDD(DUK_DDDPRINT("enum is null, execute jump slot"));
 				}
-				break;				
+				break;
 			}
 
 			case DUK_EXTRAOP_INITSET:
@@ -3301,7 +3392,7 @@ void duk_js_execute_bytecode(duk_hthread *entry_thread) {
 
 				if (DUK_CAT_HAS_FINALLY_ENABLED(cat)) {
 					DUK_DDD(DUK_DDDPRINT("ENDTRY: finally part is active, jump through 2nd jump slot with 'normal continuation'"));
-			
+
 					tv1 = thr->valstack + cat->idx_base;
 					DUK_ASSERT(tv1 >= thr->valstack && tv1 < thr->valstack_top);
 					DUK_TVAL_SET_TVAL(&tv_tmp, tv1);
@@ -3357,7 +3448,7 @@ void duk_js_execute_bytecode(duk_hthread *entry_thread) {
 
 				if (DUK_CAT_HAS_FINALLY_ENABLED(cat)) {
 					DUK_DDD(DUK_DDDPRINT("ENDCATCH: finally part is active, jump through 2nd jump slot with 'normal continuation'"));
-			
+
 					tv1 = thr->valstack + cat->idx_base;
 					DUK_ASSERT(tv1 >= thr->valstack && tv1 < thr->valstack_top);
 					DUK_TVAL_SET_TVAL(&tv_tmp, tv1);

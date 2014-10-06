@@ -70,7 +70,14 @@ duk_ret_t duk_bi_duktape_object_info(duk_context *ctx) {
 		duk_push_uint(ctx, (duk_uint_t) hdr_size);
 		duk_push_uint(ctx, (duk_uint_t) DUK_HOBJECT_E_ALLOC_SIZE(h_obj));
 		duk_push_uint(ctx, (duk_uint_t) h_obj->e_size);
-		duk_push_uint(ctx, (duk_uint_t) h_obj->e_used);
+		/* Note: e_next indicates the number of gc-reachable entries
+		 * in the entry part, and also indicates the index where the
+		 * next new property would be inserted.  It does *not* indicate
+		 * the number of non-NULL keys present in the object.  That
+		 * value could be counted separately but requires a pass through
+		 * the key list.
+		 */
+		duk_push_uint(ctx, (duk_uint_t) h_obj->e_next);
 		duk_push_uint(ctx, (duk_uint_t) h_obj->a_size);
 		duk_push_uint(ctx, (duk_uint_t) h_obj->h_size);
 		if (DUK_HOBJECT_IS_COMPILEDFUNCTION(h_obj)) {
@@ -102,7 +109,7 @@ duk_ret_t duk_bi_duktape_object_info(duk_context *ctx) {
 
  done:
 	/* set values into ret array */
-	/* FIXME: primitive to make array from valstack slice */
+	/* XXX: primitive to make array from valstack slice */
 	n = duk_get_top(ctx);
 	for (i = 2; i < n; i++) {
 		duk_dup(ctx, i);
@@ -150,7 +157,7 @@ duk_ret_t duk_bi_duktape_object_act(duk_context *ctx) {
 
 	/* [ level obj func pc line ] */
 
-	/* FIXME: version specific array format instead? */
+	/* XXX: version specific array format instead? */
 	duk_def_prop_stridx_wec(ctx, -4, DUK_STRIDX_LINE_NUMBER);
 	duk_def_prop_stridx_wec(ctx, -3, DUK_STRIDX_PC);
 	duk_def_prop_stridx_wec(ctx, -2, DUK_STRIDX_LC_FUNCTION);

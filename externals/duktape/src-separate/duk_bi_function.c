@@ -4,9 +4,6 @@
 
 #include "duk_internal.h"
 
-/* FIXME: shared string */
-const char *duk__str_anon = "anon";
-
 duk_ret_t duk_bi_function_constructor(duk_context *ctx) {
 	duk_hthread *thr = (duk_hthread *) ctx;
 	duk_hstring *h_sourcecode;
@@ -41,7 +38,7 @@ duk_ret_t duk_bi_function_constructor(duk_context *ctx) {
 
 	DUK_ASSERT_TOP(ctx, 2);
 
-	/* FIXME: this placeholder is not always correct, but use for now.
+	/* XXX: this placeholder is not always correct, but use for now.
 	 * It will fail in corner cases; see test-dev-func-cons-args.js.
 	 */
 	duk_push_string(ctx, "function(");
@@ -58,7 +55,7 @@ duk_ret_t duk_bi_function_constructor(duk_context *ctx) {
 	/* strictness is not inherited, intentional */
 	comp_flags = DUK_JS_COMPILE_FLAG_FUNCEXPR;
 
-	duk_push_hstring_stridx(ctx, DUK_STRIDX_COMPILE);  /* XXX: copy from caller? */  /* FIXME: ignored now */
+	duk_push_hstring_stridx(ctx, DUK_STRIDX_COMPILE);  /* XXX: copy from caller? */  /* XXX: ignored now */
 	h_sourcecode = duk_require_hstring(ctx, -2);
 	duk_js_compile(thr,
 	               (const duk_uint8_t *) DUK_HSTRING_GET_DATA(h_sourcecode),
@@ -110,16 +107,16 @@ duk_ret_t duk_bi_function_prototype_to_string(duk_context *ctx) {
 	 */
 
 
-	/* FIXME: faster internal way to get this */
+	/* XXX: faster internal way to get this */
 	duk_push_this(ctx);
 	tv = duk_get_tval(ctx, -1);
 	DUK_ASSERT(tv != NULL);
 
 	if (DUK_TVAL_IS_OBJECT(tv)) {
 		duk_hobject *obj = DUK_TVAL_GET_OBJECT(tv);
-		const char *func_name = duk__str_anon;
+		const char *func_name = DUK_STR_ANON;
 
-		/* FIXME: rework, it would be nice to avoid C formatting functions to
+		/* XXX: rework, it would be nice to avoid C formatting functions to
 		 * ensure there are no Unicode issues.
 		 */
 
@@ -129,7 +126,7 @@ duk_ret_t duk_bi_function_prototype_to_string(duk_context *ctx) {
 			DUK_ASSERT(func_name != NULL);
 
 			if (func_name[0] == (char) 0) {
-				func_name = duk__str_anon;
+				func_name = DUK_STR_ANON;
 			}
 		}
 
@@ -182,7 +179,7 @@ duk_ret_t duk_bi_function_prototype_apply(duk_context *ctx) {
 	} else {
 		DUK_DDD(DUK_DDDPRINT("argArray is an object"));
 
-		/* FIXME: make this an internal helper */
+		/* XXX: make this an internal helper */
 		duk_get_prop_stridx(ctx, 2, DUK_STRIDX_LENGTH);
 		len = (duk_idx_t) duk_to_uint32(ctx, -1);  /* ToUint32() coercion required */
 		duk_pop(ctx);
@@ -198,7 +195,7 @@ duk_ret_t duk_bi_function_prototype_apply(duk_context *ctx) {
 	DUK_ASSERT_TOP(ctx, 2 + len);
 
 	/* [ func thisArg arg1 ... argN ] */
-	
+
 	DUK_DDD(DUK_DDDPRINT("apply, func=%!iT, thisArg=%!iT, len=%ld",
 	                     (duk_tval *) duk_get_tval(ctx, 0),
 	                     (duk_tval *) duk_get_tval(ctx, 1),
@@ -237,17 +234,18 @@ duk_ret_t duk_bi_function_prototype_call(duk_context *ctx) {
 	                     (duk_tval *) duk_get_tval(ctx, 1),
 	                     (long) (nargs - 1),
 	                     (long) duk_get_top(ctx)));
-	duk_call_method(ctx, nargs - 1);	
+	duk_call_method(ctx, nargs - 1);
 	return 1;
 }
 
-/* FIXME: the implementation now assumes "chained" bound functions,
+/* XXX: the implementation now assumes "chained" bound functions,
  * whereas "collapsed" bound functions (where there is ever only
  * one bound function which directly points to a non-bound, final
  * function) would require a "collapsing" implementation which
  * merges argument lists etc here.
  */
 duk_ret_t duk_bi_function_prototype_bind(duk_context *ctx) {
+	duk_hobject *h_bound;
 	duk_hobject *h_target;
 	duk_idx_t nargs;
 	duk_idx_t i;
@@ -276,8 +274,8 @@ duk_ret_t duk_bi_function_prototype_bind(duk_context *ctx) {
 	                       DUK_HOBJECT_FLAG_CONSTRUCTABLE |
 	                       DUK_HOBJECT_CLASS_AS_FLAGS(DUK_HOBJECT_CLASS_FUNCTION),
 	                       DUK_BIDX_FUNCTION_PROTOTYPE);
-
-	/* FIXME: check hobject flags (e.g. strict) */
+	h_bound = duk_get_hobject(ctx, -1);
+	DUK_ASSERT(h_bound != NULL);
 
 	/* [ thisArg arg1 ... argN func boundFunc ] */
 	duk_dup(ctx, -2);  /* func */
@@ -323,6 +321,14 @@ duk_ret_t duk_bi_function_prototype_bind(duk_context *ctx) {
 	duk_get_prop_stridx(ctx, -2, DUK_STRIDX_FILE_NAME);
 	duk_def_prop_stridx(ctx, -2, DUK_STRIDX_FILE_NAME, DUK_PROPDESC_FLAGS_WC);
 
+	/* The 'strict' flag is copied to get the special [[Get]] of E5.1
+	 * Section 15.3.5.4 to apply when a 'caller' value is a strict bound
+	 * function.  Not sure if this is correct, because the specification
+	 * is a bit ambiguous on this point but it would make sense.
+	 */
+	if (DUK_HOBJECT_HAS_STRICT(h_target)) {
+		DUK_HOBJECT_SET_STRICT(h_bound);
+	}
 	DUK_DDD(DUK_DDDPRINT("created bound function: %!iT", (duk_tval *) duk_get_tval(ctx, -1)));
 
 	return 1;

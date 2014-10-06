@@ -98,13 +98,13 @@
 #ifdef DUK_USE_DDPRINT
 #define DUK_DDPRINT  DUK__DEBUG_STASH(DUK_LEVEL_DDEBUG), (void) duk_debug_log  /* args go here in parens */
 #else
-#define DUK_DDPRINT  0 && 
+#define DUK_DDPRINT  0 && /* args */
 #endif
 
 #ifdef DUK_USE_DDDPRINT
 #define DUK_DDDPRINT  DUK__DEBUG_STASH(DUK_LEVEL_DDDEBUG), (void) duk_debug_log  /* args go here in parens */
 #else
-#define DUK_DDDPRINT  0 && 
+#define DUK_DDDPRINT  0 && /* args */
 #endif
 
 #endif  /* DUK_USE_VARIADIC_MACROS */
@@ -131,7 +131,7 @@
 		duk_debug_summary_buf[duk_debug_summary_idx++] = (ch); \
 		if ((duk_size_t) duk_debug_summary_idx >= (duk_size_t) (sizeof(duk_debug_summary_buf) - 1)) { \
 			duk_debug_summary_buf[duk_debug_summary_idx++] = (char) 0; \
-			DUK_DPRINT("    %s", (const char *) duk_debug_summary_buf); \
+			DUK_D(DUK_DPRINT("    %s", (const char *) duk_debug_summary_buf)); \
 			DUK_DEBUG_SUMMARY_INIT(); \
 		} \
 	} while (0)
@@ -139,7 +139,7 @@
 #define DUK_DEBUG_SUMMARY_FINISH()  do { \
 		if (duk_debug_summary_idx > 0) { \
 			duk_debug_summary_buf[duk_debug_summary_idx++] = (char) 0; \
-			DUK_DPRINT("    %s", (const char *) duk_debug_summary_buf); \
+			DUK_D(DUK_DPRINT("    %s", (const char *) duk_debug_summary_buf)); \
 			DUK_DEBUG_SUMMARY_INIT(); \
 		} \
 	} while (0)
@@ -163,8 +163,8 @@
 #else  /* DUK_USE_VARIADIC_MACROS */
 
 #define DUK_DPRINT    0 && /* args go here as a comma expression in parens */
-#define DUK_DDPRINT   0 && 
-#define DUK_DDDPRINT  0 && 
+#define DUK_DDPRINT   0 && /* args */
+#define DUK_DDDPRINT  0 && /* args */
 
 #endif  /* DUK_USE_VARIADIC_MACROS */
 
@@ -219,6 +219,7 @@ void duk_fb_put_bytes(duk_fixedbuffer *fb, duk_uint8_t *buffer, duk_size_t lengt
 void duk_fb_put_byte(duk_fixedbuffer *fb, duk_uint8_t x);
 void duk_fb_put_cstring(duk_fixedbuffer *fb, const char *x);
 void duk_fb_sprintf(duk_fixedbuffer *fb, const char *fmt, ...);
+void duk_fb_put_funcptr(duk_fixedbuffer *fb, duk_uint8_t *fptr, duk_size_t fptr_size);
 duk_bool_t duk_fb_is_full(duk_fixedbuffer *fb);
 
 void duk_debug_dump_heap(duk_heap *heap);

@@ -13,12 +13,12 @@ duk_ret_t duk_bi_error_constructor_shared(duk_context *ctx) {
 	 */
 
 	duk_hthread *thr = (duk_hthread *) ctx;
-	duk_small_int_t bidx_prototype = duk_get_magic(ctx);
+	duk_small_int_t bidx_prototype = duk_get_current_magic(ctx);
 
 	/* same for both error and each subclass like TypeError */
 	duk_uint_t flags_and_class = DUK_HOBJECT_FLAG_EXTENSIBLE |
 	                             DUK_HOBJECT_CLASS_AS_FLAGS(DUK_HOBJECT_CLASS_ERROR);
-	
+
 	DUK_UNREF(thr);
 
 	duk_push_object_helper(ctx, flags_and_class, bidx_prototype);
@@ -46,7 +46,7 @@ duk_ret_t duk_bi_error_constructor_shared(duk_context *ctx) {
 }
 
 duk_ret_t duk_bi_error_prototype_to_string(duk_context *ctx) {
-	/* FIXME: optimize with more direct internal access */
+	/* XXX: optimize with more direct internal access */
 
 	duk_push_this(ctx);
 	if (!duk_is_object(ctx, -1)) {
@@ -65,7 +65,7 @@ duk_ret_t duk_bi_error_prototype_to_string(duk_context *ctx) {
 
 	/* [ ... this name ] */
 
-	/* FIXME: Are steps 6 and 7 in E5 Section 15.11.4.4 duplicated by
+	/* XXX: Are steps 6 and 7 in E5 Section 15.11.4.4 duplicated by
 	 * accident or are they actually needed?  The first ToString()
 	 * could conceivably return 'undefined'.
 	 */
@@ -143,7 +143,7 @@ static duk_ret_t duk__traceback_getter_helper(duk_context *ctx, duk_small_int_t 
 
 	/* [ ... this tracedata sep ToString(this) ] */
 
-	/* FIXME: skip null filename? */
+	/* XXX: skip null filename? */
 
 	if (duk_check_type(ctx, idx_td, DUK_TYPE_OBJECT)) {
 		/* Current tracedata contains 2 entries per callstack entry. */
@@ -273,7 +273,7 @@ static duk_ret_t duk__traceback_getter_helper(duk_context *ctx, duk_small_int_t 
 	}
 }
 
-/* FIXME: output type could be encoded into native function 'magic' value to
+/* XXX: output type could be encoded into native function 'magic' value to
  * save space.
  */
 
@@ -308,7 +308,7 @@ duk_ret_t duk_bi_error_prototype_linenumber_getter(duk_context *ctx) {
  */
 
 duk_ret_t duk_bi_error_prototype_stack_getter(duk_context *ctx) {
-	/* FIXME: remove this native function and map 'stack' accessor
+	/* XXX: remove this native function and map 'stack' accessor
 	 * to the toString() implementation directly.
 	 */
 	return duk_bi_error_prototype_to_string(ctx);

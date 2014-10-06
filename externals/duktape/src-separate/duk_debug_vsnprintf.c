@@ -400,7 +400,7 @@ static void duk__print_hobject(duk__dprint_state *st, duk_hobject *h) {
 			DUK__COMMA();
 			duk__print_tval(st, tv);
 		}
-		for (i = 0; i < h->e_used; i++) {
+		for (i = 0; i < h->e_next; i++) {
 			key = DUK_HOBJECT_E_GET_KEY(h, i);
 			if (!key) {
 				continue;
@@ -526,11 +526,9 @@ static void duk__print_hobject(duk__dprint_state *st, duk_hobject *h) {
 		DUK__COMMA(); duk_fb_sprintf(fb, "__nargs:%ld", (long) f->nargs);
 	} else if (st->internal && DUK_HOBJECT_IS_NATIVEFUNCTION(h)) {
 		duk_hnativefunction *f = (duk_hnativefunction *) h;
-#if 0  /* FIXME: no portable way to print function pointers */
-		DUK__COMMA(); duk_fb_sprintf(fb, "__func:%p", (void *) f->func);
-#endif
+		DUK__COMMA(); duk_fb_sprintf(fb, "__func:");
+		duk_fb_put_funcptr(fb, (duk_uint8_t *) &f->func, sizeof(f->func));
 		DUK__COMMA(); duk_fb_sprintf(fb, "__nargs:%ld", (long) f->nargs);
-
 	} else if (st->internal && DUK_HOBJECT_IS_THREAD(h)) {
 		duk_hthread *t = (duk_hthread *) h;
 		DUK__COMMA(); duk_fb_sprintf(fb, "__strict:%ld", (long) t->strict);
@@ -784,7 +782,7 @@ duk_int_t duk_debug_vsnprintf(char *str, duk_size_t size, const char *format, va
 	const char *p = format;
 	const char *p_end = p + DUK_STRLEN(format);
 	duk_int_t retval;
-	
+
 	DUK_MEMZERO(&fb, sizeof(fb));
 	fb.buffer = (duk_uint8_t *) str;
 	fb.length = size;
@@ -997,7 +995,7 @@ void duk_debug_format_funcptr(char *buf, duk_size_t buf_size, duk_uint8_t *fptr,
 		ch = fptr[fptr_size - 1 - i];
 #endif
 		p += DUK_SNPRINTF((char *) p, left, "%02lx", (unsigned long) ch);
-	}	
+	}
 }
 
 #endif  /* DUK_USE_DEBUG */

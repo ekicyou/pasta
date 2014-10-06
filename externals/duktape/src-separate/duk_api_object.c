@@ -99,7 +99,7 @@ duk_bool_t duk_put_prop(duk_context *ctx, duk_idx_t obj_index) {
 	tv_obj = duk_require_tval(ctx, obj_index);
 	tv_key = duk_require_tval(ctx, -2);
 	tv_val = duk_require_tval(ctx, -1);
-	throw_flag = duk_is_strict_call(ctx);  /* FIXME */
+	throw_flag = duk_is_strict_call(ctx);
 
 	rc = duk_hobject_putprop(thr, tv_obj, tv_key, tv_val, throw_flag);
 	DUK_ASSERT(rc == 0 || rc == 1);
@@ -155,7 +155,7 @@ duk_bool_t duk_del_prop(duk_context *ctx, duk_idx_t obj_index) {
 
 	tv_obj = duk_require_tval(ctx, obj_index);
 	tv_key = duk_require_tval(ctx, -1);
-	throw_flag = duk_is_strict_call(ctx);  /* FIXME */
+	throw_flag = duk_is_strict_call(ctx);
 
 	rc = duk_hobject_delprop(thr, tv_obj, tv_key, throw_flag);
 	DUK_ASSERT(rc == 0 || rc == 1);
@@ -352,7 +352,7 @@ void duk_compact(duk_context *ctx, duk_idx_t obj_index) {
 	}
 }
 
-/* FIXME: the duk_hobject_enum.c stack APIs should be reworked */
+/* XXX: the duk_hobject_enum.c stack APIs should be reworked */
 
 void duk_enum(duk_context *ctx, duk_idx_t obj_index, duk_uint_t enum_flags) {
 	DUK_ASSERT(ctx != NULL);
@@ -421,4 +421,62 @@ duk_bool_t duk_get_global_string(duk_context *ctx, const char *key) {
 	ret = duk_get_prop_string(ctx, -1, key);
 	duk_remove(ctx, -2);
 	return ret;
+}
+
+/*
+ *  Object prototype
+ */
+
+void duk_get_prototype(duk_context *ctx, duk_idx_t index) {
+	duk_hobject *obj;
+	duk_hobject *proto;
+
+	DUK_ASSERT(ctx != NULL);
+
+	obj = duk_require_hobject(ctx, index);
+	DUK_ASSERT(obj != NULL);
+
+	/* XXX: shared helper for duk_push_hobject_or_undefined()? */
+	proto = DUK_HOBJECT_GET_PROTOTYPE(obj);
+	if (proto) {
+		duk_push_hobject(ctx, proto);
+	} else {
+		duk_push_undefined(ctx);
+	}
+}
+
+void duk_set_prototype(duk_context *ctx, duk_idx_t index) {
+	duk_hthread *thr = (duk_hthread *) ctx;
+	duk_hobject *obj;
+	duk_hobject *proto;
+
+	DUK_ASSERT(ctx != NULL);
+
+	obj = duk_require_hobject(ctx, index);
+	DUK_ASSERT(obj != NULL);
+	duk_require_type_mask(ctx, -1, DUK_TYPE_MASK_UNDEFINED |
+	                               DUK_TYPE_MASK_OBJECT);
+	proto = duk_get_hobject(ctx, -1);
+	/* proto can also be NULL here (allowed explicitly) */
+
+	DUK_HOBJECT_SET_PROTOTYPE_UPDREF(thr, obj, proto);
+
+	duk_pop(ctx);
+}
+
+/*
+ *  Object finalizer
+ */
+
+/* XXX: these could be implemented as macros calling an internal function
+ * directly.
+ * XXX: same issue as with Duktape.fin: there's no way to delete the property
+ * now (just set it to undefined).
+ */
+void duk_get_finalizer(duk_context *ctx, duk_idx_t index) {
+	duk_get_prop_stridx(ctx, index, DUK_STRIDX_INT_FINALIZER);
+}
+
+void duk_set_finalizer(duk_context *ctx, duk_idx_t index) {
+	duk_put_prop_stridx(ctx, index, DUK_STRIDX_INT_FINALIZER);
 }

@@ -282,7 +282,7 @@ duk_ret_t duk_bi_string_prototype_slice(duk_context *ctx) {
 
 duk_ret_t duk_bi_string_prototype_caseconv_shared(duk_context *ctx) {
 	duk_hthread *thr = (duk_hthread *) ctx;
-	duk_small_int_t uppercase = duk_get_magic(ctx);
+	duk_small_int_t uppercase = duk_get_current_magic(ctx);
 
 	(void) duk_push_this_coercible_to_string(ctx);
 	duk_unicode_case_convert_string(thr, (duk_bool_t) uppercase);
@@ -305,7 +305,7 @@ duk_ret_t duk_bi_string_prototype_indexof_shared(duk_context *ctx) {
 	duk_int_t q_blen;
 	duk_uint8_t firstbyte;
 	duk_uint8_t t;
-	duk_small_int_t is_lastindexof = duk_get_magic(ctx);  /* 0=indexOf, 1=lastIndexOf */
+	duk_small_int_t is_lastindexof = duk_get_current_magic(ctx);  /* 0=indexOf, 1=lastIndexOf */
 
 	h_this = duk_push_this_coercible_to_string(ctx);
 	DUK_ASSERT(h_this != NULL);
@@ -320,7 +320,7 @@ duk_ret_t duk_bi_string_prototype_indexof_shared(duk_context *ctx) {
 	if (duk_is_nan(ctx, 1) && is_lastindexof) {
 		/* indexOf: NaN should cause pos to be zero.
 		 * lastIndexOf: NaN should cause pos to be +Infinity
-	 	 * (and later be clamped to len).
+		 * (and later be clamped to len).
 		 */
 		cpos = clen_this;
 	} else {

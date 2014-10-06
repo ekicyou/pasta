@@ -15,7 +15,7 @@ static void duk__mark_tval(duk_heap *heap, duk_tval *tv);
 
 /* Select a thread for mark-and-sweep use.
  *
- * FIXME: This needs to change later.
+ * XXX: This needs to change later.
  */
 static duk_hthread *duk__get_temp_hthread(duk_heap *heap) {
 	if (heap->curr_thread) {
@@ -47,7 +47,7 @@ static void duk__mark_hobject(duk_heap *heap, duk_hobject *h) {
 
 	/* XXX: use advancing pointers instead of index macros -> faster and smaller? */
 
-	for (i = 0; i < (duk_uint_fast32_t) h->e_used; i++) {
+	for (i = 0; i < (duk_uint_fast32_t) h->e_next; i++) {
 		duk_hstring *key = DUK_HOBJECT_E_GET_KEY(h, i);
 		if (!key) {
 			continue;
@@ -181,7 +181,7 @@ static void duk__mark_tval(duk_heap *heap, duk_tval *tv) {
 		return;
 	}
 	if (DUK_TVAL_IS_HEAP_ALLOCATED(tv)) {
-		duk__mark_heaphdr(heap, DUK_TVAL_GET_HEAPHDR(tv)); 
+		duk__mark_heaphdr(heap, DUK_TVAL_GET_HEAPHDR(tv));
 	}
 }
 
@@ -257,8 +257,11 @@ static void duk__mark_finalizable(duk_heap *heap) {
 	hdr = heap->heap_allocated;
 	while (hdr) {
 		/* A finalizer is looked up from the object and up its prototype chain
-		 * (which allows inherited finalizers).
+		 * (which allows inherited finalizers).  A prototype loop must not cause
+		 * an error to be thrown here; duk_hobject_hasprop_raw() will ignore a
+		 * prototype loop silently and indicate that the property doesn't exist.
 		 */
+
 		if (!DUK_HEAPHDR_HAS_REACHABLE(hdr) &&
 		    DUK_HEAPHDR_GET_TYPE(hdr) == DUK_HTYPE_OBJECT &&
 		    !DUK_HEAPHDR_HAS_FINALIZED(hdr) &&
@@ -744,7 +747,7 @@ static void duk__compact_object_list(duk_heap *heap, duk_hthread *thr, duk_heaph
 		DUK_DDD(DUK_DDDPRINT("mark-and-sweep compact: %p", (void *) curr));
 
 		if (DUK_HEAPHDR_GET_TYPE(curr) != DUK_HTYPE_OBJECT) {
-			goto next;	
+			goto next;
 		}
 		obj = (duk_hobject *) curr;
 
@@ -883,7 +886,7 @@ duk_bool_t duk_heap_mark_and_sweep(duk_heap *heap, duk_small_uint_t flags) {
 	duk_size_t count_keep_str;
 	duk_size_t tmp;
 
-	/* FIXME: thread selection for mark-and-sweep is currently a hack.
+	/* XXX: thread selection for mark-and-sweep is currently a hack.
 	 * If we don't have a thread, the entire mark-and-sweep is now
 	 * skipped (although we could just skip finalizations).
 	 */

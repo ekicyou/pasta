@@ -13,17 +13,17 @@
   <ItemGroup>
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_alloc_default.c" />
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_alloc_torture.c" />
-    <ClCompile Include="..\..\externals\duktape\src-separate\duk_api.c" />
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_buffer.c" />
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_call.c" />
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_codec.c" />
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_compile.c" />
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_debug.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_heap.c" />
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_logging.c" />
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_memory.c" />
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_object.c" />
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_stack.c" />
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_string.c" />
-    <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_thread.c" />
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_var.c" />
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_bi_array.c" />
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_bi_boolean.c" />

@@ -176,6 +176,7 @@ static void duk__free_stringtable(duk_heap *heap) {
 }
 
 static void duk__free_run_finalizers(duk_heap *heap) {
+	duk_hthread *thr;
 	duk_heaphdr *curr;
 #ifdef DUK_USE_DEBUG
 	duk_size_t count_obj = 0;
@@ -190,17 +191,25 @@ static void duk__free_run_finalizers(duk_heap *heap) {
 	DUK_ASSERT(heap->finalize_list == NULL);  /* mark-and-sweep not running -> must be empty */
 #endif
 
-	/* FIXME: here again finalizer thread is the heap_thread which needs
+	/* XXX: here again finalizer thread is the heap_thread which needs
 	 * to be coordinated with finalizer thread fixes.
 	 */
+	thr = heap->heap_thread;
+	DUK_ASSERT(thr != NULL);
 
 	curr = heap->heap_allocated;
 	while (curr) {
 		if (DUK_HEAPHDR_GET_TYPE(curr) == DUK_HTYPE_OBJECT) {
-			/* Only objects in heap_allocated may have finalizers. */
-			DUK_ASSERT(heap->heap_thread != NULL);
+			/* Only objects in heap_allocated may have finalizers.  Check that
+			 * the object itself has a _finalizer property so that we don't
+			 * execute finalizers for e.g. Proxy objects.
+			 */
+			DUK_ASSERT(thr != NULL);
 			DUK_ASSERT(curr != NULL);
-			duk_hobject_run_finalizer(heap->heap_thread, (duk_hobject *) curr);
+
+			if (duk_hobject_hasprop_raw(thr, (duk_hobject *) curr, DUK_HTHREAD_STRING_INT_FINALIZER(thr))) {
+				duk_hobject_run_finalizer(thr, (duk_hobject *) curr);
+			}
 #ifdef DUK_USE_DEBUG
 			count_obj++;
 #endif
@@ -223,7 +232,7 @@ void duk_heap_free(duk_heap *heap) {
 	 * resources like file handles, allocations made outside Duktape,
 	 * etc.
 	 *
-	 * FIXME: this perhaps requires an execution time limit.
+	 * XXX: this perhaps requires an execution time limit.
 	 */
 	DUK_D(DUK_DPRINT("execute finalizers before freeing heap"));
 #ifdef DUK_USE_MARK_AND_SWEEP
@@ -318,11 +327,11 @@ static int duk__init_heap_strings(duk_heap *heap) {
 			goto error;
 		}
 
-		/* special flags */
-
-		if (len > 0 && tmp[0] == (duk_uint8_t) 0xff) {
-			DUK_HSTRING_SET_INTERNAL(h);
-		}
+		/* Special flags checks.  Since these strings are always
+		 * reachable and a string cannot appear twice in the string
+		 * table, there's no need to check/set these flags elsewhere.
+		 * The 'internal' flag is set by string intern code.
+		 */
 		if (i == DUK_STRIDX_EVAL || i == DUK_STRIDX_LC_ARGUMENTS) {
 			DUK_HSTRING_SET_EVAL_OR_ARGUMENTS(h);
 		}
@@ -351,7 +360,7 @@ static int duk__init_heap_strings(duk_heap *heap) {
 
 static int duk__init_heap_thread(duk_heap *heap) {
 	duk_hthread *thr;
-	
+
 	DUK_DD(DUK_DDPRINT("heap init: alloc heap thread"));
 	thr = duk_hthread_alloc(heap,
 	                        DUK_HOBJECT_FLAG_EXTENSIBLE |
@@ -373,7 +382,7 @@ static int duk__init_heap_thread(duk_heap *heap) {
 		return 0;
 	}
 
-	/* FIXME: this may now fail, and is not handled correctly */
+	/* XXX: this may now fail, and is not handled correctly */
 	duk_hthread_create_builtin_objects(thr);
 
 	/* default prototype (Note: 'thr' must be reachable) */
@@ -637,7 +646,7 @@ duk_heap *duk_heap_alloc(duk_alloc_function alloc_func,
 	{
 		duk_small_uint_t i;
 	        for (i = 0; i < DUK_HEAP_NUM_STRINGS; i++) {
-        	        res->strs[i] = NULL;
+			res->strs[i] = NULL;
 	        }
 	}
 #endif
@@ -654,7 +663,7 @@ duk_heap *duk_heap_alloc(duk_alloc_function alloc_func,
 	res->call_recursion_depth = 0;
 	res->call_recursion_limit = DUK_HEAP_DEFAULT_CALL_RECURSION_LIMIT;
 
-	/* FIXME: use the pointer as a seed for now: mix in time at least */
+	/* XXX: use the pointer as a seed for now: mix in time at least */
 
 	/* The casts through duk_intr_pt is to avoid the following GCC warning:
 	 *
@@ -693,7 +702,7 @@ duk_heap *duk_heap_alloc(duk_alloc_function alloc_func,
 		duk_small_uint_t i;
 		DUK_ASSERT(res->st_size == DUK_STRTAB_INITIAL_SIZE);
 	        for (i = 0; i < DUK_STRTAB_INITIAL_SIZE; i++) {
-        	        res->st[i] = NULL;
+			res->st[i] = NULL;
 	        }
 	}
 #else
@@ -710,7 +719,7 @@ duk_heap *duk_heap_alloc(duk_alloc_function alloc_func,
 	}
 #endif
 
-	/* FIXME: error handling is incomplete.  It would be cleanest if
+	/* XXX: error handling is incomplete.  It would be cleanest if
 	 * there was a setjmp catchpoint, so that all init code could
 	 * freely throw errors.  If that were the case, the return code
 	 * passing here could be removed.

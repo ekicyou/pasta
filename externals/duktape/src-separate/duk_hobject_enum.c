@@ -19,7 +19,7 @@
 
 #include "duk_internal.h"
 
-/* FIXME: identify enumeration target with an object index (not top of stack) */
+/* XXX: identify enumeration target with an object index (not top of stack) */
 
 /* must match exactly the number of internal properties inserted to enumerator */
 #define DUK__ENUM_START_INDEX  2
@@ -54,14 +54,14 @@ static void duk__sort_array_indices(duk_hobject *h_obj) {
 	duk_uarridx_t val_highest, val_curr, val_insert;
 
 	DUK_ASSERT(h_obj != NULL);
-	DUK_ASSERT(h_obj->e_used >= 2);  /* control props */
+	DUK_ASSERT(h_obj->e_next >= 2);  /* control props */
 
-	if (h_obj->e_used <= 1 + DUK__ENUM_START_INDEX) {
+	if (h_obj->e_next <= 1 + DUK__ENUM_START_INDEX) {
 		return;
 	}
 
 	keys = DUK_HOBJECT_E_GET_KEY_BASE(h_obj);
-	p_end = keys + h_obj->e_used;
+	p_end = keys + h_obj->e_next;
 	keys += DUK__ENUM_START_INDEX;
 
 	DUK_DDD(DUK_DDDPRINT("keys=%p, p_end=%p (after skipping enum props)",
@@ -70,7 +70,7 @@ static void duk__sort_array_indices(duk_hobject *h_obj) {
 #ifdef DUK_USE_DDDPRINT
 	{
 		duk_uint_fast32_t i;
-		for (i = 0; i < (duk_uint_fast32_t) h_obj->e_used; i++) {
+		for (i = 0; i < (duk_uint_fast32_t) h_obj->e_next; i++) {
 			DUK_DDD(DUK_DDDPRINT("initial: %ld %p -> %!O",
 			                     (long) i,
 			                     (void *) DUK_HOBJECT_E_GET_KEY_PTR(h_obj, i),
@@ -95,7 +95,7 @@ static void duk__sort_array_indices(duk_hobject *h_obj) {
 		DUK_DDD(DUK_DDDPRINT("p_curr=%p, p_end=%p, val_highest=%ld, val_curr=%ld -> "
 		                     "needs to be inserted",
 		                     (void *) p_curr, (void *) p_end, (long) val_highest, (long) val_curr));
-	
+
 		/* Needs to be inserted; scan backwards, since we optimize
 		 * for the case where elements are nearly in order.
 		 */
@@ -140,7 +140,7 @@ static void duk__sort_array_indices(duk_hobject *h_obj) {
 #ifdef DUK_USE_DDDPRINT
 	{
 		duk_uint_fast32_t i;
-		for (i = 0; i < (duk_uint_fast32_t) h_obj->e_used; i++) {
+		for (i = 0; i < (duk_uint_fast32_t) h_obj->e_next; i++) {
 			DUK_DDD(DUK_DDDPRINT("final: %ld %p -> %!O",
 			                     (long) i,
 			                     (void *) DUK_HOBJECT_E_GET_KEY_PTR(h_obj, i),
@@ -367,7 +367,7 @@ void duk_hobject_enumerator_create(duk_context *ctx, duk_small_uint_t enum_flags
 		 *  Entries part
 		 */
 
-		for (i = 0; i < (duk_uint_fast32_t) curr->e_used; i++) {
+		for (i = 0; i < (duk_uint_fast32_t) curr->e_next; i++) {
 			duk_hstring *k;
 
 			k = DUK_HOBJECT_E_GET_KEY(curr, i);
@@ -426,12 +426,12 @@ void duk_hobject_enumerator_create(duk_context *ctx, duk_small_uint_t enum_flags
 		 *  here.
 		 */
 
-		/* FIXME: avoid this at least when enum_target is an Array, it has an
+		/* XXX: avoid this at least when enum_target is an Array, it has an
 		 * array part, and no ancestor properties were included?  Not worth
 		 * it for JSON, but maybe worth it for forEach().
 		 */
 
-		/* FIXME: may need a 'length' filter for forEach()
+		/* XXX: may need a 'length' filter for forEach()
 		 */
 		DUK_DDD(DUK_DDDPRINT("sort array indices by caller request"));
 		duk__sort_array_indices(res);
@@ -483,7 +483,6 @@ duk_bool_t duk_hobject_enumerator_next(duk_context *ctx, duk_bool_t get_value) {
 	enum_target = duk_require_hobject(ctx, -1);
 	DUK_ASSERT(enum_target != NULL);
 #if defined(DUK_USE_ES6_PROXY)
-	/* FIXME: typing issue here? */
 	check_existence = (!DUK_HOBJECT_HAS_EXOTIC_PROXYOBJ(enum_target));
 #else
 	check_existence = 1;
@@ -497,7 +496,7 @@ duk_bool_t duk_hobject_enumerator_next(duk_context *ctx, duk_bool_t get_value) {
 	for (;;) {
 		duk_hstring *k;
 
-		if (idx >= e->e_used) {
+		if (idx >= e->e_next) {
 			DUK_DDD(DUK_DDDPRINT("enumeration: ran out of elements"));
 			break;
 		}
@@ -573,7 +572,7 @@ duk_ret_t duk_hobject_get_enumerated_keys(duk_context *ctx, duk_small_uint_t enu
 	DUK_ASSERT(e != NULL);
 
 	idx = 0;
-	for (i = DUK__ENUM_START_INDEX; i < (duk_uint_fast32_t) e->e_used; i++) {
+	for (i = DUK__ENUM_START_INDEX; i < (duk_uint_fast32_t) e->e_next; i++) {
 		duk_hstring *k;
 
 		k = DUK_HOBJECT_E_GET_KEY(e, i);

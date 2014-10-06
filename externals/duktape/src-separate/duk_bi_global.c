@@ -90,7 +90,7 @@ typedef struct {
 
 typedef void (*duk__transform_callback)(duk__transform_context *tfm_ctx, void *udata, duk_codepoint_t cp);
 
-/* FIXME: refactor and share with other code */
+/* XXX: refactor and share with other code */
 static duk_small_int_t duk__decode_hex_escape(duk_uint8_t *p, duk_small_int_t n) {
 	duk_small_int_t ch;
 	duk_small_int_t t = 0;
@@ -458,7 +458,7 @@ duk_ret_t duk_bi_global_object_eval(duk_context *ctx) {
 	/* E5 Section 10.4.2 */
 	DUK_ASSERT(thr->callstack_top >= 1);
 	act = thr->callstack + thr->callstack_top - 1;  /* this function */
-	if (act->flags & DUK_ACT_FLAG_DIRECT_EVAL) {	
+	if (act->flags & DUK_ACT_FLAG_DIRECT_EVAL) {
 		DUK_ASSERT(thr->callstack_top >= 2);
 		act = thr->callstack + thr->callstack_top - 2;  /* caller */
 		if (act->lex_env == NULL) {

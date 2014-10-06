@@ -59,7 +59,7 @@ static void duk__refcount_finalize_hobject(duk_hthread *thr, duk_hobject *h) {
 
 	/* XXX: better to get base and walk forwards? */
 
-	for (i = 0; i < (duk_uint_fast32_t) h->e_used; i++) {
+	for (i = 0; i < (duk_uint_fast32_t) h->e_next; i++) {
 		duk_hstring *key = DUK_HOBJECT_E_GET_KEY(h, i);
 		if (!key) {
 			continue;
@@ -218,7 +218,7 @@ static void duk__refzero_free_pending(duk_hthread *thr) {
 		 *  objects and must be safe (not throw any errors, ever).
 		 */
 
-		/* FIXME: If object has FINALIZED, it was finalized by mark-and-sweep on
+		/* XXX: If object has FINALIZED, it was finalized by mark-and-sweep on
 		 * its previous run.  Any point in running finalizer again here?  If
 		 * finalization semantics is changed so that finalizer is only run once,
 		 * checking for FINALIZED would happen here.
@@ -246,7 +246,7 @@ static void duk__refzero_free_pending(duk_hthread *thr) {
 			}
 		}
 
-  		/* Refzero head is still the same.  This is the case even if finalizer
+		/* Refzero head is still the same.  This is the case even if finalizer
 		 * inserted more refzero objects; they are inserted to the tail.
 		 */
 		DUK_ASSERT(h1 == heap->refzero_list);
@@ -315,7 +315,7 @@ static void duk__refzero_free_pending(duk_hthread *thr) {
  *
  *  Decref may trigger immediate refzero handling, which may free and finalize
  *  an arbitrary number of objects.
- *  
+ *
  */
 
 void duk_heap_tval_incref(duk_tval *tv) {

@@ -14,7 +14,7 @@
  *  perform multiple character lookups efficiently and with few sanity
  *  checks (such as access outside the end of the input), which keeps the
  *  tokenization code small at the cost of performance.
- * 
+ *
  *  Character data in tokens (such as identifier names and string literals)
  *  is encoded into CESU-8 format on-the-fly while parsing the token in
  *  question.  The string data is made reachable to garbage collection by
@@ -151,7 +151,7 @@
  *
  *    * Reject other invalid Unicode sequences (see Wikipedia entry for examples)
  *      in strict UTF-8 mode.
- * 
+ *
  *    * Size optimize.  An attempt to use a 16-byte lookup table for the first
  *      byte resulted in a code increase though.
  *
@@ -536,7 +536,6 @@ static void duk__parse_input_element_raw(duk_lexer_ctx *lex_ctx,
 	out_token->num_escapes = 0;
 	out_token->start_line = lex_ctx->lines[0];
 	out_token->start_offset = lex_ctx->offsets[0];
-	/* out_token->end_line set at exit */
 	/* out_token->lineterm set by caller */
 
 	duk_to_undefined((duk_context *) lex_ctx->thr, lex_ctx->slot1_idx);
@@ -654,7 +653,7 @@ static void duk__parse_input_element_raw(duk_lexer_ctx *lex_ctx,
 			 *          '4'			RegularExpressionNonTerminator
 			 *
 			 *      and the escape itself is then parsed by the regexp engine.
-			 *      This is the current implementation. 
+			 *      This is the current implementation.
 			 *
 			 *  Minor spec inconsistency:
 			 *
@@ -665,9 +664,9 @@ static void duk__parse_input_element_raw(duk_lexer_ctx *lex_ctx,
 			 *      while Section A.1 RegularExpressionBackslashSequence is:
 			 *
 			 *         \ NonTerminator
-			 * 
+			 *
 			 *      The latter is not normative and a typo.
-			 * 
+			 *
 			 */
 
 			/* first, parse regexp body roughly */
@@ -1031,7 +1030,7 @@ static void duk__parse_input_element_raw(duk_lexer_ctx *lex_ctx,
 			 * OctalIntegerLiteral is the only valid NumericLiteral
 			 * alternative at this point (even if y is, say, '9').
 			 */
-	
+
 			DUK__APPENDBUFFER(lex_ctx, x);
 			DUK__ADVANCE(lex_ctx, 1);
 			int_only = 1;
@@ -1207,7 +1206,7 @@ static void duk__parse_input_element_raw(duk_lexer_ctx *lex_ctx,
 					} else if (((DUK__ISDIGIT03(x) && !DUK__ISDIGIT(DUK__L3())) || DUK__ISDIGIT47(x)) &&
 					           DUK__ISOCTDIGIT(y)) {
 						/* Two digit octal escape, digits validated.
-						 * 
+						 *
 						 * The if-condition is a bit tricky.  We could catch e.g.
 						 * '\039' in the three-digit escape and fail it there (by
 					         * validating the digits), but we want to avoid extra
@@ -1267,7 +1266,6 @@ static void duk__parse_input_element_raw(duk_lexer_ctx *lex_ctx,
 	if (out_token->t_nores < 0) {
 		out_token->t_nores = out_token->t;
 	}
-	out_token->end_line = lex_ctx->lines[0];
 }
 
 /*
@@ -1295,8 +1293,8 @@ void duk_lexer_parse_js_input_element(duk_lexer_ctx *lex_ctx,
 		duk__parse_input_element_raw(lex_ctx, out_token, strict_mode, regexp_mode);
 		tok = out_token->t;
 
-		DUK_DDD(DUK_DDDPRINT("RAWTOKEN: %ld (line %ld-%ld)",
-		                     (long) tok, (long) out_token->start_line, (long) out_token->end_line));
+		DUK_DDD(DUK_DDDPRINT("RAWTOKEN: %ld (line %ld)",
+		                     (long) tok, (long) out_token->start_line));
 
 		if (tok == DUK_TOK_COMMENT) {
 			/* single-line comment or multi-line comment without an internal lineterm */
@@ -1365,7 +1363,7 @@ void duk_lexer_parse_re_token(duk_lexer_ctx *lex_ctx, duk_re_token *out_token) {
 	}
 	case '?': {
 		out_token->qmin = 0;
-		out_token->qmax = 1;	
+		out_token->qmax = 1;
 		if (y == '?') {
 			advtok = DUK__ADVTOK(2, DUK_RETOK_QUANTIFIER);
 			out_token->greedy = 0;

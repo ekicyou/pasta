@@ -336,7 +336,7 @@ static void duk__handle_bound_chain_for_call(duk_hthread *thr,
 	func = *p_func;
 
 	sanity = DUK_HOBJECT_BOUND_CHAIN_SANITY;
-	do {	
+	do {
 		duk_idx_t i, len;
 
 		if (!DUK_HOBJECT_HAS_BOUND(func)) {
@@ -633,6 +633,7 @@ duk_int_t duk_handle_call(duk_hthread *thr,
                           duk_small_uint_t call_flags) {
 	duk_context *ctx = (duk_context *) thr;
 	duk_size_t entry_valstack_bottom_index;
+	duk_size_t entry_valstack_end;
 	duk_size_t entry_callstack_top;
 	duk_size_t entry_catchstack_top;
 	duk_int_t entry_call_recursion_depth;
@@ -672,6 +673,7 @@ duk_int_t duk_handle_call(duk_hthread *thr,
 	 */
 
 	entry_valstack_bottom_index = (duk_size_t) (thr->valstack_bottom - thr->valstack);
+	entry_valstack_end = (duk_size_t) (thr->valstack_end - thr->valstack);
 	entry_callstack_top = thr->callstack_top;
 	entry_catchstack_top = thr->catchstack_top;
 	entry_call_recursion_depth = thr->heap->call_recursion_depth;
@@ -817,7 +819,7 @@ duk_int_t duk_handle_call(duk_hthread *thr,
 
 	/* [ ... func this (crud) errobj ] */
 
-	/* FIXME: is there space?  better implementation: write directly over
+	/* XXX: is there space?  better implementation: write directly over
 	 * 'func' slot to avoid valstack grow issues.
 	 */
 	duk_push_tval(ctx, &thr->heap->lj.value1);
@@ -829,14 +831,18 @@ duk_int_t duk_handle_call(duk_hthread *thr,
 
 	/* [ ... errobj ] */
 
-	/* ensure there is internal valstack spare before we exit; this may
-	 * throw an alloc error
+	/* Ensure there is internal valstack spare before we exit; this may
+	 * throw an alloc error.  The same guaranteed size must be available
+	 * as before the call.  This is not optimal now: we store the valstack
+	 * allocated size during entry; this value may be higher than the
+	 * minimal guarantee for an application.
 	 */
 
-	duk_require_valstack_resize((duk_context *) thr,
-	                            (thr->valstack_top - thr->valstack) +            /* top of current func */
-	                                DUK_VALSTACK_INTERNAL_EXTRA,                 /* + spare => min_new_size */
-	                            1);                                              /* allow_shrink */
+	(void) duk_valstack_resize_raw((duk_context *) thr,
+	                               entry_valstack_end,                    /* same as during entry */
+	                               DUK_VSRESIZE_FLAG_SHRINK |             /* flags */
+	                               DUK_VSRESIZE_FLAG_COMPACT |
+	                               DUK_VSRESIZE_FLAG_THROW);
 
 	/* Note: currently a second setjmp restoration is done at the target;
 	 * this is OK, but could be refactored away.
@@ -884,7 +890,7 @@ duk_int_t duk_handle_call(duk_hthread *thr,
 
 	if (call_flags & DUK_CALL_FLAG_IGNORE_RECLIMIT) {
 		DUK_DD(DUK_DDPRINT("ignoring reclimit for this call (probably an errhandler call)"));
-	} else {	
+	} else {
 		if (thr->heap->call_recursion_depth >= thr->heap->call_recursion_limit) {
 			/* XXX: error message is a bit misleading: we reached a recursion
 			 * limit which is also essentially the same as a C callstack limit
@@ -974,7 +980,11 @@ duk_int_t duk_handle_call(duk_hthread *thr,
 	}
 	vs_min_size += DUK_VALSTACK_INTERNAL_EXTRA,                    /* + spare */
 
-	duk_require_valstack_resize((duk_context *) thr, vs_min_size, 1 /*allow_shrink*/);
+	(void) duk_valstack_resize_raw((duk_context *) thr,
+	                               vs_min_size,
+	                               DUK_VSRESIZE_FLAG_SHRINK |      /* flags */
+	                               0 /* no compact */ |
+	                               DUK_VSRESIZE_FLAG_THROW);
 
 	/*
 	 *  Update idx_retval of current activation.
@@ -989,7 +999,7 @@ duk_int_t duk_handle_call(duk_hthread *thr,
 	if (thr->callstack_top > 0) {
 		/* now set unconditionally, regardless of whether current activation
 		 * is native or not.
-	 	 */
+		 */
 		(thr->callstack + thr->callstack_top - 1)->idx_retval = entry_valstack_bottom_index + idx_func;
 	}
 
@@ -1101,7 +1111,7 @@ duk_int_t duk_handle_call(duk_hthread *thr,
 	/* third arg: absolute index (to entire valstack) of idx_bottom of new activation */
 	env = duk_create_activation_environment_record(thr, func, act->idx_bottom);
 	DUK_ASSERT(env != NULL);
-	
+
 	/* [... func this arg1 ... argN envobj] */
 
 	DUK_ASSERT(DUK_HOBJECT_HAS_CREATEARGS(func));
@@ -1225,12 +1235,18 @@ duk_int_t duk_handle_call(duk_hthread *thr,
 
 	/* [... retval] */
 
-	/* ensure there is internal valstack spare before we exit */
+	/* Ensure there is internal valstack spare before we exit; this may
+	 * throw an alloc error.  The same guaranteed size must be available
+	 * as before the call.  This is not optimal now: we store the valstack
+	 * allocated size during entry; this value may be higher than the
+	 * minimal guarantee for an application.
+	 */
 
-	duk_require_valstack_resize((duk_context *) thr,
-	                            (thr->valstack_top - thr->valstack) +            /* top of current func */
-	                                DUK_VALSTACK_INTERNAL_EXTRA,                 /* + spare => min_new_size */
-	                            1);                                              /* allow_shrink */
+	(void) duk_valstack_resize_raw((duk_context *) thr,
+	                               entry_valstack_end,                    /* same as during entry */
+	                               DUK_VSRESIZE_FLAG_SHRINK |             /* flags */
+	                               DUK_VSRESIZE_FLAG_COMPACT |
+	                               DUK_VSRESIZE_FLAG_THROW);
 
 
 	/*
@@ -1238,7 +1254,7 @@ duk_int_t duk_handle_call(duk_hthread *thr,
 	 */
 
 	retval = DUK_EXEC_SUCCESS;
-	goto shrink_and_finished;	
+	goto shrink_and_finished;
 
 	/*
 	 *  Ecmascript call
@@ -1303,19 +1319,25 @@ duk_int_t duk_handle_call(duk_hthread *thr,
 
 	/* [... retval] */
 
-	/* ensure there is internal valstack spare before we exit */
+	/* Ensure there is internal valstack spare before we exit; this may
+	 * throw an alloc error.  The same guaranteed size must be available
+	 * as before the call.  This is not optimal now: we store the valstack
+	 * allocated size during entry; this value may be higher than the
+	 * minimal guarantee for an application.
+	 */
 
-	duk_require_valstack_resize((duk_context *) thr,
-	                            (thr->valstack_top - thr->valstack) +            /* top of current func */
-	                                DUK_VALSTACK_INTERNAL_EXTRA,                 /* + spare => min_new_size */
-	                            1);                                              /* allow_shrink */
+	(void) duk_valstack_resize_raw((duk_context *) thr,
+	                               entry_valstack_end,                    /* same as during entry */
+	                               DUK_VSRESIZE_FLAG_SHRINK |             /* flags */
+	                               DUK_VSRESIZE_FLAG_COMPACT |
+	                               DUK_VSRESIZE_FLAG_THROW);
 
 	/*
 	 *  Shrink checks and return with success.
 	 */
 
 	retval = DUK_EXEC_SUCCESS;
-	goto shrink_and_finished;	
+	goto shrink_and_finished;
 
  shrink_and_finished:
 	/* these are "soft" shrink checks, whose failures are ignored */
@@ -1360,7 +1382,7 @@ duk_int_t duk_handle_call(duk_hthread *thr,
 	DUK_ASSERT((thr->state == DUK_HTHREAD_STATE_INACTIVE && thr->heap->curr_thread == NULL) ||  /* first call */
 	           (thr->state == DUK_HTHREAD_STATE_INACTIVE && thr->heap->curr_thread != NULL) ||  /* other call */
 	           (thr->state == DUK_HTHREAD_STATE_RUNNING && thr->heap->curr_thread == thr));     /* current thread */
-	
+
 	thr->heap->call_recursion_depth = entry_call_recursion_depth;
 
 	return retval;
@@ -1468,7 +1490,7 @@ static void duk__safe_call_adjust_valstack(duk_hthread *thr, duk_idx_t idx_retba
  *  handler if nothing else.
  */
 
-/* FIXME: bump preventcount by one for the duration of this call? */
+/* XXX: bump preventcount by one for the duration of this call? */
 
 duk_int_t duk_handle_safe_call(duk_hthread *thr,
                                duk_safe_call_function func,
@@ -1572,7 +1594,7 @@ duk_int_t duk_handle_safe_call(duk_hthread *thr,
 
 	/* [ ... | (crud) ] */
 
-	/* FIXME: space in valstack?  see discussion in duk_handle_call. */
+	/* XXX: space in valstack?  see discussion in duk_handle_call. */
 	duk_push_tval(ctx, &thr->heap->lj.value1);
 
 	/* [ ... | (crud) errobj ] */
@@ -2003,7 +2025,7 @@ void duk_handle_ecma_call_setup(duk_hthread *thr,
 
 		act->flags = (DUK_HOBJECT_HAS_STRICT(func) ?
 		              DUK_ACT_FLAG_STRICT | DUK_ACT_FLAG_TAILCALLED :
-	        	      DUK_ACT_FLAG_TAILCALLED);
+		              DUK_ACT_FLAG_TAILCALLED);
 
 		DUK_ASSERT(act->func == func);      /* already updated */
 		DUK_ASSERT(act->var_env == NULL);   /* already NULLed (by unwind) */
@@ -2035,7 +2057,7 @@ void duk_handle_ecma_call_setup(duk_hthread *thr,
 		DUK_TVAL_SET_TVAL(tv1, tv2);
 		DUK_TVAL_INCREF(thr, tv1);
 		DUK_TVAL_DECREF(thr, &tv_tmp);  /* side effects */
-		
+
 		for (i_arg = 0; i_arg < idx_args; i_arg++) {
 			/* XXX: block removal API primitive */
 			/* Note: 'func' is popped from valstack here, but it is
@@ -2050,12 +2072,14 @@ void duk_handle_ecma_call_setup(duk_hthread *thr,
 
 		/* now we can also do the valstack resize check */
 
-		duk_require_valstack_resize((duk_context *) thr,
-		                            (thr->valstack_bottom - thr->valstack) +         /* bottom of current func */
-		                                idx_args +                                   /* bottom of new func (always 0 here) */
-		                                nregs +                                      /* num entries of new func at entry */
-		                                DUK_VALSTACK_INTERNAL_EXTRA,                 /* + spare => min_new_size */
-		                            1);                                              /* allow_shrink */
+		(void) duk_valstack_resize_raw((duk_context *) thr,
+		                               (thr->valstack_bottom - thr->valstack) +     /* bottom of current func */
+		                                   idx_args +                               /* bottom of new func (always 0 here) */
+		                                   nregs +                                  /* num entries of new func at entry */
+		                                   DUK_VALSTACK_INTERNAL_EXTRA,             /* + spare => min_new_size */
+		                               DUK_VSRESIZE_FLAG_SHRINK |                   /* flags */
+		                               0 /* no compact */ |
+		                               DUK_VSRESIZE_FLAG_THROW);
 	} else {
 		DUK_DDD(DUK_DDDPRINT("not a tailcall, pushing a new activation to callstack, to index %ld",
 		                     (long) (thr->callstack_top)));
@@ -2064,12 +2088,14 @@ void duk_handle_ecma_call_setup(duk_hthread *thr,
 
 		/* func wants args clamped to 'nargs' */
 
-		duk_require_valstack_resize((duk_context *) thr,
-		                            (thr->valstack_bottom - thr->valstack) +         /* bottom of current func */
-		                                idx_args +                                   /* bottom of new func */
-		                                nregs +                                      /* num entries of new func at entry */
-		                                DUK_VALSTACK_INTERNAL_EXTRA,                 /* + spare => min_new_size */
-		                            1);                                              /* allow_shrink */
+		(void) duk_valstack_resize_raw((duk_context *) thr,
+		                               (thr->valstack_bottom - thr->valstack) +     /* bottom of current func */
+		                                   idx_args +                               /* bottom of new func */
+		                                   nregs +                                  /* num entries of new func at entry */
+		                                   DUK_VALSTACK_INTERNAL_EXTRA,             /* + spare => min_new_size */
+		                               DUK_VSRESIZE_FLAG_SHRINK |                   /* flags */
+		                               0 /* no compact */ |
+		                               DUK_VSRESIZE_FLAG_THROW);
 
 		if (call_flags & DUK_CALL_FLAG_IS_RESUME) {
 			DUK_DDD(DUK_DDDPRINT("is resume -> no update to current activation (may not even exist)"));
@@ -2094,7 +2120,7 @@ void duk_handle_ecma_call_setup(duk_hthread *thr,
 
 		act->flags = (DUK_HOBJECT_HAS_STRICT(func) ?
 		              DUK_ACT_FLAG_STRICT :
-	        	      0);
+		              0);
 		act->func = func;
 		act->var_env = NULL;
 		act->lex_env = NULL;

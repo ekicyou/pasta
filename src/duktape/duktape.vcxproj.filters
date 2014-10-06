@@ -12,9 +12,6 @@
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_alloc_torture.c">
       <Filter>src-separate</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\externals\duktape\src-separate\duk_api.c">
-      <Filter>src-separate</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_buffer.c">
       <Filter>src-separate</Filter>
     </ClCompile>
@@ -37,9 +34,6 @@
       <Filter>src-separate</Filter>
     </ClCompile>
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_string.c">
-      <Filter>src-separate</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_thread.c">
       <Filter>src-separate</Filter>
     </ClCompile>
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_var.c">
@@ -262,6 +256,12 @@
       <Filter>src-separate</Filter>
     </ClCompile>
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_strings.c">
+      <Filter>src-separate</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_heap.c">
+      <Filter>src-separate</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_stack.c">
       <Filter>src-separate</Filter>
     </ClCompile>
   </ItemGroup>

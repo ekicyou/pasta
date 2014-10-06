@@ -108,15 +108,18 @@ Released
 * Added support for function declarations outside function or program top
   level (also known as "function statements"), with V8-like semantics
 
-* Renamed __duk__ to Duktape for more consistency with Ecmascript conventions,
-  and made the following cleanups:
+* Renamed __duk__ to Duktape for more consistency with Ecmascript conventions
 
-    - removed somewhat useless 'build'
-    - added 'env'
-    - replaced 'addr' and 'refc' with 'info' which gives more internal info
-    - merged 'setFinalizer' and 'getFinalizer' into a single 'fin' call
-    - compatibility properties available for now (e.g. __duk__), but will
-      be removed after this release
+* Removed somewhat useless Duktape.build property and added Duktape.env
+
+* Replaced Duktape.addr() and Duktape.refc() with Duktape.info() which gives
+  more internal info
+
+* Merged Duktape.setFinalizer() and Duktape.getFinalizer() into a single
+  Duktape.fin() call
+
+* Some compatibility properties available for now (e.g. __duk__), but these
+  will be removed after this release
 
 * Removed array size limit for very large array joins
 
@@ -440,16 +443,102 @@ Released
   AUTHORS.txt are embedded into duktape.c and duktape.h to ensure they're
   automatically included when used in another project
 
-Planned
-=======
-
-0.12.0 (2014-08-XX)
+0.12.0 (2014-09-26)
 -------------------
 
 * Beta release for stabilization: feature freeze until 1.0.0 release, most
   work will be testing, bug fixes, and documentation
 
-1.0.0 (2014-08-XX)
+* Remove undocumented duk_xmove(), add duk_xmove_top() and duk_xcopy_top()
+  (duk_xcopy_top() provides the same semantics as the earlier undocumented
+  duk_xmove())
+
+* Change strictness behavior for Duktape API calls: all API calls now have
+  Ecmascript strict semantics, even when a call is made with an empty call
+  stack outside of any Duktape/C function
+
+* Change strictness handling of duk_eval() and variants so that all code is
+  evaluated in non-strict mode by default (unless the code itself contains
+  a "use strict" directive); without this change the strictness would depend
+  on whether a Duktape/C function call was active or not
+
+* Change Array.prototype.concat() and Array.prototype.map() behavior so that
+  trailing non-existent elements are counted towards the result array length;
+  this behavior seems to be non-standard but is the real world behavior used
+  by V8, Rhino, and Spidermonkey at least
+
+* Add API call duk_set_global_object() which allows the global object of a
+  context to be replaced; this is useful as an initial mechanism for proper
+  sandboxing of Ecmascript code
+
+* Add API calls duk_get_prototype() and duk_set_prototype() for getting and
+  setting an object's "internal prototype" from C code
+
+* Add API calls duk_get_finalizer() and duk_set_finalizer() for getting and
+  setting an object's finalizer from C code
+
+* Add API calls for function "magic" which allows a 16-bit signed integer
+  to be associated (cheaply) with a Duktape/C function
+
+* Treat any strings whose byte representation begins with 0xFF as internal,
+  so that user code can use hidden internal properties like Duktape does
+  internally; such properties are not enumerated or returned by e.g.
+  getOwnPropertyNames()
+
+* Fix the object property allocation resizing algorithm to avoid unbounded
+  memory usage with some insert/delete sequences
+  (see test-bug-object-prop-alloc-unbounded.js)
+
+* Use an equivalent year (matching leap-year-ness and weekday of Jan 1) for
+  local tzoffset calculations outside the [1971,2037] year range to improve
+  local time handling
+
+* Use gmtime() + localtime() on Unix (instead of gmtime() twice) for local
+  tzoffset, fixing some DST cases
+
+* Improve parsing of a local time (new Date(2012, 1, 2, 3, 4, 5)) using an
+  iterative algorithm to get a more accurate tzoffset/DST estimate
+
+* Apply E5.1 Section 15.3.5.4 TypeError throwing also when the property value
+  is a bound strict function, previously the special "caller" property
+  behavior was only applied when "caller" value was a non-bound strict mode
+  function
+
+* Reject deletion of plain buffer indexed elements (previously this behavior
+  was implemented only for Buffer objects), i.e. delete returns false (in
+  non-strict functions) or throws a TypeError (in strict functions)
+
+* Reject empty throw statement ('throw;') and reject a newline which occurs
+  between a 'throw' and its argument
+
+* Disable internal interrupt mechanism in anticipation of 1.0 release since
+  there will be no API to use it
+
+* Fix value stack reserve handling for function calls: a function call
+  (Ecmascript or Duktape/C) might reduce the valstack "checked size" which
+  was previously requested by user code (for more detail, see API test case
+  test-dev-valstack-checked-size-call.c)
+
+* Fix finalizer handling for Proxy objects: if a Proxy object was reachable
+  at heap destruction and the target object had a finalizer, the finalizer
+  would also be executed for the Proxy object
+
+* Fix a few Date bugs for large out-of-range years which caused some assert
+  failures and incorrect behavior when year was out of Ecmascript range (e.g.
+  year 870e6 and year -200e6)
+
+* Minor compile warnings fixes for non-default options (e.g. when reference
+  counting is disabled)
+
+* Make objects and functions defined by included polyfills non-enumerable so
+  that they don't enumerate e.g. in a for-in loop
+
+* A few more polyfills.
+
+Planned
+=======
+
+1.0.0 (2014-10-XX)
 ------------------
 
 * Feature complete baseline release
@@ -457,7 +546,8 @@ Planned
 1.1.0 (2014-XX-XX)
 ------------------
 
-* Debugger?
+1.2.0 (2015-XX-XX)
+------------------
 
 2.0.0 (XXXX-XX-XX)
 ------------------

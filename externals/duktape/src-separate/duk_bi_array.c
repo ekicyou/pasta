@@ -13,8 +13,15 @@
  *
  *  XXX: array lengths above 2G won't work reliably.  There are many places
  *  where one needs a full signed 32-bit range ([-0xffffffff, 0xffffffff],
- *  i.e. -33- bits).  Further, some valid array length values may be above
- *  2**32-1, and this is not always correctly handled (duk_uint32_t is not enough).
+ *  i.e. -33- bits).  Although array 'length' cannot be written to be outside
+ *  the unsigned 32-bit range (E5.1 Section 15.4.5.1 throws a RangeError if so)
+ *  some intermediate values may be above 0xffffffff and this may not be always
+ *  correctly handled now (duk_uint32_t is not enough for all algorithms).
+ *
+ *  For instance, push() can legitimately write entries beyond length 0xffffffff
+ *  and cause a RangeError only at the end.  To do this properly, the current
+ *  push() implementation tracks the array index using a 'double' instead of a
+ *  duk_uint32_t (which is somewhat awkward).  See test-bi-array-push-maxlen.js.
  *
  *  On using "put" vs. "def" prop
  *  =============================
@@ -62,7 +69,7 @@ static duk_uint32_t duk__push_this_obj_len_u32_limited(duk_context *ctx) {
 	 */
 	duk_uint32_t ret = duk__push_this_obj_len_u32(ctx);
 	if (DUK_UNLIKELY(ret >= 0x80000000UL)) {
-		DUK_ERROR((duk_hthread *) ctx, DUK_ERR_INTERNAL_ERROR, "array length above 2G");
+		DUK_ERROR((duk_hthread *) ctx, DUK_ERR_INTERNAL_ERROR, DUK_STR_ARRAY_LENGTH_OVER_2G);
 	}
 	return ret;
 }
@@ -215,17 +222,28 @@ duk_ret_t duk_bi_array_prototype_concat(duk_context *ctx) {
 				duk_def_prop_index_wec(ctx, -3, idx++);
 				idx_last = idx;
 			} else {
-				/* XXX: according to E5.1 Section 15.4.4.4 nonexistent trailing
-				 * elements do not affect 'length' but test262 disagrees.  Work
-				 * as E5.1 mandates for now and don't touch idx_last.
-				 */
 				idx++;
 				duk_pop(ctx);
+#if defined(DUK_USE_NONSTD_ARRAY_CONCAT_TRAILER)
+				/* According to E5.1 Section 15.4.4.4 nonexistent trailing
+				 * elements do not affect 'length' of the result.  Test262
+				 * and other engines disagree, so update idx_last here too.
+				 */
+				idx_last = idx;
+#else
+				/* Strict standard behavior, ignore trailing elements for
+				 * result 'length'.
+				 */
+#endif
 			}
 		}
 		duk_pop(ctx);
 	}
 
+	/* The E5.1 Section 15.4.4.4 algorithm doesn't set the length explicitly
+	 * in the end, but because we're operating with an internal value which
+	 * is known to be an array, this should be equivalent.
+	 */
 	duk_push_uarridx(ctx, idx_last);
 	duk_def_prop_stridx(ctx, -2, DUK_STRIDX_LENGTH, DUK_PROPDESC_FLAGS_W);
 
@@ -249,7 +267,7 @@ duk_ret_t duk_bi_array_prototype_concat(duk_context *ctx) {
 duk_ret_t duk_bi_array_prototype_join_shared(duk_context *ctx) {
 	duk_uint32_t len, count;
 	duk_uint32_t idx;
-	duk_small_int_t to_locale_string = duk_get_magic(ctx);
+	duk_small_int_t to_locale_string = duk_get_current_magic(ctx);
 	duk_idx_t valstack_required;
 
 	/* For join(), nargs is 1.  For toLocaleString(), nargs is 0 and
@@ -273,8 +291,9 @@ duk_ret_t duk_bi_array_prototype_join_shared(duk_context *ctx) {
 	                     (duk_tval *) duk_get_tval(ctx, 1),
 	                     (unsigned long) len));
 
+	/* The extra (+4) is tight. */
 	valstack_required = (len >= DUK__ARRAY_MID_JOIN_LIMIT ?
-	                     DUK__ARRAY_MID_JOIN_LIMIT : len) + 1;
+	                     DUK__ARRAY_MID_JOIN_LIMIT : len) + 4;
 	duk_require_stack(ctx, valstack_required);
 
 	duk_dup(ctx, 0);
@@ -366,6 +385,7 @@ duk_ret_t duk_bi_array_prototype_push(duk_context *ctx) {
 	/* Note: we keep track of length with a double instead of a 32-bit
 	 * (unsigned) int because the length can go beyond 32 bits and the
 	 * final length value is NOT wrapped to 32 bits on this call.
+	 * See test-bi-array-push-maxlen.js.
 	 */
 
 	for (i = 0; i < n; i++) {
@@ -658,7 +678,7 @@ static void duk__array_qsort(duk_context *ctx, duk_int_t lo, duk_int_t hi) {
 
 	/* move pivot to its final place */
 	DUK_DDD(DUK_DDDPRINT("before final pivot swap: %!T", (duk_tval *) duk_get_tval(ctx, 1)));
-	duk__array_sort_swap(ctx, lo, r);	
+	duk__array_sort_swap(ctx, lo, r);
 
 #if defined(DUK_USE_DDDPRINT)
 	duk__debuglog_qsort_state(ctx, lo, hi, r);
@@ -1078,7 +1098,7 @@ duk_ret_t duk_bi_array_prototype_indexof_shared(duk_context *ctx) {
 	duk_idx_t nargs;
 	duk_int_t i, len;
 	duk_int_t from_index;
-	duk_small_int_t idx_step = duk_get_magic(ctx);  /* idx_step is +1 for indexOf, -1 for lastIndexOf */
+	duk_small_int_t idx_step = duk_get_current_magic(ctx);  /* idx_step is +1 for indexOf, -1 for lastIndexOf */
 
 	/* lastIndexOf() needs to be a vararg function because we must distinguish
 	 * between an undefined fromIndex and a "not given" fromIndex; indexOf() is
@@ -1180,7 +1200,7 @@ duk_ret_t duk_bi_array_prototype_iter_shared(duk_context *ctx) {
 	duk_uint32_t i;
 	duk_uarridx_t k;
 	duk_bool_t bval;
-	duk_small_int_t iter_type = duk_get_magic(ctx);
+	duk_small_int_t iter_type = duk_get_current_magic(ctx);
 	duk_uint32_t res_length = 0;
 
 	/* each call this helper serves has nargs==2 */
@@ -1210,6 +1230,20 @@ duk_ret_t duk_bi_array_prototype_iter_shared(duk_context *ctx) {
 		DUK_ASSERT_TOP(ctx, 5);
 
 		if (!duk_get_prop_index(ctx, 2, (duk_uarridx_t) i)) {
+#if defined(DUK_USE_NONSTD_ARRAY_MAP_TRAILER)
+			/* Real world behavior for map(): trailing non-existent
+			 * elements don't invoke the user callback, but are still
+			 * counted towards result 'length'.
+			 */
+			if (iter_type == DUK__ITER_MAP) {
+				res_length = i + 1;
+			}
+#else
+			/* Standard behavior for map(): trailing non-existent
+			 * elements don't invoke the user callback and are not
+			 * counted towards result 'length'.
+			 */
+#endif
 			duk_pop(ctx);
 			continue;
 		}
@@ -1303,7 +1337,7 @@ duk_ret_t duk_bi_array_prototype_reduce_shared(duk_context *ctx) {
 	duk_idx_t nargs;
 	duk_bool_t have_acc;
 	duk_uint32_t i, len;
-	duk_small_int_t idx_step = duk_get_magic(ctx);  /* idx_step is +1 for reduce, -1 for reduceRight */
+	duk_small_int_t idx_step = duk_get_current_magic(ctx);  /* idx_step is +1 for reduce, -1 for reduceRight */
 
 	/* We're a varargs function because we need to detect whether
 	 * initialValue was given or not.

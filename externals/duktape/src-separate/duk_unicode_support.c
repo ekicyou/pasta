@@ -103,7 +103,7 @@ duk_small_int_t duk_unicode_encode_cesu8(duk_ucodepoint_t cp, duk_uint8_t *out) 
 		 *  See: http://en.wikipedia.org/wiki/Surrogate_pair
 		 *
 		 *  20-bit codepoint, 10 bits (A and B) per surrogate pair:
-		 * 
+		 *
 		 *    x = 0b00000000 0000AAAA AAAAAABB BBBBBBBB
 		 *  sp1 = 0b110110AA AAAAAAAA  (0xd800 + ((x >> 10) & 0x3ff))
 		 *  sp2 = 0b110111BB BBBBBBBB  (0xdc00 + (x & 0x3ff))
@@ -333,7 +333,7 @@ duk_small_int_t duk_unicode_is_whitespace(duk_codepoint_t cp) {
 	 *  It also specifies any Unicode category 'Zs' characters as white
 	 *  space.  These can be extracted with the "src/extract_chars.py" script.
 	 *  Current result:
-	 *  
+	 *
 	 *    RAW OUTPUT:
 	 *    ===========
 	 *    0020;SPACE;Zs;0;WS;;;;;N;;;;;
@@ -354,7 +354,7 @@ duk_small_int_t duk_unicode_is_whitespace(duk_codepoint_t cp) {
 	 *    202F;NARROW NO-BREAK SPACE;Zs;0;CS;<noBreak> 0020;;;;N;;;;;
 	 *    205F;MEDIUM MATHEMATICAL SPACE;Zs;0;WS;<compat> 0020;;;;N;;;;;
 	 *    3000;IDEOGRAPHIC SPACE;Zs;0;WS;<wide> 0020;;;;N;;;;;
-	 *  
+	 *
 	 *    RANGES:
 	 *    =======
 	 *    0x0020
@@ -646,7 +646,7 @@ duk_small_int_t duk_unicode_is_letter(duk_codepoint_t cp) {
  *  is very slow because it runs through the conversion data in a linear
  *  fashion to save space (which is why ASCII characters have a special
  *  fast path before arriving here).
- * 
+ *
  *  The particular bit counts etc have been determined experimentally to
  *  be small but still sufficient, and must match the Python script
  *  (src/extract_caseconv.py).
@@ -731,7 +731,7 @@ static duk_codepoint_t duk__slow_case_conversion(duk_hthread *thr,
 				while (t--) {
 					tmp_cp = (duk_codepoint_t) duk_bd_decode(bd_ctx, 16);
 					DUK_ASSERT(buf != NULL);
-					duk_hbuffer_append_xutf8(thr, buf, (duk_uint32_t) tmp_cp);  /* FIXME: duk_codepoint_t */
+					duk_hbuffer_append_xutf8(thr, buf, (duk_ucodepoint_t) tmp_cp);
 				}
 			}
 			return -1;
@@ -795,11 +795,12 @@ static duk_codepoint_t duk__case_transform_helper(duk_hthread *thr,
 	 * in the caseconv bitstream: hardcoded rules in C
 	 */
 	if (uppercase) {
-		/* XXX: turkish / azeri not implemented */
+		/* XXX: turkish / azeri */
 	} else {
 		/*
-		 *  Final sigma context specific rule.  This is a rather tricky rule
-		 *  and this handling is probably not 100% correct now.
+		 *  Final sigma context specific rule.  This is a rather tricky
+		 *  rule and this handling is probably not 100% correct now.
+		 *  The rule is not locale/language specific so it is supported.
 		 */
 
 		if (cp == 0x03a3L &&    /* U+03A3 = GREEK CAPITAL LETTER SIGMA */
@@ -817,12 +818,6 @@ static duk_codepoint_t duk__case_transform_helper(duk_hthread *thr,
 		/* XXX: lithuanian not implemented */
 		/* XXX: lithuanian, explicit dot rules */
 		/* XXX: turkish / azeri, lowercase rules */
-#if 0
-		if (0 /* language == 'lt' */ &&
-		    cp == 0x0307L) {               /* U+0307 = COMBINING DOT ABOVE */
-			goto nochar;
-		}
-#endif
 	}
 
 	/* 1:1 or special conversions, but not locale/context specific: script generated rules */
@@ -1011,4 +1006,3 @@ duk_uint16_t duk_unicode_re_ranges_not_wordchar[10] = {
 };
 
 #endif  /* DUK_USE_REGEXP_SUPPORT */
-

@@ -21,7 +21,7 @@
  *       abandoned and moved to the 'entry part'.
  *
  *    3. An optional 'hash part' is used to optimize lookups of the entry
- *       part; it is used only for objects with sufficiently many properties 
+ *       part; it is used only for objects with sufficiently many properties
  *       and can be abandoned without loss of information.
  *
  *  These three conceptual parts are stored in a single memory allocated area.
@@ -456,7 +456,9 @@
 
 /*
  *  Macros for property handling
- */		
+ */
+
+#define DUK_HOBJECT_GET_PROTOTYPE(h)                    ((h)->prototype)
 
 /* note: this updates refcounts */
 #define DUK_HOBJECT_SET_PROTOTYPE_UPDREF(thr,h,p)       duk_hobject_set_prototype((thr),(h),(p))
@@ -565,39 +567,39 @@ struct duk_hobject {
 	 *
 	 *  Layout 1 (DUK_USE_HOBJECT_LAYOUT_1):
 	 *
-	 *    e_size * sizeof(duk_hstring *)         bytes of   entry keys (e_used gc reachable)
-	 *    e_size * sizeof(duk_propvalue)         bytes of   entry values (e_used gc reachable)
-	 *    e_size * sizeof(duk_uint8_t)           bytes of   entry flags (e_used gc reachable)
+	 *    e_size * sizeof(duk_hstring *)         bytes of   entry keys (e_next gc reachable)
+	 *    e_size * sizeof(duk_propvalue)         bytes of   entry values (e_next gc reachable)
+	 *    e_size * sizeof(duk_uint8_t)           bytes of   entry flags (e_next gc reachable)
 	 *    a_size * sizeof(duk_tval)              bytes of   (opt) array values (plain only) (all gc reachable)
 	 *    h_size * sizeof(duk_uint32_t)          bytes of   (opt) hash indexes to entries (e_size),
 	 *                                                      0xffffffffUL = unused, 0xfffffffeUL = deleted
 	 *
 	 *  Layout 2 (DUK_USE_HOBJECT_LAYOUT_2):
 	 *
-	 *    e_size * sizeof(duk_propvalue)         bytes of   entry values (e_used gc reachable)
-	 *    e_size * sizeof(duk_hstring *)         bytes of   entry keys (e_used gc reachable)
-	 *    e_size * sizeof(duk_uint8_t) + pad     bytes of   entry flags (e_used gc reachable)
+	 *    e_size * sizeof(duk_propvalue)         bytes of   entry values (e_next gc reachable)
+	 *    e_size * sizeof(duk_hstring *)         bytes of   entry keys (e_next gc reachable)
+	 *    e_size * sizeof(duk_uint8_t) + pad     bytes of   entry flags (e_next gc reachable)
 	 *    a_size * sizeof(duk_tval)              bytes of   (opt) array values (plain only) (all gc reachable)
 	 *    h_size * sizeof(duk_uint32_t)          bytes of   (opt) hash indexes to entries (e_size),
 	 *                                                      0xffffffffUL = unused, 0xfffffffeUL = deleted
 	 *
 	 *  Layout 3 (DUK_USE_HOBJECT_LAYOUT_3):
 	 *
-	 *    e_size * sizeof(duk_propvalue)         bytes of   entry values (e_used gc reachable)
+	 *    e_size * sizeof(duk_propvalue)         bytes of   entry values (e_next gc reachable)
 	 *    a_size * sizeof(duk_tval)              bytes of   (opt) array values (plain only) (all gc reachable)
-	 *    e_size * sizeof(duk_hstring *)         bytes of   entry keys (e_used gc reachable)
+	 *    e_size * sizeof(duk_hstring *)         bytes of   entry keys (e_next gc reachable)
 	 *    h_size * sizeof(duk_uint32_t)          bytes of   (opt) hash indexes to entries (e_size),
 	 *                                                      0xffffffffUL = unused, 0xfffffffeUL = deleted
-	 *    e_size * sizeof(duk_uint8_t)           bytes of   entry flags (e_used gc reachable)
+	 *    e_size * sizeof(duk_uint8_t)           bytes of   entry flags (e_next gc reachable)
 	 *
-	 *  In layout 1, the 'e_used' count is rounded to 4 or 8 on platforms
+	 *  In layout 1, the 'e_next' count is rounded to 4 or 8 on platforms
 	 *  requiring 4 or 8 byte alignment.  This ensures proper alignment
 	 *  for the entries, at the cost of memory footprint.  However, it's
 	 *  probably preferable to use another layout on such platforms instead.
 	 *
 	 *  In layout 2, the key and value parts are swapped to avoid padding
 	 *  the key array on platforms requiring alignment by 8.  The flags part
-	 *  is padded to get alignment for array entries.  The 'e_used' count does
+	 *  is padded to get alignment for array entries.  The 'e_next' count does
 	 *  not need to be rounded as in layout 1.
 	 *
 	 *  In layout 3, entry values and array values are always aligned properly,
@@ -623,10 +625,10 @@ struct duk_hobject {
 	 */
 
 	duk_uint8_t *p;
-	duk_uint32_t e_size;
-	duk_uint32_t e_used;
-	duk_uint32_t a_size;
-	duk_uint32_t h_size;
+	duk_uint32_t e_size;  /* entry part size */
+	duk_uint32_t e_next;  /* index for next new key ([0,e_next[ are gc reachable) */
+	duk_uint32_t a_size;  /* array part size (entirely gc reachable) */
+	duk_uint32_t h_size;  /* hash part size or 0 if unused */
 
 	/* prototype: the only internal property lifted outside 'e' as it is so central */
 	duk_hobject *prototype;
@@ -644,7 +646,9 @@ extern duk_uint8_t duk_class_number_to_stridx[32];
 
 /* alloc and init */
 duk_hobject *duk_hobject_alloc(duk_heap *heap, duk_uint_t hobject_flags);
+#if 0  /* unused */
 duk_hobject *duk_hobject_alloc_checked(duk_hthread *thr, duk_uint_t hobject_flags);
+#endif
 duk_hcompiledfunction *duk_hcompiledfunction_alloc(duk_heap *heap, duk_uint_t hobject_flags);
 duk_hnativefunction *duk_hnativefunction_alloc(duk_heap *heap, duk_uint_t hobject_flags);
 duk_hthread *duk_hthread_alloc(duk_heap *heap, duk_uint_t hobject_flags);
@@ -683,7 +687,7 @@ duk_bool_t duk_hobject_object_ownprop_helper(duk_context *ctx, duk_small_uint_t 
 duk_bool_t duk_hobject_get_internal_value(duk_heap *heap, duk_hobject *obj, duk_tval *tv);
 duk_hstring *duk_hobject_get_internal_value_string(duk_heap *heap, duk_hobject *obj);
 duk_hbuffer *duk_hobject_get_internal_value_buffer(duk_heap *heap, duk_hobject *obj);
-	
+
 /* hobject management functions */
 void duk_hobject_compact_props(duk_hthread *thr, duk_hobject *obj);
 
@@ -709,7 +713,7 @@ void duk_hobject_pc2line_pack(duk_hthread *thr, duk_compiler_instr *instrs, duk_
 duk_uint_fast32_t duk_hobject_pc2line_query(duk_context *ctx, duk_idx_t idx_func, duk_uint_fast32_t pc);
 #endif
 
-/* misc */	
-duk_bool_t duk_hobject_prototype_chain_contains(duk_hthread *thr, duk_hobject *h, duk_hobject *p);
+/* misc */
+duk_bool_t duk_hobject_prototype_chain_contains(duk_hthread *thr, duk_hobject *h, duk_hobject *p, duk_bool_t ignore_loop);
 
 #endif  /* DUK_HOBJECT_H_INCLUDED */

@@ -405,26 +405,40 @@ duk_bool_t duk_is_constructor_call(duk_context *ctx) {
 	DUK_ASSERT_DISABLE(thr->callstack_top >= 0);
 
 	act = duk_hthread_get_current_activation(thr);
-	return (act != NULL && (act->flags & DUK_ACT_FLAG_CONSTRUCT) != 0 ? 1 : 0);
+	DUK_ASSERT(act != NULL);  /* because callstack_top > 0 */
+	return ((act->flags & DUK_ACT_FLAG_CONSTRUCT) != 0 ? 1 : 0);
 }
 
 duk_bool_t duk_is_strict_call(duk_context *ctx) {
 	duk_hthread *thr = (duk_hthread *) ctx;
 	duk_activation *act;
 
+	/* For user code this could just return 1 (strict) always
+	 * because all Duktape/C functions are considered strict,
+	 * and strict is also the default when nothing is running.
+	 * However, Duktape may call this function internally when
+	 * the current activation is an Ecmascript function, so
+	 * this cannot be replaced by a 'return 1' without fixing
+	 * the internal call sites.
+	 */
+
 	DUK_ASSERT(ctx != NULL);
 	DUK_ASSERT(thr != NULL);
 	DUK_ASSERT_DISABLE(thr->callstack_top >= 0);
 
 	act = duk_hthread_get_current_activation(thr);
-	return (act != NULL && (act->flags & DUK_ACT_FLAG_STRICT) != 0 ? 1 : 0);
+	if (act == NULL) {
+		/* Strict by default. */
+		return 1;
+	}
+	return ((act->flags & DUK_ACT_FLAG_STRICT) != 0 ? 1 : 0);
 }
 
 /*
  *  Duktape/C function magic
  */
 
-duk_int_t duk_get_magic(duk_context *ctx) {
+duk_int_t duk_get_current_magic(duk_context *ctx) {
 	duk_hthread *thr = (duk_hthread *) ctx;
 	duk_activation *act;
 	duk_hobject *func;
@@ -444,4 +458,24 @@ duk_int_t duk_get_magic(duk_context *ctx) {
 		}
 	}
 	return 0;
+}
+
+duk_int_t duk_get_magic(duk_context *ctx, duk_idx_t index) {
+	duk_hnativefunction *nf;
+
+	DUK_ASSERT(ctx != NULL);
+
+	nf = duk_require_hnativefunction(ctx, index);
+	DUK_ASSERT(nf != NULL);
+	return (duk_int_t) nf->magic;
+}
+
+void duk_set_magic(duk_context *ctx, duk_idx_t index, duk_int_t magic) {
+	duk_hnativefunction *nf;
+
+	DUK_ASSERT(ctx != NULL);
+
+	nf = duk_require_hnativefunction(ctx, index);
+	DUK_ASSERT(nf != NULL);
+	nf->magic = (duk_int16_t) magic;
 }

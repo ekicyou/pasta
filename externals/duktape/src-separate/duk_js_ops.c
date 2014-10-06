@@ -128,7 +128,7 @@ duk_bool_t duk_js_toboolean(duk_tval *tv) {
  *
  *    - Unlike source code literals, ToNumber() coerces empty strings
  *      and strings with only whitespace to zero (not NaN).
- */	
+ */
 
 /* E5 Section 9.3.1 */
 static duk_double_t duk__tonumber_string_raw(duk_hthread *thr) {
@@ -264,7 +264,7 @@ duk_double_t duk_js_tointeger(duk_hthread *thr, duk_tval *tv) {
  *  ToInt32(), ToUint32(), ToUint16()  (E5 Sections 9.5, 9.6, 9.7)
  */
 
-/* combined algorithm matching E5 Sections 9.5 and 9.6 */	
+/* combined algorithm matching E5 Sections 9.5 and 9.6 */
 static duk_double_t duk__toint32_touint32_helper(duk_double_t x, duk_bool_t is_toint32) {
 	duk_small_int_t c = (duk_small_int_t) DUK_FPCLASSIFY(x);
 	duk_small_int_t s;
@@ -280,7 +280,7 @@ static duk_double_t duk__toint32_touint32_helper(duk_double_t x, duk_bool_t is_t
 	if (s) {
 		x = -x;
 	}
-	
+
 	/* NOTE: fmod(x) result sign is same as sign of x, which
 	 * differs from what Javascript wants (see Section 9.6).
 	 */
@@ -764,6 +764,35 @@ duk_bool_t duk_js_compare_helper(duk_hthread *thr, duk_tval *tv_x, duk_tval *tv_
 	duk_small_int_t rc;
 	duk_bool_t retval;
 
+	/* Very often compared values are plain numbers, so handle that case
+	 * as the fast path without any stack operations and such.
+	 */
+#if 1  /* XXX: make fast paths optional for size minimization? */
+	if (DUK_TVAL_IS_NUMBER(tv_x) && DUK_TVAL_IS_NUMBER(tv_y)) {
+		d1 = DUK_TVAL_GET_NUMBER(tv_x);
+		d2 = DUK_TVAL_GET_NUMBER(tv_y);
+		c1 = DUK_FPCLASSIFY(d1);
+		c2 = DUK_FPCLASSIFY(d2);
+
+		if (c1 == DUK_FP_NORMAL && c2 == DUK_FP_NORMAL) {
+			/* XXX: this is a very narrow check, and doesn't cover
+			 * zeroes, subnormals, infinities, which compare normally.
+			 */
+
+			if (d1 < d2) {
+				/* 'lt is true' */
+				retval = 1;
+			} else {
+				retval = 0;
+			}
+			if (flags & DUK_COMPARE_FLAG_NEGATE) {
+				retval ^= 1;
+			}
+			return retval;
+		}
+	}
+#endif
+
 	duk_push_tval(ctx, tv_x);
 	duk_push_tval(ctx, tv_y);
 
@@ -934,7 +963,7 @@ duk_bool_t duk_js_instanceof(duk_hthread *thr, duk_tval *tv_x, duk_tval *tv_y) {
 
 		if (!DUK_HOBJECT_IS_CALLABLE(func)) {
 			/*
-		 	 *  Note: of native Ecmascript objects, only Function instances
+			 *  Note: of native Ecmascript objects, only Function instances
 			 *  have a [[HasInstance]] internal property.  Custom objects might
 			 *  also have it, but not in current implementation.
 			 *
@@ -1012,7 +1041,7 @@ duk_bool_t duk_js_instanceof(duk_hthread *thr, duk_tval *tv_x, duk_tval *tv_y) {
 	} while (--sanity > 0);
 
 	if (sanity == 0) {
-		DUK_ERROR(thr, DUK_ERR_INTERNAL_ERROR, "instanceof prototype chain sanity exceeded");
+		DUK_ERROR(thr, DUK_ERR_INTERNAL_ERROR, DUK_STR_PROTOTYPE_CHAIN_LIMIT);
 	}
 	DUK_UNREACHABLE();
 
@@ -1034,7 +1063,7 @@ duk_bool_t duk_js_instanceof(duk_hthread *thr, duk_tval *tv_x, duk_tval *tv_y) {
  *
  *  Basically just a property existence check using [[HasProperty]].
  */
-	
+
 duk_bool_t duk_js_in(duk_hthread *thr, duk_tval *tv_x, duk_tval *tv_y) {
 	duk_context *ctx = (duk_context *) thr;
 	duk_bool_t retval;
@@ -1177,7 +1206,7 @@ duk_small_int_t duk_js_to_arrayindex_raw_string(duk_uint8_t *str, duk_uint32_t b
  parse_fail:
 	*out_idx = DUK_HSTRING_NO_ARRAY_INDEX;
 	return 0;
-}	
+}
 
 /* Called by duk_hstring.h macros */
 duk_uarridx_t duk_js_to_arrayindex_string_helper(duk_hstring *h) {
