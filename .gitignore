@@ -20,3 +20,5 @@ ipch
 /src/script/obj
 /src/script/bin
 /src/script/js
+/src/domain/obj
+/src/domain/bin
