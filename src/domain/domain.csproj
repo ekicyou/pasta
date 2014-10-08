@@ -16,6 +16,7 @@
     <IISExpressAnonymousAuthentication />
     <IISExpressWindowsAuthentication />
     <IISExpressUseClassicPipelineMode />
+    <NuGetPackageImportStamp>bcceeb20</NuGetPackageImportStamp>
   </PropertyGroup>
   <ItemGroup>
     <Content Include="app.css" />
@@ -26,6 +27,8 @@
     <TypeScriptCompile Include="app.ts" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="dic\talk001.md" />
+    <Content Include="PastaParser.peg" />
     <None Include="web.Debug.config">
       <DependentUpon>web.config</DependentUpon>
     </None>

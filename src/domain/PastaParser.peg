@@ -1,0 +1,375 @@
+﻿/*
+ * pasta parser grammer(PEG)
+ * =========================
+ *
+ * compiled by http://pegjs.majda.cz/online
+ */
+
+/* サンプル
+
+：：「いつもの朝」　　朝、秋
+
+＠ほげ　今日はいい天気。
+＠ぴよ　しかし明日は台風だ。
+
+
+＠ほげ　続きの会話。
+＠ぴよ　ネタなし。
+
+
+*/
+
+{
+  function isSpace(c){
+    
+  }
+  function 漢字の変数(c){
+  }
+}
+
+/* START
+ * -----
+ */
+start
+  = BLOCK+
+
+
+/* 
+ * block
+ * -----
+ */
+BLOCK
+  = BLANK_LINE+
+  / CODE_BLOCK
+  / PASTA_BLOCK
+
+
+
+/* 
+ * code block
+ * -----------
+ */
+CODE_BLOCK = CODE_BLOCK_MARK_LINE code:((!CODE_BLOCK_MARK SKIP_EOL)*) CODE_BLOCK_MARK_LINE
+
+CODE_BLOCK_MARK      = "```"
+CODE_BLOCK_MARK_LINE = CODE_BLOCK_MARK SKIP_EOL
+
+
+/* 
+ * pasta block
+ * -----------
+ */
+PASTA_BLOCK = header:PASTA_HEADER body:(PASTA_BODY_LINE*)
+
+PASTA_BODY_LINE
+  = CODE_BLOCK
+  / PASTA_LINE
+  / SPACE_LINE
+
+/* 
+ * pasta header
+ * ------------
+ */
+
+
+
+
+/* 
+ * pasta token
+ * -----------
+ */
+PASTA_LINE = !CODE_BLOCK_MARK PASTA_TOKEN+ EOL?
+
+PASTA_TOKEN
+  = PASTA_ESCAPE
+  / PASTA_EXPR
+  / ESCAPE_CHAR
+  / WORD_BREAK_TOKEN
+  / PASTA_OTHER_CHAR
+
+PASTA_OTHER_CHAR   = (!EOL .)
+
+
+/* 
+ * pasta expr
+ * ----------
+ */
+PASTA_EXPR = PASTA_LITERAL
+
+/* 
+ * pasta literal
+ * -------------
+ */
+PASTA_LITERAL = PASTA_LITERAL_MARK key:(PASTA_LITERAL_1 PASTA_LITERAL_2*) SPACE*
+
+PASTA_LITERAL_MARK = [@＠]
+PASTA_LITERAL_1    = !PASTA_LITERAL_MARK LITERAL_1
+PASTA_LITERAL_2    = !PASTA_LITERAL_MARK LITERAL_N
+PASTA_ESCAPE       = PASTA_LITERAL_MARK PASTA_LITERAL_MARK
+
+
+
+
+/* 
+ * literal
+ * -------
+ */
+LITERAL
+  = !JAVASCRIPT_KEYWORDS LITERAL_1 LITERAL_N*
+
+LITERAL_1
+  = ESCAPE_UNICODE
+  / [a-zA-Z$_]
+  / !SPACE [\u0080-\uD7FF\uE000-\uFFFD]
+  / [\uD800-\uDBFF] [\uDC00-\uDFFF]
+
+LITERAL_N
+  = [0-9]
+  / LITERAL_1
+
+
+
+/*
+ * word brack token
+ * ----------------
+ */
+WORD_BREAK_TOKEN
+  = chars:(WORD_BREAK_L1)
+  / chars:(WORD_BREAK_L2+)
+
+WORD_BREAK_L1
+  = WORD_BREAK_CHAR10
+WORD_BREAK_10    = [･・‥…]
+
+WORD_BREAK_L2
+  = WORD_BREAK_CHAR20
+  / WORD_BREAK_CHAR21
+  / WORD_BREAK_CHAR22
+  / WORD_BREAK_CHAR23
+WORD_BREAK_20
+  = SPACE
+  / [-－ｰー]
+WORD_BREAK_21    = [、，．,.､:;）)゛゜ヽヾゝゞ々ﾞﾟ]
+WORD_BREAK_22    = [？！!?]
+WORD_BREAK_23    = [。］｝」』\]}｡｣]
+
+
+
+HANGING_CHAR     = [、。，．,.]
+WORD_START_CHAR  = [（［｛「『(\[{｢]
+
+
+/*
+ * unicode char
+ * ------------
+ */
+SPACE
+  = [\u0020\t\u00a0\u1680\u180e\u2000-\u200a\u202f\u205f\u3000]
+
+KANJI
+  = [々〇〻\u3400-\u9FFF\uF900-\uFAFF]
+  / [\uD840-\uD87F] [\uDC00-\uDFFF]
+
+
+
+/*
+ * escape char
+ * -----------
+ */
+DIGIT         = [0-9]
+HEX_DEGIT     = [0-9a-fA-F]
+ESCAPE_MARK   = "\\"
+ESCAPE_CR     = ESCAPE_MARK "r"
+ESCAPE_LF     = ESCAPE_MARK "n"
+ESCAPE_TAB    = ESCAPE_MARK "t"
+ESCAPE_OTHER  = ESCAPE_MARK .
+
+ESCAPE_UNICODE
+  = ESCAPE_MARK "u" codepoint:( HEX_DEGIT HEX_DEGIT HEX_DEGIT HEX_DEGIT)
+
+ESCAPE_CHAR
+  = ESCAPE_CR
+  / ESCAPE_LF
+  / ESCAPE_TAB
+  / ESCAPE_UNICODE
+  / ESCAPE_OTHER
+
+
+/* 
+ * blanks and comments
+ * -------------------
+ */
+
+EOL
+  = "\r"? "\n"
+  / "\r"
+
+SKIP_EOL
+  = (!EOL .) EOL
+
+SPACE_LINE
+  = SPACE* EOL
+
+
+
+LINE_COMMENT = LINE_COMMENT_START SKIP_EOL
+LINE_COMMENT_START
+  = "//"
+  / [#＃]
+
+BLOCK_COMMENT = BLOCK_COMMENT_START (!BLOCK_COMMENT_END .)* BLOCK_COMMENT_END
+BLOCK_COMMENT_START = "/*"
+BLOCK_COMMENT_END   = "*/"
+
+
+COMMENT
+  = LINE_COMMENT
+  / BLOCK_COMMENT
+
+BLANK
+  = COMMENT
+  / SPACE
+  / EOL
+
+BLANKS
+  = rc:(BLANK*) {return rc; }
+
+BLANK_LINE
+  = LINE_COMMENT
+  / BLOCK_COMMENT* SPACE_LINE
+
+
+
+/* ### javascript keywords ### */
+
+JAVASCRIPT_KEYWORDS
+  = "break"
+  / "case"
+  / "catch"
+  / "continue"
+  / "debugger"
+  / "default"
+  / "delete"
+  / "do"
+  / "else"
+  / "finally"
+  / "for"
+  / "function"
+  / "if"
+  / "in"
+  / "instanceof"
+  / "new"
+  / "return"
+  / "switch"
+  / "this"
+  / "throw"
+  / "try"
+  / "typeof"
+  / "var"
+  / "void"
+  / "while"
+  / "with"
+  / "case"
+  / "catch"
+  / "const"
+  / "debugger"
+  / "default"
+  / "do"
+  / "enum"
+  / "export"
+  / "extends"
+  / "finally"
+  / "import"
+  / "super"
+  / "switch"
+  / "throw"
+  / "try"
+  / "abstract"
+  / "boolean"
+  / "byte"
+  / "case"
+  / "catch"
+  / "char"
+  / "class"
+  / "const"
+  / "debugger"
+  / "default"
+  / "do"
+  / "double"
+  / "enum"
+  / "export"
+  / "extends"
+  / "final"
+  / "finally"
+  / "float"
+  / "goto"
+  / "implements"
+  / "import"
+  / "instanceof"
+  / "int"
+  / "interface"
+  / "long"
+  / "native"
+  / "package"
+  / "private"
+  / "protected"
+  / "public"
+  / "short"
+  / "static"
+  / "super"
+  / "switch"
+  / "synchronized"
+  / "throw"
+  / "throws"
+  / "transient"
+  / "try"
+  / "volatile"
+  / "abstract"
+  / "boolean"
+  / "byte"
+  / "char"
+  / "class"
+  / "const"
+  / "debugger"
+  / "double"
+  / "enum"
+  / "export"
+  / "extends"
+  / "final"
+  / "float"
+  / "goto"
+  / "implements"
+  / "import"
+  / "int"
+  / "interface"
+  / "long"
+  / "native"
+  / "package"
+  / "private"
+  / "protected"
+  / "public"
+  / "short"
+  / "static"
+  / "super"
+  / "synchronized"
+  / "throws"
+  / "transient"
+  / "volatile"
+  / "class"
+  / "enum"
+  / "export"
+  / "extends"
+  / "import"
+  / "super"
+  / "implements"
+  / "interface"
+  / "let"
+  / "package"
+  / "private"
+  / "protected"
+  / "public"
+  / "static"
+  / "yield"
+
+
+/* EOF */
