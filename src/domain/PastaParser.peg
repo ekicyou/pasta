@@ -20,6 +20,17 @@
 */
 
 {
+  function toText(a){
+    if(a instanceof Array){
+      var t = "";
+      a.forEach(function(el,index,array){ t += toText(el);} );
+      return t;
+    }
+    else if(a == null) return "";
+    else               return a + "";  
+  }
+
+
   function isSpace(c){
     
   }
@@ -75,7 +86,7 @@ PASTA_HEADER = PASTA_HEADER_MARK PASTA_HEADER_MARK title:PASTA_HEADER_TITLE? att
 
 PASTA_HEADER_MARK   = [:：]
 
-PASTA_HEADER_TITLE       = PASTA_HEADER_TITLE_START title:PASTA_HEADER_TITLE_VALUE PASTA_HEADER_TITLE_END
+PASTA_HEADER_TITLE       = PASTA_HEADER_TITLE_START value:PASTA_HEADER_TITLE_VALUE PASTA_HEADER_TITLE_END { return toText(value); }
 PASTA_HEADER_TITLE_START = [「｢] 
 PASTA_HEADER_TITLE_END   = [｣」]
 PASTA_HEADER_TITLE_VALUE = (!(PASTA_HEADER_TITLE_END / EOL) .)*
@@ -92,9 +103,9 @@ PASTA_TOKEN
   / PASTA_EXPR
   / ESCAPE_CHAR
   / WORD_BREAK_TOKEN
-  / PASTA_OTHER_CHAR
+  / PASTA_OTHER_CHARS
 
-PASTA_OTHER_CHAR   = (!EOL .)
+PASTA_OTHER_CHARS   = (!EOL .)+
 
 
 /* 
@@ -131,13 +142,19 @@ PASTA_ESCAPE       = PASTA_LITERAL_MARK PASTA_LITERAL_MARK
  * -------
  */
 LITERAL
-  = !JAVASCRIPT_KEYWORDS LITERAL_1 LITERAL_N*
+  = (!JAVASCRIPT_KEYWORDS value:(LITERAL_1 LITERAL_N*)) { return toText(value); }
 
 LITERAL_1
   = ESCAPE_UNICODE
   / [a-zA-Z$_]
-  / !SPACE [\u0080-\uD7FF\uE000-\uFFFD]
-  / [\uD800-\uDBFF] [\uDC00-\uDFFF]
+  / !LITERAL_REJECT [\u0080-\uD7FF\uE000-\uFFFD]
+
+LITERAL_REJECT
+  = WORD_BREAK_10
+  / WORD_BREAK_20
+  / WORD_BREAK_21
+  / WORD_BREAK_22
+  / WORD_BREAK_23
 
 LITERAL_N
   = [0-9]

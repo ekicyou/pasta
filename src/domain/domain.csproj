@@ -21,6 +21,7 @@
   <ItemGroup>
     <Content Include="app.css" />
     <Content Include="index.html" />
+    <Content Include="PastaParser.peg.js" />
     <Content Include="web.config" />
   </ItemGroup>
   <ItemGroup>
