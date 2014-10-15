@@ -8,41 +8,120 @@
 
 namespace shiori{
 
-	ShioriAgent::ShioriAgent(){
-	}
-
-	ShioriAgent::ShioriAgent(concurrency::Scheduler& scheduler)
-		:agent(scheduler)
-	{
-	}
-
-	ShioriAgent::ShioriAgent(concurrency::ScheduleGroup& group)
-		: agent(group)
-	{
-	}
-
-	void ShioriAgent::Notify(const std::wstring& req)
-	{
-        asend(reqBuf, Request(REQUEST_NOTIFY, req));
-	}
-
-    std::wstring ShioriAgent::Get(const std::wstring& req)
+    Agent::Agent()
+        :agent(), isUnload(false)
     {
-        asend(reqBuf, Request(REQUEST_GET, req));
+    }
+
+    Agent::Agent(concurrency::Scheduler& scheduler)
+        : agent(scheduler), isUnload(false)
+    {
+    }
+
+    Agent::Agent(concurrency::ScheduleGroup& group)
+        : agent(group), isUnload(false)
+    {
+    }
+
+
+    Agent::~Agent()
+    {
+        UnLoad();
+    }
+
+
+
+
+    void Agent::Notify(const std::wstring& req)
+    {
+        asend(reqBuf, RequestItem(REQUEST_NOTIFY, req));
+    }
+
+    const std::wstring Agent::Get(const std::wstring& req)
+    {
+        asend(reqBuf, RequestItem(REQUEST_GET, req));
         auto res = receive(resBuf);
         return res.value;
     }
 
-    void ShioriAgent::Load(const std::wstring& req)
+    void Agent::Load(const std::wstring& dir)
     {
-        asend(reqBuf, Request(REQUEST_LOAD, req));
+        asend(reqBuf, RequestItem(REQUEST_LOAD, dir));
     }
 
-    void ShioriAgent::UnLoad()
+    void Agent::UnLoad()
     {
-        asend(reqBuf, Request(REQUEST_UNLOAD, std::wstring()));
+        if (isUnload)return;
+        asend(reqBuf, RequestItem(REQUEST_UNLOAD, std::wstring()));
         wait(this);
+        isUnload = true;
     }
 
+
+    void Agent::run(){
+
+        try{
+            // loadèàóù
+            try{
+                auto loaddir = receive(reqBuf).value;
+                LoadAction(loaddir);
+            }
+            catch (const std::exception& ex){
+                SetException(ex);
+            }
+            catch (...){
+                SetException();
+            }
+
+            // ÉÅÉCÉìÉãÅ[Év
+            while (true){
+                auto req = receive(reqBuf);
+                switch (req.reqType)
+                {
+                case shiori::REQUEST_NOTIFY:
+                    try{
+                        NotifyAction(req.value);
+                    }
+                    catch (const std::exception& ex){
+                        SetException(ex);
+                    }
+                    catch (...){
+                        SetException();
+                    }
+                    break;
+                }
+
+                    case shiori::REQUEST_GET:
+                        try{
+                            auto value = GetAction(req.value);
+                            auto res = ResponseItem(value);
+                            asend(resBuf, res);
+                        }
+                        catch (const std::exception& ex){
+                            SetException(ex);
+                            asend(resBuf, GetErrorResponse());
+                        }
+                        catch (...){
+                            SetException();
+                            asend(resBuf, GetErrorResponse());
+                        }
+
+                        try{
+                            GetAfterAction();
+                        }
+                        catch (const std::exception& ex){
+                            SetException(ex);
+                        }
+                        catch (...){
+                            SetException();
+                        }
+                        break;
+
+                    default:
+                        break;
+            }
+        }
+    }
+   
 
 }

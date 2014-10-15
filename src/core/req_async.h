@@ -14,37 +14,57 @@ namespace shiori{
     };
 
 
-	class Request{
+	class RequestItem{
 	public:
-		explicit Request(const RequestType tp, const std::wstring& req)
+        explicit RequestItem(const RequestType tp, const std::wstring& req)
 			:reqType(tp), value(req){}
 		const RequestType reqType;
 		const std::wstring value;
 	};
 
-	class Response{
+	class ResponseItem{
     public:
-        explicit Response(const std::wstring& res)
+        explicit ResponseItem(const std::wstring& res)
 			:value(res){}
 		const std::wstring value;
 	};
 
 
-	class ShioriAgent : public concurrency::agent
+    class Agent : public concurrency::agent
 	{
 	public:
-		explicit ShioriAgent();
-		explicit ShioriAgent(concurrency::Scheduler& scheduler);
-		explicit ShioriAgent(concurrency::ScheduleGroup& group);
+        explicit Agent();
+        explicit Agent(concurrency::Scheduler& scheduler);
+        explicit Agent(concurrency::ScheduleGroup& group);
+
+        virtual  ~Agent();
 
         void Notify(const std::wstring& req);
-        std::wstring Get(const std::wstring& req);
+        const std::wstring Get(const std::wstring& req);
         void Load(const std::wstring& dir);
         void UnLoad();
 
-	private:
-		concurrency::unbounded_buffer<Request> reqBuf;
-		concurrency::unbounded_buffer<Response> resBuf;
+    protected:
+        concurrency::unbounded_buffer<RequestItem> reqBuf;
+        concurrency::unbounded_buffer<ResponseItem> resBuf;
+
+        void run();
+
+        virtual void LoadAction(const std::wstring& dir) = 0;
+        virtual void UnLoadAction() = 0;
+        virtual void NotifyAction(const std::wstring& req) = 0;
+        virtual const std::wstring GetAction(const std::wstring& req) = 0;
+        virtual void GetAfterAction() = 0;
+
+
+    private:
+        bool isUnload;
+
+        void SetException(const std::exception& ex);
+        void SetException();
+        const ResponseItem GetErrorResponse();
+
+
 	};
 
 
