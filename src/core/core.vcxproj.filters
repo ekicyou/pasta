@@ -3,10 +3,12 @@
   <ItemGroup>
     <ClCompile Include="app.cpp" />
     <ClCompile Include="stdafx.cpp" />
+    <ClCompile Include="req_async.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="app.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
+    <ClInclude Include="req_async.h" />
   </ItemGroup>
 </Project>
