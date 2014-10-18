@@ -15,7 +15,6 @@
 static HINSTANCE hinst;
 static pasta::App *app;
 
-
 /**----------------------------------------------------------------------------
  * HGLOBALŠÖŒW
  */
@@ -41,7 +40,6 @@ inline HGLOBAL AllocString(const std::string& test, long& len)
 	return hText;
 }
 
-
 /* ----------------------------------------------------------------------------
  * žx Method / load
  */
@@ -60,7 +58,7 @@ SHIORI_API BOOL __cdecl load(HGLOBAL hGlobal_loaddir, long loaddir_len)
 	catch (const std::exception&){
 		return false;
 	}
-	catch(...){
+	catch (...){
 		return false;
 	}
 }

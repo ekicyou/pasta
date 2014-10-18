@@ -4,8 +4,7 @@
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
 namespace test
-{		
-
+{
 	TEST_CLASS(UnitTest1)
 	{
 	public:
@@ -14,6 +13,5 @@ namespace test
 		{
 			// TODO: テスト コードをここに挿入します
 		}
-
 	};
 }

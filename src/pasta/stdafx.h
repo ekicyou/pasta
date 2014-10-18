@@ -11,7 +11,6 @@
 // Windows ヘッダー ファイル:
 #include <windows.h>
 
-
 #define _ATL_CSTRING_EXPLICIT_CONSTRUCTORS      // 一部の CString コンストラクターは明示的です。
 
 #include <atlbase.h>

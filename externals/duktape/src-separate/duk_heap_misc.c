@@ -13,12 +13,14 @@ void duk_heap_remove_any_from_heap_allocated(duk_heap *heap, duk_heaphdr *hdr) {
 
 	if (DUK_HEAPHDR_GET_PREV(hdr)) {
 		DUK_HEAPHDR_SET_NEXT(DUK_HEAPHDR_GET_PREV(hdr), DUK_HEAPHDR_GET_NEXT(hdr));
-	} else {
+	}
+	else {
 		heap->heap_allocated = DUK_HEAPHDR_GET_NEXT(hdr);
 	}
 	if (DUK_HEAPHDR_GET_NEXT(hdr)) {
 		DUK_HEAPHDR_SET_PREV(DUK_HEAPHDR_GET_NEXT(hdr), DUK_HEAPHDR_GET_PREV(hdr));
-	} else {
+	}
+	else {
 		;
 	}
 }

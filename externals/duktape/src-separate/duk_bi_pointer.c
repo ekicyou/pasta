@@ -15,7 +15,8 @@ duk_ret_t duk_bi_pointer_constructor(duk_context *ctx) {
 	 */
 	if (duk_get_top(ctx) == 0) {
 		duk_push_pointer(ctx, NULL);
-	} else {
+	}
+	else {
 		duk_to_pointer(ctx, 0);
 	}
 	DUK_ASSERT(duk_is_pointer(ctx, 0));
@@ -23,9 +24,9 @@ duk_ret_t duk_bi_pointer_constructor(duk_context *ctx) {
 
 	if (duk_is_constructor_call(ctx)) {
 		duk_push_object_helper(ctx,
-		                       DUK_HOBJECT_FLAG_EXTENSIBLE |
-		                       DUK_HOBJECT_CLASS_AS_FLAGS(DUK_HOBJECT_CLASS_POINTER),
-		                       DUK_BIDX_POINTER_PROTOTYPE);
+			DUK_HOBJECT_FLAG_EXTENSIBLE |
+			DUK_HOBJECT_CLASS_AS_FLAGS(DUK_HOBJECT_CLASS_POINTER),
+			DUK_BIDX_POINTER_PROTOTYPE);
 
 		/* Pointer object internal value is immutable */
 		duk_dup(ctx, 0);
@@ -50,7 +51,8 @@ duk_ret_t duk_bi_pointer_prototype_tostring_shared(duk_context *ctx) {
 
 	if (DUK_TVAL_IS_POINTER(tv)) {
 		/* nop */
-	} else if (DUK_TVAL_IS_OBJECT(tv)) {
+	}
+	else if (DUK_TVAL_IS_OBJECT(tv)) {
 		duk_hobject *h = DUK_TVAL_GET_OBJECT(tv);
 		DUK_ASSERT(h != NULL);
 
@@ -60,7 +62,8 @@ duk_ret_t duk_bi_pointer_prototype_tostring_shared(duk_context *ctx) {
 		}
 
 		duk_get_prop_stridx(ctx, -1, DUK_STRIDX_INT_VALUE);
-	} else {
+	}
+	else {
 		goto type_error;
 	}
 
@@ -69,6 +72,6 @@ duk_ret_t duk_bi_pointer_prototype_tostring_shared(duk_context *ctx) {
 	}
 	return 1;
 
- type_error:
+type_error:
 	return DUK_RET_TYPE_ERROR;
 }

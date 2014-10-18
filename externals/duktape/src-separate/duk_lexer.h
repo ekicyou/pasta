@@ -5,7 +5,7 @@
 #ifndef DUK_LEXER_H_INCLUDED
 #define DUK_LEXER_H_INCLUDED
 
-typedef void (*duk_re_range_callback)(void *user, duk_codepoint_t r1, duk_codepoint_t r2, duk_bool_t direct);
+typedef void(*duk_re_range_callback)(void *user, duk_codepoint_t r1, duk_codepoint_t r2, duk_bool_t direct);
 
 /*
  *  A token is interpreted as any possible production of InputElementDiv
@@ -409,9 +409,9 @@ void duk_lexer_initctx(duk_lexer_ctx *lex_ctx);
 void duk_lexer_setpoint(duk_lexer_ctx *lex_ctx, duk_lexer_point *pt);
 
 void duk_lexer_parse_js_input_element(duk_lexer_ctx *lex_ctx,
-                                      duk_token *out_token,
-                                      duk_bool_t strict_mode,
-                                      duk_bool_t regexp_mode);
+	duk_token *out_token,
+	duk_bool_t strict_mode,
+	duk_bool_t regexp_mode);
 #ifdef DUK_USE_REGEXP_SUPPORT
 void duk_lexer_parse_re_token(duk_lexer_ctx *lex_ctx, duk_re_token *out_token);
 void duk_lexer_parse_re_ranges(duk_lexer_ctx *lex_ctx, duk_re_range_callback gen_range, void *userdata);

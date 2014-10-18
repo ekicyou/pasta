@@ -3,9 +3,7 @@
 #include <windows.h>
 #include <string>
 
-
 namespace pasta{
-
 	enum CharMode {
 		MODE_ANSI,
 		MODE_UTF_8,
@@ -23,7 +21,6 @@ namespace pasta{
 
 		duk_context *ctx;
 
-
 	public:
 		App(const HINSTANCE hinst, const std::string& loaddir);
 		~App(void);
@@ -34,5 +31,4 @@ namespace pasta{
 
 		std::string eval(const char *utf8text);
 	};
-
 }

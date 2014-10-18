@@ -65,16 +65,16 @@ static void duk__sort_array_indices(duk_hobject *h_obj) {
 	keys += DUK__ENUM_START_INDEX;
 
 	DUK_DDD(DUK_DDDPRINT("keys=%p, p_end=%p (after skipping enum props)",
-	                     (void *) keys, (void *) p_end));
+		(void *)keys, (void *)p_end));
 
 #ifdef DUK_USE_DDDPRINT
 	{
 		duk_uint_fast32_t i;
-		for (i = 0; i < (duk_uint_fast32_t) h_obj->e_next; i++) {
+		for (i = 0; i < (duk_uint_fast32_t)h_obj->e_next; i++) {
 			DUK_DDD(DUK_DDDPRINT("initial: %ld %p -> %!O",
-			                     (long) i,
-			                     (void *) DUK_HOBJECT_E_GET_KEY_PTR(h_obj, i),
-			                     (duk_heaphdr *) DUK_HOBJECT_E_GET_KEY(h_obj, i)));
+				(long)i,
+				(void *)DUK_HOBJECT_E_GET_KEY_PTR(h_obj, i),
+				(duk_heaphdr *)DUK_HOBJECT_E_GET_KEY(h_obj, i)));
 		}
 	}
 #endif
@@ -86,15 +86,15 @@ static void duk__sort_array_indices(duk_hobject *h_obj) {
 
 		if (val_curr >= val_highest) {
 			DUK_DDD(DUK_DDDPRINT("p_curr=%p, p_end=%p, val_highest=%ld, val_curr=%ld -> "
-			                     "already in correct order, next",
-			                     (void *) p_curr, (void *) p_end, (long) val_highest, (long) val_curr));
+				"already in correct order, next",
+				(void *)p_curr, (void *)p_end, (long)val_highest, (long)val_curr));
 			val_highest = val_curr;
 			continue;
 		}
 
 		DUK_DDD(DUK_DDDPRINT("p_curr=%p, p_end=%p, val_highest=%ld, val_curr=%ld -> "
-		                     "needs to be inserted",
-		                     (void *) p_curr, (void *) p_end, (long) val_highest, (long) val_curr));
+			"needs to be inserted",
+			(void *)p_curr, (void *)p_end, (long)val_highest, (long)val_curr));
 
 		/* Needs to be inserted; scan backwards, since we optimize
 		 * for the case where elements are nearly in order.
@@ -105,20 +105,20 @@ static void duk__sort_array_indices(duk_hobject *h_obj) {
 			val_insert = DUK_HSTRING_GET_ARRIDX_SLOW(*p_insert);
 			if (val_insert < val_curr) {
 				DUK_DDD(DUK_DDDPRINT("p_insert=%p, val_insert=%ld, val_curr=%ld -> insert after this",
-				                     (void *) p_insert, (long) val_insert, (long) val_curr));
+					(void *)p_insert, (long)val_insert, (long)val_curr));
 				p_insert++;
 				break;
 			}
 			if (p_insert == keys) {
-				DUK_DDD(DUK_DDDPRINT("p_insert=%p -> out of keys, insert to beginning", (void *) p_insert));
+				DUK_DDD(DUK_DDDPRINT("p_insert=%p -> out of keys, insert to beginning", (void *)p_insert));
 				break;
 			}
 			DUK_DDD(DUK_DDDPRINT("p_insert=%p, val_insert=%ld, val_curr=%ld -> search backwards",
-			                     (void *) p_insert, (long) val_insert, (long) val_curr));
+				(void *)p_insert, (long)val_insert, (long)val_curr));
 			p_insert--;
 		}
 
-		DUK_DDD(DUK_DDDPRINT("final p_insert=%p", (void *) p_insert));
+		DUK_DDD(DUK_DDDPRINT("final p_insert=%p", (void *)p_insert));
 
 		/*        .-- p_insert   .-- p_curr
 		 *        v              v
@@ -127,12 +127,12 @@ static void duk__sort_array_indices(duk_hobject *h_obj) {
 
 		h_curr = *p_curr;
 		DUK_DDD(DUK_DDDPRINT("memmove: dest=%p, src=%p, size=%ld, h_curr=%p",
-		                     (void *) (p_insert + 1), (void *) p_insert,
-		                     (long) (p_curr - p_insert), (void *) h_curr));
+			(void *)(p_insert + 1), (void *)p_insert,
+			(long)(p_curr - p_insert), (void *)h_curr));
 
-		DUK_MEMMOVE((void *) (p_insert + 1),
-		            (void *) p_insert,
-		            (size_t) ((p_curr - p_insert) * sizeof(duk_hstring *)));
+		DUK_MEMMOVE((void *)(p_insert + 1),
+			(void *)p_insert,
+			(size_t)((p_curr - p_insert) * sizeof(duk_hstring *)));
 		*p_insert = h_curr;
 		/* keep val_highest */
 	}
@@ -140,11 +140,11 @@ static void duk__sort_array_indices(duk_hobject *h_obj) {
 #ifdef DUK_USE_DDDPRINT
 	{
 		duk_uint_fast32_t i;
-		for (i = 0; i < (duk_uint_fast32_t) h_obj->e_next; i++) {
+		for (i = 0; i < (duk_uint_fast32_t)h_obj->e_next; i++) {
 			DUK_DDD(DUK_DDDPRINT("final: %ld %p -> %!O",
-			                     (long) i,
-			                     (void *) DUK_HOBJECT_E_GET_KEY_PTR(h_obj, i),
-			                     (duk_heaphdr *) DUK_HOBJECT_E_GET_KEY(h_obj, i)));
+				(long)i,
+				(void *)DUK_HOBJECT_E_GET_KEY_PTR(h_obj, i),
+				(duk_heaphdr *)DUK_HOBJECT_E_GET_KEY(h_obj, i)));
 		}
 	}
 #endif
@@ -160,7 +160,7 @@ static void duk__sort_array_indices(duk_hobject *h_obj) {
  */
 
 void duk_hobject_enumerator_create(duk_context *ctx, duk_small_uint_t enum_flags) {
-	duk_hthread *thr = (duk_hthread *) ctx;
+	duk_hthread *thr = (duk_hthread *)ctx;
 	duk_hobject *enum_target;
 	duk_hobject *curr;
 	duk_hobject *res;
@@ -173,7 +173,7 @@ void duk_hobject_enumerator_create(duk_context *ctx, duk_small_uint_t enum_flags
 
 	DUK_ASSERT(ctx != NULL);
 
-	DUK_DDD(DUK_DDDPRINT("create enumerator, stack top: %ld", (long) duk_get_top(ctx)));
+	DUK_DDD(DUK_DDDPRINT("create enumerator, stack top: %ld", (long)duk_get_top(ctx)));
 
 	enum_target = duk_require_hobject(ctx, -1);
 	DUK_ASSERT(enum_target != NULL);
@@ -206,9 +206,9 @@ void duk_hobject_enumerator_create(duk_context *ctx, duk_small_uint_t enum_flags
 		goto skip_proxy;
 	}
 	if (DUK_LIKELY(!duk_hobject_proxy_check(thr,
-	                                        enum_target,
-	                                        &h_proxy_target,
-	                                        &h_proxy_handler))) {
+		enum_target,
+		&h_proxy_target,
+		&h_proxy_handler))) {
 		goto skip_proxy;
 	}
 
@@ -221,7 +221,7 @@ void duk_hobject_enumerator_create(duk_context *ctx, duk_small_uint_t enum_flags
 		 * target reachable.  We do need to replace the internal _target.
 		 */
 		DUK_DDD(DUK_DDDPRINT("no enumerate trap, enumerate proxy target instead"));
-		DUK_DDD(DUK_DDDPRINT("h_proxy_target=%!O", (duk_heaphdr *) h_proxy_target));
+		DUK_DDD(DUK_DDDPRINT("h_proxy_target=%!O", (duk_heaphdr *)h_proxy_target));
 		enum_target = h_proxy_target;
 
 		duk_push_hobject(ctx, enum_target);  /* -> [ ... enum_target res handler undefined target ] */
@@ -239,7 +239,7 @@ void duk_hobject_enumerator_create(duk_context *ctx, duk_small_uint_t enum_flags
 	DUK_UNREF(h_trap_result);
 
 	/* Copy trap result keys into the enumerator object. */
-	len = (duk_uint_fast32_t) duk_get_length(ctx, -1);
+	len = (duk_uint_fast32_t)duk_get_length(ctx, -1);
 	for (i = 0; i < len; i++) {
 		/* XXX: not sure what the correct semantic details are here,
 		 * e.g. handling of missing values (gaps), handling of non-array
@@ -254,7 +254,8 @@ void duk_hobject_enumerator_create(duk_context *ctx, duk_small_uint_t enum_flags
 			duk_push_true(ctx);
 			/* [ ... enum_target res trap_result val true ] */
 			duk_put_prop(ctx, -4);
-		} else {
+		}
+		else {
 			duk_pop(ctx);
 		}
 	}
@@ -270,10 +271,10 @@ void duk_hobject_enumerator_create(duk_context *ctx, duk_small_uint_t enum_flags
 	 * fact that the _target is a proxy disables key existence check
 	 * during enumeration.
 	 */
-	DUK_DDD(DUK_DDDPRINT("proxy enumeration, final res: %!O", (duk_heaphdr *) res));
+	DUK_DDD(DUK_DDDPRINT("proxy enumeration, final res: %!O", (duk_heaphdr *)res));
 	goto compact_and_return;
 
- skip_proxy:
+skip_proxy:
 #endif  /* DUK_USE_ES6_PROXY */
 
 	curr = enum_target;
@@ -287,7 +288,7 @@ void duk_hobject_enumerator_create(duk_context *ctx, duk_small_uint_t enum_flags
 		 */
 
 		if (DUK_HOBJECT_HAS_EXOTIC_STRINGOBJ(curr) ||
-		    DUK_HOBJECT_HAS_EXOTIC_BUFFEROBJ(curr)) {
+			DUK_HOBJECT_HAS_EXOTIC_BUFFEROBJ(curr)) {
 			/* String and buffer enumeration behavior is identical now,
 			 * so use shared handler.
 			 */
@@ -295,13 +296,14 @@ void duk_hobject_enumerator_create(duk_context *ctx, duk_small_uint_t enum_flags
 				duk_hstring *h_val;
 				h_val = duk_hobject_get_internal_value_string(thr->heap, curr);
 				DUK_ASSERT(h_val != NULL);  /* string objects must not created without internal value */
-				len = (duk_uint_fast32_t) DUK_HSTRING_GET_CHARLEN(h_val);
-			} else {
+				len = (duk_uint_fast32_t)DUK_HSTRING_GET_CHARLEN(h_val);
+			}
+			else {
 				duk_hbuffer *h_val;
 				DUK_ASSERT(DUK_HOBJECT_HAS_EXOTIC_BUFFEROBJ(curr));
 				h_val = duk_hobject_get_internal_value_buffer(thr->heap, curr);
 				DUK_ASSERT(h_val != NULL);  /* buffer objects must not created without internal value */
-				len = (duk_uint_fast32_t) DUK_HBUFFER_GET_SIZE(h_val);
+				len = (duk_uint_fast32_t)DUK_HBUFFER_GET_SIZE(h_val);
 			}
 
 			for (i = 0; i < len; i++) {
@@ -327,7 +329,8 @@ void duk_hobject_enumerator_create(duk_context *ctx, duk_small_uint_t enum_flags
 				duk_push_true(ctx);
 				duk_put_prop(ctx, -3);
 			}
-		} else if (DUK_HOBJECT_HAS_EXOTIC_DUKFUNC(curr)) {
+		}
+		else if (DUK_HOBJECT_HAS_EXOTIC_DUKFUNC(curr)) {
 			if (enum_flags & DUK_ENUM_INCLUDE_NONENUMERABLE) {
 				duk_push_hstring_stridx(ctx, DUK_STRIDX_LENGTH);
 				duk_push_true(ctx);
@@ -343,7 +346,7 @@ void duk_hobject_enumerator_create(duk_context *ctx, duk_small_uint_t enum_flags
 		 *  must be the same.
 		 */
 
-		for (i = 0; i < (duk_uint_fast32_t) curr->a_size; i++) {
+		for (i = 0; i < (duk_uint_fast32_t)curr->a_size; i++) {
 			duk_hstring *k;
 			duk_tval *tv;
 
@@ -367,7 +370,7 @@ void duk_hobject_enumerator_create(duk_context *ctx, duk_small_uint_t enum_flags
 		 *  Entries part
 		 */
 
-		for (i = 0; i < (duk_uint_fast32_t) curr->e_next; i++) {
+		for (i = 0; i < (duk_uint_fast32_t)curr->e_next; i++) {
 			duk_hstring *k;
 
 			k = DUK_HOBJECT_E_GET_KEY(curr, i);
@@ -375,20 +378,20 @@ void duk_hobject_enumerator_create(duk_context *ctx, duk_small_uint_t enum_flags
 				continue;
 			}
 			if (!DUK_HOBJECT_E_SLOT_IS_ENUMERABLE(curr, i) &&
-			    !(enum_flags & DUK_ENUM_INCLUDE_NONENUMERABLE)) {
+				!(enum_flags & DUK_ENUM_INCLUDE_NONENUMERABLE)) {
 				continue;
 			}
 			if (DUK_HSTRING_HAS_INTERNAL(k) &&
-			    !(enum_flags & DUK_ENUM_INCLUDE_INTERNAL)) {
+				!(enum_flags & DUK_ENUM_INCLUDE_INTERNAL)) {
 				continue;
 			}
 			if ((enum_flags & DUK_ENUM_ARRAY_INDICES_ONLY) &&
-			    (DUK_HSTRING_GET_ARRIDX_SLOW(k) == DUK_HSTRING_NO_ARRAY_INDEX)) {
+				(DUK_HSTRING_GET_ARRIDX_SLOW(k) == DUK_HSTRING_NO_ARRAY_INDEX)) {
 				continue;
 			}
 
 			DUK_ASSERT(DUK_HOBJECT_E_SLOT_IS_ACCESSOR(curr, i) ||
-			           !DUK_TVAL_IS_UNDEFINED_UNUSED(&DUK_HOBJECT_E_GET_VALUE_PTR(curr, i)->v));
+				!DUK_TVAL_IS_UNDEFINED_UNUSED(&DUK_HOBJECT_E_GET_VALUE_PTR(curr, i)->v));
 
 			duk_push_hstring(ctx, k);
 			duk_push_true(ctx);
@@ -413,7 +416,7 @@ void duk_hobject_enumerator_create(duk_context *ctx, duk_small_uint_t enum_flags
 	/* [res] */
 
 	if ((enum_flags & (DUK_ENUM_ARRAY_INDICES_ONLY | DUK_ENUM_SORT_ARRAY_INDICES)) ==
-	                  (DUK_ENUM_ARRAY_INDICES_ONLY | DUK_ENUM_SORT_ARRAY_INDICES)) {
+		(DUK_ENUM_ARRAY_INDICES_ONLY | DUK_ENUM_SORT_ARRAY_INDICES)) {
 		/*
 		 *  Some E5/E5.1 algorithms require that array indices are iterated
 		 *  in a strictly ascending order.  This is the case for e.g.
@@ -438,12 +441,12 @@ void duk_hobject_enumerator_create(duk_context *ctx, duk_small_uint_t enum_flags
 	}
 
 #if defined(DUK_USE_ES6_PROXY)
- compact_and_return:
+compact_and_return:
 #endif
 	/* compact; no need to seal because object is internal */
 	duk_hobject_compact_props(thr, res);
 
-	DUK_DDD(DUK_DDDPRINT("created enumerator object: %!iT", (duk_tval *) duk_get_tval(ctx, -1)));
+	DUK_DDD(DUK_DDDPRINT("created enumerator object: %!iT", (duk_tval *)duk_get_tval(ctx, -1)));
 }
 
 /*
@@ -455,7 +458,7 @@ void duk_hobject_enumerator_create(duk_context *ctx, duk_small_uint_t enum_flags
  *  Returns zero without pushing anything on the stack otherwise.
  */
 duk_bool_t duk_hobject_enumerator_next(duk_context *ctx, duk_bool_t get_value) {
-	duk_hthread *thr = (duk_hthread *) ctx;
+	duk_hthread *thr = (duk_hthread *)ctx;
 	duk_hobject *e;
 	duk_hobject *enum_target;
 	duk_hstring *res = NULL;
@@ -470,9 +473,9 @@ duk_bool_t duk_hobject_enumerator_next(duk_context *ctx, duk_bool_t get_value) {
 
 	/* XXX use get tval ptr, more efficient */
 	duk_get_prop_stridx(ctx, -1, DUK_STRIDX_INT_NEXT);
-	idx = (duk_uint_fast32_t) duk_require_uint(ctx, -1);
+	idx = (duk_uint_fast32_t)duk_require_uint(ctx, -1);
 	duk_pop(ctx);
-	DUK_DDD(DUK_DDDPRINT("enumeration: index is: %ld", (long) idx));
+	DUK_DDD(DUK_DDDPRINT("enumeration: index is: %ld", (long)idx));
 
 	/* Enumeration keys are checked against the enumeration target (to see
 	 * that they still exist).  In the proxy enumeration case _target will
@@ -490,7 +493,7 @@ duk_bool_t duk_hobject_enumerator_next(duk_context *ctx, duk_bool_t get_value) {
 	duk_pop(ctx);  /* still reachable */
 
 	DUK_DDD(DUK_DDDPRINT("getting next enum value, enum_target=%!iO, enumerator=%!iT",
-	                     (duk_heaphdr *) enum_target, (duk_tval *) duk_get_tval(ctx, -1)));
+		(duk_heaphdr *)enum_target, (duk_tval *)duk_get_tval(ctx, -1)));
 
 	/* no array part */
 	for (;;) {
@@ -515,14 +518,14 @@ duk_bool_t duk_hobject_enumerator_next(duk_context *ctx, duk_bool_t get_value) {
 			continue;
 		}
 
-		DUK_DDD(DUK_DDDPRINT("enumeration: found element, key: %!O", (duk_heaphdr *) k));
+		DUK_DDD(DUK_DDDPRINT("enumeration: found element, key: %!O", (duk_heaphdr *)k));
 		res = k;
 		break;
 	}
 
-	DUK_DDD(DUK_DDDPRINT("enumeration: updating next index to %ld", (long) idx));
+	DUK_DDD(DUK_DDDPRINT("enumeration: updating next index to %ld", (long)idx));
 
-	duk_push_number(ctx, (double) idx);
+	duk_push_number(ctx, (double)idx);
 	duk_put_prop_stridx(ctx, -2, DUK_STRIDX_INT_NEXT);
 
 	/* [... enum] */
@@ -535,11 +538,13 @@ duk_bool_t duk_hobject_enumerator_next(duk_context *ctx, duk_bool_t get_value) {
 			duk_get_prop(ctx, -2); /* -> [... enum key enum_target val] */
 			duk_remove(ctx, -2);   /* -> [... enum key val] */
 			duk_remove(ctx, -3);   /* -> [... key val] */
-		} else {
+		}
+		else {
 			duk_remove(ctx, -2);   /* -> [... key] */
 		}
 		return 1;
-	} else {
+	}
+	else {
 		duk_pop(ctx);  /* -> [...] */
 		return 0;
 	}
@@ -572,7 +577,7 @@ duk_ret_t duk_hobject_get_enumerated_keys(duk_context *ctx, duk_small_uint_t enu
 	DUK_ASSERT(e != NULL);
 
 	idx = 0;
-	for (i = DUK__ENUM_START_INDEX; i < (duk_uint_fast32_t) e->e_next; i++) {
+	for (i = DUK__ENUM_START_INDEX; i < (duk_uint_fast32_t)e->e_next; i++) {
 		duk_hstring *k;
 
 		k = DUK_HOBJECT_E_GET_KEY(e, i);

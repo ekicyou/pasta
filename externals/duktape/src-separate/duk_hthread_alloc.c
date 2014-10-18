@@ -25,7 +25,7 @@ duk_bool_t duk_hthread_init_stacks(duk_heap *heap, duk_hthread *thr) {
 
 	/* valstack */
 	alloc_size = sizeof(duk_tval) * DUK_VALSTACK_INITIAL_SIZE;
-	thr->valstack = (duk_tval *) DUK_ALLOC(heap, alloc_size);
+	thr->valstack = (duk_tval *)DUK_ALLOC(heap, alloc_size);
 	if (!thr->valstack) {
 		goto fail;
 	}
@@ -40,7 +40,7 @@ duk_bool_t duk_hthread_init_stacks(duk_heap *heap, duk_hthread *thr) {
 
 	/* callstack */
 	alloc_size = sizeof(duk_activation) * DUK_CALLSTACK_INITIAL_SIZE;
-	thr->callstack = (duk_activation *) DUK_ALLOC(heap, alloc_size);
+	thr->callstack = (duk_activation *)DUK_ALLOC(heap, alloc_size);
 	if (!thr->callstack) {
 		goto fail;
 	}
@@ -50,7 +50,7 @@ duk_bool_t duk_hthread_init_stacks(duk_heap *heap, duk_hthread *thr) {
 
 	/* catchstack */
 	alloc_size = sizeof(duk_catcher) * DUK_CATCHSTACK_INITIAL_SIZE;
-	thr->catchstack = (duk_catcher *) DUK_ALLOC(heap, alloc_size);
+	thr->catchstack = (duk_catcher *)DUK_ALLOC(heap, alloc_size);
 	if (!thr->catchstack) {
 		goto fail;
 	}
@@ -60,7 +60,7 @@ duk_bool_t duk_hthread_init_stacks(duk_heap *heap, duk_hthread *thr) {
 
 	return 1;
 
- fail:
+fail:
 	DUK_FREE(heap, thr->valstack);
 	DUK_FREE(heap, thr->callstack);
 	DUK_FREE(heap, thr->catchstack);
@@ -74,16 +74,16 @@ duk_bool_t duk_hthread_init_stacks(duk_heap *heap, duk_hthread *thr) {
 /* For indirect allocs. */
 
 void *duk_hthread_get_valstack_ptr(void *ud) {
-	duk_hthread *thr = (duk_hthread *) ud;
-	return (void *) thr->valstack;
+	duk_hthread *thr = (duk_hthread *)ud;
+	return (void *)thr->valstack;
 }
 
 void *duk_hthread_get_callstack_ptr(void *ud) {
-	duk_hthread *thr = (duk_hthread *) ud;
-	return (void *) thr->callstack;
+	duk_hthread *thr = (duk_hthread *)ud;
+	return (void *)thr->callstack;
 }
 
 void *duk_hthread_get_catchstack_ptr(void *ud) {
-	duk_hthread *thr = (duk_hthread *) ud;
-	return (void *) thr->catchstack;
+	duk_hthread *thr = (duk_hthread *)ud;
+	return (void *)thr->catchstack;
 }

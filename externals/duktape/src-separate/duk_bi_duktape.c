@@ -33,8 +33,9 @@ duk_ret_t duk_bi_duktape_object_info(duk_context *ctx) {
 	/* address */
 	if (DUK_TVAL_IS_HEAP_ALLOCATED(tv)) {
 		h = DUK_TVAL_GET_HEAPHDR(tv);
-		duk_push_pointer(ctx, (void *) h);
-	} else {
+		duk_push_pointer(ctx, (void *)h);
+	}
+	else {
 		goto done;
 	}
 	DUK_ASSERT(h != NULL);
@@ -49,27 +50,30 @@ duk_ret_t duk_bi_duktape_object_info(duk_context *ctx) {
 	/* heaphdr size and additional allocation size, followed by
 	 * type specific stuff (with varying value count)
 	 */
-	switch ((duk_small_int_t) DUK_HEAPHDR_GET_TYPE(h)) {
+	switch ((duk_small_int_t)DUK_HEAPHDR_GET_TYPE(h)) {
 	case DUK_HTYPE_STRING: {
-		duk_hstring *h_str = (duk_hstring *) h;
-		duk_push_uint(ctx, (duk_uint_t) (sizeof(duk_hstring) + DUK_HSTRING_GET_BYTELEN(h_str) + 1));
+		duk_hstring *h_str = (duk_hstring *)h;
+		duk_push_uint(ctx, (duk_uint_t)(sizeof(duk_hstring) + DUK_HSTRING_GET_BYTELEN(h_str) + 1));
 		break;
 	}
 	case DUK_HTYPE_OBJECT: {
-		duk_hobject *h_obj = (duk_hobject *) h;
+		duk_hobject *h_obj = (duk_hobject *)h;
 		duk_small_uint_t hdr_size;
 		if (DUK_HOBJECT_IS_COMPILEDFUNCTION(h_obj)) {
 			hdr_size = (duk_small_uint_t) sizeof(duk_hcompiledfunction);
-		} else if (DUK_HOBJECT_IS_NATIVEFUNCTION(h_obj)) {
+		}
+		else if (DUK_HOBJECT_IS_NATIVEFUNCTION(h_obj)) {
 			hdr_size = (duk_small_uint_t) sizeof(duk_hnativefunction);
-		} else if (DUK_HOBJECT_IS_THREAD(h_obj)) {
+		}
+		else if (DUK_HOBJECT_IS_THREAD(h_obj)) {
 			hdr_size = (duk_small_uint_t) sizeof(duk_hthread);
-		} else {
+		}
+		else {
 			hdr_size = (duk_small_uint_t) sizeof(duk_hobject);
 		}
-		duk_push_uint(ctx, (duk_uint_t) hdr_size);
-		duk_push_uint(ctx, (duk_uint_t) DUK_HOBJECT_E_ALLOC_SIZE(h_obj));
-		duk_push_uint(ctx, (duk_uint_t) h_obj->e_size);
+		duk_push_uint(ctx, (duk_uint_t)hdr_size);
+		duk_push_uint(ctx, (duk_uint_t)DUK_HOBJECT_E_ALLOC_SIZE(h_obj));
+		duk_push_uint(ctx, (duk_uint_t)h_obj->e_size);
 		/* Note: e_next indicates the number of gc-reachable entries
 		 * in the entry part, and also indicates the index where the
 		 * next new property would be inserted.  It does *not* indicate
@@ -77,37 +81,38 @@ duk_ret_t duk_bi_duktape_object_info(duk_context *ctx) {
 		 * value could be counted separately but requires a pass through
 		 * the key list.
 		 */
-		duk_push_uint(ctx, (duk_uint_t) h_obj->e_next);
-		duk_push_uint(ctx, (duk_uint_t) h_obj->a_size);
-		duk_push_uint(ctx, (duk_uint_t) h_obj->h_size);
+		duk_push_uint(ctx, (duk_uint_t)h_obj->e_next);
+		duk_push_uint(ctx, (duk_uint_t)h_obj->a_size);
+		duk_push_uint(ctx, (duk_uint_t)h_obj->h_size);
 		if (DUK_HOBJECT_IS_COMPILEDFUNCTION(h_obj)) {
-			duk_hbuffer *h_data = ((duk_hcompiledfunction *) h_obj)->data;
+			duk_hbuffer *h_data = ((duk_hcompiledfunction *)h_obj)->data;
 			if (h_data) {
-				duk_push_uint(ctx, (duk_uint_t) DUK_HBUFFER_GET_SIZE(h_data));
-			} else {
+				duk_push_uint(ctx, (duk_uint_t)DUK_HBUFFER_GET_SIZE(h_data));
+			}
+			else {
 				duk_push_uint(ctx, 0);
 			}
 		}
 		break;
 	}
 	case DUK_HTYPE_BUFFER: {
-		duk_hbuffer *h_buf = (duk_hbuffer *) h;
+		duk_hbuffer *h_buf = (duk_hbuffer *)h;
 		if (DUK_HBUFFER_HAS_DYNAMIC(h_buf)) {
 			/* XXX: when usable_size == 0, dynamic buf ptr may now be NULL, in which case
 			 * the second allocation does not exist.
 			 */
-			duk_hbuffer_dynamic *h_dyn = (duk_hbuffer_dynamic *) h;
-			duk_push_uint(ctx, (duk_uint_t) (sizeof(duk_hbuffer_dynamic)));
-			duk_push_uint(ctx, (duk_uint_t) (DUK_HBUFFER_DYNAMIC_GET_ALLOC_SIZE(h_dyn)));
-		} else {
-			duk_push_uint(ctx, (duk_uint_t) (sizeof(duk_hbuffer_fixed) + DUK_HBUFFER_GET_SIZE(h_buf) + 1));
+			duk_hbuffer_dynamic *h_dyn = (duk_hbuffer_dynamic *)h;
+			duk_push_uint(ctx, (duk_uint_t)(sizeof(duk_hbuffer_dynamic)));
+			duk_push_uint(ctx, (duk_uint_t)(DUK_HBUFFER_DYNAMIC_GET_ALLOC_SIZE(h_dyn)));
+		}
+		else {
+			duk_push_uint(ctx, (duk_uint_t)(sizeof(duk_hbuffer_fixed) + DUK_HBUFFER_GET_SIZE(h_buf) + 1));
 		}
 		break;
-
 	}
 	}
 
- done:
+done:
 	/* set values into ret array */
 	/* XXX: primitive to make array from valstack slice */
 	n = duk_get_top(ctx);
@@ -120,7 +125,7 @@ duk_ret_t duk_bi_duktape_object_info(duk_context *ctx) {
 }
 
 duk_ret_t duk_bi_duktape_object_act(duk_context *ctx) {
-	duk_hthread *thr = (duk_hthread *) ctx;
+	duk_hthread *thr = (duk_hthread *)ctx;
 	duk_activation *act;
 	duk_hobject *h_func;
 	duk_uint_fast32_t pc;
@@ -131,10 +136,10 @@ duk_ret_t duk_bi_duktape_object_act(duk_context *ctx) {
 	 * -callstack_top = bottom callstack entry, callstack[0]
 	 */
 	level = duk_to_int(ctx, 0);
-	if (level >= 0 || -level > (duk_int_t) thr->callstack_top) {
+	if (level >= 0 || -level > (duk_int_t)thr->callstack_top) {
 		return 0;
 	}
-	DUK_ASSERT(level >= -((duk_int_t) thr->callstack_top) && level <= -1);
+	DUK_ASSERT(level >= -((duk_int_t)thr->callstack_top) && level <= -1);
 	act = thr->callstack + thr->callstack_top + level;
 
 	duk_push_object(ctx);
@@ -143,11 +148,11 @@ duk_ret_t duk_bi_duktape_object_act(duk_context *ctx) {
 	DUK_ASSERT(h_func != NULL);
 	duk_push_hobject(ctx, h_func);
 
-	pc = (duk_uint_fast32_t) act->pc;
-	duk_push_uint(ctx, (duk_uint_t) pc);
+	pc = (duk_uint_fast32_t)act->pc;
+	duk_push_uint(ctx, (duk_uint_t)pc);
 
 	line = duk_hobject_pc2line_query(ctx, -2, pc);
-	duk_push_uint(ctx, (duk_uint_t) line);
+	duk_push_uint(ctx, (duk_uint_t)line);
 
 	/* Providing access to e.g. act->lex_env would be dangerous: these
 	 * internal structures must never be accessible to the application.
@@ -166,11 +171,11 @@ duk_ret_t duk_bi_duktape_object_act(duk_context *ctx) {
 
 duk_ret_t duk_bi_duktape_object_gc(duk_context *ctx) {
 #ifdef DUK_USE_MARK_AND_SWEEP
-	duk_hthread *thr = (duk_hthread *) ctx;
+	duk_hthread *thr = (duk_hthread *)ctx;
 	duk_small_uint_t flags;
 	duk_bool_t rc;
 
-	flags = (duk_small_uint_t) duk_get_uint(ctx, 0);
+	flags = (duk_small_uint_t)duk_get_uint(ctx, 0);
 	rc = duk_heap_mark_and_sweep(thr->heap, flags);
 	duk_push_boolean(ctx, rc);
 	return 1;
@@ -181,7 +186,7 @@ duk_ret_t duk_bi_duktape_object_gc(duk_context *ctx) {
 }
 
 duk_ret_t duk_bi_duktape_object_fin(duk_context *ctx) {
-	(void) duk_require_hobject(ctx, 0);
+	(void)duk_require_hobject(ctx, 0);
 	if (duk_get_top(ctx) >= 2) {
 		/* Set: currently a finalizer is disabled by setting it to
 		 * undefined; this does not remove the property at the moment.
@@ -190,9 +195,10 @@ duk_ret_t duk_bi_duktape_object_fin(duk_context *ctx) {
 		 * be deleted.
 		 */
 		duk_set_top(ctx, 2);
-		(void) duk_put_prop_stridx(ctx, 0, DUK_STRIDX_INT_FINALIZER);
+		(void)duk_put_prop_stridx(ctx, 0, DUK_STRIDX_INT_FINALIZER);
 		return 0;
-	} else {
+	}
+	else {
 		/* Get. */
 		DUK_ASSERT(duk_get_top(ctx) == 1);
 		duk_get_prop_stridx(ctx, 0, DUK_STRIDX_INT_FINALIZER);
@@ -201,7 +207,7 @@ duk_ret_t duk_bi_duktape_object_fin(duk_context *ctx) {
 }
 
 duk_ret_t duk_bi_duktape_object_enc(duk_context *ctx) {
-	duk_hthread *thr = (duk_hthread *) ctx;
+	duk_hthread *thr = (duk_hthread *)ctx;
 	duk_hstring *h_str;
 
 	/* Vararg function: must be careful to check/require arguments.
@@ -216,37 +222,41 @@ duk_ret_t duk_bi_duktape_object_enc(duk_context *ctx) {
 		duk_set_top(ctx, 2);
 		duk_hex_encode(ctx, 1);
 		DUK_ASSERT_TOP(ctx, 2);
-	} else if (h_str == DUK_HTHREAD_STRING_BASE64(thr)) {
+	}
+	else if (h_str == DUK_HTHREAD_STRING_BASE64(thr)) {
 		duk_set_top(ctx, 2);
 		duk_base64_encode(ctx, 1);
 		DUK_ASSERT_TOP(ctx, 2);
 #ifdef DUK_USE_JX
-	} else if (h_str == DUK_HTHREAD_STRING_JX(thr)) {
+	}
+	else if (h_str == DUK_HTHREAD_STRING_JX(thr)) {
 		duk_bi_json_stringify_helper(ctx,
-		                             1 /*idx_value*/,
-		                             2 /*idx_replacer*/,
-		                             3 /*idx_space*/,
-		                             DUK_JSON_FLAG_EXT_CUSTOM |
-		                             DUK_JSON_FLAG_ASCII_ONLY |
-		                             DUK_JSON_FLAG_AVOID_KEY_QUOTES /*flags*/);
+			1 /*idx_value*/,
+			2 /*idx_replacer*/,
+			3 /*idx_space*/,
+			DUK_JSON_FLAG_EXT_CUSTOM |
+			DUK_JSON_FLAG_ASCII_ONLY |
+			DUK_JSON_FLAG_AVOID_KEY_QUOTES /*flags*/);
 #endif
 #ifdef DUK_USE_JC
-	} else if (h_str == DUK_HTHREAD_STRING_JC(thr)) {
+	}
+	else if (h_str == DUK_HTHREAD_STRING_JC(thr)) {
 		duk_bi_json_stringify_helper(ctx,
-		                             1 /*idx_value*/,
-		                             2 /*idx_replacer*/,
-		                             3 /*idx_space*/,
-		                             DUK_JSON_FLAG_EXT_COMPATIBLE |
-		                             DUK_JSON_FLAG_ASCII_ONLY /*flags*/);
+			1 /*idx_value*/,
+			2 /*idx_replacer*/,
+			3 /*idx_space*/,
+			DUK_JSON_FLAG_EXT_COMPATIBLE |
+			DUK_JSON_FLAG_ASCII_ONLY /*flags*/);
 #endif
-	} else {
+	}
+	else {
 		return DUK_RET_TYPE_ERROR;
 	}
 	return 1;
 }
 
 duk_ret_t duk_bi_duktape_object_dec(duk_context *ctx) {
-	duk_hthread *thr = (duk_hthread *) ctx;
+	duk_hthread *thr = (duk_hthread *)ctx;
 	duk_hstring *h_str;
 
 	/* Vararg function: must be careful to check/require arguments.
@@ -261,25 +271,29 @@ duk_ret_t duk_bi_duktape_object_dec(duk_context *ctx) {
 		duk_set_top(ctx, 2);
 		duk_hex_decode(ctx, 1);
 		DUK_ASSERT_TOP(ctx, 2);
-	} else if (h_str == DUK_HTHREAD_STRING_BASE64(thr)) {
+	}
+	else if (h_str == DUK_HTHREAD_STRING_BASE64(thr)) {
 		duk_set_top(ctx, 2);
 		duk_base64_decode(ctx, 1);
 		DUK_ASSERT_TOP(ctx, 2);
 #ifdef DUK_USE_JX
-	} else if (h_str == DUK_HTHREAD_STRING_JX(thr)) {
+	}
+	else if (h_str == DUK_HTHREAD_STRING_JX(thr)) {
 		duk_bi_json_parse_helper(ctx,
-		                         1 /*idx_value*/,
-		                         2 /*idx_replacer*/,
-		                         DUK_JSON_FLAG_EXT_CUSTOM /*flags*/);
+			1 /*idx_value*/,
+			2 /*idx_replacer*/,
+			DUK_JSON_FLAG_EXT_CUSTOM /*flags*/);
 #endif
 #ifdef DUK_USE_JC
-	} else if (h_str == DUK_HTHREAD_STRING_JC(thr)) {
+	}
+	else if (h_str == DUK_HTHREAD_STRING_JC(thr)) {
 		duk_bi_json_parse_helper(ctx,
-		                         1 /*idx_value*/,
-		                         2 /*idx_replacer*/,
-		                         DUK_JSON_FLAG_EXT_COMPATIBLE /*flags*/);
+			1 /*idx_value*/,
+			2 /*idx_replacer*/,
+			DUK_JSON_FLAG_EXT_COMPATIBLE /*flags*/);
 #endif
-	} else {
+	}
+	else {
 		return DUK_RET_TYPE_ERROR;
 	}
 	return 1;

@@ -102,14 +102,14 @@ duk_ret_t duk_bi_global_object_alert(duk_context *ctx);
 duk_ret_t duk_bi_global_object_require(duk_context *ctx);
 
 void duk_bi_json_parse_helper(duk_context *ctx,
-                              duk_idx_t idx_value,
-                              duk_idx_t idx_reviver,
-                              duk_small_uint_t flags);
+	duk_idx_t idx_value,
+	duk_idx_t idx_reviver,
+	duk_small_uint_t flags);
 void duk_bi_json_stringify_helper(duk_context *ctx,
-                                  duk_idx_t idx_value,
-                                  duk_idx_t idx_replacer,
-                                  duk_idx_t idx_space,
-                                  duk_small_uint_t flags);
+	duk_idx_t idx_value,
+	duk_idx_t idx_replacer,
+	duk_idx_t idx_space,
+	duk_small_uint_t flags);
 duk_ret_t duk_bi_json_object_parse(duk_context *ctx);
 duk_ret_t duk_bi_json_object_stringify(duk_context *ctx);
 

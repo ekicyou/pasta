@@ -17,13 +17,13 @@
 #define DUK_VALSTACK_SHRINK_SPARE       64      /* roughly 0.5 kiB */
 #define DUK_VALSTACK_INITIAL_SIZE       128     /* roughly 1.0 kiB -> but rounds up to DUK_VALSTACK_GROW_STEP in practice */
 #define DUK_VALSTACK_INTERNAL_EXTRA     64      /* internal extra elements assumed on function entry,
-                                                 * always added to user-defined 'extra' for e.g. the
-                                                 * duk_check_stack() call.
-                                                 */
+ * always added to user-defined 'extra' for e.g. the
+ * duk_check_stack() call.
+ */
 #define DUK_VALSTACK_API_ENTRY_MINIMUM  DUK_API_ENTRY_STACK
-                                                /* number of elements guaranteed to be user accessible
-                                                 * (in addition to call arguments) on Duktape/C function entry.
-                                                 */
+/* number of elements guaranteed to be user accessible
+ * (in addition to call arguments) on Duktape/C function entry.
+ */
 
 /* Note: DUK_VALSTACK_INITIAL_SIZE must be >= DUK_VALSTACK_API_ENTRY_MINIMUM
  * + DUK_VALSTACK_INTERNAL_EXTRA so that the initial stack conforms to spare
@@ -90,29 +90,29 @@
 
 #define DUK_CAT_SET_CATCH_ENABLED(c)    do { \
 		(c)->flags |= DUK_CAT_FLAG_CATCH_ENABLED; \
-	} while (0)
+		} while (0)
 #define DUK_CAT_SET_FINALLY_ENABLED(c)  do { \
 		(c)->flags |= DUK_CAT_FLAG_FINALLY_ENABLED; \
-	} while (0)
+		} while (0)
 #define DUK_CAT_SET_CATCH_BINDING_ENABLED(c)    do { \
 		(c)->flags |= DUK_CAT_FLAG_CATCH_BINDING_ENABLED; \
-	} while (0)
+		} while (0)
 #define DUK_CAT_SET_LEXENV_ACTIVE(c)    do { \
 		(c)->flags |= DUK_CAT_FLAG_LEXENV_ACTIVE; \
-	} while (0)
+		} while (0)
 
 #define DUK_CAT_CLEAR_CATCH_ENABLED(c)    do { \
 		(c)->flags &= ~DUK_CAT_FLAG_CATCH_ENABLED; \
-	} while (0)
+		} while (0)
 #define DUK_CAT_CLEAR_FINALLY_ENABLED(c)  do { \
 		(c)->flags &= ~DUK_CAT_FLAG_FINALLY_ENABLED; \
-	} while (0)
+		} while (0)
 #define DUK_CAT_CLEAR_CATCH_BINDING_ENABLED(c)    do { \
 		(c)->flags &= ~DUK_CAT_FLAG_CATCH_BINDING_ENABLED; \
-	} while (0)
+		} while (0)
 #define DUK_CAT_CLEAR_LEXENV_ACTIVE(c)    do { \
 		(c)->flags &= ~DUK_CAT_FLAG_LEXENV_ACTIVE; \
-	} while (0)
+		} while (0)
 
 /*
  *  Thread defines
@@ -189,7 +189,7 @@ struct duk_activation {
 /* Note: it's nice if size is 2^N (not 4x4 = 16 bytes on 32 bit) */
 struct duk_catcher {
 	duk_hstring *h_varname;         /* borrowed reference to catch variable name (or NULL if none) */
-	                                /* (reference is valid as long activation exists) */
+	/* (reference is valid as long activation exists) */
 	duk_size_t callstack_index;     /* callstack index of related activation */
 	duk_size_t idx_base;            /* idx_base and idx_base+1 get completion value and type */
 	duk_uint32_t pc_base;           /* resume execution from pc_base or pc_base+1 */

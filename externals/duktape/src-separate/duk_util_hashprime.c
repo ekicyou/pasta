@@ -41,9 +41,9 @@ duk_uint32_t duk_util_get_hash_prime(duk_uint32_t size) {
 	const duk_int8_t *p = duk__hash_size_corrections;
 	duk_uint32_t curr;
 
-	curr = (duk_uint32_t) *p++;
+	curr = (duk_uint32_t)*p++;
 	for (;;) {
-		duk_small_int_t t = (duk_small_int_t) *p++;
+		duk_small_int_t t = (duk_small_int_t)*p++;
 		if (t < 0) {
 			/* may happen if size is very close to 2^32-1 */
 			break;
@@ -51,16 +51,16 @@ duk_uint32_t duk_util_get_hash_prime(duk_uint32_t size) {
 
 		/* prediction: portable variant using doubles if 64-bit values not available */
 #ifdef DUK_USE_64BIT_OPS
-		curr = (duk_uint32_t) ((((duk_uint64_t) curr) * ((duk_uint64_t) DUK__HASH_SIZE_RATIO)) >> 10);
+		curr = (duk_uint32_t)((((duk_uint64_t)curr) * ((duk_uint64_t)DUK__HASH_SIZE_RATIO)) >> 10);
 #else
 		/* 32-bit x 11-bit = 43-bit, fits accurately into a double */
-		curr = (duk_uint32_t) DUK_FLOOR(((double) curr) * ((double) DUK__HASH_SIZE_RATIO) / 1024.0);
+		curr = (duk_uint32_t)DUK_FLOOR(((double)curr) * ((double)DUK__HASH_SIZE_RATIO) / 1024.0);
 #endif
 
 		/* correction */
 		curr += t;
 
-		DUK_DDD(DUK_DDDPRINT("size=%ld, curr=%ld", (long) size, (long) curr));
+		DUK_DDD(DUK_DDDPRINT("size=%ld, curr=%ld", (long)size, (long)curr));
 
 		if (curr >= size) {
 			return curr;
@@ -68,4 +68,3 @@ duk_uint32_t duk_util_get_hash_prime(duk_uint32_t size) {
 	}
 	return 0;
 }
-

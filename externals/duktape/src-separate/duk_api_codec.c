@@ -8,7 +8,7 @@
 
 /* dst length must be exactly ceil(len/3)*4 */
 static void duk__base64_encode_helper(const duk_uint8_t *src, const duk_uint8_t *src_end,
-                                      duk_uint8_t *dst, duk_uint8_t *dst_end) {
+	duk_uint8_t *dst, duk_uint8_t *dst_end) {
 	duk_small_uint_t i, snip;
 	duk_uint_fast32_t t;
 	duk_uint_fast8_t x, y;
@@ -23,8 +23,9 @@ static void duk__base64_encode_helper(const duk_uint8_t *src, const duk_uint8_t 
 			t = t << 8;
 			if (src >= src_end) {
 				snip--;
-			} else {
-				t += (duk_uint_fast32_t) (*src++);
+			}
+			else {
+				t += (duk_uint_fast32_t)(*src++);
 			}
 		}
 
@@ -38,7 +39,7 @@ static void duk__base64_encode_helper(const duk_uint8_t *src, const duk_uint8_t 
 		DUK_ASSERT(snip >= 2 && snip <= 4);
 
 		for (i = 0; i < 4; i++) {
-			x = (duk_uint_fast8_t) ((t >> 18) & 0x3f);
+			x = (duk_uint_fast8_t)((t >> 18) & 0x3f);
 			t = t << 6;
 
 			/* A straightforward 64-byte lookup would be faster
@@ -46,26 +47,31 @@ static void duk__base64_encode_helper(const duk_uint8_t *src, const duk_uint8_t 
 			 */
 			if (i >= snip) {
 				y = '=';
-			} else if (x <= 25) {
+			}
+			else if (x <= 25) {
 				y = x + 'A';
-			} else if (x <= 51) {
+			}
+			else if (x <= 51) {
 				y = x - 26 + 'a';
-			} else if (x <= 61) {
+			}
+			else if (x <= 61) {
 				y = x - 52 + '0';
-			} else if (x == 62) {
+			}
+			else if (x == 62) {
 				y = '+';
-			} else {
+			}
+			else {
 				y = '/';
 			}
 
 			DUK_ASSERT(dst < dst_end);
-			*dst++ = (duk_uint8_t) y;
+			*dst++ = (duk_uint8_t)y;
 		}
 	}
 }
 
 static duk_bool_t duk__base64_decode_helper(const duk_uint8_t *src, const duk_uint8_t *src_end,
-                                            duk_uint8_t *dst, duk_uint8_t *dst_end, duk_uint8_t **out_dst_final) {
+	duk_uint8_t *dst, duk_uint8_t *dst_end, duk_uint8_t **out_dst_final) {
 	duk_uint_fast32_t t;
 	duk_uint_fast8_t x, y;
 	duk_small_uint_t group_idx;
@@ -80,15 +86,20 @@ static duk_bool_t duk__base64_decode_helper(const duk_uint8_t *src, const duk_ui
 
 		if (x >= 'A' && x <= 'Z') {
 			y = x - 'A' + 0;
-		} else if (x >= 'a' && x <= 'z') {
+		}
+		else if (x >= 'a' && x <= 'z') {
 			y = x - 'a' + 26;
-		} else if (x >= '0' && x <= '9') {
+		}
+		else if (x >= '0' && x <= '9') {
 			y = x - '0' + 52;
-		} else if (x == '+') {
+		}
+		else if (x == '+') {
 			y = 62;
-		} else if (x == '/') {
+		}
+		else if (x == '/') {
 			y = 63;
-		} else if (x == '=') {
+		}
+		else if (x == '=') {
 			/* We don't check the zero padding bytes here right now.
 			 * This seems to be common behavior for base-64 decoders.
 			 */
@@ -97,7 +108,7 @@ static duk_bool_t duk__base64_decode_helper(const duk_uint8_t *src, const duk_ui
 				/* xx== -> 1 byte, t contains 12 bits, 4 on right are zero */
 				t = t >> 4;
 				DUK_ASSERT(dst < dst_end);
-				*dst++ = (duk_uint8_t) t;
+				*dst++ = (duk_uint8_t)t;
 
 				if (src >= src_end) {
 					goto error;
@@ -106,14 +117,16 @@ static duk_bool_t duk__base64_decode_helper(const duk_uint8_t *src, const duk_ui
 				if (x != '=') {
 					goto error;
 				}
-			} else if (group_idx == 3) {
+			}
+			else if (group_idx == 3) {
 				/* xxx= -> 2 bytes, t contains 18 bits, 2 on right are zero */
 				t = t >> 2;
 				DUK_ASSERT(dst < dst_end);
-				*dst++ = (duk_uint8_t) ((t >> 8) & 0xff);
+				*dst++ = (duk_uint8_t)((t >> 8) & 0xff);
 				DUK_ASSERT(dst < dst_end);
-				*dst++ = (duk_uint8_t) (t & 0xff);
-			} else {
+				*dst++ = (duk_uint8_t)(t & 0xff);
+			}
+			else {
 				goto error;
 			}
 
@@ -125,10 +138,12 @@ static duk_bool_t duk__base64_decode_helper(const duk_uint8_t *src, const duk_ui
 			t = 0;
 			group_idx = 0;
 			continue;
-		} else if (x == 0x09 || x == 0x0a || x == 0x0d || x == 0x20) {
+		}
+		else if (x == 0x09 || x == 0x0a || x == 0x0d || x == 0x20) {
 			/* allow basic ASCII whitespace */
 			continue;
-		} else {
+		}
+		else {
 			goto error;
 		}
 
@@ -137,14 +152,15 @@ static duk_bool_t duk__base64_decode_helper(const duk_uint8_t *src, const duk_ui
 		if (group_idx == 3) {
 			/* output 3 bytes from 't' */
 			DUK_ASSERT(dst < dst_end);
-			*dst++ = (duk_uint8_t) ((t >> 16) & 0xff);
+			*dst++ = (duk_uint8_t)((t >> 16) & 0xff);
 			DUK_ASSERT(dst < dst_end);
-			*dst++ = (duk_uint8_t) ((t >> 8) & 0xff);
+			*dst++ = (duk_uint8_t)((t >> 8) & 0xff);
 			DUK_ASSERT(dst < dst_end);
-			*dst++ = (duk_uint8_t) (t & 0xff);
+			*dst++ = (duk_uint8_t)(t & 0xff);
 			t = 0;
 			group_idx = 0;
-		} else {
+		}
+		else {
 			group_idx++;
 		}
 	}
@@ -160,12 +176,12 @@ static duk_bool_t duk__base64_decode_helper(const duk_uint8_t *src, const duk_ui
 	*out_dst_final = dst;
 	return 1;
 
- error:
+error:
 	return 0;
 }
 
 const char *duk_base64_encode(duk_context *ctx, duk_idx_t index) {
-	duk_hthread *thr = (duk_hthread *) ctx;
+	duk_hthread *thr = (duk_hthread *)ctx;
 	duk_uint8_t *src;
 	duk_size_t srclen;
 	duk_size_t dstlen;
@@ -177,7 +193,7 @@ const char *duk_base64_encode(duk_context *ctx, duk_idx_t index) {
 	 */
 
 	index = duk_require_normalize_index(ctx, index);
-	src = (duk_uint8_t *) duk_to_buffer(ctx, index, &srclen);
+	src = (duk_uint8_t *)duk_to_buffer(ctx, index, &srclen);
 	/* Note: for srclen=0, src may be NULL */
 
 	/* Computation must not wrap; this limit works for 32-bit size_t:
@@ -189,22 +205,22 @@ const char *duk_base64_encode(duk_context *ctx, duk_idx_t index) {
 		goto type_error;
 	}
 	dstlen = (srclen + 2) / 3 * 4;
-	dst = (duk_uint8_t *) duk_push_fixed_buffer(ctx, dstlen);
+	dst = (duk_uint8_t *)duk_push_fixed_buffer(ctx, dstlen);
 
-	duk__base64_encode_helper((const duk_uint8_t *) src, (const duk_uint8_t *) (src + srclen),
-	                          dst, (dst + dstlen));
+	duk__base64_encode_helper((const duk_uint8_t *)src, (const duk_uint8_t *)(src + srclen),
+		dst, (dst + dstlen));
 
 	ret = duk_to_string(ctx, -1);
 	duk_replace(ctx, index);
 	return ret;
 
- type_error:
+type_error:
 	DUK_ERROR(thr, DUK_ERR_TYPE_ERROR, DUK_STR_BASE64_ENCODE_FAILED);
 	return NULL;  /* never here */
 }
 
 void duk_base64_decode(duk_context *ctx, duk_idx_t index) {
-	duk_hthread *thr = (duk_hthread *) ctx;
+	duk_hthread *thr = (duk_hthread *)ctx;
 	const duk_uint8_t *src;
 	duk_size_t srclen;
 	duk_size_t dstlen;
@@ -217,7 +233,7 @@ void duk_base64_decode(duk_context *ctx, duk_idx_t index) {
 	 */
 
 	index = duk_require_normalize_index(ctx, index);
-	src = (const duk_uint8_t *) duk_to_lstring(ctx, index, &srclen);
+	src = (const duk_uint8_t *)duk_to_lstring(ctx, index, &srclen);
 
 	/* Computation must not wrap, only srclen + 3 is at risk of
 	 * wrapping because after that the number gets smaller.
@@ -228,21 +244,21 @@ void duk_base64_decode(duk_context *ctx, duk_idx_t index) {
 		goto type_error;
 	}
 	dstlen = (srclen + 3) / 4 * 3;  /* upper limit */
-	dst = (duk_uint8_t *) duk_push_dynamic_buffer(ctx, dstlen);
+	dst = (duk_uint8_t *)duk_push_dynamic_buffer(ctx, dstlen);
 	/* Note: for dstlen=0, dst may be NULL */
 
-	retval = duk__base64_decode_helper((const duk_uint8_t *) src, (const duk_uint8_t *) (src + srclen),
-	                                   dst, dst + dstlen, &dst_final);
+	retval = duk__base64_decode_helper((const duk_uint8_t *)src, (const duk_uint8_t *)(src + srclen),
+		dst, dst + dstlen, &dst_final);
 	if (!retval) {
 		goto type_error;
 	}
 
 	/* XXX: convert to fixed buffer? */
-	(void) duk_resize_buffer(ctx, -1, (duk_size_t) (dst_final - dst));
+	(void)duk_resize_buffer(ctx, -1, (duk_size_t)(dst_final - dst));
 	duk_replace(ctx, index);
 	return;
 
- type_error:
+type_error:
 	DUK_ERROR(thr, DUK_ERR_TYPE_ERROR, DUK_STR_BASE64_DECODE_FAILED);
 }
 
@@ -257,17 +273,17 @@ const char *duk_hex_encode(duk_context *ctx, duk_idx_t index) {
 	/* XXX: special case for input string, no need to coerce to buffer */
 
 	index = duk_require_normalize_index(ctx, index);
-	data = (duk_uint8_t *) duk_to_buffer(ctx, index, &len);
+	data = (duk_uint8_t *)duk_to_buffer(ctx, index, &len);
 	DUK_ASSERT(data != NULL);
 
-	buf = (duk_uint8_t *) duk_push_fixed_buffer(ctx, len * 2);
+	buf = (duk_uint8_t *)duk_push_fixed_buffer(ctx, len * 2);
 	DUK_ASSERT(buf != NULL);
 	/* buf is always zeroed */
 
 	for (i = 0; i < len; i++) {
-		t = (duk_uint_fast8_t) data[i];
-		buf[i*2 + 0] = duk_lc_digits[t >> 4];
-		buf[i*2 + 1] = duk_lc_digits[t & 0x0f];
+		t = (duk_uint_fast8_t)data[i];
+		buf[i * 2 + 0] = duk_lc_digits[t >> 4];
+		buf[i * 2 + 1] = duk_lc_digits[t & 0x0f];
 	}
 
 	ret = duk_to_string(ctx, -1);
@@ -276,7 +292,7 @@ const char *duk_hex_encode(duk_context *ctx, duk_idx_t index) {
 }
 
 void duk_hex_decode(duk_context *ctx, duk_idx_t index) {
-	duk_hthread *thr = (duk_hthread *) ctx;
+	duk_hthread *thr = (duk_hthread *)ctx;
 	const duk_uint8_t *str;
 	duk_size_t len;
 	duk_size_t i;
@@ -288,14 +304,14 @@ void duk_hex_decode(duk_context *ctx, duk_idx_t index) {
 	 */
 
 	index = duk_require_normalize_index(ctx, index);
-	str = (const duk_uint8_t *) duk_to_lstring(ctx, index, &len);
+	str = (const duk_uint8_t *)duk_to_lstring(ctx, index, &len);
 	DUK_ASSERT(str != NULL);
 
 	if (len & 0x01) {
 		goto type_error;
 	}
 
-	buf = (duk_uint8_t *) duk_push_fixed_buffer(ctx, len / 2);
+	buf = (duk_uint8_t *)duk_push_fixed_buffer(ctx, len / 2);
 	DUK_ASSERT(buf != NULL);
 	/* buf is always zeroed */
 
@@ -308,16 +324,17 @@ void duk_hex_decode(duk_context *ctx, duk_idx_t index) {
 		}
 
 		if (i & 0x01) {
-			buf[i >> 1] += (duk_uint8_t) t;
-		} else {
-			buf[i >> 1] = (duk_uint8_t) (t << 4);
+			buf[i >> 1] += (duk_uint8_t)t;
+		}
+		else {
+			buf[i >> 1] = (duk_uint8_t)(t << 4);
 		}
 	}
 
 	duk_replace(ctx, index);
 	return;
 
- type_error:
+type_error:
 	DUK_ERROR(thr, DUK_ERR_TYPE_ERROR, DUK_STR_HEX_DECODE_FAILED);
 }
 
@@ -329,10 +346,10 @@ const char *duk_json_encode(duk_context *ctx, duk_idx_t index) {
 
 	index = duk_require_normalize_index(ctx, index);
 	duk_bi_json_stringify_helper(ctx,
-	                             index /*idx_value*/,
-	                             DUK_INVALID_INDEX /*idx_replacer*/,
-	                             DUK_INVALID_INDEX /*idx_space*/,
-	                             0 /*flags*/);
+		index /*idx_value*/,
+		DUK_INVALID_INDEX /*idx_replacer*/,
+		DUK_INVALID_INDEX /*idx_space*/,
+		0 /*flags*/);
 	DUK_ASSERT(duk_is_string(ctx, -1));
 	duk_replace(ctx, index);
 	ret = duk_get_string(ctx, index);
@@ -349,9 +366,9 @@ void duk_json_decode(duk_context *ctx, duk_idx_t index) {
 
 	index = duk_require_normalize_index(ctx, index);
 	duk_bi_json_parse_helper(ctx,
-	                         index /*idx_value*/,
-	                         DUK_INVALID_INDEX /*idx_reviver*/,
-	                         0 /*flags*/);
+		index /*idx_value*/,
+		DUK_INVALID_INDEX /*idx_reviver*/,
+		0 /*flags*/);
 	duk_replace(ctx, index);
 
 	DUK_ASSERT(duk_get_top(ctx) == top_at_entry);

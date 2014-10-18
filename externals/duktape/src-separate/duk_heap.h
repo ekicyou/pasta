@@ -22,10 +22,10 @@
 #define DUK__HEAP_HAS_FLAGS(heap,bits)               ((heap)->flags & (bits))
 #define DUK__HEAP_SET_FLAGS(heap,bits)  do { \
 		(heap)->flags |= (bits); \
-	} while (0)
+		} while (0)
 #define DUK__HEAP_CLEAR_FLAGS(heap,bits)  do { \
 		(heap)->flags &= ~(bits); \
-	} while (0)
+		} while (0)
 
 #define DUK_HEAP_HAS_MARKANDSWEEP_RUNNING(heap)            DUK__HEAP_HAS_FLAGS((heap), DUK_HEAP_FLAG_MARKANDSWEEP_RUNNING)
 #define DUK_HEAP_HAS_MARKANDSWEEP_RECLIMIT_REACHED(heap)   DUK__HEAP_HAS_FLAGS((heap), DUK_HEAP_FLAG_MARKANDSWEEP_RECLIMIT_REACHED)
@@ -84,7 +84,7 @@
 #else
 #define DUK_HEAP_SWITCH_THREAD(heap,newthr)  do { \
 		(heap)->curr_thread = (newthr); \
-	} while (0)
+		} while (0)
 #endif
 
 /*
@@ -259,15 +259,15 @@ typedef void *(*duk_mem_getptr)(void *ud);
  */
 
 #define DUK_HEAP_ALLOC_FAIL_MARKANDSWEEP_LIMIT           5   /* Retry allocation after mark-and-sweep for this
-                                                              * many times.  A single mark-and-sweep round is
-                                                              * not guaranteed to free all unreferenced memory
-                                                              * because of finalization (in fact, ANY number of
-                                                              * rounds is strictly not enough).
-                                                              */
+ * many times.  A single mark-and-sweep round is
+ * not guaranteed to free all unreferenced memory
+ * because of finalization (in fact, ANY number of
+ * rounds is strictly not enough).
+ */
 
 #define DUK_HEAP_ALLOC_FAIL_MARKANDSWEEP_EMERGENCY_LIMIT  3  /* Starting from this round, use emergency mode
-                                                              * for mark-and-sweep.
-                                                              */
+ * for mark-and-sweep.
+ */
 
 /*
  *  String cache should ideally be at duk_hthread level, but that would
@@ -396,10 +396,10 @@ struct duk_heap {
  */
 
 duk_heap *duk_heap_alloc(duk_alloc_function alloc_func,
-                         duk_realloc_function realloc_func,
-                         duk_free_function free_func,
-                         void *alloc_udata,
-                         duk_fatal_function fatal_func);
+	duk_realloc_function realloc_func,
+	duk_free_function free_func,
+	void *alloc_udata,
+	duk_fatal_function fatal_func);
 void duk_heap_free(duk_heap *heap);
 void duk_heap_free_heaphdr_raw(duk_heap *heap, duk_heaphdr *hdr);
 

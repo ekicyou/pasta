@@ -18,7 +18,6 @@
     stop() {
         clearTimeout(this.timerToken);
     }
-
 }
 
 window.onload = () => {

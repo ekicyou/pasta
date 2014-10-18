@@ -41,7 +41,5 @@ namespace test
 			OutputDebugString(A2CW_CP(rc.c_str(), CP_UTF8));
 			OutputDebugString(L"[LoadTest::JsRunTest]end\n");
 		}
-
 	};
-
 }

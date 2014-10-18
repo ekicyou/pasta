@@ -51,7 +51,7 @@
 
 #define DUK_HBUFFER_SET_SIZE(x,val)  do { \
 		(x)->size = (val); \
-	} while (0)
+		} while (0)
 
 /* growth parameters */
 #define DUK_HBUFFER_SPARE_ADD      16
@@ -125,9 +125,9 @@ struct duk_hbuffer_fixed {
 	 */
 }
 #if defined(DUK_USE_ALIGN_8) && defined(DUK_USE_PACK_GCC_ATTR)
-__attribute__ ((aligned (8)))
+__attribute__((aligned(8)))
 #elif defined(DUK_USE_ALIGN_8) && defined(DUK_USE_PACK_CLANG_ATTR)
-__attribute__ ((aligned (8)))
+__attribute__((aligned(8)))
 #endif
 ;
 #if defined(DUK_USE_ALIGN_8) && defined(DUK_USE_PACK_MSVC_PRAGMA)

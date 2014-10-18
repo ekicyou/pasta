@@ -97,9 +97,9 @@ typedef struct {
 	duk_hstring *h_label;        /* borrowed label name */
 	duk_int_t catch_depth;       /* catch depth at point of definition */
 	duk_int_t pc_label;          /* pc of label statement:
-	                              * pc+1: break jump site
-	                              * pc+2: continue jump site
-	                              */
+								  * pc+1: break jump site
+								  * pc+2: continue jump site
+								  */
 
 	/* Fast jumps (which avoid longjmp) jump directly to the jump sites
 	 * which are always known even while the iteration/switch statement
@@ -119,12 +119,12 @@ struct duk_compiler_func {
 	duk_hbuffer_dynamic *h_code;        /* C array of duk_compiler_instr */
 	duk_hobject *h_consts;              /* array */
 	duk_hobject *h_funcs;               /* array of function templates: [func1, offset1, line1, func2, offset2, line2]
-	                                     * offset/line points to closing brace to allow skipping on pass 2
-	                                     */
+										 * offset/line points to closing brace to allow skipping on pass 2
+										 */
 	duk_hobject *h_decls;               /* array of declarations: [ name1, val1, name2, val2, ... ]
-	                                     * valN = (typeN) | (fnum << 8), where fnum is inner func number (0 for vars)
-	                                     * record function and variable declarations in pass 1
-	                                     */
+										 * valN = (typeN) | (fnum << 8), where fnum is inner func number (0 for vars)
+										 * record function and variable declarations in pass 1
+										 */
 	duk_hobject *h_labelnames;          /* array of active label names */
 	duk_hbuffer_dynamic *h_labelinfos;  /* C array of duk_labelinfo */
 	duk_hobject *h_argnames;            /* array of formal argument names (-> _formals) */

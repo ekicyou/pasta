@@ -5,10 +5,10 @@
 #include "duk_internal.h"
 
 duk_context *duk_create_heap(duk_alloc_function alloc_func,
-                             duk_realloc_function realloc_func,
-                             duk_free_function free_func,
-                             void *alloc_udata,
-                             duk_fatal_function fatal_handler) {
+	duk_realloc_function realloc_func,
+	duk_free_function free_func,
+	void *alloc_udata,
+	duk_fatal_function fatal_handler) {
 	duk_heap *heap = NULL;
 	duk_context *ctx;
 
@@ -26,7 +26,8 @@ duk_context *duk_create_heap(duk_alloc_function alloc_func,
 		alloc_func = duk_default_alloc_function;
 		realloc_func = duk_default_realloc_function;
 		free_func = duk_default_free_function;
-	} else {
+	}
+	else {
 		DUK_ASSERT(realloc_func != NULL);
 		DUK_ASSERT(free_func != NULL);
 	}
@@ -44,14 +45,14 @@ duk_context *duk_create_heap(duk_alloc_function alloc_func,
 	if (!heap) {
 		return NULL;
 	}
-	ctx = (duk_context *) heap->heap_thread;
+	ctx = (duk_context *)heap->heap_thread;
 	DUK_ASSERT(ctx != NULL);
-	DUK_ASSERT(((duk_hthread *) ctx)->heap != NULL);
+	DUK_ASSERT(((duk_hthread *)ctx)->heap != NULL);
 	return ctx;
 }
 
 void duk_destroy_heap(duk_context *ctx) {
-	duk_hthread *thr = (duk_hthread *) ctx;
+	duk_hthread *thr = (duk_hthread *)ctx;
 	duk_heap *heap;
 
 	if (!ctx) {
@@ -65,7 +66,7 @@ void duk_destroy_heap(duk_context *ctx) {
 
 /* XXX: better place for this */
 void duk_set_global_object(duk_context *ctx) {
-	duk_hthread *thr = (duk_hthread *) ctx;
+	duk_hthread *thr = (duk_hthread *)ctx;
 	duk_hobject *h_glob;
 	duk_hobject *h_prev_glob;
 	duk_hobject *h_env;
@@ -94,10 +95,10 @@ void duk_set_global_object(duk_context *ctx) {
 	 *  same (initial) built-ins.
 	 */
 
-	(void) duk_push_object_helper(ctx,
-	                              DUK_HOBJECT_FLAG_EXTENSIBLE |
-	                              DUK_HOBJECT_CLASS_AS_FLAGS(DUK_HOBJECT_CLASS_OBJENV),
-	                              -1);  /* no prototype, updated below */
+	(void)duk_push_object_helper(ctx,
+		DUK_HOBJECT_FLAG_EXTENSIBLE |
+		DUK_HOBJECT_CLASS_AS_FLAGS(DUK_HOBJECT_CLASS_OBJENV),
+		-1);  /* no prototype, updated below */
 
 	duk_dup(ctx, -2);
 	duk_dup(ctx, -3);

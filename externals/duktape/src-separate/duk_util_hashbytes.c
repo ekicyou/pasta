@@ -23,12 +23,12 @@ duk_uint32_t duk_util_hashbytes(duk_uint8_t *data, duk_size_t len, duk_uint32_t 
 		 * OK as long as it is consistent for a build.
 		 */
 #ifdef DUK_USE_HASHBYTES_UNALIGNED_U32_ACCESS
-		duk_uint32_t k = *((duk_uint32_t *) data);
+		duk_uint32_t k = *((duk_uint32_t *)data);
 #else
-		duk_uint32_t k = ((duk_uint32_t) data[0]) |
-		                 (((duk_uint32_t) data[1]) << 8) |
-		                 (((duk_uint32_t) data[2]) << 16) |
-		                 (((duk_uint32_t) data[3]) << 24);
+		duk_uint32_t k = ((duk_uint32_t)data[0]) |
+			(((duk_uint32_t)data[1]) << 8) |
+			(((duk_uint32_t)data[2]) << 16) |
+			(((duk_uint32_t)data[3]) << 24);
 #endif
 
 		k *= DUK__MAGIC_M;
@@ -41,11 +41,11 @@ duk_uint32_t duk_util_hashbytes(duk_uint8_t *data, duk_size_t len, duk_uint32_t 
 	}
 
 	switch (len) {
-		case 3:	h ^= data[2] << 16;
-		case 2:	h ^= data[1] << 8;
-		case 1:	h ^= data[0];
-			h *= DUK__MAGIC_M;
-        }
+	case 3:	h ^= data[2] << 16;
+	case 2:	h ^= data[1] << 8;
+	case 1:	h ^= data[0];
+		h *= DUK__MAGIC_M;
+	}
 
 	h ^= h >> 13;
 	h *= DUK__MAGIC_M;
@@ -53,4 +53,3 @@ duk_uint32_t duk_util_hashbytes(duk_uint8_t *data, duk_size_t len, duk_uint32_t 
 
 	return h;
 }
-

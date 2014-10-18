@@ -188,8 +188,8 @@
 #define DUK_PROPDESC_FLAG_CONFIGURABLE          (1 << 2)    /* E5 Section 8.6.1 */
 #define DUK_PROPDESC_FLAG_ACCESSOR              (1 << 3)    /* accessor */
 #define DUK_PROPDESC_FLAG_VIRTUAL               (1 << 4)    /* property is virtual: used in duk_propdesc, never stored
-                                                             * (used by e.g. buffer virtual properties)
-                                                             */
+															 * (used by e.g. buffer virtual properties)
+															 */
 #define DUK_PROPDESC_FLAGS_MASK                 (DUK_PROPDESC_FLAG_WRITABLE | \
                                                  DUK_PROPDESC_FLAG_ENUMERABLE | \
                                                  DUK_PROPDESC_FLAG_CONFIGURABLE | \
@@ -254,7 +254,7 @@
 		(set_e_f) = (duk_uint8_t *) ((set_e_pv) + (n_ent)); \
 		(set_a) = (duk_tval *) ((set_e_f) + (n_ent)); \
 		(set_h) = (duk_uint32_t *) ((set_a) + (n_arr)); \
-	} while (0)
+		} while (0)
 #elif defined(DUK_USE_HOBJECT_LAYOUT_2)
 /* LAYOUT 2 */
 #if defined(DUK_USE_ALIGN_4)
@@ -305,7 +305,7 @@
 		                        sizeof(duk_uint8_t) * (n_ent) + \
 		                        DUK_HOBJECT_E_FLAG_PADDING((n_ent))); \
 		(set_h) = (duk_uint32_t *) ((set_a) + (n_arr)); \
-	} while (0)
+		} while (0)
 #elif defined(DUK_USE_HOBJECT_LAYOUT_3)
 /* LAYOUT 3 */
 #define DUK_HOBJECT_E_GET_KEY_BASE(h)           \
@@ -348,7 +348,7 @@
 		(set_e_k) = (duk_hstring **) ((set_a) + (n_arr)); \
 		(set_h) = (duk_uint32_t *) ((set_e_k) + (n_ent)); \
 		(set_e_f) = (duk_uint8_t *) ((set_h) + (n_hash)); \
-	} while (0)
+		} while (0)
 #else
 #error invalid hobject layout defines
 #endif  /* hobject property layout */
@@ -374,37 +374,37 @@
 
 #define DUK_HOBJECT_E_SET_KEY(h,i,k)  do { \
 		DUK_HOBJECT_E_GET_KEY((h),(i)) = (k); \
-	} while (0)
+		} while (0)
 #define DUK_HOBJECT_E_SET_VALUE(h,i,v)  do { \
 		DUK_HOBJECT_E_GET_VALUE((h),(i)) = (v); \
-	} while (0)
+		} while (0)
 #define DUK_HOBJECT_E_SET_VALUE_TVAL(h,i,v)  do { \
 		DUK_HOBJECT_E_GET_VALUE((h),(i)).v = (v); \
-	} while (0)
+		} while (0)
 #define DUK_HOBJECT_E_SET_VALUE_GETTER(h,i,v)  do { \
 		DUK_HOBJECT_E_GET_VALUE((h),(i)).a.get = (v); \
-	} while (0)
+		} while (0)
 #define DUK_HOBJECT_E_SET_VALUE_SETTER(h,i,v)  do { \
 		DUK_HOBJECT_E_GET_VALUE((h),(i)).a.set = (v); \
-	} while (0)
+		} while (0)
 #define DUK_HOBJECT_E_SET_FLAGS(h,i,f)  do { \
 		DUK_HOBJECT_E_GET_FLAGS((h),(i)) = (f); \
-	} while (0)
+		} while (0)
 #define DUK_HOBJECT_A_SET_VALUE(h,i,v)  do { \
 		DUK_HOBJECT_A_GET_VALUE((h),(i)) = (v); \
-	} while (0)
+		} while (0)
 #define DUK_HOBJECT_A_SET_VALUE_TVAL(h,i,v)  DUK_HOBJECT_A_SET_VALUE((h),(i),(v))  /* alias for above */
 #define DUK_HOBJECT_H_SET_INDEX(h,i,v)  do { \
 		DUK_HOBJECT_H_GET_INDEX((h),(i)) = (v); \
-	} while (0)
+		} while (0)
 
 #define DUK_HOBJECT_E_SET_FLAG_BITS(h,i,mask)  do { \
 		DUK_HOBJECT_E_GET_FLAGS_BASE((h))[(i)] |= (mask); \
-	} while (0)
+		} while (0)
 
 #define DUK_HOBJECT_E_CLEAR_FLAG_BITS(h,i,mask)  do { \
 		DUK_HOBJECT_E_GET_FLAGS_BASE((h))[(i)] &= ~(mask); \
-	} while (0)
+		} while (0)
 
 #define DUK_HOBJECT_E_SLOT_IS_WRITABLE(h,i)     ((DUK_HOBJECT_E_GET_FLAGS((h),(i)) & DUK_PROPDESC_FLAG_WRITABLE) != 0)
 #define DUK_HOBJECT_E_SLOT_IS_ENUMERABLE(h,i)   ((DUK_HOBJECT_E_GET_FLAGS((h),(i)) & DUK_PROPDESC_FLAG_ENUMERABLE) != 0)

@@ -5,7 +5,7 @@
 #include "duk_internal.h"
 
 void *duk_alloc_raw(duk_context *ctx, duk_size_t size) {
-	duk_hthread *thr = (duk_hthread *) ctx;
+	duk_hthread *thr = (duk_hthread *)ctx;
 
 	DUK_ASSERT(ctx != NULL);
 
@@ -13,7 +13,7 @@ void *duk_alloc_raw(duk_context *ctx, duk_size_t size) {
 }
 
 void duk_free_raw(duk_context *ctx, void *ptr) {
-	duk_hthread *thr = (duk_hthread *) ctx;
+	duk_hthread *thr = (duk_hthread *)ctx;
 
 	DUK_ASSERT(ctx != NULL);
 
@@ -21,7 +21,7 @@ void duk_free_raw(duk_context *ctx, void *ptr) {
 }
 
 void *duk_realloc_raw(duk_context *ctx, void *ptr, duk_size_t size) {
-	duk_hthread *thr = (duk_hthread *) ctx;
+	duk_hthread *thr = (duk_hthread *)ctx;
 
 	DUK_ASSERT(ctx != NULL);
 
@@ -29,7 +29,7 @@ void *duk_realloc_raw(duk_context *ctx, void *ptr, duk_size_t size) {
 }
 
 void *duk_alloc(duk_context *ctx, duk_size_t size) {
-	duk_hthread *thr = (duk_hthread *) ctx;
+	duk_hthread *thr = (duk_hthread *)ctx;
 
 	DUK_ASSERT(ctx != NULL);
 
@@ -37,7 +37,7 @@ void *duk_alloc(duk_context *ctx, duk_size_t size) {
 }
 
 void duk_free(duk_context *ctx, void *ptr) {
-	duk_hthread *thr = (duk_hthread *) ctx;
+	duk_hthread *thr = (duk_hthread *)ctx;
 
 	DUK_ASSERT(ctx != NULL);
 
@@ -45,7 +45,7 @@ void duk_free(duk_context *ctx, void *ptr) {
 }
 
 void *duk_realloc(duk_context *ctx, void *ptr, duk_size_t size) {
-	duk_hthread *thr = (duk_hthread *) ctx;
+	duk_hthread *thr = (duk_hthread *)ctx;
 
 	DUK_ASSERT(ctx != NULL);
 
@@ -63,7 +63,7 @@ void *duk_realloc(duk_context *ctx, void *ptr, duk_size_t size) {
 }
 
 void duk_get_memory_functions(duk_context *ctx, duk_memory_functions *out_funcs) {
-	duk_hthread *thr = (duk_hthread *) ctx;
+	duk_hthread *thr = (duk_hthread *)ctx;
 	duk_heap *heap;
 
 	DUK_ASSERT(ctx != NULL);
@@ -80,7 +80,7 @@ void duk_get_memory_functions(duk_context *ctx, duk_memory_functions *out_funcs)
 
 void duk_gc(duk_context *ctx, duk_uint_t flags) {
 #ifdef DUK_USE_MARK_AND_SWEEP
-	duk_hthread *thr = (duk_hthread *) ctx;
+	duk_hthread *thr = (duk_hthread *)ctx;
 	duk_heap *heap;
 
 	DUK_UNREF(flags);

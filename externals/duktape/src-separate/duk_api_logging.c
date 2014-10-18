@@ -18,8 +18,9 @@ void duk_log(duk_context *ctx, duk_int_t level, const char *fmt, ...) {
 
 	if (level < 0) {
 		level = 0;
-	} else if (level > (int) (sizeof(stridx_logfunc) / sizeof(duk_uint16_t)) - 1) {
-		level = (int) (sizeof(stridx_logfunc) / sizeof(duk_uint16_t)) - 1;
+	}
+	else if (level > (int) (sizeof(stridx_logfunc) / sizeof(duk_uint16_t)) - 1) {
+		level = (int)(sizeof(stridx_logfunc) / sizeof(duk_uint16_t)) - 1;
 	}
 
 	duk_push_hobject_bidx(ctx, DUK_BIDX_LOGGER_CONSTRUCTOR);

@@ -12,12 +12,12 @@ duk_ret_t duk_bi_error_constructor_shared(duk_context *ctx) {
 	 * it here.
 	 */
 
-	duk_hthread *thr = (duk_hthread *) ctx;
+	duk_hthread *thr = (duk_hthread *)ctx;
 	duk_small_int_t bidx_prototype = duk_get_current_magic(ctx);
 
 	/* same for both error and each subclass like TypeError */
 	duk_uint_t flags_and_class = DUK_HOBJECT_FLAG_EXTENSIBLE |
-	                             DUK_HOBJECT_CLASS_AS_FLAGS(DUK_HOBJECT_CLASS_ERROR);
+		DUK_HOBJECT_CLASS_AS_FLAGS(DUK_HOBJECT_CLASS_ERROR);
 
 	DUK_UNREF(thr);
 
@@ -59,7 +59,8 @@ duk_ret_t duk_bi_error_prototype_to_string(duk_context *ctx) {
 	if (duk_is_undefined(ctx, -1)) {
 		duk_pop(ctx);
 		duk_push_string(ctx, "Error");
-	} else {
+	}
+	else {
 		duk_to_string(ctx, -1);
 	}
 
@@ -73,7 +74,8 @@ duk_ret_t duk_bi_error_prototype_to_string(duk_context *ctx) {
 	if (duk_is_undefined(ctx, -1)) {
 		duk_pop(ctx);
 		duk_push_string(ctx, "");
-	} else {
+	}
+	else {
 		duk_to_string(ctx, -1);
 	}
 
@@ -94,7 +96,7 @@ duk_ret_t duk_bi_error_prototype_to_string(duk_context *ctx) {
 
 	return 1;
 
- type_error:
+type_error:
 	return DUK_RET_TYPE_ERROR;
 }
 
@@ -120,7 +122,7 @@ duk_ret_t duk_bi_error_prototype_to_string(duk_context *ctx) {
 #define DUK__OUTPUT_TYPE_LINENUMBER  1
 
 static duk_ret_t duk__traceback_getter_helper(duk_context *ctx, duk_small_int_t output_type) {
-	duk_hthread *thr = (duk_hthread *) ctx;
+	duk_hthread *thr = (duk_hthread *)ctx;
 	duk_idx_t idx_td;
 	duk_small_int_t i;  /* traceback depth fits into 16 bits */
 	duk_small_int_t t;  /* stack type fits into 16 bits */
@@ -147,7 +149,7 @@ static duk_ret_t duk__traceback_getter_helper(duk_context *ctx, duk_small_int_t 
 
 	if (duk_check_type(ctx, idx_td, DUK_TYPE_OBJECT)) {
 		/* Current tracedata contains 2 entries per callstack entry. */
-		for (i = 0; ; i += 2) {
+		for (i = 0;; i += 2) {
 			duk_int_t pc;
 			duk_int_t line;
 			duk_int_t flags;
@@ -161,9 +163,9 @@ static duk_ret_t duk__traceback_getter_helper(duk_context *ctx, duk_small_int_t 
 			duk_get_prop_index(ctx, idx_td, i);
 			duk_get_prop_index(ctx, idx_td, i + 1);
 			d = duk_to_number(ctx, -1);
-			pc = (duk_int_t) DUK_FMOD(d, DUK_DOUBLE_2TO32);
-			flags = (duk_int_t) DUK_FLOOR(d / DUK_DOUBLE_2TO32);
-			t = (duk_small_int_t) duk_get_type(ctx, -2);
+			pc = (duk_int_t)DUK_FMOD(d, DUK_DOUBLE_2TO32);
+			flags = (duk_int_t)DUK_FLOOR(d / DUK_DOUBLE_2TO32);
+			t = (duk_small_int_t)duk_get_type(ctx, -2);
 
 			if (t == DUK_TYPE_OBJECT) {
 				/*
@@ -179,7 +181,7 @@ static duk_ret_t duk__traceback_getter_helper(duk_context *ctx, duk_small_int_t 
 				duk_get_prop_stridx(ctx, -3, DUK_STRIDX_FILE_NAME);
 
 #if defined(DUK_USE_PC2LINE)
-				line = duk_hobject_pc2line_query(ctx, -4, (duk_uint_fast32_t) pc);
+				line = duk_hobject_pc2line_query(ctx, -4, (duk_uint_fast32_t)pc);
 #else
 				line = 0;
 #endif
@@ -188,14 +190,15 @@ static duk_ret_t duk__traceback_getter_helper(duk_context *ctx, duk_small_int_t 
 
 				if (output_type == DUK__OUTPUT_TYPE_FILENAME) {
 					return 1;
-				} else if (output_type == DUK__OUTPUT_TYPE_LINENUMBER) {
+				}
+				else if (output_type == DUK__OUTPUT_TYPE_LINENUMBER) {
 					duk_push_int(ctx, line);
 					return 1;
 				}
 
 				h_name = duk_get_hstring(ctx, -2);  /* may be NULL */
 				funcname = (h_name == NULL || h_name == DUK_HTHREAD_STRING_EMPTY_STRING(thr)) ?
-				           "anon" : (const char *) DUK_HSTRING_GET_DATA(h_name);
+					"anon" : (const char *)DUK_HSTRING_GET_DATA(h_name);
 				filename = duk_get_string(ctx, -1);
 				filename = filename ? filename : "";
 				DUK_ASSERT(funcname != NULL);
@@ -203,28 +206,29 @@ static duk_ret_t duk__traceback_getter_helper(duk_context *ctx, duk_small_int_t 
 
 				if (DUK_HOBJECT_HAS_NATIVEFUNCTION(h_func)) {
 					duk_push_sprintf(ctx, "%s %s native%s%s%s%s%s",
-					                 (const char *) funcname,
-					                 (const char *) filename,
-					                 (const char *) ((flags & DUK_ACT_FLAG_STRICT) ? str_strict : str_empty),
-					                 (const char *) ((flags & DUK_ACT_FLAG_TAILCALLED) ? str_tailcalled : str_empty),
-					                 (const char *) ((flags & DUK_ACT_FLAG_CONSTRUCT) ? str_construct : str_empty),
-					                 (const char *) ((flags & DUK_ACT_FLAG_DIRECT_EVAL) ? str_directeval : str_empty),
-					                 (const char *) ((flags & DUK_ACT_FLAG_PREVENT_YIELD) ? str_prevyield : str_empty));
-
-				} else {
+						(const char *)funcname,
+						(const char *)filename,
+						(const char *)((flags & DUK_ACT_FLAG_STRICT) ? str_strict : str_empty),
+						(const char *)((flags & DUK_ACT_FLAG_TAILCALLED) ? str_tailcalled : str_empty),
+						(const char *)((flags & DUK_ACT_FLAG_CONSTRUCT) ? str_construct : str_empty),
+						(const char *)((flags & DUK_ACT_FLAG_DIRECT_EVAL) ? str_directeval : str_empty),
+						(const char *)((flags & DUK_ACT_FLAG_PREVENT_YIELD) ? str_prevyield : str_empty));
+				}
+				else {
 					duk_push_sprintf(ctx, "%s %s:%ld%s%s%s%s%s",
-					                 (const char *) funcname,
-					                 (const char *) filename,
-					                 (long) line,
-					                 (const char *) ((flags & DUK_ACT_FLAG_STRICT) ? str_strict : str_empty),
-					                 (const char *) ((flags & DUK_ACT_FLAG_TAILCALLED) ? str_tailcalled : str_empty),
-					                 (const char *) ((flags & DUK_ACT_FLAG_CONSTRUCT) ? str_construct : str_empty),
-					                 (const char *) ((flags & DUK_ACT_FLAG_DIRECT_EVAL) ? str_directeval : str_empty),
-					                 (const char *) ((flags & DUK_ACT_FLAG_PREVENT_YIELD) ? str_prevyield : str_empty));
+						(const char *)funcname,
+						(const char *)filename,
+						(long)line,
+						(const char *)((flags & DUK_ACT_FLAG_STRICT) ? str_strict : str_empty),
+						(const char *)((flags & DUK_ACT_FLAG_TAILCALLED) ? str_tailcalled : str_empty),
+						(const char *)((flags & DUK_ACT_FLAG_CONSTRUCT) ? str_construct : str_empty),
+						(const char *)((flags & DUK_ACT_FLAG_DIRECT_EVAL) ? str_directeval : str_empty),
+						(const char *)((flags & DUK_ACT_FLAG_PREVENT_YIELD) ? str_prevyield : str_empty));
 				}
 				duk_replace(ctx, -5);   /* [ ... v1 v2 name filename str ] -> [ ... str v2 name filename ] */
 				duk_pop_n(ctx, 3);      /* -> [ ... str ] */
-			} else if (t == DUK_TYPE_STRING) {
+			}
+			else if (t == DUK_TYPE_STRING) {
 				/*
 				 *  __FILE__ / __LINE__ entry, here 'pc' is line number directly.
 				 *  Sometimes __FILE__ / __LINE__ is reported as the source for
@@ -237,17 +241,19 @@ static duk_ret_t duk__traceback_getter_helper(duk_context *ctx, duk_small_int_t 
 					if (output_type == DUK__OUTPUT_TYPE_FILENAME) {
 						duk_pop(ctx);
 						return 1;
-					} else if (output_type == DUK__OUTPUT_TYPE_LINENUMBER) {
+					}
+					else if (output_type == DUK__OUTPUT_TYPE_LINENUMBER) {
 						duk_push_int(ctx, pc);
 						return 1;
 					}
 				}
 
 				duk_push_sprintf(ctx, "%s:%ld",
-				                 (const char *) duk_get_string(ctx, -2), (long) pc);
+					(const char *)duk_get_string(ctx, -2), (long)pc);
 				duk_replace(ctx, -3);  /* [ ... v1 v2 str ] -> [ ... str v2 ] */
 				duk_pop(ctx);          /* -> [ ... str ] */
-			} else {
+			}
+			else {
 				/* unknown, ignore */
 				duk_pop_2(ctx);
 				break;
@@ -267,7 +273,8 @@ static duk_ret_t duk__traceback_getter_helper(duk_context *ctx, duk_small_int_t 
 
 	if (output_type != DUK__OUTPUT_TYPE_TRACEBACK) {
 		return 0;
-	} else {
+	}
+	else {
 		duk_join(ctx, duk_get_top(ctx) - (idx_td + 2) /*count, not including sep*/);
 		return 1;
 	}

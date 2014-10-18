@@ -19,13 +19,13 @@ typedef union {
 #define DUK__DBLUNION_CMP_TRUE(a,b)  do { \
 		if (DUK_MEMCMP((void *) (a), (void *) (b), sizeof(duk__test_double_union)) != 0) { \
 			DUK_PANIC(DUK_ERR_INTERNAL_ERROR, "self test failed: double union compares false (expected true)"); \
-		} \
+				} \
 	} while (0)
 
 #define DUK__DBLUNION_CMP_FALSE(a,b)  do { \
 		if (DUK_MEMCMP((void *) (a), (void *) (b), sizeof(duk__test_double_union)) == 0) { \
 			DUK_PANIC(DUK_ERR_INTERNAL_ERROR, "self test failed: double union compares true (expected false)"); \
-		} \
+				} \
 	} while (0)
 
 typedef union {
@@ -39,16 +39,16 @@ typedef union {
 
 static void duk__selftest_types(void) {
 	if (!(sizeof(duk_int8_t) == 1 &&
-	      sizeof(duk_uint8_t) == 1 &&
-	      sizeof(duk_int16_t) == 2 &&
-	      sizeof(duk_uint16_t) == 2 &&
-	      sizeof(duk_int32_t) == 4 &&
-	      sizeof(duk_uint32_t) == 4)) {
+		sizeof(duk_uint8_t) == 1 &&
+		sizeof(duk_int16_t) == 2 &&
+		sizeof(duk_uint16_t) == 2 &&
+		sizeof(duk_int32_t) == 4 &&
+		sizeof(duk_uint32_t) == 4)) {
 		DUK_PANIC(DUK_ERR_INTERNAL_ERROR, "self test failed: duk_(u)int{8,16,32}_t size");
 	}
 #if defined(DUK_USE_64BIT_OPS)
 	if (!(sizeof(duk_int64_t) == 8 &&
-	      sizeof(duk_uint64_t) == 8)) {
+		sizeof(duk_uint64_t) == 8)) {
 		DUK_PANIC(DUK_ERR_INTERNAL_ERROR, "self test failed: duk_(u)int64_t size");
 	}
 #endif
@@ -83,7 +83,7 @@ static void duk__selftest_packed_tval(void) {
 static void duk__selftest_twos_complement(void) {
 	volatile int test;
 	test = -1;
-	if (((duk_uint8_t *) &test)[0] != (duk_uint8_t) 0xff) {
+	if (((duk_uint8_t *)&test)[0] != (duk_uint8_t)0xff) {
 		DUK_PANIC(DUK_ERR_INTERNAL_ERROR, "self test failed: two's complement arithmetic");
 	}
 }
@@ -125,7 +125,7 @@ static void duk__selftest_byte_order(void) {
 #error unknown double endianness
 #endif
 
-	if (u1.i != (duk_uint32_t) 0xdeadbeefUL) {
+	if (u1.i != (duk_uint32_t)0xdeadbeefUL) {
 		DUK_PANIC(DUK_ERR_INTERNAL_ERROR, "self test failed: duk_uint32_t byte order");
 	}
 

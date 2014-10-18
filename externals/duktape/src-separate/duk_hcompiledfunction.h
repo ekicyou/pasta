@@ -71,7 +71,6 @@
 #define DUK_HCOMPILEDFUNCTION_GET_CODE_COUNT(h)  \
 	((duk_size_t) (DUK_HCOMPILEDFUNCTION_GET_CODE_SIZE((h)) / sizeof(duk_instr_t)))
 
-
 /*
  *  Main struct
  */

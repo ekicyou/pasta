@@ -23,7 +23,7 @@ int duk_repl_fpclassify(double x) {
 	duk_small_int_t mzero;
 
 	u.d = x;
-	exp = (duk_uint_fast16_t) (u.us[DUK_DBL_IDX_US0] & 0x7ff0UL);
+	exp = (duk_uint_fast16_t)(u.us[DUK_DBL_IDX_US0] & 0x7ff0UL);
 	if (exp > 0x0000UL && exp < 0x7ff0UL) {
 		/* exp values [0x001,0x7fe] = normal */
 		return DUK_FP_NORMAL;
@@ -34,14 +34,17 @@ int duk_repl_fpclassify(double x) {
 		/* exp 0x000 is zero/subnormal */
 		if (mzero) {
 			return DUK_FP_ZERO;
-		} else {
+		}
+		else {
 			return DUK_FP_SUBNORMAL;
 		}
-	} else {
+	}
+	else {
 		/* exp 0xfff is infinite/nan */
 		if (mzero) {
 			return DUK_FP_INFINITE;
-		} else {
+		}
+		else {
 			return DUK_FP_NAN;
 		}
 	}
@@ -52,7 +55,7 @@ int duk_repl_fpclassify(double x) {
 int duk_repl_signbit(double x) {
 	duk_double_union u;
 	u.d = x;
-	return (int) (u.uc[DUK_DBL_IDX_UC0] & 0x80UL);
+	return (int)(u.uc[DUK_DBL_IDX_UC0] & 0x80UL);
 }
 #endif
 
@@ -61,7 +64,8 @@ int duk_repl_isfinite(double x) {
 	int c = DUK_FPCLASSIFY(x);
 	if (c == DUK_FP_NAN || c == DUK_FP_INFINITE) {
 		return 0;
-	} else {
+	}
+	else {
 		return 1;
 	}
 }
@@ -80,4 +84,3 @@ int duk_repl_isinf(double x) {
 	return (c == DUK_FP_INFINITE);
 }
 #endif
-

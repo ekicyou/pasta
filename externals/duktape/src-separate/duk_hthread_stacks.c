@@ -43,14 +43,14 @@ void duk_hthread_callstack_grow(duk_hthread *thr) {
 		DUK_ERROR(thr, DUK_ERR_RANGE_ERROR, "callstack limit");
 	}
 
-	DUK_DD(DUK_DDPRINT("growing callstack %ld -> %ld", (long) old_size, (long) new_size));
+	DUK_DD(DUK_DDPRINT("growing callstack %ld -> %ld", (long)old_size, (long)new_size));
 
 	/*
 	 *  Note: must use indirect variant of DUK_REALLOC() because underlying
 	 *  pointer may be changed by mark-and-sweep.
 	 */
 
-	thr->callstack = (duk_activation *) DUK_REALLOC_INDIRECT_CHECKED(thr, duk_hthread_get_callstack_ptr, (void *) thr, sizeof(duk_activation) * new_size);
+	thr->callstack = (duk_activation *)DUK_REALLOC_INDIRECT_CHECKED(thr, duk_hthread_get_callstack_ptr, (void *)thr, sizeof(duk_activation) * new_size);
 	thr->callstack_size = new_size;
 
 	/* note: any entries above the callstack top are garbage and not zeroed */
@@ -71,7 +71,7 @@ void duk_hthread_callstack_shrink_check(duk_hthread *thr) {
 	new_size = thr->callstack_top + DUK_CALLSTACK_SHRINK_SPARE;
 	DUK_ASSERT(new_size >= thr->callstack_top);
 
-	DUK_DD(DUK_DDPRINT("shrinking callstack %ld -> %ld", (long) thr->callstack_size, (long) new_size));
+	DUK_DD(DUK_DDPRINT("shrinking callstack %ld -> %ld", (long)thr->callstack_size, (long)new_size));
 
 	/*
 	 *  Note: must use indirect variant of DUK_REALLOC() because underlying
@@ -79,11 +79,12 @@ void duk_hthread_callstack_shrink_check(duk_hthread *thr) {
 	 */
 
 	/* shrink failure is not fatal */
-	p = (duk_activation *) DUK_REALLOC_INDIRECT(thr->heap, duk_hthread_get_callstack_ptr, (void *) thr, sizeof(duk_activation) * new_size);
+	p = (duk_activation *)DUK_REALLOC_INDIRECT(thr->heap, duk_hthread_get_callstack_ptr, (void *)thr, sizeof(duk_activation) * new_size);
 	if (p) {
 		thr->callstack = p;
 		thr->callstack_size = new_size;
-	} else {
+	}
+	else {
 		DUK_D(DUK_DPRINT("callstack shrink failed, ignoring"));
 	}
 
@@ -94,14 +95,14 @@ void duk_hthread_callstack_unwind(duk_hthread *thr, duk_size_t new_top) {
 	duk_size_t idx;
 
 	DUK_DDD(DUK_DDDPRINT("unwind callstack top of thread %p from %ld to %ld",
-	                     (void *) thr,
-	                     (thr != NULL ? (long) thr->callstack_top : (long) -1),
-	                     (long) new_top));
+		(void *)thr,
+		(thr != NULL ? (long)thr->callstack_top : (long)-1),
+		(long)new_top));
 
 	DUK_ASSERT(thr);
 	DUK_ASSERT(thr->heap);
 	DUK_ASSERT_DISABLE(new_top >= 0);  /* unsigned */
-	DUK_ASSERT((duk_size_t) new_top <= thr->callstack_top);  /* cannot grow */
+	DUK_ASSERT((duk_size_t)new_top <= thr->callstack_top);  /* cannot grow */
 
 	/*
 	 *  The loop below must avoid issues with potential callstack
@@ -124,7 +125,7 @@ void duk_hthread_callstack_unwind(duk_hthread *thr, duk_size_t new_top) {
 
 		idx--;
 		DUK_ASSERT_DISABLE(idx >= 0);  /* unsigned */
-		DUK_ASSERT((duk_size_t) idx < thr->callstack_size);  /* true, despite side effect resizes */
+		DUK_ASSERT((duk_size_t)idx < thr->callstack_size);  /* true, despite side effect resizes */
 
 		p = thr->callstack + idx;
 		DUK_ASSERT(p->func != NULL);
@@ -154,12 +155,14 @@ void duk_hthread_callstack_unwind(duk_hthread *thr, duk_size_t new_top) {
 					 */
 					DUK_TVAL_SET_OBJECT(tv_caller, p->prev_caller);
 					p->prev_caller = NULL;
-				} else {
+				}
+				else {
 					DUK_TVAL_SET_NULL(tv_caller);   /* no incref needed */
 					DUK_ASSERT(p->prev_caller == NULL);
 				}
 				DUK_TVAL_DECREF(thr, &tv_tmp);  /* side effects */
-			} else {
+			}
+			else {
 				h_tmp = p->prev_caller;
 				if (h_tmp) {
 					p->prev_caller = NULL;
@@ -189,7 +192,7 @@ void duk_hthread_callstack_unwind(duk_hthread *thr, duk_size_t new_top) {
 		DUK_ASSERT(p->lex_env == p->var_env);
 		if (p->var_env != NULL) {
 			DUK_DDD(DUK_DDDPRINT("closing var_env record %p -> %!O",
-			                     (void *) p->var_env, (duk_heaphdr *) p->var_env));
+				(void *)p->var_env, (duk_heaphdr *)p->var_env));
 			duk_js_close_environment_record(thr, p->var_env, p->func, p->idx_bottom);
 			p = thr->callstack + idx;  /* avoid side effect issues */
 		}
@@ -199,11 +202,12 @@ void duk_hthread_callstack_unwind(duk_hthread *thr, duk_size_t new_top) {
 			if (p->lex_env == p->var_env) {
 				/* common case, already closed, so skip */
 				DUK_DD(DUK_DDPRINT("lex_env and var_env are the same and lex_env "
-				                   "already closed -> skip closing lex_env"));
+					"already closed -> skip closing lex_env"));
 				;
-			} else {
+			}
+			else {
 				DUK_DD(DUK_DDPRINT("closing lex_env record %p -> %!O",
-				                   (void *) p->lex_env, (duk_heaphdr *) p->lex_env));
+					(void *)p->lex_env, (duk_heaphdr *)p->lex_env));
 				duk_js_close_environment_record(thr, p->lex_env, p->func, p->idx_bottom);
 				p = thr->callstack + idx;  /* avoid side effect issues */
 			}
@@ -211,18 +215,18 @@ void duk_hthread_callstack_unwind(duk_hthread *thr, duk_size_t new_top) {
 #endif
 
 		DUK_ASSERT((p->lex_env == NULL) ||
-		           ((duk_hobject_find_existing_entry_tval_ptr(p->lex_env, DUK_HTHREAD_STRING_INT_CALLEE(thr)) == NULL) &&
-		            (duk_hobject_find_existing_entry_tval_ptr(p->lex_env, DUK_HTHREAD_STRING_INT_VARMAP(thr)) == NULL) &&
-		            (duk_hobject_find_existing_entry_tval_ptr(p->lex_env, DUK_HTHREAD_STRING_INT_THREAD(thr)) == NULL) &&
-		            (duk_hobject_find_existing_entry_tval_ptr(p->lex_env, DUK_HTHREAD_STRING_INT_REGBASE(thr)) == NULL)));
+			((duk_hobject_find_existing_entry_tval_ptr(p->lex_env, DUK_HTHREAD_STRING_INT_CALLEE(thr)) == NULL) &&
+			(duk_hobject_find_existing_entry_tval_ptr(p->lex_env, DUK_HTHREAD_STRING_INT_VARMAP(thr)) == NULL) &&
+			(duk_hobject_find_existing_entry_tval_ptr(p->lex_env, DUK_HTHREAD_STRING_INT_THREAD(thr)) == NULL) &&
+			(duk_hobject_find_existing_entry_tval_ptr(p->lex_env, DUK_HTHREAD_STRING_INT_REGBASE(thr)) == NULL)));
 
 		DUK_ASSERT((p->var_env == NULL) ||
-		           ((duk_hobject_find_existing_entry_tval_ptr(p->var_env, DUK_HTHREAD_STRING_INT_CALLEE(thr)) == NULL) &&
-		            (duk_hobject_find_existing_entry_tval_ptr(p->var_env, DUK_HTHREAD_STRING_INT_VARMAP(thr)) == NULL) &&
-		            (duk_hobject_find_existing_entry_tval_ptr(p->var_env, DUK_HTHREAD_STRING_INT_THREAD(thr)) == NULL) &&
-		            (duk_hobject_find_existing_entry_tval_ptr(p->var_env, DUK_HTHREAD_STRING_INT_REGBASE(thr)) == NULL)));
+			((duk_hobject_find_existing_entry_tval_ptr(p->var_env, DUK_HTHREAD_STRING_INT_CALLEE(thr)) == NULL) &&
+			(duk_hobject_find_existing_entry_tval_ptr(p->var_env, DUK_HTHREAD_STRING_INT_VARMAP(thr)) == NULL) &&
+			(duk_hobject_find_existing_entry_tval_ptr(p->var_env, DUK_HTHREAD_STRING_INT_THREAD(thr)) == NULL) &&
+			(duk_hobject_find_existing_entry_tval_ptr(p->var_env, DUK_HTHREAD_STRING_INT_REGBASE(thr)) == NULL)));
 
-	 skip_env_close:
+	skip_env_close:
 
 		/*
 		 *  Update preventcount
@@ -313,14 +317,14 @@ void duk_hthread_catchstack_grow(duk_hthread *thr) {
 		DUK_ERROR(thr, DUK_ERR_RANGE_ERROR, "catchstack limit");
 	}
 
-	DUK_DD(DUK_DDPRINT("growing catchstack %ld -> %ld", (long) old_size, (long) new_size));
+	DUK_DD(DUK_DDPRINT("growing catchstack %ld -> %ld", (long)old_size, (long)new_size));
 
 	/*
 	 *  Note: must use indirect variant of DUK_REALLOC() because underlying
 	 *  pointer may be changed by mark-and-sweep.
 	 */
 
-	thr->catchstack = (duk_catcher *) DUK_REALLOC_INDIRECT_CHECKED(thr, duk_hthread_get_catchstack_ptr, (void *) thr, sizeof(duk_catcher) * new_size);
+	thr->catchstack = (duk_catcher *)DUK_REALLOC_INDIRECT_CHECKED(thr, duk_hthread_get_catchstack_ptr, (void *)thr, sizeof(duk_catcher) * new_size);
 	thr->catchstack_size = new_size;
 
 	/* note: any entries above the catchstack top are garbage and not zeroed */
@@ -341,7 +345,7 @@ void duk_hthread_catchstack_shrink_check(duk_hthread *thr) {
 	new_size = thr->catchstack_top + DUK_CATCHSTACK_SHRINK_SPARE;
 	DUK_ASSERT(new_size >= thr->catchstack_top);
 
-	DUK_DD(DUK_DDPRINT("shrinking catchstack %ld -> %ld", (long) thr->catchstack_size, (long) new_size));
+	DUK_DD(DUK_DDPRINT("shrinking catchstack %ld -> %ld", (long)thr->catchstack_size, (long)new_size));
 
 	/*
 	 *  Note: must use indirect variant of DUK_REALLOC() because underlying
@@ -349,11 +353,12 @@ void duk_hthread_catchstack_shrink_check(duk_hthread *thr) {
 	 */
 
 	/* shrink failure is not fatal */
-	p = (duk_catcher *) DUK_REALLOC_INDIRECT(thr->heap, duk_hthread_get_catchstack_ptr, (void *) thr, sizeof(duk_catcher) * new_size);
+	p = (duk_catcher *)DUK_REALLOC_INDIRECT(thr->heap, duk_hthread_get_catchstack_ptr, (void *)thr, sizeof(duk_catcher) * new_size);
 	if (p) {
 		thr->catchstack = p;
 		thr->catchstack_size = new_size;
-	} else {
+	}
+	else {
 		DUK_D(DUK_DPRINT("catchstack shrink failed, ignoring"));
 	}
 
@@ -364,14 +369,14 @@ void duk_hthread_catchstack_unwind(duk_hthread *thr, duk_size_t new_top) {
 	duk_size_t idx;
 
 	DUK_DDD(DUK_DDDPRINT("unwind catchstack top of thread %p from %ld to %ld",
-	                     (void *) thr,
-	                     (thr != NULL ? (long) thr->catchstack_top : (long) -1),
-	                     (long) new_top));
+		(void *)thr,
+		(thr != NULL ? (long)thr->catchstack_top : (long)-1),
+		(long)new_top));
 
 	DUK_ASSERT(thr);
 	DUK_ASSERT(thr->heap);
 	DUK_ASSERT_DISABLE(new_top >= 0);  /* unsigned */
-	DUK_ASSERT((duk_size_t) new_top <= thr->catchstack_top);  /* cannot grow */
+	DUK_ASSERT((duk_size_t)new_top <= thr->catchstack_top);  /* cannot grow */
 
 	/*
 	 *  Since there are no references in the catcher structure,
@@ -388,13 +393,13 @@ void duk_hthread_catchstack_unwind(duk_hthread *thr, duk_size_t new_top) {
 
 		idx--;
 		DUK_ASSERT_DISABLE(idx >= 0);  /* unsigned */
-		DUK_ASSERT((duk_size_t) idx < thr->catchstack_size);
+		DUK_ASSERT((duk_size_t)idx < thr->catchstack_size);
 
 		p = thr->catchstack + idx;
 
 		if (DUK_CAT_HAS_LEXENV_ACTIVE(p)) {
 			DUK_DDD(DUK_DDDPRINT("unwinding catchstack idx %ld, callstack idx %ld, callstack top %ld: lexical environment active",
-			                     (long) idx, (long) p->callstack_index, (long) thr->callstack_top));
+				(long)idx, (long)p->callstack_index, (long)thr->callstack_top));
 
 			/* XXX: Here we have a nasty dependency: the need to manipulate
 			 * the callstack means that catchstack must always be unwound by
@@ -410,8 +415,8 @@ void duk_hthread_catchstack_unwind(duk_hthread *thr, duk_size_t new_top) {
 			DUK_ASSERT(act < thr->callstack + thr->callstack_top);
 
 			DUK_DDD(DUK_DDDPRINT("catchstack_index=%ld, callstack_index=%ld, lex_env=%!iO",
-			                     (long) idx, (long) p->callstack_index,
-			                     (duk_heaphdr *) act->lex_env));
+				(long)idx, (long)p->callstack_index,
+				(duk_heaphdr *)act->lex_env));
 
 			env = act->lex_env;             /* current lex_env of the activation (created for catcher) */
 			DUK_ASSERT(env != NULL);        /* must be, since env was created when catcher was created */

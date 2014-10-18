@@ -25,15 +25,15 @@ void duk_err_create_and_throw(duk_hthread *thr, duk_errcode_t code, const char *
 #else
 void duk_err_create_and_throw(duk_hthread *thr, duk_errcode_t code) {
 #endif
-	duk_context *ctx = (duk_context *) thr;
+	duk_context *ctx = (duk_context *)thr;
 	duk_bool_t double_error = thr->heap->handling_error;
 
 #ifdef DUK_USE_VERBOSE_ERRORS
 	DUK_DD(DUK_DDPRINT("duk_err_create_and_throw(): code=%ld, msg=%s, filename=%s, line=%ld",
-	                   (long) code, (const char *) msg,
-	                   (const char *) filename, (long) line));
+		(long)code, (const char *)msg,
+		(const char *)filename, (long)line));
 #else
-	DUK_DD(DUK_DDPRINT("duk_err_create_and_throw(): code=%ld", (long) code));
+	DUK_DD(DUK_DDPRINT("duk_err_create_and_throw(): code=%ld", (long)code));
 #endif
 
 	DUK_ASSERT(thr != NULL);
@@ -56,12 +56,14 @@ void duk_err_create_and_throw(duk_hthread *thr, duk_errcode_t code) {
 		if (thr->builtins[DUK_BIDX_DOUBLE_ERROR]) {
 			DUK_D(DUK_DPRINT("double fault detected -> push built-in fixed 'double error' instance"));
 			duk_push_hobject_bidx(ctx, DUK_BIDX_DOUBLE_ERROR);
-		} else {
-			DUK_D(DUK_DPRINT("double fault detected; there is no built-in fixed 'double error' instance "
-			                 "-> push the error code as a number"));
-			duk_push_int(ctx, (duk_int_t) code);
 		}
-	} else {
+		else {
+			DUK_D(DUK_DPRINT("double fault detected; there is no built-in fixed 'double error' instance "
+				"-> push the error code as a number"));
+			duk_push_int(ctx, (duk_int_t)code);
+		}
+	}
+	else {
 		/* Error object is augmented at its creation here. */
 		duk_require_stack(ctx, 1);
 		/* XXX: unnecessary '%s' formatting here, but cannot use
@@ -69,17 +71,17 @@ void duk_err_create_and_throw(duk_hthread *thr, duk_errcode_t code) {
 		 */
 #ifdef DUK_USE_VERBOSE_ERRORS
 		duk_push_error_object_raw(ctx,
-		                          code | DUK_ERRCODE_FLAG_NOBLAME_FILELINE,
-		                          filename,
-		                          line,
-		                          "%s",
-		                          (const char *) msg);
+			code | DUK_ERRCODE_FLAG_NOBLAME_FILELINE,
+			filename,
+			line,
+			"%s",
+			(const char *)msg);
 #else
 		duk_push_error_object_raw(ctx,
-		                          code | DUK_ERRCODE_FLAG_NOBLAME_FILELINE,
-		                          NULL,
-		                          0,
-		                          NULL);
+			code | DUK_ERRCODE_FLAG_NOBLAME_FILELINE,
+			NULL,
+			0,
+			NULL);
 #endif
 	}
 
@@ -89,10 +91,11 @@ void duk_err_create_and_throw(duk_hthread *thr, duk_errcode_t code) {
 
 	if (double_error || code == DUK_ERR_ALLOC_ERROR) {
 		DUK_D(DUK_DPRINT("alloc or double error: skip throw augmenting to avoid further trouble"));
-	} else {
+	}
+	else {
 #if defined(DUK_USE_AUGMENT_ERROR_THROW)
 		DUK_DDD(DUK_DDDPRINT("THROW ERROR (INTERNAL): %!iT (before throw augment)",
-		                     (duk_tval *) duk_get_tval(ctx, -1)));
+			(duk_tval *)duk_get_tval(ctx, -1)));
 		duk_err_augment_error_throw(thr);
 #endif
 	}
@@ -106,7 +109,7 @@ void duk_err_create_and_throw(duk_hthread *thr, duk_errcode_t code) {
 	duk_err_setup_heap_ljstate(thr, DUK_LJ_TYPE_THROW);
 
 	DUK_DDD(DUK_DDDPRINT("THROW ERROR (INTERNAL): %!iT, %!iT (after throw augment)",
-	                     (duk_tval *) &thr->heap->lj.value1, (duk_tval *) &thr->heap->lj.value2));
+		(duk_tval *)&thr->heap->lj.value1, (duk_tval *)&thr->heap->lj.value2));
 
 	duk_err_longjmp(thr);
 	DUK_UNREACHABLE();
@@ -117,7 +120,7 @@ void duk_err_create_and_throw(duk_hthread *thr, duk_errcode_t code) {
  */
 
 void duk_error_throw_from_negative_rc(duk_hthread *thr, duk_ret_t rc) {
-	duk_context *ctx = (duk_context *) thr;
+	duk_context *ctx = (duk_context *)thr;
 	const char *msg;
 	duk_errcode_t code;
 
@@ -157,6 +160,6 @@ void duk_error_throw_from_negative_rc(duk_hthread *thr, duk_ret_t rc) {
 	 *  code, and having the file/line of this function isn't very useful.
 	 */
 
-	duk_error_raw(ctx, code, NULL, 0, "%s error (rc %ld)", (const char *) msg, (long) rc);
+	duk_error_raw(ctx, code, NULL, 0, "%s error (rc %ld)", (const char *)msg, (long)rc);
 	DUK_UNREACHABLE();
 }

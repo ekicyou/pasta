@@ -713,13 +713,10 @@
             return stack[0];
         }
 
-
         function isSpace(c) {
-
         }
         function 漢字の変数(c) {
         }
-
 
         peg$result = peg$parseRule(peg$startRuleIndex);
 

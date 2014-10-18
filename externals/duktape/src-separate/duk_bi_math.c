@@ -15,8 +15,8 @@
  *  the standard library APIs.
  */
 
-typedef double (*duk__one_arg_func)(double);
-typedef double (*duk__two_arg_func)(double, double);
+typedef double(*duk__one_arg_func)(double);
+typedef double(*duk__two_arg_func)(double, double);
 
 static duk_ret_t duk__math_minmax(duk_context *ctx, duk_double_t initial, duk__two_arg_func min_max) {
 	duk_idx_t n = duk_get_top(ctx);
@@ -39,9 +39,10 @@ static duk_ret_t duk__math_minmax(duk_context *ctx, duk_double_t initial, duk__t
 		t = duk_to_number(ctx, i);
 		if (DUK_FPCLASSIFY(t) == DUK_FP_NAN || DUK_FPCLASSIFY(res) == DUK_FP_NAN) {
 			/* Note: not normalized, but duk_push_number() will normalize */
-			res = (duk_double_t) DUK_DOUBLE_NAN;
-		} else {
-			res = (duk_double_t) min_max(res, (double) t);
+			res = (duk_double_t)DUK_DOUBLE_NAN;
+		}
+		else {
+			res = (duk_double_t)min_max(res, (double)t);
 		}
 	}
 
@@ -57,7 +58,8 @@ static double duk__fmin_fixed(double x, double y) {
 		/* XXX: what's the safest way of creating a negative zero? */
 		if (DUK_SIGNBIT(x) != 0 || DUK_SIGNBIT(y) != 0) {
 			return -0.0;
-		} else {
+		}
+		else {
 			return +0.0;
 		}
 	}
@@ -75,7 +77,8 @@ static double duk__fmax_fixed(double x, double y) {
 	if (x == 0 && y == 0) {
 		if (DUK_SIGNBIT(x) == 0 || DUK_SIGNBIT(y) == 0) {
 			return +0.0;
-		} else {
+		}
+		else {
 			return -0.0;
 		}
 	}
@@ -95,7 +98,7 @@ static double duk__round_fixed(double x) {
 	 * which is incorrect for negative values.  Here we make do with floor().
 	 */
 
-	duk_small_int_t c = (duk_small_int_t) DUK_FPCLASSIFY(x);
+	duk_small_int_t c = (duk_small_int_t)DUK_FPCLASSIFY(x);
 	if (c == DUK_FP_NAN || c == DUK_FP_INFINITE || c == DUK_FP_ZERO) {
 		return x;
 	}
@@ -119,7 +122,8 @@ static double duk__round_fixed(double x) {
 		/* +0.5 is handled by floor, this is on purpose */
 		if (x < 0.0) {
 			return -0.0;
-		} else {
+		}
+		else {
 			return +0.0;
 		}
 	}
@@ -138,7 +142,7 @@ static double duk__pow_fixed(double x, double y) {
 
 	DUK_UNREF(cx);
 	DUK_UNREF(sx);
-	cy = (duk_small_int_t) DUK_FPCLASSIFY(y);
+	cy = (duk_small_int_t)DUK_FPCLASSIFY(y);
 
 	if (cy == DUK_FP_NAN) {
 		goto ret_nan;
@@ -151,9 +155,9 @@ static double duk__pow_fixed(double x, double y) {
 	 * correctly handle some cases where x=+/-0.  Specific fixes to these
 	 * here.
 	 */
-	cx = (duk_small_int_t) DUK_FPCLASSIFY(x);
+	cx = (duk_small_int_t)DUK_FPCLASSIFY(x);
 	if (cx == DUK_FP_ZERO && y < 0.0) {
-		sx = (duk_small_int_t) DUK_SIGNBIT(x);
+		sx = (duk_small_int_t)DUK_SIGNBIT(x);
 		if (sx == 0) {
 			/* Math.pow(+0,y) should be Infinity when y<0.  NetBSD pow()
 			 * returns -Infinity instead when y is <0 and finite.  The
@@ -161,7 +165,8 @@ static double duk__pow_fixed(double x, double y) {
 			 * without the fix).
 			 */
 			return DUK_DOUBLE_INFINITY;
-		} else {
+		}
+		else {
 			/* Math.pow(-0,y) where y<0 should be:
 			 *   - -Infinity if y<0 and an odd integer
 			 *   - Infinity otherwise
@@ -178,7 +183,8 @@ static double duk__pow_fixed(double x, double y) {
 			double tmp = DUK_FMOD(y, 2);
 			if (tmp == -1.0) {
 				return -DUK_DOUBLE_INFINITY;
-			} else {
+			}
+			else {
 				/* Not odd, or y == -Infinity */
 				return DUK_DOUBLE_INFINITY;
 			}
@@ -187,7 +193,7 @@ static double duk__pow_fixed(double x, double y) {
 #endif
 	return DUK_POW(x, y);
 
- ret_nan:
+ret_nan:
 	return DUK_DOUBLE_NAN;
 }
 
@@ -286,9 +292,9 @@ duk_ret_t duk_bi_math_object_onearg_shared(duk_context *ctx) {
 	duk__one_arg_func fun;
 
 	DUK_ASSERT(fun_idx >= 0);
-	DUK_ASSERT(fun_idx < (duk_small_int_t) (sizeof(duk__one_arg_funcs) / sizeof(duk__one_arg_func)));
+	DUK_ASSERT(fun_idx < (duk_small_int_t)(sizeof(duk__one_arg_funcs) / sizeof(duk__one_arg_func)));
 	fun = duk__one_arg_funcs[fun_idx];
-	duk_push_number(ctx, (duk_double_t) fun((double) duk_to_number(ctx, 0)));
+	duk_push_number(ctx, (duk_double_t)fun((double)duk_to_number(ctx, 0)));
 	return 1;
 }
 
@@ -297,9 +303,9 @@ duk_ret_t duk_bi_math_object_twoarg_shared(duk_context *ctx) {
 	duk__two_arg_func fun;
 
 	DUK_ASSERT(fun_idx >= 0);
-	DUK_ASSERT(fun_idx < (duk_small_int_t) (sizeof(duk__two_arg_funcs) / sizeof(duk__two_arg_func)));
+	DUK_ASSERT(fun_idx < (duk_small_int_t)(sizeof(duk__two_arg_funcs) / sizeof(duk__two_arg_func)));
 	fun = duk__two_arg_funcs[fun_idx];
-	duk_push_number(ctx, (duk_double_t) fun((double) duk_to_number(ctx, 0), (double) duk_to_number(ctx, 1)));
+	duk_push_number(ctx, (duk_double_t)fun((double)duk_to_number(ctx, 0), (double)duk_to_number(ctx, 1)));
 	return 1;
 }
 
@@ -312,7 +318,7 @@ duk_ret_t duk_bi_math_object_min(duk_context *ctx) {
 }
 
 duk_ret_t duk_bi_math_object_random(duk_context *ctx) {
-	duk_push_number(ctx, (duk_double_t) duk_util_tinyrandom_get_double((duk_hthread *) ctx));
+	duk_push_number(ctx, (duk_double_t)duk_util_tinyrandom_get_double((duk_hthread *)ctx));
 	return 1;
 }
 

@@ -12,13 +12,13 @@
 // RESPOSE 400: Bad Request
 void CreateBatRequestResponse(std::string& response, const char* reason)
 {
-   response =
-      "SHIORI/3.0 400 Bad Request\r\n"
-      "Charset: UTF-8\r\n"
-      "Sender: PASTA\r\n"
-      "X-PASTA-Reason: ";
-   response += reason;
-   response += "\r\n\r\n";
+	response =
+		"SHIORI/3.0 400 Bad Request\r\n"
+		"Charset: UTF-8\r\n"
+		"Sender: PASTA\r\n"
+		"X-PASTA-Reason: ";
+	response += reason;
+	response += "\r\n\r\n";
 }
 
 void CreateBatRequestResponse(std::string& response, const char* reason, const int cp){
@@ -27,13 +27,12 @@ void CreateBatRequestResponse(std::string& response, const char* reason, const i
 	CreateBatRequestResponse(response, reason);
 }
 
-
 /**----------------------------------------------------------------------------
  * カレントディレクトリ移動＆復帰
  */
 
 Pushd::Pushd(LPCTSTR newdir)
-:mOldDir()
+	:mOldDir()
 {
 	TCHAR buf[_MAX_PATH + 1];
 	GetCurrentDirectory(sizeof(buf), buf);

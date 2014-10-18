@@ -20,7 +20,8 @@ duk_bool_t duk_hobject_prototype_chain_contains(duk_hthread *thr, duk_hobject *h
 		if (sanity-- == 0) {
 			if (ignore_loop) {
 				break;
-			} else {
+			}
+			else {
 				DUK_ERROR(thr, DUK_ERR_INTERNAL_ERROR, DUK_STR_PROTOTYPE_CHAIN_LIMIT);
 			}
 		}

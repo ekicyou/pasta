@@ -6,17 +6,17 @@
 
 /* 3-letter log level strings */
 static const duk_uint8_t duk__log_level_strings[] = {
-	(duk_uint8_t) DUK_ASC_UC_T, (duk_uint8_t) DUK_ASC_UC_R, (duk_uint8_t) DUK_ASC_UC_C,
-	(duk_uint8_t) DUK_ASC_UC_D, (duk_uint8_t) DUK_ASC_UC_B, (duk_uint8_t) DUK_ASC_UC_G,
-	(duk_uint8_t) DUK_ASC_UC_I, (duk_uint8_t) DUK_ASC_UC_N, (duk_uint8_t) DUK_ASC_UC_F,
-	(duk_uint8_t) DUK_ASC_UC_W, (duk_uint8_t) DUK_ASC_UC_R, (duk_uint8_t) DUK_ASC_UC_N,
-	(duk_uint8_t) DUK_ASC_UC_E, (duk_uint8_t) DUK_ASC_UC_R, (duk_uint8_t) DUK_ASC_UC_R,
-	(duk_uint8_t) DUK_ASC_UC_F, (duk_uint8_t) DUK_ASC_UC_T, (duk_uint8_t) DUK_ASC_UC_L
+	(duk_uint8_t)DUK_ASC_UC_T, (duk_uint8_t)DUK_ASC_UC_R, (duk_uint8_t)DUK_ASC_UC_C,
+	(duk_uint8_t)DUK_ASC_UC_D, (duk_uint8_t)DUK_ASC_UC_B, (duk_uint8_t)DUK_ASC_UC_G,
+	(duk_uint8_t)DUK_ASC_UC_I, (duk_uint8_t)DUK_ASC_UC_N, (duk_uint8_t)DUK_ASC_UC_F,
+	(duk_uint8_t)DUK_ASC_UC_W, (duk_uint8_t)DUK_ASC_UC_R, (duk_uint8_t)DUK_ASC_UC_N,
+	(duk_uint8_t)DUK_ASC_UC_E, (duk_uint8_t)DUK_ASC_UC_R, (duk_uint8_t)DUK_ASC_UC_R,
+	(duk_uint8_t)DUK_ASC_UC_F, (duk_uint8_t)DUK_ASC_UC_T, (duk_uint8_t)DUK_ASC_UC_L
 };
 
 /* Constructor */
 duk_ret_t duk_bi_logger_constructor(duk_context *ctx) {
-	duk_hthread *thr = (duk_hthread *) ctx;
+	duk_hthread *thr = (duk_hthread *)ctx;
 	duk_idx_t nargs;
 
 	/* Calling as a non-constructor is not meaningful. */
@@ -57,7 +57,8 @@ duk_ret_t duk_bi_logger_constructor(duk_context *ctx) {
 	if (duk_is_string(ctx, 0)) {
 		duk_dup(ctx, 0);
 		duk_put_prop_stridx(ctx, 1, DUK_STRIDX_LC_N);
-	} else {
+	}
+	else {
 		/* don't set 'n' at all, inherited value is used as name */
 	}
 
@@ -102,8 +103,8 @@ duk_ret_t duk_bi_logger_prototype_raw(duk_context *ctx) {
 	DUK_UNREF(data_len);
 
 #ifdef DUK_USE_FILE_IO
-	data = (const char *) duk_require_buffer(ctx, 0, &data_len);
-	DUK_FWRITE((const void *) data, 1, data_len, stderr);
+	data = (const char *)duk_require_buffer(ctx, 0, &data_len);
+	DUK_FWRITE((const void *)data, 1, data_len, stderr);
 	DUK_FPUTC((int) '\n', stderr);
 	DUK_FFLUSH(stderr);
 #else
@@ -118,7 +119,7 @@ duk_ret_t duk_bi_logger_prototype_raw(duk_context *ctx) {
  * memory churn, etc.
  */
 duk_ret_t duk_bi_logger_prototype_log_shared(duk_context *ctx) {
-	duk_hthread *thr = (duk_hthread *) ctx;
+	duk_hthread *thr = (duk_hthread *)ctx;
 	duk_double_t now;
 	duk_small_int_t entry_lev = duk_get_current_magic(ctx);
 	duk_small_int_t logger_lev;
@@ -165,7 +166,7 @@ duk_ret_t duk_bi_logger_prototype_log_shared(duk_context *ctx) {
 	duk_push_this(ctx);
 
 	duk_get_prop_stridx(ctx, -1, DUK_STRIDX_LC_L);
-	logger_lev = (duk_small_int_t) duk_get_int(ctx, -1);
+	logger_lev = (duk_small_int_t)duk_get_int(ctx, -1);
 	if (entry_lev < logger_lev) {
 		return 0;
 	}
@@ -173,7 +174,7 @@ duk_ret_t duk_bi_logger_prototype_log_shared(duk_context *ctx) {
 
 	now = duk_bi_date_get_now(ctx);
 	duk_bi_date_format_timeval(now, date_buf);
-	date_len = DUK_STRLEN((const char *) date_buf);
+	date_len = DUK_STRLEN((const char *)date_buf);
 
 	duk_get_prop_stridx(ctx, -2, DUK_STRIDX_LC_N);
 	duk_to_string(ctx, -1);
@@ -189,9 +190,9 @@ duk_ret_t duk_bi_logger_prototype_log_shared(duk_context *ctx) {
 
 	tot_len = 0;
 	tot_len += 3 +  /* separators: space, space, colon */
-	           3 +  /* level string */
-	           date_len +  /* time */
-	           duk_get_length(ctx, -1);  /* loggerName */
+		3 +  /* level string */
+		date_len +  /* time */
+		duk_get_length(ctx, -1);  /* loggerName */
 
 	for (i = 0; i < nargs; i++) {
 		/* When formatting an argument to a string, errors may happen from multiple
@@ -218,7 +219,7 @@ duk_ret_t duk_bi_logger_prototype_log_shared(duk_context *ctx) {
 			}
 			duk_replace(ctx, i);
 		}
-		(void) duk_to_lstring(ctx, i, &arg_len);
+		(void)duk_to_lstring(ctx, i, &arg_len);
 		tot_len++;  /* sep (even before first one) */
 		tot_len += arg_len;
 	}
@@ -230,7 +231,7 @@ duk_ret_t duk_bi_logger_prototype_log_shared(duk_context *ctx) {
 	if (tot_len <= DUK_BI_LOGGER_SHORT_MSG_LIMIT) {
 		duk_hbuffer_dynamic *h_buf;
 
-		DUK_DDD(DUK_DDDPRINT("reuse existing small log message buffer, tot_len %ld", (long) tot_len));
+		DUK_DDD(DUK_DDDPRINT("reuse existing small log message buffer, tot_len %ld", (long)tot_len));
 
 		/* We can assert for all buffer properties because user code
 		 * never has access to heap->log_buffer.
@@ -240,45 +241,46 @@ duk_ret_t duk_bi_logger_prototype_log_shared(duk_context *ctx) {
 		DUK_ASSERT(thr->heap != NULL);
 		h_buf = thr->heap->log_buffer;
 		DUK_ASSERT(h_buf != NULL);
-		DUK_ASSERT(DUK_HBUFFER_HAS_DYNAMIC((duk_hbuffer *) h_buf));
+		DUK_ASSERT(DUK_HBUFFER_HAS_DYNAMIC((duk_hbuffer *)h_buf));
 		DUK_ASSERT(DUK_HBUFFER_DYNAMIC_GET_USABLE_SIZE(h_buf) == DUK_BI_LOGGER_SHORT_MSG_LIMIT);
 
 		/* Set buffer 'visible size' to actual message length and
 		 * push it to the stack.
 		 */
 
-		DUK_HBUFFER_SET_SIZE((duk_hbuffer *) h_buf, tot_len);
-		duk_push_hbuffer(ctx, (duk_hbuffer *) h_buf);
-		buf = (duk_uint8_t *) DUK_HBUFFER_DYNAMIC_GET_CURR_DATA_PTR(h_buf);
-	} else {
-		DUK_DDD(DUK_DDDPRINT("use a one-off large log message buffer, tot_len %ld", (long) tot_len));
-		buf = (duk_uint8_t *) duk_push_fixed_buffer(ctx, tot_len);
+		DUK_HBUFFER_SET_SIZE((duk_hbuffer *)h_buf, tot_len);
+		duk_push_hbuffer(ctx, (duk_hbuffer *)h_buf);
+		buf = (duk_uint8_t *)DUK_HBUFFER_DYNAMIC_GET_CURR_DATA_PTR(h_buf);
+	}
+	else {
+		DUK_DDD(DUK_DDDPRINT("use a one-off large log message buffer, tot_len %ld", (long)tot_len));
+		buf = (duk_uint8_t *)duk_push_fixed_buffer(ctx, tot_len);
 	}
 	DUK_ASSERT(buf != NULL);
 	p = buf;
 
-	DUK_MEMCPY((void *) p, (void *) date_buf, date_len);
+	DUK_MEMCPY((void *)p, (void *)date_buf, date_len);
 	p += date_len;
-	*p++ = (duk_uint8_t) DUK_ASC_SPACE;
+	*p++ = (duk_uint8_t)DUK_ASC_SPACE;
 
 	q = duk__log_level_strings + (entry_lev * 3);
-	DUK_MEMCPY((void *) p, (void *) q, (duk_size_t) 3);
+	DUK_MEMCPY((void *)p, (void *)q, (duk_size_t)3);
 	p += 3;
 
-	*p++ = (duk_uint8_t) DUK_ASC_SPACE;
+	*p++ = (duk_uint8_t)DUK_ASC_SPACE;
 
-	arg_str = (const duk_uint8_t *) duk_get_lstring(ctx, -2, &arg_len);
-	DUK_MEMCPY((void *) p, (const void *) arg_str, arg_len);
+	arg_str = (const duk_uint8_t *)duk_get_lstring(ctx, -2, &arg_len);
+	DUK_MEMCPY((void *)p, (const void *)arg_str, arg_len);
 	p += arg_len;
 
-	*p++ = (duk_uint8_t) DUK_ASC_COLON;
+	*p++ = (duk_uint8_t)DUK_ASC_COLON;
 
 	for (i = 0; i < nargs; i++) {
-		*p++ = (duk_uint8_t) DUK_ASC_SPACE;
+		*p++ = (duk_uint8_t)DUK_ASC_SPACE;
 
-		arg_str = (const duk_uint8_t *) duk_get_lstring(ctx, i, &arg_len);
+		arg_str = (const duk_uint8_t *)duk_get_lstring(ctx, i, &arg_len);
 		DUK_ASSERT(arg_str != NULL);
-		DUK_MEMCPY((void *) p, (const void *) arg_str, arg_len);
+		DUK_MEMCPY((void *)p, (const void *)arg_str, arg_len);
 		p += arg_len;
 	}
 	DUK_ASSERT(buf + tot_len == p);

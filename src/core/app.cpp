@@ -4,7 +4,6 @@
 #include "stdafx.h"
 #include "app.h"
 
-
 // std::string → std::wstring（ロケール依存）
 inline std::wstring ToWideStr(const std::string &str)
 {
@@ -18,7 +17,6 @@ inline std::string ToMultStr(const std::wstring &wstr)
 	return W2CA(wstr.c_str());
 }
 
-
 // std::string → std::wstring（コードページ指定）
 inline std::wstring ToWideStr(const std::string &str, int cp)
 {
@@ -31,7 +29,6 @@ inline std::string ToMultStr(const std::wstring &wstr, int cp)
 	USES_CONVERSION;
 	return W2CA_CP(wstr.c_str(), cp);
 }
-
 
 // エラーのコールバック関数（returnしない→例外に変換して戻す）
 static void FatalFunc(duk_context *ctx, int code, const char *msg){
@@ -50,7 +47,6 @@ static void FatalFunc(duk_context *ctx, int code, const char *msg){
 
 #define duk_create_heap_pasta()  (duk_create_heap(NULL, NULL, NULL, NULL, FatalFunc))
 
-
 // デストラクタ
 pasta::App::~App(void){
 	OutputDebugString(L"[pasta::App::~App]開始！\n");
@@ -58,7 +54,6 @@ pasta::App::~App(void){
 	duk_destroy_heap(ctx);
 	OutputDebugString(L"[pasta::App::~App]終了！\n");
 }
-
 
 // コンストラクタ
 pasta::App::App(const HINSTANCE hinst, const std::string& loaddir)
@@ -96,20 +91,14 @@ pasta::App::App(const HINSTANCE hinst, const std::string& loaddir)
 		duk_eval_file_noresult(ctx, utf8);
 	}
 
-
 	OutputDebugString(L"[pasta::App::App]終了！\n");
 }
 
-
 int pasta::App::CP(){ return cp; }
-
-
 
 // リクエスト処理
 bool pasta::App::request(const std::string& request, std::string& response){
 	USES_CONVERSION;
-
-
 
 	return false;
 }
@@ -128,11 +117,10 @@ static int tostring_raw(duk_context *ctx) {
 
 std::string pasta::App::eval(const char * utf8text){
 	duk_push_string(ctx, utf8text);
-	duk_safe_call(ctx, eval_raw    , 1 /*nargs*/, 1 /*nrets*/);
+	duk_safe_call(ctx, eval_raw, 1 /*nargs*/, 1 /*nrets*/);
 	duk_safe_call(ctx, tostring_raw, 1 /*nargs*/, 1 /*nrets*/);
 	auto text = duk_get_string(ctx, -1);
 	std::string rc(text);
 	duk_pop(ctx);
 	return rc;
 }
-

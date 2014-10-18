@@ -5,12 +5,12 @@
 #include "duk_internal.h"
 
 void *duk_resize_buffer(duk_context *ctx, duk_idx_t index, duk_size_t new_size) {
-	duk_hthread *thr = (duk_hthread *) ctx;
+	duk_hthread *thr = (duk_hthread *)ctx;
 	duk_hbuffer_dynamic *h;
 
 	DUK_ASSERT(ctx != NULL);
 
-	h = (duk_hbuffer_dynamic *) duk_require_hbuffer(ctx, index);
+	h = (duk_hbuffer_dynamic *)duk_require_hbuffer(ctx, index);
 	DUK_ASSERT(h != NULL);
 
 	if (!DUK_HBUFFER_HAS_DYNAMIC(h)) {

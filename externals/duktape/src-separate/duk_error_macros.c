@@ -13,8 +13,8 @@ void duk_err_handle_error(const char *filename, duk_int_t line, duk_hthread *thr
 	va_list ap;
 	char msg[DUK__ERRFMT_BUFSIZE];
 	va_start(ap, fmt);
-	(void) DUK_VSNPRINTF(msg, sizeof(msg), fmt, ap);
-	msg[sizeof(msg) - 1] = (char) 0;
+	(void)DUK_VSNPRINTF(msg, sizeof(msg), fmt, ap);
+	msg[sizeof(msg) - 1] = (char)0;
 	duk_err_create_and_throw(thr, code, msg, filename, line);
 	va_end(ap);  /* dead code, but ensures portability (see Linux man page notes) */
 }
@@ -26,8 +26,8 @@ DUK_NORETURN(static void duk__handle_error(const char *filename, duk_int_t line,
 
 static void duk__handle_error(const char *filename, duk_int_t line, duk_hthread *thr, duk_errcode_t code, const char *fmt, va_list ap) {
 	char msg[DUK__ERRFMT_BUFSIZE];
-	(void) DUK_VSNPRINTF(msg, sizeof(msg), fmt, ap);
-	msg[sizeof(msg) - 1] = (char) 0;
+	(void)DUK_VSNPRINTF(msg, sizeof(msg), fmt, ap);
+	msg[sizeof(msg) - 1] = (char)0;
 	duk_err_create_and_throw(thr, code, msg, filename, line);
 }
 
@@ -72,12 +72,12 @@ void duk_err_handle_error_nonverbose2(const char *filename, duk_int_t line, duk_
 void duk_default_fatal_handler(duk_context *ctx, duk_errcode_t code, const char *msg) {
 	DUK_UNREF(ctx);
 #ifdef DUK_USE_FILE_IO
-	DUK_FPRINTF(DUK_STDERR, "FATAL %ld: %s\n", (long) code, (const char *) (msg ? msg : "null"));
+	DUK_FPRINTF(DUK_STDERR, "FATAL %ld: %s\n", (long)code, (const char *)(msg ? msg : "null"));
 	DUK_FFLUSH(DUK_STDERR);
 #else
 	/* omit print */
 #endif
-	DUK_D(DUK_DPRINT("default fatal handler called, code %ld -> calling DUK_PANIC()", (long) code));
+	DUK_D(DUK_DPRINT("default fatal handler called, code %ld -> calling DUK_PANIC()", (long)code));
 	DUK_PANIC(code, msg);
 	DUK_UNREACHABLE();
 }
@@ -91,15 +91,15 @@ void duk_default_panic_handler(duk_errcode_t code, const char *msg) {
 #ifdef DUK_USE_FILE_IO
 	DUK_FPRINTF(DUK_STDERR, "PANIC %ld: %s ("
 #if defined(DUK_USE_PANIC_ABORT)
-	            "calling abort"
+		"calling abort"
 #elif defined(DUK_USE_PANIC_EXIT)
-	            "calling exit"
+		"calling exit"
 #elif defined(DUK_USE_PANIC_SEGFAULT)
-	            "segfaulting on purpose"
+		"segfaulting on purpose"
 #else
 #error no DUK_USE_PANIC_xxx macro defined
 #endif
-	            ")\n", (long) code, (const char *) (msg ? msg : "null"));
+		")\n", (long)code, (const char *)(msg ? msg : "null"));
 	DUK_FFLUSH(DUK_STDERR);
 #else
 	/* omit print */

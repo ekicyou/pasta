@@ -58,4 +58,3 @@ SHIORI_API HGLOBAL __cdecl request(HGLOBAL hGlobal_request, long& len);
 SHIORI_API BOOL    __cdecl unload(void);
 
 #endif
-

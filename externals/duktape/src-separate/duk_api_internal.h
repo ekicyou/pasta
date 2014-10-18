@@ -24,16 +24,16 @@
  * and duk_idx_t for local frame indices.
  */
 duk_bool_t duk_valstack_resize_raw(duk_context *ctx,
-                                   duk_size_t min_new_size,
-                                   duk_small_uint_t flags);
+	duk_size_t min_new_size,
+	duk_small_uint_t flags);
 
 duk_tval *duk_get_tval(duk_context *ctx, duk_idx_t index);
 duk_tval *duk_require_tval(duk_context *ctx, duk_idx_t index);
 void duk_push_tval(duk_context *ctx, duk_tval *tv);
 
 void duk_push_this_check_object_coercible(duk_context *ctx);   /* push the current 'this' binding; throw TypeError
-                                                                * if binding is not object coercible (CheckObjectCoercible).
-                                                                */
+																* if binding is not object coercible (CheckObjectCoercible).
+																*/
 duk_hobject *duk_push_this_coercible_to_object(duk_context *ctx);       /* duk_push_this() + CheckObjectCoercible() + duk_to_object() */
 duk_hstring *duk_push_this_coercible_to_string(duk_context *ctx);       /* duk_push_this() + CheckObjectCoercible() + duk_to_string() */
 

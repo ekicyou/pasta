@@ -87,7 +87,7 @@ static void duk__inc_data_inner_refcounts(duk_hthread *thr, duk_hcompiledfunctio
 	funcs = DUK_HCOMPILEDFUNCTION_GET_FUNCS_BASE(f);
 	funcs_end = DUK_HCOMPILEDFUNCTION_GET_FUNCS_END(f);
 	while (funcs < funcs_end) {
-		DUK_HEAPHDR_INCREF(thr, (duk_heaphdr *) *funcs);
+		DUK_HEAPHDR_INCREF(thr, (duk_heaphdr *)*funcs);
 		funcs++;
 	}
 }
@@ -110,10 +110,10 @@ static const duk_uint16_t duk__closure_copy_proplist[] = {
 };
 
 void duk_js_push_closure(duk_hthread *thr,
-                         duk_hcompiledfunction *fun_temp,
-                         duk_hobject *outer_var_env,
-                         duk_hobject *outer_lex_env) {
-	duk_context *ctx = (duk_context *) thr;
+	duk_hcompiledfunction *fun_temp,
+	duk_hobject *outer_var_env,
+	duk_hobject *outer_lex_env) {
+	duk_context *ctx = (duk_context *)thr;
 	duk_hcompiledfunction *fun_clos;
 	duk_small_uint_t i;
 	duk_uint_t len_value;
@@ -128,8 +128,8 @@ void duk_js_push_closure(duk_hthread *thr,
 	duk_push_compiledfunction(ctx);
 	duk_push_hobject(ctx, &fun_temp->obj);  /* -> [ ... closure template ] */
 
-	fun_clos = (duk_hcompiledfunction *) duk_get_hcompiledfunction(ctx, -2);
-	DUK_ASSERT(DUK_HOBJECT_IS_COMPILEDFUNCTION((duk_hobject *) fun_clos));
+	fun_clos = (duk_hcompiledfunction *)duk_get_hcompiledfunction(ctx, -2);
+	DUK_ASSERT(DUK_HOBJECT_IS_COMPILEDFUNCTION((duk_hobject *)fun_clos));
 	DUK_ASSERT(fun_clos != NULL);
 	DUK_ASSERT(fun_clos->data == NULL);
 	DUK_ASSERT(fun_clos->funcs == NULL);
@@ -224,15 +224,16 @@ void duk_js_push_closure(duk_hthread *thr,
 
 			if (outer_lex_env) {
 				proto = outer_lex_env;
-			} else {
+			}
+			else {
 				proto = thr->builtins[DUK_BIDX_GLOBAL_ENV];
 			}
 
 			/* -> [ ... closure template env ] */
-			(void) duk_push_object_helper_proto(ctx,
-			                                    DUK_HOBJECT_FLAG_EXTENSIBLE |
-			                                    DUK_HOBJECT_CLASS_AS_FLAGS(DUK_HOBJECT_CLASS_DECENV),
-			                                    proto);
+			(void)duk_push_object_helper_proto(ctx,
+				DUK_HOBJECT_FLAG_EXTENSIBLE |
+				DUK_HOBJECT_CLASS_AS_FLAGS(DUK_HOBJECT_CLASS_DECENV),
+				proto);
 
 			/* It's important that duk_def_prop() is a 'raw define' so that any
 			 * properties in an ancestor are never an issue (they should never be
@@ -251,7 +252,8 @@ void duk_js_push_closure(duk_hthread *thr,
 			 */
 
 			/* [ ... closure template ] */
-		} else {
+		}
+		else {
 			/*
 			 *  Other cases (function declaration, anonymous function expression,
 			 *  strict direct eval code).  The "outer" environment will be whatever
@@ -266,7 +268,8 @@ void duk_js_push_closure(duk_hthread *thr,
 
 			/* [ ... closure template ] */
 		}
-	} else {
+	}
+	else {
 		/*
 		 *  Function gets no new environment when called.  This is the
 		 *  case for global code, indirect eval code, and non-strict
@@ -289,8 +292,8 @@ void duk_js_push_closure(duk_hthread *thr,
 	duk_get_prop_stridx(ctx, -2, DUK_STRIDX_INT_VARENV);
 	duk_get_prop_stridx(ctx, -3, DUK_STRIDX_INT_LEXENV);
 	DUK_DDD(DUK_DDDPRINT("closure varenv -> %!ipT, lexenv -> %!ipT",
-	                     (duk_tval *) duk_get_tval(ctx, -2),
-	                     (duk_tval *) duk_get_tval(ctx, -1)));
+		(duk_tval *)duk_get_tval(ctx, -2),
+		(duk_tval *)duk_get_tval(ctx, -1)));
 	duk_pop_2(ctx);
 #endif
 
@@ -303,17 +306,18 @@ void duk_js_push_closure(duk_hthread *thr,
 	/* [ ... closure template ] */
 
 	DUK_DDD(DUK_DDDPRINT("copying properties: closure=%!iT, template=%!iT",
-	                     (duk_tval *) duk_get_tval(ctx, -2),
-	                     (duk_tval *) duk_get_tval(ctx, -1)));
+		(duk_tval *)duk_get_tval(ctx, -2),
+		(duk_tval *)duk_get_tval(ctx, -1)));
 
-	for (i = 0; i < (duk_small_uint_t) (sizeof(duk__closure_copy_proplist) / sizeof(duk_uint16_t)); i++) {
-		duk_small_int_t stridx = (duk_small_int_t) duk__closure_copy_proplist[i];
+	for (i = 0; i < (duk_small_uint_t)(sizeof(duk__closure_copy_proplist) / sizeof(duk_uint16_t)); i++) {
+		duk_small_int_t stridx = (duk_small_int_t)duk__closure_copy_proplist[i];
 		if (duk_get_prop_stridx(ctx, -1, stridx)) {
 			/* [ ... closure template val ] */
-			DUK_DDD(DUK_DDDPRINT("copying property, stridx=%ld -> found", (long) stridx));
+			DUK_DDD(DUK_DDDPRINT("copying property, stridx=%ld -> found", (long)stridx));
 			duk_def_prop_stridx(ctx, -3, stridx, DUK_PROPDESC_FLAGS_WC);
-		} else {
-			DUK_DDD(DUK_DDDPRINT("copying property, stridx=%ld -> not found", (long) stridx));
+		}
+		else {
+			DUK_DDD(DUK_DDDPRINT("copying property, stridx=%ld -> not found", (long)stridx));
 			duk_pop(ctx);
 		}
 	}
@@ -333,8 +337,9 @@ void duk_js_push_closure(duk_hthread *thr,
 		/* [ ... closure template formals ] */
 		DUK_ASSERT(duk_has_prop_stridx(ctx, -1, DUK_STRIDX_LENGTH));
 		DUK_ASSERT(duk_get_length(ctx, -1) <= DUK_UINT_MAX);  /* formal arg limits */
-		len_value = (duk_uint_t) duk_get_length(ctx, -1);
-	} else {
+		len_value = (duk_uint_t)duk_get_length(ctx, -1);
+	}
+	else {
 		/* XXX: what to do if _formals is not empty but compiler has
 		 * optimized it away -- read length from an explicit property
 		 * then?
@@ -380,7 +385,8 @@ void duk_js_push_closure(duk_hthread *thr,
 	if (DUK_HOBJECT_HAS_STRICT(&fun_clos->obj)) {
 		duk_def_prop_stridx_thrower(ctx, -2, DUK_STRIDX_CALLER, DUK_PROPDESC_FLAGS_NONE);
 		duk_def_prop_stridx_thrower(ctx, -2, DUK_STRIDX_LC_ARGUMENTS, DUK_PROPDESC_FLAGS_NONE);
-	} else {
+	}
+	else {
 #ifdef DUK_USE_NONSTD_FUNC_CALLER_PROPERTY
 		DUK_DDD(DUK_DDDPRINT("function is non-strict and non-standard 'caller' property in use, add initial 'null' value"));
 		duk_push_null(ctx);
@@ -406,7 +412,8 @@ void duk_js_push_closure(duk_hthread *thr,
 	if (duk_get_prop_stridx(ctx, -1, DUK_STRIDX_NAME)) {
 		/* [ ... closure template name ] */
 		DUK_ASSERT(duk_is_string(ctx, -1));
-	} else {
+	}
+	else {
 		/* [ ... closure template undefined ] */
 		duk_pop(ctx);
 		duk_push_hstring_stridx(ctx, DUK_STRIDX_EMPTY_STRING);
@@ -435,9 +442,9 @@ void duk_js_push_closure(duk_hthread *thr,
 	DUK_ASSERT(duk_has_prop_stridx(ctx, -2, DUK_STRIDX_PROTOTYPE) != 0);
 	DUK_ASSERT(duk_has_prop_stridx(ctx, -2, DUK_STRIDX_NAME) != 0);  /* non-standard */
 	DUK_ASSERT(!DUK_HOBJECT_HAS_STRICT(&fun_clos->obj) ||
-	           duk_has_prop_stridx(ctx, -2, DUK_STRIDX_CALLER) != 0);
+		duk_has_prop_stridx(ctx, -2, DUK_STRIDX_CALLER) != 0);
 	DUK_ASSERT(!DUK_HOBJECT_HAS_STRICT(&fun_clos->obj) ||
-	           duk_has_prop_stridx(ctx, -2, DUK_STRIDX_LC_ARGUMENTS) != 0);
+		duk_has_prop_stridx(ctx, -2, DUK_STRIDX_LC_ARGUMENTS) != 0);
 
 	/*
 	 *  Finish
@@ -446,8 +453,8 @@ void duk_js_push_closure(duk_hthread *thr,
 	/* [ ... closure template ] */
 
 	DUK_DDD(DUK_DDDPRINT("created function instance: template=%!iT -> closure=%!iT",
-	                     (duk_tval *) duk_get_tval(ctx, -1),
-	                     (duk_tval *) duk_get_tval(ctx, -2)));
+		(duk_tval *)duk_get_tval(ctx, -1),
+		(duk_tval *)duk_get_tval(ctx, -2)));
 
 	duk_pop(ctx);
 
@@ -463,9 +470,9 @@ void duk_js_push_closure(duk_hthread *thr,
 
 /* shared helper */
 duk_hobject *duk_create_activation_environment_record(duk_hthread *thr,
-                                                      duk_hobject *func,
-                                                      duk_size_t idx_bottom) {
-	duk_context *ctx = (duk_context *) thr;
+	duk_hobject *func,
+	duk_size_t idx_bottom) {
+	duk_context *ctx = (duk_context *)thr;
 	duk_hobject *env;
 	duk_hobject *parent;
 	duk_tval *tv;
@@ -478,14 +485,15 @@ duk_hobject *duk_create_activation_environment_record(duk_hthread *thr,
 		DUK_ASSERT(DUK_TVAL_IS_OBJECT(tv));
 		DUK_ASSERT(DUK_HOBJECT_IS_ENV(DUK_TVAL_GET_OBJECT(tv)));
 		parent = DUK_TVAL_GET_OBJECT(tv);
-	} else {
+	}
+	else {
 		parent = thr->builtins[DUK_BIDX_GLOBAL_ENV];
 	}
 
-	(void) duk_push_object_helper(ctx,
-	                              DUK_HOBJECT_FLAG_EXTENSIBLE |
-	                              DUK_HOBJECT_CLASS_AS_FLAGS(DUK_HOBJECT_CLASS_DECENV),
-	                              -1);  /* no prototype, updated below */
+	(void)duk_push_object_helper(ctx,
+		DUK_HOBJECT_FLAG_EXTENSIBLE |
+		DUK_HOBJECT_CLASS_AS_FLAGS(DUK_HOBJECT_CLASS_DECENV),
+		-1);  /* no prototype, updated below */
 	env = duk_require_hobject(ctx, -1);
 	DUK_ASSERT(env != NULL);
 	DUK_HOBJECT_SET_PROTOTYPE_UPDREF(thr, env, parent);  /* parent env is the prototype */
@@ -505,8 +513,8 @@ duk_hobject *duk_create_activation_environment_record(duk_hthread *thr,
 }
 
 void duk_js_init_activation_environment_records_delayed(duk_hthread *thr,
-                                                        duk_activation *act) {
-	duk_context *ctx = (duk_context *) thr;
+	duk_activation *act) {
+	duk_context *ctx = (duk_context *)thr;
 	duk_hobject *func;
 	duk_hobject *env;
 
@@ -525,12 +533,12 @@ void duk_js_init_activation_environment_records_delayed(duk_hthread *thr,
 	env = duk_create_activation_environment_record(thr, func, act->idx_bottom);
 	DUK_ASSERT(env != NULL);
 
-	DUK_DDD(DUK_DDDPRINT("created delayed fresh env: %!ipO", (duk_heaphdr *) env));
+	DUK_DDD(DUK_DDDPRINT("created delayed fresh env: %!ipO", (duk_heaphdr *)env));
 #ifdef DUK_USE_DDDPRINT
 	{
 		duk_hobject *p = env;
 		while (p) {
-			DUK_DDD(DUK_DDDPRINT("  -> %!ipO", (duk_heaphdr *) p));
+			DUK_DDD(DUK_DDDPRINT("  -> %!ipO", (duk_heaphdr *)p));
 			p = p->prototype;
 		}
 	}
@@ -560,7 +568,7 @@ void duk_js_init_activation_environment_records_delayed(duk_hthread *thr,
  */
 
 void duk_js_close_environment_record(duk_hthread *thr, duk_hobject *env, duk_hobject *func, duk_size_t regbase) {
-	duk_context *ctx = (duk_context *) thr;
+	duk_context *ctx = (duk_context *)thr;
 	duk_uint_fast32_t i;
 
 	DUK_ASSERT(thr != NULL);
@@ -569,13 +577,13 @@ void duk_js_close_environment_record(duk_hthread *thr, duk_hobject *env, duk_hob
 
 	if (!DUK_HOBJECT_IS_DECENV(env) || DUK_HOBJECT_HAS_ENVRECCLOSED(env)) {
 		DUK_DDD(DUK_DDDPRINT("environment record not a declarative record, "
-		                     "or already closed: %!iO",
-		                     (duk_heaphdr *) env));
+			"or already closed: %!iO",
+			(duk_heaphdr *)env));
 		return;
 	}
 
 	DUK_DDD(DUK_DDDPRINT("closing environment record: %!iO, func: %!iO, regbase: %ld",
-	                     (duk_heaphdr *) env, (duk_heaphdr *) func, (long) regbase));
+		(duk_heaphdr *)env, (duk_heaphdr *)func, (long)regbase));
 
 	duk_push_hobject(ctx, env);
 
@@ -586,19 +594,19 @@ void duk_js_close_environment_record(duk_hthread *thr, duk_hobject *env, duk_hob
 
 		if (duk_get_prop_stridx(ctx, -1, DUK_STRIDX_INT_CALLEE)) {
 			DUK_ASSERT(duk_is_object(ctx, -1));
-			DUK_ASSERT(duk_get_hobject(ctx, -1) == (duk_hobject *) func);
+			DUK_ASSERT(duk_get_hobject(ctx, -1) == (duk_hobject *)func);
 		}
 		duk_pop(ctx);
 
 		if (duk_get_prop_stridx(ctx, -1, DUK_STRIDX_INT_THREAD)) {
 			DUK_ASSERT(duk_is_object(ctx, -1));
-			DUK_ASSERT(duk_get_hobject(ctx, -1) == (duk_hobject *) thr);
+			DUK_ASSERT(duk_get_hobject(ctx, -1) == (duk_hobject *)thr);
 		}
 		duk_pop(ctx);
 
 		if (duk_get_prop_stridx(ctx, -1, DUK_STRIDX_INT_REGBASE)) {
 			DUK_ASSERT(duk_is_number(ctx, -1));
-			DUK_ASSERT(duk_get_number(ctx, -1) == (double) regbase);
+			DUK_ASSERT(duk_get_number(ctx, -1) == (double)regbase);
 		}
 		duk_pop(ctx);
 
@@ -645,13 +653,13 @@ void duk_js_close_environment_record(duk_hthread *thr, duk_hobject *env, duk_hob
 		varmap = duk_require_hobject(ctx, -1);
 		DUK_ASSERT(varmap != NULL);
 
-		DUK_DDD(DUK_DDDPRINT("varmap: %!O", (duk_heaphdr *) varmap));
+		DUK_DDD(DUK_DDDPRINT("varmap: %!O", (duk_heaphdr *)varmap));
 
 		/* [... env callee varmap] */
 
-		DUK_DDD(DUK_DDDPRINT("copying bound register values, %ld bound regs", (long) varmap->e_next));
+		DUK_DDD(DUK_DDDPRINT("copying bound register values, %ld bound regs", (long)varmap->e_next));
 
-		for (i = 0; i < (duk_uint_fast32_t) varmap->e_next; i++) {
+		for (i = 0; i < (duk_uint_fast32_t)varmap->e_next; i++) {
 			key = DUK_HOBJECT_E_GET_KEY(varmap, i);
 			DUK_ASSERT(key != NULL);   /* assume keys are compacted */
 
@@ -659,9 +667,9 @@ void duk_js_close_environment_record(duk_hthread *thr, duk_hobject *env, duk_hob
 
 			tv = DUK_HOBJECT_E_GET_VALUE_TVAL_PTR(varmap, i);
 			DUK_ASSERT(DUK_TVAL_IS_NUMBER(tv));  /* assume value is a number */
-			regnum = (duk_uint_t) DUK_TVAL_GET_NUMBER(tv);
+			regnum = (duk_uint_t)DUK_TVAL_GET_NUMBER(tv);
 			DUK_ASSERT_DISABLE(regnum >= 0);  /* unsigned */
-			DUK_ASSERT(regnum < ((duk_hcompiledfunction *) func)->nregs);  /* regnum is sane */
+			DUK_ASSERT(regnum < ((duk_hcompiledfunction *)func)->nregs);  /* regnum is sane */
 			DUK_ASSERT(thr->valstack + regbase + regnum >= thr->valstack);
 			DUK_ASSERT(thr->valstack + regbase + regnum < thr->valstack_top);
 
@@ -669,9 +677,9 @@ void duk_js_close_environment_record(duk_hthread *thr, duk_hobject *env, duk_hob
 			duk_push_hstring(ctx, key);
 			duk_push_tval(ctx, thr->valstack + regbase + regnum);
 			DUK_DDD(DUK_DDDPRINT("closing identifier '%s' -> reg %ld, value %!T",
-			                     (const char *) duk_require_string(ctx, -2),
-			                     (long) regnum,
-			                     (duk_tval *) duk_get_tval(ctx, -1)));
+				(const char *)duk_require_string(ctx, -2),
+				(long)regnum,
+				(duk_tval *)duk_get_tval(ctx, -1)));
 
 			/* [... env callee varmap key val] */
 
@@ -684,7 +692,7 @@ void duk_js_close_environment_record(duk_hthread *thr, duk_hobject *env, duk_hob
 		/* [... env] */
 	}
 
- skip_varmap:
+skip_varmap:
 
 	/* [... env] */
 
@@ -697,7 +705,7 @@ void duk_js_close_environment_record(duk_hthread *thr, duk_hobject *env, duk_hob
 	DUK_HOBJECT_SET_ENVRECCLOSED(env);
 
 	DUK_DDD(DUK_DDDPRINT("environment record after being closed: %!O",
-	                     (duk_heaphdr *) env));
+		(duk_heaphdr *)env));
 }
 
 /*
@@ -725,9 +733,9 @@ void duk_js_close_environment_record(duk_hthread *thr, duk_hobject *env, duk_hob
 
 /* lookup name from an open declarative record's registers */
 static duk_bool_t duk__getid_open_decl_env_regs(duk_hthread *thr,
-                                                duk_hstring *name,
-                                                duk_hobject *env,
-                                                duk__id_lookup_result *out) {
+	duk_hstring *name,
+	duk_hobject *env,
+	duk__id_lookup_result *out) {
 	duk_hthread *env_thr;
 	duk_hobject *env_func;
 	duk_size_t env_regbase;
@@ -771,16 +779,16 @@ static duk_bool_t duk__getid_open_decl_env_regs(duk_hthread *thr,
 		return 0;
 	}
 	DUK_ASSERT(DUK_TVAL_IS_NUMBER(tv));
-	reg_rel = (duk_size_t) DUK_TVAL_GET_NUMBER(tv);
+	reg_rel = (duk_size_t)DUK_TVAL_GET_NUMBER(tv);
 	DUK_ASSERT_DISABLE(reg_rel >= 0);  /* unsigned */
-	DUK_ASSERT(reg_rel < ((duk_hcompiledfunction *) env_func)->nregs);
+	DUK_ASSERT(reg_rel < ((duk_hcompiledfunction *)env_func)->nregs);
 
 	tv = duk_hobject_find_existing_entry_tval_ptr(env, DUK_HTHREAD_STRING_INT_THREAD(thr));
 	DUK_ASSERT(tv != NULL);
 	DUK_ASSERT(DUK_TVAL_IS_OBJECT(tv));
 	DUK_ASSERT(DUK_TVAL_GET_OBJECT(tv) != NULL);
 	DUK_ASSERT(DUK_HOBJECT_IS_THREAD(DUK_TVAL_GET_OBJECT(tv)));
-	env_thr = (duk_hthread *) DUK_TVAL_GET_OBJECT(tv);
+	env_thr = (duk_hthread *)DUK_TVAL_GET_OBJECT(tv);
 	DUK_ASSERT(env_thr != NULL);
 
 	/* Note: env_thr != thr is quite possible and normal, so careful
@@ -790,7 +798,7 @@ static duk_bool_t duk__getid_open_decl_env_regs(duk_hthread *thr,
 	tv = duk_hobject_find_existing_entry_tval_ptr(env, DUK_HTHREAD_STRING_INT_REGBASE(thr));
 	DUK_ASSERT(tv != NULL);
 	DUK_ASSERT(DUK_TVAL_IS_NUMBER(tv));
-	env_regbase = (duk_size_t) DUK_TVAL_GET_NUMBER(tv);
+	env_regbase = (duk_size_t)DUK_TVAL_GET_NUMBER(tv);
 
 	idx = env_regbase + reg_rel;
 	tv = env_thr->valstack + idx;
@@ -799,8 +807,8 @@ static duk_bool_t duk__getid_open_decl_env_regs(duk_hthread *thr,
 	out->value = tv;
 	out->attrs = DUK_PROPDESC_FLAGS_W;  /* registers are mutable, non-deletable */
 	out->this_binding = NULL;  /* implicit this value always undefined for
-	                            * declarative environment records.
-	                            */
+								* declarative environment records.
+								*/
 	out->env = env;
 	out->holder = NULL;
 
@@ -809,9 +817,9 @@ static duk_bool_t duk__getid_open_decl_env_regs(duk_hthread *thr,
 
 /* lookup name from current activation record's functions' registers */
 static duk_bool_t duk__getid_activation_regs(duk_hthread *thr,
-                                             duk_hstring *name,
-                                             duk_activation *act,
-                                             duk__id_lookup_result *out) {
+	duk_hstring *name,
+	duk_activation *act,
+	duk__id_lookup_result *out) {
 	duk_tval *tv;
 	duk_hobject *func;
 	duk_hobject *varmap;
@@ -844,9 +852,9 @@ static duk_bool_t duk__getid_activation_regs(duk_hthread *thr,
 		return 0;
 	}
 	DUK_ASSERT(DUK_TVAL_IS_NUMBER(tv));
-	reg_rel = (duk_size_t) DUK_TVAL_GET_NUMBER(tv);
+	reg_rel = (duk_size_t)DUK_TVAL_GET_NUMBER(tv);
 	DUK_ASSERT_DISABLE(reg_rel >= 0);
-	DUK_ASSERT(reg_rel < ((duk_hcompiledfunction *) func)->nregs);
+	DUK_ASSERT(reg_rel < ((duk_hcompiledfunction *)func)->nregs);
 
 	idx = act->idx_bottom + reg_rel;
 	DUK_ASSERT(idx >= act->idx_bottom);
@@ -855,8 +863,8 @@ static duk_bool_t duk__getid_activation_regs(duk_hthread *thr,
 	out->value = tv;
 	out->attrs = DUK_PROPDESC_FLAGS_W;  /* registers are mutable, non-deletable */
 	out->this_binding = NULL;  /* implicit this value always undefined for
-	                            * declarative environment records.
-	                            */
+								* declarative environment records.
+								*/
 	out->env = NULL;
 	out->holder = NULL;
 
@@ -864,11 +872,11 @@ static duk_bool_t duk__getid_activation_regs(duk_hthread *thr,
 }
 
 static duk_bool_t duk__get_identifier_reference(duk_hthread *thr,
-                                                duk_hobject *env,
-                                                duk_hstring *name,
-                                                duk_activation *act,
-                                                duk_bool_t parents,
-                                                duk__id_lookup_result *out) {
+	duk_hobject *env,
+	duk_hstring *name,
+	duk_activation *act,
+	duk_bool_t parents,
+	duk__id_lookup_result *out) {
 	duk_tval *tv;
 	duk_uint_t sanity;
 
@@ -900,7 +908,7 @@ static duk_bool_t duk__get_identifier_reference(duk_hthread *thr,
 		duk_hobject *func;
 
 		DUK_DDD(DUK_DDDPRINT("duk__get_identifier_reference: env is NULL, activation is non-NULL -> "
-		                     "delayed env case, look up activation regs first"));
+			"delayed env case, look up activation regs first"));
 
 		/*
 		 *  Try registers
@@ -908,11 +916,11 @@ static duk_bool_t duk__get_identifier_reference(duk_hthread *thr,
 
 		if (duk__getid_activation_regs(thr, name, act, out)) {
 			DUK_DDD(DUK_DDDPRINT("duk__get_identifier_reference successful: "
-			                     "name=%!O -> value=%!T, attrs=%ld, this=%!T, env=%!O, holder=%!O "
-			                     "(found from register bindings when env=NULL)",
-			                     (duk_heaphdr *) name, (duk_tval *) out->value,
-			                     (long) out->attrs, (duk_tval *) out->this_binding,
-			                     (duk_heaphdr *) out->env, (duk_heaphdr *) out->holder));
+				"name=%!O -> value=%!T, attrs=%ld, this=%!T, env=%!O, holder=%!O "
+				"(found from register bindings when env=NULL)",
+				(duk_heaphdr *)name, (duk_tval *)out->value,
+				(long)out->attrs, (duk_tval *)out->this_binding,
+				(duk_heaphdr *)out->env, (duk_heaphdr *)out->holder));
 			return 1;
 		}
 
@@ -935,7 +943,7 @@ static duk_bool_t duk__get_identifier_reference(duk_hthread *thr,
 
 		if (!parents) {
 			DUK_DDD(DUK_DDDPRINT("duk__get_identifier_reference failed, no parent traversal "
-			                     "(not found from register bindings when env=NULL)"));
+				"(not found from register bindings when env=NULL)"));
 			goto fail_not_found;
 		}
 
@@ -947,13 +955,14 @@ static duk_bool_t duk__get_identifier_reference(duk_hthread *thr,
 		if (tv) {
 			DUK_ASSERT(DUK_TVAL_IS_OBJECT(tv));
 			env = DUK_TVAL_GET_OBJECT(tv);
-		} else {
+		}
+		else {
 			DUK_ASSERT(duk_hobject_find_existing_entry_tval_ptr(func, DUK_HTHREAD_STRING_INT_VARENV(thr)) == NULL);
 			env = thr->builtins[DUK_BIDX_GLOBAL_ENV];
 		}
 
 		DUK_DDD(DUK_DDDPRINT("continue lookup from env: %!iO",
-		                     (duk_heaphdr *) env));
+			(duk_heaphdr *)env));
 	}
 
 	/*
@@ -969,9 +978,9 @@ static duk_bool_t duk__get_identifier_reference(duk_hthread *thr,
 		duk_int_t attrs;
 
 		DUK_DDD(DUK_DDDPRINT("duk__get_identifier_reference, name=%!O, considering env=%p -> %!iO",
-		                     (duk_heaphdr *) name,
-		                     (void *) env,
-		                     (duk_heaphdr *) env));
+			(duk_heaphdr *)name,
+			(void *)env,
+			(duk_heaphdr *)env));
 
 		DUK_ASSERT(env != NULL);
 		DUK_ASSERT(DUK_HOBJECT_IS_ENV(env));
@@ -999,34 +1008,35 @@ static duk_bool_t duk__get_identifier_reference(duk_hthread *thr,
 
 			if (duk__getid_open_decl_env_regs(thr, name, env, out)) {
 				DUK_DDD(DUK_DDDPRINT("duk__get_identifier_reference successful: "
-				                     "name=%!O -> value=%!T, attrs=%ld, this=%!T, env=%!O, holder=%!O "
-				                     "(declarative environment record, scope open, found in regs)",
-				                     (duk_heaphdr *) name, (duk_tval *) out->value,
-				                     (long) out->attrs, (duk_tval *) out->this_binding,
-				                     (duk_heaphdr *) out->env, (duk_heaphdr *) out->holder));
+					"name=%!O -> value=%!T, attrs=%ld, this=%!T, env=%!O, holder=%!O "
+					"(declarative environment record, scope open, found in regs)",
+					(duk_heaphdr *)name, (duk_tval *)out->value,
+					(long)out->attrs, (duk_tval *)out->this_binding,
+					(duk_heaphdr *)out->env, (duk_heaphdr *)out->holder));
 				return 1;
 			}
-		 skip_regs:
+		skip_regs:
 
 			tv = duk_hobject_find_existing_entry_tval_ptr_and_attrs(env, name, &attrs);
 			if (tv) {
 				out->value = tv;
 				out->attrs = attrs;
 				out->this_binding = NULL;  /* implicit this value always undefined for
-				                            * declarative environment records.
-				                            */
+											* declarative environment records.
+											*/
 				out->env = env;
 				out->holder = env;
 
 				DUK_DDD(DUK_DDDPRINT("duk__get_identifier_reference successful: "
-				                     "name=%!O -> value=%!T, attrs=%ld, this=%!T, env=%!O, holder=%!O "
-				                     "(declarative environment record, found in properties)",
-				                     (duk_heaphdr *) name, (duk_tval *) out->value,
-				                     (long) out->attrs, (duk_tval *) out->this_binding,
-				                     (duk_heaphdr *) out->env, (duk_heaphdr *) out->holder));
+					"name=%!O -> value=%!T, attrs=%ld, this=%!T, env=%!O, holder=%!O "
+					"(declarative environment record, found in properties)",
+					(duk_heaphdr *)name, (duk_tval *)out->value,
+					(long)out->attrs, (duk_tval *)out->this_binding,
+					(duk_heaphdr *)out->env, (duk_heaphdr *)out->holder));
 				return 1;
 			}
-		} else {
+		}
+		else {
 			/*
 			 *  Object environment record.
 			 *
@@ -1067,24 +1077,24 @@ static duk_bool_t duk__get_identifier_reference(duk_hthread *thr,
 				out->holder = target;
 
 				DUK_DDD(DUK_DDDPRINT("duk__get_identifier_reference successful: "
-				                     "name=%!O -> value=%!T, attrs=%ld, this=%!T, env=%!O, holder=%!O "
-				                     "(object environment record)",
-				                     (duk_heaphdr *) name, (duk_tval *) out->value,
-				                     (long) out->attrs, (duk_tval *) out->this_binding,
-				                     (duk_heaphdr *) out->env, (duk_heaphdr *) out->holder));
+					"name=%!O -> value=%!T, attrs=%ld, this=%!T, env=%!O, holder=%!O "
+					"(object environment record)",
+					(duk_heaphdr *)name, (duk_tval *)out->value,
+					(long)out->attrs, (duk_tval *)out->this_binding,
+					(duk_heaphdr *)out->env, (duk_heaphdr *)out->holder));
 				return 1;
 			}
 		}
 
 		if (!parents) {
 			DUK_DDD(DUK_DDDPRINT("duk__get_identifier_reference failed, no parent traversal "
-			                     "(not found from first traversed env)"));
+				"(not found from first traversed env)"));
 			goto fail_not_found;
 		}
 
-                if (sanity-- == 0) {
-                        DUK_ERROR(thr, DUK_ERR_INTERNAL_ERROR, DUK_STR_PROTOTYPE_CHAIN_LIMIT);
-                }
+		if (sanity-- == 0) {
+			DUK_ERROR(thr, DUK_ERR_INTERNAL_ERROR, DUK_STR_PROTOTYPE_CHAIN_LIMIT);
+		}
 		env = env->prototype;
 	};
 
@@ -1092,7 +1102,7 @@ static duk_bool_t duk__get_identifier_reference(duk_hthread *thr,
 	 *  Not found (even in global object)
 	 */
 
- fail_not_found:
+fail_not_found:
 	return 0;
 }
 
@@ -1112,22 +1122,22 @@ static duk_bool_t duk__get_identifier_reference(duk_hthread *thr,
  */
 
 duk_bool_t duk_js_hasvar_envrec(duk_hthread *thr,
-                                duk_hobject *env,
-                                duk_hstring *name) {
+	duk_hobject *env,
+	duk_hstring *name) {
 	duk__id_lookup_result ref;
 	duk_bool_t parents;
 
 	DUK_DDD(DUK_DDDPRINT("hasvar: thr=%p, env=%p, name=%!O "
-	                     "(env -> %!dO)",
-	                     (void *) thr, (void *) env, (duk_heaphdr *) name,
-	                     (duk_heaphdr *) env));
+		"(env -> %!dO)",
+		(void *)thr, (void *)env, (duk_heaphdr *)name,
+		(duk_heaphdr *)env));
 
 	DUK_ASSERT(thr != NULL);
 	DUK_ASSERT(env != NULL);
 	DUK_ASSERT(name != NULL);
 
-        DUK_ASSERT_REFCOUNT_NONZERO_HEAPHDR(env);
-        DUK_ASSERT_REFCOUNT_NONZERO_HEAPHDR(name);
+	DUK_ASSERT_REFCOUNT_NONZERO_HEAPHDR(env);
+	DUK_ASSERT_REFCOUNT_NONZERO_HEAPHDR(name);
 
 	DUK_ASSERT(DUK_HOBJECT_IS_ENV(env));
 	DUK_ASSERT(!DUK_HOBJECT_HAS_ARRAY_PART(env));
@@ -1164,27 +1174,27 @@ duk_bool_t duk_js_hasvar_envrec(duk_hthread *thr,
  */
 
 static duk_bool_t duk__getvar_helper(duk_hthread *thr,
-                                     duk_hobject *env,
-                                     duk_activation *act,
-                                     duk_hstring *name,
-                                     duk_bool_t throw_flag) {
-	duk_context *ctx = (duk_context *) thr;
+	duk_hobject *env,
+	duk_activation *act,
+	duk_hstring *name,
+	duk_bool_t throw_flag) {
+	duk_context *ctx = (duk_context *)thr;
 	duk__id_lookup_result ref;
 	duk_tval tv_tmp_obj;
 	duk_tval tv_tmp_key;
 	duk_bool_t parents;
 
 	DUK_DDD(DUK_DDDPRINT("getvar: thr=%p, env=%p, act=%p, name=%!O "
-	                     "(env -> %!dO)",
-	                     (void *) thr, (void *) env, (void *) act,
-	                     (duk_heaphdr *) name, (duk_heaphdr *) env));
+		"(env -> %!dO)",
+		(void *)thr, (void *)env, (void *)act,
+		(duk_heaphdr *)name, (duk_heaphdr *)env));
 
 	DUK_ASSERT(thr != NULL);
 	DUK_ASSERT(name != NULL);
 	/* env and act may be NULL */
 
-        DUK_ASSERT_REFCOUNT_NONZERO_HEAPHDR(env);
-        DUK_ASSERT_REFCOUNT_NONZERO_HEAPHDR(name);
+	DUK_ASSERT_REFCOUNT_NONZERO_HEAPHDR(env);
+	DUK_ASSERT_REFCOUNT_NONZERO_HEAPHDR(name);
 
 	parents = 1;     /* follow parent chain */
 	if (duk__get_identifier_reference(thr, env, name, act, parents, &ref)) {
@@ -1192,7 +1202,8 @@ static duk_bool_t duk__getvar_helper(duk_hthread *thr,
 			DUK_ASSERT(ref.this_binding == NULL);  /* always for register bindings */
 			duk_push_tval(ctx, ref.value);
 			duk_push_undefined(ctx);
-		} else {
+		}
+		else {
 			DUK_ASSERT(ref.holder != NULL);
 
 			/* Note: getprop may invoke any getter and invalidate any
@@ -1201,13 +1212,14 @@ static duk_bool_t duk__getvar_helper(duk_hthread *thr,
 
 			if (ref.this_binding) {
 				duk_push_tval(ctx, ref.this_binding);
-			} else {
+			}
+			else {
 				duk_push_undefined(ctx);
 			}
 
 			DUK_TVAL_SET_OBJECT(&tv_tmp_obj, ref.holder);
 			DUK_TVAL_SET_STRING(&tv_tmp_key, name);
-			(void) duk_hobject_getprop(thr, &tv_tmp_obj, &tv_tmp_key);  /* [this value] */
+			(void)duk_hobject_getprop(thr, &tv_tmp_obj, &tv_tmp_key);  /* [this value] */
 
 			/* ref.value, ref.this.binding invalidated here by getprop call */
 
@@ -1215,11 +1227,12 @@ static duk_bool_t duk__getvar_helper(duk_hthread *thr,
 		}
 
 		return 1;
-	} else {
+	}
+	else {
 		if (throw_flag) {
 			DUK_ERROR(thr, DUK_ERR_REFERENCE_ERROR,
-			          "identifier '%s' undefined",
-			          (const char *) DUK_HSTRING_GET_DATA(name));
+				"identifier '%s' undefined",
+				(const char *)DUK_HSTRING_GET_DATA(name));
 		}
 
 		return 0;
@@ -1227,16 +1240,16 @@ static duk_bool_t duk__getvar_helper(duk_hthread *thr,
 }
 
 duk_bool_t duk_js_getvar_envrec(duk_hthread *thr,
-                                duk_hobject *env,
-                                duk_hstring *name,
-                                duk_bool_t throw_flag) {
+	duk_hobject *env,
+	duk_hstring *name,
+	duk_bool_t throw_flag) {
 	return duk__getvar_helper(thr, env, NULL, name, throw_flag);
 }
 
 duk_bool_t duk_js_getvar_activation(duk_hthread *thr,
-                                    duk_activation *act,
-                                    duk_hstring *name,
-                                    duk_bool_t throw_flag) {
+	duk_activation *act,
+	duk_hstring *name,
+	duk_bool_t throw_flag) {
 	DUK_ASSERT(act != NULL);
 	return duk__getvar_helper(thr, act->lex_env, act, name, throw_flag);
 }
@@ -1257,29 +1270,29 @@ duk_bool_t duk_js_getvar_activation(duk_hthread *thr,
  */
 
 static void duk__putvar_helper(duk_hthread *thr,
-                               duk_hobject *env,
-                               duk_activation *act,
-                               duk_hstring *name,
-                               duk_tval *val,
-                               duk_bool_t strict) {
+	duk_hobject *env,
+	duk_activation *act,
+	duk_hstring *name,
+	duk_tval *val,
+	duk_bool_t strict) {
 	duk__id_lookup_result ref;
 	duk_tval tv_tmp_obj;
 	duk_tval tv_tmp_key;
 	duk_bool_t parents;
 
 	DUK_DDD(DUK_DDDPRINT("putvar: thr=%p, env=%p, act=%p, name=%!O, val=%p, strict=%ld "
-	                     "(env -> %!dO, val -> %!T)",
-	                     (void *) thr, (void *) env, (void *) act,
-	                     (duk_heaphdr *) name, (void *) val, (long) strict,
-	                     (duk_heaphdr *) env, (duk_tval *) val));
+		"(env -> %!dO, val -> %!T)",
+		(void *)thr, (void *)env, (void *)act,
+		(duk_heaphdr *)name, (void *)val, (long)strict,
+		(duk_heaphdr *)env, (duk_tval *)val));
 
 	DUK_ASSERT(thr != NULL);
 	DUK_ASSERT(name != NULL);
 	DUK_ASSERT(val != NULL);
 	/* env and act may be NULL */
 
-        DUK_ASSERT_REFCOUNT_NONZERO_HEAPHDR(env);
-        DUK_ASSERT_REFCOUNT_NONZERO_HEAPHDR(name);
+	DUK_ASSERT_REFCOUNT_NONZERO_HEAPHDR(env);
+	DUK_ASSERT_REFCOUNT_NONZERO_HEAPHDR(name);
 	DUK_ASSERT_REFCOUNT_NONZERO_TVAL(val);
 
 	/*
@@ -1293,8 +1306,8 @@ static void duk__putvar_helper(duk_hthread *thr,
 	 */
 
 	DUK_ASSERT(!strict ||
-	           (name != DUK_HTHREAD_STRING_EVAL(thr) &&
-	            name != DUK_HTHREAD_STRING_LC_ARGUMENTS(thr)));
+		(name != DUK_HTHREAD_STRING_EVAL(thr) &&
+		name != DUK_HTHREAD_STRING_LC_ARGUMENTS(thr)));
 
 	/*
 	 *  Lookup variable and update in-place if found.
@@ -1322,12 +1335,13 @@ static void duk__putvar_helper(duk_hthread *thr,
 			DUK_TVAL_DECREF(thr, &tv_tmp);  /* must be last */
 
 			/* ref.value and ref.this_binding invalidated here */
-		} else {
+		}
+		else {
 			DUK_ASSERT(ref.holder != NULL);
 
 			DUK_TVAL_SET_OBJECT(&tv_tmp_obj, ref.holder);
 			DUK_TVAL_SET_STRING(&tv_tmp_key, name);
-			(void) duk_hobject_putprop(thr, &tv_tmp_obj, &tv_tmp_key, val, strict);
+			(void)duk_hobject_putprop(thr, &tv_tmp_obj, &tv_tmp_key, val, strict);
 
 			/* ref.value and ref.this_binding invalidated here */
 		}
@@ -1349,7 +1363,7 @@ static void duk__putvar_helper(duk_hthread *thr,
 
 	DUK_TVAL_SET_OBJECT(&tv_tmp_obj, thr->builtins[DUK_BIDX_GLOBAL]);
 	DUK_TVAL_SET_STRING(&tv_tmp_key, name);
-	(void) duk_hobject_putprop(thr, &tv_tmp_obj, &tv_tmp_key, val, 0);  /* 0 = no throw */
+	(void)duk_hobject_putprop(thr, &tv_tmp_obj, &tv_tmp_key, val, 0);  /* 0 = no throw */
 
 	/* NB: 'val' may be invalidated here because put_value may realloc valstack,
 	 * caller beware.
@@ -1357,18 +1371,18 @@ static void duk__putvar_helper(duk_hthread *thr,
 }
 
 void duk_js_putvar_envrec(duk_hthread *thr,
-                          duk_hobject *env,
-                          duk_hstring *name,
-                          duk_tval *val,
-                          duk_bool_t strict) {
+	duk_hobject *env,
+	duk_hstring *name,
+	duk_tval *val,
+	duk_bool_t strict) {
 	duk__putvar_helper(thr, env, NULL, name, val, strict);
 }
 
 void duk_js_putvar_activation(duk_hthread *thr,
-                              duk_activation *act,
-                              duk_hstring *name,
-                              duk_tval *val,
-                              duk_bool_t strict) {
+	duk_activation *act,
+	duk_hstring *name,
+	duk_tval *val,
+	duk_bool_t strict) {
 	DUK_ASSERT(act != NULL);
 	duk__putvar_helper(thr, act->lex_env, act, name, val, strict);
 }
@@ -1393,22 +1407,22 @@ void duk_js_putvar_activation(duk_hthread *thr,
  */
 
 static duk_bool_t duk__delvar_helper(duk_hthread *thr,
-                                     duk_hobject *env,
-                                     duk_activation *act,
-                                     duk_hstring *name) {
+	duk_hobject *env,
+	duk_activation *act,
+	duk_hstring *name) {
 	duk__id_lookup_result ref;
 	duk_bool_t parents;
 
 	DUK_DDD(DUK_DDDPRINT("delvar: thr=%p, env=%p, act=%p, name=%!O "
-	                     "(env -> %!dO)",
-	                     (void *) thr, (void *) env, (void *) act,
-	                     (duk_heaphdr *) name, (duk_heaphdr *) env));
+		"(env -> %!dO)",
+		(void *)thr, (void *)env, (void *)act,
+		(duk_heaphdr *)name, (duk_heaphdr *)env));
 
 	DUK_ASSERT(thr != NULL);
 	DUK_ASSERT(name != NULL);
 	/* env and act may be NULL */
 
-        DUK_ASSERT_REFCOUNT_NONZERO_HEAPHDR(name);
+	DUK_ASSERT_REFCOUNT_NONZERO_HEAPHDR(name);
 
 	parents = 1;     /* follow parent chain */
 
@@ -1433,20 +1447,20 @@ static duk_bool_t duk__delvar_helper(duk_hthread *thr,
 	 */
 
 	DUK_DDD(DUK_DDDPRINT("identifier to be deleted not found: name=%!O "
-	                     "(treated as silent success)",
-	                     (duk_heaphdr *) name));
+		"(treated as silent success)",
+		(duk_heaphdr *)name));
 	return 1;
 }
 
 duk_bool_t duk_js_delvar_envrec(duk_hthread *thr,
-                                duk_hobject *env,
-                                duk_hstring *name) {
+	duk_hobject *env,
+	duk_hstring *name) {
 	return duk__delvar_helper(thr, env, NULL, name);
 }
 
 duk_bool_t duk_js_delvar_activation(duk_hthread *thr,
-                                    duk_activation *act,
-                                    duk_hstring *name) {
+	duk_activation *act,
+	duk_hstring *name) {
 	DUK_ASSERT(act != NULL);
 	return duk__delvar_helper(thr, act->lex_env, act, name);
 }
@@ -1502,22 +1516,22 @@ duk_bool_t duk_js_delvar_activation(duk_hthread *thr,
  */
 
 static duk_bool_t duk__declvar_helper(duk_hthread *thr,
-                                      duk_hobject *env,
-                                      duk_hstring *name,
-                                      duk_tval *val,
-                                      duk_small_int_t prop_flags,
-                                      duk_bool_t is_func_decl) {
-	duk_context *ctx = (duk_context *) thr;
+	duk_hobject *env,
+	duk_hstring *name,
+	duk_tval *val,
+	duk_small_int_t prop_flags,
+	duk_bool_t is_func_decl) {
+	duk_context *ctx = (duk_context *)thr;
 	duk_hobject *holder;
 	duk_bool_t parents;
 	duk__id_lookup_result ref;
 	duk_tval *tv;
 
 	DUK_DDD(DUK_DDDPRINT("declvar: thr=%p, env=%p, name=%!O, val=%!T, prop_flags=0x%08lx, is_func_decl=%ld "
-	                     "(env -> %!iO)",
-	                     (void *) thr, (void *) env, (duk_heaphdr *) name,
-	                     (duk_tval *) val, (unsigned long) prop_flags,
-	                     (unsigned int) is_func_decl, (duk_heaphdr *) env));
+		"(env -> %!iO)",
+		(void *)thr, (void *)env, (duk_heaphdr *)name,
+		(duk_tval *)val, (unsigned long)prop_flags,
+		(unsigned int)is_func_decl, (duk_heaphdr *)env));
 
 	DUK_ASSERT(thr != NULL);
 	DUK_ASSERT(env != NULL);
@@ -1580,7 +1594,7 @@ static duk_bool_t duk__declvar_helper(duk_hthread *thr,
 		 */
 
 		DUK_DDD(DUK_DDDPRINT("re-declare a function binding in global object, "
-		                     "updated E5.1 processing"));
+			"updated E5.1 processing"));
 
 		DUK_ASSERT(ref.holder != NULL);
 		holder = ref.holder;
@@ -1619,20 +1633,20 @@ static duk_bool_t duk__declvar_helper(duk_hthread *thr,
 		if (!(flags & DUK_PROPDESC_FLAG_CONFIGURABLE)) {
 			if (flags & DUK_PROPDESC_FLAG_ACCESSOR) {
 				DUK_DDD(DUK_DDDPRINT("existing property is a non-configurable "
-				                     "accessor -> reject"));
+					"accessor -> reject"));
 				goto fail_existing_attributes;
 			}
 			if (!((flags & DUK_PROPDESC_FLAG_WRITABLE) &&
-			      (flags & DUK_PROPDESC_FLAG_ENUMERABLE))) {
+				(flags & DUK_PROPDESC_FLAG_ENUMERABLE))) {
 				DUK_DDD(DUK_DDDPRINT("existing property is a non-configurable "
-				                     "plain property which is not writable and "
-				                     "enumerable -> reject"));
+					"plain property which is not writable and "
+					"enumerable -> reject"));
 				goto fail_existing_attributes;
 			}
 
 			DUK_DDD(DUK_DDDPRINT("existing property is not configurable but "
-			                     "is plain, enumerable, and writable -> "
-			                     "allow redeclaration"));
+				"is plain, enumerable, and writable -> "
+				"allow redeclaration"));
 		}
 
 		if (holder == ref.holder) {
@@ -1653,7 +1667,8 @@ static duk_bool_t duk__declvar_helper(duk_hthread *thr,
 				DUK_HOBJECT_E_SET_VALUE_SETTER(holder, e_idx, NULL);
 				DUK_HOBJECT_DECREF(thr, tmp);
 				DUK_UNREF(tmp);
-			} else {
+			}
+			else {
 				duk_tval tv_tmp;
 
 				tv = DUK_HOBJECT_E_GET_VALUE_TVAL_PTR(holder, e_idx);
@@ -1672,10 +1687,11 @@ static duk_bool_t duk__declvar_helper(duk_hthread *thr,
 			DUK_HOBJECT_E_SET_FLAGS(holder, e_idx, prop_flags);
 
 			DUK_DDD(DUK_DDDPRINT("updated global binding, final result: "
-			                     "value -> %!T, prop_flags=0x%08lx",
-			                     (duk_tval *) DUK_HOBJECT_E_GET_VALUE_TVAL_PTR(holder, e_idx),
-			                     (unsigned long) prop_flags));
-		} else {
+				"value -> %!T, prop_flags=0x%08lx",
+				(duk_tval *)DUK_HOBJECT_E_GET_VALUE_TVAL_PTR(holder, e_idx),
+				(unsigned long)prop_flags));
+		}
+		else {
 			DUK_DDD(DUK_DDDPRINT("redefine, offending property in ancestor"));
 
 			DUK_ASSERT(ref.holder == thr->builtins[DUK_BIDX_GLOBAL]);
@@ -1697,7 +1713,8 @@ static duk_bool_t duk__declvar_helper(duk_hthread *thr,
 
 	if (DUK_HOBJECT_IS_DECENV(env)) {
 		holder = env;
-	} else {
+	}
+	else {
 		DUK_ASSERT(DUK_HOBJECT_IS_OBJENV(env));
 
 		tv = duk_hobject_find_existing_entry_tval_ptr(env, DUK_HTHREAD_STRING_INT_TARGET(thr));
@@ -1730,18 +1747,18 @@ static duk_bool_t duk__declvar_helper(duk_hthread *thr,
 
 	return 0;
 
- fail_existing_attributes:
- fail_not_extensible:
+fail_existing_attributes:
+fail_not_extensible :
 	DUK_ERROR(thr, DUK_ERR_TYPE_ERROR, "declaration failed");
-	return 0;
+					return 0;
 }
 
 duk_bool_t duk_js_declvar_activation(duk_hthread *thr,
-                                     duk_activation *act,
-                                     duk_hstring *name,
-                                     duk_tval *val,
-                                     duk_small_int_t prop_flags,
-                                     duk_bool_t is_func_decl) {
+	duk_activation *act,
+	duk_hstring *name,
+	duk_tval *val,
+	duk_small_int_t prop_flags,
+	duk_bool_t is_func_decl) {
 	duk_hobject *env;
 	duk_tval tv_val_copy;
 

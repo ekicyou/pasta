@@ -1,7 +1,6 @@
 ﻿#include "stdafx.h"
 #include "CppUnitTest.h"
 
-
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
 namespace test
@@ -29,6 +28,5 @@ namespace test
 			struct c_comment : seq < wstr<L'開', L'始'>, star_until< any, wstr<L'終', L'了'> > > {};
 			Assert::IsTrue((match<c_comment>(std::wstring(L"開始　こんにちは、ビスケット！ 終了"))));
 		}
-
 	};
 }
