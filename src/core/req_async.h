@@ -55,6 +55,7 @@ namespace shiori{
 
 	private:
 		bool isUnload;
+		std::exception last_error;
 
 		void SetException(const std::exception& ex);
 		void SetException();

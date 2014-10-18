@@ -6,6 +6,9 @@
 #include "app.h"
 
 namespace shiori{
+	//============================================================
+	// 初期化
+	//============================================================
 	Agent::Agent()
 		:agent(), isUnload(false)
 	{
@@ -21,9 +24,28 @@ namespace shiori{
 	{
 	}
 
+	//============================================================
+	// 解放
+	//============================================================
 	Agent::~Agent()
 	{
 		UnLoad();
+	}
+
+	//============================================================
+	// SHIORI API処理
+	//============================================================
+	void Agent::Load(const std::wstring& dir)
+	{
+		asend(reqBuf, RequestItem(REQUEST_LOAD, dir));
+	}
+
+	void Agent::UnLoad()
+	{
+		if (isUnload)return;
+		asend(reqBuf, RequestItem(REQUEST_UNLOAD, std::wstring()));
+		wait(this);
+		isUnload = true;
 	}
 
 	void Agent::Notify(const std::wstring& req)
@@ -38,19 +60,10 @@ namespace shiori{
 		return res.value;
 	}
 
-	void Agent::Load(const std::wstring& dir)
-	{
-		asend(reqBuf, RequestItem(REQUEST_LOAD, dir));
-	}
 
-	void Agent::UnLoad()
-	{
-		if (isUnload)return;
-		asend(reqBuf, RequestItem(REQUEST_UNLOAD, std::wstring()));
-		wait(this);
-		isUnload = true;
-	}
-
+	//============================================================
+	// SHIORI本体側の非同期メインループ
+	//============================================================
 	void Agent::run(){
 		try{
 			// load処理
@@ -108,4 +121,26 @@ namespace shiori{
 		catch (...){ SetException(); }
 		done();
 	}
+
+
+	//============================================================
+	// 例外処理
+	//============================================================
+
+
+	void Agent::SetException(const std::exception& ex){
+		last_error = ex;
+	}
+
+	void Agent::SetException(){
+		last_error = std::exception("(none)");
+	}
+
+	const ResponseItem Agent::GetErrorResponse(){
+		USES_CONVERSION;
+		auto what = last_error.what();
+		std::wstring message(A2CW_CP(what,CP_UTF8));
+		return ResponseItem(message);
+	}
+
 }

@@ -5,7 +5,7 @@
 #include "pasta.h"
 
 //-------------------------------------------------------------
-// UTIL関数
+// 文字変換
 //-------------------------------------------------------------
 
 // std::string → std::wstring（ロケール依存）
@@ -33,6 +33,11 @@ inline std::string ToMultStr(const std::wstring &wstr, int cp)
 	USES_CONVERSION;
 	return W2CA_CP(wstr.c_str(), cp);
 }
+
+
+//-------------------------------------------------------------
+// エラーコールバック
+//-------------------------------------------------------------
 
 // エラーのコールバック関数（returnしない→例外に変換して戻す）
 static void FatalFunc(duk_context *ctx, int code, const char *msg){
