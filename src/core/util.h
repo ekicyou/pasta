@@ -33,3 +33,5 @@ inline std::string ToMultStr(const std::wstring &wstr, int cp)
     USES_CONVERSION;
     return W2CA_CP(wstr.c_str(), cp);
 }
+
+#define A2CW_UTF8(_str_) (A2CW_CP(_str_,CP_UTF8))

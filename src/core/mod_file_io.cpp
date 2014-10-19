@@ -6,41 +6,105 @@
 #include "util.h"
 
 
+static wchar_t * preLoadPath[] = {
+    L"lib",
+    L"js",
+    L".",
+    NULL,
+};
 
-static duk_ret_t loadModuleFile(duk_context *ctx, pasta::Agent* pasta){
-    throw std::exception("not_impl");
+// モジュールファイルを検索して最初に見つかったものを読み込みオープンして返す。
+static FILE* openModuleFile(pasta::Agent* pasta, LPCWSTR fname){
+    if (!fname) return NULL;
+
+    const auto &loaddir = pasta->loaddir;
+    for (int i = 0;; i++){
+        const auto pre = preLoadPath[i];
+        if (!pre) return NULL;
+        auto p = std::tr2::sys::wpath(pasta->loaddir);
+        p /= pre;
+        p /= fname;
+
+        // ファイルを開く
+        auto f = _wfopen(p.string().c_str(), L"rb");
+        if (f) return f;
+    }
 }
 
+
+// ファイルをバッファとして読み込みます。
+static duk_ret_t fileio_readfile(duk_context *ctx, pasta::Agent* pasta){
+    USES_CONVERSION;
+    OutputDebugString(L"[pasta::FileIO::readfile]開始！\n");
+
+    // 引数
+    auto fname = A2CW_UTF8(duk_to_string(ctx, 0));
+
+    // ファイルオープン
+    auto f = openModuleFile(pasta, fname);
+    if (!f)goto error;
+
+    // 読み込み
+    if (fseek(f, 0, SEEK_END) != 0) goto error;
+    auto len = ftell(f);
+    if (fseek(f, 0, SEEK_SET) != 0) goto error;
+    auto buf = duk_push_fixed_buffer(ctx, (size_t)len);
+    auto got = fread(buf, 1, len, f);
+    if (got != (size_t)len) goto error;
+
+    if (f) fclose(f);
+    return 1;
+
+error:
+    if (f) fclose(f);
+    return DUK_RET_ERROR;
+}
+
+
+// ファイルをテキストとして読み込みます。
+static duk_ret_t fileio_readtext(duk_context *ctx, pasta::Agent* pasta){
+    USES_CONVERSION;
+    OutputDebugString(L"[pasta::FileIO::readfile]開始！\n");
+
+    // 引数
+    auto fname = A2CW_UTF8(duk_to_string(ctx, 0));
+    char *buf = NULL;
+
+    // ファイルオープン
+    auto f = openModuleFile(pasta, fname);
+    if (!f)goto error;
+
+    // 読み込み
+    if (fseek(f, 0, SEEK_END) != 0) goto error;
+    auto len = ftell(f);
+    if (fseek(f, 0, SEEK_SET) != 0) goto error;
+    buf = (char *)malloc(len);
+    if (!buf)                       goto error;
+    auto got = fread(buf, 1, len, f);
+    if (got != (size_t)len)         goto error;
+    duk_push_lstring(ctx, buf, got);
+
+cleanup:
+    free(buf);
+    fclose(f);
+    return 1;
+
+error:
+    if (buf) free(buf);
+    if (f)   fclose(f);
+    return DUK_RET_ERROR;
+}
 
 
 void pasta::Agent::InitFileIO(){
 
-    auto funcs = std::vector<Func>();
-
     auto module = "FileIO";
+    auto &funcs = FileIOFuncs;
 
-    funcs.push_back(Func(this, "loadModuleFile", loadModuleFile, 2));
+    funcs.push_back(Func(this, "readfile" , fileio_readfile , 2));
+    funcs.push_back(Func(this, "readtext" , fileio_readtext , 2));
 
-
-    // 登録
-    auto entrys = std::vector<duk_function_list_entry>(funcs.size() + 1);
-    auto count = funcs.size();
-    for (int i = 0; i < count; i++){
-        Func& f = funcs[i];
-        entrys[i].key = f.key;
-        entrys[i].nargs = f.nargs;
-        auto v = f.func.target<duk_ret_t(*)(duk_context *ctx)>();
-        entrys[i].value = (duk_c_function)v;
-    }
-    entrys[count].key = NULL;
-    entrys[count].nargs = NULL;
-    entrys[count].value = NULL;
-
-    duk_push_global_object(ctx);
-    duk_push_object(ctx);  /* -> [ ... global obj ] */
-    duk_put_function_list(ctx, -1, entrys.data());
-    duk_put_prop_string(ctx, -2, module);  /* -> [ ... global ] */
-    duk_pop(ctx);
+    RegModule(module, funcs);
 }
 
 

@@ -122,6 +122,30 @@ void  pasta::Agent::GetAfterAction(){
 }
 
 
+//-------------------------------------------------------------
+// ÉÇÉWÉÖÅ[Éãìoò^
+//-------------------------------------------------------------
+
+void pasta::Agent::RegModule(const char* moduleName, const std::vector<Func> &funcs){
+    auto entrys = std::vector<duk_function_list_entry>(funcs.size() + 1);
+    auto count = funcs.size();
+    for (int i = 0; i < count; i++){
+        auto &f = funcs[i];
+        entrys[i].key = f.key;
+        entrys[i].nargs = f.nargs;
+        auto v = f.func.target<duk_ret_t(*)(duk_context *ctx)>();
+        entrys[i].value = (duk_c_function)v;
+    }
+    entrys[count].key = NULL;
+    entrys[count].nargs = NULL;
+    entrys[count].value = NULL;
+
+    duk_push_global_object(ctx);
+    duk_push_object(ctx);  /* -> [ ... global obj ] */
+    duk_put_function_list(ctx, -1, entrys.data());
+    duk_put_prop_string(ctx, -2, moduleName);  /* -> [ ... global ] */
+    duk_pop(ctx);
+}
 
 
 

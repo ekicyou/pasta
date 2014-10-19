@@ -62,10 +62,10 @@ namespace shiori{
 		virtual const std::wstring GetAction(const std::wstring& req) = 0;
 		virtual void GetAfterAction() = 0;
 
-    protected:
-        HINSTANCE hinst;        // SHIORI.DLLのインスタンス
-        int cp;                 // コードページ（UTF-8）
-        std::wstring loaddir;   // SHIORI.DLLのディレクトリ
+    public:
+        HINSTANCE hinst;                // SHIORI.DLLのインスタンス
+        int cp;                         // コードページ（UTF-8）
+        std::tr2::sys::wpath loaddir;   // SHIORI.DLLのディレクトリ
 
 	private:
 		bool isUnload;

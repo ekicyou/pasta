@@ -36,6 +36,12 @@ namespace pasta{
 
     private:
         void InitFileIO();
+        std::vector<Func> FileIOFuncs;
+
+
+    private:
+        // ‘g‚İ‚İŠÖ”‚Ì“o˜^
+        void RegModule(const char* moduleName, const std::vector<Func> &funcs);
 
 	private:
 		duk_context *ctx;
