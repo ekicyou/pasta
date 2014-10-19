@@ -22,3 +22,4 @@ ipch
 /src/script/js
 /src/domain/obj
 /src/domain/bin
+*.TMP
