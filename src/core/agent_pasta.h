@@ -7,18 +7,18 @@ namespace pasta{
 
     typedef duk_ret_t(*pasta_c_function)(duk_context *ctx, Agent *pasta);
 
-    class PastaFunc {
+    class Func {
     public:
-        PastaFunc(Agent *pasta, const char* key, const pasta_c_function pastafunc, const duk_int_t value)
+        Func(Agent *pasta, const char* key, const pasta_c_function pastafunc, const duk_int_t nargs)
             : key(key)
-            , value(value)
+            , nargs(nargs)
+            , func([pasta, pastafunc](duk_context *ctx){ return pastafunc(ctx, pasta); })
         {
-            func = [pasta, pastafunc](duk_context *ctx){ return pastafunc(ctx, pasta); };
         }
 
         const char* key;
-        const duk_int_t value;
-        std::function<duk_ret_t(duk_context *ctx)> func;
+        const duk_int_t nargs;
+        const std::function<duk_ret_t(duk_context *ctx)> func;
     };
 
 
