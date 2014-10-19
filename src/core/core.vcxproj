@@ -84,16 +84,18 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="agent_pasta.h" />
     <ClInclude Include="app.h" />
-    <ClInclude Include="pasta.h" />
-    <ClInclude Include="req_async.h" />
+    <ClInclude Include="agent_shiori.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
+    <ClInclude Include="util.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="agent_pasta.cpp" />
     <ClCompile Include="app.cpp" />
-    <ClCompile Include="pasta.cpp" />
-    <ClCompile Include="req_async.cpp" />
+    <ClCompile Include="agent_shiori.cpp" />
+    <ClCompile Include="mod_file_io.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
