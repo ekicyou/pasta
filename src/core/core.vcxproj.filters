@@ -6,6 +6,7 @@
     <ClCompile Include="agent_shiori.cpp" />
     <ClCompile Include="agent_pasta.cpp" />
     <ClCompile Include="mod_file_io.cpp" />
+    <ClCompile Include="mod_shiori.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="app.h" />

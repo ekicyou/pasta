@@ -15,6 +15,7 @@
 #include <string>
 #include <vector>
 #include <filesystem>
+#include <regex>
 #include <agents.h>
 #include <duktape.h>
 #include "biscuit/algorithm.hpp"

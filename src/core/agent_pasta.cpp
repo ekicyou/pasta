@@ -107,18 +107,14 @@ pasta::Agent::~Agent(){
 // Notify処理
 //-------------------------------------------------------------
 void  pasta::Agent::NotifyAction(const std::wstring& req){
+    throw std::exception("not implment");
 }
 
 //-------------------------------------------------------------
 // Get処理
 //-------------------------------------------------------------
-const std::wstring  pasta::Agent::GetAction(const std::wstring& req){
+void pasta::Agent::GetAction(const std::wstring& req){
     throw std::exception("not implment");
-    return L"";
-}
-
-// リクエストを返した後に非同期に行いたい処理
-void  pasta::Agent::GetAfterAction(){
 }
 
 

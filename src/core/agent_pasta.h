@@ -31,12 +31,13 @@ namespace pasta{
         virtual void LoadAction() override;
         virtual void UnLoadAction() override;
         virtual void NotifyAction(const std::wstring& req) override;
-        virtual const std::wstring GetAction(const std::wstring& req) override;
-        virtual void GetAfterAction() override;
+        virtual void GetAction(const std::wstring& req) override;
 
     private:
         void InitFileIO();
+        void InitShiori();
         std::vector<Func> FileIOFuncs;
+        std::vector<Func> ShioriFuncs;
 
 
     private:

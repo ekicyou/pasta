@@ -63,6 +63,13 @@ const std::wstring shiori::Agent::Get(const std::wstring& req)
     else             return res.value;
 }
 
+void shiori::Agent::Response(const std::wstring& res)
+{
+    asend(resBuf, ResponseItem(res));
+    hasResponse = false;
+}
+
+
 
 //============================================================
 // SHIORI本体側の非同期メインループ
@@ -74,12 +81,8 @@ void shiori::Agent::run(){
             auto req = receive(reqBuf);
             LoadAction();
         }
-        catch (const std::exception& ex){
-            SetException(ex);
-        }
-        catch (...){
-            SetException();
-        }
+        catch (const std::exception& ex){ SetException(ex); }
+        catch (...)                     { SetException(); }
 
         // メインループ
         while (true){
@@ -92,22 +95,22 @@ void shiori::Agent::run(){
                     NotifyAction(req.value);
                 }
                 catch (const std::exception& ex){ SetException(ex); }
-                catch (...){ SetException(); }
+                catch (...)                     { SetException(); }
                 continue;
 
             case shiori::REQUEST_GET:
                 try{
-                    auto value = GetAction(req.value);
-                    asend(resBuf, ResponseItem(value));
+                    // GetAction内でSHIORIレスポンスを返すこと
+                    hasResponse = true;
+                    GetAction(req.value);
+
+                    // GetAction内でResponseが呼び出されていない場合は例外とする。
+                    if (!hasResponse){
+                        throw std::exception("NOT RESPONSE");
+                    }
                 }
                 catch (const std::exception& ex){ SetException(ex); SendException(); }
                 catch (...)                     { SetException();   SendException(); }
-
-                try{
-                    GetAfterAction();
-                }
-                catch (const std::exception& ex){ SetException(ex); }
-                catch (...){ SetException(); }
                 continue;
             }
             break;
@@ -118,10 +121,10 @@ void shiori::Agent::run(){
             UnLoadAction();
         }
         catch (const std::exception& ex){ SetException(ex); }
-        catch (...){ SetException(); }
+        catch (...)                     { SetException(); }
     }
     catch (const std::exception& ex){ SetException(ex); }
-    catch (...){ SetException(); }
+    catch (...)                     { SetException(); }
     done();
 }
 

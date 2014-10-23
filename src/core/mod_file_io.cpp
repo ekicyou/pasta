@@ -33,7 +33,7 @@ static FILE* openModuleFile(pasta::Agent* pasta, LPCWSTR fname){
 
 
 // ファイルをバッファとして読み込みます。
-static duk_ret_t fileio_readfile(duk_context *ctx, pasta::Agent* pasta){
+static duk_ret_t readfile(duk_context *ctx, pasta::Agent* pasta){
     USES_CONVERSION;
     OutputDebugString(L"[pasta::FileIO::readfile]開始！\n");
 
@@ -62,7 +62,7 @@ error:
 
 
 // ファイルをテキストとして読み込みます。
-static duk_ret_t fileio_readtext(duk_context *ctx, pasta::Agent* pasta){
+static duk_ret_t readtext(duk_context *ctx, pasta::Agent* pasta){
     USES_CONVERSION;
     OutputDebugString(L"[pasta::FileIO::readfile]開始！\n");
 
@@ -101,8 +101,8 @@ void pasta::Agent::InitFileIO(){
     auto module = "FileIO";
     auto &funcs = FileIOFuncs;
 
-    funcs.push_back(Func(this, "readfile" , fileio_readfile , 2));
-    funcs.push_back(Func(this, "readtext" , fileio_readtext , 2));
+    funcs.push_back(Func(this, "readfile", readfile, 1));
+    funcs.push_back(Func(this, "readtext", readtext, 1));
 
     RegModule(module, funcs);
 }

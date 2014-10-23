@@ -50,7 +50,10 @@ namespace shiori{
         void UnLoad();
 
         void Notify(const std::wstring& req);
+
 		const std::wstring Get(const std::wstring& req);
+        void Response(const std::wstring& res);
+
 
 	protected:
 		void run();
@@ -59,8 +62,7 @@ namespace shiori{
         virtual void LoadAction() = 0;
 		virtual void UnLoadAction() = 0;
 		virtual void NotifyAction(const std::wstring& req) = 0;
-		virtual const std::wstring GetAction(const std::wstring& req) = 0;
-		virtual void GetAfterAction() = 0;
+        virtual void GetAction(const std::wstring& req) = 0;
 
     public:
         HINSTANCE hinst;                // SHIORI.DLLのインスタンス
@@ -69,6 +71,7 @@ namespace shiori{
 
 	private:
 		bool isUnload;
+        bool hasResponse = false;
         concurrency::unbounded_buffer<RequestItem> reqBuf;
         concurrency::unbounded_buffer<ResponseItem> resBuf;
         std::exception last_error;
