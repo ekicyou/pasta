@@ -3,7 +3,9 @@
 
 #include "stdafx.h"
 #include "agent_pasta.h"
+#include "shiori_parse.h"
 #include "util.h"
+#include <regex>
 
 //============================================================
 // ‰Šú‰»
@@ -69,6 +71,21 @@ void shiori::Agent::Response(const std::wstring& res)
     hasResponse = false;
 }
 
+const std::wstring shiori::Agent::Request(const std::wstring& req)
+{
+    // SHIORI REQUEST‚ğ‰ğÍ
+    auto text = req.c_str();
+    auto match = matchShioriRequest(text);
+
+    // ‰ğÍ‚É¸”s
+    if (match.empty())      throw std::exception("NOT SHIORI/3.0 REQUEST");
+    if (match.size() < 2)   throw std::exception("matchShioriRequest INTERNAL ERROR");
+
+    // GET
+
+
+
+}
 
 
 //============================================================

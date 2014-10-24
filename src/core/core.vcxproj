@@ -87,6 +87,7 @@
     <ClInclude Include="agent_pasta.h" />
     <ClInclude Include="app.h" />
     <ClInclude Include="agent_shiori.h" />
+    <ClInclude Include="shiori_parse.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="util.h" />
@@ -97,6 +98,7 @@
     <ClCompile Include="agent_shiori.cpp" />
     <ClCompile Include="mod_file_io.cpp" />
     <ClCompile Include="mod_shiori.cpp" />
+    <ClCompile Include="shiori_parse.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>

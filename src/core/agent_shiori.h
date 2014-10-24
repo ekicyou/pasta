@@ -48,10 +48,11 @@ namespace shiori{
 
         void Load(const HINSTANCE hinst, const int cp, const std::wstring& dir);
         void UnLoad();
+        const std::wstring Request(const std::wstring& req);
 
         void Notify(const std::wstring& req);
 
-		const std::wstring Get(const std::wstring& req);
+        const std::wstring Get(const std::wstring& req);
         void Response(const std::wstring& res);
 
 

@@ -13,9 +13,10 @@
 #include <atlbase.h>
 #include <atlconv.h>
 #include <string>
+#include <regex>
+#include <stdexcept>
 #include <vector>
 #include <filesystem>
-#include <regex>
 #include <agents.h>
 #include <duktape.h>
 #include "biscuit/algorithm.hpp"
