@@ -29,16 +29,10 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="unittest1.cpp">
-      <Filter>test</Filter>
-    </ClCompile>
     <ClCompile Include="stdafx.cpp">
       <Filter>other</Filter>
     </ClCompile>
     <ClCompile Include="LoadTest.cpp">
-      <Filter>test</Filter>
-    </ClCompile>
-    <ClCompile Include="PEGTests.cpp">
       <Filter>test</Filter>
     </ClCompile>
     <ClCompile Include="PastaAgentTest.cpp">
