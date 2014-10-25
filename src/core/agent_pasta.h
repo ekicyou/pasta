@@ -23,7 +23,10 @@ namespace pasta{
 
 	private:
 		duk_context *ctx;
-	};
+
+    public:
+        std::string eval(const char *utf8text);
+    };
 
 
 }

@@ -12,10 +12,6 @@
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
       <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
     </Filter>
-    <Filter Include="test">
-      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
-      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
-    </Filter>
     <Filter Include="agent">
       <UniqueIdentifier>{ea0beacc-8292-4fb8-b26e-8e61065523e5}</UniqueIdentifier>
     </Filter>
@@ -31,9 +27,6 @@
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
       <Filter>other</Filter>
-    </ClCompile>
-    <ClCompile Include="LoadTest.cpp">
-      <Filter>test</Filter>
     </ClCompile>
     <ClCompile Include="PastaAgentTest.cpp">
       <Filter>agent</Filter>
