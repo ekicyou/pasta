@@ -3,6 +3,7 @@
 
 #include "stdafx.h"
 #include "agent_pasta.h"
+#include "ctx2pasta.h"
 #include "util.h"
 
 
@@ -14,7 +15,7 @@ static wchar_t * preLoadPath[] = {
 };
 
 // モジュールファイルを検索して最初に見つかったものを読み込みオープンして返す。
-static FILE* openModuleFile(pasta::Agent* pasta, LPCWSTR fname){
+static FILE* openModuleFile(const pasta::Agent* pasta, LPCWSTR fname){
     if (!fname) return NULL;
 
     const auto &loaddir = pasta->loaddir;
@@ -33,11 +34,12 @@ static FILE* openModuleFile(pasta::Agent* pasta, LPCWSTR fname){
 
 
 // ファイルをバッファとして読み込みます。
-static duk_ret_t readfile(duk_context *ctx, pasta::Agent* pasta){
+static duk_ret_t readfile(duk_context *ctx){
     USES_CONVERSION;
     OutputDebugString(L"[pasta::FileIO::readfile]開始！\n");
 
-    // 引数
+    // 初期化＆引数取得
+    auto pasta = pasta::GetPasta(ctx);
     auto fname = A2CW_UTF8(duk_to_string(ctx, 0));
 
     // ファイルオープン
@@ -62,11 +64,12 @@ error:
 
 
 // ファイルをテキストとして読み込みます。
-static duk_ret_t readtext(duk_context *ctx, pasta::Agent* pasta){
+static duk_ret_t readtext(duk_context *ctx){
     USES_CONVERSION;
     OutputDebugString(L"[pasta::FileIO::readfile]開始！\n");
 
-    // 引数
+    // 初期化＆引数取得
+    auto pasta = pasta::GetPasta(ctx);
     auto fname = A2CW_UTF8(duk_to_string(ctx, 0));
     char *buf = NULL;
 
@@ -96,15 +99,23 @@ error:
 }
 
 
+
+//-------------------------------------------------------------
+// モジュール登録
+//-------------------------------------------------------------
+
+static duk_function_list_entry funcs[] = {
+        { "readfile", readfile, 1 },
+        { "readtext", readtext, 1 },
+        { NULL, NULL, 0 }
+};
+
 void pasta::Agent::InitFileIO(){
-
-    auto module = "FileIO";
-    auto &funcs = FileIOFuncs;
-
-    funcs.push_back(Func(this, "readfile", readfile, 1));
-    funcs.push_back(Func(this, "readtext", readtext, 1));
-
-    RegModule(module, funcs);
+    duk_push_global_object(ctx);
+    duk_push_object(ctx);
+    duk_put_function_list(ctx, -1, funcs);
+    duk_put_prop_string(ctx, -2, "FileIO");
+    duk_pop(ctx);
 }
 
-
+// EOF

@@ -35,3 +35,4 @@ inline std::string ToMultStr(const std::wstring &wstr, int cp)
 }
 
 #define A2CW_UTF8(_str_) (A2CW_CP(_str_,CP_UTF8))
+

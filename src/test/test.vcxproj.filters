@@ -16,6 +16,9 @@
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
+    <Filter Include="agent">
+      <UniqueIdentifier>{ea0beacc-8292-4fb8-b26e-8e61065523e5}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="stdafx.h">
@@ -34,6 +37,12 @@
     </ClCompile>
     <ClCompile Include="LoadTest.cpp">
       <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="PEGTests.cpp">
+      <Filter>test</Filter>
+    </ClCompile>
+    <ClCompile Include="PastaAgentTest.cpp">
+      <Filter>agent</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

@@ -43,9 +43,9 @@ namespace shiori{
 		explicit Agent();
 		explicit Agent(concurrency::Scheduler& scheduler);
 		explicit Agent(concurrency::ScheduleGroup& group);
-
 		virtual  ~Agent();
 
+    public:
         void Load(const HINSTANCE hinst, const int cp, const std::wstring& dir);
         void UnLoad();
         const std::wstring Request(const std::wstring& req);

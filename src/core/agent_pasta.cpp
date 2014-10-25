@@ -3,6 +3,7 @@
 
 #include "stdafx.h"
 #include "agent_pasta.h"
+#include "ctx2pasta.h"
 
 //-------------------------------------------------------------
 // ユーティリティ関数：文字変換
@@ -60,6 +61,7 @@ static void FatalFunc(duk_context *ctx, int code, const char *msg){
 // Load処理
 //-------------------------------------------------------------
 
+
 void pasta::Agent::LoadAction(){
     USES_CONVERSION;
 
@@ -75,10 +77,11 @@ void pasta::Agent::LoadAction(){
     // VM作成
     ctx = duk_create_heap_pasta();
     if (!ctx) { throw std::exception("FAIL duk_create_heap_default"); }
+    SetPasta(ctx, this);
 
-    // 組み込みオブジェクトの作成
+    // JavaScript組み込みオブジェクトの作成
     InitFileIO();
-
+    InitShiori();
 
     OutputDebugString(L"[pasta::Agent::LoadAction]終了！\n");
 }
@@ -88,18 +91,19 @@ void pasta::Agent::LoadAction(){
 //-------------------------------------------------------------
 
 void pasta::Agent::UnLoadAction() {
-    OutputDebugString(L"[pasta::Agent::Unload]開始！\n");
-
+    OutputDebugString(L"[pasta::Agent::Unload]START\n");
 
     // VMの解放
     duk_destroy_heap(ctx);
-    OutputDebugString(L"[pasta::Agent::Unload]終了！\n");
+    OutputDebugString(L"[pasta::Agent::Unload]END\n");
 }
 
 
 // 解放タイミングでUnloadが実行されていなければ呼び出す。
 pasta::Agent::~Agent(){
+    OutputDebugString(L"[pasta::Agent::destructor]START\n");
     UnLoad();
+    OutputDebugString(L"[pasta::Agent::destructor]END\n");
 }
 
 
@@ -116,33 +120,5 @@ void  pasta::Agent::NotifyAction(const std::wstring& req){
 void pasta::Agent::GetAction(const std::wstring& req){
     throw std::exception("not implment");
 }
-
-
-//-------------------------------------------------------------
-// モジュール登録
-//-------------------------------------------------------------
-
-void pasta::Agent::RegModule(const char* moduleName, const std::vector<Func> &funcs){
-    auto entrys = std::vector<duk_function_list_entry>(funcs.size() + 1);
-    auto count = funcs.size();
-    for (int i = 0; i < count; i++){
-        auto &f = funcs[i];
-        entrys[i].key = f.key;
-        entrys[i].nargs = f.nargs;
-        auto v = f.func.target<duk_ret_t(*)(duk_context *ctx)>();
-        entrys[i].value = (duk_c_function)v;
-    }
-    entrys[count].key = NULL;
-    entrys[count].nargs = NULL;
-    entrys[count].value = NULL;
-
-    duk_push_global_object(ctx);
-    duk_push_object(ctx);  /* -> [ ... global obj ] */
-    duk_put_function_list(ctx, -1, entrys.data());
-    duk_put_prop_string(ctx, -2, moduleName);  /* -> [ ... global ] */
-    duk_pop(ctx);
-}
-
-
 
 // EOF

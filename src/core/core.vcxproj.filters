@@ -8,6 +8,7 @@
     <ClCompile Include="mod_file_io.cpp" />
     <ClCompile Include="mod_shiori.cpp" />
     <ClCompile Include="shiori_parse.cpp" />
+    <ClCompile Include="ctx2pasta.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="app.h" />
@@ -17,5 +18,6 @@
     <ClInclude Include="agent_pasta.h" />
     <ClInclude Include="util.h" />
     <ClInclude Include="shiori_parse.h" />
+    <ClInclude Include="ctx2pasta.h" />
   </ItemGroup>
 </Project>

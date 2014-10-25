@@ -16,6 +16,7 @@
 #include <regex>
 #include <stdexcept>
 #include <vector>
+#include <unordered_map>
 #include <filesystem>
 #include <agents.h>
 #include <duktape.h>
