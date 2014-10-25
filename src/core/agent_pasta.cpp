@@ -83,6 +83,9 @@ void pasta::Agent::LoadAction(){
     InitFileIO();
     InitShiori();
 
+    // [shiori.js]ブートストラップ
+
+
     OutputDebugString(L"[pasta::Agent::LoadAction]終了！\n");
 }
 
@@ -91,11 +94,11 @@ void pasta::Agent::LoadAction(){
 //-------------------------------------------------------------
 
 void pasta::Agent::UnLoadAction() {
-    OutputDebugString(L"[pasta::Agent::Unload]START\n");
+    OutputDebugString(L"[pasta::Agent::UnLoadAction]START\n");
 
     // VMの解放
     duk_destroy_heap(ctx);
-    OutputDebugString(L"[pasta::Agent::Unload]END\n");
+    OutputDebugString(L"[pasta::Agent::UnLoadAction]END\n");
 }
 
 
@@ -110,7 +113,7 @@ pasta::Agent::~Agent(){
 //-------------------------------------------------------------
 // Notify処理
 //-------------------------------------------------------------
-void  pasta::Agent::NotifyAction(const std::wstring& req){
+void pasta::Agent::NotifyAction(const std::wstring& req){
     throw std::exception("not implment");
 }
 
@@ -119,6 +122,17 @@ void  pasta::Agent::NotifyAction(const std::wstring& req){
 //-------------------------------------------------------------
 void pasta::Agent::GetAction(const std::wstring& req){
     throw std::exception("not implment");
+}
+
+//-------------------------------------------------------------
+// モジュール登録
+//-------------------------------------------------------------
+void pasta::Agent::RegModuleFuncs(LPCSTR name, const duk_function_list_entry* funcs){
+    duk_push_global_object(ctx);
+    duk_push_object(ctx);
+    duk_put_function_list(ctx, -1, funcs);
+    duk_put_prop_string(ctx, -2, name);
+    duk_pop(ctx);
 }
 
 // EOF

@@ -16,6 +16,8 @@ namespace pasta{
         virtual void GetAction(const std::wstring& req) override;
 
     private:
+        // JavaScript‘g‚İ‚İŠÖ”‚ğ“o˜^‚µ‚Ü‚·B
+        void RegModuleFuncs(LPCSTR name, const duk_function_list_entry* funcs);
         void InitFileIO();
         void InitShiori();
 

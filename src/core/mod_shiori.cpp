@@ -33,11 +33,7 @@ static duk_function_list_entry funcs[] = {
 };
 
 void pasta::Agent::InitShiori(){
-    duk_push_global_object(ctx);
-    duk_push_object(ctx);
-    duk_put_function_list(ctx, -1, funcs);
-    duk_put_prop_string(ctx, -2, "Shiori");
-    duk_pop(ctx);
+    RegModuleFuncs("Shiori", funcs);
 }
 
 // EOF

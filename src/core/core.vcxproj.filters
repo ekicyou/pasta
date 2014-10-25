@@ -1,23 +1,69 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="app.cpp" />
-    <ClCompile Include="stdafx.cpp" />
-    <ClCompile Include="agent_shiori.cpp" />
-    <ClCompile Include="agent_pasta.cpp" />
-    <ClCompile Include="mod_file_io.cpp" />
-    <ClCompile Include="mod_shiori.cpp" />
-    <ClCompile Include="shiori_parse.cpp" />
-    <ClCompile Include="ctx2pasta.cpp" />
+    <ClCompile Include="mod_file_io.cpp">
+      <Filter>mod</Filter>
+    </ClCompile>
+    <ClCompile Include="mod_shiori.cpp">
+      <Filter>mod</Filter>
+    </ClCompile>
+    <ClCompile Include="agent_pasta.cpp">
+      <Filter>pasta</Filter>
+    </ClCompile>
+    <ClCompile Include="ctx2pasta.cpp">
+      <Filter>mod</Filter>
+    </ClCompile>
+    <ClCompile Include="agent_shiori.cpp">
+      <Filter>shiori</Filter>
+    </ClCompile>
+    <ClCompile Include="shiori_parse.cpp">
+      <Filter>shiori</Filter>
+    </ClCompile>
+    <ClCompile Include="app.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="stdafx.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="app.h" />
-    <ClInclude Include="stdafx.h" />
-    <ClInclude Include="targetver.h" />
-    <ClInclude Include="agent_shiori.h" />
-    <ClInclude Include="agent_pasta.h" />
-    <ClInclude Include="util.h" />
-    <ClInclude Include="shiori_parse.h" />
-    <ClInclude Include="ctx2pasta.h" />
+    <ClInclude Include="agent_pasta.h">
+      <Filter>pasta</Filter>
+    </ClInclude>
+    <ClInclude Include="ctx2pasta.h">
+      <Filter>mod</Filter>
+    </ClInclude>
+    <ClInclude Include="agent_shiori.h">
+      <Filter>shiori</Filter>
+    </ClInclude>
+    <ClInclude Include="shiori_parse.h">
+      <Filter>shiori</Filter>
+    </ClInclude>
+    <ClInclude Include="app.h">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="stdafx.h">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="targetver.h">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="util.h">
+      <Filter>util</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="mod">
+      <UniqueIdentifier>{52aa0476-5568-4dcc-8639-fe12ddda8464}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="pasta">
+      <UniqueIdentifier>{ad74e213-b8a7-45a2-93b1-97e55737361b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="shiori">
+      <UniqueIdentifier>{1de01818-f592-4b04-abc8-940e4790aacf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="util">
+      <UniqueIdentifier>{a942c96f-ff62-4701-b826-4165a4f16fb8}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
 </Project>

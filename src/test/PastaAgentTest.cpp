@@ -16,9 +16,8 @@ namespace test
 		{
             USES_CONVERSION;
             auto loaddir = current_path<wpath>();
-            auto ghost = pasta::Agent();
             OutputDebugString(L"## 1\n");
-            ghost.start();
+            auto ghost = pasta::Agent();
             OutputDebugString(L"## 2\n");
             ghost.Load(NULL, CP_UTF8, loaddir.string());
             OutputDebugString(L"## 3\n");

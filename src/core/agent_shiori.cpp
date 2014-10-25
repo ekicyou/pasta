@@ -42,6 +42,7 @@ void shiori::Agent::Load(const HINSTANCE hinst, const int cp, const std::wstring
     this->hinst = hinst;
     this->cp = cp;
     this->loaddir = dir;
+    start();
     asend(reqBuf, RequestItem(REQUEST_LOAD));
     OutputDebugString(L"[shiori::Agent::Load]END\n");
 }
