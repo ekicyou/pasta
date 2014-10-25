@@ -10,8 +10,8 @@ namespace shiori{
     // SHIORI REQUEST種別
     enum RequestType {
 		REQUEST_NOTIFY,		// 通知のみのリクエスト、応答なし。
-		REQUEST_GET,		// 値取得するリクエスト、応答あり。
-		REQUEST_LOAD,		// Loadリクエスト      、応答なし。
+        REQUEST_GET,		// 値取得するリクエスト、応答あり。
+        REQUEST_LOAD,		// Loadリクエスト      、応答なし。
 		REQUEST_UNLOAD,		// Unloadリクエスト    、応答なし、エージェント終了を待つ。
 	};
 
