@@ -54,7 +54,24 @@ void pasta::Agent::LoadAction(){
     InitFileIO();
     InitShiori();
 
+    // [loader.js]ブートストラップ
+    // 
+
+
     // [shiori.js]ブートストラップ
+    // ブートストラップコードは最低限
+    //  [Shiori.load(dir)]
+    //  [Shiori.load(dir)]
+    //  [Shiori.unload()]
+    //  [Shiori.get(req)]
+    //  [Shiori.notify(req)]
+    // の実装を行うことを前提とする。
+
+
+
+    // Unload処理[ Shiori.load(dir) の呼び出し]
+
+
 
 }
 
@@ -65,6 +82,8 @@ void pasta::Agent::LoadAction(){
 void pasta::Agent::UnLoadAction() {
     FUNC_START;
     USES_CONVERSION;
+
+    // Unload処理[ Shiori.unload() の呼び出し]
 
     // VMの解放
     duk_destroy_heap(ctx);
@@ -85,6 +104,9 @@ void pasta::Agent::NotifyAction(const std::wstring& req){
     FUNC_START;
 
     NOT_IMPLMENT;
+
+    // Notify処理[ Shiori.notify(req) の呼び出し]
+
 }
 
 //-------------------------------------------------------------
@@ -94,6 +116,7 @@ void pasta::Agent::GetAction(const std::wstring& req){
     FUNC_START;
 
     NOT_IMPLMENT;
+    // Get処理[ Shiori.get(req) の呼び出し]
 }
 
 //-------------------------------------------------------------

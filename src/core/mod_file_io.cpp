@@ -8,6 +8,7 @@
 
 
 static wchar_t * preLoadPath[] = {
+    L"modules",
     L"lib",
     L"js",
     L".",
