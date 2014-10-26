@@ -26,6 +26,13 @@ namespace pasta{
 
     public:
         std::string eval(const char *utf8text);
+
+        // 指定モジュールのjavascriptコードを読み込む。読み込めない場合は例外。
+        void LoadJS(LPCWSTR moduleName);
+
+        // モジュール用のファイルをread openし、FILE*を返す。
+        FILE* OpenReadModuleFile(LPCWSTR fname);
+
     };
 
 

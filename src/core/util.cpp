@@ -18,6 +18,11 @@ void ThrowStdException(LPCSTR funcname, LPCSTR what){
     throw std::exception(mes.c_str());
 }
 
+void ThrowStdException(LPCSTR funcname, LPCWSTR what){
+    USES_CONVERSION;
+    auto text = W2CA_CP(what, CP_UTF8);
+    ThrowStdException(funcname, text);
+}
 
 
 //============================================================

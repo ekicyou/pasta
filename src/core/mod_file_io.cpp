@@ -8,6 +8,7 @@
 
 
 static wchar_t * preLoadPath[] = {
+    L"duktape",
     L"modules",
     L"lib",
     L"js",
@@ -18,7 +19,6 @@ static wchar_t * preLoadPath[] = {
 // モジュールファイルを検索して最初に見つかったものを読み込みオープンして返す。
 static FILE* openModuleFile(const pasta::Agent* pasta, LPCWSTR fname){
     if (!fname) return NULL;
-
     const auto &loaddir = pasta->loaddir;
     for (int i = 0;; i++){
         const auto pre = preLoadPath[i];

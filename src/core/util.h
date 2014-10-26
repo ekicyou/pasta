@@ -5,6 +5,20 @@
 
 
 //-------------------------------------------------------------
+// ユーティリティ関数：ユニーク変数名
+//-------------------------------------------------------------
+#define CAT_IMPL(s1, s2) s1##s2
+#define CAT(s1, s2) CAT_IMPL(s1, s2)
+
+#ifdef __COUNTER__
+#define GEN_ID(str) CAT(str, __COUNTER__)
+#else
+#define GEN_ID(str) CAT(str, __LINE__)
+#endif
+
+
+
+//-------------------------------------------------------------
 // ユーティリティ関数：文字変換
 //-------------------------------------------------------------
 
@@ -42,7 +56,8 @@ inline std::string ToMultStr(const std::wstring &wstr, int cp)
 //-------------------------------------------------------------
 
 // メソッド名付きでstd::exceptionを発行します。
-void ThrowStdException(LPCSTR funcname, LPCSTR what);
+void ThrowStdException(LPCSTR funcname, LPCSTR  what);
+void ThrowStdException(LPCSTR funcname, LPCWSTR what);
 
 
 // メソッド名付きでstd::exceptionを発行します。
@@ -51,6 +66,27 @@ void ThrowStdException(LPCSTR funcname, LPCSTR what);
 // 未実装
 #define NOT_IMPLMENT    THROW_EX("not implment") 
 
+
+
+//-------------------------------------------------------------
+// スコープが外れたときに実行する関数
+//-------------------------------------------------------------
+
+class DisposeLambda{
+public:
+    DisposeLambda(const std::tr1::function<void(void)> func)
+        :dispose(func){}
+    ~DisposeLambda(){ dispose(); }
+
+private:
+    const std::tr1::function<void(void)> dispose;
+};
+
+#define DISPOSE_LAMBDA(lambda)                              \
+    DisposeLambda GEN_ID(_dispose_lambda_)(lambda)
+
+#define AUTO_CLOSE(file)                                    \
+    DISPOSE_LAMBDA( [file](){if (file) fclose(file); } )
 
 
 //-------------------------------------------------------------
