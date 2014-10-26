@@ -38,12 +38,11 @@ key2: value2
 
 
 
-
 // SHIORI3.0 REQUESTをKeyとValueのペア配列に分解します。
 const std::tr1::wcmatch shiori::matchShioriRequest(LPCWSTR text){
 
     // regex
-    const std::tr1::wregex re(SHIORI_REQUEST);
+    static std::tr1::wregex re(SHIORI_REQUEST);
 
     // match
     std::tr1::wcmatch match;

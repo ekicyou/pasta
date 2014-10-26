@@ -35,8 +35,8 @@ static FILE* openModuleFile(const pasta::Agent* pasta, LPCWSTR fname){
 
 // ファイルをバッファとして読み込みます。
 static duk_ret_t readfile(duk_context *ctx){
+    FUNC_START;
     USES_CONVERSION;
-    OutputDebugString(L"[pasta::FileIO::readfile]開始！\n");
 
     // 初期化＆引数取得
     auto pasta = pasta::GetPasta(ctx);
@@ -65,8 +65,8 @@ error:
 
 // ファイルをテキストとして読み込みます。
 static duk_ret_t readtext(duk_context *ctx){
+    FUNC_START;
     USES_CONVERSION;
-    OutputDebugString(L"[pasta::FileIO::readfile]開始！\n");
 
     // 初期化＆引数取得
     auto pasta = pasta::GetPasta(ctx);

@@ -36,3 +36,51 @@ inline std::string ToMultStr(const std::wstring &wstr, int cp)
 
 #define A2CW_UTF8(_str_) (A2CW_CP(_str_,CP_UTF8))
 
+
+//-------------------------------------------------------------
+// ユーティリティ関数：例外出力
+//-------------------------------------------------------------
+
+// メソッド名付きでstd::exceptionを発行します。
+void ThrowStdException(LPCSTR funcname, LPCSTR what);
+
+
+// メソッド名付きでstd::exceptionを発行します。
+#define THROW_EX(what)  ThrowStdException(__FUNCTION__,what)
+
+// 未実装
+#define NOT_IMPLMENT    THROW_EX("not implment") 
+
+
+
+//-------------------------------------------------------------
+// ユーティリティ関数：ログ出力関係
+//-------------------------------------------------------------
+
+class FunctionInOutDebugLog{
+public:
+    FunctionInOutDebugLog(LPCSTR funcname);
+    ~FunctionInOutDebugLog();
+
+    void OutputLog(LPCSTR message);
+    void OutputLog(LPCWSTR message);
+
+private:
+    std::wstring funcName;
+};
+
+#ifdef DEBUG
+    #define FUNC_START      FunctionInOutDebugLog __func_start_debuglog__(__FUNCTION__);
+#else
+    #define FUNC_START      ;
+#endif
+
+
+#ifdef DEBUG
+    #define DEBUG_MESSAGE(mes)  __func_start_debuglog__.OutputLog(mes);
+#else
+    #define DEBUG_MESSAGE(mes)  ;
+#endif
+
+
+

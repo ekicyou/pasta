@@ -10,8 +10,8 @@
 
 // SHIORI レスポンス応答を返します。
 static duk_ret_t response(duk_context *ctx){
+    FUNC_START;
     USES_CONVERSION;
-    OutputDebugString(L"[pasta::Shiori::response]開始！\n");
 
     // 初期化＆引数取得
     auto ghost = pasta::GetPasta(ctx);

@@ -4,6 +4,7 @@
 #include "stdafx.h"
 #include "agent_pasta.h"
 #include "shiori_parse.h"
+#include "shiori_response.h"
 #include "util.h"
 #include <regex>
 
@@ -38,66 +39,85 @@ shiori::Agent::~Agent()
 //============================================================
 void shiori::Agent::Load(const HINSTANCE hinst, const int cp, const std::wstring& dir)
 {
-    OutputDebugString(L"[shiori::Agent::Load]START\n");
+    FUNC_START;
+
     this->hinst = hinst;
     this->cp = cp;
     this->loaddir = dir;
     start();
     asend(reqBuf, RequestItem(REQUEST_LOAD));
-    OutputDebugString(L"[shiori::Agent::Load]END\n");
 }
 
 void shiori::Agent::UnLoad()
 {
     if (isUnload)return;
-    OutputDebugString(L"[shiori::Agent::UnLoad]START\n");
+
+    FUNC_START;
+
     asend(reqBuf, RequestItem(REQUEST_UNLOAD));
     wait(this);
     isUnload = true;
-    OutputDebugString(L"[shiori::Agent::UnLoad]END\n");
 }
 
-void shiori::Agent::Notify(const std::wstring& req)
+const std::wstring shiori::Agent::Notify(const std::wstring& req)
 {
-    OutputDebugString(L"[shiori::Agent::Notify]START\n");
+    FUNC_START;
+
     asend(reqBuf, RequestItem(REQUEST_NOTIFY, req));
-    OutputDebugString(L"[shiori::Agent::Notify]END\n");
+    return WSTR_RES_NO_CONTENT;
 }
 
 const std::wstring shiori::Agent::Get(const std::wstring& req)
 {
-    OutputDebugString(L"[shiori::Agent::Get]START\n");
+    FUNC_START;
+
     asend(reqBuf, RequestItem(REQUEST_GET, req));
     auto res = receive(resBuf);
     if (res.isError) throw  res.ex;
     else             return res.value;
-    OutputDebugString(L"[shiori::Agent::Get]END\n");
 }
 
 void shiori::Agent::Response(const std::wstring& res)
 {
-    OutputDebugString(L"[shiori::Agent::Response]START\n");
+    FUNC_START;
+
     asend(resBuf, ResponseItem(res));
     hasResponse = false;
-    OutputDebugString(L"[shiori::Agent::Response]END\n");
 }
 
 const std::wstring shiori::Agent::Request(const std::wstring& req)
 {
-    OutputDebugString(L"[shiori::Agent::Request]START\n");
-    // SHIORI REQUESTを解析
-    auto text = req.c_str();
-    auto match = matchShioriRequest(text);
+    FUNC_START;
+    try{
+        // SHIORI REQUESTを解析
+        auto text = req.c_str();
+        auto match = matchShioriRequest(text);
 
-    // 解析に失敗
-    if (match.empty())      throw std::exception("NOT SHIORI/3.0 REQUEST");
-    if (match.size() < 2)   throw std::exception("matchShioriRequest INTERNAL ERROR");
+        // 解析に失敗
+        if (match.empty())      return WSTR_RES_BAT_REQUEST;
+        if (match.size() < 2)   THROW_EX("matchShioriRequest INTERNAL ERROR");
 
-    // GET
+        // GET
+        std::wstring reqType(match[1].first, match[1].second);
+        if (reqType == L"GET")      return Get(req);
+        if (reqType == L"NOTIFY")   return Notify(req);
 
-
-
-    OutputDebugString(L"[shiori::Agent::Request]END\n");
+        THROW_EX("unmatch request type");
+    }
+    catch (const std::exception& ex){
+        std::string mes(STR_RES_SERVER_ERROR);
+        mes += "X-PASTA-Resion: ";
+        mes += ex.what();
+        mes += "\r\n\r\n";
+        return ToWideStr(mes, CP_UTF8);
+    }
+    catch (...){
+        std::string mes(STR_RES_SERVER_ERROR);
+        mes += "X-PASTA-Resion: ";
+        mes += "NOT std::exception fail";
+        mes += "\r\n\r\n";
+        return ToWideStr(mes, CP_UTF8);
+    }
 }
 
 
@@ -105,31 +125,32 @@ const std::wstring shiori::Agent::Request(const std::wstring& req)
 // SHIORI本体側の非同期メインループ
 //============================================================
 void shiori::Agent::run(){
+    FUNC_START;
+
     try{
-        OutputDebugString(L"[shiori::Agent::run]START\n");
         // load処理
         try{
-            OutputDebugString(L"[shiori::Agent::run]WAIT load\n");
+            DEBUG_MESSAGE(L"WAIT load");
             auto req = receive(reqBuf);
-            OutputDebugString(L"[shiori::Agent::run]CALL LoadAction()\n");
+            DEBUG_MESSAGE(L"CALL LoadAction()");
             LoadAction();
-            OutputDebugString(L"[shiori::Agent::run]END  LoadAction()\n");
+            DEBUG_MESSAGE(L"END  LoadAction()");
         }
         catch (const std::exception& ex){ SetException(ex); }
         catch (...)                     { SetException(); }
 
         // メインループ
         while (true){
-            OutputDebugString(L"[shiori::Agent::run]WAIT request\n");
+            DEBUG_MESSAGE("WAIT request");
             auto req = receive(reqBuf);
             switch (req.reqType)
             {
 
             case shiori::REQUEST_NOTIFY:
                 try{
-                    OutputDebugString(L"[shiori::Agent::run]CALL NotifyAction()\n");
+                    DEBUG_MESSAGE(L"CALL NotifyAction()");
                     NotifyAction(req.value);
-                    OutputDebugString(L"[shiori::Agent::run]END  NotifyAction()\n");
+                    DEBUG_MESSAGE(L"END  NotifyAction()");
                 }
                 catch (const std::exception& ex){ SetException(ex); }
                 catch (...)                     { SetException(); }
@@ -139,13 +160,13 @@ void shiori::Agent::run(){
                 try{
                     // GetAction内でSHIORIレスポンスを返すこと
                     hasResponse = true;
-                    OutputDebugString(L"[shiori::Agent::run]CALL GetAction()\n");
+                    DEBUG_MESSAGE(L"CALL GetAction()");
                     GetAction(req.value);
-                    OutputDebugString(L"[shiori::Agent::run]END  GetAction()\n");
+                    DEBUG_MESSAGE(L"END  GetAction()");
 
                     // GetAction内でResponseが呼び出されていない場合は例外とする。
                     if (!hasResponse){
-                        throw std::exception("NOT RESPONSE");
+                        THROW_EX("script not response [GET]");
                     }
                 }
                 catch (const std::exception& ex){ SetException(ex); SendException(); }
@@ -157,17 +178,15 @@ void shiori::Agent::run(){
 
         // unload処理
         try{
-            OutputDebugString(L"[shiori::Agent::run]CALL UnLoadAction()\n");
+            DEBUG_MESSAGE(L"CALL UnLoadAction()");
             UnLoadAction();
-            OutputDebugString(L"[shiori::Agent::run]END  UnLoadAction()\n");
+            DEBUG_MESSAGE(L"END  UnLoadAction()");
         }
         catch (const std::exception& ex){ SetException(ex); }
         catch (...)                     { SetException(); }
     }
     catch (const std::exception& ex){ SetException(ex); }
     catch (...)                     { SetException(); }
-
-    OutputDebugString(L"[shiori::Agent::run]END\n");
     done();
 }
 
@@ -178,24 +197,21 @@ void shiori::Agent::run(){
 
 
 void shiori::Agent::SetException(const std::exception& ex){
-#ifdef DEBUG
-    {
-        USES_CONVERSION;
-        std::wstring mes(L"[shiori::Agent::SetException] ");
-        mes.append(A2CW_UTF8(ex.what()));
-        mes.append(L"\n");
-        OutputDebugString(mes.c_str());
-    }
-#endif
+    FUNC_START;
+
+    DEBUG_MESSAGE(ex.what());
     last_error = ex;
 }
 
 void shiori::Agent::SetException(){
+    FUNC_START;
+
     SetException(std::exception("(none)"));
 }
 
 void shiori::Agent::SendException(){
-    OutputDebugString(L"[shiori::Agent::SendException]\n");
+    FUNC_START;
+
     auto res = ResponseItem(last_error);
     asend(resBuf, res);
 }

@@ -4,37 +4,7 @@
 #include "stdafx.h"
 #include "agent_pasta.h"
 #include "ctx2pasta.h"
-
-//-------------------------------------------------------------
-// ユーティリティ関数：文字変換
-//-------------------------------------------------------------
-
-// std::string → std::wstring（ロケール依存）
-inline std::wstring ToWideStr(const std::string &str)
-{
-    USES_CONVERSION;
-    return A2CW(str.c_str());
-}
-// std::wstring → std::string（ロケール依存）
-inline std::string ToMultStr(const std::wstring &wstr)
-{
-    USES_CONVERSION;
-    return W2CA(wstr.c_str());
-}
-
-// std::string → std::wstring（コードページ指定）
-inline std::wstring ToWideStr(const std::string &str, int cp)
-{
-    USES_CONVERSION;
-    return A2CW_CP(str.c_str(), cp);
-}
-// std::wstring → std::string（コードページ指定）
-inline std::string ToMultStr(const std::wstring &wstr, int cp)
-{
-    USES_CONVERSION;
-    return W2CA_CP(wstr.c_str(), cp);
-}
-
+#include "util.h"
 
 //-------------------------------------------------------------
 // ユーティリティ関数：エラーコールバック
@@ -42,17 +12,17 @@ inline std::string ToMultStr(const std::wstring &wstr, int cp)
 
 // エラーのコールバック関数（returnしない→例外に変換して戻す）
 static void FatalFunc(duk_context *ctx, int code, const char *msg){
+    FUNC_START;
     USES_CONVERSION;
+
     std::wstring mes(L"duktape FATAL! code=(");
     mes += code;
     mes += L") ";
     mes += A2CW_CP(msg, CP_UTF8);
 
-    OutputDebugString(L"[FatalFunc]");
-    OutputDebugString(mes.c_str());
-    OutputDebugString(L"\n");
+    DEBUG_MESSAGE(mes.c_str());
 
-    throw std::exception(W2CA(mes.c_str()));
+    THROW_EX(W2CA(mes.c_str()));
 }
 
 #define duk_create_heap_pasta()  (duk_create_heap(NULL, NULL, NULL, NULL, FatalFunc))
@@ -63,20 +33,21 @@ static void FatalFunc(duk_context *ctx, int code, const char *msg){
 
 
 void pasta::Agent::LoadAction(){
+    FUNC_START;
     USES_CONVERSION;
 
 #ifdef DEBUG
     {
-        std::wstring mes(L"[pasta::Agent::LoadAction](");
+        std::wstring mes(L"loaddir = [");
         mes.append(this->loaddir);
-        mes.append(L")\n");
-        OutputDebugString(mes.c_str());
+        mes.append(L"]");
+        DEBUG_MESSAGE(mes.c_str());
     }
 #endif
 
     // VM作成
     ctx = duk_create_heap_pasta();
-    if (!ctx) { throw std::exception("FAIL duk_create_heap_default"); }
+    if (!ctx) { THROW_EX("FAIL duk_create_heap_default"); }
     SetPasta(ctx, this);
 
     // JavaScript組み込みオブジェクトの作成
@@ -85,8 +56,6 @@ void pasta::Agent::LoadAction(){
 
     // [shiori.js]ブートストラップ
 
-
-    OutputDebugString(L"[pasta::Agent::LoadAction]終了！\n");
 }
 
 //-------------------------------------------------------------
@@ -94,19 +63,18 @@ void pasta::Agent::LoadAction(){
 //-------------------------------------------------------------
 
 void pasta::Agent::UnLoadAction() {
-    OutputDebugString(L"[pasta::Agent::UnLoadAction]START\n");
+    FUNC_START;
+    USES_CONVERSION;
 
     // VMの解放
     duk_destroy_heap(ctx);
-    OutputDebugString(L"[pasta::Agent::UnLoadAction]END\n");
 }
 
 
 // 解放タイミングでUnloadが実行されていなければ呼び出す。
 pasta::Agent::~Agent(){
-    OutputDebugString(L"[pasta::Agent::destructor]START\n");
+    FUNC_START;
     UnLoad();
-    OutputDebugString(L"[pasta::Agent::destructor]END\n");
 }
 
 
@@ -114,20 +82,26 @@ pasta::Agent::~Agent(){
 // Notify処理
 //-------------------------------------------------------------
 void pasta::Agent::NotifyAction(const std::wstring& req){
-    throw std::exception("not implment");
+    FUNC_START;
+
+    NOT_IMPLMENT;
 }
 
 //-------------------------------------------------------------
 // Get処理
 //-------------------------------------------------------------
 void pasta::Agent::GetAction(const std::wstring& req){
-    throw std::exception("not implment");
+    FUNC_START;
+
+    NOT_IMPLMENT;
 }
 
 //-------------------------------------------------------------
 // モジュール登録
 //-------------------------------------------------------------
 void pasta::Agent::RegModuleFuncs(LPCSTR name, const duk_function_list_entry* funcs){
+    FUNC_START;
+
     duk_push_global_object(ctx);
     duk_push_object(ctx);
     duk_put_function_list(ctx, -1, funcs);

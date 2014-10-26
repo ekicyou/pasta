@@ -22,6 +22,9 @@
     <ClCompile Include="stdafx.cpp">
       <Filter>util</Filter>
     </ClCompile>
+    <ClCompile Include="util.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="agent_pasta.h">
@@ -44,6 +47,9 @@
     </ClInclude>
     <ClInclude Include="util.h">
       <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="shiori_response.h">
+      <Filter>shiori</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

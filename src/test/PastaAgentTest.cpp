@@ -4,6 +4,13 @@
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
+#define ARE_WFIND(exp, actual)      \
+    Assert::AreNotEqual(            \
+        std::wstring::npos,         \
+        actual.find(exp),           \
+        L"NOT FIND [" exp L"]"      \
+    )
+
 namespace test
 {
     using namespace std::tr2::sys;
@@ -19,26 +26,28 @@ namespace test
             auto ghost = pasta::Agent();
             ghost.Load(NULL, CP_UTF8, loaddir.string());
 
-            /*
-            auto code =
-            "(function() {\r\n"
-            "var name, rc, _i, _len, _ref;\r\n"
-            "print('*** All globals');\r\n"
-            "rc = '';\r\n"
-            "_ref = Object.getOwnPropertyNames(this);\r\n"
-            "for (_i = 0, _len = _ref.length; _i < _len; _i++) {\r\n"
-            "	name = _ref[_i];\r\n"
-            "	rc += name + '\\r\\n';\r\n"
-            "}\r\n"
-            "return rc;\r\n"
-            "}).call(this);\r\n"
-            ;
-            auto rc = ghost.eval(code);
-            OutputDebugString(L"[LoadTest::JsRunTest]globals...\n");
-            OutputDebugString(A2CW_CP(rc.c_str(), CP_UTF8));
-            OutputDebugString(L"[LoadTest::JsRunTest]end\n");
-            */
-
+            {
+                auto req =
+                    L"GET Version SHIORI/2.6" L"\r\n"
+                    L"Charset: UTF-8" L"\r\n"
+                    L"Sender: SSP" L"\r\n"
+                    L"\r\n"
+                    ;
+                auto res = ghost.Request(req);
+                ARE_WFIND(L"SHIORI/3.0 400 Bad Request", res);
+            }
+            {
+                auto req =
+                    L"GET SHIORI/3.0\r\n"
+                    L"Charset: UTF-8\r\n"
+                    L"ID: version\r\n"
+                    L"SecurityLevel: local\r\n"
+                    L"Sender: SSP\r\n"
+                    L"\r\n"
+                    ;
+                auto res = ghost.Request(req);
+                ARE_WFIND(L"SHIORI/3.0 200 OK", res);
+            }
         }
 
 	};
