@@ -35,16 +35,18 @@
     // SHIORI LOAD
     Shiori.load = function (dir) {
         try{
-            logger.debug(dir);
+            logger.debug("load: start");
+            logger.debug("loaddir=" + dir);
             Shiori.loaddir = dir;
 
             // TODO: Shiori.cookie の読み込み
+
         }
         catch (e) {
             logger.error(e);
         }
         finally {
-
+            logger.debug("load: fin");
         }
     };
 
@@ -52,6 +54,7 @@
     // SHIORI UNLOAD
     Shiori.unload = function () {
         try {
+            logger.debug("unload: start");
             // TODO: シャットダウン処理の呼び出し
 
             // TODO: Shiori.cookie の保存
@@ -61,7 +64,7 @@
             logger.error(e);
         }
         finally {
-
+            logger.debug("unload: fin");
         }
     };
 
@@ -69,6 +72,7 @@
     // SHIORI NOTIFY
     Shiori.notify = function (req) {
         try {
+            logger.debug("notify: start");
             logger.debug(req);
             // TODO: NOTIFY処理
 
@@ -78,7 +82,7 @@
             logger.error(e);
         }
         finally {
-
+            logger.debug("notify: fin");
         }
     };
 
@@ -87,9 +91,11 @@
     Shiori.get = function (req) {
         hasResponse = true;
         try {
+            logger.debug("get: start");
             logger.debug(req);
-            // TODO: GET処理
 
+            // TODO: GET処理
+            response("SHIORI/3.0 200 OK\r\n\r\n");
 
         }
         catch (e) {
@@ -100,6 +106,7 @@
                 // TODO: レスポンス漏れ
 
             }
+            logger.debug("get: fin");
         }
     };
 

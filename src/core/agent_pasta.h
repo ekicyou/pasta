@@ -23,6 +23,11 @@ namespace pasta{
 
     private:
         duk_context *ctx;
+        duk_idx_t idx_global;
+        duk_idx_t idx_func_load;
+        duk_idx_t idx_func_unload;
+        duk_idx_t idx_func_notify;
+        duk_idx_t idx_func_get;
 
     public:
         // JavaScript‘g‚İ‚İŠÖ”‚ğ“o˜^‚µ‚Ü‚·B
