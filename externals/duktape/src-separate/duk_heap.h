@@ -22,10 +22,10 @@
 #define DUK__HEAP_HAS_FLAGS(heap,bits)               ((heap)->flags & (bits))
 #define DUK__HEAP_SET_FLAGS(heap,bits)  do { \
 		(heap)->flags |= (bits); \
-	} while (0)
+    	} while (0)
 #define DUK__HEAP_CLEAR_FLAGS(heap,bits)  do { \
 		(heap)->flags &= ~(bits); \
-	} while (0)
+    	} while (0)
 
 #define DUK_HEAP_HAS_MARKANDSWEEP_RUNNING(heap)            DUK__HEAP_HAS_FLAGS((heap), DUK_HEAP_FLAG_MARKANDSWEEP_RUNNING)
 #define DUK_HEAP_HAS_MARKANDSWEEP_RECLIMIT_REACHED(heap)   DUK__HEAP_HAS_FLAGS((heap), DUK_HEAP_FLAG_MARKANDSWEEP_RECLIMIT_REACHED)
@@ -84,7 +84,7 @@
 #else
 #define DUK_HEAP_SWITCH_THREAD(heap,newthr)  do { \
 		(heap)->curr_thread = (newthr); \
-	} while (0)
+    	} while (0)
 #endif
 
 /*
@@ -267,15 +267,15 @@ typedef void *(*duk_mem_getptr)(void *ud);
  */
 
 #define DUK_HEAP_ALLOC_FAIL_MARKANDSWEEP_LIMIT           5   /* Retry allocation after mark-and-sweep for this
-                                                              * many times.  A single mark-and-sweep round is
-                                                              * not guaranteed to free all unreferenced memory
-                                                              * because of finalization (in fact, ANY number of
-                                                              * rounds is strictly not enough).
-                                                              */
+ * many times.  A single mark-and-sweep round is
+ * not guaranteed to free all unreferenced memory
+ * because of finalization (in fact, ANY number of
+ * rounds is strictly not enough).
+ */
 
 #define DUK_HEAP_ALLOC_FAIL_MARKANDSWEEP_EMERGENCY_LIMIT  3  /* Starting from this round, use emergency mode
-                                                              * for mark-and-sweep.
-                                                              */
+ * for mark-and-sweep.
+ */
 
 /*
  *  String cache should ideally be at duk_hthread level, but that would
@@ -287,9 +287,9 @@ typedef void *(*duk_mem_getptr)(void *ud);
  */
 
 struct duk_strcache {
-	duk_hstring *h;
-	duk_uint32_t bidx;
-	duk_uint32_t cidx;
+    duk_hstring *h;
+    duk_uint32_t bidx;
+    duk_uint32_t cidx;
 };
 
 /*
@@ -298,11 +298,11 @@ struct duk_strcache {
  */
 
 struct duk_ljstate {
-	duk_jmpbuf *jmpbuf_ptr;   /* current setjmp() catchpoint */
-	duk_small_uint_t type;    /* longjmp type */
-	duk_bool_t iserror;       /* isError flag for yield */
-	duk_tval value1;          /* 1st related value (type specific) */
-	duk_tval value2;          /* 2nd related value (type specific) */
+    duk_jmpbuf *jmpbuf_ptr;   /* current setjmp() catchpoint */
+    duk_small_uint_t type;    /* longjmp type */
+    duk_bool_t iserror;       /* isError flag for yield */
+    duk_tval value1;          /* 1st related value (type specific) */
+    duk_tval value2;          /* 2nd related value (type specific) */
 };
 
 /*
@@ -310,93 +310,93 @@ struct duk_ljstate {
  */
 
 struct duk_heap {
-	duk_small_uint_t flags;
+    duk_small_uint_t flags;
 
-	/* allocator functions */
-	duk_alloc_function alloc_func;
-	duk_realloc_function realloc_func;
-	duk_free_function free_func;
-	void *alloc_udata;
+    /* allocator functions */
+    duk_alloc_function alloc_func;
+    duk_realloc_function realloc_func;
+    duk_free_function free_func;
+    void *alloc_udata;
 
-	/* Fatal error handling, called e.g. when a longjmp() is needed but
-	 * lj.jmpbuf_ptr is NULL.  fatal_func must never return; it's not
-	 * declared as "noreturn" because doing that for typedefs is a bit
-	 * challenging portability-wise.
-	 */
-	duk_fatal_function fatal_func;
+    /* Fatal error handling, called e.g. when a longjmp() is needed but
+     * lj.jmpbuf_ptr is NULL.  fatal_func must never return; it's not
+     * declared as "noreturn" because doing that for typedefs is a bit
+     * challenging portability-wise.
+     */
+    duk_fatal_function fatal_func;
 
-	/* allocated heap objects */
-	duk_heaphdr *heap_allocated;
+    /* allocated heap objects */
+    duk_heaphdr *heap_allocated;
 
-	/* work list for objects whose refcounts are zero but which have not been
-	 * "finalized"; avoids recursive C calls when refcounts go to zero in a
-	 * chain of objects.
-	 */
+    /* work list for objects whose refcounts are zero but which have not been
+     * "finalized"; avoids recursive C calls when refcounts go to zero in a
+     * chain of objects.
+     */
 #ifdef DUK_USE_REFERENCE_COUNTING
-	duk_heaphdr *refzero_list;
-	duk_heaphdr *refzero_list_tail;
+    duk_heaphdr *refzero_list;
+    duk_heaphdr *refzero_list_tail;
 #endif
 
 #ifdef DUK_USE_MARK_AND_SWEEP
-	/* mark-and-sweep control */
+    /* mark-and-sweep control */
 #ifdef DUK_USE_VOLUNTARY_GC
-	duk_int_t mark_and_sweep_trigger_counter;
+    duk_int_t mark_and_sweep_trigger_counter;
 #endif
-	duk_int_t mark_and_sweep_recursion_depth;
+    duk_int_t mark_and_sweep_recursion_depth;
 
-	/* mark-and-sweep flags automatically active (used for critical sections) */
-	duk_small_uint_t mark_and_sweep_base_flags;
+    /* mark-and-sweep flags automatically active (used for critical sections) */
+    duk_small_uint_t mark_and_sweep_base_flags;
 
-	/* work list for objects to be finalized (by mark-and-sweep) */
-	duk_heaphdr *finalize_list;
+    /* work list for objects to be finalized (by mark-and-sweep) */
+    duk_heaphdr *finalize_list;
 #endif
 
-	/* longjmp state */
-	duk_ljstate lj;
+    /* longjmp state */
+    duk_ljstate lj;
 
-	/* marker for detecting internal "double faults", see duk_error_throw.c */
-	duk_bool_t handling_error;
+    /* marker for detecting internal "double faults", see duk_error_throw.c */
+    duk_bool_t handling_error;
 
-	/* heap thread, used internally and for finalization */
-	duk_hthread *heap_thread;
+    /* heap thread, used internally and for finalization */
+    duk_hthread *heap_thread;
 
-	/* current thread */
-	duk_hthread *curr_thread;	/* currently running thread */
+    /* current thread */
+    duk_hthread *curr_thread;	/* currently running thread */
 
-	/* heap level "stash" object (e.g., various reachability roots) */
-	duk_hobject *heap_object;
+    /* heap level "stash" object (e.g., various reachability roots) */
+    duk_hobject *heap_object;
 
-	/* heap level temporary log formatting buffer */
-	duk_hbuffer_dynamic *log_buffer;
+    /* heap level temporary log formatting buffer */
+    duk_hbuffer_dynamic *log_buffer;
 
-	/* duk_handle_call / duk_handle_safe_call recursion depth limiting */
-	duk_int_t call_recursion_depth;
-	duk_int_t call_recursion_limit;
+    /* duk_handle_call / duk_handle_safe_call recursion depth limiting */
+    duk_int_t call_recursion_depth;
+    duk_int_t call_recursion_limit;
 
-	/* mix-in value for computing string hashes; should be reasonably unpredictable */
-	duk_uint32_t hash_seed;
+    /* mix-in value for computing string hashes; should be reasonably unpredictable */
+    duk_uint32_t hash_seed;
 
-	/* rnd_state for duk_util_tinyrandom.c */
-	duk_uint32_t rnd_state;
+    /* rnd_state for duk_util_tinyrandom.c */
+    duk_uint32_t rnd_state;
 
-	/* interrupt counter */
+    /* interrupt counter */
 #ifdef DUK_USE_INTERRUPT_COUNTER
-	duk_int_t interrupt_init;     /* start value for current countdown */
-	duk_int_t interrupt_counter;  /* countdown state (mirrored in current thread state) */
+    duk_int_t interrupt_init;     /* start value for current countdown */
+    duk_int_t interrupt_counter;  /* countdown state (mirrored in current thread state) */
 #endif
 
-	/* string intern table (weak refs) */
-	duk_hstring **st;
-	duk_uint32_t st_size;     /* alloc size in elements */
-	duk_uint32_t st_used;     /* used elements (includes DELETED) */
+    /* string intern table (weak refs) */
+    duk_hstring **st;
+    duk_uint32_t st_size;     /* alloc size in elements */
+    duk_uint32_t st_used;     /* used elements (includes DELETED) */
 
-	/* string access cache (codepoint offset -> byte offset) for fast string
-	 * character looping; 'weak' reference which needs special handling in GC.
-	 */
-	duk_strcache strcache[DUK_HEAP_STRCACHE_SIZE];
+    /* string access cache (codepoint offset -> byte offset) for fast string
+     * character looping; 'weak' reference which needs special handling in GC.
+     */
+    duk_strcache strcache[DUK_HEAP_STRCACHE_SIZE];
 
-	/* built-in strings */
-	duk_hstring *strs[DUK_HEAP_NUM_STRINGS];
+    /* built-in strings */
+    duk_hstring *strs[DUK_HEAP_NUM_STRINGS];
 };
 
 /*
@@ -405,10 +405,10 @@ struct duk_heap {
 
 DUK_INTERNAL_DECL
 duk_heap *duk_heap_alloc(duk_alloc_function alloc_func,
-                         duk_realloc_function realloc_func,
-                         duk_free_function free_func,
-                         void *alloc_udata,
-                         duk_fatal_function fatal_func);
+duk_realloc_function realloc_func,
+duk_free_function free_func,
+void *alloc_udata,
+duk_fatal_function fatal_func);
 DUK_INTERNAL_DECL void duk_heap_free(duk_heap *heap);
 DUK_INTERNAL_DECL void duk_heap_free_heaphdr_raw(duk_heap *heap, duk_heaphdr *hdr);
 

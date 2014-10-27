@@ -14,11 +14,11 @@
  */
 
 struct duk_bitdecoder_ctx {
-	const duk_uint8_t *data;
-	duk_size_t offset;
-	duk_size_t length;
-	duk_uint32_t currval;
-	duk_small_int_t currbits;
+    const duk_uint8_t *data;
+    duk_size_t offset;
+    duk_size_t length;
+    duk_uint32_t currval;
+    duk_small_int_t currbits;
 };
 
 /*
@@ -26,12 +26,12 @@ struct duk_bitdecoder_ctx {
  */
 
 struct duk_bitencoder_ctx {
-	duk_uint8_t *data;
-	duk_size_t offset;
-	duk_size_t length;
-	duk_uint32_t currval;
-	duk_small_int_t currbits;
-	duk_small_int_t truncated;
+    duk_uint8_t *data;
+    duk_size_t offset;
+    duk_size_t length;
+    duk_uint32_t currval;
+    duk_small_int_t currbits;
+    duk_small_int_t truncated;
 };
 
 /*

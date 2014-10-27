@@ -6,7 +6,6 @@
     L"\r\n"                                     \
     )
 
-
 #define WSTR_RES_BAT_REQUEST (                  \
     L"SHIORI/3.0 400 Bad Request\r\n"           \
     L"Charset: UTF-8\r\n"                       \

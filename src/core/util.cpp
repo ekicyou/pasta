@@ -24,7 +24,6 @@ void ThrowStdException(LPCSTR funcname, LPCWSTR what){
     ThrowStdException(funcname, text);
 }
 
-
 //============================================================
 // ÉçÉOèoóÕ
 //============================================================

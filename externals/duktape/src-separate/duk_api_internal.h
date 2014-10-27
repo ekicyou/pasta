@@ -25,8 +25,8 @@
  */
 DUK_INTERNAL_DECL
 duk_bool_t duk_valstack_resize_raw(duk_context *ctx,
-                                   duk_size_t min_new_size,
-                                   duk_small_uint_t flags);
+duk_size_t min_new_size,
+duk_small_uint_t flags);
 
 DUK_INTERNAL_DECL duk_tval *duk_get_tval(duk_context *ctx, duk_idx_t index);
 DUK_INTERNAL_DECL duk_tval *duk_require_tval(duk_context *ctx, duk_idx_t index);

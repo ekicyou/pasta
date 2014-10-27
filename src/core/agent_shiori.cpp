@@ -12,17 +12,17 @@
 // 初期化
 //============================================================
 shiori::Agent::Agent()
-    :agent(), isUnload(false)
+    :agent(), hasUnload(false)
 {
 }
 
 shiori::Agent::Agent(concurrency::Scheduler& scheduler)
-    : agent(scheduler), isUnload(false)
+    : agent(scheduler), hasUnload(false)
 {
 }
 
 shiori::Agent::Agent(concurrency::ScheduleGroup& group)
-    : agent(group), isUnload(false)
+    : agent(group), hasUnload(false)
 {
 }
 
@@ -44,19 +44,20 @@ void shiori::Agent::Load(const HINSTANCE hinst, const int cp, const std::wstring
     this->hinst = hinst;
     this->cp = cp;
     this->loaddir = dir;
+    this->hasUnload = true;
     start();
     asend(reqBuf, RequestItem(REQUEST_LOAD));
 }
 
 void shiori::Agent::UnLoad()
 {
-    if (isUnload)return;
+    if (!hasUnload)return;
 
     FUNC_START;
 
     asend(reqBuf, RequestItem(REQUEST_UNLOAD));
     wait(this);
-    isUnload = true;
+    hasUnload = false;
 }
 
 const std::wstring shiori::Agent::Notify(const std::wstring& req)
@@ -73,15 +74,18 @@ const std::wstring shiori::Agent::Get(const std::wstring& req)
 
     asend(reqBuf, RequestItem(REQUEST_GET, req));
     auto res = receive(resBuf);
-    if (res.isError) throw  res.ex;
-    else             return res.value;
+    if (res.resType == RESPONSE_ERROR){
+        USES_CONVERSION;
+        throw std::exception(W2CA_CP(res.value.c_str(), CP_UTF8));
+    }
+    return res.value;
 }
 
 void shiori::Agent::Response(const std::wstring& res)
 {
     FUNC_START;
 
-    asend(resBuf, ResponseItem(res));
+    asend(resBuf, ResponseItem(res, RESPONSE_NORMAL));
     hasResponse = false;
 }
 
@@ -120,7 +124,6 @@ const std::wstring shiori::Agent::Request(const std::wstring& req)
     }
 }
 
-
 //============================================================
 // SHIORI本体側の非同期メインループ
 //============================================================
@@ -145,7 +148,6 @@ void shiori::Agent::run(){
             auto req = receive(reqBuf);
             switch (req.reqType)
             {
-
             case shiori::REQUEST_NOTIFY:
                 try{
                     DEBUG_MESSAGE(L"CALL NotifyAction()");
@@ -190,17 +192,15 @@ void shiori::Agent::run(){
     done();
 }
 
-
 //============================================================
 // 例外処理
 //============================================================
-
 
 void shiori::Agent::SetException(const std::exception& ex){
     FUNC_START;
 
     DEBUG_MESSAGE(ex.what());
-    last_error = ex;
+    last_error_what = ToWideStr(ex.what(), CP_UTF8);
 }
 
 void shiori::Agent::SetException(){
@@ -212,9 +212,8 @@ void shiori::Agent::SetException(){
 void shiori::Agent::SendException(){
     FUNC_START;
 
-    auto res = ResponseItem(last_error);
+    auto res = ResponseItem(last_error_what, RESPONSE_ERROR);
     asend(resBuf, res);
 }
-
 
 // EOF

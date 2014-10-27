@@ -12,19 +12,19 @@
 // RESPOSE 400: Bad Request
 void CreateBatRequestResponse(std::string& response, const char* reason)
 {
-	response =
-		"SHIORI/3.0 400 Bad Request\r\n"
-		"Charset: UTF-8\r\n"
-		"Sender: PASTA\r\n"
-		"X-PASTA-Reason: ";
-	response += reason;
-	response += "\r\n\r\n";
+    response =
+        "SHIORI/3.0 400 Bad Request\r\n"
+        "Charset: UTF-8\r\n"
+        "Sender: PASTA\r\n"
+        "X-PASTA-Reason: ";
+    response += reason;
+    response += "\r\n\r\n";
 }
 
 void CreateBatRequestResponse(std::string& response, const char* reason, const int cp){
-	USES_CONVERSION;
-	auto message = W2A(A2W_CP(reason, cp));
-	CreateBatRequestResponse(response, reason);
+    USES_CONVERSION;
+    auto message = W2A(A2W_CP(reason, cp));
+    CreateBatRequestResponse(response, reason);
 }
 
 /**----------------------------------------------------------------------------
@@ -32,19 +32,19 @@ void CreateBatRequestResponse(std::string& response, const char* reason, const i
  */
 
 Pushd::Pushd(LPCTSTR newdir)
-	:mOldDir()
+    :mOldDir()
 {
-	TCHAR buf[_MAX_PATH + 1];
-	GetCurrentDirectory(sizeof(buf), buf);
-	mOldDir = buf;
-	BOOL rc = SetCurrentDirectory(newdir);
-	if (!rc) AtlThrow(FAILED(ERROR_CURRENT_DIRECTORY));
+    TCHAR buf[_MAX_PATH + 1];
+    GetCurrentDirectory(sizeof(buf), buf);
+    mOldDir = buf;
+    BOOL rc = SetCurrentDirectory(newdir);
+    if (!rc) AtlThrow(FAILED(ERROR_CURRENT_DIRECTORY));
 }
 
 Pushd::~Pushd()
 {
-	if (mOldDir.IsEmpty()) return;
-	SetCurrentDirectory(mOldDir);
+    if (mOldDir.IsEmpty()) return;
+    SetCurrentDirectory(mOldDir);
 }
 
 // EOF

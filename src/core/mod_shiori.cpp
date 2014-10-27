@@ -6,8 +6,6 @@
 #include "ctx2pasta.h"
 #include "util.h"
 
-
-
 // SHIORI レスポンス応答を返します。
 static duk_ret_t response(duk_context *ctx){
     FUNC_START;
@@ -21,7 +19,6 @@ static duk_ret_t response(duk_context *ctx){
 
     return 1;
 }
-
 
 //-------------------------------------------------------------
 // モジュール登録

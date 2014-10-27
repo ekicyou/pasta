@@ -3,7 +3,6 @@
 #include <windows.h>
 #include <string>
 
-
 //-------------------------------------------------------------
 // ユーティリティ関数：ユニーク変数名
 //-------------------------------------------------------------
@@ -15,8 +14,6 @@
 #else
 #define GEN_ID(str) CAT(str, __LINE__)
 #endif
-
-
 
 //-------------------------------------------------------------
 // ユーティリティ関数：文字変換
@@ -50,7 +47,6 @@ inline std::string ToMultStr(const std::wstring &wstr, int cp)
 
 #define A2CW_UTF8(_str_) (A2CW_CP(_str_,CP_UTF8))
 
-
 //-------------------------------------------------------------
 // ユーティリティ関数：例外出力
 //-------------------------------------------------------------
@@ -59,14 +55,11 @@ inline std::string ToMultStr(const std::wstring &wstr, int cp)
 void ThrowStdException(LPCSTR funcname, LPCSTR  what);
 void ThrowStdException(LPCSTR funcname, LPCWSTR what);
 
-
 // メソッド名付きでstd::exceptionを発行します。
 #define THROW_EX(what)  ThrowStdException(__FUNCTION__,what)
 
 // 未実装
-#define NOT_IMPLMENT    THROW_EX("not implment") 
-
-
+#define NOT_IMPLMENT    THROW_EX("not implment")
 
 //-------------------------------------------------------------
 // スコープが外れたときに実行する関数
@@ -88,7 +81,6 @@ private:
 #define AUTO_CLOSE(file)                                    \
     DISPOSE_LAMBDA( [file](){if (file) fclose(file); } )
 
-
 //-------------------------------------------------------------
 // ユーティリティ関数：ログ出力関係
 //-------------------------------------------------------------
@@ -106,17 +98,13 @@ private:
 };
 
 #ifdef DEBUG
-    #define FUNC_START      FunctionInOutDebugLog __func_start_debuglog__(__FUNCTION__);
+#define FUNC_START      FunctionInOutDebugLog __func_start_debuglog__(__FUNCTION__);
 #else
-    #define FUNC_START      ;
+#define FUNC_START      ;
 #endif
-
 
 #ifdef DEBUG
-    #define DEBUG_MESSAGE(mes)  __func_start_debuglog__.OutputLog(mes);
+#define DEBUG_MESSAGE(mes)  __func_start_debuglog__.OutputLog(mes);
 #else
-    #define DEBUG_MESSAGE(mes)  ;
+#define DEBUG_MESSAGE(mes)  ;
 #endif
-
-
-

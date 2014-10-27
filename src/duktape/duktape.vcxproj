@@ -12,7 +12,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_alloc_default.c" />
-    <ClCompile Include="..\..\externals\duktape\src-separate\duk_alloc_torture.c" />
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_buffer.c" />
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_call.c" />
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_codec.c" />
@@ -103,11 +102,8 @@
     <ClInclude Include="..\..\externals\duktape\src-separate\duk_api_internal.h" />
     <ClInclude Include="..\..\externals\duktape\src-separate\duk_bi_protos.h" />
     <ClInclude Include="..\..\externals\duktape\src-separate\duk_builtins.h" />
-    <ClInclude Include="..\..\externals\duktape\src-separate\duk_dblunion.h" />
     <ClInclude Include="..\..\externals\duktape\src-separate\duk_debug.h" />
     <ClInclude Include="..\..\externals\duktape\src-separate\duk_error.h" />
-    <ClInclude Include="..\..\externals\duktape\src-separate\duk_features.h" />
-    <ClInclude Include="..\..\externals\duktape\src-separate\duk_features_sanity.h" />
     <ClInclude Include="..\..\externals\duktape\src-separate\duk_forwdecl.h" />
     <ClInclude Include="..\..\externals\duktape\src-separate\duk_hbuffer.h" />
     <ClInclude Include="..\..\externals\duktape\src-separate\duk_hcompiledfunction.h" />

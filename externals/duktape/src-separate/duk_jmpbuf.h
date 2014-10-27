@@ -12,7 +12,7 @@
 #define DUK_JMPBUF_H_INCLUDED
 
 struct duk_jmpbuf {
-	jmp_buf jb;
+    jmp_buf jb;
 };
 
 #endif  /* DUK_JMPBUF_H_INCLUDED */

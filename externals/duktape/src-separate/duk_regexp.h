@@ -51,33 +51,33 @@
 #define DUK_RE_FLAG_MULTILINE              (1 << 2)
 
 struct duk_re_matcher_ctx {
-	duk_hthread *thr;
+    duk_hthread *thr;
 
-	duk_uint32_t re_flags;
-	duk_uint8_t *input;
-	duk_uint8_t *input_end;
-	duk_uint8_t *bytecode;
-	duk_uint8_t *bytecode_end;
-	duk_uint8_t **saved;		/* allocated from valstack (fixed buffer) */
-	duk_uint32_t nsaved;
-	duk_uint32_t recursion_depth;
-	duk_uint32_t recursion_limit;
-	duk_uint32_t steps_count;
-	duk_uint32_t steps_limit;
+    duk_uint32_t re_flags;
+    duk_uint8_t *input;
+    duk_uint8_t *input_end;
+    duk_uint8_t *bytecode;
+    duk_uint8_t *bytecode_end;
+    duk_uint8_t **saved;		/* allocated from valstack (fixed buffer) */
+    duk_uint32_t nsaved;
+    duk_uint32_t recursion_depth;
+    duk_uint32_t recursion_limit;
+    duk_uint32_t steps_count;
+    duk_uint32_t steps_limit;
 };
 
 struct duk_re_compiler_ctx {
-	duk_hthread *thr;
+    duk_hthread *thr;
 
-	duk_uint32_t re_flags;
-	duk_lexer_ctx lex;
-	duk_re_token curr_token;
-	duk_hbuffer_dynamic *buf;
-	duk_uint32_t captures;  /* highest capture number emitted so far (used as: ++captures) */
-	duk_uint32_t highest_backref;
-	duk_uint32_t recursion_depth;
-	duk_uint32_t recursion_limit;
-	duk_uint32_t nranges;	/* internal temporary value, used for char classes */
+    duk_uint32_t re_flags;
+    duk_lexer_ctx lex;
+    duk_re_token curr_token;
+    duk_hbuffer_dynamic *buf;
+    duk_uint32_t captures;  /* highest capture number emitted so far (used as: ++captures) */
+    duk_uint32_t highest_backref;
+    duk_uint32_t recursion_depth;
+    duk_uint32_t recursion_limit;
+    duk_uint32_t nranges;	/* internal temporary value, used for char classes */
 };
 
 /*

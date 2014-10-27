@@ -79,9 +79,9 @@ DUK_INTERNAL_DECL void duk_js_close_environment_record(duk_hthread *thr, duk_hob
 DUK_INTERNAL_DECL duk_hobject *duk_create_activation_environment_record(duk_hthread *thr, duk_hobject *func, duk_size_t idx_bottom);
 DUK_INTERNAL_DECL
 void duk_js_push_closure(duk_hthread *thr,
-                         duk_hcompiledfunction *fun_temp,
-                         duk_hobject *outer_var_env,
-                         duk_hobject *outer_lex_env);
+duk_hcompiledfunction *fun_temp,
+duk_hobject *outer_var_env,
+duk_hobject *outer_lex_env);
 
 /* call handling */
 DUK_INTERNAL_DECL duk_int_t duk_handle_call(duk_hthread *thr, duk_idx_t num_stack_args, duk_small_uint_t call_flags);

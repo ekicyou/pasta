@@ -6,7 +6,6 @@
 #include "ctx2pasta.h"
 #include "util.h"
 
-
 static wchar_t * preLoadPath[] = {
     L"duktape",
     L"modules",
@@ -32,7 +31,6 @@ static FILE* openModuleFile(const pasta::Agent* pasta, LPCWSTR fname){
         if (f) return f;
     }
 }
-
 
 // ファイルをバッファとして読み込みます。
 static duk_ret_t readfile(duk_context *ctx){
@@ -62,7 +60,6 @@ error:
     if (f) fclose(f);
     return DUK_RET_ERROR;
 }
-
 
 // ファイルをテキストとして読み込みます。
 static duk_ret_t readtext(duk_context *ctx){
@@ -98,8 +95,6 @@ error:
     if (f)   fclose(f);
     return DUK_RET_ERROR;
 }
-
-
 
 //-------------------------------------------------------------
 // モジュール登録

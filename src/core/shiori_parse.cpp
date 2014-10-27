@@ -6,7 +6,6 @@
 #include "util.h"
 #include <regex>
 
-
 // SHIORI REQUESTの正規表現
 
 /*
@@ -35,12 +34,8 @@ key2: value2
 
 #define SHIORI_REQUEST  T("^") SHIORI_HEADER T("(") SHIORI_VALUE T(")*") CRLF T("$")
 
-
-
-
 // SHIORI3.0 REQUESTをKeyとValueのペア配列に分解します。
 const std::tr1::wcmatch shiori::matchShioriRequest(LPCWSTR text){
-
     // regex
     static std::tr1::wregex re(SHIORI_REQUEST);
 

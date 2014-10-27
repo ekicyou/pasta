@@ -9,9 +9,6 @@
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_alloc_default.c">
       <Filter>src-separate</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\externals\duktape\src-separate\duk_alloc_torture.c">
-      <Filter>src-separate</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_buffer.c">
       <Filter>src-separate</Filter>
     </ClCompile>
@@ -24,6 +21,12 @@
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_compile.c">
       <Filter>src-separate</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_debug.c">
+      <Filter>src-separate</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_heap.c">
+      <Filter>src-separate</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_logging.c">
       <Filter>src-separate</Filter>
     </ClCompile>
@@ -31,6 +34,9 @@
       <Filter>src-separate</Filter>
     </ClCompile>
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_object.c">
+      <Filter>src-separate</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_stack.c">
       <Filter>src-separate</Filter>
     </ClCompile>
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_string.c">
@@ -79,6 +85,9 @@
       <Filter>src-separate</Filter>
     </ClCompile>
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_bi_pointer.c">
+      <Filter>src-separate</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_bi_proxy.c">
       <Filter>src-separate</Filter>
     </ClCompile>
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_bi_regexp.c">
@@ -225,6 +234,9 @@
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_selftest.c">
       <Filter>src-separate</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\externals\duktape\src-separate\duk_strings.c">
+      <Filter>src-separate</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_unicode_support.c">
       <Filter>src-separate</Filter>
     </ClCompile>
@@ -249,21 +261,6 @@
     <ClCompile Include="..\..\externals\duktape\src-separate\duk_util_tinyrandom.c">
       <Filter>src-separate</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_debug.c">
-      <Filter>src-separate</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\externals\duktape\src-separate\duk_bi_proxy.c">
-      <Filter>src-separate</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\externals\duktape\src-separate\duk_strings.c">
-      <Filter>src-separate</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_heap.c">
-      <Filter>src-separate</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\externals\duktape\src-separate\duk_api_stack.c">
-      <Filter>src-separate</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\externals\duktape\src-separate\duk_api_internal.h">
@@ -275,19 +272,10 @@
     <ClInclude Include="..\..\externals\duktape\src-separate\duk_builtins.h">
       <Filter>src-separate</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\externals\duktape\src-separate\duk_dblunion.h">
-      <Filter>src-separate</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\externals\duktape\src-separate\duk_debug.h">
       <Filter>src-separate</Filter>
     </ClInclude>
     <ClInclude Include="..\..\externals\duktape\src-separate\duk_error.h">
-      <Filter>src-separate</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\externals\duktape\src-separate\duk_features.h">
-      <Filter>src-separate</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\externals\duktape\src-separate\duk_features_sanity.h">
       <Filter>src-separate</Filter>
     </ClInclude>
     <ClInclude Include="..\..\externals\duktape\src-separate\duk_forwdecl.h">
@@ -350,6 +338,9 @@
     <ClInclude Include="..\..\externals\duktape\src-separate\duk_selftest.h">
       <Filter>src-separate</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\externals\duktape\src-separate\duk_strings.h">
+      <Filter>src-separate</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\externals\duktape\src-separate\duk_tval.h">
       <Filter>src-separate</Filter>
     </ClInclude>
@@ -360,9 +351,6 @@
       <Filter>src-separate</Filter>
     </ClInclude>
     <ClInclude Include="..\..\externals\duktape\src-separate\duktape.h">
-      <Filter>src-separate</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\externals\duktape\src-separate\duk_strings.h">
       <Filter>src-separate</Filter>
     </ClInclude>
   </ItemGroup>

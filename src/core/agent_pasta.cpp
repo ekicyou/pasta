@@ -31,7 +31,6 @@ static void FatalFunc(duk_context *ctx, int code, const char *msg){
 // Load処理
 //-------------------------------------------------------------
 
-
 void pasta::Agent::LoadAction(){
     FUNC_START;
     USES_CONVERSION;
@@ -68,8 +67,6 @@ void pasta::Agent::LoadAction(){
     LoadJS(L"shiori.js");
 
     // load処理[ Shiori.load(dir) の呼び出し]
-
-
 }
 
 //-------------------------------------------------------------
@@ -86,13 +83,11 @@ void pasta::Agent::UnLoadAction() {
     duk_destroy_heap(ctx);
 }
 
-
 // 解放タイミングでUnloadが実行されていなければ呼び出す。
 pasta::Agent::~Agent(){
     FUNC_START;
     UnLoad();
 }
-
 
 //-------------------------------------------------------------
 // Notify処理
@@ -103,7 +98,6 @@ void pasta::Agent::NotifyAction(const std::wstring& req){
     NOT_IMPLMENT;
 
     // Notify処理[ Shiori.notify(req) の呼び出し]
-
 }
 
 //-------------------------------------------------------------
@@ -142,7 +136,6 @@ inline void LoadJSThrow(LPCWSTR moduleName, LPCWSTR what){
     ThrowStdException("pasta::Agent::LoadJS", mes.c_str());
 }
 
-
 // 指定モジュールのjavascriptコードを読み込む。
 void pasta::Agent::LoadJS(LPCWSTR moduleName){
     FUNC_START;
@@ -160,7 +153,7 @@ void pasta::Agent::LoadJS(LPCWSTR moduleName){
     if (fseek(f, 0, SEEK_END) != 0) LoadJSThrow(moduleName, L"seek error");
     auto len = ftell(f);
     if (fseek(f, 0, SEEK_SET) != 0) LoadJSThrow(moduleName, L"seek error");
-    auto src = (char *)malloc(len+1);
+    auto src = (char *)malloc(len + 1);
     src[len] = NULL;
     if (!src)                       LoadJSThrow(moduleName, L"malloc error");
     DISPOSE_LAMBDA([src](){free(src); });
@@ -170,7 +163,6 @@ void pasta::Agent::LoadJS(LPCWSTR moduleName){
     // コンパイル
     duk_push_string(duk, W2A_CP(moduleName, CP_UTF8));
     DISPOSE_LAMBDA([duk](){duk_pop(duk); });
-
 
     if (duk_pcompile_lstring_filename(duk, 0, src, len) != 0) {
         std::wstring what(L"compile failed: ");
@@ -184,9 +176,6 @@ void pasta::Agent::LoadJS(LPCWSTR moduleName){
     }
 
     return;
-
-
-
 }
 
 //============================================================
@@ -212,7 +201,6 @@ std::string pasta::Agent::eval(const char * utf8text){
     duk_pop(ctx);
     return rc;
 }
-
 
 //-------------------------------------------------------------
 // IO
@@ -242,6 +230,5 @@ FILE* pasta::Agent::OpenReadModuleFile(LPCWSTR fname){
         if (f) return f;
     }
 }
-
 
 // EOF

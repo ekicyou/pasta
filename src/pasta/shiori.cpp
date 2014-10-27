@@ -16,22 +16,22 @@
 class AutoGrobalFree
 {
 public:
-	HGLOBAL m_hGlobal;
-	AutoGrobalFree(HGLOBAL hGlobal) {
-		m_hGlobal = hGlobal;
-	}
-	~AutoGrobalFree() {
-		GlobalFree(m_hGlobal);
-	}
+    HGLOBAL m_hGlobal;
+    AutoGrobalFree(HGLOBAL hGlobal) {
+        m_hGlobal = hGlobal;
+    }
+    ~AutoGrobalFree() {
+        GlobalFree(m_hGlobal);
+    }
 };
 
 // std::string ¨ HGLOBAL
 inline HGLOBAL AllocString(const std::string& test, long& len)
 {
-	HGLOBAL hText = GlobalAlloc(GMEM_FIXED, test.length());
-	CopyMemory(hText, test.data(), test.length());
-	len = (long)test.length();
-	return hText;
+    HGLOBAL hText = GlobalAlloc(GMEM_FIXED, test.length());
+    CopyMemory(hText, test.data(), test.length());
+    len = (long)test.length();
+    return hText;
 }
 
 /**----------------------------------------------------------------------------
@@ -91,24 +91,24 @@ SHIORI_API BOOL __cdecl load(HGLOBAL hGlobal_loaddir, long loaddir_len)
 {
     USES_CONVERSION;
     AutoGrobalFree autoFree(hGlobal_loaddir);
-	if (app != NULL) {
-		delete app;
-		app = NULL;
-	}
-	std::string loaddir((const char*)hGlobal_loaddir, (size_t)loaddir_len);
+    if (app != NULL) {
+        delete app;
+        app = NULL;
+    }
+    std::string loaddir((const char*)hGlobal_loaddir, (size_t)loaddir_len);
     auto wLoadDir = A2CW(loaddir.c_str());
-	try{
+    try{
         unload();
         app = new pasta::Agent();
         app->Load(hinst, CP_UTF8, wLoadDir);
-		return true;
-	}
-	catch (const std::exception&){
-		return false;
-	}
-	catch (...){
-		return false;
-	}
+        return true;
+    }
+    catch (const std::exception&){
+        return false;
+    }
+    catch (...){
+        return false;
+    }
 }
 
 /* ----------------------------------------------------------------------------
@@ -118,24 +118,23 @@ SHIORI_API HGLOBAL __cdecl request(HGLOBAL hGlobal_request, long& len)
 {
     USES_CONVERSION;
     AutoGrobalFree autoFree(hGlobal_request);
-	const std::string request((const char *)hGlobal_request, len);
-	std::string response;
-	try{
+    const std::string request((const char *)hGlobal_request, len);
+    std::string response;
+    try{
         const std::wstring wreq(A2CW_CP(request.c_str(), CP_UTF8));
         auto wres = app->Request(wreq);
-
-	}
-	catch (const std::exception& e){
-		CreateBatRequestResponse(response, e.what(), app->cp);
-	}
-	catch (const char* e){
+    }
+    catch (const std::exception& e){
+        CreateBatRequestResponse(response, e.what(), app->cp);
+    }
+    catch (const char* e){
         CreateBatRequestResponse(response, e, app->cp);
-	}
-	catch (...){
-		CreateBatRequestResponse(response, "Unnone Exception");
-	}
+    }
+    catch (...){
+        CreateBatRequestResponse(response, "Unnone Exception");
+    }
 
-	return AllocString(response, len);
+    return AllocString(response, len);
 }
 
 // EOF

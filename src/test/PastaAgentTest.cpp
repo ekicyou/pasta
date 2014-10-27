@@ -8,19 +8,19 @@ using namespace Microsoft::VisualStudio::CppUnitTestFramework;
     Assert::AreNotEqual(            \
         std::wstring::npos,         \
         actual.find(exp),           \
-        L"NOT FIND [" exp L"]"      \
+        (std::wstring(L"expï∂éöóÒÇ™å©Ç¬Ç©ÇËÇ‹ÇπÇÒÅB\n<<exp>>\n" exp L"\n\n<<actual>>\n") + actual + L"\n----------------").c_str()  \
     )
 
 namespace test
 {
     using namespace std::tr2::sys;
-   
+
     TEST_CLASS(PastaAgentTest)
-	{
-	public:
-		
-		TEST_METHOD(BootTest)
-		{
+    {
+    public:
+
+        TEST_METHOD(BootTest)
+        {
             USES_CONVERSION;
             auto loaddir = current_path<wpath>();
             auto ghost = pasta::Agent();
@@ -49,6 +49,5 @@ namespace test
                 ARE_WFIND(L"SHIORI/3.0 200 OK", res);
             }
         }
-
-	};
+    };
 }
