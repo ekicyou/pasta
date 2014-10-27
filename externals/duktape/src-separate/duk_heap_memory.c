@@ -17,8 +17,8 @@
 		(heap)->mark_and_sweep_trigger_counter--; \
 		if ((heap)->mark_and_sweep_trigger_counter <= 0) { \
 			duk__run_voluntary_gc(heap); \
-        		} \
-    	} while (0)
+                		} \
+            	} while (0)
 
 DUK_LOCAL void duk__run_voluntary_gc(duk_heap *heap) {
     if (DUK_HEAP_HAS_MARKANDSWEEP_RUNNING(heap)) {

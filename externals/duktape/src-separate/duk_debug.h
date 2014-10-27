@@ -129,7 +129,7 @@
 #define DUK_DEBUG_SUMMARY_INIT()  do { \
 		DUK_MEMZERO(duk_debug_summary_buf, sizeof(duk_debug_summary_buf)); \
 		duk_debug_summary_idx = 0; \
-    	} while (0)
+            	} while (0)
 
 #define DUK_DEBUG_SUMMARY_CHAR(ch)  do { \
 		duk_debug_summary_buf[duk_debug_summary_idx++] = (ch); \
@@ -137,16 +137,16 @@
 			duk_debug_summary_buf[duk_debug_summary_idx++] = (char) 0; \
 			DUK_D(DUK_DPRINT("    %s", (const char *) duk_debug_summary_buf)); \
 			DUK_DEBUG_SUMMARY_INIT(); \
-        		} \
-    	} while (0)
+                		} \
+            	} while (0)
 
 #define DUK_DEBUG_SUMMARY_FINISH()  do { \
 		if (duk_debug_summary_idx > 0) { \
 			duk_debug_summary_buf[duk_debug_summary_idx++] = (char) 0; \
 			DUK_D(DUK_DPRINT("    %s", (const char *) duk_debug_summary_buf)); \
 			DUK_DEBUG_SUMMARY_INIT(); \
-        		} \
-    	} while (0)
+                		} \
+            	} while (0)
 
 #else  /* DUK_USE_DEBUG */
 

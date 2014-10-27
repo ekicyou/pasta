@@ -3836,13 +3836,13 @@ typedef union duk_double_union duk_double_union;
 #define DUK__DBLUNION_NORMALIZE_NAN_CHECK_FULL(u)  do { \
 		if (DUK__DBLUNION_IS_NAN_FULL((u))) { \
 			DUK__DBLUNION_SET_NAN_FULL((u)); \
-        		} \
+                		} \
 	} while (0)
 
 #define DUK__DBLUNION_NORMALIZE_NAN_CHECK_NOTFULL(u)  do { \
 		if (DUK__DBLUNION_IS_NAN_NOTFULL((u))) { \
 			DUK__DBLUNION_SET_NAN_NOTFULL((u)); \
-        		} \
+                		} \
 	} while (0)
 
 /* Concrete macros for NaN handling used by the implementation internals.

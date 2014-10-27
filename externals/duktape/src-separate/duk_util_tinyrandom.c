@@ -11,7 +11,7 @@
 #define DUK__UPDATE_RND(rnd) do { \
 		(rnd) += ((rnd) * (rnd)) | 0x05; \
 		(rnd) = ((rnd) & 0xffffffffU);       /* if duk_uint32_t is exactly 32 bits, this is a NOP */ \
-    	} while (0)
+            	} while (0)
 
 #define DUK__RND_BIT(rnd)  ((rnd) >> 31)  /* only use the highest bit */
 

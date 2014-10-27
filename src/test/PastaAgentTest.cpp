@@ -17,7 +17,6 @@ inline void AreFind(LPCSTR exp, std::string& actual){
     Assert::Fail(mes.c_str());
 }
 
-
 namespace test
 {
     using namespace std::tr2::sys;

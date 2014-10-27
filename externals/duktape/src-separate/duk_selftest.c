@@ -19,13 +19,13 @@ typedef union {
 #define DUK__DBLUNION_CMP_TRUE(a,b)  do { \
 		if (DUK_MEMCMP((void *) (a), (void *) (b), sizeof(duk__test_double_union)) != 0) { \
 			DUK_PANIC(DUK_ERR_INTERNAL_ERROR, "self test failed: double union compares false (expected true)"); \
-        		} \
+                		} \
 	} while (0)
 
 #define DUK__DBLUNION_CMP_FALSE(a,b)  do { \
 		if (DUK_MEMCMP((void *) (a), (void *) (b), sizeof(duk__test_double_union)) == 0) { \
 			DUK_PANIC(DUK_ERR_INTERNAL_ERROR, "self test failed: double union compares true (expected false)"); \
-        		} \
+                		} \
 	} while (0)
 
 typedef union {

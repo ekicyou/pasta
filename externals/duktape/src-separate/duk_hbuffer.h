@@ -51,7 +51,7 @@
 
 #define DUK_HBUFFER_SET_SIZE(x,val)  do { \
 		(x)->size = (val); \
-    	} while (0)
+            	} while (0)
 
 /* growth parameters */
 #define DUK_HBUFFER_SPARE_ADD      16

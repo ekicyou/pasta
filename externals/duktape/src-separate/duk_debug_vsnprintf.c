@@ -311,9 +311,9 @@ DUK_LOCAL void duk__print_hstring(duk__dprint_state *st, duk_hstring *h, duk_boo
 #define DUK__COMMA()  do { \
 		if (first) { \
 			first = 0; \
-        		} else { \
+                		} else { \
 			duk_fb_put_byte(fb, (duk_uint8_t) DUK_ASC_COMMA); \
-        		} \
+                		} \
 	} while (0)
 
 DUK_LOCAL void duk__print_hobject(duk__dprint_state *st, duk_hobject *h) {

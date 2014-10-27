@@ -113,7 +113,6 @@ private:
 #define DEBUG_MESSAGE(mes)  ;
 #endif
 
-
 #ifdef DEBUG
 #define DEBUG_RAW_MESSAGE(mes)  __func_start_debuglog__.OutputRaw(mes);
 #else

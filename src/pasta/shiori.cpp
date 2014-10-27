@@ -135,7 +135,6 @@ SHIORI_API HGLOBAL __cdecl request(HGLOBAL hGlobal_request, long& len)
         auto res = CreateBatRequestResponse("Unnone Exception");
         return AllocString(res, len);
     }
-
 }
 
 // EOF

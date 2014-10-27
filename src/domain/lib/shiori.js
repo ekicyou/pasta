@@ -5,4 +5,3 @@
 //  [Shiori.get(req)]
 //  [Shiori.notify(req)]
 // の各関数をフックする。
-

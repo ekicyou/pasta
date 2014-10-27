@@ -18,7 +18,6 @@ void ThrowStdException(LPCSTR funcname, LPCSTR what){
     throw std::exception(mes.c_str());
 }
 
-
 //============================================================
 // ÉçÉOèoóÕ
 //============================================================
@@ -37,7 +36,6 @@ FunctionInOutDebugLog::FunctionInOutDebugLog(const int cp, LPCSTR funcname)
 FunctionInOutDebugLog::   ~FunctionInOutDebugLog(){
     OutputLog("<<< END");
 }
-
 
 void FunctionInOutDebugLog::OutputRaw(LPCWSTR message){
     OutputDebugString(message);
@@ -59,6 +57,5 @@ void FunctionInOutDebugLog::OutputLog(LPCSTR message){
     USES_CONVERSION;
     OutputLog(A2CW(message));
 }
-
 
 // EOF

@@ -22,10 +22,10 @@
 #define DUK__HEAP_HAS_FLAGS(heap,bits)               ((heap)->flags & (bits))
 #define DUK__HEAP_SET_FLAGS(heap,bits)  do { \
 		(heap)->flags |= (bits); \
-    	} while (0)
+            	} while (0)
 #define DUK__HEAP_CLEAR_FLAGS(heap,bits)  do { \
 		(heap)->flags &= ~(bits); \
-    	} while (0)
+            	} while (0)
 
 #define DUK_HEAP_HAS_MARKANDSWEEP_RUNNING(heap)            DUK__HEAP_HAS_FLAGS((heap), DUK_HEAP_FLAG_MARKANDSWEEP_RUNNING)
 #define DUK_HEAP_HAS_MARKANDSWEEP_RECLIMIT_REACHED(heap)   DUK__HEAP_HAS_FLAGS((heap), DUK_HEAP_FLAG_MARKANDSWEEP_RECLIMIT_REACHED)
@@ -84,7 +84,7 @@
 #else
 #define DUK_HEAP_SWITCH_THREAD(heap,newthr)  do { \
 		(heap)->curr_thread = (newthr); \
-    	} while (0)
+            	} while (0)
 #endif
 
 /*

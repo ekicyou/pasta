@@ -28,7 +28,6 @@ static void FatalFunc(duk_context *ctx, int code, const char *msg){
 
 #define duk_create_heap_pasta()  (duk_create_heap(NULL, NULL, NULL, NULL, FatalFunc))
 
-
 //-------------------------------------------------------------
 // デストラクタ・Unload処理
 //-------------------------------------------------------------
@@ -48,7 +47,6 @@ pasta::Agent::~Agent(){
     FUNC_START(cp);
     UnLoad();
 }
-
 
 //-------------------------------------------------------------
 // コンストラクタ・Load処置

@@ -90,29 +90,29 @@
 
 #define DUK_CAT_SET_CATCH_ENABLED(c)    do { \
 		(c)->flags |= DUK_CAT_FLAG_CATCH_ENABLED; \
-    	} while (0)
+            	} while (0)
 #define DUK_CAT_SET_FINALLY_ENABLED(c)  do { \
 		(c)->flags |= DUK_CAT_FLAG_FINALLY_ENABLED; \
-    	} while (0)
+            	} while (0)
 #define DUK_CAT_SET_CATCH_BINDING_ENABLED(c)    do { \
 		(c)->flags |= DUK_CAT_FLAG_CATCH_BINDING_ENABLED; \
-    	} while (0)
+            	} while (0)
 #define DUK_CAT_SET_LEXENV_ACTIVE(c)    do { \
 		(c)->flags |= DUK_CAT_FLAG_LEXENV_ACTIVE; \
-    	} while (0)
+            	} while (0)
 
 #define DUK_CAT_CLEAR_CATCH_ENABLED(c)    do { \
 		(c)->flags &= ~DUK_CAT_FLAG_CATCH_ENABLED; \
-    	} while (0)
+            	} while (0)
 #define DUK_CAT_CLEAR_FINALLY_ENABLED(c)  do { \
 		(c)->flags &= ~DUK_CAT_FLAG_FINALLY_ENABLED; \
-    	} while (0)
+            	} while (0)
 #define DUK_CAT_CLEAR_CATCH_BINDING_ENABLED(c)    do { \
 		(c)->flags &= ~DUK_CAT_FLAG_CATCH_BINDING_ENABLED; \
-    	} while (0)
+            	} while (0)
 #define DUK_CAT_CLEAR_LEXENV_ACTIVE(c)    do { \
 		(c)->flags &= ~DUK_CAT_FLAG_LEXENV_ACTIVE; \
-    	} while (0)
+            	} while (0)
 
 /*
  *  Thread defines

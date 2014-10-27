@@ -113,15 +113,14 @@ static duk_ret_t debugstring(duk_context *ctx){
     return 1;
 }
 
-
 //-------------------------------------------------------------
 // ƒ‚ƒWƒ…[ƒ‹“o˜^
 //-------------------------------------------------------------
 
 static duk_function_list_entry funcs[] = {
-        { "readfile"    , readfile      , 1 },
-        { "readtext"    , readtext      , 1 },
-        { "debugstring" , debugstring   , 1 },
+        { "readfile", readfile, 1 },
+        { "readtext", readtext, 1 },
+        { "debugstring", debugstring, 1 },
         { NULL, NULL, 0 }
 };
 

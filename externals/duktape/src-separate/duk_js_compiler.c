@@ -46,12 +46,12 @@
 #define DUK__RECURSION_INCREASE(comp_ctx,thr)  do { \
 		DUK_DDD(DUK_DDDPRINT("RECURSION INCREASE: %s:%ld", (const char *) DUK_FILE_MACRO, (long) DUK_LINE_MACRO)); \
 		duk__recursion_increase((comp_ctx)); \
-    	} while (0)
+            	} while (0)
 
 #define DUK__RECURSION_DECREASE(comp_ctx,thr)  do { \
 		DUK_DDD(DUK_DDDPRINT("RECURSION DECREASE: %s:%ld", (const char *) DUK_FILE_MACRO, (long) DUK_LINE_MACRO)); \
 		duk__recursion_decrease((comp_ctx)); \
-    	} while (0)
+            	} while (0)
 
 /* Value stack slot limits: these are quite approximate right now, and
  * because they overlap in control flow, some could be eliminated.
