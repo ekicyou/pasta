@@ -49,10 +49,16 @@ namespace shiori{
         virtual  ~Agent();
 
     public:
+        // SHIORI load
         void Load(const std::wstring& dir);
+
+        // SHIORI unload
         void UnLoad();
 
+        // SHIORI request
         const std::string Request(const std::string& req);
+
+    public:
         const std::string Notify(const std::string& req);
         const std::string Get(const std::string& req);
 

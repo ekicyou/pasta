@@ -103,9 +103,9 @@ const std::string shiori::Agent::Request(const std::string& req)
         if (match.size() < 2)   THROW_EX("matchShioriRequest INTERNAL ERROR");
 
         // GET
-        std::wstring reqType(match[1].first, match[1].second);
-        if (reqType == L"GET")      return Get(req);
-        if (reqType == L"NOTIFY")   return Notify(req);
+        std::string reqType(match[1].first, match[1].second);
+        if (reqType == "GET")      return Get(req);
+        if (reqType == "NOTIFY")   return Notify(req);
         THROW_EX("unmatch request type");
     }
     catch (const std::exception& ex){

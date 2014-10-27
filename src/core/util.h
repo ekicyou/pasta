@@ -93,6 +93,9 @@ public:
     void OutputLog(LPCSTR message);
     void OutputLog(LPCWSTR message);
 
+    void OutputRaw(LPCSTR message);
+    void OutputRaw(LPCWSTR message);
+
 private:
     std::wstring funcName;
     const int cp;
@@ -108,4 +111,11 @@ private:
 #define DEBUG_MESSAGE(mes)  __func_start_debuglog__.OutputLog(mes);
 #else
 #define DEBUG_MESSAGE(mes)  ;
+#endif
+
+
+#ifdef DEBUG
+#define DEBUG_RAW_MESSAGE(mes)  __func_start_debuglog__.OutputRaw(mes);
+#else
+#define DEBUG_RAW_MESSAGE(mes)  ;
 #endif

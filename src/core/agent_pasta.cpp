@@ -185,7 +185,7 @@ void pasta::Agent::LoadJS(LPCSTR moduleName){
     else {
         duk_call(duk, 0);      /* [ func ] -> [ result ] */
         auto rc = duk_safe_to_string(duk, -1);
-        DEBUG_MESSAGE(rc);
+        DEBUG_MESSAGE("script loaded");
     }
 
     return;
@@ -242,8 +242,18 @@ FILE* pasta::Agent::OpenReadModuleFile(LPCSTR fname){
         p /= wfname;
 
         // ファイルを開く
-        auto f = _wfopen(p.string().c_str(), L"rb");
-        if (f) return f;
+        auto text = p.string();
+        auto strpath = text.c_str();
+        auto f = _wfopen(strpath, L"rb");
+        if (f){
+#ifdef DEBUG
+            std::wstring mes(L"open module path = [");
+            mes += strpath;
+            mes += L"]";
+            DEBUG_MESSAGE(mes.c_str());
+#endif
+            return f;
+        }
     }
 }
 

@@ -38,14 +38,27 @@ FunctionInOutDebugLog::   ~FunctionInOutDebugLog(){
     OutputLog("<<< END");
 }
 
-void FunctionInOutDebugLog::OutputLog(LPCSTR message){
+
+void FunctionInOutDebugLog::OutputRaw(LPCWSTR message){
+    OutputDebugString(message);
+}
+
+void FunctionInOutDebugLog::OutputRaw(LPCSTR message){
     USES_CONVERSION;
-    OutputLog(A2CW(message));
+    OutputRaw(A2CW(message));
 }
 
 void FunctionInOutDebugLog::OutputLog(LPCWSTR message){
     std::wstring text(funcName);
     text += message;
     text += L"\n";
-    OutputDebugString(text.c_str());
+    OutputRaw(text.c_str());
 }
+
+void FunctionInOutDebugLog::OutputLog(LPCSTR message){
+    USES_CONVERSION;
+    OutputLog(A2CW(message));
+}
+
+
+// EOF

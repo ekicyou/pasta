@@ -20,7 +20,9 @@
   </PropertyGroup>
   <ItemGroup>
     <Content Include="app.css" />
+    <Content Include="duktape\loader.js" />
     <Content Include="index.html" />
+    <Content Include="lib\shiori.js" />
     <Content Include="PastaParser.peg.js" />
     <Content Include="web.config" />
   </ItemGroup>
@@ -30,6 +32,7 @@
   <ItemGroup>
     <Content Include="dic\talk001.md" />
     <Content Include="PastaParser.peg" />
+    <Content Include="lib\pasta\README.md" />
     <None Include="web.Debug.config">
       <DependentUpon>web.config</DependentUpon>
     </None>
