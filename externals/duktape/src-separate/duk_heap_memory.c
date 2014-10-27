@@ -17,14 +17,13 @@
 		(heap)->mark_and_sweep_trigger_counter--; \
 		if ((heap)->mark_and_sweep_trigger_counter <= 0) { \
 			duk__run_voluntary_gc(heap); \
-				} \
-		} while (0)
+		} \
+	} while (0)
 
-static void duk__run_voluntary_gc(duk_heap *heap) {
+DUK_LOCAL void duk__run_voluntary_gc(duk_heap *heap) {
 	if (DUK_HEAP_HAS_MARKANDSWEEP_RUNNING(heap)) {
 		DUK_DD(DUK_DDPRINT("mark-and-sweep in progress -> skip voluntary mark-and-sweep now"));
-	}
-	else {
+	} else {
 		duk_small_uint_t flags;
 		duk_bool_t rc;
 
@@ -43,7 +42,7 @@ static void duk__run_voluntary_gc(duk_heap *heap) {
  */
 
 #ifdef DUK_USE_MARK_AND_SWEEP
-void *duk_heap_mem_alloc(duk_heap *heap, duk_size_t size) {
+DUK_INTERNAL void *duk_heap_mem_alloc(duk_heap *heap, duk_size_t size) {
 	void *res;
 	duk_bool_t rc;
 	duk_small_int_t i;
@@ -76,7 +75,7 @@ void *duk_heap_mem_alloc(duk_heap *heap, duk_size_t size) {
 		return res;
 	}
 #ifdef DUK_USE_GC_TORTURE
-skip_attempt :
+ skip_attempt:
 #endif
 
 	DUK_D(DUK_DPRINT("first alloc attempt failed, attempt to gc and retry"));
@@ -88,7 +87,7 @@ skip_attempt :
 	 */
 
 	if (DUK_HEAP_HAS_MARKANDSWEEP_RUNNING(heap)) {
-		DUK_D(DUK_DPRINT("duk_heap_mem_alloc() failed, gc in progress (gc skipped), alloc size %ld", (long)size));
+		DUK_D(DUK_DPRINT("duk_heap_mem_alloc() failed, gc in progress (gc skipped), alloc size %ld", (long) size));
 		return NULL;
 	}
 
@@ -112,12 +111,12 @@ skip_attempt :
 		res = heap->alloc_func(heap->alloc_udata, size);
 		if (res) {
 			DUK_D(DUK_DPRINT("duk_heap_mem_alloc() succeeded after gc (pass %ld), alloc size %ld",
-				(long)(i + 1), (long)size));
+			                 (long) (i + 1), (long) size));
 			return res;
 		}
 	}
 
-	DUK_D(DUK_DPRINT("duk_heap_mem_alloc() failed even after gc, alloc size %ld", (long)size));
+	DUK_D(DUK_DPRINT("duk_heap_mem_alloc() failed even after gc, alloc size %ld", (long) size));
 	return NULL;
 }
 #else  /* DUK_USE_MARK_AND_SWEEP */
@@ -125,7 +124,7 @@ skip_attempt :
  *  Compared to a direct macro expansion this wrapper saves a few
  *  instructions because no heap dereferencing is required.
  */
-void *duk_heap_mem_alloc(duk_heap *heap, duk_size_t size) {
+DUK_INTERNAL void *duk_heap_mem_alloc(duk_heap *heap, duk_size_t size) {
 	DUK_ASSERT(heap != NULL);
 	DUK_ASSERT_DISABLE(size >= 0);
 
@@ -133,7 +132,7 @@ void *duk_heap_mem_alloc(duk_heap *heap, duk_size_t size) {
 }
 #endif  /* DUK_USE_MARK_AND_SWEEP */
 
-void *duk_heap_mem_alloc_zeroed(duk_heap *heap, duk_size_t size) {
+DUK_INTERNAL void *duk_heap_mem_alloc_zeroed(duk_heap *heap, duk_size_t size) {
 	void *res;
 
 	DUK_ASSERT(heap != NULL);
@@ -152,7 +151,7 @@ void *duk_heap_mem_alloc_zeroed(duk_heap *heap, duk_size_t size) {
  */
 
 #ifdef DUK_USE_MARK_AND_SWEEP
-void *duk_heap_mem_realloc(duk_heap *heap, void *ptr, duk_size_t newsize) {
+DUK_INTERNAL void *duk_heap_mem_realloc(duk_heap *heap, void *ptr, duk_size_t newsize) {
 	void *res;
 	duk_bool_t rc;
 	duk_small_int_t i;
@@ -186,7 +185,7 @@ void *duk_heap_mem_realloc(duk_heap *heap, void *ptr, duk_size_t newsize) {
 		return res;
 	}
 #ifdef DUK_USE_GC_TORTURE
-skip_attempt :
+ skip_attempt:
 #endif
 
 	DUK_D(DUK_DPRINT("first realloc attempt failed, attempt to gc and retry"));
@@ -196,7 +195,7 @@ skip_attempt :
 	 */
 
 	if (DUK_HEAP_HAS_MARKANDSWEEP_RUNNING(heap)) {
-		DUK_D(DUK_DPRINT("duk_heap_mem_realloc() failed, gc in progress (gc skipped), alloc size %ld", (long)newsize));
+		DUK_D(DUK_DPRINT("duk_heap_mem_realloc() failed, gc in progress (gc skipped), alloc size %ld", (long) newsize));
 		return NULL;
 	}
 
@@ -218,19 +217,19 @@ skip_attempt :
 		DUK_UNREF(rc);
 
 		res = heap->realloc_func(heap->alloc_udata, ptr, newsize);
-		if (res) {
+		if (res || newsize == 0) {
 			DUK_D(DUK_DPRINT("duk_heap_mem_realloc() succeeded after gc (pass %ld), alloc size %ld",
-				(long)(i + 1), (long)newsize));
+			                 (long) (i + 1), (long) newsize));
 			return res;
 		}
 	}
 
-	DUK_D(DUK_DPRINT("duk_heap_mem_realloc() failed even after gc, alloc size %ld", (long)newsize));
+	DUK_D(DUK_DPRINT("duk_heap_mem_realloc() failed even after gc, alloc size %ld", (long) newsize));
 	return NULL;
 }
 #else  /* DUK_USE_MARK_AND_SWEEP */
 /* saves a few instructions to have this wrapper (see comment on duk_heap_mem_alloc) */
-void *duk_heap_mem_realloc(duk_heap *heap, void *ptr, duk_size_t newsize) {
+DUK_INTERNAL void *duk_heap_mem_realloc(duk_heap *heap, void *ptr, duk_size_t newsize) {
 	DUK_ASSERT(heap != NULL);
 	/* ptr may be NULL */
 	DUK_ASSERT_DISABLE(newsize >= 0);
@@ -246,7 +245,7 @@ void *duk_heap_mem_realloc(duk_heap *heap, void *ptr, duk_size_t newsize) {
  */
 
 #ifdef DUK_USE_MARK_AND_SWEEP
-void *duk_heap_mem_realloc_indirect(duk_heap *heap, duk_mem_getptr cb, void *ud, duk_size_t newsize) {
+DUK_INTERNAL void *duk_heap_mem_realloc_indirect(duk_heap *heap, duk_mem_getptr cb, void *ud, duk_size_t newsize) {
 	void *res;
 	duk_bool_t rc;
 	duk_small_int_t i;
@@ -279,7 +278,7 @@ void *duk_heap_mem_realloc_indirect(duk_heap *heap, duk_mem_getptr cb, void *ud,
 		return res;
 	}
 #ifdef DUK_USE_GC_TORTURE
-skip_attempt :
+ skip_attempt:
 #endif
 
 	DUK_D(DUK_DPRINT("first indirect realloc attempt failed, attempt to gc and retry"));
@@ -289,7 +288,7 @@ skip_attempt :
 	 */
 
 	if (DUK_HEAP_HAS_MARKANDSWEEP_RUNNING(heap)) {
-		DUK_D(DUK_DPRINT("duk_heap_mem_realloc_indirect() failed, gc in progress (gc skipped), alloc size %ld", (long)newsize));
+		DUK_D(DUK_DPRINT("duk_heap_mem_realloc_indirect() failed, gc in progress (gc skipped), alloc size %ld", (long) newsize));
 		return NULL;
 	}
 
@@ -322,7 +321,7 @@ skip_attempt :
 		if (ptr_pre != ptr_post) {
 			/* useful for debugging */
 			DUK_DD(DUK_DDPRINT("note: base pointer changed by mark-and-sweep: %p -> %p",
-				(void *)ptr_pre, (void *)ptr_post));
+			                   (void *) ptr_pre, (void *) ptr_post));
 		}
 #endif
 
@@ -331,19 +330,19 @@ skip_attempt :
 		 */
 
 		res = heap->realloc_func(heap->alloc_udata, cb(ud), newsize);
-		if (res) {
+		if (res || newsize == 0) {
 			DUK_D(DUK_DPRINT("duk_heap_mem_realloc_indirect() succeeded after gc (pass %ld), alloc size %ld",
-				(long)(i + 1), (long)newsize));
+			                 (long) (i + 1), (long) newsize));
 			return res;
 		}
 	}
 
-	DUK_D(DUK_DPRINT("duk_heap_mem_realloc_indirect() failed even after gc, alloc size %ld", (long)newsize));
+	DUK_D(DUK_DPRINT("duk_heap_mem_realloc_indirect() failed even after gc, alloc size %ld", (long) newsize));
 	return NULL;
 }
 #else  /* DUK_USE_MARK_AND_SWEEP */
 /* saves a few instructions to have this wrapper (see comment on duk_heap_mem_alloc) */
-void *duk_heap_mem_realloc_indirect(duk_heap *heap, duk_mem_getptr cb, void *ud, duk_size_t newsize) {
+DUK_INTERNAL void *duk_heap_mem_realloc_indirect(duk_heap *heap, duk_mem_getptr cb, void *ud, duk_size_t newsize) {
 	return heap->realloc_func(heap->alloc_udata, cb(ud), newsize);
 }
 #endif  /* DUK_USE_MARK_AND_SWEEP */
@@ -353,7 +352,7 @@ void *duk_heap_mem_realloc_indirect(duk_heap *heap, duk_mem_getptr cb, void *ud,
  */
 
 #ifdef DUK_USE_MARK_AND_SWEEP
-void duk_heap_mem_free(duk_heap *heap, void *ptr) {
+DUK_INTERNAL void duk_heap_mem_free(duk_heap *heap, void *ptr) {
 	DUK_ASSERT(heap != NULL);
 	/* ptr may be NULL */
 
@@ -373,7 +372,7 @@ void duk_heap_mem_free(duk_heap *heap, void *ptr) {
 }
 #else
 /* saves a few instructions to have this wrapper (see comment on duk_heap_mem_alloc) */
-void duk_heap_mem_free(duk_heap *heap, void *ptr) {
+DUK_INTERNAL void duk_heap_mem_free(duk_heap *heap, void *ptr) {
 	DUK_ASSERT(heap != NULL);
 	/* ptr may be NULL */
 
@@ -388,10 +387,11 @@ void duk_heap_mem_free(duk_heap *heap, void *ptr) {
  *  Checked variants
  */
 
+#if 0  /*unused*/
 #ifdef DUK_USE_VERBOSE_ERRORS
-void *duk_heap_mem_alloc_checked(duk_hthread *thr, duk_size_t size, const char *filename, duk_int_t line) {
+DUK_INTERNAL void *duk_heap_mem_alloc_checked(duk_hthread *thr, duk_size_t size, const char *filename, duk_int_t line) {
 #else
-void *duk_heap_mem_alloc_checked(duk_hthread *thr, duk_size_t size) {
+DUK_INTERNAL void *duk_heap_mem_alloc_checked(duk_hthread *thr, duk_size_t size) {
 #endif
 	void *res;
 
@@ -408,11 +408,13 @@ void *duk_heap_mem_alloc_checked(duk_hthread *thr, duk_size_t size) {
 	}
 	return res;
 }
+#endif
 
+#if 0  /*unused*/
 #ifdef DUK_USE_VERBOSE_ERRORS
-void *duk_heap_mem_alloc_checked_zeroed(duk_hthread *thr, duk_size_t size, const char *filename, duk_int_t line) {
+DUK_INTERNAL void *duk_heap_mem_alloc_checked_zeroed(duk_hthread *thr, duk_size_t size, const char *filename, duk_int_t line) {
 #else
-void *duk_heap_mem_alloc_checked_zeroed(duk_hthread *thr, duk_size_t size) {
+DUK_INTERNAL void *duk_heap_mem_alloc_checked_zeroed(duk_hthread *thr, duk_size_t size) {
 #endif
 	void *res;
 
@@ -431,11 +433,13 @@ void *duk_heap_mem_alloc_checked_zeroed(duk_hthread *thr, duk_size_t size) {
 	DUK_MEMZERO(res, size);
 	return res;
 }
+#endif
 
+#if 0  /*unused*/
 #ifdef DUK_USE_VERBOSE_ERRORS
-void *duk_heap_mem_realloc_checked(duk_hthread *thr, void *ptr, duk_size_t newsize, const char *filename, duk_int_t line) {
+DUK_INTERNAL void *duk_heap_mem_realloc_checked(duk_hthread *thr, void *ptr, duk_size_t newsize, const char *filename, duk_int_t line) {
 #else
-void *duk_heap_mem_realloc_checked(duk_hthread *thr, void *ptr, duk_size_t newsize) {
+DUK_INTERNAL void *duk_heap_mem_realloc_checked(duk_hthread *thr, void *ptr, duk_size_t newsize) {
 #endif
 	void *res;
 
@@ -444,7 +448,7 @@ void *duk_heap_mem_realloc_checked(duk_hthread *thr, void *ptr, duk_size_t newsi
 	DUK_ASSERT_DISABLE(newsize >= 0);
 
 	res = DUK_REALLOC(thr->heap, ptr, newsize);
-	if (!res) {
+	if (res == NULL && newsize != 0) {
 #ifdef DUK_USE_VERBOSE_ERRORS
 		DUK_ERROR_RAW(filename, line, thr, DUK_ERR_ALLOC_ERROR, "memory realloc failed");
 #else
@@ -453,18 +457,19 @@ void *duk_heap_mem_realloc_checked(duk_hthread *thr, void *ptr, duk_size_t newsi
 	}
 	return res;
 }
+#endif
 
 #ifdef DUK_USE_VERBOSE_ERRORS
-void *duk_heap_mem_realloc_indirect_checked(duk_hthread *thr, duk_mem_getptr cb, void *ud, duk_size_t newsize, const char *filename, duk_int_t line) {
+DUK_INTERNAL void *duk_heap_mem_realloc_indirect_checked(duk_hthread *thr, duk_mem_getptr cb, void *ud, duk_size_t newsize, const char *filename, duk_int_t line) {
 #else
-void *duk_heap_mem_realloc_indirect_checked(duk_hthread *thr, duk_mem_getptr cb, void *ud, duk_size_t newsize) {
+DUK_INTERNAL void *duk_heap_mem_realloc_indirect_checked(duk_hthread *thr, duk_mem_getptr cb, void *ud, duk_size_t newsize) {
 #endif
 	void *res;
 	DUK_ASSERT(thr != NULL);
 	DUK_ASSERT_DISABLE(newsize >= 0);
 
 	res = DUK_REALLOC_INDIRECT(thr->heap, cb, ud, newsize);
-	if (!res) {
+	if (res == NULL && newsize != 0) {
 #ifdef DUK_USE_VERBOSE_ERRORS
 		DUK_ERROR_RAW(filename, line, thr, DUK_ERR_ALLOC_ERROR, "memory realloc failed");
 #else

@@ -6,9 +6,9 @@
 #define DUK_BUILTINS_H_INCLUDED
 
 #if defined(DUK_USE_DOUBLE_LE)
-extern const duk_uint8_t duk_strings_data[];
+DUK_INTERNAL_DECL const duk_uint8_t duk_strings_data[1943];
 
-#define DUK_STRDATA_DATA_LENGTH                                       1931
+#define DUK_STRDATA_DATA_LENGTH                                       1943
 #define DUK_STRDATA_MAX_STRLEN                                        24
 
 #define DUK_STRIDX_UC_LOGGER                                          0                              /* 'Logger' */
@@ -70,27 +70,27 @@ extern const duk_uint8_t duk_strings_data[];
 #define DUK_STRIDX_ERR_THROW                                          56                             /* 'errThrow' */
 #define DUK_STRIDX_ERR_CREATE                                         57                             /* 'errCreate' */
 #define DUK_STRIDX_COMPILE                                            58                             /* 'compile' */
-#define DUK_STRIDX_INT_REGBASE                                        59                             /* '\x00regbase' */
-#define DUK_STRIDX_INT_THREAD                                         60                             /* '\x00thread' */
-#define DUK_STRIDX_INT_HANDLER                                        61                             /* '\x00handler' */
-#define DUK_STRIDX_INT_FINALIZER                                      62                             /* '\x00finalizer' */
-#define DUK_STRIDX_INT_CALLEE                                         63                             /* '\x00callee' */
-#define DUK_STRIDX_INT_MAP                                            64                             /* '\x00map' */
-#define DUK_STRIDX_INT_ARGS                                           65                             /* '\x00args' */
-#define DUK_STRIDX_INT_THIS                                           66                             /* '\x00this' */
-#define DUK_STRIDX_INT_PC2LINE                                        67                             /* '\x00pc2line' */
-#define DUK_STRIDX_INT_SOURCE                                         68                             /* '\x00source' */
-#define DUK_STRIDX_INT_VARENV                                         69                             /* '\x00varenv' */
-#define DUK_STRIDX_INT_LEXENV                                         70                             /* '\x00lexenv' */
-#define DUK_STRIDX_INT_VARMAP                                         71                             /* '\x00varmap' */
-#define DUK_STRIDX_INT_FORMALS                                        72                             /* '\x00formals' */
-#define DUK_STRIDX_INT_BYTECODE                                       73                             /* '\x00bytecode' */
-#define DUK_STRIDX_INT_NEXT                                           74                             /* '\x00next' */
-#define DUK_STRIDX_INT_TARGET                                         75                             /* '\x00target' */
-#define DUK_STRIDX_INT_VALUE                                          76                             /* '\x00value' */
+#define DUK_STRIDX_INT_REGBASE                                        59                             /* '\x00Regbase' */
+#define DUK_STRIDX_INT_THREAD                                         60                             /* '\x00Thread' */
+#define DUK_STRIDX_INT_HANDLER                                        61                             /* '\x00Handler' */
+#define DUK_STRIDX_INT_FINALIZER                                      62                             /* '\x00Finalizer' */
+#define DUK_STRIDX_INT_CALLEE                                         63                             /* '\x00Callee' */
+#define DUK_STRIDX_INT_MAP                                            64                             /* '\x00Map' */
+#define DUK_STRIDX_INT_ARGS                                           65                             /* '\x00Args' */
+#define DUK_STRIDX_INT_THIS                                           66                             /* '\x00This' */
+#define DUK_STRIDX_INT_PC2LINE                                        67                             /* '\x00Pc2line' */
+#define DUK_STRIDX_INT_SOURCE                                         68                             /* '\x00Source' */
+#define DUK_STRIDX_INT_VARENV                                         69                             /* '\x00Varenv' */
+#define DUK_STRIDX_INT_LEXENV                                         70                             /* '\x00Lexenv' */
+#define DUK_STRIDX_INT_VARMAP                                         71                             /* '\x00Varmap' */
+#define DUK_STRIDX_INT_FORMALS                                        72                             /* '\x00Formals' */
+#define DUK_STRIDX_INT_BYTECODE                                       73                             /* '\x00Bytecode' */
+#define DUK_STRIDX_INT_NEXT                                           74                             /* '\x00Next' */
+#define DUK_STRIDX_INT_TARGET                                         75                             /* '\x00Target' */
+#define DUK_STRIDX_INT_VALUE                                          76                             /* '\x00Value' */
 #define DUK_STRIDX_LC_POINTER                                         77                             /* 'pointer' */
 #define DUK_STRIDX_LC_BUFFER                                          78                             /* 'buffer' */
-#define DUK_STRIDX_TRACEDATA                                          79                             /* 'tracedata' */
+#define DUK_STRIDX_INT_TRACEDATA                                      79                             /* '\x00Tracedata' */
 #define DUK_STRIDX_LINE_NUMBER                                        80                             /* 'lineNumber' */
 #define DUK_STRIDX_FILE_NAME                                          81                             /* 'fileName' */
 #define DUK_STRIDX_PC                                                 82                             /* 'pc' */
@@ -506,8 +506,8 @@ extern const duk_uint8_t duk_strings_data[];
 #define DUK_HTHREAD_STRING_LC_POINTER(thr)                            DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_LC_POINTER)
 #define DUK_HEAP_STRING_LC_BUFFER(heap)                               DUK_HEAP_GET_STRING((heap),DUK_STRIDX_LC_BUFFER)
 #define DUK_HTHREAD_STRING_LC_BUFFER(thr)                             DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_LC_BUFFER)
-#define DUK_HEAP_STRING_TRACEDATA(heap)                               DUK_HEAP_GET_STRING((heap),DUK_STRIDX_TRACEDATA)
-#define DUK_HTHREAD_STRING_TRACEDATA(thr)                             DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_TRACEDATA)
+#define DUK_HEAP_STRING_INT_TRACEDATA(heap)                           DUK_HEAP_GET_STRING((heap),DUK_STRIDX_INT_TRACEDATA)
+#define DUK_HTHREAD_STRING_INT_TRACEDATA(thr)                         DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_INT_TRACEDATA)
 #define DUK_HEAP_STRING_LINE_NUMBER(heap)                             DUK_HEAP_GET_STRING((heap),DUK_STRIDX_LINE_NUMBER)
 #define DUK_HTHREAD_STRING_LINE_NUMBER(thr)                           DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_LINE_NUMBER)
 #define DUK_HEAP_STRING_FILE_NAME(heap)                               DUK_HEAP_GET_STRING((heap),DUK_STRIDX_FILE_NAME)
@@ -1027,10 +1027,10 @@ extern const duk_uint8_t duk_strings_data[];
 #define DUK_STRIDX_START_STRICT_RESERVED                              327
 #define DUK_STRIDX_END_RESERVED                                       336                            /* exclusive endpoint */
 
-extern const duk_c_function duk_bi_native_functions[];
-extern const duk_uint8_t duk_builtins_data[];
+DUK_INTERNAL_DECL const duk_c_function duk_bi_native_functions[129];
+DUK_INTERNAL_DECL const duk_uint8_t duk_builtins_data[1336];
 #ifdef DUK_USE_BUILTIN_INITJS
-extern const duk_uint8_t duk_initjs_data[];
+DUK_INTERNAL_DECL const duk_uint8_t duk_initjs_data[187];
 #endif  /* DUK_USE_BUILTIN_INITJS */
 
 #define DUK_BUILTINS_DATA_LENGTH                                      1336
@@ -1088,9 +1088,9 @@ extern const duk_uint8_t duk_initjs_data[];
 #define DUK_NUM_BUILTINS                                              46
 
 #elif defined(DUK_USE_DOUBLE_BE)
-extern const duk_uint8_t duk_strings_data[];
+DUK_INTERNAL_DECL const duk_uint8_t duk_strings_data[1943];
 
-#define DUK_STRDATA_DATA_LENGTH                                       1931
+#define DUK_STRDATA_DATA_LENGTH                                       1943
 #define DUK_STRDATA_MAX_STRLEN                                        24
 
 #define DUK_STRIDX_UC_LOGGER                                          0                              /* 'Logger' */
@@ -1152,27 +1152,27 @@ extern const duk_uint8_t duk_strings_data[];
 #define DUK_STRIDX_ERR_THROW                                          56                             /* 'errThrow' */
 #define DUK_STRIDX_ERR_CREATE                                         57                             /* 'errCreate' */
 #define DUK_STRIDX_COMPILE                                            58                             /* 'compile' */
-#define DUK_STRIDX_INT_REGBASE                                        59                             /* '\x00regbase' */
-#define DUK_STRIDX_INT_THREAD                                         60                             /* '\x00thread' */
-#define DUK_STRIDX_INT_HANDLER                                        61                             /* '\x00handler' */
-#define DUK_STRIDX_INT_FINALIZER                                      62                             /* '\x00finalizer' */
-#define DUK_STRIDX_INT_CALLEE                                         63                             /* '\x00callee' */
-#define DUK_STRIDX_INT_MAP                                            64                             /* '\x00map' */
-#define DUK_STRIDX_INT_ARGS                                           65                             /* '\x00args' */
-#define DUK_STRIDX_INT_THIS                                           66                             /* '\x00this' */
-#define DUK_STRIDX_INT_PC2LINE                                        67                             /* '\x00pc2line' */
-#define DUK_STRIDX_INT_SOURCE                                         68                             /* '\x00source' */
-#define DUK_STRIDX_INT_VARENV                                         69                             /* '\x00varenv' */
-#define DUK_STRIDX_INT_LEXENV                                         70                             /* '\x00lexenv' */
-#define DUK_STRIDX_INT_VARMAP                                         71                             /* '\x00varmap' */
-#define DUK_STRIDX_INT_FORMALS                                        72                             /* '\x00formals' */
-#define DUK_STRIDX_INT_BYTECODE                                       73                             /* '\x00bytecode' */
-#define DUK_STRIDX_INT_NEXT                                           74                             /* '\x00next' */
-#define DUK_STRIDX_INT_TARGET                                         75                             /* '\x00target' */
-#define DUK_STRIDX_INT_VALUE                                          76                             /* '\x00value' */
+#define DUK_STRIDX_INT_REGBASE                                        59                             /* '\x00Regbase' */
+#define DUK_STRIDX_INT_THREAD                                         60                             /* '\x00Thread' */
+#define DUK_STRIDX_INT_HANDLER                                        61                             /* '\x00Handler' */
+#define DUK_STRIDX_INT_FINALIZER                                      62                             /* '\x00Finalizer' */
+#define DUK_STRIDX_INT_CALLEE                                         63                             /* '\x00Callee' */
+#define DUK_STRIDX_INT_MAP                                            64                             /* '\x00Map' */
+#define DUK_STRIDX_INT_ARGS                                           65                             /* '\x00Args' */
+#define DUK_STRIDX_INT_THIS                                           66                             /* '\x00This' */
+#define DUK_STRIDX_INT_PC2LINE                                        67                             /* '\x00Pc2line' */
+#define DUK_STRIDX_INT_SOURCE                                         68                             /* '\x00Source' */
+#define DUK_STRIDX_INT_VARENV                                         69                             /* '\x00Varenv' */
+#define DUK_STRIDX_INT_LEXENV                                         70                             /* '\x00Lexenv' */
+#define DUK_STRIDX_INT_VARMAP                                         71                             /* '\x00Varmap' */
+#define DUK_STRIDX_INT_FORMALS                                        72                             /* '\x00Formals' */
+#define DUK_STRIDX_INT_BYTECODE                                       73                             /* '\x00Bytecode' */
+#define DUK_STRIDX_INT_NEXT                                           74                             /* '\x00Next' */
+#define DUK_STRIDX_INT_TARGET                                         75                             /* '\x00Target' */
+#define DUK_STRIDX_INT_VALUE                                          76                             /* '\x00Value' */
 #define DUK_STRIDX_LC_POINTER                                         77                             /* 'pointer' */
 #define DUK_STRIDX_LC_BUFFER                                          78                             /* 'buffer' */
-#define DUK_STRIDX_TRACEDATA                                          79                             /* 'tracedata' */
+#define DUK_STRIDX_INT_TRACEDATA                                      79                             /* '\x00Tracedata' */
 #define DUK_STRIDX_LINE_NUMBER                                        80                             /* 'lineNumber' */
 #define DUK_STRIDX_FILE_NAME                                          81                             /* 'fileName' */
 #define DUK_STRIDX_PC                                                 82                             /* 'pc' */
@@ -1588,8 +1588,8 @@ extern const duk_uint8_t duk_strings_data[];
 #define DUK_HTHREAD_STRING_LC_POINTER(thr)                            DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_LC_POINTER)
 #define DUK_HEAP_STRING_LC_BUFFER(heap)                               DUK_HEAP_GET_STRING((heap),DUK_STRIDX_LC_BUFFER)
 #define DUK_HTHREAD_STRING_LC_BUFFER(thr)                             DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_LC_BUFFER)
-#define DUK_HEAP_STRING_TRACEDATA(heap)                               DUK_HEAP_GET_STRING((heap),DUK_STRIDX_TRACEDATA)
-#define DUK_HTHREAD_STRING_TRACEDATA(thr)                             DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_TRACEDATA)
+#define DUK_HEAP_STRING_INT_TRACEDATA(heap)                           DUK_HEAP_GET_STRING((heap),DUK_STRIDX_INT_TRACEDATA)
+#define DUK_HTHREAD_STRING_INT_TRACEDATA(thr)                         DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_INT_TRACEDATA)
 #define DUK_HEAP_STRING_LINE_NUMBER(heap)                             DUK_HEAP_GET_STRING((heap),DUK_STRIDX_LINE_NUMBER)
 #define DUK_HTHREAD_STRING_LINE_NUMBER(thr)                           DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_LINE_NUMBER)
 #define DUK_HEAP_STRING_FILE_NAME(heap)                               DUK_HEAP_GET_STRING((heap),DUK_STRIDX_FILE_NAME)
@@ -2109,10 +2109,10 @@ extern const duk_uint8_t duk_strings_data[];
 #define DUK_STRIDX_START_STRICT_RESERVED                              327
 #define DUK_STRIDX_END_RESERVED                                       336                            /* exclusive endpoint */
 
-extern const duk_c_function duk_bi_native_functions[];
-extern const duk_uint8_t duk_builtins_data[];
+DUK_INTERNAL_DECL const duk_c_function duk_bi_native_functions[129];
+DUK_INTERNAL_DECL const duk_uint8_t duk_builtins_data[1336];
 #ifdef DUK_USE_BUILTIN_INITJS
-extern const duk_uint8_t duk_initjs_data[];
+DUK_INTERNAL_DECL const duk_uint8_t duk_initjs_data[187];
 #endif  /* DUK_USE_BUILTIN_INITJS */
 
 #define DUK_BUILTINS_DATA_LENGTH                                      1336
@@ -2170,9 +2170,9 @@ extern const duk_uint8_t duk_initjs_data[];
 #define DUK_NUM_BUILTINS                                              46
 
 #elif defined(DUK_USE_DOUBLE_ME)
-extern const duk_uint8_t duk_strings_data[];
+DUK_INTERNAL_DECL const duk_uint8_t duk_strings_data[1943];
 
-#define DUK_STRDATA_DATA_LENGTH                                       1931
+#define DUK_STRDATA_DATA_LENGTH                                       1943
 #define DUK_STRDATA_MAX_STRLEN                                        24
 
 #define DUK_STRIDX_UC_LOGGER                                          0                              /* 'Logger' */
@@ -2234,27 +2234,27 @@ extern const duk_uint8_t duk_strings_data[];
 #define DUK_STRIDX_ERR_THROW                                          56                             /* 'errThrow' */
 #define DUK_STRIDX_ERR_CREATE                                         57                             /* 'errCreate' */
 #define DUK_STRIDX_COMPILE                                            58                             /* 'compile' */
-#define DUK_STRIDX_INT_REGBASE                                        59                             /* '\x00regbase' */
-#define DUK_STRIDX_INT_THREAD                                         60                             /* '\x00thread' */
-#define DUK_STRIDX_INT_HANDLER                                        61                             /* '\x00handler' */
-#define DUK_STRIDX_INT_FINALIZER                                      62                             /* '\x00finalizer' */
-#define DUK_STRIDX_INT_CALLEE                                         63                             /* '\x00callee' */
-#define DUK_STRIDX_INT_MAP                                            64                             /* '\x00map' */
-#define DUK_STRIDX_INT_ARGS                                           65                             /* '\x00args' */
-#define DUK_STRIDX_INT_THIS                                           66                             /* '\x00this' */
-#define DUK_STRIDX_INT_PC2LINE                                        67                             /* '\x00pc2line' */
-#define DUK_STRIDX_INT_SOURCE                                         68                             /* '\x00source' */
-#define DUK_STRIDX_INT_VARENV                                         69                             /* '\x00varenv' */
-#define DUK_STRIDX_INT_LEXENV                                         70                             /* '\x00lexenv' */
-#define DUK_STRIDX_INT_VARMAP                                         71                             /* '\x00varmap' */
-#define DUK_STRIDX_INT_FORMALS                                        72                             /* '\x00formals' */
-#define DUK_STRIDX_INT_BYTECODE                                       73                             /* '\x00bytecode' */
-#define DUK_STRIDX_INT_NEXT                                           74                             /* '\x00next' */
-#define DUK_STRIDX_INT_TARGET                                         75                             /* '\x00target' */
-#define DUK_STRIDX_INT_VALUE                                          76                             /* '\x00value' */
+#define DUK_STRIDX_INT_REGBASE                                        59                             /* '\x00Regbase' */
+#define DUK_STRIDX_INT_THREAD                                         60                             /* '\x00Thread' */
+#define DUK_STRIDX_INT_HANDLER                                        61                             /* '\x00Handler' */
+#define DUK_STRIDX_INT_FINALIZER                                      62                             /* '\x00Finalizer' */
+#define DUK_STRIDX_INT_CALLEE                                         63                             /* '\x00Callee' */
+#define DUK_STRIDX_INT_MAP                                            64                             /* '\x00Map' */
+#define DUK_STRIDX_INT_ARGS                                           65                             /* '\x00Args' */
+#define DUK_STRIDX_INT_THIS                                           66                             /* '\x00This' */
+#define DUK_STRIDX_INT_PC2LINE                                        67                             /* '\x00Pc2line' */
+#define DUK_STRIDX_INT_SOURCE                                         68                             /* '\x00Source' */
+#define DUK_STRIDX_INT_VARENV                                         69                             /* '\x00Varenv' */
+#define DUK_STRIDX_INT_LEXENV                                         70                             /* '\x00Lexenv' */
+#define DUK_STRIDX_INT_VARMAP                                         71                             /* '\x00Varmap' */
+#define DUK_STRIDX_INT_FORMALS                                        72                             /* '\x00Formals' */
+#define DUK_STRIDX_INT_BYTECODE                                       73                             /* '\x00Bytecode' */
+#define DUK_STRIDX_INT_NEXT                                           74                             /* '\x00Next' */
+#define DUK_STRIDX_INT_TARGET                                         75                             /* '\x00Target' */
+#define DUK_STRIDX_INT_VALUE                                          76                             /* '\x00Value' */
 #define DUK_STRIDX_LC_POINTER                                         77                             /* 'pointer' */
 #define DUK_STRIDX_LC_BUFFER                                          78                             /* 'buffer' */
-#define DUK_STRIDX_TRACEDATA                                          79                             /* 'tracedata' */
+#define DUK_STRIDX_INT_TRACEDATA                                      79                             /* '\x00Tracedata' */
 #define DUK_STRIDX_LINE_NUMBER                                        80                             /* 'lineNumber' */
 #define DUK_STRIDX_FILE_NAME                                          81                             /* 'fileName' */
 #define DUK_STRIDX_PC                                                 82                             /* 'pc' */
@@ -2670,8 +2670,8 @@ extern const duk_uint8_t duk_strings_data[];
 #define DUK_HTHREAD_STRING_LC_POINTER(thr)                            DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_LC_POINTER)
 #define DUK_HEAP_STRING_LC_BUFFER(heap)                               DUK_HEAP_GET_STRING((heap),DUK_STRIDX_LC_BUFFER)
 #define DUK_HTHREAD_STRING_LC_BUFFER(thr)                             DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_LC_BUFFER)
-#define DUK_HEAP_STRING_TRACEDATA(heap)                               DUK_HEAP_GET_STRING((heap),DUK_STRIDX_TRACEDATA)
-#define DUK_HTHREAD_STRING_TRACEDATA(thr)                             DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_TRACEDATA)
+#define DUK_HEAP_STRING_INT_TRACEDATA(heap)                           DUK_HEAP_GET_STRING((heap),DUK_STRIDX_INT_TRACEDATA)
+#define DUK_HTHREAD_STRING_INT_TRACEDATA(thr)                         DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_INT_TRACEDATA)
 #define DUK_HEAP_STRING_LINE_NUMBER(heap)                             DUK_HEAP_GET_STRING((heap),DUK_STRIDX_LINE_NUMBER)
 #define DUK_HTHREAD_STRING_LINE_NUMBER(thr)                           DUK_HTHREAD_GET_STRING((thr),DUK_STRIDX_LINE_NUMBER)
 #define DUK_HEAP_STRING_FILE_NAME(heap)                               DUK_HEAP_GET_STRING((heap),DUK_STRIDX_FILE_NAME)
@@ -3191,10 +3191,10 @@ extern const duk_uint8_t duk_strings_data[];
 #define DUK_STRIDX_START_STRICT_RESERVED                              327
 #define DUK_STRIDX_END_RESERVED                                       336                            /* exclusive endpoint */
 
-extern const duk_c_function duk_bi_native_functions[];
-extern const duk_uint8_t duk_builtins_data[];
+DUK_INTERNAL_DECL const duk_c_function duk_bi_native_functions[129];
+DUK_INTERNAL_DECL const duk_uint8_t duk_builtins_data[1336];
 #ifdef DUK_USE_BUILTIN_INITJS
-extern const duk_uint8_t duk_initjs_data[];
+DUK_INTERNAL_DECL const duk_uint8_t duk_initjs_data[187];
 #endif  /* DUK_USE_BUILTIN_INITJS */
 
 #define DUK_BUILTINS_DATA_LENGTH                                      1336

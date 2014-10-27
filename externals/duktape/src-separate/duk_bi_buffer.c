@@ -8,7 +8,7 @@
  *  Constructor
  */
 
-duk_ret_t duk_bi_buffer_constructor(duk_context *ctx) {
+DUK_INTERNAL duk_ret_t duk_bi_buffer_constructor(duk_context *ctx) {
 	duk_size_t buf_size;
 	duk_small_int_t buf_dynamic;
 	duk_uint8_t *buf_data;
@@ -28,8 +28,8 @@ duk_ret_t duk_bi_buffer_constructor(duk_context *ctx) {
 	switch (duk_get_type(ctx, 0)) {
 	case DUK_TYPE_NUMBER:
 		/* new buffer of specified size */
-		buf_size = (duk_size_t)duk_to_int(ctx, 0);
-		(void)duk_push_buffer(ctx, buf_size, buf_dynamic);
+		buf_size = (duk_size_t) duk_to_int(ctx, 0);
+		(void) duk_push_buffer(ctx, buf_size, buf_dynamic);
 		break;
 	case DUK_TYPE_BUFFER:
 		/* return input buffer, converted to a Buffer object if called as a
@@ -39,10 +39,10 @@ duk_ret_t duk_bi_buffer_constructor(duk_context *ctx) {
 		break;
 	case DUK_TYPE_STRING:
 		/* new buffer with string contents */
-		src_data = (const duk_uint8_t *)duk_get_lstring(ctx, 0, &buf_size);
+		src_data = (const duk_uint8_t *) duk_get_lstring(ctx, 0, &buf_size);
 		DUK_ASSERT(src_data != NULL);  /* even for zero-length string */
-		buf_data = (duk_uint8_t *)duk_push_buffer(ctx, buf_size, buf_dynamic);
-		DUK_MEMCPY((void *)buf_data, (const void *)src_data, (size_t)buf_size);
+		buf_data = (duk_uint8_t *) duk_push_buffer(ctx, buf_size, buf_dynamic);
+		DUK_MEMCPY((void *) buf_data, (const void *) src_data, (size_t) buf_size);
 		break;
 	case DUK_TYPE_OBJECT:
 		/* Buffer object: get the plain buffer inside.  If called as as
@@ -66,10 +66,10 @@ duk_ret_t duk_bi_buffer_constructor(duk_context *ctx) {
 
 	if (duk_is_constructor_call(ctx)) {
 		duk_push_object_helper(ctx,
-			DUK_HOBJECT_FLAG_EXTENSIBLE |
-			DUK_HOBJECT_FLAG_EXOTIC_BUFFEROBJ |
-			DUK_HOBJECT_CLASS_AS_FLAGS(DUK_HOBJECT_CLASS_BUFFER),
-			DUK_BIDX_BUFFER_PROTOTYPE);
+		                       DUK_HOBJECT_FLAG_EXTENSIBLE |
+		                       DUK_HOBJECT_FLAG_EXOTIC_BUFFEROBJ |
+		                       DUK_HOBJECT_CLASS_AS_FLAGS(DUK_HOBJECT_CLASS_BUFFER),
+		                       DUK_BIDX_BUFFER_PROTOTYPE);
 
 		/* Buffer object internal value is immutable */
 		duk_dup(ctx, -2);
@@ -84,7 +84,7 @@ duk_ret_t duk_bi_buffer_constructor(duk_context *ctx) {
  *  toString(), valueOf()
  */
 
-duk_ret_t duk_bi_buffer_prototype_tostring_shared(duk_context *ctx) {
+DUK_INTERNAL duk_ret_t duk_bi_buffer_prototype_tostring_shared(duk_context *ctx) {
 	duk_tval *tv;
 	duk_small_int_t to_string = duk_get_current_magic(ctx);
 
@@ -94,8 +94,7 @@ duk_ret_t duk_bi_buffer_prototype_tostring_shared(duk_context *ctx) {
 
 	if (DUK_TVAL_IS_BUFFER(tv)) {
 		/* nop */
-	}
-	else if (DUK_TVAL_IS_OBJECT(tv)) {
+	} else if (DUK_TVAL_IS_OBJECT(tv)) {
 		duk_hobject *h = DUK_TVAL_GET_OBJECT(tv);
 		DUK_ASSERT(h != NULL);
 
@@ -105,8 +104,7 @@ duk_ret_t duk_bi_buffer_prototype_tostring_shared(duk_context *ctx) {
 		}
 
 		duk_get_prop_stridx(ctx, -1, DUK_STRIDX_INT_VALUE);
-	}
-	else {
+	} else {
 		goto type_error;
 	}
 
@@ -115,6 +113,6 @@ duk_ret_t duk_bi_buffer_prototype_tostring_shared(duk_context *ctx) {
 	}
 	return 1;
 
-type_error:
+ type_error:
 	return DUK_RET_TYPE_ERROR;
 }

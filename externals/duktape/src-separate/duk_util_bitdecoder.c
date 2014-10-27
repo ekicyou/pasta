@@ -8,7 +8,7 @@
  * When reading past bitstream end, zeroes are shifted in.  The result
  * is signed to match duk_bd_decode_flagged.
  */
-duk_int32_t duk_bd_decode(duk_bitdecoder_ctx *ctx, duk_small_int_t bits) {
+DUK_INTERNAL duk_int32_t duk_bd_decode(duk_bitdecoder_ctx *ctx, duk_small_int_t bits) {
 	duk_small_int_t shift;
 	duk_uint32_t mask;
 	duk_uint32_t tmp;
@@ -21,7 +21,7 @@ duk_int32_t duk_bd_decode(duk_bitdecoder_ctx *ctx, duk_small_int_t bits) {
 	while (ctx->currbits < bits) {
 #if 0
 		DUK_DDD(DUK_DDDPRINT("decode_bits: shift more data (bits=%ld, currbits=%ld)",
-			(long)bits, (long)ctx->currbits));
+		                     (long) bits, (long) ctx->currbits));
 #endif
 		ctx->currval <<= 8;
 		if (ctx->offset < ctx->length) {
@@ -34,7 +34,7 @@ duk_int32_t duk_bd_decode(duk_bitdecoder_ctx *ctx, duk_small_int_t bits) {
 	}
 #if 0
 	DUK_DDD(DUK_DDDPRINT("decode_bits: bits=%ld, currbits=%ld, currval=0x%08lx",
-		(long)bits, (long)ctx->currbits, (unsigned long)ctx->currval));
+	                     (long) bits, (long) ctx->currbits, (unsigned long) ctx->currval));
 #endif
 
 	/* Extract 'top' bits of currval; note that the extracted bits do not need
@@ -47,25 +47,24 @@ duk_int32_t duk_bd_decode(duk_bitdecoder_ctx *ctx, duk_small_int_t bits) {
 
 #if 0
 	DUK_DDD(DUK_DDDPRINT("decode_bits: %ld bits -> 0x%08lx (%ld), currbits=%ld, currval=0x%08lx",
-		(long)bits, (unsigned long)tmp, (long)tmp, (long)ctx->currbits, (unsigned long)ctx->currval));
+	                     (long) bits, (unsigned long) tmp, (long) tmp, (long) ctx->currbits, (unsigned long) ctx->currval));
 #endif
 
 	return tmp;
 }
 
-duk_small_int_t duk_bd_decode_flag(duk_bitdecoder_ctx *ctx) {
-	return (duk_small_int_t)duk_bd_decode(ctx, 1);
+DUK_INTERNAL duk_small_int_t duk_bd_decode_flag(duk_bitdecoder_ctx *ctx) {
+	return (duk_small_int_t) duk_bd_decode(ctx, 1);
 }
 
 /* Decode a one-bit flag, and if set, decode a value of 'bits', otherwise return
  * default value.  Return value is signed so that negative marker value can be
  * used by caller as a "not present" value.
  */
-duk_int32_t duk_bd_decode_flagged(duk_bitdecoder_ctx *ctx, duk_small_int_t bits, duk_int32_t def_value) {
+DUK_INTERNAL duk_int32_t duk_bd_decode_flagged(duk_bitdecoder_ctx *ctx, duk_small_int_t bits, duk_int32_t def_value) {
 	if (duk_bd_decode_flag(ctx)) {
-		return (duk_int32_t)duk_bd_decode(ctx, bits);
-	}
-	else {
+		return (duk_int32_t) duk_bd_decode(ctx, bits);
+	} else {
 		return def_value;
 	}
 }

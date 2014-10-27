@@ -47,7 +47,7 @@ struct duk_heaphdr_string {
 #define DUK_HEAPHDR_FLAGS_TYPE_MASK      0x00000003UL
 #define DUK_HEAPHDR_FLAGS_FLAG_MASK      (~DUK_HEAPHDR_FLAGS_TYPE_MASK)
 
-/* 2 bits for heap type */
+                                             /* 2 bits for heap type */
 #define DUK_HEAPHDR_FLAGS_HEAP_START     2   /* 4 heap flags */
 #define DUK_HEAPHDR_FLAGS_USER_START     6   /* 26 user flags */
 

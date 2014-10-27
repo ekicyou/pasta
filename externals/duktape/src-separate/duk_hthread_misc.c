@@ -4,7 +4,7 @@
 
 #include "duk_internal.h"
 
-void duk_hthread_terminate(duk_hthread *thr) {
+DUK_INTERNAL void duk_hthread_terminate(duk_hthread *thr) {
 	DUK_ASSERT(thr != NULL);
 
 	/* Order of unwinding is important */
@@ -14,7 +14,7 @@ void duk_hthread_terminate(duk_hthread *thr) {
 	duk_hthread_callstack_unwind(thr, 0);  /* side effects, possibly errors */
 
 	thr->valstack_bottom = thr->valstack;
-	duk_set_top((duk_context *)thr, 0);  /* unwinds valstack, updating refcounts */
+	duk_set_top((duk_context *) thr, 0);  /* unwinds valstack, updating refcounts */
 
 	thr->state = DUK_HTHREAD_STATE_TERMINATED;
 
@@ -33,13 +33,12 @@ void duk_hthread_terminate(duk_hthread *thr) {
 	 */
 }
 
-duk_activation *duk_hthread_get_current_activation(duk_hthread *thr) {
+DUK_INTERNAL duk_activation *duk_hthread_get_current_activation(duk_hthread *thr) {
 	DUK_ASSERT(thr != NULL);
 
 	if (thr->callstack_top > 0) {
 		return thr->callstack + thr->callstack_top - 1;
-	}
-	else {
+	} else {
 		return NULL;
 	}
 }

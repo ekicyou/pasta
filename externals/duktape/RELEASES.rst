@@ -322,7 +322,7 @@ Released
 
 * Allow non-standard dollar escape inside character classes (previously
   they were already allowed elsewhere), to support non-standard regexps
-  like /[\$]/
+  like /[\\$]/
 
 * Add debug API calls to dump the stack top and values in the current context,
   see e.g. duk_dump_context_stdout
@@ -533,15 +533,77 @@ Released
 * Make objects and functions defined by included polyfills non-enumerable so
   that they don't enumerate e.g. in a for-in loop
 
-* A few more polyfills.
+* A few more polyfills
 
-Planned
-=======
-
-1.0.0 (2014-10-XX)
+1.0.0 (2014-10-26)
 ------------------
 
 * Feature complete baseline release
+
+* Add convenience API call: duk_put_global_string()
+
+* Rename duk_is_fixed() to duk_is_fixed_buffer() and duk_is_dynamic() to
+  duk_is_dynamic_buffer() for consistency with other API calls
+
+* Rename Duktape internal keys to start with an uppercase character (e.g.
+  "\\xFFValue") so that user internal keys which begin with a lowercase
+  character (e.g. "\\xFFptr") won't conflict by default
+
+* Add OS and compiler strings to Duktape.env
+
+* Make error 'tracedata' an internal property for better sandboxing
+
+* Rename members of struct duk_memory_functions to have a "_func" suffix,
+  to avoid conflicting with standard library names (which is problematic if
+  the standard names are #defines)
+
+* Add DUK_OPT_DLL_BUILD, which should be enabled for both Duktape and
+  application build when Duktape is built as a DLL; on Windows it makes
+  Duktape use __declspec(dllexport) and __declspec(dllimport) for public
+  API symbols
+
+* Rename RELEASES.txt, AUTHORS.txt, and README.txt files to .rst suffix for
+  better automatic formatting
+
+* Fix a mark-and-sweep finalizer bug which could cause memory safety issues
+  when finalizer execution was disabled for a mark-and-sweep round
+
+* Fix a mark-and-sweep zero-size realloc() bug which could happen when an
+  initial zero-size realloc() failed (this shouldn't normally happen but
+  was triggered by GC torture testing)
+
+* Fix an assertion failure when using labelled block statements; some
+  labelled block statements still cause an internal error ("INVALID
+  opcode 0") but don't cause assert failures
+
+* Fix an assertion failure when using a try-catch in a function with a lot
+  of constants (more than 511 string or non-integer constants); a compile
+  error happens now instead to prevent unsafe behavior
+
+* Fix duk_dump_context_stderr() which incorrectly dumped to stdout
+
+* Fix require() resolution of relative module identifiers, which was off by
+  one component (see GH-48)
+
+* Fix DUK_INVALID_INDEX define value, it used INT_MIN directly
+
+* Fix return value of Duktape.gc() to return true (instead of false) for
+  a successful mark-and-sweep
+
+* Fix duk_peval_file(), duk_peval_file_noresult() and duk_pcompile_file()
+  to avoid throwing an error for a missing file
+
+* Fix compile error for DUK_OPT_NO_FILE_IO
+
+* Regexp internal limit errors changed from Error to RangeError
+
+* Change command line example to be "barebones" by default, with readline
+  enabled via DUK_CMDLINE_FANCY
+
+* Use variadic macros for VS2005+
+
+Planned
+=======
 
 1.1.0 (2014-XX-XX)
 ------------------

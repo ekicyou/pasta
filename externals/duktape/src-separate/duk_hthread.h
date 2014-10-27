@@ -17,13 +17,13 @@
 #define DUK_VALSTACK_SHRINK_SPARE       64      /* roughly 0.5 kiB */
 #define DUK_VALSTACK_INITIAL_SIZE       128     /* roughly 1.0 kiB -> but rounds up to DUK_VALSTACK_GROW_STEP in practice */
 #define DUK_VALSTACK_INTERNAL_EXTRA     64      /* internal extra elements assumed on function entry,
- * always added to user-defined 'extra' for e.g. the
- * duk_check_stack() call.
- */
+                                                 * always added to user-defined 'extra' for e.g. the
+                                                 * duk_check_stack() call.
+                                                 */
 #define DUK_VALSTACK_API_ENTRY_MINIMUM  DUK_API_ENTRY_STACK
-/* number of elements guaranteed to be user accessible
- * (in addition to call arguments) on Duktape/C function entry.
- */
+                                                /* number of elements guaranteed to be user accessible
+                                                 * (in addition to call arguments) on Duktape/C function entry.
+                                                 */
 
 /* Note: DUK_VALSTACK_INITIAL_SIZE must be >= DUK_VALSTACK_API_ENTRY_MINIMUM
  * + DUK_VALSTACK_INTERNAL_EXTRA so that the initial stack conforms to spare
@@ -90,29 +90,29 @@
 
 #define DUK_CAT_SET_CATCH_ENABLED(c)    do { \
 		(c)->flags |= DUK_CAT_FLAG_CATCH_ENABLED; \
-		} while (0)
+	} while (0)
 #define DUK_CAT_SET_FINALLY_ENABLED(c)  do { \
 		(c)->flags |= DUK_CAT_FLAG_FINALLY_ENABLED; \
-		} while (0)
+	} while (0)
 #define DUK_CAT_SET_CATCH_BINDING_ENABLED(c)    do { \
 		(c)->flags |= DUK_CAT_FLAG_CATCH_BINDING_ENABLED; \
-		} while (0)
+	} while (0)
 #define DUK_CAT_SET_LEXENV_ACTIVE(c)    do { \
 		(c)->flags |= DUK_CAT_FLAG_LEXENV_ACTIVE; \
-		} while (0)
+	} while (0)
 
 #define DUK_CAT_CLEAR_CATCH_ENABLED(c)    do { \
 		(c)->flags &= ~DUK_CAT_FLAG_CATCH_ENABLED; \
-		} while (0)
+	} while (0)
 #define DUK_CAT_CLEAR_FINALLY_ENABLED(c)  do { \
 		(c)->flags &= ~DUK_CAT_FLAG_FINALLY_ENABLED; \
-		} while (0)
+	} while (0)
 #define DUK_CAT_CLEAR_CATCH_BINDING_ENABLED(c)    do { \
 		(c)->flags &= ~DUK_CAT_FLAG_CATCH_BINDING_ENABLED; \
-		} while (0)
+	} while (0)
 #define DUK_CAT_CLEAR_LEXENV_ACTIVE(c)    do { \
 		(c)->flags &= ~DUK_CAT_FLAG_LEXENV_ACTIVE; \
-		} while (0)
+	} while (0)
 
 /*
  *  Thread defines
@@ -189,7 +189,7 @@ struct duk_activation {
 /* Note: it's nice if size is 2^N (not 4x4 = 16 bytes on 32 bit) */
 struct duk_catcher {
 	duk_hstring *h_varname;         /* borrowed reference to catch variable name (or NULL if none) */
-	/* (reference is valid as long activation exists) */
+	                                /* (reference is valid as long activation exists) */
 	duk_size_t callstack_index;     /* callstack index of related activation */
 	duk_size_t idx_base;            /* idx_base and idx_base+1 get completion value and type */
 	duk_uint32_t pc_base;           /* resume execution from pc_base or pc_base+1 */
@@ -267,21 +267,21 @@ struct duk_hthread {
  *  Prototypes
  */
 
-void duk_hthread_copy_builtin_objects(duk_hthread *thr_from, duk_hthread *thr_to);
-void duk_hthread_create_builtin_objects(duk_hthread *thr);
-duk_bool_t duk_hthread_init_stacks(duk_heap *heap, duk_hthread *thr);
-void duk_hthread_terminate(duk_hthread *thr);
+DUK_INTERNAL_DECL void duk_hthread_copy_builtin_objects(duk_hthread *thr_from, duk_hthread *thr_to);
+DUK_INTERNAL_DECL void duk_hthread_create_builtin_objects(duk_hthread *thr);
+DUK_INTERNAL_DECL duk_bool_t duk_hthread_init_stacks(duk_heap *heap, duk_hthread *thr);
+DUK_INTERNAL_DECL void duk_hthread_terminate(duk_hthread *thr);
 
-void duk_hthread_callstack_grow(duk_hthread *thr);
-void duk_hthread_callstack_shrink_check(duk_hthread *thr);
-void duk_hthread_callstack_unwind(duk_hthread *thr, duk_size_t new_top);
-void duk_hthread_catchstack_grow(duk_hthread *thr);
-void duk_hthread_catchstack_shrink_check(duk_hthread *thr);
-void duk_hthread_catchstack_unwind(duk_hthread *thr, duk_size_t new_top);
+DUK_INTERNAL_DECL void duk_hthread_callstack_grow(duk_hthread *thr);
+DUK_INTERNAL_DECL void duk_hthread_callstack_shrink_check(duk_hthread *thr);
+DUK_INTERNAL_DECL void duk_hthread_callstack_unwind(duk_hthread *thr, duk_size_t new_top);
+DUK_INTERNAL_DECL void duk_hthread_catchstack_grow(duk_hthread *thr);
+DUK_INTERNAL_DECL void duk_hthread_catchstack_shrink_check(duk_hthread *thr);
+DUK_INTERNAL_DECL void duk_hthread_catchstack_unwind(duk_hthread *thr, duk_size_t new_top);
 
-duk_activation *duk_hthread_get_current_activation(duk_hthread *thr);
-void *duk_hthread_get_valstack_ptr(void *ud);  /* indirect allocs */
-void *duk_hthread_get_callstack_ptr(void *ud);  /* indirect allocs */
-void *duk_hthread_get_catchstack_ptr(void *ud);  /* indirect allocs */
+DUK_INTERNAL_DECL duk_activation *duk_hthread_get_current_activation(duk_hthread *thr);
+DUK_INTERNAL_DECL void *duk_hthread_get_valstack_ptr(void *ud);  /* indirect allocs */
+DUK_INTERNAL_DECL void *duk_hthread_get_callstack_ptr(void *ud);  /* indirect allocs */
+DUK_INTERNAL_DECL void *duk_hthread_get_catchstack_ptr(void *ud);  /* indirect allocs */
 
 #endif  /* DUK_HTHREAD_H_INCLUDED */

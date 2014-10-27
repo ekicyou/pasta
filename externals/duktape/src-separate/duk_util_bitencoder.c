@@ -4,7 +4,7 @@
 
 #include "duk_internal.h"
 
-void duk_be_encode(duk_bitencoder_ctx *ctx, duk_uint32_t data, duk_small_int_t bits) {
+DUK_INTERNAL void duk_be_encode(duk_bitencoder_ctx *ctx, duk_uint32_t data, duk_small_int_t bits) {
 	duk_uint8_t tmp;
 
 	DUK_ASSERT(ctx != NULL);
@@ -18,10 +18,9 @@ void duk_be_encode(duk_bitencoder_ctx *ctx, duk_uint32_t data, duk_small_int_t b
 
 	while (ctx->currbits >= 8) {
 		if (ctx->offset < ctx->length) {
-			tmp = (duk_uint8_t)((ctx->currval >> (ctx->currbits - 8)) & 0xff);
+			tmp = (duk_uint8_t) ((ctx->currval >> (ctx->currbits - 8)) & 0xff);
 			ctx->data[ctx->offset++] = tmp;
-		}
-		else {
+		} else {
 			/* If buffer has been exhausted, truncate bitstream */
 			ctx->truncated = 1;
 		}
@@ -30,13 +29,13 @@ void duk_be_encode(duk_bitencoder_ctx *ctx, duk_uint32_t data, duk_small_int_t b
 	}
 }
 
-void duk_be_finish(duk_bitencoder_ctx *ctx) {
+DUK_INTERNAL void duk_be_finish(duk_bitencoder_ctx *ctx) {
 	duk_small_int_t npad;
 
 	DUK_ASSERT(ctx != NULL);
 	DUK_ASSERT(ctx->currbits < 8);
 
-	npad = (duk_small_int_t)(8 - ctx->currbits);
+	npad = (duk_small_int_t) (8 - ctx->currbits);
 	if (npad > 0) {
 		duk_be_encode(ctx, 0, npad);
 	}

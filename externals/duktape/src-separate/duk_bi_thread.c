@@ -8,7 +8,7 @@
  *  Constructor
  */
 
-duk_ret_t duk_bi_thread_constructor(duk_context *ctx) {
+DUK_INTERNAL duk_ret_t duk_bi_thread_constructor(duk_context *ctx) {
 	duk_hthread *new_thr;
 	duk_hobject *func;
 
@@ -19,14 +19,14 @@ duk_ret_t duk_bi_thread_constructor(duk_context *ctx) {
 	DUK_ASSERT(func != NULL);
 
 	duk_push_thread(ctx);
-	new_thr = (duk_hthread *)duk_get_hobject(ctx, -1);
+	new_thr = (duk_hthread *) duk_get_hobject(ctx, -1);
 	DUK_ASSERT(new_thr != NULL);
 	new_thr->state = DUK_HTHREAD_STATE_INACTIVE;
 
 	/* push initial function call to new thread stack; this is
 	 * picked up by resume().
 	 */
-	duk_push_hobject((duk_context *)new_thr, func);
+	duk_push_hobject((duk_context *) new_thr, func);
 
 	return 1;  /* return thread */
 }
@@ -46,8 +46,8 @@ duk_ret_t duk_bi_thread_constructor(duk_context *ctx) {
  *  Note: yield and resume handling is currently asymmetric.
  */
 
-duk_ret_t duk_bi_thread_resume(duk_context *ctx) {
-	duk_hthread *thr = (duk_hthread *)ctx;
+DUK_INTERNAL duk_ret_t duk_bi_thread_resume(duk_context *ctx) {
+	duk_hthread *thr = (duk_hthread *) ctx;
 	duk_hthread *thr_resume;
 	duk_tval tv_tmp;
 	duk_tval *tv;
@@ -55,15 +55,15 @@ duk_ret_t duk_bi_thread_resume(duk_context *ctx) {
 	duk_small_int_t is_error;
 
 	DUK_DDD(DUK_DDDPRINT("Duktape.Thread.resume(): thread=%!T, value=%!T, is_error=%!T",
-		(duk_tval *)duk_get_tval(ctx, 0),
-		(duk_tval *)duk_get_tval(ctx, 1),
-		(duk_tval *)duk_get_tval(ctx, 2)));
+	                     (duk_tval *) duk_get_tval(ctx, 0),
+	                     (duk_tval *) duk_get_tval(ctx, 1),
+	                     (duk_tval *) duk_get_tval(ctx, 2)));
 
 	DUK_ASSERT(thr->state == DUK_HTHREAD_STATE_RUNNING);
 	DUK_ASSERT(thr->heap->curr_thread == thr);
 
 	thr_resume = duk_require_hthread(ctx, 0);
-	is_error = (duk_small_int_t)duk_to_boolean(ctx, 2);
+	is_error = (duk_small_int_t) duk_to_boolean(ctx, 2);
 	duk_set_top(ctx, 2);
 
 	/* [ thread value ] */
@@ -90,13 +90,13 @@ duk_ret_t duk_bi_thread_resume(duk_context *ctx) {
 	 */
 
 	if (thr_resume->state != DUK_HTHREAD_STATE_INACTIVE &&
-		thr_resume->state != DUK_HTHREAD_STATE_YIELDED) {
+	    thr_resume->state != DUK_HTHREAD_STATE_YIELDED) {
 		DUK_DD(DUK_DDPRINT("resume state invalid: target thread must be INACTIVE or YIELDED"));
 		goto state_error;
 	}
 
 	DUK_ASSERT(thr_resume->state == DUK_HTHREAD_STATE_INACTIVE ||
-		thr_resume->state == DUK_HTHREAD_STATE_YIELDED);
+	           thr_resume->state == DUK_HTHREAD_STATE_YIELDED);
 
 	/* Further state-dependent pre-checks */
 
@@ -104,12 +104,11 @@ duk_ret_t duk_bi_thread_resume(duk_context *ctx) {
 		/* no pre-checks now, assume a previous yield() has left things in
 		 * tip-top shape (longjmp handler will assert for these).
 		 */
-	}
-	else {
+	} else {
 		DUK_ASSERT(thr_resume->state == DUK_HTHREAD_STATE_INACTIVE);
 
 		if ((thr_resume->callstack_top != 0) ||
-			(thr_resume->valstack_top - thr_resume->valstack != 1)) {
+		    (thr_resume->valstack_top - thr_resume->valstack != 1)) {
 			goto state_invalid_initial;
 		}
 		tv = &thr_resume->valstack_top[-1];
@@ -125,6 +124,7 @@ duk_ret_t duk_bi_thread_resume(duk_context *ctx) {
 			 */
 			goto state_invalid_initial;
 		}
+
 	}
 
 	/*
@@ -145,18 +145,16 @@ duk_ret_t duk_bi_thread_resume(duk_context *ctx) {
 #ifdef DUK_USE_DEBUG
 	if (is_error) {
 		DUK_DDD(DUK_DDDPRINT("RESUME ERROR: thread=%!T, value=%!T",
-			(duk_tval *)duk_get_tval(ctx, 0),
-			(duk_tval *)duk_get_tval(ctx, 1)));
-	}
-	else if (thr_resume->state == DUK_HTHREAD_STATE_YIELDED) {
+		                     (duk_tval *) duk_get_tval(ctx, 0),
+		                     (duk_tval *) duk_get_tval(ctx, 1)));
+	} else if (thr_resume->state == DUK_HTHREAD_STATE_YIELDED) {
 		DUK_DDD(DUK_DDDPRINT("RESUME NORMAL: thread=%!T, value=%!T",
-			(duk_tval *)duk_get_tval(ctx, 0),
-			(duk_tval *)duk_get_tval(ctx, 1)));
-	}
-	else {
+		                     (duk_tval *) duk_get_tval(ctx, 0),
+		                     (duk_tval *) duk_get_tval(ctx, 1)));
+	} else {
 		DUK_DDD(DUK_DDDPRINT("RESUME INITIAL: thread=%!T, value=%!T",
-			(duk_tval *)duk_get_tval(ctx, 0),
-			(duk_tval *)duk_get_tval(ctx, 1)));
+		                     (duk_tval *) duk_get_tval(ctx, 0),
+		                     (duk_tval *) duk_get_tval(ctx, 1)));
 	}
 #endif
 
@@ -182,11 +180,11 @@ duk_ret_t duk_bi_thread_resume(duk_context *ctx) {
 	duk_err_longjmp(thr);  /* execution resumes in bytecode executor */
 	return 0;  /* never here */
 
-state_invalid_initial:
+ state_invalid_initial:
 	DUK_ERROR(thr, DUK_ERR_TYPE_ERROR, "invalid initial thread state/stack");
 	return 0;  /* never here */
 
-state_error:
+ state_error:
 	DUK_ERROR(thr, DUK_ERR_TYPE_ERROR, "invalid state for resume");
 	return 0;  /* never here */
 }
@@ -206,19 +204,19 @@ state_error:
  *  Note: yield and resume handling is currently asymmetric.
  */
 
-duk_ret_t duk_bi_thread_yield(duk_context *ctx) {
-	duk_hthread *thr = (duk_hthread *)ctx;
+DUK_INTERNAL duk_ret_t duk_bi_thread_yield(duk_context *ctx) {
+	duk_hthread *thr = (duk_hthread *) ctx;
 	duk_tval tv_tmp;
 	duk_small_int_t is_error;
 
 	DUK_DDD(DUK_DDDPRINT("Duktape.Thread.yield(): value=%!T, is_error=%!T",
-		(duk_tval *)duk_get_tval(ctx, 0),
-		(duk_tval *)duk_get_tval(ctx, 1)));
+	                     (duk_tval *) duk_get_tval(ctx, 0),
+	                     (duk_tval *) duk_get_tval(ctx, 1)));
 
 	DUK_ASSERT(thr->state == DUK_HTHREAD_STATE_RUNNING);
 	DUK_ASSERT(thr->heap->curr_thread == thr);
 
-	is_error = (duk_small_int_t)duk_to_boolean(ctx, 1);
+	is_error = (duk_small_int_t) duk_to_boolean(ctx, 1);
 	duk_set_top(ctx, 1);
 
 	/* [ value ] */
@@ -250,7 +248,7 @@ duk_ret_t duk_bi_thread_yield(duk_context *ctx) {
 	if (thr->callstack_preventcount != 1) {
 		/* Note: the only yield-preventing call is Duktape.Thread.yield(), hence check for 1, not 0 */
 		DUK_DD(DUK_DDPRINT("yield state invalid: there must be no yield-preventing calls in current thread callstack (preventcount is %ld)",
-			(long)thr->callstack_preventcount));
+		                   (long) thr->callstack_preventcount));
 		goto state_error;
 	}
 
@@ -271,11 +269,10 @@ duk_ret_t duk_bi_thread_yield(duk_context *ctx) {
 #ifdef DUK_USE_DEBUG
 	if (is_error) {
 		DUK_DDD(DUK_DDDPRINT("YIELD ERROR: value=%!T",
-			(duk_tval *)duk_get_tval(ctx, 0)));
-	}
-	else {
+		                     (duk_tval *) duk_get_tval(ctx, 0)));
+	} else {
 		DUK_DDD(DUK_DDDPRINT("YIELD NORMAL: value=%!T",
-			(duk_tval *)duk_get_tval(ctx, 0)));
+		                     (duk_tval *) duk_get_tval(ctx, 0)));
 	}
 #endif
 
@@ -301,12 +298,12 @@ duk_ret_t duk_bi_thread_yield(duk_context *ctx) {
 	duk_err_longjmp(thr);  /* execution resumes in bytecode executor */
 	return 0;  /* never here */
 
-state_error:
+ state_error:
 	DUK_ERROR(thr, DUK_ERR_TYPE_ERROR, "invalid state for yield");
 	return 0;  /* never here */
 }
 
-duk_ret_t duk_bi_thread_current(duk_context *ctx) {
+DUK_INTERNAL duk_ret_t duk_bi_thread_current(duk_context *ctx) {
 	duk_push_current_thread(ctx);
 	return 1;
 }

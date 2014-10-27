@@ -8,7 +8,7 @@
  *  Get prototype object for an integer error code.
  */
 
-duk_hobject *duk_error_prototype_from_code(duk_hthread *thr, duk_errcode_t code) {
+DUK_INTERNAL duk_hobject *duk_error_prototype_from_code(duk_hthread *thr, duk_errcode_t code) {
 	switch (code) {
 	case DUK_ERR_EVAL_ERROR:
 		return thr->builtins[DUK_BIDX_EVAL_ERROR_PROTOTYPE];
@@ -23,7 +23,7 @@ duk_hobject *duk_error_prototype_from_code(duk_hthread *thr, duk_errcode_t code)
 	case DUK_ERR_URI_ERROR:
 		return thr->builtins[DUK_BIDX_URI_ERROR_PROTOTYPE];
 
-		/* XXX: more specific error classes? */
+	/* XXX: more specific error classes? */
 	case DUK_ERR_UNIMPLEMENTED_ERROR:
 	case DUK_ERR_INTERNAL_ERROR:
 	case DUK_ERR_ALLOC_ERROR:
@@ -39,7 +39,7 @@ duk_hobject *duk_error_prototype_from_code(duk_hthread *thr, duk_errcode_t code)
  *  Exposed helper for setting up heap longjmp state.
  */
 
-void duk_err_setup_heap_ljstate(duk_hthread *thr, duk_small_int_t lj_type) {
+DUK_INTERNAL void duk_err_setup_heap_ljstate(duk_hthread *thr, duk_small_int_t lj_type) {
 	duk_tval tv_tmp;
 
 	thr->heap->lj.type = lj_type;
@@ -50,5 +50,5 @@ void duk_err_setup_heap_ljstate(duk_hthread *thr, duk_small_int_t lj_type) {
 	DUK_TVAL_INCREF(thr, &thr->heap->lj.value1);
 	DUK_TVAL_DECREF(thr, &tv_tmp);
 
-	duk_pop((duk_context *)thr);
+	duk_pop((duk_context *) thr);
 }

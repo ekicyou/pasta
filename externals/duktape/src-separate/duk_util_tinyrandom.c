@@ -11,11 +11,11 @@
 #define DUK__UPDATE_RND(rnd) do { \
 		(rnd) += ((rnd) * (rnd)) | 0x05; \
 		(rnd) = ((rnd) & 0xffffffffU);       /* if duk_uint32_t is exactly 32 bits, this is a NOP */ \
-		} while (0)
+	} while (0)
 
 #define DUK__RND_BIT(rnd)  ((rnd) >> 31)  /* only use the highest bit */
 
-duk_uint32_t duk_util_tinyrandom_get_bits(duk_hthread *thr, duk_small_int_t n) {
+DUK_INTERNAL duk_uint32_t duk_util_tinyrandom_get_bits(duk_hthread *thr, duk_small_int_t n) {
 	duk_small_int_t i;
 	duk_uint32_t res = 0;
 	duk_uint32_t rnd;
@@ -33,7 +33,7 @@ duk_uint32_t duk_util_tinyrandom_get_bits(duk_hthread *thr, duk_small_int_t n) {
 	return res;
 }
 
-duk_double_t duk_util_tinyrandom_get_double(duk_hthread *thr) {
+DUK_INTERNAL duk_double_t duk_util_tinyrandom_get_double(duk_hthread *thr) {
 	duk_double_t t;
 	duk_small_int_t n;
 	duk_uint32_t rnd;

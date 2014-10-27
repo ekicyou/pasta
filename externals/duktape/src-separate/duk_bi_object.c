@@ -4,9 +4,9 @@
 
 #include "duk_internal.h"
 
-duk_ret_t duk_bi_object_constructor(duk_context *ctx) {
+DUK_INTERNAL duk_ret_t duk_bi_object_constructor(duk_context *ctx) {
 	if (!duk_is_constructor_call(ctx) &&
-		!duk_is_null_or_undefined(ctx, 0)) {
+	    !duk_is_null_or_undefined(ctx, 0)) {
 		duk_to_object(ctx, 0);
 		return 1;
 	}
@@ -20,18 +20,18 @@ duk_ret_t duk_bi_object_constructor(duk_context *ctx) {
 	 * promote to an object value.
 	 */
 	if (duk_check_type_mask(ctx, 0, DUK_TYPE_MASK_STRING |
-		DUK_TYPE_MASK_BOOLEAN |
-		DUK_TYPE_MASK_NUMBER |
-		DUK_TYPE_MASK_POINTER |
-		DUK_TYPE_MASK_BUFFER)) {
+	                                DUK_TYPE_MASK_BOOLEAN |
+	                                DUK_TYPE_MASK_NUMBER |
+	                                DUK_TYPE_MASK_POINTER |
+	                                DUK_TYPE_MASK_BUFFER)) {
 		duk_to_object(ctx, 0);
 		return 1;
 	}
 
 	duk_push_object_helper(ctx,
-		DUK_HOBJECT_FLAG_EXTENSIBLE |
-		DUK_HOBJECT_CLASS_AS_FLAGS(DUK_HOBJECT_CLASS_OBJECT),
-		DUK_BIDX_OBJECT_PROTOTYPE);
+	                       DUK_HOBJECT_FLAG_EXTENSIBLE |
+	                       DUK_HOBJECT_CLASS_AS_FLAGS(DUK_HOBJECT_CLASS_OBJECT),
+	                       DUK_BIDX_OBJECT_PROTOTYPE);
 	return 1;
 }
 
@@ -40,7 +40,7 @@ duk_ret_t duk_bi_object_constructor(duk_context *ctx) {
  *
  * https://people.mozilla.org/~jorendorff/es6-draft.html#sec-get-object.prototype.__proto__
  */
-duk_ret_t duk_bi_object_getprototype_shared(duk_context *ctx) {
+DUK_INTERNAL duk_ret_t duk_bi_object_getprototype_shared(duk_context *ctx) {
 	duk_hobject *h;
 
 	/* magic: 0=getter call, 1=Object.getPrototypeOf */
@@ -60,8 +60,7 @@ duk_ret_t duk_bi_object_getprototype_shared(duk_context *ctx) {
 
 	if (h->prototype) {
 		duk_push_hobject(ctx, h->prototype);
-	}
-	else {
+	} else {
 		duk_push_null(ctx);
 	}
 	return 1;
@@ -73,8 +72,8 @@ duk_ret_t duk_bi_object_getprototype_shared(duk_context *ctx) {
  * https://people.mozilla.org/~jorendorff/es6-draft.html#sec-get-object.prototype.__proto__
  * https://people.mozilla.org/~jorendorff/es6-draft.html#sec-object.setprototypeof
  */
-duk_ret_t duk_bi_object_setprototype_shared(duk_context *ctx) {
-	duk_hthread *thr = (duk_hthread *)ctx;
+DUK_INTERNAL duk_ret_t duk_bi_object_setprototype_shared(duk_context *ctx) {
+	duk_hthread *thr = (duk_hthread *) ctx;
 	duk_hobject *h_obj;
 	duk_hobject *h_new_proto;
 	duk_hobject *h_curr;
@@ -94,8 +93,7 @@ duk_ret_t duk_bi_object_setprototype_shared(duk_context *ctx) {
 		 * setPrototypeOf() call which returns the target object.
 		 */
 		ret_success = 0;
-	}
-	else {
+	} else {
 		duk_require_object_coercible(ctx, 0);
 		duk_require_type_mask(ctx, 1, DUK_TYPE_MASK_NULL | DUK_TYPE_MASK_OBJECT);
 	}
@@ -126,21 +124,21 @@ duk_ret_t duk_bi_object_setprototype_shared(duk_context *ctx) {
 	DUK_HOBJECT_SET_PROTOTYPE_UPDREF(thr, h_obj, h_new_proto);
 	/* fall thru */
 
-skip:
+ skip:
 	duk_set_top(ctx, 1);
 	return ret_success;
 
-fail_nonextensible:
-fail_loop :
+ fail_nonextensible:
+ fail_loop:
 	return DUK_RET_TYPE_ERROR;
 }
 
-duk_ret_t duk_bi_object_constructor_get_own_property_descriptor(duk_context *ctx) {
+DUK_INTERNAL duk_ret_t duk_bi_object_constructor_get_own_property_descriptor(duk_context *ctx) {
 	/* XXX: no need for indirect call */
 	return duk_hobject_object_get_own_property_descriptor(ctx);
 }
 
-duk_ret_t duk_bi_object_constructor_create(duk_context *ctx) {
+DUK_INTERNAL duk_ret_t duk_bi_object_constructor_create(duk_context *ctx) {
 	duk_tval *tv;
 	duk_hobject *proto = NULL;
 
@@ -150,19 +148,17 @@ duk_ret_t duk_bi_object_constructor_create(duk_context *ctx) {
 	DUK_ASSERT(tv != NULL);
 	if (DUK_TVAL_IS_NULL(tv)) {
 		;
-	}
-	else if (DUK_TVAL_IS_OBJECT(tv)) {
+	} else if (DUK_TVAL_IS_OBJECT(tv)) {
 		proto = DUK_TVAL_GET_OBJECT(tv);
 		DUK_ASSERT(proto != NULL);
-	}
-	else {
+	} else {
 		return DUK_RET_TYPE_ERROR;
 	}
 
-	(void)duk_push_object_helper_proto(ctx,
-		DUK_HOBJECT_FLAG_EXTENSIBLE |
-		DUK_HOBJECT_CLASS_AS_FLAGS(DUK_HOBJECT_CLASS_OBJECT),
-		proto);
+	(void) duk_push_object_helper_proto(ctx,
+	                                    DUK_HOBJECT_FLAG_EXTENSIBLE |
+	                                    DUK_HOBJECT_CLASS_AS_FLAGS(DUK_HOBJECT_CLASS_OBJECT),
+	                                    proto);
 
 	if (!duk_is_undefined(ctx, 1)) {
 		/* [ O Properties obj ] */
@@ -183,25 +179,25 @@ duk_ret_t duk_bi_object_constructor_create(duk_context *ctx) {
 	return 1;
 }
 
-duk_ret_t duk_bi_object_constructor_define_property(duk_context *ctx) {
+DUK_INTERNAL duk_ret_t duk_bi_object_constructor_define_property(duk_context *ctx) {
 	/* XXX: no need for indirect call */
 	return duk_hobject_object_define_property(ctx);
 }
 
-duk_ret_t duk_bi_object_constructor_define_properties(duk_context *ctx) {
+DUK_INTERNAL duk_ret_t duk_bi_object_constructor_define_properties(duk_context *ctx) {
 	/* XXX: no need for indirect call */
 	return duk_hobject_object_define_properties(ctx);
 }
 
-duk_ret_t duk_bi_object_constructor_seal_freeze_shared(duk_context *ctx) {
-	duk_hthread *thr = (duk_hthread *)ctx;
+DUK_INTERNAL duk_ret_t duk_bi_object_constructor_seal_freeze_shared(duk_context *ctx) {
+	duk_hthread *thr = (duk_hthread *) ctx;
 	duk_hobject *h;
 	duk_bool_t is_freeze;
 
 	h = duk_require_hobject(ctx, 0);
 	DUK_ASSERT(h != NULL);
 
-	is_freeze = (duk_bool_t)duk_get_current_magic(ctx);
+	is_freeze = (duk_bool_t) duk_get_current_magic(ctx);
 	duk_hobject_object_seal_freeze_helper(thr, h, is_freeze);
 
 	/* Sealed and frozen objects cannot gain any more properties,
@@ -212,8 +208,8 @@ duk_ret_t duk_bi_object_constructor_seal_freeze_shared(duk_context *ctx) {
 	return 1;
 }
 
-duk_ret_t duk_bi_object_constructor_prevent_extensions(duk_context *ctx) {
-	duk_hthread *thr = (duk_hthread *)ctx;
+DUK_INTERNAL duk_ret_t duk_bi_object_constructor_prevent_extensions(duk_context *ctx) {
+	duk_hthread *thr = (duk_hthread *) ctx;
 	duk_hobject *h;
 
 	h = duk_require_hobject(ctx, 0);
@@ -229,7 +225,7 @@ duk_ret_t duk_bi_object_constructor_prevent_extensions(duk_context *ctx) {
 	return 1;
 }
 
-duk_ret_t duk_bi_object_constructor_is_sealed_frozen_shared(duk_context *ctx) {
+DUK_INTERNAL duk_ret_t duk_bi_object_constructor_is_sealed_frozen_shared(duk_context *ctx) {
 	duk_hobject *h;
 	duk_bool_t is_frozen;
 	duk_bool_t rc;
@@ -243,7 +239,7 @@ duk_ret_t duk_bi_object_constructor_is_sealed_frozen_shared(duk_context *ctx) {
 	return 1;
 }
 
-duk_ret_t duk_bi_object_constructor_is_extensible(duk_context *ctx) {
+DUK_INTERNAL duk_ret_t duk_bi_object_constructor_is_extensible(duk_context *ctx) {
 	duk_hobject *h;
 
 	h = duk_require_hobject(ctx, 0);
@@ -256,8 +252,8 @@ duk_ret_t duk_bi_object_constructor_is_extensible(duk_context *ctx) {
 /* Shared helper for Object.getOwnPropertyNames() and Object.keys().
  * Magic: 0=getOwnPropertyNames, 1=Object.keys.
  */
-duk_ret_t duk_bi_object_constructor_keys_shared(duk_context *ctx) {
-	duk_hthread *thr = (duk_hthread *)ctx;
+DUK_INTERNAL duk_ret_t duk_bi_object_constructor_keys_shared(duk_context *ctx) {
+	duk_hthread *thr = (duk_hthread *) ctx;
 	duk_hobject *obj;
 #if defined(DUK_USE_ES6_PROXY)
 	duk_hobject *h_proxy_target;
@@ -275,9 +271,9 @@ duk_ret_t duk_bi_object_constructor_keys_shared(duk_context *ctx) {
 
 #if defined(DUK_USE_ES6_PROXY)
 	if (DUK_LIKELY(!duk_hobject_proxy_check(thr,
-		obj,
-		&h_proxy_target,
-		&h_proxy_handler))) {
+	                                        obj,
+	                                        &h_proxy_target,
+	                                        &h_proxy_handler))) {
 		goto skip_proxy;
 	}
 
@@ -301,7 +297,7 @@ duk_ret_t duk_bi_object_constructor_keys_shared(duk_context *ctx) {
 	h_trap_result = duk_require_hobject(ctx, -1);
 	DUK_UNREF(h_trap_result);
 
-	len = (duk_uarridx_t)duk_get_length(ctx, -1);
+	len = (duk_uarridx_t) duk_get_length(ctx, -1);
 	idx = 0;
 	duk_push_array(ctx);
 	for (i = 0; i < len; i++) {
@@ -311,8 +307,7 @@ duk_ret_t duk_bi_object_constructor_keys_shared(duk_context *ctx) {
 			/* [ obj trap_result res_arr propname ] */
 			duk_put_prop_index(ctx, -2, idx);
 			idx++;
-		}
-		else {
+		} else {
 			duk_pop(ctx);
 		}
 	}
@@ -330,7 +325,7 @@ duk_ret_t duk_bi_object_constructor_keys_shared(duk_context *ctx) {
 	 */
 	return 1;
 
-skip_proxy:
+ skip_proxy:
 #endif  /* DUK_USE_ES6_PROXY */
 
 	DUK_ASSERT_TOP(ctx, 1);
@@ -338,31 +333,28 @@ skip_proxy:
 	if (duk_get_current_magic(ctx)) {
 		/* Object.keys */
 		enum_flags = DUK_ENUM_OWN_PROPERTIES_ONLY |
-			DUK_ENUM_NO_PROXY_BEHAVIOR;
-	}
-	else {
+		             DUK_ENUM_NO_PROXY_BEHAVIOR;
+	} else {
 		/* Object.getOwnPropertyNames */
 		enum_flags = DUK_ENUM_INCLUDE_NONENUMERABLE |
-			DUK_ENUM_OWN_PROPERTIES_ONLY |
-			DUK_ENUM_NO_PROXY_BEHAVIOR;
+		             DUK_ENUM_OWN_PROPERTIES_ONLY |
+		             DUK_ENUM_NO_PROXY_BEHAVIOR;
 	}
 
 	return duk_hobject_get_enumerated_keys(ctx, enum_flags);
 }
 
-duk_ret_t duk_bi_object_prototype_to_string(duk_context *ctx) {
-	duk_hthread *thr = (duk_hthread *)ctx;
+DUK_INTERNAL duk_ret_t duk_bi_object_prototype_to_string(duk_context *ctx) {
+	duk_hthread *thr = (duk_hthread *) ctx;
 
 	duk_push_this(ctx);
 	duk_push_string(ctx, "[object ");
 
 	if (duk_is_undefined(ctx, -2)) {
 		duk_push_hstring_stridx(ctx, DUK_STRIDX_UC_UNDEFINED);
-	}
-	else if (duk_is_null(ctx, -2)) {
+	} else if (duk_is_null(ctx, -2)) {
 		duk_push_hstring_stridx(ctx, DUK_STRIDX_UC_NULL);
-	}
-	else {
+	} else {
 		duk_hobject *h_this;
 		duk_hstring *h_classname;
 
@@ -381,9 +373,9 @@ duk_ret_t duk_bi_object_prototype_to_string(duk_context *ctx) {
 	return 1;
 }
 
-duk_ret_t duk_bi_object_prototype_to_locale_string(duk_context *ctx) {
+DUK_INTERNAL duk_ret_t duk_bi_object_prototype_to_locale_string(duk_context *ctx) {
 	DUK_ASSERT_TOP(ctx, 0);
-	(void)duk_push_this_coercible_to_object(ctx);
+	(void) duk_push_this_coercible_to_object(ctx);
 	duk_get_prop_stridx(ctx, 0, DUK_STRIDX_TO_STRING);
 	if (!duk_is_callable(ctx, 1)) {
 		return DUK_RET_TYPE_ERROR;
@@ -393,13 +385,13 @@ duk_ret_t duk_bi_object_prototype_to_locale_string(duk_context *ctx) {
 	return 1;
 }
 
-duk_ret_t duk_bi_object_prototype_value_of(duk_context *ctx) {
-	(void)duk_push_this_coercible_to_object(ctx);
+DUK_INTERNAL duk_ret_t duk_bi_object_prototype_value_of(duk_context *ctx) {
+	(void) duk_push_this_coercible_to_object(ctx);
 	return 1;
 }
 
-duk_ret_t duk_bi_object_prototype_is_prototype_of(duk_context *ctx) {
-	duk_hthread *thr = (duk_hthread *)ctx;
+DUK_INTERNAL duk_ret_t duk_bi_object_prototype_is_prototype_of(duk_context *ctx) {
+	duk_hthread *thr = (duk_hthread *) ctx;
 	duk_hobject *h_v;
 	duk_hobject *h_obj;
 
@@ -421,10 +413,10 @@ duk_ret_t duk_bi_object_prototype_is_prototype_of(duk_context *ctx) {
 	return 1;
 }
 
-duk_ret_t duk_bi_object_prototype_has_own_property(duk_context *ctx) {
+DUK_INTERNAL duk_ret_t duk_bi_object_prototype_has_own_property(duk_context *ctx) {
 	return duk_hobject_object_ownprop_helper(ctx, 0 /*required_desc_flags*/);
 }
 
-duk_ret_t duk_bi_object_prototype_property_is_enumerable(duk_context *ctx) {
+DUK_INTERNAL duk_ret_t duk_bi_object_prototype_property_is_enumerable(duk_context *ctx) {
 	return duk_hobject_object_ownprop_helper(ctx, DUK_PROPDESC_FLAG_ENUMERABLE /*required_desc_flags*/);
 }

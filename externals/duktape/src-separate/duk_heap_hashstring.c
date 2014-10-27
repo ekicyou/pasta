@@ -9,7 +9,7 @@
 #define DUK__STRHASH_MEDIUMSTRING  (256L * 1024L)
 #define DUK__STRHASH_BLOCKSIZE     256L
 
-duk_uint32_t duk_heap_hashstring(duk_heap *heap, duk_uint8_t *str, duk_size_t len) {
+DUK_INTERNAL duk_uint32_t duk_heap_hashstring(duk_heap *heap, duk_uint8_t *str, duk_size_t len) {
 	/*
 	 *  Sampling long strings by byte skipping (like Lua does) is potentially
 	 *  a cache problem.  Here we do 'block skipping' instead for long strings:
@@ -36,26 +36,24 @@ duk_uint32_t duk_heap_hashstring(duk_heap *heap, duk_uint8_t *str, duk_size_t le
 
 	if (len <= DUK__STRHASH_SHORTSTRING) {
 		return duk_util_hashbytes(str, len, str_seed);
-	}
-	else {
+	} else {
 		duk_uint32_t hash;
 		duk_size_t off;
 		duk_size_t skip;
 
 		if (len <= DUK__STRHASH_MEDIUMSTRING) {
-			skip = (duk_size_t)(16 * DUK__STRHASH_BLOCKSIZE + DUK__STRHASH_BLOCKSIZE);
-		}
-		else {
-			skip = (duk_size_t)(256 * DUK__STRHASH_BLOCKSIZE + DUK__STRHASH_BLOCKSIZE);
+			skip = (duk_size_t) (16 * DUK__STRHASH_BLOCKSIZE + DUK__STRHASH_BLOCKSIZE);
+		} else {
+			skip = (duk_size_t) (256 * DUK__STRHASH_BLOCKSIZE + DUK__STRHASH_BLOCKSIZE);
 		}
 
-		hash = duk_util_hashbytes(str, (duk_size_t)DUK__STRHASH_SHORTSTRING, str_seed);
+		hash = duk_util_hashbytes(str, (duk_size_t) DUK__STRHASH_SHORTSTRING, str_seed);
 		off = DUK__STRHASH_SHORTSTRING + (skip * (hash % 256)) / 256;
 
 		/* XXX: inefficient loop */
 		while (off < len) {
 			duk_size_t left = len - off;
-			duk_size_t now = (duk_size_t)(left > DUK__STRHASH_BLOCKSIZE ? DUK__STRHASH_BLOCKSIZE : left);
+			duk_size_t now = (duk_size_t) (left > DUK__STRHASH_BLOCKSIZE ? DUK__STRHASH_BLOCKSIZE : left);
 			hash ^= duk_util_hashbytes(str + off, now, str_seed);
 			off += skip;
 		}

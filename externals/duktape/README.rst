@@ -22,8 +22,11 @@ In particular, you should read the getting started section::
 
   http://duktape.org/guide.html#gettingstarted
 
-Building and integrating Duktape into your project is very straightforward.
-See Makefile.hello for an example::
+Building and integrating Duktape into your project is very straightforward::
+
+  http://duktape.org/guide.html#compiling
+
+See Makefile.hello for a concrete example::
 
   $ cd <dist_root>
   $ make -f Makefile.hello
@@ -37,11 +40,15 @@ To build an example command line tool, use the following::
   $ cd <dist_root>
   $ make -f Makefile.cmdline
   [...]
+
   $ ./duk
   ((o) Duktape
   duk> print('Hello world!');
   Hello world!
   = undefined
+
+  $ ./duk mandel.js
+  [...]
 
 There are further examples in the ``examples/`` directory.  Although
 Duktape itself is widely portable, some of the examples are Linux only.
@@ -51,12 +58,14 @@ and other standard timer functions could be implemented on Unix/Linux.
 The ``polyfills/`` directory provides a few replacement suggestions for
 non-standard Javascript functions provided by other implementations.
 
-This distributable contains Duktape version 0.12.0, created from git
-commit ab160355cf7fb793b92dea975334ad0d8803513e (v0.12.0).
+This distributable contains Duktape version 1.0.0, created from git
+commit c57f64afdc374dc3444f8447bac4f7680a2f5b0b (v1.0.0).
 
-Duktape is copyrighted by its authors (see ``AUTHORS.txt``) and licensed
-under the MIT license (see ``LICENSE.txt``).  MurmurHash2 is used internally;
-it is also under the MIT license.
+Duktape is copyrighted by its authors (see ``AUTHORS.rst``) and licensed
+under the MIT license (see ``LICENSE.txt``).  MurmurHash2 is used internally,
+it is also under the MIT license.  Duktape module loader is based on the
+CommonJS module loading specification (without sharing any code), CommonJS
+is under the MIT license.
 
 Have fun!
 

@@ -17,7 +17,7 @@
 #define DUK__HASH_SIZE_RATIO   1177  /* floor(1.15 * (1 << 10)) */
 
 /* prediction corrections for prime list (see genhashsizes.py) */
-static const duk_int8_t duk__hash_size_corrections[] = {
+DUK_LOCAL const duk_int8_t duk__hash_size_corrections[] = {
 	17,  /* minimum prime */
 	4, 3, 4, 1, 4, 1, 1, 2, 2, 2, 2, 1, 6, 6, 9, 5, 1, 2, 2, 5, 1, 3, 3, 3,
 	5, 4, 4, 2, 4, 8, 3, 4, 23, 2, 4, 7, 8, 11, 2, 12, 15, 10, 1, 1, 5, 1, 5,
@@ -32,18 +32,18 @@ static const duk_int8_t duk__hash_size_corrections[] = {
 /* probe steps (see genhashsizes.py), currently assumed to be 32 entries long
  * (DUK_UTIL_GET_HASH_PROBE_STEP macro).
  */
-duk_uint8_t duk_util_probe_steps[32] = {
+DUK_INTERNAL duk_uint8_t duk_util_probe_steps[32] = {
 	2, 3, 5, 7, 11, 13, 19, 31, 41, 47, 59, 67, 73, 79, 89, 101, 103, 107,
 	109, 127, 137, 139, 149, 157, 163, 167, 173, 181, 191, 193, 197, 199
 };
 
-duk_uint32_t duk_util_get_hash_prime(duk_uint32_t size) {
+DUK_INTERNAL duk_uint32_t duk_util_get_hash_prime(duk_uint32_t size) {
 	const duk_int8_t *p = duk__hash_size_corrections;
 	duk_uint32_t curr;
 
-	curr = (duk_uint32_t)*p++;
+	curr = (duk_uint32_t) *p++;
 	for (;;) {
-		duk_small_int_t t = (duk_small_int_t)*p++;
+		duk_small_int_t t = (duk_small_int_t) *p++;
 		if (t < 0) {
 			/* may happen if size is very close to 2^32-1 */
 			break;
@@ -51,16 +51,16 @@ duk_uint32_t duk_util_get_hash_prime(duk_uint32_t size) {
 
 		/* prediction: portable variant using doubles if 64-bit values not available */
 #ifdef DUK_USE_64BIT_OPS
-		curr = (duk_uint32_t)((((duk_uint64_t)curr) * ((duk_uint64_t)DUK__HASH_SIZE_RATIO)) >> 10);
+		curr = (duk_uint32_t) ((((duk_uint64_t) curr) * ((duk_uint64_t) DUK__HASH_SIZE_RATIO)) >> 10);
 #else
 		/* 32-bit x 11-bit = 43-bit, fits accurately into a double */
-		curr = (duk_uint32_t)DUK_FLOOR(((double)curr) * ((double)DUK__HASH_SIZE_RATIO) / 1024.0);
+		curr = (duk_uint32_t) DUK_FLOOR(((double) curr) * ((double) DUK__HASH_SIZE_RATIO) / 1024.0);
 #endif
 
 		/* correction */
 		curr += t;
 
-		DUK_DDD(DUK_DDDPRINT("size=%ld, curr=%ld", (long)size, (long)curr));
+		DUK_DDD(DUK_DDDPRINT("size=%ld, curr=%ld", (long) size, (long) curr));
 
 		if (curr >= size) {
 			return curr;
