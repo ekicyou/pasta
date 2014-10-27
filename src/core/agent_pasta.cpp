@@ -15,10 +15,11 @@ static void FatalFunc(duk_context *ctx, int code, const char *msg){
     FUNC_START;
     USES_CONVERSION;
 
+    auto pasta = pasta::GetPasta(ctx);
     std::wstring mes(L"duktape FATAL! code=(");
     mes += code;
     mes += L") ";
-    mes += A2CW_CP(msg, CP_UTF8);
+    mes += A2CW_CP(msg, pasta->cp);
 
     DEBUG_MESSAGE(mes.c_str());
 
@@ -174,12 +175,12 @@ void pasta::Agent::LoadJS(LPCWSTR moduleName){
     if (got != (size_t)len)         LoadJSThrow(moduleName, L"read error");
 
     // ƒRƒ“ƒpƒCƒ‹
-    duk_push_string(duk, W2A_CP(moduleName, CP_UTF8));
+    duk_push_string(duk, W2A_CP(moduleName, cp));
     DISPOSE_LAMBDA([duk](){duk_pop(duk); });
 
     if (duk_pcompile_lstring_filename(duk, 0, src, len) != 0) {
         std::wstring what(L"compile failed: ");
-        what += A2CW_CP(duk_safe_to_string(duk, -1), CP_UTF8);
+        what += A2CW_CP(duk_safe_to_string(duk, -1), cp);
         LoadJSThrow(moduleName, what.c_str());
     }
     else {

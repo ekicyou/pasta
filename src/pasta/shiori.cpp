@@ -121,7 +121,7 @@ SHIORI_API HGLOBAL __cdecl request(HGLOBAL hGlobal_request, long& len)
     const std::string request((const char *)hGlobal_request, len);
     std::string response;
     try{
-        const std::wstring wreq(A2CW_CP(request.c_str(), CP_UTF8));
+        const std::wstring wreq(A2CW_CP(request.c_str(), app->cp));
         auto wres = app->Request(wreq);
     }
     catch (const std::exception& e){

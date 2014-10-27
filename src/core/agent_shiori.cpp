@@ -75,7 +75,7 @@ const std::wstring shiori::Agent::Get(const std::wstring& req)
     auto res = receive(resBuf);
     if (res.resType == RESPONSE_ERROR){
         USES_CONVERSION;
-        throw std::exception(W2CA_CP(res.value.c_str(), CP_UTF8));
+        throw std::exception(W2CA_CP(res.value.c_str(), cp));
     }
     return res.value;
 }
@@ -114,14 +114,14 @@ const std::wstring shiori::Agent::Request(const std::wstring& req)
         mes += "X-PASTA-Resion: ";
         mes += ex.what();
         mes += "\r\n\r\n";
-        return ToWideStr(mes, CP_UTF8);
+        return ToWideStr(mes, cp);
     }
     catch (...){
         std::string mes(STR_RES_SERVER_ERROR);
         mes += "X-PASTA-Resion: ";
         mes += "NOT std::exception fail";
         mes += "\r\n\r\n";
-        return ToWideStr(mes, CP_UTF8);
+        return ToWideStr(mes, cp);
     }
 }
 
@@ -211,7 +211,7 @@ void shiori::Agent::SetException(const std::exception& ex){
     FUNC_START;
 
     DEBUG_MESSAGE(ex.what());
-    last_error_what = ToWideStr(ex.what(), CP_UTF8);
+    last_error_what = ToWideStr(ex.what(), cp);
 }
 
 void shiori::Agent::SetException(){
