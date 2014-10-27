@@ -43,13 +43,13 @@ namespace shiori{
     class Agent : public concurrency::agent
     {
     public:
-        explicit Agent();
-        explicit Agent(concurrency::Scheduler& scheduler);
-        explicit Agent(concurrency::ScheduleGroup& group);
+        explicit Agent(const int cp, const HINSTANCE hinst);
+        explicit Agent(const int cp, const HINSTANCE hinst, concurrency::Scheduler& scheduler);
+        explicit Agent(const int cp, const HINSTANCE hinst, concurrency::ScheduleGroup& group);
         virtual  ~Agent();
 
     public:
-        void Load(const HINSTANCE hinst, const int cp, const std::wstring& dir);
+        void Load(const std::wstring& dir);
         void UnLoad();
 
         const std::wstring Request(const std::wstring& req);
@@ -68,8 +68,8 @@ namespace shiori{
         virtual void GetAction(const std::wstring& req) = 0;
 
     public:
-        HINSTANCE hinst;                // SHIORI.DLLのインスタンス
-        int cp;                         // コードページ（UTF-8）
+        const HINSTANCE hinst;          // SHIORI.DLLのインスタンス
+        const int cp;                   // コードページ（UTF-8）
         std::tr2::sys::wpath loaddir;   // SHIORI.DLLのディレクトリ
 
     private:

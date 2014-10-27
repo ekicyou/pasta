@@ -23,8 +23,8 @@ namespace test
         {
             USES_CONVERSION;
             auto loaddir = current_path<wpath>();
-            auto ghost = pasta::Agent();
-            ghost.Load(NULL, CP_UTF8, loaddir.string());
+            auto ghost = pasta::Agent(NULL);
+            ghost.Load(loaddir.string());
 
             {
                 auto req =

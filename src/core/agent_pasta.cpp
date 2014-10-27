@@ -27,9 +27,42 @@ static void FatalFunc(duk_context *ctx, int code, const char *msg){
 
 #define duk_create_heap_pasta()  (duk_create_heap(NULL, NULL, NULL, NULL, FatalFunc))
 
+
 //-------------------------------------------------------------
-// Load処理
+// デストラクタ・Unload処理
 //-------------------------------------------------------------
+
+void pasta::Agent::UnLoadAction() {
+    FUNC_START;
+    USES_CONVERSION;
+
+    // Unload処理[ Shiori.unload() の呼び出し]
+
+    // VMの解放
+    duk_destroy_heap(ctx);
+}
+
+// 解放タイミングでUnloadが実行されていなければ呼び出す。
+pasta::Agent::~Agent(){
+    FUNC_START;
+    UnLoad();
+}
+
+
+//-------------------------------------------------------------
+// コンストラクタ・Load処置
+//-------------------------------------------------------------
+
+pasta::Agent::Agent(const HINSTANCE hinst)
+    :shiori::Agent(CP_UTF8, hinst)
+{}
+
+pasta::Agent::Agent(const HINSTANCE hinst, concurrency::Scheduler& scheduler)
+    : shiori::Agent(CP_UTF8, hinst, scheduler)
+{}
+pasta::Agent::Agent(const HINSTANCE hinst, concurrency::ScheduleGroup& group)
+    : shiori::Agent(CP_UTF8, hinst, group)
+{}
 
 void pasta::Agent::LoadAction(){
     FUNC_START;
@@ -67,26 +100,6 @@ void pasta::Agent::LoadAction(){
     LoadJS(L"shiori.js");
 
     // load処理[ Shiori.load(dir) の呼び出し]
-}
-
-//-------------------------------------------------------------
-// Unload処理
-//-------------------------------------------------------------
-
-void pasta::Agent::UnLoadAction() {
-    FUNC_START;
-    USES_CONVERSION;
-
-    // Unload処理[ Shiori.unload() の呼び出し]
-
-    // VMの解放
-    duk_destroy_heap(ctx);
-}
-
-// 解放タイミングでUnloadが実行されていなければ呼び出す。
-pasta::Agent::~Agent(){
-    FUNC_START;
-    UnLoad();
 }
 
 //-------------------------------------------------------------

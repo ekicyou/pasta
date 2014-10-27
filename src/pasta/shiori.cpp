@@ -99,8 +99,8 @@ SHIORI_API BOOL __cdecl load(HGLOBAL hGlobal_loaddir, long loaddir_len)
     auto wLoadDir = A2CW(loaddir.c_str());
     try{
         unload();
-        app = new pasta::Agent();
-        app->Load(hinst, CP_UTF8, wLoadDir);
+        app = new pasta::Agent(hinst);
+        app->Load(wLoadDir);
         return true;
     }
     catch (const std::exception&){

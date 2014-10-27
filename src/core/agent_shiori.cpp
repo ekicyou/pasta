@@ -11,18 +11,18 @@
 //============================================================
 // ‰Šú‰»
 //============================================================
-shiori::Agent::Agent()
-    :agent(), hasUnload(false)
+shiori::Agent::Agent(const int cp,const HINSTANCE hinst)
+    :agent(), hinst(hinst), cp(cp), hasUnload(false)
 {
 }
 
-shiori::Agent::Agent(concurrency::Scheduler& scheduler)
-    : agent(scheduler), hasUnload(false)
+shiori::Agent::Agent(const int cp, const HINSTANCE hinst, concurrency::Scheduler& scheduler)
+    : agent(scheduler), hinst(hinst), cp(cp), hasUnload(false)
 {
 }
 
-shiori::Agent::Agent(concurrency::ScheduleGroup& group)
-    : agent(group), hasUnload(false)
+shiori::Agent::Agent(const int cp, const HINSTANCE hinst, concurrency::ScheduleGroup& group)
+    : agent(group), hinst(hinst), cp(cp), hasUnload(false)
 {
 }
 
@@ -37,12 +37,10 @@ shiori::Agent::~Agent()
 //============================================================
 // SHIORI APIˆ—
 //============================================================
-void shiori::Agent::Load(const HINSTANCE hinst, const int cp, const std::wstring& dir)
+void shiori::Agent::Load(const std::wstring& dir)
 {
     FUNC_START;
 
-    this->hinst = hinst;
-    this->cp = cp;
     this->loaddir = dir;
     this->hasUnload = true;
     start();

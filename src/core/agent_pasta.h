@@ -6,6 +6,10 @@ namespace pasta{
     // Javascript栞[PASTA] 非同期エージェント
     class Agent :public shiori::Agent{
     public:
+        explicit Agent(const HINSTANCE hinst);
+        explicit Agent(const HINSTANCE hinst, concurrency::Scheduler& scheduler);
+        explicit Agent(const HINSTANCE hinst, concurrency::ScheduleGroup& group);
+
         virtual ~Agent();
 
         virtual void LoadAction() override;
