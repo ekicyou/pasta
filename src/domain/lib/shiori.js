@@ -35,6 +35,7 @@
     // SHIORI LOAD
     Shiori.load = function (dir) {
         try{
+            logger.debug(dir);
             Shiori.loaddir = dir;
 
             // TODO: Shiori.cookie の読み込み
@@ -68,6 +69,7 @@
     // SHIORI NOTIFY
     Shiori.notify = function (req) {
         try {
+            logger.debug(req);
             // TODO: NOTIFY処理
 
 
@@ -85,6 +87,7 @@
     Shiori.get = function (req) {
         hasResponse = true;
         try {
+            logger.debug(req);
             // TODO: GET処理
 
 
