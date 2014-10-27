@@ -18,17 +18,13 @@ void ThrowStdException(LPCSTR funcname, LPCSTR what){
     throw std::exception(mes.c_str());
 }
 
-void ThrowStdException(LPCSTR funcname, LPCWSTR what){
-    USES_CONVERSION;
-    auto text = W2CA_CP(what, CP_UTF8);
-    ThrowStdException(funcname, text);
-}
 
 //============================================================
 // ÉçÉOèoóÕ
 //============================================================
 
-FunctionInOutDebugLog::FunctionInOutDebugLog(LPCSTR funcname)
+FunctionInOutDebugLog::FunctionInOutDebugLog(const int cp, LPCSTR funcname)
+    :cp(cp)
 {
     USES_CONVERSION;
     funcName += L"[";

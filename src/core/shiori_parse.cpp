@@ -24,7 +24,7 @@ key2: value2
 (空行)
 */
 
-#define T(x)            L ## x
+#define T(x)            x
 #define IDENTIFIER      T("([$a-zA-Z_][$0-9a-zA-Z_-]*)")
 #define CRLF            T("\\r\\n")
 
@@ -35,12 +35,12 @@ key2: value2
 #define SHIORI_REQUEST  T("^") SHIORI_HEADER T("(") SHIORI_VALUE T(")*") CRLF T("$")
 
 // SHIORI3.0 REQUESTをKeyとValueのペア配列に分解します。
-const std::tr1::wcmatch shiori::matchShioriRequest(LPCWSTR text){
+const std::tr1::cmatch shiori::matchShioriRequest(LPCSTR text){
     // regex
-    static std::tr1::wregex re(SHIORI_REQUEST);
+    static std::tr1::regex re(SHIORI_REQUEST);
 
     // match
-    std::tr1::wcmatch match;
+    std::tr1::cmatch match;
     std::tr1::regex_match(text, match, re);
     return match;
 }

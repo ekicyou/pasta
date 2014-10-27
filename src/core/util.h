@@ -87,7 +87,7 @@ private:
 
 class FunctionInOutDebugLog{
 public:
-    FunctionInOutDebugLog(LPCSTR funcname);
+    FunctionInOutDebugLog(const int cp, LPCSTR funcname);
     ~FunctionInOutDebugLog();
 
     void OutputLog(LPCSTR message);
@@ -95,12 +95,13 @@ public:
 
 private:
     std::wstring funcName;
+    const int cp;
 };
 
 #ifdef DEBUG
-#define FUNC_START      FunctionInOutDebugLog __func_start_debuglog__(__FUNCTION__);
+#define FUNC_START(cp)  FunctionInOutDebugLog __func_start_debuglog__(cp,__FUNCTION__);
 #else
-#define FUNC_START      ;
+#define FUNC_START(cp)  ;
 #endif
 
 #ifdef DEBUG

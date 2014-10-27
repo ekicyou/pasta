@@ -12,14 +12,14 @@
 
 // エラーのコールバック関数（returnしない→例外に変換して戻す）
 static void FatalFunc(duk_context *ctx, int code, const char *msg){
-    FUNC_START;
     USES_CONVERSION;
+    auto ghost = pasta::GetPasta(ctx);
+    FUNC_START(ghost->cp);
 
-    auto pasta = pasta::GetPasta(ctx);
     std::wstring mes(L"duktape FATAL! code=(");
     mes += code;
     mes += L") ";
-    mes += A2CW_CP(msg, pasta->cp);
+    mes += A2CW_CP(msg, ghost->cp);
 
     DEBUG_MESSAGE(mes.c_str());
 
@@ -34,7 +34,7 @@ static void FatalFunc(duk_context *ctx, int code, const char *msg){
 //-------------------------------------------------------------
 
 void pasta::Agent::UnLoadAction() {
-    FUNC_START;
+    FUNC_START(cp);
     USES_CONVERSION;
 
     // Unload処理[ Shiori.unload() の呼び出し]
@@ -45,7 +45,7 @@ void pasta::Agent::UnLoadAction() {
 
 // 解放タイミングでUnloadが実行されていなければ呼び出す。
 pasta::Agent::~Agent(){
-    FUNC_START;
+    FUNC_START(cp);
     UnLoad();
 }
 
@@ -66,7 +66,7 @@ pasta::Agent::Agent(const HINSTANCE hinst, concurrency::ScheduleGroup& group)
 {}
 
 void pasta::Agent::LoadAction(){
-    FUNC_START;
+    FUNC_START(cp);
     USES_CONVERSION;
 
 #ifdef DEBUG
@@ -89,7 +89,7 @@ void pasta::Agent::LoadAction(){
 
     // ブートストラップ[loader.js]
     // ブートストラップコードは[Duktape.modSearch]を解決すること
-    LoadJS(L"loader.js");
+    LoadJS("loader.js");
 
     // [shiori.js]ブートストラップ
     // ブートストラップコードは最低限
@@ -98,7 +98,7 @@ void pasta::Agent::LoadAction(){
     //  [Shiori.get(req)]
     //  [Shiori.notify(req)]
     // の実装を行うことを前提とする。
-    LoadJS(L"shiori.js");
+    LoadJS("shiori.js");
 
     // load処理[ Shiori.load(dir) の呼び出し]
 }
@@ -106,8 +106,8 @@ void pasta::Agent::LoadAction(){
 //-------------------------------------------------------------
 // Notify処理
 //-------------------------------------------------------------
-void pasta::Agent::NotifyAction(const std::wstring& req){
-    FUNC_START;
+void pasta::Agent::NotifyAction(const std::string& req){
+    FUNC_START(cp);
 
     NOT_IMPLMENT;
 
@@ -117,8 +117,8 @@ void pasta::Agent::NotifyAction(const std::wstring& req){
 //-------------------------------------------------------------
 // Get処理
 //-------------------------------------------------------------
-void pasta::Agent::GetAction(const std::wstring& req){
-    FUNC_START;
+void pasta::Agent::GetAction(const std::string& req){
+    FUNC_START(cp);
 
     NOT_IMPLMENT;
     // Get処理[ Shiori.get(req) の呼び出し]
@@ -128,7 +128,7 @@ void pasta::Agent::GetAction(const std::wstring& req){
 // モジュール登録
 //-------------------------------------------------------------
 void pasta::Agent::RegModuleFuncs(LPCSTR name, const duk_function_list_entry* funcs){
-    FUNC_START;
+    FUNC_START(cp);
 
     duk_push_global_object(ctx);
     duk_push_object(ctx);
@@ -141,46 +141,45 @@ void pasta::Agent::RegModuleFuncs(LPCSTR name, const duk_function_list_entry* fu
 // スクリプトロード
 //-------------------------------------------------------------
 
-inline void LoadJSThrow(LPCWSTR moduleName, LPCWSTR what){
-    std::wstring mes;
-    mes += L"FAIL (";
+inline void LoadJSThrow(LPCSTR moduleName, LPCSTR what){
+    std::string mes;
+    mes += "FAIL (";
     mes += moduleName;
-    mes += L") ";
+    mes += ") ";
     mes += what;
     ThrowStdException("pasta::Agent::LoadJS", mes.c_str());
 }
 
 // 指定モジュールのjavascriptコードを読み込む。
-void pasta::Agent::LoadJS(LPCWSTR moduleName){
-    FUNC_START;
-    USES_CONVERSION;
+void pasta::Agent::LoadJS(LPCSTR moduleName){
+    FUNC_START(cp);
 
     // 変数
     auto duk = ctx;
 
     // ファイルオープン
     auto f = OpenReadModuleFile(moduleName);
-    if (!f) LoadJSThrow(moduleName, L"not found");
+    if (!f) LoadJSThrow(moduleName, "not found");
     AUTO_CLOSE(f);
 
     // 読み込み
-    if (fseek(f, 0, SEEK_END) != 0) LoadJSThrow(moduleName, L"seek error");
+    if (fseek(f, 0, SEEK_END) != 0) LoadJSThrow(moduleName, "seek error");
     auto len = ftell(f);
-    if (fseek(f, 0, SEEK_SET) != 0) LoadJSThrow(moduleName, L"seek error");
+    if (fseek(f, 0, SEEK_SET) != 0) LoadJSThrow(moduleName, "seek error");
     auto src = (char *)malloc(len + 1);
     src[len] = NULL;
-    if (!src)                       LoadJSThrow(moduleName, L"malloc error");
+    if (!src)                       LoadJSThrow(moduleName, "malloc error");
     DISPOSE_LAMBDA([src](){free(src); });
     auto got = fread(src, 1, len, f);
-    if (got != (size_t)len)         LoadJSThrow(moduleName, L"read error");
+    if (got != (size_t)len)         LoadJSThrow(moduleName, "read error");
 
     // コンパイル
-    duk_push_string(duk, W2A_CP(moduleName, cp));
+    duk_push_string(duk, moduleName);
     DISPOSE_LAMBDA([duk](){duk_pop(duk); });
 
     if (duk_pcompile_lstring_filename(duk, 0, src, len) != 0) {
-        std::wstring what(L"compile failed: ");
-        what += A2CW_CP(duk_safe_to_string(duk, -1), cp);
+        std::string what("compile failed: ");
+        what += duk_safe_to_string(duk, -1);
         LoadJSThrow(moduleName, what.c_str());
     }
     else {
@@ -206,7 +205,7 @@ static int tostring_raw(duk_context *ctx) {
     return 1;
 }
 
-std::string pasta::Agent::eval(const char * utf8text){
+std::string pasta::Agent::eval(LPCSTR utf8text){
     duk_push_string(ctx, utf8text);
     duk_safe_call(ctx, eval_raw, 1 /*nargs*/, 1 /*nrets*/);
     duk_safe_call(ctx, tostring_raw, 1 /*nargs*/, 1 /*nrets*/);
@@ -228,16 +227,19 @@ static wchar_t * preLoadPath[] = {
     NULL,
 };
 
-FILE* pasta::Agent::OpenReadModuleFile(LPCWSTR fname){
-    FUNC_START;
+FILE* pasta::Agent::OpenReadModuleFile(LPCSTR fname){
+    FUNC_START(cp);
+    USES_CONVERSION;
 
     if (!fname) return NULL;
+    auto wfname = A2W_CP(fname, cp);
+
     for (int i = 0;; i++){
         const auto pre = preLoadPath[i];
         if (!pre) return NULL;
         auto p = std::tr2::sys::wpath(loaddir);
         p /= pre;
-        p /= fname;
+        p /= wfname;
 
         // ファイルを開く
         auto f = _wfopen(p.string().c_str(), L"rb");

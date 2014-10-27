@@ -118,23 +118,24 @@ SHIORI_API HGLOBAL __cdecl request(HGLOBAL hGlobal_request, long& len)
 {
     USES_CONVERSION;
     AutoGrobalFree autoFree(hGlobal_request);
-    const std::string request((const char *)hGlobal_request, len);
-    std::string response;
+    const std::string req((const char *)hGlobal_request, len);
     try{
-        const std::wstring wreq(A2CW_CP(request.c_str(), app->cp));
-        auto wres = app->Request(wreq);
+        auto res = app->Request(req);
+        return AllocString(res, len);
     }
     catch (const std::exception& e){
-        CreateBatRequestResponse(response, e.what(), app->cp);
+        auto res = CreateBatRequestResponse(e.what(), app->cp);
+        return AllocString(res, len);
     }
     catch (const char* e){
-        CreateBatRequestResponse(response, e, app->cp);
+        auto res = CreateBatRequestResponse(e, app->cp);
+        return AllocString(res, len);
     }
     catch (...){
-        CreateBatRequestResponse(response, "Unnone Exception");
+        auto res = CreateBatRequestResponse("Unnone Exception");
+        return AllocString(res, len);
     }
 
-    return AllocString(response, len);
 }
 
 // EOF

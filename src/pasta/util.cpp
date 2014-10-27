@@ -10,21 +10,24 @@
  * SHIORI 3.0 RESPONSE
  */
 // RESPOSE 400: Bad Request
-void CreateBatRequestResponse(std::string& response, const char* reason)
+std::string CreateBatRequestResponse(LPCSTR reason)
 {
-    response =
+    std::string res =
         "SHIORI/3.0 400 Bad Request\r\n"
         "Charset: UTF-8\r\n"
         "Sender: PASTA\r\n"
         "X-PASTA-Reason: ";
-    response += reason;
-    response += "\r\n\r\n";
+    res += reason;
+    res += "\r\n\r\n";
+    return res;
 }
 
-void CreateBatRequestResponse(std::string& response, const char* reason, const int cp){
+std::string CreateBatRequestResponse(LPCSTR reason, const int cp){
+    if (cp == CP_UTF8)return CreateBatRequestResponse(reason);
+
     USES_CONVERSION;
-    auto message = W2A(A2W_CP(reason, cp));
-    CreateBatRequestResponse(response, reason);
+    auto message = W2A_CP(A2W_CP(reason, cp), CP_UTF8);
+    return CreateBatRequestResponse(reason);
 }
 
 /**----------------------------------------------------------------------------

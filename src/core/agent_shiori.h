@@ -23,20 +23,20 @@ namespace shiori{
     // SHIORI REQUEST
     class RequestItem{
     public:
-        explicit RequestItem(const RequestType tp, const std::wstring& req)
+        explicit RequestItem(const RequestType tp, const std::string& req)
             :reqType(tp), value(req){}
         explicit RequestItem(const RequestType tp)
             :reqType(tp){}
         const RequestType reqType;
-        const std::wstring value;
+        const std::string value;
     };
 
     // SHIORI RESPONSE
     class ResponseItem{
     public:
-        explicit ResponseItem(const std::wstring& res, const ResponseType tp) :value(res), resType(tp){}
+        explicit ResponseItem(const std::string& res, const ResponseType tp) :value(res), resType(tp){}
         const ResponseType resType;
-        const std::wstring value;
+        const std::string value;
     };
 
     // SHIORI 非同期エージェント
@@ -52,11 +52,11 @@ namespace shiori{
         void Load(const std::wstring& dir);
         void UnLoad();
 
-        const std::wstring Request(const std::wstring& req);
-        const std::wstring Notify(const std::wstring& req);
-        const std::wstring Get(const std::wstring& req);
+        const std::string Request(const std::string& req);
+        const std::string Notify(const std::string& req);
+        const std::string Get(const std::string& req);
 
-        void Response(const std::wstring& res);
+        void Response(const std::string& res);
 
     protected:
         void run();
@@ -64,8 +64,8 @@ namespace shiori{
     public:
         virtual void LoadAction() = 0;
         virtual void UnLoadAction() = 0;
-        virtual void NotifyAction(const std::wstring& req) = 0;
-        virtual void GetAction(const std::wstring& req) = 0;
+        virtual void NotifyAction(const std::string& req) = 0;
+        virtual void GetAction(const std::string& req) = 0;
 
     public:
         const HINSTANCE hinst;          // SHIORI.DLLのインスタンス
@@ -77,7 +77,7 @@ namespace shiori{
         bool hasResponse = false;
         concurrency::unbounded_buffer<RequestItem> reqBuf;
         concurrency::unbounded_buffer<ResponseItem> resBuf;
-        std::wstring last_error_what;
+        std::string last_error_what;
         bool IsRunning();
 
         void SetException(const std::exception& ex);

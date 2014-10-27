@@ -14,8 +14,8 @@ namespace pasta{
 
         virtual void LoadAction() override;
         virtual void UnLoadAction() override;
-        virtual void NotifyAction(const std::wstring& req) override;
-        virtual void GetAction(const std::wstring& req) override;
+        virtual void NotifyAction(const std::string& req) override;
+        virtual void GetAction(const std::string& req) override;
 
     private:
         void InitFileIO();
@@ -29,12 +29,12 @@ namespace pasta{
         void RegModuleFuncs(LPCSTR name, const duk_function_list_entry* funcs);
 
         // evalを実行します。
-        std::string eval(const char *utf8text);
+        std::string eval(LPCSTR utf8text);
 
         // 指定モジュールのjavascriptコードを読み込む。読み込めない場合は例外。
-        void LoadJS(LPCWSTR moduleName);
+        void LoadJS(LPCSTR moduleName);
 
         // モジュール用のファイルをread openし、FILE*を返す。
-        FILE* OpenReadModuleFile(LPCWSTR fname);
+        FILE* OpenReadModuleFile(LPCSTR fname);
     };
 }

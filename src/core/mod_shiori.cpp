@@ -8,13 +8,13 @@
 
 // SHIORI レスポンス応答を返します。
 static duk_ret_t response(duk_context *ctx){
-    FUNC_START;
     USES_CONVERSION;
 
     // 初期化＆引数取得
     auto ghost = pasta::GetPasta(ctx);
-    auto res = A2CW_UTF8(duk_to_string(ctx, 0));
+    FUNC_START(ghost->cp);
 
+    auto res = duk_to_string(ctx, 0);
     ghost->Response(res);
 
     return 1;

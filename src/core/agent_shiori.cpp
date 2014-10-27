@@ -11,7 +11,7 @@
 //============================================================
 // 初期化
 //============================================================
-shiori::Agent::Agent(const int cp,const HINSTANCE hinst)
+shiori::Agent::Agent(const int cp, const HINSTANCE hinst)
     :agent(), hinst(hinst), cp(cp), hasUnload(false)
 {
 }
@@ -39,7 +39,7 @@ shiori::Agent::~Agent()
 //============================================================
 void shiori::Agent::Load(const std::wstring& dir)
 {
-    FUNC_START;
+    FUNC_START(cp);
 
     this->loaddir = dir;
     this->hasUnload = true;
@@ -51,7 +51,7 @@ void shiori::Agent::UnLoad()
 {
     if (!hasUnload)return;
 
-    FUNC_START;
+    FUNC_START(cp);
     if (IsRunning()){
         asend(reqBuf, RequestItem(REQUEST_UNLOAD));
     }
@@ -59,38 +59,37 @@ void shiori::Agent::UnLoad()
     hasUnload = false;
 }
 
-const std::wstring shiori::Agent::Notify(const std::wstring& req)
+const std::string shiori::Agent::Notify(const std::string& req)
 {
-    FUNC_START;
+    FUNC_START(cp);
 
     asend(reqBuf, RequestItem(REQUEST_NOTIFY, req));
-    return WSTR_RES_NO_CONTENT;
+    return STR_RES_NO_CONTENT;
 }
 
-const std::wstring shiori::Agent::Get(const std::wstring& req)
+const std::string shiori::Agent::Get(const std::string& req)
 {
-    FUNC_START;
+    FUNC_START(cp);
 
     asend(reqBuf, RequestItem(REQUEST_GET, req));
     auto res = receive(resBuf);
     if (res.resType == RESPONSE_ERROR){
-        USES_CONVERSION;
-        throw std::exception(W2CA_CP(res.value.c_str(), cp));
+        throw std::exception(res.value.c_str());
     }
     return res.value;
 }
 
-void shiori::Agent::Response(const std::wstring& res)
+void shiori::Agent::Response(const std::string& res)
 {
-    FUNC_START;
+    FUNC_START(cp);
 
     asend(resBuf, ResponseItem(res, RESPONSE_NORMAL));
     hasResponse = false;
 }
 
-const std::wstring shiori::Agent::Request(const std::wstring& req)
+const std::string shiori::Agent::Request(const std::string& req)
 {
-    FUNC_START;
+    FUNC_START(cp);
     try{
         // エージェントが既に終了しているなら例外。
         if (!IsRunning()) THROW_EX("Agent not running");
@@ -100,7 +99,7 @@ const std::wstring shiori::Agent::Request(const std::wstring& req)
         auto match = matchShioriRequest(text);
 
         // 解析に失敗
-        if (match.empty())      return WSTR_RES_BAT_REQUEST;
+        if (match.empty())      return STR_RES_BAT_REQUEST;
         if (match.size() < 2)   THROW_EX("matchShioriRequest INTERNAL ERROR");
 
         // GET
@@ -114,14 +113,14 @@ const std::wstring shiori::Agent::Request(const std::wstring& req)
         mes += "X-PASTA-Resion: ";
         mes += ex.what();
         mes += "\r\n\r\n";
-        return ToWideStr(mes, cp);
+        return mes;
     }
     catch (...){
         std::string mes(STR_RES_SERVER_ERROR);
         mes += "X-PASTA-Resion: ";
         mes += "NOT std::exception fail";
         mes += "\r\n\r\n";
-        return ToWideStr(mes, cp);
+        return mes;
     }
 }
 
@@ -129,7 +128,7 @@ const std::wstring shiori::Agent::Request(const std::wstring& req)
 // SHIORI本体側の非同期メインループ
 //============================================================
 void shiori::Agent::run(){
-    FUNC_START;
+    FUNC_START(cp);
 
     try{
         // load処理
@@ -202,26 +201,25 @@ bool shiori::Agent::IsRunning(){
     return false;
 }
 
-
 //============================================================
 // 例外処理
 //============================================================
 
 void shiori::Agent::SetException(const std::exception& ex){
-    FUNC_START;
+    FUNC_START(cp);
 
     DEBUG_MESSAGE(ex.what());
-    last_error_what = ToWideStr(ex.what(), cp);
+    last_error_what = ex.what();
 }
 
 void shiori::Agent::SetException(){
-    FUNC_START;
+    FUNC_START(cp);
 
     SetException(std::exception("(none)"));
 }
 
 void shiori::Agent::SendException(){
-    FUNC_START;
+    FUNC_START(cp);
 
     auto res = ResponseItem(last_error_what, RESPONSE_ERROR);
     asend(resBuf, res);
