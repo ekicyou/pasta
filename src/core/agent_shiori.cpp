@@ -54,8 +54,9 @@ void shiori::Agent::UnLoad()
     if (!hasUnload)return;
 
     FUNC_START;
-
-    asend(reqBuf, RequestItem(REQUEST_UNLOAD));
+    if (IsRunning()){
+        asend(reqBuf, RequestItem(REQUEST_UNLOAD));
+    }
     wait(this);
     hasUnload = false;
 }
@@ -93,6 +94,9 @@ const std::wstring shiori::Agent::Request(const std::wstring& req)
 {
     FUNC_START;
     try{
+        // エージェントが既に終了しているなら例外。
+        if (!IsRunning()) THROW_EX("Agent not running");
+
         // SHIORI REQUESTを解析
         auto text = req.c_str();
         auto match = matchShioriRequest(text);
@@ -105,7 +109,6 @@ const std::wstring shiori::Agent::Request(const std::wstring& req)
         std::wstring reqType(match[1].first, match[1].second);
         if (reqType == L"GET")      return Get(req);
         if (reqType == L"NOTIFY")   return Notify(req);
-
         THROW_EX("unmatch request type");
     }
     catch (const std::exception& ex){
@@ -191,6 +194,16 @@ void shiori::Agent::run(){
     catch (...)                     { SetException(); }
     done();
 }
+
+bool shiori::Agent::IsRunning(){
+    switch (status()){
+    case concurrency::agent_runnable:
+    case concurrency::agent_started:
+        return true;
+    }
+    return false;
+}
+
 
 //============================================================
 // 例外処理

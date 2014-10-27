@@ -78,6 +78,7 @@ namespace shiori{
         concurrency::unbounded_buffer<RequestItem> reqBuf;
         concurrency::unbounded_buffer<ResponseItem> resBuf;
         std::wstring last_error_what;
+        bool IsRunning();
 
         void SetException(const std::exception& ex);
         void SetException();
