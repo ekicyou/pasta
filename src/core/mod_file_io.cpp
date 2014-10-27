@@ -6,31 +6,6 @@
 #include "ctx2pasta.h"
 #include "util.h"
 
-static wchar_t * preLoadPath[] = {
-    L"duktape",
-    L"modules",
-    L"lib",
-    L"js",
-    L".",
-    NULL,
-};
-
-// モジュールファイルを検索して最初に見つかったものを読み込みオープンして返す。
-static FILE* openModuleFile(const pasta::Agent* pasta, LPCWSTR fname){
-    if (!fname) return NULL;
-    const auto &loaddir = pasta->loaddir;
-    for (int i = 0;; i++){
-        const auto pre = preLoadPath[i];
-        if (!pre) return NULL;
-        auto p = std::tr2::sys::wpath(pasta->loaddir);
-        p /= pre;
-        p /= fname;
-
-        // ファイルを開く
-        auto f = _wfopen(p.string().c_str(), L"rb");
-        if (f) return f;
-    }
-}
 
 // ファイルをバッファとして読み込みます。
 static duk_ret_t readfile(duk_context *ctx){
@@ -39,10 +14,10 @@ static duk_ret_t readfile(duk_context *ctx){
     FUNC_START(pasta->cp);
 
     // 初期化＆引数取得
-    auto fname = A2CW_UTF8(duk_to_string(ctx, 0));
+    auto fname = duk_to_string(ctx, 0);
 
     // ファイルオープン
-    auto f = openModuleFile(pasta, fname);
+    auto f = pasta->OpenReadModuleFile(fname);
     if (!f)goto error;
 
     // 読み込み
@@ -68,11 +43,11 @@ static duk_ret_t readtext(duk_context *ctx){
     FUNC_START(pasta->cp);
 
     // 初期化＆引数取得
-    auto fname = A2CW_UTF8(duk_to_string(ctx, 0));
+    auto fname = duk_to_string(ctx, 0);
     char *buf = NULL;
 
     // ファイルオープン
-    auto f = openModuleFile(pasta, fname);
+    auto f = pasta->OpenReadModuleFile(fname);
     if (!f)goto error;
 
     // 読み込み

@@ -2,6 +2,7 @@
 // duktapeのrequire()解決用のロジック
 // pasta.dllの起動時に必ず読み込まれる。
 
+'use strict';
 (function (global) {
     // スクリプトローダ
     Duktape.modSearch = function (id, require, exports, module) {
