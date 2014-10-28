@@ -250,7 +250,8 @@ std::string pasta::Agent::eval(LPCSTR utf8text){
 static wchar_t * preLoadPath[] = {
     L"duktape",
     L"modules",
-    L"lib",
+    L"lib/ts",
+    L"lib/js",
     L"js",
     L".",
     NULL,

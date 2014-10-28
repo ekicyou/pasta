@@ -22,17 +22,18 @@
     <Content Include="app.css" />
     <EmbeddedResource Include="duktape\loader.js" />
     <Content Include="index.html" />
-    <EmbeddedResource Include="lib\shiori.js" />
-    <Content Include="PastaParser.peg.js" />
+    <EmbeddedResource Include="js\shiori.js" />
+    <Content Include="lib\dummy.txt" />
+    <Content Include="js\pasta\pasta-parser.js" />
     <Content Include="web.config" />
   </ItemGroup>
   <ItemGroup>
-    <TypeScriptCompile Include="app.ts" />
+    <TypeScriptCompile Include="ts\app.ts" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="dic\talk001.md" />
-    <Content Include="PastaParser.peg" />
-    <Content Include="lib\pasta\README.md" />
+    <Content Include="js\pasta\pasta-parser.peg" />
+    <Content Include="js\pasta\README.md" />
     <Content Include="copyItem.bat" />
     <None Include="web.Debug.config">
       <DependentUpon>web.config</DependentUpon>
@@ -73,6 +74,11 @@
   <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
     <TypeScriptRemoveComments>false</TypeScriptRemoveComments>
     <TypeScriptSourceMap>true</TypeScriptSourceMap>
+    <TypeScriptModuleKind>commonjs</TypeScriptModuleKind>
+    <TypeScriptOutDir>lib\ts</TypeScriptOutDir>
+    <TypeScriptGeneratesDeclarations>True</TypeScriptGeneratesDeclarations>
+    <TypeScriptSourceRoot>ts</TypeScriptSourceRoot>
+    <TypeScriptNoImplicitAny>True</TypeScriptNoImplicitAny>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
     <TypeScriptRemoveComments>true</TypeScriptRemoveComments>
