@@ -1,0 +1,1 @@
+{"version":3,"file":"user-persistence.js","sourceRoot":"ts/","sources":["pasta/user-persistence.ts"],"names":["pasta","pasta.user_persistence","pasta.user_persistence.constructor"],"mappings":"AAAA,YAAY;AAEZ,IAAO,KAAK;AASX,CATD,UAAO,KAAK;IAERA;QAAAC;QAIAC,CAACA;AAAAD,QAADA,wBAACA;IAADA,CAACA,IAAAD;IAJDA,0CAICA;AAGLA,CAACA,yBAAA"}

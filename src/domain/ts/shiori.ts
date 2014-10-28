@@ -1,40 +1,41 @@
-// ルートプログラム
-// 必要なスクリプトを読み込み、
-//  [shiori.load(dir)]
-//  [shiori.unload()]
-//  [shiori.get(req)]
-//  [shiori.notify(req)]
-// の各関数をフックする。
+﻿// shioriインターフェース
 
-'use strict';
-(function (global) {
+module shiori {
 
     //---------------------------------------------------------
-    // モジュール
+    // ロギング
     var logger = new Duktape.Logger();
+
+    //---------------------------------------------------------
+    // 公開変数
+
+    // ロードディレクトリ
+    export var loaddir: string;
+
 
 
     //---------------------------------------------------------
     // レスポンス処理関数
     var hasResponse = false;
-    var response = function (res) {
+
+    // レスポンス
+    function response(res: string): void {
         if (!hasResponse) {
             logger.error("response(): multiple call");
             return;
         }
         hasResponse = false;
         shiori.response(res);
-    };
+    }
+
 
     //---------------------------------------------------------
     // SHIORI LOAD
-    shiori.load = function (dir) {
-        try{
+    export function load(dir: string): void {
+        try {
             logger.debug("load: start");
             logger.debug("loaddir=" + dir);
             shiori.loaddir = dir;
-
-
         }
         catch (e) {
             logger.error(e);
@@ -42,11 +43,11 @@
         finally {
             logger.debug("load: fin");
         }
-    };
+    }
 
     //---------------------------------------------------------
     // SHIORI UNLOAD
-    shiori.unload = function () {
+    export function unload  () {
         try {
             logger.debug("unload: start");
             // TODO: シャットダウン処理の呼び出し
@@ -63,7 +64,7 @@
 
     //---------------------------------------------------------
     // SHIORI NOTIFY
-    shiori.notify = function (req) {
+    export function notify (req:string) {
         try {
             logger.debug("notify: start");
             logger.debug(req);
@@ -81,7 +82,7 @@
 
     //---------------------------------------------------------
     // SHIORI GET
-    shiori.get = function (req) {
+    export function get(req: string) {
         hasResponse = true;
         try {
             logger.debug("get: start");
@@ -105,4 +106,4 @@
 
     logger.info("loaded");
 
-})(this);
+}

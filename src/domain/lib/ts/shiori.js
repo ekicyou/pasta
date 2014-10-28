@@ -1,108 +1,97 @@
-// ルートプログラム
-// 必要なスクリプトを読み込み、
-//  [shiori.load(dir)]
-//  [shiori.unload()]
-//  [shiori.get(req)]
-//  [shiori.notify(req)]
-// の各関数をフックする。
-
-'use strict';
-(function (global) {
-
+﻿// shioriインターフェース
+var shiori;
+(function (shiori) {
     //---------------------------------------------------------
-    // モジュール
+    // ロギング
     var logger = new Duktape.Logger();
 
+    //---------------------------------------------------------
+    // 公開変数
+    // ロードディレクトリ
+    shiori.loaddir;
 
     //---------------------------------------------------------
     // レスポンス処理関数
     var hasResponse = false;
-    var response = function (res) {
+
+    // レスポンス
+    function response(res) {
         if (!hasResponse) {
             logger.error("response(): multiple call");
             return;
         }
         hasResponse = false;
         shiori.response(res);
-    };
+    }
 
     //---------------------------------------------------------
     // SHIORI LOAD
-    shiori.load = function (dir) {
-        try{
+    function load(dir) {
+        try  {
             logger.debug("load: start");
             logger.debug("loaddir=" + dir);
             shiori.loaddir = dir;
-
-
-        }
-        catch (e) {
+        } catch (e) {
             logger.error(e);
-        }
-        finally {
+        } finally {
             logger.debug("load: fin");
         }
-    };
+    }
+    shiori.load = load;
 
     //---------------------------------------------------------
     // SHIORI UNLOAD
-    shiori.unload = function () {
-        try {
+    function unload() {
+        try  {
             logger.debug("unload: start");
             // TODO: シャットダウン処理の呼び出し
-
-
-        }
-        catch (e) {
+        } catch (e) {
             logger.error(e);
-        }
-        finally {
+        } finally {
             logger.debug("unload: fin");
         }
-    };
+    }
+    shiori.unload = unload;
+    ;
 
     //---------------------------------------------------------
     // SHIORI NOTIFY
-    shiori.notify = function (req) {
-        try {
+    function notify(req) {
+        try  {
             logger.debug("notify: start");
             logger.debug(req);
             // TODO: NOTIFY処理
-
-
-        }
-        catch (e) {
+        } catch (e) {
             logger.error(e);
-        }
-        finally {
+        } finally {
             logger.debug("notify: fin");
         }
-    };
+    }
+    shiori.notify = notify;
+    ;
 
     //---------------------------------------------------------
     // SHIORI GET
-    shiori.get = function (req) {
+    function get(req) {
         hasResponse = true;
-        try {
+        try  {
             logger.debug("get: start");
             logger.debug(req);
 
             // TODO: GET処理
             response("SHIORI/3.0 200 OK\r\n\r\n");
-
-        }
-        catch (e) {
+        } catch (e) {
             logger.error(e);
-        }
-        finally {
+        } finally {
             if (hasResponse) {
                 // TODO: レスポンス漏れ
-
             }
             logger.debug("get: fin");
         }
-    };
+    }
+    shiori.get = get;
+    ;
 
     logger.info("loaded");
-
-})(this);
+})(shiori || (shiori = {}));
+//# sourceMappingURL=shiori.js.map

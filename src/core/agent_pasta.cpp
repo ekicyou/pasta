@@ -36,14 +36,14 @@ void pasta::Agent::UnLoadAction() {
     FUNC_START(cp);
     USES_CONVERSION;
 
-    // Shiori.unload関数の実行
+    // shiori.unload関数の実行
     duk_push_global_object(ctx);
-    if (!duk_get_prop_string(ctx, -1, "Shiori"))    THROW_EX("object Shiori not found");
-    if (!duk_get_prop_string(ctx, -1, "unload"))    THROW_EX("object Shiori.unload not found");
-    /* -> [ global Shiori unload ] */
-    if (!duk_is_function(ctx, -1))                  THROW_EX("object Shiori.unload is't function");
+    if (!duk_get_prop_string(ctx, -1, "shiori"))    THROW_EX("object shiori not found");
+    if (!duk_get_prop_string(ctx, -1, "unload"))    THROW_EX("object shiori.unload not found");
+    /* -> [ global shiori unload ] */
+    if (!duk_is_function(ctx, -1))                  THROW_EX("object shiori.unload is't function");
     duk_call(ctx, 0);
-    /* -> [ global Shiori <retval> ] */
+    /* -> [ global shiori <retval> ] */
     duk_pop_3(ctx);
 
     // VMの解放
@@ -99,21 +99,21 @@ void pasta::Agent::LoadAction(){
 
     // [shiori.js]ブートストラップ
     // ブートストラップコードは最低限
-    //  [Shiori.load(dir)]
-    //  [Shiori.unload()]
-    //  [Shiori.get(req)]
-    //  [Shiori.notify(req)]
+    //  [shiori.load(dir)]
+    //  [shiori.unload()]
+    //  [shiori.get(req)]
+    //  [shiori.notify(req)]
     // の実装を行うことを前提とする。
     LoadJS("shiori.js");
 
-    // Shiori.load関数の実行
+    // shiori.load関数の実行
     duk_push_global_object(ctx);
-    if (!duk_get_prop_string(ctx, -1, "Shiori"))    THROW_EX("object Shiori not found");
-    if (!duk_get_prop_string(ctx, -1, "load"))      THROW_EX("object Shiori.load not found");
-    /* -> [ global Shiori load ] */
-    if (!duk_is_function(ctx, -1))                  THROW_EX("object Shiori.load is't function");
+    if (!duk_get_prop_string(ctx, -1, "shiori"))    THROW_EX("object shiori not found");
+    if (!duk_get_prop_string(ctx, -1, "load"))      THROW_EX("object shiori.load not found");
+    /* -> [ global shiori load ] */
+    if (!duk_is_function(ctx, -1))                  THROW_EX("object shiori.load is't function");
     duk_call(ctx, 0);   
-    /* -> [ global Shiori <retval> ] */
+    /* -> [ global shiori <retval> ] */
     duk_pop_3(ctx);
 }
 
@@ -123,15 +123,15 @@ void pasta::Agent::LoadAction(){
 void pasta::Agent::NotifyAction(const std::string& req){
     FUNC_START(cp);
 
-    // Shiori.notify(req)関数の実行
+    // shiori.notify(req)関数の実行
     duk_push_global_object(ctx);
-    if (!duk_get_prop_string(ctx, -1, "Shiori"))    THROW_EX("object Shiori not found");
-    if (!duk_get_prop_string(ctx, -1, "notify"))    THROW_EX("object Shiori.notify not found");
-    /* -> [ global Shiori notify ] */
-    if (!duk_is_function(ctx, -1))                  THROW_EX("object Shiori.notify is't function");
+    if (!duk_get_prop_string(ctx, -1, "shiori"))    THROW_EX("object shiori not found");
+    if (!duk_get_prop_string(ctx, -1, "notify"))    THROW_EX("object shiori.notify not found");
+    /* -> [ global shiori notify ] */
+    if (!duk_is_function(ctx, -1))                  THROW_EX("object shiori.notify is't function");
     duk_push_string(ctx, req.c_str());
     duk_call(ctx, 1);
-    /* -> [ global Shiori <retval> ] */
+    /* -> [ global shiori <retval> ] */
     duk_pop_3(ctx);
 }
 
@@ -141,15 +141,15 @@ void pasta::Agent::NotifyAction(const std::string& req){
 void pasta::Agent::GetAction(const std::string& req){
     FUNC_START(cp);
 
-    // Shiori.get(req)関数の実行
+    // shiori.get(req)関数の実行
     duk_push_global_object(ctx);
-    if (!duk_get_prop_string(ctx, -1, "Shiori"))    THROW_EX("object Shiori not found");
-    if (!duk_get_prop_string(ctx, -1, "get"))       THROW_EX("object Shiori.get not found");
-    /* -> [ global Shiori get ] */
-    if (!duk_is_function(ctx, -1))                  THROW_EX("object Shiori.get is't function");
+    if (!duk_get_prop_string(ctx, -1, "shiori"))    THROW_EX("object shiori not found");
+    if (!duk_get_prop_string(ctx, -1, "get"))       THROW_EX("object shiori.get not found");
+    /* -> [ global shiori get ] */
+    if (!duk_is_function(ctx, -1))                  THROW_EX("object shiori.get is't function");
     duk_push_string(ctx, req.c_str());
     duk_call(ctx, 1);
-    /* -> [ global Shiori <retval> ] */
+    /* -> [ global shiori <retval> ] */
     duk_pop_3(ctx);
 }
 
@@ -250,9 +250,9 @@ std::string pasta::Agent::eval(LPCSTR utf8text){
 static wchar_t * preLoadPath[] = {
     L"duktape",
     L"modules",
+    L"js",
     L"lib/ts",
     L"lib/js",
-    L"js",
     L".",
     NULL,
 };
