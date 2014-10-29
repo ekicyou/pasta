@@ -90,8 +90,8 @@ void pasta::Agent::LoadAction(){
     SetPasta(ctx, this);
 
     // JavaScript組み込みオブジェクトの作成
-	InitModuleShiori();
-	InitModuleFileIO();
+    InitModuleShiori();
+    InitModuleFileIO();
 
     // ブートストラップ[loader.js]
     // ブートストラップコードは[Duktape.modSearch]を解決すること
@@ -112,7 +112,7 @@ void pasta::Agent::LoadAction(){
     if (!duk_get_prop_string(ctx, -1, "load"))      THROW_EX("object shiori.load not found");
     /* -> [ global shiori load ] */
     if (!duk_is_function(ctx, -1))                  THROW_EX("object shiori.load is't function");
-    duk_call(ctx, 0);   
+    duk_call(ctx, 0);
     /* -> [ global shiori <retval> ] */
     duk_pop_3(ctx);
 }
@@ -288,7 +288,7 @@ FILE* pasta::Agent::OpenReadModuleFile(LPCSTR fname){
 
         // ファイルを開く
         FILE *f;
-		if (_wfopen_s(&f, text.c_str(), L"rb") == 0){
+        if (_wfopen_s(&f, text.c_str(), L"rb") == 0){
             DEBUG_MESSAGE(L"  << FIND!! >>");
             return f;
         }

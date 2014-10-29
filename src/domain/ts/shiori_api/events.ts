@@ -1,4 +1,4 @@
-﻿// SHIORI EVENT を解釈し、ghostとのやり取りを行う 
+﻿// SHIORI EVENT を解釈し、ghostとのやり取りを行う
 
 var logger = new Duktape.Logger();
 
@@ -6,9 +6,7 @@ import pasta = require('../pasta');
 import api = require('../shiori_api');
 import IF = require('../interfaces');
 
-
 export class events {
-
     public constructor(ghost: IF.ghost) {
         this.ghost = ghost;
     }
@@ -39,5 +37,4 @@ export class events {
     public get(req: IF.shiori_request): void {
         // TODO: [get]実装する
     }
-
 }

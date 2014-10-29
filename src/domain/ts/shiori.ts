@@ -5,7 +5,6 @@ import api = require("./shiori_api");
 
 var logger = new Duktape.Logger();
 
-
 //---------------------------------------------------------
 // ゴースト/shiori event ハンドラ
 var ghost = new pasta.ghost();
@@ -93,7 +92,6 @@ export function get(raw_request: string) {
 
         // TODO: 正式応答を返すようになったら外す
         response("SHIORI/3.0 200 OK\r\n\r\n");
-
     }
     catch (e) {
         logger.error(e);
@@ -101,7 +99,6 @@ export function get(raw_request: string) {
     finally {
         if (hasResponse) {
             // TODO: レスポンス漏れ
-
         }
         logger.debug("get: fin");
     }

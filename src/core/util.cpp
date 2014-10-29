@@ -65,5 +65,4 @@ void FunctionInOutDebugLog::OutputLog(std::wstring& message){
     OutputLog(message.c_str());
 }
 
-
 // EOF

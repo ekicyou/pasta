@@ -2,7 +2,7 @@
 
 declare module Duktape {
     /**
-     * ロガー 
+     * ロガー
      */
     class Logger {
         trace(fmt: string, ...args: any[]): void;

@@ -6,7 +6,6 @@
 #include "ctx2pasta.h"
 #include "util.h"
 
-
 // ファイルをバッファとして読み込みます。
 static duk_ret_t readfile(duk_context *ctx){
     USES_CONVERSION;
@@ -28,8 +27,8 @@ static duk_ret_t readfile(duk_context *ctx){
     auto got = fread(buf, 1, len, f);
     if (got != (size_t)len) goto error;
 
-	// 解放
-	if (f) fclose(f);
+    // 解放
+    if (f) fclose(f);
     return 1;
 
 error:
@@ -61,8 +60,8 @@ static duk_ret_t readtext(duk_context *ctx){
     if (got != (size_t)len)         goto error;
     duk_push_lstring(ctx, buf, got);
 
-	// 解放
-	free(buf);
+    // 解放
+    free(buf);
     fclose(f);
     return 1;
 
@@ -78,7 +77,7 @@ error:
 
 static duk_function_list_entry funcs[] = {
         { "readfile", readfile, 1 },
-		{ "readtext", readtext, 1 },
+        { "readtext", readtext, 1 },
         { NULL, NULL, 0 }
 };
 
