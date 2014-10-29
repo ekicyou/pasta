@@ -23,3 +23,5 @@ ipch
 /src/domain/obj
 /src/domain/bin
 *.TMP
+/src/web/bin
+/src/web/obj
