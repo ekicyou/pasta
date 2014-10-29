@@ -1,20 +1,22 @@
 ﻿// shioriインターフェース
-/// <reference path="libshiori.d.ts">
-var pasta = require("./pasta/ghost");
-var api = require("./shiori/request");
+var pasta = require("./pasta");
+var api = require("./shiori_api");
+
+var logger = new Duktape.Logger();
+logger.info("\n<<import:pasta>>\n", Duktape.enc("jx", pasta, null, 4));
+logger.info("\n<<import:api>>\n", Duktape.enc("jx", api, null, 4));
+logger.info("import fin...");
 
 //---------------------------------------------------------
 // ゴースト
 var ghost = new pasta.ghost();
-
-//---------------------------------------------------------
-// ロギング
-var logger = new Duktape.Logger();
+logger.info("x:1");
 
 //---------------------------------------------------------
 // 公開変数
 /// ロードディレクトリ
 exports.loaddir;
+logger.info("x:2");
 
 //---------------------------------------------------------
 // レスポンス処理関数
@@ -29,6 +31,7 @@ var response = function (res) {
     hasResponse = false;
     libshiori.response(res);
 };
+logger.info("x:3");
 
 //---------------------------------------------------------
 // SHIORI LOAD
@@ -44,6 +47,7 @@ function load(dir) {
     }
 }
 exports.load = load;
+logger.info("x:4");
 
 //---------------------------------------------------------
 // SHIORI UNLOAD
@@ -59,6 +63,7 @@ function unload() {
 }
 exports.unload = unload;
 ;
+logger.info("x:5");
 
 //---------------------------------------------------------
 // SHIORI NOTIFY
@@ -77,6 +82,7 @@ function notify(raw_request) {
 }
 exports.notify = notify;
 ;
+logger.info("x:6");
 
 //---------------------------------------------------------
 // SHIORI GET

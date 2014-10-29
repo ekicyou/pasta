@@ -12,4 +12,8 @@ declare module Duktape {
         error(fmt: string, ...args: any[]): void;
         fatal(fmt: string, ...args: any[]): void;
     }
+
+    function enc(fmt: string, obj: any, replacer: any, space: number): string;
+    function enc(fmt: string, obj: any, replacer: any): string;
+    function enc(fmt: string, obj: any): string;
 }

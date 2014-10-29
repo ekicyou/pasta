@@ -1,5 +1,7 @@
 ﻿// shiori request管理
 // リクエストの解釈など
+var logger = new Duktape.Logger();
+
 var request = (function () {
     function request(text, res_func) {
         this.raw = text;

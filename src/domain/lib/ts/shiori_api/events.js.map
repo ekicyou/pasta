@@ -1,0 +1,1 @@
+{"version":3,"file":"events.js","sourceRoot":"ts/","sources":["shiori_api/events.ts"],"names":["events","events.constructor"],"mappings":"AAAA,6BAA8B;AAA9B,IAEI,MAAM,GAAG,IAAI,OAAO,CAAC,MAAM,CAAC,CAAC;;AAKjC;IAEIA,gBAAmBA,KAAkBA;QACjCC,IAAIA,CAACA,KAAKA,GAAGA,KAAKA;IACtBA,CAACA;IAILD,cAACA;AAADA,CAACA,IAAA;AARD,wBAQC;AACD"}

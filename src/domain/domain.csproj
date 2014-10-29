@@ -23,20 +23,22 @@
     <EmbeddedResource Include="duktape\loader.js" />
     <Content Include="duktape\boot.js" />
     <Content Include="index.html" />
-    <EmbeddedResource Include="js\shiorix.js" />
     <Content Include="lib\dummy.txt" />
     <Content Include="js\pasta\pasta-parser.js" />
     <Content Include="web.config" />
   </ItemGroup>
   <ItemGroup>
     <TypeScriptCompile Include="ts\app.ts" />
-    <TypeScriptCompile Include="ts\Duktape\Logger.d.ts" />
+    <TypeScriptCompile Include="ts\declare\duktape.d.ts" />
+    <TypeScriptCompile Include="ts\pasta.ts" />
     <TypeScriptCompile Include="ts\pasta\events.ts" />
     <TypeScriptCompile Include="ts\pasta\ghost.ts" />
-    <TypeScriptCompile Include="ts\pasta\user-persistence.ts" />
+    <TypeScriptCompile Include="ts\pasta\user_persistence.ts" />
     <TypeScriptCompile Include="ts\shiori.ts" />
-    <TypeScriptCompile Include="ts\shiori\request.ts" />
-    <TypeScriptCompile Include="ts\shiorilib.d.ts" />
+    <TypeScriptCompile Include="ts\shiori_api\events.ts" />
+    <TypeScriptCompile Include="ts\shiori_api\request.ts" />
+    <TypeScriptCompile Include="ts\declare\libshiori.d.ts" />
+    <TypeScriptCompile Include="ts\shiori_api.ts" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="dic\talk001.md" />
@@ -50,6 +52,7 @@
       <DependentUpon>web.config</DependentUpon>
     </None>
   </ItemGroup>
+  <ItemGroup />
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">12.0</VisualStudioVersion>
   </PropertyGroup>

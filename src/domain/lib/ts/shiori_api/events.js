@@ -1,8 +1,9 @@
-﻿// イベントハンドリング
+﻿// SHIORI EVENT を解釈し、ghostに渡す
 var logger = new Duktape.Logger();
 
 var events = (function () {
-    function events() {
+    function events(ghost) {
+        this.ghost = ghost;
     }
     return events;
 })();

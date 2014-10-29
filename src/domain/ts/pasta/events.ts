@@ -1,9 +1,9 @@
 ﻿// イベントハンドリング
-module pasta {
 
-    export class events {
+var logger = new Duktape.Logger();
+
+export class events {
 
 
 
-    }
 }

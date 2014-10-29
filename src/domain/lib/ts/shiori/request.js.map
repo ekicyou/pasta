@@ -1,1 +1,0 @@
-{"version":3,"file":"request.js","sourceRoot":"ts/","sources":["shiori/request.ts"],"names":["request","request.constructor"],"mappings":"AAAA,mBAAmB;AACnB,aAAa;AADb;IAKIA,iBAAmBA,IAAYA,EAAEA,QAA+BA;QAC5DC,IAAIA,CAACA,GAAGA,GAAGA,IAAIA;QACfA,IAAIA,CAACA,QAAQA,GAAGA,QAAQA;IAC5BA,CAACA;IAOLD,eAACA;AAADA,CAACA,IAAA;AAZD,0BAYC;AACD"}

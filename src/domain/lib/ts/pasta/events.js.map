@@ -1,1 +1,1 @@
-{"version":3,"file":"events.js","sourceRoot":"ts/","sources":["pasta/events.ts"],"names":["pasta","pasta.events","pasta.events.constructor"],"mappings":"AAAA,aAAa;AACb,IAAO,KAAK;AAOX,CAPD,UAAO,KAAK;IAERA;QAAAC;QAIAC,CAACA;AAAAD,QAADA,cAACA;IAADA,CAACA,IAAAD;IAJDA,sBAICA;AACLA,CAACA,yBAAA"}
+{"version":3,"file":"events.js","sourceRoot":"ts/","sources":["pasta/events.ts"],"names":["events","events.constructor"],"mappings":"AAAA,aAAa;AAAb,IAEI,MAAM,GAAG,IAAI,OAAO,CAAC,MAAM,CAAC,CAAC;;AAEjC;IAAAA;IAIAC,CAACA;AAAAD,IAADA,cAACA;AAADA,CAACA,IAAA;AAJD,wBAIC;AACD"}
