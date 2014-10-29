@@ -1,1 +1,1 @@
-{"version":3,"file":"shiori_api.js","sourceRoot":"ts/","sources":["shiori_api.ts"],"names":[],"mappings":"AAAA,eAAe;AAAf,4CAEgD;AAChD,8CAAkD;;AAE3C,QAAI,MAAM,GAAG,OAAO,CAAC,MAAM;AAC3B,QAAI,OAAO,GAAG,QAAQ,CAAC,OAAO;AAErC"}
+{"version":3,"file":"shiori_api.js","sourceRoot":"ts/","sources":["shiori_api.ts"],"names":[],"mappings":"AAAA,eAAe;AAAf,4CAEgD;AAChD,8CAAkD;;AAE3C,QAAI,MAAM,GAAG,OAAO,CAAC,MAAM;AAC3B,QAAI,OAAO,GAAG,QAAQ,CAAC,OAAO;AAAC"}

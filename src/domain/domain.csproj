@@ -25,9 +25,11 @@
     <Content Include="index.html" />
     <Content Include="lib\dummy.txt" />
     <Content Include="js\pasta\pasta-parser.js" />
+    <Content Include="lib\js\js-yaml.js" />
     <Content Include="web.config" />
   </ItemGroup>
   <ItemGroup>
+    <TypeScriptCompile Include="Scripts\typings\js-yaml\js-yaml.d.ts" />
     <TypeScriptCompile Include="ts\app.ts" />
     <TypeScriptCompile Include="ts\declare\duktape.d.ts" />
     <TypeScriptCompile Include="ts\pasta.ts" />
@@ -46,6 +48,7 @@
     <Content Include="js\pasta\pasta-parser.peg" />
     <Content Include="js\pasta\README.md" />
     <Content Include="copyItem.bat" />
+    <Content Include="packages.config" />
     <None Include="web.Debug.config">
       <DependentUpon>web.config</DependentUpon>
     </None>
