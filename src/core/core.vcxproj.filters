@@ -22,7 +22,7 @@
     <ClCompile Include="util.cpp">
       <Filter>util</Filter>
     </ClCompile>
-    <ClCompile Include="mod_shiorilib.cpp">
+    <ClCompile Include="mod_libshiori.cpp">
       <Filter>modules</Filter>
     </ClCompile>
   </ItemGroup>

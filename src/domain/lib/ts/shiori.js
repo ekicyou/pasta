@@ -1,5 +1,5 @@
 ﻿// shioriインターフェース
-/// <reference path="shiorilib.d.ts">
+/// <reference path="libshiori.d.ts">
 var pasta = require("./pasta/ghost");
 var api = require("./shiori/request");
 
@@ -27,7 +27,7 @@ var response = function (res) {
         return;
     }
     hasResponse = false;
-    shiorilib.response(res);
+    libshiori.response(res);
 };
 
 //---------------------------------------------------------

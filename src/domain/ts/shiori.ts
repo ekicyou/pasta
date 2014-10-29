@@ -1,6 +1,6 @@
 ﻿// shioriインターフェース
 
-/// <reference path="shiorilib.d.ts">
+/// <reference path="libshiori.d.ts">
 
 import pasta = require("./pasta/ghost");
 import api = require("./shiori/request");
@@ -30,7 +30,7 @@ var response = (res: string) => {
         return;
     }
     hasResponse = false;
-    shiorilib.response(res);
+    libshiori.response(res);
 }
 
     //---------------------------------------------------------

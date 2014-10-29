@@ -6,7 +6,7 @@
 (function () {
     // ロギング設定
     Duktape.Logger.prototype.raw = function (buf) {
-        shiorilib.debugstring(buf);
+        libshiori.debugstring(buf);
     }
     var logger = new Duktape.Logger();
     logger.debug("start");

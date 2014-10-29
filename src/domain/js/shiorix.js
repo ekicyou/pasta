@@ -41,7 +41,7 @@
             return;
         }
         hasResponse = false;
-        shiorilib.response(res);
+        libshiori.response(res);
     };
 
     //---------------------------------------------------------

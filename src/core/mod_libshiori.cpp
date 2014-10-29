@@ -48,7 +48,7 @@ static duk_function_list_entry funcs[] = {
 };
 
 void pasta::Agent::InitModuleShiori(){
-    RegModuleFuncs("shiorilib", funcs);
+    RegModuleFuncs("libshiori", funcs);
 }
 
 // EOF

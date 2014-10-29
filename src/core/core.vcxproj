@@ -98,7 +98,7 @@
     <ClCompile Include="agent_shiori.cpp" />
     <ClCompile Include="ctx2pasta.cpp" />
     <ClCompile Include="mod_file_io.cpp" />
-    <ClCompile Include="mod_shiorilib.cpp" />
+    <ClCompile Include="mod_libshiori.cpp" />
     <ClCompile Include="shiori_parse.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
