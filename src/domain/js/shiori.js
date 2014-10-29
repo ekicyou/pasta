@@ -6,13 +6,31 @@
 //  [shiori.notify(req)]
 // の各関数をフックする。
 
-'use strict';
-(function (global) {
+
+(function (definition) {// 定義する関数を引数にとる
+    // ロードされた文脈に応じてエクスポート方法を変える
+
+    // CommonJS
+    if (typeof exports === "object") {
+        module.exports = definition();
+
+        // RequireJS
+    } else if (typeof define === "function" && define.amd) {
+        define(definition);
+
+        // <script>
+    } else {
+        shiori = definition();
+    }
+
+})(function () {// 実際の定義を行う関数
+    'use strict';
+
+    var mod = function() { };
 
     //---------------------------------------------------------
     // モジュール
     var logger = new Duktape.Logger();
-
 
     //---------------------------------------------------------
     // レスポンス処理関数
@@ -23,16 +41,16 @@
             return;
         }
         hasResponse = false;
-        shiori.response(res);
+        shiorilib.response(res);
     };
 
     //---------------------------------------------------------
     // SHIORI LOAD
-    shiori.load = function (dir) {
-        try{
+    mod.load = function (dir) {
+        try {
             logger.debug("load: start");
             logger.debug("loaddir=" + dir);
-            shiori.loaddir = dir;
+            mod.loaddir = dir;
 
 
         }
@@ -46,7 +64,7 @@
 
     //---------------------------------------------------------
     // SHIORI UNLOAD
-    shiori.unload = function () {
+    mod.unload = function () {
         try {
             logger.debug("unload: start");
             // TODO: シャットダウン処理の呼び出し
@@ -63,7 +81,7 @@
 
     //---------------------------------------------------------
     // SHIORI NOTIFY
-    shiori.notify = function (req) {
+    mod.notify = function (req) {
         try {
             logger.debug("notify: start");
             logger.debug(req);
@@ -81,7 +99,7 @@
 
     //---------------------------------------------------------
     // SHIORI GET
-    shiori.get = function (req) {
+    mod.get = function (req) {
         hasResponse = true;
         try {
             logger.debug("get: start");
@@ -105,4 +123,5 @@
 
     logger.info("loaded");
 
-})(this);
+    return mod;
+});

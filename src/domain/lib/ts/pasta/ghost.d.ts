@@ -1,4 +1,2 @@
-﻿declare module pasta {
-    class ghost {
-    }
+﻿export declare class ghost {
 }

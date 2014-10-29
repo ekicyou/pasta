@@ -1,10 +1,7 @@
-﻿var pasta;
-(function (pasta) {
-    var ghost = (function () {
-        function ghost() {
-        }
-        return ghost;
-    })();
-    pasta.ghost = ghost;
-})(pasta || (pasta = {}));
+﻿var ghost = (function () {
+    function ghost() {
+    }
+    return ghost;
+})();
+exports.ghost = ghost;
 //# sourceMappingURL=ghost.js.map

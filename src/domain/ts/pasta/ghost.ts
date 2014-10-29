@@ -1,10 +1,7 @@
-﻿module pasta {
+﻿
 
-    export class ghost {
+export class ghost {
 
-
-
-    }
 
 
 }

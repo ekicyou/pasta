@@ -1,14 +1,11 @@
 ﻿// shiori request管理
 // リクエストの解釈など
-var shiori;
-(function (shiori) {
-    var request = (function () {
-        function request() {
-        }
-        request.prototype.request = function (text) {
-        };
-        return request;
-    })();
-    shiori.request = request;
-})(shiori || (shiori = {}));
+var request = (function () {
+    function request(text, res_func) {
+        this.raw = text;
+        this.response = res_func;
+    }
+    return request;
+})();
+exports.request = request;
 //# sourceMappingURL=request.js.map

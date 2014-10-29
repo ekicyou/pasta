@@ -35,7 +35,7 @@
     <TypeScriptCompile Include="ts\pasta\user-persistence.ts" />
     <TypeScriptCompile Include="ts\shiori.ts" />
     <TypeScriptCompile Include="ts\shiori\request.ts" />
-    <TypeScriptCompile Include="ts\shiori.d.ts" />
+    <TypeScriptCompile Include="ts\shiorilib.d.ts" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="dic\talk001.md" />

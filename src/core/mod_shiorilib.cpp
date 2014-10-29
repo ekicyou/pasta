@@ -1,4 +1,4 @@
-// mod_file_io.cpp : 組み込み関数：fileアクセス関係
+// mod_shiorilib.cpp : 組み込み関数：shiori関係
 //
 
 #include "stdafx.h"
@@ -29,7 +29,7 @@ static duk_function_list_entry funcs[] = {
 };
 
 void pasta::Agent::InitShiori(){
-    RegModuleFuncs("shiori", funcs);
+    RegModuleFuncs("shiorilib", funcs);
 }
 
 // EOF

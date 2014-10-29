@@ -4,9 +4,6 @@
     <ClCompile Include="mod_file_io.cpp">
       <Filter>mod</Filter>
     </ClCompile>
-    <ClCompile Include="mod_shiori.cpp">
-      <Filter>mod</Filter>
-    </ClCompile>
     <ClCompile Include="agent_pasta.cpp">
       <Filter>pasta</Filter>
     </ClCompile>
@@ -24,6 +21,9 @@
     </ClCompile>
     <ClCompile Include="util.cpp">
       <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="mod_shiorilib.cpp">
+      <Filter>mod</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
