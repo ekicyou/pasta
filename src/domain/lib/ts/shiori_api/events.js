@@ -8,21 +8,25 @@ var events = (function () {
     // --------------------------------------------------------
     // SHIORI: load
     events.prototype.load = function (dir) {
+        // TODO: [load]実装する
     };
 
     // --------------------------------------------------------
     // SHIORI: unload
     events.prototype.unload = function () {
+        // TODO: [unload]実装する
     };
 
     // --------------------------------------------------------
     // SHIORI: notify
     events.prototype.notify = function (req) {
+        // TODO: [notify]実装する
     };
 
     // --------------------------------------------------------
     // SHIORI: get
     events.prototype.get = function (req) {
+        // TODO: [get]実装する
     };
     return events;
 })();

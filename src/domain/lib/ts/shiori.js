@@ -5,8 +5,9 @@ var api = require("./shiori_api");
 var logger = new Duktape.Logger();
 
 //---------------------------------------------------------
-// ゴースト
+// ゴースト/shiori event ハンドラ
 var ghost = new pasta.ghost();
+var event = new api.events(ghost);
 
 //---------------------------------------------------------
 // 公開変数
@@ -34,6 +35,7 @@ function load(dir) {
         logger.debug("load: start");
         logger.debug("loaddir=" + dir);
         exports.loaddir = dir;
+        event.load(dir);
     } catch (e) {
         logger.error(e);
     } finally {
@@ -47,7 +49,7 @@ exports.load = load;
 function unload() {
     try  {
         logger.debug("unload: start");
-        // TODO: シャットダウン処理の呼び出し
+        event.unload();
     } catch (e) {
         logger.error(e);
     } finally {
@@ -63,9 +65,8 @@ function notify(raw_request) {
     try  {
         logger.debug("notify: start");
         logger.debug(raw_request);
-
-        // TODO: NOTIFY処理
         var req = new api.request(raw_request, response);
+        event.notify(req);
     } catch (e) {
         logger.error(e);
     } finally {
@@ -83,9 +84,10 @@ function get(raw_request) {
         logger.debug("get: start");
         logger.debug(raw_request);
 
-        // TODO: GET処理
         var req = new api.request(raw_request, response);
+        event.notify(req);
 
+        // TODO: 正式応答を返すようになったら外す
         response("SHIORI/3.0 200 OK\r\n\r\n");
     } catch (e) {
         logger.error(e);

@@ -19,23 +19,25 @@ export class events {
     // --------------------------------------------------------
     // SHIORI: load
     public load(dir: string): void {
-
+        // TODO: [load]実装する
     }
 
     // --------------------------------------------------------
     // SHIORI: unload
     public unload(): void {
-
+        // TODO: [unload]実装する
     }
 
     // --------------------------------------------------------
     // SHIORI: notify
     public notify(req: IF.shiori_request): void {
+        // TODO: [notify]実装する
     }
 
     // --------------------------------------------------------
     // SHIORI: get
     public get(req: IF.shiori_request): void {
+        // TODO: [get]実装する
     }
 
 }

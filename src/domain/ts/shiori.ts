@@ -7,8 +7,9 @@ var logger = new Duktape.Logger();
 
 
 //---------------------------------------------------------
-// ゴースト
+// ゴースト/shiori event ハンドラ
 var ghost = new pasta.ghost();
+var event = new api.events(ghost);
 
 //---------------------------------------------------------
 // 公開変数
@@ -37,6 +38,7 @@ export function load(dir: string): void {
         logger.debug("load: start");
         logger.debug("loaddir=" + dir);
         loaddir = dir;
+        event.load(dir);
     }
     catch (e) {
         logger.error(e);
@@ -51,9 +53,7 @@ export function load(dir: string): void {
 export function unload() {
     try {
         logger.debug("unload: start");
-        // TODO: シャットダウン処理の呼び出し
-
-
+        event.unload();
     }
     catch (e) {
         logger.error(e);
@@ -69,10 +69,8 @@ export function notify(raw_request: string) {
     try {
         logger.debug("notify: start");
         logger.debug(raw_request);
-        // TODO: NOTIFY処理
         var req = new api.request(raw_request, response);
-
-
+        event.notify(req);
     }
     catch (e) {
         logger.error(e);
@@ -90,9 +88,10 @@ export function get(raw_request: string) {
         logger.debug("get: start");
         logger.debug(raw_request);
 
-        // TODO: GET処理
-    var req = new api.request(raw_request, response);
+        var req = new api.request(raw_request, response);
+        event.notify(req);
 
+        // TODO: 正式応答を返すようになったら外す
         response("SHIORI/3.0 200 OK\r\n\r\n");
 
     }
