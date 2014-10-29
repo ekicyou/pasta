@@ -31,6 +31,7 @@
     <TypeScriptCompile Include="ts\app.ts" />
     <TypeScriptCompile Include="ts\declare\duktape.d.ts" />
     <TypeScriptCompile Include="ts\pasta.ts" />
+    <TypeScriptCompile Include="ts\interfaces.ts" />
     <TypeScriptCompile Include="ts\pasta\events.ts" />
     <TypeScriptCompile Include="ts\pasta\ghost.ts" />
     <TypeScriptCompile Include="ts\pasta\user_persistence.ts" />

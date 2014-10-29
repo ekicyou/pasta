@@ -4,22 +4,17 @@ import pasta = require("./pasta");
 import api = require("./shiori_api");
 
 var logger = new Duktape.Logger();
-logger.info("\n<<import:pasta>>\n", Duktape.enc("jx", pasta, null, 4));
-logger.info("\n<<import:api>>\n", Duktape.enc("jx", api, null, 4));
-logger.info("import fin...");
 
 
 //---------------------------------------------------------
 // ゴースト
 var ghost = new pasta.ghost();
-logger.info("x:1");
 
 //---------------------------------------------------------
 // 公開変数
 
 /// ロードディレクトリ
 export var loaddir: string;
-logger.info("x:2");
 
 //---------------------------------------------------------
 // レスポンス処理関数
@@ -34,7 +29,6 @@ var response = (res: string) => {
     hasResponse = false;
     libshiori.response(res);
 }
-logger.info("x:3");
 
 //---------------------------------------------------------
 // SHIORI LOAD
@@ -51,7 +45,6 @@ export function load(dir: string): void {
         logger.debug("load: fin");
     }
 }
-logger.info("x:4");
 
 //---------------------------------------------------------
 // SHIORI UNLOAD
@@ -69,7 +62,6 @@ export function unload() {
         logger.debug("unload: fin");
     }
 };
-logger.info("x:5");
 
 //---------------------------------------------------------
 // SHIORI NOTIFY
@@ -89,7 +81,6 @@ export function notify(raw_request: string) {
         logger.debug("notify: fin");
     }
 };
-logger.info("x:6");
 
 //---------------------------------------------------------
 // SHIORI GET
