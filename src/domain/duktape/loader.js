@@ -21,7 +21,7 @@
         /* Ecmascript check. */
         name = id + '.js';
         logger.trace('loading ecmascript:', name);
-        src = _raw_fs.readtext(name);
+        src = libfs.readtext(name);
         logger.trace('loaded ecmascript');
         if (typeof src === 'string') {
             logger.trace('loaded Ecmascript:', name);

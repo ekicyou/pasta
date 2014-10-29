@@ -28,7 +28,8 @@ static duk_ret_t readfile(duk_context *ctx){
     auto got = fread(buf, 1, len, f);
     if (got != (size_t)len) goto error;
 
-    if (f) fclose(f);
+	// ‰ð•ú
+	if (f) fclose(f);
     return 1;
 
 error:
@@ -60,8 +61,8 @@ static duk_ret_t readtext(duk_context *ctx){
     if (got != (size_t)len)         goto error;
     duk_push_lstring(ctx, buf, got);
 
-cleanup:
-    free(buf);
+	// ‰ð•ú
+	free(buf);
     fclose(f);
     return 1;
 
@@ -82,7 +83,7 @@ static duk_function_list_entry funcs[] = {
 };
 
 void pasta::Agent::InitModuleFileIO(){
-    RegModuleFuncs("_raw_fs", funcs);
+    RegModuleFuncs("libfs", funcs);
 }
 
 // EOF

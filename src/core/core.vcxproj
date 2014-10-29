@@ -97,7 +97,7 @@
     <ClCompile Include="agent_pasta.cpp" />
     <ClCompile Include="agent_shiori.cpp" />
     <ClCompile Include="ctx2pasta.cpp" />
-    <ClCompile Include="mod_file_io.cpp" />
+    <ClCompile Include="mod_libfs.cpp" />
     <ClCompile Include="mod_libshiori.cpp" />
     <ClCompile Include="shiori_parse.cpp" />
     <ClCompile Include="stdafx.cpp">

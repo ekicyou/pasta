@@ -1,9 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="mod_file_io.cpp">
-      <Filter>modules</Filter>
-    </ClCompile>
     <ClCompile Include="agent_pasta.cpp">
       <Filter>pasta</Filter>
     </ClCompile>
@@ -23,6 +20,9 @@
       <Filter>util</Filter>
     </ClCompile>
     <ClCompile Include="mod_libshiori.cpp">
+      <Filter>modules</Filter>
+    </ClCompile>
+    <ClCompile Include="mod_libfs.cpp">
       <Filter>modules</Filter>
     </ClCompile>
   </ItemGroup>
