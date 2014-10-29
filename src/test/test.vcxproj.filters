@@ -32,4 +32,7 @@
       <Filter>agent</Filter>
     </ClCompile>
   </ItemGroup>
+  <ItemGroup>
+    <Text Include="ssp_shiori_log.log" />
+  </ItemGroup>
 </Project>
