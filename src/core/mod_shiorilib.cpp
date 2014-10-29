@@ -6,6 +6,7 @@
 #include "ctx2pasta.h"
 #include "util.h"
 
+//-------------------------------------------------------------
 // SHIORI レスポンス応答を返します。
 static duk_ret_t response(duk_context *ctx){
     // 初期化＆引数取得
@@ -20,15 +21,33 @@ static duk_ret_t response(duk_context *ctx){
 }
 
 //-------------------------------------------------------------
+// デバッグ出力を行います。
+static duk_ret_t debugstring(duk_context *ctx){
+	// 初期化＆引数取得
+	auto ghost = pasta::GetPasta(ctx);
+	auto cp = ghost->cp;
+#ifdef DEBUG
+	std::string text(duk_to_string(ctx, 0));
+	text += "\n";
+	USES_CONVERSION;
+	OutputDebugString(A2CW_CP(text.c_str(), cp));
+#endif
+
+	return 1;
+}
+
+
+//-------------------------------------------------------------
 // モジュール登録
 //-------------------------------------------------------------
 
 static duk_function_list_entry funcs[] = {
-        { "response", response, 1 },
-        { NULL, NULL, 0 }
+        { "response"	, response		, 1 },
+		{ "debugstring"	, debugstring	, 1 },
+		{ NULL, NULL, 0 }
 };
 
-void pasta::Agent::InitShiori(){
+void pasta::Agent::InitModuleShiori(){
     RegModuleFuncs("shiorilib", funcs);
 }
 

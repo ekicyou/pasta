@@ -21,7 +21,7 @@ static void FatalFunc(duk_context *ctx, int code, const char *msg){
     mes += L") ";
     mes += A2CW_CP(msg, ghost->cp);
 
-    DEBUG_MESSAGE(mes.c_str());
+    DEBUG_MESSAGE(mes);
 
     THROW_EX(W2CA(mes.c_str()));
 }
@@ -80,7 +80,7 @@ void pasta::Agent::LoadAction(){
         std::wstring mes(L"loaddir = [");
         mes.append(this->loaddir);
         mes.append(L"]");
-        DEBUG_MESSAGE(mes.c_str());
+        DEBUG_MESSAGE(mes);
     }
 #endif
 
@@ -90,21 +90,21 @@ void pasta::Agent::LoadAction(){
     SetPasta(ctx, this);
 
     // JavaScript組み込みオブジェクトの作成
-    InitFileIO();
-    InitShiori();
+	InitModuleShiori();
+	InitModuleFileIO();
 
     // ブートストラップ[loader.js]
     // ブートストラップコードは[Duktape.modSearch]を解決すること
     LoadJS("loader.js");
 
-    // [shiori.js]ブートストラップ
+    // [boot.js]ブートストラップ
     // ブートストラップコードは最低限
     //  [shiori.load(dir)]
     //  [shiori.unload()]
     //  [shiori.get(req)]
     //  [shiori.notify(req)]
     // の実装を行うことを前提とする。
-    LoadJS("shiori.js");
+    LoadJS("boot.js");
 
     // shiori.load関数の実行
     duk_push_global_object(ctx);
@@ -212,6 +212,7 @@ void pasta::Agent::LoadJS(LPCSTR moduleName){
         LoadJSThrow(moduleName, what.c_str());
     }
     else {
+        DEBUG_MESSAGE("script start");
         duk_call(duk, 0);      /* [ func ] -> [ result ] */
         auto rc = duk_safe_to_string(duk, -1);
         DEBUG_MESSAGE("script loaded");
@@ -266,22 +267,29 @@ FILE* pasta::Agent::OpenReadModuleFile(LPCSTR fname){
 
     for (int i = 0;; i++){
         const auto pre = preLoadPath[i];
-        if (!pre) return NULL;
+        if (!pre){
+            DEBUG_MESSAGE(L"  << NOT FOUND!! >>");
+            return NULL;
+        }
+
+        // ファイル名を生成
         auto p = std::tr2::sys::wpath(loaddir);
         p /= pre;
         p /= wfname;
+        auto text = p.string();
+#ifdef DEBUG
+        {
+            std::wstring mes(L"  check path=[");
+            mes += text;
+            mes += L"]";
+            DEBUG_MESSAGE(mes);
+        }
+#endif
 
         // ファイルを開く
-        auto text = p.string();
-        auto strpath = text.c_str();
-        auto f = _wfopen(strpath, L"rb");
-        if (f){
-#ifdef DEBUG
-            std::wstring mes(L"open module path = [");
-            mes += strpath;
-            mes += L"]";
-            DEBUG_MESSAGE(mes.c_str());
-#endif
+        FILE *f;
+		if (_wfopen_s(&f, text.c_str(), L"rb") == 0){
+            DEBUG_MESSAGE(L"  << FIND!! >>");
             return f;
         }
     }

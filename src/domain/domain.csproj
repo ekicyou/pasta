@@ -21,8 +21,9 @@
   <ItemGroup>
     <Content Include="app.css" />
     <EmbeddedResource Include="duktape\loader.js" />
+    <Content Include="duktape\boot.js" />
     <Content Include="index.html" />
-    <EmbeddedResource Include="js\shiori.js" />
+    <EmbeddedResource Include="js\shiorix.js" />
     <Content Include="lib\dummy.txt" />
     <Content Include="js\pasta\pasta-parser.js" />
     <Content Include="web.config" />

@@ -18,8 +18,8 @@ namespace pasta{
         virtual void GetAction(const std::string& req) override;
 
     private:
-        void InitFileIO();
-        void InitShiori();
+        void InitModuleFileIO();
+        void InitModuleShiori();
 
     private:
         duk_context *ctx;

@@ -1,39 +1,43 @@
 // スクリプトローダ
 // duktapeのrequire()解決用のロジック
 // pasta.dllの起動時に必ず読み込まれる。
-
 'use strict';
-(function (global) {
+
+(function () {
+    // ロギング設定
+    Duktape.Logger.prototype.raw = function (buf) {
+        shiorilib.debugstring(buf);
+    }
+    var logger = new Duktape.Logger();
+    logger.debug("start");
+
     // スクリプトローダ
     Duktape.modSearch = function (id, require, exports, module) {
-        var name;
-        var src;
+        var name, src;
         var found = false;
 
-        print('loading module:', id);
+        logger.info('[modSearch] loading module:', id);
 
         /* Ecmascript check. */
-        jsname = id + '.js';
-        src = FileIO.readtext(jsname);
+        name = id + '.js';
+        logger.trace('loading ecmascript:', name);
+        src = _raw_fs.readtext(name);
+        logger.trace('loaded ecmascript');
         if (typeof src === 'string') {
-            print('loaded Ecmascript:', name);
+            logger.trace('loaded Ecmascript:', name);
             found = true;
         }
 
         /* Must find either a DLL or an Ecmascript file (or both) */
         if (!found) {
-            throw new Error('module not found: ' + id);
+            var mes = 'module not found: ' + id;
+            logger.error(mes);
+            throw new Error(mes);
         }
 
         /* For pure C modules, 'src' may be undefined which is OK. */
         return src;
     }
 
-    // デバッグログの出力先変更
-    Duktape.Logger.prototype.raw = function (buf) {
-        FileIO.debugstring(buf);
-    }
-
-    var logger = new Duktape.Logger();
-    logger.info("loaded");
-})(this);
+    logger.debug("loaded");
+})();

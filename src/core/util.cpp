@@ -58,4 +58,12 @@ void FunctionInOutDebugLog::OutputLog(LPCSTR message){
     OutputLog(A2CW(message));
 }
 
+void FunctionInOutDebugLog::OutputLog(std::string& message){
+    OutputLog(message.c_str());
+}
+void FunctionInOutDebugLog::OutputLog(std::wstring& message){
+    OutputLog(message.c_str());
+}
+
+
 // EOF

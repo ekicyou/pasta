@@ -92,6 +92,8 @@ public:
 
     void OutputLog(LPCSTR message);
     void OutputLog(LPCWSTR message);
+    void OutputLog(std::string& message);
+    void OutputLog(std::wstring& message);
 
     void OutputRaw(LPCSTR message);
     void OutputRaw(LPCWSTR message);
