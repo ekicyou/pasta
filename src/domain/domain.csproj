@@ -22,10 +22,15 @@
     <Content Include="app.css" />
     <EmbeddedResource Include="duktape\loader.js" />
     <Content Include="duktape\boot.js" />
-    <Content Include="index.html" />
     <Content Include="lib\dummy.txt" />
     <Content Include="js\pasta\pasta-parser.js" />
     <Content Include="lib\js\js-yaml.js" />
+    <Content Include="index.html" />
+    <Content Include="require-simple.js" />
+    <Content Include="Scripts\r.js" />
+    <Content Include="tests\all.js" />
+    <Content Include="tests\duktape.js" />
+    <Content Include="tests\hello.test.js" />
     <Content Include="web.config" />
   </ItemGroup>
   <ItemGroup>
@@ -49,6 +54,8 @@
     <Content Include="js\pasta\README.md" />
     <Content Include="copyItem.bat" />
     <Content Include="packages.config" />
+    <Content Include="chutzpah.json" />
+    <Content Include="tests\shiori_api_test.js" />
     <None Include="web.Debug.config">
       <DependentUpon>web.config</DependentUpon>
     </None>
@@ -56,7 +63,9 @@
       <DependentUpon>web.config</DependentUpon>
     </None>
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
+  </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">12.0</VisualStudioVersion>
   </PropertyGroup>

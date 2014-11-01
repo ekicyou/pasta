@@ -1,4 +1,6 @@
-﻿// SHIORI EVENT を解釈し、ghostとのやり取りを行う
+﻿// shiori_api/event.ts
+// ------------------------------------------------------------
+// SHIORI EVENT を解釈し、ghostとのやり取りを行う
 
 var logger = new Duktape.Logger();
 

@@ -65,5 +65,8 @@
     <Filter Include="modules">
       <UniqueIdentifier>{52aa0476-5568-4dcc-8639-fe12ddda8464}</UniqueIdentifier>
     </Filter>
+    <Filter Include="test">
+      <UniqueIdentifier>{e2215dac-1819-4153-9ec5-189ba2d81a20}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
 </Project>
