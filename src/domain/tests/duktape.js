@@ -11,18 +11,9 @@
     var mod = {};
 
     //
-    mod.Logger = (function () {
-        var cls = function () {
-        }
-        cls.prototype.trace = function () { console.trace.apply(this, arguments); };
-        cls.prototype.debug = function () { console.debug.apply(this, arguments); };
-        cls.prototype.info = function () { console.info.apply(this, arguments); };
-        cls.prototype.warn = function () { console.warn.apply(this, arguments); };
-        cls.prototype.error = function () { console.error.apply(this, arguments); };
-        cls.prototype.fatal = function () { console.fatal.apply(this, arguments); };
-        return cls;
-    })();
-
+    mod.Logger = function () {
+        return console;
+    }
 
     // モジュールのエクスポート
     return mod;

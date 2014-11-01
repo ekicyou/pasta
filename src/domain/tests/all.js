@@ -9,7 +9,6 @@
     // 実際の定義を行う関数
     'use strict';
     window.Duktape = require("./duktape");
-    var api = require("shiori_api");
 
     // 試験モジュール
     var mod = {};

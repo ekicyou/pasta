@@ -10,12 +10,28 @@
     'use strict';
     var mod = {};
     var api = require("shiori_api");
+    var CRLF="\r\n";
 
     //---------------------------------------------------------
     test("shiori_api::test1", function () {
+        var text = "";
+        text += "GET SHIORI/123" + CRLF;
+        text += CRLF;
+        var req = new api.request(text);
+        equal(req.method, undefined);
+    });
 
-
-        equal(8, 8);
+    //---------------------------------------------------------
+    test("shiori_api::test2", function () {
+        var text = "";
+        text += "GET SHIORI/3.0" + CRLF;
+        text += "Charset: UTF-8" + CRLF;
+        text += "ID: version" + CRLF;
+        text += "SecurityLevel: local" + CRLF;
+        text += "Sender: SSP" + CRLF;
+        text += CRLF;
+        var req = new api.request(text);
+        equal(req.method, "GET");
     });
 
 

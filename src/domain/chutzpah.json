@@ -1,9 +1,0 @@
-﻿{
-    "TestHarnessLocationMode": "SettingsFileAdjacent",
-    "References" : [
-        {"Path" : "require.js" } 
-    ],
-    "TestHarnessReferenceMode": "CommonJS",
-    "TypeScriptModuleKind": "CommonJS",
-    "Framework": "qunit"
-}

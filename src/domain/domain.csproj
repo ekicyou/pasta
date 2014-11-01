@@ -26,7 +26,7 @@
     <Content Include="js\pasta\pasta-parser.js" />
     <Content Include="lib\js\js-yaml.js" />
     <Content Include="index.html" />
-    <Content Include="require-simple.js" />
+    <Content Include="tests\require-simple.js" />
     <Content Include="Scripts\r.js" />
     <Content Include="tests\all.js" />
     <Content Include="tests\duktape.js" />
@@ -54,9 +54,8 @@
     <Content Include="js\pasta\README.md" />
     <Content Include="copyItem.bat" />
     <Content Include="packages.config" />
-    <Content Include="chutzpah.json" />
     <Content Include="tests\shiori_api_test.js" />
-    <Content Include="ssp_shiori_log.log" />
+    <Content Include="tests\ssp_shiori_log.log" />
     <None Include="web.Debug.config">
       <DependentUpon>web.config</DependentUpon>
     </None>
