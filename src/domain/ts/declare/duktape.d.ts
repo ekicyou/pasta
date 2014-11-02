@@ -16,4 +16,6 @@ declare module Duktape {
     function enc(fmt: string, obj: any, replacer: any, space: number): string;
     function enc(fmt: string, obj: any, replacer: any): string;
     function enc(fmt: string, obj: any): string;
+
+    function dec(fmt: string, text: string): any;
 }

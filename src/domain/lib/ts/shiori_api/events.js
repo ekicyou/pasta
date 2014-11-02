@@ -3,23 +3,23 @@
 // SHIORI EVENT を解釈し、ghostとのやり取りを行う
 var logger = new Duktape.Logger();
 
-var yaml = require('yaml');
+var userfilename = "pasta.json";
 
-var userfilename = "pasta.yaml";
+function enc(obj) {
+    return Duktape.enc("jx", obj, null, 2);
+}
+function dec(str) {
+    return Duktape.dec("jx", str);
+}
 
 function loaduser() {
     var str = libfs.readuser(userfilename);
-    logger.info("<<loaduser:読み込みデータ>>\n" + str + "\n<<ここまで>>");
-    var user = yaml.parse(str);
-    logger.info("<<loaduser:1>>");
-    logger.info(user);
-    logger.info("<<loaduser:終了>>");
+    var user = dec(str);
     return user;
 }
 
 function saveuser(user) {
-    logger.info(user);
-    var str = yaml.stringify(user);
+    var str = enc(user);
     libfs.writeuser(userfilename, str);
 }
 

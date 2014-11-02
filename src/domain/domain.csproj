@@ -22,20 +22,9 @@
     <Content Include="app.css" />
     <EmbeddedResource Include="duktape\loader.js" />
     <Content Include="duktape\boot.js" />
-    <Content Include="lib\dummy.txt" />
+    <Content Include="lib\js\dummy.txt" />
     <Content Include="js\pasta\pasta-parser.js" />
     <Content Include="index.html" />
-    <Content Include="lib\js\yaml.js" />
-    <Content Include="lib\js\yaml\Dumper.js" />
-    <Content Include="lib\js\yaml\Escaper.js" />
-    <Content Include="lib\js\yaml\Exception\DumpException.js" />
-    <Content Include="lib\js\yaml\Exception\ParseException.js" />
-    <Content Include="lib\js\yaml\Inline.js" />
-    <Content Include="lib\js\yaml\Parser.js" />
-    <Content Include="lib\js\yaml\Pattern.js" />
-    <Content Include="lib\js\yaml\Unescaper.js" />
-    <Content Include="lib\js\yaml\Utils.js" />
-    <Content Include="lib\js\yaml\Yaml.js" />
     <Content Include="tests\require-simple.js" />
     <Content Include="tests\all.js" />
     <Content Include="tests\duktape.js" />
@@ -56,7 +45,6 @@
     <TypeScriptCompile Include="ts\shiori_api\request.ts" />
     <TypeScriptCompile Include="ts\declare\libshiori.d.ts" />
     <TypeScriptCompile Include="ts\shiori_api.ts" />
-    <TypeScriptCompile Include="ts\yaml.d.ts" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="dic\talk001.md" />
@@ -65,7 +53,7 @@
     <Content Include="copyItem.bat" />
     <Content Include="tests\shiori_api_test.js" />
     <Content Include="tests\ssp_shiori_log.log" />
-    <Content Include="user\init\pasta.yaml" />
+    <None Include="user\init\pasta.json" />
     <None Include="web.Debug.config">
       <DependentUpon>web.config</DependentUpon>
     </None>
@@ -104,6 +92,7 @@
           <SaveServerSettingsInUserFile>False</SaveServerSettingsInUserFile>
         </WebProjectProperties>
       </FlavorProperties>
+      <UserProperties user_2init_2pasta_1json__JSONSchema="" />
     </VisualStudio>
   </ProjectExtensions>
   <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
