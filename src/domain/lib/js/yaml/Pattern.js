@@ -113,7 +113,6 @@ Pattern = (function() {
   };
 
   return Pattern;
-
 })();
 
 module.exports = Pattern;

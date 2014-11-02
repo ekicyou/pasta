@@ -477,7 +477,6 @@ Inline = (function() {
   };
 
   return Inline;
-
 })();
 
 module.exports = Inline;

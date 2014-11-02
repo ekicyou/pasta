@@ -25,10 +25,8 @@
         console.trace("[writeuser]\n<<<< file=" + fname +" >>>>\n"+ buf +"\n<<<< ここまで >>>>");
     };
 
-
     //---------------------------------------------------------
     test("shiori_events::load save test", function () {
-
         window.libfs = libfs;
 
         // 実行
@@ -41,7 +39,6 @@
 
         events.unload();
     });
-
 
     //---------------------------------------------------------
     // モジュールのエクスポート

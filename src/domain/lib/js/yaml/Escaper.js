@@ -50,7 +50,6 @@ Escaper = (function() {
   };
 
   return Escaper;
-
 })();
 
 module.exports = Escaper;

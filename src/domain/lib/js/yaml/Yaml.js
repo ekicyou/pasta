@@ -90,7 +90,6 @@ Yaml = (function() {
   };
 
   return Yaml;
-
 })();
 
 if (typeof window !== "undefined" && window !== null) {

@@ -21,7 +21,6 @@ DumpException = (function(_super) {
   };
 
   return DumpException;
-
 })(Error);
 
 module.exports = DumpException;

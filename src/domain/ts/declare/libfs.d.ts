@@ -1,6 +1,5 @@
 ﻿// pasta.dll組み込み関数[libfs]
 declare module libfs {
-
     // ファイルをバッファとして読み込みます。
     function readfile(fname: string): string;
 
@@ -12,5 +11,4 @@ declare module libfs {
 
     // ユーザーファイルを保存します。
     function writeuser(fname: string, buf: string): string;
-
 }

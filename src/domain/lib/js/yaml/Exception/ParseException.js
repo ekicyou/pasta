@@ -21,7 +21,6 @@ ParseException = (function(_super) {
   };
 
   return ParseException;
-
 })(Error);
 
 module.exports = ParseException;

@@ -25,7 +25,6 @@ if (typeof (window) === "undefined") {
         else if (name.indexOf("../") === 0) id = current;
         else id = root;
 
-
         if (id.substr(id.length - 1) != '/') {
             id = id.split('/');
             id.length--;
@@ -74,7 +73,6 @@ if (typeof (window) === "undefined") {
         return findFile(paths, name);
     }
 
-
     function require_simple(id, current) {
         var name = absname(require_simple.root, current, id);
 
@@ -88,7 +86,6 @@ if (typeof (window) === "undefined") {
             return require_simple.modules[name].exports;
         }
         console.trace("[require::load] => [" + name + "]");
-
 
         var module = require_simple.modules[name] = {
             id: name,

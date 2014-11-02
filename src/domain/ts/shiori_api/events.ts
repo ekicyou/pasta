@@ -21,13 +21,11 @@ function loaduser(): any {
     return user;
 }
 
-
 function saveuser(user: any): void {
     logger.info(user);
     var str = yaml.stringify(user);
     libfs.writeuser(userfilename, str);
 }
-
 
 export class events {
     public constructor(ghost: IF.ghost) {

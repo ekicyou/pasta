@@ -47,7 +47,6 @@ Dumper = (function() {
   };
 
   return Dumper;
-
 })();
 
 module.exports = Dumper;

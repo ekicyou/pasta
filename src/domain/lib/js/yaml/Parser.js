@@ -204,7 +204,6 @@ Parser = (function() {
           values.value = matches.value;
         }
         if (mergeNode) {
-
         } else if (!(values.value != null) || '' === Utils.trim(values.value, ' ') || Utils.ltrim(values.value, ' ').indexOf('#') === 0) {
           if (!(this.isNextLineIndented()) && !(this.isNextLineUnIndentedCollection())) {
             if (allowOverwrite || data[key] === void 0) {
@@ -575,7 +574,6 @@ Parser = (function() {
   };
 
   return Parser;
-
 })();
 
 module.exports = Parser;
