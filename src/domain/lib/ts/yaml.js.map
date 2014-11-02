@@ -1,0 +1,1 @@
+{"version":3,"file":"yaml.js","sourceRoot":"ts/","sources":["yaml.ts"],"names":["parse","stringify"],"mappings":"AAAA,SACgB,KAAK,CAAC,UAAkB;IACpCA,OAAOA,SAASA;AACpBA,CAACA;AAFD,sBAEC;;AAED,SAAgB,SAAS,CAAC,GAAQ;IAC9BC,OAAOA,SAASA;AACpBA,CAACA;AAFD,8BAEC;AACD"}

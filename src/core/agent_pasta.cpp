@@ -292,9 +292,9 @@ static FILE* OpenModuleFile(int cp, std::tr2::sys::wpath& loaddir, LPCWSTR paths
 static LPCWSTR preLoadPath[] = {
     L"duktape",
     L"modules",
-    L"js",
-    L"lib/ts",
     L"lib/js",
+    L"lib/ts",
+    L"js",
     L".",
     NULL,
 };

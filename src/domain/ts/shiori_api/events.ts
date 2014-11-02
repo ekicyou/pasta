@@ -7,21 +7,24 @@ var logger = new Duktape.Logger();
 import pasta = require('../pasta');
 import api = require('../shiori_api');
 import IF = require('../interfaces');
-import yaml = require('js-yaml');
+import yaml = require('yaml');
 
 var userfilename = "pasta.yaml";
 
 function loaduser(): any {
     var str = libfs.readuser(userfilename);
-    var user = yaml.safeLoad(str);
-    logger.trace(user);
+    logger.info("<<loaduser:読み込みデータ>>\n"+str+"\n<<ここまで>>");
+    var user = yaml.parse(str);
+    logger.info("<<loaduser:1>>");
+    logger.info(user);
+    logger.info("<<loaduser:終了>>");
     return user;
 }
 
 
 function saveuser(user: any): void {
-    logger.trace(user);
-    var str = yaml.safeDump(user);
+    logger.info(user);
+    var str = yaml.stringify(user);
     libfs.writeuser(userfilename, str);
 }
 

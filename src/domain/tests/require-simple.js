@@ -35,9 +35,9 @@ if (typeof (window) === "undefined") {
             id = id.substr(0, id.length - 1);
         }
 
-        id = id.split('\\');
+        id = id.split('/');
 
-        while (0 == name.indexOf('../')) {
+        while (0 === name.indexOf('../')) {
             id.length--;
             name = name.substr(3);
         }

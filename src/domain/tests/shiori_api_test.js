@@ -14,7 +14,7 @@
     var CRLF = "\r\n";
 
     //---------------------------------------------------------
-    test("shiori_api::test1", function () {
+    test("shiori_api::request ng test", function () {
         var text = "";
         text += "GET SHIORI/123" + CRLF;
         text += CRLF;
@@ -23,7 +23,7 @@
     });
 
     //---------------------------------------------------------
-    test("shiori_api::test2", function () {
+    test("shiori_api::request ok test", function () {
         var text = "";
         text += "GET SHIORI/3.0" + CRLF;
         text += "Charset: UTF-8" + CRLF;

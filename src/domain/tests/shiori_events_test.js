@@ -26,7 +26,7 @@
 
 
     //---------------------------------------------------------
-    test("shiori_events::test1", function () {
+    test("shiori_events::load save test", function () {
 
         window.libfs = libfs;
 

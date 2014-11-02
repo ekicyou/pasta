@@ -25,16 +25,14 @@
     <Content Include="lib\dummy.txt" />
     <Content Include="js\pasta\pasta-parser.js" />
     <Content Include="index.html" />
+    <Content Include="lib\js\yaml.js" />
     <Content Include="tests\require-simple.js" />
-    <Content Include="Scripts\r.js" />
     <Content Include="tests\all.js" />
     <Content Include="tests\duktape.js" />
-    <Content Include="lib\js\js-yaml.js" />
     <Content Include="tests\shiori_events_test.js" />
     <Content Include="web.config" />
   </ItemGroup>
   <ItemGroup>
-    <TypeScriptCompile Include="Scripts\typings\js-yaml\js-yaml.d.ts" />
     <TypeScriptCompile Include="ts\app.ts" />
     <TypeScriptCompile Include="ts\declare\duktape.d.ts" />
     <TypeScriptCompile Include="ts\declare\libfs.d.ts" />
@@ -48,13 +46,13 @@
     <TypeScriptCompile Include="ts\shiori_api\request.ts" />
     <TypeScriptCompile Include="ts\declare\libshiori.d.ts" />
     <TypeScriptCompile Include="ts\shiori_api.ts" />
+    <TypeScriptCompile Include="ts\yaml.d.ts" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="dic\talk001.md" />
     <Content Include="js\pasta\pasta-parser.peg" />
     <Content Include="js\pasta\README.md" />
     <Content Include="copyItem.bat" />
-    <Content Include="packages.config" />
     <Content Include="tests\shiori_api_test.js" />
     <Content Include="tests\ssp_shiori_log.log" />
     <Content Include="user\init\pasta.yaml" />

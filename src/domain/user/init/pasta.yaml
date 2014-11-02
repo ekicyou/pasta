@@ -1,2 +1,3 @@
 ﻿# pasta ユーザ情報：初回起動時に読み込み
 # "/user/pasta.yaml"が見つからない場合はこちらを読み込む
+firstload: true
