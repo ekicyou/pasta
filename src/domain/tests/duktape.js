@@ -1,4 +1,4 @@
-﻿// Duktapeモジュール（ダミー）
+﻿// Duktape / pasta.dll組み込みモジュール（ダミー）
 
 (function (definition) {
     // CommonJS/RequireJS/<script>

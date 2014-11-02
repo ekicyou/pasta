@@ -13,6 +13,7 @@
     // 試験モジュール
     var mod = {};
     mod.shiori_api_test = require("shiori_api_test");
+    mod.shiori_events_test = require("shiori_events_test");
 
     // モジュールのエクスポート
     return mod;

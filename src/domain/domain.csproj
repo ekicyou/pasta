@@ -29,8 +29,8 @@
     <Content Include="Scripts\r.js" />
     <Content Include="tests\all.js" />
     <Content Include="tests\duktape.js" />
-    <Content Include="tests\hello.test.js" />
     <Content Include="lib\js\js-yaml.js" />
+    <Content Include="tests\shiori_events_test.js" />
     <Content Include="web.config" />
   </ItemGroup>
   <ItemGroup>

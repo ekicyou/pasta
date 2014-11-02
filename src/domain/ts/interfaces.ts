@@ -1,6 +1,9 @@
 ﻿// pasta interfase定義
 
 export interface ghost {
+
+    user: any;
+
 }
 
 export interface shiori_request {

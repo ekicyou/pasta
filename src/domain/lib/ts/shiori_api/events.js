@@ -30,7 +30,9 @@ var events = (function () {
         this.loaddir = dir;
 
         // TODO: レジストリの読み込み
-        this.user = loaduser();
+        var user = loaduser();
+        this.user = user;
+        this.ghost.user = user;
         // TODO: [load]実装する
     };
 
