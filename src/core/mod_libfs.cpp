@@ -6,6 +6,28 @@
 #include "ctx2pasta.h"
 #include "util.h"
 
+
+
+//-------------------------------------------------------------
+// オープンされたFILE*をバッファに読み込む。
+static duk_ret_t push_file_to_buffer(duk_context *ctx, FILE* f){
+    duk_ret_t rc = DUK_RET_ERROR;
+
+    if (fseek(f, 0, SEEK_END) != 0) goto clean;
+    auto len = ftell(f);
+    if (fseek(f, 0, SEEK_SET) != 0) goto clean;
+    auto buf = duk_push_fixed_buffer(ctx, (size_t)len);
+    auto got = fread(buf, 1, len, f);
+    if (got != (size_t)len) goto clean;
+    rc = 1;
+
+clean:
+    return rc;
+}
+
+
+
+//-------------------------------------------------------------
 // ファイルをバッファとして読み込みます。
 static duk_ret_t readfile(duk_context *ctx){
     USES_CONVERSION;
@@ -36,6 +58,8 @@ error:
     return DUK_RET_ERROR;
 }
 
+
+//-------------------------------------------------------------
 // ファイルをテキストとして読み込みます。
 static duk_ret_t readtext(duk_context *ctx){
     USES_CONVERSION;
@@ -71,6 +95,7 @@ error:
     return DUK_RET_ERROR;
 }
 
+//-------------------------------------------------------------
 // ユーザーファイルをテキストとして読み込みます。
 static duk_ret_t readuser(duk_context *ctx){
     USES_CONVERSION;

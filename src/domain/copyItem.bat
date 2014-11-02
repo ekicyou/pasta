@@ -5,4 +5,5 @@ pushd %~dp0
   robocopy /MIR lib\     %1\lib\
   robocopy /MIR js\      %1\js\
   robocopy /MIR dic\     %1\dic\
+  robocopy /MIR user\    %1\user\
   popd
