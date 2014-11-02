@@ -245,20 +245,12 @@ std::string pasta::Agent::eval(LPCSTR utf8text){
     return rc;
 }
 
+
 //-------------------------------------------------------------
 // IO
 //-------------------------------------------------------------
-static wchar_t * preLoadPath[] = {
-    L"duktape",
-    L"modules",
-    L"js",
-    L"lib/ts",
-    L"lib/js",
-    L".",
-    NULL,
-};
 
-FILE* pasta::Agent::OpenReadModuleFile(LPCSTR fname){
+static FILE* OpenModuleFile(int cp, std::tr2::sys::wpath& loaddir, LPCWSTR paths[], LPCWSTR mode, LPCSTR fname){
     FUNC_START(cp);
     USES_CONVERSION;
 
@@ -266,7 +258,7 @@ FILE* pasta::Agent::OpenReadModuleFile(LPCSTR fname){
     auto wfname = A2W_CP(fname, cp);
 
     for (int i = 0;; i++){
-        const auto pre = preLoadPath[i];
+        const auto pre = paths[i];
         if (!pre){
             DEBUG_MESSAGE(L"  << NOT FOUND!! >>");
             return NULL;
@@ -288,11 +280,47 @@ FILE* pasta::Agent::OpenReadModuleFile(LPCSTR fname){
 
         // ファイルを開く
         FILE *f;
-        if (_wfopen_s(&f, text.c_str(), L"rb") == 0){
+        if (_wfopen_s(&f, text.c_str(), mode) == 0){
             DEBUG_MESSAGE(L"  << FIND!! >>");
             return f;
         }
     }
 }
+
+
+//-------------------------------------------------------------
+// IO:Module
+//-------------------------------------------------------------
+static LPCWSTR preLoadPath[] = {
+    L"duktape",
+    L"modules",
+    L"js",
+    L"lib/ts",
+    L"lib/js",
+    L".",
+    NULL,
+};
+
+FILE* pasta::Agent::OpenReadModuleFile(LPCSTR fname){
+    return OpenModuleFile(cp, loaddir, preLoadPath, L"rb", fname);
+}
+
+
+//-------------------------------------------------------------
+// IO:user date
+//-------------------------------------------------------------
+static LPCWSTR preUserPath[] = {
+    L"user",
+    L"modules",
+    L"js",
+    L"lib/ts",
+    L"lib/js",
+    NULL,
+};
+
+FILE* pasta::Agent::OpenReadUserFile(LPCSTR fname){
+    return OpenModuleFile(cp, loaddir, preUserPath, L"rb", fname);
+}
+
 
 // EOF

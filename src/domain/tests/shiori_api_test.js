@@ -10,7 +10,8 @@
     'use strict';
     var mod = {};
     var api = require("shiori_api");
-    var CRLF="\r\n";
+
+    var CRLF = "\r\n";
 
     //---------------------------------------------------------
     test("shiori_api::test1", function () {

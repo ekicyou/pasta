@@ -8,11 +8,11 @@
 })(function () {
     // 実際の定義を行う関数
     'use strict';
-    window.Duktape = require("./duktape");
+    window.Duktape = require("duktape");
 
     // 試験モジュール
     var mod = {};
-    mod.shiori_api_test = require("./shiori_api_test");
+    mod.shiori_api_test = require("shiori_api_test");
 
     // モジュールのエクスポート
     return mod;

@@ -41,5 +41,8 @@ namespace pasta{
 
         // モジュール用のファイルをread openし、FILE*を返す。
         FILE* OpenReadModuleFile(LPCSTR fname);
+
+        // User用のファイルをread openし、FILE*を返す。
+        FILE* OpenReadUserFile(LPCSTR fname);
     };
 }

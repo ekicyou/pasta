@@ -9,6 +9,7 @@ export declare class request implements IF.shiori_request {
     private parse(text);
     public response: (res: string) => void;
     public raw: string;
+    public time: number;
     public match: string[];
     public method: string;
     public kvlist: keyvalue[];

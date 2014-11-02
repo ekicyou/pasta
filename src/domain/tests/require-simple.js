@@ -16,16 +16,31 @@ if (typeof (window) === "undefined") {
     throw new Error("require-simple.js works only on browsers!");
 }
 
-function require(name) {
+(function () {
     "use strict";
-    if (!require.modules) {
-        require.modules = {};
-    }
-    if (require.modules[name]) {
-        if (require.debug) {
-            console.log("require: \"" + name + "\" is already loaded");
+
+    function absname(base, path) {
+        if (base.substr(base.length - 1) != '/') {
+            base = base.split('/');
+            base.length--;
+            base = base.join('/');
         }
-        return require.modules[name].exports;
+        else {
+            base = base.substr(0, base.length - 1);
+        }
+
+        base = base.split('\\');
+
+        while (0 == path.indexOf('../')) {
+            base.length--;
+            path = path.substr(3);
+        }
+
+        base = base.join('/');
+        base = base + '/' + path;
+        base = base.replace(/\.\//g, "");
+
+        return base;
     }
 
     function findModule(paths, name) {
@@ -45,31 +60,51 @@ function require(name) {
 
             if (xhr.status !== 404 || (i + 1) === paths.length) {
                 throw new Error("Cannot load module \"" + name + "\": " +
-								xhr.status);
+                                xhr.status);
             }
         }
     }
-    var module = require.modules[name] = {
-        id: name,
-        exports: {}
-    };
 
-    var src = findModule(require.paths, name);
+    function require(id) {
+        var current = require.current[require.current.length - 1];
+        var name = absname(current, id);
 
-    var m = "require.modules['" + name.replace(/'/g, "\\'") + "']";
-    var srcSection = document.createTextNode(
-		"(function (module, exports) { // " + name + ".js\n" +
-		src +
-		"\n}(" + m + ", " + m + ".exports));\n"
-	);
+        if (!require.modules) {
+            require.modules = {};
+        }
+        if (require.modules[name]) {
+            if (require.debug) {
+                console.log("require: \"" + name + "\" is already loaded");
+            }
+            return require.modules[name].exports;
+        }
 
-    var script = document.createElement("script");
-    script.appendChild(srcSection);
+        var module = require.modules[name] = {
+            id: name,
+            exports: {}
+        };
+        var src = findModule(require.paths, name);
 
-    document.head.appendChild(script);
 
-    return module.exports;
-}
+        var m = "require.modules['" + name.replace(/'/g, "\\'") + "']";
+        var srcSection = document.createTextNode(
+            "(function (module, exports) { // " + name + ".js\n" +
+            src +
+            "\n}(" + m + ", " + m + ".exports));\n"
+        );
 
-require.debug = false;
-require.paths = ["."];
+        var script = document.createElement("script");
+        script.appendChild(srcSection);
+
+        document.head.appendChild(script);
+
+        return module.exports;
+    }
+
+    require.debug = false;
+    require.paths = ["."];
+    require.current = ["/base"];
+
+    window.require = require;
+
+})();

@@ -14,12 +14,12 @@ var CRLF = "\\r\\n";
 
 var SHIORI_VER = quote("SHIORI/3.0");
 var SHIORI_HEADER = IDENTIFIER + " " + SHIORI_VER + CRLF;
-var SHIORI_VALUE = IDENTIFIER + quote(": ") + "(.*?)" + CRLF;
+var SHIORI_VALUE = IDENTIFIER + quote(": ") + "(.*)" + "(" + CRLF + ")?";
 
-var SHIORI_REQUEST = "^" + SHIORI_HEADER + "(?:" + SHIORI_VALUE + ")*";
+var reHeader = new RegExp("^" + SHIORI_HEADER);
+var reValue = new RegExp("^" + SHIORI_VALUE);
 
-var re = new RegExp(SHIORI_REQUEST);
-
+//var re = re_base.compile();
 /// KeyValueアイテム
 var keyvalue = (function () {
     function keyvalue(key, value) {
@@ -39,33 +39,34 @@ var request = (function () {
     /// リクエスト分解
     request.prototype.parse = function (text) {
         this.raw = text;
+        this.time = Date.now();
 
         // メソッド取得まで
-        var m = this.match = text.match(re);
+        var m = this.match = text.match(reHeader);
         if (!m)
             return;
         this.method = m[1];
 
         // 値の取得
-        var len = m.length;
+        var lines = text.split("\r\n");
+        var len = lines.length;
         var list = [];
 
-        var index = 2;
-        while (index + 1 < len) {
-            var kv = new keyvalue(m[index], m[index + 1]);
+        for (var index = 1; index < len; index++) {
+            var m = lines[index].match(reValue);
+            if (!m)
+                break;
+            var kv = new keyvalue(m[1], m[2]);
             list.push(kv);
-            index += 2;
         }
         this.kvlist = list;
 
         // map化
         var map = {};
         list.forEach(function (item, i, a) {
-            map[item.key] = item.value;
+            return map[item.key] = item.value;
         });
         this.map = map;
-
-        logger.trace(this);
     };
     return request;
 })();
