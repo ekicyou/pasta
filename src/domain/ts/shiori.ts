@@ -40,7 +40,7 @@ export function load(dir: string): void {
         event.load(dir);
     }
     catch (e) {
-        logger.error(e);
+        logger.error(e.stack || e);
     }
     finally {
         logger.debug("load: fin");
@@ -55,7 +55,7 @@ export function unload() {
         event.unload();
     }
     catch (e) {
-        logger.error(e);
+        logger.error(e.stack || e);
     }
     finally {
         logger.debug("unload: fin");
@@ -72,7 +72,7 @@ export function notify(raw_request: string) {
         event.notify(req);
     }
     catch (e) {
-        logger.error(e);
+        logger.error(e.stack || e);
     }
     finally {
         logger.debug("notify: fin");
@@ -94,7 +94,7 @@ export function get(raw_request: string) {
         response("SHIORI/3.0 200 OK\r\n\r\n");
     }
     catch (e) {
-        logger.error(e);
+        logger.error(e.stack || e);
     }
     finally {
         if (hasResponse) {

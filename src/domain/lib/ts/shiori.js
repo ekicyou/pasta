@@ -37,7 +37,7 @@ function load(dir) {
         exports.loaddir = dir;
         event.load(dir);
     } catch (e) {
-        logger.error(e);
+        logger.error(e.stack || e);
     } finally {
         logger.debug("load: fin");
     }
@@ -51,7 +51,7 @@ function unload() {
         logger.debug("unload: start");
         event.unload();
     } catch (e) {
-        logger.error(e);
+        logger.error(e.stack || e);
     } finally {
         logger.debug("unload: fin");
     }
@@ -68,7 +68,7 @@ function notify(raw_request) {
         var req = new api.request(raw_request, response);
         event.notify(req);
     } catch (e) {
-        logger.error(e);
+        logger.error(e.stack || e);
     } finally {
         logger.debug("notify: fin");
     }
@@ -90,7 +90,7 @@ function get(raw_request) {
         // TODO: 正式応答を返すようになったら外す
         response("SHIORI/3.0 200 OK\r\n\r\n");
     } catch (e) {
-        logger.error(e);
+        logger.error(e.stack || e);
     } finally {
         if (hasResponse) {
             // TODO: レスポンス漏れ
