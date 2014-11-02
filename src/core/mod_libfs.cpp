@@ -71,6 +71,42 @@ error:
     return DUK_RET_ERROR;
 }
 
+// ユーザーファイルをテキストとして読み込みます。
+static duk_ret_t readuser(duk_context *ctx){
+    USES_CONVERSION;
+    auto pasta = pasta::GetPasta(ctx);
+    FUNC_START(pasta->cp);
+
+    // 初期化＆引数取得
+    auto fname = duk_to_string(ctx, 0);
+    char *buf = NULL;
+
+    // ファイルオープン
+    auto f = pasta->OpenReadUserFile(fname);
+    if (!f)goto error;
+
+    // 読み込み
+    if (fseek(f, 0, SEEK_END) != 0) goto error;
+    auto len = ftell(f);
+    if (fseek(f, 0, SEEK_SET) != 0) goto error;
+    buf = (char *)malloc(len);
+    if (!buf)                       goto error;
+    auto got = fread(buf, 1, len, f);
+    if (got != (size_t)len)         goto error;
+    duk_push_lstring(ctx, buf, got);
+
+    // 解放
+    free(buf);
+    fclose(f);
+    return 1;
+
+error:
+    if (buf) free(buf);
+    if (f)   fclose(f);
+    return DUK_RET_ERROR;
+}
+
+
 //-------------------------------------------------------------
 // モジュール登録
 //-------------------------------------------------------------
@@ -78,6 +114,7 @@ error:
 static duk_function_list_entry funcs[] = {
         { "readfile", readfile, 1 },
         { "readtext", readtext, 1 },
+        { "readuser", readuser, 1 },
         { NULL, NULL, 0 }
 };
 

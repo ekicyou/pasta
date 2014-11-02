@@ -309,18 +309,28 @@ FILE* pasta::Agent::OpenReadModuleFile(LPCSTR fname){
 //-------------------------------------------------------------
 // IO:user date
 //-------------------------------------------------------------
-static LPCWSTR preUserPath[] = {
+static LPCWSTR preUserReadPath[] = {
     L"user",
-    L"modules",
-    L"js",
-    L"lib/ts",
-    L"lib/js",
+    L"user/init",
     NULL,
 };
 
 FILE* pasta::Agent::OpenReadUserFile(LPCSTR fname){
-    return OpenModuleFile(cp, loaddir, preUserPath, L"rb", fname);
+    return OpenModuleFile(cp, loaddir, preUserReadPath, L"rb", fname);
 }
+
+//-------------------------------------------------------------
+// IO:user date
+//-------------------------------------------------------------
+static LPCWSTR preUserWritePath[] = {
+    L"user",
+    NULL,
+};
+
+FILE* pasta::Agent::OpenWriteUserFile(LPCSTR fname){
+    return OpenModuleFile(cp, loaddir, preUserWritePath, L"wb", fname);
+}
+
 
 
 // EOF

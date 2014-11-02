@@ -44,5 +44,8 @@ namespace pasta{
 
         // User用のファイルをread openし、FILE*を返す。
         FILE* OpenReadUserFile(LPCSTR fname);
+
+        // User用のファイルをread openし、FILE*を返す。
+        FILE* OpenWriteUserFile(LPCSTR fname);
     };
 }

@@ -56,6 +56,7 @@
     <Content Include="packages.config" />
     <Content Include="tests\shiori_api_test.js" />
     <Content Include="tests\ssp_shiori_log.log" />
+    <Content Include="user\init\pasta.yaml" />
     <None Include="web.Debug.config">
       <DependentUpon>web.config</DependentUpon>
     </None>
