@@ -24,19 +24,20 @@
     <Content Include="duktape\boot.js" />
     <Content Include="lib\dummy.txt" />
     <Content Include="js\pasta\pasta-parser.js" />
-    <Content Include="lib\js\js-yaml.js" />
     <Content Include="index.html" />
     <Content Include="tests\require-simple.js" />
     <Content Include="Scripts\r.js" />
     <Content Include="tests\all.js" />
     <Content Include="tests\duktape.js" />
     <Content Include="tests\hello.test.js" />
+    <Content Include="lib\js\js-yaml.js" />
     <Content Include="web.config" />
   </ItemGroup>
   <ItemGroup>
     <TypeScriptCompile Include="Scripts\typings\js-yaml\js-yaml.d.ts" />
     <TypeScriptCompile Include="ts\app.ts" />
     <TypeScriptCompile Include="ts\declare\duktape.d.ts" />
+    <TypeScriptCompile Include="ts\declare\libfs.d.ts" />
     <TypeScriptCompile Include="ts\pasta.ts" />
     <TypeScriptCompile Include="ts\interfaces.ts" />
     <TypeScriptCompile Include="ts\pasta\events.ts" />
@@ -67,6 +68,7 @@
   <ItemGroup>
     <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
   </ItemGroup>
+  <ItemGroup />
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">12.0</VisualStudioVersion>
   </PropertyGroup>

@@ -19,28 +19,35 @@ if (typeof (window) === "undefined") {
 (function () {
     "use strict";
 
-    function absname(base, path) {
-        if (base.substr(base.length - 1) != '/') {
-            base = base.split('/');
-            base.length--;
-            base = base.join('/');
+    function absname(currents, name) {
+        var current = currents[require.current.length - 1];
+        var root = currents[0];
+
+        var id = current;
+
+        if (id.substr(id.length - 1) != '/') {
+            id = id.split('/');
+            id.length--;
+            id = id.join('/');
         }
         else {
-            base = base.substr(0, base.length - 1);
+            id = id.substr(0, id.length - 1);
         }
 
-        base = base.split('\\');
+        id = id.split('\\');
 
-        while (0 == path.indexOf('../')) {
-            base.length--;
-            path = path.substr(3);
+        while (0 == name.indexOf('../')) {
+            id.length--;
+            name = name.substr(3);
         }
 
-        base = base.join('/');
-        base = base + '/' + path;
-        base = base.replace(/\.\//g, "");
+        id = id.join('/');
+        id = id + '/' + name;
+        id = id.replace(/\.\//g, "");
 
-        return base;
+        console.trace("[absname]=> [" + id + "] : name=" + name + " current=" + current + " root=" + root);
+
+        return id;
     }
 
     function findModule(paths, name) {
@@ -66,8 +73,7 @@ if (typeof (window) === "undefined") {
     }
 
     function require(id) {
-        var current = require.current[require.current.length - 1];
-        var name = absname(current, id);
+        var name = absname(require.current, id);
 
         if (!require.modules) {
             require.modules = {};
@@ -78,6 +84,8 @@ if (typeof (window) === "undefined") {
             }
             return require.modules[name].exports;
         }
+
+        require.current.push(name);
 
         var module = require.modules[name] = {
             id: name,
@@ -97,12 +105,13 @@ if (typeof (window) === "undefined") {
 
         document.head.appendChild(script);
 
+        require.current.pop();
         return module.exports;
     }
 
     require.debug = false;
     require.paths = ["."];
-    require.current = ["/base"];
+    require.current = ["/root"];
 
     window.require = require;
 })();

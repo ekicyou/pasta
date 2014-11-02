@@ -3,6 +3,23 @@
 // SHIORI EVENT を解釈し、ghostとのやり取りを行う
 var logger = new Duktape.Logger();
 
+var yaml = require('js-yaml');
+
+var userfilename = "pasta.yaml";
+
+function loaduser() {
+    var str = libfs.readuser(userfilename);
+    var user = yaml.safeLoad(str);
+    logger.trace(user);
+    return user;
+}
+
+function saveuser(user) {
+    logger.trace(user);
+    var str = yaml.safeDump(user);
+    libfs.writeuser(userfilename, str);
+}
+
 var events = (function () {
     function events(ghost) {
         this.ghost = ghost;
@@ -11,7 +28,9 @@ var events = (function () {
     // SHIORI: load
     events.prototype.load = function (dir) {
         this.loaddir = dir;
+
         // TODO: レジストリの読み込み
+        this.user = loaduser();
         // TODO: [load]実装する
     };
 
@@ -19,6 +38,7 @@ var events = (function () {
     // SHIORI: unload
     events.prototype.unload = function () {
         // TODO: レジストリの保存
+        saveuser(this.user);
         // TODO: [unload]実装する
     };
 

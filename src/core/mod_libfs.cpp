@@ -127,7 +127,7 @@ clean:
 }
 
 //-------------------------------------------------------------
-// ユーザーファイルをテキストとして読み込みます。
+// ユーザーファイルを保存します。
 static duk_ret_t writeuser(duk_context *ctx){
     auto pasta = pasta::GetPasta(ctx);
     FUNC_START(pasta->cp);

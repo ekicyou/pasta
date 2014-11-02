@@ -7,6 +7,24 @@ var logger = new Duktape.Logger();
 import pasta = require('../pasta');
 import api = require('../shiori_api');
 import IF = require('../interfaces');
+import yaml = require('js-yaml');
+
+var userfilename = "pasta.yaml";
+
+function loaduser(): any {
+    var str = libfs.readuser(userfilename);
+    var user = yaml.safeLoad(str);
+    logger.trace(user);
+    return user;
+}
+
+
+function saveuser(user: any): void {
+    logger.trace(user);
+    var str = yaml.safeDump(user);
+    libfs.writeuser(userfilename, str);
+}
+
 
 export class events {
     public constructor(ghost: IF.ghost) {
@@ -28,6 +46,7 @@ export class events {
         this.loaddir = dir;
 
         // TODO: レジストリの読み込み
+        this.user = loaduser();
 
         // TODO: [load]実装する
     }
@@ -36,6 +55,7 @@ export class events {
     // SHIORI: unload
     public unload(): void {
         // TODO: レジストリの保存
+        saveuser(this.user);
 
         // TODO: [unload]実装する
     }
