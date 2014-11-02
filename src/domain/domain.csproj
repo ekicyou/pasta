@@ -26,6 +26,16 @@
     <Content Include="js\pasta\pasta-parser.js" />
     <Content Include="index.html" />
     <Content Include="lib\js\yaml.js" />
+    <Content Include="lib\js\yaml\Dumper.js" />
+    <Content Include="lib\js\yaml\Escaper.js" />
+    <Content Include="lib\js\yaml\Exception\DumpException.js" />
+    <Content Include="lib\js\yaml\Exception\ParseException.js" />
+    <Content Include="lib\js\yaml\Inline.js" />
+    <Content Include="lib\js\yaml\Parser.js" />
+    <Content Include="lib\js\yaml\Pattern.js" />
+    <Content Include="lib\js\yaml\Unescaper.js" />
+    <Content Include="lib\js\yaml\Utils.js" />
+    <Content Include="lib\js\yaml\Yaml.js" />
     <Content Include="tests\require-simple.js" />
     <Content Include="tests\all.js" />
     <Content Include="tests\duktape.js" />

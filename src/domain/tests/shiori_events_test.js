@@ -19,9 +19,10 @@
     var libfs = {};
     libfs.readuser = function (fname) {
         var rc = require_simple.findFile(paths, fname);
+        return rc;
     };
     libfs.writeuser = function (fname, buf) {
-        console.trace("[writeuser]\n<<<< file=" + fname +" >>>>\n"+ buf);
+        console.trace("[writeuser]\n<<<< file=" + fname +" >>>>\n"+ buf +"\n<<<< ここまで >>>>");
     };
 
 
@@ -36,14 +37,9 @@
         events.load(null);
         console.trace(events.user);
 
-        events.user = {};
-        events.user.hello = "ぱすたさん";
-        events.user.checked = true;
-        events.user.list = ["今日は","いい天気"];
+        equal(true, ghost.user.firstload);
 
         events.unload();
-
-        equal("", "");
     });
 
 

@@ -11,9 +11,9 @@
     <script src="http://code.jquery.com/qunit/qunit-1.15.0.js"></script>
     <script src="/tests/require-simple.js"></script>
     <script>
-        require_simple.paths.unshift("/lib/js");
-        require_simple.paths.unshift("/lib/ts");
         require_simple.paths.unshift("/tests");
+        require_simple.paths.unshift("/lib/ts");
+        require_simple.paths.unshift("/lib/js");
 
         var module = require("all");
     </script>

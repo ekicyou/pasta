@@ -46,16 +46,12 @@ if (typeof (window) === "undefined") {
         id = id + '/' + name;
         id = id.replace(/\.\//g, "");
 
-        console.trace("[absname]=> [" + id + "] : name=" + name + " current=" + current + " root=" + root);
-
         return id;
     }
 
     function findFile(paths, name) {
         for (var i = 0; i < paths.length; ++i) {
             var url = paths[i] + name;
-            console.trace("url: ", url);
-
             var xhr = new XMLHttpRequest();
             xhr.open("GET", url, false);
             xhr.send(null);
@@ -91,6 +87,8 @@ if (typeof (window) === "undefined") {
             }
             return require_simple.modules[name].exports;
         }
+        console.trace("[require::load] => [" + name + "]");
+
 
         var module = require_simple.modules[name] = {
             id: name,
