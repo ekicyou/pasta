@@ -46,6 +46,26 @@ clean:
 }
 
 //-------------------------------------------------------------
+// バッファのファイルを書き込みます。
+static duk_ret_t _writebuf(FILE* f, void* buf, duk_size_t len){
+    duk_ret_t rc = DUK_RET_ERROR;
+    USES_CONVERSION;
+
+    // 書き込み
+    auto got = fwrite(buf, 1, len, f);
+    if (got != (size_t)len)         goto clean;
+    rc = 1;
+
+clean:
+    if (f) fclose(f);
+    return rc;
+}
+
+
+
+
+//-------------------------------------------------------------
+//-------------------------------------------------------------
 // ファイルをバッファとして読み込みます。
 static duk_ret_t readfile(duk_context *ctx){
     auto pasta = pasta::GetPasta(ctx);
@@ -88,7 +108,6 @@ clean:
 //-------------------------------------------------------------
 // ユーザーファイルをテキストとして読み込みます。
 static duk_ret_t readuser(duk_context *ctx){
-    USES_CONVERSION;
     auto pasta = pasta::GetPasta(ctx);
     FUNC_START(pasta->cp);
 
@@ -108,13 +127,37 @@ clean:
 }
 
 //-------------------------------------------------------------
+// ユーザーファイルをテキストとして読み込みます。
+static duk_ret_t writeuser(duk_context *ctx){
+    auto pasta = pasta::GetPasta(ctx);
+    FUNC_START(pasta->cp);
+
+    // 初期化＆引数取得
+    duk_ret_t rc = DUK_RET_ERROR;
+    duk_size_t len = NULL;
+    auto fname = duk_to_string(ctx, 0);
+    auto buf = duk_to_lstring(ctx, 1, &len);
+    if (!buf)goto clean;
+
+    // ファイルオープン
+    auto f = pasta->OpenWriteUserFile(fname);
+    if (!f)goto clean;
+    rc = _writebuf(f, (void*)buf, len);
+
+clean:
+    if (f) fclose(f);
+    return rc;
+}
+
+//-------------------------------------------------------------
 // モジュール登録
 //-------------------------------------------------------------
 
 static duk_function_list_entry funcs[] = {
-        { "readfile", readfile, 1 },
-        { "readtext", readtext, 1 },
-        { "readuser", readuser, 1 },
+        { "readfile"    , readfile  , 1 },
+        { "readtext"    , readtext  , 1 },
+        { "readuser"    , readuser  , 1 },
+        { "writeuser"   , writeuser , 2 },
         { NULL, NULL, 0 }
 };
 
