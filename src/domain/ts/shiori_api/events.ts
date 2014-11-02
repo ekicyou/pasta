@@ -22,7 +22,6 @@ export class events {
     /// ユーザデータ
     public user: any;
 
-
     // --------------------------------------------------------
     // SHIORI: load
     public load(dir: string): void {
@@ -36,7 +35,6 @@ export class events {
     // --------------------------------------------------------
     // SHIORI: unload
     public unload(): void {
-
         // TODO: レジストリの保存
 
         // TODO: [unload]実装する

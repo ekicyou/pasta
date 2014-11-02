@@ -50,7 +50,6 @@ var requirejs, require, define, xpcUtil;
             console.log('x.js exists not applicable in browser env');
             return false;
         };
-
     } else if (typeof process !== 'undefined' && process.versions && !!process.versions.node) {
         env = 'node';
 
@@ -83,7 +82,6 @@ var requirejs, require, define, xpcUtil;
         exists = function (fileName) {
             return existsForNode(fileName);
         };
-
 
         fileName = process.argv[2];
 
@@ -247,7 +245,6 @@ var requirejs, require, define, xpcUtil;
 /*jslint regexp: true, nomen: true, sloppy: true */
 /*global window, navigator, document, importScripts, setTimeout, opera */
 
-
 (function (global) {
     var req, s, head, baseElement, dataMain, src,
         interactiveScript, currentlyAddingScript, mainScript, subPath,
@@ -350,7 +347,6 @@ var requirejs, require, define, xpcUtil;
                     if (deepStringMixin && typeof value === 'object' && value &&
                         !isArray(value) && !isFunction(value) &&
                         !(value instanceof RegExp)) {
-
                         if (!target[prop]) {
                             target[prop] = {};
                         }
@@ -1132,7 +1128,6 @@ var requirejs, require, define, xpcUtil;
                                 err.requireType = this.map.isDefine ? 'define' : 'require';
                                 return onError((this.error = err));
                             }
-
                         } else {
                             //Just a literal value
                             exports = factory;
@@ -1164,7 +1159,6 @@ var requirejs, require, define, xpcUtil;
                         this.emit('defined', this.exports);
                         this.defineEmitComplete = true;
                     }
-
                 }
             },
 
@@ -1949,7 +1943,6 @@ var requirejs, require, define, xpcUtil;
      * name for minification/local scope use.
      */
     req = requirejs = function (deps, callback, errback, optional) {
-
         //Find the right context, use default
         var context, config,
             contextName = defContextName;
@@ -2298,7 +2291,6 @@ var requirejs, require, define, xpcUtil;
         jQuery: true
     };
 
-
     /**
      * Executes the text. Normally just uses eval, but can be modified
      * to use a better, environment-specific call. Only used for transpiling
@@ -2313,8 +2305,6 @@ var requirejs, require, define, xpcUtil;
     //Set up with config info.
     req(cfg);
 }(this));
-
-
 
     this.requirejsVars = {
         require: require,
@@ -2364,13 +2354,11 @@ var requirejs, require, define, xpcUtil;
 (function () {
     'use strict';
     require.load = function (context, moduleName, url) {
-
         load(url);
 
         //Support anonymous modules.
         context.completeLoad(moduleName);
     };
-
 }());
     } else if (env === 'node') {
         this.requirejsVars.nodeRequire = nodeRequire;
@@ -2553,7 +2541,6 @@ var requirejs, require, define, xpcUtil;
         return eval(text);
     };
 }());
-
     } else if (env === 'xpconnect') {
         /**
  * @license RequireJS xpconnect Copyright (c) 2013-2014, The Dojo Foundation All Rights Reserved.
@@ -2567,15 +2554,12 @@ var requirejs, require, define, xpcUtil;
 (function () {
     'use strict';
     require.load = function (context, moduleName, url) {
-
         load(url);
 
         //Support anonymous modules.
         context.completeLoad(moduleName);
     };
-
 }());
-
     }
 
     //Support a default file name to execute. Useful for hosted envs
@@ -2748,7 +2732,6 @@ define('lang', function () {
                 if (typeof value === 'object' && value &&
                     !lang.isArray(value) && !lang.isFunction(value) &&
                     !(value instanceof RegExp)) {
-
                     if (!dest[prop]) {
                         dest[prop] = {};
                     }
@@ -3069,7 +3052,6 @@ if(env === 'browser') {
 define('browser/assert', function () {
     return {};
 });
-
 }
 
 if(env === 'node') {
@@ -3086,7 +3068,6 @@ if(env === 'node') {
 define('node/assert', ['assert'], function (assert) {
     return assert;
 });
-
 }
 
 if(env === 'rhino') {
@@ -3103,7 +3084,6 @@ if(env === 'rhino') {
 define('rhino/assert', function () {
     return {};
 });
-
 }
 
 if(env === 'xpconnect') {
@@ -3120,7 +3100,6 @@ if(env === 'xpconnect') {
 define('xpconnect/assert', function () {
     return {};
 });
-
 }
 
 if(env === 'browser') {
@@ -3137,7 +3116,6 @@ define('browser/args', function () {
     //Always expect config via an API call
     return [];
 });
-
 }
 
 if(env === 'node') {
@@ -3161,7 +3139,6 @@ define('node/args', function () {
 
     return args;
 });
-
 }
 
 if(env === 'rhino') {
@@ -3186,7 +3163,6 @@ define('rhino/args', function () {
 
     return args;
 });
-
 }
 
 if(env === 'xpconnect') {
@@ -3211,7 +3187,6 @@ define('xpconnect/args', function () {
 
     return args;
 });
-
 }
 
 if(env === 'browser') {
@@ -3231,7 +3206,6 @@ define('browser/load', ['./file'], function (file) {
 
     return load;
 });
-
 }
 
 if(env === 'node') {
@@ -3252,7 +3226,6 @@ define('node/load', ['fs'], function (fs) {
 
     return load;
 });
-
 }
 
 if(env === 'rhino') {
@@ -3268,7 +3241,6 @@ if(env === 'rhino') {
 define('rhino/load', function () {
     return load;
 });
-
 }
 
 if(env === 'xpconnect') {
@@ -3284,7 +3256,6 @@ if(env === 'xpconnect') {
 define('xpconnect/load', function () {
     return load;
 });
-
 }
 
 if(env === 'browser') {
@@ -3298,7 +3269,6 @@ if(env === 'browser') {
 /*global require, define, console, XMLHttpRequest, requirejs, location */
 
 define('browser/file', ['prim'], function (prim) {
-
     var file,
         currDirRegExp = /^\.(\/|$)/;
 
@@ -3390,7 +3360,6 @@ define('browser/file', ['prim'], function (prim) {
 
         copyDir: function (srcDir, destDir, regExpFilter, onlyCopyNew) {
             console.log('file.copyDir is no-op in browser');
-
         },
 
         copyFile: function (srcFileName, destFileName, onlyCopyNew) {
@@ -3460,9 +3429,7 @@ define('browser/file', ['prim'], function (prim) {
     };
 
     return file;
-
 });
-
 }
 
 if(env === 'node') {
@@ -3476,7 +3443,6 @@ if(env === 'node') {
 /*global define: false, process: false */
 
 define('node/file', ['fs', 'path', 'prim'], function (fs, path, prim) {
-
     var isWindows = process.platform === 'win32',
         windowsDriveRegExp = /^[a-zA-Z]\:\/$/,
         file;
@@ -3743,7 +3709,6 @@ define('node/file', ['fs', 'path', 'prim'], function (fs, path, prim) {
             }
         },
 
-
         /**
          * Deletes any empty directories under the given directory.
          */
@@ -3770,9 +3735,7 @@ define('node/file', ['fs', 'path', 'prim'], function (fs, path, prim) {
     };
 
     return file;
-
 });
-
 }
 
 if(env === 'rhino') {
@@ -4066,7 +4029,6 @@ define('rhino/file', ['prim'], function (prim) {
 
     return file;
 });
-
 }
 
 if(env === 'xpconnect') {
@@ -4328,7 +4290,6 @@ define('xpconnect/file', ['prim'], function (prim) {
 
     return file;
 });
-
 }
 
 if(env === 'browser') {
@@ -4364,7 +4325,6 @@ define('node/quit', function () {
         exit();
     };
 });
-
 }
 
 if(env === 'rhino') {
@@ -4375,7 +4335,6 @@ define('rhino/quit', function () {
         return quit(code);
     };
 });
-
 }
 
 if(env === 'xpconnect') {
@@ -4386,7 +4345,6 @@ define('xpconnect/quit', function () {
         return quit(code);
     };
 });
-
 }
 
 if(env === 'browser') {
@@ -4406,7 +4364,6 @@ define('browser/print', function () {
 
     return print;
 });
-
 }
 
 if(env === 'node') {
@@ -4426,7 +4383,6 @@ define('node/print', function () {
 
     return print;
 });
-
 }
 
 if(env === 'rhino') {
@@ -4442,7 +4398,6 @@ if(env === 'rhino') {
 define('rhino/print', function () {
     return print;
 });
-
 }
 
 if(env === 'xpconnect') {
@@ -4458,7 +4413,6 @@ if(env === 'xpconnect') {
 define('xpconnect/print', function () {
     return print;
 });
-
 }
 /**
  * @license RequireJS Copyright (c) 2010-2014, The Dojo Foundation All Rights Reserved.
@@ -4751,7 +4705,6 @@ parseStatement: true, parseSourceElement: true */
     function isOctalDigit(ch) {
         return '01234567'.indexOf(ch) >= 0;
     }
-
 
     // 7.2 White Space
 
@@ -5153,7 +5106,6 @@ parseStatement: true, parseSourceElement: true */
         };
     }
 
-
     // 7.7 Punctuators
 
     function scanPunctuator() {
@@ -5166,7 +5118,6 @@ parseStatement: true, parseSourceElement: true */
             ch4;
 
         switch (code) {
-
         // Check for most common single-character punctuators.
         case 0x2E:  // . dot
         case 0x28:  // ( open bracket
@@ -5821,7 +5772,6 @@ parseStatement: true, parseSourceElement: true */
             return scanStringLiteral();
         }
 
-
         // Dot (.) U+002E can also start a floating-point number, hence the need
         // to check the next character.
         if (ch === 0x2E) {
@@ -5913,7 +5863,6 @@ parseStatement: true, parseSourceElement: true */
     }
 
     SyntaxTreeDelegate = {
-
         name: 'SyntaxTree',
 
         processComment: function (node) {
@@ -5955,7 +5904,6 @@ parseStatement: true, parseSourceElement: true */
                 node.leadingComments = extra.leadingComments;
                 extra.leadingComments = [];
             }
-
 
             if (trailingComments) {
                 node.trailingComments = trailingComments;
@@ -6379,7 +6327,6 @@ parseStatement: true, parseSourceElement: true */
         }
     }
 
-
     // Throw an exception because of the token.
 
     function throwUnexpected(token) {
@@ -6561,7 +6508,6 @@ parseStatement: true, parseSourceElement: true */
         startToken = lookahead;
 
         if (token.type === Token.Identifier) {
-
             id = parseObjectPropertyKey();
 
             // Property Assignment: Getter and Setter.
@@ -6664,7 +6610,6 @@ parseStatement: true, parseSourceElement: true */
 
         return expr;
     }
-
 
     // 11.1 Primary Expressions
 
@@ -7010,7 +6955,6 @@ parseStatement: true, parseSourceElement: true */
         stack = [left, token, right];
 
         while ((prec = binaryPrecedence(lookahead, state.allowIn)) > 0) {
-
             // Reduce: make a binary expression from the three topmost entries.
             while ((stack.length > 2) && (prec <= stack[stack.length - 2].prec)) {
                 right = stack.pop();
@@ -7045,7 +6989,6 @@ parseStatement: true, parseSourceElement: true */
 
         return expr;
     }
-
 
     // 11.12 Conditional Operator
 
@@ -7386,7 +7329,6 @@ parseStatement: true, parseSourceElement: true */
         }
 
         if (typeof left === 'undefined') {
-
             if (!match(';')) {
                 test = parseExpression();
             }
@@ -8275,7 +8217,6 @@ parseStatement: true, parseSourceElement: true */
 
         return types;
     }());
-
 }));
 /* vim: set sw=4 ts=4 et tw=80 : */
 /**
@@ -9801,7 +9742,6 @@ function is_token(token, type, val) {
 var EX_EOF = {};
 
 function tokenizer($TEXT) {
-
     var S = {
         text            : $TEXT.replace(/\r\n?|[\n\u2028\u2029]/g, "\n").replace(/^\uFEFF/, ''),
         pos             : 0,
@@ -10143,7 +10083,6 @@ function tokenizer($TEXT) {
     };
 
     return next_token;
-
 };
 
 /* -----[ Parser (constants) ]----- */
@@ -10213,7 +10152,6 @@ function NodeWithToken(str, start, end) {
 NodeWithToken.prototype.toString = function() { return this.name; };
 
 function parse($TEXT, exigent_mode, embed_tokens) {
-
     var S = {
         input         : typeof $TEXT == "string" ? tokenizer($TEXT, true) : $TEXT,
         token         : null,
@@ -10820,7 +10758,6 @@ function parse($TEXT, exigent_mode, embed_tokens) {
             a.push(statement());
         return a;
     })([]));
-
 };
 
 /* -----[ Utilities ]----- */
@@ -11369,7 +11306,6 @@ Scope.prototype = {
 };
 
 function ast_add_scope(ast) {
-
     var current_scope = null;
     var w = ast_walker(), walk = w.walk;
     var having_eval = [];
@@ -11477,7 +11413,6 @@ function ast_add_scope(ast) {
 
         return ret;
     });
-
 };
 
 /* -----[ mangle names ]----- */
@@ -11682,7 +11617,6 @@ function is_string(node) {
 };
 
 var when_constant = (function(){
-
     var $NOT_CONSTANT = {};
 
     // this can only evaluate constant expressions.  If it finds anything
@@ -11777,7 +11711,6 @@ var when_constant = (function(){
             else throw ex;
         }
     };
-
 })();
 
 function warn_unreachable(ast) {
@@ -12954,7 +12887,6 @@ function gen_code(ast, options) {
             name = add_spaces([ make_name(name), "=", parenthesize(val, "seq") ]);
         return name;
     };
-
 };
 
 function split_lines(code, max_line_length) {
@@ -13116,7 +13048,6 @@ module.exports = uglify
  */
 
 define('source-map/array-set', function (require, exports, module) {
-
   var util = require('./util');
 
   /**
@@ -13201,7 +13132,6 @@ define('source-map/array-set', function (require, exports, module) {
   };
 
   exports.ArraySet = ArraySet;
-
 });
 /* -*- Mode: js; js-indent-level: 2; -*- */
 /*
@@ -13241,7 +13171,6 @@ define('source-map/array-set', function (require, exports, module) {
  */
 
 define('source-map/base64-vlq', function (require, exports, module) {
-
   var base64 = require('./base64');
 
   // A single base 64 digit can contain 6 bits of data. For the base 64 variable
@@ -13343,7 +13272,6 @@ define('source-map/base64-vlq', function (require, exports, module) {
       rest: aStr.slice(i)
     };
   };
-
 });
 /* -*- Mode: js; js-indent-level: 2; -*- */
 /*
@@ -13353,7 +13281,6 @@ define('source-map/base64-vlq', function (require, exports, module) {
  */
 
 define('source-map/base64', function (require, exports, module) {
-
   var charToIntMap = {};
   var intToCharMap = {};
 
@@ -13383,7 +13310,6 @@ define('source-map/base64', function (require, exports, module) {
     }
     throw new TypeError("Not a valid base 64 digit: " + aChar);
   };
-
 });
 /* -*- Mode: js; js-indent-level: 2; -*- */
 /*
@@ -13393,7 +13319,6 @@ define('source-map/base64', function (require, exports, module) {
  */
 
 define('source-map/binary-search', function (require, exports, module) {
-
   /**
    * Recursive implementation of binary search.
    *
@@ -13462,7 +13387,6 @@ define('source-map/binary-search', function (require, exports, module) {
       ? recursiveSearch(-1, aHaystack.length, aNeedle, aHaystack, aCompare)
       : null;
   };
-
 });
 /* -*- Mode: js; js-indent-level: 2; -*- */
 /*
@@ -13472,7 +13396,6 @@ define('source-map/binary-search', function (require, exports, module) {
  */
 
 define('source-map/source-map-consumer', function (require, exports, module) {
-
   var util = require('./util');
   var binarySearch = require('./binary-search');
   var ArraySet = require('./array-set').ArraySet;
@@ -13938,7 +13861,6 @@ define('source-map/source-map-consumer', function (require, exports, module) {
     };
 
   exports.SourceMapConsumer = SourceMapConsumer;
-
 });
 /* -*- Mode: js; js-indent-level: 2; -*- */
 /*
@@ -13948,7 +13870,6 @@ define('source-map/source-map-consumer', function (require, exports, module) {
  */
 
 define('source-map/source-map-generator', function (require, exports, module) {
-
   var base64VLQ = require('./base64-vlq');
   var util = require('./util');
   var ArraySet = require('./array-set').ArraySet;
@@ -14160,7 +14081,6 @@ define('source-map/source-map-generator', function (require, exports, module) {
         if (name && !newNames.has(name)) {
           newNames.add(name);
         }
-
       }, this);
       this._sources = newSources;
       this._names = newNames;
@@ -14333,7 +14253,6 @@ define('source-map/source-map-generator', function (require, exports, module) {
     };
 
   exports.SourceMapGenerator = SourceMapGenerator;
-
 });
 /* -*- Mode: js; js-indent-level: 2; -*- */
 /*
@@ -14343,7 +14262,6 @@ define('source-map/source-map-generator', function (require, exports, module) {
  */
 
 define('source-map/source-node', function (require, exports, module) {
-
   var SourceMapGenerator = require('./source-map-generator').SourceMapGenerator;
   var util = require('./util');
 
@@ -14718,7 +14636,6 @@ define('source-map/source-node', function (require, exports, module) {
   };
 
   exports.SourceNode = SourceNode;
-
 });
 /* -*- Mode: js; js-indent-level: 2; -*- */
 /*
@@ -14728,7 +14645,6 @@ define('source-map/source-node', function (require, exports, module) {
  */
 
 define('source-map/util', function (require, exports, module) {
-
   /**
    * This is a helper function for getting values from parameter/options
    * objects.
@@ -15018,10 +14934,8 @@ define('source-map/util', function (require, exports, module) {
     return strcmp(mappingA.name, mappingB.name);
   };
   exports.compareByGeneratedPositions = compareByGeneratedPositions;
-
 });
 define('source-map', function (require, exports, module) {
-
 /*
  * Copyright 2009-2011 Mozilla Foundation and contributors
  * Licensed under the New BSD license. See LICENSE.txt or:
@@ -15030,13 +14944,11 @@ define('source-map', function (require, exports, module) {
 exports.SourceMapGenerator = require('./source-map/source-map-generator').SourceMapGenerator;
 exports.SourceMapConsumer = require('./source-map/source-map-consumer').SourceMapConsumer;
 exports.SourceNode = require('./source-map/source-node').SourceNode;
-
 });
 
 //Distributed under the BSD license:
 //Copyright 2012 (c) Mihai Bazon <mihai.bazon@gmail.com>
 define('uglifyjs2', ['exports', 'source-map', 'logger', 'env!env/file'], function (exports, MOZ_SourceMap, logger, rjsFile) {
-
 /***********************************************************************
 
   A JavaScript tokenizer / parser / beautifier / compressor.
@@ -16538,7 +16450,6 @@ function is_token(token, type, val) {
 var EX_EOF = {};
 
 function tokenizer($TEXT, filename, html5_comments) {
-
     var S = {
         text            : $TEXT.replace(/\r\n?|[\n\u2028\u2029]/g, "\n").replace(/\uFEFF/g, ''),
         filename        : filename,
@@ -16884,7 +16795,6 @@ function tokenizer($TEXT, filename, html5_comments) {
     };
 
     return next_token;
-
 };
 
 /* -----[ Parser (constants) ]----- */
@@ -16936,7 +16846,6 @@ var ATOMIC_START_TOKEN = array_to_hash([ "atom", "num", "string", "regexp", "nam
 /* -----[ Parser ]----- */
 
 function parse($TEXT, options) {
-
     options = defaults(options, {
         strict         : false,
         filename       : null,
@@ -17780,7 +17689,6 @@ function parse($TEXT, options) {
         }
         return toplevel;
     })();
-
 };
 
 /***********************************************************************
@@ -17838,7 +17746,6 @@ function TreeTransformer(before, after) {
 TreeTransformer.prototype = new TreeWalker;
 
 (function(undefined){
-
     function _(node, descend) {
         node.DEFMETHOD("transform", function(tw, in_list){
             var x, y;
@@ -17999,7 +17906,6 @@ TreeTransformer.prototype = new TreeWalker;
     _(AST_ObjectProperty, function(self, tw){
         self.value = self.value.transform(tw);
     });
-
 })();
 
 /***********************************************************************
@@ -18616,7 +18522,6 @@ AST_Toplevel.DEFMETHOD("scope_warnings", function(options){
 "use strict";
 
 function OutputStream(options) {
-
     options = defaults(options, {
         indent_start     : 0,
         indent_level     : 4,
@@ -18913,13 +18818,11 @@ function OutputStream(options) {
             return stack[stack.length - 2 - (n || 0)];
         }
     };
-
 };
 
 /* -----[ code generators ]----- */
 
 (function(){
-
     /* -----[ utils ]----- */
 
     function DEFPRINT(nodetype, generator) {
@@ -19868,7 +19771,6 @@ function OutputStream(options) {
     DEFMAP(AST_ObjectProperty, function(self, output){
         output.add_mapping(self.start, self.key);
     });
-
 })();
 
 /***********************************************************************
@@ -19978,7 +19880,6 @@ merge(Compressor.prototype, {
 });
 
 (function(){
-
     function OPT(node, optimizer) {
         node.DEFMETHOD("optimize", function(compressor){
             var self = this;
@@ -20455,7 +20356,6 @@ merge(Compressor.prototype, {
                 }
             });
         };
-
     };
 
     function extract_declarations_from_unreachable_code(compressor, stat, target) {
@@ -22243,7 +22143,6 @@ merge(Compressor.prototype, {
     OPT(AST_Array, literals_in_boolean_context);
     OPT(AST_Object, literals_in_boolean_context);
     OPT(AST_RegExp, literals_in_boolean_context);
-
 })();
 
 /***********************************************************************
@@ -22380,7 +22279,6 @@ function SourceMap(options) {
 "use strict";
 
 (function(){
-
     var MOZ_TO_ME = {
         TryStatement : function(M) {
             return new AST_Try({
@@ -22599,7 +22497,6 @@ function SourceMap(options) {
         FROM_MOZ_STACK = save_stack;
         return ast;
     };
-
 })();
 
 AST_Node.warn_function = function(txt) { logger.error("uglifyjs2 WARN: " + txt); };
@@ -22673,7 +22570,6 @@ exports.minify = function(files, options, name) {
                 }
             }
         }
-
     }
     if (options.output) {
         merge(output, options.output);
@@ -22734,8 +22630,6 @@ exports.describe_ast = function() {
     doitem(AST_Node);
     return out + "";
 };
-
-
 });
 /**
  * @license Copyright (c) 2010-2014, The Dojo Foundation All Rights Reserved.
@@ -23109,7 +23003,6 @@ define('parse', ['./esprimaAdapter', 'lang'], function (esprima, lang) {
             var arg0, arg1;
 
             if (parse.isDefineNodeWithArgs(node)) {
-
                 //Just the factory function passed to define
                 arg0 = node[argPropName][0];
                 if (arg0 && arg0.type === 'FunctionExpression') {
@@ -23160,7 +23053,6 @@ define('parse', ['./esprimaAdapter', 'lang'], function (esprima, lang) {
                     requireType === 'requirejs' ||
                     requireType === 'requireConfig' ||
                     requireType === 'requirejsConfig')) {
-
                 arg = node[argPropName] && node[argPropName][0];
 
                 if (arg && arg.type === 'ObjectExpression') {
@@ -23422,7 +23314,6 @@ define('parse', ['./esprimaAdapter', 'lang'], function (esprima, lang) {
         var uses = null,
             assignsExports = false;
 
-
         traverse(esprima.parse(fileContents), function (node) {
             var type,
                 exp = node.expression || node.init;
@@ -23445,7 +23336,6 @@ define('parse', ['./esprimaAdapter', 'lang'], function (esprima, lang) {
                         exp.left.property) {
                     type = 'exports';
                 }
-
             } else if (node && node.type === 'CallExpression' && node.callee &&
                     node.callee.type === 'Identifier' &&
                     node.callee.name === 'require' && node[argPropName] &&
@@ -23469,7 +23359,6 @@ define('parse', ['./esprimaAdapter', 'lang'], function (esprima, lang) {
         return uses;
     };
 
-
     parse.findRequireDepNames = function (node, deps) {
         traverse(node, function (node) {
             var arg;
@@ -23478,7 +23367,6 @@ define('parse', ['./esprimaAdapter', 'lang'], function (esprima, lang) {
                     node.callee.type === 'Identifier' &&
                     node.callee.name === 'require' &&
                     node[argPropName] && node[argPropName].length === 1) {
-
                 arg = node[argPropName][0];
                 if (arg.type === 'Literal') {
                     deps.push(arg.value);
@@ -23592,7 +23480,6 @@ define('parse', ['./esprimaAdapter', 'lang'], function (esprima, lang) {
                     exp.expression.arguments &&
                     exp.expression.arguments.length === 1 &&
                     exp.expression.arguments[0].type === 'Identifier') {
-
                     //Calls define(Identifier) as first statement in body.
                     //Confirm the if test references define.amd
                     traverse(bodyNode.test, function (node) {
@@ -23708,11 +23595,9 @@ define('parse', ['./esprimaAdapter', 'lang'], function (esprima, lang) {
                             value.indexOf('/*!') === 0) ||
                         value.indexOf('opyright') !== -1 ||
                         value.indexOf('(c)') !== -1)) {
-
                     result += value;
                     existsMap[value] = true;
                 }
-
             }
         }
 
@@ -23928,7 +23813,6 @@ function (esprima, parse, logger, lang) {
                     }
                 }
             });
-
 
             if (!defineInfos.length) {
                 return applySourceUrl(contents);
@@ -24220,7 +24104,6 @@ define('pragma', ['parse', 'logger'], function (parse, logger) {
                 //Namespace require/define calls
                 fileContents = fileContents.replace(pragma.configRegExp, '$1' + ns + '.$2$3(');
 
-
                 fileContents = parse.renameNamespace(fileContents, ns);
 
                 //Namespace define ternary use:
@@ -24322,7 +24205,6 @@ define('pragma', ['parse', 'logger'], function (parse, logger) {
             }
 
             if (!config.skipPragmas) {
-
                 while ((foundIndex = fileContents.indexOf("//>>", startIndex)) !== -1) {
                     //Found a conditional. Get the conditional line.
                     lineEndIndex = fileContents.indexOf("\n", foundIndex);
@@ -24382,7 +24264,6 @@ define('pragma', ['parse', 'logger'], function (parse, logger) {
                                   fileName +
                                   ". Cannot find end marker for conditional comment: " +
                                   conditionLine;
-
                         }
                     }
                 }
@@ -24424,7 +24305,6 @@ define('pragma', ['parse', 'logger'], function (parse, logger) {
                 fileContents = pragma.namespace(fileContents, config.namespace, onLifecycleName);
             }
 
-
             return pragma.removeStrict(fileContents, config);
         }
     };
@@ -24442,7 +24322,6 @@ if(env === 'browser') {
 /*global define: false */
 
 define('browser/optimize', {});
-
 }
 
 if(env === 'node') {
@@ -24456,7 +24335,6 @@ if(env === 'node') {
 /*global define: false */
 
 define('node/optimize', {});
-
 }
 
 if(env === 'rhino') {
@@ -24470,7 +24348,6 @@ if(env === 'rhino') {
 /*global define, java, Packages, com */
 
 define('rhino/optimize', ['logger', 'env!env/file'], function (logger, file) {
-
     //Add .reduce to Rhino so UglifyJS can run in Rhino,
     //inspired by https://developer.mozilla.org/en/JavaScript/Reference/Global_Objects/Array/reduce
     //but rewritten for brevity, and to be good enough for use by UglifyJS.
@@ -24520,7 +24397,6 @@ define('rhino/optimize', ['logger', 'env!env/file'], function (logger, file) {
         return JSSourceFilefromCode.invoke(null, [filename, content]);
     }
 
-
     function getFileWriter(fileName, encoding) {
         var outFile = new java.io.File(fileName), outWriter, parentDir;
 
@@ -24566,7 +24442,6 @@ define('rhino/optimize', ['logger', 'env!env/file'], function (logger, file) {
                 if (config.CompilerOptions[option]) {
                     options[option] = config.CompilerOptions[option];
                 }
-
             }
             options.prettyPrint = keepLines || options.prettyPrint;
 
@@ -24930,7 +24805,6 @@ function (lang,   logger,   envOptimize,        file,           parse,
          * cssImportIgnore options.
          */
         cssFile: function (fileName, outFileName, config) {
-
             //Read in the file. Make sure we have a JS string.
             var originalFileContents = file.readFile(fileName),
                 flat = flattenCss(fileName, originalFileContents, config.cssImportIgnore, config.cssPrefix, {}, true),
@@ -25173,7 +25047,6 @@ define('requirePatch', [ 'env!env/file', 'pragma', 'parse', 'lang', 'logger', 'c
     commonJs,
     prim
 ) {
-
     var allowRun = true,
         hasProp = lang.hasProp,
         falseProp = lang.falseProp,
@@ -25330,7 +25203,6 @@ define('requirePatch', [ 'env!env/file', 'pragma', 'parse', 'lang', 'logger', 'c
                         if (parentId && getOwn(needFullExec, parentId)) {
                             needFullExec[id] = depMap;
                         }
-
                     } else if ((getOwn(needFullExec, id) && falseProp(fullExec, id)) ||
                                (parentId && getOwn(needFullExec, parentId) &&
                                 falseProp(fullExec, id))) {
@@ -25483,7 +25355,6 @@ define('requirePatch', [ 'env!env/file', 'pragma', 'parse', 'lang', 'logger', 'c
                                 throw e;
                             }
                         }).then(null, function (eOuter) {
-
                             if (!eOuter.fileName) {
                                 eOuter.fileName = url;
                             }
@@ -25756,7 +25627,6 @@ define('commonJs', ['env!env/file', 'parse'], function (file, parse) {
                     preamble +
                     fileContents +
                     '\n});\n';
-
             } catch (e) {
                 console.log("commonJs.convert: COULD NOT CONVERT: " + fileName + ", so skipping it. Error was: " + e);
                 return fileContents;
@@ -25776,7 +25646,6 @@ define('commonJs', ['env!env/file', 'parse'], function (file, parse) {
 
 /*jslint plusplus: true, nomen: true, regexp: true  */
 /*global define, requirejs, java, process, console */
-
 
 define('build', function (require) {
     'use strict';
@@ -26243,7 +26112,6 @@ define('build', function (require) {
                                     file.saveUtf8File(module._buildPath + '.map', builtModule.sourceMap);
                                 }
                                 file.saveUtf8File(module._buildPath + '-temp', finalText);
-
                             }
                             buildFileContents += builtModule.buildText;
                         });
@@ -26347,7 +26215,6 @@ define('build', function (require) {
                         //standalone, one module per file.
                         fileContents = file.readFile(fileName);
 
-
                         //For builds, if wanting cjs translation, do it now, so that
                         //the individual modules can be loaded cross domain via
                         //plain script tags.
@@ -26446,12 +26313,10 @@ define('build', function (require) {
                                 pluginProcessed[moduleMap.id] = true;
                             }
                         }
-
                     }
                 }
 
                 //console.log('PLUGIN COLLECTOR: ' + JSON.stringify(pluginCollector, null, "  "));
-
 
                 //All module layers are done, write out the build.txt file.
                 file.saveUtf8File(config.dir + "build.txt", buildFileContents);
@@ -26494,7 +26359,6 @@ define('build', function (require) {
                 }
                 result = result[prop];
             }
-
         });
     }
 
@@ -26707,7 +26571,6 @@ define('build', function (require) {
                 if (typeof value === 'object' && value &&
                         !isArray && !lang.isFunction(value) &&
                         !lang.isRegExp(value)) {
-
                     // TODO: need to generalize this work, maybe also reuse
                     // the work done in requirejs configure, perhaps move to
                     // just a deep copy/merge overall. However, given the
@@ -26931,7 +26794,6 @@ define('build', function (require) {
             config.dirBaseUrl = endsWithSlash(config.dirBaseUrl);
         }
 
-
         //If out=stdout, write output to STDOUT instead of a file.
         if (config.out && config.out === 'stdout') {
             config.out = function (content) {
@@ -27088,7 +26950,6 @@ define('build', function (require) {
         //Cycle through modules and normalize
         if (config.modules && config.modules.length) {
             config.modules.forEach(function (mod) {
-
                 //Combine any local stubModules with global values.
                 if (config.stubModules) {
                     mod.stubModules = config.stubModules.concat(mod.stubModules || []);
@@ -27157,7 +27018,6 @@ define('build', function (require) {
         if (config.deps) {
             config._depsInclude = config.deps;
         }
-
 
         //Remove things that may cause problems in the build.
         //deps already merged above
@@ -27263,7 +27123,6 @@ define('build', function (require) {
                 require._cachedRawText[url] = contents;
             });
         }
-
 
         //Configure the callbacks to be called.
         deferred.reject.__requireJsBuild = true;
@@ -27785,9 +27644,7 @@ define('build', function (require) {
 
     return build;
 });
-
     }
-
 
     /**
      * Sets the default baseUrl for requirejs to be directory of top level
@@ -27946,8 +27803,6 @@ function (args, quit, logger, build) {
         quit(1);
     });
 });
-
-
     } else if (commandOption === 'v') {
         console.log('r.js: ' + version +
                     ', RequireJS: ' + this.requirejsVars.require.version +
@@ -27957,7 +27812,6 @@ function (args, quit, logger, build) {
 
         this.requirejsVars.require(['env!env/args', 'commonJs', 'env!env/print'],
             function (args, commonJs, print) {
-
                 var srcDir, outDir;
                 srcDir = args[0];
                 outDir = args[1];
@@ -27985,7 +27839,6 @@ function (args, quit, logger, build) {
             showHelp();
         }
     }
-
 }((typeof console !== 'undefined' ? console : undefined),
     (typeof Packages !== 'undefined' || (typeof window === 'undefined' &&
         typeof Components !== 'undefined' && Components.interfaces) ?

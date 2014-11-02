@@ -32,7 +32,6 @@ export class keyvalue {
     public value: string;
 }
 
-
 /// リクエスト管理
 export class request implements IF.shiori_request {
     public constructor(text: string, res_func: (res: string) => void) {
@@ -89,6 +88,4 @@ export class request implements IF.shiori_request {
 
     /// <key/value> map
     public map: any;
-
-    
 }

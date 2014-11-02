@@ -85,7 +85,6 @@ if (typeof (window) === "undefined") {
         };
         var src = findModule(require.paths, name);
 
-
         var m = "require.modules['" + name.replace(/'/g, "\\'") + "']";
         var srcSection = document.createTextNode(
             "(function (module, exports) { // " + name + ".js\n" +
@@ -106,5 +105,4 @@ if (typeof (window) === "undefined") {
     require.current = ["/base"];
 
     window.require = require;
-
 })();

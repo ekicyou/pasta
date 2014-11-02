@@ -245,7 +245,6 @@ std::string pasta::Agent::eval(LPCSTR utf8text){
     return rc;
 }
 
-
 //-------------------------------------------------------------
 // IO
 //-------------------------------------------------------------
@@ -287,7 +286,6 @@ static FILE* OpenModuleFile(int cp, std::tr2::sys::wpath& loaddir, LPCWSTR paths
     }
 }
 
-
 //-------------------------------------------------------------
 // IO:Module
 //-------------------------------------------------------------
@@ -304,7 +302,6 @@ static LPCWSTR preLoadPath[] = {
 FILE* pasta::Agent::OpenReadModuleFile(LPCSTR fname){
     return OpenModuleFile(cp, loaddir, preLoadPath, L"rb", fname);
 }
-
 
 //-------------------------------------------------------------
 // IO:user date
@@ -330,7 +327,5 @@ static LPCWSTR preUserWritePath[] = {
 FILE* pasta::Agent::OpenWriteUserFile(LPCSTR fname){
     return OpenModuleFile(cp, loaddir, preUserWritePath, L"wb", fname);
 }
-
-
 
 // EOF
