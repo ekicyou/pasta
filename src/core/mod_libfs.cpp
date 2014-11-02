@@ -101,32 +101,18 @@ static duk_ret_t readuser(duk_context *ctx){
     FUNC_START(pasta->cp);
 
     // 初期化＆引数取得
+    duk_ret_t rc = DUK_RET_ERROR;
     auto fname = duk_to_string(ctx, 0);
     char *buf = NULL;
 
     // ファイルオープン
     auto f = pasta->OpenReadUserFile(fname);
-    if (!f)goto error;
+    if (!f)goto clean;
+    rc = push_file_to_string(ctx, f);
 
-    // 読み込み
-    if (fseek(f, 0, SEEK_END) != 0) goto error;
-    auto len = ftell(f);
-    if (fseek(f, 0, SEEK_SET) != 0) goto error;
-    buf = (char *)malloc(len);
-    if (!buf)                       goto error;
-    auto got = fread(buf, 1, len, f);
-    if (got != (size_t)len)         goto error;
-    duk_push_lstring(ctx, buf, got);
-
-    // 解放
-    free(buf);
-    fclose(f);
-    return 1;
-
-error:
-    if (buf) free(buf);
-    if (f)   fclose(f);
-    return DUK_RET_ERROR;
+clean:
+    if (f) fclose(f);
+    return rc;
 }
 
 
