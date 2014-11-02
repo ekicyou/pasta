@@ -26,6 +26,31 @@ clean:
 }
 
 
+//-------------------------------------------------------------
+// オープンされたFILE*をバッファに読み込む。
+static duk_ret_t push_file_to_string(duk_context *ctx, FILE* f){
+    duk_ret_t rc = DUK_RET_ERROR;
+    char *buf = NULL;
+
+    // 読み込み
+    if (fseek(f, 0, SEEK_END) != 0) goto clean;
+    auto len = ftell(f);
+    if (fseek(f, 0, SEEK_SET) != 0) goto clean;
+    buf = (char *)malloc(len);
+    if (!buf)                       goto clean;
+    auto got = fread(buf, 1, len, f);
+    if (got != (size_t)len)         goto clean;
+    duk_push_lstring(ctx, buf, got);
+    rc = 1;
+
+clean:
+    if (buf) free(buf);
+    return rc;
+}
+
+
+
+
 
 //-------------------------------------------------------------
 // ファイルをバッファとして読み込みます。
@@ -35,27 +60,19 @@ static duk_ret_t readfile(duk_context *ctx){
     FUNC_START(pasta->cp);
 
     // 初期化＆引数取得
+    duk_ret_t rc = DUK_RET_ERROR;
     auto fname = duk_to_string(ctx, 0);
 
     // ファイルオープン
     auto f = pasta->OpenReadModuleFile(fname);
-    if (!f)goto error;
+    if (!f)goto clean;
 
     // 読み込み
-    if (fseek(f, 0, SEEK_END) != 0) goto error;
-    auto len = ftell(f);
-    if (fseek(f, 0, SEEK_SET) != 0) goto error;
-    auto buf = duk_push_fixed_buffer(ctx, (size_t)len);
-    auto got = fread(buf, 1, len, f);
-    if (got != (size_t)len) goto error;
+    rc = push_file_to_buffer(ctx, f);
 
-    // 解放
+clean:
     if (f) fclose(f);
-    return 1;
-
-error:
-    if (f) fclose(f);
-    return DUK_RET_ERROR;
+    return rc;
 }
 
 
