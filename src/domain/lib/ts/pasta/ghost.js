@@ -6,15 +6,33 @@ var ghost = (function () {
         logger.info("ghost::constructor");
     }
     // --------------------------------------------------------
-    // 製作者（ascii表記）
-    ghost.prototype.craftman = function () {
-        return "<<todo.craftman>>";
+    // ユーザー名
+    ghost.prototype.username = function () {
+        return "<<todo.username>>";
     };
 
     // --------------------------------------------------------
-    // 製作者（ascii表記）
-    ghost.prototype.craftmanw = function () {
-        return "<<todo.craftmanw>>";
+    // メインキャラ：ポータルサイト
+    ghost.prototype.sakura$portalsites = function () {
+        return "<<todo.sakura$portalsites>>";
+    };
+
+    // --------------------------------------------------------
+    // メインキャラ：おすすめサイト
+    ghost.prototype.sakura$recommendsites = function () {
+        return "<<todo.sakura$recommendsites>>";
+    };
+
+    // --------------------------------------------------------
+    // メインキャラ：ポータルサイト
+    ghost.prototype.kero$portalsites = function () {
+        return "<<todo.kero$portalsites>>";
+    };
+
+    // --------------------------------------------------------
+    // メインキャラ：おすすめサイト
+    ghost.prototype.kero$recommendsites = function () {
+        return "<<todo.kero$recommendsites>>";
     };
     return ghost;
 })();

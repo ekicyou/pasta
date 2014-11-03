@@ -2,6 +2,9 @@
 export declare class ghost implements IF.ghost {
     constructor();
     public user: any;
-    public craftman(): string;
-    public craftmanw(): string;
+    public username(): string;
+    public sakura$portalsites(): string;
+    public sakura$recommendsites(): string;
+    public kero$portalsites(): string;
+    public kero$recommendsites(): string;
 }

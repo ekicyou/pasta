@@ -96,23 +96,73 @@ export class events {
         call_get_id_method(this, id, req);
         if (!send.hasResponse()) return true;
 
+        call_get_id_method(api, id, req);
+        if (!send.hasResponse()) return true;
+
 
         // TODO: [get]実装する
         return false;
     }
 
     // --------------------------------------------------------
-    // SHIORI: ID: version
-    private version(req: IF.shiori_request): boolean {
-        send.resValue(api.version());
-        return true;
+    // SHIORI: ID: OnMinuteChange
+    public OnMinuteChange(req: IF.shiori_request): boolean {
+
+        return false;
     }
 
     // --------------------------------------------------------
-    // SHIORI: ID: name
-    private name(req: IF.shiori_request): boolean {
-        send.resValue(api.name());
-        return true;
+    // SHIORI: ID: OnSecondChange
+    public OnSecondChange(req: IF.shiori_request): boolean {
+
+        return false;
     }
+
+    // --------------------------------------------------------
+    // SHIORI: ID: OnSurfaceRestore
+    public OnSurfaceRestore(req: IF.shiori_request): boolean {
+
+        return false;
+    }
+
+    // --------------------------------------------------------
+    // SHIORI: ID: OnTrayBalloonTimeout
+    public OnTrayBalloonTimeout(req: IF.shiori_request): boolean {
+
+        return false;
+    }
+
+    // --------------------------------------------------------
+    // SHIORI: ID: OnMouseEnterAll
+    public OnMouseEnterAll(req: IF.shiori_request): boolean {
+
+        return false;
+    }
+
+    // --------------------------------------------------------
+    // SHIORI: ID: OnMouseEnter
+    public OnMouseEnter(req: IF.shiori_request): boolean {
+
+        return false;
+    }
+
+    // --------------------------------------------------------
+    // SHIORI: ID: OnMouseMove
+    public OnMouseMove(req: IF.shiori_request): boolean {
+
+        return false;
+    }
+
+    // --------------------------------------------------------
+    // SHIORI: ID: OnMouseHover
+    public OnMouseHover(req: IF.shiori_request): boolean {
+
+        return false;
+    }
+
+
+
+
+
 
 }

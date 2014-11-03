@@ -88,22 +88,60 @@ var events = (function () {
         if (!send.hasResponse())
             return true;
 
+        call_get_id_method(api, id, req);
+        if (!send.hasResponse())
+            return true;
+
         // TODO: [get]実装する
         return false;
     };
 
     // --------------------------------------------------------
-    // SHIORI: ID: version
-    events.prototype.version = function (req) {
-        send.resValue(api.version());
-        return true;
+    // SHIORI: ID: OnMinuteChange
+    events.prototype.OnMinuteChange = function (req) {
+        return false;
     };
 
     // --------------------------------------------------------
-    // SHIORI: ID: name
-    events.prototype.name = function (req) {
-        send.resValue(api.name());
-        return true;
+    // SHIORI: ID: OnSecondChange
+    events.prototype.OnSecondChange = function (req) {
+        return false;
+    };
+
+    // --------------------------------------------------------
+    // SHIORI: ID: OnSurfaceRestore
+    events.prototype.OnSurfaceRestore = function (req) {
+        return false;
+    };
+
+    // --------------------------------------------------------
+    // SHIORI: ID: OnTrayBalloonTimeout
+    events.prototype.OnTrayBalloonTimeout = function (req) {
+        return false;
+    };
+
+    // --------------------------------------------------------
+    // SHIORI: ID: OnMouseEnterAll
+    events.prototype.OnMouseEnterAll = function (req) {
+        return false;
+    };
+
+    // --------------------------------------------------------
+    // SHIORI: ID: OnMouseEnter
+    events.prototype.OnMouseEnter = function (req) {
+        return false;
+    };
+
+    // --------------------------------------------------------
+    // SHIORI: ID: OnMouseMove
+    events.prototype.OnMouseMove = function (req) {
+        return false;
+    };
+
+    // --------------------------------------------------------
+    // SHIORI: ID: OnMouseHover
+    events.prototype.OnMouseHover = function (req) {
+        return false;
     };
     return events;
 })();

@@ -13,10 +13,26 @@ export class ghost implements IF.ghost {
     public user: any;
 
     // --------------------------------------------------------
-    // 製作者（ascii表記）
-    public craftman(): string { return "<<todo.craftman>>"; }
+    // ユーザー名
+    public username(): string { return "<<todo.username>>"; }
 
     // --------------------------------------------------------
-    // 製作者（ascii表記）
-    public craftmanw(): string { return "<<todo.craftmanw>>"; }
+    // メインキャラ：ポータルサイト
+    public sakura$portalsites(): string { return "<<todo.sakura$portalsites>>"; }
+
+    // --------------------------------------------------------
+    // メインキャラ：おすすめサイト
+    public sakura$recommendsites(): string { return "<<todo.sakura$recommendsites>>"; }
+
+
+
+
+
+    // --------------------------------------------------------
+    // メインキャラ：ポータルサイト
+    public kero$portalsites(): string { return "<<todo.kero$portalsites>>"; }
+
+    // --------------------------------------------------------
+    // メインキャラ：おすすめサイト
+    public kero$recommendsites(): string { return "<<todo.kero$recommendsites>>"; }
 }
