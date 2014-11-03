@@ -1,16 +1,4 @@
 =====send=====
-(load library)
-=====send=====
-(function : load found)
-=====send=====
-(function : request found)
-=====send=====
-(function : unload found)
-=====send=====
-(getversion/loadex call)
-=====send=====
-(load call)
-=====send=====
 GET Version SHIORI/2.6
 Charset: UTF-8
 Sender: SSP
@@ -32,7 +20,7 @@ Sender: SSP
 SHIORI/3.0 200 OK
 Sender: AYA
 Charset: UTF-8
-Value: Tc545-1
+Value: pasta-0.07.01Duktape10000
 
 
 =====send=====
@@ -841,7 +829,7 @@ ID: version
 SHIORI/3.0 200 OK
 Sender: AYA
 Charset: UTF-8
-Value: Tc545-1
+Value: pasta-0.07.01Duktape10000
 
 
 =====send=====
@@ -873,7 +861,7 @@ ID: craftman
 SHIORI/3.0 200 OK
 Sender: AYA
 Charset: UTF-8
-Value: umeici/The Maintenance Shop
+Value: <<todo.craftman>>
 
 
 =====send=====
@@ -888,7 +876,7 @@ ID: craftmanw
 SHIORI/3.0 200 OK
 Sender: AYA
 Charset: UTF-8
-Value: umeici/The Maintenance Shop
+Value: <<todo.craftmanw>>
 
 
 =====send=====

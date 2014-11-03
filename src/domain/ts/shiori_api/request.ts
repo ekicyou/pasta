@@ -2,6 +2,7 @@
 // リクエストの解釈など
 
 import IF = require('../interfaces');
+import res = require('./send');
 
 var logger = new Duktape.Logger();
 
@@ -22,22 +23,13 @@ var reHeader = new RegExp("^" +SHIORI_HEADER);
 var reValue = new RegExp("^" + SHIORI_VALUE);
 //var re = re_base.compile();
 
-/// KeyValueアイテム
-export class keyvalue {
-    public constructor(key: string, value: string) {
-        this.key = key;
-        this.value = value;
-    }
-    public key: string;
-    public value: string;
-}
-
 /// リクエスト管理
 export class request implements IF.shiori_request {
-    public constructor(text: string, res_func: (res: string) => void) {
-        this.response = res_func;
+    public constructor(text: string) {
         this.parse(text);
     }
+
+    public static res = res;
 
     /// リクエスト分解
     private parse(text: string): void {
@@ -52,12 +44,12 @@ export class request implements IF.shiori_request {
         // 値の取得
         var lines = text.split("\r\n");
         var len = lines.length;
-        var list: keyvalue[] = [];
+        var list: IF.keyvalue[] = [];
 
         for (var index = 1; index < len; index++) {
             var m = lines[index].match(reValue);
             if (!m) break;
-            var kv = new keyvalue(m[1], m[2]);
+            var kv = new IF.keyvalue(m[1], m[2]);
             list.push(kv);
         }
         this.kvlist = list;
@@ -66,10 +58,10 @@ export class request implements IF.shiori_request {
         var map: any = {};
         list.forEach((item, i, a) => map[item.key] = item.value);
         this.map = map;
-    }
 
-    /// GETリクエストの場合、応答を返すための関数。
-    public response: (res: string) => void;
+        // 固有パラメータ
+        this.ID = map.ID;
+    }
 
     /// 生リクエスト
     public raw: string;
@@ -84,8 +76,11 @@ export class request implements IF.shiori_request {
     public method: string;
 
     /// <key/value> list
-    public kvlist: keyvalue[];
+    public kvlist: IF.keyvalue[];
 
     /// <key/value> map
     public map: any;
+
+    /// ID:
+    public ID: string;
 }

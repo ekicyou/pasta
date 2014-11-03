@@ -13,7 +13,28 @@
     //
     mod.Logger = function () {
         return console;
-    }
+    };
+
+    mod.enc = function (fmt, obj, replacer, space) {
+        try {
+            return JSON.stringify(obj, replacer, space);
+        }
+        catch (e) {
+            console.error(e);
+            throw e;
+        }
+    };
+
+    mod.dec = function (fmt, str) {
+        try {
+            return JSON.parse(str);
+        }
+        catch (e) {
+            console.error(e);
+            console.error(str);
+            throw e;
+        }
+    };
 
     // モジュールのエクスポート
     return mod;

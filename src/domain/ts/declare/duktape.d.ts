@@ -13,6 +13,8 @@ declare module Duktape {
         fatal(...args: any[]): void;
     }
 
+    var version: number;
+
     function enc(fmt: string, obj: any, replacer: any, space: number): string;
     function enc(fmt: string, obj: any, replacer: any): string;
     function enc(fmt: string, obj: any): string;

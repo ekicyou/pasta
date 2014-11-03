@@ -1,5 +1,8 @@
 ﻿// shiori request管理
 // リクエストの解釈など
+var IF = require('../interfaces');
+var res = require('./send');
+
 var logger = new Duktape.Logger();
 
 /// regのエスケープ
@@ -20,20 +23,9 @@ var reHeader = new RegExp("^" + SHIORI_HEADER);
 var reValue = new RegExp("^" + SHIORI_VALUE);
 
 //var re = re_base.compile();
-/// KeyValueアイテム
-var keyvalue = (function () {
-    function keyvalue(key, value) {
-        this.key = key;
-        this.value = value;
-    }
-    return keyvalue;
-})();
-exports.keyvalue = keyvalue;
-
 /// リクエスト管理
 var request = (function () {
-    function request(text, res_func) {
-        this.response = res_func;
+    function request(text) {
         this.parse(text);
     }
     /// リクエスト分解
@@ -56,7 +48,7 @@ var request = (function () {
             var m = lines[index].match(reValue);
             if (!m)
                 break;
-            var kv = new keyvalue(m[1], m[2]);
+            var kv = new IF.keyvalue(m[1], m[2]);
             list.push(kv);
         }
         this.kvlist = list;
@@ -67,7 +59,11 @@ var request = (function () {
             return map[item.key] = item.value;
         });
         this.map = map;
+
+        // 固有パラメータ
+        this.ID = map.ID;
     };
+    request.res = res;
     return request;
 })();
 exports.request = request;

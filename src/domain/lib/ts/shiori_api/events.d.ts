@@ -6,6 +6,8 @@ export declare class events {
     public user: any;
     public load(dir: string): void;
     public unload(): void;
-    public notify(req: IF.shiori_request): void;
-    public get(req: IF.shiori_request): void;
+    public notify(req: IF.shiori_request): boolean;
+    public get(req: IF.shiori_request): boolean;
+    private version(req);
+    private name(req);
 }

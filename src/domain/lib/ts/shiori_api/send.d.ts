@@ -1,0 +1,11 @@
+﻿export declare var Charset: string;
+export declare var Sender: string;
+export declare var last_response: string;
+export declare function hasResponse(): boolean;
+export declare function reset(): void;
+export declare function res400BadRequest(): void;
+export declare function res204NoContent(): void;
+export declare function res200Ok(values: string[]): void;
+export declare function resValue(value: string): void;
+export declare function res500message(mes: string): void;
+export declare function res500error(e: Error): void;

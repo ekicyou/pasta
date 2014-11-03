@@ -29,6 +29,7 @@
     <Content Include="tests\all.js" />
     <Content Include="tests\duktape.js" />
     <Content Include="tests\shiori_events_test.js" />
+    <Content Include="tests\shiori_test_data.js" />
     <Content Include="web.config" />
   </ItemGroup>
   <ItemGroup>
@@ -45,6 +46,7 @@
     <TypeScriptCompile Include="ts\shiori_api\request.ts" />
     <TypeScriptCompile Include="ts\declare\libshiori.d.ts" />
     <TypeScriptCompile Include="ts\shiori_api.ts" />
+    <TypeScriptCompile Include="ts\shiori_api\send.ts" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="dic\talk001.md" />

@@ -5,6 +5,17 @@ var ghost = (function () {
     function ghost() {
         logger.info("ghost::constructor");
     }
+    // --------------------------------------------------------
+    // 製作者（ascii表記）
+    ghost.prototype.craftman = function () {
+        return "<<todo.craftman>>";
+    };
+
+    // --------------------------------------------------------
+    // 製作者（ascii表記）
+    ghost.prototype.craftmanw = function () {
+        return "<<todo.craftmanw>>";
+    };
     return ghost;
 })();
 exports.ghost = ghost;

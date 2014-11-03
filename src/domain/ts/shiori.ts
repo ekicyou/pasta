@@ -9,26 +9,13 @@ var logger = new Duktape.Logger();
 // ゴースト/shiori event ハンドラ
 var ghost = new pasta.ghost();
 var event = new api.events(ghost);
+var send = api.send;
 
 //---------------------------------------------------------
 // 公開変数
 
 /// ロードディレクトリ
 export var loaddir: string;
-
-//---------------------------------------------------------
-// レスポンス処理関数
-var hasResponse = false;
-
-// レスポンス
-var response = (res: string) => {
-    if (!hasResponse) {
-        logger.error("response(): multiple call");
-        return;
-    }
-    hasResponse = false;
-    libshiori.response(res);
-}
 
 //---------------------------------------------------------
 // SHIORI LOAD
@@ -68,7 +55,7 @@ export function notify(raw_request: string) {
     try {
         logger.debug("notify: start");
         logger.debug(raw_request);
-        var req = new api.request(raw_request, response);
+        var req = new api.request(raw_request);
         event.notify(req);
     }
     catch (e) {
@@ -82,23 +69,24 @@ export function notify(raw_request: string) {
 //---------------------------------------------------------
 // SHIORI GET
 export function get(raw_request: string) {
-    hasResponse = true;
     try {
         logger.debug("get: start");
         logger.debug(raw_request);
-
-        var req = new api.request(raw_request, response);
-        event.notify(req);
-
-        // TODO: 正式応答を返すようになったら外す
-        response("SHIORI/3.0 200 OK\r\n\r\n");
+        send.reset();
+        var req = new api.request(raw_request);
+        if (!req.method) {
+            send.res400BadRequest();
+            return;
+        }
+        event.get(req);
     }
     catch (e) {
+        send.res500error(e);
         logger.error(e.stack || e);
     }
     finally {
-        if (hasResponse) {
-            // TODO: レスポンス漏れ
+        if (send.hasResponse()) {
+            send.res204NoContent();
         }
         logger.debug("get: fin");
     }
