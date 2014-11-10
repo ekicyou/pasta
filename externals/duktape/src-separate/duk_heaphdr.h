@@ -26,28 +26,28 @@
  */
 
 struct duk_heaphdr {
-    duk_uint32_t h_flags;
+	duk_uint32_t h_flags;
 #if defined(DUK_USE_REFERENCE_COUNTING)
-    duk_size_t h_refcount;
+	duk_size_t h_refcount;
 #endif
-    duk_heaphdr *h_next;
+	duk_heaphdr *h_next;
 #if defined(DUK_USE_DOUBLE_LINKED_HEAP)
-    /* refcounting requires direct heap frees, which in turn requires a dual linked heap */
-    duk_heaphdr *h_prev;
+	/* refcounting requires direct heap frees, which in turn requires a dual linked heap */
+	duk_heaphdr *h_prev;
 #endif
 };
 
 struct duk_heaphdr_string {
-    duk_uint32_t h_flags;
+	duk_uint32_t h_flags;
 #if defined(DUK_USE_REFERENCE_COUNTING)
-    duk_size_t h_refcount;
+	duk_size_t h_refcount;
 #endif
 };
 
 #define DUK_HEAPHDR_FLAGS_TYPE_MASK      0x00000003UL
 #define DUK_HEAPHDR_FLAGS_FLAG_MASK      (~DUK_HEAPHDR_FLAGS_TYPE_MASK)
 
-/* 2 bits for heap type */
+                                             /* 2 bits for heap type */
 #define DUK_HEAPHDR_FLAGS_HEAP_START     2   /* 4 heap flags */
 #define DUK_HEAPHDR_FLAGS_USER_START     6   /* 26 user flags */
 

@@ -17,13 +17,13 @@
 #define DUK_VALSTACK_SHRINK_SPARE       64      /* roughly 0.5 kiB */
 #define DUK_VALSTACK_INITIAL_SIZE       128     /* roughly 1.0 kiB -> but rounds up to DUK_VALSTACK_GROW_STEP in practice */
 #define DUK_VALSTACK_INTERNAL_EXTRA     64      /* internal extra elements assumed on function entry,
- * always added to user-defined 'extra' for e.g. the
- * duk_check_stack() call.
- */
+                                                 * always added to user-defined 'extra' for e.g. the
+                                                 * duk_check_stack() call.
+                                                 */
 #define DUK_VALSTACK_API_ENTRY_MINIMUM  DUK_API_ENTRY_STACK
-/* number of elements guaranteed to be user accessible
- * (in addition to call arguments) on Duktape/C function entry.
- */
+                                                /* number of elements guaranteed to be user accessible
+                                                 * (in addition to call arguments) on Duktape/C function entry.
+                                                 */
 
 /* Note: DUK_VALSTACK_INITIAL_SIZE must be >= DUK_VALSTACK_API_ENTRY_MINIMUM
  * + DUK_VALSTACK_INTERNAL_EXTRA so that the initial stack conforms to spare
@@ -90,29 +90,29 @@
 
 #define DUK_CAT_SET_CATCH_ENABLED(c)    do { \
 		(c)->flags |= DUK_CAT_FLAG_CATCH_ENABLED; \
-            	} while (0)
+	} while (0)
 #define DUK_CAT_SET_FINALLY_ENABLED(c)  do { \
 		(c)->flags |= DUK_CAT_FLAG_FINALLY_ENABLED; \
-            	} while (0)
+	} while (0)
 #define DUK_CAT_SET_CATCH_BINDING_ENABLED(c)    do { \
 		(c)->flags |= DUK_CAT_FLAG_CATCH_BINDING_ENABLED; \
-            	} while (0)
+	} while (0)
 #define DUK_CAT_SET_LEXENV_ACTIVE(c)    do { \
 		(c)->flags |= DUK_CAT_FLAG_LEXENV_ACTIVE; \
-            	} while (0)
+	} while (0)
 
 #define DUK_CAT_CLEAR_CATCH_ENABLED(c)    do { \
 		(c)->flags &= ~DUK_CAT_FLAG_CATCH_ENABLED; \
-            	} while (0)
+	} while (0)
 #define DUK_CAT_CLEAR_FINALLY_ENABLED(c)  do { \
 		(c)->flags &= ~DUK_CAT_FLAG_FINALLY_ENABLED; \
-            	} while (0)
+	} while (0)
 #define DUK_CAT_CLEAR_CATCH_BINDING_ENABLED(c)    do { \
 		(c)->flags &= ~DUK_CAT_FLAG_CATCH_BINDING_ENABLED; \
-            	} while (0)
+	} while (0)
 #define DUK_CAT_CLEAR_LEXENV_ACTIVE(c)    do { \
 		(c)->flags &= ~DUK_CAT_FLAG_LEXENV_ACTIVE; \
-            	} while (0)
+	} while (0)
 
 /*
  *  Thread defines
@@ -135,132 +135,132 @@
 
 /* Note: it's nice if size is 2^N (now 32 bytes on 32 bit without 'caller' property) */
 struct duk_activation {
-    duk_hobject *func;      /* function being executed; for bound function calls, this is the final, real function */
-    duk_hobject *var_env;   /* current variable environment (may be NULL if delayed) */
-    duk_hobject *lex_env;   /* current lexical environment (may be NULL if delayed) */
+	duk_hobject *func;      /* function being executed; for bound function calls, this is the final, real function */
+	duk_hobject *var_env;   /* current variable environment (may be NULL if delayed) */
+	duk_hobject *lex_env;   /* current lexical environment (may be NULL if delayed) */
 #ifdef DUK_USE_NONSTD_FUNC_CALLER_PROPERTY
-    /* Previous value of 'func' caller, restored when unwound.  Only in use
-     * when 'func' is non-strict.
-     */
-    duk_hobject *prev_caller;
+	/* Previous value of 'func' caller, restored when unwound.  Only in use
+	 * when 'func' is non-strict.
+	 */
+	duk_hobject *prev_caller;
 #endif
 
-    duk_small_uint_t flags;
-    duk_uint32_t pc;        /* next instruction to execute */
+	duk_small_uint_t flags;
+	duk_uint32_t pc;        /* next instruction to execute */
 
-    /* idx_bottom and idx_retval are only used for book-keeping of
-     * Ecmascript-initiated calls, to allow returning to an Ecmascript
-     * function properly.  They are duk_size_t to match the convention
-     * that value stack sizes are duk_size_t and local frame indices
-     * are duk_idx_t.
-     */
+	/* idx_bottom and idx_retval are only used for book-keeping of
+	 * Ecmascript-initiated calls, to allow returning to an Ecmascript
+	 * function properly.  They are duk_size_t to match the convention
+	 * that value stack sizes are duk_size_t and local frame indices
+	 * are duk_idx_t.
+	 */
 
-    /* Bottom of valstack for this activation, used to reset
-     * valstack_bottom on return; index is absolute.  Note:
-     * idx_top not needed because top is set to 'nregs' always
-     * when returning to an Ecmascript activation.
-     */
-    duk_size_t idx_bottom;
+	/* Bottom of valstack for this activation, used to reset
+	 * valstack_bottom on return; index is absolute.  Note:
+	 * idx_top not needed because top is set to 'nregs' always
+	 * when returning to an Ecmascript activation.
+	 */
+	duk_size_t idx_bottom;
 
-    /* Return value when returning to this activation (points to caller
-     * reg, not callee reg); index is absolute (only set if activation is
-     * not topmost).
-     *
-     * Note: idx_bottom is always set, while idx_retval is only applicable
-     * for activations below the topmost one.  Currently idx_retval for
-     * the topmost activation is considered garbage (and it not initialized
-     * on entry or cleared on return; may contain previous or garbage
-     * values).
-     */
-    duk_size_t idx_retval;
+	/* Return value when returning to this activation (points to caller
+	 * reg, not callee reg); index is absolute (only set if activation is
+	 * not topmost).
+	 *
+	 * Note: idx_bottom is always set, while idx_retval is only applicable
+	 * for activations below the topmost one.  Currently idx_retval for
+	 * the topmost activation is considered garbage (and it not initialized
+	 * on entry or cleared on return; may contain previous or garbage
+	 * values).
+	 */
+	duk_size_t idx_retval;
 
-    /* Current 'this' binding is the value just below idx_bottom.
-     * Previously, 'this' binding was handled with an index to the
-     * (calling) valstack.  This works for everything except tail
-     * calls, which must not "cumulate" valstack temps.
-     */
+	/* Current 'this' binding is the value just below idx_bottom.
+	 * Previously, 'this' binding was handled with an index to the
+	 * (calling) valstack.  This works for everything except tail
+	 * calls, which must not "cumulate" valstack temps.
+	 */
 
 #if defined(DUK_USE_32BIT_PTRS) && !defined(DUK_USE_NONSTD_FUNC_CALLER_PROPERTY)
-    /* Minor optimization: pad structure to 2^N size on 32-bit platforms. */
-    duk_int_t unused1;  /* pad to 2^N */
+	/* Minor optimization: pad structure to 2^N size on 32-bit platforms. */
+	duk_int_t unused1;  /* pad to 2^N */
 #endif
 };
 
 /* Note: it's nice if size is 2^N (not 4x4 = 16 bytes on 32 bit) */
 struct duk_catcher {
-    duk_hstring *h_varname;         /* borrowed reference to catch variable name (or NULL if none) */
-    /* (reference is valid as long activation exists) */
-    duk_size_t callstack_index;     /* callstack index of related activation */
-    duk_size_t idx_base;            /* idx_base and idx_base+1 get completion value and type */
-    duk_uint32_t pc_base;           /* resume execution from pc_base or pc_base+1 */
-    duk_uint32_t flags;             /* type and control flags, label number */
+	duk_hstring *h_varname;         /* borrowed reference to catch variable name (or NULL if none) */
+	                                /* (reference is valid as long activation exists) */
+	duk_size_t callstack_index;     /* callstack index of related activation */
+	duk_size_t idx_base;            /* idx_base and idx_base+1 get completion value and type */
+	duk_uint32_t pc_base;           /* resume execution from pc_base or pc_base+1 */
+	duk_uint32_t flags;             /* type and control flags, label number */
 };
 
 struct duk_hthread {
-    /* shared object part */
-    duk_hobject obj;
+	/* shared object part */
+	duk_hobject obj;
 
-    /* backpointers */
-    duk_heap *heap;
+	/* backpointers */
+	duk_heap *heap;
 
-    /* current strictness flag: affects API calls */
-    duk_uint8_t strict;
-    duk_uint8_t state;
-    duk_uint8_t unused1;
-    duk_uint8_t unused2;
+	/* current strictness flag: affects API calls */
+	duk_uint8_t strict;
+	duk_uint8_t state;
+	duk_uint8_t unused1;
+	duk_uint8_t unused2;
 
-    /* sanity limits */
-    duk_size_t valstack_max;
-    duk_size_t callstack_max;
-    duk_size_t catchstack_max;
+	/* sanity limits */
+	duk_size_t valstack_max;
+	duk_size_t callstack_max;
+	duk_size_t catchstack_max;
 
-    /* XXX: valstack, callstack, and catchstack are currently assumed
-     * to have non-NULL pointers.  Relaxing this would not lead to big
-     * benefits (except perhaps for terminated threads).
-     */
+	/* XXX: valstack, callstack, and catchstack are currently assumed
+	 * to have non-NULL pointers.  Relaxing this would not lead to big
+	 * benefits (except perhaps for terminated threads).
+	 */
 
-    /* value stack: these are expressed as pointers for faster stack manipulation */
-    duk_tval *valstack;			/* start of valstack allocation */
-    duk_tval *valstack_end;			/* end of valstack allocation (exclusive) */
-    duk_tval *valstack_bottom;		/* bottom of current frame */
-    duk_tval *valstack_top;			/* top of current frame (exclusive) */
+	/* value stack: these are expressed as pointers for faster stack manipulation */
+	duk_tval *valstack;			/* start of valstack allocation */
+	duk_tval *valstack_end;			/* end of valstack allocation (exclusive) */
+	duk_tval *valstack_bottom;		/* bottom of current frame */
+	duk_tval *valstack_top;			/* top of current frame (exclusive) */
 
-    /* call stack */
-    duk_activation *callstack;
-    duk_size_t callstack_size;		/* allocation size */
-    duk_size_t callstack_top;		/* next to use, highest used is top - 1 */
-    duk_size_t callstack_preventcount;	/* number of activation records in callstack preventing a yield */
+	/* call stack */
+	duk_activation *callstack;
+	duk_size_t callstack_size;		/* allocation size */
+	duk_size_t callstack_top;		/* next to use, highest used is top - 1 */
+	duk_size_t callstack_preventcount;	/* number of activation records in callstack preventing a yield */
 
-    /* catch stack */
-    duk_catcher *catchstack;
-    duk_size_t catchstack_size;		/* allocation size */
-    duk_size_t catchstack_top;		/* next to use, highest used is top - 1 */
+	/* catch stack */
+	duk_catcher *catchstack;
+	duk_size_t catchstack_size;		/* allocation size */
+	duk_size_t catchstack_top;		/* next to use, highest used is top - 1 */
 
-    /* yield/resume book-keeping */
-    duk_hthread *resumer;			/* who resumed us (if any) */
+	/* yield/resume book-keeping */
+	duk_hthread *resumer;			/* who resumed us (if any) */
 
 #ifdef DUK_USE_INTERRUPT_COUNTER
-    /* Interrupt counter for triggering a slow path check for execution
-     * timeout, debugger interaction such as breakpoints, etc.  This is
-     * actually a value copied from the heap structure into the current
-     * thread to be more convenient for the bytecode executor inner loop.
-     * The final value is copied back to the heap structure on a thread
-     * switch by DUK_HEAP_SWITCH_THREAD().
-     */
-    duk_int_t interrupt_counter;
+	/* Interrupt counter for triggering a slow path check for execution
+	 * timeout, debugger interaction such as breakpoints, etc.  This is
+	 * actually a value copied from the heap structure into the current
+	 * thread to be more convenient for the bytecode executor inner loop.
+	 * The final value is copied back to the heap structure on a thread
+	 * switch by DUK_HEAP_SWITCH_THREAD().
+	 */
+	duk_int_t interrupt_counter;
 #endif
 
-    /* Builtin-objects; may or may not be shared with other threads,
-     * threads existing in different "compartments" will have different
-     * built-ins.  Must be stored on a per-thread basis because there
-     * is no intermediate structure for a thread group / compartment.
-     * This takes quite a lot of space, currently 43x4 = 172 bytes on
-     * 32-bit platforms.
-     */
-    duk_hobject *builtins[DUK_NUM_BUILTINS];
+	/* Builtin-objects; may or may not be shared with other threads,
+	 * threads existing in different "compartments" will have different
+	 * built-ins.  Must be stored on a per-thread basis because there
+	 * is no intermediate structure for a thread group / compartment.
+	 * This takes quite a lot of space, currently 43x4 = 172 bytes on
+	 * 32-bit platforms.
+	 */
+	duk_hobject *builtins[DUK_NUM_BUILTINS];
 
-    /* convenience copies from heap/vm for faster access */
-    duk_hstring **strs;			/* (from duk_heap) */
+	/* convenience copies from heap/vm for faster access */
+	duk_hstring **strs;			/* (from duk_heap) */
 };
 
 /*

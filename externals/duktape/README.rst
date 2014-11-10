@@ -58,8 +58,12 @@ and other standard timer functions could be implemented on Unix/Linux.
 The ``polyfills/`` directory provides a few replacement suggestions for
 non-standard Javascript functions provided by other implementations.
 
-This distributable contains Duktape version 1.0.0, created from git
-commit c57f64afdc374dc3444f8447bac4f7680a2f5b0b (v1.0.0).
+You can find release notes at:
+
+* https://github.com/svaarala/duktape/blob/master/RELEASES.rst
+
+This distributable contains Duktape version 1.0.2, created from git
+commit a476318bf025137c2847c808a8334d8b7db985f2 (v1.0.2).
 
 Duktape is copyrighted by its authors (see ``AUTHORS.rst``) and licensed
 under the MIT license (see ``LICENSE.txt``).  MurmurHash2 is used internally,

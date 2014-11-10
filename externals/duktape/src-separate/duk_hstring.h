@@ -84,25 +84,25 @@
  */
 
 struct duk_hstring {
-    /* smaller heaphdr than for other objects, because strings are held
-     * in string intern table which requires no link pointers.
-     */
-    duk_heaphdr_string hdr;
+	/* smaller heaphdr than for other objects, because strings are held
+	 * in string intern table which requires no link pointers.
+	 */
+	duk_heaphdr_string hdr;
 
-    /* Note: we could try to stuff a partial hash (e.g. 16 bits) into the
-     * shared heap header.  Good hashing needs more hash bits though.
-     */
+	/* Note: we could try to stuff a partial hash (e.g. 16 bits) into the
+	 * shared heap header.  Good hashing needs more hash bits though.
+	 */
 
-    duk_uint32_t hash;         /* string hash */
-    duk_uint32_t blen;         /* length in bytes (not counting NUL term) */
-    duk_uint32_t clen;         /* length in codepoints (must be E5 compatible) */
+	duk_uint32_t hash;         /* string hash */
+	duk_uint32_t blen;         /* length in bytes (not counting NUL term) */
+	duk_uint32_t clen;         /* length in codepoints (must be E5 compatible) */
 
-    /*
-     *  String value of 'blen+1' bytes follows (+1 for NUL termination
-     *  convenience for C API).  No alignment needs to be guaranteed
-     *  for strings, but fields above should guarantee alignment-by-4
-     *  (but not alignment-by-8).
-     */
+	/*
+	 *  String value of 'blen+1' bytes follows (+1 for NUL termination
+	 *  convenience for C API).  No alignment needs to be guaranteed
+	 *  for strings, but fields above should guarantee alignment-by-4
+	 *  (but not alignment-by-8).
+	 */
 };
 
 /*

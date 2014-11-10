@@ -51,83 +51,83 @@
 
 #define DUK_HBUFFER_SET_SIZE(x,val)  do { \
 		(x)->size = (val); \
-            	} while (0)
+	} while (0)
 
 /* growth parameters */
 #define DUK_HBUFFER_SPARE_ADD      16
 #define DUK_HBUFFER_SPARE_DIVISOR  16   /* 2^4 -> 1/16 = 6.25% spare */
 
 struct duk_hbuffer {
-    duk_heaphdr hdr;
+	duk_heaphdr hdr;
 
-    /* it's not strictly necessary to track the current size, but
-     * it is useful for writing robust native code.
-     */
+	/* it's not strictly necessary to track the current size, but
+	 * it is useful for writing robust native code.
+	 */
 
-    duk_size_t size;  /* current size (not counting a dynamic buffer's "spare") */
+	duk_size_t size;  /* current size (not counting a dynamic buffer's "spare") */
 
-    /*
-     *  Data following the header depends on the DUK_HBUFFER_FLAG_DYNAMIC
-     *  flag.
-     *
-     *  If the flag is clear (the buffer is a fixed size one), the buffer
-     *  data follows the header directly, consisting of 'size' bytes.
-     *
-     *  If the flag is set, the actual buffer is allocated separately, and
-     *  a few control fields follow the header.  Specifically:
-     *
-     *    - a "void *" pointing to the current allocation
-     *    - a duk_size_t indicating the full allocated size (always >= 'size')
-     *
-     *  Unlike strings, no terminator byte (NUL) is guaranteed after the
-     *  data.  This would be convenient, but would pad aligned user buffers
-     *  unnecessarily upwards in size.  For instance, if user code requested
-     *  a 64-byte dynamic buffer, 65 bytes would actually be allocated which
-     *  would then potentially round upwards to perhaps 68 or 72 bytes.
-     */
+	/*
+	 *  Data following the header depends on the DUK_HBUFFER_FLAG_DYNAMIC
+	 *  flag.
+	 *
+	 *  If the flag is clear (the buffer is a fixed size one), the buffer
+	 *  data follows the header directly, consisting of 'size' bytes.
+	 *
+	 *  If the flag is set, the actual buffer is allocated separately, and
+	 *  a few control fields follow the header.  Specifically:
+	 *
+	 *    - a "void *" pointing to the current allocation
+	 *    - a duk_size_t indicating the full allocated size (always >= 'size')
+	 *
+	 *  Unlike strings, no terminator byte (NUL) is guaranteed after the
+	 *  data.  This would be convenient, but would pad aligned user buffers
+	 *  unnecessarily upwards in size.  For instance, if user code requested
+	 *  a 64-byte dynamic buffer, 65 bytes would actually be allocated which
+	 *  would then potentially round upwards to perhaps 68 or 72 bytes.
+	 */
 };
 
 #if defined(DUK_USE_ALIGN_8) && defined(DUK_USE_PACK_MSVC_PRAGMA)
 #pragma pack(push, 8)
 #endif
 struct duk_hbuffer_fixed {
-    /* A union is used here as a portable struct size / alignment trick:
-     * by adding a 32-bit or a 64-bit (unused) union member, the size of
-     * the struct is effectively forced to be a multiple of 4 or 8 bytes
-     * (respectively) without increasing the size of the struct unless
-     * necessary.
-     */
-    union {
-        struct {
-            duk_heaphdr hdr;
-            duk_size_t size;
-        } s;
+	/* A union is used here as a portable struct size / alignment trick:
+	 * by adding a 32-bit or a 64-bit (unused) union member, the size of
+	 * the struct is effectively forced to be a multiple of 4 or 8 bytes
+	 * (respectively) without increasing the size of the struct unless
+	 * necessary.
+	 */
+	union {
+		struct {
+			duk_heaphdr hdr;
+			duk_size_t size;
+		} s;
 #if defined(DUK_USE_ALIGN_4)
-        duk_uint32_t dummy_for_align4;
+		duk_uint32_t dummy_for_align4;
 #elif defined(DUK_USE_ALIGN_8)
-        duk_uint64_t dummy_for_align8;
+		duk_uint64_t dummy_for_align8;
 #else
-        /* no extra padding */
+		/* no extra padding */
 #endif
-    } u;
+	} u;
 
-    /*
-     *  Data follows the struct header.  The struct size is padded by the
-     *  compiler based on the struct members.  This guarantees that the
-     *  buffer data will be aligned-by-4 but not necessarily aligned-by-8.
-     *
-     *  On platforms where alignment does not matter, the struct padding
-     *  could be removed (if there is any).  On platforms where alignment
-     *  by 8 is required, the struct size must be forced to be a multiple
-     *  of 8 by some means.  Without it, some user code may break, and also
-     *  Duktape itself breaks (e.g. the compiler stores duk_tvals in a
-     *  dynamic buffer).
-     */
+	/*
+	 *  Data follows the struct header.  The struct size is padded by the
+	 *  compiler based on the struct members.  This guarantees that the
+	 *  buffer data will be aligned-by-4 but not necessarily aligned-by-8.
+	 *
+	 *  On platforms where alignment does not matter, the struct padding
+	 *  could be removed (if there is any).  On platforms where alignment
+	 *  by 8 is required, the struct size must be forced to be a multiple
+	 *  of 8 by some means.  Without it, some user code may break, and also
+	 *  Duktape itself breaks (e.g. the compiler stores duk_tvals in a
+	 *  dynamic buffer).
+	 */
 }
 #if defined(DUK_USE_ALIGN_8) && defined(DUK_USE_PACK_GCC_ATTR)
-__attribute__((aligned(8)))
+__attribute__ ((aligned (8)))
 #elif defined(DUK_USE_ALIGN_8) && defined(DUK_USE_PACK_CLANG_ATTR)
-__attribute__((aligned(8)))
+__attribute__ ((aligned (8)))
 #endif
 ;
 #if defined(DUK_USE_ALIGN_8) && defined(DUK_USE_PACK_MSVC_PRAGMA)
@@ -135,21 +135,21 @@ __attribute__((aligned(8)))
 #endif
 
 struct duk_hbuffer_dynamic {
-    duk_heaphdr hdr;
-    duk_size_t size;
+	duk_heaphdr hdr;
+	duk_size_t size;
 
-    void *curr_alloc;  /* may be NULL if usable_size == 0 */
-    duk_size_t usable_size;
+	void *curr_alloc;  /* may be NULL if usable_size == 0 */
+	duk_size_t usable_size;
 
-    /*
-     *  Allocation size for 'curr_alloc' is usable_size directly.
-     *  There is no automatic NUL terminator for buffers (see above
-     *  for rationale).
-     *
-     *  'curr_alloc' is explicitly allocated with heap allocation
-     *  primitives and will thus always have alignment suitable for
-     *  e.g. duk_tval and an IEEE double.
-     */
+	/*
+	 *  Allocation size for 'curr_alloc' is usable_size directly.
+	 *  There is no automatic NUL terminator for buffers (see above
+	 *  for rationale).
+	 *
+	 *  'curr_alloc' is explicitly allocated with heap allocation
+	 *  primitives and will thus always have alignment suitable for
+	 *  e.g. duk_tval and an IEEE double.
+	 */
 };
 
 /*

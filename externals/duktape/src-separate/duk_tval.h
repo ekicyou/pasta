@@ -164,19 +164,19 @@ typedef union duk_double_union duk_tval;
 typedef struct duk_tval_struct duk_tval;
 
 struct duk_tval_struct {
-    duk_small_uint_t t;
-    union {
-        duk_double_t d;
-        duk_small_int_t i;
-        void *voidptr;
-        duk_hstring *hstring;
-        duk_hobject *hobject;
-        duk_hcompiledfunction *hcompiledfunction;
-        duk_hnativefunction *hnativefunction;
-        duk_hthread *hthread;
-        duk_hbuffer *hbuffer;
-        duk_heaphdr *heaphdr;
-    } v;
+	duk_small_uint_t t;
+	union {
+		duk_double_t d;
+		duk_small_int_t i;
+		void *voidptr;
+		duk_hstring *hstring;
+		duk_hobject *hobject;
+		duk_hcompiledfunction *hcompiledfunction;
+		duk_hnativefunction *hnativefunction;
+		duk_hthread *hthread;
+		duk_hbuffer *hbuffer;
+		duk_heaphdr *heaphdr;
+	} v;
 };
 
 #define DUK__TAG_NUMBER               0  /* not exposed */

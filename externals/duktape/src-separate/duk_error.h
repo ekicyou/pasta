@@ -132,8 +132,8 @@
 		DUK_PANIC(DUK_ERR_ASSERTION_ERROR, \
 			"assertion failed: " #x \
 			" (" DUK_FILE_MACRO ":" DUK_MACRO_STRINGIFY(DUK_LINE_MACRO) ")"); \
-        	} \
-            	} while (0)
+	} \
+	} while (0)
 
 #else  /* DUK_USE_ASSERTIONS */
 
@@ -153,12 +153,12 @@
 #if defined(DUK_USE_ASSERTIONS) && defined(DUK_USE_REFERENCE_COUNTING)
 #define DUK_ASSERT_REFCOUNT_NONZERO_HEAPHDR(h)  do { \
 		DUK_ASSERT((h) == NULL || DUK_HEAPHDR_GET_REFCOUNT((duk_heaphdr *) (h)) > 0); \
-            	} while (0)
+	} while (0)
 #define DUK_ASSERT_REFCOUNT_NONZERO_TVAL(tv)  do { \
 		if ((tv) != NULL && DUK_TVAL_IS_HEAP_ALLOCATED((tv))) { \
 			DUK_ASSERT(DUK_HEAPHDR_GET_REFCOUNT(DUK_TVAL_GET_HEAPHDR((tv))) > 0); \
-                		} \
-            	} while (0)
+		} \
+	} while (0)
 #else
 #define DUK_ASSERT_REFCOUNT_NONZERO_HEAPHDR(h)  /* no refcount check */
 #define DUK_ASSERT_REFCOUNT_NONZERO_TVAL(tv)    /* no refcount check */
@@ -171,7 +171,7 @@
 		duk_double_union assert_tmp_du; \
 		assert_tmp_du.d = (dval); \
 		DUK_ASSERT(DUK_DBLUNION_IS_NORMALIZED(&assert_tmp_du)); \
-            	} while (0)
+	} while (0)
 #else
 #define DUK_ASSERT_DOUBLE_IS_NORMALIZED(dval)  /* nop */
 #endif
@@ -185,13 +185,13 @@
  */
 
 #define DUK_VALSTACK_ASSERT_EXTRA  5  /* this is added to checks to allow for Duktape
- * API calls in addition to function's own use
- */
+                                       * API calls in addition to function's own use
+                                       */
 #if defined(DUK_USE_ASSERTIONS)
 #define DUK_ASSERT_VALSTACK_SPACE(thr,n)   do { \
 		DUK_ASSERT((thr) != NULL); \
 		DUK_ASSERT((thr)->valstack_end - (thr)->valstack_top >= (n) + DUK_VALSTACK_ASSERT_EXTRA); \
-            	} while (0)
+	} while (0)
 #else
 #define DUK_ASSERT_VALSTACK_SPACE(thr,n)   /* no valstack space check */
 #endif

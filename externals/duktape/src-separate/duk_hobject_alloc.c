@@ -10,21 +10,21 @@
 
 DUK_LOCAL void duk__init_object_parts(duk_heap *heap, duk_hobject *obj, duk_uint_t hobject_flags) {
 #ifdef DUK_USE_EXPLICIT_NULL_INIT
-    obj->p = NULL;
+	obj->p = NULL;
 #endif
 
-    /* XXX: macro? sets both heaphdr and object flags */
-    obj->hdr.h_flags = hobject_flags;
-    DUK_HEAPHDR_SET_TYPE(&obj->hdr, DUK_HTYPE_OBJECT);  /* also goes into flags */
+	/* XXX: macro? sets both heaphdr and object flags */
+	obj->hdr.h_flags = hobject_flags;
+	DUK_HEAPHDR_SET_TYPE(&obj->hdr, DUK_HTYPE_OBJECT);  /* also goes into flags */
 
-    DUK_HEAP_INSERT_INTO_HEAP_ALLOCATED(heap, &obj->hdr);
+        DUK_HEAP_INSERT_INTO_HEAP_ALLOCATED(heap, &obj->hdr);
 
-    /*
-     *  obj->p is intentionally left as NULL, and duk_hobject_props.c must deal
-     *  with this properly.  This is intentional: empty objects consume a minimum
-     *  amount of memory.  Further, an initial allocation might fail and cause
-     *  'obj' to "leak" (require a mark-and-sweep) since it is not reachable yet.
-     */
+	/*
+	 *  obj->p is intentionally left as NULL, and duk_hobject_props.c must deal
+	 *  with this properly.  This is intentional: empty objects consume a minimum
+	 *  amount of memory.  Further, an initial allocation might fail and cause
+	 *  'obj' to "leak" (require a mark-and-sweep) since it is not reachable yet.
+	 */
 }
 
 /*
@@ -39,62 +39,62 @@ DUK_LOCAL void duk__init_object_parts(duk_heap *heap, duk_hobject *obj, duk_uint
  */
 
 DUK_INTERNAL duk_hobject *duk_hobject_alloc(duk_heap *heap, duk_uint_t hobject_flags) {
-    duk_hobject *res;
+	duk_hobject *res;
 
-    DUK_ASSERT(heap != NULL);
+	DUK_ASSERT(heap != NULL);
 
-    /* different memory layout, alloc size, and init */
-    DUK_ASSERT((hobject_flags & DUK_HOBJECT_FLAG_COMPILEDFUNCTION) == 0);
-    DUK_ASSERT((hobject_flags & DUK_HOBJECT_FLAG_NATIVEFUNCTION) == 0);
-    DUK_ASSERT((hobject_flags & DUK_HOBJECT_FLAG_THREAD) == 0);
+	/* different memory layout, alloc size, and init */
+	DUK_ASSERT((hobject_flags & DUK_HOBJECT_FLAG_COMPILEDFUNCTION) == 0);
+	DUK_ASSERT((hobject_flags & DUK_HOBJECT_FLAG_NATIVEFUNCTION) == 0);
+	DUK_ASSERT((hobject_flags & DUK_HOBJECT_FLAG_THREAD) == 0);
 
-    res = (duk_hobject *)DUK_ALLOC(heap, sizeof(duk_hobject));
-    if (!res) {
-        return NULL;
-    }
-    DUK_MEMZERO(res, sizeof(duk_hobject));
+	res = (duk_hobject *) DUK_ALLOC(heap, sizeof(duk_hobject));
+	if (!res) {
+		return NULL;
+	}
+	DUK_MEMZERO(res, sizeof(duk_hobject));
 
-    duk__init_object_parts(heap, res, hobject_flags);
+	duk__init_object_parts(heap, res, hobject_flags);
 
-    return res;
+	return res;
 }
 
 DUK_INTERNAL duk_hcompiledfunction *duk_hcompiledfunction_alloc(duk_heap *heap, duk_uint_t hobject_flags) {
-    duk_hcompiledfunction *res;
+	duk_hcompiledfunction *res;
 
-    res = (duk_hcompiledfunction *)DUK_ALLOC(heap, sizeof(duk_hcompiledfunction));
-    if (!res) {
-        return NULL;
-    }
-    DUK_MEMZERO(res, sizeof(duk_hcompiledfunction));
+	res = (duk_hcompiledfunction *) DUK_ALLOC(heap, sizeof(duk_hcompiledfunction));
+	if (!res) {
+		return NULL;
+	}
+	DUK_MEMZERO(res, sizeof(duk_hcompiledfunction));
 
-    duk__init_object_parts(heap, &res->obj, hobject_flags);
+	duk__init_object_parts(heap, &res->obj, hobject_flags);
 
 #ifdef DUK_USE_EXPLICIT_NULL_INIT
-    res->data = NULL;
-    res->funcs = NULL;
-    res->bytecode = NULL;
+	res->data = NULL;
+	res->funcs = NULL;
+	res->bytecode = NULL;
 #endif
 
-    return res;
+	return res;
 }
 
 DUK_INTERNAL duk_hnativefunction *duk_hnativefunction_alloc(duk_heap *heap, duk_uint_t hobject_flags) {
-    duk_hnativefunction *res;
+	duk_hnativefunction *res;
 
-    res = (duk_hnativefunction *)DUK_ALLOC(heap, sizeof(duk_hnativefunction));
-    if (!res) {
-        return NULL;
-    }
-    DUK_MEMZERO(res, sizeof(duk_hnativefunction));
+	res = (duk_hnativefunction *) DUK_ALLOC(heap, sizeof(duk_hnativefunction));
+	if (!res) {
+		return NULL;
+	}
+	DUK_MEMZERO(res, sizeof(duk_hnativefunction));
 
-    duk__init_object_parts(heap, &res->obj, hobject_flags);
+	duk__init_object_parts(heap, &res->obj, hobject_flags);
 
 #ifdef DUK_USE_EXPLICIT_NULL_INIT
-    res->func = NULL;
+	res->func = NULL;
 #endif
 
-    return res;
+	return res;
 }
 
 /*
@@ -106,50 +106,50 @@ DUK_INTERNAL duk_hnativefunction *duk_hnativefunction_alloc(duk_heap *heap, duk_
  */
 
 DUK_INTERNAL duk_hthread *duk_hthread_alloc(duk_heap *heap, duk_uint_t hobject_flags) {
-    duk_hthread *res;
+	duk_hthread *res;
 
-    res = (duk_hthread *)DUK_ALLOC(heap, sizeof(duk_hthread));
-    if (!res) {
-        return NULL;
-    }
-    DUK_MEMZERO(res, sizeof(duk_hthread));
+	res = (duk_hthread *) DUK_ALLOC(heap, sizeof(duk_hthread));
+	if (!res) {
+		return NULL;
+	}
+	DUK_MEMZERO(res, sizeof(duk_hthread));
 
-    duk__init_object_parts(heap, &res->obj, hobject_flags);
+	duk__init_object_parts(heap, &res->obj, hobject_flags);
 
 #ifdef DUK_USE_EXPLICIT_NULL_INIT
-    res->heap = NULL;
-    res->valstack = NULL;
-    res->valstack_end = NULL;
-    res->valstack_bottom = NULL;
-    res->valstack_top = NULL;
-    res->callstack = NULL;
-    res->catchstack = NULL;
-    res->resumer = NULL;
-    res->strs = NULL;
-    {
-        int i;
-        for (i = 0; i < DUK_NUM_BUILTINS; i++) {
-            res->builtins[i] = NULL;
-        }
-    }
+	res->heap = NULL;
+	res->valstack = NULL;
+	res->valstack_end = NULL;
+	res->valstack_bottom = NULL;
+	res->valstack_top = NULL;
+	res->callstack = NULL;
+	res->catchstack = NULL;
+	res->resumer = NULL;
+	res->strs = NULL;
+	{
+		int i;
+		for (i = 0; i < DUK_NUM_BUILTINS; i++) {
+			res->builtins[i] = NULL;
+		}
+	}
 #endif
-    /* when nothing is running, API calls are in non-strict mode */
-    DUK_ASSERT(res->strict == 0);
+	/* when nothing is running, API calls are in non-strict mode */
+	DUK_ASSERT(res->strict == 0);
 
-    res->heap = heap;
-    res->valstack_max = DUK_VALSTACK_DEFAULT_MAX;
-    res->callstack_max = DUK_CALLSTACK_DEFAULT_MAX;
-    res->catchstack_max = DUK_CATCHSTACK_DEFAULT_MAX;
+	res->heap = heap;
+	res->valstack_max = DUK_VALSTACK_DEFAULT_MAX;
+	res->callstack_max = DUK_CALLSTACK_DEFAULT_MAX;
+	res->catchstack_max = DUK_CATCHSTACK_DEFAULT_MAX;
 
-    return res;
+	return res;
 }
 
 #if 0  /* unused now */
 DUK_INTERNAL duk_hobject *duk_hobject_alloc_checked(duk_hthread *thr, duk_uint_t hobject_flags) {
-    duk_hobject *res = duk_hobject_alloc(thr->heap, hobject_flags);
-    if (!res) {
-        DUK_ERROR(thr, DUK_ERR_ALLOC_ERROR, "failed to allocate an object");
-    }
-    return res;
+	duk_hobject *res = duk_hobject_alloc(thr->heap, hobject_flags);
+	if (!res) {
+		DUK_ERROR(thr, DUK_ERR_ALLOC_ERROR, "failed to allocate an object");
+	}
+	return res;
 }
 #endif

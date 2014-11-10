@@ -1,11 +1,11 @@
 /*
- *  Duktape public API for Duktape 1.0.0.
+ *  Duktape public API for Duktape 1.0.2.
  *  See the API reference for documentation on call semantics.
  *  The exposed API is inside the DUK_API_PUBLIC_H_INCLUDED
  *  include guard.  Other parts of the header are Duktape
  *  internal and related to platform/compiler/feature detection.
  *
- *  Git commit c57f64afdc374dc3444f8447bac4f7680a2f5b0b (v1.0.0).
+ *  Git commit a476318bf025137c2847c808a8334d8b7db985f2 (v1.0.2).
  *
  *  See Duktape AUTHORS.rst and LICENSE.txt for copyright and
  *  licensing information.
@@ -2081,6 +2081,24 @@ typedef FILE duk_file;
 #define DUK_LOCAL_DECL     static
 #define DUK_LOCAL          static
 
+/* In C++ one cannot declare and define "static" variables separately (GH-63).
+ * As a quick workaround, use "extern" instead: it makes the symbol table ugly
+ * but allows compilation.  A better fix is to avoid the need to forward declare
+ * internal symbols, but it requires changes to combine_src.py.
+ *
+ * XXX: better fix is needed.
+ */
+#if defined(DUK_F_CPP)
+#undef DUK_INTERNAL_DECL
+#undef DUK_INTERNAL
+#undef DUK_LOCAL_DECL
+#undef DUK_LOCAL
+#define DUK_INTERNAL_DECL  extern
+#define DUK_INTERNAL       /*empty*/
+#define DUK_LOCAL_DECL     extern
+#define DUK_LOCAL          /*empty*/
+#endif
+
 /*
  *  __FILE__, __LINE__, __func__ are wrapped.  Especially __func__ is a
  *  problem because it is not available even in some compilers which try
@@ -2760,7 +2778,7 @@ struct duk_number_list_entry {
  * have 99 for patch level (e.g. 0.10.99 would be a development version
  * after 0.10.0 but before the next official release).
  */
-#define DUK_VERSION                       10000L
+#define DUK_VERSION                       10002L
 
 /* Used to represent invalid index; if caller uses this without checking,
  * this index will map to a non-existent stack entry.  Also used in some

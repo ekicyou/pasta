@@ -9,36 +9,35 @@
 #include "duk_internal.h"
 
 DUK_EXTERNAL void duk_log(duk_context *ctx, duk_int_t level, const char *fmt, ...) {
-    va_list ap;
-    /* stridx_logfunc[] must be static to allow initializer with old compilers like BCC */
-    static const duk_uint16_t stridx_logfunc[6] = {
-        DUK_STRIDX_LC_TRACE, DUK_STRIDX_LC_DEBUG, DUK_STRIDX_LC_INFO,
-        DUK_STRIDX_LC_WARN, DUK_STRIDX_LC_ERROR, DUK_STRIDX_LC_FATAL
-    };
+	va_list ap;
+	/* stridx_logfunc[] must be static to allow initializer with old compilers like BCC */
+	static const duk_uint16_t stridx_logfunc[6] = {
+		DUK_STRIDX_LC_TRACE, DUK_STRIDX_LC_DEBUG, DUK_STRIDX_LC_INFO,
+		DUK_STRIDX_LC_WARN, DUK_STRIDX_LC_ERROR, DUK_STRIDX_LC_FATAL
+	};
 
-    if (level < 0) {
-        level = 0;
-    }
-    else if (level > (int) (sizeof(stridx_logfunc) / sizeof(duk_uint16_t)) - 1) {
-        level = (int)(sizeof(stridx_logfunc) / sizeof(duk_uint16_t)) - 1;
-    }
+	if (level < 0) {
+		level = 0;
+	} else if (level > (int) (sizeof(stridx_logfunc) / sizeof(duk_uint16_t)) - 1) {
+		level = (int) (sizeof(stridx_logfunc) / sizeof(duk_uint16_t)) - 1;
+	}
 
-    duk_push_hobject_bidx(ctx, DUK_BIDX_LOGGER_CONSTRUCTOR);
-    duk_get_prop_stridx(ctx, -1, DUK_STRIDX_CLOG);
-    duk_get_prop_stridx(ctx, -1, stridx_logfunc[level]);
-    duk_dup(ctx, -2);
+	duk_push_hobject_bidx(ctx, DUK_BIDX_LOGGER_CONSTRUCTOR);
+	duk_get_prop_stridx(ctx, -1, DUK_STRIDX_CLOG);
+	duk_get_prop_stridx(ctx, -1, stridx_logfunc[level]);
+	duk_dup(ctx, -2);
 
-    /* [ ... Logger clog logfunc clog ] */
+	/* [ ... Logger clog logfunc clog ] */
 
-    va_start(ap, fmt);
-    duk_push_vsprintf(ctx, fmt, ap);
-    va_end(ap);
+	va_start(ap, fmt);
+	duk_push_vsprintf(ctx, fmt, ap);
+	va_end(ap);
 
-    /* [ ... Logger clog logfunc clog(=this) msg ] */
+	/* [ ... Logger clog logfunc clog(=this) msg ] */
 
-    duk_call_method(ctx, 1 /*nargs*/);
+	duk_call_method(ctx, 1 /*nargs*/);
 
-    /* [ ... Logger clog res ] */
+	/* [ ... Logger clog res ] */
 
-    duk_pop_3(ctx);
+	duk_pop_3(ctx);
 }
