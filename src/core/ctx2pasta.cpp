@@ -4,7 +4,7 @@
 #include "stdafx.h"
 #include "ctx2pasta.h"
 
-static std::unordered_map<duk_context*, pasta::Agent*> hashCtx2Pasta;
+static std::map<duk_context*, pasta::Agent*> hashCtx2Pasta;
 
 // duk_contextに対応するpastaエージェントへの参照を登録する。
 void pasta::SetPasta(duk_context*ctx, pasta::Agent* pasta){

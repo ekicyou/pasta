@@ -16,7 +16,8 @@
 #include <atlbase.h>
 #include <atlstr.h>
 
-// TODO: プログラムに必要な追加ヘッダーをここで参照してください。
+// 
+#include <memory>
 #include <string>
 #include <duktape.h>
 #include <agent_pasta.h>

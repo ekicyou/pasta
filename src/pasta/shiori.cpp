@@ -13,14 +13,14 @@
  * HGLOBAL関係
  */
 // 自動開放
-class AutoGrobalFree
+class AutoGrobal
 {
 public:
     HGLOBAL m_hGlobal;
-    AutoGrobalFree(HGLOBAL hGlobal) {
+    AutoGrobal(HGLOBAL hGlobal) {
         m_hGlobal = hGlobal;
     }
-    ~AutoGrobalFree() {
+    ~AutoGrobal() {
         GlobalFree(m_hGlobal);
     }
 };
@@ -38,7 +38,7 @@ inline HGLOBAL AllocString(const std::string& test, long& len)
 * グローバルインスタンス
 */
 static HINSTANCE hinst;
-static pasta::Agent *app;
+static std::unique_ptr<pasta::Agent> app;
 
 /**----------------------------------------------------------------------------
 * Dllエントリーポイント
@@ -73,10 +73,8 @@ extern "C" __declspec(dllexport) BOOL WINAPI DllMain(
 SHIORI_API BOOL __cdecl unload(void)
 {
     try{
-        if (app != NULL) {
-            delete app;
-            app = NULL;
-        }
+        if (app != nullptr)app->UnLoad();
+        app = NULL;
         return true;
     }
     catch (...){
@@ -90,16 +88,12 @@ SHIORI_API BOOL __cdecl unload(void)
 SHIORI_API BOOL __cdecl load(HGLOBAL hGlobal_loaddir, long loaddir_len)
 {
     USES_CONVERSION;
-    AutoGrobalFree autoFree(hGlobal_loaddir);
-    if (app != NULL) {
-        delete app;
-        app = NULL;
-    }
+    AutoGrobal auto_loaddir(hGlobal_loaddir);
     std::string loaddir((const char*)hGlobal_loaddir, (size_t)loaddir_len);
     auto wLoadDir = A2CW(loaddir.c_str());
     try{
         unload();
-        app = new pasta::Agent(hinst);
+        app = std::make_unique<pasta::Agent>(hinst);
         app->Load(wLoadDir);
         return true;
     }
@@ -117,7 +111,7 @@ SHIORI_API BOOL __cdecl load(HGLOBAL hGlobal_loaddir, long loaddir_len)
 SHIORI_API HGLOBAL __cdecl request(HGLOBAL hGlobal_request, long& len)
 {
     USES_CONVERSION;
-    AutoGrobalFree autoFree(hGlobal_request);
+    AutoGrobal auto_request(hGlobal_request);
     const std::string req((const char *)hGlobal_request, len);
     try{
         auto res = app->Request(req);
