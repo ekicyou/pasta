@@ -79,7 +79,7 @@ const std::string shiori::Agent::get(const std::string& req)
     return res.value;
 }
 
-void shiori::Agent::Response(const std::string& res)
+void shiori::Agent::response(const std::string& res)
 {
     FUNC_START(cp);
 
@@ -136,11 +136,11 @@ void shiori::Agent::run(){
             DEBUG_MESSAGE(L"WAIT load");
             auto req = receive(reqBuf);
             DEBUG_MESSAGE(L"CALL LoadAction()");
-            LoadAction();
+            loadAction();
             DEBUG_MESSAGE(L"END  LoadAction()");
         }
-        catch (const std::exception& ex){ SetException(ex); }
-        catch (...)                     { SetException(); }
+        catch (const std::exception& ex){ setException(ex); }
+        catch (...)                     { setException(); }
 
         // メインループ
         while (true){
@@ -151,11 +151,11 @@ void shiori::Agent::run(){
             case shiori::REQUEST_NOTIFY:
                 try{
                     DEBUG_MESSAGE(L"CALL NotifyAction()");
-                    NotifyAction(req.value);
+                    notifyAction(req.value);
                     DEBUG_MESSAGE(L"END  NotifyAction()");
                 }
-                catch (const std::exception& ex){ SetException(ex); }
-                catch (...)                     { SetException(); }
+                catch (const std::exception& ex){ setException(ex); }
+                catch (...)                     { setException(); }
                 continue;
 
             case shiori::REQUEST_GET:
@@ -163,7 +163,7 @@ void shiori::Agent::run(){
                     // GetAction内でSHIORIレスポンスを返すこと
                     hasResponse = true;
                     DEBUG_MESSAGE(L"CALL GetAction()");
-                    GetAction(req.value);
+                    getAction(req.value);
                     DEBUG_MESSAGE(L"END  GetAction()");
 
                     // GetAction内でResponseが呼び出されていない場合は例外とする。
@@ -171,8 +171,8 @@ void shiori::Agent::run(){
                         THROW_EX("script not response [GET]");
                     }
                 }
-                catch (const std::exception& ex){ SetException(ex); SendException(); }
-                catch (...)                     { SetException();   SendException(); }
+                catch (const std::exception& ex){ setException(ex); sendException(); }
+                catch (...)                     { setException();   sendException(); }
                 continue;
             }
             break;
@@ -181,14 +181,14 @@ void shiori::Agent::run(){
         // unload処理
         try{
             DEBUG_MESSAGE(L"CALL UnLoadAction()");
-            UnLoadAction();
+            unloadAction();
             DEBUG_MESSAGE(L"END  UnLoadAction()");
         }
-        catch (const std::exception& ex){ SetException(ex); }
-        catch (...)                     { SetException(); }
+        catch (const std::exception& ex){ setException(ex); }
+        catch (...)                     { setException(); }
     }
-    catch (const std::exception& ex){ SetException(ex); }
-    catch (...)                     { SetException(); }
+    catch (const std::exception& ex){ setException(ex); }
+    catch (...)                     { setException(); }
     done();
 }
 
@@ -205,20 +205,20 @@ bool shiori::Agent::IsRunning(){
 // 例外処理
 //============================================================
 
-void shiori::Agent::SetException(const std::exception& ex){
+void shiori::Agent::setException(const std::exception& ex){
     FUNC_START(cp);
 
     DEBUG_MESSAGE(ex.what());
     last_error_what = ex.what();
 }
 
-void shiori::Agent::SetException(){
+void shiori::Agent::setException(){
     FUNC_START(cp);
 
-    SetException(std::exception("(none)"));
+    setException(std::exception("(none)"));
 }
 
-void shiori::Agent::SendException(){
+void shiori::Agent::sendException(){
     FUNC_START(cp);
 
     auto res = ResponseItem(last_error_what, RESPONSE_ERROR);

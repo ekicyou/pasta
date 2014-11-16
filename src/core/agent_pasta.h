@@ -12,10 +12,10 @@ namespace pasta{
 
         virtual ~Agent();
 
-        virtual void LoadAction() override;
-        virtual void UnLoadAction() override;
-        virtual void NotifyAction(const std::string& req) override;
-        virtual void GetAction(const std::string& req) override;
+        virtual void loadAction() override;
+        virtual void unloadAction() override;
+        virtual void notifyAction(const std::string& req) override;
+        virtual void getAction(const std::string& req) override;
 
     private:
         void InitModuleFileIO();

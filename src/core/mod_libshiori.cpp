@@ -15,7 +15,7 @@ static duk_ret_t response(duk_context *ctx){
     auto res = duk_to_string(ctx, 0);
 
     // GETレスポンス発行。
-    ghost->Response(res);
+    ghost->response(res);
 
     return 1;
 }

@@ -62,16 +62,16 @@ namespace shiori{
         const std::string notify(const std::string& req);
         const std::string get(const std::string& req);
 
-        void Response(const std::string& res);
+        void response(const std::string& res);
 
     protected:
         void run();
 
     public:
-        virtual void LoadAction() = 0;
-        virtual void UnLoadAction() = 0;
-        virtual void NotifyAction(const std::string& req) = 0;
-        virtual void GetAction(const std::string& req) = 0;
+        virtual void loadAction() = 0;
+        virtual void unloadAction() = 0;
+        virtual void notifyAction(const std::string& req) = 0;
+        virtual void getAction(const std::string& req) = 0;
 
     public:
         const HINSTANCE hinst;          // SHIORI.DLLのインスタンス
@@ -86,9 +86,9 @@ namespace shiori{
         std::string last_error_what;
         bool IsRunning();
 
-        void SetException(const std::exception& ex);
-        void SetException();
-        void SendException();
-        const ResponseItem GetErrorResponse();
+        void setException(const std::exception& ex);
+        void setException();
+        void sendException();
+        const ResponseItem getErrorResponse();
     };
 }

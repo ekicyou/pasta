@@ -32,7 +32,7 @@ static void FatalFunc(duk_context *ctx, int code, const char *msg){
 // デストラクタ・Unload処理
 //-------------------------------------------------------------
 
-void pasta::Agent::UnLoadAction() {
+void pasta::Agent::unloadAction() {
     FUNC_START(cp);
     USES_CONVERSION;
 
@@ -71,7 +71,7 @@ pasta::Agent::Agent(const HINSTANCE hinst, concurrency::ScheduleGroup& group)
     : shiori::Agent(CP_UTF8, hinst, group)
 {}
 
-void pasta::Agent::LoadAction(){
+void pasta::Agent::loadAction(){
     FUNC_START(cp);
     USES_CONVERSION;
 
@@ -120,7 +120,7 @@ void pasta::Agent::LoadAction(){
 //-------------------------------------------------------------
 // Notify処理
 //-------------------------------------------------------------
-void pasta::Agent::NotifyAction(const std::string& req){
+void pasta::Agent::notifyAction(const std::string& req){
     FUNC_START(cp);
 
     // shiori.notify(req)関数の実行
@@ -138,7 +138,7 @@ void pasta::Agent::NotifyAction(const std::string& req){
 //-------------------------------------------------------------
 // Get処理
 //-------------------------------------------------------------
-void pasta::Agent::GetAction(const std::string& req){
+void pasta::Agent::getAction(const std::string& req){
     FUNC_START(cp);
 
     // shiori.get(req)関数の実行
