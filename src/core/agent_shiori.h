@@ -60,7 +60,7 @@ namespace shiori{
 
     public:
         const std::string notify(const std::string& req);
-        const std::string Get(const std::string& req);
+        const std::string get(const std::string& req);
 
         void Response(const std::string& res);
 

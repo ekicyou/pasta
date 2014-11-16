@@ -67,7 +67,7 @@ const std::string shiori::Agent::notify(const std::string& req)
     return STR_RES_NO_CONTENT;
 }
 
-const std::string shiori::Agent::Get(const std::string& req)
+const std::string shiori::Agent::get(const std::string& req)
 {
     FUNC_START(cp);
 
@@ -104,7 +104,7 @@ const std::string shiori::Agent::request(const std::string& req)
 
         // GET
         std::string reqType(match[1].first, match[1].second);
-        if (reqType == "GET")      return Get(req);
+        if (reqType == "GET")      return get(req);
         if (reqType == "NOTIFY")   return notify(req);
         THROW_EX("unmatch request type");
     }
