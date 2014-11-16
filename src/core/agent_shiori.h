@@ -56,7 +56,7 @@ namespace shiori{
         void unload();
 
         // SHIORI request
-        const std::string Request(const std::string& req);
+        const std::string request(const std::string& req);
 
     public:
         const std::string Notify(const std::string& req);

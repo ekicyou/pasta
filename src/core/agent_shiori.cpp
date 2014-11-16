@@ -87,7 +87,7 @@ void shiori::Agent::Response(const std::string& res)
     hasResponse = false;
 }
 
-const std::string shiori::Agent::Request(const std::string& req)
+const std::string shiori::Agent::request(const std::string& req)
 {
     FUNC_START(cp);
     try{

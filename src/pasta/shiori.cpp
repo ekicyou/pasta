@@ -87,7 +87,7 @@ SHIORI_API HGLOBAL __cdecl request(HGLOBAL hGlobal_request, long& len)
     AutoGrobal auto_request(hGlobal_request);
     const std::string req((const char *)hGlobal_request, len);
     try{
-        auto res = app->Request(req);
+        auto res = app->request(req);
         return AllocString(res, len);
     }
     catch (const std::exception& e){

@@ -38,7 +38,7 @@ namespace test
                     "Sender: SSP"               "\r\n"
                     "\r\n"
                     ;
-                auto res = ghost.Request(req);
+                auto res = ghost.request(req);
                 AreFind("SHIORI/3.0 400 Bad Request", res);
             }
             {
@@ -50,7 +50,7 @@ namespace test
                     "Sender: SSP\r\n"
                     "\r\n"
                     ;
-                auto res = ghost.Request(req);
+                auto res = ghost.request(req);
                 AreFind("SHIORI/3.0 200 OK", res);
             }
         }
