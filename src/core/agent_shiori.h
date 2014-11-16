@@ -50,10 +50,10 @@ namespace shiori{
 
     public:
         // SHIORI load
-        void Load(const std::wstring& dir);
+        void load(const std::wstring& dir);
 
         // SHIORI unload
-        void UnLoad();
+        void unload();
 
         // SHIORI request
         const std::string Request(const std::string& req);

@@ -40,40 +40,13 @@ inline HGLOBAL AllocString(const std::string& test, long& len)
 static HINSTANCE hinst;
 static std::unique_ptr<pasta::Agent> app;
 
-/**----------------------------------------------------------------------------
-* Dllエントリーポイント
-*/
-extern "C" __declspec(dllexport) BOOL WINAPI DllMain(
-    HINSTANCE hinstDLL,  // DLL モジュールのハンドル
-    DWORD fdwReason,     // 関数を呼び出す理由
-    LPVOID lpvReserved   // 予約済み
-    )
-{
-    switch (fdwReason) {
-    case    DLL_PROCESS_ATTACH: // プロセス接続
-        hinst = hinstDLL;
-        break;
-
-    case    DLL_PROCESS_DETACH: // プロセス切り離し
-        unload();
-        break;
-
-    case    DLL_THREAD_ATTACH:  // スレッド接続
-        break;
-
-    case    DLL_THREAD_DETACH:  // スレッド切り離し
-        break;
-    }
-    return true;
-}
-
 /* ----------------------------------------------------------------------------
 * 栞 Method / unload
 */
 SHIORI_API BOOL __cdecl unload(void)
 {
     try{
-        if (app != nullptr)app->UnLoad();
+        if (app != nullptr)app->unload();
         app = NULL;
         return true;
     }
@@ -94,7 +67,7 @@ SHIORI_API BOOL __cdecl load(HGLOBAL hGlobal_loaddir, long loaddir_len)
     try{
         unload();
         app = std::make_unique<pasta::Agent>(hinst);
-        app->Load(wLoadDir);
+        app->load(wLoadDir);
         return true;
     }
     catch (const std::exception&){
@@ -129,6 +102,33 @@ SHIORI_API HGLOBAL __cdecl request(HGLOBAL hGlobal_request, long& len)
         auto res = CreateBatRequestResponse("Unnone Exception");
         return AllocString(res, len);
     }
+}
+
+/**----------------------------------------------------------------------------
+* Dllエントリーポイント
+*/
+extern "C" __declspec(dllexport) BOOL WINAPI DllMain(
+    HINSTANCE hinstDLL,  // DLL モジュールのハンドル
+    DWORD fdwReason,     // 関数を呼び出す理由
+    LPVOID lpvReserved   // 予約済み
+    )
+{
+    switch (fdwReason) {
+    case    DLL_PROCESS_ATTACH: // プロセス接続
+        hinst = hinstDLL;
+        break;
+
+    case    DLL_PROCESS_DETACH: // プロセス切り離し
+        unload();
+        break;
+
+    case    DLL_THREAD_ATTACH:  // スレッド接続
+        break;
+
+    case    DLL_THREAD_DETACH:  // スレッド切り離し
+        break;
+    }
+    return true;
 }
 
 // EOF

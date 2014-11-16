@@ -53,7 +53,7 @@ void pasta::Agent::UnLoadAction() {
 // 解放タイミングでUnloadが実行されていなければ呼び出す。
 pasta::Agent::~Agent(){
     FUNC_START(cp);
-    UnLoad();
+    unload();
 }
 
 //-------------------------------------------------------------

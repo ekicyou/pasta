@@ -31,13 +31,13 @@ shiori::Agent::Agent(const int cp, const HINSTANCE hinst, concurrency::ScheduleG
 //============================================================
 shiori::Agent::~Agent()
 {
-    UnLoad();
+    unload();
 }
 
 //============================================================
 // SHIORI APIèàóù
 //============================================================
-void shiori::Agent::Load(const std::wstring& dir)
+void shiori::Agent::load(const std::wstring& dir)
 {
     FUNC_START(cp);
 
@@ -47,7 +47,7 @@ void shiori::Agent::Load(const std::wstring& dir)
     asend(reqBuf, RequestItem(REQUEST_LOAD));
 }
 
-void shiori::Agent::UnLoad()
+void shiori::Agent::unload()
 {
     if (!hasUnload)return;
 

@@ -29,7 +29,7 @@ namespace test
         {
             auto loaddir = current_path<wpath>();
             auto ghost = pasta::Agent(NULL);
-            ghost.Load(loaddir.string());
+            ghost.load(loaddir.string());
 
             {
                 auto req =
