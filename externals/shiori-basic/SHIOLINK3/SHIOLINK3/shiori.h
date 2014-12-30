@@ -1,31 +1,14 @@
 // ----------------------------------------------------------------------------
-// 別プロセス通信SHIORI SHIOLINK.DLL
+// 別プロセス通信SHIORI SHIOLINK3.DLL
 //   The MIT License
 //   http://sourceforge.jp/projects/opensource/wiki/licenses%2FMIT_license
 // ----------------------------------------------------------------------------
-#ifndef SHIORI_H__
-#define SHIORI_H__
-
+#pragma once
 #include <windows.h>
 
 /* ----------------------------------------------------------------------------
- * 栞 I/F 関数の宣言があるだけ?.
- *
- * 使い方:
- *
- * #include <windows.h>
- * #define  SHIORI_API_IMPLEMENTS
- * #include "shiori.h"
- *
- * SHIORI_API_IMPLEMENTS を define しておくと,
- * 関数を dll-export する様になります.
- * define されていなければ, dll-import する様になります.
- *
- */
-
-/* ----------------------------------------------------------------------------
- * import/export マクロ
- */
+* import/export マクロ
+*/
 #ifndef SHIORI_API_IMPORT
 #  ifdef __cplusplus
 #    define SHIORI_API_IMPORT extern "C" __declspec(dllimport)
@@ -51,11 +34,9 @@
 #endif
 
 /* ----------------------------------------------------------------------------
- * 栞 メソッド
- */
+* 栞 メソッド
+*/
 SHIORI_API BOOL    __cdecl load(HGLOBAL    hGlobal_loaddir, long  loaddir_len);
 SHIORI_API HGLOBAL __cdecl request(HGLOBAL hGlobal_request, long& len);
 SHIORI_API BOOL    __cdecl unload(void);
-
-#endif
-
+// EOF

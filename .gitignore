@@ -25,3 +25,5 @@ ipch
 *.TMP
 /src/web/bin
 /src/web/obj
+/externals/shiori-basic/SHIOLINK3/Debug
+/externals/shiori-basic/SHIOLINK3/SHIOLINK3/Debug
