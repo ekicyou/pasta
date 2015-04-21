@@ -9,6 +9,4 @@ pushd ..
 
 pushd ..\_out
   echo nojekyll > .nojekyll
-  git add --all
-  git commit -a -m "sync %COMPUTERNAME%"
   popd
