@@ -1,7 +1,0 @@
-syntax: glob
-*.suo
-.nuget/
-*.user
-bin/
-obj/
-*.userprefs
