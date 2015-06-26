@@ -498,7 +498,7 @@ DUK_LOCAL void duk__parse_disjunction(duk_re_compiler_ctx *re_ctx, duk_bool_t ex
 					 *      SPLIT1 LSEQ
 					 *      (atom)
 					 *      SPLIT1 LSEQ    ; <- the byte length of this instruction is needed
-					 *      (atom)	       ; to encode the above SPLIT1 correctly
+					 *      (atom)         ; to encode the above SPLIT1 correctly
 					 *      ...
 					 *   LSEQ:
 					 */
@@ -762,8 +762,8 @@ DUK_LOCAL void duk__parse_disjunction(duk_re_compiler_ctx *re_ctx, duk_bool_t ex
  */
 
 DUK_LOCAL duk_uint32_t duk__parse_regexp_flags(duk_hthread *thr, duk_hstring *h) {
-	duk_uint8_t *p;
-	duk_uint8_t *p_end;
+	const duk_uint8_t *p;
+	const duk_uint8_t *p_end;
 	duk_uint32_t flags = 0;
 
 	p = DUK_HSTRING_GET_DATA(h);
@@ -943,7 +943,7 @@ DUK_INTERNAL void duk_regexp_compile(duk_hthread *thr) {
 	 *  Init lexer
 	 */
 
-	lex_point.offset = 0;		/* expensive init, just want to fill window */
+	lex_point.offset = 0;  /* expensive init, just want to fill window */
 	lex_point.line = 1;
 	DUK_LEXER_SETPOINT(&re_ctx.lex, &lex_point);
 
@@ -1042,25 +1042,25 @@ DUK_INTERNAL void duk_regexp_create_instance(duk_hthread *thr) {
 	DUK_HOBJECT_SET_CLASS_NUMBER(h, DUK_HOBJECT_CLASS_REGEXP);
 	DUK_HOBJECT_SET_PROTOTYPE_UPDREF(thr, h, thr->builtins[DUK_BIDX_REGEXP_PROTOTYPE]);
 
-	duk_def_prop_stridx(ctx, -3, DUK_STRIDX_INT_BYTECODE, DUK_PROPDESC_FLAGS_NONE);
+	duk_xdef_prop_stridx(ctx, -3, DUK_STRIDX_INT_BYTECODE, DUK_PROPDESC_FLAGS_NONE);
 
 	/* [ ... regexp_object escaped_source ] */
 
-	duk_def_prop_stridx(ctx, -2, DUK_STRIDX_SOURCE, DUK_PROPDESC_FLAGS_NONE);
+	duk_xdef_prop_stridx(ctx, -2, DUK_STRIDX_SOURCE, DUK_PROPDESC_FLAGS_NONE);
 
 	/* [ ... regexp_object ] */
 
 	duk_push_boolean(ctx, (re_flags & DUK_RE_FLAG_GLOBAL));
-	duk_def_prop_stridx(ctx, -2, DUK_STRIDX_GLOBAL, DUK_PROPDESC_FLAGS_NONE);
+	duk_xdef_prop_stridx(ctx, -2, DUK_STRIDX_GLOBAL, DUK_PROPDESC_FLAGS_NONE);
 
 	duk_push_boolean(ctx, (re_flags & DUK_RE_FLAG_IGNORE_CASE));
-	duk_def_prop_stridx(ctx, -2, DUK_STRIDX_IGNORE_CASE, DUK_PROPDESC_FLAGS_NONE);
+	duk_xdef_prop_stridx(ctx, -2, DUK_STRIDX_IGNORE_CASE, DUK_PROPDESC_FLAGS_NONE);
 
 	duk_push_boolean(ctx, (re_flags & DUK_RE_FLAG_MULTILINE));
-	duk_def_prop_stridx(ctx, -2, DUK_STRIDX_MULTILINE, DUK_PROPDESC_FLAGS_NONE);
+	duk_xdef_prop_stridx(ctx, -2, DUK_STRIDX_MULTILINE, DUK_PROPDESC_FLAGS_NONE);
 
 	duk_push_int(ctx, 0);
-	duk_def_prop_stridx(ctx, -2, DUK_STRIDX_LAST_INDEX, DUK_PROPDESC_FLAGS_W);
+	duk_xdef_prop_stridx(ctx, -2, DUK_STRIDX_LAST_INDEX, DUK_PROPDESC_FLAGS_W);
 
 	/* [ ... regexp_object ] */
 }

@@ -101,13 +101,13 @@ DUK_LOCAL void duk__dump_stringtable(duk_heap *heap) {
 	char buf[64+1];
 
 	DUK_D(DUK_DPRINT("stringtable %p, used %ld, size %ld, load %ld%%",
-	                 (void *) heap->st,
+	                 (void *) heap->strtable,
 	                 (long) heap->st_used,
 	                 (long) heap->st_size,
 	                 (long) (((double) heap->st_used) / ((double) heap->st_size) * 100.0)));
 
 	for (i = 0; i < (duk_uint_fast32_t) heap->st_size; i++) {
-		duk_hstring *e = heap->st[i];
+		duk_hstring *e = heap->strtable[i];
 
 		if (!e) {
 			DUK_D(DUK_DPRINT("  [%ld]: NULL", (long) i));
@@ -198,7 +198,7 @@ DUK_INTERNAL void duk_debug_dump_heap(duk_heap *heap) {
 #pragma GCC diagnostic pop
 #endif
 
-	DUK_D(DUK_DPRINT("  alloc_udata: %p", (void *) heap->alloc_udata));
+	DUK_D(DUK_DPRINT("  heap_udata: %p", (void *) heap->heap_udata));
 
 #ifdef DUK_USE_MARK_AND_SWEEP
 #ifdef DUK_USE_VOLUNTARY_GC

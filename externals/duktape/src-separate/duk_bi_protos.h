@@ -75,7 +75,6 @@ DUK_INTERNAL_DECL duk_ret_t duk_bi_error_prototype_to_string(duk_context *ctx);
 DUK_INTERNAL_DECL duk_ret_t duk_bi_error_prototype_stack_getter(duk_context *ctx);
 DUK_INTERNAL_DECL duk_ret_t duk_bi_error_prototype_filename_getter(duk_context *ctx);
 DUK_INTERNAL_DECL duk_ret_t duk_bi_error_prototype_linenumber_getter(duk_context *ctx);
-DUK_INTERNAL_DECL duk_ret_t duk_bi_error_prototype_stack_getter(duk_context *ctx);
 DUK_INTERNAL_DECL duk_ret_t duk_bi_error_prototype_nop_setter(duk_context *ctx);
 
 DUK_INTERNAL_DECL duk_ret_t duk_bi_function_constructor(duk_context *ctx);
@@ -96,8 +95,7 @@ DUK_INTERNAL_DECL duk_ret_t duk_bi_global_object_encode_uri(duk_context *ctx);
 DUK_INTERNAL_DECL duk_ret_t duk_bi_global_object_encode_uri_component(duk_context *ctx);
 DUK_INTERNAL_DECL duk_ret_t duk_bi_global_object_escape(duk_context *ctx);
 DUK_INTERNAL_DECL duk_ret_t duk_bi_global_object_unescape(duk_context *ctx);
-DUK_INTERNAL_DECL duk_ret_t duk_bi_global_object_print(duk_context *ctx);
-DUK_INTERNAL_DECL duk_ret_t duk_bi_global_object_alert(duk_context *ctx);
+DUK_INTERNAL_DECL duk_ret_t duk_bi_global_object_print_helper(duk_context *ctx);
 DUK_INTERNAL_DECL duk_ret_t duk_bi_global_object_require(duk_context *ctx);
 
 DUK_INTERNAL_DECL
@@ -171,9 +169,10 @@ DUK_INTERNAL_DECL duk_ret_t duk_bi_string_prototype_split(duk_context *ctx);
 DUK_INTERNAL_DECL duk_ret_t duk_bi_string_prototype_substring(duk_context *ctx);
 DUK_INTERNAL_DECL duk_ret_t duk_bi_string_prototype_caseconv_shared(duk_context *ctx);
 DUK_INTERNAL_DECL duk_ret_t duk_bi_string_prototype_trim(duk_context *ctx);
-#ifdef DUK_USE_SECTION_B
+/* Note: present even if DUK_OPT_NO_SECTION_B given because genbuiltins.py
+ * will point to it.
+ */
 DUK_INTERNAL_DECL duk_ret_t duk_bi_string_prototype_substr(duk_context *ctx);
-#endif
 
 DUK_INTERNAL_DECL duk_ret_t duk_bi_proxy_constructor(duk_context *ctx);
 #if 0  /* unimplemented now */

@@ -27,7 +27,6 @@ DUK_INTERNAL const char *duk_str_not_number = "not number";
 DUK_INTERNAL const char *duk_str_not_string = "not string";
 DUK_INTERNAL const char *duk_str_not_pointer = "not pointer";
 DUK_INTERNAL const char *duk_str_not_buffer = "not buffer";
-DUK_INTERNAL const char *duk_str_not_object = "not object";
 DUK_INTERNAL const char *duk_str_unexpected_type = "unexpected type";
 DUK_INTERNAL const char *duk_str_not_thread = "not thread";
 #if 0  /*unused*/
@@ -58,8 +57,7 @@ DUK_INTERNAL const char *duk_str_array_length_over_2g = "array length over 2G";
 
 /* JSON */
 DUK_INTERNAL const char *duk_str_fmt_ptr = "%p";
-DUK_INTERNAL const char *duk_str_invalid_json = "invalid json";
-DUK_INTERNAL const char *duk_str_invalid_number = "invalid number";
+DUK_INTERNAL const char *duk_str_fmt_invalid_json = "invalid json (at offset %ld)";
 DUK_INTERNAL const char *duk_str_jsondec_reclimit = "json decode recursion limit";
 DUK_INTERNAL const char *duk_str_jsonenc_reclimit = "json encode recursion limit";
 DUK_INTERNAL const char *duk_str_cyclic_input = "cyclic input";
@@ -122,6 +120,8 @@ DUK_INTERNAL const char *duk_str_regexp_internal_error = "regexp internal error"
 
 /* Limits */
 DUK_INTERNAL const char *duk_str_valstack_limit = "valstack limit";
+DUK_INTERNAL const char *duk_str_callstack_limit = "callstack limit";
+DUK_INTERNAL const char *duk_str_catchstack_limit = "catchstack limit";
 DUK_INTERNAL const char *duk_str_object_property_limit = "object property limit";
 DUK_INTERNAL const char *duk_str_prototype_chain_limit = "prototype chain limit";
 DUK_INTERNAL const char *duk_str_bound_chain_limit = "function call bound chain limit";
@@ -138,3 +138,4 @@ DUK_INTERNAL const char *duk_str_regexp_executor_step_limit = "regexp step limit
 
 /* Misc */
 DUK_INTERNAL const char *duk_str_anon = "anon";
+DUK_INTERNAL const char *duk_str_realloc_failed = "realloc failed";

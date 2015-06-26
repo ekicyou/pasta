@@ -25,7 +25,12 @@
  * This limit should be eliminated on 64-bit platforms (and increased
  * closer to maximum support on 32-bit platforms).
  */
+
+#if defined(DUK_USE_STRLEN16)
+#define DUK_HSTRING_MAX_BYTELEN                     (0x0000ffffUL)
+#else
 #define DUK_HSTRING_MAX_BYTELEN                     (0x7fffffffUL)
+#endif
 
 /* XXX: could add flags for "is valid CESU-8" (Ecmascript compatible strings),
  * "is valid UTF-8", "is valid extended UTF-8" (internal strings are not,
@@ -38,33 +43,77 @@
 #define DUK_HSTRING_FLAG_RESERVED_WORD              DUK_HEAPHDR_USER_FLAG(2)  /* string is a reserved word (non-strict) */
 #define DUK_HSTRING_FLAG_STRICT_RESERVED_WORD       DUK_HEAPHDR_USER_FLAG(3)  /* string is a reserved word (strict) */
 #define DUK_HSTRING_FLAG_EVAL_OR_ARGUMENTS          DUK_HEAPHDR_USER_FLAG(4)  /* string is 'eval' or 'arguments' */
+#define DUK_HSTRING_FLAG_EXTDATA                    DUK_HEAPHDR_USER_FLAG(5)  /* string data is external (duk_hstring_external) */
 
 #define DUK_HSTRING_HAS_ARRIDX(x)                   DUK_HEAPHDR_CHECK_FLAG_BITS(&(x)->hdr, DUK_HSTRING_FLAG_ARRIDX)
 #define DUK_HSTRING_HAS_INTERNAL(x)                 DUK_HEAPHDR_CHECK_FLAG_BITS(&(x)->hdr, DUK_HSTRING_FLAG_INTERNAL)
 #define DUK_HSTRING_HAS_RESERVED_WORD(x)            DUK_HEAPHDR_CHECK_FLAG_BITS(&(x)->hdr, DUK_HSTRING_FLAG_RESERVED_WORD)
 #define DUK_HSTRING_HAS_STRICT_RESERVED_WORD(x)     DUK_HEAPHDR_CHECK_FLAG_BITS(&(x)->hdr, DUK_HSTRING_FLAG_STRICT_RESERVED_WORD)
 #define DUK_HSTRING_HAS_EVAL_OR_ARGUMENTS(x)        DUK_HEAPHDR_CHECK_FLAG_BITS(&(x)->hdr, DUK_HSTRING_FLAG_EVAL_OR_ARGUMENTS)
+#define DUK_HSTRING_HAS_EXTDATA(x)                  DUK_HEAPHDR_CHECK_FLAG_BITS(&(x)->hdr, DUK_HSTRING_FLAG_EXTDATA)
 
 #define DUK_HSTRING_SET_ARRIDX(x)                   DUK_HEAPHDR_SET_FLAG_BITS(&(x)->hdr, DUK_HSTRING_FLAG_ARRIDX)
 #define DUK_HSTRING_SET_INTERNAL(x)                 DUK_HEAPHDR_SET_FLAG_BITS(&(x)->hdr, DUK_HSTRING_FLAG_INTERNAL)
 #define DUK_HSTRING_SET_RESERVED_WORD(x)            DUK_HEAPHDR_SET_FLAG_BITS(&(x)->hdr, DUK_HSTRING_FLAG_RESERVED_WORD)
 #define DUK_HSTRING_SET_STRICT_RESERVED_WORD(x)     DUK_HEAPHDR_SET_FLAG_BITS(&(x)->hdr, DUK_HSTRING_FLAG_STRICT_RESERVED_WORD)
 #define DUK_HSTRING_SET_EVAL_OR_ARGUMENTS(x)        DUK_HEAPHDR_SET_FLAG_BITS(&(x)->hdr, DUK_HSTRING_FLAG_EVAL_OR_ARGUMENTS)
+#define DUK_HSTRING_SET_EXTDATA(x)                  DUK_HEAPHDR_SET_FLAG_BITS(&(x)->hdr, DUK_HSTRING_FLAG_EXTDATA)
 
 #define DUK_HSTRING_CLEAR_ARRIDX(x)                 DUK_HEAPHDR_CLEAR_FLAG_BITS(&(x)->hdr, DUK_HSTRING_FLAG_ARRIDX)
 #define DUK_HSTRING_CLEAR_INTERNAL(x)               DUK_HEAPHDR_CLEAR_FLAG_BITS(&(x)->hdr, DUK_HSTRING_FLAG_INTERNAL)
 #define DUK_HSTRING_CLEAR_RESERVED_WORD(x)          DUK_HEAPHDR_CLEAR_FLAG_BITS(&(x)->hdr, DUK_HSTRING_FLAG_RESERVED_WORD)
 #define DUK_HSTRING_CLEAR_STRICT_RESERVED_WORD(x)   DUK_HEAPHDR_CLEAR_FLAG_BITS(&(x)->hdr, DUK_HSTRING_FLAG_STRICT_RESERVED_WORD)
 #define DUK_HSTRING_CLEAR_EVAL_OR_ARGUMENTS(x)      DUK_HEAPHDR_CLEAR_FLAG_BITS(&(x)->hdr, DUK_HSTRING_FLAG_EVAL_OR_ARGUMENTS)
+#define DUK_HSTRING_CLEAR_EXTDATA(x)                DUK_HEAPHDR_CLEAR_FLAG_BITS(&(x)->hdr, DUK_HSTRING_FLAG_EXTDATA)
 
-#define DUK_HSTRING_IS_ASCII(x)                     ((x)->blen == (x)->clen)
-#define DUK_HSTRING_IS_EMPTY(x)                     ((x)->blen == 0)
+#define DUK_HSTRING_IS_ASCII(x)                     (DUK_HSTRING_GET_BYTELEN((x)) == DUK_HSTRING_GET_CHARLEN((x)))
+#define DUK_HSTRING_IS_EMPTY(x)                     (DUK_HSTRING_GET_BYTELEN((x)) == 0)
 
+#if defined(DUK_USE_STRHASH16)
+#define DUK_HSTRING_GET_HASH(x)                     ((x)->hdr.h_flags >> 16)
+#define DUK_HSTRING_SET_HASH(x,v) do { \
+		(x)->hdr.h_flags = ((x)->hdr.h_flags & 0x0000ffffUL) | ((v) << 16); \
+	} while (0)
+#else
 #define DUK_HSTRING_GET_HASH(x)                     ((x)->hash)
+#define DUK_HSTRING_SET_HASH(x,v) do { \
+		(x)->hash = (v); \
+	} while (0)
+#endif
+
+#if defined(DUK_USE_STRLEN16)
+#define DUK_HSTRING_GET_BYTELEN(x)                  ((x)->blen16)
+#define DUK_HSTRING_SET_BYTELEN(x,v) do { \
+		(x)->blen16 = (v); \
+	} while (0)
+#define DUK_HSTRING_GET_CHARLEN(x)                  ((x)->clen16)
+#define DUK_HSTRING_SET_CHARLEN(x,v) do { \
+		(x)->clen16 = (v); \
+	} while (0)
+#else
 #define DUK_HSTRING_GET_BYTELEN(x)                  ((x)->blen)
+#define DUK_HSTRING_SET_BYTELEN(x,v) do { \
+		(x)->blen = (v); \
+	} while (0)
 #define DUK_HSTRING_GET_CHARLEN(x)                  ((x)->clen)
-#define DUK_HSTRING_GET_DATA(x)                     ((duk_uint8_t *) ((x) + 1))
-#define DUK_HSTRING_GET_DATA_END(x)                 (((duk_uint8_t *) ((x) + 1)) + ((x)->blen))
+#define DUK_HSTRING_SET_CHARLEN(x,v) do { \
+		(x)->clen = (v); \
+	} while (0)
+#endif
+
+#if defined(DUK_USE_HSTRING_EXTDATA)
+#define DUK_HSTRING_GET_EXTDATA(x) \
+	((x)->extdata)
+#define DUK_HSTRING_GET_DATA(x) \
+	(DUK_HSTRING_HAS_EXTDATA((x)) ? \
+		DUK_HSTRING_GET_EXTDATA((duk_hstring_external *) (x)) : ((const duk_uint8_t *) ((x) + 1)))
+#else
+#define DUK_HSTRING_GET_DATA(x) \
+	((const duk_uint8_t *) ((x) + 1))
+#endif
+
+#define DUK_HSTRING_GET_DATA_END(x) \
+	(DUK_HSTRING_GET_DATA((x)) + (x)->blen)
 
 /* marker value; in E5 2^32-1 is not a valid array index (2^32-2 is highest valid) */
 #define DUK_HSTRING_NO_ARRAY_INDEX  (0xffffffffUL)
@@ -84,8 +133,10 @@
  */
 
 struct duk_hstring {
-	/* smaller heaphdr than for other objects, because strings are held
-	 * in string intern table which requires no link pointers.
+	/* Smaller heaphdr than for other objects, because strings are held
+	 * in string intern table which requires no link pointers.  Much of
+	 * the 32-bit flags field is unused by flags, so we can stuff a 16-bit
+	 * field in there.
 	 */
 	duk_heaphdr_string hdr;
 
@@ -93,9 +144,26 @@ struct duk_hstring {
 	 * shared heap header.  Good hashing needs more hash bits though.
 	 */
 
-	duk_uint32_t hash;         /* string hash */
-	duk_uint32_t blen;         /* length in bytes (not counting NUL term) */
-	duk_uint32_t clen;         /* length in codepoints (must be E5 compatible) */
+	/* string hash */
+#if defined(DUK_USE_STRHASH16)
+	/* If 16-bit hash is in use, stuff it into duk_heaphdr_string flags. */
+#else
+	duk_uint32_t hash;
+#endif
+
+	/* length in bytes (not counting NUL term) */
+#if defined(DUK_USE_STRLEN16)
+	duk_uint16_t blen16;
+#else
+	duk_uint32_t blen;
+#endif
+
+	/* length in codepoints (must be E5 compatible) */
+#if defined(DUK_USE_STRLEN16)
+	duk_uint16_t clen16;
+#else
+	duk_uint32_t clen;
+#endif
 
 	/*
 	 *  String value of 'blen+1' bytes follows (+1 for NUL termination
@@ -103,6 +171,19 @@ struct duk_hstring {
 	 *  for strings, but fields above should guarantee alignment-by-4
 	 *  (but not alignment-by-8).
 	 */
+};
+
+/* The external string struct is defined even when the feature is inactive. */
+struct duk_hstring_external {
+	duk_hstring str;
+
+	/*
+	 *  For an external string, the NUL-terminated string data is stored
+	 *  externally.  The user must guarantee that data behind this pointer
+	 *  doesn't change while it's used.
+	 */
+
+	const duk_uint8_t *extdata;
 };
 
 /*

@@ -37,7 +37,6 @@
  */
 
 /* Forward declarations. */
-DUK_LOCAL_DECL duk_uint8_t duk__date_equivyear[14];
 DUK_LOCAL_DECL duk_double_t duk__push_this_get_timeval_tzoffset(duk_context *ctx, duk_small_uint_t flags, duk_int_t *out_tzoffset);
 DUK_LOCAL_DECL duk_double_t duk__push_this_get_timeval(duk_context *ctx, duk_small_uint_t flags);
 DUK_LOCAL_DECL void duk__timeval_to_parts(duk_double_t d, duk_int_t *parts, duk_double_t *dparts, duk_small_uint_t flags);
@@ -139,6 +138,43 @@ DUK_LOCAL_DECL duk_bool_t duk__year_in_valid_range(duk_double_t year);
 		                 (double) (dparts)[4], (double) (dparts)[5], \
 		                 (double) (dparts)[6], (double) (dparts)[7])); \
 	} while (0)
+
+/* Equivalent year for DST calculations outside [1970,2038[ range, see
+ * E5 Section 15.9.1.8.  Equivalent year has the same leap-year-ness and
+ * starts with the same weekday on Jan 1.
+ * https://bugzilla.mozilla.org/show_bug.cgi?id=351066
+ */
+#define DUK__YEAR(x) ((duk_uint8_t) ((x) - 1970))
+DUK_LOCAL duk_uint8_t duk__date_equivyear[14] = {
+#if 1
+	/* This is based on V8 EquivalentYear() algorithm (see src/genequivyear.py):
+	 * http://code.google.com/p/v8/source/browse/trunk/src/date.h#146
+	 */
+
+	/* non-leap year: sunday, monday, ... */
+	DUK__YEAR(2023), DUK__YEAR(2035), DUK__YEAR(2019), DUK__YEAR(2031),
+	DUK__YEAR(2015), DUK__YEAR(2027), DUK__YEAR(2011),
+
+	/* leap year: sunday, monday, ... */
+	DUK__YEAR(2012), DUK__YEAR(2024), DUK__YEAR(2008), DUK__YEAR(2020),
+	DUK__YEAR(2032), DUK__YEAR(2016), DUK__YEAR(2028)
+#endif
+
+#if 0
+	/* This is based on Rhino EquivalentYear() algorithm:
+	 * https://github.com/mozilla/rhino/blob/f99cc11d616f0cdda2c42bde72b3484df6182947/src/org/mozilla/javascript/NativeDate.java
+	 */
+
+	/* non-leap year: sunday, monday, ... */
+	DUK__YEAR(1978), DUK__YEAR(1973), DUK__YEAR(1985), DUK__YEAR(1986),
+	DUK__YEAR(1981), DUK__YEAR(1971), DUK__YEAR(1977),
+
+	/* leap year: sunday, monday, ... */
+	DUK__YEAR(1984), DUK__YEAR(1996), DUK__YEAR(1980), DUK__YEAR(1992),
+	DUK__YEAR(1976), DUK__YEAR(1988), DUK__YEAR(1972)
+#endif
+};
+#undef DUK__YEAR
 
 /*
  *  Platform specific helpers
@@ -853,43 +889,6 @@ DUK_LOCAL duk_uint8_t duk__days_in_month[12] = {
 	(duk_uint8_t) 31, (duk_uint8_t) 30, (duk_uint8_t) 31, (duk_uint8_t) 31,
 	(duk_uint8_t) 30, (duk_uint8_t) 31, (duk_uint8_t) 30, (duk_uint8_t) 31
 };
-
-/* Equivalent year for DST calculations outside [1970,2038[ range, see
- * E5 Section 15.9.1.8.  Equivalent year has the same leap-year-ness and
- * starts with the same weekday on Jan 1.
- * https://bugzilla.mozilla.org/show_bug.cgi?id=351066
- */
-#define DUK__YEAR(x) ((duk_uint8_t) ((x) - 1970))
-DUK_LOCAL duk_uint8_t duk__date_equivyear[14] = {
-#if 1
-	/* This is based on V8 EquivalentYear() algorithm (see src/genequivyear.py):
-	 * http://code.google.com/p/v8/source/browse/trunk/src/date.h#146
-	 */
-
-	/* non-leap year: sunday, monday, ... */
-	DUK__YEAR(2023), DUK__YEAR(2035), DUK__YEAR(2019), DUK__YEAR(2031),
-	DUK__YEAR(2015), DUK__YEAR(2027), DUK__YEAR(2011),
-
-	/* leap year: sunday, monday, ... */
-	DUK__YEAR(2012), DUK__YEAR(2024), DUK__YEAR(2008), DUK__YEAR(2020),
-	DUK__YEAR(2032), DUK__YEAR(2016), DUK__YEAR(2028)
-#endif
-
-#if 0
-	/* This is based on Rhino EquivalentYear() algorithm:
-	 * https://github.com/mozilla/rhino/blob/f99cc11d616f0cdda2c42bde72b3484df6182947/src/org/mozilla/javascript/NativeDate.java
-	 */
-
-	/* non-leap year: sunday, monday, ... */
-	DUK__YEAR(1978), DUK__YEAR(1973), DUK__YEAR(1985), DUK__YEAR(1986),
-	DUK__YEAR(1981), DUK__YEAR(1971), DUK__YEAR(1977),
-
-	/* leap year: sunday, monday, ... */
-	DUK__YEAR(1984), DUK__YEAR(1996), DUK__YEAR(1980), DUK__YEAR(1992),
-	DUK__YEAR(1976), DUK__YEAR(1988), DUK__YEAR(1972)
-#endif
-};
-#undef DUK__YEAR
 
 /* Maximum iteration count for computing UTC-to-local time offset when
  * creating an Ecmascript time value from local parts.
@@ -1749,6 +1748,145 @@ DUK_INTERNAL void duk_bi_date_format_timeval(duk_double_t timeval, duk_uint8_t *
 }
 
 /*
+ *  Indirect magic value lookup for Date methods.
+ *
+ *  Date methods don't put their control flags into the function magic value
+ *  because they wouldn't fit into a LIGHTFUNC's magic field.  Instead, the
+ *  magic value is set to an index pointing to the array of control flags
+ *  below.
+ *
+ *  This must be kept in strict sync with genbuiltins.py!
+ */
+
+static duk_uint16_t duk__date_magics[] = {
+	/* 0: toString */
+	DUK__FLAG_TOSTRING_DATE + DUK__FLAG_TOSTRING_TIME + DUK__FLAG_LOCALTIME,
+
+	/* 1: toDateString */
+	DUK__FLAG_TOSTRING_DATE + DUK__FLAG_LOCALTIME,
+
+	/* 2: toTimeString */
+	DUK__FLAG_TOSTRING_TIME + DUK__FLAG_LOCALTIME,
+
+	/* 3: toLocaleString */
+	DUK__FLAG_TOSTRING_DATE + DUK__FLAG_TOSTRING_TIME + DUK__FLAG_TOSTRING_LOCALE + DUK__FLAG_LOCALTIME,
+
+	/* 4: toLocaleDateString */
+	DUK__FLAG_TOSTRING_DATE + DUK__FLAG_TOSTRING_LOCALE + DUK__FLAG_LOCALTIME,
+
+	/* 5: toLocaleTimeString */
+	DUK__FLAG_TOSTRING_TIME + DUK__FLAG_TOSTRING_LOCALE + DUK__FLAG_LOCALTIME,
+
+	/* 6: toUTCString */
+	DUK__FLAG_TOSTRING_DATE + DUK__FLAG_TOSTRING_TIME,
+
+	/* 7: toISOString */
+	DUK__FLAG_TOSTRING_DATE + DUK__FLAG_TOSTRING_TIME + DUK__FLAG_NAN_TO_RANGE_ERROR + DUK__FLAG_SEP_T,
+
+	/* 8: getFullYear */
+	DUK__FLAG_LOCALTIME + (DUK__IDX_YEAR << DUK__FLAG_VALUE_SHIFT),
+
+	/* 9: getUTCFullYear */
+	0 + (DUK__IDX_YEAR << DUK__FLAG_VALUE_SHIFT),
+
+	/* 10: getMonth */
+	DUK__FLAG_LOCALTIME + (DUK__IDX_MONTH << DUK__FLAG_VALUE_SHIFT),
+
+	/* 11: getUTCMonth */
+	0 + (DUK__IDX_MONTH << DUK__FLAG_VALUE_SHIFT),
+
+	/* 12: getDate */
+	DUK__FLAG_ONEBASED + DUK__FLAG_LOCALTIME + (DUK__IDX_DAY << DUK__FLAG_VALUE_SHIFT),
+
+	/* 13: getUTCDate */
+	DUK__FLAG_ONEBASED + (DUK__IDX_DAY << DUK__FLAG_VALUE_SHIFT),
+
+	/* 14: getDay */
+	DUK__FLAG_LOCALTIME + (DUK__IDX_WEEKDAY << DUK__FLAG_VALUE_SHIFT),
+
+	/* 15: getUTCDay */
+	0 + (DUK__IDX_WEEKDAY << DUK__FLAG_VALUE_SHIFT),
+
+	/* 16: getHours */
+	DUK__FLAG_LOCALTIME + (DUK__IDX_HOUR << DUK__FLAG_VALUE_SHIFT),
+
+	/* 17: getUTCHours */
+	0 + (DUK__IDX_HOUR << DUK__FLAG_VALUE_SHIFT),
+
+	/* 18: getMinutes */
+	DUK__FLAG_LOCALTIME + (DUK__IDX_MINUTE << DUK__FLAG_VALUE_SHIFT),
+
+	/* 19: getUTCMinutes */
+	0 + (DUK__IDX_MINUTE << DUK__FLAG_VALUE_SHIFT),
+
+	/* 20: getSeconds */
+	DUK__FLAG_LOCALTIME + (DUK__IDX_SECOND << DUK__FLAG_VALUE_SHIFT),
+
+	/* 21: getUTCSeconds */
+	0 + (DUK__IDX_SECOND << DUK__FLAG_VALUE_SHIFT),
+
+	/* 22: getMilliseconds */
+	DUK__FLAG_LOCALTIME + (DUK__IDX_MILLISECOND << DUK__FLAG_VALUE_SHIFT),
+
+	/* 23: getUTCMilliseconds */
+	0 + (DUK__IDX_MILLISECOND << DUK__FLAG_VALUE_SHIFT),
+
+	/* 24: setMilliseconds */
+	DUK__FLAG_TIMESETTER + DUK__FLAG_LOCALTIME + (1 << DUK__FLAG_VALUE_SHIFT),
+
+	/* 25: setUTCMilliseconds */
+	DUK__FLAG_TIMESETTER + (1 << DUK__FLAG_VALUE_SHIFT),
+
+	/* 26: setSeconds */
+	DUK__FLAG_TIMESETTER + DUK__FLAG_LOCALTIME + (2 << DUK__FLAG_VALUE_SHIFT),
+
+	/* 27: setUTCSeconds */
+	DUK__FLAG_TIMESETTER + (2 << DUK__FLAG_VALUE_SHIFT),
+
+	/* 28: setMinutes */
+	DUK__FLAG_TIMESETTER + DUK__FLAG_LOCALTIME + (3 << DUK__FLAG_VALUE_SHIFT),
+
+	/* 29: setUTCMinutes */
+	DUK__FLAG_TIMESETTER + (3 << DUK__FLAG_VALUE_SHIFT),
+
+	/* 30: setHours */
+	DUK__FLAG_TIMESETTER + DUK__FLAG_LOCALTIME + (4 << DUK__FLAG_VALUE_SHIFT),
+
+	/* 31: setUTCHours */
+	DUK__FLAG_TIMESETTER + (4 << DUK__FLAG_VALUE_SHIFT),
+
+	/* 32: setDate */
+	DUK__FLAG_LOCALTIME + (1 << DUK__FLAG_VALUE_SHIFT),
+
+	/* 33: setUTCDate */
+	0 + (1 << DUK__FLAG_VALUE_SHIFT),
+
+	/* 34: setMonth */
+	DUK__FLAG_LOCALTIME + (2 << DUK__FLAG_VALUE_SHIFT),
+
+	/* 35: setUTCMonth */
+	0 + (2 << DUK__FLAG_VALUE_SHIFT),
+
+	/* 36: setFullYear */
+	DUK__FLAG_NAN_TO_ZERO + DUK__FLAG_LOCALTIME + (3 << DUK__FLAG_VALUE_SHIFT),
+
+	/* 37: setUTCFullYear */
+	DUK__FLAG_NAN_TO_ZERO + (3 << DUK__FLAG_VALUE_SHIFT),
+
+	/* 38: getYear */
+	DUK__FLAG_LOCALTIME + DUK__FLAG_SUB1900 + (DUK__IDX_YEAR << DUK__FLAG_VALUE_SHIFT),
+
+	/* 39: setYear */
+	DUK__FLAG_NAN_TO_ZERO + DUK__FLAG_YEAR_FIXUP + (3 << DUK__FLAG_VALUE_SHIFT),
+};
+
+DUK_LOCAL duk_small_uint_t duk__date_get_indirect_magic(duk_context *ctx) {
+	duk_small_int_t magicidx = (duk_small_uint_t) duk_get_current_magic(ctx);
+	DUK_ASSERT(magicidx >= 0 && magicidx < (duk_small_int_t) (sizeof(duk__date_magics) / sizeof(duk_uint16_t)));
+	return (duk_small_uint_t) duk__date_magics[magicidx];
+}
+
+/*
  *  Constructor calls
  */
 
@@ -1772,7 +1910,7 @@ DUK_INTERNAL duk_ret_t duk_bi_date_constructor(duk_context *ctx) {
 	if (nargs == 0 || !is_cons) {
 		d = duk__timeclip(DUK__GET_NOW_TIMEVAL(ctx));
 		duk_push_number(ctx, d);
-		duk_def_prop_stridx(ctx, -2, DUK_STRIDX_INT_VALUE, DUK_PROPDESC_FLAGS_W);
+		duk_xdef_prop_stridx(ctx, -2, DUK_STRIDX_INT_VALUE, DUK_PROPDESC_FLAGS_W);
 		if (!is_cons) {
 			/* called as a normal function: return new Date().toString() */
 			duk_to_string(ctx, -1);
@@ -1786,7 +1924,7 @@ DUK_INTERNAL duk_ret_t duk_bi_date_constructor(duk_context *ctx) {
 		}
 		d = duk__timeclip(duk_to_number(ctx, 0));
 		duk_push_number(ctx, d);
-		duk_def_prop_stridx(ctx, -2, DUK_STRIDX_INT_VALUE, DUK_PROPDESC_FLAGS_W);
+		duk_xdef_prop_stridx(ctx, -2, DUK_STRIDX_INT_VALUE, DUK_PROPDESC_FLAGS_W);
 		return 1;
 	}
 
@@ -1866,7 +2004,7 @@ DUK_INTERNAL duk_ret_t duk_bi_date_constructor_now(duk_context *ctx) {
  */
 
 DUK_INTERNAL duk_ret_t duk_bi_date_prototype_tostring_shared(duk_context *ctx) {
-	duk_small_uint_t flags = (duk_small_uint_t) duk_get_current_magic(ctx);
+	duk_small_uint_t flags = duk__date_get_indirect_magic(ctx);
 	return duk__to_string_helper(ctx, flags);
 }
 
@@ -1948,7 +2086,7 @@ DUK_INTERNAL duk_ret_t duk_bi_date_prototype_to_json(duk_context *ctx) {
  */
 
 DUK_INTERNAL duk_ret_t duk_bi_date_prototype_get_shared(duk_context *ctx) {
-	duk_small_uint_t flags_and_idx = (duk_small_uint_t) duk_get_current_magic(ctx);
+	duk_small_uint_t flags_and_idx = duk__date_get_indirect_magic(ctx);
 	return duk__get_part_helper(ctx, flags_and_idx);
 }
 
@@ -2033,7 +2171,7 @@ DUK_INTERNAL duk_ret_t duk_bi_date_prototype_get_timezone_offset(duk_context *ct
  */
 
 DUK_INTERNAL duk_ret_t duk_bi_date_prototype_set_shared(duk_context *ctx) {
-	duk_small_uint_t flags_and_maxnargs = (duk_small_uint_t) duk_get_current_magic(ctx);
+	duk_small_uint_t flags_and_maxnargs = duk__date_get_indirect_magic(ctx);
 	return duk__set_part_helper(ctx, flags_and_maxnargs);
 }
 

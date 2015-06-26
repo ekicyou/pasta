@@ -48,11 +48,14 @@
  *  Activation defines
  */
 
-#define DUK_ACT_FLAG_STRICT          (1 << 0)  /* function executes in strict mode */
-#define DUK_ACT_FLAG_TAILCALLED      (1 << 1)  /* activation has tailcalled one or more times */
-#define DUK_ACT_FLAG_CONSTRUCT       (1 << 2)  /* function executes as a constructor (called via "new") */
-#define DUK_ACT_FLAG_PREVENT_YIELD   (1 << 3)  /* activation prevents yield (native call or "new") */
-#define DUK_ACT_FLAG_DIRECT_EVAL     (1 << 4)  /* activation is a direct eval call */
+#define DUK_ACT_FLAG_STRICT             (1 << 0)  /* function executes in strict mode */
+#define DUK_ACT_FLAG_TAILCALLED         (1 << 1)  /* activation has tailcalled one or more times */
+#define DUK_ACT_FLAG_CONSTRUCT          (1 << 2)  /* function executes as a constructor (called via "new") */
+#define DUK_ACT_FLAG_PREVENT_YIELD      (1 << 3)  /* activation prevents yield (native call or "new") */
+#define DUK_ACT_FLAG_DIRECT_EVAL        (1 << 4)  /* activation is a direct eval call */
+#define DUK_ACT_FLAG_BREAKPOINT_ACTIVE  (1 << 5)  /* activation has active breakpoint(s) */
+
+#define DUK_ACT_GET_FUNC(act)        ((act)->func)
 
 /*
  *  Flags for __FILE__ / __LINE__ registered into tracedata
@@ -118,7 +121,13 @@
  *  Thread defines
  */
 
-#define DUK_HTHREAD_GET_STRING(thr,idx)          ((thr)->strs[(idx)])
+#if defined(DUK_USE_HEAPPTR16)
+#define DUK_HTHREAD_GET_STRING(thr,idx) \
+	((duk_hstring *) DUK_USE_HEAPPTR_DEC16((thr)->heap->heap_udata, (thr)->strs16[(idx)]))
+#else
+#define DUK_HTHREAD_GET_STRING(thr,idx) \
+	((thr)->strs[(idx)])
+#endif
 
 #define DUK_HTHREAD_GET_CURRENT_ACTIVATION(thr)  (&(thr)->callstack[(thr)->callstack_top - 1])
 
@@ -133,9 +142,14 @@
  *  Struct defines
  */
 
-/* Note: it's nice if size is 2^N (now 32 bytes on 32 bit without 'caller' property) */
+/* XXX: for a memory-code tradeoff, remove 'func' and make it's access either a function
+ * or a macro.  This would make the activation 32 bytes long on 32-bit platforms again.
+ */
+
+/* Note: it's nice if size is 2^N (at least for 32-bit platforms). */
 struct duk_activation {
-	duk_hobject *func;      /* function being executed; for bound function calls, this is the final, real function */
+	duk_tval tv_func;       /* borrowed: full duk_tval for function being executed; for lightfuncs */
+	duk_hobject *func;      /* borrowed: function being executed; for bound function calls, this is the final, real function, NULL for lightfuncs */
 	duk_hobject *var_env;   /* current variable environment (may be NULL if delayed) */
 	duk_hobject *lex_env;   /* current lexical environment (may be NULL if delayed) */
 #ifdef DUK_USE_NONSTD_FUNC_CALLER_PROPERTY
@@ -147,6 +161,9 @@ struct duk_activation {
 
 	duk_small_uint_t flags;
 	duk_uint32_t pc;        /* next instruction to execute */
+#if defined(DUK_USE_DEBUGGER_SUPPORT)
+	duk_uint32_t prev_line; /* needed for stepping */
+#endif
 
 	/* idx_bottom and idx_retval are only used for book-keeping of
 	 * Ecmascript-initiated calls, to allow returning to an Ecmascript
@@ -179,11 +196,6 @@ struct duk_activation {
 	 * (calling) valstack.  This works for everything except tail
 	 * calls, which must not "cumulate" valstack temps.
 	 */
-
-#if defined(DUK_USE_32BIT_PTRS) && !defined(DUK_USE_NONSTD_FUNC_CALLER_PROPERTY)
-	/* Minor optimization: pad structure to 2^N size on 32-bit platforms. */
-	duk_int_t unused1;  /* pad to 2^N */
-#endif
 };
 
 /* Note: it's nice if size is 2^N (not 4x4 = 16 bytes on 32 bit) */
@@ -220,24 +232,27 @@ struct duk_hthread {
 	 */
 
 	/* value stack: these are expressed as pointers for faster stack manipulation */
-	duk_tval *valstack;			/* start of valstack allocation */
-	duk_tval *valstack_end;			/* end of valstack allocation (exclusive) */
-	duk_tval *valstack_bottom;		/* bottom of current frame */
-	duk_tval *valstack_top;			/* top of current frame (exclusive) */
+	duk_tval *valstack;                     /* start of valstack allocation */
+	duk_tval *valstack_end;                 /* end of valstack allocation (exclusive) */
+	duk_tval *valstack_bottom;              /* bottom of current frame */
+	duk_tval *valstack_top;                 /* top of current frame (exclusive) */
 
 	/* call stack */
 	duk_activation *callstack;
-	duk_size_t callstack_size;		/* allocation size */
-	duk_size_t callstack_top;		/* next to use, highest used is top - 1 */
-	duk_size_t callstack_preventcount;	/* number of activation records in callstack preventing a yield */
+	duk_size_t callstack_size;              /* allocation size */
+	duk_size_t callstack_top;               /* next to use, highest used is top - 1 */
+	duk_size_t callstack_preventcount;      /* number of activation records in callstack preventing a yield */
 
 	/* catch stack */
 	duk_catcher *catchstack;
-	duk_size_t catchstack_size;		/* allocation size */
-	duk_size_t catchstack_top;		/* next to use, highest used is top - 1 */
+	duk_size_t catchstack_size;             /* allocation size */
+	duk_size_t catchstack_top;              /* next to use, highest used is top - 1 */
 
 	/* yield/resume book-keeping */
-	duk_hthread *resumer;			/* who resumed us (if any) */
+	duk_hthread *resumer;                   /* who resumed us (if any) */
+
+	/* current compiler state (if any), used for augmenting SyntaxErrors */
+	duk_compiler_ctx *compile_ctx;
 
 #ifdef DUK_USE_INTERRUPT_COUNTER
 	/* Interrupt counter for triggering a slow path check for execution
@@ -260,7 +275,11 @@ struct duk_hthread {
 	duk_hobject *builtins[DUK_NUM_BUILTINS];
 
 	/* convenience copies from heap/vm for faster access */
-	duk_hstring **strs;			/* (from duk_heap) */
+#if defined(DUK_USE_HEAPPTR16)
+	duk_uint16_t *strs16;
+#else
+	duk_hstring **strs;
+#endif
 };
 
 /*
@@ -280,8 +299,8 @@ DUK_INTERNAL_DECL void duk_hthread_catchstack_shrink_check(duk_hthread *thr);
 DUK_INTERNAL_DECL void duk_hthread_catchstack_unwind(duk_hthread *thr, duk_size_t new_top);
 
 DUK_INTERNAL_DECL duk_activation *duk_hthread_get_current_activation(duk_hthread *thr);
-DUK_INTERNAL_DECL void *duk_hthread_get_valstack_ptr(void *ud);  /* indirect allocs */
-DUK_INTERNAL_DECL void *duk_hthread_get_callstack_ptr(void *ud);  /* indirect allocs */
-DUK_INTERNAL_DECL void *duk_hthread_get_catchstack_ptr(void *ud);  /* indirect allocs */
+DUK_INTERNAL_DECL void *duk_hthread_get_valstack_ptr(duk_heap *heap, void *ud);  /* indirect allocs */
+DUK_INTERNAL_DECL void *duk_hthread_get_callstack_ptr(duk_heap *heap, void *ud);  /* indirect allocs */
+DUK_INTERNAL_DECL void *duk_hthread_get_catchstack_ptr(duk_heap *heap, void *ud);  /* indirect allocs */
 
 #endif  /* DUK_HTHREAD_H_INCLUDED */

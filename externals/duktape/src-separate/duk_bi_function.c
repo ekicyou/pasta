@@ -132,14 +132,16 @@ DUK_INTERNAL duk_ret_t duk_bi_function_prototype_to_string(duk_context *ctx) {
 
 		if (DUK_HOBJECT_HAS_COMPILEDFUNCTION(obj)) {
 			/* XXX: actual source, if available */
-			duk_push_sprintf(ctx, "function %s() {/* source code */}", (const char *) func_name);
+			duk_push_sprintf(ctx, "function %s() {/* ecmascript */}", (const char *) func_name);
 		} else if (DUK_HOBJECT_HAS_NATIVEFUNCTION(obj)) {
-			duk_push_sprintf(ctx, "function %s() {/* native code */}", (const char *) func_name);
+			duk_push_sprintf(ctx, "function %s() {/* native */}", (const char *) func_name);
 		} else if (DUK_HOBJECT_HAS_BOUND(obj)) {
 			duk_push_sprintf(ctx, "function %s() {/* bound */}", (const char *) func_name);
 		} else {
 			goto type_error;
 		}
+	} else if (DUK_TVAL_IS_LIGHTFUNC(tv)) {
+		duk_push_lightfunc_tostring(ctx, tv);
 	} else {
 		goto type_error;
 	}
@@ -279,10 +281,10 @@ DUK_INTERNAL duk_ret_t duk_bi_function_prototype_bind(duk_context *ctx) {
 
 	/* [ thisArg arg1 ... argN func boundFunc ] */
 	duk_dup(ctx, -2);  /* func */
-	duk_def_prop_stridx(ctx, -2, DUK_STRIDX_INT_TARGET, DUK_PROPDESC_FLAGS_NONE);
+	duk_xdef_prop_stridx(ctx, -2, DUK_STRIDX_INT_TARGET, DUK_PROPDESC_FLAGS_NONE);
 
 	duk_dup(ctx, 0);   /* thisArg */
-	duk_def_prop_stridx(ctx, -2, DUK_STRIDX_INT_THIS, DUK_PROPDESC_FLAGS_NONE);
+	duk_xdef_prop_stridx(ctx, -2, DUK_STRIDX_INT_THIS, DUK_PROPDESC_FLAGS_NONE);
 
 	duk_push_array(ctx);
 
@@ -292,14 +294,15 @@ DUK_INTERNAL duk_ret_t duk_bi_function_prototype_bind(duk_context *ctx) {
 		duk_dup(ctx, 1 + i);
 		duk_put_prop_index(ctx, -2, i);
 	}
-	duk_def_prop_stridx(ctx, -2, DUK_STRIDX_INT_ARGS, DUK_PROPDESC_FLAGS_NONE);
+	duk_xdef_prop_stridx(ctx, -2, DUK_STRIDX_INT_ARGS, DUK_PROPDESC_FLAGS_NONE);
 
 	/* [ thisArg arg1 ... argN func boundFunc ] */
 
 	/* bound function 'length' property is interesting */
 	h_target = duk_get_hobject(ctx, -2);
-	DUK_ASSERT(h_target != NULL);
-	if (DUK_HOBJECT_GET_CLASS_NUMBER(h_target) == DUK_HOBJECT_CLASS_FUNCTION) {
+	if (h_target == NULL ||  /* lightfunc */
+	    DUK_HOBJECT_GET_CLASS_NUMBER(h_target) == DUK_HOBJECT_CLASS_FUNCTION) {
+		/* For lightfuncs, simply read the virtual property. */
 		duk_int_t tmp;
 		duk_get_prop_stridx(ctx, -2, DUK_STRIDX_LENGTH);
 		tmp = duk_to_int(ctx, -1) - (nargs - 1);  /* step 15.a */
@@ -308,25 +311,28 @@ DUK_INTERNAL duk_ret_t duk_bi_function_prototype_bind(duk_context *ctx) {
 	} else {
 		duk_push_int(ctx, 0);
 	}
-	duk_def_prop_stridx(ctx, -2, DUK_STRIDX_LENGTH, DUK_PROPDESC_FLAGS_NONE);  /* attrs in E5 Section 15.3.5.1 */
+	duk_xdef_prop_stridx(ctx, -2, DUK_STRIDX_LENGTH, DUK_PROPDESC_FLAGS_NONE);  /* attrs in E5 Section 15.3.5.1 */
 
 	/* caller and arguments must use the same thrower, [[ThrowTypeError]] */
-	duk_def_prop_stridx_thrower(ctx, -1, DUK_STRIDX_CALLER, DUK_PROPDESC_FLAGS_NONE);
-	duk_def_prop_stridx_thrower(ctx, -1, DUK_STRIDX_LC_ARGUMENTS, DUK_PROPDESC_FLAGS_NONE);
+	duk_xdef_prop_stridx_thrower(ctx, -1, DUK_STRIDX_CALLER, DUK_PROPDESC_FLAGS_NONE);
+	duk_xdef_prop_stridx_thrower(ctx, -1, DUK_STRIDX_LC_ARGUMENTS, DUK_PROPDESC_FLAGS_NONE);
 
 	/* these non-standard properties are copied for convenience */
 	/* XXX: 'copy properties' API call? */
 	duk_get_prop_stridx(ctx, -2, DUK_STRIDX_NAME);
-	duk_def_prop_stridx(ctx, -2, DUK_STRIDX_NAME, DUK_PROPDESC_FLAGS_WC);
+	duk_xdef_prop_stridx(ctx, -2, DUK_STRIDX_NAME, DUK_PROPDESC_FLAGS_WC);
 	duk_get_prop_stridx(ctx, -2, DUK_STRIDX_FILE_NAME);
-	duk_def_prop_stridx(ctx, -2, DUK_STRIDX_FILE_NAME, DUK_PROPDESC_FLAGS_WC);
+	duk_xdef_prop_stridx(ctx, -2, DUK_STRIDX_FILE_NAME, DUK_PROPDESC_FLAGS_WC);
 
 	/* The 'strict' flag is copied to get the special [[Get]] of E5.1
 	 * Section 15.3.5.4 to apply when a 'caller' value is a strict bound
 	 * function.  Not sure if this is correct, because the specification
 	 * is a bit ambiguous on this point but it would make sense.
 	 */
-	if (DUK_HOBJECT_HAS_STRICT(h_target)) {
+	if (h_target == NULL) {
+		/* Lightfuncs are always strict. */
+		DUK_HOBJECT_SET_STRICT(h_bound);
+	} else if (DUK_HOBJECT_HAS_STRICT(h_target)) {
 		DUK_HOBJECT_SET_STRICT(h_bound);
 	}
 	DUK_DDD(DUK_DDDPRINT("created bound function: %!iT", (duk_tval *) duk_get_tval(ctx, -1)));

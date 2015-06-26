@@ -27,20 +27,58 @@
 
 struct duk_heaphdr {
 	duk_uint32_t h_flags;
+
 #if defined(DUK_USE_REFERENCE_COUNTING)
+#if defined(DUK_USE_REFCOUNT16)
+	duk_uint16_t h_refcount16;
+#else
 	duk_size_t h_refcount;
 #endif
+#endif
+
+#if defined(DUK_USE_HEAPPTR16)
+	duk_uint16_t h_next16;
+#else
 	duk_heaphdr *h_next;
+#endif
+
 #if defined(DUK_USE_DOUBLE_LINKED_HEAP)
 	/* refcounting requires direct heap frees, which in turn requires a dual linked heap */
+#if defined(DUK_USE_HEAPPTR16)
+	duk_uint16_t h_prev16;
+#else
 	duk_heaphdr *h_prev;
+#endif
+#endif
+
+	/* When DUK_USE_HEAPPTR16 (and DUK_USE_REFCOUNT16) is in use, the
+	 * struct won't align nicely to 4 bytes.  This 16-bit extra field
+	 * is added to make the alignment clean; the field can be used by
+	 * heap objects when 16-bit packing is used.  This field is now
+	 * conditional to DUK_USE_HEAPPTR16 only, but it is intended to be
+	 * used with DUK_USE_REFCOUNT16 and DUK_USE_DOUBLE_LINKED_HEAP;
+	 * this only matter to low memory environments anyway.
+	 */
+#if defined(DUK_USE_HEAPPTR16)
+	duk_uint16_t h_extra16;
 #endif
 };
 
 struct duk_heaphdr_string {
+	/* 16 bits would be enough for shared heaphdr flags and duk_hstring
+	 * flags.  The initial parts of duk_heaphdr_string and duk_heaphdr
+	 * must match so changing the flags field size here would be quite
+	 * awkward.  However, to minimize struct size, we can pack at least
+	 * 16 bits of duk_hstring data into the flags field.
+	 */
 	duk_uint32_t h_flags;
+
 #if defined(DUK_USE_REFERENCE_COUNTING)
+#if defined(DUK_USE_REFCOUNT16)
+	duk_uint16_t h_refcount16;
+#else
 	duk_size_t h_refcount;
+#endif
 #endif
 };
 
@@ -67,23 +105,50 @@ struct duk_heaphdr_string {
 #define DUK_HTYPE_BUFFER                 3
 #define DUK_HTYPE_MAX                    3
 
-#define DUK_HEAPHDR_GET_NEXT(h)       ((h)->h_next)
-#define DUK_HEAPHDR_SET_NEXT(h,val)   do { \
-		(h)->h_next = (val); \
+#if defined(DUK_USE_HEAPPTR16)
+#define DUK_HEAPHDR_GET_NEXT(heap,h) \
+	((duk_heaphdr *) DUK_USE_HEAPPTR_DEC16((heap)->heap_udata, (h)->h_next16))
+#define DUK_HEAPHDR_SET_NEXT(heap,h,val)   do { \
+		(h)->h_next16 = DUK_USE_HEAPPTR_ENC16((heap)->heap_udata, (void *) val); \
 	} while (0)
-
-#if defined(DUK_USE_DOUBLE_LINKED_HEAP)
-#define DUK_HEAPHDR_GET_PREV(h)       ((h)->h_prev)
-#define DUK_HEAPHDR_SET_PREV(h,val)   do { \
-		(h)->h_prev = (val); \
+#else
+#define DUK_HEAPHDR_GET_NEXT(heap,h)  ((h)->h_next)
+#define DUK_HEAPHDR_SET_NEXT(heap,h,val)   do { \
+		(h)->h_next = (val); \
 	} while (0)
 #endif
 
+#if defined(DUK_USE_DOUBLE_LINKED_HEAP)
+#if defined(DUK_USE_HEAPPTR16)
+#define DUK_HEAPHDR_GET_PREV(heap,h) \
+	((duk_heaphdr *) DUK_USE_HEAPPTR_DEC16((heap)->heap_udata, (h)->h_prev16))
+#define DUK_HEAPHDR_SET_PREV(heap,h,val)   do { \
+		(h)->h_prev16 = DUK_USE_HEAPPTR_ENC16((heap)->heap_udata, (void *) (val)); \
+	} while (0)
+#else
+#define DUK_HEAPHDR_GET_PREV(heap,h)       ((h)->h_prev)
+#define DUK_HEAPHDR_SET_PREV(heap,h,val)   do { \
+		(h)->h_prev = (val); \
+	} while (0)
+#endif
+#endif
+
 #if defined(DUK_USE_REFERENCE_COUNTING)
+#if defined(DUK_USE_REFCOUNT16)
+#define DUK_HEAPHDR_GET_REFCOUNT(h)   ((h)->h_refcount16)
+#define DUK_HEAPHDR_SET_REFCOUNT(h,val)  do { \
+		(h)->h_refcount16 = (val); \
+	} while (0)
+#define DUK_HEAPHDR_PREINC_REFCOUNT(h)  (++(h)->h_refcount16)  /* result: updated refcount */
+#define DUK_HEAPHDR_PREDEC_REFCOUNT(h)  (--(h)->h_refcount16)  /* result: updated refcount */
+#else
 #define DUK_HEAPHDR_GET_REFCOUNT(h)   ((h)->h_refcount)
 #define DUK_HEAPHDR_SET_REFCOUNT(h,val)  do { \
 		(h)->h_refcount = (val); \
 	} while (0)
+#define DUK_HEAPHDR_PREINC_REFCOUNT(h)  (++(h)->h_refcount)  /* result: updated refcount */
+#define DUK_HEAPHDR_PREDEC_REFCOUNT(h)  (--(h)->h_refcount)  /* result: updated refcount */
+#endif
 #else
 /* refcount macros not defined without refcounting, caller must #ifdef now */
 #endif  /* DUK_USE_REFERENCE_COUNTING */
@@ -92,6 +157,8 @@ struct duk_heaphdr_string {
  *  Note: type is treated as a field separate from flags, so some masking is
  *  involved in the macros below.
  */
+
+#define DUK_HEAPHDR_GET_FLAGS_RAW(h)  ((h)->h_flags)
 
 #define DUK_HEAPHDR_GET_FLAGS(h)      ((h)->h_flags & DUK_HEAPHDR_FLAGS_FLAG_MASK)
 #define DUK_HEAPHDR_SET_FLAGS(h,val)  do { \
@@ -153,12 +220,12 @@ struct duk_heaphdr_string {
 /* init pointer fields to null */
 #if defined(DUK_USE_DOUBLE_LINKED_HEAP)
 #define DUK_HEAPHDR_INIT_NULLS(h)       do { \
-		(h)->h_next = NULL; \
+		DUK_HEAPHDR_SET_NEXT((h), (void *) NULL); \
+		DUK_HEAPHDR_SET_PREV((h), (void *) NULL); \
 	} while (0)
 #else
 #define DUK_HEAPHDR_INIT_NULLS(h)       do { \
-		(h)->h_next = NULL; \
-		(h)->h_prev = NULL; \
+		DUK_HEAPHDR_SET_NEXT((h), (void *) NULL); \
 	} while (0)
 #endif
 
@@ -177,43 +244,138 @@ struct duk_heaphdr_string {
 
 #if defined(DUK_USE_REFERENCE_COUNTING)
 
-#define DUK_TVAL_INCREF(thr,tv)                duk_heap_tval_incref((tv))
-#define DUK_TVAL_DECREF(thr,tv)                duk_heap_tval_decref((thr),(tv))
-#define DUK__HEAPHDR_INCREF(thr,h)             duk_heap_heaphdr_incref((h))
-#define DUK__HEAPHDR_DECREF(thr,h)             duk_heap_heaphdr_decref((thr),(h))
-#define DUK_HEAPHDR_INCREF(thr,h)              DUK__HEAPHDR_INCREF((thr),(duk_heaphdr *) (h))
-#define DUK_HEAPHDR_DECREF(thr,h)              DUK__HEAPHDR_DECREF((thr),(duk_heaphdr *) (h))
-#define DUK_HSTRING_INCREF(thr,h)              DUK__HEAPHDR_INCREF((thr),(duk_heaphdr *) (h))
-#define DUK_HSTRING_DECREF(thr,h)              DUK__HEAPHDR_DECREF((thr),(duk_heaphdr *) (h))
-#define DUK_HOBJECT_INCREF(thr,h)              DUK__HEAPHDR_INCREF((thr),(duk_heaphdr *) (h))
-#define DUK_HOBJECT_DECREF(thr,h)              DUK__HEAPHDR_DECREF((thr),(duk_heaphdr *) (h))
-#define DUK_HBUFFER_INCREF(thr,h)              DUK__HEAPHDR_INCREF((thr),(duk_heaphdr *) (h))
-#define DUK_HBUFFER_DECREF(thr,h)              DUK__HEAPHDR_DECREF((thr),(duk_heaphdr *) (h))
-#define DUK_HCOMPILEDFUNCTION_INCREF(thr,h)    DUK__HEAPHDR_INCREF((thr),(duk_heaphdr *) &(h)->obj)
-#define DUK_HCOMPILEDFUNCTION_DECREF(thr,h)    DUK__HEAPHDR_DECREF((thr),(duk_heaphdr *) &(h)->obj)
-#define DUK_HNATIVEFUNCTION_INCREF(thr,h)      DUK__HEAPHDR_INCREF((thr),(duk_heaphdr *) &(h)->obj)
-#define DUK_HNATIVEFUNCTION_DECREF(thr,h)      DUK__HEAPHDR_DECREF((thr),(duk_heaphdr *) &(h)->obj)
-#define DUK_HTHREAD_INCREF(thr,h)              DUK__HEAPHDR_INCREF((thr),(duk_heaphdr *) &(h)->obj)
-#define DUK_HTHREAD_DECREF(thr,h)              DUK__HEAPHDR_DECREF((thr),(duk_heaphdr *) &(h)->obj)
+/* Fast variants, inline refcount operations except for refzero handling.
+ * Can be used explicitly when speed is always more important than size.
+ * For a good compiler and a single file build, these are basically the
+ * same as a forced inline.
+ */
+#define DUK_TVAL_INCREF_FAST(thr,tv) do { \
+		duk_tval *duk__tv = (tv); \
+		DUK_ASSERT(duk__tv != NULL); \
+		if (DUK_TVAL_IS_HEAP_ALLOCATED(duk__tv)) { \
+			duk_heaphdr *duk__h = DUK_TVAL_GET_HEAPHDR(duk__tv); \
+			DUK_ASSERT(duk__h != NULL); \
+			DUK_ASSERT(DUK_HEAPHDR_HTYPE_VALID(duk__h)); \
+			DUK_HEAPHDR_PREINC_REFCOUNT(duk__h); \
+		} \
+	} while (0)
+#define DUK_TVAL_DECREF_FAST(thr,tv) do { \
+		duk_tval *duk__tv = (tv); \
+		DUK_ASSERT(duk__tv != NULL); \
+		if (DUK_TVAL_IS_HEAP_ALLOCATED(duk__tv)) { \
+			duk_heaphdr *duk__h = DUK_TVAL_GET_HEAPHDR(duk__tv); \
+			DUK_ASSERT(duk__h != NULL); \
+			DUK_ASSERT(DUK_HEAPHDR_HTYPE_VALID(duk__h)); \
+			DUK_ASSERT(DUK_HEAPHDR_GET_REFCOUNT(duk__h) > 0); \
+			if (DUK_HEAPHDR_PREDEC_REFCOUNT(duk__h) == 0) { \
+				duk_heaphdr_refzero((thr), duk__h); \
+			} \
+		} \
+	} while (0)
+#define DUK_HEAPHDR_INCREF_FAST(thr,h) do { \
+		duk_heaphdr *duk__h = (duk_heaphdr *) (h); \
+		DUK_ASSERT(duk__h != NULL); \
+		DUK_ASSERT(DUK_HEAPHDR_HTYPE_VALID(duk__h)); \
+		DUK_HEAPHDR_PREINC_REFCOUNT(duk__h); \
+	} while (0)
+#define DUK_HEAPHDR_DECREF_FAST(thr,h) do { \
+		duk_heaphdr *duk__h = (duk_heaphdr *) (h); \
+		DUK_ASSERT(duk__h != NULL); \
+		DUK_ASSERT(DUK_HEAPHDR_HTYPE_VALID(duk__h)); \
+		DUK_ASSERT(DUK_HEAPHDR_GET_REFCOUNT(duk__h) > 0); \
+		if (DUK_HEAPHDR_PREDEC_REFCOUNT(duk__h) == 0) { \
+			duk_heaphdr_refzero((thr), duk__h); \
+		} \
+	} while (0)
+
+/* Slow variants, call to a helper to reduce code size.
+ * Can be used explicitly when size is always more important than speed.
+ */
+#define DUK_TVAL_INCREF_SLOW(thr,tv) do { \
+		duk_tval_incref((tv)); \
+	} while (0)
+#define DUK_TVAL_DECREF_SLOW(thr,tv) do { \
+		duk_tval_decref((thr), (tv)); \
+	} while (0)
+#define DUK_HEAPHDR_INCREF_SLOW(thr,h) do { \
+		duk_heaphdr_incref((duk_heaphdr *) (h)); \
+	} while (0)
+#define DUK_HEAPHDR_DECREF_SLOW(thr,h) do { \
+		duk_heaphdr_decref((thr), (duk_heaphdr *) (h)); \
+	} while (0)
+
+/* Default variants.  Selection depends on speed/size preference.
+ * Concretely: with gcc 4.8.1 -Os x64 the difference in final binary
+ * is about +1kB for _FAST variants.
+ */
+#if defined(DUK_USE_FAST_REFCOUNT_DEFAULT)
+#define DUK_TVAL_INCREF(thr,tv)                DUK_TVAL_INCREF_FAST((thr),(tv))
+#define DUK_TVAL_DECREF(thr,tv)                DUK_TVAL_DECREF_FAST((thr),(tv))
+#define DUK_HEAPHDR_INCREF(thr,h)              DUK_HEAPHDR_INCREF_FAST((thr),(h))
+#define DUK_HEAPHDR_DECREF(thr,h)              DUK_HEAPHDR_DECREF_FAST((thr),(h))
+#else
+#define DUK_TVAL_INCREF(thr,tv)                DUK_TVAL_INCREF_SLOW((thr),(tv))
+#define DUK_TVAL_DECREF(thr,tv)                DUK_TVAL_DECREF_SLOW((thr),(tv))
+#define DUK_HEAPHDR_INCREF(thr,h)              DUK_HEAPHDR_INCREF_SLOW((thr),(h))
+#define DUK_HEAPHDR_DECREF(thr,h)              DUK_HEAPHDR_DECREF_SLOW((thr),(h))
+#endif
+
+/* Casting convenience. */
+#define DUK_HSTRING_INCREF(thr,h)              DUK_HEAPHDR_INCREF((thr),(duk_heaphdr *) (h))
+#define DUK_HSTRING_DECREF(thr,h)              DUK_HEAPHDR_DECREF((thr),(duk_heaphdr *) (h))
+#define DUK_HOBJECT_INCREF(thr,h)              DUK_HEAPHDR_INCREF((thr),(duk_heaphdr *) (h))
+#define DUK_HOBJECT_DECREF(thr,h)              DUK_HEAPHDR_DECREF((thr),(duk_heaphdr *) (h))
+#define DUK_HBUFFER_INCREF(thr,h)              DUK_HEAPHDR_INCREF((thr),(duk_heaphdr *) (h))
+#define DUK_HBUFFER_DECREF(thr,h)              DUK_HEAPHDR_DECREF((thr),(duk_heaphdr *) (h))
+#define DUK_HCOMPILEDFUNCTION_INCREF(thr,h)    DUK_HEAPHDR_INCREF((thr),(duk_heaphdr *) &(h)->obj)
+#define DUK_HCOMPILEDFUNCTION_DECREF(thr,h)    DUK_HEAPHDR_DECREF((thr),(duk_heaphdr *) &(h)->obj)
+#define DUK_HNATIVEFUNCTION_INCREF(thr,h)      DUK_HEAPHDR_INCREF((thr),(duk_heaphdr *) &(h)->obj)
+#define DUK_HNATIVEFUNCTION_DECREF(thr,h)      DUK_HEAPHDR_DECREF((thr),(duk_heaphdr *) &(h)->obj)
+#define DUK_HTHREAD_INCREF(thr,h)              DUK_HEAPHDR_INCREF((thr),(duk_heaphdr *) &(h)->obj)
+#define DUK_HTHREAD_DECREF(thr,h)              DUK_HEAPHDR_DECREF((thr),(duk_heaphdr *) &(h)->obj)
+
+/* Convenience for some situations; the above macros don't allow NULLs
+ * for performance reasons.
+ */
+#define DUK_HOBJECT_INCREF_ALLOWNULL(thr,h) do { \
+		if ((h) != NULL) { \
+			DUK_HEAPHDR_INCREF((thr), (duk_heaphdr *) (h)); \
+		} \
+	} while (0)
+#define DUK_HOBJECT_DECREF_ALLOWNULL(thr,h) do { \
+		if ((h) != NULL) { \
+			DUK_HEAPHDR_DECREF((thr), (duk_heaphdr *) (h)); \
+		} \
+	} while (0)
 
 #else  /* DUK_USE_REFERENCE_COUNTING */
 
-#define DUK_TVAL_INCREF(thr,v)                 /* nop */
-#define DUK_TVAL_DECREF(thr,v)                 /* nop */
-#define DUK_HEAPHDR_INCREF(thr,h)              /* nop */
-#define DUK_HEAPHDR_DECREF(thr,h)              /* nop */
-#define DUK_HSTRING_INCREF(thr,h)              /* nop */
-#define DUK_HSTRING_DECREF(thr,h)              /* nop */
-#define DUK_HOBJECT_INCREF(thr,h)              /* nop */
-#define DUK_HOBJECT_DECREF(thr,h)              /* nop */
-#define DUK_HBUFFER_INCREF(thr,h)              /* nop */
-#define DUK_HBUFFER_DECREF(thr,h)              /* nop */
-#define DUK_HCOMPILEDFUNCTION_INCREF(thr,h)    /* nop */
-#define DUK_HCOMPILEDFUNCTION_DECREF(thr,h)    /* nop */
-#define DUK_HNATIVEFUNCTION_INCREF(thr,h)      /* nop */
-#define DUK_HNATIVEFUNCTION_DECREF(thr,h)      /* nop */
-#define DUK_HTHREAD_INCREF(thr,h)              /* nop */
-#define DUK_HTHREAD_DECREF(thr,h)              /* nop */
+#define DUK_TVAL_INCREF_FAST(thr,v)            do {} while (0) /* nop */
+#define DUK_TVAL_DECREF_FAST(thr,v)            do {} while (0) /* nop */
+#define DUK_TVAL_INCREF_SLOW(thr,v)            do {} while (0) /* nop */
+#define DUK_TVAL_DECREF_SLOW(thr,v)            do {} while (0) /* nop */
+#define DUK_TVAL_INCREF(thr,v)                 do {} while (0) /* nop */
+#define DUK_TVAL_DECREF(thr,v)                 do {} while (0) /* nop */
+#define DUK_HEAPHDR_INCREF_FAST(thr,h)         do {} while (0) /* nop */
+#define DUK_HEAPHDR_DECREF_FAST(thr,h)         do {} while (0) /* nop */
+#define DUK_HEAPHDR_INCREF_SLOW(thr,h)         do {} while (0) /* nop */
+#define DUK_HEAPHDR_DECREF_SLOW(thr,h)         do {} while (0) /* nop */
+#define DUK_HEAPHDR_INCREF(thr,h)              do {} while (0) /* nop */
+#define DUK_HEAPHDR_DECREF(thr,h)              do {} while (0) /* nop */
+#define DUK_HSTRING_INCREF(thr,h)              do {} while (0) /* nop */
+#define DUK_HSTRING_DECREF(thr,h)              do {} while (0) /* nop */
+#define DUK_HOBJECT_INCREF(thr,h)              do {} while (0) /* nop */
+#define DUK_HOBJECT_DECREF(thr,h)              do {} while (0) /* nop */
+#define DUK_HBUFFER_INCREF(thr,h)              do {} while (0) /* nop */
+#define DUK_HBUFFER_DECREF(thr,h)              do {} while (0) /* nop */
+#define DUK_HCOMPILEDFUNCTION_INCREF(thr,h)    do {} while (0) /* nop */
+#define DUK_HCOMPILEDFUNCTION_DECREF(thr,h)    do {} while (0) /* nop */
+#define DUK_HNATIVEFUNCTION_INCREF(thr,h)      do {} while (0) /* nop */
+#define DUK_HNATIVEFUNCTION_DECREF(thr,h)      do {} while (0) /* nop */
+#define DUK_HTHREAD_INCREF(thr,h)              do {} while (0) /* nop */
+#define DUK_HTHREAD_DECREF(thr,h)              do {} while (0) /* nop */
+#define DUK_HOBJECT_INCREF_ALLOWNULL(thr,h)    do {} while (0) /* nop */
+#define DUK_HOBJECT_DECREF_ALLOWNULL(thr,h)    do {} while (0) /* nop */
 
 #endif  /* DUK_USE_REFERENCE_COUNTING */
 

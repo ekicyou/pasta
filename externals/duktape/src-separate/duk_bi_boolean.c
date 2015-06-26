@@ -44,7 +44,10 @@ DUK_INTERNAL duk_ret_t duk_bi_boolean_prototype_tostring_shared(duk_context *ctx
 }
 
 DUK_INTERNAL duk_ret_t duk_bi_boolean_constructor(duk_context *ctx) {
+	duk_hthread *thr = (duk_hthread *) ctx;
 	duk_hobject *h_this;
+
+	DUK_UNREF(thr);
 
 	duk_to_boolean(ctx, 0);
 
@@ -53,12 +56,12 @@ DUK_INTERNAL duk_ret_t duk_bi_boolean_constructor(duk_context *ctx) {
 		duk_push_this(ctx);
 		h_this = duk_get_hobject(ctx, -1);
 		DUK_ASSERT(h_this != NULL);
-		DUK_ASSERT(h_this->prototype == ((duk_hthread *) ctx)->builtins[DUK_BIDX_BOOLEAN_PROTOTYPE]);
+		DUK_ASSERT(DUK_HOBJECT_GET_PROTOTYPE(thr->heap, h_this) == thr->builtins[DUK_BIDX_BOOLEAN_PROTOTYPE]);
 
 		DUK_HOBJECT_SET_CLASS_NUMBER(h_this, DUK_HOBJECT_CLASS_BOOLEAN);
 
 		duk_dup(ctx, 0);  /* -> [ val obj val ] */
-		duk_def_prop_stridx(ctx, -2, DUK_STRIDX_INT_VALUE, DUK_PROPDESC_FLAGS_NONE);  /* XXX: proper flags? */
+		duk_xdef_prop_stridx(ctx, -2, DUK_STRIDX_INT_VALUE, DUK_PROPDESC_FLAGS_NONE);  /* XXX: proper flags? */
 	}  /* unbalanced stack */
 
 	return 1;

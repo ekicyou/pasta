@@ -15,6 +15,7 @@ struct duk_jmpbuf;
 struct duk_heaphdr;
 struct duk_heaphdr_string;
 struct duk_hstring;
+struct duk_hstring_external;
 struct duk_hobject;
 struct duk_hcompiledfunction;
 struct duk_hnativefunction;
@@ -28,11 +29,13 @@ union duk_propvalue;
 struct duk_propdesc;
 
 struct duk_heap;
+struct duk_breakpoint;
 
 struct duk_activation;
 struct duk_catcher;
 struct duk_strcache;
 struct duk_ljstate;
+struct duk_strtab_entry;
 
 #ifdef DUK_USE_DEBUG
 struct duk_fixedbuffer;
@@ -59,6 +62,7 @@ typedef struct duk_jmpbuf duk_jmpbuf;
 typedef struct duk_heaphdr duk_heaphdr;
 typedef struct duk_heaphdr_string duk_heaphdr_string;
 typedef struct duk_hstring duk_hstring;
+typedef struct duk_hstring_external duk_hstring_external;
 typedef struct duk_hobject duk_hobject;
 typedef struct duk_hcompiledfunction duk_hcompiledfunction;
 typedef struct duk_hnativefunction duk_hnativefunction;
@@ -72,11 +76,13 @@ typedef union duk_propvalue duk_propvalue;
 typedef struct duk_propdesc duk_propdesc;
 
 typedef struct duk_heap duk_heap;
+typedef struct duk_breakpoint duk_breakpoint;
 
 typedef struct duk_activation duk_activation;
 typedef struct duk_catcher duk_catcher;
 typedef struct duk_strcache duk_strcache;
 typedef struct duk_ljstate duk_ljstate;
+typedef struct duk_strtab_entry duk_strtab_entry;
 
 #ifdef DUK_USE_DEBUG
 typedef struct duk_fixedbuffer duk_fixedbuffer;

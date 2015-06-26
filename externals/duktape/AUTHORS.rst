@@ -21,12 +21,14 @@ their contributions under the Duktape ``LICENSE.txt`` (in order of appearance):
 * Sami Vaarala <sami.vaarala@iki.fi>
 * Niki Dobrev
 * Andreas Öman <andreas@lonelycoder.com>
+* László Langó <llango.u-szeged@partner.samsung.com>
+* Legimet <legimet.calc@gmail.com>
 
 Other contributions
 ===================
 
 The following people have contributed something other than code (e.g. reported
-bugs, provided ideas, etc; in order of appearance):
+bugs, provided ideas, etc; roughly in order of appearance):
 
 * Greg Burns
 * Anthony Rabine
@@ -42,5 +44,18 @@ bugs, provided ideas, etc; in order of appearance):
 * Rajaran Gaunker (https://github.com/zimbabao)
 * Andreas Öman
 * Doug Sanden
+* Josh Engebretson (https://github.com/JoshEngebretson)
 * Remo Eichenberger (https://github.com/remoe)
-* David Demelier
+* Mamod Mehyar (https://github.com/mamod)
+* David Demelier (https://github.com/hftmarkand)
+* Tim Caswell (https://github.com/creationix)
+* Mitchell Blank Jr (https://github.com/mitchblank)
+* https://github.com/yushli
+* Seo Sanghyeon (https://github.com/sanxiyn)
+* Han ChoongWoo (https://github.com/tunz)
+* Joshua Peek (https://github.com/josh)
+* Bruce E. Pascoe (https://github.com/fatcerberus)
+* https://github.com/Kelledin
+
+If you are accidentally missing from this list, send me an e-mail
+(``sami.vaarala@iki.fi``) and I'll fix the omission.

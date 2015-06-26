@@ -12,19 +12,19 @@ Proxy objects).  Duktape also provides a number of custom features such as
 error tracebacks, additional data types for better C integration, combined
 reference counting and mark-and sweep garbage collector, object finalizers,
 co-operative threads a.k.a. coroutines, tail calls, built-in logging and
-module frameworks, and so on.
+module frameworks, a built-in debugger protocol, and so on.
 
-You can browse Duktape programmer's API and other documentation at::
+You can browse Duktape programmer's API and other documentation at:
 
-  http://duktape.org/
+* http://duktape.org/
 
-In particular, you should read the getting started section::
+In particular, you should read the getting started section:
 
-  http://duktape.org/guide.html#gettingstarted
+* http://duktape.org/guide.html#gettingstarted
 
-Building and integrating Duktape into your project is very straightforward::
+Building and integrating Duktape into your project is very straightforward:
 
-  http://duktape.org/guide.html#compiling
+* http://duktape.org/guide.html#compiling
 
 See Makefile.hello for a concrete example::
 
@@ -50,20 +50,38 @@ To build an example command line tool, use the following::
   $ ./duk mandel.js
   [...]
 
-There are further examples in the ``examples/`` directory.  Although
-Duktape itself is widely portable, some of the examples are Linux only.
-For instance the ``eventloop`` example illustrates how ``setTimeout()``
-and other standard timer functions could be implemented on Unix/Linux.
+This distributable contains:
 
-The ``polyfills/`` directory provides a few replacement suggestions for
-non-standard Javascript functions provided by other implementations.
+* ``src/``: main Duktape library in a "single file" format (duktape.c and
+  duktape.h)
+
+* ``src-separate/``: main Duktape library in multiple files format.
+
+* ``examples/``: further examples for using Duktape.  Although Duktape
+  itself is widely portable, some of the examples are Linux only.
+  For instance the ``eventloop`` example illustrates how ``setTimeout()``
+  and other standard timer functions could be implemented on Unix/Linux.
+
+* ``extras/``: utilities and modules which don't comfortably fit into the
+  main Duktape library because of footprint or portability concerns.
+  Extras are maintained and bug fixed code, but don't have the same version
+  guarantees as the main Duktape library.
+
+* ``polyfills/``: a few replacement suggestions for non-standard Javascript
+  functions provided by other implementations.
+
+* ``debugger/``: a debugger with a web UI, see ``debugger/README.rst`` and
+  https://github.com/svaarala/duktape/blob/master/doc/debugger.rst for
+  details on Duktape debugger support.
+
+* ``licenses/``: licensing information.
 
 You can find release notes at:
 
 * https://github.com/svaarala/duktape/blob/master/RELEASES.rst
 
-This distributable contains Duktape version 1.0.2, created from git
-commit a476318bf025137c2847c808a8334d8b7db985f2 (v1.0.2).
+This distributable contains Duktape version 1.2.2, created from git
+commit 5f4302c732d21b3b721db3d3473db32e4eb92470 (v1.2.2).
 
 Duktape is copyrighted by its authors (see ``AUTHORS.rst``) and licensed
 under the MIT license (see ``LICENSE.txt``).  MurmurHash2 is used internally,

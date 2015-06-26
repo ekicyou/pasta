@@ -135,6 +135,55 @@ DUK_LOCAL void duk__selftest_byte_order(void) {
 }
 
 /*
+ *  DUK_BSWAP macros
+ */
+
+DUK_LOCAL void duk__selftest_bswap_macros(void) {
+	duk_uint32_t x32;
+	duk_uint16_t x16;
+	duk_double_union du;
+	duk_double_t du_diff;
+
+	x16 = 0xbeefUL;
+	x16 = DUK_BSWAP16(x16);
+	if (x16 != (duk_uint16_t) 0xefbeUL) {
+		DUK_PANIC(DUK_ERR_INTERNAL_ERROR, "self test failed: DUK_BSWAP16");
+	}
+
+	x32 = 0xdeadbeefUL;
+	x32 = DUK_BSWAP32(x32);
+	if (x32 != (duk_uint32_t) 0xefbeaddeUL) {
+		DUK_PANIC(DUK_ERR_INTERNAL_ERROR, "self test failed: DUK_BSWAP32");
+	}
+
+	/* >>> struct.unpack('>d', '4000112233445566'.decode('hex'))
+	 * (2.008366013071895,)
+	 */
+
+	du.uc[0] = 0x40; du.uc[1] = 0x00; du.uc[2] = 0x11; du.uc[3] = 0x22;
+	du.uc[4] = 0x33; du.uc[5] = 0x44; du.uc[6] = 0x55; du.uc[7] = 0x66;
+	DUK_DBLUNION_BSWAP(&du);
+	du_diff = du.d - 2.008366013071895;
+#if 0
+	DUK_FPRINTF(DUK_STDERR, "du_diff: %lg\n", (double) du_diff);
+#endif
+	if (du_diff > 1e-15) {
+		/* Allow very small lenience because some compilers won't parse
+		 * exact IEEE double constants (happened in matrix testing with
+		 * Linux gcc-4.8 -m32 at least).
+		 */
+#if 0
+		DUK_FPRINTF(DUK_STDERR, "Result of DUK_DBLUNION_BSWAP: %02x %02x %02x %02x %02x %02x %02x %02x\n",
+		            (unsigned int) du.uc[0], (unsigned int) du.uc[1],
+		            (unsigned int) du.uc[2], (unsigned int) du.uc[3],
+		            (unsigned int) du.uc[4], (unsigned int) du.uc[5],
+		            (unsigned int) du.uc[6], (unsigned int) du.uc[7]);
+#endif
+		DUK_PANIC(DUK_ERR_INTERNAL_ERROR, "self test failed: DUK_DBLUNION_BSWAP");
+	}
+}
+
+/*
  *  Basic double / byte union memory layout.
  */
 
@@ -219,6 +268,63 @@ DUK_LOCAL void duk__selftest_struct_align(void) {
 }
 
 /*
+ *  64-bit arithmetic
+ *
+ *  There are some platforms/compilers where 64-bit types are available
+ *  but don't work correctly.  Test for known cases.
+ */
+
+DUK_LOCAL void duk__selftest_64bit_arithmetic(void) {
+#if defined(DUK_USE_64BIT_OPS)
+	volatile duk_int64_t i;
+	volatile duk_double_t d;
+
+	/* Catch a double-to-int64 cast issue encountered in practice. */
+	d = 2147483648.0;
+	i = (duk_int64_t) d;
+	if (i != 0x80000000LL) {
+		DUK_PANIC(DUK_ERR_INTERNAL_ERROR, "self test failed: casting 2147483648.0 to duk_int64_t failed");
+	}
+#else
+	/* nop */
+#endif
+}
+
+/*
+ *  Casting
+ */
+
+DUK_LOCAL void duk__selftest_cast_double_to_uint(void) {
+	/*
+	 *  https://github.com/svaarala/duktape/issues/127#issuecomment-77863473
+	 */
+
+	duk_double_t d1, d2;
+	duk_small_uint_t u;
+
+	duk_double_t d1v, d2v;
+	duk_small_uint_t uv;
+
+	d1 = 1.0;
+	u = (duk_small_uint_t) d1;
+	d2 = (duk_double_t) u;
+
+	if (!(d1 == 1.0 && u == 1 && d2 == 1.0 && d1 == d2)) {
+		DUK_PANIC(DUK_ERR_INTERNAL_ERROR, "self test failed: double to uint cast failed");
+	}
+
+	/* Same test with volatiles */
+
+	d1v = 1.0;
+	uv = (duk_small_uint_t) d1v;
+	d2v = (duk_double_t) uv;
+
+	if (!(d1v == 1.0 && uv == 1 && d2v == 1.0 && d1v == d2v)) {
+		DUK_PANIC(DUK_ERR_INTERNAL_ERROR, "self test failed: double to uint cast failed");
+	}
+}
+
+/*
  *  Self test main
  */
 
@@ -227,10 +333,13 @@ DUK_INTERNAL void duk_selftest_run_tests(void) {
 	duk__selftest_packed_tval();
 	duk__selftest_twos_complement();
 	duk__selftest_byte_order();
+	duk__selftest_bswap_macros();
 	duk__selftest_double_union_size();
 	duk__selftest_double_aliasing();
 	duk__selftest_double_zero_sign();
 	duk__selftest_struct_align();
+	duk__selftest_64bit_arithmetic();
+	duk__selftest_cast_double_to_uint();
 }
 
 #undef DUK__DBLUNION_CMP_TRUE

@@ -30,8 +30,9 @@
 #define DUK_IVAL_NONE          0   /* no value */
 #define DUK_IVAL_PLAIN         1   /* register, constant, or value */
 #define DUK_IVAL_ARITH         2   /* binary arithmetic; DUK_OP_ADD, DUK_OP_EQ, other binary ops */
-#define DUK_IVAL_PROP          3   /* property access */
-#define DUK_IVAL_VAR           4   /* variable access */
+#define DUK_IVAL_ARITH_EXTRAOP 3   /* binary arithmetic using extraops; DUK_EXTRAOP_INSTOF etc */
+#define DUK_IVAL_PROP          4   /* property access */
+#define DUK_IVAL_VAR           5   /* variable access */
 
 #define DUK_ISPEC_NONE         0   /* no value */
 #define DUK_ISPEC_VALUE        1   /* value resides in 'valstack_idx' */
@@ -62,7 +63,7 @@ typedef struct {
 
 	/* XXX: can be optimized for smaller footprint esp. on 32-bit environments */
 	duk_small_uint_t t;          /* DUK_IVAL_XXX */
-	duk_small_uint_t op;         /* bytecode opcode for binary ops */
+	duk_small_uint_t op;         /* bytecode opcode (or extraop) for binary ops */
 	duk_ispec x1;
 	duk_ispec x2;
 } duk_ivalue;
@@ -165,6 +166,10 @@ struct duk_compiler_func {
 	duk_int_t fnum_next;                /* inner function numbering */
 	duk_int_t num_formals;              /* number of formal arguments */
 	duk_reg_t reg_stmt_value;           /* register for writing value of 'non-empty' statements (global or eval code), -1 is marker */
+#if defined(DUK_USE_DEBUGGER_SUPPORT)
+	duk_int_t min_line;                 /* XXX: typing (duk_hcompiledfunction has duk_uint32_t) */
+	duk_int_t max_line;
+#endif
 
 	/* status booleans */
 	duk_bool_t is_function;             /* is an actual function (not global/eval code) */
@@ -204,6 +209,9 @@ struct duk_compiler_ctx {
 	/* recursion limit */
 	duk_int_t recursion_depth;
 	duk_int_t recursion_limit;
+
+	/* code emission temporary */
+	duk_int_t emit_jumpslot_pc;
 
 	/* current function being compiled (embedded instead of pointer for more compact access) */
 	duk_compiler_func curr_func;

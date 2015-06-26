@@ -6,7 +6,9 @@
 #define DUK_BUILTINS_H_INCLUDED
 
 #if defined(DUK_USE_DOUBLE_LE)
+#if !defined(DUK_SINGLE_FILE)
 DUK_INTERNAL_DECL const duk_uint8_t duk_strings_data[1943];
+#endif  /* !DUK_SINGLE_FILE */
 
 #define DUK_STRDATA_DATA_LENGTH                                       1943
 #define DUK_STRDATA_MAX_STRLEN                                        24
@@ -1027,13 +1029,15 @@ DUK_INTERNAL_DECL const duk_uint8_t duk_strings_data[1943];
 #define DUK_STRIDX_START_STRICT_RESERVED                              327
 #define DUK_STRIDX_END_RESERVED                                       336                            /* exclusive endpoint */
 
-DUK_INTERNAL_DECL const duk_c_function duk_bi_native_functions[129];
-DUK_INTERNAL_DECL const duk_uint8_t duk_builtins_data[1336];
+#if !defined(DUK_SINGLE_FILE)
+DUK_INTERNAL_DECL const duk_c_function duk_bi_native_functions[128];
+DUK_INTERNAL_DECL const duk_uint8_t duk_builtins_data[1341];
 #ifdef DUK_USE_BUILTIN_INITJS
 DUK_INTERNAL_DECL const duk_uint8_t duk_initjs_data[187];
 #endif  /* DUK_USE_BUILTIN_INITJS */
+#endif  /* !DUK_SINGLE_FILE */
 
-#define DUK_BUILTINS_DATA_LENGTH                                      1336
+#define DUK_BUILTINS_DATA_LENGTH                                      1341
 #ifdef DUK_USE_BUILTIN_INITJS
 #define DUK_BUILTIN_INITJS_DATA_LENGTH                                187
 #endif  /* DUK_USE_BUILTIN_INITJS */
@@ -1088,7 +1092,9 @@ DUK_INTERNAL_DECL const duk_uint8_t duk_initjs_data[187];
 #define DUK_NUM_BUILTINS                                              46
 
 #elif defined(DUK_USE_DOUBLE_BE)
+#if !defined(DUK_SINGLE_FILE)
 DUK_INTERNAL_DECL const duk_uint8_t duk_strings_data[1943];
+#endif  /* !DUK_SINGLE_FILE */
 
 #define DUK_STRDATA_DATA_LENGTH                                       1943
 #define DUK_STRDATA_MAX_STRLEN                                        24
@@ -2109,13 +2115,15 @@ DUK_INTERNAL_DECL const duk_uint8_t duk_strings_data[1943];
 #define DUK_STRIDX_START_STRICT_RESERVED                              327
 #define DUK_STRIDX_END_RESERVED                                       336                            /* exclusive endpoint */
 
-DUK_INTERNAL_DECL const duk_c_function duk_bi_native_functions[129];
-DUK_INTERNAL_DECL const duk_uint8_t duk_builtins_data[1336];
+#if !defined(DUK_SINGLE_FILE)
+DUK_INTERNAL_DECL const duk_c_function duk_bi_native_functions[128];
+DUK_INTERNAL_DECL const duk_uint8_t duk_builtins_data[1341];
 #ifdef DUK_USE_BUILTIN_INITJS
 DUK_INTERNAL_DECL const duk_uint8_t duk_initjs_data[187];
 #endif  /* DUK_USE_BUILTIN_INITJS */
+#endif  /* !DUK_SINGLE_FILE */
 
-#define DUK_BUILTINS_DATA_LENGTH                                      1336
+#define DUK_BUILTINS_DATA_LENGTH                                      1341
 #ifdef DUK_USE_BUILTIN_INITJS
 #define DUK_BUILTIN_INITJS_DATA_LENGTH                                187
 #endif  /* DUK_USE_BUILTIN_INITJS */
@@ -2170,7 +2178,9 @@ DUK_INTERNAL_DECL const duk_uint8_t duk_initjs_data[187];
 #define DUK_NUM_BUILTINS                                              46
 
 #elif defined(DUK_USE_DOUBLE_ME)
+#if !defined(DUK_SINGLE_FILE)
 DUK_INTERNAL_DECL const duk_uint8_t duk_strings_data[1943];
+#endif  /* !DUK_SINGLE_FILE */
 
 #define DUK_STRDATA_DATA_LENGTH                                       1943
 #define DUK_STRDATA_MAX_STRLEN                                        24
@@ -3191,13 +3201,15 @@ DUK_INTERNAL_DECL const duk_uint8_t duk_strings_data[1943];
 #define DUK_STRIDX_START_STRICT_RESERVED                              327
 #define DUK_STRIDX_END_RESERVED                                       336                            /* exclusive endpoint */
 
-DUK_INTERNAL_DECL const duk_c_function duk_bi_native_functions[129];
-DUK_INTERNAL_DECL const duk_uint8_t duk_builtins_data[1336];
+#if !defined(DUK_SINGLE_FILE)
+DUK_INTERNAL_DECL const duk_c_function duk_bi_native_functions[128];
+DUK_INTERNAL_DECL const duk_uint8_t duk_builtins_data[1341];
 #ifdef DUK_USE_BUILTIN_INITJS
 DUK_INTERNAL_DECL const duk_uint8_t duk_initjs_data[187];
 #endif  /* DUK_USE_BUILTIN_INITJS */
+#endif  /* !DUK_SINGLE_FILE */
 
-#define DUK_BUILTINS_DATA_LENGTH                                      1336
+#define DUK_BUILTINS_DATA_LENGTH                                      1341
 #ifdef DUK_USE_BUILTIN_INITJS
 #define DUK_BUILTIN_INITJS_DATA_LENGTH                                187
 #endif  /* DUK_USE_BUILTIN_INITJS */

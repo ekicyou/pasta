@@ -47,21 +47,22 @@
  *  (Compiles to about 160 bytes now as a stand-alone function.)
  */
 
-DUK_LOCAL void duk__sort_array_indices(duk_hobject *h_obj) {
+DUK_LOCAL void duk__sort_array_indices(duk_hthread *thr, duk_hobject *h_obj) {
 	duk_hstring **keys;
 	duk_hstring **p_curr, **p_insert, **p_end;
 	duk_hstring *h_curr;
 	duk_uarridx_t val_highest, val_curr, val_insert;
 
 	DUK_ASSERT(h_obj != NULL);
-	DUK_ASSERT(h_obj->e_next >= 2);  /* control props */
+	DUK_ASSERT(DUK_HOBJECT_GET_ENEXT(h_obj) >= 2);  /* control props */
+	DUK_UNREF(thr);
 
-	if (h_obj->e_next <= 1 + DUK__ENUM_START_INDEX) {
+	if (DUK_HOBJECT_GET_ENEXT(h_obj) <= 1 + DUK__ENUM_START_INDEX) {
 		return;
 	}
 
-	keys = DUK_HOBJECT_E_GET_KEY_BASE(h_obj);
-	p_end = keys + h_obj->e_next;
+	keys = DUK_HOBJECT_E_GET_KEY_BASE(thr->heap, h_obj);
+	p_end = keys + DUK_HOBJECT_GET_ENEXT(h_obj);
 	keys += DUK__ENUM_START_INDEX;
 
 	DUK_DDD(DUK_DDDPRINT("keys=%p, p_end=%p (after skipping enum props)",
@@ -70,11 +71,11 @@ DUK_LOCAL void duk__sort_array_indices(duk_hobject *h_obj) {
 #ifdef DUK_USE_DDDPRINT
 	{
 		duk_uint_fast32_t i;
-		for (i = 0; i < (duk_uint_fast32_t) h_obj->e_next; i++) {
+		for (i = 0; i < (duk_uint_fast32_t) DUK_HOBJECT_GET_ENEXT(h_obj); i++) {
 			DUK_DDD(DUK_DDDPRINT("initial: %ld %p -> %!O",
 			                     (long) i,
-			                     (void *) DUK_HOBJECT_E_GET_KEY_PTR(h_obj, i),
-			                     (duk_heaphdr *) DUK_HOBJECT_E_GET_KEY(h_obj, i)));
+			                     (void *) DUK_HOBJECT_E_GET_KEY_PTR(thr->heap, h_obj, i),
+			                     (duk_heaphdr *) DUK_HOBJECT_E_GET_KEY(thr->heap, h_obj, i)));
 		}
 	}
 #endif
@@ -140,11 +141,11 @@ DUK_LOCAL void duk__sort_array_indices(duk_hobject *h_obj) {
 #ifdef DUK_USE_DDDPRINT
 	{
 		duk_uint_fast32_t i;
-		for (i = 0; i < (duk_uint_fast32_t) h_obj->e_next; i++) {
+		for (i = 0; i < (duk_uint_fast32_t) DUK_HOBJECT_GET_ENEXT(h_obj); i++) {
 			DUK_DDD(DUK_DDDPRINT("final: %ld %p -> %!O",
 			                     (long) i,
-			                     (void *) DUK_HOBJECT_E_GET_KEY_PTR(h_obj, i),
-			                     (duk_heaphdr *) DUK_HOBJECT_E_GET_KEY(h_obj, i)));
+			                     (void *) DUK_HOBJECT_E_GET_KEY_PTR(thr->heap, h_obj, i),
+			                     (duk_heaphdr *) DUK_HOBJECT_E_GET_KEY(thr->heap, h_obj, i)));
 		}
 	}
 #endif
@@ -343,11 +344,11 @@ DUK_INTERNAL void duk_hobject_enumerator_create(duk_context *ctx, duk_small_uint
 		 *  must be the same.
 		 */
 
-		for (i = 0; i < (duk_uint_fast32_t) curr->a_size; i++) {
+		for (i = 0; i < (duk_uint_fast32_t) DUK_HOBJECT_GET_ASIZE(curr); i++) {
 			duk_hstring *k;
 			duk_tval *tv;
 
-			tv = DUK_HOBJECT_A_GET_VALUE_PTR(curr, i);
+			tv = DUK_HOBJECT_A_GET_VALUE_PTR(thr->heap, curr, i);
 			if (DUK_TVAL_IS_UNDEFINED_UNUSED(tv)) {
 				continue;
 			}
@@ -367,14 +368,14 @@ DUK_INTERNAL void duk_hobject_enumerator_create(duk_context *ctx, duk_small_uint
 		 *  Entries part
 		 */
 
-		for (i = 0; i < (duk_uint_fast32_t) curr->e_next; i++) {
+		for (i = 0; i < (duk_uint_fast32_t) DUK_HOBJECT_GET_ENEXT(curr); i++) {
 			duk_hstring *k;
 
-			k = DUK_HOBJECT_E_GET_KEY(curr, i);
+			k = DUK_HOBJECT_E_GET_KEY(thr->heap, curr, i);
 			if (!k) {
 				continue;
 			}
-			if (!DUK_HOBJECT_E_SLOT_IS_ENUMERABLE(curr, i) &&
+			if (!DUK_HOBJECT_E_SLOT_IS_ENUMERABLE(thr->heap, curr, i) &&
 			    !(enum_flags & DUK_ENUM_INCLUDE_NONENUMERABLE)) {
 				continue;
 			}
@@ -387,8 +388,8 @@ DUK_INTERNAL void duk_hobject_enumerator_create(duk_context *ctx, duk_small_uint
 				continue;
 			}
 
-			DUK_ASSERT(DUK_HOBJECT_E_SLOT_IS_ACCESSOR(curr, i) ||
-			           !DUK_TVAL_IS_UNDEFINED_UNUSED(&DUK_HOBJECT_E_GET_VALUE_PTR(curr, i)->v));
+			DUK_ASSERT(DUK_HOBJECT_E_SLOT_IS_ACCESSOR(thr->heap, curr, i) ||
+			           !DUK_TVAL_IS_UNDEFINED_UNUSED(&DUK_HOBJECT_E_GET_VALUE_PTR(thr->heap, curr, i)->v));
 
 			duk_push_hstring(ctx, k);
 			duk_push_true(ctx);
@@ -403,7 +404,7 @@ DUK_INTERNAL void duk_hobject_enumerator_create(duk_context *ctx, duk_small_uint
 			break;
 		}
 
-		curr = curr->prototype;
+		curr = DUK_HOBJECT_GET_PROTOTYPE(thr->heap, curr);
 	}
 
 	/* [enum_target res] */
@@ -434,7 +435,7 @@ DUK_INTERNAL void duk_hobject_enumerator_create(duk_context *ctx, duk_small_uint
 		/* XXX: may need a 'length' filter for forEach()
 		 */
 		DUK_DDD(DUK_DDDPRINT("sort array indices by caller request"));
-		duk__sort_array_indices(res);
+		duk__sort_array_indices(thr, res);
 	}
 
 #if defined(DUK_USE_ES6_PROXY)
@@ -496,16 +497,16 @@ DUK_INTERNAL duk_bool_t duk_hobject_enumerator_next(duk_context *ctx, duk_bool_t
 	for (;;) {
 		duk_hstring *k;
 
-		if (idx >= e->e_next) {
+		if (idx >= DUK_HOBJECT_GET_ENEXT(e)) {
 			DUK_DDD(DUK_DDDPRINT("enumeration: ran out of elements"));
 			break;
 		}
 
 		/* we know these because enum objects are internally created */
-		k = DUK_HOBJECT_E_GET_KEY(e, idx);
+		k = DUK_HOBJECT_E_GET_KEY(thr->heap, e, idx);
 		DUK_ASSERT(k != NULL);
-		DUK_ASSERT(!DUK_HOBJECT_E_SLOT_IS_ACCESSOR(e, idx));
-		DUK_ASSERT(!DUK_TVAL_IS_UNDEFINED_UNUSED(&DUK_HOBJECT_E_GET_VALUE(e, idx).v));
+		DUK_ASSERT(!DUK_HOBJECT_E_SLOT_IS_ACCESSOR(thr->heap, e, idx));
+		DUK_ASSERT(!DUK_TVAL_IS_UNDEFINED_UNUSED(&DUK_HOBJECT_E_GET_VALUE(thr->heap, e, idx).v));
 
 		idx++;
 
@@ -522,7 +523,7 @@ DUK_INTERNAL duk_bool_t duk_hobject_enumerator_next(duk_context *ctx, duk_bool_t
 
 	DUK_DDD(DUK_DDDPRINT("enumeration: updating next index to %ld", (long) idx));
 
-	duk_push_number(ctx, (double) idx);
+	duk_push_u32(ctx, (duk_uint32_t) idx);
 	duk_put_prop_stridx(ctx, -2, DUK_STRIDX_INT_NEXT);
 
 	/* [... enum] */
@@ -551,12 +552,14 @@ DUK_INTERNAL duk_bool_t duk_hobject_enumerator_next(duk_context *ctx, duk_bool_t
  */
 
 DUK_INTERNAL duk_ret_t duk_hobject_get_enumerated_keys(duk_context *ctx, duk_small_uint_t enum_flags) {
+	duk_hthread *thr = (duk_hthread *) ctx;
 	duk_hobject *e;
 	duk_uint_fast32_t i;
 	duk_uint_fast32_t idx;
 
 	DUK_ASSERT(ctx != NULL);
 	DUK_ASSERT(duk_get_hobject(ctx, -1) != NULL);
+	DUK_UNREF(thr);
 
 	/* Create a temporary enumerator to get the (non-duplicated) key list;
 	 * the enumerator state is initialized without being needed, but that
@@ -572,10 +575,10 @@ DUK_INTERNAL duk_ret_t duk_hobject_get_enumerated_keys(duk_context *ctx, duk_sma
 	DUK_ASSERT(e != NULL);
 
 	idx = 0;
-	for (i = DUK__ENUM_START_INDEX; i < (duk_uint_fast32_t) e->e_next; i++) {
+	for (i = DUK__ENUM_START_INDEX; i < (duk_uint_fast32_t) DUK_HOBJECT_GET_ENEXT(e); i++) {
 		duk_hstring *k;
 
-		k = DUK_HOBJECT_E_GET_KEY(e, i);
+		k = DUK_HOBJECT_E_GET_KEY(thr->heap, e, i);
 		DUK_ASSERT(k);  /* enumerator must have no keys deleted */
 
 		/* [enum_target enum res] */

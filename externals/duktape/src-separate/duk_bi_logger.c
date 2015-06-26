@@ -39,12 +39,15 @@ DUK_INTERNAL duk_ret_t duk_bi_logger_constructor(duk_context *ctx) {
 
 		if (thr->callstack_top >= 2) {
 			duk_activation *act_caller = thr->callstack + thr->callstack_top - 2;
-			if (act_caller->func) {
+			duk_hobject *func_caller;
+
+			func_caller = DUK_ACT_GET_FUNC(act_caller);
+			if (func_caller) {
 				/* Stripping the filename might be a good idea
 				 * ("/foo/bar/quux.js" -> logger name "quux"),
 				 * but now used verbatim.
 				 */
-				duk_push_hobject(ctx, act_caller->func);
+				duk_push_hobject(ctx, func_caller);
 				duk_get_prop_stridx(ctx, -1, DUK_STRIDX_FILE_NAME);
 				duk_replace(ctx, 0);
 			}
@@ -241,7 +244,7 @@ DUK_INTERNAL duk_ret_t duk_bi_logger_prototype_log_shared(duk_context *ctx) {
 		h_buf = thr->heap->log_buffer;
 		DUK_ASSERT(h_buf != NULL);
 		DUK_ASSERT(DUK_HBUFFER_HAS_DYNAMIC((duk_hbuffer *) h_buf));
-		DUK_ASSERT(DUK_HBUFFER_DYNAMIC_GET_USABLE_SIZE(h_buf) == DUK_BI_LOGGER_SHORT_MSG_LIMIT);
+		DUK_ASSERT(DUK_HBUFFER_DYNAMIC_GET_ALLOC_SIZE(h_buf) == DUK_BI_LOGGER_SHORT_MSG_LIMIT);
 
 		/* Set buffer 'visible size' to actual message length and
 		 * push it to the stack.
@@ -249,7 +252,7 @@ DUK_INTERNAL duk_ret_t duk_bi_logger_prototype_log_shared(duk_context *ctx) {
 
 		DUK_HBUFFER_SET_SIZE((duk_hbuffer *) h_buf, tot_len);
 		duk_push_hbuffer(ctx, (duk_hbuffer *) h_buf);
-		buf = (duk_uint8_t *) DUK_HBUFFER_DYNAMIC_GET_CURR_DATA_PTR(h_buf);
+		buf = (duk_uint8_t *) DUK_HBUFFER_DYNAMIC_GET_DATA_PTR(thr->heap, h_buf);
 	} else {
 		DUK_DDD(DUK_DDDPRINT("use a one-off large log message buffer, tot_len %ld", (long) tot_len));
 		buf = (duk_uint8_t *) duk_push_fixed_buffer(ctx, tot_len);
@@ -284,6 +287,22 @@ DUK_INTERNAL duk_ret_t duk_bi_logger_prototype_log_shared(duk_context *ctx) {
 	DUK_ASSERT(buf + tot_len == p);
 
 	/* [ arg1 ... argN this loggerLevel loggerName buffer ] */
+
+#if defined(DUK_USE_DEBUGGER_SUPPORT) && defined(DUK_USE_DEBUGGER_FWD_LOGGING)
+	/* Do debugger forwarding before raw() because the raw() function
+	 * doesn't get the log level right now.
+	 */
+	if (DUK_HEAP_IS_DEBUGGER_ATTACHED(thr->heap)) {
+		const char *log_buf;
+		duk_size_t sz_buf;
+		log_buf = (const char *) duk_get_buffer(ctx, -1, &sz_buf);
+		DUK_ASSERT(log_buf != NULL);
+		duk_debug_write_notify(thr, DUK_DBG_CMD_LOG);
+		duk_debug_write_int(thr, (duk_int32_t) entry_lev);
+		duk_debug_write_string(thr, (const char *) log_buf, sz_buf);
+		duk_debug_write_eom(thr);
+	}
+#endif
 
 	/* Call this.raw(msg); look up through the instance allows user to override
 	 * the raw() function in the instance or in the prototype for maximum

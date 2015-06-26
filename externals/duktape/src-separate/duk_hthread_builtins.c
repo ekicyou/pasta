@@ -110,7 +110,7 @@ DUK_INTERNAL void duk_hthread_create_builtin_objects(duk_hthread *thr) {
 			/* XXX: function properties */
 
 			duk_push_hstring_stridx(ctx, stridx);
-			duk_def_prop_stridx(ctx, -2, DUK_STRIDX_NAME, DUK_PROPDESC_FLAGS_NONE);
+			duk_xdef_prop_stridx(ctx, -2, DUK_STRIDX_NAME, DUK_PROPDESC_FLAGS_NONE);
 
 			/* Almost all global level Function objects are constructable
 			 * but not all: Function.prototype is a non-constructable,
@@ -156,11 +156,11 @@ DUK_INTERNAL void duk_hthread_create_builtin_objects(duk_hthread *thr) {
 			 */
 
 			duk_push_int(ctx, len);
-			duk_def_prop_stridx(ctx,
-			                    -2,
-			                    DUK_STRIDX_LENGTH,
-			                    (class_num == DUK_HOBJECT_CLASS_ARRAY ?  /* only Array.prototype matches */
-			                     DUK_PROPDESC_FLAGS_W : DUK_PROPDESC_FLAGS_NONE));
+			duk_xdef_prop_stridx(ctx,
+			                     -2,
+			                     DUK_STRIDX_LENGTH,
+			                     (class_num == DUK_HOBJECT_CLASS_ARRAY ?  /* only Array.prototype matches */
+			                      DUK_PROPDESC_FLAGS_W : DUK_PROPDESC_FLAGS_NONE));
 		}
 
 		/* enable exotic behaviors last */
@@ -221,7 +221,7 @@ DUK_INTERNAL void duk_hthread_create_builtin_objects(duk_hthread *thr) {
 			 *  [[Configurable]] = false
 			 */
 			DUK_DDD(DUK_DDDPRINT("set external prototype: built-in %ld", (long) t));
-			duk_def_prop_stridx_builtin(ctx, i, DUK_STRIDX_PROTOTYPE, t, DUK_PROPDESC_FLAGS_NONE);
+			duk_xdef_prop_stridx_builtin(ctx, i, DUK_STRIDX_PROTOTYPE, t, DUK_PROPDESC_FLAGS_NONE);
 		}
 
 		t = (duk_small_uint_t) duk_bd_decode(bd, DUK__BIDX_BITS);
@@ -232,7 +232,7 @@ DUK_INTERNAL void duk_hthread_create_builtin_objects(duk_hthread *thr) {
 			 *  [[Configurable]] = true
 			 */
 			DUK_DDD(DUK_DDDPRINT("set external constructor: built-in %ld", (long) t));
-			duk_def_prop_stridx_builtin(ctx, i, DUK_STRIDX_CONSTRUCTOR, t, DUK_PROPDESC_FLAGS_WC);
+			duk_xdef_prop_stridx_builtin(ctx, i, DUK_STRIDX_CONSTRUCTOR, t, DUK_PROPDESC_FLAGS_WC);
 		}
 
 		/* normal valued properties */
@@ -360,7 +360,7 @@ DUK_INTERNAL void duk_hthread_create_builtin_objects(duk_hthread *thr) {
 			}
 
 			DUK_ASSERT((prop_flags & DUK_PROPDESC_FLAG_ACCESSOR) == 0);
-			duk_def_prop_stridx(ctx, i, stridx, prop_flags);
+			duk_xdef_prop_stridx(ctx, i, stridx, prop_flags);
 
 		 skip_value:
 			continue;  /* avoid empty label at the end of a compound statement */
@@ -377,6 +377,9 @@ DUK_INTERNAL void duk_hthread_create_builtin_objects(duk_hthread *thr) {
 			duk_int16_t magic;
 			duk_c_function c_func;
 			duk_hnativefunction *h_func;
+#if defined(DUK_USE_LIGHTFUNC_BUILTINS)
+			duk_small_int_t lightfunc_eligible;
+#endif
 
 			stridx = (duk_small_uint_t) duk_bd_decode(bd, DUK__STRIDX_BITS);
 			natidx = (duk_small_uint_t) duk_bd_decode(bd, DUK__NATIDX_BITS);
@@ -392,6 +395,39 @@ DUK_INTERNAL void duk_hthread_create_builtin_objects(duk_hthread *thr) {
 			DUK_DDD(DUK_DDDPRINT("built-in %ld, function-valued property %ld, stridx %ld, natidx %ld, length %ld, nargs %ld",
 			                     (long) i, (long) j, (long) stridx, (long) natidx, (long) c_length,
 			                     (c_nargs == DUK_VARARGS ? (long) -1 : (long) c_nargs)));
+
+			/* Cast converts magic to 16-bit signed value */
+			magic = (duk_int16_t) duk_bd_decode_flagged(bd, DUK__MAGIC_BITS, 0);
+
+#if defined(DUK_USE_LIGHTFUNC_BUILTINS)
+			lightfunc_eligible =
+				((c_nargs >= DUK_LFUNC_NARGS_MIN && c_nargs <= DUK_LFUNC_NARGS_MAX) || (c_nargs == DUK_VARARGS)) &&
+				(c_length <= DUK_LFUNC_LENGTH_MAX) &&
+				(magic >= DUK_LFUNC_MAGIC_MIN && magic <= DUK_LFUNC_MAGIC_MAX);
+			if (stridx == DUK_STRIDX_EVAL ||
+			    stridx == DUK_STRIDX_YIELD ||
+			    stridx == DUK_STRIDX_RESUME ||
+			    stridx == DUK_STRIDX_REQUIRE) {
+				/* These functions have trouble working as lightfuncs.
+				 * Some of them have specific asserts and some may have
+			         * additional properties (e.g. 'require.id' may be written).
+				 */
+				DUK_D(DUK_DPRINT("reject as lightfunc: stridx=%d, i=%d, j=%d", (int) stridx, (int) i, (int) j));
+				lightfunc_eligible = 0;
+			}
+
+			if (lightfunc_eligible) {
+				duk_tval tv_lfunc;
+				duk_small_uint_t lf_nargs = (c_nargs == DUK_VARARGS ? DUK_LFUNC_NARGS_VARARGS : c_nargs);
+				duk_small_uint_t lf_flags = DUK_LFUNC_FLAGS_PACK(magic, c_length, lf_nargs);
+				DUK_TVAL_SET_LIGHTFUNC(&tv_lfunc, c_func, lf_flags);
+				duk_push_tval(ctx, &tv_lfunc);
+				DUK_D(DUK_DPRINT("built-in function eligible as light function: i=%d, j=%d c_length=%ld, c_nargs=%ld, magic=%ld -> %!iT", (int) i, (int) j, (long) c_length, (long) c_nargs, (long) magic, duk_get_tval(ctx, -1)));
+				goto lightfunc_skip;
+			}
+
+			DUK_D(DUK_DPRINT("built-in function NOT ELIGIBLE as light function: i=%d, j=%d c_length=%ld, c_nargs=%ld, magic=%ld", (int) i, (int) j, (long) c_length, (long) c_nargs, (long) magic));
+#endif  /* DUK_USE_LIGHTFUNC_BUILTINS */
 
 			/* [ (builtin objects) ] */
 
@@ -415,17 +451,15 @@ DUK_INTERNAL void duk_hthread_create_builtin_objects(duk_hthread *thr) {
 			/* XXX: any way to avoid decoding magic bit; there are quite
 			 * many function properties and relatively few with magic values.
 			 */
-			/* Cast converts magic to 16-bit signed value */
-			magic = (duk_int16_t) duk_bd_decode_flagged(bd, DUK__MAGIC_BITS, 0);
 			h_func->magic = magic;
 
 			/* [ (builtin objects) func ] */
 
 			duk_push_int(ctx, c_length);
-			duk_def_prop_stridx(ctx, -2, DUK_STRIDX_LENGTH, DUK_PROPDESC_FLAGS_NONE);
+			duk_xdef_prop_stridx(ctx, -2, DUK_STRIDX_LENGTH, DUK_PROPDESC_FLAGS_NONE);
 
 			duk_push_hstring_stridx(ctx, stridx);
-			duk_def_prop_stridx(ctx, -2, DUK_STRIDX_NAME, DUK_PROPDESC_FLAGS_NONE);
+			duk_xdef_prop_stridx(ctx, -2, DUK_STRIDX_NAME, DUK_PROPDESC_FLAGS_NONE);
 
 			/* XXX: other properties of function instances; 'arguments', 'caller'. */
 
@@ -439,7 +473,11 @@ DUK_INTERNAL void duk_hthread_create_builtin_objects(duk_hthread *thr) {
 			 *  function valued properties of built-in objects now.
 			 */
 
-			duk_def_prop_stridx(ctx, i, stridx, DUK_PROPDESC_FLAGS_WC);
+#if defined(DUK_USE_LIGHTFUNC_BUILTINS)
+		 lightfunc_skip:
+#endif
+
+			duk_xdef_prop_stridx(ctx, i, stridx, DUK_PROPDESC_FLAGS_WC);
 
 			/* [ (builtin objects) ] */
 		}
@@ -463,7 +501,7 @@ DUK_INTERNAL void duk_hthread_create_builtin_objects(duk_hthread *thr) {
 	 */
 
 	duk_get_prop_stridx(ctx, DUK_BIDX_DATE_PROTOTYPE, DUK_STRIDX_TO_UTC_STRING);
-	duk_def_prop_stridx(ctx, DUK_BIDX_DATE_PROTOTYPE, DUK_STRIDX_TO_GMT_STRING, DUK_PROPDESC_FLAGS_WC);
+	duk_xdef_prop_stridx(ctx, DUK_BIDX_DATE_PROTOTYPE, DUK_STRIDX_TO_GMT_STRING, DUK_PROPDESC_FLAGS_WC);
 
 	h = duk_require_hobject(ctx, DUK_BIDX_DOUBLE_ERROR);
 	DUK_ASSERT(h != NULL);
@@ -471,15 +509,16 @@ DUK_INTERNAL void duk_hthread_create_builtin_objects(duk_hthread *thr) {
 
 #if !defined(DUK_USE_ES6_OBJECT_PROTO_PROPERTY)
 	DUK_DD(DUK_DDPRINT("delete Object.prototype.__proto__ built-in which is not enabled in features"));
-	(void) duk_hobject_delprop_raw(thr, thr->builtins[DUK_BIDX_OBJECT_PROTOTYPE], DUK_HTHREAD_STRING___PROTO__(thr), 1 /*throw_flag*/);
+	(void) duk_hobject_delprop_raw(thr, thr->builtins[DUK_BIDX_OBJECT_PROTOTYPE], DUK_HTHREAD_STRING___PROTO__(thr), DUK_DELPROP_FLAG_THROW);
 #endif
 
 #if !defined(DUK_USE_ES6_OBJECT_SETPROTOTYPEOF)
 	DUK_DD(DUK_DDPRINT("delete Object.setPrototypeOf built-in which is not enabled in features"));
-	(void) duk_hobject_delprop_raw(thr, thr->builtins[DUK_BIDX_OBJECT_CONSTRUCTOR], DUK_HTHREAD_STRING_SET_PROTOTYPE_OF(thr), 1 /*throw_flag*/);
+	(void) duk_hobject_delprop_raw(thr, thr->builtins[DUK_BIDX_OBJECT_CONSTRUCTOR], DUK_HTHREAD_STRING_SET_PROTOTYPE_OF(thr), DUK_DELPROP_FLAG_THROW);
 #endif
 
 	duk_push_string(ctx,
+			/* Endianness indicator */
 #if defined(DUK_USE_INTEGER_LE)
 	                "l"
 #elif defined(DUK_USE_INTEGER_BE)
@@ -502,12 +541,56 @@ DUK_INTERNAL void duk_hthread_create_builtin_objects(duk_hthread *thr) {
 			"f"
 #endif
 	                " "
+			/* Packed or unpacked tval */
 #if defined(DUK_USE_PACKED_TVAL)
 	                "p"
 #else
 	                "u"
 #endif
+#if defined(DUK_USE_FASTINT)
+			"f"
+#endif
+			" "
+			/* Low memory options */
+#if defined(DUK_USE_STRTAB_CHAIN)
+			"c"  /* chain */
+#elif defined(DUK_USE_STRTAB_PROBE)
+			"p"  /* probe */
+#else
+			"?"
+#endif
+#if !defined(DUK_USE_HEAPPTR16) && !defined(DUK_DATAPTR16) && !defined(DUK_FUNCPTR16)
+			"n"
+#endif
+#if defined(DUK_USE_HEAPPTR16)
+			"h"
+#endif
+#if defined(DUK_USE_DATAPTR16)
+			"d"
+#endif
+#if defined(DUK_USE_FUNCPTR16)
+			"f"
+#endif
+#if defined(DUK_USE_REFCOUNT16)
+			"R"
+#endif
+#if defined(DUK_USE_STRHASH16)
+			"H"
+#endif
+#if defined(DUK_USE_STRLEN16)
+			"S"
+#endif
+#if defined(DUK_USE_BUFLEN16)
+			"B"
+#endif
+#if defined(DUK_USE_OBJSIZES16)
+			"O"
+#endif
+#if defined(DUK_USE_LIGHTFUNC_BUILTINS)
+			"L"
+#endif
 	                " "
+			/* Object property allocation layout */
 #if defined(DUK_USE_HOBJECT_LAYOUT_1)
 			"p1"
 #elif defined(DUK_USE_HOBJECT_LAYOUT_2)
@@ -518,6 +601,7 @@ DUK_INTERNAL void duk_hthread_create_builtin_objects(duk_hthread *thr) {
 			"p?"
 #endif
 			" "
+			/* Alignment guarantee */
 #if defined(DUK_USE_ALIGN_4)
 			"a4"
 #elif defined(DUK_USE_ALIGN_8)
@@ -526,12 +610,13 @@ DUK_INTERNAL void duk_hthread_create_builtin_objects(duk_hthread *thr) {
 			"a1"
 #endif
 			" "
+			/* Architecture, OS, and compiler strings */
 	                DUK_USE_ARCH_STRING
 			" "
 	                DUK_USE_OS_STRING
 			" "
 	                DUK_USE_COMPILER_STRING);
-	duk_def_prop_stridx(ctx, DUK_BIDX_DUKTAPE, DUK_STRIDX_ENV, DUK_PROPDESC_FLAGS_WC);
+	duk_xdef_prop_stridx(ctx, DUK_BIDX_DUKTAPE, DUK_STRIDX_ENV, DUK_PROPDESC_FLAGS_WC);
 
 	/*
 	 *  InitJS code - Ecmascript code evaluated from a built-in source
@@ -570,13 +655,6 @@ DUK_INTERNAL void duk_hthread_create_builtin_objects(duk_hthread *thr) {
 	}
 #endif
 
-#ifdef DUK_USE_DDDPRINT /*XXX:incorrect*/
-	for (i = 0; i < DUK_NUM_BUILTINS; i++) {
-		DUK_DDD(DUK_DDDPRINT("built-in object %ld after initialization and compacting", (long) i));
-		DUK_DEBUG_DUMP_HOBJECT(thr->builtins[i]);
-	}
-#endif
-
 	/*
 	 *  Pop built-ins from stack: they are now INCREF'd and
 	 *  reachable from the builtins[] array.
@@ -591,6 +669,6 @@ DUK_INTERNAL void duk_hthread_copy_builtin_objects(duk_hthread *thr_from, duk_ht
 
 	for (i = 0; i < DUK_NUM_BUILTINS; i++) {
 		thr_to->builtins[i] = thr_from->builtins[i];
-		DUK_HOBJECT_INCREF(thr_to, thr_to->builtins[i]);  /* side effect free */
+		DUK_HOBJECT_INCREF_ALLOWNULL(thr_to, thr_to->builtins[i]);  /* side effect free */
 	}
 }
