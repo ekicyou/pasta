@@ -13,3 +13,4 @@
 /_old/src/pasta/UnitTest/bin
 *.suo
 *.user
+/node_modules
