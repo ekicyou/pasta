@@ -5,5 +5,5 @@
 setlocal
 pushd %~dp0
   set PATH=%PATH%;%~dp0node_modules\.bin
-  call coffee gulpfiles\tasks\watch.coffee
-
+  pushd gulpfiles\tasks
+    call gulp build

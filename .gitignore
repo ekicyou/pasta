@@ -14,3 +14,4 @@
 *.suo
 *.user
 /node_modules
+/dist
