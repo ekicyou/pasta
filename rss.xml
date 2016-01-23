@@ -1,4 +1,3 @@
-
 <?xml version="1.0"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
 <channel>
@@ -13,20 +12,20 @@
     
     <item>
       <title>春の嵐</title>
-      <link>http://domain/2014/03/13/the-first-spring-storm.html</link>
+      <link>http://domain/2014/03/13/the/first/spring/storm.html</link>
       <pubDate>木, 13 3 2014 00:00:00 +0900</pubDate>
       <author>Author</author>
-      <guid>http://domain/2014/03/13/the-first-spring-storm.html</guid>
+      <guid>http://domain/2014/03/13/the/first/spring/storm.html</guid>
       <description>&lt;h2&gt;春の嵐&lt;/h2&gt;
 &lt;p&gt;冬将軍。&lt;/p&gt;</description>
     </item>
     
     <item>
       <title>this is a post</title>
-      <link>http://domain/2014/03/13/the-first-spring-storm_a2ecbd478975ccf534ff8aca5358cb23.html</link>
+      <link>http://domain/2014/03/13/the/first/spring/storm_a2ecbd478975ccf534ff8aca5358cb23.html</link>
       <pubDate>木, 13 3 2014 00:00:00 +0900</pubDate>
       <author>Author</author>
-      <guid>http://domain/2014/03/13/the-first-spring-storm_a2ecbd478975ccf534ff8aca5358cb23.html</guid>
+      <guid>http://domain/2014/03/13/the/first/spring/storm_a2ecbd478975ccf534ff8aca5358cb23.html</guid>
       <description>&lt;!DOCTYPE HTML PUBLIC &apos;-//W3C//DTD HTML 4.01//EN&apos; &apos;http://www.w3.org/TR/html4/strict.dtd&apos;&gt;
 &lt;html&gt;
 &lt;head&gt;

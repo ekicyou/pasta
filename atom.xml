@@ -1,4 +1,3 @@
-
 <?xml version="1.0"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
   <title>Feed Name</title>
@@ -13,8 +12,8 @@
 
   
   <entry>
-    <id>http://domain//2014/03/13/the-first-spring-storm.html</id>
-    <link type="text/html" rel="alternate" href="http://domain//2014/03/13/the-first-spring-storm.html"/>
+    <id>http://domain//2014/03/13/the/first/spring/storm.html</id>
+    <link type="text/html" rel="alternate" href="http://domain//2014/03/13/the/first/spring/storm.html"/>
     <title>春の嵐</title>
     <updated>2014-03-13T00:00:00+09:00</updated>
     <author>
@@ -26,8 +25,8 @@
   </entry>
   
   <entry>
-    <id>http://domain//2014/03/13/the-first-spring-storm_a2ecbd478975ccf534ff8aca5358cb23.html</id>
-    <link type="text/html" rel="alternate" href="http://domain//2014/03/13/the-first-spring-storm_a2ecbd478975ccf534ff8aca5358cb23.html"/>
+    <id>http://domain//2014/03/13/the/first/spring/storm_a2ecbd478975ccf534ff8aca5358cb23.html</id>
+    <link type="text/html" rel="alternate" href="http://domain//2014/03/13/the/first/spring/storm_a2ecbd478975ccf534ff8aca5358cb23.html"/>
     <title>this is a post</title>
     <updated>2014-03-13T00:00:00+09:00</updated>
     <author>
