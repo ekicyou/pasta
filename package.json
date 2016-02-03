@@ -9,6 +9,7 @@
   "author": "kazukitash",
   "license": "MIT",
   "devDependencies": {
+    "async-await": "^0.1.32",
     "babelify": "^6.4.0",
     "browser-sync": "^2.9.11",
     "browserify": "^12.0.1",
