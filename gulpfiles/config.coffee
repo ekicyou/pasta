@@ -8,6 +8,8 @@ module.exports =
   es6:      source + '/js/**/[^_]*.js'
   jade:     source + '/**/*.jade'
   jadeBase: 'src'
+  tate:     source + '/**/*.tate'
+  tateBase: 'src'
 
   # 出力先の設定
   es5:  dist + '/js'
