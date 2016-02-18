@@ -10,7 +10,7 @@ notify     = require 'gulp-notify'
 glob       = require 'glob'
 path       = require 'path'
 
-gulp.task 'build', ['jade'], ->
+gulp.task 'build', ['jade','md'], ->
   files = glob.sync config.es6
   files.forEach (file) ->
     browserify
