@@ -14,8 +14,8 @@ gulp.task 'build', ['jade','md'], ->
   files = glob.sync config.es6
   files.forEach (file) ->
     browserify
-        entries: file
-        extensions: config.browserify.extensions
+      entries:    file
+      extensions: config.browserify.extensions
       .transform babelify
       .transform stylify
       .transform {global: true}, uglifyify
