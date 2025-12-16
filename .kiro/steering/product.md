@@ -28,22 +28,34 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 
 ## 機能の優先順位
 
-### Phase 1: 基盤確立（完了）
-- [x] 「パスタスクリプト」DSLのAST分解
-- [x] ２パストランスパイル
-- [x] ラベルジャンプテーブルの実装
-- [x] 宣言的制御フロー（Call/Jump文）
-- [x] UI層独立性確立
+### Phase 0: 一次設計の再構築（進行中）⚠️
+**現状**: 過去11仕様は完了扱いだが、実装品質が要件定義意図を満たしておらず、**大規模な差し戻し・再設計中**
 
-**完了仕様**: 11件（`pasta-engine-independence`, `pasta-transpiler-pass2-output`, `pasta-label-resolution-runtime` 他）
+- [ ] 「パスタスクリプト」DSL設計の見直し
+- [ ] ２パストランスパイル設計の再検討
+- [ ] ラベルジャンプテーブル設計の修正
+- [ ] 宣言的制御フロー（Call/Jump文）の再実装
+- [ ] UI層独立性の正確な実現
 
-### Phase 2: コア機能実装（進行中）
+**課題**:
+- DSL文法の曖昧性・不完全性
+- トランスパイル結果の品質問題
+- ラベルテーブル設計の不備
+- Yield伝搬問題（Call/Jump文が動作しない）🔴
+- 要件と実装の乖離
+
+**過去の「完了」仕様**: 11件（実装品質不十分、再評価必要）
+
+### Phase 1: 基盤確立（未達）
+Phase 0の再構築が完了するまで、基盤確立とは言えない状態。
+
+### Phase 2: コア機能実装（保留）
 - [ ] **P0**: Call/Jump文のyield伝搬修正（`pasta-yield-propagation`）🔴
 - [ ] **P0**: Runeブロックローカル関数呼び出し（`pasta-local-rune-calls`）
 - [ ] **P1**: 単語ジャンプテーブルの実装（`pasta-word-definition-dsl`）
 - [ ] **P1**: Call解決優先度明確化（`pasta-call-resolution-priority`）
 
-**進行中仕様**: 9件
+**進行中仕様**: 9件（Phase 0完了後に着手）
 
 ### Phase 3: 高度機能（計画中）
 - [ ] ラベル継続チェーン（`pasta-label-continuation`）
@@ -56,4 +68,4 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 - [ ] arekaへの投入（`ukagaka-desktop-mascot`メタ仕様 - 32子仕様管理中）
 - [ ] MCPまたはLLMとの連携（`areka-P0-mcp-server`）
 
-**現在地**: Phase 2進行中（基盤完成、コア機能実装段階）
+**現在地**: Phase 0（一次設計再構築中）- **基盤未確立**
