@@ -1,0 +1,22 @@
+{
+    "feature_name": "pasta-chain-token-ir-check",
+    "created_at": "2025-12-11T00:00:00Z",
+    "updated_at": "2025-12-11T00:00:00Z",
+    "language": "ja",
+    "phase": "completed",
+    "approvals": {
+        "requirements": {
+            "generated": true,
+            "approved": true
+        },
+        "design": {
+            "generated": false,
+            "approved": false
+        },
+        "tasks": {
+            "generated": false,
+            "approved": false
+        }
+    },
+    "ready_for_implementation": false
+}
