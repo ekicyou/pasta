@@ -1,0 +1,92 @@
+warning: unexpected `cfg` condition value: `old_api_tests`
+   --> crates\pasta\src\engine.rs:782:17
+    |
+782 | #[cfg(all(test, feature = "old_api_tests"))]
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove the condition
+    |
+    = note: no expected values for `feature`
+    = help: consider adding `old_api_tests` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+    = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: field `cache` is never read
+  --> crates\pasta\src\engine.rs:61:5
+   |
+53 | pub struct PastaEngine {
+   |            ----------- field in this struct
+...
+61 |     cache: ParseCache,
+   |     ^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: associated function `build_engine` is never used
+   --> crates\pasta\src\engine.rs:298:8
+    |
+ 66 | impl PastaEngine {
+    | ---------------- associated function in this implementation
+...
+298 |     fn build_engine(
+    |        ^^^^^^^^^^^^
+
+warning: function `parse_var_assign_from_parts` is never used
+   --> crates\pasta\src\parser\mod.rs:530:4
+    |
+530 | fn parse_var_assign_from_parts(pair: Pair<Rule>) -> Result<Statement, PastaError> {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `parse_call_stmt` is never used
+   --> crates\pasta\src\parser\mod.rs:598:4
+    |
+598 | fn parse_call_stmt(pair: Pair<Rule>) -> Result<Statement, PastaError> {
+    |    ^^^^^^^^^^^^^^^
+
+warning: function `parse_jump_stmt` is never used
+   --> crates\pasta\src\parser\mod.rs:631:4
+    |
+631 | fn parse_jump_stmt(pair: Pair<Rule>) -> Result<Statement, PastaError> {
+    |    ^^^^^^^^^^^^^^^
+
+warning: function `parse_var_assign` is never used
+   --> crates\pasta\src\parser\mod.rs:721:4
+    |
+721 | fn parse_var_assign(pair: Pair<Rule>) -> Result<Statement, PastaError> {
+    |    ^^^^^^^^^^^^^^^^
+
+warning: function `parse_rune_block` is never used
+   --> crates\pasta\src\parser\mod.rs:754:4
+    |
+754 | fn parse_rune_block(pair: Pair<Rule>) -> Result<Statement, PastaError> {
+    |    ^^^^^^^^^^^^^^^^
+
+warning: `pasta` (lib) generated 8 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s
+     Running tests\test_comprehensive_control_flow_transpile.rs (C:\home\maz\git\dcomp_sample-rs-2\target\debug\deps\test_comprehensive_control_flow_transpile-a5602e3588370296.exe)
+
+running 1 test
+
+thread 'test_comprehensive_control_flow_transpile' (31892) panicked at crates\pasta\tests\test_comprehensive_control_flow_transpile.rs:21:5:
+__start__髢｢謨ｰ縺檎函謌舌＆繧後※縺・↑縺・stack backtrace:
+   0: std::panicking::panic_handler
+             at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library\std\src\panicking.rs:698
+   1: core::panicking::panic_fmt
+             at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library\core\src\panicking.rs:80
+   2: test_comprehensive_control_flow_transpile::test_comprehensive_control_flow_transpile
+             at .\tests\test_comprehensive_control_flow_transpile.rs:21
+   3: test_comprehensive_control_flow_transpile::test_comprehensive_control_flow_transpile::closure$0
+             at .\tests\test_comprehensive_control_flow_transpile.rs:9
+   4: core::ops::function::FnOnce::call_once<test_comprehensive_control_flow_transpile::test_comprehensive_control_flow_transpile::closure_env$0,tuple$<> >
+             at C:\rust\up\toolchains\stable-x86_64-pc-windows-msvc\lib\rustlib\src\rust\library\core\src\ops\function.rs:250
+   5: core::ops::function::FnOnce::call_once
+             at /rustc/ded5c06cf21d2b93bffd5d884aa6e96934ee4234/library\core\src\ops\function.rs:250
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+test test_comprehensive_control_flow_transpile ... FAILED
+
+failures:
+
+failures:
+    test_comprehensive_control_flow_transpile
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.20s
+
+error: test failed, to rerun pass `--test test_comprehensive_control_flow_transpile`

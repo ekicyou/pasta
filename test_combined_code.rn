@@ -1,0 +1,120 @@
+// Main Rune entry point for test project
+// This file defines global actor constants and other shared definitions
+
+// Actor definitions - organized in actors module
+pub mod actors {
+    pub const さくら = #{
+        name: "さくら",
+        id: "sakura",
+    };
+
+    pub const うにゅう = #{
+        name: "うにゅう", 
+        id: "unyuu",
+    };
+
+    pub const ななこ = #{
+        name: "ななこ",
+        id: "nanako",
+    };
+}
+
+pub fn main() {
+    // Entry point (not used in tests)
+}
+
+
+pub mod メイン_1 {
+    use pasta_stdlib::*;
+    use crate::actors::*;
+
+    pub fn __start__(ctx, args) {
+        let カウンタ = 10;
+        ctx.actor = さくら;
+        yield Actor(ctx.actor.name);
+        yield pasta_stdlib::word(ctx, "挨拶", []);
+        yield Talk("！");
+        ctx.actor = うにゅう;
+        yield Actor(ctx.actor.name);
+        yield Talk("やっほー。");
+        for a in crate::pasta::call(ctx, "自己紹介", #{}, []) { yield a; }
+        let カウンタ = 1;
+        for a in crate::pasta::call(ctx, "カウント表示", #{}, [カウンタ]) { yield a; }
+        for a in crate::pasta::jump(ctx, "会話分岐", #{}, []) { yield a; }
+    }
+    pub fn 自己紹介_1(ctx, args) {
+        ctx.actor = さくら;
+        yield Actor(ctx.actor.name);
+        yield Talk("私はさくらです。");
+        ctx.actor = うにゅう;
+        yield Actor(ctx.actor.name);
+        yield Talk("僕はうにゅうだよ。");
+        for a in crate::pasta::call(ctx, "趣味紹介", #{}, []) { yield a; }
+    }
+
+    pub fn 趣味紹介_1(ctx, args) {
+        ctx.actor = さくら;
+        yield Actor(ctx.actor.name);
+        yield Talk("私の趣味は読書です。");
+        ctx.actor = うにゅう;
+        yield Actor(ctx.actor.name);
+        yield Talk("僕はゲームが好き。");
+    }
+
+    pub fn カウント表示_1(ctx, args) {
+        ctx.actor = さくら;
+        yield Actor(ctx.actor.name);
+        yield Talk("カウンターは＄値です。");
+    }
+
+    pub fn 会話分岐_1(ctx, args) {
+        ctx.actor = さくら;
+        yield Actor(ctx.actor.name);
+        yield pasta_stdlib::word(ctx, "場所の天気は", []);
+        yield pasta_stdlib::word(ctx, "天気だね", []);
+        yield Talk("。");
+        ctx.actor = うにゅう;
+        yield Actor(ctx.actor.name);
+        yield Talk("そうだね。");
+        for a in crate::pasta::jump(ctx, "別の話題", #{}, []) { yield a; }
+    }
+
+    pub fn 別の話題_1(ctx, args) {
+        ctx.actor = さくら;
+        yield Actor(ctx.actor.name);
+        yield Talk("ところで、明日は何する？");
+        ctx.actor = うにゅう;
+        yield Actor(ctx.actor.name);
+        yield Talk("まだ決めてないなぁ。");
+    }
+
+}
+
+pub mod __pasta_trans2__ {
+    use pasta_stdlib::*;
+
+    pub fn label_selector(label, filters) {
+        let id = pasta_stdlib::select_label_to_id(label, filters);
+        match id {
+            1 => crate::メイン_1::__start__,
+            2 => crate::メイン_1::自己紹介_1,
+            3 => crate::メイン_1::趣味紹介_1,
+            4 => crate::メイン_1::カウント表示_1,
+            5 => crate::メイン_1::会話分岐_1,
+            6 => crate::メイン_1::別の話題_1,
+            _ => |_ctx, _args| { yield pasta_stdlib::Error(`ラベルID ${id} が見つかりませんでした。`); },
+        }
+    }
+}
+
+pub mod pasta {
+    pub fn jump(ctx, label, filters, args) {
+        let func = crate::__pasta_trans2__::label_selector(label, filters);
+        for a in func(ctx, args) { yield a; }
+    }
+
+    pub fn call(ctx, label, filters, args) {
+        let func = crate::__pasta_trans2__::label_selector(label, filters);
+        for a in func(ctx, args) { yield a; }
+    }
+}

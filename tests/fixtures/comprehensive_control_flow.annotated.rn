@@ -1,0 +1,226 @@
+// 包括的なコントロールフロー参照実装（期待される出力）
+// 予約関数パターンによる統一アーキテクチャ
+// すべてのコントロールフロー構文（＠Word, ＞Call, ？Jump）を予約関数に変換
+
+pub mod メイン_1 {
+    // このスコープで利用可能なアクター定数
+    use super::{さくら, うにゅう};
+    
+    /// __start__関数: ラベルのエントリポイント
+    /// 
+    /// 統一パターン:
+    /// - ＠単語   → __word_単語__(ctx, args)
+    /// - ＞ラベル → __call_ラベル__(ctx, args)
+    /// - ？ラベル → __jump_ラベル__(ctx, args)
+    pub fn __start__(ctx) {
+        // ローカル単語定義: 単語：場所＝「東京」「大阪」
+        ctx.pasta.add_words("場所", ["東京", "大阪"]);
+        ctx.pasta.commit_words();
+        
+        // ＄カウンタ＝１０
+        ctx.var.カウンタ = 10;
+        
+        // さくら：＠挨拶！
+        ctx.actor = さくら;
+        yield #{ type: "Actor", actor: ctx.actor };
+        for a in __word_挨拶__(ctx, []) { yield a; }
+        yield #{ type: "Talk", text: "！" };
+
+        // うにゅう：＠ローカル関数（「はろー」）
+        ctx.actor = うにゅう;
+        yield #{ type: "Actor", actor: ctx.actor };
+        for a in __word_ローカル関数__(ctx, ["はろー"]) { yield a; }
+
+        // ＞自己紹介
+        for a in __call_自己紹介__(ctx, []) { yield a; }
+
+        // ＄カウンタ＝１
+        ctx.var.カウンタ = 1;
+
+        // ＞カウント表示（＄カウンタ）
+        for a in __call_カウント表示__(ctx, [ctx.var.カウンタ]) { yield a; }
+
+        // ？会話分岐
+        for a in __jump_会話分岐__(ctx, []) { yield a; }
+    }
+    
+    // ========================================
+    // 予約関数: 2パス目で生成される
+    // ========================================
+    
+    /// 予約関数: __word_挨拶__
+    /// ＠挨拶 → グローバル単語辞書から検索
+    fn __word_挨拶__(ctx, args) {
+        // Pattern 3: 辞書単語（関数が見つからない）
+        for value in ctx.pasta.word(ctx, "挨拶", args) {
+            yield value;
+        }
+    }
+    
+    /// 予約関数: __word_ローカル関数__
+    /// ＠ローカル関数 → ローカル関数を呼び出し
+    fn __word_ローカル関数__(ctx, args) {
+        // Pattern 1: ローカル関数が存在
+        for value in ローカル関数(ctx, args) {
+            yield value;
+        }
+    }
+    
+    /// 予約関数: __call_自己紹介__
+    /// ＞自己紹介 → ローカル関数を呼び出し
+    fn __call_自己紹介__(ctx, args) {
+        // Pattern 1: ローカル関数が存在
+        for value in 自己紹介(ctx) {
+            yield value;
+        }
+    }
+    
+    /// 予約関数: __call_カウント表示__
+    /// ＞カウント表示 → ローカル関数を呼び出し
+    fn __call_カウント表示__(ctx, args) {
+        // Pattern 1: ローカル関数が存在
+        for value in カウント表示(ctx, args) {
+            yield value;
+        }
+    }
+    
+    /// 予約関数: __jump_会話分岐__
+    /// ？会話分岐 → ローカル関数を呼び出し（_1サフィックス）
+    fn __jump_会話分岐__(ctx, args) {
+        // Pattern 1: ローカル関数が存在（Jump用に_1サフィックス）
+        for value in 会話分岐_1(ctx) {
+            yield value;
+        }
+    }
+    
+    /// 予約関数: __call_趣味紹介__
+    /// ＞趣味紹介 → ローカル関数を呼び出し（ネスト元から呼ばれる）
+    fn __call_趣味紹介__(ctx, args) {
+        // Pattern 1: ローカル関数が存在
+        for value in 趣味紹介(ctx) {
+            yield value;
+        }
+    }
+    
+    /// 予約関数: __jump_別の話題__
+    /// ？別の話題 → ローカル関数を呼び出し（_1サフィックス）
+    fn __jump_別の話題__(ctx, args) {
+        // Pattern 1: ローカル関数が存在
+        for value in 別の話題_1(ctx) {
+            yield value;
+        }
+    }
+    
+    /// 予約関数: __word_場所__
+    /// ＠場所 → ローカル単語辞書から検索
+    fn __word_場所__(ctx, args) {
+        // Pattern 3: 辞書単語（ローカル定義）
+        for value in ctx.pasta.word(ctx, "場所", args) {
+            yield value;
+        }
+    }
+    
+    /// 予約関数: __word_天気__
+    /// ＠天気 → ローカル単語辞書から検索（未定義の場合は空）
+    fn __word_天気__(ctx, args) {
+        // Pattern 3: 辞書単語（未定義の可能性）
+        for value in ctx.pasta.word(ctx, "天気", args) {
+            yield value;
+        }
+    }
+    
+    // ========================================
+    // 実際のラベル関数: ユーザー定義
+    // ========================================
+    
+    /// Callラベル: 自己紹介
+    pub fn 自己紹介(ctx) {
+        // さくら：私はさくらです。
+        ctx.actor = さくら;
+        yield #{ type: "Actor", actor: ctx.actor };
+        yield #{ type: "Talk", text: "私はさくらです。" };
+        
+        // うにゅう：僕はうにゅうだよ。
+        ctx.actor = うにゅう;
+        yield #{ type: "Actor", actor: ctx.actor };
+        yield #{ type: "Talk", text: "僕はうにゅうだよ。" };
+        
+        // ネストされたCall: ＞趣味紹介
+        for a in __call_趣味紹介__(ctx, []) {
+            yield a;
+        }
+    }
+    
+    /// Callラベル: 趣味紹介（ネスト先）
+    pub fn 趣味紹介(ctx) {
+        // さくら：私の趣味は読書です。
+        ctx.actor = さくら;
+        yield #{ type: "Actor", actor: ctx.actor };
+        yield #{ type: "Talk", text: "私の趣味は読書です。" };
+        
+        // うにゅう：僕はゲームが好き。
+        ctx.actor = うにゅう;
+        yield #{ type: "Actor", actor: ctx.actor };
+        yield #{ type: "Talk", text: "僕はゲームが好き。" };
+    }
+    
+    /// Callラベル: カウント表示（引数を受け取る）
+    pub fn カウント表示(ctx, args) {
+        let 値 = args[0];
+        
+        // さくら：カウンターは＄値です。
+        ctx.actor = さくら;
+        yield #{ type: "Actor", actor: ctx.actor };
+        yield #{ type: "Talk", text: `カウンターは${値}です。` };
+    }
+    
+    /// Jumpラベル1: 会話分岐
+    pub fn 会話分岐_1(ctx) {
+        // さくら：＠場所の天気は＠天気だね。
+        ctx.actor = さくら;
+        yield #{ type: "Actor", actor: ctx.actor };
+        
+        // 単語展開: ＠場所
+        for a in __word_場所__(ctx, []) {
+            yield a;
+        }
+        yield #{ type: "Talk", text: "の天気は" };
+        
+        // 単語展開: ＠天気
+        for a in __word_天気__(ctx, []) {
+            yield a;
+        }
+        yield #{ type: "Talk", text: "だね。" };
+        
+        // うにゅう：そうだね。
+        ctx.actor = うにゅう;
+        yield #{ type: "Actor", actor: ctx.actor };
+        yield #{ type: "Talk", text: "そうだね。" };
+        
+        // Jump: ？別の話題
+        for a in __jump_別の話題__(ctx, []) {
+            yield a;
+        }
+    }
+    
+    /// Jumpラベル2: 別の話題
+    pub fn 別の話題_1(ctx) {
+        // さくら：ところで、明日は何する？
+        ctx.actor = さくら;
+        yield #{ type: "Actor", actor: ctx.actor };
+        yield #{ type: "Talk", text: "ところで、明日は何する？" };
+        
+        // うにゅう：まだ決めてないなぁ。
+        ctx.actor = うにゅう;
+        yield #{ type: "Actor", actor: ctx.actor };
+        yield #{ type: "Talk", text: "まだ決めてないなぁ。" };
+    }
+
+    /// Rune code block: ユーザー定義のローカル関数
+    pub fn ローカル関数(ctx, args) {
+        let メッセージ = args[0];
+        ctx.actor = super::うにゅう;
+        yield #{ type: "Actor", actor: ctx.actor };
+        yield #{ type: "Talk", text: `ローカル関数が呼ばれました: ${メッセージ}` };
+    }
+}
