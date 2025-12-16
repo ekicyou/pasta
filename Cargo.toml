@@ -1,12 +1,25 @@
 [package]
 name = "pasta"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 authors = ["Dot-Station Master <dot.station@gmail.com>"]
 license = "MIT OR Apache-2.0"
-publish = false
+publish = true
 
 # 独立したプロジェクトとして管理（親ワークスペースから除外）
 [workspace]
 
 [dependencies]
+rune = "0.14"
+thiserror = "2"
+pest = "2.8"
+pest_derive = "2.8"
+glob = "0.3"
+tracing = "0.1"
+rand = "0.9"
+futures = "0.3"
+toml = "0.8"
+fast_radix_trie = "1.1.0"
+
+[dev-dependencies]
+tempfile = "3"

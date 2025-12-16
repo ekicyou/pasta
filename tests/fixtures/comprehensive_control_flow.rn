@@ -1,0 +1,180 @@
+pub mod actors {
+    pub const さくら = #{
+        name: "さくら",
+        id: 1,
+    };
+
+    pub const うにゅう = #{
+        name: "うにゅう",
+        id: 2,
+    };
+}
+
+pub mod メイン_1 {
+    use super::actors::{さくら, うにゅう};
+    
+    // Mock pasta_stdlib functions for testing
+    fn Actor(name) {
+        #{ type: "Actor", name: name }
+    }
+    
+    fn Talk(text) {
+        #{ type: "Talk", text: text }
+    }
+    
+    pub fn __start__(ctx) {
+        ctx.pasta.add_words("場所", ["東京", "大阪"]);
+        ctx.pasta.commit_words();
+        
+        ctx.var.カウンタ = 10;
+        
+        ctx.actor = さくら;
+        yield Actor(ctx.actor.name);
+        for a in __word_挨拶__(ctx, []) { yield a; }
+        yield Talk("！");
+
+        ctx.actor = うにゅう;
+        yield Actor(ctx.actor.name);
+        for a in __word_ローカル関数__(ctx, ["はろー"]) { yield a; }
+
+        for a in __call_自己紹介__(ctx, []) { yield a; }
+
+        ctx.var.カウンタ = 1;
+
+        for a in __call_カウント表示__(ctx, [ctx.var.カウンタ]) { yield a; }
+
+        for a in __jump_会話分岐__(ctx, []) { yield a; }
+    }
+    
+    fn __word_挨拶__(ctx, args) {
+        for value in ctx.pasta.word(ctx, "挨拶", args) {
+            yield value;
+        }
+    }
+    
+    fn __word_ローカル関数__(ctx, args) {
+        let saved_args = ctx.args;
+        ctx.args = args;
+        for value in ローカル関数(ctx) {
+            yield value;
+        }
+        ctx.args = saved_args;
+    }
+    
+    fn __call_自己紹介__(ctx, args) {
+        for value in 自己紹介(ctx) {
+            yield value;
+        }
+    }
+    
+    fn __call_カウント表示__(ctx, args) {
+        let saved_args = ctx.args;
+        ctx.args = args;
+        for value in カウント表示(ctx) {
+            yield value;
+        }
+        ctx.args = saved_args;
+    }
+    
+    fn __jump_会話分岐__(ctx, args) {
+        for value in 会話分岐_1(ctx) {
+            yield value;
+        }
+    }
+    
+    fn __call_趣味紹介__(ctx, args) {
+        for value in 趣味紹介(ctx) {
+            yield value;
+        }
+    }
+    
+    fn __jump_別の話題__(ctx, args) {
+        for value in 別の話題_1(ctx) {
+            yield value;
+        }
+    }
+    
+    fn __word_場所__(ctx, args) {
+        for value in ctx.pasta.word(ctx, "場所", args) {
+            yield value;
+        }
+    }
+    
+    fn __word_天気__(ctx, args) {
+        for value in ctx.pasta.word(ctx, "天気", args) {
+            yield value;
+        }
+    }
+    
+    pub fn 自己紹介(ctx) {
+        ctx.actor = さくら;
+        yield Actor(ctx.actor.name);
+        yield Talk("私はさくらです。");
+        
+        ctx.actor = うにゅう;
+        yield Actor(ctx.actor.name);
+        yield Talk("僕はうにゅうだよ。");
+        
+        for a in __call_趣味紹介__(ctx, []) {
+            yield a;
+        }
+    }
+    
+    pub fn 趣味紹介(ctx) {
+        ctx.actor = さくら;
+        yield Actor(ctx.actor.name);
+        yield Talk("私の趣味は読書です。");
+        
+        ctx.actor = うにゅう;
+        yield Actor(ctx.actor.name);
+        yield Talk("僕はゲームが好き。");
+    }
+    
+    pub fn カウント表示(ctx) {
+        let 値 = ctx.args[0];
+        
+        ctx.actor = さくら;
+        yield Actor(ctx.actor.name);
+        yield Talk(`カウンターは${値}です。`);
+    }
+    
+    pub fn 会話分岐_1(ctx) {
+        ctx.actor = さくら;
+        yield Actor(ctx.actor.name);
+        
+        for a in __word_場所__(ctx, []) {
+            yield a;
+        }
+        yield Talk("の天気は");
+        
+        for a in __word_天気__(ctx, []) {
+            yield a;
+        }
+        yield Talk("だね。");
+        
+        ctx.actor = うにゅう;
+        yield Actor(ctx.actor.name);
+        yield Talk("そうだね。");
+        
+        for a in __jump_別の話題__(ctx, []) {
+            yield a;
+        }
+    }
+    
+    pub fn 別の話題_1(ctx) {
+        ctx.actor = さくら;
+        yield Actor(ctx.actor.name);
+        yield Talk("ところで、明日は何する？");
+        
+        ctx.actor = うにゅう;
+        yield Actor(ctx.actor.name);
+        yield Talk("まだ決めてないなぁ。");
+    }
+
+    pub fn ローカル関数(ctx) {
+        let メッセージ = ctx.args[0];
+        ctx.actor = super::actors::うにゅう;
+        yield Actor(ctx.actor.name);
+        yield Talk(`ローカル関数が呼ばれました: ${メッセージ}`);
+    }
+}
