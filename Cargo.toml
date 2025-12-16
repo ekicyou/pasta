@@ -6,4 +6,7 @@ authors = ["Dot-Station Master <dot.station@gmail.com>"]
 license = "MIT OR Apache-2.0"
 publish = false
 
+# 独立したプロジェクトとして管理（親ワークスペースから除外）
+[workspace]
+
 [dependencies]
