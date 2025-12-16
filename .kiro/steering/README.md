@@ -6,6 +6,18 @@
 
 ## ステアリングファイル一覧
 
+### 0. [status.md](./status.md) - プロジェクト状態レポート 🔴
+**現在のPhase・課題・優先タスク**
+
+- **現在地**: Phase 0（一次設計再構築中）⚠️
+- **重大な問題**: 過去の「完了」仕様は実装品質不十分、大規模差し戻し中
+- **最優先課題**: Yield伝搬問題（Call/Jump文動作不全）🔴
+- Phase 1移行条件、保留中作業、行動指針
+
+**読むべきタイミング**: 🔴 **最初に必ず読む** - プロジェクトの現状を正確に把握するため
+
+---
+
 ### 1. [product.md](./product.md) - プロダクトステアリング
 **プロジェクトのビジョンと目標**
 
@@ -14,7 +26,7 @@
 - 設計思想: 前方一致ランダムジャンプ、yield型エンジン、runeトランスパイル
 - コアバリュー: 日本語フレンドリー、UNICODE識別子
 - ターゲットユーザー: デスクトップマスコット制作者、ゲームエンジン利用者
-- 機能優先順位: Phase 1完了（基盤確立）、Phase 2進行中（コア機能実装）
+- 機能優先順位: ⚠️ Phase 0進行中（一次設計再構築）、基盤未確立
 
 **読むべきタイミング**: プロジェクト全体の方向性を確認したいとき
 
@@ -70,55 +82,66 @@
 
 ---
 
-### 5. [completed-specs.md](./completed-specs.md) - 完了仕様一覧
-**実装済み機能の記録**
+### 5. [completed-specs.md](./completed-specs.md) - 「完了」扱い仕様一覧 ⚠️
+**過去に完了扱いされた仕様（実装品質不十分）**
 
-- 完了仕様11件の詳細:
-  - `pasta-engine-independence`: UI独立性確立（最重要）
-  - `pasta-transpiler-pass2-output`: 2パス出力
-  - `pasta-declarative-control-flow`: 宣言的制御フロー
+- ⚠️ 「完了」仕様11件の記録（**再評価必要**）:
+  - `pasta-engine-independence`: UI独立性（実装不完全）
+  - `pasta-transpiler-pass2-output`: 2パス出力（品質問題）
+  - `pasta-declarative-control-flow`: 宣言的制御フロー（動作不全）
   - 他8件
-- 統計とマイルストーン
-- 完了期間: 2025-11-27 ～ 2025-12-14
+- 再評価必要度の分類（🔴高/🟡中/🟢低）
+- **注意**: 手続き上の完了であり、実装品質は保証されていない
 
-**読むべきタイミング**: 既存実装を参照したいとき、実装パターンを知りたいとき
+**読むべきタイミング**: 過去実装を参照する際、**要件との乖離を意識**しながら
 
 ---
 
 ### 6. [active-specs.md](./active-specs.md) - 進行中仕様一覧
-**現在の開発状況と優先順位**
+**現在の開発状況と優先順位（Phase 0完了後に着手）**
 
-- 進行中仕様9件の状態:
-  - **P0**: `pasta-yield-propagation` 🔴 最優先（Call/Jump文動作不全）
-  - **P0**: `pasta-local-rune-calls` - Runeブロック統合
-  - **P1**: `pasta-word-definition-dsl` - 単語定義DSL（設計承認待ち）
+- 進行中仕様9件（**Phase 0完了まで保留**）:
+  - **P0**: `pasta-yield-propagation` 🔴 Phase 0で対応中
+  - **P0**: `pasta-local-rune-calls` - 基盤安定後
+  - **P1**: `pasta-word-definition-dsl` - 基盤安定後
   - 他6件
-- 優先順位マトリクス（P0-P3）
-- 依存関係グラフ
-- 推奨アクション
+- ⚠️ 現状認識: Phase 0（一次設計再構築中）
+- 推奨アクション: **新機能実装より既存問題解決を優先**
+- Phase 1移行条件
 
-**読むべきタイミング**: 次のタスクを決めるとき、進捗確認時
+**読むべきタイミング**: 次のタスクを決めるとき、進捗確認時（Phase 0優先を意識）
 
 ---
 
 ## クイックスタート
 
-### 新機能開発を始める前に
-1. **[product.md](./product.md)**: ビジョン・目標との整合性確認
-2. **[active-specs.md](./active-specs.md)**: 重複作業がないか確認、優先順位確認
-3. **[domain.md](./domain.md)**: ドメイン概念理解
-4. **[tech.md](./tech.md)**: アーキテクチャ原則・コーディング規約確認
-5. **[structure.md](./structure.md)**: ファイル配置・モジュール依存確認
+### 🔴 まず最初に（必須）
+1. **[status.md](./status.md)**: **現在のプロジェクト状態を把握**
+   - Phase 0（一次設計再構築中）であることを認識
+   - 最優先課題（Yield伝搬問題）の確認
+   - 新機能実装は保留中であることを理解
 
-### バグ修正・既存機能改善時
-1. **[completed-specs.md](./completed-specs.md)**: 関連する完了仕様を参照
-2. **[domain.md](./domain.md)**: 実装知見を確認
-3. **[tech.md](./tech.md)**: テスト戦略・品質基準確認
+### Phase 0: 既存問題解決時
+1. **[status.md](./status.md)**: Phase 0タスク一覧確認
+2. **[completed-specs.md](./completed-specs.md)**: 過去の「完了」仕様を参照（⚠️ 品質不十分）
+3. **[domain.md](./domain.md)**: ドメイン概念と実装知見確認
+4. **[tech.md](./tech.md)**: アーキテクチャ原則・品質基準確認
+5. **要件定義に立ち戻る**: `.kiro/specs/{spec-name}/requirements.md`を精読
+
+### Phase 1以降: 新機能開発（Phase 0完了後のみ）
+1. **[status.md](./status.md)**: Phase 1移行条件を確認
+2. **[product.md](./product.md)**: ビジョン・目標との整合性確認
+3. **[active-specs.md](./active-specs.md)**: 重複作業がないか確認、優先順位確認
+4. **[domain.md](./domain.md)**: ドメイン概念理解
+5. **[tech.md](./tech.md)**: アーキテクチャ原則・コーディング規約確認
+6. **[structure.md](./structure.md)**: ファイル配置・モジュール依存確認
 
 ### 仕様レビュー時
-1. **[product.md](./product.md)**: コアバリューとの整合性
-2. **[tech.md](./tech.md)**: アーキテクチャ原則違反がないか
-3. **[domain.md](./domain.md)**: 既存実装パターンとの一貫性
+1. **[status.md](./status.md)**: 現在のPhaseに適したレビューか確認
+2. **[product.md](./product.md)**: コアバリューとの整合性
+3. **[tech.md](./tech.md)**: アーキテクチャ原則違反がないか
+4. **[domain.md](./domain.md)**: 既存実装パターンとの一貫性
+5. **要件との整合性**: requirements.mdとの乖離がないか厳密にチェック
 
 ---
 

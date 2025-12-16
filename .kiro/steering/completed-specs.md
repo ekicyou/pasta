@@ -156,8 +156,8 @@
 
 ## 統計
 
-- **完了仕様総数**: 11件
-- **完了期間**: 2025-11-27 ～ 2025-12-14（推定）
+- **「完了」扱い仕様**: 11件（⚠️ 実装品質不十分、再評価必要）
+- **実施期間**: 2025-11-27 ～ 2025-12-14（推定）
 - **カテゴリ分布**:
   - トランスパイラ: 3件
   - アーキテクチャ: 1件
@@ -168,31 +168,87 @@
 
 ---
 
-## 主要マイルストーン
+## ⚠️ 重要: 現状認識
 
-### Phase 1: 基盤確立（～2025-12-10）
-- ✅ UI層独立性確立（`pasta-engine-independence`）
-- ✅ 宣言的制御フロー実装（`pasta-declarative-control-flow`）
-- ✅ ラベル解決ランタイム（`pasta-label-resolution-runtime`）
+### プロジェクト構造の正確な理解
 
-### Phase 2: トランスパイラ完成（～2025-12-14）
-- ✅ 2パス出力実装（`pasta-transpiler-pass2-output`）
-- ✅ アクター変数生成（`pasta-transpiler-actor-variables`）
+#### 初期実装の根本的欠陥
+**`areka-P0-script-engine`**（最初の仕様）の完成度が極めて低く、設計レベルで致命的な問題を抱えていた。
 
-### Phase 3: 品質向上（～2025-12-14）
-- ✅ テスト修正・拡充
-- ✅ ドキュメント改善
-- ✅ シリアライゼーション実装
+#### 「完了」仕様の実態
+これら11件は、`areka-P0-script-engine`の**小規模改修パッチ**として実装されたもの。根本的な設計問題は手つかずで、表面的な修正・機能追加に留まっている。
+
+#### 真の修正仕様
+現在の**未着手仕様9件**が、実は**Phase 0・Phase 1の修正仕様**。これらを実装することで、初期実装の根本的な問題を解決する。
+
+### 現在のステータス
+
+❌ **基盤未確立** - Phase 0（未着手仕様9件の実装による根本修正）進行中
+
+過去の「完了」実装は小規模改修であり、根本解決には**未着手仕様9件の実装**が必要。
+
+---
+
+## 「完了」仕様の位置付け
+
+### 🔴 初期実装（設計欠陥の起点）
+**areka-P0-script-engine**
+- 極めて低完成度
+- DSL、トランスパイル、ラベルテーブル設計に根本的欠陥
+- 後続の全仕様に影響
+
+### 📦 小規模改修パッチ群（10件）
+
+以下は`areka-P0-script-engine`の小規模改修として実装されたもの。根本的な設計問題は解決していない。
+
+**トランスパイラ関連** (3件):
+- `pasta-transpiler-pass2-output`: 2パス出力の表面的実装
+- `pasta-transpiler-actor-variables`: アクター変数追加（部分機能）
+- `pasta-declarative-control-flow`: Call/Jump文の不完全実装
+
+**ランタイム関連** (1件):
+- `pasta-label-resolution-runtime`: ラベルテーブルの部分実装
+
+**アーキテクチャ関連** (1件):
+- `pasta-engine-independence`: UI独立性の部分対応
+
+**インフラ関連** (2件):
+- `pasta-script-loader`: ローダー追加
+- `pasta-serialization`: シリアライゼーション追加
+
+**テスト・修正** (3件):
+- `pasta-chain-token-ir-check`: IR検証追加
+- `pasta-test-missing-entry-hash`: テスト修正
+- `pasta-engine-doctest-fix`: ドキュメント修正
+
+### ⚠️ 評価
+小規模改修では根本的な設計問題は解決できない。**未着手仕様9件（Phase 0・1修正仕様）の実装**による根本解決が必要。
 
 ---
 
 ## 次のステップ
 
-完了した11仕様により、Pastaエンジンの基礎は確立されました。現在進行中の9仕様により、以下の機能が追加される予定です：
+### Phase 0: 未着手仕様9件の実装による根本修正（現在）
 
-- **pasta-yield-propagation**: Call/Jump文のyield伝搬問題解決（最優先）
-- **pasta-word-definition-dsl**: 単語定義・前方一致呼び出し
-- **pasta-local-rune-calls**: Runeブロック統合
-- その他継続・多段解決機能
+小規模改修では解決できない。**未着手仕様9件を順次実装**することで根本から再構築。
 
-完了した仕様の成果物は、新機能開発時の参考実装として活用してください。
+#### P0・P1（Phase 0完了条件: 4仕様）
+1. 🔴 **pasta-yield-propagation** - Call/Jump文修正（最優先）
+2. 🔴 **pasta-local-rune-calls** - Runeブロック統合
+3. 🟡 **pasta-word-definition-dsl** - 単語定義DSL（コア機能）
+4. 🟡 **pasta-call-resolution-priority** - スコープ解決明確化
+
+#### P2・P3（Phase 1以降: 5仕様）
+5. 🟢 **pasta-label-continuation** - ラベル連鎖
+6. 🟢 **pasta-jump-function-calls** - Jump文拡張
+7. ⚪ **pasta-conversation-inline-multi-stage-resolution** - 多段解決
+8. ⚪ **pasta-dialogue-continuation-syntax** - 継続構文
+9. 📋 **ukagaka-desktop-mascot** - 32子仕様管理
+
+### Phase 1以降
+
+P0・P1（4仕様）完了後、残りのP2・P3仕様とエコシステム統合へ。
+
+---
+
+**重要**: このドキュメントの「完了」仕様は、`areka-P0-script-engine`の小規模改修パッチであり、根本的な設計問題は解決していません。**未着手仕様9件の実装**が真の修正プロセスです。
