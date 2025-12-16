@@ -1,0 +1,145 @@
+// このファイルは pasta-transpiler-pass2-output 仕様の参照資料です
+// 誤った実装と正しい実装を比較するための教育目的ファイル
+// 
+// 元ファイル: crates/pasta/tests/fixtures/comprehensive_control_flow.transpiled.rn
+// コピー日時: 2025-12-14
+
+use pasta_stdlib::*;
+
+pub mod メイン_1 {
+    use pasta_stdlib::*;
+
+    pub fn __start__(ctx, args) {
+        let カウンタ = 10;
+        ctx.actor = "さくら";
+        yield Actor("さくら");
+        yield pasta_stdlib::word(ctx, "挨拶", []);
+        ctx.actor = "うにゅう";
+        yield Actor("うにゅう");
+        yield pasta_stdlib::word(ctx, "ローカル関数", ["はろー"]);
+        for a in crate::pasta::call(ctx, "自己紹介", #{}, []) { yield a; }
+        let カウンタ = 1;
+        for a in crate::pasta::call(ctx, "カウント表示", #{}, [カウンタ]) { yield a; }
+        for a in crate::pasta::jump(ctx, "会話分岐", #{}, []) { yield a; }
+    }
+    pub fn 自己紹介_1(ctx, args) {
+        ctx.actor = "さくら";
+        yield Actor("さくら");
+        yield Talk("私はさくらです。");
+        ctx.actor = "うにゅう";
+        yield Actor("うにゅう");
+        yield Talk("僕はうにゅうだよ。");
+        for a in crate::pasta::call(ctx, "趣味紹介", #{}, []) { yield a; }
+    }
+
+    pub fn 趣味紹介_1(ctx, args) {
+        ctx.actor = "さくら";
+        yield Actor("さくら");
+        yield Talk("私の趣味は読書です。");
+        ctx.actor = "うにゅう";
+        yield Actor("うにゅう");
+        yield Talk("僕はゲームが好き。");
+    }
+
+    pub fn カウント表示_1(ctx, args) {
+        ctx.actor = "さくら";
+        yield Actor("さくら");
+        yield Talk("カウンターは＄値です。");
+    }
+
+    pub fn 会話分岐_1(ctx, args) {
+        ctx.actor = "さくら";
+        yield Actor("さくら");
+        yield pasta_stdlib::word(ctx, "場所の天気は", []);
+        yield pasta_stdlib::word(ctx, "天気だね", []);
+        yield Talk("。");
+        ctx.actor = "うにゅう";
+        yield Actor("うにゅう");
+        yield Talk("そうだね。");
+        for a in crate::pasta::jump(ctx, "別の話題", #{}, []) { yield a; }
+    }
+
+    pub fn 別の話題_1(ctx, args) {
+        ctx.actor = "さくら";
+        yield Actor("さくら");
+        yield Talk("ところで、明日は何する？");
+        ctx.actor = "うにゅう";
+        yield Actor("うにゅう");
+        yield Talk("まだ決めてないなぁ。");
+        pub fn ローカル関数(ctx, args) {
+        let メッセージ = args[0];
+        ctx.actor = super::うにゅう;
+        yield #{ type: "Actor", actor: ctx.actor };
+        yield #{ type: "Talk", text: `ローカル関数が呼ばれました: ${メッセージ}` };
+        }
+    }
+
+}
+
+// ❌ 間違ったpastaモジュール（本仕様で修正する対象）
+// 問題点:
+// 1. jump() と call() が直接 match ロジックを持つ（コード重複）
+// 2. __pasta_trans2__::label_selector() を使用していない
+// 3. 関数呼び出しを直接実行（関数ポインタを返していない）
+pub mod pasta {
+    pub fn jump(ctx, label, filters, args) {
+        let func = crate::__pasta_trans2__::label_selector(label, filters);
+        for a in func(ctx, args) { yield a; } }:
+        match id {
+            2 => { for a in crate::メイン_1::自己紹介_1(ctx, args) { yield a; } },
+            3 => { for a in crate::メイン_1::趣味紹介_1(ctx, args) { yield a; } },
+            4 => { for a in crate::メイン_1::カウント表示_1(ctx, args) { yield a; } },
+            5 => { for a in crate::メイン_1::会話分岐_1(ctx, args) { yield a; } },
+            6 => { for a in crate::メイン_1::別の話題_1(ctx, args) { yield a; } },
+            _ => { yield pasta_stdlib::Error(`ラベルID ${id} が見つかりませんでした。`); },
+        }
+    }
+
+    pub fn call(ctx, label, filters, args) {
+        let id = pasta_stdlib::select_label_to_id(label, filters);
+        match id {
+            1 => { for a in crate::メイン_1::__start__(ctx, args) { yield a; } },
+            2 => { for a in crate::メイン_1::自己紹介_1(ctx, args) { yield a; } },
+            3 => { for a in crate::メイン_1::趣味紹介_1(ctx, args) { yield a; } },
+            4 => { for a in crate::メイン_1::カウント表示_1(ctx, args) { yield a; } },
+            5 => { for a in crate::メイン_1::会話分岐_1(ctx, args) { yield a; } },
+            6 => { for a in crate::メイン_1::別の話題_1(ctx, args) { yield a; } },
+            _ => { yield pasta_stdlib::Error(`ラベルID ${id} が見つかりませんでした。`); },
+        }
+    }
+}
+
+// ✅ 正しいトランスパイル２パス出力（目標とする実装）
+pub mod __pasta_trans2__{
+    // ✅ label_selectorはラベルに対応する関数ポインタを返す
+    // 重要: 関数を実行するのではなく、関数そのものを返す
+    pub fn label_selector(label, filters) {
+        let id = pasta_stdlib::select_label_to_id(label, filters);
+        match id {
+            1 => crate::メイン_1::__start__,
+            2 => crate::メイン_1::自己紹介_1,
+            3 => crate::メイン_1::趣味紹介_1,
+            4 => crate::メイン_1::カウント表示_1,
+            5 => crate::メイン_1::会話分岐_1,
+            6 => crate::メイン_1::別の話題_1,
+            _ => |_ctx,_args|{ yield pasta_stdlib::Error(`ラベルID ${id} が見つかりませんでした。`); },
+        }
+    }
+}
+
+// ✅ 正しいpastaモジュール（シンプルなラッパー）
+// 利点:
+// 1. コード重複なし（DRY原則に準拠）
+// 2. label_selector() が一元管理
+// 3. jump() と call() の実装が簡潔
+pub mod pasta {
+    pub fn jump(ctx, label, filters, args) {
+        let func = crate::__pasta_trans2__::label_selector(label, filters);
+        for a in func(ctx, args) { yield a; }
+    }
+
+    pub fn call(ctx, label, filters, args) {
+        let func = crate::__pasta_trans2__::label_selector(label, filters);
+        for a in func(ctx, args) { yield a; }
+    }
+}
