@@ -9,12 +9,12 @@
 ### 1.1 行指向文法
 Pasta スクリプトは**行指向文法**です。行頭の数文字により行属性が確定します。
 
-**構文**:
-```pest
-sakura_command ::= "\"" ~ identifier ~ bracket_content?
-identifier ::= [a-zA-Z0-9_]+  /* 数字開始も許容 */
-bracket_content ::= "[" ~ content ~ "]"
+**例外**:
+- Rune コードブロック：複数行にわたりコードブロックを形成する唯一の例外
+
+### 1.2 ファイル構造（俯瞰）
 ```
+ファイル
 ├─ グローバルラベル (＊ 或いは *)
 │  ├─ 単語定義行 (＠)
 │  └─ Rune コードブロック
@@ -69,7 +69,7 @@ fn calculate(ctx) {
 ### 2.1 基本要素
 
 #### 改行（NEWLINE）
-```pest
+```
 改行 ::= "\r\n" | "\n" | "\r"
 ```
 
@@ -95,7 +95,7 @@ Pasta では空白をトークンとして扱う可能性があるため、Pest 
 - 空白は有効なトークン区切り文字であり、Pest の自動スキップ対象ではありません
 
 #### コロン（Colon）
-```pest
+```
 コロン ::= "：" | ":"
 ```
 
@@ -111,7 +111,7 @@ Pasta では空白をトークンとして扱う可能性があるため、Pest 
 - 引数リスト（関数呼び出し）：`＠func（arg1：value1　arg2：value2）`
 
 #### 識別子（Identifier）
-```pest
+```
 識別子 ::= { XID_START ~ XID_CONTINUE* }
 ```
 
@@ -131,7 +131,7 @@ Pasta では空白をトークンとして扱う可能性があるため、Pest 
 - 例：`＠挨拶、みんな！` → 識別子は「挨拶」、以降は通常テキスト「、みんな！」
 
 #### インデント（Indent）
-```pest
+```
 インデント ::= WHITE_SPACE+
 ```
 
@@ -335,13 +335,13 @@ fn update_state() {
 ### 2.8 リテラル・文字列
 
 #### 日本語文字列
-```pest
+```
 日本語文字列 ::= "「" ~ content ~ "」"
 例: 「こんにちは」
 ```
 
 #### 英語文字列
-```pest
+```
 英語文字列 ::= "\"" ~ content ~ "\""
 例: "Hello"
 ```
@@ -352,7 +352,7 @@ fn update_state() {
 - `\"` → ダブルクォート
 
 #### 数値リテラル
-```pest
+```
 数値 ::= ["-" | "－"] ~ 数字+ ~ ["." | "．" ~ 数字+]?
 
 例:
@@ -369,7 +369,7 @@ fn update_state() {
 ### 2.9 単語値の区切り文字
 
 #### 区切り文字
-```pest
+```
 区切り ::= WHITE_SPACE+
 ```
 
@@ -378,7 +378,7 @@ fn update_state() {
 **定義の参照**: [2.1 空白（WHITE_SPACE 文字クラス）](#空白white_space-文字クラス)に定義されるWHITE_SPACE文字クラスを使用。
 
 **例**:
-```pasta
+```
 ＠fruits：apple　banana　orange
 ＠numbers：1　2　3
 ＠items：value1  value2	value3
@@ -391,14 +391,14 @@ fn update_state() {
 ## 2.10 コメント
 
 #### コメント行
-```pest
+```
 コメント ::= "#" | "＃" ~ content ~ NEWLINE
 ```
 
 **セマンティクス**: 行末までコメント（処理されない）
 
 **例**:
-```pasta
+```
 # これはコメント
 ＃全角シャープでもOK
 ```
@@ -412,7 +412,7 @@ fn update_state() {
 Pasta は行指向文法です。各行は改行（NEWLINE）で終わり、行頭の文字（マーカー）により行の型が決定されます。
 
 **行の構成**:
-```pest
+```
 行 ::= [インデント] マーカー 内容 NEWLINE
 または
 行 ::= [インデント] 内容 NEWLINE  （属性行、発言行など）
@@ -505,7 +505,7 @@ Pasta スクリプトは階層的なブロック構造を持ちます。
 
 Rune ブロックは暗黙ローカル開始ブロック（`__start__`）内に配置されます。
 
-````pasta
+````
 ＊グローバル名
   ```rune
   fn on_event() {
@@ -642,16 +642,13 @@ Call/単語検索において、ターゲットの候補列挙は**前方一致*
 ### 4.2 フィルター（属性フィルター）
 
 **構文**:
-```pest
+```
 filter_list ::= ("＆" ~ key ~ 比較演算子 ~ value)+
 現在: ＆key＝value
 将来: ＆score＞50　＆level＜10　など比較演算子ベースに拡張予定
-```
 
-**例**:
-```pasta
-＞ラベル名＆author＝Alice＆genre＝comedy
-＠単語名＆category＝food＆season＝summer
+例: ＞ラベル名＆author＝Alice＆genre＝comedy
+   ＠単語名＆category＝food＆season＝summer
 ```
 
 **セマンティクス**: ターゲット選択時に属性で絞り込み（将来予約）
@@ -667,7 +664,7 @@ filter_list ::= ("＆" ~ key ~ 比較演算子 ~ value)+
 ### 4.3 引数リスト
 
 **構文**:
-```pest
+```
 arg_list ::= "（" ~ argument* ~ "）"
 argument ::= 名前付き引数
 名前付き引数 ::= name ~ "：" ~ value
@@ -675,7 +672,7 @@ argument ::= 名前付き引数
 ```
 
 **例**:
-```pasta
+```
 ＠関数呼び出し（引数１：値１　引数２：値２）
 ＠calculate（x：10　y：20）
 ```
@@ -710,7 +707,7 @@ bracket_content ::= "[" ~ content ~ "]"
 **説明**: バックスラッシュに続いて半角文字の変数識別子（数字で始まることも許容）、その後に角括弧`[]`で囲まれた要素が0個または1個
 
 **例**:
-```text
+```
 \s[0]          ← 識別子 s + 括弧あり
 \w8            ← 識別子 w8 + 括弧なし
 \n             ← 識別子 n + 括弧なし
@@ -858,14 +855,14 @@ Carol：＠greet（time：morning）
 ### 7.4 行継続
 複数行にわたるアクション：
 
-```pasta
+```
 Alice：長い台詞は
   複数行に分けて
   記述できます
 ```
 
 **構文**:
-```pest
+```
 continuation_line ::= INDENT ~ !(statement_marker) ~ content
 statement_marker ::= "＄" | "＠" | "＞" | "＆" | "＊" | "・"
 ```
@@ -890,7 +887,7 @@ statement_marker ::= "＄" | "＠" | "＞" | "＆" | "＊" | "・"
 - 連続する空行は、その数に応じた連続改行として出力される。
 
 **文法追加**:
-```pest
+```
 continuation_line_newline ::= INDENT ~ NEWLINE
 ```
 
@@ -899,7 +896,7 @@ continuation_line_newline ::= INDENT ~ NEWLINE
 - 空白（INDENT）は出力には含まれない（2.1 の原則継承）。
 
 **例**:
-```pasta
+```
 Alice：１行目。
   １行目の続き。
   
