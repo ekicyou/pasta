@@ -1016,7 +1016,7 @@ file_level_attribute ::= "＆" ~ key ~ "：" ~ value ~ NEWLINE
 ```
 
 #### 代替方法：Rune 関数を使用
-```pasta
+````pasta
 ```rune
 fn add(ctx, x, y) {
     x + y
@@ -1029,7 +1029,7 @@ fn is_greater(ctx, x, threshold) {
 
 ＄result ： ＀add（x：10　y：20）
 ＄flag ： ＠is_greater（x：＠score　threshold：5）
-```
+````
 
 ---
 
