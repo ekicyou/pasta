@@ -61,9 +61,10 @@ fn test_basic_sakura_script_ascii() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Test basic sakura script escape parsing with full-width backslash (Requirement 3.1)
+/// Phase 1 (REQ-BC-2): Full-width backslash is NO LONGER recognized as Sakura escape
+/// After Phase 1, ＼ｓ［０］ is treated as plain text
 #[test]
-fn test_basic_sakura_script_fullwidth() -> Result<(), Box<dyn std::error::Error>> {
+fn test_fullwidth_sakura_not_recognized() -> Result<(), Box<dyn std::error::Error>> {
     let script = r#"
 ＊test
     さくら：こんにちは＼ｓ［０］
@@ -75,9 +76,12 @@ fn test_basic_sakura_script_fullwidth() -> Result<(), Box<dyn std::error::Error>
     let events = engine.execute_label("test")?;
 
     let parts = extract_content_parts(&events);
-    assert_eq!(parts.len(), 2);
-    assert!(matches!(parts[0], ContentPart::Text(t) if t == "こんにちは"));
-    assert!(matches!(parts[1], ContentPart::SakuraScript(s) if s == "ｓ［０］"));
+    // Phase 1: Full-width is NOT recognized as Sakura, so it's all Text
+    // The entire "こんにちは＼ｓ［０］" should be treated as plain text
+    assert!(!parts.is_empty(), "Should have content parts");
+    
+    let has_sakura = parts.iter().any(|p| matches!(p, ContentPart::SakuraScript(_)));
+    assert!(!has_sakura, "Phase 1: Full-width Sakura should NOT be recognized as SakuraScript");
 
     Ok(())
 }
@@ -393,9 +397,10 @@ fn test_complex_sakura_commands() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Test mixed ASCII and full-width backslashes
+/// Phase 1 (REQ-BC-2): Only ASCII backslashes are recognized as Sakura
+/// Full-width backslashes are now treated as plain text
 #[test]
-fn test_mixed_backslashes() -> Result<(), Box<dyn std::error::Error>> {
+fn test_mixed_backslashes_phase1() -> Result<(), Box<dyn std::error::Error>> {
     let script = r#"
 ＊test
     さくら：ASCII\s[0]とfull-width＼ｓ［１］混在
@@ -415,10 +420,12 @@ fn test_mixed_backslashes() -> Result<(), Box<dyn std::error::Error>> {
         })
         .collect();
 
+    // Phase 1: Only ASCII is recognized
     assert!(sakura_parts.contains(&"s[0]"), "Expected ASCII \\s[0]");
+    // Phase 1: Full-width is NOT recognized as Sakura
     assert!(
-        sakura_parts.contains(&"ｓ［１］"),
-        "Expected full-width ＼ｓ［１］"
+        !sakura_parts.contains(&"ｓ［１］"),
+        "Phase 1: Full-width ＼ｓ［１］ should NOT be recognized as Sakura"
     );
 
     Ok(())

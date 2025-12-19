@@ -176,12 +176,9 @@ fn parse_global_label(pair: Pair<Rule>) -> Result<LabelDef, PastaError> {
                         Rule::call_content => {
                             statements.push(parse_call_content(content_pair)?);
                         }
-                        Rule::jump_marker => {
-                            // Skip marker
-                        }
-                        Rule::jump_content => {
-                            statements.push(parse_jump_content(content_pair)?);
-                        }
+                        // Phase 1 (REQ-BC-1): Jump removed - use Call instead
+                        // Rule::jump_marker => {}
+                        // Rule::jump_content => { statements.push(parse_jump_content(content_pair)?); }
                         Rule::speech_line_content => {
                             statements.push(parse_speech_line_content(content_pair)?);
                         }
@@ -272,10 +269,9 @@ fn parse_local_label_content(pair: Pair<Rule>) -> Result<LabelDef, PastaError> {
                         Rule::call_content => {
                             statements.push(parse_call_content(content_pair)?);
                         }
-                        Rule::jump_marker => {}
-                        Rule::jump_content => {
-                            statements.push(parse_jump_content(content_pair)?);
-                        }
+                        // Phase 1 (REQ-BC-1): Jump removed - use Call instead
+                        // Rule::jump_marker => {}
+                        // Rule::jump_content => { statements.push(parse_jump_content(content_pair)?); }
                         Rule::speech_line_content => {
                             statements.push(parse_speech_line_content(content_pair)?);
                         }
@@ -445,36 +441,8 @@ fn parse_call_content(pair: Pair<Rule>) -> Result<Statement, PastaError> {
     })
 }
 
-fn parse_jump_content(pair: Pair<Rule>) -> Result<Statement, PastaError> {
-    let span_pest = pair.as_span();
-    let start = span_pest.start_pos().line_col();
-    let end = span_pest.end_pos().line_col();
-    let span = Span::from_pest(start, end);
-
-    let mut target = JumpTarget::Local(String::new());
-    let mut filters = Vec::new();
-
-    for inner_pair in pair.into_inner() {
-        match inner_pair.as_rule() {
-            Rule::jump_target => {
-                target = parse_jump_target(inner_pair)?;
-            }
-            Rule::filter_list => {
-                filters = parse_filter_list(inner_pair)?;
-            }
-            Rule::arg_list => {
-                // jump doesn't take args in spec, but grammar allows it
-            }
-            _ => {}
-        }
-    }
-
-    Ok(Statement::Jump {
-        target,
-        filters,
-        span,
-    })
-}
+// NOTE: parse_jump_content removed in Phase 1 (REQ-BC-1: Jump statement removal)
+// Jump statement (？) is no longer supported. Use Call (＞) instead.
 
 fn parse_speech_line_content(pair: Pair<Rule>) -> Result<Statement, PastaError> {
     let span_pest = pair.as_span();

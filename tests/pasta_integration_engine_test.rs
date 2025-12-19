@@ -109,9 +109,10 @@ fn test_engine_executes_to_completion() -> Result<(), Box<dyn std::error::Error>
 
 #[test]
 fn test_engine_with_sakura_script() -> Result<(), Box<dyn std::error::Error>> {
+    // Phase 1 (REQ-BC-2): Half-width Sakura only
     let script = r#"
 ＊test
-    さくら：こんにちは＼ｓ［０］
+    さくら：こんにちは\s[0]
 "#;
 
     let script_dir = create_test_script(script).expect("Failed to create script");
@@ -301,9 +302,10 @@ fn test_multiple_speakers_complex() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn test_sakura_script_content_parts() -> Result<(), Box<dyn std::error::Error>> {
     // Test that sakura script escapes are included in content as ContentPart::SakuraScript
+    // Phase 1 (REQ-BC-2): Half-width Sakura only - using \s[0] not ＼ｓ［０］
     let script = r#"
 ＊test
-    さくら：テキスト＼ｓ［０］続き
+    さくら：テキスト\s[0]続き
 "#;
 
     let script_dir = create_test_script(script).expect("Failed to create script");

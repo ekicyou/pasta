@@ -55,8 +55,10 @@ fn test_call_statement() {
     assert!(result.contains("pasta::call"));
 }
 
+/// Phase 1 (REQ-BC-1): Jump statement is deprecated
+/// This test verifies that Jump statement (？) is now rejected at parse time
 #[test]
-fn test_jump_statement() {
+fn test_jump_statement_deprecated() {
     let pasta_content = r#"
 ＊メイン
 　さくら：メイン発言
@@ -66,11 +68,10 @@ fn test_jump_statement() {
 　さくら：サブ発言
 "#;
 
-    let ast = parse_str(pasta_content, "test.pasta").expect("Failed to parse");
-    let result = Transpiler::transpile_to_string(&ast).expect("Failed to transpile");
+    let result = parse_str(pasta_content, "test.pasta");
 
-    println!("=== Transpiled ===\n{}", result);
-
-    // Jump statement should generate pasta::jump()
-    assert!(result.contains("pasta::jump"));
-}
+    // Phase 1: Jump statement should be rejected at parse time
+    assert!(
+        result.is_err(),
+        "Phase 1: Jump statement (？) is deprecated. Use Call (＞) instead"
+    );}

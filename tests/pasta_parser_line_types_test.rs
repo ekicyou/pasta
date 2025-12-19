@@ -96,11 +96,17 @@ fn test_call_with_args() {
     );
 }
 
+/// Phase 1 (REQ-BC-1): Jump statement (？) is deprecated
+/// Use Call (＞) instead
 #[test]
-fn test_jump_statement() {
+fn test_jump_statement_deprecated() {
     let input = "＊メイン\n　？会話分岐\n";
     let result = parse_str(input, "test");
-    assert!(result.is_ok(), "Jump文のパースに失敗: {:?}", result.err());
+    // Phase 1: Jump statement is rejected
+    assert!(
+        result.is_err(),
+        "Phase 1: Jump statement (？) is deprecated. Use Call (＞) instead"
+    );
 }
 
 #[test]

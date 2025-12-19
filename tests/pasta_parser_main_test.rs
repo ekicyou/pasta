@@ -107,23 +107,19 @@ fn test_parse_call_statement() {
     }
 }
 
+/// Phase 1 (REQ-BC-1): Jump statement (？) is deprecated
+/// Use Call (＞) instead
 #[test]
-fn test_parse_jump_global() {
+fn test_parse_jump_global_deprecated() {
     let source = r#"＊開始
   ？＊終了
 "#;
     let result = parse_str(source, "test.pasta");
-    assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
-
-    let file = result.unwrap();
-    if let Statement::Jump { target, .. } = &file.labels[0].statements[0] {
-        match target {
-            JumpTarget::Global(name) => assert_eq!(name, "終了"),
-            _ => panic!("Expected global jump target"),
-        }
-    } else {
-        panic!("Expected Jump statement");
-    }
+    // Phase 1: Jump statement is rejected
+    assert!(
+        result.is_err(),
+        "Phase 1: Jump statement (？) is deprecated. Use Call (＞) instead"
+    );
 }
 
 #[test]
