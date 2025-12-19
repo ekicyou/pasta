@@ -2,8 +2,8 @@
 
 ## Phase 0: テスト層別化・グリーン確認
 
-- [ ] 1. テスト層別化とグリーン確認
-- [ ] 1.1 (P) Parser層テストファイルのリネーム
+- [x] 1. テスト層別化とグリーン確認
+- [x] 1.1 (P) Parser層テストファイルのリネーム
   - `parser_tests.rs` → `pasta_parser_main_test.rs`
   - `parser_error_tests.rs` → `pasta_parser_error_test.rs`
   - `parser_line_types.rs` → `pasta_parser_line_types_test.rs`
@@ -15,7 +15,7 @@
   - `pest_debug.rs` → `pasta_parser_pest_debug_test.rs`
   - _Requirements: REQ-QA-2_
 
-- [ ] 1.2 (P) Transpiler層テストファイルのリネーム
+- [x] 1.2 (P) Transpiler層テストファイルのリネーム
   - `transpile_comprehensive_test.rs` → `pasta_transpiler_comprehensive_test.rs`
   - `two_pass_transpiler_test.rs` → `pasta_transpiler_two_pass_test.rs`
   - `label_registry_test.rs` → `pasta_transpiler_label_registry_test.rs`
@@ -23,7 +23,7 @@
   - `phase3_test.rs` → `pasta_transpiler_phase3_test.rs`
   - _Requirements: REQ-QA-2_
 
-- [ ] 1.3 (P) Engine層テストファイルのリネーム
+- [x] 1.3 (P) Engine層テストファイルのリネーム
   - `comprehensive_rune_vm_test.rs` → `pasta_engine_rune_vm_comprehensive_test.rs`
   - `rune_block_integration_test.rs` → `pasta_engine_rune_block_test.rs`
   - `rune_closure_test.rs` → `pasta_engine_rune_closure_test.rs`
@@ -37,7 +37,7 @@
   - `persistence_test.rs` → `pasta_engine_persistence_test.rs`
   - _Requirements: REQ-QA-2_
 
-- [ ] 1.4 (P) 統合テストファイルのリネーム
+- [x] 1.4 (P) 統合テストファイルのリネーム
   - `engine_integration_test.rs` → `pasta_integration_engine_test.rs`
   - `engine_independence_test.rs` → `pasta_integration_engine_independence_test.rs`
   - `engine_two_pass_test.rs` → `pasta_integration_engine_two_pass_test.rs`
@@ -49,7 +49,7 @@
   - `error_handling_tests.rs` → `pasta_integration_error_handling_test.rs`
   - _Requirements: REQ-QA-2_
 
-- [ ] 1.5 グリーン確認とベースライン記録
+- [x] 1.5 グリーン確認とベースライン記録
   - `cargo test --all` で全テスト通過を確認
   - `test-baseline.log` に結果を記録
   - Git commit でグリーン状態を保存
