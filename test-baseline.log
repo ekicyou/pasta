@@ -1,0 +1,499 @@
+   Compiling pasta v0.1.0 (C:\home\maz\git\pasta)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.66s
+     Running unittests src\lib.rs (target\debug\deps\pasta-03d36781c5dd0dcd.exe)
+
+running 45 tests
+test cache::tests::test_cache_empty ... ok
+test cache::tests::test_hash_difference ... ok
+test ir::tests::test_content_part_equality ... ok
+test cache::tests::test_hash_consistency ... ok
+test ir::tests::test_script_event_equality ... ok
+test ir::tests::test_content_part_sakura_script ... ok
+test ir::tests::test_content_part_text ... ok
+test ir::tests::test_script_event_error ... ok
+test runtime::random::tests::test_mock_selector ... ok
+test ir::tests::test_script_event_talk ... ok
+test runtime::generator::tests::test_generator_skip ... ok
+test runtime::generator::tests::test_generator_state ... ok
+test runtime::random::tests::test_shuffle ... ok
+test runtime::random::tests::test_default_selector_empty ... ok
+test runtime::labels::tests::test_resolve_label_id_basic ... ok
+test runtime::random::tests::test_default_selector ... ok
+test ir::tests::test_script_event_sync_markers ... ok
+test cache::tests::test_cache_miss ... ok
+test ir::tests::test_script_event_wait ... ok
+test cache::tests::test_cache_insert_and_get ... ok
+test cache::tests::test_cache_clear ... ok
+test runtime::variables::tests::test_variable_manager_basic ... ok
+test cache::tests::test_cache_multiple_entries ... ok
+test runtime::random::tests::test_mock_selector_empty ... ok
+test runtime::variables::tests::test_variable_manager_clear_local ... ok
+test runtime::variables::tests::test_variable_manager_load ... ok
+test runtime::variables::tests::test_variable_manager_scopes ... ok
+test runtime::variables::tests::test_variable_value_conversions ... ok
+test stdlib::tests::test_change_speaker ... ok
+test stdlib::persistence::tests::test_register_persistence_functions ... ok
+test stdlib::tests::test_emit_error ... ok
+test stdlib::tests::test_create_module ... ok
+test stdlib::tests::test_emit_sakura_script ... ok
+test stdlib::tests::test_sync_markers ... ok
+test stdlib::tests::test_emit_text ... ok
+test stdlib::tests::test_wait ... ok
+test transpiler::label_registry::tests::test_register_duplicate_global_labels ... ok
+test transpiler::label_registry::tests::test_register_global_label ... ok
+test transpiler::label_registry::tests::test_register_multiple_global_labels ... ok
+test transpiler::label_registry::tests::test_sanitize_name ... ok
+test transpiler::label_registry::tests::test_register_local_label ... ok
+test transpiler::tests::test_escape_string ... ok
+test transpiler::tests::test_sanitize_identifier ... ok
+test transpiler::tests::test_transpile_expr ... ok
+test transpiler::tests::test_transpile_simple_label ... ok
+
+test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests\label_id_consistency_test.rs (target\debug\deps\label_id_consistency_test-a931051ee6bb7b3a.exe)
+
+running 2 tests
+test test_transpiler_runtime_id_consistency ... ok
+test test_duplicate_labels_id_consistency ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests\pasta_engine_function_scope_test.rs (target\debug\deps\pasta_engine_function_scope_test-126c75379a763a55.exe)
+
+running 12 tests
+test test_local_function_priority ... ok
+test test_add_global_function ... ok
+test test_explicit_global_scope ... ok
+test test_empty_local_functions ... ok
+test test_function_not_found_global_only_scope ... ok
+test test_global_function_fallback ... ok
+test test_function_not_found_auto_scope ... ok
+test test_shadowing_scenario ... ok
+test test_multiple_local_functions ... ok
+test test_function_not_found_error_message ... ok
+test test_transpile_context_default_global_functions ... ok
+test test_integration_function_scope_resolution ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\pasta_engine_label_resolution_test.rs (target\debug\deps\pasta_engine_label_resolution_test-e8558e47c49a7d8b.exe)
+
+running 3 tests
+test test_label_resolution_with_multiple_labels ... ok
+test test_label_resolution_with_prefix_match ... ok
+test test_label_resolution_sequential_consumption ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests\pasta_engine_persistence_test.rs (target\debug\deps\pasta_engine_persistence_test-de7013f1e170b786.exe)
+
+running 11 tests
+test test_tempdir_auto_cleanup ... ok
+test test_invalid_persistence_path ... ok
+test test_new_without_persistence ... ok
+test test_persistence_with_fixture_files ... ok
+test test_new_with_persistence_absolute_path ... ok
+test test_transpiler_signature_change ... ok
+test test_rune_script_access_persistence_path ... ok
+test test_rune_script_without_persistence_path ... ok
+test test_rune_toml_serialization ... ok
+test test_new_with_persistence_relative_path ... ok
+test test_multiple_engines_different_paths ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+
+     Running tests\pasta_engine_rune_block_test.rs (target\debug\deps\pasta_engine_rune_block_test-472f35dc98ecab37.exe)
+
+running 8 tests
+test test_rune_block_empty ... ok
+test test_rune_block_in_local_label ... ok
+test test_rune_block_with_complex_code ... ok
+test test_rune_block_with_function_call ... ok
+test test_rune_block_transpilation ... ok
+test test_rune_block_indentation_preserved ... ok
+test test_rune_block_parsing ... ok
+test test_multiple_rune_blocks ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running tests\pasta_engine_rune_closure_test.rs (target\debug\deps\pasta_engine_rune_closure_test-37306565c2a4edd7.exe)
+
+running 3 tests
+test test_register_closure_with_captured_state ... ok
+test test_p1_select_label_to_id_pattern ... ok
+test test_register_function_with_arc_parameter ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests\pasta_engine_rune_compile_test.rs (target\debug\deps\pasta_engine_rune_compile_test-283701eae59bf7a7.exe)
+
+running 1 test
+test test_rune_compile_simple ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests\pasta_engine_rune_module_memory_test.rs (target\debug\deps\pasta_engine_rune_module_memory_test-d9d5d00d3e5b3a52.exe)
+
+running 2 tests
+test test_single_source_memory_with_complete_module ... ok
+test test_incremental_module_with_memory - should panic ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+
+     Running tests\pasta_engine_rune_module_merge_test.rs (target\debug\deps\pasta_engine_rune_module_merge_test-e8bb501bf3226d1c.exe)
+
+running 2 tests
+test test_module_function_overwrite ... ok
+test test_module_merge_in_multiple_sources - should panic ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+
+     Running tests\pasta_engine_rune_rust_module_test.rs (target\debug\deps\pasta_engine_rune_rust_module_test-8eee159689261b4c.exe)
+
+running 2 tests
+test test_add_rust_function_to_rune_module ... ok
+test test_rust_module_then_rune_calls ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests\pasta_engine_rune_simple_test.rs (target\debug\deps\pasta_engine_rune_simple_test-ba979862e483e66a.exe)
+
+running 1 test
+test test_simple_rust_function ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests\pasta_engine_rune_vm_comprehensive_test.rs (target\debug\deps\pasta_engine_rune_vm_comprehensive_test-e7bac25321450882.exe)
+
+running 1 test
+test test_comprehensive_control_flow_rune_compile ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests\pasta_integration_concurrent_execution_test.rs (target\debug\deps\pasta_integration_concurrent_execution_test-55318ecad1a73aba.exe)
+
+running 7 tests
+test test_thread_safety ... ok
+test test_multiple_threads_same_script ... ok
+test test_independent_execution_across_threads ... ok
+test test_no_data_races ... ok
+test test_send_trait ... ok
+test test_concurrent_engine_creation ... ok
+test test_thread_local_cache ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s
+
+     Running tests\pasta_integration_control_flow_test.rs (target\debug\deps\pasta_integration_control_flow_test-d2f8cd7f74d13cb9.exe)
+
+running 3 tests
+test verify_pasta_input_structure ... ok
+test verify_reference_implementation_structure ... ok
+test test_comprehensive_control_flow_reference ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests\pasta_integration_directory_loader_test.rs (target\debug\deps\pasta_integration_directory_loader_test-26c56248352ae701.exe)
+
+running 8 tests
+test test_not_absolute_path_error ... ok
+test test_directory_not_found_error ... ok
+test test_main_rune_not_found_error ... ok
+test test_dic_directory_not_found_error ... ok
+test test_multiple_labels_random_selection ... ok
+test test_label_execution ... ok
+test test_ignored_files_skipped ... ok
+test test_from_directory_success ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running tests\pasta_integration_e2e_simple_test.rs (target\debug\deps\pasta_integration_e2e_simple_test-84cef7c7e42bf621.exe)
+
+running 2 tests
+test test_simple_generator_execution ... ok
+test test_simple_end_to_end ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests\pasta_integration_engine_independence_test.rs (target\debug\deps\pasta_integration_engine_independence_test-0156d98d87935145.exe)
+
+running 8 tests
+test test_independent_execution ... ok
+test test_engine_with_different_scripts ... ok
+test test_global_variable_isolation ... ok
+test test_drop_independence ... ok
+test test_random_selector_independence ... ok
+test test_independent_label_execution ... ok
+test test_independent_parsing ... ok
+test test_concurrent_parsing ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.53s
+
+     Running tests\pasta_integration_engine_test.rs (target\debug\deps\pasta_integration_engine_test-d35880781a8b8778.exe)
+
+running 17 tests
+test test_engine_with_sakura_script ... ok
+test test_repeated_label_execution ... ok
+test test_engine_empty_label ... ok
+test test_engine_executes_to_completion ... ok
+test test_engine_execute_simple_label ... ok
+test test_chain_talk_manual ... ok
+test test_empty_script ... ok
+test test_multiple_speakers_complex ... ok
+test test_label_execution ... ok
+test test_error_handling_invalid_label ... ok
+test test_chain_talk_with_api ... ok
+test test_label_isolation ... ok
+test test_engine_label_with_call ... ok
+test test_sakura_script_content_parts ... ok
+test test_engine_multiple_executions ... ok
+test test_engine_multiple_labels ... ok
+test test_engine_lifecycle ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+
+     Running tests\pasta_integration_engine_two_pass_test.rs (target\debug\deps\pasta_integration_engine_two_pass_test-c81c05a7aa6270db.exe)
+
+running 3 tests
+test test_engine_with_test_project ... ok
+test test_engine_execute_label ... ok
+test test_engine_with_simple_project ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests\pasta_integration_error_handling_test.rs (target\debug\deps\pasta_integration_error_handling_test-8c2ace96399707c6.exe)
+
+running 19 tests
+test test_error_type_name_conflict ... ok
+test test_error_type_label_not_found ... ok
+test test_error_type_parse_error ... ok
+test test_dynamic_error_from_rune_script ... ok
+test test_error_event_structure ... ok
+test test_parse_error_with_location ... ok
+test test_parse_error_multiple_errors ... ok
+test test_parse_error_message_quality ... ok
+test test_whitespace_only_no_error ... ok
+test test_empty_script_no_error ... ok
+test test_comments_only_no_error ... ok
+test test_error_message_is_descriptive ... ok
+test test_error_in_nested_label ... ok
+test test_parse_error_missing_label_content ... ok
+test test_runtime_error_preserves_engine_state ... ok
+test test_error_recovery_generator_continues ... ok
+test test_runtime_error_label_not_found ... ok
+test test_end_to_end_error_scenarios ... ok
+test test_multiple_labels_after_error ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+
+     Running tests\pasta_integration_stdlib_test.rs (target\debug\deps\pasta_integration_stdlib_test-0f645af4cf3470e4.exe)
+
+running 3 tests
+test test_stdlib_module_creation ... ok
+test test_emit_text_via_rune ... ok
+test test_sync_functions_via_rune ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests\pasta_parser_debug_test.rs (target\debug\deps\pasta_parser_debug_test-e1edf762588bd1c0.exe)
+
+running 3 tests
+test test_minimal ... ok
+test test_with_speech_halfwidth ... ok
+test test_with_speech_fullwidth ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\pasta_parser_error_test.rs (target\debug\deps\pasta_parser_error_test-1b9f8a677827f3b2.exe)
+
+running 20 tests
+test test_parse_empty_file ... ok
+test test_error_invalid_number ... ok
+test test_error_mismatched_quotes ... ok
+test test_error_empty_label_name ... ok
+test test_error_missing_colon_in_speech ... ok
+test test_error_invalid_label_marker ... ok
+test test_error_line_column_reporting ... ok
+test test_parse_complex_expression ... ok
+test test_error_missing_rparen ... ok
+test test_error_handling_preserves_context ... ok
+test test_error_invalid_jump_target ... ok
+test test_parse_label_with_only_newlines ... ok
+test test_parse_only_comments ... ok
+test test_parse_mixed_width_syntax ... ok
+test test_error_missing_equals_in_assignment ... ok
+test test_error_nested_function_calls ... ok
+test test_error_unclosed_string ... ok
+test test_error_invalid_expression ... ok
+test test_error_duplicate_named_args ... ok
+test test_parse_unicode_identifiers ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\pasta_parser_grammar_diagnostic_test.rs (target\debug\deps\pasta_parser_grammar_diagnostic_test-5a45373bda247e07.exe)
+
+running 16 tests
+test test_argument_value_number ... ok
+test test_rune_start ... ok
+test test_func_name ... ok
+test test_arg_value_ja_string ... ok
+test test_argument_ja_string ... ok
+test test_arg_list_fullwidth ... ok
+test test_identifier ... ok
+test test_ideographic_space ... ok
+test test_arg_list_simple ... ok
+test test_rune_block_minimal ... ok
+test test_two_args_with_ideographic_space ... ok
+test test_two_strings_ascii_space ... ok
+test test_ws_rule ... ok
+test test_at_marker ... ok
+test test_two_args_simple ... ok
+test test_ja_string ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\pasta_parser_line_types_test.rs (target\debug\deps\pasta_parser_line_types_test-b8f44beb49ad0be8.exe)
+
+running 13 tests
+test test_global_label ... ok
+test test_call_no_args ... ok
+test test_jump_statement ... ok
+test test_local_label_no_args ... ok
+test test_global_word_def ... ok
+test test_call_with_args ... ok
+test test_local_label_with_args ... ok
+test test_local_word_def ... ok
+test test_speech_line_with_word ... ok
+test test_var_assign ... ok
+test test_comment_line ... ok
+test test_rune_block ... ok
+test test_comprehensive_control_flow_full ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\pasta_parser_main_test.rs (target\debug\deps\pasta_parser_main_test-e924fd70473a378a.exe)
+
+running 17 tests
+test test_parse_attributes ... ok
+test test_parse_expression ... ok
+test test_parse_function_call_in_speech ... ok
+test test_parse_continuation_lines ... ok
+test test_parse_halfwidth_syntax ... ok
+test test_parse_jump_global ... ok
+test test_parse_long_jump ... ok
+test test_parse_multiple_labels ... ok
+test test_parse_sakura_script ... ok
+test test_parse_string_literals ... ok
+test test_parse_call_statement ... ok
+test test_parse_error_reporting ... ok
+test test_parse_local_label ... ok
+test test_parse_simple_label ... ok
+test test_parse_var_assign ... ok
+test test_parse_speech_with_var_ref ... ok
+test test_parse_global_var_assign ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\pasta_parser_pest_debug_test.rs (target\debug\deps\pasta_parser_pest_debug_test-eafbde8699d6a8af.exe)
+
+running 2 tests
+test test_global_label_with_statement ... ok
+test test_file_with_statement ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\pasta_parser_pest_sakura_test.rs (target\debug\deps\pasta_parser_pest_sakura_test-df8cc41c9da1a912.exe)
+
+running 2 tests
+test test_sakura_script_direct ... ok
+test test_speech_content_with_sakura ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\pasta_parser_sakura_debug_test.rs (target\debug\deps\pasta_parser_sakura_debug_test-0921dc6a73b03564.exe)
+
+running 1 test
+test test_parse_sakura ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\pasta_parser_sakura_script_test.rs (target\debug\deps\pasta_parser_sakura_script_test-1ecaf8390d824c4f.exe)
+
+running 16 tests
+test test_multiple_commands ... ok
+test test_basic_sakura_script_fullwidth ... ok
+test test_sakura_script_at_start ... ok
+test test_sakura_script_multiple_lines ... ok
+test test_sakura_with_text ... ok
+test test_quick_wait ... ok
+test test_only_sakura_script ... ok
+test test_surface_switching ... ok
+test test_newline_commands ... ok
+test test_mixed_backslashes ... ok
+test test_speaker_switching_commands ... ok
+test test_sakura_script_at_end ... ok
+test test_basic_sakura_script_ascii ... ok
+test test_wait_commands ... ok
+test test_complex_sakura_commands ... ok
+test test_custom_commands ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+
+     Running tests\pasta_transpiler_actor_assignment_test.rs (target\debug\deps\pasta_transpiler_actor_assignment_test-0fe786d11dcab221.exe)
+
+running 1 test
+test test_string_vs_variable_actor ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests\pasta_transpiler_comprehensive_test.rs (target\debug\deps\pasta_transpiler_comprehensive_test-6428e7d7c67b528d.exe)
+
+running 1 test
+test test_transpile_comprehensive_control_flow ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\pasta_transpiler_label_registry_test.rs (target\debug\deps\pasta_transpiler_label_registry_test-7b9c61fa072ab1ef.exe)
+
+running 3 tests
+test test_label_registry_basic ... ok
+test test_label_registry_duplicate_names ... ok
+test test_label_registry_with_local_labels ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\pasta_transpiler_phase3_test.rs (target\debug\deps\pasta_transpiler_phase3_test-d744cd1cf9260e59.exe)
+
+running 3 tests
+test test_jump_statement ... ok
+test test_call_statement ... ok
+test test_global_and_local_labels ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\pasta_transpiler_two_pass_test.rs (target\debug\deps\pasta_transpiler_two_pass_test-61a873802e4c04ee.exe)
+
+running 4 tests
+test test_transpile_to_string_helper ... ok
+test test_two_pass_transpiler_to_string ... ok
+test test_multiple_files_simulation ... ok
+test test_two_pass_transpiler_to_vec ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\sakura_debug_test.rs (target\debug\deps\sakura_debug_test-b0e68f1764a59017.exe)
+
+running 1 test
+test debug_sakura_parsing ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+   Doc-tests pasta
+
+running 2 tests
+test src\lib.rs - (line 25) - compile ... ok
+test src\engine.rs - engine::PastaEngine::new (line 80) - compile ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+all doctests ran in 1.05s; merged doctests compilation took 0.95s
