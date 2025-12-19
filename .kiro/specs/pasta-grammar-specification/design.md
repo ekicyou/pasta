@@ -37,6 +37,164 @@ Pasta DSL の文法仕様を、現在の実装（pest定義）と乖離から修
 
 ---
 
+## 統合検証用最小スクリプト（Golden Test）
+
+### 目的
+grammar-specification.md の全機能を包括する最小の pasta スクリプトを定義し、Phase 1-3 の各段階で Parser・Transpiler・Runtime の3層すべてが正しく動作することを検証する。
+
+### Golden Test スクリプト
+
+**ファイル**: `tests/fixtures/golden/complete-feature-test.pasta`
+
+```pasta
+# コメント（2.10）
+＃全角コメント
+
+＆file_level_attr：test_file
+
+＠global_word：apple　banana　orange
+
+＊統合テスト
+  ＆author：Alice
+  ＆genre：test
+  ```rune
+  fn calculate(ctx, x, y) {
+    x + y
+  }
+  fn get_greeting(ctx) {
+    "こんにちは"
+  }
+  ```
+  ＄＊global_var ： 100
+  ＄local_var ： 「ローカル値」
+  ＄result ： ＠calculate（x：10　y：20）
+  
+  Alice：単語参照＠global_word　変数＄local_var
+  Alice：関数呼び出し＠get_greeting()
+  Alice：Sakura\n改行\w8待機\s[0]表情
+  Alice：長い台詞は
+    複数行に
+    
+    分けて記述
+  
+  ・選択肢1
+    ＠local_word：choice1　choice2
+    Bob：選択肢1が選ばれました
+    ＞＊他のラベル
+  
+  ・選択肢2
+    Bob：選択肢2が選ばれました
+```
+
+### Golden Test の網羅項目
+
+| 機能カテゴリ | 仕様セクション | 検証項目 |
+|------------|--------------|---------|
+| コメント | 2.10 | 半角 `#`、全角 `＃` |
+| ファイルレベル属性 | 8.3 | `＆file_level_attr` |
+| グローバル単語定義 | 10.1 | `＠global_word：value1　value2` |
+| グローバルラベル | 2.2, 3 | `＊統合テスト` |
+| 属性定義 | 8.1 | `＆author`, `＆genre` |
+| Rune ブロック | 2.6 | 関数定義（`fn calculate`, `fn get_greeting`） |
+| グローバル変数 | 9.1 | `＄＊global_var` |
+| ローカル変数 | 9.1 | `＄local_var` |
+| 関数呼び出し（引数付き） | 4.3 | `＠calculate（x：10　y：20）` |
+| アクション行 | 6.1-6.3 | `Alice：...` |
+| 単語参照 | 10.3 | `＠global_word` |
+| 変数参照 | 6.3 | `＄local_var` |
+| 関数呼び出し（引数なし） | 6.3 | `＠get_greeting()` |
+| Sakura スクリプト | 7 | `\n`, `\w8`, `\s[0]` |
+| 行継続 | 6.4 | 複数行台詞 |
+| 継続行内空行 | 6.5.3 | 空行による改行 |
+| ローカルラベル | 2.2, 3 | `・選択肢1`, `・選択肢2` |
+| ローカル単語定義 | 10.2 | `＠local_word：choice1　choice2` |
+| Call（グローバル） | 4.1 | `＞＊他のラベル` |
+
+### 検証基準
+
+#### Phase 1（Parser 層）
+
+**ツール**: `cargo test pasta_parser_golden_test`
+
+**合格条件**:
+1. **構文解析成功**: Golden Test スクリプトが Parser を通過（Parse エラーなし）
+2. **AST 構造検証**: 以下の AST ノードが正しく生成される
+   - グローバルラベル（1個）: `統合テスト`
+   - ローカルラベル（2個）: `選択肢1`, `選択肢2`
+   - 属性（3個）: file_level, author, genre
+   - Rune ブロック（1個）: 2関数定義
+   - 変数代入（3個）: global_var, local_var, result
+   - アクション行（5個）: Alice（4個）, Bob（2個）
+   - Call（1個）: `＊他のラベル`
+   - 単語定義（2個）: global_word, local_word
+3. **Sakura トークン検出**: `\n`, `\w8`, `\s[0]` が個別トークンとして検出される
+4. **行継続検出**: 4行継続（「長い台詞は」→「複数行に」→空行→「分けて記述」）
+5. **Jump 非存在**: AST に `Statement::Jump` が存在しない
+
+**実装**: `tests/pasta_parser_golden_test.rs`（新規作成）
+
+#### Phase 2（Transpiler 層）
+
+**ツール**: `cargo test pasta_transpiler_golden_test`
+
+**合格条件**:
+1. **Rune コード生成成功**: Golden Test が Rune コードへ変換される
+2. **関数シグネチャ検証**: 
+   - `pasta::call(ctx, "統合テスト", [], [])` 生成
+   - `pasta::call(ctx, "他のラベル", [], [])` 生成
+   - `pasta::word_lookup(ctx, "global_word")` 生成
+3. **変数スコープ**: `ctx.global["global_var"]`, `ctx.local["local_var"]` 生成
+4. **Sakura 透過**: `\n`, `\w8`, `\s[0]` がそのまま文字列として出力
+5. **Jump コード非存在**: `pasta::jump()` 呼び出しが生成されない
+6. **Rune コンパイル成功**: 生成コードが Rune VM で compile() を通過
+
+**実装**: `tests/pasta_transpiler_golden_test.rs`（新規作成）
+
+#### Phase 3（Runtime/Integration 層）
+
+**ツール**: `cargo test pasta_integration_golden_test`
+
+**合格条件**:
+1. **エンドツーエンド実行成功**: Golden Test スクリプトが完全実行される
+2. **出力トークン検証**: 
+   - アクション行（6個）のトークンが正しい順序で yield される
+   - 単語参照がランダム選択される（`apple`/`banana`/`orange` のいずれか）
+   - 変数参照が正しく展開される（`「ローカル値」`）
+   - 関数呼び出し結果が展開される（`「こんにちは」`, `30`）
+3. **Sakura スクリプト透過**: 出力に `\n`, `\w8`, `\s[0]` が含まれる
+4. **Call 実行**: `＞＊他のラベル` が呼び出される（実装済みラベルの場合）
+5. **エラーなし**: Runtime エラー、panic なし
+
+**実装**: `tests/pasta_integration_golden_test.rs`（新規作成）
+
+### リグレッション検出方法
+
+#### Phase 0 → Phase 1
+- Phase 0 完了時: 既存テスト全通過（test-baseline.log 記録）
+- Phase 1 修正後: `cargo test pasta_parser_` 実行
+- **合格**: Parser 層テストすべて通過 + Golden Test 通過
+- **リグレッション**: Parser 層テスト失敗 → pest 修正にバグ
+
+#### Phase 1 → Phase 2
+- Phase 1 完了時: Parser 層テスト全通過
+- Phase 2 修正後: `cargo test pasta_transpiler_` 実行
+- **合格**: Transpiler 層テストすべて通過 + Golden Test 通過
+- **リグレッション**: Transpiler 層テスト失敗 → AST 変更の波及確認
+
+#### Phase 2 → Phase 3
+- Phase 2 完了時: Parser + Transpiler 層テスト全通過
+- Phase 3 修正後: `cargo test --all` 実行
+- **合格**: 全テスト通過 + Golden Test 通過
+- **リグレッション**: Runtime/Integration 層テスト失敗 → フィクスチャ置換ミス
+
+### Golden Test の保守
+
+- **Phase 1-3 全体を通じて Golden Test は修正しない**
+- Golden Test が通過しない場合は実装側を修正
+- 仕様変更時のみ Golden Test を更新（その際は要件定義から見直し）
+
+---
+
 ## Phase 0: Pre-Implementation Preparation
 
 ### 目的
@@ -55,7 +213,53 @@ pasta_integration_<name>_test.rs     — 統合テスト
 pasta_debug_<name>_test.rs           — デバッグ用（オプション）
 ```
 
-**リネーム対象ファイル（約38ファイル）** → [test-hierarchy-plan.md](test-hierarchy-plan.md) に詳細記載
+**リネーム計画（約38ファイル）**:
+
+##### Parser 層
+- `parser_tests.rs` → `pasta_parser_main_test.rs`
+- `parser_error_tests.rs` → `pasta_parser_error_test.rs`
+- `parser_line_types.rs` → `pasta_parser_line_types_test.rs`
+- `sakura_script_tests.rs` → `pasta_parser_sakura_script_test.rs`
+- `pest_sakura_test.rs` → `pasta_parser_pest_sakura_test.rs`
+- `grammar_diagnostic.rs` → `pasta_parser_grammar_diagnostic_test.rs`
+- `parser_debug.rs` → `pasta_parser_debug_test.rs`
+- `parser_sakura_debug.rs` → `pasta_parser_sakura_debug_test.rs`
+- `pest_debug.rs` → `pasta_parser_pest_debug_test.rs`
+
+##### Transpiler 層
+- `transpile_comprehensive_test.rs` → `pasta_transpiler_comprehensive_test.rs`
+- `two_pass_transpiler_test.rs` → `pasta_transpiler_two_pass_test.rs`
+- `label_registry_test.rs` → `pasta_transpiler_label_registry_test.rs`
+- `actor_assignment_test.rs` → `pasta_transpiler_actor_assignment_test.rs`
+- `phase3_test.rs` → `pasta_transpiler_phase3_test.rs`
+
+##### Engine/Runtime 層
+- `comprehensive_rune_vm_test.rs` → `pasta_engine_rune_vm_comprehensive_test.rs`
+- `rune_block_integration_test.rs` → `pasta_engine_rune_block_test.rs`
+- `rune_closure_test.rs` → `pasta_engine_rune_closure_test.rs`
+- `rune_compile_test.rs` → `pasta_engine_rune_compile_test.rs`
+- `rune_module_memory_test.rs` → `pasta_engine_rune_module_memory_test.rs`
+- `rune_module_merge_test.rs` → `pasta_engine_rune_module_merge_test.rs`
+- `rune_rust_module_test.rs` → `pasta_engine_rune_rust_module_test.rs`
+- `simple_rune_test.rs` → `pasta_engine_rune_simple_test.rs`
+- `label_resolution_runtime_test.rs` → `pasta_engine_label_resolution_test.rs`
+- `function_scope_tests.rs` → `pasta_engine_function_scope_test.rs`
+- `persistence_test.rs` → `pasta_engine_persistence_test.rs`
+
+##### 統合テスト
+- `engine_integration_test.rs` → `pasta_integration_engine_test.rs`
+- `engine_independence_test.rs` → `pasta_integration_engine_independence_test.rs`
+- `engine_two_pass_test.rs` → `pasta_integration_engine_two_pass_test.rs`
+- `end_to_end_simple_test.rs` → `pasta_integration_e2e_simple_test.rs`
+- `comprehensive_control_flow_test.rs` → `pasta_integration_control_flow_test.rs`
+- `concurrent_execution_test.rs` → `pasta_integration_concurrent_execution_test.rs`
+- `stdlib_integration_test.rs` → `pasta_integration_stdlib_test.rs`
+- `directory_loader_test.rs` → `pasta_integration_directory_loader_test.rs`
+- `error_handling_tests.rs` → `pasta_integration_error_handling_test.rs`
+
+##### Debug・Legacy（統合/削除候補）
+- `sakura_debug_test.rs` → `pasta_debug_sakura_test.rs`（または削除）
+- `label_id_consistency_test.rs` → `pasta_integration_label_id_consistency_test.rs`（または削除）
 
 #### 0.2 事前グリーン確認
 
@@ -73,12 +277,28 @@ git commit -m "Refactor: Organize test files by layer hierarchy for regression t
 
 ### 成果物
 - リネーム済みテストファイル
-- test-baseline.log
+- test-baseline.log（全テスト通過の記録）
+- Golden Test スクリプト（`tests/fixtures/golden/complete-feature-test.pasta`）
+- Golden Test 実装（3層分、Phase 1-3 で順次作成）
 - Git commit ID（グリーン状態の参照点）
 
 ### 検証方法
-- `cargo test --all` が 100% パス
-- `git log --oneline | head -1` でコミット確認
+```bash
+# 全テスト実行
+cargo test --all 2>&1 | tee .kiro/specs/pasta-grammar-specification/test-baseline.log
+
+# グリーン確認
+grep "test result:" test-baseline.log
+# 期待: "test result: ok. X passed; 0 failed"
+
+# Golden Test フィクスチャ作成
+mkdir -p tests/fixtures/golden
+# （上記 Golden Test スクリプトを作成）
+
+# Commit
+git add tests/*.rs tests/fixtures/golden/
+git commit -m "Refactor: Organize test files by layer hierarchy + add Golden Test fixture (Phase 0)"
+```
 
 ---
 
@@ -330,13 +550,26 @@ Rule::jump_marker => { ... }
 ### 成果物
 - 修正済み pasta.pest
 - 修正済み ast.rs
+- 修正済み parser/mod.rs
 - 修正済み Parser テスト
-- `git commit` 記録（Phase 1 完了）
+- Golden Test（Parser 層）実装
+- Git commit 記録（Phase 1 完了）
 
 ### 検証方法
 ```bash
+# Parser 層テスト実行
 cargo test pasta_parser_ --all
-# test result: ok を確認
+
+# Golden Test（Parser 層）実行
+cargo test pasta_parser_golden_test
+
+# 合格条件
+# 1. 全 Parser 層テストが通過
+# 2. Golden Test の AST 構造検証が通過
+# 3. Jump 関連の AST ノードが存在しない
+
+# 検証レポート出力
+cargo test pasta_parser_ --all 2>&1 | tee .kiro/specs/pasta-grammar-specification/phase1-test-result.log
 ```
 
 ---
@@ -399,12 +632,25 @@ pub fn jump(ctx, label, filters, args) { ... }
 ### 成果物
 - 修正済み transpiler/mod.rs
 - 修正済み Transpiler テスト
+- Golden Test（Transpiler 層）実装
 - Git commit 記録
 
 ### 検証方法
 ```bash
+# Transpiler 層テスト実行
 cargo test pasta_transpiler_ --all
-# test result: ok を確認
+
+# Golden Test（Transpiler 層）実行
+cargo test pasta_transpiler_golden_test
+
+# 合格条件
+# 1. 全 Transpiler 層テストが通過
+# 2. Golden Test の Rune コード生成が成功
+# 3. pasta::jump() 呼び出しが生成されない
+# 4. 生成 Rune コードが compile() を通過
+
+# 検証レポート出力
+cargo test pasta_transpiler_ --all 2>&1 | tee .kiro/specs/pasta-grammar-specification/phase2-test-result.log
 ```
 
 ---
@@ -487,15 +733,32 @@ find tests/fixtures -name "*.pasta" -exec sed -i 's/？/＞/g' {} \;
 - [ ] `cargo test pasta_integration_ --all` が 100% パス
 
 ### 成果物
-- 置換済みテストフィクスチャ
-- 修正済みテストコード
+- 置換済みテストフィクスチャ（`？` → `＞`）
+- 修正済みテストコード（全角削除）
 - 改訂済み GRAMMAR.md
+- Golden Test（Runtime/Integration 層）実装
 - Git commit 記録
 
 ### 検証方法
 ```bash
+# 全テスト実行（Phase 3 完了検証）
 cargo test --all
-# test result: ok を確認
+
+# Golden Test（Runtime/Integration 層）実行
+cargo test pasta_integration_golden_test
+
+# 合格条件
+# 1. 全テストが通過（Parser + Transpiler + Engine + Integration）
+# 2. Golden Test のエンドツーエンド実行が成功
+# 3. 出力トークン検証が通過
+# 4. Runtime エラーなし
+
+# 最終検証レポート出力
+cargo test --all 2>&1 | tee .kiro/specs/pasta-grammar-specification/phase3-test-result.log
+
+# Phase 0 baseline との比較
+diff test-baseline.log phase3-test-result.log
+# 期待: テスト数の変化のみ（Golden Test 3件追加）、失敗なし
 ```
 
 ---
