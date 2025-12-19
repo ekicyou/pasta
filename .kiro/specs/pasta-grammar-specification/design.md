@@ -57,6 +57,7 @@ grammar-specification.md の全機能を包括する最小の pasta スクリプ
 ＊統合テスト
   ＆author：Alice
   ＆genre：test
+  ＠local_word：choice1　choice2
   ```rune
   fn calculate(ctx, x, y) {
     x + y
@@ -65,7 +66,6 @@ grammar-specification.md の全機能を包括する最小の pasta スクリプ
     "こんにちは"
   }
   ```
-  ＠local_word：choice1　choice2
   ＄＊global_var ： 100
   ＄local_var ： 「ローカル値」
   ＄result ： ＠calculate（x：10　y：20）
