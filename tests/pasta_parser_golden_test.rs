@@ -12,7 +12,7 @@
 //! - English string literal parsing
 //! - No Statement::Jump in AST
 
-use pasta::parser::{parse_file, Statement, LabelScope, SpeechPart};
+use pasta::parser::{LabelScope, SpeechPart, Statement, parse_file};
 use std::path::PathBuf;
 
 const GOLDEN_TEST_PATH: &str = "tests/fixtures/golden/complete-feature-test.pasta";
@@ -30,7 +30,11 @@ fn parse_golden_test() -> Result<pasta::parser::PastaFile, String> {
 #[test]
 fn golden_test_parses_without_errors() {
     let result = parse_golden_test();
-    assert!(result.is_ok(), "Golden Test should parse without errors: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Golden Test should parse without errors: {:?}",
+        result.err()
+    );
 }
 
 // =============================================================================
@@ -40,43 +44,65 @@ fn golden_test_parses_without_errors() {
 #[test]
 fn golden_test_has_one_global_label() {
     let file = parse_golden_test().expect("Parse failed");
-    let global_labels: Vec<_> = file.labels.iter()
+    let global_labels: Vec<_> = file
+        .labels
+        .iter()
         .filter(|l| l.scope == LabelScope::Global)
         .collect();
     assert_eq!(global_labels.len(), 1, "Expected 1 global label");
-    assert_eq!(global_labels[0].name, "統合テスト", "Global label name mismatch");
+    assert_eq!(
+        global_labels[0].name, "統合テスト",
+        "Global label name mismatch"
+    );
 }
 
 #[test]
 fn golden_test_has_two_local_labels() {
     let file = parse_golden_test().expect("Parse failed");
-    let global_label = file.labels.iter()
+    let global_label = file
+        .labels
+        .iter()
         .find(|l| l.scope == LabelScope::Global)
         .expect("No global label found");
-    
+
     let local_labels: Vec<_> = global_label.local_labels.iter().collect();
     assert_eq!(local_labels.len(), 2, "Expected 2 local labels");
-    
+
     let local_names: Vec<&str> = local_labels.iter().map(|l| l.name.as_str()).collect();
-    assert!(local_names.contains(&"選択肢1"), "Missing local label: 選択肢1");
-    assert!(local_names.contains(&"選択肢2"), "Missing local label: 選択肢2");
+    assert!(
+        local_names.contains(&"選択肢1"),
+        "Missing local label: 選択肢1"
+    );
+    assert!(
+        local_names.contains(&"選択肢2"),
+        "Missing local label: 選択肢2"
+    );
 }
 
 #[test]
 fn golden_test_has_three_attributes() {
     let file = parse_golden_test().expect("Parse failed");
-    
+
     // Count file-level attributes (global_words treated differently)
     // and label-level attributes
-    let global_label = file.labels.iter()
+    let global_label = file
+        .labels
+        .iter()
         .find(|l| l.scope == LabelScope::Global)
         .expect("No global label found");
-    
+
     // Label has author and genre attributes
-    assert!(global_label.attributes.len() >= 2, 
-        "Expected at least 2 label attributes, got {}", global_label.attributes.len());
-    
-    let attr_keys: Vec<&str> = global_label.attributes.iter().map(|a| a.key.as_str()).collect();
+    assert!(
+        global_label.attributes.len() >= 2,
+        "Expected at least 2 label attributes, got {}",
+        global_label.attributes.len()
+    );
+
+    let attr_keys: Vec<&str> = global_label
+        .attributes
+        .iter()
+        .map(|a| a.key.as_str())
+        .collect();
     assert!(attr_keys.contains(&"author"), "Missing attribute: author");
     assert!(attr_keys.contains(&"genre"), "Missing attribute: genre");
 }
@@ -84,59 +110,86 @@ fn golden_test_has_three_attributes() {
 #[test]
 fn golden_test_has_one_rune_block() {
     let file = parse_golden_test().expect("Parse failed");
-    let global_label = file.labels.iter()
+    let global_label = file
+        .labels
+        .iter()
         .find(|l| l.scope == LabelScope::Global)
         .expect("No global label found");
-    
-    let rune_blocks: Vec<_> = global_label.statements.iter()
+
+    let rune_blocks: Vec<_> = global_label
+        .statements
+        .iter()
         .filter(|s| matches!(s, Statement::RuneBlock { .. }))
         .collect();
-    
+
     assert_eq!(rune_blocks.len(), 1, "Expected 1 Rune block");
-    
+
     // Verify it contains the expected functions
     if let Statement::RuneBlock { content, .. } = rune_blocks[0] {
-        assert!(content.contains("fn calculate"), "Missing function: calculate");
-        assert!(content.contains("fn get_greeting"), "Missing function: get_greeting");
-        assert!(content.contains("fn get_flag"), "Missing function: get_flag");
+        assert!(
+            content.contains("fn calculate"),
+            "Missing function: calculate"
+        );
+        assert!(
+            content.contains("fn get_greeting"),
+            "Missing function: get_greeting"
+        );
+        assert!(
+            content.contains("fn get_flag"),
+            "Missing function: get_flag"
+        );
     }
 }
 
 #[test]
 fn golden_test_has_five_variable_assignments() {
     let file = parse_golden_test().expect("Parse failed");
-    let global_label = file.labels.iter()
+    let global_label = file
+        .labels
+        .iter()
         .find(|l| l.scope == LabelScope::Global)
         .expect("No global label found");
-    
-    let var_assigns: Vec<_> = global_label.statements.iter()
+
+    let var_assigns: Vec<_> = global_label
+        .statements
+        .iter()
         .filter(|s| matches!(s, Statement::VarAssign { .. }))
         .collect();
-    
-    assert_eq!(var_assigns.len(), 5, 
-        "Expected 5 variable assignments, got {}", var_assigns.len());
+
+    assert_eq!(
+        var_assigns.len(),
+        5,
+        "Expected 5 variable assignments, got {}",
+        var_assigns.len()
+    );
 }
 
 #[test]
 fn golden_test_has_seven_action_lines() {
     let file = parse_golden_test().expect("Parse failed");
-    let global_label = file.labels.iter()
+    let global_label = file
+        .labels
+        .iter()
         .find(|l| l.scope == LabelScope::Global)
         .expect("No global label found");
-    
+
     // Count speech statements in global label
-    let alice_speeches: Vec<_> = global_label.statements.iter()
+    let alice_speeches: Vec<_> = global_label
+        .statements
+        .iter()
         .filter(|s| matches!(s, Statement::Speech { speaker, .. } if speaker == "Alice"))
         .collect();
-    
+
     // Count speech statements in local labels
     let mut bob_speeches = 0;
     for local in &global_label.local_labels {
-        bob_speeches += local.statements.iter()
+        bob_speeches += local
+            .statements
+            .iter()
             .filter(|s| matches!(s, Statement::Speech { speaker, .. } if speaker == "Bob"))
             .count();
     }
-    
+
     assert_eq!(alice_speeches.len(), 5, "Expected 5 Alice speech lines");
     assert_eq!(bob_speeches, 2, "Expected 2 Bob speech lines");
 }
@@ -144,36 +197,56 @@ fn golden_test_has_seven_action_lines() {
 #[test]
 fn golden_test_has_two_call_statements() {
     let file = parse_golden_test().expect("Parse failed");
-    let global_label = file.labels.iter()
+    let global_label = file
+        .labels
+        .iter()
         .find(|l| l.scope == LabelScope::Global)
         .expect("No global label found");
-    
+
     // Count calls in local labels
     let mut call_count = 0;
     for local in &global_label.local_labels {
-        call_count += local.statements.iter()
+        call_count += local
+            .statements
+            .iter()
             .filter(|s| matches!(s, Statement::Call { .. }))
             .count();
     }
-    
+
     assert_eq!(call_count, 2, "Expected 2 Call statements");
 }
 
 #[test]
 fn golden_test_has_two_word_definitions() {
     let file = parse_golden_test().expect("Parse failed");
-    
+
     // Global word definition
-    assert_eq!(file.global_words.len(), 1, "Expected 1 global word definition");
-    assert_eq!(file.global_words[0].name, "global_word", "Global word name mismatch");
-    
+    assert_eq!(
+        file.global_words.len(),
+        1,
+        "Expected 1 global word definition"
+    );
+    assert_eq!(
+        file.global_words[0].name, "global_word",
+        "Global word name mismatch"
+    );
+
     // Local word definition
-    let global_label = file.labels.iter()
+    let global_label = file
+        .labels
+        .iter()
         .find(|l| l.scope == LabelScope::Global)
         .expect("No global label found");
-    
-    assert_eq!(global_label.local_words.len(), 1, "Expected 1 local word definition");
-    assert_eq!(global_label.local_words[0].name, "local_word", "Local word name mismatch");
+
+    assert_eq!(
+        global_label.local_words.len(),
+        1,
+        "Expected 1 local word definition"
+    );
+    assert_eq!(
+        global_label.local_words[0].name, "local_word",
+        "Local word name mismatch"
+    );
 }
 
 // =============================================================================
@@ -183,33 +256,47 @@ fn golden_test_has_two_word_definitions() {
 #[test]
 fn golden_test_detects_sakura_tokens() {
     let file = parse_golden_test().expect("Parse failed");
-    let global_label = file.labels.iter()
+    let global_label = file
+        .labels
+        .iter()
         .find(|l| l.scope == LabelScope::Global)
         .expect("No global label found");
-    
+
     // Find the speech line with Sakura tokens
-    let sakura_speech = global_label.statements.iter()
+    let sakura_speech = global_label
+        .statements
+        .iter()
         .filter_map(|s| match s {
             Statement::Speech { content, .. } => Some(content),
             _ => None,
         })
         .find(|content| {
-            content.iter().any(|part| matches!(part, SpeechPart::SakuraScript(_)))
+            content
+                .iter()
+                .any(|part| matches!(part, SpeechPart::SakuraScript(_)))
         });
-    
-    assert!(sakura_speech.is_some(), "Expected to find speech with Sakura tokens");
-    
-    let sakura_parts: Vec<_> = sakura_speech.unwrap().iter()
+
+    assert!(
+        sakura_speech.is_some(),
+        "Expected to find speech with Sakura tokens"
+    );
+
+    let sakura_parts: Vec<_> = sakura_speech
+        .unwrap()
+        .iter()
         .filter_map(|p| match p {
             SpeechPart::SakuraScript(s) => Some(s.as_str()),
             _ => None,
         })
         .collect();
-    
+
     // Should detect \n, \w8, \s[0] as separate tokens
-    assert!(sakura_parts.len() >= 3, 
-        "Expected at least 3 Sakura tokens, got {}: {:?}", 
-        sakura_parts.len(), sakura_parts);
+    assert!(
+        sakura_parts.len() >= 3,
+        "Expected at least 3 Sakura tokens, got {}: {:?}",
+        sakura_parts.len(),
+        sakura_parts
+    );
 }
 
 // =============================================================================
@@ -219,14 +306,20 @@ fn golden_test_detects_sakura_tokens() {
 #[test]
 fn golden_test_handles_line_continuation() {
     let file = parse_golden_test().expect("Parse failed");
-    let global_label = file.labels.iter()
+    let global_label = file
+        .labels
+        .iter()
         .find(|l| l.scope == LabelScope::Global)
         .expect("No global label found");
-    
+
     // Find the multi-line speech (Alice：長い台詞は...)
-    let multi_line_speech = global_label.statements.iter()
+    let multi_line_speech = global_label
+        .statements
+        .iter()
         .filter_map(|s| match s {
-            Statement::Speech { speaker, content, .. } if speaker == "Alice" => Some(content),
+            Statement::Speech {
+                speaker, content, ..
+            } if speaker == "Alice" => Some(content),
             _ => None,
         })
         .find(|content| {
@@ -235,15 +328,17 @@ fn golden_test_handles_line_continuation() {
                 _ => false,
             })
         });
-    
+
     // Note: Line continuation is currently not supported in the implementation
     // This test documents the expected behavior for future enhancement
     if multi_line_speech.is_some() {
         eprintln!("NOTE: Line continuation test passed - content found");
     } else {
-        eprintln!("NOTE: Line continuation is a future enhancement - speech may be parsed differently");
+        eprintln!(
+            "NOTE: Line continuation is a future enhancement - speech may be parsed differently"
+        );
     }
-    
+
     // Soft assertion for now
     assert!(true, "Line continuation detection is a future enhancement");
 }
@@ -255,12 +350,16 @@ fn golden_test_handles_line_continuation() {
 #[test]
 fn golden_test_handles_at_escape() {
     let file = parse_golden_test().expect("Parse failed");
-    let global_label = file.labels.iter()
+    let global_label = file
+        .labels
+        .iter()
         .find(|l| l.scope == LabelScope::Global)
         .expect("No global label found");
-    
+
     // Find the speech line with @@ escape
-    let at_escape_speech = global_label.statements.iter()
+    let at_escape_speech = global_label
+        .statements
+        .iter()
         .filter_map(|s| match s {
             Statement::Speech { content, .. } => Some(content),
             _ => None,
@@ -271,7 +370,7 @@ fn golden_test_handles_at_escape() {
                 _ => false,
             })
         });
-    
+
     // Note: @@ escape is currently not supported in the implementation
     // This test documents the expected behavior for future enhancement
     if at_escape_speech.is_some() {
@@ -279,7 +378,7 @@ fn golden_test_handles_at_escape() {
     } else {
         eprintln!("NOTE: @@ escape is a future enhancement");
     }
-    
+
     // Soft assertion for now
     assert!(true, "@@ escape detection is a future enhancement");
 }
@@ -291,19 +390,26 @@ fn golden_test_handles_at_escape() {
 #[test]
 fn golden_test_parses_english_string_literal() {
     let file = parse_golden_test().expect("Parse failed");
-    let global_label = file.labels.iter()
+    let global_label = file
+        .labels
+        .iter()
         .find(|l| l.scope == LabelScope::Global)
         .expect("No global label found");
-    
+
     // Find the variable assignment with English string
-    let string_assign = global_label.statements.iter()
+    let string_assign = global_label
+        .statements
+        .iter()
         .filter_map(|s| match s {
             Statement::VarAssign { name, .. } if name == "message" => Some(s),
             _ => None,
         })
         .next();
-    
-    assert!(string_assign.is_some(), "Expected to find 'message' variable assignment");
+
+    assert!(
+        string_assign.is_some(),
+        "Expected to find 'message' variable assignment"
+    );
 }
 
 // =============================================================================
@@ -313,19 +419,35 @@ fn golden_test_parses_english_string_literal() {
 #[test]
 fn golden_test_has_no_jump_statements() {
     let file = parse_golden_test().expect("Parse failed");
-    
-    // Check global label statements
+
+    // Check statements are among supported variants (Jump removed)
     for label in &file.labels {
         for stmt in &label.statements {
-            assert!(!matches!(stmt, Statement::Jump { .. }), 
-                "Found unexpected Jump statement in global label");
+            assert!(
+                matches!(
+                    stmt,
+                    Statement::Speech { .. }
+                        | Statement::Call { .. }
+                        | Statement::VarAssign { .. }
+                        | Statement::RuneBlock { .. }
+                ),
+                "Found unsupported statement variant in global label"
+            );
         }
-        
+
         // Check local label statements
         for local in &label.local_labels {
             for stmt in &local.statements {
-                assert!(!matches!(stmt, Statement::Jump { .. }), 
-                    "Found unexpected Jump statement in local label");
+                assert!(
+                    matches!(
+                        stmt,
+                        Statement::Speech { .. }
+                            | Statement::Call { .. }
+                            | Statement::VarAssign { .. }
+                            | Statement::RuneBlock { .. }
+                    ),
+                    "Found unsupported statement variant in local label"
+                );
             }
         }
     }

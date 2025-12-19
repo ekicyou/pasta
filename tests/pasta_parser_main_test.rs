@@ -3,7 +3,7 @@
 //! These tests validate the parser's ability to convert DSL source code into AST.
 
 use pasta::{
-    parse_str, BinOp, Expr, JumpTarget, LabelScope, Literal, SpeechPart, Statement, VarScope,
+    BinOp, Expr, JumpTarget, LabelScope, Literal, SpeechPart, Statement, VarScope, parse_str,
 };
 
 #[test]

@@ -74,4 +74,5 @@ fn test_jump_statement_deprecated() {
     assert!(
         result.is_err(),
         "Phase 1: Jump statement (？) is deprecated. Use Call (＞) instead"
-    );}
+    );
+}

@@ -198,7 +198,7 @@ impl Transpiler {
         writeln!(writer, "pub mod pasta {{").map_err(|e| PastaError::io_error(e.to_string()))?;
         // Phase 1 (REQ-BC-1): Jump function removed - use call() instead
         // writeln!(writer, "    pub fn jump(ctx, label, filters, args) {{ ... }}")?;
-        
+
         writeln!(writer, "    pub fn call(ctx, label, filters, args) {{")
             .map_err(|e| PastaError::io_error(e.to_string()))?;
         writeln!(
@@ -368,20 +368,6 @@ impl Transpiler {
                     search_key, filters_str, args_str
                 )
                 .map_err(|e| PastaError::io_error(e.to_string()))?;
-            }
-            Statement::Jump {
-                target: _,
-                filters: _,
-                span,
-            } => {
-                // Phase 1 (REQ-BC-1): Jump statement is deprecated
-                // This should never be reached as parser no longer generates Jump
-                return Err(PastaError::parse_error(
-                    "transpiler",
-                    span.start_line,
-                    span.start_col,
-                    "Jump statement is deprecated. Use Call (＞) instead.",
-                ));
             }
             Statement::VarAssign {
                 name,
@@ -651,15 +637,6 @@ impl Transpiler {
                 // Generate call statement
                 let target_fn = Self::transpile_jump_target(target);
                 output.push_str(&format!("    {}();\n", target_fn));
-            }
-            Statement::Jump {
-                target: _,
-                filters: _,
-                span: _,
-            } => {
-                // Phase 1 (REQ-BC-1): Jump statement is deprecated
-                // This branch should never be reached as parser no longer generates Jump
-                output.push_str("    // ERROR: Jump statement is deprecated. Use Call instead.\n");
             }
             Statement::VarAssign {
                 name,
