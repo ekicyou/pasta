@@ -116,48 +116,76 @@
 
 ---
 
-#### 議題 4: Grammar.md 改訂の現状確認（TODO-4）
+#### ✅ 議題 4: Grammar.md 改訂の現状確認（クローズ）
 
-**背景**:
-- grammar-specification.md は先日「さくら・Jump改訂」済み
-- Design では「7章・11章・制御フロー」改訂指示があるが、現在の完成度は？
+**確認結果**: grammar-specification.md は **既に Call のみの正しい状態**
 
-**質問**:
-1. grammar-specification.md のどのセクションが「仕様として確定」し、どこが「まだ改訂待ち」か？
-2. 実装フェーズで改訂対象のセクションは？
+**詳細**:
+- 4 章（Call 詳細仕様）: ✅ Call のみ定義、Jump 記述なし
+- 7 章（Sakura）: ✅ 字句仕様確定、全角削除反映
+- 11 章（未確定事項）: ✅ すべて確定
+- Jump 廃止: ✅ 既に反映済み（Call への統一）
 
-**決定ポイント**:
-- 現状確認のみ（修正不要な可能性）
-- 必要なら「改訂セクション」をタスクとして design.md に追加
+**修正不要**: grammar-specification.md は Jump 廃止決定に既に準拠している
+
+**Phase 3 タスク**: GRAMMAR.md（ユーザー向けドキュメント）の改訂は設計通り実施
+
+**確認結果**: grammar-specification.md は **既に Call のみの正しい状態**
+
+**詳細**:
+- 4 章（Call 詳細仕様）: ✅ Call のみ定義、Jump 記述なし
+- 7 章（Sakura）: ✅ 字句仕様確定、全角削除反映
+- 11 章（未確定事項）: ✅ すべて確定
+- Jump 廃止: ✅ 既に反映済み（Call への統一）
+
+**修正不要**: grammar-specification.md は Jump 廃止決定に既に準拠している
+
+**Phase 3 タスク**: GRAMMAR.md（ユーザー向けドキュメント）の改訂は設計通り実施
 
 ---
 
-#### 議題 5: Test Hierarchy Plan の Cargo 互換性確認（TODO-5）
+#### 議題 5: テスト層別化の Cargo 互換性確認（TODO-5）
 
 **背景**:
-- test-hierarchy-plan.md で「pasta_parser_*_test.rs」等の命名規則提案
-- 但し Cargo.toml の tests/ ディレクトリ設定・CI との相互作用未確認
+- test-hierarchy-plan.md で「pasta_parser_*_test.rs」等の命名規則を提案
+- Cargo の自動検出・CI 統合の確認が必要
 
 **質問**:
-1. テストファイルリネーム後、`cargo test` が正しく動作するか（Cargo は自動検出するか、明示指定が必要か）？
+1. テストファイルリネーム後、`cargo test` が正しく検出・実行するか？
 2. tests/common への相互参照は影響を受けるか？
+3. CI・GitHub Actions との互換性は？
 
-**決定ポイント**:
-- 現状確認 → 必要ならリネーム計画を修正
+---
+
+#### 議題 6: Issue 1-4 の最終確認＆設計フェーズ終了確認（TODO-6）
+
+**背景**:
+- Issues 1-4 で決定事項を確定
+- 決定内容が design.md / requirements.md / grammar-specification.md に正しく反映されたか確認
+- Phase 0 実行前の最終チェックポイント
+
+**質問**:
+1. すべての決定事項が文書に反映されているか？
+2. 矛盾や漏れはないか？
+3. Phase 0（テスト層別化）開始の GO/NG 判定
 
 ---
 
 ## 進捗管理
 
-### クローズ予定
-1. 議題 1-5 を 1 つずつディスカッション
-2. 各議題のクローズごとに requirements.md / design.md / grammar-specification.md を更新
-3. 更新後、git commit で進捗記録
-4. 全議題クローズ後、設計→実装フェーズへ移行
+### 現在のクローズ状況
+- ✅ Issue 1（Sakura 簡素化）: 決定済み（決定: 案 B + \] 必須）
+- ✅ Issue 2（Jump 削除）: 決定済み（決定: Jump 廃止必須）
+- ✅ Issue 3（全角文字）: 決定済み（決定: Case A 完全削除）
+- ✅ Issue 4（Grammar.md 改訂）: 確認完了（修正不要、既に準拠）
+- ⏳ Issue 5（Cargo 互換性）: ディスカッション予定
+- ⏳ Issue 6（最終確認）: ディスカッション予定
 
-### スケジュール
-- 各議題: 1-2 時間見積
-- 全クローズ: 本日中（可能なら）
+### 次のステップ
+- Issue 5-6 をクローズ
+- すべての文書更新・コミット完了
+- Phase 0 実行開始
+
 
 ---
 
