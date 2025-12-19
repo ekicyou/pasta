@@ -20,88 +20,102 @@ Pasta DSLの文法仕様が、現在の実装（pest定義）と乖離してい�
 **目的**: パーサー開発者として、現在の`pasta.pest`による実装定義を完全に把握し、各ルールの意図と制約を明確にしたい。これにより、あるべき文法仕様の検討基盤を得られます。
 
 #### 受け入れ基準
-1. When analyzing `src/parser/pasta.pest`, the 開発者 shall identify all production rules including ファイル構造、ラベル、ステートメント、マーカー、式
-2. The 開発者 shall document the supported character categories including Unicode空白、全角/半角文字、識別子 in the implementation context
-3. The 開発者 shall map each rule's semantic purpose to its usage intent in the Pasta DSL
-4. The 開発者 shall verify that pest rules correctly handle edge cases including 行継続、rune ブロック、埋め込み式
-5. If contradictions exist between pest comments and implementation rules, the 開発者 shall report them as deviation candidates
+1. When `src/parser/pasta.pest` を分析する際, the 開発者 shall ファイル構造、ラベル、ステートメント、マーカー、式を含むすべてのproduction ruleを特定する
+2. The 開発者 shall 実装の文脈において、Unicode空白、全角/半角文字、識別子を含むサポートされる文字カテゴリを文書化する
+3. The 開発者 shall 各ルールの意味的目的をPasta DSLでの使用意図にマッピングする
+4. The 開発者 shall 行継続、runeブロック、埋め込み式を含むエッジケースをpestルールが正しく処理することを検証する
+5. If pestコメントと実装ルール間に矛盾が存在する場合, the 開発者 shall それらを乖離候補として報告する
 
 ### 2. 文法仕様の再検討と理想形設計
 
 **目的**: 保守性と拡張性に優れた、あるべきパスタスクリプト文法を設計したい。現在のpest実装と理想的なDSL設計のギャップを分析し、破壊的変更の必要性と範囲を明確にします。
 
 #### 受け入れ基準
-1. The 文法仕様チーム shall document the constraint conditions extracted from the current pest definition
-2. The 文法仕様チーム shall propose the ideal form of Pasta DSL from perspectives of ユーザビリティ、拡張性、保守性
-3. The 文法仕様チーム shall enumerate all locations where breaking changes are necessary between current implementation and ideal form
-4. The 文法仕様チーム shall document the rationale (なぜ変更が必要か) for each breaking change
-5. The 文法仕様チーム shall estimate the impact range of each breaking change on 既存スクリプト、テスト、トランスパイラ
+1. The 文法仕様チーム shall 現在のpest定義から抽出された制約条件を文書化する
+2. The 文法仕様チーム shall ユーザビリティ、拡張性、保守性の観点からPasta DSLの理想形を提案する
+3. The 文法仕様チーム shall 現在の実装と理想形の間で破壊的変更が必要なすべての箇所を列挙する
+4. The 文法仕様チーム shall 各破壊的変更についてその理由（なぜ変更が必要か）を文書化する
+5. The 文法仕様チーム shall 各破壊的変更が既存スクリプト、テスト、トランスパイラに与える影響範囲を見積もる
 
 ### 3. GRAMMAR.md の乖離箇所の特定と評価
 
 **目的**: ドキュメント維持者として、GRAMMAR.mdの現在の記述と実装（pest定義）および設計（あるべき仕様）との食い違いを明確にしたい。改善対象を系統的に把握し、優先度を決定します。
 
 #### 受け入れ基準
-1. The ドキュメント分析者 shall identify productions that are missing from GRAMMAR.md but present in pest rules
-2. The ドキュメント分析者 shall verify that GRAMMAR.md contains no incorrect syntax descriptions
-3. The ドキュメント分析者 shall flag features in GRAMMAR.md that exist but are not reflected in pest rules as "未実装機能"
-4. The ドキュメント分析者 shall enumerate features that exist in pest rules but are not documented in GRAMMAR.md as "未文書化機能"
-5. The ドキュメント分析者 shall clarify implementation scope and design gaps for features that are only partially implemented in GRAMMAR.md
+1. The ドキュメント分析者 shall GRAMMAR.mdに欠落しているがpestルールに存在するproductionを特定する
+2. The ドキュメント分析者 shall GRAMMAR.mdに誤った構文記述が含まれていないことを検証する
+3. The ドキュメント分析者 shall GRAMMAR.mdに存在するがpestルールに反映されていない機能を「未実装機能」としてフラグ付けする
+4. The ドキュメント分析者 shall pestルールに存在するがGRAMMAR.mdに文書化されていない機能を「未文書化機能」として列挙する
+5. The ドキュメント分析者 shall GRAMMAR.mdで部分的にのみ実装されている機能について、実装スコープと設計ギャップを明確化する
 
 ### 4. 破壊的変更の影響範囲分析とテスト修正計画
 
 **目的**: テスト責任者として、文法仕様の破壊的変更に伴うリグレッション対応を明確にしたい。既存テストの修正が必要な範囲を把握し、修正戦略を立案します。
 
+**主要な破壊的変更**:
+- **Jump マーカー廃止**: Jump 文（`？`）を削除し、Call (`＞`) に統一
+  - 影響：Jump 関連のパーサーテスト全削除
+  - 影響：Jump マーカー定義・判定ロジック削除
+  - 影響：トランスパイラーの Jump 処理コード削除
+  - 影響：すべてのテストフィクスチャから `？` マーカーを削除・`＞` に置換
+
+**テスト修正方針**:
+- **パーサーテスト**: 既存のパーサーテスト（`tests/parser_*.rs`等）は、旧仕様に強く依存しているため、**書き直すより削除して新仕様に基づき作り直す**ことを優先します
+- **Jump 関連テスト**: Jump マーカー廃止に伴い、Jump 検証テストは全削除。Call のみの新規テストを作成
+- **その他のテスト**: 個別に修正・削除・新規作成の判断を行います
+
 #### 受け入れ基準
-1. The テスト分析者 shall traverse test code under `tests/` and enumerate all tests affected by breaking changes
-2. The テスト分析者 shall determine whether each affected test requires "修正"、"削除"、or "新規作成"
-3. When test modification is necessary, the テスト分析者 shall document the specific changes including 変更前後の構文、期待値 etc
-4. The テスト分析者 shall apply modification to test fixtures in `tests/fixtures/*.pasta` to support breaking changes
-5. The テスト分析者 shall verify that all tests pass under the new specification after modification
+1. The テスト分析者 shall `tests/` 配下のテストコードを走査し、破壊的変更の影響を受けるすべてのテストを列挙する
+2. When パーサーテスト (tests/parser_*.rs) を分析する際, the テスト分析者 shall 新仕様に基づくクリーンな実装を確保するため、「修正」より「削除＋新規作成」戦略を優先する
+3. The テスト分析者 shall Jump関連のすべてのテストとコード（パーサー、トランスパイラー層のJump処理）を特定し削除する
+4. The テスト分析者 shall すべてのテストフィクスチャ (`tests/fixtures/*.pasta`) 内のJumpマーカー (`？`) をCallマーカー (`＞`) に置換する
+5. The テスト分析者 shall 破壊的変更の影響に基づき、各影響テストが「修正」「削除」「新規作成」のいずれが必要か判定する
+6. When テスト修正が必要な場合, the テスト分析者 shall 変更前後の構文、期待値等を含む具体的な変更内容を文書化する
+7. The テスト分析者 shall 修正後、新仕様の下ですべてのテストがパスすることを検証する
 
 ### 5. 実装仕様に基づく正確な文法説明の作成
 
 **目的**: パーサー開発者として、あるべき文法仕様を完全に反映した正確な文法説明が必要です。他の開発者が仕様の意図を理解し、拡張・保守が容易になるようにします。
 
 #### 受け入れ基準
-1. The 文法リファレンス shall describe all production rules from the final pest implementation that reflects breaking changes
-2. The 文法リファレンス shall clarify supported character types including Unicode categories and marker symbols for each rule
-3. The 文法リファレンス shall provide concrete syntax examples and annotations for statement types including 発言、単語定義、制御フロー
-4. When rules include branching or choice options, the 文法リファレンス shall clearly explain conditions and precedence
-5. The 文法リファレンス shall distinguish between required and optional elements for each rule component
+1. The 文法リファレンス shall 破壊的変更を反映した最終的なpest実装からすべてのproduction ruleを記述する
+2. The 文法リファレンス shall 各ルールについてUnicodeカテゴリーとマーカー記号を含むサポートされる文字型を明確化する
+3. The 文法リファレンス shall 発言、単語定義、制御フローを含むステートメントタイプに対して具体的な構文例と注釈を提供する
+4. When ルールに分岐や選択肢が含まれる場合, the 文法リファレンス shall 条件と優先順位を明確に説明する
+5. The 文法リファレンス shall 各ルールコンポーネントについて必須要素とオプション要素を区別する
 
 ### 6. 一般ユーザー向け GRAMMAR.md ドキュメントの改訂
 
 **目的**: Pastaユーザーとして、DSL文法を直感的に理解できるドキュメントが必要です。新しい文法仕様に基づき、スクリプト記述の学習曲線を下げ、バグを削減します。
 
 #### 受け入れ基準
-1. When users read the core syntax sections of GRAMMAR.md (ラベル、発言、ステートメント), the document shall explain purpose before syntax detail
-2. The GRAMMAR.md shall provide 3 or more practical examples covering common use cases for each statement type including 発言、制御、変数
-3. When features have multiple variations (全角/半角マーカー、optional parameters), the GRAMMAR.md shall emphasize recommended usage
-4. When pest defines complex precedence or edge case handling, the GRAMMAR.md shall provide clear guidance in a "落とし穴" section
-5. The GRAMMAR.md shall be organized based on user intent (e.g., "対話を作成する方法"、"フロー制御の方法"、"単語定義の方法") rather than pure syntax order
+1. When ユーザーがGRAMMAR.mdのコア構文セクション（ラベル、発言、ステートメント）を読む際, the ドキュメント shall 構文詳細の前に目的を説明する
+2. The GRAMMAR.md shall 発言、制御、変数を含む各ステートメントタイプについて、一般的なユースケースをカバーする3つ以上の実用的な例を提供する
+3. When 機能に複数のバリエーションがある場合（全角/半角マーカー、オプションパラメータ）, the GRAMMAR.md shall 推奨される使用法を強調する
+4. When pestが複雑な優先順位やエッジケース処理を定義している場合, the GRAMMAR.md shall 「落とし穴」セクションで明確なガイダンスを提供する
+5. The GRAMMAR.md shall 純粋な構文順序ではなく、ユーザーの意図（例：「対話を作成する方法」「フロー制御の方法」「単語定義の方法」）に基づいて構成する
 
 ### 7. 実装と仕様の同期メカニズムの構築
 
 **目的**: 保守性向上のため、pest定義とドキュメントの同期を支援する仕組みが必要です。将来の仕様変更時に乖離を最小化できます。
 
 #### 受け入れ基準
-1. The 同期メカニズム shall enable inline comments in `pasta.pest` to directly reference GRAMMAR.md sections or version information
-2. When `pasta.pest` is modified, the メカニズム shall flag related GRAMMAR.md sections as requiring review
-3. The メカニズム shall provide automated reporting when pest rules lack corresponding documentation
-4. The メカニズム shall provide checklist or template to support documentation updates when grammar is extended
-5. The メカニズム shall document version coupling between pest rules and GRAMMAR.md sections
+1. The 同期メカニズム shall `pasta.pest` 内のインラインコメントがGRAMMAR.mdセクションまたはバージョン情報を直接参照できるようにする
+2. When `pasta.pest` が変更された場合, the メカニズム shall 関連するGRAMMAR.mdセクションにレビューが必要であることをフラグ付けする
+3. The メカニズム shall pestルールに対応するドキュメントが欠落している場合の自動レポートを提供する
+4. The メカニズム shall 文法拡張時のドキュメント更新をサポートするチェックリストまたはテンプレートを提供する
+5. The メカニズム shall pestルールとGRAMMAR.mdセクション間のバージョン結合を文書化する
 
 ### 8. 実装成果物の検証と品質確保
 
 **目的**: 要件定義者として、改訂後のドキュメント、破壊的変更、テスト修正が正確に実装されていることを確認し、将来の機能追加や保守時の信頼性を確保します。
 
 #### 受け入れ基準
-1. When developers create new Pasta scripts using GRAMMAR.md, they shall be able to create correct scripts without referencing source code
-2. All pest rules documented in GRAMMAR.md shall compile and execute without error under existing test fixtures
-3. When GRAMMAR.md describes syntax variations (全角 vs 半角 etc), the document shall include examples of all documented variations
-4. The ドキュメント検証プロセス shall cross-reference rule descriptions with actual pest implementation at least once
-5. When validation discovers inconsistencies, the メカニズム shall provide reports identifying sections requiring correction
+1. When 開発者がGRAMMAR.mdを使用して新しいPastaスクリプトを作成する際, the 開発者 shall ソースコードを参照せずに正しいスクリプトを作成できる
+2. The GRAMMAR.mdに文書化されたすべてのpestルール shall 既存のテストフィクスチャの下でエラーなくコンパイルおよび実行できる
+3. When GRAMMAR.mdが構文バリエーション（全角 vs 半角等）を記述する場合, the ドキュメント shall すべての文書化されたバリエーションの例を含む
+4. The ドキュメント検証プロセス shall ルール記述と実際のpest実装を少なくとも1回はクロスリファレンスする
+5. When 検証が不整合を発見した場合, the メカニズム shall 修正が必要なセクションを特定するレポートを提供する
 
 ---
 
