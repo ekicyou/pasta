@@ -144,11 +144,14 @@
 
 ## Phase 0.5+: Golden Test フィクスチャ作成
 
-- [ ] 3. Golden Test フィクスチャの作成
-- [ ] 3.1 Golden Test スクリプト作成
+- [x] 3. Golden Test フィクスチャの作成
+- [x] 3.1 Golden Test スクリプト作成
   - `tests/fixtures/golden/complete-feature-test.pasta` を作成
   - 22機能カテゴリ（コメント、属性、ラベル、Rune、変数、関数呼び出し、アクション行、Sakura、行継続、Call等）を包括
-  - design.md の Golden Test セクションに準拠
+  - `tests/pasta_parser_golden_test.rs` を作成（14テスト）
+  - 発見事項: 変数代入は `＝` を使用（design.md は `：` で記載されていたが実装は `＝`）
+  - 発見事項: 名前付き引数付き関数呼び出し `（x：10　y：20）` は別途調査が必要
+  - 結果: 222テスト全通過（208 + 14 Golden Test）
   - _Requirements: REQ-QA-1, REQ-2.10, REQ-8.1, REQ-8.2, REQ-2.2.1, REQ-2.2.2, REQ-10.1, REQ-10.2, REQ-2.6, REQ-9.1.1, REQ-9.1.2, REQ-4.3, REQ-5.2, REQ-2.8, REQ-6.1, REQ-6.2, REQ-6.3.1, REQ-6.4, REQ-7.2, REQ-7.3, REQ-4.1.1, REQ-4.1.2_
 
 ---

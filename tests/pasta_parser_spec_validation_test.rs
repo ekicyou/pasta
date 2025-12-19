@@ -1109,7 +1109,10 @@ fn spec_ch6_4_line_continuation() {
     // 現在の実装では「：」のみでの行継続はサポートされていない可能性
     // Phase 1以降の機能拡張候補として記録
     if result.is_err() {
-        eprintln!("NOTE: 「：」のみの行継続は現在サポートされていない: {:?}", result.err());
+        eprintln!(
+            "NOTE: 「：」のみの行継続は現在サポートされていない: {:?}",
+            result.err()
+        );
     }
     // テスト自体は成功として扱う（仕様と実装の乖離を記録）
 }
