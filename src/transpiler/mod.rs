@@ -196,18 +196,9 @@ impl Transpiler {
 
         // Generate pasta module with wrapper functions
         writeln!(writer, "pub mod pasta {{").map_err(|e| PastaError::io_error(e.to_string()))?;
-        writeln!(writer, "    pub fn jump(ctx, label, filters, args) {{")
-            .map_err(|e| PastaError::io_error(e.to_string()))?;
-        writeln!(
-            writer,
-            "        let func = crate::__pasta_trans2__::label_selector(label, filters);"
-        )
-        .map_err(|e| PastaError::io_error(e.to_string()))?;
-        writeln!(writer, "        for a in func(ctx, args) {{ yield a; }}")
-            .map_err(|e| PastaError::io_error(e.to_string()))?;
-        writeln!(writer, "    }}").map_err(|e| PastaError::io_error(e.to_string()))?;
-        writeln!(writer).map_err(|e| PastaError::io_error(e.to_string()))?;
-
+        // Phase 1 (REQ-BC-1): Jump function removed - use call() instead
+        // writeln!(writer, "    pub fn jump(ctx, label, filters, args) {{ ... }}")?;
+        
         writeln!(writer, "    pub fn call(ctx, label, filters, args) {{")
             .map_err(|e| PastaError::io_error(e.to_string()))?;
         writeln!(
@@ -379,19 +370,18 @@ impl Transpiler {
                 .map_err(|e| PastaError::io_error(e.to_string()))?;
             }
             Statement::Jump {
-                target,
-                filters,
-                span: _,
+                target: _,
+                filters: _,
+                span,
             } => {
-                // Generate jump statement: for a in crate::pasta::jump(ctx, "label", #{}, []) { yield a; }
-                let search_key = Self::transpile_jump_target_to_search_key(target);
-                let filters_str = Self::transpile_attributes_to_map(filters);
-                writeln!(
-                    writer,
-                    "        for a in crate::pasta::jump(ctx, \"{}\", {}, []) {{ yield a; }}",
-                    search_key, filters_str
-                )
-                .map_err(|e| PastaError::io_error(e.to_string()))?;
+                // Phase 1 (REQ-BC-1): Jump statement is deprecated
+                // This should never be reached as parser no longer generates Jump
+                return Err(PastaError::parse_error(
+                    "transpiler",
+                    span.start_line,
+                    span.start_col,
+                    "Jump statement is deprecated. Use Call (＞) instead.",
+                ));
             }
             Statement::VarAssign {
                 name,
@@ -663,13 +653,13 @@ impl Transpiler {
                 output.push_str(&format!("    {}();\n", target_fn));
             }
             Statement::Jump {
-                target,
+                target: _,
                 filters: _,
                 span: _,
             } => {
-                // Generate jump (return from current function and call target)
-                let target_fn = Self::transpile_jump_target(target);
-                output.push_str(&format!("    return {}();\n", target_fn));
+                // Phase 1 (REQ-BC-1): Jump statement is deprecated
+                // This branch should never be reached as parser no longer generates Jump
+                output.push_str("    // ERROR: Jump statement is deprecated. Use Call instead.\n");
             }
             Statement::VarAssign {
                 name,
