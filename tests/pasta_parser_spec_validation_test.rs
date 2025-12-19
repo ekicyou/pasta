@@ -498,10 +498,11 @@ fn spec_ch2_4_call_local_fullwidth() {
     );
 }
 
-/// §2.4 Jump全角（現行仕様）: ？＊label
+/// §2.4 Jump全角（Phase 1で廃止）: ？＊label
+/// REQ-BC-1: Jump statement removal - use Call (＞) instead
 #[test]
-fn spec_ch2_4_jump_global_fullwidth_current() {
-    // 現行仕様: Phase 1以降で廃止予定
+fn spec_ch2_4_jump_global_fullwidth_deprecated() {
+    // Phase 1以降: Jump文は廃止、＞ Call を使用すること
     let source = r#"＊メイン
   Alice：ジャンプします
   ？＊終了
@@ -510,17 +511,18 @@ fn spec_ch2_4_jump_global_fullwidth_current() {
   Bob：終了しました
 "#;
     let result = parse_str(source, "test.pasta");
+    // Phase 1: Jump は拒否される
     assert!(
-        result.is_ok(),
-        "全角？＊でのJump文がパースできるべき: {:?}",
-        result.err()
+        result.is_err(),
+        "Phase 1: Jump文（？）は廃止されました。＞ Call を使用してください"
     );
 }
 
-/// §2.4 Jump半角（現行仕様）: ?*label
+/// §2.4 Jump半角（Phase 1で廃止）: ?*label
+/// REQ-BC-1: Jump statement removal - use Call (＞) instead
 #[test]
-fn spec_ch2_4_jump_global_halfwidth_current() {
-    // 現行仕様: Phase 1以降で廃止予定
+fn spec_ch2_4_jump_global_halfwidth_deprecated() {
+    // Phase 1以降: Jump文は廃止、＞ Call を使用すること
     let source = r#"＊main
   Alice：jumping
   ?*end
@@ -529,10 +531,10 @@ fn spec_ch2_4_jump_global_halfwidth_current() {
   Bob：ended
 "#;
     let result = parse_str(source, "test.pasta");
+    // Phase 1: Jump は拒否される
     assert!(
-        result.is_ok(),
-        "半角?*でのJump文がパースできるべき: {:?}",
-        result.err()
+        result.is_err(),
+        "Phase 1: Jump文（?）は廃止されました。＞ Call を使用してください"
     );
 }
 

@@ -50,7 +50,7 @@ label_body_line = {
         dollar_marker ~ var_assign_content |
         local_label_marker ~ local_label_content |
         call_marker ~ call_content |
-        jump_marker ~ jump_content |
+        // Phase 1 (REQ-BC-1): jump_marker ~ jump_content removed
         speech_line_content
     )
 }
@@ -72,7 +72,7 @@ local_label_body_line = {
         amp_marker ~ attribute_content |
         dollar_marker ~ var_assign_content |
         call_marker ~ call_content |
-        jump_marker ~ jump_content |
+        // Phase 1 (REQ-BC-1): jump_marker ~ jump_content removed
         speech_line_content
     )
 }
@@ -115,10 +115,10 @@ call_content = {
     jump_target ~ filter_list? ~ arg_list? ~ NEWLINE
 }
 
-// Jump statement content (after ？)
-jump_content = {
-    jump_target ~ filter_list? ~ arg_list? ~ NEWLINE
-}
+// Phase 1 (REQ-BC-1): Jump statement removed - use Call instead
+// jump_content = {
+//     jump_target ~ filter_list? ~ arg_list? ~ NEWLINE
+// }
 
 // Speech line content (speaker：content)
 speech_line_content = {
@@ -134,40 +134,46 @@ continuation_line = {
     indent ~ indent+ ~ speech_content ~ NEWLINE
 }
 
-text_part = @{ (!(at_marker | sakura_escape | NEWLINE) ~ ANY)+ }
+// Phase 1 (REQ-BC-3): Added dollar_marker exclusion for inline variable references
+text_part = @{ (!(at_marker | dollar_marker | sakura_escape | NEWLINE) ~ ANY)+ }
 
 sakura_script = { sakura_escape ~ sakura_command }
-sakura_escape = { "\\" | "＼" }
-// Sakura commands can be:
-// - Single char: \n, \0, \1, ＼ｎ, ＼０, ＼１
-// - Char + number: \w8, ＼ｗ８
-// - Char + brackets: \s[0], ＼ｓ［０］, \![raise,event]
-// - Underscore + char + brackets: \_w[50], ＿ｗ［５０］
-sakura_bracket_open = { "[" | "［" }
-sakura_bracket_close = { "]" | "］" }
-sakura_letter = { ASCII_ALPHA | '\u{FF41}'..'\u{FF5A}' | '\u{FF21}'..'\u{FF3A}' }  // Latin letters (both half and full width)
-sakura_digit = { ASCII_DIGIT | '\u{FF10}'..'\u{FF19}' }  // Digits (both half and full width)
-sakura_underscore = { "_" | "＿" }
+// Phase 1 (REQ-BC-2): Half-width backslash only
+sakura_escape = { "\\" }
+// Sakura commands: lexical recognition only, no interpretation
+// - Single char: \n, \0, \1
+// - Char + number: \w8
+// - Char + brackets: \s[0], \![raise,event]
+// - Underscore + char + brackets: \_w[50]
+// Phase 1 (REQ-BC-2): Half-width brackets only
+sakura_bracket_open = { "[" }
+sakura_bracket_close = { "]" }
+// Phase 1 (REQ-BC-2): Half-width characters only - removed full-width variants
+// sakura_letter, sakura_digit, sakura_underscore simplified
 
 sakura_command = @{
     // Pattern 1: Underscore + letters + optional brackets: \_w[50]
-    sakura_underscore ~ sakura_letter+ ~ (sakura_bracket_open ~ (!sakura_bracket_close ~ ANY)* ~ sakura_bracket_close)?  |
+    "_" ~ ASCII_ALPHA+ ~ (sakura_bracket_open ~ sakura_bracket_chars ~ sakura_bracket_close)?  |
     
     // Pattern 2: ! or letter(s) + brackets: \s[0], \custom[arg], \![event]
-    ("!" | "！" | sakura_letter+) ~ sakura_bracket_open ~ (!sakura_bracket_close ~ ANY)* ~ sakura_bracket_close  |
+    ("!" | ASCII_ALPHA+) ~ sakura_bracket_open ~ sakura_bracket_chars ~ sakura_bracket_close  |
     
     // Pattern 3: Single letter + digits: \w8  (but not \n2 - that should be \n followed by text "2")
-    sakura_letter ~ sakura_digit+ ~ !sakura_letter  |
+    ASCII_ALPHA ~ ASCII_DIGIT+ ~ !ASCII_ALPHA  |
     
     // Pattern 4: Single letter: \n
-    sakura_letter  |
+    ASCII_ALPHA  |
     
     // Pattern 5: Digits only: \0, \1
-    sakura_digit+
+    ASCII_DIGIT+
 }
 
+// Bracket content: allows \] escape inside brackets (REQ-7.3)
+sakura_bracket_chars = @{ (("\\" ~ "]") | (!"]" ~ ANY))* }
+
 call_marker = { "＞" | ">" }
-jump_marker = { "？" | "?" }
+// Phase 1 (REQ-BC-1): Jump marker removed - use Call (＞) instead
+// jump_marker = { "？" | "?" }  // REMOVED
 
 jump_target = {
     dynamic_target |
@@ -296,7 +302,8 @@ amp_marker = { "＆" | "&" }
 colon = { "：" | ":" }
 
 ident = @{ !ident_forbidden ~ XID_START ~ XID_CONTINUE* }
-ident_forbidden = { global_label_marker | local_label_marker | call_marker | jump_marker | at_marker | dollar_marker | colon | equals }
+// Phase 1 (REQ-BC-1): jump_marker removed from ident_forbidden
+ident_forbidden = { global_label_marker | local_label_marker | call_marker | at_marker | dollar_marker | colon | equals }
 
 indent = @{ WHITESPACE+ }
 ws = { (" " | "\t" | "\u{3000}")+ }  // Non-silent whitespace for explicit spacing

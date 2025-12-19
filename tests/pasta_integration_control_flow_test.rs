@@ -106,7 +106,8 @@ fn verify_pasta_input_structure() -> Result<(), Box<dyn std::error::Error>> {
     );
     assert!(pasta_code.contains("＄カウンタ"), "変数が存在すること");
     assert!(pasta_code.contains("＞自己紹介"), "Call文が存在すること");
-    assert!(pasta_code.contains("？会話分岐"), "Jump文が存在すること");
+    // Phase 1 (REQ-BC-1): Jump statement deprecated, using Call instead
+    assert!(pasta_code.contains("＞会話分岐"), "Call文（旧Jump）が存在すること");
     assert!(pasta_code.contains("さくら　："), "会話文が存在すること");
 
     println!("✅ Pasta入力の構造検証成功");

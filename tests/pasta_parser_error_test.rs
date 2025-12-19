@@ -62,13 +62,15 @@ fn test_error_missing_equals_in_assignment() {
     );
 }
 
+/// Phase 1 (REQ-BC-1): Jump statement is no longer supported
+/// Multiple ？ would fail parsing regardless
 #[test]
-fn test_error_invalid_jump_target() {
+fn test_error_invalid_statement() {
     let source = r#"＊開始
   ？？？無効
 "#;
     let result = parse_str(source, "test.pasta");
-    assert!(result.is_err(), "Should fail with invalid jump syntax");
+    assert!(result.is_err(), "Should fail with invalid syntax");
 }
 
 #[test]
