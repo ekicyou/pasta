@@ -570,18 +570,133 @@ cargo test pasta_parser_spec_validation
 **失敗ケース**:
 - 一部のテストが失敗
 - 失敗したテストケースから、既存実装と仕様書の乖離箇所が特定される
-- Phase 1 の修正項目一覧に追加項目として記録
+- 以下の**失敗時エスカレーションプロセス**に従う
 
-#### 0.5.6 Commit
+#### 0.5.6 失敗時エスカレーションプロセス
+
+**目的**: Phase 0.5 で失敗が発生した場合、原因を正しく分類し、適切な対処を行う。
+
+##### 失敗の分類
+
+各失敗テストケースを以下の3つのタイプに分類：
+
+| Type | 名称 | 説明 | 対処 |
+|------|------|------|------|
+| **Type A** | 既存実装のバグ | 仕様書通りに動作すべきだが動作していない | Phase 1 で修正 |
+| **Type B** | 仕様書の誤り | 仕様書が実装と乖離しており、実装が正しい | grammar-specification.md を修正し、requirements.md を再評価（要件定義フェーズに差し戻し） |
+| **Type C** | テストコードの誤り | テストケースの期待値が間違っている | テストを修正して再実行 |
+
+##### 判断プロセス
+
+```
+Phase 0.5 テスト実行
+  ↓
+失敗あり？
+  ├─ No → Phase 1 へ進む
+  └─ Yes → 失敗ケースごとに Type A/B/C を判定
+           ↓
+           Type B が1件でも存在？
+             ├─ Yes → 要件定義フェーズに差し戻し
+             │         (grammar-specification.md 修正)
+             └─ No → Type A/C のみ
+                      ↓
+                      Type C を修正・再実行
+                      ↓
+                      Type A の修正項目を Phase 1 に追加
+                      ↓
+                      Phase 1 へ進む
+```
+
+##### ドキュメント更新手順
+
+1. **検証レポート作成**:
+   - ファイル: `.kiro/specs/pasta-grammar-specification/phase0.5-validation-report.md`
+   - 内容:
+     ```markdown
+     # Phase 0.5 検証レポート
+     
+     ## 実行日時
+     [YYYY-MM-DD HH:MM:SS]
+     
+     ## 実行結果サマリー
+     - 総テストケース数: [N]
+     - 成功: [M]
+     - 失敗: [N-M]
+     
+     ## 失敗ケース詳細
+     
+     ### [失敗ケース1]
+     - **テストケース名**: `chapter2_keywords_markers::Call_全角`
+     - **失敗内容**: Parse エラー（`＞＊label` が認識されない）
+     - **分類**: Type A（既存実装のバグ）
+     - **根拠**: grammar-specification.md §2.4 に明記
+     - **対処**: Phase 1 修正項目 B5 として追加
+     
+     ### [失敗ケース2]
+     - **テストケース名**: `chapter7_sakura::エスケープ_全角_現行`
+     - **失敗内容**: Parse エラー（`＼n` が認識される）
+     - **分類**: Type A（期待通り）
+     - **根拠**: Phase 1 で廃止予定のため、現行では失敗が正常
+     - **対処**: Phase 1 で修正されることを確認
+     
+     ## 判定結果
+     - Type A: [X]件
+     - Type B: [Y]件
+     - Type C: [Z]件
+     
+     ## 最終判断
+     - [ ] Phase 1 へ進む（Type B = 0）
+     - [ ] 要件定義フェーズに差し戻し（Type B ≥ 1）
+     ```
+
+2. **Phase 1 修正項目更新**（Type A のみ）:
+   - design.md §1.1「修正項目一覧」に追加項目を記録
+   - 例: 「B5: Call_全角対応の追加」
+
+3. **Commit**:
+   ```bash
+   git add .kiro/specs/pasta-grammar-specification/phase0.5-validation-report.md
+   git add .kiro/specs/pasta-grammar-specification/design.md  # Phase 1 修正項目更新
+   git commit -m "test: Phase 0.5 validation report - [Type A: X, Type B: Y, Type C: Z]"
+   ```
+
+##### Type B 発生時の特別対応
+
+Type B（仕様書の誤り）が1件でも発生した場合：
+
+1. **要件定義フェーズへ差し戻し**:
+   - spec.json の `phase` を `requirements` に戻す
+   - grammar-specification.md を修正
+   - requirements.md を再評価
+   
+2. **差し戻しの記録**:
+   ```bash
+   git add .kiro/specs/pasta-grammar-specification/spec.json
+   git add .kiro/specs/pasta-grammar-specification/grammar-specification.md
+   git commit -m "fix(spec): Revert to requirements phase - grammar spec correction needed
+
+   Type B failures detected in Phase 0.5 validation:
+   - [失敗ケース名]: [理由]
+   
+   grammar-specification.md corrections required before design can proceed."
+   ```
+
+3. **再レビュー**:
+   - `/kiro-spec-requirements pasta-grammar-specification` で要件定義を再生成
+   - 修正内容を確認後、再度設計フェーズへ
+
+#### 0.5.7 Commit（成功時）
 
 ```bash
 git add tests/pasta_parser_spec_validation_test.rs
+git add .kiro/specs/pasta-grammar-specification/phase0.5-validation-report.md
 git commit -m "test: Add specification-driven parser validation tests (Phase 0.5)
 
 - Created comprehensive validation tests based solely on grammar-specification.md
 - 10 chapters, ~100 test cases covering REQ-1 to REQ-10
 - No reference to existing test code or pest definitions
-- Validates existing implementation against authoritative specification"
+- Validates existing implementation against authoritative specification
+- All tests passed: existing implementation conforms to spec"
 ```
 
 ---
