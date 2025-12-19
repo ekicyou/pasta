@@ -121,15 +121,6 @@ pub enum Statement {
         /// Source location span
         span: Span,
     },
-    /// Jump statement (unconditional jump without return)
-    Jump {
-        /// Jump target
-        target: JumpTarget,
-        /// Attribute filters for label selection
-        filters: Vec<Attribute>,
-        /// Source location span
-        span: Span,
-    },
     /// Variable assignment
     VarAssign {
         /// Variable name

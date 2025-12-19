@@ -56,7 +56,7 @@
 ```
 
 ### Rune ブロック
-```pasta
+````pasta
 ＊計算
 ```rune
 fn calculate(ctx) {
@@ -65,7 +65,7 @@ fn calculate(ctx) {
 }
 ```
   Alice：結果は ＠calculate() です
-```
+````
 
 ### 変数スコープ
 ```pasta

@@ -8,8 +8,8 @@ mod ast;
 pub use ast::*;
 
 use crate::error::PastaError;
-use pest::iterators::Pair;
 use pest::Parser as PestParser;
+use pest::iterators::Pair;
 use pest_derive::Parser;
 use std::path::Path;
 
@@ -583,33 +583,7 @@ fn parse_call_stmt(pair: Pair<Rule>) -> Result<Statement, PastaError> {
 }
 
 #[allow(dead_code)]
-fn parse_jump_stmt(pair: Pair<Rule>) -> Result<Statement, PastaError> {
-    let span_pest = pair.as_span();
-    let start = span_pest.start_pos().line_col();
-    let end = span_pest.end_pos().line_col();
-    let span = Span::from_pest(start, end);
-
-    let mut target = JumpTarget::Local(String::new());
-    let mut filters = Vec::new();
-
-    for inner_pair in pair.into_inner() {
-        match inner_pair.as_rule() {
-            Rule::jump_target => {
-                target = parse_jump_target(inner_pair)?;
-            }
-            Rule::filter_list => {
-                filters = parse_filter_list(inner_pair)?;
-            }
-            _ => {}
-        }
-    }
-
-    Ok(Statement::Jump {
-        target,
-        filters,
-        span,
-    })
-}
+// parse_jump_stmt removed in Phase 1 (REQ-BC-1): Jump statement deprecated
 
 fn parse_jump_target(pair: Pair<Rule>) -> Result<JumpTarget, PastaError> {
     let inner_pair = pair.into_inner().next().unwrap();

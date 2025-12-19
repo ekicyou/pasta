@@ -16,8 +16,8 @@ mod common;
 
 use common::{create_test_script, get_test_persistence_dir};
 use pasta::{
-    ir::{ContentPart, ScriptEvent},
     PastaEngine,
+    ir::{ContentPart, ScriptEvent},
 };
 
 /// Helper function to extract all ContentParts from a sequence of events
@@ -46,9 +46,11 @@ fn test_basic_sakura_script_ascii() -> Result<(), Box<dyn std::error::Error>> {
     let events = engine.execute_label("test")?;
 
     // Verify we have a ChangeSpeaker event
-    assert!(events
-        .iter()
-        .any(|e| matches!(e, ScriptEvent::ChangeSpeaker { name } if name == "さくら")));
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e, ScriptEvent::ChangeSpeaker { name } if name == "さくら"))
+    );
 
     // Extract all content parts
     let parts = extract_content_parts(&events);
@@ -79,9 +81,14 @@ fn test_fullwidth_sakura_not_recognized() -> Result<(), Box<dyn std::error::Erro
     // Phase 1: Full-width is NOT recognized as Sakura, so it's all Text
     // The entire "こんにちは＼ｓ［０］" should be treated as plain text
     assert!(!parts.is_empty(), "Should have content parts");
-    
-    let has_sakura = parts.iter().any(|p| matches!(p, ContentPart::SakuraScript(_)));
-    assert!(!has_sakura, "Phase 1: Full-width Sakura should NOT be recognized as SakuraScript");
+
+    let has_sakura = parts
+        .iter()
+        .any(|p| matches!(p, ContentPart::SakuraScript(_)));
+    assert!(
+        !has_sakura,
+        "Phase 1: Full-width Sakura should NOT be recognized as SakuraScript"
+    );
 
     Ok(())
 }
@@ -133,15 +140,21 @@ fn test_wait_commands() -> Result<(), Box<dyn std::error::Error>> {
     let parts = extract_content_parts(&events);
 
     // Should have: Text + SakuraScript(w8) + Text
-    assert!(parts
-        .iter()
-        .any(|p| matches!(p, ContentPart::Text(t) if t == "こんにちは")));
-    assert!(parts
-        .iter()
-        .any(|p| matches!(p, ContentPart::SakuraScript(s) if s == "w8")));
-    assert!(parts
-        .iter()
-        .any(|p| matches!(p, ContentPart::Text(t) if t == "お元気ですか")));
+    assert!(
+        parts
+            .iter()
+            .any(|p| matches!(p, ContentPart::Text(t) if t == "こんにちは"))
+    );
+    assert!(
+        parts
+            .iter()
+            .any(|p| matches!(p, ContentPart::SakuraScript(s) if s == "w8"))
+    );
+    assert!(
+        parts
+            .iter()
+            .any(|p| matches!(p, ContentPart::Text(t) if t == "お元気ですか"))
+    );
 
     Ok(())
 }
@@ -160,9 +173,11 @@ fn test_quick_wait() -> Result<(), Box<dyn std::error::Error>> {
     let events = engine.execute_label("test")?;
 
     let parts = extract_content_parts(&events);
-    assert!(parts
-        .iter()
-        .any(|p| matches!(p, ContentPart::SakuraScript(s) if s == "_w[50]")));
+    assert!(
+        parts
+            .iter()
+            .any(|p| matches!(p, ContentPart::SakuraScript(s) if s == "_w[50]"))
+    );
 
     Ok(())
 }
@@ -182,12 +197,16 @@ fn test_speaker_switching_commands() -> Result<(), Box<dyn std::error::Error>> {
     let events = engine.execute_label("test")?;
 
     let parts = extract_content_parts(&events);
-    assert!(parts
-        .iter()
-        .any(|p| matches!(p, ContentPart::SakuraScript(s) if s == "0")));
-    assert!(parts
-        .iter()
-        .any(|p| matches!(p, ContentPart::SakuraScript(s) if s == "1")));
+    assert!(
+        parts
+            .iter()
+            .any(|p| matches!(p, ContentPart::SakuraScript(s) if s == "0"))
+    );
+    assert!(
+        parts
+            .iter()
+            .any(|p| matches!(p, ContentPart::SakuraScript(s) if s == "1"))
+    );
 
     Ok(())
 }
@@ -266,9 +285,11 @@ fn test_custom_commands() -> Result<(), Box<dyn std::error::Error>> {
     let events = engine.execute_label("test")?;
 
     let parts = extract_content_parts(&events);
-    assert!(parts
-        .iter()
-        .any(|p| matches!(p, ContentPart::SakuraScript(s) if s == "custom[arg1,arg2]")));
+    assert!(
+        parts
+            .iter()
+            .any(|p| matches!(p, ContentPart::SakuraScript(s) if s == "custom[arg1,arg2]"))
+    );
 
     Ok(())
 }
@@ -288,12 +309,16 @@ fn test_sakura_script_multiple_lines() -> Result<(), Box<dyn std::error::Error>>
     let events = engine.execute_label("test")?;
 
     let parts = extract_content_parts(&events);
-    assert!(parts
-        .iter()
-        .any(|p| matches!(p, ContentPart::SakuraScript(s) if s == "s[0]")));
-    assert!(parts
-        .iter()
-        .any(|p| matches!(p, ContentPart::SakuraScript(s) if s == "w5")));
+    assert!(
+        parts
+            .iter()
+            .any(|p| matches!(p, ContentPart::SakuraScript(s) if s == "s[0]"))
+    );
+    assert!(
+        parts
+            .iter()
+            .any(|p| matches!(p, ContentPart::SakuraScript(s) if s == "w5"))
+    );
 
     Ok(())
 }
@@ -312,12 +337,16 @@ fn test_sakura_script_at_start() -> Result<(), Box<dyn std::error::Error>> {
     let events = engine.execute_label("test")?;
 
     let parts = extract_content_parts(&events);
-    assert!(parts
-        .iter()
-        .any(|p| matches!(p, ContentPart::SakuraScript(s) if s == "s[0]")));
-    assert!(parts
-        .iter()
-        .any(|p| matches!(p, ContentPart::Text(t) if t == "最初から表情変更")));
+    assert!(
+        parts
+            .iter()
+            .any(|p| matches!(p, ContentPart::SakuraScript(s) if s == "s[0]"))
+    );
+    assert!(
+        parts
+            .iter()
+            .any(|p| matches!(p, ContentPart::Text(t) if t == "最初から表情変更"))
+    );
 
     Ok(())
 }
@@ -336,12 +365,16 @@ fn test_sakura_script_at_end() -> Result<(), Box<dyn std::error::Error>> {
     let events = engine.execute_label("test")?;
 
     let parts = extract_content_parts(&events);
-    assert!(parts
-        .iter()
-        .any(|p| matches!(p, ContentPart::Text(t) if t == "最後に表情変更")));
-    assert!(parts
-        .iter()
-        .any(|p| matches!(p, ContentPart::SakuraScript(s) if s == "s[0]")));
+    assert!(
+        parts
+            .iter()
+            .any(|p| matches!(p, ContentPart::Text(t) if t == "最後に表情変更"))
+    );
+    assert!(
+        parts
+            .iter()
+            .any(|p| matches!(p, ContentPart::SakuraScript(s) if s == "s[0]"))
+    );
 
     Ok(())
 }
@@ -360,15 +393,21 @@ fn test_only_sakura_script() -> Result<(), Box<dyn std::error::Error>> {
     let events = engine.execute_label("test")?;
 
     let parts = extract_content_parts(&events);
-    assert!(parts
-        .iter()
-        .any(|p| matches!(p, ContentPart::SakuraScript(s) if s == "s[0]")));
-    assert!(parts
-        .iter()
-        .any(|p| matches!(p, ContentPart::SakuraScript(s) if s == "w5")));
-    assert!(parts
-        .iter()
-        .any(|p| matches!(p, ContentPart::SakuraScript(s) if s == "n")));
+    assert!(
+        parts
+            .iter()
+            .any(|p| matches!(p, ContentPart::SakuraScript(s) if s == "s[0]"))
+    );
+    assert!(
+        parts
+            .iter()
+            .any(|p| matches!(p, ContentPart::SakuraScript(s) if s == "w5"))
+    );
+    assert!(
+        parts
+            .iter()
+            .any(|p| matches!(p, ContentPart::SakuraScript(s) if s == "n"))
+    );
 
     Ok(())
 }
@@ -387,12 +426,16 @@ fn test_complex_sakura_commands() -> Result<(), Box<dyn std::error::Error>> {
     let events = engine.execute_label("test")?;
 
     let parts = extract_content_parts(&events);
-    assert!(parts
-        .iter()
-        .any(|p| matches!(p, ContentPart::SakuraScript(s) if s == "s[10]")));
-    assert!(parts
-        .iter()
-        .any(|p| matches!(p, ContentPart::SakuraScript(s) if s == "![raise,OnTest,arg1,arg2]")));
+    assert!(
+        parts
+            .iter()
+            .any(|p| matches!(p, ContentPart::SakuraScript(s) if s == "s[10]"))
+    );
+    assert!(
+        parts
+            .iter()
+            .any(|p| matches!(p, ContentPart::SakuraScript(s) if s == "![raise,OnTest,arg1,arg2]"))
+    );
 
     Ok(())
 }
@@ -447,15 +490,21 @@ fn test_sakura_with_text() -> Result<(), Box<dyn std::error::Error>> {
     let parts = extract_content_parts(&events);
 
     // Should have sakura scripts and text
-    assert!(parts
-        .iter()
-        .any(|p| matches!(p, ContentPart::SakuraScript(s) if s == "s[0]")));
-    assert!(parts
-        .iter()
-        .any(|p| matches!(p, ContentPart::Text(t) if t.contains("こんにちは"))));
-    assert!(parts
-        .iter()
-        .any(|p| matches!(p, ContentPart::SakuraScript(s) if s == "w5")));
+    assert!(
+        parts
+            .iter()
+            .any(|p| matches!(p, ContentPart::SakuraScript(s) if s == "s[0]"))
+    );
+    assert!(
+        parts
+            .iter()
+            .any(|p| matches!(p, ContentPart::Text(t) if t.contains("こんにちは")))
+    );
+    assert!(
+        parts
+            .iter()
+            .any(|p| matches!(p, ContentPart::SakuraScript(s) if s == "w5"))
+    );
 
     Ok(())
 }

@@ -4,8 +4,8 @@ mod common;
 
 use common::{create_test_script, get_test_persistence_dir};
 use pasta::{
-    ir::{ContentPart, ScriptEvent},
     PastaEngine,
+    ir::{ContentPart, ScriptEvent},
 };
 
 #[test]
