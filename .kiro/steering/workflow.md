@@ -1,54 +1,69 @@
-# Workflow - 開発ワークフロー
+# 開発ワークフロー
 
-Kiro仕様駆動開発における作業フローと完了時アクション。
+Kiro仕様駆動開発における作業フローと完了基準。
 
 ---
 
-## 実装完了時のアクション
+## 仕様フェーズ
 
-仕様の実装が完了し、フェーズが `implementation-complete` に移行した際の必須アクション：
+```
+requirements → design → tasks → implementation → implementation-complete
+```
+
+### コマンド
+| コマンド | 用途 |
+|---------|------|
+| `/kiro-spec-init "description"` | 仕様初期化 |
+| `/kiro-spec-requirements {feature}` | 要件定義 |
+| `/kiro-spec-design {feature} [-y]` | 設計生成 |
+| `/kiro-spec-tasks {feature} [-y]` | タスク分解 |
+| `/kiro-spec-impl {feature} [tasks]` | 実装 |
+| `/kiro-spec-status {feature}` | 進捗確認 |
+
+---
+
+## 完了基準（DoD）
+
+すべて同時に満たすこと：
+
+1. **Spec Gate**: 全フェーズ承認済み
+2. **Test Gate**: `cargo test --workspace` 成功
+3. **Doc Gate**: 仕様差分を反映
+4. **Steering Gate**: 既存ステアリングと整合
+
+---
+
+## 実装完了時アクション
 
 ### 1. コミット
 ```bash
 git add -A
 git commit -m "<type>(<scope>): <summary>
 
-<body>
-
 Spec: <spec-name>"
 ```
 
-**コミットタイプ**:
-- `feat`: 新機能
-- `fix`: バグ修正
-- `refactor`: リファクタリング
-- `docs`: ドキュメント
-- `test`: テスト追加・修正
+**コミットタイプ**: `feat`, `fix`, `refactor`, `docs`, `test`
 
 ### 2. リモート同期
 ```bash
 git push origin <branch>
 ```
 
-### 3. ロードマップ更新
-ROADMAPが存在する場合（メタ仕様配下の仕様など）：
-- Progress Summary を更新
-- Phase 列を `implementation-complete` に更新
-- 📍 参照: `focus.md` のROADMAP更新タイミング
+---
 
-### 4. 完了確認
-- スペックファイルが `.kiro/specs/completed/` に移動済み
-- `spec.json` の `phase` が `implementation-complete`
-- 全テストがパス
-- ロードマップ更新済み（該当する場合）
+## 回帰責任（Regression-First Fix）
 
-## 仕様フェーズフロー
-
-```
-requirements → design → tasks → implementation → implementation-complete
-```
-
-各フェーズ移行時に進捗を確認し、完了時は上記アクションを実行。
+- **同一PRで修正**: 既存テストが落ちたらマージ前に修正
+- **原因特定**: 最小再現を特定し根本原因を修正
+- **テスト更新**: 挙動変更が正当なら、テストを先に更新し理由を明記
 
 ---
-_Document patterns, not every workflow variation_
+
+## 禁止事項
+
+**MVP禁止**: 以下の表現は完成宣言に使わない
+- 「MVP」「部分実装」「スキャフォールドのみ」「とりあえず動く」
+
+**推奨表現**:
+- 「全テスト合格」「DoD Gate通過」「追加タスク待ち（未完成）」
