@@ -3,11 +3,13 @@
 ## Summary
 - **Feature**: `pasta-grammar-specification`
 - **Discovery Scope**: Full（既存パーサー・トランスパイラーの破壊的変更を伴う拡張 + 外部仕様調査）
+- **Authoritative Specification**: [grammar-specification.md](grammar-specification.md)（正規仕様）
 - **Key Findings**:
-  1. Sakura スクリプトは「字句のみ認識、非解釈」で確定。半角 `\` + ASCII トークン + 非ネスト `[...]`（`\]` エスケープ許容）
-  2. Jump マーカー（`？`）は廃止、Call（`＞`）へ統一
-  3. 全角文字（`＼` `［］`）は pest 定義から完全削除
+  1. Sakura スクリプトは「字句のみ認識、非解釈」で確定。半角 `\` + ASCII トークン + 非ネスト `[...]`（`\]` エスケープ許容）— 仕様 7.2-7.4
+  2. Jump マーカー（`？`）は廃止、Call（`＞`）へ統一 — 仕様 2.4
+  3. 全角文字（`＼` `［］`）は pest 定義から完全削除 — 仕様 7.4
   4. **ukadoc 公式仕様検証完了**: エスケープ規則・コマンド体系の正確な仕様を確認
+  5. **text_part バグ発見**: `＄` が除外されておらず変数参照が吸収される — 仕様 6.3
 
 ---
 
@@ -165,6 +167,28 @@ Statement::Jump { target, filters, span: _ } => {
   - tests/common モジュール参照も影響なし
 - **Implications**: Phase 0 テスト層別化は安全に実行可能
 
+### 7. text_part における変数参照の除外漏れ（バグ発見）
+- **Context**: アクション行内のインライン要素が正しくパースされるか
+- **Sources Consulted**: 
+  - grammar-specification.md 6.3（インライン要素）
+  - pasta.pest（現行実装）
+- **Findings**:
+  - 仕様 6.3: インライン要素に `＄var_name`（変数参照）が含まれる
+  - 現行 pest: `text_part = @{ (!(at_marker | sakura_escape | NEWLINE) ~ ANY)+ }`
+  - `dollar_marker` が除外されていないため、`＄` が text_part に吸収される
+- **Implications**: Phase 1 で `dollar_marker` を除外対象に追加（C1）
+
+### 8. GRAMMAR.md と grammar-specification.md の乖離
+- **Context**: 2つのドキュメントの関係性と正規性
+- **Sources Consulted**: 
+  - GRAMMAR.md（ユーザー向け）
+  - grammar-specification.md（正規仕様）
+- **Findings**:
+  - GRAMMAR.md には `//` コメント、`/* */` ブロックコメント、同期セクションの記載あり
+  - grammar-specification.md にはこれらの記載なし（コメントは `#` / `＃` のみ、同期セクション未定義）
+  - grammar-specification.md が正規仕様、GRAMMAR.md は Phase 3 で同期セクション等を削除
+- **Implications**: GRAMMAR.md の記載は正規仕様外の「未実装/廃止機能」として Phase 3 で修正
+
 ---
 
 ## Architecture Pattern Evaluation
@@ -290,11 +314,23 @@ Phase 3: Runtime/Tests/Documentation
 | `\]` 許容 | "スクウェアブラケット内に引数を持つタグ内でのみ、「]」は「\]」と書ける" |
 | コマンド非解釈 | コマンド数 100+ 、詳細解釈は Rune VM 側で実施 |
 
+### grammar-specification.md ギャップ一覧（Phase 1 対象）
+| ID | 仕様箇所 | 現状 pest | 問題 | 対応 |
+|----|---------|-----------|------|------|
+| A1 | 7.2 | `sakura_escape = { "\\" \| "＼" }` | 全角許容 | 半角のみ |
+| A2 | 7.3 | 5パターン複雑 | 過剰詳細 | 簡素化 |
+| A3 | 7.3 | `(!] ~ ANY)*` | `\]` 非許容 | `\]` 許容 |
+| A4 | 7.4 | 全角 `［` `］` 許容 | 仕様外 | 半角のみ |
+| A5-A7 | 7.4 | `sakura_letter/digit/underscore` 全角含む | 不要 | 削除 |
+| B1-B4 | 2.4 | `jump_marker`, `jump_content` | 仕様外 | 削除 |
+| C1 | 6.3 | `text_part` に `＄` 未除外 | バグ | 修正 |
+
 ---
 
 ## References
+- [grammar-specification.md](grammar-specification.md)（**正規仕様**）
 - [ukadoc - さくらスクリプトリスト（公式仕様）](https://ssp.shillest.net/ukadoc/manual/list_sakura_script.html)
 - [ukadoc - さくらスクリプトのエスケープ](https://ssp.shillest.net/ukadoc/manual/list_sakura_script.html#notes_escape)
-- grammar-specification.md（本仕様の文法仕様書）
 - gap-analysis-2025-12-19.md（層別ギャップ分析）
 - test-hierarchy-plan.md（テスト層別化計画）
+
