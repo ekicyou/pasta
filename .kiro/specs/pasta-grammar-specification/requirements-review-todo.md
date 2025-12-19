@@ -71,19 +71,26 @@
 
 ---
 
-#### 議題 2: Jump 削除の最終承認（TODO-2）
+#### ✅ 議題 2: Jump 削除の最終承認（クローズ）
 
-**背景**:
-- Design.md・Gap-Analysis で Jump 廃止方針は確定
-- 但し requirements.md に「Jump 廃止は必須」vs「Jump 廃止は選択肢」の区別がない
+**決定**: **Jump 廃止は必須**（破壊的変更として）
 
-**質問**:
-1. Jump 廃止は**破壊的変更として必須**か、それとも**オプション**か？
-2. Jump を廃止しない場合の代替案（Call への統一の見合わせ）は検討対象か？
+**内容**:
+- Jump 文（`？`）は廃止
+- Call 文（`＞`）へ統一
+- セマンティクス上の区別なし（Call と同一動作）
+- MVP 達成前の段階において、破壊的変更を積極的に適用
 
-**決定ポイント**:
-- **決定 A**: Jump 廃止は必須 → Phase 1-3 で Jump 削除を進行
-- **決定 B**: Jump 維持 → design.md・gap-analysis を修正し、Jump は継続サポート
+**修正対象**:
+- requirements.md: 「Jump 廃止は必須」を明記（オプションではない）
+- design.md: Phase 1-3 タスク（Jump 削除）を確定タスクに昇格
+- gap-analysis: Jump 廃止を必須方針に統一
+
+**影響**:
+- Parser 層: jump_marker, jump_content ルール削除
+- Transpiler 層: Statement::Jump, pasta::jump() 削除
+- Tests: Jump 依存テスト全削除、`？` → `＞` 置換
+- GRAMMAR.md: Jump 記述削除、Call のみ記載
 
 ---
 
