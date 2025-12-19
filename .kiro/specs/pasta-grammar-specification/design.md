@@ -108,9 +108,9 @@ pest 定義と AST 型を新仕様（さくら半角限定、Jump 削除）に�
    }
    
    // 変更後（決定版）
-   sakura_escape = { "\\" }  // 半角のみ
-   sakura_bracket_open = { "[" }  // 半角のみ
-   sakura_bracket_close = { "]" }  // 半角のみ
+   sakura_escape = { "\\" }  // 半角のみ（全角＼削除）
+   sakura_bracket_open = { "[" }  // 半角のみ（全角［削除）
+   sakura_bracket_close = { "]" }  // 半角のみ（全角］削除）
    sakura_command = @{
        // ASCIIトークン + 任意の非ネスト[...]（\]をコンテンツとして許容）
        // Pattern: letter(s) + optional digits + optional [content]
@@ -120,7 +120,7 @@ pest 定義と AST 型を新仕様（さくら半角限定、Jump 削除）に�
        ASCII_DIGIT+
    }
    ```
-   **理由**: 仕様「非解釈・字句のみ」に準拠した完全簡素化。詳細5パターン廃止。ただし `\]` はコンテンツとして許容。
+   **理由**: 仕様「非解釈・字句のみ」に準拠した完全簡素化。詳細5パターン廃止。ただし `\]` はコンテンツとして許容。**全角文字の定義なし（Case A 決定）**。
 
 2. **Jump 削除**:
    ```pest
