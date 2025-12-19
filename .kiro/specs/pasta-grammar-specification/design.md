@@ -65,10 +65,15 @@ grammar-specification.md の全機能を包括する最小の pasta スクリプ
   fn get_greeting(ctx) {
     "こんにちは"
   }
+  fn get_flag(ctx) {
+    true
+  }
   ```
   ＄＊global_var ： 100
   ＄local_var ： 「ローカル値」
   ＄result ： ＠calculate（x：10　y：20）
+  ＄flag ： ＠get_flag()
+  ＄message ： "Hello World"
   
   Alice：単語参照＠global_word　変数＄local_var
   Alice：関数呼び出し＠get_greeting()
@@ -77,38 +82,44 @@ grammar-specification.md の全機能を包括する最小の pasta スクリプ
     複数行に
     
     分けて記述
+  Alice：＠＠はリテラルのアットマーク
   
   ・選択肢1
     Bob：選択肢1が選ばれました＠local_word
-    ＞＊他のラベル
+    ＞選択肢2
   
   ・選択肢2
     Bob：選択肢2が選ばれました
+    ＞＊他のラベル
 ```
 
 ### Golden Test の網羅項目
 
-| 機能カテゴリ | 仕様セクション | 検証項目 |
-|------------|--------------|---------|
-| コメント | 2.10 | 半角 `#`、全角 `＃` |
-| ファイルレベル属性 | 8.3 | `＆file_level_attr` |
-| グローバル単語定義 | 10.1 | `＠global_word：value1　value2` |
-| グローバルラベル | 2.2, 3 | `＊統合テスト` |
-| 属性定義 | 8.1 | `＆author`, `＆genre` |
-| Rune ブロック | 2.6 | 関数定義（`fn calculate`, `fn get_greeting`） |
-| グローバル変数 | 9.1 | `＄＊global_var` |
-| ローカル変数 | 9.1 | `＄local_var` |
-| 関数呼び出し（引数付き） | 4.3 | `＠calculate（x：10　y：20）` |
-| アクション行 | 6.1-6.3 | `Alice：...` |
-| 単語参照 | 10.3 | `＠global_word` |
-| 変数参照 | 6.3 | `＄local_var` |
-| 関数呼び出し（引数なし） | 6.3 | `＠get_greeting()` |
-| Sakura スクリプト | 7 | `\n`, `\w8`, `\s[0]` |
-| 行継続 | 6.4 | 複数行台詞 |
-| 継続行内空行 | 6.5.3 | 空行による改行 |
-| ローカルラベル | 2.2, 3 | `・選択肢1`, `・選択肢2` |
-| ローカル単語定義 | 10.2 | `＠local_word：choice1　choice2` |
-| Call（グローバル） | 4.1 | `＞＊他のラベル` |
+| 機能カテゴリ | 仕様セクション | 検証項目 | 要件ID |
+|------------|--------------|---------|--------|
+| コメント | 2.10 | 半角 `#`、全角 `＃` | REQ-2.10 |
+| ファイルレベル属性 | 8.3 | `＆file_level_attr` | REQ-8.3 |
+| グローバル単語定義 | 10.1 | `＠global_word：value1　value2` | REQ-10.1 |
+| グローバルラベル | 2.2, 3 | `＊統合テスト` | REQ-2.2.1, REQ-3.2.1 |
+| 属性定義 | 8.1 | `＆author`, `＆genre` | REQ-8.1, REQ-8.2 |
+| ローカル単語定義 | 10.2 | `＠local_word：choice1　choice2` | REQ-10.2 |
+| Rune ブロック | 2.6 | 関数定義（`fn calculate`, `fn get_greeting`, `fn get_flag`） | REQ-2.6 |
+| グローバル変数 | 9.1 | `＄＊global_var` | REQ-9.1.1 |
+| ローカル変数 | 9.1 | `＄local_var` | REQ-9.1.2 |
+| 関数呼び出し（引数付き） | 4.3 | `＠calculate（x：10　y：20）` | REQ-4.3 |
+| bool 型リテラル | 5.2 | `＠get_flag()` が `true` を返す | REQ-5.2 |
+| 英語文字列リテラル | 2.8, 5.2 | `＄message ： "Hello World"` | REQ-2.8, REQ-5.2 |
+| アクション行 | 6.1-6.3 | `Alice：...` | REQ-6.1, REQ-6.2, REQ-6.3 |
+| 単語参照 | 10.3 | `＠global_word` | REQ-10.3 |
+| 変数参照 | 6.3 | `＄local_var` | REQ-6.3.1 |
+| 関数呼び出し（引数なし） | 6.3 | `＠get_greeting()` | REQ-6.3.1 |
+| ＠エスケープ | 6.3 | `＠＠` → `＠` | REQ-6.3.1 |
+| Sakura スクリプト | 7 | `\n`, `\w8`, `\s[0]` | REQ-7 |
+| 行継続 | 6.4 | 複数行台詞 | REQ-6.4 |
+| 継続行内空行 | 6.5.3 | 空行による改行 | REQ-6.5.2 |
+| ローカルラベル | 2.2, 3 | `・選択肢1`, `・選択肢2` | REQ-2.2.2, REQ-3.2.2 |
+| Call（ローカル） | 4.1 | `＞選択肢2` | REQ-4.1.2 |
+| Call（グローバル） | 4.1 | `＞＊他のラベル` | REQ-4.1.1 |
 
 ### 検証基準
 
@@ -122,14 +133,16 @@ grammar-specification.md の全機能を包括する最小の pasta スクリプ
    - グローバルラベル（1個）: `統合テスト`
    - ローカルラベル（2個）: `選択肢1`, `選択肢2`
    - 属性（3個）: file_level, author, genre
-   - Rune ブロック（1個）: 2関数定義
-   - 変数代入（3個）: global_var, local_var, result
-   - アクション行（5個）: Alice（4個）, Bob（2個）
-   - Call（1個）: `＊他のラベル`
+   - Rune ブロック（1個）: 3関数定義（`calculate`, `get_greeting`, `get_flag`）
+   - 変数代入（5個）: global_var, local_var, result, flag, message
+   - アクション行（7個）: Alice（5個）, Bob（2個）
+   - Call（2個）: `選択肢2`（ローカル）, `＊他のラベル`（グローバル）
    - 単語定義（2個）: global_word, local_word
 3. **Sakura トークン検出**: `\n`, `\w8`, `\s[0]` が個別トークンとして検出される
 4. **行継続検出**: 4行継続（「長い台詞は」→「複数行に」→空行→「分けて記述」）
-5. **Jump 非存在**: AST に `Statement::Jump` が存在しない
+5. **＠エスケープ検出**: `＠＠` がリテラル `＠` として認識される
+6. **英語文字列リテラル**: `"Hello World"` が正しくパースされる
+7. **Jump 非存在**: AST に `Statement::Jump` が存在しない
 
 **実装**: `tests/pasta_parser_golden_test.rs`（新規作成）
 
@@ -141,12 +154,15 @@ grammar-specification.md の全機能を包括する最小の pasta スクリプ
 1. **Rune コード生成成功**: Golden Test が Rune コードへ変換される
 2. **関数シグネチャ検証**: 
    - `pasta::call(ctx, "統合テスト", [], [])` 生成
-   - `pasta::call(ctx, "他のラベル", [], [])` 生成
+   - `pasta::call(ctx, "他のラベル", [], [])` 生成（グローバル Call）
+   - `pasta::call(ctx, "選択肢2", [], [])` 生成（ローカル Call）
    - `pasta::word_lookup(ctx, "global_word")` 生成
 3. **変数スコープ**: `ctx.global["global_var"]`, `ctx.local["local_var"]` 生成
 4. **Sakura 透過**: `\n`, `\w8`, `\s[0]` がそのまま文字列として出力
-5. **Jump コード非存在**: `pasta::jump()` 呼び出しが生成されない
-6. **Rune コンパイル成功**: 生成コードが Rune VM で compile() を通過
+5. **＠エスケープ透過**: `＠＠` がリテラル文字列 `＠` に変換
+6. **bool/String リテラル**: `true`, `"Hello World"` が正しく生成
+7. **Jump コード非存在**: `pasta::jump()` 呼び出しが生成されない
+8. **Rune コンパイル成功**: 生成コードが Rune VM で compile() を通過
 
 **実装**: `tests/pasta_transpiler_golden_test.rs`（新規作成）
 
@@ -157,12 +173,15 @@ grammar-specification.md の全機能を包括する最小の pasta スクリプ
 **合格条件**:
 1. **エンドツーエンド実行成功**: Golden Test スクリプトが完全実行される
 2. **出力トークン検証**: 
-   - アクション行（6個）のトークンが正しい順序で yield される
+   - アクション行（7個）のトークンが正しい順序で yield される
    - 単語参照がランダム選択される（`apple`/`banana`/`orange` のいずれか）
-   - 変数参照が正しく展開される（`「ローカル値」`）
-   - 関数呼び出し結果が展開される（`「こんにちは」`, `30`）
+   - 変数参照が正しく展開される（`「ローカル値」`、`"Hello World"`）
+   - 関数呼び出し結果が展開される（`「こんにちは」`, `30`, `true`）
+   - ＠エスケープが正しく展開される（`＠＠` → `＠`）
 3. **Sakura スクリプト透過**: 出力に `\n`, `\w8`, `\s[0]` が含まれる
-4. **Call 実行**: `＞＊他のラベル` が呼び出される（実装済みラベルの場合）
+4. **Call 実行**: 
+   - ローカル Call（`＞選択肢2`）が正しく呼び出される
+   - グローバル Call（`＞＊他のラベル`）が呼び出される（実装済みラベルの場合）
 5. **エラーなし**: Runtime エラー、panic なし
 
 **実装**: `tests/pasta_integration_golden_test.rs`（新規作成）
