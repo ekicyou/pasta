@@ -65,6 +65,7 @@ grammar-specification.md の全機能を包括する最小の pasta スクリプ
     "こんにちは"
   }
   ```
+  ＠local_word：choice1　choice2
   ＄＊global_var ： 100
   ＄local_var ： 「ローカル値」
   ＄result ： ＠calculate（x：10　y：20）
@@ -78,8 +79,7 @@ grammar-specification.md の全機能を包括する最小の pasta スクリプ
     分けて記述
   
   ・選択肢1
-    ＠local_word：choice1　choice2
-    Bob：選択肢1が選ばれました
+    Bob：選択肢1が選ばれました＠local_word
     ＞＊他のラベル
   
   ・選択肢2
