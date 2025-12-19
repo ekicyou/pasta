@@ -107,18 +107,20 @@ pest 定義と AST 型を新仕様（さくら半角限定、Jump 削除）に�
        sakura_digit+
    }
    
-   // 変更後（案）
+   // 変更後（決定版）
    sakura_escape = { "\\" }  // 半角のみ
    sakura_bracket_open = { "[" }  // 半角のみ
    sakura_bracket_close = { "]" }  // 半角のみ
    sakura_command = @{
-       // ASCIIトークン + 任意の非ネスト[...]（\]を内容として許容）
-       ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* ~ ("[" ~ (("\\" ~ "]") | (!"[ ]" ~ ANY))* ~ "]")?  |
-       ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* |
+       // ASCIIトークン + 任意の非ネスト[...]（\]をコンテンツとして許容）
+       // Pattern: letter(s) + optional digits + optional [content]
+       // Or: digits only
+       // Or: underscore + letter(s) + optional [content]
+       (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* ~ ("[" ~ (("\\" ~ "]") | (!"[ ]" ~ ANY))* ~ "]")? |
        ASCII_DIGIT+
    }
    ```
-   **理由**: 仕様「非解釈・未知トークン許容」に合わせて簡素化。
+   **理由**: 仕様「非解釈・字句のみ」に準拠した完全簡素化。詳細5パターン廃止。ただし `\]` はコンテンツとして許容。
 
 2. **Jump 削除**:
    ```pest
@@ -376,7 +378,14 @@ cargo test --all
 - **案 A**: 現在の詳細5パターンを維持し、半角・`\]` 対応のみ
 - **案 B**: 「未知トークン許容」で完全に簡素化（仕様「非解釈」に最も準拠）
 
-**推奨**: 案 B（仕様に忠実、保守性向上）
+**決定**: ✅ **案 B（完全簡素化）を採用**
+
+**理由**:
+- 仕様「Sakura は字句のみ認識、非解釈」に忠実
+- 詳細5パターン区別は必要ない（実装側も複雑化しない）
+- **ただしブラケット内の `\]` エスケープ対応は必須**
+- 未知トークンを通すことで、将来の拡張性確保
+- テスト修正も最小化（詳細パターン検証ケース削除）
 
 ### 2. Jump 関連コードの削除戦略
 
