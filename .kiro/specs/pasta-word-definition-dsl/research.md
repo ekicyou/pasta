@@ -1,81 +1,101 @@
 # Research & Design Decisions: pasta-word-definition-dsl
 
 ---
+**Purpose**: 単語定義機能の技術設計に先立つ調査結果とアーキテクチャ決定の記録
+
+---
 
 ## Summary
-- **Feature**: pasta-word-definition-dsl
-- **Discovery Scope**: Extension（既存システムへの拡張）
+- **Feature**: `pasta-word-definition-dsl`
+- **Discovery Scope**: Extension（既存LabelRegistry/LabelTableパターンの拡張）
 - **Key Findings**:
-  - 既存のStatement enumにWordDef variantを追加するパターンが確立されている
-  - trie-rs 0.4.2はpredictive_search()で前方一致検索をサポート、日本語（UTF-8）対応済み
-  - SpeechPart::VarRefをRuntime解決に拡張することで最小限の変更で実装可能
+  1. 既存の`LabelRegistry`と`LabelTable`のパターンを完全に踏襲可能
+  2. `fast_radix_trie`の`iter_prefix()`でローカル/グローバル2段階検索を実現
+  3. `CachedSelection`パターン（シャッフル＋Pop）がそのまま適用可能
+  4. トランスパイラのモジュール名取得は既存の`parent_counter`パターンで対応
 
 ---
 
 ## Research Log
 
-### trie-rs前方一致検索の調査
+### Topic 1: 既存LabelRegistryパターンの分析
 
-- **Context**: 単語定義の前方一致検索（例：`＠場所`が`場所`, `場所＿日本`にマッチ）に最適なライブラリを調査
+- **Context**: `WordDefRegistry`の設計にあたり、類似構造の`LabelRegistry`を分析
 - **Sources Consulted**: 
-  - https://docs.rs/trie-rs/latest/trie_rs/
-  - https://crates.io/crates/trie-rs
+  - [label_registry.rs](../../src/transpiler/label_registry.rs)
+  - [labels.rs](../../src/runtime/labels.rs)
 - **Findings**:
-  - `trie-rs` 0.4.2がLOUDSベースのメモリ効率的なTrie実装を提供
-  - `predictive_search()`メソッドで前方一致検索をサポート
-  - 日本語（UTF-8文字列）に対応済み（例：`"すし"`, `"すしや"`等）
-  - `map::Trie`を使用すると各単語にValue（単語リスト）を関連付け可能
-  - イテレータベースの遅延評価でメモリ効率が良い
-  - Rust 1.75.0以降対応、MIT/Apache-2.0デュアルライセンス
-- **Implications**:
-  - `predictive_search(key)`で前方一致するすべての単語名を取得可能
-  - 単語辞書構築時にTrieを事前構築し、検索時に高速参照
-  - 依存関係: `trie-rs = "0.4.2"`
+  - `LabelRegistry`はPass1でラベルを収集し、IDを採番
+  - `register_global(name, attributes) -> (id, counter)` パターン
+  - `register_local(name, parent_name, parent_counter, attributes)` パターン
+  - `sanitize_name()`でRune識別子に変換
+  - `HashMap<i64, LabelInfo>`でID→情報マッピング
+- **Implications**: 
+  - `WordDefRegistry`も同様のパターンで実装可能
+  - ただし単語定義は`fn_path`不要、代わりに`values: Vec<String>`が必要
+  - エントリ単位（マージなし）で保持する設計に合致
 
-### 既存ASTパターンの調査
+### Topic 2: 前方一致インデックス（RadixMap）の使用パターン
 
-- **Context**: 新しいStatement::WordDef variantの追加方法を確認
-- **Sources Consulted**: 
-  - `crates/pasta/src/parser/ast.rs`
-  - `crates/pasta/src/transpiler/mod.rs`
+- **Context**: 単語検索における2段階前方一致の実現方法
+- **Sources Consulted**:
+  - [fast_radix_trie docs](https://docs.rs/fast_radix_trie/1.1.0/)
+  - [labels.rs#L160](../../src/runtime/labels.rs) - 既存の`iter_prefix`使用例
 - **Findings**:
-  - `Statement` enumは現在5つのvariant: `Speech`, `Call`, `Jump`, `VarAssign`, `RuneBlock`
-  - 各variantは`span: Span`フィールドを含む
-  - Transpilerの`transpile_statement()`でmatchによる振り分け
-  - 新variant追加のパターンは`RuneBlock`が最近の例として確立
+  - `RadixMap::iter_prefix(query)` で前方一致する全エントリを取得
+  - 返り値は`Iterator<Item = (&[u8], &V)>` - キーとValue参照のタプル
+  - `Vec<usize>`をValueとすることで、同一プレフィックスに複数エントリIDを格納
+  - O(M)検索（Mは検索キー長、エントリ数に非依存）
 - **Implications**:
-  - `Statement::WordDef`追加は既存パターンに沿った自然な拡張
-  - パーサー・トランスパイラの変更は最小限で済む
+  - ローカル検索: `":module_name:key"`前方一致
+  - グローバル検索: `"key"`前方一致
+  - 両結果のエントリIDリストを結合してマージ処理
 
-### SpeechPartフォールバック検索の調査
+### Topic 3: CachedSelectionパターンの再利用
 
-- **Context**: 会話行内の`＠名前`参照をどのように拡張するか
-- **Sources Consulted**: 
-  - `crates/pasta/src/parser/ast.rs` (SpeechPart定義)
-  - `crates/pasta/src/transpiler/mod.rs` (transpile_speech_part)
+- **Context**: シャッフル＋順次消費パターンの適用
+- **Sources Consulted**:
+  - [labels.rs](../../src/runtime/labels.rs) - `CachedSelection`構造体
 - **Findings**:
-  - `SpeechPart::VarRef(String)`: 変数参照として実装済み
-  - `SpeechPart::FuncCall`: 関数呼び出しとして実装済み
-  - 現在の`VarRef`はget_variable()呼び出しに変換される
-  - `FuncCall`はcontext.resolve_function()でローカル→グローバル検索
+  - 構造: `{ candidates: Vec<LabelId>, next_index: usize, history: Vec<LabelId> }`
+  - キャッシュキー: `CacheKey { search_key: String, filters: Vec<(String, String)> }`
+  - 初回アクセス時にシャッフルして格納
+  - `next_index`をインクリメントしてPopを模倣
+  - 枯渇時は再シャッフル
 - **Implications**:
-  - VarRefの意味を拡張し、Runtime側でフォールバック検索を実装
-  - Transpiler生成コードで`resolve_ref()`関数を呼び出すよう変更
-  - AST構造変更なし、後方互換性維持
+  - 単語検索では`(module_name, key)`をキャッシュキーに
+  - `filters`は将来の属性フィルタリング用（P1）
+  - `history`は不要（単語選択履歴の追跡は要件にない）
 
-### pest文法拡張の調査
+### Topic 4: トランスパイラの単語参照コード生成
 
-- **Context**: 単語定義構文`＠単語名：単語1　単語2`のパースルール追加方法
-- **Sources Consulted**: 
-  - `crates/pasta/src/parser/pasta.pest`
+- **Context**: `SpeechPart::FuncCall`から`pasta_stdlib::word()`への変換
+- **Sources Consulted**:
+  - [mod.rs#L428-450](../../src/transpiler/mod.rs) - 現行実装
 - **Findings**:
-  - `at_marker`, `colon`, `ident`などの基礎トークンは既存
-  - `file`ルールに`global_label`が配置、同様に`word_def_stmt`追加可能
-  - `global_label`内に`attribute_line`, `rune_block`, `statement`が配置される構造
-  - `indent`で宣言部/実行部を区別可能
+  - 現行: `yield Talk(pasta_stdlib::word(ctx, "word", [args]));`
+  - 要件: `yield Talk(pasta_stdlib::word("module_name", "word", [filters]));`
+  - `ctx`パラメータは廃止し、`module_name`を第1引数に
+  - トランスパイル時に現在のグローバルラベル名（サニタイズ済み）を取得可能
+  - グローバルスコープでの呼び出しは存在しない（`__start__`もローカル）
 - **Implications**:
-  - `word_def_stmt`ルールを追加し、`file`と`global_label`に配置
-  - 配置制約はパーサーレベルで検証（宣言部/実行部の境界）
+  - `transpile_speech_part_to_writer()`を修正
+  - 呼び出し元から`module_name`を渡す必要あり
+  - `TranspileContext`に`current_module`フィールド追加
+
+### Topic 5: キー形式とID空間の分離
+
+- **Context**: グローバル/ローカルキーの衝突回避
+- **Sources Consulted**: 要件定義書
+- **Findings**:
+  - グローバルキー: `"単語名"` (例: `"挨拶"`)
+  - ローカルキー: `":モジュール名:単語名"` (例: `":会話_1:挨拶"`)
+  - コロン（`:`）で始まるかどうかで区別
+  - 前方一致検索でも衝突しない設計
+- **Implications**:
+  - エントリIDはグローバル通し番号（`Vec<WordEntry>`のインデックス）
+  - 検索結果のIDリストを単純結合可能（重複排除不要）
+  - キー生成ロジック: `format!(":{}:{}", module_name, key)`
 
 ---
 
@@ -83,97 +103,109 @@
 
 | Option | Description | Strengths | Risks / Limitations | Notes |
 |--------|-------------|-----------|---------------------|-------|
-| Option A: 既存コンポーネント拡張 | Statement enumに新variant追加、既存フローに統合 | 最小限の変更、既存パターン踏襲、学習コスト低 | Transpiler前処理が複雑化 | **採用** |
-| Option B: 新規コンポーネント作成 | words/モジュール新設、専用パーサー・リゾルバ | 責務分離明確、テスト容易 | ファイル数増加、初期overhead | 将来リファクタリング候補 |
-| Option C: ハイブリッド | Phase 1でOption A、Phase 2で分離 | 段階的改善可能 | 計画複雑性 | Phase 1スコープに集中 |
+| LabelRegistry/LabelTableパターン踏襲 | 既存のトランスパイラ→ランタイム分離パターンをそのまま適用 | 実績あり、一貫性、コードレビュー容易 | なし | **選択** |
+| 単一構造体 | トランスパイラ・ランタイム兼用の単一WordTable | 実装量削減 | 責務混在、テスト困難 | 却下 |
+| 遅延ビルド | ランタイム初回アクセス時にインデックス構築 | 初期化高速化 | 複雑性増加、初回検索遅延 | 却下 |
 
 ---
 
 ## Design Decisions
 
-### Decision: VarRef拡張によるフォールバック検索
+### Decision: WordDefRegistry/WordTable分離
 
-- **Context**: 会話行内の`＠名前`参照で単語辞書・ラベルを検索する方法
+- **Context**: 単語定義の収集と実行時検索を分離する必要性
 - **Alternatives Considered**:
-  1. SpeechPart::WordRef新設 — 単語参照専用variant追加
-  2. VarRef拡張 — 既存VarRefをRuntime側で多義的に解決
-- **Selected Approach**: Option 2（VarRef拡張）
+  1. 単一構造体で両方の責務を持つ
+  2. トランスパイラ層(WordDefRegistry) + ランタイム層(WordTable)に分離
+- **Selected Approach**: Option 2 - 2層分離
 - **Rationale**: 
-  - AST構造変更なし、パーサー変更最小限
-  - ユーザーには透過的（`＠名前`と書くだけ）
-  - 要件のフォールバック検索を自然に実現
+  - 既存LabelRegistry/LabelTableと一貫性
+  - 責務の明確な分離（収集 vs 検索）
+  - 将来の拡張性（属性フィルタリング等）
 - **Trade-offs**: 
-  - ✅ 既存コードへの影響最小
-  - ✅ 後方互換性維持
-  - ❌ VarRefの意味が拡張されるためドキュメント必須
-- **Follow-up**: ドキュメントでVarRefの意味拡張を明記
+  - コード量増加（2つの構造体）
+  - 変換処理が必要（Registry → Table）
+- **Follow-up**: `from_word_def_registry()`変換メソッドの実装
 
-### Decision: Transpiler内前処理でWordDefマージ
+### Decision: キー形式によるスコープ区別
 
-- **Context**: 同名単語定義のマージ処理をどこで実行するか
+- **Context**: ローカル/グローバル単語の区別方法
 - **Alternatives Considered**:
-  1. Transpiler内実装 — transpile_file()冒頭で前処理
-  2. Parser内実装 — パース時にマージ
-  3. 専用Preprocessor — preprocessor.rs新設
-- **Selected Approach**: Option 1（Transpiler内実装）
-- **Rationale**: 
-  - 既存フローに自然に統合
-  - AST構造を変更せずにマージ可能
-  - 将来的にpreprocessor.rsへ分離可能
-- **Trade-offs**: 
-  - ✅ 初期実装がシンプル
-  - ❌ Transpilerの責務が増加
-- **Follow-up**: 複雑化した際にpreprocessor.rsへリファクタリング
+  1. 別々のRadixMapで管理
+  2. キー形式で区別（コロンプレフィックス）
+  3. メタデータフラグで区別
+- **Selected Approach**: Option 2 - キー形式による区別
+- **Rationale**:
+  - 単一RadixMapで効率的
+  - 前方一致検索が自然に動作
+  - 追加のデータ構造不要
+- **Trade-offs**:
+  - キー文字列が冗長（ローカルは`:module:key`形式）
+- **Follow-up**: キー生成ヘルパー関数の実装
 
-### Decision: trie-rs採用による前方一致検索
+### Decision: CachedSelectionキー設計
 
-- **Context**: 単語辞書の前方一致検索に使用するデータ構造
+- **Context**: キャッシュのキー設計（モジュール間分離）
 - **Alternatives Considered**:
-  1. HashMap + 線形検索 — シンプルだが効率悪い
-  2. trie-rs — LOUDSベースの効率的なTrie
-  3. 自作Trie — カスタマイズ可能だが開発コスト大
-- **Selected Approach**: Option 2（trie-rs）
-- **Rationale**: 
-  - predictive_search()で前方一致検索を直接サポート
-  - 日本語UTF-8対応済み
-  - メモリ効率が良い（LOUDSベース）
-  - 安定したライブラリ（0.4.2）
-- **Trade-offs**: 
-  - ✅ 開発コスト低、信頼性高
-  - ❌ 外部依存追加
-- **Follow-up**: Cargo.tomlに`trie-rs = "0.4.2"`追加
+  1. `key`のみ（グローバルキャッシュ）
+  2. `(module_name, key)`タプル（モジュール別キャッシュ）
+  3. `search_key`（生成済みキー文字列）
+- **Selected Approach**: Option 2 - `(module_name, key)`タプル
+- **Rationale**:
+  - モジュール間でキャッシュを分離（要件4.8準拠）
+  - 検索キー生成とキャッシュキー生成を分離可能
+  - デバッグ時に意味がわかりやすい
+- **Trade-offs**:
+  - HashMap keyのオーバーヘッド（タプル比較）
+- **Follow-up**: なし
 
-### Decision: シャッフルキャッシュ機構の実装
+### Decision: 空文字列返却（マッチなし時）
 
-- **Context**: 単語のランダム選択で重複を回避するキャッシュ戦略
+- **Context**: 単語が見つからない場合の返却値
 - **Alternatives Considered**:
-  1. 単純ランダム選択 — 毎回ランダム、重複あり
-  2. シャッフルキャッシュ — シャッフル後順次消費、枯渇時再シャッフル
-- **Selected Approach**: Option 2（シャッフルキャッシュ）
-- **Rationale**: 
-  - 同じ単語が連続で選ばれることを防止
-  - 全単語を一巡してから再シャッフル
-  - 要件の「ランダム選択」を高品質に実現
-- **Trade-offs**: 
-  - ✅ ユーザー体験向上（単調さ回避）
-  - ❌ キャッシュ管理のオーバーヘッド
-- **Follow-up**: 
-  - ローカルキャッシュ: グローバルラベル終了時にクリア
-  - グローバルキャッシュ: セッション永続、手動クリア関数提供
+  1. `Option<String>`で`None`返却
+  2. 空文字列`""`返却
+  3. エラー発生（panic）
+- **Selected Approach**: Option 2 - 空文字列返却
+- **Rationale**:
+  - 要件3.6準拠「空文字列として処理を継続」
+  - Rune側での処理が単純（nullチェック不要）
+  - Graceful degradation
+- **Trade-offs**:
+  - エラー検出が困難（ログで対応）
+- **Follow-up**: エラーログ出力の実装
+
+### Decision: fast_radix_trie継続使用
+
+- **Context**: 前方一致インデックスのデータ構造選択
+- **Alternatives Considered**:
+  1. `trie-rs` - LOUDSベースの効率的なTrie
+  2. `fast_radix_trie` - 既存で使用中のRadixMap
+  3. 自作実装
+- **Selected Approach**: Option 2 - fast_radix_trie継続使用
+- **Rationale**:
+  - 既にLabelTableで使用実績あり
+  - `iter_prefix()`で前方一致検索を直接サポート
+  - 新規依存追加不要
+  - コードパターンの一貫性
+- **Trade-offs**:
+  - trie-rsより機能が限定的（LOUDSなし）
+  - 十分な機能があるため問題なし
+- **Follow-up**: なし（既存依存）
 
 ---
 
 ## Risks & Mitigations
 
-- **Transpiler前処理の複雑化** — Phase 1で最小限の実装に留め、必要に応じてリファクタリング
-- **trie-rs依存追加** — 安定版0.4.2を使用、ライセンス（MIT/Apache-2.0）はプロジェクトと互換
-- **VarRef意味拡張による混乱** — ドキュメントで明確に説明、エラーメッセージで検索順序を明示
-- **配置制約の複雑性** — パーサーレベルで明確なエラーメッセージを出力
+- **Risk 1: パフォーマンス（大量エントリ）** — RadixMapのO(M)検索により緩和、ベンチマーク追加で検証
+- **Risk 2: メモリ使用量** — エントリ数に比例するが、実用上問題なし（数千エントリ想定）
+- **Risk 3: キャッシュ肥大化** — 同一(module, key)ペアでのみキャッシュ生成、問題になれば LRU 導入
+- **Risk 4: APIシグネチャ変更** — 現行`word(ctx, key, args)`から`word(module, key, filters)`への変更、stdlib修正が必要
 
 ---
 
 ## References
 
-- [trie-rs公式ドキュメント](https://docs.rs/trie-rs/latest/trie_rs/) — 前方一致検索API、日本語対応
-- [pest PEGパーサー](https://pest.rs/) — 文法定義の参考
-- gap-analysis.md — 決定事項の詳細記録
+- [fast_radix_trie crate documentation](https://docs.rs/fast_radix_trie/1.1.0/fast_radix_trie/) — RadixMap API
+- [pasta-label-resolution-runtime design](../completed/pasta-label-resolution-runtime/design.md) — LabelTable設計
+- [SPECIFICATION.md](../../../SPECIFICATION.md) — Pasta DSL仕様
