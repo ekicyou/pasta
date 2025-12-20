@@ -37,16 +37,19 @@ requirements → design → tasks → implementation → implementation-complete
 
 ### 1. コミット
 ```bash
-git add -A
-git commit -m "<type>(<scope>): <summary>
-
-Spec: <spec-name>"
+git add -A && git commit -m "<type>(<scope>): <summary>"
 ```
-
-**コミットタイプ**: `feat`, `fix`, `refactor`, `docs`, `test`
+タイプ: `feat`, `fix`, `refactor`, `docs`, `test`
 
 ### 2. リモート同期
 ```bash
+git push origin <branch>
+```
+
+### 3. 仕様アーカイブ
+```bash
+mv .kiro/specs/<spec-name> .kiro/specs/completed/
+git add -A && git commit -m "chore(spec): <spec-name>をcompletedへ移動"
 git push origin <branch>
 ```
 
