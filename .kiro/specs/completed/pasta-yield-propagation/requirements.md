@@ -41,6 +41,19 @@ fn b() {
 - **アプローチ**: Transpiler修正によるyield伝搬ロジックの生成とモジュール構造化
 - **制約**: 既存のPastaスクリプトとの後方互換性を維持、Rune VM仕様に準拠
 
+### 実装状況
+
+一部のyield伝搬パターンは既に検証済みです：
+
+```rune
+// 検証済みパターン: for-in ループによるyield伝搬
+for a in crate::pasta::call(ctx, "自己紹介", #{}, []) { 
+    yield a; 
+}
+```
+
+このパターンは有効であり、既存のトランスパイラまたはランタイムの一部で実装されている可能性があります。本仕様では、この実装の完全性を検証し、不足している部分（Jump文、単語参照、エラーハンドリング等）を補完します。
+
 ### Transpiler出力形式の方針
 
 トランスパイラは以下の構造を持つRune IRを生成する：
@@ -115,13 +128,13 @@ fn b() {
 
 4.4. When 同名のローカルラベルが複数存在する, the Pasta Transpiler shall 連番サフィックス（`_1`, `_2`）で区別する
 
-4.5. When Call文（`＞label`）をトランスパイルする, the Pasta Transpiler shall `while let Some(a) = ctx.pasta.call(ctx, "モジュール名", "関数名").next() { yield a; }`形式のyield伝搬ループを生成する
+4.5. When Call文（`＞label`）をトランスパイルする, the Pasta Transpiler shall yield伝搬ループを生成する（`for a in crate::pasta::call(ctx, "モジュール名", #{}, []) { yield a; }`または`while let Some(a) = ctx.pasta.call(ctx, "モジュール名", "関数名").next() { yield a; }`形式）
 
-4.6. When Jump文（`－label`）をトランスパイルする, the Pasta Transpiler shall `while let Some(a) = ctx.pasta.jump(ctx, "モジュール名", "関数名").next() { yield a; }`形式を生成する（制御移譲後は戻らない）
+4.6. When Jump文（`－label`）をトランスパイルする, the Pasta Transpiler shall yield伝搬ループを生成する（`for a in crate::pasta::jump(ctx, "モジュール名", #{}, []) { yield a; }`または`while let Some(a) = ctx.pasta.jump(ctx, "モジュール名", "関数名").next() { yield a; }`形式、制御移譲後は戻らない）
 
 4.7. When 単語定義をトランスパイルする, the Pasta Transpiler shall `ctx.pasta.add_words("名前", ["単語1", "単語2"])`でローカル辞書に登録し、`ctx.pasta.commit_words()`で確定する
 
-4.8. When 単語参照（`＠単語`）をトランスパイルする, the Pasta Transpiler shall `while let Some(a) = ctx.pasta.word(ctx, "名前").next() { yield a; }`形式でyield伝搬を行う
+4.8. When 単語参照（`＠単語`）をトランスパイルする, the Pasta Transpiler shall yield伝搬ループを生成する（`for a in crate::pasta::word(ctx, "名前") { yield a; }`または`while let Some(a) = ctx.pasta.word(ctx, "名前").next() { yield a; }`形式）
 
 4.9. When 会話行をトランスパイルする, the Pasta Transpiler shall `ctx.actor = アクター名; yield Actor("名前"); yield Talk("テキスト");`形式で生成する
 
@@ -210,6 +223,9 @@ fn b() {
 ```
 
 ### 期待されるRune IR
+
+**注記**: 以下の例では `for-in` ループを使用していますが、`while let Some(a) = ... .next()` パターンも受け入れ可能です。
+
 ```rune
 use pasta::add_words;
 
@@ -221,9 +237,10 @@ pub mod 会話_1 {
         ctx.pasta.commit_words();
         ctx.var.変数 = 10;
         
-        while let Some(a) = ctx.pasta.call(ctx, "会話_1", "コール１").next() { yield a; }
-        while let Some(a) = ctx.pasta.call(ctx, "会話_1", "コール２").next() { yield a; }
-        while let Some(a) = ctx.pasta.jump(ctx, "会話_1", "ジャンプ").next() { yield a; }
+        // yield伝搬パターン（for-in または while-let いずれも可）
+        for a in crate::pasta::call(ctx, "コール１", #{}, []) { yield a; }
+        for a in crate::pasta::call(ctx, "コール２", #{}, []) { yield a; }
+        for a in crate::pasta::jump(ctx, "ジャンプ", #{}, []) { yield a; }
     }
     
     pub fn ジャンプ_1(ctx) {
@@ -241,7 +258,7 @@ pub mod 会話_1 {
         //  さくら：＠場所　では雨が降ってる。
         ctx.actor = さくら;
         yield Actor("さくら");
-        while let Some(a) = ctx.pasta.word(ctx, "場所").next() { yield a; };
+        for a in crate::pasta::word(ctx, "場所") { yield a; }
         yield Talk("では雨が降ってる。");
         //  うにゅう：ぐんにょり。
         ctx.actor = うにゅう;
