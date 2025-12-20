@@ -83,13 +83,13 @@
 
 #### Acceptance Criteria
 
-4.1. The Pasta Source Code shall ローカル変数名 `label` を `scene` に置換する（文脈に応じて）
+4.1. The Pasta Source Code shall ローカル変数名 `label` を `scene` に置換する（例: `let label = ...` → `let scene = ...`、`for label in ...` → `for scene in ...`）
 
-4.2. The Pasta Source Code shall 関数引数名 `label` を `scene` に置換する
+4.2. The Pasta Source Code shall 関数引数名 `label` を `scene` に置換する（例: `fn process(label: &str)` → `fn process(scene: &str)`）
 
 4.3. The Pasta Source Code shall ドキュメントコメント内の「label」を「scene」に置換する
 
-4.4. The Pasta Source Code shall `label_counters` を `scene_counters` に置換する
+4.4. The Pasta Source Code shall 変数名パターン `label_*` を `scene_*` に置換する（例: `label_counters` → `scene_counters`、`label_name` → `scene_name`）
 
 4.5. The Pasta Source Code shall `local_label` を `local_scene` に置換する
 
