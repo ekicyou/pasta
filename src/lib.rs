@@ -57,7 +57,7 @@ pub use ir::{ContentPart, ScriptEvent};
 pub use loader::{DirectoryLoader, LoadedFiles};
 pub use parser::{
     parse_file, parse_str, Argument, Attribute, AttributeValue, BinOp, Expr, FunctionScope,
-    JumpTarget, LabelDef, LabelScope, Literal, PastaFile, Span, SpeechPart, Statement, VarScope,
+    JumpTarget, SceneDef, SceneScope, Literal, PastaFile, Span, SpeechPart, Statement, VarScope,
 };
 pub use runtime::{
     DefaultRandomSelector, LabelInfo, LabelTable, RandomSelector, ScriptGenerator,

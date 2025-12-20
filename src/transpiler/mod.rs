@@ -10,7 +10,7 @@ pub use scene_registry::{LabelInfo, LabelRegistry};
 pub use word_registry::{WordDefRegistry, WordEntry};
 
 use crate::{
-    Argument, BinOp, Expr, FunctionScope, JumpTarget, LabelDef, LabelScope, Literal, PastaError,
+    Argument, BinOp, Expr, FunctionScope, JumpTarget, SceneDef, SceneScope, Literal, PastaError,
     PastaFile, SpeechPart, Statement, VarScope,
 };
 use std::collections::HashMap;
@@ -156,9 +156,9 @@ impl Transpiler {
             word_registry.register_global(&word_def.name, word_def.values.clone());
         }
 
-        // Register all labels and generate modules
-        for label in &file.labels {
-            Self::transpile_global_label(label, label_registry, word_registry, writer)?;
+        // Register all scenes and generate modules
+        for scene in &file.scenes {
+            Self::transpile_global_scene(scene, label_registry, word_registry, writer)?;
         }
 
         Ok(())
@@ -270,22 +270,22 @@ impl Transpiler {
         Ok((source, label_registry, word_registry))
     }
 
-    /// Transpile a global label and register it.
-    fn transpile_global_label<W: std::io::Write>(
-        label: &LabelDef,
-        label_registry: &mut LabelRegistry,
+    /// Transpile a global scene and register it.
+    fn transpile_global_scene<W: std::io::Write>(
+        scene: &SceneDef,
+        scene_registry: &mut LabelRegistry,
         word_registry: &mut WordDefRegistry,
         writer: &mut W,
     ) -> Result<(), PastaError> {
         #[allow(unused_imports)]
         use std::io::Write;
 
-        // Register the global label
-        let (_id, counter) = label_registry.register_global(&label.name, HashMap::new());
-        let module_name = format!("{}_{}", Self::sanitize_identifier(&label.name), counter);
+        // Register the global scene
+        let (_id, counter) = scene_registry.register_global(&scene.name, HashMap::new());
+        let module_name = format!("{}_{}", Self::sanitize_identifier(&scene.name), counter);
 
-        // Register local word definitions for this label
-        for word_def in &label.local_words {
+        // Register local word definitions for this scene
+        for word_def in &scene.local_words {
             word_registry.register_local(&module_name, &word_def.name, word_def.values.clone());
         }
 
@@ -304,21 +304,21 @@ impl Transpiler {
         writeln!(writer, "    pub fn __start__(ctx, args) {{")
             .map_err(|e| PastaError::io_error(e.to_string()))?;
 
-        // Transpile statements before first local label
-        for stmt in &label.statements {
+        // Transpile statements before first local scene
+        for stmt in &scene.statements {
             Self::transpile_statement_to_writer(writer, stmt)?;
         }
 
         writeln!(writer, "    }}").map_err(|e| PastaError::io_error(e.to_string()))?;
 
-        // Register and generate local labels
-        for local_label in &label.local_labels {
-            Self::transpile_local_label(
-                local_label,
-                &label.name,
+        // Register and generate local scenes
+        for local_scene in &scene.local_scenes {
+            Self::transpile_local_scene(
+                local_scene,
+                &scene.name,
                 counter,
                 &module_name,
-                label_registry,
+                scene_registry,
                 word_registry,
                 writer,
             )?;
@@ -330,26 +330,26 @@ impl Transpiler {
         Ok(())
     }
 
-    /// Transpile a local label and register it.
-    fn transpile_local_label<W: std::io::Write>(
-        label: &LabelDef,
+    /// Transpile a local scene and register it.
+    fn transpile_local_scene<W: std::io::Write>(
+        scene: &SceneDef,
         parent_name: &str,
         parent_counter: usize,
         module_name: &str,
-        label_registry: &mut LabelRegistry,
+        scene_registry: &mut LabelRegistry,
         word_registry: &mut WordDefRegistry,
         writer: &mut W,
     ) -> Result<(), PastaError> {
         #[allow(unused_imports)]
         use std::io::Write;
 
-        // Register the local label
+        // Register the local scene
         let (_id, counter) =
-            label_registry.register_local(&label.name, parent_name, parent_counter, HashMap::new());
-        let fn_name = format!("{}_{}", Self::sanitize_identifier(&label.name), counter);
+            scene_registry.register_local(&scene.name, parent_name, parent_counter, HashMap::new());
+        let fn_name = format!("{}_{}", Self::sanitize_identifier(&scene.name), counter);
 
-        // Register local word definitions for this local label (same module scope)
-        for word_def in &label.local_words {
+        // Register local word definitions for this local scene (same module scope)
+        for word_def in &scene.local_words {
             word_registry.register_local(module_name, &word_def.name, word_def.values.clone());
         }
 
@@ -358,7 +358,7 @@ impl Transpiler {
             .map_err(|e| PastaError::io_error(e.to_string()))?;
 
         // Transpile statements
-        for stmt in &label.statements {
+        for stmt in &scene.statements {
             Self::transpile_statement_to_writer(writer, stmt)?;
         }
 
@@ -537,60 +537,60 @@ impl Transpiler {
         // Create transpile context
         let mut context = TranspileContext::new();
 
-        // Collect all global label names as global functions
-        for label in &file.labels {
-            let fn_name = Self::sanitize_identifier(&label.name);
+        // Collect all global scene names as global functions
+        for scene in &file.scenes {
+            let fn_name = Self::sanitize_identifier(&scene.name);
             context.add_global_function(fn_name);
         }
 
-        // Track label counters to generate unique function names for duplicates
-        let mut label_counters: HashMap<String, usize> = HashMap::new();
+        // Track scene counters to generate unique function names for duplicates
+        let mut scene_counters: HashMap<String, usize> = HashMap::new();
 
-        // Transpile each global label
-        for label in &file.labels {
-            let counter = label_counters.entry(label.name.clone()).or_insert(0);
-            Self::transpile_label_with_counter(&mut output, label, None, *counter, &context)?;
+        // Transpile each global scene
+        for scene in &file.scenes {
+            let counter = scene_counters.entry(scene.name.clone()).or_insert(0);
+            Self::transpile_scene_with_counter(&mut output, scene, None, *counter, &context)?;
             *counter += 1;
         }
 
         Ok(output)
     }
 
-    /// Transpile a single label definition to a Rune function with a counter for duplicates.
-    fn transpile_label_with_counter(
+    /// Transpile a single scene definition to a Rune function with a counter for duplicates.
+    fn transpile_scene_with_counter(
         output: &mut String,
-        label: &LabelDef,
+        scene: &SceneDef,
         parent_name: Option<&str>,
         counter: usize,
         global_context: &TranspileContext,
     ) -> Result<(), PastaError> {
-        let fn_name = Self::label_to_fn_name_with_counter(label, parent_name, counter);
+        let fn_name = Self::scene_to_fn_name_with_counter(scene, parent_name, counter);
 
-        // Create a context for this label with local functions
-        let mut label_context = global_context.clone();
+        // Create a context for this scene with local functions
+        let mut scene_context = global_context.clone();
 
         // Collect local function names from Rune blocks (TODO: parse Rune blocks to extract function names)
         // For now, local functions would be extracted from RuneBlock statements
         // This is a placeholder - actual implementation would need to parse Rune code
-        let local_functions = Vec::new(); // TODO: Extract from label.statements
-        label_context.set_local_functions(local_functions);
+        let local_functions = Vec::new(); // TODO: Extract from scene.statements
+        scene_context.set_local_functions(local_functions);
 
         // Function signature - generators don't need async keyword in Rune
         output.push_str(&format!("pub fn {}(ctx) {{\n", fn_name));
 
         // Transpile statements
-        for stmt in &label.statements {
-            Self::transpile_statement(output, stmt, &label_context)?;
+        for stmt in &scene.statements {
+            Self::transpile_statement(output, stmt, &scene_context)?;
         }
 
-        // Transpile local labels (with their own counter tracking)
+        // Transpile local scenes (with their own counter tracking)
         let mut local_counters: HashMap<String, usize> = HashMap::new();
-        for local_label in &label.local_labels {
-            let counter = local_counters.entry(local_label.name.clone()).or_insert(0);
-            Self::transpile_label_with_counter(
+        for local_scene in &scene.local_scenes {
+            let counter = local_counters.entry(local_scene.name.clone()).or_insert(0);
+            Self::transpile_scene_with_counter(
                 output,
-                local_label,
-                Some(&label.name),
+                local_scene,
+                Some(&scene.name),
                 *counter,
                 global_context,
             )?;
@@ -601,27 +601,27 @@ impl Transpiler {
         Ok(())
     }
 
-    /// Generate a function name from a label definition with counter for duplicates.
-    fn label_to_fn_name_with_counter(
-        label: &LabelDef,
+    /// Generate a function name from a scene definition with counter for duplicates.
+    fn scene_to_fn_name_with_counter(
+        scene: &SceneDef,
         parent_name: Option<&str>,
         counter: usize,
     ) -> String {
-        let base_name = match label.scope {
-            LabelScope::Global => {
-                // Global labels use their name directly
-                Self::sanitize_identifier(&label.name)
+        let base_name = match scene.scope {
+            SceneScope::Global => {
+                // Global scenes use their name directly
+                Self::sanitize_identifier(&scene.name)
             }
-            LabelScope::Local => {
-                // Local labels are prefixed with parent name
+            SceneScope::Local => {
+                // Local scenes are prefixed with parent name
                 if let Some(parent) = parent_name {
                     format!(
                         "{}__{}",
                         Self::sanitize_identifier(parent),
-                        Self::sanitize_identifier(&label.name)
+                        Self::sanitize_identifier(&scene.name)
                     )
                 } else {
-                    Self::sanitize_identifier(&label.name)
+                    Self::sanitize_identifier(&scene.name)
                 }
             }
         };
@@ -855,17 +855,17 @@ mod tests {
     }
 
     #[test]
-    fn test_transpile_simple_label() {
+    fn test_transpile_simple_scene() {
         let file = PastaFile {
             path: "test.pasta".into(),
             global_words: vec![],
-            labels: vec![LabelDef {
+            scenes: vec![SceneDef {
                 name: "greeting".to_string(),
-                scope: LabelScope::Global,
+                scope: SceneScope::Global,
                 params: vec![],
                 attributes: vec![],
                 local_words: vec![],
-                local_labels: vec![],
+                local_scenes: vec![],
                 statements: vec![Statement::Speech {
                     speaker: "sakura".to_string(),
                     content: vec![SpeechPart::Text("Hello!".to_string())],
