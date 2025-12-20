@@ -27,7 +27,7 @@ requirements → design → tasks → implementation → implementation-complete
 すべて同時に満たすこと：
 
 1. **Spec Gate**: 全フェーズ承認済み
-2. **Test Gate**: `cargo test --workspace` 成功
+2. **Test Gate**: `cargo test --all` 成功
 3. **Doc Gate**: 仕様差分を反映
 4. **Steering Gate**: 既存ステアリングと整合
 
