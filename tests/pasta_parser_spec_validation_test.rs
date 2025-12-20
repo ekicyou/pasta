@@ -33,7 +33,7 @@ fn spec_ch1_line_oriented_grammar_basic() {
     );
 
     let file = result.unwrap();
-    assert_eq!(file.labels.len(), 1, "グローバルラベルが1つ存在するべき");
+    assert_eq!(file.scenes.len(), 1, "グローバルラベルが1つ存在するべき");
 }
 
 /// §1.1 例外: Runeコードブロックは複数行にわたる
@@ -65,8 +65,8 @@ fn spec_ch1_file_structure_global_label() {
     assert!(result.is_ok(), "グローバルラベルがパースできるべき");
 
     let file = result.unwrap();
-    assert_eq!(file.labels.len(), 1);
-    assert_eq!(file.labels[0].name, "テストラベル");
+    assert_eq!(file.scenes.len(), 1);
+    assert_eq!(file.scenes[0].name, "テストラベル");
 }
 
 /// §1.2 ファイル構造: グローバル単語定義
@@ -160,7 +160,7 @@ fn spec_ch2_1_identifier_xid_japanese() {
     assert!(result.is_ok(), "日本語識別子がパースできるべき");
 
     let file = result.unwrap();
-    assert_eq!(file.labels[0].name, "日本語ラベル名");
+    assert_eq!(file.scenes[0].name, "日本語ラベル名");
 }
 
 /// §2.1 識別子: ASCII英数字とアンダースコア
@@ -171,7 +171,7 @@ fn spec_ch2_1_identifier_ascii() {
     assert!(result.is_ok(), "ASCII識別子がパースできるべき");
 
     let file = result.unwrap();
-    assert_eq!(file.labels[0].name, "my_label_123");
+    assert_eq!(file.scenes[0].name, "my_label_123");
 }
 
 /// §2.1 インデント: 行頭空白（スペース）がインデントとして認識される
@@ -200,7 +200,7 @@ fn spec_ch2_2_global_label_fullwidth() {
     let source = "＊挨拶\n";
     let result = parse_str(source, "test.pasta");
     assert!(result.is_ok(), "全角＊でグローバルラベルがパースできるべき");
-    assert_eq!(result.unwrap().labels[0].name, "挨拶");
+    assert_eq!(result.unwrap().scenes[0].name, "挨拶");
 }
 
 /// §2.2 グローバルラベル: 半角アスタリスク（*）
@@ -209,7 +209,7 @@ fn spec_ch2_2_global_label_halfwidth() {
     let source = "*greeting\n";
     let result = parse_str(source, "test.pasta");
     assert!(result.is_ok(), "半角*でグローバルラベルがパースできるべき");
-    assert_eq!(result.unwrap().labels[0].name, "greeting");
+    assert_eq!(result.unwrap().scenes[0].name, "greeting");
 }
 
 /// §2.2 ローカルラベル: 全角中点（・）
@@ -228,11 +228,11 @@ fn spec_ch2_2_local_label_fullwidth() {
 
     let file = result.unwrap();
     assert_eq!(
-        file.labels[0].local_labels.len(),
+        file.scenes[0].local_scenes.len(),
         1,
         "ローカルラベルが1つ存在するべき"
     );
-    assert_eq!(file.labels[0].local_labels[0].name, "選択肢1");
+    assert_eq!(file.scenes[0].local_scenes[0].name, "選択肢1");
 }
 
 /// §2.2 ローカルラベル: 半角ハイフン（-）
@@ -250,8 +250,8 @@ fn spec_ch2_2_local_label_halfwidth() {
     );
 
     let file = result.unwrap();
-    assert_eq!(file.labels[0].local_labels.len(), 1);
-    assert_eq!(file.labels[0].local_labels[0].name, "choice1");
+    assert_eq!(file.scenes[0].local_scenes.len(), 1);
+    assert_eq!(file.scenes[0].local_scenes[0].name, "choice1");
 }
 
 /// §2.2 属性マーカー: 全角アンパサンド（＆）
@@ -269,7 +269,7 @@ fn spec_ch2_2_attribute_marker_fullwidth() {
     );
 
     let file = result.unwrap();
-    assert!(!file.labels[0].attributes.is_empty(), "属性が存在するべき");
+    assert!(!file.scenes[0].attributes.is_empty(), "属性が存在するべき");
 }
 
 /// §2.2 属性マーカー: 半角アンパサンド（&）
@@ -749,7 +749,7 @@ fn spec_ch3_1_line_independent_parsing() {
     );
 
     let file = result.unwrap();
-    assert_eq!(file.labels.len(), 2, "2つのラベルが存在するべき");
+    assert_eq!(file.scenes.len(), 2, "2つのラベルが存在するべき");
 }
 
 /// §3.2 インデント不要: グローバルラベル
@@ -809,7 +809,7 @@ fn spec_ch3_3_global_block_structure() {
 
     let file = result.unwrap();
     assert_eq!(file.global_words.len(), 1);
-    assert_eq!(file.labels.len(), 1);
+    assert_eq!(file.scenes.len(), 1);
 }
 
 /// §3.3 グローバルラベルブロック: 属性→宣言→本体の構造
@@ -828,7 +828,7 @@ fn spec_ch3_3_global_label_block_structure() {
     );
 
     let file = result.unwrap();
-    assert!(!file.labels[0].attributes.is_empty(), "属性が存在するべき");
+    assert!(!file.scenes[0].attributes.is_empty(), "属性が存在するべき");
 }
 
 /// §3.3 ローカルブロック: ローカルラベル内の構造
@@ -853,7 +853,7 @@ fn spec_ch3_3_local_block_structure() {
 
     let file = result.unwrap();
     assert_eq!(
-        file.labels[0].local_labels.len(),
+        file.scenes[0].local_scenes.len(),
         2,
         "2つのローカルラベルが存在するべき"
     );
@@ -1198,7 +1198,7 @@ fn spec_ch8_1_attribute_syntax() {
     assert!(result.is_ok(), "属性構文がパースできるべき");
 
     let file = result.unwrap();
-    assert!(!file.labels[0].attributes.is_empty());
+    assert!(!file.scenes[0].attributes.is_empty());
 }
 
 /// §8.2 配置ルール: ラベル直後

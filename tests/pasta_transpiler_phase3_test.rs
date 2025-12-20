@@ -4,7 +4,7 @@ use pasta::parser::parse_str;
 use pasta::transpiler::Transpiler;
 
 #[test]
-fn test_global_and_local_labels() {
+fn test_global_and_local_scenes() {
     let pasta_content = r#"
 ＊メイン
 　さくら：最初の発言

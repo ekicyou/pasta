@@ -5,7 +5,7 @@
 //! - Word references use `word()` function which only accesses `WordTable`
 //! - The two dictionaries are completely separate
 
-use pasta::runtime::labels::LabelTable;
+use pasta::runtime::scene::LabelTable;
 use pasta::runtime::random::DefaultRandomSelector;
 use pasta::runtime::words::WordTable;
 use pasta::transpiler::{LabelRegistry, WordDefRegistry};

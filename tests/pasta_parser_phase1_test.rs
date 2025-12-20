@@ -57,7 +57,7 @@ fn phase1_reject_sakura_fullwidth_backslash() {
 
     // Verify that ＼n is NOT recognized as Sakura script
     if let Ok(file) = &result {
-        let label = file.labels.first().expect("Should have label");
+        let label = file.scenes.first().expect("Should have label");
         let speech = label
             .statements
             .iter()
@@ -112,7 +112,7 @@ fn phase1_reject_sakura_fullwidth_brackets() {
     // The important thing is that full-width is NOT recognized as Sakura
     if result.is_ok() {
         if let Ok(file) = &result {
-            let label = file.labels.first().expect("Should have label");
+            let label = file.scenes.first().expect("Should have label");
             let speech = label
                 .statements
                 .iter()
@@ -214,7 +214,7 @@ fn phase1_success_inline_variable_reference() {
 
     // Verify that $name is recognized as variable reference, not text
     if let Ok(file) = result {
-        let label = file.labels.first().expect("Should have label");
+        let label = file.scenes.first().expect("Should have label");
         let speech = label
             .statements
             .iter()

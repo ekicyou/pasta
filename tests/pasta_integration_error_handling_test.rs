@@ -155,7 +155,7 @@ fn test_dynamic_error_from_rune_script() {
     // we'll test that the emit_error stdlib function exists and works
     // by checking the module can be created
     let selector = Box::new(pasta::runtime::random::DefaultRandomSelector::new());
-    let table = pasta::runtime::labels::LabelTable::new(selector);
+    let table = pasta::runtime::scene::LabelTable::new(selector);
     let word_table = create_test_word_table();
 
     let result = pasta::stdlib::create_module(table, word_table);

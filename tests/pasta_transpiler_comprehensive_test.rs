@@ -12,7 +12,7 @@ fn test_transpile_comprehensive_control_flow() {
     let ast = match parse_file(pasta_path) {
         Ok(ast) => {
             println!("✅ Parse successful!");
-            println!("Global labels: {}", ast.labels.len());
+            println!("Global labels: {}", ast.scenes.len());
             println!("Global words: {}", ast.global_words.len());
             ast
         }
