@@ -8,7 +8,7 @@ pub mod persistence;
 
 use crate::error::PastaError;
 use crate::ir::{ContentPart, ScriptEvent};
-use crate::runtime::labels::LabelTable;
+use crate::runtime::scene::LabelTable;
 use crate::runtime::words::WordTable;
 use rune::{ContextError, Module};
 use std::collections::HashMap;

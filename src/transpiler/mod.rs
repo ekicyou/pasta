@@ -3,10 +3,10 @@
 //! This module converts the Pasta AST into Rune source code that can be executed
 //! by the Rune VM to generate ScriptEvent IR.
 
-mod label_registry;
+mod scene_registry;
 mod word_registry;
 
-pub use label_registry::{LabelInfo, LabelRegistry};
+pub use scene_registry::{LabelInfo, LabelRegistry};
 pub use word_registry::{WordDefRegistry, WordEntry};
 
 use crate::{
