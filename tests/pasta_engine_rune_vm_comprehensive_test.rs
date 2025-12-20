@@ -3,6 +3,13 @@ use pasta::transpiler::Transpiler;
 use rune::{Context, Sources};
 use std::path::Path;
 
+/// Helper to create a test word table
+fn create_test_word_table() -> pasta::runtime::words::WordTable {
+    let selector = Box::new(pasta::runtime::random::DefaultRandomSelector::new());
+    let registry = pasta::transpiler::WordDefRegistry::new();
+    pasta::runtime::words::WordTable::from_word_def_registry(registry, selector)
+}
+
 #[test]
 fn test_comprehensive_control_flow_rune_compile() {
     let pasta_path = Path::new("tests/fixtures/comprehensive_control_flow.pasta");
@@ -29,9 +36,10 @@ fn test_comprehensive_control_flow_rune_compile() {
     // Install pasta_stdlib
     let selector = Box::new(pasta::runtime::random::DefaultRandomSelector::new());
     let table = pasta::runtime::labels::LabelTable::new(selector);
+    let word_table = create_test_word_table();
 
     context
-        .install(pasta::stdlib::create_module(table).expect("Failed to create stdlib"))
+        .install(pasta::stdlib::create_module(table, word_table).expect("Failed to create stdlib"))
         .expect("Failed to install stdlib");
 
     // Combine main.rn and transpiled code into a single source

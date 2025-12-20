@@ -4,6 +4,13 @@ use pasta::parser::parse_str;
 use pasta::transpiler::Transpiler;
 use rune::{Context, Sources, Vm};
 
+/// Helper to create a test word table
+fn create_test_word_table() -> pasta::runtime::words::WordTable {
+    let selector = Box::new(pasta::runtime::random::DefaultRandomSelector::new());
+    let registry = pasta::transpiler::WordDefRegistry::new();
+    pasta::runtime::words::WordTable::from_word_def_registry(registry, selector)
+}
+
 #[test]
 fn test_rune_compile_simple() {
     // Simple pasta script
@@ -28,9 +35,10 @@ fn test_rune_compile_simple() {
     // Install pasta_stdlib
     let selector = Box::new(pasta::runtime::random::DefaultRandomSelector::new());
     let table = pasta::runtime::labels::LabelTable::new(selector);
+    let word_table = create_test_word_table();
 
     context
-        .install(pasta::stdlib::create_module(table).expect("Failed to create stdlib"))
+        .install(pasta::stdlib::create_module(table, word_table).expect("Failed to create stdlib"))
         .expect("Failed to install stdlib");
 
     // Add actors module (required for use crate::actors::*)

@@ -4,8 +4,10 @@
 //! by the Rune VM to generate ScriptEvent IR.
 
 mod label_registry;
+mod word_registry;
 
 pub use label_registry::{LabelInfo, LabelRegistry};
+pub use word_registry::{WordDefRegistry, WordEntry};
 
 use crate::{
     Argument, BinOp, Expr, FunctionScope, JumpTarget, LabelDef, LabelScope, Literal, PastaError,
@@ -20,6 +22,8 @@ pub struct TranspileContext {
     local_functions: Vec<String>,
     /// List of global function names (standard library + user-defined)
     global_functions: Vec<String>,
+    /// Current module name (sanitized global label name) for word lookup
+    current_module: String,
 }
 
 impl TranspileContext {
@@ -28,6 +32,7 @@ impl TranspileContext {
         Self {
             local_functions: Vec::new(),
             global_functions: Self::default_global_functions(),
+            current_module: String::new(),
         }
     }
 
@@ -95,6 +100,16 @@ impl TranspileContext {
             }
         }
     }
+
+    /// Set the current module name for word lookup.
+    pub fn set_current_module(&mut self, module_name: String) {
+        self.current_module = module_name;
+    }
+
+    /// Get the current module name.
+    pub fn current_module(&self) -> &str {
+        &self.current_module
+    }
 }
 
 impl Default for TranspileContext {
@@ -111,34 +126,39 @@ impl Transpiler {
     ///
     /// This performs Pass 1 of the two-pass transpilation strategy:
     /// - Registers all labels in the LabelRegistry
+    /// - Registers all word definitions in the WordDefRegistry
     /// - Generates Rune modules for each global label
     /// - Generates function code for labels
     ///
     /// # Arguments
     ///
     /// * `file` - The parsed Pasta file AST
-    /// * `registry` - The label registry for tracking labels across files
+    /// * `label_registry` - The label registry for tracking labels across files
+    /// * `word_registry` - The word definition registry for tracking words
     /// * `writer` - Output destination implementing Write trait
     ///
     /// # Notes
     ///
     /// - This can be called multiple times for multiple Pasta files
-    /// - Each call accumulates labels in the registry
+    /// - Each call accumulates labels and words in the registries
     /// - The output does NOT include `mod pasta {}` (generated in Pass 2)
     pub fn transpile_pass1<W: std::io::Write>(
         file: &PastaFile,
-        registry: &mut LabelRegistry,
+        label_registry: &mut LabelRegistry,
+        word_registry: &mut WordDefRegistry,
         writer: &mut W,
     ) -> Result<(), PastaError> {
         #[allow(unused_imports)]
         use std::io::Write;
 
-        // Note: Top-level use statement is not needed
-        // Each module has its own use statements
+        // Register global word definitions
+        for word_def in &file.global_words {
+            word_registry.register_global(&word_def.name, word_def.values.clone());
+        }
 
         // Register all labels and generate modules
         for label in &file.labels {
-            Self::transpile_global_label(label, registry, writer)?;
+            Self::transpile_global_label(label, label_registry, word_registry, writer)?;
         }
 
         Ok(())
@@ -222,44 +242,52 @@ impl Transpiler {
     /// It only handles a single PastaFile and doesn't support multiple files.
     #[doc(hidden)]
     pub fn transpile_to_string(file: &PastaFile) -> Result<String, PastaError> {
-        let mut registry = LabelRegistry::new();
+        let mut label_registry = LabelRegistry::new();
+        let mut word_registry = WordDefRegistry::new();
         let mut output = Vec::new();
 
-        Self::transpile_pass1(file, &mut registry, &mut output)?;
-        Self::transpile_pass2(&registry, &mut output)?;
+        Self::transpile_pass1(file, &mut label_registry, &mut word_registry, &mut output)?;
+        Self::transpile_pass2(&label_registry, &mut output)?;
 
         String::from_utf8(output).map_err(|e| PastaError::io_error(e.to_string()))
     }
 
-    /// Transpile and return both the Rune source and the label registry.
+    /// Transpile and return both the Rune source and the registries.
     ///
-    /// This is used by PastaEngine to get the label registry that matches
+    /// This is used by PastaEngine to get the registries that match
     /// the generated Rune source code.
     pub fn transpile_with_registry(
         file: &PastaFile,
-    ) -> Result<(String, LabelRegistry), PastaError> {
-        let mut registry = LabelRegistry::new();
+    ) -> Result<(String, LabelRegistry, WordDefRegistry), PastaError> {
+        let mut label_registry = LabelRegistry::new();
+        let mut word_registry = WordDefRegistry::new();
         let mut output = Vec::new();
 
-        Self::transpile_pass1(file, &mut registry, &mut output)?;
-        Self::transpile_pass2(&registry, &mut output)?;
+        Self::transpile_pass1(file, &mut label_registry, &mut word_registry, &mut output)?;
+        Self::transpile_pass2(&label_registry, &mut output)?;
 
         let source = String::from_utf8(output).map_err(|e| PastaError::io_error(e.to_string()))?;
-        Ok((source, registry))
+        Ok((source, label_registry, word_registry))
     }
 
     /// Transpile a global label and register it.
     fn transpile_global_label<W: std::io::Write>(
         label: &LabelDef,
-        registry: &mut LabelRegistry,
+        label_registry: &mut LabelRegistry,
+        word_registry: &mut WordDefRegistry,
         writer: &mut W,
     ) -> Result<(), PastaError> {
         #[allow(unused_imports)]
         use std::io::Write;
 
         // Register the global label
-        let (_id, counter) = registry.register_global(&label.name, HashMap::new());
+        let (_id, counter) = label_registry.register_global(&label.name, HashMap::new());
         let module_name = format!("{}_{}", Self::sanitize_identifier(&label.name), counter);
+
+        // Register local word definitions for this label
+        for word_def in &label.local_words {
+            word_registry.register_local(&module_name, &word_def.name, word_def.values.clone());
+        }
 
         // Generate module
         writeln!(writer, "pub mod {} {{", module_name)
@@ -285,7 +313,15 @@ impl Transpiler {
 
         // Register and generate local labels
         for local_label in &label.local_labels {
-            Self::transpile_local_label(local_label, &label.name, counter, registry, writer)?;
+            Self::transpile_local_label(
+                local_label,
+                &label.name,
+                counter,
+                &module_name,
+                label_registry,
+                word_registry,
+                writer,
+            )?;
         }
 
         writeln!(writer, "}}").map_err(|e| PastaError::io_error(e.to_string()))?;
@@ -299,7 +335,9 @@ impl Transpiler {
         label: &LabelDef,
         parent_name: &str,
         parent_counter: usize,
-        registry: &mut LabelRegistry,
+        module_name: &str,
+        label_registry: &mut LabelRegistry,
+        word_registry: &mut WordDefRegistry,
         writer: &mut W,
     ) -> Result<(), PastaError> {
         #[allow(unused_imports)]
@@ -307,8 +345,13 @@ impl Transpiler {
 
         // Register the local label
         let (_id, counter) =
-            registry.register_local(&label.name, parent_name, parent_counter, HashMap::new());
+            label_registry.register_local(&label.name, parent_name, parent_counter, HashMap::new());
         let fn_name = format!("{}_{}", Self::sanitize_identifier(&label.name), counter);
+
+        // Register local word definitions for this local label (same module scope)
+        for word_def in &label.local_words {
+            word_registry.register_local(module_name, &word_def.name, word_def.values.clone());
+        }
 
         // Generate function
         writeln!(writer, "    pub fn {}(ctx, args) {{", fn_name)
@@ -427,26 +470,16 @@ impl Transpiler {
             }
             SpeechPart::FuncCall {
                 name,
-                args,
+                args: _,
                 scope: _,
             } => {
-                // Word expansion: yield Talk(pasta_stdlib::word(ctx, "word", []))
-                let args_str = args
-                    .iter()
-                    .map(|arg| match arg {
-                        Argument::Positional(expr) => Self::transpile_expr(expr, context),
-                        Argument::Named { name, value } => Ok(format!(
-                            "{}={}",
-                            name,
-                            Self::transpile_expr(value, context)?
-                        )),
-                    })
-                    .collect::<Result<Vec<_>, _>>()?
-                    .join(", ");
+                // Word expansion: yield Talk(pasta_stdlib::word("module_name", "word_key", []))
+                // module_name is current module (for local word lookup), empty string for global
                 writeln!(
                     writer,
-                    "        yield Talk(pasta_stdlib::word(ctx, \"{}\", [{}]));",
-                    name, args_str
+                    "        yield Talk(pasta_stdlib::word(\"{}\", \"{}\", []));",
+                    context.current_module(),
+                    name
                 )
                 .map_err(|e| PastaError::io_error(e.to_string()))?;
             }
