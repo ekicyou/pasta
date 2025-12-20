@@ -139,6 +139,10 @@
 
 7.3. The Pasta Transpiler shall `pasta::call(ctx, label, ...)` の引数名を `scene` に変更する
 
+7.4. The Pasta Transpiler shall 生成されるRuneコード内の全ての変数名・引数名で `label` を `scene` に置換する（`label_fn` → `scene_fn`、`label_id` → `scene_id` 等）
+
+7.5. The Pasta Transpiler shall エラーメッセージ内の「ラベルID」を「シーンID」に置換する
+
 ---
 
 ### Requirement 8: 仕様ドキュメント更新

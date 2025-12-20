@@ -115,11 +115,26 @@
 
 #### 置換パターン（英語・識別子）
 
-- `label_registry` → `scene_registry`
+**Rust識別子:**
 - `LabelRegistry` → `SceneRegistry`
-- `label_table` → `scene_table`
+- `LabelInfo` → `SceneInfo`
+- `LabelDef` → `SceneDef`
+- `LabelScope` → `SceneScope`
 - `LabelTable` → `SceneTable`
-- など（上記構造体・関数名リストを参照）
+- `LabelId` → `SceneId`
+- `LabelNotFound` → `SceneNotFound`
+- `label_registry` → `scene_registry`
+- `label_table` → `scene_table`
+
+**生成されるRuneコード変数名:**
+- `label` → `scene`
+- `label_fn` → `scene_fn`
+- `label_id` → `scene_id`
+- `label_selector` → `scene_selector`
+
+**エラーメッセージ:**
+- `"Label not found"` → `"Scene not found"`
+- `"ラベルID"` → `"シーンID"`
 
 ### 1.3 アーキテクチャパターン
 
