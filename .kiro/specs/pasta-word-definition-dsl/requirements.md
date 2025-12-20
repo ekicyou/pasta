@@ -1,203 +1,227 @@
-# Requirements Document
-
-## Project Description (Input)
-pasta DSLで、現在、「＊挨拶」など、会話ブロックについては問題なく記載できるが、単語定義を行いたい場合に冗長である。単語定義のためのDSLを新たに要件定義し、実装に加えよ。単語定義について、会話内の「＠単語」などから呼び出せるようにせよ。グローバルセクションにも、ローカルセクションにも書けるようにせよ。
-
-**確定した構文**（議題1で決定）:
-```pasta
-# グローバル単語定義（インデントなし）
-＠場所：東京　ニューヨーク　千葉
-＠場所：カナダ　オランダ　いつか見た場所  # 同名は自動マージ
-
-# ローカル単語定義（インデント付き、グローバルラベル内）
-＊会話
-　＠天気：晴れ　雨　曇り　「晴れか、　あめ」
-　＠場所＿外国：パリ　ロンドン
-　
-　さくら：今日は＠天気　ですね
-　さくら：＠場所　に行こう  # 前方一致: 場所、場所＿外国がヒット
-```
-
-**設計決定事項**:
-- **記号統一**: 単語定義と参照の両方で`＠`を使用（`＄`から変更）
-- **フォールバック検索**: `＠場所`はRune変数/関数→単語辞書→前方一致ラベルの順で検索
-- **前方一致**: `＠場所`は`場所`で始まるすべての単語定義・ラベルを候補に含む
-- **自動マージ**: 同じ名前の単語定義は自動的に統合される
-- **独立した辞書**: 単語辞書とラベル辞書は別のデータ構造で管理
-- **`＠＊`廃止**: グローバル明示構文は不要（フォールバック機構で自動解決）
-- **配置制約**（議題2で決定）:
-  - グローバル単語定義（インデントなし）: ファイル内のどこでも配置可能
-  - ローカル単語定義（インデントあり）: グローバルラベル直後の宣言部のみ配置可能（会話行・ローカルラベル・ジャンプ・コール文の後は不可）
-  - 変数定義との違い: 変数定義は実行部でも可能だが、単語定義は宣言部のみ
-- **エスケープ処理**（議題4で決定）:
-  - 二重引用符エスケープ: `「「` → `「`、`」」` → `」`
-  - 例: `「彼女は「「ありがとう」」と言った」` → `彼女は「ありがとう」と言った`
-- **命名規則**（議題5で決定）:
-  - Rust識別子ルール適用（ラベル名と同じ）
-  - 使用可能: ASCII英数字・アンダースコア、Unicode XID_Start/XID_Continue（日本語含む）
-  - 禁止: 数字始まり、予約記号（`＠`, `＄`, `＞`等）、空白、引用符
-- **マージ順序**（議題6で決定）:
-  - 順序保証なし（ランダム選択なので順序は無意味）
-  - 重複許容（同じ単語を複数回登録で選択確率調整可能）
-  - ファイル読み込み順序は環境依存
-- **AST表現**（議題7で決定）:
-  - `Statement::WordDef`として実装（既存のStatement enumにvariant追加）
-  - 既存のStatement処理フローに統合、パーサー変更最小限
-
----
+````markdown
+# Requirements Document: pasta-word-definition-dsl
 
 ## Introduction
 
 本要件は、Pasta DSLにおける単語定義機能の追加を定義します。現在のPasta DSLでは、ランダムに選択される単語や語句を定義する際に、前方一致ラベル（例：`＊場所ー東京`、`＊場所ー大阪`）を使う必要があり、冗長でした。
 
-本機能により、`＠場所：東京　大阪`という簡潔な構文で単語リストを定義でき、会話内から`＠場所　`で参照できるようになります。これは既存の前方一致ラベル機構を補完し、より軽量で直感的な単語管理を実現します。
+本機能により、`＠場所：東京　大阪`という簡潔な構文で単語リストを定義でき、会話内から`＠場所`で参照できるようになります。これは既存の前方一致ラベル機構を補完し、より軽量で直感的な単語管理を実現します。
+
+### Syntax Overview
+
+```pasta
+# グローバル単語定義（インデントなし、ファイル内どこでも配置可能）
+＠場所：東京　ニューヨーク　千葉
+＠場所：カナダ　オランダ　いつか見た場所  # 同名は自動マージ
+
+# ローカル単語定義（インデント付き、グローバルラベル直後の宣言部のみ）
+＊会話
+　＠天気：晴れ　雨　曇り　「晴れか、　あめ」
+　＠場所＿外国：パリ　ロンドン
+　
+　さくら：今日は＠天気ですね
+　さくら：＠場所に行こう  # 前方一致: 場所、場所＿外国がヒット、両方の単語を候補にマージ
+```
+
+### Core Design Decisions
+
+以下の設計決定により、実装可能で保守性の高い仕様とします：
+
+1. **AST構造**: `PastaFile::global_words: Vec<WordDef>`と`LabelDef::local_words: Vec<WordDef>`として表現
+   - Statementパターンではなく、属性（Attribute）やパラメータ（params）と同じメタデータパターン
+   - 理由: 単語定義は宣言的データであり、実行時の「文」ではない
+
+2. **非マージ収集戦略**: 単語定義をエントリ単位（WordEntry）で個別保持
+   - 同名定義を早期マージせず、エントリのリストとして保持
+   - 理由: 将来の属性機能（`＠key＆attr:value：word1 word2`）に対応するため
+   - 各エントリは独立して属性を持ち、検索時に属性フィルタリング可能にする
+
+3. **キー形式とスコープ管理**:
+   - グローバル単語: キー = `"単語名"` （例: `"挨拶"`）
+   - ローカル単語: キー = `":モジュール名:単語名"` （例: `":会話_1:挨拶"`）
+   - コロンプレフィックス（`:`）により、前方一致検索でグローバルとローカルが衝突しない
+   - モジュール名 = グローバルラベル名のサニタイズ版（`LabelRegistry`と同じロジック）
+
+4. **検索・キャッシュ戦略**:
+   - 検索: ローカル（`:module:key`前方一致）+ グローバル（`key`前方一致）の候補を統合
+   - マージ: すべてのマッチしたエントリの単語リストを結合（`Vec::extend`）
+   - キャッシュ: 統合リストを1回シャッフルし、順次消費（`LabelTable::CachedSelection`パターン踏襲）
+   - 再シャッフル: キャッシュ枯渇時に全単語を再シャッフル
+
+5. **データ構造設計**:
+   - トランスパイラー層: `WordDefRegistry`（`LabelRegistry`パターン踏襲）
+     - Pass1で`WordDef`を収集し、`WordEntry { key: String, values: Vec<String> }`に変換
+     - グローバル/ローカルを区別してエントリリストに追加
+   - ランタイム層: `WordTable`（`LabelTable`パターン踏襲）
+     - `RadixMap<Vec<usize>>`で前方一致インデックス構築（キー → エントリIDリスト）
+     - `entries: Vec<WordEntry>`で実体を保持
+     - `cached_selections: HashMap<String, CachedSelection>`でシャッフルキャッシュ管理
+
+6. **トランスパイラー出力仕様**:
+   - `＠単語名` → `yield Talk(pasta_stdlib::word(ctx, "単語名", []))`
+   - `pasta_stdlib::word()`は純粋な文字列（String）を返却
+   - `Talk()`によるラッピングはトランスパイラーが生成
+
+---
 
 ## Requirements
 
-### Requirement 1: 単語定義構文
+> **Note**: パーサー層の単語定義構文解析（`＠単語名：単語1　単語2`のパース、`WordDef`生成、エラーハンドリング等）は既に実装済みです。本要件はトランスパイラー層とランタイム層の実装に焦点を当てます。
 
-**Objective:** As a スクリプト作成者, I want 単語リストを簡潔に定義できる構文, so that 同じ種類の単語をまとめて管理し、ランダムに選択できる
+### Requirement 1: グローバルスコープ単語定義
 
-#### Acceptance Criteria
-
-1. When パーサーが`＠単語名：単語1　単語2　単語3`形式の行を検出した場合, the Pasta Parser shall 単語定義として解析する（**記号を`＄`から`＠`に変更**）
-2. The Pasta Parser shall 単語名がRust識別子規則に従うことを検証する（ASCII: a-z, A-Z, 0-9, _、Unicode: XID_Start/XID_Continue、数字始まり禁止）
-3. The Pasta Parser shall 全角スペースまたはタブ文字を単語の区切り文字として認識する
-4. When 引用符`「」`で囲まれた文字列が定義された場合, the Pasta Parser shall 内部の全角スペースを区切り文字として扱わず、一つの単語として認識する
-5. The Pasta Parser shall 引用符内で`「「`を`「`に、`」」`を`」`に変換する（二重引用符エスケープ）
-6. When 同じ単語名が複数回定義された場合, the Pasta Parser shall すべての定義を自動的にマージし、単一の単語リストとして扱う
-7. When `＠単語名＝`のように単語リストが空の場合, the Pasta Parser shall 構文エラーとして検出し、エラーを記録してパースを継続する
-6. The Pasta Parser shall すべての構文エラーを収集した後、`Result::Err`でエラーを返す（panic禁止）
-7. The Pasta Parser shall 空の単語定義を単語辞書に登録せず、マージ対象から除外する
-8. When 会話行内で`＠場所　`のように単語参照があった場合, the Pasta Runtime shall `場所`で始まるすべての単語定義（例：`場所`, `場所＿日本`, `場所＿外国`）を前方一致検索し、すべての単語を候補として列挙する
-
-### Requirement 2: グローバルスコープ単語定義
-
-**Objective:** As a スクリプト作成者, I want ファイル全体で使用できる単語を定義できる, so that 複数の会話ブロックから共通の単語セットを参照できる
+**Objective:** As a Pastaトランスパイラー, I want パーサーが生成した`PastaFile::global_words`を処理できる, so that ランタイムで使用可能な単語辞書を構築できる
 
 #### Acceptance Criteria
 
-1. When 単語定義行がインデントなしで記述された場合, the Pasta Parser shall グローバルスコープの単語定義として登録する
-2. The Pasta Parser shall インデントなしの単語定義をファイル内のどこにでも配置可能とする（ラベル定義の前後、ラベル内外を問わず）
-3. The Pasta Runtime shall グローバルスコープの単語定義をスクリプト全体で参照可能にする
-4. When 複数のファイルまたは複数行で同じグローバル単語名が定義された場合, the Pasta Runtime shall すべての定義を統合マージし、単一の単語リストとして管理する
-5. The Pasta Runtime shall マージ時に重複する単語を排除せず、そのまま保持する（重複登録で選択確率を調整可能）
-6. The Pasta Runtime shall マージ順序を保証せず、ファイル読み込み順序は環境依存とする（ランダム選択なので順序は非本質的）
-7. The Pasta Runtime shall グローバル単語定義をファイル解析時に登録し、実行開始前に利用可能にする
-8. The Pasta Runtime shall グローバル単語定義を`HashMap<String, Vec<String>>`形式で管理する（キー：単語名、値：単語リスト）
+1. The Pasta Transpiler shall `PastaFile::global_words: Vec<WordDef>`を入力として受け取る（パーサーが生成済み）
+2. The Pasta Transpiler shall グローバル単語定義を`WordEntry { key: String, values: Vec<String> }`形式で収集する
+3. The Pasta Transpiler shall グローバル単語のキーを`"単語名"`形式で登録する（例: `"挨拶"`）
+4. When 同じ名前のグローバル単語定義が複数行で定義された場合, the Pasta Transpiler shall 各定義を独立した`WordEntry`として保持する（早期マージしない）
+5. The Pasta Transpiler shall 同名エントリの単語リストを検索時にマージし、統合候補リストを作成する
+6. The Pasta Transpiler shall マージ時に重複する単語を排除せず、そのまま保持する（重複登録で選択確率を調整可能）
+7. The Pasta Runtime shall グローバル単語エントリを`WordTable`で管理し、前方一致インデックス（`RadixMap<Vec<usize>>`）を構築する
+   - インデックスは「プレフィックスキー → マッチしたエントリIDのリスト」を保持
+   - 各キーでマッチしたエントリの`values`を統合して検索結果を作成
 
-### Requirement 3: ローカルスコープ単語定義
+### Requirement 2: ローカルスコープ単語定義
 
-**Objective:** As a スクリプト作成者, I want 特定の会話ブロック内でのみ使用する単語を定義できる, so that 会話のコンテキストに応じた単語セットを管理できる
-
-#### Acceptance Criteria
-
-1. When 単語定義行がラベル定義内でインデント付きで記述された場合, the Pasta Parser shall ローカルスコープの単語定義として登録する
-2. The Pasta Parser shall インデント付き単語定義をグローバルラベル定義直後の宣言部（属性設定・変数定義と同じブロック）のみ配置可能とする
-3. The Pasta Parser shall 会話行・ローカルラベル・ジャンプ文・コール文の後に単語定義が現れた場合、構文エラーとする
-4. The Pasta Parser shall 変数定義（`＄variable = value`）は実行部でも配置可能だが、単語定義は宣言部のみに制限する
-5. The Pasta Runtime shall ローカルスコープの単語定義を当該グローバルラベル実行中のみ参照可能にする
-6. When ローカルとグローバルで同じ単語名が定義された場合, the Pasta Runtime shall ローカル定義を優先して参照する（シャドーイング）
-7. The Pasta Runtime shall ラベル実行終了時にローカル単語定義のスコープを解放する
-8. The Pasta Runtime shall ローカル単語定義を`HashMap<(String, String), Vec<String>>`形式で管理する（キー：(グローバルラベル名, 単語名)、値：単語リスト）
-
-### Requirement 4: 会話内からの単語参照
-
-**Objective:** As a スクリプト作成者, I want 会話行内で単語定義を参照できる, so that ランダムに選択された単語を発言内容に埋め込める
+**Objective:** As a Pastaトランスパイラー, I want パーサーが生成した`LabelDef::local_words`を処理できる, so that モジュールスコープに紐づく単語辞書を構築できる
 
 #### Acceptance Criteria
 
-1. When 会話行（Speech文）内に`＠単語名`形式の参照が記述された場合, the Pasta Runtime shall 対応する単語定義からランダムに一つの単語を選択する
-2. The Pasta Runtime shall 選択された単語を会話内容に展開して出力する
-3. When `＠name`がRune変数/関数・単語辞書・前方一致ラベルのいずれにも該当しない場合, the Pasta Runtime shall エラーログを出力し、空文字列として処理を継続する（panic禁止）
-4. The Pasta Runtime shall エラーハンドリングに`Result`型を使用し、実行時エラーでもスクリプト実行を停止しない
-5. The Pasta Runtime shall 同一会話行内で複数の単語参照があった場合、それぞれ独立してランダム選択を実行する
-6. When 単語参照が前方一致で複数の単語定義にマッチした場合（例：`＠場所`が`場所`, `場所＿日本`, `場所＿外国`にマッチ）, the Pasta Runtime shall すべての単語定義の単語を統合し、ランダムに1つ選択する
+1. The Pasta Transpiler shall `LabelDef::local_words: Vec<WordDef>`を入力として受け取る（パーサーが生成済み）
+2. The Pasta Transpiler shall ローカル単語定義を`WordEntry { key: String, values: Vec<String> }`形式で収集する
+3. The Pasta Transpiler shall ローカル単語のキーを`":モジュール名:単語名"`形式で登録する（例: `":会話_1:挨拶"`）
+4. The Pasta Transpiler shall モジュール名をグローバルラベル名のサニタイズ版として生成する（`LabelRegistry::sanitize_name()`と同じロジック）
+5. The Pasta Runtime shall ローカル単語定義を当該モジュール実行中のみ参照可能にする（`ctx.current_module`でスコープ判定）
+6. When 検索キー`"挨拶"`でローカル検索を実行する場合, the Pasta Runtime shall `":current_module:挨拶"`前方一致でローカルエントリを検索する
+7. When ローカルとグローバルで同じ単語名が定義された場合, the Pasta Runtime shall 両方の候補を統合してマージする（ローカル優先ではなく、統合リストから選択）
 
-### Requirement 5: 単語参照のフォールバック検索
+### Requirement 3: 会話内での単語参照と展開
 
-**Objective:** As a Pasta Runtime, I want 単語参照時に適切な検索順序で定義を解決できる, so that Rune変数・関数、単語辞書、前方一致ラベルの優先順位に従った値選択が行われる
+**Objective:** As a Pastaトランスパイラー/ランタイム, I want 会話行内の単語参照を適切なRune コードに変換し、実行時に単語辞書から選択できる, so that ランダムな単語展開を実現できる
 
 #### Acceptance Criteria
 
-1. When 会話行内で`＠名前　`形式の参照が発生した場合, the Pasta Runtime shall 以下の順序でフォールバック検索を実行する：
-   - a. Runeスコープ検索（ローカル変数・関数 → グローバル変数・関数）
-   - b. 単語辞書検索（前方一致、ローカル → グローバル）
-   - c. 前方一致ラベル検索（既存機構、`＊名前ーXXX`形式）
-2. When Runeスコープで変数または関数が見つかった場合, the Pasta Runtime shall その値または関数戻り値を使用し、単語辞書検索をスキップする
-3. When 単語辞書検索で前方一致する定義が見つかった場合, the Pasta Runtime shall すべてのマッチした単語を統合し、シャッフル・キャッシュ機構を適用する
-4. When いずれの検索でも見つからない場合, the Pasta Runtime shall 未定義エラーを発生させる
-5. The Pasta Runtime shall `＠＊名前`構文（グローバル明示指定）をサポートしない（フォールバック機構で自動解決されるため廃止）
+1. The Pasta Parser shall 会話行（Speech）内の`＠単語名`を`SpeechPart::FuncCall { name, args, scope }`として解析する（既存実装）
+2. When トランスパイラーが`SpeechPart::FuncCall`を処理する場合, the Pasta Transpiler shall `yield Talk(pasta_stdlib::word(ctx, "単語名", [filters]));` 形式のRune コードを生成する
+3. The `pasta_stdlib::word()` function shall 純粋な文字列（String）を返却し、`Talk()`によるラッピングはトランスパイラーが生成する
+4. When 単語辞書で前方一致する定義が見つかった場合, the Pasta Runtime shall すべてのマッチした単語定義の単語を統合してシャッフルし、ランダムに1つを選択する
+5. When 選択された単語が見つかった場合, the Pasta Runtime shall その単語文字列を返却する
+6. When `＠name`が単語辞書で見つからない場合, the Pasta Runtime shall エラーログを出力し、空文字列として処理を継続する（panic禁止）
+7. The Pasta Runtime shall 同一会話行内で複数の単語参照があった場合、それぞれ独立してランダム選択を実行する
+8. The Pasta Runtime shall エラーハンドリングに`Result`型を使用し、実行時エラーでもスクリプト実行を停止しない
 
-### Requirement 6: AST表現と内部データ構造
+### Requirement 4: 前方一致による複合検索
+
+**Objective:** As a Pastaランタイム, I want 単語参照時に前方一致で複数の定義をマッチさせ、統合できる, so that 柔軟な単語グループ化を実現できる
+
+#### Acceptance Criteria
+
+1. When 会話行内で`＠場所`と記述された場合, the Pasta Runtime shall 以下の2段階検索を実行する：
+   - ローカル検索: `":current_module:場所"`前方一致（例: `":会話_1:場所"`, `":会話_1:場所_日本"`）
+   - グローバル検索: `"場所"`前方一致（例: `"場所"`, `"場所_外国"`）
+2. The Pasta Runtime shall ローカル検索とグローバル検索の候補を統合し、単一の候補リストを作成する
+3. When 複数のエントリにマッチした場合, the Pasta Runtime shall すべてのエントリの`values`を`Vec::extend`でマージする
+4. The Pasta Runtime shall マージした単語リストを1回シャッフルし、`CachedSelection`に格納する
+5. The Pasta Runtime shall シャッフルキャッシュから順次単語を取り出し（Pop方式）、毎回異なる単語を返却する
+6. When キャッシュの残り単語が0になった場合, the Pasta Runtime shall 全単語リストを再シャッフルしてキャッシュを再構築する
+7. The Pasta Runtime shall 前方一致インデックスに`RadixMap<Vec<usize>>`を使用する（`fast_radix_trie` crate）
+8. The Pasta Runtime shall キャッシュキーを`(search_key, current_module)`として管理し、モジュール間でキャッシュを分離する
+
+### Requirement 5: AST構造と内部データ表現
 
 **Objective:** As a Pasta Parser, I want 単語定義を適切なAST構造で表現できる, so that トランスパイラとランタイムで一貫した処理が可能になる
 
 #### Acceptance Criteria
 
-1. The Pasta Parser shall 単語定義を`Statement::WordDef`として新規AST要素で表現する
-2. The Pasta AST shall 単語名、単語リスト、スコープ情報（Global/Local）を保持する
-3. The Pasta Runtime shall グローバル単語定義を`HashMap<String, Vec<String>>`形式で管理する
-4. The Pasta Runtime shall ローカル単語定義を`HashMap<(String, String), Vec<String>>`形式で管理する（キー：(グローバルラベル名, 単語名)）
-5. The Pasta Runtime shall 同じ名前の単語定義が複数回現れた場合、AST全体をスキャンして単語リストをマージする
-6. The Pasta Runtime shall ランダム選択時の公平性を保証する（各単語の選択確率が均等）
-7. The Pasta Transpiler shall 単語定義をRune静的変数（`GLOBAL_WORD_DICT`, `LOCAL_WORD_DICT`）に変換し、実行時に前方一致検索・シャッフル・キャッシュ機構を適用する
+1. The Pasta Parser shall `PastaFile`に`global_words: Vec<WordDef>`フィールドを保持する（既存実装）
+2. The Pasta Parser shall `LabelDef`に`local_words: Vec<WordDef>`フィールドを保持する（既存実装）
+3. The Pasta AST shall `WordDef`構造体を以下のフィールドで定義する：`name: String`, `values: Vec<String>`, `span: Span`（既存実装）
+4. When 単語定義のパースが完了した場合, the Pasta Parser shall 単語名の妥当性を検証し（識別子規則）、単語リストが非空であることを確認する
+5. The Pasta Transpiler shall `WordDefRegistry`構造体を実装し、以下の責務を持たせる：
+   - `WordEntry { key: String, values: Vec<String> }`のリスト管理
+   - グローバル単語の登録（`register_global(name, values)`）
+   - ローカル単語の登録（`register_local(module_name, name, values)`）
+   - エントリIDの自動採番とトラッキング
+6. The Pasta Transpiler shall Pass1で`PastaFile::global_words`と`LabelDef::local_words`を走査し、`WordDefRegistry`に登録する
+7. The Pasta Runtime shall `WordTable`構造体を実装し、以下の責務を持たせる：
+   - `entries: Vec<WordEntry>`で単語エントリを保持
+   - `prefix_index: RadixMap<Vec<usize>>`で前方一致インデックス構築（プレフィックス → マッチしたエントリIDリスト）
+   - `cached_selections: HashMap<String, CachedSelection>`でシャッフルキャッシュ管理
+   - `search_word(key, current_module) -> Option<String>`でランダム単語選択：
+     - プレフィックス検索でマッチしたエントリIDリストを取得
+     - 各エントリの`values`を統合してマージ
+     - マージ結果をシャッフルし、キャッシュから順次取り出す
+8. The Pasta Runtime shall ランダム選択時の公平性を保証する（シャッフルにより各単語の選択確率が均等）
 
-### Requirement 7: call/jumpからの非呼び出し制約
+### Requirement 6: Call/Jump文からの単語辞書非アクセス
 
-**Objective:** As a Pasta Runtime, I want 単語定義をcall/jump文から呼び出せないように制限する, so that ラベルと単語定義の責務を明確に分離できる
-
-**Note:** `＞name`や`－name`構文は、Rune関数呼び出し・前方一致ラベル検索のみを実行し、単語辞書には一切アクセスしない。これにより、単語定義はテキスト置換専用の機能として明確に分離される。
+**Objective:** As a Pastaランタイム, I want 単語定義をcall/jump文から呼び出せないようにする, so that ラベルと単語定義の責務を明確に分離できる
 
 #### Acceptance Criteria
 
-1. When call文（`＞name`）またはjump文（`－name`）で名前が指定された場合, the Pasta Runtime shall Rune関数呼び出し→前方一致ラベル検索のみを実行し、単語辞書を検索対象としない
+1. When Call文（`＞name`）またはJump文（`－name`）で名前が指定された場合, the Pasta Runtime shall Rune関数呼び出し→前方一致ラベル検索のみを実行し、単語辞書は検索対象としない
 2. When call/jumpで指定された名前がRune関数・ラベルとして存在せず、単語定義として存在する場合, the Pasta Runtime shall 関数/ラベル未定義エラーを発生させる
-3. The Pasta Runtime shall 単語定義とラベル定義を別のデータ構造で管理する（単語辞書 vs Runeスコープ＋前方一致ラベルマップ）
-4. The Pasta Documentation shall 単語定義はcall/jumpから呼び出せないこと、単語辞書はcall/jump処理フェーズで一切参照されないことを明記する
+3. The Pasta Runtime shall 単語定義とラベル定義を別のデータ構造で管理し、call/jump処理フェーズでは単語辞書にアクセスしない
+4. The Pasta Documentation shall call/jumpから単語辞書がアクセスされないことを明記する
 
-### Requirement 8: 会話行からのラベル呼び出し非対応
+### Requirement 7: エラーハンドリングと診断
 
-**Objective:** As a Pasta Parser, I want 会話行内の`＠名前`記法を単語参照専用とする, so that 構文の一貫性を保ち、ラベル呼び出しとの混同を防ぐ
-
-**Note:** `＠name`は会話行内で単語辞書へのアクセスを行い、フォールバック検索（Runeスコープ→単語辞書→前方一致ラベル）を適用する。これにより、単語定義が見つからない場合は自動的に前方一致ラベルへフォールバックし、柔軟な検索が可能になる。
+**Objective:** As a Pastaランタイム, I want 単語検索時のエラーを適切に処理できる, so that スクリプト実行を継続できる
 
 #### Acceptance Criteria
 
-1. When 会話行内に`＠名前`形式の記述がある場合, the Pasta Runtime shall フォールバック検索を実行する（Runeスコープ→単語辞書前方一致→前方一致ラベル）
-2. When `＠名前`で指定された名前が単語辞書で前方一致した場合, the Pasta Runtime shall 単語リストからランダム選択してテキスト置換する
-3. When `＠名前`で指定された名前が単語辞書で見つからない場合, the Pasta Runtime shall 前方一致ラベルへフォールバックする
-4. When `＠名前`がRune変数/関数、単語定義、前方一致ラベルのいずれにも該当しない場合, the Pasta Runtime shall エラーを発生させる
-5. The Pasta Runtime shall 会話行内から明示的にラベルを呼び出す専用構文を提供しない（フォールバックのみ）
-6. The Pasta Documentation shall `＠名前`のフォールバック検索順序とラベル自動フォールバックの動作を明記する
+1. When `＠name`が単語辞書で見つからない場合, the Pasta Runtime shall エラーログを出力し、空文字列として処理を継続する（panic禁止）
+2. The Pasta Runtime shall エラーハンドリングに`Result`型を使用し、実行時エラーでもスクリプト実行を停止しない
+3. The Pasta Error Messages shall 日本語でわかりやすいメッセージを提供する（例：「単語定義 @場所 が見つかりません」）
 
-### Requirement 9: エラーハンドリングと診断
-
-**Objective:** As a スクリプト作成者, I want 単語定義に関するエラーを明確に理解できる, so that 問題を迅速に修正できる
-
-#### Acceptance Criteria
-
-1. When 単語定義の構文エラーが発生した場合（例：閉じ「が欠落、空の単語リスト）, the Pasta Parser shall ファイル名、行番号、エラー内容を含むメッセージを出力する
-2. The Pasta Parser shall すべての構文エラーを収集した後、`Result::Err`でエラーを返す（panic禁止）
-3. The Pasta Parser shall 空の単語定義（`＠単語名＝`）をエラーとして記録し、単語辞書に登録しない
-4. When `＠name`がRuneスコープ・単語辞書・前方一致ラベルのいずれにも該当しない場合, the Pasta Runtime shall 参照箇所、名前、試行した検索順序を含むエラーログを出力し、空文字列として処理を継続する（panic禁止）
-5. The Pasta Runtime shall エラーハンドリングに`Result`型を使用し、実行時エラーでもスクリプト実行を停止しない
-6. The Pasta Error Messages shall 日本語でわかりやすいメッセージを提供する
-
-### Requirement 10: ドキュメント更新
+### Requirement 8: ドキュメント更新
 
 **Objective:** As a Pasta DSL ユーザー, I want 単語定義機能の使い方を理解できる, so that 効果的にスクリプトを作成できる
 
 #### Acceptance Criteria
 
-1. The Pasta Documentation shall GRAMMAR.mdに単語定義の構文セクションを追加する（`＠単語名＝「単語1」「単語2」...`形式の説明を含む）
-2. The Pasta Documentation shall グローバル/ローカルスコープの使い分け方法を説明する（ラベル外=グローバル、ラベル内=ローカルの自動判定ルールを含む）
-3. The Pasta Documentation shall 会話行内からの参照方法と例を提供する（`＠name`によるフォールバック検索の動作を含む）
-4. The Pasta Documentation shall フォールバック検索の順序を明記する（Runeスコープ→単語辞書前方一致→前方一致ラベル）
-5. The Pasta Documentation shall call/jumpからの単語辞書非アクセスの制約を明記する（`＞name`/`－name`は単語辞書を一切参照しない）
-6. The Pasta Documentation shall `＠＊name`構文が非推奨であることを明記する（フォールバック検索で自動的にグローバル単語へアクセス可能）
-7. The Pasta Documentation shall 前方一致検索の動作を説明する（`＠挨`が`＠挨拶`や`＠挨拶_朝`にマッチする例を含む）
-8. The Pasta Documentation shall 同名単語定義の自動マージ動作を説明する（複数回定義された単語リストが結合される挙動を含む）
-9. The Pasta Documentation shall 最低3つの実用的なサンプルスクリプトを提供する（グローバル/ローカル単語定義、前方一致、フォールバックの各ケースを含む）
+1. The Pasta Documentation shall GRAMMAR.mdに「単語定義」セクションを追加し、構文形式を説明する（例：`＠単語名：単語1　単語2`）
+2. The Pasta Documentation shall グローバル/ローカルスコープの使い分け方法を説明する（ラベル外=グローバル、ラベル内=ローカル）
+3. The Pasta Documentation shall 会話行内からの参照方法と複数例を提供する
+4. The Pasta Documentation shall フォールバック検索の順序を明記する（Rune変数/関数→単語辞書前方一致→前方一致ラベル）
+5. The Pasta Documentation shall call/jumpから単語辞書がアクセスされないことを明記する
+6. The Pasta Documentation shall 前方一致検索の動作を具体例で説明する（例：`＠挨`が`＠挨拶`や`＠挨拶_朝`にマッチする）
+7. The Pasta Documentation shall 同名単語定義の自動マージ動作を説明する
+8. The Pasta Documentation shall 引用符エスケープの動作を説明する（例：`「「test」」` → `「test」`）
+9. The Pasta Documentation shall 最低3つの実用的なサンプルスクリプトを提供する（グローバル/ローカル単語定義、前方一致、フォールバックの各ケース）
+
+### Requirement 9: テスト可能性と検証
+
+**Objective:** As a 開発チーム, I want 単語定義機能の各要素をユニットテストできる, so that 品質を保証できる
+
+#### Acceptance Criteria
+
+1. The Pasta Test Suite shall トランスパイラテストで単語辞書の統合マージ（WordDefRegistry）を検証する
+2. The Pasta Test Suite shall ランタイムテストで単語検索・キャッシュ・前方一致（WordTable）を検証する
+3. The Pasta Test Suite shall 前方一致のエッジケース（単語名の前方一致、複数マッチ、マッチなし）を検証する
+4. The Pasta Test Suite shall シャッフルキャッシュの動作（初回シャッフル、再シャッフル）を検証する
+5. The Pasta Test Suite shall call/jumpから単語辞書がアクセスされないことを検証する
 
 ---
+
+## Summary of Requirement Areas
+
+本要件定義は、**トランスパイラー層とランタイム層**の実装に焦点を当て、以下の要件領域を網羅します：
+
+1. **トランスパイラ層**: WordDefRegistry実装、単語エントリ収集、キー形式管理、Rune コード生成
+2. **ランタイム層**: WordTable実装、前方一致検索、シャッフルキャッシング、ランダム選択
+3. **スコープ管理**: グローバル/ローカル定義の統合マージ戦略
+4. **エラーハンドリング**: Graceful degradation（パニック不可）
+5. **ドキュメント**: 使用例、API仕様
+6. **テスト**: ユニットテストと統合テストの包括的カバレッジ
+
+**パーサー層の前提条件**: 以下は既に実装済みとしてスコープ外とします：
+- 単語定義構文のパース（`＠単語名：単語1　単語2`）
+- `WordDef`構造体の生成
+- `PastaFile::global_words`および`LabelDef::local_words`への格納
+- 引用符エスケープ、識別子検証、構文エラーハンドリング
+
+````
