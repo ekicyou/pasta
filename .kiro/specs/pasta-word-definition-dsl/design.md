@@ -6,18 +6,19 @@
 
 **Users**: Pasta DSLでデスクトップマスコット（伺か）のスクリプトを作成する開発者が、会話の多様性を高めるために使用する。
 
-**Impact**: 既存の前方一致ラベル機構を補完し、より軽量で直感的な単語管理を実現。既存のStatement処理フローに新しいvariantを追加する形で統合。
+**Impact**: 既存の前方一致ラベル機構を補完し、より軽量で直感的な単語管理を実現。パーサー層は実装済みのため、本設計はトランスパイラ層とランタイム層に焦点を当てる。
 
 ### Goals
-- 単語定義構文（`＠単語名：単語1　単語2`）のパースと検証
-- グローバル/ローカルスコープの単語辞書管理
-- 会話行内からのフォールバック検索（Rune変数 → 単語辞書 → 前方一致ラベル）
+- トランスパイラ層: `WordDefRegistry`による単語定義収集とRuneコード生成
+- ランタイム層: `WordTable`による前方一致検索とシャッフルキャッシュ
+- 2段階検索: ローカル（`:module:key`前方一致）→ グローバル（`key`前方一致）→ 統合
 - シャッフルキャッシュによる重複回避ランダム選択
 
 ### Non-Goals
 - 外部ファイルからの単語辞書読み込み（将来機能）
 - 単語定義のホットリロード
-- call/jump構文からの単語辞書アクセス（明示的に除外）
+- call/jump構文からの単語辞書アクセス（明示的に除外 - 要件6）
+- パーサー層の変更（実装済み、スコープ外）
 
 ---
 
@@ -25,119 +26,99 @@
 
 ### Existing Architecture Analysis
 
-Pasta DSLは3層アーキテクチャで構成される：
+Pasta DSLは以下の層構造で構成される：
 
-| Layer | 責務 | 主要ファイル |
-|-------|------|-------------|
-| Parser | PEG文法によるAST生成 | `pasta.pest`, `ast.rs`, `mod.rs` |
-| Transpiler | AST→Rune IR変換 | `transpiler/mod.rs` |
-| Runtime | Rune VM実行、ラベル/変数管理 | `runtime/`, `engine.rs` |
+| Layer | 責務 | 主要ファイル | 本機能での変更 |
+|-------|------|-------------|---------------|
+| Parser | PEG文法によるAST生成 | `pasta.pest`, `ast.rs` | なし（実装済み） |
+| Transpiler | AST→Runeコード変換 | `transpiler/mod.rs`, `label_registry.rs` | `WordDefRegistry`追加 |
+| Runtime | Rune VM実行、テーブル管理 | `runtime/labels.rs` | `WordTable`追加 |
+| Stdlib | Rune側関数提供 | `stdlib/mod.rs` | `word()`実装変更 |
 
-**既存パターン**:
-- `Statement` enumにvariant追加（Speech, Call, Jump, VarAssign, RuneBlock）
-- `SpeechPart` enumで会話内要素を表現（Text, VarRef, FuncCall, SakuraScript）
-- `HashMap`ベースの辞書管理（`LabelTable`, 変数管理）
+**既存パターンの活用**:
+- `LabelRegistry`: トランスパイラ層でラベルを収集、IDを採番 → `WordDefRegistry`で踏襲
+- `LabelTable`: ランタイム層で前方一致検索、シャッフルキャッシュ → `WordTable`で踏襲
+- `RadixMap<Vec<usize>>`: 前方一致インデックス（キー → エントリIDリスト）
 
 ### Architecture Pattern & Boundary Map
 
 ```mermaid
 graph TB
-    subgraph Parser
-        PestGrammar[pasta.pest]
-        ASTTypes[ast.rs]
-        ParserMod[parser/mod.rs]
+    subgraph Parser["Parser Layer (実装済み)"]
+        PastaFile["PastaFile<br/>global_words: Vec&lt;WordDef&gt;"]
+        LabelDef["LabelDef<br/>local_words: Vec&lt;WordDef&gt;"]
     end
     
-    subgraph Transpiler
-        TranspileMod[transpiler/mod.rs]
-        WordDefPreprocess[WordDef前処理]
-        RuneCodeGen[Rune IR生成]
+    subgraph Transpiler["Transpiler Layer"]
+        WordDefRegistry["WordDefRegistry<br/>entries: Vec&lt;WordEntry&gt;"]
+        TranspileContext["TranspileContext<br/>+ current_module: String"]
+        CodeGen["Runeコード生成<br/>word(module, key, filters)"]
     end
     
-    subgraph Runtime
-        WordDict[単語辞書]
-        WordCache[シャッフルキャッシュ]
-        WordTrie[前方一致Trie]
-        ResolveRef[resolve_ref関数]
+    subgraph Runtime["Runtime Layer"]
+        WordTable["WordTable<br/>prefix_index: RadixMap<br/>cached_selections: HashMap"]
+        StdlibWord["pasta_stdlib::word()<br/>search_word()呼び出し"]
     end
     
-    PestGrammar --> ParserMod
-    ParserMod --> ASTTypes
-    ASTTypes --> TranspileMod
-    TranspileMod --> WordDefPreprocess
-    WordDefPreprocess --> RuneCodeGen
-    RuneCodeGen --> WordDict
-    RuneCodeGen --> WordTrie
-    WordDict --> ResolveRef
-    WordTrie --> ResolveRef
-    ResolveRef --> WordCache
+    PastaFile --> WordDefRegistry
+    LabelDef --> WordDefRegistry
+    WordDefRegistry --> WordTable
+    TranspileContext --> CodeGen
+    CodeGen --> StdlibWord
+    StdlibWord --> WordTable
 ```
 
-**Architecture Integration**:
-- **Selected Pattern**: 既存コンポーネント拡張（Option A）
-- **Domain Boundaries**: Parser/Transpiler/Runtimeの3層構造を維持
-- **Existing Patterns Preserved**: Statement enum拡張、HashMap辞書管理
-- **New Components**: WordDef variant、WordCache構造体、Trie統合
-- **Steering Compliance**: Rust型安全性、Result型エラーハンドリング
+**アーキテクチャ選択**: LabelRegistry/LabelTableパターン踏襲（詳細は`research.md`参照）
 
 ### Technology Stack
 
 | Layer | Choice / Version | Role in Feature | Notes |
 |-------|------------------|-----------------|-------|
-| Parser | pest 2.x | PEG文法定義、AST生成 | 既存 |
-| Data Structure | trie-rs 0.4.2 | 前方一致検索 | **新規依存** |
-| Random | rand (既存) | シャッフル、ランダム選択 | 既存 |
-| Runtime | Rune | IR実行、変数解決 | 既存 |
+| Transpiler | Rust 2024 | WordDefRegistry実装、コード生成 | 既存パターン踏襲 |
+| Runtime | Rust 2024 + Rune 0.14 | WordTable実装、stdlib関数 | LabelTableと同構造 |
+| Data Structure | fast_radix_trie 1.1.0 | RadixMap前方一致検索 | 既存依存、追加なし |
+| Random | rand 0.9 | シャッフル処理 | 既存依存 |
 
 ---
 
 ## System Flows
 
-### 単語定義パース・変換フロー
+### 単語検索フロー
 
 ```mermaid
 sequenceDiagram
-    participant P as Parser
-    participant T as Transpiler
-    participant R as Runtime
+    participant Script as Pasta Script
+    participant Trans as Transpiler
+    participant Rune as Rune VM
+    participant Stdlib as pasta_stdlib::word()
+    participant Table as WordTable
     
-    P->>P: word_def_stmt ルール適用
-    P->>P: Statement::WordDef 生成
-    P->>T: AST (PastaFile)
-    T->>T: extract_word_defs()
-    T->>T: merge_word_defs()
-    T->>T: build_word_trie()
-    T->>R: Rune IR (静的変数, resolve_ref関数)
-    R->>R: GLOBAL_WORD_DICT 初期化
-    R->>R: LOCAL_WORD_DICT_xxx 初期化
+    Note over Script,Trans: Pass 1: 単語定義収集
+    Script->>Trans: PastaFile.global_words
+    Script->>Trans: LabelDef.local_words
+    Trans->>Trans: WordDefRegistry.register_global()
+    Trans->>Trans: WordDefRegistry.register_local()
+    
+    Note over Trans,Rune: Pass 2: コード生成
+    Trans->>Rune: yield Talk(pasta_stdlib::word("module", "key", []))
+    
+    Note over Rune,Table: Runtime: 検索実行
+    Rune->>Stdlib: word("会話_1", "場所", [])
+    Stdlib->>Table: search_word("会話_1", "場所", [])
+    Table->>Table: Step 1: ":会話_1:場所" 前方一致
+    Table->>Table: Step 2: "場所" 前方一致
+    Table->>Table: Step 3: エントリID統合
+    Table->>Table: Step 4: キャッシュ処理
+    Table-->>Stdlib: "東京"
+    Stdlib-->>Rune: "東京"
+    Rune->>Rune: yield Talk("東京")
 ```
 
-### 単語参照解決フロー
-
-```mermaid
-stateDiagram-v2
-    [*] --> VarRefDetected: @名前 検出
-    VarRefDetected --> RuneAutoResolve: Rune変数/関数?
-    RuneAutoResolve --> ReturnValue: Yes (自動解決)
-    RuneAutoResolve --> LocalWordSearch: No
-    LocalWordSearch --> LocalCacheCheck: ローカル辞書検索
-    LocalCacheCheck --> CacheHit: キャッシュあり
-    LocalCacheCheck --> TrieSearch: キャッシュなし
-    TrieSearch --> BuildCache: 前方一致検索
-    BuildCache --> CacheHit: シャッフル・キャッシュ作成
-    CacheHit --> PopWord: remaining.pop()
-    PopWord --> ReshuffleCheck: 残り0?
-    ReshuffleCheck --> Reshuffle: Yes
-    Reshuffle --> PopWord
-    ReshuffleCheck --> ReturnWord: No
-    ReturnWord --> [*]
-    LocalWordSearch --> GlobalWordSearch: ローカル未検出
-    GlobalWordSearch --> GlobalCacheCheck: グローバル辞書検索
-    GlobalCacheCheck --> CacheHit
-    GlobalWordSearch --> EmitError: 未検出
-    EmitError --> ReturnEmpty: 空文字列
-    ReturnEmpty --> [*]
-```
+**フロー説明**:
+1. Pass 1でWordDefRegistryに全単語定義を収集
+2. Pass 2でRuneコードを生成（`word(module, key, filters)`呼び出し）
+3. Runtime実行時にWordTableで2段階前方一致検索
+4. シャッフルキャッシュから単語を選択して返却
 
 ---
 
@@ -145,225 +126,28 @@ stateDiagram-v2
 
 | Requirement | Summary | Components | Interfaces | Flows |
 |-------------|---------|------------|------------|-------|
-| 1.1-1.8 | 単語定義構文パース | WordDefStmt, Statement::WordDef | parse_word_def_stmt() | パースフロー |
-| 2.1-2.8 | グローバルスコープ | WordDefRegistry, GLOBAL_WORD_DICT | merge_word_defs() | 変換フロー |
-| 3.1-3.8 | ローカルスコープ | WordDefRegistry, LOCAL_WORD_DICT | merge_word_defs() | 変換フロー |
-| 4.1-4.6 | 会話内参照 | resolve_ref, WordCache | resolve_ref() | 参照解決フロー |
-| 5.1-5.5 | フォールバック検索 | resolve_ref, WordTrie | search_with_cache() | 参照解決フロー |
-| 6.1-6.7 | AST/データ構造 | Statement::WordDef, WordScope | - | - |
-| 7.1-7.4 | call/jump非呼び出し | transpile_jump_target | - | - |
-| 8.1-8.6 | ラベル呼び出し非対応 | resolve_ref | - | 参照解決フロー |
-| 9.1-9.6 | エラーハンドリング | PastaError, ParseErrorInfo | - | - |
-| 10.1-10.8 | ドキュメント | GRAMMAR.md | - | - |
+| 1.1-1.7 | グローバルスコープ単語定義 | WordDefRegistry, WordTable | register_global() | Pass 1 |
+| 2.1-2.7 | ローカルスコープ単語定義 | WordDefRegistry, WordTable | register_local() | Pass 1 |
+| 3.1-3.8 | 会話内での単語参照と展開 | Transpiler, Stdlib | word(), Talk() | Pass 2 + Runtime |
+| 4.1-4.8 | 前方一致による複合検索 | WordTable | search_word() | Runtime |
+| 5.1-5.8 | AST構造と内部データ表現 | WordDefRegistry, WordTable | WordEntry | 全フェーズ |
+| 6.1-6.4 | Call/Jump文からの非アクセス | (変更なし) | - | - |
+| 7.1-7.3 | エラーハンドリングと診断 | WordTable, Stdlib | Result型 | Runtime |
+| 8.1-8.9 | ドキュメント更新 | - | - | - |
+| 9.1-9.5 | テスト可能性と検証 | 全コンポーネント | - | - |
 
 ---
 
 ## Components and Interfaces
 
-### 概要表
+### Summary
 
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies | Contracts |
-|-----------|--------------|--------|--------------|-----------------|-----------|
-| Statement::WordDef | Parser | 単語定義AST表現 | 1, 6 | Span | - |
-| WordScope | Parser | スコープ識別 | 2, 3, 6 | - | - |
-| word_def_stmt | Parser | PEG文法ルール | 1 | pest | - |
-| parse_word_def_stmt | Parser | パース関数 | 1, 9 | pest Pair | Service |
-| WordDefRegistry | Transpiler | 単語辞書管理 | 2, 3, 6 | trie-rs (P0) | Service |
-| extract_word_defs | Transpiler | WordDef抽出 | 6 | PastaFile | Service |
-| merge_word_defs | Transpiler | 同名定義マージ | 2.4, 3.6 | - | Service |
-| WordCache | Runtime | シャッフルキャッシュ | 4, 5 | rand (P0) | State |
-| resolve_ref | Runtime | フォールバック検索 | 4, 5, 8 | WordTrie (P0) | Service |
-| search_with_cache | Runtime | キャッシュ付き検索 | 4, 5 | WordCache | Service |
-
----
-
-### Parser Layer
-
-#### Statement::WordDef
-
-| Field | Detail |
-|-------|--------|
-| Intent | 単語定義文をAST上で表現する |
-| Requirements | 1.1-1.8, 6.1-6.3 |
-
-**Responsibilities & Constraints**
-- 単語名、単語リスト、スコープ情報を保持
-- Spanによるエラー報告位置情報
-- 既存Statementパターンとの一貫性
-
-**Dependencies**
-- Inbound: parse_word_def_stmt — AST生成元 (P0)
-- Outbound: Transpiler — Rune IR変換 (P0)
-
-**Contracts**: Service [ ]
-
-##### Service Interface
-```rust
-/// 単語定義Statement variant
-#[derive(Debug, Clone)]
-pub enum Statement {
-    // ... 既存variants ...
-    
-    /// 単語定義
-    WordDef {
-        /// 単語名（Rust識別子規則）
-        name: String,
-        /// 単語リスト
-        words: Vec<String>,
-        /// スコープ（Global/Local）
-        scope: WordScope,
-        /// ソース位置
-        span: Span,
-    },
-}
-
-/// 単語定義のスコープ
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WordScope {
-    /// グローバルスコープ（ファイル全体）
-    Global,
-    /// ローカルスコープ（現在のグローバルラベル内）
-    Local,
-}
-```
-
-**Implementation Notes**
-- Integration: 既存Statement enumにvariant追加
-- Validation: 空の単語リストはパースエラー
-
----
-
-#### word_def_stmt（PEG文法）
-
-| Field | Detail |
-|-------|--------|
-| Intent | 単語定義構文のPEG文法ルール |
-| Requirements | 1.1-1.5 |
-
-**Contracts**: Service [ ]
-
-##### Service Interface
-```pest
-// 単語定義文
-word_def_stmt = {
-    indent? ~ at_marker ~ word_name ~ colon ~ word_list ~ NEWLINE
-}
-
-// 単語名（Rust識別子規則）
-word_name = @{ ident }
-
-// 単語リスト（全角スペース/タブ区切り）
-word_list = { word_item ~ (ws ~ word_item)* }
-
-// 単語アイテム（引用符あり/なし）
-word_item = { quoted_word | unquoted_word }
-
-// 引用符付き単語（全角スペース含む可能）
-quoted_word = { "「" ~ quoted_content ~ "」" }
-quoted_content = @{ (!"」" ~ !"「" ~ ANY | "「「" | "」」")* }
-
-// 引用符なし単語
-unquoted_word = @{ (!ws ~ !NEWLINE ~ !"「" ~ !"」" ~ ANY)+ }
-```
-
-**Implementation Notes**
-- Integration: `file`ルールに追加（グローバル配置）、`global_label`内にも追加（ローカル配置）
-- Validation: 二重引用符エスケープ（`「「`→`「`、`」」`→`」`）
-
----
-
-#### parse_word_def_stmt
-
-| Field | Detail |
-|-------|--------|
-| Intent | pest Pairから Statement::WordDef を生成 |
-| Requirements | 1.1-1.8, 9.1-9.3 |
-
-**Dependencies**
-- Inbound: Parser main loop — Pair振り分け (P0)
-- Outbound: Statement::WordDef — AST生成 (P0)
-
-**Contracts**: Service [x]
-
-##### Service Interface
-```rust
-impl Parser {
-    /// 単語定義文をパース
-    fn parse_word_def_stmt(
-        &mut self,
-        pair: pest::iterators::Pair<Rule>,
-        scope: WordScope,
-    ) -> Result<Statement, PastaError> {
-        // ...
-    }
-    
-    /// 引用符エスケープ処理
-    fn unescape_quoted_content(content: &str) -> String {
-        content
-            .replace("「「", "「")
-            .replace("」」", "」")
-    }
-}
-```
-- Preconditions: `pair.as_rule() == Rule::word_def_stmt`
-- Postconditions: 空リストの場合はエラー、正常時はStatement::WordDef
-- Invariants: 単語名はRust識別子規則に準拠
-
-**Implementation Notes**
-- Validation: 空リスト検出時に`PastaError::parse_error`
-- Risks: 二重引用符エスケープの処理順序に注意
-
----
-
-#### ParsePhase状態管理
-
-| Field | Detail |
-|-------|--------|
-| Intent | 宣言部/実行部の境界判定でローカル単語定義の配置制約を検証 |
-| Requirements | 3.2-3.4, 9.1-9.3 |
-
-**Dependencies**
-- Inbound: parse_statement — フェーズ切り替え (P0)
-- Outbound: parse_word_def_stmt — フェーズ検証 (P0)
-
-**Contracts**: State [x]
-
-##### State Management
-```rust
-/// パースフェーズ（宣言部/実行部）
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ParsePhase {
-    /// 宣言部（属性、Runeブロック、変数定義、単語定義）
-    Declaration,
-    /// 実行部（会話行、ローカルラベル、ジャンプ、コール）
-    Execution,
-}
-
-impl Parser {
-    /// 現在のパースフェーズ
-    parse_phase: ParsePhase,
-    
-    /// フェーズをExecutionに切り替え（トリガー検出時）
-    fn enter_execution_phase(&mut self) {
-        self.parse_phase = ParsePhase::Execution;
-    }
-    
-    /// グローバルラベル開始時にフェーズをリセット
-    fn reset_parse_phase(&mut self) {
-        self.parse_phase = ParsePhase::Declaration;
-    }
-}
-```
-- State Model: グローバルラベルごとにDeclaration→Executionへ遷移
-- Persistence: パース中のみ保持
-- Concurrency: シングルスレッドパース
-
-**Implementation Notes**
-- Integration: `parse_statement()`でトリガー検出
-  - `speech_line`, `local_label`, `jump_stmt`, `call_stmt`がトリガー
-  - トリガー検出時に`enter_execution_phase()`呼び出し
-- Validation: `parse_word_def_stmt()`で`scope == Local && parse_phase == Execution`の場合にエラー
-- Risks: `var_assign`はトリガーにならない（宣言部・実行部両対応）
+|-----------|--------------|--------|--------------|------------------|-----------|
+| WordDefRegistry | Transpiler | 単語定義収集とエントリ管理 | 1, 2, 5 | LabelRegistry (P0) | Service |
+| WordTable | Runtime | 前方一致検索とキャッシュ管理 | 1, 2, 4, 5, 7 | RadixMap (P0), RandomSelector (P0) | Service |
+| TranspileContext拡張 | Transpiler | モジュール名伝播 | 3 | - | State |
+| pasta_stdlib::word() | Stdlib | ランタイム単語検索API | 3, 4, 7 | WordTable (P0) | Service |
 
 ---
 
@@ -373,244 +157,277 @@ impl Parser {
 
 | Field | Detail |
 |-------|--------|
-| Intent | 単語辞書の構築・マージ・Trie生成を管理 |
-| Requirements | 2.1-2.8, 3.1-3.8, 6.3-6.5 |
+| Intent | 単語定義の収集、エントリID採番、キー形式管理 |
+| Requirements | 1.1-1.7, 2.1-2.7, 5.5-5.6 |
+
+**Responsibilities & Constraints**
+- グローバル単語定義を`key`形式で登録
+- ローカル単語定義を`:module:key`形式で登録
+- エントリ単位で保持（早期マージなし）
+- LabelRegistryと並行してPass 1で使用
 
 **Dependencies**
-- Inbound: extract_word_defs — WordDef抽出 (P0)
-- Outbound: Rune IR生成 — 静的変数コード (P0)
-- External: trie-rs — Trie構築 (P0)
-
-**Contracts**: Service [x] / State [x]
-
-##### Service Interface
-```rust
-use trie_rs::TrieBuilder;
-
-/// 単語辞書レジストリ
-pub struct WordDefRegistry {
-    /// グローバル単語辞書
-    global_words: HashMap<String, Vec<String>>,
-    /// ローカル単語辞書（ラベル名→単語辞書）
-    local_words: HashMap<String, HashMap<String, Vec<String>>>,
-}
-
-impl WordDefRegistry {
-    /// 新規作成
-    pub fn new() -> Self;
-    
-    /// グローバル単語定義を登録
-    pub fn register_global(&mut self, name: String, words: Vec<String>);
-    
-    /// ローカル単語定義を登録
-    pub fn register_local(&mut self, label: String, name: String, words: Vec<String>);
-    
-    /// グローバル辞書用Trieを構築
-    pub fn build_global_trie(&self) -> trie_rs::Trie<u8>;
-    
-    /// ローカル辞書用Trieを構築
-    pub fn build_local_trie(&self, label: &str) -> trie_rs::Trie<u8>;
-    
-    /// Rune静的変数コードを生成
-    pub fn generate_rune_code(&self) -> String;
-}
-```
-
-##### State Management
-- State Model: HashMap<String, Vec<String>>で単語辞書を保持
-- Persistence: Transpile時のみ使用、永続化不要
-- Concurrency: シングルスレッドで処理
-
-**Implementation Notes**
-- Integration: `transpile_file()`冒頭でレジストリ構築
-- Validation: 空辞書は登録しない
-- Risks: 大量の単語定義時のメモリ使用量
-
----
-
-#### extract_word_defs / merge_word_defs
-
-| Field | Detail |
-|-------|--------|
-| Intent | AST全体からWordDefを抽出し、同名定義をマージ |
-| Requirements | 6.5, 2.4-2.6, 3.6 |
+- Inbound: Transpiler::transpile_pass1() — 単語定義収集 (P0)
+- Outbound: WordTable::from_word_def_registry() — ランタイムテーブル構築 (P0)
 
 **Contracts**: Service [x]
 
 ##### Service Interface
 ```rust
-impl Transpiler {
-    /// AST全体からWordDefを抽出
-    fn extract_word_defs(file: &PastaFile) -> Vec<(WordScope, Option<String>, String, Vec<String>)> {
-        // (scope, label_name, word_name, words)
-    }
+/// 単語エントリ（マージなしの個別定義）
+pub struct WordEntry {
+    /// エントリID（Vec<WordEntry>のインデックス）
+    pub id: usize,
+    /// 検索キー（グローバル: "key", ローカル: ":module:key"）
+    pub key: String,
+    /// 単語リスト
+    pub values: Vec<String>,
+}
+
+/// 単語定義レジストリ（トランスパイラ層）
+pub struct WordDefRegistry {
+    entries: Vec<WordEntry>,
+}
+
+impl WordDefRegistry {
+    /// 新規レジストリ作成
+    pub fn new() -> Self;
     
-    /// 同名定義をマージしてレジストリ構築
-    fn build_registry(word_defs: Vec<...>) -> WordDefRegistry {
-        // 同名はVec<String>をextend
-    }
+    /// グローバル単語を登録
+    /// - name: 単語名（例: "挨拶"）
+    /// - values: 単語リスト
+    /// - returns: 割り当てられたエントリID
+    pub fn register_global(&mut self, name: &str, values: Vec<String>) -> usize;
+    
+    /// ローカル単語を登録
+    /// - module_name: サニタイズ済みモジュール名（例: "会話_1"）
+    /// - name: 単語名（例: "挨拶"）
+    /// - values: 単語リスト
+    /// - returns: 割り当てられたエントリID
+    pub fn register_local(
+        &mut self, 
+        module_name: &str, 
+        name: &str, 
+        values: Vec<String>
+    ) -> usize;
+    
+    /// 全エントリを取得
+    pub fn all_entries(&self) -> &[WordEntry];
+    
+    /// サニタイズ関数（LabelRegistryと同一ロジック）
+    pub fn sanitize_name(name: &str) -> String;
 }
 ```
-- Preconditions: PastaFileがパース済み
-- Postconditions: 全WordDefがレジストリに登録
+
+**Preconditions**:
+- `name`は空文字列でないこと
+- `values`は空でないこと（パーサーが保証）
+
+**Postconditions**:
+- エントリIDは0から連番で採番
+- グローバルキーは`"name"`形式
+- ローカルキーは`":module_name:name"`形式
+
+**Implementation Notes**
+- `sanitize_name()`は`LabelRegistry::sanitize_name()`と同一ロジックを使用
+- 将来の属性フィルタリング用にフィールド拡張の余地を残す
 
 ---
 
-### Runtime Layer
-
-#### WordCache
+#### TranspileContext拡張
 
 | Field | Detail |
 |-------|--------|
-| Intent | シャッフル済み単語リストのキャッシュ管理 |
-| Requirements | 4.5, 5.3 |
+| Intent | 現在のモジュール名をコード生成に伝播 |
+| Requirements | 3.2 |
 
-**Dependencies**
-- Inbound: resolve_ref — キャッシュ参照 (P0)
-- External: rand — シャッフル (P0)
+**Responsibilities & Constraints**
+- 現在トランスパイル中のグローバルラベル名（サニタイズ済み）を保持
+- `transpile_speech_part_to_writer()`に渡す
 
 **Contracts**: State [x]
 
 ##### State Management
 ```rust
-/// 単語キャッシュエントリ
-pub struct WordCacheEntry {
-    /// 検索キーワード
-    pub key: String,
-    /// 残り単語リスト（シャッフル済み、pop用）
-    pub remaining: Vec<String>,
-    /// 元の全単語リスト（再シャッフル用）
-    pub all_words: Vec<String>,
+/// トランスパイルコンテキスト（既存構造体への追加）
+pub struct TranspileContext {
+    // ... 既存フィールド ...
+    
+    /// 現在のモジュール名（サニタイズ済みグローバルラベル名）
+    pub current_module: String,
 }
 
-/// キャッシュレジストリ（Rune静的変数として生成）
-// Rune側:
-// static LOCAL_WORD_CACHE = #{};
-// static GLOBAL_WORD_CACHE = #{};
+impl TranspileContext {
+    /// モジュール名を設定
+    pub fn set_current_module(&mut self, module_name: String);
+    
+    /// モジュール名を取得
+    pub fn current_module(&self) -> &str;
+}
 ```
-- State Model: HashMap<String, WordCacheEntry>
-- Persistence: ローカルはラベル終了時クリア、グローバルはセッション永続
-- Concurrency: Rune VM内シングルスレッド
 
 **Implementation Notes**
-- Integration: Rune静的変数として生成
-- Validation: remainingが空の場合はall_wordsから再シャッフル
+- `transpile_global_label()`でモジュール名を設定
+- `transpile_speech_part_to_writer()`でモジュール名を使用
 
 ---
 
-#### resolve_ref / search_with_cache
+### Runtime Layer
+
+#### WordTable
 
 | Field | Detail |
 |-------|--------|
-| Intent | 単語参照のフォールバック検索とキャッシュ付き取得 |
-| Requirements | 4.1-4.6, 5.1-5.4, 8.1-8.4 |
+| Intent | 前方一致検索、シャッフルキャッシュ、ランダム単語選択 |
+| Requirements | 1.7, 2.6-2.7, 4.1-4.8, 5.7-5.8, 7.1-7.2 |
+
+**Responsibilities & Constraints**
+- `RadixMap<Vec<usize>>`で前方一致インデックス構築
+- `(module_name, key)`タプルでキャッシュ分離
+- シャッフル＋Pop方式でランダム選択
+- マッチなし時は空文字列返却（panic禁止）
 
 **Dependencies**
-- Inbound: SpeechPart::VarRef変換 — Rune IR (P0)
-- Outbound: WordCache — キャッシュ操作 (P0)
-- External: trie-rs Trie — 前方一致検索 (P0)
+- Inbound: pasta_stdlib::word() — 検索要求 (P0)
+- Inbound: WordDefRegistry — テーブル構築 (P0)
+- Outbound: RandomSelector — シャッフル処理 (P0)
+- External: fast_radix_trie::RadixMap — 前方一致検索 (P0)
+
+**Contracts**: Service [x] / State [x]
+
+##### Service Interface
+```rust
+use fast_radix_trie::RadixMap;
+use std::collections::HashMap;
+
+/// キャッシュキー（モジュール名 + 検索キー）
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct WordCacheKey {
+    pub module_name: String,
+    pub search_key: String,
+}
+
+/// キャッシュ済み選択状態
+struct CachedWordSelection {
+    /// シャッフル済み単語リスト
+    words: Vec<String>,
+    /// 次に返す単語のインデックス
+    next_index: usize,
+}
+
+/// 単語テーブル（ランタイム層）
+pub struct WordTable {
+    /// 単語エントリ保持（ID = Vecインデックス）
+    entries: Vec<WordEntry>,
+    /// 前方一致インデックス（キー → エントリIDリスト）
+    prefix_index: RadixMap<Vec<usize>>,
+    /// シャッフルキャッシュ（(module, key) → CachedWordSelection）
+    cached_selections: HashMap<WordCacheKey, CachedWordSelection>,
+    /// ランダムセレクタ
+    random_selector: Box<dyn RandomSelector>,
+}
+
+impl WordTable {
+    /// WordDefRegistryからテーブルを構築
+    pub fn from_word_def_registry(
+        registry: WordDefRegistry,
+        random_selector: Box<dyn RandomSelector>,
+    ) -> Self;
+    
+    /// 単語検索（メインAPI）
+    /// - module_name: 呼び出し元モジュール名
+    /// - key: 検索キー
+    /// - filters: 属性フィルタ（将来用、現在は未使用）
+    /// - returns: 選択された単語（マッチなしなら空文字列）
+    pub fn search_word(&mut self, module_name: &str, key: &str, filters: &[String]) -> String;
+    
+    /// テスト用: シャッフル無効化
+    pub fn set_shuffle_enabled(&mut self, enabled: bool);
+}
+```
+
+**search_word()アルゴリズム**:
+```
+Step 1: ローカル検索
+  - prefix_index で ":module_name:key" 前方一致
+  - マッチしたエントリIDリストを取得（ヒットなしなら空リスト）
+
+Step 2: グローバル検索（常に実行）
+  - prefix_index で "key" 前方一致
+  - マッチしたエントリIDリストを取得
+
+Step 3: 統合とマージ
+  - ローカルとグローバルのエントリIDリストを結合
+  - 結合IDリストから各 entries[id].values を順次取得
+  - Vec::extend ですべての単語リストをマージ
+
+Step 4: キャッシュ処理
+  - キャッシュキー (module_name, key) でマッチを確認
+  - キャッシュ未作成時: マージした単語リストをシャッフルして格納
+  - キャッシュ存在時: 残り単語から1つをPop
+  - 残り単語がない場合: 全単語を再シャッフル
+
+Step 5: 返却
+  - 選択された単語を返却
+  - マッチなし時は空文字列を返却
+```
+
+**Preconditions**:
+- `from_word_def_registry()`でテーブル構築済み
+
+**Postconditions**:
+- 同一(module, key)ペアは枯渇まで重複なし
+- エントリ追加順序に依存しない（シャッフルで公平化）
+
+**Implementation Notes**
+- `LabelTable`の`CachedSelection`パターンを参考に実装
+- `history`フィールドは不要（単語選択履歴の追跡は要件にない）
+
+---
+
+### Stdlib Layer
+
+#### pasta_stdlib::word()
+
+| Field | Detail |
+|-------|--------|
+| Intent | Runeからの単語検索APIエントリポイント |
+| Requirements | 3.2-3.6, 7.1-7.2 |
+
+**Responsibilities & Constraints**
+- `WordTable::search_word(module_name, key, filters)`を呼び出し
+- `filters`引数をそのまま伝播（現在未使用、将来拡張用）
+- 結果をそのまま文字列で返却
+- `Talk()`ラッピングはトランスパイラが生成
+
+**Dependencies**
+- Inbound: Runeコード — word()呼び出し (P0)
+- Outbound: WordTable — search_word() (P0)
 
 **Contracts**: Service [x]
 
 ##### Service Interface
 ```rust
-// pasta_stdlib: Rustで実装、Runeに登録
-impl pasta_stdlib {
-    /// 単語辞書検索（前方一致 + キャッシュ）
-    pub fn search_word_dict(
-        cache: &mut HashMap<String, Vec<String>>,
-        trie: &Trie<u8>,
-        key: &str,
-    ) -> Option<String> {
-        // 1. キャッシュ検索
-        if let Some(remaining) = cache.get_mut(key) {
-            if !remaining.is_empty() {
-                return Some(remaining.remove(0));
-            }
-        }
-        
-        // 2. Trie前方一致検索
-        let matches: Vec<_> = trie.predictive_search(key).collect();
-        if matches.is_empty() {
-            return None;
-        }
-        
-        // 3. シャッフル + キャッシュ登録
-        let mut shuffled = matches;
-        shuffled.shuffle(&mut rand::thread_rng());
-        let result = shuffled[0].clone();
-        cache.insert(key.to_string(), shuffled[1..].to_vec());
-        
-        Some(result)
-    }
-}
+/// 単語検索関数（Rune側から呼び出し）
+/// 
+/// # Arguments
+/// * `module_name` - 呼び出し元モジュール名（サニタイズ済み）
+/// * `key` - 検索キー
+/// * `filters` - 属性フィルタ（将来用、現在は未使用）
+/// 
+/// # Returns
+/// 選択された単語文字列（マッチなしなら空文字列）
+pub fn word(
+    module_name: String,
+    key: String,
+    filters: rune::runtime::Value,
+) -> String;
 ```
-- Preconditions: trieは初期化済み、keyは非空
-- Postconditions: 見つかればSome(単語)、なければNone
-- Invariants: キャッシュは最初の呼び出しで構築
 
 **Implementation Notes**
-- **Rust実装理由**: ユニットテスト容易性、Pastaコア機能としての責任範囲
-- **Rune統合**: `pasta_stdlib`パターンで関数登録、Runeスクリプトから呼び出し可能
-- **テスト要件**: Runeからの関数呼び出し検証を含む
-- Validation: Trie検索結果が空の場合はNone返却
-- Risks: シャッフルのランダム性がテストに影響（seed固定化考慮）
-
-##### Rune側使用例
-```rune
-// IRトランスパイル時に生成されるRune側コード
-fn resolve_ref(name) {
-    // 1-2. Rune変数/関数は自動解決（この関数が呼ばれる = 未定義）
-    
-    // 3. ローカル単語辞書検索
-    if let Some(word) = search_word_dict(LOCAL_WORD_CACHE, LOCAL_WORD_TRIE, name) {
-        return word;
-    }
-    
-    // 4. グローバル単語辞書検索
-    if let Some(word) = search_word_dict(GLOBAL_WORD_CACHE, GLOBAL_WORD_TRIE, name) {
-        return word;
-    }
-    
-    // 5. エラーログ、空文字列返却
-    emit_error("Word not found: @" + name);
-    return "";
-}
-        if let Some(word) = entry.remaining.pop() {
-            return Some(word);
-        }
-        // 3. 再シャッフル
-        entry.remaining = shuffle(entry.all_words.clone());
-        return Some(entry.remaining.pop().unwrap());
-    }
-    
-    // 4. Trie前方一致検索
-    let matches = trie.predictive_search(key);
-    if matches.is_empty() {
-        return None;
-    }
-    
-    // 5. 全単語収集・シャッフル・キャッシュ作成
-    let all_words = collect_all_words(matches);
-    let remaining = shuffle(all_words.clone());
-    cache.insert(key, WordCacheEntry { key, remaining, all_words });
-    
-    return Some(cache.get(key).remaining.pop().unwrap());
-}
-
-/// グローバルキャッシュクリア
-pub fn clear_global_word_cache() {
-    GLOBAL_WORD_CACHE.clear();
-}
-```
-- Preconditions: Trie・辞書が初期化済み
-- Postconditions: 単語が見つかればString、未検出なら空文字列
-- Invariants: キャッシュは常に有効な状態
-
-**Implementation Notes**
-- Integration: Transpilerで生成、pasta_stdlibに登録
-- Validation: 空マッチ時はNone返却
-- Risks: キャッシュとTrieの不整合
+- 現行実装の`word(ctx, word, args)`から`word(module_name, key, filters)`に変更
+- `WordTable`への参照は`Mutex<WordTable>`でラップ（`select_label_to_id`と同様）
+- エラー時はログ出力して空文字列返却
 
 ---
 
@@ -620,110 +437,174 @@ pub fn clear_global_word_cache() {
 
 ```mermaid
 erDiagram
-    PastaFile ||--o{ LabelDef : contains
-    LabelDef ||--o{ Statement : contains
-    Statement ||--o| WordDef : is
-    WordDef {
-        string name
-        vec_string words
-        WordScope scope
-        Span span
+    WordDefRegistry ||--o{ WordEntry : contains
+    WordTable ||--o{ WordEntry : holds
+    WordTable ||--o{ CachedWordSelection : manages
+    
+    WordEntry {
+        usize id PK
+        String key
+        Vec_String values
     }
-    WordDefRegistry ||--o{ GlobalWordEntry : manages
-    WordDefRegistry ||--o{ LocalWordEntry : manages
-    GlobalWordEntry {
-        string name
-        vec_string words
-    }
-    LocalWordEntry {
-        string label_name
-        string word_name
-        vec_string words
-    }
-    WordCache ||--o{ WordCacheEntry : contains
-    WordCacheEntry {
-        string key
-        vec_string remaining
-        vec_string all_words
+    
+    CachedWordSelection {
+        Vec_String words
+        usize next_index
     }
 ```
 
+**集約境界**:
+- `WordDefRegistry`: トランスパイラ層の集約ルート（Pass 1でのみ変更）
+- `WordTable`: ランタイム層の集約ルート（実行中に変更）
+
+**不変条件**:
+- `WordEntry.id`は`Vec<WordEntry>`のインデックスと一致
+- `WordEntry.key`はグローバル（`"name"`）またはローカル（`":module:name"`）形式
+- `CachedWordSelection.next_index <= words.len()`
+
 ### Logical Data Model
 
-**Structure Definition**:
-- `Statement::WordDef`: AST上の単語定義表現
-- `WordDefRegistry`: Transpile時の単語辞書管理（メモリ内）
-- `WordCache`: Runtime時のシャッフルキャッシュ（Rune静的変数）
+**キー形式設計**:
 
-**Consistency & Integrity**:
-- 単語名はRust識別子規則に準拠（XID_Start + XID_Continue）
-- 空の単語リストはパースエラー
-- 同名定義はVec<String>をextendでマージ（重複許容）
+| スコープ | キー形式 | 例 |
+|---------|---------|---|
+| グローバル | `"単語名"` | `"挨拶"`, `"場所"`, `"場所_日本"` |
+| ローカル | `":モジュール名:単語名"` | `":会話_1:挨拶"`, `":会話_1:場所"` |
+
+**前方一致検索パターン**:
+
+| 検索キー | マッチ対象（グローバル） | マッチ対象（ローカル） |
+|---------|----------------------|---------------------|
+| `"場所"` | `"場所"`, `"場所_日本"`, `"場所_外国"` | - |
+| `":会話_1:場所"` | - | `":会話_1:場所"`, `":会話_1:場所_日本"` |
+
+**インデックス構造**:
+```
+RadixMap<Vec<usize>>:
+  "挨拶" → [0]
+  "場所" → [1, 2]
+  "場所_日本" → [2]
+  ":会話_1:挨拶" → [3]
+  ":会話_1:場所" → [4]
+```
 
 ---
 
 ## Error Handling
 
 ### Error Strategy
-- パース時: 全エラー収集後にResult::Err（panic禁止）
-- Runtime時: エラーログ出力、空文字列で継続（graceful degradation）
+
+| エラー種別 | 発生箇所 | 対応 | ログ |
+|-----------|---------|------|------|
+| 単語未発見 | search_word() | 空文字列返却 | WARN |
+| レジストリ構築失敗 | from_word_def_registry() | Result::Err | ERROR |
+| キャッシュロック失敗 | word() | 空文字列返却 | ERROR |
 
 ### Error Categories and Responses
 
-**Parse Errors (構文エラー)**:
-- 空の単語定義 → `Empty word definition: @{name} has no words`
-- 宣言部外の配置 → `Local word definition in execution block: @{name} must be in declaration block`
-- 閉じ引用符欠落 → `Unclosed quote in word definition: @{name}`
+**Runtime Errors (Graceful Degradation)**:
+- 単語辞書で見つからない → 空文字列として処理を継続（panic禁止）
+- エラーログ出力：「単語定義 @場所 が見つかりません」
 
-**Runtime Errors (実行時エラー)**:
-- 未定義参照 → `Word not found: @{name} not found in any dictionary`
-- ログ出力して空文字列で継続
-
-### Monitoring
-- エラーカウントのトラッキング（将来機能）
-- パースエラーは`MultipleParseErrors`で一括報告
+**Validation Errors**:
+- 空のキーでの検索 → 空文字列返却、WARNログ
 
 ---
 
 ## Testing Strategy
 
 ### Unit Tests
-- `parse_word_def_stmt`: 正常パース、空リストエラー、引用符エスケープ
-- `WordDefRegistry`: グローバル/ローカル登録、マージ動作
-- `search_with_cache`: キャッシュヒット/ミス、再シャッフル
-- `build_word_trie`: 前方一致検索の正確性
+
+| テスト対象 | テスト内容 | ファイル |
+|-----------|----------|---------|
+| WordDefRegistry | register_global/local、キー形式検証 | `tests/pasta_transpiler_word_registry_test.rs` |
+| WordTable | search_word、前方一致、キャッシュ動作 | `tests/pasta_runtime_word_table_test.rs` |
+| pasta_stdlib::word() | Rune統合、エラーハンドリング | `tests/pasta_stdlib_word_test.rs` |
 
 ### Integration Tests
-- パース→Transpile→Runtime全フロー
-- グローバル/ローカルスコープ分離
-- フォールバック検索順序
-- 配置制約違反検出
 
-### E2E Tests
-- サンプルスクリプトの実行
-- 会話行内の単語展開確認
-- エラーメッセージの妥当性
+| テスト内容 | 検証ポイント | ファイル |
+|-----------|------------|---------|
+| Pass 1収集 | global_words/local_wordsからの収集 | `tests/pasta_integration_word_definition_test.rs` |
+| Pass 2生成 | word()呼び出しコード生成 | `tests/pasta_integration_word_definition_test.rs` |
+| E2Eフロー | 定義→参照→出力 | `tests/pasta_integration_word_definition_test.rs` |
+
+### Edge Case Tests
+
+| ケース | 期待動作 |
+|-------|---------|
+| 同名グローバル定義×複数 | 全エントリの単語を統合 |
+| ローカル+グローバル同名 | 両方を統合（優先順位なし） |
+| 前方一致で複数マッチ | 全マッチの単語を統合 |
+| キャッシュ枯渇 | 再シャッフルして継続 |
+| 単語未発見 | 空文字列返却、ログ出力 |
+| call/jumpから単語参照 | ラベル/関数検索のみ（単語辞書不参照） |
 
 ---
 
 ## Security Considerations
 
-- **入力検証**: 単語名はRust識別子規則に制限、任意コード実行を防止
-- **メモリ安全性**: Rust型システムによる保証
-- **サイズ制限**: 大量単語定義時のメモリ使用量監視（将来機能）
+- **入力検証**: 単語名・単語値はパーサーが検証済み（トランスパイラは信頼）
+- **リソース枯渇**: キャッシュサイズは(module, key)ペア数に比例（実用上問題なし）
 
 ---
 
 ## Performance & Scalability
 
-- **Target**: 単語検索 < 1ms（前方一致含む）
-- **Optimization**: trie-rs（LOUDSベース）によるメモリ効率的な前方一致検索
-- **Caching**: シャッフルキャッシュで重複検索を回避
+### Target Metrics
+
+| 指標 | 目標値 | 測定方法 |
+|------|-------|---------|
+| 前方一致検索 | O(M) ※M=キー長 | RadixMap.iter_prefix() |
+| キャッシュヒット | O(1) | HashMap lookup |
+| メモリ | 数千エントリで < 1MB | ベンチマーク |
+
+### Optimization Notes
+
+- RadixMapは既にLabelTableで実績あり
+- シャッフルは初回/再シャッフル時のみ（O(N)）
+- キャッシュは(module, key)ペアでのみ生成（不要なキャッシュ抑制）
 
 ---
 
-## Migration Strategy
+## Supporting References
 
-- **Phase 1**: 基本構文サポート、前方一致検索、シャッフルキャッシュ
-- **Phase 2**: 必要に応じてpreprocessor.rsへリファクタリング
-- **Rollback**: Statement::WordDefを無効化するフィーチャーフラグ（オプション）
+### Runeコード生成例
+
+**Before (現行)**:
+```rune
+yield Talk(pasta_stdlib::word(ctx, "場所", []));
+```
+
+**After (本設計)**:
+```rune
+yield Talk(pasta_stdlib::word("会話_1", "場所", []));
+```
+
+### キー生成ロジック
+
+```rust
+impl WordDefRegistry {
+    fn make_local_key(module_name: &str, name: &str) -> String {
+        format!(":{}:{}", Self::sanitize_name(module_name), name)
+    }
+    
+    fn make_global_key(name: &str) -> String {
+        name.to_string()
+    }
+}
+```
+
+---
+
+## Summary
+
+本設計は以下の原則に従う：
+
+1. **既存パターン踏襲**: LabelRegistry/LabelTableのパターンを完全に再利用
+2. **2層分離**: トランスパイラ層(WordDefRegistry) + ランタイム層(WordTable)
+3. **キー形式によるスコープ区別**: コロンプレフィックスでローカル/グローバルを分離
+4. **シャッフルキャッシュ**: 重複回避のためのPop方式ランダム選択
+5. **Graceful Degradation**: エラー時は空文字列返却、panic禁止
+
+詳細な調査結果とアーキテクチャ決定の根拠は`research.md`を参照。
