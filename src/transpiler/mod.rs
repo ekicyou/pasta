@@ -430,7 +430,7 @@ impl Transpiler {
                 args,
                 scope: _,
             } => {
-                // Word expansion: yield pasta_stdlib::word(ctx, "word", [])
+                // Word expansion: yield Talk(pasta_stdlib::word(ctx, "word", []))
                 let args_str = args
                     .iter()
                     .map(|arg| match arg {
@@ -445,7 +445,7 @@ impl Transpiler {
                     .join(", ");
                 writeln!(
                     writer,
-                    "        yield pasta_stdlib::word(ctx, \"{}\", [{}]);",
+                    "        yield Talk(pasta_stdlib::word(ctx, \"{}\", [{}]));",
                     name, args_str
                 )
                 .map_err(|e| PastaError::io_error(e.to_string()))?;
