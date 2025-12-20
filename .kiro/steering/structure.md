@@ -38,19 +38,11 @@ pasta/
 │   └── ...
 ├── examples/                 # サンプルコード（将来追加）
 ├── benches/                  # ベンチマークコード（将来追加）
-├── .kiro/                    # Kiro Spec-Driven Development設定
-│   ├── steering/            # ステアリング（プロジェクト規約）
-│   │   ├── product.md       # プロダクトビジョン
-│   │   ├── tech.md          # 技術スタック・原則
-│   │   └── structure.md     # このファイル
+├── .kiro/                    # Kiro Spec-Driven設定
+│   ├── steering/            # ステアリング規約
 │   └── specs/               # 仕様管理
-│       ├── completed/       # 完了した仕様
-│       │   ├── pasta-engine-independence/
-│       │   ├── pasta-transpiler-pass2-output/
-│       │   └── ...（計11件）
-│       ├── pasta-yield-propagation/  # 進行中仕様
-│       ├── pasta-word-definition-dsl/
-│       └── ...（計9件）
+│       ├── completed/       # 完了仕様（アーカイブ）
+│       └── <spec-name>/     # 進行中仕様
 ├── Cargo.toml               # Cargo設定
 ├── README.md                # プロジェクト概要
 ├── GRAMMAR.md               # Pasta DSL文法リファレンス
@@ -106,87 +98,34 @@ stdlib, ir
 
 ## テスト構成
 
-### テストカテゴリ
+| カテゴリ | 対象 |
+|---------|------|
+| Parser | 文法パース、エラー、行タイプ |
+| Transpiler | 2パス変換、ラベル管理 |
+| Runtime | Rune VM、ラベル解決、スコープ |
+| Engine | E2E統合、UI独立性 |
+| Control Flow | Call/Jump、並行実行 |
 
-#### パーサーテスト
-- `parser_tests.rs`: 基本文法パース
-- `parser_error_tests.rs`: エラーケース
-- `parser_line_types.rs`: 行タイプ分類
-- `sakura_script_tests.rs`: さくらスクリプトエスケープ
-
-#### トランスパイラテスト
-- `transpile_comprehensive_test.rs`: 総合トランスパイル
-- `two_pass_transpiler_test.rs`: 2パス処理
-- `label_registry_test.rs`: ラベル管理
-- `actor_assignment_test.rs`: アクター変数生成
-
-#### ランタイムテスト
-- `comprehensive_rune_vm_test.rs`: Rune VM基本動作
-- `rune_block_integration_test.rs`: Runeブロック統合
-- `label_resolution_runtime_test.rs`: ラベル解決
-- `function_scope_tests.rs`: 関数スコープ解決
-
-#### エンジンテスト
-- `engine_integration_test.rs`: E2E統合テスト
-- `engine_independence_test.rs`: UI層独立性確認
-- `engine_two_pass_test.rs`: エンジン2パス処理
-- `directory_loader_test.rs`: スクリプトローダー
-
-#### 制御フローテスト
-- `comprehensive_control_flow_test.rs`: Call/Jump文総合
-- `concurrent_execution_test.rs`: 並行実行
-
-#### その他
-- `error_handling_tests.rs`: エラーハンドリング
-- `persistence_test.rs`: 永続化（シリアライゼーション）
-- `stdlib_integration_test.rs`: 標準ライブラリ
-
-### テストフィクスチャ
-`tests/fixtures/` 配下のPastaスクリプト：
-- `simple_hello.pasta`: 基本的な挨拶
-- `comprehensive_control_flow.pasta`: Call/Jump文総合
-- `actor_switch.pasta`: アクター切り替え
-- `label_continuation.pasta`: ラベル継続
+### テストファイル配置
+- `tests/<category>_test.rs`: 統合テスト
+- `tests/fixtures/*.pasta`: テスト用スクリプト
+- `tests/common/`: 共通ユーティリティ
 
 ## ドキュメント構成
 
-### プロジェクトルート
-- **README.md**: プロジェクト概要、クイックスタート
-- **GRAMMAR.md**: Pasta DSL完全文法リファレンス（10セクション、600行超）
-- **AGENTS.md**: AI開発支援・コンテキスト情報
-- **LICENSE**: MIT OR Apache-2.0
+| ファイル | 用途 |
+|---------|------|
+| README.md | プロジェクト概要 |
+| GRAMMAR.md | DSL文法リファレンス |
+| SPECIFICATION.md | 言語仕様書 |
+| AGENTS.md | AI開発支援 |
 
 ### Kiro仕様管理
-- **`.kiro/steering/`**: プロジェクトステアリング（規約・原則）
-- **`.kiro/specs/completed/`**: 完了仕様11件
-  - `pasta-engine-independence`: UI層独立性確立
-  - `pasta-transpiler-pass2-output`: 2パス出力実装
-  - `pasta-label-resolution-runtime`: ラベル解決ランタイム
-  - `pasta-script-loader`: スクリプトローダー
-  - `pasta-declarative-control-flow`: 宣言的制御フロー
-  - `pasta-serialization`: シリアライゼーション
-  - `pasta-transpiler-actor-variables`: アクター変数
-  - `pasta-chain-token-ir-check`: チェイントークンIRチェック
-  - `pasta-test-missing-entry-hash`: エントリーハッシュテスト修正
-  - `pasta-engine-doctest-fix`: Doctest修正
-  - `areka-P0-script-engine`: Arekaスクリプトエンジン統合基盤
-- **`.kiro/specs/`**: 進行中仕様9件
-  - `pasta-yield-propagation`: Yield伝搬問題解決（実装中）
-  - `pasta-word-definition-dsl`: 単語定義DSL（設計段階）
-  - `pasta-local-rune-calls`: ローカルRune呼び出し
-  - `pasta-label-continuation`: ラベル継続
-  - `pasta-call-resolution-priority`: Call解決優先度
-  - `pasta-conversation-inline-multi-stage-resolution`: インライン多段解決
-  - `pasta-dialogue-continuation-syntax`: 対話継続構文
-  - `pasta-jump-function-calls`: Jump関数呼び出し
-  - `ukagaka-desktop-mascot`: 伺かデスクトップマスコット統合メタ仕様（32子仕様管理）
+- `.kiro/steering/`: 規約・原則
+- `.kiro/specs/completed/`: 完了仕様アーカイブ
+- `.kiro/specs/<name>/`: 進行中仕様
 
 ### コードドキュメント
-- `///`ドキュメントコメント: 公開API全体
-- `//!`モジュールコメント: 各モジュール先頭
-- Doctestサンプル: `lib.rs`、主要API
-
-### 将来追加予定
-- **ARCHITECTURE.md**: 詳細アーキテクチャ設計
-- **CHANGELOG.md**: バージョン履歴
-- **examples/**: 使用例スクリプト
+- `///`: 公開APIドキュメント
+- `//!`: モジュール概要
+- Doctest: 使用例をドキュメント内に記述
