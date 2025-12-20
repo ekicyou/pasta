@@ -345,8 +345,8 @@ git mv tests/pasta_transpiler_label_registry_test.rs tests/pasta_transpiler_scen
 # src/transpiler/mod.rs: mod label_registry; → mod scene_registry;
 # src/runtime/mod.rs: mod labels; → mod scene;
 
-# 検証・コミット
-cargo check
+# 検証・コミット（テスト実施）
+cargo test --all
 git add -A
 git commit -m "refactor(label-to-scene): Phase 1 ファイルリネーム完了"
 ```
@@ -376,7 +376,7 @@ git commit -m "refactor(label-to-scene): Phase 2 開始前コミット"
 ```bash
 # IDE Rename実行: LabelDef → SceneDef
 # IDE Rename実行: LabelScope → SceneScope
-cargo check
+cargo test --all
 # 失敗時: 当該ファイルを確認・修正（または grep + sed）
 git add -A
 git commit -m "refactor(label-to-scene): Phase 2.1 Parser層型リネーム完了"
@@ -389,7 +389,7 @@ git commit -m "refactor(label-to-scene): Phase 2.1 Parser層型リネーム完�
 ```bash
 # IDE Rename実行: LabelRegistry → SceneRegistry
 # IDE Rename実行: LabelInfo → SceneInfo
-cargo check
+cargo test --all
 # 失敗時: 修正
 git add -A
 git commit -m "refactor(label-to-scene): Phase 2.2 Transpiler層型リネーム完了"
@@ -404,7 +404,7 @@ git commit -m "refactor(label-to-scene): Phase 2.2 Transpiler層型リネーム�
 # IDE Rename実行: LabelTable → SceneTable
 # IDE Rename実行: LabelId → SceneId
 # IDE Rename実行: LabelInfo → SceneInfo (Runtime版)
-cargo check
+cargo test --all
 # 失敗時: 修正
 git add -A
 git commit -m "refactor(label-to-scene): Phase 2.3 Runtime層型リネーム完了"
@@ -415,13 +415,13 @@ git commit -m "refactor(label-to-scene): Phase 2.3 Runtime層型リネーム完�
 
 ```bash
 # IDE Rename実行: LabelNotFound → SceneNotFound
-cargo check
+cargo test --all
 # 失敗時: 修正
 git add -A
 git commit -m "refactor(label-to-scene): Phase 2.4 Error型リネーム完了"
 ```
 
-#### 2.3. テスト検証
+#### 2.3. 最終テスト検証
 
 ```bash
 cargo test --all
@@ -455,7 +455,7 @@ git commit -m "refactor(label-to-scene): Phase 3 開始前コミット"
 # スネークケース置換: label_* → scene_*
 find src/transpiler src/runtime -name "*.rs" -exec sed -i 's/\blabel_/scene_/g' {} +
 
-cargo check
+cargo test --all
 # 失敗時: 修正
 git add -A
 git commit -m "refactor(label-to-scene): Phase 3.1 label_* 置換完了"
@@ -467,7 +467,7 @@ git commit -m "refactor(label-to-scene): Phase 3.1 label_* 置換完了"
 find src -name "*.rs" -exec sed -i 's/\blabel\b/scene/g' {} +
 find tests -name "*.rs" -exec sed -i 's/\blabel\b/scene/g' {} +
 
-cargo check
+cargo test --all
 # 失敗時: 修正
 git add -A
 git commit -m "refactor(label-to-scene): Phase 3.2 label→scene 置換完了"
@@ -483,7 +483,7 @@ find tests -name "*.rs" -exec sed -i 's/\blabels\b/scenes/g' {} +
 find src -name "*.rs" -exec sed -i 's/\bLabel\b/Scene/g' {} +
 find tests -name "*.rs" -exec sed -i 's/\bLabel\b/Scene/g' {} +
 
-cargo check
+cargo test --all
 # 失敗時: 修正
 git add -A
 git commit -m "refactor(label-to-scene): Phase 3.3 複数形・コメント置換完了"
@@ -529,7 +529,7 @@ git commit -m "refactor(label-to-scene): Phase 4 開始前コミット"
 # src/stdlib/mod.rs で:
 #   "select_label_to_id" → "select_scene_to_id"
 
-cargo check
+cargo test --all
 # 失敗時: 修正
 git add -A
 git commit -m "refactor(label-to-scene): Phase 4 生成コード修正完了"
@@ -590,9 +590,6 @@ grep -r "ラベル" . --include="*.md" | grep -v ".git"
 ### Phase 6: 最終検証
 
 ```bash
-# コンパイル
-cargo check
-
 # 全テスト実行
 cargo test --all
 
