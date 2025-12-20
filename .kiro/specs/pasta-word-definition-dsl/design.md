@@ -338,8 +338,13 @@ impl WordTable {
     /// - module_name: 呼び出し元モジュール名
     /// - key: 検索キー
     /// - filters: 属性フィルタ（将来用、現在は未使用）
-    /// - returns: 選択された単語（マッチなしなら空文字列）
-    pub fn search_word(&mut self, module_name: &str, key: &str, filters: &[String]) -> String;
+    /// - returns: Ok(単語) or Err(PastaError::WordNotFound)
+    pub fn search_word(
+        &mut self, 
+        module_name: &str, 
+        key: &str, 
+        filters: &[String]
+    ) -> Result<String, PastaError>;
     
     /// テスト用: シャッフル無効化
     pub fn set_shuffle_enabled(&mut self, enabled: bool);
@@ -368,8 +373,8 @@ Step 4: キャッシュ処理
   - 残り単語がない場合: 全単語を再シャッフル
 
 Step 5: 返却
-  - 選択された単語を返却
-  - マッチなし時は空文字列を返却
+  - 選択された単語をOk(word)で返却
+  - マッチなし時はErr(PastaError::WordNotFound { key })を返却
 ```
 
 **Preconditions**:
@@ -416,7 +421,12 @@ Step 5: 返却
 /// * `filters` - 属性フィルタ（将来用、現在は未使用）
 /// 
 /// # Returns
-/// 選択された単語文字列（マッチなしなら空文字列）
+/// 選択された単語文字列（エラー時は空文字列）
+/// 
+/// # Error Handling
+/// - WordNotFound: WARNログ発行、空文字列返却
+/// - その他エラー: ERRORログ発行、空文字列返却
+/// - panic禁止（no panic原則）
 pub fn word(
     module_name: String,
     key: String,
@@ -427,7 +437,11 @@ pub fn word(
 **Implementation Notes**
 - 現行実装の`word(ctx, word, args)`から`word(module_name, key, filters)`に変更
 - `WordTable`への参照は`Mutex<WordTable>`でラップ（`select_label_to_id`と同様）
-- エラー時はログ出力して空文字列返却
+- `WordTable::search_word()`呼び出し：
+  - `Ok(word)` → そのまま`word`を返却
+  - `Err(PastaError::WordNotFound)` → WARNログ発行、`""`返却
+  - その他`Err` → ERRORログ発行、`""`返却
+- Rune側にエラーを伝播せず、常に`String`返却（no panic原則）
 
 ---
 
@@ -496,9 +510,14 @@ RadixMap<Vec<usize>>:
 
 | エラー種別 | 発生箇所 | 対応 | ログ |
 |-----------|---------|------|------|
-| 単語未発見 | search_word() | 空文字列返却 | WARN |
-| レジストリ構築失敗 | from_word_def_registry() | Result::Err | ERROR |
+| 単語未発見 | search_word() | Err(WordNotFound) | - |
+| レジストリ構築失敗 | from_word_def_registry() | Err(PastaError) | ERROR |
+| 単語未発見 | word() | 空文字列返却 | WARN |
 | キャッシュロック失敗 | word() | 空文字列返却 | ERROR |
+
+**内部APIと公開APIの分離**:
+- **内部API** (`WordTable::search_word`): `Result<String, PastaError>`返却、テスト可能性高
+- **公開API** (`pasta_stdlib::word`): `String`返却、エラー時はログ発行のみ、no panic
 
 ### Error Categories and Responses
 
