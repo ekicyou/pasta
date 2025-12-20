@@ -190,7 +190,10 @@
 #### Acceptance Criteria
 
 1. When `＠name`が単語辞書で見つからない場合, the Pasta Runtime shall エラーログを出力し、空文字列として処理を継続する（panic禁止）
-2. The Pasta Runtime shall エラーハンドリングに`Result`型を使用し、実行時エラーでもスクリプト実行を停止しない
+2. The Pasta Runtime shall エラーハンドリングに以下の2層戦略を採用する：
+   - **内部API** (`WordTable::search_word`): `Result<String, PastaError>`を返却し、未ヒット時は`Err(PastaError::WordNotFound)`
+   - **公開API** (`pasta_stdlib::word`): `String`を返却し、エラー時はログ発行のみで空文字列を返却（Rune側にエラーを伝播させない、no panic原則）
+   - この設計によりテスト可能性を確保しつつ、Rune側でのエラー処理実装困難性を回避する
 3. The Pasta Error Messages shall 日本語でわかりやすいメッセージを提供する（例：「単語定義 @場所 が見つかりません」）
 
 ### Requirement 8: ドキュメント更新
