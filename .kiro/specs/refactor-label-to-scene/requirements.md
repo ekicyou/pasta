@@ -147,11 +147,11 @@
 
 #### Acceptance Criteria
 
-8.1. The Spec Documents shall `.kiro/specs/completed/` 内の完了仕様で「label/Label」を「scene/Scene」に置換する
+8.1. The Spec Documents shall `.kiro/specs/completed/` 内の完了仕様（全ファイル）で「label/Label」を「scene/Scene」に置換する
 
 8.2. The Spec Documents shall `.kiro/specs/` 内の進行中仕様で「label/Label」を「scene/Scene」に置換する
 
-8.3. The Spec Documents shall 仕様名 `pasta-label-continuation` を `pasta-scene-continuation` にリネームする（ディレクトリ名）
+8.3. The Spec Documents shall 進行中仕様のディレクトリ名で「label」を「scene」に置換する（例: `pasta-label-continuation` → `pasta-scene-continuation`）
 
 ---
 
@@ -211,3 +211,4 @@
 - **文法マーカーの変更**: `＊`（グローバルシーン）、`・`（ローカルシーン）のマーカー文字自体は変更しない
 - **機能変更**: 動作・API・セマンティクスの変更は行わない
 - **外部依存関係**: crates.ioへの公開名やCargo.tomlのパッケージ名は変更しない
+- **仕様の選択的除外**: 完了済み・進行中を問わず、全仕様ドキュメントを置換対象とする（歴史的記録はgit履歴で保持）
