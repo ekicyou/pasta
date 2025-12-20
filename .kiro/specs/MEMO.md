@@ -53,28 +53,62 @@ call/jump/単語呼び出しは、呼び出し条件に一致したセクショ�
 
 ### 開発者確認が必要な項目（TODO）
 
-#### TODO 1: トランスパイラー出力の修正指示
-- **現状**: `src/transpiler/mod.rs` L448で `yield pasta_stdlib::word(ctx, "单語", []);` を生成
-- **要件**: `yield Talk(pasta_stdlib::word(ctx, "单語", []));` に修正
-- **影響**: 現在の `comprehensive_control_flow.transpiled.rn` L9, L51-53の出力形式を変更する必要がある
-- **質問**: この修正を実施してよいか？
+#### TODO 1: トランスパイラー出力の修正指示 ✅ COMPLETED
+- **実施内容**:
+  - `src/transpiler/mod.rs` L448の出力を修正
+  - `yield pasta_stdlib::word(ctx, "単語", []);` → `yield Talk(pasta_stdlib::word(ctx, "単語", []));`
+  - コメント更新: "Word expansion: yield pasta_stdlib::word(...)" → "Word expansion: yield Talk(pasta_stdlib::word(...))"
+- **テスト結果**: ✅ リグレッションなし
+  - `cargo test`: 全テスト成功
+  - `comprehensive_control_flow.transpiled.rn`: 自動生成・更新
+  - 新出力確認: L9, L51-53で word() が Talk() で包まれていることを確認
+- **コミット**: `feat: Wrap word() output in Talk() - トランスパイラー出力修正`
 
-#### TODO 2: ctx.current_module の要件定義への追加
-- **現状**: Requirement 2 AC5, 6 でローカルスコープ判定に `ctx.current_module` を使用と記載
-- **問題**: このフィールドが要件定義に明記されていない
-- **質問**: ランタイムContext構造体に `current_module: String` フィールドを追加する要件を、Requirement 5 に追加すべきか？
+#### TODO 2: ctx.current_module の要件定義への追加 - ディスカッション開始
+- **現状**: 
+  - Requirement 2 AC5, AC6 で`ctx.current_module`を使用してローカルスコープ判定と記載
+  - Requirement 4 AC8 で`(search_key, current_module)`をキャッシュキーとして使用と記載
+- **問題**: ランタイムContext構造体に`current_module`フィールドが要件定義に明記されていない
+- **選択肢**:
+  - **A案**: Requirement 5 AC7（WordTable実装要件）に以下を追加
+    ```
+    The Pasta Runtime shall Context構造体にcurrent_module: Stringフィールドを追加する
+    The Pasta Transpiler shall 関数呼び出しの開始時にctx.current_moduleをグローバルラベル名に設定する
+    The Pasta Transpiler shall 関数終了時にctx.current_moduleを前の値に復元する（ネスト対応）
+    ```
+  - **B案**: 新しいRequirement として「Context拡張」を追加（Requirement 10）
+  - **C案**: Requirement 3（会話内での単語参照）に統合
+- **質問**: どのアプローチを選択すべきでしょうか？
 
-#### TODO 3: Requirement 8 AC4 の乖離
-- **現状**: Requirement 8（ドキュメント）AC4 に「フォールバック検索の順序を明記する」と記載
-- **問題**: Requirement 4 でフォールバック検索を削除したため、ドキュメント要件と矛盾
-- **質問**: AC4を以下のいずれかに修正すべきか？
-  - A案：単語辞書検索の動作のみ記述（フォールバックは記載しない）
-  - B案：AC4をドキュメント要件から削除
-  - C案：AC4は将来対応として保持
+#### TODO 3: Requirement 8 AC4 の設計変更への対応 ✅ COMPLETED
+- **問題**: 
+  - Requirement 8 AC4: 「フォールバック検索の順序を明記する（Rune変数/関数→単語辞書前方一致→前方一致ラベル）」
+  - Requirement 4 でフォールバック検索を削除した（単語定義は前方一致のみ、フォールバックなし）
+  - 矛盾: AC4がフォールバック検索の記述を求めているが、Requirement 4の設計でそれは不要
+- **決定**: AC4を修正
+  - 現在: 「フォールバック検索の順序を明記する...」
+  - 修正後: 「単語辞書検索の前方一致ロジックを説明する（ローカル → グローバル統合マージ）」
+- **実施内容**: requirements.md の Requirement 8 AC4 を更新
+- **備考**: Requirement 9 AC9（サンプルスクリプト）の説明も「フォールバック」→「複合検索」に変更
 
-#### TODO 4: 参照実装ファイルの同期確認
-- **現状**: `comprehensive_control_flow.rn`（参照実装）が古い（2025/12/16）、`comprehensive_control_flow.transpiled.rn`（現出力）が新しい（2025/12/20）
-- **質問**: 参照実装ファイルを現在のトランスパイラー出力に同期すべきか、それとも比較テストを追加して定期同期するか？
+#### TODO 4: 参照実装ファイルの同期確認 - 検討中
+- **現状**: 
+  - `comprehensive_control_flow.rn`（参照実装、手作業メンテナンス）: 最終更新 2025/12/16
+  - `comprehensive_control_flow.transpiled.rn`（現トランスパイラー出力）: 最終更新 2025/12/20（修正済み）
+  - 参照実装は老朽化（4日古い）かつスタイルが異なる（Actor/Talk関数の手作業定義 vs 自動生成）
+- **選択肢**:
+  - **A案**: 参照実装を削除・廃止化する
+    - 理由: 自動生成される`.transpiled.rn`が常にシングルソースオブトゥルース
+    - 手作業メンテナンスの負担を排除
+    - テストは自動生成ファイルのパース確認に集中
+  - **B案**: 参照実装を最新化し、テストとして位置づける
+    - 参照実装 = 期待される出力の手作業リファレンス
+    - テストで`.transpiled.rn`と比較・同期チェック
+    - 手作業メンテナンスコストが高い
+  - **C案**: 参照実装はライブドキュメントとして整理
+    - mock関数を削除し、最小限の構造リファレンスのみ記載
+    - コメントを充実させて使用例説明に特化
+- **質問**: どのアプローチを選択すべきでしょうか？
 
 ---
 

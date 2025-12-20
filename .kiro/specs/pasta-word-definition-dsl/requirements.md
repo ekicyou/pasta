@@ -186,12 +186,12 @@
 1. The Pasta Documentation shall GRAMMAR.mdに「単語定義」セクションを追加し、構文形式を説明する（例：`＠単語名：単語1　単語2`）
 2. The Pasta Documentation shall グローバル/ローカルスコープの使い分け方法を説明する（ラベル外=グローバル、ラベル内=ローカル）
 3. The Pasta Documentation shall 会話行内からの参照方法と複数例を提供する
-4. The Pasta Documentation shall フォールバック検索の順序を明記する（Rune変数/関数→単語辞書前方一致→前方一致ラベル）
+4. The Pasta Documentation shall 単語辞書検索の前方一致ロジックを説明する（ローカル→グローバル統合マージ、複数マッチ時は全単語統合）
 5. The Pasta Documentation shall call/jumpから単語辞書がアクセスされないことを明記する
 6. The Pasta Documentation shall 前方一致検索の動作を具体例で説明する（例：`＠挨`が`＠挨拶`や`＠挨拶_朝`にマッチする）
 7. The Pasta Documentation shall 同名単語定義の自動マージ動作を説明する
 8. The Pasta Documentation shall 引用符エスケープの動作を説明する（例：`「「test」」` → `「test」`）
-9. The Pasta Documentation shall 最低3つの実用的なサンプルスクリプトを提供する（グローバル/ローカル単語定義、前方一致、フォールバックの各ケース）
+9. The Pasta Documentation shall 最低3つの実用的なサンプルスクリプトを提供する（グローバル/ローカル単語定義、前方一致、複合検索の各ケース）
 
 ### Requirement 9: テスト可能性と検証
 
