@@ -32,7 +32,7 @@ pub mod メイン_1 {
         let カウンタ = 10;
         ctx.actor = さくら;
         yield Actor(ctx.actor.name);
-        yield Talk(pasta_stdlib::word(ctx, "挨拶", []));
+        yield Talk(pasta_stdlib::word("", "挨拶", []));
         yield Talk("！");
         ctx.actor = うにゅう;
         yield Actor(ctx.actor.name);
@@ -72,8 +72,8 @@ pub mod メイン_1 {
     pub fn 会話分岐_1(ctx, args) {
         ctx.actor = さくら;
         yield Actor(ctx.actor.name);
-        yield Talk(pasta_stdlib::word(ctx, "場所の天気は", []));
-        yield Talk(pasta_stdlib::word(ctx, "天気だね", []));
+        yield Talk(pasta_stdlib::word("", "場所の天気は", []));
+        yield Talk(pasta_stdlib::word("", "天気だね", []));
         yield Talk("。");
         ctx.actor = うにゅう;
         yield Actor(ctx.actor.name);

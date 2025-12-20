@@ -168,7 +168,10 @@ impl LabelRegistry {
     }
 
     /// Sanitize a label name for use in Rune identifiers.
-    fn sanitize_name(name: &str) -> String {
+    ///
+    /// Replaces any character that is not alphanumeric or underscore with underscore.
+    /// This is used by both LabelRegistry and WordDefRegistry for consistent naming.
+    pub fn sanitize_name(name: &str) -> String {
         name.replace(|c: char| !c.is_alphanumeric() && c != '_', "_")
     }
 }

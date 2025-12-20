@@ -6,14 +6,20 @@
 
 pub mod persistence;
 
+use crate::error::PastaError;
 use crate::ir::{ContentPart, ScriptEvent};
 use crate::runtime::labels::LabelTable;
+use crate::runtime::words::WordTable;
 use rune::{ContextError, Module};
 use std::collections::HashMap;
 use std::sync::Mutex;
+use tracing::{error, warn};
 
 /// Create the Pasta standard library module for Rune.
-pub fn create_module(label_table: LabelTable) -> Result<Module, ContextError> {
+pub fn create_module(
+    label_table: LabelTable,
+    word_table: WordTable,
+) -> Result<Module, ContextError> {
     let mut module = Module::with_crate("pasta_stdlib")?;
 
     // Register emit functions
@@ -49,8 +55,17 @@ pub fn create_module(label_table: LabelTable) -> Result<Module, ContextError> {
         )
         .build()?;
 
-    // Register word expansion functions (P0: stub implementation)
-    module.function("word", word_expansion).build()?;
+    // Register word expansion functions
+    // Wrap in Mutex for interior mutability (search_word needs &mut self)
+    let word_table_mutex = Mutex::new(word_table);
+    module
+        .function(
+            "word",
+            move |module_name: String, key: String, _filters: rune::runtime::Value| {
+                word_expansion(&word_table_mutex, module_name, key)
+            },
+        )
+        .build()?;
 
     // Register event constructor functions
     module.function("Actor", actor_event).build()?;
@@ -124,31 +139,62 @@ fn parse_rune_filters(value: rune::Value) -> Result<HashMap<String, String>, Str
     }
 }
 
-/// P0 implementation: Stub word expansion that returns the word name as-is.
+/// Word expansion function.
 ///
-/// This allows basic testing without implementing the full word dictionary.
-/// P1 will implement proper word expansion with random selection.
+/// Searches for a word in the WordTable and returns a randomly selected value.
+/// Uses a 2-stage search: first local (`:module:key`), then global (`key`).
 ///
 /// # Arguments
-/// * `_ctx` - Context object (unused in P0)
-/// * `word` - Word name to expand
-/// * `_args` - Arguments (unused in P0)
+/// * `word_table` - Shared reference to the WordTable
+/// * `module_name` - Current module name (empty for global context)
+/// * `key` - Word key to search for
 ///
 /// # Returns
-/// A Talk event with the word name
-fn word_expansion(
-    _ctx: rune::runtime::Value,
-    word: String,
-    _args: rune::runtime::Value,
-) -> ScriptEvent {
-    // P0: Just return the word name as text
-    // P1 will implement:
-    // - Word dictionary lookup
-    // - Random selection from alternatives
-    // - Cache-based exhaustion
-    ScriptEvent::Talk {
-        speaker: String::new(),
-        content: vec![ContentPart::Text(word)],
+/// Selected word value, or empty string if not found
+///
+/// # Error Handling
+/// - WordNotFound: Returns empty string with WARN log (no panic principle)
+/// - Lock error: Returns empty string with ERROR log (no panic principle)
+fn word_expansion(word_table: &Mutex<WordTable>, module_name: String, key: String) -> String {
+    // Try to lock the word table
+    let mut table = match word_table.lock() {
+        Ok(guard) => guard,
+        Err(e) => {
+            // Lock poisoned - this is a serious error
+            error!(
+                "単語テーブルのロック取得に失敗しました: module={}, key={}, error={}",
+                module_name, key, e
+            );
+            return String::new();
+        }
+    };
+
+    // Search for the word using 2-stage search
+    match table.search_word(&module_name, &key, &[]) {
+        Ok(word) => word,
+        Err(e) => {
+            // Emit appropriate log based on error type
+            match &e {
+                PastaError::WordNotFound { key: word_key } => {
+                    warn!(
+                        "単語定義 @{} が見つかりません（モジュール: {}）",
+                        word_key,
+                        if module_name.is_empty() {
+                            "グローバル"
+                        } else {
+                            &module_name
+                        }
+                    );
+                }
+                _ => {
+                    error!(
+                        "単語展開エラー: module={}, key={}, error={}",
+                        module_name, key, e
+                    );
+                }
+            }
+            String::new()
+        }
     }
 }
 
@@ -344,13 +390,20 @@ mod tests {
     fn test_create_module() {
         use crate::runtime::labels::LabelTable;
         use crate::runtime::random::DefaultRandomSelector;
+        use crate::runtime::words::WordTable;
+        use crate::transpiler::WordDefRegistry;
 
         // Create a test label table
         let selector = Box::new(DefaultRandomSelector::new());
         let table = LabelTable::new(selector);
 
+        // Create a test word table
+        let word_selector = Box::new(DefaultRandomSelector::new());
+        let word_registry = WordDefRegistry::new();
+        let word_table = WordTable::from_word_def_registry(word_registry, word_selector);
+
         // Test that module creation succeeds
-        let result = create_module(table);
+        let result = create_module(table, word_table);
         assert!(result.is_ok());
     }
 

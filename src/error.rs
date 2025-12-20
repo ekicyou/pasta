@@ -114,6 +114,10 @@ pub enum PastaError {
     /// Multiple parse errors.
     #[error("Multiple parse errors ({} errors). See logs for details.", .errors.len())]
     MultipleParseErrors { errors: Vec<ParseErrorInfo> },
+
+    /// Word definition not found.
+    #[error("単語定義 @{key} が見つかりません")]
+    WordNotFound { key: String },
 }
 
 /// Individual parse error information for MultipleParseErrors.

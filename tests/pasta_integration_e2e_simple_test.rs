@@ -4,6 +4,13 @@ use pasta::parser::parse_str;
 use pasta::transpiler::Transpiler;
 use rune::{Context, Sources, Vm};
 
+/// Helper to create a test word table
+fn create_test_word_table() -> pasta::runtime::words::WordTable {
+    let selector = Box::new(pasta::runtime::random::DefaultRandomSelector::new());
+    let registry = pasta::transpiler::WordDefRegistry::new();
+    pasta::runtime::words::WordTable::from_word_def_registry(registry, selector)
+}
+
 #[test]
 fn test_simple_end_to_end() {
     // Simple pasta script
@@ -36,10 +43,11 @@ pub mod actors {
     // Create dummy label table for testing
     let selector = Box::new(pasta::runtime::random::DefaultRandomSelector::new());
     let table = pasta::runtime::labels::LabelTable::new(selector);
+    let word_table = create_test_word_table();
 
     let mut context = Context::with_default_modules().expect("Failed to create context");
     context
-        .install(pasta::stdlib::create_module(table).expect("Failed to create stdlib"))
+        .install(pasta::stdlib::create_module(table, word_table).expect("Failed to create stdlib"))
         .expect("Failed to install stdlib");
 
     let mut sources = Sources::new();
@@ -108,10 +116,11 @@ pub mod actors {
     // Create dummy label table for testing
     let selector = Box::new(pasta::runtime::random::DefaultRandomSelector::new());
     let table = pasta::runtime::labels::LabelTable::new(selector);
+    let word_table = create_test_word_table();
 
     let mut context = Context::with_default_modules().expect("Failed to create context");
     context
-        .install(pasta::stdlib::create_module(table).expect("Failed to create stdlib"))
+        .install(pasta::stdlib::create_module(table, word_table).expect("Failed to create stdlib"))
         .expect("Failed to install stdlib");
 
     let mut sources = Sources::new();

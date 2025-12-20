@@ -2,7 +2,7 @@
 // Writeトレイトへの出力と2パス処理を検証
 
 use pasta::parser::parse_str;
-use pasta::transpiler::{LabelRegistry, Transpiler};
+use pasta::transpiler::{LabelRegistry, Transpiler, WordDefRegistry};
 
 #[test]
 fn test_two_pass_transpiler_to_vec() {
@@ -15,10 +15,11 @@ fn test_two_pass_transpiler_to_vec() {
     let ast = parse_str(pasta_code, "test.pasta").unwrap();
 
     // Pass 1: Output to Vec<u8>
-    let mut registry = LabelRegistry::new();
+    let mut label_registry = LabelRegistry::new();
+    let mut word_registry = WordDefRegistry::new();
     let mut output = Vec::new();
 
-    Transpiler::transpile_pass1(&ast, &mut registry, &mut output).unwrap();
+    Transpiler::transpile_pass1(&ast, &mut label_registry, &mut word_registry, &mut output).unwrap();
 
     let pass1_output = String::from_utf8(output.clone()).unwrap();
     println!("Pass 1 output:\n{}", pass1_output);
@@ -29,7 +30,7 @@ fn test_two_pass_transpiler_to_vec() {
     assert!(!pass1_output.contains("pub mod pasta")); // mod pasta not yet generated
 
     // Pass 2: Append mod pasta
-    Transpiler::transpile_pass2(&registry, &mut output).unwrap();
+    Transpiler::transpile_pass2(&label_registry, &mut output).unwrap();
 
     let final_output = String::from_utf8(output).unwrap();
     println!("\nFinal output:\n{}", final_output);
@@ -66,22 +67,23 @@ fn test_two_pass_transpiler_to_string() {
     let ast = parse_str(pasta_code, "test.pasta").unwrap();
 
     // Pass 1: Output to String (via Vec<u8>)
-    let mut registry = LabelRegistry::new();
+    let mut label_registry = LabelRegistry::new();
+    let mut word_registry = WordDefRegistry::new();
 
     // String doesn't impl Write, so use Vec<u8>
     let mut buffer = Vec::new();
-    Transpiler::transpile_pass1(&ast, &mut registry, &mut buffer).unwrap();
+    Transpiler::transpile_pass1(&ast, &mut label_registry, &mut word_registry, &mut buffer).unwrap();
     let mut output = String::from_utf8(buffer).unwrap();
 
     // Verify labels are registered
-    let labels = registry.all_labels();
+    let labels = label_registry.all_labels();
     assert_eq!(labels.len(), 2);
     assert_eq!(labels[0].name, "会話");
     assert_eq!(labels[1].name, "別会話");
 
     // Pass 2
     let mut buffer = Vec::new();
-    Transpiler::transpile_pass2(&registry, &mut buffer).unwrap();
+    Transpiler::transpile_pass2(&label_registry, &mut buffer).unwrap();
     let pass2_output = String::from_utf8(buffer).unwrap();
 
     output.push_str(&pass2_output);
@@ -138,17 +140,18 @@ fn test_multiple_files_simulation() {
     let ast2 = parse_str(file2, "file2.pasta").unwrap();
 
     // Shared registry across files
-    let mut registry = LabelRegistry::new();
+    let mut label_registry = LabelRegistry::new();
+    let mut word_registry = WordDefRegistry::new();
     let mut output = Vec::new();
 
     // Pass 1 for file1
-    Transpiler::transpile_pass1(&ast1, &mut registry, &mut output).unwrap();
+    Transpiler::transpile_pass1(&ast1, &mut label_registry, &mut word_registry, &mut output).unwrap();
 
     // Pass 1 for file2
-    Transpiler::transpile_pass1(&ast2, &mut registry, &mut output).unwrap();
+    Transpiler::transpile_pass1(&ast2, &mut label_registry, &mut word_registry, &mut output).unwrap();
 
     // Pass 2 once for all files
-    Transpiler::transpile_pass2(&registry, &mut output).unwrap();
+    Transpiler::transpile_pass2(&label_registry, &mut output).unwrap();
 
     let final_output = String::from_utf8(output).unwrap();
     println!("Multi-file output:\n{}", final_output);

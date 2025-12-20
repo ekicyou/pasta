@@ -16,6 +16,13 @@ mod common;
 use common::{create_test_script, get_test_persistence_dir};
 use pasta::{PastaEngine, PastaError};
 
+/// Helper to create a test word table
+fn create_test_word_table() -> pasta::runtime::words::WordTable {
+    let selector = Box::new(pasta::runtime::random::DefaultRandomSelector::new());
+    let registry = pasta::transpiler::WordDefRegistry::new();
+    pasta::runtime::words::WordTable::from_word_def_registry(registry, selector)
+}
+
 // ============================================================================
 // Category 1: Parse-time Errors (Static Errors)
 // ============================================================================
@@ -149,8 +156,9 @@ fn test_dynamic_error_from_rune_script() {
     // by checking the module can be created
     let selector = Box::new(pasta::runtime::random::DefaultRandomSelector::new());
     let table = pasta::runtime::labels::LabelTable::new(selector);
+    let word_table = create_test_word_table();
 
-    let result = pasta::stdlib::create_module(table);
+    let result = pasta::stdlib::create_module(table, word_table);
     assert!(
         result.is_ok(),
         "Stdlib module with emit_error should be created"
