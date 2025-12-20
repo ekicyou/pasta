@@ -350,7 +350,7 @@ cargo clippy       # リントエラー確認
 
 2. **ファイル名変更手順書**
    - `src/transpiler/label_registry.rs` → `scene_registry.rs`
-   - `src/runtime/labels.rs` → `scenes.rs`（注: 複数形）
+   - `src/runtime/labels.rs` → `scene.rs`（注: 単数形、議題1で決定）
    - mod.rs修正箇所の特定
 
 3. **検証チェックリスト**

@@ -13,12 +13,14 @@
 
 **原則**: プロジェクト内の全ての「ラベル」（日本語）、「label」（英語）を機械的に「シーン」、「scene」に置換します。
 
+**複数形**: 英語の複数形 `labels` も `scenes` に置換します。
+
 **対象**:
-- Rustソースコード（型名、関数名、変数名、引数名、コメント）
+- Rustソースコード（型名、関数名、変数名、引数名、コメント、複数形含む）
 - Markdownドキュメント（技術文書、仕様書、README、ステアリング）
 - テストコード（ファイル名、関数名、アサーションメッセージ）
 - 生成されるRuneコード（変数名、関数名、エラーメッセージ）
-- ファイル名（例: `label_registry.rs` → `scene_registry.rs`）
+- ファイル名（例: `label_registry.rs` → `scene_registry.rs`、`labels.rs` → `scene.rs`）
 - ディレクトリ名（例: `.kiro/specs/refactor-label-to-scene/`）
 
 **例外**: Out of Scopeセクションを参照。理由が明示されている箱所のみ置換しない。
