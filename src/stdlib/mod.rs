@@ -388,7 +388,7 @@ mod tests {
 
     #[test]
     fn test_create_module() {
-        use crate::runtime::labels::LabelTable;
+        use crate::runtime::scene::LabelTable;
         use crate::runtime::random::DefaultRandomSelector;
         use crate::runtime::words::WordTable;
         use crate::transpiler::WordDefRegistry;

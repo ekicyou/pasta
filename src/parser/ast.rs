@@ -22,8 +22,8 @@ pub struct PastaFile {
     pub path: PathBuf,
     /// Global word definitions
     pub global_words: Vec<WordDef>,
-    /// All global labels defined in the file
-    pub labels: Vec<LabelDef>,
+    /// All global scenes defined in the file
+    pub scenes: Vec<SceneDef>,
     /// Source location span
     pub span: Span,
 }
@@ -39,33 +39,33 @@ pub struct WordDef {
     pub span: Span,
 }
 
-/// Label definition (global or local)
+/// Scene definition (global or local)
 #[derive(Debug, Clone)]
-pub struct LabelDef {
-    /// Label name (without marker prefix)
+pub struct SceneDef {
+    /// Scene name (without marker prefix)
     pub name: String,
-    /// Scope of the label (global or local)
-    pub scope: LabelScope,
+    /// Scope of the scene (global or local)
+    pub scope: SceneScope,
     /// Parameters for this label (e.g., `＄値` in `ーカウント表示　＄値`)
     pub params: Vec<String>,
     /// Attributes attached to this label
     pub attributes: Vec<Attribute>,
-    /// Local word definitions within this label
+    /// Local word definitions within this scene
     pub local_words: Vec<WordDef>,
-    /// Local labels nested within this label (only for global labels)
-    pub local_labels: Vec<LabelDef>,
-    /// Statements in this label's body
+    /// Local scenes nested within this scene (only for global scenes)
+    pub local_scenes: Vec<SceneDef>,
+    /// Statements in this scene's body
     pub statements: Vec<Statement>,
     /// Source location span
     pub span: Span,
 }
 
-/// Label scope
+/// Scene scope
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LabelScope {
-    /// Global label (accessible from anywhere)
+pub enum SceneScope {
+    /// Global scene (accessible from anywhere)
     Global,
-    /// Local label (accessible only within parent global label)
+    /// Local scene (accessible only within parent global scene)
     Local,
 }
 

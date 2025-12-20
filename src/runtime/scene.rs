@@ -1,31 +1,31 @@
-//! Label management for Pasta scripts.
+//! Scene management for Pasta scripts.
 //!
-//! This module provides label registration, lookup, and random selection
-//! for labels with the same name.
+//! This module provides scene registration, lookup, and random selection
+//! for scenes with the same name.
 
 use crate::runtime::random::RandomSelector;
-use crate::{LabelScope, PastaError};
+use crate::{SceneScope, PastaError};
 use fast_radix_trie::RadixMap;
 use std::collections::HashMap;
 
-/// Unique identifier for a label (Vec index).
+/// Unique identifier for a scene (Vec index).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct LabelId(pub usize);
 
-/// Information about a single label.
+/// Information about a single scene.
 #[derive(Debug, Clone)]
 pub struct LabelInfo {
-    /// Unique identifier for this label.
+    /// Unique identifier for this scene.
     pub id: LabelId,
-    /// Label name.
+    /// Scene name.
     pub name: String,
-    /// Label scope.
-    pub scope: LabelScope,
+    /// Scene scope.
+    pub scope: SceneScope,
     /// Attributes for filtering.
     pub attributes: HashMap<String, String>,
     /// Generated function name in Rune code.
     pub fn_name: String,
-    /// Parent label name (for local labels).
+    /// Parent scene name (for local scenes).
     pub parent: Option<String>,
 }
 
@@ -100,9 +100,9 @@ impl LabelTable {
                 id: LabelId(idx),
                 name: registry_info.name.clone(),
                 scope: if registry_info.parent.is_some() {
-                    LabelScope::Local
+                    SceneScope::Local
                 } else {
-                    LabelScope::Global
+                    SceneScope::Global
                 },
                 attributes: registry_info.attributes.clone(),
                 fn_name: registry_info.fn_name.clone(),
@@ -250,11 +250,11 @@ mod tests {
     use super::*;
     use crate::runtime::random::MockRandomSelector;
 
-    fn create_test_label_info(id: usize, name: &str, fn_name: &str) -> LabelInfo {
+    fn create_test_scene_info(id: usize, name: &str, fn_name: &str) -> LabelInfo {
         LabelInfo {
             id: LabelId(id),
             name: name.to_string(),
-            scope: LabelScope::Global,
+            scope: SceneScope::Global,
             attributes: HashMap::new(),
             fn_name: fn_name.to_string(),
             parent: None,
@@ -262,10 +262,10 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_label_id_basic() {
+    fn test_resolve_scene_id_basic() {
         let selector = Box::new(MockRandomSelector::new(vec![0]));
         let mut table = LabelTable {
-            labels: vec![create_test_label_info(0, "test", "test_1::__start__")],
+            labels: vec![create_test_scene_info(0, "test", "test_1::__start__")],
             prefix_index: {
                 let mut map = RadixMap::new();
                 map.insert(b"test_1::__start__", vec![LabelId(0)]);

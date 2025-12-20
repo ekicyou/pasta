@@ -30,7 +30,7 @@ pub fn parse_str(source: &str, filename: &str) -> Result<PastaFile, PastaError> 
 
     let file_pair = pairs.next().unwrap(); // file rule always produces one pair
     let mut global_words = Vec::new();
-    let mut labels = Vec::new();
+    let mut scenes = Vec::new();
 
     for pair in file_pair.into_inner() {
         match pair.as_rule() {
@@ -42,7 +42,7 @@ pub fn parse_str(source: &str, filename: &str) -> Result<PastaFile, PastaError> 
                             global_words.push(parse_word_def(inner_pair)?);
                         }
                         Rule::global_label => {
-                            labels.push(parse_global_label(inner_pair)?);
+                            scenes.push(parse_global_scene(inner_pair)?);
                         }
                         _ => {}
                     }
@@ -52,7 +52,7 @@ pub fn parse_str(source: &str, filename: &str) -> Result<PastaFile, PastaError> 
                 global_words.push(parse_word_def(pair)?);
             }
             Rule::global_label => {
-                labels.push(parse_global_label(pair)?);
+                scenes.push(parse_global_scene(pair)?);
             }
             Rule::EOI => {} // End of input, ignore
             _ => {}
@@ -64,7 +64,7 @@ pub fn parse_str(source: &str, filename: &str) -> Result<PastaFile, PastaError> 
     Ok(PastaFile {
         path: Path::new(filename).to_path_buf(),
         global_words,
-        labels,
+        scenes,
         span,
     })
 }
@@ -100,7 +100,7 @@ fn parse_word_def(pair: Pair<Rule>) -> Result<WordDef, PastaError> {
     Ok(WordDef { name, values, span })
 }
 
-fn parse_global_label(pair: Pair<Rule>) -> Result<LabelDef, PastaError> {
+fn parse_global_scene(pair: Pair<Rule>) -> Result<SceneDef, PastaError> {
     let span_pest = pair.as_span();
     let start = span_pest.start_pos().line_col();
     let end = span_pest.end_pos().line_col();
@@ -109,7 +109,7 @@ fn parse_global_label(pair: Pair<Rule>) -> Result<LabelDef, PastaError> {
     let mut name = String::new();
     let mut attributes = Vec::new();
     let mut local_words = Vec::new();
-    let mut local_labels = Vec::new();
+    let mut local_scenes = Vec::new();
     let mut statements = Vec::new();
 
     for inner_pair in pair.into_inner() {
@@ -168,7 +168,7 @@ fn parse_global_label(pair: Pair<Rule>) -> Result<LabelDef, PastaError> {
                             // Skip marker
                         }
                         Rule::local_label_content => {
-                            local_labels.push(parse_local_label_content(content_pair)?);
+                            local_scenes.push(parse_local_scene_content(content_pair)?);
                         }
                         Rule::call_marker => {
                             // Skip marker
@@ -190,19 +190,19 @@ fn parse_global_label(pair: Pair<Rule>) -> Result<LabelDef, PastaError> {
         }
     }
 
-    Ok(LabelDef {
+    Ok(SceneDef {
         name,
-        scope: LabelScope::Global,
-        params: Vec::new(), // Global labels don't have params
+        scope: SceneScope::Global,
+        params: Vec::new(), // Global scenes don't have params
         attributes,
         local_words,
-        local_labels,
+        local_scenes,
         statements,
         span,
     })
 }
 
-fn parse_local_label_content(pair: Pair<Rule>) -> Result<LabelDef, PastaError> {
+fn parse_local_scene_content(pair: Pair<Rule>) -> Result<SceneDef, PastaError> {
     let span_pest = pair.as_span();
     let start = span_pest.start_pos().line_col();
     let end = span_pest.end_pos().line_col();
@@ -283,13 +283,13 @@ fn parse_local_label_content(pair: Pair<Rule>) -> Result<LabelDef, PastaError> {
         }
     }
 
-    Ok(LabelDef {
+    Ok(SceneDef {
         name,
-        scope: LabelScope::Local,
+        scope: SceneScope::Local,
         params,
         attributes,
         local_words,
-        local_labels: Vec::new(),
+        local_scenes: Vec::new(),
         statements,
         span,
     })

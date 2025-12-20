@@ -119,14 +119,14 @@ impl PastaEngine {
         let loaded = DirectoryLoader::load(path)?;
 
         // Step 2: Parse all .pasta files (collect errors)
-        let mut all_labels = Vec::new();
+        let mut all_scenes = Vec::new();
         let mut all_global_words = Vec::new();
         let mut parse_errors = Vec::new();
 
         for pasta_file in &loaded.pasta_files {
             match parse_file(pasta_file) {
                 Ok(ast) => {
-                    all_labels.extend(ast.labels);
+                    all_scenes.extend(ast.scenes);
                     all_global_words.extend(ast.global_words);
                 }
                 Err(e) => {
@@ -152,7 +152,7 @@ impl PastaEngine {
         let merged_ast = PastaFile {
             path: loaded.script_root.clone(),
             global_words: all_global_words,
-            labels: all_labels,
+            scenes: all_scenes,
             span: crate::parser::Span::new(1, 1, 1, 0),
         };
 

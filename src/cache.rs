@@ -125,7 +125,7 @@ mod tests {
         assert!(cached.is_some());
 
         let (cached_ast, cached_rune) = cached.unwrap();
-        assert_eq!(cached_ast.labels.len(), ast.labels.len());
+        assert_eq!(cached_ast.scenes.len(), ast.scenes.len());
         assert_eq!(cached_rune, rune_source);
         assert_eq!(cache.len(), 1);
     }
