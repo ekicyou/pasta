@@ -330,62 +330,294 @@ refactor(label-to-scene): Phase N 完了 - <フェーズ説明>
 ### Phase 1: ファイルリネーム
 
 ```bash
+# 前提コミット
+git add -A
+git commit -m "refactor(label-to-scene): Phase 1 開始前コミット"
+
+# ファイルリネーム実行
 git mv src/transpiler/label_registry.rs src/transpiler/scene_registry.rs
 git mv src/runtime/labels.rs src/runtime/scene.rs
 git mv tests/label_id_consistency_test.rs tests/scene_id_consistency_test.rs
 git mv tests/pasta_engine_label_resolution_test.rs tests/pasta_engine_scene_resolution_test.rs
 git mv tests/pasta_transpiler_label_registry_test.rs tests/pasta_transpiler_scene_registry_test.rs
-```
 
-### Phase 2: 型名リネーム
+# mod.rs 内の宣言更新
+# src/transpiler/mod.rs: mod label_registry; → mod scene_registry;
+# src/runtime/mod.rs: mod labels; → mod scene;
 
-IDE (VS Code + rust-analyzer) の Rename 機能を使用：
-1. `LabelRegistry` → `SceneRegistry`
-2. `LabelInfo` → `SceneInfo`（両方）
-3. `LabelDef` → `SceneDef`
-4. `LabelScope` → `SceneScope`
-5. `LabelTable` → `SceneTable`
-6. `LabelId` → `SceneId`
-7. `LabelNotFound` → `SceneNotFound`
-
-#### Phase 2A: IDE Rename 実行
-
-上記7つの型名を rust-analyzer で Rename。
-
-#### Phase 2B: IDE Rename 検証
-
-IDE Rename 後、即座に検証：
-```bash
+# 検証・コミット
 cargo check
+git add -A
+git commit -m "refactor(label-to-scene): Phase 1 ファイルリネーム完了"
 ```
 
-**失敗時のフォールバック**:
-- cargo check でコンパイルエラーが発生した場合、当該ファイル・行を確認
-- IDE Rename で漏れた箇所を手動で grep + sed で置換
-- 例: `grep -n "LabelRegistry" src/**/*.rs` で残存確認
+### Phase 2: 型名リネーム（グラデュアル方式）
+
+**方針**: 実施前コミット → Rename → cargo check → 修正 → コミット を繰り返し、修正不可能な問題を事前に防止。
+
+**実行主体**: AI（開発者）がリネームを実施。
+
+#### 2.1. 前提コミット
+
+```bash
+git status
+git add -A
+git commit -m "refactor(label-to-scene): Phase 2 開始前コミット"
+```
+
+#### 2.2. グラデュアルリネーム（4チャンク）
+
+各チャンク：**リネーム → cargo check → 修正必要なら修正 → コミット**
+
+**チャンク1** (Parser層):
+1. `LabelDef` → `SceneDef` (src/parser/ast.rs で定義)
+2. `LabelScope` → `SceneScope` (src/parser/ast.rs で定義)
+
+```bash
+# IDE Rename実行: LabelDef → SceneDef
+# IDE Rename実行: LabelScope → SceneScope
+cargo check
+# 失敗時: 当該ファイルを確認・修正（または grep + sed）
+git add -A
+git commit -m "refactor(label-to-scene): Phase 2.1 Parser層型リネーム完了"
+```
+
+**チャンク2** (Transpiler層):
+1. `LabelRegistry` → `SceneRegistry` (src/transpiler/scene_registry.rs)
+2. `LabelInfo` → `SceneInfo` (src/transpiler/scene_registry.rs)
+
+```bash
+# IDE Rename実行: LabelRegistry → SceneRegistry
+# IDE Rename実行: LabelInfo → SceneInfo
+cargo check
+# 失敗時: 修正
+git add -A
+git commit -m "refactor(label-to-scene): Phase 2.2 Transpiler層型リネーム完了"
+```
+
+**チャンク3** (Runtime層):
+1. `LabelTable` → `SceneTable` (src/runtime/scene.rs)
+2. `LabelId` → `SceneId` (src/runtime/scene.rs)
+3. `LabelInfo` → `SceneInfo` (src/runtime/scene.rs)
+
+```bash
+# IDE Rename実行: LabelTable → SceneTable
+# IDE Rename実行: LabelId → SceneId
+# IDE Rename実行: LabelInfo → SceneInfo (Runtime版)
+cargo check
+# 失敗時: 修正
+git add -A
+git commit -m "refactor(label-to-scene): Phase 2.3 Runtime層型リネーム完了"
+```
+
+**チャンク4** (Error/その他):
+1. `LabelNotFound` → `SceneNotFound` (src/error.rs)
+
+```bash
+# IDE Rename実行: LabelNotFound → SceneNotFound
+cargo check
+# 失敗時: 修正
+git add -A
+git commit -m "refactor(label-to-scene): Phase 2.4 Error型リネーム完了"
+```
+
+#### 2.3. テスト検証
+
+```bash
+cargo test --all
+# 失敗時: テストコード修正 → 再度 cargo test --all → コミット
+git add -A
+git commit -m "refactor(label-to-scene): Phase 2 テスト修正・検証完了"
+```
 
 ### Phase 3: 変数名・コメント置換
 
-PowerShell/sed スクリプトで一括置換。
+**方針**: Phase 2 同様、段階的チェック・コミット方式を採用。
 
-### Phase 4: 生成コード修正
+**実行主体**: AI（開発者）が置換スクリプト実施。
 
-`src/transpiler/mod.rs`, `src/stdlib/mod.rs` を手動編集。
+#### 3.1. 対象ファイル確認・スクリプト準備
+
+```bash
+# 対象ファイルリスト作成
+find src -name "*.rs" -type f > /tmp/rust_files.txt
+find tests -name "*.rs" -type f >> /tmp/rust_files.txt
+
+# 前提コミット
+git add -A
+git commit -m "refactor(label-to-scene): Phase 3 開始前コミット"
+```
+
+#### 3.2. グラデュアル置換（3チャンク）
+
+**チャンク1** (Transpiler・Runtime層の変数):
+```bash
+# スネークケース置換: label_* → scene_*
+find src/transpiler src/runtime -name "*.rs" -exec sed -i 's/\blabel_/scene_/g' {} +
+
+cargo check
+# 失敗時: 修正
+git add -A
+git commit -m "refactor(label-to-scene): Phase 3.1 label_* 置換完了"
+```
+
+**チャンク2** (ローカル変数・引数: label → scene):
+```bash
+# 単語境界を考慮した置換
+find src -name "*.rs" -exec sed -i 's/\blabel\b/scene/g' {} +
+find tests -name "*.rs" -exec sed -i 's/\blabel\b/scene/g' {} +
+
+cargo check
+# 失敗時: 修正
+git add -A
+git commit -m "refactor(label-to-scene): Phase 3.2 label→scene 置換完了"
+```
+
+**チャンク3** (複数形: labels → scenes、コメント内のLabel):
+```bash
+# 複数形置換
+find src -name "*.rs" -exec sed -i 's/\blabels\b/scenes/g' {} +
+find tests -name "*.rs" -exec sed -i 's/\blabels\b/scenes/g' {} +
+
+# コメント内のLabel（キャメルケース）
+find src -name "*.rs" -exec sed -i 's/\bLabel\b/Scene/g' {} +
+find tests -name "*.rs" -exec sed -i 's/\bLabel\b/Scene/g' {} +
+
+cargo check
+# 失敗時: 修正
+git add -A
+git commit -m "refactor(label-to-scene): Phase 3.3 複数形・コメント置換完了"
+```
+
+#### 3.3. テスト検証（重要：トランスパイラー出力修正含む）
+
+```bash
+cargo test --all
+```
+
+**テスト失敗時の対応**（必須スコープ）:
+- トランスパイラー出力の変更により、テストが失敗する可能性あり
+- テストコード内の期待値（assertion）を修正
+  - 例：`label_selector` → `scene_selector`
+  - 例：`label_fn` → `scene_fn`
+  - 例：ラベルID関連のエラーメッセージ修正
+- テスト修正後、再度 `cargo test --all` で検証
+- コミット: `git commit -m "refactor(label-to-scene): Phase 3 テスト修正・検証完了"`
+
+### Phase 4: 生成コード修正（Transpiler出力）
+
+**方針**: Transpiler が生成する Rune コード内の識別子を修正。
+
+#### 4.1. 前提コミット
+
+```bash
+git add -A
+git commit -m "refactor(label-to-scene): Phase 4 開始前コミット"
+```
+
+#### 4.2. 生成コード修正
+
+対象ファイル：
+- `src/transpiler/mod.rs`: `label_selector` → `scene_selector`、エラーメッセージ修正
+- `src/stdlib/mod.rs`: `select_label_to_id` → `select_scene_to_id`
+
+```bash
+# 手動編集（IDE検索置換利用）:
+# src/transpiler/mod.rs で:
+#   "label_selector" → "scene_selector"
+#   "ラベルID" → "シーンID"
+# src/stdlib/mod.rs で:
+#   "select_label_to_id" → "select_scene_to_id"
+
+cargo check
+# 失敗時: 修正
+git add -A
+git commit -m "refactor(label-to-scene): Phase 4 生成コード修正完了"
+```
+
+#### 4.3. テスト検証
+
+```bash
+cargo test --all
+# 失敗時: テスト修正 → 再度 cargo test --all → コミット
+```
 
 ### Phase 5: Markdown置換
 
-PowerShell/sed スクリプトで一括置換。
+**方針**: Markdown ドキュメント内の用語を置換。
 
-### Phase 6: 検証
+**実行主体**: AI（開発者）が戦略的に実施。
+
+#### 5.1. 対象ドキュメント確認
 
 ```bash
-cargo check && cargo test --all && cargo clippy
+# 前提コミット
+git add -A
+git commit -m "refactor(label-to-scene): Phase 5 開始前コミット"
+```
+
+#### 5.2. グラデュアル Markdown 置換
+
+**チャンク1** (ステアリング・メイン仕様):
+```bash
+# .kiro/steering/ と メイン仕様（GRAMMAR.md, SPECIFICATION.md, README.md）
+# 長いパターンから先に置換: グローバルラベル→グローバルシーン等
+# 最後に短いパターン: ラベル→シーン
+
+# 置換スクリプト実行（パターン順序重視）
+grep -r "ラベル" .kiro/steering/ GRAMMAR.md SPECIFICATION.md README.md
+# 置換実行後:
+git add -A
+git commit -m "refactor(label-to-scene): Phase 5.1 ステアリング・メイン仕様置換完了"
+```
+
+**チャンク2** (Examples・完了仕様):
+```bash
+# examples/ と .kiro/specs/completed/ 
+grep -r "ラベル" examples/ .kiro/specs/completed/
+# 置換実行後:
+git add -A
+git commit -m "refactor(label-to-scene): Phase 5.2 Examples・完了仕様置換完了"
+```
+
+#### 5.3. grep 確認
+
+```bash
+# 残存確認
+grep -r "ラベル" . --include="*.md" | grep -v ".git"
+```
+
+### Phase 6: 最終検証
+
+```bash
+# コンパイル
+cargo check
+
+# 全テスト実行
+cargo test --all
+
+# Lint
+cargo clippy
+
+# 残存チェック（Rust）
+grep -r "\blabel\b\|\bLabel\b" src/ tests/
+
+# 残存チェック（Markdown）
+grep -r "ラベル" *.md .kiro/ examples/ | grep -v ".git"
+
+# すべてクリア後
+git add -A
+git commit -m "refactor(label-to-scene): Phase 6 最終検証完了"
 ```
 
 ### Phase 7: ディレクトリリネーム（最後）
 
 ```bash
+# 最後に仕様ディレクトリ自体をリネーム（オプション）
 git mv .kiro/specs/refactor-label-to-scene .kiro/specs/refactor-scene
+
+git add -A
+git commit -m "refactor(label-to-scene): Phase 7 ディレクトリリネーム・リファクタリング完了"
 ```
 
 ## Supporting References
