@@ -213,11 +213,14 @@ flowchart TD
 6. `Label not found` → `Scene not found`
 7. `label` → `scene` （最後に基本形、単語境界考慮）
 
-**対象ファイル**:
+**対象ファイル** (限定的):
+
+仕様書（Req 1.1-1.6, 2.1-2.4）で指定されたファイルのみ：
 - `GRAMMAR.md`, `SPECIFICATION.md`, `README.md`
-- `.kiro/steering/*.md`
-- `.kiro/specs/**/*.md`
+- `.kiro/steering/*.md` (product.md, tech.md, structure.md, grammar.md, workflow.md)
 - `examples/**/*.md`
+
+**除外**: `.kiro/specs/` 内の他仕様ディレクトリ（例：pasta-grammar-revision など）は置換対象外。本リファクタリング仕様内の spec.md/design.md/research.md は最後に個別確認。
 
 #### Validator
 
@@ -254,14 +257,60 @@ grep -r "ラベル" *.md .kiro/ examples/
 ### Error Strategy
 
 リファクタリング中のエラーは即座に停止し、手動修正後に再開。
+各フェーズ完了後にマイルストーンコミットを実行し、ロールバック対応を容易にする。
 
 ### Error Categories and Responses
 
 | エラー種別 | 対応 |
 |-----------|------|
-| コンパイルエラー | 当該ファイルを手動確認・修正 |
-| テスト失敗 | テストコードの置換漏れを確認 |
+| コンパイルエラー | 当該ファイルを手動確認・修正、またはフォールバック手順実行 |
+| テスト失敗 | テストコードの置換漏れを確認、手動修正 |
 | grep残存検出 | 漏れ箇所を手動置換 |
+
+### ロールバック戦略
+
+大規模エラー発生時の復旧手順：
+
+#### マイルストーンコミット
+
+各フェーズ完了後に確認ポイント設置：
+
+| フェーズ | 検証コマンド | コミット |
+|---------|-------------|---------|
+| Phase 1完了 | `git status` + `cargo check` | ✓ マイルストーン1 |
+| Phase 2完了 | `cargo check` + `cargo test --all` | ✓ マイルストーン2 |
+| Phase 3完了 | `cargo clippy` | ✓ マイルストーン3 |
+| Phase 4完了 | `cargo test --all` | ✓ マイルストーン4 |
+| Phase 5完了 | grep確認 | ✓ マイルストーン5 |
+| Phase 6完了 | `cargo test --all` | ✓ マイルストーン6 |
+
+#### エラー時の復旧手順
+
+```bash
+# 1. 現在の状態確認
+git status
+git log --oneline -10
+
+# 2. 差分内容確認
+git diff HEAD
+
+# 3. 直前のマイルストーンまでロールバック
+# 例：マイルストーン2 まで戻す場合
+git reset --hard <マイルストーン2のコミットハッシュ>
+
+# または直前 N コミット分ロールバック
+git reset --hard HEAD~3  # 3コミット前まで戻す
+
+# 4. ロールバック後、エラー原因を分析して再実行
+```
+
+#### マイルストーンコミットメッセージ形式
+
+```
+refactor(label-to-scene): Phase N 完了 - <フェーズ説明>
+
+マイルストーン: M (cumulative X files changed)
+```
 
 ## Testing Strategy
 
@@ -298,6 +347,22 @@ IDE (VS Code + rust-analyzer) の Rename 機能を使用：
 5. `LabelTable` → `SceneTable`
 6. `LabelId` → `SceneId`
 7. `LabelNotFound` → `SceneNotFound`
+
+#### Phase 2A: IDE Rename 実行
+
+上記7つの型名を rust-analyzer で Rename。
+
+#### Phase 2B: IDE Rename 検証
+
+IDE Rename 後、即座に検証：
+```bash
+cargo check
+```
+
+**失敗時のフォールバック**:
+- cargo check でコンパイルエラーが発生した場合、当該ファイル・行を確認
+- IDE Rename で漏れた箇所を手動で grep + sed で置換
+- 例: `grep -n "LabelRegistry" src/**/*.rs` で残存確認
 
 ### Phase 3: 変数名・コメント置換
 
