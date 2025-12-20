@@ -57,9 +57,9 @@
      - `cached_selections: HashMap<String, CachedSelection>`でシャッフルキャッシュ管理
 
 6. **トランスパイラー出力仕様**:
-   - グローバル単語参照: `＠単語名` → `yield Talk(pasta_stdlib::word(ctx, "", "単語名", []))`
-   - ローカル単語参照: `＠単語名` → `yield Talk(pasta_stdlib::word(ctx, "モジュール名", "単語名", []))`
-   - `pasta_stdlib::word(module_name, key, filters)`は純粋な文字列（String）を返却
+   - グローバル単語参照: `＠単語名` → `yield Talk(pasta_stdlib::word("", "単語名", []))`
+   - ローカル単語参照: `＠単語名` → `yield Talk(pasta_stdlib::word("モジュール名", "単語名", []))`
+   - `pasta_stdlib::word(module_name, key, filters) -> String`は純粋な文字列を返却
    - `Talk()`によるラッピングはトランスパイラーが生成
    - モジュール名はトランスパイラーが現在のコンテキストから決定（グローバルスコープでは空文字列）
 
@@ -96,7 +96,7 @@
 3. The Pasta Transpiler shall ローカル単語のキーを`":モジュール名:単語名"`形式で登録する（例: `":会話_1:挨拶"`）
 4. The Pasta Transpiler shall モジュール名をグローバルラベル名のサニタイズ版として生成する（`LabelRegistry::sanitize_name()`と同じロジック）
 5. The Pasta Transpiler shall ローカル単語参照時に現在のモジュール名を`word()`関数の第2引数として渡す
-6. When `word(ctx, "会話_1", "挨拶", [])`が呼ばれた場合, the Pasta Runtime shall `":会話_1:挨拶"`前方一致でローカルエントリを検索する
+6. When `pasta_stdlib::word("会話_1", "挨拶", [])`が呼ばれた場合, the Pasta Runtime shall `":会話_1:挨拶"`前方一致でローカルエントリを検索する
 7. When ローカルとグローバルで同じ単語名が定義された場合, the Pasta Runtime shall 両方の候補を統合してマージする（ローカル優先ではなく、統合リストから選択）
 
 ### Requirement 3: 会話内での単語参照と展開
@@ -106,8 +106,8 @@
 #### Acceptance Criteria
 
 1. The Pasta Parser shall 会話行（Speech）内の`＠単語名`を`SpeechPart::FuncCall { name, args, scope }`として解析する（既存実装）
-2. When トランスパイラーが`SpeechPart::FuncCall`を処理する場合, the Pasta Transpiler shall `yield Talk(pasta_stdlib::word(ctx, "モジュール名", "単語名", [filters]));` 形式のRune コードを生成する（グローバルスコープでは第2引数は空文字列）
-3. The `pasta_stdlib::word(ctx, module_name, key, filters)` function shall 純粋な文字列（String）を返却し、`Talk()`によるラッピングはトランスパイラーが生成する
+2. When トランスパイラーが`SpeechPart::FuncCall`を処理する場合, the Pasta Transpiler shall `yield Talk(pasta_stdlib::word("モジュール名", "単語名", [filters]));` 形式のRune コードを生成する（グローバルスコープでは第2引数は空文字列）
+3. The `pasta_stdlib::word(module_name, key, filters) -> String` function shall 純粋な文字列を返却し、`Talk()`によるラッピングはトランスパイラーが生成する
 4. When 単語辞書で前方一致する定義が見つかった場合, the Pasta Runtime shall すべてのマッチした単語定義の単語を統合してシャッフルし、ランダムに1つを選択する
 5. When 選択された単語が見つかった場合, the Pasta Runtime shall その単語文字列を返却する
 6. When `＠name`が単語辞書で見つからない場合, the Pasta Runtime shall エラーログを出力し、空文字列として処理を継続する（panic禁止）
@@ -120,7 +120,7 @@
 
 #### Acceptance Criteria
 
-1. When `word(ctx, "会話_1", "場所", [])`が呼ばれた場合, the Pasta Runtime shall 以下の2段階検索を実行する：
+1. When `pasta_stdlib::word("会話_1", "場所", [])`が呼ばれた場合, the Pasta Runtime shall 以下の2段階検索を実行する：
    - ローカル検索: `":会話_1:場所"`前方一致（例: `":会話_1:場所"`, `":会話_1:場所_日本"`）
    - グローバル検索: `"場所"`前方一致（例: `"場所"`, `"場所_外国"`）
 2. The Pasta Runtime shall ローカル検索とグローバル検索の候補を統合し、単一の候補リストを作成する
@@ -148,15 +148,28 @@
    - エントリIDの自動採番とトラッキング
 6. The Pasta Transpiler shall Pass1で`PastaFile::global_words`と`LabelDef::local_words`を走査し、`WordDefRegistry`に登録する
 7. The Pasta Runtime shall `WordTable`構造体を実装し、以下の責務を持たせる：
-   - `entries: Vec<WordEntry>`で単語エントリを保持
-   - `prefix_index: RadixMap<Vec<usize>>`で前方一致インデックス構築（プレフィックス → マッチしたエントリIDリスト）
-   - `cached_selections: HashMap<(String, String), CachedSelection>`でシャッフルキャッシュ管理（キー: `(module_name, search_key)`）
-   - `search_word(module_name, key) -> Option<String>`でランダム単語選択：
-     - `module_name`が空でない場合、`":module_name:key"`前方一致でローカル検索
-     - `key`前方一致でグローバル検索
-     - 両検索結果のエントリIDリストを統合
-     - 各エントリの`values`を統合してマージ
-     - マージ結果をシャッフルし、キャッシュから順次取り出す
+    - `entries: Vec<WordEntry>`で単語エントリを保持
+    - `prefix_index: RadixMap<Vec<usize>>`で前方一致インデックス構築（プレフィックス → マッチしたエントリIDリスト）
+    - `cached_selections: HashMap<(String, String), CachedSelection>`でシャッフルキャッシュ管理（キー: `(module_name, search_key)`）
+    - `search_word(module_name, key) -> String`でランダム単語選択：
+       - **ステップ1: ローカル検索**
+          - `prefix_index`で`":module_name:key"`前方一致を実行（呼び出し元は常にアクション行＝ローカルスコープ。`__start__`もローカルなので必ずモジュール名が渡される）
+          - マッチしたエントリIDリストを取得（ヒットなしなら空リスト）
+       - **ステップ2: グローバル検索（常に実行）**
+          - `prefix_index`で`key`前方一致を実行
+          - マッチしたエントリIDリストを取得
+       - **ステップ3: 統合とマージ**
+          - ローカル検索とグローバル検索のエントリIDリストを結合
+          - 結合IDリストから各`entries[id].values`を順次取得
+          - `Vec::extend`ですべての単語リストをマージ
+       - **ステップ4: キャッシュ処理**
+          - キャッシュキー`(module_name, key)`でマッチを確認
+          - キャッシュ未作成時：マージした単語リストをシャッフルして`CachedSelection`に格納
+          - キャッシュ存在時：残り単語から1つをPop
+          - 残り単語がない場合：全単語を再シャッフル
+       - **ステップ5: 返却**
+          - 選択された単語を返却
+          - マッチなし時は空文字列を返却
 8. The Pasta Runtime shall ランダム選択時の公平性を保証する（シャッフルにより各単語の選択確率が均等）
 
 ### Requirement 6: Call/Jump文からの単語辞書非アクセス
