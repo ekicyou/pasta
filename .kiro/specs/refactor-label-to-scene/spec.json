@@ -1,9 +1,9 @@
 {
     "feature_name": "refactor-label-to-scene",
     "created_at": "2025-12-21T00:00:00Z",
-    "updated_at": "2025-12-21T00:00:00Z",
+    "updated_at": "2025-12-21T02:30:00Z",
     "language": "ja",
-    "phase": "design-generated",
+    "phase": "tasks-generated",
     "approvals": {
         "requirements": {
             "generated": true,
@@ -12,10 +12,11 @@
         },
         "design": {
             "generated": true,
-            "approved": false
+            "approved": true,
+            "approved_at": "2025-12-21T02:00:00Z"
         },
         "tasks": {
-            "generated": false,
+            "generated": true,
             "approved": false
         }
     },
