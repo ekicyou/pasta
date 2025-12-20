@@ -11,9 +11,9 @@ fn test_parse_sakura() {
     assert!(result.is_ok(), "Parse failed: {:?}", result.err());
 
     let file = result.unwrap();
-    println!("Parsed {} labels", file.labels.len());
+    println!("Parsed {} labels", file.scenes.len());
 
-    for label in &file.labels {
+    for label in &file.scenes {
         println!("Label: {}", label.name);
         for stmt in &label.statements {
             println!("  Statement: {:?}", stmt);

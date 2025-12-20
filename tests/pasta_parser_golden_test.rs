@@ -12,7 +12,7 @@
 //! - English string literal parsing
 //! - No Statement::Jump in AST
 
-use pasta::parser::{LabelScope, SpeechPart, Statement, parse_file};
+use pasta::parser::{SceneScope, SpeechPart, Statement, parse_file};
 use std::path::PathBuf;
 
 const GOLDEN_TEST_PATH: &str = "tests/fixtures/golden/complete-feature-test.pasta";
@@ -45,9 +45,9 @@ fn golden_test_parses_without_errors() {
 fn golden_test_has_one_global_label() {
     let file = parse_golden_test().expect("Parse failed");
     let global_labels: Vec<_> = file
-        .labels
+        .scenes
         .iter()
-        .filter(|l| l.scope == LabelScope::Global)
+        .filter(|l| l.scope == SceneScope::Global)
         .collect();
     assert_eq!(global_labels.len(), 1, "Expected 1 global label");
     assert_eq!(
@@ -57,18 +57,18 @@ fn golden_test_has_one_global_label() {
 }
 
 #[test]
-fn golden_test_has_two_local_labels() {
+fn golden_test_has_two_local_scenes() {
     let file = parse_golden_test().expect("Parse failed");
     let global_label = file
-        .labels
+        .scenes
         .iter()
-        .find(|l| l.scope == LabelScope::Global)
+        .find(|l| l.scope == SceneScope::Global)
         .expect("No global label found");
 
-    let local_labels: Vec<_> = global_label.local_labels.iter().collect();
-    assert_eq!(local_labels.len(), 2, "Expected 2 local labels");
+    let local_scenes: Vec<_> = global_label.local_scenes.iter().collect();
+    assert_eq!(local_scenes.len(), 2, "Expected 2 local labels");
 
-    let local_names: Vec<&str> = local_labels.iter().map(|l| l.name.as_str()).collect();
+    let local_names: Vec<&str> = local_scenes.iter().map(|l| l.name.as_str()).collect();
     assert!(
         local_names.contains(&"選択肢1"),
         "Missing local label: 選択肢1"
@@ -86,9 +86,9 @@ fn golden_test_has_three_attributes() {
     // Count file-level attributes (global_words treated differently)
     // and label-level attributes
     let global_label = file
-        .labels
+        .scenes
         .iter()
-        .find(|l| l.scope == LabelScope::Global)
+        .find(|l| l.scope == SceneScope::Global)
         .expect("No global label found");
 
     // Label has author and genre attributes
@@ -111,9 +111,9 @@ fn golden_test_has_three_attributes() {
 fn golden_test_has_one_rune_block() {
     let file = parse_golden_test().expect("Parse failed");
     let global_label = file
-        .labels
+        .scenes
         .iter()
-        .find(|l| l.scope == LabelScope::Global)
+        .find(|l| l.scope == SceneScope::Global)
         .expect("No global label found");
 
     let rune_blocks: Vec<_> = global_label
@@ -145,9 +145,9 @@ fn golden_test_has_one_rune_block() {
 fn golden_test_has_five_variable_assignments() {
     let file = parse_golden_test().expect("Parse failed");
     let global_label = file
-        .labels
+        .scenes
         .iter()
-        .find(|l| l.scope == LabelScope::Global)
+        .find(|l| l.scope == SceneScope::Global)
         .expect("No global label found");
 
     let var_assigns: Vec<_> = global_label
@@ -168,9 +168,9 @@ fn golden_test_has_five_variable_assignments() {
 fn golden_test_has_seven_action_lines() {
     let file = parse_golden_test().expect("Parse failed");
     let global_label = file
-        .labels
+        .scenes
         .iter()
-        .find(|l| l.scope == LabelScope::Global)
+        .find(|l| l.scope == SceneScope::Global)
         .expect("No global label found");
 
     // Count speech statements in global label
@@ -182,7 +182,7 @@ fn golden_test_has_seven_action_lines() {
 
     // Count speech statements in local labels
     let mut bob_speeches = 0;
-    for local in &global_label.local_labels {
+    for local in &global_label.local_scenes {
         bob_speeches += local
             .statements
             .iter()
@@ -198,14 +198,14 @@ fn golden_test_has_seven_action_lines() {
 fn golden_test_has_two_call_statements() {
     let file = parse_golden_test().expect("Parse failed");
     let global_label = file
-        .labels
+        .scenes
         .iter()
-        .find(|l| l.scope == LabelScope::Global)
+        .find(|l| l.scope == SceneScope::Global)
         .expect("No global label found");
 
     // Count calls in local labels
     let mut call_count = 0;
-    for local in &global_label.local_labels {
+    for local in &global_label.local_scenes {
         call_count += local
             .statements
             .iter()
@@ -233,9 +233,9 @@ fn golden_test_has_two_word_definitions() {
 
     // Local word definition
     let global_label = file
-        .labels
+        .scenes
         .iter()
-        .find(|l| l.scope == LabelScope::Global)
+        .find(|l| l.scope == SceneScope::Global)
         .expect("No global label found");
 
     assert_eq!(
@@ -257,9 +257,9 @@ fn golden_test_has_two_word_definitions() {
 fn golden_test_detects_sakura_tokens() {
     let file = parse_golden_test().expect("Parse failed");
     let global_label = file
-        .labels
+        .scenes
         .iter()
-        .find(|l| l.scope == LabelScope::Global)
+        .find(|l| l.scope == SceneScope::Global)
         .expect("No global label found");
 
     // Find the speech line with Sakura tokens
@@ -307,9 +307,9 @@ fn golden_test_detects_sakura_tokens() {
 fn golden_test_handles_line_continuation() {
     let file = parse_golden_test().expect("Parse failed");
     let global_label = file
-        .labels
+        .scenes
         .iter()
-        .find(|l| l.scope == LabelScope::Global)
+        .find(|l| l.scope == SceneScope::Global)
         .expect("No global label found");
 
     // Find the multi-line speech (Alice：長い台詞は...)
@@ -351,9 +351,9 @@ fn golden_test_handles_line_continuation() {
 fn golden_test_handles_at_escape() {
     let file = parse_golden_test().expect("Parse failed");
     let global_label = file
-        .labels
+        .scenes
         .iter()
-        .find(|l| l.scope == LabelScope::Global)
+        .find(|l| l.scope == SceneScope::Global)
         .expect("No global label found");
 
     // Find the speech line with @@ escape
@@ -391,9 +391,9 @@ fn golden_test_handles_at_escape() {
 fn golden_test_parses_english_string_literal() {
     let file = parse_golden_test().expect("Parse failed");
     let global_label = file
-        .labels
+        .scenes
         .iter()
-        .find(|l| l.scope == LabelScope::Global)
+        .find(|l| l.scope == SceneScope::Global)
         .expect("No global label found");
 
     // Find the variable assignment with English string
@@ -421,7 +421,7 @@ fn golden_test_has_no_jump_statements() {
     let file = parse_golden_test().expect("Parse failed");
 
     // Check statements are among supported variants (Jump removed)
-    for label in &file.labels {
+    for label in &file.scenes {
         for stmt in &label.statements {
             assert!(
                 matches!(
@@ -436,7 +436,7 @@ fn golden_test_has_no_jump_statements() {
         }
 
         // Check local label statements
-        for local in &label.local_labels {
+        for local in &label.local_scenes {
             for stmt in &local.statements {
                 assert!(
                     matches!(

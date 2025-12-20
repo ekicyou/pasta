@@ -147,7 +147,7 @@ fn test_parse_empty_file() {
     assert!(result.is_ok(), "Empty file should parse successfully");
 
     let file = result.unwrap();
-    assert_eq!(file.labels.len(), 0, "Empty file should have no labels");
+    assert_eq!(file.scenes.len(), 0, "Empty file should have no labels");
 }
 
 #[test]
@@ -160,7 +160,7 @@ fn test_parse_only_comments() {
 
     let file = result.unwrap();
     assert_eq!(
-        file.labels.len(),
+        file.scenes.len(),
         0,
         "Comment-only file should have no labels"
     );
@@ -176,9 +176,9 @@ fn test_parse_label_with_only_newlines() {
     assert!(result.is_ok(), "Label with only newlines should parse");
 
     let file = result.unwrap();
-    assert_eq!(file.labels.len(), 1);
+    assert_eq!(file.scenes.len(), 1);
     assert_eq!(
-        file.labels[0].statements.len(),
+        file.scenes[0].statements.len(),
         0,
         "Should have no statements"
     );
@@ -216,7 +216,7 @@ fn test_parse_unicode_identifiers() {
     let result2 = parse_str(source2, "test.pasta");
     if result2.is_ok() {
         let file = result2.unwrap();
-        assert_eq!(file.labels[0].name, "挨拶");
+        assert_eq!(file.scenes[0].name, "挨拶");
     }
 }
 

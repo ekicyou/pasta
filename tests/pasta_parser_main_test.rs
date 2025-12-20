@@ -3,7 +3,7 @@
 //! These tests validate the parser's ability to convert DSL source code into AST.
 
 use pasta::{
-    BinOp, Expr, JumpTarget, LabelScope, Literal, SpeechPart, Statement, VarScope, parse_str,
+    BinOp, Expr, JumpTarget, SceneScope, Literal, SpeechPart, Statement, VarScope, parse_str,
 };
 
 #[test]
@@ -15,10 +15,10 @@ fn test_parse_simple_label() {
     assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
 
     let file = result.unwrap();
-    assert_eq!(file.labels.len(), 1);
-    assert_eq!(file.labels[0].name, "挨拶");
-    assert_eq!(file.labels[0].scope, LabelScope::Global);
-    assert_eq!(file.labels[0].statements.len(), 1);
+    assert_eq!(file.scenes.len(), 1);
+    assert_eq!(file.scenes[0].name, "挨拶");
+    assert_eq!(file.scenes[0].scope, SceneScope::Global);
+    assert_eq!(file.scenes[0].statements.len(), 1);
 }
 
 #[test]
@@ -30,10 +30,10 @@ fn test_parse_speech_with_var_ref() {
     assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
 
     let file = result.unwrap();
-    println!("Labels: {}", file.labels.len());
-    println!("Statements: {}", file.labels[0].statements.len());
+    println!("Labels: {}", file.scenes.len());
+    println!("Statements: {}", file.scenes[0].statements.len());
 
-    if let Statement::Speech { content, .. } = &file.labels[0].statements[0] {
+    if let Statement::Speech { content, .. } = &file.scenes[0].statements[0] {
         println!("Content length: {}, parts: {:?}", content.len(), content);
         if content.len() >= 2 {
             // ＠ユーザー名 は単語展開（word expansion）なので FuncCall
@@ -51,7 +51,7 @@ fn test_parse_speech_with_var_ref() {
     } else {
         panic!(
             "Expected Speech statement, got: {:?}",
-            file.labels[0].statements[0]
+            file.scenes[0].statements[0]
         );
     }
 }
@@ -67,8 +67,8 @@ fn test_parse_attributes() {
     assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
 
     let file = result.unwrap();
-    assert_eq!(file.labels[0].attributes.len(), 2);
-    assert_eq!(file.labels[0].attributes[0].key, "時間帯");
+    assert_eq!(file.scenes[0].attributes.len(), 2);
+    assert_eq!(file.scenes[0].attributes[0].key, "時間帯");
 }
 
 #[test]
@@ -83,9 +83,9 @@ fn test_parse_local_label() {
     assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
 
     let file = result.unwrap();
-    assert_eq!(file.labels[0].local_labels.len(), 2);
-    assert_eq!(file.labels[0].local_labels[0].name, "朝");
-    assert_eq!(file.labels[0].local_labels[0].scope, LabelScope::Local);
+    assert_eq!(file.scenes[0].local_scenes.len(), 2);
+    assert_eq!(file.scenes[0].local_scenes[0].name, "朝");
+    assert_eq!(file.scenes[0].local_scenes[0].scope, SceneScope::Local);
 }
 
 #[test]
@@ -97,7 +97,7 @@ fn test_parse_call_statement() {
     assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
 
     let file = result.unwrap();
-    if let Statement::Call { target, .. } = &file.labels[0].statements[0] {
+    if let Statement::Call { target, .. } = &file.scenes[0].statements[0] {
         match target {
             JumpTarget::Local(name) => assert_eq!(name, "挨拶"),
             _ => panic!("Expected local jump target"),
@@ -133,7 +133,7 @@ fn test_parse_var_assign() {
     let file = result.unwrap();
     if let Statement::VarAssign {
         name, scope, value, ..
-    } = &file.labels[0].statements[0]
+    } = &file.scenes[0].statements[0]
     {
         assert_eq!(name, "カウンター");
         assert_eq!(*scope, VarScope::Local);
@@ -155,7 +155,7 @@ fn test_parse_global_var_assign() {
     assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
 
     let file = result.unwrap();
-    if let Statement::VarAssign { scope, .. } = &file.labels[0].statements[0] {
+    if let Statement::VarAssign { scope, .. } = &file.scenes[0].statements[0] {
         assert_eq!(*scope, VarScope::Global);
     } else {
         panic!("Expected VarAssign statement");
@@ -174,7 +174,7 @@ fn test_parse_expression() {
     assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
 
     let file = result.unwrap();
-    if let Statement::VarAssign { value, .. } = &file.labels[0].statements[0] {
+    if let Statement::VarAssign { value, .. } = &file.scenes[0].statements[0] {
         // Should parse as: 1 + (2 * 3) due to left-to-right in our simple parser
         // Actually it's ((1 + 2) * 3) since we don't have precedence
         match value {
@@ -201,7 +201,7 @@ fn test_parse_function_call_in_speech() {
     assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
 
     let file = result.unwrap();
-    if let Statement::Speech { content, .. } = &file.labels[0].statements[0] {
+    if let Statement::Speech { content, .. } = &file.scenes[0].statements[0] {
         // Should have: text, func_call, text
         println!("Content: {:?}", content);
         assert!(content.len() >= 2);
@@ -224,9 +224,9 @@ fn test_parse_string_literals() {
     assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
 
     let file = result.unwrap();
-    assert_eq!(file.labels[0].statements.len(), 2);
+    assert_eq!(file.scenes[0].statements.len(), 2);
 
-    for stmt in &file.labels[0].statements {
+    for stmt in &file.scenes[0].statements {
         if let Statement::VarAssign { value, .. } = stmt {
             match value {
                 Expr::Literal(Literal::String(_)) => {} // OK
@@ -251,10 +251,10 @@ fn test_parse_multiple_labels() {
     assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
 
     let file = result.unwrap();
-    assert_eq!(file.labels.len(), 3);
-    assert_eq!(file.labels[0].name, "挨拶");
-    assert_eq!(file.labels[1].name, "挨拶"); // Same name OK
-    assert_eq!(file.labels[2].name, "終了");
+    assert_eq!(file.scenes.len(), 3);
+    assert_eq!(file.scenes[0].name, "挨拶");
+    assert_eq!(file.scenes[1].name, "挨拶"); // Same name OK
+    assert_eq!(file.scenes[2].name, "終了");
 }
 
 #[test]
@@ -269,7 +269,7 @@ fn test_parse_continuation_lines() {
     assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
 
     let file = result.unwrap();
-    if let Statement::Speech { content, .. } = &file.labels[0].statements[0] {
+    if let Statement::Speech { content, .. } = &file.scenes[0].statements[0] {
         // Should contain the text
         println!("Content parts: {}", content.len());
         assert!(content.len() >= 1);
@@ -287,7 +287,7 @@ fn test_parse_sakura_script() {
     assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
 
     let file = result.unwrap();
-    if let Statement::Speech { content, .. } = &file.labels[0].statements[0] {
+    if let Statement::Speech { content, .. } = &file.scenes[0].statements[0] {
         let has_sakura = content
             .iter()
             .any(|part| matches!(part, SpeechPart::SakuraScript(_)));
@@ -328,8 +328,8 @@ fn test_parse_halfwidth_syntax() {
     );
 
     let file = result.unwrap();
-    assert_eq!(file.labels.len(), 1);
-    assert_eq!(file.labels[0].name, "greeting");
+    assert_eq!(file.scenes.len(), 1);
+    assert_eq!(file.scenes[0].name, "greeting");
 }
 
 #[test]
@@ -341,7 +341,7 @@ fn test_parse_long_jump() {
     assert!(result.is_ok(), "Failed to parse: {:?}", result.err());
 
     let file = result.unwrap();
-    if let Statement::Call { target, .. } = &file.labels[0].statements[0] {
+    if let Statement::Call { target, .. } = &file.scenes[0].statements[0] {
         println!("Target: {:?}", target);
         match target {
             JumpTarget::LongJump { global, local } => {

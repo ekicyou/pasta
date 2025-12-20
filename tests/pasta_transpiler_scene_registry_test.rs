@@ -29,7 +29,7 @@ fn test_label_registry_basic() {
 }
 
 #[test]
-fn test_label_registry_with_local_labels() {
+fn test_label_registry_with_local_scenes() {
     let mut registry = LabelRegistry::new();
 
     // Register parent

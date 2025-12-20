@@ -166,15 +166,15 @@ fn test_p1_select_label_to_id_pattern() {
     // Simulate LabelTable
     #[derive(Debug, Clone)]
     struct SimpleLabelTable {
-        labels: std::collections::HashMap<String, i64>,
+        scenes: std::collections::HashMap<String, i64>,
     }
 
     let mut table = SimpleLabelTable {
-        labels: std::collections::HashMap::new(),
+        scenes: std::collections::HashMap::new(),
     };
-    table.labels.insert("会話_1::__start__".to_string(), 1);
-    table.labels.insert("会話_1::選択肢_1".to_string(), 2);
-    table.labels.insert("会話_1::選択肢_2".to_string(), 3);
+    table.scenes.insert("会話_1::__start__".to_string(), 1);
+    table.scenes.insert("会話_1::選択肢_1".to_string(), 2);
+    table.scenes.insert("会話_1::選択肢_2".to_string(), 3);
 
     let label_table = Arc::new(Mutex::new(table));
     let label_table_clone = label_table.clone();
@@ -184,7 +184,7 @@ fn test_p1_select_label_to_id_pattern() {
     // P1 implementation pattern
     let select_label_to_id = move |label: String, _filters: Value| -> i64 {
         let table = label_table_clone.lock().unwrap();
-        table.labels.get(&label).copied().unwrap_or(1)
+        table.scenes.get(&label).copied().unwrap_or(1)
     };
 
     module

@@ -38,8 +38,8 @@ fn test_global_label() {
         result.err()
     );
     let file = result.unwrap();
-    assert_eq!(file.labels.len(), 1);
-    assert_eq!(file.labels[0].name, "メイン");
+    assert_eq!(file.scenes.len(), 1);
+    assert_eq!(file.scenes[0].name, "メイン");
 }
 
 #[test]
@@ -52,8 +52,8 @@ fn test_local_word_def() {
         result.err()
     );
     let file = result.unwrap();
-    assert_eq!(file.labels[0].local_words.len(), 1);
-    assert_eq!(file.labels[0].local_words[0].name, "場所");
+    assert_eq!(file.scenes[0].local_words.len(), 1);
+    assert_eq!(file.scenes[0].local_words[0].name, "場所");
 }
 
 #[test]
@@ -119,9 +119,9 @@ fn test_local_label_no_args() {
         result.err()
     );
     let file = result.unwrap();
-    assert_eq!(file.labels[0].local_labels.len(), 1);
-    assert_eq!(file.labels[0].local_labels[0].name, "自己紹介");
-    assert_eq!(file.labels[0].local_labels[0].params.len(), 0);
+    assert_eq!(file.scenes[0].local_scenes.len(), 1);
+    assert_eq!(file.scenes[0].local_scenes[0].name, "自己紹介");
+    assert_eq!(file.scenes[0].local_scenes[0].params.len(), 0);
 }
 
 #[test]
@@ -134,10 +134,10 @@ fn test_local_label_with_args() {
         result.err()
     );
     let file = result.unwrap();
-    assert_eq!(file.labels[0].local_labels.len(), 1);
-    assert_eq!(file.labels[0].local_labels[0].name, "カウント表示");
-    assert_eq!(file.labels[0].local_labels[0].params.len(), 1);
-    assert_eq!(file.labels[0].local_labels[0].params[0], "値");
+    assert_eq!(file.scenes[0].local_scenes.len(), 1);
+    assert_eq!(file.scenes[0].local_scenes[0].name, "カウント表示");
+    assert_eq!(file.scenes[0].local_scenes[0].params.len(), 1);
+    assert_eq!(file.scenes[0].local_scenes[0].params[0], "値");
 }
 
 #[test]
