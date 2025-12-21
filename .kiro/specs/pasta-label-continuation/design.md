@@ -350,8 +350,12 @@ global_label = ${
 
 ### Error Categories and Responses
 **User Errors (Parse Errors)**:
-- **先頭無名「＊」**: 最初のグローバルシーンでシーン名が省略されている → 「直前のグローバルシーンが存在しません。最初のシーン定義には明示的な名前が必要です。」（行番号付き）
-- **名前付きシーン未出現時の無名「＊」**: ファイル内で名前付きシーンがまだパースされていない → 「シーン名が省略されていますが、参照可能なグローバルシーンが存在しません。」（行番号付き）
+- **先頭無名「＊」**: 最初のグローバルシーンでシーン名が省略されている
+  - Example message: `"Unnamed global scene at the start of file. The first scene definition must have an explicit name. Consider adding a scene name after the '＊' marker."`
+  - Location: Line number and column included in `PastaError::ParseError`
+- **名前付きシーン未出現時の無名「＊」**: ファイル内で名前付きシーンがまだパースされていない
+  - Example message: `"Unnamed global scene with no prior named scene for continuation. A named global scene must appear before using unnamed '＊' markers."`
+  - Location: Line number and column included in `PastaError::ParseError`
 - **無名「＊」行にコメント**: 文法レベルで拒否 → Pestエラー「unexpected token」
 
 **System Errors**:
@@ -383,6 +387,10 @@ global_label = ${
 - **E2E parsing**:
   - 実際のDSLファイル（`tests/fixtures/unnamed_scene.pasta`）をパースし、複数の無名「＊」が正しく補完されることを検証
   - トランスパイラがパース結果を受け取り、重複シーン登録が正常に動作することを確認
+- **Backward Compatibility Validation**:
+  - 既存のDSLファイル（`tests/fixtures/`内の全ファイル）が引き続き正常にパース可能であることを検証
+  - 既存テストスイート（`cargo test --all`）が全て通過することを確認
+  - 名前付き「＊」のみを使用したDSLスクリプトが、パーサー拡張後も同一のASTを生成することを検証
 - **Error messaging**:
   - 先頭無名「＊」のDSLファイルをパースし、エラーメッセージが行番号と明確な指示を含むことを検証
 
