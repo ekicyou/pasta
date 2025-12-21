@@ -167,9 +167,9 @@ sequenceDiagram
     Script->>Parser: Alice：@$挨拶
     Parser->>Parser: SpeechPart::FuncCall{name:"$挨拶"}
     Parser->>Transpiler: AST
-    Transpiler->>Transpiler: yield Talk(pasta_stdlib::word(module, `${ctx.local.挨拶}`, []))
+    Transpiler->>Transpiler: let a = ctx.local.挨拶; yield Talk(pasta_stdlib::word(module, `${a}`, []))
     Transpiler->>Rune: 生成Runeコード
-    Rune->>Rune: ctx.local.挨拶 = "おはよう"（評価）
+    Rune->>Rune: a = ctx.local.挨拶（評価）
     Rune->>Stdlib: pasta_stdlib::word(module, "おはよう", [])
     Stdlib->>Stdlib: 単語検索
     Stdlib->>Rune: "おはようございます！"
@@ -178,8 +178,8 @@ sequenceDiagram
 
 **Key Decisions**:
 - `@$変数`を`FuncCall`として解釈し、`name`フィールドに変数名を格納（`"$挨拶"`）
-- トランスパイラーで`name`が`$`プレフィックスを持つ場合、`` `${ctx.local.変数名}` ``テンプレートとして展開
-- `@$*変数`の場合は`` `${ctx.global.変数名}` ``へ展開
+- トランスパイラーで`name`が`$`プレフィックスを持つ場合、`let a = ctx.local.変数名; pasta_stdlib::word(module, `${a}`, [])`形式で展開
+- `@$*変数`の場合は`let a = ctx.global.変数名; ...`へ展開
 
 ### 動的シーン呼び出しフロー (`>$変数`)
 
@@ -194,9 +194,9 @@ sequenceDiagram
     Script->>Parser: >$次のシーン
     Parser->>Parser: JumpTarget::Dynamic("$次のシーン")
     Parser->>Transpiler: AST
-    Transpiler->>Transpiler: for a in crate::pasta::call(ctx, `${ctx.local.次のシーン}`, #{}, [])
+    Transpiler->>Transpiler: let a = ctx.local.次のシーン; for b in crate::pasta::call(ctx, `${a}`, #{}, []) { yield b; }
     Transpiler->>Rune: 生成Runeコード
-    Rune->>Rune: ctx.local.次のシーン = "会話2"（評価）
+    Rune->>Rune: a = ctx.local.次のシーン（評価）
     Rune->>CallFn: crate::pasta::call(ctx, "会話2", #{}, [])
     CallFn->>CallFn: シーン検索
     CallFn->>Rune: Generator
@@ -204,7 +204,7 @@ sequenceDiagram
 ```
 
 **Key Decisions**:
-- `JumpTarget::Dynamic(var_name)`を受け取り、`var_name`が`$`プレフィックスを持つ場合、`` `${ctx.local.変数名}` ``テンプレートへ展開
+- `JumpTarget::Dynamic(var_name)`を受け取り、`var_name`が`$`プレフィックスを持つ場合、`let a = ctx.local.変数名; for b in crate::pasta::call(ctx, `${a}`, ...) { yield b; }`形式で展開
 - 旧式`@var_name`形式（`transpile_jump_target_to_search_key`で`@`プレフィックス付与）は文法誤りとして廃止
 
 ## Requirements Traceability
@@ -298,8 +298,10 @@ impl Transpiler {
 
 **Implementation Notes**
 - **Integration**: 既存`transpile_statement()`の`VarAssign`分岐を修正し、`scope`に応じて`ctx.local.name`または`ctx.global.name`を生成。`let name = ...`形式は削除。
-- **Integration**: `transpile_speech_part_to_writer()`の`VarRef`分岐を修正し、`` `${ctx.local.name}` ``テンプレートを生成。`FuncCall`分岐で`name`が`$`で始まる場合、テンプレート展開を適用。
-- **Integration**: `transpile_jump_target_to_search_key()`を修正し、`JumpTarget::Dynamic`で`$`プレフィックス検出時に`` `${ctx.local.name}` ``を返す。旧式`@var_name`生成ロジックを削除。
+- **Integration**: `transpile_speech_part_to_writer()`の`VarRef`分岐を修正し、中間変数を経由して`` `${a}` ``テンプレートを生成。`FuncCall`分岐で`name`が`$`で始まる場合、テンプレート展開を適用。
+  - パターン1: `let a = ctx.local.変数名; yield Talk(`${a}`);`
+  - パターン2: `let a = ctx.local.変数名; yield Talk(pasta_stdlib::word(module, `${a}`, []));`
+- **Integration**: `transpile_jump_target_to_search_key()`を修正し、`JumpTarget::Dynamic`で`$`プレフィックス検出時に中間変数経由で`` `${a}` ``を返す。パターン: `let a = ctx.local.変数名; for b in crate::pasta::call(ctx, `${a}`, ...) { yield b; }`
 - **Validation**: `transpile_expr()`で`VarRef`が未定義かチェックする場合、`VariableManager`の事前定義変数リストを参照する（将来拡張）。現状は`ctx.local`/`ctx.global`アクセスでRuntime評価を許容。
 - **Risks**: Parser層で`@$変数`が`FuncCall`として正しく認識されない場合、文法拡張が必要（design-discovery-lightで要検証事項として記録済み）。
 
@@ -605,17 +607,31 @@ flowchart LR
 
 ## Supporting References
 
-### Rune文字列テンプレート構文
+### Rune文字列テンプレート構文と中間変数方式
 
-Rune 0.14では`` `${variable}` ``構文で文字列内に変数を埋め込める：
+Rune 0.14では`` `${variable}` ``構文で文字列内に変数を埋め込める。本設計では、中間変数を経由して動的キー展開を実現する（Rune VMでの直接式評価の複雑性を回避するため）。
 
-```rune
-let name = "世界";
-let message = `こんにちは、${name}！`;
-// message == "こんにちは、世界！"
-```
+**実装パターン**:
 
-本設計では、この機能を活用して動的キー展開を実現する。
+1. **ローカル変数参照** (`$変数` in Talk):
+   ```rune
+   let a = ctx.local.挨拶;
+   yield Talk(`${a}`); // @$挨拶
+   ```
+
+2. **動的単語検索** (`@$変数`):
+   ```rune
+   let a = ctx.local.keyword;
+   yield Talk(pasta_stdlib::word(module, `${a}`, [])); // @$keyword
+   ```
+
+3. **動的シーン呼び出し** (`>$変数`):
+   ```rune
+   let a = ctx.local.scene;
+   for b in crate::pasta::call(ctx, `${a}`, #{}, []) { yield b; } // >$scene
+   ```
+
+**命名規則**: 中間変数は短い名前（`a`, `b`, `c`, ...）を使い回し、1トークン1行で展開（文法の簡潔性）。
 
 ### 旧式API削除対象
 
