@@ -11,9 +11,14 @@ Pastaトランスパイラーは現在、関数呼び出しの引数をRune配�
 1. Call/Jump文の引数リスト（`pasta::call`関数呼び出し）
 2. アクション行の関数呼び出し（`＠関数（引数）`構文）
 
+**アクション行の処理区分**:
+- `＠XXX`（括弧なし）: 単語検索 → `pasta_stdlib::word(...)` （本仕様のスコープ外）
+- `＠XXX()`（括弧あり）: 関数呼び出し → `for a in XXX(ctx, args) { yield a; }` （本仕様の対象）
+- `＠＊XXX()`（グローバル指定）: グローバル関数呼び出し → `for a in super::XXX(ctx, args) { yield a; }` （本仕様の対象）
+
 **注意事項**:
 - 単語展開（`pasta_stdlib::word`）の第3引数は`_filters`（フィルター用）であり、`args`（引数リスト）ではないため本仕様のスコープ外
-- **実装バグ**: 現在`transpile_speech_part_to_writer` (L507-520) は`SpeechPart::FuncCall`の`args`を無視して単語展開として誤処理している。正しくは関数呼び出しとして`pasta::call`を生成すべき。
+- **実装バグ**: 現在`transpile_speech_part_to_writer` (L507-520) は`SpeechPart::FuncCall`の`args`を無視して単語展開として誤処理している。正しくは関数呼び出しとして`for a in function_name(ctx, args) { yield a; }`を生成すべき。
 
 ## Requirements
 
@@ -45,9 +50,19 @@ for a in crate::pasta::call(ctx, "scene", #{}, (arg1, arg2)) { yield a; }
 yield Talk(pasta_stdlib::word("module", "func_name", []));  // 引数を無視
 ```
 
-**アクション行の変更後**:
+**アクション行の変更後（ローカル優先）**:
 ```rune
-for a in crate::pasta::call(ctx, "func_name", #{}, (arg1, arg2)) { yield a; }
+for a in func_name(ctx, (arg1, arg2)) { yield a; }
+```
+
+**アクション行の変更後（グローバル指定）**:
+```rune
+for a in super::func_name(ctx, (arg1, arg2)) { yield a; }
+```
+
+**空引数の場合**:
+```rune
+for a in func_name(ctx, ()) { yield a; }
 ```
 
 ### Requirement 2: 引数トランスパイル関数の修正
