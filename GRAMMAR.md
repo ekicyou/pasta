@@ -306,7 +306,7 @@ fn 分岐判定(ctx, args) {
         if スコア >= 90 { "優秀" }
         else if スコア >= 50 { "合格" }
         else { "不合格" };
-    for a in crate::pasta::call(ctx, label, #{}, []) { yield a; }
+    for a in crate::pasta::call(ctx, label, #{}, ()) { yield a; }
 }
 ```
 
