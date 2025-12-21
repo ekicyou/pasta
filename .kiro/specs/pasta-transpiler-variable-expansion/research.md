@@ -32,7 +32,9 @@
 
 ## Gaps & Constraints（詳細）
 - **✅ Resolved（憲法決定）**: `ctx.local`/`ctx.global`を正式APIとして採用。`VariableManager`を`ctx`に統合し、`ctx.local.<name>`/`ctx.global.<name>`で直接アクセスする設計とする。
-- Missing: `@$変数`を「変数値をキーとするword検索」へ展開するため、`SpeechPart::FuncCall`生成時に`name`を変数参照で埋める（`word(module, get_variable(name), [])`相当）のサポート。
+- Missing: `@$変数`を「変数値をキーとするword検索」へ展開するため、`SpeechPart::FuncCall`生成時に`name`を変数参照で埋める（`word(module, `${ctx.local.name}`, [])`相当）のサポート。
+  - **✅ Resolved（議題2）**: Runeの文字列テンプレート`` `${ctx.local.変数名}` ``を活用し、`pasta_stdlib::word(module, `${ctx.local.変数名}`, [])`形式へ展開。`@$*変数`は`` `${ctx.global.変数名}` ``。
+  - **⚠️ Parser層ギャップ（設計段階で対応）**: pest文法で`@$変数`が`func_call`として認識されるかの確認が必要。必要に応じて`func_name`に`$`プレフィックス許容、または新ルール`word_var_ref`追加。
 - **✅ Resolved（憲法決定）**: 旧式API（`get_global`, `set_global`）は廃止対象。新式は`ctx.local`/`ctx.global`テンプレ展開に統一。
 - **✅ Resolved（憲法決定）**: Local変数は`ctx.local.<name>`、Global変数は`ctx.global.<name>`で参照。`let`束縛は使用せず、全て`ctx`経由とする。
 
@@ -54,7 +56,8 @@
 
 ## Recommendations for Design Phase
 - **✅ Decided**: Option A（Transpiler拡張）を採用。`ctx.local`/`ctx.global`を憲法レベルで確定。
-- Key Decisions Remaining: `@$変数`の動的wordキー展開手順、`>$変数`の`scene_selector`動的解決契約。
+- **✅ Decided（議題2）**: `@$変数`は`` `${ctx.local.変数名}` ``テンプレート展開でword検索へ。Parser層の`@$変数`認識ギャップは設計フェーズで対応。
+- Key Decisions Remaining: `>$変数`の`scene_selector`動的解決契約。
 - Research Needed:
   - Rune側での`${ctx.var.name}`テンプレ評価の正規手段（現在の生成文字列の扱い）。
   - `scene_selector`が`@var_name`形式をどのように解決するか（ラベルID解決フロー）。
