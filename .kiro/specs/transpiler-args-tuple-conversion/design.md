@@ -277,27 +277,24 @@ Runeタプル構文（検証済み - `pasta_rune_tuple_syntax_test.rs`）:
 
 ### テスト更新対象
 
-| テストファイル | 変更内容 |
-|---------------|---------|
-| `tests/pasta_transpiler_word_code_gen_test.rs` | 期待値文字列を`[]`から`()`に更新 |
-| その他のトランスパイラーテスト | grep検索で特定、必要に応じて更新 |
+既存テストの分析から、以下の点が判明：
 
-### 新規テストケース
+| テストファイル | 影響 | アクション |
+|---------------|------|-----------|
+| `tests/pasta_transpiler_word_code_gen_test.rs` | 軽微 | 単語展開テスト（本仕様スコープ外）- 変更不要 |
+| `tests/pasta_transpiler_two_pass_test.rs` | なし | `contains("for a in func(ctx, args)")` - args形式チェック無し |
+| その他トランスパイラーテスト | なし | Call文の期待値マッチング無し |
+| `cargo test --all` | 必須 | 実装後に全テスト実行して回帰確認 |
 
-```rust
-#[test]
-fn test_call_with_tuple_args() {
-    // 0引数: pasta::call(ctx, "scene", #{}, ())
-    // 1引数: pasta::call(ctx, "scene", #{}, (arg,))
-    // 2引数: pasta::call(ctx, "scene", #{}, (a, b))
-}
+**重要**: 既存テストは`[]`の具体的な形式をチェックしておらず、出力のRune構文コンパイル可能性を確認しています。そのため、テスト期待値更新よりも、**実装後のRune出力コンパイル確認**が重要です。
 
-#[test]
-fn test_action_line_func_call() {
-    // ローカル: for a in func(ctx, (args)) { yield a; }
-    // グローバル: for a in super::func(ctx, (args)) { yield a; }
-}
-```
+### 確認方法
+
+1. **自動回帰テスト**: `cargo test --all` で全テスト実行
+2. **Rune構文検証**: 生成されたRuneコードが以下を満たすか確認：
+   - Call文: `for a in crate::pasta::call(ctx, scene, filters, (args)) { yield a; }`
+   - アクション行: `for a in func(ctx, (args)) { yield a; }`
+3. **fixtures検証**: `tests/fixtures/*.rn` が正しくRune VM上でコンパイル可能か確認
 
 ---
 
