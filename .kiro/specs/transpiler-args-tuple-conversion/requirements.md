@@ -9,30 +9,45 @@ Pastaトランスパイラーは現在、関数呼び出しの引数をRune配�
 
 本仕様では、トランスパイラーが生成する以下の箇所における配列リテラルをタプルリテラルに変換します：
 1. Call/Jump文の引数リスト（`pasta::call`関数呼び出し）
+2. アクション行の関数呼び出し（`＠関数（引数）`構文）
 
-**注意**: 単語展開（`pasta_stdlib::word`）の第3引数は`_filters`（フィルター用、現在は空配列`[]`を渡しているが本来は空の連想配列`#{}`であるべき）であり、`args`（引数リスト）ではないため、本仕様のスコープ外です。
+**注意事項**:
+- 単語展開（`pasta_stdlib::word`）の第3引数は`_filters`（フィルター用）であり、`args`（引数リスト）ではないため本仕様のスコープ外
+- **実装バグ**: 現在`transpile_speech_part_to_writer` (L507-520) は`SpeechPart::FuncCall`の`args`を無視して単語展開として誤処理している。正しくは関数呼び出しとして`pasta::call`を生成すべき。
 
 ## Requirements
 
-### Requirement 1: Call/Jump文の引数変換
-**Objective:** トランスパイラー開発者として、Call/Jump文生成時に引数を配列ではなくタプルとして展開したい。これにより、Rune側の関数シグネチャと意味的に一致したコードが生成される。
+### Requirement 1: 関数呼び出しの引数変換（Call/Jump文およびアクション行）
+**Objective:** トランスパイラー開発者として、すべての関数呼び出し生成時に引数を配列ではなくタプルとして展開したい。これにより、Rune側の関数シグネチャと意味的に一致したコードが生成される。
 
 #### Acceptance Criteria
 1. When Statement::Callを処理するとき、Pastaトランスパイラーは引数リストをタプルリテラル `(arg1, arg2, ...)` 形式で生成する
-2. When 引数が0個のとき、Pastaトランスパイラーは空タプル `()` を生成する
-3. When 引数が1個のとき、Pastaトランスパイラーは単一要素タプル `(arg,)` を生成する（末尾カンマ必須）
-4. When 引数が2個以上のとき、Pastaトランスパイラーは通常のタプル `(arg1, arg2, ...)` を生成する
-5. The Pastaトランスパイラーは、動的ターゲット（テンプレートリテラル使用）と静的ターゲット両方でタプル構文を使用する
+2. When SpeechPart::FuncCallを処理するとき、Pastaトランスパイラーは`pasta::call`を使用して関数を呼び出し、引数をタプル形式で渡す
+3. When 引数が0個のとき、Pastaトランスパイラーは空タプル `()` を生成する
+4. When 引数が1個のとき、Pastaトランスパイラーは単一要素タプル `(arg,)` を生成する（末尾カンマ必須）
+5. When 引数が2個以上のとき、Pastaトランスパイラーは通常のタプル `(arg1, arg2, ...)` を生成する
+6. The Pastaトランスパイラーは、動的ターゲット（テンプレートリテラル使用）と静的ターゲット両方でタプル構文を使用する
 
 #### Implementation Notes
-現在のコード生成：
+
+**Call/Jump文の現在のコード生成**:
 ```rune
 for a in crate::pasta::call(ctx, "scene", #{}, [arg1, arg2]) { yield a; }
 ```
 
-変更後のコード生成：
+**Call/Jump文の変更後**:
 ```rune
 for a in crate::pasta::call(ctx, "scene", #{}, (arg1, arg2)) { yield a; }
+```
+
+**アクション行の現在のコード生成（バグ）**:
+```rune
+yield Talk(pasta_stdlib::word("module", "func_name", []));  // 引数を無視
+```
+
+**アクション行の変更後**:
+```rune
+for a in crate::pasta::call(ctx, "func_name", #{}, (arg1, arg2)) { yield a; }
 ```
 
 ### Requirement 2: 引数トランスパイル関数の修正
