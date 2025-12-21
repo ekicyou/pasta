@@ -57,7 +57,7 @@
 ## Recommendations for Design Phase
 - **✅ Decided**: Option A（Transpiler拡張）を採用。`ctx.local`/`ctx.global`を憲法レベルで確定。
 - **✅ Decided（議題2）**: `@$変数`は`` `${ctx.local.変数名}` ``テンプレート展開でword検索へ。Parser層の`@$変数`認識ギャップは設計フェーズで対応。
-- Key Decisions Remaining: `>$変数`の`scene_selector`動的解決契約。
+- **✅ Decided（議題3）**: `>$変数`は`` `${ctx.local.変数名}` ``テンプレート展開でシーン呼び出しへ。現行`@var_name`形式は文法誤りとして廃止。
 - Research Needed:
   - Rune側での`${ctx.var.name}`テンプレ評価の正規手段（現在の生成文字列の扱い）。
-  - `scene_selector`が`@var_name`形式をどのように解決するか（ラベルID解決フロー）。
+  - **廃止**: `scene_selector`の`@var_name`形式解決ロジック（文法誤りとして削除）。
