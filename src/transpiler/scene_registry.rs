@@ -8,7 +8,7 @@ use std::collections::HashMap;
 
 /// Information about a registered label.
 #[derive(Debug, Clone, PartialEq)]
-pub struct LabelInfo {
+pub struct SceneInfo {
     /// Unique numeric ID (starting from 1).
     pub id: i64,
 
@@ -36,9 +36,9 @@ pub struct LabelInfo {
 /// - **P1 Implementation**: Handle duplicate names with sequential counters (`_1`, `_2`, ...)
 /// - IDs start from 1 and increment sequentially
 /// - Each label gets a unique ID even if names are the same
-pub struct LabelRegistry {
+pub struct SceneRegistry {
     /// All registered labels, indexed by ID.
-    labels: HashMap<i64, LabelInfo>,
+    labels: HashMap<i64, SceneInfo>,
 
     /// Counter for assigning the next unique ID.
     next_id: i64,
@@ -49,7 +49,7 @@ pub struct LabelRegistry {
     name_counters: HashMap<String, usize>,
 }
 
-impl LabelRegistry {
+impl SceneRegistry {
     /// Create a new label registry.
     pub fn new() -> Self {
         Self {
@@ -81,7 +81,7 @@ impl LabelRegistry {
         let fn_name = format!("{}_{}::__start__", Self::sanitize_name(name), counter);
         let fn_path = format!("crate::{}", fn_name);
 
-        let info = LabelInfo {
+        let info = SceneInfo {
             id,
             name: name.to_string(),
             attributes,
@@ -130,7 +130,7 @@ impl LabelRegistry {
         );
         let fn_path = format!("crate::{}", fn_name);
 
-        let info = LabelInfo {
+        let info = SceneInfo {
             id,
             name: name.to_string(),
             attributes,
@@ -143,20 +143,20 @@ impl LabelRegistry {
         (id, counter)
     }
 
-    /// Get all registered labels.
-    pub fn all_labels(&self) -> Vec<&LabelInfo> {
-        let mut labels: Vec<_> = self.labels.values().collect();
-        labels.sort_by_key(|l| l.id);
-        labels
+    /// Get all registered scenes.
+    pub fn all_scenes(&self) -> Vec<&SceneInfo> {
+        let mut scenes: Vec<_> = self.labels.values().collect();
+        scenes.sort_by_key(|s| s.id);
+        scenes
     }
 
-    /// Get a label by ID.
-    pub fn get_label(&self, id: i64) -> Option<&LabelInfo> {
+    /// Get a scene by ID.
+    pub fn get_scene(&self, id: i64) -> Option<&SceneInfo> {
         self.labels.get(&id)
     }
 
-    /// Iterate over all registered labels.
-    pub fn iter(&self) -> impl Iterator<Item = (&i64, &LabelInfo)> {
+    /// Iterate over all registered scenes.
+    pub fn iter(&self) -> impl Iterator<Item = (&i64, &SceneInfo)> {
         self.labels.iter()
     }
 
@@ -170,13 +170,13 @@ impl LabelRegistry {
     /// Sanitize a label name for use in Rune identifiers.
     ///
     /// Replaces any character that is not alphanumeric or underscore with underscore.
-    /// This is used by both LabelRegistry and WordDefRegistry for consistent naming.
+    /// This is used by both SceneRegistry and WordDefRegistry for consistent naming.
     pub fn sanitize_name(name: &str) -> String {
         name.replace(|c: char| !c.is_alphanumeric() && c != '_', "_")
     }
 }
 
-impl Default for LabelRegistry {
+impl Default for SceneRegistry {
     fn default() -> Self {
         Self::new()
     }
@@ -188,13 +188,13 @@ mod tests {
 
     #[test]
     fn test_register_global_label() {
-        let mut registry = LabelRegistry::new();
+        let mut registry = SceneRegistry::new();
 
         let (id1, counter1) = registry.register_global("会話", HashMap::new());
         assert_eq!(id1, 1);
         assert_eq!(counter1, 1);
 
-        let label = registry.get_label(id1).unwrap();
+        let label = registry.get_scene(id1).unwrap();
         assert_eq!(label.name, "会話");
         assert_eq!(label.fn_path, "crate::会話_1::__start__");
         assert_eq!(label.parent, None);
@@ -202,7 +202,7 @@ mod tests {
 
     #[test]
     fn test_register_multiple_global_labels() {
-        let mut registry = LabelRegistry::new();
+        let mut registry = SceneRegistry::new();
 
         let (id1, _) = registry.register_global("会話", HashMap::new());
         let (id2, _) = registry.register_global("別会話", HashMap::new());
@@ -210,7 +210,7 @@ mod tests {
         assert_eq!(id1, 1);
         assert_eq!(id2, 2);
 
-        let labels = registry.all_labels();
+        let labels = registry.all_scenes();
         assert_eq!(labels.len(), 2);
         assert_eq!(labels[0].name, "会話");
         assert_eq!(labels[1].name, "別会話");
@@ -218,7 +218,7 @@ mod tests {
 
     #[test]
     fn test_register_duplicate_global_labels() {
-        let mut registry = LabelRegistry::new();
+        let mut registry = SceneRegistry::new();
 
         let (id1, counter1) = registry.register_global("会話", HashMap::new());
         let (id2, counter2) = registry.register_global("会話", HashMap::new());
@@ -228,8 +228,8 @@ mod tests {
         assert_eq!(id2, 2);
         assert_eq!(counter2, 2);
 
-        let label1 = registry.get_label(id1).unwrap();
-        let label2 = registry.get_label(id2).unwrap();
+        let label1 = registry.get_scene(id1).unwrap();
+        let label2 = registry.get_scene(id2).unwrap();
 
         assert_eq!(label1.fn_path, "crate::会話_1::__start__");
         assert_eq!(label2.fn_path, "crate::会話_2::__start__");
@@ -237,7 +237,7 @@ mod tests {
 
     #[test]
     fn test_register_local_label() {
-        let mut registry = LabelRegistry::new();
+        let mut registry = SceneRegistry::new();
 
         // Register parent first
         let (parent_id, parent_counter) = registry.register_global("会話", HashMap::new());
@@ -250,7 +250,7 @@ mod tests {
         assert_eq!(local_id, 2);
         assert_eq!(local_counter, 1);
 
-        let local_label = registry.get_label(local_id).unwrap();
+        let local_label = registry.get_scene(local_id).unwrap();
         assert_eq!(local_label.name, "選択肢");
         assert_eq!(local_label.parent, Some("会話".to_string()));
         // Local label function is in parent module: crate::親_番号::子名_番号
@@ -259,9 +259,9 @@ mod tests {
 
     #[test]
     fn test_sanitize_name() {
-        assert_eq!(LabelRegistry::sanitize_name("hello"), "hello");
-        assert_eq!(LabelRegistry::sanitize_name("hello-world"), "hello_world");
-        assert_eq!(LabelRegistry::sanitize_name("会話"), "会話");
-        assert_eq!(LabelRegistry::sanitize_name("＊会話"), "_会話");
+        assert_eq!(SceneRegistry::sanitize_name("hello"), "hello");
+        assert_eq!(SceneRegistry::sanitize_name("hello-world"), "hello_world");
+        assert_eq!(SceneRegistry::sanitize_name("会話"), "会話");
+        assert_eq!(SceneRegistry::sanitize_name("＊会話"), "_会話");
     }
 }

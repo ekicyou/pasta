@@ -2,7 +2,7 @@
 // Writeトレイトへの出力と2パス処理を検証
 
 use pasta::parser::parse_str;
-use pasta::transpiler::{LabelRegistry, Transpiler, WordDefRegistry};
+use pasta::transpiler::{SceneRegistry, Transpiler, WordDefRegistry};
 
 #[test]
 fn test_two_pass_transpiler_to_vec() {
@@ -15,11 +15,11 @@ fn test_two_pass_transpiler_to_vec() {
     let ast = parse_str(pasta_code, "test.pasta").unwrap();
 
     // Pass 1: Output to Vec<u8>
-    let mut label_registry = LabelRegistry::new();
+    let mut scene_registry = SceneRegistry::new();
     let mut word_registry = WordDefRegistry::new();
     let mut output = Vec::new();
 
-    Transpiler::transpile_pass1(&ast, &mut label_registry, &mut word_registry, &mut output).unwrap();
+    Transpiler::transpile_pass1(&ast, &mut scene_registry, &mut word_registry, &mut output).unwrap();
 
     let pass1_output = String::from_utf8(output.clone()).unwrap();
     println!("Pass 1 output:\n{}", pass1_output);
@@ -30,23 +30,23 @@ fn test_two_pass_transpiler_to_vec() {
     assert!(!pass1_output.contains("pub mod pasta")); // mod pasta not yet generated
 
     // Pass 2: Append mod pasta
-    Transpiler::transpile_pass2(&label_registry, &mut output).unwrap();
+    Transpiler::transpile_pass2(&scene_registry, &mut output).unwrap();
 
     let final_output = String::from_utf8(output).unwrap();
     println!("\nFinal output:\n{}", final_output);
 
     // Verify final output contains __pasta_trans2__ module
     assert!(final_output.contains("pub mod __pasta_trans2__"));
-    assert!(final_output.contains("pub fn label_selector(label, filters)"));
+    assert!(final_output.contains("pub fn scene_selector(scene, filters)"));
 
-    // Verify pasta module calls label_selector
+    // Verify pasta module calls scene_selector
     assert!(final_output.contains("pub mod pasta"));
     assert!(
         final_output.contains("pub fn jump(ctx, label, filters, args)")
-            || final_output.contains("pub fn call(ctx, label, filters, args)")
+            || final_output.contains("pub fn call(ctx, scene, filters, args)")
     );
     assert!(final_output
-        .contains("let func = crate::__pasta_trans2__::label_selector(label, filters);"));
+        .contains("let func = crate::__pasta_trans2__::scene_selector(scene, filters);"));
     assert!(final_output.contains("for a in func(ctx, args) { yield a; }"));
 
     // Verify match expression is in __pasta_trans2__ module (function pointer, not call)
@@ -67,23 +67,23 @@ fn test_two_pass_transpiler_to_string() {
     let ast = parse_str(pasta_code, "test.pasta").unwrap();
 
     // Pass 1: Output to String (via Vec<u8>)
-    let mut label_registry = LabelRegistry::new();
+    let mut scene_registry = SceneRegistry::new();
     let mut word_registry = WordDefRegistry::new();
 
     // String doesn't impl Write, so use Vec<u8>
     let mut buffer = Vec::new();
-    Transpiler::transpile_pass1(&ast, &mut label_registry, &mut word_registry, &mut buffer).unwrap();
+    Transpiler::transpile_pass1(&ast, &mut scene_registry, &mut word_registry, &mut buffer).unwrap();
     let mut output = String::from_utf8(buffer).unwrap();
 
     // Verify labels are registered
-    let labels = label_registry.all_labels();
+    let labels = scene_registry.all_scenes();
     assert_eq!(labels.len(), 2);
     assert_eq!(labels[0].name, "会話");
     assert_eq!(labels[1].name, "別会話");
 
     // Pass 2
     let mut buffer = Vec::new();
-    Transpiler::transpile_pass2(&label_registry, &mut buffer).unwrap();
+    Transpiler::transpile_pass2(&scene_registry, &mut buffer).unwrap();
     let pass2_output = String::from_utf8(buffer).unwrap();
 
     output.push_str(&pass2_output);
@@ -95,7 +95,7 @@ fn test_two_pass_transpiler_to_string() {
     assert!(output.contains("2 => crate::別会話_1::__start__,"));
 
     // Verify pasta module structure
-    assert!(output.contains("let func = crate::__pasta_trans2__::label_selector(label, filters);"));
+    assert!(output.contains("let func = crate::__pasta_trans2__::scene_selector(scene, filters);"));
     assert!(output.contains("for a in func(ctx, args) { yield a; }"));
 }
 
@@ -120,7 +120,7 @@ fn test_transpile_to_string_helper() {
 
     // Verify correct structure (function pointer in __pasta_trans2__)
     assert!(output.contains("1 => crate::会話_1::__start__,"));
-    assert!(output.contains("let func = crate::__pasta_trans2__::label_selector(label, filters);"));
+    assert!(output.contains("let func = crate::__pasta_trans2__::scene_selector(scene, filters);"));
 }
 
 #[test]
@@ -140,18 +140,18 @@ fn test_multiple_files_simulation() {
     let ast2 = parse_str(file2, "file2.pasta").unwrap();
 
     // Shared registry across files
-    let mut label_registry = LabelRegistry::new();
+    let mut scene_registry = SceneRegistry::new();
     let mut word_registry = WordDefRegistry::new();
     let mut output = Vec::new();
 
     // Pass 1 for file1
-    Transpiler::transpile_pass1(&ast1, &mut label_registry, &mut word_registry, &mut output).unwrap();
+    Transpiler::transpile_pass1(&ast1, &mut scene_registry, &mut word_registry, &mut output).unwrap();
 
     // Pass 1 for file2
-    Transpiler::transpile_pass1(&ast2, &mut label_registry, &mut word_registry, &mut output).unwrap();
+    Transpiler::transpile_pass1(&ast2, &mut scene_registry, &mut word_registry, &mut output).unwrap();
 
     // Pass 2 once for all files
-    Transpiler::transpile_pass2(&label_registry, &mut output).unwrap();
+    Transpiler::transpile_pass2(&scene_registry, &mut output).unwrap();
 
     let final_output = String::from_utf8(output).unwrap();
     println!("Multi-file output:\n{}", final_output);
@@ -166,5 +166,5 @@ fn test_multiple_files_simulation() {
 
     // Verify pasta module wrapper structure
     assert!(final_output
-        .contains("let func = crate::__pasta_trans2__::label_selector(label, filters);"));
+        .contains("let func = crate::__pasta_trans2__::scene_selector(scene, filters);"));
 }

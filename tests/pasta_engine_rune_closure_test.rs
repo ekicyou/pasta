@@ -1,7 +1,7 @@
 /// Test: Can we register Rust closures/delegates to Rune modules?
 ///
 /// Purpose: Verify if we can register Rust closures (not just static functions) to Rune
-/// This is critical for P1 implementation where select_label_to_id needs to access LabelTable
+/// This is critical for P1 implementation where select_scene_to_id needs to access SceneTable
 ///
 /// Scenario:
 /// - Create a closure that captures external state
@@ -159,11 +159,11 @@ fn test_register_function_with_arc_parameter() {
 }
 
 #[test]
-fn test_p1_select_label_to_id_pattern() {
+fn test_p1_select_scene_to_id_pattern() {
     // Simulate P1 implementation pattern
     let mut context = Context::with_default_modules().expect("Failed to create context");
 
-    // Simulate LabelTable
+    // Simulate SceneTable
     #[derive(Debug, Clone)]
     struct SimpleLabelTable {
         scenes: std::collections::HashMap<String, i64>,
@@ -176,21 +176,21 @@ fn test_p1_select_label_to_id_pattern() {
     table.scenes.insert("会話_1::選択肢_1".to_string(), 2);
     table.scenes.insert("会話_1::選択肢_2".to_string(), 3);
 
-    let label_table = Arc::new(Mutex::new(table));
-    let label_table_clone = label_table.clone();
+    let scene_table = Arc::new(Mutex::new(table));
+    let label_table_clone = scene_table.clone();
 
     let mut module = Module::with_crate("pasta_stdlib").expect("Failed to create module");
 
     // P1 implementation pattern
-    let select_label_to_id = move |label: String, _filters: Value| -> i64 {
+    let select_scene_to_id = move |label: String, _filters: Value| -> i64 {
         let table = label_table_clone.lock().unwrap();
         table.scenes.get(&label).copied().unwrap_or(1)
     };
 
     module
-        .function("select_label_to_id", select_label_to_id)
+        .function("select_scene_to_id", select_scene_to_id)
         .build()
-        .expect("Failed to register select_label_to_id");
+        .expect("Failed to register select_scene_to_id");
 
     context.install(module).expect("Failed to install module");
     let runtime = Arc::new(context.runtime().expect("Failed to create runtime"));
@@ -199,10 +199,10 @@ fn test_p1_select_label_to_id_pattern() {
 
     let rune_code = r#"
         pub fn main() {
-            let id1 = pasta_stdlib::select_label_to_id("会話_1::__start__", #{});
-            let id2 = pasta_stdlib::select_label_to_id("会話_1::選択肢_1", #{});
-            let id3 = pasta_stdlib::select_label_to_id("会話_1::選択肢_2", #{});
-            let id_unknown = pasta_stdlib::select_label_to_id("unknown", #{});
+            let id1 = pasta_stdlib::select_scene_to_id("会話_1::__start__", #{});
+            let id2 = pasta_stdlib::select_scene_to_id("会話_1::選択肢_1", #{});
+            let id3 = pasta_stdlib::select_scene_to_id("会話_1::選択肢_2", #{});
+            let id_unknown = pasta_stdlib::select_scene_to_id("unknown", #{});
             (id1, id2, id3, id_unknown)
         }
     "#;

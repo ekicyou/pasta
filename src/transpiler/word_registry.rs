@@ -3,7 +3,7 @@
 //! This module collects word definitions from PastaFile and LabelDef during Pass 1
 //! and assigns unique entry IDs for runtime lookup in WordTable.
 
-use super::LabelRegistry;
+use super::SceneRegistry;
 
 /// A single word entry (unmarged individual definition).
 #[derive(Debug, Clone, PartialEq)]
@@ -19,7 +19,7 @@ pub struct WordEntry {
 /// Word definition registry (transpiler layer).
 ///
 /// Collects word definitions during Pass 1 and maintains entry IDs.
-/// Similar pattern to LabelRegistry but for word definitions.
+/// Similar pattern to SceneRegistry but for word definitions.
 pub struct WordDefRegistry {
     /// All registered word entries.
     entries: Vec<WordEntry>,
@@ -75,9 +75,9 @@ impl WordDefRegistry {
         self.entries
     }
 
-    /// Sanitize a name for use in keys (same logic as LabelRegistry).
+    /// Sanitize a name for use in keys (same logic as SceneRegistry).
     pub fn sanitize_name(name: &str) -> String {
-        LabelRegistry::sanitize_name(name)
+        SceneRegistry::sanitize_name(name)
     }
 }
 

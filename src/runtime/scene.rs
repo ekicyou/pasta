@@ -10,13 +10,13 @@ use std::collections::HashMap;
 
 /// Unique identifier for a scene (Vec index).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct LabelId(pub usize);
+pub struct SceneId(pub usize);
 
 /// Information about a single scene.
 #[derive(Debug, Clone)]
-pub struct LabelInfo {
+pub struct SceneInfo {
     /// Unique identifier for this scene.
-    pub id: LabelId,
+    pub id: SceneId,
     /// Scene name.
     pub name: String,
     /// Scene scope.
@@ -52,17 +52,17 @@ impl CacheKey {
 
 /// Cached selection state for sequential label consumption.
 struct CachedSelection {
-    candidates: Vec<LabelId>,
+    candidates: Vec<SceneId>,
     next_index: usize,
-    history: Vec<LabelId>,
+    history: Vec<SceneId>,
 }
 
 /// Label table for managing script labels.
-pub struct LabelTable {
-    /// ID-based storage for labels (index = LabelId).
-    labels: Vec<LabelInfo>,
-    /// Prefix index for forward-matching search (fn_name → [LabelId]).
-    prefix_index: RadixMap<Vec<LabelId>>,
+pub struct SceneTable {
+    /// ID-based storage for labels (index = SceneId).
+    labels: Vec<SceneInfo>,
+    /// Prefix index for forward-matching search (fn_name → [SceneId]).
+    prefix_index: RadixMap<Vec<SceneId>>,
     /// Cache for sequential label consumption ((search_key, filters) → CachedSelection).
     cache: HashMap<CacheKey, CachedSelection>,
     /// Random selector for label selection.
@@ -71,7 +71,7 @@ pub struct LabelTable {
     shuffle_enabled: bool,
 }
 
-impl LabelTable {
+impl SceneTable {
     /// Create a new label table with default random selector.
     pub fn new(random_selector: Box<dyn RandomSelector>) -> Self {
         Self {
@@ -83,21 +83,21 @@ impl LabelTable {
         }
     }
 
-    /// Create a label table from a transpiler's LabelRegistry.
+    /// Create a label table from a transpiler's SceneRegistry.
     ///
-    /// This converts the LabelRegistry (used during transpilation) into
-    /// a LabelTable (used during runtime).
+    /// This converts the SceneRegistry (used during transpilation) into
+    /// a SceneTable (used during runtime).
     pub fn from_label_registry(
-        registry: crate::transpiler::LabelRegistry,
+        registry: crate::transpiler::SceneRegistry,
         random_selector: Box<dyn RandomSelector>,
     ) -> Result<Self, PastaError> {
         // Build Vec storage with ID assignment
         // Note: Internal IDs are 0-based (Vec index), but select_label_to_id converts to 1-based
-        let labels: Vec<LabelInfo> = registry
+        let labels: Vec<SceneInfo> = registry
             .iter()
             .enumerate()
-            .map(|(idx, (_, registry_info))| LabelInfo {
-                id: LabelId(idx),
+            .map(|(idx, (_, registry_info))| SceneInfo {
+                id: SceneId(idx),
                 name: registry_info.name.clone(),
                 scope: if registry_info.parent.is_some() {
                     SceneScope::Local
@@ -119,7 +119,7 @@ impl LabelTable {
             
             // Check for duplicates (defensive programming)
             if !entry.is_empty() {
-                return Err(PastaError::DuplicateLabelPath {
+                return Err(PastaError::DuplicateScenePath {
                     fn_name: label.fn_name.clone(),
                 });
             }
@@ -142,45 +142,45 @@ impl LabelTable {
     /// 1. Prefix search using RadixMap (search_key → candidate IDs)
     /// 2. Filter by attributes
     /// 3. Cache-based sequential selection (no repeat until exhausted)
-    /// 4. Return selected LabelId
-    pub fn resolve_label_id(
+    /// 4. Return selected SceneId
+    pub fn resolve_scene_id(
         &mut self,
         search_key: &str,
         filters: &HashMap<String, String>,
-    ) -> Result<LabelId, PastaError> {
+    ) -> Result<SceneId, PastaError> {
         // Validate search_key
         if search_key.is_empty() {
-            return Err(PastaError::InvalidLabel {
-                label: search_key.to_string(),
+            return Err(PastaError::InvalidScene {
+                scene: search_key.to_string(),
             });
         }
 
         // Phase 1: Prefix search using RadixMap
-        let mut candidate_ids: Vec<LabelId> = Vec::new();
+        let mut candidate_ids: Vec<SceneId> = Vec::new();
         for (_key, ids) in self.prefix_index.iter_prefix(search_key.as_bytes()) {
             candidate_ids.extend(ids.iter().copied());
         }
 
         if candidate_ids.is_empty() {
-            return Err(PastaError::LabelNotFound {
-                label: search_key.to_string(),
+            return Err(PastaError::SceneNotFound {
+                scene: search_key.to_string(),
             });
         }
 
         // Phase 2: Filter by attributes
-        let filtered_ids: Vec<LabelId> = candidate_ids
+        let filtered_ids: Vec<SceneId> = candidate_ids
             .into_iter()
             .filter(|&id| {
-                let label = &self.labels[id.0];
+                let scene = &self.labels[id.0];
                 filters
                     .iter()
-                    .all(|(key, value)| label.attributes.get(key) == Some(value))
+                    .all(|(key, value)| scene.attributes.get(key) == Some(value))
             })
             .collect();
 
         if filtered_ids.is_empty() {
-            return Err(PastaError::NoMatchingLabel {
-                label: search_key.to_string(),
+            return Err(PastaError::NoMatchingScene {
+                scene: search_key.to_string(),
                 filters: filters.clone(),
             });
         }
@@ -192,7 +192,7 @@ impl LabelTable {
             if self.shuffle_enabled {
                 self.random_selector.shuffle_usize(&mut id_values);
             }
-            let ids = id_values.into_iter().map(LabelId).collect();
+            let ids = id_values.into_iter().map(SceneId).collect();
             CachedSelection {
                 candidates: ids,
                 next_index: 0,
@@ -202,7 +202,7 @@ impl LabelTable {
 
         // Phase 4: Sequential selection
         if cached.next_index >= cached.candidates.len() {
-            return Err(PastaError::NoMoreLabels {
+            return Err(PastaError::NoMoreScenes {
                 search_key: search_key.to_string(),
                 filters: filters.clone(),
             });
@@ -215,8 +215,8 @@ impl LabelTable {
         Ok(selected_id)
     }
 
-    /// Get label info by ID.
-    pub fn get_label(&self, id: LabelId) -> Option<&LabelInfo> {
+    /// Get scene info by ID.
+    pub fn get_scene(&self, id: SceneId) -> Option<&SceneInfo> {
         self.labels.get(id.0)
     }
 
@@ -225,23 +225,23 @@ impl LabelTable {
         self.shuffle_enabled = enabled;
     }
 
-    /// Find a label by name, with optional attribute filters (legacy method).
+    /// Find a scene by name, with optional attribute filters (legacy method).
     ///
-    /// This is kept for backward compatibility with execute_label().
-    /// For new code, use resolve_label_id() instead.
-    pub fn find_label(
+    /// This is kept for backward compatibility with execute_scene().
+    /// For new code, use resolve_scene_id() instead.
+    pub fn find_scene(
         &mut self,
         name: &str,
         filters: &HashMap<String, String>,
     ) -> Result<String, PastaError> {
-        // Use resolve_label_id for the lookup
-        let label_id = self.resolve_label_id(name, filters)?;
-        let label = self
-            .get_label(label_id)
-            .ok_or_else(|| PastaError::LabelNotFound {
-                label: name.to_string(),
+        // Use resolve_scene_id for the lookup
+        let scene_id = self.resolve_scene_id(name, filters)?;
+        let scene = self
+            .get_scene(scene_id)
+            .ok_or_else(|| PastaError::SceneNotFound {
+                scene: name.to_string(),
             })?;
-        Ok(label.fn_name.clone())
+        Ok(scene.fn_name.clone())
     }
 }
 
@@ -250,9 +250,9 @@ mod tests {
     use super::*;
     use crate::runtime::random::MockRandomSelector;
 
-    fn create_test_scene_info(id: usize, name: &str, fn_name: &str) -> LabelInfo {
-        LabelInfo {
-            id: LabelId(id),
+    fn create_test_scene_info(id: usize, name: &str, fn_name: &str) -> SceneInfo {
+        SceneInfo {
+            id: SceneId(id),
             name: name.to_string(),
             scope: SceneScope::Global,
             attributes: HashMap::new(),
@@ -264,11 +264,11 @@ mod tests {
     #[test]
     fn test_resolve_scene_id_basic() {
         let selector = Box::new(MockRandomSelector::new(vec![0]));
-        let mut table = LabelTable {
+        let mut table = SceneTable {
             labels: vec![create_test_scene_info(0, "test", "test_1::__start__")],
             prefix_index: {
                 let mut map = RadixMap::new();
-                map.insert(b"test_1::__start__", vec![LabelId(0)]);
+                map.insert(b"test_1::__start__", vec![SceneId(0)]);
                 map
             },
             cache: HashMap::new(),
@@ -276,8 +276,8 @@ mod tests {
             shuffle_enabled: false,
         };
 
-        let result = table.resolve_label_id("test", &HashMap::new());
+        let result = table.resolve_scene_id("test", &HashMap::new());
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), LabelId(0));
+        assert_eq!(result.unwrap(), SceneId(0));
     }
 }

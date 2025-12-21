@@ -15,7 +15,7 @@ fn create_test_word_table() -> pasta::runtime::words::WordTable {
 fn test_stdlib_module_creation() {
     // Create dummy label table for testing
     let selector = Box::new(pasta::runtime::random::DefaultRandomSelector::new());
-    let table = pasta::runtime::scene::LabelTable::new(selector);
+    let table = pasta::runtime::scene::SceneTable::new(selector);
     let word_table = create_test_word_table();
 
     let result = stdlib::create_module(table, word_table);
@@ -30,7 +30,7 @@ fn test_stdlib_module_creation() {
 fn test_emit_text_via_rune() -> Result<(), Box<dyn std::error::Error>> {
     // Create dummy label table for testing
     let selector = Box::new(pasta::runtime::random::DefaultRandomSelector::new());
-    let table = pasta::runtime::scene::LabelTable::new(selector);
+    let table = pasta::runtime::scene::SceneTable::new(selector);
     let word_table = create_test_word_table();
 
     // Create context with stdlib
@@ -65,7 +65,7 @@ fn test_emit_text_via_rune() -> Result<(), Box<dyn std::error::Error>> {
 fn test_sync_functions_via_rune() -> Result<(), Box<dyn std::error::Error>> {
     // Create dummy label table for testing
     let selector = Box::new(pasta::runtime::random::DefaultRandomSelector::new());
-    let table = pasta::runtime::scene::LabelTable::new(selector);
+    let table = pasta::runtime::scene::SceneTable::new(selector);
     let word_table = create_test_word_table();
 
     // Create context with stdlib
