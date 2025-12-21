@@ -13,7 +13,7 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 | 機能 | 説明 |
 |------|------|
 | 行指向文法 | 冒頭インデント＋キーワードで行属性決定 |
-| ラベル前方一致 | ランダムJump/Call候補をシャッフル選択 |
+| シーン前方一致 | ランダムJump/Call候補をシャッフル選択 |
 | 単語前方一致 | 単語keyの前方一致でランダム選択 |
 | SHIORI.DLL | 従来伺かユーザー向けインターフェース |
 | areka統合 | 次世代デスクトップマスコット基盤 |
@@ -22,7 +22,7 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 | 原則 | 内容 |
 |------|------|
 | 日本語フレンドリー | 全角キーワードでタイプ量削減 |
-| UNICODE識別子 | 日本語ラベル名・変数名をサポート |
+| UNICODE識別子 | 日本語シーン名・変数名をサポート |
 | yield型エンジン | 継続出力でチェイントーク対応 |
 | runeトランスパイル | 2pass変換、複雑ロジックはrune側で実装 |
 
@@ -37,13 +37,13 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 
 - [ ] 「パスタスクリプト」DSL設計の見直し
 - [ ] ２パストランスパイル設計の再検討
-- [ ] ラベルジャンプテーブル設計の修正
+- [ ] シーンジャンプテーブル設計の修正
 - [ ] 宣言的制御フロー（Call/Jump文）の再実装
 
 **課題**:
 - DSL文法の曖昧性・不完全性
 - トランスパイル結果の品質問題
-- ラベルテーブル設計の不備
+- シーンテーブル設計の不備
 - 要件と実装の乖離
 
 **過去の「完了」仕様**: 12件（実装品質不十分、再評価必要）
@@ -56,7 +56,7 @@ Phase 0の再構築が完了するまで、基盤確立とは言えない状態�
 **進行中仕様**: 8件（Phase 0完了後に着手）
 
 ### Phase 3: 高度機能（計画中）
-- [ ] ラベル継続チェーン（`pasta-label-continuation`）
+- [ ] シーン継続チェーン（`pasta-label-continuation`）
 - [ ] インライン多段解決（`pasta-conversation-inline-multi-stage-resolution`）
 - [ ] rune側ランタイムを拡充し、使い勝手を向上させる
 - [ ] イベントハンドリングの拡充

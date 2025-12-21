@@ -9,11 +9,11 @@
 
 - 複数キャラクターの発言
 - スピーカーの切り替え
-- 同じラベル名での複数定義（ランダム選択）
+- 同じシーン名での複数定義（ランダム選択）
 - 挨拶、自己紹介、雑談、別れの基本パターン
 
 **学べること:**
-- ラベル定義の基本
+- シーン定義の基本
 - 発言文の記述方法
 - ランダムバリエーションの実装
 
@@ -103,7 +103,7 @@ let script = fs::read_to_string("examples/scripts/01_basic_conversation.pasta")?
 // エンジンを初期化
 let mut engine = PastaEngine::new(&script)?;
 
-// ラベルを実行
+// シーンを実行
 let events = engine.execute_label("挨拶")?;
 
 // イベントを処理
@@ -138,7 +138,7 @@ let events = engine.on_event("Weather", filters)?;
 
 1. **初心者**: 
    - `01_basic_conversation.pasta` で基本を学ぶ
-   - ラベルと発言の基礎を理解
+   - シーンと発言の基礎を理解
 
 2. **初級者**:
    - `03_variables.pasta` で変数を学ぶ
@@ -154,7 +154,7 @@ let events = engine.on_event("Weather", filters)?;
 
 ## ベストプラクティス
 
-### 1. ラベル命名
+### 1. シーン命名
 
 ```pasta
 // ✓ Good: 説明的な名前
@@ -223,15 +223,15 @@ let events = engine.on_event("Weather", filters)?;
 1. **Parse error**: インデントが揃っていない
    ```pasta
    // ✗ Bad
-   ＊ラベル
+   ＊シーン
    さくら：発言  // インデントなし
    
    // ✓ Good
-   ＊ラベル
+   ＊シーン
        さくら：発言  // インデントあり
    ```
 
-2. **LabelNotFound**: ラベル名のタイポ
+2. **LabelNotFound**: シーン名のタイポ
    ```pasta
    ＊挨拶
        ＠jump：あいさつ  // ✗ タイポ

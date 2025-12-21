@@ -17,12 +17,12 @@ pasta/
 │   │   └── pasta.pest       # Pest文法定義
 │   ├── transpiler/          # トランスパイラレイヤー
 │   │   ├── mod.rs           # Transpiler API
-│   │   └── label_registry.rs # ラベル管理・モジュール生成
+│   │   └── label_registry.rs # シーン管理・モジュール生成
 │   ├── runtime/             # ランタイムレイヤー
 │   │   ├── mod.rs           # ランタイムAPI
 │   │   ├── generator.rs     # ScriptGenerator - Rune VM実行
 │   │   ├── variable.rs      # VariableManager - 変数管理
-│   │   ├── label_table.rs   # LabelTable - ラベル検索テーブル
+│   │   ├── label_table.rs   # LabelTable - シーン検索テーブル
 │   │   └── random.rs        # RandomSelector - ランダム選択
 │   └── stdlib/              # Pasta標準ライブラリ（Rune側関数）
 │       └── mod.rs           # stdlib API登録
@@ -93,7 +93,7 @@ stdlib, ir
 ### 内部モジュール
 - `loader`: ディレクトリスキャン・ファイル読み込み
 - `cache`: パース結果メモリキャッシュ
-- `transpiler::label_registry`: ラベル登録・ID管理・モジュール生成
+- `transpiler::label_registry`: シーン登録・ID管理・モジュール生成
 - `runtime::generator`: Rune VM実行・Generator継続管理
 
 ## テスト構成
@@ -101,8 +101,8 @@ stdlib, ir
 | カテゴリ | 対象 |
 |---------|------|
 | Parser | 文法パース、エラー、行タイプ |
-| Transpiler | 2パス変換、ラベル管理 |
-| Runtime | Rune VM、ラベル解決、スコープ |
+| Transpiler | 2パス変換、シーン管理 |
+| Runtime | Rune VM、シーン解決、スコープ |
 | Engine | E2E統合、UI独立性 |
 | Control Flow | Call/Jump、並行実行 |
 
