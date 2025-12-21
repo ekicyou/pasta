@@ -539,12 +539,20 @@ pub struct VariableProxy {
 - `transpile_statement()`、`transpile_speech_part_to_writer()`、`transpile_jump_target_to_search_key()`を修正
 - 旧式API（`ctx.var.*`、`get_global()`、`set_global()`）を削除
 
-### Phase 2: 文法拡張（必要な場合）
-- Parser層で`@$変数`が`FuncCall`として認識されることを検証
-- 必要に応じて`pasta.pest`の`func_call`ルールを拡張
+### Phase 2: 文法拡張（検証済み：対応不要）
+- ✅ **検証完了**: `pasta.pest`の`var_ref`ルール（L253）により、`@$変数`は既に`SpeechPart::VarRef`として認識される
+- ✅ **Parser修正不要**: `var_ref = { (at_marker | dollar_marker) ~ var_scope? ~ var_name }`が`@`+`$`+`変数名`パターンをカバー
+- **Transpiler対応**: `transpile_speech_part_to_writer()`で`SpeechPart::VarRef`の`@$変数`パターンを検出し、`` pasta_stdlib::word(module, `${ctx.local.変数名}`, []) ``へ展開
 
-### Phase 3: テスト追加
-- 新式APIを検証するユニット/統合テストを追加
+### Phase 3: テスト追加・修正
+- **既存テスト修正**: 1ファイル（`tests/pasta_integration_control_flow_test.rs`）の2箇所でprintlnメッセージ内に`ctx.var`が記載されているため、`ctx.local`/`ctx.global`へ修正
+  - L31: `println!("   ✓ ctx.var.変数名 アクセスが正しいです");` → `ctx.local.変数名`
+  - L37: `println!("   - 変数代入・参照 (ctx.var.カウンター)");` → `ctx.local.カウンター`
+  - **影響範囲**: printlnメッセージのみ（実コードへの影響なし）
+- **新規テスト追加**: 新式APIを検証するユニット/統合テストを追加
+  - 変数代入（Local/Global）のRune出力検証
+  - `@$変数`動的単語検索の統合テスト
+  - `>$変数`動的シーン呼び出しの統合テスト
 - 既存テストが全て合格することを確認（`cargo test --all`）
 
 ### Phase 4: リリース
@@ -554,7 +562,7 @@ pub struct VariableProxy {
 
 **Rollback Triggers**:
 - `cargo test --all`が失敗する場合、Phase 1をロールバック
-- Rune側プロパティアクセスがサポートされない場合、`ctx.local(name)`メソッド形式へフォールバック（Phase 1修正）
+- Rune側プロパティアクセスがサポートされない場合、`ctx.local(name)`メソッド形式または静的プロパティ生成へフォールバック（Phase 1修正、議題1で決定）
 
 **Validation Checkpoints**:
 - Phase 1完了後: ユニットテスト合格
@@ -563,13 +571,14 @@ pub struct VariableProxy {
 
 ```mermaid
 flowchart LR
-    P1[Phase 1: 新式API実装] --> V1{ユニットテスト合格?}
+    P0[Phase 0: Rune PoC] --> P0V{動的プロパティ可能?}
+    P0V -->|No| P0F[メソッド形式へ設計変更]
+    P0V -->|Yes| P1[Phase 1: 新式API実装]
+    P0F --> P1
+    P1 --> V1{ユニットテスト合格?}
     V1 -->|No| RB1[Phase 1 Rollback]
-    V1 -->|Yes| P2[Phase 2: 文法拡張検証]
-    P2 --> V2{Parser対応必要?}
-    V2 -->|Yes| P2A[pasta.pest修正]
-    V2 -->|No| P3[Phase 3: テスト追加]
-    P2A --> P3
+    V1 -->|Yes| P2[Phase 2: Parser検証完了]
+    P2 --> P3[Phase 3: テスト追加・修正]
     P3 --> V3{全テスト合格?}
     V3 -->|No| RB3[Phase 3 Rollback]
     V3 -->|Yes| P4[Phase 4: リリース]
