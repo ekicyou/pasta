@@ -65,12 +65,22 @@ SpeechPart::FuncCall {
 
 // 変更後（正しく関数呼び出しとして処理）
 SpeechPart::FuncCall { name, args, scope } => {
-    let resolved_name = context.resolve_function(name, *scope)?;
     let args_str = Self::transpile_exprs_to_args(args, &context)?;
+    let function_call = match scope {
+        FunctionScope::Auto => {
+            // ローカル優先（resolve_functionでスコープ解決）
+            let resolved_name = context.resolve_function(name, *scope)?;
+            format!("{}(ctx, ({}))", resolved_name, args_str)
+        }
+        FunctionScope::GlobalOnly => {
+            // グローバル指定（super::を付与）
+            format!("super::{}(ctx, ({}))", name, args_str)
+        }
+    };
     writeln!(
         writer,
-        "        for a in crate::pasta::call(ctx, \"{}\", #{{}}, ({})) {{ yield a; }}",
-        resolved_name, args_str
+        "        for a in {} {{ yield a; }}",
+        function_call
     )
     .map_err(|e| PastaError::io_error(e.to_string()))?;
 }
