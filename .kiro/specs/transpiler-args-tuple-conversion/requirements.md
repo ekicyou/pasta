@@ -9,8 +9,8 @@ Pastaトランスパイラーは現在、関数呼び出しの引数をRune配�
 
 本仕様では、トランスパイラーが生成する以下の箇所における配列リテラルをタプルリテラルに変換します：
 1. Call/Jump文の引数リスト（`pasta::call`関数呼び出し）
-2. 単語展開の引数リスト（`pasta_stdlib::word`関数呼び出し）
-3. その他の関数呼び出しにおける引数リスト
+
+**注意**: 単語展開（`pasta_stdlib::word`）の第3引数は`_filters`（フィルター用、現在は空配列`[]`を渡しているが本来は空の連想配列`#{}`であるべき）であり、`args`（引数リスト）ではないため、本仕様のスコープ外です。
 
 ## Requirements
 
@@ -35,27 +35,7 @@ for a in crate::pasta::call(ctx, "scene", #{}, [arg1, arg2]) { yield a; }
 for a in crate::pasta::call(ctx, "scene", #{}, (arg1, arg2)) { yield a; }
 ```
 
-### Requirement 2: 単語展開の引数変換
-**Objective:** トランスパイラー開発者として、単語展開（Word expansion）生成時に引数を配列ではなくタプルとして展開したい。これにより、将来的に引数付き単語呼び出しをサポートする際の一貫性が保たれる。
-
-#### Acceptance Criteria
-1. When SpeechPart::FuncCallを処理するとき、Pastaトランスパイラーは`pasta_stdlib::word`関数の第3引数を空タプル `()` で生成する
-2. The Pastaトランスパイラーは、グローバル単語とローカル単語両方でタプル構文を使用する
-
-#### Implementation Notes
-現在のコード生成：
-```rune
-yield Talk(pasta_stdlib::word("module", "word_key", []));
-```
-
-変更後のコード生成：
-```rune
-yield Talk(pasta_stdlib::word("module", "word_key", ()));
-```
-
-**補足**: `pasta_stdlib::word`関数の第3引数は現在未使用（`_filters`として無視）だが、将来の拡張のために予約されている。
-
-### Requirement 3: 引数トランスパイル関数の修正
+### Requirement 2: 引数トランスパイル関数の修正
 **Objective:** トランスパイラー開発者として、`transpile_exprs_to_args`関数がタプルリテラル構文を生成するように修正したい。これにより、引数リストの変換ロジックが一元化される。
 
 #### Acceptance Criteria
@@ -64,7 +44,7 @@ yield Talk(pasta_stdlib::word("module", "word_key", ()));
 3. When `transpile_exprs_to_args`が2個以上の引数を受け取るとき、Pastaトランスパイラーは `"arg1, arg2, ..."` を返す
 4. The Pastaトランスパイラーは、呼び出し側で引数文字列を括弧 `()` で囲んでタプルを形成する
 
-### Requirement 4: 後方互換性の保証
+### Requirement 3: 後方互換性の保証
 **Objective:** 開発者として、既存のテストが引き続き合格することを確認したい。これにより、変更が既存機能を破壊しないことが保証される。
 
 #### Acceptance Criteria
@@ -72,7 +52,7 @@ yield Talk(pasta_stdlib::word("module", "word_key", ()));
 2. If テストが失敗するとき、then Pastaトランスパイラーは期待されるRune出力を配列からタプルに更新する
 3. The Pastaトランスパイラーは、変更前と同じ意味的な動作を維持する
 
-### Requirement 5: ドキュメント更新
+### Requirement 4: ドキュメント更新
 **Objective:** 開発者として、トランスパイラーの出力仕様が最新の実装を反映していることを確認したい。これにより、ドキュメントと実装の乖離を防ぐ。
 
 #### Acceptance Criteria
