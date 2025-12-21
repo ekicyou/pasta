@@ -11,15 +11,15 @@ use pasta::runtime::words::WordTable;
 use pasta::transpiler::{SceneRegistry, WordDefRegistry};
 use std::collections::HashMap;
 
-/// Helper to create a test SceneTable with labels
-fn create_test_label_table_with_labels(labels: Vec<&str>) -> SceneTable {
+/// Helper to create a test SceneTable with scenes
+fn create_test_scene_table_with_scenes(scene_names: Vec<&str>) -> SceneTable {
     let mut registry = SceneRegistry::new();
-    for label in labels {
-        registry.register_global(label, HashMap::new());
+    for scene_name in scene_names {
+        registry.register_global(scene_name, HashMap::new());
     }
     
     let selector = Box::new(DefaultRandomSelector::new());
-    SceneTable::from_label_registry(registry, selector).unwrap()
+    SceneTable::from_scene_registry(registry, selector).unwrap()
 }
 
 /// Helper to create a test WordTable with words
@@ -39,7 +39,7 @@ fn create_test_word_table_with_words(words: Vec<(&str, Vec<&str>)>) -> WordTable
 /// not WordTable.
 #[test]
 fn test_label_table_does_not_contain_word_definitions() {
-    let mut scene_table = create_test_label_table_with_labels(vec!["test_label", "another_label"]);
+    let mut scene_table = create_test_scene_table_with_scenes(vec!["test_label", "another_label"]);
 
     // Verify SceneTable has labels
     let result = scene_table.resolve_scene_id("test_label", &HashMap::new());
@@ -49,7 +49,7 @@ fn test_label_table_does_not_contain_word_definitions() {
     // The struct only contains label_prefix_map, no word-related fields
 }
 
-/// Verify that WordTable does not contain label definitions.
+/// Verify that WordTable does not contain scene definitions.
 /// This test documents the design requirement that word expansion uses WordTable,
 /// not SceneTable.
 #[test]
@@ -64,11 +64,11 @@ fn test_word_table_does_not_contain_label_definitions() {
     assert!(result.is_ok());
     assert_eq!(result.unwrap(), "こんにちは");
 
-    // WordTable has no API to access labels - this is by design
+    // WordTable has no API to access scenes - this is by design
     // The struct only contains entries (RadixMap), no label-related fields
 }
 
-/// Verify that words prefixed with common label patterns are not confused with labels.
+/// Verify that words prefixed with common scene patterns are not confused with labels.
 /// For example, a word named "＊ラベル" should not be treated as a label.
 #[test]
 fn test_word_with_label_like_name_stays_in_word_table() {
@@ -82,18 +82,18 @@ fn test_word_with_label_like_name_stays_in_word_table() {
     assert_eq!(result.unwrap(), "単語です");
 }
 
-/// Verify that labels with common word patterns are not confused with words.
-/// For example, a label named "挨拶ラベル" should not be treated as a word.
+/// Verify that scenes with common word patterns are not confused with words.
+/// For example, a scene named "挨拶ラベル" should not be treated as a word.
 #[test]
 fn test_label_with_word_like_name_stays_in_label_table() {
-    let mut scene_table = create_test_label_table_with_labels(vec!["挨拶ラベル"]);
+    let mut scene_table = create_test_scene_table_with_scenes(vec!["挨拶ラベル"]);
 
-    // The label should be accessible from SceneTable
+    // The scene should be accessible from SceneTable
     let result = scene_table.resolve_scene_id("挨拶ラベル", &HashMap::new());
     assert!(result.is_ok());
 }
 
-/// Integration test: Verify that a script with both labels and words
+/// Integration test: Verify that a script with both scenes and words
 /// keeps them in separate dictionaries.
 #[test]
 fn test_separate_dictionaries_integration() {
@@ -102,15 +102,15 @@ fn test_separate_dictionaries_integration() {
     // - They are converted to SceneTable and WordTable respectively
     // - At runtime, Call/Jump use SceneTable, word references use WordTable
 
-    // Simulate labels collected in Pass 1
-    let mut scene_table = create_test_label_table_with_labels(vec!["会話ラベル"]);
+    // Simulate scenes collected in Pass 1
+    let mut scene_table = create_test_scene_table_with_scenes(vec!["会話ラベル"]);
 
     // Simulate words collected in Pass 1
     let mut word_table = create_test_word_table_with_words(vec![
         ("場所", vec!["東京", "大阪"]),
     ]);
 
-    // Labels are ONLY in SceneTable
+    // scenes are ONLY in SceneTable
     assert!(scene_table.resolve_scene_id("会話ラベル", &HashMap::new()).is_ok());
     assert!(word_table.search_word("", "会話ラベル", &[]).is_err());
 

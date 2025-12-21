@@ -13,7 +13,7 @@ fn create_test_word_table() -> pasta::runtime::words::WordTable {
 
 #[test]
 fn test_stdlib_module_creation() {
-    // Create dummy label table for testing
+    // Create dummy scene table for testing
     let selector = Box::new(pasta::runtime::random::DefaultRandomSelector::new());
     let table = pasta::runtime::scene::SceneTable::new(selector);
     let word_table = create_test_word_table();
@@ -28,7 +28,7 @@ fn test_stdlib_module_creation() {
 
 #[test]
 fn test_emit_text_via_rune() -> Result<(), Box<dyn std::error::Error>> {
-    // Create dummy label table for testing
+    // Create dummy scene table for testing
     let selector = Box::new(pasta::runtime::random::DefaultRandomSelector::new());
     let table = pasta::runtime::scene::SceneTable::new(selector);
     let word_table = create_test_word_table();
@@ -63,7 +63,7 @@ fn test_emit_text_via_rune() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn test_sync_functions_via_rune() -> Result<(), Box<dyn std::error::Error>> {
-    // Create dummy label table for testing
+    // Create dummy scene table for testing
     let selector = Box::new(pasta::runtime::random::DefaultRandomSelector::new());
     let table = pasta::runtime::scene::SceneTable::new(selector);
     let word_table = create_test_word_table();

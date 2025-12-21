@@ -5,7 +5,7 @@ use std::collections::HashMap;
 fn test_label_registry_basic() {
     let mut registry = SceneRegistry::new();
 
-    // Register global labels
+    // Register global scenes
     let (id1, counter1) = registry.register_global("会話", HashMap::new());
     let (id2, counter2) = registry.register_global("別会話", HashMap::new());
 
@@ -35,7 +35,7 @@ fn test_label_registry_with_local_scenes() {
     // Register parent
     let (parent_id, parent_counter) = registry.register_global("メイン", HashMap::new());
 
-    // Register local labels
+    // Register local scenes
     let (local1_id, _local1_counter) =
         registry.register_local("自己紹介", "メイン", parent_counter, HashMap::new());
 
@@ -52,7 +52,7 @@ fn test_label_registry_with_local_scenes() {
     assert_eq!(parent.fn_path, "crate::メイン_1::__start__");
     assert_eq!(parent.parent, None);
 
-    // Verify local labels
+    // Verify local scenes
     let local1 = registry.get_scene(local1_id).unwrap();
     assert_eq!(local1.name, "自己紹介");
     assert_eq!(local1.fn_path, "crate::メイン_1::自己紹介_1");
@@ -68,7 +68,7 @@ fn test_label_registry_with_local_scenes() {
 fn test_label_registry_duplicate_names() {
     let mut registry = SceneRegistry::new();
 
-    // Register duplicate global labels
+    // Register duplicate global scenes
     let (id1, counter1) = registry.register_global("会話", HashMap::new());
     let (id2, counter2) = registry.register_global("会話", HashMap::new());
     let (id3, counter3) = registry.register_global("会話", HashMap::new());

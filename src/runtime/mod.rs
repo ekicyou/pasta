@@ -1,7 +1,7 @@
 //! Runtime module for executing Rune scripts.
 //!
 //! This module provides the runtime environment for executing Rune scripts,
-//! including the Rune VM wrapper, variable management, and label management.
+//! including the Rune VM wrapper, variable management, and scene management.
 
 pub mod generator;
 pub mod scene;

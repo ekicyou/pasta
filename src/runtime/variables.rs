@@ -8,7 +8,7 @@ use std::collections::HashMap;
 /// Variable scope.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum VariableScope {
-    /// Local to current label execution.
+    /// Local to current scene execution.
     Local,
     /// Global across all script execution.
     Global,
@@ -103,7 +103,7 @@ impl From<f64> for VariableValue {
 
 /// Variable manager for Pasta scripts.
 pub struct VariableManager {
-    /// Local variables (cleared after label execution).
+    /// Local variables (cleared after scene execution).
     local_vars: HashMap<String, VariableValue>,
     /// Global variables (persist during runtime).
     global_vars: HashMap<String, VariableValue>,

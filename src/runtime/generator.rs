@@ -2,7 +2,7 @@
 //!
 //! This module provides types for script execution state management.
 //! Note: Due to Rune 0.14 Generator<&mut Vm> lifetime constraints,
-//! the current implementation executes labels to completion rather than
+//! the current implementation executes scenes to completion rather than
 //! providing incremental resumption. Future versions may support streaming.
 
 /// State of the script generator.
@@ -19,7 +19,7 @@ pub enum ScriptGeneratorState {
 /// Script generator for executing Pasta scripts.
 ///
 /// Note: This is a placeholder type. The current implementation
-/// in PastaEngine executes labels to completion due to Rune
+/// in PastaEngine executes scenes to completion due to Rune
 /// Generator lifetime constraints.
 pub struct ScriptGenerator {
     state: ScriptGeneratorState,

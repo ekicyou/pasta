@@ -12,7 +12,7 @@ use pasta::PastaEngine;
 
 #[test]
 fn test_transpiler_runtime_id_consistency() {
-    // Create a script with multiple labels to verify ID assignment
+    // Create a script with multiple scenes to verify ID assignment
     let script = r#"
 ＊会話
     さくら：こんにちは
@@ -48,13 +48,13 @@ fn test_transpiler_runtime_id_consistency() {
     let result3 = engine.execute_label("別れ");
     assert!(result3.is_ok(), "Runtime should resolve 別れ correctly");
 
-    println!("✅ ID consistency verified: All labels execute successfully");
+    println!("✅ ID consistency verified: All scenes execute successfully");
     println!("   This confirms transpiler IDs match runtime IDs");
 }
 
 #[test]
 fn test_duplicate_labels_id_consistency() {
-    // Test with duplicate label names
+    // Test with duplicate scene names
     // Each duplicate should get unique ID (1, 2, 3)
     let script = r#"
 ＊挨拶
@@ -80,10 +80,10 @@ fn test_duplicate_labels_id_consistency() {
         let result = engine.execute_label("挨拶");
         assert!(
             result.is_ok(),
-            "Runtime should handle duplicate labels with correct IDs"
+            "Runtime should handle duplicate scenes with correct IDs"
         );
     }
 
-    println!("✅ Duplicate label ID consistency verified");
+    println!("✅ Duplicate scene ID consistency verified");
     println!("   Each duplicate has unique ID and resolves correctly");
 }

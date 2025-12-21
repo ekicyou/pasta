@@ -121,8 +121,8 @@ fn test_rune_block_empty() {
 
 #[test]
 fn test_rune_block_in_local_label() {
-    // Test rune blocks in local labels
-    // Note: Using ASCII label names to avoid encoding issues in test
+    // Test rune blocks in local scenes
+    // Note: Using ASCII scene names to avoid encoding issues in test
     let script = "＊Global\n  -Local\n    ```rune\n    fn local_func() {\n      return \"local\";\n    }\n    ```\n    さくら：ローカル関数定義\n";
 
     let script_dir = create_test_script(script).expect("Failed to create script");
@@ -132,7 +132,7 @@ fn test_rune_block_in_local_label() {
     let engine = PastaEngine::new(&script_dir, &persistence_dir);
     assert!(
         engine.is_ok(),
-        "Failed to parse script with rune block in local label: {:?}",
+        "Failed to parse script with rune block in local scene: {:?}",
         engine.err()
     );
 }

@@ -17,7 +17,7 @@ fn test_engine_with_simple_project() {
         Ok(mut engine) => {
             println!("Engine created successfully!");
 
-            // Test label existence by execution
+            // Test scene existence by execution
             assert!(
                 engine.execute_label("会話").is_ok(),
                 "Label '会話' should exist"
@@ -43,7 +43,7 @@ fn test_engine_with_test_project() {
         Ok(mut engine) => {
             println!("Engine created successfully!");
 
-            // Test label existence by execution (use actual Japanese label name)
+            // Test scene existence by execution (use actual Japanese scene name)
             assert!(
                 engine.execute_label("挨拶").is_ok(),
                 "Label '挨拶' should exist"
@@ -64,7 +64,7 @@ fn test_engine_execute_label() {
 
     let mut engine = PastaEngine::new(&script_root, temp_dir.path()).unwrap();
 
-    // Execute a label (use actual Japanese label name)
+    // Execute a scene (use actual Japanese scene name)
     let events = engine.execute_label("挨拶").unwrap();
 
     // Verify events

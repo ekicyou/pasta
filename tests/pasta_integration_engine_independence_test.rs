@@ -207,7 +207,7 @@ fn test_concurrent_parsing() {
 
 #[test]
 fn test_independent_label_execution() {
-    // Test that label execution state doesn't leak between engines
+    // Test that scene execution state doesn't leak between engines
     let script = r#"
 ＊label_a
     さくら：ラベルA
@@ -224,7 +224,7 @@ fn test_independent_label_execution() {
     let mut engine2 =
         PastaEngine::new(&script_dir, &persistence_dir).expect("Failed to create engine2");
 
-    // Execute different labels on each engine
+    // Execute different scenes on each engine
     let events1_a = engine1.execute_label("label_a").unwrap();
     let events2_b = engine2.execute_label("label_b").unwrap();
 
@@ -243,7 +243,7 @@ fn test_independent_label_execution() {
     let events1_b = engine1.execute_label("label_b").unwrap();
     let events2_a = engine2.execute_label("label_a").unwrap();
 
-    // Both engines should be able to execute both labels independently
+    // Both engines should be able to execute both scenes independently
     assert!(!events1_b.is_empty());
     assert!(!events2_a.is_empty());
 }
@@ -278,7 +278,7 @@ fn test_engine_with_different_scripts() {
     assert!(simple_engine.execute_label("simple").is_ok());
     assert!(complex_engine.execute_label("complex").is_ok());
 
-    // Verify label isolation by executing
+    // Verify scene isolation by executing
     assert!(simple_engine.execute_label("simple").is_ok());
     assert!(simple_engine.execute_label("complex").is_err());
     assert!(complex_engine.execute_label("complex").is_ok());

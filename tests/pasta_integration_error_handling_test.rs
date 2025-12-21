@@ -54,7 +54,7 @@ fn test_parse_error_with_location() {
 
 #[test]
 fn test_parse_error_missing_label_content() {
-    // Empty labels should parse successfully (no statements is valid)
+    // Empty scenes should parse successfully (no statements is valid)
     let script = r#"
 ＊空ラベル
 "#;
@@ -64,7 +64,7 @@ fn test_parse_error_missing_label_content() {
         let persistence_dir = get_test_persistence_dir();
         PastaEngine::new(&script_dir, &persistence_dir)
     };
-    assert!(result.is_ok(), "Empty label should be valid");
+    assert!(result.is_ok(), "Empty scene should be valid");
 }
 
 #[test]
@@ -94,7 +94,7 @@ fn test_parse_error_multiple_errors() {
 
 #[test]
 fn test_runtime_error_label_not_found() {
-    // Test that executing a non-existent label returns an error
+    // Test that executing a non-existent scene returns an error
     let script = r#"
 ＊存在するラベル
     さくら：こんにちは
@@ -216,7 +216,7 @@ fn test_error_recovery_generator_continues() {
 #[test]
 fn test_multiple_labels_after_error() {
     // Test that after an error executing one label,
-    // other labels can still be executed (Task 8.2)
+    // other scenes can still be executed (Task 8.2)
 
     let script = r#"
 ＊ラベル1
@@ -231,15 +231,15 @@ fn test_multiple_labels_after_error() {
     let mut engine =
         PastaEngine::new(&script_dir, &persistence_dir).expect("Failed to create engine");
 
-    // Try to execute non-existent label (error)
+    // Try to execute non-existent scene (error)
     let result1 = engine.execute_label("存在しない");
     assert!(result1.is_err(), "Should error on non-existent label");
 
-    // Execute valid label 1 (should work)
+    // Execute valid scene 1 (should work)
     let result2 = engine.execute_label("ラベル1");
     assert!(result2.is_ok(), "Should recover and execute valid label");
 
-    // Execute valid label 2 (should also work)
+    // Execute valid scene 2 (should also work)
     let result3 = engine.execute_label("ラベル2");
     assert!(result3.is_ok(), "Should continue to work after recovery");
 }
@@ -268,7 +268,7 @@ fn test_error_message_is_descriptive() {
 
     // Error message should be human-readable
     assert!(!err_msg.is_empty());
-    // Should mention the label name
+    // Should mention the scene name
     assert!(err_msg.contains("存在しないラベル") || err_msg.to_lowercase().contains("not found"));
 }
 
@@ -388,15 +388,15 @@ fn test_end_to_end_error_scenarios() {
 
     // 1. Execute valid label
     let result1 = engine.execute_label("起動");
-    assert!(result1.is_ok(), "Valid label should execute");
+    assert!(result1.is_ok(), "Valid scene should execute");
     let events1 = result1.unwrap();
     assert!(events1.len() > 0);
 
     // 2. Try invalid label
     let result2 = engine.execute_label("存在しない");
-    assert!(result2.is_err(), "Invalid label should error");
+    assert!(result2.is_err(), "Invalid scene should error");
 
-    // 3. Execute another valid label (error recovery)
+    // 3. Execute another valid scene (error recovery)
     let result3 = engine.execute_label("正常処理");
     assert!(result3.is_ok(), "Should recover from error");
     let events3 = result3.unwrap();
@@ -453,7 +453,7 @@ fn test_whitespace_only_no_error() {
 #[test]
 fn test_error_in_nested_label() {
     // Test error handling with local (nested) labels
-    // Note: Local labels use single ＊ with indentation
+    // Note: Local scenes use single ＊ with indentation
     let script = r#"
 ＊親ラベル
     さくら：親のコンテンツ
@@ -466,9 +466,9 @@ fn test_error_in_nested_label() {
 
     // Execute parent label
     let result1 = engine.execute_label("親ラベル");
-    assert!(result1.is_ok(), "Parent label should work");
+    assert!(result1.is_ok(), "Parent scene should work");
 
     // Try to execute non-existent label
     let result2 = engine.execute_label("存在しないラベル");
-    assert!(result2.is_err(), "Non-existent label should error");
+    assert!(result2.is_err(), "Non-existent scene should error");
 }

@@ -29,7 +29,7 @@ pub struct SceneInfo {
     pub parent: Option<String>,
 }
 
-/// Cache key for label resolution (search_key + sorted filters).
+/// Cache key for scene resolution (search_key + sorted filters).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct CacheKey {
     search_key: String,
@@ -50,29 +50,29 @@ impl CacheKey {
     }
 }
 
-/// Cached selection state for sequential label consumption.
+/// Cached selection state for sequential scene consumption.
 struct CachedSelection {
     candidates: Vec<SceneId>,
     next_index: usize,
     history: Vec<SceneId>,
 }
 
-/// Label table for managing script labels.
+/// scene table for managing script labels.
 pub struct SceneTable {
-    /// ID-based storage for labels (index = SceneId).
+    /// ID-based storage for scenes (index = SceneId).
     labels: Vec<SceneInfo>,
     /// Prefix index for forward-matching search (fn_name → [SceneId]).
     prefix_index: RadixMap<Vec<SceneId>>,
-    /// Cache for sequential label consumption ((search_key, filters) → CachedSelection).
+    /// Cache for sequential scene consumption ((search_key, filters) → CachedSelection).
     cache: HashMap<CacheKey, CachedSelection>,
-    /// Random selector for label selection.
+    /// Random selector for scene selection.
     random_selector: Box<dyn RandomSelector>,
     /// Whether to shuffle candidates (default: true, false for deterministic testing).
     shuffle_enabled: bool,
 }
 
 impl SceneTable {
-    /// Create a new label table with default random selector.
+    /// Create a new scene table with default random selector.
     pub fn new(random_selector: Box<dyn RandomSelector>) -> Self {
         Self {
             labels: Vec::new(),
@@ -83,11 +83,11 @@ impl SceneTable {
         }
     }
 
-    /// Create a label table from a transpiler's SceneRegistry.
+    /// Create a scene table from a transpiler's SceneRegistry.
     ///
     /// This converts the SceneRegistry (used during transpilation) into
     /// a SceneTable (used during runtime).
-    pub fn from_label_registry(
+    pub fn from_scene_registry(
         registry: crate::transpiler::SceneRegistry,
         random_selector: Box<dyn RandomSelector>,
     ) -> Result<Self, PastaError> {
@@ -112,19 +112,19 @@ impl SceneTable {
 
         // Build RadixMap prefix index with duplicate detection
         let mut prefix_index = RadixMap::new();
-        for label in &labels {
+        for scene in &labels {
             let entry = prefix_index
-                .entry(label.fn_name.as_bytes())
+                .entry(scene.fn_name.as_bytes())
                 .or_insert_with(Vec::new);
             
             // Check for duplicates (defensive programming)
             if !entry.is_empty() {
                 return Err(PastaError::DuplicateScenePath {
-                    fn_name: label.fn_name.clone(),
+                    fn_name: scene.fn_name.clone(),
                 });
             }
             
-            entry.push(label.id);
+            entry.push(scene.id);
         }
 
         Ok(Self {
@@ -136,7 +136,7 @@ impl SceneTable {
         })
     }
 
-    /// Resolve label ID by search key and filters (P1 runtime resolution).
+    /// Resolve scene ID by search key and filters (P1 runtime resolution).
     ///
     /// # Algorithm
     /// 1. Prefix search using RadixMap (search_key → candidate IDs)

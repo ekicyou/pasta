@@ -121,7 +121,7 @@ fn test_send_trait() {
     // Move engine to another thread
     let handle = thread::spawn(move || {
         // This proves that PastaEngine implements Send
-        // Label existence is verified by successful execution
+        // scene existence is verified by successful execution
         drop(engine);
     });
 

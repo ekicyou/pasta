@@ -1,4 +1,4 @@
-//! End-to-end test for runtime label resolution with actual SceneTable
+//! End-to-end test for runtime scene resolution with actual SceneTable
 
 mod common;
 
@@ -28,13 +28,13 @@ fn test_label_resolution_with_prefix_match() {
     let events = result.unwrap();
     assert!(
         !events.is_empty(),
-        "Should have events from label execution"
+        "Should have events from scene execution"
     );
 }
 
 #[test]
 fn test_label_resolution_with_multiple_labels() {
-    // Test multiple labels with same name (random selection)
+    // Test multiple scenes with same name (random selection)
     let script = r#"
 ＊挨拶
     さくら：おはよう
@@ -63,7 +63,7 @@ fn test_label_resolution_with_multiple_labels() {
 
 #[test]
 fn test_label_resolution_sequential_consumption() {
-    // Test sequential label consumption (no repeat until exhausted)
+    // Test sequential scene consumption (no repeat until exhausted)
     let script = r#"
 ＊カウント
     さくら：1回目
@@ -83,5 +83,5 @@ fn test_label_resolution_sequential_consumption() {
     // Note: Current execute_label implementation doesn't use the full resolution
     // This test documents the expected behavior for when full integration is complete
     let result = engine.execute_label("カウント");
-    assert!(result.is_ok(), "First label should execute");
+    assert!(result.is_ok(), "First scene should execute");
 }

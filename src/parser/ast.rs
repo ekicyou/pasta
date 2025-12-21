@@ -46,7 +46,7 @@ pub struct SceneDef {
     pub name: String,
     /// Scope of the scene (global or local)
     pub scope: SceneScope,
-    /// Parameters for this label (e.g., `＄値` in `ーカウント表示　＄値`)
+    /// Parameters for this scene (e.g., `＄値` in `ーカウント表示　＄値`)
     pub params: Vec<String>,
     /// Attributes attached to this label
     pub attributes: Vec<Attribute>,
@@ -69,7 +69,7 @@ pub enum SceneScope {
     Local,
 }
 
-/// Attribute definition for label filtering
+/// Attribute definition for scene filtering
 #[derive(Debug, Clone)]
 pub struct Attribute {
     /// Attribute key
@@ -98,7 +98,7 @@ impl std::fmt::Display for AttributeValue {
     }
 }
 
-/// Statement in a label body
+/// Statement in a scene body
 #[derive(Debug, Clone)]
 pub enum Statement {
     /// Speech/dialogue line
@@ -114,7 +114,7 @@ pub enum Statement {
     Call {
         /// Jump target
         target: JumpTarget,
-        /// Attribute filters for label selection
+        /// Attribute filters for scene selection
         filters: Vec<Attribute>,
         /// Arguments to pass to the called label
         args: Vec<Expr>,
@@ -164,15 +164,15 @@ pub enum SpeechPart {
 /// Jump target specification
 #[derive(Debug, Clone)]
 pub enum JumpTarget {
-    /// Local label in current global label scope
+    /// Local scene in current global scene scope
     Local(String),
-    /// Global label
+    /// global scene
     Global(String),
-    /// Long jump to local label in specified global label
+    /// Long jump to local scene in specified global scene
     LongJump {
-        /// Global label name
+        /// Global scene name
         global: String,
-        /// Local label name
+        /// Local scene name
         local: String,
     },
     /// Dynamic target (resolved from variable at runtime)

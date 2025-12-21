@@ -128,7 +128,7 @@ fn test_engine_with_sakura_script() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn test_engine_multiple_executions() -> Result<(), Box<dyn std::error::Error>> {
-    // Test that we can execute labels multiple times
+    // Test that we can execute scenes multiple times
     let script = r#"
 ＊label1
     さくら：message1
@@ -193,7 +193,7 @@ fn test_engine_empty_label() -> Result<(), Box<dyn std::error::Error>> {
     let mut engine = PastaEngine::new(&script_dir, &persistence_dir)?;
     let events = engine.execute_label("empty")?;
 
-    // Empty label should produce no events
+    // Empty scene should produce no events
     assert_eq!(events.len(), 0);
 
     Ok(())
@@ -205,7 +205,7 @@ fn test_engine_empty_label() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn test_chain_talk_manual() -> Result<(), Box<dyn std::error::Error>> {
-    // Test consecutive label execution (manual chain)
+    // Test consecutive scene execution (manual chain)
     let script = r#"
 ＊挨拶
     さくら：おはよう！
@@ -222,7 +222,7 @@ fn test_chain_talk_manual() -> Result<(), Box<dyn std::error::Error>> {
     let mut all_events = engine.execute_label("挨拶")?;
     assert!(all_events.len() >= 2);
 
-    // Execute second label (chain continuation)
+    // Execute second scene (chain continuation)
     let events2 = engine.execute_label("挨拶_続き")?;
     all_events.extend(events2);
 
@@ -250,7 +250,7 @@ fn test_chain_talk_with_api() -> Result<(), Box<dyn std::error::Error>> {
     let persistence_dir = get_test_persistence_dir();
     let mut engine = PastaEngine::new(&script_dir, &persistence_dir)?;
 
-    // Execute each label individually to simulate chain
+    // Execute each scene individually to simulate chain
     let events1 = engine.execute_label("start")?;
     let events2 = engine.execute_label("middle")?;
     let events3 = engine.execute_label("end")?;
@@ -369,7 +369,7 @@ fn test_empty_script() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn test_label_isolation() -> Result<(), Box<dyn std::error::Error>> {
-    // Test that labels don't interfere with each other
+    // Test that scenes don't interfere with each other
     let script = r#"
 ＊label1
     さくら：one
@@ -402,7 +402,7 @@ fn test_label_isolation() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn test_repeated_label_execution() -> Result<(), Box<dyn std::error::Error>> {
-    // Test executing the same label multiple times
+    // Test executing the same scene multiple times
     let script = r#"
 ＊greeting
     さくら：こんにちは
@@ -412,7 +412,7 @@ fn test_repeated_label_execution() -> Result<(), Box<dyn std::error::Error>> {
     let persistence_dir = get_test_persistence_dir();
     let mut engine = PastaEngine::new(&script_dir, &persistence_dir)?;
 
-    // Execute same label 10 times
+    // Execute same scene 10 times
     for _ in 0..10 {
         let events = engine.execute_label("greeting")?;
         assert_eq!(events.len(), 2);
@@ -438,7 +438,7 @@ fn test_label_execution() -> Result<(), Box<dyn std::error::Error>> {
     let persistence_dir = get_test_persistence_dir();
     let mut engine = PastaEngine::new(&script_dir, &persistence_dir)?;
 
-    // Verify labels exist by executing them
+    // Verify scenes exist by executing them
     assert!(engine.execute_label("挨拶").is_ok());
     assert!(engine.execute_label("別れ").is_ok());
     assert!(engine.execute_label("雑談").is_ok());
