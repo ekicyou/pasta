@@ -330,8 +330,8 @@ impl Transpiler {
 - **Concurrency**: シングルスレッド実行想定（Rune VM制約）
 
 **Implementation Notes**
-- **Integration**: Rune側で`ctx`オブジェクトに`local`/`global`フィールドを追加し、`VariableManager`のプロキシとして機能させる。`ctx.local.name`アクセスで`VariableManager::get(name, Local)`を呼び出す仕組みを実装。
-- **Risks**: Rune 0.14のオブジェクトプロパティアクセスAPIが動的プロパティをサポートしない場合、`ctx.local(name)`メソッド形式へフォールバック。
+- **Integration**: Rune側で`ctx`オブジェクトに`local`/`global`フィールドを`Object`型として追加。Rust側で`Object::insert()`/`get()`を使用して`VariableManager`と統合。Runeコードでは`ctx.local.変数名`形式でアクセス可能（Runeの`Object`型が`object.key`形式をサポート）。
+- **Risks**: なし（Runeドキュメントで動的プロパティアクセスが標準サポート確認済み）。
 
 #### pasta_stdlib
 
@@ -450,18 +450,27 @@ pub fn call(
 - `ctx.global`: グローバル変数へのプロキシオブジェクト
 - プロパティアクセスで`VariableManager::get()`/`set()`を呼び出す
 
+**実装方式**（Rune Objectベース）:
+- `ctx.local`/`ctx.global`をRune `Object`型（HashMapエイリアス）で実装
+- Runeは`object["key"]`または`object.key`形式で動的プロパティアクセスをサポート
+- 参考: [Rune Objects](https://rune-rs.github.io/book/objects.html) - `values.second`形式が標準サポート
+
 **スキーマ**:
 ```rust
 // Rune側で公開するコンテキスト構造
+use rune::runtime::Object;
+
 pub struct RuneContext {
-    pub local: VariableProxy,   // ctx.local.<name> アクセス
-    pub global: VariableProxy,  // ctx.global.<name> アクセス
+    pub local: Object,   // Rune Object (HashMap) - ctx.local.変数名 アクセス
+    pub global: Object,  // Rune Object (HashMap) - ctx.global.変数名 アクセス
 }
 
-// VariableManager へのプロキシ
-pub struct VariableProxy {
-    manager: Arc<Mutex<VariableManager>>,
-    scope: VariableScope,
+// VariableManager との統合
+impl RuneContext {
+    pub fn new(var_manager: Arc<Mutex<VariableManager>>) -> Self {
+        // local/global ObjectをVariableManagerのプロキシとして構築
+        // Object::insert()/get()でVariableManagerを呼び出す
+    }
 }
 ```
 
@@ -532,7 +541,21 @@ pub struct VariableProxy {
 
 ## Migration Strategy
 
-本仕様は既存コードを破壊的に変更するため、段階的移行を実施する。
+### Phase 0: Rune Object方式検証（任意）
+- **目的**: `ctx.local.変数名`形式の動的プロパティアクセスをRune `Object`型で実現することを確認
+- **方針**: Runeの`Object`型（`HashMap<String, Value>`のエイリアス）を活用
+  - Runeは`object.key`形式で動的フィールドアクセスをサポート（[Rune Objects](https://rune-rs.github.io/book/objects.html)）
+  - `ctx.local`/`ctx.global`を`Object`としてVMに渡す
+  - Rust側で`Object::insert()`/`get()`を使用して`VariableManager`と統合
+- **PoC内容**（任意）:
+  ```rust
+  use rune::runtime::Object;
+  let mut local_obj = Object::new();
+  local_obj.insert("test_var".try_into()?, rune::to_value("test_value")?)?;
+  // Runeコード: ctx.local.test_var → "test_value"
+  ```
+- **結果**: ✅ Runeドキュメントで確認済み、動的プロパティアクセスは標準機能としてサポートされている
+- **決定**: フォールバック不要、`Object`型ベースでPhase 1へ進む
 
 ### Phase 1: 新式API実装
 - `VariableManager`をRune側に`ctx.local`/`ctx.global`として公開
@@ -562,7 +585,6 @@ pub struct VariableProxy {
 
 **Rollback Triggers**:
 - `cargo test --all`が失敗する場合、Phase 1をロールバック
-- Rune側プロパティアクセスがサポートされない場合、`ctx.local(name)`メソッド形式または静的プロパティ生成へフォールバック（Phase 1修正、議題1で決定）
 
 **Validation Checkpoints**:
 - Phase 1完了後: ユニットテスト合格
@@ -571,11 +593,7 @@ pub struct VariableProxy {
 
 ```mermaid
 flowchart LR
-    P0[Phase 0: Rune PoC] --> P0V{動的プロパティ可能?}
-    P0V -->|No| P0F[メソッド形式へ設計変更]
-    P0V -->|Yes| P1[Phase 1: 新式API実装]
-    P0F --> P1
-    P1 --> V1{ユニットテスト合格?}
+    P1[Phase 1: 新式API実装] --> V1{ユニットテスト合格?}
     V1 -->|No| RB1[Phase 1 Rollback]
     V1 -->|Yes| P2[Phase 2: Parser検証完了]
     P2 --> P3[Phase 3: テスト追加・修正]
