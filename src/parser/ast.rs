@@ -48,7 +48,7 @@ pub struct SceneDef {
     pub scope: SceneScope,
     /// Parameters for this scene (e.g., `＄値` in `ーカウント表示　＄値`)
     pub params: Vec<String>,
-    /// Attributes attached to this label
+    /// Attributes attached to this scene
     pub attributes: Vec<Attribute>,
     /// Local word definitions within this scene
     pub local_words: Vec<WordDef>,
@@ -116,7 +116,7 @@ pub enum Statement {
         target: JumpTarget,
         /// Attribute filters for scene selection
         filters: Vec<Attribute>,
-        /// Arguments to pass to the called label
+        /// Arguments to pass to the called scene
         args: Vec<Expr>,
         /// Source location span
         span: Span,
@@ -182,7 +182,7 @@ pub enum JumpTarget {
 /// Variable scope
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VarScope {
-    /// Local variable (label scope)
+    /// Local variable (scene scope)
     Local,
     /// Global variable (script scope)
     Global,

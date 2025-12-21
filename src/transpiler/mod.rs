@@ -18,7 +18,7 @@ use std::collections::HashMap;
 /// Transpile context that holds scope information during transpilation.
 #[derive(Clone)]
 pub struct TranspileContext {
-    /// List of local function names defined in the current label
+    /// List of local function names defined in the current scene
     local_functions: Vec<String>,
     /// List of global function names (standard library + user-defined)
     global_functions: Vec<String>,
@@ -217,7 +217,7 @@ impl Transpiler {
         // Generate pasta module with wrapper functions
         writeln!(writer, "pub mod pasta {{").map_err(|e| PastaError::io_error(e.to_string()))?;
         // Phase 1 (REQ-BC-1): Jump function removed - use call() instead
-        // writeln!(writer, "    pub fn jump(ctx, label, filters, args) {{ ... }}")?;
+        // writeln!(writer, "    pub fn jump(ctx, scene, filters, args) {{ ... }}")?;
 
         writeln!(writer, "    pub fn call(ctx, scene, filters, args) {{")
             .map_err(|e| PastaError::io_error(e.to_string()))?;
@@ -401,7 +401,7 @@ impl Transpiler {
                 args,
                 span: _,
             } => {
-                // Generate call statement: for a in crate::pasta::call(ctx, "label", #{}, [args]) { yield a; }
+                // Generate call statement: for a in crate::pasta::call(ctx, "scene", #{}, [args]) { yield a; }
                 let search_key = Self::transpile_jump_target_to_search_key(target);
                 let args_str = Self::transpile_exprs_to_args(args, &context)?;
                 let filters_str = Self::transpile_attributes_to_map(filters);

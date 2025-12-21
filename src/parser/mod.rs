@@ -123,7 +123,7 @@ fn parse_global_scene(pair: Pair<Rule>) -> Result<SceneDef, PastaError> {
                         line: start.0,
                         column: start.1,
                         message: format!(
-                            "Label name '{}' is reserved for system use. \
+                            "Scene name '{}' is reserved for system use. \
                             scene names starting and ending with '__' are not allowed. \
                             Consider using '{}' or '_{}_' instead.",
                             name,
@@ -225,7 +225,7 @@ fn parse_local_scene_content(pair: Pair<Rule>) -> Result<SceneDef, PastaError> {
                         line: start.0,
                         column: start.1,
                         message: format!(
-                            "Label name '{}' is reserved for system use. \
+                            "Scene name '{}' is reserved for system use. \
                             scene names starting and ending with '__' are not allowed. \
                             Consider using '{}' or '_{}_' instead.",
                             name,

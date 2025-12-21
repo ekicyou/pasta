@@ -6,7 +6,7 @@
 
 use std::collections::HashMap;
 
-/// Information about a registered label.
+/// Information about a registered scene.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SceneInfo {
     /// Unique numeric ID (starting from 1).
@@ -68,7 +68,7 @@ impl SceneRegistry {
     ///
     /// # Returns
     ///
-    /// The assigned ID and counter for this label.
+    /// The assigned ID and counter for this scene.
     pub fn register_global(
         &mut self,
         name: &str,
@@ -105,7 +105,7 @@ impl SceneRegistry {
     ///
     /// # Returns
     ///
-    /// The assigned ID and counter for this label.
+    /// The assigned ID and counter for this scene.
     pub fn register_local(
         &mut self,
         name: &str,
