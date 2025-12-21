@@ -21,7 +21,7 @@
 **内容**: 仕様書（Req 8.1）では `.kiro/specs/completed/` 内の完了仕様も置換対象としているが、現在の修正では除外している。確認が必要。
 
 **質問**:
-1. `.kiro/specs/completed/` 内の完了仕様ファイルも「ラベル」→「シーン」に置換すべきか？
+1. `.kiro/specs/completed/` 内の完了仕様ファイルも「シーン」→「シーン」に置換すべきか？
 2. それとも、他仕様との干渉を避けるため、完了仕様は置換しないか？
 
 **現状**: design.md では `.kiro/specs/completed/` を除外
@@ -115,9 +115,9 @@ pub mod pasta{
     for a in label(ctx, args) { yield a; }
   }
 
-  // rust側で登録するrune関数。ラベルから関数ポインタを返す。
-  // global_label: string　      ⇒ グローバルラベル検索キー
-  // local_label: Option<string> ⇒ ローカルラベル検索キー
+  // rust側で登録するrune関数。シーンから関数ポインタを返す。
+  // global_label: string　      ⇒ グローバルシーン検索キー
+  // local_label: Option<string> ⇒ ローカルシーン検索キー
   pub fn label_selector(label){
     let n = select_label_to_id(label, filters);
     match n {
@@ -127,7 +127,7 @@ pub mod pasta{
     }
   }
 
-  // rust側で実装するrust関数。ラベルとfiltersから関数番号を返す。
+  // rust側で実装するrust関数。シーンとfiltersから関数番号を返す。
   pub fn select_label_to_id(label, filters){
     1   // 現在は常に1を返す。
   }
@@ -139,13 +139,13 @@ pub mod pasta{
 #### グローバルジャンプの場合
 
 - **label_selector("会話",None)**
-  ⇒ "会話" で始まるラベルを前方一致
+  ⇒ "会話" で始まるシーンを前方一致
   ⇒ 末尾が必ず`::__start__`であること。
 
 #### ローカルジャンプの場合
 
 -- **label_selector("会話\_1::選択肢", None)**
-⇒ `mod 会話_1`の要素から、"選択肢"で始まるラベルを前方一致
+⇒ `mod 会話_1`の要素から、"選択肢"で始まるシーンを前方一致
 
 ### filters について
 
@@ -155,12 +155,12 @@ API 引数として予約。将来的にはフィルター条件をここに並�
 
 ### グローバルの連番
 
-("グローバルラベル名", "**start**")でキー
+("グローバルシーン名", "**start**")でキー
 
 ### ローカルの連番
 
-("グローバルラベル名", "ローカルラベル名") でキー
+("グローバルシーン名", "ローカルシーン名") でキー
 
-### 同じグローバルラベルが複数あるが？
+### 同じグローバルシーンが複数あるが？
 
 連番が重複しないことさえ保証すればよいので、実用上は困らない。fn_path が少し長くなる弊害は発生するがそれだけといえばそれだけ。

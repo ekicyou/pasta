@@ -11,10 +11,10 @@
 - **thiserror 2**: エラー型定義
 - **glob 0.3**: ファイルパターンマッチング（スクリプト読み込み）
 - **tracing 0.1**: ロギング・診断
-- **rand 0.9**: ランダム選択（重複ラベル、前方一致候補）
+- **rand 0.9**: ランダム選択（重複シーン、前方一致候補）
 - **futures 0.3**: 非同期処理サポート
 - **toml 0.9.8**: 設定ファイル管理
-- **fast_radix_trie 1.1.0**: 前方一致ラベル検索
+- **fast_radix_trie 1.1.0**: 前方一致シーン検索
 
 ### 開発環境
 - **tempfile 3**: テスト用一時ファイル生成
@@ -33,7 +33,7 @@ Runtime (Rune VM) → IR Output (ScriptEvent)
 | レイヤー | 責務 |
 |---------|------|
 | Parser | DSL→AST変換 |
-| Transpiler | AST→Runeコード、ラベル管理 |
+| Transpiler | AST→Runeコード、シーン管理 |
 | Runtime | Rune VM実行、yield出力 |
 | Engine | 統合API、キャッシュ |
 | IR | ScriptEventイベント出力 |
@@ -45,7 +45,7 @@ Runtime (Rune VM) → IR Output (ScriptEvent)
 | UI独立性 | Wait/Syncはマーカーのみ、areka側で制御 |
 | 宣言的フロー | Call/Jumpで制御、if/while/forなし |
 | Yield型 | 全出力はyield、Generator継続 |
-| 2パス変換 | Pass1: ラベル登録、Pass2: コード生成 |
+| 2パス変換 | Pass1: シーン登録、Pass2: コード生成 |
 
 **結果**: 完全なユニットテスト可能性を実現
 
@@ -71,7 +71,7 @@ Runtime (Rune VM) → IR Output (ScriptEvent)
 |------|------|
 | テスト | 新機能必須、リグレッション防止 |
 | キャッシュ | パース結果をメモリ保持 |
-| 検索性能 | ラベルO(1)、前方一致Radix Trie |
+| 検索性能 | シーンO(1)、前方一致Radix Trie |
 | セキュリティ | Rune VMサンドボックス依存 |
 
 ## 依存関係管理
