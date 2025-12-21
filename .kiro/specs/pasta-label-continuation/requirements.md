@@ -34,6 +34,5 @@ pasta DSLにおいて、グローバルシーンを示す「＊」行でシー�
 **Objective:** 無名「＊」行の許容フォーマットを明確化し、曖昧さを排除する。
 
 #### Acceptance Criteria
-1. For unnamed `＊` lines, only trailing whitespace shall be permitted on the same line; any other characters are not allowed.
-2. Comment markers (`#` or `＃`) shall not be permitted on unnamed `＊` lines. Lines containing `#` or `＃` after the `＊` shall be rejected as syntax errors.
-3. Comment lines shall be recognized only when a line begins with optional whitespace followed by a comment marker (`#` or `＃`), consistent with the DSL grammar; inline trailing comments are not recognized anywhere in the file.
+1. Comment markers (`#` or `＃`) shall not be permitted on unnamed `＊` lines. Any characters other than optional trailing whitespace after the `＊` marker shall be rejected as syntax errors.
+2. Comment lines shall be recognized only when a line begins with optional whitespace followed by a comment marker (`#` or `＃`), consistent with the DSL grammar; inline trailing comments are not recognized anywhere in the file.
