@@ -1,4 +1,4 @@
-//! End-to-end test for runtime label resolution with actual LabelTable
+//! End-to-end test for runtime label resolution with actual SceneTable
 
 mod common;
 
@@ -18,7 +18,7 @@ fn test_label_resolution_with_prefix_match() {
     let mut engine =
         PastaEngine::new(&script_dir, &persistence_dir).expect("Failed to create engine");
 
-    // This should execute via label_selector -> select_label_to_id -> resolve_label_id
+    // This should execute via scene_selector -> select_scene_to_id -> resolve_label_id
     let result = engine.execute_label("会話");
     assert!(
         result.is_ok(),

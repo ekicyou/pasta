@@ -17,36 +17,36 @@ pub enum PastaError {
         message: String,
     },
 
-    /// Label not found error.
-    #[error("Label not found: {label}")]
-    LabelNotFound { label: String },
+    /// Scene not found error.
+    #[error("Scene not found: {scene}")]
+    SceneNotFound { scene: String },
 
-    /// No matching label with filters.
-    #[error("No matching label for '{label}' with filters {filters:?}")]
-    NoMatchingLabel {
-        label: String,
+    /// No matching scene with filters.
+    #[error("No matching scene for '{scene}' with filters {filters:?}")]
+    NoMatchingScene {
+        scene: String,
         filters: std::collections::HashMap<String, String>,
     },
 
-    /// Invalid label name.
-    #[error("Invalid label name: '{label}'")]
-    InvalidLabel { label: String },
+    /// Invalid scene name.
+    #[error("Invalid scene name: '{scene}'")]
+    InvalidScene { scene: String },
 
     /// Random selection failed.
     #[error("Random selection failed")]
     RandomSelectionFailed,
 
-    /// Duplicate label name.
-    #[error("Duplicate label name: {name}")]
-    DuplicateLabelName { name: String },
+    /// Duplicate scene name.
+    #[error("Duplicate scene name: {name}")]
+    DuplicateSceneName { name: String },
 
-    /// Duplicate label path (fn_name).
-    #[error("Duplicate label path: {fn_name}")]
-    DuplicateLabelPath { fn_name: String },
+    /// Duplicate scene path (fn_name).
+    #[error("Duplicate scene path: {fn_name}")]
+    DuplicateScenePath { fn_name: String },
 
-    /// No more labels available.
-    #[error("No more labels for '{search_key}' with filters {filters:?}")]
-    NoMoreLabels {
+    /// No more scenes available.
+    #[error("No more scenes for '{search_key}' with filters {filters:?}")]
+    NoMoreScenes {
         search_key: String,
         filters: std::collections::HashMap<String, String>,
     },
@@ -145,10 +145,10 @@ impl PastaError {
         }
     }
 
-    /// Create a new label not found error.
-    pub fn label_not_found(label: impl Into<String>) -> Self {
-        PastaError::LabelNotFound {
-            label: label.into(),
+    /// Create a new scene not found error.
+    pub fn scene_not_found(scene: impl Into<String>) -> Self {
+        PastaError::SceneNotFound {
+            scene: scene.into(),
         }
     }
 

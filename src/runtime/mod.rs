@@ -10,7 +10,7 @@ pub mod variables;
 pub mod words;
 
 pub use generator::{ScriptGenerator, ScriptGeneratorState};
-pub use scene::{LabelInfo, LabelTable};
+pub use scene::{SceneInfo, SceneTable};
 pub use random::{DefaultRandomSelector, RandomSelector};
 pub use variables::{VariableManager, VariableScope, VariableValue};
 pub use words::{WordCacheKey, WordTable};

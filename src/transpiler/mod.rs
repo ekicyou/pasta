@@ -6,7 +6,7 @@
 mod scene_registry;
 mod word_registry;
 
-pub use scene_registry::{LabelInfo, LabelRegistry};
+pub use scene_registry::{SceneInfo, SceneRegistry};
 pub use word_registry::{WordDefRegistry, WordEntry};
 
 use crate::{
@@ -125,7 +125,7 @@ impl Transpiler {
     /// Transpile a Pasta file AST to Rune source code (Pass 1).
     ///
     /// This performs Pass 1 of the two-pass transpilation strategy:
-    /// - Registers all labels in the LabelRegistry
+    /// - Registers all labels in the SceneRegistry
     /// - Registers all word definitions in the WordDefRegistry
     /// - Generates Rune modules for each global label
     /// - Generates function code for labels
@@ -133,7 +133,7 @@ impl Transpiler {
     /// # Arguments
     ///
     /// * `file` - The parsed Pasta file AST
-    /// * `label_registry` - The label registry for tracking labels across files
+    /// * `scene_registry` - The label registry for tracking labels across files
     /// * `word_registry` - The word definition registry for tracking words
     /// * `writer` - Output destination implementing Write trait
     ///
@@ -144,7 +144,7 @@ impl Transpiler {
     /// - The output does NOT include `mod pasta {}` (generated in Pass 2)
     pub fn transpile_pass1<W: std::io::Write>(
         file: &PastaFile,
-        label_registry: &mut LabelRegistry,
+        scene_registry: &mut SceneRegistry,
         word_registry: &mut WordDefRegistry,
         writer: &mut W,
     ) -> Result<(), PastaError> {
@@ -158,7 +158,7 @@ impl Transpiler {
 
         // Register all scenes and generate modules
         for scene in &file.scenes {
-            Self::transpile_global_scene(scene, label_registry, word_registry, writer)?;
+            Self::transpile_global_scene(scene, scene_registry, word_registry, writer)?;
         }
 
         Ok(())
@@ -181,33 +181,33 @@ impl Transpiler {
     /// - This should be called ONCE after all Pass 1 calls are complete
     /// - The output is appended to the Pass 1 output
     pub fn transpile_pass2<W: std::io::Write>(
-        registry: &LabelRegistry,
+        registry: &SceneRegistry,
         writer: &mut W,
     ) -> Result<(), PastaError> {
         #[allow(unused_imports)]
         use std::io::Write;
 
-        // Generate __pasta_trans2__ module with label_selector function
+        // Generate __pasta_trans2__ module with scene_selector function
         writeln!(writer, "pub mod __pasta_trans2__ {{")
             .map_err(|e| PastaError::io_error(e.to_string()))?;
         writeln!(writer, "    use pasta_stdlib::*;")
             .map_err(|e| PastaError::io_error(e.to_string()))?;
         writeln!(writer).map_err(|e| PastaError::io_error(e.to_string()))?;
-        writeln!(writer, "    pub fn label_selector(label, filters) {{")
+        writeln!(writer, "    pub fn scene_selector(scene, filters) {{")
             .map_err(|e| PastaError::io_error(e.to_string()))?;
         writeln!(
             writer,
-            "        let id = pasta_stdlib::select_label_to_id(label, filters);"
+            "        let id = pasta_stdlib::select_scene_to_id(scene, filters);"
         )
         .map_err(|e| PastaError::io_error(e.to_string()))?;
         writeln!(writer, "        match id {{").map_err(|e| PastaError::io_error(e.to_string()))?;
 
-        for label in registry.all_labels() {
-            writeln!(writer, "            {} => {},", label.id, label.fn_path)
+        for scene in registry.all_scenes() {
+            writeln!(writer, "            {} => {},", scene.id, scene.fn_path)
                 .map_err(|e| PastaError::io_error(e.to_string()))?;
         }
 
-        writeln!(writer, "            _ => |_ctx, _args| {{ yield pasta_stdlib::Error(`ラベルID ${{id}} が見つかりませんでした。`); }},")
+        writeln!(writer, "            _ => |_ctx, _args| {{ yield pasta_stdlib::Error(`シーンID ${{id}} が見つかりませんでした。`); }},")
             .map_err(|e| PastaError::io_error(e.to_string()))?;
         writeln!(writer, "        }}").map_err(|e| PastaError::io_error(e.to_string()))?;
         writeln!(writer, "    }}").map_err(|e| PastaError::io_error(e.to_string()))?;
@@ -219,11 +219,11 @@ impl Transpiler {
         // Phase 1 (REQ-BC-1): Jump function removed - use call() instead
         // writeln!(writer, "    pub fn jump(ctx, label, filters, args) {{ ... }}")?;
 
-        writeln!(writer, "    pub fn call(ctx, label, filters, args) {{")
+        writeln!(writer, "    pub fn call(ctx, scene, filters, args) {{")
             .map_err(|e| PastaError::io_error(e.to_string()))?;
         writeln!(
             writer,
-            "        let func = crate::__pasta_trans2__::label_selector(label, filters);"
+            "        let func = crate::__pasta_trans2__::scene_selector(scene, filters);"
         )
         .map_err(|e| PastaError::io_error(e.to_string()))?;
         writeln!(writer, "        for a in func(ctx, args) {{ yield a; }}")
@@ -242,12 +242,12 @@ impl Transpiler {
     /// It only handles a single PastaFile and doesn't support multiple files.
     #[doc(hidden)]
     pub fn transpile_to_string(file: &PastaFile) -> Result<String, PastaError> {
-        let mut label_registry = LabelRegistry::new();
+        let mut scene_registry = SceneRegistry::new();
         let mut word_registry = WordDefRegistry::new();
         let mut output = Vec::new();
 
-        Self::transpile_pass1(file, &mut label_registry, &mut word_registry, &mut output)?;
-        Self::transpile_pass2(&label_registry, &mut output)?;
+        Self::transpile_pass1(file, &mut scene_registry, &mut word_registry, &mut output)?;
+        Self::transpile_pass2(&scene_registry, &mut output)?;
 
         String::from_utf8(output).map_err(|e| PastaError::io_error(e.to_string()))
     }
@@ -258,22 +258,22 @@ impl Transpiler {
     /// the generated Rune source code.
     pub fn transpile_with_registry(
         file: &PastaFile,
-    ) -> Result<(String, LabelRegistry, WordDefRegistry), PastaError> {
-        let mut label_registry = LabelRegistry::new();
+    ) -> Result<(String, SceneRegistry, WordDefRegistry), PastaError> {
+        let mut scene_registry = SceneRegistry::new();
         let mut word_registry = WordDefRegistry::new();
         let mut output = Vec::new();
 
-        Self::transpile_pass1(file, &mut label_registry, &mut word_registry, &mut output)?;
-        Self::transpile_pass2(&label_registry, &mut output)?;
+        Self::transpile_pass1(file, &mut scene_registry, &mut word_registry, &mut output)?;
+        Self::transpile_pass2(&scene_registry, &mut output)?;
 
         let source = String::from_utf8(output).map_err(|e| PastaError::io_error(e.to_string()))?;
-        Ok((source, label_registry, word_registry))
+        Ok((source, scene_registry, word_registry))
     }
 
     /// Transpile a global scene and register it.
     fn transpile_global_scene<W: std::io::Write>(
         scene: &SceneDef,
-        scene_registry: &mut LabelRegistry,
+        scene_registry: &mut SceneRegistry,
         word_registry: &mut WordDefRegistry,
         writer: &mut W,
     ) -> Result<(), PastaError> {
@@ -336,7 +336,7 @@ impl Transpiler {
         parent_name: &str,
         parent_counter: usize,
         module_name: &str,
-        scene_registry: &mut LabelRegistry,
+        scene_registry: &mut SceneRegistry,
         word_registry: &mut WordDefRegistry,
         writer: &mut W,
     ) -> Result<(), PastaError> {

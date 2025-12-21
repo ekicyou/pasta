@@ -3,7 +3,7 @@
 //! Tests that word definitions collected in Pass 1 result in correct code generation in Pass 2.
 
 use pasta::parser::parse_str;
-use pasta::transpiler::{LabelRegistry, Transpiler, WordDefRegistry};
+use pasta::transpiler::{SceneRegistry, Transpiler, WordDefRegistry};
 
 /// Test that word reference generates correct Rune code
 #[test]
@@ -36,11 +36,11 @@ fn test_global_word_definition_collection() {
 "#;
     let ast = parse_str(source, "test.pasta").expect("parse failed");
     let mut word_registry = WordDefRegistry::new();
-    let mut label_registry = LabelRegistry::new();
+    let mut scene_registry = SceneRegistry::new();
     let mut output = Vec::new();
 
     // Pass 1 should collect word definitions
-    Transpiler::transpile_pass1(&ast, &mut label_registry, &mut word_registry, &mut output)
+    Transpiler::transpile_pass1(&ast, &mut scene_registry, &mut word_registry, &mut output)
         .expect("pass1 failed");
 
     // Verify word was registered
@@ -87,10 +87,10 @@ fn test_multiple_global_word_definitions() {
 "#;
     let ast = parse_str(source, "test.pasta").expect("parse failed");
     let mut word_registry = WordDefRegistry::new();
-    let mut label_registry = LabelRegistry::new();
+    let mut scene_registry = SceneRegistry::new();
     let mut output = Vec::new();
 
-    Transpiler::transpile_pass1(&ast, &mut label_registry, &mut word_registry, &mut output)
+    Transpiler::transpile_pass1(&ast, &mut scene_registry, &mut word_registry, &mut output)
         .expect("pass1 failed");
 
     let entries = word_registry.into_entries();

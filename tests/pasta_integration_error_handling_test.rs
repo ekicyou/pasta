@@ -106,14 +106,14 @@ fn test_runtime_error_label_not_found() {
         PastaEngine::new(&script_dir, &persistence_dir).expect("Failed to create engine");
     let result = engine.execute_label("存在しないラベル");
 
-    assert!(result.is_err(), "Should error when label not found");
+    assert!(result.is_err(), "Should error when scene not found");
 
     let err = result.unwrap_err();
     match err {
-        PastaError::LabelNotFound { label } => {
-            assert_eq!(label, "存在しないラベル");
+        PastaError::SceneNotFound { scene } => {
+            assert_eq!(scene, "存在しないラベル");
         }
-        _ => panic!("Expected LabelNotFound error, got: {:?}", err),
+        _ => panic!("Expected SceneNotFound error, got: {:?}", err),
     }
 }
 
@@ -155,7 +155,7 @@ fn test_dynamic_error_from_rune_script() {
     // we'll test that the emit_error stdlib function exists and works
     // by checking the module can be created
     let selector = Box::new(pasta::runtime::random::DefaultRandomSelector::new());
-    let table = pasta::runtime::scene::LabelTable::new(selector);
+    let table = pasta::runtime::scene::SceneTable::new(selector);
     let word_table = create_test_word_table();
 
     let result = pasta::stdlib::create_module(table, word_table);
@@ -303,20 +303,20 @@ fn test_parse_error_message_quality() {
 // ============================================================================
 
 #[test]
-fn test_error_type_label_not_found() {
-    // Test PastaError::LabelNotFound construction
-    let err = PastaError::label_not_found("test_label");
+fn test_error_type_scene_not_found() {
+    // Test PastaError::SceneNotFound construction
+    let err = PastaError::scene_not_found("test_scene");
 
     match &err {
-        PastaError::LabelNotFound { label } => {
-            assert_eq!(label, "test_label");
+        PastaError::SceneNotFound { scene } => {
+            assert_eq!(scene, "test_scene");
         }
-        _ => panic!("Expected LabelNotFound variant"),
+        _ => panic!("Expected SceneNotFound variant"),
     }
 
     // Test Display implementation
     let err_msg = format!("{}", err);
-    assert!(err_msg.contains("test_label"));
+    assert!(err_msg.contains("test_scene"));
     assert!(err_msg.to_lowercase().contains("not found") || err_msg.contains("見つかりません"));
 }
 

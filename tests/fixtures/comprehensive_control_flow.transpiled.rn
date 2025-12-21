@@ -69,8 +69,8 @@ pub mod メイン_1 {
 pub mod __pasta_trans2__ {
     use pasta_stdlib::*;
 
-    pub fn label_selector(label, filters) {
-        let id = pasta_stdlib::select_label_to_id(label, filters);
+    pub fn scene_selector(scene, filters) {
+        let id = pasta_stdlib::select_scene_to_id(scene, filters);
         match id {
             1 => crate::メイン_1::__start__,
             2 => crate::メイン_1::自己紹介_1,
@@ -78,14 +78,14 @@ pub mod __pasta_trans2__ {
             4 => crate::メイン_1::カウント表示_1,
             5 => crate::メイン_1::会話分岐_1,
             6 => crate::メイン_1::別の話題_1,
-            _ => |_ctx, _args| { yield pasta_stdlib::Error(`ラベルID ${id} が見つかりませんでした。`); },
+            _ => |_ctx, _args| { yield pasta_stdlib::Error(`シーンID ${id} が見つかりませんでした。`); },
         }
     }
 }
 
 pub mod pasta {
-    pub fn call(ctx, label, filters, args) {
-        let func = crate::__pasta_trans2__::label_selector(label, filters);
+    pub fn call(ctx, scene, filters, args) {
+        let func = crate::__pasta_trans2__::scene_selector(scene, filters);
         for a in func(ctx, args) { yield a; }
     }
 }

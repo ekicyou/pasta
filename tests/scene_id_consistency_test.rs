@@ -30,14 +30,14 @@ fn test_transpiler_runtime_id_consistency() {
     // Create engine - this internally:
     // 1. Parses Pasta files
     // 2. Transpiles to Rune with ID assignment
-    // 3. Creates LabelTable from registry
-    // 4. Registers select_label_to_id with LabelTable
+    // 3. Creates SceneTable from registry
+    // 4. Registers select_scene_to_id with SceneTable
     let mut engine =
         PastaEngine::new(&script_dir, &persistence_dir).expect("Failed to create engine");
 
     // If transpiler and runtime IDs don't match, these executions will fail
-    // because select_label_to_id will return wrong IDs that don't match
-    // the match statement in label_selector
+    // because select_scene_to_id will return wrong IDs that don't match
+    // the match statement in scene_selector
 
     let result1 = engine.execute_label("会話");
     assert!(result1.is_ok(), "Runtime should resolve 会話 correctly");
@@ -74,7 +74,7 @@ fn test_duplicate_labels_id_consistency() {
         PastaEngine::new(&script_dir, &persistence_dir).expect("Failed to create engine");
 
     // If ID assignment is inconsistent, runtime resolution will fail
-    // because select_label_to_id will return IDs that don't match
+    // because select_scene_to_id will return IDs that don't match
     // the transpiler's match statement
     for _ in 0..5 {
         let result = engine.execute_label("挨拶");

@@ -101,25 +101,25 @@ fn test_single_source_memory_with_complete_module() {
     // Single source with complete module
     let code = r#"
         pub mod pasta {
-            pub fn jump(ctx, label, filters, args) {
-                let label_fn = label_selector(label, filters);
-                for event in label_fn(ctx, args) { yield event; }
+            pub fn jump(ctx, scene, filters, args) {
+                let scene_fn = scene_selector(scene, filters);
+                for event in scene_fn(ctx, args) { yield event; }
             }
             
-            pub fn call(ctx, label, filters, args) {
-                let label_fn = label_selector(label, filters);
-                for event in label_fn(ctx, args) { yield event; }
+            pub fn call(ctx, scene, filters, args) {
+                let scene_fn = scene_selector(scene, filters);
+                for event in scene_fn(ctx, args) { yield event; }
             }
             
-            pub fn label_selector(label, filters) {
-                let id = select_label_to_id(label, filters);
+            pub fn scene_selector(scene, filters) {
+                let id = select_scene_to_id(scene, filters);
                 match id {
                     1 => crate::test_func,
-                    _ => panic("Unknown label"),
+                    _ => panic("Unknown scene"),
                 }
             }
             
-            pub fn select_label_to_id(label, filters) {
+            pub fn select_scene_to_id(scene, filters) {
                 1
             }
         }

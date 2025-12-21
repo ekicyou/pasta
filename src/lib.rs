@@ -60,7 +60,7 @@ pub use parser::{
     JumpTarget, SceneDef, SceneScope, Literal, PastaFile, Span, SpeechPart, Statement, VarScope,
 };
 pub use runtime::{
-    DefaultRandomSelector, LabelInfo, LabelTable, RandomSelector, ScriptGenerator,
+    DefaultRandomSelector, SceneInfo, SceneTable, RandomSelector, ScriptGenerator,
     ScriptGeneratorState, VariableManager, VariableScope, VariableValue,
 };
 pub use transpiler::{TranspileContext, Transpiler};

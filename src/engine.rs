@@ -9,7 +9,7 @@ use crate::{
     ir::ScriptEvent,
     loader::{DirectoryLoader, ErrorLogWriter},
     parser::parse_file,
-    runtime::{DefaultRandomSelector, LabelTable, RandomSelector, WordTable},
+    runtime::{DefaultRandomSelector, SceneTable, RandomSelector, WordTable},
     transpiler::Transpiler,
 };
 use rune::{Context, Vm};
@@ -157,7 +157,7 @@ impl PastaEngine {
         };
 
         // Step 5: Transpile merged AST to Rune source using two-pass transpiler
-        let (rune_source, label_registry, word_registry) =
+        let (rune_source, scene_registry, word_registry) =
             Transpiler::transpile_with_registry(&merged_ast)?;
 
         #[cfg(debug_assertions)]
@@ -168,7 +168,7 @@ impl PastaEngine {
         }
 
         // Step 6: Build label table for Rune module (ownership moved to closure)
-        let label_table = LabelTable::from_label_registry(label_registry, random_selector)?;
+        let scene_table = SceneTable::from_label_registry(scene_registry, random_selector)?;
 
         // Step 7: Build word table for word expansion (with its own random selector)
         let word_random_selector: Box<dyn RandomSelector> = Box::new(DefaultRandomSelector::new());
@@ -182,7 +182,7 @@ impl PastaEngine {
         // Install standard library with label table and word table (moved into module)
         context
             .install(
-                crate::stdlib::create_module(label_table, word_table).map_err(|e| {
+                crate::stdlib::create_module(scene_table, word_table).map_err(|e| {
                     PastaError::RuneRuntimeError(format!("Failed to install stdlib: {}", e))
                 })?,
             )
@@ -350,11 +350,11 @@ impl PastaEngine {
         })?;
 
         let execution = vm.execute(hash, (context, args)).map_err(|e| {
-            // Convert function not found errors to LabelNotFound
+            // Convert function not found errors to SceneNotFound
             let err_msg = format!("{:?}", e);
             if err_msg.contains("MissingEntry") || err_msg.contains("MissingFunction") {
-                PastaError::LabelNotFound {
-                    label: label_name.to_string(),
+                PastaError::SceneNotFound {
+                    scene: label_name.to_string(),
                 }
             } else {
                 PastaError::VmError(e)
@@ -430,7 +430,7 @@ impl Drop for PastaEngine {
         // self.variables.save_to_disk().ok();
 
         // TODO: Persist label execution history/cache
-        // self.label_table.save_cache().ok();
+        // self.scene_table.save_cache().ok();
 
         // For now, we just log that the engine is being dropped
         #[cfg(debug_assertions)]

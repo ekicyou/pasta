@@ -34,7 +34,7 @@ fn test_rune_compile_simple() {
 
     // Install pasta_stdlib
     let selector = Box::new(pasta::runtime::random::DefaultRandomSelector::new());
-    let table = pasta::runtime::scene::LabelTable::new(selector);
+    let table = pasta::runtime::scene::SceneTable::new(selector);
     let word_table = create_test_word_table();
 
     context

@@ -8,7 +8,7 @@ pub mod persistence;
 
 use crate::error::PastaError;
 use crate::ir::{ContentPart, ScriptEvent};
-use crate::runtime::scene::LabelTable;
+use crate::runtime::scene::SceneTable;
 use crate::runtime::words::WordTable;
 use rune::{ContextError, Module};
 use std::collections::HashMap;
@@ -17,7 +17,7 @@ use tracing::{error, warn};
 
 /// Create the Pasta standard library module for Rune.
 pub fn create_module(
-    label_table: LabelTable,
+    scene_table: SceneTable,
     word_table: WordTable,
 ) -> Result<Module, ContextError> {
     let mut module = Module::with_crate("pasta_stdlib")?;
@@ -43,14 +43,14 @@ pub fn create_module(
     // Register persistence functions
     persistence::register_persistence_functions(&mut module)?;
 
-    // Register label resolution functions
-    // Wrap in Mutex for interior mutability (resolve_label_id needs &mut self)
-    let label_table_mutex = Mutex::new(label_table);
+    // Register scene resolution functions
+    // Wrap in Mutex for interior mutability (resolve_scene_id needs &mut self)
+    let scene_table_mutex = Mutex::new(scene_table);
     module
         .function(
-            "select_label_to_id",
-            move |label: String, filters: rune::runtime::Value| {
-                select_label_to_id(label, filters, &label_table_mutex)
+            "select_scene_to_id",
+            move |scene: String, filters: rune::runtime::Value| {
+                select_scene_to_id(scene, filters, &scene_table_mutex)
             },
         )
         .build()?;
@@ -75,37 +75,37 @@ pub fn create_module(
     Ok(module)
 }
 
-/// Label resolution with prefix matching and attribute filtering.
+/// Scene resolution with prefix matching and attribute filtering.
 ///
 /// # Arguments
-/// * `label` - Label name to resolve (search key)
+/// * `scene` - Scene name to resolve (search key)
 /// * `filters` - Attribute filters (Rune Object or Unit)
-/// * `label_table` - Shared reference to the label table
+/// * `scene_table` - Shared reference to the scene table
 ///
 /// # Returns
-/// Label ID as i64
+/// Scene ID as i64
 ///
 /// # Panics
-/// Panics if label resolution fails (no matching labels, lock error, etc.)
-fn select_label_to_id(
-    label: String,
+/// Panics if scene resolution fails (no matching scenes, lock error, etc.)
+fn select_scene_to_id(
+    scene: String,
     filters: rune::runtime::Value,
-    label_table: &Mutex<LabelTable>,
+    scene_table: &Mutex<SceneTable>,
 ) -> Result<i64, String> {
     // Phase 1: Parse Rune filters to HashMap
     let filter_map = parse_rune_filters(filters)?;
 
-    // Phase 2: Lock and resolve label ID
-    let mut table = label_table
+    // Phase 2: Lock and resolve scene ID
+    let mut table = scene_table
         .lock()
-        .map_err(|e| format!("Failed to lock label_table: {}", e))?;
+        .map_err(|e| format!("Failed to lock scene_table: {}", e))?;
 
-    let label_id = table
-        .resolve_label_id(&label, &filter_map)
-        .map_err(|e| format!("Label resolution failed: {}", e))?;
+    let scene_id = table
+        .resolve_scene_id(&scene, &filter_map)
+        .map_err(|e| format!("Scene resolution failed: {}", e))?;
 
-    // Convert LabelId (0-based) to transpiler ID (1-based)
-    Ok((label_id.0 + 1) as i64)
+    // Convert SceneId (0-based) to transpiler ID (1-based)
+    Ok((scene_id.0 + 1) as i64)
 }
 
 /// Parse Rune Value filters to Rust HashMap.
@@ -388,14 +388,14 @@ mod tests {
 
     #[test]
     fn test_create_module() {
-        use crate::runtime::scene::LabelTable;
+        use crate::runtime::scene::SceneTable;
         use crate::runtime::random::DefaultRandomSelector;
         use crate::runtime::words::WordTable;
         use crate::transpiler::WordDefRegistry;
 
         // Create a test label table
         let selector = Box::new(DefaultRandomSelector::new());
-        let table = LabelTable::new(selector);
+        let table = SceneTable::new(selector);
 
         // Create a test word table
         let word_selector = Box::new(DefaultRandomSelector::new());
