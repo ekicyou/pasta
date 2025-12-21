@@ -1320,5 +1320,147 @@ fn spec_ch10_3_word_reference_static() {
 }
 
 // =============================================================================
+// Unnamed Global Scene (継続) Tests - pasta-label-continuation feature
+// =============================================================================
+
+/// Unnamed scene continuation: named scene followed by unnamed scene
+/// Requirement 1.1: Unnamed (＊) line continues the last global scene name
+#[test]
+fn test_unnamed_scene_basic_continuation() {
+    let source = r#"＊会話
+  Alice：こんにちは
+
+＊
+  Bob：こんばんは
+"#;
+    let result = parse_str(source, "test.pasta");
+    assert!(
+        result.is_ok(),
+        "無名シーン（継続）がパースできるべき: {:?}",
+        result.err()
+    );
+
+    let file = result.unwrap();
+    assert_eq!(file.scenes.len(), 2, "2つのシーンが存在するべき");
+    assert_eq!(file.scenes[0].name, "会話", "最初のシーン名は '会話'");
+    assert_eq!(
+        file.scenes[1].name, "会話",
+        "無名シーンは最後のシーン名 '会話' を継続するべき"
+    );
+}
+
+/// Unnamed scene continuation: consecutive unnamed scenes
+/// Requirement 1.2: Multiple consecutive unnamed (＊) lines maintain last scene name
+#[test]
+fn test_unnamed_scene_consecutive() {
+    let source = r#"＊greeting
+  Alice：hello
+
+＊
+  Bob：hi
+
+＊
+  Carol：hey
+"#;
+    let result = parse_str(source, "test.pasta");
+    assert!(
+        result.is_ok(),
+        "連続する無名シーンがパースできるべき: {:?}",
+        result.err()
+    );
+
+    let file = result.unwrap();
+    assert_eq!(file.scenes.len(), 3, "3つのシーンが存在するべき");
+    assert_eq!(file.scenes[0].name, "greeting");
+    assert_eq!(
+        file.scenes[1].name, "greeting",
+        "最初の無名シーンは 'greeting' を継続"
+    );
+    assert_eq!(
+        file.scenes[2].name, "greeting",
+        "2番目の無名シーンも 'greeting' を継続"
+    );
+}
+
+/// Unnamed scene continuation: context update
+/// Requirement 2.1: Explicit scene name updates continuation context
+#[test]
+fn test_unnamed_scene_context_update() {
+    let source = r#"＊シーン1
+  Alice：最初のシーン
+
+＊
+  Bob：シーン1の継続
+
+＊シーン2
+  Carol：新しいシーン
+
+＊
+  Dave：シーン2の継続
+"#;
+    let result = parse_str(source, "test.pasta");
+    assert!(
+        result.is_ok(),
+        "コンテキスト更新がパースできるべき: {:?}",
+        result.err()
+    );
+
+    let file = result.unwrap();
+    assert_eq!(file.scenes.len(), 4);
+    assert_eq!(file.scenes[0].name, "シーン1");
+    assert_eq!(file.scenes[1].name, "シーン1", "1番目の無名は 'シーン1'");
+    assert_eq!(file.scenes[2].name, "シーン2");
+    assert_eq!(file.scenes[3].name, "シーン2", "3番目の無名は 'シーン2'");
+}
+
+/// Unnamed scene at file start: error
+/// Requirement 3.1: First unnamed scene without prior named scene should error
+#[test]
+fn test_unnamed_scene_error_at_start() {
+    let source = r#"＊
+  Alice：これはエラーになるべき
+"#;
+    let result = parse_str(source, "test.pasta");
+    assert!(
+        result.is_err(),
+        "ファイル先頭の無名シーンはエラーになるべき"
+    );
+
+    if let Err(pasta::error::PastaError::ParseError { ref message, .. }) = result {
+        assert!(
+            message.contains("Unnamed") || message.contains("start"),
+            "エラーメッセージに無名シーンの説明を含むべき: {}",
+            message
+        );
+    }
+}
+
+/// Unnamed scene with context: local scene relationship
+/// Requirement 1.3: Local scenes after unnamed continuation relate to continued global scene
+#[test]
+fn test_unnamed_scene_with_local_scenes() {
+    let source = r#"＊options
+  Alice：選択肢です
+
+＊
+  Bob：オプション1
+  
+  ・option1
+    Carol：選んだ
+"#;
+    let result = parse_str(source, "test.pasta");
+    assert!(
+        result.is_ok(),
+        "無名シーン後のローカルシーンがパースできるべき: {:?}",
+        result.err()
+    );
+
+    let file = result.unwrap();
+    assert_eq!(file.scenes.len(), 2);
+    assert_eq!(file.scenes[1].name, "options");
+    assert_eq!(file.scenes[1].local_scenes.len(), 1, "ローカルシーンが存在");
+}
+
+// =============================================================================
 // 追加のテストは後続タスクで実装
 // =============================================================================
