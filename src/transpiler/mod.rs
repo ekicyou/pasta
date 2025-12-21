@@ -10,8 +10,8 @@ pub use scene_registry::{SceneInfo, SceneRegistry};
 pub use word_registry::{WordDefRegistry, WordEntry};
 
 use crate::{
-    Argument, BinOp, Expr, FunctionScope, JumpTarget, SceneDef, SceneScope, Literal, PastaError,
-    PastaFile, SpeechPart, Statement, VarScope,
+    Argument, BinOp, Expr, FunctionScope, JumpTarget, Literal, PastaError, PastaFile, SceneDef,
+    SceneScope, SpeechPart, Statement, VarScope,
 };
 use std::collections::HashMap;
 

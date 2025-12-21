@@ -4,14 +4,14 @@
 //! including the Rune VM wrapper, variable management, and scene management.
 
 pub mod generator;
-pub mod scene;
 pub mod random;
+pub mod scene;
 pub mod variables;
 pub mod words;
 
 pub use generator::{ScriptGenerator, ScriptGeneratorState};
-pub use scene::{SceneInfo, SceneTable};
 pub use random::{DefaultRandomSelector, RandomSelector};
+pub use scene::{SceneInfo, SceneTable};
 pub use variables::{VariableManager, VariableScope, VariableValue};
 pub use words::{WordCacheKey, WordTable};
 
