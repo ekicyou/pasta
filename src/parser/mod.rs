@@ -563,8 +563,13 @@ fn parse_speech_content(pair: Pair<Rule>) -> Result<Vec<SpeechPart>, PastaError>
                 parts.push(SpeechPart::Text(inner_pair.as_str().to_string()));
             }
             Rule::var_ref => {
-                let var_name = inner_pair.into_inner().nth(1).unwrap().as_str().to_string();
-                parts.push(SpeechPart::VarRef(var_name));
+                // var_ref = { (at_marker | dollar_marker) ~ var_scope? ~ var_name }
+                // Extract scope and name from var_ref
+                let (var_name, var_scope) = parse_var_ref_with_scope(inner_pair)?;
+                parts.push(SpeechPart::VarRef {
+                    name: var_name,
+                    scope: var_scope,
+                });
             }
             Rule::func_call => {
                 let (name, args, scope) = parse_func_call(inner_pair)?;
@@ -768,6 +773,29 @@ fn parse_expr(pair: Pair<Rule>) -> Result<Expr, PastaError> {
     Ok(expr)
 }
 
+/// Parse a var_ref and extract the variable name and scope.
+/// var_ref = { (at_marker | dollar_marker) ~ var_scope? ~ var_name }
+/// var_scope = { global_label_marker } (i.e., "*" or "＊")
+fn parse_var_ref_with_scope(pair: Pair<Rule>) -> Result<(String, VarScope), PastaError> {
+    let mut scope = VarScope::Local;
+    let mut var_name = String::new();
+
+    for inner_pair in pair.into_inner() {
+        match inner_pair.as_rule() {
+            Rule::var_scope => {
+                // var_scope = { global_label_marker } means "*" is present
+                scope = VarScope::Global;
+            }
+            Rule::var_name => {
+                var_name = inner_pair.as_str().to_string();
+            }
+            // Skip at_marker and dollar_marker
+            _ => {}
+        }
+    }
+
+    Ok((var_name, scope))
+}
 fn parse_term(pair: Pair<Rule>) -> Result<Expr, PastaError> {
     let inner_pair = pair.into_inner().next().unwrap();
     match inner_pair.as_rule() {
@@ -780,10 +808,10 @@ fn parse_term(pair: Pair<Rule>) -> Result<Expr, PastaError> {
             Ok(Expr::FuncCall { name, args, scope })
         }
         Rule::var_ref => {
-            let var_name = inner_pair.into_inner().nth(1).unwrap().as_str().to_string();
+            let (var_name, var_scope) = parse_var_ref_with_scope(inner_pair)?;
             Ok(Expr::VarRef {
                 name: var_name,
-                scope: VarScope::Local, // Default to local, transpiler will resolve
+                scope: var_scope,
             })
         }
         Rule::number_literal => {
@@ -913,10 +941,10 @@ fn parse_arg_value(pair: Pair<Rule>) -> Result<Expr, PastaError> {
             inner_pair.as_str().parse().unwrap(),
         ))),
         Rule::var_ref => {
-            let var_name = inner_pair.into_inner().nth(1).unwrap().as_str().to_string();
+            let (var_name, var_scope) = parse_var_ref_with_scope(inner_pair)?;
             Ok(Expr::VarRef {
                 name: var_name,
-                scope: VarScope::Local,
+                scope: var_scope,
             })
         }
         Rule::func_call => {

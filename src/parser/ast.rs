@@ -146,8 +146,13 @@ pub enum Statement {
 pub enum SpeechPart {
     /// Plain text
     Text(String),
-    /// Variable reference (@var_name)
-    VarRef(String),
+    /// Variable reference ($var_name or $*var_name)
+    VarRef {
+        /// Variable name
+        name: String,
+        /// Variable scope (Local or Global)
+        scope: VarScope,
+    },
     /// Function call (@func_name(args) or @*func_name(args))
     FuncCall {
         /// Function name
