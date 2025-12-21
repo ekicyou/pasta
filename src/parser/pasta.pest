@@ -34,9 +34,11 @@ indent_only_line = _{ indent ~ NEWLINE }
 // === Labels ===
 // Global label: starts with ＊ or *
 // Body can contain indented lines
+// Note: label_name is optional to support unnamed scenes (継続).
+// Unnamed scene: only global_label_marker followed by NEWLINE
 
 global_label = ${
-    global_label_marker ~ label_name ~ NEWLINE ~
+    global_label_marker ~ label_name? ~ NEWLINE ~
     (label_body_line | indent_only_line | empty_line)*
 }
 

@@ -31,6 +31,7 @@ pub fn parse_str(source: &str, filename: &str) -> Result<PastaFile, PastaError> 
     let file_pair = pairs.next().unwrap(); // file rule always produces one pair
     let mut global_words = Vec::new();
     let mut scenes = Vec::new();
+    let mut last_global_scene_name: Option<String> = None; // Context for unnamed scenes
 
     for pair in file_pair.into_inner() {
         match pair.as_rule() {
@@ -42,7 +43,14 @@ pub fn parse_str(source: &str, filename: &str) -> Result<PastaFile, PastaError> 
                             global_words.push(parse_word_def(inner_pair)?);
                         }
                         Rule::global_label => {
-                            scenes.push(parse_global_scene(inner_pair)?);
+                            let scene = parse_global_scene(
+                                inner_pair,
+                                last_global_scene_name.clone(),
+                                filename,
+                            )?;
+                            // Update last_global_scene_name after successfully parsing
+                            last_global_scene_name = Some(scene.name.clone());
+                            scenes.push(scene);
                         }
                         _ => {}
                     }
@@ -52,7 +60,10 @@ pub fn parse_str(source: &str, filename: &str) -> Result<PastaFile, PastaError> 
                 global_words.push(parse_word_def(pair)?);
             }
             Rule::global_label => {
-                scenes.push(parse_global_scene(pair)?);
+                let scene = parse_global_scene(pair, last_global_scene_name.clone(), filename)?;
+                // Update last_global_scene_name after successfully parsing
+                last_global_scene_name = Some(scene.name.clone());
+                scenes.push(scene);
             }
             Rule::EOI => {} // End of input, ignore
             _ => {}
@@ -100,7 +111,11 @@ fn parse_word_def(pair: Pair<Rule>) -> Result<WordDef, PastaError> {
     Ok(WordDef { name, values, span })
 }
 
-fn parse_global_scene(pair: Pair<Rule>) -> Result<SceneDef, PastaError> {
+fn parse_global_scene(
+    pair: Pair<Rule>,
+    last_scene_name: Option<String>,
+    filename: &str,
+) -> Result<SceneDef, PastaError> {
     let span_pest = pair.as_span();
     let start = span_pest.start_pos().line_col();
     let end = span_pest.end_pos().line_col();
@@ -111,15 +126,17 @@ fn parse_global_scene(pair: Pair<Rule>) -> Result<SceneDef, PastaError> {
     let mut local_words = Vec::new();
     let mut local_scenes = Vec::new();
     let mut statements = Vec::new();
+    let mut explicit_name = false;
 
     for inner_pair in pair.into_inner() {
         match inner_pair.as_rule() {
             Rule::label_name => {
                 name = inner_pair.as_str().to_string();
+                explicit_name = true;
                 // Validate reserved scene pattern: __*__ is reserved for system use
                 if name.starts_with("__") && name.ends_with("__") {
                     return Err(PastaError::ParseError {
-                        file: "<input>".to_string(),
+                        file: filename.to_string(),
                         line: start.0,
                         column: start.1,
                         message: format!(
@@ -187,6 +204,24 @@ fn parse_global_scene(pair: Pair<Rule>) -> Result<SceneDef, PastaError> {
                 }
             }
             _ => {}
+        }
+    }
+
+    // If no explicit name was provided (unnamed scene), use last_scene_name
+    if !explicit_name {
+        if let Some(continuation_name) = last_scene_name {
+            name = continuation_name;
+        } else {
+            // Error: First unnamed scene has no prior scene name
+            return Err(PastaError::ParseError {
+                file: filename.to_string(),
+                line: start.0,
+                column: start.1,
+                message: "Unnamed global scene (＊ or *) at start of file. \
+                    A named global scene must appear before any unnamed scenes. \
+                    Provide a scene name like '＊会話' or use the continuation feature after defining a named scene."
+                    .to_string(),
+            });
         }
     }
 
