@@ -47,14 +47,14 @@ graph TB
         TranspileStatement --> CallGen[Call文生成 L424/L433]
         TranspileStatement --> SpeechGen[transpile_speech_part_to_writer]
         SpeechGen --> FuncCallFix[SpeechPart::FuncCall バグ修正]
-        CallGen --> ArgsHelper[transpile_exprs_to_args]
+        CallGen --> ArgsHelper["transpile_exprs_to_tuple<br/>(括弧付きタプル返却)"]
         FuncCallFix --> ArgsHelper
     end
     
     subgraph RuneVM
-        ArgsHelper --> TupleOutput["タプル出力 ()"]
-        TupleOutput --> PastaCall["pasta::call(ctx, scene, filters, args)"]
-        TupleOutput --> DirectCall["func(ctx, args)"]
+        ArgsHelper --> TupleOutput["完全なタプル文字列<br/>() | (arg,) | (a, b)"]
+        TupleOutput --> PastaCall["pasta::call(ctx, scene, filters, tuple)"]
+        TupleOutput --> DirectCall["func(ctx, tuple)"]
     end
 ```
 
@@ -78,8 +78,8 @@ graph TB
 
 | Requirement | Summary | Components | Interfaces | Flows |
 |-------------|---------|------------|------------|-------|
-| 1.1-1.6 | Call/Jump文・アクション行のタプル変換 | CallGenerator, FuncCallFix | transpile_exprs_to_args | Call文生成フロー |
-| 2.1-2.4 | transpile_exprs_to_args修正 | ArgsHelper | 関数シグネチャ | ヘルパー関数フロー |
+| 1.1-1.6 | Call/Jump文・アクション行のタプル変換 | CallGenerator, FuncCallFix | transpile_exprs_to_tuple | Call文生成フロー |
+| 2.1-2.4 | transpile_exprs_to_tuple実装 | ArgsHelper | 関数シグネチャ | ヘルパー関数フロー |
 | 3.1-3.3 | 後方互換性保証 | TestUpdates | N/A | テスト実行フロー |
 | 4.1-4.2 | ドキュメント更新 | Documentation | N/A | N/A |
 
@@ -89,10 +89,10 @@ graph TB
 
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies | Contracts |
 |-----------|--------------|--------|--------------|------------------|-----------|
-| CallGenerator | Transpiler | Call/Jump文のタプル生成 | 1.1-1.6 | transpile_exprs_to_args (P0) | Service |
-| FuncCallFix | Transpiler | アクション行関数呼び出しバグ修正 | 1.1-1.6 | TranspileContext (P0), FunctionScope (P0) | Service |
-| ArgsHelper | Transpiler | 引数リスト文字列生成 | 2.1-2.4 | transpile_expr (P0) | Service |
-| TestUpdates | Tests | テスト期待値更新 | 3.1-3.3 | N/A | N/A |
+| CallGenerator | Transpiler | Call/Jump文のタプル生成 | 1.1-1.6 | transpile_exprs_to_tuple (P0) | Service |
+| FuncCallFix | Transpiler | アクション行関数呼び出しバグ修正 | 1.1-1.6 | transpile_exprs_to_tuple (P0) | Service |
+| ArgsHelper | Transpiler | タプル文字列生成（括弧付き） | 2.1-2.4 | transpile_expr (P0) | Service |
+| TestUpdates | Tests | テスト検証・実装 | 3.1-3.3 | N/A | N/A |
 
 ### Transpiler Layer
 
@@ -106,10 +106,10 @@ graph TB
 **Responsibilities & Constraints**
 - `transpile_statement_to_writer`内のCall文生成ロジックを修正
 - 動的ターゲット（L424）と静的ターゲット（L433）の両方を対応
-- `pasta::call`の第4引数をタプル形式に変更
+- `pasta::call`の第4引数を`transpile_exprs_to_tuple`の戻り値に変更
 
 **Dependencies**
-- Outbound: `transpile_exprs_to_args` — 引数文字列生成 (P0)
+- Outbound: `transpile_exprs_to_tuple` — タプル文字列生成（括弧付き）(P0)
 
 **Contracts**: Service [x]
 
@@ -119,13 +119,49 @@ graph TB
 // Before:
 "        for a in crate::pasta::call(ctx, `${{ctx.{}.{}}}`, {}, [{}]) {{ yield a; }}"
 // After:
-"        for a in crate::pasta::call(ctx, `${{ctx.{}.{}}}`, {}, ({})) {{ yield a; }}"
+"        for a in crate::pasta::call(ctx, `${{ctx.{}.{}}}`, {}, {}) {{ yield a; }}"  // {} = transpile_exprs_to_tuple()の戻り値
 
 // 変更箇所2: 静的ターゲット（L433）
 // Before:
 "        for a in crate::pasta::call(ctx, \"{}\", {}, [{}]) {{ yield a; }}"
 // After:
-"        for a in crate::pasta::call(ctx, \"{}\", {}, ({})) {{ yield a; }}"
+"        for a in crate::pasta::call(ctx, \"{}\", {}, {}) {{ yield a; }}"  // {} = transpile_exprs_to_tuple()の戻り値
+
+// 実装例:
+let tuple_str = Self::transpile_exprs_to_tuple(args, &context)?;
+writeln!(
+    writer,
+    "        for a in crate::pasta::call(ctx, \"{}\", {}, {}) {{ yield a; }}",
+    search_key, filters_str, tuple_str  // tuple_str = "()" or "(arg,)" or "(a, b)"
+)
+```
+
+**Dependencies**
+- Outbound: `transpile_exprs_to_tuple` — タプル文字列生成（括弧付き）(P0)
+
+**Contracts**: Service [x]
+
+##### Service Interface
+```rust
+// 変更箇所1: 動的ターゲット（L424）
+// Before:
+"        for a in crate::pasta::call(ctx, `${{ctx.{}.{}}}`, {}, [{}]) {{ yield a; }}"
+// After:
+"        for a in crate::pasta::call(ctx, `${{ctx.{}.{}}}`, {}, {}) {{ yield a; }}"  // {} = transpile_exprs_to_tuple()の戻り値
+
+// 変更箇所2: 静的ターゲット（L433）
+// Before:
+"        for a in crate::pasta::call(ctx, \"{}\", {}, [{}]) {{ yield a; }}"
+// After:
+"        for a in crate::pasta::call(ctx, \"{}\", {}, {}) {{ yield a; }}"  // {} = transpile_exprs_to_tuple()の戻り値
+
+// 実装例:
+let tuple_str = Self::transpile_exprs_to_tuple(args, &context)?;
+writeln!(
+    writer,
+    "        for a in crate::pasta::call(ctx, \"{}\", {}, {}) {{ yield a; }}",
+    search_key, filters_str, tuple_str  // tuple_str = "()" or "(arg,)" or "(a, b)"
+)
 ```
 
 ---
@@ -168,15 +204,15 @@ SpeechPart::FuncCall {
 
 // 修正後の実装（Option B: Rune側で解決を委譲）:
 SpeechPart::FuncCall { name, args, scope } => {
-    let args_str = Self::transpile_exprs_to_args(args, context)?;
+    let tuple_str = Self::transpile_exprs_to_tuple(args, context)?;
     match scope {
         FunctionScope::Auto => {
             // ＠関数(): ローカル優先（Rune側で自動探索）
             // Rune側の名前解決により、現在のモジュール内優先で関数を探索
             writeln!(
                 writer,
-                "        for a in {}(ctx, ({})) {{ yield a; }}",
-                name, args_str
+                "        for a in {}(ctx, {}) {{ yield a; }}",
+                name, tuple_str
             )
         }
         FunctionScope::GlobalOnly => {
@@ -184,8 +220,8 @@ SpeechPart::FuncCall { name, args, scope } => {
             // super::プレフィックスでグローバルスコープを明示
             writeln!(
                 writer,
-                "        for a in super::{}(ctx, ({})) {{ yield a; }}",
-                name, args_str
+                "        for a in super::{}(ctx, {}) {{ yield a; }}",
+                name, tuple_str
             )
         }
     }
@@ -197,21 +233,21 @@ SpeechPart::FuncCall { name, args, scope } => {
 - **スコープ解決**: Rust側では単なるプレフィックス付与で、Rune側のモジュール名前解決に完全に委譲
 - **FunctionScope::Auto**: プレフィックスなし → Rune側で自動探索（ローカルモジュール優先）
 - **FunctionScope::GlobalOnly**: `super::`プレフィックス → グローバルスコープに明示的にバインド
-- **引数形式**: 常にタプル形式`(args)`で渡す（単一要素タプルは末尾カンマ必須）
+- **引数形式**: `transpile_exprs_to_tuple`が括弧を含むタプル文字列を返す（常に正しい形式）
 
 ---
 
-#### ArgsHelper（transpile_exprs_to_args修正）
+#### ArgsHelper（transpile_exprs_to_tuple 新規実装）
 
 | Field | Detail |
 |-------|--------|
-| Intent | 引数リストをタプル構文に適した文字列に変換 |
+| Intent | 引数リストをタプル構文の完全な文字列に変換（括弧付き） |
 | Requirements | 2.1, 2.2, 2.3, 2.4 |
 
 **Responsibilities & Constraints**
-- 0個の引数: 空文字列を返す（呼び出し側で`()`に展開）
-- 1個の引数: 末尾カンマを追加（`"arg,"`）
-- 2個以上の引数: カンマ区切り（`"arg1, arg2"`）
+- 0個の引数: `"()"`を返す
+- 1個の引数: `"(arg,)"`を返す（末尾カンマ必須）
+- 2個以上の引数: `"(arg1, arg2, ...)"`を返す
 
 **Dependencies**
 - Outbound: `transpile_expr` — 個別式変換 (P0)
@@ -219,14 +255,19 @@ SpeechPart::FuncCall { name, args, scope } => {
 **Contracts**: Service [x]
 
 ##### Service Interface
+
+**関数名の変更**: `transpile_exprs_to_args` → `transpile_exprs_to_tuple`
+
+（責務がより明確：括弧を含むタプル文字列全体を返す）
+
 ```rust
-/// Transpile expressions to argument list string for tuple syntax.
+/// Transpile expressions to tuple string for function arguments.
 /// 
 /// # Returns
-/// - Empty args: "" (caller adds "()")
-/// - Single arg: "arg," (trailing comma for single-element tuple)
-/// - Multiple args: "arg1, arg2, ..."
-fn transpile_exprs_to_args(
+/// - Empty args: "()" 
+/// - Single arg: "(arg,)" (trailing comma mandatory for single-element tuple)
+/// - Multiple args: "(arg1, arg2, ...)"
+fn transpile_exprs_to_tuple(
     exprs: &[Expr],
     context: &TranspileContext,
 ) -> Result<String, PastaError> {
@@ -235,17 +276,20 @@ fn transpile_exprs_to_args(
         .map(|expr| Self::transpile_expr(expr, context))
         .collect::<Result<Vec<_>, _>>()?;
     
-    match args.len() {
-        0 => Ok(String::new()),
-        1 => Ok(format!("{},", args[0])),  // 単一要素タプルは末尾カンマ必須
-        _ => Ok(args.join(", ")),
-    }
+    let args_str = match args.len() {
+        0 => String::new(),
+        1 => format!("{},", args[0]),  // 単一要素タプルは末尾カンマ必須
+        _ => args.join(", "),
+    };
+    
+    Ok(format!("({})", args_str))  // 括弧を付与して返す
 }
 ```
 
 **Design Decisions**
-- 末尾カンマはRuneの単一要素タプル構文に必須（`(x,)` vs `(x)`はグループ化）
-- 呼び出し側で括弧`()`を追加する責務分離を維持
+- **括弧を含める**: ヘルパーが責務をすべて負う（呼び出し側は単純化）
+- **末尾カンマ**: Runeの単一要素タプル構文に必須（`(x,)` vs `(x)`はグループ化）
+- **関数名**: `transpile_exprs_to_tuple`に変更することで、責務をより明確化
 
 ---
 
@@ -255,11 +299,11 @@ fn transpile_exprs_to_args(
 
 Runeタプル構文（検証済み - `pasta_rune_tuple_syntax_test.rs`）:
 
-| 要素数 | Rune構文 | 生成される文字列 |
-|--------|----------|-----------------|
-| 0 | `()` | `""` → `()` |
-| 1 | `(x,)` | `"x,"` → `(x,)` |
-| 2+ | `(a, b, c)` | `"a, b, c"` → `(a, b, c)` |
+| 要素数 | Rune構文 | transpile_exprs_to_tuple戻り値 |
+|--------|----------|------------------------------|
+| 0 | `()` | `"()"` |
+| 1 | `(x,)` | `"(x,)"` |
+| 2+ | `(a, b, c)` | `"(a, b, c)"` |
 
 ---
 
