@@ -166,12 +166,13 @@ SpeechPart::FuncCall {
     )
 }
 
-// 修正後の実装:
+// 修正後の実装（Option B: Rune側で解決を委譲）:
 SpeechPart::FuncCall { name, args, scope } => {
     let args_str = Self::transpile_exprs_to_args(args, context)?;
     match scope {
         FunctionScope::Auto => {
-            // ローカル優先: 現在のモジュール内で関数を探し、なければグローバル
+            // ＠関数(): ローカル優先（Rune側で自動探索）
+            // Rune側の名前解決により、現在のモジュール内優先で関数を探索
             writeln!(
                 writer,
                 "        for a in {}(ctx, ({})) {{ yield a; }}",
@@ -179,7 +180,8 @@ SpeechPart::FuncCall { name, args, scope } => {
             )
         }
         FunctionScope::GlobalOnly => {
-            // グローバル指定: super::を付与
+            // ＠＊関数(): グローバル明示（super::で確定）
+            // super::プレフィックスでグローバルスコープを明示
             writeln!(
                 writer,
                 "        for a in super::{}(ctx, ({})) {{ yield a; }}",
@@ -192,9 +194,10 @@ SpeechPart::FuncCall { name, args, scope } => {
 ```
 
 **Implementation Notes**
-- FunctionScope::Autoの場合、関数はローカルモジュール内で定義されていると仮定
-- FunctionScope::GlobalOnlyの場合、`super::`プレフィックスでグローバルスコープを指定
-- 引数は常にタプル形式`(args)`で渡す
+- **スコープ解決**: Rust側では単なるプレフィックス付与で、Rune側のモジュール名前解決に完全に委譲
+- **FunctionScope::Auto**: プレフィックスなし → Rune側で自動探索（ローカルモジュール優先）
+- **FunctionScope::GlobalOnly**: `super::`プレフィックス → グローバルスコープに明示的にバインド
+- **引数形式**: 常にタプル形式`(args)`で渡す（単一要素タプルは末尾カンマ必須）
 
 ---
 
