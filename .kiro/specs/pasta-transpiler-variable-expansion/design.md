@@ -543,21 +543,21 @@ impl RuneContext {
 
 ## Migration Strategy
 
-### Phase 0: Rune Object方式検証（任意）
-- **目的**: `ctx.local.変数名`形式の動的プロパティアクセスをRune `Object`型で実現することを確認
-- **方針**: Runeの`Object`型（`HashMap<String, Value>`のエイリアス）を活用
-  - Runeは`object.key`形式で動的フィールドアクセスをサポート（[Rune Objects](https://rune-rs.github.io/book/objects.html)）
-  - `ctx.local`/`ctx.global`を`Object`としてVMに渡す
-  - Rust側で`Object::insert()`/`get()`を使用して`VariableManager`と統合
-- **PoC内容**（任意）:
+### Phase 0: Rune Template Literal 直接評価の確認（実装フェーズで実施）
+- **目的**: 中間変数を使わない形式 `${ctx.local.変数名}` が実際に動作するか確認
+- **方針**: Phase 1 実装時に PoC を作成し、Rune VM での動作を検証
+  - Rune template literal での複雑な式評価は既に確認済み（`${1 - 10}`、`${{ ... }}`）
+  - Object 型プロパティアクセスの DISPLAY_FMT protocol 要件を確認
+  - 実装可能であれば、中間変数方式を簡潔形式に修正
+  - 不可であれば、現在の中間変数方式を採用（確実性優先）
+- **PoC内容**:
   ```rust
-  use rune::runtime::Object;
-  let mut local_obj = Object::new();
-  local_obj.insert("test_var".try_into()?, rune::to_value("test_value")?)?;
-  // Runeコード: ctx.local.test_var → "test_value"
+  // Rune側で実装
+  let ctx = #{local: #{test_var: "test_value"}};
+  yield Talk(`${ctx.local.test_var}`); // 直接評価可能か確認
   ```
-- **結果**: ✅ Runeドキュメントで確認済み、動的プロパティアクセスは標準機能としてサポートされている
-- **決定**: フォールバック不要、`Object`型ベースでPhase 1へ進む
+- **決定タイミング**: Phase 1 実装開始時に確定
+- **フォールバック**: 直接評価不可 → 現在の中間変数方式（`let a = ctx.local.変数名; ${a}`）を確定
 
 ### Phase 1: 新式API実装
 - `VariableManager`をRune側に`ctx.local`/`ctx.global`として公開
