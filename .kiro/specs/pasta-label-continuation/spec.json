@@ -1,13 +1,13 @@
 {
     "feature_name": "pasta-label-continuation",
     "created_at": "2025-12-10T00:00:00Z",
-    "updated_at": "2025-12-10T00:00:00Z",
+    "updated_at": "2025-12-21T06:00:00Z",
     "language": "ja",
-    "phase": "initialized",
+    "phase": "requirements-approved",
     "approvals": {
         "requirements": {
-            "generated": false,
-            "approved": false
+            "generated": true,
+            "approved": true
         },
         "design": {
             "generated": false,
