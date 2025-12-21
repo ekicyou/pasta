@@ -27,7 +27,7 @@ fn test_error_invalid_label_marker() {
   さくら：こんにちは
 "#;
     let result = parse_str(source, "test.pasta");
-    assert!(result.is_err(), "Should fail with invalid label marker");
+    assert!(result.is_err(), "Should fail with invalid scene marker");
 
     let err = result.unwrap_err();
     let err_str = format!("{}", err);
@@ -90,7 +90,7 @@ fn test_error_empty_label_name() {
   さくら：こんにちは
 "#;
     let result = parse_str(source, "test.pasta");
-    assert!(result.is_err(), "Should fail with empty label name");
+    assert!(result.is_err(), "Should fail with empty scene name");
 }
 
 #[test]

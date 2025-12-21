@@ -393,7 +393,7 @@ mod tests {
         use crate::runtime::words::WordTable;
         use crate::transpiler::WordDefRegistry;
 
-        // Create a test label table
+        // Create a test scene table
         let selector = Box::new(DefaultRandomSelector::new());
         let table = SceneTable::new(selector);
 

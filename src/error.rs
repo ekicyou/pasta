@@ -55,7 +55,7 @@ pub enum PastaError {
     #[error("Function not found: {name}")]
     FunctionNotFound { name: String },
 
-    /// Name conflict error (duplicate label or variable).
+    /// Name conflict error (duplicate scene or variable).
     #[error("Name conflict: '{name}' is already defined as {existing_kind}")]
     NameConflict { name: String, existing_kind: String },
 

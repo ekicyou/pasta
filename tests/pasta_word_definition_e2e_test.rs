@@ -52,7 +52,7 @@ fn test_global_word_definition_e2e() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Test local word definition within a module.
-/// Note: Currently word definitions must be at top-level within a label block,
+/// Note: Currently word definitions must be at top-level within a scene block,
 /// not followed immediately by indented speech lines.
 #[test]
 fn test_local_word_definition_e2e() -> Result<(), Box<dyn std::error::Error>> {

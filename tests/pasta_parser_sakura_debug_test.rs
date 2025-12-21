@@ -11,11 +11,11 @@ fn test_parse_sakura() {
     assert!(result.is_ok(), "Parse failed: {:?}", result.err());
 
     let file = result.unwrap();
-    println!("Parsed {} labels", file.scenes.len());
+    println!("Parsed {} scenes", file.scenes.len());
 
-    for label in &file.scenes {
-        println!("Label: {}", label.name);
-        for stmt in &label.statements {
+    for scene in &file.scenes {
+        println!("Scene: {}", scene.name);
+        for stmt in &scene.statements {
             println!("  Statement: {:?}", stmt);
         }
     }

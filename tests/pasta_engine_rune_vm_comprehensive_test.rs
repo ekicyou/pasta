@@ -70,7 +70,7 @@ fn test_comprehensive_control_flow_rune_compile() {
             println!("   ✓ main.rn (actor definitions) compiled successfully");
             println!("   ✓ __pasta_trans2__ module compiled successfully");
             println!("   ✓ pasta module compiled successfully");
-            println!("   ✓ All label functions (6 labels) compiled successfully");
+            println!("   ✓ All scene functions (6 labels) compiled successfully");
             println!("   ✓ Rune blocks with actor variables resolved successfully");
         }
         Err(e) => {

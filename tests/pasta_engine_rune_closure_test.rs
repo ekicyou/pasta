@@ -97,7 +97,7 @@ fn test_register_function_with_arc_parameter() {
 
     let mut module = Module::with_crate("test_lib").expect("Failed to create module");
 
-    // Register function that takes a string parameter (simulating label parameter)
+    // Register function that takes a string parameter (simulating scene parameter)
     let func = move |label: String| -> i64 {
         let mut state = state_clone.lock().unwrap();
         state.value += 1;

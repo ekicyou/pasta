@@ -40,7 +40,7 @@ pub mod actors {
 "#;
     let combined_code = format!("{}\n\n{}", actors_def, rune_code);
 
-    // Create dummy label table for testing
+    // Create dummy scene table for testing
     let selector = Box::new(pasta::runtime::random::DefaultRandomSelector::new());
     let table = pasta::runtime::scene::SceneTable::new(selector);
     let word_table = create_test_word_table();
@@ -113,7 +113,7 @@ pub mod actors {
 "#;
     let combined_code = format!("{}\n\n{}", actors_def, rune_code);
 
-    // Create dummy label table for testing
+    // Create dummy scene table for testing
     let selector = Box::new(pasta::runtime::random::DefaultRandomSelector::new());
     let table = pasta::runtime::scene::SceneTable::new(selector);
     let word_table = create_test_word_table();

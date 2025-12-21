@@ -167,8 +167,8 @@ impl PastaEngine {
             eprintln!("===============================================");
         }
 
-        // Step 6: Build label table for Rune module (ownership moved to closure)
-        let scene_table = SceneTable::from_label_registry(scene_registry, random_selector)?;
+        // Step 6: Build scene table for Rune module (ownership moved to closure)
+        let scene_table = SceneTable::from_scene_registry(scene_registry, random_selector)?;
 
         // Step 7: Build word table for word expansion (with its own random selector)
         let word_random_selector: Box<dyn RandomSelector> = Box::new(DefaultRandomSelector::new());
@@ -179,7 +179,7 @@ impl PastaEngine {
             PastaError::RuneRuntimeError(format!("Failed to create Rune context: {}", e))
         })?;
 
-        // Install standard library with label table and word table (moved into module)
+        // Install standard library with scene table and word table (moved into module)
         context
             .install(
                 crate::stdlib::create_module(scene_table, word_table).map_err(|e| {
@@ -292,14 +292,14 @@ impl PastaEngine {
             .map_err(|e| PastaError::RuneRuntimeError(format!("Failed to build context: {}", e)))
     }
 
-    /// Execute a label and return all events synchronously.
+    /// Execute a scene and return all events synchronously.
     ///
-    /// This looks up the label (with optional attribute filters), selects one
-    /// if multiple labels match, and executes it to completion, returning all events.
+    /// This looks up the scene (with optional attribute filters), selects one
+    /// if multiple scenes match, and executes it to completion, returning all events.
     ///
     /// # Arguments
     ///
-    /// * `label_name` - The name of the label to execute
+    /// * `label_name` - The name of the scene to execute
     ///
     /// # Returns
     ///
@@ -308,20 +308,20 @@ impl PastaEngine {
     /// # Errors
     ///
     /// Returns an error if:
-    /// - The label is not found
-    /// - No labels match the filters
+    /// - The scene is not found
+    /// - No scenes match the filters
     /// - A runtime error occurs during execution
     pub fn execute_label(&mut self, label_name: &str) -> Result<Vec<ScriptEvent>> {
         self.execute_label_with_filters(label_name, &HashMap::new())
     }
 
-    /// Execute a label with attribute filters and return all events.
+    /// Execute a scene with attribute filters and return all events.
     ///
     /// This is the full version of `execute_label` that accepts filters.
     ///
-    /// Note: After pasta-label-resolution-runtime implementation, label resolution
+    /// Note: After pasta-label-resolution-runtime implementation, scene resolution
     /// is handled by Rune's label_selector at runtime. This method attempts to
-    /// execute the most common label format.
+    /// execute the most common scene format.
     pub fn execute_label_with_filters(
         &mut self,
         label_name: &str,
@@ -420,7 +420,7 @@ impl Drop for PastaEngine {
     ///
     /// This implementation saves:
     /// - Global variables (if variable manager is added in future)
-    /// - Label execution history and caches
+    /// - scene execution history and caches
     ///
     /// Currently, this is a placeholder for Task 5.5 implementation.
     /// Full persistence will be added when VariableManager is integrated
@@ -429,7 +429,7 @@ impl Drop for PastaEngine {
         // TODO: Persist global variables when VariableManager is integrated
         // self.variables.save_to_disk().ok();
 
-        // TODO: Persist label execution history/cache
+        // TODO: Persist scene execution history/cache
         // self.scene_table.save_cache().ok();
 
         // For now, we just log that the engine is being dropped

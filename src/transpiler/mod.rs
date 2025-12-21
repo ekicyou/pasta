@@ -22,7 +22,7 @@ pub struct TranspileContext {
     local_functions: Vec<String>,
     /// List of global function names (standard library + user-defined)
     global_functions: Vec<String>,
-    /// Current module name (sanitized global label name) for word lookup
+    /// Current module name (sanitized global scene name) for word lookup
     current_module: String,
 }
 
@@ -51,7 +51,7 @@ impl TranspileContext {
         ]
     }
 
-    /// Set local functions for the current label scope.
+    /// Set local functions for the current scene scope.
     pub fn set_local_functions(&mut self, functions: Vec<String>) {
         self.local_functions = functions;
     }
@@ -125,22 +125,22 @@ impl Transpiler {
     /// Transpile a Pasta file AST to Rune source code (Pass 1).
     ///
     /// This performs Pass 1 of the two-pass transpilation strategy:
-    /// - Registers all labels in the SceneRegistry
+    /// - Registers all scenes in the SceneRegistry
     /// - Registers all word definitions in the WordDefRegistry
-    /// - Generates Rune modules for each global label
+    /// - Generates Rune modules for each global scene
     /// - Generates function code for labels
     ///
     /// # Arguments
     ///
     /// * `file` - The parsed Pasta file AST
-    /// * `scene_registry` - The label registry for tracking labels across files
+    /// * `scene_registry` - The scene registry for tracking scenes across files
     /// * `word_registry` - The word definition registry for tracking words
     /// * `writer` - Output destination implementing Write trait
     ///
     /// # Notes
     ///
     /// - This can be called multiple times for multiple Pasta files
-    /// - Each call accumulates labels and words in the registries
+    /// - Each call accumulates scenes and words in the registries
     /// - The output does NOT include `mod pasta {}` (generated in Pass 2)
     pub fn transpile_pass1<W: std::io::Write>(
         file: &PastaFile,
@@ -173,7 +173,7 @@ impl Transpiler {
     ///
     /// # Arguments
     ///
-    /// * `registry` - The label registry containing all registered labels
+    /// * `registry` - The scene registry containing all registered labels
     /// * `writer` - Output destination implementing Write trait
     ///
     /// # Notes

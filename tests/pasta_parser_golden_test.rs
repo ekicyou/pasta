@@ -49,10 +49,10 @@ fn golden_test_has_one_global_label() {
         .iter()
         .filter(|l| l.scope == SceneScope::Global)
         .collect();
-    assert_eq!(global_labels.len(), 1, "Expected 1 global label");
+    assert_eq!(global_labels.len(), 1, "Expected 1 global scene");
     assert_eq!(
         global_labels[0].name, "統合テスト",
-        "Global label name mismatch"
+        "Global scene name mismatch"
     );
 }
 
@@ -63,19 +63,19 @@ fn golden_test_has_two_local_scenes() {
         .scenes
         .iter()
         .find(|l| l.scope == SceneScope::Global)
-        .expect("No global label found");
+        .expect("No global scene found");
 
     let local_scenes: Vec<_> = global_label.local_scenes.iter().collect();
-    assert_eq!(local_scenes.len(), 2, "Expected 2 local labels");
+    assert_eq!(local_scenes.len(), 2, "Expected 2 local scenes");
 
     let local_names: Vec<&str> = local_scenes.iter().map(|l| l.name.as_str()).collect();
     assert!(
         local_names.contains(&"選択肢1"),
-        "Missing local label: 選択肢1"
+        "Missing local scene: 選択肢1"
     );
     assert!(
         local_names.contains(&"選択肢2"),
-        "Missing local label: 選択肢2"
+        "Missing local scene: 選択肢2"
     );
 }
 
@@ -89,12 +89,12 @@ fn golden_test_has_three_attributes() {
         .scenes
         .iter()
         .find(|l| l.scope == SceneScope::Global)
-        .expect("No global label found");
+        .expect("No global scene found");
 
-    // Label has author and genre attributes
+    // scene has author and genre attributes
     assert!(
         global_label.attributes.len() >= 2,
-        "Expected at least 2 label attributes, got {}",
+        "Expected at least 2 scene attributes, got {}",
         global_label.attributes.len()
     );
 
@@ -114,7 +114,7 @@ fn golden_test_has_one_rune_block() {
         .scenes
         .iter()
         .find(|l| l.scope == SceneScope::Global)
-        .expect("No global label found");
+        .expect("No global scene found");
 
     let rune_blocks: Vec<_> = global_label
         .statements
@@ -148,7 +148,7 @@ fn golden_test_has_five_variable_assignments() {
         .scenes
         .iter()
         .find(|l| l.scope == SceneScope::Global)
-        .expect("No global label found");
+        .expect("No global scene found");
 
     let var_assigns: Vec<_> = global_label
         .statements
@@ -171,16 +171,16 @@ fn golden_test_has_seven_action_lines() {
         .scenes
         .iter()
         .find(|l| l.scope == SceneScope::Global)
-        .expect("No global label found");
+        .expect("No global scene found");
 
-    // Count speech statements in global label
+    // Count speech statements in global scene
     let alice_speeches: Vec<_> = global_label
         .statements
         .iter()
         .filter(|s| matches!(s, Statement::Speech { speaker, .. } if speaker == "Alice"))
         .collect();
 
-    // Count speech statements in local labels
+    // Count speech statements in local scenes
     let mut bob_speeches = 0;
     for local in &global_label.local_scenes {
         bob_speeches += local
@@ -201,9 +201,9 @@ fn golden_test_has_two_call_statements() {
         .scenes
         .iter()
         .find(|l| l.scope == SceneScope::Global)
-        .expect("No global label found");
+        .expect("No global scene found");
 
-    // Count calls in local labels
+    // Count calls in local scenes
     let mut call_count = 0;
     for local in &global_label.local_scenes {
         call_count += local
@@ -236,7 +236,7 @@ fn golden_test_has_two_word_definitions() {
         .scenes
         .iter()
         .find(|l| l.scope == SceneScope::Global)
-        .expect("No global label found");
+        .expect("No global scene found");
 
     assert_eq!(
         global_label.local_words.len(),
@@ -260,7 +260,7 @@ fn golden_test_detects_sakura_tokens() {
         .scenes
         .iter()
         .find(|l| l.scope == SceneScope::Global)
-        .expect("No global label found");
+        .expect("No global scene found");
 
     // Find the speech line with Sakura tokens
     let sakura_speech = global_label
@@ -310,7 +310,7 @@ fn golden_test_handles_line_continuation() {
         .scenes
         .iter()
         .find(|l| l.scope == SceneScope::Global)
-        .expect("No global label found");
+        .expect("No global scene found");
 
     // Find the multi-line speech (Alice：長い台詞は...)
     let multi_line_speech = global_label
@@ -354,7 +354,7 @@ fn golden_test_handles_at_escape() {
         .scenes
         .iter()
         .find(|l| l.scope == SceneScope::Global)
-        .expect("No global label found");
+        .expect("No global scene found");
 
     // Find the speech line with @@ escape
     let at_escape_speech = global_label
@@ -394,7 +394,7 @@ fn golden_test_parses_english_string_literal() {
         .scenes
         .iter()
         .find(|l| l.scope == SceneScope::Global)
-        .expect("No global label found");
+        .expect("No global scene found");
 
     // Find the variable assignment with English string
     let string_assign = global_label
@@ -421,8 +421,8 @@ fn golden_test_has_no_jump_statements() {
     let file = parse_golden_test().expect("Parse failed");
 
     // Check statements are among supported variants (Jump removed)
-    for label in &file.scenes {
-        for stmt in &label.statements {
+    for scene in &file.scenes {
+        for stmt in &scene.statements {
             assert!(
                 matches!(
                     stmt,
@@ -431,12 +431,12 @@ fn golden_test_has_no_jump_statements() {
                         | Statement::VarAssign { .. }
                         | Statement::RuneBlock { .. }
                 ),
-                "Found unsupported statement variant in global label"
+                "Found unsupported statement variant in global scene"
             );
         }
 
-        // Check local label statements
-        for local in &label.local_scenes {
+        // Check local scene statements
+        for local in &scene.local_scenes {
             for stmt in &local.statements {
                 assert!(
                     matches!(
@@ -446,7 +446,7 @@ fn golden_test_has_no_jump_statements() {
                             | Statement::VarAssign { .. }
                             | Statement::RuneBlock { .. }
                     ),
-                    "Found unsupported statement variant in local label"
+                    "Found unsupported statement variant in local scene"
                 );
             }
         }

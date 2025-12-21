@@ -75,11 +75,11 @@ fn test_two_pass_transpiler_to_string() {
     Transpiler::transpile_pass1(&ast, &mut scene_registry, &mut word_registry, &mut buffer).unwrap();
     let mut output = String::from_utf8(buffer).unwrap();
 
-    // Verify labels are registered
-    let labels = scene_registry.all_scenes();
-    assert_eq!(labels.len(), 2);
-    assert_eq!(labels[0].name, "会話");
-    assert_eq!(labels[1].name, "別会話");
+    // Verify scenes are registered
+    let scenes = scene_registry.all_scenes();
+    assert_eq!(scenes.len(), 2);
+    assert_eq!(scenes[0].name, "会話");
+    assert_eq!(scenes[1].name, "別会話");
 
     // Pass 2
     let mut buffer = Vec::new();
@@ -90,7 +90,7 @@ fn test_two_pass_transpiler_to_string() {
 
     println!("Full output:\n{}", output);
 
-    // Verify both labels in __pasta_trans2__ module (function pointers)
+    // Verify both scenes in __pasta_trans2__ module (function pointers)
     assert!(output.contains("1 => crate::会話_1::__start__,"));
     assert!(output.contains("2 => crate::別会話_1::__start__,"));
 
@@ -160,7 +160,7 @@ fn test_multiple_files_simulation() {
     assert!(final_output.contains("pub mod メイン_1"));
     assert!(final_output.contains("pub mod サブ_1"));
 
-    // __pasta_trans2__ module should have both labels (function pointers)
+    // __pasta_trans2__ module should have both scenes (function pointers)
     assert!(final_output.contains("1 => crate::メイン_1::__start__,"));
     assert!(final_output.contains("2 => crate::サブ_1::__start__,"));
 

@@ -1,4 +1,4 @@
-// Phase 3: 基本的なcall/jump/local label テスト
+// Phase 3: 基本的なcall/jump/local scene テスト
 
 use pasta::parser::parse_str;
 use pasta::transpiler::Transpiler;
@@ -21,11 +21,11 @@ fn test_global_and_local_scenes() {
 
     println!("=== Transpiled ===\n{}", result);
 
-    // Global label module
+    // Global scene module
     assert!(result.contains("pub mod メイン_1"));
     assert!(result.contains("pub fn __start__(ctx, args)"));
 
-    // Local labels
+    // local scenes
     assert!(result.contains("pub fn 選択肢１_1(ctx, args)"));
     assert!(result.contains("pub fn 選択肢２_1(ctx, args)"));
 

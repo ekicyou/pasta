@@ -116,7 +116,7 @@ fn parse_global_scene(pair: Pair<Rule>) -> Result<SceneDef, PastaError> {
         match inner_pair.as_rule() {
             Rule::label_name => {
                 name = inner_pair.as_str().to_string();
-                // Validate reserved label pattern: __*__ is reserved for system use
+                // Validate reserved scene pattern: __*__ is reserved for system use
                 if name.starts_with("__") && name.ends_with("__") {
                     return Err(PastaError::ParseError {
                         file: "<input>".to_string(),
@@ -124,7 +124,7 @@ fn parse_global_scene(pair: Pair<Rule>) -> Result<SceneDef, PastaError> {
                         column: start.1,
                         message: format!(
                             "Label name '{}' is reserved for system use. \
-                            Label names starting and ending with '__' are not allowed. \
+                            scene names starting and ending with '__' are not allowed. \
                             Consider using '{}' or '_{}_' instead.",
                             name,
                             name.trim_start_matches('_').trim_end_matches('_'),
@@ -218,7 +218,7 @@ fn parse_local_scene_content(pair: Pair<Rule>) -> Result<SceneDef, PastaError> {
         match inner_pair.as_rule() {
             Rule::label_name => {
                 name = inner_pair.as_str().to_string();
-                // Validate reserved label pattern: __*__ is reserved for system use
+                // Validate reserved scene pattern: __*__ is reserved for system use
                 if name.starts_with("__") && name.ends_with("__") {
                     return Err(PastaError::ParseError {
                         file: "<input>".to_string(),
@@ -226,7 +226,7 @@ fn parse_local_scene_content(pair: Pair<Rule>) -> Result<SceneDef, PastaError> {
                         column: start.1,
                         message: format!(
                             "Label name '{}' is reserved for system use. \
-                            Label names starting and ending with '__' are not allowed. \
+                            scene names starting and ending with '__' are not allowed. \
                             Consider using '{}' or '_{}_' instead.",
                             name,
                             name.trim_start_matches('_').trim_end_matches('_'),

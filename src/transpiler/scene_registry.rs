@@ -1,7 +1,7 @@
-//! Label registry for tracking labels and assigning unique IDs during transpilation.
+//! scene registry for tracking scenes and assigning unique IDs during transpilation.
 //!
 //! This module implements the two-pass transpiler strategy:
-//! - Pass 1: Collect all labels from PastaFile(s) and assign unique IDs
+//! - Pass 1: Collect all scenes from PastaFile(s) and assign unique IDs
 //! - Pass 2: Generate `mod pasta {}` with ID→function path mapping
 
 use std::collections::HashMap;
@@ -12,10 +12,10 @@ pub struct SceneInfo {
     /// Unique numeric ID (starting from 1).
     pub id: i64,
 
-    /// Original label name (without counter suffix).
+    /// Original scene name (without counter suffix).
     pub name: String,
 
-    /// Attributes associated with this label (for future P1 filtering).
+    /// Attributes associated with this scene (for future P1 filtering).
     pub attributes: HashMap<String, String>,
 
     /// Full Rune function path (e.g., "crate::会話_1::__start__").
@@ -24,18 +24,18 @@ pub struct SceneInfo {
     /// Module/function name without "crate::" prefix (e.g., "会話_1::__start__").
     pub fn_name: String,
 
-    /// Parent label name (for local labels only, None for global labels).
+    /// Parent scene name (for local scenes only, None for global scenes).
     pub parent: Option<String>,
 }
 
-/// Label registry for managing label collection and ID assignment.
+/// scene registry for managing scene collection and ID assignment.
 ///
 /// # Design Notes
 ///
-/// - **P0 Implementation**: No duplicate label names, all labels get `_1` suffix
+/// - **P0 Implementation**: No duplicate scene names, all scenes get `_1` suffix
 /// - **P1 Implementation**: Handle duplicate names with sequential counters (`_1`, `_2`, ...)
 /// - IDs start from 1 and increment sequentially
-/// - Each label gets a unique ID even if names are the same
+/// - Each scene gets a unique ID even if names are the same
 pub struct SceneRegistry {
     /// All registered labels, indexed by ID.
     labels: HashMap<i64, SceneInfo>,
@@ -43,14 +43,14 @@ pub struct SceneRegistry {
     /// Counter for assigning the next unique ID.
     next_id: i64,
 
-    /// Counter for tracking duplicate label names (name → counter).
+    /// Counter for tracking duplicate scene names (name → counter).
     /// P0: Always returns 1 (no duplicates expected).
     /// P1: Increments for each duplicate.
     name_counters: HashMap<String, usize>,
 }
 
 impl SceneRegistry {
-    /// Create a new label registry.
+    /// Create a new scene registry.
     pub fn new() -> Self {
         Self {
             labels: HashMap::new(),
@@ -59,11 +59,11 @@ impl SceneRegistry {
         }
     }
 
-    /// Register a global label.
+    /// Register a global scene.
     ///
     /// # Arguments
     ///
-    /// * `name` - Original label name (without scope prefix)
+    /// * `name` - Original scene name (without scope prefix)
     /// * `attributes` - Attributes for filtering (P1 feature)
     ///
     /// # Returns
@@ -94,12 +94,12 @@ impl SceneRegistry {
         (id, counter)
     }
 
-    /// Register a local label.
+    /// Register a local scene.
     ///
     /// # Arguments
     ///
-    /// * `name` - Original label name (without scope prefix)
-    /// * `parent_name` - Parent global label name
+    /// * `name` - Original scene name (without scope prefix)
+    /// * `parent_name` - Parent global scene name
     /// * `parent_counter` - Parent's counter value
     /// * `attributes` - Attributes for filtering (P1 feature)
     ///
@@ -113,13 +113,13 @@ impl SceneRegistry {
         parent_counter: usize,
         attributes: HashMap<String, String>,
     ) -> (i64, usize) {
-        // For local labels, the full name includes parent for uniqueness
+        // For local scenes, the full name includes parent for uniqueness
         let full_name = format!("{}::{}", parent_name, name);
         let counter = self.increment_counter(&full_name);
         let id = self.next_id;
         self.next_id += 1;
 
-        // Local label function path: parent module + local function
+        // Local scene function path: parent module + local function
         // Format: crate::親_番号::子_番号
         let fn_name = format!(
             "{}_{}::{}_{}",
@@ -160,14 +160,14 @@ impl SceneRegistry {
         self.labels.iter()
     }
 
-    /// Increment the counter for a label name and return the new value.
+    /// Increment the counter for a scene name and return the new value.
     fn increment_counter(&mut self, name: &str) -> usize {
         let counter = self.name_counters.entry(name.to_string()).or_insert(0);
         *counter += 1;
         *counter
     }
 
-    /// Sanitize a label name for use in Rune identifiers.
+    /// Sanitize a scene name for use in Rune identifiers.
     ///
     /// Replaces any character that is not alphanumeric or underscore with underscore.
     /// This is used by both SceneRegistry and WordDefRegistry for consistent naming.
@@ -194,10 +194,10 @@ mod tests {
         assert_eq!(id1, 1);
         assert_eq!(counter1, 1);
 
-        let label = registry.get_scene(id1).unwrap();
-        assert_eq!(label.name, "会話");
-        assert_eq!(label.fn_path, "crate::会話_1::__start__");
-        assert_eq!(label.parent, None);
+        let scene = registry.get_scene(id1).unwrap();
+        assert_eq!(scene.name, "会話");
+        assert_eq!(scene.fn_path, "crate::会話_1::__start__");
+        assert_eq!(scene.parent, None);
     }
 
     #[test]
@@ -210,10 +210,10 @@ mod tests {
         assert_eq!(id1, 1);
         assert_eq!(id2, 2);
 
-        let labels = registry.all_scenes();
-        assert_eq!(labels.len(), 2);
-        assert_eq!(labels[0].name, "会話");
-        assert_eq!(labels[1].name, "別会話");
+        let scenes = registry.all_scenes();
+        assert_eq!(scenes.len(), 2);
+        assert_eq!(scenes[0].name, "会話");
+        assert_eq!(scenes[1].name, "別会話");
     }
 
     #[test]
@@ -242,7 +242,7 @@ mod tests {
         // Register parent first
         let (parent_id, parent_counter) = registry.register_global("会話", HashMap::new());
 
-        // Register local label
+        // Register local scene
         let (local_id, local_counter) =
             registry.register_local("選択肢", "会話", parent_counter, HashMap::new());
 
@@ -253,7 +253,7 @@ mod tests {
         let local_label = registry.get_scene(local_id).unwrap();
         assert_eq!(local_label.name, "選択肢");
         assert_eq!(local_label.parent, Some("会話".to_string()));
-        // Local label function is in parent module: crate::親_番号::子名_番号
+        // Local scene function is in parent module: crate::親_番号::子名_番号
         assert_eq!(local_label.fn_path, "crate::会話_1::選択肢_1");
     }
 

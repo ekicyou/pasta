@@ -14,7 +14,7 @@ pub trait RandomSelector: Send + Sync {
     /// Select a random index from 0..len.
     fn select_index(&mut self, len: usize) -> Option<usize>;
 
-    /// Shuffle a vec of usize in-place (for label IDs).
+    /// Shuffle a vec of usize in-place (for scene IDs).
     fn shuffle_usize(&mut self, items: &mut [usize]);
 }
 

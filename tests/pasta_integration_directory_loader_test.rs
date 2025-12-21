@@ -41,7 +41,7 @@ fn test_from_directory_success() {
 
     let mut engine = engine.unwrap();
 
-    // Verify labels by executing them
+    // Verify scenes by executing them
     let result = engine.execute_label("挨拶");
     assert!(result.is_ok(), "Should be able to execute 挨拶 label");
 
@@ -157,7 +157,7 @@ fn test_multiple_labels_random_selection() {
     let mut engine =
         PastaEngine::new(&script_path, &persistence_path).expect("Engine should initialize");
 
-    // Execute the same label multiple times
+    // Execute the same scene multiple times
     // With 3 definitions, at least one should be selected
     let mut results = Vec::new();
     for _ in 0..10 {
