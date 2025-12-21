@@ -123,12 +123,12 @@ fn transpile_exprs_to_args(
 
 #### Rune VM側（変更不要と仮定）
 - `pasta::call(ctx, scene, filters, args)` - 第4引数はタプルとして受け取る設計を想定
-- `pasta_stdlib::word(module, key, args)` - 第3引数はタプルとして受け取る設計を想定
+- アクション行の関数: `function_name(ctx, args)` - 第2引数はタプルとして受け取る設計を想定
 
 #### テストの依存性
-- **3ファイルが影響を受ける**:
-  1. `pasta_transpiler_word_code_gen_test.rs` - 3箇所の期待値文字列
-  2. その他のトランスパイラーテスト（要確認）
+- **複数ファイルが影響を受ける**:
+  1. `pasta_transpiler_word_code_gen_test.rs` - 期待値文字列の更新
+  2. その他のトランスパイラーテスト（要grep検索で特定）
 
 ---
 
@@ -138,12 +138,10 @@ fn transpile_exprs_to_args(
 
 | 要件 | 現在の状態 | ギャップ | 実装難易度 |
 |------|-----------|---------|-----------|
-| Req 1.1-1.4: Call文のタプル変換 | 配列`[]`を使用 | 文字列置換のみ | **低** |
-| Req 1.5: 動的・静的両対応 | 両方で配列使用 | 両方で文字列置換 | **低** |
-| Req 2.1-2.2: 単語展開のタプル変換 | 空配列`[]`を使用 | 空タプル`()`に置換 | **低** |
-| Req 3.1-3.4: `transpile_exprs_to_args`修正 | カンマ区切り文字列返す | 1個の引数に末尾カンマ追加 | **中** |
-| Req 4.1-4.3: 後方互換性 | 全テスト合格 | テスト期待値を更新 | **中** |
-| Req 5.1-5.2: ドキュメント更新 | コメントに配列リテラル例 | タプルリテラル例に更新 | **低** |
+| Req 1.1-1.6: Call文・アクション行のタプル変換 | 配列`[]`を使用 | 文字列置換とロジック修正 | **中** |
+| Req 2.1-2.4: `transpile_exprs_to_args`修正 | カンマ区切り文字列返す | 1個の引数に末尾カンマ追加 | **中** |
+| Req 3.1-3.3: 後方互換性 | 全テスト合格 | テスト期待値を更新 | **中** |
+| Req 4.1-4.2: ドキュメント更新 | コメントに配列リテラル例 | タプルリテラル例に更新 | **低** |
 
 ### 2.2 検証済みの前提条件
 
@@ -189,7 +187,7 @@ test test_rune_zero_element_tuple ... ok
 - **`src/transpiler/mod.rs`**:
   - L424: 動的Call文の配列→タプル
   - L433: 静的Call文の配列→タプル
-  - L516: 単語展開の配列→タプル
+  - L507-520: アクション行の関数呼び出し（バグ修正）
   - L546-555: `transpile_exprs_to_args`にタプル生成ロジック追加
 
 #### 変更の詳細
@@ -230,15 +228,23 @@ writeln!(
 )
 ```
 
-**Step 3: 単語展開の修正**
+**Step 3: アクション行の関数呼び出し修正**
 ```rust
-// L516
-writeln!(
-    writer,
-    "        yield Talk(pasta_stdlib::word(\"{}\", \"{}\", ()));",
-    context.current_module(),
-    name
-)
+// L507-520（バグ修正）
+SpeechPart::FuncCall { name, args, scope } => {
+    let args_str = Self::transpile_exprs_to_args(args, &context)?;
+    let function_call = match scope {
+        FunctionScope::Auto => {
+            let resolved_name = context.resolve_function(name, *scope)?;
+            format!("{}(ctx, ({}))", resolved_name, args_str)
+        }
+        FunctionScope::GlobalOnly => {
+            format!("super::{}(ctx, ({}))", name, args_str)
+        }
+    };
+    writeln!(writer, "        for a in {} {{ yield a; }}", function_call)
+        .map_err(|e| PastaError::io_error(e.to_string()))?;
+}
 ```
 
 #### 後方互換性評価
@@ -362,11 +368,10 @@ writeln!(
 
 | 要件 | 現在の資産 | ギャップ | タグ |
 |------|-----------|---------|------|
-| Req 1: Call文のタプル変換 | `src/transpiler/mod.rs` L424, L433 | 配列`[]`→タプル`()`文字列置換 | **修正必要** |
-| Req 2: 単語展開のタプル変換 | `src/transpiler/mod.rs` L516 | 空配列`[]`→空タプル`()`文字列置換 | **修正必要** |
-| Req 3: ヘルパー関数修正 | `src/transpiler/mod.rs` L546-555 | 1個の引数に末尾カンマ追加ロジック | **拡張必要** |
-| Req 4: 後方互換性 | 既存テスト | 期待値文字列の更新 | **更新必要** |
-| Req 5: ドキュメント | コード内コメント | タプル例への更新 | **更新必要** |
+| Req 1: Call文・アクション行のタプル変換 | `src/transpiler/mod.rs` L424, L433, L507-520 | 配列`[]`→タプル`()`置換 + バグ修正 | **修正必要** |
+| Req 2: ヘルパー関数修正 | `src/transpiler/mod.rs` L546-555 | 1個の引数に末尾カンマ追加ロジック | **拡張必要** |
+| Req 3: 後方互換性 | 既存テスト | 期待値文字列の更新 | **更新必要** |
+| Req 4: ドキュメント | コード内コメント | タプル例への更新 | **更新必要** |
 
 ### ✅ Options A/B/C with Rationale
 
@@ -376,8 +381,8 @@ writeln!(
 
 ### ✅ Effort & Risk
 
-- **Effort**: **S（1-3日）** - 既存パターン活用、依存少、統合容易
-- **Risk**: **Low（低）** - 技術確立済み、スコープ明確、テストカバレッジあり
+- **Effort**: **M（3-5日）** - 文字列置換に加え、アクション行の関数呼び出しロジック修正が必要
+- **Risk**: **Medium（中）** - L507-520のバグ修正により既存動作が変わるため、慎重なテストが必要
 
 ### ✅ Recommendations
 
