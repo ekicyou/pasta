@@ -37,10 +37,10 @@ pub mod メイン_1 {
         ctx.actor = うにゅう;
         yield Actor(ctx.actor.name);
         yield Talk("やっほー。");
-        for a in crate::pasta::call(ctx, "自己紹介", #{}, []) { yield a; }
+        for a in crate::pasta::call(ctx, "自己紹介", #{}, ()) { yield a; }
         ctx.local.カウンタ = 1;
-        for a in crate::pasta::call(ctx, "カウント表示", #{}, [ctx.local.カウンタ]) { yield a; }
-        for a in crate::pasta::call(ctx, "会話分岐", #{}, []) { yield a; }
+        for a in crate::pasta::call(ctx, "カウント表示", #{}, (ctx.local.カウンタ,)) { yield a; }
+        for a in crate::pasta::call(ctx, "会話分岐", #{}, ()) { yield a; }
     }
     pub fn 自己紹介_1(ctx, args) {
         ctx.actor = さくら;
@@ -49,7 +49,7 @@ pub mod メイン_1 {
         ctx.actor = うにゅう;
         yield Actor(ctx.actor.name);
         yield Talk("僕はうにゅうだよ。");
-        for a in crate::pasta::call(ctx, "趣味紹介", #{}, []) { yield a; }
+        for a in crate::pasta::call(ctx, "趣味紹介", #{}, ()) { yield a; }
     }
 
     pub fn 趣味紹介_1(ctx, args) {
@@ -78,7 +78,7 @@ pub mod メイン_1 {
         ctx.actor = うにゅう;
         yield Actor(ctx.actor.name);
         yield Talk("そうだね。");
-        for a in crate::pasta::call(ctx, "別の話題", #{}, []) { yield a; }
+        for a in crate::pasta::call(ctx, "別の話題", #{}, ()) { yield a; }
     }
 
     pub fn 別の話題_1(ctx, args) {
