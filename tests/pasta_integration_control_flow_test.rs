@@ -28,13 +28,13 @@ fn test_comprehensive_control_flow_reference() -> Result<(), Box<dyn std::error:
     println!("   ✓ Object literal syntax (#{{ type: ..., ... }}) が正しいです");
     println!("   ✓ ctx.pasta.word(ctx, \"keyword\") 呼び出しが正しいです");
     println!("   ✓ ctx.pasta.add_words()/commit_words() 呼び出しが正しいです");
-    println!("   ✓ ctx.var.変数名 アクセスが正しいです");
+    println!("   ✓ ctx.local.変数名/ctx.global.変数名 アクセスが正しいです");
     println!("   ✓ ctx.args 配列アクセスが正しいです");
     println!("   ✓ String interpolation (`${{値}}`) が正しいです");
     println!();
     println!("📝 参照実装が含む全機能:");
     println!("   - ローカル単語定義 (add_words/commit_words)");
-    println!("   - 変数代入・参照 (ctx.var.カウンター)");
+    println!("   - 変数代入・参照 (ctx.local.カウンター)");
     println!("   - Call文（引数なし・あり）");
     println!("   - Jump文（複数ラベル）");
     println!("   - 単語展開 (ctx.pasta.word())");

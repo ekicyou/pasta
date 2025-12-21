@@ -224,7 +224,7 @@ fn phase1_success_inline_variable_reference() {
         if let pasta::parser::Statement::Speech { content, .. } = speech {
             let has_var_ref = content
                 .iter()
-                .any(|p| matches!(p, pasta::parser::SpeechPart::VarRef(_)));
+                .any(|p| matches!(p, pasta::parser::SpeechPart::VarRef { .. }));
 
             if has_var_ref {
                 eprintln!("SUCCESS: Variable reference detected in speech content");

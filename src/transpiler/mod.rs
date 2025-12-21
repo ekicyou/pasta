@@ -401,16 +401,41 @@ impl Transpiler {
                 args,
                 span: _,
             } => {
-                // Generate call statement: for a in crate::pasta::call(ctx, "scene", #{}, [args]) { yield a; }
-                let search_key = Self::transpile_jump_target_to_search_key(target);
+                // Generate call statement: for a in crate::pasta::call(ctx, scene, #{}, [args]) { yield a; }
                 let args_str = Self::transpile_exprs_to_args(args, &context)?;
                 let filters_str = Self::transpile_attributes_to_map(filters);
-                writeln!(
-                    writer,
-                    "        for a in crate::pasta::call(ctx, \"{}\", {}, [{}]) {{ yield a; }}",
-                    search_key, filters_str, args_str
-                )
-                .map_err(|e| PastaError::io_error(e.to_string()))?;
+
+                // Task 7.1, 7.2: Handle dynamic targets with template literals
+                match target {
+                    JumpTarget::Dynamic(var_name) => {
+                        // Parse variable reference to determine scope
+                        // Format: "$変数" for local, "$*変数" for global
+                        let (scope_str, name) =
+                            if var_name.starts_with('*') || var_name.starts_with('＊') {
+                                (
+                                    "global",
+                                    var_name.trim_start_matches(|c| c == '*' || c == '＊'),
+                                )
+                            } else {
+                                ("local", var_name.as_str())
+                            };
+                        writeln!(
+                            writer,
+                            "        for a in crate::pasta::call(ctx, `${{ctx.{}.{}}}`, {}, [{}]) {{ yield a; }}",
+                            scope_str, name, filters_str, args_str
+                        )
+                        .map_err(|e| PastaError::io_error(e.to_string()))?;
+                    }
+                    _ => {
+                        let search_key = Self::transpile_jump_target_to_search_key(target);
+                        writeln!(
+                            writer,
+                            "        for a in crate::pasta::call(ctx, \"{}\", {}, [{}]) {{ yield a; }}",
+                            search_key, filters_str, args_str
+                        )
+                        .map_err(|e| PastaError::io_error(e.to_string()))?;
+                    }
+                }
             }
             Statement::VarAssign {
                 name,
@@ -421,11 +446,13 @@ impl Transpiler {
                 let value_expr = Self::transpile_expr(value, &context)?;
                 match scope {
                     VarScope::Local => {
-                        writeln!(writer, "        let {} = {};", name, value_expr)
+                        // Task 4.1: Local variable assignment using ctx.local
+                        writeln!(writer, "        ctx.local.{} = {};", name, value_expr)
                             .map_err(|e| PastaError::io_error(e.to_string()))?;
                     }
                     VarScope::Global => {
-                        writeln!(writer, "        ctx.var.{} = {};", name, value_expr)
+                        // Task 4.2: Global variable assignment using ctx.global
+                        writeln!(writer, "        ctx.global.{} = {};", name, value_expr)
                             .map_err(|e| PastaError::io_error(e.to_string()))?;
                     }
                 }
@@ -464,9 +491,18 @@ impl Transpiler {
                 )
                 .map_err(|e| PastaError::io_error(e.to_string()))?;
             }
-            SpeechPart::VarRef(var_name) => {
-                writeln!(writer, "        yield Talk(`${{ctx.var.{}}}`);", var_name)
-                    .map_err(|e| PastaError::io_error(e.to_string()))?;
+            SpeechPart::VarRef { name, scope } => {
+                // Task 5.1, 5.2: Variable reference using template literal with ctx.local/ctx.global
+                let scope_str = match scope {
+                    VarScope::Local => "local",
+                    VarScope::Global => "global",
+                };
+                writeln!(
+                    writer,
+                    "        yield Talk(`${{ctx.{}.{}}}`);",
+                    scope_str, name
+                )
+                .map_err(|e| PastaError::io_error(e.to_string()))?;
             }
             SpeechPart::FuncCall {
                 name,
@@ -501,7 +537,8 @@ impl Transpiler {
             JumpTarget::Local(name) => name.clone(),
             JumpTarget::Global(name) => name.clone(),
             JumpTarget::LongJump { global, local } => format!("{}::{}", global, local),
-            JumpTarget::Dynamic(var_name) => format!("@{}", var_name),
+            // Task 8.1: Dynamic targets are now handled separately with template literals
+            JumpTarget::Dynamic(var_name) => var_name.clone(),
         }
     }
 
@@ -717,10 +754,15 @@ impl Transpiler {
                     Self::escape_string(text)
                 ));
             }
-            SpeechPart::VarRef(var_name) => {
+            SpeechPart::VarRef { name, scope } => {
+                // Use template literal with ctx.local/ctx.global
+                let scope_str = match scope {
+                    VarScope::Local => "local",
+                    VarScope::Global => "global",
+                };
                 output.push_str(&format!(
-                    "    yield emit_text(&format!(\"{{}}\", get_variable(\"{}\")));\n",
-                    var_name
+                    "    yield emit_text(`${{ctx.{}.{}}}`);\n",
+                    scope_str, name
                 ));
             }
             SpeechPart::FuncCall { name, args, scope } => {
@@ -775,8 +817,9 @@ impl Transpiler {
         match expr {
             Expr::Literal(lit) => Ok(Self::transpile_literal(lit)),
             Expr::VarRef { name, scope } => match scope {
-                VarScope::Local => Ok(name.clone()),
-                VarScope::Global => Ok(format!("get_global(\"{}\")", name)),
+                // Task 4.1, 4.2: Use ctx.local/ctx.global for variable references
+                VarScope::Local => Ok(format!("ctx.local.{}", name)),
+                VarScope::Global => Ok(format!("ctx.global.{}", name)),
             },
             Expr::FuncCall { name, args, scope } => {
                 // Resolve function name using scope rules
