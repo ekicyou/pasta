@@ -1,17 +1,18 @@
 {
     "feature_name": "word-reference-whitespace-handling",
     "created_at": "2025-12-21T00:00:00Z",
-    "updated_at": "2025-12-21T00:00:00Z",
+    "updated_at": "2025-12-21T10:00:00Z",
     "language": "ja",
-    "phase": "requirements-generated",
+    "phase": "design-approved",
     "approvals": {
         "requirements": {
             "generated": true,
-            "approved": false
+            "approved": true
         },
         "design": {
-            "generated": false,
-            "approved": false
+            "generated": true,
+            "approved": true,
+            "reviewed_at": "2025-12-21T10:00:00Z"
         },
         "tasks": {
             "generated": false,
