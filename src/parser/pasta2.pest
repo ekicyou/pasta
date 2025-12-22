@@ -53,7 +53,7 @@ call_marker    = _{ gt }
 var_marker     = _{ dollar }
 word_marker    = _{ at }
 fn_marker      = _{ at }
-comma_sep     = _{ s ~ comma ~ s }
+comma_sep      = _{ s ~ comma ~ s }
 
 // ################################################# expr
 expr   = _{ term ~ s ~ bin* }
@@ -150,7 +150,7 @@ call_scene_global =  { call_marker ~ global_marker ~ id ~ s ~ args? }
 scene = _{ id ~ s ~ attrs? }
 
 // ################################################# action
-action  =_{ at_escape | dollar_escape | fn_call | word_ref | var_ref | talk }
+action  =_{ at_escape | dollar_escape | sakura_escape | fn_call | word_ref | var_ref | sakura_script | talk }
 actions = { action+ }
 
 word_ref        =_{ word_ref_global | word_ref_local }
@@ -159,8 +159,24 @@ word_ref_global = { word_marker ~ global_marker ~ id ~ s }
 
 at_escape     = @{ at{2} }
 dollar_escape = @{ dollar{2} }
-talk_word = _{ !(at | dollar | eol) ~ ANY }
+sakura_escape = @{ sakura_marker{2} }
+talk_word = _{ !(at | dollar | sakura_marker | eol) ~ ANY }
 talk      = @{ talk_word+ }
+
+// ################################################# sakura_script
+sakura_script = @{ sakura_marker ~ sakura_id ~ sakura_args? }
+sakura_id     = @{ (('a'..'z') | ('A'..'Z') | ('0'..'9') | "_" )+ }
+sakura_args   =  { sakura_open ~ sakura_body ~ sakura_close }
+sakura_open   = _{ "[" ~ PUSH_LITERAL("]") }
+sakura_body   = @{ ( sakura_str | (!PEEK ~ ANY) )* }
+sakura_close  = _{ POP }
+
+sakura_str       =  { sakura_str_open ~ sakura_str_body ~ sakura_str_close }
+sakura_str_open  = _{ PUSH("\"") }
+sakura_str_body  = @{ ( PEEK{2} | (!PEEK ~ ANY) )* }
+sakura_str_close = _{ POP }
+
+sakura_marker     = _{ "\\" }
 
 // ################################################# eol
 eol             = _{ NEWLINE }
