@@ -263,25 +263,16 @@
 **対応**: SPECIFICATION.md 1.3節「式の制約」を「式（Expression）のサポート」に改名し、expr, term, bin, bin_op規則を詳細説明に変更。既存の2.7節「演算子」セクション参照を追加
 **影響**: Requirement 7 AC 1-8（式説明）が自動的に満たされる
 
-### 6.1 括弧形式の確定 (Research Needed)
-- **現状**: comprehensive_control_flow2.pasta で全角括弧（）を使用
-- **pasta2.pest**: `lparen = "（" | "("` で両対応を定義
+### 6.3 括弧形式の確定 (Pending)
+- **現状**: comprehensive_control_flow2.pasta で全角括弧（）を使用。pasta2.pest は両対応（`lparen = "（" | "("`)
 - **確認項目**:
-  - パーサーでの実装状況（全角括弧の扱い）
-  - トランスパイラーでの対応状況
-  - 既存テストでの括弧形式
+  - Call文引数括弧は全角（）と半角()のどちらを推奨するか？
+  - パーサー・トランスパイラーでの実装状況
 
-### 6.2 グローバル参照の詳細仕様 (Research Needed)
-- **現状**: pasta2.pest で `var_ref_global`, `word_ref_global`, `call_scene_global` が定義されているが、仕様説明が不足
-- **確認項目**:
-  - グローバル参照は実装済みか、計画中か
-  - ローカル参照との差別化点（$var vs $*var の実意）
-  - 使用例（テストコード等）
-
-### 6.3 Run コンテンツ検証 (Research Needed)
+### 6.4 Rune コンテンツ検証 (Pending)
 - **現状**: comprehensive_control_flow2.pasta 末尾のRuneブロックが空
 - **確認項目**:
-  - 有効な関数定義を追加する場合、どのような関数を例示するか
+  - 有効な関数定義例を追加すべきか、あるいは空でよいか？
 
 ---
 

@@ -36,7 +36,7 @@
 8. When SPECIFICATION.mdの属性セクションを読む場合、the SPECIFICATION.md shall pasta2.pestのattr, key_attr, attr_value規則と一致する
 9. When SPECIFICATION.mdのシーン定義セクションを読む場合、the SPECIFICATION.md shall pasta2.pestのglobal_scene_line, local_scene_line, scene規則と一致する
 10. When SPECIFICATION.mdのアクション行セクションを読む場合、the SPECIFICATION.md shall pasta2.pestのaction_line, continue_action_line, actions, action規則と一致する
-11. When SPECIFICATION.mdのCall文セクションを読む場合、the SPECIFICATION.md shall pasta2.pestのcall_scene, call_scene_local, call_scene_global規則と一致する
+11. When SPECIFICATION.mdのCall文セクションを読む場合、the SPECIFICATION.md shall pasta2.pestのcall_scene規則と一致する ✅ **[AC 11修正] call_scene_globalは存在しないため、ローカル・グローバル兼用の call_scene のみ説明**
 12. When SPECIFICATION.mdのさくらスクリプトセクションを読む場合、the SPECIFICATION.md shall pasta2.pestのsakura_script, sakura_marker（半角\\のみ）規則と一致する
 13. When SPECIFICATION.mdのRuneコードブロックセクションを読む場合、the SPECIFICATION.md shall pasta2.pestのcode_block, code_open, code_contents, code_close規則と一致する
 14. When SPECIFICATION.mdのスコープ構造セクションを読む場合、the SPECIFICATION.md shall pasta2.pestのfile_scope, global_scene_scope, local_scene_scope規則と一致する
@@ -51,7 +51,7 @@
 1. When GRAMMAR.mdのマーカー一覧を参照する場合、the GRAMMAR.md shall pasta2.pestで定義されたマーカーの全角/半角両対応を正確に示す
 2. When GRAMMAR.mdのシーン定義セクションを読む場合、the GRAMMAR.md shall pasta2.pestのglobal_scene_line, local_scene_line構文に従った例を提供する
 3. When GRAMMAR.mdのアクション行の説明を読む場合、the GRAMMAR.md shall pasta2.pestのaction_line, continue_action_line構文に従った例を提供する
-4. When GRAMMAR.mdの変数セクションを読む場合、the GRAMMAR.md shall pasta2.pestのvar_set（ローカル/グローバル）構文に従った例を提供する
+4. When GRAMMAR.mdの変数セクションを読む場合、the GRAMMAR.md shall pasta2.pestのvar_ref（ローカル/グローバル）、var_set構文に従った例を提供する ✅ **[AC 4修正] $var（ローカル）vs $*var（グローバル）の例を提供**
 5. When GRAMMAR.mdの単語定義と参照セクションを読む場合、the GRAMMAR.md shall pasta2.pestのword_ref, key_words構文に従った例を提供する
 6. When GRAMMAR.mdの関数呼び出しセクションを読む場合、the GRAMMAR.md shall pasta2.pestのfn_call, args構文に従った例を提供する
 7. When GRAMMAR.mdのさくらスクリプトセクションを読む場合、the GRAMMAR.md shall sakura_marker（半角\\のみ）を正確に説明し、全角\\は使用不可と明記する
@@ -108,17 +108,17 @@
 ---
 
 ### Requirement 7: 新規構文の完全反映
-**Objective:** 開発者として、pasta2.pestで新たに定義された構文要素（式のサポート、グローバル変数・関数呼び出し等）がすべてのドキュメントに正確に記載されるようにしたい。
+**Objective:** 開発者として、pasta2.pestで新たに定義された構文要素（式のサポート、グローバル変数等）がすべてのドキュメントに正確に記載されるようにしたい。
 
 #### Acceptance Criteria
-1. When SPECIFICATION.mdの式（Expression）セクションを読む場合、the SPECIFICATION.md shall pasta2.pestのexpr, term, bin, bin_op規則を詳細に説明する ✅ **[RESOLVED] 決定: pasta2.pestは式を正式採用。SPECIFICATION.md 1.3節「式の制約」を「式（Expression）のサポート」に改名し、expr, term, bin, bin_op規則を詳細説明に変更。**
-2. When SPECIFICATION.mdのグローバル変数セクションを読む場合、the SPECIFICATION.md shall $*id構文（var_ref_global, var_set_global）を説明する ⏳ **[議題2: グローバル参照仕様確認中]**
-3. When SPECIFICATION.mdのグローバル関数呼び出しセクションを読む場合、the SPECIFICATION.md shall @*id(args)構文（fn_call_global）を説明する ⏳ **[議題2: グローバル参照仕様確認中]**
-4. When SPECIFICATION.mdのグローバル単語参照セクションを読む場合、the SPECIFICATION.md shall @*id構文（word_ref_global）を説明する ⏳ **[議題2: グローバル参照仕様確認中]**
-5. When SPECIFICATION.mdのグローバルCall文セクションを読む場合、the SPECIFICATION.md shall >*id構文（call_scene_global）を説明する ⏳ **[議題2: グローバル参照仕様確認中]**
-6. When GRAMMAR.mdの式セクションを読む場合、the GRAMMAR.md shall pasta2.pestで定義された式の構文例を提供する ✅ **[RESOLVED] 決定と同時に対応可能**
-7. When GRAMMAR.mdのグローバル参照セクションを読む場合、the GRAMMAR.md shall $*id, @*id, >*id構文の使用例を提供する ⏳ **[議題2: グローバル参照仕様確認中]**
-8. When comprehensive_control_flow2.pastaにグローバル参照が必要な場合、the comprehensive_control_flow2.pasta shall $*id, @*id, >*id構文を正確に使用する ⏳ **[議題2・3: 後続議題で確認]**
+1. When SPECIFICATION.mdの式（Expression）セクションを読む場合、the SPECIFICATION.md shall pasta2.pestのexpr, term, bin, bin_op規則を詳細に説明する ✅ **[RESOLVED] 決定: pasta2.pestは式を正式採用。**
+2. When SPECIFICATION.mdのグローバル変数セクションを読む場合、the SPECIFICATION.md shall $*id構文（var_ref_global, var_set_global）を説明する ✅ **[RESOLVED 議題2] $*var（グローバル変数）のみ存在。ドキュメントに記載。**
+3. ~~When SPECIFICATION.mdのグローバル関数呼び出しセクションを読む場合...~~ ❌ **削除: fn_call_globalが存在しない**
+4. ~~When SPECIFICATION.mdのグローバル単語参照セクションを読む場合...~~ ❌ **削除: word_ref_globalが存在しない**
+5. ~~When SPECIFICATION.mdのグローバルCall文セクションを読む場合...~~ ❌ **削除: call_scene_globalが存在しない**
+6. When GRAMMAR.mdの式セクションを読む場合、the GRAMMAR.md shall pasta2.pestで定義された式の構文例を提供する ✅ **[RESOLVED]**
+7. ~~When GRAMMAR.mdのグローバル参照セクションを読む場合...~~ ❌ **削除: @*id, >*idが存在しない**
+8. ~~When comprehensive_control_flow2.pastaにグローバル参照が必要な場合...~~ ❌ **削除: @*id, >*idが存在しない**
 
 ---
 
