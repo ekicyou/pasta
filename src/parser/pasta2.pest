@@ -77,14 +77,14 @@ paren_expr = { lparen ~ s ~ expr ~ s ~ rparen }
 
 // ################################################# var_ref
 var_ref        =_{ var_ref_global | var_ref_local }
-var_ref_local  = { var_marker ~  id }
-var_ref_global = { var_marker ~ global_marker  ~  id }
+var_ref_local  = { var_marker                 ~ id ~ s }
+var_ref_global = { var_marker ~ global_marker ~ id ~ s }
 
 // ################################################# var_set
 var_set        =_{ var_set_global | var_set_local }
-var_set_local  = { var_marker ~ set }
+var_set_local  = { var_marker                 ~ set }
 var_set_global = { var_marker ~ global_marker ~ set }
-set            = { id ~ s ~ set_marker ~ s ~ expr }
+set            =_{ id ~ s ~ set_marker ~ s ~ expr }
 
 // ################################################# fn_call
 fn_call        =_{ fn_call_global | fn_call_local }
@@ -150,15 +150,16 @@ call_scene_global =  { call_marker ~ global_marker ~ id ~ s ~ args? }
 scene = _{ id ~ s ~ attrs? }
 
 // ################################################# action
-action  =_{ at_escape | fn_call | word_ref | talk }
+action  =_{ at_escape | dollar_escape | fn_call | word_ref | var_ref | talk }
 actions = { action+ }
 
 word_ref        =_{ word_ref_global | word_ref_local }
 word_ref_local  = { word_marker ~ id ~ s}
 word_ref_global = { word_marker ~ global_marker ~ id ~ s }
 
-at_escape = @{ at{2} }
-talk_word = _{ !(at | eol) ~ ANY }
+at_escape     = @{ at{2} }
+dollar_escape = @{ dollar{2} }
+talk_word = _{ !(at | dollar | eol) ~ ANY }
 talk      = @{ talk_word+ }
 
 // ################################################# eol
