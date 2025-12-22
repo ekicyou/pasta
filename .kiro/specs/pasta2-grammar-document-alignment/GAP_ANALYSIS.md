@@ -276,19 +276,22 @@
 
 ---
 
-## 7. 議題3: 括弧形式・Rune コンテンツ確認 ⏳ 開発者確認待ち
+## 7. 議題3: 括弧形式・Rune コンテンツ確認 ✅ RESOLVED
 
-開発者への質問:
+**開発者回答**:
 
-**Q1. Call文引数括弧の形式**:
-- comprehensive_control_flow2.pasta では全角括弧（）を使用しています
-- pasta2.pest は両対応定義（`lparen = "（" | "（"`）です
-- パーサー・トランスパイラーでは、全角括弧（）と半角括弧()のどちらを推奨しますか？それとも両対応で問題ありませんか？
+**A1. Call文引数括弧の形式**:
+- **決定**: 全角括弧（）を推奨
+- **理由**: パスタスクリプトは日本語IMEフレンドリー
+- **対応**: comprehensive_control_flow2.pasta は全角括弧（）を継続使用
 
-**Q2. Runeブロック コンテンツ**:
-- comprehensive_control_flow2.pasta 末尾のRuneブロック（```rune ... ```）が空です
-- トランスパイラーでエラーが起きませんか？
-- 有効な関数定義例を追加すべきですか？例えば、`fn is_even(n) => n % 2 == 0` のような簡単な関数を追加しますか？
+**A2. Runeブロック コンテンツ**:
+- **決定**: 有効な関数定義例を追加
+- **対応**: comprehensive_control_flow2.pasta 末尾のRuneブロックに以下の関数定義例を追加:
+  ```rune
+  fn is_even(n) => n % 2 == 0
+  fn greet(name) => "Hello, " + name
+  ```
 
 ---
 
