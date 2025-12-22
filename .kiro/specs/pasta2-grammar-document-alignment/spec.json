@@ -1,13 +1,13 @@
 {
     "feature_name": "pasta2-grammar-document-alignment",
     "created_at": "2025-12-23T00:00:00Z",
-    "updated_at": "2025-12-25T00:00:00Z",
+    "updated_at": "2025-12-25T00:10:00Z",
     "language": "ja",
-    "phase": "issue-discussion-pending",
+    "phase": "requirements-approved",
     "approvals": {
         "requirements": {
             "generated": true,
-            "approved": false
+            "approved": true
         },
         "design": {
             "generated": false,
@@ -19,5 +19,5 @@
         }
     },
     "ready_for_implementation": false,
-    "notes": "議題1（式サポート） RESOLVED。議題2（グローバル参照仕様） RESOLVED（var_ref_global のみ保持、word_ref_global/call_scene_global は削除）。議題3（括弧形式・Rune コンテンツ）開発者確認待ち。requirements.md と GAP_ANALYSIS.md を議題1・2決定に基づき更新。次ステップ: 議題3確認後、設計フェーズ進行。"
+    "notes": "✅ 議題1（式サポート）RESOLVED。✅ 議題2（グローバル参照仕様）RESOLVED。✅ 議題3（括弧形式・Rune）RESOLVED。全3議題完全解決。requirements.md/GAP_ANALYSIS.md を更新。comprehensive_control_flow2.pasta にRune関数定義例追加。次: 設計フェーズに進行（`/kiro-spec-design pasta2-grammar-document-alignment`）"
 }
