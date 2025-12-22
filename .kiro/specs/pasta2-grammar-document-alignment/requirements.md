@@ -52,7 +52,7 @@
 2. When GRAMMAR.mdのシーン定義セクションを読む場合、the GRAMMAR.md shall pasta2.pestのglobal_scene_line, local_scene_line構文に従った例を提供する
 3. When GRAMMAR.mdのアクション行の説明を読む場合、the GRAMMAR.md shall pasta2.pestのaction_line, continue_action_line構文に従った例を提供する
 4. When GRAMMAR.mdの変数セクションを読む場合、the GRAMMAR.md shall pasta2.pestのvar_ref（ローカル/グローバル）、var_set構文に従った例を提供する ✅ **[AC 4修正] $var（ローカル）vs $*var（グローバル）の例を提供**
-5. When GRAMMAR.mdの単語定義と参照セクションを読む場合、the GRAMMAR.md shall pasta2.pestのword_ref, key_words構文に従った例を提供する
+5. When GRAMMAR.mdの単語定義と参照セクションを読む場合、the GRAMMAR.md shall pasta2.pestのword_ref, key_words（ローカル・グローバル単語定義）構文に従った例を提供する ✅ **[議題A決定] グローバル単語定義（@単語キー）は保持対象。グローバル機能参照（@*id）のみ削除対象**
 6. When GRAMMAR.mdの関数呼び出しセクションを読む場合、the GRAMMAR.md shall pasta2.pestのfn_call, args構文に従った例を提供する
 7. When GRAMMAR.mdのさくらスクリプトセクションを読む場合、the GRAMMAR.md shall sakura_marker（半角\\のみ）を正確に説明し、全角\\は使用不可と明記する
 8. When GRAMMAR.mdの文字列リテラルセクションを読む場合、the GRAMMAR.md shall pasta2.pestのstring_fenced（「」または"）構文を正確に説明する
