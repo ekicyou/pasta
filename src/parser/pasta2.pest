@@ -172,7 +172,7 @@ code_contents = @{ (!PEEK ~ ANY)+ }
 code_close    = _{ POP ~ or_comment_eol }
 
 // ################################################# line
-blank_line     =@{ or_comment_eol }
+blank_line     =_{ or_comment_eol }
 file_attr_line = { attrs ~ or_comment_eol }
 file_word_line = { word_marker ~ key_words ~ or_comment_eol }
 
