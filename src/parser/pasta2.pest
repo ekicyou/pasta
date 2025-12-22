@@ -1,0 +1,126 @@
+// ################################################# WHITE SPACE
+space_chars = _{ " " | "\t" | "\u{3000}" | "\u{00A0}" | "\u{1680}" | "\u{2000}" | "\u{2001}" | "\u{2002}" | "\u{2003}" | "\u{2004}" | "\u{2005}" | "\u{2006}" | "\u{2007}" | "\u{2008}" | "\u{2009}" | "\u{200A}" | "\u{202F}" | "\u{205F}" }
+ws          = @{ space_chars+ }
+s           = _{ space_chars* }
+pad         = _{ space_chars+ }
+no_ws       = @{ !(space_chars | "\r" | "\n") ~ ANY }
+
+// ################################################# id
+
+// `_`は含まない
+xid1 = @{ XID_START }
+
+// `_`を含む
+xidn = @{ XID_CONTINUE }
+
+id1         = @{ xid1 | "_" }
+idn         = @{ xidn }
+idn2        = @{ !"_" ~ xidn }
+identifier  = @{ id1 ~ idn* }
+dunder      = @{ "__" }
+reserved_id = @{ dunder ~ idn2* ~ dunder }
+id          = @{ !(reserved_id) ~ identifier }
+
+// ################################################# marker and element
+hash   = _{ "＃" | "#" }
+at     = _{ "＠" | "@" }
+amp    = _{ "＆" | "&" }
+ast    = _{ "＊" | "*" }
+add    = _{ "+" | "＋" }
+sub    = _{ "-" | "－" }
+mul    = _{ "*" | "＊" | "×" }
+div    = _{ "/" | "／" | "÷" }
+modulo = _{ "%" | "％" }
+equals = _{ "＝" | "=" }
+dollar = _{ "＄" | "$" }
+lparen = _{ "（" | "(" }
+rparen = _{ "）" | ")" }
+gt     = _{ "＞" | ">" }
+lt     = _{ "＜" | "<" }
+pipe   = _{ "｜" | "|" }
+comma  = _{ "，" | "," }
+dot    = _{ "．" | "." }
+colon  = _{ "：" | ":" }
+semi   = _{ "；" | ";" }
+
+comment_marker = _{ hash }
+attr_marker    = _{ amp }
+global_marker  = _{ ast }
+local_marker   = _{ "・" | "-" }
+kv_marker      = _{ colon }
+call_marker    = _{ gt }
+var_marker     = _{ dollar }
+word_marker    = _{ at }
+fn_marker      = _{ at }
+
+// ################################################# expr
+expr = { term ~ s ~ (bin_op ~ s ~ term ~ s)* }
+
+term = _{
+    paren_expr
+  | fn_call
+  | var_ref
+  | number_literal
+  | string_literal
+}
+
+paren_expr = { lparen ~ s ~ expr ~ s ~ rparen ~ s }
+bin_op     = { add | sub | mul | div | modulo }
+
+var_ref = { var_marker ~ global_marker? ~ id }
+fn_call = { fn_marker ~ global_marker? ~ id ~ args }
+
+// ################################################# args
+args           = { lparen ~ s ~ (arg ~ (pad ~ arg)*)? ~ s ~ rparen }
+arg            =_{ key_arg | positional_arg }
+key_arg        = { key_expr }
+positional_arg = { expr }
+
+// ################################################# string_literal
+string_literal  = _{ string_fenced | string_blank }
+string_nofenced = @{ (!strfence ~ no_ws)+ }
+string_blank    = @{ "\"\"" | "「」" }
+string_fenced   = _{ strfence ~ string_contents ~ strclose }
+
+string_contents = @{ (!PEEK ~ ANY)+ }
+strclose         = _{ POP }
+
+strfence = _{
+    slfence_ja4
+  | slfence_ja3
+  | slfence_ja2
+  | slfence_ja1
+  | slfence_en
+}
+
+slfence_ja1 = _{ "「"{1} ~ PUSH_LITERAL("」") }
+slfence_ja2 = _{ "「"{2} ~ PUSH_LITERAL("」」") }
+slfence_ja3 = _{ "「"{3} ~ PUSH_LITERAL("」」」") }
+slfence_ja4 = _{ "「"{4} ~ PUSH_LITERAL("」」」」") }
+slfence_en = _{ PUSH("\""+) }
+
+// ################################################# number_literal
+number_literal = @{ sub? ~ digit+ ~ (dot ~ digit+)? }
+digit          =  { ASCII_DIGIT | '０'..'９' }
+
+// ################################################# key_value
+key_literal = { id ~ s ~ kv_marker ~ s ~ ( number_literal | string_literal ) }
+key_expr    = { id ~ s ~ kv_marker ~ s ~ expr }
+key_term    = { id ~ s ~ kv_marker ~ s ~ term }
+key_words   = { id ~ s ~ kv_marker ~ s ~ word+ }
+
+// ################################################# word
+word = @{ string_literal | string_nofenced }
+
+
+// ################################################# eol
+eol             = _{ NEWLINE }
+or_comment_eol  = _{ s ~ ( comment_marker ~ (!NEWLINE ~ ANY)* )? ~ eol }
+
+// ################################################# line
+blank_line     = { or_comment_eol }
+file_attr_line = { attr_marker ~ key_literal ~ or_comment_eol }
+global_word_line = { word_marker ~ id ~ or_comment_eol }
+global_scene_line = { global_marker ~ id ~ or_comment_eol }
+
+
