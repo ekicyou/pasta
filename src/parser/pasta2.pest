@@ -48,6 +48,7 @@ attr_marker    = _{ amp }
 global_marker  = _{ ast }
 local_marker   = _{ "・" | "-" }
 kv_marker      = _{ colon }
+set_marker     = _{ equals }
 call_marker    = _{ gt }
 var_marker     = _{ dollar }
 word_marker    = _{ at }
@@ -81,8 +82,9 @@ var_ref_global = { var_marker ~ global_marker  ~  id }
 
 // ################################################# var_set
 var_set        =_{ var_set_global | var_set_local }
-var_set_local  = { var_marker ~ key_expr }
-var_set_global = { var_marker ~ global_marker ~ key_expr }
+var_set_local  = { var_marker ~ set }
+var_set_global = { var_marker ~ global_marker ~ set }
+set            = { id ~ s ~ set_marker ~ s ~ expr }
 
 // ################################################# fn_call
 fn_call        =_{ fn_call_global | fn_call_local }
