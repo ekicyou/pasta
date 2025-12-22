@@ -142,9 +142,7 @@ attr_value = _{ number_literal | string_literal | attr_string }
 attr_string = @ { ( !( kv_marker | attr_marker | comment_marker ) ~ no_ws )+ }
 
 // ################################################# call
-call_scene        = _{ call_scene_global | call_scene_local }
-call_scene_local  =  { call_marker ~ id ~ s ~ args? }
-call_scene_global =  { call_marker ~ global_marker ~ id ~ s ~ args? }
+call_scene = { call_marker ~ id ~ s ~ args? }
 
 // ################################################# scene
 scene = _{ id ~ s ~ attrs? }
@@ -153,9 +151,7 @@ scene = _{ id ~ s ~ attrs? }
 action  =_{ at_escape | dollar_escape | sakura_escape | fn_call | word_ref | var_ref | sakura_script | talk }
 actions = { action+ }
 
-word_ref        =_{ word_ref_global | word_ref_local }
-word_ref_local  = { word_marker ~ id ~ s}
-word_ref_global = { word_marker ~ global_marker ~ id ~ s }
+word_ref        = { word_marker ~ id ~ s}
 
 at_escape     = @{ at{2} }
 dollar_escape = @{ dollar{2} }
