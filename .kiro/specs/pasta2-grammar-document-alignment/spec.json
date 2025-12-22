@@ -1,9 +1,9 @@
 {
     "feature_name": "pasta2-grammar-document-alignment",
     "created_at": "2025-12-23T00:00:00Z",
-    "updated_at": "2025-12-23T08:30:00Z",
+    "updated_at": "2025-12-23T09:45:00Z",
     "language": "ja",
-    "phase": "tasks-ready",
+    "phase": "tasks-generated",
     "approvals": {
         "requirements": {
             "generated": true,
@@ -14,10 +14,10 @@
             "approved": true
         },
         "tasks": {
-            "generated": false,
+            "generated": true,
             "approved": false
         }
     },
     "ready_for_implementation": false,
-    "notes": "設計フェーズ承認完了。修正計画確定：SPECIFICATION.md 4項目、GRAMMAR.md 5項目、comprehensive_control_flow2.pasta 2項目。次: タスク生成フェーズ"
+    "notes": "タスク生成完了。11メジャータスク、16サブタスク。全7要件をカバー。修正作業（Task 1-7）→ 検証作業（Task 8-11）。並列実行可能タスク標識済み（(P)）。次: タスク承認後、実装フェーズ実施"
 }
