@@ -50,13 +50,14 @@ pasta2.pestに基づいた実装を行う。pasta2.pestを憲法とし、新た�
 3. The Parser2 shall `PastaParser::parse(Rule::file, source)`を使用して有効なPastaスクリプトのパースに成功する
 
 ### Requirement 5: レガシーparserとの共存
-**Objective:** 開発者として、既存のmod parserを削除せずに稼働させたい。これにより、新旧パーサーの比較テストとリスク管理を可能にする。
+**Objective:** 開発者として、既存のmod parserを削除せずに稼働させたい。これにより、新旧パーサーの比較テストとリスク管理を可能にする。最終的にはparser2がparserを置き換える。
 
 #### Acceptance Criteria
 1. The Pastaプロジェクト shall `src/parser/`と`src/parser2/`の両モジュールを同時に維持する
 2. When lib.rsがインポートを宣言する、the Pastaクレート shall 異なるインポートパスを提供する：`pasta::parser`と`pasta::parser2`
-3. The 既存のテストスイート shall 変更なしで`pasta::parser`を使い続ける
-4. The Parser2モジュール shall レガシーparserモジュールとのコンパイルエラーやランタイム競合を引き起こさない
+3. The lib.rs shall `pub mod parser2;`のみを追加し、エイリアスや再公開を行わない（将来parser2がparserに置き換わるため、一時的なエイリアスは不要）
+4. The 既存のテストスイート shall 変更なしで`pasta::parser`を使い続ける
+5. The Parser2モジュール shall レガシーparserモジュールとのコンパイルエラーやランタイム競合を引き起こさない
 
 ### Requirement 6: Module Structure
 **Objective:** 開発者として、parser2モジュールを標準的なRustモジュール構成で実装したい。これにより、保守性と拡張性を確保できる。
