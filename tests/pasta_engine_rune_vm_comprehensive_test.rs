@@ -47,11 +47,6 @@ fn test_comprehensive_control_flow_rune_compile() {
     // the actors module defined in the same compilation unit
     let combined_code = format!("{}\n\n{}", main_rn, transpiled_code);
 
-    // Debug: save combined code to file
-    if let Err(e) = std::fs::write("test_combined_code.rn", &combined_code) {
-        eprintln!("Warning: Failed to write debug file: {}", e);
-    }
-
     // Add combined source
     let mut sources = Sources::new();
     sources
