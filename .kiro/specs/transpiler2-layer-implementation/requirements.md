@@ -71,13 +71,11 @@ parser2-pest-migrationを完成させた後、トランスパイラー2層を実
 ### Requirement 6: Expression Evaluation and Type Inference
 **Objective:** 開発者として、Pasta DSL式（整数、浮動小数点、文字列、演算）をRuneコードで評価可能にしたい。これにより、動的スクリプト機能を実現できる。
 
-**Note:** 式の結果として「Data型」を提供するかは設計フェーズで決定する。実装方針として、(1) 型情報を含むData構造体、(2) 直接Rune型（i64/f64/String）の両案を評価し、既存Runtime層との互換性で決定する。
-
 #### Acceptance Criteria
 1. The Transpiler2 shall 整数リテラル（全角`０`〜`９`、半角`0`〜`9`）をRune `i64`値に変換する
 2. The Transpiler2 shall 浮動小数点リテラル（小数点含む）をRune `f64`値に変換する
 3. The Transpiler2 shall 文字列リテラル（括弧括り：`「text」`、`「「nested」」`等）をRune文字列として処理する
-4. The Transpiler2 shall 二項演算式（`+`, `-`, `*`, `/`, `%`, `==`, `!=`, `<`, `>`, `<=`, `>=`）をRune式に変換する
+4. The Transpiler2 shall 二項演算式（`+`, `-`, `*`, `/`, `%`, `==`, `!=`, `<`, `>`, `<=`, `>=`）をRune式に変換する（直接変換：`１＋（２＊４）` → `1 + ( 2 * 4 )`）
 5. The Transpiler2 shall 関数呼び出し（式内）を以下のパターンで展開する：
    - ローカル関数（`＠func_name(arg1, arg2, ...)`）→ `func_name(ctx, args, arg1, arg2, ...)`
    - グローバル関数（`＠*func_name(arg1, arg2, ...)`）→ `super::func_name(ctx, args, arg1, arg2, ...)`
@@ -85,7 +83,25 @@ parser2-pest-migrationを完成させた後、トランスパイラー2層を実
    - 後続する引数は Pasta式として評価した値を順次渡す
 6. The Transpiler2 shall 式の結果を正しく型判定し、Runeコードへ適切に埋め込む
 
-### Requirement 7: Error Handling and Diagnostics
+### Requirement 7: Action Processing (Talk, WordRef, FuncCall)
+**Objective:** 開発者として、アクション行内の各要素（会話テキスト、単語参照、関数呼び出し）を正確に処理したい。これにより、会話の動的生成と単語の拡張を実現できる。
+
+**背景（parser2 AST）**: parser2では Action enum で Talk/WordRef/FnCall/VarRef/SakuraScript を区別し、明示的に処理可能。
+
+#### Acceptance Criteria
+1. The Transpiler2 shall Action::Talk を `yield Talk("text");` として出力する
+2. The Transpiler2 shall Action::VarRef を Runeテンプレート文字列 `` yield Talk(`${ctx.local.var}`); `` として出力する
+3. The Transpiler2 shall Action::WordRef（`＠word`）を単語辞書呼び出し `yield Talk(pasta_stdlib::word("module", "word", []));` として出力する（既存transpiler1のパターン踏襲）
+4. The Transpiler2 shall Action::FnCall（`＠func()`）を以下のパターンで展開する：
+   - 基本：式と同じ函数展開（`func_name(ctx, args, arg1, arg2, ...)`）
+   - 最終処理：yield で受け取る → `for a in func_name(ctx, args) { yield a; }`
+   - グローバル関数：`super::` プレフィックス利用
+5. The Transpiler2 shall Action::SakuraScript を `yield emit_sakura_script("\\command[args]");` として出力する
+6. The テストスイート shall 全Action型の展開パターンを検証する
+
+---
+
+### Requirement 8: Error Handling and Diagnostics
 **Objective:** 開発者として、transpiler2のエラーを統一的に処理し、意味のある診断メッセージを提供したい。これにより、デバッグを容易にできる。
 
 **Note:** TranspileError型の具体的な実装形式（error.rsへの追加 vs. transpiler2/error.rs独立モジュール）は設計フェーズで決定する。既存PastaErrorとの統合戦略も設計で詳細化する。
@@ -98,7 +114,7 @@ parser2-pest-migrationを完成させた後、トランスパイラー2層を実
 5. The Transpiler2エラーメッセージ shall ソース位置（ファイル名、行番号、列番号）を含む
 6. The Transpiler2 shall 診断情報としてAST Spanを保有し、エラーメッセージに組み込む
 
-### Requirement 8: Rune Code Output and Runtime Compatibility
+### Requirement 9: Rune Code Output and Runtime Compatibility
 **Objective:** 開発者として、生成されたRuneコードが既存Rune VMで正常に実行されることを保証したい。これにより、既存Runtimeとの互換性を確保できる。
 
 #### Acceptance Criteria
@@ -119,7 +135,7 @@ parser2-pest-migrationを完成させた後、トランスパイラー2層を実
 5. The Transpiler2 shall Phase 1・Phase 2の分離を明確にコードで表現する（`Phase1Context`、`Phase2Generator`等の構造体分離）
 6. The Transpiler2 shall レガシーtranspiler（2パス実装）との互換性を保ちながら、新AST型に対応する
 
-### Requirement 10: Full Test Coverage
+### Requirement 11: Full Test Coverage
 **Objective:** 開発者として、transpiler2の全機能を網羅的にテストしたい。これにより、品質保証と将来の保守性を確保できる。
 
 **Fixture戦略（承認済み）**: parser2で既にテスト済みのfixtureを最大限流用する。`tests/fixtures/parser2/`の3ファイル（basic_syntax.pasta、string_and_numbers.pasta、escape_sequences.pasta）および`comprehensive_control_flow2.pasta`をベースとし、transpiler固有機能（変数スコープ、シーン呼び出し等）で追加が必要な場合のみ新規fixtureを作成する。
