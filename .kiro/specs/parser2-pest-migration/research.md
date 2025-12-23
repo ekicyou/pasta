@@ -203,23 +203,68 @@ pub enum Expr {
 
 #### 実装ガイドライン
 
-パーサー実装時の判定ロジック:
+**全角数字変換関数**:
+```rust
+/// 全角数字・記号を半角に変換
+/// pasta2.pestのdigit規則: ASCII_DIGIT | '０'..'９'
+/// 符号: '－' | '-'
+/// 小数点: '．' | '.'
+fn normalize_number(text: &str) -> String {
+    text.chars()
+        .map(|c| match c {
+            // 全角数字 → 半角数字
+            '０' => '0', '１' => '1', '２' => '2', '３' => '3', '４' => '4',
+            '５' => '5', '６' => '6', '７' => '7', '８' => '8', '９' => '9',
+            // 全角記号 → 半角記号
+            '－' => '-',  // マイナス記号
+            '．' => '.',  // 小数点
+            // 半角はそのまま
+            c => c,
+        })
+        .collect()
+}
+```
+
+**パーサー実装時の判定ロジック**:
 ```rust
 fn parse_number_literal(text: &str) -> Result<Expr, PastaError> {
-    if text.contains('.') {
-        let value = text.parse::<f64>()?;
+    // 1. 全角を半角に正規化
+    let normalized = normalize_number(text);
+    
+    // 2. 小数点の有無で型を判定
+    if normalized.contains('.') {
+        // 浮動小数点数
+        let value = normalized.parse::<f64>()
+            .map_err(|e| PastaError::ParseError {
+                message: format!("Invalid float literal '{}': {}", text, e),
+            })?;
         Ok(Expr::Float(value))
     } else {
-        let value = text.parse::<i64>()?;
+        // 整数
+        let value = normalized.parse::<i64>()
+            .map_err(|e| PastaError::ParseError {
+                message: format!("Invalid integer literal '{}': {}", text, e),
+            })?;
         Ok(Expr::Integer(value))
     }
 }
 ```
 
-注意事項:
-- 全角数字（'０'..'９'）は半角に変換してからパース
-- 符号処理も考慮
-- オーバーフロー検出
+**テストケース例**:
+| 入力 | 正規化後 | 結果 |
+|------|---------|------|
+| `123` | `123` | `Integer(123)` |
+| `１２３` | `123` | `Integer(123)` |
+| `-456` | `-456` | `Integer(-456)` |
+| `－４５６` | `-456` | `Integer(-456)` |
+| `3.14` | `3.14` | `Float(3.14)` |
+| `３．１４` | `3.14` | `Float(3.14)` |
+| `－０．５` | `-0.5` | `Float(-0.5)` |
+
+**エラーハンドリング**:
+- i64オーバーフロー: `9223372036854775808` → ParseError
+- 不正な形式: `.123` (先頭ピリオド) → Pestレベルで拒否済み
+- 複数の小数点: `1.2.3` → Pestレベルで拒否済み
 
 #### トレーサビリティ
 
