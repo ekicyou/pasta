@@ -554,13 +554,13 @@ fn parse_call_scene(pair: Pair<Rule>) -> Result<CallScene, PastaError> {
 /// Parse action_line.
 fn parse_action_line(pair: Pair<Rule>) -> Result<ActionLine, PastaError> {
     let span = span_from_pair(&pair);
-    let mut speaker = String::new();
+    let mut actor = String::new();
     let mut actions = Vec::new();
 
     for inner in pair.into_inner() {
         match inner.as_rule() {
             Rule::id => {
-                speaker = inner.as_str().to_string();
+                actor = inner.as_str().to_string();
             }
             Rule::actions => {
                 actions = parse_actions(inner)?;
@@ -570,7 +570,7 @@ fn parse_action_line(pair: Pair<Rule>) -> Result<ActionLine, PastaError> {
     }
 
     Ok(ActionLine {
-        speaker,
+        actor,
         actions,
         span,
     })
