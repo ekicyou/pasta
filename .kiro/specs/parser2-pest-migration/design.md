@@ -277,6 +277,11 @@ pub fn parse_str(source: &str, filename: &str) -> Result<PastaFile2, PastaError>
 **Implementation Notes**
 - Integration: `#[grammar = "parser2/grammar.pest"]`でsrc/からの相対パス指定
 - Validation: 未名グローバルシーンが先頭で出現した場合はPastaError::ParseErrorを返す
+- Number Parsing: 全角数字（'０'..'９'）を半角に正規化してからi64/f64へパース
+  - 小数点なし → `Integer(i64)`
+  - 小数点あり → `Float(f64)`
+  - 全角記号変換: '－' → '-', '．' → '.'
+  - 詳細はresearch.md調査7を参照
 - Risks: スコープ解析のバグ→ユニットテストで軽減
 
 ---
