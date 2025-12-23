@@ -217,28 +217,37 @@ file = _{ SOI ~ ( file_scope | global_scene_scope )* ~ s ~ EOI }
 ```rust
 // 新規: src/parser2/ast.rs
 pub enum FileItem {
-    FileScope(FileScope),
-    GlobalSceneScope(GlobalSceneScope),
+    FileAttr(Attr),                    // file_scope 内の属性
+    GlobalWord(KeyWords),              // file_scope 内の単語定義
+    GlobalSceneScope(GlobalSceneScope), // グローバルシーン
 }
 
 pub struct PastaFile {
     pub path: PathBuf,
-    pub items: Vec<FileItem>,  // ← 新フィールド（統合）
+    pub items: Vec<FileItem>,  // ← 新フィールド（3バリアント統合）
+    pub span: Span,
+    // 廃止予定:
     // pub file_scope: FileScope,  ← 廃止
     // pub global_scenes: Vec<GlobalSceneScope>,  ← 廃止
-    pub span: Span,
 }
 
 impl PastaFile {
-    // ヘルパーメソッド（利便性向上）
-    pub fn file_scopes(&self) -> Vec<&FileScope> {
+    // ヘルパーメソッド（transpiler2での利便性向上）
+    pub fn file_attrs(&self) -> Vec<&Attr> {
         self.items.iter().filter_map(|item| match item {
-            FileItem::FileScope(fs) => Some(fs),
+            FileItem::FileAttr(attr) => Some(attr),
             _ => None,
         }).collect()
     }
     
-    pub fn global_scenes(&self) -> Vec<&GlobalSceneScope> {
+    pub fn words(&self) -> Vec<&KeyWords> {
+        self.items.iter().filter_map(|item| match item {
+            FileItem::GlobalWord(word) => Some(word),
+            _ => None,
+        }).collect()
+    }
+    
+    pub fn global_scene_scopes(&self) -> Vec<&GlobalSceneScope> {
         self.items.iter().filter_map(|item| match item {
             FileItem::GlobalSceneScope(gs) => Some(gs),
             _ => None,
@@ -257,8 +266,14 @@ fn build_ast(pairs: Pairs<Rule>, filename: &str) -> Result<PastaFile, PastaError
     for pair in pairs {
         match pair.as_rule() {
             Rule::file_scope => {
+                // file_scope 内の attrs と words を個別の FileItem として追加
                 let fs = parse_file_scope(pair)?;
-                file.items.push(FileItem::FileScope(fs));  // ← FIX: push操作
+                for attr in fs.attrs {
+                    file.items.push(FileItem::FileAttr(attr));
+                }
+                for word in fs.words {
+                    file.items.push(FileItem::GlobalWord(word));
+                }
             }
             Rule::global_scene_scope => {
                 let scene = parse_global_scene_scope(pair, &mut last_global_scene_name, filename)?;

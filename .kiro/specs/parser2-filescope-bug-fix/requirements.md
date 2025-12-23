@@ -17,98 +17,63 @@ parser2の現在の実装は、Pest文法定義 `file = ( file_scope | global_sc
 
 ## 要件
 
-### 要件1: 複数FileScope保持
-**目的**: Pastaスクリプト作成者として、ファイル内で複数の`file_scope`ブロックを記述できるようにし、すべてのブロックが消失せずに保持されることを保証する。
+### 要件1: FileItem3バリアント構造によるファイルスコープ管理
+**目的**: parser2が`(file_scope | global_scene_scope)*`文法を正確に実装し、複数のファイルレベルアイテム（属性、単語、シーン）を交互出現させながら、記述順序を完全に保持すること。
 
 #### 受入基準
-1. When Pastaファイルに複数の`file_scope`ブロックが記述された場合、parser2 shall すべての`file_scope`ブロックをAST構造内に保持する
-2. When `file_scope`ブロックが2回以上出現する場合、parser2 shall 最初のブロックから最後のブロックまで、ファイル記述順序を保持する
-3. If 後続の`file_scope`ブロックが先行ブロックと同じ属性名を定義する場合、parser2 shall 両方のブロックを個別に保持し、マージや上書きを行わない
-4. The parser2 shall ファイル中の任意の位置（先頭、中間、末尾）に出現する`file_scope`を等しく扱う
+1. When `PastaFile`を構築する場合、parser2 shall `Vec<FileItem>`フィールドを使用し、FileAttr・GlobalWord・GlobalScopeScope の3つのバリアントを交互に任意回数格納できる
+2. When パーサーが `file_scope` ブロックをマッチする場合、parser2 shall そのブロック内の `attrs` を `FileItem::FileAttr` として items に追加する
+3. When パーサーが `file_scope` ブロックをマッチする場合、parser2 shall そのブロック内の `words` を `FileItem::GlobalWord` として items に追加する
+4. When パーサーが `global_scene_scope` ブロックをマッチする場合、parser2 shall それを `FileItem::GlobalSceneScope` として items に追加する
+5. When複数の`file_scope`ブロック間に`global_scene_scope`が挟まれる場合、parser2 shall その出現順序をitems配列の並序で正確に保持し、ファイル記述順序から復元可能にする
+6. If `file_scope` 内の属性または単語が複数回定義される場合、parser2 shall 各定義を個別の `FileItem` として保持し、マージや上書きを行わない
 
-### 要件2: FileScope/GlobalSceneScope交互出現対応
-**目的**: 開発者として、grammar.pestの `( file_scope | global_scene_scope )*` 仕様に完全準拠し、`file_scope`と`global_scene_scope`の交互出現順序を正確に保持する。
-
-#### 受入基準
-1. When `file_scope`と`global_scene_scope`が交互に出現する場合、parser2 shall ファイル記述順序を保持したデータ構造を生成する
-2. When `file_scope`がグローバルシーンの間に挟まれている場合、parser2 shall その`file_scope`の位置情報を正確に保持する
-3. The parser2 shall `file_scope`と`global_scene_scope`の出現順序をAST構造から復元可能にする
-4. The parser2 shall 順序保持のため、`PastaFile`に統一的なアイテムリスト（`items: Vec<FileItem>`）を提供する
-
-### 要件3: ファイルレベル属性の分離保持
-**目的**: transpiler2開発者として、各`file_scope`ブロックの属性を個別に取得し、シーンごとの属性コンテキストを正確に解決できるようにする。
+### 要件2: FileItem列挙型とAST構造の導入
+**目的**: grammar.pest準拠のAST構造を実装し、破壊的変更によって既存コードの修正を強制するメカニズムを提供する。
 
 #### 受入基準
-1. When 1つ目の`file_scope`に `＆season：winter` が定義され、2つ目の`file_scope`に `＆season：summer` が定義される場合、parser2 shall 両方の属性定義を個別の`FileScope`インスタンスとして保持する
-2. When `file_scope`間に`global_scene_scope`が挟まれる場合、parser2 shall 各`file_scope`がどのグローバルシーンの前に位置するかを判別可能な情報を提供する
-3. The parser2 shall 各`FileScope`インスタンスに、属性リスト（`attrs: Vec<Attr>`）を保持する
-4. The parser2 shall `FileScope`インスタンスにSpan情報を含め、ソースコード位置をトレース可能にする
+1. The parser2 shall `pub enum FileItem { FileAttr(Attr), GlobalWord(KeyWords), GlobalSceneScope(GlobalSceneScope) }` を定義する
+2. The parser2 shall `PastaFile` 構造体に `items: Vec<FileItem>` フィールドを追加する
+3. The parser2 shall 既存の `file_scope: FileScope` フィールドを廃止し、コンパイルエラーにより依存コードの修正を強制する
+4. The parser2 shall 既存の `global_scenes: Vec<GlobalSceneScope>` フィールドを廃止する
+5. The parser2 shall ヘルパーメソッド `file_attrs()` と `words()` と `global_scene_scopes()` を提供し、transpiler2での利便性を確保する
 
-### 要件4: ファイルレベル単語定義の累積保持
-**目的**: Pastaスクリプト作成者として、ファイル途中で単語を定義し、後続のシーンで使用できることを保証する。
-
-#### 受入基準
-1. When 複数の`file_scope`にそれぞれ異なる単語定義（`＠word1`, `＠word2`）が記述される場合、parser2 shall すべての単語定義を個別の`FileScope`インスタンス内に保持する
-2. The parser2 shall 単語定義の消失を防ぎ、すべての`＠`単語定義を各`FileScope`の`words`フィールドに格納する
-3. The parser2 shall 単語定義の出現順序を保持し、transpiler側での順次処理を可能にする
-4. If ファイル内に3つの`file_scope`が存在し、それぞれ異なる単語を定義する場合、parser2 shall 3つの個別の`FileScope`インスタンスとして保持する
-
-### 要件5: AST構造の破壊的変更
-**目的**: メンテナーとして、grammar.pest準拠のためにAST構造を変更し、既存コードへの影響を最小化する移行パスを提供する。
+### 要件3: パーサーロジックの修正
+**目的**: `src/parser2/mod.rs` の解析ループを修正し、複数出現するアイテムの累積処理を実現する。
 
 #### 受入基準
-1. The parser2 shall `PastaFile`構造体に`items: Vec<FileItem>`フィールドを導入する
-2. The parser2 shall `enum FileItem { FileScope(FileScope), GlobalSceneScope(GlobalSceneScope) }`を定義する
-3. When 既存の`file_scope: FileScope`フィールドが廃止される場合、parser2 shall コンパイルエラーを発生させ、依存コードの修正を強制する
-4. The parser2 shall `PastaFile`に`file_scope`フィールドの代わりに`items`フィールドを使用するヘルパーメソッド（`file_scopes()`, `global_scenes()`）を提供する
-5. While AST構造を変更する期間、parser2 shall すべてのユニットテストと統合テストを更新し、リグレッションを防止する
+1. When パーサーが `Rule::file_scope` をマッチする場合、parser2 shall 上書き代入を廃止し、parse_file_scope() で取得した属性・単語を個別の `FileItem` として `file.items.push()` する
+2. When パーサーが `Rule::global_scene_scope` をマッチする場合、parser2 shall `file.items.push(FileItem::GlobalSceneScope(...))` を実行する
+3. The parser2 shall ループ内で、`file_scope` と `global_scene_scope` が出現する順序を items 配列に反映する
+4. The parser2 shall パーサーループ内で上書き代入操作を排除し、すべてのアイテムをpush操作で累積する
 
-### 要件6: パーサーロジックの修正
-**目的**: 開発者として、`src/parser2/mod.rs`のパーサーループを修正し、`file_scope`の上書き代入を廃止する。
-
-#### 受入基準
-1. When パーサーが`Rule::file_scope`をマッチする場合、parser2 shall `file.items.push(FileItem::FileScope(parse_file_scope(pair)?))` を実行する
-2. When パーサーが`Rule::global_scene_scope`をマッチする場合、parser2 shall `file.items.push(FileItem::GlobalSceneScope(...))` を実行する
-3. If パーサーループ内で`file.file_scope = ...`のような上書き代入が検出される場合、parser2 shall コンパイルエラーを発生させる（フィールド削除により）
-4. The parser2 shall ループ内で`items`ベクターに順次push操作を行い、ファイル記述順序を保持する
-
-### 要件7: テストケースの追加
-**目的**: 品質保証担当者として、複数`file_scope`シナリオをカバーする回帰テストを追加し、将来のバグ再発を防止する。
+### 要件4: テストケースの追加と既存テストの移行
+**目的**: 複数ファイルアイテム交互出現シナリオをカバーする統合テストを追加し、既存テストを新AST構造に対応させる。
 
 #### 受入基準
-1. The parser2 shall 複数`file_scope`属性定義シナリオのテストケースを含む
-2. The parser2 shall `file_scope`と`global_scene_scope`の交互出現シナリオのテストケースを含む
-3. The parser2 shall 単語定義が複数`file_scope`に分散されるシナリオのテストケースを含む
-4. When テストケースを実行する場合、parser2 shall すべての`file_scope`が順序通りに保持されることを検証する
-5. When テストケースを実行する場合、parser2 shall 1つ目の`file_scope`と2つ目の`file_scope`の属性が個別に取得可能であることを検証する
+1. The parser2 shall ファイルスコープと複数グローバルシーンが交互に3回以上出現するテストフィクスチャ（`comprehensive_control_flow2.pasta` など）を含む
+2. When テストを実行する場合、parser2 shall `file.items` が正確に6個以上のFileItem（FileAttr・GlobalWord・GlobalSceneScope の混在）を格納していることを検証する
+3. When テストを実行する場合、parser2 shall items の各インデックスで期待される順序（ファイル記述順）に従っていることを検証する
+4. The parser2 shall `tests/parser2_integration_test.rs` 内の既存テスト6箇所を新 items ベースの検証に修正する
+5. The parser2 shall パターンマッチまたはヘルパーメソッドを使用して、特定の `FileItem` バリアントを抽出可能にする
 
-### 要件8: transpiler2互換性の確保
-**目的**: transpiler2開発者として、修正後のAST構造からファイルレベル属性とシーンコンテキストを正確に抽出できることを保証する。
-
-#### 受入基準
-1. When transpiler2が`PastaFile.items`を順次処理する場合、transpiler2 shall 各`FileScope`の属性を累積的にマージできる
-2. When transpiler2が`GlobalSceneScope`に到達する場合、transpiler2 shall 直前の`FileScope`群から累積されたファイルレベル属性を取得できる
-3. The parser2 shall `FileItem`列挙型からパターンマッチで`FileScope`と`GlobalSceneScope`を識別可能にする
-4. The parser2 shall transpiler2が必要とするSpan情報を各`FileItem`に含める
-5. When parser2がAST構造を変更する場合、parser2 shall transpiler2の既存実装（存在する場合）への影響を文書化する
-
-### 要件9: エラーハンドリングの保持
-**目的**: 開発者として、AST構造変更後もエラーメッセージの品質と詳細度を維持する。
+### 要件5: transpiler2互換性インターフェース
+**目的**: transpiler2が `PastaFile.items` を順次処理し、ファイルレベルコンテキストを積算しながらシーンを処理できるAPIを提供する。
 
 #### 受入基準
-1. When パース中にエラーが発生する場合、parser2 shall 各`FileScope`または`GlobalSceneScope`のSpan情報を含むエラーメッセージを生成する
-2. If 無効な`file_scope`ブロックが検出される場合、parser2 shall そのブロックの行番号と位置を含むエラーを返す
-3. The parser2 shall AST構造変更後も、既存のエラーハンドリング機構（`PastaError`）を使用する
-4. The parser2 shall エラー報告において、複数の`file_scope`が存在する場合でも、エラー発生箇所を一意に特定可能にする
+1. When transpiler2が `file.items` をイテレートする場合、transpiler2 shall パターンマッチで `FileItem::FileAttr`, `FileItem::GlobalWord`, `FileItem::GlobalSceneScope` を識別し処理できる
+2. The parser2 shall 各 `FileItem` に Span 情報を含め、エラー報告やログにおいて発生箇所をトレース可能にする
+3. When transpiler2 が items をスキャンする場合、transpiler2 shall 直前の `FileAttr` と `GlobalWord` をバッファリングし、次の `GlobalSceneScope` 到達時に属性コンテキストとして適用できる
+4. The parser2 shall ヘルパーメソッド（`file_attrs()`, `words()`, `global_scene_scopes()`）を通じて、全アイテムを型別に取得可能にする
 
-### 要件10: ドキュメント更新
-**目的**: メンテナーとして、AST構造変更の影響範囲と移行ガイドを文書化し、将来の開発者を支援する。
+### 要件6: エラーハンドリングとドキュメント整備
+**目的**: AST構造変更後も診断品質を維持し、破壊的変更の影響を文書化する。
 
 #### 受入基準
-1. The parser2 shall `PastaFile`構造体の変更内容をdocコメントに記載する
-2. The parser2 shall `FileItem`列挙型の使用例をdocコメントまたは統合テストに含める
-3. When 破壊的変更が導入される場合、parser2 shall CHANGELOG.mdまたは該当仕様の`design.md`に移行ガイドを記載する
-4. The parser2 shall grammar.pest仕様との対応関係を`src/parser2/mod.rs`のモジュールコメントに明記する
+1. The parser2 shall パース中にエラーが発生する場合、各 `FileItem` のSpan情報を使用してエラーメッセージに行番号・位置を含める
+2. The parser2 shall `PastaFile` 構造体と `FileItem` 列挙型に対して、移行ガイドと使用例を docコメントに記載する
+3. The parser2 shall `src/parser2/mod.rs` のモジュールコメントに「grammar.pest `( file_scope | global_scene_scope )*` 準拠」と明記する
+4. The parser2 shall 既存transpiler（legacy parser使用）への影響がないことを確認し、その旨を仕様書に記載する
 
 ---
 
