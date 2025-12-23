@@ -4,8 +4,8 @@
 //! and cover all grammar rules defined in grammar.pest.
 
 use pasta::parser2::{
-    parse_file, parse_str, Action, Arg, AttrValue, Expr, FnScope, GlobalSceneScope,
-    LocalSceneItem, PastaFile, VarScope,
+    Action, Arg, AttrValue, Expr, FnScope, GlobalSceneScope, LocalSceneItem, PastaFile, VarScope,
+    parse_file, parse_str,
 };
 use std::path::Path;
 
@@ -401,7 +401,11 @@ fn test_parse_basic_syntax_fixture() {
     let path = Path::new("tests/fixtures/parser2/basic_syntax.pasta");
     if path.exists() {
         let result = parse_file(path);
-        assert!(result.is_ok(), "Failed to parse basic_syntax.pasta: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "Failed to parse basic_syntax.pasta: {:?}",
+            result
+        );
     }
 }
 
@@ -410,7 +414,11 @@ fn test_parse_string_and_numbers_fixture() {
     let path = Path::new("tests/fixtures/parser2/string_and_numbers.pasta");
     if path.exists() {
         let result = parse_file(path);
-        assert!(result.is_ok(), "Failed to parse string_and_numbers.pasta: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "Failed to parse string_and_numbers.pasta: {:?}",
+            result
+        );
     }
 }
 
@@ -419,7 +427,11 @@ fn test_parse_escape_sequences_fixture() {
     let path = Path::new("tests/fixtures/parser2/escape_sequences.pasta");
     if path.exists() {
         let result = parse_file(path);
-        assert!(result.is_ok(), "Failed to parse escape_sequences.pasta: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "Failed to parse escape_sequences.pasta: {:?}",
+            result
+        );
     }
 }
 
