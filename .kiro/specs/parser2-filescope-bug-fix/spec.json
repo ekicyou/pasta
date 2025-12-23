@@ -2,17 +2,17 @@
     "id": "parser2-filescope-bug-fix",
     "title": "parser2: Fix FileScope Multiple Occurrence Bug",
     "purpose": "parser2がgrammar.pestの`file = ( file_scope | global_scene_scope )*`仕様に違反し、複数のfile_scopeを正しく処理できないバグを修正する",
-    "phase": "requirements-generated",
+    "phase": "requirements-approved",
     "language": "ja",
     "priority": "critical",
     "blocking": [
         "transpiler2-layer-implementation"
     ],
     "created": "2025-12-23T08:36:00Z",
-    "updated": "2025-12-23T08:45:00Z",
+    "updated": "2025-12-23T10:15:00Z",
     "approvals": {
         "requirements": {
-            "approved": false,
+            "approved": true,
             "generated": true
         },
         "design": {
