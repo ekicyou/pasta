@@ -8,14 +8,17 @@ pasta2.pestに基づいた実装を行う。pasta2.pestを憲法とし、新た�
 
 ## Requirements
 
-### Requirement 1: pasta2.pest文法の絶対的保全
-**Objective:** 開発者として、pasta2.pestファイルを移動してもその内容を**絶対に変更しない**ことを保証したい。pasta2.pestは既に検証済みの権威的文法定義であり、一切の変更を認めない。
+### Requirement 1: Grammar File Preservation and History Tracking
+**Objective:** 開発者として、pasta2.pestファイルを移動してもその内容を**絶対に変更しない**こと、かつファイル履歴を保全することを保証したい。pasta2.pestは既に検証済みの権威的文法定義であり、一切の変更を認めない。
 
 #### Acceptance Criteria
 1. When pasta2.pestを`src/parser2/grammar.pest`に移動する、the Parser2移行プロセス shall ファイル内容を一切変更せずに保全する（空白・コメント・フォーマットも含めて完全にそのまま）
 2. The Parser2モジュール shall grammar.pestを**不変の**構文規則の唯一の真実として扱う
 3. The Parser2実装 shall オリジナルのpasta2.pest仕様から逸脱するgrammar.pestへの手動編集を拒否する
 4. When grammar.pestが作成される、the ファイル shall オリジナルのpasta2.pestとバイト単位で同一である（`git diff`またはチェックサムで検証可能）
+5. When pasta2.pestを移動する、the 移行プロセス shall ファイル履歴を保全するために`git mv`コマンドを使用する
+6. The gitコミットメッセージ shall conventional commitsフォーマットに従う：`refactor(parser2): Move pasta2.pest to parser2/grammar.pest`
+7. The コミットメッセージ shall 操作を明確にするために"no content changes"を明示的に記述する
 
 ### Requirement 2: 新しいパーサーモジュール（parser2）の作成
 **Objective:** 開発者として、既存parserとは独立した新しいparser2モジュールを作成したい。これにより、段階的移行とリグレッションリスク軽減を実現できる。
@@ -56,14 +59,18 @@ pasta2.pestに基づいた実装を行う。pasta2.pestを憲法とし、新た�
 3. The 既存のテストスイート shall 変更なしで`pasta::parser`を使い続ける
 4. The Parser2モジュール shall レガシーparserモジュールとのコンパイルエラーやランタイム競合を引き起こさない
 
-### Requirement 6: parser2モジュールの基本構成
-**Objective:** 開発者として、parser2モジュールを標準的なRustモジュール構成で実装したい。これにより、保守性と拡張性を確保できる。
+### Requirement 6: Module Structure and Documentation
+**Objective:** 開発者として、parser2モジュールを標準的なRustモジュール構成で実装し、目的と使用方法を文書化したい。これにより、保守性・拡張性を確保し、将来の開発者が意図を理解できる。
 
 #### Acceptance Criteria
 1. The Parser2モジュール shall モジュールエントリーポイントとして`mod.rs`ファイルを定義する
 2. The Parser2モジュール shall AST型定義用の`ast.rs`ファイルを定義する
 3. The Parser2モジュール shall Pest文法仕様として`grammar.pest`ファイルを定義する
 4. When `mod.rs`が公開APIを公開する、the Parser2モジュール shall `pub use ast::*`を使用してAST型を再公開する
+5. The Parser2の`mod.rs` shall 移行目的を説明するモジュールレベルのdocコメント（`//!`）を含む
+6. The Parser2のdocコメント shall grammar.pestを権威的仕様として参照する
+7. The Parser2の公開API関数 shall 使用例を含むdocコメントを含む
+8. When README.mdが更新される、the Pastaプロジェクト shall 並行パーサーアーキテクチャを文書化する
 
 ### Requirement 7: エラーハンドリング統合
 **Objective:** 開発者として、parser2のエラーを既存のPastaError型で扱いたい。これにより、統一的なエラー処理を維持できる。
@@ -87,20 +94,4 @@ pasta2.pestに基づいた実装を行う。pasta2.pestを憲法とし、新た�
 7. The テストスイート shall `tests/fixtures/`ディレクトリのfixtureを使用し、parser2固有機能用の新しい包括的fixtureを作成する
 8. The テストスイート shall すべての文法規則についてparser2がpest_consumeデバッグ出力と同一の結果を生成することを検証する
 
-### Requirement 9: ドキュメント整備
-**Objective:** 開発者として、parser2モジュールの目的と使用方法を文書化したい。これにより、将来の開発者が意図を理解できる。
 
-#### Acceptance Criteria
-1. The Parser2の`mod.rs` shall 移行目的を説明するモジュールレベルのdocコメント（`//!`）を含む
-2. The Parser2のdocコメント shall grammar.pestを権威的仕様として参照する
-3. The Parser2の公開API関数 shall 使用例を含むdocコメントを含む
-4. When README.mdが更新される、the Pastaプロジェクト shall 並行パーサーアーキテクチャを文書化する
-
-### Requirement 10: ファイル移動の追跡可能性
-**Objective:** 開発者として、pasta2.pestの移動を履歴から追跡したい。これにより、文法定義の変更履歴を保全できる。
-
-#### Acceptance Criteria
-1. When pasta2.pestを移動する、the 移行プロセス shall ファイル履歴を保全するために`git mv`コマンドを使用する
-2. The gitコミットメッセージ shall conventional commitsフォーマットに従う：`refactor(parser2): Move pasta2.pest to parser2/grammar.pest`
-3. The コミットメッセージ shall 操作を明確にするために"no content changes"を明示的に記述する
-4. When grammar.pestが作成される、the ファイル shall pasta2.pestからの元の行単位の内容をすべて保持する
