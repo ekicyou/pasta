@@ -22,10 +22,11 @@
 **Impact**: 既存のparserモジュールには一切影響しない。lib.rsに`pub mod parser2`を追加し、新しいインポートパス`pasta::parser2::*`を提供する。
 
 ### Goals
-- pasta2.pestの全60規則を完全実装（MVP禁止）
+- pasta2.pestの全140規則を完全実装（normal 39規則 + atomic 26規則 + silent 75規則）（MVP禁止）
+  - **詳細**: [grammar-mapping.md](grammar-mapping.md)に規則→AST型の完全マッピング表を記載
 - 3層スコープ階層（FileScope ⊃ GlobalSceneScope ⊃ LocalSceneScope）の正確なAST表現
 - レガシーparser APIと同一シグネチャ（`parse_file`, `parse_str`）
-- 全文法規則のテストカバレッジ
+- 全文法規則のテストカバレッジ（特にnormal規則39個は必須）
 
 ### Non-Goals
 - transpiler2の実装（将来仕様）
