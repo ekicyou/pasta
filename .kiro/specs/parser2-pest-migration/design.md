@@ -94,10 +94,10 @@ graph TB
     LibParser --> PastaParser
     LibParser2 --> PastaParser
     PastaParser --> PastaPest
-    PastaParser2 --> GrammarPest
+    PastaParser --> GrammarPest
     PastaParser --> ParserAST
-    PastaParser2 --> Parser2AST
-    PastaParser2 --> ErrorMod
+    PastaParser --> Parser2AST
+    PastaParser --> ErrorMod
     PastaParser --> ErrorMod
 ```
 
@@ -127,17 +127,17 @@ graph TB
 sequenceDiagram
     participant Client
     participant parse_str
-    participant PastaParser2
+    participant PastaParser
     participant Pest
     participant ASTBuilder
     
     Client->>parse_str: (source, filename)
-    parse_str->>PastaParser2: parse(Rule::file, source)
-    PastaParser2->>Pest: PEGパース実行
-    Pest-->>PastaParser2: Pairs<Rule>
+    parse_str->>PastaParser: parse(Rule::file, source)
+    PastaParser->>Pest: PEGパース実行
+    Pest-->>PastaParser: Pairs<Rule>
     
     alt パース成功
-        PastaParser2-->>parse_str: Ok(pairs)
+        PastaParser-->>parse_str: Ok(pairs)
         parse_str->>ASTBuilder: build_ast(pairs)
         ASTBuilder->>ASTBuilder: parse_file_scope
         ASTBuilder->>ASTBuilder: parse_global_scene_scope (loop)
@@ -145,8 +145,8 @@ sequenceDiagram
         ASTBuilder-->>parse_str: PastaFile
         parse_str-->>Client: Ok(PastaFile)
     else パース失敗
-        Pest-->>PastaParser2: PestError
-        PastaParser2-->>parse_str: Err
+        Pest-->>PastaParser: PestError
+        PastaParser-->>parse_str: Err
         parse_str-->>Client: Err(PastaError::PestError)
     end
 ```
@@ -230,7 +230,7 @@ use pest_derive::Parser;
 
 #[derive(Parser)]
 #[grammar = "parser2/grammar.pest"]
-pub struct PastaParser2;
+pub struct PastaParser;
 
 /// Parse a Pasta script file using pasta2.pest grammar.
 ///
@@ -661,7 +661,7 @@ erDiagram
 
 ```rust
 // Pestエラーのラップパターン（レガシーparserと同一）
-PastaParser2::parse(Rule::file, source)
+PastaParser::parse(Rule::file, source)
     .map_err(|e| PastaError::PestError(
         format!("Parse error in {}: {}", filename, e)
     ))?;
@@ -721,7 +721,7 @@ PastaError::ParseError {
 
 ```
 src/parser2/
-├── mod.rs          # エントリーポイント、PastaParser2、parse_file/parse_str
+├── mod.rs          # エントリーポイント、PastaParser、parse_file/parse_str
 ├── ast.rs          # AST型定義（23種類以上）
 └── grammar.pest    # 権威的文法（pasta2.pestから移動）
 
