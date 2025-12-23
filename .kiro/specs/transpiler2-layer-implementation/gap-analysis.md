@@ -500,11 +500,26 @@ for global_scene in file.global_scenes {
        - Runtime実行時にRune VMが変数を展開
        - 参考: src/transpiler/mod.rs:502 (SpeechPart::VarRef処理)
    
-   - **式の型システム**: 🔶 設計フェーズで決定
-     - parser1 transpiler: Literal::Number(f64) を直接 to_string() で出力
-     - parser2 AST: Integer(i64) と Float(f64) を明示的に区別
-     - Question: Rune VMでの型推論に委ねる（`42`, `3.14`）？または型サフィックス（`42i64`, `3.14f64`）？
-     - Decision: 設計書で既存transpilerパターン確認後に決定
+   - **式の型システム**: ✅ 「そのままの形で素直に変換」で確定
+     - parser2の Integer/Float 分離から、直接文字列化して出力
+     - 例: `１＋（２＊４）` → `1 + ( 2 * 4 )`
+     - Rune VMの型推論に委ねる
+     - 参考: src/transpiler/mod.rs:860-862 (transpile_literal)
+
+4. 🚨 CLARIFICATION NEEDED - 関数呼び出し処理（議題8）:
+   - **Context**: Req 6 AC5「関数呼び出し（`＠fn_name(arg1, arg2, ...)`）をRune関数呼び出しに展開する」
+   - **既存transpiler処理**: 
+     - `Expr::FuncCall { name, args, scope }` → `resolve_function(name, scope)` で関数名解決
+     - グローバル関数: `グローバルシーン名_N::関数名` 形式
+     - ローカル関数: `親_M::子_N::関数名` 形式
+     - 参考: src/transpiler/mod.rs:824-836 (transpile_expr FuncCall処理)
+   
+   - **Issues requiring clarification**:
+     1. **Pasta側の関数定義**（シーン内の関数）と**Rune側の関数呼び出し**のマッピング方法は？
+     2. **既存transpilerでのシーン関数呼び出し**と**式内での関数呼び出し**の違いは何か？
+     3. **引数マッピング**: Pasta式の引数 → Rune関数の引数型への変換方法は？
+   
+   - Decision: 設計フェーズで関数スコープ解決戦略を詳細化
 ```
 
 ---
