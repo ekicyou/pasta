@@ -724,6 +724,7 @@ PastaError::ParseError {
 ### Test Fixtures
 - `tests/fixtures/parser2/` - parser2専用fixtureディレクトリ
 - 各規則に対応するfixture（例: `scope_hierarchy.pasta`, `code_block.pasta`）
+- `comprehensive_control_flow2.pasta` - 最終的な統合テストケース（Call文、ネストされたCall、引数付きCall、変数代入、単語定義、コードブロック、継続行を網羅）
 
 ---
 
