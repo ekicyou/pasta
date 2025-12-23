@@ -128,3 +128,75 @@ parser2-pest-migrationを完成させた後、トランスパイラー2層を実
 8. The テストスイート shall parser2テスト済みfixture（`tests/fixtures/parser2/*.pasta`、`comprehensive_control_flow2.pasta`）を流用し、必要最小限の追加fixtureのみ作成する
 9. The テストスイート shall 生成されたRuneコードがRuntime層で実行可能であることをE2E検証する（統合テスト）
 10. The テストスイート shall transpiler2がparser2 AST出力に対して、期待されるRune出力を生成することを検証する
+
+### Requirement 11: FileScope Attribute Inheritance
+**Objective:** 開発者として、ファイルレベル属性（FileScope.attrs）をすべてのグローバルシーンに継承させたい。これにより、共通属性の一括定義と属性フィルタリングを実現できる。
+
+**背景（parser1→parser2のAST変更）**: parser1にはFileScope自体が存在せず、file-level attributesは処理されなかった。parser2ではFileScope { attrs, words }が導入され、ファイル全体に共通する属性を定義可能になった。
+
+#### Acceptance Criteria
+1. The Transpiler2 shall FileScope.attrsを解析し、HashMap<String, String>形式に変換する
+2. When グローバルシーンが登録される、the Transpiler2 shall file-level attributesをグローバルシーン属性とmergeする
+3. The Transpiler2 shall 属性merge時に、シーンレベル属性を優先する（同一キーの場合、シーン属性がfile属性を上書き）
+4. When シーンに属性が定義されていない、the Transpiler2 shall file-level attributesをそのまま継承する
+5. The Transpiler2 shall mergeされた属性をSceneRegistry.register_globalの`attributes`引数として渡す
+6. The テストスイート shall file-level attributes継承パターン（継承のみ、上書きあり）を検証する
+
+**実装例**:
+```pasta
+＆天気：晴れ
+＆季節：冬
+
+＊会話＆時間：夜＆季節：夏
+```
+→ シーン「会話」の最終属性: `{天気: "晴れ", 時間: "夜", 季節: "夏"}` (季節はシーンレベルで上書き)
+
+### Requirement 12: Scene and Local Attributes Processing
+**Objective:** 開発者として、シーンレベル・ローカルシーンレベルの属性を正しく処理したい。これにより、シーン選択フィルタリング機能の基盤を確立できる。
+
+**背景（旧transpilerとのギャップ）**: 旧transpilerでは`transpile_attributes_to_map()`が常に空HashMap `#{}`を返し、属性機能はP0スコープ外として未実装だった。transpiler2では属性処理を完全実装する。
+
+#### Acceptance Criteria
+1. The Transpiler2 shall GlobalSceneScope.attrsを解析し、HashMap<String, String>に変換する
+2. The Transpiler2 shall LocalSceneScope.attrsを解析し、HashMap<String, String>に変換する
+3. The Transpiler2 shall 属性値の文字列リテラルとエスケープシーケンスを正しく処理する
+4. The Transpiler2 shall 属性をSceneRegistry.register_global/register_localの引数として渡す
+5. The Transpiler2 shall 属性情報をSceneTable生成時に保持し、Runtime層のフィルタリング機能で利用可能にする
+6. The テストスイート shall 属性付きシーン（グローバル・ローカル）の登録を検証する
+
+### Requirement 13: CodeBlock Embedding
+**Objective:** 開発者として、Runeコードブロック（` ```rune ... ``` `）を適切な位置にそのまま埋め込みたい。これにより、Pasta DSLで表現できない高度なロジックをRuneで直接記述できる。
+
+**背景（parser1→parser2のAST変更）**: parser1にはcode_blocks機能が存在せず、Runeブロックは処理できなかった。parser2ではGlobalSceneScope/LocalScopeに`code_blocks: Vec<CodeBlock>`が追加され、明示的に扱える。
+
+#### Acceptance Criteria
+1. The Transpiler2 shall GlobalSceneScope.code_blocksを検出し、グローバルモジュールレベルにRune codeを出力する
+2. The Transpiler2 shall LocalSceneScope.code_blocksを検出し、ローカルシーン関数内にRune codeを出力する
+3. The Transpiler2 shall code_blocksの出力位置を正しく制御する（関数定義の前 vs. 後、他statements/itemsとの順序）
+4. The Transpiler2 shall code_blocks内のRune構文を一切加工せず、そのまま出力する（transpiler2は構文検証しない）
+5. When code_blocksに不正なRune構文が含まれる、the Rune VMのコンパイルエラー shall Transpiler2の責任外として扱う
+6. The テストスイート shall code_blocks埋め込みパターン（global/local scope）を検証する
+
+### Requirement 14: Explicit ContinueAction Processing
+**Objective:** 開発者として、継続行（ContinueAction）を明示的な`：`prefixで処理したい。これにより、pasta2.pest文法仕様の変更に対応できる。
+
+**背景（pasta.pest→pasta2.pestの文法変更）**: pasta.pestでは継続行に明示的なprefixがなかったが、pasta2.pestでは`continue_action_line`ルールとして`：`または`:`による明示的prefix付きで定義された。parser2 ASTでは`LocalSceneItem::ContinueAction(ContinueAction { actions })`として独立型になった。
+
+#### Acceptance Criteria
+1. The Transpiler2 shall LocalSceneItem::ContinueAction型を認識し、ActionLineと別処理する
+2. The Transpiler2 shall ContinueAction.actionsを直前のActionLineに連結する（同一yield文として出力）
+3. When ContinueActionが最初のitemである（直前にActionLineがない）、the Transpiler2 shall TranspileError::InvalidContinuationを返す
+4. The Transpiler2 shall ContinueActionの連結時に、話者（speaker）を継承しない（既存ActionLineの話者を使用）
+5. The テストスイート shall 継続行の連結パターン（1行ActionLine + 複数ContinueAction）を検証する
+
+### Requirement 15: FileScope Words Registration
+**Objective:** 開発者として、ファイルレベル単語定義（FileScope.words）をグローバル単語として登録したい。これにより、ファイル全体で使用可能な単語セットを定義できる。
+
+**背景（parser1→parser2のAST変更）**: parser1では`PastaFile.global_words`として単一フィールドで管理されたが、parser2では`PastaFile.file_scope.words`に移動した。旧transpilerでは`file.global_words`を処理していたため、同等の機能をfile_scope.wordsで実装する必要がある。
+
+#### Acceptance Criteria
+1. The Transpiler2 shall FileScope.words（Vec<KeyWords>）を解析し、すべての単語をWordDefRegistryに登録する
+2. The Transpiler2 shall Phase 1（登録フェーズ）でfile_scope.wordsを最初に処理する（グローバルシーンwordsより前）
+3. The Transpiler2 shall file_scope.wordsとglobal_scene.wordsの重複チェックを行い、重複時にWarningを発行する（エラーではない）
+4. The Transpiler2 shall 登録された単語をRuneの単語選択関数として生成する（既存word_registry.rsのパターンを踏襲）
+5. The テストスイート shall file-level words定義と参照を検証する
