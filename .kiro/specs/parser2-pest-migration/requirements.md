@@ -26,13 +26,16 @@ pasta2.pestに基づいた実装を行う。pasta2.pestを憲法とし、新た�
 4. The Parser2 module shall not share AST type definitions with the legacy parser module to ensure complete independence
 
 ### Requirement 3: pasta2.pest文法に基づくAST型定義
-**Objective:** 開発者として、pasta2.pest文法規則を正確に反映したAST型を定義したい。これにより、文法と実装の一貫性を保証できる。
+**Objective:** 開発者として、pasta2.pest文法規則を**すべて**正確に反映したAST型を定義したい。これにより、文法と実装の完全な一貫性を保証できる。
 
 #### Acceptance Criteria
-1. When grammar.pestでRuleが定義されている場合、the Parser2 AST module shall define corresponding Rust structs for all terminal and non-terminal rules
-2. The Parser2 AST types shall support Unicode identifiers (XID_START, XID_CONTINUE) as defined in grammar.pest
+1. The Parser2 AST module shall define corresponding Rust structs for **all** terminal and non-terminal rules in grammar.pest
+2. The Parser2 AST types shall support Unicode identifiers (XID_START, XID_CONTINUE) and reserved ID pattern (`__name__`) validation as defined in grammar.pest
 3. The Parser2 AST types shall distinguish between global_marker (`＊` or `*`) and local_marker (`・` or `-`) scene definitions
 4. The Parser2 AST types shall represent full-width and half-width marker pairs (e.g., `＠`/`@`, `＄`/`$`, `＞`/`>`) as equivalent token types
+5. The Parser2 AST types shall support nested string literals using Pest PUSH/POP stack mechanism for 4-level bracketing (`「「「「text」」」」`)
+6. The Parser2 AST types shall represent hierarchical scope structure: `FileScope` → `GlobalSceneScope` → `LocalSceneScope`
+7. The Parser2 AST types shall support code blocks with language identifiers (e.g., ` ```rune ... ``` `)
 
 ### Requirement 4: Pest parser生成の統合
 **Objective:** 開発者として、grammar.pestからPest parserを生成し、Rustコードに統合したい。これにより、型安全なパース処理を実現できる。
@@ -70,14 +73,18 @@ pasta2.pestに基づいた実装を行う。pasta2.pestを憲法とし、新た�
 3. When IO errorsが発生する場合、the Parser2 shall wrap them in `PastaError::IoError` variant using `From` trait
 4. The Parser2 error messages shall include filename and source location context
 
-### Requirement 8: 初期テストカバレッジ
-**Objective:** 開発者として、parser2の基本動作を検証するテストを用意したい。これにより、実装の正確性を初期段階で確保できる。
+### Requirement 8: 完全なテストカバレッジ
+**Objective:** 開発者として、pasta2.pest文法の**すべての機能**を検証するテストを用意したい。これにより、実装の完全性を保証できる。
 
 #### Acceptance Criteria
-1. The Pasta project shall create a new test file `tests/pasta_parser2_basic_test.rs`
-2. When parser2がテストされる場合、the test suite shall verify successful parsing of minimal valid Pasta script
-3. When invalid syntaxがテストされる場合、the test suite shall verify that parser2 returns `PastaError::PestError`
-4. The Parser2 tests shall use fixtures from `tests/fixtures/` directory for integration testing
+1. The Pasta project shall create test files covering all grammar rules defined in grammar.pest
+2. The test suite shall verify all scope structures: file_scope, global_scene_scope, local_scene_scope
+3. The test suite shall verify nested string literals at all 4 bracket levels (`「text」`, `「「text」」`, `「「「text」」」`, `「「「「text」」」」`)
+4. The test suite shall verify reserved ID pattern rejection (`__name__` shall fail to parse)
+5. The test suite shall verify code blocks with language identifiers (e.g., ` ```rune ... ``` `, ` ```rust ... ``` `)
+6. The test suite shall verify all 14 Unicode whitespace characters defined in `space_chars`
+7. The test suite shall use fixtures from `tests/fixtures/` directory and create new comprehensive fixtures for parser2-specific features
+8. The test suite shall verify that parser2 produces identical results to pest_consume debug output for all grammar rules
 
 ### Requirement 9: ドキュメント整備
 **Objective:** 開発者として、parser2モジュールの目的と使用方法を文書化したい。これにより、将来の開発者が意図を理解できる。
