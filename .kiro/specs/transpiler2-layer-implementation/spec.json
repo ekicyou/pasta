@@ -3,7 +3,7 @@
     "created_at": "2025-12-23T14:30:00Z",
     "updated_at": "2025-12-23T17:00:00Z",
     "language": "ja",
-    "phase": "design-generated",
+    "phase": "design-approved",
     "dependencies": {
         "blocking": [
             {
@@ -26,7 +26,9 @@
         "design": {
             "generated": true,
             "generated_at": "2025-12-23T17:00:00Z",
-            "approved": false
+            "approved": true,
+            "approved_at": "2025-12-23T17:40:00Z",
+            "approved_by": "human-review"
         },
         "tasks": {
             "generated": false,
