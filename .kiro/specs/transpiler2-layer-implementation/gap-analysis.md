@@ -488,6 +488,18 @@ for global_scene in file.global_scenes {
    - 3-layer scope handling state machine
    - Error handling flow
    - Code generation examples
+
+3. 🚨 CLARIFICATION NEEDED - 議題として検討:
+   - **式の型システム**: parser2では Integer/Float を分離したが、Rune出力時の型推論戦略は？
+     - parser1 transpiler: Literal::Number(f64) を直接 to_string() で出力
+     - parser2 AST: Integer(i64) と Float(f64) を明示的に区別
+     - Question: Rune VMでの型推論に委ねる？または明示的に型サフィックス（`42i64`）を付与？
+   
+   - **変数のスコープ解決**: parser2では VarScope::Local/Global だが、transpiler2での参照方法は？
+     - parser1 transpiler: `ctx.local.変数名` / `ctx.global.変数名`
+     - parser2 AST: VarScope enum は同じ構造
+     - Question: Req 5の「変数参照をRune値として埋め込む」は文字列補間？代入文の右辺？両方？
+     - Example clarification needed: `let msg = "Count: $count";` → `format!("Count: {}", ctx.local.count)` なのか？
 ```
 
 ---
