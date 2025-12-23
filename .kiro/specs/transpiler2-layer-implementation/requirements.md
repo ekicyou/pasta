@@ -224,7 +224,7 @@ parser2-pest-migrationを完成させた後、トランスパイラー2層を実
 1. The Transpiler2 shall LocalSceneItem::ContinueAction型を認識し、ActionLineと別処理する
 2. The Transpiler2 shall ContinueAction.actionsを直前のActionLineに連結する（同一yield文として出力）
 3. When ContinueActionが最初のitemである（直前にActionLineがない）、the Transpiler2 shall TranspileError::InvalidContinuationを返す
-4. The Transpiler2 shall ContinueActionの連結時に、話者（speaker）を継承しない（既存ActionLineの話者を使用）
+4. The Transpiler2 shall ContinueActionの連結時に、話者（actor）を継承しない（既存ActionLineの話者を使用）
 5. The テストスイート shall 継続行の連結パターン（1行ActionLine + 複数ContinueAction）を検証する
 
 ### Requirement 15: FileScope Words Registration

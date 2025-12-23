@@ -653,11 +653,11 @@ pub fn __start__(ctx, args) {
 }
 ```
 
-**Speaker継承メカニズム**:
-- ActionLine は `change_speaker(speaker)` を最初に出力
-- ContinueAction は speaker 情報を保有しない（ActionLine内で既に設定済み）
-- 後続の yield はこの speaker 下で実行される（Rune generator継続）
-- ContinueAction の actions は直前ActionLineと同じspeaker継続として処理
-- **結果**: speaker を複製することなく、暗黙的に継承される
+**Actor継承メカニズム**:
+- ActionLine は `change_speaker(actor)` を最初に出力
+- ContinueAction は actor 情報を保有しない（ActionLine内で既に設定済み）
+- 後続の yield はこの actor 下で実行される（Rune generator継続）
+- ContinueAction の actions は直前ActionLineと同じactor継続として処理
+- **結果**: actor を複製することなく、暗黙的に継承される
 
-**注**: ContinueActionは同一speaker継続として処理され、個別のyield文として出力される（speaker変更なし）。
+**注**: ContinueActionは同一actor継続として処理され、個別のyield文として出力される（actor変更なし）。

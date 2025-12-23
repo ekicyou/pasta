@@ -328,13 +328,13 @@ pub enum LocalSceneItem {
 // ActionLine and ContinueAction
 // ============================================================================
 
-/// Action line with speaker.
+/// Action line with actor.
 ///
-/// Corresponds to the `action_line` rule: `speaker：actions`
+/// Corresponds to the `action_line` rule: `actor：actions`
 #[derive(Debug, Clone)]
 pub struct ActionLine {
-    /// Speaker name
-    pub speaker: String,
+    /// Actor name
+    pub actor: String,
     /// List of actions
     pub actions: Vec<Action>,
     /// Source location
