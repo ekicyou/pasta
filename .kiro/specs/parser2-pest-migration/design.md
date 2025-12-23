@@ -407,8 +407,11 @@ pub enum Action {
     FnCall { name: String, args: Args, scope: FnScope },
     /// さくらスクリプト（sakura_script）
     SakuraScript(String),
-    /// エスケープ（at_escape / dollar_escape / sakura_escape）
-    Escape(EscapeType),
+    /// エスケープシーケンス（at_escape / dollar_escape / sakura_escape）
+    /// 
+    /// pasta2.pestではアトミック規則として定義されており、
+    /// マッチしたテキストがそのまま取得できる（例：「＠＠」「@@」「＄＄」「$$」「\\\\」）
+    Escape(String),
 }
 
 /// コードブロック（code_block規則）
@@ -542,14 +545,6 @@ pub enum BinOp {
     Mul,  // *
     Div,  // /
     Mod,  // %
-}
-
-/// エスケープ種別
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum EscapeType {
-    At,      // @@
-    Dollar,  // $$
-    Sakura,  // \\
 }
 
 /// ソース位置
