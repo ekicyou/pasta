@@ -150,6 +150,86 @@ pub enum Action {
 
 ---
 
+### 調査7: 数値リテラルの型判定
+
+**日付**: 2025-12-23
+
+**調査対象**: pasta2.pestの数値リテラル規則と型システム
+
+#### pasta2.pestでの定義
+
+```pest
+number_literal = @{ sub? ~ digit+ ~ (dot ~ digit+)? }
+digit          =  { ASCII_DIGIT | '０'..'９' }
+```
+
+- `sub?`: 符号（オプション）
+- `digit+`: 整数部（必須）
+- `(dot ~ digit+)?`: 小数部（オプション）
+
+#### 設計決定
+
+**問題**: 当初のAST設計ではすべての数値を`f64`として扱っていた
+```rust
+pub enum AttrValue {
+    Number(f64),  // 整数も浮動小数点として扱う → 型情報損失
+    // ...
+}
+
+pub enum Expr {
+    Number(f64),  // 同様の問題
+    // ...
+}
+```
+
+**解決策**: パーサー層で小数点の有無により型を判定
+- **小数点なし** → `Integer(i64)`
+- **小数点あり** → `Float(f64)`
+
+**修正後のAST設計**:
+```rust
+pub enum AttrValue {
+    Integer(i64),  // 例: 123, -456
+    Float(f64),    // 例: 3.14, -0.5
+    // ...
+}
+
+pub enum Expr {
+    Integer(i64),
+    Float(f64),
+    // ...
+}
+```
+
+#### 実装ガイドライン
+
+パーサー実装時の判定ロジック:
+```rust
+fn parse_number_literal(text: &str) -> Result<Expr, PastaError> {
+    if text.contains('.') {
+        let value = text.parse::<f64>()?;
+        Ok(Expr::Float(value))
+    } else {
+        let value = text.parse::<i64>()?;
+        Ok(Expr::Integer(value))
+    }
+}
+```
+
+注意事項:
+- 全角数字（'０'..'９'）は半角に変換してからパース
+- 符号処理も考慮
+- オーバーフロー検出
+
+#### トレーサビリティ
+
+- **要件**: Requirement 3 (pasta2.pest文法に基づくAST型定義)
+- **設計原則**: 型安全性の最大化
+- **影響範囲**: `Expr`, `AttrValue`, パーサー実装ロジック
+- **テスト観点**: 整数/浮動小数点の区別、境界値（i64::MAX, i64::MIN）
+
+---
+
 ### 調査2: レガシーパーサーとの差分分析
 
 **対象**: `src/parser/mod.rs` (978行), `src/parser/ast.rs` (297行)
