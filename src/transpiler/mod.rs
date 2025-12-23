@@ -3,11 +3,8 @@
 //! This module converts the Pasta AST into Rune source code that can be executed
 //! by the Rune VM to generate ScriptEvent IR.
 
-mod scene_registry;
-mod word_registry;
-
-pub use scene_registry::{SceneInfo, SceneRegistry};
-pub use word_registry::{WordDefRegistry, WordEntry};
+// Re-export from shared registry module for backward compatibility
+pub use crate::registry::{SceneInfo, SceneRegistry, WordDefRegistry, WordEntry};
 
 use crate::{
     Argument, BinOp, Expr, FunctionScope, JumpTarget, Literal, PastaError, PastaFile, SceneDef,

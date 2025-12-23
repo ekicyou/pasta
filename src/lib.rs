@@ -46,9 +46,11 @@ pub mod ir;
 mod loader;
 pub mod parser;
 pub mod parser2;
+pub mod registry;
 pub mod runtime;
 pub mod stdlib;
 pub mod transpiler;
+pub mod transpiler2;
 
 // Re-export commonly used types
 pub use cache::ParseCache;

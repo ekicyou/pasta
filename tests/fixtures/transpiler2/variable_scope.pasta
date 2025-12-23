@@ -1,0 +1,8 @@
+# Variable scope fixture for transpiler2 tests
+# Tests local and global variable handling
+
+＊変数テスト
+  $count=0
+  $*global_count=100
+  さくら：「ローカル変数」
+  $count=$count+1

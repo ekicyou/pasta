@@ -457,7 +457,7 @@ pub struct Attr {
 }
 
 /// Attribute value types.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum AttrValue {
     /// Integer literal (no decimal point)
     Integer(i64),
@@ -467,6 +467,17 @@ pub enum AttrValue {
     String(String),
     /// Attribute string (unquoted)
     AttrString(String),
+}
+
+impl std::fmt::Display for AttrValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AttrValue::Integer(v) => write!(f, "{}", v),
+            AttrValue::Float(v) => write!(f, "{}", v),
+            AttrValue::String(v) => write!(f, "{}", v),
+            AttrValue::AttrString(v) => write!(f, "{}", v),
+        }
+    }
 }
 
 // ============================================================================
