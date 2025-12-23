@@ -12,6 +12,42 @@
 use std::path::PathBuf;
 
 // ============================================================================
+// FileItem - File-Level Item
+// ============================================================================
+
+/// ファイルレベルで出現するアイテムの統一表現
+///
+/// grammar.pest の `file = ( file_scope | global_scene_scope )*` に対応。
+/// file_scope 内の attrs と words は個別のバリアントとして分離。
+///
+/// # grammar.pest 対応関係
+///
+/// - `FileAttr`: file_scope 内の attr（ファイルレベル属性）
+/// - `GlobalWord`: file_scope 内の key_words（ファイルレベル単語定義）
+/// - `GlobalSceneScope`: global_scene_scope（グローバルシーン）
+///
+/// # 使用例
+///
+/// ```ignore
+/// for item in &file.items {
+///     match item {
+///         FileItem::FileAttr(attr) => { /* 属性処理 */ }
+///         FileItem::GlobalWord(word) => { /* 単語定義処理 */ }
+///         FileItem::GlobalSceneScope(scene) => { /* シーン処理 */ }
+///     }
+/// }
+/// ```
+#[derive(Debug, Clone)]
+pub enum FileItem {
+    /// ファイルレベル属性（file_scope 内の attr）
+    FileAttr(Attr),
+    /// ファイルレベル単語定義（file_scope 内の key_words）
+    GlobalWord(KeyWords),
+    /// グローバルシーン
+    GlobalSceneScope(GlobalSceneScope),
+}
+
+// ============================================================================
 // Span - Source Location
 // ============================================================================
 
@@ -55,17 +91,42 @@ impl Span {
 
 /// Complete AST representation of a Pasta file.
 ///
-/// A Pasta file consists of:
-/// - An optional file-level scope (attributes and word definitions)
-/// - Zero or more global scene scopes
+/// grammar.pest `file = ( file_scope | global_scene_scope )*` に完全準拠。
+/// ファイル内の全アイテムを記述順序で保持します。
+///
+/// # Migration Guide (移行ガイド)
+///
+/// 旧APIからの移行:
+/// - `file.file_scope.attrs` → `file.file_attrs()`
+/// - `file.file_scope.words` → `file.words()`
+/// - `file.global_scenes` → `file.global_scene_scopes()`
+///
+/// # 使用例
+///
+/// ```ignore
+/// // 型別アクセス（ヘルパーメソッド）
+/// let attrs = file.file_attrs();
+/// let words = file.words();
+/// let scenes = file.global_scene_scopes();
+///
+/// // 順序保持アクセス（transpiler2向け）
+/// for item in &file.items {
+///     match item {
+///         FileItem::FileAttr(attr) => { /* コンテキスト積算 */ }
+///         FileItem::GlobalWord(word) => { /* 単語定義積算 */ }
+///         FileItem::GlobalSceneScope(scene) => { /* シーン処理 */ }
+///     }
+/// }
+/// ```
 #[derive(Debug, Clone)]
 pub struct PastaFile {
     /// Source file path
     pub path: PathBuf,
-    /// File-level scope (attributes and word definitions)
-    pub file_scope: FileScope,
-    /// List of global scenes
-    pub global_scenes: Vec<GlobalSceneScope>,
+    /// ファイル内の全アイテム（記述順序を保持）
+    ///
+    /// grammar.pest `( file_scope | global_scene_scope )*` に対応。
+    /// 複数の file_scope と global_scene_scope を任意順序で格納。
+    pub items: Vec<FileItem>,
     /// Source location
     pub span: Span,
 }
@@ -75,10 +136,57 @@ impl PastaFile {
     pub fn new(path: PathBuf) -> Self {
         Self {
             path,
-            file_scope: FileScope::default(),
-            global_scenes: Vec::new(),
+            items: Vec::new(),
             span: Span::default(),
         }
+    }
+
+    /// ファイルレベル属性を取得（FileAttr バリアントのみ抽出）
+    ///
+    /// 複数の file_scope に分散した属性を記述順で返します。
+    pub fn file_attrs(&self) -> Vec<&Attr> {
+        self.items
+            .iter()
+            .filter_map(|item| {
+                if let FileItem::FileAttr(attr) = item {
+                    Some(attr)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    /// ファイルレベル単語定義を取得（GlobalWord バリアントのみ抽出）
+    ///
+    /// 複数の file_scope に分散した単語定義を記述順で返します。
+    pub fn words(&self) -> Vec<&KeyWords> {
+        self.items
+            .iter()
+            .filter_map(|item| {
+                if let FileItem::GlobalWord(word) = item {
+                    Some(word)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    /// グローバルシーンを取得（GlobalSceneScope バリアントのみ抽出）
+    ///
+    /// 記述順で全グローバルシーンを返します。
+    pub fn global_scene_scopes(&self) -> Vec<&GlobalSceneScope> {
+        self.items
+            .iter()
+            .filter_map(|item| {
+                if let FileItem::GlobalSceneScope(scene) = item {
+                    Some(scene)
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 }
 
@@ -534,8 +642,8 @@ mod tests {
     fn test_pasta_file_new() {
         let file = PastaFile::new(PathBuf::from("test.pasta"));
         assert_eq!(file.path, PathBuf::from("test.pasta"));
-        assert!(file.file_scope.attrs.is_empty());
-        assert!(file.global_scenes.is_empty());
+        assert!(file.file_attrs().is_empty());
+        assert!(file.global_scene_scopes().is_empty());
     }
 
     #[test]
