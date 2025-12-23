@@ -87,6 +87,8 @@ pasta2.pestに基づいた実装を行う。pasta2.pestを憲法とし、新た�
 5. The テストスイート shall 言語識別子付きコードブロックを検証する（例：` ```rune ... ``` `、` ```rust ... ``` `）
 6. The テストスイート shall `space_chars`で定義された14種類のUnicode空白文字すべてを検証する
 7. The テストスイート shall `tests/fixtures/`ディレクトリのfixtureを使用し、parser2固有機能用の新しい包括的fixtureを作成する
+   - `comprehensive_control_flow2.pasta`をパーサーテストの最終ケースとして使用する（Call文、ネストされたCall、引数付きCall、変数代入、単語定義、コードブロック、継続行を網羅）
+   - pasta2.pestによるAST展開が正常に完了することを検証済み
 8. The テストスイート shall すべての文法規則についてparser2がpest_consumeデバッグ出力と同一の結果を生成することを検証する
 
 ### Requirement 9: Documentation
