@@ -58,18 +58,14 @@ pasta2.pestに基づいた実装を行う。pasta2.pestを憲法とし、新た�
 3. The 既存のテストスイート shall 変更なしで`pasta::parser`を使い続ける
 4. The Parser2モジュール shall レガシーparserモジュールとのコンパイルエラーやランタイム競合を引き起こさない
 
-### Requirement 6: Module Structure and Documentation
-**Objective:** 開発者として、parser2モジュールを標準的なRustモジュール構成で実装し、目的と使用方法を文書化したい。これにより、保守性・拡張性を確保し、将来の開発者が意図を理解できる。
+### Requirement 6: Module Structure
+**Objective:** 開発者として、parser2モジュールを標準的なRustモジュール構成で実装したい。これにより、保守性と拡張性を確保できる。
 
 #### Acceptance Criteria
 1. The Parser2モジュール shall モジュールエントリーポイントとして`mod.rs`ファイルを定義する
 2. The Parser2モジュール shall AST型定義用の`ast.rs`ファイルを定義する
 3. The Parser2モジュール shall Pest文法仕様として`grammar.pest`ファイルを定義する
 4. When `mod.rs`が公開APIを公開する、the Parser2モジュール shall `pub use ast::*`を使用してAST型を再公開する
-5. The Parser2の`mod.rs` shall 移行目的を説明するモジュールレベルのdocコメント（`//!`）を含む
-6. The Parser2のdocコメント shall grammar.pestを権威的仕様として参照する
-7. The Parser2の公開API関数 shall 使用例を含むdocコメントを含む
-8. When README.mdが更新される、the Pastaプロジェクト shall 並行パーサーアーキテクチャを文書化する
 
 ### Requirement 7: エラーハンドリング統合
 **Objective:** 開発者として、parser2のエラーを既存のPastaError型で扱いたい。これにより、統一的なエラー処理を維持できる。
@@ -92,5 +88,14 @@ pasta2.pestに基づいた実装を行う。pasta2.pestを憲法とし、新た�
 6. The テストスイート shall `space_chars`で定義された14種類のUnicode空白文字すべてを検証する
 7. The テストスイート shall `tests/fixtures/`ディレクトリのfixtureを使用し、parser2固有機能用の新しい包括的fixtureを作成する
 8. The テストスイート shall すべての文法規則についてparser2がpest_consumeデバッグ出力と同一の結果を生成することを検証する
+
+### Requirement 9: Documentation
+**Objective:** 開発者として、parser2モジュールの目的と使用方法を文書化したい。これにより、将来の開発者が意図を理解し、適切にメンテナンスできる。
+
+#### Acceptance Criteria
+1. The Parser2の`mod.rs` shall 移行目的を説明するモジュールレベルのdocコメント（`//!`）を含む
+2. The Parser2のdocコメント shall grammar.pestを権威的仕様として参照する
+3. The Parser2の公開API関数 shall 使用例を含むdocコメントを含む
+4. When README.mdが更新される、the Pastaプロジェクト shall 並行パーサーアーキテクチャを文書化する（parser vs parser2の使い分け、移行計画）
 
 
