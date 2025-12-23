@@ -41,8 +41,8 @@
 |-------------|---------|------------|------------|-------|
 | 1 | Grammar File保全 | grammar.pest | git mv | - |
 | 2 | parser2モジュール作成 | mod.rs | parse_file, parse_str | Main Parse Flow |
-| 3 | AST型定義 | ast.rs | PastaFile2, Scope types | - |
-| 4 | Pest parser統合 | mod.rs | PastaParser2, Rule | - |
+| 3 | AST型定義 | ast.rs | PastaFile, Scope types | - |
+| 4 | Pest parser統合 | mod.rs | PastaParser, Rule | - |
 | 5 | レガシー共存 | lib.rs | pub mod parser2 | - |
 | 6 | Module Structure | mod.rs, ast.rs, grammar.pest | - | - |
 | 7 | エラーハンドリング | mod.rs | PastaError::PestError | Error Flow |
@@ -82,9 +82,9 @@ graph TB
     end
     
     subgraph "parser2 (新規)"
-        PastaParser2[PastaParser2]
+        PastaParser[PastaParser]
         GrammarPest[grammar.pest<br/>pasta2.pest移動]
-        Parser2AST[ast.rs<br/>PastaFile2, Scope types...]
+        Parser2AST[ast.rs<br/>PastaFile, Scope types...]
     end
     
     subgraph "共通"
@@ -92,7 +92,7 @@ graph TB
     end
     
     LibParser --> PastaParser
-    LibParser2 --> PastaParser2
+    LibParser2 --> PastaParser
     PastaParser --> PastaPest
     PastaParser2 --> GrammarPest
     PastaParser --> ParserAST
@@ -142,8 +142,8 @@ sequenceDiagram
         ASTBuilder->>ASTBuilder: parse_file_scope
         ASTBuilder->>ASTBuilder: parse_global_scene_scope (loop)
         ASTBuilder->>ASTBuilder: parse_local_scene_scope (nested loop)
-        ASTBuilder-->>parse_str: PastaFile2
-        parse_str-->>Client: Ok(PastaFile2)
+        ASTBuilder-->>parse_str: PastaFile
+        parse_str-->>Client: Ok(PastaFile)
     else パース失敗
         Pest-->>PastaParser2: PestError
         PastaParser2-->>parse_str: Err
@@ -175,7 +175,7 @@ flowchart TD
     O --> P[Update last_global_scene_name]
     
     E -->|No| Q{EOI?}
-    Q -->|Yes| R[Complete PastaFile2]
+    Q -->|Yes| R[Complete PastaFile]
     P --> E
 ```
 
@@ -257,7 +257,7 @@ pub fn parse_file(path: &Path) -> Result<PastaFile2, PastaError>;
 /// * `filename` - Filename for error reporting
 ///
 /// # Returns
-/// * `Ok(PastaFile2)` - Successfully parsed AST
+/// * `Ok(PastaFile)` - Successfully parsed AST
 /// * `Err(PastaError)` - Parse error
 ///
 /// # Example
@@ -267,7 +267,7 @@ pub fn parse_file(path: &Path) -> Result<PastaFile2, PastaError>;
 /// let source = "＊挨拶\n  Alice：こんにちは\n";
 /// let ast = parse_str(source, "test.pasta")?;
 /// ```
-pub fn parse_str(source: &str, filename: &str) -> Result<PastaFile2, PastaError>;
+pub fn parse_str(source: &str, filename: &str) -> Result<PastaFile, PastaError>;
 ```
 
 - Preconditions: source/fileは有効なUTF-8
@@ -309,7 +309,7 @@ pub fn parse_str(source: &str, filename: &str) -> Result<PastaFile2, PastaError>
 ```rust
 /// 完全なPastaファイルのAST表現
 #[derive(Debug, Clone)]
-pub struct PastaFile2 {
+pub struct PastaFile {
     /// ソースファイルのパス
     pub path: PathBuf,
     /// ファイルレベルのスコープ（属性・単語定義）
@@ -606,8 +606,8 @@ impl Span {
 
 ```mermaid
 erDiagram
-    PastaFile2 ||--o| FileScope : contains
-    PastaFile2 ||--o{ GlobalSceneScope : contains
+    PastaFile ||--o| FileScope : contains
+    PastaFile ||--o{ GlobalSceneScope : contains
     
     FileScope ||--o{ Attr : has
     FileScope ||--o{ KeyWords : has
@@ -640,8 +640,8 @@ erDiagram
 
 | Entity | Cardinality | Description |
 |--------|-------------|-------------|
-| PastaFile2 → FileScope | 1:1 | 常に存在（空でも） |
-| PastaFile2 → GlobalSceneScope | 1:N | 0個以上 |
+| PastaFile → FileScope | 1:1 | 常に存在（空でも） |
+| PastaFile → GlobalSceneScope | 1:N | 0個以上 |
 | GlobalSceneScope → LocalSceneScope | 1:N | 1個以上（local_start_scene_scope必須） |
 | LocalSceneScope → LocalSceneItem | 1:N | 1個以上 |
 
@@ -744,7 +744,7 @@ pub mod parser2;
 pub use parser2::{
     parse_file as parse_file_v2,
     parse_str as parse_str_v2,
-    PastaFile2,
+    PastaFile,
     FileScope,
     GlobalSceneScope,
     LocalSceneScope,

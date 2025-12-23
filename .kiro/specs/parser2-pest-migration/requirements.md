@@ -46,8 +46,8 @@ pasta2.pestに基づいた実装を行う。pasta2.pestを憲法とし、新た�
 
 #### Acceptance Criteria
 1. The Parser2モジュール shall pest_derive用に`#[grammar = "parser2/grammar.pest"]`ディレクティブを使用する（src/ディレクトリからの相対パス）
-2. The Parser2モジュール shall `#[derive(Parser)]`マクロを使用して`PastaParser2`構造体を生成する
-3. The Parser2 shall `PastaParser2::parse(Rule::file, source)`を使用して有効なPastaスクリプトのパースに成功する
+2. The Parser2モジュール shall `#[derive(Parser)]`マクロを使用して`PastaParser`構造体を生成する
+3. The Parser2 shall `PastaParser::parse(Rule::file, source)`を使用して有効なPastaスクリプトのパースに成功する
 
 ### Requirement 5: レガシーparserとの共存
 **Objective:** 開発者として、既存のmod parserを削除せずに稼働させたい。これにより、新旧パーサーの比較テストとリスク管理を可能にする。

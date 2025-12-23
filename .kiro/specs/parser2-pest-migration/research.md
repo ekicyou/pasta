@@ -54,7 +54,7 @@ file
 
 | 規則 | 行 | 用途 | AST対応 |
 |------|---|------|---------|
-| `file` | 202 | エントリーポイント | `PastaFile2` |
+| `file` | 202 | エントリーポイント | `PastaFile` |
 | `file_scope` | 179 | ファイルレベル属性/単語 | `FileScope` |
 | `global_scene_scope` | 182 | グローバルシーン全体 | `GlobalSceneScope` |
 | `local_scene_scope` | 188-189 | ローカルシーン全体 | `LocalSceneScope` |
@@ -300,14 +300,14 @@ fn parse_number_literal(text: &str) -> Result<Expr, PastaError> {
 |------|---------------|-----------------|
 | ファイルパース | `parse_file(path)` | `parse_file(path)` (同一シグネチャ) |
 | 文字列パース | `parse_str(source, filename)` | `parse_str(source, filename)` (同一シグネチャ) |
-| 戻り値型 | `Result<PastaFile, PastaError>` | `Result<PastaFile2, PastaError>` |
+| 戻り値型 | `Result<PastaFile, PastaError>` | `Result<PastaFile, PastaError>` |
 | エラー型 | `PastaError::PestError(String)` | 同一（再利用） |
 
 #### AST型の差分
 
 | レガシーAST | parser2 AST | 差分理由 |
 |-------------|-------------|----------|
-| `PastaFile` | `PastaFile2` | FileScope追加 |
+| `PastaFile` | `PastaFile` | FileScope追加 |
 | - | `FileScope` | 新規：ファイルレベル属性/単語 |
 | `SceneDef` | `GlobalSceneScope` | 構造変更：init + local_scenes |
 | - | `LocalSceneScope` | 新規：ローカルシーン専用型 |
@@ -393,7 +393,7 @@ FileScope (ファイル全体)
 #### スコープ解析アルゴリズム
 
 ```rust
-fn parse_file(pairs: Pairs<Rule>) -> PastaFile2 {
+fn parse_file(pairs: Pairs<Rule>) -> PastaFile {
     let mut file_scope = FileScope::default();
     let mut global_scenes = Vec::new();
     let mut last_global_scene_name: Option<String> = None;
@@ -413,7 +413,7 @@ fn parse_file(pairs: Pairs<Rule>) -> PastaFile2 {
         }
     }
     
-    PastaFile2 { file_scope, global_scenes, ... }
+    PastaFile { file_scope, global_scenes, ... }
 }
 ```
 
@@ -481,7 +481,7 @@ pub enum LocalSceneItem {
 **決定**: `FileScope`は常に存在（空でも生成）
 
 ```rust
-pub struct PastaFile2 {
+pub struct PastaFile {
     pub file_scope: FileScope,  // 空でも存在
     pub global_scenes: Vec<GlobalSceneScope>,
     // ...
