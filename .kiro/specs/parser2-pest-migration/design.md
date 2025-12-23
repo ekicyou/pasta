@@ -737,20 +737,24 @@ tests/
 ### lib.rs Integration
 
 ```rust
-// 追加するエクスポート
+// parser2モジュールを公開（将来的にparserを置き換える）
 pub mod parser2;
 
-// 公開API（既存parserと並存）
-pub use parser2::{
-    parse_file as parse_file_v2,
-    parse_str as parse_str_v2,
-    PastaFile,
-    FileScope,
-    GlobalSceneScope,
-    LocalSceneScope,
-    // ... その他のAST型
-};
+// 注意: エイリアス不要
+// - parser2モジュールとして使用: `pasta::parser2::parse_file()`
+// - 移行完了後はparser2がparserに置き換わる
+// - 現時点では既存parserと並存
 ```
+
+**移行計画**:
+1. **Phase 0 (現在)**: `parser`のみ存在
+2. **Phase 1 (本仕様)**: `parser`と`parser2`が並存
+   - 既存コード: `pasta::parser::*` を継続使用
+   - 新規コード: `pasta::parser2::*` を使用可能
+3. **Phase 2 (将来)**: `parser2`を`parser`にリネーム、旧`parser`削除
+   - `git mv src/parser src/parser_legacy`
+   - `git mv src/parser2 src/parser`
+   - lib.rsで`pub mod parser;`のみ
 
 ---
 
@@ -769,14 +773,16 @@ pub use parser2::{
 
 ### Phase 3: パーサー実装
 - [ ] `src/parser2/mod.rs` 作成
-- [ ] `PastaParser2` 構造体定義
+- [ ] `PastaParser` 構造体定義
 - [ ] `parse_str` 実装
 - [ ] `parse_file` 実装
 - [ ] 未名シーン継承ロジック実装
+- [ ] 全角数字正規化関数実装
 
 ### Phase 4: 統合・テスト
-- [ ] `lib.rs` に `pub mod parser2` 追加
+- [ ] `lib.rs` に `pub mod parser2;` 追加（エイリアス不要）
 - [ ] 全60規則のテスト作成
+- [ ] 数値リテラルテスト（14ケース）作成
 - [ ] fixtureファイル作成
 - [ ] `cargo test --all` 成功確認
 
