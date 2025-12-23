@@ -8,13 +8,14 @@ pasta2.pestに基づいた実装を行う。pasta2.pestを憲法とし、新た�
 
 ## Requirements
 
-### Requirement 1: pasta2.pest文法の保全
-**Objective:** 開発者として、pasta2.pestファイルを移動してもその内容を保全したい。これにより、文法定義の権威性を維持できる。
+### Requirement 1: pasta2.pest文法の絶対的保全
+**Objective:** 開発者として、pasta2.pestファイルを移動してもその内容を**絶対に変更しない**ことを保証したい。pasta2.pestは既に検証済みの権威的文法定義であり、一切の変更を認めない。
 
 #### Acceptance Criteria
-1. When pasta2.pestを`src/parser2/grammar.pest`に移動する場合、the Parser2 migration process shall preserve the exact file contents without modification
-2. When parser2ディレクトリ構造が作成される場合、the Parser2 module shall treat grammar.pest as the single source of truth for syntax rules
+1. When pasta2.pestを`src/parser2/grammar.pest`に移動する場合、the Parser2 migration process shall preserve the exact file contents **without any modification whatsoever** (not even whitespace, comments, or formatting changes)
+2. The Parser2 module shall treat grammar.pest as the **immutable** single source of truth for syntax rules
 3. The Parser2 implementation shall reject any manual edits to grammar.pest that deviate from the original pasta2.pest specification
+4. When grammar.pestが作成される場合、the file shall be byte-for-byte identical to the original pasta2.pest (verifiable via `git diff` or checksum)
 
 ### Requirement 2: 新しいパーサーモジュール（parser2）の作成
 **Objective:** 開発者として、既存parserとは独立した新しいparser2モジュールを作成したい。これにより、段階的移行とリグレッションリスク軽減を実現できる。
@@ -26,14 +27,14 @@ pasta2.pestに基づいた実装を行う。pasta2.pestを憲法とし、新た�
 4. The Parser2 module shall not share AST type definitions with the legacy parser module to ensure complete independence
 
 ### Requirement 3: pasta2.pest文法に基づくAST型定義
-**Objective:** 開発者として、pasta2.pest文法規則を**すべて**正確に反映したAST型を定義したい。これにより、文法と実装の完全な一貫性を保証できる。
+**Objective:** 開発者として、**検証済み**のpasta2.pest文法規則を**すべて**正確に反映したAST型を定義したい。これにより、文法と実装の完全な一貫性を保証できる。
 
 #### Acceptance Criteria
-1. The Parser2 AST module shall define corresponding Rust structs for **all** terminal and non-terminal rules in grammar.pest
+1. The Parser2 AST module shall define corresponding Rust structs for **all** terminal and non-terminal rules in grammar.pest (pasta2.pestは既に検証済みであり、文法の妥当性は保証されている)
 2. The Parser2 AST types shall support Unicode identifiers (XID_START, XID_CONTINUE) and reserved ID pattern (`__name__`) validation as defined in grammar.pest
 3. The Parser2 AST types shall distinguish between global_marker (`＊` or `*`) and local_marker (`・` or `-`) scene definitions
 4. The Parser2 AST types shall represent full-width and half-width marker pairs (e.g., `＠`/`@`, `＄`/`$`, `＞`/`>`) as equivalent token types
-5. The Parser2 AST types shall support nested string literals using Pest PUSH/POP stack mechanism for 4-level bracketing (`「「「「text」」」」`)
+5. The Parser2 AST types shall support nested string literals using Pest PUSH/POP stack mechanism for 4-level bracketing (`「「「「text」」」」`) **as already verified in grammar.pest**
 6. The Parser2 AST types shall represent hierarchical scope structure: `FileScope` → `GlobalSceneScope` → `LocalSceneScope`
 7. The Parser2 AST types shall support code blocks with language identifiers (e.g., ` ```rune ... ``` `)
 
