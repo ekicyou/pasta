@@ -506,20 +506,21 @@ for global_scene in file.global_scenes {
      - Rune VMの型推論に委ねる
      - 参考: src/transpiler/mod.rs:860-862 (transpile_literal)
 
-4. 🚨 CLARIFICATION NEEDED - 関数呼び出し処理（議題8）:
-   - **Context**: Req 6 AC5「関数呼び出し（`＠fn_name(arg1, arg2, ...)`）をRune関数呼び出しに展開する」
-   - **既存transpiler処理**: 
-     - `Expr::FuncCall { name, args, scope }` → `resolve_function(name, scope)` で関数名解決
-     - グローバル関数: `グローバルシーン名_N::関数名` 形式
-     - ローカル関数: `親_M::子_N::関数名` 形式
-     - 参考: src/transpiler/mod.rs:824-836 (transpile_expr FuncCall処理)
+4. ✅ CLARIFIED - 関数呼び出し処理戦略（議題8）:
+   - **ローカル関数呼び出し**: ✅ 確定
+     - `＠func_name(arg1, arg2, ...)` → `func_name(ctx, args, arg1, arg2, ...)`
+     - ctx, argsは常に最初に渡す（シーン呼び出し時の既定引数を引き継ぐ）
+     - 後続引数は Pasta式を評価して渡す
    
-   - **Issues requiring clarification**:
-     1. **Pasta側の関数定義**（シーン内の関数）と**Rune側の関数呼び出し**のマッピング方法は？
-     2. **既存transpilerでのシーン関数呼び出し**と**式内での関数呼び出し**の違いは何か？
-     3. **引数マッピング**: Pasta式の引数 → Rune関数の引数型への変換方法は？
+   - **グローバル関数呼び出し**: ✅ 確定
+     - `＠*func_name(arg1, arg2, ...)` → `super::func_name(ctx, args, arg1, arg2, ...)`
+     - `super::` プレフィックスで親モジュール（グローバルスコープ）を参照
+     - ctx, args引数の処理はローカルと同じ
    
-   - Decision: 設計フェーズで関数スコープ解決戦略を詳細化
+   - **実装パターン**:
+     - `FnScope::Local` → `func_name(ctx, args, ...)`
+     - `FnScope::Global` → `super::func_name(ctx, args, ...)`
+     - 参考: src/transpiler/mod.rs:71 (resolve_function), Line 824-836 (Expr::FuncCall)
 ```
 
 ---

@@ -78,7 +78,11 @@ parser2-pest-migrationを完成させた後、トランスパイラー2層を実
 2. The Transpiler2 shall 浮動小数点リテラル（小数点含む）をRune `f64`値に変換する
 3. The Transpiler2 shall 文字列リテラル（括弧括り：`「text」`、`「「nested」」`等）をRune文字列として処理する
 4. The Transpiler2 shall 二項演算式（`+`, `-`, `*`, `/`, `%`, `==`, `!=`, `<`, `>`, `<=`, `>=`）をRune式に変換する
-5. The Transpiler2 shall 関数呼び出し（`＠fn_name(arg1, arg2, ...)`）をRune関数呼び出しに展開する
+5. The Transpiler2 shall 関数呼び出し（式内）を以下のパターンで展開する：
+   - ローカル関数（`＠func_name(arg1, arg2, ...)`）→ `func_name(ctx, args, arg1, arg2, ...)`
+   - グローバル関数（`＠*func_name(arg1, arg2, ...)`）→ `super::func_name(ctx, args, arg1, arg2, ...)`
+   - ctx, args（シーン呼び出しの既定引数）を常に最初に渡す
+   - 後続する引数は Pasta式として評価した値を順次渡す
 6. The Transpiler2 shall 式の結果を正しく型判定し、Runeコードへ適切に埋め込む
 
 ### Requirement 7: Error Handling and Diagnostics
