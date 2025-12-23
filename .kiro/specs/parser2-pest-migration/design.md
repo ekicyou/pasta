@@ -696,7 +696,18 @@ PastaError::ParseError {
 7. 4階層文字列リテラル - PUSH/POPスタック
 
 ### Grammar Coverage Tests
-1. **全60規則のカバレッジ** - 各規則に対応するテストケース
+
+**カバレッジ測定方針**:
+- **測定対象**: 65規則（Normal 39規則 + Atomic 26規則）
+  - Normal規則: 必須（AST型生成、transpiler層で使用）
+  - Atomic規則: エッジケース（テキスト抽出、数値リテラル正規化など）
+  - Silent規則: 測定対象外（75規則、パーサー内部処理のみ）
+- **測定方法**: テストファイル内のコメントで規則名を明記（例: `// Tests: file_scope, global_scene_scope`）
+- **CI統合**: 手動レビュー（自動化は将来の改善として検討）
+- **参照**: [grammar-mapping.md](grammar-mapping.md) の規則分類表
+
+**テストケース**:
+1. **全65規則のカバレッジ** - Normal/Atomic規則に対応するテストケース
 2. **14種類Unicode空白** - space_charsの全パターン
 3. **reserved ID拒否** - `__name__`パターンの検証
 4. **4階層括弧** - `「」`, `「「」」`, `「「「」」」`, `「「「「」」」」`
