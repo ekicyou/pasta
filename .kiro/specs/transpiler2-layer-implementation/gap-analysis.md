@@ -345,9 +345,70 @@ for global_scene in file.global_scenes {
    - transpiler が生成する Rune コード の例 を test_combined_code.rn から抽出
    - transpiler2 の出力仕様書 を design で定義
 
-5. **Fixture Strategy**
-   - parser2 test fixtures (`tests/fixtures/...`) の一覧確認
-   - transpiler2 の新 fixtures が必要か判定
+5. **Fixture Strategy** ✅ **RESOLVED (議題2)**
+   - **Decision**: parser2 test fixtures (`tests/fixtures/parser2/*.pasta`, `comprehensive_control_flow2.pasta`) を流用
+   - **Rationale**: parser2で既にテスト済み、重複を避ける
+   - **Approach**: transpiler固有機能（変数スコープ、call処理）で5-10個の新規fixtureのみ追加
+
+### New Features (parser1→parser2 AST Changes) - **Critical Gaps**
+
+6. **FileScope Attribute Inheritance (Req 11)** 🚨 **NEW PROCESSING REQUIRED**
+   - **Gap**: parser1には`FileScope`自体が存在しない → 旧transpilerはfile-level attributesを処理不可
+   - **parser2 Structure**: `PastaFile { file_scope: FileScope { attrs, words }, global_scenes }`
+   - **Required Implementation**:
+     - `file_scope.attrs`を解析してHashMap<String, String>に変換
+     - グローバルシーン登録時に、file-level attrsとシーンattrsをmerge
+     - Merge rule: シーンレベル属性が優先（同一キーの場合上書き）
+   - **Example**:
+     ```pasta
+     ＆天気：晴れ     # file-level
+     ＆季節：冬       # file-level
+     ＊会話＆時間：夜＆季節：夏  # scene-level
+     ```
+     → シーン「会話」最終属性: `{天気: "晴れ", 時間: "夜", 季節: "夏"}`
+   - →Design で attribute merge strategyを詳細設計
+
+7. **Scene Attributes Processing (Req 12)** 🚨 **NEW PROCESSING REQUIRED**
+   - **Gap**: 旧transpiler `transpile_attributes_to_map()` は常に空HashMap `#{}` を返す（P0スコープ外として未実装）
+   - **Code Reference**: `src/transpiler/mod.rs:558` - "P0: filters are not used, always return empty map"
+   - **parser2 Structure**: `GlobalSceneScope.attrs: Vec<Attr>`, `LocalSceneScope.attrs: Vec<Attr>`
+   - **Required Implementation**:
+     - `GlobalSceneScope.attrs` / `LocalSceneScope.attrs`を解析
+     - 属性値（文字列リテラル、エスケープシーケンス）を正しく処理
+     - SceneRegistry.register_global/register_localに渡す
+   - →Design で attribute conversion logicを実装
+
+8. **CodeBlock Embedding (Req 13)** 🚨 **NEW PROCESSING REQUIRED**
+   - **Gap**: parser1には`code_blocks`機能が存在しない → 旧transpilerはRune codeブロックを処理不可
+   - **parser2 Structure**: 
+     ```rust
+     GlobalSceneScope { code_blocks: Vec<CodeBlock>, ... }
+     LocalSceneScope { code_blocks: Vec<CodeBlock>, ... }
+     ```
+   - **Required Implementation**:
+     - `GlobalSceneScope.code_blocks`をグローバルモジュールレベルに出力
+     - `LocalSceneScope.code_blocks`をローカルシーン関数内に出力
+     - 出力位置の制御（statements/itemsとの順序）
+     - code_blocks内容をそのまま出力（構文検証はRune VMに委譲）
+   - →Design で code block placement strategyを決定
+
+9. **ContinueAction Explicit Processing (Req 14)** 🚨 **SPECIFICATION CHANGE**
+   - **Gap**: pasta.pest（旧）では継続行に明示的prefixなし、pasta2.pest（新）では`：`prefixが必須
+   - **parser2 Structure**: `LocalSceneItem::ContinueAction(ContinueAction { actions, span })`
+   - **Required Implementation**:
+     - `ContinueAction`型を認識し、`ActionLine`と別処理
+     - 直前の`ActionLine`に連結（同一yield文として出力）
+     - 最初のitemがContinueActionの場合、TranspileError::InvalidContinuationを返す
+   - →Design で continuation line merge logicを実装
+
+10. **FileScope Words Registration (Req 15)** 🚨 **FIELD LOCATION CHANGE**
+    - **Gap**: parser1では`PastaFile.global_words`として単一フィールド、parser2では`PastaFile.file_scope.words`に移動
+    - **Code Reference**: 旧transpiler `src/transpiler/mod.rs:156` - `for word_def in &file.global_words { ... }`
+    - **Required Implementation**:
+      - `file_scope.words`（Vec<KeyWords>）をPhase 1で最初に処理
+      - WordDefRegistry.register_globalに登録
+      - file_scope.wordsとglobal_scene.wordsの重複チェック（Warningのみ、エラーではない）
+    - →Design で word registration orderを明確化
 
 ---
 
@@ -357,10 +418,12 @@ for global_scene in file.global_scenes {
 
 | Phase | Task | Days | Notes |
 |-------|------|------|-------|
-| **Design** | Architecture + error types + scope logic | 1-2 | Research items解決 |
-| **Implementation** | mod.rs + context + registries + codegen | 3-4 | ~800行Rust code |
-| **Testing** | 10カテゴリテスト + fixtures | 1-2 | parser2 fixtures流用 |
-| **Total** | | **5-8日** | M (medium) |
+| **Design** | Architecture + error types + scope logic + 新機能5項目 | 2-3 | Research items解決 + 新ギャップ設計 |
+| **Implementation** | mod.rs + context + registries + codegen + 新機能実装 | 4-6 | ~1000-1200行Rust code (FileScope/CodeBlock/Attributes処理追加) |
+| **Testing** | 15カテゴリテスト + fixtures | 2-3 | parser2 fixtures流用 + 新機能テスト追加 |
+| **Total** | | **8-12日** | M→L (medium-to-large) |
+
+**変更理由**: 5つの新機能（Req 11-15）追加により、設計・実装・テストすべてのフェーズで工数増加。特にAttribute継承ロジック（Req 11-12）とCodeBlock埋め込み（Req 13）は新規設計が必要。
 
 ### Risk Assessment
 
@@ -370,8 +433,11 @@ for global_scene in file.global_scenes {
 | **Rune Codegen Bug** | Medium | High | 生成コードのunit test → Runtime 実行テスト |
 | **Symbol Resolution** | Low | Medium | Phase 1 registration ロジックを厳密に仕様化 |
 | **Compatibility** | Low | Medium | E2E integration test で既存Runtime 連携確認 |
+| **Attribute Merge Logic** 🆕 | Medium | Medium | File-level/scene-level属性mergeルールをテストで網羅検証 |
+| **CodeBlock Placement** 🆕 | Low | Medium | Code block出力位置を仕様化、出力Runeコードの構文検証テスト |
+| **ContinueAction Continuity** 🆕 | Low | Low | 継続行連結ロジックをunit testで厳密検証 |
 
-**Overall Risk: Medium** (新規実装だが、既存パターン踏襲で軽減)
+**Overall Risk: Medium-High** (新規実装 + 5つの新機能追加でリスク増加、ただし既存パターン踏襲で軽減可能)
 
 ---
 
