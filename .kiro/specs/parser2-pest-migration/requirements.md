@@ -85,7 +85,7 @@ pasta2.pestに基づいた実装を行う。pasta2.pestを憲法とし、新た�
 **Objective:** 開発者として、pasta2.pest文法の**すべての機能**を検証するテストを用意したい。これにより、実装の完全性を保証できる。
 
 #### Acceptance Criteria
-1. The Pastaプロジェクト shall grammar.pestで定義されたすべての文法規則をカバーするテストファイルを作成する
+1. The Pastaプロジェクト shall grammar.pestで定義された**すべての**文法規則（約60規則）をカバーするテストファイルを作成する（式展開を含む全規則を網羅し、将来のtranspiler2実装の基盤とする）
 2. The テストスイート shall すべてのスコープ構造を検証する：file_scope、global_scene_scope、local_scene_scope
 3. The テストスイート shall 4階層すべての括弧レベルで入れ子文字列リテラルを検証する（`「text」`、`「「text」」`、`「「「text」」」`、`「「「「text」」」」`）
 4. The テストスイート shall 予約IDパターンの拒否を検証する（`__name__` shall パース失敗する）
