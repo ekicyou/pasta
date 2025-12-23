@@ -131,17 +131,17 @@ pub fn parse_str(source: &str, filename: &str) -> Result<PastaFile, PastaError> 
 ### 実装上の複雑性シグナル
 
 - **高度なアルゴリズム**: スコープ階層の完全解析 (file → global → local の3層構造)
-- **外部統合**: Pest 2.8のPUSH/POPスタック機能（4階層入れ子文字列必須）
+- **既存検証済み文法の実装**: Pest 2.8のPUSH/POPスタック機能（4階層入れ子文字列）は**pasta2.pestで既に検証済み**、実装のみ実施
 - **検証ロジック**: reserved ID pattern (`__.*__`)の拒否（Pest negative lookahead必須）
 - **Unicode完全対応**: 14種類の空白文字すべてのサポート
 
-### 実装必須項目（Research完了後に実装）
+### 実装必須項目（Design/Implementation Phaseで完了）
 
 **Implementation Required**:
-1. **Pest PUSH/POPスタック**: 4階層文字列リテラル (`「「「「text」」」」`) の完全実装（Pestドキュメント研究 + 動作検証）
-2. **スコープ解析戦略**: `file_scope`内の`global_scene_scope`反復の完全実装（再帰的パース）
-3. **継続行の完全統合**: `continue_action_line` (`:` 開始) の意味論を確定し実装
-4. **reserved ID検証**: Pest negative lookaheadまたはRust側検証の決定と実装
+1. **Pest PUSH/POPスタック実装**: 4階層文字列リテラル (`「「「「text」」」」`) - **文法は検証済み**、Rust AST構築ロジックのみ実装
+2. **スコープ解析実装**: `file_scope`内の`global_scene_scope`反復の完全実装（再帰的パース）
+3. **継続行の実装**: `continue_action_line` (`:` 開始) のAST構築
+4. **reserved ID検証実装**: Pest negative lookaheadまたはRust側検証の実装
 
 ---
 
@@ -285,26 +285,27 @@ pub use parser2::{
 ### 工数見積もり: **L (Large: 1-2 weeks)**
 
 **内訳**:
-1. **Pest PUSH/POPスタック研究** (1日): ドキュメント調査 + 動作検証
+1. **pasta2.pest文法の完全理解** (1日): 既存検証済み文法の詳細把握、Pest PUSH/POP等の動作確認
 2. **ディレクトリ・ファイル作成** (0.5日): `parser2/mod.rs`, `ast.rs`, git mv
 3. **完全なAST型定義** (3日): 20種類以上の型（FileScope, GlobalSceneScope, LocalSceneScope, CodeBlock, 4階層StringLiteral, reserved ID対応等）
-4. **Pestパーサー統合** (2日): `#[derive(Parser)]`, Rule定義、PUSH/POP実装
+4. **Pestパーサー統合** (2日): `#[derive(Parser)]`, Rule定義、PUSH/POP AST構築実装
 5. **parse_str/parse_file完全実装** (3日): Pest結果から完全なAST構築ロジック（スコープ階層解析含む）
 6. **包括的テストスイート** (2日): 全文法規則カバレッジ、fixtures作成
 7. **ドキュメント・lib.rs統合** (0.5日): mod doc, 公開API追加
 
 **根拠**:
-- ⚠️ pasta2.pest文法の完全実装には高度な学習コストあり
-- ⚠️ PUSH/POPスタック機構は新規技術要素
+- ✅ **pasta2.pest文法は検証済み** - 文法研究の工数削減
+- ⚠️ AST構築ロジックの実装は高度な学習コストあり
+- ⚠️ PUSH/POPスタック機構のRust側実装は新規技術要素
 - ⚠️ スコープ階層解析は複雑なロジック
 - ✅ 既存パターン（parser実装）の部分的再適用が可能
 
-### リスク評価: **High**
+### リスク評価: **Medium-High**
 
 | リスク要因 | レベル | 軽減策 |
 |-----------|--------|--------|
-| **pasta2.pest文法の完全実装** | High | 実装前にPest動作を完全検証、曖昧な箇所は明確化してから着手 |
-| **Pest PUSH/POPスタック** | High | 専用の研究フェーズを設け、サンプルコードで動作確認後に実装 |
+| **pasta2.pest文法の完全実装** | Medium | **文法は検証済み** - Pest動作確認のみで実装着手可能 |
+| **Pest PUSH/POPスタック実装** | Medium | **文法は検証済み** - Rust AST構築ロジックの実装とテストに集中 |
 | **スコープ階層解析の複雑性** | Medium | 段階的実装（file → global → local の順）とユニットテスト |
 | **reserved ID検証** | Medium | Pest negative lookahead vs Rust検証の両方をプロトタイプし、品質の高い方を採用 |
 | **テストカバレッジ不足** | Medium | 全文法規則に対するテストケースマトリクスを事前作成 |
@@ -312,10 +313,11 @@ pub use parser2::{
 | **既存parserへの影響** | Low | 完全独立なのでゼロリスク |
 
 **根拠**:
-- ❌ pasta2.pest文法の新規要素（PUSH/POP、スコープ階層）が高リスク
-- ❌ 完全実装要求により妥協の余地なし
+- ✅ **pasta2.pest文法検証済み** - 文法妥当性リスクなし
+- ⚠️ AST構築ロジックの実装は中程度のリスク（文法は確定済み）
+- ⚠️ 完全実装要求により妥協の余地なし
 - ✅ 独立モジュールなので影響範囲が限定的
-- ⚠️ 工数超過リスクあり（L → XL の可能性）
+- ✅ 文法検証済みにより工数超過リスク軽減（L維持可能）
 
 ---
 
@@ -328,58 +330,65 @@ pub use parser2::{
 2. pasta2.pest文法とpasta.pest文法の差分が大きく、段階的移行が不可能
 3. 将来のリファクタリング（parser削除）が容易
 
-### 重要な設計判断事項
+### 設計判断事項（Design Phaseで決定）
 
 #### 優先度A（本仕様で決定・実装必須）
 1. **AST型の命名**: `PastaFileV2` vs `PastaFile2` vs 別名？ → 設計フェーズで決定
 2. **公開API命名**: 既に決定 - `parser2::parse_str` (namespace経由)
 3. **スコープ構造のAST表現**: `FileScope { attrs, words, scenes }`の詳細設計 → 設計フェーズで詳細化
-4. **PUSH/POPスタック実装方法**: Pestドキュメント研究 + 実装パターン確立 → 設計/実装フェーズで完了必須
+4. **PUSH/POPスタックAST構築**: **文法は検証済み** - Rust側のAST構築ロジック設計 → 設計/実装フェーズで完了必須
 5. **reserved ID検証方法**: Pest negative lookahead vs Rust validation → 設計フェーズで決定
-6. **継続行の統合**: `continue_action_line`と既存`continuation_line`の関係 → 設計フェーズで明確化
+6. **継続行のAST表現**: `continue_action_line`のAST型設計 → 設計フェーズで明確化
 
 #### 優先度B（将来仕様で対応）
 7. **transpiler2設計**: parser2::AST → Runeコード変換 → 別仕様
 8. **テスト移行戦略**: 12個の既存testをparser2に移行する順序 → 別仕様
 
-### 研究項目（Design Phaseで実施完了必須）
+### 実装項目（Design/Implementation Phaseで実施）
 
-**Research Item 1: Pest PUSH/POPスタック（必須）**
-- **目的**: 4階層文字列リテラル (`「「「「text」」」」`) の完全実装方法確認
-- **アクション**: Pestドキュメント + サンプルコード実装 + 動作検証完了
-- **成果物**: 実装可能な確定コード + テストケース
+**前提: pasta2.pest文法は既に検証済み（一切の変更を認めない）**
 
-**Research Item 2: スコープ階層パース戦略（必須）**
+**Design Item 1: AST型の完全設計**
+- **目的**: pasta2.pest全規則に対応するRust型定義
+- **アクション**: 20種類以上のAST型を詳細設計（FileScope, GlobalSceneScope, LocalSceneScope, CodeBlock, 4階層StringLiteral等）
+- **成果物**: 完全なAST型定義 + 型間関係図
+
+**Design Item 2: PUSH/POPスタックのAST構築設計**
+- **目的**: **検証済み文法**に対するRust AST構築ロジックの設計
+- **アクション**: Pestの`PUSH`/`POP`/`PEEK`機能とRust AST型のマッピング設計
+- **成果物**: AST構築アルゴリズムの詳細設計 + サンプルコード
+
+**Design Item 3: スコープ階層解析アルゴリズム**
 - **目的**: `file_scope` → `global_scene_scope` → `local_scene_scope` の完全解析方法
-- **アクション**: Pestの再帰的規則処理の完全理解 + アルゴリズム確定
-- **成果物**: AST構築アルゴリズムの詳細設計 + 擬似コード
+- **アクション**: Pestの再帰的規則処理の設計、AST構築の詳細フロー
+- **成果物**: スコープ解析アルゴリズムの詳細設計 + 擬似コード
 
-**Research Item 3: reserved ID検証ロジック（必須）**
+**Design Item 4: reserved ID検証方法の決定**
 - **目的**: `__name__` パターンの拒否方法（Pest段階 vs AST構築段階）
-- **アクション**: Pest negative lookahead vs Rust validationの両方を実装・比較
+- **アクション**: Pest negative lookahead vs Rust validationの実装・比較プロトタイプ
 - **成果物**: 実装方針の確定（エラーメッセージ品質・パフォーマンス評価済み）
 
-**Research Item 4: 継続行の意味論（必須）**
-- **目的**: `continue_action_line` (`:` 開始) の正確な動作仕様
-- **アクション**: pasta2.pestの意図を明確化、AST表現を決定
-- **成果物**: 継続行のAST型定義 + サンプルコード
+**Design Item 5: 継続行のAST設計**
+- **目的**: `continue_action_line` (`:` 開始) のAST表現
+- **アクション**: pasta2.pestの文法規則からAST型を設計
+- **成果物**: 継続行のAST型定義 + パース実装方針
 
 ### 次フェーズへの引き継ぎ事項
 
 **Design Phaseで詳細化すべき項目**:
-- [ ] parser2::ASTの全型定義（20種類以上予想：FileScope, GlobalSceneScope, LocalSceneScope, CodeBlock, 4階層StringLiteral, ReservedIdValidation等）
+- [ ] parser2::ASTの全型定義（20種類以上：FileScope, GlobalSceneScope, LocalSceneScope, CodeBlock, 4階層StringLiteral, ReservedIdValidation等）
 - [ ] `parse_str`のエラーハンドリング詳細（全エラーケースの網羅）
 - [ ] `src/parser2/mod.rs`の構造（関数分割方針、1000行超え想定）
 - [ ] 包括的テストケースマトリクス（全文法規則カバレッジ）
-- [ ] 4つのResearch Itemの完了と実装方針確定
+- [ ] 5つのDesign Itemの完了と実装方針確定
 
 **Implementation Phaseで実施すべき項目**:
-- [ ] `git mv src/parser/pasta2.pest src/parser2/grammar.pest`
-- [ ] parser2::ast型定義（完全版）
-- [ ] Pestパーサー統合（PUSH/POPスタック含む）
+- [ ] **絶対要件**: `git mv src/parser/pasta2.pest src/parser2/grammar.pest` - バイト単位で同一性を保証
+- [ ] parser2::ast型定義（完全版、20種類以上）
+- [ ] Pestパーサー統合（PUSH/POPスタックAST構築含む）
 - [ ] スコープ階層解析ロジック実装
 - [ ] reserved ID検証実装
-- [ ] 包括的テストスイート作成
+- [ ] 包括的テストスイート作成（全文法規則カバレッジ）
 - [ ] 全テスト合格確認
 
 ---
@@ -392,13 +401,15 @@ pasta2.pest文法は既存pasta.pest文法との間に、スコープ構造・�
 
 **推奨実装戦略**: Option B（新規parser2モジュール作成）+ **完全実装アプローチ**
 
+**重要な前提**: pasta2.pest文法は**既に検証済み**であり、**一切の変更を認めない**。実装フェーズでは検証済み文法に対するRust AST構築ロジックのみを実装する。
+
 この戦略により、以下を達成します：
 - ✅ 既存parserの完全保全（ゼロリスク）
-- ✅ pasta2.pest文法の**完全実装**（202行すべて）
-- ✅ PUSH/POPスタック研究完了後の確実な実装
+- ✅ pasta2.pest文法の**完全実装**（202行すべて、バイト単位で保全）
+- ✅ **検証済み文法の活用** - 文法研究不要、AST構築実装に集中
 - ✅ 包括的テストスイート（全文法規則カバレッジ）
 - ✅ 将来のリファクタリング容易性
 
-**工数**: **L (1-2週間)**（完全実装要求により増加）、**リスク**: **High**（PUSH/POPスタック、スコープ階層、妥協なし）
+**工数**: **L (1-2週間)**、**リスク**: **Medium-High**（文法検証済みによりリスク軽減、AST実装は中程度の複雑性）
 
-次のDesign Phaseでは、4つのResearch Itemを完了し、AST型の完全設計・スコープ解析アルゴリズム・PUSH/POPスタック実装パターンを確定させます。MVP禁止原則に従い、pasta2.pestの全機能を実装完了してからのみ完成とします。
+次のDesign Phaseでは、5つのDesign Itemを完了し、AST型の完全設計・PUSH/POPスタックAST構築・スコープ解析アルゴリズムを確定させます。MVP禁止原則に従い、pasta2.pestの全機能を実装完了してからのみ完成とします。
