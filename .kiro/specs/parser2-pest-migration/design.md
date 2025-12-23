@@ -699,6 +699,15 @@ PastaError::ParseError {
 2. **14種類Unicode空白** - space_charsの全パターン
 3. **reserved ID拒否** - `__name__`パターンの検証
 4. **4階層括弧** - `「」`, `「「」」`, `「「「」」」`, `「「「「」」」」`
+5. **数値リテラル変換** - 全角/半角数字・記号の正規化
+   - 全角数字: `１２３` → `Integer(123)`
+   - 全角マイナス: `－４５６` → `Integer(-456)`
+   - 全角小数点（`．`）: `３．１４` → `Float(3.14)`
+   - 半角小数点（`.`）: `3.14` → `Float(3.14)`
+   - 混在パターン: `３.１４`, `3．14`
+   - 境界値: `i64::MAX`, `i64::MIN`
+   - ゼロ: `０` → `Integer(0)`, `0.0` → `Float(0.0)`
+   - 詳細はresearch.md調査7参照
 
 ### Test Fixtures
 - `tests/fixtures/parser2/` - parser2専用fixtureディレクトリ
