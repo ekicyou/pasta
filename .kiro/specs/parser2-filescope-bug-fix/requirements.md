@@ -21,7 +21,7 @@ parser2の現在の実装は、Pest文法定義 `file = ( file_scope | global_sc
 **目的**: parser2が`(file_scope | global_scene_scope)*`文法を正確に実装し、複数のファイルレベルアイテム（属性、単語、シーン）を交互出現させながら、記述順序を完全に保持すること。
 
 #### 受入基準
-1. When `PastaFile`を構築する場合、parser2 shall `Vec<FileItem>`フィールドを使用し、FileAttr・GlobalWord・GlobalScopeScope の3つのバリアントを交互に任意回数格納できる
+1. When `PastaFile`を構築する場合、parser2 shall `Vec<FileItem>`フィールドを使用し、FileAttr・GlobalWord・GlobalSceneScope の3つのバリアントを0回以上任意に格納できる（grammar.pest `( file_scope | global_scene_scope )*` に準拠、各要素は任意回数出現）
 2. When パーサーが `file_scope` ブロックをマッチする場合、parser2 shall そのブロック内の `attrs` を `FileItem::FileAttr` として items に追加する
 3. When パーサーが `file_scope` ブロックをマッチする場合、parser2 shall そのブロック内の `words` を `FileItem::GlobalWord` として items に追加する
 4. When パーサーが `global_scene_scope` ブロックをマッチする場合、parser2 shall それを `FileItem::GlobalSceneScope` として items に追加する
@@ -51,8 +51,8 @@ parser2の現在の実装は、Pest文法定義 `file = ( file_scope | global_sc
 **目的**: 複数ファイルアイテム交互出現シナリオをカバーする統合テストを追加し、既存テストを新AST構造に対応させる。
 
 #### 受入基準
-1. The parser2 shall ファイルスコープと複数グローバルシーンが交互に3回以上出現するテストフィクスチャ（`comprehensive_control_flow2.pasta` など）を含む
-2. When テストを実行する場合、parser2 shall `file.items` が正確に6個以上のFileItem（FileAttr・GlobalWord・GlobalSceneScope の混在）を格納していることを検証する
+1. The parser2 shall file_scope と global_scene_scope の複数出現パターン（交互出現、単一種類のみ、混在など）をカバーするテストフィクスチャを含む
+2. When テストを実行する場合、parser2 shall `file.items` が期待された各FileItemバリアント（FileAttr・GlobalWord・GlobalSceneScope）を正確に格納していることを検証する
 3. When テストを実行する場合、parser2 shall items の各インデックスで期待される順序（ファイル記述順）に従っていることを検証する
 4. The parser2 shall `tests/parser2_integration_test.rs` 内の既存テスト6箇所を新 items ベースの検証に修正する
 5. The parser2 shall パターンマッチまたはヘルパーメソッドを使用して、特定の `FileItem` バリアントを抽出可能にする
@@ -80,8 +80,8 @@ parser2の現在の実装は、Pest文法定義 `file = ( file_scope | global_sc
 ## 制約条件
 
 ### 技術制約
-- **Pest文法準拠**: `file = ( file_scope | global_scene_scope )*` 仕様に完全準拠すること
-- **Rust所有権**: `FileItem`列挙型は`FileScope`と`GlobalSceneScope`を所有すること
+- **Pest文法準拠**: `file = ( file_scope | global_scene_scope )*` 仕様に完全準拠すること（各要素は0回以上の任意回数出現）
+- **Rust所有権**: `FileItem`列挙型は`Attr`・`KeyWords`・`GlobalSceneScope`を所有すること
 - **後方互換性**: `PastaFile`のパブリックAPIを変更する場合、セマンティックバージョニング（メジャーバージョンアップ）を適用すること
 
 ### 非機能制約
