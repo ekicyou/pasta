@@ -139,35 +139,47 @@ Pass 2 (transpile_pass2):
 
 ---
 
-### Option B: Create New Transpiler2 Components ⭐ **RECOMMENDED**
+### Option B-改改: Create New Transpiler2 + Shared Registry Module ⭐ **RECOMMENDED & APPROVED**
 
-**Rationale**: `src/transpiler2/`を新規作成し、既存transpilerと完全に独立
+**Rationale**: `src/transpiler2/`を新規作成し、既存transpilerと独立。ただし、SceneRegistry/WordDefRegistry/SceneTable/WordTableは共有モジュール`src/registry/`に統合して再利用。
 
 **Architecture**:
 ```
-src/transpiler2/
-├── mod.rs                  # Transpiler2 struct + public API
-├── context.rs              # TranspileContext2（parser2対応）
-├── scene_registry.rs       # SceneRegistry2（既存から最小改修）
-├── word_registry.rs        # WordDefRegistry2（既存から流用）
-├── symbol_resolver.rs      # Symbol resolution (parser2専用)
-└── code_generator.rs       # AST → Rune code generation
+src/
+├── registry/              # 新規：共有レジストリモジュール
+│   ├── mod.rs            # 公開API
+│   ├── scene_registry.rs # SceneRegistry（transpilerから移動）
+│   ├── word_registry.rs  # WordDefRegistry（transpilerから移動）
+│   ├── scene_table.rs    # SceneTable（runtimeから移動）
+│   └── word_table.rs     # WordTable（runtimeから移動）
+├── transpiler/            # Transpiler struct のみ（registry import）
+│   └── mod.rs
+├── transpiler2/           # 新規
+│   ├── mod.rs            # Transpiler2 struct + public API
+│   ├── context.rs        # TranspileContext2（parser2対応）
+│   ├── symbol_resolver.rs # Symbol resolution (parser2専用)
+│   └── code_generator.rs # AST → Rune code generation
+└── runtime/               # Generator/Variables等のみ（registry import）
+    ├── mod.rs
+    ├── generator.rs
+    └── variables.rs
 ```
 
 **Advantages**:
 - ✅ **完全な独立性**: parser/transpiler と parser2/transpiler2 は完全分離
-- ✅ **明確なレイヤー分離**: tech.md「レイヤードアーキテクチャ」準拠
+- ✅ **レジストリ共有**: SceneRegistry/WordDefRegistry/SceneTable/WordTableはAST型に依存せず、100%再利用可能
+- ✅ **コード重複0**: Registry/Tableの重複実装不要
+- ✅ **明確な名前空間**: `pasta::registry::*` として独立管理
 - ✅ **リグレッション0**: 既存テストへの影響なし
-- ✅ **段階的置き換え**: lib.rs に `pub mod transpiler2;` 追加のみで、将来 `pub mod transpiler;` 削除可能
+- ✅ **段階的置き換え**: 将来 `transpiler` 削除時も `registry` は継続使用可能
 - ✅ **テスト隔離**: transpiler2テストが既存テストと独立
 
 **Disadvantages**:
-- ❌ ファイル数増加（6-7ファイル）
-- ❌ 一部ロジック重複（SceneRegistry → SceneRegistry2は85%同一）
-- ❌ メンテナンス負荷増加
+- ❌ ファイル移動作業（scene_registry.rs/word_registry.rs/scene_table.rs/word_table.rsの4ファイル）
+- ❌ import文の更新（既存transpiler/runtimeコードのuse文修正）
 
-**Estimated Effort**: M (4-6日)
-**Estimated Risk**: Medium (新規実装、既存パターン踏襲 → リスク軽減)
+**Estimated Effort**: M (4-5日) - レジストリ移動で1日節約
+**Estimated Risk**: Low-Medium (既存Registry完全再利用 → リスク大幅軽減)
 
 ---
 
@@ -201,14 +213,15 @@ src/transpiler/             # 既存
 
 ---
 
-## 4. Recommended Approach: Option B
+## 4. Recommended Approach: Option B-改改 ✅ **APPROVED**
 
 ### Rationale
 
 1. **Specification準拠**: `.kiro/steering/tech.md` - "レイヤー構成...レイヤー分離原則"
-2. **マイグレーション安全性**: Requirement 5 - "レガシーとのコンパイルエラーを引き起こさない"
-3. **テスト隔離**: Requirement 10の10カテゴリテストが既存テストと独立に実行可能
-4. **段階的統合**: parser2完了直後に transpiler2着手可能、将来レガシー削除時にmod transpiler2をpub mod transpilerに置き換え可能
+2. **マイグレーション安全性**: Requirement 1 - "レガシーとのコンパイルエラーを引き起こさない"
+3. **レジストリ再利用**: SceneRegistry/WordDefRegistry/SceneTable/WordTableはAST型に依存せず完全再利用可能
+4. **テスト隔離**: Requirement 10の10カテゴリテストが既存テストと独立に実行可能
+5. **段階的統合**: parser2完了直後に transpiler2着手可能、将来レガシー削除時にmod transpiler2をpub mod transpilerに置き換え可能
 
 ### Key Design Decisions
 
@@ -256,16 +269,18 @@ pub enum TranspileError {
 }
 ```
 
-#### 3. SceneRegistry2 vs. SceneRegistry
+#### 3. Registry Module Design
 
-| Aspect | SceneRegistry (parser) | SceneRegistry2 (parser2) |
-|--------|-------------------------|--------------------------|
-| Input | `parser::SceneDef` | `parser2::GlobalSceneScope` |
-| Fn path pattern | `crate::{scene}_{counter}::__start__` | Same |
-| Parent tracking | None (global only) | Optional (for local scenes) |
-| Reusability | ~30% （Input型が異なる） | New implementation |
+**共有レジストリモジュール `src/registry/`**
 
-**設計**: SceneRegistry を完全新規実装（継承せず）→ 各レイヤーの独立性最大化
+| Component | Purpose | Reusability |
+|-----------|---------|-------------|
+| **SceneRegistry** | Transpile時のシーン登録（AST型非依存） | ✅ 100% transpiler/transpiler2共用 |
+| **WordDefRegistry** | Transpile時の単語定義登録（AST型非依存） | ✅ 100% transpiler/transpiler2共用 |
+| **SceneTable** | Runtime時のシーン検索・選択 | ✅ 100% 既存Runtime層と共用 |
+| **WordTable** | Runtime時の単語検索・選択 | ✅ 100% 既存Runtime層と共用 |
+
+**設計**: 既存Registry/Tableを `src/registry/` に移動し、transpiler/transpiler2/runtimeから `use crate::registry::*;` で共用
 
 #### 4. Scope Handling Logic
 

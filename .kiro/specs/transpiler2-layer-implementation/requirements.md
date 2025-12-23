@@ -6,6 +6,8 @@ parser2-pest-migrationを完成させた後、トランスパイラー2層を実
 ## Introduction
 本仕様は、既に完成した`parser2`モジュール（parser2-pest-migration完了後）を入力として、新たな`transpiler2`レイヤーを実装するための要件を定義します。transpiler2は、parser2が生成した新AST型に対応し、より保守性の高い実装設計を提供します。レガシーtranspilerと並存しながら、段階的に置き換える基盤を確立します。
 
+**実装方針（ギャップ分析承認済み）**: SceneRegistry/WordDefRegistry/SceneTable/WordTableを共有モジュール`src/registry/`に統合し、transpiler/transpiler2/runtimeから共用します。これにより、コード重複を完全に排除し、既存Registry実装を100%再利用します。
+
 ## Requirements
 
 ### Requirement 1: Transpiler2 Module Independence
