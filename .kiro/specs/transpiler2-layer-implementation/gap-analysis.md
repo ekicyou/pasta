@@ -489,17 +489,22 @@ for global_scene in file.global_scenes {
    - Error handling flow
    - Code generation examples
 
-3. 🚨 CLARIFICATION NEEDED - 議題として検討:
-   - **式の型システム**: parser2では Integer/Float を分離したが、Rune出力時の型推論戦略は？
+3. ✅ CLARIFIED - 変数・式処理戦略（議題7）:
+   - **変数のスコープ解決**: ✅ 既存transpilerパターン踏襲で確定
+     - VarScope::Local → `ctx.local.変数名`
+     - VarScope::Global → `ctx.global.変数名`
+     - 代入文: `＄count：１０` → `ctx.local.count = 10;`
+     - 式内参照: `＄count + １` → `ctx.local.count + 1`
+     - **会話行内参照**: `「現在：＄count」` → `` yield Talk(`現在：${ctx.local.count}`); ``
+       - Runeテンプレート文字列（バッククォート）で動的評価
+       - Runtime実行時にRune VMが変数を展開
+       - 参考: src/transpiler/mod.rs:502 (SpeechPart::VarRef処理)
+   
+   - **式の型システム**: 🔶 設計フェーズで決定
      - parser1 transpiler: Literal::Number(f64) を直接 to_string() で出力
      - parser2 AST: Integer(i64) と Float(f64) を明示的に区別
-     - Question: Rune VMでの型推論に委ねる？または明示的に型サフィックス（`42i64`）を付与？
-   
-   - **変数のスコープ解決**: parser2では VarScope::Local/Global だが、transpiler2での参照方法は？
-     - parser1 transpiler: `ctx.local.変数名` / `ctx.global.変数名`
-     - parser2 AST: VarScope enum は同じ構造
-     - Question: Req 5の「変数参照をRune値として埋め込む」は文字列補間？代入文の右辺？両方？
-     - Example clarification needed: `let msg = "Count: $count";` → `format!("Count: {}", ctx.local.count)` なのか？
+     - Question: Rune VMでの型推論に委ねる（`42`, `3.14`）？または型サフィックス（`42i64`, `3.14f64`）？
+     - Decision: 設計書で既存transpilerパターン確認後に決定
 ```
 
 ---

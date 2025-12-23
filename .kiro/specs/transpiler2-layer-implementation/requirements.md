@@ -63,7 +63,10 @@ parser2-pest-migrationを完成させた後、トランスパイラー2層を実
 2. The Transpiler2 shall グローバル変数（`＄＊var_name`）をRuneの共有状態（extern関数経由、またはコンテキストパラメータ）として生成する
 3. The Transpiler2 shall システム変数（`＄＊＊var_name`）に専用マーカー（例：メタデータタグ）を付与し、Engine/Runtime層で永続化可能にする（具体的な永続化メカニズム実装はEngine/Runtime層の責任）
 4. The Transpiler2 shall 変数代入（`＄var：value`）のRHS値をPasta式として評価する
-5. The Transpiler2 shall 変数参照（`＄var`）をRune値として埋め込む（例：`let msg = "Current: {$count}";`→`let msg = format!("Current: {}", count);`）
+5. The Transpiler2 shall 変数参照（`＄var`）を以下の方法でRune値として埋め込む：
+   - 代入文右辺・式内: `ctx.local.変数名` / `ctx.global.変数名` として直接参照
+   - 会話行内: Runeテンプレート文字列で動的評価（`` yield Talk(`現在：${ctx.local.count}`); ``）
+   - 参考: src/transpiler/mod.rs:502 (SpeechPart::VarRef処理)
 
 ### Requirement 6: Expression Evaluation and Type Inference
 **Objective:** 開発者として、Pasta DSL式（整数、浮動小数点、文字列、演算）をRuneコードで評価可能にしたい。これにより、動的スクリプト機能を実現できる。
