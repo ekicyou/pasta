@@ -3,10 +3,7 @@
 //! These tests verify the parser2 module implementation using fixtures
 //! and cover all grammar rules defined in grammar.pest.
 
-use pasta::parser2::{
-    Action, Arg, AttrValue, Expr, FnScope, GlobalSceneScope, LocalSceneItem, PastaFile, VarScope,
-    parse_file, parse_str,
-};
+use pasta::parser2::{Expr, FileItem, LocalSceneItem, parse_file, parse_str};
 use std::path::Path;
 
 // ============================================================================
@@ -18,9 +15,9 @@ fn test_parse_empty_file() {
     let result = parse_str("", "empty.pasta");
     assert!(result.is_ok());
     let file = result.unwrap();
-    assert!(file.global_scenes.is_empty());
-    assert!(file.file_scope.attrs.is_empty());
-    assert!(file.file_scope.words.is_empty());
+    assert!(file.global_scene_scopes().is_empty());
+    assert!(file.file_attrs().is_empty());
+    assert!(file.words().is_empty());
 }
 
 #[test]
@@ -36,8 +33,8 @@ fn test_parse_simple_scene() {
     let result = parse_str(source, "simple.pasta");
     assert!(result.is_ok());
     let file = result.unwrap();
-    assert_eq!(file.global_scenes.len(), 1);
-    assert_eq!(file.global_scenes[0].name, "挨拶");
+    assert_eq!(file.global_scene_scopes().len(), 1);
+    assert_eq!(file.global_scene_scopes()[0].name, "挨拶");
 }
 
 // ============================================================================
@@ -56,8 +53,9 @@ fn test_three_layer_scope_structure() {
     let file = result.unwrap();
 
     // GlobalSceneScope
-    assert_eq!(file.global_scenes.len(), 1);
-    let global = &file.global_scenes[0];
+    let scenes = file.global_scene_scopes();
+    assert_eq!(scenes.len(), 1);
+    let global = scenes[0];
     assert_eq!(global.name, "グローバル");
 
     // LocalSceneScope (start scene + named scene)
@@ -78,10 +76,12 @@ fn test_file_scope_attrs_and_words() {
     assert!(result.is_ok());
     let file = result.unwrap();
 
-    assert_eq!(file.file_scope.attrs.len(), 2);
-    assert_eq!(file.file_scope.attrs[0].key, "author");
-    assert_eq!(file.file_scope.words.len(), 1);
-    assert_eq!(file.file_scope.words[0].name, "greeting");
+    let attrs = file.file_attrs();
+    let words = file.words();
+    assert_eq!(attrs.len(), 2);
+    assert_eq!(attrs[0].key, "author");
+    assert_eq!(words.len(), 1);
+    assert_eq!(words[0].name, "greeting");
 }
 
 #[test]
@@ -94,7 +94,7 @@ fn test_continue_action_line() {
     assert!(result.is_ok());
     let file = result.unwrap();
 
-    let local = &file.global_scenes[0].local_scenes[0];
+    let local = &file.global_scene_scopes()[0].local_scenes[0];
     assert!(local.items.len() >= 2);
     assert!(matches!(local.items[0], LocalSceneItem::ActionLine(_)));
     assert!(matches!(local.items[1], LocalSceneItem::ContinueAction(_)));
@@ -115,11 +115,12 @@ fn test_unnamed_scene_inheritance() {
     assert!(result.is_ok());
     let file = result.unwrap();
 
-    assert_eq!(file.global_scenes.len(), 2);
-    assert_eq!(file.global_scenes[0].name, "挨拶");
-    assert!(!file.global_scenes[0].is_continuation);
-    assert_eq!(file.global_scenes[1].name, "挨拶"); // inherited
-    assert!(file.global_scenes[1].is_continuation);
+    let scenes = file.global_scene_scopes();
+    assert_eq!(scenes.len(), 2);
+    assert_eq!(scenes[0].name, "挨拶");
+    assert!(!scenes[0].is_continuation);
+    assert_eq!(scenes[1].name, "挨拶"); // inherited
+    assert!(scenes[1].is_continuation);
 }
 
 #[test]
@@ -145,10 +146,11 @@ fn test_multiple_unnamed_scenes() {
     assert!(result.is_ok());
     let file = result.unwrap();
 
-    assert_eq!(file.global_scenes.len(), 3);
-    assert_eq!(file.global_scenes[0].name, "元");
-    assert_eq!(file.global_scenes[1].name, "元");
-    assert_eq!(file.global_scenes[2].name, "元");
+    let scenes = file.global_scene_scopes();
+    assert_eq!(scenes.len(), 3);
+    assert_eq!(scenes[0].name, "元");
+    assert_eq!(scenes[1].name, "元");
+    assert_eq!(scenes[2].name, "元");
 }
 
 // ============================================================================
@@ -242,7 +244,7 @@ fn test_half_width_integer() {
     let result = parse_str(source, "num_hw.pasta");
     assert!(result.is_ok());
     let file = result.unwrap();
-    let item = &file.global_scenes[0].local_scenes[0].items[0];
+    let item = &file.global_scene_scopes()[0].local_scenes[0].items[0];
     if let LocalSceneItem::VarSet(vs) = item {
         assert!(matches!(vs.value, Expr::Integer(123)));
     } else {
@@ -258,7 +260,7 @@ fn test_full_width_integer() {
     let result = parse_str(source, "num_fw.pasta");
     assert!(result.is_ok());
     let file = result.unwrap();
-    let item = &file.global_scenes[0].local_scenes[0].items[0];
+    let item = &file.global_scene_scopes()[0].local_scenes[0].items[0];
     if let LocalSceneItem::VarSet(vs) = item {
         assert!(matches!(vs.value, Expr::Integer(123)));
     } else {
@@ -448,6 +450,222 @@ fn test_parse_comprehensive_control_flow() {
         // that differs from pasta2.pest
         if result.is_err() {
             println!("Note: comprehensive_control_flow.pasta may use pasta.pest-specific syntax");
+        }
+    }
+}
+
+// ============================================================================
+// Multiple FileItem Occurrence Tests (parser2-filescope-bug-fix)
+// ============================================================================
+
+/// Task 4.1: 複数 file_scope 単純連続パターンのテスト
+/// 連続する attrs/words は 1つの file_scope としてパースされる
+/// 複数の file_scope を発生させるには global_scene_scope を挟む必要がある
+#[test]
+fn test_multiple_file_scope_consecutive() {
+    // 連続する file_scope アイテムは1つの file_scope としてパース
+    let source = r#"&author：テスト
+@greeting：こんにちは
+&version：1.0
+@farewell：さようなら
+＊シーン
+  Alice：テスト
+"#;
+    let result = parse_str(source, "multi_file_scope.pasta");
+    assert!(result.is_ok());
+    let file = result.unwrap();
+
+    // 全ての attrs と words が先に来て、その後 GlobalSceneScope
+    // 連続した file_scope アイテムは attrs → words の順でパースされる
+    let attrs = file.file_attrs();
+    let words = file.words();
+    assert_eq!(attrs.len(), 2);
+    assert_eq!(words.len(), 2);
+    assert_eq!(attrs[0].key, "author");
+    assert_eq!(attrs[1].key, "version");
+    assert_eq!(words[0].name, "greeting");
+    assert_eq!(words[1].name, "farewell");
+    assert_eq!(file.global_scene_scopes().len(), 1);
+}
+
+/// Task 4.2: file_scope と global_scene_scope 交互出現パターンのテスト
+#[test]
+fn test_file_scope_and_global_scene_interleaved() {
+    let source = r#"&author：テスト
+@greeting：こんにちは
+＊シーン1
+  Alice：最初
+&version：2.0
+@farewell：さようなら
+＊シーン2
+  Bob：次
+"#;
+    let result = parse_str(source, "interleaved.pasta");
+    assert!(result.is_ok());
+    let file = result.unwrap();
+
+    // items の順序がファイル記述順と一致
+    // FileAttr, GlobalWord, GlobalSceneScope, FileAttr, GlobalWord, GlobalSceneScope
+    assert_eq!(file.items.len(), 6);
+    assert!(matches!(file.items[0], FileItem::FileAttr(_)));
+    assert!(matches!(file.items[1], FileItem::GlobalWord(_)));
+    assert!(matches!(file.items[2], FileItem::GlobalSceneScope(_)));
+    assert!(matches!(file.items[3], FileItem::FileAttr(_)));
+    assert!(matches!(file.items[4], FileItem::GlobalWord(_)));
+    assert!(matches!(file.items[5], FileItem::GlobalSceneScope(_)));
+
+    // 属性と単語は全て取得可能
+    assert_eq!(file.file_attrs().len(), 2);
+    assert_eq!(file.words().len(), 2);
+    assert_eq!(file.global_scene_scopes().len(), 2);
+}
+
+/// Task 4.3: 単一バリアント頻出パターンのテスト
+#[test]
+fn test_single_variant_multiple_occurrences() {
+    // 複数 global_scene_scope のみ
+    let source = r#"＊シーン1
+  Alice：最初
+＊シーン2
+  Bob：次
+＊シーン3
+  Charlie：最後
+"#;
+    let result = parse_str(source, "scenes_only.pasta");
+    assert!(result.is_ok());
+    let file = result.unwrap();
+
+    assert_eq!(file.items.len(), 3);
+    for item in &file.items {
+        assert!(matches!(item, FileItem::GlobalSceneScope(_)));
+    }
+    assert_eq!(file.global_scene_scopes().len(), 3);
+    assert!(file.file_attrs().is_empty());
+    assert!(file.words().is_empty());
+}
+
+/// Task 4.4: パターンマッチと型判定の動作確認テスト
+#[test]
+fn test_pattern_match_and_helper_methods() {
+    let source = r#"&title：テスト
+@word1：あ、い、う
+＊シーン
+  Alice：セリフ
+"#;
+    let result = parse_str(source, "pattern_match.pasta");
+    assert!(result.is_ok());
+    let file = result.unwrap();
+
+    // items をイテレートしながら match で各バリアントを識別
+    let mut attr_count = 0;
+    let mut word_count = 0;
+    let mut scene_count = 0;
+
+    for item in &file.items {
+        match item {
+            FileItem::FileAttr(attr) => {
+                attr_count += 1;
+                assert_eq!(attr.key, "title");
+            }
+            FileItem::GlobalWord(word) => {
+                word_count += 1;
+                assert_eq!(word.name, "word1");
+            }
+            FileItem::GlobalSceneScope(scene) => {
+                scene_count += 1;
+                assert_eq!(scene.name, "シーン");
+            }
+        }
+    }
+
+    assert_eq!(attr_count, 1);
+    assert_eq!(word_count, 1);
+    assert_eq!(scene_count, 1);
+
+    // ヘルパーメソッドが正確に型別抽出できることを確認
+    assert_eq!(file.file_attrs().len(), 1);
+    assert_eq!(file.words().len(), 1);
+    assert_eq!(file.global_scene_scopes().len(), 1);
+}
+
+// ============================================================================
+// transpiler2 Compatibility Tests (Phase 5)
+// ============================================================================
+
+/// Task 5.1: items イテレーション処理の型安全性テスト
+/// transpiler2 風の順次処理シミュレーション
+#[test]
+fn test_transpiler2_style_iteration() {
+    let source = r#"&title：テストタイトル
+@greeting：こんにちは、おはよう
+＊シーン1
+  Alice：最初のセリフ
+&author：テスト作者
+@farewell：さようなら、またね
+＊シーン2
+  Bob：次のセリフ
+"#;
+    let result = parse_str(source, "transpiler2.pasta");
+    assert!(result.is_ok());
+    let file = result.unwrap();
+
+    // transpiler2 風の順次処理シミュレーション
+    // 属性と単語をバッファリングし、シーン到達時に適用
+    let mut buffered_attrs = Vec::new();
+    let mut buffered_words = Vec::new();
+    let mut scene_contexts = Vec::new();
+
+    for item in &file.items {
+        match item {
+            FileItem::FileAttr(attr) => {
+                buffered_attrs.push(attr.key.clone());
+            }
+            FileItem::GlobalWord(word) => {
+                buffered_words.push(word.name.clone());
+            }
+            FileItem::GlobalSceneScope(scene) => {
+                // シーン到達時に現在のコンテキストを記録
+                scene_contexts.push((
+                    scene.name.clone(),
+                    buffered_attrs.clone(),
+                    buffered_words.clone(),
+                ));
+            }
+        }
+    }
+
+    // シーン1のコンテキスト: title, greeting
+    assert_eq!(scene_contexts[0].0, "シーン1");
+    assert_eq!(scene_contexts[0].1, vec!["title"]);
+    assert_eq!(scene_contexts[0].2, vec!["greeting"]);
+
+    // シーン2のコンテキスト: title, author, greeting, farewell（累積）
+    assert_eq!(scene_contexts[1].0, "シーン2");
+    assert_eq!(scene_contexts[1].1, vec!["title", "author"]);
+    assert_eq!(scene_contexts[1].2, vec!["greeting", "farewell"]);
+}
+
+/// Task 5.2: Span情報の伝播確認テスト
+#[test]
+fn test_span_information_preserved() {
+    let source = "&title：テスト\n＊シーン\n  Alice：セリフ\n";
+    let result = parse_str(source, "span.pasta");
+    assert!(result.is_ok());
+    let file = result.unwrap();
+
+    // 各 FileItem が Span を保有していることを確認
+    for item in &file.items {
+        match item {
+            FileItem::FileAttr(attr) => {
+                // Span が設定されている（デフォルトの0,0,0,0でない）
+                assert!(attr.span.start_line > 0 || attr.span.start_col > 0);
+            }
+            FileItem::GlobalWord(word) => {
+                assert!(word.span.start_line > 0 || word.span.start_col > 0);
+            }
+            FileItem::GlobalSceneScope(scene) => {
+                assert!(scene.span.start_line > 0 || scene.span.start_col > 0);
+            }
         }
     }
 }

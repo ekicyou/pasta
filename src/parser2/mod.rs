@@ -1,5 +1,8 @@
 //! Parser2 module for Pasta DSL using pasta2.pest grammar.
 //!
+//! grammar.pest `file = ( file_scope | global_scene_scope )*` 仕様に完全準拠。
+//! 複数の file_scope と global_scene_scope を任意順序・任意回数で正確に処理します。
+//!
 //! This module provides parsing functionality based on the authoritative
 //! pasta2.pest grammar specification (now located at `grammar.pest`).
 //! The grammar file is immutable and represents the canonical definition
@@ -20,18 +23,44 @@
 //! for Pasta DSL syntax. It was moved from `pasta2.pest` without any content
 //! changes and must never be manually edited.
 //!
+//! # AST Structure (parser2-filescope-bug-fix)
+//!
+//! `PastaFile.items: Vec<FileItem>` でファイル内の全アイテムを記述順序で保持:
+//! - `FileItem::FileAttr` - ファイルレベル属性
+//! - `FileItem::GlobalWord` - ファイルレベル単語定義
+//! - `FileItem::GlobalSceneScope` - グローバルシーン
+//!
+//! ヘルパーメソッドで型別アクセスも可能:
+//! - `file.file_attrs()` - 全ファイル属性
+//! - `file.words()` - 全単語定義
+//! - `file.global_scene_scopes()` - 全グローバルシーン
+//!
 //! # Example
 //!
 //! ```no_run
-//! use pasta::parser2::{parse_str, parse_file};
+//! use pasta::parser2::{parse_str, parse_file, FileItem};
 //! use std::path::Path;
 //!
 //! // Parse from string
 //! let source = "＊挨拶\n  Alice：こんにちは\n";
 //! let ast = parse_str(source, "test.pasta").unwrap();
 //!
-//! // Parse from file
-//! let ast = parse_file(Path::new("script.pasta")).unwrap();
+//! // Access via helper methods
+//! for attr in ast.file_attrs() {
+//!     println!("Attr: {}", attr.key);
+//! }
+//! for scene in ast.global_scene_scopes() {
+//!     println!("Scene: {}", scene.name);
+//! }
+//!
+//! // Or iterate items directly for order-sensitive processing
+//! for item in &ast.items {
+//!     match item {
+//!         FileItem::FileAttr(attr) => println!("FileAttr: {}", attr.key),
+//!         FileItem::GlobalWord(word) => println!("GlobalWord: {}", word.name),
+//!         FileItem::GlobalSceneScope(scene) => println!("Scene: {}", scene.name),
+//!     }
+//! }
 //! ```
 
 pub mod ast;
@@ -78,7 +107,7 @@ pub struct PastaParser2;
 /// "#;
 ///
 /// match parse_str(source, "example.pasta") {
-///     Ok(ast) => println!("Parsed {} global scenes", ast.global_scenes.len()),
+///     Ok(ast) => println!("Parsed {} global scenes", ast.global_scene_scopes().len()),
 ///     Err(e) => eprintln!("Parse error: {}", e),
 /// }
 /// ```
@@ -110,7 +139,7 @@ pub fn parse_str(source: &str, filename: &str) -> Result<PastaFile, PastaError> 
 ///
 /// let ast = parse_file(Path::new("scripts/main.pasta"))?;
 /// println!("File: {:?}", ast.path);
-/// println!("Global scenes: {}", ast.global_scenes.len());
+/// println!("Global scenes: {}", ast.global_scene_scopes().len());
 /// # Ok::<(), pasta::PastaError>(())
 /// ```
 pub fn parse_file(path: &Path) -> Result<PastaFile, PastaError> {
@@ -126,6 +155,10 @@ pub fn parse_file(path: &Path) -> Result<PastaFile, PastaError> {
 // ============================================================================
 
 /// Build AST from parsed pairs.
+///
+/// grammar.pest `file = ( file_scope | global_scene_scope )*` に準拠。
+/// 複数の file_scope と global_scene_scope を任意順序で処理し、
+/// 出現順序を items に保持します。
 fn build_ast(pairs: Pairs<Rule>, filename: &str) -> Result<PastaFile, PastaError> {
     let mut file = PastaFile::new(std::path::PathBuf::from(filename));
     let mut last_global_scene_name: Option<String> = None;
@@ -133,11 +166,18 @@ fn build_ast(pairs: Pairs<Rule>, filename: &str) -> Result<PastaFile, PastaError
     for pair in pairs {
         match pair.as_rule() {
             Rule::file_scope => {
-                file.file_scope = parse_file_scope(pair)?;
+                // file_scope 内の attrs と words を個別の FileItem として追加
+                let scope = parse_file_scope(pair)?;
+                for attr in scope.attrs {
+                    file.items.push(FileItem::FileAttr(attr));
+                }
+                for word in scope.words {
+                    file.items.push(FileItem::GlobalWord(word));
+                }
             }
             Rule::global_scene_scope => {
                 let scene = parse_global_scene_scope(pair, &mut last_global_scene_name, filename)?;
-                file.global_scenes.push(scene);
+                file.items.push(FileItem::GlobalSceneScope(scene));
             }
             Rule::EOI => {}
             _ => {}
@@ -819,7 +859,7 @@ mod tests {
         let result = parse_str("", "test.pasta");
         assert!(result.is_ok());
         let file = result.unwrap();
-        assert!(file.global_scenes.is_empty());
+        assert!(file.global_scene_scopes().is_empty());
     }
 
     #[test]
@@ -828,9 +868,10 @@ mod tests {
         let result = parse_str(source, "test.pasta");
         assert!(result.is_ok());
         let file = result.unwrap();
-        assert_eq!(file.global_scenes.len(), 1);
-        assert_eq!(file.global_scenes[0].name, "挨拶");
-        assert!(!file.global_scenes[0].is_continuation);
+        let scenes = file.global_scene_scopes();
+        assert_eq!(scenes.len(), 1);
+        assert_eq!(scenes[0].name, "挨拶");
+        assert!(!scenes[0].is_continuation);
     }
 
     #[test]
@@ -839,11 +880,12 @@ mod tests {
         let result = parse_str(source, "test.pasta");
         assert!(result.is_ok());
         let file = result.unwrap();
-        assert_eq!(file.global_scenes.len(), 2);
-        assert_eq!(file.global_scenes[0].name, "挨拶");
-        assert!(!file.global_scenes[0].is_continuation);
-        assert_eq!(file.global_scenes[1].name, "挨拶");
-        assert!(file.global_scenes[1].is_continuation);
+        let scenes = file.global_scene_scopes();
+        assert_eq!(scenes.len(), 2);
+        assert_eq!(scenes[0].name, "挨拶");
+        assert!(!scenes[0].is_continuation);
+        assert_eq!(scenes[1].name, "挨拶");
+        assert!(scenes[1].is_continuation);
     }
 
     #[test]
@@ -862,8 +904,9 @@ mod tests {
         let result = parse_str(source, "test.pasta");
         assert!(result.is_ok());
         let file = result.unwrap();
-        assert_eq!(file.file_scope.attrs.len(), 1);
-        assert_eq!(file.file_scope.attrs[0].key, "author");
+        let attrs = file.file_attrs();
+        assert_eq!(attrs.len(), 1);
+        assert_eq!(attrs[0].key, "author");
     }
 
     #[test]
@@ -872,8 +915,9 @@ mod tests {
         let result = parse_str(source, "test.pasta");
         assert!(result.is_ok());
         let file = result.unwrap();
-        assert_eq!(file.global_scenes.len(), 1);
-        let local_scene = &file.global_scenes[0].local_scenes[0];
+        let scenes = file.global_scene_scopes();
+        assert_eq!(scenes.len(), 1);
+        let local_scene = &scenes[0].local_scenes[0];
         assert!(local_scene.items.len() >= 2);
         // First item should be ActionLine, second should be ContinueAction
         assert!(matches!(
@@ -892,7 +936,7 @@ mod tests {
         let result = parse_str(source, "test.pasta");
         assert!(result.is_ok());
         let file = result.unwrap();
-        assert_eq!(file.global_scenes.len(), 1);
+        assert_eq!(file.global_scene_scopes().len(), 1);
         // Code blocks may be in global or local scope depending on grammar
     }
 

@@ -52,8 +52,13 @@ parser2-pest-migrationを完成させた後、トランスパイラー2層を実
 2. The Transpiler2 shall すべてのグローバルシーン定義を1回目のパス（Phase 1）で登録し、シンボルテーブルを構築する
 3. The Transpiler2 shall すべてのローカルシーン定義を各グローバルシーンの処理時に登録する
 4. The Transpiler2 shall すべての単語定義（`＠word_name：...`）を1回目のパス（Phase 1）で登録する
-5. The Transpiler2 shall 未定義のシーン・単語参照を検出し、TranspileErrorを生成する
-6. The Transpiler2 shall ローカルシーン内の単語参照を適切にバインディングする（同一スコープ・親スコープ検索）
+   - FileScope.words → GlobalSceneScope.words → LocalSceneScope.words の順序で処理
+   - 同一スコープ内の重複は Warningを発行（エラーではない）
+5. The Transpiler2 shall 単語参照時の検索順序を以下とおり実装する：
+   - ActionLine/Expr内の単語参照（`@word`）は、最初にローカルスコープを検索、次にグローバルスコープ、最後にファイルスコープを検索
+   - 同一単語が複数スコープで定義された場合、最も内側のスコープを優先
+6. The Transpiler2 shall 未定義のシーン・単語参照を検出し、TranspileErrorを生成する
+7. The Transpiler2 shall ローカルシーン内の単語参照を適切にバインディングする（同一スコープ・親スコープ検索）
 
 ### Requirement 5: Variable Scope and Lifetime Management
 **Objective:** 開発者として、Pasta DSLの変数スコープ（ローカル変数`＄var`、グローバル変数`＄＊var`、システム変数`＄＊＊var`）をRuneコードで正しく実装したい。これにより、データ永続化を実現できる。
