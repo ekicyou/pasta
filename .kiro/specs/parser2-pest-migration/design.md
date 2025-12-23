@@ -777,8 +777,49 @@ pub mod parser2;
 - [ ] `PastaParser` 構造体定義
 - [ ] `parse_str` 実装
 - [ ] `parse_file` 実装
-- [ ] 未名シーン継承ロジック実装
+- [ ] 未名シーン継承ロジック実装（詳細は後述）
 - [ ] 全角数字正規化関数実装
+
+#### 未名シーン継承ロジック詳細
+
+**目的**: グローバルシーン名が省略されたローカルシーンに、直前のグローバルシーン名を自動的に割り当てる
+
+**アルゴリズム**:
+```rust
+// Phase 1: file_scopeパース時の初期化
+let mut last_global_scene_name: Option<String> = None;
+
+// Phase 2: scene_scopeパース時の更新・継承
+for scene in scenes {
+    if let Some(global_label) = scene.global_label {
+        // グローバルシーンの場合: 名前を更新
+        last_global_scene_name = Some(global_label.name.clone());
+        scene.parent = None; // グローバルシーンにparentはない
+    } else {
+        // 未名シーン（ローカルシーン）の場合: 直前のグローバルシーン名を継承
+        match last_global_scene_name {
+            Some(ref parent_name) => {
+                scene.parent = Some(parent_name.clone());
+            }
+            None => {
+                // ファイル先頭で未名シーンが登場した場合はエラー
+                return Err(ParseError::UnnamedSceneWithoutParent { line: scene.line });
+            }
+        }
+    }
+}
+```
+
+**ライフサイクル**:
+- **初期化**: `None` でファイルパース開始
+- **更新**: グローバルシーン登場時に `Some(name.clone())` で上書き
+- **継承**: 未名シーン登場時に `last_global_scene_name` を `parent` に設定
+- **クリア**: なし（ファイル単位で直前のグローバルシーン名を上書きし続ける）
+
+**エッジケース**:
+- ファイル先頭が未名シーン → エラー（`last_global_scene_name = None` のため）
+- 連続する未名シーン → すべて同じ `parent` を継承
+- グローバルシーン名の切り替え → 以降の未名シーンは新しい `parent` を継承
 
 ### Phase 4: 統合・テスト
 - [ ] `lib.rs` に `pub mod parser2;` 追加（エイリアス不要）
