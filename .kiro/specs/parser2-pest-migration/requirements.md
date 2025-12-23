@@ -47,8 +47,7 @@ pasta2.pestに基づいた実装を行う。pasta2.pestを憲法とし、新た�
 #### Acceptance Criteria
 1. The Parser2モジュール shall pest_derive用に`#[grammar = "parser2/grammar.pest"]`ディレクティブを使用する（src/ディレクトリからの相対パス）
 2. The Parser2モジュール shall `#[derive(Parser)]`マクロを使用して`PastaParser2`構造体を生成する
-3. When パースエラーが発生する、the Parser2 shall ファイル位置とエラーコンテキストを含む`PastaError::PestError`を返す
-4. The Parser2 shall `PastaParser2::parse(Rule::file, source)`を使用して有効なPastaスクリプトのパースに成功する
+3. The Parser2 shall `PastaParser2::parse(Rule::file, source)`を使用して有効なPastaスクリプトのパースに成功する
 
 ### Requirement 5: レガシーparserとの共存
 **Objective:** 開発者として、既存のmod parserを削除せずに稼働させたい。これにより、新旧パーサーの比較テストとリスク管理を可能にする。
@@ -77,9 +76,9 @@ pasta2.pestに基づいた実装を行う。pasta2.pestを憲法とし、新た�
 
 #### Acceptance Criteria
 1. The Parser2モジュール shall すべてのパース操作で`Result<T, PastaError>`を返す
-2. When Pestパースエラーが発生する、the Parser2 shall それらを`PastaError::PestError`バリアントでラップする
-3. When IOエラーが発生する、the Parser2 shall `From`トレイトを使用してそれらを`PastaError::IoError`バリアントでラップする
-4. The Parser2エラーメッセージ shall ファイル名とソース位置のコンテキストを含む
+2. When Pestパースエラーが発生する、the Parser2 shall それらを`PastaError::PestError(String)`バリアントでラップする（既存parser実装と同様）
+3. When IOエラーが発生する、the Parser2 shall `From<std::io::Error>`トレイトを使用して自動変換する
+4. The Parser2エラーメッセージ shall ファイル名とソース位置のコンテキストを含む（format!("Parse error in {}: {}", filename, e)形式）
 
 ### Requirement 8: 完全なテストカバレッジ
 **Objective:** 開発者として、pasta2.pest文法の**すべての機能**を検証するテストを用意したい。これにより、実装の完全性を保証できる。
