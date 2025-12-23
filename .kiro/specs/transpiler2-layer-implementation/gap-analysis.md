@@ -540,11 +540,11 @@ for global_scene in file.global_scenes {
      - `Talk(text)` → `yield Talk("text")`
      - `VarRef` → `` yield Talk(`${ctx.local.var}`); ``（Rune template string）
      - `SakuraScript` → `yield emit_sakura_script("\\command[args]")`
-     - `Escape` → エスケープ文字を実文字に変換して単独出力（マージなし）
-       - `Escape("@@")` → `yield Talk("@");`
-       - `Escape("$$")` → `yield Talk("$");`
-       - `Escape("\\\\")` → `yield Talk("\\");`
-       - **設計方針**: 各 Action を独立して処理、隣接 Action との連結は行わない（実装シンプル化）
+     - `Escape` → 2文字目を抽出して単独 Talk として出力（マージなし）
+       - `Escape("@@")` → `s.chars().nth(1)` で `@` を取得 → `yield Talk("@");`
+       - `Escape("$$")` → `s.chars().nth(1)` で `$` を取得 → `yield Talk("$");`
+       - `Escape("\\\\")` → `s.chars().nth(1)` で `\` を取得 → `yield Talk("\\");`
+       - **実装**: 単純で構造を信頼（2文字構造が保証されている）
 ```
 
 ---
