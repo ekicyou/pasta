@@ -540,7 +540,16 @@ for global_scene in file.global_scenes {
      - `Talk(text)` → `yield Talk("text")`
      - `VarRef` → `` yield Talk(`${ctx.local.var}`); ``（Rune template string）
      - `SakuraScript` → `yield emit_sakura_script("\\command[args]")`
-     - `Escape` → 処理なし（transpiler層では扱わない、parser2で既に処理）
+     - `Escape` → エスケープ文字を実際の文字に変換して処理（transpiler2層での出力が必須）
+       - `Escape("@@")` → `"@"` に変換
+       - `Escape("$$")` → `"$"` に変換
+       - `Escape("\\\\")` → `"\\"` に変換
+       - **マージ戦略**（実装時の最適化）：
+         - 直前に Talk がある：連結 → `Talk("previous@")`
+         - 直後に Talk がある：連結 → `Talk("@next")`
+         - 両方ある：1つのマージ Talk に統合 → `Talk("previous@next")`
+         - マージ不可：単独文字 Talk として出力 → `yield Talk("@");`
+       - **責務分離**: transpiler2は変換・マージの候補化まで、実際のマージ処理は Runtime層が担当可能
 ```
 
 ---

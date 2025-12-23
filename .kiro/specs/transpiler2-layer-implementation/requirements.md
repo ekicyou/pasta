@@ -97,7 +97,11 @@ parser2-pest-migrationを完成させた後、トランスパイラー2層を実
    - 最終処理：yield で受け取る → `for a in func_name(ctx, args) { yield a; }`
    - グローバル関数：`super::` プレフィックス利用
 5. The Transpiler2 shall Action::SakuraScript を `yield emit_sakura_script("\\command[args]");` として出力する
-6. The テストスイート shall 全Action型の展開パターンを検証する
+6. The Transpiler2 shall Action::Escape（`@@`, `$$`, `\\\\`）を以下のパターンで処理する：
+   - エスケープ文字変換：`@@` → `@`、`$$` → `$`、`\\\\` → `\\`
+   - 可能なら直前・直後の Action::Talk と1つの yield Talk にマージする
+   - マージできない場合は単独文字の Talk として出力（例：`yield Talk("@");`）
+7. The テストスイート shall 全Action型の展開パターン（Escape マージ含む）を検証する
 
 ---
 
