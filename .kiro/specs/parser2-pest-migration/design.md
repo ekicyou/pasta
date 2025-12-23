@@ -463,8 +463,10 @@ pub struct Attr {
 /// 属性値
 #[derive(Debug, Clone)]
 pub enum AttrValue {
-    /// 数値リテラル
-    Number(f64),
+    /// 整数リテラル（小数点なし）
+    Integer(i64),
+    /// 浮動小数点リテラル（小数点あり）
+    Float(f64),
     /// 文字列リテラル
     String(String),
     /// 属性文字列（クォートなし）
@@ -503,8 +505,10 @@ pub enum Arg {
 /// 式（expr規則）
 #[derive(Debug, Clone)]
 pub enum Expr {
-    /// 数値リテラル
-    Number(f64),
+    /// 整数リテラル（小数点なし）
+    Integer(i64),
+    /// 浮動小数点リテラル（小数点あり）
+    Float(f64),
     /// 文字列リテラル
     String(String),
     /// 空文字列リテラル（""または「」）
