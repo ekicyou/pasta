@@ -1,5 +1,23 @@
 # Implementation Gap Analysis: transpiler2-layer-implementation
 
+## ⚠️ CRITICAL BLOCKER: parser2-filescope-bug-fix Required
+
+**Status**: 🔴 **IMPLEMENTATION BLOCKED**
+
+**Discovered Bug**: parser2 violates grammar.pest specification `file = ( file_scope | global_scene_scope )*`  
+**Root Cause**: `src/parser2/mod.rs:136` - `file.file_scope = parse_file_scope(pair)?;` (overwrites on each occurrence)  
+**Impact**: Multiple `file_scope` blocks → only last one is retained, earlier ones are lost
+
+**Blocking Requirements**:
+- Requirement 11: FileScope Attribute Inheritance (requires sequential file_scope processing)
+- Requirement 15: FileScope Words Registration (requires all file_scope words preserved)
+
+**Resolution**: Complete `.kiro/specs/parser2-filescope-bug-fix/` specification before implementing transpiler2.
+
+**Detailed Analysis**: See [parser2-filescope-bug-fix/bug-report.md](../parser2-filescope-bug-fix/bug-report.md)
+
+---
+
 ## Analysis Date
 2025-12-23
 
