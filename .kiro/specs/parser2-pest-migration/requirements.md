@@ -39,6 +39,7 @@ pasta2.pestに基づいた実装を行う。pasta2.pestを憲法とし、新た�
 2. The Parser2 AST型 shall grammar.pestで定義されたUnicode識別子（XID_START, XID_CONTINUE）と予約IDパターン（`__name__`）の検証をサポートする
 3. The Parser2 AST型 shall 階層的スコープ構造を表現する：`FileScope` → `GlobalSceneScope` → `LocalSceneScope`
 4. The Parser2 AST型 shall 言語識別子付きコードブロック（例：` ```rune ... ``` `）をサポートする
+5. The Parser2 AST型 shall 継続行アクション（`：` または `:` で始まる行）を独立したAST型として表現する **（pasta.pestとの仕様変化：従来は継続行の接頭辞がなかったが、pasta2.pestでは明示的に`：行頭` または `:行頭` で始まる）**
 
 ### Requirement 4: Pest parser生成の統合
 **Objective:** 開発者として、grammar.pestからPest parserを生成し、Rustコードに統合したい。これにより、型安全なパース処理を実現できる。
