@@ -5,24 +5,46 @@
 
 ## ✅ Dependency Resolution: parser2-filescope-bug-fix
 
-**Status**: ✅ **RESOLVED** - parser2のFileScope複数出現バグは修正済みです。
+**Status**: ✅ **RESOLVED & VALIDATED** - parser2のFileScope複数出現バグは修正済み・検証完了。
 
 **Fixed Issue**: parser2は `file = ( file_scope | global_scene_scope )*` 文法仕様に準拠し、複数の`file_scope`を順序を保って処理できるようになりました。
 
-**Implementation**: `PastaFile.items: Vec<FileItem>` 構造により、file_scopeとglobal_scene_scopeの出現順序が保持されます。
+**Implementation**: 
+- `PastaFile.items: Vec<FileItem>` 構造により、file_scopeとglobal_scene_scopeの出現順序が保持されます
+- `FileItem` enum: `FileAttr(Attr)`, `GlobalWord(KeyWords)`, `GlobalSceneScope(GlobalSceneScope)`
+- **破壊的AST変更**: 旧 `file.file_scope` / `file.global_scenes` → 新 `file.items`（統一配列）
+
+**Validation Results** (2025-12-23):
+- ✅ 全テスト合格: 98+ passed; 0 failed
+- ✅ 要件カバレッジ: 21/21 (100%)
+- ✅ リグレッション: 0件
+- ✅ Phase: `validated-production` (本番可能)
 
 **Enabled Requirements**:
 - Requirement 11: FileScope Attribute Inheritance（Pass1での順次処理が可能）
 - Requirement 15: FileScope Words Registration（全file_scope wordsが保持される）
 
+**Transpiler2 への影響**:
+- ✅ `file.items` をイテレートし、各 `FileItem` を match で処理
+- ✅ ヘルパーメソッド利用: `file.file_attrs()`, `file.words()`, `file.global_scene_scopes()`
+- ✅ 記述順序を保持したまま処理可能（file-level属性→単語→シーンの順序で積算）
+
 ## Executive Summary
 
 transpiler2実装は**中程度の複雑度（M: 3-7日）**・**中リスク**の機能です。以下の理由から**Option B（新規コンポーネント）を推奨**します：
 
-- **AST型の根本的な差異**: parser2（新3層スコープ）vs. parser（既存フラット構造）→ 共存不可
+- **AST型の根本的な差異**: parser2（新3層スコープ + FileItem統一配列）vs. parser（既存フラット構造）→ 共存不可
+- **parser2-filescope-bug-fix完了**: ✅ FileItem統一配列により、file-level属性・単語・シーンの記述順序保持が可能に
 - **既存パターンの再利用性**: TranspileContext、SceneRegistry、WordDefRegistry は parser2にも適用可能
 - **段階的統合**: レガシーtranspilerと完全に独立、段階的置き換え可能
 - **明確なレイヤー分離**: tech.md（レイヤードアーキテクチャ）を完全準拠
+
+**parser2-filescope-bug-fix で利用可能になった機能**:
+- ✅ `PastaFile.items: Vec<FileItem>` - 統一配列アクセス
+- ✅ `file.file_attrs()` - file-level属性の型別抽出（記述順保持）
+- ✅ `file.words()` - file-level単語の型別抽出（記述順保持）
+- ✅ `file.global_scene_scopes()` - グローバルシーンの型別抽出
+- ✅ 複数file_scopeの順序保持処理が可能（属性積算・単語登録の正確性向上）
 
 ---
 
@@ -297,36 +319,66 @@ pub enum TranspileError {
 
 #### 4. Scope Handling Logic
 
-**Parser2 AST構造** (3層):
+**Parser2 AST構造** (3層 + FileItem統一):
 ```
 PastaFile
-  ├─ FileScope (attributes, file-level words)
-  └─ GlobalSceneScope[] (global scene definitions)
-      ├─ GlobalSceneScope.name (scene name)
-      ├─ GlobalSceneScope.attrs
-      ├─ GlobalSceneScope.words (local words)
-      └─ LocalSceneScope[] (nested local scenes)
-          ├─ LocalSceneScope.name
-          └─ LocalSceneScope.items (actions)
+  ├─ path: PathBuf
+  ├─ items: Vec<FileItem> 🆕 統一配列（記述順保持）
+  │   ├─ FileItem::FileAttr(Attr)           // file_scope内の属性
+  │   ├─ FileItem::GlobalWord(KeyWords)     // file_scope内の単語定義
+  │   └─ FileItem::GlobalSceneScope(...)    // グローバルシーン
+  │       ├─ name: String
+  │       ├─ attrs: Vec<Attr>
+  │       ├─ words: Vec<KeyWords>
+  │       ├─ local_scenes: Vec<LocalSceneScope>
+  │       │   ├─ name: String
+  │       │   ├─ attrs: Vec<Attr>
+  │       │   ├─ items: Vec<LocalSceneItem> // ActionLine/ContinueAction/CallScene
+  │       │   └─ code_blocks: Vec<CodeBlock>
+  │       └─ code_blocks: Vec<CodeBlock>
+  └─ span: Span
 ```
 
-**Transpiler2 Phase 1処理**:
+**Transpiler2 Phase 1処理**（FileItem対応版）:
 ```rust
-for global_scene in file.global_scenes {
-    // 1. Register global scene
-    let global_id = registry.register_global(&global_scene.name, ...);
-    
-    // 2. Register local scenes within this global
-    for local_scene in &global_scene.local_scenes {
-        let local_id = registry.register_local(
-            &global_scene.name,
-            &local_scene.name,
-            ...
-        );
+// Option 1: ヘルパーメソッド利用（型別処理）
+for attr in file.file_attrs() {
+    // file-level 属性をコンテキストに積算
+}
+for word in file.words() {
+    // file-level 単語をWordDefRegistryに登録
+}
+for global_scene in file.global_scene_scopes() {
+    // グローバルシーン処理
+}
+
+// Option 2: 記述順序を保持（attributes積算→単語登録→シーン処理の順序制御）
+for item in &file.items {
+    match item {
+        FileItem::FileAttr(attr) => {
+            // file-level 属性を順次積算
+        }
+        FileItem::GlobalWord(word) => {
+            // file-level 単語を順次登録
+        }
+        FileItem::GlobalSceneScope(scene) => {
+            // 1. Register global scene with accumulated file-level attributes
+            let merged_attrs = merge_attributes(file_attrs, &scene.attrs);
+            let global_id = registry.register_global(&scene.name, merged_attrs, ...);
+            
+            // 2. Register local scenes within this global
+            for local_scene in &scene.local_scenes {
+                let local_id = registry.register_local(
+                    &scene.name,
+                    &local_scene.name,
+                    ...
+                );
+            }
+            
+            // 3. Generate Rune module for global scene
+            generate_global_scene_module(scene, ...)?;
+        }
     }
-    
-    // 3. Generate Rune module for global scene
-    generate_global_scene_module(&global_scene, ...)?;
 }
 ```
 
@@ -364,18 +416,21 @@ for global_scene in file.global_scenes {
 
 ### New Features (parser1→parser2 AST Changes) - **Critical Gaps**
 
-6. **FileScope Attribute Inheritance (Req 11)** 🚨 **NEW PROCESSING REQUIRED**
+6. **FileScope Attribute Inheritance (Req 11)** 🚨 **NEW PROCESSING REQUIRED** ✅ **AST構造確定**
    - **Gap**: parser1には`FileScope`自体が存在しない → 旧transpilerはfile-level attributesを処理不可
-   - **parser2 Structure**: `PastaFile { file_scope: FileScope { attrs, words }, global_scenes }`
+   - **parser2 Structure**: `PastaFile { items: Vec<FileItem> }` 🆕 **破壊的変更後**
+     - `FileItem::FileAttr(Attr)` でファイルレベル属性を個別管理
+     - 複数file_scope由来のattrsが`items`配列に記述順で混在可能
    - **Required Implementation**:
-     - `file_scope.attrs`を解析してHashMap<String, String>に変換
+     - `file.file_attrs()` ヘルパーメソッドで全file-level属性を取得
+     - または `file.items` をイテレートして `FileItem::FileAttr` のみ抽出
      - グローバルシーン登録時に、file-level attrsとシーンattrsをmerge
      - Merge rule: シーンレベル属性が優先（同一キーの場合上書き）
    - **Example**:
      ```pasta
-     ＆天気：晴れ     # file-level
-     ＆季節：冬       # file-level
-     ＊会話＆時間：夜＆季節：夏  # scene-level
+     ＆天気：晴れ     # file-level (FileItem::FileAttr)
+     ＆季節：冬       # file-level (FileItem::FileAttr)
+     ＊会話＆時間：夜＆季節：夏  # scene-level (GlobalSceneScope.attrs)
      ```
      → シーン「会話」最終属性: `{天気: "晴れ", 時間: "夜", 季節: "夏"}`
    - →Design で attribute merge strategyを詳細設計
@@ -413,13 +468,16 @@ for global_scene in file.global_scenes {
      - 最初のitemがContinueActionの場合、TranspileError::InvalidContinuationを返す
    - →Design で continuation line merge logicを実装
 
-10. **FileScope Words Registration (Req 15)** 🚨 **FIELD LOCATION CHANGE**
-    - **Gap**: parser1では`PastaFile.global_words`として単一フィールド、parser2では`PastaFile.file_scope.words`に移動
+10. **FileScope Words Registration (Req 15)** 🚨 **FIELD LOCATION CHANGE** ✅ **AST構造確定**
+    - **Gap**: parser1では`PastaFile.global_words`として単一フィールド、parser2では`PastaFile.items`内に分散
     - **Code Reference**: 旧transpiler `src/transpiler/mod.rs:156` - `for word_def in &file.global_words { ... }`
+    - **parser2 Structure**: `FileItem::GlobalWord(KeyWords)` 🆕 **破壊的変更後**
+      - 複数file_scope由来のwordsが`items`配列に記述順で混在可能
     - **Required Implementation**:
-      - `file_scope.words`（Vec<KeyWords>）をPhase 1で最初に処理
-      - WordDefRegistry.register_globalに登録
-      - file_scope.wordsとglobal_scene.wordsの重複チェック（Warningのみ、エラーではない）
+      - `file.words()` ヘルパーメソッドで全file-level単語を取得
+      - または `file.items` をイテレートして `FileItem::GlobalWord` のみ抽出
+      - WordDefRegistry.register_globalに登録（Phase 1最初に処理）
+      - file-level wordsとglobal_scene.wordsの重複チェック（Warningのみ、エラーではない）
     - →Design で word registration orderを明確化
 
 ---
