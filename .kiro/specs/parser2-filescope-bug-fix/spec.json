@@ -20,7 +20,7 @@
             "generated": true
         },
         "tasks": {
-            "approved": false,
+            "approved": true,
             "generated": true
         },
         "implementation": {
