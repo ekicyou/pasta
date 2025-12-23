@@ -12,95 +12,95 @@ pasta2.pestに基づいた実装を行う。pasta2.pestを憲法とし、新た�
 **Objective:** 開発者として、pasta2.pestファイルを移動してもその内容を**絶対に変更しない**ことを保証したい。pasta2.pestは既に検証済みの権威的文法定義であり、一切の変更を認めない。
 
 #### Acceptance Criteria
-1. When pasta2.pestを`src/parser2/grammar.pest`に移動する場合、the Parser2 migration process shall preserve the exact file contents **without any modification whatsoever** (not even whitespace, comments, or formatting changes)
-2. The Parser2 module shall treat grammar.pest as the **immutable** single source of truth for syntax rules
-3. The Parser2 implementation shall reject any manual edits to grammar.pest that deviate from the original pasta2.pest specification
-4. When grammar.pestが作成される場合、the file shall be byte-for-byte identical to the original pasta2.pest (verifiable via `git diff` or checksum)
+1. When pasta2.pestを`src/parser2/grammar.pest`に移動する、the Parser2移行プロセス shall ファイル内容を一切変更せずに保全する（空白・コメント・フォーマットも含めて完全にそのまま）
+2. The Parser2モジュール shall grammar.pestを**不変の**構文規則の唯一の真実として扱う
+3. The Parser2実装 shall オリジナルのpasta2.pest仕様から逸脱するgrammar.pestへの手動編集を拒否する
+4. When grammar.pestが作成される、the ファイル shall オリジナルのpasta2.pestとバイト単位で同一である（`git diff`またはチェックサムで検証可能）
 
 ### Requirement 2: 新しいパーサーモジュール（parser2）の作成
 **Objective:** 開発者として、既存parserとは独立した新しいparser2モジュールを作成したい。これにより、段階的移行とリグレッションリスク軽減を実現できる。
 
 #### Acceptance Criteria
-1. The Pasta project shall create a new module `src/parser2/` with independent namespace
-2. The Parser2 module shall expose public API functions with the same naming as legacy parser: `parse_file`, `parse_str` (namespaced via module path `pasta::parser2::parse_str`)
-3. When lib.rsがpublic APIを公開する場合、the Pasta crate shall export `parser2` module as public (`pub mod parser2;`) for usage via `pasta::parser2::*`
-4. The Parser2 module shall not share AST type definitions with the legacy parser module to ensure complete independence
+1. The Pastaプロジェクト shall 独立した名前空間を持つ新しいモジュール`src/parser2/`を作成する
+2. The Parser2モジュール shall レガシーparserと同じ命名の公開API関数を公開する：`parse_file`, `parse_str`（モジュールパス`pasta::parser2::parse_str`経由で名前空間分離）
+3. When lib.rsが公開APIを公開する、the Pastaクレート shall `parser2`モジュールをpublicとして公開する（`pub mod parser2;`）、`pasta::parser2::*`経由で使用可能にする
+4. The Parser2モジュール shall 完全な独立性を保証するため、レガシーparserモジュールとAST型定義を共有しない
 
 ### Requirement 3: pasta2.pest文法に基づくAST型定義
 **Objective:** 開発者として、**検証済み**のpasta2.pest文法規則を**すべて**正確に反映したAST型を定義したい。これにより、文法と実装の完全な一貫性を保証できる。
 
 #### Acceptance Criteria
-1. The Parser2 AST module shall define corresponding Rust structs for **all** terminal and non-terminal rules in grammar.pest (pasta2.pestは既に検証済みであり、文法の妥当性は保証されている)
-2. The Parser2 AST types shall support Unicode identifiers (XID_START, XID_CONTINUE) and reserved ID pattern (`__name__`) validation as defined in grammar.pest
-3. The Parser2 AST types shall distinguish between global_marker (`＊` or `*`) and local_marker (`・` or `-`) scene definitions
-4. The Parser2 AST types shall represent full-width and half-width marker pairs (e.g., `＠`/`@`, `＄`/`$`, `＞`/`>`) as equivalent token types
-5. The Parser2 AST types shall support nested string literals using Pest PUSH/POP stack mechanism for 4-level bracketing (`「「「「text」」」」`) **as already verified in grammar.pest**
-6. The Parser2 AST types shall represent hierarchical scope structure: `FileScope` → `GlobalSceneScope` → `LocalSceneScope`
-7. The Parser2 AST types shall support code blocks with language identifiers (e.g., ` ```rune ... ``` `)
+1. The Parser2 ASTモジュール shall grammar.pest内の**すべての**終端・非終端規則に対応するRust構造体を定義する（pasta2.pestは既に検証済みであり、文法の妥当性は保証されている）
+2. The Parser2 AST型 shall grammar.pestで定義されたUnicode識別子（XID_START, XID_CONTINUE）と予約IDパターン（`__name__`）の検証をサポートする
+3. The Parser2 AST型 shall global_marker（`＊`または`*`）とlocal_marker（`・`または`-`）のシーン定義を区別する
+4. The Parser2 AST型 shall 全角・半角マーカー対（例：`＠`/`@`、`＄`/`$`、`＞`/`>`）を等価なトークン型として表現する
+5. The Parser2 AST型 shall Pest PUSH/POPスタック機構を使用した4階層括弧の入れ子文字列リテラル（`「「「「text」」」」`）をサポートする **（grammar.pestで既に検証済み）**
+6. The Parser2 AST型 shall 階層的スコープ構造を表現する：`FileScope` → `GlobalSceneScope` → `LocalSceneScope`
+7. The Parser2 AST型 shall 言語識別子付きコードブロック（例：` ```rune ... ``` `）をサポートする
 
 ### Requirement 4: Pest parser生成の統合
 **Objective:** 開発者として、grammar.pestからPest parserを生成し、Rustコードに統合したい。これにより、型安全なパース処理を実現できる。
 
 #### Acceptance Criteria
-1. The Parser2 module shall use `#[grammar = "parser2/grammar.pest"]` directive for pest_derive (relative to src/ directory)
-2. The Parser2 module shall generate a `PastaParser2` struct using `#[derive(Parser)]` macro
-3. When parse errorsが発生する場合、the Parser2 shall return `PastaError::PestError` with file location and error context
-4. The Parser2 shall successfully parse valid Pasta scripts using `PastaParser2::parse(Rule::file, source)`
+1. The Parser2モジュール shall pest_derive用に`#[grammar = "parser2/grammar.pest"]`ディレクティブを使用する（src/ディレクトリからの相対パス）
+2. The Parser2モジュール shall `#[derive(Parser)]`マクロを使用して`PastaParser2`構造体を生成する
+3. When パースエラーが発生する、the Parser2 shall ファイル位置とエラーコンテキストを含む`PastaError::PestError`を返す
+4. The Parser2 shall `PastaParser2::parse(Rule::file, source)`を使用して有効なPastaスクリプトのパースに成功する
 
 ### Requirement 5: レガシーparserとの共存
 **Objective:** 開発者として、既存のmod parserを削除せずに稼働させたい。これにより、新旧パーサーの比較テストとリスク管理を可能にする。
 
 #### Acceptance Criteria
-1. The Pasta project shall maintain both `src/parser/` and `src/parser2/` modules simultaneously
-2. When lib.rsがインポートを宣言する場合、the Pasta crate shall provide distinct import paths: `pasta::parser` and `pasta::parser2`
-3. The existing test suite shall continue to use `pasta::parser` without modification
-4. The Parser2 module shall not cause compilation errors or runtime conflicts with the legacy parser module
+1. The Pastaプロジェクト shall `src/parser/`と`src/parser2/`の両モジュールを同時に維持する
+2. When lib.rsがインポートを宣言する、the Pastaクレート shall 異なるインポートパスを提供する：`pasta::parser`と`pasta::parser2`
+3. The 既存のテストスイート shall 変更なしで`pasta::parser`を使い続ける
+4. The Parser2モジュール shall レガシーparserモジュールとのコンパイルエラーやランタイム競合を引き起こさない
 
 ### Requirement 6: parser2モジュールの基本構成
 **Objective:** 開発者として、parser2モジュールを標準的なRustモジュール構成で実装したい。これにより、保守性と拡張性を確保できる。
 
 #### Acceptance Criteria
-1. The Parser2 module shall define a `mod.rs` file as the module entry point
-2. The Parser2 module shall define an `ast.rs` file for AST type definitions
-3. The Parser2 module shall define a `grammar.pest` file as the Pest grammar specification
-4. When `mod.rs`がpublic APIを公開する場合、the Parser2 module shall re-export AST types using `pub use ast::*`
+1. The Parser2モジュール shall モジュールエントリーポイントとして`mod.rs`ファイルを定義する
+2. The Parser2モジュール shall AST型定義用の`ast.rs`ファイルを定義する
+3. The Parser2モジュール shall Pest文法仕様として`grammar.pest`ファイルを定義する
+4. When `mod.rs`が公開APIを公開する、the Parser2モジュール shall `pub use ast::*`を使用してAST型を再公開する
 
 ### Requirement 7: エラーハンドリング統合
 **Objective:** 開発者として、parser2のエラーを既存のPastaError型で扱いたい。これにより、統一的なエラー処理を維持できる。
 
 #### Acceptance Criteria
-1. The Parser2 module shall return `Result<T, PastaError>` for all parsing operations
-2. When Pest parse errorsが発生する場合、the Parser2 shall wrap them in `PastaError::PestError` variant
-3. When IO errorsが発生する場合、the Parser2 shall wrap them in `PastaError::IoError` variant using `From` trait
-4. The Parser2 error messages shall include filename and source location context
+1. The Parser2モジュール shall すべてのパース操作で`Result<T, PastaError>`を返す
+2. When Pestパースエラーが発生する、the Parser2 shall それらを`PastaError::PestError`バリアントでラップする
+3. When IOエラーが発生する、the Parser2 shall `From`トレイトを使用してそれらを`PastaError::IoError`バリアントでラップする
+4. The Parser2エラーメッセージ shall ファイル名とソース位置のコンテキストを含む
 
 ### Requirement 8: 完全なテストカバレッジ
 **Objective:** 開発者として、pasta2.pest文法の**すべての機能**を検証するテストを用意したい。これにより、実装の完全性を保証できる。
 
 #### Acceptance Criteria
-1. The Pasta project shall create test files covering all grammar rules defined in grammar.pest
-2. The test suite shall verify all scope structures: file_scope, global_scene_scope, local_scene_scope
-3. The test suite shall verify nested string literals at all 4 bracket levels (`「text」`, `「「text」」`, `「「「text」」」`, `「「「「text」」」」`)
-4. The test suite shall verify reserved ID pattern rejection (`__name__` shall fail to parse)
-5. The test suite shall verify code blocks with language identifiers (e.g., ` ```rune ... ``` `, ` ```rust ... ``` `)
-6. The test suite shall verify all 14 Unicode whitespace characters defined in `space_chars`
-7. The test suite shall use fixtures from `tests/fixtures/` directory and create new comprehensive fixtures for parser2-specific features
-8. The test suite shall verify that parser2 produces identical results to pest_consume debug output for all grammar rules
+1. The Pastaプロジェクト shall grammar.pestで定義されたすべての文法規則をカバーするテストファイルを作成する
+2. The テストスイート shall すべてのスコープ構造を検証する：file_scope、global_scene_scope、local_scene_scope
+3. The テストスイート shall 4階層すべての括弧レベルで入れ子文字列リテラルを検証する（`「text」`、`「「text」」`、`「「「text」」」`、`「「「「text」」」」`）
+4. The テストスイート shall 予約IDパターンの拒否を検証する（`__name__` shall パース失敗する）
+5. The テストスイート shall 言語識別子付きコードブロックを検証する（例：` ```rune ... ``` `、` ```rust ... ``` `）
+6. The テストスイート shall `space_chars`で定義された14種類のUnicode空白文字すべてを検証する
+7. The テストスイート shall `tests/fixtures/`ディレクトリのfixtureを使用し、parser2固有機能用の新しい包括的fixtureを作成する
+8. The テストスイート shall すべての文法規則についてparser2がpest_consumeデバッグ出力と同一の結果を生成することを検証する
 
 ### Requirement 9: ドキュメント整備
 **Objective:** 開発者として、parser2モジュールの目的と使用方法を文書化したい。これにより、将来の開発者が意図を理解できる。
 
 #### Acceptance Criteria
-1. The Parser2 `mod.rs` shall include a module-level doc comment (`//!`) explaining the migration purpose
-2. The Parser2 doc comment shall reference grammar.pest as the authoritative specification
-3. The Parser2 public API functions shall include doc comments with usage examples
-4. When README.mdが更新される場合、the Pasta project shall document the parallel parser architecture
+1. The Parser2の`mod.rs` shall 移行目的を説明するモジュールレベルのdocコメント（`//!`）を含む
+2. The Parser2のdocコメント shall grammar.pestを権威的仕様として参照する
+3. The Parser2の公開API関数 shall 使用例を含むdocコメントを含む
+4. When README.mdが更新される、the Pastaプロジェクト shall 並行パーサーアーキテクチャを文書化する
 
 ### Requirement 10: ファイル移動の追跡可能性
 **Objective:** 開発者として、pasta2.pestの移動を履歴から追跡したい。これにより、文法定義の変更履歴を保全できる。
 
 #### Acceptance Criteria
-1. When pasta2.pestを移動する場合、the migration process shall use `git mv` command to preserve file history
-2. The git commit message shall follow conventional commits format: `refactor(parser2): Move pasta2.pest to parser2/grammar.pest`
-3. The commit message shall explicitly state "no content changes" to clarify the operation
-4. When grammar.pestが作成される場合、the file shall retain all original line-by-line content from pasta2.pest
+1. When pasta2.pestを移動する、the 移行プロセス shall ファイル履歴を保全するために`git mv`コマンドを使用する
+2. The gitコミットメッセージ shall conventional commitsフォーマットに従う：`refactor(parser2): Move pasta2.pest to parser2/grammar.pest`
+3. The コミットメッセージ shall 操作を明確にするために"no content changes"を明示的に記述する
+4. When grammar.pestが作成される、the ファイル shall pasta2.pestからの元の行単位の内容をすべて保持する
