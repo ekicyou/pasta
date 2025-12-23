@@ -1,25 +1,19 @@
 # Implementation Gap Analysis: transpiler2-layer-implementation
 
-## ⚠️ CRITICAL BLOCKER: parser2-filescope-bug-fix Required
-
-**Status**: 🔴 **IMPLEMENTATION BLOCKED**
-
-**Discovered Bug**: parser2 violates grammar.pest specification `file = ( file_scope | global_scene_scope )*`  
-**Root Cause**: `src/parser2/mod.rs:136` - `file.file_scope = parse_file_scope(pair)?;` (overwrites on each occurrence)  
-**Impact**: Multiple `file_scope` blocks → only last one is retained, earlier ones are lost
-
-**Blocking Requirements**:
-- Requirement 11: FileScope Attribute Inheritance (requires sequential file_scope processing)
-- Requirement 15: FileScope Words Registration (requires all file_scope words preserved)
-
-**Resolution**: Complete `.kiro/specs/parser2-filescope-bug-fix/` specification before implementing transpiler2.
-
-**Detailed Analysis**: See [parser2-filescope-bug-fix/bug-report.md](../parser2-filescope-bug-fix/bug-report.md)
-
----
-
 ## Analysis Date
 2025-12-23
+
+## ✅ Dependency Resolution: parser2-filescope-bug-fix
+
+**Status**: ✅ **RESOLVED** - parser2のFileScope複数出現バグは修正済みです。
+
+**Fixed Issue**: parser2は `file = ( file_scope | global_scene_scope )*` 文法仕様に準拠し、複数の`file_scope`を順序を保って処理できるようになりました。
+
+**Implementation**: `PastaFile.items: Vec<FileItem>` 構造により、file_scopeとglobal_scene_scopeの出現順序が保持されます。
+
+**Enabled Requirements**:
+- Requirement 11: FileScope Attribute Inheritance（Pass1での順次処理が可能）
+- Requirement 15: FileScope Words Registration（全file_scope wordsが保持される）
 
 ## Executive Summary
 

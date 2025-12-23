@@ -10,7 +10,7 @@
                 "spec": "parser2-filescope-bug-fix",
                 "reason": "Requirement 11 (FileScope Attribute Inheritance) requires parser2 to correctly handle multiple file_scope occurrences as per grammar.pest specification",
                 "critical": true,
-                "status": "pending"
+                "status": "resolved"
             }
         ]
     },
