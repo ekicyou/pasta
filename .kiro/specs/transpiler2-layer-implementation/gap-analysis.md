@@ -521,6 +521,26 @@ for global_scene in file.global_scenes {
      - `FnScope::Local` → `func_name(ctx, args, ...)`
      - `FnScope::Global` → `super::func_name(ctx, args, ...)`
      - 参考: src/transpiler/mod.rs:71 (resolve_function), Line 824-836 (Expr::FuncCall)
+
+5. ✅ CLARIFIED - アクション中の関数呼び出し処理戦略（議題9）:
+   - **アクション中の関数呼び出し（@func）**: ✅ 確定
+     - 基本戦略：式内の関数と同じパターンで展開（`func_name(ctx, args, arg1, arg2, ...)`）
+     - 最終処理：`yield`で結果を受け取る
+     - **実装パターン**: `for a in func_name(ctx, args) { yield a; }`
+     - グローバル関数: `for a in super::func_name(ctx, args) { yield a; }`
+     - 参考: Rune generator継続パターン、既存transpiler:507-517行 (SpeechPart::FuncCall)
+
+   - **アクション中の単語参照（@word）**: ✅ 確定
+     - 現在の実装戦略：単語辞書呼び出し（既存transpiler1パターン踏襲）
+     - `＠word` → `yield Talk(pasta_stdlib::word("module", "word", []))`
+     - **将来変更の可能性**: 単語展開戦略は Engine層で決定可能（transpiler2では決定しない）
+     - 参考: src/transpiler/mod.rs:508-517 (SpeechPart::FuncCall with pasta_stdlib::word)
+
+   - **その他アクション型**:
+     - `Talk(text)` → `yield Talk("text")`
+     - `VarRef` → `` yield Talk(`${ctx.local.var}`); ``（Rune template string）
+     - `SakuraScript` → `yield emit_sakura_script("\\command[args]")`
+     - `Escape` → 処理なし（transpiler層では扱わない、parser2で既に処理）
 ```
 
 ---
