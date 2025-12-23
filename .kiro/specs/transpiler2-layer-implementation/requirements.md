@@ -3,23 +3,6 @@
 ## Project Description (Input)
 parser2-pest-migrationを完成させた後、トランスパイラー2層を実装する。新しいpasta2.pestベースのParser2が提供するAST構造に対応した効率的なトランスパイラーを構築し、従来のtranspilerコンポーネントを段階的に置き換える基盤を確立する。
 
-## ⚠️ Critical Dependency: parser2-filescope-bug-fix
-
-**Status**: 🔴 **BLOCKED** - parser2にgrammar.pest仕様違反のバグが発見されました。
-
-**Bug Summary**: parser2は `file = ( file_scope | global_scene_scope )*` 文法仕様に反し、複数の`file_scope`出現時に最後のfile_scopeのみを保持する（上書き代入バグ）。
-
-**Impact on transpiler2**:
-- **Requirement 11 (FileScope Attribute Inheritance)**: 複数file_scopeの順次処理が前提条件
-- **Requirement 15 (FileScope Words Registration)**: file_scope間のword定義が消失
-
-**Blocking Spec**: `.kiro/specs/parser2-filescope-bug-fix/`  
-**Detailed Report**: [bug-report.md](../parser2-filescope-bug-fix/bug-report.md)
-
-**Next Action**: parser2-filescope-bug-fix仕様を完了してから、本仕様（transpiler2）の実装を開始してください。
-
----
-
 ## Introduction
 本仕様は、既に完成した`parser2`モジュール（parser2-pest-migration完了後）を入力として、新たな`transpiler2`レイヤーを実装するための要件を定義します。transpiler2は、parser2が生成した新AST型に対応し、より保守性の高い実装設計を提供します。レガシーtranspilerと並存しながら、段階的に置き換える基盤を確立します。
 
