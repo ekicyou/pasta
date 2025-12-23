@@ -1,857 +1,773 @@
-# Design Document: Parser2 Migration
-
-## 設計概要
-
-本文書は、pasta2.pest文法に基づく新パーサー層（`src/parser2/`）の詳細設計を定義します。Gap analysisで特定された5つのDesign Itemsを詳細化し、実装フェーズへの橋渡しを行います。
-
-**設計原則**:
-- pasta2.pestは**検証済み・不変の憲法**として扱う（一切の文法変更を認めない）
-- Legacy parser（`src/parser/`）との完全な独立性を保証
-- 全202行の文法規則に対して完全なAST型定義を提供
-
-## Design Item 1: AST型の完全設計
-
-### 1.1 型階層の全体像
-
-pasta2.pestの文法構造に対応する23種類のAST型を定義します：
-
-```
-FileNode                              # file規則
-├── FileScope                         # file_scope規則
-│   ├── FileAttrLine                  # file_attr_line規則
-│   └── FileWordLine                  # file_word_line規則
-└── GlobalSceneScope                  # global_scene_scope規則
-    ├── GlobalSceneStart              # global_scene_start規則
-    │   ├── GlobalSceneLine           # global_scene_line規則
-    │   └── GlobalSceneContinueLine   # global_scene_continue_line規則
-    ├── GlobalSceneInit               # global_scene_init規則
-    │   ├── GlobalSceneAttrLine       # global_scene_attr_line規則
-    │   └── GlobalSceneWordLine       # global_scene_word_line規則
-    └── LocalSceneScope               # local_scene_scope規則
-        ├── LocalSceneLine            # local_scene_line規則
-        └── LocalSceneItem            # local_scene_item規則
-            ├── VarSetLine            # var_set_line規則
-            ├── CallSceneLine         # call_scene_line規則
-            ├── ActionLine            # action_line規則
-            └── ContinueActionLine    # continue_action_line規則
-```
-
-### 1.2 コア型定義
-
-#### 1.2.1 トップレベル型
-
-```rust
-/// pasta2.pest file規則に対応
-#[derive(Debug, Clone, PartialEq)]
-pub struct FileNode {
-    pub file_scope: Option<FileScope>,
-    pub global_scenes: Vec<GlobalSceneScope>,
-    pub span: Span,
-}
-
-/// pasta2.pest file_scope規則に対応
-#[derive(Debug, Clone, PartialEq)]
-pub struct FileScope {
-    pub attrs: Vec<AttrLine>,
-    pub words: Vec<WordDefLine>,
-    pub span: Span,
-}
-```
-
-#### 1.2.2 グローバルシーン型
-
-```rust
-/// pasta2.pest global_scene_scope規則に対応
-#[derive(Debug, Clone, PartialEq)]
-pub struct GlobalSceneScope {
-    pub start: GlobalSceneStart,
-    pub init: Vec<GlobalSceneInit>,
-    pub code_blocks: Vec<CodeBlock>,
-    pub first_local: LocalStartSceneScope,
-    pub other_locals: Vec<LocalSceneScope>,
-    pub span: Span,
-}
-
-/// pasta2.pest global_scene_start規則に対応
-#[derive(Debug, Clone, PartialEq)]
-pub enum GlobalSceneStart {
-    Line(GlobalSceneLine),
-    Continue(GlobalSceneContinueLine),
-}
-
-/// pasta2.pest global_scene_line規則に対応
-#[derive(Debug, Clone, PartialEq)]
-pub struct GlobalSceneLine {
-    pub marker: GlobalMarker,  // ＊ or *
-    pub scene_id: Identifier,
-    pub attrs: Vec<Attr>,
-    pub span: Span,
-}
-
-/// pasta2.pest global_scene_continue_line規則に対応
-#[derive(Debug, Clone, PartialEq)]
-pub struct GlobalSceneContinueLine {
-    pub marker: GlobalMarker,  // ＊ or *
-    pub span: Span,
-}
-
-/// pasta2.pest global_scene_init規則に対応
-#[derive(Debug, Clone, PartialEq)]
-pub enum GlobalSceneInit {
-    Attr(GlobalSceneAttrLine),
-    Word(GlobalSceneWordLine),
-}
-```
-
-#### 1.2.3 ローカルシーン型
-
-```rust
-/// pasta2.pest local_scene_scope規則に対応
-#[derive(Debug, Clone, PartialEq)]
-pub struct LocalSceneScope {
-    pub start: LocalSceneLine,
-    pub items: Vec<LocalSceneItem>,
-    pub code_blocks: Vec<CodeBlock>,
-    pub span: Span,
-}
-
-/// pasta2.pest local_start_scene_scope規則に対応
-#[derive(Debug, Clone, PartialEq)]
-pub struct LocalStartSceneScope {
-    pub items: Vec<LocalSceneItem>,
-    pub code_blocks: Vec<CodeBlock>,
-    pub span: Span,
-}
-
-/// pasta2.pest local_scene_line規則に対応
-#[derive(Debug, Clone, PartialEq)]
-pub struct LocalSceneLine {
-    pub marker: LocalMarker,  // ・ or -
-    pub scene_id: Identifier,
-    pub attrs: Vec<Attr>,
-    pub span: Span,
-}
-
-/// pasta2.pest local_scene_item規則に対応
-#[derive(Debug, Clone, PartialEq)]
-pub enum LocalSceneItem {
-    VarSet(VarSetLine),
-    CallScene(CallSceneLine),
-    Action(ActionLine),
-    ContinueAction(ContinueActionLine),
-}
-```
-
-#### 1.2.4 アクション型
-
-```rust
-/// pasta2.pest action_line規則に対応
-#[derive(Debug, Clone, PartialEq)]
-pub struct ActionLine {
-    pub speaker: Identifier,
-    pub actions: Vec<Action>,
-    pub span: Span,
-}
-
-/// pasta2.pest continue_action_line規則に対応
-#[derive(Debug, Clone, PartialEq)]
-pub struct ContinueActionLine {
-    pub actions: Vec<Action>,
-    pub span: Span,
-}
-
-/// pasta2.pest action規則に対応
-#[derive(Debug, Clone, PartialEq)]
-pub enum Action {
-    FnCall(FnCall),
-    WordRef(WordRef),
-    VarRef(VarRef),
-    SakuraScript(SakuraScript),
-    Talk(Talk),
-    AtEscape,
-    DollarEscape,
-    SakuraEscape,
-}
-
-/// pasta2.pest talk規則に対応
-#[derive(Debug, Clone, PartialEq)]
-pub struct Talk {
-    pub content: String,
-    pub span: Span,
-}
-```
-
-### 1.3 式・リテラル型
-
-#### 1.3.1 文字列リテラル（4階層PUSH/POP対応）
-
-```rust
-/// pasta2.pest string_literal規則に対応
-#[derive(Debug, Clone, PartialEq)]
-pub enum StringLiteral {
-    Blank,                          // "" or 「」
-    Fenced(FencedString),           // 4階層括弧対応
-}
-
-/// PUSH/POPスタック機構で解析された文字列
-#[derive(Debug, Clone, PartialEq)]
-pub struct FencedString {
-    pub content: String,
-    pub fence_type: FenceType,
-    pub span: Span,
-}
-
-/// 文字列フェンスの種類（4階層日本語 + 英語）
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum FenceType {
-    Japanese1,  // 「...」
-    Japanese2,  // 「「...」」
-    Japanese3,  // 「「「...」」」
-    Japanese4,  // 「「「「...」」」」
-    English,    // "..." (PUSHで任意長対応)
-}
-```
-
-#### 1.3.2 数値リテラル
-
-```rust
-/// pasta2.pest number_literal規則に対応
-#[derive(Debug, Clone, PartialEq)]
-pub struct NumberLiteral {
-    pub value: f64,
-    pub raw: String,  // 全角数字対応のため元文字列を保持
-    pub span: Span,
-}
-```
-
-#### 1.3.3 式・演算子
-
-```rust
-/// pasta2.pest expr規則に対応
-#[derive(Debug, Clone, PartialEq)]
-pub struct Expr {
-    pub term: Term,
-    pub operations: Vec<BinOp>,
-    pub span: Span,
-}
-
-/// pasta2.pest bin規則に対応
-#[derive(Debug, Clone, PartialEq)]
-pub struct BinOp {
-    pub operator: BinOperator,
-    pub right: Term,
-    pub span: Span,
-}
-
-/// pasta2.pest bin_op規則に対応
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum BinOperator {
-    Add,     // + or ＋
-    Sub,     // - or －
-    Mul,     // * or ＊ or ×
-    Div,     // / or ／ or ÷
-    Modulo,  // % or ％
-}
-
-/// pasta2.pest term規則に対応
-#[derive(Debug, Clone, PartialEq)]
-pub enum Term {
-    ParenExpr(Box<Expr>),
-    FnCall(FnCall),
-    VarRef(VarRef),
-    Number(NumberLiteral),
-    String(StringLiteral),
-}
-```
-
-### 1.4 識別子・マーカー型
-
-#### 1.4.1 識別子（予約ID検証対応）
-
-```rust
-/// pasta2.pest id規則に対応（reserved_id拒否済み）
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Identifier {
-    pub name: String,
-    pub span: Span,
-}
-
-impl Identifier {
-    /// __name__形式の予約IDをチェック（AST構築段階での追加検証）
-    pub fn validate_not_reserved(&self) -> Result<(), String> {
-        if self.name.starts_with("__") && self.name.ends_with("__") {
-            Err(format!("Reserved identifier pattern: {}", self.name))
-        } else {
-            Ok(())
-        }
-    }
-}
-```
-
-#### 1.4.2 マーカー型（全角・半角等価性）
-
-```rust
-/// pasta2.pest global_marker規則に対応
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum GlobalMarker {
-    FullWidth,  // ＊
-    HalfWidth,  // *
-}
-
-/// pasta2.pest local_marker規則に対応
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum LocalMarker {
-    FullWidth,  // ・
-    HalfWidth,  // -
-}
-
-/// 全角・半角の等価性を保証
-impl PartialEq<LocalMarker> for GlobalMarker {
-    fn eq(&self, _other: &LocalMarker) -> bool {
-        false  // 異なるマーカー種別は等価でない
-    }
-}
-```
-
-### 1.5 コードブロック型
-
-```rust
-/// pasta2.pest code_block規則に対応
-#[derive(Debug, Clone, PartialEq)]
-pub struct CodeBlock {
-    pub language: Option<Identifier>,  // 言語識別子（例: rune, rust）
-    pub content: String,
-    pub fence_length: usize,  // PUSHで記録されたバッククォート数
-    pub span: Span,
-}
-```
-
-### 1.6 補助型
-
-```rust
-/// Sakuraスクリプト（\s0等）
-#[derive(Debug, Clone, PartialEq)]
-pub struct SakuraScript {
-    pub id: String,
-    pub args: Option<SakuraArgs>,
-    pub span: Span,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct SakuraArgs {
-    pub body: String,  // PUSH/POP解析済み内容
-    pub strings: Vec<SakuraString>,  // 内部の文字列リテラル
-    pub span: Span,
-}
-
-/// ソース位置情報
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Span {
-    pub start: usize,
-    pub end: usize,
-}
-```
-
-## Design Item 2: PUSH/POPスタックのAST構築設計
-
-### 2.1 Pestスタック機構の理解
-
-pasta2.pestでは3箇所でPUSH/POP機構を使用：
-
-1. **4階層文字列リテラル**: `slfence_ja1`〜`slfence_ja4`, `slfence_en`
-2. **コードブロック**: `code_open` → `code_contents` → `code_close`
-3. **Sakuraスクリプト引数**: `sakura_open` → `sakura_body` → `sakura_close`
-   - 内部文字列: `sakura_str_open` → `sakura_str_body` → `sakura_str_close`
-
-### 2.2 文字列リテラルの構築アルゴリズム
-
-```rust
-/// pest::iterators::Pair<Rule> からStringLiteralを構築
-fn build_string_literal(pair: Pair<Rule>) -> Result<StringLiteral, ParseError> {
-    match pair.as_rule() {
-        Rule::string_blank => Ok(StringLiteral::Blank),
-        Rule::string_fenced => {
-            let mut inner = pair.into_inner();
-            
-            // PUSH規則で決定されたフェンスタイプを取得
-            let fence_pair = inner.next().unwrap();
-            let fence_type = match fence_pair.as_rule() {
-                Rule::slfence_ja1 => FenceType::Japanese1,
-                Rule::slfence_ja2 => FenceType::Japanese2,
-                Rule::slfence_ja3 => FenceType::Japanese3,
-                Rule::slfence_ja4 => FenceType::Japanese4,
-                Rule::slfence_en => FenceType::English,
-                _ => unreachable!(),
-            };
-            
-            // string_contents（PEEK照合で解析済み）
-            let content_pair = inner.next().unwrap();
-            let content = content_pair.as_str().to_string();
-            
-            // strclose（POP自動照合）は消費されるが検証不要
-            
-            Ok(StringLiteral::Fenced(FencedString {
-                content,
-                fence_type,
-                span: Span::from_pair(&fence_pair),
-            }))
-        }
-        _ => Err(ParseError::UnexpectedRule(pair.as_rule())),
-    }
-}
-```
-
-### 2.3 コードブロックの構築アルゴリズム
-
-```rust
-/// pest::iterators::Pair<Rule> からCodeBlockを構築
-fn build_code_block(pair: Pair<Rule>) -> Result<CodeBlock, ParseError> {
-    let span = Span::from_pair(&pair);
-    let mut inner = pair.into_inner();
-    
-    // code_open（PUSH規則で開始）
-    let open_pair = inner.next().unwrap();
-    let mut open_inner = open_pair.into_inner();
-    
-    // PUSHで記録されたバッククォート列を取得
-    let fence_str = open_inner.next().unwrap().as_str();
-    let fence_length = fence_str.len();
-    
-    // 言語識別子（オプション）
-    let language = open_inner.next().map(|p| Identifier {
-        name: p.as_str().to_string(),
-        span: Span::from_pair(&p),
-    });
-    
-    // code_contents（PEEKで終了マーカー検出まで消費）
-    let content_pair = inner.next().unwrap();
-    let content = content_pair.as_str().to_string();
-    
-    // code_close（POP自動照合）は消費されるが検証不要
-    
-    Ok(CodeBlock {
-        language,
-        content,
-        fence_length,
-        span,
-    })
-}
-```
-
-### 2.4 Sakuraスクリプト引数の構築アルゴリズム
-
-```rust
-/// Sakuraスクリプト引数（ネストした文字列リテラル対応）
-fn build_sakura_args(pair: Pair<Rule>) -> Result<SakuraArgs, ParseError> {
-    let span = Span::from_pair(&pair);
-    let mut inner = pair.into_inner();
-    
-    // sakura_open（PUSH_LITERAL("]")）
-    inner.next().unwrap();  // 消費のみ
-    
-    // sakura_body（sakura_str混在の可能性あり）
-    let body_pair = inner.next().unwrap();
-    let body = body_pair.as_str().to_string();
-    
-    // sakura_str（内部文字列）を抽出
-    let mut strings = Vec::new();
-    for str_pair in body_pair.into_inner() {
-        if str_pair.as_rule() == Rule::sakura_str {
-            let mut str_inner = str_pair.into_inner();
-            
-            // sakura_str_open（PUSH("\"")）
-            str_inner.next().unwrap();
-            
-            // sakura_str_body（PEEK{2}でエスケープ対応）
-            let str_body = str_inner.next().unwrap().as_str().to_string();
-            
-            // sakura_str_close（POP）
-            strings.push(SakuraString {
-                content: str_body,
-                span: Span::from_pair(&str_pair),
-            });
-        }
-    }
-    
-    // sakura_close（POP）は消費されるが検証不要
-    
-    Ok(SakuraArgs { body, strings, span })
-}
-```
-
-## Design Item 3: スコープ階層解析アルゴリズム
-
-### 3.1 3層スコープ構造の定義
-
-pasta2.pestは以下の厳格な階層構造を定義：
-
-```
-file規則
-├── file_scope（0または1個）        # FileScope型
-│   └── file_scppe_item+             # ファイル属性・ワード定義
-└── global_scene_scope*（0個以上）   # GlobalSceneScope型
-    ├── global_scene_start           # グローバルシーン開始
-    ├── global_scene_init*           # グローバルシーン属性・ワード定義
-    ├── code_scope*                  # コードブロック（全スコープで配置可能）
-    ├── local_start_scene_scope      # 最初のローカルシーン（必須）
-    │   └── local_scene_item+
-    └── local_scene_scope*           # 2番目以降のローカルシーン
-        ├── local_scene_start        # ローカルシーン開始
-        └── local_scene_item+
-```
-
-### 3.2 FileNode構築アルゴリズム
-
-```rust
-/// pest::iterators::Pair<Rule::file> からFileNodeを構築
-fn build_file_node(file_pair: Pair<Rule>) -> Result<FileNode, ParseError> {
-    let span = Span::from_pair(&file_pair);
-    let mut file_scope = None;
-    let mut global_scenes = Vec::new();
-    
-    for scope_pair in file_pair.into_inner() {
-        match scope_pair.as_rule() {
-            Rule::file_scope => {
-                // file_scopeは最大1個のみ存在
-                if file_scope.is_some() {
-                    return Err(ParseError::DuplicateFileScope);
-                }
-                file_scope = Some(build_file_scope(scope_pair)?);
-            }
-            Rule::global_scene_scope => {
-                global_scenes.push(build_global_scene_scope(scope_pair)?);
-            }
-            Rule::EOI => {} // 終端マーカー
-            _ => return Err(ParseError::UnexpectedRule(scope_pair.as_rule())),
-        }
-    }
-    
-    Ok(FileNode {
-        file_scope,
-        global_scenes,
-        span,
-    })
-}
-```
-
-### 3.3 GlobalSceneScope構築アルゴリズム
-
-```rust
-/// pest::iterators::Pair<Rule::global_scene_scope> からGlobalSceneScopeを構築
-fn build_global_scene_scope(pair: Pair<Rule>) -> Result<GlobalSceneScope, ParseError> {
-    let span = Span::from_pair(&pair);
-    let mut inner = pair.into_inner();
-    
-    // 1. global_scene_start（必須）
-    let start_pair = inner.next().ok_or(ParseError::MissingGlobalSceneStart)?;
-    let start = match start_pair.as_rule() {
-        Rule::global_scene_line => GlobalSceneStart::Line(build_global_scene_line(start_pair)?),
-        Rule::global_scene_continue_line => GlobalSceneStart::Continue(build_global_scene_continue_line(start_pair)?),
-        _ => return Err(ParseError::UnexpectedRule(start_pair.as_rule())),
-    };
-    
-    // 2. global_scene_init*（0個以上）
-    let mut init = Vec::new();
-    let mut code_blocks = Vec::new();
-    let mut first_local = None;
-    let mut other_locals = Vec::new();
-    
-    for item_pair in inner {
-        match item_pair.as_rule() {
-            Rule::global_scene_attr_line => {
-                init.push(GlobalSceneInit::Attr(build_global_scene_attr_line(item_pair)?));
-            }
-            Rule::global_scene_word_line => {
-                init.push(GlobalSceneInit::Word(build_global_scene_word_line(item_pair)?));
-            }
-            Rule::code_block => {
-                code_blocks.push(build_code_block(item_pair)?);
-            }
-            Rule::local_start_scene_scope => {
-                // 最初のlocal_start_scene_scope（必須）
-                if first_local.is_some() {
-                    return Err(ParseError::DuplicateLocalStartScope);
-                }
-                first_local = Some(build_local_start_scene_scope(item_pair)?);
-            }
-            Rule::local_scene_scope => {
-                // 2番目以降のlocal_scene_scope
-                other_locals.push(build_local_scene_scope(item_pair)?);
-            }
-            _ => return Err(ParseError::UnexpectedRule(item_pair.as_rule())),
-        }
-    }
-    
-    // local_start_scene_scopeは必須
-    let first_local = first_local.ok_or(ParseError::MissingLocalStartScope)?;
-    
-    Ok(GlobalSceneScope {
-        start,
-        init,
-        code_blocks,
-        first_local,
-        other_locals,
-        span,
-    })
-}
-```
-
-### 3.4 LocalSceneScope構築アルゴリズム
-
-```rust
-/// pest::iterators::Pair<Rule::local_scene_scope> からLocalSceneScopeを構築
-fn build_local_scene_scope(pair: Pair<Rule>) -> Result<LocalSceneScope, ParseError> {
-    let span = Span::from_pair(&pair);
-    let mut inner = pair.into_inner();
-    
-    // 1. local_scene_start（必須）
-    let start_pair = inner.next().ok_or(ParseError::MissingLocalSceneStart)?;
-    let start = build_local_scene_line(start_pair)?;
-    
-    // 2. local_scene_item+（1個以上）
-    let mut items = Vec::new();
-    let mut code_blocks = Vec::new();
-    
-    for item_pair in inner {
-        match item_pair.as_rule() {
-            Rule::var_set_line => {
-                items.push(LocalSceneItem::VarSet(build_var_set_line(item_pair)?));
-            }
-            Rule::call_scene_line => {
-                items.push(LocalSceneItem::CallScene(build_call_scene_line(item_pair)?));
-            }
-            Rule::action_line => {
-                items.push(LocalSceneItem::Action(build_action_line(item_pair)?));
-            }
-            Rule::continue_action_line => {
-                items.push(LocalSceneItem::ContinueAction(build_continue_action_line(item_pair)?));
-            }
-            Rule::code_block => {
-                code_blocks.push(build_code_block(item_pair)?);
-            }
-            Rule::blank_line => {} // 空白行は無視
-            _ => return Err(ParseError::UnexpectedRule(item_pair.as_rule())),
-        }
-    }
-    
-    if items.is_empty() {
-        return Err(ParseError::EmptyLocalScene);
-    }
-    
-    Ok(LocalSceneScope {
-        start,
-        items,
-        code_blocks,
-        span,
-    })
-}
-```
-
-## Design Item 4: reserved ID検証方法の決定
-
-### 4.1 検証戦略の比較
-
-pasta2.pestでは以下の方法でreserved ID（`__name__`）を拒否：
-
-```pest
-reserved_id = _{ dunder ~ idn2* ~ dunder }
-id          = @{ !(reserved_id) ~ identifier }
-```
-
-**方法A: Pest negative lookahead（現在の実装）**
-- **利点**: パース段階で即座に拒否、エラー位置が正確
-- **欠点**: エラーメッセージがPest標準形式（"expected id, found __"）
-
-**方法B: AST構築段階でのRust検証**
-- **利点**: カスタムエラーメッセージ可能（"Reserved identifier pattern: __name__"）
-- **欠点**: パース成功後のAST構築で失敗、二段階エラー処理
-
-### 4.2 採用方針: ハイブリッドアプローチ
-
-**決定**: Pest negative lookaheadを**主検証**、Rust検証を**補助検証**として併用
-
-```rust
-impl Identifier {
-    /// AST構築段階での追加検証（Pestをすり抜けた場合の防御）
-    pub fn validate_not_reserved(&self) -> Result<(), ParseError> {
-        if self.name.starts_with("__") && self.name.ends_with("__") && self.name.len() > 4 {
-            Err(ParseError::ReservedIdentifier {
-                name: self.name.clone(),
-                suggestion: format!("Identifiers starting and ending with '__' are reserved. Consider using '{}_' or '{}' instead.", 
-                    &self.name[2..], &self.name[2..self.name.len()-2]),
-            })
-        } else {
-            Ok(())
-        }
-    }
-}
-
-/// 全Identifier構築時に自動検証
-fn build_identifier(pair: Pair<Rule>) -> Result<Identifier, ParseError> {
-    let name = pair.as_str().to_string();
-    let span = Span::from_pair(&pair);
-    
-    let id = Identifier { name, span };
-    id.validate_not_reserved()?;  // 追加検証
-    Ok(id)
-}
-```
-
-### 4.3 エラーメッセージ設計
-
-```rust
-#[derive(Debug, Clone)]
-pub enum ParseError {
-    /// Pest解析エラー（標準メッセージ）
-    PestError(Box<pest::error::Error<Rule>>),
-    
-    /// 予約ID使用エラー（カスタムメッセージ）
-    ReservedIdentifier {
-        name: String,
-        suggestion: String,
-    },
-    
-    // その他のエラー型...
-}
-
-impl Display for ParseError {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match self {
-            ParseError::ReservedIdentifier { name, suggestion } => {
-                write!(f, "Reserved identifier '{}': {}", name, suggestion)
-            }
-            ParseError::PestError(e) => write!(f, "{}", e),
-            // ...
-        }
-    }
-}
-```
-
-## Design Item 5: 継続行のAST設計
-
-### 5.1 継続行の文法構造
-
-pasta2.pestにおける継続行の定義：
-
-```pest
-action_line          = { pad ~ id ~ s ~ kv_marker ~ s ~ actions ~ eol }
-continue_action_line = { pad ~ kv_marker ~ s ~ actions ~ eol }
-```
-
-**特徴**:
-- `action_line`: 話者ID + `:` + アクション
-- `continue_action_line`: `:` + アクション（話者ID省略）
-
-### 5.2 AST型設計
-
-```rust
-/// pasta2.pest action_line規則に対応
-#[derive(Debug, Clone, PartialEq)]
-pub struct ActionLine {
-    pub speaker: Identifier,      // 話者ID
-    pub actions: Vec<Action>,     // アクション列
-    pub span: Span,
-}
-
-/// pasta2.pest continue_action_line規則に対応
-#[derive(Debug, Clone, PartialEq)]
-pub struct ContinueActionLine {
-    pub actions: Vec<Action>,     // アクション列（話者IDなし）
-    pub span: Span,
-}
-
-/// LocalSceneItemに統合
-#[derive(Debug, Clone, PartialEq)]
-pub enum LocalSceneItem {
-    VarSet(VarSetLine),
-    CallScene(CallSceneLine),
-    Action(ActionLine),
-    ContinueAction(ContinueActionLine),  // 継続行専用型
-}
-```
-
-### 5.3 意味解析での処理方針
-
-継続行は**前のActionLineと結合**する必要があります：
-
-```rust
-/// LocalSceneScope解析後の後処理で継続行を統合
-fn merge_continue_actions(items: Vec<LocalSceneItem>) -> Vec<LocalSceneItem> {
-    let mut merged = Vec::new();
-    let mut pending_speaker: Option<Identifier> = None;
-    
-    for item in items {
-        match item {
-            LocalSceneItem::Action(mut action) => {
-                // 通常のアクション行（話者ID付き）
-                pending_speaker = Some(action.speaker.clone());
-                merged.push(LocalSceneItem::Action(action));
-            }
-            LocalSceneItem::ContinueAction(continue_action) => {
-                // 継続行を直前のActionLineに統合
-                if let Some(LocalSceneItem::Action(ref mut last_action)) = merged.last_mut() {
-                    last_action.actions.extend(continue_action.actions);
-                } else {
-                    // エラー: 継続行の前にActionLineが存在しない
-                    return Err(ParseError::OrphanContinueAction {
-                        span: continue_action.span,
-                    });
-                }
-            }
-            other => {
-                merged.push(other);
-            }
-        }
-    }
-    
-    Ok(merged)
-}
-```
-
-### 5.4 例: 継続行の解析
-
-```pasta
-＊グローバルシーン
-　ー開始
-　　話者：こんにちは
-　　　：これは継続行です
-　　　：さらに続きます
-```
-
-**AST構造**:
-```rust
-LocalSceneScope {
-    start: LocalSceneLine { scene_id: "開始", ... },
-    items: vec![
-        LocalSceneItem::Action(ActionLine {
-            speaker: Identifier { name: "話者" },
-            actions: vec![
-                Action::Talk(Talk { content: "こんにちは" }),
-                Action::Talk(Talk { content: "これは継続行です" }),  // 統合後
-                Action::Talk(Talk { content: "さらに続きます" }),    // 統合後
-            ],
-        }),
-    ],
-}
-```
-
-## 次のステップ
-
-Design phaseが完了したら、以下を実施：
-
-1. **spec.json更新**: `phase: "design-generated"`に変更
-2. **Tasks phase開始**: 実装タスクの詳細分解
-   - Task 1: grammar.pest移動（git mv）
-   - Task 2: `src/parser2/mod.rs` 骨格作成
-   - Task 3: `src/parser2/ast.rs` 型定義（23型）
-   - Task 4: AST構築関数実装（build_*系）
-   - Task 5: エラー型定義とFrom trait実装
-   - Task 6: `parse_file` / `parse_str` API実装
-   - Task 7: `lib.rs` への統合
-   - Task 8: テストファイル作成（8項目カバレッジ）
-3. **Implementation phase**: タスク実行・検証
-4. **Validation**: 全要件のAcceptance Criteria確認
+# Design Document - parser2-pest-migration
+
+---
+**Purpose**: pasta2.pestを権威的文法として、既存parserと並存する新パーサーモジュール（parser2）を設計する。
+
+**Approach**:
+- pasta2.pest文法は検証済み・不変（一切の変更禁止）
+- 完全独立モジュールとして実装（Option B）
+- 3層スコープ階層を正確にAST表現
+- レガシーparserとのAPI互換性を維持
+---
+
+## Overview
+
+**Purpose**: parser2モジュールは、検証済みのpasta2.pest文法に基づき、Pasta DSLソースコードを構造化されたAST（抽象構文木）に変換する。pasta2.pestは「憲法」として一切の変更を認めず、その約60の文法規則すべてを忠実に実装する。
+
+**Users**: 
+- transpiler2開発者：parser2 ASTを入力としてRuneコードを生成
+- テスト作成者：文法規則の動作検証
+- 将来のパーサー保守者：文法とAST対応の理解
+
+**Impact**: 既存のparserモジュールには一切影響しない。lib.rsに`pub mod parser2`を追加し、新しいインポートパス`pasta::parser2::*`を提供する。
+
+### Goals
+- pasta2.pestの全60規則を完全実装（MVP禁止）
+- 3層スコープ階層（FileScope ⊃ GlobalSceneScope ⊃ LocalSceneScope）の正確なAST表現
+- レガシーparser APIと同一シグネチャ（`parse_file`, `parse_str`）
+- 全文法規則のテストカバレッジ
+
+### Non-Goals
+- transpiler2の実装（将来仕様）
+- 既存parserの修正・削除
+- pasta2.pest文法の変更
+- パフォーマンス最適化（正確性優先）
 
 ---
 
-**設計承認**: Design Document完成後、人間による承認を経て実装フェーズに移行します。
+## Requirements Traceability
+
+| Requirement | Summary | Components | Interfaces | Flows |
+|-------------|---------|------------|------------|-------|
+| 1 | Grammar File保全 | grammar.pest | git mv | - |
+| 2 | parser2モジュール作成 | mod.rs | parse_file, parse_str | Main Parse Flow |
+| 3 | AST型定義 | ast.rs | PastaFile2, Scope types | - |
+| 4 | Pest parser統合 | mod.rs | PastaParser2, Rule | - |
+| 5 | レガシー共存 | lib.rs | pub mod parser2 | - |
+| 6 | Module Structure | mod.rs, ast.rs, grammar.pest | - | - |
+| 7 | エラーハンドリング | mod.rs | PastaError::PestError | Error Flow |
+| 8 | テストカバレッジ | tests/ | - | - |
+| 9 | Documentation | mod.rs (doc comments) | - | - |
+
+---
+
+## Architecture
+
+### Existing Architecture Analysis
+
+現在のアーキテクチャ（tech.md準拠）:
+```
+Engine (上位API) → Cache/Loader
+    ↓
+Transpiler (2pass) ← Parser (Pest)
+    ↓
+Runtime (Rune VM) → IR Output (ScriptEvent)
+```
+
+parser2は既存Parserレイヤーと並存し、将来的にTranspiler2と連携する。
+
+### Architecture Pattern & Boundary Map
+
+```mermaid
+graph TB
+    subgraph "公開API (lib.rs)"
+        LibParser[parser module]
+        LibParser2[parser2 module]
+    end
+    
+    subgraph "parser (既存・無変更)"
+        PastaParser[PastaParser]
+        PastaPest[pasta.pest]
+        ParserAST[ast.rs<br/>PastaFile, SceneDef...]
+    end
+    
+    subgraph "parser2 (新規)"
+        PastaParser2[PastaParser2]
+        GrammarPest[grammar.pest<br/>pasta2.pest移動]
+        Parser2AST[ast.rs<br/>PastaFile2, Scope types...]
+    end
+    
+    subgraph "共通"
+        ErrorMod[error.rs<br/>PastaError]
+    end
+    
+    LibParser --> PastaParser
+    LibParser2 --> PastaParser2
+    PastaParser --> PastaPest
+    PastaParser2 --> GrammarPest
+    PastaParser --> ParserAST
+    PastaParser2 --> Parser2AST
+    PastaParser2 --> ErrorMod
+    PastaParser --> ErrorMod
+```
+
+**Architecture Integration**:
+- **選択パターン**: レイヤードアーキテクチャ（既存踏襲）
+- **ドメイン境界**: parser2はparserと完全独立、AST型も共有しない
+- **既存パターン維持**: `#[derive(Parser)]` + `#[grammar = "..."]`パターン
+- **新規コンポーネント理由**: pasta2.pest文法がpasta.pestと構造的に異なるため
+- **Steering準拠**: tech.mdのレイヤー構成、workflow.mdのMVP禁止
+
+### Technology Stack
+
+| Layer | Choice / Version | Role in Feature | Notes |
+|-------|------------------|-----------------|-------|
+| Parser Generator | Pest 2.8 | PEG文法からパーサー生成 | PUSH/POPスタック使用 |
+| 派生マクロ | pest_derive 2.8 | コンパイル時パーサー生成 | `#[derive(Parser)]` |
+| エラー型 | thiserror 2 | PastaError定義 | 既存error.rs再利用 |
+| テスト | Rust標準 + tempfile 3 | ユニット・統合テスト | fixtureファイル使用 |
+
+---
+
+## System Flows
+
+### Main Parse Flow
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant parse_str
+    participant PastaParser2
+    participant Pest
+    participant ASTBuilder
+    
+    Client->>parse_str: (source, filename)
+    parse_str->>PastaParser2: parse(Rule::file, source)
+    PastaParser2->>Pest: PEGパース実行
+    Pest-->>PastaParser2: Pairs<Rule>
+    
+    alt パース成功
+        PastaParser2-->>parse_str: Ok(pairs)
+        parse_str->>ASTBuilder: build_ast(pairs)
+        ASTBuilder->>ASTBuilder: parse_file_scope
+        ASTBuilder->>ASTBuilder: parse_global_scene_scope (loop)
+        ASTBuilder->>ASTBuilder: parse_local_scene_scope (nested loop)
+        ASTBuilder-->>parse_str: PastaFile2
+        parse_str-->>Client: Ok(PastaFile2)
+    else パース失敗
+        Pest-->>PastaParser2: PestError
+        PastaParser2-->>parse_str: Err
+        parse_str-->>Client: Err(PastaError::PestError)
+    end
+```
+
+### Scope Hierarchy Parse Flow
+
+```mermaid
+flowchart TD
+    A[file rule] --> B{file_scope?}
+    B -->|Yes| C[parse_file_scope]
+    C --> D[FileScope]
+    B -->|No| E{global_scene_scope?}
+    
+    E -->|Yes| F[parse_global_scene_scope]
+    F --> G{global_scene_continue_line?}
+    G -->|Yes| H{last_name exists?}
+    H -->|Yes| I[継承: name = last_name]
+    H -->|No| J[Error: Unnamed at start]
+    G -->|No| K[parse global_scene_line]
+    K --> L[Extract scene name]
+    
+    I --> M[parse global_scene_init]
+    L --> M
+    M --> N[parse local_scene_scope loop]
+    N --> O[GlobalSceneScope]
+    O --> P[Update last_global_scene_name]
+    
+    E -->|No| Q{EOI?}
+    Q -->|Yes| R[Complete PastaFile2]
+    P --> E
+```
+
+---
+
+## Components and Interfaces
+
+### Summary Table
+
+| Component | Domain/Layer | Intent | Req Coverage | Key Dependencies | Contracts |
+|-----------|--------------|--------|--------------|------------------|-----------|
+| mod.rs | Parser2 | エントリーポイント、公開API | 2, 4, 5, 7 | grammar.pest (P0), error.rs (P0) | Service |
+| ast.rs | Parser2 | AST型定義 | 3 | - | - |
+| grammar.pest | Parser2 | 権威的文法定義 | 1 | - | - |
+| tests/ | Test | 全規則テスト | 8 | parser2 (P0) | - |
+
+---
+
+### Parser2 Layer
+
+#### mod.rs
+
+| Field | Detail |
+|-------|--------|
+| Intent | pasta2.pest文法に基づくパース処理の実装と公開API提供 |
+| Requirements | 2.1-2.6, 4.1-4.3, 5.1-5.4, 7.1-7.4 |
+
+**Responsibilities & Constraints**
+- pasta2.pest（grammar.pest）からRust parserを生成
+- ソースコードを3層スコープ構造のASTに変換
+- 未名グローバルシーンの名前継承処理
+- すべてのエラーをPastaError::PestErrorでラップ
+
+**Dependencies**
+- Inbound: lib.rs — 公開API再エクスポート (P0)
+- Outbound: ast.rs — AST型定義 (P0)
+- Outbound: error.rs — PastaError型 (P0)
+- External: pest/pest_derive 2.8 — パーサー生成 (P0)
+
+**Contracts**: Service [x] / API [ ] / Event [ ] / Batch [ ] / State [ ]
+
+##### Service Interface
+
+```rust
+//! Parser2 module for Pasta DSL using pasta2.pest grammar.
+//!
+//! This module provides parsing functionality based on the authoritative
+//! pasta2.pest grammar specification. The grammar file is immutable and
+//! represents the canonical definition of Pasta DSL syntax.
+
+use pest_derive::Parser;
+
+#[derive(Parser)]
+#[grammar = "parser2/grammar.pest"]
+pub struct PastaParser2;
+
+/// Parse a Pasta script file using pasta2.pest grammar.
+///
+/// # Arguments
+/// * `path` - Path to the .pasta file
+///
+/// # Returns
+/// * `Ok(PastaFile2)` - Successfully parsed AST
+/// * `Err(PastaError)` - Parse or IO error
+///
+/// # Example
+/// ```no_run
+/// use pasta::parser2::parse_file;
+/// use std::path::Path;
+///
+/// let ast = parse_file(Path::new("script.pasta"))?;
+/// ```
+pub fn parse_file(path: &Path) -> Result<PastaFile2, PastaError>;
+
+/// Parse a Pasta script from a string using pasta2.pest grammar.
+///
+/// # Arguments
+/// * `source` - Pasta DSL source code
+/// * `filename` - Filename for error reporting
+///
+/// # Returns
+/// * `Ok(PastaFile2)` - Successfully parsed AST
+/// * `Err(PastaError)` - Parse error
+///
+/// # Example
+/// ```
+/// use pasta::parser2::parse_str;
+///
+/// let source = "＊挨拶\n  Alice：こんにちは\n";
+/// let ast = parse_str(source, "test.pasta")?;
+/// ```
+pub fn parse_str(source: &str, filename: &str) -> Result<PastaFile2, PastaError>;
+```
+
+- Preconditions: source/fileは有効なUTF-8
+- Postconditions: 成功時、全スコープ構造がAST化される
+- Invariants: grammar.pestは不変、一切の変更禁止
+
+**Implementation Notes**
+- Integration: `#[grammar = "parser2/grammar.pest"]`でsrc/からの相対パス指定
+- Validation: 未名グローバルシーンが先頭で出現した場合はPastaError::ParseErrorを返す
+- Risks: スコープ解析のバグ→ユニットテストで軽減
+
+---
+
+#### ast.rs
+
+| Field | Detail |
+|-------|--------|
+| Intent | pasta2.pest文法規則に対応するAST型の完全定義 |
+| Requirements | 3.1-3.5 |
+
+**Responsibilities & Constraints**
+- pasta2.pestの全規則に対応するRust構造体/列挙型を定義
+- 3層スコープ階層を型で表現
+- 継続行（ContinueAction）を独立型として定義
+- ソース位置（Span）を全ノードに付与
+
+**Dependencies**
+- Inbound: mod.rs — パース結果のAST構築 (P0)
+
+**Contracts**: State [x] (型定義のみ)
+
+##### Data Model (Core AST Types)
+
+```rust
+/// 完全なPastaファイルのAST表現
+#[derive(Debug, Clone)]
+pub struct PastaFile2 {
+    /// ソースファイルのパス
+    pub path: PathBuf,
+    /// ファイルレベルのスコープ（属性・単語定義）
+    pub file_scope: FileScope,
+    /// グローバルシーンのリスト
+    pub global_scenes: Vec<GlobalSceneScope>,
+    /// ソース位置
+    pub span: Span,
+}
+
+/// ファイルレベルスコープ（file_scope規則）
+#[derive(Debug, Clone, Default)]
+pub struct FileScope {
+    /// ファイルレベル属性
+    pub attrs: Vec<Attr>,
+    /// ファイルレベル単語定義
+    pub words: Vec<KeyWords>,
+}
+
+/// グローバルシーンスコープ（global_scene_scope規則）
+#[derive(Debug, Clone)]
+pub struct GlobalSceneScope {
+    /// シーン名（継承の場合は直前のシーン名）
+    pub name: String,
+    /// 継承フラグ（global_scene_continue_lineの場合true）
+    pub is_continuation: bool,
+    /// シーン属性
+    pub attrs: Vec<Attr>,
+    /// シーンレベル単語定義
+    pub words: Vec<KeyWords>,
+    /// コードブロック（グローバルレベル）
+    pub code_blocks: Vec<CodeBlock>,
+    /// ローカルシーンのリスト
+    pub local_scenes: Vec<LocalSceneScope>,
+    /// ソース位置
+    pub span: Span,
+}
+
+/// ローカルシーンスコープ（local_scene_scope / local_start_scene_scope規則）
+#[derive(Debug, Clone)]
+pub struct LocalSceneScope {
+    /// シーン名（local_start_scene_scopeの場合None）
+    pub name: Option<String>,
+    /// シーン属性
+    pub attrs: Vec<Attr>,
+    /// ローカルシーンアイテム
+    pub items: Vec<LocalSceneItem>,
+    /// コードブロック（ローカルレベル）
+    pub code_blocks: Vec<CodeBlock>,
+    /// ソース位置
+    pub span: Span,
+}
+
+/// ローカルシーン内のアイテム（local_scene_item規則）
+#[derive(Debug, Clone)]
+pub enum LocalSceneItem {
+    /// 変数代入（var_set_line）
+    VarSet(VarSet),
+    /// シーン呼び出し（call_scene_line）
+    CallScene(CallScene),
+    /// アクション行（action_line）
+    ActionLine(ActionLine),
+    /// 継続行（continue_action_line）
+    ContinueAction(ContinueAction),
+}
+
+/// アクション行（action_line規則）
+#[derive(Debug, Clone)]
+pub struct ActionLine {
+    /// 話者名
+    pub speaker: String,
+    /// アクション内容
+    pub actions: Vec<Action>,
+    /// ソース位置
+    pub span: Span,
+}
+
+/// 継続行（continue_action_line規則）
+/// 
+/// pasta2.pestでは継続行は`：`または`:`で始まる。
+/// これはpasta.pestとの仕様変更である。
+#[derive(Debug, Clone)]
+pub struct ContinueAction {
+    /// アクション内容
+    pub actions: Vec<Action>,
+    /// ソース位置
+    pub span: Span,
+}
+
+/// アクション（actions規則内の各要素）
+#[derive(Debug, Clone)]
+pub enum Action {
+    /// プレーンテキスト（talk）
+    Talk(String),
+    /// 単語参照（word_ref）
+    WordRef(String),
+    /// 変数参照（var_ref_local / var_ref_global）
+    VarRef { name: String, scope: VarScope },
+    /// 関数呼び出し（fn_call_local / fn_call_global）
+    FnCall { name: String, args: Args, scope: FnScope },
+    /// さくらスクリプト（sakura_script）
+    SakuraScript(String),
+    /// エスケープ（at_escape / dollar_escape / sakura_escape）
+    Escape(EscapeType),
+}
+
+/// コードブロック（code_block規則）
+#[derive(Debug, Clone)]
+pub struct CodeBlock {
+    /// 言語識別子（```rune, ```rust等）
+    pub language: Option<String>,
+    /// コード内容
+    pub content: String,
+    /// ソース位置
+    pub span: Span,
+}
+
+/// 変数代入（var_set規則）
+#[derive(Debug, Clone)]
+pub struct VarSet {
+    /// 変数名
+    pub name: String,
+    /// スコープ（local / global）
+    pub scope: VarScope,
+    /// 値（式）
+    pub value: Expr,
+    /// ソース位置
+    pub span: Span,
+}
+
+/// シーン呼び出し（call_scene規則）
+#[derive(Debug, Clone)]
+pub struct CallScene {
+    /// ターゲットシーン名
+    pub target: String,
+    /// 引数
+    pub args: Option<Args>,
+    /// ソース位置
+    pub span: Span,
+}
+
+/// 属性（attr規則）
+#[derive(Debug, Clone)]
+pub struct Attr {
+    /// キー
+    pub key: String,
+    /// 値
+    pub value: AttrValue,
+    /// ソース位置
+    pub span: Span,
+}
+
+/// 属性値
+#[derive(Debug, Clone)]
+pub enum AttrValue {
+    /// 数値リテラル
+    Number(f64),
+    /// 文字列リテラル
+    String(String),
+    /// 属性文字列（クォートなし）
+    AttrString(String),
+}
+
+/// 単語定義（key_words規則）
+#[derive(Debug, Clone)]
+pub struct KeyWords {
+    /// 単語名
+    pub name: String,
+    /// 単語値のリスト
+    pub words: Vec<String>,
+    /// ソース位置
+    pub span: Span,
+}
+
+/// 引数リスト（args規則）
+#[derive(Debug, Clone)]
+pub struct Args {
+    /// 引数のリスト
+    pub items: Vec<Arg>,
+    /// ソース位置
+    pub span: Span,
+}
+
+/// 引数（arg規則）
+#[derive(Debug, Clone)]
+pub enum Arg {
+    /// 位置引数（positional_arg）
+    Positional(Expr),
+    /// キーワード引数（key_arg）
+    Keyword { key: String, value: Expr },
+}
+
+/// 式（expr規則）
+#[derive(Debug, Clone)]
+pub enum Expr {
+    /// 数値リテラル
+    Number(f64),
+    /// 文字列リテラル
+    String(String),
+    /// 空文字列リテラル（""または「」）
+    BlankString,
+    /// 変数参照
+    VarRef { name: String, scope: VarScope },
+    /// 関数呼び出し
+    FnCall { name: String, args: Args, scope: FnScope },
+    /// 括弧式
+    Paren(Box<Expr>),
+    /// 二項演算
+    Binary { op: BinOp, lhs: Box<Expr>, rhs: Box<Expr> },
+}
+
+/// 変数スコープ
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VarScope {
+    /// ローカル変数（$var）
+    Local,
+    /// グローバル変数（$*var）
+    Global,
+}
+
+/// 関数スコープ
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FnScope {
+    /// ローカル優先検索（@func）
+    Local,
+    /// グローバル限定（@*func）
+    Global,
+}
+
+/// 二項演算子
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BinOp {
+    Add,  // +
+    Sub,  // -
+    Mul,  // *
+    Div,  // /
+    Mod,  // %
+}
+
+/// エスケープ種別
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EscapeType {
+    At,      // @@
+    Dollar,  // $$
+    Sakura,  // \\
+}
+
+/// ソース位置
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Span {
+    pub start_line: usize,
+    pub start_col: usize,
+    pub end_line: usize,
+    pub end_col: usize,
+}
+
+impl Span {
+    pub fn new(start_line: usize, start_col: usize, end_line: usize, end_col: usize) -> Self {
+        Self { start_line, start_col, end_line, end_col }
+    }
+    
+    pub fn from_pest(start: (usize, usize), end: (usize, usize)) -> Self {
+        Self::new(start.0, start.1, end.0, end.1)
+    }
+}
+```
+
+---
+
+#### grammar.pest
+
+| Field | Detail |
+|-------|--------|
+| Intent | 権威的文法定義（pasta2.pestから移動） |
+| Requirements | 1.1-1.7 |
+
+**Responsibilities & Constraints**
+- pasta2.pestの内容をバイト単位で保全
+- 一切の変更を禁止（憲法）
+- git履歴を保全するため`git mv`で移動
+
+**Dependencies**
+- Inbound: mod.rs — Pest派生マクロが参照 (P0)
+
+**Implementation Notes**
+- Integration: `git mv src/parser/pasta2.pest src/parser2/grammar.pest`
+- Validation: `git diff`またはチェックサムで同一性を検証
+- Risks: 手動編集による破損→CIでチェックサム検証を推奨
+
+---
+
+## Data Models
+
+### Domain Model
+
+```mermaid
+erDiagram
+    PastaFile2 ||--o| FileScope : contains
+    PastaFile2 ||--o{ GlobalSceneScope : contains
+    
+    FileScope ||--o{ Attr : has
+    FileScope ||--o{ KeyWords : has
+    
+    GlobalSceneScope ||--o{ Attr : has
+    GlobalSceneScope ||--o{ KeyWords : has
+    GlobalSceneScope ||--o{ CodeBlock : has
+    GlobalSceneScope ||--o{ LocalSceneScope : contains
+    
+    LocalSceneScope ||--o{ Attr : has
+    LocalSceneScope ||--o{ LocalSceneItem : has
+    LocalSceneScope ||--o{ CodeBlock : has
+    
+    LocalSceneItem ||--o| VarSet : is
+    LocalSceneItem ||--o| CallScene : is
+    LocalSceneItem ||--o| ActionLine : is
+    LocalSceneItem ||--o| ContinueAction : is
+    
+    ActionLine ||--o{ Action : has
+    ContinueAction ||--o{ Action : has
+    
+    VarSet ||--|| Expr : value
+    CallScene ||--o| Args : has
+    
+    Args ||--o{ Arg : has
+    Arg ||--o| Expr : value
+```
+
+### Entity Relationships
+
+| Entity | Cardinality | Description |
+|--------|-------------|-------------|
+| PastaFile2 → FileScope | 1:1 | 常に存在（空でも） |
+| PastaFile2 → GlobalSceneScope | 1:N | 0個以上 |
+| GlobalSceneScope → LocalSceneScope | 1:N | 1個以上（local_start_scene_scope必須） |
+| LocalSceneScope → LocalSceneItem | 1:N | 1個以上 |
+
+---
+
+## Error Handling
+
+### Error Strategy
+
+| エラー種別 | 発生条件 | 対応 |
+|-----------|---------|------|
+| **PestError** | 文法不一致 | `PastaError::PestError(String)`でラップ |
+| **ParseError** | 未名シーンが先頭 | `PastaError::ParseError`（詳細情報付き） |
+| **IoError** | ファイル読み込み失敗 | `PastaError::IoError`（From変換） |
+
+### Error Format
+
+```rust
+// Pestエラーのラップパターン（レガシーparserと同一）
+PastaParser2::parse(Rule::file, source)
+    .map_err(|e| PastaError::PestError(
+        format!("Parse error in {}: {}", filename, e)
+    ))?;
+
+// セマンティックエラー（未名シーン）
+PastaError::ParseError {
+    file: filename.to_string(),
+    line: start.0,
+    column: start.1,
+    message: "Unnamed global scene at start of file. \
+              A named global scene must appear before any unnamed scenes.".to_string(),
+}
+```
+
+---
+
+## Testing Strategy
+
+### Unit Tests (ast.rs)
+1. Span::from_pest - 座標変換の正確性
+2. Default trait実装 - FileScope::default()
+3. Clone/Debug trait - すべてのAST型
+
+### Integration Tests (mod.rs)
+1. 単純なグローバルシーン - 最小パース成功
+2. 3層スコープ - file_scope + global + local
+3. 継続行 - continue_action_lineの処理
+4. 未名シーン継承 - global_scene_continue_line
+5. 未名シーンエラー - 先頭での出現
+6. コードブロック - 言語識別子の抽出
+7. 4階層文字列リテラル - PUSH/POPスタック
+
+### Grammar Coverage Tests
+1. **全60規則のカバレッジ** - 各規則に対応するテストケース
+2. **14種類Unicode空白** - space_charsの全パターン
+3. **reserved ID拒否** - `__name__`パターンの検証
+4. **4階層括弧** - `「」`, `「「」」`, `「「「」」」`, `「「「「」」」」`
+
+### Test Fixtures
+- `tests/fixtures/parser2/` - parser2専用fixtureディレクトリ
+- 各規則に対応するfixture（例: `scope_hierarchy.pasta`, `code_block.pasta`）
+
+---
+
+## Module Structure
+
+### File Layout
+
+```
+src/parser2/
+├── mod.rs          # エントリーポイント、PastaParser2、parse_file/parse_str
+├── ast.rs          # AST型定義（23種類以上）
+└── grammar.pest    # 権威的文法（pasta2.pestから移動）
+
+tests/
+├── pasta_parser2_*.rs   # parser2統合テスト
+└── fixtures/
+    └── parser2/         # parser2専用fixture
+        ├── scope_hierarchy.pasta
+        ├── code_block.pasta
+        └── ...
+```
+
+### lib.rs Integration
+
+```rust
+// 追加するエクスポート
+pub mod parser2;
+
+// 公開API（既存parserと並存）
+pub use parser2::{
+    parse_file as parse_file_v2,
+    parse_str as parse_str_v2,
+    PastaFile2,
+    FileScope,
+    GlobalSceneScope,
+    LocalSceneScope,
+    // ... その他のAST型
+};
+```
+
+---
+
+## Implementation Checklist
+
+### Phase 1: ファイル準備
+- [ ] `src/parser2/` ディレクトリ作成
+- [ ] `git mv src/parser/pasta2.pest src/parser2/grammar.pest`
+- [ ] `git diff`でバイト同一性を検証
+- [ ] コミット: `refactor(parser2): Move pasta2.pest to parser2/grammar.pest (no content changes)`
+
+### Phase 2: AST型定義
+- [ ] `src/parser2/ast.rs` 作成
+- [ ] 23種類のAST型定義
+- [ ] ユニットテスト追加
+
+### Phase 3: パーサー実装
+- [ ] `src/parser2/mod.rs` 作成
+- [ ] `PastaParser2` 構造体定義
+- [ ] `parse_str` 実装
+- [ ] `parse_file` 実装
+- [ ] 未名シーン継承ロジック実装
+
+### Phase 4: 統合・テスト
+- [ ] `lib.rs` に `pub mod parser2` 追加
+- [ ] 全60規則のテスト作成
+- [ ] fixtureファイル作成
+- [ ] `cargo test --all` 成功確認
+
+### Phase 5: ドキュメント
+- [ ] `mod.rs` docコメント追加
+- [ ] `ast.rs` 型docコメント追加
+- [ ] README.md更新（並行パーサーアーキテクチャ説明）
