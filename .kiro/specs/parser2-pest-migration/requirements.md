@@ -37,7 +37,7 @@ pasta2.pestに基づいた実装を行う。pasta2.pestを憲法とし、新た�
 2. The Parser2 AST型 shall grammar.pestで定義されたUnicode識別子（XID_START, XID_CONTINUE）と予約IDパターン（`__name__`）の検証をサポートする
 3. The Parser2 AST型 shall global_marker（`＊`または`*`）とlocal_marker（`・`または`-`）のシーン定義を区別する
 4. The Parser2 AST型 shall 全角・半角マーカー対（例：`＠`/`@`、`＄`/`$`、`＞`/`>`）を等価なトークン型として表現する
-5. The Parser2 AST型 shall Pest PUSH/POPスタック機構を使用した4階層括弧の入れ子文字列リテラル（`「「「「text」」」」`）をサポートする **（grammar.pestで既に検証済み）**
+5. The Parser2 AST型 shall 4階層の入れ子文字列リテラル（`「text」`、`「「text」」`、`「「「text」」」`、`「「「「text」」」」`）を区別可能なAST型として表現する **（grammar.pestで既に検証済み）**
 6. The Parser2 AST型 shall 階層的スコープ構造を表現する：`FileScope` → `GlobalSceneScope` → `LocalSceneScope`
 7. The Parser2 AST型 shall 言語識別子付きコードブロック（例：` ```rune ... ``` `）をサポートする
 
