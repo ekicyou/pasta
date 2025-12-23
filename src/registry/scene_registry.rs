@@ -1,4 +1,4 @@
-//! scene registry for tracking scenes and assigning unique IDs during transpilation.
+//! Scene registry for tracking scenes and assigning unique IDs during transpilation.
 //!
 //! This module implements the two-pass transpiler strategy:
 //! - Pass 1: Collect all scenes from PastaFile(s) and assign unique IDs
@@ -28,7 +28,7 @@ pub struct SceneInfo {
     pub parent: Option<String>,
 }
 
-/// scene registry for managing scene collection and ID assignment.
+/// Scene registry for managing scene collection and ID assignment.
 ///
 /// # Design Notes
 ///
