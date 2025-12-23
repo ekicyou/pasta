@@ -169,13 +169,17 @@ parser2-pest-migrationを完成させた後、トランスパイラー2層を実
 
 **背景（parser1→parser2のAST変更）**: parser1にはcode_blocks機能が存在せず、Runeブロックは処理できなかった。parser2ではGlobalSceneScope/LocalScopeに`code_blocks: Vec<CodeBlock>`が追加され、明示的に扱える。
 
+**実装方針（既存transpilerパターン踏襲）**: CodeBlockは出現位置でインライン出力する。statements/items内に出現した順序でそのまま出力し、インデントのみ調整する。
+
 #### Acceptance Criteria
-1. The Transpiler2 shall GlobalSceneScope.code_blocksを検出し、グローバルモジュールレベルにRune codeを出力する
-2. The Transpiler2 shall LocalSceneScope.code_blocksを検出し、ローカルシーン関数内にRune codeを出力する
-3. The Transpiler2 shall code_blocksの出力位置を正しく制御する（関数定義の前 vs. 後、他statements/itemsとの順序）
-4. The Transpiler2 shall code_blocks内のRune構文を一切加工せず、そのまま出力する（transpiler2は構文検証しない）
+1. The Transpiler2 shall GlobalSceneScope.code_blocksを検出し、出現位置でインライン出力する
+2. The Transpiler2 shall LocalSceneScope.code_blocksを検出し、出現位置でインライン出力する
+3. The Transpiler2 shall code_blocksの内容をそのまま出力し、インデントのみ調整する（既存transpilerのStatement::RuneBlockパターンを踏襲）
+4. The Transpiler2 shall code_blocks内のRune構文を一切加工せず、インデント調整のみ行う（transpiler2は構文検証しない）
 5. When code_blocksに不正なRune構文が含まれる、the Rune VMのコンパイルエラー shall Transpiler2の責任外として扱う
-6. The テストスイート shall code_blocks埋め込みパターン（global/local scope）を検証する
+6. The テストスイート shall code_blocks埋め込みパターン（global/local scope、インデント調整）を検証する
+
+**参考実装**: `src/transpiler/mod.rs:460` - `Statement::RuneBlock` 処理（行ごとにtrim_start()してインデント調整）
 
 ### Requirement 14: Explicit ContinueAction Processing
 **Objective:** 開発者として、継続行（ContinueAction）を明示的な`：`prefixで処理したい。これにより、pasta2.pest文法仕様の変更に対応できる。
