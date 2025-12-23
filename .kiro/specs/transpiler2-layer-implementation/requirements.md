@@ -115,6 +115,8 @@ parser2-pest-migrationを完成させた後、トランスパイラー2層を実
 ### Requirement 10: Full Test Coverage
 **Objective:** 開発者として、transpiler2の全機能を網羅的にテストしたい。これにより、品質保証と将来の保守性を確保できる。
 
+**Fixture戦略（承認済み）**: parser2で既にテスト済みのfixtureを最大限流用する。`tests/fixtures/parser2/`の3ファイル（basic_syntax.pasta、string_and_numbers.pasta、escape_sequences.pasta）および`comprehensive_control_flow2.pasta`をベースとし、transpiler固有機能（変数スコープ、シーン呼び出し等）で追加が必要な場合のみ新規fixtureを作成する。
+
 #### Acceptance Criteria
 1. The Pastaプロジェクト shall 全スコープ構造（FileScope、GlobalSceneScope、LocalSceneScope）の変換を検証するテストを作成する
 2. The テストスイート shall シーン呼び出し（Call文）のランダム選択メカニズムを検証する
@@ -123,6 +125,6 @@ parser2-pest-migrationを完成させた後、トランスパイラー2層を実
 5. The テストスイート shall 継続行の連結処理を検証する
 6. The テストスイート shall Runeコードブロックの埋め込み処理を検証する
 7. The テストスイート shall エラーケース（未定義シーン・単語、型不正）を検証する
-8. The テストスイート shall `tests/fixtures/`の既存fixtureとpasta2.pestベースの新fixtureを使用する
+8. The テストスイート shall parser2テスト済みfixture（`tests/fixtures/parser2/*.pasta`、`comprehensive_control_flow2.pasta`）を流用し、必要最小限の追加fixtureのみ作成する
 9. The テストスイート shall 生成されたRuneコードがRuntime層で実行可能であることをE2E検証する（統合テスト）
-10. The テストスイート shall transpiler2がparser2 AST出力に対して、レガシーtranspiler相当の結果を生成することを検証する
+10. The テストスイート shall transpiler2がparser2 AST出力に対して、期待されるRune出力を生成することを検証する

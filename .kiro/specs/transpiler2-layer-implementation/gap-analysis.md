@@ -114,7 +114,8 @@ Pass 2 (transpile_pass2):
 
 3. **Fixture Preparation**
    - Requirement 10: transpiler2専用fixtureを準備
-   - **作業項目**: parser2テスト済みfixtureの流用 vs. 新規作成
+   - **決定**: parser2テスト済みfixtureを流用（`tests/fixtures/parser2/*.pasta`、`comprehensive_control_flow2.pasta`）
+   - **追加作業**: transpiler固有機能テストのみ新規fixture作成（推定5-10ファイル）
 
 ---
 
