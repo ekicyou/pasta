@@ -4,113 +4,69 @@
 ランタイム層のAPI切り替えについて、パーサー２、トランスパイラー２を利用したバージョンに完全に切り替えます。
 
 ## Introduction
-PastaEngineは現在、旧parser/transpilerスタック(`src/parser`および`src/transpiler`)を使用していますが、新しいparser2/transpiler2スタック(`src/parser2`、`src/transpiler2`、`src/registry`)が完成しており、全611テストが成功しています。この移行により、PastaEngineは新しいアーキテクチャを活用し、モジュール間の独立性と保守性を向上させます。
-
-移行スコープ:
-- `src/engine.rs`: parser/transpilerからparser2/transpiler2へのAPI切り替え
-- AST構造の変換: 旧PastaFile(flat構造)から新PastaFile(items構造)へ
-- トランスパイル呼び出しの更新: 単一pass(`transpile_with_registry`)から2-pass(`transpile_pass1` + `transpile_pass2`)へ
-- ランタイム層は変更不要(互換性維持)
+PastaEngineは旧parser/transpilerスタックから新parser2/transpiler2スタックへの移行を完了させる。対象は`src/engine.rs`におけるパース・マージ・トランスパイル経路であり、itemsベースASTと2-passトランスパイルを採用しつつランタイム層と既存テスト行動を維持する。
 
 ## Requirements
 
-### Requirement 1: Parser2への移行
-**目的:** 開発者として、PastaEngineが新しいparser2モジュールを使用してPastaスクリプトをパースできるようにし、文法の一貫性と保守性を向上させたい
+### Requirement 1: Parser2統合
+**目的:** 開発者として、PastaEngineがparser2を通じてPastaスクリプトをパースし、旧parser依存を排除したい
 
 #### Acceptance Criteria
-1. When PastaEngineが初期化される時、PastaEngineは`crate::parser2`をインポートするものとする
-2. When Pastaファイルをパースする時、PastaEngineは`parser2::parse_file()`を呼び出すものとする
-3. When パース結果を取得する時、PastaEngineは`parser2::PastaFile`構造体(items-based)を使用するものとする
-4. When 旧parser APIへの参照が残っている時、PastaEngineはそれらをすべて削除するものとする
-5. The PastaEngineは旧`parser::parse_file`を使用してはならない
+1. When PastaEngineがPastaファイルをパースする時、the PastaEngine shall `parser2::parse_file`を呼び出して結果を取得する。
+2. While パース結果を保持する時、the PastaEngine shall `parser2::PastaFile`のitemsベース構造を用いてASTを管理する。
+3. If パースに失敗する時、the PastaEngine shall `parser2::PastaError`をパス情報付きで`PastaError`へ変換して報告する。
+4. The PastaEngine shall 旧`crate::parser`経由のパースAPIをインポートまたは呼び出さない。
 
-### Requirement 2: Transpiler2への移行
-**目的:** 開発者として、PastaEngineが新しいtranspiler2モジュールの2-pass戦略を使用してRuneコードを生成できるようにし、コード品質を向上させたい
-
-#### Acceptance Criteria
-1. When PastaEngineが初期化される時、PastaEngineは`crate::transpiler2::Transpiler2`をインポートするものとする
-2. When トランスパイルを実行する時、PastaEngineは`Transpiler2::transpile_pass1()`と`transpile_pass2()`を順次呼び出すものとする
-3. When Pass 1を実行する時、PastaEngineはシーン登録とモジュール生成を完了するものとする
-4. When Pass 2を実行する時、PastaEngineはscene_selectorとpastaラッパーを生成するものとする
-5. When 旧transpiler APIへの参照が残っている時、PastaEngineはそれらをすべて削除するものとする
-6. The PastaEngineは旧`Transpiler::transpile_with_registry`を使用してはならない
-
-### Requirement 3: AST構造変換
-**目的:** 開発者として、PastaEngineが複数のPastaFileをマージする際に新しいitems-based構造を使用できるようにし、データ統合の一貫性を確保したい
+### Requirement 2: ASTマージのitems化
+**目的:** 開発者として、複数ファイルのASTを新items構造で正しく統合し、構造的整合性を確保したい
 
 #### Acceptance Criteria
-1. When 複数のPastaFileをマージする時、PastaEngineは`parser2::PastaFile::items`からFileItemを抽出するものとする
-2. When FileItemを処理する時、PastaEngineは`FileAttr`、`GlobalWord`、`GlobalSceneScope`の各バリアントを識別するものとする
-3. When マージされたASTを構築する時、PastaEngineは新しいPastaFileのitemsベクターを作成するものとする
-4. When 旧AST構造(global_words、scenes)への参照が残っている時、PastaEngineはそれらをitems-based構造に置き換えるものとする
-5. The PastaEngineは旧PastaFileのflat構造(global_words、scenesフィールド)を直接参照してはならない
+1. When 複数のPastaFileを統合する時、the PastaEngine shall `FileItem`列挙を識別して1つの`items`ベクターへ順序を保ったまま集約する。
+2. When FileItemを処理する時、the PastaEngine shall `FileAttr`・`GlobalWord`・`GlobalSceneScope`を区別して統合結果に保持する。
+3. While 統合ASTを生成する時、the PastaEngine shall 元ファイルの`path`および`span`情報を維持した`PastaFile`を構築する。
+4. If 旧`global_words`または`scenes`フィールドへの依存が残存する時、the PastaEngine shall itemsベースの参照に置き換える。
 
-### Requirement 4: Registry統合
-**目的:** 開発者として、PastaEngineが共有registryモジュールを使用してシーンと単語定義を管理できるようにし、transpiler間の一貫性を確保したい
-
-#### Acceptance Criteria
-1. When レジストリを初期化する時、PastaEngineは`crate::registry::SceneRegistry`と`WordDefRegistry`を使用するものとする
-2. When トランスパイル時にレジストリを渡す時、PastaEngineは両方のレジストリへの可変参照を提供するものとする
-3. When レジストリからシーン情報を取得する時、PastaEngineは`SceneRegistry::all_scenes()`を使用するものとする
-4. When 旧transpiler内部レジストリへの参照が残っている時、PastaEngineはそれらを共有registryへの参照に置き換えるものとする
-5. The PastaEngineは`crate::transpiler::{SceneRegistry, WordDefRegistry}`ではなく`crate::registry::{SceneRegistry, WordDefRegistry}`をインポートするものとする
-
-### Requirement 5: ランタイム互換性の維持
-**目的:** 開発者として、新しいparser2/transpiler2への移行後もランタイム層が変更なく動作することを確認し、リスクを最小化したい
+### Requirement 3: Transpiler2二段トランスパイル
+**目的:** 開発者として、2-passトランスパイルでRuneコードを生成し、出力を一貫したバッファに蓄積したい
 
 #### Acceptance Criteria
-1. When Runeコードを生成した後、PastaEngineは既存の`runtime::SceneTable`と`WordTable`を使用するものとする
-2. When Rune VMを実行する時、PastaEngineは既存の`ScriptGenerator`を使用するものとする
-3. When pasta_stdlib関数を呼び出す時、PastaEngineは既存のstdlib APIを使用するものとする
-4. When ScriptEventを出力する時、PastaEngineは既存のIR型を使用するものとする
-5. The PastaEngineはランタイム層(`src/runtime/`、`src/stdlib/`)のコードを変更してはならない
+1. When トランスパイルを開始する時、the PastaEngine shall `SceneRegistry`と`WordDefRegistry`を生成し、単一の可変バッファを用意する。
+2. When Pass1を実行する時、the PastaEngine shall `Transpiler2::transpile_pass1`を`PastaFile`・両レジストリ・出力バッファに対して呼び出す。
+3. When Pass2を実行する時、the PastaEngine shall 同一バッファに追記する形で`Transpiler2::transpile_pass2`を呼び出す。
+4. If Pass1またはPass2が失敗する時、the PastaEngine shall `TranspileError`を段階情報付きで`PastaError`として返す。
+5. The PastaEngine shall `Transpiler::transpile_with_registry`を呼び出さない。
 
-### Requirement 6: 後方互換性の確保
-**目的:** ユーザーとして、既存のPastaスクリプトがparser2/transpiler2への移行後も同じ動作をすることを保証し、移行の透明性を確保したい
-
-#### Acceptance Criteria
-1. When 既存の統合テストを実行する時、PastaEngineはすべてのテストに合格するものとする
-2. When 既存のフィクスチャファイルをロードする時、PastaEngineは同じIR出力を生成するものとする
-3. When シーン呼び出しを実行する時、PastaEngineは同じシーン解決動作を提供するものとする
-4. When 単語参照を展開する時、PastaEngineは同じランダム選択動作を提供するものとする
-5. The PastaEngineは既存のengine統合テスト(`tests/pasta_integration_engine_test.rs`等)を破壊してはならない
-
-### Requirement 7: テストカバレッジの維持
-**目的:** 開発者として、parser2/transpiler2への移行が完全にテストされていることを確認し、リグレッションを防止したい
+### Requirement 4: Registry統合とランタイム生成
+**目的:** 開発者として、共有registryを通じてシーン・単語定義を管理し、ランタイムテーブルを一貫して生成したい
 
 #### Acceptance Criteria
-1. When engine.rsを変更した後、PastaEngineは既存の全611テスト(3 ignored除く)を合格するものとする
-2. When 新しいparser2/transpiler2統合を追加する時、PastaEngineは既存のengineテストスイートで検証されるものとする
-3. If テストが失敗する時、PastaEngineは失敗理由を明確なエラーメッセージで報告するものとする
-4. When 移行が完了した後、PastaEngineは新規のリグレッションテストを0件に保つものとする
-5. The PastaEngineは移行前と同じテストカバレッジレベル(611 passed)を維持するものとする
+1. When レジストリを初期化する時、the PastaEngine shall `crate::registry::{SceneRegistry, WordDefRegistry}`を使用する。
+2. When トランスパイルが完了する時、the PastaEngine shall `SceneTable`と`WordTable`を各レジストリから生成する。
+3. While レジストリを参照する時、the PastaEngine shall シーン列挙に`SceneRegistry::all_scenes`を用いてランタイム入力を取得する。
+4. If レジストリが未初期化のままPass2実行を試みる時、the PastaEngine shall エラーとして処理し不整合出力を防止する。
 
-### Requirement 8: 段階的移行の実施
-**目的:** 開発者として、parser2/transpiler2への移行を段階的に実施し、各ステップで検証することで安全性を確保したい
-
-#### Acceptance Criteria
-1. When 移行を開始する時、PastaEngineはまずimport文を更新するものとする
-2. When import更新後、PastaEngineはコンパイルエラーを修正するものとする
-3. When AST変換ロジックを実装する時、PastaEngineは単一の関数またはメソッドに変更を局所化するものとする
-4. When 各変更ステップ後、PastaEngineは`cargo test`を実行して回帰を検出するものとする
-5. The PastaEngineは一度にすべての変更を適用せず、検証可能な小さなステップで移行するものとする
-
-### Requirement 9: ドキュメントの更新
-**目的:** 開発者として、PastaEngineのドキュメントがparser2/transpiler2アーキテクチャを正確に反映することで、将来のメンテナンスを容易にしたい
+### Requirement 5: 後方互換性と動作維持
+**目的:** ユーザーとして、移行後も既存スクリプトが同じIRと実行結果を得られるようにしたい
 
 #### Acceptance Criteria
-1. When engine.rsのドキュメントコメントを更新する時、PastaEngineは使用するparser2/transpiler2モジュールを明記するものとする
-2. When アーキテクチャ図を更新する時、PastaEngineは新しい2-pass戦略を反映するものとする
-3. When README.mdを更新する時、PastaEngineは最新のモジュール構成を記載するものとする
-4. When 旧parserへの参照がドキュメントに残っている時、PastaEngineはそれらをparser2への参照に更新するものとする
-5. The PastaEngineのドキュメントは旧parser/transpilerアーキテクチャへの参照を含んではならない
+1. When 既存フィクスチャをロードする時、the PastaEngine shall 旧スタックと同等の`ScriptEvent`系列を生成する。
+2. When Rune VMを実行する時、the PastaEngine shall 既存`ScriptGenerator`で同じシーン解決とランダム選択動作を提供する。
+3. When シーン呼び出しや単語展開を行う時、the PastaEngine shall 前方一致選択の確率分布と挙動を維持する。
+4. The PastaEngine shall ランタイム層およびstdlibのコード変更を伴わずに移行を完了する。
 
-### Requirement 10: 旧モジュールの非推奨化計画
-**目的:** プロジェクト管理者として、旧parser/transpilerモジュールの将来的な削除計画を明確にし、技術的負債を管理したい
+### Requirement 6: テストおよび品質ゲート
+**目的:** 開発者として、移行後も既存テスト網で回帰を即座に検知し、611テスト合格状態を維持したい
 
 #### Acceptance Criteria
-1. When 移行が完了した後、PastaEngineは旧parserモジュールへのアクティブな参照を0件にするものとする
-2. When 移行が完了した後、PastaEngineは旧transpilerモジュールへのアクティブな参照を0件にするものとする
-3. When 非推奨化戦略を文書化する時、PastaEngineはREADMEまたはCHANGELOGに計画を記載するものとする
-4. If 旧モジュールを並行保持する場合、PastaEngineは明確な非推奨マーカー(`#[deprecated]`)を追加するものとする
-5. The PastaEngineは移行完了後、旧parser/transpilerモジュールの削除タイムラインを提示するものとする
+1. When 移行後にテストスイートを実行する時、the PastaEngine shall 全611テスト(ignored除く)を合格する。
+2. While engine.rsの変更をレビューする時、the PastaEngine shall `cargo test`を含む自動チェックでparser2/transpiler2統合を検証する。
+3. If 任意のテストが失敗する時、the PastaEngine shall エラーをparser2/transpiler2コンテキスト付きで報告し再現手順を示す。
+4. The PastaEngine shall 新規回帰テストを不要にする形で既存テストカバレッジを維持する。
+
+### Requirement 7: ドキュメント更新
+**目的:** プロジェクト管理者として、移行後のアーキテクチャを文書化し、新スタック採用を明確にしたい
+
+#### Acceptance Criteria
+1. When ドキュメントを更新する時、the PastaEngine shall parser2/transpiler2採用と2-pass戦略をREADMEやengineドキュメントに反映する。
+2. When 旧parser/transpilerへの記述が残存する時、the PastaEngine shall 新スタックの記述へ置き換える。
+3. The PastaEngine shall engine.rs内の旧parser/transpiler参照をすべて削除し、新スタックのみ使用することを示す。

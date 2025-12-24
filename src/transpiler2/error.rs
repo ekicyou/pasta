@@ -2,6 +2,7 @@
 //!
 //! This module defines error types specific to transpiler2 operations.
 
+use crate::error::{PastaError, Transpiler2Pass};
 use crate::parser2::Span;
 use thiserror::Error;
 
@@ -69,6 +70,14 @@ impl TranspileError {
     /// Create an InternalError.
     pub fn internal(message: impl Into<String>) -> Self {
         TranspileError::InternalError(message.into())
+    }
+
+    /// Convert this error into PastaError with pass phase context.
+    pub fn into_pasta_error(self, pass: Transpiler2Pass) -> PastaError {
+        PastaError::Transpiler2Error {
+            pass,
+            message: self.to_string(),
+        }
     }
 
     /// Convert a Span to a location string.
