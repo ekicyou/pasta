@@ -89,7 +89,9 @@
 
 **追加削除対象**:
 - `src/cache.rs` (Line 96-233): `#[cfg(test)]` テストモジュール全体（旧parser/transpiler依存）
-- `README.md` (Line 37-43): レガシースタック使用例のコードブロック
+- `README.md` (Line 26-43): レガシースタックに関する記述を完全削除
+  - 削除内容: モジュール状態テーブルの「レガシー」行、レガシースタック使用例、Phase 4 記述
+  - 残留内容: 「パーサー/トランスパイラーアーキテクチャ」セクションのタイトルと現行スタック情報のみ
 
 ### 1.3 Existing Patterns
 
@@ -256,11 +258,16 @@
    - カテゴリC: `tests/pasta_integration_e2e_simple_test.rs`, `tests/pasta_engine_rune_compile_test.rs`, `tests/pasta_engine_rune_vm_comprehensive_test.rs`
 2. 1個のテストファイルを修正:
    - `tests/pasta_stdlib_call_jump_separation_test.rs`: `use pasta::transpiler::` → `use pasta::registry::`
-3. `README.md` 修正 (Line 37-43):
+3. `README.md` 修正 (Line 26-43):
+   - レガシースタックに関する記述を完全削除
+   - モジュール状態テーブルから「レガシー」行を削除
    - レガシースタック使用例のコードブロックを削除
-   - 「現行スタック（推奨）」のみ残す
-4. **検証**: `cargo check --all` 成功
-5. **コミット**: `git add -A && git commit -m "refactor(cleanup): 旧parser/transpilerテスト削除とREADME更新"`
+   - Phase 4 「保留」記述を削除
+   - 「現行スタック（推奨）」の記述のみ残す
+4. `src/cache.rs` 修正 (Line 96-233):
+   - `#[cfg(test)]` モジュール全体を削除
+5. **検証**: `cargo check --all` 成功
+6. **コミット**: `git add -A && git commit -m "refactor(cleanup): 旧parser/transpilerテスト削除とREADME更新"`
 3. **検証**: `cargo check --all` 成功
 4. **コミット**: `git add -A && git commit -m "refactor(cleanup): 旧parser/transpilerテスト削除とREADME更新"`
 
