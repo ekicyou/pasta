@@ -3,14 +3,23 @@
 //! This module provides scene registration, lookup, and random selection
 //! for scenes with the same name.
 
+use crate::PastaError;
 use crate::runtime::random::RandomSelector;
-use crate::{SceneScope, PastaError};
 use fast_radix_trie::RadixMap;
 use std::collections::HashMap;
 
 /// Unique identifier for a scene (Vec index).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SceneId(pub usize);
+
+/// Scene scope type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SceneScope {
+    /// Global scene (accessible from any scope).
+    Global,
+    /// Local scene (accessible only within parent scene).
+    Local,
+}
 
 /// Information about a single scene.
 #[derive(Debug, Clone)]
@@ -88,7 +97,7 @@ impl SceneTable {
     /// This converts the SceneRegistry (used during transpilation) into
     /// a SceneTable (used during runtime).
     pub fn from_scene_registry(
-        registry: crate::transpiler::SceneRegistry,
+        registry: crate::registry::SceneRegistry,
         random_selector: Box<dyn RandomSelector>,
     ) -> Result<Self, PastaError> {
         // Build Vec storage with ID assignment
@@ -116,14 +125,14 @@ impl SceneTable {
             let entry = prefix_index
                 .entry(scene.fn_name.as_bytes())
                 .or_insert_with(Vec::new);
-            
+
             // Check for duplicates (defensive programming)
             if !entry.is_empty() {
                 return Err(PastaError::DuplicateScenePath {
                     fn_name: scene.fn_name.clone(),
                 });
             }
-            
+
             entry.push(scene.id);
         }
 

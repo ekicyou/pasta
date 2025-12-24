@@ -5,10 +5,10 @@
 //! - Word references use `word()` function which only accesses `WordTable`
 //! - The two dictionaries are completely separate
 
-use pasta::runtime::scene::SceneTable;
-use pasta::runtime::random::DefaultRandomSelector;
-use pasta::runtime::words::WordTable;
 use pasta::registry::{SceneRegistry, WordDefRegistry};
+use pasta::runtime::random::DefaultRandomSelector;
+use pasta::runtime::scene::SceneTable;
+use pasta::runtime::words::WordTable;
 use std::collections::HashMap;
 
 /// Helper to create a test SceneTable with scenes
@@ -17,7 +17,7 @@ fn create_test_scene_table_with_scenes(scene_names: Vec<&str>) -> SceneTable {
     for scene_name in scene_names {
         registry.register_global(scene_name, HashMap::new());
     }
-    
+
     let selector = Box::new(DefaultRandomSelector::new());
     SceneTable::from_scene_registry(registry, selector).unwrap()
 }
@@ -29,7 +29,7 @@ fn create_test_word_table_with_words(words: Vec<(&str, Vec<&str>)>) -> WordTable
         let values: Vec<String> = values.into_iter().map(|s| s.to_string()).collect();
         registry.register_global(name, values);
     }
-    
+
     let selector = Box::new(DefaultRandomSelector::new());
     WordTable::from_word_def_registry(registry, selector)
 }
@@ -72,9 +72,7 @@ fn test_word_table_does_not_contain_label_definitions() {
 /// For example, a word named "＊ラベル" should not be treated as a label.
 #[test]
 fn test_word_with_label_like_name_stays_in_word_table() {
-    let mut word_table = create_test_word_table_with_words(vec![
-        ("＊ラベル風", vec!["単語です"]),
-    ]);
+    let mut word_table = create_test_word_table_with_words(vec![("＊ラベル風", vec!["単語です"])]);
 
     // The word should be accessible from WordTable
     let result = word_table.search_word("", "＊ラベル風", &[]);
@@ -106,15 +104,21 @@ fn test_separate_dictionaries_integration() {
     let mut scene_table = create_test_scene_table_with_scenes(vec!["会話ラベル"]);
 
     // Simulate words collected in Pass 1
-    let mut word_table = create_test_word_table_with_words(vec![
-        ("場所", vec!["東京", "大阪"]),
-    ]);
+    let mut word_table = create_test_word_table_with_words(vec![("場所", vec!["東京", "大阪"])]);
 
     // scenes are ONLY in SceneTable
-    assert!(scene_table.resolve_scene_id("会話ラベル", &HashMap::new()).is_ok());
+    assert!(
+        scene_table
+            .resolve_scene_id("会話ラベル", &HashMap::new())
+            .is_ok()
+    );
     assert!(word_table.search_word("", "会話ラベル", &[]).is_err());
 
     // Words are ONLY in WordTable
     assert!(word_table.search_word("", "場所", &[]).is_ok());
-    assert!(scene_table.resolve_scene_id("場所", &HashMap::new()).is_err());
+    assert!(
+        scene_table
+            .resolve_scene_id("場所", &HashMap::new())
+            .is_err()
+    );
 }
