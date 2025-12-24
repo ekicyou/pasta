@@ -48,15 +48,18 @@
 **目的:** 開発者として、旧実装削除後にテストコードを整理し、残存テストがコンパイル可能な状態を維持したい
 
 #### Acceptance Criteria
-1. When 旧parser/transpiler依存テストを削除する場合、Pastaプロジェクトは `tests/` 配下の旧実装専用テストファイル（12個）を完全に削除する
-2. When テストコード修正を完了する場合、Pastaプロジェクトは `cargo check --all` コマンドでエラーなくコンパイルを成功させる
-3. When ビルド修正を完了する場合、Pastaプロジェクトは修正内容を Git にコミットする
+1. When 旧parser/transpiler依存テストを削除する場合、Pastaプロジェクトは `tests/` 配下の旧実装専用テストファイル（21個）を完全に削除する
+2. When Registry参照テストを修正する場合、Pastaプロジェクトは `tests/pasta_stdlib_call_jump_separation_test.rs` の `use pasta::transpiler::` を `use pasta::registry::` に変更する
+3. When テストコード修正を完了する場合、Pastaプロジェクトは `cargo check --all` コマンドでエラーなくコンパイルを成功させる
+4. When ビルド修正を完了する場合、Pastaプロジェクトは修正内容を Git にコミットする
 
-**削除対象テストファイル（12個）**:
-- `tests/pasta_parser_*.rs` (5ファイル)
-- `tests/pasta_transpiler_*.rs` (5ファイル)  
-- `tests/pasta_integration_e2e_simple_test.rs`
-- `tests/pasta_engine_rune_*_test.rs` (旧API依存のもの)
+**削除対象テストファイル（21個）**:
+- カテゴリA: `tests/pasta_parser_*.rs` (12ファイル)
+- カテゴリB: `tests/pasta_transpiler_*.rs` (7ファイル)  
+- カテゴリC: `tests/pasta_integration_e2e_simple_test.rs`, `tests/pasta_engine_rune_compile_test.rs`, `tests/pasta_engine_rune_vm_comprehensive_test.rs`
+
+**修正して残すテストファイル（1個）**:
+- `tests/pasta_stdlib_call_jump_separation_test.rs` - Registry参照に変更
 
 **注記**: parser2/transpiler2 用のテストは別仕様で追加予定
 

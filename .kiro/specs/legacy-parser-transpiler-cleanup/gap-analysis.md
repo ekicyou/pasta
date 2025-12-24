@@ -40,42 +40,56 @@
 ### 1.2 Dependencies and References
 
 #### ソースコード層の参照
-| ファイル                        | 参照箇所                                                                 | 影響範囲         |
-| ------------------------------- | ------------------------------------------------------------------------ | ---------------- |
-| `src/lib.rs` (Line 47)          | `pub mod parser;`                                                        | クレート公開API  |
-| `src/lib.rs` (Line 52)          | `pub mod transpiler;`                                                    | クレート公開API  |
-| `src/lib.rs` (Line 61-64)       | `pub use parser::{...13個の型...}`                                       | 公開型の再export |
-| `src/lib.rs` (Line 70)          | `pub use transpiler::{TranspileContext, Transpiler}`                     | 公開型の再export |
+| ファイル                        | 参照箇所                                                                         | 影響範囲             |
+| ------------------------------- | -------------------------------------------------------------------------------- | -------------------- |
+| `src/lib.rs` (Line 47)          | `pub mod parser;`                                                                | クレート公開API      |
+| `src/lib.rs` (Line 52)          | `pub mod transpiler;`                                                            | クレート公開API      |
+| `src/lib.rs` (Line 61-64)       | `pub use parser::{...13個の型...}`                                               | 公開型の再export     |
+| `src/lib.rs` (Line 70)          | `pub use transpiler::{TranspileContext, Transpiler}`                             | 公開型の再export     |
 | `src/cache.rs` (Line 96-233)    | `#[cfg(test)] mod tests { use crate::parser::...; use crate::transpiler::...; }` | テストモジュール全体 |
-| `src/runtime/words.rs` (Line 8) | `use crate::transpiler::{WordDefRegistry, WordEntry};`                   | 実装コード       |
+| `src/runtime/words.rs` (Line 8) | `use crate::transpiler::{WordDefRegistry, WordEntry};`                           | 実装コード           |
 
 **注記**: `src/stdlib/mod.rs` は WordTable のみ使用、transpiler への直接参照なし（修正不要）
-| `src/stdlib/mod.rs` (Line 394)  | `use crate::transpiler::WordDefRegistry;`                                | テストコード内   |
 
-**注記**: `WordDefRegistry` と `WordEntry` は現在 `src/registry/` に移動済み（[pasta-test-missing-entry-hash仕様](../.kiro/specs/completed/pasta-test-missing-entry-hash/)で対応）
+#### テストコード層の参照（21ファイル削除対象 + 1ファイル修正）
 
-#### テストコード層の参照（12ファイル）
-| カテゴリ          | ファイル数 | 代表例                                                                        |
-| ----------------- | ---------- | ----------------------------------------------------------------------------- |
-| Parser Tests      | 5          | `pasta_parser_golden_test.rs`, `pasta_parser_phase1_test.rs`                  |
-| Transpiler Tests  | 5          | `pasta_transpiler_comprehensive_test.rs`, `pasta_transpiler_two_pass_test.rs` |
-| Integration Tests | 2          | `pasta_integration_e2e_simple_test.rs`, `pasta_engine_rune_compile_test.rs`   |
+**カテゴリA: 旧parser専用（12ファイル）** - 削除
+1. `tests/pasta_parser_debug_test.rs`
+2. `tests/pasta_parser_error_test.rs`
+3. `tests/pasta_parser_golden_test.rs`
+4. `tests/pasta_parser_grammar_diagnostic_test.rs`
+5. `tests/pasta_parser_line_types_test.rs`
+6. `tests/pasta_parser_main_test.rs`
+7. `tests/pasta_parser_pest_debug_test.rs`
+8. `tests/pasta_parser_pest_sakura_test.rs`
+9. `tests/pasta_parser_phase1_test.rs`
+10. `tests/pasta_parser_sakura_debug_test.rs`
+11. `tests/pasta_parser_sakura_script_test.rs`
+12. `tests/pasta_parser_spec_validation_test.rs`
 
-**詳細リスト**:
-1. `tests/pasta_transpiler_word_code_gen_test.rs` - `use pasta::parser::parse_str;` + `use pasta::transpiler::{SceneRegistry, Transpiler, WordDefRegistry};`
-2. `tests/pasta_transpiler_two_pass_test.rs` - 同上
-3. `tests/pasta_transpiler_phase3_test.rs` - `use pasta::parser::parse_str;` + `use pasta::transpiler::Transpiler;`
-4. `tests/pasta_transpiler_comprehensive_test.rs` - `use pasta::parser::parse_file;` + `use pasta::transpiler::Transpiler;`
-5. `tests/pasta_parser_sakura_debug_test.rs` - `use pasta::parser::parse_str;`
-6. `tests/pasta_parser_phase1_test.rs` - `use pasta::parser::parse_file;`
-7. `tests/pasta_parser_line_types_test.rs` - `use pasta::parser::parse_str;`
-8. `tests/pasta_parser_golden_test.rs` - `use pasta::parser::{SceneScope, SpeechPart, Statement, parse_file};`
-9. `tests/pasta_integration_e2e_simple_test.rs` - `use pasta::parser::parse_str;` + `use pasta::transpiler::Transpiler;`
-10. `tests/pasta_engine_rune_vm_comprehensive_test.rs` - `use pasta::parser::parse_file;` + `use pasta::transpiler::Transpiler;`
-11. `tests/pasta_engine_rune_compile_test.rs` - `use pasta::parser::parse_str;` + `use pasta::transpiler::Transpiler;`
-12. `tests/pasta_transpiler_scene_registry_test.rs` - `use pasta::transpiler::SceneRegistry;`
+**カテゴリB: 旧transpiler専用（7ファイル）** - 削除
+13. `tests/pasta_transpiler_actor_assignment_test.rs`
+14. `tests/pasta_transpiler_comprehensive_test.rs`
+15. `tests/pasta_transpiler_phase3_test.rs`
+16. `tests/pasta_transpiler_scene_registry_test.rs`
+17. `tests/pasta_transpiler_two_pass_test.rs`
+18. `tests/pasta_transpiler_variable_expansion_test.rs`
+19. `tests/pasta_transpiler_word_code_gen_test.rs`
 
-**追加**: `README.md` (Line 37-38) もサンプルコードで旧APIを参照
+**カテゴリC: 旧parser+transpiler統合（2ファイル）** - 削除
+20. `tests/pasta_integration_e2e_simple_test.rs`
+21. `tests/pasta_engine_rune_compile_test.rs`
+22. `tests/pasta_engine_rune_vm_comprehensive_test.rs`
+
+**カテゴリD: Registry参照（1ファイル）** - 修正して残す
+- `tests/pasta_stdlib_call_jump_separation_test.rs`
+  - `use pasta::transpiler::{SceneRegistry, WordDefRegistry}` → `use pasta::registry::{SceneRegistry, WordDefRegistry}`
+  - テスト目的: Call/Jumpがword dictionaryにアクセスしない設計原則の検証
+  - 旧parser/transpilerに依存せず、registryモジュールのみ使用
+
+**追加削除対象**:
+- `src/cache.rs` (Line 96-233): `#[cfg(test)]` テストモジュール全体（旧parser/transpiler依存）
+- `README.md` (Line 37-43): レガシースタック使用例のコードブロック
 
 ### 1.3 Existing Patterns
 
@@ -109,7 +123,8 @@
 
 #### Requirement 3: テストコード層のビルド復旧
 - **必要な操作**:
-  - 22個のテストファイルを完全削除（カテゴリA: parser 12個、カテゴリB: transpiler 7個、カテゴリC: 統合3個）
+  - 21個のテストファイルを完全削除（カテゴリA: parser 12個、カテゴリB: transpiler 7個、カテゴリC: 統合2個）
+  - 1個のテストファイルを修正（カテゴリD: `pasta_stdlib_call_jump_separation_test.rs`）
   - 詳細リストは「1.2 Dependencies and References」参照
 - **検証**: `cargo check --all` 成功
 
@@ -235,13 +250,17 @@
 7. **コミット**: `git add -A && git commit -m "refactor(cleanup): 旧parser/transpilerディレクトリ削除とソースコード修正"`
 
 ##### Phase 3: テストコードビルド復旧
-1. 22個のテストファイルを完全削除:
+1. 21個のテストファイルを完全削除:
    - カテゴリA: `tests/pasta_parser_*.rs` (12ファイル)
    - カテゴリB: `tests/pasta_transpiler_*.rs` (7ファイル)
    - カテゴリC: `tests/pasta_integration_e2e_simple_test.rs`, `tests/pasta_engine_rune_compile_test.rs`, `tests/pasta_engine_rune_vm_comprehensive_test.rs`
-2. `README.md` 修正 (Line 37-43):
+2. 1個のテストファイルを修正:
+   - `tests/pasta_stdlib_call_jump_separation_test.rs`: `use pasta::transpiler::` → `use pasta::registry::`
+3. `README.md` 修正 (Line 37-43):
    - レガシースタック使用例のコードブロックを削除
    - 「現行スタック（推奨）」のみ残す
+4. **検証**: `cargo check --all` 成功
+5. **コミット**: `git add -A && git commit -m "refactor(cleanup): 旧parser/transpilerテスト削除とREADME更新"`
 3. **検証**: `cargo check --all` 成功
 4. **コミット**: `git add -A && git commit -m "refactor(cleanup): 旧parser/transpilerテスト削除とREADME更新"`
 
