@@ -14,5 +14,5 @@
 mod scene_registry;
 mod word_registry;
 
-pub use scene_registry::{SceneInfo, SceneRegistry};
+pub use scene_registry::{SceneEntry, SceneRegistry};
 pub use word_registry::{WordDefRegistry, WordEntry};

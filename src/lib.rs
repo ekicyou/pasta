@@ -56,7 +56,8 @@ pub use engine::PastaEngine;
 pub use error::{ParseErrorInfo, PastaError, Result};
 pub use ir::{ContentPart, ScriptEvent};
 pub use loader::{DirectoryLoader, LoadedFiles};
+pub use registry::SceneEntry;
 pub use runtime::{
-    DefaultRandomSelector, RandomSelector, SceneInfo, SceneTable, ScriptGenerator,
-    ScriptGeneratorState, VariableManager, VariableScope, VariableValue,
+    DefaultRandomSelector, RandomSelector, SceneTable, ScriptGenerator, ScriptGeneratorState,
+    VariableManager, VariableScope, VariableValue,
 };
