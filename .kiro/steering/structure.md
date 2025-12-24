@@ -11,13 +11,19 @@ pasta/
 │   ├── loader.rs            # DirectoryLoader - スクリプト読み込み
 │   ├── error.rs             # PastaError - エラー型定義
 │   ├── ir.rs                # ScriptEvent - IR出力型
-│   ├── parser/              # パーサーレイヤー
+│   ├── parser/              # パーサーレイヤー（PEG → AST変換）
 │   │   ├── mod.rs           # パーサーAPI公開
 │   │   ├── ast.rs           # AST定義（Statement, Expr, LabelDef等）
-│   │   └── pasta.pest       # Pest文法定義
-│   ├── transpiler/          # トランスパイラレイヤー
+│   │   └── grammar.pest     # Pest文法定義
+│   ├── transpiler/          # トランスパイラレイヤー（AST → Rune、2pass）
 │   │   ├── mod.rs           # Transpiler API
-│   │   └── label_registry.rs # シーン管理・モジュール生成
+│   │   ├── code_generator.rs # Runeコード生成
+│   │   ├── context.rs       # トランスパイルコンテキスト
+│   │   └── error.rs         # トランスパイルエラー型
+│   ├── registry/            # 型管理レイヤー（独立）
+│   │   ├── mod.rs           # Registry API
+│   │   ├── scene_registry.rs # SceneRegistry - シーン管理
+│   │   └── word_registry.rs  # WordDefRegistry - 単語辞書
 │   ├── runtime/             # ランタイムレイヤー
 │   │   ├── mod.rs           # ランタイムAPI
 │   │   ├── generator.rs     # ScriptGenerator - Rune VM実行
@@ -32,9 +38,10 @@ pasta/
 │   │   ├── simple_hello.pasta
 │   │   ├── comprehensive_control_flow.pasta
 │   │   └── ...
-│   ├── parser_tests.rs      # パーサーテスト
-│   ├── transpile_comprehensive_test.rs
-│   ├── engine_integration_test.rs
+│   ├── parser2_integration_test.rs  # パーサー統合テスト
+│   ├── pasta_transpiler2_*.rs       # トランスパイラーテスト群
+│   ├── pasta_engine_*.rs            # エンジンテスト群
+│   ├── pasta_integration_*.rs       # E2E統合テスト群
 │   └── ...
 ├── examples/                 # サンプルコード（将来追加）
 ├── benches/                  # ベンチマークコード（将来追加）
@@ -75,16 +82,17 @@ engine (上位API)
   ↓
 cache, loader
   ↓
-transpiler ← parser
+parser, transpiler (2pass)
   ↓
 runtime
   ↓
-stdlib, ir
+registry (公開型) → stdlib, ir
 ```
 
 ### 公開API (`lib.rs`)
-- **Parser**: `parse_str`, `parse_file`, AST型
-- **Transpiler**: `Transpiler`, `TranspileContext`
+- **Parser**: `parse()`, AST型（Statement, Expr等）
+- **Transpiler**: `transpile()`, `TranspileContext`
+- **Registry**: `SceneRegistry`, `WordDefRegistry`, `WordEntry`
 - **Runtime**: `ScriptGenerator`, `LabelTable`, `VariableManager`
 - **Engine**: `PastaEngine`（統合API）
 - **IR**: `ScriptEvent`, `ContentPart`
@@ -93,32 +101,35 @@ stdlib, ir
 ### 内部モジュール
 - `loader`: ディレクトリスキャン・ファイル読み込み
 - `cache`: パース結果メモリキャッシュ
-- `transpiler::label_registry`: シーン登録・ID管理・モジュール生成
+- `registry`: シーン登録・単語辞書・型管理（独立層）
 - `runtime::generator`: Rune VM実行・Generator継続管理
 
 ## テスト構成
 
-| カテゴリ | 対象 |
-|---------|------|
-| Parser | 文法パース、エラー、行タイプ |
-| Transpiler | 2パス変換、シーン管理 |
-| Runtime | Rune VM、シーン解決、スコープ |
-| Engine | E2E統合、UI独立性 |
-| Control Flow | Call/Jump、並行実行 |
+| カテゴリ     | 対象                  | ファイル例                                  |
+| ------------ | --------------------- | ------------------------------------------- |
+| Parser       | 文法パース、エラー    | `parser2_integration_test.rs`               |
+| Transpiler   | 2パス変換、シーン管理 | `pasta_transpiler2_*.rs`                    |
+| Runtime      | Rune VM、シーン解決   | `pasta_engine_rune_*.rs`                    |
+| Engine       | E2E統合、スコープ     | `pasta_engine_*.rs`                         |
+| Registry     | 型管理、独立性        | `pasta_stdlib_call_jump_separation_test.rs` |
+| Control Flow | Call/Jump、並行実行   | `pasta_integration_control_flow_test.rs`    |
 
 ### テストファイル配置
-- `tests/<category>_test.rs`: 統合テスト
+- `tests/<feature>_test.rs`: 統合テスト
 - `tests/fixtures/*.pasta`: テスト用スクリプト
 - `tests/common/`: 共通ユーティリティ
 
+**注**: 旧parser/transpiler実装に依存していたテスト21ファイルは削除済み（2024-12-24 legacy-parser-transpiler-cleanup完了）
+
 ## ドキュメント構成
 
-| ファイル | 用途 |
-|---------|------|
-| README.md | プロジェクト概要 |
-| GRAMMAR.md | DSL文法リファレンス |
-| SPECIFICATION.md | 言語仕様書 |
-| AGENTS.md | AI開発支援 |
+| ファイル         | 用途                |
+| ---------------- | ------------------- |
+| README.md        | プロジェクト概要    |
+| GRAMMAR.md       | DSL文法リファレンス |
+| SPECIFICATION.md | 言語仕様書          |
+| AGENTS.md        | AI開発支援          |
 
 ### Kiro仕様管理
 - `.kiro/steering/`: 規約・原則
