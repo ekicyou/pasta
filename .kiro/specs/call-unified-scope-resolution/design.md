@@ -60,7 +60,7 @@ graph TB
     
     CG -->|"current_module()"| CTX
     CG -->|"pasta::call(ctx, target, module_name)"| SSI
-    SSI -->|"find_scene_merged(module_name, prefix)"| ST
+    SSI -->|"collect_scene_candidates(module_name, prefix)"| ST
     WE -->|"search_word(module_name, key)"| WT
 ```
 
@@ -94,7 +94,7 @@ sequenceDiagram
     CG->>CG: generate_call_scene()
     CG->>R: pasta::call(ctx, target, module_name)
     R->>S: select_scene_to_id(scene, module_name, filters)
-    S->>ST: find_scene_merged(module_name, scene)
+    S->>ST: collect_scene_candidates(module_name, scene)
     ST->>ST: Step1 Local search :module:prefix
     ST->>ST: Step2 Global search prefix (exclude :)
     ST->>ST: Step3 Merge candidates
@@ -114,9 +114,9 @@ sequenceDiagram
 
 | Requirement             | Summary               | Components            | Interfaces                              | Flows           |
 | ----------------------- | --------------------- | --------------------- | --------------------------------------- | --------------- |
-| 1.1, 1.2, 1.4           | スコープ統合検索      | SceneTable            | find_scene_merged()                     | Call 実行フロー |
+| 1.1, 1.2, 1.4           | スコープ統合検索      | SceneTable            | collect_scene_candidates()              | Call 実行フロー |
 | 2.2, 2.4                | シンプルなCall構文    | CodeGenerator, stdlib | generate_call_scene()                   | Pass2 処理      |
-| 3.1, 3.2, 3.3, 3.4, 3.5 | ランタイム解決一貫性  | SceneTable            | find_scene_merged(), resolve_scene_id() | 2段階検索       |
+| 3.1, 3.2, 3.3, 3.4, 3.5 | ランタイム解決一貫性  | SceneTable            | collect_scene_candidates(), resolve_scene_id() | 2段階検索       |
 | 4.2, 4.3, 4.4           | 既存テスト互換性      | 全コンポーネント      | 既存 API 維持                           | 回帰テスト      |
 | 5.1, 5.2, 5.3           | SPECIFICATION.md 更新 | ドキュメント          | -                                       | -               |
 
@@ -168,21 +168,21 @@ impl SceneTable {
     /// # Returns
     /// Ok(Vec<SceneId>) マージされた候補リスト
     /// Err(SceneNotFound) 候補なし
-    pub fn find_scene_merged(
+    pub fn collect_scene_candidates(
         &self,
         module_name: &str,
         prefix: &str,
     ) -> Result<Vec<SceneId>, PastaError>;
 
-    /// Resolve scene ID with unified scope search.
+    /// Resolve scene ID with unified scope search (local + global).
     ///
-    /// 既存の resolve_scene_id() を拡張し、内部で find_scene_merged() を使用。
+    /// 既存の resolve_scene_id() を拡張し、内部で collect_scene_candidates() を使用。
     ///
     /// # Arguments
     /// * `module_name` - グローバルシーン名（親グローバルシーン）
     /// * `search_key` - 検索キー
     /// * `filters` - 属性フィルター
-    pub fn resolve_scene_id_unified(
+    pub fn resolve_scene_id(
         &mut self,
         module_name: &str,
         search_key: &str,
@@ -195,10 +195,10 @@ impl SceneTable {
 - Postconditions: 返却される SceneId は有効なインデックス
 - Invariants: ローカル候補は `:module:` プレフィックスで区別
 
-##### find_scene_merged Implementation Pattern (Pseudo-code)
+##### collect_scene_candidates Implementation Pattern (Pseudo-code)
 
 ```rust
-pub fn find_scene_merged(
+pub fn collect_scene_candidates(
     &self,
     module_name: &str,
     prefix: &str,
@@ -253,7 +253,7 @@ struct SceneCacheKey {
 - **Cache Invalidation Strategy**: `module_name` 追加により、同一 `search_key` でも異なる `module_name` では異なるキャッシュキーが生成される。セッション終了時に自動クリア（既存 `clear()` メソッド継承）。モジュール再読み込みなどは現在未サポート（将来拡張候補）
 
 **Implementation Notes**
-- Integration: `WordTable.collect_word_candidates()` の実装パターンをコピー
+- Integration: `WordTable.collect_word_candidates()` の実装パターンを完全継承（メソッド名も対称）
 - Validation: prefix が空の場合は InvalidScene エラー
 - Risks: キャッシュキー拡張によるメモリ使用量微増（許容範囲）
 
@@ -341,7 +341,7 @@ pub fn select_scene_to_id(
     
     // 統合スコープ検索を実行
     let filters_map = parse_filters(&filters)?;
-    let scene_id = table.find_scene_merged(&module_name, &scene)?;
+    let scene_id = table.collect_scene_candidates(&module_name, &scene)?;
     
     // シーンID（1-based）を返却
     Ok((scene_id.0 + 1) as i64)
@@ -350,7 +350,7 @@ pub fn select_scene_to_id(
 
 **実装上の注意点**:
 - `module_name` は CodeGenerator が `context.current_module()` から取得（既実装）
-- `find_scene_merged()` が2段階検索を実行（上記 pseudo-code 参照）
+- `collect_scene_candidates()` が2段階検索を実行（上記 pseudo-code 参照）
 - 返却値は 1-based SceneId（既存慣例維持、Vec index + 1）
 - 参照: `word_expansion()` 関数（stdlib/mod.rs）が同様に `module_name` を受け取り実装済み
 
@@ -385,7 +385,7 @@ let search_key = if scene.parent.is_some() {
 };
 ```
 
-**検索時のキー構築** (find_scene_merged 内):
+**検索時のキー構築** (collect_scene_candidates 内):
 - ローカル検索: `:{module_name}:{prefix}` で前方一致
 - グローバル検索: `{prefix}` で前方一致（`:` で始まるキーを除外）
 
@@ -406,11 +406,11 @@ let search_key = if scene.parent.is_some() {
 
 | Test Case                           | Component  | Requirement   |
 | ----------------------------------- | ---------- | ------------- |
-| find_scene_merged_local_only        | SceneTable | 3.1, 3.2      |
-| find_scene_merged_global_only       | SceneTable | 3.1, 3.2      |
-| find_scene_merged_local_and_global  | SceneTable | 1.1, 1.2, 3.3 |
-| find_scene_merged_prefix_match      | SceneTable | 1.1           |
-| resolve_scene_id_unified_with_cache | SceneTable | 3.4           |
+| collect_scene_candidates_local_only        | SceneTable | 3.1, 3.2      |
+| collect_scene_candidates_global_only       | SceneTable | 3.1, 3.2      |
+| collect_scene_candidates_local_and_global  | SceneTable | 1.1, 1.2, 3.3 |
+| collect_scene_candidates_prefix_match      | SceneTable | 1.1           |
+| resolve_scene_id_with_cache                | SceneTable | 3.4           |
 
 ### Integration Tests
 
@@ -431,7 +431,7 @@ let search_key = if scene.parent.is_some() {
 - 既存生成 Rune コードは再生成が必要
 
 **移行手順**:
-1. SceneTable 拡張（find_scene_merged 追加）
+1. SceneTable 拡張（collect_scene_candidates 追加）
 2. stdlib シグネチャ変更
 3. CodeGenerator generate_call_scene 変更
 4. テスト更新・回帰確認
