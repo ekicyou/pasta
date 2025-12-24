@@ -20,8 +20,8 @@ use std::sync::Arc;
 /// Main Pasta script engine.
 ///
 /// This engine integrates all layers of the Pasta stack:
-/// - Parser: Parses Pasta DSL to AST
-/// - Transpiler: Converts AST to Rune source code
+/// - Parser2: Parses Pasta DSL to AST using `grammar.pest`
+/// - Transpiler2: Converts AST to Rune source code (2-pass strategy)
 /// - Runtime: Executes Rune code with generators
 ///
 /// # Instance Independence

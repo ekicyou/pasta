@@ -15,31 +15,35 @@ Transpiler (2pass) ← Parser (Pest)
 Runtime (Rune VM) → IR Output (ScriptEvent)
 ```
 
-### 並行パーサーアーキテクチャ
+### パーサー/トランスパイラーアーキテクチャ
 
-Pastaは2つのパーサーモジュールを持ちます：
+Pastaは `parser2` + `transpiler2` スタックを使用しています：
 
 | モジュール | 文法ファイル | 状態 | 用途 |
 |------------|--------------|------|------|
-| `pasta::parser` | `pasta.pest` | 現行（レガシー） | 既存のtranspiler/runtimeで使用 |
-| `pasta::parser2` | `grammar.pest` | 新規開発中 | pasta2.pestに基づく新実装 |
+| `pasta::parser2` | `grammar.pest` | **現行** | engine.rsで使用 |
+| `pasta::transpiler2` | - | **現行** | 2-pass トランスパイル |
+| `pasta::parser` | `pasta.pest` | レガシー（非推奨） | 後方互換性のため維持 |
+| `pasta::transpiler` | - | レガシー（非推奨） | 後方互換性のため維持 |
 
-#### 使い分け
+#### 使用方法
 
 ```rust
-// レガシーパーサー（現在のメイン）
-use pasta::parser::{parse_str, parse_file};
-
-// 新パーサー（開発中）
+// 現行スタック（推奨）
 use pasta::parser2::{parse_str, parse_file};
+use pasta::transpiler2::Transpiler2;
+
+// レガシースタック（非推奨）
+use pasta::parser::{parse_str, parse_file};
+use pasta::transpiler::Transpiler;
 ```
 
-#### 移行計画
+#### 移行履歴
 
-1. **Phase 1（現在）**: parser2モジュールを作成、parser と並存
-2. **Phase 2**: transpiler2を作成、parser2と連携
-3. **Phase 3**: 検証完了後、parser → parser2への完全移行
-4. **Phase 4**: レガシーparserを削除
+1. **Phase 1**: ✅ parser2モジュールを作成、parser と並存
+2. **Phase 2**: ✅ transpiler2を作成、parser2と連携
+3. **Phase 3**: ✅ engine.rs を parser2/transpiler2 に完全移行
+4. **Phase 4**: （保留）レガシースタックの削除は後方互換性確認後に実施
 
 ### parser2について
 
