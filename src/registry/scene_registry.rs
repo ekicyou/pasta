@@ -6,9 +6,9 @@
 
 use std::collections::HashMap;
 
-/// Information about a registered scene.
+/// A single scene entry (individual scene definition).
 #[derive(Debug, Clone, PartialEq)]
-pub struct SceneInfo {
+pub struct SceneEntry {
     /// Unique numeric ID (starting from 1, matches Vec index + 1).
     pub id: i64,
 
@@ -39,7 +39,7 @@ pub struct SceneInfo {
 /// - Vec-based storage ensures consistent iteration order
 pub struct SceneRegistry {
     /// All registered scenes (index + 1 = scene ID).
-    scenes: Vec<SceneInfo>,
+    scenes: Vec<SceneEntry>,
 
     /// Counter for tracking duplicate scene names (name → counter).
     /// P0: Always returns 1 (no duplicates expected).
@@ -77,7 +77,7 @@ impl SceneRegistry {
         let fn_name = format!("{}_{}::__start__", Self::sanitize_name(name), counter);
         let fn_path = format!("crate::{}", fn_name);
 
-        let info = SceneInfo {
+        let entry = SceneEntry {
             id,
             name: name.to_string(),
             attributes,
@@ -86,7 +86,7 @@ impl SceneRegistry {
             parent: None,
         };
 
-        self.scenes.push(info);
+        self.scenes.push(entry);
         (id, counter)
     }
 
@@ -125,7 +125,7 @@ impl SceneRegistry {
         );
         let fn_path = format!("crate::{}", fn_name);
 
-        let info = SceneInfo {
+        let entry = SceneEntry {
             id,
             name: name.to_string(),
             attributes,
@@ -134,17 +134,17 @@ impl SceneRegistry {
             parent: Some(parent_name.to_string()),
         };
 
-        self.scenes.push(info);
+        self.scenes.push(entry);
         id
     }
 
     /// Get all registered scenes in ID order.
-    pub fn all_scenes(&self) -> Vec<&SceneInfo> {
+    pub fn all_scenes(&self) -> Vec<&SceneEntry> {
         self.scenes.iter().collect()
     }
 
     /// Get a scene by ID.
-    pub fn get_scene(&self, id: i64) -> Option<&SceneInfo> {
+    pub fn get_scene(&self, id: i64) -> Option<&SceneEntry> {
         if id < 1 {
             return None;
         }
