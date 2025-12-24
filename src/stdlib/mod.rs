@@ -49,8 +49,8 @@ pub fn create_module(
     module
         .function(
             "select_scene_to_id",
-            move |scene: String, filters: rune::runtime::Value| {
-                select_scene_to_id(scene, filters, &scene_table_mutex)
+            move |scene: String, module_name: String, filters: rune::runtime::Value| {
+                select_scene_to_id(scene, module_name, filters, &scene_table_mutex)
             },
         )
         .build()?;
@@ -75,33 +75,40 @@ pub fn create_module(
     Ok(module)
 }
 
-/// Scene resolution with prefix matching and attribute filtering.
+/// Scene resolution with unified scope search (local + global).
+///
+/// Uses 2-stage search pattern (same as word_expansion):
+/// 1. Local search: `:module_name:scene` prefix match
+/// 2. Global search: `scene` prefix match (excluding local keys)
+/// 3. Merge and select from combined candidates
 ///
 /// # Arguments
 /// * `scene` - Scene name to resolve (search key)
+/// * `module_name` - Current module name (parent global scene)
 /// * `filters` - Attribute filters (Rune Object or Unit)
 /// * `scene_table` - Shared reference to the scene table
 ///
 /// # Returns
-/// Scene ID as i64
+/// Scene ID as i64 (1-based, for Rune compatibility)
 ///
-/// # Panics
-/// Panics if scene resolution fails (no matching scenes, lock error, etc.)
+/// # Errors
+/// Returns error string if scene resolution fails
 fn select_scene_to_id(
     scene: String,
+    module_name: String,
     filters: rune::runtime::Value,
     scene_table: &Mutex<SceneTable>,
 ) -> Result<i64, String> {
     // Phase 1: Parse Rune filters to HashMap
     let filter_map = parse_rune_filters(filters)?;
 
-    // Phase 2: Lock and resolve scene ID
+    // Phase 2: Lock and resolve scene ID using unified scope search
     let mut table = scene_table
         .lock()
         .map_err(|e| format!("Failed to lock scene_table: {}", e))?;
 
     let scene_id = table
-        .resolve_scene_id(&scene, &filter_map)
+        .resolve_scene_id_unified(&module_name, &scene, &filter_map)
         .map_err(|e| format!("Scene resolution failed: {}", e))?;
 
     // Convert SceneId (0-based) to transpiler ID (1-based)
@@ -133,7 +140,13 @@ fn parse_rune_filters(value: rune::Value) -> Result<HashMap<String, String>, Str
             // Try unit type (empty filters)
             match rune::from_value::<()>(value.clone()) {
                 Ok(_) => Ok(HashMap::new()),
-                Err(_) => Err(format!("Filters must be object or unit")),
+                Err(_) => {
+                    // Try empty Vec (also valid for empty filters)
+                    match rune::from_value::<Vec<rune::Value>>(value.clone()) {
+                        Ok(vec) if vec.is_empty() => Ok(HashMap::new()),
+                        _ => Err(format!("Filters must be object or unit")),
+                    }
+                }
             }
         }
     }
@@ -388,10 +401,10 @@ mod tests {
 
     #[test]
     fn test_create_module() {
-        use crate::runtime::scene::SceneTable;
-        use crate::runtime::random::DefaultRandomSelector;
-        use crate::runtime::words::WordTable;
         use crate::registry::WordDefRegistry;
+        use crate::runtime::random::DefaultRandomSelector;
+        use crate::runtime::scene::SceneTable;
+        use crate::runtime::words::WordTable;
 
         // Create a test scene table
         let selector = Box::new(DefaultRandomSelector::new());

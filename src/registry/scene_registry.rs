@@ -9,7 +9,7 @@ use std::collections::HashMap;
 /// Information about a registered scene.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SceneInfo {
-    /// Unique numeric ID (starting from 1).
+    /// Unique numeric ID (starting from 1, matches Vec index + 1).
     pub id: i64,
 
     /// Original scene name (without counter suffix).
@@ -34,14 +34,12 @@ pub struct SceneInfo {
 ///
 /// - **P0 Implementation**: No duplicate scene names, all scenes get `_1` suffix
 /// - **P1 Implementation**: Handle duplicate names with sequential counters (`_1`, `_2`, ...)
-/// - IDs start from 1 and increment sequentially
+/// - IDs start from 1 and increment sequentially (ID = Vec index + 1)
 /// - Each scene gets a unique ID even if names are the same
+/// - Vec-based storage ensures consistent iteration order
 pub struct SceneRegistry {
-    /// All registered labels, indexed by ID.
-    labels: HashMap<i64, SceneInfo>,
-
-    /// Counter for assigning the next unique ID.
-    next_id: i64,
+    /// All registered scenes (index + 1 = scene ID).
+    scenes: Vec<SceneInfo>,
 
     /// Counter for tracking duplicate scene names (name → counter).
     /// P0: Always returns 1 (no duplicates expected).
@@ -53,8 +51,7 @@ impl SceneRegistry {
     /// Create a new scene registry.
     pub fn new() -> Self {
         Self {
-            labels: HashMap::new(),
-            next_id: 1,
+            scenes: Vec::new(),
             name_counters: HashMap::new(),
         }
     }
@@ -75,8 +72,7 @@ impl SceneRegistry {
         attributes: HashMap<String, String>,
     ) -> (i64, usize) {
         let counter = self.increment_counter(name);
-        let id = self.next_id;
-        self.next_id += 1;
+        let id = (self.scenes.len() + 1) as i64;
 
         let fn_name = format!("{}_{}::__start__", Self::sanitize_name(name), counter);
         let fn_path = format!("crate::{}", fn_name);
@@ -90,7 +86,7 @@ impl SceneRegistry {
             parent: None,
         };
 
-        self.labels.insert(id, info);
+        self.scenes.push(info);
         (id, counter)
     }
 
@@ -101,32 +97,31 @@ impl SceneRegistry {
     /// * `name` - Original scene name (without scope prefix)
     /// * `parent_name` - Parent global scene name
     /// * `parent_counter` - Parent's counter value
+    /// * `local_index` - Local scene index within parent (1-based, matches CodeGenerator)
     /// * `attributes` - Attributes for filtering (P1 feature)
     ///
     /// # Returns
     ///
-    /// The assigned ID and counter for this scene.
+    /// The assigned ID for this scene.
     pub fn register_local(
         &mut self,
         name: &str,
         parent_name: &str,
         parent_counter: usize,
+        local_index: usize,
         attributes: HashMap<String, String>,
-    ) -> (i64, usize) {
-        // For local scenes, the full name includes parent for uniqueness
-        let full_name = format!("{}::{}", parent_name, name);
-        let counter = self.increment_counter(&full_name);
-        let id = self.next_id;
-        self.next_id += 1;
+    ) -> i64 {
+        let id = (self.scenes.len() + 1) as i64;
 
         // Local scene function path: parent module + local function
         // Format: crate::親_番号::子_番号
+        // Use local_index to match CodeGenerator's generate_local_scene
         let fn_name = format!(
             "{}_{}::{}_{}",
             Self::sanitize_name(parent_name),
             parent_counter,
             Self::sanitize_name(name),
-            counter
+            local_index
         );
         let fn_path = format!("crate::{}", fn_name);
 
@@ -139,25 +134,21 @@ impl SceneRegistry {
             parent: Some(parent_name.to_string()),
         };
 
-        self.labels.insert(id, info);
-        (id, counter)
+        self.scenes.push(info);
+        id
     }
 
-    /// Get all registered scenes.
+    /// Get all registered scenes in ID order.
     pub fn all_scenes(&self) -> Vec<&SceneInfo> {
-        let mut scenes: Vec<_> = self.labels.values().collect();
-        scenes.sort_by_key(|s| s.id);
-        scenes
+        self.scenes.iter().collect()
     }
 
     /// Get a scene by ID.
     pub fn get_scene(&self, id: i64) -> Option<&SceneInfo> {
-        self.labels.get(&id)
-    }
-
-    /// Iterate over all registered scenes.
-    pub fn iter(&self) -> impl Iterator<Item = (&i64, &SceneInfo)> {
-        self.labels.iter()
+        if id < 1 {
+            return None;
+        }
+        self.scenes.get((id - 1) as usize)
     }
 
     /// Increment the counter for a scene name and return the new value.
@@ -243,12 +234,10 @@ mod tests {
         let (parent_id, parent_counter) = registry.register_global("会話", HashMap::new());
 
         // Register local scene
-        let (local_id, local_counter) =
-            registry.register_local("選択肢", "会話", parent_counter, HashMap::new());
+        let local_id = registry.register_local("選択肢", "会話", parent_counter, 1, HashMap::new());
 
         assert_eq!(parent_id, 1);
         assert_eq!(local_id, 2);
-        assert_eq!(local_counter, 1);
 
         let local_label = registry.get_scene(local_id).unwrap();
         assert_eq!(local_label.name, "選択肢");

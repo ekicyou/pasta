@@ -112,13 +112,22 @@ fn test_e2e_pasta_call_wrapper() {
     let file = parser::parse_str(source, "test.pasta").expect("Parse failed");
     let code = Transpiler2::transpile_to_string(&file).expect("Transpile failed");
 
-    // Verify pasta::call wrapper
+    // Verify pasta::call wrapper with module_name parameter for unified scope resolution
     assert!(code.contains("pub mod pasta"));
-    assert!(code.contains("pub fn call(ctx, scene, filters, args)"));
-    assert!(code.contains("crate::__pasta_trans2__::scene_selector"));
+    assert!(code.contains("pub fn call(ctx, scene, module_name, filters, args)"));
+    assert!(code.contains("crate::__pasta_trans2__::scene_selector(scene, module_name, filters)"));
     assert!(
         code.contains("for a in func(ctx, args) { yield a; }"),
         "Should have yield loop"
+    );
+    // Result handling in nested match
+    assert!(
+        code.contains("let id = pasta_stdlib::select_scene_to_id(scene, module_name, filters);"),
+        "Should call select_scene_to_id"
+    );
+    assert!(
+        code.contains("Ok(id) => match id"),
+        "Should handle Ok case with nested match"
     );
 }
 

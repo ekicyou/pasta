@@ -21,6 +21,8 @@ pub struct CodeGenerator<'a, W: Write> {
     writer: &'a mut W,
     /// Current indentation level
     indent_level: usize,
+    /// Current module name for scene resolution (set by generate_global_scene)
+    current_module: String,
 }
 
 impl<'a, W: Write> CodeGenerator<'a, W> {
@@ -29,6 +31,7 @@ impl<'a, W: Write> CodeGenerator<'a, W> {
         Self {
             writer,
             indent_level: 0,
+            current_module: String::new(),
         }
     }
 
@@ -75,6 +78,9 @@ impl<'a, W: Write> CodeGenerator<'a, W> {
     ) -> Result<(), TranspileError> {
         let sanitized_name = SceneRegistry::sanitize_name(&scene.name);
         let module_name = format!("{}_{}", sanitized_name, scene_counter);
+
+        // Store current module name for Call scene resolution
+        self.current_module = module_name.clone();
 
         // Generate module header
         self.writeln(&format!("pub mod {} {{", module_name))?;
@@ -182,11 +188,12 @@ impl<'a, W: Write> CodeGenerator<'a, W> {
         Ok(())
     }
 
-    /// Generate scene call.
+    /// Generate scene call with module context for unified scope resolution.
     fn generate_call_scene(&mut self, call_scene: &CallScene) -> Result<(), TranspileError> {
         self.writeln(&format!(
-            "for a in pasta::call(ctx, \"{}\") {{ yield a; }}",
-            call_scene.target
+            "for a in crate::pasta::call(ctx, \"{}\", \"{}\", [], args) {{ yield a; }}",
+            call_scene.target,
+            self.current_module
         ))?;
         Ok(())
     }
@@ -498,6 +505,28 @@ mod tests {
         codegen.generate_call_scene(&call_scene).unwrap();
 
         let result = String::from_utf8(output).unwrap();
-        assert!(result.contains("for a in pasta::call(ctx, \"挨拶\") { yield a; }"));
+        // Updated: Now includes module_name parameter for unified scope resolution
+        // Uses crate::pasta::call for absolute path resolution
+        assert!(result.contains("for a in crate::pasta::call(ctx, \"挨拶\", \"\", [], args) { yield a; }"));
+    }
+
+    #[test]
+    fn test_generate_call_scene_with_module_context() {
+        let mut output = Vec::new();
+        let mut codegen = CodeGenerator::new(&mut output);
+
+        // Set current module context
+        codegen.current_module = "会話_1".to_string();
+
+        let call_scene = CallScene {
+            target: "選択肢".to_string(),
+            args: None,
+            span: Span::default(),
+        };
+        codegen.generate_call_scene(&call_scene).unwrap();
+
+        let result = String::from_utf8(output).unwrap();
+        // Verify module_name is passed for unified scope resolution with crate:: prefix
+        assert!(result.contains("for a in crate::pasta::call(ctx, \"選択肢\", \"会話_1\", [], args) { yield a; }"));
     }
 }

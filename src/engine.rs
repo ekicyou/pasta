@@ -232,10 +232,23 @@ impl PastaEngine {
             })?)
             .map_err(|e| PastaError::RuneRuntimeError(format!("Failed to insert source: {}", e)))?;
 
-        // Step 8: Compile Rune code
-        let unit = rune::prepare(&mut sources)
+        // Step 8: Compile Rune code with diagnostics
+        let mut diagnostics = rune::Diagnostics::new();
+        let result = rune::prepare(&mut sources)
             .with_context(&context)
-            .build()
+            .with_diagnostics(&mut diagnostics)
+            .build();
+
+        // Print diagnostics for debugging
+        if !diagnostics.is_empty() {
+            eprintln!("=== Rune Compile Diagnostics ===");
+            for diagnostic in diagnostics.diagnostics() {
+                eprintln!("{:?}", diagnostic);
+            }
+            eprintln!("=================================");
+        }
+
+        let unit = result
             .map_err(|e| PastaError::RuneCompileError(format!("Failed to compile Rune: {}", e)))?;
 
         // Step 9: Validate persistence path
