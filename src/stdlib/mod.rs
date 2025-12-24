@@ -391,7 +391,7 @@ mod tests {
         use crate::runtime::scene::SceneTable;
         use crate::runtime::random::DefaultRandomSelector;
         use crate::runtime::words::WordTable;
-        use crate::transpiler::WordDefRegistry;
+        use crate::registry::WordDefRegistry;
 
         // Create a test scene table
         let selector = Box::new(DefaultRandomSelector::new());

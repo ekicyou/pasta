@@ -19,7 +19,7 @@ use pasta::{PastaEngine, PastaError};
 /// Helper to create a test word table
 fn create_test_word_table() -> pasta::runtime::words::WordTable {
     let selector = Box::new(pasta::runtime::random::DefaultRandomSelector::new());
-    let registry = pasta::transpiler::WordDefRegistry::new();
+    let registry = pasta::registry::WordDefRegistry::new();
     pasta::runtime::words::WordTable::from_word_def_registry(registry, selector)
 }
 

@@ -125,12 +125,12 @@ No new architecture patterns introduced in this specification. This is pure code
 **No new dependencies introduced**.
 
 Affected Stack Components:
-| Layer | Tool/Version | Change |
-|-------|--------------|--------|
-| Build System | Cargo (standard) | None |
-| Compiler | Rust 2024 edition | None |
-| Parser Gen | Pest 2.8 | Rename grammar.pest location (parser2 → parser) |
-| Backend VM | Rune 0.14 | None |
+| Layer        | Tool/Version      | Change                                          |
+| ------------ | ----------------- | ----------------------------------------------- |
+| Build System | Cargo (standard)  | None                                            |
+| Compiler     | Rust 2024 edition | None                                            |
+| Parser Gen   | Pest 2.8          | Rename grammar.pest location (parser2 → parser) |
+| Backend VM   | Rune 0.14         | None                                            |
 
 ---
 

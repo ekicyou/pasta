@@ -4,8 +4,8 @@
 //! prefix-based search and shuffle-based random selection.
 
 use crate::PastaError;
+use crate::registry::{WordDefRegistry, WordEntry};
 use crate::runtime::random::RandomSelector;
-use crate::transpiler::{WordDefRegistry, WordEntry};
 use fast_radix_trie::RadixMap;
 use std::collections::HashMap;
 
