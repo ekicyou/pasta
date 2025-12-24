@@ -109,36 +109,42 @@ impl Transpiler2 {
         writer: &mut W,
     ) -> Result<(), TranspileError> {
         // Generate __pasta_trans2__ module with scene_selector
+        // Note: scene_selector must be a pure function (not a generator) because it returns a function pointer
         writeln!(writer)?;
         writeln!(writer, "pub mod __pasta_trans2__ {{")?;
         writeln!(writer, "    use pasta_stdlib::*;")?;
         writeln!(writer)?;
-        writeln!(writer, "    pub fn scene_selector(scene, filters) {{")?;
         writeln!(
             writer,
-            "        let id = pasta_stdlib::select_scene_to_id(scene, filters);"
+            "    pub fn scene_selector(scene, module_name, filters) {{"
+        )?;
+        writeln!(
+            writer,
+            "        let id = pasta_stdlib::select_scene_to_id(scene, module_name, filters);"
         )?;
         writeln!(writer, "        match id {{")?;
+        writeln!(writer, "            Ok(id) => match id {{")?;
 
         // Generate match arms for each registered scene
         for scene_info in scene_registry.all_scenes() {
-            // Extract module name from fn_name (e.g., "会話_1::__start__" -> "会話_1")
-            let module_name = scene_info
-                .fn_name
-                .split("::")
-                .next()
-                .unwrap_or(&scene_info.fn_name);
+            // Use fn_name directly to get the correct function path
+            // fn_name format: "モジュール名::関数名" (e.g., "会話_1::__start__" or "会話_1::返答_1")
             writeln!(
                 writer,
-                "            {} => crate::{}::__start__,",
-                scene_info.id, module_name
+                "                {} => crate::{},",
+                scene_info.id, scene_info.fn_name
             )?;
         }
 
         // Default case for unknown scene IDs
         writeln!(
             writer,
-            "            _ => |_ctx, _args| {{ yield Error(`シーンID ${{id}} が見つかりませんでした。`); }},"
+            "                _ => |_ctx, _args| {{ yield Error(`シーンID ${{id}} が見つかりませんでした。`); }},"
+        )?;
+        writeln!(writer, "            }},")?;
+        writeln!(
+            writer,
+            "            Err(e) => |_ctx, _args| {{ yield Error(`シーン解決エラー: ${{e}}`); }},"
         )?;
         writeln!(writer, "        }}")?;
         writeln!(writer, "    }}")?;
@@ -147,10 +153,13 @@ impl Transpiler2 {
         // Generate pasta module with call wrapper
         writeln!(writer)?;
         writeln!(writer, "pub mod pasta {{")?;
-        writeln!(writer, "    pub fn call(ctx, scene, filters, args) {{")?;
         writeln!(
             writer,
-            "        let func = crate::__pasta_trans2__::scene_selector(scene, filters);"
+            "    pub fn call(ctx, scene, module_name, filters, args) {{"
+        )?;
+        writeln!(
+            writer,
+            "        let func = crate::__pasta_trans2__::scene_selector(scene, module_name, filters);"
         )?;
         writeln!(writer, "        for a in func(ctx, args) {{ yield a; }}")?;
         writeln!(writer, "    }}")?;
@@ -204,15 +213,23 @@ impl Transpiler2 {
             word_registry.register_local(&context.current_module(), &word.name, values);
         }
 
-        // Register local scenes
-        for local_scene in &scene.local_scenes {
+        // Register local scenes with index matching CodeGenerator
+        for (idx, local_scene) in scene.local_scenes.iter().enumerate() {
             if let Some(ref local_name) = local_scene.name {
                 let local_attrs: HashMap<String, String> = local_scene
                     .attrs
                     .iter()
                     .map(|a| (a.key.clone(), a.value.to_string()))
                     .collect();
-                scene_registry.register_local(local_name, &scene.name, scene_counter, local_attrs);
+                // local_index is 1-based to match CodeGenerator.generate_local_scene
+                let local_index = idx + 1;
+                scene_registry.register_local(
+                    local_name,
+                    &scene.name,
+                    scene_counter,
+                    local_index,
+                    local_attrs,
+                );
             }
         }
 
