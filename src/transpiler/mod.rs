@@ -20,12 +20,12 @@
 //! # Example
 //!
 //! ```ignore
-//! use pasta::parser2;
-//! use pasta::transpiler2::Transpiler2;
+//! use pasta::parser;
+//! use pasta::transpiler::Transpiler2;
 //! use pasta::registry::{SceneRegistry, WordDefRegistry};
 //!
 //! let source = "＊会話\nさくら：こんにちは";
-//! let file = parser2::parse_str(source, "test.pasta").unwrap();
+//! let file = parser::parse_str(source, "test.pasta").unwrap();
 //!
 //! let mut scene_registry = SceneRegistry::new();
 //! let mut word_registry = WordDefRegistry::new();
@@ -43,7 +43,7 @@ pub use code_generator::CodeGenerator;
 pub use context::TranspileContext2;
 pub use error::TranspileError;
 
-use crate::parser2::{FileItem, GlobalSceneScope, PastaFile};
+use crate::parser::{FileItem, GlobalSceneScope, PastaFile};
 use crate::registry::{SceneRegistry, WordDefRegistry};
 
 /// Transpiler2 for parser2 AST to Rune code conversion.
@@ -227,7 +227,7 @@ impl Transpiler2 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser2;
+    use crate::parser;
 
     #[test]
     fn test_transpile_empty_file() {
@@ -241,7 +241,7 @@ mod tests {
         // action_line requires: pad + id + colon + actions
         // local_start_scene_scope requires at least one local_scene_item
         let source = "＊会話\n  sakura：hello\n";
-        let file = parser2::parse_str(source, "test.pasta").unwrap();
+        let file = parser::parse_str(source, "test.pasta").unwrap();
 
         let mut scene_registry = SceneRegistry::new();
         let mut word_registry = WordDefRegistry::new();
@@ -265,7 +265,7 @@ mod tests {
     fn test_transpile_pass1_registers_words() {
         // file_word_line: word_marker ~ key_words ~ eol
         let source = "＠挨拶：こんにちは、おはよう\n＊会話\n  sakura：hi\n";
-        let file = parser2::parse_str(source, "test.pasta").unwrap();
+        let file = parser::parse_str(source, "test.pasta").unwrap();
 
         let mut scene_registry = SceneRegistry::new();
         let mut word_registry = WordDefRegistry::new();
@@ -289,7 +289,7 @@ mod tests {
     #[test]
     fn test_transpile_pass2_generates_selector() {
         let source = "＊会話\n  sakura：hello\n";
-        let file = parser2::parse_str(source, "test.pasta").unwrap();
+        let file = parser::parse_str(source, "test.pasta").unwrap();
 
         let mut scene_registry = SceneRegistry::new();
         let mut word_registry = WordDefRegistry::new();
@@ -320,7 +320,7 @@ mod tests {
     #[test]
     fn test_transpile_pass2_scene_match_cases() {
         let source = "＊挨拶\n  sakura：hello\n＊会話\n  kero：yo\n";
-        let file = parser2::parse_str(source, "test.pasta").unwrap();
+        let file = parser::parse_str(source, "test.pasta").unwrap();
 
         let mut scene_registry = SceneRegistry::new();
         let mut word_registry = WordDefRegistry::new();

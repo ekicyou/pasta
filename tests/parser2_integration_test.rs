@@ -3,7 +3,7 @@
 //! These tests verify the parser2 module implementation using fixtures
 //! and cover all grammar rules defined in grammar.pest.
 
-use pasta::parser2::{Expr, FileItem, LocalSceneItem, parse_file, parse_str};
+use pasta::parser::{Expr, FileItem, LocalSceneItem, parse_file, parse_str};
 use std::path::Path;
 
 // ============================================================================

@@ -5,7 +5,7 @@
 //! during transpilation.
 
 use super::TranspileError;
-use crate::parser2::{Attr, AttrValue, FnScope};
+use crate::parser::{Attr, AttrValue, FnScope};
 use std::collections::HashMap;
 
 /// Transpile context for parser2 AST transpilation.
@@ -153,7 +153,7 @@ impl Default for TranspileContext2 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser2::Span;
+    use crate::parser::Span;
 
     fn make_attr(key: &str, value: AttrValue) -> Attr {
         Attr {

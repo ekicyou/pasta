@@ -2,9 +2,9 @@
 //!
 //! These tests verify that Transpiler2 produces appropriate errors for invalid inputs.
 
-use pasta::parser2;
+use pasta::parser;
 use pasta::registry::{SceneRegistry, WordDefRegistry};
-use pasta::transpiler2::{TranspileError, Transpiler2};
+use pasta::transpiler::{TranspileError, Transpiler2};
 
 // ============================================================
 // Parse Error Propagation Tests
@@ -14,7 +14,7 @@ use pasta::transpiler2::{TranspileError, Transpiler2};
 fn test_error_invalid_syntax() {
     // Invalid pasta syntax should fail at parse stage, not transpile stage
     let source = "＊＊＊Invalid";
-    let result = parser2::parse_str(source, "test.pasta");
+    let result = parser::parse_str(source, "test.pasta");
 
     // Should fail to parse
     assert!(result.is_err(), "Invalid syntax should fail to parse");
@@ -27,7 +27,7 @@ fn test_error_unclosed_quote() {
   さくら：「閉じていない
 "#;
 
-    let result = parser2::parse_str(source, "test.pasta");
+    let result = parser::parse_str(source, "test.pasta");
     // This may or may not be a parse error depending on grammar
     // Either parse fails or we get malformed AST
     if result.is_err() {
@@ -55,7 +55,7 @@ fn test_error_first_line_continue() {
   ：「これは最初の行です」
 "#;
 
-    let result = parser2::parse_str(source, "test.pasta");
+    let result = parser::parse_str(source, "test.pasta");
 
     // This might fail at parse stage or be caught at transpile stage
     if result.is_ok() {
@@ -87,7 +87,7 @@ fn test_error_empty_scene_name() {
   さくら：「テスト」
 "#;
 
-    let result = parser2::parse_str(source, "test.pasta");
+    let result = parser::parse_str(source, "test.pasta");
 
     // This is actually valid - unnamed scene (continuation scene)
     if result.is_ok() {
@@ -106,7 +106,7 @@ fn test_error_scene_with_no_actions() {
 "#;
 
     // This should fail parsing because no action lines after attribute
-    let result = parser2::parse_str(source, "test.pasta");
+    let result = parser::parse_str(source, "test.pasta");
 
     match result {
         Err(e) => {
@@ -134,7 +134,7 @@ fn test_special_characters_in_scene_name() {
   さくら：「テスト」
 "#;
 
-    let result = parser2::parse_str(source, "test.pasta");
+    let result = parser::parse_str(source, "test.pasta");
 
     // Parse might succeed or fail depending on grammar
     if let Ok(file) = result {
@@ -160,7 +160,7 @@ fn test_very_long_scene_name() {
     let long_name = "あ".repeat(100);
     let source = format!("＊{}\n  さくら：「テスト」\n", long_name);
 
-    let file = parser2::parse_str(&source, "test.pasta").expect("Parse should work");
+    let file = parser::parse_str(&source, "test.pasta").expect("Parse should work");
     let result = Transpiler2::transpile_to_string(&file);
 
     // Should handle long names (truncate or allow)
@@ -175,7 +175,7 @@ fn test_numeric_scene_name() {
 "#;
 
     // This may or may not be valid depending on grammar's id rule
-    let result = parser2::parse_str(source, "test.pasta");
+    let result = parser::parse_str(source, "test.pasta");
 
     if let Ok(file) = result {
         let code_result = Transpiler2::transpile_to_string(&file);
@@ -197,7 +197,7 @@ fn test_registry_remains_valid_after_error() {
 "#;
 
     // First file is valid
-    let file1 = parser2::parse_str(source1, "file1.pasta").expect("Parse should work");
+    let file1 = parser::parse_str(source1, "file1.pasta").expect("Parse should work");
 
     let mut scene_registry = SceneRegistry::new();
     let mut word_registry = WordDefRegistry::new();
@@ -213,7 +213,7 @@ fn test_registry_remains_valid_after_error() {
     let source2 = r#"＊別シーン
   うにゅう：「別」
 "#;
-    let file2 = parser2::parse_str(source2, "file2.pasta").expect("Parse should work");
+    let file2 = parser::parse_str(source2, "file2.pasta").expect("Parse should work");
 
     Transpiler2::transpile_pass1(&file2, &mut scene_registry, &mut word_registry, &mut output)
         .expect("Pass1 should work");
@@ -233,7 +233,7 @@ fn test_unicode_normalization() {
   さくら：「こんにちは」
 "#;
 
-    let file = parser2::parse_str(source, "test.pasta").expect("Parse should work");
+    let file = parser::parse_str(source, "test.pasta").expect("Parse should work");
     let code = Transpiler2::transpile_to_string(&file).expect("Transpile should work");
 
     assert!(!code.is_empty(), "Should produce output for unicode input");
@@ -246,7 +246,7 @@ fn test_emoji_in_dialogue() {
   さくら：「こんにちは😀」
 "#;
 
-    let result = parser2::parse_str(source, "test.pasta");
+    let result = parser::parse_str(source, "test.pasta");
 
     if let Ok(file) = result {
         let code = Transpiler2::transpile_to_string(&file).expect("Should handle emoji");
@@ -287,7 +287,7 @@ fn test_output_is_valid_utf8() {
   さくら：「日本語テスト」
 "#;
 
-    let file = parser2::parse_str(source, "test.pasta").expect("Parse should work");
+    let file = parser::parse_str(source, "test.pasta").expect("Parse should work");
     let code = Transpiler2::transpile_to_string(&file).expect("Transpile should work");
 
     // Output should be valid UTF-8 (implicit since it's a String)
@@ -303,7 +303,7 @@ fn test_output_has_no_null_bytes() {
   さくら：「テスト」
 "#;
 
-    let file = parser2::parse_str(source, "test.pasta").expect("Parse should work");
+    let file = parser::parse_str(source, "test.pasta").expect("Parse should work");
     let code = Transpiler2::transpile_to_string(&file).expect("Transpile should work");
 
     assert!(!code.contains('\0'), "Output should not contain null bytes");
@@ -322,7 +322,7 @@ fn test_word_definition_empty_values() {
   さくら：「テスト」
 "#;
 
-    let result = parser2::parse_str(source, "test.pasta");
+    let result = parser::parse_str(source, "test.pasta");
 
     // This might fail at parse or transpile
     if let Ok(file) = result {
@@ -340,7 +340,7 @@ fn test_word_definition_many_values() {
         .join("、");
     let source = format!("@多数：{}\n\n＊テスト\n  さくら：「テスト」\n", values);
 
-    let file = parser2::parse_str(&source, "test.pasta").expect("Parse should work");
+    let file = parser::parse_str(&source, "test.pasta").expect("Parse should work");
 
     let mut scene_registry = SceneRegistry::new();
     let mut word_registry = WordDefRegistry::new();

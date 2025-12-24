@@ -5,9 +5,9 @@
 //! - Multiple files and scenes registration
 //! - Attribute inheritance patterns
 
-use pasta::parser2;
+use pasta::parser;
 use pasta::registry::{SceneRegistry, WordDefRegistry};
-use pasta::transpiler2::Transpiler2;
+use pasta::transpiler::Transpiler2;
 use std::fs;
 use std::path::PathBuf;
 
@@ -27,7 +27,7 @@ fn read_fixture(name: &str) -> String {
 #[test]
 fn test_pass1_pass2_complete_flow() {
     let source = read_fixture("simple_scene.pasta");
-    let file = parser2::parse_str(&source, "simple_scene.pasta").unwrap();
+    let file = parser::parse_str(&source, "simple_scene.pasta").unwrap();
 
     let mut scene_registry = SceneRegistry::new();
     let mut word_registry = WordDefRegistry::new();
@@ -55,7 +55,7 @@ fn test_pass1_pass2_complete_flow() {
 #[test]
 fn test_transpile_to_string_complete() {
     let source = read_fixture("simple_scene.pasta");
-    let file = parser2::parse_str(&source, "simple_scene.pasta").unwrap();
+    let file = parser::parse_str(&source, "simple_scene.pasta").unwrap();
 
     let result = Transpiler2::transpile_to_string(&file).unwrap();
 
@@ -73,7 +73,7 @@ fn test_transpile_to_string_complete() {
 #[test]
 fn test_multi_scene_registration() {
     let source = read_fixture("multi_scene.pasta");
-    let file = parser2::parse_str(&source, "multi_scene.pasta").unwrap();
+    let file = parser::parse_str(&source, "multi_scene.pasta").unwrap();
 
     let mut scene_registry = SceneRegistry::new();
     let mut word_registry = WordDefRegistry::new();
@@ -95,7 +95,7 @@ fn test_multi_scene_registration() {
 #[test]
 fn test_multi_scene_selector_generation() {
     let source = read_fixture("multi_scene.pasta");
-    let file = parser2::parse_str(&source, "multi_scene.pasta").unwrap();
+    let file = parser::parse_str(&source, "multi_scene.pasta").unwrap();
 
     let result = Transpiler2::transpile_to_string(&file).unwrap();
 
@@ -117,7 +117,7 @@ fn test_multi_scene_selector_generation() {
 #[test]
 fn test_nested_scene_structure() {
     let source = read_fixture("nested_scene.pasta");
-    let file = parser2::parse_str(&source, "nested_scene.pasta").unwrap();
+    let file = parser::parse_str(&source, "nested_scene.pasta").unwrap();
 
     let result = Transpiler2::transpile_to_string(&file).unwrap();
 
@@ -136,7 +136,7 @@ fn test_nested_scene_structure() {
 #[test]
 fn test_word_definitions_registration() {
     let source = read_fixture("word_definitions.pasta");
-    let file = parser2::parse_str(&source, "word_definitions.pasta").unwrap();
+    let file = parser::parse_str(&source, "word_definitions.pasta").unwrap();
 
     let mut scene_registry = SceneRegistry::new();
     let mut word_registry = WordDefRegistry::new();
@@ -162,7 +162,7 @@ fn test_word_definitions_registration() {
 #[test]
 fn test_file_level_attribute_inheritance() {
     let source = read_fixture("attribute_inheritance.pasta");
-    let file = parser2::parse_str(&source, "attribute_inheritance.pasta").unwrap();
+    let file = parser::parse_str(&source, "attribute_inheritance.pasta").unwrap();
 
     let mut scene_registry = SceneRegistry::new();
     let mut word_registry = WordDefRegistry::new();
@@ -188,7 +188,7 @@ fn test_file_level_attribute_inheritance() {
 #[test]
 fn test_variable_scope_generation() {
     let source = read_fixture("variable_scope.pasta");
-    let file = parser2::parse_str(&source, "variable_scope.pasta").unwrap();
+    let file = parser::parse_str(&source, "variable_scope.pasta").unwrap();
 
     let result = Transpiler2::transpile_to_string(&file).unwrap();
 
@@ -206,7 +206,7 @@ fn test_variable_scope_generation() {
 #[test]
 fn test_continue_lines_generation() {
     let source = read_fixture("continue_lines.pasta");
-    let file = parser2::parse_str(&source, "continue_lines.pasta").unwrap();
+    let file = parser::parse_str(&source, "continue_lines.pasta").unwrap();
 
     let result = Transpiler2::transpile_to_string(&file).unwrap();
 
@@ -225,7 +225,7 @@ fn test_continue_lines_generation() {
 #[test]
 fn test_code_blocks_processing() {
     let source = read_fixture("code_blocks.pasta");
-    let file = parser2::parse_str(&source, "code_blocks.pasta").unwrap();
+    let file = parser::parse_str(&source, "code_blocks.pasta").unwrap();
 
     let result = Transpiler2::transpile_to_string(&file).unwrap();
 
@@ -240,7 +240,7 @@ fn test_code_blocks_processing() {
 
 #[test]
 fn test_empty_file_produces_valid_output() {
-    let file = pasta::parser2::PastaFile::new(PathBuf::from("empty.pasta"));
+    let file = pasta::parser::PastaFile::new(PathBuf::from("empty.pasta"));
 
     let result = Transpiler2::transpile_to_string(&file).unwrap();
 
@@ -254,8 +254,8 @@ fn test_multiple_files_share_registry() {
     let source1 = "＊シーンA\n  actor：hello\n";
     let source2 = "＊シーンB\n  actor：world\n";
 
-    let file1 = parser2::parse_str(source1, "file1.pasta").unwrap();
-    let file2 = parser2::parse_str(source2, "file2.pasta").unwrap();
+    let file1 = parser::parse_str(source1, "file1.pasta").unwrap();
+    let file2 = parser::parse_str(source2, "file2.pasta").unwrap();
 
     let mut scene_registry = SceneRegistry::new();
     let mut word_registry = WordDefRegistry::new();

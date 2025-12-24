@@ -2,7 +2,7 @@
 //!
 //! This module generates Rune source code from parser2 AST nodes.
 
-use crate::parser2::{
+use crate::parser::{
     Action, ActionLine, CallScene, CodeBlock, ContinueAction, Expr, GlobalSceneScope,
     LocalSceneItem, LocalSceneScope, VarScope, VarSet,
 };
@@ -314,11 +314,11 @@ impl<'a, W: Write> CodeGenerator<'a, W> {
             Expr::Binary { op, lhs, rhs } => {
                 self.generate_expr(lhs)?;
                 let op_str = match op {
-                    crate::parser2::BinOp::Add => " + ",
-                    crate::parser2::BinOp::Sub => " - ",
-                    crate::parser2::BinOp::Mul => " * ",
-                    crate::parser2::BinOp::Div => " / ",
-                    crate::parser2::BinOp::Mod => " % ",
+                    crate::parser::BinOp::Add => " + ",
+                    crate::parser::BinOp::Sub => " - ",
+                    crate::parser::BinOp::Mul => " * ",
+                    crate::parser::BinOp::Div => " / ",
+                    crate::parser::BinOp::Mod => " % ",
                 };
                 write!(self.writer, "{}", op_str)?;
                 self.generate_expr(rhs)?;
@@ -341,7 +341,7 @@ impl<'a, W: Write> CodeGenerator<'a, W> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser2::Span;
+    use crate::parser::Span;
 
     fn create_action_line(actor: &str, actions: Vec<Action>) -> ActionLine {
         ActionLine {
@@ -458,7 +458,7 @@ mod tests {
         let mut codegen = CodeGenerator::new(&mut output);
 
         let expr = Expr::Binary {
-            op: crate::parser2::BinOp::Add,
+            op: crate::parser::BinOp::Add,
             lhs: Box::new(Expr::Integer(1)),
             rhs: Box::new(Expr::Integer(2)),
         };

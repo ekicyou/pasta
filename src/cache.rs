@@ -3,7 +3,7 @@
 //! This module provides caching of parsed AST and transpiled Rune code
 //! to avoid re-parsing the same script multiple times.
 
-use crate::parser2::ast::PastaFile;
+use crate::parser::ast::PastaFile;
 use std::collections::HashMap;
 
 /// A cache entry containing parsed AST and transpiled Rune code.

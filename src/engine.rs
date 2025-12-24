@@ -7,10 +7,10 @@ use crate::{
     error::{PastaError, Result, Transpiler2Pass},
     ir::ScriptEvent,
     loader::{DirectoryLoader, ErrorLogWriter},
-    parser2::{self, FileItem, PastaFile},
+    parser::{self, FileItem, PastaFile},
     registry::{SceneRegistry, WordDefRegistry},
     runtime::{DefaultRandomSelector, RandomSelector, SceneTable, WordTable},
-    transpiler2::Transpiler2,
+    transpiler::Transpiler2,
 };
 use rune::{Context, Vm};
 use std::collections::HashMap;
@@ -123,7 +123,7 @@ impl PastaEngine {
         let mut parse_errors = Vec::new();
 
         for pasta_file in &loaded.pasta_files {
-            match parser2::parse_file(pasta_file) {
+            match parser::parse_file(pasta_file) {
                 Ok(ast) => {
                     parsed_files.push(ast);
                 }
@@ -156,7 +156,7 @@ impl PastaEngine {
         let merged_file = PastaFile {
             path: loaded.script_root.clone().into(),
             items: all_items,
-            span: parser2::Span::default(), // Merged file has no meaningful span
+            span: parser::Span::default(), // Merged file has no meaningful span
         };
 
         // Step 5: Transpile using 2-pass strategy (transpiler2)
