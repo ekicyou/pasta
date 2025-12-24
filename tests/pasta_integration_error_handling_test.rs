@@ -54,9 +54,9 @@ fn test_parse_error_with_location() {
 
 #[test]
 fn test_parse_error_missing_label_content() {
-    // Empty scenes should parse successfully (no statements is valid)
-    let script = r#"
-＊空ラベル
+    // parser2 grammar: scenes require at least one local_scene_item
+    // Empty scenes should produce a parse error
+    let script = r#"＊空ラベル
 "#;
 
     let result = {
@@ -64,7 +64,11 @@ fn test_parse_error_missing_label_content() {
         let persistence_dir = get_test_persistence_dir();
         PastaEngine::new(&script_dir, &persistence_dir)
     };
-    assert!(result.is_ok(), "Empty scene should be valid");
+    // parser2 does NOT allow empty scenes
+    assert!(
+        result.is_err(),
+        "Empty scene should produce parse error in parser2"
+    );
 }
 
 #[test]

@@ -251,18 +251,17 @@ fn test_independent_label_execution() {
 #[test]
 fn test_engine_with_different_scripts() {
     // Test engines with completely different script structures
-    let simple_script = r#"
-＊simple
-    さくら：シンプル
+    // parser2 grammar: action_line requires pad, ＊ must be at line start
+    let simple_script = r#"＊simple
+  さくら：シンプル
 "#;
 
-    let complex_script = r#"
-＊complex
-    さくら：複雑なスクリプト
-    うにゅう：ネストあり
-    
-    ＊local
-        さくら：ローカルラベル
+    // parser2 grammar: local scenes use -marker with pad prefix
+    let complex_script = r#"＊complex
+  さくら：複雑なスクリプト
+  うにゅう：ネストあり
+  -local
+  さくら：ローカルラベル
 "#;
 
     let simple_dir = create_test_script(simple_script).expect("Failed to create simple script");

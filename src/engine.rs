@@ -4,13 +4,13 @@
 //! and runtime execution to provide a high-level API for running Pasta scripts.
 
 use crate::{
-    PastaFile,
-    error::{PastaError, Result},
+    error::{PastaError, Result, Transpiler2Pass},
     ir::ScriptEvent,
     loader::{DirectoryLoader, ErrorLogWriter},
-    parser::parse_file,
-    runtime::{DefaultRandomSelector, SceneTable, RandomSelector, WordTable},
-    transpiler::Transpiler,
+    parser2::{self, FileItem, PastaFile},
+    registry::{SceneRegistry, WordDefRegistry},
+    runtime::{DefaultRandomSelector, RandomSelector, SceneTable, WordTable},
+    transpiler2::Transpiler2,
 };
 use rune::{Context, Vm};
 use std::collections::HashMap;
@@ -118,16 +118,14 @@ impl PastaEngine {
         // Step 1: Load files from directory
         let loaded = DirectoryLoader::load(path)?;
 
-        // Step 2: Parse all .pasta files (collect errors)
-        let mut all_scenes = Vec::new();
-        let mut all_global_words = Vec::new();
+        // Step 2: Parse all .pasta files using parser2 (collect errors)
+        let mut parsed_files: Vec<PastaFile> = Vec::new();
         let mut parse_errors = Vec::new();
 
         for pasta_file in &loaded.pasta_files {
-            match parse_file(pasta_file) {
+            match parser2::parse_file(pasta_file) {
                 Ok(ast) => {
-                    all_scenes.extend(ast.scenes);
-                    all_global_words.extend(ast.global_words);
+                    parsed_files.push(ast);
                 }
                 Err(e) => {
                     // Collect parse errors, fail-fast on other errors
@@ -148,17 +146,41 @@ impl PastaEngine {
             });
         }
 
-        // Step 4: Merge all ASTs into a single AST
-        let merged_ast = PastaFile {
-            path: loaded.script_root.clone(),
-            global_words: all_global_words,
-            scenes: all_scenes,
-            span: crate::parser::Span::new(1, 1, 1, 0),
+        // Step 4: Merge all ASTs into items-based structure
+        let mut all_items: Vec<FileItem> = Vec::new();
+        for file in &parsed_files {
+            all_items.extend(file.items.iter().cloned());
+        }
+
+        // Create merged PastaFile
+        let merged_file = PastaFile {
+            path: loaded.script_root.clone().into(),
+            items: all_items,
+            span: parser2::Span::default(), // Merged file has no meaningful span
         };
 
-        // Step 5: Transpile merged AST to Rune source using two-pass transpiler
-        let (rune_source, scene_registry, word_registry) =
-            Transpiler::transpile_with_registry(&merged_ast)?;
+        // Step 5: Transpile using 2-pass strategy (transpiler2)
+        // Prepare registries and buffer
+        let mut scene_registry = SceneRegistry::new();
+        let mut word_def_registry = WordDefRegistry::new();
+        let mut buffer: Vec<u8> = Vec::new();
+
+        // Pass 1: Register definitions and generate modules
+        Transpiler2::transpile_pass1(
+            &merged_file,
+            &mut scene_registry,
+            &mut word_def_registry,
+            &mut buffer,
+        )
+        .map_err(|e| e.into_pasta_error(Transpiler2Pass::Pass1))?;
+
+        // Pass 2: Generate selectors
+        Transpiler2::transpile_pass2(&scene_registry, &mut buffer)
+            .map_err(|e| e.into_pasta_error(Transpiler2Pass::Pass2))?;
+
+        // Convert buffer to String
+        let rune_source = String::from_utf8(buffer)
+            .map_err(|e| PastaError::RuneRuntimeError(format!("UTF-8 conversion error: {}", e)))?;
 
         #[cfg(debug_assertions)]
         {
@@ -172,7 +194,7 @@ impl PastaEngine {
 
         // Step 7: Build word table for word expansion (with its own random selector)
         let word_random_selector: Box<dyn RandomSelector> = Box::new(DefaultRandomSelector::new());
-        let word_table = WordTable::from_word_def_registry(word_registry, word_random_selector);
+        let word_table = WordTable::from_word_def_registry(word_def_registry, word_random_selector);
 
         // Step 8: Build Rune sources with main.rn
         let mut context = Context::with_default_modules().map_err(|e| {
