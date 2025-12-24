@@ -3,15 +3,23 @@
 ---
 **Feature**: `call-unified-scope-resolution`  
 **Discovery Scope**: Extension（既存システム拡張）  
-**Key Findings**:
-1. WordTable の 2段階検索＋マージ実装が完全なリファレンスとして存在
-2. SceneTable の prefix_index は RadixMap ベースで word と同一パターン
-3. TranspileContext に `current_module` 管理機能が既存（word lookup 用）
+**Last Updated**: 2025-12-24  
+**Key Findings** (Updated):
+1. ✅ WordTable の 2段階検索＋マージ実装が完全なリファレンスとして存在
+2. ✅ `JumpTarget` 列挙型は削除済み - `CallScene.target` は単純な `String` 型
+3. ✅ `TranspileContext2.current_module()` は既に実装済み（単語登録で使用中）
+4. ✅ Transpiler層は `code_generator.rs` に刷新済み（`generate_call_scene()` を修正対象）
 ---
 
 ## Summary
 
-本機能は Call 文（＞シーン）のスコープ解決を単語検索（＠単語）と統一する拡張です。既存の WordTable 実装パターンを SceneTable に適用し、Transpiler から Runtime への module_name 引き渡しを追加します。
+本機能は Call 文（＞シーン）のスコープ解決を単語検索（＠単語）と統一する拡張です。
+
+**2025-12-24 更新**: パーサー・トランスパイラー刷新により実装スコープが縮小：
+- **Parser層**: 変更不要（`JumpTarget` 削除済み、`＊` 構文は非サポート）
+- **Transpiler層**: `code_generator.rs` の `generate_call_scene()` のみ修正
+- **Runtime層**: `SceneTable.find_scene_merged()` 追加
+- **Stdlib層**: `select_scene_to_id()` シグネチャ変更
 
 ## Research Log
 
@@ -19,7 +27,7 @@
 
 - **Context**: 単語検索のスコープ解決実装を確認し、シーン検索への流用可能性を調査
 - **Sources Consulted**: 
-  - [src/runtime/words.rs](src/runtime/words.rs) L88-L128 `collect_word_candidates()`
+  - [src/runtime/words.rs](src/runtime/words.rs) L106-L150 `collect_word_candidates()`
 - **Findings**:
   - 検索キー形式: ローカル = `:module_name:key`、グローバル = `key`
   - Step 1: ローカル検索 `iter_prefix(":module:key")`
@@ -29,69 +37,37 @@
   - 同一パターンを SceneTable に適用可能
   - `:` プレフィックスによるローカル/グローバル区別が確立済み
 
-### SceneTable の現在の検索ロジック
+### Transpiler (CodeGenerator) の Call 文処理 ✅ 2025-12-24 更新
 
-- **Context**: 現在の resolve_scene_id() の構造を確認
+- **Context**: パーサー刷新後の Call 文処理を確認
 - **Sources Consulted**: 
-  - [src/runtime/scene.rs](src/runtime/scene.rs) L131-L180 `resolve_scene_id()`
+  - [src/transpiler/code_generator.rs](src/transpiler/code_generator.rs) L186-191 `generate_call_scene()`
 - **Findings**:
-  - 現在は単純な前方一致検索（`iter_prefix(search_key)`）
-  - module_name 引数なし → スコープ区別不可
-  - キャッシュ機構は `(search_key, filters)` ベース
+  - 現在の生成コード: `pasta::call(ctx, "{target}")`
+  - `JumpTarget` 列挙型は削除済み、`CallScene.target` は単純な `String`
+  - `self.context.current_module()` は利用可能（`generate_word()` で使用実績あり）
 - **Implications**: 
-  - `find_scene_merged(module_name, prefix)` メソッド追加が必要
-  - キャッシュキーに module_name を追加する必要あり
+  - `module_name` を第2引数として追加: `pasta::call(ctx, "{target}", "{module_name}")`
+  - シンプルな1箇所の変更で対応可能
 
-### prefix_index への登録キー形式
-
-- **Context**: SceneRegistry がどのようなキーで prefix_index に登録しているか確認
-- **Sources Consulted**: 
-  - [src/transpiler/scene_registry.rs](src/transpiler/scene_registry.rs) L73-L87 `register_global()`
-  - [src/transpiler/scene_registry.rs](src/transpiler/scene_registry.rs) L106-L129 `register_local()`
-  - [src/runtime/scene.rs](src/runtime/scene.rs) L89-L112 `from_scene_registry()`
-- **Findings**:
-  - グローバル: `fn_name = "{name}_{counter}::__start__"`
-  - ローカル: `fn_name = "{parent}_{parent_counter}::{local}_{local_counter}"`
-  - prefix_index への登録は `fn_name` をそのまま使用
-  - 現在は `:` プレフィックスによるスコープ区別なし
-- **Implications**: 
-  - Option 1: prefix_index 登録時にローカルシーンのみ `:parent:` プレフィックスを付与
-  - Option 2: 検索時に動的にキーを構築（word と同様）
-  - **採用**: Option 2（既存の fn_name 形式を変更せず、検索ロジックで対応）
-
-### Transpiler の Call 文処理
-
-- **Context**: 現在の Call 文がどのように Rune コードに変換されているか確認
-- **Sources Consulted**: 
-  - [src/transpiler/mod.rs](src/transpiler/mod.rs) L398-L436 `transpile_statement_pass2_to_writer()`
-- **Findings**:
-  - 生成コード: `crate::pasta::call(ctx, "{search_key}", #{filters}, [args])`
-  - `context.current_module()` は存在するが Call には未使用
-  - JumpTarget::Local/Global どちらも同じ `search_key` 変換で処理
-- **Implications**: 
-  - `module_name` を第3引数として追加: `call(ctx, scene, module_name, filters, args)`
-  - stdlib の `select_scene_to_id` 関数シグネチャも変更必要
-
-### TranspileContext の module 管理
+### TranspileContext2 の current_module ✅ 2025-12-24 確認
 
 - **Context**: current_module がどのように設定・使用されているか確認
 - **Sources Consulted**: 
-  - [src/transpiler/mod.rs](src/transpiler/mod.rs) L22-L31 `TranspileContext`
-  - [src/transpiler/mod.rs](src/transpiler/mod.rs) L102-L109 `set_current_module()` / `current_module()`
+  - [src/transpiler/context.rs](src/transpiler/context.rs) `current_module()` / `set_current_module()`
 - **Findings**:
   - `current_module: String` フィールドが既存
-  - `set_current_module()` / `current_module()` メソッドが既存
-  - 単語参照の Rune コード生成で使用中
+  - 単語登録（`word_registry.register_local()`）で使用中
+  - `generate_word()` で `self.context.current_module()` として参照
 - **Implications**: 
-  - Call 文処理でも `context.current_module()` を使用するだけで対応可能
-  - 追加実装不要
+  - **追加実装不要** - `generate_call_scene()` でも同じ方法で使用可能
 
 ## Architecture Pattern Evaluation
 
-| Option | Description | Strengths | Risks / Limitations | Notes |
-|--------|-------------|-----------|---------------------|-------|
-| A: Extend existing | SceneTable に `find_scene_merged()` 追加、transpiler/stdlib シグネチャ変更 | 最小変更、word パターン再利用 | 4ファイル変更が連鎖 | **採用** |
-| B: New component | ScopeResolver 新規作成 | 責務分離 | 過剰設計、word との非対称性 | 不採用 |
+| Option             | Description                                                                | Strengths                     | Risks / Limitations         | Notes    |
+| ------------------ | -------------------------------------------------------------------------- | ----------------------------- | --------------------------- | -------- |
+| A: Extend existing | SceneTable に `find_scene_merged()` 追加、transpiler/stdlib シグネチャ変更 | 最小変更、word パターン再利用 | 4ファイル変更が連鎖         | **採用** |
+| B: New component   | ScopeResolver 新規作成                                                     | 責務分離                      | 過剰設計、word との非対称性 | 不採用   |
 
 ## Design Decisions
 

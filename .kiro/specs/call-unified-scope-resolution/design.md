@@ -112,13 +112,13 @@ sequenceDiagram
 
 ## Requirements Traceability
 
-| Requirement             | Summary               | Components            | Interfaces                              | Flows           |
-| ----------------------- | --------------------- | --------------------- | --------------------------------------- | --------------- |
-| 1.1, 1.2, 1.4           | スコープ統合検索      | SceneTable            | collect_scene_candidates()              | Call 実行フロー |
-| 2.2, 2.4                | シンプルなCall構文    | CodeGenerator, stdlib | generate_call_scene()                   | Pass2 処理      |
+| Requirement             | Summary               | Components            | Interfaces                                     | Flows           |
+| ----------------------- | --------------------- | --------------------- | ---------------------------------------------- | --------------- |
+| 1.1, 1.2, 1.4           | スコープ統合検索      | SceneTable            | collect_scene_candidates()                     | Call 実行フロー |
+| 2.2, 2.4                | シンプルなCall構文    | CodeGenerator, stdlib | generate_call_scene()                          | Pass2 処理      |
 | 3.1, 3.2, 3.3, 3.4, 3.5 | ランタイム解決一貫性  | SceneTable            | collect_scene_candidates(), resolve_scene_id() | 2段階検索       |
-| 4.2, 4.3, 4.4           | 既存テスト互換性      | 全コンポーネント      | 既存 API 維持                           | 回帰テスト      |
-| 5.1, 5.2, 5.3           | SPECIFICATION.md 更新 | ドキュメント          | -                                       | -               |
+| 4.2, 4.3, 4.4           | 既存テスト互換性      | 全コンポーネント      | 既存 API 維持                                  | 回帰テスト      |
+| 5.1, 5.2, 5.3           | SPECIFICATION.md 更新 | ドキュメント          | -                                              | -               |
 
 > **Note**: Requirement 2.1, 2.3, 4.1, 5.4 は「達成済み」または「不要」のため設計対象外
 
@@ -404,13 +404,13 @@ let search_key = if scene.parent.is_some() {
 
 ### Unit Tests
 
-| Test Case                           | Component  | Requirement   |
-| ----------------------------------- | ---------- | ------------- |
-| collect_scene_candidates_local_only        | SceneTable | 3.1, 3.2      |
-| collect_scene_candidates_global_only       | SceneTable | 3.1, 3.2      |
-| collect_scene_candidates_local_and_global  | SceneTable | 1.1, 1.2, 3.3 |
-| collect_scene_candidates_prefix_match      | SceneTable | 1.1           |
-| resolve_scene_id_with_cache                | SceneTable | 3.4           |
+| Test Case                                 | Component  | Requirement   |
+| ----------------------------------------- | ---------- | ------------- |
+| collect_scene_candidates_local_only       | SceneTable | 3.1, 3.2      |
+| collect_scene_candidates_global_only      | SceneTable | 3.1, 3.2      |
+| collect_scene_candidates_local_and_global | SceneTable | 1.1, 1.2, 3.3 |
+| collect_scene_candidates_prefix_match     | SceneTable | 1.1           |
+| resolve_scene_id_with_cache               | SceneTable | 3.4           |
 
 ### Integration Tests
 
