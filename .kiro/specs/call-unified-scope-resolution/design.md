@@ -162,7 +162,7 @@ impl SceneTable {
     /// 3. Merge: 両方の SceneId をマージ
     ///
     /// # Arguments
-    /// * `module_name` - グローバルシーン名（Call 実行コンテキストがローカルシーン内でも、親グローバルシーン名）
+    /// * `module_name` - グローバルシーン名
     /// * `prefix` - 検索プレフィックス
     ///
     /// # Returns
@@ -234,7 +234,6 @@ pub fn find_scene_merged(
 **Algorithm Notes**:
 - WordTable.collect_word_candidates() と完全同一パターン
 - ローカル優先なし、完全ランダムマージ
-- **重要**: `module_name` は常に **グローバルシーン名（親グローバルシーン）**。ローカルシーン内で Call を実行していても、`module_name` はそのローカルシーンの親グローバルシーン名。Step 1 ローカル検索 `:{module_name}:` は「現在のグローバルコンテキスト内のローカルシーン」を検索することに相当
 
 ##### State Management
 
@@ -303,10 +302,7 @@ struct SceneCacheKey {
 **Rune API Contract Details**:
 - Rune VM が生成コードを実行時に `pasta::call(ctx, target, module_name)` を呼び出し
 - `pasta::call()` は stdlib の `select_scene_to_id(scene, module_name, filters)` にルーティング
-- `module_name` は **常にグローバルシーン名（親グローバルシーン）**
-  - グローバルシーン「会話_1」内での Call 実行: `module_name = "会話_1"`
-  - グローバルシーン「会話_1」のローカルシーン「選択肢_1」内での Call 実行: `module_name = "会話_1"`（親グローバルシーン名）
-  - これにより、Step 1 ローカル検索で「現在のグローバルコンテキスト内のローカルシーン」を自動的に候補化
+- `module_name` はグローバルシーン名（WordTable の `search_word(module_name, key)` と同一形式）
 
 ### Stdlib Layer
 
@@ -353,7 +349,7 @@ pub fn select_scene_to_id(
 ```
 
 **実装上の注意点**:
-- `module_name` は CodeGenerator が `context.current_module()` から取得（既実装）。常に **グローバルシーン名** を返却
+- `module_name` は CodeGenerator が `context.current_module()` から取得（既実装）
 - `find_scene_merged()` が2段階検索を実行（上記 pseudo-code 参照）
 - 返却値は 1-based SceneId（既存慣例維持、Vec index + 1）
 - 参照: `word_expansion()` 関数（stdlib/mod.rs）が同様に `module_name` を受け取り実装済み
