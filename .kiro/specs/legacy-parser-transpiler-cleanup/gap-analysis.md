@@ -46,8 +46,10 @@
 | `src/lib.rs` (Line 52)          | `pub mod transpiler;`                                                    | クレート公開API  |
 | `src/lib.rs` (Line 61-64)       | `pub use parser::{...13個の型...}`                                       | 公開型の再export |
 | `src/lib.rs` (Line 70)          | `pub use transpiler::{TranspileContext, Transpiler}`                     | 公開型の再export |
-| `src/cache.rs` (Line 98-99)     | `use crate::parser::parse_str;`<br/>`use crate::transpiler::Transpiler;` | テストコード内   |
+| `src/cache.rs` (Line 96-233)    | `#[cfg(test)] mod tests { use crate::parser::...; use crate::transpiler::...; }` | テストモジュール全体 |
 | `src/runtime/words.rs` (Line 8) | `use crate::transpiler::{WordDefRegistry, WordEntry};`                   | 実装コード       |
+
+**注記**: `src/stdlib/mod.rs` は WordTable のみ使用、transpiler への直接参照なし（修正不要）
 | `src/stdlib/mod.rs` (Line 394)  | `use crate::transpiler::WordDefRegistry;`                                | テストコード内   |
 
 **注記**: `WordDefRegistry` と `WordEntry` は現在 `src/registry/` に移動済み（[pasta-test-missing-entry-hash仕様](../.kiro/specs/completed/pasta-test-missing-entry-hash/)で対応）
@@ -101,21 +103,20 @@
 - **必要な操作**:
   - `src/lib.rs`: `pub mod parser;` と `pub use parser::{...}` を削除
   - `src/lib.rs`: `pub mod transpiler;` と `pub use transpiler::{...}` を削除
-  - `src/cache.rs`: テスト内の `use crate::parser::...` を削除またはコメントアウト
-  - `src/runtime/words.rs`: `use crate::transpiler::{WordDefRegistry, WordEntry}` → `use crate::registry::{WordDefRegistry, WordEntry}`
-  - `src/stdlib/mod.rs`: `use crate::transpiler::WordDefRegistry` → `use crate::registry::WordDefRegistry`
+  - `src/cache.rs` (Line 96-233): `#[cfg(test)]` モジュール全体を削除（旧parser/transpiler依存テスト）
+  - `src/runtime/words.rs` (Line 8): `use crate::transpiler::{WordDefRegistry, WordEntry}` → `use crate::registry::{WordDefRegistry, WordEntry}`
 - **検証**: `cargo check` 成功
 
 #### Requirement 3: テストコード層のビルド復旧
 - **必要な操作**:
-  - 12個のテストファイルから `use pasta::parser::...` を削除またはコメントアウト
-  - 12個のテストファイルから `use pasta::transpiler::...` を削除またはコメントアウト
+  - 22個のテストファイルを完全削除（カテゴリA: parser 12個、カテゴリB: transpiler 7個、カテゴリC: 統合3個）
+  - 詳細リストは「1.2 Dependencies and References」参照
 - **検証**: `cargo check --all` 成功
 
 #### Requirement 4: テスト実行の復旧
 - **必要な操作**:
-  - テストロジックを parser2/transpiler2 に移行（または無効化）
-  - `README.md` のサンプルコードを更新
+  - テストファイル削除後、残存テストが正常に実行されることを確認
+  - `README.md` (Line 37-43): レガシースタック使用例のコードブロックを削除
 - **検証**: `cargo test --all` 成功
 
 #### Requirement 5: モジュール名の正規化
@@ -152,9 +153,11 @@
 
 ### 2.2 Identified Gaps and Constraints
 
-#### Gap 1: Registry依存の整理
-- **状態**: `WordDefRegistry`, `WordEntry` は既に `src/registry/` に移動済み
-- **対応**: `src/runtime/words.rs` と `src/stdlib/mod.rs` を修正するのみ
+#### Gap 1: Registry依存の整理（議題2で確認済み）
+- **状態**: `WordDefRegistry`, `WordEntry` は既に `src/registry/` に実装済み
+- **旧transpilerの役割**: `pub use crate::registry::{...}` で再export（後方互換）
+- **対応**: `src/runtime/words.rs` (Line 8) を `use crate::registry::` に変更
+- **対応**: `src/stdlib/mod.rs` は WordTable のみ使用、変更不要
 - **制約**: なし
 
 #### Gap 2: テストコードの移行戦略
@@ -224,25 +227,21 @@
    - `pub mod transpiler;` 削除
    - `pub use parser::{...}` 削除（13型）
    - `pub use transpiler::{...}` 削除（2型）
-3. `src/runtime/words.rs` 修正:
-   - `use crate::transpiler::{WordDefRegistry, WordEntry}` → `use crate::registry::{WordDefRegistry, WordEntry}`
-4. `src/stdlib/mod.rs` 修正:
-   - `use crate::transpiler::WordDefRegistry` → `use crate::registry::WordDefRegistry`
-5. `src/cache.rs` 修正（テストコード）:
-   - `use crate::parser::parse_str;` をコメントアウト
-   - `use crate::transpiler::Transpiler;` をコメントアウト
-   - テスト関数を `#[ignore]` または削除
+3. `src/runtime/words.rs` 修正 (Line 8):
+   - `use crate::transpiler::{WordDefRegistry, WordEntry};` → `use crate::registry::{WordDefRegistry, WordEntry};`
+4. `src/cache.rs` 修正 (Line 96-233):
+   - `#[cfg(test)]` モジュール全体を削除（旧parser/transpiler依存テスト）
 6. **検証**: `cargo check` 成功
 7. **コミット**: `git add -A && git commit -m "refactor(cleanup): 旧parser/transpilerディレクトリ削除とソースコード修正"`
 
 ##### Phase 3: テストコードビルド復旧
-1. 12個のテストファイルを完全削除:
-   - `tests/pasta_parser_*.rs` (5ファイル)
-   - `tests/pasta_transpiler_*.rs` (5ファイル)
-   - `tests/pasta_integration_e2e_simple_test.rs`
-   - `tests/pasta_engine_rune_*_test.rs` (旧API依存のもの)
-2. `README.md` 修正:
-   - サンプルコードを parser2/transpiler2 API に更新（または削除）
+1. 22個のテストファイルを完全削除:
+   - カテゴリA: `tests/pasta_parser_*.rs` (12ファイル)
+   - カテゴリB: `tests/pasta_transpiler_*.rs` (7ファイル)
+   - カテゴリC: `tests/pasta_integration_e2e_simple_test.rs`, `tests/pasta_engine_rune_compile_test.rs`, `tests/pasta_engine_rune_vm_comprehensive_test.rs`
+2. `README.md` 修正 (Line 37-43):
+   - レガシースタック使用例のコードブロックを削除
+   - 「現行スタック（推奨）」のみ残す
 3. **検証**: `cargo check --all` 成功
 4. **コミット**: `git add -A && git commit -m "refactor(cleanup): 旧parser/transpilerテスト削除とREADME更新"`
 
