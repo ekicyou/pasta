@@ -8,7 +8,7 @@
 use pasta::runtime::scene::SceneTable;
 use pasta::runtime::random::DefaultRandomSelector;
 use pasta::runtime::words::WordTable;
-use pasta::transpiler::{SceneRegistry, WordDefRegistry};
+use pasta::registry::{SceneRegistry, WordDefRegistry};
 use std::collections::HashMap;
 
 /// Helper to create a test SceneTable with scenes
