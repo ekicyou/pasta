@@ -19,12 +19,12 @@ Runtime (Rune VM) → IR Output (ScriptEvent)
 
 Pastaは `parser2` + `transpiler2` スタックを使用しています：
 
-| モジュール | 文法ファイル | 状態 | 用途 |
-|------------|--------------|------|------|
-| `pasta::parser2` | `grammar.pest` | **現行** | engine.rsで使用 |
-| `pasta::transpiler2` | - | **現行** | 2-pass トランスパイル |
-| `pasta::parser` | `pasta.pest` | レガシー（非推奨） | 後方互換性のため維持 |
-| `pasta::transpiler` | - | レガシー（非推奨） | 後方互換性のため維持 |
+| モジュール           | 文法ファイル   | 状態               | 用途                  |
+| -------------------- | -------------- | ------------------ | --------------------- |
+| `pasta::parser2`     | `grammar.pest` | **現行**           | engine.rsで使用       |
+| `pasta::transpiler2` | -              | **現行**           | 2-pass トランスパイル |
+| `pasta::parser`      | `pasta.pest`   | レガシー（非推奨） | 後方互換性のため維持  |
+| `pasta::transpiler`  | -              | レガシー（非推奨） | 後方互換性のため維持  |
 
 #### 使用方法
 
