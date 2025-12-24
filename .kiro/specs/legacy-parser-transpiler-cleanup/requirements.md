@@ -22,86 +22,94 @@
 
 ---
 
-## 概要
+## Requirements
 
-本仕様は、pastaプロジェクトにおける旧parser/transpiler実装の完全削除と、parser2/transpiler2モジュールの正規化（名称から「2」を除去）を管理する。ランタイム層が新実装（parser2/transpiler2）への移行を完了したため、レガシーコードを安全に削除し、コードベースを整理する。
+### Requirement 1: 旧実装ディレクトリの削除
+**目的:** 開発者として、パーサー２・トランスパイラー２への移行が完了したため、旧実装コードを削除し、コードベースを整理したい
+
+#### Acceptance Criteria
+1. When 旧実装削除を実施する場合、Pastaプロジェクトは `src/parser/` ディレクトリを完全に削除する
+2. When 旧実装削除を実施する場合、Pastaプロジェクトは `src/transpiler/` ディレクトリを完全に削除する
+3. When ディレクトリ削除後、Pastaプロジェクトは削除された旧モジュールへの全参照を特定する
 
 ---
 
-## Requirements
-
-### Requirement 1: レガシーディレクトリの削除
-**Objective:** As a プロジェクトメンテナ, I want 旧parser/transpilerディレクトリを完全削除する, so that コードベースが新実装のみを含む状態になる
+### Requirement 2: ソースコード層のビルド復旧
+**目的:** 開発者として、旧実装削除後にソースコードのビルドエラーを修正し、ライブラリとして正常にコンパイル可能な状態を維持したい
 
 #### Acceptance Criteria
-1. When レガシーディレクトリ削除を実行する, the Pasta Build System shall `src/parser/` ディレクトリを完全に削除する
-2. When レガシーディレクトリ削除を実行する, the Pasta Build System shall `src/transpiler/` ディレクトリを完全に削除する
-3. The Pasta Build System shall `src/parser2/` と `src/transpiler2/` ディレクトリを保持する
+1. When 旧parser/transpiler参照を削除する場合、Pastaプロジェクトは `src/lib.rs` から旧モジュールのexport宣言を削除する
+2. When 旧parser/transpiler参照を削除する場合、Pastaプロジェクトは他のソースファイル（`src/engine.rs`, `src/runtime/`, etc.）から旧モジュールへの `use` 文と参照コードを削除する
+3. When ソースコード修正を完了する場合、Pastaプロジェクトは `cargo check` コマンドでエラーなくコンパイルを成功させる
 
-### Requirement 2: ソースコードコンパイル成功
-**Objective:** As a 開発者, I want ソースコード内の旧実装参照を削除する, so that `cargo check` が成功する
+---
 
-#### Acceptance Criteria
-1. When レガシーディレクトリ削除後にビルドを実行する, the Pasta Build System shall すべての `src/` 配下ファイルでコンパイルエラーが0件である
-2. If `src/lib.rs` や他のモジュールが旧parser/transpilerを参照している, then the Developer shall 該当参照コードを削除する
-3. When `cargo check` を実行する, the Cargo Build Tool shall 終了コード0を返す
-
-### Requirement 3: 全ターゲットコンパイル成功
-**Objective:** As a 開発者, I want テストコード内の旧実装参照を削除する, so that `cargo check --all` が成功する
+### Requirement 3: テストコード層のビルド復旧
+**目的:** 開発者として、旧実装削除後にテストコードを整理し、残存テストがコンパイル可能な状態を維持したい
 
 #### Acceptance Criteria
-1. When 全ターゲットビルドを実行する, the Pasta Build System shall `tests/` 配下のすべてのテストファイルでコンパイルエラーが0件である
-2. If テストファイルが旧parser/transpilerをインポートしている, then the Developer shall 該当インポート文を削除する
-3. When `cargo check --all` を実行する, the Cargo Build Tool shall 終了コード0を返す
-4. When コンパイル成功を確認する, the Developer shall 変更内容をGitコミットする
+1. When 旧parser/transpiler依存テストを削除する場合、Pastaプロジェクトは `tests/` 配下の旧実装専用テストファイル（12個）を完全に削除する
+2. When テストコード修正を完了する場合、Pastaプロジェクトは `cargo check --all` コマンドでエラーなくコンパイルを成功させる
+3. When ビルド修正を完了する場合、Pastaプロジェクトは修正内容を Git にコミットする
 
-### Requirement 4: 全テスト成功（旧実装削除後）
-**Objective:** As a QA担当者, I want 旧実装削除後も全テストが成功する, so that 機能退行がないことを確認できる
+**削除対象テストファイル（12個）**:
+- `tests/pasta_parser_*.rs` (5ファイル)
+- `tests/pasta_transpiler_*.rs` (5ファイル)  
+- `tests/pasta_integration_e2e_simple_test.rs`
+- `tests/pasta_engine_rune_*_test.rs` (旧API依存のもの)
 
-#### Acceptance Criteria
-1. When `cargo test --all` を実行する, the Pasta Test Framework shall すべてのテストが成功する（失敗0件）
-2. If テストが旧実装固有の機能をテストしている, then the Developer shall 該当テストを削除または新実装向けに修正する
-3. When テスト修正が完了する, the Developer shall 変更内容をGitコミットする
+**注記**: parser2/transpiler2 用のテストは別仕様で追加予定
 
-### Requirement 5: モジュール名正規化（「2」除去）
-**Objective:** As a 開発者, I want parser2/transpiler2の名称から「2」を除去する, so that モジュール名が正規化される
+---
 
-#### Acceptance Criteria
-1. When モジュール名変更を実行する, the Developer shall `src/parser2/` を `src/parser/` にリネームする
-2. When モジュール名変更を実行する, the Developer shall `src/transpiler2/` を `src/transpiler/` にリネームする
-3. When モジュール名変更を実行する, the Developer shall すべての参照コード（`use`, `mod`, `extern`文）を新名称に更新する
-4. The Pasta Build System shall モジュールパス変更後に `src/lib.rs` のエクスポート宣言が正しく機能する
-
-### Requirement 6: ビルド成功（正規化後）
-**Objective:** As a 開発者, I want モジュール名変更後もビルドが成功する, so that リネームが正しく反映されたことを確認できる
+### Requirement 4: テスト実行の復旧
+**目的:** 開発者として、テストファイル削除後も残存テストが正常に実行されることを確認したい
 
 #### Acceptance Criteria
-1. When `cargo check` を実行する, the Cargo Build Tool shall 終了コード0を返す
-2. When `cargo check --all` を実行する, the Cargo Build Tool shall 終了コード0を返す
-3. If ビルドエラーが発生する, then the Developer shall モジュールパス参照を修正する
+1. When テストファイル削除後、Pastaプロジェクトは残存するparser2/transpiler2ベースのテストが正常に実行されることを確認する
+2. When テスト修正を完了する場合、Pastaプロジェクトは `cargo test --all` コマンドで全テストを成功させる
+3. When テスト修正を完了する場合、Pastaプロジェクトは修正内容を Git にコミットする
 
-### Requirement 7: テスト成功（正規化後）
-**Objective:** As a QA担当者, I want モジュール名変更後も全テストが成功する, so that リネームによる機能退行がないことを確認できる
+---
 
-#### Acceptance Criteria
-1. When `cargo test --all` を実行する, the Pasta Test Framework shall すべてのテストが成功する（失敗0件）
-2. If テストがモジュールパスを直接参照している, then the Developer shall テストコードを新名称に更新する
-3. When テスト成功を確認する, the Developer shall 変更内容をGitコミットする
-
-### Requirement 8: 未使用テストファイルの削除
-**Objective:** As a プロジェクトメンテナ, I want testsディレクトリ内の未使用非Rustファイルを削除する, so that テストfixturesが整理される
+### Requirement 5: モジュール名の正規化（parser2 → parser）
+**目的:** 開発者として、旧実装削除後に parser2/transpiler2 の「２」を外し、正式名称としてモジュールを統一したい
 
 #### Acceptance Criteria
-1. When 未使用ファイル検出を実行する, the Developer shall `tests/` 配下の `*.rs` 以外のファイルを列挙する
-2. When 各非Rustファイルを検証する, the Developer shall 現存テストから参照されていないファイルを特定する
-3. If ファイルが未参照である, then the Developer shall 該当ファイルを削除する
-4. The Pasta Build System shall 削除後も `cargo test --all` が成功する
+1. When モジュール名を正規化する場合、Pastaプロジェクトは `src/parser2/` ディレクトリを `src/parser_new/` に一時的にリネームする
+2. When モジュール名を正規化する場合、Pastaプロジェクトは `src/transpiler2/` ディレクトリを `src/transpiler_new/` に一時的にリネームする
+3. When リネーム後、Pastaプロジェクトは `src/parser_new/` を `src/parser/` に最終リネームする
+4. When リネーム後、Pastaプロジェクトは `src/transpiler_new/` を `src/transpiler/` に最終リネームする
+5. When ディレクトリリネーム後、Pastaプロジェクトは全ソースコードとテストコードの `use` 文とモジュール宣言を新しい名前に修正する
 
-### Requirement 9: 最終検証とコミット
-**Objective:** As a プロジェクトメンテナ, I want 全変更後に完全な検証を実施する, so that クリーンアップが完全であることを確認できる
+---
+
+### Requirement 6: モジュール名正規化後のビルド復旧
+**目的:** 開発者として、モジュール名変更後にビルドとテストが成功することを確認し、安定した状態を維持したい
 
 #### Acceptance Criteria
-1. When 最終検証を実行する, the Cargo Build Tool shall `cargo check --all` が成功する
-2. When 最終検証を実行する, the Pasta Test Framework shall `cargo test --all` が成功する（失敗0件）
-3. When 全検証が成功する, the Developer shall すべての変更をGitコミットする
-4. The Git Repository shall レガシーコード削除、モジュール正規化、テストクリーンアップの各段階でコミット履歴を持つ
+1. When モジュール名変更後、Pastaプロジェクトは `cargo check` コマンドでエラーなくコンパイルを成功させる
+2. When モジュール名変更後、Pastaプロジェクトは `cargo test --all` コマンドで全テストを成功させる
+3. When ビルド・テスト成功後、Pastaプロジェクトは修正内容を Git にコミットする
+
+---
+
+### Requirement 7: 未使用テストフィクスチャの削除
+**目的:** 開発者として、旧実装専用のテストフィクスチャや補助ファイルを削除し、テストディレクトリを整理したい
+
+#### Acceptance Criteria
+1. When 未使用ファイルを検索する場合、Pastaプロジェクトは `tests/` ディレクトリ配下の `*.rs` 以外のファイルをリストアップする
+2. When 未使用ファイルを判定する場合、Pastaプロジェクトは残存テストコードから参照されていないファイルを特定する
+3. When 未使用ファイルを削除する場合、Pastaプロジェクトは参照されていないファイルのみを削除する
+4. When ファイル削除後、Pastaプロジェクトは `cargo test --all` コマンドで全テストを成功させる
+
+---
+
+### Requirement 8: 最終検証とコミット
+**目的:** 開発者として、全作業完了後にビルドとテストが正常に動作することを最終確認し、クリーンな状態でコミットしたい
+
+#### Acceptance Criteria
+1. When 最終検証を実施する場合、Pastaプロジェクトは `cargo check --all` コマンドでエラーなくコンパイルを成功させる
+2. When 最終検証を実施する場合、Pastaプロジェクトは `cargo test --all` コマンドで全テストを成功させる
+3. When 最終検証成功後、Pastaプロジェクトは全変更を Git にコミットする
+4. The Pastaプロジェクトは、旧実装関連のコードとファイルが完全に削除され、parser/transpiler が正規化された状態を維持する
