@@ -118,6 +118,15 @@ pub enum PastaError {
     /// Word definition not found.
     #[error("単語定義 @{key} が見つかりません")]
     WordNotFound { key: String },
+
+    /// Transpiler2 error with pass phase information.
+    #[error("Transpiler2 {pass:?} error: {message}")]
+    Transpiler2Error {
+        /// Pass phase identifier (Pass1 or Pass2).
+        pass: Transpiler2Pass,
+        /// Original transpiler2 error message.
+        message: String,
+    },
 }
 
 /// Individual parse error information for MultipleParseErrors.
@@ -196,4 +205,11 @@ impl From<&PastaError> for Option<ParseErrorInfo> {
             _ => None,
         }
     }
+}
+
+/// Pass phase for transpiler2 execution.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Transpiler2Pass {
+    Pass1,
+    Pass2,
 }

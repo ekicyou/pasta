@@ -1,13 +1,13 @@
 {
     "feature_name": "engine-parser2-transpiler2-migration",
     "created_at": "2025-12-23T00:00:00Z",
-    "updated_at": "2025-12-23T00:00:00Z",
+    "updated_at": "2025-12-24T00:00:00Z",
     "language": "ja",
-    "phase": "requirements-generated",
+    "phase": "requirements-approved",
     "approvals": {
         "requirements": {
             "generated": true,
-            "approved": false
+            "approved": true
         },
         "design": {
             "generated": false,

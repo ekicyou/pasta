@@ -112,8 +112,16 @@ pub struct PastaParser2;
 /// }
 /// ```
 pub fn parse_str(source: &str, filename: &str) -> Result<PastaFile, PastaError> {
-    let pairs = PastaParser2::parse(Rule::file, source)
-        .map_err(|e| PastaError::PestError(format!("Parse error in {}: {}", filename, e)))?;
+    let pairs = PastaParser2::parse(Rule::file, source).map_err(|e| {
+        let (line, column) = e.line_col();
+        let message = format!("Parse error in {} at {}:{}: {}", filename, line, column, e);
+        PastaError::ParseError {
+            file: filename.to_string(),
+            line,
+            column,
+            message,
+        }
+    })?;
 
     build_ast(pairs, filename)
 }
