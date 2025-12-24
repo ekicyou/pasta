@@ -44,11 +44,11 @@ pub mod engine;
 pub mod error;
 pub mod ir;
 mod loader;
-pub mod parser2;
+pub mod parser;
 pub mod registry;
 pub mod runtime;
 pub mod stdlib;
-pub mod transpiler2;
+pub mod transpiler;
 
 // Re-export commonly used types
 pub use cache::ParseCache;

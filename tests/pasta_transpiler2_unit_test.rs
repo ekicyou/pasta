@@ -7,9 +7,9 @@
 //!
 //! Note: CodeGenerator internal methods are tested via mod.rs internal tests.
 
-use pasta::parser2::{self, FnScope, Span};
+use pasta::parser::{self, FnScope, Span};
 use pasta::registry::{SceneRegistry, WordDefRegistry};
-use pasta::transpiler2::{TranspileContext2, TranspileError, Transpiler2};
+use pasta::transpiler::{TranspileContext2, TranspileError, Transpiler2};
 
 // ====================
 // TranspileContext2 Tests
@@ -78,14 +78,14 @@ fn test_context_resolve_function_unknown_global_scope() {
 fn test_context_file_attrs_accumulation() {
     let mut ctx = TranspileContext2::new();
 
-    let attr1 = pasta::parser2::Attr {
+    let attr1 = pasta::parser::Attr {
         key: "天気".to_string(),
-        value: pasta::parser2::AttrValue::AttrString("晴れ".to_string()),
+        value: pasta::parser::AttrValue::AttrString("晴れ".to_string()),
         span: Span::default(),
     };
-    let attr2 = pasta::parser2::Attr {
+    let attr2 = pasta::parser::Attr {
         key: "季節".to_string(),
-        value: pasta::parser2::AttrValue::AttrString("夏".to_string()),
+        value: pasta::parser::AttrValue::AttrString("夏".to_string()),
         span: Span::default(),
     };
 
@@ -96,7 +96,7 @@ fn test_context_file_attrs_accumulation() {
     assert_eq!(attrs.len(), 2);
     assert_eq!(
         attrs.get("天気"),
-        Some(&pasta::parser2::AttrValue::AttrString("晴れ".to_string()))
+        Some(&pasta::parser::AttrValue::AttrString("晴れ".to_string()))
     );
 }
 
@@ -105,24 +105,24 @@ fn test_context_merge_attrs_scene_priority() {
     let mut ctx = TranspileContext2::new();
 
     // File-level attr
-    let file_attr = pasta::parser2::Attr {
+    let file_attr = pasta::parser::Attr {
         key: "季節".to_string(),
-        value: pasta::parser2::AttrValue::AttrString("冬".to_string()),
+        value: pasta::parser::AttrValue::AttrString("冬".to_string()),
         span: Span::default(),
     };
     ctx.accumulate_file_attr(&file_attr);
 
     // Scene-level attrs override file-level
-    let scene_attrs = vec![pasta::parser2::Attr {
+    let scene_attrs = vec![pasta::parser::Attr {
         key: "季節".to_string(),
-        value: pasta::parser2::AttrValue::AttrString("夏".to_string()),
+        value: pasta::parser::AttrValue::AttrString("夏".to_string()),
         span: Span::default(),
     }];
 
     let merged = ctx.merge_attrs(&scene_attrs);
     assert_eq!(
         merged.get("季節"),
-        Some(&pasta::parser2::AttrValue::AttrString("夏".to_string()))
+        Some(&pasta::parser::AttrValue::AttrString("夏".to_string()))
     );
 }
 
@@ -174,7 +174,7 @@ fn test_error_internal() {
 
 #[test]
 fn test_transpile_to_string_empty_file() {
-    let file = pasta::parser2::PastaFile::new(std::path::PathBuf::from("test.pasta"));
+    let file = pasta::parser::PastaFile::new(std::path::PathBuf::from("test.pasta"));
     let result = Transpiler2::transpile_to_string(&file);
     assert!(result.is_ok());
 
@@ -187,7 +187,7 @@ fn test_transpile_to_string_empty_file() {
 #[test]
 fn test_transpile_pass1_scene_registration() {
     let source = "＊テスト\n  actor：hello\n";
-    let file = parser2::parse_str(source, "test.pasta").unwrap();
+    let file = parser::parse_str(source, "test.pasta").unwrap();
 
     let mut scene_registry = SceneRegistry::new();
     let mut word_registry = WordDefRegistry::new();
@@ -204,7 +204,7 @@ fn test_transpile_pass1_scene_registration() {
 #[test]
 fn test_transpile_pass1_word_registration() {
     let source = "＠挨拶：hello、hi\n＊シーン\n  actor：test\n";
-    let file = parser2::parse_str(source, "test.pasta").unwrap();
+    let file = parser::parse_str(source, "test.pasta").unwrap();
 
     let mut scene_registry = SceneRegistry::new();
     let mut word_registry = WordDefRegistry::new();
@@ -221,7 +221,7 @@ fn test_transpile_pass1_word_registration() {
 #[test]
 fn test_transpile_pass2_generates_selector() {
     let source = "＊会話\n  actor：hello\n";
-    let file = parser2::parse_str(source, "test.pasta").unwrap();
+    let file = parser::parse_str(source, "test.pasta").unwrap();
 
     let mut scene_registry = SceneRegistry::new();
     let mut word_registry = WordDefRegistry::new();
@@ -241,7 +241,7 @@ fn test_transpile_pass2_generates_selector() {
 #[test]
 fn test_transpile_full_scene() {
     let source = "＊挨拶\n  さくら：「こんにちは」\n";
-    let file = parser2::parse_str(source, "test.pasta").unwrap();
+    let file = parser::parse_str(source, "test.pasta").unwrap();
 
     let result = Transpiler2::transpile_to_string(&file).unwrap();
 
@@ -255,7 +255,7 @@ fn test_transpile_full_scene() {
 #[test]
 fn test_transpile_multiple_scenes() {
     let source = "＊挨拶\n  sakura：hello\n＊会話\n  kero：hi\n";
-    let file = parser2::parse_str(source, "test.pasta").unwrap();
+    let file = parser::parse_str(source, "test.pasta").unwrap();
 
     let result = Transpiler2::transpile_to_string(&file).unwrap();
 
@@ -271,7 +271,7 @@ fn test_transpile_multiple_scenes() {
 #[test]
 fn test_transpile_scene_with_file_level_attributes() {
     let source = "＆天気：晴れ\n＊会話\n  sakura：hello\n";
-    let file = parser2::parse_str(source, "test.pasta").unwrap();
+    let file = parser::parse_str(source, "test.pasta").unwrap();
 
     let mut scene_registry = SceneRegistry::new();
     let mut word_registry = WordDefRegistry::new();
@@ -291,7 +291,7 @@ fn test_transpile_scene_with_file_level_attributes() {
 #[test]
 fn test_transpile_global_word_definition() {
     let source = "＠挨拶：こんにちは、おはよう\n＊シーン\n  actor：test\n";
-    let file = parser2::parse_str(source, "test.pasta").unwrap();
+    let file = parser::parse_str(source, "test.pasta").unwrap();
 
     let mut scene_registry = SceneRegistry::new();
     let mut word_registry = WordDefRegistry::new();

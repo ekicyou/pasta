@@ -3,7 +3,7 @@
 //! This module defines error types specific to transpiler2 operations.
 
 use crate::error::{PastaError, Transpiler2Pass};
-use crate::parser2::Span;
+use crate::parser::Span;
 use thiserror::Error;
 
 /// Transpiler2 error type.

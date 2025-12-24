@@ -2,9 +2,9 @@
 //!
 //! These tests verify the complete pipeline from .pasta source to executable Rune code.
 
-use pasta::parser2;
+use pasta::parser;
 use pasta::registry::{SceneRegistry, WordDefRegistry};
-use pasta::transpiler2::Transpiler2;
+use pasta::transpiler::Transpiler2;
 
 // ============================================================
 // Basic Transpilation Tests
@@ -17,7 +17,7 @@ fn test_e2e_simple_scene_compiles() {
   さくら：「こんにちは！」
 "#;
 
-    let file = parser2::parse_str(source, "test.pasta").expect("Parse failed");
+    let file = parser::parse_str(source, "test.pasta").expect("Parse failed");
     let code = Transpiler2::transpile_to_string(&file).expect("Transpile failed");
 
     // Verify the generated code structure
@@ -51,7 +51,7 @@ fn test_e2e_multi_scene_registration() {
   さくら：「最後」
 "#;
 
-    let file = parser2::parse_str(source, "test.pasta").expect("Parse failed");
+    let file = parser::parse_str(source, "test.pasta").expect("Parse failed");
 
     let mut scene_registry = SceneRegistry::new();
     let mut word_registry = WordDefRegistry::new();
@@ -79,7 +79,7 @@ fn test_e2e_selector_generates_match_arms() {
   さくら：「B」
 "#;
 
-    let file = parser2::parse_str(source, "test.pasta").expect("Parse failed");
+    let file = parser::parse_str(source, "test.pasta").expect("Parse failed");
     let code = Transpiler2::transpile_to_string(&file).expect("Transpile failed");
 
     // Verify scene_selector has match arms
@@ -109,7 +109,7 @@ fn test_e2e_pasta_call_wrapper() {
   さくら：「テスト」
 "#;
 
-    let file = parser2::parse_str(source, "test.pasta").expect("Parse failed");
+    let file = parser::parse_str(source, "test.pasta").expect("Parse failed");
     let code = Transpiler2::transpile_to_string(&file).expect("Transpile failed");
 
     // Verify pasta::call wrapper
@@ -136,7 +136,7 @@ fn test_e2e_nested_local_scenes() {
     さくら：「サブシーン2」
 "#;
 
-    let file = parser2::parse_str(source, "test.pasta").expect("Parse failed");
+    let file = parser::parse_str(source, "test.pasta").expect("Parse failed");
     let code = Transpiler2::transpile_to_string(&file).expect("Transpile failed");
 
     // Verify local scenes are generated
@@ -158,7 +158,7 @@ fn test_e2e_continue_lines() {
   ：「続き2」
 "#;
 
-    let file = parser2::parse_str(source, "test.pasta").expect("Parse failed");
+    let file = parser::parse_str(source, "test.pasta").expect("Parse failed");
     let code = Transpiler2::transpile_to_string(&file).expect("Transpile failed");
 
     // Verify code is generated (specific output depends on CodeGenerator)
@@ -179,7 +179,7 @@ fn test_e2e_file_attributes() {
   さくら：「属性テスト」
 "#;
 
-    let file = parser2::parse_str(source, "test.pasta").expect("Parse failed");
+    let file = parser::parse_str(source, "test.pasta").expect("Parse failed");
     let code = Transpiler2::transpile_to_string(&file).expect("Transpile failed");
 
     // File attributes should be processed (may affect metadata)
@@ -194,7 +194,7 @@ fn test_e2e_file_word_definitions() {
   さくら：「テスト」
 "#;
 
-    let file = parser2::parse_str(source, "test.pasta").expect("Parse failed");
+    let file = parser::parse_str(source, "test.pasta").expect("Parse failed");
 
     let mut scene_registry = SceneRegistry::new();
     let mut word_registry = WordDefRegistry::new();
@@ -226,8 +226,8 @@ fn test_e2e_multiple_files_share_registry() {
   さくら：「ファイル2」
 "#;
 
-    let file1 = parser2::parse_str(source1, "file1.pasta").expect("Parse failed");
-    let file2 = parser2::parse_str(source2, "file2.pasta").expect("Parse failed");
+    let file1 = parser::parse_str(source1, "file1.pasta").expect("Parse failed");
+    let file2 = parser::parse_str(source2, "file2.pasta").expect("Parse failed");
 
     // Shared registries
     let mut scene_registry = SceneRegistry::new();
@@ -260,7 +260,7 @@ fn test_e2e_same_name_scenes_get_unique_ids() {
   さくら：「2つ目」
 "#;
 
-    let file = parser2::parse_str(source, "test.pasta").expect("Parse failed");
+    let file = parser::parse_str(source, "test.pasta").expect("Parse failed");
 
     let mut scene_registry = SceneRegistry::new();
     let mut word_registry = WordDefRegistry::new();
@@ -285,7 +285,7 @@ fn test_e2e_same_name_scenes_get_unique_ids() {
 fn test_e2e_empty_file_produces_valid_output() {
     let source = "# Just a comment\n";
 
-    let file = parser2::parse_str(source, "empty.pasta").expect("Parse failed");
+    let file = parser::parse_str(source, "empty.pasta").expect("Parse failed");
     let code = Transpiler2::transpile_to_string(&file).expect("Transpile failed");
 
     // Empty file should still produce selector structure
@@ -301,7 +301,7 @@ fn test_e2e_scene_with_only_attributes() {
   さくら：「設定完了」
 "#;
 
-    let file = parser2::parse_str(source, "test.pasta").expect("Parse failed");
+    let file = parser::parse_str(source, "test.pasta").expect("Parse failed");
     let code = Transpiler2::transpile_to_string(&file).expect("Transpile failed");
 
     assert!(code.contains("pub mod 設定シーン_1"));
@@ -321,7 +321,7 @@ fn helper() { 42 }
 ```
 "#;
 
-    let file = parser2::parse_str(source, "test.pasta").expect("Parse failed");
+    let file = parser::parse_str(source, "test.pasta").expect("Parse failed");
     let code = Transpiler2::transpile_to_string(&file).expect("Transpile failed");
 
     // Code block content should appear in output
@@ -344,7 +344,7 @@ fn test_e2e_output_order() {
   さくら：「B」
 "#;
 
-    let file = parser2::parse_str(source, "test.pasta").expect("Parse failed");
+    let file = parser::parse_str(source, "test.pasta").expect("Parse failed");
     let code = Transpiler2::transpile_to_string(&file).expect("Transpile failed");
 
     // Scene modules should come before selector
@@ -370,7 +370,7 @@ fn test_e2e_pasta_wrapper_after_selector() {
   さくら：「テスト」
 "#;
 
-    let file = parser2::parse_str(source, "test.pasta").expect("Parse failed");
+    let file = parser::parse_str(source, "test.pasta").expect("Parse failed");
     let code = Transpiler2::transpile_to_string(&file).expect("Transpile failed");
 
     let selector_pos = code
