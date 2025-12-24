@@ -80,6 +80,10 @@ impl<'a, W: Write> CodeGenerator<'a, W> {
         self.writeln(&format!("pub mod {} {{", module_name))?;
         self.indent();
 
+        // Import stdlib functions for this module
+        self.writeln("use pasta_stdlib::*;")?;
+        self.writeln("")?;
+
         // Generate __start__ function or inline code if no local scenes
         if scene.local_scenes.is_empty() {
             // Empty scene - generate placeholder

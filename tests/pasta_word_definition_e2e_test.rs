@@ -6,18 +6,19 @@
 mod common;
 
 use common::{create_test_script, get_test_persistence_dir};
-use pasta::ir::{ContentPart, ScriptEvent};
 use pasta::PastaEngine;
+use pasta::ir::{ContentPart, ScriptEvent};
 
 /// Test basic global word definition and usage in a conversation.
 #[test]
 fn test_global_word_definition_e2e() -> Result<(), Box<dyn std::error::Error>> {
     // Word definition at global scope (before label)
+    // Note: parser2 uses comma-separated values for word definitions
     let source = r#"
-＠挨拶：こんにちは　おはよう　こんばんは
+＠挨拶：こんにちは、おはよう、こんばんは
 
 ＊会話
-　さくら：＠挨拶
+  さくら：＠挨拶
 "#;
 
     let script_dir = create_test_script(source)?;
@@ -57,11 +58,12 @@ fn test_global_word_definition_e2e() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn test_local_word_definition_e2e() -> Result<(), Box<dyn std::error::Error>> {
     // Word definition at global scope referenced in label
+    // Note: parser2 uses comma-separated values for word definitions
     let source = r#"
-＠挨拶：おはよう　早起き
+＠挨拶：おはよう、早起き
 
 ＊会話_朝
-　さくら：＠挨拶
+  さくら：＠挨拶
 "#;
 
     let script_dir = create_test_script(source)?;
@@ -130,11 +132,7 @@ fn test_global_local_word_merge_e2e() -> Result<(), Box<dyn std::error::Error>> 
             })
             .collect();
         // Should be global word
-        assert!(
-            text == "グローバル挨拶",
-            "Unexpected word: {}",
-            text
-        );
+        assert!(text == "グローバル挨拶", "Unexpected word: {}", text);
     }
     Ok(())
 }
@@ -143,12 +141,13 @@ fn test_global_local_word_merge_e2e() -> Result<(), Box<dyn std::error::Error>> 
 /// Searching for "場所" should find both "場所" and "場所_日本" definitions.
 #[test]
 fn test_prefix_match_word_search_e2e() -> Result<(), Box<dyn std::error::Error>> {
+    // Note: parser2 uses comma-separated values for word definitions
     let source = r#"
 ＠場所：東京
-＠場所_日本：大阪　京都
+＠場所_日本：大阪、京都
 
 ＊会話
-    さくら：＠場所
+  さくら：＠場所
 "#;
 
     let script_dir = create_test_script(source)?;
@@ -189,11 +188,12 @@ fn test_prefix_match_word_search_e2e() -> Result<(), Box<dyn std::error::Error>>
 #[test]
 fn test_word_in_sentence_e2e() -> Result<(), Box<dyn std::error::Error>> {
     // Use word reference at the end of speech line
+    // Note: parser2 uses comma-separated values for word definitions
     let source = r#"
-＠場所：東京　大阪
+＠場所：東京、大阪
 
 ＊会話
-    さくら：今日の目的地は＠場所
+  さくら：今日の目的地は＠場所
 "#;
 
     let script_dir = create_test_script(source)?;

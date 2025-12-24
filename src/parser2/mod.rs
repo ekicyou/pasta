@@ -113,7 +113,10 @@ pub struct PastaParser2;
 /// ```
 pub fn parse_str(source: &str, filename: &str) -> Result<PastaFile, PastaError> {
     let pairs = PastaParser2::parse(Rule::file, source).map_err(|e| {
-        let (line, column) = e.line_col();
+        let (line, column) = match e.line_col {
+            pest::error::LineColLocation::Pos((l, c)) => (l, c),
+            pest::error::LineColLocation::Span((l, c), _) => (l, c),
+        };
         let message = format!("Parse error in {} at {}:{}: {}", filename, line, column, e);
         PastaError::ParseError {
             file: filename.to_string(),
