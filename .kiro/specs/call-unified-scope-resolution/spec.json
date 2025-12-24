@@ -15,9 +15,9 @@
         },
         "tasks": {
             "generated": true,
-            "approved": false
+            "approved": true
         }
     },
-    "ready_for_implementation": false,
+    "ready_for_implementation": true,
     "notes": "2025-12-24: 要件・設計承認完了。API 名称統一（find_scene_merged → collect_scene_candidates、resolve_scene_id_unified → resolve_scene_id）適用、タスク生成完了。"
 }
