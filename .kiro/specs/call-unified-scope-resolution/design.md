@@ -1,12 +1,14 @@
 # Design Document: Call Unified Scope Resolution
 
+**Updated**: 2025-12-24 (パーサー刷新に伴う再設計)
+
 ## Overview
 
 **Purpose**: Call 文（＞シーン）のシーン解決スコープを単語検索（＠単語）と同一の「ローカル＋グローバル統合検索」に統一し、利用者の学習コスト削減と記述簡潔化を実現する。
 
 **Users**: パスタスクリプト利用者が `＞シーン名` のみで、現在のグローバルシーン内のローカルシーン＋全グローバルシーンから前方一致候補を収集し、ランダムに1つ選択する。
 
-**Impact**: SceneTable、Transpiler、stdlib の3レイヤーにわたるスコープ解決ロジックを変更。既存の `＞＊シーン名` 構文は非推奨だが互換性のためサポート継続。
+**Impact**: SceneTable、CodeGenerator、stdlib の3レイヤーにわたるスコープ解決ロジックを変更。パーサー刷新により `JumpTarget` 列挙型は削除済み、`＊` 構文は非サポート。
 
 ### Goals
 - Call 文と単語検索で同一のスコープ解決ロジック（ローカル＋グローバル統合検索）を適用
@@ -15,45 +17,51 @@
 
 ### Non-Goals
 - フィルター機能の拡張（既存仕様のまま）
-- JumpTarget 列挙型の変更（パーサー層は維持）
+- ~~JumpTarget 列挙型の変更~~ → **削除済み、対応不要**
 - 検索優先順位の導入（完全ランダムマージ、ローカル優先なし）
+- `＊` 構文の後方互換サポート → **新パーサーで非サポート、対応不要**
 
 ## Architecture
 
-### Existing Architecture Analysis
+### Existing Architecture Analysis (2025-12-24 Updated)
 
 **現在の実装**:
-- SceneTable.resolve_scene_id() は単純な前方一致検索（module_name 引数なし）
-- Transpiler は JumpTarget::Local/Global を search_key に変換し、module_name を渡していない
-- stdlib の select_scene_to_id() は module_name 引数を受け取らない
+- **SceneTable**: `resolve_scene_id(search_key, filters)` は単純な前方一致検索（`module_name` 引数なし）
+- **CodeGenerator**: `generate_call_scene()` は `pasta::call(ctx, "{target}")` を生成（`module_name` 未使用）
+- **stdlib**: `select_scene_to_id(scene, filters)` は `module_name` 引数なし
 
-**既存パターン**:
-- WordTable.collect_word_candidates() が 2段階検索＋マージを実装済み
-- TranspileContext に current_module 管理機能が既存
-- RadixMap による前方一致検索が両テーブルで共通
+**既存パターン（参照実装）**:
+- **WordTable**: `collect_word_candidates(module_name, key)` が 2段階検索＋マージを実装済み
+- **TranspileContext2**: `current_module()` / `set_current_module()` が既存（単語登録で使用中）
+- **RadixMap**: 前方一致検索が両テーブルで共通
+
+**✅ パーサー刷新による簡素化**:
+- `JumpTarget` 列挙型は削除済み、`CallScene.target` は単純な `String` 型
+- `＊` プレフィックス構文は非サポート（後方互換性対応不要）
 
 ### Architecture Pattern & Boundary Map
 
 ```mermaid
 graph TB
-    subgraph Transpiler
-        TC[TranspileContext]
-        Pass2[transpile_pass2]
+    subgraph Transpiler["Transpiler (code_generator.rs)"]
+        CG[CodeGenerator]
+        CTX[TranspileContext2]
     end
     
-    subgraph Runtime
+    subgraph Runtime["Runtime (scene.rs, words.rs)"]
         ST[SceneTable]
         WT[WordTable]
     end
     
-    subgraph Stdlib
+    subgraph Stdlib["Stdlib (mod.rs)"]
         SSI[select_scene_to_id]
+        WE[word_expansion]
     end
     
-    Pass2 -->|current_module| SSI
-    SSI -->|module_name| ST
-    ST -->|find_scene_merged| ST
-    WT -->|collect_word_candidates| WT
+    CG -->|"current_module()"| CTX
+    CG -->|"pasta::call(ctx, target, module_name)"| SSI
+    SSI -->|"find_scene_merged(module_name, prefix)"| ST
+    WE -->|"search_word(module_name, key)"| WT
 ```
 
 **Architecture Integration**:
@@ -65,12 +73,12 @@ graph TB
 
 ### Technology Stack
 
-| Layer | Choice / Version | Role in Feature | Notes |
-|-------|------------------|-----------------|-------|
-| Runtime | Rust 2024 + fast_radix_trie 1.1.0 | SceneTable 拡張 | 既存 RadixMap 活用 |
-| Transpiler | Rust 2024 | module_name 伝播 | TranspileContext 既存機能使用 |
-| Stdlib | Rune 0.14 | 関数シグネチャ変更 | 内部 API のみ |
-| Specification | SPECIFICATION.md | Section 4 更新 | 破壊的変更の明記 |
+| Layer         | Choice / Version                  | Role in Feature        | Notes                   |
+| ------------- | --------------------------------- | ---------------------- | ----------------------- |
+| Runtime       | Rust 2024 + fast_radix_trie 1.1.0 | SceneTable 拡張        | 既存 RadixMap 活用      |
+| Transpiler    | Rust 2024                         | code_generator.rs 修正 | `current_module()` 既存 |
+| Stdlib        | Rune 0.14                         | 関数シグネチャ変更     | 内部 API のみ           |
+| Specification | SPECIFICATION.md                  | Section 4 更新         | `＊` 構文削除           |
 
 ## System Flows
 
@@ -78,18 +86,19 @@ graph TB
 
 ```mermaid
 sequenceDiagram
-    participant T as Transpiler Pass2
+    participant CG as CodeGenerator
     participant R as Rune VM
     participant S as stdlib
     participant ST as SceneTable
 
-    T->>R: generate call(ctx, scene, module_name, filters, args)
+    CG->>CG: generate_call_scene()
+    CG->>R: pasta::call(ctx, target, module_name)
     R->>S: select_scene_to_id(scene, module_name, filters)
     S->>ST: find_scene_merged(module_name, scene)
-    ST->>ST: Step1 Local search :module:scene
-    ST->>ST: Step2 Global search scene exclude :
+    ST->>ST: Step1 Local search :module:prefix
+    ST->>ST: Step2 Global search prefix (exclude :)
     ST->>ST: Step3 Merge candidates
-    ST-->>S: merged candidate list
+    ST-->>S: merged SceneId list
     S->>ST: resolve from cache or shuffle
     ST-->>S: selected SceneId
     S-->>R: scene_id as i64
@@ -97,35 +106,37 @@ sequenceDiagram
 ```
 
 **Key Decisions**:
-- module_name は Transpiler から Rune コード生成時に埋め込み
+- `module_name` は CodeGenerator が `context.current_module()` から取得
 - 2段階検索はランタイムで実行（コンパイル時解決ではない）
 
 ## Requirements Traceability
 
-| Requirement | Summary | Components | Interfaces | Flows |
-|-------------|---------|------------|------------|-------|
-| 1.1, 1.2, 1.4 | スコープ統合検索 | SceneTable | find_scene_merged() | Call 実行フロー |
-| 2.1, 2.2, 2.3 | グローバルプレフィックス廃止 | Transpiler, stdlib | Call 生成コード変更 | Pass2 処理 |
-| 3.1, 3.2, 3.3, 3.4 | ランタイム解決一貫性 | SceneTable | find_scene_merged(), resolve_scene_id() | 2段階検索 |
-| 4.1, 4.2, 4.3, 4.4 | 既存テスト互換性 | 全コンポーネント | 既存 API 維持 | 回帰テスト |
-| 5.1, 5.2, 5.3, 5.4 | SPECIFICATION.md 更新 | ドキュメント | - | - |
+| Requirement             | Summary               | Components            | Interfaces                              | Flows           |
+| ----------------------- | --------------------- | --------------------- | --------------------------------------- | --------------- |
+| 1.1, 1.2, 1.4           | スコープ統合検索      | SceneTable            | find_scene_merged()                     | Call 実行フロー |
+| 2.2, 2.4                | シンプルなCall構文    | CodeGenerator, stdlib | generate_call_scene()                   | Pass2 処理      |
+| 3.1, 3.2, 3.3, 3.4, 3.5 | ランタイム解決一貫性  | SceneTable            | find_scene_merged(), resolve_scene_id() | 2段階検索       |
+| 4.2, 4.3, 4.4           | 既存テスト互換性      | 全コンポーネント      | 既存 API 維持                           | 回帰テスト      |
+| 5.1, 5.2, 5.3           | SPECIFICATION.md 更新 | ドキュメント          | -                                       | -               |
+
+> **Note**: Requirement 2.1, 2.3, 4.1, 5.4 は「達成済み」または「不要」のため設計対象外
 
 ## Components and Interfaces
 
-| Component | Domain/Layer | Intent | Req Coverage | Key Dependencies | Contracts |
-|-----------|--------------|--------|--------------|------------------|-----------|
-| SceneTable | Runtime | シーン検索とランダム選択 | 1, 3 | RadixMap (P0) | Service |
-| Transpiler | Transpiler | Call 文 Rune コード生成 | 2 | TranspileContext (P0) | - |
-| stdlib | Runtime/Rune | シーン解決関数 | 2, 3 | SceneTable (P0) | API |
+| Component          | Domain/Layer | Intent                   | Req Coverage | Key Dependencies       | Contracts      |
+| ------------------ | ------------ | ------------------------ | ------------ | ---------------------- | -------------- |
+| SceneTable         | Runtime      | シーン検索とランダム選択 | 1, 3         | RadixMap (P0)          | Service, State |
+| CodeGenerator      | Transpiler   | Call 文 Rune コード生成  | 2            | TranspileContext2 (P0) | -              |
+| select_scene_to_id | Stdlib       | シーン解決関数           | 2, 3         | SceneTable (P0)        | API            |
 
 ### Runtime Layer
 
 #### SceneTable
 
-| Field | Detail |
-|-------|--------|
-| Intent | シーン検索とスコープ統合によるランダム選択を提供 |
-| Requirements | 1.1, 1.2, 1.4, 3.1, 3.2, 3.3, 3.4 |
+| Field        | Detail                                           |
+| ------------ | ------------------------------------------------ |
+| Intent       | シーン検索とスコープ統合によるランダム選択を提供 |
+| Requirements | 1.1, 1.2, 1.4, 3.1, 3.2, 3.3, 3.4, 3.5           |
 
 **Responsibilities & Constraints**
 - ローカル＋グローバルシーンの統合検索を実行
@@ -144,13 +155,13 @@ sequenceDiagram
 impl SceneTable {
     /// Collect all scene candidates using 2-stage search + merge.
     ///
-    /// # Algorithm
+    /// # Algorithm (WordTable.collect_word_candidates() と同一)
     /// 1. Local search: `:module_name:prefix` で前方一致
     /// 2. Global search: `prefix` で前方一致（`:` で始まるキーを除外）
     /// 3. Merge: 両方の SceneId をマージ
     ///
     /// # Arguments
-    /// * `module_name` - 現在のグローバルシーン名（sanitized）
+    /// * `module_name` - 現在のグローバルシーン名
     /// * `prefix` - 検索プレフィックス
     ///
     /// # Returns
@@ -183,6 +194,46 @@ impl SceneTable {
 - Postconditions: 返却される SceneId は有効なインデックス
 - Invariants: ローカル候補は `:module:` プレフィックスで区別
 
+##### find_scene_merged Implementation Pattern (Pseudo-code)
+
+```rust
+pub fn find_scene_merged(
+    &self,
+    module_name: &str,
+    prefix: &str,
+) -> Result<Vec<SceneId>, PastaError> {
+    if prefix.is_empty() {
+        return Err(PastaError::InvalidScene { scene: prefix.to_string() });
+    }
+
+    let mut candidates = Vec::new();
+
+    // Step 1: Local search with :{module_name}:{prefix} pattern
+    let local_search_key = format!(":{module_name}:");
+    for (_key, ids) in self.prefix_index.iter_prefix(local_search_key.as_bytes()) {
+        candidates.extend(ids.iter().copied());
+    }
+
+    // Step 2: Global search with {prefix} pattern (exclude : prefix)
+    for (key, ids) in self.prefix_index.iter_prefix(prefix.as_bytes()) {
+        if !key.starts_with(b":") {
+            candidates.extend(ids.iter().copied());
+        }
+    }
+
+    // Step 3: Return merged candidate list
+    if candidates.is_empty() {
+        Err(PastaError::SceneNotFound { scene: prefix.to_string() })
+    } else {
+        Ok(candidates)
+    }
+}
+```
+
+**Algorithm Notes**:
+- WordTable.collect_word_candidates() と完全同一パターン
+- ローカル優先なし、完全ランダムマージ
+
 ##### State Management
 
 ```rust
@@ -198,77 +249,109 @@ struct SceneCacheKey {
 - State model: HashMap<SceneCacheKey, CachedSelection>
 - Persistence: メモリ内キャッシュ（セッション中のみ）
 - Concurrency: Mutex による排他制御（既存パターン維持）
+- **Cache Invalidation Strategy**: `module_name` 追加により、同一 `search_key` でも異なる `module_name` では異なるキャッシュキーが生成される。セッション終了時に自動クリア（既存 `clear()` メソッド継承）。モジュール再読み込みなどは現在未サポート（将来拡張候補）
 
 **Implementation Notes**
-- Integration: WordTable.collect_word_candidates() の実装パターンを流用
+- Integration: `WordTable.collect_word_candidates()` の実装パターンをコピー
 - Validation: prefix が空の場合は InvalidScene エラー
 - Risks: キャッシュキー拡張によるメモリ使用量微増（許容範囲）
 
 ### Transpiler Layer
 
-#### Transpiler (Call Statement Processing)
+#### CodeGenerator (generate_call_scene)
 
-| Field | Detail |
-|-------|--------|
-| Intent | Call 文を Rune コードに変換し、module_name を引数に含める |
-| Requirements | 2.1, 2.2 |
+| Field        | Detail                                                    |
+| ------------ | --------------------------------------------------------- |
+| Intent       | Call 文を Rune コードに変換し、module_name を引数に含める |
+| Requirements | 2.2, 2.4                                                  |
 
 **Responsibilities & Constraints**
-- Call 文の Rune コード生成時に `context.current_module()` を埋め込む
-- JumpTarget::Local/Global を統一的に処理
+- Call 文の Rune コード生成時に `self.context.current_module()` を埋め込む
+- 単純な文字列 `target` を使用（`JumpTarget` 列挙型は削除済み）
 
 **Dependencies**
-- Inbound: Pass2 処理 — Statement::Call 変換 (P0)
-- Outbound: TranspileContext — current_module 取得 (P0)
+- Inbound: generate_statement() — Statement::Call 変換 (P0)
+- Outbound: TranspileContext2 — current_module() 取得 (P0)
 
 **Implementation Notes**
-- Integration: 既存の `transpile_statement_pass2_to_writer()` 内の Call 処理を変更
+- Integration: 既存の `generate_call_scene()` メソッドを1行変更
 - 生成コード変更:
   ```rust
-  // Before
-  crate::pasta::call(ctx, "{search_key}", #{filters}, [args])
+  // Before (L186-191)
+  fn generate_call_scene(&mut self, call_scene: &CallScene) -> Result<(), TranspileError> {
+      self.writeln(&format!(
+          "for a in pasta::call(ctx, \"{}\") {{ yield a; }}",
+          call_scene.target
+      ))?;
+      Ok(())
+  }
+  
   // After
-  crate::pasta::call(ctx, "{search_key}", "{module_name}", #{filters}, [args])
+  fn generate_call_scene(&mut self, call_scene: &CallScene) -> Result<(), TranspileError> {
+      let module_name = self.context.current_module();
+      self.writeln(&format!(
+          "for a in pasta::call(ctx, \"{}\", \"{}\") {{ yield a; }}",
+          call_scene.target,
+          module_name
+      ))?;
+      Ok(())
+  }
   ```
+
+**Rune API Contract Details**:
+- Rune VM が生成コードを実行時に `pasta::call(ctx, target, module_name)` を呼び出し
+- `pasta::call()` は stdlib の `select_scene_to_id(scene, module_name, filters)` にルーティング
+- `module_name` は常に現在のグローバルシーン（またはグローバルレベルで実行の場合は親シーン）
 
 ### Stdlib Layer
 
 #### select_scene_to_id
 
-| Field | Detail |
-|-------|--------|
-| Intent | Rune VM から呼び出されるシーン解決関数 |
-| Requirements | 2.2, 3.1 |
+| Field        | Detail                                 |
+| ------------ | -------------------------------------- |
+| Intent       | Rune VM から呼び出されるシーン解決関数 |
+| Requirements | 2.2, 3.1                               |
 
 **Contracts**: API [x]
 
 ##### API Contract
 
-| Method | Signature | Request | Response | Errors |
-|--------|-----------|---------|----------|--------|
-| select_scene_to_id | fn(String, String, Value, &Mutex<SceneTable>) | scene, module_name, filters | i64 | String |
+| Method             | Signature                                     | Request                     | Response | Errors |
+| ------------------ | --------------------------------------------- | --------------------------- | -------- | ------ |
+| select_scene_to_id | fn(String, String, Value, &Mutex<SceneTable>) | scene, module_name, filters | i64      | String |
 
-**変更点**:
+**シグネチャ変更詳細**:
 ```rust
-// Before
-fn select_scene_to_id(
+// Before (L91-94, stdlib/mod.rs)
+pub fn select_scene_to_id(
     scene: String,
     filters: rune::runtime::Value,
     scene_table: &Mutex<SceneTable>,
 ) -> Result<i64, String>
 
-// After
-fn select_scene_to_id(
+// After (新シグネチャ)
+pub fn select_scene_to_id(
     scene: String,
-    module_name: String,  // 新規引数
+    module_name: String,        // 新規引数（位置: 2番目）
     filters: rune::runtime::Value,
     scene_table: &Mutex<SceneTable>,
-) -> Result<i64, String>
+) -> Result<i64, String> {
+    let mut table = scene_table.lock().map_err(|e| e.to_string())?;
+    
+    // 統合スコープ検索を実行
+    let filters_map = parse_filters(&filters)?;
+    let scene_id = table.find_scene_merged(&module_name, &scene)?;
+    
+    // シーンID（1-based）を返却
+    Ok((scene_id.0 + 1) as i64)
+}
 ```
 
-**Implementation Notes**
-- Integration: `SceneTable::resolve_scene_id_unified()` を呼び出し
-- Validation: module_name が空の場合はグローバルのみ検索
+**実装上の注意点**:
+- `module_name` は CodeGenerator が `context.current_module()` から取得（既実装）
+- `find_scene_merged()` が2段階検索を実行（上記 pseudo-code 参照）
+- 返却値は 1-based SceneId（既存慣例維持、Vec index + 1）
+- 参照: `word_expansion()` 関数（stdlib/mod.rs）が同様に `module_name` を受け取り実装済み
 
 ## Data Models
 
@@ -285,9 +368,9 @@ fn select_scene_to_id(
 
 ### Logical Data Model
 
-**prefix_index への登録**（Option A: WordTable 統一形式）:
-- グローバルシーン: `{name}_{counter}::__start__`（変更なし）
-- ローカルシーン: `:{parent}_{parent_counter}:{local}_{local_counter}`（**キー変換**）
+**prefix_index への登録**（WordTable 統一形式）:
+- グローバルシーン: `{name}` 形式で登録（`::__start__` を除去）
+- ローカルシーン: `:{parent}:{local}` 形式で登録（**キー変換**）
 
 **キー変換ロジック** (SceneTable::from_scene_registry 内):
 ```rust
@@ -296,13 +379,13 @@ let search_key = if scene.parent.is_some() {
     let parts: Vec<_> = scene.fn_name.split("::").collect();
     format!(":{}", parts.join(":"))
 } else {
-    // グローバルは変換なし
-    scene.fn_name.clone()
+    // グローバル: "会話_1::__start__" → "会話_1"
+    scene.fn_name.split("::").next().unwrap_or(&scene.fn_name).to_string()
 };
 ```
 
 **検索時のキー構築** (find_scene_merged 内):
-- ローカル検索: `:{sanitized_module}:{prefix}` で前方一致
+- ローカル検索: `:{module_name}:{prefix}` で前方一致
 - グローバル検索: `{prefix}` で前方一致（`:` で始まるキーを除外）
 
 **WordTable との完全統一**: 両者のキー形式・検索ロジックが `:module:name` パターンで一致
@@ -320,21 +403,20 @@ let search_key = if scene.parent.is_some() {
 
 ### Unit Tests
 
-| Test Case | Component | Requirement |
-|-----------|-----------|-------------|
-| find_scene_merged_local_only | SceneTable | 3.1, 3.2 |
-| find_scene_merged_global_only | SceneTable | 3.1, 3.2 |
-| find_scene_merged_local_and_global | SceneTable | 1.1, 1.2, 3.3 |
-| find_scene_merged_prefix_match | SceneTable | 1.1 |
-| resolve_scene_id_unified_with_cache | SceneTable | 3.4 |
+| Test Case                           | Component  | Requirement   |
+| ----------------------------------- | ---------- | ------------- |
+| find_scene_merged_local_only        | SceneTable | 3.1, 3.2      |
+| find_scene_merged_global_only       | SceneTable | 3.1, 3.2      |
+| find_scene_merged_local_and_global  | SceneTable | 1.1, 1.2, 3.3 |
+| find_scene_merged_prefix_match      | SceneTable | 1.1           |
+| resolve_scene_id_unified_with_cache | SceneTable | 3.4           |
 
 ### Integration Tests
 
-| Test Case | Scope | Requirement |
-|-----------|-------|-------------|
-| call_local_scene_from_global_context | Engine E2E | 1.4, 4.2 |
-| call_global_scene_with_local_fallback | Engine E2E | 1.2, 4.1 |
-| call_deprecated_global_prefix | Engine E2E | 2.3, 4.1 |
+| Test Case                            | Scope      | Requirement |
+| ------------------------------------ | ---------- | ----------- |
+| call_local_scene_from_global_context | Engine E2E | 1.4, 4.2    |
+| call_merged_local_and_global_scenes  | Engine E2E | 1.2, 3.3    |
 
 ### Regression Tests
 
@@ -350,7 +432,7 @@ let search_key = if scene.parent.is_some() {
 **移行手順**:
 1. SceneTable 拡張（find_scene_merged 追加）
 2. stdlib シグネチャ変更
-3. Transpiler Call 生成コード変更
+3. CodeGenerator generate_call_scene 変更
 4. テスト更新・回帰確認
 5. SPECIFICATION.md 更新
 
@@ -361,4 +443,4 @@ let search_key = if scene.parent.is_some() {
 詳細な調査結果は [research.md](research.md) を参照:
 - WordTable 2段階検索パターンの詳細
 - prefix_index 登録キー形式の分析
-- TranspileContext module 管理の確認
+- TranspileContext2 current_module の確認
