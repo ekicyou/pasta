@@ -39,13 +39,13 @@ Engine + Runtime + Transpiler + エラー リファクタリング
 - 要件 4.1, 4.2, 4.3, 4.4
 
 #### 受け入れ基準
-- [x] ワークスペース構成を `[workspace]` セクションで作成
-- [x] `members = ["crates/*"]` を設定し、/crates/ 配下のすべてのクレートを含む
-- [x] `resolver = "2"` を設定し、依存関係解決の一貫性を確保
-- [x] すべての共有依存関係を含む `[workspace.dependencies]` セクションを作成
-- [x] edition、authors、license を指定した `[workspace.package]` を定義
-- [x] ルート Cargo.toml から `[package]` セクションを削除
-- [x] ルート Cargo.toml がワークスペース専用構成になる
+- [ ] ワークスペース構成を `[workspace]` セクションで作成
+- [ ] `members = ["crates/*"]` を設定し、/crates/ 配下のすべてのクレートを含む
+- [ ] `resolver = "2"` を設定し、依存関係解決の一貫性を確保
+- [ ] すべての共有依存関係を含む `[workspace.dependencies]` セクションを作成
+- [ ] edition、authors、license を指定した `[workspace.package]` を定義
+- [ ] ルート Cargo.toml から `[package]` セクションを削除
+- [ ] ルート Cargo.toml がワークスペース専用構成になる
 
 #### 実装詳細
 - **ファイル:** `Cargo.toml`（ルート）
@@ -72,12 +72,12 @@ Engine + Runtime + Transpiler + エラー リファクタリング
 - 要件 5.1, 5.2, 5.3, 5.4, 5.5, 5.6
 
 #### 受け入れ基準
-- [x] `/crates/` ディレクトリを作成
-- [x] `/crates/pasta_core/` サブディレクトリを作成
-- [x] `/crates/pasta_rune/` サブディレクトリを作成
-- [x] 各クレート配下に基本的なディレクトリ構造（src/）を作成
-- [x] `/tests/` がワークスペースルートに残ることを確認
-- [x] `/tests/common/` を共有ユーティリティ用に準備（空の状態で作成）
+- [ ] `/crates/` ディレクトリを作成
+- [ ] `/crates/pasta_core/` サブディレクトリを作成
+- [ ] `/crates/pasta_rune/` サブディレクトリを作成
+- [ ] 各クレート配下に基本的なディレクトリ構造（src/）を作成
+- [ ] `/tests/` がワークスペースルートに残ることを確認
+- [ ] `/tests/common/` を共有ユーティリティ用に準備（空の状態で作成）
 
 #### 実装詳細
 - **作成するディレクトリ:**
@@ -116,14 +116,14 @@ Engine + Runtime + Transpiler + エラー リファクタリング
 - 要件 2.1, 2.3, 3.1, 3.3
 
 #### 受け入れ基準
-- [x] `/crates/pasta_core/Cargo.toml` をパッケージメタデータで作成
-- [x] pasta_core 依存関係を設定: pest, pest_derive, thiserror, fast_radix_trie, rand, tracing
-- [x] すべての依存関係が `dependency.workspace = true` でワークスペースバージョンを参照
-- [x] `/crates/pasta_rune/Cargo.toml` をパッケージメタデータで作成
-- [x] pasta_rune 依存関係を設定: pasta_core, rune, thiserror, glob, tracing, rand, futures, toml, fast_radix_trie
-- [x] すべての依存関係が `dependency.workspace = true` でワークスペースバージョンを参照
-- [x] 両方が `edition.workspace = true`、`authors.workspace = true`、`license.workspace = true` を使用
-- [x] 両方が `publish = true` を設定
+- [ ] `/crates/pasta_core/Cargo.toml` をパッケージメタデータで作成
+- [ ] pasta_core 依存関係を設定: pest, pest_derive, thiserror, fast_radix_trie, rand, tracing
+- [ ] すべての依存関係が `dependency.workspace = true` でワークスペースバージョンを参照
+- [ ] `/crates/pasta_rune/Cargo.toml` をパッケージメタデータで作成
+- [ ] pasta_rune 依存関係を設定: pasta_core, rune, thiserror, glob, tracing, rand, futures, toml, fast_radix_trie
+- [ ] すべての依存関係が `dependency.workspace = true` でワークスペースバージョンを参照
+- [ ] 両方が `edition.workspace = true`、`authors.workspace = true`、`license.workspace = true` を使用
+- [ ] 両方が `publish = true` を設定
 
 #### 実装詳細
 - **pasta_core/Cargo.toml 構造:**
@@ -188,12 +188,12 @@ Engine + Runtime + Transpiler + エラー リファクタリング
 - 要件 2.2, 2.4, 5.1, 9.1
 
 #### 受け入れ基準
-- [x] `src/parser/mod.rs` を `crates/pasta_core/src/parser/mod.rs` に移動
-- [x] `src/parser/ast.rs` を `crates/pasta_core/src/parser/ast.rs` に移動
-- [x] `src/parser/grammar.pest` を `crates/pasta_core/src/parser/grammar.pest` に移動
-- [x] parser/ 内のすべてのインポートが解決される（pest, pest_derive）
-- [x] Rune またはランタイムコンポーネントへの参照がない
-- [x] パーサーモジュールがエクスポート: `pub fn parse_str()`、`pub fn parse_file()`、`pub struct PastaFile` など
+- [ ] `src/parser/mod.rs` を `crates/pasta_core/src/parser/mod.rs` に移動
+- [ ] `src/parser/ast.rs` を `crates/pasta_core/src/parser/ast.rs` に移動
+- [ ] `src/parser/grammar.pest` を `crates/pasta_core/src/parser/grammar.pest` に移動
+- [ ] parser/ 内のすべてのインポートが解決される（pest, pest_derive）
+- [ ] Rune またはランタイムコンポーネントへの参照がない
+- [ ] パーサーモジュールがエクスポート: `pub fn parse_str()`、`pub fn parse_file()`、`pub struct PastaFile` など
 
 #### 実装詳細
 - **移動するファイル:**
@@ -220,12 +220,12 @@ Engine + Runtime + Transpiler + エラー リファクタリング
 - 要件 2.2, 5.1, 9.1
 
 #### 受け入れ基準
-- [x] `src/registry/mod.rs` を `crates/pasta_core/src/registry/mod.rs` に移動
-- [x] `src/registry/scene_registry.rs` を `crates/pasta_core/src/registry/scene_registry.rs` に移動
-- [x] `src/registry/word_registry.rs` を `crates/pasta_core/src/registry/word_registry.rs` に移動
-- [x] registry/ 内のすべてのインポートが解決される（fast_radix_trie, rand）
-- [x] Rune またはエンジンコンポーネントへの参照がない
-- [x] レジストリモジュールがエクスポート: SceneRegistry、WordDefRegistry など
+- [ ] `src/registry/mod.rs` を `crates/pasta_core/src/registry/mod.rs` に移動
+- [ ] `src/registry/scene_registry.rs` を `crates/pasta_core/src/registry/scene_registry.rs` に移動
+- [ ] `src/registry/word_registry.rs` を `crates/pasta_core/src/registry/word_registry.rs` に移動
+- [ ] registry/ 内のすべてのインポートが解決される（fast_radix_trie, rand）
+- [ ] Rune またはエンジンコンポーネントへの参照がない
+- [ ] レジストリモジュールがエクスポート: SceneRegistry、WordDefRegistry など
 
 #### 実装詳細
 - **移動するファイル:**
@@ -252,12 +252,12 @@ Engine + Runtime + Transpiler + エラー リファクタリング
 - 要件 2.2, 5.1, 5.2
 
 #### 受け入れ基準
-- [x] WordTable を `src/runtime/words.rs` から → `crates/pasta_core/src/registry/word_table.rs` に抽出
-- [x] SceneTable を `src/runtime/scene.rs` から → `crates/pasta_core/src/registry/scene_table.rs` に抽出
-- [x] RandomSelector トレイト + DefaultRandomSelector を `src/runtime/random.rs` から → `crates/pasta_core/src/registry/random.rs` に抽出
-- [x] registry/mod.rs を更新して WordTable、SceneTable、RandomSelector を再エクスポート
-- [x] Rune 言語固有の依存関係を削除（trait/type 定義のみ保持）
-- [x] RandomSelector が言語に非依存（trait ベース、Rune 参照なし）
+- [ ] WordTable を `src/runtime/words.rs` から → `crates/pasta_core/src/registry/word_table.rs` に抽出
+- [ ] SceneTable を `src/runtime/scene.rs` から → `crates/pasta_core/src/registry/scene_table.rs` に抽出
+- [ ] RandomSelector トレイト + DefaultRandomSelector を `src/runtime/random.rs` から → `crates/pasta_core/src/registry/random.rs` に抽出
+- [ ] registry/mod.rs を更新して WordTable、SceneTable、RandomSelector を再エクスポート
+- [ ] Rune 言語固有の依存関係を削除（trait/type 定義のみ保持）
+- [ ] RandomSelector が言語に非依存（trait ベース、Rune 参照なし）
 
 #### 実装詳細
 - **作成/抽出するファイル:**
@@ -298,11 +298,11 @@ Engine + Runtime + Transpiler + エラー リファクタリング
 - 要件 2.2, 2.4, 9.1
 
 #### 受け入れ基準
-- [x] `crates/pasta_core/src/error.rs` を ParseError、ParseErrorInfo、ParseResult で作成
-- [x] ParseError バリアント定義: SyntaxError、PestError、IoError、MultipleErrors
-- [x] エラー報告に file、line、column 情報を含める
-- [x] エラー定義に thiserror クレートを使用
-- [x] lib.rs 経由でエクスポート: `pub mod error;` および `pub use error::{ParseError, ParseErrorInfo, ParseResult};`
+- [ ] `crates/pasta_core/src/error.rs` を ParseError、ParseErrorInfo、ParseResult で作成
+- [ ] ParseError バリアント定義: SyntaxError、PestError、IoError、MultipleErrors
+- [ ] エラー報告に file、line、column 情報を含める
+- [ ] エラー定義に thiserror クレートを使用
+- [ ] lib.rs 経由でエクスポート: `pub mod error;` および `pub use error::{ParseError, ParseErrorInfo, ParseResult};`
 
 #### 実装詳細
 - **error.rs 構造（design.md から）:**
@@ -332,10 +332,10 @@ Engine + Runtime + Transpiler + エラー リファクタリング
 - 要件 2.1, 9.1
 
 #### 受け入れ基準
-- [x] `crates/pasta_core/src/lib.rs` をモジュール宣言で作成
-- [x] モジュール構造: `pub mod error;`、`pub mod parser;`、`pub mod registry;`
-- [x] 再エクスポート: ParseError、ParseErrorInfo、ParseResult、parse_file、parse_str、PastaFile、SceneEntry、SceneRegistry、WordDefRegistry、WordEntry
-- [x] モジュール documentation コメントを含める
+- [ ] `crates/pasta_core/src/lib.rs` をモジュール宣言で作成
+- [ ] モジュール構造: `pub mod error;`、`pub mod parser;`、`pub mod registry;`
+- [ ] 再エクスポート: ParseError、ParseErrorInfo、ParseResult、parse_file、parse_str、PastaFile、SceneEntry、SceneRegistry、WordDefRegistry、WordEntry
+- [ ] モジュール documentation コメントを含める
 
 #### 実装詳細
 - **lib.rs 構造（design.md から）:**
@@ -369,12 +369,12 @@ Engine + Runtime + Transpiler + エラー リファクタリング
 - 要件 3.2, 5.2
 
 #### 受け入れ基準
-- [x] `src/transpiler/mod.rs` を `crates/pasta_rune/src/transpiler/mod.rs` に移動
-- [x] `src/transpiler/code_generator.rs` を `crates/pasta_rune/src/transpiler/code_generator.rs` に移動
-- [x] `src/transpiler/context.rs` を `crates/pasta_rune/src/transpiler/context.rs` に移動
-- [x] `src/transpiler/error.rs` を `crates/pasta_rune/src/transpiler/error.rs` に移動
-- [x] すべてのインポートを更新して `pasta_core::{parser, registry, error}` の代わりにルートクレートを参照
-- [x] トランスパイラモジュールのコンパイルにエラーなし
+- [ ] `src/transpiler/mod.rs` を `crates/pasta_rune/src/transpiler/mod.rs` に移動
+- [ ] `src/transpiler/code_generator.rs` を `crates/pasta_rune/src/transpiler/code_generator.rs` に移動
+- [ ] `src/transpiler/context.rs` を `crates/pasta_rune/src/transpiler/context.rs` に移動
+- [ ] `src/transpiler/error.rs` を `crates/pasta_rune/src/transpiler/error.rs` に移動
+- [ ] すべてのインポートを更新して `pasta_core::{parser, registry, error}` の代わりにルートクレートを参照
+- [ ] トランスパイラモジュールのコンパイルにエラーなし
 
 #### 実装詳細
 - **移動するファイル:**
@@ -404,12 +404,12 @@ Engine + Runtime + Transpiler + エラー リファクタリング
 - 要件 3.2, 5.2
 
 #### 受け入れ基準
-- [x] `src/runtime/mod.rs` を `crates/pasta_rune/src/runtime/mod.rs` に移動
-- [x] `src/runtime/generator.rs` を `crates/pasta_rune/src/runtime/generator.rs` に移動
-- [x] `src/runtime/variables.rs` を `crates/pasta_rune/src/runtime/variables.rs` に移動
-- [x] **移動しない**: `scene.rs`、`words.rs`、`random.rs`（すでに pasta_core にある）
-- [x] すべてのインポートを更新して検索テーブル用に `pasta_core::{registry, ...}` を参照
-- [x] ランタイムモジュールが pasta_core から RandomSelector にアクセス可能
+- [ ] `src/runtime/mod.rs` を `crates/pasta_rune/src/runtime/mod.rs` に移動
+- [ ] `src/runtime/generator.rs` を `crates/pasta_rune/src/runtime/generator.rs` に移動
+- [ ] `src/runtime/variables.rs` を `crates/pasta_rune/src/runtime/variables.rs` に移動
+- [ ] **移動しない**: `scene.rs`、`words.rs`、`random.rs`（すでに pasta_core にある）
+- [ ] すべてのインポートを更新して検索テーブル用に `pasta_core::{registry, ...}` を参照
+- [ ] ランタイムモジュールが pasta_core から RandomSelector にアクセス可能
 
 #### 実装詳細
 - **移動するファイル:**
@@ -442,13 +442,13 @@ Engine + Runtime + Transpiler + エラー リファクタリング
 - 要件 3.1, 3.2, 5.2
 
 #### 受け入れ基準
-- [x] `src/engine.rs` を `crates/pasta_rune/src/engine.rs` に移動
-- [x] `src/cache.rs` を `crates/pasta_rune/src/cache.rs` に移動
-- [x] `src/loader.rs` を `crates/pasta_rune/src/loader.rs` に移動
-- [x] `src/ir/` を `crates/pasta_rune/src/ir/` に移動
-- [x] engine.rs 内のすべてのインポートを更新: `use pasta_core::{parser, registry, error}`
-- [x] cache.rs 内のすべてのインポートを更新: `use pasta_core::parser`
-- [x] loader.rs 依存関係が transpiler、runtime、engine に対してローカル（`crate::`）であることを確認
+- [ ] `src/engine.rs` を `crates/pasta_rune/src/engine.rs` に移動
+- [ ] `src/cache.rs` を `crates/pasta_rune/src/cache.rs` に移動
+- [ ] `src/loader.rs` を `crates/pasta_rune/src/loader.rs` に移動
+- [ ] `src/ir/` を `crates/pasta_rune/src/ir/` に移動
+- [ ] engine.rs 内のすべてのインポートを更新: `use pasta_core::{parser, registry, error}`
+- [ ] cache.rs 内のすべてのインポートを更新: `use pasta_core::parser`
+- [ ] loader.rs 依存関係が transpiler、runtime、engine に対してローカル（`crate::`）であることを確認
 
 #### 実装詳細
 - **移動するファイル:**
@@ -477,9 +477,9 @@ Engine + Runtime + Transpiler + エラー リファクタリング
 - 要件 3.2, 5.2
 
 #### 受け入れ基準
-- [x] `src/stdlib/mod.rs` を `crates/pasta_rune/src/stdlib/mod.rs` に移動
-- [x] `src/stdlib/persistence.rs` を `crates/pasta_rune/src/stdlib/persistence.rs` に移動
-- [x] すべてのインポートが解決される（pasta_core インポートが不要であることを確認）
+- [ ] `src/stdlib/mod.rs` を `crates/pasta_rune/src/stdlib/mod.rs` に移動
+- [ ] `src/stdlib/persistence.rs` を `crates/pasta_rune/src/stdlib/persistence.rs` に移動
+- [ ] すべてのインポートが解決される（pasta_core インポートが不要であることを確認）
 
 #### 実装詳細
 - **移動するファイル:**
@@ -502,12 +502,12 @@ Engine + Runtime + Transpiler + エラー リファクタリング
 - 要件 3.2, 9.2
 
 #### 受け入れ基準
-- [x] `src/error.rs`（PastaError セクションのみ）を `crates/pasta_rune/src/error.rs` に移動/リファクタリング
-- [x] `#[from] ParseError` 変換を追加: `#[from] pasta_core::error::ParseError`
-- [x] すべてのランタイムエラーバリアント含める: SceneNotFound、RuneCompileError、VmError、IoError
-- [x] エラー定義に thiserror を使用
-- [x] ParseError を `pub use pasta_core::error::ParseError;` 経由でエクスポート
-- [x] 型エイリアス: `pub type Result<T> = std::result::Result<T, PastaError>;`
+- [ ] `src/error.rs`（PastaError セクションのみ）を `crates/pasta_rune/src/error.rs` に移動/リファクタリング
+- [ ] `#[from] ParseError` 変換を追加: `#[from] pasta_core::error::ParseError`
+- [ ] すべてのランタイムエラーバリアント含める: SceneNotFound、RuneCompileError、VmError、IoError
+- [ ] エラー定義に thiserror を使用
+- [ ] ParseError を `pub use pasta_core::error::ParseError;` 経由でエクスポート
+- [ ] 型エイリアス: `pub type Result<T> = std::result::Result<T, PastaError>;`
 
 #### 実装詳細
 - **error.rs 構造（design.md から）:**
@@ -545,12 +545,12 @@ Engine + Runtime + Transpiler + エラー リファクタリング
 - 要件 3.1, 3.4, 9.2
 
 #### 受け入れ基準
-- [x] `crates/pasta_rune/src/lib.rs` をモジュール宣言で作成
-- [x] モジュール宣言: `pub mod cache;`、`pub mod engine;`、`pub mod error;`、`pub mod ir;`、`mod loader;`、`pub mod runtime;`、`pub mod stdlib;`、`pub mod transpiler;`
-- [x] 再エクスポート: `pub use pasta_core as core;`
-- [x] 再エクスポート: ParseCache、PastaEngine、PastaError、Result、ScriptEvent、ContentPart、DirectoryLoader、LoadedFiles、RandomSelector、SceneTable、ScriptGenerator
-- [x] モジュール documentation コメントを含める
-- [x] `loader` モジュールがプライベート（`mod loader;`、`pub mod` ではない）
+- [ ] `crates/pasta_rune/src/lib.rs` をモジュール宣言で作成
+- [ ] モジュール宣言: `pub mod cache;`、`pub mod engine;`、`pub mod error;`、`pub mod ir;`、`mod loader;`、`pub mod runtime;`、`pub mod stdlib;`、`pub mod transpiler;`
+- [ ] 再エクスポート: `pub use pasta_core as core;`
+- [ ] 再エクスポート: ParseCache、PastaEngine、PastaError、Result、ScriptEvent、ContentPart、DirectoryLoader、LoadedFiles、RandomSelector、SceneTable、ScriptGenerator
+- [ ] モジュール documentation コメントを含める
+- [ ] `loader` モジュールがプライベート（`mod loader;`、`pub mod` ではない）
 
 #### 実装詳細
 - **lib.rs 構造（design.md から）:**
@@ -597,10 +597,10 @@ Engine + Runtime + Transpiler + エラー リファクタリング
 - 要件 6.5, 6.6
 
 #### 受け入れ基準
-- [x] `tests/common/mod.rs` を `fixtures_path()` および `fixture()` ユーティリティ関数で作成
-- [x] 関数がワークスペースレベル `/tests/fixtures/` をいずれのクレートテストコンテキストからでも解決
-- [x] `pasta_core` および `pasta_rune` クレートテストコンテキストの両方を処理
-- [x] design.md のナビゲーションロジックから `CARGO_MANIFEST_DIR` と使用
+- [ ] `tests/common/mod.rs` を `fixtures_path()` および `fixture()` ユーティリティ関数で作成
+- [ ] 関数がワークスペースレベル `/tests/fixtures/` をいずれのクレートテストコンテキストからでも解決
+- [ ] `pasta_core` および `pasta_rune` クレートテストコンテキストの両方を処理
+- [ ] design.md のナビゲーションロジックから `CARGO_MANIFEST_DIR` と使用
 
 #### 実装詳細
 - **ファイル:** `tests/common/mod.rs`
@@ -626,12 +626,12 @@ Engine + Runtime + Transpiler + エラー リファクタリング
 - 要件 6.1, 6.2, 6.3, 6.4, 6.5
 
 #### 受け入れ基準
-- [x] `tests/` 内のすべてのテストファイルを正しいインポートパスで更新
-- [x] pasta_core 型を使用するテストファイルがインポート: `use pasta_rune::core::{parser, registry, error};`
-- [x] pasta_rune 型を使用するテストファイルがインポート: `use pasta_rune::{engine, runtime, ...};`
-- [x] すべてのフィクスチャパス参照が `common::fixtures_path()` または `common::fixture()` を使用
-- [x] `cargo test --workspace` がすべてのテストを実行し、エラーなく成功
-- [x] リグレッションテストスイート実行成功: `parser`、`transpiler`、`engine`、`integration`
+- [ ] `tests/` 内のすべてのテストファイルを正しいインポートパスで更新
+- [ ] pasta_core 型を使用するテストファイルがインポート: `use pasta_rune::core::{parser, registry, error};`
+- [ ] pasta_rune 型を使用するテストファイルがインポート: `use pasta_rune::{engine, runtime, ...};`
+- [ ] すべてのフィクスチャパス参照が `common::fixtures_path()` または `common::fixture()` を使用
+- [ ] `cargo test --workspace` がすべてのテストを実行し、エラーなく成功
+- [ ] リグレッションテストスイート実行成功: `parser`、`transpiler`、`engine`、`integration`
 
 #### 実装詳細
 - **テストファイル更新:**
@@ -660,12 +660,12 @@ Engine + Runtime + Transpiler + エラー リファクタリング
 - 要件 8.1, 8.2, 8.3, 8.4
 
 #### 受け入れ基準
-- [x] `.kiro/steering/structure.md` をワークスペース構造で更新
-- [x] `.kiro/steering/structure.md` に `/crates/` ディレクトリ階層を含める
-- [x] `README.md` をビルド指示で更新: `cargo build --workspace`、`cargo test --workspace`
-- [x] `README.md` にワークスペースアーキテクチャ概要を含める
-- [x] `.kiro/steering/tech.md` をワークスペースアーキテクチャ原則で更新
-- [x] 依存関係図を含める（pasta_rune → pasta_core）
+- [ ] `.kiro/steering/structure.md` をワークスペース構造で更新
+- [ ] `.kiro/steering/structure.md` に `/crates/` ディレクトリ階層を含める
+- [ ] `README.md` をビルド指示で更新: `cargo build --workspace`、`cargo test --workspace`
+- [ ] `README.md` にワークスペースアーキテクチャ概要を含める
+- [ ] `.kiro/steering/tech.md` をワークスペースアーキテクチャ原則で更新
+- [ ] 依存関係図を含める（pasta_rune → pasta_core）
 
 #### 実装詳細
 - **更新するファイル:**
@@ -752,13 +752,13 @@ Phase 4（最終）:
 ## 成功基準
 
 ### 完了の定義
-- [x] すべてのワークスペースメンバーがエラーなくビルド: `cargo build --workspace`
-- [x] すべてのテストが成功: `cargo test --workspace`
-- [x] 未使用のインポートまたはデッドコード警告がない
-- [x] 公開 API 境界が明確でドキュメント化
-- [x] クレート間に循環依存がない
-- [x] すべての要件受け入れ基準が満たされている
-- [x] ドキュメントが最新
+- [ ] すべてのワークスペースメンバーがエラーなくビルド: `cargo build --workspace`
+- [ ] すべてのテストが成功: `cargo test --workspace`
+- [ ] 未使用のインポートまたはデッドコード警告がない
+- [ ] 公開 API 境界が明確でドキュメント化
+- [ ] クレート間に循環依存がない
+- [ ] すべての要件受け入れ基準が満たされている
+- [ ] ドキュメントが最新
 
 ---
 
