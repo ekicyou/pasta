@@ -3,7 +3,7 @@
 mod common;
 
 use common::{create_test_script, get_test_persistence_dir};
-use pasta::{PastaEngine, PastaError};
+use pasta_rune::{PastaEngine, PastaError};
 use std::fs;
 use std::path::PathBuf;
 use tempfile::TempDir;
@@ -383,3 +383,4 @@ yield emit_text(text);
         assert!(text[0].contains("Gold: 100"));
     }
 }
+

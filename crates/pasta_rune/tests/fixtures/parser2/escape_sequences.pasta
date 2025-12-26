@@ -1,0 +1,11 @@
+# parser2テスト用フィクスチャ: エスケープシーケンス
+
+＊エスケープテスト
+  Alice：@@はアットマーク
+  Alice：$$はドルマーク
+  Alice：\\はバックスラッシュ
+
+＊関数呼び出しテスト
+  Alice：@hello（）と言う
+  Alice：$localを使う
+  Alice：$*globalを参照する

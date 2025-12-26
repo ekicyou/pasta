@@ -11,8 +11,8 @@
 mod common;
 
 use common::{create_test_script, get_test_persistence_dir};
-use pasta::PastaEngine;
-use pasta::ir::ScriptEvent;
+use pasta_rune::PastaEngine;
+use pasta_rune::ir::ScriptEvent;
 use std::collections::HashSet;
 
 /// Test: Call statement can invoke local scene within the same global scene.
@@ -300,3 +300,4 @@ fn test_call_local_and_global_same_name() -> Result<(), Box<dyn std::error::Erro
 
     Ok(())
 }
+

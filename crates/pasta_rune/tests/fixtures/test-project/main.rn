@@ -1,0 +1,24 @@
+// Main Rune entry point for test project
+// This file defines global actor constants and other shared definitions
+
+// Actor definitions - organized in actors module
+pub mod actors {
+    pub const さくら = #{
+        name: "さくら",
+        id: "sakura",
+    };
+
+    pub const うにゅう = #{
+        name: "うにゅう", 
+        id: "unyuu",
+    };
+
+    pub const ななこ = #{
+        name: "ななこ",
+        id: "nanako",
+    };
+}
+
+pub fn main() {
+    // Entry point (not used in tests)
+}

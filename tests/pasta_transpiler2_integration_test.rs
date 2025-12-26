@@ -5,9 +5,9 @@
 //! - Multiple files and scenes registration
 //! - Attribute inheritance patterns
 
-use pasta::parser;
-use pasta::registry::{SceneRegistry, WordDefRegistry};
-use pasta::transpiler::Transpiler2;
+use pasta_rune::parser;
+use pasta_rune::registry::{SceneRegistry, WordDefRegistry};
+use pasta_rune::transpiler::Transpiler2;
 use std::fs;
 use std::path::PathBuf;
 
@@ -278,3 +278,4 @@ fn test_multiple_files_share_registry() {
     assert!(result.contains("1 =>"));
     assert!(result.contains("2 =>"));
 }
+

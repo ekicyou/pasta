@@ -3,41 +3,55 @@
 ## ディレクトリ構造
 
 ```
-pasta/
-├── src/                      # ソースコード
-│   ├── lib.rs               # クレートエントリーポイント、公開API定義
-│   ├── engine.rs            # PastaEngine - 上位API層
-│   ├── cache.rs             # ParseCache - パース結果キャッシュ
-│   ├── loader.rs            # DirectoryLoader - スクリプト読み込み
-│   ├── error.rs             # PastaError - エラー型定義
-│   ├── ir.rs                # ScriptEvent - IR出力型
-│   ├── parser/              # パーサーレイヤー（PEG → AST変換）
-│   │   ├── mod.rs           # パーサーAPI公開
-│   │   ├── ast.rs           # AST定義（Statement, Expr, LabelDef等）
-│   │   └── grammar.pest     # Pest文法定義
-│   ├── transpiler/          # トランスパイラレイヤー（AST → Rune、2pass）
-│   │   ├── mod.rs           # Transpiler API
-│   │   ├── code_generator.rs # Runeコード生成
-│   │   ├── context.rs       # トランスパイルコンテキスト
-│   │   └── error.rs         # トランスパイルエラー型
-│   ├── registry/            # 型管理レイヤー（独立）
-│   │   ├── mod.rs           # Registry API
-│   │   ├── scene_registry.rs # SceneRegistry - シーン管理
-│   │   └── word_registry.rs  # WordDefRegistry - 単語辞書
-│   ├── runtime/             # ランタイムレイヤー
-│   │   ├── mod.rs           # ランタイムAPI
-│   │   ├── generator.rs     # ScriptGenerator - Rune VM実行
-│   │   ├── variable.rs      # VariableManager - 変数管理
-│   │   ├── label_table.rs   # LabelTable - シーン検索テーブル
-│   │   └── random.rs        # RandomSelector - ランダム選択
-│   └── stdlib/              # Pasta標準ライブラリ（Rune側関数）
-│       └── mod.rs           # stdlib API登録
-├── tests/                    # 統合テスト
+pasta/                        # Cargo ワークスペースルート
+├── crates/                   # クレート群
+│   ├── pasta_core/          # 言語非依存層
+│   │   ├── Cargo.toml       # pasta_core設定
+│   │   └── src/
+│   │       ├── lib.rs       # クレートエントリーポイント
+│   │       ├── error.rs     # ParseError, SceneTableError, WordTableError
+│   │       ├── parser/      # パーサーレイヤー（PEG → AST変換）
+│   │       │   ├── mod.rs   # パーサーAPI公開
+│   │       │   ├── ast.rs   # AST定義（Statement, Expr, LabelDef等）
+│   │       │   └── grammar.pest # Pest文法定義
+│   │       └── registry/    # 型管理レイヤー（独立）
+│   │           ├── mod.rs   # Registry API
+│   │           ├── scene_registry.rs # SceneRegistry - シーン管理
+│   │           ├── word_registry.rs  # WordDefRegistry - 単語辞書
+│   │           ├── scene_table.rs    # SceneTable - シーン検索
+│   │           ├── word_table.rs     # WordTable - 単語検索
+│   │           └── random.rs         # RandomSelector - ランダム選択
+│   └── pasta_rune/          # Rune言語バックエンド層
+│       ├── Cargo.toml       # pasta_rune設定（pasta_core依存）
+│       ├── src/
+│       │   ├── lib.rs       # クレートエントリーポイント、公開API定義
+│       │   ├── engine.rs    # PastaEngine - 上位API層
+│       │   ├── cache.rs     # ParseCache - パース結果キャッシュ
+│       │   ├── loader.rs    # DirectoryLoader - スクリプト読み込み
+│       │   ├── error.rs     # PastaError - ランタイムエラー型定義
+│       │   ├── ir/          # ScriptEvent - IR出力型
+│       │   │   └── mod.rs
+│       │   ├── transpiler/  # トランスパイラレイヤー（AST → Rune、2pass）
+│       │   │   ├── mod.rs   # Transpiler API
+│       │   │   ├── code_generator.rs # Runeコード生成
+│       │   │   ├── context.rs # トランスパイルコンテキスト
+│       │   │   └── error.rs  # トランスパイルエラー型
+│       │   ├── runtime/     # ランタイムレイヤー
+│       │   │   ├── mod.rs   # ランタイムAPI
+│       │   │   ├── generator.rs # ScriptGenerator - Rune VM実行
+│       │   │   └── variables.rs # VariableManager - 変数管理
+│       │   └── stdlib/      # Pasta標準ライブラリ（Rune側関数）
+│       │       ├── mod.rs   # stdlib API登録
+│       │       └── persistence.rs # 永続化API
+│       └── tests/           # pasta_rune統合テスト
+│           ├── common/      # テスト共通ユーティリティ
+│           └── fixtures/    # テスト用Pastaスクリプト
+├── tests/                    # ワークスペースレベル統合テスト
 │   ├── common/              # テスト共通ユーティリティ
-│   ├── fixtures/            # テスト用Pastaスクリプト
-│   │   ├── simple_hello.pasta
-│   │   ├── comprehensive_control_flow.pasta
-│   │   └── ...
+│   └── fixtures/            # テスト用Pastaスクリプト
+│       ├── simple_hello.pasta
+│       ├── comprehensive_control_flow.pasta
+│       └── ...
 │   ├── parser2_integration_test.rs  # パーサー統合テスト
 │   ├── pasta_transpiler2_*.rs       # トランスパイラーテスト群
 │   ├── pasta_engine_*.rs            # エンジンテスト群
@@ -74,35 +88,54 @@ pasta/
 
 ## モジュール構成
 
+### ワークスペース構成
+
+```
+pasta (workspace)
+├── pasta_core          # 言語非依存層（パーサー、レジストリ）
+└── pasta_rune          # Runeバックエンド層（pasta_core依存）
+```
+
 ### レイヤー分離原則
 各レイヤーは上位レイヤーのみに依存：
 
+**pasta_core:**
+```
+parser（AST生成）
+  ↓
+registry（シーン/単語テーブル）
+  ↓
+error（パースエラー）
+```
+
+**pasta_rune:**
 ```
 engine (上位API)
   ↓
 cache, loader
   ↓
-parser, transpiler (2pass)
+transpiler (2pass)
   ↓
 runtime
   ↓
-registry (公開型) → stdlib, ir
+stdlib, ir
+  ↓
+pasta_core（再エクスポート）
 ```
 
-### 公開API (`lib.rs`)
-- **Parser**: `parse()`, AST型（Statement, Expr等）
-- **Transpiler**: `transpile()`, `TranspileContext`
-- **Registry**: `SceneRegistry`, `WordDefRegistry`, `WordEntry`
-- **Runtime**: `ScriptGenerator`, `LabelTable`, `VariableManager`
-- **Engine**: `PastaEngine`（統合API）
-- **IR**: `ScriptEvent`, `ContentPart`
-- **Error**: `PastaError`, `Result`
+### 公開API (`pasta_core/lib.rs`)
+- **Parser**: `parse_str()`, `parse_file()`, AST型（PastaFile, Statement, Expr等）
+- **Registry**: `SceneRegistry`, `WordDefRegistry`, `SceneTable`, `WordTable`
+- **Random**: `RandomSelector`, `DefaultRandomSelector`
+- **Error**: `ParseError`, `SceneTableError`, `WordTableError`
 
-### 内部モジュール
-- `loader`: ディレクトリスキャン・ファイル読み込み
-- `cache`: パース結果メモリキャッシュ
-- `registry`: シーン登録・単語辞書・型管理（独立層）
-- `runtime::generator`: Rune VM実行・Generator継続管理
+### 公開API (`pasta_rune/lib.rs`)
+- **Engine**: `PastaEngine`（統合API）
+- **Transpiler**: `transpile()`, `TranspileContext`
+- **Runtime**: `ScriptGenerator`, `VariableManager`
+- **IR**: `ScriptEvent`, `ContentPart`
+- **Error**: `PastaError`, `Result`, `Transpiler2Pass`
+- **Core**: `pasta_core`の再エクスポート（`parser`, `core`エイリアス）
 
 ## テスト構成
 

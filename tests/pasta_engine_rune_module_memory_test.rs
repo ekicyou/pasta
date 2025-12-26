@@ -171,3 +171,4 @@ fn test_single_source_memory_with_complete_module() {
         }
     }
 }
+
