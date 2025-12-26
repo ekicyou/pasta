@@ -784,21 +784,55 @@ graph LR
 
 ---
 
-### Query 2: テスト配置戦略の確定
+### Query 2: テスト配置戦略の確定 ✅ **解決済み**
 
-**背景**: 既存28テストファイルのワークスペース内配置が不明確
+**背景**: 既存28テストファイルのワークスペース内配置
 
-**質問**:
-- 28テストファイルをすべてワークスペースルート`/tests/`に集約することを推奨していますが、これで問題ありませんか？
-- または、pasta_core/tests/, pasta_rune/tests/ に層別配置すべきですか？
+**決定**: ✅ **クレート別配置**（過去の議論で確定済み）
 
-**影響度**: **High**（テスト実行パス、フィクスチャ参照の複雑性を左右）
+**テスト分類**:
 
-**実装への影響**:
-- ワークスペース集約 → fixtures_path() 実装が単純化（推奨）
-- クレート別配置 → 各クレートでfixtures_path()が異なるロジック必要
+**pasta_core層テスト**（parser, registry）→ `crates/pasta_core/tests/`
+- `parser2_integration_test.rs` - parser層
+- 合計: **1テスト**
 
-**解決方法**: テストファイル一覧確認 + 依存関係分析
+**pasta_rune層テスト**（transpiler, runtime, engine, stdlib）→ `crates/pasta_rune/tests/`
+- `pasta_transpiler2_*_test.rs` (4個) - transpiler層
+- `pasta_engine_*_test.rs` (6個) - engine層
+- `pasta_integration_*_test.rs` (6個) - E2E統合テスト
+- `pasta_rune_*_test.rs`, `pasta_stdlib_*_test.rs`, `pasta_word_definition_*_test.rs` (8個) - runtime層
+- その他（sakura_debug, scene_id_consistency等）(3個)
+- 合計: **27テスト**
+
+**共有リソース** → ワークスペースレベル
+- `tests/common/mod.rs` - fixtures_path() 関数
+- `tests/fixtures/` - 共有フィクスチャ
+
+**fixtures_path() 実装**:
+```rust
+// tests/common/mod.rs
+pub fn fixtures_path() -> PathBuf {
+    // cargo test 実行時のCARGO_MANIFEST_DIRを判定
+    let manifest_dir = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string()));
+    
+    // クレート直下なら親→親→testsへナビゲート
+    // ワークスペースなら直接testsへアクセス
+    let root = if manifest_dir.ends_with("pasta_core") || manifest_dir.ends_with("pasta_rune") {
+        manifest_dir.parent().unwrap().parent().unwrap().to_path_buf()
+    } else {
+        manifest_dir
+    };
+    
+    root.join("tests").join("fixtures")
+}
+```
+
+**理由**: 
+- 28テストの大半（27個）が言語依存テスト（pasta_rune層）
+- クレート別配置により、各層が独立したテストスイートを保有
+- 共有フィクスチャは ワークスペースレベルで一元管理
+
+**結論**: ✅ **クレート別配置で確定**
 
 ---
 
