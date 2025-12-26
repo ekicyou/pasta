@@ -154,3 +154,4 @@ fn test_rust_module_then_rune_calls() {
 fn rust_helper_function(input: String) -> String {
     format!("rust_processed: {}", input)
 }
+

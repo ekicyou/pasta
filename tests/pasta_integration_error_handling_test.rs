@@ -14,7 +14,7 @@
 mod common;
 
 use common::{create_test_script, get_test_persistence_dir};
-use pasta::{PastaEngine, PastaError};
+use pasta_rune::{PastaEngine, PastaError};
 
 /// Helper to create a test word table
 fn create_test_word_table() -> pasta::runtime::words::WordTable {
@@ -172,7 +172,7 @@ fn test_dynamic_error_from_rune_script() {
 #[test]
 fn test_error_event_structure() {
     // Test that ScriptEvent::Error has the correct structure
-    use pasta::ir::ScriptEvent;
+    use pasta_rune::ir::ScriptEvent;
 
     let error_event = ScriptEvent::Error {
         message: "Test error".to_string(),
@@ -476,3 +476,4 @@ fn test_error_in_nested_label() {
     let result2 = engine.execute_label("存在しないラベル");
     assert!(result2.is_err(), "Non-existent scene should error");
 }
+

@@ -7,9 +7,9 @@
 //!
 //! Note: CodeGenerator internal methods are tested via mod.rs internal tests.
 
-use pasta::parser::{self, FnScope, Span};
-use pasta::registry::{SceneRegistry, WordDefRegistry};
-use pasta::transpiler::{TranspileContext2, TranspileError, Transpiler2};
+use pasta_rune::parser::{self, FnScope, Span};
+use pasta_rune::registry::{SceneRegistry, WordDefRegistry};
+use pasta_rune::transpiler::{TranspileContext2, TranspileError, Transpiler2};
 
 // ====================
 // TranspileContext2 Tests
@@ -304,3 +304,4 @@ fn test_transpile_global_word_definition() {
     assert_eq!(entries.len(), 1);
     assert_eq!(entries[0].values, vec!["こんにちは", "おはよう"]);
 }
+

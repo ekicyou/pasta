@@ -1,6 +1,6 @@
 //! Integration test for standard library functions
 
-use pasta::stdlib;
+use pasta_rune::stdlib;
 use rune::{Context, Vm};
 use std::sync::Arc;
 
@@ -95,3 +95,4 @@ fn test_sync_functions_via_rune() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+

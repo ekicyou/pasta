@@ -7,36 +7,54 @@
 - **Rune 0.14**: バックエンドスクリプトVM（generator機能を使用）
 - **Pest 2.8**: PEGパーサー生成器（`pasta.pest`文法定義）
 
+### ワークスペース構成
+- **pasta_core**: 言語非依存層（パーサー、レジストリ）
+- **pasta_rune**: Runeバックエンド層（pasta_core依存）
+
 ### 主要依存関係
+
+**pasta_core:**
+- **pest 2.8, pest_derive 2.8**: PEGパーサー生成器
+- **thiserror 2**: エラー型定義
+- **fast_radix_trie 1.1.0**: 前方一致シーン検索
+- **rand 0.9**: ランダム選択（重複シーン、前方一致候補）
+- **tracing 0.1**: ロギング・診断
+
+**pasta_rune:**
+- **pasta_core**: 言語非依存層
+- **rune 0.14**: スクリプトVM
 - **thiserror 2**: エラー型定義
 - **glob 0.3**: ファイルパターンマッチング（スクリプト読み込み）
-- **tracing 0.1**: ロギング・診断
-- **rand 0.9**: ランダム選択（重複シーン、前方一致候補）
 - **futures 0.3**: 非同期処理サポート
 - **toml 0.9.8**: 設定ファイル管理
-- **fast_radix_trie 1.1.0**: 前方一致シーン検索
+- **tracing 0.1**: ロギング・診断
 
 ### 開発環境
 - **tempfile 3**: テスト用一時ファイル生成
 
 ## アーキテクチャ原則
 
-### レイヤー構成
+### ワークスペースレイヤー構成
 ```
-Engine (上位API) → Cache/Loader
-    ↓
-Transpiler (2pass) ← Parser (Pest)
-    ↓
-Runtime (Rune VM) → IR Output (ScriptEvent)
+pasta (workspace)
+├── pasta_core          # 言語非依存層
+│   ├── Parser          # DSL→AST変換
+│   └── Registry        # シーン/単語テーブル
+└── pasta_rune          # Runeバックエンド層
+    ├── Engine          # 統合API、キャッシュ
+    ├── Transpiler      # AST→Runeコード (2pass)
+    ├── Runtime         # Rune VM実行、yield出力
+    └── Stdlib          # Pasta標準ライブラリ
 ```
 
-| レイヤー | 責務 |
-|---------|------|
-| Parser | DSL→AST変換 |
-| Transpiler | AST→Runeコード、シーン管理 |
-| Runtime | Rune VM実行、yield出力 |
-| Engine | 統合API、キャッシュ |
-| IR | ScriptEventイベント出力 |
+| クレート | レイヤー | 責務 |
+|----------|---------|------|
+| pasta_core | Parser | DSL→AST変換 |
+| pasta_core | Registry | シーン/単語テーブル管理 |
+| pasta_rune | Transpiler | AST→Runeコード、シーン管理 |
+| pasta_rune | Runtime | Rune VM実行、yield出力 |
+| pasta_rune | Engine | 統合API、キャッシュ |
+| pasta_rune | IR | ScriptEventイベント出力 |
 
 ### 設計哲学
 
@@ -93,8 +111,17 @@ Runtime (Rune VM) → IR Output (ScriptEvent)
 ## デプロイメント
 
 ```bash
-cargo test --all-features  # 全テスト
-cargo test --release       # リリースビルド
+cargo build --workspace     # ワークスペースビルド
+cargo test --workspace      # 全テスト
+cargo test --release        # リリースビルド
+```
+
+### クレート別コマンド
+```bash
+cargo build -p pasta_core   # pasta_coreビルド
+cargo build -p pasta_rune   # pasta_runeビルド
+cargo test -p pasta_core    # pasta_coreテスト
+cargo test -p pasta_rune    # pasta_runeテスト
 ```
 
 ### 将来計画

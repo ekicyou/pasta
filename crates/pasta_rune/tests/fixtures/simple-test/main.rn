@@ -1,0 +1,10 @@
+// Simple test main.rn
+
+pub mod actors {
+    pub const さくら = #{
+        name: "さくら",
+        id: "sakura",
+    };
+}
+
+pub fn main() {}

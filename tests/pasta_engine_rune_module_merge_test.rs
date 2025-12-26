@@ -183,3 +183,4 @@ fn test_module_function_overwrite() {
         }
     }
 }
+
