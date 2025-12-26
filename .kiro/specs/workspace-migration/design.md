@@ -836,23 +836,61 @@ pub fn fixtures_path() -> PathBuf {
 
 ---
 
-### Query 3: Steering更新計画の スコープ確定
+### Query 3: Steering更新計画の スコープ確定 ✅ **解決済み**
 
-**背景**: 新設計でワークスペース構成に変更されるため、既存のsteering.mdとの矛盾が生じる
+**背景**: 新設計でワークスペース構成に変更されるため、既存steering.mdとの矛盾
 
-**質問**:
-- Phase 5（Documentation）で、以下の steering ファイルをすべて更新対象にしていいですか？
-  - `steering/structure.md`（ディレクトリ構造更新）
-  - `steering/tech.md`（レイヤー図更新）
-  - 他のsteering files?
+**更新対象ファイル**:
 
-**影響度**: **Medium**（設計の formal化の完全性を左右）
+| Steering File | 更新内容 | 影響度 |
+|---------------|---------|--------|
+| `steering/structure.md` | ✅ 必須 | **高** |
+| `steering/tech.md` | ✅ 必須 | **高** |
+| `steering/product.md` | ❌ 不要 | 低 |
+| `steering/grammar.md` | ❌ 不要 | 低 |
+| `steering/workflow.md` | ❌ 不要 | 低 |
 
-**実装への影響**:
-- 更新対象が多い → Phase 5の作業量増加
-- 範囲が不明確 → 実装後の documentation gap 発生
+**steering/structure.md 更新差分**:
+- **現在**: 単一クレート `src/` レイアウト（単一lib.rs）
+- **変更後**: Cargoワークスペース `crates/` レイアウト
+  ```
+  pasta/
+  ├── Cargo.toml                          # ワークスペース定義
+  ├── crates/
+  │   ├── pasta_core/
+  │   │   └── src/
+  │   │       ├── lib.rs
+  │   │       ├── error.rs
+  │   │       ├── parser/
+  │   │       └── registry/
+  │   └── pasta_rune/
+  │       └── src/
+  │           ├── lib.rs
+  │           ├── engine.rs
+  │           ├── transpiler/
+  │           ├── runtime/
+  │           └── ...
+  ├── tests/
+  │   ├── common/mod.rs
+  │   └── fixtures/
+  ```
 
-**解決方法**: steering/ ディレクトリ内容確認 + 更新リスト作成
+**steering/tech.md 更新差分**:
+- **アーキテクチャ図**: 単一クレート → 2クレート構成に変更
+  ```
+  Before: Engine → Transpiler → Parser
+  After:  pasta_rune (Engine→Transpiler→Runtime) 
+          ↓
+          pasta_core (Parser, Registry)
+  ```
+
+**変更対象セクション**:
+1. `## アーキテクチャ原則 > レイヤー構成` - クレート境界を明示
+2. `## 依存関係管理 > バージョン戦略` - workspace.dependencies 説明を追加
+
+**実装タイミング**: Phase 5（Documentation）で実施
+
+**結論**: ✅ **steering/structure.md と steering/tech.md を Phase 5で更新**
 
 ---
 - Phase 3完了: `cargo build --workspace`成功
