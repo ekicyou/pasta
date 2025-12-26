@@ -755,21 +755,32 @@ graph LR
 
 本設計を実装するにあたり、以下3点の確認が必須です。設計レビュー段階で不確実性があり、Phase 1前に開発者と協議する必要があります。
 
-### Query 1: Registry層の参照パターン確認
+### Query 1: Registry層の参照パターン確認 ✅ **解決済み**
 
 **背景**: Runtime層（transpiler/, runtime/）が SceneTable/WordTable に依存するか不明確
 
-**質問**: 
-- 既存実装で、Transpiler層はシーン登録（Pass 1）時に SceneRegistry のみを参照していますか？それとも Runtime の SceneTable（検索テーブル）も参照していますか？
-- Runtime層（generator.rs等）は実行時にSceneTable/WordTableを参照していますか？それともRegistry型のみですか？
+**調査結果**:
+- ✅ **Transpiler層**: `SceneRegistry`, `WordDefRegistry` のみを参照（Pass 1の登録処理）
+  - 参照箇所: `src/transpiler/mod.rs` line 47, 72-73, 108
+  - テーブルへの参照なし（設計通り）
+  
+- ✅ **Registry → Table 変換**: Engine層で実行
+  - `src/engine.rs` line 193: `SceneTable::from_scene_registry(scene_registry, ...)`
+  - `src/engine.rs` line 197: `WordTable::from_word_def_registry(word_def_registry, ...)`
+  
+- ✅ **Runtime層**: `SceneTable`, `WordTable` を参照
+  - 参照箇所: `src/stdlib/mod.rs` line 20-21, 100, 171
+  - `src/runtime/scene.rs` line 100-106: `SceneTable` 検索API
+  - `src/runtime/words.rs` line 53-74: `WordTable::from_word_def_registry()` 変換ロジック
 
-**影響度**: **Critical**（依存グラフの正確性を左右）
+**設計への影響**: ✅ **確認 - 設計は正確**
 
-**実装への影響**:
-- YES → SceneTable/WordTable を pasta_core に移動（現設計通り）
-- NO → Registry型の一部をpasta_runeに残す可能性あり
+設計.md の以下の記述が実装と完全に一致：
+- Transpiler は Pass 1 で Registry のみを使用（登録）
+- Runtime/Engine は Table を使用（検索・実行）
+- Table は Registry から変換されたもの（言語非依存性を保証）
 
-**解決方法**: 既存コード分析（grep: `SceneTable`, `WordTable`の使用箇所を runtime/, transpiler/ で検索）
+**結論**: SceneTable/WordTable を pasta_core の registry/ に移動する設計は正確です。
 
 ---
 
