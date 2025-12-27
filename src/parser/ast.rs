@@ -17,7 +17,7 @@ use std::path::PathBuf;
 
 /// ファイルレベルで出現するアイテムの統一表現
 ///
-/// grammar.pest の `file = ( file_scope | global_scene_scope )*` に対応。
+/// grammar.pest の `file = ( file_scope | global_scene_scope | actor_scope )*` に対応。
 /// file_scope 内の attrs と words は個別のバリアントとして分離。
 ///
 /// # grammar.pest 対応関係
@@ -25,6 +25,7 @@ use std::path::PathBuf;
 /// - `FileAttr`: file_scope 内の attr（ファイルレベル属性）
 /// - `GlobalWord`: file_scope 内の key_words（ファイルレベル単語定義）
 /// - `GlobalSceneScope`: global_scene_scope（グローバルシーン）
+/// - `ActorScope`: actor_scope（アクター定義）
 ///
 /// # 使用例
 ///
@@ -34,6 +35,7 @@ use std::path::PathBuf;
 ///         FileItem::FileAttr(attr) => { /* 属性処理 */ }
 ///         FileItem::GlobalWord(word) => { /* 単語定義処理 */ }
 ///         FileItem::GlobalSceneScope(scene) => { /* シーン処理 */ }
+///         FileItem::ActorScope(actor) => { /* アクター処理 */ }
 ///     }
 /// }
 /// ```
@@ -45,6 +47,8 @@ pub enum FileItem {
     GlobalWord(KeyWords),
     /// グローバルシーン
     GlobalSceneScope(GlobalSceneScope),
+    /// アクター定義（actor_scope）
+    ActorScope(ActorScope),
 }
 
 // ============================================================================
@@ -187,6 +191,66 @@ impl PastaFile {
                 }
             })
             .collect()
+    }
+
+    /// アクター定義を取得（ActorScope バリアントのみ抽出）
+    ///
+    /// 記述順で全アクター定義を返します。
+    pub fn actor_scopes(&self) -> Vec<&ActorScope> {
+        self.items
+            .iter()
+            .filter_map(|item| {
+                if let FileItem::ActorScope(actor) = item {
+                    Some(actor)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+}
+
+// ============================================================================
+// ActorScope - Actor Definition Scope
+// ============================================================================
+
+/// アクター定義スコープ
+///
+/// grammar.pest の `actor_scope = { actor_line ~ actor_scope_item* }` に対応。
+/// アクター（キャラクター）の名前とその属性・単語定義・変数設定を保持します。
+///
+/// # 例
+///
+/// ```pasta
+/// ％さくら
+///   ＠通常  ：\s[0]
+///   ＠照れ  ：\s[1]
+///   ＄デフォルト表情＝0
+/// ```
+#[derive(Debug, Clone)]
+pub struct ActorScope {
+    /// アクター名
+    pub name: String,
+    /// アクターの属性
+    pub attrs: Vec<Attr>,
+    /// アクターの単語定義（表情など）
+    pub words: Vec<KeyWords>,
+    /// アクターの変数設定
+    pub var_sets: Vec<VarSet>,
+    /// ソース位置
+    pub span: Span,
+}
+
+impl ActorScope {
+    /// Create a new actor scope with the given name.
+    pub fn new(name: String) -> Self {
+        Self {
+            name,
+            attrs: Vec::new(),
+            words: Vec::new(),
+            var_sets: Vec::new(),
+            span: Span::default(),
+        }
     }
 }
 

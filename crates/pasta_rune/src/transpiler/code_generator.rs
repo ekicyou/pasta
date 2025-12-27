@@ -178,6 +178,13 @@ impl<'a, W: Write> CodeGenerator<'a, W> {
         let var_path = match var_set.scope {
             VarScope::Local => format!("ctx.local.{}", var_set.name),
             VarScope::Global => format!("ctx.global.{}", var_set.name),
+            VarScope::Args(_) => {
+                // Cannot assign to scene arguments
+                return Err(TranspileError::invalid_ast(
+                    &var_set.span,
+                    "Cannot assign to scene argument",
+                ));
+            }
         };
 
         self.write_indent()?;
@@ -192,8 +199,7 @@ impl<'a, W: Write> CodeGenerator<'a, W> {
     fn generate_call_scene(&mut self, call_scene: &CallScene) -> Result<(), TranspileError> {
         self.writeln(&format!(
             "for a in crate::pasta::call(ctx, \"{}\", \"{}\", [], args) {{ yield a; }}",
-            call_scene.target,
-            self.current_module
+            call_scene.target, self.current_module
         ))?;
         Ok(())
     }
@@ -257,6 +263,7 @@ impl<'a, W: Write> CodeGenerator<'a, W> {
                 let var_path = match scope {
                     VarScope::Local => format!("ctx.local.{}", name),
                     VarScope::Global => format!("ctx.global.{}", name),
+                    VarScope::Args(index) => format!("ctx.args[{}]", index),
                 };
                 self.writeln(&format!("yield Talk(`${{{}}}`);", var_path))?;
             }
@@ -303,6 +310,7 @@ impl<'a, W: Write> CodeGenerator<'a, W> {
                 let var_path = match scope {
                     VarScope::Local => format!("ctx.local.{}", name),
                     VarScope::Global => format!("ctx.global.{}", name),
+                    VarScope::Args(index) => format!("ctx.args[{}]", index),
                 };
                 write!(self.writer, "{}", var_path)?;
             }
@@ -507,7 +515,11 @@ mod tests {
         let result = String::from_utf8(output).unwrap();
         // Updated: Now includes module_name parameter for unified scope resolution
         // Uses crate::pasta::call for absolute path resolution
-        assert!(result.contains("for a in crate::pasta::call(ctx, \"挨拶\", \"\", [], args) { yield a; }"));
+        assert!(
+            result.contains(
+                "for a in crate::pasta::call(ctx, \"挨拶\", \"\", [], args) { yield a; }"
+            )
+        );
     }
 
     #[test]
@@ -527,6 +539,8 @@ mod tests {
 
         let result = String::from_utf8(output).unwrap();
         // Verify module_name is passed for unified scope resolution with crate:: prefix
-        assert!(result.contains("for a in crate::pasta::call(ctx, \"選択肢\", \"会話_1\", [], args) { yield a; }"));
+        assert!(result.contains(
+            "for a in crate::pasta::call(ctx, \"選択肢\", \"会話_1\", [], args) { yield a; }"
+        ));
     }
 }
