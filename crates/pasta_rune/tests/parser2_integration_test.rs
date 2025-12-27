@@ -575,6 +575,9 @@ fn test_pattern_match_and_helper_methods() {
                 scene_count += 1;
                 assert_eq!(scene.name, "シーン");
             }
+            FileItem::ActorScope(_) => {
+                // アクター定義はこのテストでは対象外
+            }
         }
     }
 
@@ -631,6 +634,9 @@ fn test_transpiler2_style_iteration() {
                     buffered_words.clone(),
                 ));
             }
+            FileItem::ActorScope(_) => {
+                // アクター定義はこのテストでは対象外
+            }
         }
     }
 
@@ -666,7 +672,9 @@ fn test_span_information_preserved() {
             FileItem::GlobalSceneScope(scene) => {
                 assert!(scene.span.start_line > 0 || scene.span.start_col > 0);
             }
+            FileItem::ActorScope(actor) => {
+                assert!(actor.span.start_line > 0 || actor.span.start_col > 0);
+            }
         }
     }
 }
-

@@ -28,5 +28,9 @@ toml = "0.9.8"
 # Development dependencies
 tempfile = "3"
 
+# pasta_lua dependencies
+mlua = { git = "https://github.com/ekicyou/mlua.git", features = ["lua54", "vendored", "ucid"] }
+
 # Internal dependencies
 pasta_core = { path = "crates/pasta_core" }
+pasta_lua = { path = "crates/pasta_lua" }

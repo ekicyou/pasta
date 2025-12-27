@@ -29,11 +29,13 @@
 //! - `FileItem::FileAttr` - ファイルレベル属性
 //! - `FileItem::GlobalWord` - ファイルレベル単語定義
 //! - `FileItem::GlobalSceneScope` - グローバルシーン
+//! - `FileItem::ActorScope` - アクター定義
 //!
 //! ヘルパーメソッドで型別アクセスも可能:
 //! - `file.file_attrs()` - 全ファイル属性
 //! - `file.words()` - 全単語定義
 //! - `file.global_scene_scopes()` - 全グローバルシーン
+//! - `file.actor_scopes()` - 全アクター定義
 //!
 //! # Example
 //!
@@ -59,6 +61,7 @@
 //!         FileItem::FileAttr(attr) => println!("FileAttr: {}", attr.key),
 //!         FileItem::GlobalWord(word) => println!("GlobalWord: {}", word.name),
 //!         FileItem::GlobalSceneScope(scene) => println!("Scene: {}", scene.name),
+//!         FileItem::ActorScope(actor) => println!("Actor: {}", actor.name),
 //!     }
 //! }
 //! ```
@@ -168,8 +171,8 @@ pub fn parse_file(path: &Path) -> Result<PastaFile, ParseError> {
 
 /// Build AST from parsed pairs.
 ///
-/// grammar.pest `file = ( file_scope | global_scene_scope )*` に準拠。
-/// 複数の file_scope と global_scene_scope を任意順序で処理し、
+/// grammar.pest `file = ( file_scope | global_scene_scope | actor_scope )*` に準拠。
+/// 複数の file_scope、global_scene_scope、actor_scope を任意順序で処理し、
 /// 出現順序を items に保持します。
 fn build_ast(pairs: Pairs<Rule>, filename: &str) -> Result<PastaFile, ParseError> {
     let mut file = PastaFile::new(std::path::PathBuf::from(filename));
@@ -190,6 +193,10 @@ fn build_ast(pairs: Pairs<Rule>, filename: &str) -> Result<PastaFile, ParseError
             Rule::global_scene_scope => {
                 let scene = parse_global_scene_scope(pair, &mut last_global_scene_name, filename)?;
                 file.items.push(FileItem::GlobalSceneScope(scene));
+            }
+            Rule::actor_scope => {
+                let actor = parse_actor_scope(pair)?;
+                file.items.push(FileItem::ActorScope(actor));
             }
             Rule::EOI => {}
             _ => {}
@@ -224,6 +231,57 @@ fn parse_file_scope(pair: Pair<Rule>) -> Result<FileScope, ParseError> {
     }
 
     Ok(scope)
+}
+
+/// Parse actor scope.
+///
+/// grammar.pest `actor_scope = { actor_line ~ actor_scope_item* }` に対応。
+/// actor_scope_item = _{ global_scene_attr_line | global_scene_word_line | var_set_line | blank_line }
+fn parse_actor_scope(pair: Pair<Rule>) -> Result<ActorScope, ParseError> {
+    let span = span_from_pair(&pair);
+    let mut name = String::new();
+    let mut attrs = Vec::new();
+    let mut words = Vec::new();
+    let mut var_sets = Vec::new();
+
+    for inner in pair.into_inner() {
+        match inner.as_rule() {
+            Rule::actor_line => {
+                // actor_line = { actor_marker ~ id ~ or_comment_eol }
+                for id_pair in inner.into_inner() {
+                    if id_pair.as_rule() == Rule::id {
+                        name = id_pair.as_str().to_string();
+                    }
+                }
+            }
+            Rule::global_scene_attr_line => {
+                for attr_pair in inner.into_inner() {
+                    if attr_pair.as_rule() == Rule::attr {
+                        attrs.push(parse_attr(attr_pair)?);
+                    }
+                }
+            }
+            Rule::global_scene_word_line => {
+                for kw_pair in inner.into_inner() {
+                    if kw_pair.as_rule() == Rule::key_words {
+                        words.push(parse_key_words(kw_pair)?);
+                    }
+                }
+            }
+            Rule::var_set_local | Rule::var_set_global => {
+                var_sets.push(parse_var_set(inner)?);
+            }
+            _ => {}
+        }
+    }
+
+    Ok(ActorScope {
+        name,
+        attrs,
+        words,
+        var_sets,
+        span,
+    })
 }
 
 /// Parse global scene scope.
@@ -473,6 +531,9 @@ fn parse_key_words(pair: Pair<Rule>) -> Result<KeyWords, ParseError> {
                         Rule::word_nofenced => {
                             words.push(word_inner.as_str().to_string());
                         }
+                        Rule::sakura_script => {
+                            words.push(word_inner.as_str().to_string());
+                        }
                         _ => {}
                     }
                 }
@@ -619,12 +680,29 @@ fn parse_actions(pair: Pair<Rule>) -> Result<Vec<Action>, ParseError> {
                 }
             }
             Rule::var_ref_local => {
-                for id_inner in inner.into_inner() {
-                    if id_inner.as_rule() == Rule::id {
-                        actions.push(Action::VarRef {
-                            name: id_inner.as_str().to_string(),
-                            scope: VarScope::Local,
-                        });
+                for var_id_pair in inner.into_inner() {
+                    if var_id_pair.as_rule() == Rule::var_id {
+                        // var_idの内部構造を確認（idまたはdigit_id）
+                        for id_inner in var_id_pair.into_inner() {
+                            match id_inner.as_rule() {
+                                Rule::id => {
+                                    actions.push(Action::VarRef {
+                                        name: id_inner.as_str().to_string(),
+                                        scope: VarScope::Local,
+                                    });
+                                }
+                                Rule::digit_id => {
+                                    let index = normalize_number_str(id_inner.as_str())
+                                        .parse::<u8>()
+                                        .unwrap_or(0);
+                                    actions.push(Action::VarRef {
+                                        name: id_inner.as_str().to_string(),
+                                        scope: VarScope::Args(index),
+                                    });
+                                }
+                                _ => {}
+                            }
+                        }
                     }
                 }
             }
@@ -751,12 +829,29 @@ fn try_parse_expr(pair: Pair<Rule>) -> Option<Expr> {
         Rule::string_contents => Some(Expr::String(pair.as_str().to_string())),
         Rule::string_blank => Some(Expr::BlankString),
         Rule::var_ref_local => {
-            for inner in pair.into_inner() {
-                if inner.as_rule() == Rule::id {
-                    return Some(Expr::VarRef {
-                        name: inner.as_str().to_string(),
-                        scope: VarScope::Local,
-                    });
+            for var_id_pair in pair.into_inner() {
+                if var_id_pair.as_rule() == Rule::var_id {
+                    // var_idの内部構造を確認（idまたはdigit_id）
+                    for id_inner in var_id_pair.into_inner() {
+                        match id_inner.as_rule() {
+                            Rule::id => {
+                                return Some(Expr::VarRef {
+                                    name: id_inner.as_str().to_string(),
+                                    scope: VarScope::Local,
+                                });
+                            }
+                            Rule::digit_id => {
+                                let index = normalize_number_str(id_inner.as_str())
+                                    .parse::<u8>()
+                                    .unwrap_or(0);
+                                return Some(Expr::VarRef {
+                                    name: id_inner.as_str().to_string(),
+                                    scope: VarScope::Args(index),
+                                });
+                            }
+                            _ => {}
+                        }
+                    }
                 }
             }
             None

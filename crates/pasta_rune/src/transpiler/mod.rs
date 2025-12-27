@@ -93,6 +93,10 @@ impl Transpiler2 {
                         writer,
                     )?;
                 }
+                FileItem::ActorScope(_actor) => {
+                    // TODO: アクター定義の処理を実装
+                    // 現時点ではスキップ（将来的にアクター情報をレジストリに登録）
+                }
             }
         }
 

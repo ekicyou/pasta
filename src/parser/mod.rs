@@ -67,8 +67,8 @@ pub mod ast;
 
 pub use ast::*;
 
-use pest::Parser as PestParser;
 use pest::iterators::{Pair, Pairs};
+use pest::Parser as PestParser;
 use pest_derive::Parser;
 use std::path::Path;
 
@@ -167,8 +167,8 @@ pub fn parse_file(path: &Path) -> Result<PastaFile, PastaError> {
 
 /// Build AST from parsed pairs.
 ///
-/// grammar.pest `file = ( file_scope | global_scene_scope )*` に準拠。
-/// 複数の file_scope と global_scene_scope を任意順序で処理し、
+/// grammar.pest `file = ( file_scope | global_scene_scope | actor_scope )*` に準拠。
+/// 複数の file_scope、global_scene_scope、actor_scope を任意順序で処理し、
 /// 出現順序を items に保持します。
 fn build_ast(pairs: Pairs<Rule>, filename: &str) -> Result<PastaFile, PastaError> {
     let mut file = PastaFile::new(std::path::PathBuf::from(filename));
@@ -189,6 +189,10 @@ fn build_ast(pairs: Pairs<Rule>, filename: &str) -> Result<PastaFile, PastaError
             Rule::global_scene_scope => {
                 let scene = parse_global_scene_scope(pair, &mut last_global_scene_name, filename)?;
                 file.items.push(FileItem::GlobalSceneScope(scene));
+            }
+            Rule::actor_scope => {
+                let actor = parse_actor_scope(pair)?;
+                file.items.push(FileItem::ActorScope(actor));
             }
             Rule::EOI => {}
             _ => {}
@@ -223,6 +227,57 @@ fn parse_file_scope(pair: Pair<Rule>) -> Result<FileScope, PastaError> {
     }
 
     Ok(scope)
+}
+
+/// Parse actor scope.
+///
+/// grammar.pest `actor_scope = { actor_line ~ actor_scope_item* }` に対応。
+/// actor_scope_item = _{ global_scene_attr_line | global_scene_word_line | var_set_line | blank_line }
+fn parse_actor_scope(pair: Pair<Rule>) -> Result<ActorScope, PastaError> {
+    let span = span_from_pair(&pair);
+    let mut name = String::new();
+    let mut attrs = Vec::new();
+    let mut words = Vec::new();
+    let mut var_sets = Vec::new();
+
+    for inner in pair.into_inner() {
+        match inner.as_rule() {
+            Rule::actor_line => {
+                // actor_line = { actor_marker ~ id ~ or_comment_eol }
+                for id_pair in inner.into_inner() {
+                    if id_pair.as_rule() == Rule::id {
+                        name = id_pair.as_str().to_string();
+                    }
+                }
+            }
+            Rule::global_scene_attr_line => {
+                for attr_pair in inner.into_inner() {
+                    if attr_pair.as_rule() == Rule::attr {
+                        attrs.push(parse_attr(attr_pair)?);
+                    }
+                }
+            }
+            Rule::global_scene_word_line => {
+                for kw_pair in inner.into_inner() {
+                    if kw_pair.as_rule() == Rule::key_words {
+                        words.push(parse_key_words(kw_pair)?);
+                    }
+                }
+            }
+            Rule::var_set_local | Rule::var_set_global => {
+                var_sets.push(parse_var_set(inner)?);
+            }
+            _ => {}
+        }
+    }
+
+    Ok(ActorScope {
+        name,
+        attrs,
+        words,
+        var_sets,
+        span,
+    })
 }
 
 /// Parse global scene scope.
@@ -470,6 +525,9 @@ fn parse_key_words(pair: Pair<Rule>) -> Result<KeyWords, PastaError> {
                             words.push(word_inner.as_str().to_string());
                         }
                         Rule::word_nofenced => {
+                            words.push(word_inner.as_str().to_string());
+                        }
+                        Rule::sakura_script => {
                             words.push(word_inner.as_str().to_string());
                         }
                         _ => {}

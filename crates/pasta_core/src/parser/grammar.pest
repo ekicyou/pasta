@@ -54,6 +54,7 @@ var_marker     = _{ dollar }
 word_marker    = _{ at }
 fn_marker      = _{ at }
 comma_sep      = _{ s ~ comma ~ s }
+actor_marker   = _{ modulo }
 
 // ################################################# expr
 expr   = _{ term ~ s ~ bin* }
@@ -77,8 +78,9 @@ paren_expr = { lparen ~ s ~ expr ~ s ~ rparen }
 
 // ################################################# var_ref
 var_ref        =_{ var_ref_global | var_ref_local }
-var_ref_local  = { var_marker                 ~ id ~ s }
-var_ref_global = { var_marker ~ global_marker ~ id ~ s }
+var_id         = { id | digit_id }
+var_ref_local  = { var_marker                 ~ var_id ~ s }
+var_ref_global = { var_marker ~ global_marker ~ id     ~ s }
 
 // ################################################# var_set
 var_set        =_{ var_set_global | var_set_local }
@@ -123,6 +125,7 @@ slfence_en = _{ PUSH("\""+) }
 // ################################################# number_literal
 number_literal = @{ sub? ~ digit+ ~ (dot ~ digit+)? }
 digit          =  { ASCII_DIGIT | '０'..'９' }
+digit_id       = @{ digit+ }
 
 // ################################################# key_value
 key_literal = { id ~ s ~ kv_marker ~ s ~ ( number_literal | string_literal ) }
@@ -131,7 +134,7 @@ key_words   = { id ~ s ~ kv_marker ~ s ~ words }
 
 // ################################################# word_dic
 words         =  { word ~ ( comma_sep ~ word )* ~ comma_sep? }
-word          = _{ string_literal | word_nofenced }
+word          = _{ string_literal | sakura_script | word_nofenced }
 word_nofenced = @{ (!(comma_sep | "\r" | "\n") ~ ANY)+ }
 
 // ################################################# attr
@@ -161,7 +164,7 @@ talk      = @{ talk_word+ }
 
 // ################################################# sakura_script
 sakura_script = @{ sakura_marker ~ sakura_id ~ sakura_args? }
-sakura_id     = @{ (('a'..'z') | ('A'..'Z') | ('0'..'9') | "_" )+ }
+sakura_id     = @{ (('a'..'z') | ('A'..'Z') | ('0'..'9') | "_" | "!" )+ }
 sakura_args   =  { sakura_open ~ sakura_body ~ sakura_close }
 sakura_open   = _{ "[" ~ PUSH_LITERAL("]") }
 sakura_body   = @{ ( sakura_str | (!PEEK ~ ANY) )* }
@@ -185,9 +188,11 @@ code_contents = @{ (!PEEK ~ ANY)+ }
 code_close    = _{ POP ~ or_comment_eol }
 
 // ################################################# line
-blank_line     =_{ or_comment_eol }
-file_attr_line = { attrs ~ or_comment_eol }
-file_word_line = { word_marker ~ key_words ~ or_comment_eol }
+blank_line      =_{ or_comment_eol }
+file_attr_line  = { attrs ~ or_comment_eol }
+file_word_line  = { word_marker ~ key_words ~ or_comment_eol }
+
+actor_line = { actor_marker ~ id ~ or_comment_eol }
 
 global_scene_line          = { global_marker ~ scene ~ or_comment_eol }
 global_scene_continue_line = { global_marker ~ or_comment_eol }
@@ -206,6 +211,9 @@ call_scene_line      =_{ pad ~ call_scene ~ or_comment_eol }
 file_scope      = { file_scppe_item+ }
 file_scppe_item =_{ file_attr_line | file_word_line | blank_line }
 
+actor_scope      =  { actor_line ~ actor_scope_item* }
+actor_scope_item = _{ global_scene_attr_line | global_scene_word_line | var_set_line | blank_line }
+
 global_scene_scope = { global_scene_start ~ global_scene_init* ~ code_scope* ~ local_start_scene_scope ~ local_scene_scope* }
 global_scene_start = { global_scene_line | global_scene_continue_line }
 global_scene_init  =_{ global_scene_attr_line | global_scene_word_line | blank_line }
@@ -219,4 +227,4 @@ local_scene_item  =_{ var_set_line | call_scene_line | action_line | continue_ac
 code_scope = _{ code_block ~ blank_line* }
 
 // ################################################# file
-file = _{ SOI ~ ( file_scope | global_scene_scope )* ~ s ~ EOI }
+file = _{ SOI ~ ( file_scope | global_scene_scope | actor_scope )* ~ s ~ EOI }
