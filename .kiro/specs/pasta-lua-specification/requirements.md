@@ -40,12 +40,12 @@
 **背景**: トランスパイラーで機械的にコードを生成する際、アクター・シーン・変数が増えるとローカル変数が蓄積しやすい。この制約に引っかからない設計パターンの確立が必須。
 
 **受け入れ基準**:
-- The Transpiler shall ローカル変数の宣言を最小化する設計パターンを採用する（単一変数の再利用、テーブル格納）
-- When アクター定義が複数あるとき、Transpiler shall `local ACTOR`（1個）と`local ACTORS`（1個）で管理し、アクター数に依らずローカル変数を2個に抑える
-- When シーン定義が複数あるとき、Transpiler shall `local SCENE`（1個）で管理し、シーン数に依らずローカル変数を1個に抑える
+- The Transpiler shall ローカル変数の宣言を最小化する設計パターンを採用する（単一変数の再利用、テーブル格納、スコープ分離）
+- When アクター定義が複数あるとき、Transpiler shall 各アクター定義を `do...end` ブロックで分離し、ブロックごとに `local ACTOR` を再利用する（チェッカー警告回避、スコープ明確化）
+- When シーン定義が複数あるとき、Transpiler shall 各グローバルシーン定義を `do...end` ブロックで分離し、ブロックごとに `local SCENE` を再利用する（チェッカー警告回避、スコープ明確化）
 - When 関数内でローカル・グローバル・アクター動作を管理するとき、Transpiler shall `var`, `save`, `act` の3個テーブルのみを使用し、個別変数を避ける
-- The Transpiler shall テーブル再利用パターン（`VAR = VAR or {}; VAR.name = value`）で複数定義に対応する
-- The Document shall 生成Luaコード内で使用するローカル変数数の見積もり方法（最大値の計算方法）を記載する
+- The Transpiler shall スコープ分離パターン（`do...end` ブロック）により、各ブロック内で約200個のローカル変数枠を確保できる構造を実装する
+- The Document shall 生成Luaコード内で使用するローカル変数数の見積もり方法（スコープ分離による最大値計算）を記載する
 
 ### 0-2. Lua文字列リテラル形式の標準化
 
@@ -83,32 +83,33 @@
 **目的**: アクター辞書（`％アクター名`）とその属性をLua構造に変換
 
 **受け入れ基準**:
-- When `％さくら` アクター定義があるとき、Transpiler shall `ACTOR = PASTA:create_actor("さくら")` と生成する
+- When `％さくら` アクター定義があるとき、Transpiler shall `do...end` ブロックで分離し、ブロック内で `local ACTOR = PASTA:create_actor("さくら")` と生成する（スコープ明確化、チェッカー警告回避）
 - When アクター属性（`＄通常：\s[0]`）が続くとき、Transpiler shall `ACTOR.通常 = [=[\s[0]]=]` と生成する（Requirement 0-2の文字列リテラル形式判定アルゴリズムを適用）
 - The Transpiler shall Sakuraスクリプトシーケンス（`[` を含む）に対して、危険パターン判定により最小の `n` 値を選択する（例: `\s[0]` → `n=1` → `[=[...]=]`）
 - Where アクター属性が複数あるとき、Transpiler shall 同一ACTOR変数への連続代入として生成する（ローカル変数数を抑制）
-- The Transpiler shall 複数アクター定義時も `local ACTOR` を1回のみ宣言し、再利用する
+- The Transpiler shall 複数アクター定義時に各定義を独立した `do...end` ブロックで分離することで、ACTOR変数の再利用を明確化する（Requirement 0対応）
 
 #### 1b. シーン定義とモジュール構造
 
 **目的**: グローバルシーン（`＊メイン`）をLuaテーブル・関数構造に変換
 
 **受け入れ基準**:
-- When `＊メイン` グローバルシーン定義があるとき、Transpiler shall `SCENE = PASTA:create_scene("メイン1")` と生成する（重複対策のカウンタ付与）
-- The Transpiler shall グローバルシーンをモジュール化せず、同一ファイル内のテーブルメンバーとして実装する（関数は`function SCENE.関数名(...)`形式）
+- When `＊メイン` グローバルシーン定義があるとき、Transpiler shall `do...end` ブロックで分離し、ブロック内で `local SCENE = PASTA:create_scene("メイン1")` と生成する（スコープ明確化、チェッカー警告回避、Requirement 0対応）
+- The Transpiler shall グローバルシーンをモジュール化せず、同一ブロック内のテーブルメンバーとして実装する（関数は`function SCENE:関数名(...)` 形式で：構文を使用）
 - When ファイルレベル属性（`＆天気：晴れ`）があるとき、Transpiler shall Lua出力を生成せず、内部レジストリに記録する
 - When グローバル単語定義（`＠挨拶：こんにちは、やあ`）があるとき、Transpiler shall Lua出力を生成せず、WordDefRegistry に登録する
+- The Transpiler shall 複数グローバルシーン定義時に各定義を独立した `do...end` ブロックで分離し、スコープ混在を避ける
 
 #### 1c. ローカルシーン関数への変換
 
 **目的**: ローカルシーン（`・自己紹介`）をLua関数として生成
 
 **受け入れ基準**:
-- When グローバルシーン `＊メイン` のエントリーポイントを生成するとき、Transpiler shall `function SCENE.__start__(scene, ctx, ...)` と生成する（固定名）
-- When 第1階層ローカルシーン `・自己紹介` があるとき、Transpiler shall `function SCENE.__自己紹介1__(scene, ctx, ...)` と生成する（`__名前__` 形式、カウンタ付与）
-- When 第2階層以降のローカルシーンがあるとき、Transpiler shall `function SCENE.モジュール名_ラベル名1(scene, ctx, ...)` と生成する（モジュール名プレフィックス付き）
-- The Transpiler shall すべてのシーン関数の第一行を `local args = { ... }` とし、第二行を `local act, save, var = PASTA:create_session(scene, ctx)` とする
-- The Transpiler shall 関数シグネチャを `(scene, ctx, ...)` の3引数で統一する（scene=シーンオブジェクト、ctx=実行コンテキスト、...=可変長引数）
+- When グローバルシーン `＊メイン` のエントリーポイントを生成するとき、Transpiler shall `function SCENE.__start__(ctx, ...)` と生成する（. 構文で宣言、Rust的に第1引数を明示的に指定）
+- When 第1階層ローカルシーン `・自己紹介` があるとき、Transpiler shall `function SCENE.__自己紹介1__(ctx, ...)` と生成する（`__名前__` 形式、. 構文使用、カウンタ付与）
+- When 第2階層以降のローカルシーンがあるとき、Transpiler shall `function SCENE.モジュール名_ラベル名1(ctx, ...)` と生成する（. 構文で統一）
+- The Transpiler shall すべてのシーン関数の第一行を `local args = { ... }` とし、第二行を `local act, save, var = PASTA:create_session(SCENE, ctx)` とする（SCENE = 所属するシーンオブジェクト、. 構文で明示的に渡す）
+- The Transpiler shall 関数シグネチャを `. 構文` で `(ctx, ...)` に統一し、シーンオブジェクト（SCENE）を第1引数で明示的に `create_session()` に渡す設計とする（Rust的な明示的呼び出し）
 
 #### 1d. 変数スコープ管理（var/save/act分離）
 
@@ -119,10 +120,10 @@
 - When グローバル変数（`＄＊グローバル`）が代入されるとき、Transpiler shall `save.グローバル = ...` と生成する（`save`は永続テーブル）
 - When アクター発言（`さくら：テキスト`）が発生するとき、Transpiler shall `act.さくら:talk("テキスト")` と生成する
 - When 単語参照発言（`さくら：＠挨拶！`）があるとき、Transpiler shall `act.さくら:word("挨拶")` と `act.さくら:talk("！")` に分割して生成する
-- The Transpiler shall act/save/var の3つのテーブルを `PASTA:create_session(scene, ctx)` で初期化し、メタテーブル設定は避ける
+- The Transpiler shall act/save/var の3つのテーブルを `PASTA:create_session(SCENE, ctx)` で初期化し、メタテーブル設定は避ける（SCENE = . 構文で受け取ったシーンオブジェクト）
 - When Call文（`＞ラベル`）があるとき、Transpiler shall `act:call("モジュール名", "ラベル名", {}, table.unpack(args))` と生成する（第3引数は属性フィルター用の空テーブル）
 - When 引数付きCall文（`＞ラベル（＄変数）`）があるとき、Transpiler shall `act:call("モジュール名", "ラベル名", {}, var.変数, ...)` と生成する（変数展開後に残り引数を継承）
-- When Rune/Lua関数呼び出し（`＠関数(arg1, arg2)`）があるとき、Transpiler shall `scene.関数(ctx, arg1, arg2)` と生成する（第1引数にctxを挿入）
+- When Rune/Lua関数呼び出し（`＠関数(arg1, arg2)`）があるとき、Transpiler shall `SCENE:関数(ctx, arg1, arg2)` と生成する（呼び出しは : 糖衣化、SCENE のメンバー関数を実行、ctx を第1引数に渡す）
 - When ローカルシーン内で引数参照（`＄０`、`＄１`）があるとき、Transpiler shall `args[1]`、`args[2]` として参照する（Luaは1-based配列）
 - When 引数内で文字列連結が必要なとき、Transpiler shall `"text" .. tostring(args[1]) .. "text"` 形式に変換する
 
@@ -141,9 +142,11 @@
 
 **受け入れ基準**:
 - When Pastaスクリプト内に ` ```rune` または ` ```lua` ブロックがあるとき、Transpiler shall そのブロックをLua関数定義として抽出する
-- The Transpiler shall ブロック内の関数定義を `function SCENE.関数名(...)` 形式に変換し、同一SCENEテーブル内に配置する
-- When ブロック内で `ctx`、`scene` などのコンテキスト変数が使用されるとき、Transpiler shall それらを関数引数として明示的に渡す形式に変換する
+- The Transpiler shall ブロック内の関数定義を `function SCENE.関数名(ctx, ...)` 形式に変換し、同一SCENEテーブル内に配置する（. 構文で宣言、ctx を第1引数に明示的に受け取る）
+- When ブロック内で呼び出すときは、Transpiler shall `:` 糖衣化を使用して `SCENE:関数(ctx, ...)` と呼び出す（Lua標準のメソッド呼び出し形式）
+- When ブロック内で `ctx` などのコンテキスト変数が使用されるとき、Transpiler shall それらを関数引数として明示的に渡す形式に変換する
 - The Transpiler shall Runeブロック→Luaブロック変換時の構文差異（例: Runeの`let` → Luaの`local`）を吸収する変換ルールを定義する
+- The Transpiler shall Luaコードブロック内の関数も、グローバルシーン定義と同じ `do...end` ブロック内に配置して、スコープを統一する
 
 #### 1g. グローバルシーン間遷移
 
