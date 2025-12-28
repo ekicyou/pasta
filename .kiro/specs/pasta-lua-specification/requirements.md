@@ -84,9 +84,10 @@
 
 **受け入れ基準**:
 - When `％さくら` アクター定義があるとき、Transpiler shall `ACTOR = PASTA:create_actor("さくら")` と生成する
-- When アクター属性（`＄通常：\s[0]`）が続くとき、Transpiler shall `ACTOR.通常 = [==[\s[0]]==]` と生成する（マルチライン文字列で保存）
-- The Transpiler shall Sakuraスクリプトシーケンスをエスケープせず、Lua文字列リテラル（`[==[...]==]`）として保持する
-- Where アクター属性が複数あるとき、Transpiler shall 同一ACTOR変数への連続代入として生成する
+- When アクター属性（`＄通常：\s[0]`）が続くとき、Transpiler shall `ACTOR.通常 = [=[\s[0]]=]` と生成する（Requirement 0-2の文字列リテラル形式判定アルゴリズムを適用）
+- The Transpiler shall Sakuraスクリプトシーケンス（`[` を含む）に対して、危険パターン判定により最小の `n` 値を選択する（例: `\s[0]` → `n=1` → `[=[...]=]`）
+- Where アクター属性が複数あるとき、Transpiler shall 同一ACTOR変数への連続代入として生成する（ローカル変数数を抑制）
+- The Transpiler shall 複数アクター定義時も `local ACTOR` を1回のみ宣言し、再利用する
 
 #### 1b. シーン定義とモジュール構造
 
@@ -103,9 +104,11 @@
 **目的**: ローカルシーン（`・自己紹介`）をLua関数として生成
 
 **受け入れ基準**:
-- When ローカルシーン `・自己紹介` があるとき、Transpiler shall `function SCENE.__自己紹介1__(scene, ctx, ...)` と生成する（カウンタ付与）
-- The Transpiler shall ローカルシーンの実装を名前付きLua関数（アンダースコア+ローマ字+数字）とし、メタテーブルやクロージャでの隠蔽は避ける
-- When ローカルシーン内に最初のアクション行があるとき、Transpiler shall 関数の第一行を `local args = { ... }; local act, save, var = PASTA:create_session(scene, ctx)` と生成する
+- When グローバルシーン `＊メイン` のエントリーポイントを生成するとき、Transpiler shall `function SCENE.__start__(scene, ctx, ...)` と生成する（固定名）
+- When 第1階層ローカルシーン `・自己紹介` があるとき、Transpiler shall `function SCENE.__自己紹介1__(scene, ctx, ...)` と生成する（`__名前__` 形式、カウンタ付与）
+- When 第2階層以降のローカルシーンがあるとき、Transpiler shall `function SCENE.モジュール名_ラベル名1(scene, ctx, ...)` と生成する（モジュール名プレフィックス付き）
+- The Transpiler shall すべてのシーン関数の第一行を `local args = { ... }` とし、第二行を `local act, save, var = PASTA:create_session(scene, ctx)` とする
+- The Transpiler shall 関数シグネチャを `(scene, ctx, ...)` の3引数で統一する（scene=シーンオブジェクト、ctx=実行コンテキスト、...=可変長引数）
 
 #### 1d. 変数スコープ管理（var/save/act分離）
 
@@ -114,9 +117,14 @@
 **受け入れ基準**:
 - When ローカル変数（`＄カウンタ`）が代入されるとき、Transpiler shall `var.カウンタ = 10` と生成する
 - When グローバル変数（`＄＊グローバル`）が代入されるとき、Transpiler shall `save.グローバル = ...` と生成する（`save`は永続テーブル）
-- When アクター発言が発生するとき、Transpiler shall `act.さくら:talk("テキスト")` と生成する（`act`はアクター動作テーブル）
-- The Transpiler shall act/save/var の3つのテーブルを `PASTA:create_session()` で初期化し、メタテーブル設定は避ける
-- When 関数呼び出しが必要なとき、Transpiler shall `scene.関数(...)` で呼び出す（既存レジストリとの連携）
+- When アクター発言（`さくら：テキスト`）が発生するとき、Transpiler shall `act.さくら:talk("テキスト")` と生成する
+- When 単語参照発言（`さくら：＠挨拶！`）があるとき、Transpiler shall `act.さくら:word("挨拶")` と `act.さくら:talk("！")` に分割して生成する
+- The Transpiler shall act/save/var の3つのテーブルを `PASTA:create_session(scene, ctx)` で初期化し、メタテーブル設定は避ける
+- When Call文（`＞ラベル`）があるとき、Transpiler shall `act:call("モジュール名", "ラベル名", {}, table.unpack(args))` と生成する（第3引数は属性フィルター用の空テーブル）
+- When 引数付きCall文（`＞ラベル（＄変数）`）があるとき、Transpiler shall `act:call("モジュール名", "ラベル名", {}, var.変数, ...)` と生成する（変数展開後に残り引数を継承）
+- When Rune/Lua関数呼び出し（`＠関数(arg1, arg2)`）があるとき、Transpiler shall `scene.関数(ctx, arg1, arg2)` と生成する（第1引数にctxを挿入）
+- When ローカルシーン内で引数参照（`＄０`、`＄１`）があるとき、Transpiler shall `args[1]`、`args[2]` として参照する（Luaは1-based配列）
+- When 引数内で文字列連結が必要なとき、Transpiler shall `"text" .. tostring(args[1]) .. "text"` 形式に変換する
 
 #### 1e. 単語・属性の処理戦略
 
@@ -126,6 +134,26 @@
 - When ローカル単語定義（`＠場所：東京、大阪`）があるとき、Transpiler shall Lua出力を生成せず、ローカルスコープのWordDefRegistry に登録する
 - When アクション行内で単語参照（`＠挨拶`）があるとき、Transpiler shall `act.さくら:word("挨拶")` と生成し、Lua側で単語選択ロジックを実装する
 - The Transpiler shall 単語選択のランダマイズロジックを（Lua生成ではなく）PASTA.word()メソッド内に委譲する
+
+#### 1f. Runeブロック埋め込み（Lua化におけるLuaブロック）
+
+**目的**: Pastaスクリプト内に埋め込まれたRune/Luaブロックの変換方法を定義
+
+**受け入れ基準**:
+- When Pastaスクリプト内に ` ```rune` または ` ```lua` ブロックがあるとき、Transpiler shall そのブロックをLua関数定義として抽出する
+- The Transpiler shall ブロック内の関数定義を `function SCENE.関数名(...)` 形式に変換し、同一SCENEテーブル内に配置する
+- When ブロック内で `ctx`、`scene` などのコンテキスト変数が使用されるとき、Transpiler shall それらを関数引数として明示的に渡す形式に変換する
+- The Transpiler shall Runeブロック→Luaブロック変換時の構文差異（例: Runeの`let` → Luaの`local`）を吸収する変換ルールを定義する
+
+#### 1g. グローバルシーン間遷移
+
+**目的**: 異なるグローバルシーン間の遷移（Call/Jump）をLua構造で実現
+
+**受け入れ基準**:
+- When ローカルシーンから別のグローバルシーン（`＊会話分岐グローバル`）への遷移があるとき、Transpiler shall グローバルシーンレジストリ経由の呼び出しに変換する
+- The Transpiler shall グローバルシーンへの遷移を `PASTA:call_global_scene("会話分岐グローバル")` 形式として生成する
+- When 前方一致シーン検索が必要なとき、Transpiler shall Lua側で `string.sub` と `ipairs` を使った検索ロジックを実装可能な形式を定義する
+- The Transpiler shall 優先度（`&priority`）を考慮したシーン選択ロジックをLua側で実装可能な構造を定義する
 
 ### 2. Rune Generator → Lua Coroutine マッピング
 
@@ -176,3 +204,13 @@
 - When ローカル変数処理テストを記述するとき、Test shall 初期化・参照・更新の3パターンを含む
 - When Call文テストを記述するとき、Test shall ネストされたCall、戻り値処理、エラーハンドリングを含む
 - The Test shall 既存Rune実装との比較（同等性検証）を念頭に設計する
+
+### 7. sample.pastaからsample.luaへの変換検証
+
+**目的**: 仕様フォルダ内のsample.pastaを手作業でsample.luaに変換しながら、トランスパイルルールを検証
+
+**受け入れ基準**:
+- The specification document shall sample.pastaに含まれる全機能（アクター辞書、グローバル/ローカルシーン、単語定義、引数付き呼び出し、Runeブロック、グローバルシーン遷移）をカバーする
+- When sample.pasta→sample.lua手作業変換を行うとき、Conversion shall 各構文要素の対応関係を明確にする（コメント付き）
+- The sample.lua shall トランスパイルルールの具体例として機能し、実装時のリファレンスとなる
+- When 変換中に曖昧性が発見されたとき、Requirements shall それを解消するための追加受け入れ基準を含める
