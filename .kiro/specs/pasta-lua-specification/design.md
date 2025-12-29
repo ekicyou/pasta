@@ -449,22 +449,200 @@ end
 - **ユーザーコンテキスト**: Pasta 源行番号をエラーメッセージに含める
 
 ### エラーカテゴリと対応
+
+**エラー分類の原則**:
+- **復帰不可（fatal）**: IO エラー、AST 構造エラー
+- **部分失敗（partial）**: 文字列リテラル変換失敗
+- **未実装（unimplemented）**: 未サポート機能
+
 ```rust
 pub enum TranspileError {
-    /// IO エラー（Writer への書き込み失敗）
-    IoError(std::io::Error),
-    /// 無効な AST 構造
-    InvalidAst { span: Span, message: String },
-    /// 継続アクションにアクター未設定
-    InvalidContinuation { span: Span },
-    /// 文字列リテラル変換失敗（すべての n で危険パターン）
-    StringLiteralError { text: String },
+    /// Pass 1 - IO エラー（レジストリ操作時の予期しないエラー）
+    #[error("IO error during transpilation: {0}")]
+    IoError(#[from] std::io::Error),
+    
+    /// Pass 1 - AST 構造エラー（無効なノード）
+    #[error("Invalid AST structure at {span}: {message}")]
+    InvalidAst {
+        span: Span,
+        message: String,
+    },
+    
+    /// Pass 1 - シーン参照エラー（定義されていないシーン参照）
+    #[error("Undefined scene '{name}' at {span}")]
+    UndefinedScene {
+        name: String,
+        span: Span,
+    },
+    
+    /// Pass 1 - 単語参照エラー（定義されていない単語参照）
+    #[error("Undefined word '{name}' at {span}")]
+    UndefinedWord {
+        name: String,
+        span: Span,
+    },
+    
+    /// Pass 2 - 継続アクションエラー（アクター未設定）
+    #[error("Continuation action without actor at {span}")]
+    InvalidContinuation {
+        span: Span,
+    },
+    
+    /// Pass 2 - 文字列リテラル変換失敗（すべての n で危険パターン発生）
+    #[error("String literal cannot be converted: dangerous pattern detected in all formats")]
+    StringLiteralError {
+        text: String,
+        span: Span,
+    },
+    
+    /// Pass 2 - ローカル変数数超過（Lua 制限 ~200 個）
+    #[error("Too many local variables in scope: {count} (max ~200)")]
+    TooManyLocalVariables {
+        count: usize,
+        span: Span,
+    },
+    
     /// 未サポート機能
-    Unsupported { feature: String },
+    #[error("Unsupported feature: {feature} at {span}")]
+    Unsupported {
+        feature: String,
+        span: Span,
+    },
 }
 ```
 
-## テスト戦略
+**エラー対応マトリックス**:
+
+| エラー | 発生フェーズ | 原因 | 対応 | 例 |
+|--------|------------|------|------|----|
+| InvalidAst | Pass 1 | AST ノード構造の矛盾 | 早期失敗 | LocalSceneScope が items を持たない |
+| UndefinedScene | Pass 1 | シーン定義前の参照 | 早期失敗 | CallScene が存在しないシーンを参照 |
+| UndefinedWord | Pass 1 | 単語定義前の参照 | 早期失敗 | Action::WordRef が存在しない単語を参照 |
+| InvalidContinuation | Pass 2 | ContinueAction 実行時にアクター未設定 | コード生成スキップ | ContinueAction が最初の文で発生 |
+| StringLiteralError | Pass 2 | 危険パターン全形式で検出 | 文字列スキップまたはエラー出力 | Pasta テキストに `]` と任意数の `=` が組み合わせで出現 |
+| TooManyLocalVariables | Pass 2 | do...end ブロック内の変数数 > 200 | 警告またはスコープ分割提案 | 200+ 個の VarSet が同一ブロック内 |
+| Unsupported | Pass 1/2 | まだ実装していない機能 | 明示的な未実装メッセージ | 属性処理など後続仕様の機能 |
+
+## Pass 1/Pass 2 ハンドシェイク詳細
+
+### Pass 1: レジストリ登録フェーズ
+
+**入力**: `&[GlobalSceneScope]`, `&[ActorScope]` (AST)
+
+**処理フロー**:
+```
+1. ActorScope 走査
+   ├─ 各アクターを SceneRegistry に登録
+   │  └─ KEY: actor.name, VALUE: ActorMetadata { attrs, words }
+   └─ 各アクターの単語定義を WordDefRegistry に登録
+      └─ KEY: "${actor_name}::${word_name}", VALUE: WordDef
+
+2. GlobalSceneScope 走査（順序重要：引用元が存在してから引用を登録）
+   ├─ 各グローバルシーンを SceneRegistry に登録
+   │  └─ KEY: scene.name, VALUE: SceneMetadata { kind: Global, ... }
+   ├─ 各ローカルシーンを SceneRegistry に登録（子として関連付け）
+   │  └─ KEY: "${global_scene}::${local_scene}", VALUE: SceneMetadata { kind: Local, parent: "global_scene" }
+   ├─ GlobalSceneScope.word_defs を WordDefRegistry に登録
+   │  └─ KEY: word.name, VALUE: WordDef { rules, conditions }
+   └─ AST 整合性検証（CallScene, WordRef のすべてが登録済みエントリを指す）
+      └─ 失敗時: UndefinedScene, UndefinedWord, InvalidAst エラー
+```
+
+**出力**: `TranspileContext { scene_registry, word_registry, ... }`
+
+**不変式**:
+- SceneRegistry に登録されたシーン名は重複しない
+- WordDefRegistry に登録された単語名は（スコープ付き）重複しない
+- すべての参照（CallScene, WordRef）が登録済みエントリを指す
+
+**典型的な登録データ**:
+```rust
+// SceneRegistry の内容例
+scene_registry.register("さくら", SceneMetadata::Actor { ... })?;
+scene_registry.register("さくら::会話", SceneMetadata::Local { parent: "さくら", ... })?;
+scene_registry.register("メイン", SceneMetadata::Global { ... })?;
+scene_registry.register("メイン::オープニング", SceneMetadata::Local { parent: "メイン", ... })?;
+
+// WordDefRegistry の内容例
+word_registry.register_global("笑う", WordDef { ... })?;
+word_registry.register_actor("さくら", "照れる", WordDef { ... })?;
+```
+
+### Pass 2: Lua コード生成フェーズ
+
+**入力**: `TranspileContext` (Pass 1 構築済み)、`LuaCodeGenerator` インスタンス
+
+**処理フロー**:
+```
+1. GlobalSceneScope 走査（Pass 1 と同じ順序）
+   ├─ LuaCodeGenerator::generate_global_scene(scene)
+   │  ├─ scene_registry.lookup(scene.name) → SceneMetadata 取得
+   │  └─ シーン構造 + モジュール定義を Lua コード生成
+   ├─ LocalSceneScope 走査
+   │  ├─ LuaCodeGenerator::generate_local_scene(local_scene)
+   │  ├─ scene_registry.lookup("${global}::${local}") → SceneMetadata 取得
+   │  └─ ローカル関数定義を Lua コード生成
+   └─ LocalSceneItem 走査（VarSet, CallScene, ActionLine, ...）
+      ├─ VarSet → LuaCodeGenerator::generate_var_set()
+      │  └─ LocalVariable 追跡（do...end ブロック分割判定用）
+      ├─ CallScene → LuaCodeGenerator::generate_call_scene()
+      │  └─ scene_registry.lookup() で呼び出しシーン検証（Pass 1 で検証済み）
+      ├─ Action → LuaCodeGenerator::generate_action()
+      │  ├─ Action::WordRef → word_registry.lookup() で単語定義取得
+      │  │  └─ 生成コード内で単語ルール展開
+      │  ├─ Action::Talk → Lua 文字列出力 + StringLiteralizer
+      │  ├─ Action::VarRef → 変数参照コード生成
+      │  └─ Action::Escape → SakuraScript エスケープ処理
+      └─ CodeBlock → LuaCodeGenerator::generate_code_block()
+         └─ Lua コードを直接出力
+
+2. コード生成オプション適用
+   ├─ comment_mode=true の場合、span.start_line から行番号コメント挿入
+   └─ comment_mode=false の場合、純粋 Lua コードのみ出力
+
+3. エラーハンドリング（部分的な出力可能）
+   ├─ StringLiteralizer エラー（n > 10）→ StringLiteralError（該当 Action スキップ）
+   ├─ ローカル変数超過（> 200）→ TooManyLocalVariables（警告 + 次ブロックへ）
+   ├─ ContinueAction + アクター未設定 → InvalidContinuation（該当 Action スキップ）
+   └─ Writer エラー → IoError（処理停止）
+```
+
+**出力**: Lua コード（Writer へ直接出力）
+
+**不変式**:
+- Pass 1 で検出されたすべての参照エラー（UndefinedScene, UndefinedWord）は Pass 2 に到達しない
+- 各 GenerateXxx メソッドは Writer に部分的なコードを追記（ロールバック不可）
+- エラー時の部分的な出力は呼び出し側で処理（テンポラリバッファの使用推奨）
+
+**典型的な呼び出し順序**:
+```rust
+// Pass 1
+let mut ctx = transpiler.pass1(&ast)?;  // UndefinedScene/UndefinedWord 検出
+
+// Pass 2
+let config = TranspilerConfig { comment_mode: false };
+let mut gen = LuaCodeGenerator::new(&ctx, config);
+for scene in &ast {
+    gen.generate_global_scene(scene)?;  // StringLiteralError, TooManyLocalVariables 可能
+    for local_scene in &scene.local_scenes {
+        gen.generate_local_scene(local_scene)?;  // InvalidContinuation 可能
+    }
+}
+```
+
+### エラー伝搬パターン
+
+| エラー型 | 検出フェーズ | 検出方法 | 伝搬戦略 |
+|--------|-----------|--------|--------|
+| UndefinedScene | Pass 1 | AST 走査 loop | Err() で即座に失敗（Pass 2 到達なし） |
+| UndefinedWord | Pass 1 | AST 走査 loop | Err() で即座に失敗（Pass 2 到達なし） |
+| InvalidAst | Pass 1 | 構造チェック | Err() で即座に失敗（Pass 2 到達なし） |
+| StringLiteralError | Pass 2 | generate_action() → literalize() | Err() で該当 Action スキップ（全体は継続可能） |
+| TooManyLocalVariables | Pass 2 | generate_local_scene() 内カウント | 警告ログ + Err() または継続（ブロック分割提案） |
+| InvalidContinuation | Pass 2 | generate_action() 内判定 | 警告ログ + コード生成スキップ（全体は継続） |
+| IoError | Pass 1/2 | Writer 操作 | Err() で即座に失敗（部分的な出力は廃棄） |
+
+**重要**: Pass 1 で早期失敗することで、Pass 2 での参照エラーを事前に排除。これにより、Pass 2 は「生成成功」または「部分失敗（スキップ）」のいずれかになり、参照エラーの復帰処理が不要
 
 ### ユニットテスト
 - `StringLiteralizer::literalize()` - 各ルールの境界条件
