@@ -34,14 +34,30 @@ pasta_luaトランスパイラーがPastaFileを入力として受け取り、pa
 - [ ] FileItem::ActorScopeがアクターとして処理される
 - [ ] 上記すべてが出現順に処理される
 
-### REQ-3: ファイルレベル属性処理
+### REQ-3: ファイルレベル属性処理【順序依存・シャドーイング】
 **ID**: REQ-3  
 **Title**: ファイルレベル属性処理  
-**Statement**: When LuaTranspiler encounters a FileItem::FileAttr during iteration, the LuaTranspiler shall accumulate the attribute and apply it according to pasta_rune's file attribute handling rules.  
+**Priority**: 🔴 HIGH - 順序依存の処理ロジック  
+**Statement**: When LuaTranspiler encounters a FileItem::FileAttr during iteration, the LuaTranspiler shall accumulate the attribute and apply it according to pasta_rune's file attribute handling rules, respecting the shadowing semantics where later attributes override earlier ones.  
+**Shadowing Semantics**:
+- FileAttrは**直後のグローバルシーン**が参照する
+- 同じキーの属性が再出現すると**上書き**される（シャドーイング）
+- グローバルシーン出現時の属性状態が**そのシーンに継承**される
+- 例:
+  ```pasta
+  &author:A
+  ＊シーン1  ← author=A を継承
+  &author:B  ← A を上書き
+  ＊シーン2  ← author=B を継承
+  ```
+- **順序が処理結果に直接影響**するため、HashMap列挙は使用不可
+
 **Acceptance Criteria**:
-- [ ] FileAttrがTranspileContext内で累積される
-- [ ] 累積された属性が後続のシーン/アクター生成に影響する
+- [ ] FileAttrがTranspileContext内で累積される（順序保持）
+- [ ] 同じキーの属性が再出現した場合、新しい値で上書きされる
+- [ ] 累積された属性が後続のシーン/アクター生成時に正しい値で利用可能
 - [ ] pasta_runeのaccumulate_file_attr()と同等の動作をする
+- [ ] 属性の適用順序がファイル内の出現順序と一致することをテストで検証
 
 ### REQ-4: グローバル単語登録
 **ID**: REQ-4  
