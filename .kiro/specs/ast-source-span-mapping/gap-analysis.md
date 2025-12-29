@@ -111,7 +111,7 @@ pub fn invalid_ast(span: &Span, message: impl Into<String>) -> Self {
 | 1 | Span 構造拡張（絶対バイトオフセット） | start_line, start_col, end_line, end_col のみ | +start_byte, +end_byte フィールド追加 | **Missing** |
 | 2.1 | Pest から正確なバイト位置情報抽出 | `pest_span.line_col()` 利用中 | `pest_span.start()`, `pest_span.end()` メソッド利用 | **Constraint** |
 | 2.2 | UTF-8 マルチバイト正確計算 | 行/列ベースのみ | バイト単位のオフセット実装必須 | **Missing** |
-| 3.1 | Statement への Span 統合 | ✅ 完了 | なし | **None** |
+| 3.1 | 行レベル項目への Span 統合（VarSet, CallScene, ActionLine, ContinueAction） | ✅ 完了 | なし | **None** |
 | 3.2 | Action への Span 統合（ActionWithSpan経由） | ❌ なし | Action に Span フィールド追加 | **Missing** |
 | 3.3 | Label 定義への Span 統合 | ✅ 完了 | なし | **None** |
 | 4 | ソースコード参照 API | なし | 新規公開関数 3-4 個必要 | **Missing** |
@@ -120,7 +120,7 @@ pub fn invalid_ast(span: &Span, message: impl Into<String>) -> Self {
 | 5.3 | ネスト構造テスト | 基本的なテストのみ | バイトオフセット伝播検証 | **Constraint** |
 | 6.1 | 後方互換性 | 既存フィールド温存予定 | 新規フィールド追加時の設計 | **Constraint** |
 | 6.2 | エラー情報の充実 | 行:列のみ | バイトオフセット含む形式へ | **Constraint** |
-| 7 | トランスパイル時のコメント生成対応 | なし | ActionWithSpan の Span データアクセス実装 | **Missing** |
+| 7 | トランスパイル時のコメント生成対応（全行） | なし | 行レベル Span データのメタデータ出力実装 | **Missing** |
 
 ---
 
@@ -292,7 +292,62 @@ pub struct ParsedFile {
 
 ---
 
-## 設計フェーズでの判断選択肢
+## 議題2: 既存 Span 呼び出しの互換性戦略
+
+### 現状
+- 実装コード: 29個の `Span::default()` + `Span::new()` 呼び出し
+- テストコード: 10個の `Span::default()` + `Span::new()` 呼び出し
+- **合計: 41個**
+
+### 決定：Option A（コンストラクタ互換性レイヤー）
+
+**理由**:
+1. 既存テストおよび補助的な Span 生成は byte offset = 0 で十分（テストデータ）
+2. 実装フェーズで実際のバイト位置計算は `span_from_pair()` で集約管理
+3. 既存コード修正の手数最小化
+
+**実装方針**:
+- `Span::default()` → 継続使用可（内部では `(0, 0, 0, 0, 0, 0)` として解釈）
+- `Span::new(line, col, end_line, end_col)` → 継続使用可（byte offset は後で計算）
+- 新規: `Span::with_bytes(line, col, end_line, end_col, start_byte, end_byte)` を追加
+- 実際の byte offset 計算は `span_from_pair()` のみで実施
+
+**互換性レイヤーの実装例**:
+```rust
+impl Span {
+    // 既存コンストラクタ（変更なし）
+    pub fn new(start_line: usize, start_col: usize, 
+               end_line: usize, end_col: usize) -> Self {
+        Self {
+            start_line,
+            start_col,
+            end_line,
+            end_col,
+            start_byte: 0,  // 暫定値
+            end_byte: 0,    // 暫定値
+        }
+    }
+    
+    // 新規コンストラクタ（byte offset 指定）
+    pub fn with_bytes(start_line: usize, start_col: usize,
+                      end_line: usize, end_col: usize,
+                      start_byte: usize, end_byte: usize) -> Self {
+        Self {
+            start_line,
+            start_col,
+            end_line,
+            end_col,
+            start_byte,
+            end_byte,
+        }
+    }
+}
+```
+
+**この決定により**:
+- ✅ 既存テスト 41個、修正不要
+- ✅ 実装フェーズで `span_from_pair()` のみ更新
+- ✅ 結果 AST の Span は正確なバイト位置を持つ
 
 ### 「全 AST ノードに Span」による簡潔性
 
