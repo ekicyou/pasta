@@ -191,23 +191,24 @@ for item in &file.items {
   - 型別フィルタリングによる順序情報の喪失
   - 構造的に間違った実装を防ぐにはAPI廃止が唯一の解決策
 - **廃止対象**:
-  - `PastaFile::file_attrs()`
-  - `PastaFile::words()`
-  - `PastaFile::global_scene_scopes()`
-  - `PastaFile::actor_scopes()`
-- **コンパイルエラー発生箇所**: 70マッチ以上（9ファイル）
+  - `PastaFile::file_attrs()` - 型別フィルタリング
+  - `PastaFile::words()` - 型別フィルタリング
+  - `PastaFile::global_scene_scopes()` - 型別フィルタリング
+  - `PastaFile::actor_scopes()` - 型別フィルタリング
+  - `TranspileContext2::file_attrs()` - HashMap列挙による順序喪失（害悪）
+- **コンパイルエラー発生箇所**: 76マッチ以上（9ファイル）
   - **pasta_lua**: 
     - `tests/parser2_integration_test.rs` (22マッチ)
     - `crates/pasta_lua/tests/transpiler_integration_test.rs` (28マッチ)
   - **pasta_rune**:
     - `crates/pasta_rune/tests/parser2_integration_test.rs` (14マッチ)
     - `crates/pasta_rune/tests/pasta_transpiler2_unit_test.rs` (2マッチ)
-    - `crates/pasta_rune/src/transpiler/context.rs` (6マッチ - `ctx.file_attrs()`メソッド）
+    - `crates/pasta_rune/src/transpiler/context.rs` (12マッチ - `ctx.file_attrs()`メソッド定義+使用）
   - **共通**:
     - `tests/parser2_integration_test.rs` (パスタワークスペースレベル)
 - **修正スコープ**: 
   - テストコード: `file.items`への書き換え（メカニカル）
-  - TranspileContext: `ctx.file_attrs()`メソッドは残す（内部実装）
+  - TranspileContext2: `file_attrs()`メソッド削除、内部フィールドアクセスまたは個別取得メソッドに変更
   - pasta_coreのAST定義からヘルパーメソッド削除
 
 **実現難度**: M（メカニカルな修正だが量が多い）
