@@ -77,12 +77,19 @@ pasta_luaトランスパイラーがPastaFileを入力として受け取り、pa
 - [ ] シーン処理時に登録済みグローバル単語が利用可能
 - [ ] 現在のシーンより前に定義されたグローバル単語のみが参照可能
 
-### REQ-6: アクター処理順序
+### REQ-6: アクター処理順序【属性非依存】
 **ID**: REQ-6  
 **Title**: アクター処理順序  
-**Statement**: When LuaTranspiler encounters a FileItem::ActorScope during iteration, the LuaTranspiler shall process the actor definition with awareness of previously accumulated file attributes.  
+**Priority**: ℹ️ INFO - アクターは属性の影響を受けない  
+**Statement**: When LuaTranspiler encounters a FileItem::ActorScope during iteration, the LuaTranspiler shall process the actor definition in document order, but actors shall NOT inherit file attributes (unlike GlobalSceneScopes).  
+**Design Rationale**:
+- アクターは**ファイル属性の影響を受けない**（file_attrのシャドーイングはアクターに継承されない）
+- ただし、**出現順に処理**される（FileItem列挙順序を保持）
+- アクター内の単語定義はアクタースコープで処理される
+
 **Acceptance Criteria**:
-- [ ] アクター処理時に累積されたファイル属性が利用可能
+- [ ] アクターが出現順に処理される
+- [ ] アクターはfile_attrの累積状態を**継承しない**
 - [ ] アクター内の単語定義がアクタースコープで正しく処理される
 
 ## Non-Functional Requirements
