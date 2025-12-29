@@ -161,8 +161,7 @@ flowchart TD
 | 要件 | 概要 | コンポーネント | インターフェース | フロー |
 |------|------|----------------|------------------|--------|
 | 1 | ローカル変数数制限対応 | LuaCodeGenerator | generate_actor(), generate_global_scene() | Pass 1 |
-| 2 | コメント出力モード | LuaTranspiler, LuaCodeGenerator | TranspilerConfig | Pass 1 |
-| 3 | 文字列リテラル形式 | StringLiteralizer | literalize() | Pass 1 |
+| 2 | 文字列リテラル形式 | StringLiteralizer | literalize() | Pass 1 |
 | 4a | アクター定義Lua化 | LuaCodeGenerator | generate_actor() | Pass 1 |
 | 4b | シーン定義・モジュール構造 | LuaCodeGenerator | generate_global_scene() | Pass 1 |
 | 4c | ローカルシーン関数変換 | LuaCodeGenerator | generate_local_scene() | Pass 1 |
@@ -789,49 +788,6 @@ step 6: テスト結果をレポート
 
 - 生成 Lua コードの構文妥当性（luacheck または Lua インタープリタ）
 - 複数 Pasta ファイルのバッチトランスパイル
-
-## コメント出力詳細
-
-**comment_mode の実装方式**:
-- `TranspilerConfig::comment_mode: bool` でデフォルト false（sample.lua との比較用）
-- `comment_mode=true` 時、AST ノードの `span.start_line` からファイルレベルの行番号を取得
-- 行番号取得不可な場合（古い AST など）はコメント出力をスキップ
-- コメント形式: `-- [Pasta src:L○]` で生成行の Pasta ソース行番号を記録
-
-**comment_mode=true 時の Lua コード（テーブル構造例）**:
-```lua
--- [Pasta src:L3]
-local scenes = {
-  さくら = {
-    -- [Pasta src:L5]
-    会話 = function()
-      -- [Pasta src:L6]
-      print("こんにちは")
-    end,
-  },
-}
-```
-
-**comment_mode=false 時の Lua コード（テーブル構造例）**:
-```lua
-local scenes = {
-  さくら = {
-    会話 = function()
-      print("こんにちは")
-    end,
-  },
-}
-```
-
-**CallScene の呼び出し（テーブル参照形式）**:
-```lua
--- ランタイム層から呼び出し
-if scenes["さくら"] and scenes["さくら"]["会話"] then
-  scenes["さくら"]["会話"]()
-else
-  error("Scene not found")
-end
-```
 
 ## セキュリティ考慮事項
 
