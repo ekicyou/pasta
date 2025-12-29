@@ -115,7 +115,7 @@ sequenceDiagram
     participant SceneRegistry
     participant WordDefRegistry
     
-    Caller->>LuaTranspiler: transpile_file(&PastaFile, ...)
+    Caller->>LuaTranspiler: transpile(&PastaFile, ...)
     LuaTranspiler->>TranspileContext: new()
     LuaTranspiler->>LuaCodeGenerator: write_header()
     
@@ -146,16 +146,15 @@ sequenceDiagram
 
 | Requirement | Summary | Components | Interfaces | Flows |
 |-------------|---------|------------|------------|-------|
-| 1 | PastaFile入力IF | LuaTranspiler | transpile_file() | FileItem処理 |
-| 2 | FileItem出現順処理 | LuaTranspiler | transpile_file() | FileItem処理 |
+| 1 | PastaFile入力IF（バグ修正） | LuaTranspiler | transpile() | FileItem処理 |
+| 2 | FileItem出現順処理 | LuaTranspiler | transpile() | FileItem処理 |
 | 3 | ファイル属性処理 | TranspileContext | accumulate_file_attr(), merge_attrs() | FileItem処理 |
 | 4 | グローバル単語登録 | LuaTranspiler, WordDefRegistry | register_global() | FileItem処理 |
 | 5 | シーン処理順序 | LuaTranspiler | process_global_scene() | FileItem処理 |
 | 6 | アクター処理順序 | LuaTranspiler | generate_actor() | FileItem処理 |
-| 7 | API一貫性 | LuaTranspiler | transpile_file() | - |
-| 8 | 後方互換性 | LuaTranspiler | transpile(), transpile_with_globals() | - |
-| 9 | テストカバレッジ | tests/ | - | - |
-| 10 | ヘルパーメソッド廃止 | PastaFile | 削除 | - |
+| 7 | API一貫性 | LuaTranspiler | transpile() | - |
+| 8 | テストカバレッジ | tests/ | - | - |
+| 9 | ヘルパーメソッド廃止 | PastaFile | 削除 | - |
 
 ## Components and Interfaces
 
@@ -163,9 +162,9 @@ sequenceDiagram
 
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies | Contracts |
 |-----------|--------------|--------|--------------|------------------|-----------|
-| LuaTranspiler | pasta_lua | Luaコード生成エントリーポイント | 1, 2, 4, 5, 6, 7, 8 | TranspileContext (P0), LuaCodeGenerator (P0) | Service |
+| LuaTranspiler | pasta_lua | Luaコード生成エントリーポイント | 1, 2, 4, 5, 6, 7 | TranspileContext (P0), LuaCodeGenerator (P0) | Service |
 | TranspileContext | pasta_lua | トランスパイル状態管理 | 3 | SceneRegistry (P0), WordDefRegistry (P0) | State |
-| PastaFile | pasta_core | AST表現（ヘルパー廃止対象） | 10 | - | - |
+| PastaFile | pasta_core | AST表現（ヘルパー廃止対象） | 9 | - | - |
 
 ### pasta_lua Layer
 
@@ -193,29 +192,10 @@ sequenceDiagram
 ##### Service Interface
 ```rust
 impl LuaTranspiler {
-    /// 新規: PastaFileを入力として受け取るメインAPI
-    pub fn transpile_file<W: Write>(
-        &self,
-        file: &PastaFile,
-        writer: &mut W,
-    ) -> Result<TranspileContext, TranspileError>;
-    
-    /// 既存: 非推奨ラッパー
-    #[deprecated(since = "0.X.X", note = "use `transpile_file` instead")]
+    /// バグ修正: シグネチャを&PastaFile入力に変更
     pub fn transpile<W: Write>(
         &self,
-        actors: &[ActorScope],
-        scenes: &[GlobalSceneScope],
-        writer: &mut W,
-    ) -> Result<TranspileContext, TranspileError>;
-    
-    /// 既存: 非推奨ラッパー
-    #[deprecated(since = "0.X.X", note = "use `transpile_file` instead")]
-    pub fn transpile_with_globals<W: Write>(
-        &self,
-        actors: &[ActorScope],
-        scenes: &[GlobalSceneScope],
-        global_words: &[KeyWords],
+        file: &PastaFile,
         writer: &mut W,
     ) -> Result<TranspileContext, TranspileError>;
 }
@@ -223,6 +203,11 @@ impl LuaTranspiler {
 - Preconditions: PastaFileが有効なAST
 - Postconditions: Luaコードがwriterに出力される、TranspileContextにレジストリ情報が格納
 - Invariants: FileItem出現順が処理順と一致
+
+**Breaking Change Notice**:
+- 既存の `transpile(&[ActorScope], &[GlobalSceneScope], ...)` は削除
+- 既存の `transpile_with_globals(...)` は削除
+- 設計バグの修正のため、後方互換性は提供しない
 
 **Implementation Notes**
 - Integration: pasta_runeのtranspile_pass1()パターンを参考に実装
@@ -233,7 +218,7 @@ impl LuaTranspiler {
   - 現時点では属性値を使ったコード生成をしない（未使用パラメータ）
   - 将来の拡張性のためシグネチャには含める（pasta_runeで省略された実装を補完）
 - Validation: FileItem種別の網羅性チェック（match exhaustive）
-- Risks: 非推奨メソッドからのPastaFile再構築は順序情報を喪失
+- Breaking Change: 既存のtranspile()/transpile_with_globals()は削除（バグ修正）
 
 #### TranspileContext
 
@@ -385,13 +370,12 @@ for item in &file.items {
 ### Unit Tests
 - `accumulate_file_attr()`: 累積・シャドーイング動作確認
 - `merge_attrs()`: ファイル属性とシーン属性のマージ確認
-- `transpile_file()`: 各FileItem種別の処理確認
+- `transpile()`: 各FileItem種別の処理確認
 
 ### Integration Tests
 - FileItem出現順序が処理順序と一致することの検証
 - ファイル属性シャドーイングの順序依存性テスト
 - アクター処理がファイル属性を継承しないことの確認
-- 非推奨メソッドの動作確認（後方互換性）
 
 ### Regression Tests
 - 既存テストがすべてパスすること（file.items書き換え後）
@@ -401,16 +385,11 @@ for item in &file.items {
 
 ### フェーズ1: 新API実装
 1. TranspileContextに`file_attrs`フィールドと関連メソッドを追加
-2. `transpile_file()`メソッドを新規実装
+2. `transpile(&PastaFile, ...)`メソッドを新規実装（既存メソッドを削除してシグネチャ変更）
 3. 新テスト群を追加
 4. **検証**: 新テストがgreen
 
-### フェーズ2: 既存メソッド非推奨化
-1. `transpile()` / `transpile_with_globals()` に `#[deprecated]` を付与
-2. 内部実装を`transpile_file()`呼び出しに変更（可能な範囲で）
-3. **検証**: 既存テストがgreen
-
-### フェーズ3: ヘルパーメソッド廃止
+### フェーズ2: ヘルパーメソッド廃止
 1. PastaFile側から4メソッドを削除
 2. TranspileContext2から`file_attrs()`を削除
 3. テストを`file.items`イテレーションに書き換え
@@ -418,9 +397,7 @@ for item in &file.items {
 
 ```mermaid
 graph LR
-    A[フェーズ1: 新API] --> B[フェーズ2: 非推奨化]
-    B --> C[フェーズ3: ヘルパー廃止]
+    A[フェーズ1: 新API] --> B[フェーズ2: ヘルパー廃止]
     A --> |検証| A1[新テストgreen]
-    B --> |検証| B1[既存テストgreen]
-    C --> |検証| C1[全テストgreen]
+    B --> |検証| B1[全テストgreen]
 ```
