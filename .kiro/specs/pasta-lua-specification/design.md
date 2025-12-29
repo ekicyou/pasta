@@ -331,13 +331,13 @@ impl StringLiteralizer {
 ##### 状態管理
 ```rust
 pub struct TranspilerConfig {
-    /// Pasta 源コードをコメントで出力するか（デフォルト: true）
+    /// Pasta 源コードをコメントで出力するか（デフォルト: false）
     pub comment_mode: bool,
 }
 
 impl Default for TranspilerConfig {
     fn default() -> Self {
-        Self { comment_mode: true }
+        Self { comment_mode: false }
     }
 }
 ```
@@ -477,25 +477,55 @@ pub enum TranspileError {
 ### 統合テスト
 - `pasta_lua_transpiler_integration_test.rs` - sample.pasta → Lua 変換
 - comment_mode=true/false 両モードの検証
-- 参照実装 sample.lua との行比較
+- 参照実装 sample.lua との構文的同一性を確認
 
-**比較アルゴリズム詳細**:
+**Lua 構文的同一性検証方式**:
 ```
 step 1: 生成 Lua コードをテキスト行に分割
 step 2: 参照実装 sample.lua をテキスト行に分割
-step 3: 両者を行ごとに比較
-  - コメント行（`--` で開始）は除外
-  - 空行（`^\s*$`）の差異は許容
-  - コード行の内容が完全一致することを確認
-step 4: テスト結果をレポート
-  - 期待値行数 vs 実際値行数
+step 3: 両者から比較対象外の行を除外
+  - コメント行（`--` で開始）を削除
+  - 空行（`^\s*$`）を削除
+step 4: コード行を正規化
+  - 行頭・行末の空白を削除
+  - インデント量の差異を吸収（構文木レベルで同等か確認）
+step 5: 正規化済みコード行を比較
+  - 期待値と実際値が 1:1 対応することを確認
+  - 不一致がある場合、トランスパイラールール側の調整を検討
+step 6: テスト結果をレポート
+  - コード行数が一致することを確認
   - 不一致行の詳細（行番号、期待コード、実際コード）
-  - 差分パターン分類（字句的、構文的、論理的）
+  - インデント差異は別途ログに記載
+  - トランスパイラー調整フラグを明記
 ```
 
 ### E2E テスト
 - 生成 Lua コードの構文妥当性（luacheck または Lua インタープリタ）
 - 複数 Pasta ファイルのバッチトランスパイル
+
+## コメント出力詳細
+
+**comment_mode の実装方式**:
+- `TranspilerConfig::comment_mode: bool` でデフォルト false（sample.lua との比較用）
+- `comment_mode=true` 時、AST ノードの `span.start_line` からファイルレベルの行番号を取得
+- 行番号取得不可な場合（古い AST など）はコメント出力をスキップ
+- コメント形式: `-- [Pasta src:L○]` で生成行の Pasta ソース行番号を記録
+
+**comment_mode=true 時の Lua コード**:
+```lua
+-- [Pasta src:L5]
+local talk_function = function()
+  -- [Pasta src:L6]
+  print("Hello")
+end
+```
+
+**comment_mode=false 時の Lua コード**:
+```lua
+local talk_function = function()
+  print("Hello")
+end
+```
 
 ## セキュリティ考慮事項
 
