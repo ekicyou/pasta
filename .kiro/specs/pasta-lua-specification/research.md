@@ -50,7 +50,9 @@
   - `LocalSceneItem`: `VarSet`, `CallScene`, `ActionLine`, `ContinueAction` の enum
   - `Action`: `Talk`, `WordRef`, `VarRef`, `FnCall`, `SakuraScript`, `Escape` の enum
   - `VarScope`: `Local`, `Global`, `Args(usize)` の enum
-- **設計への影響**: 既存 AST 構造をそのまま利用し、Lua 出力パターンのみ変更
+  - **актерの型**: `ActorScope` （`name: String`, `attrs: HashMap<String, String>`, `words: Vec<WordScope>`, `var_sets: Vec<VarSet>` を保持）
+  - **Span 情報**: すべての AST ノードに `span: Span` を含有（`start_line`, `start_col`, `end_line`, `end_col` で行番号位置を記録）
+- **設計への影響**: 既存 AST 構造をそのまま利用し、Lua 出力パターンのみ変更。Span 情報により `comment_mode=true` 時に行番号コメント出力が可能
 
 ## アーキテクチャパターン評価
 

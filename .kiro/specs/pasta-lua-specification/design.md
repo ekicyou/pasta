@@ -208,7 +208,7 @@ impl LuaTranspiler {
     pub fn transpile<W: Write>(
         &self,
         ast: &[GlobalSceneScope],
-        actors: &[ActorDef],
+        actors: &[ActorScope],
         writer: &mut W,
     ) -> Result<TranspileContext, TranspileError>;
 }
@@ -468,6 +468,9 @@ pub enum TranspileError {
 
 ### ユニットテスト
 - `StringLiteralizer::literalize()` - 各ルールの境界条件
+  - エスケープ不要パターン（通常文字列）
+  - エスケープ必要パターン（危険パターン検出）
+  - n > 10 の上限エラー
 - `LuaCodeGenerator::generate_*()` - 各 AST ノードの出力パターン
 - `TranspilerConfig` - デフォルト値、設定変更
 
@@ -475,6 +478,20 @@ pub enum TranspileError {
 - `pasta_lua_transpiler_integration_test.rs` - sample.pasta → Lua 変換
 - comment_mode=true/false 両モードの検証
 - 参照実装 sample.lua との行比較
+
+**比較アルゴリズム詳細**:
+```
+step 1: 生成 Lua コードをテキスト行に分割
+step 2: 参照実装 sample.lua をテキスト行に分割
+step 3: 両者を行ごとに比較
+  - コメント行（`--` で開始）は除外
+  - 空行（`^\s*$`）の差異は許容
+  - コード行の内容が完全一致することを確認
+step 4: テスト結果をレポート
+  - 期待値行数 vs 実際値行数
+  - 不一致行の詳細（行番号、期待コード、実際コード）
+  - 差分パターン分類（字句的、構文的、論理的）
+```
 
 ### E2E テスト
 - 生成 Lua コードの構文妥当性（luacheck または Lua インタープリタ）
