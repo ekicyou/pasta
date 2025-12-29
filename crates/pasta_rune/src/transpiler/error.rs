@@ -92,7 +92,7 @@ mod tests {
 
     #[test]
     fn test_invalid_ast_error() {
-        let span = Span::new(10, 5, 10, 15);
+        let span = Span::new(10, 5, 10, 15, 0, 15);
         let err = TranspileError::invalid_ast(&span, "unexpected token");
 
         assert!(err.to_string().contains("10:5"));
@@ -109,7 +109,7 @@ mod tests {
 
     #[test]
     fn test_invalid_continuation_error() {
-        let span = Span::new(20, 1, 20, 10);
+        let span = Span::new(20, 1, 20, 10, 0, 10);
         let err = TranspileError::invalid_continuation(&span);
 
         assert!(err.to_string().contains("20:1"));

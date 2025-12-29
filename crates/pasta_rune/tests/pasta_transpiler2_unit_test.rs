@@ -132,7 +132,7 @@ fn test_context_merge_attrs_scene_priority() {
 
 #[test]
 fn test_error_invalid_ast() {
-    let span = Span::new(10, 5, 10, 15);
+    let span = Span::new(10, 5, 10, 15, 0, 15);
     let err = TranspileError::invalid_ast(&span, "unexpected token");
 
     assert!(err.to_string().contains("10:5"));
@@ -152,7 +152,7 @@ fn test_error_undefined_symbol() {
 
 #[test]
 fn test_error_invalid_continuation() {
-    let span = Span::new(20, 1, 20, 10);
+    let span = Span::new(20, 1, 20, 10, 0, 10);
     let err = TranspileError::invalid_continuation(&span);
     assert!(matches!(err, TranspileError::InvalidContinuation { .. }));
 }
