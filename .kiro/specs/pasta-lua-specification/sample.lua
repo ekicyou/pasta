@@ -197,13 +197,12 @@ do
         act.うにゅう:talk("第２引数は" .. tostring(args[2]) .. "やね。")
     end
 
-    -- ```lua
+    -- ```
     -- function SCENE.関数(ctx, value, ...)
     --     return value * value
     -- end
     -- ```
-    -- 意図: Runeブロック（```rune または ```lua）内の関数定義は、
-    --       . 構文で SCENE.関数名 としてLua関数定義に変換（Requirement 1f）
+    -- 意図: コードブロック（``` で識別、言語識別子は無視）内のコードをそのまま出力（Requirement 1f）
     function SCENE.関数(ctx, value, ...)
         return value * value
     end
