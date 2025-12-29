@@ -60,9 +60,13 @@
 
 ## 要件
 
-### 0. Luaローカル変数数制限への対応設計
+### 0. 出力メカニズム・全体設計
 
-**目的**: Luaのローカル変数数制限（約200個）を超えないトランスパイル出力設計を確立
+**目的**: Luaのローカル変数数制限（約200個）を超えないトランスパイル出力設計を確立、かつデバッグ・検証を支援
+
+#### 0-1. ローカル変数数制限への対応
+
+**目的**: トランスパイル出力がLuaの200ローカル変数制限を超えない設計を確立
 
 **背景**: トランスパイラーで機械的にコードを生成する際、アクター・シーン・変数が増えるとローカル変数が蓄積しやすい。
 
@@ -73,7 +77,27 @@
 - When 関数内でローカル・グローバル・アクター動作を管理するとき、Transpiler shall `var`, `save`, `act` の3個テーブルのみを使用する
 - The Transpiler shall スコープ分離パターン（`do...end` ブロック）により、各ブロック内で約200個のローカル変数枠を確保できる構造を生成する
 
-### 0-2. Lua文字列リテラル形式の標準化
+#### 0-2. コメント出力モード（デバッグ機能）
+
+**目的**: トランスパイル出力の検証・デバッグを容易にするため、Pasta源コメントをLuaコメントで出力
+
+**受け入れ基準**:
+- The Transpiler shall トランスパイラーコンストラクタで設定可能な `comment_mode: bool` フラグを実装する
+- When `comment_mode = true`（**デフォルト**）のとき、Transpiler shall 対応するPasta源コードを `-- [Pasta Line N] ...` 形式で各Luaコード行の直前に出力する
+- When `comment_mode = false` のとき、Transpiler shall コメント出力を抑止し、Luaコード出力のみとする
+- The Transpiler shall 1行のPastaコードが複数のLua行に展開される場合、最初のLua行のみに元Pasta行番号コメントを付与する
+
+**実装例**:
+```lua
+-- [Pasta Line 5] ＊メイン：プレイヤーの初期化シーン
+local __メイン_1__ = function(var, save, act)
+  -- [Pasta Line 6] ＄会話：ゲーム開始時のセリフを表示
+  var.message = "ゲームを開始します。"
+  ...
+end
+```
+
+#### 0-3. Lua文字列リテラル形式の標準化
 
 **目的**: Pastaテキスト・Sakuraスクリプトを含む文字列を、最適な形式で統一的に生成
 
@@ -199,12 +223,35 @@
 - When ローカル単語定義があるとき、Transpiler shall ローカルスコープの WordDefRegistry に登録する
 - The Transpiler shall パーサーから属性（`＆key：value`）を取得するが、トランスパイラー層では処理しない（属性実装は後続仕様）
 
-### 4. 参照実装による検証
+### 4. インテグレーションテストと自動検証
 
-**目的**: sample.pasta → sample.lua の手作業変換により、トランスパイルルールを検証
+**目的**: sample.pasta → Lua への自動トランスパイル出力を検証、参照実装 sample.lua との一致性を確認
 
 **受け入れ基準**:
-- The sample.lua shall sample.pasta に含まれる全機能をカバーする
-- The sample.lua shall トランスパイルルールの参照実装として機能する
-- When 各 AST ノードと生成 Lua コードの対応を示すとき、Comment shall Requirement 番号を含める
+- The Test Suite shall `tests/` に新規テストファイル `pasta_lua_transpiler_integration_test.rs` を作成する
+- The Test shall `sample.pasta` を comment_mode=true でトランスパイルし、生成 Lua コードを検証する
+- When トランスパイル出力をコメント行を除外した形で参照実装 `sample.lua` と比較するとき、Transpiler shall 行ごとの一致性をチェックする
+- When 出力が参照実装と完全一致するとき、Test shall PASS と判定する
+- When 出力が参照実装と異なるとき、Test shall FAIL と報告し、以下を明示する：
+  - 不一致の行番号
+  - 期待されたLuaコード
+  - 実際に生成されたLuaコード
+  - Pasta源行との対応（`[Pasta Line N]` コメント参照）
+- The Test Report shall 統計情報を含める（一致行数/総行数、不一致パターン分類）
+
+**比較アルゴリズム**:
+```
+1. 生成Lua出力をコメント行で分割
+2. 参照実装をコメント行で分割
+3. 両者を行ごとに比較
+   - コメント行（`--` 開始）は除外
+   - 空行差異は許容（インデント調整を想定）
+   - コード内容が異なれば即座にFAIL
+4. テスト結果をレポート（差分箇所の詳細出力）
+```
+
+**実装ガイドライン**:
+- comment_mode=true での出力を使用し、Pasta源とのトレーサビリティを確保
+- パーサーエラー、トランスパイルエラーは個別にテストケースで検証
+- 将来の拡張に備え、テストフレームワークは複数 Pasta 入力に対応できる設計にする
 
