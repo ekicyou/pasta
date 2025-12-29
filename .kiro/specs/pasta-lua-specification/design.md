@@ -250,9 +250,11 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     pub fn new(writer: &'a mut W, config: &'a TranspilerConfig) -> Self;
     
     /// アクター定義ブロックを生成（Requirement 4a）
+    /// シーン定義テーブル `local scenes = { [actor_name] = { ... }, ... }` を出力
     pub fn generate_actor(&mut self, actor: &ActorDef) -> Result<(), TranspileError>;
     
     /// グローバルシーンブロックを生成（Requirement 4b）
+    /// シーン関数定義 `function scene_name() ... end` または `scenes[...] = function() ... end` を出力
     pub fn generate_global_scene(
         &mut self,
         scene: &GlobalSceneScope,
@@ -261,6 +263,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     ) -> Result<(), TranspileError>;
     
     /// ローカルシーン関数を生成（Requirement 4c）
+    /// ローカルシーン関数 `scenes[actor][scene_name] = function() ... end` を出力
     pub fn generate_local_scene(
         &mut self,
         scene: &LocalSceneScope,
@@ -271,6 +274,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     pub fn generate_var_set(&mut self, var_set: &VarSet) -> Result<(), TranspileError>;
     
     /// シーン呼び出しを生成（Requirement 4d, 4g）
+    /// テーブル参照形式: `scenes[actor_name][scene_name]()` を出力
     pub fn generate_call_scene(&mut self, call_scene: &CallScene) -> Result<(), TranspileError>;
     
     /// アクション（Talk, WordRef, VarRef 等）を生成（Requirement 4d, 4e）
@@ -368,6 +372,119 @@ pub struct TranspileContext {
 - 状態モデル: Pass 1 で構築、Pass 2 で参照
 - 永続性: トランスパイル実行中のみ
 - 並行性: 単一スレッドで使用（排他的所有）
+
+## シーン呼び出しメカニズム
+
+### 責務分離: トランスパイラー vs ランタイム層
+
+**pasta_rune での実装（参考）**:
+- トランスパイラーがシーン ID → 関数へのジャンプテーブルをハードコード出力
+- ランタイム層が ID 指定で関数を実行
+- 問題: ID 番号を管理する複雑性
+
+**pasta_lua での簡略化（本仕様）**:
+- トランスパイラーはシーン定義テーブル（Lua テーブル）のみを出力
+- ランタイム層がテーブルを参照して Lua 関数を作成・実行
+- 利点: ID 管理が不要、テーブル参照のみで十分
+
+### トランスパイラーの責務
+
+**生成する Lua コード構造**:
+```lua
+-- シーン定義テーブル（マップのみ、実行可能な関数ではない）
+local scenes = {
+  さくら = {
+    会話 = function(arg1, arg2) ... end,
+    笑う = function() ... end,
+  },
+  メイン = {
+    オープニング = function() ... end,
+  },
+}
+
+-- グローバルシーン定義
+local function メイン() ... end
+
+-- または
+メイン.オープニング = function() ... end
+```
+
+**出力責務**:
+- シーン定義テーブルの Lua テーブル構造
+- 各シーン内の関数定義（変数管理、アクション生成）
+- CallScene の呼び出しコード（テーブル参照形式: `scenes["さくら"]["会話"]()`）
+
+**出力しない責務** ❌:
+- シーン ID のハードコード（ジャンプテーブル）
+- シーン実行の際のランタイム状態管理（coroutine など）
+- word/talk 関数の実装
+- ランタイムコンテキスト管理
+
+### ランタイム層の責務
+
+**呼び出し側（ランタイムエンジン）**:
+```lua
+-- シーン実行（テーブルアクセス）
+if scenes[actor_name][scene_name] then
+  scenes[actor_name][scene_name](/* args */)
+else
+  error("Scene not found: " .. actor_name .. "::" .. scene_name)
+end
+
+-- または遅延生成（オプション）
+local function get_scene(actor, scene)
+  if not scenes[actor] then scenes[actor] = {} end
+  return scenes[actor][scene]
+end
+```
+
+**実装責務**:
+- シーン定義テーブルの検証（存在確認）
+- CallScene の実行制御（引数の解析、戻り値処理）
+- ランタイムコンテキスト管理（現在のアクター、変数スコープなど）
+- word/talk 関数の実装と登録
+
+### CallScene コード生成パターン
+
+**トランスパイラー出力**:
+```lua
+-- シーン定義テーブル参照（直接実行）
+scenes["さくら"]["会話"]()
+
+-- または変数経由
+local scene_fn = scenes["さくら"]["会話"]
+if scene_fn then
+  scene_fn()
+else
+  error("Scene not found")
+end
+```
+
+**呼び出し側での処理の例** (ランタイム層):
+```rust
+// Rust コード（ランタイム層）で Lua 関数を実行
+let scene_value = lua.globals()
+  .get::<_, Table>("scenes")?
+  .get::<_, Table>("さくら")?
+  .get::<_, Function>("会話")?;
+scene_value.call::<_, ()>(())?;
+```
+
+### 設計上の利点
+
+| 観点 | pasta_rune | pasta_lua |
+|------|-----------|----------|
+| **ID 管理** | ハードコード (0, 1, 2, ...) | テーブルキーのみ（文字列） |
+| **シーン追加** | ID 再割り当て必要 | テーブル追加のみ |
+| **メモリ効率** | ID テーブル + シーン関数 | シーン関数のみ |
+| **可読性** | ID 番号 → 関数マッピング不明 | テーブル構造で一目瞭然 |
+| **拡張性** | ID 範囲の制限あり | 動的シーン追加可能 |
+
+### 次フェーズの実装
+
+**タスク分割**:
+1. **pasta_lua**: シーン定義テーブル構造 + CallScene 参照コード生成
+2. **ランタイム層** (後続仕様): テーブル参照 + 実行制御 + word/talk 関数実装
 
 ## データモデル
 
@@ -689,19 +806,38 @@ step 6: テスト結果をレポート
 - 行番号取得不可な場合（古い AST など）はコメント出力をスキップ
 - コメント形式: `-- [Pasta src:L○]` で生成行の Pasta ソース行番号を記録
 
-**comment_mode=true 時の Lua コード**:
+**comment_mode=true 時の Lua コード（テーブル構造例）**:
 ```lua
--- [Pasta src:L5]
-local talk_function = function()
-  -- [Pasta src:L6]
-  print("Hello")
-end
+-- [Pasta src:L3]
+local scenes = {
+  さくら = {
+    -- [Pasta src:L5]
+    会話 = function()
+      -- [Pasta src:L6]
+      print("こんにちは")
+    end,
+  },
+}
 ```
 
-**comment_mode=false 時の Lua コード**:
+**comment_mode=false 時の Lua コード（テーブル構造例）**:
 ```lua
-local talk_function = function()
-  print("Hello")
+local scenes = {
+  さくら = {
+    会話 = function()
+      print("こんにちは")
+    end,
+  },
+}
+```
+
+**CallScene の呼び出し（テーブル参照形式）**:
+```lua
+-- ランタイム層から呼び出し
+if scenes["さくら"] and scenes["さくら"]["会話"] then
+  scenes["さくら"]["会話"]()
+else
+  error("Scene not found")
 end
 ```
 
