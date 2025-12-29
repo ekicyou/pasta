@@ -118,6 +118,8 @@ mod tests {
             start_col: 5,
             end_line: 10,
             end_col: 23,
+            start_byte: 0,
+            end_byte: 18,
         };
         let display = SpanDisplay::from(span);
         assert_eq!(format!("{}", display), "[L10:5-L10:23]");
@@ -130,6 +132,8 @@ mod tests {
             start_col: 1,
             end_line: 5,
             end_col: 10,
+            start_byte: 0,
+            end_byte: 50,
         };
         let display = SpanDisplay::from(span);
         assert_eq!(format!("{}", display), "[L1:1-L5:10]");
@@ -146,7 +150,7 @@ mod tests {
 
     #[test]
     fn test_transpile_error_invalid_ast() {
-        let span = Span::new(1, 1, 1, 10);
+        let span = Span::new(1, 1, 1, 10, 0, 10);
         let err = TranspileError::invalid_ast(&span, "test message");
         let msg = format!("{}", err);
         assert!(msg.contains("Invalid AST structure"));
@@ -156,7 +160,7 @@ mod tests {
 
     #[test]
     fn test_transpile_error_invalid_continuation() {
-        let span = Span::new(25, 1, 25, 8);
+        let span = Span::new(25, 1, 25, 8, 0, 8);
         let err = TranspileError::invalid_continuation(&span);
         let msg = format!("{}", err);
         assert!(msg.contains("Continuation action without actor"));

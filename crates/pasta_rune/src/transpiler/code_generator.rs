@@ -247,19 +247,19 @@ impl<'a, W: Write> CodeGenerator<'a, W> {
     /// Generate a single action.
     fn generate_action(&mut self, action: &Action) -> Result<(), TranspileError> {
         match action {
-            Action::Talk(text) => {
+            Action::Talk { text, .. } => {
                 // Escape backslashes and quotes for Rune string
                 let escaped = text.replace('\\', "\\\\").replace('"', "\\\"");
                 self.writeln(&format!("yield Talk(\"{}\");", escaped))?;
             }
-            Action::WordRef(word_name) => {
+            Action::WordRef { name: word_name, .. } => {
                 self.writeln(&format!(
                     "yield Talk(pasta_stdlib::word(\"{}\", \"{}\", []));",
                     "", // module - empty for now
                     word_name
                 ))?;
             }
-            Action::VarRef { name, scope } => {
+            Action::VarRef { name, scope, .. } => {
                 let var_path = match scope {
                     VarScope::Local => format!("ctx.local.{}", name),
                     VarScope::Global => format!("ctx.global.{}", name),
@@ -271,15 +271,16 @@ impl<'a, W: Write> CodeGenerator<'a, W> {
                 name,
                 args: _,
                 scope: _,
+                ..
             } => {
                 // For now, generate simple function call with yield
                 self.writeln(&format!("for a in {}(ctx, args) {{ yield a; }}", name))?;
             }
-            Action::SakuraScript(script) => {
+            Action::SakuraScript { script, .. } => {
                 let escaped = script.replace('\\', "\\\\").replace('"', "\\\"");
                 self.writeln(&format!("yield emit_sakura_script(\"{}\");", escaped))?;
             }
-            Action::Escape(escape) => {
+            Action::Escape { sequence: escape, .. } => {
                 // Extract second character (the escaped character)
                 if let Some(c) = escape.chars().nth(1) {
                     self.writeln(&format!("yield Talk(\"{}\");", c))?;
@@ -371,7 +372,10 @@ mod tests {
         let mut output = Vec::new();
         let mut codegen = CodeGenerator::new(&mut output);
 
-        let action = Action::Talk("こんにちは".to_string());
+        let action = Action::Talk {
+            text: "こんにちは".to_string(),
+            span: Span::default(),
+        };
         codegen.generate_action(&action).unwrap();
 
         let result = String::from_utf8(output).unwrap();
@@ -383,7 +387,10 @@ mod tests {
         let mut output = Vec::new();
         let mut codegen = CodeGenerator::new(&mut output);
 
-        let action = Action::Escape("@@".to_string());
+        let action = Action::Escape {
+            sequence: "@@".to_string(),
+            span: Span::default(),
+        };
         codegen.generate_action(&action).unwrap();
 
         let result = String::from_utf8(output).unwrap();
@@ -398,6 +405,7 @@ mod tests {
         let action = Action::VarRef {
             name: "count".to_string(),
             scope: VarScope::Local,
+            span: Span::default(),
         };
         codegen.generate_action(&action).unwrap();
 
@@ -410,7 +418,10 @@ mod tests {
         let mut output = Vec::new();
         let mut codegen = CodeGenerator::new(&mut output);
 
-        let action_line = create_action_line("sakura", vec![Action::Talk("hello".to_string())]);
+        let action_line = create_action_line("sakura", vec![Action::Talk {
+            text: "hello".to_string(),
+            span: Span::default(),
+        }]);
         let mut last_actor = None;
 
         codegen
@@ -428,7 +439,10 @@ mod tests {
         let mut output = Vec::new();
         let mut codegen = CodeGenerator::new(&mut output);
 
-        let action_line = create_action_line("sakura", vec![Action::Talk("hello".to_string())]);
+        let action_line = create_action_line("sakura", vec![Action::Talk {
+            text: "hello".to_string(),
+            span: Span::default(),
+        }]);
         let mut last_actor = Some("sakura".to_string());
 
         codegen
@@ -447,8 +461,11 @@ mod tests {
         let mut codegen = CodeGenerator::new(&mut output);
 
         let continue_action = ContinueAction {
-            actions: vec![Action::Talk("continued".to_string())],
-            span: Span::new(1, 1, 1, 10),
+            actions: vec![Action::Talk {
+                text: "continued".to_string(),
+                span: Span::default(),
+            }],
+            span: Span::new(1, 1, 1, 10, 0, 10),
         };
         let last_actor = None;
 

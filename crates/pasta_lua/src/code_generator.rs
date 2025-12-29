@@ -374,16 +374,16 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// Generate a single action (Requirement 3d, 3e).
     fn generate_action(&mut self, action: &Action, actor: &str) -> Result<(), TranspileError> {
         match action {
-            Action::Talk(text) => {
+            Action::Talk { text, .. } => {
                 // act.アクター:talk("文字列")
                 let literal = StringLiteralizer::literalize(text)?;
                 self.writeln(&format!("act.{}:talk({})", actor, literal))?;
             }
-            Action::WordRef(word_name) => {
+            Action::WordRef { name: word_name, .. } => {
                 // act.アクター:word("単語名")
                 self.writeln(&format!("act.{}:word(\"{}\")", actor, word_name))?;
             }
-            Action::VarRef { name, scope } => {
+            Action::VarRef { name, scope, .. } => {
                 // Variable interpolation: generate talk with concatenation
                 let var_path = match scope {
                     VarScope::Local => format!("var.{}", name),
@@ -392,7 +392,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                 };
                 self.writeln(&format!("act.{}:talk(tostring({}))", actor, var_path))?;
             }
-            Action::FnCall { name, args, scope } => {
+            Action::FnCall { name, args, scope, .. } => {
                 // SCENE:関数名(ctx, 引数...)
                 let args_str = self.generate_args_string(args)?;
                 let prefix = match scope {
@@ -411,12 +411,12 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                     }
                 ))?;
             }
-            Action::SakuraScript(script) => {
+            Action::SakuraScript { script, .. } => {
                 // SakuraScript is output as talk
                 let literal = StringLiteralizer::literalize(script)?;
                 self.writeln(&format!("act.{}:talk({})", actor, literal))?;
             }
-            Action::Escape(escape) => {
+            Action::Escape { sequence: escape, .. } => {
                 // Extract the escaped character (second char)
                 if let Some(c) = escape.chars().nth(1) {
                     self.writeln(&format!("act.{}:talk(\"{}\")", actor, c))?;
@@ -610,7 +610,10 @@ mod tests {
         let mut output = Vec::new();
         let mut codegen = LuaCodeGenerator::new(&mut output);
 
-        let action = Action::Talk("こんにちは".to_string());
+        let action = Action::Talk {
+            text: "こんにちは".to_string(),
+            span: Span::default(),
+        };
         codegen.generate_action(&action, "さくら").unwrap();
 
         let result = String::from_utf8(output).unwrap();
@@ -622,7 +625,10 @@ mod tests {
         let mut output = Vec::new();
         let mut codegen = LuaCodeGenerator::new(&mut output);
 
-        let action = Action::WordRef("挨拶".to_string());
+        let action = Action::WordRef {
+            name: "挨拶".to_string(),
+            span: Span::default(),
+        };
         codegen.generate_action(&action, "さくら").unwrap();
 
         let result = String::from_utf8(output).unwrap();
@@ -637,6 +643,7 @@ mod tests {
         let action = Action::VarRef {
             name: "カウンタ".to_string(),
             scope: VarScope::Local,
+            span: Span::default(),
         };
         codegen.generate_action(&action, "さくら").unwrap();
 
@@ -652,6 +659,7 @@ mod tests {
         let action = Action::VarRef {
             name: "グローバル".to_string(),
             scope: VarScope::Global,
+            span: Span::default(),
         };
         codegen.generate_action(&action, "さくら").unwrap();
 
@@ -668,6 +676,7 @@ mod tests {
         let action = Action::VarRef {
             name: "0".to_string(),
             scope: VarScope::Args(0),
+            span: Span::default(),
         };
         codegen.generate_action(&action, "さくら").unwrap();
 
@@ -680,7 +689,10 @@ mod tests {
         let mut output = Vec::new();
         let mut codegen = LuaCodeGenerator::new(&mut output);
 
-        let action = Action::Escape("@@".to_string());
+        let action = Action::Escape {
+            sequence: "@@".to_string(),
+            span: Span::default(),
+        };
         codegen.generate_action(&action, "さくら").unwrap();
 
         let result = String::from_utf8(output).unwrap();

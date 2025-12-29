@@ -126,7 +126,7 @@ pub fn parse_str(source: &str, filename: &str) -> Result<PastaFile, PastaError> 
         }
     })?;
 
-    build_ast(pairs, filename)
+    build_ast(pairs, filename, source)
 }
 
 /// Parse a Pasta script file using pasta2.pest grammar.
@@ -170,9 +170,14 @@ pub fn parse_file(path: &Path) -> Result<PastaFile, PastaError> {
 /// grammar.pest `file = ( file_scope | global_scene_scope | actor_scope )*` に準拠。
 /// 複数の file_scope、global_scene_scope、actor_scope を任意順序で処理し、
 /// 出現順序を items に保持します。
-fn build_ast(pairs: Pairs<Rule>, filename: &str) -> Result<PastaFile, PastaError> {
+fn build_ast(pairs: Pairs<Rule>, filename: &str, source: &str) -> Result<PastaFile, PastaError> {
     let mut file = PastaFile::new(std::path::PathBuf::from(filename));
     let mut last_global_scene_name: Option<String> = None;
+
+    // Set file span to cover the entire source
+    let line_count = source.lines().count().max(1);
+    let last_line_len = source.lines().last().map(|l| l.len()).unwrap_or(0);
+    file.span = Span::new(1, 1, line_count, last_line_len + 1, 0, source.len());
 
     for pair in pairs {
         match pair.as_rule() {
@@ -234,7 +239,7 @@ fn parse_file_scope(pair: Pair<Rule>) -> Result<FileScope, PastaError> {
 /// grammar.pest `actor_scope = { actor_line ~ actor_scope_item* }` に対応。
 /// actor_scope_item = _{ global_scene_attr_line | global_scene_word_line | var_set_line | blank_line }
 fn parse_actor_scope(pair: Pair<Rule>) -> Result<ActorScope, PastaError> {
-    let span = span_from_pair(&pair);
+    let span = Span::from(&pair.as_span());
     let mut name = String::new();
     let mut attrs = Vec::new();
     let mut words = Vec::new();
@@ -286,7 +291,7 @@ fn parse_global_scene_scope(
     last_name: &mut Option<String>,
     filename: &str,
 ) -> Result<GlobalSceneScope, PastaError> {
-    let span = span_from_pair(&pair);
+    let span = Span::from(&pair.as_span());
     let mut scene_name = String::new();
     let mut is_continuation = false;
     let mut attrs = Vec::new();
@@ -380,7 +385,7 @@ fn parse_global_scene_start(
 
 /// Parse local start scene scope (no name).
 fn parse_local_start_scene_scope(pair: Pair<Rule>) -> Result<LocalSceneScope, PastaError> {
-    let span = span_from_pair(&pair);
+    let span = Span::from(&pair.as_span());
     let mut scope = LocalSceneScope::start();
     scope.span = span;
 
@@ -420,7 +425,7 @@ fn parse_local_start_scene_scope(pair: Pair<Rule>) -> Result<LocalSceneScope, Pa
 
 /// Parse local scene scope (with name).
 fn parse_local_scene_scope(pair: Pair<Rule>) -> Result<LocalSceneScope, PastaError> {
-    let span = span_from_pair(&pair);
+    let span = Span::from(&pair.as_span());
     let mut scope = LocalSceneScope::start();
     scope.span = span;
 
@@ -468,7 +473,7 @@ fn parse_local_scene_scope(pair: Pair<Rule>) -> Result<LocalSceneScope, PastaErr
 
 /// Parse attribute.
 fn parse_attr(pair: Pair<Rule>) -> Result<Attr, PastaError> {
-    let span = span_from_pair(&pair);
+    let span = Span::from(&pair.as_span());
     let mut key = String::new();
     let mut value = AttrValue::AttrString(String::new());
 
@@ -509,7 +514,7 @@ fn parse_attr_number(s: &str) -> AttrValue {
 
 /// Parse key_words.
 fn parse_key_words(pair: Pair<Rule>) -> Result<KeyWords, PastaError> {
-    let span = span_from_pair(&pair);
+    let span = Span::from(&pair.as_span());
     let mut name = String::new();
     let mut words = Vec::new();
 
@@ -543,7 +548,7 @@ fn parse_key_words(pair: Pair<Rule>) -> Result<KeyWords, PastaError> {
 
 /// Parse code block.
 fn parse_code_block(pair: Pair<Rule>) -> Result<CodeBlock, PastaError> {
-    let span = span_from_pair(&pair);
+    let span = Span::from(&pair.as_span());
     let mut language = None;
     let mut content = String::new();
 
@@ -568,7 +573,7 @@ fn parse_code_block(pair: Pair<Rule>) -> Result<CodeBlock, PastaError> {
 
 /// Parse var_set.
 fn parse_var_set(pair: Pair<Rule>) -> Result<VarSet, PastaError> {
-    let span = span_from_pair(&pair);
+    let span = Span::from(&pair.as_span());
     let scope = match pair.as_rule() {
         Rule::var_set_global => VarScope::Global,
         _ => VarScope::Local,
@@ -601,7 +606,7 @@ fn parse_var_set(pair: Pair<Rule>) -> Result<VarSet, PastaError> {
 
 /// Parse call_scene.
 fn parse_call_scene(pair: Pair<Rule>) -> Result<CallScene, PastaError> {
-    let span = span_from_pair(&pair);
+    let span = Span::from(&pair.as_span());
     let mut target = String::new();
     let mut args = None;
 
@@ -622,7 +627,7 @@ fn parse_call_scene(pair: Pair<Rule>) -> Result<CallScene, PastaError> {
 
 /// Parse action_line.
 fn parse_action_line(pair: Pair<Rule>) -> Result<ActionLine, PastaError> {
-    let span = span_from_pair(&pair);
+    let span = Span::from(&pair.as_span());
     let mut actor = String::new();
     let mut actions = Vec::new();
 
@@ -647,7 +652,7 @@ fn parse_action_line(pair: Pair<Rule>) -> Result<ActionLine, PastaError> {
 
 /// Parse continue_action_line.
 fn parse_continue_action_line(pair: Pair<Rule>) -> Result<ContinueAction, PastaError> {
-    let span = span_from_pair(&pair);
+    let span = Span::from(&pair.as_span());
     let mut actions = Vec::new();
 
     for inner in pair.into_inner() {
@@ -664,14 +669,21 @@ fn parse_actions(pair: Pair<Rule>) -> Result<Vec<Action>, PastaError> {
     let mut actions = Vec::new();
 
     for inner in pair.into_inner() {
+        let action_span = Span::from(&inner.as_span());
         match inner.as_rule() {
             Rule::talk => {
-                actions.push(Action::Talk(inner.as_str().to_string()));
+                actions.push(Action::Talk {
+                    text: inner.as_str().to_string(),
+                    span: action_span,
+                });
             }
             Rule::word_ref => {
                 for id_inner in inner.into_inner() {
                     if id_inner.as_rule() == Rule::id {
-                        actions.push(Action::WordRef(id_inner.as_str().to_string()));
+                        actions.push(Action::WordRef {
+                            name: id_inner.as_str().to_string(),
+                            span: action_span,
+                        });
                     }
                 }
             }
@@ -681,6 +693,7 @@ fn parse_actions(pair: Pair<Rule>) -> Result<Vec<Action>, PastaError> {
                         actions.push(Action::VarRef {
                             name: id_inner.as_str().to_string(),
                             scope: VarScope::Local,
+                            span: action_span,
                         });
                     }
                 }
@@ -691,6 +704,7 @@ fn parse_actions(pair: Pair<Rule>) -> Result<Vec<Action>, PastaError> {
                         actions.push(Action::VarRef {
                             name: id_inner.as_str().to_string(),
                             scope: VarScope::Global,
+                            span: action_span,
                         });
                     }
                 }
@@ -701,6 +715,7 @@ fn parse_actions(pair: Pair<Rule>) -> Result<Vec<Action>, PastaError> {
                     name,
                     args,
                     scope: FnScope::Local,
+                    span: action_span,
                 });
             }
             Rule::fn_call_global => {
@@ -709,13 +724,20 @@ fn parse_actions(pair: Pair<Rule>) -> Result<Vec<Action>, PastaError> {
                     name,
                     args,
                     scope: FnScope::Global,
+                    span: action_span,
                 });
             }
             Rule::sakura_script => {
-                actions.push(Action::SakuraScript(inner.as_str().to_string()));
+                actions.push(Action::SakuraScript {
+                    script: inner.as_str().to_string(),
+                    span: action_span,
+                });
             }
             Rule::at_escape | Rule::dollar_escape | Rule::sakura_escape => {
-                actions.push(Action::Escape(inner.as_str().to_string()));
+                actions.push(Action::Escape {
+                    sequence: inner.as_str().to_string(),
+                    span: action_span,
+                });
             }
             _ => {}
         }
@@ -746,7 +768,7 @@ fn parse_fn_call_inner(pair: Pair<Rule>) -> Result<(String, Args), PastaError> {
 
 /// Parse args.
 fn parse_args(pair: Pair<Rule>) -> Result<Args, PastaError> {
-    let span = span_from_pair(&pair);
+    let span = Span::from(&pair.as_span());
     let mut items = Vec::new();
 
     for inner in pair.into_inner() {
@@ -884,14 +906,6 @@ fn normalize_number_str(s: &str) -> String {
             _ => c,
         })
         .collect()
-}
-
-/// Create Span from pest Pair.
-fn span_from_pair(pair: &Pair<Rule>) -> Span {
-    let pest_span = pair.as_span();
-    let (start_line, start_col) = pest_span.start_pos().line_col();
-    let (end_line, end_col) = pest_span.end_pos().line_col();
-    Span::from_pest((start_line, start_col), (end_line, end_col))
 }
 
 // ============================================================================
