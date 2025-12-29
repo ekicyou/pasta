@@ -140,8 +140,12 @@ end
 
 **目的**: グローバルシーン（`＊メイン`）をLuaテーブル・関数構造に変換
 
+**背景**: グローバルシーンは各ファイル内で一意である必要があり、重複する場合は番号で区別する。命名規則は Rune 実装に従う。
+
 **受け入れ基準**:
-- When `＊メイン` グローバルシーン定義があるとき、Transpiler shall `do...end` ブロックで分離し、ブロック内で `local SCENE = PASTA:create_scene("モジュール名")` と生成する
+- When `＊メイン` グローバルシーン定義があるとき、Transpiler shall `do...end` ブロックで分離し、ブロック内で `local SCENE = PASTA:create_scene("モジュール名_N")` と生成する（N=1,2,3... はグローバルシーン定義順、0-indexed を 1-indexed に変換）
+- The Transpiler shall グローバルシーン名の重複有無に関わらず、常に `_N` 番号を付与する（例: `＊メイン` → `メイン_1`、2個目の `＊メイン` → `メイン_2`）
+- The Transpiler shall モジュール名の実際の登録・解決ロジックは `PASTA:create_scene()` ランタイム関数に委譲する（トランスパイラー層では機械的に `_N` を付与するのみ）
 - When ローカル単語定義（`＠場所：東京、大阪`）があるとき、Transpiler shall Lua コード出力を生成せず、内部の WordDefRegistry に登録する
 - When グローバル単語定義（`＠挨拶：こんにちは、やあ`）があるとき、Transpiler shall Lua コード出力を生成せず、内部の WordDefRegistry に登録する
 - When ファイルレベル属性（`＆天気：晴れ`）があるとき、Transpiler shall パーサーから取得するが、トランスパイラー層では処理しない（属性実装は後続仕様）
