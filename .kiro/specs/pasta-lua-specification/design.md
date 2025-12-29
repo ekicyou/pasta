@@ -503,6 +503,37 @@ scene_value.call::<_, ()>(())?;
 1. **pasta_lua**: シーン定義テーブル構造 + CallScene 参照コード生成
 2. **ランタイム層** (後続仕様): テーブル参照 + 実行制御 + word/talk 関数実装
 
+## 位置情報と エラー出力
+
+### Span 構造と Display フォーマット
+
+**定義**:
+```rust
+pub struct Span {
+    pub start_line: usize,      // 1-based
+    pub start_col: usize,       // 1-based
+    pub end_line: usize,        // 1-based
+    pub end_col: usize,         // 1-based
+}
+```
+
+**Display トレイト実装**:
+```rust
+impl Display for Span {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "[L{}:{}-L{}:{}]", self.start_line, self.start_col, self.end_line, self.end_col)
+    }
+}
+```
+
+**出力例**:
+```
+エラー: [L10:5-L10:23] Undefined scene: メイン::会話
+エラー: [L25:1-L25:8] String literal cannot be converted: dangerous pattern detected in all formats
+```
+
+**用途**: TranspileError の #[error] マクロ内で {span} プレースホルダーにより自動展開。ユーザーに行番号・カラム番号を提示し、ソースコード位置を特定可能にする。
+
 ## データモデル
 
 ### ドメインモデル
