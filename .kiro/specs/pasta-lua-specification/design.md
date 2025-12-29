@@ -36,7 +36,7 @@ pasta (workspace)
 
 **維持するパターン**:
 - `std::io::Write` トレイトによる出力抽象化
-- 2パス変換戦略（Pass 1: レジストリ登録、Pass 2: コード生成）
+- Pass 1 統一設計（Lua テーブル参照特性により参照検証不要）
 - `CodeGenerator<W: Write>` 構造体パターン
 
 ### アーキテクチャパターン・境界マップ
@@ -160,18 +160,18 @@ flowchart TD
 
 | 要件 | 概要 | コンポーネント | インターフェース | フロー |
 |------|------|----------------|------------------|--------|
-| 1 | ローカル変数数制限対応 | LuaCodeGenerator | generate_actor_block, generate_scene_block | Pass 2 |
-| 2 | コメント出力モード | LuaTranspiler, LuaCodeGenerator | TranspilerConfig | Pass 2 |
-| 3 | 文字列リテラル形式 | StringLiteralizer | literalize() | Pass 2 |
-| 4a | アクター定義Lua化 | LuaCodeGenerator | generate_actor() | Pass 2 |
-| 4b | シーン定義・モジュール構造 | LuaCodeGenerator | generate_global_scene() | Pass 2 |
-| 4c | ローカルシーン関数変換 | LuaCodeGenerator | generate_local_scene() | Pass 2 |
-| 4d | 変数スコープ管理 | LuaCodeGenerator | generate_var_set(), generate_action() | Pass 2 |
-| 4e | 単語参照処理 | LuaCodeGenerator, Pass 1 | generate_action(), WordDefRegistry | Pass 1, Pass 2 |
-| 4f | コードブロック埋め込み | LuaCodeGenerator | generate_code_block() | Pass 2 |
-| 4g | グローバルシーン間参照 | LuaCodeGenerator | generate_call_scene() | Pass 2 |
+| 1 | ローカル変数数制限対応 | LuaCodeGenerator | generate_actor(), generate_global_scene() | Pass 1 |
+| 2 | コメント出力モード | LuaTranspiler, LuaCodeGenerator | TranspilerConfig | Pass 1 |
+| 3 | 文字列リテラル形式 | StringLiteralizer | literalize() | Pass 1 |
+| 4a | アクター定義Lua化 | LuaCodeGenerator | generate_actor() | Pass 1 |
+| 4b | シーン定義・モジュール構造 | LuaCodeGenerator | generate_global_scene() | Pass 1 |
+| 4c | ローカルシーン関数変換 | LuaCodeGenerator | generate_local_scene() | Pass 1 |
+| 4d | 変数スコープ管理 | LuaCodeGenerator | generate_var_set(), generate_action() | Pass 1 |
+| 4e | 単語参照処理 | LuaCodeGenerator | generate_action(), WordDefRegistry | Pass 1 |
+| 4f | コードブロック埋め込み | LuaCodeGenerator | generate_code_block() | Pass 1 |
+| 4g | グローバルシーン間参照 | LuaCodeGenerator | generate_call_scene() | Pass 1 |
 | 5 | 実装制約・前提 | LuaTranspiler | TranspileError, Result<T, E> | 全体 |
-| 6 | レジストリ登録 | Pass 1 | SceneRegistry, WordDefRegistry | Pass 1 |
+| 6 | レジストリ登録 | LuaCodeGenerator | SceneRegistry, WordDefRegistry | Pass 1 |
 | 7 | インテグレーションテスト | Test Suite | pasta_lua_transpiler_integration_test.rs | テスト |
 
 ## コンポーネントとインターフェース
@@ -196,7 +196,7 @@ flowchart TD
 | Requirements | 2, 5 |
 
 **責務と制約**
-- 2パス変換の制御（Pass 1: レジストリ登録、Pass 2: コード生成）
+- Pass 1 統一処理の制御（機械的な Lua コード生成）
 - TranspilerConfig による設定管理（comment_mode 等）
 - TranspileError による一貫したエラーハンドリング
 
@@ -268,7 +268,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     
     /// アクター定義ブロックを生成（Requirement 4a）
     /// シーン定義テーブル `local scenes = { [actor_name] = { ... }, ... }` を出力
-    pub fn generate_actor(&mut self, actor: &ActorDef) -> Result<(), TranspileError>;
+    pub fn generate_actor(&mut self, actor: &ActorScope) -> Result<(), TranspileError>;
     
     /// グローバルシーンブロックを生成（Requirement 4b）
     /// シーン関数定義 `function scene_name() ... end` または `scenes[...] = function() ... end` を出力
@@ -387,7 +387,7 @@ pub struct TranspileContext {
     pub current_module: Option<String>,
 }
 ```
-- 状態モデル: Pass 1 で構築、Pass 2 で参照
+- 状態モデル: Pass 1 で構築・使用（単一パス内で完結）
 - 永続性: トランスパイル実行中のみ
 - 並行性: 単一スレッドで使用（排他的所有）
 
@@ -617,20 +617,20 @@ pub enum TranspileError {
         span: Span,
     },
     
-    /// Pass 2 - 継続アクションエラー（アクター未設定）
+    /// Pass 1 - 継続アクションエラー（アクター未設定）
     #[error("Continuation action without actor at {span}")]
     InvalidContinuation {
         span: Span,
     },
     
-    /// Pass 2 - 文字列リテラル変換失敗（すべての n で危険パターン発生）
+    /// Pass 1 - 文字列リテラル変換失敗（すべての n で危険パターン発生）
     #[error("String literal cannot be converted: dangerous pattern detected in all formats")]
     StringLiteralError {
         text: String,
         span: Span,
     },
     
-    /// Pass 2 - ローカル変数数超過（Lua 制限 ~200 個）
+    /// Pass 1 - ローカル変数数超過（Lua 制限 ~200 個）
     #[error("Too many local variables in scope: {count} (max ~200)")]
     TooManyLocalVariables {
         count: usize,
@@ -650,13 +650,14 @@ pub enum TranspileError {
 
 | エラー | 発生フェーズ | 原因 | 対応 | 例 |
 |--------|------------|------|------|----|
+| IoError | Pass 1 | Writer への書き込み失敗 | 処理停止 | ファイル書き込み権限なし |
 | InvalidAst | Pass 1 | AST ノード構造の矛盾 | 早期失敗 | LocalSceneScope が items を持たない |
-| UndefinedScene | Pass 1 | シーン定義前の参照 | 早期失敗 | CallScene が存在しないシーンを参照 |
-| UndefinedWord | Pass 1 | 単語定義前の参照 | 早期失敗 | Action::WordRef が存在しない単語を参照 |
-| InvalidContinuation | Pass 2 | ContinueAction 実行時にアクター未設定 | コード生成スキップ | ContinueAction が最初の文で発生 |
-| StringLiteralError | Pass 2 | 危険パターン全形式で検出 | 文字列スキップまたはエラー出力 | Pasta テキストに `]` と任意数の `=` が組み合わせで出現 |
-| TooManyLocalVariables | Pass 2 | do...end ブロック内の変数数 > 200 | 警告またはスコープ分割提案 | 200+ 個の VarSet が同一ブロック内 |
-| Unsupported | Pass 1/2 | まだ実装していない機能 | 明示的な未実装メッセージ | 属性処理など後続仕様の機能 |
+| UndefinedScene | ランタイム層 | シーン定義前の参照 | ランタイムエラー | CallScene が存在しないシーンを参照 |
+| UndefinedWord | ランタイム層 | 単語定義前の参照 | ランタイムエラー | Action::WordRef が存在しない単語を参照 |
+| InvalidContinuation | Pass 1 | ContinueAction 実行時にアクター未設定 | コード生成スキップ | ContinueAction が最初の文で発生 |
+| StringLiteralError | Pass 1 | 危険パターン全形式で検出 | 文字列スキップまたはエラー出力 | Pasta テキストに `]` と任意数の `=` が組み合わせで出現 |
+| TooManyLocalVariables | Pass 1 | do...end ブロック内の変数数 > 200 | 警告またはスコープ分割提案 | 200+ 個の VarSet が同一ブロック内 |
+| Unsupported | Pass 1 | まだ実装していない機能 | 明示的な未実装メッセージ | 属性処理など後続仕様の機能 |
 
 ## Pass 1: 統一処理フェーズ
 
