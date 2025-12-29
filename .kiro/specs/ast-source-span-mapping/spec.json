@@ -3,7 +3,7 @@
     "created_at": "2025-12-29T00:00:00Z",
     "updated_at": "2025-12-29T12:30:00Z",
     "language": "ja",
-    "phase": "tasks-approved",
+    "phase": "implementation-complete",
     "approvals": {
         "requirements": {
             "generated": true,
@@ -16,7 +16,15 @@
         "tasks": {
             "generated": true,
             "approved": true
+        },
+        "implementation": {
+            "completed": true,
+            "approved": true,
+            "approved_by": "user",
+            "approved_at": "2025-12-29T06:00:00Z"
         }
     },
-    "ready_for_implementation": true
+    "ready_for_implementation": true,
+    "tests_passing": true,
+    "total_tests": 430
 }
