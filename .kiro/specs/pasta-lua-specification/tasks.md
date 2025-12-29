@@ -77,13 +77,13 @@
 
 ## 3. レジストリ統合と状態管理
 
-- [ ] 3.1 SceneRegistry へのシーン登録処理 (P)
+- [x] 3.1 SceneRegistry へのシーン登録処理 (P)
   - グローバルシーン定義（GlobalSceneScope）をシーン情報として SceneRegistry に登録
   - ローカルシーン定義（LocalSceneScope）をラベル情報として登録
   - グローバルシーン名の `_N` 番号付けロジック（定義順 0-indexed → 1-indexed）
   - _Requirements: 5_
 
-- [ ] 3.2 WordDefRegistry への単語登録処理 (P)
+- [x] 3.2 WordDefRegistry への単語登録処理 (P)
   - グローバル単語定義（＠単語：選択肢1, 選択肢2）を WordDefRegistry に登録
   - ローカル単語定義をローカルスコープの WordDefRegistry に登録
   - 属性（＆属性名：値）をパーサーから取得（トランスパイラー層では処理なし）
@@ -98,7 +98,7 @@
   - エラーメッセージの一貫性確保
   - _Requirements: 4_
 
-- [ ] 4.2 エラーハンドリングの統合
+- [x] 4.2 エラーハンドリングの統合
   - トランスパイル処理各ステップでの TranspileError 生成
   - Writer エラーの処理（IO エラー発生時の動作）
   - 参照エラー（UndefinedScene, UndefinedWord）をランタイム層での検証に委譲（トランスパイラーは出力継続）
@@ -122,7 +122,7 @@
   - エラー出力テスト（各 TranspileError タイプ）
   - _Requirements: 6_
 
-- [ ] 5.3 要件トレーサビリティ検証 (P)
+- [x] 5.3 要件トレーサビリティ検証 (P)
   - sample.lua コメント内の Requirement 参照が妥当か確認
   - 各要件（1-6）に対応するコード出力が sample.lua に存在するか確認
   - 削除された要件2（comment_mode）への遺存参照がないか確認
@@ -136,7 +136,7 @@
   - スコープ分離により約200個ローカル変数枠を確保
   - _Requirements: 1_
 
-- [ ] 6.2 var/save/act テーブル運用パターンの実装と検証
+- [x] 6.2 var/save/act テーブル運用パターンの実装と検証
   - 各シーン関数内で var（ローカル）, save（グローバル）, act（アクター操作）の3テーブルを使用
   - ローカル変数数制限を回避するパターン設計
   - パフォーマンステスト（大規模 Pasta スクリプト）
