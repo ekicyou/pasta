@@ -157,14 +157,32 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         ))?;
         self.writeln("")?;
 
-        // Generate local scenes
-        for (idx, local_scene) in scene.local_scenes.iter().enumerate() {
-            self.generate_local_scene(local_scene, idx)?;
+        // Generate local scenes with per-name counters
+        // Same-name scenes get incrementing numbers (_1, _2, ...)
+        let mut name_counters: std::collections::HashMap<String, usize> =
+            std::collections::HashMap::new();
+        for local_scene in &scene.local_scenes {
+            let counter = if let Some(ref name) = local_scene.name {
+                let count = name_counters.entry(name.clone()).or_insert(0);
+                *count += 1;
+                *count
+            } else {
+                0 // start scene doesn't use counter
+            };
+            self.generate_local_scene(local_scene, counter)?;
         }
 
-        // Generate code blocks at module level (after all functions)
+        // Generate code blocks at module level (after all local scene functions)
+        // First: global scene level code blocks
         for code_block in &scene.code_blocks {
             self.generate_code_block(code_block)?;
+        }
+        // Second: code blocks from local scenes (these are stored in local scenes but should
+        // appear at the global scene level, after all function definitions)
+        for local_scene in &scene.local_scenes {
+            for code_block in &local_scene.code_blocks {
+                self.generate_code_block(code_block)?;
+            }
         }
 
         self.dedent();
@@ -184,14 +202,20 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     ///     -- items...
     /// end
     /// ```
+    ///
+    /// The `counter` parameter is the per-name counter (1, 2, 3... for same-name scenes).
+    /// For start scenes (name is None), counter is ignored.
+    ///
+    /// Note: Code blocks associated with local scenes are NOT generated here.
+    /// They are generated at the global scene level by generate_global_scene.
     pub fn generate_local_scene(
         &mut self,
         scene: &LocalSceneScope,
-        index: usize,
+        counter: usize,
     ) -> Result<(), TranspileError> {
         let fn_name = if let Some(ref name) = scene.name {
             let sanitized = SceneRegistry::sanitize_name(name);
-            format!("__{}_{}__", sanitized, index + 1)
+            format!("__{}_{}__", sanitized, counter)
         } else {
             "__start__".to_string()
         };
@@ -207,10 +231,8 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         // Generate local scene items
         self.generate_local_scene_items(&scene.items)?;
 
-        // Generate code blocks inline
-        for code_block in &scene.code_blocks {
-            self.generate_code_block(code_block)?;
-        }
+        // Code blocks are NOT generated here - they are generated at global scene level
+        // This ensures code blocks appear after all local scene function definitions
 
         self.dedent();
         self.writeln("end")?;
