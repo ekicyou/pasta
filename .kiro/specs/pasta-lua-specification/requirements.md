@@ -145,14 +145,14 @@
 - The Transpiler shall Call文（`＞ラベル`）を `act:call("モジュール名", "ラベル名", {}, table.unpack(args))` として生成する
 - The Transpiler shall 関数呼び出し（`＠関数`）を `SCENE:関数(ctx, ...)` コード文字列として生成する
 
-#### 1e. 単語・属性の処理（コード生成）
+#### 1e. 単語参照の処理（コード生成）
 
-**目的**: 単語定義・属性をコード生成の観点で定義
+**目的**: 単語定義・参照をコード生成の観点で定義
 
 **受け入れ基準**:
 - When ローカル単語定義（`＠場所：東京、大阪`）があるとき、Transpiler shall Lua コード出力を生成せず、内部の WordDefRegistry に登録する
 - When グローバル単語定義（`＠挨拶：こんにちは、やあ`）があるとき、Transpiler shall Lua コード出力を生成せず、内部の WordDefRegistry に登録する
-- When アクション行内で単語参照（`さくら：＠挨拶！`）があるとき、Transpiler shall `act.さくら:word("挨拶")` と `act.さくら:talk("！")` をコード出力する
+- When アクション行内で単語参照（`＠挨拶`）があるとき、Transpiler shall `act.アクター:word("挨拶")` をコード出力する
 
 #### 1f. Luaコードブロック（ブロック抽出）
 
