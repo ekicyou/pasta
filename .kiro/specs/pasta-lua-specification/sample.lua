@@ -13,11 +13,11 @@ local PASTA = require "pasta.runtime"
 -- ####################################################################
 
 -- ％さくら
--- 意図: ACTOR変数を再利用してローカル変数数を抑制（Requirement 0）
+-- 意図: ACTOR変数を再利用してローカル変数数を抑制（Requirement 1）
 do
     local ACTOR = PASTA:create_actor("さくら")
     -- 　＄通常　　　：\s[0]
-    -- 意図: \s[0] には [ が含まれるため、n=1 の [=[...]=] 形式を使用（Requirement 0-2）
+    -- 意図: \s[0] には [ が含まれるため、n=1 の [=[...]=] 形式を使用（Requirement 2）
     --       危険パターン判定: "]" が含まれるため n=0 ([[...]]) は不可
     ACTOR.通常 = [=[\s[0]]=]
     -- 　＄照れ　　　：\s[1]
@@ -31,7 +31,7 @@ do
 end
 
 -- ％うにゅう
--- 意図: 同一ACTOR変数を再利用（Requirement 0）
+-- 意図: 同一ACTOR変数を再利用（Requirement 1）
 do
     local ACTOR = PASTA:create_actor("うにゅう")
     -- 　＄通常　：\s[10]
@@ -45,20 +45,20 @@ end
 -- ####################################################################
 
 -- ＆天気：晴れ
--- 意図: ファイルレベル属性はAttributeRegistryに記録、Lua出力なし（Requirement 1b）
+-- 意図: ファイルレベル属性はAttributeRegistryに記録、Lua出力なし（Requirement 3b）
 
 -- ####################################################################
 -- ＃ グローバル単語定義（トップレベル）
 -- ####################################################################
 
 -- ＠挨拶：こんにちは、やあ、ハロー
--- 意図: グローバル単語定義はWordDefRegistryに登録、Lua出力なし（Requirement 1b）
+-- 意図: グローバル単語定義はWordDefRegistryに登録、Lua出力なし（Requirement 3e）
 
 -- ####################################################################
 -- ＊メイン
 -- ####################################################################
 
--- 意図: SCENE変数を再利用してシーン定義（Requirement 0）
+-- 意図: SCENE変数を再利用してシーン定義（Requirement 1）
 --       "メイン1" はSceneRegistryで一意なモジュール名として解決
 do
     local SCENE = PASTA:create_scene("メイン1")
@@ -66,19 +66,19 @@ do
     -- 　＃ ローカル単語定義
     -- 　＠場所：東京、大阪、京都
     -- 　＠天気：晴れ、曇り、雨
-    -- 意図: ローカル単語定義はローカルスコープのWordDefRegistryに登録、Lua出力なし（Requirement 1e）
+    -- 意図: ローカル単語定義はローカルスコープのWordDefRegistryに登録、Lua出力なし（Requirement 3e）
 
     -- __start__ - グローバルシーンのエントリーポイント
-    -- 意図: グローバルシーン（＊メイン）のエントリーポイントは常に __start__（Requirement 1c）
+    -- 意図: グローバルシーン（＊メイン）のエントリーポイントは常に __start__（Requirement 3c）
     --       関数シグネチャ: (ctx, ...)
     --       . 構文で宣言、SCENE はセッション初期化の第1引数で明示的に渡す
     function SCENE.__start__(ctx, ...)
-        -- 意図: 第1行で引数をテーブル化、第2行でセッション初期化（Requirement 1c）
+        -- 意図: 第1行で引数をテーブル化、第2行でセッション初期化（Requirement 3c）
         local args = { ... }
         local act, save, var = PASTA:create_session(SCENE, ctx)
 
         -- 　　　＞グローバル単語呼び出し
-        -- 意図: Call文は act:call(モジュール名, ラベル名, 属性フィルター, ...引数) 形式（Requirement 1d）
+        -- 意図: Call文は act:call(モジュール名, ラベル名, 属性フィルター, ...引数) 形式（Requirement 3d）
         --       第3引数の {} は属性フィルター用の空テーブル（将来拡張用に予約）
         --       table.unpack(args) で受け取った引数を継承
         act:call("メイン1", "グローバル単語呼び出し", {}, table.unpack(args))
@@ -93,20 +93,20 @@ do
         act:call("メイン1", "変数代入", {}, table.unpack(args))
 
         -- 　　　＞引数付き呼び出し（＄カウンタ、＄＊グローバル）
-        -- 意図: 引数付きCall文では変数展開後、残りの引数を ... で継承（Requirement 1d）
+        -- 意図: 引数付きCall文では変数展開後、残りの引数を ... で継承（Requirement 3d）
         act:call("メイン1", "引数付き呼び出し", {}, var.カウンタ, save.グローバル, table.unpack(args))
     end
 
     -- 　・グローバル単語呼び出し
-    -- 意図: 第1階層ローカルシーンは __ローカルシーン名_N__ 形式で常にカウンター付与（Requirement 1c）
+    -- 意図: 第1階層ローカルシーンは __ローカルシーン名_N__ 形式で常にカウンター付与（Requirement 3c）
     --       N=1,2,3... で各ローカルシーン定義順に採番。Rune実装と同一パターン
     function SCENE.__グローバル単語呼び出し_1__(ctx, ...)
         local args = { ... }
         local act, save, var = PASTA:create_session(SCENE, ctx)
 
         -- 　　　さくら　：＠笑顔　＠挨拶！
-        -- 意図: ＠XXX 参照は word("XXX") に展開（Requirement 1e）
-        --       通常テキストは talk() に展開（Requirement 1d）
+        -- 意図: ＠XXX 参照は word("XXX") に展開（Requirement 3e）
+        --       通常テキストは talk() に展開（Requirement 3d）
         act.さくら:word("笑顔")
         act.さくら:word("挨拶")
         act.さくら:talk("！")
@@ -122,7 +122,7 @@ do
         local act, save, var = PASTA:create_session(SCENE, ctx)
 
         -- 　　　さくら　：＠通常　＠場所　の天気は？
-        -- 意図: ＠XXX 参照と通常テキストの混在を word() と talk() に分割（Requirement 1e, 1d）
+        -- 意図: ＠XXX 参照と通常テキストの混在を word() と talk() に分割（Requirement 3e, 3d）
         act.さくら:word("通常")
         act.さくら:word("場所")
         act.さくら:talk("の天気は？")
@@ -133,7 +133,7 @@ do
     end
 
     -- 　・会話分岐
-    -- 意図: ローカルシーン定義順に採番。最初の「会話分岐」は_1（Requirement 1c、Rune実装と同一）
+    -- 意図: ローカルシーン定義順に採番。最初の「会話分岐」は_1（Requirement 3c、Rune実装と同一）
     function SCENE.__会話分岐_1__(ctx, ...)
         local args = { ... }
         local act, save, var = PASTA:create_session(SCENE, ctx)
@@ -158,7 +158,7 @@ do
         act.うにゅう:talk("もっと飛べる、ワイは飛べるんや！")
 
         -- 　　　さくら　：＠ぐんにょり　なんでだよ。
-        -- 意図: ＠XXX 参照は word() に展開（Requirement 1e）
+        -- 意図: ＠XXX 参照は word() に展開（Requirement 3e）
         act.さくら:word("ぐんにょり")
         act.さくら:talk("なんでだよ。")
     end
@@ -176,12 +176,12 @@ do
         act.うにゅう:talk("中身は内緒や。")
 
         -- 　　　＄カウンタ＝１０
-        -- 意図: ローカル変数（＄変数名）は var.変数名 に代入（Requirement 1d）
+        -- 意図: ローカル変数（＄変数名）は var.変数名 に代入（Requirement 3d）
         var.カウンタ = 10
 
         -- 　　　＄＊グローバル＝＠関数（２+１）
-        -- 意図: グローバル変数（＄＊変数名）は save.変数名 に代入（Requirement 1d）
-        --       関数呼び出し（＠関数）は SCENE.関数(ctx, 引数...) 形式で宣言、呼び出しは : で実行（Requirement 1d）
+        -- 意図: グローバル変数（＄＊変数名）は save.変数名 に代入（Requirement 3d）
+        --       関数呼び出し（＠関数）は SCENE.関数(ctx, 引数...) 形式で宣言、呼び出しは : で実行（Requirement 3d）
         save.グローバル = SCENE:関数(ctx, 2 + 1)
     end
 
@@ -191,8 +191,8 @@ do
         local act, save, var = PASTA:create_session(SCENE, ctx)
 
         -- 　　　さくら　：第１引数は＄０　だよ。
-        -- 意図: 引数参照（＄０→args[1]、＄１→args[2]）Pasta DSLの0-baseをLua 1-baseに変換（Requirement 1d）
-        --       文字列連結は ".." 演算子、tostring() で型変換（Requirement 1d）
+        -- 意図: 引数参照（＄０→args[1]、＄１→args[2]）Pasta DSLの0-baseをLua 1-baseに変換（Requirement 3d）
+        --       文字列連結は ".." 演算子、tostring() で型変換（Requirement 3d）
         act.さくら:talk("第１引数は" .. tostring(args[1]) .. "だよ。")
 
         -- 　　　うにゅう：第２引数は＄１　やね。
@@ -204,7 +204,7 @@ do
     --     return value * value
     -- end
     -- ```
-    -- 意図: コードブロック（``` で識別、言語識別子は無視）内のコードをそのまま出力（Requirement 1f）
+    -- 意図: コードブロック（``` で識別、言語識別子は無視）内のコードをそのまま出力（Requirement 3f）
     function SCENE.関数(ctx, value, ...)
         return value * value
     end
@@ -215,17 +215,8 @@ end
 -- ＊会話分岐グローバル
 -- ####################################################################
 
--- 意図: 別のグローバルシーン定義（SCENE変数を再利用）（Requirement 0）
---       グローバルシーン「＊会話分岐グローバル」は一意なモジュール名「会話分岐1」として生成（Requirement 1g）
-do
-    local SCENE = PASTA:create_scene("会話分岐1")
-
-    -- __start__ - グローバルシーンのエントリーポイント
-    function SCENE.__start__(ctx, ...)
-        local args = { ... }
-        local act, save, var = PASTA:create_session(SCENE, ctx)
-
-        -- 　　さくら　：グローバルの分岐に飛んできた。
+-- 意図: 別のグローバルシーン定義（SCENE変数を再利用）（Requirement 1）
+--       グローバルシーン「＊会話分岐」は一意なモジュール名「会話分岐1」として生成（Requirement 3b）
         act.さくら:talk("グローバルの分岐に飛んできた。")
 
         -- 　　うにゅう：世界取れるで。
