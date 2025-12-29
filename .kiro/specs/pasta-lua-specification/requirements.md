@@ -124,7 +124,7 @@
 - When `＊メイン` グローバルシーン定義があるとき、Transpiler shall `do...end` ブロックで分離し、ブロック内で `local SCENE = PASTA:create_scene("モジュール名")` と生成する
 - When ローカル単語定義（`＠場所：東京、大阪`）があるとき、Transpiler shall Lua コード出力を生成せず、内部の WordDefRegistry に登録する
 - When グローバル単語定義（`＠挨拶：こんにちは、やあ`）があるとき、Transpiler shall Lua コード出力を生成せず、内部の WordDefRegistry に登録する
-- When ファイルレベル属性（`＆天気：晴れ`）があるとき、Transpiler shall Lua コード出力を生成せず、内部の AttributeRegistry に登録する
+- When ファイルレベル属性（`＆天気：晴れ`）があるとき、Transpiler shall パーサーから取得するが、トランスパイラー層では処理しない（属性実装は後続仕様）
 - The Transpiler shall 複数グローバルシーン定義時に各定義を独立した `do...end` ブロックで分離し、スコープ混在を避ける
 
 #### 1c. ローカルシーン関数への変換
@@ -186,6 +186,7 @@
 - The Transpiler shall コード内に Requirement 番号をコメント（`-- (Requirement 1a)` 等）で埋め込む
 - The Transpiler shall 文法エラー時の処理を `Result<T, TranspileError>` 型で定義する
 - When 複数パスが必要なとき、Transpiler shall Rune の 2pass 戦略（Pass 1: レジストリ登録、Pass 2: コード生成）を参考に実装する
+- The Transpiler shall パーサーから属性（`＆key：value`）を取得するが、トランスパイラー層では処理しない（属性実装は後続仕様）
 
 ### 3. シーン・単語レジストリへのエントリー登録
 
@@ -196,6 +197,7 @@
 - When ローカルシーン定義（`・自己紹介`）があるとき、Transpiler shall SceneRegistry にラベル情報として登録する
 - When グローバル単語定義（`＠挨拶：こんにちは`）があるとき、Transpiler shall WordDefRegistry に登録する
 - When ローカル単語定義があるとき、Transpiler shall ローカルスコープの WordDefRegistry に登録する
+- The Transpiler shall パーサーから属性（`＆key：value`）を取得するが、トランスパイラー層では処理しない（属性実装は後続仕様）
 
 ### 4. 参照実装による検証
 
