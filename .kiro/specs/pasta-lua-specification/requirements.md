@@ -112,8 +112,8 @@
 
 **受け入れ基準**:
 - When `％さくら` アクター定義があるとき、Transpiler shall `do...end` ブロックで分離し、ブロック内で `local ACTOR = PASTA:create_actor("さくら")` と生成する
-- When アクター属性（`＄通常：\s[0]`）が続くとき、Transpiler shall `ACTOR.通常 = [=[\s[0]]=]` と生成する（Requirement 0-2の文字列リテラル形式判定アルゴリズムを適用）
-- Where アクター属性が複数あるとき、Transpiler shall 同一ACTOR変数への連続代入として生成する
+- When アクター単語定義（`＠通常：\s[0]`）が続くとき、Transpiler shall `ACTOR.通常 = [=[\s[0]]=]` と生成する（Requirement 0-2の文字列リテラル形式判定アルゴリズムを適用）
+- Where アクター単語定義が複数あるとき、Transpiler shall 同一ACTOR変数への連続代入として生成する
 - The Transpiler shall 複数アクター定義時に各定義を独立した `do...end` ブロックで分離することで、ACTOR変数の再利用を明確化する
 
 #### 3b. シーン定義とモジュール構造
