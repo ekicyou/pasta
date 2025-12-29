@@ -110,9 +110,8 @@ do
         local act, save, var = PASTA:create_session(SCENE, ctx)
 
         -- 　　　さくら　：＠笑顔　＠挨拶！
-        -- 意図: 単語参照（＠挨拶）は act.アクター:word("単語名") に変換（Requirement 1e）
-        --       アクター属性（＠笑顔）も同様に word() で処理
-        --       通常テキストは act.アクター:talk("テキスト") に変換（Requirement 1d）
+        -- 意図: ＠XXX 参照は word("XXX") に展開（Requirement 1e）
+        --       通常テキストは talk() に展開（Requirement 1d）
         act.さくら:word("笑顔")
         act.さくら:word("挨拶")
         act.さくら:talk("！")
@@ -128,7 +127,7 @@ do
         local act, save, var = PASTA:create_session(SCENE, ctx)
 
         -- 　　　さくら　：＠通常　＠場所　の天気は？
-        -- 意図: 複数の単語参照とテキストの混在を、word() と talk() に分割（Requirement 1d）
+        -- 意図: ＠XXX 参照と通常テキストの混在を word() と talk() に分割（Requirement 1e, 1d）
         act.さくら:word("通常")
         act.さくら:word("場所")
         act.さくら:talk("の天気は？")
@@ -164,7 +163,7 @@ do
         act.うにゅう:talk("もっと飛べる、ワイは飛べるんや！")
 
         -- 　　　さくら　：＠ぐんにょり　なんでだよ。
-        -- 意図: アクター属性参照は word() で処理（Requirement 1e）
+        -- 意図: ＠XXX 参照は word() に展開（Requirement 1e）
         act.さくら:word("ぐんにょり")
         act.さくら:talk("なんでだよ。")
     end
