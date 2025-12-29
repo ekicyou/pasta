@@ -334,6 +334,33 @@ pub struct ParsedFile {
 - ✅ 将来の Span 拡張に対応しやすい
 - ⚠️ 既存テスト 41個を修正（手作業必要だが、機械的）
 
+---
+
+## 議題3: Pest 2.8 バイトスパンAPI検証
+
+### 検証内容
+
+Pest 2.8 の `Span` 型が以下のメソッドを提供しているか確認：
+
+```rust
+let pest_span = pair.as_span();
+let start_byte = pest_span.start();  // ✅ 存在確認
+let end_byte = pest_span.end();      // ✅ 存在確認
+```
+
+### 検証結果: ✅ **成功**
+
+**検証方法**: `tests/parser2_integration_test.rs` に検証テストコード追加
+- `verify_pest_span_byte_offset_api()` テスト実装
+- コンパイル成功 → **API が存在することを確認**
+
+**結論**:
+- ✅ Pest 2.8 は `Span::start()`, `Span::end()` メソッドを標準提供
+- ✅ バイトオフセット情報は Pest から直接取得可能
+- ✅ 実装可能性が確定
+
+---
+
 ### 「全 AST ノードに Span」による簡潔性
 
 **要件レベル**: Action/ActionLine レベルで充分（ユースケース明確）
