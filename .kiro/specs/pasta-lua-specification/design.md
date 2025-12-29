@@ -192,11 +192,10 @@ flowchart TD
 | フィールド | 詳細 |
 |----------|------|
 | Intent | Pasta AST から Lua コードへのトランスパイル処理を統合する |
-| Requirements | 2, 5 |
+| Requirements | 2, 4 |
 
 **責務と制約**
 - Pass 1 統一処理の制御（機械的な Lua コード生成）
-- TranspilerConfig による設定管理（comment_mode 等）
 - TranspileError による一貫したエラーハンドリング
 
 **依存関係**
@@ -238,7 +237,7 @@ impl LuaTranspiler {
 | フィールド | 詳細 |
 |----------|------|
 | Intent | AST ノードを Lua コード文字列に変換し Writer に出力する |
-| Requirements | 1, 4a, 4b, 4c, 4d, 4e, 4f, 4g |
+| Requirements | 1, 3a, 3b, 3c, 3d, 3e, 3f, 3g |
 
 **責務と制約**
 - do...end ブロックによるスコープ分離（Requirement 1）
@@ -265,11 +264,11 @@ pub struct LuaCodeGenerator<'a, W: Write> {
 impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     pub fn new(writer: &'a mut W, config: &'a TranspilerConfig) -> Self;
     
-    /// アクター定義ブロックを生成（Requirement 4a）
+    /// アクター定義ブロックを生成（Requirement 3a）
     /// シーン定義テーブル `local scenes = { [actor_name] = { ... }, ... }` を出力
     pub fn generate_actor(&mut self, actor: &ActorScope) -> Result<(), TranspileError>;
     
-    /// グローバルシーンブロックを生成（Requirement 4b）
+    /// グローバルシーンブロックを生成（Requirement 3b）
     /// シーン関数定義 `function scene_name() ... end` または `scenes[...] = function() ... end` を出力
     pub fn generate_global_scene(
         &mut self,
@@ -278,7 +277,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         context: &TranspileContext,
     ) -> Result<(), TranspileError>;
     
-    /// ローカルシーン関数を生成（Requirement 4c）
+    /// ローカルシーン関数を生成（Requirement 3c）
     /// ローカルシーン関数 `scenes[actor][scene_name] = function() ... end` を出力
     pub fn generate_local_scene(
         &mut self,
@@ -286,18 +285,18 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         index: usize,
     ) -> Result<(), TranspileError>;
     
-    /// 変数代入を生成（Requirement 4d）
+    /// 変数代入を生成（Requirement 3d）
     pub fn generate_var_set(&mut self, var_set: &VarSet) -> Result<(), TranspileError>;
     
-    /// シーン呼び出しを生成（Requirement 4d, 4g）
+    /// シーン呼び出しを生成（Requirement 3d, 3g）
     /// テーブル参照形式: act:call("グローバルシーン", "ローカルシーン", {}, 引数1, 引数2, ...) を出力
     /// 引数は CallScene の args を各 Action に従って変換
     pub fn generate_call_scene(&mut self, call_scene: &CallScene) -> Result<(), TranspileError>;
     
-    /// アクション（Talk, WordRef, VarRef 等）を生成（Requirement 4d, 4e）
+    /// アクション（Talk, WordRef, VarRef 等）を生成（Requirement 3d, 3e）
     pub fn generate_action(&mut self, action: &Action) -> Result<(), TranspileError>;
     
-    /// コードブロックを生成（Requirement 4f）
+    /// コードブロックを生成（Requirement 3f）
     pub fn generate_code_block(&mut self, block: &CodeBlock) -> Result<(), TranspileError>;
 }
 ```
@@ -340,38 +339,12 @@ impl StringLiteralizer {
 - 事後条件: 返り値は有効な Lua 文字列リテラル
 - 不変条件: 入力文字列は変更されない
 
-#### TranspilerConfig
-
-| フィールド | 詳細 |
-|----------|------|
-| Intent | トランスパイラーの設定を管理する |
-| Requirements | 2 |
-
-**契約**: State [x]
-
-##### 状態管理
-```rust
-pub struct TranspilerConfig {
-    /// Pasta 源コードをコメントで出力するか（デフォルト: false）
-    pub comment_mode: bool,
-}
-
-impl Default for TranspilerConfig {
-    fn default() -> Self {
-        Self { comment_mode: false }
-    }
-}
-```
-- 状態モデル: イミュータブル設定オブジェクト
-- 永続性: なし（トランスパイル実行時のみ）
-- 並行性: スレッドセーフ（Copy 可能）
-
 #### TranspileContext
 
 | フィールド | 詳細 |
 |----------|------|
 | Intent | パス間でコンテキスト情報を共有する |
-| Requirements | 6 |
+| Requirements | 5 |
 
 **契約**: State [x]
 
