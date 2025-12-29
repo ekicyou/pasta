@@ -1,15 +1,10 @@
 -- sample.lua - sample.pastaからのトランスパイル出力例
 -- 目的: pasta-lua-specification の要件定義に基づくトランスパイル結果の参照実装
 --
--- トランスパイルルール:
---   - Requirement 0: ローカル変数数制限対策（ACTOR/SCENE変数再利用）
---   - Requirement 0-2: 文字列リテラル形式判定（エスケープ対象の有無で分岐）
---   - Requirement 1a: アクター定義のLua化
---   - Requirement 1b: シーン定義とモジュール構造
---   - Requirement 1c: ローカルシーン関数への変換（__start__, __名前__, モジュール_名前）
---   - Requirement 1d: 変数スコープ管理（var/save/act分離）
---   - Requirement 1f: Runeブロック埋め込み
---   - Requirement 1g: グローバルシーン間遷移
+-- 設計その他:
+-- - do...end: Lua をスコープ分割してローカル変数枠を管理
+-- - var, save, act: 3個テーブルで変数管理（ローカル変数数制限対策）
+-- - act:call(): グローバルシーン呼び出し形式
 
 local PASTA = require "pasta.runtime"
 
