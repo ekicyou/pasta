@@ -80,17 +80,23 @@
 - **トレードオフ**: なし（API がシンプル化）
 - **フォローアップ**: 既存の `span_from_pair()` 関数は削除し、`Span::from(&pair)` で統一
 
-### 決定: ActionWithSpan ラッパーパターン
-- **背景**: Action enum への Span 追加方法
+### 決定: Action enum を named fields 化 + Span 統合
+
+- **背景**: 要件 3.2「Action に Span 統合」の実現方法
 - **検討した代替案**:
-  1. 各 Action バリアントに Span フィールド追加
-  2. ActionWithSpan ラッパー構造体
-- **選択したアプローチ**: ActionWithSpan ラッパー
+  1. ActionWithSpan ラッパー構造体
+  2. Action enum の各バリアントに Span フィールド追加（named fields 化）
+- **選択したアプローチ**: Option 2（named fields 化）
 - **根拠**:
-  - Action enum の変更を最小化
-  - トランスパイラでの扱いが統一的
-  - 将来の Action 拡張に影響しない
-- **トレードオフ**: 間接参照が 1 段増える（パフォーマンス影響なし）
+  - **AST 設計の一貫性**: 全 AST ノードが named fields 形式で統一
+  - **明示性**: フィールド名で意図が明確（`text` vs 匿名の `String`）
+  - **本質的設計**: Span は Action の「本質的な一部」であり、外付けラッパーではない
+  - **将来の拡張性**: フィールド追加が自然
+- **トレードオフ**: 
+  - **修正箇所が多い**: パーサー 20+ 箇所、pasta_rune + pasta_lua 各 10+ 箇所、テスト各 10+ 箇所
+  - **作業性質**: コンパイルエラーを機械的に修正（難易度低、作業量大）
+  - **スコープ**: リファクタリング作業を含む（仕様変更ではなく、型の統一化）
+- **フォローアップ**: pasta_core、pasta_rune、pasta_lua の3クレートで機械的修正を実施
 
 ### 決定: Span::new() 破壊的拡張
 - **背景**: コンストラクタ変更方針
