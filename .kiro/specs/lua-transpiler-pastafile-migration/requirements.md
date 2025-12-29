@@ -87,13 +87,20 @@ pasta_luaトランスパイラーがPastaFileを入力として受け取り、pa
 
 ## Non-Functional Requirements
 
-### REQ-7: API一貫性
+### REQ-7: API一貫性【1パス処理】
 **ID**: REQ-7  
 **Title**: API一貫性  
-**Statement**: The LuaTranspiler shall provide an API that is consistent with pasta_rune's Transpiler2, using the same method naming conventions and parameter patterns where applicable.  
+**Priority**: ℹ️ INFO - Lua言語とRune言語の設計差異により2パス不要  
+**Statement**: The LuaTranspiler shall provide an API that is consistent with pasta_rune's Transpiler2 in terms of input parameters and method naming conventions, but shall use a single-pass implementation due to Lua language design differences.  
+**Design Rationale**:
+- Rune言語: 2パス必要（pass1: 登録+生成、pass2: scene_selector）
+- Lua言語: 1パスで完結（言語設計の違いにより2段階処理が不要）
+- API名は `transpile_file()` を採用（pasta_runeのpass1相当だが、実装は1パス完結）
+
 **Acceptance Criteria**:
-- [ ] メソッド名がpasta_runeと一致（transpile_file または transpile_pass1）
-- [ ] パラメータ順序がpasta_runeと一致
+- [ ] メソッド名は `transpile_file()` （pasta_runeと一致）
+- [ ] パラメータは `&PastaFile` を第一引数として受け取る
+- [ ] 1パス処理で完結する（pass2は実装しない）
 - [ ] 戻り値の型がpasta_runeのパターンに準拠
 
 ### REQ-8: 後方互換性
