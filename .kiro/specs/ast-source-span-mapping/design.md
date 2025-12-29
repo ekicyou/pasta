@@ -100,22 +100,23 @@ graph TB
 sequenceDiagram
     participant Source as ソースファイル
     participant Pest as Pest Parser
-    participant Parser as span_from_pair()
+    participant FromTrait as From Trait
     participant Span as Span 構造体
     participant AST as AST ノード
     
     Source->>Pest: parse(source_text)
-    Pest->>Parser: Pair<Rule>
-    Parser->>Pest: pair.as_span()
-    Pest-->>Parser: pest::Span
-    Parser->>Pest: pest_span.start()
-    Pest-->>Parser: start_byte: usize
-    Parser->>Pest: pest_span.end()
-    Pest-->>Parser: end_byte: usize
-    Parser->>Pest: pest_span.start_pos().line_col()
-    Pest-->>Parser: (line, col)
-    Parser->>Span: Span::new(6 args)
-    Parser->>AST: ノード生成 with Span
+    Pest->>FromTrait: &Pair<Rule>
+    FromTrait->>Pest: pair.as_span()
+    Pest-->>FromTrait: pest::Span
+    FromTrait->>Pest: pest_span.start()
+    Pest-->>FromTrait: start_byte: usize
+    FromTrait->>Pest: pest_span.end()
+    Pest-->>FromTrait: end_byte: usize
+    FromTrait->>Pest: pest_span.start_pos().line_col()
+    Pest-->>FromTrait: (line, col)
+    FromTrait->>Span: Span::new(6 args)
+    FromTrait-->>AST: Span インスタンス
+    AST-->>AST: ノード生成 with Span
 ```
 
 ### ソースコード参照フロー
@@ -153,8 +154,7 @@ sequenceDiagram
 
 | コンポーネント | ドメイン/レイヤー | 目的 | 要件カバレッジ | 依存関係 | 契約 |
 |--------------|-----------------|------|---------------|---------|------|
-| Span | pasta_core/Parser | ソース位置情報保持 | 1, 4, 6 | - | Service |
-| span_from_pair | pasta_core/Parser | Pest→Span 変換 | 2 | Pest (P0) | - |
+| Span | pasta_core/Parser | ソース位置情報保持 + From トレイト | 1, 2, 4, 6 | - | Service |
 | ActionWithSpan | pasta_core/Parser | Action+Span ラッパー | 3.2, 7 | Span (P0) | - |
 
 ### pasta_core/Parser
@@ -207,15 +207,18 @@ impl Span {
         start_byte: usize,
         end_byte: usize,
     ) -> Self;
+}
 
-    /// Pest の位置タプルから Span を生成。
-    /// バイトオフセットは別途指定。
-    pub fn from_pest(
-        start: (usize, usize),
-        end: (usize, usize),
-        start_byte: usize,
-        end_byte: usize,
-    ) -> Self;
+/// Pest の Pair から Span を自動変換。
+impl From<&Pair<Rule>> for Span {
+    fn from(pair: &Pair<Rule>) -> Self {
+        let pest_span = pair.as_span();
+        let (start_line, start_col) = pest_span.start_pos().line_col();
+        let (end_line, end_col) = pest_span.end_pos().line_col();
+        let start_byte = pest_span.start();
+        let end_byte = pest_span.end();
+        Span::new(start_line, start_col, end_line, end_col, start_byte, end_byte)
+    }
 
     /// 指定されたソーステキストから該当部分を抽出。
     /// 
@@ -248,8 +251,8 @@ impl Span {
 | 要件 | 2 |
 
 **責務と制約**
-- Pest の `Pair::as_span()` から全位置情報を抽出
-- 行/列（1-based）とバイトオフセット（0-based）を統合
+- パーサー層で `Span::from(pair)` の結果を使用
+- `From<&Pair<Rule>> for Span` トレイト実装で自動変換
 
 **依存関係**
 - 外部: Pest 2.8 (P0)
@@ -257,17 +260,15 @@ impl Span {
 ##### サービスインターフェース
 
 ```rust
-/// Pest の Pair から Span を生成。
-/// バイトオフセットと行/列情報の両方を抽出。
-fn span_from_pair(pair: &Pair<Rule>) -> Span {
-    let pest_span = pair.as_span();
-    let (start_line, start_col) = pest_span.start_pos().line_col();
-    let (end_line, end_col) = pest_span.end_pos().line_col();
-    let start_byte = pest_span.start();
-    let end_byte = pest_span.end();
-    Span::new(start_line, start_col, end_line, end_col, start_byte, end_byte)
-}
+// span_from_pair 関数は削除（From トレイトで置換）
+// パーサー層での呼び出し：
+//   let span = Span::from(&pair);  // From トレイトで自動変換
 ```
+
+**実装ノート**
+- 既存の `fn span_from_pair(pair: &Pair<Rule>) -> Span` は削除
+- `From<&Pair<Rule>> for Span` として Span 構造体に実装
+- パーサー層では `Span::from(&pair)` で呼び出し
 
 #### ActionWithSpan
 
