@@ -99,20 +99,33 @@ pasta_luaトランスパイラーがPastaFileを入力として受け取り、pa
 - [ ] FileItem出現順序を検証する統合テストが存在する
 - [ ] pasta_runeの対応テストと同等のカバレッジがある
 
-### REQ-10: PastaFileヘルパーメソッドの廃止
+### REQ-10: PastaFileヘルパーメソッドの廃止【本仕様の核心】
 **ID**: REQ-10  
 **Title**: PastaFileヘルパーメソッドの廃止  
+**Priority**: 🔴 CRITICAL - 本仕様の根本的な目的  
 **Statement**: The PastaFile helper methods `file_attrs()`, `words()`, `global_scene_scopes()`, and `actor_scopes()` shall be removed from the PastaFile implementation, forcing all transpilers and consumers to iterate directly over `file.items`.  
-**Rationale**: These methods encourage type-filtered access patterns that ignore FileItem出現順, which is critical for correct transpilation. Direct `file.items` iteration ensures order-sensitive processing is always performed.  
+**Rationale**: 
+- **根本問題**: これらのメソッドが存在すること自体が、出現順を無視した実装を誘発する
+- **設計原則**: "あれば使ってしまう" → 開発者（人間・LLM問わず）は便利なヘルパーがあれば使用する
+- **結果**: 型別フィルタリングによりFileItem出現順が失われ、正しいトランスパイルが不可能になる
+- **解決策**: API自体を廃止し、`file.items`の直接イテレーションを強制することで、構造的に出現順処理を保証する
+
+**Scope Note**: 本要件はpasta_core（PastaFile定義）の変更を伴うため、pasta_lua・pasta_rune両方のトランスパイラーとテストに影響する。影響範囲：
+- pasta_lua: 50マッチ（6ファイル）
+- pasta_rune: 22マッチ（3ファイル）
+- **合計: 70マッチ以上の修正が必要**
+
 **Acceptance Criteria**:
-- [ ] PastaFile から以下のメソッドが削除される：
+- [ ] pasta_core の PastaFile から以下のメソッドが削除される：
   - `file_attrs()`
   - `words()`
   - `global_scene_scopes()`
   - `actor_scopes()`
-- [ ] 削除されたメソッドを使用していたテストがすべて `file.items` を使用するように修正される
-- [ ] 削除されたメソッドを使用していた他のコード（transpiler含む）がすべて修正される
-- [ ] コンパイルエラーが生じないことを確認
+- [ ] pasta_lua のすべての使用箇所が `file.items` イテレーションに修正される
+- [ ] pasta_rune のすべての使用箇所が `file.items` イテレーションに修正される
+- [ ] tests/ ディレクトリのすべての使用箇所が修正される
+- [ ] `cargo check --all` が成功する
+- [ ] `cargo test --all` が成功する
 
 ## Out of Scope
 
