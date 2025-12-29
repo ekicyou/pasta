@@ -92,37 +92,54 @@ graph TB
 sequenceDiagram
     participant Client
     participant LuaTranspiler
-    participant Pass1 as Pass 1: Registry
-    participant Pass2 as Pass 2: CodeGen
+    participant Pass1 as Pass 1: 統一処理<br/>参照検証 + Lua出力
     participant Writer
     
     Client->>LuaTranspiler: transpile(ast, writer)
     
-    LuaTranspiler->>Pass1: register_scenes(ast)
-    Pass1->>Pass1: SceneRegistry.register()
-    Pass1->>Pass1: WordDefRegistry.register()
-    Pass1-->>LuaTranspiler: TranspileContext
+    LuaTranspiler->>Pass1: execute_pass(ast, writer)
+    Pass1->>Pass1: ActorScope走査 → scenes{}宣言
+    Pass1->>Pass1: GlobalSceneScope走査 → 参照検証
+    Pass1->>Pass1: 参照エラー検出 → UndefinedScene/Word
+    Pass1->>Writer: scenes = { ... } 出力
+    Pass1->>Writer: シーン関数定義出力
+    Pass1-->>LuaTranspiler: Result<(), TranspileError>
     
-    LuaTranspiler->>Pass2: generate_code(ast, context)
-    Pass2->>Writer: write header/runtime require
-    
-    loop for each Actor
-        Pass2->>Writer: do...end block
-        Pass2->>Writer: local ACTOR = create_actor()
-        Pass2->>Writer: ACTOR.属性 = リテラル
-    end
-    
-    loop for each GlobalScene
-        Pass2->>Writer: do...end block
-        Pass2->>Writer: local SCENE = create_scene()
-        loop for each LocalScene
-            Pass2->>Writer: function SCENE.__name_N__()
-        end
-    end
-    
-    Pass2-->>LuaTranspiler: Ok(())
-    LuaTranspiler-->>Client: Result<(), TranspileError>
+    LuaTranspiler-->>Client: 完了
 ```
+
+### 処理フロー（統一 Pass 設計）
+
+Lua のテーブル参照特性を活用し、Pass 1 で参照検証とコード生成を同時実行：
+
+```
+Input: AST (GlobalSceneScope[], ActorScope[])
+  ↓
+[Pass 1: 統一処理]
+  1. ActorScope 走査
+     ├─ scenes テーブルの初期化コード出力
+     │  └─ local scenes = { actor1 = {}, actor2 = {}, ... }
+     └─ 単語定義レジストリに登録（参照検証用）
+  
+  2. GlobalSceneScope 走査（前方参照対応）
+     ├─ CallScene → 参照先シーン存在確認
+     ├─ WordRef → 参照先単語存在確認
+     ├─ エラー → UndefinedScene, UndefinedWord で失敗（ここで出力停止）
+     ├─ グローバルシーン関数定義出力
+     │  └─ function scene_name() ... end または scenes[...] = function() ... end
+     └─ ローカルシーン関数定義出力
+        └─ scenes[actor][scene] = function() ... end
+  
+  3. 完了処理
+     └─ Writer に最終行を出力（return scenes など）
+  
+Output: 完全な Lua コード（Writer に直接出力）、エラー時は部分出力で失敗
+```
+
+**設計上のポイント**:
+- Lua はテーブルを**宣言時点では空**にしておき、**実行時に内容を設定**できる
+- このため、シーン定義の順序は関数実行時に確認される
+- Parse フェーズで参照エラーを検出できれば、Pass 2 は不要
 
 ### 文字列リテラル判定フロー
 
@@ -274,7 +291,8 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     pub fn generate_var_set(&mut self, var_set: &VarSet) -> Result<(), TranspileError>;
     
     /// シーン呼び出しを生成（Requirement 4d, 4g）
-    /// テーブル参照形式: `scenes[actor_name][scene_name]()` を出力
+    /// テーブル参照形式: act:call("グローバルシーン", "ローカルシーン", {}, 引数1, 引数2, ...) を出力
+    /// 引数は CallScene の args を各 Action に従って変換
     pub fn generate_call_scene(&mut self, call_scene: &CallScene) -> Result<(), TranspileError>;
     
     /// アクション（Talk, WordRef, VarRef 等）を生成（Requirement 4d, 4e）
@@ -640,126 +658,80 @@ pub enum TranspileError {
 | TooManyLocalVariables | Pass 2 | do...end ブロック内の変数数 > 200 | 警告またはスコープ分割提案 | 200+ 個の VarSet が同一ブロック内 |
 | Unsupported | Pass 1/2 | まだ実装していない機能 | 明示的な未実装メッセージ | 属性処理など後続仕様の機能 |
 
-## Pass 1/Pass 2 ハンドシェイク詳細
+## Pass 1: 統一処理フェーズ
 
-### Pass 1: レジストリ登録フェーズ
+Lua のテーブル参照特性を活かし、参照検証と Lua コード生成を同一 Pass で実施：
+
+### 入力と出力
 
 **入力**: `&[GlobalSceneScope]`, `&[ActorScope]` (AST)
 
-**処理フロー**:
-```
-1. ActorScope 走査
-   ├─ 各アクターを SceneRegistry に登録
-   │  └─ KEY: actor.name, VALUE: ActorMetadata { attrs, words }
-   └─ 各アクターの単語定義を WordDefRegistry に登録
-      └─ KEY: "${actor_name}::${word_name}", VALUE: WordDef
-
-2. GlobalSceneScope 走査（順序重要：引用元が存在してから引用を登録）
-   ├─ 各グローバルシーンを SceneRegistry に登録
-   │  └─ KEY: scene.name, VALUE: SceneMetadata { kind: Global, ... }
-   ├─ 各ローカルシーンを SceneRegistry に登録（子として関連付け）
-   │  └─ KEY: "${global_scene}::${local_scene}", VALUE: SceneMetadata { kind: Local, parent: "global_scene" }
-   ├─ GlobalSceneScope.word_defs を WordDefRegistry に登録
-   │  └─ KEY: word.name, VALUE: WordDef { rules, conditions }
-   └─ AST 整合性検証（CallScene, WordRef のすべてが登録済みエントリを指す）
-      └─ 失敗時: UndefinedScene, UndefinedWord, InvalidAst エラー
-```
-
-**出力**: `TranspileContext { scene_registry, word_registry, ... }`
-
-**不変式**:
-- SceneRegistry に登録されたシーン名は重複しない
-- WordDefRegistry に登録された単語名は（スコープ付き）重複しない
-- すべての参照（CallScene, WordRef）が登録済みエントリを指す
-
-**典型的な登録データ**:
-```rust
-// SceneRegistry の内容例
-scene_registry.register("さくら", SceneMetadata::Actor { ... })?;
-scene_registry.register("さくら::会話", SceneMetadata::Local { parent: "さくら", ... })?;
-scene_registry.register("メイン", SceneMetadata::Global { ... })?;
-scene_registry.register("メイン::オープニング", SceneMetadata::Local { parent: "メイン", ... })?;
-
-// WordDefRegistry の内容例
-word_registry.register_global("笑う", WordDef { ... })?;
-word_registry.register_actor("さくら", "照れる", WordDef { ... })?;
-```
-
-### Pass 2: Lua コード生成フェーズ
-
-**入力**: `TranspileContext` (Pass 1 構築済み)、`LuaCodeGenerator` インスタンス
-
-**処理フロー**:
-```
-1. GlobalSceneScope 走査（Pass 1 と同じ順序）
-   ├─ LuaCodeGenerator::generate_global_scene(scene)
-   │  ├─ scene_registry.lookup(scene.name) → SceneMetadata 取得
-   │  └─ シーン構造 + モジュール定義を Lua コード生成
-   ├─ LocalSceneScope 走査
-   │  ├─ LuaCodeGenerator::generate_local_scene(local_scene)
-   │  ├─ scene_registry.lookup("${global}::${local}") → SceneMetadata 取得
-   │  └─ ローカル関数定義を Lua コード生成
-   └─ LocalSceneItem 走査（VarSet, CallScene, ActionLine, ...）
-      ├─ VarSet → LuaCodeGenerator::generate_var_set()
-      │  └─ LocalVariable 追跡（do...end ブロック分割判定用）
-      ├─ CallScene → LuaCodeGenerator::generate_call_scene()
-      │  └─ scene_registry.lookup() で呼び出しシーン検証（Pass 1 で検証済み）
-      ├─ Action → LuaCodeGenerator::generate_action()
-      │  ├─ Action::WordRef → word_registry.lookup() で単語定義取得
-      │  │  └─ 生成コード内で単語ルール展開
-      │  ├─ Action::Talk → Lua 文字列出力 + StringLiteralizer
-      │  ├─ Action::VarRef → 変数参照コード生成
-      │  └─ Action::Escape → SakuraScript エスケープ処理
-      └─ CodeBlock → LuaCodeGenerator::generate_code_block()
-         └─ Lua コードを直接出力
-
-2. コード生成オプション適用
-   ├─ comment_mode=true の場合、span.start_line から行番号コメント挿入
-   └─ comment_mode=false の場合、純粋 Lua コードのみ出力
-
-3. エラーハンドリング（部分的な出力可能）
-   ├─ StringLiteralizer エラー（n > 10）→ StringLiteralError（該当 Action スキップ）
-   ├─ ローカル変数超過（> 200）→ TooManyLocalVariables（警告 + 次ブロックへ）
-   ├─ ContinueAction + アクター未設定 → InvalidContinuation（該当 Action スキップ）
-   └─ Writer エラー → IoError（処理停止）
-```
-
 **出力**: Lua コード（Writer へ直接出力）
 
-**不変式**:
-- Pass 1 で検出されたすべての参照エラー（UndefinedScene, UndefinedWord）は Pass 2 に到達しない
-- 各 GenerateXxx メソッドは Writer に部分的なコードを追記（ロールバック不可）
-- エラー時の部分的な出力は呼び出し側で処理（テンポラリバッファの使用推奨）
+### 処理フロー
 
-**典型的な呼び出し順序**:
-```rust
-// Pass 1
-let mut ctx = transpiler.pass1(&ast)?;  // UndefinedScene/UndefinedWord 検出
+```
+1. ActorScope 走査
+   ├─ scenes テーブル初期化コード出力
+   │  └─ local scenes = { さくら = {}, うにゅう = {}, ... }
+   └─ 単語定義レジストリに登録（参照検証用）
 
-// Pass 2
-let config = TranspilerConfig { comment_mode: false };
-let mut gen = LuaCodeGenerator::new(&ctx, config);
-for scene in &ast {
-    gen.generate_global_scene(scene)?;  // StringLiteralError, TooManyLocalVariables 可能
-    for local_scene in &scene.local_scenes {
-        gen.generate_local_scene(local_scene)?;  // InvalidContinuation 可能
-    }
-}
+2. GlobalSceneScope 走査
+   ├─ グローバルシーン関数定義出力
+   │  └─ do ... local SCENE = PASTA:create_scene("シーン名") ...end
+   ├─ LocalSceneScope 走査（同一ブロック内）
+   │  ├─ ローカルシーン関数定義出力
+   │  │  └─ function SCENE.__シーン名_N__() ... end
+   │  └─ LocalSceneItem 走査（VarSet, CallScene, Action, ...）
+   │     ├─ VarSet → var.名前 = 値 出力
+   │     ├─ CallScene → act:call("グローバル", "ローカル", {}, 引数...) 出力
+   │     ├─ ActionLine → 各 Action 走査 (Talk, WordRef, VarRef, ...)
+   │     │  ├─ Action::Talk → act.アクター:talk("文字列")
+   │     │  ├─ Action::WordRef → act.アクター:word("単語名") または word参照に変換
+   │     │  ├─ Action::VarRef → var.名前 または save.名前 参照
+   │     │  ├─ Action::FnCall → SCENE.関数名(ctx, 引数...) 呼び出し
+   │     │  └─ Action::Escape → SakuraScript エスケープシーケンス処理
+   │     └─ CodeBlock → Lua コードを直接出力
+   └─ 完了処理（必要に応じて）
+
+3. エラーハンドリング
+   ├─ CallScene/WordRef 参照エラー → ランタイム層で検証（トランスパイラーは出力継続）
+   ├─ StringLiteralError (n > 10) → 該当 Action スキップ + 警告ログ
+   └─ Writer エラー → 処理停止
+
+Output: Lua コード
 ```
 
-### エラー伝搬パターン
+### 重要な設計ポイント
 
-| エラー型 | 検出フェーズ | 検出方法 | 伝搬戦略 |
-|--------|-----------|--------|--------|
-| UndefinedScene | Pass 1 | AST 走査 loop | Err() で即座に失敗（Pass 2 到達なし） |
-| UndefinedWord | Pass 1 | AST 走査 loop | Err() で即座に失敗（Pass 2 到達なし） |
-| InvalidAst | Pass 1 | 構造チェック | Err() で即座に失敗（Pass 2 到達なし） |
-| StringLiteralError | Pass 2 | generate_action() → literalize() | Err() で該当 Action スキップ（全体は継続可能） |
-| TooManyLocalVariables | Pass 2 | generate_local_scene() 内カウント | 警告ログ + Err() または継続（ブロック分割提案） |
-| InvalidContinuation | Pass 2 | generate_action() 内判定 | 警告ログ + コード生成スキップ（全体は継続） |
-| IoError | Pass 1/2 | Writer 操作 | Err() で即座に失敗（部分的な出力は廃棄） |
+**Lua テーブル参照によるシンプルさ**:
+- Pasta DSL は前方参照を許すが、Lua はテーブル参照で実行時に解決
+- トランスパイラーは参照検証不要、機械的なコード生成のみ
+- 参照エラー（UndefinedScene, UndefinedWord）はランタイム層で検証
 
-**重要**: Pass 1 で早期失敗することで、Pass 2 での参照エラーを事前に排除。これにより、Pass 2 は「生成成功」または「部分失敗（スキップ）」のいずれかになり、参照エラーの復帰処理が不要
+**不変式**:
+- 各 generate_* メソッドは Writer に部分的なコードを追記（ロールバック不可）
+- エラー時でも部分的な出力が残る（テンポラリバッファの使用を推奨）
+
+**CallScene の引数変換ルール**:
+```lua
+-- Pasta DSL: @メイン:会話（$カウンタ、"文字列"）
+-- 変換後Lua:
+act:call("メイン", "会話", {}, var.カウンタ, "文字列")
+```
+
+### 処理チェックリスト
+
+| 処理 | 責務 | 実装位置 |
+|------|------|--------|
+| ActorScope → scenes 初期化 | スキップ（テーブル参照のため） | 省略 OR マップ出力のみ |
+| GlobalSceneScope → 関数定義 | function SCENE.__start__() ... end | generate_global_scene() |
+| LocalSceneScope → ローカル関数 | function SCENE.__名前_N__() ... end | generate_local_scene() |
+| VarSet → 変数代入 | var.名前 = 値 | generate_var_set() |
+| CallScene → call 出力 | act:call(...) | generate_call_scene() |
+| Action → Lua コード | word(), talk(), 変数参照など | generate_action() |
+| CodeBlock → 直接出力 | コードをそのまま出力 | generate_code_block() |
+| エラー処理 | StringLiteralError のみ対応 | 各メソッド |
 
 ### ユニットテスト
 - `StringLiteralizer::literalize()` - 各ルールの境界条件
@@ -775,6 +747,20 @@ for scene in &ast {
 - 参照実装 sample.lua との構文的同一性を確認
 
 **Lua 構文的同一性検証方式**:
+### ユニットテスト
+
+トランスパイラー層は機械的な変換のため、ユニットテストは限定的：
+
+- `StringLiteralizer::literalize()` - 各ルールの境界条件（n=0～11のテスト）
+- `LuaCodeGenerator::generate_*()` - 各 AST ノードから正しい Lua コード生成
+- `TranspilerConfig` - デフォルト値、設定変更の動作確認
+
+### 統合テスト
+
+`pasta_lua_transpiler_integration_test.rs` - sample.pasta → Lua 変換の全体検証
+
+**Lua 構文的同一性検証方式**:
+
 ```
 step 1: 生成 Lua コードをテキスト行に分割
 step 2: 参照実装 sample.lua をテキスト行に分割
@@ -791,10 +777,15 @@ step 6: テスト結果をレポート
   - コード行数が一致することを確認
   - 不一致行の詳細（行番号、期待コード、実際コード）
   - インデント差異は別途ログに記載
-  - トランスパイラー調整フラグを明記
+  - comment_mode の影響を確認
 ```
 
+**comment_mode オプションテスト**:
+- `comment_mode=false` → sample.lua との行数・コンテンツ一致確認
+- `comment_mode=true` → 行番号コメント挿入確認（`-- [Pasta src:L○]` 形式）
+
 ### E2E テスト
+
 - 生成 Lua コードの構文妥当性（luacheck または Lua インタープリタ）
 - 複数 Pasta ファイルのバッチトランスパイル
 
