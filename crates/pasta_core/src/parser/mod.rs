@@ -579,21 +579,47 @@ fn parse_var_set(pair: Pair<Rule>) -> Result<VarSet, ParseError> {
     };
 
     let mut name = String::new();
-    let mut value = Expr::BlankString;
+    let mut terms: Vec<Expr> = Vec::new();
+    let mut operators: Vec<BinOp> = Vec::new();
 
     for inner in pair.into_inner() {
         match inner.as_rule() {
             Rule::id => {
-                name = inner.as_str().to_string();
+                // The first id is the variable name
+                if name.is_empty() {
+                    name = inner.as_str().to_string();
+                }
             }
+            Rule::add_op => operators.push(BinOp::Add),
+            Rule::sub_op => operators.push(BinOp::Sub),
+            Rule::mul_op => operators.push(BinOp::Mul),
+            Rule::div_op => operators.push(BinOp::Div),
+            Rule::modulo_op => operators.push(BinOp::Mod),
             _ => {
-                // Try to parse as expression
-                if let Some(expr) = try_parse_expr(inner.clone()) {
-                    value = expr;
+                // Try to parse as expression (term)
+                if let Some(expr) = try_parse_expr(inner) {
+                    terms.push(expr);
                 }
             }
         }
     }
+
+    // Build left-associative binary expression
+    let value = if terms.is_empty() {
+        Expr::BlankString
+    } else {
+        let mut result = terms.remove(0);
+        for (i, op) in operators.into_iter().enumerate() {
+            if i < terms.len() {
+                result = Expr::Binary {
+                    op,
+                    lhs: Box::new(result),
+                    rhs: Box::new(terms[i].clone()),
+                };
+            }
+        }
+        result
+    };
 
     Ok(VarSet {
         name,
@@ -773,10 +799,11 @@ fn parse_args(pair: Pair<Rule>) -> Result<Args, ParseError> {
     for inner in pair.into_inner() {
         match inner.as_rule() {
             Rule::positional_arg => {
-                for expr_inner in inner.into_inner() {
-                    if let Some(expr) = try_parse_expr(expr_inner) {
-                        items.push(Arg::Positional(expr));
-                    }
+                // Collect all terms and operators for this positional argument
+                // Grammar: expr = term ~ bin*, where bin = bin_op ~ term
+                // Since expr and bin are silent rules, we get term, op, term, op, term...
+                if let Some(expr) = parse_expr_from_parts(inner) {
+                    items.push(Arg::Positional(expr));
                 }
             }
             Rule::key_arg => {
@@ -790,27 +817,93 @@ fn parse_args(pair: Pair<Rule>) -> Result<Args, ParseError> {
     Ok(Args { items, span })
 }
 
+/// Parse an expression from parts (terms and binary operators).
+/// Handles the case where expr = term ~ (bin_op ~ term)* expands into multiple pairs.
+fn parse_expr_from_parts(pair: Pair<Rule>) -> Option<Expr> {
+    let mut terms: Vec<Expr> = Vec::new();
+    let mut operators: Vec<BinOp> = Vec::new();
+
+    for expr_inner in pair.into_inner() {
+        match expr_inner.as_rule() {
+            Rule::add_op => operators.push(BinOp::Add),
+            Rule::sub_op => operators.push(BinOp::Sub),
+            Rule::mul_op => operators.push(BinOp::Mul),
+            Rule::div_op => operators.push(BinOp::Div),
+            Rule::modulo_op => operators.push(BinOp::Mod),
+            _ => {
+                if let Some(term) = try_parse_expr(expr_inner) {
+                    terms.push(term);
+                }
+            }
+        }
+    }
+
+    if terms.is_empty() {
+        return None;
+    }
+
+    // Build left-associative binary expression
+    let mut result = terms.remove(0);
+    for (i, op) in operators.into_iter().enumerate() {
+        if i < terms.len() {
+            result = Expr::Binary {
+                op,
+                lhs: Box::new(result),
+                rhs: Box::new(terms[i].clone()),
+            };
+        }
+    }
+
+    Some(result)
+}
+
 /// Parse key_arg.
 fn parse_key_arg(pair: Pair<Rule>) -> Result<(String, Expr), ParseError> {
     let mut key = String::new();
-    let mut value = Expr::BlankString;
+    let mut terms: Vec<Expr> = Vec::new();
+    let mut operators: Vec<BinOp> = Vec::new();
 
     for inner in pair.into_inner() {
         if inner.as_rule() == Rule::key_expr {
             for kv_inner in inner.into_inner() {
                 match kv_inner.as_rule() {
                     Rule::id => {
-                        key = kv_inner.as_str().to_string();
+                        // The first id is the key name
+                        if key.is_empty() {
+                            key = kv_inner.as_str().to_string();
+                        }
                     }
+                    Rule::add_op => operators.push(BinOp::Add),
+                    Rule::sub_op => operators.push(BinOp::Sub),
+                    Rule::mul_op => operators.push(BinOp::Mul),
+                    Rule::div_op => operators.push(BinOp::Div),
+                    Rule::modulo_op => operators.push(BinOp::Mod),
                     _ => {
                         if let Some(expr) = try_parse_expr(kv_inner) {
-                            value = expr;
+                            terms.push(expr);
                         }
                     }
                 }
             }
         }
     }
+
+    // Build left-associative binary expression
+    let value = if terms.is_empty() {
+        Expr::BlankString
+    } else {
+        let mut result = terms.remove(0);
+        for (i, op) in operators.into_iter().enumerate() {
+            if i < terms.len() {
+                result = Expr::Binary {
+                    op,
+                    lhs: Box::new(result),
+                    rhs: Box::new(terms[i].clone()),
+                };
+            }
+        }
+        result
+    };
 
     Ok((key, value))
 }
