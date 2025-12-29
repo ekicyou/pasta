@@ -14,14 +14,20 @@ pasta_luaトランスパイラーがPastaFileを入力として受け取り、pa
 
 ## Functional Requirements
 
-### REQ-1: PastaFile入力インターフェース
+### REQ-1: PastaFile入力インターフェース【バグ修正】
 **ID**: REQ-1  
 **Title**: PastaFile入力インターフェース  
-**Statement**: When LuaTranspiler processes a Pasta source file, the LuaTranspiler shall accept a `&PastaFile` reference as the primary input parameter instead of separate `&[ActorScope]` and `&[GlobalSceneScope]` arrays.  
+**Priority**: 🔴 CRITICAL - バグ修正（破壊的変更を伴う）  
+**Statement**: When LuaTranspiler processes a Pasta source file, the LuaTranspiler shall accept a `&PastaFile` reference as the primary input parameter instead of separate `&[ActorScope]` and `&[GlobalSceneScope]` arrays. The existing `transpile()` method signature shall be changed to accept `&PastaFile`, and `transpile_with_globals()` shall be removed.  
+**Rationale**:
+- 古いAPI（分離配列入力）は**設計バグ**である
+- FileItem出現順を失うAPIは正しいトランスパイルを不可能にする
+- バグのあるコードを残してはならない（非推奨化ではなく削除）
+
 **Acceptance Criteria**:
-- [ ] LuaTranspilerに`transpile_file(&PastaFile, ...)` メソッドが存在する
-- [ ] メソッドのシグネチャがpasta_runeのTranspiler2と一致している
-- [ ] 既存のtranspile()メソッドは後方互換性のため残すが、非推奨マークを付ける
+- [ ] `transpile(&PastaFile, ...)` メソッドが`&PastaFile`を第一引数として受け取る
+- [ ] `transpile_with_globals()` メソッドが削除される
+- [ ] メソッドのシグネチャがpasta_runeのTranspiler2と一貫性がある
 
 ### REQ-2: FileItem出現順処理
 **ID**: REQ-2  
@@ -98,39 +104,29 @@ pasta_luaトランスパイラーがPastaFileを入力として受け取り、pa
 **ID**: REQ-7  
 **Title**: API一貫性  
 **Priority**: ℹ️ INFO - Lua言語とRune言語の設計差異により2パス不要  
-**Statement**: The LuaTranspiler shall provide an API that is consistent with pasta_rune's Transpiler2 in terms of input parameters and method naming conventions, but shall use a single-pass implementation due to Lua language design differences.  
+**Statement**: The LuaTranspiler shall provide an API that accepts `&PastaFile` as input, but shall use a single-pass implementation due to Lua language design differences.  
 **Design Rationale**:
 - Rune言語: 2パス必要（pass1: 登録+生成、pass2: scene_selector）
 - Lua言語: 1パスで完結（言語設計の違いにより2段階処理が不要）
-- API名は `transpile_file()` を採用（pasta_runeのpass1相当だが、実装は1パス完結）
+- API名は `transpile()` のまま（シグネチャのみ変更）
 
 **Acceptance Criteria**:
-- [ ] メソッド名は `transpile_file()` （pasta_runeと一致）
+- [ ] メソッド名は `transpile()` （既存メソッド名を維持）
 - [ ] パラメータは `&PastaFile` を第一引数として受け取る
 - [ ] 1パス処理で完結する（pass2は実装しない）
 - [ ] 戻り値の型がpasta_runeのパターンに準拠
 
-### REQ-8: 後方互換性
+### REQ-8: テストカバレッジ
 **ID**: REQ-8  
-**Title**: 後方互換性  
-**Statement**: The LuaTranspiler shall maintain backward compatibility by keeping the existing `transpile()` and `transpile_with_globals()` methods as deprecated wrappers.  
-**Acceptance Criteria**:
-- [ ] 既存のtranspile()メソッドが引き続き動作する
-- [ ] 既存のtranspile_with_globals()メソッドが引き続き動作する
-- [ ] 非推奨メソッドに#[deprecated]属性が付与されている
-- [ ] 既存のテストが変更なしでパスする
-
-### REQ-9: テストカバレッジ
-**ID**: REQ-9  
 **Title**: テストカバレッジ  
-**Statement**: The new transpile_file() method shall have comprehensive test coverage including unit tests for each FileItem type and integration tests for order-sensitive processing.  
+**Statement**: The modified transpile() method shall have comprehensive test coverage including unit tests for each FileItem type and integration tests for order-sensitive processing.  
 **Acceptance Criteria**:
 - [ ] 各FileItem種別に対するユニットテストが存在する
 - [ ] FileItem出現順序を検証する統合テストが存在する
 - [ ] pasta_runeの対応テストと同等のカバレッジがある
 
-### REQ-10: PastaFileヘルパーメソッドの廃止【本仕様の核心】
-**ID**: REQ-10  
+### REQ-9: PastaFileヘルパーメソッドの廃止【本仕様の核心】
+**ID**: REQ-9
 **Title**: PastaFileヘルパーメソッドの廃止  
 **Priority**: 🔴 CRITICAL - 本仕様の根本的な目的  
 **Statement**: The PastaFile helper methods `file_attrs()`, `words()`, `global_scene_scopes()`, and `actor_scopes()` shall be removed from the PastaFile implementation, forcing all transpilers and consumers to iterate directly over `file.items`.  
