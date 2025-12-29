@@ -17,7 +17,7 @@
 - ヘルパーメソッド廃止により、構造的に出現順無視の実装を防止
 
 ### Non-Goals
-- LuaCodeGenerator内部の変更（必要最小限を除く）
+- LuaCodeGenerator内部ロジックの変更（シグネチャ拡張のみ実施）
 - Lua出力フォーマットの変更
 - パフォーマンス最適化（本移行の範囲外）
 - 2パス処理の実装（Lua言語では不要）
@@ -125,9 +125,9 @@ sequenceDiagram
         else FileItem::GlobalWord
             LuaTranspiler->>WordDefRegistry: register_global(name, values)
         else FileItem::GlobalSceneScope
-            LuaTranspiler->>TranspileContext: merge_attrs(scene.attrs)
+            LuaTranspiler->>TranspileContext: merge_attrs(&scene.attrs) → merged_attrs
             LuaTranspiler->>SceneRegistry: register_global(...)
-            LuaTranspiler->>LuaCodeGenerator: generate_global_scene(...)
+            LuaTranspiler->>LuaCodeGenerator: generate_global_scene(&scene, &merged_attrs)
         else FileItem::ActorScope
             LuaTranspiler->>LuaCodeGenerator: generate_actor(actor)
         end
@@ -138,8 +138,9 @@ sequenceDiagram
 
 **Key Decisions**:
 - FileAttr処理: 累積のみ（コード生成なし）
-- GlobalSceneScope処理: 累積済みfile_attrsとシーンattrsをマージして使用
-- ActorScope処理: file_attrs**継承なし**（決定済み）
+- GlobalSceneScope処理: merge_attrs()を呼び出し、結果をCodeGeneratorに渡す
+- CodeGenerator受け取り: `generate_global_scene(&scene, &merged_attrs)`として受け取る（現時点では未使用でも可）
+- アクター処理: ファイル属性の影響を受けない（出現順処理のみ）
 
 ## Requirements Traceability
 
@@ -225,6 +226,12 @@ impl LuaTranspiler {
 
 **Implementation Notes**
 - Integration: pasta_runeのtranspile_pass1()パターンを参考に実装
+  - FileItem出現順に処理（for item in &file.items）
+  - GlobalSceneScope処理時に`merge_attrs(&scene.attrs)`を呼び出し
+  - マージ結果（`HashMap<String, AttrValue>`）をLuaCodeGeneratorに渡す
+- CodeGenerator Integration: `generate_global_scene()`に`file_attrs: &HashMap<String, AttrValue>`引数を追加
+  - 現時点では属性値を使ったコード生成をしない（未使用パラメータ）
+  - 将来の拡張性のためシグネチャには含める（pasta_runeで省略された実装を補完）
 - Validation: FileItem種別の網羅性チェック（match exhaustive）
 - Risks: 非推奨メソッドからのPastaFile再構築は順序情報を喪失
 
@@ -286,6 +293,41 @@ impl TranspileContext {
 - Integration: pasta_rune TranspileContext2のaccumulate_file_attr()と同等
 - Validation: attr.keyの重複時は上書き（シャドーイング）
 - Risks: file_attrs()列挙メソッドは追加しない（害悪）
+
+#### LuaCodeGenerator（シグネチャ拡張）
+
+| Field | Detail |
+|-------|--------|
+| Intent | ファイル属性を受け取れるよう`generate_global_scene()`を拡張 |
+| Requirements | 3, 5 |
+
+**シグネチャ変更**:
+```rust
+impl<'a, W: Write> LuaCodeGenerator<'a, W> {
+    // 既存シグネチャ
+    pub fn generate_global_scene(
+        &mut self,
+        scene: &GlobalSceneScope,
+        scene_counter: usize,
+        _context: &TranspileContext,  // ← 廃止予定（現在は未使用）
+    ) -> Result<(), TranspileError>;
+    
+    // 新規シグネチャ（フェーズ1で実装）
+    pub fn generate_global_scene(
+        &mut self,
+        scene: &GlobalSceneScope,
+        scene_counter: usize,
+        file_attrs: &HashMap<String, AttrValue>,  // ← 追加
+        context: &TranspileContext,
+    ) -> Result<(), TranspileError>;
+}
+```
+
+**Implementation Notes**
+- Integration: pasta_runeのCodeGenerator参照（ただしpasta_runeは`_context`未使用でfile_attrs引数なし）
+- Signature Rationale: 将来の拡張性（属性値を使ったコード生成）のため引数に含める
+- Current Usage: 現時点では`file_attrs`は未使用でも可（`_file_attrs`として受け取り）
+- Future Extension: シーンごとの属性値に基づいたLuaコード生成が可能になる
 
 ### pasta_core Layer
 
