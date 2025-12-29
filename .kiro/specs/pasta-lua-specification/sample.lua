@@ -168,6 +168,13 @@ do
         local args = { ... }
         local act, save, var = PASTA:create_session(SCENE, ctx)
 
+        -- 　　　さくら　：＠通常　変数を代入。
+        act.さくら:word("通常")
+        act.さくら:talk("変数を代入。")
+
+        -- 　　　うにゅう：中身は内緒や。
+        act.うにゅう:talk("中身は内緒や。")
+
         -- 　　　＄カウンタ＝１０
         -- 意図: ローカル変数（＄変数名）は var.変数名 に代入（Requirement 1d）
         var.カウンタ = 10
