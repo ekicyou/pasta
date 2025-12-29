@@ -114,19 +114,6 @@ impl Span {
         }
     }
 
-    /// Create a span from pest's position tuples with byte offsets.
-    ///
-    /// Pest uses 1-based line numbers and 1-based column numbers.
-    /// Byte offsets are 0-based.
-    pub fn from_pest(
-        start: (usize, usize),
-        end: (usize, usize),
-        start_byte: usize,
-        end_byte: usize,
-    ) -> Self {
-        Self::new(start.0, start.1, end.0, end.1, start_byte, end_byte)
-    }
-
     /// Extract the corresponding source code substring from the original source.
     ///
     /// # Arguments
@@ -807,17 +794,6 @@ mod tests {
         assert_eq!(span.end_col, 10);
         assert_eq!(span.start_byte, 0);
         assert_eq!(span.end_byte, 10);
-    }
-
-    #[test]
-    fn test_span_from_pest() {
-        let span = Span::from_pest((5, 3), (10, 15), 100, 200);
-        assert_eq!(span.start_line, 5);
-        assert_eq!(span.start_col, 3);
-        assert_eq!(span.end_line, 10);
-        assert_eq!(span.end_col, 15);
-        assert_eq!(span.start_byte, 100);
-        assert_eq!(span.end_byte, 200);
     }
 
     #[test]
