@@ -265,8 +265,9 @@ fn test_transpile_reference_sample_structure() {
         lua_code.contains("PASTA:create_scene(\"メイン1\")"),
         "Missing scene メイン1"
     );
+    // Each unique scene name gets counter=1 (counter is per-name, not global)
     assert!(
-        lua_code.contains("PASTA:create_scene(\"会話分岐2\")"),
-        "Missing scene 会話分岐2"
+        lua_code.contains("PASTA:create_scene(\"会話分岐1\")"),
+        "Missing scene 会話分岐1"
     );
 }
