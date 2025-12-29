@@ -155,7 +155,7 @@ sequenceDiagram
 | コンポーネント | ドメイン/レイヤー | 目的 | 要件カバレッジ | 依存関係 | 契約 |
 |--------------|-----------------|------|---------------|---------|------|
 | Span | pasta_core/Parser | ソース位置情報保持 + From トレイト | 1, 2, 4, 6 | - | Service |
-| ActionWithSpan | pasta_core/Parser | Action+Span ラッパー | 3.2, 7 | Span (P0) | - |
+| Action enum | pasta_core/Parser | アクション定義（named fields 化 + Span 統合） | 3.2, 7 | Span (P0) | - |
 
 ### pasta_core/Parser
 
@@ -270,38 +270,41 @@ impl From<&Pair<Rule>> for Span {
 - `From<&Pair<Rule>> for Span` として Span 構造体に実装
 - パーサー層では `Span::from(&pair)` で呼び出し
 
-#### ActionWithSpan
+#### Action enum (リファクタリング)
 
 | フィールド | 詳細 |
 |-----------|------|
-| 目的 | Action に Span 情報を付加 |
+| 目的 | アクション定義を named fields 化し、Span を統合 |
 | 要件 | 3.2, 7 |
 
 **責務と制約**
-- Action enum のラッパーとして Span を保持
+- 全 Action バリアントに Span フィールドを追加
+- タプル形式から named fields 形式に統一（AST 一貫性向上）
 - トランスパイラがアクション単位でソース位置を参照可能に
 
 **依存関係**
-- 内部: Span (P0), Action (P0)
+- 内部: Span (P0)
 
 ##### サービスインターフェース
 
 ```rust
-/// Action とその Span 情報を保持するラッパー。
+/// アクション定義（named fields 化 + Span 統合）
 #[derive(Debug, Clone)]
-pub struct ActionWithSpan {
-    pub action: Action,
-    pub span: Span,
-}
-
-impl ActionWithSpan {
-    pub fn new(action: Action, span: Span) -> Self;
+pub enum Action {
+    Talk { text: String, span: Span },
+    WordRef { name: String, span: Span },
+    VarRef { name: String, scope: VarScope, span: Span },
+    FnCall { name: String, args: Args, scope: FnScope, span: Span },
+    SakuraScript { script: String, span: Span },
+    Escape { sequence: String, span: Span },
 }
 ```
 
 **実装ノート**
-- ActionLine の actions フィールドを `Vec<Action>` から `Vec<ActionWithSpan>` に変更
-- 既存の Action パターンマッチは `.action` 経由でアクセス
+- **リファクタリング作業**: タプル形式 `Action::Talk(String)` → named fields `Action::Talk { text, span }`
+- **影響範囲**: pasta_core（Parser層）+ pasta_rune + pasta_lua（両トランスパイラ層）
+- **作業性質**: コンパイルエラーを機械的に修正（難易度低、作業量大）
+- **修正箇所**: パーサー 20+ 箇所、トランスパイラ 10+ 箇所（各）、テスト 10+ 箇所（各）
 
 ## データモデル
 
@@ -317,27 +320,29 @@ classDiagram
         +usize start_byte
         +usize end_byte
         +new() Span
-        +from_pest() Span
         +extract_source() Result
         +is_valid() bool
         +byte_len() usize
     }
     
-    class ActionWithSpan {
-        +Action action
-        +Span span
-        +new() ActionWithSpan
+    class Action {
+        <<enumeration>>
+        Talk { text, span }
+        WordRef { name, span }
+        VarRef { name, scope, span }
+        FnCall { name, args, scope, span }
+        SakuraScript { script, span }
+        Escape { sequence, span }
     }
     
     class ActionLine {
         +Option~String~ actor
-        +Vec~ActionWithSpan~ actions
+        +Vec~Action~ actions
         +Span span
     }
     
-    ActionWithSpan --> Span
-    ActionWithSpan --> Action
-    ActionLine --> ActionWithSpan
+    Action --> Span
+    ActionLine --> Action
     ActionLine --> Span
 ```
 
