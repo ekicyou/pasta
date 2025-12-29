@@ -144,6 +144,7 @@
 - The Transpiler shall グローバル変数（`＄＊グローバル`）を `save.グローバル = ...` として生成する
 - The Transpiler shall Call文（`＞ラベル`）を `act:call("モジュール名", "ラベル名", {}, table.unpack(args))` として生成する
 - The Transpiler shall 関数呼び出し（`＠関数`）を `SCENE:関数(ctx, ...)` コード文字列として生成する
+- When 引数参照（`＄N`）があるとき、Transpiler shall Pasta DSL の 0-indexed を Lua の 1-indexed に変換し、`args[N+1]` として生成する（例：`＄０` → `args[1]`, `＄１` → `args[2]`）
 
 #### 1e. 単語参照の処理（コード生成）
 
