@@ -37,7 +37,11 @@ parserのASTから、元ソースコードへの参照を得ることができ�
 ソースコード参照と行単位のコメント挿入を可能にする
 
 #### 受け入れ基準
-1. The Parser shall include a Span field in Statement enum variants representing scenes, labels, and flow control
+1. The Parser shall include a Span field in all line-level items within LocalSceneItem:
+   - VarSet (variable assignments)
+   - CallScene (scene calls)
+   - ActionLine (actor + actions)
+   - ContinueAction (continuation lines)
 2. The Parser shall include a Span field for Action elements (each action within ActionLine)
    to enable line-by-line comment insertion and precise debug stack trace mapping
 3. The Parser shall include a Span field in Label definition structures
