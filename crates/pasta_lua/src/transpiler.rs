@@ -3,7 +3,8 @@
 //! This module provides the main transpiler interface for converting
 //! Pasta AST to Lua code.
 
-use pasta_core::parser::{ActorScope, GlobalSceneScope};
+use pasta_core::parser::{ActorScope, GlobalSceneScope, KeyWords};
+use pasta_core::registry::SceneRegistry;
 
 use super::code_generator::LuaCodeGenerator;
 use super::config::TranspilerConfig;
@@ -53,7 +54,7 @@ impl LuaTranspiler {
         scenes: &[GlobalSceneScope],
         writer: &mut W,
     ) -> Result<TranspileContext, TranspileError> {
-        let context = TranspileContext::new();
+        let mut context = TranspileContext::new();
         let mut codegen = LuaCodeGenerator::new(writer);
 
         // Write header
@@ -64,9 +65,80 @@ impl LuaTranspiler {
             codegen.generate_actor(actor)?;
         }
 
-        // Generate scene definitions
-        for (idx, scene) in scenes.iter().enumerate() {
-            codegen.generate_global_scene(scene, idx + 1, &context)?;
+        // Generate scene definitions with registry integration (Task 3.1, 3.2)
+        for scene in scenes {
+            // Register global scene in SceneRegistry
+            let (scene_id, counter) = context.register_global_scene(scene);
+
+            // Register scene-level word definitions in WordDefRegistry
+            let module_name = format!("{}{}", SceneRegistry::sanitize_name(&scene.name), counter);
+            context.register_local_words(&scene.words, &module_name);
+
+            // Generate Lua code for the scene
+            codegen.generate_global_scene(scene, counter, &context)?;
+
+            // Register local scenes (Task 3.1)
+            for (local_idx, local_scene) in scene.local_scenes.iter().enumerate() {
+                // Skip start scene (name is None) - already registered as part of global
+                if local_scene.name.is_some() {
+                    context.register_local_scene(
+                        local_scene,
+                        &scene.name,
+                        counter,
+                        local_idx + 1, // 1-based index for named local scenes
+                    );
+                }
+            }
+
+            // Store scene ID for potential future use
+            let _ = scene_id;
+        }
+
+        Ok(context)
+    }
+
+    /// Transpile with file-level word definitions (Task 3.2).
+    ///
+    /// This method accepts additional global word definitions that should be
+    /// registered before scene processing.
+    pub fn transpile_with_globals<W: Write>(
+        &self,
+        actors: &[ActorScope],
+        scenes: &[GlobalSceneScope],
+        global_words: &[KeyWords],
+        writer: &mut W,
+    ) -> Result<TranspileContext, TranspileError> {
+        let mut context = TranspileContext::new();
+
+        // Register file-level global word definitions first (Task 3.2)
+        context.register_global_words(global_words);
+
+        let mut codegen = LuaCodeGenerator::new(writer);
+
+        // Write header
+        codegen.write_header()?;
+
+        // Generate actor definitions
+        for actor in actors {
+            codegen.generate_actor(actor)?;
+        }
+
+        // Generate scene definitions with registry integration
+        for scene in scenes {
+            let (scene_id, counter) = context.register_global_scene(scene);
+
+            let module_name = format!("{}{}", SceneRegistry::sanitize_name(&scene.name), counter);
+            context.register_local_words(&scene.words, &module_name);
+
+            codegen.generate_global_scene(scene, counter, &context)?;
+
+            for (local_idx, local_scene) in scene.local_scenes.iter().enumerate() {
+                if local_scene.name.is_some() {
+                    context.register_local_scene(local_scene, &scene.name, counter, local_idx + 1);
+                }
+            }
+
+            let _ = scene_id;
         }
 
         Ok(context)
@@ -105,6 +177,41 @@ mod tests {
             words: vec![],
             code_blocks: vec![],
             local_scenes: vec![LocalSceneScope::start()],
+            span: Span::default(),
+        }
+    }
+
+    fn create_scene_with_words(
+        name: &str,
+        word_name: &str,
+        word_values: Vec<&str>,
+    ) -> GlobalSceneScope {
+        GlobalSceneScope {
+            name: name.to_string(),
+            is_continuation: false,
+            attrs: vec![],
+            words: vec![KeyWords {
+                name: word_name.to_string(),
+                words: word_values.iter().map(|s| s.to_string()).collect(),
+                span: Span::default(),
+            }],
+            code_blocks: vec![],
+            local_scenes: vec![LocalSceneScope::start()],
+            span: Span::default(),
+        }
+    }
+
+    fn create_scene_with_local(name: &str, local_name: &str) -> GlobalSceneScope {
+        GlobalSceneScope {
+            name: name.to_string(),
+            is_continuation: false,
+            attrs: vec![],
+            words: vec![],
+            code_blocks: vec![],
+            local_scenes: vec![
+                LocalSceneScope::start(),
+                LocalSceneScope::named(local_name.to_string()),
+            ],
             span: Span::default(),
         }
     }
@@ -168,7 +275,74 @@ mod tests {
         assert!(result.is_ok());
 
         let lua_code = String::from_utf8(output).unwrap();
+        // Each unique scene name gets counter=1 (counter is per-name, not global)
         assert!(lua_code.contains("PASTA:create_scene(\"メイン1\")"));
-        assert!(lua_code.contains("PASTA:create_scene(\"会話分岐2\")"));
+        assert!(lua_code.contains("PASTA:create_scene(\"会話分岐1\")"));
+    }
+
+    // Task 3.1: SceneRegistry integration tests
+    #[test]
+    fn test_transpile_registers_global_scene() {
+        let transpiler = LuaTranspiler::default();
+        let scenes = vec![create_simple_scene("メイン")];
+        let mut output = Vec::new();
+
+        let context = transpiler.transpile(&[], &scenes, &mut output).unwrap();
+
+        let registered_scenes = context.scene_registry.all_scenes();
+        assert_eq!(registered_scenes.len(), 1);
+        assert_eq!(registered_scenes[0].name, "メイン");
+        assert_eq!(registered_scenes[0].id, 1);
+    }
+
+    #[test]
+    fn test_transpile_registers_local_scene() {
+        let transpiler = LuaTranspiler::default();
+        let scenes = vec![create_scene_with_local("メイン", "自己紹介")];
+        let mut output = Vec::new();
+
+        let context = transpiler.transpile(&[], &scenes, &mut output).unwrap();
+
+        let registered_scenes = context.scene_registry.all_scenes();
+        assert_eq!(registered_scenes.len(), 2); // global + local
+        assert_eq!(registered_scenes[1].name, "自己紹介");
+    }
+
+    // Task 3.2: WordDefRegistry integration tests
+    #[test]
+    fn test_transpile_registers_local_words() {
+        let transpiler = LuaTranspiler::default();
+        let scenes = vec![create_scene_with_words(
+            "メイン",
+            "場所",
+            vec!["東京", "大阪"],
+        )];
+        let mut output = Vec::new();
+
+        let context = transpiler.transpile(&[], &scenes, &mut output).unwrap();
+
+        let entries = context.word_registry.all_entries();
+        assert_eq!(entries.len(), 1);
+        assert!(entries[0].key.contains("場所"));
+    }
+
+    #[test]
+    fn test_transpile_with_global_words() {
+        let transpiler = LuaTranspiler::default();
+        let scenes = vec![create_simple_scene("メイン")];
+        let global_words = vec![KeyWords {
+            name: "挨拶".to_string(),
+            words: vec!["こんにちは".to_string(), "やあ".to_string()],
+            span: Span::default(),
+        }];
+        let mut output = Vec::new();
+
+        let context = transpiler
+            .transpile_with_globals(&[], &scenes, &global_words, &mut output)
+            .unwrap();
+
+        let entries = context.word_registry.all_entries();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].key, "挨拶");
     }
 }
