@@ -117,12 +117,15 @@ pasta_luaトランスパイラーがPastaFileを入力として受け取り、pa
 
 **Acceptance Criteria**:
 - [ ] pasta_core の PastaFile から以下のメソッドが削除される：
-  - `file_attrs()`
-  - `words()`
-  - `global_scene_scopes()`
-  - `actor_scopes()`
+  - `file_attrs()` - 型別フィルタリングによる順序喪失
+  - `words()` - 型別フィルタリングによる順序喪失
+  - `global_scene_scopes()` - 型別フィルタリングによる順序喪失
+  - `actor_scopes()` - 型別フィルタリングによる順序喪失
+- [ ] pasta_rune の TranspileContext2 から以下のメソッドが削除される：
+  - `file_attrs()` - HashMapによる列挙は順序情報を喪失（害悪）
+- [ ] pasta_lua の TranspileContext に同様のメソッドがあれば削除される
 - [ ] pasta_lua のすべての使用箇所が `file.items` イテレーションに修正される
-- [ ] pasta_rune のすべての使用箇所が `file.items` イテレーションに修正される
+- [ ] pasta_rune のすべての使用箇所が `file.items` イテレーションまたは内部フィールドアクセスに修正される
 - [ ] tests/ ディレクトリのすべての使用箇所が修正される
 - [ ] `cargo check --all` が成功する
 - [ ] `cargo test --all` が成功する
