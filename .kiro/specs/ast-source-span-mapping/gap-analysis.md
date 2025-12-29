@@ -299,55 +299,40 @@ pub struct ParsedFile {
 - テストコード: 10個の `Span::default()` + `Span::new()` 呼び出し
 - **合計: 41個**
 
-### 決定：Option A（コンストラクタ互換性レイヤー）
+### 決定：破壊的変更（Span::new() を拡張）
 
 **理由**:
-1. 既存テストおよび補助的な Span 生成は byte offset = 0 で十分（テストデータ）
-2. 実装フェーズで実際のバイト位置計算は `span_from_pair()` で集約管理
-3. 既存コード修正の手数最小化
+1. **API設計の一貫性**: `Span::new()` が全パラメータ（line, col, end_line, end_col, start_byte, end_byte）を受け入れるべき
+2. **中途半端を避ける**: 互換性レイヤーより、正面からの改定が保守性向上
+3. **単一責任**: Span 生成には一つのコンストラクタで十分
 
 **実装方針**:
-- `Span::default()` → 継続使用可（内部では `(0, 0, 0, 0, 0, 0)` として解釈）
-- `Span::new(line, col, end_line, end_col)` → 継続使用可（byte offset は後で計算）
-- 新規: `Span::with_bytes(line, col, end_line, end_col, start_byte, end_byte)` を追加
-- 実際の byte offset 計算は `span_from_pair()` のみで実施
+- `Span::new()` を拡張：
+  ```rust
+  pub fn new(start_line: usize, start_col: usize,
+             end_line: usize, end_col: usize,
+             start_byte: usize, end_byte: usize) -> Self {
+      Self {
+          start_line,
+          start_col,
+          end_line,
+          end_col,
+          start_byte,
+          end_byte,
+      }
+  }
+  ```
 
-**互換性レイヤーの実装例**:
-```rust
-impl Span {
-    // 既存コンストラクタ（変更なし）
-    pub fn new(start_line: usize, start_col: usize, 
-               end_line: usize, end_col: usize) -> Self {
-        Self {
-            start_line,
-            start_col,
-            end_line,
-            end_col,
-            start_byte: 0,  // 暫定値
-            end_byte: 0,    // 暫定値
-        }
-    }
-    
-    // 新規コンストラクタ（byte offset 指定）
-    pub fn with_bytes(start_line: usize, start_col: usize,
-                      end_line: usize, end_col: usize,
-                      start_byte: usize, end_byte: usize) -> Self {
-        Self {
-            start_line,
-            start_col,
-            end_line,
-            end_col,
-            start_byte,
-            end_byte,
-        }
-    }
-}
-```
+- `Span::default()` → 継続使用可（内部では全フィールド = 0）
+
+- **既存 41個の呼び出しを修正**:
+  - テスト用の仮 Span: `Span::new(line, col, end_line, end_col, 0, 0)`
+  - 実装の実 Span: `Span::new(line, col, end_line, end_col, start_byte, end_byte)`（`span_from_pair()` で計算）
 
 **この決定により**:
-- ✅ 既存テスト 41個、修正不要
-- ✅ 実装フェーズで `span_from_pair()` のみ更新
-- ✅ 結果 AST の Span は正確なバイト位置を持つ
+- ✅ API 設計が一貫性・シンプル
+- ✅ 将来の Span 拡張に対応しやすい
+- ⚠️ 既存テスト 41個を修正（手作業必要だが、機械的）
 
 ### 「全 AST ノードに Span」による簡潔性
 
