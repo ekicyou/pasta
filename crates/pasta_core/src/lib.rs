@@ -13,13 +13,14 @@
 //! # Example
 //!
 //! ```no_run
-//! use pasta_core::parser::{parse_str, PastaFile};
+//! use pasta_core::parser::{parse_str, FileItem, PastaFile};
 //! use pasta_core::registry::{SceneRegistry, WordDefRegistry};
 //!
 //! let source = "＊挨拶\n  Alice：こんにちは\n";
 //! let ast = parse_str(source, "test.pasta").unwrap();
 //!
-//! println!("Parsed {} global scenes", ast.global_scene_scopes().len());
+//! let scene_count = ast.items.iter().filter(|i| matches!(i, FileItem::GlobalSceneScope(_))).count();
+//! println!("Parsed {} global scenes", scene_count);
 //! ```
 
 pub mod error;

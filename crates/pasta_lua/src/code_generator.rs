@@ -4,8 +4,8 @@
 //! Implements Requirements 1, 3a-3g for Lua code generation.
 
 use pasta_core::parser::{
-    Action, ActionLine, Args, CallScene, CodeBlock, ContinueAction, Expr, GlobalSceneScope,
-    LocalSceneItem, LocalSceneScope, VarScope, VarSet,
+    Action, ActionLine, ActorScope, Args, AttrValue, CallScene, CodeBlock, ContinueAction, Expr,
+    GlobalSceneScope, LocalSceneItem, LocalSceneScope, VarScope, VarSet,
 };
 use pasta_core::registry::SceneRegistry;
 
@@ -13,6 +13,7 @@ use super::context::TranspileContext;
 use super::error::TranspileError;
 use super::string_literalizer::StringLiteralizer;
 
+use std::collections::HashMap;
 use std::io::Write;
 
 /// Lua code generator.
@@ -85,10 +86,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     ///     ACTOR.属性 = [=[値]=]
     /// end
     /// ```
-    pub fn generate_actor(
-        &mut self,
-        actor: &pasta_core::parser::ActorScope,
-    ) -> Result<(), TranspileError> {
+    pub fn generate_actor(&mut self, actor: &ActorScope) -> Result<(), TranspileError> {
         // do block for scope separation (Requirement 1)
         self.writeln("do")?;
         self.indent();
@@ -116,7 +114,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         Ok(())
     }
 
-    /// Generate global scene block (Requirement 3b).
+    /// Generate global scene block (Requirement 3b, MAJOR-3).
     ///
     /// Generates:
     /// ```lua
@@ -134,11 +132,19 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     ///     end
     /// end
     /// ```
+    ///
+    /// # Arguments
+    /// * `scene` - The global scene scope
+    /// * `scene_counter` - Scene counter for name uniqueness
+    /// * `_context` - Transpile context (currently unused)
+    /// * `_file_attrs` - Merged file+scene attributes (MAJOR-3, currently unused for future extension)
+    #[allow(unused_variables)]
     pub fn generate_global_scene(
         &mut self,
         scene: &GlobalSceneScope,
         scene_counter: usize,
         _context: &TranspileContext,
+        _file_attrs: &HashMap<String, AttrValue>,
     ) -> Result<(), TranspileError> {
         let sanitized_name = SceneRegistry::sanitize_name(&scene.name);
         let module_name = format!("{}{}", sanitized_name, scene_counter);
@@ -379,7 +385,9 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                 let literal = StringLiteralizer::literalize(text)?;
                 self.writeln(&format!("act.{}:talk({})", actor, literal))?;
             }
-            Action::WordRef { name: word_name, .. } => {
+            Action::WordRef {
+                name: word_name, ..
+            } => {
                 // act.アクター:word("単語名")
                 self.writeln(&format!("act.{}:word(\"{}\")", actor, word_name))?;
             }
@@ -392,7 +400,9 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                 };
                 self.writeln(&format!("act.{}:talk(tostring({}))", actor, var_path))?;
             }
-            Action::FnCall { name, args, scope, .. } => {
+            Action::FnCall {
+                name, args, scope, ..
+            } => {
                 // SCENE:関数名(ctx, 引数...)
                 let args_str = self.generate_args_string(args)?;
                 let prefix = match scope {
@@ -416,7 +426,9 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                 let literal = StringLiteralizer::literalize(script)?;
                 self.writeln(&format!("act.{}:talk({})", actor, literal))?;
             }
-            Action::Escape { sequence: escape, .. } => {
+            Action::Escape {
+                sequence: escape, ..
+            } => {
                 // Extract the escaped character (second char)
                 if let Some(c) = escape.chars().nth(1) {
                     self.writeln(&format!("act.{}:talk(\"{}\")", actor, c))?;

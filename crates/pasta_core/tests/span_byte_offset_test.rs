@@ -4,7 +4,21 @@
 //! These tests verify the Span byte offset functionality specified in
 //! ast-source-span-mapping requirements.
 
-use pasta_core::parser::{parse_str, Span, SpanError};
+use pasta_core::parser::{FileItem, GlobalSceneScope, Span, SpanError, parse_str};
+
+/// Helper to get global scene scopes from PastaFile items
+fn get_global_scene_scopes(file: &pasta_core::parser::PastaFile) -> Vec<&GlobalSceneScope> {
+    file.items
+        .iter()
+        .filter_map(|item| {
+            if let FileItem::GlobalSceneScope(scene) = item {
+                Some(scene)
+            } else {
+                None
+            }
+        })
+        .collect()
+}
 
 // ============================================================================
 // Task 1.1: Span バイトオフセットフィールドのテスト
@@ -153,7 +167,7 @@ fn test_parser_span_byte_offset_utf8() {
     let ast = parse_str(source, "test.pasta").unwrap();
 
     // シーンの Span を確認
-    let scenes = ast.global_scene_scopes();
+    let scenes = get_global_scene_scopes(&ast);
     assert!(!scenes.is_empty());
 
     let scene = &scenes[0];
