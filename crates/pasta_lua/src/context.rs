@@ -2,7 +2,7 @@
 //!
 //! This module provides context management for the transpilation process.
 
-use pasta_core::parser::{GlobalSceneScope, KeyWords, LocalSceneScope};
+use pasta_core::parser::{Attr, AttrValue, GlobalSceneScope, KeyWords, LocalSceneScope};
 use pasta_core::registry::{SceneRegistry, WordDefRegistry};
 use std::collections::HashMap;
 
@@ -15,6 +15,8 @@ pub struct TranspileContext {
     pub word_registry: WordDefRegistry,
     /// Current module name being processed
     pub current_module: Option<String>,
+    /// File-level attributes accumulated from FileAttr items (MAJOR-1)
+    file_attrs: HashMap<String, AttrValue>,
 }
 
 impl TranspileContext {
@@ -83,6 +85,40 @@ impl TranspileContext {
             self.word_registry
                 .register_local(module_name, &kw.name, kw.words.clone());
         }
+    }
+
+    // =========================================================================
+    // MAJOR-1: ファイル属性累積・マージ機能
+    // =========================================================================
+
+    /// Accumulate file-level attribute (MAJOR-1).
+    ///
+    /// Multiple FileAttr items are processed in order. If the same key
+    /// appears multiple times, the later value overwrites the earlier one
+    /// (shadowing semantics).
+    pub fn accumulate_file_attr(&mut self, attr: &Attr) {
+        self.file_attrs.insert(attr.key.clone(), attr.value.clone());
+    }
+
+    /// Get accumulated file-level attributes.
+    pub fn file_attrs(&self) -> &HashMap<String, AttrValue> {
+        &self.file_attrs
+    }
+
+    /// Merge scene attributes with file attributes (MAJOR-1).
+    ///
+    /// Merge rules:
+    /// 1. Start with all keys from file_attrs as the base
+    /// 2. Overwrite with each key from scene_attrs (scene takes priority)
+    /// 3. Return the merged result as HashMap<String, AttrValue>
+    pub fn merge_attrs(&self, scene_attrs: &[Attr]) -> HashMap<String, AttrValue> {
+        let mut result = self.file_attrs.clone();
+
+        for attr in scene_attrs {
+            result.insert(attr.key.clone(), attr.value.clone());
+        }
+
+        result
     }
 }
 
@@ -181,5 +217,111 @@ mod tests {
         let entries = ctx.word_registry.all_entries();
         assert_eq!(entries.len(), 1);
         assert!(entries[0].key.contains(":メイン_1:場所"));
+    }
+
+    // =========================================================================
+    // MAJOR-1: ファイル属性累積・マージ機能のテスト
+    // =========================================================================
+
+    use pasta_core::parser::{Attr, AttrValue};
+
+    fn create_attr(key: &str, value: &str) -> Attr {
+        Attr {
+            key: key.to_string(),
+            value: AttrValue::AttrString(value.to_string()),
+            span: Span::default(),
+        }
+    }
+
+    #[test]
+    fn test_accumulate_file_attr_basic() {
+        let mut ctx = TranspileContext::new();
+        let attr1 = create_attr("author", "Alice");
+        let attr2 = create_attr("version", "1.0");
+
+        ctx.accumulate_file_attr(&attr1);
+        ctx.accumulate_file_attr(&attr2);
+
+        let attrs = ctx.file_attrs();
+        assert_eq!(attrs.len(), 2);
+        assert_eq!(
+            attrs.get("author"),
+            Some(&AttrValue::AttrString("Alice".to_string()))
+        );
+        assert_eq!(
+            attrs.get("version"),
+            Some(&AttrValue::AttrString("1.0".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_accumulate_file_attr_shadowing() {
+        // シャドーイング: 同じキーの属性が再出現すると上書きされる
+        let mut ctx = TranspileContext::new();
+        let attr1 = create_attr("author", "Alice");
+        let attr2 = create_attr("author", "Bob"); // Alice を上書き
+
+        ctx.accumulate_file_attr(&attr1);
+        ctx.accumulate_file_attr(&attr2);
+
+        let attrs = ctx.file_attrs();
+        assert_eq!(attrs.len(), 1);
+        assert_eq!(
+            attrs.get("author"),
+            Some(&AttrValue::AttrString("Bob".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_merge_attrs_file_only() {
+        let mut ctx = TranspileContext::new();
+        ctx.accumulate_file_attr(&create_attr("author", "Alice"));
+
+        let merged = ctx.merge_attrs(&[]);
+        assert_eq!(merged.len(), 1);
+        assert_eq!(
+            merged.get("author"),
+            Some(&AttrValue::AttrString("Alice".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_merge_attrs_scene_overrides_file() {
+        let mut ctx = TranspileContext::new();
+        ctx.accumulate_file_attr(&create_attr("author", "Alice"));
+        ctx.accumulate_file_attr(&create_attr("version", "1.0"));
+
+        // シーン属性がファイル属性を上書き
+        let scene_attrs = vec![create_attr("author", "Bob")];
+        let merged = ctx.merge_attrs(&scene_attrs);
+
+        assert_eq!(merged.len(), 2);
+        assert_eq!(
+            merged.get("author"),
+            Some(&AttrValue::AttrString("Bob".to_string()))
+        );
+        assert_eq!(
+            merged.get("version"),
+            Some(&AttrValue::AttrString("1.0".to_string()))
+        );
+    }
+
+    #[test]
+    fn test_merge_attrs_scene_adds_new_key() {
+        let mut ctx = TranspileContext::new();
+        ctx.accumulate_file_attr(&create_attr("author", "Alice"));
+
+        let scene_attrs = vec![create_attr("title", "MyScene")];
+        let merged = ctx.merge_attrs(&scene_attrs);
+
+        assert_eq!(merged.len(), 2);
+        assert_eq!(
+            merged.get("author"),
+            Some(&AttrValue::AttrString("Alice".to_string()))
+        );
+        assert_eq!(
+            merged.get("title"),
+            Some(&AttrValue::AttrString("MyScene".to_string()))
+        );
     }
 }

@@ -209,27 +209,16 @@ impl<'i> From<&pest::Span<'i>> for Span {
 /// grammar.pest `file = ( file_scope | global_scene_scope )*` に完全準拠。
 /// ファイル内の全アイテムを記述順序で保持します。
 ///
-/// # Migration Guide (移行ガイド)
-///
-/// 旧APIからの移行:
-/// - `file.file_scope.attrs` → `file.file_attrs()`
-/// - `file.file_scope.words` → `file.words()`
-/// - `file.global_scenes` → `file.global_scene_scopes()`
-///
 /// # 使用例
 ///
 /// ```ignore
-/// // 型別アクセス（ヘルパーメソッド）
-/// let attrs = file.file_attrs();
-/// let words = file.words();
-/// let scenes = file.global_scene_scopes();
-///
-/// // 順序保持アクセス（transpiler2向け）
+/// // 順序保持アクセス（transpiler向け - 推奨）
 /// for item in &file.items {
 ///     match item {
-///         FileItem::FileAttr(attr) => { /* コンテキスト積算 */ }
-///         FileItem::GlobalWord(word) => { /* 単語定義積算 */ }
+///         FileItem::FileAttr(attr) => { /* 属性処理 */ }
+///         FileItem::GlobalWord(word) => { /* 単語定義処理 */ }
 ///         FileItem::GlobalSceneScope(scene) => { /* シーン処理 */ }
+///         FileItem::ActorScope(actor) => { /* アクター処理 */ }
 ///     }
 /// }
 /// ```
@@ -254,70 +243,6 @@ impl PastaFile {
             items: Vec::new(),
             span: Span::default(),
         }
-    }
-
-    /// ファイルレベル属性を取得（FileAttr バリアントのみ抽出）
-    ///
-    /// 複数の file_scope に分散した属性を記述順で返します。
-    pub fn file_attrs(&self) -> Vec<&Attr> {
-        self.items
-            .iter()
-            .filter_map(|item| {
-                if let FileItem::FileAttr(attr) = item {
-                    Some(attr)
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-
-    /// ファイルレベル単語定義を取得（GlobalWord バリアントのみ抽出）
-    ///
-    /// 複数の file_scope に分散した単語定義を記述順で返します。
-    pub fn words(&self) -> Vec<&KeyWords> {
-        self.items
-            .iter()
-            .filter_map(|item| {
-                if let FileItem::GlobalWord(word) = item {
-                    Some(word)
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-
-    /// グローバルシーンを取得（GlobalSceneScope バリアントのみ抽出）
-    ///
-    /// 記述順で全グローバルシーンを返します。
-    pub fn global_scene_scopes(&self) -> Vec<&GlobalSceneScope> {
-        self.items
-            .iter()
-            .filter_map(|item| {
-                if let FileItem::GlobalSceneScope(scene) = item {
-                    Some(scene)
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-
-    /// アクター定義を取得（ActorScope バリアントのみ抽出）
-    ///
-    /// 記述順で全アクター定義を返します。
-    pub fn actor_scopes(&self) -> Vec<&ActorScope> {
-        self.items
-            .iter()
-            .filter_map(|item| {
-                if let FileItem::ActorScope(actor) = item {
-                    Some(actor)
-                } else {
-                    None
-                }
-            })
-            .collect()
     }
 }
 

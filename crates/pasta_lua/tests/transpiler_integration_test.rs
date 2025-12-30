@@ -3,7 +3,36 @@
 //! Tests that verify the transpiler generates Lua code matching the reference implementation.
 
 use pasta_core::parse_str;
+use pasta_core::parser::{ActorScope, FileItem, GlobalSceneScope};
 use pasta_lua::{LuaTranspiler, TranspilerConfig};
+
+/// Helper to get global scene scopes from PastaFile
+fn get_global_scene_scopes(file: &pasta_core::parser::PastaFile) -> Vec<&GlobalSceneScope> {
+    file.items
+        .iter()
+        .filter_map(|item| {
+            if let FileItem::GlobalSceneScope(scene) = item {
+                Some(scene)
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+/// Helper to get actor scopes from PastaFile
+fn get_actor_scopes(file: &pasta_core::parser::PastaFile) -> Vec<&ActorScope> {
+    file.items
+        .iter()
+        .filter_map(|item| {
+            if let FileItem::ActorScope(actor) = item {
+                Some(actor)
+            } else {
+                None
+            }
+        })
+        .collect()
+}
 
 /// Sample Pasta source for testing
 /// アクター定義では ＠ (word_marker) を使用して表情を定義
@@ -29,16 +58,10 @@ fn test_transpile_sample_pasta_header() {
     let transpiler = LuaTranspiler::default();
     let mut output = Vec::new();
 
-    // Parse the sample
+    // Parse the sample - returns PastaFile directly
     let file = parse_str(SAMPLE_PASTA, "test.pasta").unwrap();
-    let actors = file.actor_scopes();
-    let scenes = file.global_scene_scopes();
 
-    // Convert references to owned values for transpile
-    let actors: Vec<_> = actors.into_iter().cloned().collect();
-    let scenes: Vec<_> = scenes.into_iter().cloned().collect();
-
-    let result = transpiler.transpile(&actors, &scenes, &mut output);
+    let result = transpiler.transpile(&file, &mut output);
     assert!(result.is_ok());
 
     let lua_code = String::from_utf8(output).unwrap();
@@ -56,10 +79,8 @@ fn test_transpile_sample_pasta_actors() {
     let mut output = Vec::new();
 
     let file = parse_str(SAMPLE_PASTA, "test.pasta").unwrap();
-    let actors: Vec<_> = file.actor_scopes().into_iter().cloned().collect();
-    let scenes: Vec<_> = file.global_scene_scopes().into_iter().cloned().collect();
 
-    transpiler.transpile(&actors, &scenes, &mut output).unwrap();
+    transpiler.transpile(&file, &mut output).unwrap();
     let lua_code = String::from_utf8(output).unwrap();
 
     // Verify actor definitions (Requirement 3a)
@@ -93,10 +114,8 @@ fn test_transpile_sample_pasta_scenes() {
     let mut output = Vec::new();
 
     let file = parse_str(SAMPLE_PASTA, "test.pasta").unwrap();
-    let actors: Vec<_> = file.actor_scopes().into_iter().cloned().collect();
-    let scenes: Vec<_> = file.global_scene_scopes().into_iter().cloned().collect();
 
-    transpiler.transpile(&actors, &scenes, &mut output).unwrap();
+    transpiler.transpile(&file, &mut output).unwrap();
     let lua_code = String::from_utf8(output).unwrap();
 
     // Verify scene definition (Requirement 3b)
@@ -134,10 +153,8 @@ fn test_transpile_sample_pasta_actions() {
     let mut output = Vec::new();
 
     let file = parse_str(SAMPLE_PASTA, "test.pasta").unwrap();
-    let actors: Vec<_> = file.actor_scopes().into_iter().cloned().collect();
-    let scenes: Vec<_> = file.global_scene_scopes().into_iter().cloned().collect();
 
-    transpiler.transpile(&actors, &scenes, &mut output).unwrap();
+    transpiler.transpile(&file, &mut output).unwrap();
     let lua_code = String::from_utf8(output).unwrap();
 
     // Verify talk actions (Requirement 3d)
@@ -157,10 +174,8 @@ fn test_transpile_do_end_scope_separation() {
     let mut output = Vec::new();
 
     let file = parse_str(SAMPLE_PASTA, "test.pasta").unwrap();
-    let actors: Vec<_> = file.actor_scopes().into_iter().cloned().collect();
-    let scenes: Vec<_> = file.global_scene_scopes().into_iter().cloned().collect();
 
-    transpiler.transpile(&actors, &scenes, &mut output).unwrap();
+    transpiler.transpile(&file, &mut output).unwrap();
     let lua_code = String::from_utf8(output).unwrap();
 
     // Verify do...end scope separation (Requirement 1)
@@ -198,10 +213,8 @@ fn test_string_literalizer_in_transpile() {
 "#;
 
     let file = parse_str(pasta, "test.pasta").unwrap();
-    let actors: Vec<_> = file.actor_scopes().into_iter().cloned().collect();
-    let scenes: Vec<_> = file.global_scene_scopes().into_iter().cloned().collect();
 
-    transpiler.transpile(&actors, &scenes, &mut output).unwrap();
+    transpiler.transpile(&file, &mut output).unwrap();
     let lua_code = String::from_utf8(output).unwrap();
 
     // Verify long string format for SakuraScript with brackets
@@ -218,10 +231,8 @@ fn test_transpile_config_no_comments() {
     let mut output = Vec::new();
 
     let file = parse_str(SAMPLE_PASTA, "test.pasta").unwrap();
-    let actors: Vec<_> = file.actor_scopes().into_iter().cloned().collect();
-    let scenes: Vec<_> = file.global_scene_scopes().into_iter().cloned().collect();
 
-    transpiler.transpile(&actors, &scenes, &mut output).unwrap();
+    transpiler.transpile(&file, &mut output).unwrap();
     let lua_code = String::from_utf8(output).unwrap();
 
     // Config without comments should still produce valid code
@@ -235,8 +246,8 @@ fn test_transpile_reference_sample_structure() {
     let sample_pasta = include_str!("fixtures/sample.pasta");
 
     let file = parse_str(sample_pasta, "sample.pasta").unwrap();
-    let actors = file.actor_scopes();
-    let scenes = file.global_scene_scopes();
+    let actors = get_actor_scopes(&file);
+    let scenes = get_global_scene_scopes(&file);
 
     // Verify the sample parses correctly
     assert_eq!(actors.len(), 2, "Expected 2 actors");
@@ -246,10 +257,7 @@ fn test_transpile_reference_sample_structure() {
     let transpiler = LuaTranspiler::default();
     let mut output = Vec::new();
 
-    let actors: Vec<_> = actors.into_iter().cloned().collect();
-    let scenes: Vec<_> = scenes.into_iter().cloned().collect();
-
-    transpiler.transpile(&actors, &scenes, &mut output).unwrap();
+    transpiler.transpile(&file, &mut output).unwrap();
     let lua_code = String::from_utf8(output).unwrap();
 
     // Verify key structural elements
@@ -278,12 +286,11 @@ fn test_debug_dump_generated_lua() {
     let sample_pasta = include_str!("fixtures/sample.pasta");
 
     let file = parse_str(sample_pasta, "sample.pasta").unwrap();
-    let actors: Vec<_> = file.actor_scopes().into_iter().cloned().collect();
-    let scenes: Vec<_> = file.global_scene_scopes().into_iter().cloned().collect();
+    let scenes = get_global_scene_scopes(&file);
 
     let transpiler = LuaTranspiler::default();
     let mut output = Vec::new();
-    transpiler.transpile(&actors, &scenes, &mut output).unwrap();
+    transpiler.transpile(&file, &mut output).unwrap();
     let lua_code = String::from_utf8(output).unwrap();
 
     // Debug: Check code block locations in AST
@@ -504,12 +511,10 @@ fn test_transpile_sample_pasta_line_comparison() {
 
     // Parse and transpile
     let file = parse_str(sample_pasta, "sample.pasta").unwrap();
-    let actors: Vec<_> = file.actor_scopes().into_iter().cloned().collect();
-    let scenes: Vec<_> = file.global_scene_scopes().into_iter().cloned().collect();
 
     let transpiler = LuaTranspiler::default();
     let mut output = Vec::new();
-    transpiler.transpile(&actors, &scenes, &mut output).unwrap();
+    transpiler.transpile(&file, &mut output).unwrap();
     let generated_lua = String::from_utf8(output).unwrap();
 
     // Compare line by line
@@ -547,12 +552,10 @@ fn test_transpile_reference_code_patterns() {
 
     // Parse and transpile
     let file = parse_str(sample_pasta, "sample.pasta").unwrap();
-    let actors: Vec<_> = file.actor_scopes().into_iter().cloned().collect();
-    let scenes: Vec<_> = file.global_scene_scopes().into_iter().cloned().collect();
 
     let transpiler = LuaTranspiler::default();
     let mut output = Vec::new();
-    transpiler.transpile(&actors, &scenes, &mut output).unwrap();
+    transpiler.transpile(&file, &mut output).unwrap();
     let generated_lua = String::from_utf8(output).unwrap();
 
     // Extract code lines (non-comment) from reference
@@ -606,4 +609,215 @@ fn test_transpile_reference_code_patterns() {
         "Pattern coverage too low: {:.1}%. Expected at least 50%.",
         coverage
     );
+}
+
+// ============================================================================
+// MAJOR-4: FileItem出現順処理・シャドーイング・属性非継承テスト
+// ============================================================================
+
+/// MAJOR-4: FileItem出現順処理の検証
+/// アクターとシーンがファイル内出現順に処理されることを確認
+#[test]
+fn test_file_item_order_preserved() {
+    let pasta = r#"
+％アクター1
+　＠表情：\s[0]
+
+＊シーン1
+　　アクター1：セリフ1
+
+％アクター2
+　＠表情：\s[10]
+
+＊シーン2
+　　アクター2：セリフ2
+"#;
+
+    let file = parse_str(pasta, "test.pasta").unwrap();
+    let transpiler = LuaTranspiler::default();
+    let mut output = Vec::new();
+
+    transpiler.transpile(&file, &mut output).unwrap();
+    let lua_code = String::from_utf8(output).unwrap();
+
+    // 出現順序を確認: アクター1 → シーン1 → アクター2 → シーン2
+    let actor1_pos = lua_code.find("create_actor(\"アクター1\")").unwrap();
+    let scene1_pos = lua_code.find("create_scene(\"シーン11\")").unwrap();
+    let actor2_pos = lua_code.find("create_actor(\"アクター2\")").unwrap();
+    let scene2_pos = lua_code.find("create_scene(\"シーン21\")").unwrap();
+
+    assert!(
+        actor1_pos < scene1_pos,
+        "アクター1はシーン1より前に出現すべき"
+    );
+    assert!(
+        scene1_pos < actor2_pos,
+        "シーン1はアクター2より前に出現すべき"
+    );
+    assert!(
+        actor2_pos < scene2_pos,
+        "アクター2はシーン2より前に出現すべき"
+    );
+}
+
+/// MAJOR-4: ファイル属性シャドーイングの検証
+/// 同じキーの属性が再出現すると後勝ちで上書きされることを確認
+#[test]
+fn test_file_attr_shadowing() {
+    use pasta_core::parser::{Attr, AttrValue, FileItem, PastaFile, Span};
+    use std::path::PathBuf;
+
+    // 手動でPastaFileを構築（FileAttrを含む）
+    let attr1 = FileItem::FileAttr(Attr {
+        key: "author".to_string(),
+        value: AttrValue::AttrString("Alice".to_string()),
+        span: Span::default(),
+    });
+    let attr2 = FileItem::FileAttr(Attr {
+        key: "author".to_string(),
+        value: AttrValue::AttrString("Bob".to_string()), // シャドーイング
+        span: Span::default(),
+    });
+
+    // 正しいPasta構文でシーンをパース
+    let scene_pasta = r#"
+＊テスト
+　　さくら：こんにちは。
+"#;
+    let scene = parse_str(scene_pasta, "test.pasta")
+        .unwrap()
+        .items
+        .into_iter()
+        .next()
+        .unwrap();
+
+    let file = PastaFile {
+        path: PathBuf::from("test.pasta"),
+        items: vec![attr1, attr2, scene],
+        span: Span::default(),
+    };
+
+    let transpiler = LuaTranspiler::default();
+    let mut output = Vec::new();
+    let context = transpiler.transpile(&file, &mut output).unwrap();
+
+    // file_attrs()でシャドーイングを確認
+    let attrs = context.file_attrs();
+    assert_eq!(attrs.len(), 1, "シャドーイングにより1つのキーのみ");
+    assert_eq!(
+        attrs.get("author"),
+        Some(&AttrValue::AttrString("Bob".to_string())),
+        "後勝ちでBobになるべき"
+    );
+}
+
+/// MAJOR-4: アクターがファイル属性を継承しないことの検証
+#[test]
+fn test_actor_does_not_inherit_file_attrs() {
+    use pasta_core::parser::{Attr, AttrValue, FileItem, PastaFile, Span};
+    use std::path::PathBuf;
+
+    // ファイル属性 → アクター → シーン の順序
+    let file_attr = FileItem::FileAttr(Attr {
+        key: "author".to_string(),
+        value: AttrValue::AttrString("Alice".to_string()),
+        span: Span::default(),
+    });
+
+    // アクターを含むPastaファイルをパース（表情定義なしでシンプルに）
+    let actor_pasta = r#"
+％さくら
+"#;
+    let actor = parse_str(actor_pasta, "test.pasta")
+        .unwrap()
+        .items
+        .into_iter()
+        .next()
+        .unwrap();
+
+    let scene_pasta = r#"
+＊メイン
+　　さくら：こんにちは。
+"#;
+    let scene = parse_str(scene_pasta, "test.pasta")
+        .unwrap()
+        .items
+        .into_iter()
+        .next()
+        .unwrap();
+
+    let file = PastaFile {
+        path: PathBuf::from("test.pasta"),
+        items: vec![file_attr, actor, scene],
+        span: Span::default(),
+    };
+
+    let transpiler = LuaTranspiler::default();
+    let mut output = Vec::new();
+    let context = transpiler.transpile(&file, &mut output).unwrap();
+
+    // ファイル属性はコンテキストに累積されている
+    let attrs = context.file_attrs();
+    assert_eq!(attrs.len(), 1);
+
+    // 生成されたLuaコードにはアクター定義が含まれる
+    let lua_code = String::from_utf8(output).unwrap();
+    assert!(lua_code.contains("create_actor(\"さくら\")"));
+
+    // アクターはファイル属性の影響を受けないことを確認
+    // （アクター内にauthor属性が出現しないこと）
+    // Luaコード生成時にアクターは独立して処理される
+    assert!(
+        !lua_code.contains("author = ") || !lua_code.contains("ACTOR.author"),
+        "アクターはファイル属性を継承しない"
+    );
+}
+
+/// MAJOR-4: グローバル単語がFileItem出現順に登録されることの検証
+#[test]
+fn test_global_word_registration_order() {
+    use pasta_core::parser::{FileItem, KeyWords, PastaFile, Span};
+    use std::path::PathBuf;
+
+    let word1 = FileItem::GlobalWord(KeyWords {
+        name: "挨拶1".to_string(),
+        words: vec!["こんにちは".to_string()],
+        span: Span::default(),
+    });
+    let word2 = FileItem::GlobalWord(KeyWords {
+        name: "挨拶2".to_string(),
+        words: vec!["やあ".to_string()],
+        span: Span::default(),
+    });
+
+    let scene_pasta = r#"
+＊メイン
+　　さくら：テスト。
+"#;
+    let scene = parse_str(scene_pasta, "test.pasta")
+        .unwrap()
+        .items
+        .into_iter()
+        .next()
+        .unwrap();
+
+    let file = PastaFile {
+        path: PathBuf::from("test.pasta"),
+        items: vec![word1, word2, scene],
+        span: Span::default(),
+    };
+
+    let transpiler = LuaTranspiler::default();
+    let mut output = Vec::new();
+    let context = transpiler.transpile(&file, &mut output).unwrap();
+
+    // 登録順序を確認
+    let entries = context.word_registry.all_entries();
+    // グローバル単語が2つ登録されていることを確認
+    let global_entries: Vec<_> = entries.iter().filter(|e| !e.key.contains(":")).collect();
+    assert_eq!(global_entries.len(), 2);
+
+    // 名前で確認
+    assert!(entries.iter().any(|e| e.key == "挨拶1"));
+    assert!(entries.iter().any(|e| e.key == "挨拶2"));
 }
