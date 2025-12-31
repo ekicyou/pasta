@@ -3,8 +3,9 @@
 ## ディレクトリ構造
 
 ```
-pasta/                        # Cargo ワークスペースルート
-├── crates/                   # クレート群
+pasta/                        # Cargo ワークスペースルート（Pure Virtual Workspace）
+├── Cargo.toml               # ワークスペース設定のみ（[package] セクションなし）
+├── crates/                  # クレート群
 │   ├── pasta_core/          # 言語非依存層
 │   │   ├── Cargo.toml       # pasta_core設定
 │   │   └── src/
@@ -21,31 +22,41 @@ pasta/                        # Cargo ワークスペースルート
 │   │           ├── scene_table.rs    # SceneTable - シーン検索
 │   │           ├── word_table.rs     # WordTable - 単語検索
 │   │           └── random.rs         # RandomSelector - ランダム選択
-│   └── pasta_rune/          # Rune言語バックエンド層
-│       ├── Cargo.toml       # pasta_rune設定（pasta_core依存）
-│       ├── src/
-│       │   ├── lib.rs       # クレートエントリーポイント、公開API定義
-│       │   ├── engine.rs    # PastaEngine - 上位API層
-│       │   ├── cache.rs     # ParseCache - パース結果キャッシュ
-│       │   ├── loader.rs    # DirectoryLoader - スクリプト読み込み
-│       │   ├── error.rs     # PastaError - ランタイムエラー型定義
-│       │   ├── ir/          # ScriptEvent - IR出力型
-│       │   │   └── mod.rs
-│       │   ├── transpiler/  # トランスパイラレイヤー（AST → Rune、2pass）
-│       │   │   ├── mod.rs   # Transpiler API
-│       │   │   ├── code_generator.rs # Runeコード生成
-│       │   │   ├── context.rs # トランスパイルコンテキスト
-│       │   │   └── error.rs  # トランスパイルエラー型
-│       │   ├── runtime/     # ランタイムレイヤー
-│       │   │   ├── mod.rs   # ランタイムAPI
-│       │   │   ├── generator.rs # ScriptGenerator - Rune VM実行
-│       │   │   └── variables.rs # VariableManager - 変数管理
-│       │   └── stdlib/      # Pasta標準ライブラリ（Rune側関数）
-│       │       ├── mod.rs   # stdlib API登録
-│       │       └── persistence.rs # 永続化API
-│       └── tests/           # pasta_rune統合テスト
-│           ├── common/      # テスト共通ユーティリティ
-│           └── fixtures/    # テスト用Pastaスクリプト
+│   ├── pasta_rune/          # Rune言語バックエンド層（公開API）
+│   │   ├── Cargo.toml       # pasta_rune設定（pasta_core依存）
+│   │   ├── src/
+│   │   │   ├── lib.rs       # クレートエントリーポイント、公開API定義
+│   │   │   ├── engine.rs    # PastaEngine - 上位API層
+│   │   │   ├── cache.rs     # ParseCache - パース結果キャッシュ
+│   │   │   ├── loader.rs    # DirectoryLoader - スクリプト読み込み
+│   │   │   ├── error.rs     # PastaError - ランタイムエラー型定義
+│   │   │   ├── ir/          # ScriptEvent - IR出力型
+│   │   │   │   └── mod.rs
+│   │   │   ├── transpiler/  # トランスパイラレイヤー（AST → Rune、2pass）
+│   │   │   │   ├── mod.rs   # Transpiler API
+│   │   │   │   ├── code_generator.rs # Runeコード生成
+│   │   │   │   ├── context.rs # トランスパイルコンテキスト
+│   │   │   │   └── error.rs  # トランスパイルエラー型
+│   │   │   ├── runtime/     # ランタイムレイヤー
+│   │   │   │   ├── mod.rs   # ランタイムAPI
+│   │   │   │   ├── generator.rs # ScriptGenerator - Rune VM実行
+│   │   │   │   └── variables.rs # VariableManager - 変数管理
+│   │   │   └── stdlib/      # Pasta標準ライブラリ（Rune側関数）
+│   │   │       ├── mod.rs   # stdlib API登録
+│   │   │       └── persistence.rs # 永続化API
+│   │   └── tests/           # pasta_rune統合テスト
+│   │       ├── common/      # テスト共通ユーティリティ
+│   │       └── fixtures/    # テスト用Pastaスクリプト
+│   └── pasta_lua/           # Lua言語バックエンド層
+│       ├── Cargo.toml       # pasta_lua設定（pasta_core依存）
+│       └── src/
+│           ├── lib.rs       # クレートエントリーポイント
+│           ├── config.rs    # 設定管理
+│           ├── code_generator.rs # Lua コード生成
+│           ├── context.rs   # トランスパイルコンテキスト
+│           ├── error.rs     # エラー型
+│           ├── runtime/     # ランタイムレイヤー
+│           └── stdlib/      # Lua標準ライブラリ
 ├── tests/                    # ワークスペースレベル統合テスト
 │   ├── common/              # テスト共通ユーティリティ
 │   └── fixtures/            # テスト用Pastaスクリプト
@@ -57,19 +68,27 @@ pasta/                        # Cargo ワークスペースルート
 │   ├── pasta_engine_*.rs            # エンジンテスト群
 │   ├── pasta_integration_*.rs       # E2E統合テスト群
 │   └── ...
-├── examples/                 # サンプルコード（将来追加）
-├── benches/                  # ベンチマークコード（将来追加）
+├── examples/                 # サンプルコード
+│   ├── scripts/              # Pastaスクリプト例
+│   ├── rune_module_test.rs   # Rune統合例
+│   └── test_*.rs             # 動作確認例
+├── benches/                  # ベンチマークコード
 ├── .kiro/                    # Kiro Spec-Driven設定
 │   ├── steering/            # ステアリング規約
+│   ├── settings/            # テンプレート・ルール
 │   └── specs/               # 仕様管理
 │       ├── completed/       # 完了仕様（アーカイブ）
 │       └── <spec-name>/     # 進行中仕様
-├── Cargo.toml               # Cargo設定
+├── .vscode/                 # VS Code 設定
+├── .github/                 # GitHub Actions, PR テンプレート
 ├── README.md                # プロジェクト概要
 ├── GRAMMAR.md               # Pasta DSL文法リファレンス
+├── SPECIFICATION.md         # 言語仕様書
 ├── LICENSE                  # ライセンス
 └── AGENTS.md                # AI開発支援ドキュメント
 ```
+
+**注**: ルートクレート (`src/`) は削除済み。すべての実装コードは `crates/*/src/` 配下に配置。
 
 ## ファイル命名規則
 

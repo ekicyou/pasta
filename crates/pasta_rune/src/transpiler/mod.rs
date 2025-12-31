@@ -20,9 +20,9 @@
 //! # Example
 //!
 //! ```ignore
-//! use pasta::parser;
-//! use pasta::transpiler::Transpiler2;
-//! use pasta::registry::{SceneRegistry, WordDefRegistry};
+//! use pasta_core::parser;
+//! use pasta_rune::transpiler::Transpiler;
+//! use pasta_core::registry::{SceneRegistry, WordDefRegistry};
 //!
 //! let source = "＊会話\nさくら：こんにちは";
 //! let file = parser::parse_str(source, "test.pasta").unwrap();
@@ -31,8 +31,8 @@
 //! let mut word_registry = WordDefRegistry::new();
 //! let mut output = Vec::new();
 //!
-//! Transpiler2::transpile_pass1(&file, &mut scene_registry, &mut word_registry, &mut output).unwrap();
-//! Transpiler2::transpile_pass2(&scene_registry, &mut output).unwrap();
+//! Transpiler::transpile_pass1(&file, &mut scene_registry, &mut word_registry, &mut output).unwrap();
+//! Transpiler::transpile_pass2(&scene_registry, &mut output).unwrap();
 //! ```
 
 mod code_generator;
