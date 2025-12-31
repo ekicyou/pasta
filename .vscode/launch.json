@@ -1,0 +1,25 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Lua (pasta_lua scripts)",
+      "type": "lua",
+      "request": "launch",
+      "program": "${workspaceFolder}/crates/pasta_lua/scripts/hello.lua",
+      "cwd": "${workspaceFolder}",
+      "stopOnEntry": false,
+      "console": "integratedTerminal",
+      "luaVersion": "lua54"
+    },
+    {
+      "name": "Lua (lua_specs tests)",
+      "type": "lua",
+      "request": "launch",
+      "program": "${workspaceFolder}/crates/pasta_lua/tests/lua_specs/transpiler_spec.lua",
+      "cwd": "${workspaceFolder}",
+      "stopOnEntry": false,
+      "console": "integratedTerminal",
+      "luaVersion": "lua54"
+    }
+  ]
+}
