@@ -30,7 +30,9 @@ pub enum TranspileError {
     InvalidContinuation { span: SpanDisplay },
 
     /// String literal cannot be converted.
-    #[error("String literal cannot be converted at {span}: dangerous pattern detected in all formats")]
+    #[error(
+        "String literal cannot be converted at {span}: dangerous pattern detected in all formats"
+    )]
     StringLiteralError { text: String, span: SpanDisplay },
 
     /// Too many local variables.
@@ -141,10 +143,8 @@ mod tests {
 
     #[test]
     fn test_transpile_error_io() {
-        let err = TranspileError::IoError(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "test error",
-        ));
+        let err =
+            TranspileError::IoError(std::io::Error::new(std::io::ErrorKind::Other, "test error"));
         assert!(format!("{}", err).contains("IO error"));
     }
 

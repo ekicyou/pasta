@@ -6,8 +6,8 @@
 //! - Attribute inheritance patterns
 
 use pasta_rune::parser;
-use pasta_rune::{SceneRegistry, WordDefRegistry};
 use pasta_rune::transpiler::Transpiler2;
+use pasta_rune::{SceneRegistry, WordDefRegistry};
 use std::fs;
 use std::path::PathBuf;
 
@@ -278,4 +278,3 @@ fn test_multiple_files_share_registry() {
     assert!(result.contains("1 =>"));
     assert!(result.contains("2 =>"));
 }
-

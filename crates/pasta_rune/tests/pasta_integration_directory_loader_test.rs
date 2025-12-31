@@ -185,4 +185,3 @@ fn test_label_execution() {
 
     assert!(!events.is_empty(), "Should produce at least one event");
 }
-

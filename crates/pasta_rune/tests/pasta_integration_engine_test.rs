@@ -473,4 +473,3 @@ fn test_engine_lifecycle() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
-

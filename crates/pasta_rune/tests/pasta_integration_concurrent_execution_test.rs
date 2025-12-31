@@ -282,4 +282,3 @@ fn test_thread_local_cache() {
         handle.join().expect("Thread panicked");
     }
 }
-

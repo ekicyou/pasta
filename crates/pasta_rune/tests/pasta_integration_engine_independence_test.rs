@@ -283,4 +283,3 @@ fn test_engine_with_different_scripts() {
     assert!(complex_engine.execute_label("complex").is_ok());
     assert!(complex_engine.execute_label("simple").is_err());
 }
-

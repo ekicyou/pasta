@@ -77,7 +77,10 @@ fn test_register_closure_with_captured_state() {
             }
         }
         Err(e) => {
-            panic!("❌ Closure registration failed: {:?}\nCannot use closures - must use static functions only", e);
+            panic!(
+                "❌ Closure registration failed: {:?}\nCannot use closures - must use static functions only",
+                e
+            );
         }
     }
 }
@@ -141,7 +144,9 @@ fn test_register_function_with_arc_parameter() {
                 Ok(mut result) => {
                     let output = result.complete().expect("Failed to complete");
                     println!("✅ Execution result: {:?}", output);
-                    println!("✅ CONFIRMED: Can use closures with Arc<Mutex<State>> for P1 implementation");
+                    println!(
+                        "✅ CONFIRMED: Can use closures with Arc<Mutex<State>> for P1 implementation"
+                    );
 
                     let final_state = state.lock().unwrap();
                     println!("✅ Final state value: {}", final_state.value);
@@ -231,4 +236,3 @@ fn test_p1_select_scene_to_id_pattern() {
         }
     }
 }
-

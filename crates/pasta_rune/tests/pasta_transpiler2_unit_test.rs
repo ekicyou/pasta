@@ -8,8 +8,8 @@
 //! Note: CodeGenerator internal methods are tested via mod.rs internal tests.
 
 use pasta_rune::parser::{self, FnScope, Span};
-use pasta_rune::{SceneRegistry, WordDefRegistry};
 use pasta_rune::transpiler::{TranspileContext2, TranspileError, Transpiler2};
+use pasta_rune::{SceneRegistry, WordDefRegistry};
 
 // ====================
 // TranspileContext2 Tests
@@ -96,7 +96,9 @@ fn test_context_file_attrs_accumulation() {
     assert_eq!(attrs.len(), 2);
     assert_eq!(
         attrs.get("天気"),
-        Some(&pasta_rune::parser::AttrValue::AttrString("晴れ".to_string()))
+        Some(&pasta_rune::parser::AttrValue::AttrString(
+            "晴れ".to_string()
+        ))
     );
 }
 
@@ -304,4 +306,3 @@ fn test_transpile_global_word_definition() {
     assert_eq!(entries.len(), 1);
     assert_eq!(entries[0].values, vec!["こんにちは", "おはよう"]);
 }
-

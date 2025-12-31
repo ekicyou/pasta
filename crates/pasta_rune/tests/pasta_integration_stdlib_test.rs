@@ -95,4 +95,3 @@ fn test_sync_functions_via_rune() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
-

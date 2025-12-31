@@ -252,7 +252,9 @@ impl<'a, W: Write> CodeGenerator<'a, W> {
                 let escaped = text.replace('\\', "\\\\").replace('"', "\\\"");
                 self.writeln(&format!("yield Talk(\"{}\");", escaped))?;
             }
-            Action::WordRef { name: word_name, .. } => {
+            Action::WordRef {
+                name: word_name, ..
+            } => {
                 self.writeln(&format!(
                     "yield Talk(pasta_stdlib::word(\"{}\", \"{}\", []));",
                     "", // module - empty for now
@@ -280,7 +282,9 @@ impl<'a, W: Write> CodeGenerator<'a, W> {
                 let escaped = script.replace('\\', "\\\\").replace('"', "\\\"");
                 self.writeln(&format!("yield emit_sakura_script(\"{}\");", escaped))?;
             }
-            Action::Escape { sequence: escape, .. } => {
+            Action::Escape {
+                sequence: escape, ..
+            } => {
                 // Extract second character (the escaped character)
                 if let Some(c) = escape.chars().nth(1) {
                     self.writeln(&format!("yield Talk(\"{}\");", c))?;
@@ -418,10 +422,13 @@ mod tests {
         let mut output = Vec::new();
         let mut codegen = CodeGenerator::new(&mut output);
 
-        let action_line = create_action_line("sakura", vec![Action::Talk {
-            text: "hello".to_string(),
-            span: Span::default(),
-        }]);
+        let action_line = create_action_line(
+            "sakura",
+            vec![Action::Talk {
+                text: "hello".to_string(),
+                span: Span::default(),
+            }],
+        );
         let mut last_actor = None;
 
         codegen
@@ -439,10 +446,13 @@ mod tests {
         let mut output = Vec::new();
         let mut codegen = CodeGenerator::new(&mut output);
 
-        let action_line = create_action_line("sakura", vec![Action::Talk {
-            text: "hello".to_string(),
-            span: Span::default(),
-        }]);
+        let action_line = create_action_line(
+            "sakura",
+            vec![Action::Talk {
+                text: "hello".to_string(),
+                span: Span::default(),
+            }],
+        );
         let mut last_actor = Some("sakura".to_string());
 
         codegen

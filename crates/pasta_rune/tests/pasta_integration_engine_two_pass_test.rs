@@ -70,4 +70,3 @@ fn test_engine_execute_label() {
     // Verify events
     assert!(!events.is_empty(), "Should generate events");
 }
-

@@ -3,8 +3,8 @@
 //! These tests verify that Transpiler2 produces appropriate errors for invalid inputs.
 
 use pasta_rune::parser;
-use pasta_rune::{SceneRegistry, WordDefRegistry};
 use pasta_rune::transpiler::{TranspileError, Transpiler2};
+use pasta_rune::{SceneRegistry, WordDefRegistry};
 
 // ============================================================
 // Parse Error Propagation Tests
@@ -355,4 +355,3 @@ fn test_word_definition_many_values() {
     assert!(entry.is_some(), "Word should be registered");
     assert!(entry.unwrap().values.len() > 10, "Should have many values");
 }
-

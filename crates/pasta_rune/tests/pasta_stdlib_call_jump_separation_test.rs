@@ -5,10 +5,10 @@
 //! - Word references use `word()` function which only accesses `WordTable`
 //! - The two dictionaries are completely separate
 
-use pasta_rune::{SceneRegistry, WordDefRegistry};
 use pasta_rune::DefaultRandomSelector;
 use pasta_rune::SceneTable;
 use pasta_rune::runtime::WordTable;
+use pasta_rune::{SceneRegistry, WordDefRegistry};
 use std::collections::HashMap;
 
 /// Helper to create a test SceneTable with scenes
@@ -122,4 +122,3 @@ fn test_separate_dictionaries_integration() {
             .is_err()
     );
 }
-

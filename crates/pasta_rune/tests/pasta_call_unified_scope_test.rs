@@ -300,4 +300,3 @@ fn test_call_local_and_global_same_name() -> Result<(), Box<dyn std::error::Erro
 
     Ok(())
 }
-

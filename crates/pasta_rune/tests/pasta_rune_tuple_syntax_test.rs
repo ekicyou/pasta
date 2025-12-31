@@ -128,4 +128,3 @@ fn test_rune_tuple_as_function_argument() -> Result<(), Box<dyn std::error::Erro
 
     Ok(())
 }
-

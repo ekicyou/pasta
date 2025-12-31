@@ -3,8 +3,8 @@
 //! These tests verify the complete pipeline from .pasta source to executable Rune code.
 
 use pasta_rune::parser;
-use pasta_rune::{SceneRegistry, WordDefRegistry};
 use pasta_rune::transpiler::Transpiler2;
+use pasta_rune::{SceneRegistry, WordDefRegistry};
 
 // ============================================================
 // Basic Transpilation Tests
@@ -394,4 +394,3 @@ fn test_e2e_pasta_wrapper_after_selector() {
         "Selector should come before pasta wrapper"
     );
 }
-

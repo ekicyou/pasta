@@ -85,4 +85,3 @@ fn test_label_resolution_sequential_consumption() {
     let result = engine.execute_label("カウント");
     assert!(result.is_ok(), "First scene should execute");
 }
-

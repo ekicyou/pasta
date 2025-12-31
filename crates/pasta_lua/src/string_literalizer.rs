@@ -169,18 +169,33 @@ mod tests {
     #[test]
     fn test_danger_pattern_n0() {
         assert!(StringLiteralizer::contains_danger_pattern("hello]world", 0));
-        assert!(!StringLiteralizer::contains_danger_pattern("hello world", 0));
+        assert!(!StringLiteralizer::contains_danger_pattern(
+            "hello world",
+            0
+        ));
     }
 
     #[test]
     fn test_danger_pattern_n1() {
-        assert!(StringLiteralizer::contains_danger_pattern("hello]=world", 1));
-        assert!(!StringLiteralizer::contains_danger_pattern("hello]world", 1));
+        assert!(StringLiteralizer::contains_danger_pattern(
+            "hello]=world",
+            1
+        ));
+        assert!(!StringLiteralizer::contains_danger_pattern(
+            "hello]world",
+            1
+        ));
     }
 
     #[test]
     fn test_danger_pattern_n2() {
-        assert!(StringLiteralizer::contains_danger_pattern("hello]==world", 2));
-        assert!(!StringLiteralizer::contains_danger_pattern("hello]=world", 2));
+        assert!(StringLiteralizer::contains_danger_pattern(
+            "hello]==world",
+            2
+        ));
+        assert!(!StringLiteralizer::contains_danger_pattern(
+            "hello]=world",
+            2
+        ));
     }
 }
