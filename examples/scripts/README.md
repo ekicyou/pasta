@@ -94,7 +94,7 @@
 ### Rustコードからの実行
 
 ```rust
-use pasta::PastaEngine;
+use pasta_rune::PastaEngine;
 use std::fs;
 
 // スクリプトファイルを読み込む

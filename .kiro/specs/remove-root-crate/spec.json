@@ -1,0 +1,24 @@
+{
+    "feature_name": "remove-root-crate",
+    "created_at": "2025-12-31T00:00:00Z",
+    "updated_at": "2025-12-31T12:00:00Z",
+    "language": "ja",
+    "phase": "completed",
+    "gap_analysis_generated": true,
+    "approvals": {
+        "requirements": {
+            "generated": true,
+            "approved": true
+        },
+        "design": {
+            "generated": true,
+            "approved": true
+        },
+        "tasks": {
+            "generated": true,
+            "approved": true
+        }
+    },
+    "ready_for_implementation": false,
+    "implementation_completed": true
+}
