@@ -44,7 +44,11 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 - ✅ **pasta-transpiler-variable-expansion** (2025-12-21)
   - 変数スコープ管理（Local/Global）実装完了
   - 20テスト合格、リグレッション0件
-  - [IMPLEMENTATION_COMPLETION_REPORT.md](./.kiro/specs/pasta-transpiler-variable-expansion/IMPLEMENTATION_COMPLETION_REPORT.md)
+  - [IMPLEMENTATION_COMPLETION_REPORT.md](./.kiro/specs/completed/pasta-transpiler-variable-expansion/IMPLEMENTATION_COMPLETION_REPORT.md)
+- ✅ **remove-root-crate** (2025-12-31)
+  - Pure Virtual Workspace 化（ルートクレート削除）
+  - 全タスク完了、182テスト成功
+  - [COMPLETION_REPORT.md](./.kiro/specs/completed/remove-root-crate/COMPLETION_REPORT.md)
 
 **課題**:
 - DSL文法の曖昧性・不完全性
@@ -52,7 +56,7 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 - シーンテーブル設計の不備
 - 要件と実装の乖離
 
-**過去の「完了」仕様**: 12件（実装品質不十分、再評価必要）
+**過去の「完了」仕様**: 31件（完了済み）
 
 ### Phase 1: 基盤確立（未達）
 Phase 0の再構築が完了するまで、基盤確立とは言えない状態。
