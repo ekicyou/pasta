@@ -383,4 +383,3 @@ yield emit_text(text);
         assert!(text[0].contains("Gold: 100"));
     }
 }
-

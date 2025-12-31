@@ -3,32 +3,63 @@
 //! These tests verify the parser2 module implementation using fixtures
 //! and cover all grammar rules defined in grammar.pest.
 
-use pasta_rune::parser::{Attr, ActorScope, Expr, FileItem, GlobalSceneScope, KeyWords, LocalSceneItem, parse_file, parse_str, PastaFile};
+use pasta_rune::parser::{
+    ActorScope, Attr, Expr, FileItem, GlobalSceneScope, KeyWords, LocalSceneItem, PastaFile,
+    parse_file, parse_str,
+};
 use std::path::Path;
 
 fn get_file_attrs(file: &PastaFile) -> Vec<&Attr> {
-    file.items.iter().filter_map(|item| {
-        if let FileItem::FileAttr(attr) = item { Some(attr) } else { None }
-    }).collect()
+    file.items
+        .iter()
+        .filter_map(|item| {
+            if let FileItem::FileAttr(attr) = item {
+                Some(attr)
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
 fn get_words(file: &PastaFile) -> Vec<&KeyWords> {
-    file.items.iter().filter_map(|item| {
-        if let FileItem::GlobalWord(word) = item { Some(word) } else { None }
-    }).collect()
+    file.items
+        .iter()
+        .filter_map(|item| {
+            if let FileItem::GlobalWord(word) = item {
+                Some(word)
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
 fn get_global_scene_scopes(file: &PastaFile) -> Vec<&GlobalSceneScope> {
-    file.items.iter().filter_map(|item| {
-        if let FileItem::GlobalSceneScope(scene) = item { Some(scene) } else { None }
-    }).collect()
+    file.items
+        .iter()
+        .filter_map(|item| {
+            if let FileItem::GlobalSceneScope(scene) = item {
+                Some(scene)
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
 #[allow(dead_code)]
 fn get_actor_scopes(file: &PastaFile) -> Vec<&ActorScope> {
-    file.items.iter().filter_map(|item| {
-        if let FileItem::ActorScope(actor) = item { Some(actor) } else { None }
-    }).collect()
+    file.items
+        .iter()
+        .filter_map(|item| {
+            if let FileItem::ActorScope(actor) = item {
+                Some(actor)
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
 // ============================================================================

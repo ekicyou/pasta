@@ -32,4 +32,3 @@ fn test_simple_rust_function() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(result, 3);
     Ok(())
 }
-

@@ -79,7 +79,10 @@ fn test_module_merge_in_multiple_sources() {
             unit
         }
         Err(e) => {
-            panic!("❌ Compilation failed: {:?}\nThis means Rune does NOT merge modules from different sources", e);
+            panic!(
+                "❌ Compilation failed: {:?}\nThis means Rune does NOT merge modules from different sources",
+                e
+            );
         }
     };
 
@@ -183,4 +186,3 @@ fn test_module_function_overwrite() {
         }
     }
 }
-

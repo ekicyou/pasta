@@ -1,7 +1,7 @@
 {
     "name": "pasta-lua-unit-test-framework",
     "title": "pasta_lua スクリプト層ユニットテストフレームワーク導入",
-    "description": "pasta_lua に Lua デファクトスタンダード テストスイーツ (Busted) を導入し、スクリプト層の品質を確保する。",
+    "description": "pasta_lua に lua-testing-library (Pure Lua, 依存ゼロ) を導入し、スクリプト層の品質を確保する。",
     "priority": "P1",
     "phases": [
         "requirements",
@@ -11,7 +11,7 @@
     ],
     "language": "ja",
     "targetCrate": "pasta_lua",
-    "status": "design-generated",
+    "status": "completed",
     "approvals": {
         "requirements": {
             "generated": true,
@@ -19,8 +19,17 @@
         },
         "design": {
             "generated": true,
-            "approved": false
+            "approved": true
+        },
+        "tasks": {
+            "generated": true,
+            "approved": true
+        },
+        "implementation": {
+            "completed": true,
+            "verified": true
         }
     },
-    "updated_at": "2025-12-31T00:00:00Z"
+    "updated_at": "2025-12-31T00:00:00Z",
+    "completed_at": "2025-12-31T00:00:00Z"
 }

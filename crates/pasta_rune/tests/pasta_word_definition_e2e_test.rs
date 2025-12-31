@@ -260,4 +260,3 @@ fn test_undefined_word_returns_empty_e2e() -> Result<(), Box<dyn std::error::Err
     assert!(!events.is_empty(), "Expected some events");
     Ok(())
 }
-

@@ -87,4 +87,3 @@ fn test_duplicate_labels_id_consistency() {
     println!("✅ Duplicate scene ID consistency verified");
     println!("   Each duplicate has unique ID and resolves correctly");
 }
-

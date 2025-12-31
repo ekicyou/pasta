@@ -116,4 +116,3 @@ fn verify_pasta_input_structure() -> Result<(), Box<dyn std::error::Error>> {
     println!("✅ Pasta入力の構造検証成功");
     Ok(())
 }
-
