@@ -1,4 +1,18 @@
 {
   "Lua.diagnostics.disable": ["unicode-name"],
-  "Lua.runtime.unicodeName": true
+  "Lua.runtime.unicodeName": true,
+  "Lua.runtime.path": [
+    "${workspaceFolder}/crates/pasta_lua/scripts/?.lua",
+    "${workspaceFolder}/crates/pasta_lua/scripts/?/init.lua",
+    "${workspaceFolder}/crates/pasta_lua/scriptlibs/?.lua",
+    "${workspaceFolder}/crates/pasta_lua/scriptlibs/?/init.lua",
+    "?.lua",
+    "?/init.lua"
+  ],
+  "Lua.workspace.library": [
+    "${workspaceFolder}/crates/pasta_lua/scripts",
+    "${workspaceFolder}/crates/pasta_lua/scriptlibs",
+    "${workspaceFolder}/crates/pasta_lua/tests/lua_specs"
+  ],
+  "Lua.diagnostics.globals": ["describe", "test", "expect"]
 }
