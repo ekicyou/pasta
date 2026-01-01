@@ -508,6 +508,8 @@ fn test_transpile_sample_pasta_line_comparison() {
     // Load sample files
     let sample_pasta = include_str!("fixtures/sample.pasta");
     let sample_lua = include_str!("fixtures/sample.lua");
+    // TODO: 実装完了後に sample.expected.lua を作成し、以下のコメントを解除
+    // let sample_expected = include_str!("fixtures/sample.expected.lua");
 
     // Parse and transpile
     let file = parse_str(sample_pasta, "sample.pasta").unwrap();
@@ -516,6 +518,10 @@ fn test_transpile_sample_pasta_line_comparison() {
     let mut output = Vec::new();
     transpiler.transpile(&file, &mut output).unwrap();
     let generated_lua = String::from_utf8(output).unwrap();
+
+    // Save generated output for debugging
+    std::fs::write("tests/fixtures/sample.generated.lua", &generated_lua)
+        .expect("Failed to write sample.generated.lua");
 
     // Compare line by line
     let (mismatches, stats) = compare_lua_output(sample_lua, &generated_lua);
@@ -526,12 +532,14 @@ fn test_transpile_sample_pasta_line_comparison() {
     // Print report for debugging (visible in test output with --nocapture)
     eprintln!("{}", report);
 
-    // Test passes if match rate is above threshold (allowing for minor differences)
+    // TODO: 実装完了後に厳密一致テストを有効化
+    // assert_eq!(generated_lua, sample_expected, "Generated code must match expected output");
+    
     // For now, we verify the comparison runs and report is generated
-    // Full match requirement can be enforced once transpiler is complete
+    // Match rate check is currently lenient; will be replaced with strict equality check
     assert!(
         stats.match_rate() >= 0.0,
-        "Comparison completed. See report above for details."
+        "Comparison completed. See report above for details. Generated output saved to tests/fixtures/sample.generated.lua"
     );
 
     // Report statistics even on success
