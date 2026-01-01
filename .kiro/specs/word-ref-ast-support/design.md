@@ -256,6 +256,42 @@ VarSet
 
 ---
 
+## ⚠️ 重要な制限事項
+
+本仕様で導入される word_ref 構文はパース可能ですが、**トランスパイラー層でコード生成されません**。
+
+```
+＄場所＝＠場所  # パース成功 → SetValue::WordRef { name: "場所" }
+           ↓
+           (コード生成なし)
+           ↓
+           実行結果に影響なし
+```
+
+SetValue::WordRef を含むスクリプト実行結果は、word_ref を含まないスクリプトと同じになります。word_ref のセマンティクス実装（変数に単語を割り当てるロジック）は**別仕様**で扱うため、本仕様では無視することが設計です。
+
+---
+
+## Grammar Integration
+
+### grammar.pest の set ルール（参照）
+
+```pest
+set = _{ id ~ s ~ set_marker ~ s ~ ( expr | word_ref ) }
+word_ref = { word_marker ~ id ~ s}
+```
+
+- `set` ルールは括弧で明示的に `( expr | word_ref )` をグループ化
+- Pest PEGパーサーは順序的に `expr` を先に試行
+- `expr` は `term ~ s ~ bin*` で定義され、term は paren_expr, fn_call, var_ref, number_literal, string_literal のいずれか
+- word_ref（`@id`）はこれらに該当しないため、自動的に word_ref ルールが選ばれる
+
+### parse_var_set での処理と grammar.pest の整合性
+
+parse_var_set で `inner.peek() == Some(Rule::word_ref)` により word_ref を検出することは、grammar.pest の構造に対して**安全**です。expr として吸収される可能性はありません。
+
+---
+
 ## Requirements Traceability
 
 | Requirement ID | Component | Implementation Details |
@@ -274,28 +310,46 @@ VarSet
 | Risk | Likelihood | Impact | Mitigation |
 |------|------------|--------|------------|
 | VarSet.value 使用箇所の見落とし | Low | Low | コンパイルエラーで検出 |
-| word_ref を含むスクリプトの無視 | Medium | Medium | ドキュメント化、将来仕様への参照 |
+| word_ref を含むスクリプトの無視 | Medium | Medium | 本ドキュメントの「重要な制限事項」で明示 |
 | parse_var_set の複雑度増加 | Low | Low | 明確な分岐処理、コメント |
 
 ---
 
 ## Test Strategy
 
-### Unit Tests
+### Unit Tests - パーサー層（pasta_core）
+
+#### word_ref パース テスト
+
+| Test Case | Description | Expected Result | Acceptance |
+|-----------|-------------|-----------------|------------|
+| parse_word_ref_simple | `＄場所＝＠場所` をパース | SetValue::WordRef { name: "場所" } | name フィールドが `@` を除去して "場所" |
+| parse_word_ref_unicode | `＄敵＝＠敵1` をパース | SetValue::WordRef { name: "敵1" } | UNICODE 識別子と数字の組み合わせを支持 |
+| parse_word_ref_underscore | `＄x＝＠long_name` をパース | SetValue::WordRef { name: "long_name" } | アンダースコアを含む識別子を支持 |
+
+#### expr パース テスト
 
 | Test Case | Description | Expected Result |
 |-----------|-------------|-----------------|
-| parse_word_ref_in_var_set | `＄場所＝＠場所` をパース | SetValue::WordRef { name: "場所" } |
-| parse_expr_in_var_set | `＄場所＝"東京"` をパース | SetValue::Expr(Expr::String("東京")) |
-| generate_var_set_with_expr | SetValue::Expr のコード生成 | 既存と同じ出力 |
-| generate_var_set_with_word_ref | SetValue::WordRef のコード生成 | 空文字列 |
+| parse_expr_integer_in_var_set | `＄x＝123` をパース | SetValue::Expr(Expr::Integer(123)) |
+| parse_expr_string_in_var_set | `＄y＝"東京"` をパース | SetValue::Expr(Expr::String("東京")) |
+| parse_expr_var_ref_in_var_set | `＄z＝＄x` をパース | SetValue::Expr(Expr::VarRef(...)) |
+| parse_expr_binary_in_var_set | `＄result＝10＋20` をパース | SetValue::Expr(Expr::Binary(...)) |
+
+### Unit Tests - コード生成層（pasta_rune）
+
+| Test Case | Description | Expected Result |
+|-----------|-------------|-----------------|
+| generate_var_set_with_expr | SetValue::Expr のコード生成 | 既存の generate_expr と同じ出力 |
+| generate_var_set_with_word_ref | SetValue::WordRef のコード生成 | 空文字列または無視（本仕様の設計） |
 
 ### Integration Tests
 
 | Test Case | Description | Expected Result |
 |-----------|-------------|-----------------|
-| existing_tests_pass | 既存テストスイートの実行 | 全テスト通過 |
-| word_ref_syntax_roundtrip | word_ref を含むスクリプトのパース→AST検証 | 正しい AST 構造 |
+| existing_tests_pass | 既存全テストスイート（cargo test --all） | 全テスト通過、リグレッション 0 件 |
+| word_ref_in_script | word_ref を含む .pasta スクリプト | パース成功、AST に SetValue::WordRef を格納 |
+| word_ref_roundtrip | word_ref パース → AST → Rune トランスパイル | パーサー: 成功、トランスパイラー: コード生成なし |
 
 ---
 
