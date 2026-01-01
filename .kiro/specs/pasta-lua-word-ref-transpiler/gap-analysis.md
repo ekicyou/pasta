@@ -37,21 +37,6 @@ pub enum SetValue {
 
 ✅ **完了**: パーサーは既に `＄変数＝＠単語` を `SetValue::WordRef` としてパース可能
 
-#### pasta_rune（Rune バックエンド）
-
-**実装状態**: `crates/pasta_rune/src/transpiler/code_generator.rs:197-204`
-
-```rust
-SetValue::WordRef { name } => {
-    return Err(TranspileError::unimplemented(format!(
-        "WordRef '@{}' in VarSet is not yet implemented. ...",
-        name
-    )));
-}
-```
-
-❌ **未実装**: Runeバックエンドも同様に未実装（将来実装予定）
-
 #### pasta_lua（Lua バックエンド）
 
 **実装状態**: `crates/pasta_lua/src/code_generator.rs:300-307`
@@ -235,7 +220,7 @@ SetValue::WordRef { name } => {
 ✅ **Pros**:
 - 既存パターン（SetValue::Expr）と完全に並行
 - 最小変更（単一メソッド内の分岐追加）
-- pasta_core, pasta_rune の設計思想と整合
+- pasta_core の設計思想と整合
 - テストフィクスチャ `sample.lua` の期待値と一致
 
 ❌ **Cons**:
@@ -302,16 +287,15 @@ SetValue::WordRef { name } => {
   self.write_raw(&format!("{} = act:word(\"{}\")", var_path, name.escape_default()))?;
   ```
 
-### 4.3 pasta_rune との実装統一
+### 4.3 実装の一貫性
 
-**調査必要性**: Low
+**調査必要性**: None
 
-- **現状**: pasta_rune も未実装だが、エラーメッセージは類似
-- **設計思想**: pasta_lua と pasta_rune は独立したバックエンド（統一不要）
+- **現状**: pasta_lua が唯一のバックエンド実装（pasta_rune は廃止予定）
+- **設計思想**: pasta_core の AST 定義に準拠
 
 **推奨対応**:
-- pasta_lua の実装完了後、pasta_rune への横展開は別仕様で対応
-- 本仕様では pasta_lua のみに集中
+- pasta_lua の実装に集中
 
 ---
 
@@ -348,7 +332,7 @@ SetValue::WordRef { name } => {
 | **Luaランタイム未実装** | None | 別仕様対応、本仕様はトランスパイルのみ |
 
 **総合リスク**: Low  
-**根拠**: 明確な仕様、既存パターン踏襲、テスト基盤完備
+**根拠**: 明確な仕様、既存パターン踏襲、テスト基盤完備、pasta_lua に集中可能
 
 ---
 
@@ -381,13 +365,11 @@ SetValue::WordRef { name } => {
    - エラーケース: ✅ 不要（既存のArgs代入エラーで対応）
 
 **Priority: Low**
-3. **pasta_rune への横展開計画**
-   - 本仕様完了後、Runeバックエンドへの同等実装
-   - 別仕様として切り出す可能性
-
 4. **Luaランタイム `act:word()` 実装**
    - 本仕様の対象外（別仕様で実装予定）
    - トランスパイル機能実装後に着手推奨
+
+**Note**: pasta_rune は廃止予定のため、横展開計画は不要
 
 ---
 
@@ -450,15 +432,6 @@ SetValue::WordRef { name } => {
 
 `crates/pasta_core/src/parser/ast.rs:671-677`
 
-```rust
-pub enum SetValue {
-    Expr(Expr),
-    WordRef { name: String },
-}
-```
-
-### B. pasta_lua 現在の実装
-
 `crates/pasta_lua/src/code_generator.rs:281-309`
 
 ```rust
@@ -494,7 +467,7 @@ fn generate_var_set(&mut self, var_set: &VarSet) -> Result<(), TranspileError> {
 }
 ```
 
-### C. 期待される実装（設計案）
+### B. pasta_lua 現在の実装
 
 ```rust
 SetValue::WordRef { name } => {
@@ -504,7 +477,7 @@ SetValue::WordRef { name } => {
 }
 ```
 
-### D. テストフィクスチャ期待値
+### C. 期待される実装（設計案）
 
 `crates/pasta_lua/tests/fixtures/sample.lua:180`
 
@@ -513,6 +486,4 @@ SetValue::WordRef { name } => {
 var.場所 = act:word("場所")
 ```
 
----
-
-**分析完了**: このギャップ分析に基づき、設計フェーズで詳細な技術設計を策定してください。
+### D. テストフィクスチャ期待値
