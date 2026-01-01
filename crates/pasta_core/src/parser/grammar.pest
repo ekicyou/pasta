@@ -86,7 +86,7 @@ var_ref_global = { var_marker ~ global_marker ~ id     ~ s }
 var_set        =_{ var_set_global | var_set_local }
 var_set_local  = { var_marker                 ~ set }
 var_set_global = { var_marker ~ global_marker ~ set }
-set            =_{ id ~ s ~ set_marker ~ s ~ expr }
+set            =_{ id ~ s ~ set_marker ~ s ~ ( expr | word_ref ) }
 
 // ################################################# fn_call
 fn_call        =_{ fn_call_global | fn_call_local }

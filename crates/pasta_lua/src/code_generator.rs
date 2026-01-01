@@ -5,7 +5,7 @@
 
 use pasta_core::parser::{
     Action, ActionLine, ActorScope, Args, AttrValue, CallScene, CodeBlock, ContinueAction, Expr,
-    GlobalSceneScope, LocalSceneItem, LocalSceneScope, VarScope, VarSet,
+    GlobalSceneScope, LocalSceneItem, LocalSceneScope, SetValue, VarScope, VarSet,
 };
 use pasta_core::registry::SceneRegistry;
 
@@ -291,10 +291,21 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             }
         };
 
-        self.write_indent()?;
-        self.write_raw(&format!("{} = ", var_path))?;
-        self.generate_expr(&var_set.value)?;
-        writeln!(self.writer)?;
+        match &var_set.value {
+            SetValue::Expr(expr) => {
+                self.write_indent()?;
+                self.write_raw(&format!("{} = ", var_path))?;
+                self.generate_expr(expr)?;
+                writeln!(self.writer)?;
+            }
+            SetValue::WordRef { name } => {
+                // word_ref semantics not yet implemented - return unsupported error
+                return Err(TranspileError::unsupported(
+                    &var_set.span,
+                    &format!("WordRef '@{}' in VarSet is not yet implemented", name),
+                ));
+            }
+        }
 
         Ok(())
     }
