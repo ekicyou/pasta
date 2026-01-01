@@ -543,7 +543,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                 let args_str = self.generate_args_string(args)?;
                 let prefix = match scope {
                     pasta_core::parser::FnScope::Local => "SCENE:",
-                    pasta_core::parser::FnScope::Global => "SCENE:",
+                    pasta_core::parser::FnScope::Global => "SCENE.",
                 };
                 write!(
                     buf,
