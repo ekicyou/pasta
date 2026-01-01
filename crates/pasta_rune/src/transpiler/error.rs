@@ -35,6 +35,13 @@ pub enum TranspileError {
         location: String,
     },
 
+    /// Unimplemented feature.
+    #[error("未実装機能: {message}")]
+    Unimplemented {
+        /// Description of the unimplemented feature
+        message: String,
+    },
+
     /// IO error during code generation.
     #[error("IO エラー: {0}")]
     IoError(#[from] std::io::Error),
@@ -64,6 +71,13 @@ impl TranspileError {
     pub fn invalid_continuation(span: &Span) -> Self {
         TranspileError::InvalidContinuation {
             location: Self::span_to_location(span),
+        }
+    }
+
+    /// Create an Unimplemented error.
+    pub fn unimplemented(message: impl Into<String>) -> Self {
+        TranspileError::Unimplemented {
+            message: message.into(),
         }
     }
 

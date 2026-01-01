@@ -4,7 +4,7 @@
 
 use pasta_core::parser::{
     Action, ActionLine, CallScene, CodeBlock, ContinueAction, Expr, GlobalSceneScope,
-    LocalSceneItem, LocalSceneScope, VarScope, VarSet,
+    LocalSceneItem, LocalSceneScope, SetValue, VarScope, VarSet,
 };
 use pasta_core::registry::SceneRegistry;
 
@@ -187,10 +187,21 @@ impl<'a, W: Write> CodeGenerator<'a, W> {
             }
         };
 
-        self.write_indent()?;
-        self.write_raw(&format!("{} = ", var_path))?;
-        self.generate_expr(&var_set.value)?;
-        writeln!(self.writer, ";")?;
+        match &var_set.value {
+            SetValue::Expr(expr) => {
+                self.write_indent()?;
+                self.write_raw(&format!("{} = ", var_path))?;
+                self.generate_expr(expr)?;
+                writeln!(self.writer, ";")?;
+            }
+            SetValue::WordRef { name } => {
+                // word_ref semantics not yet implemented - return unimplemented error
+                return Err(TranspileError::unimplemented(format!(
+                    "WordRef '@{}' in VarSet is not yet implemented. Implement in a future specification.",
+                    name
+                )));
+            }
+        }
 
         Ok(())
     }
@@ -518,7 +529,7 @@ mod tests {
         let var_set = VarSet {
             name: "x".to_string(),
             scope: VarScope::Local,
-            value: Expr::Integer(10),
+            value: SetValue::Expr(Expr::Integer(10)),
             span: Span::default(),
         };
         codegen.generate_var_set(&var_set).unwrap();

@@ -509,8 +509,8 @@ pub struct VarSet {
     pub name: String,
     /// Variable scope
     pub scope: VarScope,
-    /// Value expression
-    pub value: Expr,
+    /// Value (expression or word reference)
+    pub value: SetValue,
     /// Source location
     pub span: Span,
 }
@@ -597,7 +597,7 @@ pub struct KeyWords {
 /// Argument list.
 ///
 /// Corresponds to the `args` rule: `(arg1, arg2, ...)`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Args {
     /// List of arguments
     pub items: Vec<Arg>,
@@ -616,7 +616,7 @@ impl Args {
 }
 
 /// Single argument (positional or keyword).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Arg {
     /// Positional argument
     Positional(Expr),
@@ -631,7 +631,7 @@ pub enum Arg {
 /// Expression types.
 ///
 /// Corresponds to the `expr` rule and its alternatives.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     /// Integer literal (no decimal point)
     Integer(i64),
@@ -657,6 +657,22 @@ pub enum Expr {
         lhs: Box<Expr>,
         rhs: Box<Expr>,
     },
+}
+
+// ============================================================================
+// SetValue - VarSet value type
+// ============================================================================
+
+/// Value type for variable assignment (VarSet).
+///
+/// Corresponds to grammar.pest's `set = ( expr | word_ref )`.
+/// Distinguishes whether the right-hand side is an expression or a word reference.
+#[derive(Debug, Clone, PartialEq)]
+pub enum SetValue {
+    /// Expression value (numbers, strings, variable references, function calls, binary operations, etc.)
+    Expr(Expr),
+    /// Word reference (`@word_name` form)
+    WordRef { name: String },
 }
 
 // ============================================================================

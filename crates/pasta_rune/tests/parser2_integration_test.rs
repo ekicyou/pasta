@@ -5,7 +5,7 @@
 
 use pasta_rune::parser::{
     ActorScope, Attr, Expr, FileItem, GlobalSceneScope, KeyWords, LocalSceneItem, PastaFile,
-    parse_file, parse_str,
+    SetValue, parse_file, parse_str,
 };
 use std::path::Path;
 
@@ -302,7 +302,7 @@ fn test_half_width_integer() {
     let file = result.unwrap();
     let item = &get_global_scene_scopes(&file)[0].local_scenes[0].items[0];
     if let LocalSceneItem::VarSet(vs) = item {
-        assert!(matches!(vs.value, Expr::Integer(123)));
+        assert!(matches!(vs.value, SetValue::Expr(Expr::Integer(123))));
     } else {
         panic!("Expected VarSet");
     }
@@ -318,7 +318,7 @@ fn test_full_width_integer() {
     let file = result.unwrap();
     let item = &get_global_scene_scopes(&file)[0].local_scenes[0].items[0];
     if let LocalSceneItem::VarSet(vs) = item {
-        assert!(matches!(vs.value, Expr::Integer(123)));
+        assert!(matches!(vs.value, SetValue::Expr(Expr::Integer(123))));
     } else {
         panic!("Expected VarSet");
     }
@@ -732,5 +732,74 @@ fn test_span_information_preserved() {
                 assert!(actor.span.start_line > 0 || actor.span.start_col > 0);
             }
         }
+    }
+}
+
+// ============================================================================
+// SetValue / WordRef Tests (word-ref-ast-support)
+// ============================================================================
+
+#[test]
+fn test_word_ref_parse_in_var_set() {
+    // word_ref 構文 ($変数 = @単語参照) がパースできることを検証
+    let source = r#"＊テスト
+  $場所＝@場所
+"#;
+    let result = parse_str(source, "word_ref.pasta");
+    assert!(result.is_ok(), "word_ref構文のパースに成功すること");
+    let file = result.unwrap();
+    let item = &get_global_scene_scopes(&file)[0].local_scenes[0].items[0];
+    if let LocalSceneItem::VarSet(vs) = item {
+        // SetValue::WordRef であることを確認
+        match &vs.value {
+            SetValue::WordRef { name } => {
+                assert_eq!(name, "場所", "word_refの名前が正しく抽出されていること");
+            }
+            _ => panic!("Expected SetValue::WordRef, got {:?}", vs.value),
+        }
+    } else {
+        panic!("Expected VarSet");
+    }
+}
+
+#[test]
+fn test_word_ref_parse_unicode_name() {
+    // UNICODE識別子を持つword_refがパースできること
+    let source = r#"＊テスト
+  $挨拶文＝@挨拶
+"#;
+    let result = parse_str(source, "word_ref_unicode.pasta");
+    assert!(result.is_ok());
+    let file = result.unwrap();
+    let item = &get_global_scene_scopes(&file)[0].local_scenes[0].items[0];
+    if let LocalSceneItem::VarSet(vs) = item {
+        match &vs.value {
+            SetValue::WordRef { name } => {
+                assert_eq!(name, "挨拶");
+            }
+            _ => panic!("Expected SetValue::WordRef"),
+        }
+    } else {
+        panic!("Expected VarSet");
+    }
+}
+
+#[test]
+fn test_set_value_expr_still_works() {
+    // 既存のexpr代入が引き続きSetValue::Exprでラップされること
+    let source = r#"＊テスト
+  $x＝42
+"#;
+    let result = parse_str(source, "set_value_expr.pasta");
+    assert!(result.is_ok());
+    let file = result.unwrap();
+    let item = &get_global_scene_scopes(&file)[0].local_scenes[0].items[0];
+    if let LocalSceneItem::VarSet(vs) = item {
+        match &vs.value {
+            SetValue::Expr(Expr::Integer(42)) => {}
+            _ => panic!("Expected SetValue::Expr(Integer(42)), got {:?}", vs.value),
+        }
+    } else {
+        panic!("Expected VarSet");
     }
 }

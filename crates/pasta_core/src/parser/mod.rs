@@ -576,6 +576,7 @@ fn parse_var_set(pair: Pair<Rule>) -> Result<VarSet, ParseError> {
     let mut name = String::new();
     let mut terms: Vec<Expr> = Vec::new();
     let mut operators: Vec<BinOp> = Vec::new();
+    let mut word_ref_name: Option<String> = None;
 
     for inner in pair.into_inner() {
         match inner.as_rule() {
@@ -583,6 +584,16 @@ fn parse_var_set(pair: Pair<Rule>) -> Result<VarSet, ParseError> {
                 // The first id is the variable name
                 if name.is_empty() {
                     name = inner.as_str().to_string();
+                }
+            }
+            Rule::word_ref => {
+                // word_ref = { word_marker ~ id ~ s }
+                // word_marker is a hidden rule, so only id is in inner pairs
+                for word_inner in inner.into_inner() {
+                    if word_inner.as_rule() == Rule::id {
+                        word_ref_name = Some(word_inner.as_str().to_string());
+                        break;
+                    }
                 }
             }
             Rule::add_op => operators.push(BinOp::Add),
@@ -599,21 +610,28 @@ fn parse_var_set(pair: Pair<Rule>) -> Result<VarSet, ParseError> {
         }
     }
 
-    // Build left-associative binary expression
-    let value = if terms.is_empty() {
-        Expr::BlankString
+    // Build value based on whether we have word_ref or expr
+    let value = if let Some(ref_name) = word_ref_name {
+        // word_ref was detected
+        SetValue::WordRef { name: ref_name }
     } else {
-        let mut result = terms.remove(0);
-        for (i, op) in operators.into_iter().enumerate() {
-            if i < terms.len() {
-                result = Expr::Binary {
-                    op,
-                    lhs: Box::new(result),
-                    rhs: Box::new(terms[i].clone()),
-                };
+        // Build left-associative binary expression
+        let expr = if terms.is_empty() {
+            Expr::BlankString
+        } else {
+            let mut result = terms.remove(0);
+            for (i, op) in operators.into_iter().enumerate() {
+                if i < terms.len() {
+                    result = Expr::Binary {
+                        op,
+                        lhs: Box::new(result),
+                        rhs: Box::new(terms[i].clone()),
+                    };
+                }
             }
-        }
-        result
+            result
+        };
+        SetValue::Expr(expr)
     };
 
     Ok(VarSet {
