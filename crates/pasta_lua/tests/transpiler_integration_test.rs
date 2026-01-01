@@ -508,8 +508,7 @@ fn test_transpile_sample_pasta_line_comparison() {
     // Load sample files
     let sample_pasta = include_str!("fixtures/sample.pasta");
     let sample_lua = include_str!("fixtures/sample.lua");
-    // TODO: 実装完了後に sample.expected.lua を作成し、以下のコメントを解除
-    // let sample_expected = include_str!("fixtures/sample.expected.lua");
+    let sample_expected = include_str!("fixtures/sample.expected.lua");
 
     // Parse and transpile
     let file = parse_str(sample_pasta, "sample.pasta").unwrap();
@@ -532,9 +531,12 @@ fn test_transpile_sample_pasta_line_comparison() {
     // Print report for debugging (visible in test output with --nocapture)
     eprintln!("{}", report);
 
-    // TODO: 実装完了後に厳密一致テストを有効化
-    // assert_eq!(generated_lua, sample_expected, "Generated code must match expected output");
-    
+    // Strict equality check with expected output
+    assert_eq!(
+        generated_lua, sample_expected,
+        "Generated code must match expected output"
+    );
+
     // For now, we verify the comparison runs and report is generated
     // Match rate check is currently lenient; will be replaced with strict equality check
     assert!(

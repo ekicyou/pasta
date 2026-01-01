@@ -299,11 +299,8 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                 writeln!(self.writer)?;
             }
             SetValue::WordRef { name } => {
-                // word_ref semantics not yet implemented - return unsupported error
-                return Err(TranspileError::unsupported(
-                    &var_set.span,
-                    &format!("WordRef '@{}' in VarSet is not yet implemented", name),
-                ));
+                // Generate: var.変数名 = act:word("単語名") or save.変数名 = act:word("単語名")
+                self.writeln(&format!("{} = act:word(\"{}\")", var_path, name))?;
             }
         }
 
@@ -617,7 +614,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pasta_core::parser::Span;
+    use pasta_core::parser::{SetValue, Span, VarSet};
 
     #[allow(dead_code)]
     fn create_action_line(actor: &str, actions: Vec<Action>) -> ActionLine {
@@ -731,5 +728,110 @@ mod tests {
 
         let result = String::from_utf8(output).unwrap();
         assert!(result.contains("local PASTA = require \"pasta.runtime\""));
+    }
+
+    // ========================================================================
+    // VarSet with WordRef tests (Requirement 1.1, 1.2, 1.3, 4.1)
+    // ========================================================================
+
+    #[test]
+    fn test_generate_var_set_wordref_local() {
+        let mut output = Vec::new();
+        let mut codegen = LuaCodeGenerator::new(&mut output);
+
+        let var_set = VarSet {
+            name: "場所".to_string(),
+            scope: VarScope::Local,
+            value: SetValue::WordRef {
+                name: "場所".to_string(),
+            },
+            span: Span::default(),
+        };
+        codegen.generate_var_set(&var_set).unwrap();
+
+        let result = String::from_utf8(output).unwrap();
+        assert!(
+            result.contains("var.場所 = act:word(\"場所\")"),
+            "Expected 'var.場所 = act:word(\"場所\")' but got: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_generate_var_set_wordref_global() {
+        let mut output = Vec::new();
+        let mut codegen = LuaCodeGenerator::new(&mut output);
+
+        let var_set = VarSet {
+            name: "グローバル".to_string(),
+            scope: VarScope::Global,
+            value: SetValue::WordRef {
+                name: "単語".to_string(),
+            },
+            span: Span::default(),
+        };
+        codegen.generate_var_set(&var_set).unwrap();
+
+        let result = String::from_utf8(output).unwrap();
+        assert!(
+            result.contains("save.グローバル = act:word(\"単語\")"),
+            "Expected 'save.グローバル = act:word(\"単語\")' but got: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_generate_var_set_wordref_args_error() {
+        let mut output = Vec::new();
+        let mut codegen = LuaCodeGenerator::new(&mut output);
+
+        let var_set = VarSet {
+            name: "0".to_string(),
+            scope: VarScope::Args(0),
+            value: SetValue::WordRef {
+                name: "単語".to_string(),
+            },
+            span: Span::default(),
+        };
+        let result = codegen.generate_var_set(&var_set);
+
+        assert!(
+            result.is_err(),
+            "Expected error for Args scope WordRef assignment"
+        );
+        let err = result.unwrap_err();
+        match err {
+            TranspileError::InvalidAst { message, .. } => {
+                assert!(
+                    message.contains("Cannot assign to scene argument"),
+                    "Expected 'Cannot assign to scene argument' error but got: {}",
+                    message
+                );
+            }
+            _ => panic!("Expected InvalidAst error but got: {:?}", err),
+        }
+    }
+
+    #[test]
+    fn test_generate_var_set_expr_still_works() {
+        use pasta_core::parser::Expr;
+
+        let mut output = Vec::new();
+        let mut codegen = LuaCodeGenerator::new(&mut output);
+
+        let var_set = VarSet {
+            name: "カウンタ".to_string(),
+            scope: VarScope::Local,
+            value: SetValue::Expr(Expr::Integer(10)),
+            span: Span::default(),
+        };
+        codegen.generate_var_set(&var_set).unwrap();
+
+        let result = String::from_utf8(output).unwrap();
+        assert!(
+            result.contains("var.カウンタ = 10"),
+            "Expected 'var.カウンタ = 10' but got: {}",
+            result
+        );
     }
 }
