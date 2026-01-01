@@ -182,7 +182,7 @@ do
         -- 　　　＄＊グローバル＝＠関数（２+１）
         -- 意図: グローバル変数（＄＊変数名）は save.変数名 に代入（Requirement 3d）
         --       関数呼び出し（＠関数）は SCENE.関数(ctx, 引数...) 形式で宣言、呼び出しは : で実行（Requirement 3d）
-        save.グローバル = SCENE:関数(ctx, 2 + 1)
+        save.グローバル = SCENE.関数(ctx, 2 + 1)
 
         -- 　　　＄場所＝＠場所
         -- 意図: WordRef代入（＄変数＝＠単語）は var.変数名 = act:word("単語名") 形式で出力（Requirement 3d）
