@@ -394,7 +394,41 @@ parse_var_set で `inner.peek() == Some(Rule::word_ref)` により word_ref を�
 4. **tests/parser2_integration_test.rs**
    - vs.value のパターンマッチ更新（4箇所）
 
-### マイグレーション手順
+### ビルドエラー対応方針（実装時）
+
+VarSet.value の型が Expr から SetValue に変更されることにより、多くのコンパイルエラーが発生します。対応方針は以下の通りです：
+
+#### 原則：既存テストはすべて SetValue::Expr でラップ
+
+既存テストではすべて expr 入力（数値、文字列、変数参照など）のみが使用されているため、以下の対応で統一します：
+
+```rust
+// Before（既存）
+if let Expr::Integer(n) = vs.value { ... }
+VarSet { name, scope, value: Expr::Integer(10), span }
+
+// After（修正）
+if let SetValue::Expr(Expr::Integer(n)) = &vs.value { ... }
+VarSet { name, scope, value: SetValue::Expr(Expr::Integer(10)), span }
+```
+
+#### 手順
+
+1. **VarSet.value 型変更後、cargo check --all で全エラー抽出**
+2. **既存のパターンマッチ箇所**: SetValue::Expr でラップ
+3. **既存の VarSet リテラル作成**: value フィールドを SetValue::Expr でラップ
+4. **新規テスト追加**: word_ref パース、コード生成エラーのテストを追加
+5. **cargo test --all で全テスト実行**: 既存テスト（expr パスのみ）が通ることを確認
+
+#### 留意事項
+
+- **word_ref 入力を含むテストは不要**: 本仕様では word_ref のセマンティクス実装がないため、既存テストに word_ref 入力は存在しない
+- **型安全性**: コンパイルエラーで漏れなく修正箇所が検出されるため、見落としのリスクは低い
+- **文法整合性**: grammar.pest で `set = ( expr | word_ref )` と分離されているため、expr テストでは SetValue::Expr パターンしてマッチしない
+
+---
+
+## マイグレーション手順
 
 ```rust
 // Before
