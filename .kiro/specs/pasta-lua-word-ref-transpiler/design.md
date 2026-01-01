@@ -214,13 +214,19 @@ pub struct VarSet {
 ### Integration Tests
 
 1. **sample.pasta トランスパイル**: `＄場所＝＠場所` が `var.場所 = act:word("場所")` に変換
-2. **期待値一致検証**: 生成コードと `sample.lua` の行単位比較
+2. **期待値一致検証**: 生成コードと期待値の厳密一致比較
 3. **混在処理**: 同一ファイル内の Expr/WordRef 両方の処理
+
+### Test Fixtures
+
+- **sample.lua**: 参照実装（コメント含む、変更不可）
+- **sample.expected.lua**: 厳密一致テスト用期待値（実装完了後に作成）
+- **sample.generated.lua**: トランスパイル結果保存（デバッグ用、テスト実行時に自動生成）
 
 ### Existing Test Coverage
 
-- `test_transpile_sample_pasta_line_comparison()`: 行単位の一致率テスト
+- `test_transpile_sample_pasta_line_comparison()`: 厳密一致テスト（sample.expected.luaと比較）
 - `test_transpile_reference_code_patterns()`: パターンカバレッジテスト
 
-**Note**: 既存テストは実装後に自動的に合格する設計（期待値は既に `sample.lua` に記述済み）。
+**Note**: 実装完了後に sample.expected.lua を作成し、厳密一致テストを有効化。
 

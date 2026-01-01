@@ -35,9 +35,12 @@ pasta_luaトランスパイラーにおいて、`SetValue::WordRef` 構文のコ
 
 #### Acceptance Criteria
 
-1. The sample.lua fixture shall 「`var.場所 = act:word("場所")`」形式の出力を期待値として含む
-2. When pasta_luaのトランスパイルテストが実行される, the test suite shall `sample.pasta` から生成されたコードが `sample.lua` の期待値と一致することを検証する（文字列比較）
-3. The test suite shall トランスパイル結果の正しさのみを検証し、Luaランタイムの実行は検証対象外とする
+1. The sample.expected.lua fixture shall 「`var.場所 = act:word("場所")`」形式の出力を期待値として含む
+2. When pasta_luaのトランスパイルテストが実行される, the test suite shall `sample.pasta` から生成されたコードが `sample.expected.lua` の期待値と厳密一致することを検証する（文字列比較）
+3. The test suite shall トランスパイル結果を `sample.generated.lua` として保存し、デバッグを容易にする
+4. The test suite shall トランスパイル結果の正しさのみを検証し、Luaランタイムの実行は検証対象外とする
+
+**Note**: sample.lua は参照実装として保持し、厳密一致テストには sample.expected.lua を使用。
 
 ### Requirement 4: エラーハンドリング
 
