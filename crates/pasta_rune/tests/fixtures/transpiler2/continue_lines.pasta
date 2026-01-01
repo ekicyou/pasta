@@ -1,9 +1,0 @@
-# Continue lines fixture for transpiler2 tests
-# Tests ContinueAction processing
-
-＊継続テスト
-  さくら：「最初の行」
-  ：「継続行1」
-  ：「継続行2」
-  うにゅう：「話者変更」
-  ：「うにゅうの継続」

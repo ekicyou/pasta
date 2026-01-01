@@ -30,12 +30,8 @@ Pastaは `parser2` + `transpiler2` スタックを使用しています：
 
 ```rust
 // 現行スタック（推奨）
-use pasta_rune::parser::{parse_str, parse_file};
-use pasta_rune::transpiler::Transpiler2;
-
-// レガシースタック（非推奨、crates/pasta_rune/src/ で参照）
-use pasta_rune::core::parser::{parse_str, parse_file};
-use pasta_rune::transpiler::Transpiler;
+use pasta_core::parser::{parse_str, parse_file};
+use pasta_lua::transpiler::Transpiler;
 ```
 
 #### 移行履歴

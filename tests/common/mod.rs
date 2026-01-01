@@ -113,7 +113,7 @@ pub fn fixtures_path() -> PathBuf {
         PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string()));
 
     // Navigate to workspace root if we're in a crate directory
-    let root = if manifest_dir.ends_with("pasta_core") || manifest_dir.ends_with("pasta_rune") {
+    let root = if manifest_dir.ends_with("pasta_core") || manifest_dir.ends_with("pasta_lua") {
         manifest_dir
             .parent()
             .unwrap()
