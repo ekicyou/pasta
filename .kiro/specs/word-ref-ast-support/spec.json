@@ -1,9 +1,9 @@
 {
     "feature_name": "word-ref-ast-support",
     "created_at": "2026-01-01T16:06:55.1183398+09:00",
-    "updated_at": "2026-01-01T17:00:00+09:00",
+    "updated_at": "2026-01-01T17:30:00+09:00",
     "language": "ja",
-    "phase": "design-generated",
+    "phase": "design-approved",
     "approvals": {
         "requirements": {
             "generated": true,
@@ -11,7 +11,7 @@
         },
         "design": {
             "generated": true,
-            "approved": false
+            "approved": true
         },
         "tasks": {
             "generated": false,
