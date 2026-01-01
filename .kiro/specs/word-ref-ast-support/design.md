@@ -124,7 +124,8 @@ fn parse_var_set(&self, pair: Pair<Rule>) -> Result<VarSet, PastaError> {
 - inner.peek() で Rule::word_ref を検出
 - word_ref の場合:
   - inner_pairs から word_ref ペアを取得
-  - as_str() で `@単語名` を取得し、`@` を除去して name に設定
+  - word_ref ペアの inner から id ペアを取得（word_marker は hidden rule）
+  - id.as_str() で単語名を取得（@ プレフィックスは自動除去）
   - `SetValue::WordRef { name }` を構築
   - 二項演算処理をスキップ（word_ref は単独値）
 - expr の場合:
@@ -143,7 +144,9 @@ parse_var_set(pair)
 ├── inner = pair.into_inner()
 ├── if inner.peek() == Some(Rule::word_ref)
 │   ├── word_ref_pair = inner.next()
-│   ├── name = word_ref_pair.as_str().trim_start('@')
+│   ├── word_ref_inner = word_ref_pair.into_inner()
+│   ├── id_pair = word_ref_inner.next()  # grammar.pest の word_ref 内の id を取得
+│   ├── name = id_pair.as_str().to_string()  # @ プレフィックスは hidden rule で自動除去
 │   └── value = SetValue::WordRef { name }
 ├── else (expr の場合)
 │   ├── 既存の try_parse_expr 処理
@@ -151,6 +154,12 @@ parse_var_set(pair)
 │   └── value = SetValue::Expr(expr)
 └── return VarSet { name, scope, value, span }
 ```
+
+**実装上の注意**:
+- grammar.pest で `word_ref = { word_marker ~ id ~ s}` と定義され、word_marker は hidden rule（`_`）
+- したがって word_ref ペアの inner には id ペアのみが含まれる（word_marker と s は child ペアにならない）
+- as_str() で `@` を trim する必要がなく、id.as_str() だけで単語名を取得できる
+- これにより hidden rule の振る舞いに依存しない堅牢な実装が可能
 
 ---
 
