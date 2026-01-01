@@ -274,18 +274,23 @@ SetValue::WordRef { name } => {
 
 ### 4.2 エスケープ処理
 
-**調査必要性**: Low
+**調査結果**: ✅ **エスケープ不要**
 
-- **現状**: `generate_expr()` で既に文字列リテラル生成は実装済み
-- **WordRef の name フィールド**: 単語名（識別子）のため、通常エスケープ不要
-- **懸念**: 単語名に `"` や `\` が含まれる場合の処理
+- **文法定義**: `word_ref = { word_marker ~ id ~ s}` - XID準拠識別子のみ
+  - `id` は `XID_START + XID_CONTINUE*`（Unicode Extended Identifier）
+  - Rust/JavaScript識別子と同等の制約
+  - 特殊文字（`"`、`\`等）は文法レベルで除外済み
 
-**推奨対応**:
-- 単語名は識別子（日本語、ASCII）のため、通常は安全
-- 万全を期すなら、Rust の文字列エスケープ機能を適用
+- **既存実装の一貫性**:
   ```rust
-  self.write_raw(&format!("{} = act:word(\"{}\")", var_path, name.escape_default()))?;
+  // code_generator.rs:402 - Action::WordRef の既存実装
+  self.writeln(&format!("act.{}:word(\"{}\")", actor, word_name))?;
   ```
+  エスケープなしで直接出力（既存パターンと同一）
+
+**実装方針**:
+- エスケープ処理なしで直接ダブルクォートに包む
+- 既存の `Action::WordRef` パターンを踏襲
 
 ### 4.3 実装の一貫性
 
@@ -363,6 +368,7 @@ SetValue::WordRef { name } => {
    - Local変数 WordRef: ✅ 確認済み（`var.場所 = act:word("場所")`）
    - Global変数 WordRef: ❓ 未確認（sample.pasta に追加が必要か検討）
    - エラーケース: ✅ 不要（既存のArgs代入エラーで対応）
+   - エスケープ処理: ✅ 不要（XID識別子のため文法レベルで安全）
 
 **Priority: Low**
 4. **Luaランタイム `act:word()` 実装**
