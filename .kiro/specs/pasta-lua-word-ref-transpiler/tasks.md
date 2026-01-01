@@ -14,8 +14,8 @@
 
 ### Core Implementation
 
-- [ ] 1. WordRef代入のコード生成を実装
-- [ ] 1.1 (P) generate_var_set()メソッドのSetValue::WordRef分岐を実装
+- [x] 1. WordRef代入のコード生成を実装
+- [x] 1.1 (P) generate_var_set()メソッドのSetValue::WordRef分岐を実装
   - `SetValue::WordRef { name }` パターンマッチング処理を追加
   - `var_path`変数（既存のVarScope判定結果）を使用してLuaコードを生成
   - ローカル変数: `var.変数名 = act:word("単語名")` 形式で出力
@@ -23,7 +23,7 @@
   - 既存の `Action::WordRef` 実装パターン（L399-402）を参照
   - _Requirements: 1.1, 1.2, 1.3_
 
-- [ ] 1.2 (P) 既存Expr処理との互換性を検証
+- [x] 1.2 (P) 既存Expr処理との互換性を検証
   - `SetValue::Expr` 分岐が引き続き正常に動作することを確認
   - 同一ファイル内でExprとWordRefの混在処理が可能であることを確認
   - 既存の統合テスト（sample.pasta）を実行して互換性を検証
@@ -31,21 +31,21 @@
 
 ### Testing & Validation
 
-- [ ] 2. テストフィクスチャとテストケースを整備
-- [ ] 2.1 sample.expected.luaを作成
+- [x] 2. テストフィクスチャとテストケースを整備
+- [x] 2.1 sample.expected.luaを作成
   - sample.luaを元に厳密一致テスト用の期待値ファイルを作成
   - コメントを除去し、トランスパイル結果との完全一致を可能にする
   - `var.場所 = act:word("場所")` 形式の出力を含める
   - _Requirements: 3.1_
 
-- [ ] 2.2 統合テストを更新して厳密一致検証を有効化
+- [x] 2.2 統合テストを更新して厳密一致検証を有効化
   - `test_transpile_sample_pasta_line_comparison()` のTODOコメントを解除
   - `sample.expected.lua` との文字列比較による厳密一致検証を実装
   - `assert_eq!` による完全一致アサーションを追加
   - `sample.generated.lua` の保存機能が正常に動作することを確認
   - _Requirements: 3.2, 3.3_
 
-- [ ] 2.3* (P) ユニットテストを追加（任意）
+- [x] 2.3* (P) ユニットテストを追加（任意）
   - WordRef Local変数代入の単体テスト
   - WordRef Global変数代入の単体テスト
   - VarScope::Args へのWordRef代入がエラーになることを確認
@@ -55,8 +55,8 @@
 
 ### Final Validation
 
-- [ ] 3. 全体テストと統合検証
-- [ ] 3.1 全統合テストを実行して合格を確認
+- [x] 3. 全体テストと統合検証
+- [x] 3.1 全統合テストを実行して合格を確認
   - `cargo test --package pasta_lua` を実行
   - `test_transpile_sample_pasta_line_comparison()` が合格することを確認
   - `test_transpile_reference_code_patterns()` が合格することを確認
