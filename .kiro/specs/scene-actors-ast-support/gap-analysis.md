@@ -100,13 +100,14 @@ Rule::global_scene_word_line => {
 |---------|---------|---------|
 | `SceneActorItem`型 | なし | **Missing** - 新規作成必要 |
 | アクター名保持 | `String`型使用パターン確立 | なし |
-| 番号保持 | `Option<u32>`パターン確立 | なし |
+| 番号保持 | `u32`型 | なし |
 | Span保持 | `Span`型再利用可 | なし |
 
-**設計決定（議題1で確定）**:
-- `SceneActorLine`型は定義しない（中間型不要）
-- パース関数は1行単位で`Vec<SceneActorItem>`を返す
-- `GlobalSceneScope.actors`には複数行の結果を統合して保持
+**設計決定**:
+- **議題1**: `SceneActorLine`型は定義しない（中間型不要）
+- **議題2**: 番号はC#のenum採番ルールで計算し、`u32`として保持
+  - 複数行にまたがる場合でも、最後の番号を引き継いで+1
+  - 実装: `parse_global_scene_scope`で`next_number: u32`を管理し、`parse_scene_actors_line`に渡す
 
 ### 2.2 要件2: GlobalSceneScopeへの統合
 

@@ -27,13 +27,17 @@ grammar.pestに新しい文法`scene_actors_line`（グローバルシーンに�
 **目的:** パーサー開発者として、`actors_item`文法に対応するAST型を定義したい。これにより、パース結果を型安全に表現できるようになる。
 
 #### 受け入れ基準
-1. The `SceneActorItem` shall アクター名（`String`）と任意の番号（`Option<u32>`）を保持する
+1. The `SceneActorItem` shall アクター名（`String`）と番号（`u32`）を保持する
 2. The `SceneActorItem` shall ソース位置情報（`Span`）を保持する
 
-#### 設計決定（議題1で確定）
-- `SceneActorLine`型は定義しない（中間型不要）
-- パース関数は1行単位で`Vec<SceneActorItem>`を返す
-- `GlobalSceneScope.actors`には複数行の結果を統合して保持
+#### 設計決定
+- **議題1**: `SceneActorLine`型は定義しない（中間型不要）。パース関数は1行単位で処理し、`GlobalSceneScope.actors`に統合
+- **議題2**: 番号はC#のenum採番ルールで計算し、`u32`として保持（`Option`ではない）
+  - 番号指定なし: 0から連番（または直前の番号+1）
+  - 番号指定あり: その番号を使用
+  - 再び番号なし: 直前の番号+1
+  - 例: `％さくら、うにゅう＝２、まりか、ゆかり＝10、あかね` → さくら=0, うにゅう=2, まりか=3, ゆかり=10, あかね=11
+  - **複数行にまたがる場合でも、最後の番号を引き継いで+1する**
 
 ### 要件2: GlobalSceneScopeへの統合
 **目的:** パーサー開発者として、`SceneActorLine`を`GlobalSceneScope`に統合したい。これにより、シーンレベルのアクター宣言にアクセスできるようになる。
@@ -66,6 +70,7 @@ grammar.pestに新しい文法`scene_actors_line`（グローバルシーンに�
 
 #### 受け入れ基準
 1. The pasta_core shall `scene_actors_line`のパーステストを持つ
-2. When `％さくら、うにゅう＝１`をパースした時, pasta_core shall アクター「さくら」（番号なし）と「うにゅう」（番号1）を正しく抽出する
+2. When `％さくら、うにゅう＝２`をパースした時, pasta_core shall アクター「さくら」（番号0）と「うにゅう」（番号2）を正しく抽出する
 3. When 複数アクターを含む行をパースした時, pasta_core shall すべてのアクターを順序通りに保持する
-4. When `cargo test --all`を実行した時, すべてのテスト（既存＋新規）が成功する
+4. When 複数行のアクター宣言をパースした時, pasta_core shall 番号を行をまたいで引き継ぐ
+5. When `cargo test --all`を実行した時, すべてのテスト（既存＋新規）が成功する
