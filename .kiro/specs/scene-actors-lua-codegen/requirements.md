@@ -41,8 +41,8 @@ SCENE.__start__()メソッドの「PASTA.create_session」行の後ろに、下�
 
 #### 受け入れ基準
 1. The pasta_lua shall `set_spot`呼び出しを`__start__`関数内でのみ生成する（他のローカルシーン関数では生成しない）
-2. The pasta_lua shall `set_spot`呼び出しを`local act, save, var = PASTA.create_session(SCENE, ctx)`行の直後に配置する
-3. The pasta_lua shall `set_spot`呼び出しの後に空行を挿入してから、他のシーン処理コードを出力する
+2. The pasta_lua shall `set_spot`呼び出しを`local act, save, var = PASTA.create_session(SCENE, ctx)`行の直後に配置する（前後に空行を1行ずつ挿入）
+3. When 複数の`scene_actors_line`がグローバルシーン内に存在する時, pasta_lua shall すべてのアクターを1つの`__start__`内で集約初期化する
 
 ### 要件3: テスト
 **目的:** 品質保証担当者として、新機能が正しく動作することを検証したい。これにより、リグレッションを防止できる。
@@ -61,6 +61,7 @@ SCENE.__start__()メソッドの「PASTA.create_session」行の後ろに、下�
 ```pasta
 ＊シーン１
 ％さくら、うにゅう＝２
+％まりか
 ・
 　さくら：こんにちは
 ```
@@ -70,9 +71,13 @@ SCENE.__start__()メソッドの「PASTA.create_session」行の後ろに、下�
 function SCENE.__start__(ctx, ...)
     local args = { ... }
     local act, save, var = PASTA.create_session(SCENE, ctx)
+
     act.さくら:set_spot(0)
     act.うにゅう:set_spot(2)
+    act.まりか:set_spot(3)
 
     act.さくら:talk("こんにちは")
 end
 ```
+
+※ 複数の`scene_actors_line`がある場合も、すべてのアクターは1つの`__start__`で集約初期化される
