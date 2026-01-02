@@ -123,6 +123,7 @@ sequenceDiagram
 **責任と制約**
 - `scene.actors`を取得し、`generate_local_scene`呼び出し時に渡す
 - 既存の処理フローは変更なし
+- 呼び出し箇所は`code_generator.rs` line 184のみ（単一箇所、テストコードからの呼び出しなし）
 
 **変更箇所**
 ```rust
@@ -172,7 +173,7 @@ pub fn generate_local_scene(
 
 #### set_spot生成ロジック
 
-**生成パターン**
+**生成パターン（議題3対応）**
 
 ```rust
 // generate_local_scene内（create_session後）
@@ -181,41 +182,37 @@ pub fn generate_local_scene(
 self.writeln("local args = { ... }")?;
 self.writeln("local act, save, var = PASTA.create_session(SCENE, ctx)")?;
 
-// NEW: set_spot block for __start__ only
+// NEW: set_spot block for __start__ only (counter == 0)
 if counter == 0 && !actors.is_empty() {
-    self.write_blank_line()?;  // 空行（前）
+    self.write_blank_line()?;  // 空行（create_session直後）
     for actor in actors {
         self.writeln(&format!("act.{}:set_spot({})", actor.name, actor.number))?;
     }
+    self.write_blank_line()?;  // 空行（set_spot直後、items前）
+} else {
+    // other scenes: just blank line after session init
+    self.write_blank_line()?;
 }
 
-self.write_blank_line()?;  // 既存の空行（後）
+// ... items generation below ...
 ```
 
-**生成コード例**
+**空行配置の厳密性（要件4「生成コード例」対応）**
 
-入力:
-```pasta
-＊シーン１
-％さくら、うにゅう＝２
-％まりか
-・
-　さくら：こんにちは
-```
-
-出力:
 ```lua
 function SCENE.__start__(ctx, ...)
     local args = { ... }
     local act, save, var = PASTA.create_session(SCENE, ctx)
-
-    act.さくら:set_spot(0)
+    [空行 1]
+    act.さくら:set_spot(0)      
     act.うにゅう:set_spot(2)
     act.まりか:set_spot(3)
-
-    act.さくら:talk("こんにちは")
+    [空行 2]
+    act.さくら:talk(...)
 end
 ```
+
+注記: `counter != 0` の場合（他のローカルシーン）は `set_spot` ブロック全体がスキップされ、既存の 1 行空行のみ生成。
 
 ## データモデル
 
@@ -235,6 +232,12 @@ act.<name>:set_spot(<number>)
 ```
 
 ## テスト戦略
+
+### テスト配置計画（議題2対応）
+
+- **新規関数配置**: `crates/pasta_lua/tests/transpiler_integration_test.rs` の最後に4つのテスト関数を追加
+- **既存テストとの関係**: 既存テスト（`test_transpile_sample_pasta_*`）に依存なし、独立したテストとして実行
+- **パターン遵守**: 既存テストに倣い同ファイル内に配置、`parse_str()` → `transpile()` → `lua_code.contains()` パターン
 
 ### 統合テスト（transpiler_integration_test.rs）
 
