@@ -61,9 +61,12 @@ grammar.pestに新しい文法`scene_actors_line`（グローバルシーンに�
 **目的:** pasta_lua開発者として、新しいAST型によるコンパイルエラーを回避したい。これにより、pasta_coreの変更がpasta_luaのビルドを破壊しない。
 
 #### 受け入れ基準
-1. When pasta_coreに`SceneActorLine`/`SceneActorItem`が追加された時, pasta_lua shall コンパイルエラーなくビルドできる
+1. When pasta_coreに`SceneActorItem`が追加された時, pasta_lua shall コンパイルエラーなくビルドできる
 2. The pasta_lua shall `GlobalSceneScope.actors`フィールドを無視（スキップ）してトランスパイルを継続する
-3. The pasta_lua shall 新しいAST型に対して警告（unused）を発生させない
+
+#### 設計決定（議題3で確定）
+- トランスパイラ/コード生成では`actors`フィールドを単に無視する（エラーにしない）
+- テストコード内の`GlobalSceneScope`構築には`actors: Vec::new()`を追加
 
 ### 要件5: テスト
 **目的:** 品質保証担当者として、新機能が正しく動作することを検証したい。これにより、リグレッションを防止できる。
