@@ -831,3 +831,114 @@ fn test_global_word_registration_order() {
     assert!(entries.iter().any(|e| e.key == "挨拶1"));
     assert!(entries.iter().any(|e| e.key == "挨拶2"));
 }
+
+// ============================================================================
+// set_spot Tests (scene-actors-lua-codegen)
+// ============================================================================
+
+/// Test 3.1: 複数アクター生成テスト
+#[test]
+fn test_set_spot_multiple_actors() {
+    let source = r#"
+＊シーン
+　％さくら、うにゅう＝２
+　　さくら：こんにちは
+"#;
+    let file = parse_str(source, "test.pasta").unwrap();
+    let transpiler = LuaTranspiler::default();
+    let mut output = Vec::new();
+    transpiler.transpile(&file, &mut output).unwrap();
+    let lua_code = String::from_utf8(output).unwrap();
+
+    // Verify set_spot calls are generated
+    assert!(
+        lua_code.contains("act.さくら:set_spot(0)"),
+        "Missing さくら set_spot call. Generated code:\n{lua_code}"
+    );
+    assert!(
+        lua_code.contains("act.うにゅう:set_spot(2)"),
+        "Missing うにゅう set_spot call. Generated code:\n{lua_code}"
+    );
+
+    // Verify order is preserved (さくら before うにゅう)
+    let sakura_pos = lua_code
+        .find("act.さくら:set_spot")
+        .expect("さくら set_spot not found");
+    let unyu_pos = lua_code
+        .find("act.うにゅう:set_spot")
+        .expect("うにゅう set_spot not found");
+    assert!(
+        sakura_pos < unyu_pos,
+        "Actor order not preserved: さくら should come before うにゅう"
+    );
+}
+
+/// Test 3.2: 単一アクター生成テスト
+#[test]
+fn test_set_spot_single_actor() {
+    let source = r#"
+＊シーン
+　％さくら
+　　さくら：こんにちは
+"#;
+    let file = parse_str(source, "test.pasta").unwrap();
+    let transpiler = LuaTranspiler::default();
+    let mut output = Vec::new();
+    transpiler.transpile(&file, &mut output).unwrap();
+    let lua_code = String::from_utf8(output).unwrap();
+
+    // Verify single actor set_spot is generated
+    assert!(
+        lua_code.contains("act.さくら:set_spot(0)"),
+        "Missing single actor set_spot call. Generated code:\n{lua_code}"
+    );
+}
+
+/// Test 3.3: アクター未定義テスト
+#[test]
+fn test_set_spot_empty_actors() {
+    let source = r#"
+＊シーン
+　　さくら：こんにちは
+"#;
+    let file = parse_str(source, "test.pasta").unwrap();
+    let transpiler = LuaTranspiler::default();
+    let mut output = Vec::new();
+    transpiler.transpile(&file, &mut output).unwrap();
+    let lua_code = String::from_utf8(output).unwrap();
+
+    // Verify no set_spot calls are generated
+    assert!(
+        !lua_code.contains("set_spot"),
+        "set_spot should not be generated when no actors defined. Generated code:\n{lua_code}"
+    );
+}
+
+/// Test 3.4: 明示的番号付きアクターテスト
+#[test]
+fn test_set_spot_with_explicit_number() {
+    let source = r#"
+＊シーン
+　％さくら、うにゅう＝２、まりか
+　　さくら：こんにちは
+"#;
+    let file = parse_str(source, "test.pasta").unwrap();
+    let transpiler = LuaTranspiler::default();
+    let mut output = Vec::new();
+    transpiler.transpile(&file, &mut output).unwrap();
+    let lua_code = String::from_utf8(output).unwrap();
+
+    // Verify explicit numbers are respected (C# enum rule)
+    assert!(
+        lua_code.contains("act.さくら:set_spot(0)"),
+        "Missing さくら set_spot(0). Generated code:\n{lua_code}"
+    );
+    assert!(
+        lua_code.contains("act.うにゅう:set_spot(2)"),
+        "Missing うにゅう set_spot(2). Generated code:\n{lua_code}"
+    );
+    assert!(
+        lua_code.contains("act.まりか:set_spot(3)"),
+        "Missing まりか set_spot(3). Generated code:\n{lua_code}"
+    );
+}
