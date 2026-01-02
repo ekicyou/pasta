@@ -133,6 +133,7 @@ mod tests {
             is_continuation: false,
             attrs: vec![],
             words: vec![],
+            actors: vec![],
             code_blocks: vec![],
             local_scenes: vec![],
             span: Span::default(),

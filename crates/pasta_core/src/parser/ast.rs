@@ -293,6 +293,34 @@ pub struct FileScope {
 }
 
 // ============================================================================
+// SceneActorItem - Actor Item in Scene
+// ============================================================================
+
+/// シーンに登場するアクター項目
+///
+/// grammar.pestの`actors_item = { id ~ ( s ~ set_marker ~ s ~ digit_id )? }`に対応。
+/// 番号はC#のenum採番ルールで計算済みの値を保持する。
+///
+/// # C# enum採番ルール
+///
+/// - 番号指定なし: 0から連番（または直前の番号+1）
+/// - 番号指定あり: その番号を使用
+/// - 再び番号なし: 直前の番号+1
+///
+/// # 例
+///
+/// `％さくら、うにゅう＝２、まりか` → さくら=0, うにゅう=2, まりか=3
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SceneActorItem {
+    /// アクター名
+    pub name: String,
+    /// アクター番号（C#のenum採番ルールで計算済み）
+    pub number: u32,
+    /// ソース位置
+    pub span: Span,
+}
+
+// ============================================================================
 // GlobalSceneScope - Global Scene Scope
 // ============================================================================
 
@@ -310,6 +338,8 @@ pub struct GlobalSceneScope {
     pub attrs: Vec<Attr>,
     /// Scene-level word definitions
     pub words: Vec<KeyWords>,
+    /// シーンに登場するアクター一覧
+    pub actors: Vec<SceneActorItem>,
     /// Code blocks at global scene level
     pub code_blocks: Vec<CodeBlock>,
     /// List of local scenes
@@ -326,6 +356,7 @@ impl GlobalSceneScope {
             is_continuation: false,
             attrs: Vec::new(),
             words: Vec::new(),
+            actors: Vec::new(),
             code_blocks: Vec::new(),
             local_scenes: Vec::new(),
             span: Span::default(),
@@ -339,6 +370,7 @@ impl GlobalSceneScope {
             is_continuation: true,
             attrs: Vec::new(),
             words: Vec::new(),
+            actors: Vec::new(),
             code_blocks: Vec::new(),
             local_scenes: Vec::new(),
             span: Span::default(),

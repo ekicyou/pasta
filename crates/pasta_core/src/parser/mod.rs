@@ -290,8 +290,10 @@ fn parse_global_scene_scope(
     let mut is_continuation = false;
     let mut attrs = Vec::new();
     let mut words = Vec::new();
+    let mut actors = Vec::new();
     let mut code_blocks = Vec::new();
     let mut local_scenes = Vec::new();
+    let mut next_actor_number: u32 = 0;
 
     for inner in pair.into_inner() {
         match inner.as_rule() {
@@ -315,6 +317,10 @@ fn parse_global_scene_scope(
                     }
                 }
             }
+            Rule::scene_actors_line => {
+                let items = parse_scene_actors_line(inner, &mut next_actor_number)?;
+                actors.extend(items);
+            }
             Rule::code_block => {
                 code_blocks.push(parse_code_block(inner)?);
             }
@@ -333,6 +339,7 @@ fn parse_global_scene_scope(
         is_continuation,
         attrs,
         words,
+        actors,
         code_blocks,
         local_scenes,
         span,
@@ -375,6 +382,78 @@ fn parse_global_scene_start(
     }
 
     Ok((String::new(), false))
+}
+
+/// Parse scene_actors_line to extract SceneActorItems.
+///
+/// grammar.pest:
+/// - `scene_actors_line = { pad ~ actor_marker ~ actors ~ or_comment_eol }`
+/// - `actors = _{ actors_item ~ ( comma_sep ~ actors_item )* ~ comma_sep? }`
+///
+/// # Arguments
+/// * `pair` - Rule::scene_actors_lineのPair
+/// * `next_number` - 次の採番値（可変参照、更新される）
+///
+/// # Returns
+/// パースされたSceneActorItemのベクタ
+fn parse_scene_actors_line(
+    pair: Pair<Rule>,
+    next_number: &mut u32,
+) -> Result<Vec<SceneActorItem>, ParseError> {
+    let mut items = Vec::new();
+
+    // scene_actors_line = { pad ~ actor_marker ~ actors ~ or_comment_eol }
+    // actors is a silent rule, so actors_item pairs appear directly
+    for inner in pair.into_inner() {
+        if inner.as_rule() == Rule::actors_item {
+            let item = parse_actors_item(inner, next_number)?;
+            items.push(item);
+        }
+    }
+
+    Ok(items)
+}
+
+/// Parse a single actors_item to SceneActorItem.
+///
+/// grammar.pest: `actors_item = { id ~ ( s ~ set_marker ~ s ~ digit_id )? }`
+///
+/// C#のenum採番ルール:
+/// - 番号指定あり: その番号を使用し、next_number = その番号 + 1
+/// - 番号指定なし: next_numberを使用し、next_number += 1
+fn parse_actors_item(
+    pair: Pair<Rule>,
+    next_number: &mut u32,
+) -> Result<SceneActorItem, ParseError> {
+    let span = Span::from(&pair.as_span());
+    let mut name = String::new();
+    let mut explicit_number: Option<u32> = None;
+
+    for inner in pair.into_inner() {
+        match inner.as_rule() {
+            Rule::id => {
+                name = inner.as_str().to_string();
+            }
+            Rule::digit_id => {
+                // 全角数字を半角に正規化してパース
+                let normalized = normalize_number_str(inner.as_str());
+                explicit_number = normalized.parse::<u32>().ok();
+            }
+            _ => {}
+        }
+    }
+
+    // C#のenum採番ルールを適用
+    let number = if let Some(n) = explicit_number {
+        *next_number = n + 1;
+        n
+    } else {
+        let n = *next_number;
+        *next_number += 1;
+        n
+    };
+
+    Ok(SceneActorItem { name, number, span })
 }
 
 /// Parse local start scene scope (no name).
@@ -1194,5 +1273,128 @@ mod tests {
         // Verify that PastaParser2 can parse the file rule
         let result = PastaParser2::parse(Rule::file, "");
         assert!(result.is_ok());
+    }
+
+    // ========================================================================
+    // SceneActorItem Tests (scene-actors-ast-support)
+    // ========================================================================
+
+    #[test]
+    fn test_parse_scene_actors_single() {
+        // 単一アクター「さくら」（番号0）
+        let source = "＊挨拶\n　％さくら\n  さくら：こんにちは\n";
+        let result = parse_str(source, "test.pasta");
+        assert!(result.is_ok());
+        let file = result.unwrap();
+        let scenes = get_global_scene_scopes(&file);
+        assert_eq!(scenes.len(), 1);
+        assert_eq!(scenes[0].actors.len(), 1);
+        assert_eq!(scenes[0].actors[0].name, "さくら");
+        assert_eq!(scenes[0].actors[0].number, 0);
+    }
+
+    #[test]
+    fn test_parse_scene_actors_with_explicit_number() {
+        // 「さくら」（番号0）と「うにゅう＝２」
+        let source = "＊挨拶\n　％さくら、うにゅう＝２\n  さくら：こんにちは\n";
+        let result = parse_str(source, "test.pasta");
+        assert!(result.is_ok());
+        let file = result.unwrap();
+        let scenes = get_global_scene_scopes(&file);
+        assert_eq!(scenes.len(), 1);
+        assert_eq!(scenes[0].actors.len(), 2);
+        assert_eq!(scenes[0].actors[0].name, "さくら");
+        assert_eq!(scenes[0].actors[0].number, 0);
+        assert_eq!(scenes[0].actors[1].name, "うにゅう");
+        assert_eq!(scenes[0].actors[1].number, 2);
+    }
+
+    #[test]
+    fn test_parse_scene_actors_csharp_enum_numbering() {
+        // C#のenum採番ルール: さくら=0, うにゅう=2, まりか=3
+        let source = "＊挨拶\n　％さくら、うにゅう＝２、まりか\n  さくら：こんにちは\n";
+        let result = parse_str(source, "test.pasta");
+        assert!(result.is_ok());
+        let file = result.unwrap();
+        let scenes = get_global_scene_scopes(&file);
+        assert_eq!(scenes.len(), 1);
+        assert_eq!(scenes[0].actors.len(), 3);
+        assert_eq!(scenes[0].actors[0].name, "さくら");
+        assert_eq!(scenes[0].actors[0].number, 0);
+        assert_eq!(scenes[0].actors[1].name, "うにゅう");
+        assert_eq!(scenes[0].actors[1].number, 2);
+        assert_eq!(scenes[0].actors[2].name, "まりか");
+        assert_eq!(scenes[0].actors[2].number, 3);
+    }
+
+    #[test]
+    fn test_parse_scene_actors_fullwidth_number() {
+        // 全角数字「＝１０」が正しくパースされることを確認
+        let source = "＊挨拶\n　％さくら＝１０\n  さくら：こんにちは\n";
+        let result = parse_str(source, "test.pasta");
+        assert!(result.is_ok());
+        let file = result.unwrap();
+        let scenes = get_global_scene_scopes(&file);
+        assert_eq!(scenes.len(), 1);
+        assert_eq!(scenes[0].actors.len(), 1);
+        assert_eq!(scenes[0].actors[0].name, "さくら");
+        assert_eq!(scenes[0].actors[0].number, 10);
+    }
+
+    #[test]
+    fn test_parse_scene_actors_multiple_lines() {
+        // 複数行のアクター宣言で番号が行をまたいで引き継がれることを確認
+        // 1行目: さくら=0
+        // 2行目: うにゅう=5
+        // 3行目: まりか=6
+        let source = "＊挨拶\n　％さくら\n　％うにゅう＝５\n　％まりか\n  さくら：こんにちは\n";
+        let result = parse_str(source, "test.pasta");
+        assert!(result.is_ok());
+        let file = result.unwrap();
+        let scenes = get_global_scene_scopes(&file);
+        assert_eq!(scenes.len(), 1);
+        assert_eq!(scenes[0].actors.len(), 3);
+        assert_eq!(scenes[0].actors[0].name, "さくら");
+        assert_eq!(scenes[0].actors[0].number, 0);
+        assert_eq!(scenes[0].actors[1].name, "うにゅう");
+        assert_eq!(scenes[0].actors[1].number, 5);
+        assert_eq!(scenes[0].actors[2].name, "まりか");
+        assert_eq!(scenes[0].actors[2].number, 6);
+    }
+
+    #[test]
+    fn test_parse_scene_actors_complex_numbering() {
+        // 複雑な採番パターン: さくら=0, うにゅう=2, まりか=3, ゆかり=10, あかね=11
+        let source = "＊挨拶\n　％さくら、うにゅう＝２、まりか、ゆかり＝１０、あかね\n  さくら：こんにちは\n";
+        let result = parse_str(source, "test.pasta");
+        assert!(result.is_ok());
+        let file = result.unwrap();
+        let scenes = get_global_scene_scopes(&file);
+        assert_eq!(scenes.len(), 1);
+        assert_eq!(scenes[0].actors.len(), 5);
+        assert_eq!(scenes[0].actors[0].name, "さくら");
+        assert_eq!(scenes[0].actors[0].number, 0);
+        assert_eq!(scenes[0].actors[1].name, "うにゅう");
+        assert_eq!(scenes[0].actors[1].number, 2);
+        assert_eq!(scenes[0].actors[2].name, "まりか");
+        assert_eq!(scenes[0].actors[2].number, 3);
+        assert_eq!(scenes[0].actors[3].name, "ゆかり");
+        assert_eq!(scenes[0].actors[3].number, 10);
+        assert_eq!(scenes[0].actors[4].name, "あかね");
+        assert_eq!(scenes[0].actors[4].number, 11);
+    }
+
+    #[test]
+    fn test_parse_scene_actors_span_valid() {
+        // SceneActorItemのSpanが有効であることを確認
+        let source = "＊挨拶\n　％さくら\n  さくら：こんにちは\n";
+        let result = parse_str(source, "test.pasta");
+        assert!(result.is_ok());
+        let file = result.unwrap();
+        let scenes = get_global_scene_scopes(&file);
+        assert_eq!(scenes.len(), 1);
+        assert_eq!(scenes[0].actors.len(), 1);
+        // Spanが有効であることを確認
+        assert!(scenes[0].actors[0].span.is_valid());
     }
 }
