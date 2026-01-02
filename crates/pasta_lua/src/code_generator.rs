@@ -5,7 +5,7 @@
 
 use pasta_core::parser::{
     Action, ActionLine, ActorScope, Args, AttrValue, CallScene, CodeBlock, ContinueAction, Expr,
-    GlobalSceneScope, LocalSceneItem, LocalSceneScope, SetValue, VarScope, VarSet,
+    GlobalSceneScope, LocalSceneItem, LocalSceneScope, SceneActorItem, SetValue, VarScope, VarSet,
 };
 use pasta_core::registry::SceneRegistry;
 
@@ -181,7 +181,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             } else {
                 0 // start scene doesn't use counter
             };
-            self.generate_local_scene(local_scene, counter)?;
+            self.generate_local_scene(local_scene, counter, &scene.actors)?;
         }
 
         // Generate code blocks at module level (after all local scene functions)
@@ -224,6 +224,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         &mut self,
         scene: &LocalSceneScope,
         counter: usize,
+        actors: &[SceneActorItem],
     ) -> Result<(), TranspileError> {
         let fn_name = if let Some(ref name) = scene.name {
             let sanitized = SceneRegistry::sanitize_name(name);
@@ -238,7 +239,17 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         // Session initialization (Requirement 3c)
         self.writeln("local args = { ... }")?;
         self.writeln("local act, save, var = PASTA.create_session(SCENE, ctx)")?;
-        self.write_blank_line()?;
+
+        // Generate set_spot calls for __start__ only (counter == 0)
+        if counter == 0 && !actors.is_empty() {
+            self.write_blank_line()?;
+            for actor in actors {
+                self.writeln(&format!("act.{}:set_spot({})", actor.name, actor.number))?;
+            }
+            self.write_blank_line()?;
+        } else {
+            self.write_blank_line()?;
+        }
 
         // Generate local scene items
         self.generate_local_scene_items(&scene.items)?;
