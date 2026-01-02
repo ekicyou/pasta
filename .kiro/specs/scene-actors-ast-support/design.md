@@ -211,6 +211,10 @@ pub struct SceneActorItem {
 **責務 & 制約**
 - 既存フィールドに`actors: Vec<SceneActorItem>`を追加
 - コンストラクタ（`new()`, `continuation()`）で`actors: Vec::new()`初期化
+- **フィールド挿入位置**: `words`フィールドの直後に挿入（論理的グループ化：メタデータ集約）
+  - 理由: `attrs`と`words`は同様のメタデータ、`actors`も同じカテゴリ
+  - 既存フィールド順: `name, is_continuation, attrs, words, code_blocks, local_scenes, span`
+  - 新フィールド順: `name, is_continuation, attrs, words, actors, code_blocks, local_scenes, span`
 
 **依存関係**
 - Inbound: parse_global_scene_scope — 生成元 (P0)
@@ -286,6 +290,16 @@ fn parse_scene_actors_line(
 ```
 
 ##### 処理ロジック
+
+grammar.pestの定義:
+```pest
+scene_actors_line = { pad ~ actor_marker ~ actors ~ or_comment_eol }
+actors = _{ actors_item ~ ( comma_sep ~ actors_item )* ~ comma_sep? }
+```
+
+内部イテレータには`pad`, `actor_marker`, `actors`, `or_comment_eol`が含まれます。
+パーサーは`Rule::actors`ペア（silent rule `=_`のため直下に`actors_item`が展開）を処理します。
+
 ```rust
 fn parse_scene_actors_line(
     pair: Pair<Rule>,
@@ -294,14 +308,24 @@ fn parse_scene_actors_line(
     let mut items = Vec::new();
     
     for inner in pair.into_inner() {
-        if inner.as_rule() == Rule::actors_item {
-            items.push(parse_actors_item(inner, next_number)?);
+        match inner.as_rule() {
+            Rule::actors => {
+                // actors は silent rule (=_) なため、直下に actors_item が展開される
+                for actor_pair in inner.into_inner() {
+                    if actor_pair.as_rule() == Rule::actors_item {
+                        items.push(parse_actors_item(actor_pair, next_number)?);
+                    }
+                }
+            }
+            _ => {} // pad, actor_marker, or_comment_eol はスキップ
         }
     }
     
     Ok(items)
 }
 ```
+
+**注釈**: 既存の`parse_global_scene_attr_line`パターンに準拠。`attrs`および`key_words`も同様に内部をイテレータで処理している。
 
 ---
 
@@ -437,8 +461,14 @@ fn parse_global_scene_scope(
 
 **変更箇所**
 - `transpiler.rs`: 変更なし（`actors`フィールドは無視）
-- `code_generator.rs`: 変更なし
+- `code_generator.rs`: 変更なし（参照のみで構築しない）
 - `context.rs`: テスト内の`GlobalSceneScope`構築に`actors: Vec::new()`追加
+  - 修正関数: `create_test_scene()`（125-140行）
+
+**テスト修正関数リスト** (`transpiler.rs`):
+1. `create_simple_scene()` (140-153行) - `actors: vec![]`追加
+2. `create_scene_with_words()` (156-171行) - `actors: vec![]`追加
+3. `create_scene_with_local()` (176-189行) - `actors: vec![]`追加
 
 ##### テストコード修正例
 ```rust
@@ -455,6 +485,8 @@ fn create_test_scene(name: &str) -> GlobalSceneScope {
     }
 }
 ```
+
+**修正パターン**: すべての`GlobalSceneScope`リテラル構築（テストコード内）に`actors: Vec::new(),`を追加するだけ。
 
 ---
 
@@ -489,4 +521,5 @@ fn create_test_scene(name: &str) -> GlobalSceneScope {
 |-------|--------|
 | 全角数字パースエラー | 既存`normalize_number_str`を再利用 |
 | 採番状態管理漏れ | `next_number`を`&mut u32`で明示的に管理 |
-| pasta_luaビルドエラー | テストコードのみ修正、本体は変更なし |
+| pasta_luaビルドエラー | テストコードのみ修正（4箇所確定）、本体は変更なし |
+| グローバルシーン初期化時のRule検証漏れ | `actors` silent ruleの内部展開を明示的に処理 |
