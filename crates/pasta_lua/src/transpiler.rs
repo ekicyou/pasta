@@ -147,6 +147,7 @@ mod tests {
             is_continuation: false,
             attrs: vec![],
             words: vec![],
+            actors: vec![],
             code_blocks: vec![],
             local_scenes: vec![LocalSceneScope::start()],
             span: Span::default(),
@@ -167,6 +168,7 @@ mod tests {
                 words: word_values.iter().map(|s| s.to_string()).collect(),
                 span: Span::default(),
             }],
+            actors: vec![],
             code_blocks: vec![],
             local_scenes: vec![LocalSceneScope::start()],
             span: Span::default(),
@@ -179,6 +181,7 @@ mod tests {
             is_continuation: false,
             attrs: vec![],
             words: vec![],
+            actors: vec![],
             code_blocks: vec![],
             local_scenes: vec![
                 LocalSceneScope::start(),
