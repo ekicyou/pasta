@@ -111,7 +111,7 @@
 **目的**: アクター辞書（`％アクター名`）とその属性をLua構造に変換
 
 **受け入れ基準**:
-- When `％さくら` アクター定義があるとき、Transpiler shall `do...end` ブロックで分離し、ブロック内で `local ACTOR = PASTA:create_actor("さくら")` と生成する
+- When `％さくら` アクター定義があるとき、Transpiler shall `do...end` ブロックで分離し、ブロック内で `local ACTOR = PASTA.create_actor("さくら")` と生成する
 - When アクター単語定義（`＠通常：\s[0]`）が続くとき、Transpiler shall `ACTOR.通常 = [=[\s[0]]=]` と生成する（Requirement 0-2の文字列リテラル形式判定アルゴリズムを適用）
 - Where アクター単語定義が複数あるとき、Transpiler shall 同一ACTOR変数への連続代入として生成する
 - The Transpiler shall 複数アクター定義時に各定義を独立した `do...end` ブロックで分離することで、ACTOR変数の再利用を明確化する
@@ -123,9 +123,9 @@
 **背景**: グローバルシーンは各ファイル内で一意である必要があり、重複する場合は番号で区別する。命名規則は Rune 実装に従う。
 
 **受け入れ基準**:
-- When `＊メイン` グローバルシーン定義があるとき、Transpiler shall `do...end` ブロックで分離し、ブロック内で `local SCENE = PASTA:create_scene("モジュール名_N")` と生成する（N=1,2,3... はグローバルシーン定義順、0-indexed を 1-indexed に変換）
+- When `＊メイン` グローバルシーン定義があるとき、Transpiler shall `do...end` ブロックで分離し、ブロック内で `local SCENE = PASTA.create_scene("モジュール名_N")` と生成する（N=1,2,3... はグローバルシーン定義順、0-indexed を 1-indexed に変換）
 - The Transpiler shall グローバルシーン名の重複有無に関わらず、常に `_N` 番号を付与する（例: `＊メイン` → `メイン_1`、2個目の `＊メイン` → `メイン_2`）
-- The Transpiler shall モジュール名の実際の登録・解決ロジックは `PASTA:create_scene()` ランタイム関数に委譲する（トランスパイラー層では機械的に `_N` を付与するのみ）
+- The Transpiler shall モジュール名の実際の登録・解決ロジックは `PASTA.create_scene()` ランタイム関数に委譲する（トランスパイラー層では機械的に `_N` を付与するのみ）
 - When ローカル単語定義（`＠場所：東京、大阪`）があるとき、Transpiler shall Lua コード出力を生成せず、内部の WordDefRegistry に登録する
 - When グローバル単語定義（`＠挨拶：こんにちは、やあ`）があるとき、Transpiler shall Lua コード出力を生成せず、内部の WordDefRegistry に登録する
 - When ファイルレベル属性（`＆天気：晴れ`）があるとき、Transpiler shall パーサーから取得するが、トランスパイラー層では処理しない（属性実装は後続仕様）
@@ -141,7 +141,7 @@
 - When グローバルシーン `＊メイン` のエントリーポイントを生成するとき、Transpiler shall `function SCENE.__start__(ctx, ...)` と生成する
 - When 第1階層ローカルシーン `・自己紹介` があるとき、Transpiler shall `function SCENE.__自己紹介_N__(ctx, ...)` と生成する（`__ローカルシーン名_N__` 形式、N=1,2,3...）
 - Where N は各グローバルシーン内でのローカルシーン定義順序（0-indexed を 1-indexed に変換）。同名シーンの重複有無に関わらず、常に 1 から開始
-- The Transpiler shall すべてのシーン関数の第一行を `local args = { ... }` とし、第二行を `local act, save, var = PASTA:create_session(SCENE, ctx)` として生成する
+- The Transpiler shall すべてのシーン関数の第一行を `local args = { ... }` とし、第二行を `local act, save, var = PASTA.create_session(SCENE, ctx)` として生成する
 
 #### 3d. 変数スコープ管理（var/save/act分離）
 

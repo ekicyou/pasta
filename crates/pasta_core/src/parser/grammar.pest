@@ -137,6 +137,10 @@ words         =  { word ~ ( comma_sep ~ word )* ~ comma_sep? }
 word          = _{ string_literal | sakura_script | word_nofenced }
 word_nofenced = @{ (!(comma_sep | "\r" | "\n") ~ ANY)+ }
 
+// ################################################# actors
+actors       = _{ actors_item ~ ( comma_sep ~ actors_item )* ~ comma_sep? }
+actors_item  =  { id ~ ( s ~ set_marker ~ s ~ digit_id )? }
+
 // ################################################# attr
 attr  =  { attr_marker ~ key_attr ~ s }
 attrs = _{ attr+ }
@@ -206,6 +210,7 @@ action_line          = { pad ~ id ~ s ~ kv_marker ~ s ~ actions ~ eol }
 continue_action_line = { pad ~ kv_marker ~ s ~ actions ~ eol }
 var_set_line         =_{ pad ~ var_set ~ or_comment_eol }
 call_scene_line      =_{ pad ~ call_scene ~ or_comment_eol }
+scene_actors_line    = { pad ~ actor_marker ~ actors ~ or_comment_eol }
 
 // ################################################# scope
 file_scope      = { file_scppe_item+ }
@@ -216,7 +221,7 @@ actor_scope_item = _{ global_scene_attr_line | global_scene_word_line | var_set_
 
 global_scene_scope = { global_scene_start ~ global_scene_init* ~ code_scope* ~ local_start_scene_scope ~ local_scene_scope* }
 global_scene_start = { global_scene_line | global_scene_continue_line }
-global_scene_init  =_{ global_scene_attr_line | global_scene_word_line | blank_line }
+global_scene_init  =_{ global_scene_attr_line | global_scene_word_line | scene_actors_line | blank_line }
 
 local_start_scene_scope = {                     local_scene_item+ ~ code_scope* }
 local_scene_scope       = { local_scene_start ~ local_scene_item+ ~ code_scope* }

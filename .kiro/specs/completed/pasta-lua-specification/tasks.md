@@ -26,17 +26,17 @@
 ## 2. LuaCodeGenerator による出力生成
 
 - [x] 2.1 アクター定義ブロック生成 (P)
-  - ActorScope ノードから `local ACTOR = PASTA:create_actor(...)` コードを生成
+  - ActorScope ノードから `local ACTOR = PASTA.create_actor(...)` コードを生成
   - 各アクター属性を `ACTOR.属性名 = [...]=]` 形式で出力
   - 複数アクター定義を `do...end` ブロックで分離し、ACTOR 変数を再利用
   - 属性値の文字列リテラル化（StringLiteralizer 使用）
   - _Requirements: 1, 3a_
 
 - [x] 2.2 グローバルシーン定義ブロック生成 (P)
-  - GlobalSceneScope ノードから `local SCENE = PASTA:create_scene("モジュール名_N")` コードを生成
+  - GlobalSceneScope ノードから `local SCENE = PASTA.create_scene("モジュール名_N")` コードを生成
   - グローバルシーン定義順に番号付け（N=1,2,3...）し、重複有無に関わらず常に `_N` を付与
   - エントリーポイント関数 `function SCENE.__start__(ctx, ...) ... end` を生成
-  - 引数テーブル化 `local args = { ... }` とセッション初期化 `local act, save, var = PASTA:create_session(SCENE, ctx)` を生成
+  - 引数テーブル化 `local args = { ... }` とセッション初期化 `local act, save, var = PASTA.create_session(SCENE, ctx)` を生成
   - 複数グローバルシーン定義を独立した `do...end` ブロックで分離
   - _Requirements: 1, 3b_
 
@@ -44,7 +44,7 @@
   - LocalSceneScope ノードから `function SCENE.__シーン名_N__(ctx, ...) ... end` 形式を生成
   - グローバルシーン内でのローカルシーン定義順に番号付け（N=1,2,3...）
   - 同一グローバルシーン内での重複名に対応（番号で区別）
-  - セッション初期化コード（args テーブル化と PASTA:create_session 呼び出し）を生成
+  - セッション初期化コード（args テーブル化と PASTA.create_session 呼び出し）を生成
   - _Requirements: 1, 3c_
 
 - [x] 2.4 変数代入・参照コード生成 (P)

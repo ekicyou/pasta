@@ -185,8 +185,8 @@ pasta_lua/src/
 - 実装確認: error.rs の Display トレイト実装 ✅
 
 **Lua コード生成形式**:
-- アクター: `local ACTOR = PASTA:create_actor("...")` ✅
-- グローバルシーン: `local SCENE = PASTA:create_scene("モジュール名_N")` ✅
+- アクター: `local ACTOR = PASTA.create_actor("...")` ✅
+- グローバルシーン: `local SCENE = PASTA.create_scene("モジュール名_N")` ✅
 - ローカルシーン: `function SCENE.__シーン名_N__(...)` ✅
 - Call 文: `act:call("モジュール名", "ラベル", {}, ...)` ✅
 

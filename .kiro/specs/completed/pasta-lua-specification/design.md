@@ -553,22 +553,22 @@ classDiagram
 
 ```lua
 -- ヘッダー
-local PASTA = require "pasta.runtime"
+local PASTA = require "pasta"
 
 -- アクター定義（Requirement 4a）
 do
-    local ACTOR = PASTA:create_actor("アクター名")
+    local ACTOR = PASTA.create_actor("アクター名")
     ACTOR.属性 = [=[値]=]  -- Requirement 3
 end
 
 -- シーン定義（Requirement 4b）
 do
-    local SCENE = PASTA:create_scene("モジュール名")
+    local SCENE = PASTA.create_scene("モジュール名")
     
     -- エントリーポイント（Requirement 4c）
     function SCENE.__start__(ctx, ...)
         local args = { ... }
-        local act, save, var = PASTA:create_session(SCENE, ctx)
+        local act, save, var = PASTA.create_session(SCENE, ctx)
         -- アクション生成（Requirement 4d, 4e）
     end
     
@@ -682,10 +682,10 @@ Lua のテーブル参照特性を活かし、参照検証と Lua コード生�
 
 2. GlobalSceneScope 走査
    ├─ グローバルシーン関数定義出力
-   │  └─ do ... local SCENE = PASTA:create_scene("モジュール名_N") ...end
+   │  └─ do ... local SCENE = PASTA.create_scene("モジュール名_N") ...end
    │     ・N = グローバルシーン定義順（1,2,3... ファイル内出現順、0-indexed を 1-indexed に変換）
    │     ・重複有無に関わらず常に _N を付与（例: ＊メイン → "メイン_1", 2個目 → "メイン_2"）
-   │     ・登録ロジックは PASTA:create_scene() ランタイム関数に委譲
+   │     ・登録ロジックは PASTA.create_scene() ランタイム関数に委譲
    ├─ LocalSceneScope 走査（同一ブロック内）
    │  ├─ ローカルシーン関数定義出力
    │  │  └─ function SCENE.__シーン名_N__() ... end

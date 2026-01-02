@@ -52,6 +52,12 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         Ok(())
     }
 
+    /// Write a blank line without indentation.
+    fn write_blank_line(&mut self) -> Result<(), TranspileError> {
+        writeln!(self.writer)?;
+        Ok(())
+    }
+
     /// Write without indentation.
     fn write_raw(&mut self, s: &str) -> Result<(), TranspileError> {
         write!(self.writer, "{}", s)?;
@@ -72,8 +78,8 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
 
     /// Write the Lua header (require statement).
     pub fn write_header(&mut self) -> Result<(), TranspileError> {
-        self.writeln("local PASTA = require \"pasta.runtime\"")?;
-        self.writeln("")?;
+        self.writeln("local PASTA = require \"pasta\"")?;
+        self.write_blank_line()?;
         Ok(())
     }
 
@@ -82,7 +88,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// Generates:
     /// ```lua
     /// do
-    ///     local ACTOR = PASTA:create_actor("アクター名")
+    ///     local ACTOR = PASTA.create_actor("アクター名")
     ///     ACTOR.属性 = [=[値]=]
     /// end
     /// ```
@@ -93,7 +99,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
 
         // Create actor
         self.writeln(&format!(
-            "local ACTOR = PASTA:create_actor(\"{}\")",
+            "local ACTOR = PASTA.create_actor(\"{}\")",
             actor.name
         ))?;
 
@@ -109,7 +115,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
 
         self.dedent();
         self.writeln("end")?;
-        self.writeln("")?;
+        self.write_blank_line()?;
 
         Ok(())
     }
@@ -119,11 +125,11 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// Generates:
     /// ```lua
     /// do
-    ///     local SCENE = PASTA:create_scene("モジュール名_N")
+    ///     local SCENE = PASTA.create_scene("モジュール名_N")
     ///     
     ///     function SCENE.__start__(ctx, ...)
     ///         local args = { ... }
-    ///         local act, save, var = PASTA:create_session(SCENE, ctx)
+    ///         local act, save, var = PASTA.create_session(SCENE, ctx)
     ///         -- ...
     ///     end
     ///     
@@ -158,10 +164,10 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
 
         // Create scene
         self.writeln(&format!(
-            "local SCENE = PASTA:create_scene(\"{}\")",
+            "local SCENE = PASTA.create_scene(\"{}\")",
             module_name
         ))?;
-        self.writeln("")?;
+        self.write_blank_line()?;
 
         // Generate local scenes with per-name counters
         // Same-name scenes get incrementing numbers (_1, _2, ...)
@@ -193,7 +199,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
 
         self.dedent();
         self.writeln("end")?;
-        self.writeln("")?;
+        self.write_blank_line()?;
 
         Ok(())
     }
@@ -204,7 +210,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// ```lua
     /// function SCENE.__シーン名_N__(ctx, ...)
     ///     local args = { ... }
-    ///     local act, save, var = PASTA:create_session(SCENE, ctx)
+    ///     local act, save, var = PASTA.create_session(SCENE, ctx)
     ///     -- items...
     /// end
     /// ```
@@ -231,8 +237,8 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
 
         // Session initialization (Requirement 3c)
         self.writeln("local args = { ... }")?;
-        self.writeln("local act, save, var = PASTA:create_session(SCENE, ctx)")?;
-        self.writeln("")?;
+        self.writeln("local act, save, var = PASTA.create_session(SCENE, ctx)")?;
+        self.write_blank_line()?;
 
         // Generate local scene items
         self.generate_local_scene_items(&scene.items)?;
@@ -242,7 +248,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
 
         self.dedent();
         self.writeln("end")?;
-        self.writeln("")?;
+        self.write_blank_line()?;
 
         Ok(())
     }
@@ -474,8 +480,8 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             Expr::FnCall { name, args, scope } => {
                 let args_str = self.generate_args_string(args)?;
                 let prefix = match scope {
-                    pasta_core::parser::FnScope::Local => "SCENE:",
-                    pasta_core::parser::FnScope::Global => "SCENE:",
+                    pasta_core::parser::FnScope::Local => "SCENE.",
+                    pasta_core::parser::FnScope::Global => "SCENE.",
                 };
                 write!(
                     self.writer,
@@ -542,7 +548,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             Expr::FnCall { name, args, scope } => {
                 let args_str = self.generate_args_string(args)?;
                 let prefix = match scope {
-                    pasta_core::parser::FnScope::Local => "SCENE:",
+                    pasta_core::parser::FnScope::Local => "SCENE.",
                     pasta_core::parser::FnScope::Global => "SCENE.",
                 };
                 write!(
@@ -727,7 +733,7 @@ mod tests {
         codegen.write_header().unwrap();
 
         let result = String::from_utf8(output).unwrap();
-        assert!(result.contains("local PASTA = require \"pasta.runtime\""));
+        assert!(result.contains("local PASTA = require \"pasta\""));
     }
 
     // ========================================================================

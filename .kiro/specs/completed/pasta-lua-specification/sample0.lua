@@ -16,7 +16,7 @@ local ACTOR, SCENE
 --       ローカル変数数を抑制（Requirement 0対策）
 
 --％さくら
-ACTOR = PASTA:create_actor("さくら")
+ACTOR = PASTA.create_actor("さくら")
 --　＄通常　　　：\s[0]
 --　＄照れ　　　：\s[1]
 --　＄驚き　　　：\s[2]
@@ -34,7 +34,7 @@ ACTOR.怒り = [=[\s[4]]=]
 --
 --％うにゅう
 -- 意図: 前のアクター定義と同じACTOR変数を再利用
-ACTOR = PASTA:create_actor("うにゅう")
+ACTOR = PASTA.create_actor("うにゅう")
 --　＄通常　：\s[10]
 --　＄刮目　：\s[11]
 ACTOR.通常 = [=[\s[10]]=]
@@ -55,7 +55,7 @@ ACTOR.刮目 = [=[\s[11]]=]
 --＊メイン
 -- 意図: 同一SCENE変数を再利用してシーン定義（Requirement 0対策）
 --       "メイン1"は一意なモジュール名として解決される（Scene Registry管理）
-SCENE = PASTA:create_scene("メイン1")
+SCENE = PASTA.create_scene("メイン1")
 
 --⇒SceneRegistryに登録されるため、Lua出力無し
 --⇒ここで、グローバルシーンのモジュール名を「メイン1」と解決した
@@ -72,7 +72,7 @@ function SCENE.__start__(scene, ctx, ...)
     local args = { ... }
     -- 意図: セッション管理オブジェクト取得
     --       act=アクション制御, save=永続変数($*), var=一時変数($)
-    local act, save, var = PASTA:create_session(scene, ctx)
+    local act, save, var = PASTA.create_session(scene, ctx)
 
     --＃ 変数代入
     --＄カウンタ＝１０
@@ -110,7 +110,7 @@ end
 --       "__"で囲む=トップレベルスコープ、"1"=重複回避のシーケンス番号
 function SCENE.__自己紹介1__(scene, ctx, ...)
     local args = { ... }
-    local act, save, var = PASTA:create_session(scene, ctx)
+    local act, save, var = PASTA.create_session(scene, ctx)
 
     --＃ Callラベル1: 自己紹介
     --さくら　：私はさくらです。
@@ -128,7 +128,7 @@ end
 ---趣味紹介
 function SCENE.メイン1_趣味紹介1(scene, ctx, ...)
     local args = { ... }
-    local act, save, var = PASTA:create_session(scene, ctx)
+    local act, save, var = PASTA.create_session(scene, ctx)
 
     --＃ Callラベル2: 趣味紹介（ネスト先）
     --さくら　：私の趣味は読書です。
@@ -141,7 +141,7 @@ end
 -- 意図: 引数を受け取るローカルシーン、＄値は仮引数名（args[1]で受け取る）
 function SCENE.メイン1_カウント表示1(scene, ctx, ...)
     local args = { ... }
-    local act, save, var = PASTA:create_session(scene, ctx)
+    local act, save, var = PASTA.create_session(scene, ctx)
 
     --＃ Callラベル3: 引数を受け取る
     --さくら　：カウンターは＄０　です。
