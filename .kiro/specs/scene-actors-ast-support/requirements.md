@@ -40,7 +40,7 @@ grammar.pestに新しい文法`scene_actors_line`（グローバルシーンに�
   - **複数行にまたがる場合でも、最後の番号を引き継いで+1する**
 
 ### 要件2: GlobalSceneScopeへの統合
-**目的:** パーサー開発者として、`SceneActorLine`を`GlobalSceneScope`に統合したい。これにより、シーンレベルのアクター宣言にアクセスできるようになる。
+**目的:** パーサー開発者として、`SceneActorItem`を`GlobalSceneScope`に統合したい。これにより、シーンレベルのアクター宣言にアクセスできるようになる。
 
 #### 受け入れ基準
 1. The `GlobalSceneScope` shall `actors`フィールド（`Vec<SceneActorItem>`）を保持する
@@ -53,8 +53,8 @@ grammar.pestに新しい文法`scene_actors_line`（グローバルシーンに�
 #### 受け入れ基準
 1. When Pestが`scene_actors_line`ルールをパースした時, pasta_core shall 1行分の`Vec<SceneActorItem>`を生成する
 2. When Pestが`actors_item`ルールをパースした時, pasta_core shall `SceneActorItem`型に変換する
-3. When `actors_item`に`set_marker`と`digit_id`が含まれる時, pasta_core shall `SceneActorItem.number`に対応する数値を設定する
-4. If `actors_item`に`digit_id`が含まれない時, pasta_core shall `SceneActorItem.number`を`None`に設定する
+3. When `actors_item`に`set_marker`と`digit_id`が含まれる時, pasta_core shall その数値を`SceneActorItem.number`に設定し、次の採番基準を更新する
+4. If `actors_item`に`digit_id`が含まれない時, pasta_core shall 現在の採番カウンタ値を`SceneActorItem.number`に設定し、カウンタを+1する
 5. The pasta_core shall 各ASTノードに正確な`Span`情報を設定する
 
 ### 要件4: pasta_lua最低限対応
