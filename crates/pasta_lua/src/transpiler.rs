@@ -220,7 +220,7 @@ mod tests {
         assert!(result.is_ok());
 
         let lua_code = String::from_utf8(output).unwrap();
-        assert!(lua_code.contains("local PASTA = require \"pasta.runtime\""));
+        assert!(lua_code.contains("local PASTA = require \"pasta\""));
     }
 
     #[test]
@@ -234,7 +234,7 @@ mod tests {
         assert!(result.is_ok());
 
         let lua_code = String::from_utf8(output).unwrap();
-        assert!(lua_code.contains("PASTA:create_actor(\"さくら\")"));
+        assert!(lua_code.contains("PASTA.create_actor(\"さくら\")"));
         assert!(lua_code.contains("ACTOR.通常 = [=[\\s[0]]=]"));
     }
 
@@ -249,7 +249,7 @@ mod tests {
         assert!(result.is_ok());
 
         let lua_code = String::from_utf8(output).unwrap();
-        assert!(lua_code.contains("PASTA:create_scene(\"メイン1\")"));
+        assert!(lua_code.contains("PASTA.create_scene(\"メイン1\")"));
         assert!(lua_code.contains("function SCENE.__start__(ctx, ...)"));
     }
 
@@ -268,8 +268,8 @@ mod tests {
 
         let lua_code = String::from_utf8(output).unwrap();
         // Each unique scene name gets counter=1 (counter is per-name, not global)
-        assert!(lua_code.contains("PASTA:create_scene(\"メイン1\")"));
-        assert!(lua_code.contains("PASTA:create_scene(\"会話分岐1\")"));
+        assert!(lua_code.contains("PASTA.create_scene(\"メイン1\")"));
+        assert!(lua_code.contains("PASTA.create_scene(\"会話分岐1\")"));
     }
 
     // Task 3.1: SceneRegistry integration tests

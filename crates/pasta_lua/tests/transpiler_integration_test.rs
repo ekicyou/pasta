@@ -68,7 +68,7 @@ fn test_transpile_sample_pasta_header() {
 
     // Verify header
     assert!(
-        lua_code.contains("local PASTA = require \"pasta.runtime\""),
+        lua_code.contains("local PASTA = require \"pasta\""),
         "Missing PASTA require statement"
     );
 }
@@ -85,11 +85,11 @@ fn test_transpile_sample_pasta_actors() {
 
     // Verify actor definitions (Requirement 3a)
     assert!(
-        lua_code.contains("PASTA:create_actor(\"さくら\")"),
+        lua_code.contains("PASTA.create_actor(\"さくら\")"),
         "Missing actor さくら"
     );
     assert!(
-        lua_code.contains("PASTA:create_actor(\"うにゅう\")"),
+        lua_code.contains("PASTA.create_actor(\"うにゅう\")"),
         "Missing actor うにゅう"
     );
 
@@ -120,7 +120,7 @@ fn test_transpile_sample_pasta_scenes() {
 
     // Verify scene definition (Requirement 3b)
     assert!(
-        lua_code.contains("PASTA:create_scene(\"メイン1\")"),
+        lua_code.contains("PASTA.create_scene(\"メイン1\")"),
         "Missing scene メイン1"
     );
 
@@ -136,7 +136,7 @@ fn test_transpile_sample_pasta_scenes() {
         "Missing args initialization"
     );
     assert!(
-        lua_code.contains("local act, save, var = PASTA:create_session(SCENE, ctx)"),
+        lua_code.contains("local act, save, var = PASTA.create_session(SCENE, ctx)"),
         "Missing session initialization"
     );
 
@@ -236,8 +236,8 @@ fn test_transpile_config_no_comments() {
     let lua_code = String::from_utf8(output).unwrap();
 
     // Config without comments should still produce valid code
-    assert!(lua_code.contains("PASTA:create_actor"));
-    assert!(lua_code.contains("PASTA:create_scene"));
+    assert!(lua_code.contains("PASTA.create_actor"));
+    assert!(lua_code.contains("PASTA.create_scene"));
 }
 
 /// Test case for the reference implementation sample.pasta
@@ -262,20 +262,20 @@ fn test_transpile_reference_sample_structure() {
 
     // Verify key structural elements
     assert!(
-        lua_code.contains("PASTA:create_actor(\"さくら\")"),
+        lua_code.contains("PASTA.create_actor(\"さくら\")"),
         "Missing actor さくら"
     );
     assert!(
-        lua_code.contains("PASTA:create_actor(\"うにゅう\")"),
+        lua_code.contains("PASTA.create_actor(\"うにゅう\")"),
         "Missing actor うにゅう"
     );
     assert!(
-        lua_code.contains("PASTA:create_scene(\"メイン1\")"),
+        lua_code.contains("PASTA.create_scene(\"メイン1\")"),
         "Missing scene メイン1"
     );
     // Each unique scene name gets counter=1 (counter is per-name, not global)
     assert!(
-        lua_code.contains("PASTA:create_scene(\"会話分岐1\")"),
+        lua_code.contains("PASTA.create_scene(\"会話分岐1\")"),
         "Missing scene 会話分岐1"
     );
 }
