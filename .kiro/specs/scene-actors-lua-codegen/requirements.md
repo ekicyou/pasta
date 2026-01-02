@@ -50,8 +50,12 @@ SCENE.__start__()メソッドの「PASTA.create_session」行の後ろに、下�
 #### 受け入れ基準
 1. When `％さくら、うにゅう＝２`を含むPastaファイルをトランスパイルした時, pasta_lua shall `act.さくら:set_spot(0)`と`act.うにゅう:set_spot(2)`を生成する
 2. When アクター宣言がない場合, pasta_lua shall `set_spot`呼び出しを含まないLuaコードを生成する
-3. When 複数行にまたがるアクター宣言がある場合, pasta_lua shall 全アクターの`set_spot`を正しい番号で生成する
-4. When `cargo test --all`を実行した時, すべてのテスト（既存＋新規）が成功する
+3. When `cargo test --all`を実行した時, すべてのテスト（既存＋新規）が成功する
+
+**テスト設計方針:**
+- パーサー側（pasta_core）で採番ルール検証済みのため、Lua側は「正しく受け取ったactorsをLua形式で出力する」ことのみ検証
+- テストパターン: 単一アクター、複数アクター、アクターなし（各1～2ケース）
+- 複数行継続のC#採番検証はpasta_coreの責務、Lua側では不要
 
 ### 要件4: 生成コード例
 **目的:** 開発者として、期待される生成コードを理解したい。
