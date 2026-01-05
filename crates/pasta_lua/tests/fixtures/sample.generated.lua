@@ -22,6 +22,9 @@ do
         local args = { ... }
         local act, save, var = PASTA.create_session(SCENE, ctx)
 
+        act.さくら:set_spot(0)
+        act.うにゅう:set_spot(1)
+
         act:call("メイン1", "グローバル単語呼び出し", {}, table.unpack(args))
         act:call("メイン1", "ローカル単語呼び出し", {}, table.unpack(args))
         act:call("メイン1", "会話分岐", {}, table.unpack(args))

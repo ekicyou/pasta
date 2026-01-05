@@ -77,6 +77,11 @@ do
         local args = { ... }
         local act, save, var = PASTA.create_session(SCENE, ctx)
 
+        -- 　％さくら、うにゅう
+        -- 意図: シーンアクター設定。set_spot(n)でアクターの表示位置を設定
+        act.さくら:set_spot(0)
+        act.うにゅう:set_spot(1)
+
         -- 　　　＞グローバル単語呼び出し
         -- 意図: Call文は act:call(モジュール名, ラベル名, 属性フィルター, ...引数) 形式（Requirement 3d）
         --       第3引数の {} は属性フィルター用の空テーブル（将来拡張用に予約）
