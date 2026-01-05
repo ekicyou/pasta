@@ -10,6 +10,7 @@ use super::code_generator::LuaCodeGenerator;
 use super::config::TranspilerConfig;
 use super::context::TranspileContext;
 use super::error::TranspileError;
+use super::normalize::normalize_output;
 
 use std::io::Write;
 
@@ -50,13 +51,19 @@ impl LuaTranspiler {
     /// # Returns
     /// * `Ok(TranspileContext)` - Transpilation successful, context contains registries
     /// * `Err(TranspileError)` - Transpilation failed
+    ///
+    /// # Post-processing
+    /// - Output is normalized: trailing blank lines removed, ends with exactly one newline
     pub fn transpile<W: Write>(
         &self,
         file: &PastaFile,
         writer: &mut W,
     ) -> Result<TranspileContext, TranspileError> {
         let mut context = TranspileContext::new();
-        let mut codegen = LuaCodeGenerator::with_line_ending(writer, self.config.line_ending);
+        
+        // Use intermediate buffer for code generation
+        let mut intermediate_buffer: Vec<u8> = Vec::new();
+        let mut codegen = LuaCodeGenerator::with_line_ending(&mut intermediate_buffer, self.config.line_ending);
 
         // Write header
         codegen.write_header()?;
@@ -111,6 +118,14 @@ impl LuaTranspiler {
                 }
             }
         }
+
+        // Convert intermediate buffer to UTF-8 string and normalize
+        let raw_output = String::from_utf8(intermediate_buffer)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        let normalized_output = normalize_output(&raw_output);
+        
+        // Write normalized output to final writer
+        writer.write_all(normalized_output.as_bytes())?;
 
         Ok(context)
     }
