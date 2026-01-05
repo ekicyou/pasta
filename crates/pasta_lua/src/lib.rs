@@ -28,6 +28,7 @@ pub mod code_generator;
 pub mod config;
 pub mod context;
 pub mod error;
+pub mod normalize;
 pub mod string_literalizer;
 pub mod transpiler;
 
