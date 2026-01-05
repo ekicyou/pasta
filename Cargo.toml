@@ -23,7 +23,8 @@ tracing = "0.1"
 tempfile = "3"
 
 # pasta_lua dependencies
-mlua = { git = "https://github.com/ekicyou/mlua.git", features = ["lua54", "vendored", "ucid"] }
+lua-src = { version = ">= 548.1.0, < 549.0.0", features = ["ucid"] }
+mlua = { version = "0.11", features = ["lua54", "vendored"] }
 
 # Internal dependencies
 pasta_core = { path = "crates/pasta_core" }

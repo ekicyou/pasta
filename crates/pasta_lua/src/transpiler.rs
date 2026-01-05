@@ -56,7 +56,7 @@ impl LuaTranspiler {
         writer: &mut W,
     ) -> Result<TranspileContext, TranspileError> {
         let mut context = TranspileContext::new();
-        let mut codegen = LuaCodeGenerator::new(writer);
+        let mut codegen = LuaCodeGenerator::with_line_ending(writer, self.config.line_ending);
 
         // Write header
         codegen.write_header()?;
