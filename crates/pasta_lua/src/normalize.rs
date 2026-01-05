@@ -30,25 +30,25 @@
 pub fn normalize_output(input: &str) -> String {
     // Normalize CRLF to LF first
     let input_lf = input.replace("\r\n", "\n");
-    
+
     // Split into lines (preserving the content, not the line endings)
     let lines: Vec<&str> = input_lf.lines().collect();
     let mut result_lines: Vec<&str> = Vec::with_capacity(lines.len());
-    
+
     // Process lines, removing blank lines before `end`
     // Use a loop that can skip blank lines when followed by `end`
     let mut i = 0;
     while i < lines.len() {
         let line = lines[i];
         let trimmed = line.trim();
-        
+
         // Check if this is a blank line
         if trimmed.is_empty() {
-            // Look ahead to find if any subsequent line starts with `end` 
+            // Look ahead to find if any subsequent line starts with `end`
             // (skipping any other blank lines)
             let mut j = i + 1;
             let mut found_end = false;
-            
+
             // Check only the immediate next non-blank line
             while j < lines.len() {
                 let next_trimmed = lines[j].trim();
@@ -63,24 +63,24 @@ pub fn normalize_output(input: &str) -> String {
                 }
                 break;
             }
-            
+
             if found_end {
                 // Skip this blank line
                 i += 1;
                 continue;
             }
         }
-        
+
         result_lines.push(line);
         i += 1;
     }
-    
+
     // Join lines back with LF
     let processed = result_lines.join("\n");
-    
+
     // Trim trailing whitespace (spaces, tabs, carriage returns, newlines)
     let trimmed = processed.trim_end_matches(|c| c == ' ' || c == '\t' || c == '\r' || c == '\n');
-    
+
     // Return with exactly one newline at end
     format!("{}\n", trimmed)
 }
@@ -178,7 +178,10 @@ mod tests {
     #[test]
     fn test_normalize_lua_do_block() {
         let input = "do\n    function f()\n        return 1\n    end\n\nend\n";
-        assert_eq!(normalize_output(input), "do\n    function f()\n        return 1\n    end\nend\n");
+        assert_eq!(
+            normalize_output(input),
+            "do\n    function f()\n        return 1\n    end\nend\n"
+        );
     }
 
     /// Test 15: Nested end blocks
