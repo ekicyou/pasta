@@ -200,12 +200,12 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
 ### Integration Tests
 既存テストの修正対象:
 
-| テスト名                             | 修正内容                                                |
-| ------------------------------------ | ------------------------------------------------------- |
+| テスト名                             | 修正内容                                     |
+| ------------------------------------ | -------------------------------------------- |
 | `test_set_spot_multiple_actors`      | 検証文字列を新形式に変更＋clear_spot検証追加 |
-| `test_set_spot_single_actor`         | 同上＋clear_spot検証追加                                |
-| `test_set_spot_empty_actors`         | set_spot出力なし＋clear_spot不出力を確認                |
-| `test_set_spot_with_explicit_number` | 検証文字列を新形式に変更＋clear_spot検証追加            |
+| `test_set_spot_single_actor`         | 同上＋clear_spot検証追加                     |
+| `test_set_spot_empty_actors`         | set_spot出力なし＋clear_spot不出力を確認     |
+| `test_set_spot_with_explicit_number` | 検証文字列を新形式に変更＋clear_spot検証追加 |
 
 ### テスト検証項目
 **文字列置換に加えて、以下の検証アサーションを追加:**
