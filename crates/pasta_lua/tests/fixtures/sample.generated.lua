@@ -20,9 +20,9 @@ do
 
     function SCENE.__start__(ctx, ...)
         local args = { ... }
-        PASTA.clear_spot()
-        PASTA.set_spot("さくら", 0)
-        PASTA.set_spot("うにゅう", 1)
+        PASTA.clear_spot(ctx)
+        PASTA.set_spot(ctx, "さくら", 0)
+        PASTA.set_spot(ctx, "うにゅう", 1)
         local act, save, var = PASTA.create_session(SCENE, ctx)
 
         act:call("メイン1", "グローバル単語呼び出し", {}, table.unpack(args))

@@ -865,29 +865,29 @@ fn test_set_spot_multiple_actors() {
 
     // Verify clear_spot is generated (Requirement 2.1)
     assert!(
-        lua_code.contains("PASTA.clear_spot()"),
+        lua_code.contains("PASTA.clear_spot(ctx)"),
         "Missing clear_spot call. Generated code:\n{lua_code}"
     );
 
     // Verify set_spot calls are generated with new format (Requirement 3.1, 3.2)
     assert!(
-        lua_code.contains(r#"PASTA.set_spot("さくら", 0)"#),
+        lua_code.contains(r#"PASTA.set_spot(ctx, "さくら", 0)"#),
         "Missing さくら set_spot call. Generated code:\n{lua_code}"
     );
     assert!(
-        lua_code.contains(r#"PASTA.set_spot("うにゅう", 2)"#),
+        lua_code.contains(r#"PASTA.set_spot(ctx, "うにゅう", 2)"#),
         "Missing うにゅう set_spot call. Generated code:\n{lua_code}"
     );
 
     // Verify order: clear_spot -> set_spot -> create_session (Requirement 1.1, 1.2)
     let clear_spot_pos = lua_code
-        .find("PASTA.clear_spot()")
+        .find("PASTA.clear_spot(ctx)")
         .expect("clear_spot not found");
     let sakura_pos = lua_code
-        .find(r#"PASTA.set_spot("さくら""#)
+        .find(r#"PASTA.set_spot(ctx, "さくら""#)
         .expect("さくら set_spot not found");
     let unyu_pos = lua_code
-        .find(r#"PASTA.set_spot("うにゅう""#)
+        .find(r#"PASTA.set_spot(ctx, "うにゅう""#)
         .expect("うにゅう set_spot not found");
     let create_session_pos = lua_code
         .find("PASTA.create_session")
@@ -923,22 +923,22 @@ fn test_set_spot_single_actor() {
 
     // Verify clear_spot is generated (Requirement 2.1)
     assert!(
-        lua_code.contains("PASTA.clear_spot()"),
+        lua_code.contains("PASTA.clear_spot(ctx)"),
         "Missing clear_spot call. Generated code:\n{lua_code}"
     );
 
     // Verify single actor set_spot is generated with new format (Requirement 3.1, 3.2)
     assert!(
-        lua_code.contains(r#"PASTA.set_spot("さくら", 0)"#),
+        lua_code.contains(r#"PASTA.set_spot(ctx, "さくら", 0)"#),
         "Missing single actor set_spot call. Generated code:\n{lua_code}"
     );
 
     // Verify order: clear_spot -> set_spot -> create_session
     let clear_spot_pos = lua_code
-        .find("PASTA.clear_spot()")
+        .find("PASTA.clear_spot(ctx)")
         .expect("clear_spot not found");
     let set_spot_pos = lua_code
-        .find(r#"PASTA.set_spot("さくら""#)
+        .find(r#"PASTA.set_spot(ctx, "さくら""#)
         .expect("set_spot not found");
     let create_session_pos = lua_code
         .find("PASTA.create_session")
@@ -996,30 +996,30 @@ fn test_set_spot_with_explicit_number() {
 
     // Verify clear_spot is generated (Requirement 2.1)
     assert!(
-        lua_code.contains("PASTA.clear_spot()"),
+        lua_code.contains("PASTA.clear_spot(ctx)"),
         "Missing clear_spot call. Generated code:\n{lua_code}"
     );
 
     // Verify explicit numbers are respected with new format (C# enum rule)
     assert!(
-        lua_code.contains(r#"PASTA.set_spot("さくら", 0)"#),
+        lua_code.contains(r#"PASTA.set_spot(ctx, "さくら", 0)"#),
         "Missing さくら set_spot(0). Generated code:\n{lua_code}"
     );
     assert!(
-        lua_code.contains(r#"PASTA.set_spot("うにゅう", 2)"#),
+        lua_code.contains(r#"PASTA.set_spot(ctx, "うにゅう", 2)"#),
         "Missing うにゅう set_spot(2). Generated code:\n{lua_code}"
     );
     assert!(
-        lua_code.contains(r#"PASTA.set_spot("まりか", 3)"#),
+        lua_code.contains(r#"PASTA.set_spot(ctx, "まりか", 3)"#),
         "Missing まりか set_spot(3). Generated code:\n{lua_code}"
     );
 
     // Verify order: clear_spot -> all set_spot -> create_session
     let clear_spot_pos = lua_code
-        .find("PASTA.clear_spot()")
+        .find("PASTA.clear_spot(ctx)")
         .expect("clear_spot not found");
     let marika_pos = lua_code
-        .find(r#"PASTA.set_spot("まりか""#)
+        .find(r#"PASTA.set_spot(ctx, "まりか""#)
         .expect("まりか set_spot not found");
     let create_session_pos = lua_code
         .find("PASTA.create_session")

@@ -257,11 +257,11 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         // Order: clear_spot -> set_spot(s) -> create_session (Requirement 1.1, 1.2)
         if counter == 0 && !actors.is_empty() {
             // clear_spot at the start of actor initialization block (Requirement 2.1)
-            self.writeln("PASTA.clear_spot()")?;
-            // set_spot with new format: PASTA.set_spot("name", number) (Requirement 3.1, 3.2)
+            self.writeln("PASTA.clear_spot(ctx)")?;
+            // set_spot with new format: PASTA.set_spot(ctx, "name", number) (Requirement 3.1, 3.2)
             for actor in actors {
                 self.writeln(&format!(
-                    r#"PASTA.set_spot("{}", {})"#,
+                    r#"PASTA.set_spot(ctx, "{}", {})"#,
                     actor.name, actor.number
                 ))?;
             }
