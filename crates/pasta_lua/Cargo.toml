@@ -12,3 +12,6 @@ tracing.workspace = true
 thiserror.workspace = true
 mlua.workspace = true
 pasta_core.workspace = true
+
+[build-dependencies]
+lua-src.workspace = true

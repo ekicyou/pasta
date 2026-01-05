@@ -6,6 +6,12 @@ use pasta_core::parse_str;
 use pasta_core::parser::{ActorScope, FileItem, GlobalSceneScope};
 use pasta_lua::{LuaTranspiler, TranspilerConfig};
 
+/// Normalize line endings to LF (\n) for cross-platform comparison.
+/// This handles the case where Git's autocrlf setting converts LF to CRLF on Windows.
+fn normalize_line_endings(s: &str) -> String {
+    s.replace("\r\n", "\n").replace("\r", "\n")
+}
+
 /// Helper to get global scene scopes from PastaFile
 fn get_global_scene_scopes(file: &pasta_core::parser::PastaFile) -> Vec<&GlobalSceneScope> {
     file.items
@@ -177,6 +183,9 @@ fn test_transpile_do_end_scope_separation() {
 
     transpiler.transpile(&file, &mut output).unwrap();
     let lua_code = String::from_utf8(output).unwrap();
+
+    // Normalize line endings for reliable pattern matching
+    let lua_code = normalize_line_endings(&lua_code);
 
     // Verify do...end scope separation (Requirement 1)
     // Count do/end pairs
@@ -522,8 +531,12 @@ fn test_transpile_sample_pasta_line_comparison() {
     std::fs::write("tests/fixtures/sample.generated.lua", &generated_lua)
         .expect("Failed to write sample.generated.lua");
 
-    // Compare line by line
-    let (mismatches, stats) = compare_lua_output(sample_lua, &generated_lua);
+    // Normalize line endings for comparison (handles Git autocrlf differences)
+    let generated_normalized = normalize_line_endings(&generated_lua);
+    let expected_normalized = normalize_line_endings(sample_expected);
+
+    // Compare line by line (using normalized versions)
+    let (mismatches, stats) = compare_lua_output(sample_lua, &generated_normalized);
 
     // Generate and print report
     let report = generate_mismatch_report(&mismatches, &stats);
@@ -531,10 +544,10 @@ fn test_transpile_sample_pasta_line_comparison() {
     // Print report for debugging (visible in test output with --nocapture)
     eprintln!("{}", report);
 
-    // Strict equality check with expected output
+    // Strict equality check with expected output (normalized)
     assert_eq!(
-        generated_lua, sample_expected,
-        "Generated code must match expected output"
+        generated_normalized, expected_normalized,
+        "Generated code must match expected output (line endings normalized)"
     );
 
     // For now, we verify the comparison runs and report is generated

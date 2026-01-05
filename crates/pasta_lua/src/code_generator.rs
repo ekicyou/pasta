@@ -9,6 +9,7 @@ use pasta_core::parser::{
 };
 use pasta_core::registry::SceneRegistry;
 
+use super::config::LineEnding;
 use super::context::TranspileContext;
 use super::error::TranspileError;
 use super::string_literalizer::StringLiteralizer;
@@ -26,6 +27,8 @@ pub struct LuaCodeGenerator<'a, W: Write> {
     indent_level: usize,
     /// Current module name for scene resolution
     current_module: String,
+    /// Line ending style
+    line_ending: LineEnding,
 }
 
 impl<'a, W: Write> LuaCodeGenerator<'a, W> {
@@ -35,6 +38,17 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             writer,
             indent_level: 0,
             current_module: String::new(),
+            line_ending: LineEnding::default(),
+        }
+    }
+
+    /// Create a new Lua code generator with specified line ending.
+    pub fn with_line_ending(writer: &'a mut W, line_ending: LineEnding) -> Self {
+        Self {
+            writer,
+            indent_level: 0,
+            current_module: String::new(),
+            line_ending,
         }
     }
 
@@ -48,13 +62,13 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// Write a line with current indentation.
     fn writeln(&mut self, s: &str) -> Result<(), TranspileError> {
         self.write_indent()?;
-        writeln!(self.writer, "{}", s)?;
+        write!(self.writer, "{}{}", s, self.line_ending.as_str())?;
         Ok(())
     }
 
     /// Write a blank line without indentation.
     fn write_blank_line(&mut self) -> Result<(), TranspileError> {
-        writeln!(self.writer)?;
+        write!(self.writer, "{}", self.line_ending.as_str())?;
         Ok(())
     }
 
