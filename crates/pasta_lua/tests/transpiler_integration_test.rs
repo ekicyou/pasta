@@ -863,26 +863,47 @@ fn test_set_spot_multiple_actors() {
     transpiler.transpile(&file, &mut output).unwrap();
     let lua_code = String::from_utf8(output).unwrap();
 
-    // Verify set_spot calls are generated
+    // Verify clear_spot is generated (Requirement 2.1)
     assert!(
-        lua_code.contains("act.さくら:set_spot(0)"),
+        lua_code.contains("PASTA.clear_spot()"),
+        "Missing clear_spot call. Generated code:\n{lua_code}"
+    );
+
+    // Verify set_spot calls are generated with new format (Requirement 3.1, 3.2)
+    assert!(
+        lua_code.contains(r#"PASTA.set_spot("さくら", 0)"#),
         "Missing さくら set_spot call. Generated code:\n{lua_code}"
     );
     assert!(
-        lua_code.contains("act.うにゅう:set_spot(2)"),
+        lua_code.contains(r#"PASTA.set_spot("うにゅう", 2)"#),
         "Missing うにゅう set_spot call. Generated code:\n{lua_code}"
     );
 
-    // Verify order is preserved (さくら before うにゅう)
+    // Verify order: clear_spot -> set_spot -> create_session (Requirement 1.1, 1.2)
+    let clear_spot_pos = lua_code
+        .find("PASTA.clear_spot()")
+        .expect("clear_spot not found");
     let sakura_pos = lua_code
-        .find("act.さくら:set_spot")
+        .find(r#"PASTA.set_spot("さくら""#)
         .expect("さくら set_spot not found");
     let unyu_pos = lua_code
-        .find("act.うにゅう:set_spot")
+        .find(r#"PASTA.set_spot("うにゅう""#)
         .expect("うにゅう set_spot not found");
+    let create_session_pos = lua_code
+        .find("PASTA.create_session")
+        .expect("create_session not found");
+
+    assert!(
+        clear_spot_pos < sakura_pos,
+        "clear_spot should come before さくら set_spot"
+    );
     assert!(
         sakura_pos < unyu_pos,
         "Actor order not preserved: さくら should come before うにゅう"
+    );
+    assert!(
+        unyu_pos < create_session_pos,
+        "set_spot should come before create_session"
     );
 }
 
@@ -900,10 +921,36 @@ fn test_set_spot_single_actor() {
     transpiler.transpile(&file, &mut output).unwrap();
     let lua_code = String::from_utf8(output).unwrap();
 
-    // Verify single actor set_spot is generated
+    // Verify clear_spot is generated (Requirement 2.1)
     assert!(
-        lua_code.contains("act.さくら:set_spot(0)"),
+        lua_code.contains("PASTA.clear_spot()"),
+        "Missing clear_spot call. Generated code:\n{lua_code}"
+    );
+
+    // Verify single actor set_spot is generated with new format (Requirement 3.1, 3.2)
+    assert!(
+        lua_code.contains(r#"PASTA.set_spot("さくら", 0)"#),
         "Missing single actor set_spot call. Generated code:\n{lua_code}"
+    );
+
+    // Verify order: clear_spot -> set_spot -> create_session
+    let clear_spot_pos = lua_code
+        .find("PASTA.clear_spot()")
+        .expect("clear_spot not found");
+    let set_spot_pos = lua_code
+        .find(r#"PASTA.set_spot("さくら""#)
+        .expect("set_spot not found");
+    let create_session_pos = lua_code
+        .find("PASTA.create_session")
+        .expect("create_session not found");
+
+    assert!(
+        clear_spot_pos < set_spot_pos,
+        "clear_spot should come before set_spot"
+    );
+    assert!(
+        set_spot_pos < create_session_pos,
+        "set_spot should come before create_session"
     );
 }
 
@@ -920,10 +967,16 @@ fn test_set_spot_empty_actors() {
     transpiler.transpile(&file, &mut output).unwrap();
     let lua_code = String::from_utf8(output).unwrap();
 
-    // Verify no set_spot calls are generated
+    // Verify no set_spot calls are generated (Requirement 2.2)
     assert!(
         !lua_code.contains("set_spot"),
         "set_spot should not be generated when no actors defined. Generated code:\n{lua_code}"
+    );
+
+    // Verify no clear_spot call is generated (Requirement 2.2)
+    assert!(
+        !lua_code.contains("PASTA.clear_spot()"),
+        "clear_spot should not be generated when no actors defined. Generated code:\n{lua_code}"
     );
 }
 
@@ -941,17 +994,43 @@ fn test_set_spot_with_explicit_number() {
     transpiler.transpile(&file, &mut output).unwrap();
     let lua_code = String::from_utf8(output).unwrap();
 
-    // Verify explicit numbers are respected (C# enum rule)
+    // Verify clear_spot is generated (Requirement 2.1)
     assert!(
-        lua_code.contains("act.さくら:set_spot(0)"),
+        lua_code.contains("PASTA.clear_spot()"),
+        "Missing clear_spot call. Generated code:\n{lua_code}"
+    );
+
+    // Verify explicit numbers are respected with new format (C# enum rule)
+    assert!(
+        lua_code.contains(r#"PASTA.set_spot("さくら", 0)"#),
         "Missing さくら set_spot(0). Generated code:\n{lua_code}"
     );
     assert!(
-        lua_code.contains("act.うにゅう:set_spot(2)"),
+        lua_code.contains(r#"PASTA.set_spot("うにゅう", 2)"#),
         "Missing うにゅう set_spot(2). Generated code:\n{lua_code}"
     );
     assert!(
-        lua_code.contains("act.まりか:set_spot(3)"),
+        lua_code.contains(r#"PASTA.set_spot("まりか", 3)"#),
         "Missing まりか set_spot(3). Generated code:\n{lua_code}"
+    );
+
+    // Verify order: clear_spot -> all set_spot -> create_session
+    let clear_spot_pos = lua_code
+        .find("PASTA.clear_spot()")
+        .expect("clear_spot not found");
+    let marika_pos = lua_code
+        .find(r#"PASTA.set_spot("まりか""#)
+        .expect("まりか set_spot not found");
+    let create_session_pos = lua_code
+        .find("PASTA.create_session")
+        .expect("create_session not found");
+
+    assert!(
+        clear_spot_pos < marika_pos,
+        "clear_spot should come before last set_spot"
+    );
+    assert!(
+        marika_pos < create_session_pos,
+        "set_spot should come before create_session"
     );
 }

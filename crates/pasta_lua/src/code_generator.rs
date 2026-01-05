@@ -250,20 +250,26 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         self.writeln(&format!("function SCENE.{}(ctx, ...)", fn_name))?;
         self.indent();
 
-        // Session initialization (Requirement 3c)
+        // Session initialization
         self.writeln("local args = { ... }")?;
-        self.writeln("local act, save, var = PASTA.create_session(SCENE, ctx)")?;
 
-        // Generate set_spot calls for __start__ only (counter == 0)
+        // Generate actor initialization block for __start__ only (counter == 0)
+        // Order: clear_spot -> set_spot(s) -> create_session (Requirement 1.1, 1.2)
         if counter == 0 && !actors.is_empty() {
-            self.write_blank_line()?;
+            // clear_spot at the start of actor initialization block (Requirement 2.1)
+            self.writeln("PASTA.clear_spot()")?;
+            // set_spot with new format: PASTA.set_spot("name", number) (Requirement 3.1, 3.2)
             for actor in actors {
-                self.writeln(&format!("act.{}:set_spot({})", actor.name, actor.number))?;
+                self.writeln(&format!(
+                    r#"PASTA.set_spot("{}", {})"#,
+                    actor.name, actor.number
+                ))?;
             }
-            self.write_blank_line()?;
-        } else {
-            self.write_blank_line()?;
         }
+
+        // create_session comes after actor initialization (Requirement 1.2)
+        self.writeln("local act, save, var = PASTA.create_session(SCENE, ctx)")?;
+        self.write_blank_line()?;
 
         // Generate local scene items
         self.generate_local_scene_items(&scene.items)?;
