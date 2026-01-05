@@ -1,26 +1,29 @@
 --- @class Action アクションオブジェクト
 --- @field now_actor Actor 現在のアクターオブジェクト
 
-
 --- @class Actor アクターオブジェクト
+--- @field name string アクター名
+--- @field spot integer 立ち位置（０以上）
 --- @field action Action アクションオブジェクト
+--- @field has_init_script boolean 初期化スクリプトが未実行ならtrue
 local IMPL = {}
 
 
---- アクションオブジェクトを設定し、現在のアクターをリセットする。
---- アクター初期化スクリプトを追加する。
---- @param action Action アクションオブジェクト
---- @param scope integer 立ち位置（０以上）
-function IMPL.set_action(self, action, scope)
-    self.action = action
-    self.scope = scope or 0
-    action.now_actor = nil
-    self:set_init_script()
+--- 立ち位置を設定する。
+--- @param spot integer 立ち位置（０以上）
+function IMPL.set_spot(self, spot)
+    self.spot = spot
 end
 
-function IMPL.set_init_script(self)
-    self.init_script = true
+--- アクションの開始。アクションオブジェクトを設定し、現在のアクターをリセットする。
+--- アクター初期化スクリプトを追加する。
+--- @param action Action アクションオブジェクト
+function IMPL.start_action(self, action)
+    self.action = action
+    action.now_actor = nil
+    self.has_init_script = true
 end
+
 
 function IMPL.change_actor(self)
     if self.now_actor == self then
@@ -37,10 +40,15 @@ function IMPL.word(self, key)
 
 end
 
+local spot_counter = 0
+
 -- アクターオブジェクトの新規作成
--- @return table アクターオブジェクト
-local function new()
+-- @return Actor アクターオブジェクト
+local function new(name)
     local actor = {}
+    actor.name = name
+    actor.spot = spot_counter
+    spot_counter = spot_counter + 1
     setmetatable(actor, IMPL)
     return actor
 end
