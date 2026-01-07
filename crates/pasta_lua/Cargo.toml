@@ -8,10 +8,11 @@ publish = true
 description = "Pasta Lua - Lua integration for Pasta DSL"
 
 [dependencies]
+pasta_core.workspace = true
 tracing.workspace = true
 thiserror.workspace = true
 mlua.workspace = true
-pasta_core.workspace = true
+mlua-stdlib.workspace = true
 
 [build-dependencies]
 lua-src.workspace = true

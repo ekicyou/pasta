@@ -1,5 +1,4 @@
 --- @class Action アクションオブジェクト
---- @field now_actor Actor 現在のアクターオブジェクト
 
 --- @class Actor アクターオブジェクト
 --- @field name string アクター名

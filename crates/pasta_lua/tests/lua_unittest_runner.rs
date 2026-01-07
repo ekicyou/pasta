@@ -15,14 +15,17 @@ fn run_lua_unit_tests() -> LuaResult<()> {
 
     let scripts_path = workspace_root.join("crates/pasta_lua/scripts");
     let scriptlibs_path = workspace_root.join("crates/pasta_lua/scriptlibs");
+    let lua_specs_path = workspace_root.join("crates/pasta_lua/tests/lua_specs");
 
     // package.path を設定（Lua モジュール解決用）
+    // lua_specs を追加して、init.lua から各 spec を require できるようにする
     let package_path = format!(
-        "{}/?.lua;{}/?/init.lua;{}/?.lua;{}/?/init.lua",
+        "{}/?.lua;{}/?/init.lua;{}/?.lua;{}/?/init.lua;{}/?.lua",
         scripts_path.display(),
         scripts_path.display(),
         scriptlibs_path.display(),
-        scriptlibs_path.display()
+        scriptlibs_path.display(),
+        lua_specs_path.display()
     );
 
     lua.load(&format!(
@@ -35,13 +38,13 @@ fn run_lua_unit_tests() -> LuaResult<()> {
     ))
     .exec()?;
 
-    // Lua ユニットテストを実行
-    let test_file = workspace_root.join("crates/pasta_lua/tests/lua_specs/transpiler_spec.lua");
+    // Lua ユニットテストを実行（エントリーポイント: init.lua）
+    let test_file = lua_specs_path.join("init.lua");
     println!("Running Lua tests from: {}", test_file.display());
 
     let test_code = std::fs::read_to_string(&test_file).expect("Failed to read test file");
 
-    // テスト実行（describe 内で自動実行される）
+    // テスト実行（init.lua が各 spec を require して実行）
     match lua.load(&test_code).exec() {
         Ok(_) => {
             println!("✅ All Lua tests passed");
