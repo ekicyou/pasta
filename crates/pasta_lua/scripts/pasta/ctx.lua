@@ -1,4 +1,4 @@
-local ACT = require("pasta.shiori.act")
+local ACT = require("pasta.act")
 
 --- @class CTX 環境オブジェクト
 --- @field actors [Actor] 登場アクター
