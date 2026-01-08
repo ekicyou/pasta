@@ -150,6 +150,29 @@
 - **Trade-offs**: PASTA公開APIからcreate_sessionを削除
 - **Follow-up**: Rust側code_generator.rsの修正（別仕様）
 
+### Decision: 単語検索のRust連携仕様
+- **Context**: ActorProxy:word() の実装におけるLua→Rust連携の明確化
+- **Alternatives Considered**:
+  1. Lua側で全検索実装（Rust呼び出しなし）
+  2. Lua前処理 + Rust検索の役割分担
+- **Selected Approach**: Lua前処理 + mlua FFI経由でRust検索関数を呼び出し（Option 2）
+- **Rationale**: 
+  - アクターfield検索はLua側のみで完結（前処理）
+  - グローバルシーン名検索・全体検索はRust側のWordTableを活用
+  - 優先順位制御はLua側、検索ロジックはRust側と責務が明確
+- **Trade-offs**: mlua FFIのセットアップが必要
+- **Follow-up**: 
+  - Rust側で `PASTA_RUNTIME.search_word(global_name|nil, name)` を公開
+  - pasta_core の WordTable を使用（実装詳細は別仕様）
+- **API形式**:
+  ```lua
+  -- グローバルシーン名スコープ検索
+  local result = PASTA_RUNTIME.search_word("メインシーン", "挨拶")
+  -- 全体スコープ検索
+  local result = PASTA_RUNTIME.search_word(nil, "挨拶")
+  ```
+- **Evidence**: design.md の ActorProxy:word() に詳細コメント追記済み
+
 ## Risks & Mitigations
 - **Risk 1**: Rust側code_generator.rsの修正が必要 → 別仕様で対応、本仕様は設計ドキュメントのみ
 - **Risk 2**: 既存テストコードとの非互換 → 設計ドキュメント完成後、実装仕様で対応
