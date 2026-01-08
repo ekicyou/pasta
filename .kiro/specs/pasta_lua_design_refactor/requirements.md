@@ -61,7 +61,7 @@ pasta_luaのlua側設計を手伝ってほしい。迷走しているので調�
 #### Acceptance Criteria
 1. The 設計ドキュメント shall 5つのコアモジュールの責務を定義する: `pasta.init`, `pasta.ctx`, `pasta.act`, `pasta.actor`, `pasta.scene`
 2. The 設計ドキュメント shall `require "pasta"` が返すべき公開APIテーブル構造を定義する
-3. The 設計ドキュメント shall `create_actor`, `create_scene`, `create_session`, `clear_spot`, `set_spot` 関数の仕様を記載する
+3. The 設計ドキュメント shall `create_actor`, `create_scene`, `create_session` 関数の仕様を記載する（スポット管理はactに移動）
 4. The 設計ドキュメント shall scene.lua がシーンテーブル（グローバルシーン名とローカルシーン名の階層構造）を管理する設計を定義する
 5. The 設計ドキュメント shall グローバル状態汚染を防ぐ実装方針を記載する
 
