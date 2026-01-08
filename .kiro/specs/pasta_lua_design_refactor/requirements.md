@@ -69,12 +69,12 @@ pasta_luaのlua側設計を手伝ってほしい。迷走しているので調�
 **Objective:** As a シーン実行者, I want 環境コンテキストが変数スコープとアクター管理を提供する, so that シーン間でデータを共有できる
 
 #### Acceptance Criteria
-1. The 設計ドキュメント shall CTXオブジェクトが保持すべき `var` テーブルの仕様を定義する（ローカルセッション変数）
-2. The 設計ドキュメント shall CTXオブジェクトが保持すべき `save` テーブルの仕様を定義する（永続変数）
-3. The 設計ドキュメント shall CTXオブジェクトが保持すべき `actors` テーブルの仕様を定義する
-4. The 設計ドキュメント shall `CTX.new(save, actors)` 初期化API仕様を記載する
-5. The 設計ドキュメント shall CTXがActオブジェクトに内包される設計を定義する
-6. The 設計ドキュメント shall CTXがスポット管理情報を保持する仕様を記載する
+1. The 設計ドキュメント shall CTXオブジェクトが保持すべき `save` テーブルの仕様を定義する（永続変数、コルーチン終了後も残る）
+2. The 設計ドキュメント shall CTXオブジェクトが保持すべき `actors` テーブルの仕様を定義する
+3. The 設計ドキュメント shall `CTX.new(save, actors)` 初期化API仕様を記載する
+4. The 設計ドキュメント shall CTXがActオブジェクトに内包される設計を定義する
+5. The 設計ドキュメント shall CTXがスポット管理情報を保持する仕様を記載する
+6. The 設計ドキュメント shall varはAct側に移動したことを明記する（アクション期間中のみ有効な作業変数）
 
 ### Requirement 3: Act（アクション）の設計
 **Objective:** As a シーン記述者, I want アクションを通じてトークン列を構築できる, so that 発話やスクリプト出力を生成できる
@@ -84,20 +84,21 @@ pasta_luaのlua側設計を手伝ってほしい。迷走しているので調�
 #### Acceptance Criteria
 1. The 設計ドキュメント shall Actオブジェクトが内部にctxを保持する設計を定義する
 2. The 設計ドキュメント shall `act.ctx` プロパティを通じた環境アクセス仕様を記載する
-3. The 設計ドキュメント shall `act.var`, `act.save` プロパティアクセス仕様を記載する（ctx.var, ctx.saveへの委譲）
+3. The 設計ドキュメント shall `act.var` プロパティアクセス仕様を記載する（アクション期間中のみ有効な作業変数、co_actionコルーチン内で共有）
 4. The 設計ドキュメント shall Actオブジェクトの `token` 配列蓄積メカニズムを定義する
 5. The 設計ドキュメント shall Actの `__index` メタメソッドによるアクタープロキシ設計を記載する（`act.アクター名` でアクタープロキシを返す、プロキシはactへの参照を保持する）
 6. The 設計ドキュメント shall `act:talk(actor, text)` API仕様を記載する（talkトークンの蓄積）
 7. The 設計ドキュメント shall `act:sakura_script(text)` API仕様を記載する（さくらスクリプトトークンの蓄積）
 8. The 設計ドキュメント shall `act:yield()` API仕様とトークン出力動作を記載する（蓄積トークンの出力とコルーチン一時停止）
 9. The 設計ドキュメント shall `act:end_action()` API仕様と終了処理を記載する（最終トークンの出力とアクション終了）
-10. The 設計ドキュメント shall `act:call(search_result, opts, ...)` シーン呼び出しAPI仕様を記載する（Rust側検索結果からシーン関数を取得して実行）
-11. The 設計ドキュメント shall `act.init_scene(SCENE)` API仕様を記載する（シーン関数内でSCENEへの参照を設定し、save/var参照を返す。単語検索に使用）
+10. The 設計ドキュメント shall `act:call(search_result, opts, ...)` シーン呼び出しAPI仕様を記載する（Rust側検索結果からシーン関数を取得して実行、act継続）
+11. The 設計ドキュメント shall `act.init_scene(SCENE)` API仕様を記載する（シーンテーブルへの参照を設定し、save/var参照を返す）
 12. The 設計ドキュメント shall `act.set_spot(name, number)` スポット設定API仕様を記載する（ctx内部のスポット情報を更新）
 13. The 設計ドキュメント shall `act.clear_spot()` スポットクリアAPI仕様を記載する（ctx内部の全スポット情報をリセット）
 14. The 設計ドキュメント shall Actが現在のSCENEへの参照を持つ設計を定義する（単語検索時にグローバルシーン名として使用）
 15. The 設計ドキュメント shall Actがシーン関数の第1引数である設計原則を明記する
-16. The 設計ドキュメント shall トークン蓄積からCTX反映までのデータフローを定義する
+16. The 設計ドキュメント shall act:call()連鎖中もactが継続される仕様を定義する（co_actionコルーチンの実行期間 = actの生存期間）
+17. The 設計ドキュメント shall トークン蓄積からCTX反映までのデータフローを定義する
 
 ### Requirement 4: Actor（アクター）の設計
 **Objective:** As a キャラクター管理者, I want アクターがスポット位置と属性を持つ, so that 複数キャラクターの会話を管理できる
