@@ -16,8 +16,8 @@ pasta_luaは、Pasta DSLをLua言語にトランスパイルするバックエ�
 
 ```lua
 function SCENE.__start__(act, ...)
-    -- シーン関数冒頭でSCENEへの参照を設定（単語検索に必要）
-    act.set_scene(SCENE)
+    -- シーン関数冒頭でSCENEへの参照を設定し、save/var参照を取得（短記法アクセス用）
+    local save, var = act.init_scene(SCENE)
     -- シーン関数はactに行動を与える
     act.set_spot("さくら", 0)              -- 誰が参加するか、立ち位置はどこか
     act.さくら:talk("こんにちは")          -- 会話内容
@@ -61,7 +61,7 @@ pasta_luaのlua側設計を手伝ってほしい。迷走しているので調�
 #### Acceptance Criteria
 1. The 設計ドキュメント shall 5つのコアモジュールの責務を定義する: `pasta.init`, `pasta.ctx`, `pasta.act`, `pasta.actor`, `pasta.scene`
 2. The 設計ドキュメント shall `require "pasta"` が返すべき公開APIテーブル構造を定義する
-3. The 設計ドキュメント shall `create_actor`, `create_scene`, `create_session` 関数の仕様を記載する（スポット管理はactに移動）
+3. The 設計ドキュメント shall `create_actor`, `create_scene` 関数の仕様を記載する（スポット管理はactに移動、セッション初期化はact.init_scene()メソッドに移動）
 4. The 設計ドキュメント shall scene.lua がシーンテーブル（グローバルシーン名とローカルシーン名の階層構造）を管理する設計を定義する
 5. The 設計ドキュメント shall グローバル状態汚染を防ぐ実装方針を記載する
 
@@ -92,12 +92,12 @@ pasta_luaのlua側設計を手伝ってほしい。迷走しているので調�
 8. The 設計ドキュメント shall `act:yield()` API仕様とトークン出力動作を記載する（蓄積トークンの出力とコルーチン一時停止）
 9. The 設計ドキュメント shall `act:end_action()` API仕様と終了処理を記載する（最終トークンの出力とアクション終了）
 10. The 設計ドキュメント shall `act:call(search_result, opts, ...)` シーン呼び出しAPI仕様を記載する（Rust側検索結果からシーン関数を取得して実行）
-11. The 設計ドキュメント shall `act.set_scene(SCENE)` API仕様を記載する（actが現在のシーンテーブルへの参照を保持、単語検索に使用）
+11. The 設計ドキュメント shall `act.init_scene(SCENE)` API仕様を記載する（シーン関数内でSCENEへの参照を設定し、save/var参照を返す。単語検索に使用）
 12. The 設計ドキュメント shall `act.set_spot(name, number)` スポット設定API仕様を記載する（ctx内部のスポット情報を更新）
 13. The 設計ドキュメント shall `act.clear_spot()` スポットクリアAPI仕様を記載する（ctx内部の全スポット情報をリセット）
 14. The 設計ドキュメント shall Actが現在のSCENEへの参照を持つ設計を定義する（単語検索時にグローバルシーン名として使用）
-13. The 設計ドキュメント shall Actがシーン関数の第1引数である設計原則を明記する
-14. The 設計ドキュメント shall トークン蓄積からCTX反映までのデータフローを定義する
+15. The 設計ドキュメント shall Actがシーン関数の第1引数である設計原則を明記する
+16. The 設計ドキュメント shall トークン蓄積からCTX反映までのデータフローを定義する
 
 ### Requirement 4: Actor（アクター）の設計
 **Objective:** As a キャラクター管理者, I want アクターがスポット位置と属性を持つ, so that 複数キャラクターの会話を管理できる
@@ -124,9 +124,9 @@ pasta_luaのlua側設計を手伝ってほしい。迷走しているので調�
 4. The 設計ドキュメント shall `__name_N__` パターンの命名規則を定義する（ローカルシーン関数の番号付けパターン）
 5. The 設計ドキュメント shall Rust側の前方一致検索がグローバル名・ローカル名の組を返す仕様と、Lua側がそれを用いてシーン関数を取得する方法を定義する
 6. The 設計ドキュメント shall シーン関数シグネチャ `(act, ...)` を定義する（第1引数はActオブジェクト）
-7. The 設計ドキュメント shall シーン関数冒頭で `act.set_scene(SCENE)` を呼び出すパターンを例示する（actが現在のシーンへの参照を持つことで、単語検索でグローバルシーン名を使用可能にする）
+7. The 設計ドキュメント shall シーン関数冒頭で `local save, var = act.init_scene(SCENE)` を呼び出すパターンを例示する（actが現在のシーンへの参照を持ち、save/var参照を返す。単語検索でグローバルシーン名を使用可能）
 8. The 設計ドキュメント shall シーン関数内でactに行動を与えるパターンを例示する（`act.アクター:talk("テキスト")`, `act.アクター:word("name")`, `act.set_spot()` 等、アクタープロキシ経由のメソッド呼び出し）
-9. The 設計ドキュメント shall `act.var`, `act.save` を通じた変数アクセス方法を記載する
+9. The 設計ドキュメント shall `save.変数名`, `var.変数名` を通じた短記法変数アクセス方法を記載する（code_generator.rsの頻繁な出力に対応）
 10. The 設計ドキュメント shall act.__indexメタメソッドによるアクタープロキシ取得パターンを例示する
 11. The 設計ドキュメント shall シーン関数が「行動の記述」に専念し、トークン管理はactに委譲する設計を明記する
 
@@ -164,8 +164,8 @@ pasta_luaのlua側設計を手伝ってほしい。迷走しているので調�
 2. The 設計ドキュメント shall `PASTA.create_actor("name")` API仕様を記載する
 3. The 設計ドキュメント shall `PASTA.create_scene(global_name, local_name, scene_func)` API仕様を記載する（グローバル・ローカル名の階層管理）
 4. The 設計ドキュメント shall シーン関数シグネチャ `function SCENE.__start__(act, ...)` を定義する
-5. The 設計ドキュメント shall シーン関数冒頭の `act.set_scene(SCENE)` 呼び出しパターンを定義する（単語検索にグローバルシーン名を使用可能にする）
-6. The 設計ドキュメント shall `act.var.変数名`, `act.save.変数名` アクセスパターンを定義する
+5. The 設計ドキュメント shall シーン関数冒頭の `local save, var = act.init_scene(SCENE)` 呼び出しパターンを定義する（単語検索にグローバルシーン名を使用可能にし、短記法アクセス用にsave/varを返す）
+6. The 設計ドキュメント shall `save.変数名`, `var.変数名` アクセスパターンを定義する（code_generator.rsの頻繁な出力に対応）
 7. The 設計ドキュメント shall `act:call(search_result, {}, ...)` API仕様を記載する（Rust側から返されたグローバル名・ローカル名から場景を取得、search_resultは`{global_name, local_name}`タプル）
 8. The 設計ドキュメント shall `act.アクター:word("name")` 呼び出しパターンを定義する（アクター選択により単語解決結果が変わる）
 9. The 設計ドキュメント shall Rust側code_generator.rsの修正が別仕様で必要となることを明記する
