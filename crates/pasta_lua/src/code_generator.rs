@@ -284,20 +284,42 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         Ok(())
     }
 
+    /// Check if a LocalSceneItem is a "callable" item (TCO optimization target).
+    ///
+    /// Currently only `CallScene` is considered callable. When new variants like
+    /// `FnCall` are added in the future, simply extend the `matches!` condition:
+    ///
+    /// ```ignore
+    /// // Future extension example:
+    /// // matches!(item, LocalSceneItem::CallScene(_) | LocalSceneItem::FnCall(_))
+    /// ```
+    fn is_callable_item(item: &LocalSceneItem) -> bool {
+        matches!(item, LocalSceneItem::CallScene(_))
+    }
+
     /// Generate local scene items (action lines, var sets, calls).
+    ///
+    /// Tail call optimization: The last item in the list gets a `return` prefix
+    /// if it is a CallScene, enabling Lua TCO.
     fn generate_local_scene_items(
         &mut self,
         items: &[LocalSceneItem],
     ) -> Result<(), TranspileError> {
+        // Calculate the index of the last callable item for TCO
+        // TCO only applies if the last item itself is callable
+        let last_index = items.len().saturating_sub(1);
+        let last_is_callable = items.last().is_some_and(Self::is_callable_item);
+
         let mut last_actor: Option<String> = None;
 
-        for item in items {
+        for (index, item) in items.iter().enumerate() {
             match item {
                 LocalSceneItem::VarSet(var_set) => {
                     self.generate_var_set(var_set)?;
                 }
                 LocalSceneItem::CallScene(call_scene) => {
-                    self.generate_call_scene(call_scene)?;
+                    let is_tail_call = last_is_callable && index == last_index;
+                    self.generate_call_scene(call_scene, is_tail_call)?;
                 }
                 LocalSceneItem::ActionLine(action_line) => {
                     self.generate_action_line(action_line, &mut last_actor)?;
@@ -347,7 +369,13 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// Generate scene call (Requirement 3d, 3g).
     ///
     /// Generates: `act:call("モジュール名", "ラベル名", {}, table.unpack(args))`
-    fn generate_call_scene(&mut self, call_scene: &CallScene) -> Result<(), TranspileError> {
+    ///
+    /// When `is_tail_call` is true, prepends `return` to enable Lua TCO.
+    fn generate_call_scene(
+        &mut self,
+        call_scene: &CallScene,
+        is_tail_call: bool,
+    ) -> Result<(), TranspileError> {
         let target = &call_scene.target;
 
         // Generate argument list
@@ -376,10 +404,17 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             "table.unpack(args)".to_string()
         };
 
-        self.writeln(&format!(
+        let call_stmt = format!(
             "act:call(\"{}\", \"{}\", {{}}, {})",
             self.current_module, target, args_str
-        ))?;
+        );
+
+        // Tail call optimization: prepend 'return' for the last callable item
+        if is_tail_call {
+            self.writeln(&format!("return {}", call_stmt))?;
+        } else {
+            self.writeln(&call_stmt)?;
+        }
 
         Ok(())
     }

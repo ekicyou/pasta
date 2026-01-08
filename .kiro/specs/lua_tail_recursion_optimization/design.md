@@ -104,13 +104,13 @@ sequenceDiagram
 
 ## Requirements Traceability
 
-| Requirement | Summary                 | Components                       | Interfaces             | Flows          |
-| ----------- | ----------------------- | -------------------------------- | ---------------------- | -------------- |
-| 1           | 末尾呼び出し検出        | `generate_local_scene_items`     | `is_callable_item`     | 末尾判定フロー |
-| 2           | return 文の条件付き生成 | `generate_call_scene`            | `is_tail_call: bool`   | 末尾判定フロー |
-| 3           | 既存テストの互換性維持  | 全体                             | -                      | -              |
-| 4           | 新規テストケース追加    | `transpiler_integration_test.rs` | -                      | テストフロー   |
-| 5           | 将来の拡張性維持        | `is_callable_item`               | `matches!` マクロ      | -              |
+| Requirement | Summary                 | Components                       | Interfaces           | Flows          |
+| ----------- | ----------------------- | -------------------------------- | -------------------- | -------------- |
+| 1           | 末尾呼び出し検出        | `generate_local_scene_items`     | `is_callable_item`   | 末尾判定フロー |
+| 2           | return 文の条件付き生成 | `generate_call_scene`            | `is_tail_call: bool` | 末尾判定フロー |
+| 3           | 既存テストの互換性維持  | 全体                             | -                    | -              |
+| 4           | 新規テストケース追加    | `transpiler_integration_test.rs` | -                    | テストフロー   |
+| 5           | 将来の拡張性維持        | `is_callable_item`               | `matches!` マクロ    | -              |
 
 ## Components and Interfaces
 
@@ -231,10 +231,10 @@ fn generate_call_scene(
 
 #### is_callable_item（新規ヘルパー関数）
 
-| Field        | Detail                                                                                                 |
-| ------------ | ------------------------------------------------------------------------------------------------------ |
-| Intent       | 項目が「呼び出し可能」（TCO対象）かどうかを判定する汎用ヘルパー（将来の拡張に対応可能な設計）         |
-| Requirements | 1, 5                                                                                                   |
+| Field        | Detail                                                                                        |
+| ------------ | --------------------------------------------------------------------------------------------- |
+| Intent       | 項目が「呼び出し可能」（TCO対象）かどうかを判定する汎用ヘルパー（将来の拡張に対応可能な設計） |
+| Requirements | 1, 5                                                                                          |
 
 **Responsibilities & Constraints**
 - 現時点では `CallScene` のみを呼び出し可能項目として判定
