@@ -29,7 +29,7 @@ do
         act:call("メイン1", "ローカル単語呼び出し", {}, table.unpack(args))
         act:call("メイン1", "会話分岐", {}, table.unpack(args))
         act:call("メイン1", "変数代入", {}, table.unpack(args))
-        act:call("メイン1", "引数付き呼び出し", {}, var.カウンタ, save.グローバル, table.unpack(args))
+        return act:call("メイン1", "引数付き呼び出し", {}, var.カウンタ, save.グローバル, table.unpack(args))
     end
 
     function SCENE.__グローバル単語呼び出し_1__(ctx, ...)
