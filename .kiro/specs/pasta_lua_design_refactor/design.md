@@ -512,7 +512,7 @@ function PROXY:talk(text)
     self.act:talk(self.actor, text)
 end
 
---- プロキシ経由でword（単語解決してトークン蓄積）
+--- プロキシ経由でword（単語検索して結果を返す）
 --- 
 --- 検索優先順位（Lua側で制御）:
 ---   1. アクターfield（Lua側のみ）
@@ -526,6 +526,7 @@ end
 ---   - Rust側実装は別仕様で定義（pasta_core の WordTable使用）
 --- 
 --- @param name string 単語名
+--- @return string|nil 検索結果（見つからない場合はnil）
 function PROXY:word(name)
     local resolved = nil
     
@@ -546,9 +547,7 @@ function PROXY:word(name)
         resolved = PASTA_RUNTIME.search_word(nil, name)
     end
     
-    if resolved then
-        self.act:sakura_script(resolved)
-    end
+    return resolved
 end
 ```
 
@@ -890,22 +889,23 @@ sequenceDiagram
 2. `PASTA.create_session()` を廃止、`act.init_scene(SCENE)` メソッドに置き換え
 3. `PASTA.set_spot()`, `PASTA.clear_spot()` をグローバルAPIから削除、`act:set_spot()`, `act:clear_spot()` メソッドに統一
 4. `act:call()` の引数を `{global_name, local_name}` タプル形式に変更
+5. `act.アクター:word("単語")` を `act.アクター:talk(act.アクター:word("単語"))` に変更（word()は検索のみ、戻り値を返す形式に）
 
 **別仕様実施なしでは、本設計のLua側実装が生成Runeコードと互換性を失い、テスト不合格になります。**
 
 ### 現在のRust生成パターンと対応API
 
-| Rust生成コード（現在）                                    | Lua API（設計）                         | 状態               |
-| --------------------------------------------------------- | --------------------------------------- | ------------------ |
-| `PASTA.create_actor("name")`                              | PASTA.create_actor                      | ✅ 互換             |
-| `PASTA.create_scene("module")`                            | PASTA.create_scene(global, local, func) | ⚠️ 別仕様で修正前提 |
-| `local act, save, var = PASTA.create_session(SCENE, ctx)` | act.init_scene(SCENE) → save, var       | ⚠️ 別仕様で修正前提 |
-| `PASTA.set_spot(ctx, "name", num)`                        | act:set_spot(name, num)                 | ⚠️ 別仕様で修正前提 |
-| `PASTA.clear_spot(ctx)`                                   | act:clear_spot()                        | ⚠️ 別仕様で修正前提 |
-| `act.アクター:talk(text)`                                 | ActorProxy:talk                         | ✅ 互換             |
-| `act.アクター:word("name")`                               | ActorProxy:word                         | ✅ 互換             |
-| `act:call("module", "label", {}, ...)`                    | act:call(search_result, opts, ...)      | ⚠️ 別仕様で修正前提 |
-| `save.変数名`, `var.変数名`                               | save/var参照                            | ✅ 互換             |
+| Rust生成コード（現在）                                    | Lua API（設計）                           | 状態               |
+| --------------------------------------------------------- | ----------------------------------------- | ------------------ |
+| `PASTA.create_actor("name")`                              | PASTA.create_actor                        | ✅ 互換             |
+| `PASTA.create_scene("module")`                            | PASTA.create_scene(global, local, func)   | ⚠️ 別仕様で修正前提 |
+| `local act, save, var = PASTA.create_session(SCENE, ctx)` | act.init_scene(SCENE) → save, var         | ⚠️ 別仕様で修正前提 |
+| `PASTA.set_spot(ctx, "name", num)`                        | act:set_spot(name, num)                   | ⚠️ 別仕様で修正前提 |
+| `PASTA.clear_spot(ctx)`                                   | act:clear_spot()                          | ⚠️ 別仕様で修正前提 |
+| `act.アクター:talk(text)`                                 | ActorProxy:talk                           | ✅ 互換             |
+| `act.アクター:word("name")`                               | act.アクター:talk(act.アクター:word(...)) | ⚠️ 別仕様で修正前提 |
+| `act:call("module", "label", {}, ...)`                    | act:call(search_result, opts, ...)        | ⚠️ 別仕様で修正前提 |
+| `save.変数名`, `var.変数名`                               | save/var参照                              | ✅ 互換             |
 
 **Note**: 
 - ✅印：既存Rust生成コードと互換性あり、本設計で対応可能
