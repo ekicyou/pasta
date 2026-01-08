@@ -1,0 +1,22 @@
+{
+    "feature_name": "lua_tail_recursion_optimization",
+    "created_at": "2026-01-08T00:00:00Z",
+    "updated_at": "2026-01-08T13:00:00Z",
+    "language": "ja",
+    "phase": "tasks-generated",
+    "approvals": {
+        "requirements": {
+            "generated": true,
+            "approved": true
+        },
+        "design": {
+            "generated": true,
+            "approved": true
+        },
+        "tasks": {
+            "generated": true,
+            "approved": false
+        }
+    },
+    "ready_for_implementation": false
+}
