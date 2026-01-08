@@ -173,6 +173,44 @@
   ```
 - **Evidence**: design.md の ActorProxy:word() に詳細コメント追記済み
 
+### Decision: ActorProxy:word() は検索のみ、戻り値を返す形式
+- **Context**: word() の責務範囲（検索のみ vs. 検索+トークン登録）の決定
+- **Alternatives Considered**:
+  1. **Option A**: word()は検索のみ、戻り値を返す（責務分離）
+  2. **Option B**: word()はトークン登録も実施、戻り値も返す（両立）
+  3. **Option C**: 2つの関数に分離（word_search/word_exec）
+- **Selected Approach**: **Option A**（検索のみ、戻り値を返す）
+- **Rationale**: 
+  - 関数の責務が単一（検索のみ）、SRP（Single Responsibility Principle）に準拠
+  - 戻り値により柔軟な使い方が可能（加工・条件分岐など）
+  - Rust側code_generator.rsが生成する `var.場所 = act:word("場所")` パターンに対応
+  - pasta DSLの `@単語` 命令は「単語を検索して、結果をトークンとして出力」であり、Lua生成コードでは `talk(word(...))` の2段階で表現すべき
+- **Trade-offs**: 
+  - `act.アクター:word("挨拶")` の即座実行パターンが冗長になる
+  - Rust側の生成パターンを `act.アクター:talk(act.アクター:word("挨拶"))` に変更する必要がある（別仕様）
+- **Follow-up**: 
+  - Rust側code_generator.rsで `Action::WordRef` の生成を修正（別仕様 `pasta_lua_code_gen_refactor`）
+  - 現在: `act.アクター:word("単語")`
+  - 修正後: `act.アクター:talk(act.アクター:word("単語"))`
+- **API形式**:
+  ```lua
+  -- 戻り値: string | nil（見つかった場合は文字列、見つからない場合はnil）
+  local word_result = act.さくら:word("挨拶")
+  
+  -- 使用例1: 変数代入
+  var.場所 = act:word("場所")
+  
+  -- 使用例2: 即座実行（1行形式）
+  act.さくら:talk(act.さくら:word("挨拶"))
+  
+  -- 使用例3: 条件分岐
+  local w = act.さくら:word("挨拶")
+  if w then
+      act.さくら:talk(w)
+  end
+  ```
+- **Evidence**: design.md の ActorProxy:word() 実装、前提条件セクションに追記済み
+
 ## Risks & Mitigations
 - **Risk 1**: Rust側code_generator.rsの修正が必要 → 別仕様で対応、本仕様は設計ドキュメントのみ
 - **Risk 2**: 既存テストコードとの非互換 → 設計ドキュメント完成後、実装仕様で対応
