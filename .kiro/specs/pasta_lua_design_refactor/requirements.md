@@ -16,10 +16,12 @@ pasta_luaは、Pasta DSLをLua言語にトランスパイルするバックエ�
 
 ```lua
 function SCENE.__start__(act, ...)
+    -- シーン関数冒頭でSCENEへの参照を設定（単語検索に必要）
+    act.set_scene(SCENE)
     -- シーン関数はactに行動を与える
     act.set_spot("さくら", 0)              -- 誰が参加するか、立ち位置はどこか
     act.さくら:talk("こんにちは")          -- 会話内容
-    act.さくら:word("笑顔")                -- 表情変化
+    act.さくら:word("笑顔")                -- 表情変化（単語解決）
 end
 ```
 
@@ -87,12 +89,13 @@ pasta_luaのlua側設計を手伝ってほしい。迷走しているので調�
 5. The 設計ドキュメント shall Actの `__index` メタメソッドによるアクタープロキシ設計を記載する（`act.アクター名` でアクタープロキシを返す、プロキシはactへの参照を保持する）
 6. The 設計ドキュメント shall `act:talk(actor, text)` API仕様を記載する（talkトークンの蓄積）
 7. The 設計ドキュメント shall `act:sakura_script(text)` API仕様を記載する（さくらスクリプトトークンの蓄積）
-7. The 設計ドキュメント shall `act:yield()` API仕様とトークン出力動作を記載する（蓄積トークンの出力とコルーチン一時停止）
-8. The 設計ドキュメント shall `act:end_action()` API仕様と終了処理を記載する（最終トークンの出力とアクション終了）
-9. The 設計ドキュメント shall `act:call(module, label, opts, ...)` シーン呼び出しAPI仕様を記載する
-10. The 設計ドキュメント shall `act:word(name)` 単語解決API仕様を記載する
-11. The 設計ドキュメント shall `act.set_spot(name, number)` スポット設定API仕様を記載する（ctx内部のスポット情報を更新）
-12. The 設計ドキュメント shall `act.clear_spot()` スポットクリアAPI仕様を記載する（ctx内部の全スポット情報をリセット）
+8. The 設計ドキュメント shall `act:yield()` API仕様とトークン出力動作を記載する（蓄積トークンの出力とコルーチン一時停止）
+9. The 設計ドキュメント shall `act:end_action()` API仕様と終了処理を記載する（最終トークンの出力とアクション終了）
+10. The 設計ドキュメント shall `act:call(search_result, opts, ...)` シーン呼び出しAPI仕様を記載する（Rust側検索結果からシーン関数を取得して実行）
+11. The 設計ドキュメント shall `act.set_scene(SCENE)` API仕様を記載する（actが現在のシーンテーブルへの参照を保持、単語検索に使用）
+12. The 設計ドキュメント shall `act.set_spot(name, number)` スポット設定API仕様を記載する（ctx内部のスポット情報を更新）
+13. The 設計ドキュメント shall `act.clear_spot()` スポットクリアAPI仕様を記載する（ctx内部の全スポット情報をリセット）
+14. The 設計ドキュメント shall Actが現在のSCENEへの参照を持つ設計を定義する（単語検索時にグローバルシーン名として使用）
 13. The 設計ドキュメント shall Actがシーン関数の第1引数である設計原則を明記する
 14. The 設計ドキュメント shall トークン蓄積からCTX反映までのデータフローを定義する
 
@@ -105,8 +108,9 @@ pasta_luaのlua側設計を手伝ってほしい。迷走しているので調�
 3. The 設計ドキュメント shall `PASTA.create_actor(name)` のキャッシュ機構を定義する
 4. The 設計ドキュメント shall 動的属性代入の仕様を記載する（例: `ACTOR.通常 = [=[\s[0]]=]`）
 5. The 設計ドキュメント shall Actorの `talk(text)` メソッド仕様を記載する（actプロキシから呼ばれる、トークンをactに蓄積）
-6. The 設計ドキュメント shall Actorの `word(name)` メソッド仕様を記載する（actプロキシから呼ばれる、単語をトークン化してactに蓄積）
+6. The 設計ドキュメント shall Actorの `word(name)` メソッド仕様を記載する（actプロキシから呼ばれる、単語解決してトークン化し、actに蓄積）
 7. The 設計ドキュメント shall Actorメソッドが呼び出し元actへの参照を持つ設計を定義する（逆参照によるトークン蓄積）
+8. The 設計ドキュメント shall Actor.word() の単語検索優先順位を定義する（1. アクターfield、2. グローバルシーン名での単語検索、3. 全体での単語検索）
 
 ### Requirement 5: Scene（シーン）の設計
 **Objective:** As a トランスパイル出力消費者, I want シーンがモジュール単位で管理される, so that Call/Jumpによるシーン遷移が可能
@@ -120,10 +124,11 @@ pasta_luaのlua側設計を手伝ってほしい。迷走しているので調�
 4. The 設計ドキュメント shall `__name_N__` パターンの命名規則を定義する（ローカルシーン関数の番号付けパターン）
 5. The 設計ドキュメント shall Rust側の前方一致検索がグローバル名・ローカル名の組を返す仕様と、Lua側がそれを用いてシーン関数を取得する方法を定義する
 6. The 設計ドキュメント shall シーン関数シグネチャ `(act, ...)` を定義する（第1引数はActオブジェクト）
-7. The 設計ドキュメント shall シーン関数内でactに行動を与えるパターンを例示する（`act.アクター:talk("テキスト")`, `act.set_spot()` 等、アクタープロキシ経由のメソッド呼び出し）
-8. The 設計ドキュメント shall `act.var`, `act.save` を通じた変数アクセス方法を記載する
-9. The 設計ドキュメント shall act.__indexメタメソッドによるアクタープロキシ取得パターンを例示する
-10. The 設計ドキュメント shall シーン関数が「行動の記述」に専念し、トークン管理はactに委譲する設計を明記する
+7. The 設計ドキュメント shall シーン関数冒頭で `act.set_scene(SCENE)` を呼び出すパターンを例示する（actが現在のシーンへの参照を持つことで、単語検索でグローバルシーン名を使用可能にする）
+8. The 設計ドキュメント shall シーン関数内でactに行動を与えるパターンを例示する（`act.アクター:talk("テキスト")`, `act.アクター:word("name")`, `act.set_spot()` 等、アクタープロキシ経由のメソッド呼び出し）
+9. The 設計ドキュメント shall `act.var`, `act.save` を通じた変数アクセス方法を記載する
+10. The 設計ドキュメント shall act.__indexメタメソッドによるアクタープロキシ取得パターンを例示する
+11. The 設計ドキュメント shall シーン関数が「行動の記述」に専念し、トークン管理はactに委譲する設計を明記する
 
 ### Requirement 6: Spot管理（アクター表示位置）の設計
 **Objective:** As a シーン演出者, I want アクターの表示位置を制御できる, so that 伺かの掛け合い表現が可能
@@ -159,10 +164,11 @@ pasta_luaのlua側設計を手伝ってほしい。迷走しているので調�
 2. The 設計ドキュメント shall `PASTA.create_actor("name")` API仕様を記載する
 3. The 設計ドキュメント shall `PASTA.create_scene(global_name, local_name, scene_func)` API仕様を記載する（グローバル・ローカル名の階層管理）
 4. The 設計ドキュメント shall シーン関数シグネチャ `function SCENE.__start__(act, ...)` を定義する
-5. The 設計ドキュメント shall `act.var.変数名`, `act.save.変数名` アクセスパターンを定義する
-6. The 設計ドキュメント shall `act:call(search_result, {}, ...)` API仕様を記載する（Rust側から返されたグローバル名・ローカル名から場景を取得、search_resultは`{global_name, local_name}`タプル）
-7. The 設計ドキュメント shall `act:word("name")` API仕様を記載する
-8. The 設計ドキュメント shall Rust側code_generator.rsの修正が別仕様で必要となることを明記する
+5. The 設計ドキュメント shall シーン関数冒頭の `act.set_scene(SCENE)` 呼び出しパターンを定義する（単語検索にグローバルシーン名を使用可能にする）
+6. The 設計ドキュメント shall `act.var.変数名`, `act.save.変数名` アクセスパターンを定義する
+7. The 設計ドキュメント shall `act:call(search_result, {}, ...)` API仕様を記載する（Rust側から返されたグローバル名・ローカル名から場景を取得、search_resultは`{global_name, local_name}`タプル）
+8. The 設計ドキュメント shall `act.アクター:word("name")` 呼び出しパターンを定義する（アクター選択により単語解決結果が変わる）
+9. The 設計ドキュメント shall Rust側code_generator.rsの修正が別仕様で必要となることを明記する
 
 ### Requirement 9: 拡張ポイントの設計（areka/shiori）
 **Objective:** As a 統合開発者, I want areka/shiori固有機能の拡張ポイントがある, so that プラットフォーム固有の実装を追加できる
