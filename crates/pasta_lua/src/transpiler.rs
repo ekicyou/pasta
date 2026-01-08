@@ -60,10 +60,11 @@ impl LuaTranspiler {
         writer: &mut W,
     ) -> Result<TranspileContext, TranspileError> {
         let mut context = TranspileContext::new();
-        
+
         // Use intermediate buffer for code generation
         let mut intermediate_buffer: Vec<u8> = Vec::new();
-        let mut codegen = LuaCodeGenerator::with_line_ending(&mut intermediate_buffer, self.config.line_ending);
+        let mut codegen =
+            LuaCodeGenerator::with_line_ending(&mut intermediate_buffer, self.config.line_ending);
 
         // Write header
         codegen.write_header()?;
@@ -123,7 +124,7 @@ impl LuaTranspiler {
         let raw_output = String::from_utf8(intermediate_buffer)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
         let normalized_output = normalize_output(&raw_output);
-        
+
         // Write normalized output to final writer
         writer.write_all(normalized_output.as_bytes())?;
 
