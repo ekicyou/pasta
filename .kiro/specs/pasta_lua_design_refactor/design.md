@@ -513,25 +513,35 @@ function PROXY:talk(text)
 end
 
 --- プロキシ経由でword（単語解決してトークン蓄積）
---- 検索優先順位: 1. アクターfield, 2. グローバルシーン名での単語検索, 3. 全体検索
+--- 
+--- 検索優先順位（Lua側で制御）:
+---   1. アクターfield（Lua側のみ）
+---   2. グローバルシーン名での単語検索（Rust関数呼び出し）
+---   3. 全体検索（Rust関数呼び出し）
+--- 
+--- Rust連携仕様:
+---   - mlua FFI経由でRust側に公開された search_word() 関数を使用
+---   - search_word(global_name, name) → グローバルシーン名スコープ検索
+---   - search_word(nil, name) → 全体スコープ検索
+---   - Rust側実装は別仕様で定義（pasta_core の WordTable使用）
+--- 
 --- @param name string 単語名
 function PROXY:word(name)
     local resolved = nil
     
-    -- 1. アクターfield
+    -- 1. アクターfield（Lua側前処理）
     local actor_word = self.actor[name]
     if actor_word then
         resolved = actor_word
     end
     
-    -- 2. グローバルシーン名での単語検索（Rust側呼び出し）
+    -- 2. グローバルシーン名での単語検索（mlua FFI → Rust関数）
     if not resolved and self.act.current_scene then
         local global_name = SCENE.get_global_name(self.act.current_scene)
-        -- Rust側: word_registry.search_prefix(global_name, name)
         resolved = PASTA_RUNTIME.search_word(global_name, name)
     end
     
-    -- 3. 全体検索
+    -- 3. 全体検索（mlua FFI → Rust関数）
     if not resolved then
         resolved = PASTA_RUNTIME.search_word(nil, name)
     end
@@ -804,23 +814,23 @@ sequenceDiagram
 
 ### act.var のライフサイクル
 
-| Timing | act.var状態 | 説明 |
-|--------|-----------|------|
-| co_action開始 | 初期化 | `ACT.new(ctx)` で `var = {}` |
-| シーン実行中 | 読み書き可能 | `local save, var = act:init_scene()` で参照を取得 |
-| yield/end_action出力 | 値維持 | トークン出力後も act.var は継続 |
-| act:call()連鎖 | 共有 | 新シーンから同じ act.var にアクセス可能 |
-| co_action終了 | 破棄 | コルーチン終了と同時に act 破棄、var は失われる |
+| Timing               | act.var状態  | 説明                                              |
+| -------------------- | ------------ | ------------------------------------------------- |
+| co_action開始        | 初期化       | `ACT.new(ctx)` で `var = {}`                      |
+| シーン実行中         | 読み書き可能 | `local save, var = act:init_scene()` で参照を取得 |
+| yield/end_action出力 | 値維持       | トークン出力後も act.var は継続                   |
+| act:call()連鎖       | 共有         | 新シーンから同じ act.var にアクセス可能           |
+| co_action終了        | 破棄         | コルーチン終了と同時に act 破棄、var は失われる   |
 
 ### CTX.save の永続性
 
-| Timing | ctx.save状態 | 説明 |
-|--------|-------------|------|
-| CTX.new() | 初期化 | `save = {}` で作成 |
-| シーン実行中 | 読み書き可能 | `save.変数名 = 値` でアクセス |
-| yield/end_action出力 | 値維持・永続 | トークン出力後も値は保持 |
-| co_action終了 | 継続残存 | コルーチン終了後も ctx.save は存在 |
-| 次のco_action | 再利用可能 | 同じctx使用時は前回の値がアクセス可能 |
+| Timing               | ctx.save状態 | 説明                                  |
+| -------------------- | ------------ | ------------------------------------- |
+| CTX.new()            | 初期化       | `save = {}` で作成                    |
+| シーン実行中         | 読み書き可能 | `save.変数名 = 値` でアクセス         |
+| yield/end_action出力 | 値維持・永続 | トークン出力後も値は保持              |
+| co_action終了        | 継続残存     | コルーチン終了後も ctx.save は存在    |
+| 次のco_action        | 再利用可能   | 同じctx使用時は前回の値がアクセス可能 |
 
 ### 実装時の注意点
 
@@ -885,17 +895,17 @@ sequenceDiagram
 
 ### 現在のRust生成パターンと対応API
 
-| Rust生成コード（現在）                                    | Lua API（設計）                         | 状態                        |
-| --------------------------------------------------------- | --------------------------------------- | --------------------------- |
-| `PASTA.create_actor("name")`                              | PASTA.create_actor                      | ✅ 互換                      |
-| `PASTA.create_scene("module")`                            | PASTA.create_scene(global, local, func) | ⚠️ 別仕様で修正前提          |
-| `local act, save, var = PASTA.create_session(SCENE, ctx)` | act.init_scene(SCENE) → save, var       | ⚠️ 別仕様で修正前提          |
-| `PASTA.set_spot(ctx, "name", num)`                        | act:set_spot(name, num)                 | ⚠️ 別仕様で修正前提          |
-| `PASTA.clear_spot(ctx)`                                   | act:clear_spot()                        | ⚠️ 別仕様で修正前提          |
-| `act.アクター:talk(text)`                                 | ActorProxy:talk                         | ✅ 互換                      |
-| `act.アクター:word("name")`                               | ActorProxy:word                         | ✅ 互換                      |
-| `act:call("module", "label", {}, ...)`                    | act:call(search_result, opts, ...)      | ⚠️ 別仕様で修正前提          |
-| `save.変数名`, `var.変数名`                               | save/var参照                            | ✅ 互換                      |
+| Rust生成コード（現在）                                    | Lua API（設計）                         | 状態               |
+| --------------------------------------------------------- | --------------------------------------- | ------------------ |
+| `PASTA.create_actor("name")`                              | PASTA.create_actor                      | ✅ 互換             |
+| `PASTA.create_scene("module")`                            | PASTA.create_scene(global, local, func) | ⚠️ 別仕様で修正前提 |
+| `local act, save, var = PASTA.create_session(SCENE, ctx)` | act.init_scene(SCENE) → save, var       | ⚠️ 別仕様で修正前提 |
+| `PASTA.set_spot(ctx, "name", num)`                        | act:set_spot(name, num)                 | ⚠️ 別仕様で修正前提 |
+| `PASTA.clear_spot(ctx)`                                   | act:clear_spot()                        | ⚠️ 別仕様で修正前提 |
+| `act.アクター:talk(text)`                                 | ActorProxy:talk                         | ✅ 互換             |
+| `act.アクター:word("name")`                               | ActorProxy:word                         | ✅ 互換             |
+| `act:call("module", "label", {}, ...)`                    | act:call(search_result, opts, ...)      | ⚠️ 別仕様で修正前提 |
+| `save.変数名`, `var.変数名`                               | save/var参照                            | ✅ 互換             |
 
 **Note**: 
 - ✅印：既存Rust生成コードと互換性あり、本設計で対応可能
