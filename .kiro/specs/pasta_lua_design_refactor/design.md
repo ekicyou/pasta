@@ -33,27 +33,27 @@
 
 ```mermaid
 graph TB
-    subgraph PASTA_API[PASTA公開API]
-        create_actor[create_actor]
-        create_scene[create_scene]
+    subgraph PASTA_API["PASTA公開API"]
+        create_actor["create_actor"]
+        create_scene["create_scene"]
     end
     
-    subgraph Core_Modules[コアモジュール]
-        init[pasta.init]
-        ctx_mod[pasta.ctx]
-        act_mod[pasta.act]
-        actor_mod[pasta.actor]
-        scene_mod[pasta.scene]
+    subgraph Core_Modules["コアモジュール"]
+        init["pasta.init"]
+        ctx_mod["pasta.ctx"]
+        act_mod["pasta.act"]
+        actor_mod["pasta.actor"]
+        scene_mod["pasta.scene"]
     end
     
-    subgraph Runtime[ランタイム]
-        co_action[co_action coroutine]
-        token_buffer[トークンバッファ]
+    subgraph Runtime["ランタイム"]
+        co_action["co_action coroutine"]
+        token_buffer["トークンバッファ"]
     end
     
-    subgraph Extensions[拡張モジュール]
-        areka[pasta.areka]
-        shiori[pasta.shiori]
+    subgraph Extensions["拡張モジュール"]
+        areka["pasta.areka"]
+        shiori["pasta.shiori"]
     end
     
     PASTA_API --> init
@@ -98,7 +98,7 @@ sequenceDiagram
     participant CTX as CTX
     participant Act as Act
     participant Scene as シーン関数
-    participant Actor as アクタープロキシ
+    participant Proxy as アクタープロキシ
     
     Rust->>CTX: co_action(scene, ...)
     CTX->>Act: start_action()
@@ -106,17 +106,17 @@ sequenceDiagram
     CTX->>Scene: scene(act, ...)
     Scene->>Act: init_scene(SCENE)
     Act-->>Scene: save, var
-    Scene->>Actor: act.アクター
-    Actor-->>Scene: proxy
-    Scene->>Actor: proxy:talk(text)
-    Actor->>Act: talk(actor, text)
-    Act->>Act: token追加
+    Scene->>Proxy: get via __index
+    Proxy-->>Scene: proxy
+    Scene->>Proxy: talk(text)
+    Proxy->>Act: talk(actor, text)
+    Act->>Act: token蓄積
     Scene->>Act: yield()
     Act->>CTX: yield(act)
-    CTX-->>Rust: { type: yield, token: [...] }
+    CTX-->>Rust: yield result
     Scene->>Act: end_action()
     Act->>CTX: end_action(act)
-    CTX-->>Rust: { type: end_action, token: [...] }
+    CTX-->>Rust: end result
 ```
 
 ### actライフサイクル（co_actionコルーチン）
@@ -125,13 +125,13 @@ sequenceDiagram
 stateDiagram-v2
     [*] --> Created: co_action開始
     Created --> Active: start_action()
-    Active --> Active: act:call()連鎖
-    Active --> Yielded: yield()
-    Yielded --> Active: coroutine.resume
-    Active --> Ended: end_action()
+    Active --> Active: call連鎖継続
+    Active --> Yielded: yield
+    Yielded --> Active: resume
+    Active --> Ended: end_action
     Ended --> [*]: コルーチン終了
     
-    note right of Active: act.varは全シーン連鎖で共有
+    note right of Active: var共有期間
 ```
 
 ## Requirements Traceability
