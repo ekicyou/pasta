@@ -219,9 +219,11 @@ fn generate_action(
 | L510 | `act.{}:word({})` | `act.{}:talk(act.{}:word({}))` |
 
 **Implementation Notes**
-- L509: Action::SakuraScript マッチング時の出力を変更
+- L509: Action::SakuraScript マッチング時の出力を変更（StringLiteralizer 適用済み）
 - L510: Action::Word マッチング時に talk() でラッピング
+- L511: Action::Escape マッチング時、エスケープ文字出力に StringLiteralizer を適用（例外修正）
 - StringLiteralizer は両方で引き続き使用
+- **追加修正必要**: L362（VarSet word()）、L472（Action::WordRef）でも StringLiteralizer を適用すること
 
 ---
 
@@ -295,6 +297,18 @@ end
 | 4 | Req 3 | `PASTA.set_spot(ctx, "name", idx)` | `act:set_spot("name", idx)` | L270 |
 | 5 | Req 4 | `act.actor:word()` | `act.actor:talk(act.actor:word())` | L510 |
 | 6 | Req 6 | `act.actor:talk(sakura_text)` | `act:sakura_script(text)` | L509 |
+
+### Requirement 7 検証結果: StringLiteralizer 適用箇所
+
+**発見事項**: Requirement 7 要件「すべての文字列リテラル出力を StringLiteralizer で処理（例外なし）」の実装漏れ箇所を特定しました。
+
+| 行番号 | 処理内容 | 現状 | 必要修正 |
+|--------|---------|------|---------|
+| L362 | VarSet word() 出力 | `format!("{} = act:word(\"{}\")...")` | `StringLiteralizer::literalize(name)?` 適用必須 |
+| L472 | Action::WordRef 出力 | `format!("act.{}:word(\"{}\")", actor, word_name)` | `StringLiteralizer::literalize(word_name)?` 適用必須 |
+| L511 | Action::Escape 出力 | `format!("act.{}:talk(\"{}\")", actor, c)` | `StringLiteralizer::literalize(c)?` 適用必須 |
+
+**修正対応**: これら 3 箇所について、StringLiteralizer による処理を追加実装。
 
 ---
 
