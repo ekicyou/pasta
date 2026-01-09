@@ -1,67 +1,76 @@
-local ACT = require("pasta.act")
+--- @module pasta.ctx
+--- 環境コンテキストモジュール
+---
+--- セッション管理とコルーチン制御を担当する。
+--- save（永続変数）とactors（登録アクター）を保持する。
+
+local ACT -- 前方宣言（循環参照回避）
 
 --- @class CTX 環境オブジェクト
---- @field actors [Actor] 登場アクター
---- @field var table セッション変数（セッションが終わると消える）
 --- @field save table 永続変数（セッションが終わっても残る）
---- @field act Action 現在のアクション
-local IMPL = {}
+--- @field actors table<string, Actor> 登録アクター（名前→アクター）
+local CTX = {}
+CTX.__index = CTX
 
---- コルーチンでアクションを実行する。
---- @param scene function シーン関数
-function IMPL.co_action(self, scene, ...)
+--- ACTモジュールを遅延ロード（循環参照回避）
+--- @return table ACTモジュール
+local function get_act()
+    if not ACT then
+        ACT = require("pasta.act")
+    end
+    return ACT
+end
+
+--- 新規CTXを作成
+--- @param save table|nil 永続変数
+--- @param actors table|nil 登録アクター
+--- @return CTX 環境オブジェクト
+function CTX.new(save, actors)
+    local obj = {
+        save = save or {},
+        actors = actors or {},
+    }
+    setmetatable(obj, CTX)
+    return obj
+end
+
+--- コルーチンでアクションを実行する
+--- @param scene function シーン関数（第1引数にactを受け取る）
+--- @return thread コルーチン
+function CTX:co_action(scene, ...)
     local args = { ... }
+    local act_mod = get_act()
     return coroutine.create(function()
-        local act = self:start_action()
-        scene(self, table.unpack(args))
+        local act = act_mod.new(self)
+        scene(act, table.unpack(args))
         if #act.token > 0 then
-            act:end_action()
+            self:end_action(act)
         end
     end)
 end
 
---- アクションを開始する。新しいアクションオブジェクトを作成し、現在のアクションに設定する。
---- @return Action アクションオブジェクト
-function IMPL.start_action(self)
-    local act = ACT.new(self)
-    self.act = act
-    return act
+--- アクション開始
+--- @return Act アクションオブジェクト
+function CTX:start_action()
+    local act_mod = get_act()
+    return act_mod.new(self)
 end
 
---- アクションを継続する。トークを区切り、次のタイミングで再開する。
---- @param act Action アクションオブジェクト
-function IMPL.yield(self, act)
+--- yieldでトークンを出力
+--- @param act Act アクションオブジェクト
+function CTX:yield(act)
     local token = act.token
     act.token = {}
     act.now_actor = nil
-    local mes = { type = "yield", token = token }
-    coroutine.yield(mes)
+    coroutine.yield({ type = "yield", token = token })
 end
 
---- アクションを終了する。
---- @param act Action アクションオブジェクト
-function IMPL.end_action(self, act)
+--- アクション終了
+--- @param act Act アクションオブジェクト
+function CTX:end_action(act)
     local token = act.token
     act.token = {}
-    local mes = { type = "end_action", token = token }
-    coroutine.yield(mes)
-    self.act = nil
+    coroutine.yield({ type = "end_action", token = token })
 end
 
-local MOD = {}
-
---- 環境オブジェクトの新規作成
---- @param save table 永続変数（セッションが終わっても残る）
---- @param actors [Actor] 登場アクター
---- @return CTX 環境オブジェクト
-function MOD.new(save, actors)
-    local obj = {}
-    obj.save = save or {}
-    obj.actors = actors or {}
-    obj.var = {}
-    obj.act = nil
-    setmetatable(obj, IMPL)
-    return obj
-end
-
-return MOD
+return CTX

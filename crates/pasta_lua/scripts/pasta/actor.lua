@@ -1,70 +1,77 @@
---- @class Action アクションオブジェクト
+--- @module pasta.actor
+--- アクターモジュール
+---
+--- アクターオブジェクトの管理とプロキシ生成を担当する。
+--- アクターはキャッシュされ、同名のアクターは同一オブジェクトを返す。
 
 --- @class Actor アクターオブジェクト
 --- @field name string アクター名
---- @field spot integer 立ち位置（０以上）
---- @field action Action アクションオブジェクト
---- @field has_init_script boolean 初期化スクリプトが未実行ならtrue
---- @field [string] string 動的定義
-local IMPL = {}
+--- @field spot integer|nil 立ち位置（0以上）
+local ACTOR = {}
+ACTOR.__index = ACTOR
 
-local MOD = {}
+--- アクターキャッシュ（名前→アクター）
+local actor_cache = {}
 
---- 立ち位置を設定する。
---- @param spot integer 立ち位置（０以上）
-function IMPL.set_spot(self, spot)
-    self.spot = spot
-end
-
---- アクションの開始。アクションオブジェクトを設定し、現在のアクターをリセットする。
---- アクター初期化スクリプトを追加する。
---- @param action Action アクションオブジェクト
-function IMPL.start_action(self, action)
-    self.action = action
-    action.now_actor = nil
-    self.has_init_script = true
-end
-
-function IMPL.change_actor(self)
-    if self.now_actor == self then
-        return
-    end
-    self.now_actor = self
-end
-
-function IMPL.talk(self, text)
-    self:change_actor()
-end
-
-function IMPL.word(self, key)
-
-end
-
-local spot_counter = 0
-
--- アクターオブジェクトの新規作成
--- @return Actor アクターオブジェクト
-function MOD.new_actor(name)
-    local actor = {}
-    actor.name = name
-    actor.spot = spot_counter
-    spot_counter = spot_counter + 1
-    setmetatable(actor, IMPL)
-    return actor
-end
-
-local actors = {}
-
---- アクターオブジェクトを取得または新規作成する。
+--- アクターを取得または新規作成
 --- @param name string アクター名
---- @return Actor
-function MOD.create_actor(name)
-    if actors[name] then
-        return actors[name]
+--- @return Actor アクターオブジェクト
+function ACTOR.get_or_create(name)
+    if not actor_cache[name] then
+        local actor = {
+            name = name,
+            spot = nil,
+        }
+        setmetatable(actor, ACTOR)
+        actor_cache[name] = actor
     end
-    local actor = MOD.new_actor(name)
-    actors[name] = actor
-    return actor
+    return actor_cache[name]
 end
 
-return MOD
+--- @class ActorProxy アクタープロキシ（actへの逆参照付き）
+--- @field actor Actor アクターオブジェクト
+--- @field act Act アクションオブジェクト
+local PROXY = {}
+PROXY.__index = PROXY
+
+--- プロキシを作成
+--- @param actor Actor アクターオブジェクト
+--- @param act Act アクションオブジェクト
+--- @return ActorProxy アクタープロキシ
+function ACTOR.create_proxy(actor, act)
+    local proxy = {
+        actor = actor,
+        act = act,
+    }
+    setmetatable(proxy, PROXY)
+    return proxy
+end
+
+--- talk（act経由でトークン蓄積）
+--- @param text string 発話テキスト
+function PROXY:talk(text)
+    self.act:talk(self.actor, text)
+end
+
+--- word（4レベル検索）
+--- @param name string 単語名
+--- @return string|nil 見つかった単語、またはnil
+function PROXY:word(name)
+    -- Level 1: アクターfield
+    local actor_value = rawget(self.actor, name)
+    if actor_value then
+        return actor_value
+    end
+
+    -- Level 2: SCENEfield
+    local scene = self.act.current_scene
+    if scene and scene[name] then
+        return scene[name]
+    end
+
+    -- Level 3: グローバルシーン名での検索（Rust関数呼び出し予定）
+    -- Level 4: 全体検索（Rust関数呼び出し予定）
+    return nil -- TODO: Rust search_word 統合
+end
+
+return ACTOR
