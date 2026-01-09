@@ -49,7 +49,7 @@ end
 **設計が求める出力:**
 ```lua
 do
-    local SCENE = {}
+    local SCENE = PASTA.create_scene("モジュール名_1")
     
     function SCENE.__start__(act, ...)
         local args = { ... }
@@ -60,8 +60,6 @@ do
         act.さくら:talk("こんにちは")
         act:sakura_script("\\s[0]")
     end
-    
-    PASTA.create_scene("モジュール名_1", "__start__", SCENE.__start__)
 end
 ```
 
