@@ -132,7 +132,7 @@ pasta_luaのlua側設計を手伝ってほしい。迷走しているので調�
 **設計原則**: シーン関数はactに「実際の行動」（会話、表情、スポット設定等）を与える台本である。シーンレジストリはグローバルシーン名とローカルシーン名の階層構造を持ち、Rust側の前方一致検索結果から対応するシーン関数を取得する。
 
 #### Acceptance Criteria
-1. The 設計ドキュメント shall `PASTA.create_scene(global_name, local_name, scene_func)` API仕様を記載する（グローバルシーン名とローカルシーン名でシーン関数を登録）
+1. The 設計ドキュメント shall `PASTA.create_scene(global_name)` API仕様を記載する（グローバルシーン名でSCENEテーブルを作成・返却。シーン関数はトランスパイラがSCENEテーブルに直接定義する）
 2. The 設計ドキュメント shall シーンテーブル構造 `{ [global_name] = { [local_name] = scene_func, ... }, ... }` を定義する
 3. The 設計ドキュメント shall エントリーポイント `__start__` ローカルシーン関数の役割を定義する（モジュールロード時の自動実行ポイント）
 4. The 設計ドキュメント shall `__name_N__` パターンの命名規則を定義する（ローカルシーン関数の番号付けパターン）
@@ -174,7 +174,7 @@ pasta_luaのlua側設計を手伝ってほしい。迷走しているので調�
 #### Acceptance Criteria
 1. The 設計ドキュメント shall `code_generator.rs` が将来生成すべき関数呼び出しパターンを定義する
 2. The 設計ドキュメント shall `PASTA.create_actor("name")` API仕様を記載する
-3. The 設計ドキュメント shall `PASTA.create_scene(global_name, local_name, scene_func)` API仕様を記載する（グローバル・ローカル名の階層管理）
+3. The 設計ドキュメント shall `PASTA.create_scene(global_name)` API仕様を記載する（SCENEテーブルを作成・返却。シーン関数はトランスパイラがSCENEテーブルに直接定義する）
 4. The 設計ドキュメント shall シーン関数シグネチャ `function SCENE.__start__(act, ...)` を定義する
 5. The 設計ドキュメント shall シーン関数冒頭の `local save, var = act:init_scene(SCENE)` 呼び出しパターンを定義する（単語検索にグローバルシーン名を使用可能にし、短記法アクセス用にsave/varを返す）
 6. The 設計ドキュメント shall `save.変数名`, `var.変数名` アクセスパターンを定義する（code_generator.rsの頻繁な出力に対応）
