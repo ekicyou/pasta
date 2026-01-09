@@ -13,11 +13,11 @@
 - Act-firstアーキテクチャ（シーン関数がactを第1引数で受け取る）の確立
 - Rust側code_generator.rsとの完全なAPI互換性の設計
 - areka/shiori拡張ポイントの定義
+- **子仕様の作成**: トランスパイラー、Lua実装、検索モジュールの仕様
+- **Luaスケルトンコード**: トランスパイラー出力がエラーにならないAPI定義
 
 ### Non-Goals
-- **本仕様での実装コード変更は対象外**（設計ドキュメントのみ）
-- Rust側code_generator.rsの修正（別仕様で実施）
-- areka/shioriの具体的実装
+- areka/shioriの具体的実装（拡張ポイントのみ定義）
 
 ## Architecture
 
