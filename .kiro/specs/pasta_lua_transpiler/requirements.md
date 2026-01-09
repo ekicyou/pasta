@@ -215,6 +215,29 @@ end
 - `crates/pasta_lua/tests/fixtures/` - 期待出力の更新
 - `crates/pasta_lua/tests/lua_specs/` - Lua単体テストの更新
 
+### 実装戦略
+
+**採用アプローチ: Option A（行レベル修正・段階的実装）**
+
+6つの変更（L253, L268, L270, L278, L509-510）は相互依存性が低いため、段階的な行レベル修正で対応する。
+
+#### 実装順序:
+1. **L253**: シグネチャ `ctx` → `act`
+2. **L268**: `PASTA.clear_spot(ctx)` → `act:clear_spot()`
+3. **L270**: `PASTA.set_spot(ctx, ...)` → `act:set_spot(...)`
+4. **L278**: `PASTA.create_session()` → `act:init_scene()` + 戻り値変更
+5. **L510**: `word()` → `act.actor:talk(act.actor:word())`
+6. **L509**: `act.actor:talk(sakura_text)` → `act:sakura_script(text)`
+
+#### メリット:
+- 各変更が独立（順序依存性低い）
+- テスト検証が段階的に可能
+- 問題箇所の特定が容易
+
+#### コミット粒度:
+- 各変更後にコミット（合計6コミット、または関連する複数変更をグループ化）
+- 各段階で `cargo test` 実行可能
+
 ### 変更の優先順位
 
 1. **Phase 1**: シーン関数シグネチャ、init_scene（Req 1, 2）
