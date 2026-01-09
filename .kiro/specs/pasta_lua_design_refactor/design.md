@@ -227,7 +227,7 @@ end
 | Requirements | 2.1, 2.2, 2.3, 2.4, 2.5, 2.6             |
 
 **Responsibilities & Constraints**
-- **映画撮影比喩での役割**: 撮影環境であり、外部（Rust Runtime/areka/shiori）との接続点。actからの撮影記録（トークン）を世間で受け、外部に出力しる中継値
+- **映画撮影比喩での役割**: 撮影環境であり、外部（Rust Runtime/areka/shiori）との接続点。actからの撮影記録（トークン）を受け取り、外部に出力する中継点
 - save（永続変数）テーブルの保持
 - actors（登録アクター）テーブルの保持
 - spots（スポット割り当て）情報の保持
