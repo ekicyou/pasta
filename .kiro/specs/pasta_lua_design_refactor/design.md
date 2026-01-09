@@ -26,8 +26,8 @@
 | 概念       | 映画撮影         | pasta_lua                               |
 | ---------- | ---------------- | --------------------------------------- |
 | シーン関数 | 台本             | 撮影対象のシーン記述                    |
-| act        | 「アクション！」 | 実行コンテキスト（トークン蓄積）        |
-| ctx        | 撮影環境         | 永続的な環境情報（save, actors, spots） |
+| act        | カメラ、撮影記録 | 演技を記録し、トークンを蓄積        |
+| ctx        | 撮影環境、接続点 | 永続情報管理、外部に接続、トークン出力 |
 
 ### Architecture Pattern & Boundary Map
 
@@ -155,7 +155,7 @@ stateDiagram-v2
 | Component    | Domain    | Intent           | Req Coverage                    | Key Dependencies  | Contracts      |
 | ------------ | --------- | ---------------- | ------------------------------- | ----------------- | -------------- |
 | pasta.init   | API       | 公開API提供      | 1.1-1.5                         | actor, scene      | Service        |
-| pasta.ctx    | Runtime   | 環境管理         | 2.1-2.6, 6.4-6.5                | -                 | State          |
+| pasta.ctx    | Runtime   | 環境管理、外部接続 | 2.1-2.6, 6.4-6.5                | -                 | State          |
 | pasta.act    | Runtime   | シーン撮影（演技記録）   | 3.1-3.17, 6.1-6.3, 6.6, 7.1-7.6 | ctx, actor, scene | Service, State |
 | pasta.actor  | Entity    | アクター定義     | 4.1-4.8                         | -                 | Service        |
 | pasta.scene  | Registry  | シーンレジストリ | 5.1-5.11                        | -                 | Service        |
@@ -219,15 +219,16 @@ end
 
 | Field        | Detail                                   |
 | ------------ | ---------------------------------------- |
-| Intent       | 環境管理（永続変数、アクター、スポット） |
+| Intent       | 環境管理、外部との接続点 |
 | Requirements | 2.1, 2.2, 2.3, 2.4, 2.5, 2.6             |
 
 **Responsibilities & Constraints**
+- **映画撮影比喩での役割**: 撮影環境であり、外部（Rust Runtime/areka/shiori）との接続点。actからの撮影記録（トークン）を世間で受け、外部に出力しる中継値
 - save（永続変数）テーブルの保持
 - actors（登録アクター）テーブルの保持
 - spots（スポット割り当て）情報の保持
 - co_actionコルーチンによるアクション実行制御
-- actオブジェクトを内包（actがctxを参照する）
+- actオブジェクトを内包（actが設定を受け、記録を提供）
 
 **Dependencies**
 - Outbound: pasta.act — Act生成 (P0)
@@ -308,8 +309,7 @@ end
 
 **Implementation Notes**
 - varはCTXから削除、Act側に移動（2.6）
-- spotsテーブルはact.set_spot/clear_spotで更新される
-
+- spotsテーブルはact.set_spot/clear_spotで更新される- **トークン出力の中継点**: ctx:yield() と ctx:end_action() は、actから受けたトークンを coroutine.yield 経由で外部（Rust Runtime）に出力する。置想: saveを撮影環境、actのトークンを撮影記録とし、ctxがそれを外部に流す役割
 ---
 
 #### pasta.act
