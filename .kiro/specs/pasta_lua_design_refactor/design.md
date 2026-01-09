@@ -156,7 +156,7 @@ stateDiagram-v2
 | ------------ | --------- | ---------------- | ------------------------------- | ----------------- | -------------- |
 | pasta.init   | API       | 公開API提供      | 1.1-1.5                         | actor, scene      | Service        |
 | pasta.ctx    | Runtime   | 環境管理         | 2.1-2.6, 6.4-6.5                | -                 | State          |
-| pasta.act    | Runtime   | アクション実行   | 3.1-3.17, 6.1-6.3, 6.6, 7.1-7.6 | ctx, actor, scene | Service, State |
+| pasta.act    | Runtime   | シーン撮影（演技記録）   | 3.1-3.17, 6.1-6.3, 6.6, 7.1-7.6 | ctx, actor, scene | Service, State |
 | pasta.actor  | Entity    | アクター定義     | 4.1-4.8                         | -                 | Service        |
 | pasta.scene  | Registry  | シーンレジストリ | 5.1-5.11                        | -                 | Service        |
 | pasta.areka  | Extension | areka拡張        | 9.1                             | init              | Service        |
@@ -316,14 +316,15 @@ end
 
 | Field        | Detail                                             |
 | ------------ | -------------------------------------------------- |
-| Intent       | アクション実行、トークン蓄積、アクタープロキシ提供 |
+| Intent       | シーン撮影（アクターの演技をカメラで記録する） |
 | Requirements | 3.1-3.17, 6.1-6.3, 6.6, 7.1-7.6                    |
 
 **Responsibilities & Constraints**
-- ctxへの参照を保持
+- **映画撮影比喩での役割**: 撮影監督（director of photography）のように、シーン関数の指示に従ってアクターの演技を記録する
+- ctxへの参照を保持（撮影環境にアクセス）
 - var（作業変数）テーブルの保持（アクション期間中のみ有効）
-- tokenバッファへのトークン蓄積
-- __indexメタメソッドによるアクタープロキシ提供
+- tokenバッファへのトークン蓄積（撮影記録）
+- __indexメタメソッドによるアクタープロキシ提供（各アクターにアクセス）
 - 現在のSCENEへの参照保持（単語検索用）
 
 **Dependencies**
@@ -448,6 +449,7 @@ end
 **Implementation Notes**
 - act:call()連鎖中もactは継続される（3.16）
 - current_sceneは単語検索のグローバルシーン名取得に使用（3.14）
+- **撮影比喩**: act はシーン関数の記述（台本）に基づいて、アクター（演者）の行動を記録する。その記録（token）は最終的に areka/shiori 層で実行される
 
 ---
 
