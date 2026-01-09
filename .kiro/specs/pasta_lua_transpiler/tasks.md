@@ -1,167 +1,168 @@
-# Implementation Plan
+# 実装計画
 
-## Task Overview
+## タスク概要
 
-**Total**: 6 major tasks, 17 sub-tasks  
-**Coverage**: All 9 requirements (1, 2, 3, 4, 5, 6, 7, 8, 9)  
-**Estimated Duration**: 4-5 hours total (1-3 hours per major task)
-
----
-
-## Major Tasks
-
-### 1. Update Scene Function Signature and Initialize Session
-
-- [ ] 1.1 (P) Change scene function signature from `ctx` to `act` parameter
-  - Replace the parameter name in function declaration at L253
-  - Update function naming pattern (entry point and named local scenes)
-  - Verify all actor context references use the new `act` parameter
-  - Run `cargo build` to validate syntax
-  - _Requirements: 1, 2_
-
-- [ ] 1.2 (P) Replace `PASTA.create_session()` call with `act:init_scene()` 
-  - Update the call format at L278 to use `act:init_scene(SCENE)`
-  - Adjust return value handling from 3-tuple to 2-tuple (save, var)
-  - Ensure save/var variables are properly captured from init_scene return
-  - Run `cargo build` to validate syntax
-  - _Requirements: 2, 7_
-
-- [ ] 1.3 Update `generate_local_scene()` function documentation
-  - Add docstring explaining the new `act` parameter convention
-  - Include example output showing the updated signature
-  - Document the init_scene call pattern
-  - _Requirements: 9_
-
-### 2. Implement Spot Management API Changes
-
-- [ ] 2.1 (P) Replace `PASTA.clear_spot(ctx)` with `act:clear_spot()` call
-  - Update the method call format at L268
-  - Remove the `ctx` parameter from the call
-  - Ensure this change precedes init_scene() in generated code
-  - Run `cargo build` to validate syntax
-  - _Requirements: 3, 7_
-
-- [ ] 2.2 (P) Replace `PASTA.set_spot()` calls with `act:set_spot()` format
-  - Update the method call format at L270
-  - Remove the `ctx` parameter and adjust argument positions
-  - Ensure each actor's spot is set in correct order after clear_spot()
-  - Run `cargo build` to validate syntax
-  - _Requirements: 3, 7_
-
-- [ ] 2.3 Update spot management logic in documentation
-  - Add docstring notes about clear_spot and set_spot API
-  - Include examples of the new format in generate_local_scene documentation
-  - _Requirements: 9_
-
-### 3. Implement Actor Proxy Calling Patterns
-
-- [ ] 3.1 (P) Wrap word() calls with talk() at L510
-  - Change output format from `act.actor:word()` to `act.actor:talk(act.actor:word())`
-  - Ensure current actor context is maintained
-  - Apply StringLiteralizer to word name argument via literalize()
-  - Run `cargo build` to validate syntax
-  - _Requirements: 4, 7_
-
-- [ ] 3.2 (P) Apply StringLiteralizer to word() arguments at L362 and L472
-  - Update VarSet word() processing at L362 to wrap word name with StringLiteralizer::literalize()
-  - Update Action::WordRef processing at L472 to wrap word name with StringLiteralizer::literalize()
-  - Ensure all string literals are processed uniformly
-  - Run `cargo build` to validate syntax
-  - _Requirements: 7, 4_
-
-- [ ] 3.3 Update actor proxy documentation
-  - Add docstring explaining word() wrapping pattern
-  - Document the talk() + word() nested call format
-  - Include StringLiteralizer requirement explanation
-  - _Requirements: 9_
-
-### 4. Implement SakuraScript and Escape Character Handling
-
-- [ ] 4.1 (P) Replace actor-scoped sakura_script with `act:sakura_script()` at L509
-  - Change output format to use act-scoped method instead of actor-scoped talk()
-  - Ensure SakuraScript is output as standalone (not wrapped in talk)
-  - Maintain StringLiteralizer processing for script text
-  - Run `cargo build` to validate syntax
-  - _Requirements: 6, 7_
-
-- [ ] 4.2 (P) Apply StringLiteralizer to escape character output at L511
-  - Update Action::Escape match branch to wrap escape character with StringLiteralizer::literalize()
-  - Ensure character is properly escaped before output
-  - Run `cargo build` to validate syntax
-  - _Requirements: 7, 6_
-
-- [ ] 4.3 Update sakura_script documentation
-  - Add docstring explaining the act:sakura_script() method
-  - Document escape character handling with StringLiteralizer
-  - _Requirements: 9_
-
-### 5. Update Tests for New Output Format
-
-- [ ] 5.1 Update transpiler integration test assertions
-  - Modify existing test cases in `transpiler_integration_test.rs` to match new output format
-  - Update assertions for scene signature (ctx → act)
-  - Update assertions for init_scene call format
-  - Update assertions for spot management methods
-  - Verify test count (~20-25 affected tests)
-  - _Requirements: 8, 1, 2, 3_
-
-- [ ] 5.2 Update actor proxy and sakura_script test assertions
-  - Update assertions for word() wrapping pattern
-  - Update assertions for act:sakura_script() format
-  - Update assertions for escape character handling
-  - Verify all affected tests pass
-  - _Requirements: 8, 4, 6, 7_
-
-- [ ] 5.3 Update fixture files and expected outputs
-  - Update files in `crates/pasta_lua/tests/fixtures/`
-  - Update Lua test expectations in `crates/pasta_lua/tests/lua_specs/`
-  - Ensure all expected output reflects new API format
-  - Run `cargo test --lib` to validate
-  - _Requirements: 8_
-
-- [ ] 5.4 (P) Execute full test suite
-  - Run `cargo test --all` to verify no regressions
-  - Verify all new assertions pass
-  - Confirm test coverage for new code patterns
-  - Document any test failures and corrections needed
-  - _Requirements: 8_
-
-### 6. Verify Code Generation and Document Changes
-
-- [ ] 6.1 (P) Validate generated Lua code correctness
-  - Run integration tests and inspect generated output samples
-  - Verify scene function signature matches expected format
-  - Verify API calls (init_scene, clear_spot, set_spot, sakura_script) are correct
-  - Verify word() wrapping and actor proxy calls are correct
-  - _Requirements: 1, 2, 3, 4, 5, 6, 7_
-
-- [ ] 6.2 Update code_generator.rs module documentation
-  - Update module-level docstring with overview of new functionality
-  - Update method documentation for generate_local_scene() and generate_action()
-  - Add examples showing new output format for each major change
-  - Ensure documentation reflects StringLiteralizer unified rule
-  - _Requirements: 9_
-
-- [ ] 6.3 Final validation and commit
-  - Verify `cargo check --all` passes
-  - Verify `cargo test --all` passes with no failures
-  - Confirm all changes are committed with clear commit messages
-  - Document any deviations from design in implementation notes
-  - _Requirements: 1, 2, 3, 4, 5, 6, 7, 8, 9_
+**合計**: 6 つのメジャータスク、17 個のサブタスク  
+**カバレッジ**: すべての 9 要件（1, 2, 3, 4, 5, 6, 7, 8, 9）  
+**推定工数**: 4-5 時間（メジャータスクあたり 1-3 時間）
 
 ---
 
-## Requirement Mapping Summary
+## メジャータスク
 
-| Requirement | Tasks | Coverage |
-|-------------|-------|----------|
-| 1 | 1.1, 5.1, 6.1 | Scene signature change implementation and verification |
-| 2 | 1.2, 5.1, 6.1 | init_scene implementation and verification |
-| 3 | 2.1, 2.2, 5.1, 6.1 | Spot management implementation and verification |
-| 4 | 3.1, 3.2, 5.2, 6.1 | Actor proxy implementation and verification |
-| 5 | - | (Already implemented, skipped) |
-| 6 | 4.1, 4.2, 5.2, 6.1 | SakuraScript implementation and verification |
-| 7 | 1.2, 2.1, 2.2, 3.1, 3.2, 4.1, 4.2, 6.1 | StringLiteralizer and variable access throughout |
-| 8 | 5.1, 5.2, 5.3, 5.4, 6.1 | Test updates and coverage |
-| 9 | 1.3, 2.3, 3.3, 4.3, 6.2 | Documentation updates |
+### 1. シーン関数のシグネチャ変更とセッション初期化
+
+- [ ] 1.1 (P) シーン関数のパラメータを `ctx` から `act` に変更
+  - L253 の関数宣言のパラメータ名を変更
+  - エントリーポイントと名前付きローカルシーンの関数命名パターン更新
+  - すべてのアクターコンテキスト参照が新しい `act` パラメータを使用することを確認
+  - `cargo build` を実行して文法を検証
+  - _要件: 1, 2_
+
+- [ ] 1.2 (P) `PASTA.create_session()` 呼び出しを `act:init_scene()` に置き換え
+  - L278 の呼び出し形式を `act:init_scene(SCENE)` に更新
+  - 戻り値の処理を 3 つ組から 2 つ組（save, var）に調整
+  - init_scene の戻り値から save/var 変数が適切にキャプチャされることを確認
+  - `cargo build` を実行して文法を検証
+  - _要件: 2, 7_
+
+- [ ] 1.3 `generate_local_scene()` 関数のドキュメント更新
+  - 新しい `act` パラメータ規約を説明するドキュメント文字列を追加
+  - 更新されたシグネチャを示す出力例を含める
+  - init_scene 呼び出しパターンを文書化
+  - _要件: 9_
+
+### 2. スポット管理 API の変更
+
+- [ ] 2.1 (P) `PASTA.clear_spot(ctx)` を `act:clear_spot()` に置き換え
+  - L268 のメソッド呼び出し形式を更新
+  - 呼び出しから `ctx` パラメータを削除
+  - この変更が生成されたコード内で init_scene() の前に配置されることを確認
+  - `cargo build` を実行して文法を検証
+  - _要件: 3, 7_
+
+- [ ] 2.2 (P) `PASTA.set_spot()` 呼び出しを `act:set_spot()` 形式に置き換え
+  - L270 のメソッド呼び出し形式を更新
+  - `ctx` パラメータを削除して引数位置を調整
+  - clear_spot() 後に各アクターのスポットが正しい順序で設定されることを確認
+  - `cargo build` を実行して文法を検証
+  - _要件: 3, 7_
+
+- [ ] 2.3 スポット管理ロジックのドキュメント更新
+  - clear_spot と set_spot API についてのドキュメント文字列ノートを追加
+  - generate_local_scene のドキュメントに新しい形式の例を含める
+  - _要件: 9_
+
+### 3. アクタープロキシ呼び出しパターン実装
+
+- [ ] 3.1 (P) L510 で word() 呼び出しを talk() でラッピング
+  - 出力形式を `act.actor:word()` から `act.actor:talk(act.actor:word())` に変更
+  - 現在のアクターコンテキストが保持されることを確認
+  - StringLiteralizer で word 名引数を literalize() で処理
+  - `cargo build` を実行して文法を検証
+  - _要件: 4, 7_
+
+- [ ] 3.2 (P) L362 と L472 で word() 引数に StringLiteralizer を適用
+  - L362 の VarSet word() 処理を更新して word 名を StringLiteralizer::literalize() でラップ
+  - L472 の Action::WordRef 処理を更新して word 名を StringLiteralizer::literalize() でラップ
+  - すべての文字列リテラルが統一して処理されることを確認
+  - `cargo build` を実行して文法を検証
+  - _要件: 7, 4_
+
+- [ ] 3.3 アクタープロキシのドキュメント更新
+  - word() ラッピングパターンを説明するドキュメント文字列を追加
+  - talk() + word() ネストされた呼び出し形式を文書化
+  - StringLiteralizer 要件の説明を含める
+  - _要件: 9_
+
+### 4. さくらスクリプトとエスケープ文字処理実装
+
+- [ ] 4.1 (P) L509 でアクター範囲のさくらスクリプトを `act:sakura_script()` に置き換え
+  - 出力形式をアクター範囲のメソッドから act 範囲のメソッドに変更
+  - さくらスクリプトが単独で出力され、talk() でラップされないことを確認
+  - スクリプトテキストの StringLiteralizer 処理を維持
+  - `cargo build` を実行して文法を検証
+  - _要件: 6, 7_
+
+- [ ] 4.2 (P) L511 でエスケープ文字出力に StringLiteralizer を適用
+  - Action::Escape マッチブランチを更新してエスケープ文字を StringLiteralizer::literalize() でラップ
+  - 文字が出力前に適切にエスケープされることを確認
+  - `cargo build` を実行して文法を検証
+  - _要件: 7, 6_
+
+- [ ] 4.3 さくらスクリプトのドキュメント更新
+  - act:sakura_script() メソッドを説明するドキュメント文字列を追加
+  - StringLiteralizer を使用したエスケープ文字処理を文書化
+  - _要件: 9_
+
+### 5. 新しい出力形式のテスト更新
+
+- [ ] 5.1 トランスパイラー統合テストのアサーション更新
+  - `transpiler_integration_test.rs` の既存テストケースを新しい出力形式に合わせて修正
+  - シーンシグネチャのアサーション更新（ctx → act）
+  - init_scene 呼び出し形式のアサーション更新
+  - スポット管理メソッドのアサーション更新
+  - テスト数を確認（約 20～25 個の影響を受けるテスト）
+  - _要件: 8, 1, 2, 3_
+
+- [ ] 5.2 アクタープロキシとさくらスクリプトのテストアサーション更新
+  - word() ラッピングパターンのアサーション更新
+  - act:sakura_script() 形式のアサーション更新
+  - エスケープ文字処理のアサーション更新
+  - すべての影響を受けるテストが成功することを確認
+  - _要件: 8, 4, 6, 7_
+
+- [ ] 5.3 フィクスチャファイルと期待出力の更新
+  - `crates/pasta_lua/tests/fixtures/` のファイルを更新
+  - `crates/pasta_lua/tests/lua_specs/` の Lua テスト期待値を更新
+  - すべての期待出力が新しい API 形式を反映することを確認
+  - `cargo test --lib` を実行して検証
+  - _要件: 8_
+
+- [ ] 5.4 (P) 完全なテストスイートを実行
+  - `cargo test --all` を実行してリグレッションがないことを確認
+  - すべての新しいアサーションが成功することを確認
+  - 新しいコードパターンのテストカバレッジを確認
+  - テスト失敗と必要な修正を文書化
+  - _要件: 8_
+
+### 6. コード生成の検証とドキュメント更新
+
+- [ ] 6.1 (P) 生成 Lua コードの正確性を検証
+  - 統合テストを実行して生成出力サンプルを確認
+  - シーン関数シグネチャが期待形式と一致することを確認
+  - API 呼び出し（init_scene, clear_spot, set_spot, sakura_script）が正しいことを確認
+  - word() ラッピングとアクタープロキシ呼び出しが正しいことを確認
+  - _要件: 1, 2, 3, 4, 5, 6, 7_
+
+- [ ] 6.2 code_generator.rs モジュールドキュメント更新
+  - 新しい機能の概要を含むモジュールレベルのドキュメント文字列を更新
+  - generate_local_scene() と generate_action() のメソッドドキュメントを新しい形式に合わせて更新
+  - 各主要変更の新しい出力形式を示す例を追加
+  - StringLiteralizer 統一ルールが反映されるようにドキュメントを確認
+  - _要件: 9_
+
+- [ ] 6.3 最終検証とコミット
+  - `cargo check --all` が成功することを確認
+  - `cargo test --all` が成功してエラーがないことを確認
+  - すべての変更が明確なコミットメッセージでコミットされていることを確認
+  - 設計からの逸脱があれば実装ノートに記録
+  - _要件: 1, 2, 3, 4, 5, 6, 7, 8, 9_
+
+---
+
+## 要件マッピング一覧
+
+| 要件 | タスク | カバレッジ |
+|------|--------|----------|
+| 1 | 1.1, 5.1, 6.1 | シーンシグネチャ変更の実装と検証 |
+| 2 | 1.2, 5.1, 6.1 | init_scene の実装と検証 |
+| 3 | 2.1, 2.2, 5.1, 6.1 | スポット管理の実装と検証 |
+| 4 | 3.1, 3.2, 5.2, 6.1 | アクタープロキシの実装と検証 |
+| 5 | - | （既実装のため スキップ） |
+| 6 | 4.1, 4.2, 5.2, 6.1 | さくらスクリプトの実装と検証 |
+| 7 | 1.2, 2.1, 2.2, 3.1, 3.2, 4.1, 4.2, 6.1 | StringLiteralizer と変数アクセス全体 |
+| 8 | 5.1, 5.2, 5.3, 5.4, 6.1 | テスト更新とカバレッジ |
+| 9 | 1.3, 2.3, 3.3, 4.3, 6.2 | ドキュメント更新 |
+
 
