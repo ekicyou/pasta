@@ -557,6 +557,14 @@ end
 
 ---
 
+## Extension Modules
+
+### Core Modules Summary
+
+| Component    | Domain    | Intent           | Req Coverage                    | Key Dependencies  | Contracts      |
+| ------------ | --------- | ---------------- | ------------------------------- | ----------------- | -------------- |
+| pasta.scene  | Registry  | シーンレジストリ | 5.1-5.11                        | -                 | Service        |
+
 #### pasta.scene
 
 | Field        | Detail               |
@@ -754,18 +762,6 @@ classDiagram
 
 ---
 
-## Error Handling
-
-### Error Strategy
-
-本設計は「設計ドキュメント」であり、エラーハンドリングの詳細実装は将来の実装仕様で定義する。
-
-基本方針:
-- **Fail Fast**: 不正なアクター名、シーン名は即座にエラー
-- **Graceful Degradation**: 未定義の単語は空文字列として処理
-- **Observability**: Rust側でログ出力
-
----
 
 ## Token Output & CTX State Synchronization
 
