@@ -111,10 +111,11 @@ sequenceDiagram
     Scene->>Proxy: talk(text)
     Proxy->>Act: talk(actor, text)
     Act->>Act: token蓄積
-    Scene->>Act: yield()
+    Scene->>Act: yield() [optional]
     Act->>CTX: yield(act)
     CTX-->>Rust: yield result
-    Scene->>Act: end_action()
+    Note over Scene,CTX: シーン関数終了
+    Note over CTX,Act: co_action自動処理
     Act->>CTX: end_action(act)
     CTX-->>Rust: end result
 ```
@@ -306,7 +307,7 @@ end
 
 **Implementation Notes**
 - varはCTXから削除、Act側に移動（2.6）
-- spotsテーブルはact.set_spot/clear_spotで更新される
+- スポット情報はActorProxyオブジェクトに保持される
 - **複数 co_action 対応**: act はコルーチン内のローカル変数として管理され、ctx には保存されない。これにより複数の co_action が並行実行可能
 - **トークン出力の中継点**: ctx:yield() と ctx:end_action() は、act から受けたトークンを coroutine.yield 経由で外部（Rust Runtime）に出力する。保存を撮影環境、act のトークンを撮影記録とし、ctx がそれを外部に流す役割
 ---
@@ -396,6 +397,18 @@ function ACT:talk(actor, text)
     table.insert(self.token, { type = "talk", text = text })
 end
 
+--- 単語検索（アクター非依存）
+--- 
+--- 検索優先順位:
+---   1. SCENEfield
+---   2. グローバルシーン名での単語検索（Rust関数）
+---   3. 全体検索（Rust関数）
+--- 
+--- @param name string 単語名
+--- @return string|nil 検索結果
+function ACT:word(name)
+end
+
 --- sakura_scriptトークンを蓄積
 --- @param text string さくらスクリプト
 function ACT:sakura_script(text)
@@ -408,7 +421,7 @@ function ACT:yield()
     self.ctx:yield(self)
 end
 
---- アクションを終了
+--- アクションを終了（co_action自動実行、シーン関数からは呼ばない）
 function ACT:end_action()
     table.insert(self.token, { type = "end_action" })
     self.ctx:end_action(self)
@@ -427,15 +440,14 @@ function ACT:call(search_result, opts, ...)
 end
 
 --- スポットを設定（ctx内部を更新）
+--- アクターのスポット位置を設定
 --- @param name string アクター名
 --- @param number integer 立ち位置
 function ACT:set_spot(name, number)
-    self.ctx.spots[name] = number
 end
 
---- 全スポットをクリア（ctx内部を更新）
+--- 全スポットをクリア
 function ACT:clear_spot()
-    self.ctx.spots = {}
 end
 ```
 
@@ -515,46 +527,18 @@ end
 
 --- プロキシ経由でword（単語検索して結果を返す）
 --- 
---- 動作：
----   1. 検索優先順位に基づいて単語を検索（アクターfield → グローバルシーン検索 → 全体検索）
----   2. 検索結果の文字列を戻り値として返す
----   3. 副作用：Rust側のランダム選択ロジックの状態を変更（一度選択された選択肢は全選択肢が選ばれるまで再選択されない）
----      → 同じword呼び出しを複数回実行するとランダム循環により異なる結果が返される可能性がある
+--- 検索優先順位:
+---   1. アクターfield
+---   2. SCENEfield
+---   3. グローバルシーン名での単語検索（Rust関数）
+---   4. 全体検索（Rust関数）
 --- 
---- 検索優先順位（Lua側で制御）:
----   1. アクターfield（Lua側のみ）
----   2. グローバルシーン名での単語検索（Rust関数呼び出し）
----   3. 全体検索（Rust関数呼び出し）
---- 
---- Rust連携仕様:
----   - mlua FFI経由でRust側に公開された search_word() 関数を使用
----   - search_word(global_name, name) → グローバルシーン名スコープ検索
----   - search_word(nil, name) → 全体スコープ検索
----   - Rust側実装は pasta_core の WordTable使用
+--- 副作用: Rust側のランダム選択ロジックの状態を変更
+---   （同じword呼び出しを複数回実行すると循環により異なる結果が返される可能性）
 --- 
 --- @param name string 単語名
---- @return string|nil 検索結果（見つからない場合はnil）
+--- @return string|nil 検索結果
 function PROXY:word(name)
-    local resolved = nil
-    
-    -- 1. アクターfield（Lua側前処理）
-    local actor_word = self.actor[name]
-    if actor_word then
-        resolved = actor_word
-    end
-    
-    -- 2. グローバルシーン名での単語検索（mlua FFI → Rust関数）
-    if not resolved and self.act.current_scene then
-        local global_name = SCENE.get_global_name(self.act.current_scene)
-        resolved = PASTA_RUNTIME.search_word(global_name, name)
-    end
-    
-    -- 3. 全体検索（mlua FFI → Rust関数）
-    if not resolved then
-        resolved = PASTA_RUNTIME.search_word(nil, name)
-    end
-    
-    return resolved
 end
 ```
 
@@ -849,9 +833,9 @@ sequenceDiagram
    - 単一の co_action 内でのみ有効
    - act:call() で連鎖するすべてのシーンが同じ act.var を参照
    
-3. **スポット情報（ctx.spots）の同期**:
-   - act:set_spot() / act:clear_spot() は即座に ctx.spots を更新
-   - 次のyield/end_action出力時に、areka/shiori層がスポット情報を利用可能
+3. **スポット情報の管理**:
+   - act:set_spot() / act:clear_spot() でスポット情報を設定
+   - 詳細な保存メカニズムは実装フェーズで決定
 
 ---
 
@@ -904,8 +888,7 @@ function SCENE.__start__(act, ...)
     
     -- アクタープロキシ経由のメソッド呼び出し
     act.さくら:talk("こんにちは")
-    local emotion = act.さくら:word("笑顔")  -- word()は検索と循環ロジック処理（副作用あり）
-    act.さくら:talk(emotion)  -- talk()でトークン化
+    act.さくら:talk(act.さくら:word("笑顔"))  -- word()は検索のみ、結果をtalk()に渡す
     
     -- 変数アクセス（短記法）
     save.挨拶回数 = (save.挨拶回数 or 0) + 1
