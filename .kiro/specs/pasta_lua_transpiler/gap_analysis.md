@@ -20,7 +20,7 @@
 | 2 | Req 2.1 | `PASTA.create_session(SCENE, ctx)` | `act:init_scene(SCENE)` | L278 | S |
 | 3 | Req 3.1 | `PASTA.clear_spot(ctx)` | `act:clear_spot()` | L268 | S |
 | 4 | Req 3.2 | `PASTA.set_spot(ctx, "name", idx)` | `act:set_spot("name", idx)` | L270 | S |
-| 5 | Req 7.1 | `act:word()` | `talk(act:word())` | L510 | S |
+| 5 | Req 7.1 | `act.actor:word()` | `act.actor:talk(act.actor:word())` | L510 | S |
 | 6 | Req 7.2 | `act.actor:talk(sakura_text)` | `act:sakura_script(text)` | L509 | M |
 
 ---
