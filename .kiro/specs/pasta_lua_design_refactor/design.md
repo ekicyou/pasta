@@ -875,40 +875,6 @@ sequenceDiagram
 
 ---
 
-## Rust生成コードとの互換性（Requirement 8）
-
-### ⚠️ 前提条件（Critical）
-
-本設計の実装開始には、**別仕様『pasta_lua_code_gen_refactor』** で以下のRust側修正が先行実施される必要があります：
-
-1. `PASTA.create_scene()` を `PASTA.create_scene(global_name, local_name, scene_func)` に変更（グローバル名・ローカル名の階層対応）
-2. `PASTA.create_session()` を廃止、`act.init_scene(SCENE)` メソッドに置き換え
-3. `PASTA.set_spot()`, `PASTA.clear_spot()` をグローバルAPIから削除、`act:set_spot()`, `act:clear_spot()` メソッドに統一
-4. `act:call()` の引数を `{global_name, local_name}` タプル形式に変更
-5. `act.アクター:word("単語")` を `act.アクター:talk(act.アクター:word("単語"))` に変更（word()は検索のみ、戻り値を返す形式に）
-
-**別仕様実施なしでは、本設計のLua側実装が生成Runeコードと互換性を失い、テスト不合格になります。**
-
-### 現在のRust生成パターンと対応API
-
-| Rust生成コード（現在）                                    | Lua API（設計）                           | 状態               |
-| --------------------------------------------------------- | ----------------------------------------- | ------------------ |
-| `PASTA.create_actor("name")`                              | PASTA.create_actor                        | ✅ 互換             |
-| `PASTA.create_scene("module")`                            | PASTA.create_scene(global, local, func)   | ⚠️ 別仕様で修正前提 |
-| `local act, save, var = PASTA.create_session(SCENE, ctx)` | act.init_scene(SCENE) → save, var         | ⚠️ 別仕様で修正前提 |
-| `PASTA.set_spot(ctx, "name", num)`                        | act:set_spot(name, num)                   | ⚠️ 別仕様で修正前提 |
-| `PASTA.clear_spot(ctx)`                                   | act:clear_spot()                          | ⚠️ 別仕様で修正前提 |
-| `act.アクター:talk(text)`                                 | ActorProxy:talk                           | ✅ 互換             |
-| `act.アクター:word("name")`                               | act.アクター:talk(act.アクター:word(...)) | ⚠️ 別仕様で修正前提 |
-| `act:call("module", "label", {}, ...)`                    | act:call(search_result, opts, ...)        | ⚠️ 別仕様で修正前提 |
-| `save.変数名`, `var.変数名`                               | save/var参照                              | ✅ 互換             |
-
-**Note**: 
-- ✅印：既存Rust生成コードと互換性あり、本設計で対応可能
-- ⚠️印：Rust側code_generator.rs修正が前提条件（別仕様『pasta_lua_code_gen_refactor』で実施、P0優先度）
-
----
-
 ## Supporting References
 
 ### シーン関数の標準パターン（Requirement 5.7, 5.8, 5.9）
@@ -926,7 +892,7 @@ function SCENE.__start__(act, ...)
     
     -- アクタープロキシ経由のメソッド呼び出し
     act.さくら:talk("こんにちは")
-    act.さくら:word("笑顔")
+    act.さくら:talk(act.さくら:word("笑顔"))  -- word()は検索のみ、talk()でトークン化
     
     -- 変数アクセス（短記法）
     save.挨拶回数 = (save.挨拶回数 or 0) + 1

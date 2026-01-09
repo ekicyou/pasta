@@ -109,8 +109,8 @@ pasta_luaのlua側設計を手伝ってほしい。迷走しているので調�
 3. The 設計ドキュメント shall `PASTA.create_actor(name)` のキャッシュ機構を定義する
 4. The 設計ドキュメント shall 動的属性代入の仕様を記載する（例: `ACTOR.通常 = [=[\s[0]]=]`）
 5. The 設計ドキュメント shall Actorの `talk(text)` メソッド仕様を記載する（actプロキシから呼ばれる、トークンをactに蓄積）
-6. The 設計ドキュメント shall Actorの `word(name)` メソッド仕様を記載する（actプロキシから呼ばれる、単語解決してトークン化し、actに蓄積）
-7. The 設計ドキュメント shall Actorメソッドが呼び出し元actへの参照を持つ設計を定義する（逆参照によるトークン蓄積）
+6. The 設計ドキュメント shall Actorの `word(name)` メソッド仕様を記載する（actプロキシから呼ばれる、単語検索を実施して結果を返す。トークン化はtalk()で行う）
+7. The 設計ドキュメント shall Actorメソッドが呼び出し元actへの参照を持つ設計を定義する（talk()で逆参照によるトークン蓄積）
 8. The 設計ドキュメント shall Actor.word() の単語検索優先順位を定義する（1. アクターfield、2. グローバルシーン名での単語検索、3. 全体での単語検索）
 
 ### Requirement 5: Scene（シーン）の設計
