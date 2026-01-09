@@ -162,16 +162,21 @@ end
 2. The code_generator shall エスケープシーケンスを適切に処理する
 3. The code_generator shall sakura_script を talk() で包まない（単独出力）
 
-### Requirement 8: 変数アクセスパターンの維持
+### Requirement 8: 変数アクセスパターンの維持 & 文字列リテラル処理
 **Objective:** As a トランスパイラ開発者, I want save/var変数アクセスが維持される, so that 既存の変数展開ロジックとの互換性を保つ
 
 **親仕様参照**: Requirement 8.6
+
+**統一ルール**: すべての文字列リテラル出力は `StringLiteralizer::literalize()` を通す（例外なし）
 
 #### Acceptance Criteria
 1. The code_generator shall 永続変数アクセスを `save.変数名` 形式で出力する
 2. The code_generator shall 作業変数アクセスを `var.変数名` 形式で出力する
 3. The code_generator shall 変数代入を `save.変数名 = 値` 形式で出力する
 4. The code_generator shall 既存の変数スコープ解決ロジックを維持する
+5. The code_generator shall すべての文字列リテラルを `StringLiteralizer::literalize()` で処理する
+6. The code_generator shall word()の単語名引数も `StringLiteralizer::literalize()` で処理する
+7. The code_generator shall エスケープ文字も `StringLiteralizer::literalize()` で処理する
 
 ### Requirement 9: テスト互換性
 **Objective:** As a トランスパイラ開発者, I want 既存テストが新出力形式に対応する, so that リグレッションを防止できる
@@ -200,6 +205,21 @@ end
 - Luaランタイムの変更
 
 ## Technical Notes
+
+### 文字列リテラル処理の統一ルール
+
+**重要**: すべての文字列リテラル出力は `StringLiteralizer::literalize()` を通す（例外なし）
+
+これにより以下を保証：
+- Lua の特殊文字（`[`, `]`, `"`, `\` 等）が正しくエスケープされる
+- 長い文字列は `[=[...]=]` 形式で出力される
+- コード生成の一貫性が保たれ、バグが防止される
+
+**適用対象**:
+- `act.アクター:talk()` の文字列引数 ✅ 現在OK
+- `act.アクター:word()` の単語名引数 ❌ 修正必要
+- `act:sakura_script()` の文字列引数 ✅ 修正済み
+- `Action::Escape` のエスケープ文字 ❌ 修正必要
 
 ### 影響を受けるファイル
 
