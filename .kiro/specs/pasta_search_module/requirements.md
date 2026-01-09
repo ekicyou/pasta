@@ -42,7 +42,7 @@ Rust側のシーン辞書・単語辞書検索機能を mlua バインディン�
 #### Acceptance Criteria
 1. The 検索モジュール shall `@pasta_search` というモジュール名で Lua に登録される
 2. When `local SEARCH = require "@pasta_search"` を実行した場合, the 検索モジュール shall 公開API一覧を含むテーブルを返す
-3. The `SEARCH` テーブル shall 本仕様で定義する全公開関数を属性として含む（`search_scene`, `search_word`, `set_scene_selector`, `set_word_selector`）
+3. The `SEARCH` テーブル shall SearchContext を単一 UserData として公開し、本仕様で定義する全公開関数を属性として含む（`search_scene`, `search_word`, `set_scene_selector`, `set_word_selector`）。Lua側の呼び出しは メタテーブル設定により `SEARCH:search_scene(...)` および `SEARCH.search_scene(...)` の両形式で可能
 4. The 検索モジュール shall pasta_lua の初期化時に自動的に登録される
 5. The 検索モジュール shall 複数回の require でも同じモジュールインスタンスを返す（一度だけ初期化）
 

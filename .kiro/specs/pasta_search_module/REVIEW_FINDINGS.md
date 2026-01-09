@@ -35,16 +35,41 @@
 - Option A を採用することを明示的に決定
 - requirements.md に「Design フェーズで Option A を選択」と記載（D記号で）
 
-### 2.2 Selector 制御実装方法（Requirement 8）
+### 2.2 ✅ 議題 2: Lua側インターフェースデザイン（決定済み）
+**決定対象**: SearchContext 公開方式
+
+**検討内容**:
+- パターン A: SearchContext を単一 UserData として公開 → `SEARCH:search_scene()` 呼び出し
+- パターン B: SceneTable/WordTable を別々 UserData で公開 → `SEARCH.scene:search()` 呼び出し
+
+**決定**: **パターン A を採用**
+
+**理由**:
+- シンプルなインターフェース設計
+- Lua側でワードテーブル・シーンテーブルをほじくり返す必要なし
+- API呼び出し形式が最初の提案と一致（`SEARCH:search_scene(...)`）
+
+**修正内容**:
+- requirements.md Requirement 1, Criteria 3 を修正
+- gap_analysis.md Option B/C セクションを削除し、Option A に特化
+
+**設計フェーズアクション**:
+- メタテーブル設定で `SEARCH:func()` と `SEARCH.func()` の両形式対応
+- mlua の `add_method_mut()` API で &mut self を提供（Selector 切り替え時）
+
+---
+
+### 2.3 Selector 制御実装方法（Requirement 8）
 **決定対象**: set_scene_selector() / set_word_selector() の可変性制御
 
 **現状**:
 - Requirement 8 で MockRandomSelector への切り替えを要求
 - gap_analysis.md で UserData の `&mut self` による実装を提案
+- 議題 2 決定により、Option A (SearchContext UserData) 採用 → &mut self 実装可能
 
 **設計フェーズアクション**:
 - mlua の `add_method_mut()` API で &mut self を提供する方針を決定
-- Lua 側の呼び出し形式（`SEARCH.func()` vs `SEARCH:func()`）を統一決定
+- Selector の内部可変性（Interior Mutability）パターンを検討（Cell<T> 等）
 
 ---
 
