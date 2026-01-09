@@ -514,6 +514,12 @@ end
 
 --- プロキシ経由でword（単語検索して結果を返す）
 --- 
+--- 動作：
+---   1. 検索優先順位に基づいて単語を検索（アクターfield → グローバルシーン検索 → 全体検索）
+---   2. 検索結果の文字列を戻り値として返す
+---   3. 副作用：Rust側のランダム選択ロジックの状態を変更（一度選択された選択肢は全選択肢が選ばれるまで再選択されない）
+---      → 同じword呼び出しを複数回実行するとランダム循環により異なる結果が返される可能性がある
+--- 
 --- 検索優先順位（Lua側で制御）:
 ---   1. アクターfield（Lua側のみ）
 ---   2. グローバルシーン名での単語検索（Rust関数呼び出し）
@@ -523,7 +529,7 @@ end
 ---   - mlua FFI経由でRust側に公開された search_word() 関数を使用
 ---   - search_word(global_name, name) → グローバルシーン名スコープ検索
 ---   - search_word(nil, name) → 全体スコープ検索
----   - Rust側実装は別仕様で定義（pasta_core の WordTable使用）
+---   - Rust側実装は pasta_core の WordTable使用
 --- 
 --- @param name string 単語名
 --- @return string|nil 検索結果（見つからない場合はnil）
@@ -892,7 +898,8 @@ function SCENE.__start__(act, ...)
     
     -- アクタープロキシ経由のメソッド呼び出し
     act.さくら:talk("こんにちは")
-    act.さくら:talk(act.さくら:word("笑顔"))  -- word()は検索のみ、talk()でトークン化
+    local emotion = act.さくら:word("笑顔")  -- word()は検索と循環ロジック処理（副作用あり）
+    act.さくら:talk(emotion)  -- talk()でトークン化
     
     -- 変数アクセス（短記法）
     save.挨拶回数 = (save.挨拶回数 or 0) + 1
