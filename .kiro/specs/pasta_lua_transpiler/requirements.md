@@ -24,7 +24,6 @@
 | セッション初期化 | `local act, save, var = PASTA.create_session(SCENE, ctx)` | `local save, var = act:init_scene(SCENE)` |
 | スポットクリア | `PASTA.clear_spot(ctx)` | `act:clear_spot()` |
 | スポット設定 | `PASTA.set_spot(ctx, "name", number)` | `act:set_spot("name", number)` |
-| create_scene呼び出し | `PASTA.create_scene("module_name")` | `PASTA.create_scene("global_name", "local_name", scene_func)` |
 | アクター発話 | `act.アクター:talk("テキスト")` | `act.アクター:talk("テキスト")` |
 | 単語参照 | `act.アクター:word("name")` (単語参照) | `act.アクター:talk(act.アクター:word("name"))` (talk()で包む) |
 | さくらスクリプト | `act.アクター:talk(\s[0])` | `act:sakura_script(\s[0])` |
@@ -102,22 +101,7 @@ end
 4. When アクターリストが存在する場合, the code_generator shall clear_spot()を最初に出力する
 5. The code_generator shall 各アクターに対してset_spot()を順番に出力する
 
-### Requirement 4: create_scene APIの変更
-**Objective:** As a トランスパイラ開発者, I want create_sceneがグローバル名・ローカル名・関数の3引数を取る, so that 階層構造に対応できる
-
-**親仕様参照**: Requirement 5.1, 8.3
-
-**変更履歴**: 
-- AC 6（SCENE初期化）は削除。SCENE の初期化は `local SCENE = PASTA.create_scene(...)` のままでよい（実装で確認後、設計が求める空テーブル初期化は不要と判断）
-
-#### Acceptance Criteria
-1. The code_generator shall `PASTA.create_scene(global_name, local_name, scene_func)` 形式で呼び出しを生成する
-2. The code_generator shall グローバルシーン名をモジュール名から生成する
-3. The code_generator shall ローカルシーン名を `__start__`, `__name_N__` パターンで生成する
-4. The code_generator shall シーン関数への参照（`SCENE.__start__` など）を第3引数として渡す
-5. The code_generator shall create_scene呼び出しをシーン関数定義の後に配置する
-
-### Requirement 5: アクタープロキシ呼び出しパターン
+### Requirement 4: アクタープロキシ呼び出しパターン
 **Objective:** As a トランスパイラ開発者, I want talk/wordがアクタープロキシ経由で呼び出される, so that 設計に準拠したコードを生成できる
 
 **親仕様参照**: Requirement 5.8, 8.8
@@ -134,7 +118,7 @@ end
 4. When アクターが指定されていない場合, the code_generator shall デフォルトアクターを使用する
 5. The code_generator shall `act:talk()` パターン（アクター指定なし）を生成しない（さくらスクリプト出力用の `act:sakura_script()` を除く）
 
-### Requirement 6: シーン遷移APIの変更
+### Requirement 5: シーン遷移APIの変更
 **Objective:** As a トランスパイラ開発者, I want act:call()がsearch_resultを受け取る, so that Rust側検索結果を使用できる
 
 **親仕様参照**: Requirement 8.7
@@ -146,7 +130,7 @@ end
 4. The code_generator shall optsを空テーブル `{}` として出力する
 5. The code_generator shall 末尾呼び出し最適化（return付き）を維持する
 
-### Requirement 7: さくらスクリプト出力の変更
+### Requirement 6: さくらスクリプト出力の変更
 **Objective:** As a トランスパイラ開発者, I want さくらスクリプトがact経由で出力される, so that 設計に準拠したコードを生成できる
 
 **親仕様参照**: Requirement 3.7
@@ -162,7 +146,7 @@ end
 2. The code_generator shall エスケープシーケンスを適切に処理する
 3. The code_generator shall sakura_script を talk() で包まない（単独出力）
 
-### Requirement 8: 変数アクセスパターンの維持 & 文字列リテラル処理
+### Requirement 7: 変数アクセスパターンの維持 & 文字列リテラル処理
 **Objective:** As a トランスパイラ開発者, I want save/var変数アクセスが維持される, so that 既存の変数展開ロジックとの互換性を保つ
 
 **親仕様参照**: Requirement 8.6
@@ -178,7 +162,7 @@ end
 6. The code_generator shall word()の単語名引数も `StringLiteralizer::literalize()` で処理する
 7. The code_generator shall エスケープ文字も `StringLiteralizer::literalize()` で処理する
 
-### Requirement 9: テスト互換性
+### Requirement 8: テスト互換性
 **Objective:** As a トランスパイラ開発者, I want 既存テストが新出力形式に対応する, so that リグレッションを防止できる
 
 #### Acceptance Criteria
@@ -188,7 +172,7 @@ end
 4. When 全テストを実行した場合, the テスト shall 成功する
 5. The テスト修正 shall 新出力形式を検証する追加テストケースを含む
 
-### Requirement 10: ドキュメント更新
+### Requirement 9: ドキュメント更新
 **Objective:** As a トランスパイラ開発者, I want code_generator.rsのドキュメントが更新される, so that 新設計が正しく文書化される
 
 #### Acceptance Criteria
