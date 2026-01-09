@@ -175,6 +175,8 @@ stateDiagram-v2
 
 **Responsibilities & Constraints**
 - `require "pasta"` で返すPASTA公開APIテーブルの提供
+- create_actor: アクターを作成し、レジストリに登録する（同名アクターは同一インスタンス）
+- create_scene: グローバルシーンオブジェクトを作成し、レジストリに登録し、戻り値として返す
 - グローバル状態汚染の防止（すべてローカルテーブル内に閉じる）
 - 内部モジュールへのファサードとして機能
 
@@ -188,24 +190,26 @@ stateDiagram-v2
 
 ```lua
 --- @class PASTA 公開APIテーブル
---- @field create_actor fun(name: string): Actor アクター作成
---- @field create_scene fun(global_name: string, local_name: string, scene_func: function): void シーン登録
+--- @field create_actor fun(name: string): Actor アクター作成・登録
+--- @field create_scene fun(global_name: string, local_name: string, scene_func: function): table グローバルシーン作成・登録
 
 local PASTA = {}
 
---- アクターを作成または取得する（キャッシュ機構）
+--- アクターを作成し、レジストリに登録する（キャッシュで同名アクターは同一インスタンス）
 --- @param name string アクター名
---- @return Actor
+--- @return Actor 作成・登録されたアクターオブジェクト
 function PASTA.create_actor(name)
     return ACTOR.get_or_create(name)
 end
 
---- シーン関数をレジストリに登録する
+--- グローバルシーンオブジェクトを作成し、レジストリに登録する
 --- @param global_name string グローバルシーン名（モジュール名）
 --- @param local_name string ローカルシーン名（__start__, __name_N__ 等）
 --- @param scene_func function シーン関数
+--- @return table 作成・登録されたグローバルシーンオブジェクト（階層構造テーブル）
 function PASTA.create_scene(global_name, local_name, scene_func)
     SCENE.register(global_name, local_name, scene_func)
+    return SCENE.get_global_table(global_name)  -- グローバルシーンオブジェクトを返す
 end
 ```
 
@@ -606,6 +610,13 @@ function SCENE.register(global_name, local_name, scene_func)
         registry[global_name] = { __global_name__ = global_name }
     end
     registry[global_name][local_name] = scene_func
+end
+
+--- グローバルシーンオブジェクト（テーブル）を取得
+--- @param global_name string グローバルシーン名
+--- @return table|nil グローバルシーンオブジェクト
+function SCENE.get_global_table(global_name)
+    return registry[global_name]
 end
 
 --- シーン関数を取得
