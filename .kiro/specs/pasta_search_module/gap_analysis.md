@@ -375,13 +375,18 @@ local word = SEARCH2.search_word("単語", "グローバル")
 - mlua-stdlib パターンとの完全互換
 - マルチスレッド安全性が高い
 
-### Phase 1: UserData 実装詳細（Design フェーズ）
+### Phase 1: UserData 実装詳細（Design フェーズ・決定済み）
 
 **詳細設計内容**:
 1. SearchContext struct の定義（SceneTable, WordTable フィールド）
-2. UserData impl の方法論
-3. メタテーブル設定（`__index` で `func()` 呼び出しを可能にする）
-4. Selector 切り替え時の `&mut self` 制御方法
+2. UserData impl での不変メソッド実装（search_scene, search_word など）
+3. **mlua の `add_method_mut()` で可変メソッド実装**（set_scene_selector, set_word_selector）
+4. Lua 側の呼び出し形式：`SEARCH:search_scene(...)` / `SEARCH:set_scene_selector(...)`
+
+**決定事項**:
+- Selector 切り替え時の `&mut self` は mlua の `add_method_mut()` で実装
+- Interior Mutability（Arc<Mutex<>>）は不要
+- Lua 側から呼び出し時に Rust 側で exclusive access が自動的に確保される
 
 ---
 

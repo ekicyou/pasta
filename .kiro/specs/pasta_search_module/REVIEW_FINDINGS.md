@@ -59,17 +59,49 @@
 
 ---
 
-### 2.3 Selector 制御実装方法（Requirement 8）
+### 2.3 ✅ Selector 制御実装方法（Requirement 8・決定済み）
 **決定対象**: set_scene_selector() / set_word_selector() の可変性制御
 
-**現状**:
-- Requirement 8 で MockRandomSelector への切り替えを要求
-- gap_analysis.md で UserData の `&mut self` による実装を提案
-- 議題 2 決定により、Option A (SearchContext UserData) 採用 → &mut self 実装可能
+**検討内容**:
+- 方針 A: Interior Mutability（Arc<Mutex<>>）
+- 方針 B: mlua の `add_method_mut()` で &mut self を使用 ← **採用**
 
-**設計フェーズアクション**:
-- mlua の `add_method_mut()` API で &mut self を提供する方針を決定
-- Selector の内部可変性（Interior Mutability）パターンを検討（Cell<T> 等）
+**決定**: **方針 B を採用**
+
+**理由**:
+- mlua の `add_method_mut()` で UserData への可変参照メソッドが作成可能
+- Lua 側から `SEARCH:set_scene_selector(...)` で呼び出し
+- Rust 側で SearchContext への exclusive access が自動的に確保される
+- Arc<Mutex<>> の overhead や deadlock リスクが不要
+- Rust 的な &mut self 設計が活用できる
+
+**実装方針**:
+```rust
+impl mlua::UserData for SearchContext {
+    fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
+        // 不変メソッド
+        methods.add_method("search_scene", |lua, this: &SearchContext, ...| { ... });
+        
+        // 可変メソッド
+        methods.add_method_mut("set_scene_selector", |lua, this: &mut SearchContext, selector_config| {
+            this.scene_table.replace_random_selector(...)?;
+            Ok(())
+        });
+    }
+}
+```
+
+---
+
+## 3. 全議題の決定内容サマリ
+
+| 議題 | 内容 | 決定 | 状態 |
+|------|------|------|------|
+| 1 | SceneInfo API 設計 | SceneTable/WordTable が直接 SceneInfo/String を返す | ✅ クローズ |
+| 2 | Lua側インターフェース | SearchContext を単一 UserData として公開（パターン A） | ✅ クローズ |
+| 3 | RandomSelector &mut 制御 | mlua の add_method_mut() で &mut self を使用 | ✅ クローズ |
+
+**次フェーズ**: Design フェーズで上記決定を基に詳細設計を実施
 
 ---
 
