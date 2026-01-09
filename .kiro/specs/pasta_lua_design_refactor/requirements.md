@@ -17,9 +17,9 @@ pasta_luaは、Pasta DSLをLua言語にトランスパイルするバックエ�
 ```lua
 function SCENE.__start__(act, ...)
     -- シーン関数冒頭でSCENEへの参照を設定し、save/var参照を取得（短記法アクセス用）
-    local save, var = act.init_scene(SCENE)
+    local save, var = act:init_scene(SCENE)
     -- シーン関数はactに行動を与える
-    act.set_spot("さくら", 0)              -- 誰が参加するか、立ち位置はどこか
+    act:set_spot("さくら", 0)              -- 誰が参加するか、立ち位置はどこか
     act.さくら:talk("こんにちは")          -- 会話内容
     act.さくら:word("笑顔")                -- 表情変化（単語解決）
 end
@@ -92,9 +92,9 @@ pasta_luaのlua側設計を手伝ってほしい。迷走しているので調�
 8. The 設計ドキュメント shall `act:yield()` API仕様とトークン出力動作を記載する（蓄積トークンの出力とコルーチン一時停止）
 9. The 設計ドキュメント shall `act:end_action()` API仕様と終了処理を記載する（最終トークンの出力とアクション終了）
 10. The 設計ドキュメント shall `act:call(search_result, opts, ...)` シーン呼び出しAPI仕様を記載する（Rust側検索結果からシーン関数を取得して実行、act継続）
-11. The 設計ドキュメント shall `act.init_scene(SCENE)` API仕様を記載する（シーンテーブルへの参照を設定し、save/var参照を返す）
-12. The 設計ドキュメント shall `act.set_spot(name, number)` スポット設定API仕様を記載する（ctx内部のスポット情報を更新）
-13. The 設計ドキュメント shall `act.clear_spot()` スポットクリアAPI仕様を記載する（ctx内部の全スポット情報をリセット）
+11. The 設計ドキュメント shall `act:init_scene(SCENE)` API仕様を記載する（シーンテーブルへの参照を設定し、save/var参照を返す）
+12. The 設計ドキュメント shall `act:set_spot(name, number)` スポット設定API仕様を記載する（ctx内部のスポット情報を更新）
+13. The 設計ドキュメント shall `act:clear_spot()` スポットクリアAPI仕様を記載する（ctx内部の全スポット情報をリセット）
 14. The 設計ドキュメント shall Actが現在のSCENEへの参照を持つ設計を定義する（単語検索時にグローバルシーン名として使用）
 15. The 設計ドキュメント shall Actがシーン関数の第1引数である設計原則を明記する
 16. The 設計ドキュメント shall act:call()連鎖中もactが継続される仕様を定義する（co_actionコルーチンの実行期間 = actの生存期間）
@@ -125,8 +125,8 @@ pasta_luaのlua側設計を手伝ってほしい。迷走しているので調�
 4. The 設計ドキュメント shall `__name_N__` パターンの命名規則を定義する（ローカルシーン関数の番号付けパターン）
 5. The 設計ドキュメント shall Rust側の前方一致検索がグローバル名・ローカル名の組を返す仕様と、Lua側がそれを用いてシーン関数を取得する方法を定義する
 6. The 設計ドキュメント shall シーン関数シグネチャ `(act, ...)` を定義する（第1引数はActオブジェクト）
-7. The 設計ドキュメント shall シーン関数冒頭で `local save, var = act.init_scene(SCENE)` を呼び出すパターンを例示する（actが現在のシーンへの参照を持ち、save/var参照を返す。単語検索でグローバルシーン名を使用可能）
-8. The 設計ドキュメント shall シーン関数内でactに行動を与えるパターンを例示する（`act.アクター:talk("テキスト")`, `act.アクター:word("name")`, `act.set_spot()` 等、アクタープロキシ経由のメソッド呼び出し）
+7. The 設計ドキュメント shall シーン関数冒頭で `local save, var = act:init_scene(SCENE)` を呼び出すパターンを例示する（actが現在のシーンへの参照を持ち、save/var参照を返す。単語検索でグローバルシーン名を使用可能）
+8. The 設計ドキュメント shall シーン関数内でactに行動を与えるパターンを例示する（`act.アクター:talk("テキスト")`, `act.アクター:word("name")`, `act:set_spot()` 等、アクタープロキシ経由のメソッド呼び出し）
 9. The 設計ドキュメント shall `save.変数名`, `var.変数名` を通じた短記法変数アクセス方法を記載する（code_generator.rsの頻繁な出力に対応）
 10. The 設計ドキュメント shall act.__indexメタメソッドによるアクタープロキシ取得パターンを例示する
 11. The 設計ドキュメント shall シーン関数が「行動の記述」に専念し、トークン管理はactに委譲する設計を明記する
@@ -139,7 +139,7 @@ pasta_luaのlua側設計を手伝ってほしい。迷走しているので調�
 #### Acceptance Criteria
 1. The 設計ドキュメント shall `act.clear_spot()` API仕様を記載する（全スポット割り当てリセット、内部的にctxのスポット情報を更新）
 2. The 設計ドキュメント shall `act.set_spot(name, number)` API仕様を記載する（アクター位置指定、内部的にctxのスポット情報を更新）
-3. The 設計ドキュメント shall シーン関数内での呼び出しパターン `act.set_spot("さくら", 0)` を例示する
+3. The 設計ドキュメント shall シーン関数内での呼び出しパターン `act:set_spot("さくら", 0)` を例示する
 4. The 設計ドキュメント shall スポット割り当て情報のCTX内保存方法を定義する
 5. The 設計ドキュメント shall `act.set_spot()` / `act.clear_spot()` が内部的にctx.spotsを更新する仕様を定義する
 6. The 設計ドキュメント shall スポット情報がactのトークン出力に反映される仕組みを定義する（必要に応じてスポットトークンの生成）
@@ -165,7 +165,7 @@ pasta_luaのlua側設計を手伝ってほしい。迷走しているので調�
 2. The 設計ドキュメント shall `PASTA.create_actor("name")` API仕様を記載する
 3. The 設計ドキュメント shall `PASTA.create_scene(global_name, local_name, scene_func)` API仕様を記載する（グローバル・ローカル名の階層管理）
 4. The 設計ドキュメント shall シーン関数シグネチャ `function SCENE.__start__(act, ...)` を定義する
-5. The 設計ドキュメント shall シーン関数冒頭の `local save, var = act.init_scene(SCENE)` 呼び出しパターンを定義する（単語検索にグローバルシーン名を使用可能にし、短記法アクセス用にsave/varを返す）
+5. The 設計ドキュメント shall シーン関数冒頭の `local save, var = act:init_scene(SCENE)` 呼び出しパターンを定義する（単語検索にグローバルシーン名を使用可能にし、短記法アクセス用にsave/varを返す）
 6. The 設計ドキュメント shall `save.変数名`, `var.変数名` アクセスパターンを定義する（code_generator.rsの頻繁な出力に対応）
 7. The 設計ドキュメント shall `act:call(search_result, {}, ...)` API仕様を記載する（Rust側から返されたグローバル名・ローカル名から場景を取得、search_resultは`{global_name, local_name}`タプル）
 8. The 設計ドキュメント shall `act.アクター:word("name")` 呼び出しパターンを定義する（アクター選択により単語解決結果が変わる）
