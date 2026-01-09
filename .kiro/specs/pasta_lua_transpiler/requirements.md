@@ -74,7 +74,9 @@ end
 
 #### Acceptance Criteria
 1. The code_generator shall シーン関数シグネチャを `function SCENE.__start__(act, ...)` 形式で出力する
-2. The code_generator shall ローカルシーン関数シグネチャを `function SCENE.__name_N__(act, ...)` 形式で出力する
+2. The code_generator shall ローカルシーン関数シグネチャを以下の形式で出力する
+   - エントリーポイント（シーン名なし）: `function SCENE.__start__(act, ...)`
+   - 名前付きローカルシーン: `function SCENE.__<sanitized_name>_<counter>__(act, ...)` （例：`__scene_1__`, `__会話_2__`）
 3. The code_generator shall 引数変数を `local args = { ... }` で定義する
 4. The code_generator shall 第1引数の名前を `ctx` から `act` に変更する
 
@@ -126,6 +128,9 @@ end
 #### Acceptance Criteria
 1. The code_generator shall シーン呼び出しを `act:call(search_result, opts, ...)` 形式で出力する
 2. The code_generator shall search_resultを `{"global_name", "local_name"}` テーブル形式で生成する
+   - local_name パターン:
+     - エントリーポイント（シーン名なし）: `"__start__"`
+     - 名前付きローカルシーン: `"__<sanitized_name>_<counter>__"` （例：`"__scene_1__"`, `"__会話_2__"`）
 3. When モジュール内シーン呼び出しの場合, the code_generator shall 現在のモジュール名をglobal_nameとして使用する
 4. The code_generator shall optsを空テーブル `{}` として出力する
 5. The code_generator shall 末尾呼び出し最適化（return付き）を維持する
@@ -135,11 +140,10 @@ end
 
 **親仕様参照**: Requirement 3.7
 
-**議論背景**:
-- 元々の想定では sakura_script は専用関数 `act:sakura_script(text)` として実装される予定だった
-- 現状の code_generator.rs では sakura_script を `act.アクター:talk()` で出力していたが、これは誤り
-- sakura_script はアクター固有ではなく act 直下のメソッドとして設計されている
-- トークンタイプも分離されている（親仕様 Requirement 7-3 参照）
+**決定事項**:
+- さくらスクリプトはアクター非依存（アクター固有ではない）
+- 専用関数 `act:sakura_script(text)` として Lua側に実装される
+- トークンタイプが分離される（親仕様 Requirement 7-3 参照）
 
 #### Acceptance Criteria
 1. The code_generator shall さくらスクリプトを `act:sakura_script("text")` 形式で出力する（アクタープロキシ経由ではなく）
