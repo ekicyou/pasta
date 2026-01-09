@@ -18,12 +18,12 @@ end
 do
     local SCENE = PASTA.create_scene("メイン1")
 
-    function SCENE.__start__(ctx, ...)
+    function SCENE.__start__(act, ...)
         local args = { ... }
-        PASTA.clear_spot(ctx)
-        PASTA.set_spot(ctx, "さくら", 0)
-        PASTA.set_spot(ctx, "うにゅう", 1)
-        local act, save, var = PASTA.create_session(SCENE, ctx)
+        local save, var = act:init_scene(SCENE)
+        act:clear_spot()
+        act:set_spot("さくら", 0)
+        act:set_spot("うにゅう", 1)
 
         act:call("メイン1", "グローバル単語呼び出し", {}, table.unpack(args))
         act:call("メイン1", "ローカル単語呼び出し", {}, table.unpack(args))
@@ -32,51 +32,51 @@ do
         return act:call("メイン1", "引数付き呼び出し", {}, var.カウンタ, save.グローバル, table.unpack(args))
     end
 
-    function SCENE.__グローバル単語呼び出し_1__(ctx, ...)
+    function SCENE.__グローバル単語呼び出し_1__(act, ...)
         local args = { ... }
-        local act, save, var = PASTA.create_session(SCENE, ctx)
+        local save, var = act:init_scene(SCENE)
 
-        act.さくら:word("笑顔")
-        act.さくら:word("挨拶")
+        act.さくら:talk(act.さくら:word("笑顔"))
+        act.さくら:talk(act.さくら:word("挨拶"))
         act.さくら:talk("！")
-        act.うにゅう:word("通常")
+        act.うにゅう:talk(act.うにゅう:word("通常"))
         act.うにゅう:talk("やふぅ。")
     end
 
-    function SCENE.__ローカル単語呼び出し_1__(ctx, ...)
+    function SCENE.__ローカル単語呼び出し_1__(act, ...)
         local args = { ... }
-        local act, save, var = PASTA.create_session(SCENE, ctx)
+        local save, var = act:init_scene(SCENE)
 
-        act.さくら:word("通常")
-        act.さくら:word("場所")
+        act.さくら:talk(act.さくら:word("通常"))
+        act.さくら:talk(act.さくら:word("場所"))
         act.さくら:talk("の天気は？")
-        act.うにゅう:word("天気")
+        act.うにゅう:talk(act.うにゅう:word("天気"))
         act.うにゅう:talk("らしいで。")
     end
 
-    function SCENE.__会話分岐_1__(ctx, ...)
+    function SCENE.__会話分岐_1__(act, ...)
         local args = { ... }
-        local act, save, var = PASTA.create_session(SCENE, ctx)
+        local save, var = act:init_scene(SCENE)
 
         act.さくら:talk("ローカル分岐１だよ。")
         act.うにゅう:talk("ちっぽけやね。")
     end
 
-    function SCENE.__会話分岐_2__(ctx, ...)
+    function SCENE.__会話分岐_2__(act, ...)
         local args = { ... }
-        local act, save, var = PASTA.create_session(SCENE, ctx)
+        local save, var = act:init_scene(SCENE)
 
         act.さくら:talk("ローカル分岐２だよ。")
         act.うにゅう:talk("もっと飛べる、ワイは飛べるんや！")
-        act.さくら:word("ぐんにょり")
+        act.さくら:talk(act.さくら:word("ぐんにょり"))
         act.さくら:talk("なんでだよ。")
     end
 
-    function SCENE.__変数代入_1__(ctx, ...)
+    function SCENE.__変数代入_1__(act, ...)
         local args = { ... }
-        local act, save, var = PASTA.create_session(SCENE, ctx)
+        local save, var = act:init_scene(SCENE)
 
-        act.さくら:word("通常")
+        act.さくら:talk(act.さくら:word("通常"))
         act.さくら:talk("変数を代入。")
         act.うにゅう:talk("中身は内緒や。")
         var.カウンタ = 10
@@ -84,9 +84,9 @@ do
         var.場所 = act:word("場所")
     end
 
-    function SCENE.__引数付き呼び出し_1__(ctx, ...)
+    function SCENE.__引数付き呼び出し_1__(act, ...)
         local args = { ... }
-        local act, save, var = PASTA.create_session(SCENE, ctx)
+        local save, var = act:init_scene(SCENE)
 
         act.さくら:talk("第１引数は")
         act.さくら:talk(tostring(args[1]))
@@ -104,9 +104,9 @@ end
 do
     local SCENE = PASTA.create_scene("会話分岐1")
 
-    function SCENE.__start__(ctx, ...)
+    function SCENE.__start__(act, ...)
         local args = { ... }
-        local act, save, var = PASTA.create_session(SCENE, ctx)
+        local save, var = act:init_scene(SCENE)
 
         act.さくら:talk("グローバルの分岐に飛んできた。")
         act.うにゅう:talk("世界取れるで。")

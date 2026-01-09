@@ -247,28 +247,27 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             "__start__".to_string()
         };
 
-        self.writeln(&format!("function SCENE.{}(ctx, ...)", fn_name))?;
+        self.writeln(&format!("function SCENE.{}(act, ...)", fn_name))?;
         self.indent();
 
-        // Session initialization
+        // Session initialization: args and init_scene come first
         self.writeln("local args = { ... }")?;
+        self.writeln("local save, var = act:init_scene(SCENE)")?;
 
         // Generate actor initialization block for __start__ only (counter == 0)
-        // Order: clear_spot -> set_spot(s) -> create_session (Requirement 1.1, 1.2)
+        // Order: init_scene -> clear_spot -> set_spot(s)
         if counter == 0 && !actors.is_empty() {
             // clear_spot at the start of actor initialization block (Requirement 2.1)
-            self.writeln("PASTA.clear_spot(ctx)")?;
-            // set_spot with new format: PASTA.set_spot(ctx, "name", number) (Requirement 3.1, 3.2)
+            self.writeln("act:clear_spot()")?;
+            // set_spot with new format: act:set_spot("name", number) (Requirement 3.1, 3.2)
             for actor in actors {
                 self.writeln(&format!(
-                    r#"PASTA.set_spot(ctx, "{}", {})"#,
+                    r#"act:set_spot("{}", {})"#,
                     actor.name, actor.number
                 ))?;
             }
         }
 
-        // create_session comes after actor initialization (Requirement 1.2)
-        self.writeln("local act, save, var = PASTA.create_session(SCENE, ctx)")?;
         self.write_blank_line()?;
 
         // Generate local scene items
@@ -359,7 +358,8 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             }
             SetValue::WordRef { name } => {
                 // Generate: var.変数名 = act:word("単語名") or save.変数名 = act:word("単語名")
-                self.writeln(&format!("{} = act:word(\"{}\")", var_path, name))?;
+                let word_literal = StringLiteralizer::literalize(name)?;
+                self.writeln(&format!("{} = act:word({})", var_path, word_literal))?;
             }
         }
 
@@ -468,8 +468,12 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             Action::WordRef {
                 name: word_name, ..
             } => {
-                // act.アクター:word("単語名")
-                self.writeln(&format!("act.{}:word(\"{}\")", actor, word_name))?;
+                // act.アクター:talk(act.アクター:word("単語名"))
+                let word_literal = StringLiteralizer::literalize(word_name)?;
+                self.writeln(&format!(
+                    "act.{}:talk(act.{}:word({}))",
+                    actor, actor, word_literal
+                ))?;
             }
             Action::VarRef { name, scope, .. } => {
                 // Variable interpolation: generate talk with concatenation
@@ -502,16 +506,17 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                 ))?;
             }
             Action::SakuraScript { script, .. } => {
-                // SakuraScript is output as talk
+                // SakuraScript is output as act:sakura_script()
                 let literal = StringLiteralizer::literalize(script)?;
-                self.writeln(&format!("act.{}:talk({})", actor, literal))?;
+                self.writeln(&format!("act:sakura_script({})", literal))?;
             }
             Action::Escape {
                 sequence: escape, ..
             } => {
-                // Extract the escaped character (second char)
+                // Extract the escaped character (second char) and literalize
                 if let Some(c) = escape.chars().nth(1) {
-                    self.writeln(&format!("act.{}:talk(\"{}\")", actor, c))?;
+                    let literal = StringLiteralizer::literalize(&c.to_string())?;
+                    self.writeln(&format!("act.{}:talk({})", actor, literal))?;
                 }
             }
         }
