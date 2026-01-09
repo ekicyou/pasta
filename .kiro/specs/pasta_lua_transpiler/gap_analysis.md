@@ -111,7 +111,7 @@ act:set_spot("actor_name", position_index)
 
 ---
 
-### 変更5: 単語参照の talk ラッピング `word()` → `talk(word())`
+### 変更5: 単語参照の talk メソッドラッピング `word()` → `talk(word())`
 
 **位置:** [code_generator.rs L510](crates/pasta_lua/src/code_generator.rs#L510)
 
@@ -122,16 +122,18 @@ act.actor:word()
 
 **設計:**
 ```lua
-talk(act.actor:word())
+act.actor:talk(act.actor:word())
 ```
 
 **実装:**
-- `word()` 呼び出しを `talk()` 関数でラッピング
+- `word()` 呼び出しを `act.actor:talk()` メソッドでラッピング
+- グローバル `talk` 関数ではなく、アクタープロキシのメソッド `talk()` を使用
 - 親仕様の word-search-only パターンに従う
 
-**根拠:** Requirement 7.1 - 単語参照は talk 出力で包含
+**根拠:** Requirement 7.1 - 単語参照は talk メソッド出力で包含
 
-**Note:** 親仕様 design.md Requirement 5.2 参照パターンより
+**Note:** 親仕様 design.md L891 の例参照
+- `act.さくら:talk(act.さくら:word("笑顔"))` — word()は検索のみ、結果をtalk()メソッドに渡す
 
 ---
 
