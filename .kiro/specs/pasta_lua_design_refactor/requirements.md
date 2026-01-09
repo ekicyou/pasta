@@ -111,7 +111,7 @@ pasta_luaのlua側設計を手伝ってほしい。迷走しているので調�
 5. The 設計ドキュメント shall Actorの `talk(text)` メソッド仕様を記載する（actプロキシから呼ばれる、トークンをactに蓄積）
 6. The 設計ドキュメント shall Actorの `word(name)` メソッド仕様を記載する（actプロキシから呼ばれる、単語検索を実施して結果を返す。トークン化はtalk()で行う）
 7. The 設計ドキュメント shall Actorメソッドが呼び出し元actへの参照を持つ設計を定義する（talk()で逆参照によるトークン蓄積）
-8. The 設計ドキュメント shall Actor.word() の単語検索優先順位を定義する（1. アクターfield、2. グローバルシーン名での単語検索、3. 全体での単語検索）
+8. The 設計ドキュメント shall Actor.word() の単語検索優先順位を定義する（1. アクターfield、2. SCENEfield、3. グローバルシーン名での単語検索、4. 全体での単語検索）
 
 ### Requirement 5: Scene（シーン）の設計
 **Objective:** As a トランスパイル出力消費者, I want シーンがモジュール単位で管理される, so that Call/Jumpによるシーン遷移が可能
