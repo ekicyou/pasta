@@ -192,7 +192,7 @@ stateDiagram-v2
 ```lua
 --- @class PASTA 公開APIテーブル
 --- @field create_actor fun(name: string): Actor アクター作成・登録
---- @field create_scene fun(global_name: string, local_name: string, scene_func: function): table グローバルシーン作成・登録
+--- @field create_scene fun(global_name: string): table グローバルシーンテーブル作成・登録
 
 local PASTA = {}
 
@@ -203,14 +203,14 @@ function PASTA.create_actor(name)
     return ACTOR.get_or_create(name)
 end
 
---- グローバルシーンオブジェクトを作成し、レジストリに登録する
+--- グローバルシーンテーブルを作成し、レジストリに登録する
+--- シーン関数はトランスパイラが生成したコードがSCENEテーブルに直接定義する
 --- @param global_name string グローバルシーン名（モジュール名）
---- @param local_name string ローカルシーン名（__start__, __name_N__ 等）
---- @param scene_func function シーン関数
---- @return table 作成・登録されたグローバルシーンオブジェクト（階層構造テーブル）
-function PASTA.create_scene(global_name, local_name, scene_func)
-    SCENE.register(global_name, local_name, scene_func)
-    return SCENE.get_global_table(global_name)  -- グローバルシーンオブジェクトを返す
+--- @return table 作成・登録されたグローバルシーンテーブル（シーン関数を格納するテーブル）
+function PASTA.create_scene(global_name)
+    local scene_table = {}
+    SCENE.register_global(global_name, scene_table)
+    return scene_table  -- トランスパイラがこのテーブルにシーン関数を定義する
 end
 ```
 
