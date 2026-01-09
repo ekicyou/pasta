@@ -73,11 +73,12 @@ end
 **親仕様参照**: Requirement 5.6, 8.4
 
 #### Acceptance Criteria
-1. The code_generator shall シーン関数シグネチャを `function SCENE.__start__(act, ...)` 形式で出力する
-2. The code_generator shall ローカルシーン関数シグネチャを以下の形式で出力する
-   - エントリーポイント（シーン名なし）: `function SCENE.__start__(act, ...)`
-   - 名前付きローカルシーン: `function SCENE.__<sanitized_name>_<counter>__(act, ...)` （例：`__scene_1__`, `__会話_2__`）
-3. The code_generator shall 引数変数を `local args = { ... }` で定義する
+1. The code_generator shall シーン関数シグネチャを `function SCENE.__start__(act, ...)` 形式で出力する（第1引数を `ctx` から `act` に変更）
+2. The code_generator shall ローカルシーン関数シグネチャの第1引数を `ctx` から `act` に変更する
+   - 命名パターンは現行仕様（変更なし）:
+     - エントリーポイント（シーン名なし）: `function SCENE.__start__(act, ...)`
+     - 名前付きローカルシーン: `function SCENE.__<sanitized_name>_<counter>__(act, ...)` （例：`__scene_1__`, `__会話_2__`）
+3. The code_generator shall 引数変数を `local args = { ... }` で定義する（現行仕様、変更なし）
 4. The code_generator shall 第1引数の名前を `ctx` から `act` に変更する
 
 ### Requirement 2: init_scene呼び出しパターンの変更
@@ -127,13 +128,13 @@ end
 
 #### Acceptance Criteria
 1. The code_generator shall シーン呼び出しを `act:call(search_result, opts, ...)` 形式で出力する
-2. The code_generator shall search_resultを `{"global_name", "local_name"}` テーブル形式で生成する
+2. The code_generator shall search_resultを `{"global_name", "local_name"}` テーブル形式で生成する（現行仕様、変更なし）
    - local_name パターン:
      - エントリーポイント（シーン名なし）: `"__start__"`
      - 名前付きローカルシーン: `"__<sanitized_name>_<counter>__"` （例：`"__scene_1__"`, `"__会話_2__"`）
 3. When モジュール内シーン呼び出しの場合, the code_generator shall 現在のモジュール名をglobal_nameとして使用する
-4. The code_generator shall optsを空テーブル `{}` として出力する
-5. The code_generator shall 末尾呼び出し最適化（return付き）を維持する
+4. The code_generator shall optsを空テーブル `{}` として出力する（現行仕様、変更なし）
+5. The code_generator shall 末尾呼び出し最適化（return付き）を維持する（現行仕様、変更なし）
 
 ### Requirement 6: さくらスクリプト出力の変更
 **Objective:** As a トランスパイラ開発者, I want さくらスクリプトがact経由で出力される, so that 設計に準拠したコードを生成できる
