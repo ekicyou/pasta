@@ -73,8 +73,8 @@ graph TB
 - **Selected pattern**: Act-first（シーン関数がactを第1引数で受け取る）
 - **Domain boundaries**: 
   - init: 公開API提供
-  - ctx: 環境管理（save, actors, spots）
-  - act: アクション実行（トークン蓄積、actorプロキシ）
+  - ctx: 環境管理（save, actors）
+  - act: アクション実行（トークン蓄積、actorプロキシ、spot管理）
   - actor: アクター定義
   - scene: シーンレジストリ
 - **Existing patterns preserved**: Luaメタテーブル、コルーチン

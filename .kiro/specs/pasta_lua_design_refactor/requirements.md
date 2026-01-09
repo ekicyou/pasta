@@ -106,8 +106,8 @@ pasta_luaのlua側設計を手伝ってほしい。迷走しているので調�
 9. The 設計ドキュメント shall `act:end_action()` API仕様と終了処理を記載する（最終トークンの出力とアクション終了）
 10. The 設計ドキュメント shall `act:call(search_result, opts, ...)` シーン呼び出しAPI仕様を記載する（Rust側検索結果からシーン関数を取得して実行、act継続）
 11. The 設計ドキュメント shall `act:init_scene(SCENE)` API仕様を記載する（シーンテーブルへの参照を設定し、save/var参照を返す）
-12. The 設計ドキュメント shall `act:set_spot(name, number)` スポット設定API仕様を記載する（ctx内部のスポット情報を更新）
-13. The 設計ドキュメント shall `act:clear_spot()` スポットクリアAPI仕様を記載する（ctx内部の全スポット情報をリセット）
+12. The 設計ドキュメント shall `act:set_spot(name, number)` スポット設定API仕様を記載する（ActorProxy経由でスポット情報を設定）
+13. The 設計ドキュメント shall `act:clear_spot()` スポットクリアAPI仕様を記載する（全ActorProxyのスポット情報をリセット）
 14. The 設計ドキュメント shall Actが現在のSCENEへの参照を持つ設計を定義する（単語検索時にグローバルシーン名として使用）
 15. The 設計ドキュメント shall Actがシーン関数の第1引数である設計原則を明記する
 16. The 設計ドキュメント shall act:call()連鎖中もactが継続される仕様を定義する（co_actionコルーチンの実行期間 = actの生存期間）
