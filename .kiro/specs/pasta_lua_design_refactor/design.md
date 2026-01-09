@@ -232,7 +232,6 @@ end
 - actors（登録アクター）テーブルの保持
 - spots（スポット割り当て）情報の保持
 - co_actionコルーチンによるアクション実行制御
-- actオブジェクトを内包（actが設定を受け、記録を提供）
 
 **Dependencies**
 - Outbound: pasta.act — Act生成 (P0)
@@ -246,7 +245,6 @@ end
 --- @field save table 永続変数（コルーチン終了後も残る）
 --- @field actors table<string, Actor> 登録アクター
 --- @field spots table<string, integer> スポット割り当て
---- @field act Action|nil 現在のアクション
 
 local CTX = {}
 CTX.__index = CTX
@@ -260,7 +258,6 @@ function CTX.new(save, actors)
         save = save or {},
         actors = actors or {},
         spots = {},
-        act = nil,
     }
     setmetatable(obj, CTX)
     return obj
@@ -283,9 +280,7 @@ end
 --- アクションを開始する
 --- @return Action
 function CTX:start_action()
-    local act = ACT.new(self)
-    self.act = act
-    return act
+    return ACT.new(self)
 end
 
 --- アクションをyieldする
@@ -303,17 +298,17 @@ function CTX:end_action(act)
     local token = act.token
     act.token = {}
     coroutine.yield({ type = "end_action", token = token })
-    self.act = nil
 end
 ```
 
 - Persistence: saveテーブルはコルーチン終了後も永続
-- Consistency: 単一actのみアクティブ（self.act）
-- Concurrency: コルーチンによる協調的マルチタスク
+- Concurrency: 複数 co_action が並行実行可能（各コルーチンが独立した act を管理）
 
 **Implementation Notes**
 - varはCTXから削除、Act側に移動（2.6）
-- spotsテーブルはact.set_spot/clear_spotで更新される- **トークン出力の中継点**: ctx:yield() と ctx:end_action() は、actから受けたトークンを coroutine.yield 経由で外部（Rust Runtime）に出力する。置想: saveを撮影環境、actのトークンを撮影記録とし、ctxがそれを外部に流す役割
+- spotsテーブルはact.set_spot/clear_spotで更新される
+- **複数 co_action 対応**: act はコルーチン内のローカル変数として管理され、ctx には保存されない。これにより複数の co_action が並行実行可能
+- **トークン出力の中継点**: ctx:yield() と ctx:end_action() は、act から受けたトークンを coroutine.yield 経由で外部（Rust Runtime）に出力する。保存を撮影環境、act のトークンを撮影記録とし、ctx がそれを外部に流す役割
 ---
 
 #### pasta.act
@@ -712,7 +707,6 @@ classDiagram
         +table save
         +table actors
         +table spots
-        +Act act
         +co_action(scene, ...)
         +start_action()
         +yield(act)
@@ -753,7 +747,6 @@ classDiagram
         +get_global_name(scene_table)
     }
     
-    CTX "1" --> "0..1" Act : 現在のアクション
     Act "1" --> "1" CTX : 環境参照
     Act "1" --> "*" ActorProxy : __index生成
     ActorProxy "1" --> "1" Actor : 対象
