@@ -16,12 +16,12 @@
 
 | # | 要件 | 現状出力 | 設計出力 | 対象行 | 難度 |
 |---|------|---------|---------|-------|------|
-| 1 | Req 1.1 | `function SCENE.__start__(ctx, ...)` | `function SCENE.__start__(act, ...)` | L253 | S |
-| 2 | Req 2.1 | `PASTA.create_session(SCENE, ctx)` | `act:init_scene(SCENE)` | L278 | S |
-| 3 | Req 3.1 | `PASTA.clear_spot(ctx)` | `act:clear_spot()` | L268 | S |
-| 4 | Req 3.2 | `PASTA.set_spot(ctx, "name", idx)` | `act:set_spot("name", idx)` | L270 | S |
-| 5 | Req 7.1 | `act.actor:word()` | `act.actor:talk(act.actor:word())` | L510 | S |
-| 6 | Req 7.2 | `act.actor:talk(sakura_text)` | `act:sakura_script(text)` | L509 | M |
+| 1 | Req 1 | `function SCENE.__start__(ctx, ...)` | `function SCENE.__start__(act, ...)` | L253 | S |
+| 2 | Req 2 | `PASTA.create_session(SCENE, ctx)` | `act:init_scene(SCENE)` | L278 | S |
+| 3 | Req 3 | `PASTA.clear_spot(ctx)` | `act:clear_spot()` | L268 | S |
+| 4 | Req 3 | `PASTA.set_spot(ctx, "name", idx)` | `act:set_spot("name", idx)` | L270 | S |
+| 5 | Req 4 | `act.actor:word()` | `act.actor:talk(act.actor:word())` | L510 | S |
+| 6 | Req 6 | `act.actor:talk(sakura_text)` | `act:sakura_script(text)` | L509 | M |
 
 ---
 
@@ -43,7 +43,7 @@ function SCENE.__start__(act, ...)
 
 **実装:** 文字列内の `ctx` を `act` に置換
 
-**根拠:** Requirement 1.1 - Act-firstアーキテクチャへの移行
+**根拠:** Requirement 1 - Act-firstアーキテクチャへの移行
 
 ---
 
@@ -65,7 +65,7 @@ local save, var = act:init_scene(SCENE)
 - 呼び出し形式を `PASTA.create_session(SCENE, ctx)` → `act:init_scene(SCENE)` に変更
 - 戻り値束縛を `act, save, var = ...` → `save, var = ...` に変更（`act` は既に第1引数）
 
-**根拠:** Requirement 2.1 - Act-firstパターンへの統一
+**根拠:** Requirement 2 - Act-firstパターンへの統一
 
 **複雑度:** M（戻り値構造の変更）
 
@@ -87,7 +87,7 @@ act:clear_spot()
 
 **実装:** 呼び出しを `PASTA.clear_spot(ctx)` → `act:clear_spot()` に置換
 
-**根拠:** Requirement 3.1 - スポット管理のact統一
+**根拠:** Requirement 3 - スポット管理のact統一
 
 ---
 
@@ -107,7 +107,7 @@ act:set_spot("actor_name", position_index)
 
 **実装:** 呼び出しを変更し、`ctx` 引数を削除
 
-**根拠:** Requirement 3.2 - スポット管理のact統一
+**根拠:** Requirement 3 - スポット管理のact統一
 
 ---
 
@@ -130,7 +130,7 @@ act.actor:talk(act.actor:word())
 - グローバル `talk` 関数ではなく、アクタープロキシのメソッド `talk()` を使用
 - 親仕様の word-search-only パターンに従う
 
-**根拠:** Requirement 7.1 - 単語参照は talk メソッド出力で包含
+**根拠:** Requirement 4 - アクタープロキシ呼び出しパターン（単語参照ラッピング）
 
 **Note:** 親仕様 design.md L891 の例参照
 - `act.さくら:talk(act.さくら:word("笑顔"))` — word()は検索のみ、結果をtalk()メソッドに渡す
@@ -156,7 +156,7 @@ act:sakura_script(text)
 - `act.actor:talk()` → `act:sakura_script()` へ置換
 - text は StringLiteralizer 経由で処理（既存）
 
-**根拠:** Requirement 7.2 - さくらスクリプトの専用メソッド化
+**根拠:** Requirement 6 - さくらスクリプト出力の変更
 
 **複雑度:** M（アクション分岐の追加判定必要）
 

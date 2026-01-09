@@ -269,7 +269,7 @@ mod tests {
 
         let lua_code = String::from_utf8(output).unwrap();
         assert!(lua_code.contains("PASTA.create_scene(\"メイン1\")"));
-        assert!(lua_code.contains("function SCENE.__start__(ctx, ...)"));
+        assert!(lua_code.contains("function SCENE.__start__(act, ...)"));
     }
 
     #[test]
