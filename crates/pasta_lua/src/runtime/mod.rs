@@ -17,9 +17,48 @@
 //! ```
 
 use crate::context::TranspileContext;
-use mlua::{Lua, Result as LuaResult, Table, Value};
+use mlua::{Lua, Result as LuaResult, StdLib, Table, Value};
 use std::path::Path;
 use std::sync::Arc;
+
+/// Configuration for which standard libraries to enable in the Lua runtime.
+#[derive(Debug, Clone, Default)]
+pub struct RuntimeConfig {
+    /// Enable Lua standard libraries (base, table, string, math, etc.)
+    /// Default: true
+    pub enable_std_libs: bool,
+    /// Enable mlua-stdlib regex module (@regex)
+    /// Default: true
+    pub enable_regex: bool,
+    /// Enable mlua-stdlib json module (@json)
+    /// Default: true
+    pub enable_json: bool,
+    /// Enable mlua-stdlib yaml module (@yaml)
+    /// Default: true
+    pub enable_yaml: bool,
+}
+
+impl RuntimeConfig {
+    /// Create a new configuration with all features enabled (default).
+    pub fn new() -> Self {
+        Self {
+            enable_std_libs: true,
+            enable_regex: true,
+            enable_json: true,
+            enable_yaml: true,
+        }
+    }
+
+    /// Create a minimal configuration with only pasta modules.
+    pub fn minimal() -> Self {
+        Self {
+            enable_std_libs: false,
+            enable_regex: false,
+            enable_json: false,
+            enable_yaml: false,
+        }
+    }
+}
 
 /// Pasta Lua Runtime - hosts a Lua VM with pasta modules.
 ///
@@ -30,10 +69,13 @@ pub struct PastaLuaRuntime {
 }
 
 impl PastaLuaRuntime {
-    /// Create a new runtime from a TranspileContext.
+    /// Create a new runtime from a TranspileContext with default configuration.
     ///
-    /// Initializes a Lua VM and registers the `@pasta_search` module
-    /// with the scene and word registries from the context.
+    /// Initializes a Lua VM with standard libraries enabled and registers:
+    /// - `@pasta_search` module with scene and word registries
+    /// - `@regex` module for regular expression support
+    /// - `@json` module for JSON encoding/decoding
+    /// - `@yaml` module for YAML encoding/decoding
     ///
     /// # Arguments
     /// * `context` - TranspileContext from LuaTranspiler::transpile()
@@ -42,7 +84,27 @@ impl PastaLuaRuntime {
     /// * `Ok(Self)` - Runtime initialized successfully
     /// * `Err(e)` - Lua VM or module registration failed
     pub fn new(context: TranspileContext) -> LuaResult<Self> {
-        let lua = Lua::new();
+        Self::with_config(context, RuntimeConfig::new())
+    }
+
+    /// Create a new runtime from a TranspileContext with custom configuration.
+    ///
+    /// # Arguments
+    /// * `context` - TranspileContext from LuaTranspiler::transpile()
+    /// * `config` - Runtime configuration for library loading
+    ///
+    /// # Returns
+    /// * `Ok(Self)` - Runtime initialized successfully
+    /// * `Err(e)` - Lua VM or module registration failed
+    pub fn with_config(context: TranspileContext, config: RuntimeConfig) -> LuaResult<Self> {
+        // Create Lua VM with appropriate standard libraries
+        let lua = if config.enable_std_libs {
+            // Load all safe standard libraries (excluding debug and ffi)
+            // SAFETY: ALL_SAFE only loads safe standard libraries
+            unsafe { Lua::unsafe_new_with(StdLib::ALL_SAFE, mlua::LuaOptions::default()) }
+        } else {
+            Lua::new()
+        };
 
         // Extract registries from context
         let scene_registry = context.scene_registry;
@@ -50,6 +112,17 @@ impl PastaLuaRuntime {
 
         // Register @pasta_search module
         crate::search::register(&lua, scene_registry, word_registry)?;
+
+        // Register mlua-stdlib modules based on configuration
+        if config.enable_regex {
+            mlua_stdlib::regex::register(&lua, None)?;
+        }
+        if config.enable_json {
+            mlua_stdlib::json::register(&lua, None)?;
+        }
+        if config.enable_yaml {
+            mlua_stdlib::yaml::register(&lua, None)?;
+        }
 
         Ok(Self { lua })
     }
