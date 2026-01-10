@@ -76,7 +76,9 @@ ghost/master/              # 起動ディレクトリ（PastaLoader::load引数�
 3. The LuaTranspiler shall 複数ファイルのシーン・単語定義を単一のレジストリに統合する
 4. If 異なるファイルで同名のグローバルシーンが定義された, the SceneRegistry shall 重複シーンとしてランダム選択対象に登録する
 5. When すべてのファイルのトランスパイルが完了した, the PastaLoader shall トランスパイル結果を `profile/pasta/cache/lua/` に保存する（デバッグ・検証用、キャッシュとしては再利用しない）
-6. The PastaLoader shall 起動時に毎回トランスパイルを実行し、前回のキャッシュを無視する
+6. The PastaLoader shall ソースファイルパスをもとにキャッシュファイル名を生成する（例: `dic/baseware/system.pasta` → `dic_baseware_system.lua`、パス区切り文字 `\` を `_` に置換）
+7. The PastaLoader shall 起動時に `profile/pasta/cache/lua/` ディレクトリを削除し、新規作成してからトランスパイル結果を保存する
+8. The PastaLoader shall 毎回トランスパイルを実行し、前回のキャッシュを無視する
 
 ### Requirement 4: ランタイム初期化
 
