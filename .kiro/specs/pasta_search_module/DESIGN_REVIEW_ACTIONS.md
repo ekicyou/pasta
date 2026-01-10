@@ -204,7 +204,19 @@ pub fn collect_scene_candidates(...) -> Result<Vec<SceneId>, SceneTableError> {
 
 1. ✅ 議題1 コミット済み
 2. ✅ 議題3 コミット済み
-3. 議題2 コミット予定
+3. ✅ 議題2 コミット済み
+
+### 隠れた要件の追加
+
+**発見（2026-01-10）**:
+- 議題2 で決定した `PastaLuaRuntime` 構造体は **新規作成が必要**
+- pasta_lua は現在トランスパイラ層のみ（ランタイム層なし）
+- mlua 依存は Cargo.toml に存在するが未使用
+
+**対応（2026-01-10）**:
+- Requirement 9 として「pasta_lua ランタイム層（PastaLuaRuntime 構造体）」を requirements.md に追加
+- design.md に PastaLuaRuntime コンポーネント設計を追加
+- アーキテクチャ図、フロー図、ファイル構造を更新
 
 ### 完了後
 

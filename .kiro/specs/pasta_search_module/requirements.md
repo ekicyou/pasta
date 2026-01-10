@@ -19,7 +19,10 @@ Rust側のシーン辞書・単語辞書検索機能を mlua バインディン�
 
 - pasta_core の SceneRegistry, WordDefRegistry, SceneTable, WordTable が利用可能であること
 - pasta_core の RandomSelector トレイトが実装されていること
-- pasta_lua crate が mlua 依存関係を持つこと
+- pasta_lua crate が mlua 依存関係を持つこと（Cargo.toml に記載済み、未使用）
+- pasta_lua の `LuaTranspiler::transpile()` が `TranspileContext` を返すこと
+
+**注記**: pasta_lua に Lua VM 実行のためのランタイム層は**存在しない**（トランスパイラ層のみ）。本仕様の Requirement 9 でランタイム層を新規作成する。
 
 ### 技術コンテキスト
 
@@ -134,6 +137,30 @@ Rust側のシーン辞書・単語辞書検索機能を mlua バインディン�
 8. The MockRandomSelector shall シーケンスの末尾に達したら先頭にループして選択を続ける
 9. If 引数が整数以外を含む場合, the 検索モジュール shall "expected integer argument" エラーを返す
 10. The 各関数 shall モジュール初期化以外の任意のタイミングで呼び出し可能
+
+### Requirement 9: pasta_lua ランタイム層（PastaLuaRuntime 構造体）
+**Objective:** As a pasta_lua利用者, I want Rust側からLua VMを初期化し検索モジュールを自動登録できる, so that Luaスクリプト実行環境が統一的に提供される
+
+**背景**: 本仕様の Requirement 1-8 は「Lua 環境に @pasta_search モジュールが登録されている」ことを前提としているが、その Lua 環境自体を提供するランタイム層が pasta_lua に存在しない。本 Requirement はその隠れた前提条件を明示化する。
+
+**設計決定の経緯**: 議題2（DESIGN_REVIEW_ACTIONS.md）で「pasta_lua ランタイム構造体パターン」を採用決定
+
+#### Acceptance Criteria
+1. The pasta_lua crate shall `PastaLuaRuntime` 構造体を公開する
+2. The `PastaLuaRuntime` shall 内部に mlua の `Lua` インスタンスを保持する
+3. The `PastaLuaRuntime::new()` shall `TranspileContext` を入力として受け取る
+4. The `PastaLuaRuntime::new()` shall 内部で mlua の `Lua::new()` を呼び出して Lua VM を初期化する
+5. The `PastaLuaRuntime::new()` shall 初期化時に `search::loader()` を呼び出して `@pasta_search` モジュールを登録する（一度のみ）
+6. The `PastaLuaRuntime` shall `TranspileContext` から `SceneRegistry` と `WordDefRegistry` を取得して `SearchContext` を生成する
+7. The `PastaLuaRuntime` shall 複数インスタンス生成をサポートする（各インスタンスが独立した Lua VM と SearchContext を持つ）
+8. The `PastaLuaRuntime` shall Static 変数を使用しない（スレッドセーフ要件）
+9. The `PastaLuaRuntime` shall 将来の拡張用に他のモジュール登録メカニズムを持つ（例: `register_module()` メソッド）
+10. The `PastaLuaRuntime` shall Lua スクリプト実行用の `exec()` または `run()` メソッドを提供する
+
+#### 依存関係
+- **入力**: `TranspileContext`（`LuaTranspiler::transpile()` の出力）
+- **出力**: 初期化済み Lua VM + 登録済み `@pasta_search` モジュール
+- **内部依存**: Requirement 4（mlua バインディング）、Requirement 1（モジュール登録）
 
 ## Implementation Guidance
 

@@ -41,16 +41,24 @@
 
 ```mermaid
 graph TB
-    subgraph Lua側
-        LuaScript[Lua Script]
-        PastaAct[pasta.act]
-        PastaActor[pasta.actor]
+    subgraph Application
+        App[Application Layer]
     end
     
     subgraph pasta_lua
+        Runtime[PastaLuaRuntime]
+        Transpiler[LuaTranspiler]
+        TransCtx[TranspileContext]
         SearchModule[@pasta_search Module]
         SearchContext[SearchContext UserData]
         Loader[loader / register]
+    end
+    
+    subgraph Lua側
+        LuaVM[Lua VM]
+        LuaScript[Lua Script]
+        PastaAct[pasta.act]
+        PastaActor[pasta.actor]
     end
     
     subgraph pasta_core
@@ -59,6 +67,15 @@ graph TB
         RandomSelector[RandomSelector]
     end
     
+    App --> Transpiler
+    Transpiler --> TransCtx
+    App --> Runtime
+    TransCtx --> Runtime
+    Runtime --> LuaVM
+    Runtime --> Loader
+    Loader --> SearchContext
+    
+    LuaVM --> LuaScript
     LuaScript --> PastaAct
     LuaScript --> PastaActor
     PastaAct --> SearchModule
@@ -68,14 +85,13 @@ graph TB
     SearchContext --> WordTable
     SceneTable --> RandomSelector
     WordTable --> RandomSelector
-    Loader --> SearchContext
 ```
 
 **Architecture Integration**:
-- **Selected pattern**: UserData ラッピングによる状態隔離
+- **Selected pattern**: PastaLuaRuntime による Lua VM ホスティング + UserData ラッピング
 - **Domain boundaries**: pasta_lua が mlua 依存を持ち、pasta_core は言語非依存を維持
 - **Existing patterns preserved**: loader/register パターン、Result<T> エラーハンドリング
-- **New components**: SearchContext UserData、search モジュール
+- **New components**: PastaLuaRuntime、SearchContext UserData、search モジュール
 - **Steering compliance**: 複数インスタンス対応、Static 変数禁止
 
 ### Technology Stack
@@ -140,6 +156,47 @@ sequenceDiagram
     SEARCH-->>Lua: (success)
 ```
 
+### ランタイム初期化フロー（Requirement 9）
+
+```mermaid
+sequenceDiagram
+    participant App as Application
+    participant Trans as LuaTranspiler
+    participant RT as PastaLuaRuntime
+    participant Lua as Lua VM
+    participant Loader as search::register
+    participant Ctx as SearchContext
+    
+    App->>Trans: transpile(&pasta_file, &mut output)
+    Trans-->>App: TranspileContext
+    
+    App->>RT: PastaLuaRuntime::new(context)
+    RT->>Lua: Lua::new()
+    Lua-->>RT: lua
+    
+    RT->>RT: context.scene_registry, context.word_registry
+    RT->>Loader: register(&lua, scene_registry, word_registry)
+    Loader->>Ctx: SearchContext::new(scene_registry, word_registry)
+    Ctx-->>Loader: search_context
+    Loader->>Lua: package.loaded["@pasta_search"] = module
+    Loader-->>RT: Ok(table)
+    
+    RT-->>App: Ok(PastaLuaRuntime)
+    
+    Note over App,Lua: ランタイム使用準備完了
+    
+    App->>RT: exec(lua_code)
+    RT->>Lua: load(script).eval()
+    Lua-->>RT: Value
+    RT-->>App: Ok(Value)
+```
+
+**フロー説明**:
+1. **トランスパイル**: `LuaTranspiler::transpile()` で Pasta AST を Lua コードに変換し、`TranspileContext` を取得
+2. **ランタイム生成**: `PastaLuaRuntime::new(context)` で Lua VM を初期化
+3. **モジュール登録**: 初期化時に `search::register()` を呼び出し、`@pasta_search` を登録（一度のみ）
+4. **スクリプト実行**: `exec()` で Lua スクリプトを実行
+
 ---
 
 ## Requirements Traceability
@@ -154,6 +211,7 @@ sequenceDiagram
 | 6.1-6.3 | エラーハンドリング | SearchContext | Result<T, mlua::Error> | - |
 | 7.1-7.3 | パフォーマンス | SearchContext | (設計考慮) | - |
 | 8.1-8.10 | Selector 制御 API | SearchContext | set_scene_selector(), set_word_selector() | Selector 切り替えフロー |
+| 9.1-9.10 | ランタイム層 | PastaLuaRuntime | new(), exec(), register_module() | ランタイム初期化フロー |
 
 ---
 
@@ -163,9 +221,136 @@ sequenceDiagram
 
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies | Contracts |
 |-----------|--------------|--------|--------------|------------------|-----------|
+| PastaLuaRuntime | pasta_lua/runtime | Lua VM ホスト構造体 | 9 | TranspileContext (P0), Loader (P0) | Service, State |
 | SearchContext | pasta_lua/search | 検索状態管理 UserData | 1-8 | SceneTable (P0), WordTable (P0) | Service, State |
 | SearchModule | pasta_lua/search | @pasta_search モジュール登録 | 1, 4 | Loader (P0), mlua (P0) | API |
 | Loader | pasta_lua/search | モジュール初期化 | 4 | SearchContext (P0) | Service |
+
+---
+
+### pasta_lua/runtime Layer
+
+#### PastaLuaRuntime
+
+| Field | Detail |
+|-------|--------|
+| Intent | Lua VM をホストし、pasta モジュール群を統合する最上位構造体 |
+| Requirements | 9.1-9.10 |
+
+**Responsibilities & Constraints**
+- mlua の Lua インスタンスを所有・管理
+- TranspileContext から SearchContext を生成
+- @pasta_search モジュールを初期化時に登録（一度のみ）
+- 複数インスタンス生成をサポート（Static 変数禁止）
+- 将来の拡張用にモジュール登録メカニズムを提供
+
+**Dependencies**
+- Inbound: アプリケーション層 — ランタイム生成・スクリプト実行 (P0)
+- Outbound: SearchModule/Loader — @pasta_search 登録 (P0)
+- Outbound: TranspileContext — SceneRegistry/WordDefRegistry 取得 (P0)
+- External: mlua — Lua VM (P0)
+
+**Contracts**: Service [x] / API [x] / Event [ ] / Batch [ ] / State [x]
+
+##### Service Interface
+
+```rust
+use mlua::{Lua, Result as LuaResult, Table, Value};
+use crate::context::TranspileContext;
+
+/// Pasta Lua ランタイム - Lua VM と pasta モジュール群を統合
+/// 
+/// 各インスタンスは独立した Lua VM と検索コンテキストを持つ。
+/// 複数インスタンス生成をサポートし、Static 変数を使用しない。
+pub struct PastaLuaRuntime {
+    lua: Lua,
+    // 将来の拡張用（登録済みモジュール追跡など）
+}
+
+impl PastaLuaRuntime {
+    /// TranspileContext から新しいランタイムを生成
+    /// 
+    /// # Arguments
+    /// * `context` - LuaTranspiler::transpile() の出力
+    /// 
+    /// # Returns
+    /// * `Ok(Self)` - 初期化成功（@pasta_search 登録済み）
+    /// * `Err(e)` - Lua VM 初期化または モジュール登録失敗
+    /// 
+    /// # Example
+    /// ```rust,ignore
+    /// let transpiler = LuaTranspiler::default();
+    /// let context = transpiler.transpile(&pasta_file, &mut output)?;
+    /// let runtime = PastaLuaRuntime::new(context)?;
+    /// ```
+    pub fn new(context: TranspileContext) -> LuaResult<Self> {
+        let lua = Lua::new();
+        
+        // TranspileContext から Registry を取得
+        let scene_registry = context.scene_registry;
+        let word_registry = context.word_registry;
+        
+        // @pasta_search モジュールを登録（一度のみ）
+        crate::search::register(&lua, scene_registry, word_registry)?;
+        
+        Ok(Self { lua })
+    }
+    
+    /// Lua スクリプトを実行
+    /// 
+    /// # Arguments
+    /// * `script` - 実行する Lua コード
+    /// 
+    /// # Returns
+    /// * `Ok(Value)` - 実行結果
+    /// * `Err(e)` - 実行エラー
+    pub fn exec(&self, script: &str) -> LuaResult<Value> {
+        self.lua.load(script).eval()
+    }
+    
+    /// Lua スクリプトファイルを実行
+    pub fn exec_file(&self, path: &std::path::Path) -> LuaResult<Value> {
+        let script = std::fs::read_to_string(path)
+            .map_err(|e| mlua::Error::ExternalError(std::sync::Arc::new(e)))?;
+        self.exec(&script)
+    }
+    
+    /// 内部 Lua インスタンスへの参照を取得（高度な操作用）
+    pub fn lua(&self) -> &Lua {
+        &self.lua
+    }
+    
+    /// カスタムモジュールを登録（将来の拡張用）
+    /// 
+    /// # Arguments
+    /// * `name` - モジュール名（@prefix 含む）
+    /// * `module` - モジュールテーブル
+    pub fn register_module(&self, name: &str, module: Table) -> LuaResult<()> {
+        let package: Table = self.lua.globals().get("package")?;
+        let loaded: Table = package.get("loaded")?;
+        loaded.set(name, module)?;
+        Ok(())
+    }
+}
+```
+
+- Preconditions: TranspileContext が有効な SceneRegistry/WordDefRegistry を持つこと
+- Postconditions: Lua VM が初期化され、@pasta_search が登録されている
+- Invariants: 各インスタンスは独立した状態を持つ
+
+##### State Management
+
+- **State model**: PastaLuaRuntime は Lua インスタンスを所有し、SearchContext は Lua の UserData として管理される
+- **Persistence**: なし（インメモリ）
+- **Concurrency**: Lua シングルスレッド前提、各ランタイムインスタンスは独立
+
+**Implementation Notes**
+- Integration: `LuaTranspiler::transpile()` → `TranspileContext` → `PastaLuaRuntime::new()`
+- Validation: TranspileContext の有効性チェック
+- Risks: なし（シンプルな所有権モデル）
+- **将来の拡張性**:
+  - 他の pasta モジュール（pasta.act, pasta.ctx 等）の Rust バインディング追加
+  - 複数のトランスパイル済みファイルを1つのランタイムで実行
 
 ---
 
@@ -185,6 +370,7 @@ sequenceDiagram
 - Static 変数禁止
 
 **Dependencies**
+- Inbound: PastaLuaRuntime — ランタイム初期化時に生成 (P0)
 - Inbound: SearchModule — モジュール登録時に生成 (P0)
 - Outbound: SceneTable — シーン検索実行 (P0)
 - Outbound: WordTable — 単語検索実行 (P0)
@@ -419,14 +605,16 @@ classDiagram
 ## Testing Strategy
 
 ### Unit Tests
+- PastaLuaRuntime::new() の初期化成功
+- PastaLuaRuntime::exec() のスクリプト実行
 - SearchContext::search_scene() の段階的フォールバック動作
 - SearchContext::search_word() のローカル/グローバル検索
 - set_scene_selector() / set_word_selector() の MockSelector 切り替え
 - 引数型検証エラー
 
 ### Integration Tests
-- Lua からの `require "@pasta_search"` + 検索呼び出し
-- 複数 Lua インスタンスでの独立性検証
+- PastaLuaRuntime から `require "@pasta_search"` + 検索呼び出し
+- 複数 PastaLuaRuntime インスタンスでの独立性検証
 - MockSelector 設定後の決定的選択動作
 
 ### E2E Tests (Lua)
@@ -466,7 +654,11 @@ pub struct MockRandomSelector { ... }
 
 ```
 pasta_lua/src/
-├── lib.rs (修正: pub mod search)
+├── lib.rs (修正: pub mod runtime, pub mod search)
+├── runtime/
+│   ├── mod.rs
+│   │   └── pub struct PastaLuaRuntime
+│   └── (将来の拡張用)
 ├── search/
 │   ├── mod.rs
 │   │   ├── pub struct SearchContext
@@ -477,7 +669,7 @@ pasta_lua/src/
 │   │   └── search_scene 実装
 │   └── word_search.rs
 │       └── search_word 実装
-└── (既存ファイル)
+└── (既存ファイル: transpiler.rs, code_generator.rs, etc.)
 ```
 
 ---
