@@ -58,13 +58,42 @@ ghost/master/              # 起動ディレクトリ（PastaLoader::load引数�
 
 **Objective:** As a pasta_lua利用者, I want プロジェクト設定ファイルで起動オプションを制御したい, so that 柔軟な起動設定が可能になる
 
+#### 設定ファイルスキーマ (pasta.toml)
+
+```toml
+[loader]
+# Pastaファイル探索パターン（デフォルト: ["dic/*/*.pasta"]）
+pasta_patterns = ["dic/*/*.pasta"]
+
+# Luaモジュール検索パス（デフォルト、前方優先）
+lua_search_paths = [
+    "profile/pasta/save/lua",
+    "scripts",
+    "profile/pasta/cache/lua",
+    "scriptlibs"
+]
+
+# トランスパイル結果の出力先（デフォルト: "profile/pasta/cache/lua"）
+transpiled_output_dir = "profile/pasta/cache/lua"
+
+# デバッグモード（トランスパイル結果を保存、デフォルト: true）
+debug_mode = true
+
+# --- カスタム設定（[loader]以外の任意のフィールド）---
+# @pasta_configモジュールからLuaで参照可能
+# 例: ghost_name = "MyGhost"
+# 例: [user_data]
+#     key1 = "value1"
+```
+
 #### Acceptance Criteria
 1. When 起動ディレクトリに `pasta.toml` が存在する, the PastaLoader shall 設定ファイルを読み込みデフォルト設定を上書きする
-2. If 設定ファイルの解析に失敗した, the PastaLoader shall 詳細なエラー位置情報と共にエラーを返す
-3. While 設定ファイルが存在しない状態, the PastaLoader shall デフォルト設定（`dic/*/*.pasta` 探索、profile除外、全モジュール有効）で動作を継続する
-4. The PastaLoader shall 設定ファイルでランタイム設定（RuntimeConfig相当）を指定できる
-5. The PastaLoader shall `profile/pasta/save/`, `profile/pasta/save/lua/`, `profile/pasta/cache/`, `profile/pasta/cache/lua/` ディレクトリが存在しない場合に自動作成する
-6. The PastaLoader shall 設定ファイル全体をTranspileContextに保持し、ランタイムからアクセス可能にする
+2. The PastaLoader shall `[loader]` セクションから4つのフィールド（pasta_patterns, lua_search_paths, transpiled_output_dir, debug_mode）を解析する
+3. The PastaLoader shall `[loader]` 以外のすべてのフィールド・セクションを `toml::Table` として保持する（#[serde(flatten)]使用）
+4. If 設定ファイルの解析に失敗した, the PastaLoader shall 詳細なエラー位置情報と共にエラーを返す
+5. While 設定ファイルが存在しない状態, the PastaLoader shall すべてデフォルト値で動作を継続する
+6. The PastaLoader shall `profile/pasta/save/`, `profile/pasta/save/lua/`, `profile/pasta/cache/`, `profile/pasta/cache/lua/` ディレクトリが存在しない場合に自動作成する
+7. The PastaLoader shall 設定ファイル全体（loader設定 + カスタムフィールド）をTranspileContextに保持し、ランタイムからアクセス可能にする
 
 ### Requirement 3: 複数ファイルトランスパイル
 
