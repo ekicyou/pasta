@@ -272,10 +272,11 @@ impl SearchContext {
 **Implementation Notes**
 - Integration: TranspileContext から SceneRegistry/WordDefRegistry を受け取り SearchContext を生成
 - Validation: 引数型チェックは mlua が自動実行
-- **⚠️ 要確認: 検索戦略の不一致**:
-  - **要件定義**: 段階的フォールバック（ローカル優先、0件ならグローバル）
-  - **pasta_core 実装**: マージ戦略（ローカル + グローバル両方を結合）
-  - 【議題3】で解決が必要
+- **段階的フォールバック戦略（確定）**:
+  - pasta_core の既存マージ戦略を**フォールバック戦略に変更**する
+  - ローカル検索 → 結果あり → ローカルから選択（終了）
+  - ローカル検索 → 結果なし → グローバル検索 → グローバルから選択
+  - 既存のマージ戦略コード・テストは削除対象
 - **エラー処理**: 候補なし → `SceneTableError::SceneNotFound` → SearchContext が mlua::Error に変換
 - Risks: MockRandomSelector が pasta_core で `#[cfg(test)]` 限定 → **公開化が必要**
 

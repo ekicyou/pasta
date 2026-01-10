@@ -88,69 +88,50 @@
 
 ---
 
-### 【議題3】段階的フォールバック戦略の責任分岐 ⚠️ 重大な不一致発見
+### 【議題3】段階的フォールバック戦略の責任分岐 ✅ クローズ
 
-**課題**: design.md が示す「段階的フォールバック」（ローカル → グローバル）の実装責任が不明確です。
+**課題**: design.md が示す「段階的フォールバック」（ローカル → グローバル）と pasta_core 実装（マージ戦略）の不一致
 
-**🔴 重大な発見**:
+**🔴 調査で発見した不一致**:
 
-厳密な調査の結果、**要件と pasta_core 実装に重大な不一致** があることが判明しました。
+| 項目 | 要件定義（フォールバック） | pasta_core 実装（マージ） |
+|------|---------------------------|--------------------------|
+| ローカルで見つかった場合 | ローカルのみから選択 | ローカル + グローバル両方から選択 |
+| 選択プール | ローカル優先、なければグローバル | 常に両方をマージ |
 
-#### 要件定義の期待（フォールバック戦略）
+**✅ 決定（2026-01-10）**:
 
-**Requirement 2.2-2.5**:
-> 2.2: global_scene_name が指定された場合、段階的フォールバック戦略で検索を実行（ローカル → グローバル）
-> 2.3: ローカルシーンで結果が見つかった場合、**そこから選択**
-> 2.4: ローカルシーン検索結果が**０件の場合**、グローバルシーンで検索を**再実行**
+**採用**: フォールバック戦略（要件定義通り）
 
-つまり：ローカルで見つかったら**ローカルのみ**から選択、なければグローバルへフォールバック
+**対応内容**:
+1. **pasta_core を修正**: `collect_scene_candidates()` / `collect_word_candidates()` をフォールバック戦略に変更
+2. **マージ戦略のコードを削除**: 既存の「両方をマージ」するロジックを削除
+3. **関連テストケースを破棄**: `test_collect_scene_candidates_local_and_global_merge` 等を削除
+4. **新規テストケース追加**: フォールバック動作を検証するテストを追加
 
-#### pasta_core の実装（マージ戦略）
-
-**scene_table.rs L372-392**:
+**実装方針**:
 ```rust
-// Step 1: Local search with :{module_name}:{prefix} pattern
-candidates.extend(local_ids);  // ローカル結果を追加
-
-// Step 2: Global search with {prefix} pattern
-candidates.extend(global_ids); // グローバル結果も追加
-
-// Step 3: Return merged candidate list
-Ok(candidates)  // 両方をマージして返す
+// 変更後のフォールバック戦略
+pub fn collect_scene_candidates(...) -> Result<Vec<SceneId>, SceneTableError> {
+    // Step 1: Local search only
+    if !module_name.is_empty() {
+        let local_candidates = local_search(module_name, prefix);
+        if !local_candidates.is_empty() {
+            return Ok(local_candidates);  // ローカルで見つかったらそこで終了
+        }
+    }
+    
+    // Step 2: Global search (fallback)
+    let global_candidates = global_search(prefix);
+    if global_candidates.is_empty() {
+        Err(SceneNotFound)
+    } else {
+        Ok(global_candidates)
+    }
+}
 ```
 
-**テストケース `test_collect_scene_candidates_local_and_global_merge`**:
-> "Test: Both local and global candidates should be merged"
-> `candidates.len() == 2` （ローカル + グローバル両方が含まれる）
-
-#### 不一致の影響
-
-| シナリオ | 要件の期待 | 実装の動作 |
-|----------|-----------|-----------|
-| ローカル2件 + グローバル3件 | ローカル2件から選択 | 5件全部から選択 |
-| ローカル0件 + グローバル3件 | グローバル3件から選択 | グローバル3件から選択 ✅ |
-
-#### 選択肢
-
-**選択肢 A**: 要件を修正（マージ戦略を採用）
-- pasta_core の既存実装を尊重
-- 要件を「ローカル + グローバルをマージして選択」に変更
-- **利点**: 実装変更不要
-- **欠点**: 要件の意図と異なる可能性
-
-**選択肢 B**: pasta_core を修正（フォールバック戦略を実装）
-- 新しいメソッド `collect_scene_candidates_fallback()` を追加
-- または既存メソッドにフラグを追加
-- **利点**: 要件通りの動作
-- **欠点**: pasta_core への修正が必要
-
-**選択肢 C**: SearchContext レイヤーでフォールバック実装
-- pasta_core はマージのまま維持
-- SearchContext が2段階で呼び出し（ローカル検索 → 0件ならグローバル検索）
-- **利点**: pasta_core 変更なし、要件通りの動作
-- **欠点**: 検索ロジックの分散
-
-**Status**: ⏳ ユーザー確認待ち
+**Status**: ✅ クローズ（タスク生成フェーズで pasta_core 修正タスクを追加）
 
 ---
 
