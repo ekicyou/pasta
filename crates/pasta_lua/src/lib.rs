@@ -33,6 +33,7 @@ pub mod code_generator;
 pub mod config;
 pub mod context;
 pub mod error;
+pub mod loader;
 pub mod normalize;
 pub mod runtime;
 pub mod search;
@@ -44,6 +45,9 @@ pub use code_generator::LuaCodeGenerator;
 pub use config::{LineEnding, TranspilerConfig};
 pub use context::TranspileContext;
 pub use error::TranspileError;
+pub use loader::{
+    LoaderConfig, LoaderContext, LoaderError, PastaConfig, PastaLoader, TranspileResult,
+};
 pub use runtime::{PastaLuaRuntime, RuntimeConfig};
 pub use search::{SearchContext, SearchError};
 pub use string_literalizer::StringLiteralizer;

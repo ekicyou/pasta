@@ -165,6 +165,26 @@ impl SceneRegistry {
     pub fn sanitize_name(name: &str) -> String {
         name.replace(|c: char| !c.is_alphanumeric() && c != '_', "_")
     }
+
+    /// Merge scenes and counters from another registry.
+    ///
+    /// Used by PastaLoader to combine registries from multiple files.
+    /// Scene IDs are reassigned during merge to maintain uniqueness.
+    pub fn merge_from(&mut self, other: SceneRegistry) {
+        for mut entry in other.scenes {
+            // Reassign ID based on current length
+            entry.id = (self.scenes.len() + 1) as i64;
+            self.scenes.push(entry);
+        }
+
+        // Merge name counters (take max value)
+        for (name, counter) in other.name_counters {
+            let current = self.name_counters.entry(name).or_insert(0);
+            if counter > *current {
+                *current = counter;
+            }
+        }
+    }
 }
 
 impl Default for SceneRegistry {
