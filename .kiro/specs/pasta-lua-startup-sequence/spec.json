@@ -18,5 +18,14 @@
             "approved": false
         }
     },
-    "ready_for_implementation": false
+    "ready_for_implementation": false,
+    "discussions": [
+        {
+            "id": 1,
+            "date": "2026-01-10",
+            "topic": "トランスパイル結果のロード方法（Requirement 4.3実装詳細）",
+            "decision": "Option B（メモリ直接exec）を採用。キャッシュファイルはデバッグ用途のみ。",
+            "rationale": "Requirements 3.5/3.8によりキャッシュ再利用しない設計のため、mlua::Lua::load()でメモリ上のバイト列から直接実行する方式が適切。将来キャッシュ再利用が必要になった場合は変更可能な設計を維持。"
+        }
+    ]
 }

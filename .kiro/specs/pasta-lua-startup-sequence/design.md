@@ -550,6 +550,33 @@ key2 = 123
 
 ## Testing Strategy
 
+## Implementation Details
+
+### Requirement 4.3: トランスパイル結果のロード
+
+**採用アプローチ: Option B（メモリ直接exec）**
+
+設計判断: Requirements 3.5/3.8によりキャッシュ再利用しない設計のため、トランスパイル結果は`mlua::Lua::load()`でメモリ上のバイト列から直接実行する。キャッシュファイル（`.pasta_cache/*.lua`）への保存はデバッグ目的の副次的機能として実装する。
+
+```rust
+// 擬似コード（実装イメージ）
+for transpile_result in transpiled {
+    // デバッグ用: キャッシュファイルに書き込み（オプション）
+    if config.cache_enabled() {
+        std::fs::write(cache_path, &transpile_result.lua_code)?;
+    }
+    
+    // メモリ上のバイト列から直接実行
+    runtime.lua()
+        .load(&transpile_result.lua_code)
+        .set_name(&transpile_result.module_name)
+        .exec()?;
+}
+```
+
+**将来拡張:**
+- Requirements 3.5/3.8が変更され、キャッシュ再利用が必要になった場合、`dofile()`順次ロードまたは統合ファイル方式に変更可能な設計を維持する
+
 ### ユニットテスト
 - `loader/config.rs` - PastaConfig デシリアライズ
 - `loader/discovery.rs` - ファイル探索パターン
