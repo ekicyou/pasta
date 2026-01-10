@@ -17,6 +17,7 @@
 //! ```
 
 use crate::context::TranspileContext;
+use crate::loader::{LoaderContext, TranspileResult};
 use mlua::{Lua, Result as LuaResult, StdLib, Table, Value};
 use std::path::Path;
 use std::sync::Arc;
@@ -223,5 +224,103 @@ impl PastaLuaRuntime {
         let loaded: Table = package.get("loaded")?;
         loaded.set(name, module)?;
         Ok(())
+    }
+
+    /// Create a runtime from LoaderContext with transpiled code.
+    ///
+    /// This is the factory method used by PastaLoader to create a runtime
+    /// with all configuration applied.
+    ///
+    /// # Arguments
+    /// * `context` - TranspileContext with scene/word registries
+    /// * `loader_context` - Configuration and paths from PastaLoader
+    /// * `config` - Runtime configuration
+    /// * `transpiled` - Transpiled Lua code to load
+    ///
+    /// # Returns
+    /// * `Ok(Self)` - Runtime initialized and code loaded
+    /// * `Err(e)` - Initialization or code loading failed
+    pub fn from_loader(
+        context: TranspileContext,
+        loader_context: LoaderContext,
+        config: RuntimeConfig,
+        transpiled: &[TranspileResult],
+    ) -> LuaResult<Self> {
+        // Create base runtime
+        let runtime = Self::with_config(context, config)?;
+
+        // Setup package.path for module resolution
+        Self::setup_package_path(&runtime.lua, &loader_context)?;
+
+        // Register @pasta_config module
+        Self::register_config_module(&runtime.lua, &loader_context.custom_fields)?;
+
+        // Load transpiled code directly into memory
+        for result in transpiled {
+            runtime
+                .lua
+                .load(&result.lua_code)
+                .set_name(&result.module_name)
+                .exec()?;
+            tracing::debug!(module = %result.module_name, "Loaded transpiled module");
+        }
+
+        Ok(runtime)
+    }
+
+    /// Setup package.path for Lua module resolution.
+    ///
+    /// Sets the package.path to include all search paths from LoaderContext
+    /// in priority order (first path has highest priority).
+    fn setup_package_path(lua: &Lua, loader_context: &LoaderContext) -> LuaResult<()> {
+        let package_path = loader_context.generate_package_path();
+
+        let package: Table = lua.globals().get("package")?;
+        package.set("path", package_path.clone())?;
+
+        tracing::debug!(path = %package_path, "Set package.path");
+        Ok(())
+    }
+
+    /// Register @pasta_config module with custom fields.
+    ///
+    /// Creates a read-only Lua table from the TOML custom_fields and
+    /// registers it as the @pasta_config module.
+    fn register_config_module(lua: &Lua, custom_fields: &toml::Table) -> LuaResult<()> {
+        let config_table = Self::toml_to_lua(lua, &toml::Value::Table(custom_fields.clone()))?;
+
+        let package: Table = lua.globals().get("package")?;
+        let loaded: Table = package.get("loaded")?;
+        loaded.set("@pasta_config", config_table)?;
+
+        tracing::debug!("Registered @pasta_config module");
+        Ok(())
+    }
+
+    /// Convert toml::Value to mlua::Value.
+    ///
+    /// Recursively converts TOML structures to Lua tables.
+    fn toml_to_lua(lua: &Lua, value: &toml::Value) -> LuaResult<Value> {
+        match value {
+            toml::Value::String(s) => Ok(Value::String(lua.create_string(s)?)),
+            toml::Value::Integer(i) => Ok(Value::Integer(*i)),
+            toml::Value::Float(f) => Ok(Value::Number(*f)),
+            toml::Value::Boolean(b) => Ok(Value::Boolean(*b)),
+            toml::Value::Datetime(dt) => Ok(Value::String(lua.create_string(dt.to_string())?)),
+            toml::Value::Array(arr) => {
+                let table = lua.create_table()?;
+                for (i, v) in arr.iter().enumerate() {
+                    table.set(i + 1, Self::toml_to_lua(lua, v)?)?;
+                }
+                Ok(Value::Table(table))
+            }
+            toml::Value::Table(t) => {
+                let table = lua.create_table()?;
+                for (k, v) in t {
+                    table.set(k.as_str(), Self::toml_to_lua(lua, v)?)?;
+                }
+                Ok(Value::Table(table))
+            }
+        }
     }
 }

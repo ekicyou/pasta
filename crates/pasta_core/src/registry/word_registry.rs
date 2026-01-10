@@ -79,6 +79,18 @@ impl WordDefRegistry {
     pub fn sanitize_name(name: &str) -> String {
         SceneRegistry::sanitize_name(name)
     }
+
+    /// Merge entries from another registry.
+    ///
+    /// Used by PastaLoader to combine registries from multiple files.
+    /// Entry IDs are reassigned during merge.
+    pub fn merge_from(&mut self, other: WordDefRegistry) {
+        for mut entry in other.entries {
+            // Reassign ID based on current length
+            entry.id = self.entries.len();
+            self.entries.push(entry);
+        }
+    }
 }
 
 impl Default for WordDefRegistry {

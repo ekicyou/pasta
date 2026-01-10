@@ -120,6 +120,18 @@ impl TranspileContext {
 
         result
     }
+
+    /// Merge registries from another TranspileContext.
+    ///
+    /// Used by PastaLoader to combine contexts from multiple files.
+    /// File attributes are not merged (they are file-specific).
+    pub fn merge_from(&mut self, other: TranspileContext) {
+        // Merge scene registry
+        self.scene_registry.merge_from(other.scene_registry);
+
+        // Merge word registry
+        self.word_registry.merge_from(other.word_registry);
+    }
 }
 
 #[cfg(test)]

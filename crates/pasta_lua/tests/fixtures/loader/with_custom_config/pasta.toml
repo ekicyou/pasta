@@ -1,0 +1,10 @@
+ghost_name = "TestGhost"
+version = "1.0.0"
+
+[loader]
+debug_mode = true
+
+[user_data]
+key1 = "value1"
+key2 = 42
+nested = { inner = "data" }

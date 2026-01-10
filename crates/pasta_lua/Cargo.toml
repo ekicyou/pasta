@@ -19,3 +19,6 @@ glob.workspace = true
 
 [build-dependencies]
 lua-src.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
