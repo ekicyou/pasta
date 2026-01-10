@@ -89,7 +89,59 @@ pub struct MockRandomSelector { ... }
 
 **決定の権限**: パスタプロジェクトの設計方針
 
-**Status**: ⏳ ユーザー確認待ち
+---
+
+### 【議題2】複数 Lua インスタンス対応：初期化フロー・所有権構造 ✅ クローズ
+
+**課題**: 複数 Lua インスタンス対応の初期化フロー・所有権構造の明確化
+
+**✅ 決定（2026-01-10）**:
+
+#### 2-1: loader() の呼び出し元
+
+**採用**: pasta_lua ランタイム構造体による初期化パターン
+
+- pasta_lua が Lua ランタイム構造体（例: `PastaLuaRuntime`）を持つ
+- ランタイム初期化時に `loader()` を **一度** 呼び出す
+- 複数ランタイムインスタンス = 複数の `PastaLuaRuntime` インスタンス
+
+```rust
+pub struct PastaLuaRuntime {
+    lua: Lua,
+    search_module: Table,  // @pasta_search モジュール
+    // ...
+}
+
+impl PastaLuaRuntime {
+    pub fn new(
+        scene_registry: SceneRegistry,
+        word_registry: WordRegistry,
+    ) -> Result<Self> {
+        let lua = Lua::new();
+        let search_module = search::loader(&lua, scene_registry, word_registry)?;
+        search::register(&lua, search_module)?;  // Lua globals に登録
+        Ok(Self { lua, search_module, ... })
+    }
+}
+```
+
+#### 2-2: SearchContext の所有権
+
+**採用**: mlua が自動管理（案 A）
+
+- SearchContext は mlua の UserData として Lua に登録
+- Lua の GC が自動管理 → Rust 側で参照保持不要
+- Rust 側は最小限の参照（loader 実行時のみ）
+
+#### 2-3: 複数ランタイム = 複数 SceneRegistry か？
+
+**採用**: 各ランタイムが独立した SceneRegistry/WordRegistry を保持（案 A）
+
+- 各 `PastaLuaRuntime` インスタンスが独立した SceneRegistry/WordRegistry を保持
+- 複数ランタイム間での検索結果は独立
+- ランタイムごとの隔離レベル最大化
+
+**Status**: ✅ クローズ
 
 ---
 
@@ -142,18 +194,20 @@ pub fn collect_scene_candidates(...) -> Result<Vec<SceneId>, SceneTableError> {
 
 ## 次のステップ
 
-### 自明な修正点の修正
-- [ ] 確認項目1.1 を design.md に反映
-- [ ] 確認項目1.2 を design.md に反映
-- [ ] すべての修正をコミット
+### 全議題クローズ ✅
 
-### 議題の解決（ユーザーとの対話）
-1. 【議題1】: MockRandomSelector 公開化のオプション選択
-2. 【議題2】: 複数ランタイム初期化フローの確認
-3. 【議題3】: 段階的フォールバック責任の確認
-4. 各議題クローズごとに design.md 更新 + コミット
+1. ✅ 【議題1】MockRandomSelector 公開化 → オプション A（常時公開）採用
+2. ✅ 【議題2】複数 Lua インスタンス対応 → pasta_lua ランタイム構造体パターン採用
+3. ✅ 【議題3】段階的フォールバック戦略 → フォールバック戦略採用、マージ戦略削除
+
+### コミット
+
+1. ✅ 議題1 コミット済み
+2. ✅ 議題3 コミット済み
+3. 議題2 コミット予定
 
 ### 完了後
+
 - `/kiro-spec-tasks pasta_search_module` でタスク生成
 
 ---
