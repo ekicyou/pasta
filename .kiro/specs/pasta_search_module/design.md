@@ -208,37 +208,39 @@ impl SearchContext {
         word_registry: WordDefRegistry,
     ) -> Result<Self, SearchError>;
     
-    /// シーン検索（段階的フォールバック）
+    /// シーン検索（段階的フォールバック：ローカル → グローバル）
     /// 
     /// # Arguments
     /// * `name` - 検索プレフィックス
     /// * `global_scene_name` - 親シーン名（None でグローバルのみ検索）
     /// 
     /// # Returns
-    /// * `Ok(Some((global_name, local_name)))` - 検索成功
-    /// * `Ok(None)` - 候補なし
-    /// * `Err(e)` - エラー
+    /// * `Ok((global_name, local_name))` - 検索成功
+    ///   - ローカルシーンで検索成功: (全体シーン名, ローカルシーン名)
+    ///   - グローバルシーンで検索成功: (全体シーン名, "__start__")
+    /// * `Err(SearchError::NotFound)` - 全検索で候補なし
+    /// * `Err(e)` - その他エラー
     pub fn search_scene(
         &mut self,
         name: &str,
         global_scene_name: Option<&str>,
-    ) -> Result<Option<(String, String)>, SearchError>;
+    ) -> Result<(String, String), SearchError>;
     
-    /// 単語検索（段階的フォールバック）
+    /// 単語検索（段階的フォールバック：ローカル → グローバル）
     /// 
     /// # Arguments
     /// * `name` - 検索キー
     /// * `global_scene_name` - 親シーン名（None でグローバルのみ検索）
     /// 
     /// # Returns
-    /// * `Ok(Some(word))` - 検索成功
-    /// * `Ok(None)` - 候補なし
-    /// * `Err(e)` - エラー
+    /// * `Ok(word_string)` - 検索成功（文字列を返す）
+    /// * `Err(SearchError::NotFound)` - 全検索で候補なし
+    /// * `Err(e)` - その他エラー（引数型不正など）
     pub fn search_word(
         &mut self,
         name: &str,
         global_scene_name: Option<&str>,
-    ) -> Result<Option<String>, SearchError>;
+    ) -> Result<String, SearchError>;
     
     /// シーン用 RandomSelector をリセットまたは切り替え
     /// 
@@ -269,8 +271,8 @@ impl SearchContext {
 
 **Implementation Notes**
 - Integration: TranspileContext から SceneRegistry/WordDefRegistry を受け取り SearchContext を生成
-- Validation: 引数型チェックは mlua が自動実行
-- Risks: MockRandomSelector が pasta_core で `#[cfg(test)]` 限定 → **公開化が必要**
+- Validation: 引数型チェックは mlua が自動実行- **段階的フォールバック**: pasta_core の `SceneTable::collect_scene_candidates()` が `:module_name:key` (ローカル) → `key` (グローバル) の 2段階検索を自動実行
+- **エラー処理**: 候補なし → `SceneTableError::SceneNotFound` → SearchContext が mlua::Error に変換- Risks: MockRandomSelector が pasta_core で `#[cfg(test)]` 限定 → **公開化が必要**
 
 ---
 
@@ -483,17 +485,13 @@ impl mlua::UserData for SearchContext {
         //     add_method_mut を使用
         
         methods.add_method_mut("search_scene", |lua, this, (name, global_scene_name): (String, Option<String>)| {
-            match this.search_scene(&name, global_scene_name.as_deref())? {
-                Some((global, local)) => Ok((global, local).into_lua_multi(lua)?),
-                None => Ok(mlua::Value::Nil.into_lua_multi(lua)?),
-            }
+            let (global, local) = this.search_scene(&name, global_scene_name.as_deref())?;
+            Ok((global, local).into_lua_multi(lua)?)
         });
         
         methods.add_method_mut("search_word", |lua, this, (name, global_scene_name): (String, Option<String>)| {
-            match this.search_word(&name, global_scene_name.as_deref())? {
-                Some(word) => Ok(word.into_lua(lua)?),
-                None => Ok(mlua::Value::Nil),
-            }
+            let word = this.search_word(&name, global_scene_name.as_deref())?;
+            Ok(word.into_lua(lua)?)
         });
         
         // 可変メソッド（&mut self）
