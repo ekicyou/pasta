@@ -93,7 +93,8 @@ debug_mode = true
 4. If 設定ファイルの解析に失敗した, the PastaLoader shall 詳細なエラー位置情報と共にエラーを返す
 5. While 設定ファイルが存在しない状態, the PastaLoader shall すべてデフォルト値で動作を継続する
 6. The PastaLoader shall `profile/pasta/save/`, `profile/pasta/save/lua/`, `profile/pasta/cache/`, `profile/pasta/cache/lua/` ディレクトリが存在しない場合に自動作成する
-7. The PastaLoader shall 設定ファイル全体（loader設定 + カスタムフィールド）をTranspileContextに保持し、ランタイムからアクセス可能にする
+7. The PastaLoader shall 設定ファイルのカスタムフィールド（custom_fields: toml::Table）をランタイム初期化時の引数として渡し、@pasta_configモジュールとして登録する
+8. The TranspileContext shall 設定データを保持しない（トランスパイル処理専用の設計を維持）
 
 ### Requirement 3: 複数ファイルトランスパイル
 
@@ -149,9 +150,10 @@ debug_mode = true
 **Objective:** As a pasta_luaスクリプト作成者, I want Luaスクリプトから設定ファイルの内容を参照したい, so that ゴースト固有の設定値に基づいてスクリプトを動的に変更できる
 
 #### Acceptance Criteria
-1. When PastaLuaRuntimeが初期化される, the PastaLuaRuntime shall `@pasta_config` モジュールをLua VMに登録する
-2. When Luaスクリプトが `require("@pasta_config")` を実行した, the `@pasta_config` module shall 設定ファイル（pasta.toml）の内容をLuaテーブルとして返す
-3. While 設定ファイルが存在しない状態, the `@pasta_config` module shall 空のテーブル `{}` を返す
-4. The `@pasta_config` module shall 設定ファイルのTOML構造をLuaテーブルに忠実にマッピングする（ネストされたテーブル、配列、文字列、数値、真偽値）
+1. When PastaLuaRuntimeが初期化される, the PastaLuaRuntime shall 初期化引数として受け取ったカスタムフィールド（toml::Table）から `@pasta_config` モジュールをLua VMに登録する
+2. When Luaスクリプトが `require("@pasta_config")` を実行した, the `@pasta_config` module shall カスタムフィールドの内容をLuaテーブルとして返す（[loader]セクションは含まない）
+3. While カスタムフィールドが空の状態, the `@pasta_config` module shall 空のテーブル `{}` を返す
+4. The `@pasta_config` module shall TOML構造をLuaテーブルに忠実にマッピングする（ネストされたテーブル、配列、文字列、数値、真偽値）
 5. The `@pasta_config` module shall 読み取り専用で設定を提供し、Lua側からの変更を許可しない
+6. The PastaLuaRuntime shall mlua の `IntoLua` trait を使用して `toml::Value` から `mlua::Value` への自動変換を実行する
 
