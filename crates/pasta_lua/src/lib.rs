@@ -44,7 +44,7 @@ pub use code_generator::LuaCodeGenerator;
 pub use config::{LineEnding, TranspilerConfig};
 pub use context::TranspileContext;
 pub use error::TranspileError;
-pub use runtime::PastaLuaRuntime;
+pub use runtime::{PastaLuaRuntime, RuntimeConfig};
 pub use search::{SearchContext, SearchError};
 pub use string_literalizer::StringLiteralizer;
 pub use transpiler::LuaTranspiler;
