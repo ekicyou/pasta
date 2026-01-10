@@ -39,24 +39,29 @@
 
 ## 議題リスト
 
-### 【議題1】MockRandomSelector 公開化の進め方
+### 【議題1】MockRandomSelector 公開化の進め方 ✅ クローズ
 
 **課題**: Requirement 8（テスト用 Selector 制御）を実装するため、`MockRandomSelector` を `#[cfg(test)]` から外す必要があります。
 
-**選択肢**:
-- **オプション A**: 常時公開（`pub struct MockRandomSelector`）
-  - 利点: テスト・Lua 実装で直接利用可能
-  - 欠点: 本番環境で意図しない使用の可能性
-- **オプション B**: Feature フラグ（`#[cfg(any(test, feature = "test-selector"))]`）
-  - 利点: 本番環境で除外可能、テスト環境では有効
-  - 欠点: pasta_lua が feature を有効化する必要がある
+**✅ 決定（2026-01-10）**:
 
-**決定の権限**: pasta_core maintainer または本プロジェクトの方針
+**採用**: オプション A（常時公開）
 
-**設計判断が必要な理由**:
-- design.md では「推奨: オプション A」とありますが、プロジェクト方針（本番環境への懸念）によって判断が変わります
+```rust
+// 変更前
+#[cfg(test)]
+pub struct MockRandomSelector { ... }
 
-**Status**: ⏳ ユーザー確認待ち
+// 変更後
+pub struct MockRandomSelector { ... }
+```
+
+**対応内容**:
+1. `crates/pasta_core/src/registry/random.rs` から `#[cfg(test)]` を削除
+2. `MockRandomSelector` を公開APIとして維持
+3. pasta_lua から直接利用可能に
+
+**Status**: ✅ クローズ（タスク生成フェーズで pasta_core 修正タスクを追加）
 
 ---
 
