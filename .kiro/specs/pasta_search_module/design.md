@@ -271,8 +271,13 @@ impl SearchContext {
 
 **Implementation Notes**
 - Integration: TranspileContext から SceneRegistry/WordDefRegistry を受け取り SearchContext を生成
-- Validation: 引数型チェックは mlua が自動実行- **段階的フォールバック**: pasta_core の `SceneTable::collect_scene_candidates()` が `:module_name:key` (ローカル) → `key` (グローバル) の 2段階検索を自動実行
-- **エラー処理**: 候補なし → `SceneTableError::SceneNotFound` → SearchContext が mlua::Error に変換- Risks: MockRandomSelector が pasta_core で `#[cfg(test)]` 限定 → **公開化が必要**
+- Validation: 引数型チェックは mlua が自動実行
+- **⚠️ 要確認: 検索戦略の不一致**:
+  - **要件定義**: 段階的フォールバック（ローカル優先、0件ならグローバル）
+  - **pasta_core 実装**: マージ戦略（ローカル + グローバル両方を結合）
+  - 【議題3】で解決が必要
+- **エラー処理**: 候補なし → `SceneTableError::SceneNotFound` → SearchContext が mlua::Error に変換
+- Risks: MockRandomSelector が pasta_core で `#[cfg(test)]` 限定 → **公開化が必要**
 
 ---
 

@@ -88,35 +88,69 @@
 
 ---
 
-### 【議題3】段階的フォールバック戦略の責任分岐
+### 【議題3】段階的フォールバック戦略の責任分岐 ⚠️ 重大な不一致発見
 
 **課題**: design.md が示す「段階的フォールバック」（ローカル → グローバル）の実装責任が不明確です。
 
-**現状分析**:
+**🔴 重大な発見**:
+
+厳密な調査の結果、**要件と pasta_core 実装に重大な不一致** があることが判明しました。
+
+#### 要件定義の期待（フォールバック戦略）
+
+**Requirement 2.2-2.5**:
+> 2.2: global_scene_name が指定された場合、段階的フォールバック戦略で検索を実行（ローカル → グローバル）
+> 2.3: ローカルシーンで結果が見つかった場合、**そこから選択**
+> 2.4: ローカルシーン検索結果が**０件の場合**、グローバルシーンで検索を**再実行**
+
+つまり：ローカルで見つかったら**ローカルのみ**から選択、なければグローバルへフォールバック
+
+#### pasta_core の実装（マージ戦略）
+
+**scene_table.rs L372-392**:
+```rust
+// Step 1: Local search with :{module_name}:{prefix} pattern
+candidates.extend(local_ids);  // ローカル結果を追加
+
+// Step 2: Global search with {prefix} pattern
+candidates.extend(global_ids); // グローバル結果も追加
+
+// Step 3: Return merged candidate list
+Ok(candidates)  // 両方をマージして返す
 ```
-設計.md の期待:
-  SearchContext.search_scene(name, Some("parent"))
-    → SceneTable.resolve_scene_id_unified("parent", name, filters)  # ローカル検索
-    → (失敗時) SceneTable.resolve_scene_id(name, filters)           # グローバル検索
 
-実装仕様:
-  resolve_scene_id_unified(module, key, filters)
-    → collect_scene_candidates(module, key)  # ⚠️ この実装は？
-    → フィルタリング・キャッシュ・選択
-```
+**テストケース `test_collect_scene_candidates_local_and_global_merge`**:
+> "Test: Both local and global candidates should be merged"
+> `candidates.len() == 2` （ローカル + グローバル両方が含まれる）
 
-**問題点**:
-- `collect_scene_candidates()` メソッドの仕様が確認できていません
-- グローバル検索へのフォールバックはメソッド内で行われるのか、呼び出し側で行うのか不明確
+#### 不一致の影響
 
-**詳細確認項目**:
-1. `SceneTable::collect_scene_candidates()` の挙動（引数・戻り値・エラー処理）
-2. LocalScene が見つからない場合の返却値（`Err(NotFound)` か、`Ok(empty)` か？）
-3. グローバル検索への自動フォールバック機能の有無
+| シナリオ | 要件の期待 | 実装の動作 |
+|----------|-----------|-----------|
+| ローカル2件 + グローバル3件 | ローカル2件から選択 | 5件全部から選択 |
+| ローカル0件 + グローバル3件 | グローバル3件から選択 | グローバル3件から選択 ✅ |
 
-**決定の権限**: パスタプロジェクトの既存実装設計
+#### 選択肢
 
-**Status**: ⏳ コード検証 → ユーザー確認待ち
+**選択肢 A**: 要件を修正（マージ戦略を採用）
+- pasta_core の既存実装を尊重
+- 要件を「ローカル + グローバルをマージして選択」に変更
+- **利点**: 実装変更不要
+- **欠点**: 要件の意図と異なる可能性
+
+**選択肢 B**: pasta_core を修正（フォールバック戦略を実装）
+- 新しいメソッド `collect_scene_candidates_fallback()` を追加
+- または既存メソッドにフラグを追加
+- **利点**: 要件通りの動作
+- **欠点**: pasta_core への修正が必要
+
+**選択肢 C**: SearchContext レイヤーでフォールバック実装
+- pasta_core はマージのまま維持
+- SearchContext が2段階で呼び出し（ローカル検索 → 0件ならグローバル検索）
+- **利点**: pasta_core 変更なし、要件通りの動作
+- **欠点**: 検索ロジックの分散
+
+**Status**: ⏳ ユーザー確認待ち
 
 ---
 
