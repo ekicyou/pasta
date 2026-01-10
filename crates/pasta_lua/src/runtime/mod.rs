@@ -27,6 +27,18 @@ pub struct RuntimeConfig {
     /// Enable Lua standard libraries (base, table, string, math, etc.)
     /// Default: true
     pub enable_std_libs: bool,
+    /// Enable mlua-stdlib assertions module (@assertions)
+    /// Provides assertion functions for testing and validation.
+    /// Default: true
+    pub enable_assertions: bool,
+    /// Enable mlua-stdlib testing module (@testing)
+    /// Provides a testing framework with hooks and reporting.
+    /// Default: true
+    pub enable_testing: bool,
+    /// Enable mlua-stdlib env module (@env)
+    /// Provides environment variable and filesystem path access.
+    /// Default: false (security-sensitive, opt-in)
+    pub enable_env: bool,
     /// Enable mlua-stdlib regex module (@regex)
     /// Default: true
     pub enable_regex: bool,
@@ -39,10 +51,28 @@ pub struct RuntimeConfig {
 }
 
 impl RuntimeConfig {
-    /// Create a new configuration with all features enabled (default).
+    /// Create a new configuration with all safe features enabled (default).
+    ///
+    /// Note: `enable_env` is disabled by default for security reasons.
     pub fn new() -> Self {
         Self {
             enable_std_libs: true,
+            enable_assertions: true,
+            enable_testing: true,
+            enable_env: false, // Disabled by default for security
+            enable_regex: true,
+            enable_json: true,
+            enable_yaml: true,
+        }
+    }
+
+    /// Create a configuration with all features enabled, including security-sensitive ones.
+    pub fn full() -> Self {
+        Self {
+            enable_std_libs: true,
+            enable_assertions: true,
+            enable_testing: true,
+            enable_env: true,
             enable_regex: true,
             enable_json: true,
             enable_yaml: true,
@@ -53,6 +83,9 @@ impl RuntimeConfig {
     pub fn minimal() -> Self {
         Self {
             enable_std_libs: false,
+            enable_assertions: false,
+            enable_testing: false,
+            enable_env: false,
             enable_regex: false,
             enable_json: false,
             enable_yaml: false,
@@ -73,9 +106,14 @@ impl PastaLuaRuntime {
     ///
     /// Initializes a Lua VM with standard libraries enabled and registers:
     /// - `@pasta_search` module with scene and word registries
+    /// - `@assertions` module for testing and validation
+    /// - `@testing` module for testing framework with hooks and reporting
     /// - `@regex` module for regular expression support
     /// - `@json` module for JSON encoding/decoding
     /// - `@yaml` module for YAML encoding/decoding
+    ///
+    /// Note: `@env` module is disabled by default for security reasons.
+    /// Use `RuntimeConfig::full()` or enable it explicitly to access environment variables.
     ///
     /// # Arguments
     /// * `context` - TranspileContext from LuaTranspiler::transpile()
@@ -113,7 +151,18 @@ impl PastaLuaRuntime {
         // Register @pasta_search module
         crate::search::register(&lua, scene_registry, word_registry)?;
 
-        // Register mlua-stdlib modules based on configuration
+        // Register mlua-stdlib core modules based on configuration
+        if config.enable_assertions {
+            mlua_stdlib::assertions::register(&lua, None)?;
+        }
+        if config.enable_testing {
+            mlua_stdlib::testing::register(&lua, None)?;
+        }
+        if config.enable_env {
+            mlua_stdlib::env::register(&lua, None)?;
+        }
+
+        // Register mlua-stdlib feature-gated modules
         if config.enable_regex {
             mlua_stdlib::regex::register(&lua, None)?;
         }
