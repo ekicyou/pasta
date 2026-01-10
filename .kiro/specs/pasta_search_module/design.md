@@ -121,19 +121,27 @@ sequenceDiagram
     
     alt global_scene_name が指定
         Ctx->>ST: resolve_scene_id_unified(parent, name, filters)
-        ST-->>Ctx: SceneId or Error
+        ST-->>Ctx: SceneId or NotFound
         
         alt ローカル検索成功
-            Ctx-->>SEARCH: (global_name, local_name)
+            Ctx-->>SEARCH: Some((global_name, local_name))
         else ローカル検索失敗 → グローバル検索
             Ctx->>ST: resolve_scene_id(name, filters)
-            ST-->>Ctx: SceneId or Error
-            Ctx-->>SEARCH: (global_name, "__start__") or nil
+            ST-->>Ctx: SceneId or NotFound
+            alt グローバル検索成功
+                Ctx-->>SEARCH: Some((global_name, "__start__"))
+            else グローバル検索も失敗
+                Ctx-->>SEARCH: None
+            end
         end
     else global_scene_name が nil
         Ctx->>ST: resolve_scene_id(name, filters)
-        ST-->>Ctx: SceneId or Error
-        Ctx-->>SEARCH: (global_name, "__start__") or nil
+        ST-->>Ctx: SceneId or NotFound
+        alt 検索成功
+            Ctx-->>SEARCH: Some((global_name, "__start__"))
+        else 検索失敗
+            Ctx-->>SEARCH: None
+        end
     end
     
     SEARCH-->>Lua: (global_name, local_name) or nil
@@ -401,16 +409,16 @@ impl SearchContext {
     /// * `global_scene_name` - 親シーン名（None でグローバルのみ検索）
     /// 
     /// # Returns
-    /// * `Ok((global_name, local_name))` - 検索成功
+    /// * `Ok(Some((global_name, local_name)))` - 検索成功
     ///   - ローカルシーンで検索成功: (全体シーン名, ローカルシーン名)
     ///   - グローバルシーンで検索成功: (全体シーン名, "__start__")
-    /// * `Err(SearchError::NotFound)` - 全検索で候補なし
-    /// * `Err(e)` - その他エラー
+    /// * `Ok(None)` - 全検索で候補なし（Lua 側では nil として返す）
+    /// * `Err(e)` - その他エラー（内部エラー）
     pub fn search_scene(
         &mut self,
         name: &str,
         global_scene_name: Option<&str>,
-    ) -> Result<(String, String), SearchError>;
+    ) -> Result<Option<(String, String)>, SearchError>;
     
     /// 単語検索（段階的フォールバック：ローカル → グローバル）
     /// 
@@ -419,14 +427,14 @@ impl SearchContext {
     /// * `global_scene_name` - 親シーン名（None でグローバルのみ検索）
     /// 
     /// # Returns
-    /// * `Ok(word_string)` - 検索成功（文字列を返す）
-    /// * `Err(SearchError::NotFound)` - 全検索で候補なし
-    /// * `Err(e)` - その他エラー（引数型不正など）
+    /// * `Ok(Some(word_string))` - 検索成功（文字列を返す）
+    /// * `Ok(None)` - 全検索で候補なし（Lua 側では nil として返す）
+    /// * `Err(e)` - その他エラー（内部エラー）
     pub fn search_word(
         &mut self,
         name: &str,
         global_scene_name: Option<&str>,
-    ) -> Result<String, SearchError>;
+    ) -> Result<Option<String>, SearchError>;
     
     /// シーン用 RandomSelector をリセットまたは切り替え
     /// 
@@ -512,8 +520,8 @@ pub fn register(
 
 | Method | Signature | Returns | Errors |
 |--------|-----------|---------|--------|
-| search_scene | `SEARCH:search_scene(name, global_scene_name?)` | `global_name, local_name` | SceneNotFound |
-| search_word | `SEARCH:search_word(name, global_scene_name?)` | `string` | WordNotFound |
+| search_scene | `SEARCH:search_scene(name, global_scene_name?)` | `global_name, local_name` または `nil` | internal error |
+| search_word | `SEARCH:search_word(name, global_scene_name?)` | `string` または `nil` | internal error |
 | set_scene_selector | `SEARCH:set_scene_selector(n1, n2, ...)` | (none) | type error |
 | set_word_selector | `SEARCH:set_word_selector(n1, n2, ...)` | (none) | type error |
 
@@ -684,13 +692,17 @@ impl mlua::UserData for SearchContext {
         //     add_method_mut を使用
         
         methods.add_method_mut("search_scene", |lua, this, (name, global_scene_name): (String, Option<String>)| {
-            let (global, local) = this.search_scene(&name, global_scene_name.as_deref())?;
-            Ok((global, local).into_lua_multi(lua)?)
+            match this.search_scene(&name, global_scene_name.as_deref())? {
+                Some((global, local)) => Ok((global, local).into_lua_multi(lua)?),
+                None => Ok(mlua::MultiValue::new()),  // nil を返す
+            }
         });
         
         methods.add_method_mut("search_word", |lua, this, (name, global_scene_name): (String, Option<String>)| {
-            let word = this.search_word(&name, global_scene_name.as_deref())?;
-            Ok(word.into_lua(lua)?)
+            match this.search_word(&name, global_scene_name.as_deref())? {
+                Some(word) => Ok(word.into_lua(lua)?),
+                None => Ok(mlua::Value::Nil),  // nil を返す
+            }
         });
         
         // 可変メソッド（&mut self）

@@ -203,7 +203,7 @@ Luaへの公開ライブラリの実装方法については、[mlua-stdlib](htt
 - SceneTable/WordTable 参照の管理方法は Design段階で詳細決定
 - mlua-stdlib のコード生成・登録パターンに従う
 
-#### 複数ランタイムインスタンス対応 ✅ 要件確認
+#### 複数ランタイムインスタンス対応 ✅ 決定済み
 
 pasta_lua は複数の独立した Lua ランタイムインスタンスをサポートする必要があります。
 
@@ -212,12 +212,14 @@ pasta_lua は複数の独立した Lua ランタイムインスタンスをサ�
 - 各ランタイムインスタンスは独立した SceneTable/WordTable を持つ必要がある
 - スレッドローカル（TLS）でも複数インスタンス対応には不十分
 
-**選択肢**:
-1. **UserData ラッピング**（推奨候補）: SceneTable/WordTable を UserData として Lua に登録し、各ランタイムが独立管理
-2. **Arc<Mutex<>> + Lua Globals**: Arc でランタイムごとに参照を保持
-3. **mlua UserData Registry**: mlua 提供の UserData registry パターン
+**採用パターン（Design 段階で決定済み）**:
+- **PastaLuaRuntime 構造体** + **UserData ラッピング**
+- 各 `PastaLuaRuntime` インスタンスが独立した Lua VM と SearchContext を持つ
+- SearchContext は mlua の UserData として Lua に登録
+- Lua の GC が自動管理 → Rust 側で参照保持不要
 
-**Decision pending**: Design 段階で最適なパターンを決定（Requirement 4, Criteria 6 での詳細決定項目）
+**参照**: Requirement 9、DESIGN_REVIEW_ACTIONS.md 議題2
+
 ## Out of Scope
 
 - Lua側モジュール（pasta.act, pasta.actor）の実装（pasta_lua_implementation 仕様）
