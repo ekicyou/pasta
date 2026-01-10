@@ -271,6 +271,7 @@ impl SearchContext {
 
 **Implementation Notes**
 - Integration: TranspileContext から SceneRegistry/WordDefRegistry を受け取り SearchContext を生成
+- **Initialization**: pasta_lua ランタイム構造体が初期化時に `loader()` を呼び出す（一度のみ）
 - Validation: 引数型チェックは mlua が自動実行
 - **段階的フォールバック戦略（確定）**:
   - pasta_core の既存マージ戦略を**フォールバック戦略に変更**する
@@ -278,7 +279,7 @@ impl SearchContext {
   - ローカル検索 → 結果なし → グローバル検索 → グローバルから選択
   - 既存のマージ戦略コード・テストは削除対象
 - **エラー処理**: 候補なし → `SceneTableError::SceneNotFound` → SearchContext が mlua::Error に変換
-- Risks: MockRandomSelector が pasta_core で `#[cfg(test)]` 限定 → **公開化が必要**
+- **MockRandomSelector**: pasta_core で常時公開（`#[cfg(test)]` 削除）
 
 ---
 
@@ -321,12 +322,12 @@ pub fn register(
 ) -> Result<Table, mlua::Error>;
 ```
 
-##### API Contract (Lua側)
+#### API Contract (Lua側)
 
 | Method | Signature | Returns | Errors |
 |--------|-----------|---------|--------|
-| search_scene | `SEARCH:search_scene(name, global_scene_name?)` | `global_name, local_name` or `nil` | type error |
-| search_word | `SEARCH:search_word(name, global_scene_name?)` | `string` or `nil` | type error |
+| search_scene | `SEARCH:search_scene(name, global_scene_name?)` | `global_name, local_name` | SceneNotFound |
+| search_word | `SEARCH:search_word(name, global_scene_name?)` | `string` | WordNotFound |
 | set_scene_selector | `SEARCH:set_scene_selector(n1, n2, ...)` | (none) | type error |
 | set_word_selector | `SEARCH:set_word_selector(n1, n2, ...)` | (none) | type error |
 
