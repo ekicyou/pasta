@@ -13,15 +13,22 @@
 ### 1.1 ✅ 検索 API の戻り値形式を確認・修正
 
 **発見**:
-- `search_word()` は `Result<String, WordTableError>` を返す（`Option` ではない）
-- `resolve_scene_id()` は `SceneId` を返すが、SceneInfo は自分で取得する必要がある（`get_scene(id)` メソッド）
+- pasta_core の `search_word()` は `Result<String, WordTableError>` を返す
+- pasta_core の `resolve_scene_id()` は `SceneId` を返す
+- しかし、requirements.md では「候補なしの場合は nil を返す」と規定（Req 2.8, 3.8, 6.3）
 
-**修正内容**:
-- design.md: `search_scene()` の戻り値を `Result<Option<...>, SearchError>` から `Result<(String, String), SearchError>` に統一
-- design.md: `search_word()` の戻り値を `Result<Option<String>, SearchError>` から `Result<String, SearchError>` に統一
-- design.md: SearchContext が `SceneTable::get_scene()` を使用してメタデータを取得することを明記
+**修正内容（2026-01-10 最終版）**:
+- design.md: `search_scene()` の戻り値を `Result<Option<(String, String)>, SearchError>` に変更
+- design.md: `search_word()` の戻り値を `Result<Option<String>, SearchError>` に変更
+- design.md: UserData 実装で `None` → Lua `nil` 変換を明記
+- design.md: API Contract テーブルの Errors 列から NotFound を削除
 
-**Status**: 修正待ち
+**設計方針**:
+- Rust 側: `Ok(None)` で候補なしを表現
+- Lua 側: `nil` を返す
+- エラー（`Err(e)`）は内部エラーのみ
+
+**Status**: ✅ 完了
 
 ### 1.2 ✅ SearchContext 初期化の引数を確認・修正
 
@@ -101,26 +108,29 @@ pub struct MockRandomSelector { ... }
 
 **採用**: pasta_lua ランタイム構造体による初期化パターン
 
-- pasta_lua が Lua ランタイム構造体（例: `PastaLuaRuntime`）を持つ
+- pasta_lua が Lua ランタイム構造体（`PastaLuaRuntime`）を持つ
 - ランタイム初期化時に `loader()` を **一度** 呼び出す
 - 複数ランタイムインスタンス = 複数の `PastaLuaRuntime` インスタンス
+- **入力**: `TranspileContext`（`LuaTranspiler::transpile()` の出力）
 
 ```rust
 pub struct PastaLuaRuntime {
     lua: Lua,
-    search_module: Table,  // @pasta_search モジュール
-    // ...
+    // 将来の拡張用
 }
 
 impl PastaLuaRuntime {
-    pub fn new(
-        scene_registry: SceneRegistry,
-        word_registry: WordRegistry,
-    ) -> Result<Self> {
+    pub fn new(context: TranspileContext) -> mlua::Result<Self> {
         let lua = Lua::new();
-        let search_module = search::loader(&lua, scene_registry, word_registry)?;
-        search::register(&lua, search_module)?;  // Lua globals に登録
-        Ok(Self { lua, search_module, ... })
+        
+        // TranspileContext から Registry を取得
+        let scene_registry = context.scene_registry;
+        let word_registry = context.word_registry;
+        
+        // @pasta_search モジュールを登録（一度のみ）
+        search::register(&lua, scene_registry, word_registry)?;
+        
+        Ok(Self { lua })
     }
 }
 ```
