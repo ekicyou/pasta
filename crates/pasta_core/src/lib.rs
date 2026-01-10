@@ -34,6 +34,6 @@ pub use error::{
 };
 pub use parser::{FileItem, PastaFile, parse_file, parse_str};
 pub use registry::{
-    DefaultRandomSelector, RandomSelector, SceneEntry, SceneId, SceneInfo, SceneRegistry,
-    SceneScope, SceneTable, WordCacheKey, WordDefRegistry, WordEntry, WordTable,
+    DefaultRandomSelector, MockRandomSelector, RandomSelector, SceneEntry, SceneId, SceneInfo,
+    SceneRegistry, SceneScope, SceneTable, WordCacheKey, WordDefRegistry, WordEntry, WordTable,
 };

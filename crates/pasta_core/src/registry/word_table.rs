@@ -87,56 +87,66 @@ impl WordTable {
         }
     }
 
-    /// Collect all word candidates for a search key (before shuffling).
+    /// Collect all word candidates using fallback strategy (local → global).
     ///
-    /// This is a helper function that performs the search and merge logic:
+    /// # Algorithm (Fallback Strategy)
     /// 1. Local search: `:module_name:key` prefix match
-    /// 2. Global search: `key` prefix match
-    /// 3. Merge all matched word entries
-    ///
-    /// This function is useful for testing and validating the merge logic
-    /// independently from shuffling and caching.
+    ///    - 結果あり → ローカル候補のみ返す（終了）
+    /// 2. Global search: `key` prefix match (exclude keys starting with ':')
+    ///    - ローカル検索結果が0件の場合のみ実行
     ///
     /// # Arguments
     /// * `module_name` - Current module name (empty for global scope)
     /// * `key` - Search key
     ///
     /// # Returns
-    /// Ok(word_list) with all merged candidates, Err(WordNotFound) if no match
+    /// Ok(word_list) with fallback candidates, Err(WordNotFound) if no match
     pub fn collect_word_candidates(
         &self,
         module_name: &str,
         key: &str,
     ) -> Result<Vec<String>, WordTableError> {
         // Step 1: Local search (if module_name is not empty)
-        let mut entry_ids: Vec<usize> = Vec::new();
-
         if !module_name.is_empty() {
             let local_key = format!(":{}:{}", module_name, key);
+            let mut local_entry_ids: Vec<usize> = Vec::new();
             for (_matched_key, ids) in self.prefix_index.iter_prefix(local_key.as_bytes()) {
-                entry_ids.extend(ids.iter().copied());
+                local_entry_ids.extend(ids.iter().copied());
+            }
+
+            // Fallback: If local entries found, return them immediately
+            if !local_entry_ids.is_empty() {
+                let mut local_words: Vec<String> = Vec::new();
+                for id in &local_entry_ids {
+                    if let Some(entry) = self.entries.get(*id) {
+                        local_words.extend(entry.values.iter().cloned());
+                    }
+                }
+                if !local_words.is_empty() {
+                    return Ok(local_words);
+                }
             }
         }
 
-        // Step 2: Global search
-        // Only match keys that don't start with ':' (exclude local keys)
+        // Step 2: Global search (only if local search returned no results)
+        let mut global_entry_ids: Vec<usize> = Vec::new();
         for (matched_key, ids) in self.prefix_index.iter_prefix(key.as_bytes()) {
             // Skip local keys (start with ':')
             if !matched_key.starts_with(&[b':']) {
-                entry_ids.extend(ids.iter().copied());
+                global_entry_ids.extend(ids.iter().copied());
             }
         }
 
         // No matches found
-        if entry_ids.is_empty() {
+        if global_entry_ids.is_empty() {
             return Err(WordTableError::WordNotFound {
                 key: key.to_string(),
             });
         }
 
-        // Step 3: Merge all words from matched entries
+        // Step 3: Collect words from global entries
         let mut all_words: Vec<String> = Vec::new();
-        for id in &entry_ids {
+        for id in &global_entry_ids {
             if let Some(entry) = self.entries.get(*id) {
                 all_words.extend(entry.values.iter().cloned());
             }
@@ -283,18 +293,35 @@ mod tests {
     }
 
     #[test]
-    fn test_collect_word_candidates_local() {
+    fn test_collect_word_candidates_local_takes_priority() {
         let registry = create_test_registry();
         let selector = Box::new(MockRandomSelector::new(vec![]));
         let table = WordTable::from_word_def_registry(registry, selector);
 
-        // Local search: ":会話_1:挨拶" + global "挨拶"
+        // Fallback strategy: Local search found, global NOT included
         let candidates = table.collect_word_candidates("会話_1", "挨拶").unwrap();
-        // Should get 3 words (やあ from local, こんにちは and おはよう from global)
-        assert_eq!(candidates.len(), 3);
+        // Should get ONLY local word (やあ) - fallback strategy
+        assert_eq!(candidates.len(), 1);
         assert!(candidates.contains(&"やあ".to_string()));
-        assert!(candidates.contains(&"こんにちは".to_string()));
-        assert!(candidates.contains(&"おはよう".to_string()));
+        // Global words NOT included
+        assert!(!candidates.contains(&"こんにちは".to_string()));
+        assert!(!candidates.contains(&"おはよう".to_string()));
+    }
+
+    #[test]
+    fn test_collect_word_candidates_fallback_to_global() {
+        let registry = create_test_registry();
+        let selector = Box::new(MockRandomSelector::new(vec![]));
+        let table = WordTable::from_word_def_registry(registry, selector);
+
+        // No local word for "場所" in module "会話_1", should fall back to global
+        // Note: create_test_registry has local "場所" in 会話_1, so use different module
+        let candidates = table
+            .collect_word_candidates("別のモジュール", "場所")
+            .unwrap();
+        // Should get global words via fallback
+        assert!(candidates.len() >= 1);
+        assert!(candidates.contains(&"東京".to_string()));
     }
 
     #[test]
@@ -371,12 +398,12 @@ mod tests {
         let mut table = WordTable::from_word_def_registry(registry, selector);
         table.set_shuffle_enabled(false);
 
-        // Local search: ":会話_1:挨拶" + global "挨拶"
+        // Fallback strategy: Local search found, global NOT included
         let result = table.search_word("会話_1", "挨拶", &[]);
         assert!(result.is_ok());
-        // Should get from merged list (やあ, こんにちは, おはよう)
+        // Should get ONLY from local (やあ) - fallback strategy
         let word = result.unwrap();
-        assert!(word == "やあ" || word == "こんにちは" || word == "おはよう");
+        assert_eq!(word, "やあ");
     }
 
     #[test]
@@ -448,10 +475,11 @@ mod tests {
         let r1 = table.search_word("mod1", "word", &[]).unwrap();
         let r2 = table.search_word("mod2", "word", &[]).unwrap();
 
-        // mod1 search: local1 + global = [local1, global]
-        // mod2 search: local2 + global = [local2, global]
-        assert!(r1 == "local1" || r1 == "global");
-        assert!(r2 == "local2" || r2 == "global");
+        // Fallback strategy: local found, global NOT included
+        // mod1 search: ONLY local1 (fallback)
+        // mod2 search: ONLY local2 (fallback)
+        assert_eq!(r1, "local1");
+        assert_eq!(r2, "local2");
     }
 
     #[test]

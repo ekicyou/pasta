@@ -17,7 +17,7 @@ mod scene_table;
 mod word_registry;
 mod word_table;
 
-pub use random::{DefaultRandomSelector, RandomSelector};
+pub use random::{DefaultRandomSelector, MockRandomSelector, RandomSelector};
 pub use scene_registry::{SceneEntry, SceneRegistry};
 pub use scene_table::{SceneId, SceneInfo, SceneScope, SceneTable};
 pub use word_registry::{WordDefRegistry, WordEntry};
