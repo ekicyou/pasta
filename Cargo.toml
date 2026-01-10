@@ -24,8 +24,11 @@ tempfile = "3"
 
 # pasta_lua dependencies
 lua-src = { version = ">= 548.1.0, < 549.0.0", features = ["ucid"] }
-mlua = { version = "0.11", features = ["lua54", "vendored"] }
+mlua = { version = "0.11", features = ["lua54", "vendored", "serialize"] }
 mlua-stdlib = { version = "0.1", features = ["lua54", "vendored", "json", "regex", "yaml"] }
+toml = "0.9.8"
+serde = { version = "1", features = ["derive"] }
+glob = "0.3"
 
 # Internal dependencies
 pasta_core = { path = "crates/pasta_core" }
