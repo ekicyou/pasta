@@ -71,9 +71,10 @@ ghost/master/              # 起動ディレクトリ（PastaLoader::load引数�
 **Objective:** As a pasta_lua利用者, I want 複数のPastaファイルを一括でトランスパイルしたい, so that プロジェクト全体を1つのランタイムで実行できる
 
 #### Acceptance Criteria
-1. When 複数の `.pasta` ファイルが収集される, the LuaTranspiler shall すべてのファイルを統合してトランスパイルする
-2. When トランスパイル中にエラーが発生した, the PastaLoader shall エラー発生ファイル名と行番号を含む詳細なエラー情報を返す
-3. The LuaTranspiler shall 複数ファイルのシーン・単語定義を単一のレジストリに統合する
+1. When 複数の `.pasta` ファイルが収集される, the PastaLoader shall ファイルをglob返却順で処理する（順序は保証せず、Pastaファイルは読み込み順に依存しない設計）
+2. The PastaLoader shall 各ファイルを個別にトランスパイルし、共有レジストリにシーン・単語定義を蓄積する
+3. When トランスパイル中にエラーが発生した, the PastaLoader shall エラー発生ファイル名と行番号を含む詳細なエラー情報を返す
+4. The LuaTranspiler shall 複数ファイルのシーン・単語定義を単一のレジストリに統合する
 4. If 異なるファイルで同名のグローバルシーンが定義された, the SceneRegistry shall 重複シーンとしてランダム選択対象に登録する
 5. When すべてのファイルのトランスパイルが完了した, the PastaLoader shall トランスパイル結果を `profile/pasta/cache/lua/` に保存する（デバッグ・検証用、キャッシュとしては再利用しない）
 6. The PastaLoader shall ソースファイルパスをもとにキャッシュファイル名を生成する（例: `dic/baseware/system.pasta` → `dic_baseware_system.lua`、パス区切り文字 `\` を `_` に置換）
