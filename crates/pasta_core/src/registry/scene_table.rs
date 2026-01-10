@@ -341,19 +341,20 @@ impl SceneTable {
         self.shuffle_enabled = enabled;
     }
 
-    /// Collect all scene candidates using 2-stage search + merge.
+    /// Collect all scene candidates using fallback strategy (local → global).
     ///
-    /// # Algorithm (WordTable.collect_word_candidates() と同一)
+    /// # Algorithm (Fallback Strategy)
     /// 1. Local search: `:module_name:prefix` で前方一致
+    ///    - 結果あり → ローカル候補のみ返す（終了）
     /// 2. Global search: `prefix` で前方一致（`:` で始まるキーを除外）
-    /// 3. Merge: 両方の SceneId をマージ
+    ///    - ローカル検索結果が0件の場合のみ実行
     ///
     /// # Arguments
     /// * `module_name` - グローバルシーン名
     /// * `prefix` - 検索プレフィックス
     ///
     /// # Returns
-    /// Ok(Vec<SceneId>) マージされた候補リスト
+    /// Ok(Vec<SceneId>) フォールバック戦略による候補リスト
     /// Err(SceneNotFound) 候補なし
     /// Err(InvalidScene) prefix が空の場合
     pub fn collect_scene_candidates(
@@ -368,31 +369,36 @@ impl SceneTable {
             });
         }
 
-        let mut candidates = Vec::new();
-
         // Step 1: Local search with :{module_name}:{prefix} pattern
         if !module_name.is_empty() {
             let local_search_key = format!(":{}:{}", module_name, prefix);
+            let mut local_candidates = Vec::new();
             for (_key, ids) in self.prefix_index.iter_prefix(local_search_key.as_bytes()) {
-                candidates.extend(ids.iter().copied());
+                local_candidates.extend(ids.iter().copied());
+            }
+            // Fallback: If local candidates found, return them immediately
+            if !local_candidates.is_empty() {
+                return Ok(local_candidates);
             }
         }
 
         // Step 2: Global search with {prefix} pattern (exclude : prefix)
+        // Only executed if local search returned no candidates
+        let mut global_candidates = Vec::new();
         for (key, ids) in self.prefix_index.iter_prefix(prefix.as_bytes()) {
             // Skip local keys (start with ':')
             if !key.starts_with(&[b':']) {
-                candidates.extend(ids.iter().copied());
+                global_candidates.extend(ids.iter().copied());
             }
         }
 
-        // Step 3: Return merged candidate list
-        if candidates.is_empty() {
+        // Step 3: Return global candidates or error
+        if global_candidates.is_empty() {
             Err(SceneTableError::SceneNotFound {
                 scene: prefix.to_string(),
             })
         } else {
-            Ok(candidates)
+            Ok(global_candidates)
         }
     }
 
@@ -518,8 +524,8 @@ mod tests {
     }
 
     #[test]
-    fn test_collect_scene_candidates_local_and_global_merge() {
-        // Test: Both local and global candidates should be merged
+    fn test_collect_scene_candidates_fallback_local_takes_priority() {
+        // Test: Fallback strategy - local candidates found, global not searched
         let selector = Box::new(MockRandomSelector::new(vec![]));
         let mut table = SceneTable::new(selector);
 
@@ -540,13 +546,33 @@ mod tests {
             .prefix_index
             .insert(":会話_1:挨拶".as_bytes(), vec![SceneId(1)]);
 
-        // Search from 会話_1 module - should get both local and global
+        // Search from 会話_1 module - should get ONLY local (fallback strategy)
         let result = table.collect_scene_candidates("会話_1", "挨拶");
         assert!(result.is_ok());
         let candidates = result.unwrap();
-        assert_eq!(candidates.len(), 2);
-        assert!(candidates.contains(&SceneId(0))); // global
-        assert!(candidates.contains(&SceneId(1))); // local
+        assert_eq!(candidates.len(), 1);
+        assert!(candidates.contains(&SceneId(1))); // local only
+        assert!(!candidates.contains(&SceneId(0))); // global NOT included
+    }
+
+    #[test]
+    fn test_collect_scene_candidates_fallback_to_global() {
+        // Test: Fallback strategy - no local found, fall back to global
+        let selector = Box::new(MockRandomSelector::new(vec![]));
+        let mut table = SceneTable::new(selector);
+
+        // Add global scene only
+        table.labels.push(create_test_scene_info(0, "挨拶", "挨拶"));
+        table
+            .prefix_index
+            .insert("挨拶".as_bytes(), vec![SceneId(0)]);
+
+        // Search from 会話_1 module - no local, should fall back to global
+        let result = table.collect_scene_candidates("会話_1", "挨拶");
+        assert!(result.is_ok());
+        let candidates = result.unwrap();
+        assert_eq!(candidates.len(), 1);
+        assert!(candidates.contains(&SceneId(0))); // global fallback
     }
 
     #[test]
@@ -732,7 +758,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_scene_id_unified_local_and_global_merge() {
+    fn test_resolve_scene_id_unified_fallback_local_only() {
         use crate::registry::SceneRegistry;
 
         let mut registry = SceneRegistry::new();
@@ -742,20 +768,21 @@ mod tests {
         let (_, counter) = registry.register_global("会話", HashMap::new());
         registry.register_local("挨拶", "会話", counter, 1, HashMap::new());
 
-        let selector = Box::new(MockRandomSelector::new(vec![0, 1]));
+        let selector = Box::new(MockRandomSelector::new(vec![0]));
         let mut table = SceneTable::from_scene_registry(registry, selector).unwrap();
         table.set_shuffle_enabled(false);
 
-        // Resolve from 会話_1 - should find both local and global
+        // Resolve from 会話_1 - fallback strategy: should find ONLY local
         let result = table.resolve_scene_id_unified("会話_1", "挨拶", &HashMap::new());
         assert!(result.is_ok());
+        let scene_id = result.unwrap();
+        let scene = table.get_scene(scene_id).unwrap();
+        // Should be local scene (has parent)
+        assert!(scene.parent.is_some());
 
-        // Call again to get second candidate
+        // Call again - should fail because only 1 local candidate
         let result2 = table.resolve_scene_id_unified("会話_1", "挨拶", &HashMap::new());
-        assert!(result2.is_ok());
-
-        // Should be different scenes
-        assert_ne!(result.unwrap(), result2.unwrap());
+        assert!(result2.is_err()); // No more scenes
     }
 
     #[test]

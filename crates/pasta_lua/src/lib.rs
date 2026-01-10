@@ -11,17 +11,22 @@
 //! - `StringLiteralizer`: Converts strings to optimal Lua literal format
 //! - `TranspileContext`: Manages state during transpilation
 //! - `TranspilerConfig`: Configuration options
+//! - `PastaLuaRuntime`: Lua VM host with pasta module integration
 //!
 //! # Example
 //!
 //! ```rust,ignore
-//! use pasta_lua::{LuaTranspiler, TranspilerConfig};
+//! use pasta_lua::{LuaTranspiler, TranspilerConfig, PastaLuaRuntime};
 //!
 //! let transpiler = LuaTranspiler::default();
 //! let mut output = Vec::new();
 //!
-//! transpiler.transpile(&actors, &scenes, &mut output)?;
+//! let context = transpiler.transpile(&actors, &scenes, &mut output)?;
 //! let lua_code = String::from_utf8(output)?;
+//!
+//! // Create runtime with the context
+//! let runtime = PastaLuaRuntime::new(context)?;
+//! runtime.exec(&lua_code)?;
 //! ```
 
 pub mod code_generator;
@@ -29,6 +34,8 @@ pub mod config;
 pub mod context;
 pub mod error;
 pub mod normalize;
+pub mod runtime;
+pub mod search;
 pub mod string_literalizer;
 pub mod transpiler;
 
@@ -37,5 +44,7 @@ pub use code_generator::LuaCodeGenerator;
 pub use config::{LineEnding, TranspilerConfig};
 pub use context::TranspileContext;
 pub use error::TranspileError;
+pub use runtime::PastaLuaRuntime;
+pub use search::{SearchContext, SearchError};
 pub use string_literalizer::StringLiteralizer;
 pub use transpiler::LuaTranspiler;

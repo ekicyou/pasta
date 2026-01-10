@@ -70,13 +70,14 @@ impl RandomSelector for DefaultRandomSelector {
 }
 
 /// Mock random selector for deterministic testing.
-#[cfg(test)]
+///
+/// This selector is always public (not just for tests) to support
+/// Lua-side selector control for test scenarios.
 pub struct MockRandomSelector {
     sequence: Vec<usize>, // Sequence of indices to select
     index: usize,         // Current position in sequence
 }
 
-#[cfg(test)]
 impl MockRandomSelector {
     /// Create a mock selector with a predetermined sequence of indices.
     pub fn new(sequence: Vec<usize>) -> Self {
@@ -84,7 +85,6 @@ impl MockRandomSelector {
     }
 }
 
-#[cfg(test)]
 impl RandomSelector for MockRandomSelector {
     fn select_index(&mut self, len: usize) -> Option<usize> {
         if len == 0 || self.sequence.is_empty() {
