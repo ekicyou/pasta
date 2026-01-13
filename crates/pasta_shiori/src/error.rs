@@ -1,3 +1,4 @@
+use crate::util::parsers;
 use std::str::Utf8Error;
 use std::sync::PoisonError;
 use thiserror::Error;
@@ -18,6 +19,9 @@ pub enum MyError {
     #[error("Poison error")]
     Poison,
 
+    #[error("Shiori request parse error for '{0}'")]
+    ParseRequest(Box<parsers::req::ParseError>),
+
     #[error("ANSI encoding error")]
     EncodeAnsi,
     #[error("UTF8 encoding error")]
@@ -25,6 +29,12 @@ pub enum MyError {
 
     #[error("script error: {}", message)]
     Script { message: String },
+}
+
+impl From<parsers::req::ParseError> for MyError {
+    fn from(error: parsers::req::ParseError) -> MyError {
+        MyError::ParseRequest(Box::new(error))
+    }
 }
 
 impl<G> From<PoisonError<G>> for MyError {
