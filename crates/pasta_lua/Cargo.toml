@@ -17,6 +17,9 @@ toml.workspace = true
 serde.workspace = true
 glob.workspace = true
 
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Globalization"] }
+
 [build-dependencies]
 lua-src.workspace = true
 

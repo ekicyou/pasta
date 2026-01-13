@@ -32,6 +32,7 @@
 pub mod code_generator;
 pub mod config;
 pub mod context;
+pub mod encoding;
 pub mod error;
 pub mod loader;
 pub mod normalize;
@@ -44,6 +45,7 @@ pub mod transpiler;
 pub use code_generator::LuaCodeGenerator;
 pub use config::{LineEnding, TranspilerConfig};
 pub use context::TranspileContext;
+pub use encoding::{Encoder, Encoding};
 pub use error::TranspileError;
 pub use loader::{
     LoaderConfig, LoaderContext, LoaderError, PastaConfig, PastaLoader, TranspileResult,
