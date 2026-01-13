@@ -1,0 +1,4 @@
+GET Version SHIORI/2.6
+Charset: UTF-8
+Sender: SSP
+

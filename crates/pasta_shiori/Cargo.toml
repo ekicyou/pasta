@@ -1,0 +1,19 @@
+[package]
+name = "pasta_shiori"
+version = "0.1.0"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "SHIORI DLL interface for pasta script engine"
+
+[lib]
+name = "pasta"
+crate-type = ["cdylib"]
+
+[dependencies]
+pasta_core.workspace = true
+pasta_lua.workspace = true
+thiserror.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_System_Memory", "Win32_Globalization"] }

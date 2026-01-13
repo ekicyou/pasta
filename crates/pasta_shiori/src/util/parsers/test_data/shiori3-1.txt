@@ -1,0 +1,6 @@
+GET SHIORI/3.0
+Charset: UTF-8
+ID: version
+SecurityLevel: local
+Sender: SSP
+

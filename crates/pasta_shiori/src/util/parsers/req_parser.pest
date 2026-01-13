@@ -1,0 +1,54 @@
+// SHIORI 3.0, 2.0 parser
+
+req         = ${ SOI ~ header ~ key_values ~ _eol ~ EOI }
+key_values  = ${ key_value* }
+
+key_value   = ${ key ~ _tag ~ value ~ _eol }
+value       = @{ remain }
+key         = _{      ( key_ref ~ !_id2 )
+                    | ( key_charset ~ !_id2 )
+                    | ( key_id ~ !_id2 )
+                    | ( key_base_id ~ !_id2 )
+                    | ( key_status ~ !_id2 )
+                    | ( key_security_level ~ !_id2 )
+                    | ( key_sender ~ !_id2 )
+                    | ( key_other )
+                }
+key_ref     = ${ "Reference" ~ nums }
+key_charset = @{ "Charset" }
+key_id      = @{ "ID" }
+key_base_id = @{ "BaseID" }
+key_status  = @{ "Status" }
+key_security_level = @{ "SecurityLevel" }
+key_sender  = @{ "Sender" }
+key_other   = @{ id }
+
+header      = ${ method ~ _sp ~ ( header3 | header2 ) ~ _eol }
+
+method      = ${ get | notify }
+header2     = ${ shiori2_id ~ _sp ~ _shiori2 ~ shiori2_ver }
+shiori2_id  = @{ id }
+shiori2_ver = @{ ver }
+header3     = ${ _shiori3 }
+
+id          = @{ XID_START ~ _id2* }
+_id2        = _{ XID_CONTINUE | _key_sep }
+
+// tokens
+_shiori2    = _{ "SHIORI/2." }
+_shiori3    = _{ "SHIORI/3.0" }
+nums        = @{ ( ('1'..'9') ~ ('0'..'9')* ) | "0" }
+ver         = @{ ASCII_DIGIT }
+get         =  { "GET" }
+notify      =  { "NOTIFY" }
+_tag        = _{ ": " }
+remain      = @{ ( !"\r" ~ !"\n" ~ ANY )* }
+
+// chars
+sp          = @{ _sp }
+eol         = @{ _eol }
+key_sep     = @{ _key_sep }
+_sp         = _{ " " }
+_eol        = _{ "\r\n" | "\n" | "\r" }
+_key_sep    = _{ "-" | "." }
+
