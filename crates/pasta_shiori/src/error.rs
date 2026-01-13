@@ -53,4 +53,23 @@ impl MyError {
     pub fn script_error(message: String) -> MyError {
         MyError::Script { message }
     }
+
+    /// Generate SHIORI 3.0 error response
+    ///
+    /// Format:
+    /// ```text
+    /// SHIORI/3.0 500 Internal Server Error\r\n
+    /// Charset: UTF-8\r\n
+    /// X-ERROR-REASON: <error message>\r\n
+    /// \r\n
+    /// ```
+    pub fn to_shiori_response(&self) -> String {
+        format!(
+            "SHIORI/3.0 500 Internal Server Error\r\n\
+             Charset: UTF-8\r\n\
+             X-ERROR-REASON: {}\r\n\
+             \r\n",
+            self
+        )
+    }
 }

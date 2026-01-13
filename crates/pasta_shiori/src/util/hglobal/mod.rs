@@ -77,8 +77,8 @@ impl ShioriString {
     /// HGLOBALを新たに作成し、textをShioriStringにクローンします。
     /// drop時にHGLOBALを開放しません。
     #[allow(dead_code)]
-    pub fn clone_from_str_nofree<'a, S: Into<&'a str>>(text: S) -> ShioriString {
-        let s = text.into();
+    pub fn clone_from_str_nofree<'a, S: AsRef<str>>(text: S) -> ShioriString {
+        let s = text.as_ref();
         let bytes = s.as_bytes();
         ShioriString::clone_from_slice_impl(bytes, false)
     }
