@@ -1,0 +1,3322 @@
+**** REQUEST ****
+GET Version SHIORI/2.6
+Charset: UTF-8
+Sender: SSP
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+ID: version
+SecurityLevel: local
+Sender: SSP
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: OnInitialize
+Reference0:
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: ownerghostname
+Reference0: セキュリティボール
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: basewareversion
+Reference0: 2.4.13
+Reference1: SSP
+Reference2: 2.4.13.3000
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: capability
+Reference0: request.status
+Reference1: request.securitylevel
+Reference2: request.baseid
+Reference3: response.marker
+Reference4: response.errorlevel
+Reference5: response.errordescription
+Reference6: response.securitylevel
+Reference7: response.requestcharset
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: OnNotifyOSInfo
+Reference0: WindowsNT,10.0,Windows 10 RS3/CB.192 (Ver.1709) Wow64@x64
+Reference1: Intel,2208,0.6.14.3,bfebfbff
+Reference2: 8236420,2097024
+Reference3: 5194
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: OnNotifyFontInfo
+Reference0: System
+Reference1: Terminal
+Reference2: FixedSys
+Reference3: Modern
+Reference4: Roman
+Reference5: Script
+Reference6: Courier
+Reference7: MS Serif
+Reference8: MS Sans Serif
+Reference9: Small Fonts
+Reference10: Terminal Greek 737 (437G)
+Reference11: 8514oem
+Reference12: Marlett
+Reference13: Ebrima
+Reference14: Franklin Gothic Medium
+Reference15: Gabriola
+Reference16: Gadugi
+Reference17: Georgia
+Reference18: Impact
+Reference19: Javanese Text
+Reference20: Leelawadee UI
+Reference21: Leelawadee UI Semilight
+Reference22: Lucida Console
+Reference23: Lucida Sans Unicode
+Reference24: Malgun Gothic
+Reference25: Malgun Gothic Semilight
+Reference26: Microsoft Himalaya
+Reference27: Microsoft JhengHei
+Reference28: Microsoft JhengHei UI
+Reference29: Microsoft JhengHei Light
+Reference30: Microsoft JhengHei UI Light
+Reference31: Microsoft New Tai Lue
+Reference32: Microsoft PhagsPa
+Reference33: Microsoft Sans Serif
+Reference34: Microsoft Tai Le
+Reference35: Microsoft YaHei
+Reference36: Microsoft YaHei UI
+Reference37: Microsoft YaHei Light
+Reference38: Microsoft YaHei UI Light
+Reference39: Microsoft Yi Baiti
+Reference40: MingLiU-ExtB
+Reference41: PMingLiU-ExtB
+Reference42: MingLiU_HKSCS-ExtB
+Reference43: Mongolian Baiti
+Reference44: ＭＳ ゴシック
+Reference45: MS UI Gothic
+Reference46: ＭＳ Ｐゴシック
+Reference47: MV Boli
+Reference48: Myanmar Text
+Reference49: Nirmala UI
+Reference50: Nirmala UI Semilight
+Reference51: Palatino Linotype
+Reference52: Segoe MDL2 Assets
+Reference53: Segoe Print
+Reference54: Segoe Script
+Reference55: Segoe UI
+Reference56: Segoe UI Black
+Reference57: Segoe UI Emoji
+Reference58: Segoe UI Historic
+Reference59: Segoe UI Light
+Reference60: Segoe UI Semibold
+Reference61: Segoe UI Semilight
+Reference62: Segoe UI Symbol
+Reference63: SimSun
+Reference64: NSimSun
+Reference65: SimSun-ExtB
+Reference66: Sitka Small
+Reference67: Sitka Text
+Reference68: Sitka Subheading
+Reference69: Sitka Heading
+Reference70: Sitka Display
+Reference71: Sitka Banner
+Reference72: Sylfaen
+Reference73: Symbol
+Reference74: Tahoma
+Reference75: Times New Roman
+Reference76: Trebuchet MS
+Reference77: Verdana
+Reference78: Webdings
+Reference79: Wingdings
+Reference80: 游ゴシック
+Reference81: Yu Gothic UI
+Reference82: Yu Gothic UI Semibold
+Reference83: 游ゴシック Light
+Reference84: Yu Gothic UI Light
+Reference85: 游ゴシック Medium
+Reference86: Yu Gothic UI Semilight
+Reference87: メイリオ
+Reference88: Meiryo UI
+Reference89: ＭＳ 明朝
+Reference90: ＭＳ Ｐ明朝
+Reference91: UD デジタル 教科書体 N-B
+Reference92: UD デジタル 教科書体 NP-B
+Reference93: UD デジタル 教科書体 NK-B
+Reference94: UD デジタル 教科書体 N-R
+Reference95: UD デジタル 教科書体 NP-R
+Reference96: UD デジタル 教科書体 NK-R
+Reference97: 游明朝
+Reference98: 游明朝 Demibold
+Reference99: 游明朝 Light
+Reference100: HoloLens MDL2 Assets
+Reference101: Elephant
+Reference102: Engravers MT
+Reference103: Eras Bold ITC
+Reference104: Eras Demi ITC
+Reference105: Eras Light ITC
+Reference106: Eras Medium ITC
+Reference107: Felix Titling
+Reference108: Forte
+Reference109: Franklin Gothic Book
+Reference110: Franklin Gothic Demi
+Reference111: Franklin Gothic Demi Cond
+Reference112: Franklin Gothic Heavy
+Reference113: Franklin Gothic Medium Cond
+Reference114: Freestyle Script
+Reference115: French Script MT
+Reference116: Footlight MT Light
+Reference117: Garamond
+Reference118: Gigi
+Reference119: Gill Sans MT
+Reference120: Gill Sans MT Condensed
+Reference121: Gill Sans Ultra Bold Condensed
+Reference122: Gill Sans Ultra Bold
+Reference123: Gloucester MT Extra Condensed
+Reference124: Gill Sans MT Ext Condensed Bold
+Reference125: Century Gothic
+Reference126: Goudy Old Style
+Reference127: Goudy Stout
+Reference128: Harlow Solid Italic
+Reference129: Harrington
+Reference130: Haettenschweiler
+Reference131: High Tower Text
+Reference132: Imprint MT Shadow
+Reference133: Informal Roman
+Reference134: Blackadder ITC
+Reference135: Edwardian Script ITC
+Reference136: Kristen ITC
+Reference137: Jokerman
+Reference138: Juice ITC
+Reference139: Kunstler Script
+Reference140: Wide Latin
+Reference141: Lucida Bright
+Reference142: Lucida Calligraphy
+Reference143: Lucida Fax
+Reference144: Lucida Handwriting
+Reference145: Lucida Sans
+Reference146: Lucida Sans Typewriter
+Reference147: Magneto
+Reference148: Maiandra GD
+Reference149: Matura MT Script Capitals
+Reference150: Mistral
+Reference151: Modern No. 20
+Reference152: Monotype Corsiva
+Reference153: Niagara Engraved
+Reference154: Niagara Solid
+Reference155: OCR A Extended
+Reference156: Old English Text MT
+Reference157: Onyx
+Reference158: MS Outlook
+Reference159: Palace Script MT
+Reference160: Papyrus
+Reference161: Parchment
+Reference162: Perpetua
+Reference163: Perpetua Titling MT
+Reference164: Playbill
+Reference165: Poor Richard
+Reference166: Pristina
+Reference167: Rage Italic
+Reference168: Ravie
+Reference169: MS Reference Sans Serif
+Reference170: MS Reference Specialty
+Reference171: Rockwell Condensed
+Reference172: Rockwell
+Reference173: Rockwell Extra Bold
+Reference174: Century Schoolbook
+Reference175: Script MT Bold
+Reference176: Showcard Gothic
+Reference177: Snap ITC
+Reference178: Stencil
+Reference179: Tw Cen MT
+Reference180: Tw Cen MT Condensed
+Reference181: Tw Cen MT Condensed Extra Bold
+Reference182: Tempus Sans ITC
+Reference183: Viner Hand ITC
+Reference184: Vivaldi
+Reference185: Vladimir Script
+Reference186: Wingdings 2
+Reference187: Wingdings 3
+Reference188: HGｺﾞｼｯｸE
+Reference189: HGPｺﾞｼｯｸE
+Reference190: HGSｺﾞｼｯｸE
+Reference191: HGｺﾞｼｯｸM
+Reference192: HGPｺﾞｼｯｸM
+Reference193: HGSｺﾞｼｯｸM
+Reference194: HG行書体
+Reference195: HGP行書体
+Reference196: HGS行書体
+Reference197: HG教科書体
+Reference198: HGP教科書体
+Reference199: HGS教科書体
+Reference200: HG明朝B
+Reference201: HGP明朝B
+Reference202: HGS明朝B
+Reference203: HG明朝E
+Reference204: HGP明朝E
+Reference205: HGS明朝E
+Reference206: HG創英角ﾎﾟｯﾌﾟ体
+Reference207: HGP創英角ﾎﾟｯﾌﾟ体
+Reference208: HGS創英角ﾎﾟｯﾌﾟ体
+Reference209: HG創英ﾌﾟﾚｾﾞﾝｽEB
+Reference210: HGP創英ﾌﾟﾚｾﾞﾝｽEB
+Reference211: HGS創英ﾌﾟﾚｾﾞﾝｽEB
+Reference212: HG創英角ｺﾞｼｯｸUB
+Reference213: HGP創英角ｺﾞｼｯｸUB
+Reference214: HGS創英角ｺﾞｼｯｸUB
+Reference215: HG正楷書体-PRO
+Reference216: HG丸ｺﾞｼｯｸM-PRO
+Reference217: OCRB
+Reference218: MT Extra
+Reference219: Microsoft MHei
+Reference220: Microsoft NeoGothic
+Reference221: Yu Gothic
+Reference222: Segoe WP Black
+Reference223: Segoe WP
+Reference224: Segoe WP Semibold
+Reference225: Segoe WP Light
+Reference226: Segoe WP SemiLight
+Reference227: Agency FB
+Reference228: Aharoni
+Reference229: Aldhabi
+Reference230: Algerian
+Reference231: Andalus
+Reference232: Angsana New
+Reference233: AngsanaUPC
+Reference234: Book Antiqua
+Reference235: Aparajita
+Reference236: Arabic Typesetting
+Reference237: Arial
+Reference238: Arial Narrow
+Reference239: Arial Unicode MS
+Reference240: Arial Black
+Reference241: Arial Rounded MT Bold
+Reference242: 有澤太楷書
+Reference243: 有澤太楷書P
+Reference244: Bahnschrift Light
+Reference245: Bahnschrift SemiLight
+Reference246: Bahnschrift
+Reference247: Bahnschrift SemiBold
+Reference248: Bahnschrift Light SemiCondensed
+Reference249: Bahnschrift SemiLight SemiConde
+Reference250: Bahnschrift SemiCondensed
+Reference251: Bahnschrift SemiBold SemiConden
+Reference252: Bahnschrift Light Condensed
+Reference253: Bahnschrift SemiLight Condensed
+Reference254: Bahnschrift Condensed
+Reference255: Bahnschrift SemiBold Condensed
+Reference256: Baskerville Old Face
+Reference257: Batang
+Reference258: BatangChe
+Reference259: Gungsuh
+Reference260: GungsuhChe
+Reference261: Bauhaus 93
+Reference262: Bell MT
+Reference263: Bernard MT Condensed
+Reference264: 恋文ペン字
+Reference265: 麗流隷書
+Reference266: Bodoni MT
+Reference267: Bodoni MT Condensed
+Reference268: Bodoni MT Black
+Reference269: Bodoni MT Poster Compressed
+Reference270: Bookman Old Style
+Reference271: Bradley Hand ITC
+Reference272: Britannic Bold
+Reference273: Berlin Sans FB
+Reference274: Berlin Sans FB Demi
+Reference275: Broadway
+Reference276: Browallia New
+Reference277: BrowalliaUPC
+Reference278: Brush Script MT
+Reference279: Bookshelf Symbol 7
+Reference280: Buxton Sketch
+Reference281: Calibri
+Reference282: Calibri Light
+Reference283: Californian FB
+Reference284: Calisto MT
+Reference285: Cambria
+Reference286: Cambria Math
+Reference287: Candara
+Reference288: Castellar
+Reference289: Centaur
+Reference290: Century
+Reference291: Chiller
+Reference292: CHRISTINA
+Reference293: Colonna MT
+Reference294: Comic Sans MS
+Reference295: Consolas
+Reference296: Constantia
+Reference297: Cooper Black
+Reference298: Copperplate Gothic Bold
+Reference299: Copperplate Gothic Light
+Reference300: Corbel
+Reference301: Cordia New
+Reference302: CordiaUPC
+Reference303: Courier New
+Reference304: Curlz MT
+Reference305: DaunPenh
+Reference306: David
+Reference307: DengXian
+Reference308: MogaHMinEx90
+Reference309: MogaHMinEx90i
+Reference310: MogaHMinExi
+Reference311: MogaMin
+Reference312: MogaMin90
+Reference313: MogaMinEx
+Reference314: MogaMinEx90
+Reference315: MogaMinEx90i
+Reference316: MogaMinExi
+Reference317: MoboGoB
+Reference318: MoboGo90B
+Reference319: MoboGoExB
+Reference320: MoboGoEx90B
+Reference321: MogaGoB
+Reference322: MogaGo90B
+Reference323: MogaGoExB
+Reference324: MogaGoEx90B
+Reference325: MogaHMinB
+Reference326: MogaHMin90B
+Reference327: MogaHMinExB
+Reference328: MogaHMinEx90B
+Reference329: MogaMinB
+Reference330: MogaMin90B
+Reference331: MogaMinExB
+Reference332: MogaMinEx90B
+Reference333: MoboGo
+Reference334: MoboGo90
+Reference335: MoboGoEx
+Reference336: MoboGoEx90
+Reference337: MogaGo
+Reference338: MogaGo90
+Reference339: MogaGoEx
+Reference340: MogaGoEx90
+Reference341: MogaHMin
+Reference342: MogaHMin90
+Reference343: MogaHMinEx
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: OnNotifySelfInfo
+Reference0: 窓の中の世界
+Reference1: セキュリティボール
+Reference2: ？？？
+Reference3: master
+Reference4: C:/home/maz/git/pasta-cs/ghost/in_the_window/shell/master/
+Reference5: SSPデフォルト+
+Reference6: C:/wintools/ssp/balloon/ssp/
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: OnNotifyBalloonInfo
+Reference0: SSPデフォルト+
+Reference1: C:/wintools/ssp/balloon/ssp/
+Reference2: 0:0,1,2,3 1:0,1,2,3
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: OnNotifyShellInfo
+Reference0: master
+Reference1: C:/home/maz/git/pasta-cs/ghost/in_the_window/shell/master/
+Reference2: 0,1,2,3,4,5,6,10,11,21,22,23,50,60,61,100,200
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: useorigin1
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: version
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: name
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: craftman
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: craftmanw
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: OnNotifyUserInfo
+Reference0: Windows ユーザー
+Reference1: Windows ユーザー
+Reference2:
+Reference3: undef
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+ID: otherghostname
+SecurityLevel: local
+Charset: UTF-8
+Sender: SSP
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: OnNetworkStatusChange
+Reference0: online
+Reference1: 192.168.1.113172.31.221.65
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: ghostpathlist
+Reference0: C:\wintools\ssp\ghost\
+Reference1: C:\home\maz\git\pasta-cs\ghost\
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: balloonpathlist
+Reference0: C:\wintools\ssp\balloon\
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: headlinepathlist
+Reference0: C:\wintools\ssp\headline\
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: pluginpathlist
+Reference0: C:\wintools\ssp\plugin\
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: calendarskinpathlist
+Reference0: C:\wintools\ssp\calendar\skin\
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: calendarpluginpathlist
+Reference0: C:\wintools\ssp\calendar\plugin\
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: OnSensorListUpdate
+Reference0: aae60552-8a1b-4b36-8fd2-3f7bc237b713Microsoft Visual Studio Location Simulator SensorLOCATION_OTHERno_data
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: OnSpeechSynthesisStatus
+Reference0: 0
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: OnVoiceRecognitionStatus
+Reference0: 0
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: menu.background.bitmap.filename
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: menu.foreground.bitmap.filename
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: menu.background.color.r
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: menu.background.color.g
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: menu.background.color.b
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: menu.foreground.color.r
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: menu.foreground.color.g
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: menu.foreground.color.b
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: username
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: OnDisplayHandover
+Reference0: init
+Reference1: 0
+Reference2:
+Reference3: 0,0,2560,1440,32,1
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: OnDisplayHandover
+Reference0: init
+Reference1: 1
+Reference2:
+Reference3: 0,0,2560,1440,32,1
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: installedghostname
+Reference0: Emily/Phase4.5
+Reference1: ＳＷポストと狛犬
+Reference2: 窓の中の世界
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: installedballoonname
+Reference0: Balloon for Emily/P4
+Reference1: SSPデフォルト+
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: installedheadlinename
+Reference0: GAME Watch
+Reference1: Google ニュース 日本語版
+Reference2: ITmedia +D Games
+Reference3: ITMedia News
+Reference4: PC Watch
+Reference5: スラド
+Reference6: 回収・無償修理等のお知らせ
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: sakura.recommendsites
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: sakura.portalsites
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: kero.recommendsites
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: installedshellname
+Reference0: master
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: uniqueid
+Reference0: ssp_fmo_header_00003684_000505ec
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+ID: otherghostname
+SecurityLevel: local
+Charset: UTF-8
+Sender: SSP
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: hwnd
+Reference0: 329196460418
+Reference1: 525696132716
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: installedshellname
+Reference0: master
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: OnDisplayChangeEx
+Reference0: init
+Reference1: 0,0,2560,1440,32,1
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: OnDisplayChange
+Reference0: 32
+Reference1: 2560
+Reference2: 1440
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: OnBatteryNotify
+Reference0: 100
+Reference1: -1
+Reference2: online
+Reference3: high
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: OnNotifyDressupInfo
+Reference0: 0体青色0
+Reference1: 0体緑色0
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: OnScheduleTodayNotify
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: rateofusegraph
+Reference0: 窓の中の世界セキュリティボール？？？395563.218391boot
+Reference1: ＳＷポストと狛犬ポスト狛犬101719.540230install
+Reference2: Emily/Phase4.5EmilyTeddy11517.241379install
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: installedplugin
+Reference0: SwissArmyKnife8F8BCFB8-B27A-456f-9BA0-551484856DDC
+Reference1: 共有変数プラグインABED14AF-F34B-4ff2-95B7-30ED37D5802D
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: OnBoot
+Reference0: master
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: OnSecondChange
+Reference0: 86
+Reference1: 0
+Reference2: 0
+Reference3: 1
+Reference4: 1
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: OnSecondChange
+Reference0: 86
+Reference1: 0
+Reference2: 0
+Reference3: 1
+Reference4: 0
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: OnSecondChange
+Reference0: 86
+Reference1: 0
+Reference2: 0
+Reference3: 1
+Reference4: 0
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: OnMinuteChange
+Reference0: 86
+Reference1: 0
+Reference2: 0
+Reference3: 1
+Reference4: 0
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: OnSecondChange
+Reference0: 86
+Reference1: 0
+Reference2: 0
+Reference3: 1
+Reference4: 0
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: OnSecondChange
+Reference0: 86
+Reference1: 0
+Reference2: 0
+Reference3: 1
+Reference4: 0
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: OnSecondChange
+Reference0: 86
+Reference1: 0
+Reference2: 0
+Reference3: 1
+Reference4: 0
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: recommendrootbutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: sakura.recommendbuttoncaption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: recommendrootbutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: portalrootbutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: sakura.portalbuttoncaption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: portalrootbutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: homeurl
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: updatebuttoncaption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: sakura.updatebuttoncaption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: updatebutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: readmebutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: readmebuttoncaption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: readmebutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: vanishbuttonvisible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: vanishbutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: vanishbuttoncaption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: vanishbutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: aistatebutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: getaistate
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: aistatebutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: sakura.recommendsites
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: sakura.portalsites
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: headlinesenserootbutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: headlinesenserootbutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: pluginrootbutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: pluginrootbutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: biffbutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: biffbutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: shellscalerootbutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: shellscalerootbutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: utilityrootbutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: utilityrootbutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: calendarbutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: calendarbutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: messengerbutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: messengerbutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: sntpbutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: sntpbutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: ghostexplorerbutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: ghostexplorerbutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: scriptlogbutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: scriptlogbutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: addressbarbutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: addressbarbutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: openfilebutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: openfilebutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: openfolderbutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: openfolderbutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: updateplatformbutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: updateplatformbutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: purgeghostcachebutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: purgeghostcachebutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: updatefmobutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: updatefmobutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: reloadinfobutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: reloadinfobutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: switchreloadbutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: switchreloadbutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: leavepassivebutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: leavepassivebutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: switchreloadtempghostbutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: switchreloadtempghostbutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: switchmovetodefaultpositionbutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: switchmovetodefaultpositionbutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: resetballoonpositionbutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: resetballoonpositionbutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: closeballoonbutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: closeballoonbutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: duibutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: duibutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: configurationrootbutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: configurationrootbutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: configurationbutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: configurationbutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: configurationghostbutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: configurationghostbutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: charsetbutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: charsetbutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: switchproxybutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: switchproxybutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: switchtalkghostbutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: switchtalkghostbutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: switchcompatiblemodebutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: switchcompatiblemodebutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: ghostrootbutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: ghostrootbutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: callghostrootbutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: callghostrootbutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: shellrootbutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: shellrootbutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: dressuprootbutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: dressuprootbutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: balloonrootbutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: balloonrootbutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: historyrootbutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: historyrootbutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: ghosthistorybutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: ghosthistorybutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: callghosthistorybutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: callghosthistorybutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: balloonhistorybutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: balloonhistorybutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: headlinesensehistorybutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: headlinesensehistorybutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: pluginhistorybutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: pluginhistorybutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: inforootbutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: inforootbutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: firststaffbutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: firststaffbutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: readmebutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: readmebutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: helpbutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: helpbutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: rateofusebutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: rateofusebutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: systeminfobutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: systeminfobutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: hidebutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: hidebutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: closebutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: closebutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: quitbutton.visible
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: quitbutton.caption
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: OnSecondChange
+Reference0: 86
+Reference1: 0
+Reference2: 0
+Reference3: 1
+Reference4: 3
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: OnBatteryNotify
+Reference0: 100
+Reference1: -1
+Reference2: online
+Reference3: high
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: rateofusegraph
+Reference0: 窓の中の世界セキュリティボール？？？395663.636364boot
+Reference1: ＳＷポストと狛犬ポスト狛犬101719.318182install
+Reference2: Emily/Phase4.5EmilyTeddy11517.045455install
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: OnSecondChange
+Reference0: 86
+Reference1: 0
+Reference2: 0
+Reference3: 1
+Reference4: 0
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: OnSecondChange
+Reference0: 86
+Reference1: 0
+Reference2: 0
+Reference3: 1
+Reference4: 1
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: OnSecondChange
+Reference0: 86
+Reference1: 0
+Reference2: 0
+Reference3: 1
+Reference4: 2
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: OnCloseAll
+BaseID: OnClose
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: OnClose
+Reference0: user
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+GET SHIORI/3.0
+ID: OnTranslate
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+Reference0: \-
+Reference1:
+Reference2:
+Reference3:
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+Status: talking
+ID: OnSecondChange
+Reference0: 86
+Reference1: 0
+Reference2: 0
+Reference3: 0
+Reference4: 0
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: rateofusegraph
+Reference0: 窓の中の世界セキュリティボール？？？395663.636364install
+Reference1: ＳＷポストと狛犬ポスト狛犬101719.318182install
+Reference2: Emily/Phase4.5EmilyTeddy11517.045455install
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********
+**** REQUEST ****
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: OnDestroy
+Reference0:
+
+********
+**** RESPONSE ****
+SHIORI/3.0 204 No Content
+Charset: UTF-8
+Sender: pasta
+
+********

@@ -1,0 +1,7 @@
+NOTIFY SHIORI/3.0
+Charset: UTF-8
+Sender: SSP
+SecurityLevel: local
+ID: ownerghostname
+Reference0: セキュリティボール
+
