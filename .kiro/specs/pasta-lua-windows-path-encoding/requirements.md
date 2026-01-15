@@ -20,13 +20,20 @@ pasta_luaの起動シーケンスにおけるWindows環境でのパス解決問�
 
 本仕様の実装にあたり、以下の設計判断が必要です。ギャップ分析に基づく推奨案を示します。
 
-### 判断1: encoding/mod.rsの関数設計
+### 判断1: encoding/mod.rsの関数設計（Rust内部実装）
 
-**選択肢**:
-- A: `path_to_lua_bytes`新規追加、既存`path_to_lua`維持（**推奨**）
-- B: `path_to_lua`をバイト列返却に変更（破壊的変更）
+**現状**: `path_to_lua`はテスト専用で使用され、バグあり（`String::from_utf8_lossy`がANSIバイト列を破壊）
 
-**推奨理由**: 後方互換性維持（Requirement 8）
+**推奨案**: 
+- `to_ansi_bytes(s: &str) -> Result<Vec<u8>>`を新規追加
+- 既存の`path_to_lua`はテスト専用として残す（本番コード未使用のため影響なし）
+
+**推奨理由**: 
+- 明確な命名（パス専用でなく汎用エンコーディング変換）
+- `@enc`モジュールの`to_ansi`と命名統一
+- 後方互換性維持
+
+**注**: この関数はRust内部で使用し、Luaには公開しない。最終的に`Lua::create_string(&bytes)`でLua文字列化する。
 
 **決定**: (設計フェーズで確定)
 
@@ -63,22 +70,22 @@ pasta_luaの起動シーケンスにおけるWindows環境でのパス解決問�
 4. The Lua標準サーチャー shall 設定されたANSIバイト列パスを使用してファイルを解決する
 5. The `require`関数 shall 日本語パスを含むモジュールを正しくロードできる
 
-### Requirement 2: encoding/mod.rsのpath_to_lua修正
-**Objective:** As a 開発者, I want 既存のpath_to_lua関数がバイト列を正しく扱うこと, so that Windows環境でのパス変換が正確に動作する
+### Requirement 2: encoding/mod.rsのto_ansi_bytes追加
+**Objective:** As a 開発者, I want 文字列をシステムネイティブエンコーディングのバイト列に変換する関数, so that Windows環境でのパス変換が正確に動作する
 
 #### Acceptance Criteria
-1. The `path_to_lua` shall `String`ではなく`Vec<u8>`を返す（または新関数`path_to_lua_bytes`を追加）
-2. When Windows環境で呼ばれた場合, the 関数 shall `Encoding::ANSI.to_bytes(path)`の結果をそのまま返す
-3. The 関数 shall `String::from_utf8_lossy`を使用しない（ANSIバイト列が破壊される）
-4. When 非Windows環境で呼ばれた場合, the 関数 shall UTF-8バイト列を返す
-5. If エンコーディング変換が失敗した場合, the 関数 shall `std::io::Error`を返す
+1. The encoding/mod.rs shall `to_ansi_bytes(s: &str) -> Result<Vec<u8>>`関数を追加する
+2. When Windows環境で呼ばれた場合, the 関数 shall `Encoding::ANSI.to_bytes(s)`の結果をそのまま返す
+3. When 非Windows環境で呼ばれた場合, the 関数 shall UTF-8バイト列（`s.as_bytes().to_vec()`）を返す
+4. If エンコーディング変換が失敗した場合, the 関数 shall `std::io::Error`を返す
+5. The 既存の`path_to_lua`関数 shall テスト専用で残し、将来的な削除を検討する（本番コード未使用）
 
 ### Requirement 3: LoaderContextのバイト列生成対応
 **Objective:** As a PastaLoader, I want LoaderContextが`package.path`用のバイト列を生成できること, so that ANSIエンコードされたパスが正しく設定される
 
 #### Acceptance Criteria
 1. The LoaderContext shall `generate_package_path_bytes() -> Result<Vec<u8>>`メソッドを提供する
-2. When メソッドが呼ばれた時, the LoaderContext shall 検索パス文字列を結合してから`path_to_lua_bytes`で変換する
+2. When メソッドが呼ばれた時, the LoaderContext shall 検索パス文字列を結合してから`encoding::to_ansi_bytes`で変換する
 3. The 生成されたバイト列 shall セミコロン区切りの`?.lua`および`?/init.lua`パターンを含む
 4. The LoaderContext shall 既存の`generate_package_path()`メソッドを維持する（後方互換性）
 
