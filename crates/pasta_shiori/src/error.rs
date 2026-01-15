@@ -10,8 +10,8 @@ pub enum MyError {
     #[error("others error")]
     Others,
 
-    #[error("load error")]
-    Load,
+    #[error("load error: {0}")]
+    Load(String),
 
     #[error("not initialized error")]
     NotInitialized,
