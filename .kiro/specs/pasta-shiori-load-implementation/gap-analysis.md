@@ -198,7 +198,8 @@ crates/pasta_shiori/src/
    - X-ERROR-REASONフィールドに含める情報レベル
 
 2. **tracingロガー初期化**:
-   - DllMainでtracing_subscriber初期化の実装方法
+   - **決定**: RawShiori::new()で初期化（シングルトンライフサイクルに合致）
+   - tracing_subscriber依存関係追加（workspace、pasta_shiori）
    - ログ出力先（stderr、ファイル、Windows OutputDebugString）
    - ログレベルの制御方法（環境変数、設定ファイル）
 
@@ -214,17 +215,12 @@ crates/pasta_shiori/src/
 
 ### 要調査項目（Research Needed）
 
-1. **tracingロガー初期化タイミング**:
-   - DllMainでtracing_subscriber::fmt()を初期化すべきか
-   - 複数DLLロード時の競合リスク
-   - → **設計フェーズで実装方針決定**
-
-2. **pasta.toml配置規約**:
+1. **pasta.toml配置規約**:
    - load_dirパラメータは `ghost/master/` を想定
    - pasta.tomlは `ghost/master/pasta.toml` に配置されるか
    - → **設計フェーズでディレクトリ構造を確認**
 
-3. **パフォーマンス要件**:
+2. **パフォーマンス要件**:
    - load()実行時間の許容範囲（SHIORI DLL起動時間）
    - PastaLoader::load()のベンチマーク結果確認
    - → **設計フェーズでパフォーマンス基準設定**
