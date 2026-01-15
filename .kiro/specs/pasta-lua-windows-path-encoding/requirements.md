@@ -26,12 +26,12 @@ pasta_luaの起動シーケンスにおけるWindows環境でのパス解決問�
 
 **推奨案**: 
 - `to_ansi_bytes(s: &str) -> Result<Vec<u8>>`を新規追加
-- 既存の`path_to_lua`はテスト専用として残す（本番コード未使用のため影響なし）
+- 既存の`path_to_lua`を廃止（バグあり、本番コード未使用、影響なし）
 
 **推奨理由**: 
 - 明確な命名（パス専用でなく汎用エンコーディング変換）
 - `@enc`モジュールの`to_ansi`と命名統一
-- 後方互換性維持
+- バグのある関数を残す理由なし
 
 **注**: この関数はRust内部で使用し、Luaには公開しない。最終的に`Lua::create_string(&bytes)`でLua文字列化する。
 
@@ -78,7 +78,7 @@ pasta_luaの起動シーケンスにおけるWindows環境でのパス解決問�
 2. When Windows環境で呼ばれた場合, the 関数 shall `Encoding::ANSI.to_bytes(s)`の結果をそのまま返す
 3. When 非Windows環境で呼ばれた場合, the 関数 shall UTF-8バイト列（`s.as_bytes().to_vec()`）を返す
 4. If エンコーディング変換が失敗した場合, the 関数 shall `std::io::Error`を返す
-5. The 既存の`path_to_lua`関数 shall テスト専用で残し、将来的な削除を検討する（本番コード未使用）
+5. The 既存の`path_to_lua`関数 shall 廃止する（バグあり、本番コード未使用、テストも削除）
 
 ### Requirement 3: LoaderContextのバイト列生成対応
 **Objective:** As a PastaLoader, I want LoaderContextが`package.path`用のバイト列を生成できること, so that ANSIエンコードされたパスが正しく設定される

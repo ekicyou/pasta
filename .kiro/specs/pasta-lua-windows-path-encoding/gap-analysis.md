@@ -117,7 +117,7 @@ pub fn register(lua: &Lua, ...) -> LuaResult<AnyUserData> {
 
 #### 1. encoding/mod.rsのto_ansi_bytes追加（Req 2）
 
-**現在のバグ（path_to_lua）**:
+**廃止対象（path_to_lua）**: バグあり、テスト専用、本番コード未使用
 ```rust
 pub fn path_to_lua(path: &str) -> Result<String> {
     let bytes = Encoding::ANSI.to_bytes(path)?;  // UTF-8 → ANSIバイト列 (OK)
@@ -125,7 +125,7 @@ pub fn path_to_lua(path: &str) -> Result<String> {
 }
 ```
 
-**新規追加方法**:
+**新規追加**:
 ```rust
 pub fn to_ansi_bytes(s: &str) -> Result<Vec<u8>> {
     #[cfg(windows)]
@@ -139,7 +139,7 @@ pub fn to_ansi_bytes(s: &str) -> Result<Vec<u8>> {
 }
 ```
 
-**複雑度**: Low（単純な関数追加、既存path_to_luaはテスト専用として維持）
+**複雑度**: Low（単純な関数追加、path_to_luaとテスト削除）
 
 #### 2. LoaderContextのバイト列生成（Req 3）
 
