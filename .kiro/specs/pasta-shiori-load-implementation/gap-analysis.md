@@ -215,15 +215,17 @@ crates/pasta_shiori/src/
 
 ### 要調査項目（Research Needed）
 
-1. **pasta.toml配置規約**:
-   - load_dirパラメータは `ghost/master/` を想定
-   - pasta.tomlは `ghost/master/pasta.toml` に配置されるか
-   - → **設計フェーズでディレクトリ構造を確認**
-
-2. **パフォーマンス要件**:
+1. **パフォーマンス要件**:
    - load()実行時間の許容範囲（SHIORI DLL起動時間）
    - PastaLoader::load()のベンチマーク結果確認
    - → **設計フェーズでパフォーマンス基準設定**
+
+### 確認済み事項
+
+1. **pasta.toml配置規約** ✅:
+   - load_dirパラメータ: `ghost/master/`
+   - pasta.toml配置: `ghost/master/pasta.toml`
+   - スクリプト配置: `ghost/master/dic/*.pasta`
 
 ---
 
