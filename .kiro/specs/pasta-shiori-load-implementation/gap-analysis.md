@@ -199,9 +199,10 @@ crates/pasta_shiori/src/
 
 2. **tracingロガー初期化**:
    - **決定**: RawShiori::new()で初期化（シングルトンライフサイクルに合致）
-   - tracing_subscriber依存関係追加（workspace、pasta_shiori）
-   - ログ出力先（stderr、ファイル、Windows OutputDebugString）
-   - ログレベルの制御方法（環境変数、設定ファイル）
+   - tracing_subscriber、tracing_appender依存関係追加
+   - ログ出力先: `ghost/master/profile/pasta/logs/pasta_shiori.log`
+   - ローテーション: なし（起動時に上書き、最後の起動ログのみ保持）
+   - profile配下以外は動的ファイルで汚染しない原則
 
 3. **テスト戦略**:
    - 単体テスト: PastaShiori::load()の成功/失敗パス
