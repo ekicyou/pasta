@@ -198,10 +198,12 @@ crates/pasta_shiori/src/
    - X-ERROR-REASONフィールドに含める情報レベル
 
 2. **tracingロガー初期化**:
-   - **決定**: RawShiori::new()で初期化（シングルトンライフサイクルに合致）
-   - tracing_subscriber、tracing_appender依存関係追加
-   - ログ出力先: `ghost/master/profile/pasta/logs/pasta_shiori.log`
-   - ローテーション: なし（起動時に上書き、最後の起動ログのみ保持）
+   - **決定**: PastaLoader::load()で初期化（OnceLockでグローバル初期化）
+   - **責務**: pasta_luaエンジンのロギングはpasta_lua層で管理
+   - tracing_subscriber、tracing_appender依存関係追加（pasta_lua）
+   - ログ出力先: `ghost/master/profile/pasta/logs/pasta.log`（デフォルト）
+   - ローテーション: 7日間保持（pasta.tomlで設定可能）
+   - pasta.toml設定項目: [logging]セクションでfile_path、rotation_daysを指定
    - profile配下以外は動的ファイルで汚染しない原則
 
 3. **テスト戦略**:

@@ -40,8 +40,8 @@ PastaShioriのload関数の最低限の実装を行う。pasta_luaのエンジ�
 2. If load_dirが存在しない場合, PastaShiori shall DirectoryNotFoundエラーとしてfalseを返す
 3. If pasta.toml設定ファイルが見つからない場合, PastaShiori shall ConfigNotFoundエラーとして処理する
 4. The PastaShiori shall tracing crateを使用してエラー詳細をログ出力する
-5. When RawShiori::new()が呼ばれた場合, RawShiori shall tracing_subscriberを初期化する（シングルトンライフサイクルに合致）
-6. When ログファイルを出力する場合, RawShiori shall profile/pasta/logs/pasta_shiori.logに出力する（起動時に上書き、ローテーションなし）
+5. When PastaLoader::load()が呼ばれた場合, PastaLoader shall tracing_subscriberを初期化する（OnceLockでグローバル初期化）
+6. When ロギング設定を行う場合, PastaLoader shall pasta.tomlの[logging]セクションを読み込み、ファイルロガーを設定する
 
 ### Requirement 4: pasta.toml必須化
 
@@ -70,3 +70,28 @@ PastaShioriのload関数の最低限の実装を行う。pasta_luaのエンジ�
 1. While ランタイムが初期化されていない状態で, PastaShiori shall request呼び出しに対してエラーを返す
 2. When load関数が成功した場合, PastaShiori shall ランタイム参照をOption<PastaLuaRuntime>フィールドに格納する
 3. The PastaShiori shall Drop trait実装でランタイムを適切に解放する
+
+### Requirement 7: pasta_luaロギング機能
+
+**Objective:** 開発者として、pasta_luaエンジンのログを永続化したい。これにより、スクリプト実行やエンジン動作のトラブルシューティングが可能になる。
+
+#### Acceptance Criteria
+
+1. When PastaLoader::load()が呼ばれた場合, PastaLoader shall tracing_subscriberをグローバルに初期化する（OnceLockパターン）
+2. When pasta.toml内に[logging]セクションが存在する場合, PastaLoader shall file_pathとrotation_daysを読み込む
+3. When file_pathが指定されている場合, PastaLoader shall tracing_appenderを使用してファイル出力を設定する
+4. When rotation_daysが指定されている場合, PastaLoader shall 指定日数でログファイルをローテーションする（例: 7日間保持）
+5. When [logging]セクションが存在しない場合, PastaLoader shall ファイルロギングを無効化し、標準エラー出力のみ使用する
+6. The PastaLoader shall ログファイルをprofile/pasta/logs/pasta.logにデフォルト配置する
+7. The PastaLoader shall profile配下以外のディレクトリを動的ファイルで汚染しない
+
+#### pasta.toml設定例
+
+```toml
+[loader]
+debug_mode = true
+
+[logging]
+file_path = "profile/pasta/logs/pasta.log"
+rotation_days = 7
+```
