@@ -215,10 +215,7 @@ crates/pasta_shiori/src/
 
 ### 要調査項目（Research Needed）
 
-1. **パフォーマンス要件**:
-   - load()実行時間の許容範囲（SHIORI DLL起動時間）
-   - PastaLoader::load()のベンチマーク結果確認
-   - → **設計フェーズでパフォーマンス基準設定**
+なし（全議題完了）
 
 ### 確認済み事項
 
@@ -226,6 +223,11 @@ crates/pasta_shiori/src/
    - load_dirパラメータ: `ghost/master/`
    - pasta.toml配置: `ghost/master/pasta.toml`
    - スクリプト配置: `ghost/master/dic/*.pasta`
+
+2. **パフォーマンス要件** ✅:
+   - load()実行時間許容範囲: 1-3秒以内
+   - ユーザー体感を重視（ゴースト起動時の待ち時間として許容範囲）
+   - 現状のPastaLoader::load()実装で要件を満たす見込み
 
 ---
 
