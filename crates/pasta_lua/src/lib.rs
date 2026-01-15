@@ -35,6 +35,7 @@ pub mod context;
 pub mod encoding;
 pub mod error;
 pub mod loader;
+pub mod logging;
 pub mod normalize;
 pub mod runtime;
 pub mod search;
@@ -48,7 +49,11 @@ pub use context::TranspileContext;
 pub use encoding::{Encoder, Encoding};
 pub use error::TranspileError;
 pub use loader::{
-    LoaderConfig, LoaderContext, LoaderError, PastaConfig, PastaLoader, TranspileResult,
+    LoaderConfig, LoaderContext, LoaderError, LoggingConfig, PastaConfig, PastaLoader,
+    TranspileResult,
+};
+pub use logging::{
+    GlobalLoggerRegistry, LoadDirGuard, PastaLogger, get_current_load_dir, set_current_load_dir,
 };
 pub use runtime::{PastaLuaRuntime, RuntimeConfig};
 pub use search::{SearchContext, SearchError};

@@ -87,7 +87,32 @@ struct RawShiori<T: Shiori + Default + Sized>(isize, Arc<Mutex<Option<T>>>);
 
 impl<T: Shiori + Default + Sized> RawShiori<T> {
     fn new(hinst: isize) -> Self {
+        // Initialize global tracing subscriber (only once)
+        Self::init_tracing();
+
         RawShiori(hinst, Arc::new(Mutex::new(None)))
+    }
+
+    /// Initialize global tracing subscriber with GlobalLoggerRegistry.
+    ///
+    /// This is called once during DLL initialization. The subscriber uses
+    /// GlobalLoggerRegistry to route logs to instance-specific files.
+    fn init_tracing() {
+        use crate::logging::GlobalLoggerRegistry;
+        use tracing_subscriber::fmt;
+        use tracing_subscriber::prelude::*;
+
+        // Try to set global subscriber. If it fails, another subscriber
+        // is already set, which is fine.
+        let _ = tracing_subscriber::registry()
+            .with(
+                fmt::layer()
+                    .with_writer(GlobalLoggerRegistry::instance().clone())
+                    .with_ansi(false)
+                    .with_target(true)
+                    .with_level(true),
+            )
+            .try_init();
     }
 
     fn unload(&self) -> bool {

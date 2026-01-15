@@ -48,6 +48,12 @@ impl From<Utf8Error> for MyError {
     }
 }
 
+impl From<pasta_lua::LoaderError> for MyError {
+    fn from(error: pasta_lua::LoaderError) -> MyError {
+        MyError::Load(format!("{}", error))
+    }
+}
+
 impl MyError {
     #[allow(dead_code)]
     pub fn script_error(message: String) -> MyError {

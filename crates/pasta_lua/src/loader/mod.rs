@@ -27,7 +27,7 @@ mod context;
 mod discovery;
 mod error;
 
-pub use config::{LoaderConfig, PastaConfig};
+pub use config::{LoaderConfig, LoggingConfig, PastaConfig};
 pub use context::LoaderContext;
 pub use error::LoaderError;
 
@@ -113,14 +113,46 @@ impl PastaLoader {
             Self::save_cache_files(base_dir, &config.loader.transpiled_output_dir, &transpiled)?;
         }
 
-        // Phase 5: Initialize runtime
-        debug!("Phase 5: Initializing runtime");
+        // Phase 5: Create logger
+        debug!("Phase 5: Creating instance logger");
+        let logger = Self::create_logger(base_dir, &config)?;
+
+        // Phase 6: Initialize runtime
+        debug!("Phase 6: Initializing runtime");
         let loader_context = LoaderContext::from_config(base_dir, &config);
-        let runtime =
-            PastaLuaRuntime::from_loader(context, loader_context, runtime_config, &transpiled)?;
+        let runtime = PastaLuaRuntime::from_loader(
+            context,
+            loader_context,
+            runtime_config,
+            &transpiled,
+            logger,
+        )?;
 
         info!(path = %base_dir.display(), "Startup sequence completed");
         Ok(runtime)
+    }
+
+    /// Create an instance-specific logger from configuration.
+    ///
+    /// Returns None if logging directory cannot be created (optional feature).
+    /// Logger is wrapped in Arc for sharing with GlobalLoggerRegistry.
+    fn create_logger(
+        base_dir: &Path,
+        config: &PastaConfig,
+    ) -> Result<Option<std::sync::Arc<crate::logging::PastaLogger>>, LoaderError> {
+        let logging_config = config.logging();
+
+        match crate::logging::PastaLogger::new(base_dir, logging_config.as_ref()) {
+            Ok(logger) => {
+                info!(path = %logger.log_path().display(), "Created instance logger");
+                Ok(Some(std::sync::Arc::new(logger)))
+            }
+            Err(e) => {
+                // Log warning but don't fail startup
+                warn!(error = %e, "Failed to create instance logger, logging disabled");
+                Ok(None)
+            }
+        }
     }
 
     /// Prepare profile directories.

@@ -20,6 +20,7 @@ mod enc;
 
 use crate::context::TranspileContext;
 use crate::loader::{LoaderContext, TranspileResult};
+use crate::logging::PastaLogger;
 use mlua::{Lua, Result as LuaResult, StdLib, Table, Value};
 use std::path::Path;
 use std::sync::Arc;
@@ -102,6 +103,10 @@ impl RuntimeConfig {
 /// Multiple instances can coexist without interference.
 pub struct PastaLuaRuntime {
     lua: Lua,
+    /// Instance-specific logger (optional).
+    /// If set, this logger is used for tracing output.
+    /// Wrapped in Arc for sharing with GlobalLoggerRegistry.
+    logger: Option<Arc<PastaLogger>>,
 }
 
 impl PastaLuaRuntime {
@@ -176,7 +181,7 @@ impl PastaLuaRuntime {
             mlua_stdlib::yaml::register(&lua, None)?;
         }
 
-        Ok(Self { lua })
+        Ok(Self { lua, logger: None })
     }
 
     /// Execute a Lua script string.
@@ -212,6 +217,14 @@ impl PastaLuaRuntime {
         &self.lua
     }
 
+    /// Get a clone of the Arc-wrapped logger, if any.
+    ///
+    /// This allows sharing the logger with GlobalLoggerRegistry
+    /// for log routing in multi-instance scenarios.
+    pub fn logger(&self) -> Option<Arc<PastaLogger>> {
+        self.logger.clone()
+    }
+
     /// Register a custom module with the runtime.
     ///
     /// # Arguments
@@ -238,6 +251,7 @@ impl PastaLuaRuntime {
     /// * `loader_context` - Configuration and paths from PastaLoader
     /// * `config` - Runtime configuration
     /// * `transpiled` - Transpiled Lua code to load
+    /// * `logger` - Optional instance-specific logger (Arc-wrapped for sharing)
     ///
     /// # Returns
     /// * `Ok(Self)` - Runtime initialized and code loaded
@@ -247,9 +261,13 @@ impl PastaLuaRuntime {
         loader_context: LoaderContext,
         config: RuntimeConfig,
         transpiled: &[TranspileResult],
+        logger: Option<Arc<PastaLogger>>,
     ) -> LuaResult<Self> {
         // Create base runtime
-        let runtime = Self::with_config(context, config)?;
+        let mut runtime = Self::with_config(context, config)?;
+
+        // Set logger if provided
+        runtime.logger = logger;
 
         // Setup package.path for module resolution
         Self::setup_package_path(&runtime.lua, &loader_context)?;

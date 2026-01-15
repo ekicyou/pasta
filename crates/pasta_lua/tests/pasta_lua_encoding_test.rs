@@ -17,7 +17,7 @@ fn create_test_runtime() -> PastaLuaRuntime {
         vec!["scripts".to_string()],
         toml::Table::new(),
     );
-    PastaLuaRuntime::from_loader(context, loader_context, RuntimeConfig::new(), &[]).unwrap()
+    PastaLuaRuntime::from_loader(context, loader_context, RuntimeConfig::new(), &[], None).unwrap()
 }
 
 // ============================================================================
@@ -194,7 +194,8 @@ fn test_package_path_set_correctly() {
     );
 
     let runtime =
-        PastaLuaRuntime::from_loader(context, loader_context, RuntimeConfig::new(), &[]).unwrap();
+        PastaLuaRuntime::from_loader(context, loader_context, RuntimeConfig::new(), &[], None)
+            .unwrap();
 
     // Get package.path
     let script = r#"return package.path"#;
@@ -227,7 +228,8 @@ fn test_package_path_with_japanese_base() {
     );
 
     let runtime =
-        PastaLuaRuntime::from_loader(context, loader_context, RuntimeConfig::new(), &[]).unwrap();
+        PastaLuaRuntime::from_loader(context, loader_context, RuntimeConfig::new(), &[], None)
+            .unwrap();
 
     // Should not panic, and package.path should be set
     let script = r#"return package.path"#;
@@ -257,7 +259,8 @@ fn test_pasta_config_module_still_works() {
         LoaderContext::new("/test/path", vec!["scripts".to_string()], custom_fields);
 
     let runtime =
-        PastaLuaRuntime::from_loader(context, loader_context, RuntimeConfig::new(), &[]).unwrap();
+        PastaLuaRuntime::from_loader(context, loader_context, RuntimeConfig::new(), &[], None)
+            .unwrap();
 
     // @pasta_config should still work
     let script = r#"

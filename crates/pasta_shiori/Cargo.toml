@@ -14,9 +14,14 @@ crate-type = ["cdylib"]
 pasta_core.workspace = true
 pasta_lua.workspace = true
 tracing.workspace = true
+tracing-subscriber.workspace = true
+tracing-appender.workspace = true
 thiserror.workspace = true
 pest.workspace = true
 pest_derive.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_System_Memory", "Win32_Globalization"] }
+
+[dev-dependencies]
+tempfile.workspace = true

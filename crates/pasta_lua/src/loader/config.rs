@@ -77,6 +77,17 @@ impl PastaConfig {
         })
     }
 
+    /// Get logging configuration from [logging] section.
+    ///
+    /// # Returns
+    /// * `Some(LoggingConfig)` - If [logging] section exists and is valid
+    /// * `None` - If [logging] section is missing or invalid
+    pub fn logging(&self) -> Option<LoggingConfig> {
+        self.custom_fields
+            .get("logging")
+            .and_then(|v| v.clone().try_into().ok())
+    }
+
     /// Create from TOML string (for testing).
     #[cfg(test)]
     fn from_str(s: &str) -> Result<Self, toml::de::Error> {
@@ -134,6 +145,39 @@ fn default_transpiled_output_dir() -> String {
 
 fn default_debug_mode() -> bool {
     true
+}
+
+/// Logging configuration from [logging] section in pasta.toml.
+///
+/// Configures instance-specific logging with file rotation.
+#[derive(Debug, Clone, Deserialize)]
+pub struct LoggingConfig {
+    /// Log file path relative to load_dir.
+    /// Default: "profile/pasta/logs/pasta.log"
+    #[serde(default = "default_log_file_path")]
+    pub file_path: String,
+
+    /// Number of days to retain log files.
+    /// Default: 7
+    #[serde(default = "default_rotation_days")]
+    pub rotation_days: usize,
+}
+
+impl Default for LoggingConfig {
+    fn default() -> Self {
+        Self {
+            file_path: default_log_file_path(),
+            rotation_days: default_rotation_days(),
+        }
+    }
+}
+
+fn default_log_file_path() -> String {
+    "profile/pasta/logs/pasta.log".to_string()
+}
+
+fn default_rotation_days() -> usize {
+    7
 }
 
 #[cfg(test)]
@@ -248,5 +292,50 @@ ghost_name = "NoLoaderGhost"
             config.custom_fields.get("ghost_name"),
             Some(&toml::Value::String("NoLoaderGhost".to_string()))
         );
+    }
+
+    #[test]
+    fn test_logging_config_default() {
+        let config = LoggingConfig::default();
+        assert_eq!(config.file_path, "profile/pasta/logs/pasta.log");
+        assert_eq!(config.rotation_days, 7);
+    }
+
+    #[test]
+    fn test_logging_config_from_toml() {
+        let toml_str = r#"
+[loader]
+debug_mode = true
+
+[logging]
+file_path = "profile/custom/logs/my.log"
+rotation_days = 14
+"#;
+        let config = PastaConfig::from_str(toml_str).unwrap();
+        let logging = config.logging().expect("logging section should exist");
+        assert_eq!(logging.file_path, "profile/custom/logs/my.log");
+        assert_eq!(logging.rotation_days, 14);
+    }
+
+    #[test]
+    fn test_logging_config_defaults_when_partial() {
+        let toml_str = r#"
+[logging]
+file_path = "profile/pasta/logs/custom.log"
+"#;
+        let config = PastaConfig::from_str(toml_str).unwrap();
+        let logging = config.logging().expect("logging section should exist");
+        assert_eq!(logging.file_path, "profile/pasta/logs/custom.log");
+        assert_eq!(logging.rotation_days, 7); // default
+    }
+
+    #[test]
+    fn test_logging_config_none_when_missing() {
+        let toml_str = r#"
+[loader]
+debug_mode = true
+"#;
+        let config = PastaConfig::from_str(toml_str).unwrap();
+        assert!(config.logging().is_none());
     }
 }
