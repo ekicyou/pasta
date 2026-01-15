@@ -34,20 +34,19 @@ impl Default for PastaConfig {
 impl PastaConfig {
     /// Load configuration from pasta.toml in the base directory.
     ///
-    /// If pasta.toml doesn't exist, returns default configuration.
+    /// Returns an error if pasta.toml doesn't exist.
     ///
     /// # Arguments
     /// * `base_dir` - Base directory to look for pasta.toml
     ///
     /// # Returns
-    /// * `Ok(PastaConfig)` - Configuration loaded or default
-    /// * `Err(LoaderError)` - File read or parse error
+    /// * `Ok(PastaConfig)` - Configuration loaded successfully
+    /// * `Err(LoaderError)` - File not found, read error, or parse error
     pub fn load(base_dir: &Path) -> Result<Self, LoaderError> {
         let config_path = base_dir.join("pasta.toml");
 
         if !config_path.exists() {
-            tracing::debug!(path = %config_path.display(), "No pasta.toml found, using defaults");
-            return Ok(Self::default());
+            return Err(LoaderError::config_not_found(&config_path));
         }
 
         let content =

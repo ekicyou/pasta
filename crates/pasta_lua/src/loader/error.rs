@@ -27,6 +27,10 @@ pub enum LoaderError {
     #[error("設定ファイル '{0}' の解析に失敗しました: {1}")]
     Config(PathBuf, #[source] toml::de::Error),
 
+    /// Configuration file not found error.
+    #[error("設定ファイル '{0}' が見つかりません")]
+    ConfigNotFound(PathBuf),
+
     /// Pasta file parsing error.
     #[error("Pastaファイル '{file}' のパースに失敗しました: {message}")]
     Parse {
@@ -66,6 +70,11 @@ impl LoaderError {
     /// Create a config error with file path.
     pub fn config(path: impl Into<PathBuf>, err: toml::de::Error) -> Self {
         LoaderError::Config(path.into(), err)
+    }
+
+    /// Create a config not found error with file path.
+    pub fn config_not_found(path: impl Into<PathBuf>) -> Self {
+        LoaderError::ConfigNotFound(path.into())
     }
 
     /// Create a parse error with file path and message.
