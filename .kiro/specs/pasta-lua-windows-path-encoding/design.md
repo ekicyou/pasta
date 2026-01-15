@@ -216,11 +216,15 @@ sequenceDiagram
 /// 
 /// # Errors
 /// エンコーディング変換が失敗した場合（無効な文字等）
+/// 
+/// # Panics
+/// この関数はpanicしない。全てのエラーはResultで返却される。
 pub fn to_ansi_bytes(s: &str) -> std::io::Result<Vec<u8>>;
 ```
 - Preconditions: `s`はvalid UTF-8文字列
 - Postconditions: 返却バイト列はシステムネイティブエンコーディング
 - Invariants: 変換は冪等（同じ入力に対して同じ出力）
+- Error Handling: `Encoding::ANSI.to_bytes`失敗時は`std::io::Error`を返却、panicなし
 
 **Implementation Notes**
 - `#[cfg(windows)]` / `#[cfg(not(windows))]`で分岐
@@ -272,12 +276,16 @@ impl LoaderContext {
     /// 
     /// # Errors
     /// エンコーディング変換が失敗した場合
+    /// 
+    /// # Panics
+    /// この関数はpanicしない。全てのエラーはResultで返却される。
     pub fn generate_package_path_bytes(&self) -> std::io::Result<Vec<u8>>;
 }
 ```
 - Preconditions: `lua_search_paths`と`base_dir`が設定済み
 - Postconditions: セミコロン区切りの`?.lua;?/init.lua`パターンのバイト列
 - Invariants: 出力形式はLuaのpackage.path仕様に準拠
+- Error Handling: `to_ansi_bytes`失敗時は`std::io::Error`を返却、panicなし
 
 **Implementation Notes**
 - 既存の`generate_package_path()`を内部で呼び出し、結果を`to_ansi_bytes`で変換
@@ -313,12 +321,19 @@ impl PastaLuaRuntime {
     /// 
     /// # Errors
     /// バイト列生成またはLua設定が失敗した場合
+    /// 
+    /// # Panics
+    /// この関数はpanicしない。全てのエラーはLuaResultで返却される。
     fn setup_package_path(lua: &Lua, loader_context: &LoaderContext) -> LuaResult<()>;
 }
 ```
 - Preconditions: `lua`は初期化済み、`loader_context`は有効
 - Postconditions: `package.path`がANSIバイト列で設定される
 - Invariants: 既存の標準サーチャーがそのまま使用可能
+- Error Handling: 
+  - `generate_package_path_bytes`失敗 → `std::io::Error`を`mlua::Error::ExternalError(Arc::new(e))`に変換
+  - `from_loader`の呼び出し元にエラー伝播、ランタイム初期化失敗
+  - panicなし、全てLuaResultで返却
 
 **Implementation Notes**
 - `io::Error`を`mlua::Error`に変換
@@ -368,13 +383,18 @@ local enc = {
 | to_ansi | UTF-8 Lua文字列 | ANSI Lua文字列, nil | nil, エラーメッセージ |
 | to_utf8 | ANSI Lua文字列 | UTF-8 Lua文字列, nil | nil, エラーメッセージ |
 
-**エラーハンドリング**:
+**エラーハンドリング** (Lua標準パターン、panic禁止):
 ```lua
 local ansi, err = enc.to_ansi("日本語パス")
 if err then
     print("変換エラー: " .. err)
 end
 ```
+
+**エラー種別**:
+- 型エラー: mlua自動検証（非文字列入力時）→ `nil, "bad argument"`
+- 変換エラー: `Encoding::ANSI.to_bytes`失敗時 → `nil, エラーメッセージ`
+- **panic禁止**: 全てのエラーケースで`nil, err`パターンを返却、panicなし
 
 ##### Service Interface (Rust)
 ```rust
@@ -392,6 +412,9 @@ pub fn register(lua: &Lua) -> LuaResult<Table>;
 - `runtime/mod.rs`に`mod enc;`追加
 - `from_loader`内で`enc::register(&lua)?`呼び出し
 - 型エラー時は`mlua`の自動型チェックを活用
+- エラーログ出力:
+  - 変換失敗: `tracing::warn!("Encoding conversion failed: {}", err)`
+  - panic禁止: 全てのエラーを`(None, Some(err.to_string()))`で返却
 
 ---
 
