@@ -41,7 +41,16 @@ PastaShioriのload関数の最低限の実装を行う。pasta_luaのエンジ�
 3. If pasta.toml設定ファイルが見つからない場合, PastaShiori shall ConfigNotFoundエラーとして処理する
 4. The PastaShiori shall tracing crateを使用してエラー詳細をログ出力する
 
-### Requirement 4: hinstパラメータ保持
+### Requirement 4: pasta.toml必須化
+
+**Objective:** 開発者として、pasta.tomlが存在しない場合は明示的なエラーとしたい。これにより、設定ファイルなしでの予期しない動作を防ぐ。
+
+#### Acceptance Criteria
+
+1. When PastaConfig::load()がpasta.tomlを発見できなかった場合, PastaConfig shall LoaderError::ConfigNotFoundを返す
+2. The PastaConfig shall デフォルト値での起動を許可しない
+
+### Requirement 5: hinstパラメータ保持
 
 **Objective:** SHIORI DLL開発者として、DLLモジュールハンドル(hinst)を保持したい。これにより、将来的なWindows API統合に備える。
 
@@ -50,7 +59,7 @@ PastaShioriのload関数の最低限の実装を行う。pasta_luaのエンジ�
 1. When load関数が呼び出された場合, PastaShiori shall hinstパラメータを内部フィールドに保存する
 2. The PastaShiori shall hinstをisize型として保持する（Windows HINSTANCE互換）
 
-### Requirement 5: ランタイム状態管理
+### Requirement 6: ランタイム状態管理
 
 **Objective:** SHIORI DLL開発者として、ランタイムの初期化状態を追跡したい。これにより、request呼び出し時にランタイムが利用可能か判断できる。
 

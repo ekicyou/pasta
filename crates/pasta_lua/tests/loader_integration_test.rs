@@ -207,6 +207,13 @@ fn test_load_empty_dic() {
     let base_dir = temp.path();
 
     std::fs::create_dir_all(base_dir.join("dic/empty")).unwrap();
+    
+    // Create minimal pasta.toml
+    std::fs::write(
+        base_dir.join("pasta.toml"),
+        "[loader]\ndebug_mode = true\n",
+    )
+    .unwrap();
 
     // Should succeed but with warning (no files found)
     let runtime = PastaLoader::load(base_dir).unwrap();
@@ -221,13 +228,17 @@ fn test_load_empty_dic() {
 // ============================================================================
 
 #[test]
-fn test_config_load_default() {
+fn test_config_load_not_found() {
     let temp = TempDir::new().unwrap();
-    let config = PastaConfig::load(temp.path()).unwrap();
+    let result = PastaConfig::load(temp.path());
 
-    assert_eq!(config.loader.pasta_patterns, vec!["dic/*/*.pasta"]);
-    assert!(config.loader.debug_mode);
-    assert!(config.custom_fields.is_empty());
+    assert!(result.is_err());
+    match result.unwrap_err() {
+        LoaderError::ConfigNotFound(path) => {
+            assert_eq!(path, temp.path().join("pasta.toml"));
+        }
+        _ => panic!("Expected ConfigNotFound error"),
+    }
 }
 
 #[test]
@@ -254,6 +265,13 @@ fn create_temp_with_pasta(pasta_content: &str) -> TempDir {
     // Create minimal dic structure
     std::fs::create_dir_all(base_dir.join("dic/test")).unwrap();
     std::fs::write(base_dir.join("dic/test/hello.pasta"), pasta_content).unwrap();
+
+    // Create minimal pasta.toml
+    std::fs::write(
+        base_dir.join("pasta.toml"),
+        "[loader]\ndebug_mode = true\n",
+    )
+    .unwrap();
 
     // Copy scripts directory from crate root for pasta runtime modules
     let crate_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
