@@ -11,7 +11,7 @@
 ### 1. encoding層の拡張
 エンコーディング変換機能を追加し、既存のバグ修正を実施する。
 
-- [ ] 1.1 (P) to_ansi_bytes関数の実装
+- [x] 1.1 (P) to_ansi_bytes関数の実装
   - UTF-8文字列をシステムネイティブエンコーディングのバイト列に変換する関数を追加
   - Windows環境では`Encoding::ANSI.to_bytes()`を使用してANSI変換
   - Unix環境では`s.as_bytes().to_vec()`でUTF-8バイト列をそのまま返す
@@ -19,12 +19,12 @@
   - `#[cfg(windows)]`と`#[cfg(not(windows))]`で環境別に実装を分岐
   - _Requirements: 2.1, 2.2, 2.3, 2.4_
 
-- [ ] 1.2 (P) path_to_lua関数の廃止
+- [x] 1.2 (P) path_to_lua関数の廃止
   - バグのある`path_to_lua`関数と関連テストを削除
   - `path_from_lua`は将来使用の可能性があるため維持
   - _Requirements: 2.5_
 
-- [ ] 1.3 (P) encoding層のユニットテスト追加
+- [x] 1.3 (P) encoding層のユニットテスト追加
   - ASCIIパス変換テスト（全プラットフォームで入出力同一を確認）
   - 日本語パス変換テスト（Windows専用、`#[cfg(windows)]`でマーク）
   - UTF-8→ANSI→UTF-8ラウンドトリップテストで変換精度を検証
@@ -36,7 +36,7 @@
 ### 2. loader層の拡張
 LoaderContextにバイト列生成機能を追加し、package.path設定用のインターフェースを提供する。
 
-- [ ] 2.1 generate_package_path_bytesメソッドの実装
+- [x] 2.1 generate_package_path_bytesメソッドの実装
   - 既存の`generate_package_path()`を内部で呼び出し、UTF-8文字列を生成
   - 生成した文字列を`encoding::to_ansi_bytes`で変換してバイト列化
   - セミコロン区切りの`?.lua;?/init.lua`パターン形式を維持
@@ -44,7 +44,7 @@ LoaderContextにバイト列生成機能を追加し、package.path設定用の�
   - 既存の`generate_package_path()`メソッドは後方互換性のため維持
   - _Requirements: 3.1, 3.2, 3.3, 3.4_
 
-- [ ] 2.2 (P) loader層のユニットテスト追加
+- [x] 2.2 (P) loader層のユニットテスト追加
   - バイト列生成の正常系テスト（期待されるパターン形式の確認）
   - Windows環境でのANSI変換確認テスト（`#[cfg(windows)]`）
   - Unix環境でのUTF-8パススルー確認テスト
@@ -56,7 +56,7 @@ LoaderContextにバイト列生成機能を追加し、package.path設定用の�
 ### 3. runtime層の実装
 package.pathのバイト列設定と@encモジュールを実装し、Lua VMへの統合を完成させる。
 
-- [ ] 3.1 setup_package_pathメソッドの修正
+- [x] 3.1 setup_package_pathメソッドの修正
   - `LoaderContext::generate_package_path_bytes()`を呼び出してバイト列取得
   - `lua.create_string(&bytes)`でバイト列をLua文字列に変換
   - `package.set("path", lua_string)`でpackage.pathを設定
@@ -65,7 +65,7 @@ package.pathのバイト列設定と@encモジュールを実装し、Lua VMへ�
   - panic禁止、全てLuaResultで返却
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
 
-- [ ] 3.2 @encモジュールの実装
+- [x] 3.2 @encモジュールの実装
   - 新規ファイル`src/runtime/enc.rs`を作成
   - `runtime/mod.rs`に`mod enc;`を追加
   - `register(lua: &Lua) -> LuaResult<Table>`関数でモジュールテーブル作成
@@ -77,13 +77,13 @@ package.pathのバイト列設定と@encモジュールを実装し、Lua VMへ�
   - tracingでwarnレベルのエラーログ出力
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 6.1, 6.2, 6.3, 6.4, 7.1, 7.2, 7.5_
 
-- [ ] 3.3 @encモジュールの登録統合
+- [x] 3.3 @encモジュールの登録統合
   - `PastaLuaRuntime::from_loader()`内で`enc::register(&lua)?`を呼び出し
   - `package.loaded["@enc"]`に登録してrequireで取得可能にする
   - 既存の`@pasta_config`モジュール登録パターンを踏襲
   - _Requirements: 5.1, 6.1_
 
-- [ ] 3.4 (P) runtime層のユニットテスト追加
+- [x] 3.4 (P) runtime層のユニットテスト追加
   - `@enc.to_ansi()`のUTF-8→ANSI変換テスト（日本語文字列、Windows専用）
   - `@enc.to_utf8()`のANSI→UTF-8変換テスト（ラウンドトリップ確認）
   - エラーハンドリングテスト：型エラー（`enc.to_ansi(123)`）、変換エラー（無効なバイト列）
@@ -96,7 +96,7 @@ package.pathのバイト列設定と@encモジュールを実装し、Lua VMへ�
 ### 4. 統合テストと検証
 全レイヤーの統合動作を検証し、後方互換性とWindows環境での実動作を確認する。
 
-- [ ] 4.1 (P) 統合テストファイルの作成
+- [x] 4.1 (P) 統合テストファイルの作成
   - `tests/pasta_lua_encoding_test.rs`を新規作成
   - Windows環境での日本語パスrequireテスト（例: `"C:\\ユーザー\\テスト\\scripts\\module.lua"`）
   - `#[cfg_attr(not(windows), ignore)]`でWindows専用テストをマーク
@@ -104,14 +104,14 @@ package.pathのバイト列設定と@encモジュールを実装し、Lua VMへ�
   - require成功確認、モジュールロード確認、エラーが発生しないことを検証
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 4.1, 4.2, 4.3, 4.4_
 
-- [ ] 4.2 (P) @encモジュールのE2Eテスト追加
+- [x] 4.2 (P) @encモジュールのE2Eテスト追加
   - Lua VM初期化後に`require "@enc"`でモジュール取得
   - `enc.to_ansi("日本語パス")`でANSI変換、結果が非nilであることを確認
   - `enc.to_utf8(ansi_result)`でUTF-8復元、元の文字列と一致することを確認
   - エラーケースのE2E確認（型エラー、変換エラー）
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8_
 
-- [ ]* 4.3 後方互換性テストの実施
+- [x]* 4.3 後方互換性テストの実施
   - `cargo test --all`で全既存テストが成功することを確認
   - `PastaLuaRuntime::new()`, `with_config()`, `from_loader()`の既存API動作確認
   - `@pasta_config`モジュールの既存動作確認
