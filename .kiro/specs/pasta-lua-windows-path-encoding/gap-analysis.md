@@ -115,9 +115,9 @@ pub fn register(lua: &Lua, ...) -> LuaResult<AnyUserData> {
 
 ### 主要なギャップ
 
-#### 1. encoding/mod.rsのpath_to_luaバグ修正（Req 2）
+#### 1. encoding/mod.rsのto_ansi_bytes追加（Req 2）
 
-**現在のバグ**:
+**現在のバグ（path_to_lua）**:
 ```rust
 pub fn path_to_lua(path: &str) -> Result<String> {
     let bytes = Encoding::ANSI.to_bytes(path)?;  // UTF-8 → ANSIバイト列 (OK)
@@ -125,21 +125,21 @@ pub fn path_to_lua(path: &str) -> Result<String> {
 }
 ```
 
-**修正方法**:
+**新規追加方法**:
 ```rust
-pub fn path_to_lua_bytes(path: &str) -> Result<Vec<u8>> {
+pub fn to_ansi_bytes(s: &str) -> Result<Vec<u8>> {
     #[cfg(windows)]
     {
-        Encoding::ANSI.to_bytes(path)
+        Encoding::ANSI.to_bytes(s)
     }
     #[cfg(not(windows))]
     {
-        Ok(path.as_bytes().to_vec())
+        Ok(s.as_bytes().to_vec())
     }
 }
 ```
 
-**複雑度**: Low（単純な関数追加）
+**複雑度**: Low（単純な関数追加、既存path_to_luaはテスト専用として維持）
 
 #### 2. LoaderContextのバイト列生成（Req 3）
 
@@ -203,7 +203,7 @@ package.path設定のみの修正、セキュリティ影響なし
 ### Option A: 最小限修正（推奨）
 
 **概要**: 
-- `encoding/mod.rs`に`path_to_lua_bytes`追加
+- `encoding/mod.rs`に`to_ansi_bytes`追加
 - `loader/context.rs`に`generate_package_path_bytes`追加
 - `runtime/mod.rs`の`setup_package_path`を修正
 - `runtime/enc.rs`を新規作成（@encモジュール）
