@@ -64,9 +64,11 @@ pasta_luaの起動シーケンスにおけるWindows環境でのパス解決問�
 1. When PastaLuaRuntimeが初期化される時, the Runtime shall `@enc`モジュールを`package.loaded`に登録する
 2. The `@enc`モジュール shall `to_ansi(utf8_string)`関数を提供する（入力: UTF-8エンコードされたLua文字列、出力: ANSIエンコードされたLua文字列）
 3. The `@enc`モジュール shall `to_utf8(ansi_string)`関数を提供する（入力: ANSIエンコードされたLua文字列、出力: UTF-8エンコードされたLua文字列）
-4. When `require "@enc"`が呼ばれた時, the Lua VM shall 登録されたモジュールを返す
-5. If 変換が失敗した場合（無効な文字が含まれる等）, the 変換関数 shall nilとエラーメッセージを返す（Lua標準エラーパターン: `result, err = func()`）
-6. The 入出力は全てLua文字列型であり、内部的なバイトエンコーディングのみが異なる
+4. The `to_ansi`関数 shall 内部で`Encoding::ANSI.to_bytes()`を使用し、結果のバイト列を`Lua::create_string(&[u8])`でLua文字列化する
+5. The `to_utf8`関数 shall Lua文字列から`LuaString::as_bytes()`でバイト列を取得し、`Encoding::ANSI.to_string()`でUTF-8文字列に変換後、`Lua::create_string()`でLua文字列化する
+6. When `require "@enc"`が呼ばれた時, the Lua VM shall 登録されたモジュールを返す
+7. If 変換が失敗した場合（無効な文字が含まれる等）, the 変換関数 shall nilとエラーメッセージを返す（Lua標準エラーパターン: `result, err = func()`）
+8. The 入出力は全てLua文字列型であり、内部的なバイトエンコーディングのみが異なる（UTF-8バイト列 vs ANSIバイト列）
 
 ### Requirement 6: 既存encoding/mod.rsの活用
 **Objective:** As a 開発者, I want 既存のエンコーディング変換実装を再利用すること, so that コードの重複を避け保守性を維持できる
@@ -76,7 +78,7 @@ pasta_luaの起動シーケンスにおけるWindows環境でのパス解決問�
 2. When Windows環境で動作する場合, the エンコーディング変換 shall `encoding/windows.rs`のWindows API実装を使用する
 3. When 非Windows環境で動作する場合, the エンコーディング変換 shall `encoding/unix.rs`のパススルー実装を使用する
 4. The Windows実装 shall 外部クレートを追加せず、既存の`windows-sys`依存のみを使用する
-5. If 将来非Windows環境で実際のエンコーディング変換が必要になった場合, the Cargo.toml shall オプショナルなエンコーディングクレート（例: `encoding_rs`）を`[target.'cfg(not(windows))'.dependencies]`で追加可能とする
+5. The 実装 shall `Encoding::OEM`は使用せず、将来必要になった場合に`to_oem`/`from_oem`関数として追加可能な設計とする
 
 ### Requirement 7: @encモジュールのドキュメントとエラーハンドリング
 **Objective:** As a Luaスクリプト開発者, I want エンコーディング変換の使用方法と制限事項を理解できること, so that 正しく機能を活用できる

@@ -154,21 +154,33 @@ pub fn path_to_lua_bytes(path: &str) -> Result<Vec<u8>> {
 pub fn register(lua: &Lua) -> LuaResult<Table> {
     let module = lua.create_table()?;
     module.set("_VERSION", "0.1.0")?;
-    module.set("_DESCRIPTION", "Encoding conversion (UTF-8 <-> ANSI/OEM)")?;
+    module.set("_DESCRIPTION", "Encoding conversion (UTF-8 <-> ANSI)")?;
     
-    let to_ansi = lua.create_function(|_, s: String| {
+    let to_ansi = lua.create_function(|lua, s: String| {
         use crate::encoding::{Encoder, Encoding};
         match Encoding::ANSI.to_bytes(&s) {
             Ok(bytes) => {
-                let result = String::from_utf8_lossy(&bytes).into_owned();
-                Ok((Some(result), None::<String>))
+                // バイト列を直接Lua文字列化（ANSIエンコードされたバイト列を保持）
+                let lua_str = lua.create_string(&bytes)?;
+                Ok((Some(lua_str), None::<String>))
             }
-            Err(e) => Ok((None::<String>, Some(e.to_string()))),
+            Err(e) => Ok((None::<LuaString>, Some(e.to_string()))),
         }
     })?;
     module.set("to_ansi", to_ansi)?;
     
-    // to_utf8, to_oem, from_oem 同様に実装
+    let to_utf8 = lua.create_function(|lua, s: LuaString| {
+        use crate::encoding::{Encoder, Encoding};
+        let bytes = s.as_bytes();
+        match Encoding::ANSI.to_string(bytes) {
+            Ok(utf8_string) => {
+                let lua_str = lua.create_string(utf8_string.as_bytes())?;
+                Ok((Some(lua_str), None::<String>))
+            }
+            Err(e) => Ok((None::<LuaString>, Some(e.to_string()))),
+        }
+    })?;
+    module.set("to_utf8", to_utf8)?;
     
     let package: Table = lua.globals().get("package")?;
     let loaded: Table = package.get("loaded")?;
