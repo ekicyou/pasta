@@ -75,13 +75,14 @@ PastaShioriのload関数の最低限の実装を行う。pasta_luaのエンジ�
 
 #### Acceptance Criteria
 
-1. When PastaLoader::load()が呼ばれた場合, PastaLoader shall tracing_subscriberをグローバルに初期化する（OnceLockパターン）
+1. When PastaLoader::load()が呼ばれた場合, PastaLoader shall そのインスタンス用のロギング設定を行う
 2. When pasta.toml内に[logging]セクションが存在する場合, PastaLoader shall file_pathとrotation_daysを読み込む
-3. When file_pathが指定されている場合, PastaLoader shall tracing_appenderを使用してファイル出力を設定する
+3. When file_pathが指定されている場合, PastaLoader shall 指定されたパスにログファイルを出力する
 4. When rotation_daysが指定されている場合, PastaLoader shall 指定日数でログファイルをローテーションする（例: 7日間保持）
-5. When [logging]セクションが存在しない場合, PastaLoader shall ファイルロギングを無効化し、標準エラー出力のみ使用する
-6. The PastaLoader shall ログファイルをprofile/pasta/logs/pasta.logにデフォルト配置する
-7. The PastaLoader shall profile配下以外のディレクトリを動的ファイルで汚染しない
+5. When [logging]セクションが存在しない場合, PastaLoader shall ファイルロギングを無効化する
+6. The PastaLoader shall ログファイルをload_dir/profile/pasta/logs/pasta.logにデフォルト配置する
+7. The PastaLoader shall 複数のPastaLoaderインスタンスが独立したログファイルを持つことを保証する
+8. The PastaLoader shall profile配下以外のディレクトリを動的ファイルで汚染しない
 
 #### pasta.toml設定例
 
@@ -90,6 +91,6 @@ PastaShioriのload関数の最低限の実装を行う。pasta_luaのエンジ�
 debug_mode = true
 
 [logging]
-file_path = "profile/pasta/logs/pasta.log"
+file_path = "profile/pasta/logs/pasta.log"  # load_dirからの相対パス
 rotation_days = 7
 ```
