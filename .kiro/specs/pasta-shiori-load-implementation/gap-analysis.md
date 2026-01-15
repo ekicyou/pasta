@@ -239,15 +239,19 @@ crates/pasta_shiori/src/
    - custom_fieldsからのデシリアライズロジック
 
 3. **tracing初期化戦略**:
-   - **決定**: PastaLoader::load()でOnceLock初期化（グローバルシングルトン）
+   - **決定**: 各PastaLoaderインスタンスが独立したログファイルを持つ
    - 初期化タイミング: PastaLoader::load()の最初（Phase 0.5として挿入）
-   - 二重初期化防止: OnceLock::get_or_init()使用
-   - エラーハンドリング: 初期化失敗時のフォールバック戦略（stderr出力）
+   - 複数インスタンス対応: 各インスタンスがload_dir/profile/pasta/logs/に出力
+   - 実装手段: 
+     - グローバルSubscriberに複数ファイル対応のLayerを設定（tracing_subscriber::layer）
+     - 各インスタンスがSpanでログを識別、フィルタで振り分け
+     - または各インスタンスが独自のSubscriberを持つ（非推奨: グローバル制約）
+   - エラーハンドリング: 初期化失敗時のフォールバック戦略（無視 or パニック）
    - tracing_subscriber構成:
-     - Layer構成（stdout + file）
+     - Layer構成（インスタンスごとのファイル出力）
      - フィルタレベル（debug/info/warn/error）
    - tracing_appender構成:
-     - ディレクトリ自動作成ロジック
+     - ディレクトリ自動作成ロジック（load_dir/profile/pasta/logs/）
      - ローテーション戦略（daily、N日保持）
      - ファイル書き込み失敗時のフォールバック
 
@@ -278,14 +282,15 @@ crates/pasta_shiori/src/
    - N日保持（rotation_days）の実装方法（手動削除 vs. max_log_files設定）
    - ファイル名パターン（`pasta.log.2026-01-15` など）
 
-2. **profile/pasta/logs/ディレクトリ作成タイミング**:
+2. **複数インスタンスのログファイル分割実装**:
+   - tracing_subscriber::Layerで複数ファイル対応の実装方法
+   - Spanフィールドによるファイルフィルタリング戦略
+   - グローバルSubscriber vs. インスタンスローカルLogger のトレードオフ
+   - **重要**: 各PastaLoaderインスタンスがload_dir/profile/pasta/logs/に独立したログファイルを持つ実装
+
+3. **profile/pasta/logs/ディレクトリ作成タイミング**:
    - PastaLoader::load()のPhase 2（Prepare directories）で作成可能か確認
    - tracing_appenderが自動作成するか、手動作成必要か
-
-3. **OnceLock初期化エラーハンドリング**:
-   - tracing_subscriber::fmt()初期化失敗時の動作
-   - 既にグローバルサブスクライバが設定されている場合の挙動
-   - set_global_default()のエラー処理戦略
 
 ### 確認済み事項
 
