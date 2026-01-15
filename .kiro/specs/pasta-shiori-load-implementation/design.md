@@ -41,7 +41,7 @@ graph TB
     subgraph pasta_shiori["pasta_shiori (cdylib)"]
         DllMain["DllMain<br/>OnceLock初期化"]
         RawShiori["RawShiori&lt;PastaShiori&gt;<br/>Arc&lt;Mutex&lt;Option&lt;T&gt;&gt;&gt;"]
-        PastaShiori["PastaShiori<br/>hinst, load_dir, runtime, logger"]
+        PastaShiori["PastaShiori<br/>hinst, load_dir, runtime"]
         MyError["MyError<br/>From&lt;LoaderError&gt;"]
     end
 
@@ -49,7 +49,7 @@ graph TB
         PastaLoader["PastaLoader::load()<br/>統合API"]
         PastaConfig["PastaConfig<br/>[loader], [logging]"]
         LoggingConfig["LoggingConfig<br/>file_path, rotation_days"]
-        PastaLuaRuntime["PastaLuaRuntime<br/>Lua VMホスト"]
+        PastaLuaRuntime["PastaLuaRuntime<br/>Lua VM + Logger"]
         PastaLogger["PastaLogger<br/>ファイル出力・ローテーション"]
     end
 
@@ -67,7 +67,7 @@ graph TB
     PastaLoader -->|"ロガー生成"| PastaLogger
     PastaLoader -.->|"エラー変換"| MyError
     PastaShiori -->|"保持"| PastaLuaRuntime
-    PastaShiori -->|"保持"| PastaLogger
+    PastaLuaRuntime -->|"内包"| PastaLogger
 ```
 
 **Architecture Integration**:
@@ -127,21 +127,24 @@ sequenceDiagram
     PastaConfig-->>PastaLoader: Ok(config)
     
     PastaLoader->>PastaLogger: new(load_dir, logging_config)
-    PastaLogger-->>PastaLoader: logger
+    PastaLogger-->>PastaLoader: logger (or None)
     
     PastaLoader->>PastaLoader: discover & transpile
-    PastaLoader->>PastaLuaRuntime: initialize
+    PastaLoader->>PastaLuaRuntime: initialize(logger)
+    Note over PastaLuaRuntime: logger内包（Option）
     PastaLuaRuntime-->>PastaLoader: runtime
     
-    PastaLoader-->>PastaShiori: Ok((runtime, logger))
-    PastaShiori->>PastaShiori: store runtime, logger
+    PastaLoader-->>PastaShiori: Ok(runtime)
+    PastaShiori->>PastaShiori: store runtime
     PastaShiori-->>Shell: true
 ```
 
 **Key Decisions**:
 - load_dir存在確認はPastaShiori側で実施（FFI境界での早期エラー検出）
-- PastaLoader::load()がログローテーション込みの初期化を完結
+- PastaLoader::load()がログローテーション込みの初期化を完結し、PastaLuaRuntimeに内包
+- PastaShioriはPastaLoggerの存在を知らない（カプセル化）
 - エラー発生時はMyError::Load(String)に変換してfalse返却
+- API変更なし（既存13テスト無修正で動作）
 
 ---
 
@@ -149,13 +152,13 @@ sequenceDiagram
 
 | Requirement | Summary | Components | Interfaces | Flows |
 |-------------|---------|------------|------------|-------|
-| 1.1, 1.2, 1.3 | Runtime初期化・保持 | PastaShiori, PastaLoader | Shiori::load() | load()シーケンス |
+| 1.1, 1.2, 1.3 | Runtime初期化・保持 | PastaShiori, PastaLoader, PastaLuaRuntime | Shiori::load() | load()シーケンス |
 | 2.1, 2.2, 2.3 | load_dirパス処理 | PastaShiori | PathBuf変換 | load()シーケンス |
 | 3.1, 3.2, 3.3, 3.4 | エラーハンドリング | MyError, LoaderError | From<LoaderError> | load()シーケンス |
 | 4.1, 4.2 | pasta.toml必須化 | PastaConfig | LoaderError::ConfigNotFound | load()シーケンス |
 | 5.1, 5.2 | hinst保持 | PastaShiori | isize field | - |
 | 6.1, 6.2, 6.3 | Runtime状態管理 | PastaShiori | Option<PastaLuaRuntime> | - |
-| 7.1-7.8 | ロギング機能 | LoggingConfig, PastaLogger | logging()メソッド | load()シーケンス |
+| 7.1-7.8 | ロギング機能 | PastaLuaRuntime, LoggingConfig, PastaLogger | PastaLoader::load() | load()シーケンス |
 
 ---
 
@@ -168,6 +171,7 @@ sequenceDiagram
 | PastaConfig | pasta_lua/Config | pasta.toml解析 | 4, 7.2 | toml (P1), serde (P1) | Service |
 | LoggingConfig | pasta_lua/Config | [logging]セクション | 7.2, 7.3, 7.4 | serde (P1) | State |
 | PastaLogger | pasta_lua/Logging | ファイル出力・ローテーション | 7.1, 7.3-7.8 | tracing-appender (P0) | Service |
+| PastaLuaRuntime | pasta_lua/Runtime | Lua VM実行環境 | 1, 7.7 | PastaLogger (P0) | Service |
 | PastaLoader | pasta_lua/Loader | 統合初期化API | 1, 7.1 | PastaConfig (P0), PastaLogger (P0) | Service |
 
 ---
@@ -206,7 +210,6 @@ pub(crate) struct PastaShiori {
     hinst: isize,
     load_dir: Option<PathBuf>,
     runtime: Option<PastaLuaRuntime>,
-    logger: Option<PastaLogger>,
 }
 ```
 
@@ -259,6 +262,45 @@ impl From<LoaderError> for MyError {
 ---
 
 ### pasta_lua Layer
+
+#### PastaLuaRuntime (拡張)
+
+| Field | Detail |
+|-------|--------|
+| Intent | Lua VM実行環境とログ管理の統合 |
+| Requirements | 1.1, 1.2, 1.3, 7.7 |
+
+**Responsibilities & Constraints**
+- Lua VMのライフサイクル管理
+- インスタンスごとのロガー保持（Option<PastaLogger>）
+- ロガーとランタイムの同期的破棄
+
+**Dependencies**
+- Internal: PastaLogger — ログ出力 (P0、Optional）
+
+**Contracts**: Service [x]
+
+##### Service Interface (拡張)
+
+```rust
+pub struct PastaLuaRuntime {
+    // ... 既存フィールド（Lua VM関連）
+    
+    /// インスタンスごとのロガー（[logging]なければNone）
+    logger: Option<PastaLogger>,
+}
+```
+
+- **Preconditions**: PastaLoader::load()で初期化済み
+- **Postconditions**: ロガーが設定されていればログ出力可能
+- **Invariants**: loggerのライフサイクルはランタイムと一致
+
+**Implementation Notes**
+- Integration: PastaLoader::load()内でロガーを生成しruntimeに格納
+- Encapsulation: pasta_shioriはPastaLoggerの存在を知らない（カプセル化）
+- Risks: Drop順序（logger→runtime）の保証
+
+---
 
 #### LoggingConfig
 
@@ -396,22 +438,19 @@ impl PastaConfig {
 
 **Contracts**: Service [x]
 
-##### Service Interface (シグネチャ変更)
+##### Service Interface
 
 ```rust
 impl PastaLoader {
-    /// ロガー付きでランタイムをロード
-    pub fn load(base_dir: impl AsRef<Path>) -> Result<(PastaLuaRuntime, Option<PastaLogger>), LoaderError>;
-    
-    /// 従来互換API（ロガーなし）
-    pub fn load_runtime_only(base_dir: impl AsRef<Path>) -> Result<PastaLuaRuntime, LoaderError>;
+    /// ランタイムをロード（[logging]設定に基づきロガーも内部初期化）
+    pub fn load(base_dir: impl AsRef<Path>) -> Result<PastaLuaRuntime, LoaderError>;
 }
 ```
 
 **Implementation Notes**
-- Integration: Phase 0.5としてロガー初期化を追加
-- Validation: [logging]セクションの有無でロガー生成判断
-- Risks: API変更による既存テストへの影響（load_runtime_only()で互換維持）
+- Integration: Phase 0.5としてロガー初期化を追加、PastaLuaRuntime内部に格納
+- Validation: [logging]セクションの有無でロガー生成判断（なければNone）
+- Backward Compatibility: API変更なし、既存13テスト無修正で動作
 
 ---
 
