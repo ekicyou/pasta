@@ -10,6 +10,8 @@ description = "Pasta Lua - Lua integration for Pasta DSL"
 [dependencies]
 pasta_core.workspace = true
 tracing.workspace = true
+tracing-appender.workspace = true
+tracing-subscriber.workspace = true
 thiserror.workspace = true
 mlua.workspace = true
 mlua-stdlib.workspace = true

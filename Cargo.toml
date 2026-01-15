@@ -30,6 +30,10 @@ toml = "0.9.8"
 serde = { version = "1", features = ["derive"] }
 glob = "0.3"
 
+# Logging dependencies
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
+
 # Internal dependencies
 pasta_core = { path = "crates/pasta_core" }
 pasta_lua = { path = "crates/pasta_lua" }
