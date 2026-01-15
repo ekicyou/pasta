@@ -62,11 +62,11 @@ pasta_luaの起動シーケンスにおけるWindows環境でのパス解決問�
 
 #### Acceptance Criteria
 1. When PastaLuaRuntimeが初期化される時, the Runtime shall `@enc`モジュールを`package.loaded`に登録する
-2. The `@enc`モジュール shall `to_ansi(utf8_string)`関数を提供する（UTF-8文字列をANSIバイト列に変換）
-3. The `@enc`モジュール shall `to_utf8(ansi_bytes)`関数を提供する（ANSIバイト列をUTF-8文字列に変換）
+2. The `@enc`モジュール shall `to_ansi(utf8_string)`関数を提供する（入力: UTF-8エンコードされたLua文字列、出力: ANSIエンコードされたLua文字列）
+3. The `@enc`モジュール shall `to_utf8(ansi_string)`関数を提供する（入力: ANSIエンコードされたLua文字列、出力: UTF-8エンコードされたLua文字列）
 4. When `require "@enc"`が呼ばれた時, the Lua VM shall 登録されたモジュールを返す
-5. If 変換が失敗した場合（無効な文字が含まれる等）, the 変換関数 shall nilとエラーメッセージを返す
-6. The `@enc`モジュール shall OEMコードページ用の`to_oem()` / `from_oem()`も提供する（オプション）
+5. If 変換が失敗した場合（無効な文字が含まれる等）, the 変換関数 shall nilとエラーメッセージを返す（Lua標準エラーパターン: `result, err = func()`）
+6. The 入出力は全てLua文字列型であり、内部的なバイトエンコーディングのみが異なる
 
 ### Requirement 6: 既存encoding/mod.rsの活用
 **Objective:** As a 開発者, I want 既存のエンコーディング変換実装を再利用すること, so that コードの重複を避け保守性を維持できる
@@ -87,6 +87,7 @@ pasta_luaの起動シーケンスにおけるWindows環境でのパス解決問�
 3. When `to_ansi()`に非文字列が渡された場合, the 関数 shall 型エラーを報告する
 4. When `to_utf8()`に非文字列が渡された場合, the 関数 shall 型エラーを報告する
 5. While tracingが有効な場合, the エンコーディング変換 shall 変換エラーをwarnレベルでログ出力する
+6. The ドキュメント shall Lua文字列の内部エンコーディングの違いを明記する（UTF-8 vs ANSI）
 
 ### Requirement 8: 後方互換性の維持
 **Objective:** As a 既存ユーザー, I want 既存のpasta_luaコードが変更なしで動作すること, so that 移行コストがない
