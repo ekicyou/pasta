@@ -40,8 +40,6 @@ PastaShioriのload関数の最低限の実装を行う。pasta_luaのエンジ�
 2. If load_dirが存在しない場合, PastaShiori shall DirectoryNotFoundエラーとしてfalseを返す
 3. If pasta.toml設定ファイルが見つからない場合, PastaShiori shall ConfigNotFoundエラーとして処理する
 4. The PastaShiori shall tracing crateを使用してエラー詳細をログ出力する
-5. When PastaLoader::load()が呼ばれた場合, PastaLoader shall tracing_subscriberを初期化する（OnceLockでグローバル初期化）
-6. When ロギング設定を行う場合, PastaLoader shall pasta.tomlの[logging]セクションを読み込み、ファイルロガーを設定する
 
 ### Requirement 4: pasta.toml必須化
 
