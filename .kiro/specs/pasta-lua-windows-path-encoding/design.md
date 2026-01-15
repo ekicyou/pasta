@@ -440,15 +440,60 @@ UTF-8 String ─→ to_ansi_bytes() ─→ Vec<u8> (ANSI)
 ### 必須テストケース
 
 1. **ASCII パス変換**: 全プラットフォームで変換なしで動作
+   - テストパス例: `"test/path/file.lua"`, `"scripts/init.lua"`
+   - 期待値: 入力と同じバイト列が出力される
+
 2. **日本語パス変換** (Windows): UTF-8→ANSI→UTF-8のラウンドトリップ
+   - テストパス例: `"C:\\ユーザー\\テスト\\scripts"`, `"日本語フォルダ/モジュール.lua"`
+   - 期待値: `to_ansi_bytes` → ANSI変換成功、`Encoding::ANSI.to_string` → 元のUTF-8に復元
+   - Windows専用: `#[cfg(windows)]`または`#[cfg_attr(not(windows), ignore)]`でマーク
+
 3. **@enc.to_ansi**: UTF-8入力、ANSI出力確認
+   - 入力例: `enc.to_ansi("日本語パス")`
+   - 期待値: `(ansi_string, nil)` - Lua文字列内部がANSIバイト列
+   - 検証: `#ansi_string > 0`でバイト列存在確認
+
 4. **@enc.to_utf8**: ANSI入力、UTF-8出力確認
+   - 前提: Test 3のANSI出力を入力として使用
+   - 期待値: `(utf8_string, nil)` - 元の"日本語パス"に復元
+   - 検証: `utf8_string == "日本語パス"`
+
 5. **エラーハンドリング**: 無効な入力時の`nil, err`返却
+   - 型エラー: `enc.to_ansi(123)` → `nil, "bad argument"` (mlua自動検証)
+   - 変換エラー: 無効なANSIバイト列 → `nil, エラーメッセージ文字列`
+
 6. **後方互換性**: 既存テストが変更なしで合格
+   - `cargo test --all` - 全テストが成功
+   - リグレッション検出: 既存テスト失敗時は即座に原因調査
+
+### テスト実装ガイドライン
+
+**ユニットテスト配置**:
+- `encoding/mod.rs`: `to_ansi_bytes`のテスト（Windows/Unix分岐）
+- `loader/context.rs`: `generate_package_path_bytes`のテスト
+- `runtime/enc.rs`: `@enc`モジュールのテスト（`#[cfg(test)]`ブロック内）
+
+**統合テスト配置**:
+- `tests/pasta_lua_encoding_test.rs`: 新規作成
+  - Windows日本語パスでの`require`成功テスト
+  - `@enc`モジュールのE2Eテスト
+
+**CI設定方針**:
+- GitHub Actions: `windows-latest`と`ubuntu-latest`マトリックス
+- Windows専用テスト: `#[cfg(windows)]`または`#[cfg_attr(not(windows), ignore)]`
+- 日本語パステスト: テストフィクスチャとしてUTF-8ファイル名を使用
 
 ### CI考慮事項
 - Windows環境でのみ日本語パステスト実行
 - Unix環境ではパススルー動作確認
+- CI設定例（GitHub Actions）:
+  ```yaml
+  strategy:
+    matrix:
+      os: [windows-latest, ubuntu-latest]
+  steps:
+    - run: cargo test --all
+  ```
 
 ---
 
