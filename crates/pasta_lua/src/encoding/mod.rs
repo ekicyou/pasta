@@ -44,23 +44,42 @@ pub enum Encoding {
     OEM,
 }
 
-/// Convert a UTF-8 path string to system encoding for Lua.
+/// Convert a UTF-8 string to ANSI bytes (system encoding).
 ///
-/// On Windows, converts to ANSI code page (e.g., Shift-JIS).
-/// On other systems, returns the original string.
-pub fn path_to_lua(path: &str) -> Result<String> {
-    #[cfg(windows)]
-    {
-        // Convert UTF-8 to ANSI bytes, then back to String for Lua
-        let bytes = Encoding::ANSI.to_bytes(path)?;
-        // Return as a byte string that Lua can use directly
-        Ok(String::from_utf8_lossy(&bytes).into_owned())
-    }
+/// On Windows, converts to ANSI code page (e.g., Shift-JIS/CP932 for Japanese locale).
+/// On other systems, returns the original UTF-8 bytes.
+///
+/// # Arguments
+/// * `s` - UTF-8 string to convert
+///
+/// # Returns
+/// * `Ok(Vec<u8>)` - Converted byte vector
+/// * `Err(std::io::Error)` - If encoding conversion fails (Windows only)
+///
+/// # Example
+/// ```rust,ignore
+/// use pasta_lua::encoding::to_ansi_bytes;
+///
+/// let bytes = to_ansi_bytes("hello").unwrap();
+/// assert_eq!(bytes, b"hello");
+/// ```
+#[cfg(windows)]
+pub fn to_ansi_bytes(s: &str) -> Result<Vec<u8>> {
+    Encoding::ANSI.to_bytes(s)
+}
 
-    #[cfg(not(windows))]
-    {
-        Ok(path.to_string())
-    }
+/// Convert a UTF-8 string to ANSI bytes (system encoding).
+///
+/// On Unix systems, returns the original UTF-8 bytes unchanged.
+///
+/// # Arguments
+/// * `s` - UTF-8 string to convert
+///
+/// # Returns
+/// * `Ok(Vec<u8>)` - UTF-8 bytes
+#[cfg(not(windows))]
+pub fn to_ansi_bytes(s: &str) -> Result<Vec<u8>> {
+    Ok(s.as_bytes().to_vec())
 }
 
 /// Convert a path string from Lua (system encoding) to UTF-8.
@@ -85,15 +104,44 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_ascii_roundtrip() {
-        let original = "test/path/file.lua";
-        let converted = path_to_lua(original).unwrap();
-        // ASCII should pass through unchanged
-        assert!(converted.contains("test"));
+    fn test_to_ansi_bytes_ascii() {
+        // ASCII should pass through unchanged on all platforms
+        let result = to_ansi_bytes("test/path/file.lua").unwrap();
+        assert_eq!(result, b"test/path/file.lua");
+    }
+
+    #[test]
+    fn test_to_ansi_bytes_empty() {
+        // Empty string should return empty bytes
+        let result = to_ansi_bytes("").unwrap();
+        assert!(result.is_empty());
     }
 
     #[test]
     fn test_encoding_enum() {
         assert_ne!(Encoding::ANSI, Encoding::OEM);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_to_ansi_bytes_japanese() {
+        // Japanese characters should be converted to ANSI (Shift-JIS/CP932)
+        let result = to_ansi_bytes("日本語パス").unwrap();
+        // On Japanese Windows, this should be convertible
+        assert!(!result.is_empty());
+        // The result should not be the same as UTF-8 bytes
+        let utf8_bytes = "日本語パス".as_bytes();
+        // ANSI encoding will be different from UTF-8 for Japanese
+        assert_ne!(result, utf8_bytes);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_to_ansi_bytes_roundtrip() {
+        // Roundtrip test: UTF-8 -> ANSI -> UTF-8
+        let original = "日本語テスト";
+        let ansi_bytes = to_ansi_bytes(original).unwrap();
+        let restored = Encoding::ANSI.to_string(&ansi_bytes).unwrap();
+        assert_eq!(restored, original);
     }
 }

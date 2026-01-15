@@ -16,6 +16,8 @@
 //! let result = runtime.exec("return 1 + 1")?;
 //! ```
 
+mod enc;
+
 use crate::context::TranspileContext;
 use crate::loader::{LoaderContext, TranspileResult};
 use mlua::{Lua, Result as LuaResult, StdLib, Table, Value};
@@ -255,6 +257,9 @@ impl PastaLuaRuntime {
         // Register @pasta_config module
         Self::register_config_module(&runtime.lua, &loader_context.custom_fields)?;
 
+        // Register @enc module for encoding conversion
+        Self::register_enc_module(&runtime.lua)?;
+
         // Load transpiled code directly into memory
         for result in transpiled {
             runtime
@@ -272,13 +277,24 @@ impl PastaLuaRuntime {
     ///
     /// Sets the package.path to include all search paths from LoaderContext
     /// in priority order (first path has highest priority).
+    ///
+    /// On Windows, the path is converted to ANSI encoding to ensure
+    /// Lua's file I/O functions (which use fopen) can resolve non-ASCII paths.
     fn setup_package_path(lua: &Lua, loader_context: &LoaderContext) -> LuaResult<()> {
-        let package_path = loader_context.generate_package_path();
+        // Get path bytes in system encoding (ANSI on Windows, UTF-8 on Unix)
+        let path_bytes = loader_context
+            .generate_package_path_bytes()
+            .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+
+        // Create Lua string from raw bytes
+        let lua_path_string = lua.create_string(&path_bytes)?;
 
         let package: Table = lua.globals().get("package")?;
-        package.set("path", package_path.clone())?;
+        package.set("path", lua_path_string)?;
 
-        tracing::debug!(path = %package_path, "Set package.path");
+        // Log the path (interpret as UTF-8 if possible, otherwise show byte count)
+        let path_display = String::from_utf8_lossy(&path_bytes);
+        tracing::debug!(path = %path_display, "Set package.path");
         Ok(())
     }
 
@@ -294,6 +310,20 @@ impl PastaLuaRuntime {
         loaded.set("@pasta_config", config_table)?;
 
         tracing::debug!("Registered @pasta_config module");
+        Ok(())
+    }
+
+    /// Register @enc module for encoding conversion.
+    ///
+    /// Provides UTF-8 <-> ANSI conversion functions for Lua scripts.
+    fn register_enc_module(lua: &Lua) -> LuaResult<()> {
+        let enc_table = enc::register(lua)?;
+
+        let package: Table = lua.globals().get("package")?;
+        let loaded: Table = package.get("loaded")?;
+        loaded.set("@enc", enc_table)?;
+
+        tracing::debug!("Registered @enc module");
         Ok(())
     }
 
