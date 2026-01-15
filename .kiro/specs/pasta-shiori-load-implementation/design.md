@@ -168,6 +168,7 @@ sequenceDiagram
 |-----------|--------------|--------|--------------|------------------|-----------|
 | PastaShiori | pasta_shiori/SHIORI | SHIORIライフサイクル管理 | 1, 2, 3, 5, 6 | PastaLoader (P0), MyError (P0) | Service |
 | MyError | pasta_shiori/Error | エラー型変換 | 3 | LoaderError (P0) | Service |
+| GlobalLoggerRegistry | pasta_shiori/Logging | グローバルロガー管理とSpan振り分け | 7.7 | PastaLogger (P0) | Service |
 | PastaConfig | pasta_lua/Config | pasta.toml解析 | 4, 7.2 | toml (P1), serde (P1) | Service |
 | LoggingConfig | pasta_lua/Config | [logging]セクション | 7.2, 7.3, 7.4 | serde (P1) | State |
 | PastaLogger | pasta_lua/Logging | ファイル出力・ローテーション | 7.1, 7.3-7.8 | tracing-appender (P0) | Service |
@@ -222,6 +223,10 @@ pub(crate) struct PastaShiori {
 - Validation: load_dir存在確認、pasta.toml存在確認（PastaLoader経由）
 - Risks: 複数回load()呼び出し時の既存ランタイム解放順序
 - **Logging Initialization**: グローバルtracing Subscriberの初期化はRawShiori::new()（DllMain時）でOnceLockにより1回のみ実行。2回目以降のゴースト起動時はno-opとなり、既存Subscriberを再利用。初期化失敗時はログ出力を無効化し、エンジン起動は継続（panic回避）。
+- **Span Strategy**: 
+  - load/unload: `info_span!("shiori_load/unload", load_dir = %path)` — 頻度低、重要イベント
+  - request: `debug_span!("shiori_request", load_dir = %path)` — 頻度高、詳細トレース
+  - Span内のすべてのログ（trace～error）にload_dirフィールドが自動付与され、GlobalLoggerRegistryが振り分け
 
 ---
 
@@ -258,6 +263,71 @@ impl From<LoaderError> for MyError {
 - **Preconditions**: LoaderErrorが有効
 - **Postconditions**: MyError::Load(String)に変換
 - **Invariants**: エラーメッセージにデバッグ情報を含む
+
+---
+
+#### GlobalLoggerRegistry
+
+| Field | Detail |
+|-------|--------|
+| Intent | 複数PastaLoggerの管理とSpan識別による振り分け |
+| Requirements | 7.7 |
+
+**Responsibilities & Constraints**
+- load時にPastaLoggerをload_dirで登録
+- unload時にPastaLoggerを削除
+- MakeWriter実装でSpanのload_dirを見て対応ロガーに振り分け
+
+**Dependencies**
+- Internal: PastaLogger — 各インスタンスのロガー (P0)
+- External: tracing — Span情報取得 (P0)
+
+**Contracts**: Service [x]
+
+##### Service Interface
+
+```rust
+pub struct GlobalLoggerRegistry {
+    loggers: Arc<Mutex<HashMap<PathBuf, Arc<PastaLogger>>>>,
+}
+
+impl GlobalLoggerRegistry {
+    /// シングルトンインスタンス取得
+    pub fn instance() -> &'static Self;
+    
+    /// ロガー登録（PastaShiori::load時）
+    pub fn register(&self, load_dir: PathBuf, logger: Arc<PastaLogger>);
+    
+    /// ロガー削除（PastaShiori::unload時）
+    pub fn unregister(&self, load_dir: &Path);
+}
+
+impl<'a> MakeWriter<'a> for GlobalLoggerRegistry {
+    type Writer = Box<dyn io::Write + 'a>;
+    
+    fn make_writer(&'a self) -> Self::Writer {
+        // 現在のSpanから load_dir を取得
+        let span = tracing::Span::current();
+        if let Some(load_dir) = span.field("load_dir") {
+            // 対応するPastaLoggerを探す
+            if let Some(logger) = self.loggers.lock().get(load_dir) {
+                return Box::new(logger.make_writer());
+            }
+        }
+        // 該当なしはno-op
+        Box::new(io::sink())
+    }
+}
+```
+
+- **Preconditions**: RawShiori::new()でSubscriber初期化済み
+- **Postconditions**: Spanのload_dirに基づいて適切なPastaLoggerに出力
+- **Invariants**: 登録されていないload_dirのログは破棄（sink）
+
+**Implementation Notes**
+- Integration: RawShiori::new()でSubscriberに登録、PastaShiori::load/unloadで登録/削除
+- Thread Safety: Arc<Mutex<HashMap>>で複数スレッド対応
+- Performance: Span情報取得はO(1)、HashMap検索もO(1)
 
 ---
 
@@ -398,6 +468,7 @@ impl Drop for PastaLogger {
 - Validation: パス正規化、ディレクトリ作成権限確認
 - Risks: ファイル書き込み権限エラー時のフォールバック（ログ無効化）
 - **Global Subscriber Strategy**: グローバルtracing Subscriberは`RawShiori::new()`で初期化（OnceLockパターン）。各PastaLoggerはインスタンスごとのMakeWriter実装を通じて独立したファイルに出力。グローバルSubscriberへの登録は1回のみで、2回目以降のゴースト起動時はSubscriber再利用により複数インスタンス対応を実現。
+- **Span-based Routing**: PastaShioriがSpan（`info_span!`/`debug_span!`）でload_dirを設定。GlobalLoggerRegistryがSpanのload_dirフィールドを見て対応するPastaLoggerに振り分け。該当なしならno-op。
 
 ---
 
