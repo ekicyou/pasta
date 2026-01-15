@@ -16,6 +16,41 @@ pasta_luaの起動シーケンスにおけるWindows環境でのパス解決問�
 - Windows環境では、`fopen`はANSIコードページ（日本語環境ではShift_JIS/CP932）でパスを解釈
 - 現在の`encoding::path_to_lua`は`String::from_utf8_lossy`を使用しているが、これがANSIバイト列を破壊
 
+## 設計判断事項
+
+本仕様の実装にあたり、以下の設計判断が必要です。ギャップ分析に基づく推奨案を示します。
+
+### 判断1: encoding/mod.rsの関数設計
+
+**選択肢**:
+- A: `path_to_lua_bytes`新規追加、既存`path_to_lua`維持（**推奨**）
+- B: `path_to_lua`をバイト列返却に変更（破壊的変更）
+
+**推奨理由**: 後方互換性維持（Requirement 8）
+
+**決定**: (設計フェーズで確定)
+
+### 判断2: @encモジュールの関数セット
+
+**必須**: `to_ansi(utf8_str)`, `to_utf8(ansi_str)`  
+**オプション**: `to_oem(utf8_str)`, `from_oem(oem_str)`（コンソールI/O用）
+
+**推奨**: 必須のみ実装（**推奨**）  
+**推奨理由**: 要件スコープ最小化、OEMは将来追加可能
+
+**決定**: (設計フェーズで確定)
+
+### 判断3: テスト戦略
+
+**Windows専用テスト**: 日本語パスでのモジュールロードテスト  
+**Unix環境**: パススルー動作確認のみ
+
+**CI考慮事項**: Windows環境でのみ日本語パステスト実行
+
+**決定**: (設計フェーズで確定)
+
+---
+
 ## Requirements
 
 ### Requirement 1: package.pathへのANSIバイト列設定
