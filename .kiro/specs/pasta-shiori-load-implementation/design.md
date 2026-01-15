@@ -218,6 +218,7 @@ pub(crate) struct PastaShiori {
 - Integration: PastaLoader::load()呼び出しでランタイムとロガーを取得
 - Validation: load_dir存在確認、pasta.toml存在確認（PastaLoader経由）
 - Risks: 複数回load()呼び出し時の既存ランタイム解放順序
+- **Logging Initialization**: グローバルtracing Subscriberの初期化はRawShiori::new()（DllMain時）でOnceLockにより1回のみ実行。2回目以降のゴースト起動時はno-opとなり、既存Subscriberを再利用。初期化失敗時はログ出力を無効化し、エンジン起動は継続（panic回避）。
 
 ---
 
@@ -354,6 +355,7 @@ impl Drop for PastaLogger {
 - Integration: PastaLoader::load()内で生成、PastaShioriに所有権移転
 - Validation: パス正規化、ディレクトリ作成権限確認
 - Risks: ファイル書き込み権限エラー時のフォールバック（ログ無効化）
+- **Global Subscriber Strategy**: グローバルtracing Subscriberは`RawShiori::new()`で初期化（OnceLockパターン）。各PastaLoggerはインスタンスごとのMakeWriter実装を通じて独立したファイルに出力。グローバルSubscriberへの登録は1回のみで、2回目以降のゴースト起動時はSubscriber再利用により複数インスタンス対応を実現。
 
 ---
 
