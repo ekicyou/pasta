@@ -74,8 +74,8 @@
 |------------|----------|------|---------|
 | Req 1: main.lua ロード | scripts/pasta/shiori/main.lua を自動 require | package.path に scripts/ 含む | **Missing**: 自動ロード処理 |
 | Req 2: SHIORI.request 関数 | Lua グローバル SHIORI テーブル | scripts/pasta/shiori/init.lua 空 | **Missing**: 関数定義 |
-| Req 3: Rust 呼び出し | PastaShiori::request → Lua 関数 | exec() で任意コード可能 | **Missing**: call_global API |
-| Req 4: call_global API | PastaLuaRuntime メソッド | なし | **Missing**: メソッド実装 |
+| Req 3: Rust 呼び出し | PastaShiori::request → Lua 関数（リクエスト渡し） | exec() で任意コード可能 | **Missing**: 関数参照保持と呼び出し |
+| Req 4: 関数参照保持 | Load時に SHIORI.request 参照取得 | なし | **Missing**: 関数参照取得・保持機構 |
 | Req 5: レスポンスフォーマット | 文字列結合のみ | Lua 標準機能で実現可能 | なし |
 | Req 6: テスト | pasta_shiori テスト | 既存テストあり | **Extend**: 新テスト追加 |
 
@@ -83,10 +83,11 @@
 
 #### Missing Capabilities
 
-1. **PastaLuaRuntime::call_global メソッド**
-   - 機能: グローバルテーブルから関数を取得し、引数付きで呼び出す
-   - mlua パターン: `lua.globals().get::<_, Function>("name")?.call(args)?`
-   - リターン型: `LuaResult<String>` または `LuaResult<Value>`
+1. **SHIORI.request 関数参照の保持機構**
+   - 場所: PastaShiori 構造体
+   - 機能: Load時に `lua.globals().get::<_, Table>("SHIORI")?.get::<_, Function>("request")?` で取得
+   - 保持: `Option<mlua::Function>` フィールド
+   - 呼び出し: `function.call::<_, String>((request_text,))?`
 
 2. **main.lua 自動ロード機構**
    - 場所: PastaLoader または PastaLuaRuntime::from_loader
@@ -95,11 +96,12 @@
 
 3. **scripts/pasta/shiori/main.lua 実装**
    - 内容: SHIORI グローバルテーブルに request 関数を定義
-   - 依存: pasta.shiori モジュール（既存空スタブ）を拡張
+   - 引数: リクエスト文字列（SHIORI/3.0 形式）
+   - 戻り値: レスポンス文字列（204 No Content）
 
 #### Research Needed
 
-- **mlua::Function::call() の引数・戻り値変換**: 文字列 → mlua::String、mlua::Value → String 変換パターン
+- **mlua::Function のライフタイム管理**: PastaShiori が Function 参照を保持する際の所有権とライフタイム設計
 - **Lua エラー時の詳細メッセージ取得**: mlua::Error から message 抽出方法
 
 #### Constraints
@@ -107,6 +109,7 @@
 - **PastaLuaRuntime は mlua::Lua をラップ**: 直接 lua() メソッドでアクセス可能
 - **既存 exec() は eval() ベース**: 戻り値を Value で返す
 - **package.path は from_loader で設定済み**: scripts/ は既に検索対象
+- **mlua::Function は Lua への参照を保持**: PastaShiori が Function を保持する場合、PastaLuaRuntime より長生きしないこと
 
 ### 複雑度シグナル
 
@@ -190,9 +193,10 @@
 
 ##### Rust 側拡張（既存コンポーネント）
 
-1. **PastaLuaRuntime に call_global 追加**
-   - ファイル: `crates/pasta_lua/src/runtime/mod.rs`
-   - 実装: mlua パターンのラッパー（10-20 行）
+1. **PastaShiori に SHIORI.request 関数参照を保持**
+   - ファイル: `crates/pasta_shiori/src/shiori.rs`
+   - 実装: `shiori_request_fn: Option<mlua::Function>` フィールド追加（5 行）
+   - Load時: Runtime から関数取得・保持（10-15 行）
 
 2. **PastaLoader に main.lua 自動ロード追加**
    - ファイル: `crates/pasta_lua/src/loader/mod.rs` (from_loader 内)
@@ -200,7 +204,7 @@
 
 3. **PastaShiori::request 実装**
    - ファイル: `crates/pasta_shiori/src/shiori.rs`
-   - 実装: `runtime.call_global("SHIORI.request", (req,))` 呼び出し（15-20 行）
+   - 実装: 保持した関数を `function.call::<_, String>((req,))?` で呼び出し（15-20 行）
 
 4. **エラー変換追加**
    - ファイル: `crates/pasta_shiori/src/error.rs`
@@ -209,7 +213,9 @@
 ##### Lua 側新規作成
 
 5. **scripts/pasta/shiori/main.lua 作成**
-   - 内容: SHIORI グローバルテーブル定義、request 関数実装
+   - 内容: SHIORI グローバルテーブル定義、request(request_text) 関数実装
+   - 引数: リクエスト文字列（SHIORI/3.0 形式）
+   - 戻り値: 204 No Content レスポンス文字列
    - サイズ: 20-30 行
 
 #### Phase 2: Future Enhancements（スコープ外）
@@ -251,9 +257,9 @@
 
 | タスク | 見積もり | 根拠 |
 |-------|---------|------|
-| call_global メソッド実装 | 0.5 日 | mlua パターン既知、テスト含む |
+| 関数参照保持機構実装 | 0.5 日 | mlua::Function 取得・保持、テスト含む |
 | main.lua 自動ロード | 0.3 日 | 既存 from_loader 拡張のみ |
-| PastaShiori::request 実装 | 0.5 日 | call_global 呼び出しのみ、テスト含む |
+| PastaShiori::request 実装 | 0.5 日 | 関数 call のみ、テスト含む |
 | エラー変換実装 | 0.2 日 | From trait 実装のみ |
 | main.lua 作成 | 0.3 日 | レスポンス文字列構築のみ |
 | 統合テスト | 0.7 日 | E2E テスト、エラーケース検証 |
@@ -297,19 +303,19 @@
 
 ### 設計フェーズで決定すべき重要事項
 
-1. **call_global API シグネチャ**
-   - 引数型: `impl IntoLuaMulti` vs. `Vec<Value>` vs. タプル
-   - 戻り値型: `LuaResult<String>` vs. `LuaResult<Value>` + 変換
-   - エラーハンドリング: mlua::Error を MyError::Script に変換する方法
+1. **SHIORI.request 関数参照のライフタイム管理**
+   - PastaShiori が mlua::Function を保持する際の所有権設計
+   - PastaLuaRuntime との生存期間の関係
+   - Option<mlua::Function> vs. 関数名保持 + 都度取得
 
 2. **main.lua ロードタイミング**
    - from_loader の最後 vs. transpiled コードロード後
    - エラーレベル: warn vs. debug（main.lua 不在時）
 
 3. **SHIORI.request Lua 関数シグネチャ**
-   - グローバルテーブル構造: `SHIORI.request` vs. `_G.SHIORI_request`
-   - 引数: リクエスト文字列のみ vs. 構造化オブジェクト
-   - 戻り値: レスポンス文字列のみ vs. ステータスコード + ヘッダーテーブル
+   - グローバルテーブル構造: `SHIORI.request` 確定
+   - 引数: リクエスト文字列のみ
+   - 戻り値: レスポンス文字列のみ
 
 4. **テスト戦略**
    - Fixture 追加: minimal に main.lua 含める vs. 専用 fixture 作成
@@ -317,9 +323,9 @@
 
 ### 研究項目（設計フェーズで調査）
 
-1. **mlua::Function::call() 詳細**
+1. **mlua::Function のライフタイム制約**
    - 文献: [mlua ドキュメント - Function](https://docs.rs/mlua/latest/mlua/struct.Function.html)
-   - 確認事項: 引数変換パターン、エラーメッセージ取得
+   - 確認事項: Function が参照する Lua インスタンスのライフタイム、所有権移動の可否
 
 2. **Lua エラーメッセージ伝播**
    - 文献: mlua::Error 型定義
@@ -333,45 +339,46 @@
 
 ## Appendix: Code Examples
 
-### PastaLuaRuntime::call_global 実装例（参考）
+### PastaShiori 構造体拡張例（参考）
 
 ```rust
-/// Call a global Lua function with arguments.
-///
-/// # Arguments
-/// * `name` - Function name (e.g., "SHIORI.request")
-/// * `args` - Function arguments (tuple or IntoLuaMulti)
-///
-/// # Returns
-/// * `Ok(Value)` - Function return value
-/// * `Err(e)` - Function not found or execution error
-pub fn call_global<'a, A, R>(&'a self, name: &str, args: A) -> LuaResult<R>
-where
-    A: IntoLuaMulti<'a>,
-    R: FromLuaMulti<'a>,
-{
-    // Parse nested table access (e.g., "SHIORI.request")
-    let parts: Vec<&str> = name.split('.').collect();
+pub(crate) struct PastaShiori {
+    hinst: isize,
+    load_dir: Option<PathBuf>,
+    runtime: Option<PastaLuaRuntime>,
     
-    let mut current: Value = self.lua.globals().into();
-    for (i, part) in parts.iter().enumerate() {
-        if i == parts.len() - 1 {
-            // Last part: get function
-            let table: Table = current.as_table()
-                .ok_or_else(|| mlua::Error::runtime(format!("{} is not a table", parts[..i].join("."))))?
-                .clone();
-            let func: Function = table.get(*part)?;
-            return func.call(args);
-        } else {
-            // Intermediate part: get table
-            let table: Table = current.as_table()
-                .ok_or_else(|| mlua::Error::runtime(format!("{} is not a table", parts[..i].join("."))))?
-                .clone();
-            current = table.get(*part)?;
+    /// SHIORI.request Lua 関数への参照（Load時に取得）
+    shiori_request_fn: Option<mlua::Function>,
+}
+
+impl Shiori for PastaShiori {
+    fn load<S: AsRef<OsStr>>(&mut self, hinst: isize, load_dir: S) -> MyResult<bool> {
+        // ... existing load logic ...
+        
+        // SHIORI.request 関数を取得・保持
+        if let Some(ref runtime) = self.runtime {
+            match runtime.lua().globals().get::<_, mlua::Table>("SHIORI") {
+                Ok(shiori_table) => {
+                    match shiori_table.get::<_, mlua::Function>("request") {
+                        Ok(func) => {
+                            self.shiori_request_fn = Some(func);
+                            debug!("SHIORI.request function loaded");
+                        }
+                        Err(e) => {
+                            warn!("SHIORI.request function not found: {}", e);
+                            self.shiori_request_fn = None;
+                        }
+                    }
+                }
+                Err(e) => {
+                    warn!("SHIORI table not found: {}", e);
+                    self.shiori_request_fn = None;
+                }
+            }
         }
+        
+        Ok(true)
     }
-    
-    Err(mlua::Error::runtime(format!("Invalid function path: {}", name)))
 }
 ```
 
@@ -387,8 +394,8 @@ local shiori = require("pasta.shiori")
 SHIORI = {}
 
 --- Handle SHIORI/3.0 request
---- @param request_text string Raw SHIORI request
---- @return string SHIORI response
+--- @param request_text string Raw SHIORI request (e.g., "GET SHIORI/3.0\r\n...")
+--- @return string SHIORI response (204 No Content)
 function SHIORI.request(request_text)
     -- Minimal implementation: return 204 No Content
     return "SHIORI/3.0 204 No Content\r\n" ..
@@ -410,13 +417,18 @@ fn request<S: AsRef<str>>(&mut self, req: S) -> MyResult<String> {
     let req = req.as_ref();
     debug!(request_len = req.len(), "Processing SHIORI request");
     
-    // Call Lua SHIORI.request function
-    let response: String = runtime
-        .call_global("SHIORI.request", (req,))
-        .map_err(|e| MyError::Script { 
-            message: format!("SHIORI.request failed: {}", e) 
-        })?;
-    
-    Ok(response)
+    // Call SHIORI.request function if available
+    if let Some(ref func) = self.shiori_request_fn {
+        let response: String = func
+            .call((req,))
+            .map_err(|e| MyError::Script { 
+                message: format!("SHIORI.request failed: {}", e) 
+            })?;
+        Ok(response)
+    } else {
+        // Fallback: return default 204 response
+        warn!("SHIORI.request function not available, returning default 204");
+        Ok("SHIORI/3.0 204 No Content\r\nCharset: UTF-8\r\nSender: Pasta\r\n\r\n".to_string())
+    }
 }
 ```

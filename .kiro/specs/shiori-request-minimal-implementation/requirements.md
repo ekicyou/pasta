@@ -58,23 +58,24 @@ pasta_shioriに対して、最低限のSHIORI.request実装を行う。PastaShio
 
 #### Acceptance Criteria
 
-1. When PastaShiori::request が呼び出されたとき、the PastaShiori shall PastaLuaRuntime 経由で Lua の `SHIORI.request` 関数を実行する
+1. When PastaShiori::request が呼び出されたとき、the PastaShiori shall SHIORI リクエスト文字列を引数として Lua の `SHIORI.request` 関数を実行する
 2. When SHIORI.request が文字列を返したとき、the PastaShiori::request shall その文字列をそのまま呼び出し元に返す
 3. If PastaLuaRuntime が初期化されていない場合、the PastaShiori::request shall `MyError::NotInitialized` エラーを返す
-4. If Lua 実行中にエラーが発生した場合、the PastaShiori::request shall 適切なエラー型にラップして返す
+4. If Lua 関数が存在しない場合、the PastaShiori::request shall 適切なエラーを返す
+5. If Lua 実行中にエラーが発生した場合、the PastaShiori::request shall 適切なエラー型にラップして返す
 
 ---
 
-### Requirement 4: PastaLuaRuntime Lua 関数呼び出し機能
+### Requirement 4: SHIORI.request 関数参照の保持
 
-**Objective:** pasta_lua 開発者として、ランタイムから任意の Lua グローバル関数を呼び出したい。これにより、Rust-Lua 間の双方向通信が可能になる。
+**Objective:** pasta_shiori 開発者として、Load時に取得した SHIORI.request 関数を request 時に効率的に呼び出したい。これにより、毎回 Lua コードを eval する非効率を避ける。
 
 #### Acceptance Criteria
 
-1. The PastaLuaRuntime shall `call_global` メソッドを提供し、グローバルテーブル上の関数を呼び出せる
-2. When call_global が呼び出されたとき、the PastaLuaRuntime shall 指定された引数を Lua 関数に渡す
-3. When Lua 関数が値を返したとき、the PastaLuaRuntime shall Rust の `String` 型として結果を返す
-4. If 指定された関数が存在しない場合、the PastaLuaRuntime shall 適切なエラーを返す
+1. When PastaShiori::load が成功したとき、the PastaShiori shall PastaLuaRuntime から `SHIORI.request` 関数への参照（mlua::Function）を取得して保持する
+2. If SHIORI.request 関数が存在しない場合、the PastaShiori::load shall ワーニングログを出力し、関数参照を None として継続する
+3. When PastaShiori::request が呼び出されたとき、the PastaShiori shall 保持した関数参照を使用して Lua 関数を呼び出す
+4. If 関数参照が None の場合、the PastaShiori::request shall デフォルトの 204 レスポンスを返す
 
 ---
 
