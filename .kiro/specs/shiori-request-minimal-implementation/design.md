@@ -117,37 +117,39 @@ pub(crate) struct PastaShiori {
     load_dir: Option<PathBuf>,
     runtime: Option<PastaLuaRuntime>,
     
-    // 新規追加
-    shiori_load_fn: Option<mlua::Function<'static>>,
-    shiori_request_fn: Option<mlua::Function<'static>>,
+    // 新規追加: SHIORI関数の存在フラグ
+    has_shiori_load: bool,
+    has_shiori_request: bool,
 }
 ```
 
-**注意**: `Function<'static>` は mlua の `owned` feature により Lua インスタンスからの独立した所有権を持つ。実際には `Function<'lua>` を使用し、`runtime` と同一生存期間で管理。
+**設計判断**: mlua::Function のライフタイム管理を避けるため、関数参照は保持せず、呼び出し時に都度 `runtime.lua().globals().get("SHIORI")` から取得する。パフォーマンス差は実用上無視できる（ハッシュルックアップは O(1)）。
 
 #### 3.1.2 load() メソッド拡張
 
 **責務**:
 1. 既存の PastaLoader::load() 呼び出し
-2. SHIORI テーブルから load/request 関数を取得・保持
+2. SHIORI テーブルから load/request 関数の存在確認
 3. SHIORI.load 関数を呼び出し
 
 **エラーハンドリング**:
-- SHIORI テーブル不在: warn ログ、関数参照は None
-- SHIORI.load 関数不在: warn ログ、shiori_load_fn は None
-- SHIORI.request 関数不在: warn ログ、shiori_request_fn は None
+- SHIORI テーブル不在: warn ログ、has_shiori_* = false
+- SHIORI.load 関数不在: warn ログ、has_shiori_load = false
+- SHIORI.request 関数不在: warn ログ、has_shiori_request = false
 - SHIORI.load 呼び出し失敗: error ログ、Ok(false) 返却
 - SHIORI.load が false 返却: warn ログ、Ok(false) 返却
 
 #### 3.1.3 request() メソッド実装
 
 **責務**:
-1. shiori_request_fn の存在確認
-2. 関数呼び出しまたはデフォルトレスポンス返却
+1. has_shiori_request フラグの確認
+2. SHIORI.request 関数を取得して呼び出し、またはデフォルトレスポンス返却
 
 **エラーハンドリング**:
 - runtime 未初期化: Err(MyError::NotInitialized)
-- shiori_request_fn が None: デフォルト 204 返却
+- has_shiori_request が false: デフォルト 204 返却
+- SHIORI テーブル取得失敗: デフォルト 204 返却（warn ログ）
+- SHIORI.request 関数取得失敗: デフォルト 204 返却（warn ログ）
 - Lua 実行エラー: Err(MyError::Script { message })
 
 ### 3.2 main.lua 自動ロード
