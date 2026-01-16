@@ -99,13 +99,13 @@ pasta_shioriに対して、最低限のSHIORI.request実装を行う。PastaShio
 
 #### Acceptance Criteria
 
-1. When PastaShiori::load が成功したとき、the PastaShiori shall PastaLuaRuntime から `SHIORI.load` と `SHIORI.request` 関数への参照（mlua::Function）を取得して保持する
-2. If SHIORI.load 関数が存在しない場合、the PastaShiori::load shall ワーニングログを出力し、関数参照を None として継続する
-3. If SHIORI.request 関数が存在しない場合、the PastaShiori::load shall ワーニングログを出力し、関数参照を None として継続する
-4. When PastaShiori::load が SHIORI.load を呼び出すとき、the PastaShiori shall 保持した関数参照を使用する
-5. When PastaShiori::request が呼び出されたとき、the PastaShiori shall 保持した関数参照を使用して Lua 関数を呼び出す
-6. If SHIORI.load 関数参照が None の場合、the PastaShiori::load shall SHIORI.load 呼び出しをスキップする
-7. If SHIORI.request 関数参照が None の場合、the PastaShiori::request shall デフォルトの 204 レスポンスを返す
+1. When PastaShiori::load が成功したとき、the PastaShiori shall SHIORI テーブルから `SHIORI.load` と `SHIORI.request` 関数の存在を確認し、フラグを設定する
+2. If SHIORI.load 関数が存在しない場合、the PastaShiori::load shall ワーニングログを出力し、has_shiori_load を false として継続する
+3. If SHIORI.request 関数が存在しない場合、the PastaShiori::load shall ワーニングログを出力し、has_shiori_request を false として継続する
+4. When PastaShiori::load が SHIORI.load を呼び出すとき、the PastaShiori shall SHIORI テーブルから関数を取得して呼び出す
+5. When PastaShiori::request が呼び出されたとき、the PastaShiori shall has_shiori_request フラグを確認し、true の場合は SHIORI テーブルから関数を取得して呼び出す
+6. If has_shiori_load が false の場合、the PastaShiori::load shall SHIORI.load 呼び出しをスキップする
+7. If has_shiori_request が false の場合、the PastaShiori::request shall デフォルトの 204 レスポンスを返す
 
 ---
 
