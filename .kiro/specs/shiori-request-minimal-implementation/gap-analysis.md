@@ -73,21 +73,25 @@
 | Requirement | 必要な機能 | 現状 | ギャップ |
 |------------|----------|------|---------|
 | Req 1: main.lua ロード | scripts/pasta/shiori/main.lua を自動 require | package.path に scripts/ 含む | **Missing**: 自動ロード処理 |
-| Req 2: SHIORI.request 関数 | Lua グローバル SHIORI テーブル | scripts/pasta/shiori/init.lua 空 | **Missing**: 関数定義 |
-| Req 3: Rust 呼び出し | PastaShiori::request → Lua 関数（リクエスト渡し） | exec() で任意コード可能 | **Missing**: 関数参照保持と呼び出し |
-| Req 4: 関数参照保持 | Load時に SHIORI.request 参照取得 | なし | **Missing**: 関数参照取得・保持機構 |
-| Req 5: レスポンスフォーマット | 文字列結合のみ | Lua 標準機能で実現可能 | なし |
-| Req 6: テスト | pasta_shiori テスト | 既存テストあり | **Extend**: 新テスト追加 |
+| Req 2: SHIORI.load 関数 | Lua グローバル SHIORI.load(hinst, load_dir) | scripts/pasta/shiori/init.lua 空 | **Missing**: 関数定義 |
+| Req 3: SHIORI.request 関数 | Lua グローバル SHIORI.request(request_text) | scripts/pasta/shiori/init.lua 空 | **Missing**: 関数定義 |
+| Req 4: PastaShiori::load 実装 | SHIORI.load(hinst, load_dir) 呼び出し | load() 実装済み、Lua 呼び出しなし | **Missing**: Lua 関数呼び出し処理 |
+| Req 5: PastaShiori::request 実装 | SHIORI.request(request_text) 呼び出し | request() TODO スタブ | **Missing**: 関数呼び出し実装 |
+| Req 6: 関数参照保持 | Load時に SHIORI.load/request 参照取得 | なし | **Missing**: 関数参照取得・保持機構 |
+| Req 7: レスポンスフォーマット | 文字列結合のみ | Lua 標準機能で実現可能 | なし |
+| Req 8: テスト | pasta_shiori テスト | 既存テストあり | **Extend**: 新テスト追加 |
 
 ### ギャップと制約
 
 #### Missing Capabilities
 
-1. **SHIORI.request 関数参照の保持機構**
+1. **SHIORI.load/request 関数参照の保持機構**
    - 場所: PastaShiori 構造体
-   - 機能: Load時に `lua.globals().get::<_, Table>("SHIORI")?.get::<_, Function>("request")?` で取得
-   - 保持: `Option<mlua::Function>` フィールド
-   - 呼び出し: `function.call::<_, String>((request_text,))?`
+   - 機能: Load時に `lua.globals().get::<_, Table>("SHIORI")?.get::<_, Function>("load/request")?` で取得
+   - 保持: `shiori_load_fn: Option<mlua::Function>` と `shiori_request_fn: Option<mlua::Function>` フィールド
+   - 呼び出し:
+     - `shiori_load_fn.call::<_, bool>((hinst, load_dir_str))?`
+     - `shiori_request_fn.call::<_, String>((request_text,))?`
 
 2. **main.lua 自動ロード機構**
    - 場所: PastaLoader または PastaLuaRuntime::from_loader
@@ -95,9 +99,13 @@
    - エラーハンドリング: main.lua 不在時はワーニングログのみ（エラー不要）
 
 3. **scripts/pasta/shiori/main.lua 実装**
-   - 内容: SHIORI グローバルテーブルに request 関数を定義
-   - 引数: リクエスト文字列（SHIORI/3.0 形式）
-   - 戻り値: レスポンス文字列（204 No Content）
+   - 内容: SHIORI グローバルテーブルに load と request 関数を定義
+   - SHIORI.load(hinst, load_dir):
+     - 引数: hinst (integer), load_dir (string)
+     - 戻り値: true/false (最小実装では常に true)
+   - SHIORI.request(request_text):
+     - 引数: リクエスト文字列（SHIORI/3.0 形式）
+     - 戻り値: レスポンス文字列（204 No Content）
 
 #### Research Needed
 
@@ -193,30 +201,40 @@
 
 ##### Rust 側拡張（既存コンポーネント）
 
-1. **PastaShiori に SHIORI.request 関数参照を保持**
+1. **PastaShiori に SHIORI.load/request 関数参照を保持**
    - ファイル: `crates/pasta_shiori/src/shiori.rs`
-   - 実装: `shiori_request_fn: Option<mlua::Function>` フィールド追加（5 行）
-   - Load時: Runtime から関数取得・保持（10-15 行）
+   - 実装:
+     - `shiori_load_fn: Option<mlua::Function>` フィールド追加（5 行）
+     - `shiori_request_fn: Option<mlua::Function>` フィールド追加（5 行）
+   - Load時: Runtime から両方の関数参照を取得・保持（20-25 行）
 
 2. **PastaLoader に main.lua 自動ロード追加**
    - ファイル: `crates/pasta_lua/src/loader/mod.rs` (from_loader 内)
    - 実装: `runtime.exec("require('pasta.shiori.main')")` + エラーハンドリング（10 行）
 
-3. **PastaShiori::request 実装**
+3. **PastaShiori::load に SHIORI.load 呼び出し追加**
    - ファイル: `crates/pasta_shiori/src/shiori.rs`
-   - 実装: 保持した関数を `function.call::<_, String>((req,))?` で呼び出し（15-20 行）
+   - 実装: 保持した shiori_load_fn を `function.call::<_, bool>((hinst, load_dir_str))?` で呼び出し（15-20 行）
 
-4. **エラー変換追加**
+4. **PastaShiori::request 実装**
+   - ファイル: `crates/pasta_shiori/src/shiori.rs`
+   - 実装: 保持した shiori_request_fn を `function.call::<_, String>((req,))?` で呼び出し（15-20 行）
+
+5. **エラー変換追加**
    - ファイル: `crates/pasta_shiori/src/error.rs`
    - 実装: `From<mlua::Error>` trait（5-10 行）
 
 ##### Lua 側新規作成
 
-5. **scripts/pasta/shiori/main.lua 作成**
-   - 内容: SHIORI グローバルテーブル定義、request(request_text) 関数実装
-   - 引数: リクエスト文字列（SHIORI/3.0 形式）
-   - 戻り値: 204 No Content レスポンス文字列
-   - サイズ: 20-30 行
+6. **scripts/pasta/shiori/main.lua 作成**
+   - 内容: SHIORI グローバルテーブル定義、load(hinst, load_dir) と request(request_text) 関数実装
+   - SHIORI.load:
+     - 引数: hinst (integer), load_dir (string)
+     - 戻り値: true (最小実装では固定)
+   - SHIORI.request:
+     - 引数: リクエスト文字列（SHIORI/3.0 形式）
+     - 戻り値: 204 No Content レスポンス文字列
+   - サイズ: 30-40 行
 
 #### Phase 2: Future Enhancements（スコープ外）
 
@@ -251,19 +269,20 @@
 - 外部依存なし（mlua, pasta_lua 既存）
 - SHIORI プロトコルはシンプル（文字列処理のみ）
 - 変更ファイル数: 5 ファイル（Rust 4 + Lua 1）
-- 総実装行数: 約 100 行
+- 総実装行数: 約 130 行
 
 #### 内訳
 
 | タスク | 見積もり | 根拠 |
 |-------|---------|------|
-| 関数参照保持機構実装 | 0.5 日 | mlua::Function 取得・保持、テスト含む |
+| 関数参照保持機構実装 | 0.6 日 | mlua::Function 取得・保持（load/request 両方）、テスト含む |
 | main.lua 自動ロード | 0.3 日 | 既存 from_loader 拡張のみ |
+| PastaShiori::load に SHIORI.load 呼び出し追加 | 0.4 日 | 関数 call 実装、テスト含む |
 | PastaShiori::request 実装 | 0.5 日 | 関数 call のみ、テスト含む |
 | エラー変換実装 | 0.2 日 | From trait 実装のみ |
-| main.lua 作成 | 0.3 日 | レスポンス文字列構築のみ |
-| 統合テスト | 0.7 日 | E2E テスト、エラーケース検証 |
-| **合計** | **2.5 日** | |
+| main.lua 作成 | 0.4 日 | load/request 両関数実装 |
+| 統合テスト | 0.8 日 | E2E テスト（load/request）、エラーケース検証 |
+| **合計** | **3.2 日** | |
 
 ### Risk Assessment
 
@@ -296,14 +315,14 @@
 
 #### 理由
 
-- コスト最小（S サイズ、2.5 日）
+- コスト最小（S サイズ、3.2 日）
 - リスク最小（Low、既存パターン踏襲）
 - 将来拡張性確保（Phase 2 でモジュール化可能）
 - 既存コードへの影響最小（後方互換維持）
 
 ### 設計フェーズで決定すべき重要事項
 
-1. **SHIORI.request 関数参照のライフタイム管理**
+1. **SHIORI.load/request 関数参照のライフタイム管理**
    - PastaShiori が mlua::Function を保持する際の所有権設計
    - PastaLuaRuntime との生存期間の関係
    - Option<mlua::Function> vs. 関数名保持 + 都度取得
@@ -312,14 +331,16 @@
    - from_loader の最後 vs. transpiled コードロード後
    - エラーレベル: warn vs. debug（main.lua 不在時）
 
-3. **SHIORI.request Lua 関数シグネチャ**
-   - グローバルテーブル構造: `SHIORI.request` 確定
-   - 引数: リクエスト文字列のみ
-   - 戻り値: レスポンス文字列のみ
+3. **SHIORI Lua 関数シグネチャ**
+   - グローバルテーブル構造: `SHIORI.load`, `SHIORI.request` 確定
+   - SHIORI.load 引数: hinst (integer), load_dir (string)
+   - SHIORI.load 戻り値: boolean
+   - SHIORI.request 引数: リクエスト文字列
+   - SHIORI.request 戻り値: レスポンス文字列
 
 4. **テスト戦略**
    - Fixture 追加: minimal に main.lua 含める vs. 専用 fixture 作成
-   - エラーケース: Lua エラー、関数不在、戻り値型不正
+   - エラーケース: Lua エラー、関数不在、戻り値型不正、SHIORI.load false 戻却
 
 ### 研究項目（設計フェーズで調査）
 
@@ -347,6 +368,9 @@ pub(crate) struct PastaShiori {
     load_dir: Option<PathBuf>,
     runtime: Option<PastaLuaRuntime>,
     
+    /// SHIORI.load Lua 関数への参照（Load時に取得）
+    shiori_load_fn: Option<mlua::Function>,
+    
     /// SHIORI.request Lua 関数への参照（Load時に取得）
     shiori_request_fn: Option<mlua::Function>,
 }
@@ -355,10 +379,23 @@ impl Shiori for PastaShiori {
     fn load<S: AsRef<OsStr>>(&mut self, hinst: isize, load_dir: S) -> MyResult<bool> {
         // ... existing load logic ...
         
-        // SHIORI.request 関数を取得・保持
+        // SHIORI.load と SHIORI.request 関数を取得・保持
         if let Some(ref runtime) = self.runtime {
             match runtime.lua().globals().get::<_, mlua::Table>("SHIORI") {
                 Ok(shiori_table) => {
+                    // Get SHIORI.load
+                    match shiori_table.get::<_, mlua::Function>("load") {
+                        Ok(func) => {
+                            self.shiori_load_fn = Some(func);
+                            debug!("SHIORI.load function loaded");
+                        }
+                        Err(e) => {
+                            warn!("SHIORI.load function not found: {}", e);
+                            self.shiori_load_fn = None;
+                        }
+                    }
+                    
+                    // Get SHIORI.request
                     match shiori_table.get::<_, mlua::Function>("request") {
                         Ok(func) => {
                             self.shiori_request_fn = Some(func);
@@ -372,7 +409,25 @@ impl Shiori for PastaShiori {
                 }
                 Err(e) => {
                     warn!("SHIORI table not found: {}", e);
+                    self.shiori_load_fn = None;
                     self.shiori_request_fn = None;
+                }
+            }
+        }
+        
+        // Call SHIORI.load if available
+        if let Some(ref load_fn) = self.shiori_load_fn {
+            let load_dir_str = load_dir_path.to_string_lossy().to_string();
+            match load_fn.call::<_, bool>((hinst, load_dir_str)) {
+                Ok(result) => {
+                    if !result {
+                        warn!("SHIORI.load returned false");
+                        return Ok(false);
+                    }
+                }
+                Err(e) => {
+                    error!("SHIORI.load failed: {}", e);
+                    return Ok(false);
                 }
             }
         }
@@ -392,6 +447,16 @@ local shiori = require("pasta.shiori")
 
 -- Global SHIORI table
 SHIORI = {}
+
+--- Handle SHIORI load
+--- @param hinst integer DLL handle
+--- @param load_dir string Load directory path
+--- @return boolean true on success, false on failure
+function SHIORI.load(hinst, load_dir)
+    -- Minimal implementation: always succeed
+    print(string.format("SHIORI.load: hinst=%d, load_dir=%s", hinst, load_dir))
+    return true
+end
 
 --- Handle SHIORI/3.0 request
 --- @param request_text string Raw SHIORI request (e.g., "GET SHIORI/3.0\r\n...")
