@@ -58,4 +58,7 @@ pub use logging::{
 pub use runtime::{PastaLuaRuntime, RuntimeConfig};
 pub use search::{SearchContext, SearchError};
 pub use string_literalizer::StringLiteralizer;
+
+// Re-export mlua types needed by pasta_shiori
+pub use mlua;
 pub use transpiler::LuaTranspiler;

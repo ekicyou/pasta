@@ -1,0 +1,6 @@
+# Minimal SHIORI test configuration
+# This fixture tests the SHIORI.load/request integration
+
+[loader]
+pasta_patterns = ["dic/**/*.pasta"]
+debug_mode = false

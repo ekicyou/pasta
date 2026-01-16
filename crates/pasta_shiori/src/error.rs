@@ -54,6 +54,14 @@ impl From<pasta_lua::LoaderError> for MyError {
     }
 }
 
+impl From<pasta_lua::mlua::Error> for MyError {
+    fn from(error: pasta_lua::mlua::Error) -> MyError {
+        MyError::Script {
+            message: format!("{}", error),
+        }
+    }
+}
+
 impl MyError {
     #[allow(dead_code)]
     pub fn script_error(message: String) -> MyError {

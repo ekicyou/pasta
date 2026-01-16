@@ -288,6 +288,25 @@ impl PastaLuaRuntime {
             tracing::debug!(module = %result.module_name, "Loaded transpiled module");
         }
 
+        // Load main.lua if exists (for SHIORI.load/SHIORI.request functions)
+        let main_lua_path = loader_context
+            .base_dir
+            .join("scripts/pasta/shiori/main.lua");
+        if main_lua_path.exists() {
+            match std::fs::read_to_string(&main_lua_path) {
+                Ok(script) => {
+                    if let Err(e) = runtime.lua.load(&script).set_name("main.lua").exec() {
+                        tracing::warn!(error = %e, "Failed to load main.lua, continuing without SHIORI functions");
+                    } else {
+                        tracing::debug!("Loaded main.lua");
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, "Failed to read main.lua, continuing without SHIORI functions");
+                }
+            }
+        }
+
         Ok(runtime)
     }
 
