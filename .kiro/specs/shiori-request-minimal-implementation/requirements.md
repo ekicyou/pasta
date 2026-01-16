@@ -39,7 +39,20 @@ pasta_shioriに対して、最低限のSHIORI.request実装を行う。PastaShio
 
 ---
 
-### Requirement 2: SHIORI.request Lua 関数
+### Requirement 2: SHIORI.load Lua 関数
+
+**Objective:** ゴースト開発者として、SHIORI ロード時の初期化処理を Lua 側で実装したい。これにより、DLL ロードパラメータをスクリプトで取得できる。
+
+#### Acceptance Criteria
+
+1. The `scripts/pasta/shiori/main.lua` shall `SHIORI.load(hinst, load_dir)` 関数を定義する
+2. When SHIORI.load が呼び出されたとき、the SHIORI module shall hinst（DLL ハンドル）と load_dir（ロードディレクトリパス）を受け取る
+3. The SHIORI.load shall 初期化処理を実行し、成功時に true、失敗時に false を返す
+4. The SHIORI.load shall 最小実装として常に true を返す（初期化処理なし）
+
+---
+
+### Requirement 3: SHIORI.request Lua 関数
 
 **Objective:** ゴースト開発者として、SHIORI リクエストを Lua 側で処理したい。これにより、イベントハンドリングをスクリプトでカスタマイズできる。
 
@@ -52,7 +65,21 @@ pasta_shioriに対して、最低限のSHIORI.request実装を行う。PastaShio
 
 ---
 
-### Requirement 3: PastaShiori::request Rust 実装
+### Requirement 4: PastaShiori::load Rust 実装
+
+**Objective:** SHIORI DLL 開発者として、Rust から Lua の SHIORI.load を呼び出したい。これにより、初期化処理をスクリプト側に委譲できる。
+
+#### Acceptance Criteria
+
+1. When PastaShiori::load が成功したとき、the PastaShiori shall Lua の `SHIORI.load` 関数を実行する
+2. When SHIORI.load を呼び出すとき、the PastaShiori shall hinst と load_dir を引数として渡す
+3. If SHIORI.load が false を返した場合、the PastaShiori::load shall false を返す
+4. If SHIORI.load 関数が存在しない場合、the PastaShiori::load shall ワーニングログを出力し、処理を継続する
+5. If Lua 実行中にエラーが発生した場合、the PastaShiori::load shall エラーログを出力し、false を返す
+
+---
+
+### Requirement 5: PastaShiori::request Rust 実装
 
 **Objective:** SHIORI DLL 開発者として、Rust から Lua の SHIORI.request を呼び出したい。これにより、プロトコル処理をスクリプト側に委譲できる。
 
@@ -66,20 +93,23 @@ pasta_shioriに対して、最低限のSHIORI.request実装を行う。PastaShio
 
 ---
 
-### Requirement 4: SHIORI.request 関数参照の保持
+### Requirement 6: SHIORI 関数参照の保持
 
-**Objective:** pasta_shiori 開発者として、Load時に取得した SHIORI.request 関数を request 時に効率的に呼び出したい。これにより、毎回 Lua コードを eval する非効率を避ける。
+**Objective:** pasta_shiori 開発者として、Load時に取得した SHIORI.load と SHIORI.request 関数を効率的に呼び出したい。これにより、毎回 Lua コードを eval する非効率を避ける。
 
 #### Acceptance Criteria
 
-1. When PastaShiori::load が成功したとき、the PastaShiori shall PastaLuaRuntime から `SHIORI.request` 関数への参照（mlua::Function）を取得して保持する
-2. If SHIORI.request 関数が存在しない場合、the PastaShiori::load shall ワーニングログを出力し、関数参照を None として継続する
-3. When PastaShiori::request が呼び出されたとき、the PastaShiori shall 保持した関数参照を使用して Lua 関数を呼び出す
-4. If 関数参照が None の場合、the PastaShiori::request shall デフォルトの 204 レスポンスを返す
+1. When PastaShiori::load が成功したとき、the PastaShiori shall PastaLuaRuntime から `SHIORI.load` と `SHIORI.request` 関数への参照（mlua::Function）を取得して保持する
+2. If SHIORI.load 関数が存在しない場合、the PastaShiori::load shall ワーニングログを出力し、関数参照を None として継続する
+3. If SHIORI.request 関数が存在しない場合、the PastaShiori::load shall ワーニングログを出力し、関数参照を None として継続する
+4. When PastaShiori::load が SHIORI.load を呼び出すとき、the PastaShiori shall 保持した関数参照を使用する
+5. When PastaShiori::request が呼び出されたとき、the PastaShiori shall 保持した関数参照を使用して Lua 関数を呼び出す
+6. If SHIORI.load 関数参照が None の場合、the PastaShiori::load shall SHIORI.load 呼び出しをスキップする
+7. If SHIORI.request 関数参照が None の場合、the PastaShiori::request shall デフォルトの 204 レスポンスを返す
 
 ---
 
-### Requirement 5: SHIORI レスポンスフォーマット
+### Requirement 7: SHIORI レスポンスフォーマット
 
 **Objective:** SHIORI プロトコル準拠のため、レスポンスが正しい形式であることを保証したい。
 
@@ -93,7 +123,7 @@ pasta_shioriに対して、最低限のSHIORI.request実装を行う。PastaShio
 
 ---
 
-### Requirement 6: テスト可能性
+### Requirement 8: テスト可能性
 
 **Objective:** 品質保証担当者として、SHIORI request 処理が正しく動作することを検証したい。
 
