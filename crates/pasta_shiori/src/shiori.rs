@@ -1,8 +1,9 @@
 use crate::error::*;
 use crate::logging::{GlobalLoggerRegistry, LoadDirGuard};
+use pasta_lua::mlua::{Function, Table};
 use pasta_lua::{PastaLoader, PastaLuaRuntime};
 use std::{ffi::*, path::*};
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
 pub(crate) trait Shiori {
     fn load<S: AsRef<OsStr>>(&mut self, hinst: isize, load_dir: S) -> MyResult<bool>;
@@ -27,6 +28,12 @@ pub(crate) struct PastaShiori {
 
     /// Pasta Lua runtime instance (contains logger internally)
     runtime: Option<PastaLuaRuntime>,
+
+    /// Flag indicating SHIORI.load function exists in Lua
+    has_shiori_load: bool,
+
+    /// Flag indicating SHIORI.request function exists in Lua
+    has_shiori_request: bool,
 }
 
 // SAFETY: PastaShiori is used in a single-threaded context (SHIORI DLL).
@@ -89,7 +96,17 @@ impl Shiori for PastaShiori {
                     GlobalLoggerRegistry::instance().register(load_dir_path.clone(), logger);
                     debug!(load_dir = %load_dir_path.display(), "Registered logger with GlobalLoggerRegistry");
                 }
+
+                // Check SHIORI function existence
+                self.check_shiori_functions(&runtime);
+
                 self.runtime = Some(runtime);
+
+                // Call SHIORI.load if available
+                if !self.call_shiori_load(hinst, &load_dir_path) {
+                    return Ok(false);
+                }
+
                 info!(load_dir = %load_dir_path.display(), "PastaShiori load completed");
                 Ok(true)
             }
@@ -107,7 +124,7 @@ impl Shiori for PastaShiori {
 
     fn request<S: AsRef<str>>(&mut self, req: S) -> MyResult<String> {
         // Check if runtime is initialized
-        let _runtime = self.runtime.as_ref().ok_or(MyError::NotInitialized)?;
+        let runtime = self.runtime.as_ref().ok_or(MyError::NotInitialized)?;
 
         // Set load_dir context for logging
         let _guard = self.load_dir.as_ref().map(|p| LoadDirGuard::new(p.clone()));
@@ -115,8 +132,147 @@ impl Shiori for PastaShiori {
         let req = req.as_ref();
         debug!(request_len = req.len(), "Processing SHIORI request");
 
-        // TODO: Actually process the request through the runtime
-        Ok(format!("PastaShiori received request: {}", req))
+        // If SHIORI.request function is not available, return default 204 response
+        if !self.has_shiori_request {
+            debug!("SHIORI.request not available, returning default 204 response");
+            return Ok(Self::default_204_response());
+        }
+
+        // Get SHIORI table and request function
+        let lua = runtime.lua();
+        let globals = lua.globals();
+
+        let shiori_table: Table = match globals.get("SHIORI") {
+            Ok(table) => table,
+            Err(e) => {
+                warn!(error = %e, "Failed to get SHIORI table, returning default 204 response");
+                return Ok(Self::default_204_response());
+            }
+        };
+
+        let request_fn: Function = match shiori_table.get("request") {
+            Ok(func) => func,
+            Err(e) => {
+                warn!(error = %e, "Failed to get SHIORI.request function, returning default 204 response");
+                return Ok(Self::default_204_response());
+            }
+        };
+
+        // Call SHIORI.request(request_text)
+        match request_fn.call::<String>(req) {
+            Ok(response) => {
+                debug!(response_len = response.len(), "SHIORI.request completed");
+                Ok(response)
+            }
+            Err(e) => {
+                error!(error = %e, "SHIORI.request execution failed");
+                Err(MyError::from(e))
+            }
+        }
+    }
+}
+
+impl PastaShiori {
+    /// Check if SHIORI.load and SHIORI.request functions exist in Lua runtime.
+    fn check_shiori_functions(&mut self, runtime: &PastaLuaRuntime) {
+        let lua = runtime.lua();
+        let globals = lua.globals();
+
+        // Get SHIORI table
+        let shiori_table: Result<Table, _> = globals.get("SHIORI");
+        match shiori_table {
+            Ok(table) => {
+                // Check SHIORI.load function
+                self.has_shiori_load = match table.get::<Function>("load") {
+                    Ok(_) => {
+                        debug!("SHIORI.load function found");
+                        true
+                    }
+                    Err(_) => {
+                        warn!("SHIORI.load function not found");
+                        false
+                    }
+                };
+
+                // Check SHIORI.request function
+                self.has_shiori_request = match table.get::<Function>("request") {
+                    Ok(_) => {
+                        debug!("SHIORI.request function found");
+                        true
+                    }
+                    Err(_) => {
+                        warn!("SHIORI.request function not found");
+                        false
+                    }
+                };
+            }
+            Err(e) => {
+                warn!(error = %e, "SHIORI table not found");
+                self.has_shiori_load = false;
+                self.has_shiori_request = false;
+            }
+        }
+    }
+
+    /// Call SHIORI.load function with hinst and load_dir.
+    /// Returns true if successful or if function doesn't exist (skip).
+    /// Returns false if function returns false or errors.
+    fn call_shiori_load(&self, hinst: isize, load_dir: &Path) -> bool {
+        if !self.has_shiori_load {
+            debug!("SHIORI.load not available, skipping");
+            return true;
+        }
+
+        let runtime = match self.runtime.as_ref() {
+            Some(r) => r,
+            None => return true,
+        };
+
+        let lua = runtime.lua();
+        let globals = lua.globals();
+
+        // Get SHIORI table and load function
+        let shiori_table: Table = match globals.get("SHIORI") {
+            Ok(table) => table,
+            Err(e) => {
+                warn!(error = %e, "Failed to get SHIORI table for load");
+                return true; // Continue without SHIORI.load
+            }
+        };
+
+        let load_fn: Function = match shiori_table.get("load") {
+            Ok(func) => func,
+            Err(e) => {
+                warn!(error = %e, "Failed to get SHIORI.load function");
+                return true; // Continue without SHIORI.load
+            }
+        };
+
+        // Call SHIORI.load(hinst, load_dir)
+        let load_dir_str = load_dir.to_string_lossy().to_string();
+        match load_fn.call::<bool>((hinst, load_dir_str)) {
+            Ok(true) => {
+                debug!("SHIORI.load returned true");
+                true
+            }
+            Ok(false) => {
+                warn!("SHIORI.load returned false");
+                false
+            }
+            Err(e) => {
+                error!(error = %e, "SHIORI.load execution failed");
+                false
+            }
+        }
+    }
+
+    /// Generate default 204 No Content response.
+    fn default_204_response() -> String {
+        "SHIORI/3.0 204 No Content\r\n\
+         Charset: UTF-8\r\n\
+         Sender: Pasta\r\n\
+         \r\n"
+            .to_string()
     }
 }
 
@@ -244,11 +400,14 @@ mod tests {
         assert!(shiori.runtime.is_some());
         assert_eq!(shiori.hinst, 42);
 
-        // Phase 2: request()
+        // Phase 2: request() - main.lua should provide SHIORI.request
         let request_result = shiori.request("SHIORI/3.0\r\n\r\n");
         assert!(request_result.is_ok());
         let response = request_result.unwrap();
-        assert!(response.contains("PastaShiori received request"));
+        // Should return 204 No Content from main.lua
+        assert!(response.contains("SHIORI/3.0 204 No Content"));
+        assert!(response.contains("Charset: UTF-8"));
+        assert!(response.contains("Sender: Pasta"));
 
         // Phase 3: unload via drop
         drop(shiori);
@@ -299,12 +458,12 @@ mod tests {
         assert!(shiori1.runtime.is_some());
         assert!(shiori2.runtime.is_some());
 
-        // Both should respond to requests
+        // Both should respond to requests with 204 No Content
         let response1 = shiori1.request("request1").unwrap();
         let response2 = shiori2.request("request2").unwrap();
 
-        assert!(response1.contains("request1"));
-        assert!(response2.contains("request2"));
+        assert!(response1.contains("SHIORI/3.0 204 No Content"));
+        assert!(response2.contains("SHIORI/3.0 204 No Content"));
 
         // Different hinst values
         assert_eq!(shiori1.hinst, 1);
@@ -333,5 +492,101 @@ mod tests {
         // Cleanup - drop should unregister from GlobalLoggerRegistry
         drop(shiori1);
         drop(shiori2);
+    }
+
+    // ========================================================================
+    // Task 7.1: PastaShiori::load テスト - SHIORI 関数フラグ検証
+    // ========================================================================
+
+    #[test]
+    fn test_load_sets_shiori_flags_when_main_lua_exists() {
+        let temp = copy_fixture_to_temp("minimal");
+
+        let mut shiori = PastaShiori::default();
+        assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
+
+        // main.lua is present in scripts/, so flags should be true
+        assert!(shiori.has_shiori_load, "has_shiori_load should be true");
+        assert!(
+            shiori.has_shiori_request,
+            "has_shiori_request should be true"
+        );
+    }
+
+    #[test]
+    fn test_load_flags_false_without_main_lua() {
+        let temp = copy_fixture_to_temp("minimal");
+
+        // Remove the main.lua file to simulate missing SHIORI functions
+        let main_lua_path = temp.path().join("scripts/pasta/shiori/main.lua");
+        if main_lua_path.exists() {
+            std::fs::remove_file(&main_lua_path).unwrap();
+        }
+
+        let mut shiori = PastaShiori::default();
+        assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
+
+        // main.lua doesn't exist, so flags should be false
+        assert!(
+            !shiori.has_shiori_load,
+            "has_shiori_load should be false without main.lua"
+        );
+        assert!(
+            !shiori.has_shiori_request,
+            "has_shiori_request should be false without main.lua"
+        );
+    }
+
+    // ========================================================================
+    // Task 7.2: PastaShiori::request テスト
+    // ========================================================================
+
+    #[test]
+    fn test_request_returns_204_from_lua() {
+        let temp = copy_fixture_to_temp("minimal");
+
+        let mut shiori = PastaShiori::default();
+        assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
+
+        let response = shiori.request("SHIORI/3.0\r\n\r\n").unwrap();
+
+        // Verify SHIORI/3.0 response format
+        assert!(response.starts_with("SHIORI/3.0 204 No Content\r\n"));
+        assert!(response.contains("Charset: UTF-8\r\n"));
+        assert!(response.contains("Sender: Pasta\r\n"));
+        assert!(response.ends_with("\r\n\r\n"));
+    }
+
+    #[test]
+    fn test_request_returns_default_204_without_main_lua() {
+        let temp = copy_fixture_to_temp("minimal");
+
+        // Remove main.lua to test fallback behavior
+        let main_lua_path = temp.path().join("scripts/pasta/shiori/main.lua");
+        if main_lua_path.exists() {
+            std::fs::remove_file(&main_lua_path).unwrap();
+        }
+
+        let mut shiori = PastaShiori::default();
+        assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
+
+        // Should still get 204 response (default fallback)
+        let response = shiori.request("test").unwrap();
+        assert!(response.contains("SHIORI/3.0 204 No Content"));
+        assert!(response.contains("Charset: UTF-8"));
+        assert!(response.contains("Sender: Pasta"));
+    }
+
+    #[test]
+    fn test_request_not_initialized_error() {
+        let mut shiori = PastaShiori::default();
+
+        // Request before load should return NotInitialized error
+        let result = shiori.request("test");
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            MyError::NotInitialized => {}
+            e => panic!("Expected NotInitialized, got {:?}", e),
+        }
     }
 }
