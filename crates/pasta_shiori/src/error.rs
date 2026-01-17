@@ -8,6 +8,7 @@ pub type MyResult<T> = Result<T, MyError>;
 #[derive(Clone, Eq, PartialEq, Debug, Error)]
 pub enum MyError {
     #[error("others error")]
+    #[allow(dead_code)]
     Others,
 
     #[error("load error: {0}")]

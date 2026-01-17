@@ -61,6 +61,7 @@ impl ShioriString {
     /// HGLOBALを新たに作成し、&[u8]をShioriStringにクローンします。
     /// drop時にHGLOBALを開放しません。
     /// shiori応答の作成に利用してください。
+    #[allow(dead_code)]
     pub fn clone_from_slice_nofree(bytes: &[u8]) -> ShioriString {
         ShioriString::clone_from_slice_impl(bytes, false)
     }

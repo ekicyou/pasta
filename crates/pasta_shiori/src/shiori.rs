@@ -1,7 +1,6 @@
 use crate::error::*;
-use crate::logging::{GlobalLoggerRegistry, LoadDirGuard};
 use pasta_lua::mlua::{Function, Table};
-use pasta_lua::{PastaLoader, PastaLuaRuntime};
+use pasta_lua::{GlobalLoggerRegistry, LoadDirGuard, PastaLoader, PastaLuaRuntime};
 use std::{ffi::*, path::*};
 use tracing::{debug, error, info, warn};
 
