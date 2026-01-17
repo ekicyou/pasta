@@ -28,11 +28,14 @@ pub(crate) struct PastaShiori {
     /// Pasta Lua runtime instance (contains logger internally)
     runtime: Option<PastaLuaRuntime>,
 
-    /// Flag indicating SHIORI.load function exists in Lua
-    has_shiori_load: bool,
+    /// Cached SHIORI.load function
+    load_fn: Option<Function>,
 
-    /// Flag indicating SHIORI.request function exists in Lua
-    has_shiori_request: bool,
+    /// Cached SHIORI.request function
+    request_fn: Option<Function>,
+
+    /// Cached SHIORI.unload function
+    unload_fn: Option<Function>,
 }
 
 // SAFETY: PastaShiori is used in a single-threaded context (SHIORI DLL).
@@ -43,11 +46,17 @@ unsafe impl Sync for PastaShiori {}
 
 impl Drop for PastaShiori {
     fn drop(&mut self) {
+        // Call SHIORI.unload if available (before runtime drop)
+        self.call_lua_unload();
+
         // Unregister logger from global registry
         if let Some(ref load_dir) = self.load_dir {
             GlobalLoggerRegistry::instance().unregister(load_dir);
             info!(load_dir = %load_dir.display(), "Unregistered logger");
         }
+
+        // Clear cached functions before dropping runtime
+        self.clear_cached_lua_functions();
 
         // Drop runtime (logger is dropped with it)
         self.runtime = None;
@@ -68,6 +77,8 @@ impl Shiori for PastaShiori {
         // If already loaded, cleanup previous instance
         if self.runtime.is_some() {
             info!("Releasing existing runtime for reload");
+            // Clear cached functions before releasing runtime
+            self.clear_cached_lua_functions();
             if let Some(ref old_load_dir) = self.load_dir {
                 GlobalLoggerRegistry::instance().unregister(old_load_dir);
             }
@@ -96,13 +107,13 @@ impl Shiori for PastaShiori {
                     debug!(load_dir = %load_dir_path.display(), "Registered logger with GlobalLoggerRegistry");
                 }
 
-                // Check SHIORI function existence
-                self.check_shiori_functions(&runtime);
+                // Cache SHIORI functions (load/request/unload)
+                self.cache_lua_functions(&runtime);
 
                 self.runtime = Some(runtime);
 
-                // Call SHIORI.load if available
-                if !self.call_shiori_load(hinst, &load_dir_path) {
+                // Call SHIORI.load if available (using cached function)
+                if !self.call_lua_load(hinst, &load_dir_path) {
                     return Ok(false);
                 }
 
@@ -123,7 +134,7 @@ impl Shiori for PastaShiori {
 
     fn request<S: AsRef<str>>(&mut self, req: S) -> MyResult<String> {
         // Check if runtime is initialized
-        let runtime = self.runtime.as_ref().ok_or(MyError::NotInitialized)?;
+        let _runtime = self.runtime.as_ref().ok_or(MyError::NotInitialized)?;
 
         // Set load_dir context for logging
         let _guard = self.load_dir.as_ref().map(|p| LoadDirGuard::new(p.clone()));
@@ -131,49 +142,15 @@ impl Shiori for PastaShiori {
         let req = req.as_ref();
         debug!(request_len = req.len(), "Processing SHIORI request");
 
-        // If SHIORI.request function is not available, return default 204 response
-        if !self.has_shiori_request {
-            debug!("SHIORI.request not available, returning default 204 response");
-            return Ok(Self::default_204_response());
-        }
-
-        // Get SHIORI table and request function
-        let lua = runtime.lua();
-        let globals = lua.globals();
-
-        let shiori_table: Table = match globals.get("SHIORI") {
-            Ok(table) => table,
-            Err(e) => {
-                warn!(error = %e, "Failed to get SHIORI table, returning default 204 response");
-                return Ok(Self::default_204_response());
-            }
-        };
-
-        let request_fn: Function = match shiori_table.get("request") {
-            Ok(func) => func,
-            Err(e) => {
-                warn!(error = %e, "Failed to get SHIORI.request function, returning default 204 response");
-                return Ok(Self::default_204_response());
-            }
-        };
-
-        // Call SHIORI.request(request_text)
-        match request_fn.call::<String>(req) {
-            Ok(response) => {
-                debug!(response_len = response.len(), "SHIORI.request completed");
-                Ok(response)
-            }
-            Err(e) => {
-                error!(error = %e, "SHIORI.request execution failed");
-                Err(MyError::from(e))
-            }
-        }
+        // Call SHIORI.request using cached function
+        self.call_lua_request(req)
     }
 }
 
 impl PastaShiori {
-    /// Check if SHIORI.load and SHIORI.request functions exist in Lua runtime.
-    fn check_shiori_functions(&mut self, runtime: &PastaLuaRuntime) {
+    /// Cache SHIORI.load, SHIORI.request, and SHIORI.unload functions from Lua runtime.
+    /// This eliminates the need for hash table lookups on each request.
+    fn cache_lua_functions(&mut self, runtime: &PastaLuaRuntime) {
         let lua = runtime.lua();
         let globals = lua.globals();
 
@@ -181,69 +158,69 @@ impl PastaShiori {
         let shiori_table: Result<Table, _> = globals.get("SHIORI");
         match shiori_table {
             Ok(table) => {
-                // Check SHIORI.load function
-                self.has_shiori_load = match table.get::<Function>("load") {
-                    Ok(_) => {
-                        debug!("SHIORI.load function found");
-                        true
+                // Cache SHIORI.load function
+                self.load_fn = match table.get::<Function>("load") {
+                    Ok(f) => {
+                        debug!("SHIORI.load function cached");
+                        Some(f)
                     }
                     Err(_) => {
                         warn!("SHIORI.load function not found");
-                        false
+                        None
                     }
                 };
 
-                // Check SHIORI.request function
-                self.has_shiori_request = match table.get::<Function>("request") {
-                    Ok(_) => {
-                        debug!("SHIORI.request function found");
-                        true
+                // Cache SHIORI.request function
+                self.request_fn = match table.get::<Function>("request") {
+                    Ok(f) => {
+                        debug!("SHIORI.request function cached");
+                        Some(f)
                     }
                     Err(_) => {
                         warn!("SHIORI.request function not found");
-                        false
+                        None
+                    }
+                };
+
+                // Cache SHIORI.unload function
+                self.unload_fn = match table.get::<Function>("unload") {
+                    Ok(f) => {
+                        debug!("SHIORI.unload function cached");
+                        Some(f)
+                    }
+                    Err(_) => {
+                        debug!("SHIORI.unload function not found (optional)");
+                        None
                     }
                 };
             }
             Err(e) => {
                 warn!(error = %e, "SHIORI table not found");
-                self.has_shiori_load = false;
-                self.has_shiori_request = false;
+                self.load_fn = None;
+                self.request_fn = None;
+                self.unload_fn = None;
             }
         }
     }
 
-    /// Call SHIORI.load function with hinst and load_dir.
+    /// Clear all cached SHIORI functions.
+    /// Called before reload or when runtime is released.
+    fn clear_cached_lua_functions(&mut self) {
+        self.load_fn = None;
+        self.request_fn = None;
+        self.unload_fn = None;
+    }
+
+    /// Call SHIORI.load function with hinst and load_dir using cached function.
     /// Returns true if successful or if function doesn't exist (skip).
     /// Returns false if function returns false or errors.
-    fn call_shiori_load(&self, hinst: isize, load_dir: &Path) -> bool {
-        if !self.has_shiori_load {
-            debug!("SHIORI.load not available, skipping");
-            return true;
-        }
-
-        let runtime = match self.runtime.as_ref() {
-            Some(r) => r,
-            None => return true,
-        };
-
-        let lua = runtime.lua();
-        let globals = lua.globals();
-
-        // Get SHIORI table and load function
-        let shiori_table: Table = match globals.get("SHIORI") {
-            Ok(table) => table,
-            Err(e) => {
-                warn!(error = %e, "Failed to get SHIORI table for load");
-                return true; // Continue without SHIORI.load
-            }
-        };
-
-        let load_fn: Function = match shiori_table.get("load") {
-            Ok(func) => func,
-            Err(e) => {
-                warn!(error = %e, "Failed to get SHIORI.load function");
-                return true; // Continue without SHIORI.load
+    fn call_lua_load(&self, hinst: isize, load_dir: &Path) -> bool {
+        // Use cached load_fn directly
+        let load_fn = match &self.load_fn {
+            Some(f) => f,
+            None => {
+                debug!("SHIORI.load not available, skipping");
+                return true;
             }
         };
 
@@ -262,6 +239,54 @@ impl PastaShiori {
                 error!(error = %e, "SHIORI.load execution failed");
                 false
             }
+        }
+    }
+
+    /// Call SHIORI.request function using cached function.
+    /// Returns 204 response if function doesn't exist.
+    fn call_lua_request(&self, request: &str) -> MyResult<String> {
+        // Use cached request_fn directly
+        let request_fn = match &self.request_fn {
+            Some(f) => f,
+            None => {
+                debug!("SHIORI.request not available, returning default 204 response");
+                return Ok(Self::default_204_response());
+            }
+        };
+
+        // Call SHIORI.request(request_text)
+        match request_fn.call::<String>(request) {
+            Ok(response) => {
+                debug!(response_len = response.len(), "SHIORI.request completed");
+                Ok(response)
+            }
+            Err(e) => {
+                error!(error = %e, "SHIORI.request execution failed");
+                Err(MyError::from(e))
+            }
+        }
+    }
+
+    /// Call SHIORI.unload function using cached function.
+    /// Logs warning on error but does not propagate (safe for Drop).
+    fn call_lua_unload(&self) {
+        // Check both unload_fn and runtime exist
+        let (unload_fn, _runtime) = match (&self.unload_fn, &self.runtime) {
+            (Some(f), Some(r)) => (f, r),
+            _ => {
+                debug!("SHIORI.unload not available, skipping");
+                return;
+            }
+        };
+
+        // Set load_dir context for logging
+        let _guard = self.load_dir.as_ref().map(|p| LoadDirGuard::new(p.clone()));
+
+        // Call SHIORI.unload()
+        if let Err(e) = unload_fn.call::<()>(()) {
+            warn!(error = %e, "SHIORI.unload failed");
+        } else {
+            debug!("SHIORI.unload called successfully");
         }
     }
 
@@ -504,12 +529,9 @@ mod tests {
         let mut shiori = PastaShiori::default();
         assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
 
-        // main.lua is present in scripts/, so flags should be true
-        assert!(shiori.has_shiori_load, "has_shiori_load should be true");
-        assert!(
-            shiori.has_shiori_request,
-            "has_shiori_request should be true"
-        );
+        // main.lua is present in scripts/, so cached functions should be Some
+        assert!(shiori.load_fn.is_some(), "load_fn should be cached");
+        assert!(shiori.request_fn.is_some(), "request_fn should be cached");
     }
 
     #[test]
@@ -525,14 +547,14 @@ mod tests {
         let mut shiori = PastaShiori::default();
         assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
 
-        // main.lua doesn't exist, so flags should be false
+        // main.lua doesn't exist, so cached functions should be None
         assert!(
-            !shiori.has_shiori_load,
-            "has_shiori_load should be false without main.lua"
+            shiori.load_fn.is_none(),
+            "load_fn should be None without main.lua"
         );
         assert!(
-            !shiori.has_shiori_request,
-            "has_shiori_request should be false without main.lua"
+            shiori.request_fn.is_none(),
+            "request_fn should be None without main.lua"
         );
     }
 
@@ -587,5 +609,243 @@ mod tests {
             MyError::NotInitialized => {}
             e => panic!("Expected NotInitialized, got {:?}", e),
         }
+    }
+
+    // ========================================================================
+    // Task 7.1: unload 呼び出しの検証テスト
+    // ========================================================================
+
+    #[test]
+    fn test_unload_called_on_drop() {
+        let temp = copy_fixture_to_temp("minimal");
+
+        // Create a Lua script that defines SHIORI.unload and sets a global flag
+        let main_lua_path = temp.path().join("scripts/pasta/shiori/main.lua");
+        std::fs::write(
+            &main_lua_path,
+            r#"
+SHIORI = {}
+
+-- Track if unload was called via a file marker
+local unload_marker_path = nil
+
+function SHIORI.load(hinst, load_dir)
+    unload_marker_path = load_dir .. "/unload_called.marker"
+    return true
+end
+
+function SHIORI.request(request)
+    return "SHIORI/3.0 204 No Content\r\nCharset: UTF-8\r\nSender: Pasta\r\n\r\n"
+end
+
+function SHIORI.unload()
+    -- Write a marker file to indicate unload was called
+    if unload_marker_path then
+        local f = io.open(unload_marker_path, "w")
+        if f then
+            f:write("unloaded")
+            f:close()
+        end
+    end
+end
+"#,
+        )
+        .unwrap();
+
+        let marker_path = temp.path().join("unload_called.marker");
+
+        // Ensure marker doesn't exist before test
+        if marker_path.exists() {
+            std::fs::remove_file(&marker_path).unwrap();
+        }
+
+        {
+            let mut shiori = PastaShiori::default();
+            assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
+
+            // Verify unload_fn is cached
+            assert!(shiori.unload_fn.is_some(), "unload_fn should be cached");
+
+            // shiori will be dropped here
+        }
+
+        // After drop, the marker file should exist
+        assert!(
+            marker_path.exists(),
+            "SHIORI.unload should have created the marker file on drop"
+        );
+    }
+
+    // ========================================================================
+    // Task 7.2: unload エラー耐性テスト
+    // ========================================================================
+
+    #[test]
+    fn test_unload_error_does_not_panic() {
+        let temp = copy_fixture_to_temp("minimal");
+
+        // Create a Lua script with an unload function that always errors
+        let main_lua_path = temp.path().join("scripts/pasta/shiori/main.lua");
+        std::fs::write(
+            &main_lua_path,
+            r#"
+SHIORI = {}
+
+function SHIORI.load(hinst, load_dir)
+    return true
+end
+
+function SHIORI.request(request)
+    return "SHIORI/3.0 204 No Content\r\nCharset: UTF-8\r\nSender: Pasta\r\n\r\n"
+end
+
+function SHIORI.unload()
+    error("Intentional unload error for testing")
+end
+"#,
+        )
+        .unwrap();
+
+        {
+            let mut shiori = PastaShiori::default();
+            assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
+
+            // Verify unload_fn is cached
+            assert!(shiori.unload_fn.is_some(), "unload_fn should be cached");
+
+            // shiori will be dropped here - should NOT panic even with error in unload
+        }
+
+        // If we reach here, the test passed (no panic occurred)
+    }
+
+    // ========================================================================
+    // Task 7.3: reload 時のキャッシュクリアテスト
+    // ========================================================================
+
+    #[test]
+    fn test_cached_functions_cleared_on_reload() {
+        let temp1 = copy_fixture_to_temp("minimal");
+        let temp2 = copy_fixture_to_temp("minimal");
+
+        // Modify temp2's main.lua to remove SHIORI.load but keep request
+        let main_lua_path2 = temp2.path().join("scripts/pasta/shiori/main.lua");
+        std::fs::write(
+            &main_lua_path2,
+            r#"
+SHIORI = {}
+
+-- No SHIORI.load function defined
+
+function SHIORI.request(request)
+    return "SHIORI/3.0 204 No Content\r\nCharset: UTF-8\r\nSender: Pasta\r\n\r\n"
+end
+"#,
+        )
+        .unwrap();
+
+        let mut shiori = PastaShiori::default();
+
+        // First load - should have both load and request functions
+        assert!(shiori.load(0, temp1.path().as_os_str()).unwrap());
+        assert!(
+            shiori.load_fn.is_some(),
+            "First load: load_fn should be cached"
+        );
+        assert!(
+            shiori.request_fn.is_some(),
+            "First load: request_fn should be cached"
+        );
+
+        // Second load (reload) - should only have request function
+        assert!(shiori.load(0, temp2.path().as_os_str()).unwrap());
+        assert!(
+            shiori.load_fn.is_none(),
+            "After reload: load_fn should be None (not defined in temp2)"
+        );
+        assert!(
+            shiori.request_fn.is_some(),
+            "After reload: request_fn should still be cached"
+        );
+    }
+
+    // ========================================================================
+    // Task 7.4: 複数インスタンス独立性テスト
+    // ========================================================================
+
+    #[test]
+    fn test_multiple_instances_independent_caches() {
+        let temp1 = copy_fixture_to_temp("minimal");
+        let temp2 = copy_fixture_to_temp("minimal");
+
+        // Modify temp1's main.lua to define all three SHIORI functions
+        let main_lua_path1 = temp1.path().join("scripts/pasta/shiori/main.lua");
+        std::fs::write(
+            &main_lua_path1,
+            r#"
+SHIORI = {}
+
+function SHIORI.load(hinst, load_dir)
+    return true
+end
+
+function SHIORI.request(request)
+    return "SHIORI/3.0 204 No Content\r\nCharset: UTF-8\r\nSender: Pasta\r\n\r\n"
+end
+
+function SHIORI.unload()
+    -- Instance 1 unload
+end
+"#,
+        )
+        .unwrap();
+
+        // Modify temp2's main.lua to only define request (no load/unload)
+        let main_lua_path2 = temp2.path().join("scripts/pasta/shiori/main.lua");
+        std::fs::write(
+            &main_lua_path2,
+            r#"
+SHIORI = {}
+
+-- No SHIORI.load or unload
+
+function SHIORI.request(request)
+    return "SHIORI/3.0 204 No Content\r\nCharset: UTF-8\r\nSender: Pasta\r\n\r\n"
+end
+"#,
+        )
+        .unwrap();
+
+        let mut shiori1 = PastaShiori::default();
+        let mut shiori2 = PastaShiori::default();
+
+        // Load both instances
+        assert!(shiori1.load(1, temp1.path().as_os_str()).unwrap());
+        assert!(shiori2.load(2, temp2.path().as_os_str()).unwrap());
+
+        // Instance 1 should have all functions cached
+        assert!(shiori1.load_fn.is_some(), "shiori1.load_fn should be Some");
+        assert!(
+            shiori1.request_fn.is_some(),
+            "shiori1.request_fn should be Some"
+        );
+        assert!(
+            shiori1.unload_fn.is_some(),
+            "shiori1.unload_fn should be Some"
+        );
+
+        // Instance 2 should only have request_fn cached
+        assert!(shiori2.load_fn.is_none(), "shiori2.load_fn should be None");
+        assert!(
+            shiori2.request_fn.is_some(),
+            "shiori2.request_fn should be Some"
+        );
+        assert!(
+            shiori2.unload_fn.is_none(),
+            "shiori2.unload_fn should be None"
+        );
+
+        // Modifying one instance's cache should not affect the other
+        // (This is implicitly verified by the above assertions)
     }
 }
