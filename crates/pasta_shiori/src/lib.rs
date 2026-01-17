@@ -3,7 +3,6 @@
 //! This crate provides the SHIORI protocol interface as a Windows DLL.
 
 mod error;
-pub mod logging;
 mod shiori;
 mod util;
 

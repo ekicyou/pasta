@@ -98,7 +98,7 @@ impl<T: Shiori + Default + Sized> RawShiori<T> {
     /// This is called once during DLL initialization. The subscriber uses
     /// GlobalLoggerRegistry to route logs to instance-specific files.
     fn init_tracing() {
-        use crate::logging::GlobalLoggerRegistry;
+        use pasta_lua::GlobalLoggerRegistry;
         use tracing_subscriber::fmt;
         use tracing_subscriber::prelude::*;
 
