@@ -2,9 +2,9 @@
     "feature_name": "cache-shiori-request-function",
     "description": "PastaShiori における SHIORI Lua 関数のキャッシュ。load時に load_fn / request_fn / unload_fn を取得しておき、各処理時のテーブルルックアップを省略する。",
     "created_at": "2026-01-17T00:00:00Z",
-    "updated_at": "2026-01-17T13:10:00Z",
+    "updated_at": "2026-01-17T14:00:00Z",
     "language": "ja",
-    "phase": "ready-for-implementation",
+    "phase": "completed",
     "approvals": {
         "requirements": {
             "generated": true,
@@ -22,5 +22,7 @@
             "approved_at": "2026-01-17T13:10:00Z"
         }
     },
-    "ready_for_implementation": true
+    "ready_for_implementation": true,
+    "implementation_completed": true,
+    "completed_at": "2026-01-17T14:00:00Z"
 }
