@@ -1,0 +1,22 @@
+{
+    "feature_name": "shiori-lifecycle-lua-execution-test",
+    "created_at": "2026-01-18T00:00:00Z",
+    "updated_at": "2026-01-18T01:00:00Z",
+    "language": "ja",
+    "phase": "design-generated",
+    "approvals": {
+        "requirements": {
+            "generated": true,
+            "approved": true
+        },
+        "design": {
+            "generated": true,
+            "approved": false
+        },
+        "tasks": {
+            "generated": false,
+            "approved": false
+        }
+    },
+    "ready_for_implementation": false
+}
