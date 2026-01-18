@@ -107,16 +107,23 @@ pub fn exec(&self, script: &str) -> LuaResult<Value>  // Line 195
 
 **Research Needed**: `@pasta_search` APIとシーン呼び出しパターンの調査
 
-#### Gap 3: ファイルマーカー検証のタイミング制御 ⚠️ **Constraint**
-**現状:** `drop(shiori)`後にファイルチェックするが、`TempDir`も同時にドロップされる可能性
-**制約:** `TempDir`のライフタイムを明示的に制御する必要がある
+#### Gap 3: SHIORI.unload検証（ファイルマーカー方式） ✅ **Existing Pattern**
+**現状:** `test_unload_called_on_drop`（shiori.rs:615-680）が既にファイルマーカーパターンを実装済み
+**方針:** 既存パターンを踏襲し、SHIORI.unload検証にファイルマーカーを使用
 
-**対策:**
+**実装例:**
 ```rust
-let marker_path = temp.path().join("unload_marker.txt");
-drop(shiori);  // unload呼び出し
-assert!(marker_path.exists());  // TempDirはスコープ終了まで有効
+let marker_path = temp.path().join("unload_called.marker");
+drop(shiori);  // SHIORI.unload呼び出し
+assert!(marker_path.exists(), "SHIORI.unload should have created the marker file on drop");
 ```
+
+**既知の制約:**
+- Lua `io.open()`のUnicode pathサポートは環境依存（Windows ANSI制限の可能性）
+- 現在の開発環境（`TempDir`生成パス）では問題発生の可能性は低い
+- 本番環境で非ASCII load_dirを使用する場合は別途対策が必要
+
+**リスク評価:** Low - 既存テストで動作確認済み、開発環境での再現性は確保
 
 ### 2.3 Complexity Signals
 
