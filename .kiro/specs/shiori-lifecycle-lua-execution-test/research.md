@@ -85,7 +85,18 @@
 - **Trade-offs**: ファイル追加 vs 責務明確化
 - **Follow-up**: common/mod.rsでヘルパー共有を検討
 
-### Decision: ファイルマーカー方式維持
+### Decision: テスト自己完結化（選択肢A採用）
+- **Context**: common/mod.rsのpasta_lua依存パス解決方法
+- **Alternatives Considered**:
+  1. 選択肢A: `tests/support/`に最小セット配置 — 自己完結
+  2. 選択肢B: pasta_luaへの相対パス維持 — 既存パターン踏襲
+- **Selected Approach**: 選択肢A（テスト自己完結化）
+- **Rationale**: 
+  - pasta_shioriテストがワークスペース構造変更に耐性を持つ
+  - テストの可読性向上（すべてがtests/配下）
+  - ディスク容量増加は許容範囲（Lua標準ライブラリは数百KB程度）
+- **Trade-offs**: pasta_lua本体変更時の手動同期が必要 vs ワークスペース構造独立性
+- **Follow-up**: 実装時に`tests/support/scripts/`および`tests/support/scriptlibs/`を作成、CI/CDで同期チェック検討
 - **Context**: Requirement 3のSHIORI.unload検証方法
 - **Alternatives Considered**:
   1. Luaグローバル変数 — runtimeドロップ後アクセス不可
