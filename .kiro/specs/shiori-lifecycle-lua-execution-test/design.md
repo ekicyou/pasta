@@ -319,6 +319,12 @@ function SHIORI.request(request_text)
         if scene_module and scene_module[local_name] then
             scene_output = scene_module[local_name]() or ""
         end
+    else
+        -- Scene not found - return error for test visibility
+        return "SHIORI/3.0 500 Internal Server Error\r\n" ..
+            "Charset: UTF-8\r\n" ..
+            "Value: Scene 'テスト挨拶' not found\r\n" ..
+            "\r\n"
     end
     
     return "SHIORI/3.0 200 OK\r\n" ..
@@ -438,6 +444,12 @@ classDiagram
 テストコードのため、セキュリティ考慮は最小限。
 - TempDirは自動削除されるため、テストアーティファクト漏洩なし
 - io.open()はテスト用マーカーファイルのみ書き込み
+
+### Known Limitations
+- **Unicode Path制約**: Lua `io.open()`のUnicode pathサポートは環境依存（Windows ANSI制限の可能性）
+  - 現在の開発環境（TempDirパス）では問題発生可能性は低い
+  - 本番環境で非ASCIIパスを使用する場合は別途対策が必要
+  - 将来仕様: `pasta-unicode-path-support`で対応検討
 
 ---
 
