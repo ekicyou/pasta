@@ -232,6 +232,10 @@ fn test_shiori_lifecycle_lua_execution_verified() {
 
 **Contracts**: Helper [ ✓ ]
 
+**Design Decision**: テスト自己完結化のため、`tests/support/scripts/`および`tests/support/scriptlibs/`にpasta_lua標準ライブラリの最小セットをコピー配置。
+
+**Known Limitation**: pasta_lua本体のscripts/scriptlibs変更時は手動同期が必要。将来的にはCI/CDで同期チェックを検討。
+
 ##### Helper Interface
 
 ```rust
@@ -252,17 +256,16 @@ pub fn copy_fixture_to_temp(fixture_name: &str) -> TempDir {
     let temp = TempDir::new().unwrap();
     copy_dir_recursive(&src, temp.path()).unwrap();
     
-    // Copy scripts from pasta_lua crate
-    let pasta_lua_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent().unwrap()
-        .join("pasta_lua");
-    copy_support_dirs(&pasta_lua_root, temp.path());
+    // Copy support files (scripts, scriptlibs) from tests/support/
+    let support_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/support");
+    copy_support_dirs(&support_root, temp.path());
     
     temp
 }
 
 fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()>;
-fn copy_support_dirs(pasta_lua_root: &Path, dst: &Path);
+fn copy_support_dirs(support_root: &Path, dst: &Path);
 ```
 
 ---
@@ -450,6 +453,9 @@ classDiagram
   - 現在の開発環境（TempDirパス）では問題発生可能性は低い
   - 本番環境で非ASCIIパスを使用する場合は別途対策が必要
   - 将来仕様: `pasta-unicode-path-support`で対応検討
+- **pasta_lua標準ライブラリ同期**: `tests/support/scripts/`および`tests/support/scriptlibs/`はpasta_lua本体から手動コピー
+  - pasta_lua本体の変更時は手動同期が必要
+  - 将来的にはCI/CDで同期チェックを検討（例: ハッシュ比較、自動コピースクリプト）
 
 ---
 
