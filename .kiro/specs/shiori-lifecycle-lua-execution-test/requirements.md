@@ -55,10 +55,14 @@
 3. If `.pasta`ファイルに構文エラーがある場合, the テスト shall PastaLoaderが適切なエラーメッセージを返すことを確認する
 
 ### Requirement 5: テストフィクスチャ整備
-**Objective:** As a 開発者, I want ライフサイクルテスト専用のフィクスチャを整備したい, so that 各フェーズの実行証拠を明確に収集できる
+**Objective:** As a 開発者, I want ライフサイクルテスト専用の静的フィクスチャを整備したい, so that 各フェーズの実行証拠を明確に収集できる
 
 #### Acceptance Criteria
-1. The テストフィクスチャ shall `scripts/pasta/shiori/main.lua`に観測可能な副作用を持つSHIORI関数を定義する
-2. The テストフィクスチャ shall `dic/`配下にテスト用`.pasta`シーンを配置する
-3. Where 副作用としてファイル書き込みを使用する場合, the フィクスチャ shall テスト終了時にクリーンアップ可能な設計とする
-4. The テストフィクスチャ shall 固定値ではなく入力に依存した動的な応答を生成する
+1. The テストフィクスチャ shall `crates/pasta_shiori/tests/fixtures/shiori_lifecycle/`配下に配置される
+2. The テストフィクスチャ shall `scripts/pasta/shiori/main.lua`に以下の観測可能な副作用を持つSHIORI関数を定義する:
+   - `SHIORI.load`: グローバル変数`SHIORI.loaded_hinst`, `SHIORI.load_dir`を設定
+   - `SHIORI.request`: 呼び出しカウント`SHIORI.request_count`をインクリメント、Pastaシーンを呼び出し
+   - `SHIORI.unload`: ファイルマーカー`unload_marker.txt`を作成
+3. The テストフィクスチャ shall `dic/test/lifecycle.pasta`にテスト用シーン（例: `＊テスト挨拶`）を配置する
+4. The テストフィクスチャ shall `pasta.toml`で`debug_mode = true`を設定する
+5. The インテグレーションテスト shall `crates/pasta_shiori/tests/shiori_lifecycle_test.rs`に配置され、フィクスチャを`TempDir`にコピーして使用する
