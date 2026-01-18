@@ -38,6 +38,20 @@
 #### Acceptance Criteria
 1. When PastaLoaderがload_dirを読み込む, the テスト shall `.pasta`ファイルがトランスパイルされLuaランタイムに登録されることを確認する
 2. When トランスパイル済みシーンがLuaから呼び出される, the テスト shall シーン出力がSHIORI応答に含まれることを確認する
+   - **具体例**: フィクスチャ`dic/test/lifecycle.pasta`に`＊テスト挨拶`シーンを定義し、`main.lua`から以下のように呼び出す:
+     ```lua
+     local SEARCH = require "@pasta_search"
+     local global_name, local_name = SEARCH:search_scene("テスト挨拶", nil)
+     if global_name then
+         -- シーン関数呼び出し（例: テスト挨拶_1.__start__()）
+         local scene_fn = _G[global_name][local_name]
+         if scene_fn then
+             local output = scene_fn()  -- シーン実行
+             return "SHIORI/3.0 200 OK\r\nValue: " .. output .. "\r\n\r\n"
+         end
+     end
+     ```
+   - テストは応答に`Value: <シーン出力>`が含まれることを検証する
 3. If `.pasta`ファイルに構文エラーがある場合, the テスト shall PastaLoaderが適切なエラーメッセージを返すことを確認する
 
 ### Requirement 5: テストフィクスチャ整備
