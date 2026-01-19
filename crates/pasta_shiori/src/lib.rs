@@ -8,3 +8,6 @@ mod util;
 
 #[cfg(windows)]
 mod windows;
+
+// Re-export for integration tests
+pub use shiori::{PastaShiori, Shiori};

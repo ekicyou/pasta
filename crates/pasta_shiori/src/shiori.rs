@@ -4,7 +4,7 @@ use pasta_lua::{GlobalLoggerRegistry, LoadDirGuard, PastaLoader, PastaLuaRuntime
 use std::{ffi::*, path::*};
 use tracing::{debug, error, info, warn};
 
-pub(crate) trait Shiori {
+pub trait Shiori {
     fn load<S: AsRef<OsStr>>(&mut self, hinst: isize, load_dir: S) -> MyResult<bool>;
     fn request<S: AsRef<str>>(&mut self, request: S) -> MyResult<String>;
 }
@@ -18,7 +18,7 @@ pub(crate) trait Shiori {
 /// Note: Logging is handled internally by PastaLuaRuntime (encapsulation).
 /// PastaShiori only manages the GlobalLoggerRegistry for log routing.
 #[derive(Default)]
-pub(crate) struct PastaShiori {
+pub struct PastaShiori {
     /// DLL module handle (for future Windows API integration)
     hinst: isize,
 
@@ -148,6 +148,12 @@ impl Shiori for PastaShiori {
 }
 
 impl PastaShiori {
+    /// Get a reference to the internal Lua runtime.
+    /// Returns None if the runtime has not been initialized via load().
+    pub fn runtime(&self) -> Option<&PastaLuaRuntime> {
+        self.runtime.as_ref()
+    }
+
     /// Cache SHIORI.load, SHIORI.request, and SHIORI.unload functions from Lua runtime.
     /// This eliminates the need for hash table lookups on each request.
     fn cache_lua_functions(&mut self, runtime: &PastaLuaRuntime) {

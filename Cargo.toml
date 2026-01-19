@@ -38,3 +38,11 @@ tracing-appender = "0.2"
 pasta_core = { path = "crates/pasta_core" }
 pasta_lua = { path = "crates/pasta_lua" }
 pasta_shiori = { path = "crates/pasta_shiori" }
+
+# Release profile optimizations for size reduction
+[profile.release]
+opt-level = "z"       # Optimize for size (最小サイズ)
+lto = true            # Link-Time Optimization (全体最適化)
+codegen-units = 1     # 並列コード生成を無効化して最適化向上
+panic = "abort"       # パニック時にアンワインド不要（サイズ削減）
+strip = true          # デバッグシンボルを削除

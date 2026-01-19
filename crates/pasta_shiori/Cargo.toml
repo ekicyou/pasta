@@ -8,7 +8,7 @@ description = "SHIORI DLL interface for pasta script engine"
 
 [lib]
 name = "pasta"
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 pasta_core.workspace = true
