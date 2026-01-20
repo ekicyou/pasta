@@ -13,6 +13,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 pasta_core.workspace = true
 pasta_lua.workspace = true
+time = { version = "0.3", features = ["local-offset"] }
 tracing.workspace = true
 tracing-subscriber.workspace = true
 tracing-appender.workspace = true

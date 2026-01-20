@@ -3,6 +3,7 @@
 //! This crate provides the SHIORI protocol interface as a Windows DLL.
 
 mod error;
+pub mod lua_request;
 mod shiori;
 mod util;
 
