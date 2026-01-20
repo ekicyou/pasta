@@ -44,3 +44,5 @@ lua_request.rsを使って、lua側のSHIORI.requestに、リクエスト解析�
 3. The PastaShiori shall 既存のSHIORI.load/SHIORI.unloadの呼び出し方式を変更しない
 4. The PastaShiori shall SHIORI.request関数が存在しない場合も204レスポンスを返す既存動作を維持する
 5. If SHIORI.request実行中にエラーが発生する, then the PastaShiori shall エラーをログに記録し、MyErrorを返す
+6. The 既存のLuaテストフィクスチャ shall 新しい関数シグネチャ `function SHIORI.request(req)` に更新される（`request_text` → `req`）
+7. The 既存の統合テスト shall 更新されたフィクスチャで正常に動作する
