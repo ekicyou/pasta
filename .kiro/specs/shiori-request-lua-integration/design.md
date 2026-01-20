@@ -21,7 +21,6 @@
 ### Non-Goals
 - ShioriRequest構造体の高レベルAPI（`ShioriRequest::parse`）の使用変更
 - shiori.rsからの呼び出し実装（本設計はモジュール統合のみ）
-- 新規テストファイルの作成（将来課題）
 
 ---
 
@@ -340,15 +339,22 @@ impl From<time::error::IndeterminateOffset> for MyError {
 
 ## Testing Strategy
 
+### Test File Location
+- **New file**: `crates/pasta_shiori/tests/lua_request_test.rs`
+- **Common utilities**: `crates/pasta_shiori/tests/common/mod.rs` (既存の場合は流用)
+
 ### Unit Tests
 - `lua_date`: 日時フィールドの存在確認、型確認
 - `parse_request`: 基本フィールドマッピング、reference配列、dic辞書
 - エラーケース: 不正リクエスト、空文字列
 
 ### Integration Tests
-- `tests/lua_request_test.rs`: Luaインスタンス経由でのテーブル生成・検証
+- Luaインスタンス経由でのテーブル生成・検証
 - SHIORI 3.0 / 2.x 両形式のパーステスト
 - エッジケース: 大量reference、日本語値
+
+### Rationale
+Tech Steering「テスト: 新機能必須、リグレッション防止」に準拠。DoD (Definition of Done) のTest Gate「`cargo test --all` 成功」を満たすために必須。
 
 ---
 
