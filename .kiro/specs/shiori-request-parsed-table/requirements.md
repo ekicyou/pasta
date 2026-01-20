@@ -16,7 +16,7 @@ lua_request.rsを使って、lua側のSHIORI.requestに、リクエスト解析�
 #### Acceptance Criteria
 1. When SHIORI.requestが呼び出される, the PastaShiori shall `lua_request::parse_request`を使用してリクエストテキストを解析する
 2. When リクエスト解析が成功する, the PastaShiori shall 解析結果を`req`テーブルとしてLua側に渡す
-3. If リクエスト解析が失敗する, then the PastaShiori shall エラーログを出力し、適切なエラーレスポンスを返す
+3. If リクエスト解析が失敗する, then the PastaShiori shall エラーログを出力し、Luaを呼ばずにRust側で`SHIORI/3.0 400 Bad Request`レスポンスを返す
 
 ### Requirement 2: 解析済みテーブル構造
 
