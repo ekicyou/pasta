@@ -165,6 +165,8 @@ impl PastaShiori {
 - Postconditions: SHIORI/3.0形式の400レスポンス文字列
 - Invariants: 常に同一形式のレスポンスを返却
 
+**Design Rationale**: 既存の`default_204_response`（L300）と同様に静的メソッドとして実装。状態を必要とせず、テスタビリティとコード再利用性が向上する。
+
 ### SHIORI Layer (Lua)
 
 #### SHIORI.request
@@ -262,13 +264,17 @@ req = {
 ## Migration Strategy
 
 ### Phase 1: 実装
-1. `default_400_response`関数を追加
+1. `default_400_response`関数を追加（`default_204_response`と同様の静的メソッド）
 2. `call_lua_request`を変更（parse_request呼び出し追加）
-3. Luaフィクスチャ`main.lua`を更新
+3. Luaフィクスチャ更新（調査済み: 更新対象は1ファイルのみ）
+   - `crates/pasta_shiori/tests/fixtures/shiori_lifecycle/scripts/pasta/shiori/main.lua`
+   - シグネチャ変更: `function SHIORI.request(request_text)` → `function SHIORI.request(req)`
+
+**Fixture Update Scope Verification**: `grep_search`により`SHIORI.request`を定義するLuaファイルは上記1つのみと確認済み。他のLuaファイルは存在しないため、更新漏れリスクなし。
 
 ### Phase 2: 検証
 1. `cargo test -p pasta_shiori` 実行
-2. 全テスト合格を確認
+2. 全テスト合格を確認（特に`shiori_lifecycle_test.rs`の統合テスト）
 
 ### Rollback
 - 未リリースのため不要
