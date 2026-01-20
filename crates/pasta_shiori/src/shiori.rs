@@ -1,4 +1,5 @@
 use crate::error::*;
+use crate::lua_request;
 use pasta_lua::mlua::{Function, Table};
 use pasta_lua::{GlobalLoggerRegistry, LoadDirGuard, PastaLoader, PastaLuaRuntime};
 use std::{ffi::*, path::*};
@@ -249,7 +250,9 @@ impl PastaShiori {
     }
 
     /// Call SHIORI.request function using cached function.
+    /// Parses request text and passes parsed table to Lua.
     /// Returns 204 response if function doesn't exist.
+    /// Returns 400 Bad Request if request parsing fails.
     fn call_lua_request(&self, request: &str) -> MyResult<String> {
         // Use cached request_fn directly
         let request_fn = match &self.request_fn {
@@ -260,8 +263,21 @@ impl PastaShiori {
             }
         };
 
-        // Call SHIORI.request(request_text)
-        match request_fn.call::<String>(request) {
+        // Get runtime for Lua context
+        let runtime = self.runtime.as_ref().ok_or(MyError::NotInitialized)?;
+        let lua = runtime.lua();
+
+        // Parse request text to Lua table
+        let req_table = match lua_request::parse_request(lua, request) {
+            Ok(table) => table,
+            Err(e) => {
+                error!(error = %e, "SHIORI request parsing failed");
+                return Ok(Self::default_400_response());
+            }
+        };
+
+        // Call SHIORI.request(req) with parsed table
+        match request_fn.call::<String>(req_table) {
             Ok(response) => {
                 debug!(response_len = response.len(), "SHIORI.request completed");
                 Ok(response)
@@ -299,6 +315,16 @@ impl PastaShiori {
     /// Generate default 204 No Content response.
     fn default_204_response() -> String {
         "SHIORI/3.0 204 No Content\r\n\
+         Charset: UTF-8\r\n\
+         Sender: Pasta\r\n\
+         \r\n"
+            .to_string()
+    }
+
+    /// Generate default 400 Bad Request response.
+    /// Used when SHIORI request parsing fails.
+    fn default_400_response() -> String {
+        "SHIORI/3.0 400 Bad Request\r\n\
          Charset: UTF-8\r\n\
          Sender: Pasta\r\n\
          \r\n"
@@ -431,10 +457,12 @@ mod tests {
         assert_eq!(shiori.hinst, 42);
 
         // Phase 2: request() - main.lua should provide SHIORI.request
-        let request_result = shiori.request("SHIORI/3.0\r\n\r\n");
+        // Use valid SHIORI request format (GET method required for parsing)
+        let valid_request = "GET SHIORI/3.0\r\nCharset: UTF-8\r\n\r\n";
+        let request_result = shiori.request(valid_request);
         assert!(request_result.is_ok());
         let response = request_result.unwrap();
-        // Should return 204 No Content from main.lua
+        // Should return 204 No Content from main.lua (minimal fixture has no SHIORI.request)
         assert!(response.contains("SHIORI/3.0 204 No Content"));
         assert!(response.contains("Charset: UTF-8"));
         assert!(response.contains("Sender: Pasta"));
@@ -489,8 +517,10 @@ mod tests {
         assert!(shiori2.runtime.is_some());
 
         // Both should respond to requests with 204 No Content
-        let response1 = shiori1.request("request1").unwrap();
-        let response2 = shiori2.request("request2").unwrap();
+        // Use valid SHIORI request format for parsing
+        let valid_request = "GET SHIORI/3.0\r\nCharset: UTF-8\r\n\r\n";
+        let response1 = shiori1.request(valid_request).unwrap();
+        let response2 = shiori2.request(valid_request).unwrap();
 
         assert!(response1.contains("SHIORI/3.0 204 No Content"));
         assert!(response2.contains("SHIORI/3.0 204 No Content"));
@@ -575,7 +605,9 @@ mod tests {
         let mut shiori = PastaShiori::default();
         assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
 
-        let response = shiori.request("SHIORI/3.0\r\n\r\n").unwrap();
+        // Use valid SHIORI request format for parsing
+        let valid_request = "GET SHIORI/3.0\r\nCharset: UTF-8\r\n\r\n";
+        let response = shiori.request(valid_request).unwrap();
 
         // Verify SHIORI/3.0 response format
         assert!(response.starts_with("SHIORI/3.0 204 No Content\r\n"));
@@ -853,5 +885,243 @@ end
 
         // Modifying one instance's cache should not affect the other
         // (This is implicitly verified by the above assertions)
+    }
+
+    // ========================================================================
+    // Task 1.1: 400 Bad Requestレスポンス生成機能テスト
+    // ========================================================================
+
+    #[test]
+    fn test_default_400_response_format() {
+        let response = PastaShiori::default_400_response();
+
+        // SHIORI/3.0プロトコル準拠を検証
+        assert!(response.starts_with("SHIORI/3.0 400 Bad Request\r\n"));
+        assert!(response.contains("Charset: UTF-8\r\n"));
+        assert!(response.contains("Sender: Pasta\r\n"));
+        assert!(response.ends_with("\r\n\r\n"));
+    }
+
+    // ========================================================================
+    // Task 4.1: パース成功・失敗パステスト
+    // ========================================================================
+
+    #[test]
+    fn test_request_with_valid_shiori_request() {
+        // 有効なSHIORIリクエスト形式でのテスト
+        let temp = copy_shiori_lifecycle_fixture();
+        let mut shiori = PastaShiori::default();
+
+        assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
+
+        // 有効なSHIORI/3.0リクエスト
+        let valid_request = "GET SHIORI/3.0\r\n\
+            Charset: UTF-8\r\n\
+            ID: OnBoot\r\n\
+            Reference0: first\r\n\
+            \r\n";
+
+        let result = shiori.request(valid_request);
+        assert!(result.is_ok());
+        let response = result.unwrap();
+        // パースが成功してLuaが呼ばれた証拠として、400 Bad Request以外を期待
+        // (シーンが見つからない場合は500、見つかった場合は200が返る)
+        assert!(
+            !response.contains("SHIORI/3.0 400 Bad Request"),
+            "Parse should have succeeded, but got 400 Bad Request: {}",
+            response
+        );
+        // 有効なSHIORIレスポンス形式であることを確認
+        assert!(
+            response.starts_with("SHIORI/3.0"),
+            "Expected valid SHIORI response format, got: {}",
+            response
+        );
+    }
+
+    #[test]
+    fn test_request_with_invalid_shiori_request_returns_400() {
+        // 無効なSHIORIリクエスト形式でのテスト
+        let temp = copy_shiori_lifecycle_fixture();
+        let mut shiori = PastaShiori::default();
+
+        assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
+
+        // 完全に無効なリクエスト（パース失敗を引き起こす）
+        let invalid_request = "THIS IS NOT A VALID SHIORI REQUEST";
+
+        let result = shiori.request(invalid_request);
+        assert!(result.is_ok());
+        let response = result.unwrap();
+        assert!(
+            response.contains("SHIORI/3.0 400 Bad Request"),
+            "Expected 400 Bad Request, got: {}",
+            response
+        );
+    }
+
+    /// Test that parsed request table fields are correctly passed to Lua.
+    /// This verifies Lua can actually read method, version, id, reference, dic, etc.
+    #[test]
+    fn test_request_parsed_table_fields_accessible_in_lua() {
+        let temp = copy_shiori_lifecycle_fixture();
+
+        // Override main.lua to echo back req table fields for verification
+        let main_lua_path = temp.path().join("scripts/pasta/shiori/main.lua");
+        std::fs::write(
+            &main_lua_path,
+            r#"
+SHIORI = {}
+
+function SHIORI.load(hinst, load_dir)
+    return true
+end
+
+--- Echo back req table fields for verification
+function SHIORI.request(req)
+    -- Verify req is a table
+    if type(req) ~= "table" then
+        return "SHIORI/3.0 500 Internal Server Error\r\nValue: req is not a table\r\n\r\n"
+    end
+
+    -- Extract all expected fields from req table
+    local method = req.method or "NIL"
+    local version = req.version or "NIL"
+    local id = req.id or "NIL"
+    local charset = req.charset or "NIL"
+    local sender = req.sender or "NIL"
+
+    -- Extract reference array
+    local ref0 = "NIL"
+    local ref1 = "NIL"
+    if req.reference then
+        ref0 = req.reference[0] or "NIL"
+        ref1 = req.reference[1] or "NIL"
+    end
+
+    -- Extract dic table entry
+    local dic_id = "NIL"
+    if req.dic then
+        dic_id = req.dic["ID"] or "NIL"
+    end
+
+    -- Return all fields in response Value header for verification
+    local fields = string.format(
+        "method=%s,version=%s,id=%s,charset=%s,sender=%s,ref0=%s,ref1=%s,dic_id=%s",
+        tostring(method), tostring(version), tostring(id),
+        tostring(charset), tostring(sender),
+        tostring(ref0), tostring(ref1), tostring(dic_id)
+    )
+
+    return "SHIORI/3.0 200 OK\r\n" ..
+        "Charset: UTF-8\r\n" ..
+        "Value: " .. fields .. "\r\n" ..
+        "\r\n"
+end
+
+function SHIORI.unload()
+end
+"#,
+        )
+        .unwrap();
+
+        let mut shiori = PastaShiori::default();
+        assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
+
+        // Send a request with all fields populated
+        let request = "GET SHIORI/3.0\r\n\
+            Charset: UTF-8\r\n\
+            Sender: SSP\r\n\
+            ID: OnBoot\r\n\
+            Reference0: ref_value_0\r\n\
+            Reference1: ref_value_1\r\n\
+            \r\n";
+
+        let response = shiori.request(request).unwrap();
+
+        // Verify response is 200 OK (not 400 Bad Request)
+        assert!(
+            response.contains("SHIORI/3.0 200 OK"),
+            "Expected 200 OK, got: {}",
+            response
+        );
+
+        // Verify each field was correctly parsed and accessible in Lua
+        assert!(
+            response.contains("method=get"),
+            "Expected method=get in response: {}",
+            response
+        );
+        assert!(
+            response.contains("version=30"),
+            "Expected version=30 in response: {}",
+            response
+        );
+        assert!(
+            response.contains("id=OnBoot"),
+            "Expected id=OnBoot in response: {}",
+            response
+        );
+        assert!(
+            response.contains("charset=UTF-8"),
+            "Expected charset=UTF-8 in response: {}",
+            response
+        );
+        assert!(
+            response.contains("sender=SSP"),
+            "Expected sender=SSP in response: {}",
+            response
+        );
+        assert!(
+            response.contains("ref0=ref_value_0"),
+            "Expected ref0=ref_value_0 in response: {}",
+            response
+        );
+        assert!(
+            response.contains("ref1=ref_value_1"),
+            "Expected ref1=ref_value_1 in response: {}",
+            response
+        );
+        assert!(
+            response.contains("dic_id=OnBoot"),
+            "Expected dic_id=OnBoot in response: {}",
+            response
+        );
+    }
+
+    /// Copy shiori_lifecycle fixture to a temporary directory.
+    fn copy_shiori_lifecycle_fixture() -> TempDir {
+        let src = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/shiori_lifecycle");
+        let temp = TempDir::new().unwrap();
+        copy_dir_recursive(&src, temp.path()).unwrap();
+
+        // Copy scripts directory from pasta_lua
+        let crate_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .join("pasta_lua");
+        let scripts_src = crate_root.join("scripts");
+        let scripts_dst = temp.path().join("scripts");
+        if scripts_src.exists() {
+            // Merge: copy pasta_lua scripts first, then overlay fixture scripts
+            std::fs::create_dir_all(&scripts_dst).unwrap();
+            copy_dir_recursive(&scripts_src, &scripts_dst).unwrap();
+        }
+
+        // Copy scriptlibs directory
+        let scriptlibs_src = crate_root.join("scriptlibs");
+        let scriptlibs_dst = temp.path().join("scriptlibs");
+        if scriptlibs_src.exists() {
+            std::fs::create_dir_all(&scriptlibs_dst).unwrap();
+            copy_dir_recursive(&scriptlibs_src, &scriptlibs_dst).unwrap();
+        }
+
+        // Copy fixture's scripts on top (overwrite)
+        let fixture_scripts = src.join("scripts");
+        if fixture_scripts.exists() {
+            copy_dir_recursive(&fixture_scripts, &scripts_dst).unwrap();
+        }
+
+        temp
     }
 }

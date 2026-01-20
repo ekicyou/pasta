@@ -34,14 +34,17 @@ end
 --- SHIORI.request - Increments counter, calls Pasta scene
 --- Called for each SHIORI request from the baseware.
 ---
---- @param request_text string Raw SHIORI request text
+--- @param req table Parsed SHIORI request table
 --- @return string SHIORI response with scene output
-function SHIORI.request(request_text)
+function SHIORI.request(req)
     SHIORI.request_count = SHIORI.request_count + 1
+
+    -- Get event ID from parsed table
+    local event_id = req.id or "テスト挨拶"
 
     -- Call Pasta scene via @pasta_search (Requirement 4)
     local SEARCH = require "@pasta_search"
-    local global_name, local_name = SEARCH:search_scene("テスト挨拶", nil)
+    local global_name, local_name = SEARCH:search_scene(event_id, nil)
 
     local scene_output = ""
     if global_name then
@@ -60,7 +63,7 @@ function SHIORI.request(request_text)
         -- Scene not found - return error for test visibility
         return "SHIORI/3.0 500 Internal Server Error\r\n" ..
             "Charset: UTF-8\r\n" ..
-            "Value: Scene 'テスト挨拶' not found\r\n" ..
+            "Value: Scene '" .. tostring(event_id) .. "' not found\r\n" ..
             "\r\n"
     end
 
