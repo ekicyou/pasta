@@ -104,9 +104,9 @@ fn test_shiori_request_calls_pasta_scene() {
     // Load
     assert!(shiori.load(1, temp.path().as_os_str()).unwrap());
 
-    // Request - should trigger scene call
+    // Request - should trigger scene call with ID="テスト挨拶"
     let response = shiori
-        .request("GET SHIORI/3.0\r\nID: OnBoot\r\n\r\n")
+        .request("GET SHIORI/3.0\r\nID: テスト挨拶\r\n\r\n")
         .unwrap();
 
     // Verify response contains scene output
@@ -202,7 +202,7 @@ fn test_shiori_lifecycle_lua_execution_verified() {
         // Phase 2: SHIORI.request - verify scene execution and counter
         // ================================================================
         let response = shiori
-            .request("GET SHIORI/3.0\r\nID: OnBoot\r\n\r\n")
+            .request("GET SHIORI/3.0\r\nID: テスト挨拶\r\n\r\n")
             .unwrap();
 
         // Verify scene output is in response
@@ -219,7 +219,7 @@ fn test_shiori_lifecycle_lua_execution_verified() {
 
         // Make another request to verify counter increments
         let _ = shiori
-            .request("GET SHIORI/3.0\r\nID: OnSecondChange\r\n\r\n")
+            .request("GET SHIORI/3.0\r\nID: テスト挨拶\r\n\r\n")
             .unwrap();
         let request_count_2: i64 = shiori_table
             .get("request_count")
