@@ -63,6 +63,14 @@ impl From<pasta_lua::mlua::Error> for MyError {
     }
 }
 
+impl From<time::error::IndeterminateOffset> for MyError {
+    fn from(error: time::error::IndeterminateOffset) -> MyError {
+        MyError::Script {
+            message: format!("Failed to get local time: {}", error),
+        }
+    }
+}
+
 impl MyError {
     #[allow(dead_code)]
     pub fn script_error(message: String) -> MyError {
