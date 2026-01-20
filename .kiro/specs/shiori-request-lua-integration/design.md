@@ -321,6 +321,8 @@ pub fn lua_date(lua: &Lua) -> MyResult<Table> {
 
 ### Error Conversion Implementation
 
+**Required Addition to error.rs**:
+
 ```rust
 // time::IndeterminateOffset → MyError (新規)
 impl From<time::error::IndeterminateOffset> for MyError {
@@ -330,8 +332,9 @@ impl From<time::error::IndeterminateOffset> for MyError {
         }
     }
 }
-// Note: または lua_date 内で直接 map_err 使用
 ```
+
+**Rationale**: 既存の`From<mlua::Error>`, `From<ParseError>`パターンとの一貫性を維持。`?`演算子で自動変換が可能になり、コードが簡潔化。
 
 ---
 
@@ -356,7 +359,7 @@ impl From<time::error::IndeterminateOffset> for MyError {
 | `Cargo.toml` | Modify | `time = { version = "0.3", features = ["local-offset"] }` 追加 |
 | `src/lib.rs` | Modify | `mod lua_request;` 追加 |
 | `src/lua_request.rs` | Modify | インポート修正、ライフタイム削除、chrono→time変更 |
-| `src/error.rs` | Optional | time::IndeterminateOffset変換追加（または省略） |
+| `src/error.rs` | Modify | `From<time::error::IndeterminateOffset>` trait実装追加 |
 
 ---
 
