@@ -108,3 +108,19 @@
 3. The PastaRuntime shall 辞書収集処理を個別関数に分離し、新しい辞書タイプの追加を容易にする
 
 **Note**: アクター辞書の実装詳細は本仕様のスコープ外。アクター辞書は「グローバルシーン名→アクター名」のマッピングを提供し、関数または単語辞書の呼び出しコールバックを行う仕組み（シーン辞書の亜流）として後続仕様で実装予定。
+
+### Requirement 8: シーン名カウンタのLua側管理
+
+**Objective:** トランスパイラとして、同名シーンに対する連番カウンタ生成をLua側で実装したい。これにより、Rust側レジストリ依存を廃止し、Luaコード実行時に動的に番号割当を行える。
+
+**設計方針**: トランスパイル時のRust側カウンタ管理（SceneRegistry.increment_counter）を廃止し、生成されたLuaコードの実行時に`pasta.scene`モジュール内でカウンタを管理する。将来的にパフォーマンス要求が発生した場合、Rust実装へのリファクタリングを検討する。
+
+#### Acceptance Criteria
+
+1. The pasta.scene module shall グローバルシーン名のベース名ごとにカウンタを管理する
+2. When `PASTA.create_scene(base_name)`が呼び出された時, the pasta.scene module shall 自動的に連番を割り当てて`base_name .. counter`形式の名前を生成する
+3. The pasta.scene module shall ローカルシーン名についても同様の連番カウンタを提供する
+4. When 同じベース名のシーンが複数回作成された場合, the pasta.scene module shall カウンタをインクリメントして一意な名前を保証する
+5. The transpiler shall `PASTA.create_scene("メイン")`形式のコードを生成する（番号付与はLua実行時）
+6. The pasta.scene module shall カウンタ情報を内部状態として保持し、外部からのアクセスは不要とする
+
