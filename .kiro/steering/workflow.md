@@ -72,3 +72,37 @@ git push origin <branch>
 
 **推奨表現**:
 - 「全テスト合格」「DoD Gate通過」「追加タスク待ち（未完成）」
+
+---
+
+## ドキュメント保守
+
+### 更新チェックリスト
+
+コード変更時に以下のドキュメント更新を確認：
+
+| 変更種別 | 更新対象ドキュメント |
+|----------|----------------------|
+| 公開API変更 | クレートREADME、SPECIFICATION.md |
+| DSL文法変更 | GRAMMAR.md、steering/grammar.md |
+| ディレクトリ構造変更 | steering/structure.md、クレートREADME |
+| 依存関係変更 | steering/tech.md、クレートREADME |
+| 開発フロー変更 | steering/workflow.md、AGENTS.md |
+| 新クレート追加 | README.md（ドキュメントマップ）、クレートREADME新規作成 |
+
+### 保守責任
+
+| ドキュメント | 更新トリガー |
+|--------------|--------------|
+| README.md | プロジェクト概要変更、新クレート追加 |
+| AGENTS.md | AI開発支援コンテキスト変更 |
+| GRAMMAR.md | DSL文法変更 |
+| SPECIFICATION.md | 言語仕様変更（権威的） |
+| クレートREADME | クレートAPI/構造変更 |
+| steering/* | 対応領域の変更 |
+
+### 保守ルール
+
+1. **API変更時**: 対応するクレートREADMEの「公開API」セクションを更新
+2. **仕様変更時**: まずSPECIFICATION.mdを更新、その後GRAMMAR.mdを同期
+3. **PR時確認**: ドキュメント更新漏れがないかDoDチェックリストで確認
