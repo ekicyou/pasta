@@ -195,16 +195,16 @@
 
 ### 2.2 ギャップ・未解決事項
 
-| カテゴリ            | 項目                                        | ステータス                               | 影響度 |
-| ------------------- | ------------------------------------------- | ---------------------------------------- | ------ |
-| **Missing**         | Luaテーブル → SceneRegistry変換ロジック     | 新規実装必要                             | High   |
-| **Missing**         | `pasta`モジュール関数のRust置換メカニズム   | 実装方法調査必要                         | High   |
-| **Missing**         | 既存`@pasta_search`置換ロジック             | 新規実装必要                             | Medium |
-| **Missing**         | `pasta.word`モジュール実装                  | 新規実装必要 (Req9)                      | High   |
-| **Missing**         | トランスパイラ単語定義Lua出力               | 新規実装必要 (Req2)                      | High   |
-| ~~**Constraint**~~  | ~~トランスパイル時カウンタ情報のLua側欠如~~ | ✅ **解決済み** (Req8: Lua側カウンタ管理) | N/A    |
-| ~~**Research Needed**~~ | ~~WordDefRegistry再収集 vs 再利用~~   | ✅ **決定済み** (Req2/9: Lua出力＋ビルダーAPI) | N/A |
-| **Constraint**      | SceneRegistry再構築 vs 初期構築済み         | 設計判断必要                             | Medium |
+| カテゴリ                | 項目                                        | ステータス                                    | 影響度 |
+| ----------------------- | ------------------------------------------- | --------------------------------------------- | ------ |
+| **Missing**             | Luaテーブル → SceneRegistry変換ロジック     | 新規実装必要                                  | High   |
+| **Missing**             | `pasta`モジュール関数のRust置換メカニズム   | 実装方法調査必要                              | High   |
+| **Missing**             | 既存`@pasta_search`置換ロジック             | 新規実装必要                                  | Medium |
+| **Missing**             | `pasta.word`モジュール実装                  | 新規実装必要 (Req9)                           | High   |
+| **Missing**             | トランスパイラ単語定義Lua出力               | 新規実装必要 (Req2)                           | High   |
+| ~~**Constraint**~~      | ~~トランスパイル時カウンタ情報のLua側欠如~~ | ✅ **解決済み** (Req8: Lua側カウンタ管理)      | N/A    |
+| ~~**Research Needed**~~ | ~~WordDefRegistry再収集 vs 再利用~~         | ✅ **決定済み** (Req2/9: Lua出力＋ビルダーAPI) | N/A    |
+| **Constraint**          | SceneRegistry再構築 vs 初期構築済み         | 設計判断必要                                  | Medium |
 
 ### 2.3 複雑度シグナル
 
@@ -370,14 +370,15 @@
 
 ### Phase 1実装ポイント
 
-1. `PastaLuaRuntime::with_config()`でSearchContext初期構築を**条件付きスキップ**
-   - `from_loader_with_scene_dic()`経由の場合のみスキップ
-   - 既存テストとの互換性維持
+1. **初期SearchContext構築スキップ** ✅ **決定済み**
+   - `from_loader_with_scene_dic()`では SearchContext を構築しない
+   - `finalize_scene()` 呼び出しまで `@pasta_search` モジュールは存在しない
+   - 既存テストには `finalize_scene()` 呼び出しを追加して対応
 2. `finalize_scene_impl()`を`runtime/mod.rs`に直接実装
-   - Luaレジストリ（`pasta.scene`）からシーン情報収集
-   - SceneRegistry構築（カウンタは連番で代替）
-   - WordDefRegistry再利用
-   - SearchContext構築・`@pasta_search`置換
+   - Luaレジストリ（`pasta.scene`、`pasta.word`）からシーン・単語情報収集
+   - SceneRegistry構築（Lua側カウンタ情報を使用）
+   - WordDefRegistry構築（Lua側レジストリから収集）
+   - SearchContext構築・`@pasta_search`モジュール登録
 3. Rust関数バインディング
    - `lua.create_function()`で`finalize_scene_impl`をラップ
    - `package.loaded["pasta"]`テーブルの`finalize_scene`フィールドを上書き
@@ -391,7 +392,14 @@
    - Lua実行時に動的に`"メイン1"`, `"メイン2"`等の番号付与
    - Rust側SceneRegistry廃止により、トランスパイル時のカウンタ管理を完全に削除
 
-2. **初期SearchContext構築の扱い**
+2. **初期SearchContext構築の扱い** ✅ **決定済み**
+   - **方針**: 初期構築をスキップし、`finalize_scene()`でのみ構築
+   - `from_loader_with_scene_dic()`では SearchContext を構築しない
+   - `finalize_scene()` 呼び出しまで `@pasta_search` モジュールは存在しない
+   - 無駄な初期構築処理を排除し、Lua側収集アーキテクチャと一貫性を保つ
+   - 既存テストは `finalize_scene()` 呼び出しを追加して対応
+
+3. **Lua関数置換の実装方法**
    - `from_loader_with_scene_dic()`フラグで初期構築をスキップ
    - または、ダミー（空）SearchContextを初期構築し、`finalize_scene()`で置換
 
