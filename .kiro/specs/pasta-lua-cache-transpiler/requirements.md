@@ -52,6 +52,9 @@
 5. The scene_dic.lua shall 末尾で `require("pasta").finalize_scene()` を呼び出す
 6. When 新規Pastaファイルが追加された場合, the scene_dic.lua shall 次回生成時にその require 文を含める
 7. When Pastaファイルが削除された場合, the scene_dic.lua shall 次回生成時にそのモジュールの require 文を含めない
+8. When 孤立キャッシュファイル(対応するPastaファイルが存在しない)を検出した場合, the CacheTranspiler shall 警告ログを出力する
+
+**Design Decision**: cache削除処理を完全廃止し、既存キャッシュを保持する方式を採用。孤立キャッシュは警告のみで自動削除しない(手動クリーンアップに委ねる)。
 
 ### Requirement 4: モジュール命名規則
 
