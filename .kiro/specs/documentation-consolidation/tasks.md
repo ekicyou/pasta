@@ -138,19 +138,19 @@
 
 ## Requirements Coverage
 
-| Requirement | Tasks       | Coverage Status |
-| ----------- | ----------- | --------------- |
-| 1.1, 1.2, 1.3 | 1.1, 1.3    | ✅ Covered       |
-| 2.1, 2.2, 2.3 | 3.1, 3.2    | ✅ Covered       |
-| 3.1         | 3.1, 3.3    | ✅ Covered       |
-| 3.2         | 2.1         | ✅ Covered       |
-| 3.3, 3.4    | -           | ❌ Out of Scope (GRAMMAR.md は現状維持、SPECIFICATION.md は本仕様では更新なし) |
-| 4.1, 4.2, 4.3 | 4.1, 4.2, 4.3 | ✅ Covered     |
-| 5.1, 5.2, 5.3 | 2.1, 2.2, 2.3 | ✅ Covered     |
-| 6.1, 6.2, 6.3, 6.4 | 1.1, 1.2, 1.3 | ✅ Covered |
-| 7.1, 7.2, 7.3 | 3.2, 3.3    | ✅ Covered       |
-| 8.1, 8.2, 8.3, 8.4 | 5.1     | ✅ Covered       |
-| 8.5         | 5.2, 5.3    | ✅ Covered       |
+| Requirement        | Tasks         | Coverage Status                                                               |
+| ------------------ | ------------- | ----------------------------------------------------------------------------- |
+| 1.1, 1.2, 1.3      | 1.1, 1.3      | ✅ Covered                                                                     |
+| 2.1, 2.2, 2.3      | 3.1, 3.2      | ✅ Covered                                                                     |
+| 3.1                | 3.1, 3.3      | ✅ Covered                                                                     |
+| 3.2                | 2.1           | ✅ Covered                                                                     |
+| 3.3, 3.4           | -             | ❌ Out of Scope (GRAMMAR.md は現状維持、SPECIFICATION.md は本仕様では更新なし) |
+| 4.1, 4.2, 4.3      | 4.1, 4.2, 4.3 | ✅ Covered                                                                     |
+| 5.1, 5.2, 5.3      | 2.1, 2.2, 2.3 | ✅ Covered                                                                     |
+| 6.1, 6.2, 6.3, 6.4 | 1.1, 1.2, 1.3 | ✅ Covered                                                                     |
+| 7.1, 7.2, 7.3      | 3.2, 3.3      | ✅ Covered                                                                     |
+| 8.1, 8.2, 8.3, 8.4 | 5.1           | ✅ Covered                                                                     |
+| 8.5                | 5.2, 5.3      | ✅ Covered                                                                     |
 
 **Note**: Requirements 3.3, 3.4 (GRAMMAR.md 整理、SPECIFICATION.md 更新) は要件定義で「整理と実装乖離解消のみ、大幅な削減や構造変更は Out of Scope」と明示されているため、本タスクでは扱いません。
 
