@@ -150,12 +150,12 @@ fn save_cache_files(
 
 #### Unknown（調査要）
 
-1. **scene_dic.lua のロードタイミング**
-   - Rust側でrequireするか、main.luaに追記するか
-   - 設計フェーズで判断必要
+**なし** - 主要な設計判断は完了
 
-2. **finalize_scene() の実体**
-   - 本仕様ではスコープ外だが、呼び出しシグネチャの確認必要
+**設計判断済み事項**:
+1. モジュール命名規則: Option A（ディレクトリ階層再現）
+2. scene_dic.lua のロード: Rust側で明示的にrequire（シーン構築失敗の早期検出）
+3. finalize_scene() の実体: 本仕様のスコープ外（呼び出しのみ実装）
 
 ### 2.3 複雑性シグナル
 
