@@ -12,9 +12,10 @@
 - ファイルタイムスタンプ比較による増分トランスパイル実現
 - 全シーンモジュールを一括ロードする `scene_dic.lua` の自動生成
 - Lua 標準のモジュール解決規則に準拠したディレクトリ構造
+- `finalize_scene()` スタブ実装（エラー回避用、本実装は別仕様）
 
 ### Non-Goals
-- `finalize_scene()` 関数の実体実装（呼び出しのみ）
+- `finalize_scene()` の本実装（シーン辞書構築ロジック）
 - キャッシュの自動削除・ガベージコレクション
 - リモートキャッシュ共有
 
@@ -153,12 +154,13 @@ sequenceDiagram
 
 ## Components and Interfaces
 
-| Component       | Domain/Layer | Intent                       | Req Coverage | Key Dependencies                      | Contracts |
-| --------------- | ------------ | ---------------------------- | ------------ | ------------------------------------- | --------- |
-| CacheManager    | loader/cache | キャッシュライフサイクル管理 | 1,2,3,4,6,7  | LoaderConfig (P0), std::fs (P0)       | Service   |
-| PastaLoader     | loader       | 起動シーケンス統合           | 5,6          | CacheManager (P0), LuaTranspiler (P0) | -         |
-| PastaLuaRuntime | runtime      | scene_dic.lua ロード         | 5            | mlua (P0)                             | Service   |
-| LoaderError     | loader       | エラー型拡張                 | 6            | thiserror (P0)                        | -         |
+| Component           | Domain/Layer | Intent                           | Req Coverage | Key Dependencies                      | Contracts |
+| ------------------- | ------------ | -------------------------------- | ------------ | ------------------------------------- | --------- |
+| CacheManager        | loader/cache | キャッシュライフサイクル管理     | 1,2,3,4,6,7  | LoaderConfig (P0), std::fs (P0)       | Service   |
+| PastaLoader         | loader       | 起動シーケンス統合               | 5,6          | CacheManager (P0), LuaTranspiler (P0) | -         |
+| PastaLuaRuntime     | runtime      | scene_dic.lua ロード             | 5            | mlua (P0)                             | Service   |
+| LoaderError         | loader       | エラー型拡張                     | 6            | thiserror (P0)                        | -         |
+| finalize_scene (stub) | stdlib       | スタブ関数（エラー回避）         | 3,5          | なし                                  | -         |
 
 ### Cache Layer
 
@@ -369,6 +371,81 @@ pub struct TranspileFailure {
     pub error: String,
 }
 ```
+
+#### RuntimeError (拡張)
+
+```rust
+#[derive(Debug, thiserror::Error)]
+pub enum RuntimeError {
+    // 既存バリアント...
+    
+    /// Lua ランタイムエラー
+    #[error("Lua runtime error: {0}")]
+    LuaError(#[from] mlua::Error),
+}
+```
+
+**実装詳細**: mlua::Error を `#[from]` で自動変換することで、`?` 演算子で簡潔にエラー伝播可能。
+
+---
+
+### Stdlib Layer
+
+#### finalize_scene() (スタブ)
+
+| Field        | Detail                                                         |
+| ------------ | -------------------------------------------------------------- |
+| Intent       | scene_dic.lua からの呼び出しを可能にするスタブ関数             |
+| Requirements | 3, 5                                                           |
+
+**Responsibilities & Constraints**
+- エラーを発生させず、正常終了する
+- 警告ログで未実装を通知
+- 本実装（シーン辞書構築）は別仕様で行う
+
+**Dependencies**
+- Inbound: scene_dic.lua — `require("pasta").finalize_scene()` からの呼び出し (P0)
+- Outbound: なし
+
+**Contracts**: Service [x] / API [ ] / Event [ ] / Batch [ ] / State [ ]
+
+##### Service Interface
+
+```rust
+// src/stdlib/mod.rs に追加
+
+/// シーン辞書初期化（スタブ実装）
+/// 
+/// 本実装は別仕様で行う。現在は警告ログのみ出力。
+pub fn finalize_scene(ctx: &RuntimeContext) -> Result<(), RuntimeError> {
+    tracing::warn!("finalize_scene() is a stub implementation. Scene table initialization is not yet implemented.");
+    Ok(())
+}
+```
+
+**Lua 側での登録**:
+```rust
+// src/runtime/mod.rs の pasta モジュール登録時に追加
+fn register_pasta_module(lua: &Lua) -> Result<(), mlua::Error> {
+    let pasta = lua.create_table()?;
+    
+    // 既存の stdlib 登録...
+    
+    // finalize_scene スタブを登録
+    pasta.set("finalize_scene", lua.create_function(|lua, ()| {
+        stdlib::finalize_scene(&get_context(lua)?)
+            .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))
+    })?)?;
+    
+    lua.globals().set("pasta", pasta)?;
+    Ok(())
+}
+```
+
+**Implementation Notes**
+- Integration: pasta stdlib 初期化時に登録、scene_dic.lua から呼び出し可能
+- Validation: 本仕様のテストで scene_dic.lua ロードが成功することを確認
+- Risks: なし（何もしないため）
 
 ---
 
