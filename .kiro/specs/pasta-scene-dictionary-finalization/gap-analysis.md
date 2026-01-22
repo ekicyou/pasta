@@ -393,15 +393,13 @@
    - Rust側SceneRegistry廃止により、トランスパイル時のカウンタ管理を完全に削除
 
 2. **初期SearchContext構築の扱い** ✅ **決定済み**
-   - **方針**: 初期構築をスキップし、`finalize_scene()`でのみ構築
-   - `from_loader_with_scene_dic()`では SearchContext を構築しない
+   - **方針**: `with_config()` から SearchContext 構築処理を完全削除
+   - `finalize_scene()` でのみ SearchContext を構築（すべてのケースで統一）
+   - `from_loader()`, `from_loader_with_scene_dic()`, `new()` すべてで SearchContext 初期構築なし
    - `finalize_scene()` 呼び出しまで `@pasta_search` モジュールは存在しない
+   - 状態管理（条件分岐フラグ）は不要 - シンプルに削除のみ
    - 無駄な初期構築処理を排除し、Lua側収集アーキテクチャと一貫性を保つ
    - 既存テストは `finalize_scene()` 呼び出しを追加して対応
-
-3. **Lua関数置換の実装方法**
-   - `from_loader_with_scene_dic()`フラグで初期構築をスキップ
-   - または、ダミー（空）SearchContextを初期構築し、`finalize_scene()`で置換
 
 3. **Lua関数置換の実装方法**
    - `package.loaded["pasta"]`テーブル取得 → `finalize_scene`フィールド上書き
