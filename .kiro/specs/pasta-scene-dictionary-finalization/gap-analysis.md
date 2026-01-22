@@ -8,6 +8,11 @@
 - **Before（現状）**: トランスパイル時にRust側でSceneRegistry/WordDefRegistry構築 → SearchContextに渡す
 - **After（本仕様）**: トランスパイル時はLuaコード出力のみ → Lua実行時にLua側レジストリに登録 → `finalize_scene()`でLua側から収集 → Rust側SearchContext構築
 
+**設計決定（2026-01-22）**:
+- ✅ **トランスパイラ責務削減**: SceneRegistry/WordDefRegistry構築をトランスパイラから完全削除
+- ✅ **Lua側カウンタ管理**: シーン名カウンタ生成を`pasta.scene`モジュールに実装（Requirement 8）
+- 🎯 **方針**: 積極的にLua実装に依存し、必要に応じてRustへリファクタリング
+
 ## 1. Current State Investigation
 
 ### 1.1 既存アーキテクチャとコンポーネント
@@ -195,7 +200,7 @@
 | **Missing**         | Luaテーブル → SceneRegistry変換ロジック   | 新規実装必要     | High   |
 | **Missing**         | `pasta`モジュール関数のRust置換メカニズム | 実装方法調査必要 | High   |
 | **Missing**         | 既存`@pasta_search`置換ロジック           | 新規実装必要     | Medium |
-| **Constraint**      | トランスパイル時カウンタ情報のLua側欠如   | 代替設計必要     | High   |
+| ~~**Constraint**~~  | ~~トランスパイル時カウンタ情報のLua側欠如~~   | ✅ **解決済み** (Req8: Lua側カウンタ管理) | N/A   |
 | **Constraint**      | SceneRegistry再構築 vs 初期構築済み       | 設計判断必要     | Medium |
 | **Research Needed** | WordDefRegistry再収集 vs 再利用           | 要調査           | Low    |
 
@@ -377,9 +382,12 @@
 
 ### 設計フェーズでの重要判断
 
-1. **SceneRegistry構築戦略**
-   - トランスパイル時カウンタ情報がLua側にないため、連番カウンタで代替
-   - または、Lua側でカウンタ情報を保持する拡張（スコープ外として検討）
+1. **SceneRegistry構築戦略** ✅ **決定済み**
+   - **方針**: Lua側でカウンタ情報を保持・管理（Requirement 8参照）
+   - `pasta.scene`モジュールにカウンタロジックを実装
+   - トランスパイラは番号なしの`PASTA.create_scene("メイン")`を生成
+   - Lua実行時に動的に`"メイン1"`, `"メイン2"`等の番号付与
+   - Rust側SceneRegistry廃止により、トランスパイル時のカウンタ管理を完全に削除
 
 2. **初期SearchContext構築の扱い**
    - `from_loader_with_scene_dic()`フラグで初期構築をスキップ
