@@ -519,6 +519,42 @@ local_words: Table
 
 ## Migration Strategy
 
+### Existing Test Files Impact
+
+**調査結果**: 全10テストファイルを調査し、`PastaLuaRuntime` 使用箇所53箇所を特定。
+
+| テストファイル                | Runtime使用箇所 | @pasta_search依存 | finalize_scene()追加必要 |
+| ----------------------------- | --------------- | ----------------- | ------------------------ |
+| search_module_test.rs         | 16              | ✅                | ✅ 全16箇所              |
+| stdlib_modules_test.rs        | 18              | 1箇所のみ         | ✅ 1箇所のみ             |
+| pasta_lua_encoding_test.rs    | 6               | ❌                | ❌ 修正不要              |
+| stdlib_regex_test.rs          | 13              | ❌                | ❌ 修正不要              |
+| loader_integration_test.rs    | 0               | ❌                | ❌ 修正不要              |
+| transpiler_integration_test.rs | 0               | ❌                | ❌ 修正不要              |
+| japanese_identifier_test.rs   | 0               | ❌                | ❌ 修正不要              |
+| ucid_test.rs                  | 0               | ❌                | ❌ 修正不要              |
+| lua_request_test.rs (shiori)  | -               | ❌                | ❌ 修正不要              |
+| **合計**                      | **53**          | **17**            | **17箇所修正**           |
+
+**修正が必要なテストファイル**:
+
+1. **search_module_test.rs** (16箇所):
+   - すべてのテストが `@pasta_search` モジュールに依存
+   - 修正パターン: `let runtime = PastaLuaRuntime::new(ctx).unwrap();` の直後に `runtime.finalize_scene().unwrap();` を追加
+
+2. **stdlib_modules_test.rs** (1箇所):
+   - `test_minimal_config_only_search_available()` のみ修正必要（行263付近）
+   - 他17箇所は `@pasta_search` 非依存のため修正不要
+
+**修正が不要なテストファイル**:
+- `pasta_lua_encoding_test.rs`: エンコーディングテストのみ
+- `stdlib_regex_test.rs`: 正規表現機能テストのみ
+- `loader_integration_test.rs`, `transpiler_integration_test.rs`, `japanese_identifier_test.rs`, `ucid_test.rs`: `PastaLuaRuntime` 使用なし
+
+**次のアクション**: 修正対象17箇所をタスク分割時に詳細化し、実装フェーズで機械的に修正
+
+## Migration Strategy
+
 ### 既存テスト影響範囲
 
 **調査結果**: `PastaLuaRuntime::new/with_config/from_loader` の使用箇所を全調査（53箇所）
