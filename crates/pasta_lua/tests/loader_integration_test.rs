@@ -211,6 +211,23 @@ fn test_load_empty_dic() {
     // Create minimal pasta.toml
     std::fs::write(base_dir.join("pasta.toml"), "[loader]\ndebug_mode = true\n").unwrap();
 
+    // Copy scripts directory for pasta module
+    let crate_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let scripts_src = crate_root.join("scripts");
+    let scripts_dst = base_dir.join("scripts");
+    if scripts_src.exists() {
+        std::fs::create_dir_all(&scripts_dst).unwrap();
+        copy_dir_recursive(&scripts_src, &scripts_dst).unwrap();
+    }
+
+    // Copy scriptlibs directory
+    let scriptlibs_src = crate_root.join("scriptlibs");
+    let scriptlibs_dst = base_dir.join("scriptlibs");
+    if scriptlibs_src.exists() {
+        std::fs::create_dir_all(&scriptlibs_dst).unwrap();
+        copy_dir_recursive(&scriptlibs_src, &scriptlibs_dst).unwrap();
+    }
+
     // Should succeed but with warning (no files found)
     let runtime = PastaLoader::load(base_dir).unwrap();
 
@@ -302,33 +319,37 @@ fn test_directories_created() {
 }
 
 #[test]
-fn test_cache_cleared_on_load() {
+fn test_cache_incremental_update() {
     // Use helper that copies scripts
     let temp = create_temp_with_pasta("＊テスト\n  ゴースト：「こんにちは」\n");
     let base_dir = temp.path();
 
-    // Create cache directory with old file
-    std::fs::create_dir_all(base_dir.join("profile/pasta/cache/lua")).unwrap();
-    std::fs::write(
-        base_dir.join("profile/pasta/cache/lua/old_cache.lua"),
-        "-- old cache",
-    )
-    .unwrap();
+    // Create cache directory with old file that has matching version
+    let cache_dir = base_dir.join("profile/pasta/cache/lua");
+    std::fs::create_dir_all(&cache_dir).unwrap();
 
-    // Load should clear cache
+    // Write current version to .cache_version (otherwise it will be cleared)
+    let version = env!("CARGO_PKG_VERSION");
+    std::fs::write(cache_dir.join(".cache_version"), version).unwrap();
+
+    // Create pasta/scene subdirectory for cache files
+    std::fs::create_dir_all(cache_dir.join("pasta/scene")).unwrap();
+
+    // Create an unrelated cache file (simulating orphan)
+    std::fs::write(cache_dir.join("pasta/scene/orphan.lua"), "-- orphan cache").unwrap();
+
+    // Load should preserve cache (incremental update)
     let _runtime = PastaLoader::load(base_dir).unwrap();
 
-    // Old cache file should be gone
+    // Orphan cache file should still exist (we don't auto-delete)
     assert!(
-        !base_dir
-            .join("profile/pasta/cache/lua/old_cache.lua")
-            .exists()
+        cache_dir.join("pasta/scene/orphan.lua").exists(),
+        "Orphan cache should be preserved"
     );
 
-    // New cache file should exist
+    // New scene_dic.lua should exist
     assert!(
-        base_dir
-            .join("profile/pasta/cache/lua/dic_test_hello.lua")
-            .exists()
+        cache_dir.join("pasta/scene_dic.lua").exists(),
+        "scene_dic.lua should exist"
     );
 }

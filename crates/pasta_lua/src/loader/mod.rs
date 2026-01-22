@@ -22,14 +22,16 @@
 //! let result = runtime.exec("some_scene_call()")?;
 //! ```
 
+mod cache;
 mod config;
 mod context;
 mod discovery;
 mod error;
 
+pub use cache::CacheManager;
 pub use config::{LoaderConfig, LoggingConfig, PastaConfig};
 pub use context::LoaderContext;
-pub use error::LoaderError;
+pub use error::{LoaderError, TranspileFailure};
 
 use crate::context::TranspileContext;
 use crate::runtime::{PastaLuaRuntime, RuntimeConfig};
@@ -39,14 +41,22 @@ use std::fs;
 use std::path::Path;
 use tracing::{debug, info, warn};
 
+/// Transpile statistics for logging.
+struct TranspileStats {
+    transpiled: usize,
+    skipped: usize,
+    failed: usize,
+}
+
 /// Pasta Loader - Unified startup sequence API.
 ///
 /// Orchestrates the complete startup sequence:
 /// 1. Load configuration from pasta.toml
-/// 2. Prepare profile directories
+/// 2. Prepare profile directories and cache with version check
 /// 3. Discover .pasta files in dic/*/*.pasta
-/// 4. Transpile all files to Lua
-/// 5. Initialize PastaLuaRuntime
+/// 4. Incremental transpile (only changed files)
+/// 5. Generate scene_dic.lua
+/// 6. Initialize PastaLuaRuntime and load scene_dic
 pub struct PastaLoader;
 
 impl PastaLoader {
@@ -91,9 +101,12 @@ impl PastaLoader {
         debug!("Phase 1: Loading configuration");
         let config = PastaConfig::load(base_dir)?;
 
-        // Phase 2: Prepare directories
-        debug!("Phase 2: Preparing directories");
+        // Phase 2: Prepare directories and cache (with version check)
+        debug!("Phase 2: Preparing directories and cache");
         Self::prepare_directories(base_dir, &config.loader)?;
+        let cache_manager =
+            CacheManager::new(base_dir.to_path_buf(), &config.loader.transpiled_output_dir);
+        cache_manager.prepare_cache_dir()?;
 
         // Phase 3: Discover files
         debug!("Phase 3: Discovering pasta files");
@@ -104,28 +117,46 @@ impl PastaLoader {
             info!(count = files.len(), "Found pasta files");
         }
 
-        // Phase 4: Transpile
-        debug!("Phase 4: Transpiling pasta files");
-        let (context, transpiled) = Self::transpile_all(base_dir, &files)?;
+        // Phase 4: Incremental transpile
+        debug!("Phase 4: Incremental transpilation");
+        let (context, module_names, stats) =
+            Self::transpile_incremental(base_dir, &files, &cache_manager)?;
 
-        // Save cache files if debug mode
+        // Log statistics in debug mode
         if config.loader.debug_mode {
-            Self::save_cache_files(base_dir, &config.loader.transpiled_output_dir, &transpiled)?;
+            info!(
+                transpiled = stats.transpiled,
+                skipped = stats.skipped,
+                failed = stats.failed,
+                "Transpilation statistics"
+            );
         }
 
-        // Phase 5: Create logger
-        debug!("Phase 5: Creating instance logger");
+        // Check for orphaned caches
+        let orphans = cache_manager.find_orphaned_caches(&files);
+        if !orphans.is_empty() && config.loader.debug_mode {
+            for orphan in &orphans {
+                warn!(path = %orphan.display(), "Orphaned cache file detected");
+            }
+        }
+
+        // Phase 5: Generate scene_dic.lua
+        debug!("Phase 5: Generating scene_dic.lua");
+        let scene_dic_path = cache_manager.generate_scene_dic(&module_names)?;
+
+        // Phase 6: Create logger
+        debug!("Phase 6: Creating instance logger");
         let logger = Self::create_logger(base_dir, &config)?;
 
-        // Phase 6: Initialize runtime
-        debug!("Phase 6: Initializing runtime");
+        // Phase 7: Initialize runtime and load scene_dic
+        debug!("Phase 7: Initializing runtime");
         let loader_context = LoaderContext::from_config(base_dir, &config);
-        let runtime = PastaLuaRuntime::from_loader(
+        let runtime = PastaLuaRuntime::from_loader_with_scene_dic(
             context,
             loader_context,
             runtime_config,
-            &transpiled,
             logger,
+            &scene_dic_path,
         )?;
 
         info!(path = %base_dir.display(), "Startup sequence completed");
@@ -156,6 +187,9 @@ impl PastaLoader {
     }
 
     /// Prepare profile directories.
+    ///
+    /// Note: Cache directory management (including version-based clearing)
+    /// is now handled by CacheManager::prepare_cache_dir().
     fn prepare_directories(base_dir: &Path, config: &LoaderConfig) -> Result<(), LoaderError> {
         let dirs = [
             "profile/pasta/save",
@@ -172,88 +206,128 @@ impl PastaLoader {
             }
         }
 
-        // Clear and recreate cache/lua directory
-        let cache_lua = base_dir.join(&config.transpiled_output_dir);
-        if cache_lua.exists() {
-            fs::remove_dir_all(&cache_lua).map_err(|e| LoaderError::io(&cache_lua, e))?;
-            fs::create_dir_all(&cache_lua).map_err(|e| LoaderError::io(&cache_lua, e))?;
-            debug!(path = %cache_lua.display(), "Cleared cache directory");
-        }
+        // Note: Cache clearing is now handled by CacheManager with version checking
+        // We no longer unconditionally delete cache/lua directory
 
         Ok(())
     }
 
-    /// Transpile all discovered pasta files.
-    fn transpile_all(
-        base_dir: &Path,
+    /// Incremental transpilation - only transpile changed files.
+    ///
+    /// Uses CacheManager to check timestamps and skip unchanged files.
+    fn transpile_incremental(
+        _base_dir: &Path,
         files: &[std::path::PathBuf],
-    ) -> Result<(TranspileContext, Vec<TranspileResult>), LoaderError> {
+        cache_manager: &CacheManager,
+    ) -> Result<(TranspileContext, Vec<String>, TranspileStats), LoaderError> {
         let transpiler = LuaTranspiler::default();
         let mut combined_context = TranspileContext::new();
-        let mut results = Vec::with_capacity(files.len());
+        let mut module_names = Vec::with_capacity(files.len());
+        let mut failures = Vec::new();
+        let mut stats = TranspileStats {
+            transpiled: 0,
+            skipped: 0,
+            failed: 0,
+        };
 
         for file_path in files {
-            let content =
-                fs::read_to_string(file_path).map_err(|e| LoaderError::io(file_path, e))?;
+            // Check if transpilation is needed
+            let needs_transpile = cache_manager.needs_transpile(file_path).unwrap_or(true);
 
-            // Generate module name from file path
-            let relative = file_path.strip_prefix(base_dir).unwrap_or(file_path);
-            let module_name = Self::path_to_module_name(relative);
+            // Always collect module name for scene_dic.lua
+            let module_name = cache_manager.source_to_module_name(file_path);
+            module_names.push(module_name.clone());
+
+            if !needs_transpile {
+                stats.skipped += 1;
+                debug!(file = %file_path.display(), "Skipped (cache up-to-date)");
+                continue;
+            }
+
+            // Read and parse
+            let content = match fs::read_to_string(file_path) {
+                Ok(c) => c,
+                Err(e) => {
+                    failures.push(TranspileFailure {
+                        source_path: file_path.clone(),
+                        error: format!("Read error: {}", e),
+                    });
+                    stats.failed += 1;
+                    continue;
+                }
+            };
+
             let filename = file_path.to_string_lossy().to_string();
+            let pasta_file = match pasta_core::parse_str(&content, &filename) {
+                Ok(pf) => pf,
+                Err(e) => {
+                    failures.push(TranspileFailure {
+                        source_path: file_path.clone(),
+                        error: format!("Parse error: {}", e),
+                    });
+                    stats.failed += 1;
+                    continue;
+                }
+            };
 
-            // Parse the pasta file
-            let pasta_file = pasta_core::parse_str(&content, &filename)
-                .map_err(|e| LoaderError::parse_with_source(file_path, e.to_string(), e))?;
-
-            // Transpile to Lua
+            // Transpile
             let mut output = Vec::new();
-            let file_context = transpiler
-                .transpile(&pasta_file, &mut output)
-                .map_err(LoaderError::from)?;
+            let file_context = match transpiler.transpile(&pasta_file, &mut output) {
+                Ok(ctx) => ctx,
+                Err(e) => {
+                    failures.push(TranspileFailure {
+                        source_path: file_path.clone(),
+                        error: format!("Transpile error: {}", e),
+                    });
+                    stats.failed += 1;
+                    continue;
+                }
+            };
 
-            // Merge registries into combined context
+            // Merge registries
             combined_context.merge_from(file_context);
 
-            let lua_code = String::from_utf8(output).map_err(|e| {
-                LoaderError::parse(
-                    file_path,
-                    format!("Invalid UTF-8 in transpiled output: {}", e),
-                )
-            })?;
+            let lua_code = match String::from_utf8(output) {
+                Ok(s) => s,
+                Err(e) => {
+                    failures.push(TranspileFailure {
+                        source_path: file_path.clone(),
+                        error: format!("UTF-8 error: {}", e),
+                    });
+                    stats.failed += 1;
+                    continue;
+                }
+            };
 
-            results.push(TranspileResult {
-                module_name,
-                lua_code,
-                source_path: file_path.clone(),
-            });
+            // Save to cache
+            if let Err(e) = cache_manager.save_cache(file_path, &lua_code) {
+                warn!(file = %file_path.display(), error = %e, "Failed to save cache");
+                // Continue anyway - cache write failure is not fatal
+            }
 
-            debug!(file = %file_path.display(), "Transpiled");
+            stats.transpiled += 1;
+            debug!(file = %file_path.display(), module = %module_name, "Transpiled");
         }
 
-        Ok((combined_context, results))
-    }
-
-    /// Save transpiled results to cache directory.
-    fn save_cache_files(
-        base_dir: &Path,
-        output_dir: &str,
-        results: &[TranspileResult],
-    ) -> Result<(), LoaderError> {
-        let cache_dir = base_dir.join(output_dir);
-
-        for result in results {
-            let cache_file = cache_dir.join(format!("{}.lua", result.module_name));
-            fs::write(&cache_file, &result.lua_code)
-                .map_err(|e| LoaderError::io(&cache_file, e))?;
-            debug!(file = %cache_file.display(), "Saved cache");
+        // Report failures if any
+        if !failures.is_empty() {
+            warn!(failed = stats.failed, "Some files failed to transpile");
+            for failure in &failures {
+                warn!(
+                    path = %failure.source_path.display(),
+                    error = %failure.error,
+                    "Transpile failure"
+                );
+            }
         }
 
-        Ok(())
+        Ok((combined_context, module_names, stats))
     }
 
-    /// Convert file path to module name.
+    /// Convert file path to module name (legacy - for backward compatibility).
     ///
     /// Example: `dic/baseware/system.pasta` → `dic_baseware_system`
+    #[allow(dead_code)]
     fn path_to_module_name(path: &Path) -> String {
         let stem = path.with_extension("");
         let s = stem.to_string_lossy();

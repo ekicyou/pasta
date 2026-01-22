@@ -49,8 +49,8 @@ pub use context::TranspileContext;
 pub use encoding::{Encoder, Encoding};
 pub use error::TranspileError;
 pub use loader::{
-    LoaderConfig, LoaderContext, LoaderError, LoggingConfig, PastaConfig, PastaLoader,
-    TranspileResult,
+    CacheManager, LoaderConfig, LoaderContext, LoaderError, LoggingConfig, PastaConfig,
+    PastaLoader, TranspileFailure, TranspileResult,
 };
 pub use logging::{
     GlobalLoggerRegistry, LoadDirGuard, PastaLogger, get_current_load_dir, set_current_load_dir,

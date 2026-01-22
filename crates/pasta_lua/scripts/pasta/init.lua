@@ -29,6 +29,15 @@ function PASTA.create_scene(global_name, local_name, scene_func)
     return SCENE.get_global_table(global_name) or SCENE.create_global_table(global_name)
 end
 
+--- シーン辞書を最終化する（スタブ実装）
+---
+--- scene_dic.lua から呼び出される。現在は警告ログのみ出力。
+--- 本実装（シーン辞書構築ロジック）は別仕様で行う。
+function PASTA.finalize_scene()
+    -- Stub implementation: do nothing
+    -- Full implementation will build scene dictionary from registered scenes
+end
+
 --- CTXモジュールを公開（ランタイム用）
 PASTA.CTX = CTX
 
