@@ -64,6 +64,9 @@
 3. When ファイル名に日本語が含まれる場合, the CacheTranspiler shall そのまま日本語をモジュール名に使用する
 4. The CacheTranspiler shall `.pasta` 拡張子を除去してモジュール名を生成する
 5. When ファイル名にハイフンが含まれる場合, the CacheTranspiler shall アンダースコアに変換する
+6. The CacheTranspiler shall ディレクトリ階層を再現した物理ファイル配置を行う（`dic/subdir/scene.pasta` → `{transpiled_output_dir}/pasta/scene/subdir/scene.lua`）
+
+**Design Decision**: ディレクトリ階層を再現する方式を採用。Luaの標準的なモジュール解決（`require "pasta.scene.subdir.scene"` → `pasta/scene/subdir/scene.lua`）に準拠する。
 
 ### Requirement 5: ローダー統合
 

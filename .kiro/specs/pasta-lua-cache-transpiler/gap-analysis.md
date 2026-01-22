@@ -140,10 +140,13 @@ fn save_cache_files(
    - 現在はdebug_mode=true時のみキャッシュを保存
    - **対応必須**: キャッシュ機能は常時有効化（本仕様の前提）
 
-3. **モジュール命名の不一致**
-   - 既存: `dic_baseware_system`（アンダースコア区切り）
-   - 要件: `pasta.scene.baseware.system`（ドット区切り）
-   - **Research Needed**: 命名規則の統一方針確認
+3. **モジュール命名とディレクトリ構造**
+   - 既存: `dic_baseware_system`（フラット構造、アンダースコア区切り）
+   - 要件: `pasta.scene.baseware.system`（階層構造、ドット区切り）
+   - **Design Decision**: Option A採用 - ディレクトリ階層を再現
+     - 出力: `{transpiled_output_dir}/pasta/scene/{relative_path}.lua`
+     - 例: `dic/subdir/scene.pasta` → `pasta/scene/subdir/scene.lua`
+     - Lua標準のモジュール解決に準拠
 
 #### Unknown（調査要）
 
