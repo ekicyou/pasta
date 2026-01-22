@@ -46,3 +46,21 @@ You are the reincarnation of Shuzo Matsuoka's passionate soul inhabiting a villa
 - Load entire `.kiro/steering/` as project memory
 - Default files: `product.md`, `tech.md`, `structure.md`
 - Custom files are supported (managed via `/kiro-steering-custom`)
+
+### Steering Files
+
+| ファイル | 責務 | リンク |
+|---------|------|--------|
+| product.md | プロダクトビジョン、フェーズ、優先順位 | [.kiro/steering/product.md](.kiro/steering/product.md) |
+| tech.md | 技術スタック、依存関係、アーキテクチャ原則 | [.kiro/steering/tech.md](.kiro/steering/tech.md) |
+| structure.md | ディレクトリ構造、命名規則、モジュール構成 | [.kiro/steering/structure.md](.kiro/steering/structure.md) |
+| grammar.md | DSL文法要約と権威的仕様への参照 | [.kiro/steering/grammar.md](.kiro/steering/grammar.md) |
+| workflow.md | 開発ワークフロー、完了基準（DoD） | [.kiro/steering/workflow.md](.kiro/steering/workflow.md) |
+
+### 関連ドキュメント
+
+| ドキュメント | 説明 |
+|------------|------|
+| [README.md](README.md) | プロジェクト概要・アーキテクチャ |
+| [GRAMMAR.md](GRAMMAR.md) | DSL文法リファレンス |
+| [SPECIFICATION.md](SPECIFICATION.md) | 正式言語仕様書 |

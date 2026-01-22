@@ -269,6 +269,7 @@ Pasta ファイルのパスからモジュール名が自動生成されます�
 
 - [`pasta_core`](../pasta_core/) - パーサー、AST、レジストリ
 - [`pasta_shiori`](../pasta_shiori/) - SHIORI DLL ラッパー
+- [プロジェクト概要](../../README.md) - pasta プロジェクト全体
 
 ## ライセンス
 
