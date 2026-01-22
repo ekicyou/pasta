@@ -80,10 +80,10 @@ graph TB
 ```
 
 **Architecture Integration**:
-- 選択パターン: Hybrid Approach（Phase 1 インライン実装）
+- 選択パターン: Module Separation（最初から runtime/finalize.rs に分離）
 - ドメイン境界: Lua側レジストリ管理 ↔ Rust側検索装置構築
 - 既存パターン保持: UserData, Module Registration, Function Binding
-- 新規コンポーネント: `pasta.word` モジュール、`finalize_scene_impl` 関数
+- 新規コンポーネント: `pasta.word` モジュール、`runtime/finalize.rs` モジュール
 
 ### Technology Stack
 
@@ -160,23 +160,24 @@ sequenceDiagram
 
 ## Components and Interfaces
 
-| Component               | Domain/Layer | Intent                                 | Req Coverage     | Key Dependencies                                         | Contracts |
-| ----------------------- | ------------ | -------------------------------------- | ---------------- | -------------------------------------------------------- | --------- |
-| finalize_scene_impl     | Runtime      | Lua側レジストリ収集・SearchContext構築 | 1, 2, 3, 4, 6, 7 | pasta.scene (P0), pasta.word (P0), search::register (P0) | Service   |
-| pasta.scene (拡張)      | Lua Script   | シーンレジストリ + カウンタ管理        | 1.6, 8           | -                                                        | State     |
-| pasta.word (新規)       | Lua Script   | 単語レジストリ + ビルダーAPI           | 2.3-2.5, 9       | -                                                        | State     |
-| pasta.init (修正)       | Lua Script   | 公開API（finalize_scene置換対応）      | 4.1, 8.5         | pasta.scene (P0), pasta.word (P0)                        | API       |
-| LuaCodeGenerator (修正) | Transpiler   | 単語定義Lua出力                        | 2.1, 2.2         | -                                                        | -         |
-| runtime/mod.rs (修正)   | Runtime      | SearchContext初期構築削除              | 5                | -                                                        | -         |
+| Component                | Domain/Layer | Intent                                              | Req Coverage     | Key Dependencies                                         | Contracts |
+| ------------------------ | ------------ | --------------------------------------------------- | ---------------- | -------------------------------------------------------- | --------- |
+| runtime/finalize.rs (新規) | Runtime      | Lua側レジストリ収集・SearchContext構築              | 1, 2, 3, 4, 6, 7 | pasta.scene (P0), pasta.word (P0), search::register (P0) | Service   |
+| pasta.scene (拡張)       | Lua Script   | シーンレジストリ + カウンタ管理                     | 1.6, 8           | -                                                        | State     |
+| pasta.word (新規)        | Lua Script   | 単語レジストリ + ビルダーAPI                        | 2.3-2.5, 9       | -                                                        | State     |
+| pasta.init (修正)        | Lua Script   | 公開API（finalize_scene置換対応）                   | 4.1, 8.5         | pasta.scene (P0), pasta.word (P0)                        | API       |
+| LuaCodeGenerator (修正)  | Transpiler   | 単語定義Lua出力                                     | 2.1, 2.2         | -                                                        | -         |
+| runtime/mod.rs (修正)    | Runtime      | SearchContext初期構築削除 + finalize.rs export      | 5, 4.3           | runtime::finalize (P0)                                   | -         |
 
 ### Runtime Layer
 
-#### finalize_scene_impl
+#### runtime/finalize.rs (新規モジュール)
 
 | Field        | Detail                                                     |
 | ------------ | ---------------------------------------------------------- |
 | Intent       | Lua側レジストリからデータ収集し SearchContext を構築・登録 |
 | Requirements | 1.1-1.6, 2.6-2.8, 3.1-3.5, 4.2-4.5, 6.1-6.5, 7.1-7.3       |
+| Location     | `crates/pasta_lua/src/runtime/finalize.rs` (新規作成)      |
 
 **Responsibilities & Constraints**
 - Lua側 `pasta.scene` レジストリから全シーン情報を収集
@@ -226,8 +227,23 @@ fn collect_words(lua: &Lua) -> LuaResult<Vec<WordCollectionEntry>>;
 
 **Implementation Notes**
 - Integration: `package.loaded["pasta"]` の `finalize_scene` フィールドを Rust 関数で上書き
+- Module Structure: 約200-300行の独立モジュールとして実装（finalize_scene_impl + collect_scenes + collect_words + helper関数）
 - Validation: レジストリが空の場合は警告ログを出力し空の SearchContext を構築
 - Risks: Luaテーブル構造が想定外の場合のエラーハンドリング
+
+##### Module Export
+
+```rust
+// crates/pasta_lua/src/runtime/finalize.rs
+
+pub(crate) fn register_finalize_scene(lua: &Lua) -> LuaResult<()> {
+    // finalize_scene 関数を pasta モジュールに登録
+}
+
+// crates/pasta_lua/src/runtime/mod.rs
+mod finalize;
+pub(crate) use finalize::register_finalize_scene;
+```
 
 ### Lua Script Layer
 
@@ -345,11 +361,11 @@ end
 
 #### LuaCodeGenerator (修正)
 
-| Field        | Detail                                                |
-| ------------ | ----------------------------------------------------- |
-| Intent       | シーン/単語定義のLua出力コード修正                    |
-| Requirements | 2.1, 2.2, 8.5                                         |
-| Files        | `crates/pasta_lua/src/code_generator.rs`              |
+| Field        | Detail                                   |
+| ------------ | ---------------------------------------- |
+| Intent       | シーン/単語定義のLua出力コード修正       |
+| Requirements | 2.1, 2.2, 8.5                            |
+| Files        | `crates/pasta_lua/src/code_generator.rs` |
 
 **修正対象関数**:
 
@@ -391,41 +407,33 @@ end
 
 ### Runtime Modification
 
-#### with_config() 修正
+#### runtime/mod.rs 修正
 
-| Field        | Detail                       |
-| ------------ | ---------------------------- |
-| Intent       | SearchContext 初期構築の削除 |
-| Requirements | 5.1-5.4                      |
+| Field        | Detail                                         |
+| ------------ | ---------------------------------------------- |
+| Intent       | SearchContext 初期構築の削除 + finalize export |
+| Requirements | 5.1-5.4, 4.3                                   |
 
 **Changes**:
-- `crate::search::register()` 呼び出しを削除
-- `@pasta_search` モジュールは `finalize_scene()` で登録
+1. `with_config()` から `crate::search::register()` 呼び出しを削除
+2. `mod finalize;` と `pub(crate) use finalize::register_finalize_scene;` を追加
+3. `from_loader_with_scene_dic()` などで `register_finalize_scene(lua)` を呼び出し
 
 ```rust
-// 削除する行（lines 160）
+// 削除する行（lines 160 付近）
 // crate::search::register(&lua, scene_registry, word_registry)?;
+
+// 追加する行（mod 宣言部）
+mod finalize;
+
+// 追加する行（use 宣言部）
+pub(crate) use finalize::register_finalize_scene;
+
+// 追加する行（初期化関数内）
+register_finalize_scene(&lua)?;
 ```
 
-#### finalize_scene バインディング登録
-
-**Location**: `from_loader_with_scene_dic()` または新規初期化関数
-
-```rust
-/// finalize_scene() の Rust 実装を pasta モジュールに登録
-fn register_finalize_scene(lua: &Lua) -> LuaResult<()> {
-    let finalize_fn = lua.create_function(|lua, ()| {
-        finalize_scene_impl(lua)
-    })?;
-    
-    let package: Table = lua.globals().get("package")?;
-    let loaded: Table = package.get("loaded")?;
-    let pasta: Table = loaded.get("pasta")?;
-    pasta.set("finalize_scene", finalize_fn)?;
-    
-    Ok(())
-}
-```
+**Note**: `@pasta_search` モジュールは `finalize_scene()` 呼び出し時に登録される
 
 ## Data Models
 
@@ -523,18 +531,18 @@ local_words: Table
 
 **調査結果**: 全10テストファイルを調査し、`PastaLuaRuntime` 使用箇所53箇所を特定。
 
-| テストファイル                | Runtime使用箇所 | @pasta_search依存 | finalize_scene()追加必要 |
-| ----------------------------- | --------------- | ----------------- | ------------------------ |
-| search_module_test.rs         | 16              | ✅                | ✅ 全16箇所              |
-| stdlib_modules_test.rs        | 18              | 1箇所のみ         | ✅ 1箇所のみ             |
-| pasta_lua_encoding_test.rs    | 6               | ❌                | ❌ 修正不要              |
-| stdlib_regex_test.rs          | 13              | ❌                | ❌ 修正不要              |
-| loader_integration_test.rs    | 0               | ❌                | ❌ 修正不要              |
-| transpiler_integration_test.rs | 0               | ❌                | ❌ 修正不要              |
-| japanese_identifier_test.rs   | 0               | ❌                | ❌ 修正不要              |
-| ucid_test.rs                  | 0               | ❌                | ❌ 修正不要              |
-| lua_request_test.rs (shiori)  | -               | ❌                | ❌ 修正不要              |
-| **合計**                      | **53**          | **17**            | **17箇所修正**           |
+| テストファイル                 | Runtime使用箇所 | @pasta_search依存 | finalize_scene()追加必要 |
+| ------------------------------ | --------------- | ----------------- | ------------------------ |
+| search_module_test.rs          | 16              | ✅                 | ✅ 全16箇所               |
+| stdlib_modules_test.rs         | 18              | 1箇所のみ         | ✅ 1箇所のみ              |
+| pasta_lua_encoding_test.rs     | 6               | ❌                 | ❌ 修正不要               |
+| stdlib_regex_test.rs           | 13              | ❌                 | ❌ 修正不要               |
+| loader_integration_test.rs     | 0               | ❌                 | ❌ 修正不要               |
+| transpiler_integration_test.rs | 0               | ❌                 | ❌ 修正不要               |
+| japanese_identifier_test.rs    | 0               | ❌                 | ❌ 修正不要               |
+| ucid_test.rs                   | 0               | ❌                 | ❌ 修正不要               |
+| lua_request_test.rs (shiori)   | -               | ❌                 | ❌ 修正不要               |
+| **合計**                       | **53**          | **17**            | **17箇所修正**           |
 
 **修正が必要なテストファイル**:
 
@@ -561,10 +569,10 @@ local_words: Table
 
 #### 修正が必要なテストファイル（@pasta_search使用テスト）
 
-| ファイル                       | 使用箇所 | SearchContext 依存 | 修正方針                           |
-| ------------------------------ | -------- | ------------------ | ---------------------------------- |
-| `search_module_test.rs`        | 16箇所   | ✅ 全テストが依存  | 全テストに `finalize_scene()` 追加 |
-| `stdlib_modules_test.rs` (一部) | 1箇所    | ✅ minimal config  | finalize_scene() 追加              |
+| ファイル                        | 使用箇所 | SearchContext 依存 | 修正方針                           |
+| ------------------------------- | -------- | ------------------ | ---------------------------------- |
+| `search_module_test.rs`         | 16箇所   | ✅ 全テストが依存   | 全テストに `finalize_scene()` 追加 |
+| `stdlib_modules_test.rs` (一部) | 1箇所    | ✅ minimal config   | finalize_scene() 追加              |
 
 **search_module_test.rs の修正パターン**:
 ```rust
@@ -586,15 +594,15 @@ let result: String = runtime.exec(r#"
 
 #### 修正が不要なテストファイル（SearchContext 非依存）
 
-| ファイル                      | 使用箇所 | SearchContext 依存 | 理由                               |
-| ----------------------------- | -------- | ------------------ | ---------------------------------- |
-| `pasta_lua_encoding_test.rs`  | 6箇所    | ❌ なし            | エンコーディングテストのみ         |
-| `loader_integration_test.rs`  | 調査必要 | 不明               | ローダー統合テスト（要調査）       |
-| `transpiler_integration_test.rs` | 調査必要 | 不明               | トランスパイラテスト（要調査）     |
-| `stdlib_modules_test.rs`      | 17箇所   | ❌ ほぼなし        | assertions, testing, env テストのみ |
-| `stdlib_regex_test.rs`        | 13箇所   | ❌ なし            | regex モジュールテストのみ         |
-| `japanese_identifier_test.rs` | 調査必要 | 不明               | 識別子テスト（要調査）             |
-| `ucid_test.rs`                | 調査必要 | 不明               | UCID テスト（要調査）              |
+| ファイル                         | 使用箇所 | SearchContext 依存 | 理由                                |
+| -------------------------------- | -------- | ------------------ | ----------------------------------- |
+| `pasta_lua_encoding_test.rs`     | 6箇所    | ❌ なし             | エンコーディングテストのみ          |
+| `loader_integration_test.rs`     | 調査必要 | 不明               | ローダー統合テスト（要調査）        |
+| `transpiler_integration_test.rs` | 調査必要 | 不明               | トランスパイラテスト（要調査）      |
+| `stdlib_modules_test.rs`         | 17箇所   | ❌ ほぼなし         | assertions, testing, env テストのみ |
+| `stdlib_regex_test.rs`           | 13箇所   | ❌ なし             | regex モジュールテストのみ          |
+| `japanese_identifier_test.rs`    | 調査必要 | 不明               | 識別子テスト（要調査）              |
+| `ucid_test.rs`                   | 調査必要 | 不明               | UCID テスト（要調査）               |
 
 **次のアクション**:
 - `loader_integration_test.rs`, `transpiler_integration_test.rs`, `japanese_identifier_test.rs`, `ucid_test.rs` の @pasta_search 使用有無を確認
