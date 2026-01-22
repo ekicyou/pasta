@@ -88,10 +88,10 @@
 
 ## Architecture Pattern Evaluation
 
-| Option | Description | Strengths | Risks / Limitations | Notes |
-|--------|-------------|-----------|---------------------|-------|
-| Phase 1 Inline | `runtime/mod.rs` に直接実装 | 最小変更、既存パターン踏襲 | ファイル肥大化リスク（現在481行） | 推奨: 初期実装として適切 |
-| New Module | `runtime/finalize.rs` 分離 | 責務分離、テスト容易性 | 過剰な構造化 | Phase 2 リファクタリング候補 |
+| Option         | Description                 | Strengths                  | Risks / Limitations               | Notes                        |
+| -------------- | --------------------------- | -------------------------- | --------------------------------- | ---------------------------- |
+| Phase 1 Inline | `runtime/mod.rs` に直接実装 | 最小変更、既存パターン踏襲 | ファイル肥大化リスク（現在481行） | 推奨: 初期実装として適切     |
+| New Module     | `runtime/finalize.rs` 分離  | 責務分離、テスト容易性     | 過剰な構造化                      | Phase 2 リファクタリング候補 |
 
 **選択**: Phase 1 Inline → 実装安定後に必要に応じて分離
 
@@ -162,12 +162,12 @@
 
 ## Risks & Mitigations
 
-| Risk | Mitigation |
-|------|------------|
-| Lua ↔ Rust連携の複雑性 | enc.rs の既存パターンを踏襲、プロトタイプで早期検証 |
-| 既存テストへの影響 | テスト一覧を作成し、`finalize_scene()` 呼び出しを計画的に追加 |
-| `pasta.word` 新規実装の品質 | 単体テスト充実、既存 `pasta.scene` パターンを踏襲 |
-| ファイルサイズ増加（runtime/mod.rs） | 500行超で Phase 2 分離検討 |
+| Risk                                 | Mitigation                                                    |
+| ------------------------------------ | ------------------------------------------------------------- |
+| Lua ↔ Rust連携の複雑性               | enc.rs の既存パターンを踏襲、プロトタイプで早期検証           |
+| 既存テストへの影響                   | テスト一覧を作成し、`finalize_scene()` 呼び出しを計画的に追加 |
+| `pasta.word` 新規実装の品質          | 単体テスト充実、既存 `pasta.scene` パターンを踏襲             |
+| ファイルサイズ増加（runtime/mod.rs） | 500行超で Phase 2 分離検討                                    |
 
 ## References
 

@@ -87,11 +87,11 @@ graph TB
 
 ### Technology Stack
 
-| Layer | Choice / Version | Role in Feature | Notes |
-|-------|------------------|-----------------|-------|
-| Backend | Rust (mlua 0.10) | Lua ↔ Rust 連携 | `create_function()`, テーブル走査 |
-| Script Runtime | Lua 5.4 (mlua) | シーン/単語レジストリ管理 | `pasta.scene`, `pasta.word` |
-| Core Types | pasta_core | SceneRegistry, WordDefRegistry | 既存型をそのまま使用 |
+| Layer          | Choice / Version | Role in Feature                | Notes                             |
+| -------------- | ---------------- | ------------------------------ | --------------------------------- |
+| Backend        | Rust (mlua 0.10) | Lua ↔ Rust 連携                | `create_function()`, テーブル走査 |
+| Script Runtime | Lua 5.4 (mlua)   | シーン/単語レジストリ管理      | `pasta.scene`, `pasta.word`       |
+| Core Types     | pasta_core       | SceneRegistry, WordDefRegistry | 既存型をそのまま使用              |
 
 ## System Flows
 
@@ -146,37 +146,37 @@ sequenceDiagram
 
 ## Requirements Traceability
 
-| Requirement | Summary | Components | Interfaces | Flows |
-|-------------|---------|------------|------------|-------|
-| 1.1-1.6 | Lua側シーン情報収集 | pasta.scene, finalize_scene_impl | get_all_scenes(), collect_scenes() | finalize_scene実行フロー |
-| 2.1-2.8 | 単語辞書情報収集 | pasta.word, LuaCodeGenerator, finalize_scene_impl | create_word():entry(), get_all_words() | finalize_scene実行フロー |
-| 3.1-3.5 | SearchContext構築・登録 | finalize_scene_impl, search::register | SearchContext::new(), register() | finalize_scene実行フロー |
-| 4.1-4.5 | Rust-Lua連携 | finalize_scene_impl, pasta.init | finalize_scene() binding | finalize_scene実行フロー |
-| 5.1-5.4 | 初期化タイミング制御 | runtime/mod.rs | with_config()修正 | - |
-| 6.1-6.5 | エラーハンドリング | finalize_scene_impl | LuaError, tracing | - |
-| 7.1-7.3 | 将来拡張 | finalize_scene_impl | 拡張ポイント設計 | - |
-| 8.1-8.6 | シーン名カウンタLua側管理 | pasta.scene, pasta.init | counter management | カウンタ生成フロー |
-| 9.1-9.6 | 単語辞書ビルダーAPI | pasta.word | create_word():entry() | - |
+| Requirement | Summary                   | Components                                        | Interfaces                             | Flows                    |
+| ----------- | ------------------------- | ------------------------------------------------- | -------------------------------------- | ------------------------ |
+| 1.1-1.6     | Lua側シーン情報収集       | pasta.scene, finalize_scene_impl                  | get_all_scenes(), collect_scenes()     | finalize_scene実行フロー |
+| 2.1-2.8     | 単語辞書情報収集          | pasta.word, LuaCodeGenerator, finalize_scene_impl | create_word():entry(), get_all_words() | finalize_scene実行フロー |
+| 3.1-3.5     | SearchContext構築・登録   | finalize_scene_impl, search::register             | SearchContext::new(), register()       | finalize_scene実行フロー |
+| 4.1-4.5     | Rust-Lua連携              | finalize_scene_impl, pasta.init                   | finalize_scene() binding               | finalize_scene実行フロー |
+| 5.1-5.4     | 初期化タイミング制御      | runtime/mod.rs                                    | with_config()修正                      | -                        |
+| 6.1-6.5     | エラーハンドリング        | finalize_scene_impl                               | LuaError, tracing                      | -                        |
+| 7.1-7.3     | 将来拡張                  | finalize_scene_impl                               | 拡張ポイント設計                       | -                        |
+| 8.1-8.6     | シーン名カウンタLua側管理 | pasta.scene, pasta.init                           | counter management                     | カウンタ生成フロー       |
+| 9.1-9.6     | 単語辞書ビルダーAPI       | pasta.word                                        | create_word():entry()                  | -                        |
 
 ## Components and Interfaces
 
-| Component | Domain/Layer | Intent | Req Coverage | Key Dependencies | Contracts |
-|-----------|--------------|--------|--------------|------------------|-----------|
-| finalize_scene_impl | Runtime | Lua側レジストリ収集・SearchContext構築 | 1, 2, 3, 4, 6, 7 | pasta.scene (P0), pasta.word (P0), search::register (P0) | Service |
-| pasta.scene (拡張) | Lua Script | シーンレジストリ + カウンタ管理 | 1.6, 8 | - | State |
-| pasta.word (新規) | Lua Script | 単語レジストリ + ビルダーAPI | 2.3-2.5, 9 | - | State |
-| pasta.init (修正) | Lua Script | 公開API（finalize_scene置換対応） | 4.1, 8.5 | pasta.scene (P0), pasta.word (P0) | API |
-| LuaCodeGenerator (修正) | Transpiler | 単語定義Lua出力 | 2.1, 2.2 | - | - |
-| runtime/mod.rs (修正) | Runtime | SearchContext初期構築削除 | 5 | - | - |
+| Component               | Domain/Layer | Intent                                 | Req Coverage     | Key Dependencies                                         | Contracts |
+| ----------------------- | ------------ | -------------------------------------- | ---------------- | -------------------------------------------------------- | --------- |
+| finalize_scene_impl     | Runtime      | Lua側レジストリ収集・SearchContext構築 | 1, 2, 3, 4, 6, 7 | pasta.scene (P0), pasta.word (P0), search::register (P0) | Service   |
+| pasta.scene (拡張)      | Lua Script   | シーンレジストリ + カウンタ管理        | 1.6, 8           | -                                                        | State     |
+| pasta.word (新規)       | Lua Script   | 単語レジストリ + ビルダーAPI           | 2.3-2.5, 9       | -                                                        | State     |
+| pasta.init (修正)       | Lua Script   | 公開API（finalize_scene置換対応）      | 4.1, 8.5         | pasta.scene (P0), pasta.word (P0)                        | API       |
+| LuaCodeGenerator (修正) | Transpiler   | 単語定義Lua出力                        | 2.1, 2.2         | -                                                        | -         |
+| runtime/mod.rs (修正)   | Runtime      | SearchContext初期構築削除              | 5                | -                                                        | -         |
 
 ### Runtime Layer
 
 #### finalize_scene_impl
 
-| Field | Detail |
-|-------|--------|
-| Intent | Lua側レジストリからデータ収集し SearchContext を構築・登録 |
-| Requirements | 1.1-1.6, 2.6-2.8, 3.1-3.5, 4.2-4.5, 6.1-6.5, 7.1-7.3 |
+| Field        | Detail                                                     |
+| ------------ | ---------------------------------------------------------- |
+| Intent       | Lua側レジストリからデータ収集し SearchContext を構築・登録 |
+| Requirements | 1.1-1.6, 2.6-2.8, 3.1-3.5, 4.2-4.5, 6.1-6.5, 7.1-7.3       |
 
 **Responsibilities & Constraints**
 - Lua側 `pasta.scene` レジストリから全シーン情報を収集
@@ -233,10 +233,10 @@ fn collect_words(lua: &Lua) -> LuaResult<Vec<WordCollectionEntry>>;
 
 #### pasta.scene (拡張)
 
-| Field | Detail |
-|-------|--------|
-| Intent | シーンレジストリ管理 + カウンタ管理 |
-| Requirements | 1.6, 8.1-8.6 |
+| Field        | Detail                              |
+| ------------ | ----------------------------------- |
+| Intent       | シーンレジストリ管理 + カウンタ管理 |
+| Requirements | 1.6, 8.1-8.6                        |
 
 **Responsibilities & Constraints**
 - 既存: シーン登録・取得機能
@@ -268,10 +268,10 @@ end
 
 #### pasta.word (新規)
 
-| Field | Detail |
-|-------|--------|
-| Intent | 単語レジストリ管理 + ビルダーパターンAPI |
-| Requirements | 2.3-2.5, 9.1-9.6 |
+| Field        | Detail                                   |
+| ------------ | ---------------------------------------- |
+| Intent       | 単語レジストリ管理 + ビルダーパターンAPI |
+| Requirements | 2.3-2.5, 9.1-9.6                         |
 
 **Responsibilities & Constraints**
 - グローバル単語レジストリ（key → values[][]）
@@ -316,10 +316,10 @@ end
 
 #### pasta.init (修正)
 
-| Field | Detail |
-|-------|--------|
-| Intent | 公開API更新（カウンタ対応、単語API追加） |
-| Requirements | 4.1, 8.5, 9.1-9.2 |
+| Field        | Detail                                   |
+| ------------ | ---------------------------------------- |
+| Intent       | 公開API更新（カウンタ対応、単語API追加） |
+| Requirements | 4.1, 8.5, 9.1-9.2                        |
 
 **Modifications**
 - `create_scene()`: カウンタ管理を使用した番号付与
@@ -345,32 +345,58 @@ end
 
 #### LuaCodeGenerator (修正)
 
-| Field | Detail |
-|-------|--------|
-| Intent | 単語定義のLuaコード出力 |
-| Requirements | 2.1, 2.2 |
+| Field        | Detail                                                |
+| ------------ | ----------------------------------------------------- |
+| Intent       | シーン/単語定義のLua出力コード修正                    |
+| Requirements | 2.1, 2.2, 8.5                                         |
+| Files        | `crates/pasta_lua/src/code_generator.rs`              |
 
-**Modifications**
-- ファイルレベル単語定義: `PASTA.create_word(key):entry(v1, v2, ...)`
-- シーンレベル単語定義: `SCENE:create_word(key):entry(v1, v2, ...)`
+**修正対象関数**:
+
+1. **`generate_global_scene()`** (lines 162-221):
+   - **現状**: `PASTA.create_scene("{module_name}")` 出力（カウンタ付き）
+   - **変更後**: `PASTA.create_scene("{base_name}")` 出力（カウンタなし）
+   - 行180-182の `module_name` を `scene.name` に変更
+   - `scene_counter` パラメータは引き続き使用（ローカルシーン番号付けのため保持）
+
+2. **`generate_local_scene()`** (lines 237-286):
+   - 修正不要（ローカルシーン名の番号付けは既存ロジック維持）
+
+3. **単語定義出力** (新規実装):
+   - PastaFile の単語定義を走査し、`PASTA.create_word(key):entry(v1, v2, ...)` 出力
+   - LocalSceneScope の単語定義を走査し、`SCENE:create_word(key):entry(v1, v2, ...)` 出力
+   - ファイルレベル: グローバルスコープに出力（do block 外）
+   - シーンレベル: ローカルシーン関数内に出力
 
 **Output Format**:
 ```lua
--- ファイルレベル
+-- ファイルレベル（do block 外）
 PASTA.create_word("挨拶"):entry("こんにちは", "おはよう")
 
--- シーンレベル（シーン関数内）
-SCENE:create_word("選択肢"):entry("はい", "いいえ")
+-- シーンレベル（ローカルシーン関数内）
+function SCENE.__start__(act, ...)
+    local args = { ... }
+    local save, var = act:init_scene(SCENE)
+    
+    SCENE:create_word("選択肢"):entry("はい", "いいえ")
+    
+    -- 以降、アクション行など
+end
 ```
+
+**実装詳細**:
+- `pasta_core::parser::PastaFile` に単語定義フィールドが存在するか確認（AST構造依存）
+- 単語定義の AST ノード構造を確認し、適切な走査ロジックを実装
+- カンマ区切り値のパース処理（grammar.pest の `words` ルールに従う）
 
 ### Runtime Modification
 
 #### with_config() 修正
 
-| Field | Detail |
-|-------|--------|
-| Intent | SearchContext 初期構築の削除 |
-| Requirements | 5.1-5.4 |
+| Field        | Detail                       |
+| ------------ | ---------------------------- |
+| Intent       | SearchContext 初期構築の削除 |
+| Requirements | 5.1-5.4                      |
 
 **Changes**:
 - `crate::search::register()` 呼び出しを削除
@@ -455,13 +481,13 @@ local_words: Table
 
 ### Error Strategy
 
-| Error Type | Source | Response | Recovery |
-|------------|--------|----------|----------|
-| Lua Table Access | pasta.scene/word 取得失敗 | LuaError 返却 | 呼び出し元で処理 |
-| Invalid Structure | 想定外のテーブル構造 | LuaError + 詳細メッセージ | ログ出力後エラー |
-| SceneTable Build | 重複シーン名 | LuaError + 原因 | エラー報告 |
-| WordTable Build | 構築失敗 | LuaError + 原因 | エラー報告 |
-| Empty Registry | シーン/単語なし | 警告ログ + 空Context | 正常続行 |
+| Error Type        | Source                    | Response                  | Recovery         |
+| ----------------- | ------------------------- | ------------------------- | ---------------- |
+| Lua Table Access  | pasta.scene/word 取得失敗 | LuaError 返却             | 呼び出し元で処理 |
+| Invalid Structure | 想定外のテーブル構造      | LuaError + 詳細メッセージ | ログ出力後エラー |
+| SceneTable Build  | 重複シーン名              | LuaError + 原因           | エラー報告       |
+| WordTable Build   | 構築失敗                  | LuaError + 原因           | エラー報告       |
+| Empty Registry    | シーン/単語なし           | 警告ログ + 空Context      | 正常続行         |
 
 ### Monitoring
 
@@ -493,23 +519,50 @@ local_words: Table
 
 ## Migration Strategy
 
-### 既存テストへの影響
+### 既存テスト影響範囲
 
-`finalize_scene()` 呼び出しが必要になるため、以下のテストを更新:
+**調査結果**: `PastaLuaRuntime::new/with_config/from_loader` の使用箇所を全調査（53箇所）
 
-1. `search_module_test.rs` - SearchContext 直接使用テスト
-2. `loader_integration_test.rs` - ローダー統合テスト
-3. `transpiler_integration_test.rs` - トランスパイラ統合テスト
+#### 修正が必要なテストファイル（@pasta_search使用テスト）
 
-**更新パターン**:
+| ファイル                       | 使用箇所 | SearchContext 依存 | 修正方針                           |
+| ------------------------------ | -------- | ------------------ | ---------------------------------- |
+| `search_module_test.rs`        | 16箇所   | ✅ 全テストが依存  | 全テストに `finalize_scene()` 追加 |
+| `stdlib_modules_test.rs` (一部) | 1箇所    | ✅ minimal config  | finalize_scene() 追加              |
+
+**search_module_test.rs の修正パターン**:
 ```rust
 // Before
-let runtime = PastaLuaRuntime::new(context)?;
+let runtime = PastaLuaRuntime::new(ctx).unwrap();
+let result: String = runtime.exec(r#"
+    local SEARCH = require "@pasta_search"
+    return SEARCH:search_scene("test")
+"#).unwrap();
 
 // After
-let runtime = PastaLuaRuntime::new(context)?;
-runtime.exec("require('pasta').finalize_scene()")?;
+let runtime = PastaLuaRuntime::new(ctx).unwrap();
+runtime.exec(r#"require('pasta').finalize_scene()"#).unwrap();  // ← 追加
+let result: String = runtime.exec(r#"
+    local SEARCH = require "@pasta_search"
+    return SEARCH:search_scene("test")
+"#).unwrap();
 ```
+
+#### 修正が不要なテストファイル（SearchContext 非依存）
+
+| ファイル                      | 使用箇所 | SearchContext 依存 | 理由                               |
+| ----------------------------- | -------- | ------------------ | ---------------------------------- |
+| `pasta_lua_encoding_test.rs`  | 6箇所    | ❌ なし            | エンコーディングテストのみ         |
+| `loader_integration_test.rs`  | 調査必要 | 不明               | ローダー統合テスト（要調査）       |
+| `transpiler_integration_test.rs` | 調査必要 | 不明               | トランスパイラテスト（要調査）     |
+| `stdlib_modules_test.rs`      | 17箇所   | ❌ ほぼなし        | assertions, testing, env テストのみ |
+| `stdlib_regex_test.rs`        | 13箇所   | ❌ なし            | regex モジュールテストのみ         |
+| `japanese_identifier_test.rs` | 調査必要 | 不明               | 識別子テスト（要調査）             |
+| `ucid_test.rs`                | 調査必要 | 不明               | UCID テスト（要調査）              |
+
+**次のアクション**:
+- `loader_integration_test.rs`, `transpiler_integration_test.rs`, `japanese_identifier_test.rs`, `ucid_test.rs` の @pasta_search 使用有無を確認
+- 確認後、修正不要テストリストを確定
 
 ### Rollback Plan
 
