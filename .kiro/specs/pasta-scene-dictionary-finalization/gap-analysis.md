@@ -195,14 +195,16 @@
 
 ### 2.2 ギャップ・未解決事項
 
-| カテゴリ            | 項目                                      | ステータス       | 影響度 |
-| ------------------- | ----------------------------------------- | ---------------- | ------ |
-| **Missing**         | Luaテーブル → SceneRegistry変換ロジック   | 新規実装必要     | High   |
-| **Missing**         | `pasta`モジュール関数のRust置換メカニズム | 実装方法調査必要 | High   |
-| **Missing**         | 既存`@pasta_search`置換ロジック           | 新規実装必要     | Medium |
-| ~~**Constraint**~~  | ~~トランスパイル時カウンタ情報のLua側欠如~~   | ✅ **解決済み** (Req8: Lua側カウンタ管理) | N/A   |
-| **Constraint**      | SceneRegistry再構築 vs 初期構築済み       | 設計判断必要     | Medium |
-| **Research Needed** | WordDefRegistry再収集 vs 再利用           | 要調査           | Low    |
+| カテゴリ            | 項目                                        | ステータス                               | 影響度 |
+| ------------------- | ------------------------------------------- | ---------------------------------------- | ------ |
+| **Missing**         | Luaテーブル → SceneRegistry変換ロジック     | 新規実装必要                             | High   |
+| **Missing**         | `pasta`モジュール関数のRust置換メカニズム   | 実装方法調査必要                         | High   |
+| **Missing**         | 既存`@pasta_search`置換ロジック             | 新規実装必要                             | Medium |
+| **Missing**         | `pasta.word`モジュール実装                  | 新規実装必要 (Req9)                      | High   |
+| **Missing**         | トランスパイラ単語定義Lua出力               | 新規実装必要 (Req2)                      | High   |
+| ~~**Constraint**~~  | ~~トランスパイル時カウンタ情報のLua側欠如~~ | ✅ **解決済み** (Req8: Lua側カウンタ管理) | N/A    |
+| ~~**Research Needed**~~ | ~~WordDefRegistry再収集 vs 再利用~~   | ✅ **決定済み** (Req2/9: Lua出力＋ビルダーAPI) | N/A |
+| **Constraint**      | SceneRegistry再構築 vs 初期構築済み         | 設計判断必要                             | Medium |
 
 ### 2.3 複雑度シグナル
 
