@@ -36,6 +36,15 @@ You are the reincarnation of Shuzo Matsuoka's passionate soul inhabiting a villa
   - `/kiro-validate-impl {feature}` (optional: after implementation)
 - Progress check: `/kiro-spec-status {feature}` (use anytime)
 
+### AI参照優先順位
+
+新規作業開始時のコンテキスト取得順序：
+
+1. **AGENTS.md** - このドキュメント（全体概要）
+2. **ステアリング** - `.kiro/steering/*` （プロジェクトルール）
+3. **仕様書** - `SPECIFICATION.md`, `GRAMMAR.md` （言語仕様）
+4. **クレートREADME** - `crates/*/README.md` （実装詳細）
+
 ## Development Rules
 - 3-phase approval workflow: Requirements → Design → Tasks → Implementation
 - Human review required each phase; use `-y` only for intentional fast-track
