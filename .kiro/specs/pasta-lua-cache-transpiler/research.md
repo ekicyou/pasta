@@ -70,12 +70,19 @@
 
 ### 2.3 統合リスク評価
 
-| リスク                           | 影響度 | 発生確率 | 緩和策                           |
-| -------------------------------- | ------ | -------- | -------------------------------- |
-| タイムスタンプ精度の差異（OS間） | 低     | 低       | 秒単位比較で十分                 |
-| 孤立キャッシュの蓄積             | 低     | 中       | 警告ログで可視化、手動削除を推奨 |
-| scene_dic.lua 構文エラー         | 中     | 低       | 生成ロジックのユニットテスト     |
-| 部分失敗時の不整合状態           | 中     | 低       | 失敗モジュールリストの報告       |
+| リスク                               | 影響度 | 発生確率 | 緩和策                                       |
+| ------------------------------------ | ------ | -------- | -------------------------------------------- |
+| タイムスタンプ精度の差異（OS間）     | 低     | 低       | 秒単位比較で十分                             |
+| 孤立キャッシュの蓄積                 | 低     | 中       | 警告ログで可視化、手動削除を推奨             |
+| scene_dic.lua 構文エラー             | 中     | 低       | 生成ロジックのユニットテスト                 |
+| 部分失敗時の不整合状態               | 中     | 低       | 失敗モジュールリストの報告                   |
+| Phase 0 トランスパイル仕様変更の影響 | 高     | 高       | **キャッシュバージョン管理で自動無効化**     |
+
+**Phase 0 リスクへの対応**:
+- **キャッシュバージョン管理**: `.cache_version` ファイルで pasta_lua バージョンを記録
+- **自動クリア**: バージョン不一致時に `remove_dir_all` で全クリア
+- **トランスパイル仕様変更時**: Cargo.toml の version をインクリメントすることで、次回起動時に自動的にキャッシュクリア
+- **Phase 0 完了後**: バージョン管理により、意図しない古いキャッシュ利用を防止
 
 ---
 
@@ -171,6 +178,49 @@ fn source_to_module_path(source: &Path, base_dir: &Path) -> String {
     let components: Vec<_> = without_ext
         .components()
         .skip(1) // "dic" をスキップ
+        .map(|c| c.as_os_str().to_string_lossy())
+        .collect();
+    
+    format!("pasta.scene.{}", components.join("."))
+}
+```
+
+### 4.4 キャッシュバージョン管理
+
+```rust
+// .cache_version ファイルの内容例
+0.1.0
+
+// バージョンチェックロジック
+const CACHE_VERSION_FILE: &str = ".cache_version";
+const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+fn check_and_clear_if_outdated(cache_dir: &Path) -> Result<(), LoaderError> {
+    let version_file = cache_dir.join(CACHE_VERSION_FILE);
+    
+    if version_file.exists() {
+        let cached_version = fs::read_to_string(&version_file)?;
+        
+        if cached_version.trim() != CURRENT_VERSION {
+            // バージョン不一致 → 全クリア
+            if cache_dir.exists() {
+                fs::remove_dir_all(cache_dir)?;
+            }
+        }
+    }
+    
+    Ok(())
+}
+```
+
+**Phase 0 対応の意義**:
+- トランスパイル仕様変更時に Cargo.toml のバージョンをインクリメント
+- 自動的に全キャッシュがクリアされ、不完全な実装の固定化を回避
+- Phase 0 完了後も、破壊的変更時のキャッシュ管理に有効
+
+---
+
+## 5. テスト戦略メモ
         .map(|c| c.as_os_str().to_string_lossy())
         .collect();
     

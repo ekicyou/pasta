@@ -154,13 +154,13 @@ sequenceDiagram
 
 ## Components and Interfaces
 
-| Component           | Domain/Layer | Intent                           | Req Coverage | Key Dependencies                      | Contracts |
-| ------------------- | ------------ | -------------------------------- | ------------ | ------------------------------------- | --------- |
-| CacheManager        | loader/cache | キャッシュライフサイクル管理     | 1,2,3,4,6,7  | LoaderConfig (P0), std::fs (P0)       | Service   |
-| PastaLoader         | loader       | 起動シーケンス統合               | 5,6          | CacheManager (P0), LuaTranspiler (P0) | -         |
-| PastaLuaRuntime     | runtime      | scene_dic.lua ロード             | 5            | mlua (P0)                             | Service   |
-| LoaderError         | loader       | エラー型拡張                     | 6            | thiserror (P0)                        | -         |
-| finalize_scene (stub) | stdlib       | スタブ関数（エラー回避）         | 3,5          | なし                                  | -         |
+| Component             | Domain/Layer | Intent                       | Req Coverage | Key Dependencies                      | Contracts |
+| --------------------- | ------------ | ---------------------------- | ------------ | ------------------------------------- | --------- |
+| CacheManager          | loader/cache | キャッシュライフサイクル管理 | 1,2,3,4,6,7  | LoaderConfig (P0), std::fs (P0)       | Service   |
+| PastaLoader           | loader       | 起動シーケンス統合           | 5,6          | CacheManager (P0), LuaTranspiler (P0) | -         |
+| PastaLuaRuntime       | runtime      | scene_dic.lua ロード         | 5            | mlua (P0)                             | Service   |
+| LoaderError           | loader       | エラー型拡張                 | 6            | thiserror (P0)                        | -         |
+| finalize_scene (stub) | stdlib       | スタブ関数（エラー回避）     | 3,5          | なし                                  | -         |
 
 ### Cache Layer
 
@@ -175,7 +175,8 @@ sequenceDiagram
 - ファイルタイムスタンプ比較によるトランスパイル要否判定
 - キャッシュファイルの保存（ディレクトリ階層再現）
 - scene_dic.lua の自動生成
-- 既存キャッシュの保持（削除しない）
+- キャッシュバージョン管理（pasta_lua バージョン変更時に全クリア）
+- 既存キャッシュの保持（バージョン一致時）
 
 **Dependencies**
 - Inbound: PastaLoader — キャッシュ操作の呼び出し元 (P0)
@@ -201,10 +202,12 @@ impl CacheManager {
     /// * `output_dir` - キャッシュ出力ディレクトリ（LoaderConfig.transpiled_output_dir）
     pub fn new(base_dir: PathBuf, output_dir: &str) -> Self;
 
-    /// キャッシュディレクトリを準備（既存ファイルは保持）
+    /// キャッシュディレクトリを準備（バージョンチェック含む）
+    /// 
+    /// pasta_lua のバージョンが変更されている場合、キャッシュを全クリアする。
     /// 
     /// # Returns
-    /// * `Ok(())` - ディレクトリ準備完了
+    /// * `Ok(())` - ディレクトリ準備完了（バージョン一致 or クリア完了）
     /// * `Err(LoaderError::CacheDirectoryError)` - ディレクトリ作成失敗
     pub fn prepare_cache_dir(&self) -> Result<(), LoaderError>;
 
@@ -269,6 +272,56 @@ impl CacheManager {
 - Integration: PastaLoader::load_with_config から呼び出し、Phase 2/4/5 で利用
 - Validation: ソースファイル存在確認、書き込み権限確認
 - Risks: ファイルシステム権限エラー → LoaderError で伝播
+
+**Cache Version Management**:
+
+キャッシュディレクトリに `.cache_version` ファイルを配置し、pasta_lua のバージョン情報を記録する。
+
+```rust
+// prepare_cache_dir の実装詳細
+const CACHE_VERSION_FILE: &str = ".cache_version";
+const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION"); // Cargo.toml から取得
+
+pub fn prepare_cache_dir(&self) -> Result<(), LoaderError> {
+    let version_file = self.cache_dir.join(CACHE_VERSION_FILE);
+    
+    // バージョンファイルが存在する場合、内容を確認
+    if version_file.exists() {
+        let cached_version = fs::read_to_string(&version_file)?;
+        
+        if cached_version.trim() != CURRENT_VERSION {
+            // バージョン不一致 → 全クリア
+            info!(
+                old_version = %cached_version.trim(),
+                new_version = %CURRENT_VERSION,
+                "Cache version mismatch, clearing all cache"
+            );
+            
+            if self.cache_dir.exists() {
+                fs::remove_dir_all(&self.cache_dir)?;
+            }
+        }
+    }
+    
+    // ディレクトリ作成（冪等）
+    fs::create_dir_all(&self.cache_dir)?;
+    fs::create_dir_all(self.cache_dir.join("pasta/scene"))?;
+    
+    // バージョンファイル書き込み
+    fs::write(&version_file, CURRENT_VERSION)?;
+    
+    Ok(())
+}
+```
+
+**バージョン変更時の動作**:
+1. pasta_lua の Cargo.toml で version をインクリメント
+2. 次回起動時、prepare_cache_dir がバージョン不一致を検出
+3. cache_dir 全体を `remove_dir_all` で削除
+4. 新しいバージョンで再構築
+5. 全ファイルが再トランスパイルされる
+
+**Phase 0 対応**: トランスパイル仕様変更時は pasta_lua のバージョンをインクリメントすることで、自動的に全キャッシュがクリアされる。
 
 ---
 
@@ -393,10 +446,10 @@ pub enum RuntimeError {
 
 #### finalize_scene() (スタブ)
 
-| Field        | Detail                                                         |
-| ------------ | -------------------------------------------------------------- |
-| Intent       | scene_dic.lua からの呼び出しを可能にするスタブ関数             |
-| Requirements | 3, 5                                                           |
+| Field        | Detail                                             |
+| ------------ | -------------------------------------------------- |
+| Intent       | scene_dic.lua からの呼び出しを可能にするスタブ関数 |
+| Requirements | 3, 5                                               |
 
 **Responsibilities & Constraints**
 - エラーを発生させず、正常終了する

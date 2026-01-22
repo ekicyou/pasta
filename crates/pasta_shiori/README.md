@@ -54,11 +54,11 @@ pasta_shiori/
 
 ### サポートイベント
 
-| イベント | 説明 |
-|----------|------|
-| `load` | 初期化。`pasta.toml` 読み込み、ランタイム起動 |
-| `request` | SHIORI/3.0 リクエスト処理 |
-| `unload` | 終了処理。リソース解放 |
+| イベント  | 説明                                          |
+| --------- | --------------------------------------------- |
+| `load`    | 初期化。`pasta.toml` 読み込み、ランタイム起動 |
+| `request` | SHIORI/3.0 リクエスト処理                     |
+| `unload`  | 終了処理。リソース解放                        |
 
 ### SHIORI/3.0 リクエスト形式
 
@@ -85,11 +85,11 @@ Value: \0\s[0]初めまして！\e
 
 ### PastaShiori
 
-| メソッド | 説明 |
-|----------|------|
-| `load(hinst, load_dir)` | ランタイム初期化 |
-| `request(request)` | SHIORI リクエスト処理 |
-| `Default::default()` | 新規インスタンス作成 |
+| メソッド                | 説明                  |
+| ----------------------- | --------------------- |
+| `load(hinst, load_dir)` | ランタイム初期化      |
+| `request(request)`      | SHIORI リクエスト処理 |
+| `Default::default()`    | 新規インスタンス作成  |
 
 ### Shiori トレイト
 
@@ -140,21 +140,21 @@ ghost/
 
 ## 依存関係
 
-| クレート | バージョン | 用途 |
-|----------|------------|------|
-| pasta_core | workspace | パーサー・レジストリ |
-| pasta_lua | workspace | Luaランタイム |
-| time | 0.3 | タイムスタンプ処理 |
-| tracing | 0.1 | ロギング |
-| tracing-subscriber | workspace | ログ出力 |
-| tracing-appender | workspace | ファイルログ |
-| thiserror | 2 | エラー型定義 |
+| クレート           | バージョン | 用途                 |
+| ------------------ | ---------- | -------------------- |
+| pasta_core         | workspace  | パーサー・レジストリ |
+| pasta_lua          | workspace  | Luaランタイム        |
+| time               | 0.3        | タイムスタンプ処理   |
+| tracing            | 0.1        | ロギング             |
+| tracing-subscriber | workspace  | ログ出力             |
+| tracing-appender   | workspace  | ファイルログ         |
+| thiserror          | 2          | エラー型定義         |
 
 ### Windows 専用
 
-| クレート | バージョン | 用途 |
-|----------|------------|------|
-| windows-sys | 0.59 | Windows API（メモリ、文字コード） |
+| クレート    | バージョン | 用途                              |
+| ----------- | ---------- | --------------------------------- |
+| windows-sys | 0.59       | Windows API（メモリ、文字コード） |
 
 ## ビルド
 
