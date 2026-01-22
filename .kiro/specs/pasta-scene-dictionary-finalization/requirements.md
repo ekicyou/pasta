@@ -38,17 +38,24 @@
 
 ### Requirement 2: 単語辞書情報収集
 
-**Objective:** ランタイムシステムとして、Lua側で登録された単語辞書情報を収集したい。これにより、単語の前方一致検索機能を有効化できる。
+**Objective:** トランスパイラとして、単語定義をLuaコードとして出力し、Lua実行時にレジストリに登録したい。これにより、キャッシュのみ実行時でも単語検索が機能する。
 
-**設計方針**: トランスパイル時のRust側収集を廃止し、キャッシュ出力されたLuaコード実行時にLua側レジストリに登録されたデータを収集する。
+**設計方針**: 
+- トランスパイル時に単語定義を`PASTA.create_word(key):entry(...)`呼び出しとして出力
+- `pasta.word`モジュールでLua側レジストリ管理
+- ビルダーパターンAPI: 可変長引数、メソッドチェーン、マージ対応
+- `finalize_scene()`で収集してRust側WordDefRegistry構築
 
 #### Acceptance Criteria
 
-1. When `finalize_scene()`が呼び出された時, the PastaRuntime shall Lua側の単語レジストリ（`pasta.word`等）から全単語定義を収集する
-2. The PastaRuntime shall 各単語について「キー」「値リスト」「スコープ（グローバル/ローカル）」を取得する
-3. The PastaRuntime shall 収集した単語情報を`WordDefRegistry`形式に変換する
-4. When 単語定義が存在しない場合, the PastaRuntime shall 空の`WordDefRegistry`を使用してSearchContextを構築する
-5. The PastaRuntime shall Lua側単語レジストリのデータ構造を定義し、トランスパイラ出力コードがこのレジストリに登録するよう設計する
+1. The transpiler shall ファイルレベルの単語定義を`PASTA.create_word(key):entry(value1, value2, ...)`形式で出力する
+2. The transpiler shall シーンレベルの単語定義を`SCENE:create_word(key):entry(value1, value2, ...)`形式で出力する
+3. The pasta.word module shall グローバル単語レジストリ（key → values[]）を管理する
+4. The pasta.word module shall ローカル単語レジストリ（scene_name → {key → values[]}）を管理する
+5. When 同じキーに対して複数回`create_word().entry()`が呼ばれた時, the pasta.word module shall 値を追加（マージ）する
+6. When `finalize_scene()`が呼び出された時, the PastaRuntime shall `pasta.word`から全単語定義を収集する
+7. The PastaRuntime shall 収集した単語情報を`WordDefRegistry`形式に変換する（同じキーの複数エントリは別WordEntryとして登録）
+8. When 単語定義が存在しない場合, the PastaRuntime shall 空の`WordDefRegistry`を使用してSearchContextを構築する
 
 ### Requirement 3: SearchContext構築・登録
 
@@ -123,4 +130,19 @@
 4. When 同じベース名のシーンが複数回作成された場合, the pasta.scene module shall カウンタをインクリメントして一意な名前を保証する
 5. The transpiler shall `PASTA.create_scene("メイン")`形式のコードを生成する（番号付与はLua実行時）
 6. The pasta.scene module shall カウンタ情報を内部状態として保持し、外部からのアクセスは不要とする
+
+### Requirement 9: 単語辞書のビルダーパターンAPI
+
+**Objective:** Luaスクリプト開発者として、直感的な単語登録APIを使用したい。これにより、トランスパイル出力コードの可読性と保守性が向上する。
+
+**設計方針**: ビルダーパターンによるメソッドチェーンAPI。可変長引数で複数値を簡潔に登録できる設計。
+
+#### Acceptance Criteria
+
+1. The PASTA module shall `create_word(key)`メソッドでグローバル単語ビルダーを返す
+2. The SCENE table shall `create_word(key)`メソッドでローカル単語ビルダーを返す
+3. The word builder shall `entry(...)`メソッドで可変長引数を受け取り、値リストとして登録する
+4. When `create_word(key):entry(values...)`が実行された時, the pasta.word module shall キーと値を対応するレジストリに登録する
+5. The word builder shall メソッドチェーン継続のため`entry()`は自身を返す
+6. When 同じキーで複数回`create_word().entry()`が呼ばれた時, the pasta.word module shall 既存エントリに値を追加する（マージ）
 
