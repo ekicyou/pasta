@@ -45,31 +45,31 @@ pasta_core/
 
 ### Parser
 
-| 関数/型 | 説明 |
-|---------|------|
-| `parse_str(source, filename)` | 文字列からパース |
-| `parse_file(path)` | ファイルからパース |
-| `PastaFile` | パース結果（ASTルート） |
-| `FileItem` | ファイル直下の項目（GlobalSceneScope, WordDef等） |
+| 関数/型                       | 説明                                              |
+| ----------------------------- | ------------------------------------------------- |
+| `parse_str(source, filename)` | 文字列からパース                                  |
+| `parse_file(path)`            | ファイルからパース                                |
+| `PastaFile`                   | パース結果（ASTルート）                           |
+| `FileItem`                    | ファイル直下の項目（GlobalSceneScope, WordDef等） |
 
 ### Registry
 
-| 型 | 説明 |
-|----|------|
-| `SceneRegistry` | シーン登録・管理（Pass 1） |
-| `WordDefRegistry` | 単語定義登録 |
-| `SceneTable` | シーン検索（完全一致 + 前方一致） |
-| `WordTable` | 単語検索 |
-| `SceneEntry` | シーン情報エントリ |
-| `WordEntry` | 単語情報エントリ |
+| 型                | 説明                              |
+| ----------------- | --------------------------------- |
+| `SceneRegistry`   | シーン登録・管理（Pass 1）        |
+| `WordDefRegistry` | 単語定義登録                      |
+| `SceneTable`      | シーン検索（完全一致 + 前方一致） |
+| `WordTable`       | 単語検索                          |
+| `SceneEntry`      | シーン情報エントリ                |
+| `WordEntry`       | 単語情報エントリ                  |
 
 ### Random
 
-| 型 | 説明 |
-|----|------|
-| `RandomSelector` | ランダム選択トレイト |
-| `DefaultRandomSelector` | 本番用ランダム実装 |
-| `MockRandomSelector` | テスト用固定選択実装 |
+| 型                      | 説明                 |
+| ----------------------- | -------------------- |
+| `RandomSelector`        | ランダム選択トレイト |
+| `DefaultRandomSelector` | 本番用ランダム実装   |
+| `MockRandomSelector`    | テスト用固定選択実装 |
 
 ## 使用例
 
@@ -130,14 +130,14 @@ if let Some(scene) = table.get_prefix("挨拶", &selector) {
 
 ## 依存関係
 
-| クレート | バージョン | 用途 |
-|----------|------------|------|
-| pest | 2.8 | PEGパーサー |
-| pest_derive | 2.8 | パーサー生成マクロ |
-| thiserror | 2 | エラー型定義 |
-| fast_radix_trie | 1.1.0 | 前方一致検索（SceneTable） |
-| rand | 0.9 | ランダム選択 |
-| tracing | 0.1 | ロギング・診断 |
+| クレート        | バージョン | 用途                       |
+| --------------- | ---------- | -------------------------- |
+| pest            | 2.8        | PEGパーサー                |
+| pest_derive     | 2.8        | パーサー生成マクロ         |
+| thiserror       | 2          | エラー型定義               |
+| fast_radix_trie | 1.1.0      | 前方一致検索（SceneTable） |
+| rand            | 0.9        | ランダム選択               |
+| tracing         | 0.1        | ロギング・診断             |
 
 ## 関連クレート
 

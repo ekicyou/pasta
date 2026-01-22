@@ -13,14 +13,14 @@ requirements → design → tasks → implementation → implementation-complete
 ```
 
 ### コマンド
-| コマンド | 用途 |
-|---------|------|
-| `/kiro-spec-init "description"` | 仕様初期化 |
-| `/kiro-spec-requirements {feature}` | 要件定義 |
-| `/kiro-spec-design {feature} [-y]` | 設計生成 |
-| `/kiro-spec-tasks {feature} [-y]` | タスク分解 |
-| `/kiro-spec-impl {feature} [tasks]` | 実装 |
-| `/kiro-spec-status {feature}` | 進捗確認 |
+| コマンド                            | 用途       |
+| ----------------------------------- | ---------- |
+| `/kiro-spec-init "description"`     | 仕様初期化 |
+| `/kiro-spec-requirements {feature}` | 要件定義   |
+| `/kiro-spec-design {feature} [-y]`  | 設計生成   |
+| `/kiro-spec-tasks {feature} [-y]`   | タスク分解 |
+| `/kiro-spec-impl {feature} [tasks]` | 実装       |
+| `/kiro-spec-status {feature}`       | 進捗確認   |
 
 ---
 
@@ -81,25 +81,25 @@ git push origin <branch>
 
 コード変更時に以下のドキュメント更新を確認：
 
-| 変更種別 | 更新対象ドキュメント |
-|----------|----------------------|
-| 公開API変更 | クレートREADME、SPECIFICATION.md |
-| DSL文法変更 | GRAMMAR.md、steering/grammar.md |
-| ディレクトリ構造変更 | steering/structure.md、クレートREADME |
-| 依存関係変更 | steering/tech.md、クレートREADME |
-| 開発フロー変更 | steering/workflow.md、AGENTS.md |
-| 新クレート追加 | README.md（ドキュメントマップ）、クレートREADME新規作成 |
+| 変更種別             | 更新対象ドキュメント                                    |
+| -------------------- | ------------------------------------------------------- |
+| 公開API変更          | クレートREADME、SPECIFICATION.md                        |
+| DSL文法変更          | GRAMMAR.md、steering/grammar.md                         |
+| ディレクトリ構造変更 | steering/structure.md、クレートREADME                   |
+| 依存関係変更         | steering/tech.md、クレートREADME                        |
+| 開発フロー変更       | steering/workflow.md、AGENTS.md                         |
+| 新クレート追加       | README.md（ドキュメントマップ）、クレートREADME新規作成 |
 
 ### 保守責任
 
-| ドキュメント | 更新トリガー |
-|--------------|--------------|
-| README.md | プロジェクト概要変更、新クレート追加 |
-| AGENTS.md | AI開発支援コンテキスト変更 |
-| GRAMMAR.md | DSL文法変更 |
-| SPECIFICATION.md | 言語仕様変更（権威的） |
-| クレートREADME | クレートAPI/構造変更 |
-| steering/* | 対応領域の変更 |
+| ドキュメント     | 更新トリガー                         |
+| ---------------- | ------------------------------------ |
+| README.md        | プロジェクト概要変更、新クレート追加 |
+| AGENTS.md        | AI開発支援コンテキスト変更           |
+| GRAMMAR.md       | DSL文法変更                          |
+| SPECIFICATION.md | 言語仕様変更（権威的）               |
+| クレートREADME   | クレートAPI/構造変更                 |
+| steering/*       | 対応領域の変更                       |
 
 ### 保守ルール
 
