@@ -84,8 +84,8 @@
 
 ### Phase 4: クレートREADME作成（優先度: A - 最低優先）
 
-- [ ] 4. pasta_core と pasta_shiori のREADME.mdを新規作成する
-- [ ] 4.1 pasta_core/README.md を新規作成
+- [x] 4. pasta_core と pasta_shiori のREADME.mdを新規作成する
+- [x] 4.1 pasta_core/README.md を新規作成
   - pasta_lua/README.md をテンプレートとして使用
   - 詳細度ガイドライン適用: pasta_lua/README.md同等の詳細度（使用例3-5個、内部構造は概要のみ、組み込みAPI一覧表形式）
   - 以下のセクションを含める: 概要、アーキテクチャ、ディレクトリ構成、公開API、使用例、依存関係、関連クレート
@@ -93,7 +93,7 @@
   - ルートREADME、pasta_lua、pasta_shioriへのバックリンク設定
   - _Requirements: 4.1, 4.2, 4.3_
 
-- [ ] 4.2 pasta_shiori/README.md を新規作成
+- [x] 4.2 pasta_shiori/README.md を新規作成
   - pasta_lua/README.md をテンプレートとして使用
   - 詳細度ガイドライン適用: pasta_lua/README.md同等の詳細度（SHIORIプロトコル基本フロー図、主要イベント一覧表、外部仕様への参照リンク）
   - 以下のセクションを含める: 概要、アーキテクチャ、ディレクトリ構成、SHIORIプロトコル、依存関係、関連クレート
@@ -101,7 +101,7 @@
   - ルートREADME、pasta_core、pasta_luaへのバックリンク設定
   - _Requirements: 4.1, 4.2, 4.3_
 
-- [ ] 4.3 ルートREADME.mdのドキュメントマップにクレートREADMEへのリンクを追加
+- [x] 4.3 ルートREADME.mdのドキュメントマップにクレートREADMEへのリンクを追加
   - 既存のドキュメントマップセクション（3.1で作成）に pasta_core、pasta_shioriへのリンク追加
   - Level 2セクションでの明示的リンク設定確認
   - _Requirements: 4.3_
