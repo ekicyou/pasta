@@ -13,20 +13,20 @@
 
 ### Phase 1: 相互参照整備（優先度: D - 最高優先）
 
-- [ ] 1. 全ドキュメント間の相互参照リンクを整備し、孤立ドキュメントを解消する
-- [ ] 1.1 全ルートレベルドキュメント（README.md, AGENTS.md, GRAMMAR.md, SPECIFICATION.md）に相互リンクを追加
+- [x] 1. 全ドキュメント間の相互参照リンクを整備し、孤立ドキュメントを解消する
+- [x] 1.1 全ルートレベルドキュメント（README.md, AGENTS.md, GRAMMAR.md, SPECIFICATION.md）に相互リンクを追加
   - README.md → GRAMMAR.md, SPECIFICATION.md, AGENTS.md へのリンク追加
   - GRAMMAR.md → SPECIFICATION.md への権威的参照リンク強化（トップ + 各セクション）
   - AGENTS.md → steering/* 全5ファイルへの明示的リンク追加
   - リンク形式: `[ドキュメント名](相対パス)`
   - _Requirements: 6.1, 6.2_
 
-- [ ] 1.2 既存クレートREADME（pasta_lua/README.md）からルートREADMEへのバックリンクを追加
+- [x] 1.2 既存クレートREADME（pasta_lua/README.md）からルートREADMEへのバックリンクを追加
   - 「プロジェクト概要」セクションにバックリンク設定
   - 他のドキュメントからの参照リンクを確認
   - _Requirements: 6.1, 6.3_
 
-- [ ] 1.3 孤立ドキュメント（他からリンクされていないドキュメント）を特定し解消
+- [x] 1.3 孤立ドキュメント（他からリンクされていないドキュメント）を特定し解消
   - 全.mdファイルを走査し、リンク元がないファイルをリストアップ
   - 各孤立ドキュメントに対し適切な親ドキュメントからリンク設定
   - 内部ドキュメント（scriptlibs/README.md等）は適切な親からリンク、または現状維持を判断
