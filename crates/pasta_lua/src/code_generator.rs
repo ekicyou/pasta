@@ -5,7 +5,8 @@
 
 use pasta_core::parser::{
     Action, ActionLine, ActorScope, Args, AttrValue, CallScene, CodeBlock, ContinueAction, Expr,
-    GlobalSceneScope, LocalSceneItem, LocalSceneScope, SceneActorItem, SetValue, VarScope, VarSet,
+    GlobalSceneScope, KeyWords, LocalSceneItem, LocalSceneScope, SceneActorItem, SetValue,
+    VarScope, VarSet,
 };
 use pasta_core::registry::SceneRegistry;
 
@@ -25,8 +26,6 @@ pub struct LuaCodeGenerator<'a, W: Write> {
     writer: &'a mut W,
     /// Current indentation level
     indent_level: usize,
-    /// Current module name for scene resolution
-    current_module: String,
     /// Line ending style
     line_ending: LineEnding,
 }
@@ -37,7 +36,6 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         Self {
             writer,
             indent_level: 0,
-            current_module: String::new(),
             line_ending: LineEnding::default(),
         }
     }
@@ -47,7 +45,6 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         Self {
             writer,
             indent_level: 0,
-            current_module: String::new(),
             line_ending,
         }
     }
@@ -162,26 +159,33 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     pub fn generate_global_scene(
         &mut self,
         scene: &GlobalSceneScope,
-        scene_counter: usize,
+        _scene_counter: usize,
         _context: &TranspileContext,
         _file_attrs: &HashMap<String, AttrValue>,
     ) -> Result<(), TranspileError> {
         let sanitized_name = SceneRegistry::sanitize_name(&scene.name);
-        let module_name = format!("{}{}", sanitized_name, scene_counter);
-
-        // Store current module name for Call scene resolution
-        self.current_module = module_name.clone();
+        // Use base name only - counter is assigned by Lua runtime (Requirement 8.5)
+        let base_name = sanitized_name;
 
         // do block for scope separation (Requirement 1)
         self.writeln("do")?;
         self.indent();
 
-        // Create scene
+        // Create scene with base name - Lua side assigns counter (Requirement 8.2, 8.5)
         self.writeln(&format!(
             "local SCENE = PASTA.create_scene(\"{}\")",
-            module_name
+            base_name
         ))?;
         self.write_blank_line()?;
+
+        // Generate scene-level word definitions (Requirement 2.2, Task 4.3)
+        // These are registered under the current global scene name
+        for word in &scene.words {
+            self.generate_local_word(word)?;
+        }
+        if !scene.words.is_empty() {
+            self.write_blank_line()?;
+        }
 
         // Generate local scenes with per-name counters
         // Same-name scenes get incrementing numbers (_1, _2, ...)
@@ -404,9 +408,11 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             "table.unpack(args)".to_string()
         };
 
+        // Use SCENE.__global_name__ instead of hardcoded module name
+        // This allows Lua runtime to determine the actual global scene name
         let call_stmt = format!(
-            "act:call(\"{}\", \"{}\", {{}}, {})",
-            self.current_module, target, args_str
+            "act:call(SCENE.__global_name__, \"{}\", {{}}, {})",
+            target, args_str
         );
 
         // Tail call optimization: prepend 'return' for the last callable item
@@ -684,6 +690,58 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         for line in block.content.lines() {
             self.writeln(line)?;
         }
+        Ok(())
+    }
+
+    /// Generate global word definition (Requirement 2.1, Task 4.2).
+    ///
+    /// Generates: `PASTA.create_word("key"):entry("value1", "value2", ...)`
+    ///
+    /// Called at file level, outside of any do block.
+    pub fn generate_global_word(&mut self, word: &KeyWords) -> Result<(), TranspileError> {
+        if word.words.is_empty() {
+            return Ok(());
+        }
+
+        // Generate entry values as string literals
+        let values: Vec<String> = word
+            .words
+            .iter()
+            .map(|w| StringLiteralizer::literalize(w))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        self.writeln(&format!(
+            "PASTA.create_word({}):entry({})",
+            StringLiteralizer::literalize(&word.name)?,
+            values.join(", ")
+        ))?;
+
+        Ok(())
+    }
+
+    /// Generate local word definition for a scene (Requirement 2.2, Task 4.3).
+    ///
+    /// Generates: `SCENE:create_word("key"):entry("value1", "value2", ...)`
+    ///
+    /// Called inside a local scene function, after init_scene.
+    pub fn generate_local_word(&mut self, word: &KeyWords) -> Result<(), TranspileError> {
+        if word.words.is_empty() {
+            return Ok(());
+        }
+
+        // Generate entry values as string literals
+        let values: Vec<String> = word
+            .words
+            .iter()
+            .map(|w| StringLiteralizer::literalize(w))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        self.writeln(&format!(
+            "SCENE:create_word({}):entry({})",
+            StringLiteralizer::literalize(&word.name)?,
+            values.join(", ")
+        ))?;
+
         Ok(())
     }
 }

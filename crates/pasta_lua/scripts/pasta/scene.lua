@@ -3,11 +3,40 @@
 ---
 --- シーン関数の登録と検索を担当する。
 --- グローバルシーン名（ファイル名）とローカルシーン名（シーン関数名）の階層構造を管理する。
+--- カウンタ管理機能により、同名シーンに対して一意な番号を自動割当する。
 
 local SCENE = {}
 
 --- シーンレジストリ（グローバル名→{ローカル名→シーン関数}）
 local registry = {}
+
+--- ベース名ごとのカウンタ（Requirement 8.1, 8.2）
+local counters = {}
+
+--- シーンテーブルのメタテーブル（create_word メソッドを提供）
+local scene_table_mt = {
+    __index = {
+        --- ローカル単語ビルダーを作成（SCENE:create_word("key") 形式）
+        --- @param self table シーンテーブル
+        --- @param key string 単語キー
+        --- @return WordBuilder ビルダーオブジェクト
+        create_word = function(self, key)
+            local WORD = require("pasta.word")
+            local global_name = self.__global_name__
+            return WORD.create_local(global_name, key)
+        end
+    }
+}
+
+--- カウンタを取得してインクリメント（Requirement 8.2, 8.4）
+--- @param base_name string ベース名
+--- @return number カウンタ値（1から始まる連番）
+function SCENE.get_or_increment_counter(base_name)
+    local current = counters[base_name] or 0
+    current = current + 1
+    counters[base_name] = current
+    return current
+end
 
 --- シーン登録
 --- @param global_name string グローバルシーン名（ファイル名）
@@ -15,7 +44,9 @@ local registry = {}
 --- @param scene_func function シーン関数
 function SCENE.register(global_name, local_name, scene_func)
     if not registry[global_name] then
-        registry[global_name] = { __global_name__ = global_name }
+        local scene_table = { __global_name__ = global_name }
+        setmetatable(scene_table, scene_table_mt)
+        registry[global_name] = scene_table
     end
     registry[global_name][local_name] = scene_func
 end
@@ -25,7 +56,9 @@ end
 --- @return table グローバルシーンテーブル
 function SCENE.create_global_table(global_name)
     if not registry[global_name] then
-        registry[global_name] = { __global_name__ = global_name }
+        local scene_table = { __global_name__ = global_name }
+        setmetatable(scene_table, scene_table_mt)
+        registry[global_name] = scene_table
     end
     return registry[global_name]
 end
@@ -61,6 +94,32 @@ end
 --- @return function|nil __start__シーン関数、またはnil
 function SCENE.get_start(global_name)
     return SCENE.get(global_name, "__start__")
+end
+
+--- 全シーン情報を取得（Requirement 1.1, 1.2, 1.6）
+--- @return table {global_name: {local_name: func}} 形式のシーンレジストリ
+function SCENE.get_all_scenes()
+    return registry
+end
+
+--- シーンを登録し、グローバルシーンテーブルを返す（Requirement 8.2, 8.5）
+---
+--- カウンタ管理を使用してベース名から一意なグローバルシーン名を生成する。
+--- 例: create_scene("メイン") → "メイン1", 2回目 → "メイン2"
+---
+--- @param base_name string ベース名（シーン名のベース）
+--- @param local_name string|nil ローカルシーン名（シーン関数名）
+--- @param scene_func function|nil シーン関数
+--- @return table グローバルシーンテーブル
+function SCENE.create_scene(base_name, local_name, scene_func)
+    -- カウンタからグローバルシーン名を生成
+    local counter = SCENE.get_or_increment_counter(base_name)
+    local global_name = base_name .. counter
+
+    if scene_func and local_name then
+        SCENE.register(global_name, local_name, scene_func)
+    end
+    return SCENE.get_global_table(global_name) or SCENE.create_global_table(global_name)
 end
 
 return SCENE
