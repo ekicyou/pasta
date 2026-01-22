@@ -79,6 +79,8 @@
 3. The PastaLoader shall scene_dic.lua のロードを、他のユーザーモジュールのロードより先に実行する
 4. While debug_mode が有効な場合, the PastaLoader shall トランスパイル対象ファイル数とスキップファイル数をログ出力する
 
+**Design Decision**: Rust側（PastaLuaRuntime::from_loader）で明示的に `require "pasta.scene_dic"` を実行する方式を採用。これにより、シーン構築の失敗を早期に検出し、確実なエラーハンドリングを実現する。
+
 ### Requirement 6: エラーハンドリング
 
 **Objective:** ゴースト開発者として、トランスパイルエラーの原因を特定したい。これにより、DSL記述ミスを素早く修正できる。
