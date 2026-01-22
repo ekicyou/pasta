@@ -125,9 +125,10 @@ fn test_transpile_sample_pasta_scenes() {
     let lua_code = String::from_utf8(output).unwrap();
 
     // Verify scene definition (Requirement 3b)
+    // Counter is now assigned by Lua runtime, not transpiler (Requirement 8.5)
     assert!(
-        lua_code.contains("PASTA.create_scene(\"メイン1\")"),
-        "Missing scene メイン1"
+        lua_code.contains("PASTA.create_scene(\"メイン\")"),
+        "Missing scene メイン"
     );
 
     // Verify entry point function (Requirement 3c)
@@ -278,14 +279,15 @@ fn test_transpile_reference_sample_structure() {
         lua_code.contains("PASTA.create_actor(\"うにゅう\")"),
         "Missing actor うにゅう"
     );
+    // Counter is now assigned by Lua runtime, not transpiler (Requirement 8.5)
     assert!(
-        lua_code.contains("PASTA.create_scene(\"メイン1\")"),
-        "Missing scene メイン1"
+        lua_code.contains("PASTA.create_scene(\"メイン\")"),
+        "Missing scene メイン"
     );
-    // Each unique scene name gets counter=1 (counter is per-name, not global)
+    // Each unique scene name gets counter at runtime
     assert!(
-        lua_code.contains("PASTA.create_scene(\"会話分岐1\")"),
-        "Missing scene 会話分岐1"
+        lua_code.contains("PASTA.create_scene(\"会話分岐\")"),
+        "Missing scene 会話分岐"
     );
 }
 
@@ -335,7 +337,8 @@ fn test_debug_dump_generated_lua() {
                 // Count ends to find the right scope boundary
             }
         }
-        if line.contains("会話分岐1") {
+        // Counter now assigned by Lua runtime, so check for base name
+        if line.contains("会話分岐") && line.contains("PASTA.create_scene") {
             break;
         }
     }
@@ -664,10 +667,11 @@ fn test_file_item_order_preserved() {
     let lua_code = String::from_utf8(output).unwrap();
 
     // 出現順序を確認: アクター1 → シーン1 → アクター2 → シーン2
+    // Counter is now assigned by Lua runtime, so scene names don't have counter suffix
     let actor1_pos = lua_code.find("create_actor(\"アクター1\")").unwrap();
-    let scene1_pos = lua_code.find("create_scene(\"シーン11\")").unwrap();
+    let scene1_pos = lua_code.find("create_scene(\"シーン1\")").unwrap();
     let actor2_pos = lua_code.find("create_actor(\"アクター2\")").unwrap();
-    let scene2_pos = lua_code.find("create_scene(\"シーン21\")").unwrap();
+    let scene2_pos = lua_code.find("create_scene(\"シーン2\")").unwrap();
 
     assert!(
         actor1_pos < scene1_pos,
@@ -1053,8 +1057,9 @@ fn test_single_call_scene_gets_return() {
     let lua_code = String::from_utf8(output).unwrap();
 
     // Verify that single call gets return prefix (Requirement 4.1)
+    // Counter now assigned by Lua runtime, uses SCENE.__global_name__
     assert!(
-        lua_code.contains(r#"return act:call("メイン1", "シーン2""#),
+        lua_code.contains(r#"return act:call(SCENE.__global_name__, "シーン2""#),
         "Single call should have 'return' prefix for TCO. Generated code:\n{lua_code}"
     );
 }
@@ -1075,18 +1080,19 @@ fn test_multiple_call_scenes_only_last_gets_return() {
     let lua_code = String::from_utf8(output).unwrap();
 
     // Verify first and second calls do NOT have return (Requirement 4.2)
+    // Counter now assigned by Lua runtime, uses SCENE.__global_name__
     assert!(
-        lua_code.contains(r#"act:call("メイン1", "シーン1""#),
+        lua_code.contains(r#"act:call(SCENE.__global_name__, "シーン1""#),
         "First call should NOT have 'return' prefix. Generated code:\n{lua_code}"
     );
     assert!(
-        lua_code.contains(r#"act:call("メイン1", "シーン2""#),
+        lua_code.contains(r#"act:call(SCENE.__global_name__, "シーン2""#),
         "Second call should NOT have 'return' prefix. Generated code:\n{lua_code}"
     );
 
     // Verify the last call HAS return
     assert!(
-        lua_code.contains(r#"return act:call("メイン1", "シーン3""#),
+        lua_code.contains(r#"return act:call(SCENE.__global_name__, "シーン3""#),
         "Last call should have 'return' prefix for TCO. Generated code:\n{lua_code}"
     );
 
@@ -1119,21 +1125,22 @@ fn test_call_scene_followed_by_action_no_return() {
     let lua_code = String::from_utf8(output).unwrap();
 
     // Verify that call does NOT have return when followed by action (Requirement 4.3)
+    // Counter now assigned by Lua runtime, uses SCENE.__global_name__
     // The call should appear without return prefix
     assert!(
-        lua_code.contains(r#"act:call("メイン1", "シーン2""#),
+        lua_code.contains(r#"act:call(SCENE.__global_name__, "シーン2""#),
         "Call should be present. Generated code:\n{lua_code}"
     );
 
     // Verify return is NOT before this call (it's not the tail)
     assert!(
-        !lua_code.contains(r#"return act:call("メイン1", "シーン2""#),
+        !lua_code.contains(r#"return act:call(SCENE.__global_name__, "シーン2""#),
         "Call followed by action should NOT have 'return' prefix. Generated code:\n{lua_code}"
     );
 
     // Verify the talk action comes after the call
     let call_pos = lua_code
-        .find(r#"act:call("メイン1", "シーン2""#)
+        .find(r#"act:call(SCENE.__global_name__, "シーン2""#)
         .expect("Call not found");
     let talk_pos = lua_code
         .find(r#"act.さくら:talk("#)
@@ -1187,8 +1194,9 @@ fn test_tail_call_optimization_fixture() {
     let lua_code = String::from_utf8(output).unwrap();
 
     // Pattern 1: 単一呼び出し - return が付く
+    // Counter now assigned by Lua runtime, so uses SCENE.__global_name__
     assert!(
-        lua_code.contains(r#"return act:call("メイン1", "シーン2""#),
+        lua_code.contains(r#"return act:call(SCENE.__global_name__, "シーン2""#),
         "単一呼び出し scene should have return. Generated code:\n{lua_code}"
     );
 
@@ -1206,7 +1214,7 @@ fn test_tail_call_optimization_fixture() {
 
     // シーン3 のみ return
     assert!(
-        multiple_call_code.contains(r#"return act:call("メイン1", "シーン3""#),
+        multiple_call_code.contains(r#"return act:call(SCENE.__global_name__, "シーン3""#),
         "Last call in 複数呼び出し should have return. Section:\n{multiple_call_code}"
     );
 

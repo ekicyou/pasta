@@ -15,8 +15,12 @@ do
     ACTOR.刮目 = [=[\s[11]]=]
 end
 
+PASTA.create_word("挨拶"):entry("こんにちは", "やあ", "ハロー")
 do
-    local SCENE = PASTA.create_scene("メイン1")
+    local SCENE = PASTA.create_scene("メイン")
+
+    SCENE:create_word("場所"):entry("東京", "大阪", "京都")
+    SCENE:create_word("天気"):entry("晴れ", "曇り", "雨")
 
     function SCENE.__start__(act, ...)
         local args = { ... }
@@ -25,11 +29,11 @@ do
         act:set_spot("さくら", 0)
         act:set_spot("うにゅう", 1)
 
-        act:call("メイン1", "グローバル単語呼び出し", {}, table.unpack(args))
-        act:call("メイン1", "ローカル単語呼び出し", {}, table.unpack(args))
-        act:call("メイン1", "会話分岐", {}, table.unpack(args))
-        act:call("メイン1", "変数代入", {}, table.unpack(args))
-        return act:call("メイン1", "引数付き呼び出し", {}, var.カウンタ, save.グローバル, table.unpack(args))
+        act:call(SCENE.__global_name__, "グローバル単語呼び出し", {}, table.unpack(args))
+        act:call(SCENE.__global_name__, "ローカル単語呼び出し", {}, table.unpack(args))
+        act:call(SCENE.__global_name__, "会話分岐", {}, table.unpack(args))
+        act:call(SCENE.__global_name__, "変数代入", {}, table.unpack(args))
+        return act:call(SCENE.__global_name__, "引数付き呼び出し", {}, var.カウンタ, save.グローバル, table.unpack(args))
     end
 
     function SCENE.__グローバル単語呼び出し_1__(act, ...)
@@ -102,7 +106,7 @@ do
 end
 
 do
-    local SCENE = PASTA.create_scene("会話分岐1")
+    local SCENE = PASTA.create_scene("会話分岐")
 
     function SCENE.__start__(act, ...)
         local args = { ... }

@@ -17,10 +17,13 @@
 //! ```
 
 mod enc;
+/// Finalize module - Collects Lua-side registries and builds SearchContext.
+pub mod finalize;
 
 use crate::context::TranspileContext;
 use crate::loader::{LoaderContext, TranspileResult};
 use crate::logging::PastaLogger;
+pub(crate) use finalize::register_finalize_scene;
 use mlua::{Lua, Result as LuaResult, StdLib, Table, Value};
 use std::path::Path;
 use std::sync::Arc;
@@ -367,7 +370,13 @@ impl PastaLuaRuntime {
             }
         }
 
+        // Register finalize_scene Rust binding to overwrite Lua stub (Requirement 4.3)
+        // This must be done before loading scene_dic.lua which calls finalize_scene()
+        register_finalize_scene(&runtime.lua)?;
+
         // Load scene_dic.lua to require all cached scene modules
+        // scene_dic.lua ends with require('pasta').finalize_scene() which
+        // triggers SearchContext construction from Lua-side registries
         tracing::debug!(path = %scene_dic_path.display(), "Loading scene_dic.lua");
         runtime.load_scene_dic(scene_dic_path)?;
 

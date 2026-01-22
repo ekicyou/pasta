@@ -77,9 +77,12 @@ impl LuaTranspiler {
                     context.accumulate_file_attr(attr);
                 }
                 FileItem::GlobalWord(word) => {
-                    // MAJOR-2.2: グローバル単語登録
+                    // MAJOR-2.2: グローバル単語登録 (Rust側レジストリ + Lua出力)
+                    // Register in Rust-side registry (for backward compatibility)
                     let values: Vec<String> = word.words.clone();
                     context.word_registry.register_global(&word.name, values);
+                    // Generate Lua code for word definition (Requirement 2.1, Task 4.2)
+                    codegen.generate_global_word(word)?;
                 }
                 FileItem::GlobalSceneScope(scene) => {
                     // MAJOR-2.3: シーン処理
@@ -268,7 +271,8 @@ mod tests {
         assert!(result.is_ok());
 
         let lua_code = String::from_utf8(output).unwrap();
-        assert!(lua_code.contains("PASTA.create_scene(\"メイン1\")"));
+        // Counter is now assigned by Lua runtime, not transpiler (Requirement 8.5)
+        assert!(lua_code.contains("PASTA.create_scene(\"メイン\")"));
         assert!(lua_code.contains("function SCENE.__start__(act, ...)"));
     }
 
@@ -286,9 +290,10 @@ mod tests {
         assert!(result.is_ok());
 
         let lua_code = String::from_utf8(output).unwrap();
-        // Each unique scene name gets counter=1 (counter is per-name, not global)
-        assert!(lua_code.contains("PASTA.create_scene(\"メイン1\")"));
-        assert!(lua_code.contains("PASTA.create_scene(\"会話分岐1\")"));
+        // Counter is now assigned by Lua runtime, not transpiler (Requirement 8.5)
+        // Both scenes use base name only - Lua will add counters at runtime
+        assert!(lua_code.contains("PASTA.create_scene(\"メイン\")"));
+        assert!(lua_code.contains("PASTA.create_scene(\"会話分岐\")"));
     }
 
     // Task 3.1: SceneRegistry integration tests
