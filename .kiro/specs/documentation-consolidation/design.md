@@ -92,11 +92,11 @@ graph TB
 
 ### Technology Stack
 
-| Layer | Choice / Version | Role in Feature | Notes |
-|-------|------------------|-----------------|-------|
-| ドキュメントフォーマット | Markdown | 全ドキュメント記述 | GitHub/VS Code互換 |
-| ダイアグラム | Mermaid | アーキテクチャ図 | コードブロック内に記述 |
-| バージョン管理 | Git | ドキュメント変更追跡 | 既存ワークフロー準拠 |
+| Layer                    | Choice / Version | Role in Feature      | Notes                  |
+| ------------------------ | ---------------- | -------------------- | ---------------------- |
+| ドキュメントフォーマット | Markdown         | 全ドキュメント記述   | GitHub/VS Code互換     |
+| ダイアグラム             | Mermaid          | アーキテクチャ図     | コードブロック内に記述 |
+| バージョン管理           | Git              | ドキュメント変更追跡 | 既存ワークフロー準拠   |
 
 ---
 
@@ -152,16 +152,16 @@ flowchart LR
 
 ## Requirements Traceability
 
-| Requirement | Summary | Components | Interfaces | Flows |
-|-------------|---------|------------|------------|-------|
-| 1.1, 1.2, 1.3 | ドキュメントインベントリ | DocumentInventory | - | Phase 1 |
-| 2.1, 2.2, 2.3 | 階層構造定義 | DocumentHierarchy | - | Phase 3 |
-| 3.1, 3.2, 3.3, 3.4 | ルートレベル整理 | RootDocuments | - | Phase 2, 3 |
-| 4.1, 4.2, 4.3 | クレートREADME | CrateReadmes | - | Phase 4 |
-| 5.1, 5.2, 5.3 | ステアリング最適化 | SteeringDocs | - | Phase 2 |
-| 6.1, 6.2, 6.3, 6.4 | 相互参照整備 | CrossReferences | - | Phase 1 |
-| 7.1, 7.2, 7.3 | オンボーディングパス | OnboardingPaths | - | Phase 3 |
-| 8.1, 8.2, 8.3, 8.4, 8.5 | 保守ガイドライン | MaintenanceGuide | - | Phase 5 |
+| Requirement             | Summary                  | Components        | Interfaces | Flows      |
+| ----------------------- | ------------------------ | ----------------- | ---------- | ---------- |
+| 1.1, 1.2, 1.3           | ドキュメントインベントリ | DocumentInventory | -          | Phase 1    |
+| 2.1, 2.2, 2.3           | 階層構造定義             | DocumentHierarchy | -          | Phase 3    |
+| 3.1, 3.2, 3.3, 3.4      | ルートレベル整理         | RootDocuments     | -          | Phase 2, 3 |
+| 4.1, 4.2, 4.3           | クレートREADME           | CrateReadmes      | -          | Phase 4    |
+| 5.1, 5.2, 5.3           | ステアリング最適化       | SteeringDocs      | -          | Phase 2    |
+| 6.1, 6.2, 6.3, 6.4      | 相互参照整備             | CrossReferences   | -          | Phase 1    |
+| 7.1, 7.2, 7.3           | オンボーディングパス     | OnboardingPaths   | -          | Phase 3    |
+| 8.1, 8.2, 8.3, 8.4, 8.5 | 保守ガイドライン         | MaintenanceGuide  | -          | Phase 5    |
 
 ---
 
@@ -169,15 +169,15 @@ flowchart LR
 
 ### コンポーネント概要
 
-| Component | Domain/Layer | Intent | Req Coverage | Key Dependencies | Contracts |
-|-----------|--------------|--------|--------------|------------------|-----------|
-| DocumentInventory | Discovery | 全ドキュメントの現状把握 | 1.1, 1.2, 1.3 | file_search | - |
-| CrossReferences | Phase 1 | 相互参照リンク整備 | 6.1, 6.2, 6.3, 6.4 | 全ドキュメント (P0) | - |
-| AgentsRestructure | Phase 2 | AGENTS.md再構成 | 3.2, 5.1, 5.2, 5.3 | steering/* (P0) | - |
-| ReadmeExpansion | Phase 3 | README.md拡充 | 2.1, 2.2, 2.3, 3.1, 7.1, 7.2, 7.3 | AGENTS.md (P1) | - |
-| CrateReadmes | Phase 4 | クレートREADME作成 | 4.1, 4.2, 4.3 | pasta_lua/README.md (P0) | - |
-| MaintenanceGuide | Phase 5 | 保守ガイドライン追加 | 8.1, 8.2, 8.3, 8.4 | workflow.md (P0) | - |
-| ArchiveCleanup | Phase 5 | 仕様アーカイブ整理 | 8.5 | .kiro/specs/* (P0) | - |
+| Component         | Domain/Layer | Intent                   | Req Coverage                      | Key Dependencies         | Contracts |
+| ----------------- | ------------ | ------------------------ | --------------------------------- | ------------------------ | --------- |
+| DocumentInventory | Discovery    | 全ドキュメントの現状把握 | 1.1, 1.2, 1.3                     | file_search              | -         |
+| CrossReferences   | Phase 1      | 相互参照リンク整備       | 6.1, 6.2, 6.3, 6.4                | 全ドキュメント (P0)      | -         |
+| AgentsRestructure | Phase 2      | AGENTS.md再構成          | 3.2, 5.1, 5.2, 5.3                | steering/* (P0)          | -         |
+| ReadmeExpansion   | Phase 3      | README.md拡充            | 2.1, 2.2, 2.3, 3.1, 7.1, 7.2, 7.3 | AGENTS.md (P1)           | -         |
+| CrateReadmes      | Phase 4      | クレートREADME作成       | 4.1, 4.2, 4.3                     | pasta_lua/README.md (P0) | -         |
+| MaintenanceGuide  | Phase 5      | 保守ガイドライン追加     | 8.1, 8.2, 8.3, 8.4                | workflow.md (P0)         | -         |
+| ArchiveCleanup    | Phase 5      | 仕様アーカイブ整理       | 8.5                               | .kiro/specs/* (P0)       | -         |
 
 ---
 
@@ -185,10 +185,10 @@ flowchart LR
 
 #### CrossReferences
 
-| Field | Detail |
-|-------|--------|
-| Intent | 全ドキュメント間に適切なクロスリファレンスを設定し、孤立ドキュメントを解消 |
-| Requirements | 6.1, 6.2, 6.3, 6.4 |
+| Field        | Detail                                                                     |
+| ------------ | -------------------------------------------------------------------------- |
+| Intent       | 全ドキュメント間に適切なクロスリファレンスを設定し、孤立ドキュメントを解消 |
+| Requirements | 6.1, 6.2, 6.3, 6.4                                                         |
 
 **Responsibilities & Constraints**
 - 全ルートドキュメント間の相互リンク追加
@@ -203,14 +203,14 @@ flowchart LR
 
 **対象ドキュメントと追加リンク**:
 
-| From | To | 追加リンク内容 |
-|------|-----|---------------|
-| README.md | GRAMMAR.md | 「Pasta DSL文法」セクションにリンク |
-| README.md | SPECIFICATION.md | 「言語仕様」セクションにリンク |
-| README.md | AGENTS.md | 「AI開発支援」セクションにリンク |
-| AGENTS.md | steering/* | 「ステアリングファイル」セクションに全5ファイルへのリンク |
-| GRAMMAR.md | SPECIFICATION.md | トップの権威的参照を強調、各セクションに詳細参照 |
-| pasta_lua/README.md | README.md | 「プロジェクト概要」へのバックリンク |
+| From                | To               | 追加リンク内容                                            |
+| ------------------- | ---------------- | --------------------------------------------------------- |
+| README.md           | GRAMMAR.md       | 「Pasta DSL文法」セクションにリンク                       |
+| README.md           | SPECIFICATION.md | 「言語仕様」セクションにリンク                            |
+| README.md           | AGENTS.md        | 「AI開発支援」セクションにリンク                          |
+| AGENTS.md           | steering/*       | 「ステアリングファイル」セクションに全5ファイルへのリンク |
+| GRAMMAR.md          | SPECIFICATION.md | トップの権威的参照を強調、各セクションに詳細参照          |
+| pasta_lua/README.md | README.md        | 「プロジェクト概要」へのバックリンク                      |
 
 **Implementation Notes**
 - 既存リンクは維持、不足リンクのみ追加
@@ -223,10 +223,10 @@ flowchart LR
 
 #### AgentsRestructure
 
-| Field | Detail |
-|-------|--------|
-| Intent | AI開発支援に必要な全情報へのポインタを含み、ステアリングとの関係を明示 |
-| Requirements | 3.2, 5.1, 5.2, 5.3 |
+| Field        | Detail                                                                 |
+| ------------ | ---------------------------------------------------------------------- |
+| Intent       | AI開発支援に必要な全情報へのポインタを含み、ステアリングとの関係を明示 |
+| Requirements | 3.2, 5.1, 5.2, 5.3                                                     |
 
 **Responsibilities & Constraints**
 - ステアリング参照セクションの明示的追加
@@ -255,13 +255,13 @@ AI開発支援のためのプロジェクトコンテキスト概要
 （既存維持）
 
 ### Steering Files
-| ファイル | 責務 | リンク |
-|---------|------|--------|
-| product.md | ビジョン、フェーズ、優先順位 | [link] |
-| tech.md | 技術スタック、依存関係 | [link] |
-| structure.md | ディレクトリ構造、命名規則 | [link] |
-| grammar.md | DSL文法要約 | [link] |
-| workflow.md | 開発ワークフロー、DoD | [link] |
+| ファイル     | 責務                         | リンク |
+| ------------ | ---------------------------- | ------ |
+| product.md   | ビジョン、フェーズ、優先順位 | [link] |
+| tech.md      | 技術スタック、依存関係       | [link] |
+| structure.md | ディレクトリ構造、命名規則   | [link] |
+| grammar.md   | DSL文法要約                  | [link] |
+| workflow.md  | 開発ワークフロー、DoD        | [link] |
 
 ## Development Guidelines
 （既存維持 + ステアリング参照追加）
@@ -287,10 +287,10 @@ AI開発支援のためのプロジェクトコンテキスト概要
 
 #### ReadmeExpansion
 
-| Field | Detail |
-|-------|--------|
-| Intent | プロジェクト概要、ドキュメントマップ、オンボーディングパスを提供するエントリーポイント |
-| Requirements | 2.1, 2.2, 2.3, 3.1, 7.1, 7.2, 7.3 |
+| Field        | Detail                                                                                 |
+| ------------ | -------------------------------------------------------------------------------------- |
+| Intent       | プロジェクト概要、ドキュメントマップ、オンボーディングパスを提供するエントリーポイント |
+| Requirements | 2.1, 2.2, 2.3, 3.1, 7.1, 7.2, 7.3                                                      |
 
 **Responsibilities & Constraints**
 - ドキュメントマップセクション追加（階層構造明示）
@@ -372,10 +372,10 @@ cargo test --workspace
 
 #### CrateReadmes
 
-| Field | Detail |
-|-------|--------|
-| Intent | 各クレートの独立したドキュメントを提供し、クレート単位での開発・保守を可能に |
-| Requirements | 4.1, 4.2, 4.3 |
+| Field        | Detail                                                                       |
+| ------------ | ---------------------------------------------------------------------------- |
+| Intent       | 各クレートの独立したドキュメントを提供し、クレート単位での開発・保守を可能に |
+| Requirements | 4.1, 4.2, 4.3                                                                |
 
 **Responsibilities & Constraints**
 - `pasta_core/README.md` 新規作成
@@ -457,13 +457,13 @@ let mut registry = SceneRegistry::new();
 \`\`\`
 
 ## 依存関係
-| クレート | バージョン | 用途 |
-|---------|-----------|------|
-| pest | 2.8 | PEGパーサー |
-| pest_derive | 2.8 | パーサー生成 |
-| thiserror | 2 | エラー型定義 |
-| fast_radix_trie | 1.1.0 | 前方一致検索 |
-| rand | 0.9 | ランダム選択 |
+| クレート        | バージョン | 用途         |
+| --------------- | ---------- | ------------ |
+| pest            | 2.8        | PEGパーサー  |
+| pest_derive     | 2.8        | パーサー生成 |
+| thiserror       | 2          | エラー型定義 |
+| fast_radix_trie | 1.1.0      | 前方一致検索 |
+| rand            | 0.9        | ランダム選択 |
 
 ## 関連クレート
 - [pasta_lua](../pasta_lua/README.md) - Luaバックエンド
@@ -508,10 +508,10 @@ pasta_shiori/
 - `request` - イベント処理
 
 ## 依存関係
-| クレート | バージョン | 用途 |
-|---------|-----------|------|
-| pasta_lua | workspace | Luaランタイム |
-| mlua | 0.9 | Lua FFI |
+| クレート  | バージョン | 用途          |
+| --------- | ---------- | ------------- |
+| pasta_lua | workspace  | Luaランタイム |
+| mlua      | 0.9        | Lua FFI       |
 
 ## 関連クレート
 - [pasta_core](../pasta_core/README.md) - パーサー・レジストリ
@@ -530,10 +530,10 @@ pasta_shiori/
 
 #### MaintenanceGuide
 
-| Field | Detail |
-|-------|--------|
-| Intent | ドキュメント更新ルールを策定し、品質を維持 |
-| Requirements | 8.1, 8.2, 8.3, 8.4 |
+| Field        | Detail                                     |
+| ------------ | ------------------------------------------ |
+| Intent       | ドキュメント更新ルールを策定し、品質を維持 |
+| Requirements | 8.1, 8.2, 8.3, 8.4                         |
 
 **Responsibilities & Constraints**
 - workflow.md に「ドキュメント保守」セクション追加
@@ -553,31 +553,31 @@ pasta_shiori/
 ### 更新チェックリスト
 コード変更時に以下を確認：
 
-| 変更種別 | 更新対象ドキュメント |
-|---------|---------------------|
-| 公開API変更 | クレートREADME、SPECIFICATION.md |
-| DSL文法変更 | GRAMMAR.md、steering/grammar.md |
+| 変更種別             | 更新対象ドキュメント                  |
+| -------------------- | ------------------------------------- |
+| 公開API変更          | クレートREADME、SPECIFICATION.md      |
+| DSL文法変更          | GRAMMAR.md、steering/grammar.md       |
 | ディレクトリ構造変更 | steering/structure.md、クレートREADME |
-| 依存関係変更 | steering/tech.md、クレートREADME |
-| 開発フロー変更 | steering/workflow.md、AGENTS.md |
+| 依存関係変更         | steering/tech.md、クレートREADME      |
+| 開発フロー変更       | steering/workflow.md、AGENTS.md       |
 
 ### 保守責任
-| ドキュメント | 更新トリガー |
-|-------------|-------------|
-| README.md | プロジェクト概要変更、新クレート追加 |
-| AGENTS.md | AI開発支援コンテキスト変更 |
-| GRAMMAR.md | DSL文法変更 |
-| SPECIFICATION.md | 言語仕様変更（権威的） |
-| クレートREADME | クレートAPI/構造変更 |
-| steering/* | 対応領域の変更 |
+| ドキュメント     | 更新トリガー                         |
+| ---------------- | ------------------------------------ |
+| README.md        | プロジェクト概要変更、新クレート追加 |
+| AGENTS.md        | AI開発支援コンテキスト変更           |
+| GRAMMAR.md       | DSL文法変更                          |
+| SPECIFICATION.md | 言語仕様変更（権威的）               |
+| クレートREADME   | クレートAPI/構造変更                 |
+| steering/*       | 対応領域の変更                       |
 ```
 
 #### ArchiveCleanup
 
-| Field | Detail |
-|-------|--------|
-| Intent | 古い仕様を整理し、仕様作成時のブレを防止 |
-| Requirements | 8.5 |
+| Field        | Detail                                   |
+| ------------ | ---------------------------------------- |
+| Intent       | 古い仕様を整理し、仕様作成時のブレを防止 |
+| Requirements | 8.5                                      |
 
 **Responsibilities & Constraints**
 - `.kiro/specs/` の全完了済み仕様を再評価
@@ -593,12 +593,12 @@ pasta_shiori/
 
 **削除判断基準**:
 
-| 基準 | 削除対象 | 保持対象 |
-|------|---------|---------|
-| 実装との乖離 | 大きく乖離 | 現在の実装と整合 |
-| 情報の鮮度 | 古い情報が中心 | 最新情報を反映 |
-| 混乱リスク | 今後の仕様作成に混乱を招く | 参考価値あり |
-| 参照頻度 | Phase 1-4 で未参照 | 有用な参照あり |
+| 基準         | 削除対象                   | 保持対象         |
+| ------------ | -------------------------- | ---------------- |
+| 実装との乖離 | 大きく乖離                 | 現在の実装と整合 |
+| 情報の鮮度   | 古い情報が中心             | 最新情報を反映   |
+| 混乱リスク   | 今後の仕様作成に混乱を招く | 参考価値あり     |
+| 参照頻度     | Phase 1-4 で未参照         | 有用な参照あり   |
 
 **Implementation Notes**
 - 削除前に必ず開発者確認
@@ -628,22 +628,22 @@ pasta_shiori/
 
 ### ドキュメント品質チェック
 
-| チェック項目 | 方法 | 合格基準 |
-|-------------|------|---------|
-| リンク切れ | 手動確認 or ツール | 0件 |
-| 階層構造整合性 | ドキュメントマップ vs 実ファイル | 完全一致 |
-| クロスリファレンス | 各ドキュメントの参照確認 | 孤立ドキュメント0件 |
-| 内容整合性 | コード vs ドキュメント照合 | 乖離なし |
+| チェック項目       | 方法                             | 合格基準            |
+| ------------------ | -------------------------------- | ------------------- |
+| リンク切れ         | 手動確認 or ツール               | 0件                 |
+| 階層構造整合性     | ドキュメントマップ vs 実ファイル | 完全一致            |
+| クロスリファレンス | 各ドキュメントの参照確認         | 孤立ドキュメント0件 |
+| 内容整合性         | コード vs ドキュメント照合       | 乖離なし            |
 
 ### 各Phase完了基準
 
-| Phase | 完了基準 |
-|-------|---------|
-| Phase 1 | 全ドキュメント間のリンク設定完了、孤立ドキュメント0件 |
-| Phase 2 | AGENTS.md にステアリング参照セクション追加完了 |
+| Phase   | 完了基準                                                     |
+| ------- | ------------------------------------------------------------ |
+| Phase 1 | 全ドキュメント間のリンク設定完了、孤立ドキュメント0件        |
+| Phase 2 | AGENTS.md にステアリング参照セクション追加完了               |
 | Phase 3 | README.md にドキュメントマップ・オンボーディングパス追加完了 |
-| Phase 4 | pasta_core, pasta_shiori のREADME.md作成完了 |
-| Phase 5 | workflow.md に保守セクション追加完了、アーカイブ整理完了 |
+| Phase 4 | pasta_core, pasta_shiori のREADME.md作成完了                 |
+| Phase 5 | workflow.md に保守セクション追加完了、アーカイブ整理完了     |
 
 ---
 
