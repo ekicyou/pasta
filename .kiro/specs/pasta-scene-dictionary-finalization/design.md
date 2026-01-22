@@ -401,9 +401,20 @@ end
 ```
 
 **実装詳細**:
-- `pasta_core::parser::PastaFile` に単語定義フィールドが存在するか確認（AST構造依存）
-- 単語定義の AST ノード構造を確認し、適切な走査ロジックを実装
-- カンマ区切り値のパース処理（grammar.pest の `words` ルールに従う）
+- `pasta_core::parser::FileItem::GlobalWord(KeyWords)` を走査してグローバル単語定義を抽出
+- `GlobalSceneScope::words: Vec<KeyWords>` を走査してシーンレベル単語定義を抽出
+- `KeyWords` 構造体: `{ name: String, words: Vec<String>, span: Span }`
+- 出力形式:
+  ```lua
+  -- グローバル単語
+  PASTA.word.create_global("キー"):entry("値1", "値2")
+  
+  -- シーンローカル単語（グローバルシーン内）
+  function メインシーン()
+    local save, var, SCENE = PASTA.init_scene()
+    SCENE:create_word("キー"):entry("値1", "値2")
+  end
+  ```
 
 ### Runtime Modification
 
