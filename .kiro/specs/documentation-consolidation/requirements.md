@@ -59,9 +59,10 @@ Pasta プロジェクトのドキュメントは現在、複数の場所に散�
 #### Acceptance Criteria
 1. The `README.md` shall 以下を含む: プロジェクト概要、クイックスタート、ドキュメントマップ、ライセンス
 2. The `AGENTS.md` shall AI開発支援に必要な全情報へのポインタを含み、ステアリングファイルとの関係を明示する
-3. The `GRAMMAR.md` shall Pasta DSL の文法リファレンスとして完結し、SPECIFICATION.md との重複を排除する
+3. The `GRAMMAR.md` shall Pasta DSL の文法リファレンスとして完結し、古い情報を更新して実装との乖離を解消する
+   - **Note**: 仕様変更の可能性が高いため、SPECIFICATION.md との重複は許容（現状維持）
+   - 作業範囲: 整理と実装乖離解消のみ、大幅な削減や構造変更は Out of Scope
 4. The `SPECIFICATION.md` shall 言語の正式仕様書として、実装判断の権威的ソースを提供する
-5. If `GRAMMAR.md` と `SPECIFICATION.md` に重複がある場合, the Documentation System shall 一方を正とし、他方は参照のみとする
 
 ---
 
