@@ -134,7 +134,11 @@ fn save_cache_files(
 1. **cache/lua ディレクトリの完全削除**（`prepare_directories`）
    - 現在は起動時に `remove_dir_all` → `create_dir_all` を実行
    - ⚠️ 増分トランスパイルと矛盾：既存キャッシュが破棄される
-   - **対応必須**: 削除処理を条件付きに変更、またはディレクトリスキャン方式に変更
+   - **Design Decision**: 削除処理を完全廃止
+     - `pasta/scene/` ディレクトリの存在確認と作成のみ実施
+     - 既存キャッシュファイルは保持し、タイムスタンプ比較で利用
+     - 孤立キャッシュ（対応するPastaファイルが削除された場合）は警告ログのみ出力
+     - **Implementation Note**: Loaderテストの修正が必要（キャッシュディレクトリの事前クリーンアップ処理追加）
 
 2. **debug_mode依存のキャッシュ保存**
    - 現在はdebug_mode=true時のみキャッシュを保存
