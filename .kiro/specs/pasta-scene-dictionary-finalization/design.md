@@ -160,14 +160,14 @@ sequenceDiagram
 
 ## Components and Interfaces
 
-| Component                | Domain/Layer | Intent                                              | Req Coverage     | Key Dependencies                                         | Contracts |
-| ------------------------ | ------------ | --------------------------------------------------- | ---------------- | -------------------------------------------------------- | --------- |
-| runtime/finalize.rs (新規) | Runtime      | Lua側レジストリ収集・SearchContext構築              | 1, 2, 3, 4, 6, 7 | pasta.scene (P0), pasta.word (P0), search::register (P0) | Service   |
-| pasta.scene (拡張)       | Lua Script   | シーンレジストリ + カウンタ管理                     | 1.6, 8           | -                                                        | State     |
-| pasta.word (新規)        | Lua Script   | 単語レジストリ + ビルダーAPI                        | 2.3-2.5, 9       | -                                                        | State     |
-| pasta.init (修正)        | Lua Script   | 公開API（finalize_scene置換対応）                   | 4.1, 8.5         | pasta.scene (P0), pasta.word (P0)                        | API       |
-| LuaCodeGenerator (修正)  | Transpiler   | 単語定義Lua出力                                     | 2.1, 2.2         | -                                                        | -         |
-| runtime/mod.rs (修正)    | Runtime      | SearchContext初期構築削除 + finalize.rs export      | 5, 4.3           | runtime::finalize (P0)                                   | -         |
+| Component                  | Domain/Layer | Intent                                         | Req Coverage     | Key Dependencies                                         | Contracts |
+| -------------------------- | ------------ | ---------------------------------------------- | ---------------- | -------------------------------------------------------- | --------- |
+| runtime/finalize.rs (新規) | Runtime      | Lua側レジストリ収集・SearchContext構築         | 1, 2, 3, 4, 6, 7 | pasta.scene (P0), pasta.word (P0), search::register (P0) | Service   |
+| pasta.scene (拡張)         | Lua Script   | シーンレジストリ + カウンタ管理                | 1.6, 8           | -                                                        | State     |
+| pasta.word (新規)          | Lua Script   | 単語レジストリ + ビルダーAPI                   | 2.3-2.5, 9       | -                                                        | State     |
+| pasta.init (修正)          | Lua Script   | 公開API（finalize_scene置換対応）              | 4.1, 8.5         | pasta.scene (P0), pasta.word (P0)                        | API       |
+| LuaCodeGenerator (修正)    | Transpiler   | 単語定義Lua出力                                | 2.1, 2.2         | -                                                        | -         |
+| runtime/mod.rs (修正)      | Runtime      | SearchContext初期構築削除 + finalize.rs export | 5, 4.3           | runtime::finalize (P0)                                   | -         |
 
 ### Runtime Layer
 
