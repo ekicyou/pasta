@@ -58,3 +58,80 @@ use pasta_lua::transpiler::Transpiler;
 - 未名グローバルシーンの自動名前継承
 - 全角/半角数字の自動正規化
 - 継続行アクション（`：`で始まる行）のサポート
+
+---
+
+## ドキュメントマップ
+
+### Level 0: Entry Point
+- [README.md](README.md) - プロジェクト概要（このドキュメント）
+
+### Level 1: Core Docs
+- [GRAMMAR.md](GRAMMAR.md) - Pasta DSL 文法リファレンス
+- [SPECIFICATION.md](SPECIFICATION.md) - 言語仕様書（権威的ソース）
+- [AGENTS.md](AGENTS.md) - AI開発支援ドキュメント
+
+### Level 2: Crate Docs
+- [pasta_core/README.md](crates/pasta_core/README.md) - パーサー・レジストリ
+- [pasta_lua/README.md](crates/pasta_lua/README.md) - Luaトランスパイラ
+- [pasta_shiori/README.md](crates/pasta_shiori/README.md) - SHIORI DLL統合
+
+### Level 3: Steering
+- [.kiro/steering/](.kiro/steering/) - AI/仕様駆動開発コンテキスト
+
+### 開発者向けリソース
+- [tests/fixtures/README.md](tests/fixtures/README.md) - テストフィクスチャ説明
+
+---
+
+## オンボーディングパス
+
+### DSLユーザー向け（推定所要時間: 30分）
+1. [GRAMMAR.md](GRAMMAR.md) - 基本文法を学ぶ
+2. [tests/fixtures/](tests/fixtures/) - サンプルスクリプト
+3. [クイックスタート](#クイックスタート) - ビルド・実行方法
+
+### 開発者向け（推定所要時間: 2-3時間）
+1. [SPECIFICATION.md](SPECIFICATION.md) - 言語仕様の理解
+2. [pasta_core/README.md](crates/pasta_core/README.md) - コアアーキテクチャ
+3. [.kiro/steering/structure.md](.kiro/steering/structure.md) - プロジェクト構造
+4. [.kiro/steering/workflow.md](.kiro/steering/workflow.md) - 開発ワークフロー
+
+### AI開発支援向け（推定所要時間: 1時間）
+1. [AGENTS.md](AGENTS.md) - AI開発支援概要
+2. [.kiro/steering/](.kiro/steering/) - ステアリングファイル群
+3. [SPECIFICATION.md](SPECIFICATION.md) - 正式仕様
+
+---
+
+## クイックスタート
+
+### 前提条件
+- Rust 2024 edition
+- cargo
+
+### ビルド
+```bash
+cargo build --workspace
+```
+
+### テスト
+```bash
+cargo test --workspace
+```
+
+### プロジェクト構造
+```
+pasta/
+├── crates/
+│   ├── pasta_core/    # パーサー・レジストリ（言語非依存層）
+│   ├── pasta_lua/     # Luaトランスパイラ・ランタイム
+│   └── pasta_shiori/  # SHIORI DLL統合
+└── tests/             # 統合テスト・フィクスチャ
+```
+
+---
+
+## ライセンス
+
+[LICENSE](LICENSE) ファイルを参照してください。
