@@ -36,14 +36,14 @@ You are the reincarnation of Shuzo Matsuoka's passionate soul inhabiting a villa
   - `/kiro-validate-impl {feature}` (optional: after implementation)
 - Progress check: `/kiro-spec-status {feature}` (use anytime)
 
-### AI参照優先順位
+### AI Context Loading Priority
 
-新規作業開始時のコンテキスト取得順序：
+When starting new work, load context in this order:
 
-1. **AGENTS.md** - このドキュメント（全体概要）
-2. **ステアリング** - `.kiro/steering/*` （プロジェクトルール）
-3. **仕様書** - `SPECIFICATION.md`, `GRAMMAR.md` （言語仕様）
-4. **クレートREADME** - `crates/*/README.md` （実装詳細）
+1. **AGENTS.md** - This document (project overview)
+2. **Steering** - `.kiro/steering/*` (project-wide rules)
+3. **Specifications** - `SPECIFICATION.md`, `GRAMMAR.md` (language specs)
+4. **Crate READMEs** - `crates/*/README.md` (implementation details)
 
 ## Development Rules
 - 3-phase approval workflow: Requirements → Design → Tasks → Implementation
@@ -58,18 +58,18 @@ You are the reincarnation of Shuzo Matsuoka's passionate soul inhabiting a villa
 
 ### Steering Files
 
-| ファイル     | 責務                                       | リンク                                                     |
-| ------------ | ------------------------------------------ | ---------------------------------------------------------- |
-| product.md   | プロダクトビジョン、フェーズ、優先順位     | [.kiro/steering/product.md](.kiro/steering/product.md)     |
-| tech.md      | 技術スタック、依存関係、アーキテクチャ原則 | [.kiro/steering/tech.md](.kiro/steering/tech.md)           |
-| structure.md | ディレクトリ構造、命名規則、モジュール構成 | [.kiro/steering/structure.md](.kiro/steering/structure.md) |
-| grammar.md   | DSL文法要約と権威的仕様への参照            | [.kiro/steering/grammar.md](.kiro/steering/grammar.md)     |
-| workflow.md  | 開発ワークフロー、完了基準（DoD）          | [.kiro/steering/workflow.md](.kiro/steering/workflow.md)   |
+| File         | Responsibility                                         | Link                                                       |
+| ------------ | ------------------------------------------------------ | ---------------------------------------------------------- |
+| product.md   | Product vision, phases, priorities                     | [.kiro/steering/product.md](.kiro/steering/product.md)     |
+| tech.md      | Tech stack, dependencies, architecture principles      | [.kiro/steering/tech.md](.kiro/steering/tech.md)           |
+| structure.md | Directory structure, naming conventions, module layout | [.kiro/steering/structure.md](.kiro/steering/structure.md) |
+| grammar.md   | DSL grammar summary & authoritative spec references    | [.kiro/steering/grammar.md](.kiro/steering/grammar.md)     |
+| workflow.md  | Development workflow, Definition of Done (DoD)         | [.kiro/steering/workflow.md](.kiro/steering/workflow.md)   |
 
-### 関連ドキュメント
+### Related Documents
 
-| ドキュメント                         | 説明                             |
-| ------------------------------------ | -------------------------------- |
-| [README.md](README.md)               | プロジェクト概要・アーキテクチャ |
-| [GRAMMAR.md](GRAMMAR.md)             | DSL文法リファレンス              |
-| [SPECIFICATION.md](SPECIFICATION.md) | 正式言語仕様書                   |
+| Document                             | Description                     |
+| ------------------------------------ | ------------------------------- |
+| [README.md](README.md)               | Project overview & architecture |
+| [GRAMMAR.md](GRAMMAR.md)             | DSL grammar reference           |
+| [SPECIFICATION.md](SPECIFICATION.md) | Formal language specification   |
