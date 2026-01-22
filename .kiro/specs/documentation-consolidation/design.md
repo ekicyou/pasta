@@ -328,18 +328,18 @@ AI開発支援のためのプロジェクトコンテキスト概要
 
 ## オンボーディングパス
 
-### DSLユーザー向け
+### DSLユーザー向け（推定所要時間: 30分）
 1. [GRAMMAR.md](GRAMMAR.md) - 基本文法を学ぶ
 2. [examples/scripts/](examples/scripts/) - サンプルスクリプト
 3. クイックスタート（下記）
 
-### 開発者向け
+### 開発者向け（推定所要時間: 2-3時間）
 1. [SPECIFICATION.md](SPECIFICATION.md) - 言語仕様の理解
 2. [pasta_core/README.md](crates/pasta_core/README.md) - コアアーキテクチャ
 3. [.kiro/steering/structure.md](.kiro/steering/structure.md) - プロジェクト構造
 4. [.kiro/steering/workflow.md](.kiro/steering/workflow.md) - 開発ワークフロー
 
-### AI開発支援向け
+### AI開発支援向け（推定所要時間: 1時間）
 1. [AGENTS.md](AGENTS.md) - AI開発支援概要
 2. [.kiro/steering/](./kiro/steering/) - ステアリングファイル群
 3. [SPECIFICATION.md](SPECIFICATION.md) - 正式仕様
@@ -389,6 +389,8 @@ cargo test --workspace
 - External: なし
 
 **pasta_core/README.md 構成**:
+
+**詳細度ガイドライン**: pasta_lua/README.md と同等の詳細度（使用例3-5個、内部構造は概要のみ、組み込みAPI一覧表形式）
 
 ```markdown
 # pasta_core
@@ -472,6 +474,8 @@ let mut registry = SceneRegistry::new();
 ```
 
 **pasta_shiori/README.md 構成**:
+
+**詳細度ガイドライン**: pasta_lua/README.md と同等の詳細度（SHIORI プロトコル基本フロー図、主要イベント一覧表、外部仕様への参照リンク）
 
 ```markdown
 # pasta_shiori
