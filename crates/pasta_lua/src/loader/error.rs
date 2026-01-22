@@ -59,6 +59,55 @@ pub enum LoaderError {
     /// Glob traversal error.
     #[error("ファイル探索中にエラーが発生しました: {0}")]
     GlobTraversal(#[from] glob::GlobError),
+
+    /// Cache directory operation error.
+    #[error("キャッシュディレクトリの操作に失敗しました: {path}")]
+    CacheDirectoryError {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+
+    /// File metadata retrieval error.
+    #[error("ファイルメタデータの取得に失敗しました: {path}")]
+    MetadataError {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+
+    /// Cache file write error.
+    #[error("キャッシュファイルの書き込みに失敗しました: {path}")]
+    CacheWriteError {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+
+    /// scene_dic.lua generation error.
+    #[error("scene_dic.lua の生成に失敗しました: {reason}")]
+    SceneDicGenerationError {
+        reason: String,
+        #[source]
+        source: Option<std::io::Error>,
+    },
+
+    /// Partial transpilation failure.
+    #[error("トランスパイル部分失敗: {succeeded}件成功, {failed}件失敗")]
+    PartialTranspileError {
+        succeeded: usize,
+        failed: usize,
+        failures: Vec<TranspileFailure>,
+    },
+}
+
+/// Details about a single transpile failure.
+#[derive(Debug)]
+pub struct TranspileFailure {
+    /// Source file path that failed.
+    pub source_path: PathBuf,
+    /// Error message describing the failure.
+    pub error: String,
 }
 
 impl LoaderError {
@@ -102,6 +151,51 @@ impl LoaderError {
     /// Create a directory not found error.
     pub fn directory_not_found(path: impl Into<PathBuf>) -> Self {
         LoaderError::DirectoryNotFound(path.into())
+    }
+
+    /// Create a cache directory error.
+    pub fn cache_directory(path: impl Into<PathBuf>, err: std::io::Error) -> Self {
+        LoaderError::CacheDirectoryError {
+            path: path.into(),
+            source: err,
+        }
+    }
+
+    /// Create a metadata error.
+    pub fn metadata(path: impl Into<PathBuf>, err: std::io::Error) -> Self {
+        LoaderError::MetadataError {
+            path: path.into(),
+            source: err,
+        }
+    }
+
+    /// Create a cache write error.
+    pub fn cache_write(path: impl Into<PathBuf>, err: std::io::Error) -> Self {
+        LoaderError::CacheWriteError {
+            path: path.into(),
+            source: err,
+        }
+    }
+
+    /// Create a scene_dic generation error.
+    pub fn scene_dic_generation(reason: impl Into<String>, err: Option<std::io::Error>) -> Self {
+        LoaderError::SceneDicGenerationError {
+            reason: reason.into(),
+            source: err,
+        }
+    }
+
+    /// Create a partial transpile error.
+    pub fn partial_transpile(
+        succeeded: usize,
+        failed: usize,
+        failures: Vec<TranspileFailure>,
+    ) -> Self {
+        LoaderError::PartialTranspileError {
+            succeeded,
+            failed,
+            failures,
+        }
     }
 }
 

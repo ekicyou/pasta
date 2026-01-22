@@ -32,4 +32,10 @@ end
 --- CTXモジュールを公開（ランタイム用）
 PASTA.CTX = CTX
 
+--- シーン辞書の読み込み完了を通知する（スタブ実装）
+--- 将来的にシーンプリロードやインデックス最適化に使用予定
+function PASTA.finalize_scene()
+    -- Stub implementation: do nothing
+end
+
 return PASTA

@@ -310,6 +310,93 @@ impl PastaLuaRuntime {
         Ok(runtime)
     }
 
+    /// Create a runtime from LoaderContext with scene_dic.lua loading.
+    ///
+    /// This is the new factory method used by PastaLoader with incremental transpilation.
+    /// Instead of loading transpiled code directly, it loads scene_dic.lua which
+    /// requires all cached scene modules.
+    ///
+    /// # Arguments
+    /// * `context` - TranspileContext with scene/word registries
+    /// * `loader_context` - Configuration and paths from PastaLoader
+    /// * `config` - Runtime configuration
+    /// * `logger` - Optional instance-specific logger (Arc-wrapped for sharing)
+    /// * `scene_dic_path` - Path to the generated scene_dic.lua
+    ///
+    /// # Returns
+    /// * `Ok(Self)` - Runtime initialized and scene_dic loaded
+    /// * `Err(e)` - Initialization or scene_dic loading failed
+    pub fn from_loader_with_scene_dic(
+        context: TranspileContext,
+        loader_context: LoaderContext,
+        config: RuntimeConfig,
+        logger: Option<Arc<PastaLogger>>,
+        scene_dic_path: &Path,
+    ) -> LuaResult<Self> {
+        // Create base runtime
+        let mut runtime = Self::with_config(context, config)?;
+
+        // Set logger if provided
+        runtime.logger = logger;
+
+        // Setup package.path for module resolution
+        Self::setup_package_path(&runtime.lua, &loader_context)?;
+
+        // Register @pasta_config module
+        Self::register_config_module(&runtime.lua, &loader_context.custom_fields)?;
+
+        // Register @enc module for encoding conversion
+        Self::register_enc_module(&runtime.lua)?;
+
+        // Load main.lua first (for SHIORI.load/SHIORI.request functions)
+        let main_lua_path = loader_context
+            .base_dir
+            .join("scripts/pasta/shiori/main.lua");
+        if main_lua_path.exists() {
+            match std::fs::read_to_string(&main_lua_path) {
+                Ok(script) => {
+                    if let Err(e) = runtime.lua.load(&script).set_name("main.lua").exec() {
+                        tracing::warn!(error = %e, "Failed to load main.lua, continuing without SHIORI functions");
+                    } else {
+                        tracing::debug!("Loaded main.lua");
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, "Failed to read main.lua, continuing without SHIORI functions");
+                }
+            }
+        }
+
+        // Load scene_dic.lua to require all cached scene modules
+        tracing::debug!(path = %scene_dic_path.display(), "Loading scene_dic.lua");
+        runtime.load_scene_dic(scene_dic_path)?;
+
+        Ok(runtime)
+    }
+
+    /// Load scene_dic.lua to initialize all scene modules.
+    ///
+    /// This method requires the scene_dic.lua file which in turn requires
+    /// all cached scene modules and calls finalize_scene().
+    ///
+    /// # Arguments
+    /// * `scene_dic_path` - Path to scene_dic.lua
+    ///
+    /// # Returns
+    /// * `Ok(())` - All scenes loaded successfully
+    /// * `Err(e)` - Scene loading failed
+    pub fn load_scene_dic(&self, scene_dic_path: &Path) -> LuaResult<()> {
+        // Read the scene_dic.lua file
+        let script = std::fs::read_to_string(scene_dic_path)
+            .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+
+        // Execute the scene_dic.lua
+        self.lua.load(&script).set_name("pasta.scene_dic").exec()?;
+
+        tracing::info!(path = %scene_dic_path.display(), "Loaded scene_dic.lua");
+        Ok(())
+    }
+
     /// Setup package.path for Lua module resolution.
     ///
     /// Sets the package.path to include all search paths from LoaderContext
