@@ -217,7 +217,7 @@ file_scope      = { file_scppe_item+ }
 file_scppe_item =_{ file_attr_line | file_word_line | blank_line }
 
 actor_scope      =  { actor_line ~ actor_scope_item* }
-actor_scope_item = _{ global_scene_attr_line | global_scene_word_line | var_set_line | blank_line }
+actor_scope_item = _{ global_scene_attr_line | global_scene_word_line | var_set_line | code_scope | blank_line }
 
 global_scene_scope = { global_scene_start ~ global_scene_init* ~ code_scope* ~ local_start_scene_scope ~ local_scene_scope* }
 global_scene_start = { global_scene_line | global_scene_continue_line }
