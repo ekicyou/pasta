@@ -94,13 +94,17 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         Ok(())
     }
 
-    /// Generate actor definition block (Requirement 3a).
+    /// Generate actor definition block (Requirement 3a, actor-word-dictionary).
     ///
     /// Generates:
     /// ```lua
     /// do
     ///     local ACTOR = PASTA.create_actor("アクター名")
-    ///     ACTOR.属性 = [=[値]=]
+    ///     ACTOR.通常 = { [=[\s[0]]=], [=[\s[100]]=] }
+    ///     
+    ///     function ACTOR.時刻(act)
+    ///         -- Lua関数定義
+    ///     end
     /// end
     /// ```
     pub fn generate_actor(&mut self, actor: &ActorScope) -> Result<(), TranspileError> {
@@ -114,13 +118,39 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             actor.name
         ))?;
 
-        // Generate word definitions as actor attributes
+        // Generate word definitions (Requirement 2, actor-word-dictionary Task 3.1)
+        // ACTOR:create_word() registers both in word.lua (L2 prefix search) and as actor attribute (L1 exact match)
         for word_def in &actor.words {
-            // Each word definition becomes an actor attribute
-            // In Pasta, actor words like ＄通常：\s[0] become ACTOR.通常 = [=[\s[0]]=]
-            if let Some(first_word) = word_def.words.first() {
-                let literal = StringLiteralizer::literalize_with_span(first_word, &word_def.span)?;
-                self.writeln(&format!("ACTOR.{} = {}", word_def.name, literal))?;
+            if word_def.words.is_empty() {
+                continue;
+            }
+
+            // Literalize all words in the array
+            let literals: Result<Vec<String>, _> = word_def
+                .words
+                .iter()
+                .map(|w| StringLiteralizer::literalize_with_span(w, &word_def.span))
+                .collect();
+            let literals = literals?;
+
+            // Use symmetric API: ACTOR:create_word(key):entry(...)
+            // This pattern matches SCENE:create_word(key):entry(...)
+            let entry_args = literals.join(", ");
+            self.writeln(&format!(
+                "ACTOR:create_word(\"{}\"):entry({})",
+                word_def.name, entry_args
+            ))?;
+        }
+
+        // Generate code blocks (Requirement 4.関数定義)
+        for code_block in &actor.code_blocks {
+            // Only expand Lua code blocks
+            if code_block.language.as_deref() == Some("lua") {
+                self.write_blank_line()?;
+                // Write code content line by line, preserving indentation
+                for line in code_block.content.lines() {
+                    self.writeln(line)?;
+                }
             }
         }
 

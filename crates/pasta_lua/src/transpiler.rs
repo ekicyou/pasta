@@ -118,6 +118,13 @@ impl LuaTranspiler {
                 }
                 FileItem::ActorScope(actor) => {
                     // MAJOR-2.4: アクター処理（ファイル属性継承なし）
+                    // Register actor word definitions in WordDefRegistry (Task 2.3)
+                    for word_def in &actor.words {
+                        let values: Vec<String> = word_def.words.clone();
+                        context
+                            .word_registry
+                            .register_actor(&actor.name, &word_def.name, values);
+                    }
                     codegen.generate_actor(actor)?;
                 }
             }
@@ -156,6 +163,7 @@ mod tests {
                 span: Span::default(),
             }],
             var_sets: vec![],
+            code_blocks: vec![],
             span: Span::default(),
         }
     }
@@ -257,7 +265,8 @@ mod tests {
 
         let lua_code = String::from_utf8(output).unwrap();
         assert!(lua_code.contains("PASTA.create_actor(\"さくら\")"));
-        assert!(lua_code.contains("ACTOR.通常 = [=[\\s[0]]=]"));
+        // Symmetric API: ACTOR:create_word(key):entry(...) (actor-word-dictionary)
+        assert!(lua_code.contains("ACTOR:create_word(\"通常\"):entry([=[\\s[0]]=])"));
     }
 
     #[test]
@@ -373,5 +382,43 @@ mod tests {
         // グローバル単語 + シーン内ローカル単語はないので1つ
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].key, "挨拶");
+    }
+
+    // Task 2.3: ActorScope word registration test
+    #[test]
+    fn test_transpile_registers_actor_words() {
+        let transpiler = LuaTranspiler::default();
+        let actor = ActorScope {
+            name: "さくら".to_string(),
+            attrs: vec![],
+            words: vec![
+                KeyWords {
+                    name: "通常".to_string(),
+                    words: vec!["\\s[0]".to_string(), "\\s[1]".to_string()],
+                    span: Span::default(),
+                },
+                KeyWords {
+                    name: "照れ".to_string(),
+                    words: vec!["\\s[2]".to_string()],
+                    span: Span::default(),
+                },
+            ],
+            var_sets: vec![],
+            code_blocks: vec![],
+            span: Span::default(),
+        };
+        let file = create_pasta_file(vec![actor], vec![]);
+        let mut output = Vec::new();
+
+        let context = transpiler.transpile(&file, &mut output).unwrap();
+
+        let entries = context.word_registry.all_entries();
+        assert_eq!(entries.len(), 2, "Expected 2 actor word entries");
+        // Check key format: :__actor_{name}__:{word}
+        assert_eq!(entries[0].key, ":__actor_さくら__:通常");
+        assert_eq!(entries[1].key, ":__actor_さくら__:照れ");
+        // Check values
+        assert_eq!(entries[0].values, vec!["\\s[0]", "\\s[1]"]);
+        assert_eq!(entries[1].values, vec!["\\s[2]"]);
     }
 }

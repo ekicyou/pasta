@@ -65,6 +65,25 @@ impl WordDefRegistry {
         id
     }
 
+    /// Register an actor word definition.
+    ///
+    /// Key format: `:__actor_{sanitized_actor_name}__:{word_name}`
+    ///
+    /// # Arguments
+    /// * `actor_name` - Actor name (e.g., "さくら")
+    /// * `name` - Word name (e.g., "通常")
+    /// * `values` - Word value list
+    ///
+    /// # Returns
+    /// The assigned entry ID.
+    pub fn register_actor(&mut self, actor_name: &str, name: &str, values: Vec<String>) -> usize {
+        let id = self.entries.len();
+        let sanitized_actor = Self::sanitize_name(actor_name);
+        let key = format!(":__actor_{}__:{}", sanitized_actor, name);
+        self.entries.push(WordEntry { id, key, values });
+        id
+    }
+
     /// Get all registered entries.
     pub fn all_entries(&self) -> &[WordEntry] {
         &self.entries
@@ -214,5 +233,65 @@ mod tests {
         let entries = registry.into_entries();
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].key, "test");
+    }
+
+    #[test]
+    fn test_register_actor_basic() {
+        let mut registry = WordDefRegistry::new();
+        let id = registry.register_actor("さくら", "通常", vec!["\\s[0]".to_string()]);
+
+        assert_eq!(id, 0);
+        let entries = registry.all_entries();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].key, ":__actor_さくら__:通常");
+        assert_eq!(entries[0].values, vec!["\\s[0]"]);
+    }
+
+    #[test]
+    fn test_register_actor_with_sanitization() {
+        let mut registry = WordDefRegistry::new();
+        let id = registry.register_actor("さくら-太郎", "表情", vec!["\\s[1]".to_string()]);
+
+        assert_eq!(id, 0);
+        let entries = registry.all_entries();
+        // Actor name should be sanitized (hyphen → underscore)
+        assert_eq!(entries[0].key, ":__actor_さくら_太郎__:表情");
+    }
+
+    #[test]
+    fn test_register_actor_multiple_values() {
+        let mut registry = WordDefRegistry::new();
+        let id = registry.register_actor(
+            "さくら",
+            "表情",
+            vec![
+                "\\s[0]".to_string(),
+                "\\s[1]".to_string(),
+                "\\s[2]".to_string(),
+            ],
+        );
+
+        assert_eq!(id, 0);
+        let entries = registry.all_entries();
+        assert_eq!(entries[0].values.len(), 3);
+    }
+
+    #[test]
+    fn test_global_local_actor_mixed() {
+        let mut registry = WordDefRegistry::new();
+
+        let id1 = registry.register_global("挨拶", vec!["こんにちは".to_string()]);
+        let id2 = registry.register_local("会話", "挨拶", vec!["やあ".to_string()]);
+        let id3 = registry.register_actor("さくら", "表情", vec!["\\s[0]".to_string()]);
+
+        assert_eq!(id1, 0);
+        assert_eq!(id2, 1);
+        assert_eq!(id3, 2);
+
+        let entries = registry.all_entries();
+        assert_eq!(entries.len(), 3);
+        assert_eq!(entries[0].key, "挨拶"); // global
+        assert_eq!(entries[1].key, ":会話:挨拶"); // local
+        assert_eq!(entries[2].key, ":__actor_さくら__:表情"); // actor
     }
 }

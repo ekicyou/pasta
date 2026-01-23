@@ -260,6 +260,8 @@ pub struct ActorScope {
     pub words: Vec<KeyWords>,
     /// アクターの変数設定
     pub var_sets: Vec<VarSet>,
+    /// コードブロック（Lua関数定義など）
+    pub code_blocks: Vec<CodeBlock>,
     /// ソース位置
     pub span: Span,
 }
@@ -272,6 +274,7 @@ impl ActorScope {
             attrs: Vec::new(),
             words: Vec::new(),
             var_sets: Vec::new(),
+            code_blocks: Vec::new(),
             span: Span::default(),
         }
     }

@@ -58,7 +58,7 @@ end
 --- @return string|nil 見つかった単語、またはnil
 function PROXY:word(name)
     -- Level 1: アクターfield
-    local actor_value = rawget(self.actor, name)
+    local actor_value = self.actor[name]
     if actor_value then
         return actor_value
     end
