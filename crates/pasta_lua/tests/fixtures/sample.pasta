@@ -58,7 +58,7 @@
 　　　うにゅう：第２引数は＄１　やね。
 
 ```lua
-function SCENE.関数(ctx, value, ...)
+function SCENE.関数(act, value, ...)
     return value * value
 end
 ```

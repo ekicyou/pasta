@@ -5,7 +5,7 @@
 --- グローバル単語とローカル単語（シーンスコープ）の両方をサポート。
 --- ビルダーパターンAPIで可変長引数・メソッドチェーンを提供（Requirement 9）。
 
-local WORD = {}
+local MOD = {}
 
 --- グローバル単語レジストリ（key → values[][]）
 --- 同じキーに対する複数回のentry()呼び出しで、values配列に追加される
@@ -59,7 +59,7 @@ end
 --- グローバル単語ビルダーを作成（Requirement 9.1）
 --- @param key string 単語キー
 --- @return WordBuilder ビルダーオブジェクト
-function WORD.create_global(key)
+function MOD.create_global(key)
     return create_builder(global_words, key)
 end
 
@@ -67,7 +67,7 @@ end
 --- @param scene_name string シーン名
 --- @param key string 単語キー
 --- @return WordBuilder ビルダーオブジェクト
-function WORD.create_local(scene_name, key)
+function MOD.create_local(scene_name, key)
     -- シーンが未登録なら初期化
     if not local_words[scene_name] then
         local_words[scene_name] = {}
@@ -77,7 +77,7 @@ end
 
 --- 全単語情報を取得（Requirement 2.6）
 --- @return table {global: {key: [[values]]}, local: {scene: {key: [[values]]}}} 形式
-function WORD.get_all_words()
+function MOD.get_all_words()
     return {
         global = global_words,
         ["local"] = local_words
@@ -88,8 +88,8 @@ end
 --- create_global のエイリアス
 --- @param key string 単語キー
 --- @return WordBuilder ビルダーオブジェクト
-function WORD.create_word(key)
-    return WORD.create_global(key)
+function MOD.create_word(key)
+    return MOD.create_global(key)
 end
 
-return WORD
+return MOD
