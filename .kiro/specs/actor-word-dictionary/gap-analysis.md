@@ -67,7 +67,7 @@ end
 1. **AST変換（pasta_core）**: `ActorScope` 構造体に `code_blocks: Vec<CodeBlock>` 追加
 2. **パーサー（pasta_core）**: `parse_actor_scope` で `Rule::code_block` を処理
 3. **コード生成（pasta_lua）**: `generate_actor` で全 `words` を配列形式で出力
-4. **ランタイム（pasta_lua）**: `actor.lua` の `PROXY:word` でランダム選択実装
+4. **ランタイム（pasta_lua）**: `crates/pasta_lua/scripts/pasta/actor.lua` の `PROXY:word` メソッドを拡張してランダム選択実装
 
 ---
 
@@ -79,8 +79,8 @@ end
 |------|--------------|----------|------|
 | **R1: DSL構文** | `grammar.pest` の `words` ルール | なし（対応済み） | ✅ |
 | **R2: Lua配列出力** | `code_generator.rs` の `generate_actor` | 単一値→配列形式変更 | ⚠️ 要修正 |
-| **R3: ランダム選択** | `actor.lua` の `PROXY:word` | ランダム選択ロジック未実装 | ❌ Missing |
-| **R4: フォールバック検索** | `PROXY:word` の4レベル検索 | 前方一致検索未実装 | ⚠️ 要拡張 |
+| **R3: ランダム選択** | `crates/pasta_lua/scripts/pasta/actor.lua` の `PROXY:word` | ランダム選択ロジック未実装（配列対応） | ❌ Missing |
+| **R4: フォールバック検索** | `PROXY:word` の4レベル検索骨格 | 前方一致検索・関数/辞書区別未実装 | ⚠️ 要拡張 |
 | **R5: Lua関数定義** | `CodeBlock` AST型 | `ActorScope` に `code_blocks` なし | ❌ Missing |
 | **R6: グローバル単語** | `word.lua` の `create_global` | 対応済み | ✅ |
 | **R7: 後方互換性** | 既存テスト群 | 配列形式でも単一値動作保証必要 | ⚠️ 要確認 |
