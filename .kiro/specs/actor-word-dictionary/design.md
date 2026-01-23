@@ -19,7 +19,7 @@
 
 - シーン単語辞書の変更（既存機能）
 - Rune言語対応（現状はLuaバックエンドのみ）
-- 前方一致検索の完全Lua実装（Rustヘルパー使用）
+- Rust FFI前方一致検索（アクター辞書はLua側で実装）
 
 ---
 
@@ -48,19 +48,21 @@ graph TB
         Grammar["grammar.pest<br/>actor_scope_item"]
         Parser["parse_actor_scope<br/>Rule::code_block処理追加"]
         AST["ActorScope<br/>+code_blocks追加"]
+        Registry["WordDefRegistry<br/>register_actor()追加"]
     end
     
     subgraph pasta_lua["pasta_lua（Luaバックエンド）"]
         CodeGen["code_generator.rs<br/>generate_actor()"]
-        ActorLua["actor.lua<br/>PROXY:word()"]
-        RustHelper["Rustヘルパー<br/>search_word_prefix()"]
+        WordLua["word.lua<br/>create_actor()"]
+        ActorLua["actor.lua<br/>PROXY:word()<br/>Lua前方一致検索"]
     end
     
     Grammar --> Parser
     Parser --> AST
     AST --> CodeGen
-    CodeGen --> ActorLua
-    ActorLua --> RustHelper
+    CodeGen --> WordLua
+    CodeGen --> Registry
+    WordLua --> ActorLua
 ```
 
 **Architecture Integration**:
@@ -76,8 +78,8 @@ graph TB
 | Parser | Pest 2.8 | `actor_scope_item` に `code_block` サポート | 既存対応済み |
 | AST | Rust struct | `ActorScope.code_blocks` 追加 | 新規フィールド |
 | Transpiler | code_generator.rs | 配列形式出力 + コードブロック展開 | 修正 |
-| Runtime | Lua 5.4 (mlua) | フォールバック検索 + ランダム選択 | actor.lua 拡張 |
-| FFI | mlua | 前方一致検索ヘルパー | 新規 |
+| Runtime | Lua 5.4 (mlua) | フォールバック検索 + ランダム選択 + 前方一致検索 | actor.lua, word.lua 拡張 |
+| Registry | WordDefRegistry | アクター単語辞書登録 | register_actor() 追加 |
 
 ---
 
@@ -89,11 +91,13 @@ graph TB
 sequenceDiagram
     participant Script as Pasta Script
     participant Transpiler as code_generator.rs
+    participant WordRegistry as WordDefRegistry
     participant Actor as actor.lua
-    participant Rust as Rust Helper
+    participant Word as word.lua
     
     Note over Script,Transpiler: トランスパイル時
     Script->>Transpiler: ActorScope (words, code_blocks)
+    Transpiler->>WordRegistry: register_actor(name, values)
     Transpiler->>Transpiler: 配列形式でLua出力
     Transpiler->>Transpiler: code_blocks展開
     
@@ -358,16 +362,21 @@ end
 --- @param name string 単語名（＠なし）
 --- @return string|nil 見つかった単語、またはnil
 function PROXY:word(name)
+    local WORD = require("pasta.word")
+    
     -- Level 1: アクター関数（完全一致）
     local actor_fn = rawget(self.actor, name)
     if type(actor_fn) == "function" then
         return actor_fn(self.act)
     end
     
-    -- Level 2: アクター辞書（前方一致）
-    local actor_words = PASTA.search_word_prefix("actor", self.actor.name, name)
-    if actor_words then
-        return actor_words[math.random(#actor_words)]
+    -- Level 2: アクター辞書（前方一致 - Lua実装）
+    local actor_dict = WORD.get_actor_words(self.actor.name)
+    if actor_dict then
+        local candidates = search_prefix_lua(actor_dict, name)
+        if candidates and #candidates > 0 then
+            return candidates[math.random(#candidates)]
+        end
     end
     
     -- Level 3: シーン関数（完全一致）
@@ -378,10 +387,13 @@ function PROXY:word(name)
             return scene_fn(self.act)
         end
         
-        -- Level 4: シーン辞書（前方一致）
-        local scene_words = PASTA.search_word_prefix("scene", scene.name, name)
-        if scene_words then
-            return scene_words[math.random(#scene_words)]
+        -- Level 4: シーン辞書（前方一致 - Lua実装）
+        local scene_dict = WORD.get_local_words(scene.name)
+        if scene_dict then
+            local candidates = search_prefix_lua(scene_dict, name)
+            if candidates and #candidates > 0 then
+                return candidates[math.random(#candidates)]
+            end
         end
     end
     
@@ -391,13 +403,30 @@ function PROXY:word(name)
         return global_fn(self.act)
     end
     
-    -- Level 6: グローバル辞書（前方一致）
-    local global_words = PASTA.search_word_prefix("global", nil, name)
-    if global_words then
-        return global_words[math.random(#global_words)]
+    -- Level 6: グローバル辞書（前方一致 - Lua実装）
+    local global_dict = WORD.get_global_words()
+    local candidates = search_prefix_lua(global_dict, name)
+    if candidates and #candidates > 0 then
+        return candidates[math.random(#candidates)]
     end
     
     return nil
+end
+
+--- Lua側前方一致検索ヘルパー（ローカル関数）
+local function search_prefix_lua(dict, prefix)
+    local results = {}
+    for key, value_arrays in pairs(dict) do
+        if key:sub(1, #prefix) == prefix then
+            -- value_arrays は [[値1, 値2], [値3]] 形式
+            for _, values in ipairs(value_arrays) do
+                for _, v in ipairs(values) do
+                    table.insert(results, v)
+                end
+            end
+        end
+    end
+    return #results > 0 and results or nil
 end
 ```
 
@@ -407,50 +436,55 @@ end
 
 ---
 
-### pasta_lua/FFI
+### pasta_lua/word.lua
 
-#### search_word_prefix（新規）
+#### create_actor / get_actor_words（新規）
 
 | Field | Detail |
 |-------|--------|
-| Intent | 前方一致で単語辞書を検索し、候補配列を返す |
-| Requirements | 4 |
+| Intent | アクター単語辞書の登録と取得 |
+| Requirements | R2, R4 |
 
 **Responsibilities & Constraints**
-- スコープ（actor/scene/global）と名前で辞書を特定
-- キーの前方一致で候補を検索
-- 全候補の値をフラット配列で返す
+- グローバル/シーン単語辞書と同じビルダーパターンを踏襲
+- アクター名でスコープ分離
+- 前方一致検索はactor.lua側で実装
 
 **Dependencies**
-- Inbound: PROXY:word — Luaから呼び出し (P0)
-- External: WordDefRegistry — 単語辞書参照 (P0)
+- Inbound: generate_actor — トランスパイル結果から呼び出し (P0)
+- Outbound: PROXY:word — 辞書取得 (P0)
 
 **Contracts**: Service [x]
 
 ##### Service Interface
 
-```rust
-/// Luaから呼び出し可能なヘルパー関数
-fn search_word_prefix(
-    lua: &Lua,
-    scope: String,      // "actor" | "scene" | "global"
-    scope_name: Option<String>,  // actor名 or scene名（globalはNone）
-    key_prefix: String, // 検索キー
-) -> LuaResult<Option<Vec<String>>> {
-    // 前方一致検索を実行
-    // 見つかった場合は値の配列を返す
-    // 見つからない場合は None
-}
+```lua
+--- アクター単語レジストリ（actor_name → {key → values[][]}）
+local actor_words = {}
+
+--- アクター単語ビルダーを作成
+--- @param actor_name string アクター名
+--- @param key string 単語キー
+--- @return WordBuilder ビルダーオブジェクト
+function MOD.create_actor(actor_name, key)
+    if not actor_words[actor_name] then
+        actor_words[actor_name] = {}
+    end
+    return create_builder(actor_words[actor_name], key)
+end
+
+--- アクター単語辞書を取得
+--- @param actor_name string アクター名
+--- @return table|nil {key → values[][]} 形式の辞書
+function MOD.get_actor_words(actor_name)
+    return actor_words[actor_name]
+end
 ```
 
-- Preconditions: `scope` は "actor", "scene", "global" のいずれか
-- Postconditions: 前方一致した候補の値配列、または None
-- Invariants: 検索はRadix Trieで効率的に実行
-
 **Implementation Notes**
-- 既存の `WordDefRegistry` または新規のアクター辞書構造を使用
-- mlua の関数登録パターンに従う
-- 設計フェーズでは詳細実装は決定しない（タスクフェーズで詳細化）
+- `create_global` / `create_local` と同じビルダーパターンを使用
+- アクター辞書は小規模（1アクターあたり数十件程度）なのでLua側ループ検索で十分
+- 既存のword.luaパターンを踏襲
 
 ---
 
