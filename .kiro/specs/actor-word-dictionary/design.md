@@ -398,8 +398,10 @@ function PROXY:word(name)
     end
     
     -- Level 5: グローバル関数（完全一致）
-    local global_fn = PASTA.get_global_function(name)
-    if global_fn then
+    -- pasta.global モジュールから関数を検索（ユーザー定義）
+    local GLOBAL = require("pasta.global")
+    local global_fn = rawget(GLOBAL, name)
+    if type(global_fn) == "function" then
         return global_fn(self.act)
     end
     
@@ -485,6 +487,51 @@ end
 - `create_global` / `create_local` と同じビルダーパターンを使用
 - アクター辞書は小規模（1アクターあたり数十件程度）なのでLua側ループ検索で十分
 - 既存のword.luaパターンを踏襲
+
+---
+
+### pasta_lua/global.lua（新規）
+
+| Field | Detail |
+|-------|--------|
+| Intent | グローバル関数を格納するモジュール |
+| Requirements | R4 (L5グローバル関数検索) |
+
+**Responsibilities & Constraints**
+- 空の `GLOBAL` テーブルを提供
+- ユーザーが自由に関数を追加可能（main.lua等から）
+- 本仕様ではDSL構文によるグローバル関数定義は対象外
+
+**Dependencies**
+- Inbound: PROXY:word — L5検索時に参照 (P0)
+- Outbound: なし（ユーザー定義）
+
+**Contracts**: State [x]
+
+##### State Management
+
+```lua
+--- @module pasta.global
+--- グローバル関数モジュール
+---
+--- ユーザー定義のグローバル関数を格納するテーブル。
+--- main.lua等から関数を追加することで、単語参照時にL5で検索される。
+
+local GLOBAL = {}
+
+-- 使用例（ユーザーがmain.lua等で定義）:
+-- local GLOBAL = require("pasta.global")
+-- function GLOBAL.時報(act)
+--     return "正午です"
+-- end
+
+return GLOBAL
+```
+
+**Implementation Notes**
+- 最小限の実装（空テーブルを返すのみ）
+- グローバル関数の定義方法はユーザー責任
+- テスト時は手動で関数を追加してテスト
 
 ---
 
@@ -583,11 +630,6 @@ end
 ＠天気：雨、雪、台風
 ＠天気予報：晴れのち曇り
 ＠挨拶：こんにちは、おはよう
-```lua
-function GLOBAL.時報(ctx)
-    return "正午です"
-end
-```
 
 # アクター定義
 ％さくら
@@ -630,8 +672,17 @@ end
 | T2 | さくら.word("表情") | L2 アクター辞書 | "\s[0]" or "\s[1]" | 完全一致キー |
 | T3 | さくら.word("日付") | L3 シーン関数 | "1月1日" | シーン関数呼び出し |
 | T4 | さくら.word("季節") | L4 シーン辞書 | "春" or "夏" | 完全一致キー |
-| T5 | さくら.word("時報") | L5 グローバル関数 | "正午です" | グローバル関数呼び出し |
+| T5 | さくら.word("時報") | L5 グローバル関数 | "正午です" | グローバル関数呼び出し（※1） |
 | T6 | さくら.word("挨拶") | L6 グローバル辞書 | "こんにちは" or "おはよう" | 完全一致キー |
+
+**※1**: T5のグローバル関数はDSLではなく、テストセットアップで直接Luaに定義：
+```lua
+-- テストセットアップ
+local GLOBAL = require("pasta.global")
+function GLOBAL.時報(act)
+    return "正午です"
+end
+```
 
 #### フォールスルー確認テスト
 
@@ -691,3 +742,4 @@ end
 | 2026-01-23 | 設計ドキュメント初版作成 |
 | 2026-01-23 | 議題1決定: Lua側前方一致検索、WordDefRegistry拡張（`:__actor_{name}__:{word}`形式） |
 | 2026-01-23 | テストケース拡充: 9件→15件（L5グローバル関数、前方一致網羅、関数優先オーバーライド追加） |
+| 2026-01-23 | 議題2決定: L5グローバル関数はpasta.globalモジュール方式（DSL構文なし、ユーザー定義） |
