@@ -358,19 +358,40 @@ end
 ##### Service Interface
 
 ```lua
+--- 値を解決（関数なら実行、その他はそのまま返す）
+--- @param value any 検索結果
+--- @param act Act アクションオブジェクト
+--- @return any 解決後の値
+local function resolve_value(value, act)
+    if value == nil then
+        return nil
+    elseif type(value) == "function" then
+        return value(act)
+    elseif type(value) == "table" then
+        -- 配列なら最初の要素を返す（完全一致の場合は辞書ではなく直接値として扱う）
+        if #value > 0 then
+            return value[1]
+        end
+        return nil
+    else
+        return tostring(value)
+    end
+end
+
 --- 単語置換（6レベルフォールバック検索）
 --- @param name string 単語名（＠なし）
 --- @return string|nil 見つかった単語、またはnil
 function PROXY:word(name)
     local WORD = require("pasta.word")
+    local GLOBAL = require("pasta.global")
     
-    -- Level 1: アクター関数（完全一致）
-    local actor_fn = rawget(self.actor, name)
-    if type(actor_fn) == "function" then
-        return actor_fn(self.act)
+    -- Level 1: アクター完全一致（関数 or 値）
+    local actor_value = self.actor[name]
+    if actor_value ~= nil then
+        return resolve_value(actor_value, self.act)
     end
     
-    -- Level 2: アクター辞書（前方一致 - Lua実装）
+    -- Level 2: アクター辞書（前方一致）
     local actor_dict = WORD.get_actor_words(self.actor.name)
     if actor_dict then
         local candidates = search_prefix_lua(actor_dict, name)
@@ -379,15 +400,15 @@ function PROXY:word(name)
         end
     end
     
-    -- Level 3: シーン関数（完全一致）
+    -- Level 3: シーン完全一致（関数 or 値）
     local scene = self.act.current_scene
     if scene then
-        local scene_fn = rawget(scene, name)
-        if type(scene_fn) == "function" then
-            return scene_fn(self.act)
+        local scene_value = scene[name]
+        if scene_value ~= nil then
+            return resolve_value(scene_value, self.act)
         end
         
-        -- Level 4: シーン辞書（前方一致 - Lua実装）
+        -- Level 4: シーン辞書（前方一致）
         local scene_dict = WORD.get_local_words(scene.name)
         if scene_dict then
             local candidates = search_prefix_lua(scene_dict, name)
@@ -397,15 +418,13 @@ function PROXY:word(name)
         end
     end
     
-    -- Level 5: グローバル関数（完全一致）
-    -- pasta.global モジュールから関数を検索（ユーザー定義）
-    local GLOBAL = require("pasta.global")
-    local global_fn = rawget(GLOBAL, name)
-    if type(global_fn) == "function" then
-        return global_fn(self.act)
+    -- Level 5: グローバル完全一致（関数 or 値）
+    local global_value = GLOBAL[name]
+    if global_value ~= nil then
+        return resolve_value(global_value, self.act)
     end
     
-    -- Level 6: グローバル辞書（前方一致 - Lua実装）
+    -- Level 6: グローバル辞書（前方一致）
     local global_dict = WORD.get_global_words()
     local candidates = search_prefix_lua(global_dict, name)
     if candidates and #candidates > 0 then
@@ -743,3 +762,4 @@ end
 | 2026-01-23 | 議題1決定: Lua側前方一致検索、WordDefRegistry拡張（`:__actor_{name}__:{word}`形式） |
 | 2026-01-23 | テストケース拡充: 9件→15件（L5グローバル関数、前方一致網羅、関数優先オーバーライド追加） |
 | 2026-01-23 | 議題2決定: L5グローバル関数はpasta.globalモジュール方式（DSL構文なし、ユーザー定義） |
+| 2026-01-23 | 議題3決定: 完全一致検索を統一（SCOPE[key]でnil以外なら使用、関数なら実行・値ならそのまま） |
