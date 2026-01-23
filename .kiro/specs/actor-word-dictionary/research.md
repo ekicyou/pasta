@@ -113,8 +113,9 @@
   - 関数/配列の区別なし ❌
   - 前方一致検索なし（TODO コメントあり）❌
 - **Implications**: 
-  - 関数（完全一致）→ 配列（前方一致）の検索ロジックを追加
-  - Rustヘルパー関数で前方一致検索を実装
+  - 関数（完全一致）→ 辞書（前方一致）の6レベル検索ロジックを追加
+  - 前方一致検索はLua側で実装（小規模辞書なのでループ検索で十分）
+  - WordDefRegistry.register_actor() で `:__actor_{name}__:{word}` 形式のキーを使用
 
 ### 6. word.lua のグローバル/ローカル単語構造
 
@@ -134,8 +135,8 @@
   end
   ```
   - `values[][]` 構造（エントリごとに配列）
-  - アクター単語には別の構造が必要（フラット配列 `{ 値1, 値2, ... }`）
-- **Implications**: アクター単語は `{ [=[値1]=], [=[値2]=] }` のフラット配列で十分
+  - アクター単語も同じビルダーパターンを使用可能
+- **Implications**: word.lua に `create_actor()` / `get_actor_words()` を追加し、同じパターンで実装
 
 ---
 
@@ -177,17 +178,18 @@
 
 ### Decision: フォールバック検索のLua/Rust分担
 
-- **Context**: 6レベル検索のロジック配置
+- **Context**: 6レベル検索のロジック配置と前方一致検索の実装方法
 - **Alternatives Considered**:
-  1. 全てLuaで実装
-  2. 全てRust FFIで実装
-  3. ハイブリッド（検索フローはLua、個別アルゴリズムはRust）
-- **Selected Approach**: Option 3 - ハイブリッド
+  1. 全てLuaで実装（前方一致もループ検索）
+  2. 全てRust FFIで実装（6レベル検索をRust側で制御）
+  3. ハイブリッド（検索フローはLua、前方一致はRust FFI）
+- **Selected Approach**: Option 1 - 全てLua実装
 - **Rationale**: 
-  - フォールバックロジック（順序制御）はLuaの方が柔軟
-  - 前方一致検索（Radix Trie等）はRustの方が高性能
-- **Trade-offs**: Lua/Rust間のインターフェース設計が必要
-- **Follow-up**: Rustヘルパー関数 `search_word_prefix(scope, key)` を設計
+  - アクター辞書は小規模（1アクターあたり数十件程度）なのでループ検索で十分
+  - WordDefRegistry を `:__actor_{name}__:{word}` 形式で拡張するのみ
+  - Rust FFI不要でシンプル
+- **Trade-offs**: 大規模辞書には不向きだが、アクター辞書は小規模なので問題なし
+- **Follow-up**: word.lua に `create_actor()` / `get_actor_words()` を追加、actor.lua に search_prefix_lua() を実装
 
 ### Decision: コードブロック言語
 
@@ -209,7 +211,7 @@
 | AST構造変更による互換性 | 下流コンポーネントへの影響 | 段階的テスト、既存テストでリグレッション確認 |
 | 後方互換性 | 既存スクリプトの動作変更 | 単一値も配列として処理、ランダム選択で同一動作 |
 | ランタイム性能 | ランダム選択のオーバーヘッド | O(1)アクセス（Luaテーブル）で問題なし |
-| Lua/Rust インターフェース | FFI設計の複雑さ | 既存の mlua パターンを活用 |
+| Lua前方一致検索の性能 | 大規模辞書での性能低下 | アクター辞書は小規模（数十件）なので問題なし |
 
 ---
 
