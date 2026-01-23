@@ -99,17 +99,17 @@ fn test_transpile_sample_pasta_actors() {
         "Missing actor うにゅう"
     );
 
-    // Verify actor attributes with StringLiteralizer (Requirement 2)
+    // Verify actor attributes with symmetric API: ACTOR:create_word(key):entry(...) (actor-word-dictionary)
     assert!(
-        lua_code.contains("ACTOR.通常 = [=[\\s[0]]=]"),
-        "Missing さくら.通常 attribute with long string format"
+        lua_code.contains("ACTOR:create_word(\"通常\"):entry([=[\\s[0]]=])"),
+        "Missing さくら.通常 attribute with create_word API"
     );
     assert!(
-        lua_code.contains("ACTOR.照れ = [=[\\s[1]]=]"),
+        lua_code.contains("ACTOR:create_word(\"照れ\"):entry([=[\\s[1]]=])"),
         "Missing さくら.照れ attribute"
     );
     assert!(
-        lua_code.contains("ACTOR.通常 = [=[\\s[10]]=]"),
+        lua_code.contains("ACTOR:create_word(\"通常\"):entry([=[\\s[10]]=])"),
         "Missing うにゅう.通常 attribute"
     );
 }

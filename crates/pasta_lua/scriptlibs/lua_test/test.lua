@@ -193,6 +193,9 @@ local function describe(name, func)
         local succeeded = performTest(_ENV.__testContext, 0)
         printTestResult(_ENV.__testContext, 0, {})
 
+        -- Reset global context after top-level describe completes
+        _ENV.__testContext = nil
+
         if not succeeded then
             os.exit(1)
         end

@@ -4,22 +4,13 @@
 --- セッション管理とコルーチン制御を担当する。
 --- save（永続変数）とactors（登録アクター）を保持する。
 
-local ACT -- 前方宣言（循環参照回避）
+local ACT = require("pasta.act")
 
 --- @class CTX 環境オブジェクト
 --- @field save table 永続変数（セッションが終わっても残る）
 --- @field actors table<string, Actor> 登録アクター（名前→アクター）
 local CTX = {}
 CTX.__index = CTX
-
---- ACTモジュールを遅延ロード（循環参照回避）
---- @return table ACTモジュール
-local function get_act()
-    if not ACT then
-        ACT = require("pasta.act")
-    end
-    return ACT
-end
 
 --- 新規CTXを作成
 --- @param save table|nil 永続変数
@@ -39,9 +30,8 @@ end
 --- @return thread コルーチン
 function CTX:co_action(scene, ...)
     local args = { ... }
-    local act_mod = get_act()
     return coroutine.create(function()
-        local act = act_mod.new(self)
+        local act = ACT.new(self)
         scene(act, table.unpack(args))
         if #act.token > 0 then
             self:end_action(act)
@@ -52,8 +42,7 @@ end
 --- アクション開始
 --- @return Act アクションオブジェクト
 function CTX:start_action()
-    local act_mod = get_act()
-    return act_mod.new(self)
+    return ACT.new(self)
 end
 
 --- yieldでトークンを出力

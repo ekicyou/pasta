@@ -7,6 +7,7 @@
 
 local specs = {
     "transpiler_spec",
+    "actor_word_spec", -- actor-word-dictionary feature tests
     -- 将来のテストスイートをここに追加
     -- "code_generator_spec",
     -- "context_spec",

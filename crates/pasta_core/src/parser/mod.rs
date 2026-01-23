@@ -231,13 +231,14 @@ fn parse_file_scope(pair: Pair<Rule>) -> Result<FileScope, ParseError> {
 /// Parse actor scope.
 ///
 /// grammar.pest `actor_scope = { actor_line ~ actor_scope_item* }` に対応。
-/// actor_scope_item = _{ global_scene_attr_line | global_scene_word_line | var_set_line | blank_line }
+/// actor_scope_item = _{ global_scene_attr_line | global_scene_word_line | var_set_line | code_scope | blank_line }
 fn parse_actor_scope(pair: Pair<Rule>) -> Result<ActorScope, ParseError> {
     let span = Span::from(&pair.as_span());
     let mut name = String::new();
     let mut attrs = Vec::new();
     let mut words = Vec::new();
     let mut var_sets = Vec::new();
+    let mut code_blocks = Vec::new();
 
     for inner in pair.into_inner() {
         match inner.as_rule() {
@@ -266,6 +267,9 @@ fn parse_actor_scope(pair: Pair<Rule>) -> Result<ActorScope, ParseError> {
             Rule::var_set_local | Rule::var_set_global => {
                 var_sets.push(parse_var_set(inner)?);
             }
+            Rule::code_block => {
+                code_blocks.push(parse_code_block(inner)?);
+            }
             _ => {}
         }
     }
@@ -275,6 +279,7 @@ fn parse_actor_scope(pair: Pair<Rule>) -> Result<ActorScope, ParseError> {
         attrs,
         words,
         var_sets,
+        code_blocks,
         span,
     })
 }

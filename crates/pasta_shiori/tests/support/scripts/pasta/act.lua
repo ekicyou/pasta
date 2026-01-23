@@ -4,8 +4,8 @@
 --- トランスパイラー出力のシーン関数から第1引数として受け取るオブジェクト。
 --- トークン蓄積、アクタープロキシ動的生成、シーン制御を担当する。
 
-local ACTOR -- 前方宣言（循環参照回避）
-local SCENE -- 前方宣言（循環参照回避）
+local ACTOR = require("pasta.actor")
+local SCENE = require("pasta.scene")
 
 --- @class Act アクションオブジェクト
 --- @field ctx CTX 環境オブジェクト
@@ -15,24 +15,18 @@ local SCENE -- 前方宣言（循環参照回避）
 --- @field current_scene table|nil 現在のシーンテーブル
 local ACT = {}
 
---- __indexメタメソッド: メソッド検索とアクタープロキシ動的生成
+--- __indexメタメソッド: アクタープロキシ動的生成
 --- @param key string
 --- @return any
 function ACT:__index(key)
-    -- 1. ACTメソッドを優先検索
-    local raw = rawget(ACT, key)
-    if raw then return raw end
-
-    -- 2. アクター名としてプロキシ生成
-    if not ACTOR then
-        ACTOR = require("pasta.actor")
-    end
+    -- アクター名としてプロキシ生成
     local actor = self.ctx.actors[key]
     if actor then
         return ACTOR.create_proxy(actor, self)
     end
 
-    return nil
+    -- フォールバック：ACTメソッド
+    return ACT[key]
 end
 
 --- 新規Actを作成
@@ -80,9 +74,6 @@ end
 --- @param name string 単語名
 --- @return string|nil 見つかった単語、またはnil
 function ACT:word(name)
-    if not SCENE then
-        SCENE = require("pasta.scene")
-    end
     -- Level 2: SCENEfield
     if self.current_scene and self.current_scene[name] then
         return self.current_scene[name]
@@ -108,9 +99,6 @@ end
 --- @param search_result table {global_name, local_name}
 --- @param opts table|nil オプション
 function ACT:call(search_result, opts, ...)
-    if not SCENE then
-        SCENE = require("pasta.scene")
-    end
     local global_name, local_name = search_result[1], search_result[2]
     local scene_func = SCENE.get(global_name, local_name)
     if scene_func then

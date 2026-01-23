@@ -2,17 +2,17 @@ local PASTA = require "pasta"
 
 do
     local ACTOR = PASTA.create_actor("さくら")
-    ACTOR.通常 = [=[\s[0]]=]
-    ACTOR.照れ = [=[\s[1]]=]
-    ACTOR.驚き = [=[\s[2]]=]
-    ACTOR.ぐんにょり = [=[\s[3]]=]
-    ACTOR.怒り = [=[\s[4]]=]
+    ACTOR:create_word("通常"):entry([=[\s[0]]=])
+    ACTOR:create_word("照れ"):entry([=[\s[1]]=])
+    ACTOR:create_word("驚き"):entry([=[\s[2]]=])
+    ACTOR:create_word("ぐんにょり"):entry([=[\s[3]]=])
+    ACTOR:create_word("怒り"):entry([=[\s[4]]=])
 end
 
 do
     local ACTOR = PASTA.create_actor("うにゅう")
-    ACTOR.通常 = [=[\s[10]]=]
-    ACTOR.刮目 = [=[\s[11]]=]
+    ACTOR:create_word("通常"):entry([=[\s[10]]=])
+    ACTOR:create_word("刮目"):entry([=[\s[11]]=])
 end
 
 PASTA.create_word("挨拶"):entry("こんにちは", "やあ", "ハロー")
@@ -100,7 +100,7 @@ do
         act.うにゅう:talk("やね。")
     end
 
-    function SCENE.関数(ctx, value, ...)
+    function SCENE.関数(act, value, ...)
         return value * value
     end
 end
