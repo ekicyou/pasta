@@ -100,17 +100,19 @@ end
 
 ---
 
-### Requirement 4: フォールバック検索 - 階層的単語解決
+### Requirement 4: 単語置換の優先順位とフォールバック検索
 
-**Objective:** ランタイムとして、単語が現在のスコープで見つからない場合に上位スコープを検索したい。これにより、グローバル単語のオーバーライドとデフォルト値の両方を実現する。
+**Objective:** ランタイムとして、単語参照 `＠キー` に対して、関数呼び出し（完全一致）と辞書検索（前方一致）を適切な優先順位で実行したい。アクター→シーン→グローバルの階層的検索により、スコープ別のオーバーライドとデフォルト値を実現する。
 
 #### Acceptance Criteria
 
-1. When 単語参照 `＠キー` が実行される場合, the Pasta Runtime shall アクター → シーン → グローバル の順序で検索する
-2. When 検索中に関数が見つかった場合, the Pasta Runtime shall 完全一致で関数を実行する
-3. When 検索中に単語辞書が見つかった場合, the Pasta Runtime shall 前方一致でマッチしたキーからランダム選択する
-4. When すべてのスコープで単語が見つからない場合, the Pasta Runtime shall nilを返す（またはエラー処理）
-5. The Pasta Runtime shall 最初にマッチしたスコープで検索を終了し、上位スコープへフォールスルーしない
+1. When 単語参照 `＠キー` が実行される場合, the Pasta Runtime shall 以下の優先順位で検索する:
+   - **関数検索（完全一致）**: 関数名が `キー` と完全一致する場合、関数を実行
+   - **辞書検索（前方一致）**: 辞書キーが `キー` で前方一致する場合、候補からランダム選択
+2. The Pasta Runtime shall アクター → シーン → グローバル の順序でスコープを検索する
+3. The Pasta Runtime shall 各スコープ内で「関数（完全一致）→ 辞書（前方一致）」の順に検索する
+4. When 検索中に最初のマッチが見つかった場合, the Pasta Runtime shall そのスコープで検索を終了し上位スコープへフォールスルーしない
+5. When すべてのスコープで単語が見つからない場合, the Pasta Runtime shall nilを返す（またはエラー処理）
 
 #### 検索優先順位
 
@@ -138,21 +140,17 @@ end
 　うにゅう：＠天気　やね。    # → 「雨」or「雪」or「台風」（グローバル）
 ```
 
----
+#### Lua関数定義（アクター内）
 
-### Requirement 5: アクター内Lua関数定義
+アクター定義内にLua関数を記述することで、動的な単語生成が可能。
 
-**Objective:** DSL作成者として、アクター定義内にLua関数を直接記述したい。これにより、動的な単語生成（時刻、状態依存など）が可能になる。
-
-#### Acceptance Criteria
-
+**Acceptance Criteria (関数定義):**
 1. When アクター定義内にluaコードブロックが記述された場合, the Pasta Parser shall コードブロックを関数定義として認識する
 2. When luaコードブロックがトランスパイルされる場合, the Lua Transpiler shall コードブロック内容をそのままアクター定義内に展開する
 3. The Lua Transpiler shall 関数シグネチャ `function ACTOR.関数名(act, ...)` を維持する
-4. When 関数が `ACTOR:word()` から呼び出される場合, the Pasta Runtime shall 関数を実行し戻り値を単語として使用する
+4. When 関数名が完全一致で検索される場合, the Pasta Runtime shall 関数を実行し戻り値を単語として使用する
 
-#### 構文例
-
+**構文例:**
 ````pasta
 ％さくら
 　＠通常：\s[0]
@@ -172,7 +170,7 @@ end
 
 ---
 
-### Requirement 6: グローバル単語定義（既存機能）
+### Requirement 5: グローバル単語定義（既存機能）
 
 > **注**: word.luaの`create_global`で既に対応済み。本要件は既存実装の文書化。
 
@@ -186,7 +184,7 @@ end
 
 ---
 
-### Requirement 7: 後方互換性
+### Requirement 6: 後方互換性の維持
 
 **Objective:** 既存のPastaスクリプト作成者として、既存のアクター定義が変更なしで動作し続けることを保証したい。
 
