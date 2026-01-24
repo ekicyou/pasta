@@ -116,7 +116,7 @@ Pasta では空白をトークンとして扱う可能性があるため、Pest 
 
 **用途**:
 - 変数代入：`＄var_name ： value`
-- 単語定義：`＠word_name ： value1 value2`
+- 単語定義：`＠word_name ： value1、value2`
 - 属性定義：`＆key ： value`
 - アクション行：`actor ： action`
 - 引数リスト（関数呼び出し）：`＠func（arg1：value1　arg2：value2）`
@@ -201,7 +201,7 @@ Pasta では空白をトークンとして扱う可能性があるため、Pest 
 
 | 用法                     | 構文                                    | 説明                         |
 | ------------------------ | --------------------------------------- | ---------------------------- |
-| 単語登録                 | `＠word_name：value1　value2`           | グローバル単語辞書に登録     |
+| 単語登録                 | `＠word_name：value1、value2`           | グローバル単語辞書に登録     |
 | 単語参照                 | `＠word_name`                           | 登録済み単語値を参照         |
 | 単語参照（動的）         | `＠＄var_name`                          | 変数値を単語名として間接参照 |
 | 関数呼び出し             | `＠func_name()`                         | 関数を呼び出し（引数なし）   |
@@ -1103,14 +1103,14 @@ fn is_greater(ctx, x, threshold) {
 
 ### 10.1 グローバル単語定義
 ```pasta
-＠word_name ： value1　value2　...
+＠word_name ： value1、value2、...
 ```
 
 **セマンティクス**: ファイル全体で参照可能な辞書エントリ
 
 ### 10.2 ローカル単語定義
 ```pasta
-  ＠word_name ： value1　value2　...
+  ＠word_name ： value1、value2、...
 ```
 
 **セマンティクス**: 親シーン内で参照可能
