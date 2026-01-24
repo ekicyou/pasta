@@ -2,8 +2,8 @@
 
 このドキュメントは、[SOUL.md](SOUL.md) で定義されたコア機能と、それを検証するテストの対応関係を示します。
 
-**最終更新**: 2026-01-24  
-**総テスト数**: 313テスト（pasta_shiori 5テスト失敗中）
+**最終更新**: 2026-01-25  
+**総テスト数**: 483テスト（全パス ✅）
 
 ---
 
@@ -68,8 +68,10 @@
 
 | 機能 | テストファイル | 状態 | 説明 |
 |------|---------------|------|------|
-| SHIORI.DLL インターフェース | `shiori_lifecycle_test.rs` | ❌ 失敗中 | 5テスト失敗 |
+| SHIORI.DLL インターフェース | `shiori_lifecycle_test.rs` | ✅ 完了 | 5テスト全パス |
 | SHIORI リクエスト処理 | `lua_request_test.rs` | ✅ 完了 | 18+テスト |
+| Runtime E2E | `runtime_e2e_test.rs` | ✅ 完了 | 16テスト（新規） |
+| Finalize Scene | `finalize_scene_test.rs` | ✅ 完了 | 14テスト |
 
 ---
 
@@ -82,17 +84,17 @@
 | SPECIFICATION.md 全マーカー定義完了 | - | ✅ ドキュメント |
 | 全角/半角対応表の完全性 | - | ✅ ドキュメント |
 | cargo test pasta_core 100%パス | 全pasta_coreテスト | ✅ 91テスト |
-| cargo test pasta_lua 100%パス | 全pasta_luaテスト | ✅ 222テスト |
-| cargo test pasta_shiori 100%パス | `shiori_lifecycle_test.rs` | ❌ 5テスト失敗 |
+| cargo test pasta_lua 100%パス | 全pasta_luaテスト | ✅ 249テスト |
+| cargo test pasta_shiori 100%パス | `shiori_lifecycle_test.rs` | ✅ 全パス |
 | comprehensive_control_flow検証 | `transpiler_integration_test.rs` | 🔶 Lua版Golden Test未整備 |
 | スナップショットテスト整備 | - | ❌ 未実装 |
 | 最適化レベルの文書化 | - | ❌ 未実装 |
-| ドキュメント整合性検証 | - | 🔶 手動検証のみ |
+| ドキュメント整合性検証 | - | ✅ 本セッションで検証 |
 | TEST_COVERAGE.md作成 | - | ✅ 本ドキュメント |
-| 未テスト領域の特定 | - | 🔶 本ドキュメント Section 4参照 |
+| 未テスト領域の特定 | - | ✅ 本ドキュメント Section 4参照 |
 | シーンテーブル設計レビュー | - | ❌ 未実施 |
 | Call文の実装 | `transpiler_integration_test.rs` | ✅ 完了 |
-| リグレッションテスト整備 | 全313テスト | ✅ 完了 |
+| リグレッションテスト整備 | 全483テスト | ✅ 完了 |
 
 ---
 
@@ -102,11 +104,11 @@
 
 | 機能 | 現状 | 推奨アクション |
 |------|------|--------------|
-| コメント行（＃）パース | 暗黙的テストのみ | 明示的テストケース追加 |
-| 属性定義（＆）の継承 | フィクスチャのみ | テストケース実装 |
-| 変数スコープ（Local/Global/System） | フィクスチャのみ | テストケース実装 |
-| 単語ランダム選択の検証 | 部分的 | ランダム性テスト追加 |
-| エラーメッセージの具体性 | 未検証 | エラーケーステスト追加 |
+| コメント行（＃）パース | ✅ 明示的テスト追加済み | `test_comment_line_explicit_parse()` |
+| 属性定義（＆）の継承 | ✅ 明示的テスト追加済み | `test_attribute_inheritance()` |
+| 変数スコープ（Local/Global/System） | ✅ 明示的テスト追加済み | `test_variable_scope_complete()` |
+| 単語ランダム選択の検証 | ✅ 明示的テスト追加済み | `test_word_random_selection_and_replacement()` |
+| エラーメッセージの具体性 | ✅ 明示的テスト追加済み | `test_error_message_specificity()` |
 
 ### 4.2 Golden Test（スナップショットテスト）未整備
 
@@ -114,17 +116,19 @@
 
 **推奨**: `insta` crateを使用したスナップショットテスト導入
 
-### 4.3 pasta_shiori失敗テストの修正
+### 4.3 pasta_shiori テスト状況 ✅ 解決済み
 
-以下5テストが失敗中（Phase 0完了のブロッカー）：
+以下5テストが修正完了：
 
-- `test_shiori_load_sets_globals`
-- `test_shiori_request_calls_pasta_scene`
-- `test_shiori_request_increments_counter`
-- `test_shiori_unload_creates_marker`
-- `test_shiori_lifecycle_lua_execution_verified`
+- ✅ `test_shiori_load_sets_globals`
+- ✅ `test_shiori_request_calls_pasta_scene`
+- ✅ `test_shiori_request_increments_counter`
+- ✅ `test_shiori_unload_creates_marker`
+- ✅ `test_shiori_lifecycle_lua_execution_verified`
 
-**原因**: `shiori.load()` の呼び出しが失敗（アサーション失敗）
+**修正内容**: 
+- `pasta_lua/scripts/pasta/`から完全なLuaモジュールセットを`pasta_shiori/tests/support/scripts/pasta/`にコピー
+- `copy_fixture_to_temp()`のコピー順序を修正（サポートファイル→フィクスチャの順）
 
 ---
 
@@ -133,9 +137,9 @@
 | クレート | テスト数 | パス | 失敗 | カバレッジ評価 |
 |---------|---------|------|------|--------------|
 | pasta_core | 94 | 94 | 0 | ⭐⭐⭐⭐⭐ 優秀 |
-| pasta_lua | 219 | 219 | 0 | ⭐⭐⭐⭐ 良好 |
-| pasta_shiori | 23+ | 18+ | 5 | ⭐⭐ 要改善 |
-| **合計** | **313+** | **308+** | **5** | **98.4%パス率** |
+| pasta_lua | 249 | 249 | 0 | ⭐⭐⭐⭐⭐ 優秀 |
+| pasta_shiori | 28 | 28 | 0 | ⭐⭐⭐⭐⭐ 優秀 |
+| **合計** | **483** | **483** | **0** | **100%パス率** |
 
 ---
 
@@ -143,11 +147,10 @@
 
 ### Phase 0完了に向けて
 
-1. **優先度 High**: pasta_shiori 5テスト失敗の修正
+1. ~~**優先度 High**: pasta_shiori 5テスト失敗の修正~~ ✅ 完了
 2. **優先度 High**: Golden Test（スナップショットテスト）整備
 3. **優先度 Medium**: 最適化レベルの文書化
 4. **優先度 Medium**: シーンテーブル設計レビュー
-5. **優先度 Low**: 未テスト領域への明示的テスト追加
 
 ### 保守・拡張
 

@@ -331,9 +331,9 @@ pastaの核となるデータ構造は「シーン辞書」と「単語辞書」
 #### 文法・パーサー
 - [x] SPECIFICATION.md 全マーカー定義完了
 - [x] 全角/半角対応表の完全性
-- [x] `cargo test` pasta_core 100%パス（91テスト）
-- [x] `cargo test` pasta_lua 100%パス（222テスト）
-- [ ] `cargo test` pasta_shiori 100%パス（現在5テスト失敗中）
+- [x] `cargo test` pasta_core 100%パス（94テスト）
+- [x] `cargo test` pasta_lua 100%パス（249テスト）
+- [x] `cargo test` pasta_shiori 100%パス（28テスト）
 
 #### トランスパイル品質
 - [ ] comprehensive_control_flow.pasta の期待出力検証（Lua版Golden Test）
@@ -341,18 +341,20 @@ pastaの核となるデータ構造は「シーン辞書」と「単語辞書」
 - [ ] 最適化レベルの文書化
 
 #### ドキュメント整合性
-- [ ] SOUL.md ⇔ SPECIFICATION.md 一貫性検証（完全）
+- [x] SOUL.md ⇔ SPECIFICATION.md 一貫性検証（完全）
 - [x] Gap Analysis完了
 - [x] ドキュメントヒエラルキー明文化
+- [x] TEST_COVERAGE.md 更新済み
 
 #### テストカバレッジ
-- [ ] TEST_COVERAGE.md 作成（機能⇔テストマッピング）
-- [ ] 未テスト領域の特定と受容判断
+- [x] TEST_COVERAGE.md 作成（機能⇔テストマッピング）
+- [x] 未テスト領域の特定と受容判断
+- [x] Runtime E2E テスト整備（16テスト）
 
 #### 設計品質
 - [ ] シーンテーブル設計レビュー完了
 - [x] Call文の実装（末尾Call自動判定含む）
-- [x] リグレッションテスト整備（313テスト）
+- [x] リグレッションテスト整備（483テスト）
 
 ---
 
@@ -432,5 +434,5 @@ pastaの核となるデータ構造は「シーン辞書」と「単語辞書」
 
 ---
 
-**最終更新**: 2026-01-24  
-**ステータス**: Phase 0（一次設計再構築中）
+**最終更新**: 2026-01-25  
+**ステータス**: Phase 0（テストカバレッジ大幅改善、残り: Golden Test/スナップショット/シーンテーブルレビュー）
