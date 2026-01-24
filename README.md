@@ -20,7 +20,7 @@ Engine (上位API) → Cache/Loader
     ↓
 Transpiler (2pass) ← Parser (Pest)
     ↓
-Runtime (Rune VM) → IR Output (ScriptEvent)
+Runtime (Lua VM) → IR Output (ScriptEvent)
 ```
 
 ### パーサー/トランスパイラーアーキテクチャ
