@@ -291,39 +291,69 @@ classDiagram
 
 ### C-3: TestHelper（テストヘルパー）
 
-既存の`finalize_scene_test.rs`パターンを拡張したヘルパー関数群。
+既存の`finalize_scene_test.rs`パターンを共通化したヘルパーモジュール。
+
+**配置**: `crates/pasta_lua/tests/common/e2e_helpers.rs`
+
+**リファクタリング方針**:
+- 既存の`finalize_scene_test.rs`から`create_runtime_with_finalize()`と`transpile()`を抽出
+- 新規の`runtime_e2e_test.rs`でも同じヘルパーを使用
+- コードの重複を排除し、保守性を向上
 
 ```rust
 /// Runtime E2Eテスト用ヘルパーモジュール
-mod e2e_helper {
+/// crates/pasta_lua/tests/common/e2e_helpers.rs
+pub mod e2e_helpers {
     use pasta_core::parser::parse_str;
     use pasta_lua::LuaTranspiler;
-    use std::collections::HashMap;
+    use std::path::PathBuf;
 
     /// finalize_scene対応ランタイムを作成
-    pub fn create_runtime_with_finalize() -> mlua::Result<mlua::Lua>;
+    pub fn create_runtime_with_finalize() -> mlua::Result<mlua::Lua> {
+        use mlua::{Lua, StdLib};
+
+        // Create Lua VM with safe standard libraries
+        let lua = unsafe { Lua::unsafe_new_with(StdLib::ALL_SAFE, mlua::LuaOptions::default()) };
+
+        // Configure package.path to include pasta scripts directory
+        let scripts_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("scripts")
+            .to_string_lossy()
+            .replace('\\', "/");
+
+        lua.load(&format!(
+            r#"
+            package.path = "{scripts_dir}/?.lua;{scripts_dir}/?/init.lua;" .. package.path
+            "#
+        ))
+        .exec()?;
+
+        // Register finalize_scene binding
+        pasta_lua::runtime::finalize::register_finalize_scene(&lua)?;
+
+        Ok(lua)
+    }
     
     /// Pastaソースをトランスパイル
-    pub fn transpile(source: &str) -> String;
+    pub fn transpile(source: &str) -> String {
+        let file = parse_str(source, "test.pasta").unwrap();
+        let transpiler = LuaTranspiler::default();
+        let mut output = Vec::new();
+        transpiler.transpile(&file, &mut output).unwrap();
+        String::from_utf8(output).unwrap()
+    }
     
     /// シーンを実行し出力を収集
-    pub fn execute_scene(lua: &mlua::Lua, scene: &str) -> Vec<String>;
-    
-    /// N回実行し分布を計測
-    pub fn count_distribution(
-        lua: &mlua::Lua,
-        scene: &str,
-        n: usize
-    ) -> HashMap<String, usize>;
-    
-    /// 分布が均等かを検証（χ²検定）
-    pub fn assert_uniform_distribution(
-        distribution: &HashMap<String, usize>,
-        expected_count: usize,
-        tolerance: f64
-    );
+    pub fn execute_scene(lua: &mlua::Lua, scene: &str) -> Vec<String> {
+        // 実装は既存の finalize_scene_test.rs パターンを参考
+        unimplemented!("実装タスクで追加")
+    }
 }
 ```
+
+**既存テストへの影響**:
+- `finalize_scene_test.rs`: ヘルパー関数を`use common::e2e_helpers::*;`に変更
+- 既存のテストロジックは変更なし（ヘルパー関数の呼び出し箇所のみ修正）
 
 ---
 
@@ -383,8 +413,10 @@ struct StatisticalResult {
 ```
 crates/pasta_lua/tests/
 ├── runtime_e2e_test.rs          # 新規: Runtime E2Eテスト
-├── e2e_helper/                  # 新規: E2Eヘルパーモジュール
-│   └── mod.rs
+├── finalize_scene_test.rs       # 修正: 共通ヘルパー使用に変更
+├── common/                      # 既存
+│   ├── mod.rs                   # 修正: e2e_helpers公開
+│   └── e2e_helpers.rs           # 新規: E2Eヘルパーモジュール
 ├── fixtures/
 │   ├── e2e/                     # 新規: E2E専用フィクスチャ
 │   │   ├── runtime_e2e_scene.pasta
@@ -398,21 +430,20 @@ crates/pasta_lua/tests/
 
 ## Implementation Notes
 
-### 既存パターンの再利用
+### 既存パターンの再利用とリファクタリング
 
-`finalize_scene_test.rs`の以下のパターンを再利用：
+`finalize_scene_test.rs`のヘルパー関数を共通モジュールに抽出：
 
-```rust
-/// Helper to create a minimal runtime with finalize_scene capability.
-fn create_runtime_with_finalize() -> mlua::Result<mlua::Lua> {
-    // ... 既存実装
-}
+**リファクタリング手順**:
+1. `crates/pasta_lua/tests/common/e2e_helpers.rs`を新規作成
+2. `finalize_scene_test.rs`から`create_runtime_with_finalize()`と`transpile()`を移動
+3. `finalize_scene_test.rs`で`use common::e2e_helpers::*;`を追加
+4. `runtime_e2e_test.rs`でも同じヘルパーを使用
 
-/// Helper to transpile pasta source to Lua code.
-fn transpile(source: &str) -> String {
-    // ... 既存実装
-}
-```
+**利点**:
+- コードの重複排除
+- テストコードの一貫性向上
+- 将来のE2Eテスト拡張が容易
 
 ### キャッシュ消費検証の実装
 
