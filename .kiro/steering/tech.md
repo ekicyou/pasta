@@ -79,8 +79,8 @@ pasta (workspace)
 
 ### テスト戦略
 - ユニット: レイヤー独立
-- 統合: `tests/`配下
-- Fixture: `tests/fixtures/*.pasta`
+- 統合: `crates/*/tests/`配下
+- Fixture: `crates/*/tests/fixtures/*.pasta`
 - Doctest: API例をドキュメント内に
 
 ## 品質基準

@@ -13,10 +13,6 @@ use std::path::PathBuf;
 /// Get the path to test fixtures
 fn fixtures_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
         .join("tests")
         .join("fixtures")
 }

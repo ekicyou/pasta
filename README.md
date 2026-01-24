@@ -80,7 +80,7 @@ use pasta_lua::transpiler::Transpiler;
 - [.kiro/steering/](.kiro/steering/) - AI/仕様駆動開発コンテキスト
 
 ### 開発者向けリソース
-- [tests/fixtures/README.md](tests/fixtures/README.md) - テストフィクスチャ説明
+- [crates/pasta_lua/tests/fixtures/](crates/pasta_lua/tests/fixtures/) - テストフィクスチャ
 
 ---
 
@@ -88,7 +88,7 @@ use pasta_lua::transpiler::Transpiler;
 
 ### DSLユーザー向け（推定所要時間: 30分）
 1. [GRAMMAR.md](GRAMMAR.md) - 基本文法を学ぶ
-2. [tests/fixtures/](tests/fixtures/) - サンプルスクリプト
+2. [crates/pasta_lua/tests/fixtures/sample.pasta](crates/pasta_lua/tests/fixtures/sample.pasta) - サンプルスクリプト
 3. [クイックスタート](#クイックスタート) - ビルド・実行方法
 
 ### 開発者向け（推定所要時間: 2-3時間）

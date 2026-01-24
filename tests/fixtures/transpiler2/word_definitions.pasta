@@ -1,8 +1,0 @@
-# Word definitions fixture for transpiler2 tests
-# Tests global and scene-level word definition registration
-
-@挨拶：こんにちは、おはよう、こんばんは
-
-＊会話
-  @返事：はい、いいえ
-  さくら：「挨拶テスト」

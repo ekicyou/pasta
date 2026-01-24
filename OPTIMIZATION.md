@@ -138,7 +138,7 @@ strip = true          # シンボル削除
 
 - [SPECIFICATION.md](SPECIFICATION.md) - 言語仕様
 - [crates/pasta_lua/src/code_generator.rs](crates/pasta_lua/src/code_generator.rs) - コード生成実装
-- [tests/fixtures/tail_call_optimization.pasta](tests/fixtures/tail_call_optimization.pasta) - TCOテストケース
+- [crates/pasta_lua/tests/fixtures/tail_call_optimization.pasta](crates/pasta_lua/tests/fixtures/tail_call_optimization.pasta) - TCOテストケース
 
 ---
 

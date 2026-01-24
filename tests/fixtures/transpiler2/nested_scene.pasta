@@ -1,9 +1,0 @@
-# Nested scene fixture for transpiler2 tests
-# Tests global scene with multiple local scenes
-
-＊メイン
-  さくら：「これはスタートです」
-  ・途中
-    さくら：「途中経過です」
-  ・終わり
-    うにゅう：「終わりです」
