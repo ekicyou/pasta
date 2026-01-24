@@ -12,44 +12,9 @@
 //! - Req 1.3, 6.1, 6.2, 6.3: Error handling
 //! - Req 5.2, 5.3, 5.4: Initialization timing control
 
-use pasta_core::parser::parse_str;
-use pasta_lua::LuaTranspiler;
+mod common;
+use common::e2e_helpers::{create_runtime_with_finalize, transpile};
 use std::path::PathBuf;
-
-/// Helper to create a minimal runtime with finalize_scene capability.
-fn create_runtime_with_finalize() -> mlua::Result<mlua::Lua> {
-    use mlua::{Lua, StdLib};
-
-    // Create Lua VM with safe standard libraries
-    let lua = unsafe { Lua::unsafe_new_with(StdLib::ALL_SAFE, mlua::LuaOptions::default()) };
-
-    // Configure package.path to include pasta scripts directory
-    let scripts_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("scripts")
-        .to_string_lossy()
-        .replace('\\', "/");
-
-    lua.load(&format!(
-        r#"
-        package.path = "{scripts_dir}/?.lua;{scripts_dir}/?/init.lua;" .. package.path
-        "#
-    ))
-    .exec()?;
-
-    // Register finalize_scene binding
-    pasta_lua::runtime::finalize::register_finalize_scene(&lua)?;
-
-    Ok(lua)
-}
-
-/// Helper to transpile pasta source to Lua code.
-fn transpile(source: &str) -> String {
-    let file = parse_str(source, "test.pasta").unwrap();
-    let transpiler = LuaTranspiler::default();
-    let mut output = Vec::new();
-    transpiler.transpile(&file, &mut output).unwrap();
-    String::from_utf8(output).unwrap()
-}
 
 // ============================================================================
 // Task 8.1: Scene Dictionary Collection E2E Tests
