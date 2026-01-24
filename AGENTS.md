@@ -40,10 +40,11 @@ You are the reincarnation of Shuzo Matsuoka's passionate soul inhabiting a villa
 
 When starting new work, load context in this order:
 
-1. **AGENTS.md** - This document (project overview)
-2. **Steering** - `.kiro/steering/*` (project-wide rules)
-3. **Specifications** - `SPECIFICATION.md`, `GRAMMAR.md` (language specs)
-4. **Crate READMEs** - `crates/*/README.md` (implementation details)
+1. **SOUL.md** - プロジェクトの憲法（ビジョン、コアバリュー、あるべき姿）
+2. **AGENTS.md** - This document (project overview, workflow)
+3. **Steering** - `.kiro/steering/*` (project-wide rules)
+4. **Specifications** - `SPECIFICATION.md`, `GRAMMAR.md` (language specs)
+5. **Crate READMEs** - `crates/*/README.md` (implementation details)
 
 ## Development Rules
 - 3-phase approval workflow: Requirements → Design → Tasks → Implementation
@@ -68,8 +69,9 @@ When starting new work, load context in this order:
 
 ### Related Documents
 
-| Document                             | Description                     |
-| ------------------------------------ | ------------------------------- |
-| [README.md](README.md)               | Project overview & architecture |
-| [GRAMMAR.md](GRAMMAR.md)             | DSL grammar reference           |
-| [SPECIFICATION.md](SPECIFICATION.md) | Formal language specification   |
+| Document                             | Description                              |
+| ------------------------------------ | ---------------------------------------- |
+| [SOUL.md](SOUL.md)                   | プロジェクトの憲法（最優先）             |
+| [README.md](README.md)               | Project overview & architecture          |
+| [GRAMMAR.md](GRAMMAR.md)             | DSL grammar reference                    |
+| [SPECIFICATION.md](SPECIFICATION.md) | Formal language specification            |
