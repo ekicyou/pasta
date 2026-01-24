@@ -77,7 +77,7 @@
 
 ## 3. Phase 0完了基準との対応
 
-[SOUL.md Section 5.6](SOUL.md#56-phase-0完了基準definition-of-done) のDoD項目とテストの対応：
+[SOUL.md Section 6.6](SOUL.md#66-phase-0完了基準definition-of-done) のDoD項目とテストの対応：
 
 | DoD項目 | 対応テスト | 状態 |
 |---------|-----------|------|
