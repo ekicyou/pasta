@@ -24,11 +24,11 @@
   - `crates/pasta_lua/tests/runtime_e2e_test.rs`作成（5テストすべてパス）
   - _Requirements: 7.2_
 
-- [ ] 1.2 (P) 既存テストのリファクタリング
-  - `finalize_scene_test.rs`から重複コードを削除
-  - `use common::e2e_helpers::*;`でヘルパーを使用
+- [x] 1.2 (P) 既存テストのリファクタリング ✅
+  - `finalize_scene_test.rs`から`create_runtime_with_finalize()`と`transpile()`を削除
+  - `use common::e2e_helpers::{create_runtime_with_finalize, transpile};`でヘルパーを使用
   - テストロジックは変更せず、ヘルパー呼び出しのみ修正
-  - リグレッション確認（既存テストが全て成功すること）
+  - リグレッション確認（全14テストが成功）
   - _Requirements: 7.2_
 
 - [ ] 2. Runtime E2Eテストの実装
