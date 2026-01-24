@@ -1,0 +1,175 @@
+# Scene Table Design Review
+
+このドキュメントは、pastaシーンテーブル設計のレビュー結果を記録します。
+
+**レビュー日**: 2026-01-25  
+**ステータス**: Phase 0レビュー完了
+
+---
+
+## 1. アーキテクチャ概要
+
+pastaのシーンテーブルは**2層構造**で設計されています：
+
+### 1.1 Rust層（pasta_core）
+
+| コンポーネント | 役割 | ファイル |
+|---------------|------|---------|
+| SceneRegistry | トランスパイル時のシーン登録 | `registry/scene_registry.rs` |
+| SceneTable | ランタイム時のシーン検索 | `registry/scene_table.rs` |
+| SceneInfo | シーンメタデータ | `registry/scene_table.rs` |
+| SceneId | シーン識別子 | `registry/scene_table.rs` |
+
+### 1.2 Lua層（pasta_lua/scripts/pasta）
+
+| コンポーネント | 役割 | ファイル |
+|---------------|------|---------|
+| scene.lua | シーン登録・検索API | `scripts/pasta/scene.lua` |
+| store.lua | グローバルストア | `scripts/pasta/store.lua` |
+| search.lua | 前方一致検索 | `scripts/pasta/search.lua` |
+
+---
+
+## 2. データ構造
+
+### 2.1 SceneTable (Rust)
+
+```rust
+pub struct SceneTable {
+    labels: Vec<SceneInfo>,           // ID-indexed storage
+    prefix_index: RadixMap<Vec<SceneId>>,  // 前方一致インデックス
+    cache: HashMap<SceneCacheKey, CachedSelection>,  // 検索キャッシュ
+    random_selector: Box<dyn RandomSelector>,
+    shuffle_enabled: bool,
+}
+```
+
+**設計判断**:
+- ✅ `fast_radix_trie` による高速前方一致
+- ✅ キャッシュによる重複検索回避
+- ✅ RandomSelector抽象化でテスト容易性確保
+
+### 2.2 Lua側ストア
+
+```lua
+STORE.scenes = {
+    ["メイン1"] = {
+        __global_name__ = "メイン1",
+        __start__ = function(act, ...) ... end,
+        __選択肢_1__ = function(act, ...) ... end,
+    }
+}
+```
+
+**設計判断**:
+- ✅ カウンタ管理で同名シーンの一意性確保
+- ✅ メタテーブルで`create_word`メソッド提供
+- ✅ `finalize_scene()`で検索インデックス構築
+
+---
+
+## 3. 検索アルゴリズム
+
+### 3.1 前方一致検索
+
+```
+入力: "挨拶"
+候補: ["挨拶1", "挨拶2", "挨拶_朝1", "挨拶_朝2"]
+結果: ランダムに1つ選択
+```
+
+### 3.2 キー変換ルール
+
+| シーンタイプ | fn_name | 検索キー |
+|-------------|---------|----------|
+| グローバル | `メイン1::__start__` | `メイン` |
+| ローカル | `メイン1::選択肢_1` | `:メイン1:選択肢` |
+
+### 3.3 スコープ解決
+
+1. **ローカル優先**: 現在のグローバルシーン内を先に検索
+2. **グローバルフォールバック**: ローカルで見つからない場合はグローバル検索
+
+---
+
+## 4. 現状の課題と評価
+
+### 4.1 解決済みの課題
+
+| 課題 | 状態 | 解決方法 |
+|------|------|---------|
+| 同名シーンの重複 | ✅ 解決 | カウンタ管理（`メイン1`, `メイン2`） |
+| 前方一致の効率 | ✅ 解決 | RadixMap使用 |
+| テスト容易性 | ✅ 解決 | MockRandomSelector |
+
+### 4.2 既知の制限事項
+
+| 項目 | 状態 | 影響度 | 備考 |
+|------|------|--------|------|
+| Rust/Lua二重管理 | 🔶 許容 | Low | 現状は問題なし |
+| 属性フィルタリング未実装 | 🔶 許容 | Medium | Phase 1で対応予定 |
+| キャッシュ無効化戦略 | 🔶 許容 | Low | 現状は問題なし |
+
+### 4.3 将来の改善候補
+
+| 改善項目 | 優先度 | 説明 |
+|---------|--------|------|
+| 統合インデックス | Low | Rust/Lua統一 |
+| 属性フィルタ | Medium | 検索時の条件指定 |
+| プリコンパイル | Low | 検索キー事前計算 |
+
+---
+
+## 5. テストカバレッジ
+
+| テスト | ファイル | 状態 |
+|--------|---------|------|
+| 前方一致検索 | `search_module_test.rs` | ✅ |
+| ランダム選択 | `search_module_test.rs` | ✅ |
+| finalize_scene | `finalize_scene_test.rs` | ✅ |
+| E2E検索 | `runtime_e2e_test.rs` | ✅ |
+
+---
+
+## 6. レビュー結論
+
+### 6.1 設計品質評価
+
+| 観点 | 評価 | 根拠 |
+|------|------|------|
+| 機能性 | ⭐⭐⭐⭐ | 要件を満たしている |
+| 性能 | ⭐⭐⭐⭐ | RadixMapで高速検索 |
+| 保守性 | ⭐⭐⭐ | 二重管理だが分離は明確 |
+| テスト性 | ⭐⭐⭐⭐⭐ | 抽象化されている |
+| 拡張性 | ⭐⭐⭐⭐ | 属性フィルタ追加可能 |
+
+### 6.2 Phase 0判定
+
+**✅ Phase 0完了基準を満たす**
+
+現在のシーンテーブル設計は、Phase 0の要件を満たしています。
+以下の点で設計が適切であることを確認しました：
+
+1. **前方一致検索**: 正常に動作（`search_scene` テスト通過）
+2. **ランダム選択**: 同名シーンからの適切な選択
+3. **スコープ管理**: グローバル/ローカルの分離
+4. **テスト容易性**: MockRandomSelectorによる決定的テスト
+
+### 6.3 次フェーズへの推奨事項
+
+1. **属性フィルタリング実装**: Phase 1で対応
+2. **パフォーマンス計測**: 大規模シーンでのベンチマーク
+3. **キャッシュ戦略見直し**: 必要に応じて実装
+
+---
+
+## 7. 関連ドキュメント
+
+- [SOUL.md Section 4](SOUL.md#4-辞書アーキテクチャ) - 辞書アーキテクチャ
+- [SPECIFICATION.md](SPECIFICATION.md) - 言語仕様
+- [pasta_core/src/registry/](crates/pasta_core/src/registry/) - Rust実装
+
+---
+
+**レビュアー**: GitHub Copilot (Claude Opus 4.5)  
+**承認日**: 2026-01-25

@@ -21,6 +21,7 @@ tracing = "0.1"
 
 # Development dependencies
 tempfile = "3"
+insta = { version = "1.42", features = ["glob"] }
 
 # pasta_lua dependencies
 lua-src = { version = ">= 548.1.0, < 549.0.0", features = ["ucid"] }

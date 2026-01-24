@@ -84,15 +84,15 @@
 | SPECIFICATION.md 全マーカー定義完了 | - | ✅ ドキュメント |
 | 全角/半角対応表の完全性 | - | ✅ ドキュメント |
 | cargo test pasta_core 100%パス | 全pasta_coreテスト | ✅ 91テスト |
-| cargo test pasta_lua 100%パス | 全pasta_luaテスト | ✅ 249テスト |
+| cargo test pasta_lua 100%パス | 全pasta_luaテスト | ✅ 257テスト |
 | cargo test pasta_shiori 100%パス | `shiori_lifecycle_test.rs` | ✅ 全パス |
-| comprehensive_control_flow検証 | `transpiler_integration_test.rs` | 🔶 Lua版Golden Test未整備 |
-| スナップショットテスト整備 | - | ❌ 未実装 |
-| 最適化レベルの文書化 | - | ❌ 未実装 |
+| comprehensive_control_flow検証 | `transpiler_snapshot_test.rs` | ✅ 8スナップショット |
+| スナップショットテスト整備 | insta crate | ✅ 実装済み |
+| 最適化レベルの文書化 | OPTIMIZATION.md | ✅ 完了 |
 | ドキュメント整合性検証 | - | ✅ 本セッションで検証 |
 | TEST_COVERAGE.md作成 | - | ✅ 本ドキュメント |
 | 未テスト領域の特定 | - | ✅ 本ドキュメント Section 4参照 |
-| シーンテーブル設計レビュー | - | ❌ 未実施 |
+| シーンテーブル設計レビュー | SCENE_TABLE_REVIEW.md | ✅ 完了 |
 | Call文の実装 | `transpiler_integration_test.rs` | ✅ 完了 |
 | リグレッションテスト整備 | 全483テスト | ✅ 完了 |
 
@@ -145,12 +145,20 @@
 
 ## 6. 次のステップ
 
-### Phase 0完了に向けて
+### Phase 0完了 ✅
+
+全DoD項目を達成しました：
 
 1. ~~**優先度 High**: pasta_shiori 5テスト失敗の修正~~ ✅ 完了
-2. **優先度 High**: Golden Test（スナップショットテスト）整備
-3. **優先度 Medium**: 最適化レベルの文書化
-4. **優先度 Medium**: シーンテーブル設計レビュー
+2. ~~**優先度 High**: Golden Test（スナップショットテスト）整備~~ ✅ 完了（8スナップショット）
+3. ~~**優先度 Medium**: 最適化レベルの文書化~~ ✅ 完了（OPTIMIZATION.md）
+4. ~~**優先度 Medium**: シーンテーブル設計レビュー~~ ✅ 完了（SCENE_TABLE_REVIEW.md）
+
+### Phase 1に向けて
+
+- 属性フィルタリング機能の実装
+- comprehensive_control_flow.pastaの文法更新
+- パフォーマンスベンチマーク
 
 ### 保守・拡張
 

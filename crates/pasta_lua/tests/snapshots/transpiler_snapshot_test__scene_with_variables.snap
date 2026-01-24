@@ -1,0 +1,23 @@
+---
+source: crates/pasta_lua/tests/transpiler_snapshot_test.rs
+assertion_line: 85
+expression: lua_code
+---
+local PASTA = require "pasta"
+
+do
+    local SCENE = PASTA.create_scene("メイン")
+
+    function SCENE.__start__(act, ...)
+        local args = { ... }
+        local save, var = act:init_scene(SCENE)
+
+        var.カウンタ = "10"
+        save.グローバル = "永続値"
+        act.さくら:talk("「カウンタは")
+        act.さくら:talk(tostring(var.カウンタ))
+        act.さくら:talk("、グローバルは")
+        act.さくら:talk(tostring(save.グローバル))
+        act.さくら:talk("」")
+    end
+end
