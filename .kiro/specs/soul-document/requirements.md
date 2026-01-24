@@ -112,11 +112,16 @@ pastaのあるべき姿、こんな実装を目標にしている、そういう
    - 変数スコープ（Local/Global/System）の完全テスト
    - 単語ランダム選択の統計的検証テスト
    - エラーメッセージの具体性検証テスト
-2. When 新規テストを追加した場合, the test-implementation shall TEST_COVERAGE.mdのマッピングを更新する
-3. The test-implementation shall SOUL.md Section 5.6（Phase 0完了基準）の未達成項目に貢献する：
+2. The test-implementation shall **Runtime E2Eテスト**を作成し、以下の実行時動作を検証する：
+   - **シーン辞書の前方一致検索とランダム選択**（finalize_scene()後の実際の動作）
+   - **単語辞書のランダム選択と置換**（実行時の単語解決）
+   - **アクター単語辞書のスコープ解決**（アクター別の単語置換）
+   - Pastaスクリプト→トランスパイル→Lua実行→シーン/単語選択の完全フロー
+3. When 新規テストを追加した場合, the test-implementation shall TEST_COVERAGE.mdのマッピングを更新する
+4. The test-implementation shall SOUL.md Section 5.6（Phase 0完了基準）の未達成項目に貢献する：
    - pasta_shiori 100%パス（該当する場合）
    - 未テスト領域の特定と受容判断
-4. Where テスト実装が困難な領域がある場合, the test-implementation shall 「受容理由」をドキュメント化し、Phase 1以降への延期を判断する
+5. Where テスト実装が困難な領域がある場合, the test-implementation shall 「受容理由」をドキュメント化し、Phase 1以降への延期を判断する
 
 ---
 
