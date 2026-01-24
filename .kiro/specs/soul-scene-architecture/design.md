@@ -173,9 +173,13 @@ _このフィーチャーはドキュメント改訂のみであり、エラー�
 - [ ] SOUL.md改訂後、Markdown lintエラーがないこと
 - [ ] 章番号の一貫性確認
 - [ ] 内部リンクの有効性確認
+- [ ] workspace全体をgrep検索し、SOUL.mdへの章番号参照を確認（検索パターン: `SOUL.md.*[第5章|Chapter 5|5\.|§5]`等）
+- [ ] 発見された外部参照箇所を更新（該当する場合）
 
 ### Review Tests
-- [ ] SPECIFICATION.mdとの用語一貫性確認
+- [ ] SPECIFICATION.mdとの用語一貫性確認（詳細は下記）
+  - シーン、アクター、act、talk、call、word等の用語がSPECIFICATION.mdの定義と一致
+  - 特に「Call/Jump」の表記が統一されていることを確認（SPECIFICATION.mdでの正式名称と照合）
 - [ ] 映画撮影メタファーの4要素がすべて説明されていること
 - [ ] 既存章（6～9章）との整合性確認
 
