@@ -68,3 +68,63 @@ fn test_e2e_pipeline_basic() {
         result.0
     );
 }
+
+// ============================================================================
+// E2E Fixture Tests (Task 2.1)
+// ============================================================================
+
+/// Test that runtime_e2e_scene.pasta fixture parses and transpiles correctly
+#[test]
+fn test_fixture_scene_parses() {
+    let source = include_str!("fixtures/e2e/runtime_e2e_scene.pasta");
+    let lua_code = transpile(source);
+
+    // Verify 3 挨拶 scenes are registered
+    assert!(
+        lua_code.contains("挨拶おはよう"),
+        "Should contain 挨拶おはよう scene"
+    );
+    assert!(
+        lua_code.contains("挨拶こんにちは"),
+        "Should contain 挨拶こんにちは scene"
+    );
+    assert!(
+        lua_code.contains("挨拶こんばんは"),
+        "Should contain 挨拶こんばんは scene"
+    );
+}
+
+/// Test that runtime_e2e_word.pasta fixture parses and transpiles correctly
+#[test]
+fn test_fixture_word_parses() {
+    let source = include_str!("fixtures/e2e/runtime_e2e_word.pasta");
+    let lua_code = transpile(source);
+
+    // Verify word definitions are present
+    assert!(
+        lua_code.contains("挨拶言葉"),
+        "Should contain 挨拶言葉 word definition"
+    );
+    assert!(lua_code.contains("場所"), "Should contain 場所 word definition");
+}
+
+/// Test that runtime_e2e_actor_word.pasta fixture parses and transpiles correctly
+#[test]
+fn test_fixture_actor_word_parses() {
+    let source = include_str!("fixtures/e2e/runtime_e2e_actor_word.pasta");
+    let lua_code = transpile(source);
+
+    // Verify actor definitions are present
+    assert!(
+        lua_code.contains("create_actor(\"さくら\")"),
+        "Should contain さくら actor"
+    );
+    assert!(
+        lua_code.contains("create_actor(\"うにゅう\")"),
+        "Should contain うにゅう actor"
+    );
+    assert!(
+        lua_code.contains("create_actor(\"まゆら\")"),
+        "Should contain まゆら actor"
+    );
+}

@@ -31,11 +31,12 @@
   - リグレッション確認（全14テストが成功）
   - _Requirements: 7.2_
 
-- [ ] 2. Runtime E2Eテストの実装
-- [ ] 2.1 (P) テストフィクスチャの作成
+- [x] 2. Runtime E2Eテストの実装
+- [x] 2.1 (P) テストフィクスチャの作成 ✅
   - `crates/pasta_lua/tests/fixtures/e2e/runtime_e2e_scene.pasta`作成（3つの「挨拶」シーン）
   - `runtime_e2e_word.pasta`作成（単語辞書定義）
   - `runtime_e2e_actor_word.pasta`作成（アクター単語定義）
+  - フィクスチャパーステスト3件追加（全8テストパス）
   - _Requirements: 7.2_
 
 - [ ] 2.2 (P) シーン辞書E2Eテスト
