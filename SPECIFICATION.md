@@ -799,8 +799,8 @@ Sakura スクリプトはアクション行のインライン要素の一つで�
 
 **例**:
 ```
-Alice：こんにちは、＄player_nameさん！\w8
-Bob：今日の天気は＠weather_wordsですね\n
+Alice：こんにちは、＄player_name　さん！\w8
+Bob：今日の天気は＠weather_words　ですね\n
 Carol：＠greet（time：morning）
 ```
 
