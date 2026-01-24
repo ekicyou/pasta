@@ -14,12 +14,14 @@
 
 ## Tasks
 
-- [ ] 1. 共通テストヘルパーモジュールの構築
-- [ ] 1.1 (P) E2Eヘルパーモジュールの作成
-  - `crates/pasta_lua/tests/common/e2e_helpers.rs`を新規作成
+- [x] 1. 共通テストヘルパーモジュールの構築
+- [x] 1.1 (P) E2Eヘルパーモジュールの作成 ✅
+  - `crates/pasta_lua/tests/common/mod.rs`作成
+  - `crates/pasta_lua/tests/common/e2e_helpers.rs`作成
   - `create_runtime_with_finalize()`関数を実装（Lua VM + finalize_scene登録）
   - `transpile()`関数を実装（Pasta→Lua変換）
   - `execute_scene()`関数のスケルトンを追加
+  - `crates/pasta_lua/tests/runtime_e2e_test.rs`作成（5テストすべてパス）
   - _Requirements: 7.2_
 
 - [ ] 1.2 (P) 既存テストのリファクタリング
