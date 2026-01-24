@@ -4,11 +4,17 @@ _Memories of pasta twine together—now and then a knot, yet always a delight._
 
 このドキュメントは、pastaプロジェクトの「憲法」です。すべての設計判断、実装方針、開発活動の根拠となる「あるべき姿」を定義します。
 
-**関連ドキュメント**:
-- [README.md](README.md) - プロジェクト概要
-- [SPECIFICATION.md](SPECIFICATION.md) - 技術仕様書（権威的ソース）
-- [GRAMMAR.md](GRAMMAR.md) - DSL文法リファレンス
-- [AGENTS.md](AGENTS.md) - AI開発支援
+### ドキュメントヒエラルキー
+
+pastaプロジェクトのドキュメントは、以下の優先順位と役割を持ちます：
+
+1. **[SOUL.md](SOUL.md)** - プロジェクトの憲法（Why: ビジョン、コアバリュー、あるべき姿）
+2. **[SPECIFICATION.md](SPECIFICATION.md)** - 権威的技術仕様（What/How: 設計の正）
+3. **[GRAMMAR.md](GRAMMAR.md)** - 利用者向けクイックリファレンス（例文豊富な学習用資料）
+4. **[README.md](README.md)** - プロジェクト概要（導入・アーキテクチャ）
+5. **[AGENTS.md](AGENTS.md)** - AI開発支援（Kiro workflow、ステアリング）
+
+**ルール**: 仕様の衝突時は SPECIFICATION.md を優先し、GRAMMAR.md・README.md を修正する
 
 ---
 
