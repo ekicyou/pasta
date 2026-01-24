@@ -196,6 +196,10 @@ classDiagram
 
 Requirement 7 AC 2の核心部分。シーン辞書/単語辞書の実行時動作を検証。
 
+**対象クレート**:
+- `pasta_lua`: Runtime E2Eテスト（シーン/単語辞書）
+- `pasta_shiori`: SHIORI.DLLインターフェーステスト（5テスト修正）
+
 ```mermaid
 classDiagram
     class RuntimeE2ETests {
@@ -205,14 +209,22 @@ classDiagram
         +test_complete_flow_pasta_to_output()
     }
     
+    class PastaShioriTests {
+        +test_shiori_load_sets_globals()
+        +test_shiori_request_calls_pasta_scene()
+        +test_shiori_request_increments_counter()
+        +test_shiori_unload_creates_marker()
+        +test_shiori_lifecycle_lua_execution_verified()
+    }
+    
     class TestHelper {
         +create_runtime_with_finalize() Lua
         +transpile(source: str) String
         +execute_scene(runtime: Lua, scene: str) Vec~String~
-        +count_distribution(results: Vec~String~, n: usize) HashMap
     }
     
     RuntimeE2ETests --> TestHelper
+    PastaShioriTests ..> RuntimeE2ETests : 依存
 ```
 
 #### Interface Contract: Scene E2E
@@ -288,6 +300,28 @@ classDiagram
 2. Luaコードが実行される
 3. シーン/単語が正しく解決される
 4. yield出力が期待形式である
+
+#### Interface Contract: PastaSHIORI E2E
+
+| 関数名 | シグネチャ | 責務 |
+|--------|-----------|------|
+| test_shiori_lifecycle_fix | `fn()` | SHIORI.DLLライフサイクル全体の検証（修正版） |
+
+**対象**: `crates/pasta_shiori/tests/shiori_lifecycle_test.rs`
+
+**失敗中の5テスト**:
+- `test_shiori_load_sets_globals`
+- `test_shiori_request_calls_pasta_scene`
+- `test_shiori_request_increments_counter`
+- `test_shiori_unload_creates_marker`
+- `test_shiori_lifecycle_lua_execution_verified`
+
+**失敗原因**: `shiori.load()`の呼び出し失敗（詳細調査が必要）
+
+**修正方針**:
+1. 失敗原因の特定（デバッグログ追加、スタックトレース確認）
+2. SHIORI.DLL初期化シーケンスの修正
+3. 5テストすべてがパスすることを確認
 
 ### C-3: TestHelper（テストヘルパー）
 
@@ -424,6 +458,10 @@ crates/pasta_lua/tests/
 │   │   └── runtime_e2e_actor.pasta
 │   └── ... (既存)
 └── ... (既存)
+
+crates/pasta_shiori/tests/
+├── shiori_lifecycle_test.rs     # 修正: 5テスト修正
+└── ... (既存)
 ```
 
 ---
@@ -514,6 +552,7 @@ fn test_word_cache_consumption() {
 |-----------|--------|---------|
 | テストカバレッジ（Req 7） | 100% | AC 1-5すべてにテスト存在 |
 | キャッシュ消費テスト | 100% | 全要素が1回ずつ消費される |
+| pasta_shiori修正 | 100% | 5テストすべてパス |
 | テスト実行時間 | <5秒 | `cargo test`計測 |
 | フレーキー率 | <1% | CI履歴分析 |
 
@@ -542,6 +581,7 @@ fn test_word_cache_consumption() {
 | フレーキーテスト | 低 | キャッシュ消費テストは決定的 |
 | テスト実行時間増大 | 低 | シンプルなキャッシュ消費テストのみ |
 | Lua環境依存 | 低 | 既存ヘルパーパターンを再利用 |
+| pasta_shiori失敗原因不明 | 中 | デバッグログ追加、段階的調査 |
 
 ---
 
@@ -558,6 +598,7 @@ fn test_word_cache_consumption() {
 | 2 | 単語ランダム+置換 | test_word_random_selection_and_replacement | runtime_e2e_word.pasta |
 | 2 | アクター単語スコープ | test_actor_word_scope_resolution | runtime_e2e_actor.pasta |
 | 2 | 完全フロー | test_complete_flow_pasta_to_output | runtime_e2e_scene.pasta |
+| 2 | pasta_shiori修正 | test_shiori_lifecycle_fix | - |
 | 3 | TEST_COVERAGE.md更新 | - | ドキュメント |
 | 4 | SOUL.md DoD更新 | - | ドキュメント |
 | 5 | 受容理由ドキュメント | - | TEST_COVERAGE.md Section 4 |
