@@ -8,6 +8,9 @@ use tempfile::TempDir;
 /// This function copies both the fixture files and the support files
 /// (scripts and scriptlibs) needed for SHIORI operation.
 ///
+/// **Important**: Support files are copied first, then fixture files.
+/// This ensures fixture-specific overrides (e.g., main.lua) take precedence.
+///
 /// # Arguments
 /// * `fixture_name` - Name of fixture under tests/fixtures/
 ///
@@ -15,18 +18,19 @@ use tempfile::TempDir;
 /// TempDir containing copied fixture with all necessary support files
 pub fn copy_fixture_to_temp(fixture_name: &str) -> TempDir {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-
-    // Copy fixture files
-    let fixture_src = manifest_dir.join("tests/fixtures").join(fixture_name);
     let temp = TempDir::new().expect("Failed to create temp directory");
 
+    // Copy support files first (scripts, scriptlibs)
+    // These provide the base runtime environment
+    let support_root = manifest_dir.join("tests/support");
+    copy_support_dirs(&support_root, temp.path());
+
+    // Copy fixture files last (overrides support files if needed)
+    // This allows fixture-specific main.lua or other customizations
+    let fixture_src = manifest_dir.join("tests/fixtures").join(fixture_name);
     if fixture_src.exists() {
         copy_dir_recursive(&fixture_src, temp.path()).expect("Failed to copy fixture");
     }
-
-    // Copy support files (scripts, scriptlibs)
-    let support_root = manifest_dir.join("tests/support");
-    copy_support_dirs(&support_root, temp.path());
 
     temp
 }

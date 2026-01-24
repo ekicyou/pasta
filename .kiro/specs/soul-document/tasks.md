@@ -85,26 +85,27 @@
   - 複数のエラーパターンを検証
   - _Requirements: 7.1_
 
-- [ ] 4. pasta_shiori失敗テストの修正
-- [ ] 4.1 失敗原因の調査
+- [x] 4. pasta_shiori失敗テストの修正
+- [x] 4.1 失敗原因の調査
   - `crates/pasta_shiori/tests/shiori_lifecycle_test.rs`の5テストを確認
   - デバッグログを追加し、`shiori.load()`失敗の詳細を特定
   - スタックトレース確認と失敗シーケンスの分析
+  - **根本原因**: `pasta_shiori/tests/support/scripts/pasta/`に不完全なLuaモジュールセット
   - _Requirements: 7.3_
 
-- [ ] 4.2 SHIORI.DLL初期化修正
-  - `shiori.load()`の呼び出しシーケンスを修正
-  - グローバル変数設定の確認とエラーハンドリング追加
-  - 必要に応じてSHIORI.DLL初期化ロジックを再実装
+- [x] 4.2 SHIORI.DLL初期化修正
+  - `pasta_lua/scripts/pasta/`から完全なLuaモジュールセットをコピー
+  - `copy_fixture_to_temp()`のコピー順序を修正（サポートファイル→フィクスチャの順）
+  - フィクスチャ固有のオーバーライド（main.lua等）が優先されるように
   - _Requirements: 7.3_
 
-- [ ] 4.3 失敗テスト修正の検証
-  - 5テストすべてが成功することを確認
-  - `test_shiori_load_sets_globals`
-  - `test_shiori_request_calls_pasta_scene`
-  - `test_shiori_request_increments_counter`
-  - `test_shiori_unload_creates_marker`
-  - `test_shiori_lifecycle_lua_execution_verified`
+- [x] 4.3 失敗テスト修正の検証
+  - 5テストすべてが成功することを確認 ✅
+  - `test_shiori_load_sets_globals` ✅
+  - `test_shiori_request_calls_pasta_scene` ✅
+  - `test_shiori_request_increments_counter` ✅
+  - `test_shiori_unload_creates_marker` ✅
+  - `test_shiori_lifecycle_lua_execution_verified` ✅
   - _Requirements: 7.3_
 
 - [ ] 5. ドキュメント整合性の確認と更新

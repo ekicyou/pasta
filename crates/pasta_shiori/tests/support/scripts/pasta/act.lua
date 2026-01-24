@@ -15,18 +15,21 @@ local SCENE = require("pasta.scene")
 --- @field current_scene table|nil 現在のシーンテーブル
 local ACT = {}
 
---- __indexメタメソッド: アクタープロキシ動的生成
+--- __indexメタメソッド: メソッド検索とアクタープロキシ動的生成
 --- @param key string
 --- @return any
 function ACT:__index(key)
-    -- アクター名としてプロキシ生成
+    -- 1. ACTメソッドを検索
+    local method = ACT[key]
+    if method then return method end
+
+    -- 2. アクター名としてプロキシ生成
     local actor = self.ctx.actors[key]
     if actor then
         return ACTOR.create_proxy(actor, self)
     end
 
-    -- フォールバック：ACTメソッド
-    return ACT[key]
+    return nil
 end
 
 --- 新規Actを作成
