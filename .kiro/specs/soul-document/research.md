@@ -190,7 +190,18 @@ fn test_golden_output() {
 - `pasta_lua`クレートがランタイム実行を担当
 - 統合テストとして`tests/`ディレクトリに配置
 
-### DD-2: フィクスチャ配置
+### DD-2: TestHelper配置
+
+**決定**: `tests/common/e2e_helpers.rs`に共通ヘルパーを配置し、既存テストもリファクタリング
+
+**理由**:
+- コードの重複排除による保守性向上
+- `finalize_scene_test.rs`（500行）のリファクタリング価値
+- 新規テスト追加と同時にリファクタリングする方が効率的
+
+**影響**:
+- `finalize_scene_test.rs`: ヘルパー関数を共通モジュールに移動
+- `runtime_e2e_test.rs`: 共通ヘルパーを使用
 
 **決定**: `crates/pasta_lua/tests/fixtures/e2e/` に新規フィクスチャを配置
 
@@ -208,7 +219,7 @@ fn test_golden_output() {
 - キャッシュ消費の正しさ（全要素が1回ずつ消費される）を検証
 - 決定的テストのためフレーキーテストのリスクなし
 
-### DD-4: pasta_shiori失敗テストの扱い
+### DD-5: pasta_shiori失敗テストの扱い
 
 **決定**: Runtime E2Eテストとは別タスクとして扱う
 
