@@ -1,7 +1,0 @@
-# All actions fixture for transpiler2 tests
-# Tests all Action types in parser2
-
-＊アクションテスト
-  さくら：「通常の台詞」
-  さくら：@挨拶
-  さくら：@@エスケープテスト

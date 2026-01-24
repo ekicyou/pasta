@@ -98,9 +98,9 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 - サブモジュール: ディレクトリ作成し`mod.rs`配置
 
 ### テストファイル
-- 統合テスト: `tests/<feature>_test.rs`（アンダースコア区切り、単数形）
-- フィクスチャ: `tests/fixtures/<scenario>.pasta`
-- 共通ユーティリティ: `tests/common/mod.rs`
+- 統合テスト: `crates/<crate>/tests/<feature>_test.rs`（アンダースコア区切り、単数形）
+- フィクスチャ: `crates/<crate>/tests/fixtures/<scenario>.pasta`
+- 共通ユーティリティ: `crates/<crate>/tests/common/mod.rs`
 
 ### 文法定義
 - Pest文法: `src/parser/pasta.pest`
@@ -168,9 +168,9 @@ pasta_core（再エクスポート）
 | Control Flow | Call/Jump、並行実行   | `pasta_integration_control_flow_test.rs`    |
 
 ### テストファイル配置
-- `tests/<feature>_test.rs`: 統合テスト
-- `tests/fixtures/*.pasta`: テスト用スクリプト
-- `tests/common/`: 共通ユーティリティ
+- `crates/<crate>/tests/<feature>_test.rs`: 統合テスト
+- `crates/<crate>/tests/fixtures/*.pasta`: テスト用スクリプト
+- `crates/<crate>/tests/common/`: 共通ユーティリティ
 
 **注**: 旧parser/transpiler実装に依存していたテスト21ファイルは削除済み（2024-12-24 legacy-parser-transpiler-cleanup完了）
 

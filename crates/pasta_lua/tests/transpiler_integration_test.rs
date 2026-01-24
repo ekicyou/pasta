@@ -530,9 +530,11 @@ fn test_transpile_sample_pasta_line_comparison() {
     transpiler.transpile(&file, &mut output).unwrap();
     let generated_lua = String::from_utf8(output).unwrap();
 
-    // Save generated output for debugging
-    std::fs::write("tests/fixtures/sample.generated.lua", &generated_lua)
-        .expect("Failed to write sample.generated.lua");
+    // Save generated output for debugging (overwrites existing file in fixtures)
+    // Note: sample.generated.lua is already tracked in crates/pasta_lua/tests/fixtures/
+    let output_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/sample.generated.lua");
+    std::fs::write(&output_path, &generated_lua).expect("Failed to write sample.generated.lua");
 
     // Normalize line endings for comparison (handles Git autocrlf differences)
     let generated_normalized = normalize_line_endings(&generated_lua);
@@ -557,7 +559,7 @@ fn test_transpile_sample_pasta_line_comparison() {
     // Match rate check is currently lenient; will be replaced with strict equality check
     assert!(
         stats.match_rate() >= 0.0,
-        "Comparison completed. See report above for details. Generated output saved to tests/fixtures/sample.generated.lua"
+        "Comparison completed. See report above for details. Generated output saved to crates/pasta_lua/tests/fixtures/sample.generated.lua"
     );
 
     // Report statistics even on success
@@ -1186,7 +1188,7 @@ fn test_no_call_scene_no_return() {
 /// Test 4.5: テストフィクスチャを使用した末尾再帰最適化の E2E 検証
 #[test]
 fn test_tail_call_optimization_fixture() {
-    let source = include_str!("../../../tests/fixtures/tail_call_optimization.pasta");
+    let source = include_str!("fixtures/tail_call_optimization.pasta");
     let file = parse_str(source, "tail_call_optimization.pasta").unwrap();
     let transpiler = LuaTranspiler::default();
     let mut output = Vec::new();
