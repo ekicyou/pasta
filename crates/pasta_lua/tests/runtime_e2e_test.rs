@@ -105,7 +105,10 @@ fn test_fixture_word_parses() {
         lua_code.contains("挨拶言葉"),
         "Should contain 挨拶言葉 word definition"
     );
-    assert!(lua_code.contains("場所"), "Should contain 場所 word definition");
+    assert!(
+        lua_code.contains("場所"),
+        "Should contain 場所 word definition"
+    );
 }
 
 /// Test that runtime_e2e_actor_word.pasta fixture parses and transpiles correctly
@@ -376,12 +379,7 @@ fn test_comment_line_explicit_parse() {
     let scene_count = file
         .items
         .iter()
-        .filter(|item| {
-            matches!(
-                item,
-                pasta_core::parser::ast::FileItem::GlobalSceneScope(_)
-            )
-        })
+        .filter(|item| matches!(item, pasta_core::parser::ast::FileItem::GlobalSceneScope(_)))
         .count();
 
     assert_eq!(scene_count, 1, "Should have exactly 1 scene");
@@ -422,10 +420,7 @@ fn test_attribute_inheritance() {
 
     // File attributes should be merged into scene
     // The transpiled code should reference both inherited and overridden attrs
-    assert!(
-        lua_code.contains("create_scene"),
-        "Should create scene"
-    );
+    assert!(lua_code.contains("create_scene"), "Should create scene");
 
     // Verify the transpiled code compiles and runs
     let lua = create_runtime_with_finalize().unwrap();
@@ -446,7 +441,10 @@ fn test_attribute_inheritance() {
         .eval()
         .unwrap();
 
-    assert!(found, "Scene with inherited attributes should be searchable");
+    assert!(
+        found,
+        "Scene with inherited attributes should be searchable"
+    );
 }
 
 // ============================================================================

@@ -1,0 +1,32 @@
+---
+source: crates/pasta_lua/tests/transpiler_snapshot_test.rs
+assertion_line: 165
+expression: lua_code
+---
+local PASTA = require "pasta"
+
+do
+    local ACTOR = PASTA.create_actor("さくら")
+    ACTOR:create_word("一人称"):entry("私", "わたし", "あたし")
+end
+
+do
+    local ACTOR = PASTA.create_actor("うにゅう")
+    ACTOR:create_word("一人称"):entry("僕", "ぼく")
+end
+
+do
+    local SCENE = PASTA.create_scene("メイン")
+
+    function SCENE.__start__(act, ...)
+        local args = { ... }
+        local save, var = act:init_scene(SCENE)
+
+        act.さくら:talk("「")
+        act.さくら:talk(act.さくら:word("一人称は元気です"))
+        act.さくら:talk("」")
+        act.うにゅう:talk("「")
+        act.うにゅう:talk(act.うにゅう:word("一人称も元気だよ"))
+        act.うにゅう:talk("」")
+    end
+end

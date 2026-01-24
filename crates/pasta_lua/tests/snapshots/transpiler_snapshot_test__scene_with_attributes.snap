@@ -1,0 +1,17 @@
+---
+source: crates/pasta_lua/tests/transpiler_snapshot_test.rs
+assertion_line: 117
+expression: lua_code
+---
+local PASTA = require "pasta"
+
+do
+    local SCENE = PASTA.create_scene("メイン")
+
+    function SCENE.__start__(act, ...)
+        local args = { ... }
+        local save, var = act:init_scene(SCENE)
+
+        act.さくら:talk("「今日の天気は晴れです」")
+    end
+end

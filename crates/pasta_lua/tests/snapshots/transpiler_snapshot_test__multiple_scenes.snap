@@ -1,0 +1,50 @@
+---
+source: crates/pasta_lua/tests/transpiler_snapshot_test.rs
+assertion_line: 142
+expression: lua_code
+---
+local PASTA = require "pasta"
+
+do
+    local SCENE = PASTA.create_scene("挨拶")
+
+    function SCENE.__start__(act, ...)
+        local args = { ... }
+        local save, var = act:init_scene(SCENE)
+
+        act.さくら:talk("「おはようございます」")
+    end
+end
+
+do
+    local SCENE = PASTA.create_scene("挨拶")
+
+    function SCENE.__start__(act, ...)
+        local args = { ... }
+        local save, var = act:init_scene(SCENE)
+
+        act.さくら:talk("「こんにちは」")
+    end
+end
+
+do
+    local SCENE = PASTA.create_scene("挨拶朝")
+
+    function SCENE.__start__(act, ...)
+        local args = { ... }
+        local save, var = act:init_scene(SCENE)
+
+        act.さくら:talk("「おはよう！朝だね」")
+    end
+end
+
+do
+    local SCENE = PASTA.create_scene("メイン")
+
+    function SCENE.__start__(act, ...)
+        local args = { ... }
+        local save, var = act:init_scene(SCENE)
+
+        return act:call(SCENE.__global_name__, "挨拶", {}, table.unpack(args))
+    end
+end

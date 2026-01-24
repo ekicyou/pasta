@@ -1,0 +1,83 @@
+---
+source: crates/pasta_lua/tests/transpiler_snapshot_test.rs
+assertion_line: 179
+expression: lua_code
+---
+local PASTA = require "pasta"
+
+do
+    local ACTOR = PASTA.create_actor("さくら")
+    ACTOR:create_word("通常"):entry([=[\s[0]]=])
+end
+
+do
+    local ACTOR = PASTA.create_actor("うにゅう")
+    ACTOR:create_word("通常"):entry([=[\s[10]]=])
+end
+
+do
+    local SCENE = PASTA.create_scene("メイン")
+
+    function SCENE.__start__(act, ...)
+        local args = { ... }
+        local save, var = act:init_scene(SCENE)
+
+        act:call(SCENE.__global_name__, "単一呼び出し", {}, table.unpack(args))
+        act:call(SCENE.__global_name__, "複数呼び出し", {}, table.unpack(args))
+        act:call(SCENE.__global_name__, "呼び出し後にアクション", {}, table.unpack(args))
+        return act:call(SCENE.__global_name__, "呼び出しなし", {}, table.unpack(args))
+    end
+
+    function SCENE.__単一呼び出し_1__(act, ...)
+        local args = { ... }
+        local save, var = act:init_scene(SCENE)
+
+        return act:call(SCENE.__global_name__, "シーン2", {}, table.unpack(args))
+    end
+
+    function SCENE.__複数呼び出し_1__(act, ...)
+        local args = { ... }
+        local save, var = act:init_scene(SCENE)
+
+        act:call(SCENE.__global_name__, "シーン1", {}, table.unpack(args))
+        act:call(SCENE.__global_name__, "シーン2", {}, table.unpack(args))
+        return act:call(SCENE.__global_name__, "シーン3", {}, table.unpack(args))
+    end
+
+    function SCENE.__呼び出し後にアクション_1__(act, ...)
+        local args = { ... }
+        local save, var = act:init_scene(SCENE)
+
+        act:call(SCENE.__global_name__, "シーン2", {}, table.unpack(args))
+        act.さくら:talk("こんにちは")
+    end
+
+    function SCENE.__呼び出しなし_1__(act, ...)
+        local args = { ... }
+        local save, var = act:init_scene(SCENE)
+
+        act.さくら:talk("こんにちは")
+        act.うにゅう:talk("やふぅ")
+    end
+
+    function SCENE.__シーン1_1__(act, ...)
+        local args = { ... }
+        local save, var = act:init_scene(SCENE)
+
+        act.さくら:talk("シーン1です")
+    end
+
+    function SCENE.__シーン2_1__(act, ...)
+        local args = { ... }
+        local save, var = act:init_scene(SCENE)
+
+        act.うにゅう:talk("シーン2やで")
+    end
+
+    function SCENE.__シーン3_1__(act, ...)
+        local args = { ... }
+        local save, var = act:init_scene(SCENE)
+
+        act.さくら:talk("シーン3だよ")
+    end
+end
