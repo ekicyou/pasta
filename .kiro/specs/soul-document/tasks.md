@@ -112,21 +112,23 @@
   - `test_shiori_lifecycle_lua_execution_verified` ✅
   - _Requirements: 7.3_
 
-- [ ] 5. ドキュメント整合性の確認と更新
-- [ ] 5.1 TEST_COVERAGE.md更新
-  - Section 4の未テスト領域マッピングを更新
-  - 新規追加テストと機能の対応表を作成
-  - 実装状態カテゴリ（完了/部分完了/未検証/未実装）を更新
+- [x] 5. ドキュメント整合性の確認と更新 ✅
+- [x] 5.1 TEST_COVERAGE.md更新 ✅
+  - Section 4の未テスト領域マッピングを更新（全5項目を「完了」に変更）
+  - 新規追加テストと機能の対応表を作成（runtime_e2e_test 16テスト追加）
+  - テスト総数を313→483に更新、100%パス率達成
+  - pasta_shiori修正内容を記録
   - _Requirements: 7.4_
 
-- [ ] 5.2 SOUL.md整合性確認
-  - Phase 0完了基準（Section 5.6）との整合性確認
-  - pasta_shiori 100%パス達成の記録
-  - 未テスト領域の受容判断結果を反映
+- [x] 5.2 SOUL.md整合性確認 ✅
+  - Phase 0完了基準（Section 5.6）を更新
+  - pasta_shiori 100%パス達成を記録（28テスト）
+  - 未テスト領域の受容判断結果を反映（Runtime E2Eテスト16件追加）
+  - テスト総数を313→483に更新
   - コアバリュー・設計原則への影響確認（該当なし）
   - _Requirements: 7.5_
 
-- [ ] 5.3 その他ドキュメント確認
+- [x] 5.3 その他ドキュメント確認 ✅
   - SPECIFICATION.md: 言語仕様への影響確認（該当なし）
   - GRAMMAR.md: 文法リファレンスへの影響確認（該当なし）
   - クレートREADME: API変更の反映確認（該当なし）
