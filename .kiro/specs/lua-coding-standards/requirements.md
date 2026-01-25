@@ -24,9 +24,10 @@ Luaスクリプトのコーディングルールを決めておいて、バグ�
 #### Acceptance Criteria
 1. The coding standard shall define snake_case for local variables and functions
 2. The coding standard shall define UPPER_CASE for module table names matching the module filename (e.g., `actor.lua` → `ACTOR`)
-3. The coding standard shall define `_IMPL` suffix for class implementation metatables (e.g., `ACTOR_IMPL`)
+3. The coding standard shall define `_IMPL` suffix for ALL class implementation metatables, including internal classes (e.g., `ACTOR_IMPL`, `WORD_BUILDER_IMPL`)
 4. When defining private module members, the coding standard shall require underscore prefix (e.g., `_internal_func`)
 5. The coding standard shall permit Japanese identifiers for domain-specific terms (e.g., `アクター名`, `シーン`)
+6. The coding standard shall prohibit PascalCase for class metatables; all class implementations must use `MODULE_NAME_IMPL` pattern
 
 ### Requirement 3: モジュール構造規約
 **Objective:** As a 開発者, I want モジュールの構造パターンが標準化されている, so that 循環参照を防ぎ保守性が向上する
@@ -171,10 +172,10 @@ The following files require class pattern refactoring:
 | File | Current Issue | Required Change |
 |------|---------------|-----------------|
 | `act.lua` | ACT is class-like but used as singleton | Separate ACT/ACT_IMPL, use ACT.new() |
-| `actor.lua` | ACTOR mixes module and class functions | Separate ACTOR/ACTOR_IMPL, explicit self |
+| `actor.lua` | ACTOR mixes module and class functions, has `WordBuilder` PascalCase | Separate ACTOR/ACTOR_IMPL, rename WordBuilder→WORD_BUILDER_IMPL, ActorWordBuilder→ACTOR_WORD_BUILDER_IMPL |
 | `ctx.lua` | CTX has .new() but uses colon syntax | Convert to dot syntax with explicit self |
 | `scene.lua` | MOD naming, mixed patterns | Rename to SCENE, clarify structure |
-| `word.lua` | MOD naming, WordBuilder pattern | Rename to WORD, apply _IMPL pattern |
+| `word.lua` | MOD naming, WordBuilder PascalCase pattern | Rename MOD→WORD, WordBuilder→WORD_BUILDER_IMPL, apply _IMPL pattern |
 | `store.lua` | Singleton pattern is correct | Minor naming alignment |
 | `global.lua` | Simple table, no class | No major changes needed |
 | `init.lua` | Entry point, no class | No major changes needed |
