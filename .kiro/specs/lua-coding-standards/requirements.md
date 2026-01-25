@@ -42,14 +42,17 @@ Luaスクリプトのコーディングルールを決めておいて、バグ�
 ### Requirement 4: クラス設計パターン
 **Objective:** As a 開発者, I want Rust風の明示的なクラス設計パターンが定義されている, so that クラスとシングルトンの混同を防ぎ、インスタンス生成が明確になる
 
+**Design Philosophy**: このパターンはRustの影響を受けており、実装側での明示性と利用側での利便性を両立します。
+
 #### Acceptance Criteria
 1. The coding standard shall require separating module table (`MODULE`) from class implementation metatable (`MODULE_IMPL`)
 2. The coding standard shall require `MODULE.new(args)` as the constructor function that creates and returns new instances
-3. When defining class methods, the coding standard shall require explicit `self` parameter with dot syntax (`function MODULE_IMPL.method(self, arg)`) instead of colon syntax
-4. The coding standard shall require `setmetatable(obj, { __index = MODULE_IMPL })` pattern in constructor
-5. The coding standard shall require module-level functions (`MODULE.func(args)`) to be separate from instance methods
-6. When singleton state is needed, the coding standard shall require using the module table itself or module-local variables (leveraging Lua's `require` caching behavior)
-7. The coding standard shall prohibit `MODULE.instance()` anti-pattern; use module-as-singleton or `pasta.store` pattern instead
+3. When defining class methods in `_IMPL`, the coding standard shall require explicit `self` parameter with dot syntax (`function MODULE_IMPL.method(self, arg)`) to prevent implicit self bugs
+4. When calling instance methods, the coding standard shall permit colon syntax (`instance:method(arg)`) for convenience, which automatically passes `self`
+5. The coding standard shall require `setmetatable(obj, { __index = MODULE_IMPL })` pattern in constructor
+6. The coding standard shall require module-level functions (`MODULE.func(args)`) to be separate from instance methods
+7. When singleton state is needed, the coding standard shall require using the module table itself or module-local variables (leveraging Lua's `require` caching behavior)
+8. The coding standard shall prohibit `MODULE.instance()` anti-pattern; use module-as-singleton or `pasta.store` pattern instead
 
 #### Singleton Pattern (via require caching)
 ```lua
@@ -104,7 +107,7 @@ function EXAMPLE.new(name, value)
     return obj
 end
 
---- Instance method (explicit self, dot syntax)
+--- Instance method (explicit self, dot syntax in implementation)
 --- @param self Example
 --- @param delta number
 --- @return number
@@ -122,6 +125,11 @@ function EXAMPLE.merge(a, b)
 end
 
 return EXAMPLE
+
+-- Usage example:
+-- local ex = EXAMPLE.new("test", 10)
+-- ex:add(5)  -- Colon syntax allowed for calls (convenience)
+-- -- Equivalent to: EXAMPLE_IMPL.add(ex, 5)
 ```
 
 ### Requirement 5: EmmyLua型アノテーション規約
@@ -161,10 +169,11 @@ return EXAMPLE
 1. When refactoring `scripts/pasta/*.lua`, the refactoring system shall ensure EmmyLua annotations are complete and consistent
 2. When refactoring, the refactoring system shall ensure all public functions have proper documentation
 3. When refactoring, the refactoring system shall ensure naming conventions are followed (MODULE, MODULE_IMPL pattern)
-4. When refactoring class-like modules, the refactoring system shall apply Requirement 4 class design pattern (separate MODULE from MODULE_IMPL, explicit self, dot syntax)
-5. When refactoring, the refactoring system shall convert colon syntax (`:`) to dot syntax with explicit `self` parameter
-6. The refactoring system shall preserve existing behavior (no functional changes)
-7. After refactoring, the test system shall pass all existing tests without modification
+4. When refactoring class-like modules, the refactoring system shall apply Requirement 4 class design pattern (separate MODULE from MODULE_IMPL, explicit self in implementation)
+5. When refactoring method implementations, the refactoring system shall convert colon syntax to dot syntax with explicit `self` parameter in `_IMPL` definitions
+6. When refactoring method calls, the refactoring system shall permit colon syntax (`:`) for convenience (caller side)
+7. The refactoring system shall preserve existing behavior (no functional changes)
+8. After refactoring, the test system shall pass all existing tests without modification
 
 #### Refactoring Target Files
 The following files require class pattern refactoring:
