@@ -15,6 +15,7 @@ local ACTOR = {}
 
 --- アクター実装メタテーブル
 local ACTOR_IMPL = {}
+ACTOR_IMPL.__index = ACTOR_IMPL
 
 -------------------------------------------
 -- ACTOR_WORD_BUILDER_IMPL - アクター単語ビルダー
@@ -27,6 +28,7 @@ local ACTOR_IMPL = {}
 --- @field _key string 単語キー
 --- @field _word_builder WordBuilder 内部のWordBuilder
 local ACTOR_WORD_BUILDER_IMPL = {}
+ACTOR_WORD_BUILDER_IMPL.__index = ACTOR_WORD_BUILDER_IMPL
 
 --- 値を追加（辞書登録＋ACTORプロパティ設定）
 --- @param self ActorWordBuilder ビルダーオブジェクト
@@ -59,7 +61,7 @@ function ACTOR_IMPL.create_word(self, key)
         _key = key,
         _word_builder = WORD.create_actor(self.name, key),
     }
-    return setmetatable(builder, { __index = ACTOR_WORD_BUILDER_IMPL })
+    return setmetatable(builder, ACTOR_WORD_BUILDER_IMPL)
 end
 
 --- アクターを取得または新規作成
@@ -71,7 +73,7 @@ function ACTOR.get_or_create(name)
             name = name,
             spot = nil,
         }
-        setmetatable(actor, { __index = ACTOR_IMPL })
+        setmetatable(actor, ACTOR_IMPL)
         STORE.actors[name] = actor
     end
     return STORE.actors[name]
@@ -85,6 +87,7 @@ end
 --- @field actor Actor アクターオブジェクト
 --- @field act Act アクションオブジェクト
 local PROXY_IMPL = {}
+PROXY_IMPL.__index = PROXY_IMPL
 
 --- プロキシを作成
 --- @param actor Actor アクターオブジェクト
@@ -95,7 +98,7 @@ function ACTOR.create_proxy(actor, act)
         actor = actor,
         act = act,
     }
-    return setmetatable(proxy, { __index = PROXY_IMPL })
+    return setmetatable(proxy, PROXY_IMPL)
 end
 
 --- talk（act経由でトークン蓄積）
