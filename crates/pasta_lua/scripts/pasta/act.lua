@@ -12,15 +12,19 @@ local SCENE = require("pasta.scene")
 --- @field var table アクションローカル変数
 --- @field token table[] 構築中のスクリプトトークン
 --- @field now_actor Actor|nil 現在のアクター
---- @field current_scene table|nil 現在のシーンテーブル
+--- @field current_scene SceneTable|nil 現在のシーンテーブル
 local ACT = {}
 
+--- ACT実装メタテーブル
+local ACT_IMPL = {}
+
 --- __indexメタメソッド: メソッド検索とアクタープロキシ動的生成
---- @param key string
---- @return any
-function ACT:__index(key)
-    -- 1. ACTメソッドを検索
-    local method = ACT[key]
+--- @param self Act アクションオブジェクト
+--- @param key string キー名
+--- @return any メソッドまたはプロキシ
+function ACT_IMPL.__index(self, key)
+    -- 1. ACT_IMPLメソッドを検索
+    local method = ACT_IMPL[key]
     if method then return method end
 
     -- 2. アクター名としてプロキシ生成
@@ -43,23 +47,25 @@ function ACT.new(ctx)
         now_actor = nil,
         current_scene = nil,
     }
-    setmetatable(obj, ACT)
-    return obj
+    return setmetatable(obj, ACT_IMPL)
 end
 
 --- シーン初期化（トランスパイラー出力から呼び出し）
---- @param scene table SCENEテーブル
+--- @param self Act アクションオブジェクト
+--- @param scene SceneTable SCENEテーブル
 --- @return table save 永続変数テーブル
 --- @return table var アクションローカル変数テーブル
-function ACT:init_scene(scene)
+function ACT_IMPL.init_scene(self, scene)
     self.current_scene = scene
     return self.ctx.save, self.var
 end
 
 --- talkトークン蓄積
+--- @param self Act アクションオブジェクト
 --- @param actor Actor アクターオブジェクト
 --- @param text string 発話テキスト
-function ACT:talk(actor, text)
+--- @return nil
+function ACT_IMPL.talk(self, actor, text)
     if self.now_actor ~= actor then
         table.insert(self.token, { type = "actor", actor = actor })
         self.now_actor = actor
@@ -68,15 +74,18 @@ function ACT:talk(actor, text)
 end
 
 --- sakura_scriptトークン蓄積
+--- @param self Act アクションオブジェクト
 --- @param text string さくらスクリプト
-function ACT:sakura_script(text)
+--- @return nil
+function ACT_IMPL.sakura_script(self, text)
     table.insert(self.token, { type = "sakura_script", text = text })
 end
 
 --- 単語検索（アクター非依存、3レベル検索）
+--- @param self Act アクションオブジェクト
 --- @param name string 単語名
 --- @return string|nil 見つかった単語、またはnil
-function ACT:word(name)
+function ACT_IMPL.word(self, name)
     -- Level 2: SCENEfield
     if self.current_scene and self.current_scene[name] then
         return self.current_scene[name]
@@ -87,21 +96,28 @@ function ACT:word(name)
 end
 
 --- トークン出力とyield
-function ACT:yield()
+--- @param self Act アクションオブジェクト
+--- @return nil
+function ACT_IMPL.yield(self)
     table.insert(self.token, { type = "yield" })
     self.ctx:yield(self)
 end
 
 --- アクション終了
-function ACT:end_action()
+--- @param self Act アクションオブジェクト
+--- @return nil
+function ACT_IMPL.end_action(self)
     table.insert(self.token, { type = "end_action" })
     self.ctx:end_action(self)
 end
 
 --- シーン呼び出し
+--- @param self Act アクションオブジェクト
 --- @param search_result table {global_name, local_name}
 --- @param opts table|nil オプション
-function ACT:call(search_result, opts, ...)
+--- @param ... any 追加引数
+--- @return nil
+function ACT_IMPL.call(self, search_result, opts, ...)
     local global_name, local_name = search_result[1], search_result[2]
     local scene_func = SCENE.get(global_name, local_name)
     if scene_func then
@@ -110,9 +126,11 @@ function ACT:call(search_result, opts, ...)
 end
 
 --- スポット設定
+--- @param self Act アクションオブジェクト
 --- @param name string アクター名
 --- @param number integer 位置
-function ACT:set_spot(name, number)
+--- @return nil
+function ACT_IMPL.set_spot(self, name, number)
     local actor = self.ctx.actors[name]
     if actor then
         actor.spot = number
@@ -120,7 +138,9 @@ function ACT:set_spot(name, number)
 end
 
 --- 全スポットクリア
-function ACT:clear_spot()
+--- @param self Act アクションオブジェクト
+--- @return nil
+function ACT_IMPL.clear_spot(self)
     for _, actor in pairs(self.ctx.actors) do
         actor.spot = nil
     end

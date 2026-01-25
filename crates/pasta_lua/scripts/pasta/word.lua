@@ -7,23 +7,24 @@
 
 local STORE = require("pasta.store")
 
-local MOD = {}
+--- @class Word モジュールテーブル
+local WORD = {}
 
 -------------------------------------------
--- WordBuilder - ビルダーパターン実装
+-- WORD_BUILDER_IMPL - ビルダーパターン実装
 -------------------------------------------
 
---- WordBuilderクラス
+--- WordBuilderクラス実装メタテーブル
 --- @class WordBuilder
 --- @field _registry table 登録先レジストリテーブル
 --- @field _key string 単語キー
-local WordBuilder = {}
-WordBuilder.__index = WordBuilder
+local WORD_BUILDER_IMPL = {}
 
 --- 値を追加（Requirement 9.3, 9.5）
---- @vararg string 可変長引数で値を受け取る
+--- @param self WordBuilder ビルダーオブジェクト
+--- @param ... string 可変長引数で値を受け取る
 --- @return WordBuilder メソッドチェーン用に自身を返す
-function WordBuilder:entry(...)
+function WORD_BUILDER_IMPL.entry(self, ...)
     local values = { ... }
     if #values > 0 then
         -- 既存のエントリ配列に新しい値リストを追加
@@ -41,10 +42,11 @@ local function create_builder(registry, key)
     if not registry[key] then
         registry[key] = {}
     end
-    local builder = setmetatable({}, WordBuilder)
-    builder._registry = registry
-    builder._key = key
-    return builder
+    local builder = {
+        _registry = registry,
+        _key = key,
+    }
+    return setmetatable(builder, { __index = WORD_BUILDER_IMPL })
 end
 
 -------------------------------------------
@@ -54,7 +56,7 @@ end
 --- グローバル単語ビルダーを作成（Requirement 9.1）
 --- @param key string 単語キー
 --- @return WordBuilder ビルダーオブジェクト
-function MOD.create_global(key)
+function WORD.create_global(key)
     return create_builder(STORE.global_words, key)
 end
 
@@ -62,7 +64,7 @@ end
 --- @param scene_name string シーン名
 --- @param key string 単語キー
 --- @return WordBuilder ビルダーオブジェクト
-function MOD.create_local(scene_name, key)
+function WORD.create_local(scene_name, key)
     -- シーンが未登録なら初期化
     if not STORE.local_words[scene_name] then
         STORE.local_words[scene_name] = {}
@@ -74,7 +76,7 @@ end
 --- @param actor_name string アクター名
 --- @param key string 単語キー
 --- @return WordBuilder ビルダーオブジェクト
-function MOD.create_actor(actor_name, key)
+function WORD.create_actor(actor_name, key)
     -- アクターが未登録なら初期化
     if not STORE.actor_words[actor_name] then
         STORE.actor_words[actor_name] = {}
@@ -84,7 +86,7 @@ end
 
 --- 全単語情報を取得（Requirement 2.6）
 --- @return table {global: {key: [[values]]}, local: {scene: {key: [[values]]}}, actor: {name: {key: [[values]]}}} 形式
-function MOD.get_all_words()
+function WORD.get_all_words()
     return {
         global = STORE.global_words,
         ["local"] = STORE.local_words,
@@ -94,21 +96,21 @@ end
 
 --- グローバル単語辞書を取得
 --- @return table {key → values[][]} 形式の辞書
-function MOD.get_global_words()
+function WORD.get_global_words()
     return STORE.global_words
 end
 
 --- ローカル単語辞書を取得
 --- @param scene_name string シーン名
 --- @return table|nil {key → values[][]} 形式の辞書
-function MOD.get_local_words(scene_name)
+function WORD.get_local_words(scene_name)
     return STORE.local_words[scene_name]
 end
 
 --- アクター単語辞書を取得
 --- @param actor_name string アクター名
 --- @return table|nil {key → values[][]} 形式の辞書
-function MOD.get_actor_words(actor_name)
+function WORD.get_actor_words(actor_name)
     return STORE.actor_words[actor_name]
 end
 
@@ -116,8 +118,8 @@ end
 --- create_global のエイリアス
 --- @param key string 単語キー
 --- @return WordBuilder ビルダーオブジェクト
-function MOD.create_word(key)
-    return MOD.create_global(key)
+function WORD.create_word(key)
+    return WORD.create_global(key)
 end
 
-return MOD
+return WORD

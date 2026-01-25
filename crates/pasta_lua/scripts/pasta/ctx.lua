@@ -10,7 +10,9 @@ local ACT = require("pasta.act")
 --- @field save table 永続変数（セッションが終わっても残る）
 --- @field actors table<string, Actor> 登録アクター（名前→アクター）
 local CTX = {}
-CTX.__index = CTX
+
+--- CTX実装メタテーブル
+local CTX_IMPL = {}
 
 --- 新規CTXを作成
 --- @param save table|nil 永続変数
@@ -21,14 +23,15 @@ function CTX.new(save, actors)
         save = save or {},
         actors = actors or {},
     }
-    setmetatable(obj, CTX)
-    return obj
+    return setmetatable(obj, { __index = CTX_IMPL })
 end
 
 --- コルーチンでアクションを実行する
+--- @param self CTX 環境オブジェクト
 --- @param scene function シーン関数（第1引数にactを受け取る）
+--- @param ... any 追加引数
 --- @return thread コルーチン
-function CTX:co_action(scene, ...)
+function CTX_IMPL.co_action(self, scene, ...)
     local args = { ... }
     return coroutine.create(function()
         local act = ACT.new(self)
@@ -40,14 +43,17 @@ function CTX:co_action(scene, ...)
 end
 
 --- アクション開始
+--- @param self CTX 環境オブジェクト
 --- @return Act アクションオブジェクト
-function CTX:start_action()
+function CTX_IMPL.start_action(self)
     return ACT.new(self)
 end
 
 --- yieldでトークンを出力
+--- @param self CTX 環境オブジェクト
 --- @param act Act アクションオブジェクト
-function CTX:yield(act)
+--- @return nil
+function CTX_IMPL.yield(self, act)
     local token = act.token
     act.token = {}
     act.now_actor = nil
@@ -55,8 +61,10 @@ function CTX:yield(act)
 end
 
 --- アクション終了
+--- @param self CTX 環境オブジェクト
 --- @param act Act アクションオブジェクト
-function CTX:end_action(act)
+--- @return nil
+function CTX_IMPL.end_action(self, act)
     local token = act.token
     act.token = {}
     coroutine.yield({ type = "end_action", token = token })
