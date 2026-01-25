@@ -1,35 +1,35 @@
-# Requirements Document
+# 要件定義書
 
-## Introduction
+## はじめに
 Pastaプロジェクトの `pasta_lua` クレートにおけるLuaスクリプトのコーディング規約を策定し、AIエージェントが参照可能な形式でステアリング配置する。バグ予防、コード品質向上、一貫性維持を目的とする。
 
-## Project Description (Input)
+## プロジェクト概要（入力）
 Luaスクリプトのコーディングルールを決めておいて、バグがなるべく出ないようにする。AI参照用のコーディング規約を作ってステアリングに配置する。
 
 **追加要件**: 作成したコーディング規約に従い、既存のコードのリファクタリングを行う。
 
-## Requirements
+## 要件
 
-### Requirement 1: コーディング規約ドキュメント作成
-**Objective:** As a AI開発エージェント, I want Luaコーディング規約がステアリングに配置されている, so that 一貫したコードスタイルでLuaスクリプトを生成・修正できる
+### 要件1: コーディング規約ドキュメント作成
+**目的:** AI開発エージェントとして、Luaコーディング規約がステアリングに配置されていることで、一貫したコードスタイルでLuaスクリプトを生成・修正できる
 
-#### Acceptance Criteria
-1. The steering system shall provide a `lua-coding.md` file in `.kiro/steering/` directory
-2. When AI agent reads `.kiro/steering/lua-coding.md`, the steering system shall provide comprehensive Lua coding rules including naming conventions, module patterns, and error handling
-3. The steering system shall document Pasta-specific Lua patterns (PASTA module API, EmmyLua annotations, メタテーブル設計)
+#### 受入基準
+1. ステアリングシステムは、`.kiro/steering/` ディレクトリに `lua-coding.md` ファイルを提供すること (shall)
+2. When AIエージェントが `.kiro/steering/lua-coding.md` を読み込んだとき、ステアリングシステムは命名規約、モジュールパターン、エラーハンドリングを含む包括的なLuaコーディングルールを提供すること (shall)
+3. ステアリングシステムは、Pasta固有のLuaパターン（PASTAモジュールAPI、EmmyLuaアノテーション、メタテーブル設計）を文書化すること (shall)
 
-### Requirement 2: 命名規約
-**Objective:** As a 開発者, I want 明確な命名規約が定義されている, so that コードの可読性と一貫性が向上する
+### 要件2: 命名規約
+**目的:** 開発者として、明確な命名規約が定義されていることで、コードの可読性と一貫性が向上する
 
-#### Acceptance Criteria
-1. The coding standard shall define snake_case for local variables and functions
-2. The coding standard shall define UPPER_CASE for module table names matching the module filename (e.g., `actor.lua` → `ACTOR`)
-3. The coding standard shall define `_IMPL` suffix for ALL class implementation metatables, including internal classes (e.g., `ACTOR_IMPL`, `WORD_BUILDER_IMPL`)
-4. When defining private module members, the coding standard shall require underscore prefix (e.g., `_internal_func`)
-5. The coding standard shall permit Japanese identifiers for domain-specific terms (e.g., `アクター名`, `シーン`)
-6. The coding standard shall prohibit PascalCase for class metatables; all class implementations must use `MODULE_NAME_IMPL` pattern
+#### 受入基準
+1. コーディング規約は、ローカル変数と関数に snake_case を定義すること (shall)
+2. コーディング規約は、モジュールファイル名に合わせたモジュールテーブル名に UPPER_CASE を定義すること (shall)（例: `actor.lua` → `ACTOR`）
+3. コーディング規約は、内部クラスを含む全てのクラス実装メタテーブルに `_IMPL` サフィックスを定義すること (shall)（例: `ACTOR_IMPL`, `WORD_BUILDER_IMPL`）
+4. When プライベートなモジュールメンバーを定義する際、コーディング規約はアンダースコアプレフィックスを要求すること (shall)（例: `_internal_func`）
+5. コーディング規約は、ドメイン固有用語に日本語識別子を許可すること (shall)（例: `アクター名`, `シーン`）
+6. コーディング規約は、クラスメタテーブルに PascalCase を禁止すること (shall)。全てのクラス実装は `MODULE_NAME_IMPL` パターンを使用すること
 
-### Requirement 3: モジュール構造規約
+### 要件3: モジュール構造規約
 **Objective:** As a 開発者, I want モジュールの構造パターンが標準化されている, so that 循環参照を防ぎ保守性が向上する
 
 #### Acceptance Criteria
@@ -39,31 +39,31 @@ Luaスクリプトのコーディングルールを決めておいて、バグ�
 4. If a module requires another module that could cause circular dependency, then the coding standard shall require using `pasta.store` pattern for shared state
 5. The coding standard shall provide the canonical module structure template
 
-### Requirement 4: クラス設計パターン
-**Objective:** As a 開発者, I want Rust風の明示的なクラス設計パターンが定義されている, so that クラスとシングルトンの混同を防ぎ、インスタンス生成が明確になる
+### 要件4: クラス設計パターン
+**目的:** 開発者として、Rust風の明示的なクラス設計パターンが定義されていることで、クラスとシングルトンの混同を防ぎ、インスタンス生成が明確になる
 
-**Design Philosophy**: このパターンはRustの影響を受けており、実装側での明示性と利用側での利便性を両立します。
+**設計思想**: このパターンはRustの影響を受けており、実装側での明示性と利用側での利便性を両立する。
 
-#### Acceptance Criteria
-1. The coding standard shall require separating module table (`MODULE`) from class implementation metatable (`MODULE_IMPL`)
-2. The coding standard shall require `MODULE.new(args)` as the constructor function that creates and returns new instances
-3. When defining class methods in `_IMPL`, the coding standard shall require explicit `self` parameter with dot syntax (`function MODULE_IMPL.method(self, arg)`) to prevent implicit self bugs
-4. When calling instance methods, the coding standard shall permit colon syntax (`instance:method(arg)`) for convenience, which automatically passes `self`
-5. The coding standard shall require `setmetatable(obj, { __index = MODULE_IMPL })` pattern in constructor
-6. The coding standard shall require module-level functions (`MODULE.func(args)`) to be separate from instance methods
-7. When singleton state is needed, the coding standard shall require using the module table itself or module-local variables (leveraging Lua's `require` caching behavior)
-8. The coding standard shall prohibit `MODULE.instance()` anti-pattern; use module-as-singleton or `pasta.store` pattern instead
+#### 受入基準
+1. コーディング規約は、モジュールテーブル（`MODULE`）とクラス実装メタテーブル（`MODULE_IMPL`）を分離することを要求すること (shall)
+2. コーディング規約は、新しいインスタンスを作成して返すコンストラクタ関数として `MODULE.new(args)` を要求すること (shall)
+3. When `_IMPL` でクラスメソッドを定義する際、コーディング規約は暗黙のselfバグを防ぐため、ドット構文で明示的な `self` パラメータを要求すること (shall)（`function MODULE_IMPL.method(self, arg)`）
+4. When インスタンスメソッドを呼び出す際、コーディング規約は利便性のためコロン構文（`instance:method(arg)`）を許可すること (shall)。これは自動的に `self` を渡す
+5. コーディング規約は、コンストラクタで `setmetatable(obj, { __index = MODULE_IMPL })` パターンを要求すること (shall)
+6. コーディング規約は、モジュールレベル関数（`MODULE.func(args)`）をインスタンスメソッドと分離することを要求すること (shall)
+7. When シングルトン状態が必要な場合、コーディング規約はモジュールテーブル自体またはモジュールローカル変数を使用することを要求すること (shall)（Luaの `require` キャッシング動作を活用）
+8. コーディング規約は、`MODULE.instance()` アンチパターンを禁止すること (shall)。モジュールをシングルトンとして扱うか `pasta.store` パターンを使用すること
 
-#### Singleton Pattern (via require caching)
+#### シングルトンパターン（requireキャッシング経由）
 ```lua
 --- @module pasta.config
---- This module is a singleton (module table itself holds state)
+--- このモジュールはシングルトン（モジュールテーブル自体が状態を保持）
 local CONFIG = {
     debug = false,
     log_level = "info",
 }
 
---- Module-local state (private singleton data)
+--- モジュールローカル状態（プライベートシングルトンデータ）
 local _cache = {}
 
 --- @param key string
@@ -79,11 +79,11 @@ function CONFIG.get(key)
 end
 
 return CONFIG
--- Usage: local CONFIG = require("pasta.config")
--- CONFIG is always the same instance due to require caching
+-- 使用例: local CONFIG = require("pasta.config")
+-- requireキャッシングにより、CONFIGは常に同じインスタンス
 ```
 
-#### Class Pattern Template
+#### クラスパターンテンプレート
 ```lua
 --- @module pasta.example
 local EXAMPLE = {}
@@ -94,7 +94,7 @@ local EXAMPLE = {}
 local EXAMPLE_IMPL = {}
 EXAMPLE_IMPL.__index = EXAMPLE_IMPL
 
---- Create new Example instance
+--- 新しいExampleインスタンスを作成
 --- @param name string
 --- @param value number
 --- @return Example
@@ -107,7 +107,7 @@ function EXAMPLE.new(name, value)
     return obj
 end
 
---- Instance method (explicit self, dot syntax in implementation)
+--- インスタンスメソッド（明示的self、実装ではドット構文）
 --- @param self Example
 --- @param delta number
 --- @return number
@@ -116,7 +116,7 @@ function EXAMPLE_IMPL.add(self, delta)
     return self.value
 end
 
---- Module-level utility function (not instance method)
+--- モジュールレベルユーティリティ関数（インスタンスメソッドではない）
 --- @param a Example
 --- @param b Example
 --- @return Example
@@ -126,76 +126,76 @@ end
 
 return EXAMPLE
 
--- Usage example:
+-- 使用例:
 -- local ex = EXAMPLE.new("test", 10)
--- ex:add(5)  -- Colon syntax allowed for calls (convenience)
--- -- Equivalent to: EXAMPLE_IMPL.add(ex, 5)
+-- ex:add(5)  -- 呼び出し時はコロン構文が使える（利便性）
+-- -- 以下と同等: EXAMPLE_IMPL.add(ex, 5)
 ```
 
-### Requirement 5: EmmyLua型アノテーション規約
-**Objective:** As a 開発者, I want 型アノテーション規約が定義されている, so that IDE補完とドキュメント生成が向上する
+### 要件5: EmmyLua型アノテーション規約
+**目的:** 開発者として、型アノテーション規約が定義されていることで、IDE補完とドキュメント生成が向上する
 
-#### Acceptance Criteria
-1. The coding standard shall require `@module` annotation at the top of each module file
-2. The coding standard shall require `@class` annotation for class-like tables
-3. The coding standard shall require `@param` and `@return` annotations for all public functions
-4. The coding standard shall require `@field` annotations for class properties
-5. When function may return nil, the coding standard shall require `|nil` in return type annotation
-6. The coding standard shall require `@param ... type` syntax for variadic functions (not `@vararg`)
+#### 受入基準
+1. コーディング規約は、各モジュールファイルの先頭に `@module` アノテーションを要求すること (shall)
+2. コーディング規約は、クラス的なテーブルに `@class` アノテーションを要求すること (shall)
+3. コーディング規約は、全ての公開関数に `@param` と `@return` アノテーションを要求すること (shall)
+4. コーディング規約は、クラスプロパティに `@field` アノテーションを要求すること (shall)
+5. When 関数がnilを返す可能性がある場合、コーディング規約は戻り値型アノテーションに `|nil` を要求すること (shall)
+6. コーディング規約は、可変長引数関数に `@param ... type` 構文を要求すること (shall)（`@vararg` ではない）
 
-### Requirement 6: エラーハンドリング規約
-**Objective:** As a 開発者, I want エラーハンドリングパターンが標準化されている, so that デバッグと障害対応が容易になる
+### 要件6: エラーハンドリング規約
+**目的:** 開発者として、エラーハンドリングパターンが標準化されていることで、デバッグと障害対応が容易になる
 
-#### Acceptance Criteria
-1. The coding standard shall define nil-check patterns before table/function access
-2. When accessing potentially nil tables, the coding standard shall require guard clause pattern
-3. The coding standard shall define pcall usage pattern for external/risky operations
-4. The coding standard shall prohibit silent nil returns without explicit documentation
+#### 受入基準
+1. コーディング規約は、テーブル/関数アクセス前のnilチェックパターンを定義すること (shall)
+2. When nilの可能性のあるテーブルにアクセスする際、コーディング規約はガード節パターンを要求すること (shall)
+3. コーディング規約は、外部/リスクのある操作に pcall 使用パターンを定義すること (shall)
+4. コーディング規約は、明示的なドキュメントなしのサイレントnil返却を禁止すること (shall)
 
-### Requirement 7: Pastaランタイム固有規約
-**Objective:** As a 開発者, I want Pasta固有のLuaパターンが文書化されている, so that ランタイムとの一貫した統合ができる
+### 要件7: Pastaランタイム固有規約
+**目的:** 開発者として、Pasta固有のLuaパターンが文書化されていることで、ランタイムとの一貫した統合ができる
 
-#### Acceptance Criteria
-1. The coding standard shall document PASTA module API usage patterns (`PASTA.create_actor`, `PASTA.create_scene`, `PASTA.create_word`)
-2. The coding standard shall document CTX (context) object patterns and lifecycle
-3. The coding standard shall document ACT (action) object patterns for scene functions
-4. The coding standard shall document PROXY patterns for actor-action interaction
-5. The coding standard shall document STORE patterns for shared state management
+#### 受入基準
+1. コーディング規約は、PASTAモジュールAPI使用パターンを文書化すること (shall)（`PASTA.create_actor`, `PASTA.create_scene`, `PASTA.create_word`）
+2. コーディング規約は、CTX（コンテキスト）オブジェクトパターンとライフサイクルを文書化すること (shall)
+3. コーディング規約は、シーン関数用のACT（アクション）オブジェクトパターンを文書化すること (shall)
+4. コーディング規約は、アクター・アクション相互作用のためのPROXYパターンを文書化すること (shall)
+5. コーディング規約は、共有状態管理のためのSTOREパターンを文書化すること (shall)
 
-### Requirement 8: 既存コードリファクタリング
-**Objective:** As a 開発者, I want 既存のLuaコードが新しい規約に準拠している, so that コードベース全体の一貫性が保たれる
+### 要件8: 既存コードリファクタリング
+**目的:** 開発者として、既存のLuaコードが新しい規約に準拠していることで、コードベース全体の一貫性が保たれる
 
-#### Acceptance Criteria
-1. When refactoring `scripts/pasta/*.lua`, the refactoring system shall ensure EmmyLua annotations are complete and consistent
-2. When refactoring, the refactoring system shall ensure all public functions have proper documentation
-3. When refactoring, the refactoring system shall ensure naming conventions are followed (MODULE, MODULE_IMPL pattern)
-4. When refactoring class-like modules, the refactoring system shall apply Requirement 4 class design pattern (separate MODULE from MODULE_IMPL, explicit self in implementation)
-5. When refactoring method implementations, the refactoring system shall convert colon syntax to dot syntax with explicit `self` parameter in `_IMPL` definitions
-6. When refactoring method calls, the refactoring system shall permit colon syntax (`:`) for convenience (caller side)
-7. The refactoring system shall preserve existing behavior (no functional changes)
-8. After refactoring, the test system shall pass all existing tests without modification
+#### 受入基準
+1. When `scripts/pasta/*.lua` をリファクタリングする際、リファクタリングシステムはEmmyLuaアノテーションが完全で一貫していることを保証すること (shall)
+2. When リファクタリングする際、リファクタリングシステムは全ての公開関数が適切なドキュメントを持つことを保証すること (shall)
+3. When リファクタリングする際、リファクタリングシステムは命名規約に従うことを保証すること (shall)（MODULE, MODULE_IMPLパターン）
+4. When クラス的なモジュールをリファクタリングする際、リファクタリングシステムは要件4のクラス設計パターンを適用すること (shall)（MODULEとMODULE_IMPLを分離、実装では明示的self）
+5. When メソッド実装をリファクタリングする際、リファクタリングシステムは `_IMPL` 定義内でコロン構文を明示的 `self` パラメータ付きドット構文に変換すること (shall)
+6. When メソッド呼び出しをリファクタリングする際、リファクタリングシステムは利便性のためコロン構文（`:`）を許可すること (shall)（呼び出し側）
+7. リファクタリングシステムは、既存の動作を保持すること (shall)（機能変更なし）
+8. After リファクタリング後、テストシステムは既存の全テストを変更なしでパスすること (shall)
 
-#### Refactoring Target Files
-The following files require class pattern refactoring:
+#### リファクタリング対象ファイル
+以下のファイルはクラスパターンリファクタリングが必要:
 
-| File | Current Issue | Required Change |
-|------|---------------|-----------------|
-| `act.lua` | ACT is class-like but used as singleton | Separate ACT/ACT_IMPL, use ACT.new() |
-| `actor.lua` | ACTOR mixes module and class functions, has `WordBuilder` PascalCase | Separate ACTOR/ACTOR_IMPL, rename WordBuilder→WORD_BUILDER_IMPL, ActorWordBuilder→ACTOR_WORD_BUILDER_IMPL |
-| `ctx.lua` | CTX has .new() but uses colon syntax | Convert to dot syntax with explicit self |
-| `scene.lua` | MOD naming, mixed patterns | Rename to SCENE, clarify structure |
-| `word.lua` | MOD naming, WordBuilder PascalCase pattern | Rename MOD→WORD, WordBuilder→WORD_BUILDER_IMPL, apply _IMPL pattern |
-| `store.lua` | Singleton pattern is correct | Minor naming alignment |
-| `global.lua` | Simple table, no class | No major changes needed |
-| `init.lua` | Entry point, no class | No major changes needed |
-| `lua_specs/*_spec.lua` | Test files use `*_spec.lua` naming | Rename to `*_test.lua` for consistency |
+| ファイル | 現在の問題 | 必要な変更 |
+|----------|-----------|-----------|
+| `act.lua` | ACTはクラス的だがシングルトンとして使用 | ACT/ACT_IMPLを分離、ACT.new()を使用 |
+| `actor.lua` | ACTORはモジュールとクラス関数が混在、`WordBuilder`がPascalCase | ACTOR/ACTOR_IMPLを分離、WordBuilder→WORD_BUILDER_IMPL、ActorWordBuilder→ACTOR_WORD_BUILDER_IMPLにリネーム |
+| `ctx.lua` | CTXは.new()があるがコロン構文を使用 | 明示的selfでドット構文に変換 |
+| `scene.lua` | MOD命名、混在パターン | SCENEにリネーム、構造を明確化 |
+| `word.lua` | MOD命名、WordBuilder PascalCaseパターン | MOD→WORD、WordBuilder→WORD_BUILDER_IMPLにリネーム、_IMPLパターンを適用 |
+| `store.lua` | シングルトンパターンは正しい | 軽微な命名調整 |
+| `global.lua` | シンプルなテーブル、クラスなし | 大きな変更不要 |
+| `init.lua` | エントリーポイント、クラスなし | 変更不要 |
+| `lua_specs/*_spec.lua` | テストファイルが `*_spec.lua` 命名 | 一貫性のため `*_test.lua` にリネーム |
 
-### Requirement 9: テストとLint規約
-**Objective:** As a 開発者, I want Luaテストとlint規約が定義されている, so that コード品質を自動検証できる
+### 要件9: テストとLint規約
+**目的:** 開発者として、Luaテストとlint規約が定義されていることで、コード品質を自動検証できる
 
-#### Acceptance Criteria
-1. The coding standard shall document lua_test framework usage patterns (`expect`, `describe`, `it`)
-2. The coding standard shall define test file naming convention as `*_test.lua` (unified with Rust `*_test.rs` for AI search reliability)
-3. The coding standard shall provide test structure template (describe/it pattern)
-4. The coding standard shall document luacheck configuration and usage (located at `crates/pasta_lua/scriptlibs/luacheck/`)
-5. The coding standard shall provide `.luacheckrc` configuration template for pasta project patterns
+#### 受入基準
+1. コーディング規約は、lua_testフレームワーク使用パターンを文書化すること (shall)（`expect`, `describe`, `it`）
+2. コーディング規約は、テストファイル命名規約を `*_test.lua` と定義すること (shall)（AI検索信頼性のためRust `*_test.rs` と統一）
+3. コーディング規約は、テスト構造テンプレートを提供すること (shall)（describe/itパターン）
+4. コーディング規約は、luacheck設定と使用方法を文書化すること (shall)（`crates/pasta_lua/scriptlibs/luacheck/` に配置）
+5. コーディング規約は、pastaプロジェクトパターン用の `.luacheckrc` 設定テンプレートを提供すること (shall)
