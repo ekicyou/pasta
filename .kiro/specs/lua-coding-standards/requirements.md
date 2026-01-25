@@ -32,12 +32,12 @@ Luaスクリプトのコーディングルールを決めておいて、バグ�
 ### 要件3: モジュール構造規約
 **Objective:** As a 開発者, I want モジュールの構造パターンが標準化されている, so that 循環参照を防ぎ保守性が向上する
 
-#### Acceptance Criteria
-1. The coding standard shall require each module to define a single module table named after the filename in UPPER_CASE
-2. The coding standard shall require all require statements at the top of the file
-3. The coding standard shall require modules to return their main table at the end
-4. If a module requires another module that could cause circular dependency, then the coding standard shall require using `pasta.store` pattern for shared state
-5. The coding standard shall provide the canonical module structure template
+#### 受入基準
+1. コーディング規約は、各モジュールがファイル名に基づいた UPPER_CASE の単一モジュールテーブルを定義することを要求すること (shall)
+2. コーディング規約は、全ての require 文をファイル先頭に配置することを要求すること (shall)
+3. コーディング規約は、モジュールが最後にメインテーブルを返すことを要求すること (shall)
+4. If 循環依存を引き起こす可能性のあるモジュールを require する場合、then コーディング規約は共有状態に `pasta.store` パターンを使用することを要求すること (shall)
+5. コーディング規約は、標準的なモジュール構造テンプレートを提供すること (shall)
 
 ### 要件4: クラス設計パターン
 **目的:** 開発者として、Rust風の明示的なクラス設計パターンが定義されていることで、クラスとシングルトンの混同を防ぎ、インスタンス生成が明確になる
