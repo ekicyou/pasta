@@ -188,12 +188,13 @@ The following files require class pattern refactoring:
 | `store.lua` | Singleton pattern is correct | Minor naming alignment |
 | `global.lua` | Simple table, no class | No major changes needed |
 | `init.lua` | Entry point, no class | No major changes needed |
+| `lua_specs/*_spec.lua` | Test files use `*_spec.lua` naming | Rename to `*_test.lua` for consistency |
 
 ### Requirement 9: テストとLint規約
 **Objective:** As a 開発者, I want Luaテストとlint規約が定義されている, so that コード品質を自動検証できる
 
 #### Acceptance Criteria
 1. The coding standard shall document lua_test framework usage patterns (`expect`, `describe`, `it`)
-2. The coding standard shall define test file naming convention (`*_test.lua` or `*_spec.lua`)
+2. The coding standard shall define test file naming convention as `*_test.lua` (unified with Rust `*_test.rs` for AI search reliability)
 3. The coding standard shall provide test structure template (describe/it pattern)
 4. Where luacheck is available, the coding standard shall document recommended luacheck configuration
