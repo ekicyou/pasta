@@ -92,9 +92,10 @@
 |------|------|----------|
 | snake_case（変数/関数） | ✅ 準拠 | 軽微な不整合 |
 | UPPER_CASE（モジュール） | ✅ 準拠 | なし |
-| PascalCase（クラス風） | ✅ 準拠 | なし |
+| `_IMPL`サフィックス | ❌ PascalCase使用 | **全クラスで修正必要**（WordBuilder→WORD_BUILDER_IMPL等） |
 | `_` プレフィックス | **Missing** | ドキュメント化＋リファクタ |
 | 日本語識別子 | ✅ 使用中 | ドキュメント化のみ |
+| PascalCase禁止 | ❌ 違反 | WordBuilder, ActorWordBuilder等を修正必要 |
 
 ### Requirement 3: モジュール構造
 | 項目 | 現状 | ギャップ |
