@@ -13,6 +13,7 @@ local CTX = {}
 
 --- CTX実装メタテーブル
 local CTX_IMPL = {}
+CTX_IMPL.__index = CTX_IMPL
 
 --- 新規CTXを作成
 --- @param save table|nil 永続変数
@@ -23,7 +24,7 @@ function CTX.new(save, actors)
         save = save or {},
         actors = actors or {},
     }
-    return setmetatable(obj, { __index = CTX_IMPL })
+    return setmetatable(obj, CTX_IMPL)
 end
 
 --- コルーチンでアクションを実行する

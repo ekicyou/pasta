@@ -19,6 +19,7 @@ local WORD = {}
 --- @field _registry table 登録先レジストリテーブル
 --- @field _key string 単語キー
 local WORD_BUILDER_IMPL = {}
+WORD_BUILDER_IMPL.__index = WORD_BUILDER_IMPL
 
 --- 値を追加（Requirement 9.3, 9.5）
 --- @param self WordBuilder ビルダーオブジェクト
@@ -46,7 +47,7 @@ local function create_builder(registry, key)
         _registry = registry,
         _key = key,
     }
-    return setmetatable(builder, { __index = WORD_BUILDER_IMPL })
+    return setmetatable(builder, WORD_BUILDER_IMPL)
 end
 
 -------------------------------------------

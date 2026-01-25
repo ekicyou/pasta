@@ -2,15 +2,15 @@
 -- このファイルから各テストスイートを require して実行する
 --
 -- 新しいテストを追加する場合：
---   1. lua_specs/ に *_spec.lua ファイルを作成
+--   1. lua_specs/ に *_test.lua ファイルを作成
 --   2. 下記の specs テーブルにモジュール名を追加
 
 local specs = {
-    "transpiler_spec",
-    "actor_word_spec", -- actor-word-dictionary feature tests
+    "transpiler_test",
+    "actor_word_test", -- actor-word-dictionary feature tests
     -- 将来のテストスイートをここに追加
-    -- "code_generator_spec",
-    -- "context_spec",
+    -- "code_generator_test",
+    -- "context_test",
 }
 
 print("=====================================")
