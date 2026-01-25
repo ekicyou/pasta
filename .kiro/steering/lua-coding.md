@@ -113,6 +113,7 @@ local WORD = {}
 --- @field _registry table
 --- @field _key string
 local WORD_BUILDER_IMPL = {}
+WORD_BUILDER_IMPL.__index = WORD_BUILDER_IMPL
 
 --- 値を追加
 --- @param self WordBuilder
@@ -137,7 +138,7 @@ function WORD.create_global(key)
         _registry = STORE.global_words,
         _key = key,
     }
-    return setmetatable(builder, { __index = WORD_BUILDER_IMPL })
+    return setmetatable(builder, WORD_BUILDER_IMPL)
 end
 
 return WORD
@@ -163,6 +164,10 @@ builder:entry("value1", "value2")
 ### 3.3 コンストラクタパターン
 
 ```lua
+--- @class Instance
+local MODULE_IMPL = {}
+MODULE_IMPL.__index = MODULE_IMPL
+
 --- @param args Args 引数
 --- @return Instance
 function MODULE.new(args)
@@ -170,7 +175,7 @@ function MODULE.new(args)
         field1 = args.field1,
         field2 = args.field2,
     }
-    return setmetatable(obj, { __index = MODULE_IMPL })
+    return setmetatable(obj, MODULE_IMPL)
 end
 ```
 
