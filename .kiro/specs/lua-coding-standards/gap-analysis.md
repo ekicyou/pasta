@@ -24,8 +24,10 @@
 | `toDebugString.lua` | デバッグ出力 | ユーティリティ |
 
 #### 既存テストスペック
-- `lua_specs/actor_word_spec.lua` - アクター単語辞書テスト
-- `lua_specs/transpiler_spec.lua` - トランスパイラーテスト
+- `lua_specs/actor_word_spec.lua` - アクター単語辞書テスト（→ `*_test.lua`にリネーム予定）
+- `lua_specs/transpiler_spec.lua` - トランスパイラーテスト（→ `*_test.lua`にリネーム予定）
+
+**Note:** AI検索確実性のため、全テストファイルを`*_test.lua`形式に統一（Rust `*_test.rs`と一貫性）
 
 ### 1.2 確認された規約パターン
 
@@ -154,7 +156,7 @@
 | 項目 | 現状 | ギャップ |
 |------|------|----------|
 | lua_testパターン | 実装済み | **ドキュメント化必要** |
-| ファイル命名 | `*_spec.lua` | ドキュメント化 |
+| ファイル命名 | `*_spec.lua` (現状) | **`*_test.lua`に統一** |
 | describe/itパターン | 使用中 | ドキュメント化 |
 | luacheck | 未導入 | **Research Needed** |
 
