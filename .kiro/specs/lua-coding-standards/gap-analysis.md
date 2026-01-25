@@ -219,14 +219,13 @@
 **Option A: ドキュメントファースト**を推奨
 
 ### 主要決定事項
-1. **規約ドキュメント構成**: 8セクション（要件1-8に対応）
-2. **リファクタリング範囲**: 8ファイル（scripts/pasta/*.lua）
+1. **規約ドキュメント構成**: 9セクション（要件1-9に対応）
+2. **リファクタリング範囲**: 8ファイル（scripts/pasta/*.lua） + テストファイル名変更
 3. **テスト戦略**: 既存テスト実行でリグレッション確認
+4. **Lint環境**: luacheck v1.2.0 導入済み（`crates/pasta_lua/scriptlibs/luacheck/`）
+5. **型注釈互換性**: EmmyLua annotations を使用（sumneko.lua 拡張で既にサポート済み）
 
-### 要調査事項（Research Needed）
-1. **EmmyLua互換性**: VS Code + sumneko lua-language-server との互換性確認
-
-**Note:** luacheck v1.2.0 は `crates/pasta_lua/scriptlibs/luacheck/` に導入済み。`.luacheckrc` 設定ファイルの作成が必要。
+**Note:** `.luacheckrc` 設定ファイルの作成は実装フェーズで対応。
 
 ### ファイル変更リスト（予定）
 | カテゴリ | ファイル | 変更種別 |
