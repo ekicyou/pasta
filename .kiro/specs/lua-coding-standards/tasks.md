@@ -89,128 +89,128 @@
 
 ## フェーズ2: 既存コードリファクタリング（依存関係順）
 
-### - [ ] 3. `store.lua` のリファクタリング
+### - [x] 3. `store.lua` のリファクタリング
 
-- [ ] 3.1 store.lua の軽微な調整
+- [x] 3.1 store.lua の軽微な調整
   - EmmyLua型アノテーションの完全性確認
   - 命名規約準拠確認（既に準拠済みのはず）
   - シングルトンパターンが正しいことを確認
   - _Requirements: 8.1, 8.2, 8.3_
 
-### - [ ] 4. `word.lua` のリファクタリング
+### - [x] 4. `word.lua` のリファクタリング
 
-- [ ] 4.1 word.lua のモジュール名変更
+- [x] 4.1 word.lua のモジュール名変更
   - モジュールテーブル名を`MOD`から`WORD`に変更
   - 全ての参照箇所を更新
   - _Requirements: 8.3_
 
-- [ ] 4.2 word.lua のクラスパターンリファクタリング
+- [x] 4.2 word.lua のクラスパターンリファクタリング
   - `WordBuilder`クラスを`WORD_BUILDER_IMPL`に変更
   - `WORD`モジュールテーブルと`WORD_BUILDER_IMPL`を分離
   - コロン構文のメソッド定義をドット構文+明示的selfに変換
   - `setmetatable(obj, { __index = WORD_BUILDER_IMPL })`パターンに変更
   - _Requirements: 2.3, 2.6, 4.1, 4.2, 4.3, 4.5, 8.4, 8.5_
 
-- [ ] 4.3 word.lua の型アノテーション修正
+- [x] 4.3 word.lua の型アノテーション修正
   - `@vararg`を`@param ... type`に修正
   - 全公開関数に`@param`/`@return`が完全であることを確認
   - `@class`/`@field`アノテーションを補完
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.6, 8.1_
 
-- [ ] 4.4 word.lua の動作検証
+- [x] 4.4 word.lua の動作検証
   - 既存テスト実行（`cargo test -p pasta_lua lua_unittest_runner`）
   - luacheck実行で警告がないことを確認
   - _Requirements: 8.7, 8.8_
 
-### - [ ] 5. `actor.lua` のリファクタリング
+### - [x] 5. `actor.lua` のリファクタリング
 
-- [ ] 5.1 actor.lua のクラスパターンリファクタリング
+- [x] 5.1 actor.lua のクラスパターンリファクタリング
   - `ActorWordBuilder`を`ACTOR_WORD_BUILDER_IMPL`に変更
   - `ACTOR`モジュールテーブルと`ACTOR_IMPL`を分離
   - コロン構文のメソッド定義をドット構文+明示的selfに変換
   - `PROXY`も同様に`PROXY_IMPL`パターンに変更
   - _Requirements: 2.3, 2.6, 4.1, 4.2, 4.3, 4.5, 8.4, 8.5_
 
-- [ ] 5.2 actor.lua の型アノテーション修正
+- [x] 5.2 actor.lua の型アノテーション修正
   - `@vararg`を`@param ... type`に修正
   - 全公開関数に`@param`/`@return`が完全であることを確認
   - `@class`/`@field`アノテーションを補完
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.6, 8.1_
 
-- [ ] 5.3 actor.lua の動作検証
-  - 既存テスト実行（`actor_word_spec.lua`含む）
+- [x] 5.3 actor.lua の動作検証
+  - 既存テスト実行（`actor_word_test.lua`含む）
   - luacheck実行で警告がないことを確認
   - _Requirements: 8.7, 8.8_
 
-### - [ ] 6. `scene.lua` のリファクタリング
+### - [x] 6. `scene.lua` のリファクタリング
 
-- [ ] 6.1 scene.lua のモジュール名変更
+- [x] 6.1 scene.lua のモジュール名変更
   - モジュールテーブル名を`MOD`から`SCENE`に変更
   - 全ての参照箇所を更新
   - _Requirements: 8.3_
 
-- [ ] 6.2 scene.lua の型アノテーション補完
+- [x] 6.2 scene.lua の型アノテーション補完
   - 欠落している公開関数に`@param`/`@return`を追加
   - 一貫性を確認
   - _Requirements: 5.1, 5.3, 8.1, 8.2_
 
-- [ ] 6.3 scene.lua の動作検証
+- [x] 6.3 scene.lua の動作検証
   - 既存テスト実行
   - luacheck実行で警告がないことを確認
   - _Requirements: 8.7, 8.8_
 
-### - [ ] 7. `act.lua` のリファクタリング
+### - [x] 7. `act.lua` のリファクタリング
 
-- [ ] 7.1 act.lua のクラスパターンリファクタリング
+- [x] 7.1 act.lua のクラスパターンリファクタリング
   - `ACT`モジュールテーブルと`ACT_IMPL`を分離
   - コロン構文のメソッド定義をドット構文+明示的selfに変換
   - `__index`メタメソッドを`ACT_IMPL.__index(self, key)`に変換
   - `setmetatable(obj, ACT_IMPL)`パターンに変更
   - _Requirements: 4.1, 4.2, 4.3, 4.5, 8.4, 8.5_
 
-- [ ] 7.2 act.lua の型アノテーション確認
+- [x] 7.2 act.lua の型アノテーション確認
   - 既存の型アノテーションが完全であることを確認
   - 必要に応じて補完
   - _Requirements: 5.1, 5.2, 5.3, 8.1_
 
-- [ ] 7.3 act.lua の動作検証
+- [x] 7.3 act.lua の動作検証
   - 既存テスト実行
   - luacheck実行で警告がないことを確認
   - _Requirements: 8.7, 8.8_
 
-### - [ ] 8. `ctx.lua` のリファクタリング
+### - [x] 8. `ctx.lua` のリファクタリング
 
-- [ ] 8.1 ctx.lua のクラスパターンリファクタリング
+- [x] 8.1 ctx.lua のクラスパターンリファクタリング
   - `CTX`モジュールテーブルと`CTX_IMPL`を分離
   - コロン構文のメソッド定義をドット構文+明示的selfに変換
   - `CTX.new()`は既に準拠しているため、メソッド定義の構文変換に注力
   - _Requirements: 4.1, 4.2, 4.3, 4.5, 8.4, 8.5_
 
-- [ ] 8.2 ctx.lua の型アノテーション確認
+- [x] 8.2 ctx.lua の型アノテーション確認
   - 既存の型アノテーションが完全であることを確認
   - 必要に応じて補完
   - _Requirements: 5.1, 5.2, 5.3, 8.1_
 
-- [ ] 8.3 ctx.lua の動作検証
+- [x] 8.3 ctx.lua の動作検証
   - 既存テスト実行
   - luacheck実行で警告がないことを確認
   - _Requirements: 8.7, 8.8_
 
-### - [ ] 9. その他ファイルの軽微な調整
+### - [x] 9. その他ファイルの軽微な調整
 
-- [ ] 9.1 (P) global.lua の調整
+- [x] 9.1 (P) global.lua の調整
   - 型アノテーションの確認
   - 命名規約準拠確認
   - _Requirements: 8.1, 8.2, 8.3_
 
-- [ ] 9.2 (P) init.lua の調整
+- [x] 9.2 (P) init.lua の調整
   - 型アノテーションの確認
   - エントリーポイントとして変更不要であることを確認
   - _Requirements: 8.1, 8.2_
 
-### - [ ] 10. テストファイル命名の統一
+### - [x] 10. テストファイル命名の統一
 
-- [ ] 10.1 テストファイルのリネーム
+- [x] 10.1 テストファイルのリネーム
   - `lua_specs/actor_word_spec.lua` → `actor_word_test.lua`
   - `lua_specs/transpiler_spec.lua` → `transpiler_test.lua`
   - テストファイル内のコメント・ドキュメントも更新（該当する場合）
@@ -220,48 +220,48 @@
 
 ## フェーズ3: 検証と最終確認
 
-### - [ ] 11. 統合テストと品質確認
+### - [x] 11. 統合テストと品質確認
 
-- [ ] 11.1 全Luaテストの実行
+- [x] 11.1 全Luaテストの実行
   - `cargo test -p pasta_lua lua_unittest_runner`で全テストを実行
   - リグレッションがないことを確認
   - 全テストがパスすることを確認
   - _Requirements: 8.7, 8.8_
 
-- [ ] 11.2 luacheckによる静的解析
+- [x] 11.2 luacheckによる静的解析
   - 全Luaファイルに対してluacheckを実行
   - 警告・エラーがないことを確認
   - 日本語識別子が正しく許可されていることを確認
   - _Requirements: 9.4, 9.5_
 
-- [ ] 11.3 コーディング規約への準拠確認
+- [x] 11.3 コーディング規約への準拠確認
   - `.kiro/steering/lua-coding.md`の規約に全ファイルが準拠していることを確認
   - 命名規約、モジュール構造、クラスパターン、型アノテーションの一貫性を検証
   - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 3.1, 3.2, 3.3, 3.4, 3.5, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6_
 
-### - [ ] 12. ドキュメント整合性の確認と更新
+### - [x] 12. ドキュメント整合性の確認と更新
 
-- [ ] 12.1 SOUL.md との整合性確認
+- [x] 12.1 SOUL.md との整合性確認
   - コアバリュー・設計原則との整合性を確認
   - Luaコーディング規約がプロジェクトビジョンに沿っていることを検証
 
-- [ ] 12.2 tech.md の更新
+- [x] 12.2 tech.md の更新
   - `pasta_lua`クレート（Luaバックエンド層）をtech.mdの技術スタックに追加
   - Lua 5.x、mlua、EmmyLua、luacheck v1.2.0の情報を記載
   - アーキテクチャ原則に`pasta_lua`の位置づけを追記
 
-- [ ] 12.3 structure.md の確認
+- [x] 12.3 structure.md の確認
   - `pasta_lua/scripts/pasta/`と`scriptlibs/`構造が正しく記載されていることを確認
   - 必要に応じて更新
 
-- [ ] 12.4 TEST_COVERAGE.md の更新
+- [x] 12.4 TEST_COVERAGE.md の更新
   - Luaテスト（`*_test.lua`）のマッピングを追加
   - lua_testフレームワークの情報を記載
 
-- [ ] 12.5 クレートREADMEの確認
+- [x] 12.5 クレートREADMEの確認
   - `crates/pasta_lua/README.md`がAPI変更を反映していることを確認
   - 必要に応じて更新
 
-- [ ] 12.6 ステアリング整合性の最終確認
+- [x] 12.6 ステアリング整合性の最終確認
   - `.kiro/steering/lua-coding.md`が他のステアリングファイルと整合していることを確認
   - workflow.mdのDoD基準を満たしていることを検証

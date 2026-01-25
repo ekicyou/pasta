@@ -1,9 +1,9 @@
 {
     "feature_name": "lua-coding-standards",
     "created_at": "2026-01-25T00:00:00Z",
-    "updated_at": "2026-01-25T18:30:00Z",
+    "updated_at": "2026-01-26T00:00:00Z",
     "language": "ja",
-    "phase": "tasks-generated",
+    "phase": "implemented",
     "approvals": {
         "requirements": {
             "generated": true,

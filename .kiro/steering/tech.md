@@ -5,11 +5,14 @@
 ### 言語・ランタイム
 - **Rust 2024 edition**: メインコンパイラ言語
 - **Rune 0.14**: バックエンドスクリプトVM（generator機能を使用）
+- **Lua 5.x (mlua)**: Luaバックエンドスクリプト実行
 - **Pest 2.8**: PEGパーサー生成器（`pasta.pest`文法定義）
 
 ### ワークスペース構成
 - **pasta_core**: 言語非依存層（パーサー、レジストリ）
 - **pasta_rune**: Runeバックエンド層（pasta_core依存）
+- **pasta_lua**: Luaバックエンド層（pasta_core依存）
+- **pasta_shiori**: SHIORI DLLインターフェース層
 
 ### 主要依存関係
 
@@ -29,6 +32,15 @@
 - **toml 0.9.8**: 設定ファイル管理
 - **tracing 0.1**: ロギング・診断
 
+**pasta_lua:**
+- **pasta_core**: 言語非依存層
+- **mlua 0.10**: Lua VMバインディング（Lua 5.4）
+- **thiserror 2**: エラー型定義
+- **toml 0.9.8**: 設定ファイル管理
+- **tracing 0.1**: ロギング・診断
+- **luacheck v1.2.0**: 静的解析ツール（scriptlibs/）
+- **lua_test**: BDDスタイルテストフレームワーク（scriptlibs/）
+
 ### 開発環境
 - **tempfile 3**: テスト用一時ファイル生成
 
@@ -40,11 +52,16 @@ pasta (workspace)
 ├── pasta_core          # 言語非依存層
 │   ├── Parser          # DSL→AST変換
 │   └── Registry        # シーン/単語テーブル
-└── pasta_rune          # Runeバックエンド層
-    ├── Engine          # 統合API、キャッシュ
-    ├── Transpiler      # AST→Runeコード (2pass)
-    ├── Runtime         # Rune VM実行、yield出力
-    └── Stdlib          # Pasta標準ライブラリ
+├── pasta_rune          # Runeバックエンド層
+│   ├── Engine          # 統合API、キャッシュ
+│   ├── Transpiler      # AST→Runeコード (2pass)
+│   ├── Runtime         # Rune VM実行、yield出力
+│   └── Stdlib          # Pasta標準ライブラリ
+├── pasta_lua           # Luaバックエンド層
+│   ├── Transpiler      # AST→Luaコード
+│   ├── Runtime         # Lua VM実行
+│   └── Loader          # スクリプト読み込み・キャッシュ
+└── pasta_shiori        # SHIORI DLLインターフェース
 ```
 
 | クレート | レイヤー | 責務 |
@@ -55,6 +72,10 @@ pasta (workspace)
 | pasta_rune | Runtime | Rune VM実行、yield出力 |
 | pasta_rune | Engine | 統合API、キャッシュ |
 | pasta_rune | IR | ScriptEventイベント出力 |
+| pasta_lua | Transpiler | AST→Luaコード変換 |
+| pasta_lua | Runtime | Lua VM実行、コルーチン制御 |
+| pasta_lua | Loader | スクリプト読み込み・キャッシュ |
+| pasta_shiori | SHIORI | DLLエクスポート、リクエスト処理 |
 
 ### 設計哲学
 
