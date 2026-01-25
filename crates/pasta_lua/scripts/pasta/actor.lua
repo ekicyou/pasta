@@ -12,25 +12,27 @@ local GLOBAL = require("pasta.global")
 --- @field name string アクター名
 --- @field spot integer|nil 立ち位置（0以上）
 local ACTOR = {}
-ACTOR.__index = ACTOR
+
+--- アクター実装メタテーブル
+local ACTOR_IMPL = {}
 
 -------------------------------------------
--- ActorWordBuilder - アクター単語ビルダー
+-- ACTOR_WORD_BUILDER_IMPL - アクター単語ビルダー
 -------------------------------------------
 
---- ActorWordBuilderクラス（WordBuilderを拡張）
+--- ActorWordBuilderクラス実装メタテーブル（WordBuilderを拡張）
 --- word.lua辞書への登録とACTORプロパティへの設定を同時に行う
 --- @class ActorWordBuilder
 --- @field _actor Actor アクターオブジェクト
 --- @field _key string 単語キー
 --- @field _word_builder WordBuilder 内部のWordBuilder
-local ActorWordBuilder = {}
-ActorWordBuilder.__index = ActorWordBuilder
+local ACTOR_WORD_BUILDER_IMPL = {}
 
 --- 値を追加（辞書登録＋ACTORプロパティ設定）
---- @vararg string 可変長引数で値を受け取る
+--- @param self ActorWordBuilder ビルダーオブジェクト
+--- @param ... string 可変長引数で値を受け取る
 --- @return ActorWordBuilder メソッドチェーン用に自身を返す
-function ActorWordBuilder:entry(...)
+function ACTOR_WORD_BUILDER_IMPL.entry(self, ...)
     local values = { ... }
     if #values > 0 then
         -- word.lua辞書に登録（L2前方一致用）
@@ -51,12 +53,13 @@ end
 --- @param self Actor アクターオブジェクト
 --- @param key string 単語キー
 --- @return ActorWordBuilder ビルダーオブジェクト
-function ACTOR:create_word(key)
-    local builder = setmetatable({}, ActorWordBuilder)
-    builder._actor = self
-    builder._key = key
-    builder._word_builder = WORD.create_actor(self.name, key)
-    return builder
+function ACTOR_IMPL.create_word(self, key)
+    local builder = {
+        _actor = self,
+        _key = key,
+        _word_builder = WORD.create_actor(self.name, key),
+    }
+    return setmetatable(builder, { __index = ACTOR_WORD_BUILDER_IMPL })
 end
 
 --- アクターを取得または新規作成
@@ -68,17 +71,20 @@ function ACTOR.get_or_create(name)
             name = name,
             spot = nil,
         }
-        setmetatable(actor, ACTOR)
+        setmetatable(actor, { __index = ACTOR_IMPL })
         STORE.actors[name] = actor
     end
     return STORE.actors[name]
 end
 
+-------------------------------------------
+-- PROXY_IMPL - アクタープロキシ実装
+-------------------------------------------
+
 --- @class ActorProxy アクタープロキシ（actへの逆参照付き）
 --- @field actor Actor アクターオブジェクト
 --- @field act Act アクションオブジェクト
-local PROXY = {}
-PROXY.__index = PROXY
+local PROXY_IMPL = {}
 
 --- プロキシを作成
 --- @param actor Actor アクターオブジェクト
@@ -89,13 +95,14 @@ function ACTOR.create_proxy(actor, act)
         actor = actor,
         act = act,
     }
-    setmetatable(proxy, PROXY)
-    return proxy
+    return setmetatable(proxy, { __index = PROXY_IMPL })
 end
 
 --- talk（act経由でトークン蓄積）
+--- @param self ActorProxy プロキシオブジェクト
 --- @param text string 発話テキスト
-function PROXY:talk(text)
+--- @return nil
+function PROXY_IMPL.talk(self, text)
     self.act:talk(self.actor, text)
 end
 
@@ -147,13 +154,14 @@ local function search_prefix_lua(dict, prefix)
 end
 
 -------------------------------------------
--- PROXY:word 6レベルフォールバック検索
+-- PROXY_IMPL:word 6レベルフォールバック検索
 -------------------------------------------
 
 --- word（6レベルフォールバック検索）
+--- @param self ActorProxy プロキシオブジェクト
 --- @param name string 単語名（＠なし）
 --- @return string|nil 見つかった単語、またはnil
-function PROXY:word(name)
+function PROXY_IMPL.word(self, name)
     if not name or name == "" then
         return nil
     end

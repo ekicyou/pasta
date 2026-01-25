@@ -10,6 +10,7 @@
 ---       return "正午です"
 ---   end
 
+--- @class Global グローバル関数テーブル
 local GLOBAL = {}
 
 return GLOBAL
