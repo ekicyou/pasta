@@ -465,6 +465,8 @@ end)
 
 ## 実装フロー
 
+**リファクタリング順序の原則**: 依存関係の葉（依存先）から順に修正し、一時的な破壊状態を回避
+
 ```mermaid
 flowchart TD
     subgraph Phase1["フェーズ1: ドキュメント作成"]
@@ -472,13 +474,14 @@ flowchart TD
         A2 --> A3["レビュー & 承認"]
     end
     
-    subgraph Phase2["フェーズ2: リファクタリング"]
-        B1["actor.lua 修正"] --> B2["word.lua 修正"]
-        B2 --> B3["ctx.lua 修正"]
-        B3 --> B4["act.lua 修正"]
-        B4 --> B5["scene.lua 修正"]
-        B5 --> B6["その他ファイル調整"]
-        B6 --> B7["テストファイルリネーム"]
+    subgraph Phase2["フェーズ2: リファクタリング（依存関係順）"]
+        B1["store.lua 修正"] --> B2["word.lua 修正"]
+        B2 --> B3["actor.lua 修正"]
+        B3 --> B4["scene.lua 修正"]
+        B4 --> B5["act.lua 修正"]
+        B5 --> B6["ctx.lua 修正"]
+        B6 --> B7["その他ファイル調整"]
+        B7 --> B8["テストファイルリネーム"]
     end
     
     subgraph Phase3["フェーズ3: 検証"]
@@ -487,21 +490,38 @@ flowchart TD
     end
     
     A3 --> B1
-    B7 --> C1
+    B8 --> C1
+```
+
+**依存関係マップ**:
+```
+store.lua (葉・依存先なし)
+  ↑
+  ├─ word.lua
+  │    ↑
+  │    └─ actor.lua
+  │         ↑
+  │         └─ act.lua
+  │              ↑
+  │              └─ ctx.lua
+  │
+  └─ scene.lua
+       ↑
+       └─ act.lua (上記と同じ)
 ```
 
 ## 付録: 変更ファイルリスト
 
-| カテゴリ | ファイル | 変更種別 | 規模 |
-|----------|----------|----------|------|
-| 新規 | `.kiro/steering/lua-coding.md` | 作成 | 大 |
-| 新規 | `crates/pasta_lua/.luacheckrc` | 作成 | 小 |
-| 修正 | `scripts/pasta/actor.lua` | リファクタ | 中 |
-| 修正 | `scripts/pasta/word.lua` | リファクタ | 中 |
-| 修正 | `scripts/pasta/ctx.lua` | リファクタ | 小 |
-| 修正 | `scripts/pasta/act.lua` | リファクタ | 中 |
-| 修正 | `scripts/pasta/scene.lua` | リファクタ | 小 |
-| 修正 | `scripts/pasta/store.lua` | 軽微調整 | 小 |
-| 修正 | `scripts/pasta/global.lua` | 軽微調整 | 小 |
-| 修正 | `scripts/pasta/init.lua` | 軽微調整 | 小 |
-| リネーム | `lua_specs/*_spec.lua` → `*_test.lua` | リネーム | 小 |
+| 順序 | カテゴリ | ファイル | 変更種別 | 規模 | 依存先 |
+|------|----------|----------|----------|------|---------|
+| - | 新規 | `.kiro/steering/lua-coding.md` | 作成 | 大 | なし |
+| - | 新規 | `crates/pasta_lua/.luacheckrc` | 作成 | 小 | なし |
+| 1 | 修正 | `scripts/pasta/store.lua` | 軽微調整 | 小 | なし（葉） |
+| 2 | 修正 | `scripts/pasta/word.lua` | リファクタ | 中 | STORE |
+| 3 | 修正 | `scripts/pasta/actor.lua` | リファクタ | 中 | STORE, WORD |
+| 4 | 修正 | `scripts/pasta/scene.lua` | リファクタ | 小 | STORE |
+| 5 | 修正 | `scripts/pasta/act.lua` | リファクタ | 中 | ACTOR, SCENE |
+| 6 | 修正 | `scripts/pasta/ctx.lua` | リファクタ | 小 | ACT |
+| 7 | 修正 | `scripts/pasta/global.lua` | 軽微調整 | 小 | なし |
+| 8 | 修正 | `scripts/pasta/init.lua` | 軽微調整 | 小 | なし |
+| 9 | リネーム | `lua_specs/*_spec.lua` → `*_test.lua` | リネーム | 小 | なし |
