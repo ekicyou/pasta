@@ -197,4 +197,5 @@ The following files require class pattern refactoring:
 1. The coding standard shall document lua_test framework usage patterns (`expect`, `describe`, `it`)
 2. The coding standard shall define test file naming convention as `*_test.lua` (unified with Rust `*_test.rs` for AI search reliability)
 3. The coding standard shall provide test structure template (describe/it pattern)
-4. Where luacheck is available, the coding standard shall document recommended luacheck configuration
+4. The coding standard shall document luacheck configuration and usage (located at `crates/pasta_lua/scriptlibs/luacheck/`)
+5. The coding standard shall provide `.luacheckrc` configuration template for pasta project patterns

@@ -224,8 +224,9 @@
 3. **テスト戦略**: 既存テスト実行でリグレッション確認
 
 ### 要調査事項（Research Needed）
-1. **luacheck導入**: CI統合可能か？設定ファイル形式は？
-2. **EmmyLua互換性**: VS Code + sumneko lua-language-server との互換性確認
+1. **EmmyLua互換性**: VS Code + sumneko lua-language-server との互換性確認
+
+**Note:** luacheck v1.2.0 は `crates/pasta_lua/scriptlibs/luacheck/` に導入済み。`.luacheckrc` 設定ファイルの作成が必要。
 
 ### ファイル変更リスト（予定）
 | カテゴリ | ファイル | 変更種別 |
