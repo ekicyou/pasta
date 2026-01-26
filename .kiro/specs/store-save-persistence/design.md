@@ -107,6 +107,21 @@ flowchart TB
 
 ## System Flows
 
+### Module Registration Order
+
+`PastaLuaRuntime::from_loader_with_scene_dic()` における初期化順序（Phase 順）:
+
+1. **Lua VM作成** - `Self::with_config()`
+2. **package.path設定** - `setup_package_path()`
+3. **@pasta_config登録** - `register_config_module()`
+4. **@enc登録** - `register_enc_module()`
+5. **@pasta_persistence登録** - `register_persistence_module()` ← **この機能で追加**
+6. **main.lua読み込み** (optional)
+7. **finalize_scene登録** - `register_finalize_scene()`
+8. **scene_dic.lua読み込み** - `load_scene_dic()`
+
+**保証**: `@pasta_persistence` モジュールは Phase 5 で登録されるため、`scene_dic.lua`（Phase 8）および `pasta.save`（scene_dic.lua から require される）より**確実に前**に利用可能になる。
+
 ### 起動時ロードフロー
 
 ```mermaid
