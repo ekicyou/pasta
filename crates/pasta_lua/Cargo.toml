@@ -17,7 +17,9 @@ mlua.workspace = true
 mlua-stdlib.workspace = true
 toml.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 glob.workspace = true
+flate2.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = ["Win32_Globalization"] }

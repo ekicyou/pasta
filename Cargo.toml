@@ -29,7 +29,9 @@ mlua = { version = "0.11", features = ["lua54", "vendored", "serialize"] }
 mlua-stdlib = { version = "0.1", features = ["lua54", "vendored", "json", "regex", "yaml"] }
 toml = "0.9.8"
 serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 glob = "0.3"
+flate2 = "1.1"
 
 # Logging dependencies
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

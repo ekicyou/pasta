@@ -19,13 +19,15 @@
 mod enc;
 /// Finalize module - Collects Lua-side registries and builds SearchContext.
 pub mod finalize;
+/// Persistence module - Persistent data storage for Lua scripts.
+pub mod persistence;
 
 use crate::context::TranspileContext;
-use crate::loader::{LoaderContext, TranspileResult};
+use crate::loader::{LoaderContext, PastaConfig, TranspileResult};
 use crate::logging::PastaLogger;
 pub(crate) use finalize::register_finalize_scene;
-use mlua::{Lua, Result as LuaResult, StdLib, Table, Value};
-use std::path::Path;
+use mlua::{Lua, LuaSerdeExt, Result as LuaResult, StdLib, Table, Value};
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 /// Configuration for which standard libraries to enable in the Lua runtime.
@@ -110,6 +112,11 @@ pub struct PastaLuaRuntime {
     /// If set, this logger is used for tracing output.
     /// Wrapped in Arc for sharing with GlobalLoggerRegistry.
     logger: Option<Arc<PastaLogger>>,
+    /// Configuration for persistence and other runtime settings.
+    /// Used for Drop-time auto-save and other Rust-side operations.
+    config: Option<PastaConfig>,
+    /// Base directory for resolving relative paths (persistence file, etc.).
+    base_dir: Option<PathBuf>,
 }
 
 impl PastaLuaRuntime {
@@ -184,7 +191,12 @@ impl PastaLuaRuntime {
             mlua_stdlib::yaml::register(&lua, None)?;
         }
 
-        Ok(Self { lua, logger: None })
+        Ok(Self {
+            lua,
+            logger: None,
+            config: None,
+            base_dir: None,
+        })
     }
 
     /// Execute a Lua script string.
@@ -322,7 +334,8 @@ impl PastaLuaRuntime {
     /// # Arguments
     /// * `context` - TranspileContext with scene/word registries
     /// * `loader_context` - Configuration and paths from PastaLoader
-    /// * `config` - Runtime configuration
+    /// * `runtime_config` - Runtime configuration
+    /// * `pasta_config` - Pasta configuration from pasta.toml
     /// * `logger` - Optional instance-specific logger (Arc-wrapped for sharing)
     /// * `scene_dic_path` - Path to the generated scene_dic.lua
     ///
@@ -332,15 +345,20 @@ impl PastaLuaRuntime {
     pub fn from_loader_with_scene_dic(
         context: TranspileContext,
         loader_context: LoaderContext,
-        config: RuntimeConfig,
+        runtime_config: RuntimeConfig,
+        pasta_config: Option<PastaConfig>,
         logger: Option<Arc<PastaLogger>>,
         scene_dic_path: &Path,
     ) -> LuaResult<Self> {
         // Create base runtime
-        let mut runtime = Self::with_config(context, config)?;
+        let mut runtime = Self::with_config(context, runtime_config)?;
 
         // Set logger if provided
         runtime.logger = logger;
+
+        // Store config and base_dir for Drop-time persistence save
+        runtime.base_dir = Some(loader_context.base_dir.clone());
+        runtime.config = pasta_config;
 
         // Setup package.path for module resolution
         Self::setup_package_path(&runtime.lua, &loader_context)?;
@@ -350,6 +368,9 @@ impl PastaLuaRuntime {
 
         // Register @enc module for encoding conversion
         Self::register_enc_module(&runtime.lua)?;
+
+        // Register @pasta_persistence module for persistent data storage
+        Self::register_persistence_module(&runtime.lua, &runtime.config, &runtime.base_dir)?;
 
         // Load main.lua first (for SHIORI.load/SHIORI.request functions)
         let main_lua_path = loader_context
@@ -460,6 +481,32 @@ impl PastaLuaRuntime {
         Ok(())
     }
 
+    /// Register @pasta_persistence module for persistent data storage.
+    ///
+    /// Provides load/save functions for persisting Lua tables to files.
+    fn register_persistence_module(
+        lua: &Lua,
+        config: &Option<PastaConfig>,
+        base_dir: &Option<PathBuf>,
+    ) -> LuaResult<()> {
+        // Get persistence config, use defaults if not specified
+        let persistence_config = config
+            .as_ref()
+            .and_then(|c| c.persistence())
+            .unwrap_or_default();
+
+        let base = base_dir.as_deref().unwrap_or(Path::new("."));
+
+        let persistence_table = persistence::register(lua, &persistence_config, base)?;
+
+        let package: Table = lua.globals().get("package")?;
+        let loaded: Table = package.get("loaded")?;
+        loaded.set("@pasta_persistence", persistence_table)?;
+
+        tracing::debug!("Registered @pasta_persistence module");
+        Ok(())
+    }
+
     /// Convert toml::Value to mlua::Value.
     ///
     /// Recursively converts TOML structures to Lua tables.
@@ -484,6 +531,56 @@ impl PastaLuaRuntime {
                 }
                 Ok(Value::Table(table))
             }
+        }
+    }
+
+    /// Save persistence data from ctx.save.
+    ///
+    /// Called automatically on Drop to save any modified persistent data.
+    fn save_persistence_data(&self) -> Result<(), persistence::PersistenceError> {
+        // Get persistence config
+        let persistence_config = self
+            .config
+            .as_ref()
+            .and_then(|c| c.persistence())
+            .unwrap_or_default();
+
+        let base_dir = self.base_dir.as_deref().unwrap_or(Path::new("."));
+        let file_path = base_dir.join(persistence_config.effective_file_path());
+
+        // Try to get ctx.save from Lua
+        let save_table: Table = match self.lua.load(r#"require("pasta.ctx").save"#).eval() {
+            Ok(t) => t,
+            Err(e) => {
+                // ctx.save might not exist if runtime wasn't fully initialized
+                tracing::debug!(error = %e, "Could not access ctx.save, skipping persistence save");
+                return Ok(());
+            }
+        };
+
+        // Convert Lua table to serde_json::Value
+        let lua_value = Value::Table(save_table);
+        let json_value: serde_json::Value = self
+            .lua
+            .from_value(lua_value)
+            .map_err(|e| persistence::PersistenceError::LuaConversionError(e.to_string()))?;
+
+        // Save to file
+        persistence::save_to_file(&json_value, &file_path, persistence_config.obfuscate)?;
+
+        if persistence_config.debug_mode {
+            tracing::debug!(path = %file_path.display(), "Saved persistence data on drop");
+        }
+
+        Ok(())
+    }
+}
+
+impl Drop for PastaLuaRuntime {
+    fn drop(&mut self) {
+        // Save persistence data (errors are logged, not propagated)
+        if let Err(e) = self.save_persistence_data() {
+            tracing::error!(error = %e, "Failed to save persistence data on drop");
         }
     }
 }
