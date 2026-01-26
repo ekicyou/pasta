@@ -7,6 +7,9 @@
 
 local STORE = {}
 
+--- 永続変数（セッションを跨いで保持）
+STORE.save = {}
+
 --- アクターキャッシュ（名前→アクター）
 STORE.actors = {}
 
@@ -27,6 +30,7 @@ STORE.actor_words = {}
 
 --- 全データをリセット
 function STORE.reset()
+    STORE.save = {}
     STORE.actors = {}
     STORE.scenes = {}
     STORE.counters = {}

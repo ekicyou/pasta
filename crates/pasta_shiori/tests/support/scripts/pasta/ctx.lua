@@ -5,6 +5,7 @@
 --- save（永続変数）とactors（登録アクター）を保持する。
 
 local ACT = require("pasta.act")
+local STORE = require("pasta.store")
 
 --- @class CTX 環境オブジェクト
 --- @field save table 永続変数（セッションが終わっても残る）
@@ -13,12 +14,11 @@ local CTX = {}
 CTX.__index = CTX
 
 --- 新規CTXを作成
---- @param save table|nil 永続変数
 --- @param actors table|nil 登録アクター
 --- @return CTX 環境オブジェクト
-function CTX.new(save, actors)
+function CTX.new(actors)
     local obj = {
-        save = save or {},
+        save = STORE.save,
         actors = actors or {},
     }
     setmetatable(obj, CTX)
