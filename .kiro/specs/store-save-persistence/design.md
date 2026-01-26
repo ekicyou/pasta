@@ -97,13 +97,13 @@ flowchart TB
 
 ### Technology Stack
 
-| Layer         | Choice / Version      | Role in Feature       | Notes                     |
-| ------------- | --------------------- | --------------------- | ------------------------- |
-| Runtime       | mlua 0.11 + serialize | Lua ↔ serde変換       | 既存依存                  |
-| Serialization | serde_json 1.x        | JSON形式永続化        | 既存依存                  |
-| Config        | serde + toml 0.9.8    | PersistenceConfig解析 | 既存依存                  |
+| Layer         | Choice / Version      | Role in Feature       | Notes                           |
+| ------------- | --------------------- | --------------------- | ------------------------------- |
+| Runtime       | mlua 0.11 + serialize | Lua ↔ serde変換       | 既存依存                        |
+| Serialization | serde_json 1.x        | JSON形式永続化        | 既存依存                        |
+| Config        | serde + toml 0.9.8    | PersistenceConfig解析 | 既存依存                        |
 | Compression   | flate2 1.1            | gzip圧縮（難読化）    | 追加依存（軽量、rust-lang公式） |
-| File I/O      | std::fs               | アトミック書き込み    | 標準ライブラリ            |
+| File I/O      | std::fs               | アトミック書き込み    | 標準ライブラリ                  |
 
 ## System Flows
 
@@ -355,6 +355,13 @@ fn default_persistence_file_path() -> String {
 **Contracts**: State [x]
 
 ```rust
+/// PastaLuaRuntime構造体にPastaConfigを保持
+pub struct PastaLuaRuntime {
+    lua: Lua,
+    logger: Option<Arc<PastaLogger>>,
+    config: Option<PastaConfig>,  // Rust側設定アクセス用
+}
+
 impl Drop for PastaLuaRuntime {
     fn drop(&mut self) {
         // 永続化データを保存（エラーはログのみ）
@@ -367,15 +374,23 @@ impl Drop for PastaLuaRuntime {
 impl PastaLuaRuntime {
     /// ctx.saveを永続化ファイルに保存
     fn save_persistence_data(&self) -> Result<(), PersistenceError> {
-        // 1. require("pasta.ctx").saveを取得
-        // 2. LuaSerdeExtでserde_json::Valueに変換
-        // 3. persistence::save_table_to_file()を呼び出し
+        // 1. self.configからPersistenceConfigを取得
+        let config = self.config.as_ref()
+            .and_then(|c| c.persistence.as_ref())
+            .ok_or_else(|| PersistenceError::ConfigNotFound)?;
+        
+        // 2. require("pasta.ctx").saveを取得
+        // 3. LuaSerdeExtでserde_json::Valueに変換
+        // 4. persistence::save_table_to_file(data, config)を呼び出し
     }
 }
 ```
 
-**Implementation Notes**
-- `PersistenceConfig`はLuaのupvalueから取得するか、Runtime構造体に保持
+**Architecture Notes**
+- **Dual-purpose config architecture**:
+  - `LoaderContext::custom_fields`: Lua側からの設定アクセス（既存の`@pasta_config`パターン）
+  - `PastaLuaRuntime::config`: Rust側からの型安全な設定アクセス（persistence, logging等）
+- `PastaConfig`を`LoaderContext`から`PastaLuaRuntime`初期化時に渡す
 - Lua VMアクセス失敗時は警告ログのみ
 
 ---
