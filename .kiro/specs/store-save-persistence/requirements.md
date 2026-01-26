@@ -46,21 +46,20 @@ store.luaのSTORE.saveテーブルについて、ランタイムロード時に�
 **Objective:** コンテンツ開発者として、保存データを簡易的に難読化したい。これにより、カジュアルな改ざんを抑止できる。
 
 #### Acceptance Criteria
-1. Where 難読化が有効な場合, the persistence module shall データをバイナリ形式で保存する
-2. Where 難読化が無効な場合, the persistence module shall データを人間可読なJSON形式で保存する
+1. Where 難読化が有効な場合, the persistence module shall データをXOR暗号化したバイナリ形式で保存する（拡張子: `.dat`）
+2. Where 難読化が無効な場合, the persistence module shall データを人間可読なJSON形式で保存する（拡張子: `.json`）
 3. The persistence module shall 難読化形式でもJSON形式でも読み込み可能とする（後方互換性）
-4. When 難読化形式で保存するとき, the persistence module shall XOR等の簡易暗号化を適用する
-5. The serialization shall ネストしたテーブル、文字列、数値、ブール値をサポートする
+4. The serialization shall 任意にネストしたテーブル、文字列、数値、ブール値、配列をサポートする
 
 ### Requirement 5: 設定ファイル対応
 **Objective:** ゴースト開発者として、pasta.tomlで永続化の動作を設定したい。これにより、プロジェクトごとに異なる設定が可能となる。
 
 #### Acceptance Criteria
 1. The PastaConfig shall `[persistence]`セクションを解析する
-2. When `obfuscate = true`が設定されているとき, the persistence module shall 難読化形式で保存する
-3. When `obfuscate = false`または未設定のとき, the persistence module shall JSON形式で保存する
-4. The PastaConfig shall `file_path`オプションで保存先パスを変更可能とする（デフォルト: `profile/pasta/save/save.dat`）
-5. If `[persistence]`セクションが存在しないとき, then the persistence module shall デフォルト設定（難読化なし、標準パス）を使用する
+2. When `obfuscate = true`が設定されているとき, the persistence module shall 難読化形式で保存する（デフォルト: `profile/pasta/save/save.dat`）
+3. When `obfuscate = false`または未設定のとき, the persistence module shall JSON形式で保存する（デフォルト: `profile/pasta/save/save.json`）
+4. The PastaConfig shall `file_path`オプションで保存先パスを変更可能とする
+5. If `[persistence]`セクションが存在しないとき, then the persistence module shall デフォルト設定（難読化なし、`profile/pasta/save/save.json`）を使用する
 
 ### Requirement 6: エラーハンドリングと堅牢性
 **Objective:** システム運用者として、永続化処理が失敗してもランタイム全体が停止しないでほしい。これにより、ファイルシステムの問題があっても対話が継続できる。
