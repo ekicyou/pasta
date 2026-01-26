@@ -8,6 +8,7 @@
 local specs = {
     "transpiler_test",
     "actor_word_test", -- actor-word-dictionary feature tests
+    "store_save_test", -- store-save-table feature tests
     -- 将来のテストスイートをここに追加
     -- "code_generator_test",
     -- "context_test",
