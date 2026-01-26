@@ -57,12 +57,12 @@
 
 ### 2.4 Runtime層テスト（実行エンジン）
 
-| 機能                     | テストファイル               | 状態   | 説明               |
-| ------------------------ | ---------------------------- | ------ | ------------------ |
-| Luaスクリプトローダー    | `loader_integration_test.rs` | ✅ 完了 | スクリプト読み込み |
-| 標準ライブラリモジュール | `stdlib_modules_test.rs`     | ✅ 完了 | stdlib機能         |
-| 正規表現モジュール       | `stdlib_regex_test.rs`       | ✅ 完了 | 14テスト           |
-| Lua単体テスト実行        | `lua_unittest_runner.rs`     | ✅ 完了 | Luaテストランナー  |
+| 機能                     | テストファイル               | 状態   | 説明                 |
+| ------------------------ | ---------------------------- | ------ | -------------------- |
+| Luaスクリプトローダー    | `loader_integration_test.rs` | ✅ 完了 | スクリプト読み込み   |
+| 標準ライブラリモジュール | `stdlib_modules_test.rs`     | ✅ 完了 | stdlib機能           |
+| 正規表現モジュール       | `stdlib_regex_test.rs`       | ✅ 完了 | 14テスト             |
+| Lua単体テスト実行        | `lua_unittest_runner.rs`     | ✅ 完了 | Luaテストランナー    |
 | STORE.save/CTX注入       | `store_save_test.lua`        | ✅ 完了 | 永続変数・参照同一性 |
 
 ### 2.5 統合テスト（E2E）
