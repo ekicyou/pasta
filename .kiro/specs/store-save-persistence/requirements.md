@@ -21,7 +21,7 @@ store.luaのSTORE.saveテーブルについて、ランタイムロード時に�
 #### Acceptance Criteria
 1. When ランタイムが初期化されるとき, the PastaLuaRuntime shall Lua側に`@pasta_persistence`モジュールを登録する
 2. When `@pasta_persistence.load()`が呼び出されるとき, the persistence module shall 永続化ファイルからデータをLuaテーブルとして返す
-3. When `@pasta_persistence.save(data)`が呼び出されるとき, the persistence module shall 渡されたLuaテーブルを永続化ファイルに書き込む
+3. When `@pasta_persistence.save(data)`が呼び出されるとき, the persistence module shall 渡されたLuaテーブルを永続化ファイルに書き込む（明示的保存）
 4. If 永続化ファイルが存在しないとき, then the persistence module shall 空テーブル`{}`を返す
 5. If ファイル読み込み中にエラーが発生したとき, then the persistence module shall エラーログを出力し空テーブルを返す（起動を妨げない）
 
@@ -34,13 +34,14 @@ store.luaのSTORE.saveテーブルについて、ランタイムロード時に�
 3. While ランタイムが動作中, the STORE.save shall 通常のLuaテーブルとして読み書き可能である
 
 ### Requirement 3: ランタイムDrop時の自動保存
-**Objective:** システム運用者として、ランタイム終了時に自動的にSTORE.saveが保存されてほしい。これにより、明示的な保存呼び出しなしでデータが永続化される。
+**Objective:** システム運用者として、ランタイム終了時に自動的にSTORE.saveが保存されてほしい。また、スクリプト開発者として、必要に応じて明示的に保存を呼び出したい。これにより、柔軟な保存タイミング制御と異常終了時の安全性が両立される。
 
 #### Acceptance Criteria
-1. When PastaLuaRuntimeがドロップされるとき, the runtime shall `STORE.save`テーブルを永続化ファイルに書き込む
+1. When PastaLuaRuntimeがドロップされるとき, the runtime shall `STORE.save`テーブルを永続化ファイルに強制的に書き込む
 2. When Drop実装が実行されるとき, the runtime shall Lua側の`require("pasta.store").save`を取得して保存する
-3. If 保存中にエラーが発生したとき, then the runtime shall エラーログを出力する（パニックしない）
-4. While ランタイムが正常に動作しているとき, the runtime shall Lua VMへの参照を保持し続ける
+3. The @pasta_persistence.save() function shall Luaスクリプトから任意のタイミングで呼び出し可能である（定期保存、特定イベント後の保存など）
+4. If 保存中にエラーが発生したとき, then the runtime shall エラーログを出力する（パニックしない）
+5. While ランタイムが正常に動作しているとき, the runtime shall Lua VMへの参照を保持し続ける
 
 ### Requirement 4: 難読化シリアライズ対応
 **Objective:** コンテンツ開発者として、保存データを簡易的に難読化したい。これにより、カジュアルな改ざんを抑止できる。
