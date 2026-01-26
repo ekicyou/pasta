@@ -88,6 +88,17 @@ impl PastaConfig {
             .and_then(|v| v.clone().try_into().ok())
     }
 
+    /// Get persistence configuration from [persistence] section.
+    ///
+    /// # Returns
+    /// * `Some(PersistenceConfig)` - If [persistence] section exists and is valid
+    /// * `None` - If [persistence] section is missing or invalid
+    pub fn persistence(&self) -> Option<PersistenceConfig> {
+        self.custom_fields
+            .get("persistence")
+            .and_then(|v| v.clone().try_into().ok())
+    }
+
     /// Create from TOML string (for testing).
     #[cfg(test)]
     fn from_str(s: &str) -> Result<Self, toml::de::Error> {
@@ -178,6 +189,56 @@ fn default_log_file_path() -> String {
 
 fn default_rotation_days() -> usize {
     7
+}
+
+/// Persistence configuration from [persistence] section in pasta.toml.
+///
+/// Configures persistent data storage with optional obfuscation.
+#[derive(Debug, Clone, Deserialize)]
+pub struct PersistenceConfig {
+    /// Enable obfuscation (gzip compression) for saved data.
+    /// Default: false
+    #[serde(default)]
+    pub obfuscate: bool,
+
+    /// Save file path relative to load_dir.
+    /// Default: "profile/pasta/save/save.json" (or .dat if obfuscate=true)
+    #[serde(default = "default_persistence_file_path")]
+    pub file_path: String,
+
+    /// Enable debug logging for persistence operations.
+    /// Default: false
+    #[serde(default)]
+    pub debug_mode: bool,
+}
+
+impl Default for PersistenceConfig {
+    fn default() -> Self {
+        Self {
+            obfuscate: false,
+            file_path: default_persistence_file_path(),
+            debug_mode: false,
+        }
+    }
+}
+
+fn default_persistence_file_path() -> String {
+    "profile/pasta/save/save.json".to_string()
+}
+
+impl PersistenceConfig {
+    /// Get the effective file path based on obfuscate setting.
+    ///
+    /// If obfuscate is true and file_path ends with .json, changes extension to .dat.
+    pub fn effective_file_path(&self) -> String {
+        if self.obfuscate && self.file_path.ends_with(".json") {
+            self.file_path.replace(".json", ".dat")
+        } else if self.obfuscate && !self.file_path.ends_with(".dat") {
+            format!("{}.dat", self.file_path)
+        } else {
+            self.file_path.clone()
+        }
+    }
 }
 
 #[cfg(test)]
@@ -337,5 +398,78 @@ debug_mode = true
 "#;
         let config = PastaConfig::from_str(toml_str).unwrap();
         assert!(config.logging().is_none());
+    }
+
+    #[test]
+    fn test_persistence_config_default() {
+        let config = PersistenceConfig::default();
+        assert!(!config.obfuscate);
+        assert_eq!(config.file_path, "profile/pasta/save/save.json");
+        assert!(!config.debug_mode);
+    }
+
+    #[test]
+    fn test_persistence_config_from_toml() {
+        let toml_str = r#"
+[persistence]
+obfuscate = true
+file_path = "profile/custom/save.dat"
+debug_mode = true
+"#;
+        let config = PastaConfig::from_str(toml_str).unwrap();
+        let persistence = config
+            .persistence()
+            .expect("persistence section should exist");
+        assert!(persistence.obfuscate);
+        assert_eq!(persistence.file_path, "profile/custom/save.dat");
+        assert!(persistence.debug_mode);
+    }
+
+    #[test]
+    fn test_persistence_config_defaults_when_partial() {
+        let toml_str = r#"
+[persistence]
+obfuscate = true
+"#;
+        let config = PastaConfig::from_str(toml_str).unwrap();
+        let persistence = config
+            .persistence()
+            .expect("persistence section should exist");
+        assert!(persistence.obfuscate);
+        assert_eq!(persistence.file_path, "profile/pasta/save/save.json"); // default
+        assert!(!persistence.debug_mode); // default
+    }
+
+    #[test]
+    fn test_persistence_config_none_when_missing() {
+        let toml_str = r#"
+[loader]
+debug_mode = true
+"#;
+        let config = PastaConfig::from_str(toml_str).unwrap();
+        assert!(config.persistence().is_none());
+    }
+
+    #[test]
+    fn test_persistence_effective_file_path() {
+        // Non-obfuscated: keep original path
+        let config = PersistenceConfig::default();
+        assert_eq!(config.effective_file_path(), "profile/pasta/save/save.json");
+
+        // Obfuscated with .json: change to .dat
+        let config = PersistenceConfig {
+            obfuscate: true,
+            file_path: "profile/pasta/save/save.json".to_string(),
+            debug_mode: false,
+        };
+        assert_eq!(config.effective_file_path(), "profile/pasta/save/save.dat");
+
+        // Obfuscated with .dat: keep as-is
+        let config = PersistenceConfig {
+            obfuscate: true,
+            file_path: "profile/pasta/save/save.dat".to_string(),
+            debug_mode: false,
+        };
+        assert_eq!(config.effective_file_path(), "profile/pasta/save/save.dat");
     }
 }

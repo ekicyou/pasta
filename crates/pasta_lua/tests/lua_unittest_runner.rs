@@ -1,4 +1,5 @@
 use mlua::prelude::*;
+use pasta_lua::loader::PersistenceConfig;
 use std::path::PathBuf;
 
 #[test]
@@ -37,6 +38,15 @@ fn run_lua_unit_tests() -> LuaResult<()> {
         package_path.replace("\\", "\\\\")
     ))
     .exec()?;
+
+    // Register @pasta_persistence module (required by pasta.save)
+    let temp_dir = std::env::temp_dir();
+    let persistence_config = PersistenceConfig::default();
+    let persistence_table =
+        pasta_lua::runtime::persistence::register(&lua, &persistence_config, &temp_dir)?;
+    let package: LuaTable = lua.globals().get("package")?;
+    let loaded: LuaTable = package.get("loaded")?;
+    loaded.set("@pasta_persistence", persistence_table)?;
 
     // Lua ユニットテストを実行（エントリーポイント: init.lua）
     let test_file = lua_specs_path.join("init.lua");

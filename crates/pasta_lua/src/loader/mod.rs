@@ -29,7 +29,7 @@ mod discovery;
 mod error;
 
 pub use cache::CacheManager;
-pub use config::{LoaderConfig, LoggingConfig, PastaConfig};
+pub use config::{LoaderConfig, LoggingConfig, PastaConfig, PersistenceConfig};
 pub use context::LoaderContext;
 pub use error::{LoaderError, TranspileFailure};
 
@@ -155,6 +155,7 @@ impl PastaLoader {
             context,
             loader_context,
             runtime_config,
+            Some(config),
             logger,
             &scene_dic_path,
         )?;

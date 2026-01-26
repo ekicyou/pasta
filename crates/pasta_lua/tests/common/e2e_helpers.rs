@@ -11,6 +11,7 @@
 use mlua::{Lua, StdLib};
 use pasta_core::parser::parse_str;
 use pasta_lua::LuaTranspiler;
+use pasta_lua::loader::PersistenceConfig;
 use std::path::PathBuf;
 
 /// Create a minimal Lua runtime with finalize_scene capability.
@@ -19,6 +20,7 @@ use std::path::PathBuf;
 /// 1. Creates a Lua VM with safe standard libraries
 /// 2. Configures package.path to include pasta scripts directory
 /// 3. Registers the finalize_scene Rust binding
+/// 4. Registers the @pasta_persistence module for save.lua
 ///
 /// # Returns
 /// * `Ok(Lua)` - Configured Lua VM ready for E2E testing
@@ -48,6 +50,15 @@ pub fn create_runtime_with_finalize() -> mlua::Result<Lua> {
         "#
     ))
     .exec()?;
+
+    // Register @pasta_persistence module (required by pasta.save)
+    let temp_dir = std::env::temp_dir();
+    let persistence_config = PersistenceConfig::default();
+    let persistence_table =
+        pasta_lua::runtime::persistence::register(&lua, &persistence_config, &temp_dir)?;
+    let package: mlua::Table = lua.globals().get("package")?;
+    let loaded: mlua::Table = package.get("loaded")?;
+    loaded.set("@pasta_persistence", persistence_table)?;
 
     // Register finalize_scene binding
     pasta_lua::runtime::finalize::register_finalize_scene(&lua)?;
