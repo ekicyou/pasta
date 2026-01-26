@@ -54,23 +54,24 @@
 - **Implications**: `PastaConfig::persistence()`メソッドを追加
 
 ### 難読化方式の選定
-- **Context**: 追加クレートなしでの難読化方式調査
+- **Context**: 難読化とファイルサイズ削減を両立する方式調査
 - **Sources Consulted**: 
-  - 既存依存（serde, serde_json）
-  - 標準ライブラリ
+  - flate2 (gzip/deflate圧縮) - crates.io
+  - zstd (Zstandard圧縮) - crates.io
 - **Findings**:
-  - XOR難読化 + Base64エンコードで簡易難読化可能
-  - 標準ライブラリのみで実装可能（追加クレートなし）
-  - Magic headerで形式判別可能
-- **Implications**: JSON → UTF-8バイト → XOR（固定キー） → Base64で難読化
+  - XOR難読化よりも圧縮の方が実用的（難読化＋サイズ削減）
+  - flate2: rust-lang公式、最終更新14日前、活発なメンテナンス
+  - zstd: 高圧縮率だが最終更新11ヶ月前、個人メンテナ
+  - flate2はRustエコシステムで最も標準的な圧縮ライブラリ
+- **Implications**: flate2によるgzip圧縮を採用（JSON → gzip → .datファイル）
 
 ## Architecture Pattern Evaluation
 
-| Option | Description | Strengths | Risks / Limitations | Notes |
-|--------|-------------|-----------|---------------------|-------|
-| A: Runtime層統合 | persistence.rsをruntime/に追加 | enc.rsと同じパターン、一貫性 | runtime層が肥大化 | **採用** |
-| B: Loader層統合 | persistence.rsをloader/に追加 | 設定との親和性 | ロード/セーブの責務分離が曖昧 | 不採用 |
-| C: 独立モジュール | persistence/ディレクトリを新設 | 責務明確 | 過剰な分離 | 将来検討 |
+| Option            | Description                    | Strengths                    | Risks / Limitations           | Notes    |
+| ----------------- | ------------------------------ | ---------------------------- | ----------------------------- | -------- |
+| A: Runtime層統合  | persistence.rsをruntime/に追加 | enc.rsと同じパターン、一貫性 | runtime層が肥大化             | **採用** |
+| B: Loader層統合   | persistence.rsをloader/に追加  | 設定との親和性               | ロード/セーブの責務分離が曖昧 | 不採用   |
+| C: 独立モジュール | persistence/ディレクトリを新設 | 責務明確                     | 過剰な分離                    | 将来検討 |
 
 ## Design Decisions
 
@@ -98,16 +99,21 @@
 - **Trade-offs**: 2箇所で保存ロジックが呼ばれる
 - **Follow-up**: 重複保存を防ぐためのダーティフラグ検討
 
-### Decision: 難読化レベル
-- **Context**: 保存データの難読化要件
+### Decision: 難読化と圧縮の統合
+- **Context**: 保存データの難読化要件とファイルサイズ削減
 - **Alternatives Considered**:
   1. 暗号学的暗号化 — 追加クレート必要、過剰
-  2. XOR難読化 — 軽量、カジュアル改ざん抑止
-  3. Base64のみ — 容易に解読可能
-- **Selected Approach**: XOR（固定キー） + Base64エンコード
-- **Rationale**: 「テキストエディタで開いても読めない」程度で十分
-- **Trade-offs**: 解析者には簡単に解読可能
-- **Follow-up**: なし（要件として暗号学的安全性は不要と確認済み）
+  2. XOR難読化 — 軽量だがファイルサイズ削減なし
+  3. gzip圧縮 — 難読化とサイズ削減を両立
+  4. zstd圧縮 — 高圧縮率だがメンテナンス懸念
+- **Selected Approach**: flate2によるgzip圧縮
+- **Rationale**: 
+  - テキストエディタで開いても読めない（難読化要件を満たす）
+  - 70-80%のファイルサイズ削減
+  - rust-lang公式で活発にメンテナンス
+  - 追加依存は軽量（純Rustバックエンド）
+- **Trade-offs**: 暗号学的安全性はないが、要件として不要
+- **Follow-up**: なし
 
 ### Decision: モジュール設計
 - **Context**: STORE.saveの代替設計

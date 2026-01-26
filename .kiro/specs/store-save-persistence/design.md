@@ -97,13 +97,13 @@ flowchart TB
 
 ### Technology Stack
 
-| Layer | Choice / Version | Role in Feature | Notes |
-|-------|------------------|-----------------|-------|
-| Runtime | mlua 0.11 + serialize | Lua ↔ serde変換 | 既存依存 |
-| Serialization | serde_json 1.x | JSON形式永続化 | 既存依存 |
-| Config | serde + toml 0.9.8 | PersistenceConfig解析 | 既存依存 |
-| Obfuscation | std XOR + Base64 | 簡易難読化 | 追加クレートなし |
-| File I/O | std::fs | アトミック書き込み | 標準ライブラリ |
+| Layer         | Choice / Version      | Role in Feature       | Notes                     |
+| ------------- | --------------------- | --------------------- | ------------------------- |
+| Runtime       | mlua 0.11 + serialize | Lua ↔ serde変換       | 既存依存                  |
+| Serialization | serde_json 1.x        | JSON形式永続化        | 既存依存                  |
+| Config        | serde + toml 0.9.8    | PersistenceConfig解析 | 既存依存                  |
+| Compression   | flate2 1.1            | gzip圧縮（難読化）    | 追加依存（軽量、rust-lang公式） |
+| File I/O      | std::fs               | アトミック書き込み    | 標準ライブラリ            |
 
 ## System Flows
 
@@ -177,35 +177,35 @@ sequenceDiagram
 
 ## Requirements Traceability
 
-| Requirement | Summary | Components | Interfaces | Flows |
-|-------------|---------|------------|------------|-------|
-| 1 | Rust側永続化API | persistence.rs | @pasta_persistence module | 起動時ロード |
-| 2 | pasta.saveモジュールとCTX統合 | save.lua, ctx.lua | require pattern | 起動時ロード |
-| 3 | Drop時自動保存 | PastaLuaRuntime Drop | save_persistence_data() | Drop時保存 |
-| 4 | 難読化シリアライズ | persistence.rs | obfuscate/deobfuscate | 両フロー |
-| 5 | 設定ファイル対応 | config.rs | PersistenceConfig | 起動時ロード |
-| 6 | エラーハンドリング | persistence.rs, Runtime | Result types, logging | 両フロー |
-| 7 | テスト・デバッグ支援 | test modules | test utilities | - |
+| Requirement | Summary                       | Components              | Interfaces                | Flows        |
+| ----------- | ----------------------------- | ----------------------- | ------------------------- | ------------ |
+| 1           | Rust側永続化API               | persistence.rs          | @pasta_persistence module | 起動時ロード |
+| 2           | pasta.saveモジュールとCTX統合 | save.lua, ctx.lua       | require pattern           | 起動時ロード |
+| 3           | Drop時自動保存                | PastaLuaRuntime Drop    | save_persistence_data()   | Drop時保存   |
+| 4           | 難読化シリアライズ            | persistence.rs          | obfuscate/deobfuscate     | 両フロー     |
+| 5           | 設定ファイル対応              | config.rs               | PersistenceConfig         | 起動時ロード |
+| 6           | エラーハンドリング            | persistence.rs, Runtime | Result types, logging     | 両フロー     |
+| 7           | テスト・デバッグ支援          | test modules            | test utilities            | -            |
 
 ## Components and Interfaces
 
 ### Summary Table
 
-| Component | Domain/Layer | Intent | Req Coverage | Key Dependencies | Contracts |
-|-----------|--------------|--------|--------------|------------------|-----------|
-| persistence.rs | runtime | Rust永続化API提供 | 1, 4, 6 | mlua, serde_json, config | Service, State |
-| PersistenceConfig | loader | 永続化設定管理 | 5 | serde, toml | - |
-| PastaLuaRuntime (Drop) | runtime | Drop時保存 | 3, 6 | persistence.rs | - |
-| save.lua | scripts | 永続化データコンテナ | 2 | @pasta_persistence | - |
-| ctx.lua (修正) | scripts | ctx.save統合 | 2 | save.lua | - |
+| Component              | Domain/Layer | Intent               | Req Coverage | Key Dependencies         | Contracts      |
+| ---------------------- | ------------ | -------------------- | ------------ | ------------------------ | -------------- |
+| persistence.rs         | runtime      | Rust永続化API提供    | 1, 4, 6      | mlua, serde_json, config | Service, State |
+| PersistenceConfig      | loader       | 永続化設定管理       | 5            | serde, toml              | -              |
+| PastaLuaRuntime (Drop) | runtime      | Drop時保存           | 3, 6         | persistence.rs           | -              |
+| save.lua               | scripts      | 永続化データコンテナ | 2            | @pasta_persistence       | -              |
+| ctx.lua (修正)         | scripts      | ctx.save統合         | 2            | save.lua                 | -              |
 
 ### Runtime Layer
 
 #### persistence.rs
 
-| Field | Detail |
-|-------|--------|
-| Intent | Lua側に`@pasta_persistence`モジュールを提供し、ファイルI/Oを抽象化 |
+| Field        | Detail                                                                         |
+| ------------ | ------------------------------------------------------------------------------ |
+| Intent       | Lua側に`@pasta_persistence`モジュールを提供し、ファイルI/Oを抽象化             |
 | Requirements | 1.1, 1.2, 1.3, 1.4, 1.5, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 6.1, 6.2, 6.3, 6.4, 6.5 |
 
 **Responsibilities & Constraints**
@@ -278,9 +278,9 @@ struct PersistenceState {
 - **Concurrency**: シングルスレッド（SHIORI DLLコンテキスト）
 
 **Implementation Notes**
-- XOR難読化キー: 固定バイト配列（ソースに埋め込み）
-- Magic header: `"PASTA_SAVE_V1\0"` (14バイト) で形式判別
-- Base64エンコード: 標準ライブラリは使用せず、簡易実装またはbase64クレート追加検討
+- gzip圧縮: flate2クレートの`GzEncoder`/`GzDecoder`を使用
+- Magic header: gzipヘッダー (`\x1f\x8b`) で自動判別可能
+- 圧縮レベル: `Compression::default()` (レベル6、バランス重視)
 
 ---
 
@@ -288,10 +288,10 @@ struct PersistenceState {
 
 #### PersistenceConfig
 
-| Field | Detail |
-|-------|--------|
-| Intent | `[persistence]`セクションの設定を管理 |
-| Requirements | 5.1, 5.2, 5.3, 5.4, 5.5 |
+| Field        | Detail                                |
+| ------------ | ------------------------------------- |
+| Intent       | `[persistence]`セクションの設定を管理 |
+| Requirements | 5.1, 5.2, 5.3, 5.4, 5.5               |
 
 **Responsibilities & Constraints**
 - pasta.tomlからの設定読み込み
@@ -342,10 +342,10 @@ fn default_persistence_file_path() -> String {
 
 #### PastaLuaRuntime Drop Implementation
 
-| Field | Detail |
-|-------|--------|
-| Intent | ランタイム終了時にctx.saveを自動保存 |
-| Requirements | 3.1, 3.2, 3.4, 3.5 |
+| Field        | Detail                               |
+| ------------ | ------------------------------------ |
+| Intent       | ランタイム終了時にctx.saveを自動保存 |
+| Requirements | 3.1, 3.2, 3.4, 3.5                   |
 
 **Responsibilities & Constraints**
 - Drop時にLua VMから`ctx.save`を取得
@@ -384,10 +384,10 @@ impl PastaLuaRuntime {
 
 #### save.lua (New)
 
-| Field | Detail |
-|-------|--------|
-| Intent | 永続化データのコンテナモジュール |
-| Requirements | 2.1, 2.2 |
+| Field        | Detail                           |
+| ------------ | -------------------------------- |
+| Intent       | 永続化データのコンテナモジュール |
+| Requirements | 2.1, 2.2                         |
 
 **Location**: `crates/pasta_lua/scripts/pasta/save.lua`
 
@@ -415,10 +415,10 @@ return save
 
 #### ctx.lua (Modification)
 
-| Field | Detail |
-|-------|--------|
-| Intent | ctx.saveをpasta.saveから初期化 |
-| Requirements | 2.3, 2.4 |
+| Field        | Detail                         |
+| ------------ | ------------------------------ |
+| Intent       | ctx.saveをpasta.saveから初期化 |
+| Requirements | 2.3, 2.4                       |
 
 **Changes**:
 ```lua
@@ -441,10 +441,10 @@ save = SAVE,
 
 #### store.lua (Modification)
 
-| Field | Detail |
-|-------|--------|
-| Intent | STORE.saveフィールドを削除 |
-| Requirements | 2.5 |
+| Field        | Detail                     |
+| ------------ | -------------------------- |
+| Intent       | STORE.saveフィールドを削除 |
+| Requirements | 2.5                        |
 
 **Changes**:
 ```lua
@@ -511,27 +511,40 @@ classDiagram
 }
 ```
 
-#### Obfuscated Binary Format
+#### Compressed Format (Obfuscated)
 
 **File**: `profile/pasta/save/save.dat`
 
 ```
-[Magic Header: 14 bytes "PASTA_SAVE_V1\0"]
-[XOR Key Index: 1 byte]
-[Data Length: 4 bytes big-endian]
-[XOR-obfuscated JSON bytes]
+[gzip header: \x1f\x8b...]
+[compressed JSON data]
+[gzip footer: CRC + size]
 ```
 
-**Obfuscation Algorithm**:
-1. JSON文字列をUTF-8バイトに変換
-2. 各バイトを固定XORキー配列で巡回XOR
-3. Magic header + メタデータ + 結果バイトを連結
+**Compression Algorithm** (using flate2):
+```rust
+use flate2::Compression;
+use flate2::write::GzEncoder;
 
-**Deobfuscation Algorithm**:
-1. Magic headerを検証（不一致ならJSONとして解析試行）
-2. メタデータからデータ長を取得
-3. XORで復号
-4. UTF-8 JSONとしてパース
+let json_bytes = serde_json::to_vec(&data)?;
+let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+encoder.write_all(&json_bytes)?;
+let compressed = encoder.finish()?;
+```
+
+**Decompression Algorithm**:
+```rust
+use flate2::read::GzDecoder;
+
+let mut decoder = GzDecoder::new(&compressed[..]);
+let mut json_bytes = Vec::new();
+decoder.read_to_end(&mut json_bytes)?;
+let data: serde_json::Value = serde_json::from_slice(&json_bytes)?;
+```
+
+**Format Detection**:
+- gzipヘッダー (`\x1f\x8b`) の存在で圧縮判定
+- ヘッダーがなければJSON形式として解析
 
 ## Error Handling Strategy
 
@@ -562,14 +575,14 @@ pub enum PersistenceError {
 
 ### Error Recovery Strategy
 
-| Scenario | Recovery | Log Level |
-|----------|----------|-----------|
-| ファイル不存在 | 空テーブル返却 | DEBUG |
-| ファイル破損 | 空テーブル返却 | WARN |
-| 保存先ディレクトリ不存在 | ディレクトリ作成 | DEBUG |
-| 書き込み失敗 | エラーログ出力、継続 | ERROR |
-| Lua変換エラー | 空テーブル返却/継続 | WARN |
-| Drop時エラー | エラーログのみ | ERROR |
+| Scenario                 | Recovery             | Log Level |
+| ------------------------ | -------------------- | --------- |
+| ファイル不存在           | 空テーブル返却       | DEBUG     |
+| ファイル破損             | 空テーブル返却       | WARN      |
+| 保存先ディレクトリ不存在 | ディレクトリ作成     | DEBUG     |
+| 書き込み失敗             | エラーログ出力、継続 | ERROR     |
+| Lua変換エラー            | 空テーブル返却/継続  | WARN      |
+| Drop時エラー             | エラーログのみ       | ERROR     |
 
 ## Testing Strategy
 

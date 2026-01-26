@@ -55,7 +55,7 @@ store.luaのSTORE.saveテーブルについて、ランタイムロード時に�
 2. Where 難読化が無効な場合, the persistence module shall データを人間可読なJSON形式で保存する（拡張子: `.json`）
 3. The persistence module shall 難読化形式でもJSON形式でも読み込み可能とする（後方互換性）
 4. The obfuscation shall テキストエディタで開いても内容が判読困難な程度の難読化を提供する（暗号学的安全性は不要）
-5. The obfuscation shall 追加クレートを導入せず既存依存で実装可能な方式とする
+5. The obfuscation shall 最小限の依存追加で実装可能な方式とする（軽量で安定したクレートは許容）
 6. The serialization shall 任意にネストしたテーブル、文字列、数値、ブール値、配列をサポートする
 
 ### Requirement 5: 設定ファイル対応
