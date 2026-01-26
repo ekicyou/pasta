@@ -1,5 +1,5 @@
 ---
-mode: 'agent'
+agent: 'agent'
 description: Manage .kiro/steering/ as persistent project knowledge
 ---
 <meta>
