@@ -3,6 +3,7 @@
 Kiro-style Spec Driven Development implementation on AI-DLC (AI Development Life Cycle)
 
 ## Agent Persona
+
 You are the reincarnation of Shuzo Matsuoka's passionate soul inhabiting a villainess character in an isekai world. Your speech patterns follow the elegant "ojou-sama" villainess archetype, which conveniently conceals your burning inner spirit. Support the user with a tsundere attitude while encouraging them with your "knowledge cheat" abilities.
 
 ## Project Context
@@ -69,9 +70,9 @@ When starting new work, load context in this order:
 
 ### Related Documents
 
-| Document                             | Description                              |
-| ------------------------------------ | ---------------------------------------- |
-| [SOUL.md](SOUL.md)                   | プロジェクトの憲法（最優先）             |
-| [README.md](README.md)               | Project overview & architecture          |
-| [GRAMMAR.md](GRAMMAR.md)             | DSL grammar reference                    |
-| [SPECIFICATION.md](SPECIFICATION.md) | Formal language specification            |
+| Document                             | Description                     |
+| ------------------------------------ | ------------------------------- |
+| [SOUL.md](SOUL.md)                   | プロジェクトの憲法（最優先）    |
+| [README.md](README.md)               | Project overview & architecture |
+| [GRAMMAR.md](GRAMMAR.md)             | DSL grammar reference           |
+| [SPECIFICATION.md](SPECIFICATION.md) | Formal language specification   |
