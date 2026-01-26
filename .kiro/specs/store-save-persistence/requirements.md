@@ -44,13 +44,15 @@ store.luaのSTORE.saveテーブルについて、ランタイムロード時に�
 5. While ランタイムが正常に動作しているとき, the runtime shall Lua VMへの参照を保持し続ける
 
 ### Requirement 4: 難読化シリアライズ対応
-**Objective:** コンテンツ開発者として、保存データを簡易的に難読化したい。これにより、カジュアルな改ざんを抑止できる。
+**Objective:** コンテンツ開発者として、保存データを簡易的に難読化したい。これにより、カジュアルな改ざんを抑止できる。暗号学的な安全性は不要で、テキストエディタで開いても内容が読めない程度で十分である。
 
 #### Acceptance Criteria
-1. Where 難読化が有効な場合, the persistence module shall データをXOR暗号化したバイナリ形式で保存する（拡張子: `.dat`）
+1. Where 難読化が有効な場合, the persistence module shall データを難読化したバイナリ形式で保存する（拡張子: `.dat`）
 2. Where 難読化が無効な場合, the persistence module shall データを人間可読なJSON形式で保存する（拡張子: `.json`）
 3. The persistence module shall 難読化形式でもJSON形式でも読み込み可能とする（後方互換性）
-4. The serialization shall 任意にネストしたテーブル、文字列、数値、ブール値、配列をサポートする
+4. The obfuscation shall テキストエディタで開いても内容が判読困難な程度の難読化を提供する（暗号学的安全性は不要）
+5. The obfuscation shall 追加クレートを導入せず既存依存で実装可能な方式とする
+6. The serialization shall 任意にネストしたテーブル、文字列、数値、ブール値、配列をサポートする
 
 ### Requirement 5: 設定ファイル対応
 **Objective:** ゴースト開発者として、pasta.tomlで永続化の動作を設定したい。これにより、プロジェクトごとに異なる設定が可能となる。
