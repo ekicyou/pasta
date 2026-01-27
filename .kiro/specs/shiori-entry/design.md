@@ -170,9 +170,15 @@ sequenceDiagram
 ##### Service Interface
 
 ```lua
+-- 1. require文（モジュールレベル）
+local EVENT = require("pasta.shiori.event")
+
+-- 2. グローバルテーブル宣言
 --- @class SHIORI
 --- SHIORI/3.0 プロトコルインターフェース（グローバル）
 SHIORI = SHIORI or {}
+
+-- 3. 公開関数
 
 --- DLLロード時の初期化
 --- @param hinst integer DLLインスタンスハンドル
