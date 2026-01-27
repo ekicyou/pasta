@@ -135,6 +135,19 @@
 
 ---
 
+### Requirement 9: エラーハンドリング戦略
+
+**Objective:** 開発者として、オプショナルな引数に対する防御的な処理により、予期しないランタイムエラーを回避したい。
+
+#### Acceptance Criteria
+
+1. The RES module shall apply defensive programming for optional `dic` parameter (e.g., `dic = dic or {}`).
+2. When `dic` parameter is `nil`, the RES module shall treat it as an empty table.
+3. The RES module shall not perform strict validation (e.g., `assert()`, `error()`) on parameter types, allowing Lua's standard behavior for type errors.
+4. The RES module shall handle `nil` values gracefully in all public functions accepting optional parameters.
+
+---
+
 ## 参考: SHIORI/3.0 レスポンス形式
 
 ```
