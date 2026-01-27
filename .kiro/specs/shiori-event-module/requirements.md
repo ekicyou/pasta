@@ -1,169 +1,153 @@
 # Requirements Document
 
-## Project Description (Input)
-# 要件書: pasta.shiori.event モジュール作成
+## Introduction
 
-## 目的
-SHIORI イベントの振り分けとハンドラ登録の仕組みを提供するモジュールを作成する
+本ドキュメントは `pasta.shiori.event` モジュールの要件を定義する。SHIORI イベントの振り分けとハンドラ登録の仕組みを提供し、ゴースト開発者が簡潔にイベントハンドラを定義できる基盤を提供する。
 
-## ファイル構成
-```
-crates/pasta_lua/scripts/pasta/shiori/event/
-├── init.lua      -- イベント振り分け（EVENT.fire, EVENT.no_entry）
-└── register.lua  -- ハンドラ登録テーブル
-```
+### 背景
 
-## 依存モジュール
-- `pasta.shiori.res` — レスポンス組み立て（別途作成済み想定）
+- **対象ファイル**:
+  - `crates/pasta_lua/scripts/pasta/shiori/event/init.lua`（イベント振り分け）
+  - `crates/pasta_lua/scripts/pasta/shiori/event/register.lua`（ハンドラ登録テーブル）
+- **依存モジュール**: `pasta.shiori.res`（レスポンス組み立て、作成済み）
+- **プロトコル**: SHIORI/3.0（伺か用ゴースト通信プロトコル）
 
----
+### スコープ
 
-## register.lua
+**含む**:
+- イベントハンドラ登録テーブル（REG）
+- イベント振り分け機構（EVENT.fire）
+- 未登録イベント用デフォルトハンドラ（EVENT.no_entry）
+- xpcallによるエラーキャッチとエラーレスポンス変換
 
-### 目的
-イベントハンドラを登録するためのテーブルを提供する
-
-### 要件
-```lua
---- @module pasta.shiori.event.register
---- イベントハンドラ登録テーブル
----
---- 使用例:
----   local REG = require("pasta.shiori.event.register")
----   local RES = require("pasta.shiori.res")
----
----   REG.OnBoot = function(req)
----       return RES.ok([[\0\s[0]こんにちは\e]])
----   end
-
-local REG = {}
-
-return REG
-```
-
-### ポイント
-- 単純な Lua テーブル
-- `REG.イベント名 = function(req) ... end` の形式で登録
-- 特別な登録関数は不要（Lua らしくテーブルに直接代入）
+**含まない**:
+- `data` 引数（状態管理）
+- 外部ファイルからの自動登録機構
+- シーン検索・実行機能
+- ウェイト処理やトーク処理
 
 ---
-
-## init.lua
-
-### 目的
-イベントの振り分けとデフォルトハンドラを提供する
-
-### 要件
-```lua
---- @module pasta.shiori.event
---- イベント振り分けモジュール
----
---- SHIORI リクエストのイベント ID に応じてハンドラを呼び分ける。
---- 未登録イベントはデフォルトハンドラ（no_entry）で処理する。
---- エラー発生時は xpcall でキャッチし、エラーレスポンスに変換する。
-
-local REG = require("pasta.shiori.event.register")
-local RES = require("pasta.shiori.res")
-
-local EVENT = {}
-
---- デフォルトハンドラ（未登録イベント用）
---- @param req table リクエストテーブル
---- @return string SHIORI レスポンス（204 No Content）
-function EVENT.no_entry(req)
-    return RES.no_content()
-end
-
---- イベント振り分け
---- @param req table リクエストテーブル（req.id にイベント名）
---- @return string SHIORI レスポンス
-function EVENT.fire(req)
-    local handler = REG[req.id] or EVENT.no_entry
-    
-    local ok, result = xpcall(function()
-        return handler(req)
-    end, debug.traceback)
-    
-    if ok then
-        return result
-    else
-        -- エラー時は 500 Internal Server Error + エラー情報
-        return RES.err(result)
-    end
-end
-
-return EVENT
-```
-
-### ポイント
-- `REG[req.id]` でハンドラ取得（未登録なら `nil`）
-- 未登録イベント → `EVENT.no_entry` → 204 No Content
-- `xpcall` でエラーキャッチ → `RES.err()` でエラーレスポンス
-- `xpcall` は `EVENT.fire` の外側のみ（内部の末尾再帰を妨げない）
-
----
-
-## 使用例
-
-### ゴースト開発者がハンドラを登録する場合
-```lua
-local REG = require("pasta.shiori.event.register")
-local RES = require("pasta.shiori.res")
-
-REG.OnBoot = function(req)
-    return RES.ok([[\0\s[0]こんにちは\e]])
-end
-
-REG.OnClose = function(req)
-    return RES.ok([[\0\s[0]さようなら\e]])
-end
-
-REG.OnMouseDoubleClick = function(req)
-    return RES.ok([[\0\s[0]なあに？\e]])
-end
-```
-
-### pasta.shiori.main から呼び出す場合
-```lua
-local EVENT = require("pasta.shiori.event")
-
-function SHIORI.request(req)
-    return EVENT.fire(req)
-end
-```
-
----
-
-## req テーブル構造（参考）
-Rust 側から渡されるパース済みリクエスト：
-```lua
-req = {
-    method = "get",
-    version = 30,
-    id = "OnBoot",           -- イベント名（これで振り分け）
-    charset = "UTF-8",
-    sender = "SSP",
-    reference = {            -- 0始まりの配列
-        [0] = "master",
-        [1] = "...",
-    },
-}
-```
-
----
-
-## テスト観点
-1. 登録済みイベント → 対応するハンドラが呼ばれる
-2. 未登録イベント → `EVENT.no_entry` が呼ばれ、204 が返る
-3. ハンドラ内でエラー発生 → 500 + エラー情報が返る（例外が飛ばない）
-4. `req.id` が `nil` の場合 → `no_entry` で処理される
-
----
-
-## 除外事項
-- `data` 引数（状態管理）は含めない
-- 外部ファイルからの自動登録機構は含めない（手動で `REG.XXX = ...` する）
-- シーン検索・実行はこのモジュールでは扱わない
 
 ## Requirements
-<!-- Will be generated in /kiro:spec-requirements phase -->
+
+### Requirement 1: ハンドラ登録テーブル（register.lua）
+
+**Objective:** ゴースト開発者として、イベントハンドラを簡潔に登録できるテーブルを使用することで、SHIORIイベントへの応答を直感的に定義したい。
+
+#### Acceptance Criteria
+
+1. The REG module shall export an empty table named `REG` as the module return value.
+2. The REG module shall include LuaDoc annotations (`--- @module pasta.shiori.event.register`) at the file header.
+3. The REG module shall allow handler registration via direct table assignment (`REG.EventName = function(req) ... end`).
+4. The REG module shall not provide special registration functions (テーブル直接代入のLuaらしいスタイル).
+5. The REG module shall follow the lua-coding steering conventions for module structure.
+
+---
+
+### Requirement 2: イベント振り分けモジュール構造（init.lua）
+
+**Objective:** 開発者として、Luaコーディング規約に準拠したモジュール構造を持つことで、保守性と一貫性を確保したい。
+
+#### Acceptance Criteria
+
+1. The EVENT module shall export a table named `EVENT` as the module return value.
+2. The EVENT module shall include LuaDoc annotations (`--- @module pasta.shiori.event`) at the file header.
+3. The EVENT module shall require `pasta.shiori.event.register` as `REG`.
+4. The EVENT module shall require `pasta.shiori.res` as `RES`.
+5. The EVENT module shall follow the lua-coding steering conventions for module structure.
+
+---
+
+### Requirement 3: デフォルトハンドラ（no_entry）
+
+**Objective:** 開発者として、未登録イベントに対して適切な204レスポンスを返すことで、SHIORIプロトコルに準拠した応答を保証したい。
+
+#### Acceptance Criteria
+
+1. The EVENT module shall provide `EVENT.no_entry(req)` function as the default handler for unregistered events.
+2. When `EVENT.no_entry(req)` is called, the EVENT module shall return `RES.no_content()` (204 No Content).
+3. The EVENT module shall include LuaDoc annotations for `EVENT.no_entry` describing its purpose and return value.
+
+---
+
+### Requirement 4: イベント振り分け（fire）
+
+**Objective:** 開発者として、リクエストの `req.id` に基づいて適切なハンドラを呼び出すことで、イベント処理を自動的に振り分けたい。
+
+#### Acceptance Criteria
+
+1. The EVENT module shall provide `EVENT.fire(req)` function for event dispatching.
+2. When `EVENT.fire(req)` is called, the EVENT module shall lookup handler via `REG[req.id]`.
+3. When registered handler exists for `req.id`, the EVENT module shall invoke that handler with `req` argument.
+4. When no handler is registered for `req.id`, the EVENT module shall invoke `EVENT.no_entry(req)`.
+5. When `req.id` is `nil` or missing, the EVENT module shall invoke `EVENT.no_entry(req)` (defensive programming).
+6. The EVENT module shall include LuaDoc annotations for `EVENT.fire` describing parameters and return value.
+
+---
+
+### Requirement 5: エラーハンドリング
+
+**Objective:** 開発者として、ハンドラ内で発生したエラーをキャッチし500レスポンスに変換することで、例外が上位に伝播せず安定した応答を保証したい。
+
+#### Acceptance Criteria
+
+1. The EVENT module shall wrap handler execution in `xpcall` with `debug.traceback` as error handler.
+2. When handler executes successfully, the EVENT module shall return the handler's result directly.
+3. When handler throws an error, the EVENT module shall return `RES.err(traceback)` (500 Internal Server Error).
+4. The EVENT module shall ensure exceptions never propagate beyond `EVENT.fire()`.
+5. The EVENT module shall apply `xpcall` only at the `EVENT.fire` level (ハンドラ内部の末尾再帰を妨げない設計).
+
+---
+
+### Requirement 6: ハンドラシグネチャ
+
+**Objective:** ゴースト開発者として、統一されたハンドラシグネチャを使用することで、一貫性のあるイベント処理コードを記述したい。
+
+#### Acceptance Criteria
+
+1. When registering a handler, the developer shall define a function with signature `function(req) -> string`.
+2. The EVENT module shall pass the `req` table unchanged to registered handlers.
+3. When handler returns a value, the EVENT module shall return that value as the SHIORI response.
+4. The EVENT module shall document expected handler signature in module header comments.
+
+---
+
+### Requirement 7: リクエストテーブル構造
+
+**Objective:** 開発者として、Rust側から渡されるリクエストテーブルの構造を理解することで、適切にイベントハンドラを実装したい。
+
+**Note:** このリクエストテーブルは `pasta_shiori::lua_request::parse_request()` により既に生成される。本要件はドキュメント整備のみ。
+
+#### Acceptance Criteria
+
+1. The EVENT module documentation shall describe expected `req` table structure generated by Rust.
+2. The EVENT module shall document that `req.id` contains the event name string (例: `"OnBoot"`, `"OnClose"`).
+3. The EVENT module shall document that `req` tables contain at minimum: `method`, `version`, `id`, `charset`, `sender`, `reference` fields.
+4. The EVENT module shall not modify the `req` table passed to handlers (read-only contract).
+
+---
+
+### Requirement 8: モジュール公開API
+
+**Objective:** 開発者として、明確な公開APIを持つことで、モジュールの正しい使用方法を理解したい。
+
+#### Acceptance Criteria
+
+1. The EVENT module shall expose exactly two public functions: `EVENT.fire` and `EVENT.no_entry`.
+2. The REG module shall be accessible via `require("pasta.shiori.event.register")` for handler registration.
+3. The EVENT module shall be accessible via `require("pasta.shiori.event")` for event dispatching.
+4. The EVENT module shall not expose internal implementation details.
+
+---
+
+### Requirement 9: 統合使用例
+
+**Objective:** ゴースト開発者として、`pasta.shiori.main` からの呼び出しパターンを理解することで、SHIORIリクエスト処理パイプラインを正しく構築したい。
+
+#### Acceptance Criteria
+
+1. When integrated with `pasta.shiori.main`, the EVENT module shall be called as `EVENT.fire(req)` from `SHIORI.request()`.
+2. The EVENT module shall return a valid SHIORI response string in all cases (正常、未登録、エラー).
+3. The EVENT module documentation shall include integration example with `pasta.shiori.main`.
+
+---
