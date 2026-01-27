@@ -236,6 +236,54 @@ end
 return SHIORI
 ```
 
+### pasta.shiori.res モジュール
+
+SHIORI/3.0 レスポンス文字列を構築するためのユーティリティモジュールです。
+
+```lua
+local RES = require "pasta.shiori.res"
+
+-- 200 OK レスポンス
+return RES.ok("Hello!")
+
+-- 204 No Content（処理完了、返却値なし）
+return RES.no_content()
+
+-- カスタムヘッダー付きレスポンス
+return RES.no_content({ ["X-Custom"] = "value" })
+
+-- エラーレスポンス
+return RES.err("Something went wrong")
+
+-- ワーニング付きレスポンス（204 + X-Warn-Reason）
+return RES.warn("Deprecated feature used")
+
+-- TEACH イベント用レスポンス
+return RES.not_enough()  -- 311 Not Enough
+return RES.advice()      -- 312 Advice
+```
+
+**利用可能な関数**:
+
+| 関数                   | ステータス                   | 説明                               |
+| ---------------------- | ---------------------------- | ---------------------------------- |
+| `RES.ok(value, dic)`   | 200 OK                       | Value ヘッダー付き成功レスポンス   |
+| `RES.no_content(dic)`  | 204 No Content               | 値なし成功レスポンス               |
+| `RES.not_enough(dic)`  | 311 Not Enough               | TEACH イベント（情報不足）         |
+| `RES.advice(dic)`      | 312 Advice                   | TEACH イベント（アドバイス）       |
+| `RES.bad_request(dic)` | 400 Bad Request              | クライアントエラー                 |
+| `RES.err(reason, dic)` | 500 Internal Server Error    | サーバーエラー（X-Error-Reason 付） |
+| `RES.warn(reason, dic)`| 204 No Content               | 警告付きレスポンス（X-Warn-Reason） |
+| `RES.build(code, dic)` | 任意                         | 汎用ビルダー（上記の基盤）         |
+
+**環境設定**:
+
+```lua
+RES.env.charset = "UTF-8"       -- デフォルト
+RES.env.sender = "Pasta"        -- デフォルト
+RES.env.security_level = "local" -- デフォルト
+```
+
 ## ファイル検出パターン
 
 デフォルトの `dic/*/*.pasta` パターンでは：
