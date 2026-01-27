@@ -89,9 +89,13 @@
 #### Acceptance Criteria
 
 1. The entry module shall `crates/pasta_lua/scripts/pasta/shiori/entry.lua` に配置される。
-2. When 移行が完了した場合、the project shall `pasta/shiori/main.lua` を削除する（開発者判断: 完全置き換え方針）。
-3. If Rust側で `require("pasta.shiori.main")` がハードコードされている場合、then the project shall `require("pasta.shiori.entry")` に変更する。
-4. The entry module shall `lua-coding.md` のモジュール構造規約（標準モジュール構造、UPPER_CASE テーブル）に従う。
+2. When 移行が完了した場合、the project shall 以下のファイルを削除する（開発者判断: 完全置き換え方針）：
+   - `crates/pasta_lua/scripts/pasta/shiori/main.lua`（本番コード）
+3. When 移行が完了した場合、the project shall 以下のテストフィクスチャを `entry.lua` にリネームする：
+   - `crates/pasta_shiori/tests/support/scripts/pasta/shiori/main.lua` → `entry.lua`
+   - `crates/pasta_shiori/tests/fixtures/shiori_lifecycle/scripts/pasta/shiori/main.lua` → `entry.lua`
+4. If Rust側で `scripts/pasta/shiori/main.lua` がハードコードされている場合、then the project shall `scripts/pasta/shiori/entry.lua` に変更する。
+5. The entry module shall `lua-coding.md` のモジュール構造規約（標準モジュール構造、UPPER_CASE テーブル）に従う。
 
 ---
 
@@ -121,7 +125,10 @@
 2. The project shall 以下の結合テストを提供する:
    - Rust側から `SHIORI.load` 呼び出し → Lua側の `SHIORI.load` が実行される
    - Rust側から `SHIORI.request` 呼び出し → Lua側でレスポンスが生成される
-3. When すべてのテストが実行された場合、the project shall `cargo test --all` が成功することを保証する。
+3. The project shall テストフィクスチャの `entry.lua` を reqテーブル対応にする:
+   - `tests/support/scripts/pasta/shiori/entry.lua`: ミニマル実装（reqテーブル対応）
+   - `tests/fixtures/shiori_lifecycle/scripts/pasta/shiori/entry.lua`: 既存実装を維持（既に対応済み）
+4. When すべてのテストが実行された場合、the project shall `cargo test --all` が成功することを保証する。
 
 ---
 
