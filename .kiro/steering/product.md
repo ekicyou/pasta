@@ -20,6 +20,10 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 - [ ] 宣言的制御フロー（Call/Jump文）の再実装
 
 **完了仕様**: 
+- ✅ **scene-search-integration** (2026-01-27)
+  - SCENE.search() 動的シーン検索機能実装
+  - 14テスト全合格、リグレッション0件
+  - [VALIDATION_REPORT.md](./.kiro/specs/completed/scene-search-integration/VALIDATION_REPORT.md)
 - ✅ **pasta-transpiler-variable-expansion** (2025-12-21)
   - 変数スコープ管理（Local/Global）実装完了
   - 20テスト合格、リグレッション0件
