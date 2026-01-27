@@ -94,7 +94,7 @@
 1. The EVENT module shall wrap handler execution in `xpcall` with `debug.traceback` as error handler.
 2. When handler executes successfully, the EVENT module shall return the handler's result directly.
 3. When handler throws an error, the EVENT module shall extract the first line of the traceback (error message only) to avoid protocol violations.
-4. When handler throws an error, the EVENT module shall return `RES.err(error_msg)` where error_msg contains no newline characters.
+4. When handler throws an error, the EVENT module shall pass the extracted error message to `RES.err()` (nil handling is delegated to RES.err).
 5. The EVENT module shall ensure exceptions never propagate beyond `EVENT.fire()`.
 6. The EVENT module shall apply `xpcall` only at the `EVENT.fire` level (ハンドラ内部の末尾再帰を妨げない設計).
 
