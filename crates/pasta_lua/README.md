@@ -171,6 +171,10 @@ local JSON = require "@json"
 local data = JSON.decode('{"key": "value"}')
 ```
 
+### API リファレンス
+
+各モジュールの詳細な API 仕様（関数シグネチャ、パラメータ、戻り値、使用例）については [LUA_API.md](./LUA_API.md) を参照してください。
+
 ## 使用方法
 
 ### 基本的な使用法
