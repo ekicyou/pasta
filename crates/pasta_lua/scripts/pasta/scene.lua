@@ -7,7 +7,6 @@
 
 local STORE = require("pasta.store")
 local WORD = require("pasta.word")
-local SEARCH = require("@pasta_search")
 
 --- @class Scene モジュールテーブル
 local SCENE = {}
@@ -151,6 +150,9 @@ function SCENE.search(name, global_scene_name)
     if type(name) ~= "string" then
         return nil
     end
+
+    -- @pasta_search を遅延ロード（初期化タイミング問題を回避）
+    local SEARCH = require("@pasta_search")
 
     -- @pasta_search を使用してシーンを検索
     local global_name, local_name = SEARCH:search_scene(name, global_scene_name)
