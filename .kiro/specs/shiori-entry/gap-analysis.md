@@ -477,21 +477,21 @@ end
 3. **クリーンな移行**: 古い main.lua を残さずシンプルに
 4. **今後のエントリーポイント**: entry.lua に統一
 
-### 設計フェーズで決定すべき事項
+### 設計フェーズで決定すべき事項（開発者判断により確定: 2026-01-27）
 
-1. **main.lua の扱い**
-   - 完全削除 vs ラッパー維持 vs 空ファイル化
-   - 推奨: ラッパー維持（後方互換性）
+1. ✅ **main.lua の扱い** → **完全削除**
+   - 本番コード: `scripts/pasta/shiori/main.lua` を削除
+   - テストフィクスチャ: すべて `entry.lua` にリネーム
 
-2. **Rust側の変更タイミング**
-   - entry.lua 作成と同時 vs 後回し
-   - 推奨: 同時変更（シンプル化）
+2. ✅ **Rust側の変更タイミング** → **同時変更**
+   - `crates/pasta_lua/src/runtime/mod.rs` の2箇所を変更
+   - `main.lua` → `entry.lua` に変更
 
-3. **テストフィクスチャ**
-   - そのまま維持 vs entry.lua に統一
-   - 推奨: そのまま維持（テスト固有の実装）
+3. ✅ **テストフィクスチャ** → **entry.lua に統一**
+   - `tests/support/scripts/pasta/shiori/main.lua` → `entry.lua` + reqテーブル対応
+   - `tests/fixtures/shiori_lifecycle/scripts/pasta/shiori/main.lua` → `entry.lua`（既に対応済み）
 
-4. **拡張ポイントの仕様**
+4. **拡張ポイントの仕様**（設計フェーズで詳細化）
    - SHIORI.load/unload のフック設計
    - 推奨: コメントのみ（実装は将来）
 
