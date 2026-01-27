@@ -46,7 +46,7 @@ SHIORI Integration (プロトコル処理)
 │   │   ├── actor.lua                # アクター管理
 │   │   ├── scene.lua                # シーン管理
 │   │   └── shiori/
-│   │       └── main.lua             # SHIORI エントリーポイント
+│   │       └── entry.lua            # SHIORI エントリーポイント
 │   └── (your_modules)/              # ユーザー定義モジュール
 │
 ├── scriptlibs/                      # 外部 Lua ライブラリ
@@ -70,7 +70,7 @@ SHIORI Integration (プロトコル処理)
 | `dic/*/*.pasta`                 | Pasta DSL ソース          | デフォルトの検出パターン                 |
 | `scripts/`                      | 自作 Lua スクリプト       | package.path に含まれる                  |
 | `scripts/pasta/`                | Pasta ランタイム          | トランスパイル済みコードから呼び出される |
-| `scripts/pasta/shiori/main.lua` | SHIORI エントリーポイント | 存在すれば自動ロード                     |
+| `scripts/pasta/shiori/entry.lua` | SHIORI エントリーポイント | 存在すれば自動ロード                     |
 | `scriptlibs/`                   | 外部ライブラリ            | package.path の最後に追加                |
 | `profile/pasta/save/lua/`       | 永続化モジュール          | 最優先で検索される                       |
 | `profile/pasta/cache/lua/`      | Lua キャッシュ            | debug_mode 時に出力                      |
@@ -214,10 +214,12 @@ runtime.exec(&lua_code)?;
 
 ## SHIORI 統合
 
-SHIORI/3.0 プロトコルとの統合には `scripts/pasta/shiori/main.lua` を配置します：
+SHIORI/3.0 プロトコルとの統合には `scripts/pasta/shiori/entry.lua` を配置します：
 
 ```lua
--- scripts/pasta/shiori/main.lua
+-- scripts/pasta/shiori/entry.lua
+local EVENT = require "pasta.shiori.event"
+
 SHIORI = SHIORI or {}
 
 function SHIORI.load(hinst, load_dir)
@@ -225,12 +227,13 @@ function SHIORI.load(hinst, load_dir)
     return true
 end
 
-function SHIORI.request(request_text)
-    -- リクエスト処理
-    return "SHIORI/3.0 200 OK\r\n" ..
-        "Charset: UTF-8\r\n" ..
-        "Value: Hello!\r\n" ..
-        "\r\n"
+function SHIORI.request(req)
+    -- req テーブル経由でイベント振り分け
+    return EVENT.fire(req)
+end
+
+function SHIORI.unload()
+    -- クリーンアップ処理
 end
 
 return SHIORI

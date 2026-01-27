@@ -130,7 +130,7 @@ ghost/
     ├── scripts/             # Lua スクリプト
     │   └── pasta/
     │       └── shiori/
-    │           └── main.lua # SHIORI エントリーポイント
+    │           └── entry.lua # SHIORI エントリーポイント
     └── profile/             # ランタイム生成
         └── pasta/
             ├── save/        # 永続化データ
