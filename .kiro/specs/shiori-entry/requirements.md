@@ -1,259 +1,166 @@
-# Requirements Document
+# Requirements Document: shiori-entry
 
-## Project Description (Input)
-# pasta.shiori.entry 要件定義書
+## Introduction
 
-## 1. 概要
+本仕様は、Rust側の SHIORI.DLL 実装（pasta_shioriクレート）から呼び出される Lua エントリーポイントモジュール `pasta.shiori.entry` を定義する。
 
-### 1.1 目的
+**背景**:
+- 「伺か」ゴースト基盤として、SHIORI/3.0 プロトコルを Lua 側で処理する必要がある
+- 現行の `pasta.shiori.main` を置き換え、責務を明確化した新エントリーポイントを提供
+- イベント処理は `pasta.shiori.event` モジュールに委譲し、単一責任原則を遵守
+
+**スコープ**:
+- `entry.lua` の新規作成
+- グローバル `SHIORI` テーブルの初期化
+- `SHIORI.load` / `SHIORI.request` / `SHIORI.unload` の実装
+- Rust側の require 対象変更（必要な場合）
+- 既存 `pasta.shiori.main` の削除または空ファイル化
+
+---
+
+## Requirements
+
+### Requirement 1: グローバル SHIORI テーブルの初期化
+
+**Objective:** ゴースト開発者として、SHIORI/3.0 プロトコルハンドラが自動的に初期化されることで、追加設定なしでイベント処理を開始できる。
+
+#### Acceptance Criteria
+
+1. When `require("pasta.shiori.entry")` が実行された場合、the entry module shall グローバルテーブル `SHIORI` を初期化する。
+2. If グローバル `SHIORI` がすでに存在する場合、then the entry module shall 既存テーブルを上書きせずに関数を追加する。
+3. The entry module shall `SHIORI.load`、`SHIORI.request`、`SHIORI.unload` の3関数を `SHIORI` テーブルに登録する。
+4. The entry module shall `pasta.shiori.event` モジュールを require して `EVENT` テーブルを取得する。
+
+---
+
+### Requirement 2: SHIORI.load によるDLLロード処理
+
+**Objective:** Rust ランタイムとして、DLLロード時に Lua 側の初期化処理を呼び出し、初期化成否を確認できる。
+
+#### Acceptance Criteria
+
+1. When Rust側から `SHIORI.load(hinst, load_dir)` が呼び出された場合、the entry module shall 初期化処理を実行する。
+2. The `SHIORI.load` function shall 引数として `hinst`（integer: DLLインスタンスハンドル）と `load_dir`（string: ゴーストの master/ ディレクトリパス）を受け取る。
+3. When 初期化が正常に完了した場合、the `SHIORI.load` function shall `true`（boolean）を返却する。
+4. If 初期化中にエラーが発生した場合、then the `SHIORI.load` function shall `false`（boolean）を返却する。
+5. The `SHIORI.load` function shall 将来の拡張に備えて、設定ファイル読み込み・セーブデータ復元の拡張ポイントを提供する（現時点では未実装）。
+
+---
+
+### Requirement 3: SHIORI.request によるリクエスト処理
+
+**Objective:** Rust ランタイムとして、SHIORI リクエストを Lua 側に渡し、SHIORI/3.0 形式のレスポンス文字列を受け取れる。
+
+**注**: 既存の `main.lua` は `request_text: string` を受け取る古い実装だが、Rust側（`pasta_shiori::shiori.rs:277`）は `lua_request::parse_request()` で**reqテーブル**を生成し、Luaに渡している。本要件はRust側の現在の実装に合わせている。
+
+#### Acceptance Criteria
+
+1. When Rust側から `SHIORI.request(req)` が呼び出された場合、the entry module shall `EVENT.fire(req)` を呼び出す。
+2. The `SHIORI.request` function shall 引数 `req` として以下の構造を持つテーブルを受け取る（Rust側 `lua_request.rs` で生成）:
+   - `method`: string ("get" または "notify")
+   - `version`: integer (30 = SHIORI/3.0)
+   - `id`: string (イベントID)
+   - `charset`: string (文字セット)
+   - `sender`: string (ベースウェア名)
+   - `reference`: table (0-indexed の Reference ヘッダー配列)
+   - `dic`: table (全ヘッダーの辞書)
+3. When `EVENT.fire(req)` がレスポンス文字列を返却した場合、the `SHIORI.request` function shall そのレスポンス文字列をそのまま返却する。
+4. The `SHIORI.request` function shall SHIORI/3.0 形式のレスポンス文字列（例: `SHIORI/3.0 200 OK\r\n...`）を返却する。
+
+---
+
+### Requirement 4: SHIORI.unload によるDLLアンロード処理
+
+**Objective:** Rust ランタイムとして、DLLアンロード時に Lua 側のクリーンアップ処理を呼び出せる。
+
+#### Acceptance Criteria
+
+1. When Rust側から `SHIORI.unload()` が呼び出された場合、the entry module shall クリーンアップ処理を実行する。
+2. The `SHIORI.unload` function shall 引数を受け取らない。
+3. The `SHIORI.unload` function shall 戻り値を返却しない（void）。
+4. The `SHIORI.unload` function shall 将来の拡張に備えて、セーブデータ保存・リソース解放の拡張ポイントを提供する（現時点では未実装）。
+
+---
+
+### Requirement 5: 既存モジュールの移行
+
+**Objective:** プロジェクトメンテナーとして、既存の `pasta.shiori.main` から新しい `entry.lua` への移行を完了し、重複コードを排除できる。
+
+#### Acceptance Criteria
+
+1. The entry module shall `crates/pasta_lua/scripts/pasta/shiori/entry.lua` に配置される。
+2. When 移行が完了した場合、the project shall `pasta/shiori/main.lua` を削除または空ファイル化する。
+3. If Rust側で `require("pasta.shiori.main")` がハードコードされている場合、then the project shall `require("pasta.shiori.entry")` に変更する。
+4. The entry module shall `lua-coding.md` のモジュール構造規約（標準モジュール構造、UPPER_CASE テーブル）に従う。
+
+---
+
+### Requirement 6: Rust側との整合性
+
+**Objective:** Rust ランタイムとして、Lua エントリーポイントの変更後も既存の SHIORI 呼び出しフローが正常に動作することを保証できる。
+
+#### Acceptance Criteria
+
+1. The entry module shall Rust側の `pasta_shiori` クレートが期待する `SHIORI.load`、`SHIORI.request`、`SHIORI.unload` のシグネチャと互換性を保つ。
+2. When Rust側から SHIORI 関数が呼び出された場合、the entry module shall 既存のテストケース（`shiori_event_test.rs` 等）が通過する動作を維持する。
+3. If Rust側でエントリーポイントモジュール名がハードコードされている場合、then the implementation shall その箇所を特定し変更する。
+
+---
+
+### Requirement 7: テスト要件
+
+**Objective:** 開発者として、entry モジュールの動作を自動テストで検証でき、リグレッションを防止できる。
+
+#### Acceptance Criteria
+
+1. The project shall 以下の単体テストを提供する:
+   - `require("pasta.shiori.entry")` でグローバル `SHIORI` テーブルが作成される
+   - `SHIORI.load(0, "/path/to/ghost")` が `true` を返す
+   - `SHIORI.request(valid_req)` が `EVENT.fire` を呼び出しレスポンス文字列を返す
+   - `SHIORI.unload()` がエラーなく完了する
+2. The project shall 以下の結合テストを提供する:
+   - Rust側から `SHIORI.load` 呼び出し → Lua側の `SHIORI.load` が実行される
+   - Rust側から `SHIORI.request` 呼び出し → Lua側でレスポンスが生成される
+3. When すべてのテストが実行された場合、the project shall `cargo test --all` が成功することを保証する。
+
+---
+
+## Original Project Description
+
+<!-- 以下は初期化フェーズで入力されたプロジェクト説明（参照用） -->
+
+<details>
+<summary>元の要件定義書（入力）</summary>
+
+### 目的
 Rust側の SHIORI.DLL 実装から呼び出される Lua 側のエントリーポイントを提供する。
 グローバル変数 `SHIORI` を初期化し、SHIORI/3.0 プロトコルの load / request / unload を処理する。
 
-### 1.2 責務
+### 責務
 - グローバルテーブル `SHIORI` の初期化
 - `SHIORI.load(hinst, load_dir)` の実装
 - `SHIORI.request(req)` の実装（EVENT.fire への委譲）
 - `SHIORI.unload()` の実装
 
-### 1.3 ファイル配置
+### ファイル配置
 ```
 crates/pasta_lua/scripts/pasta/shiori/entry.lua
 ```
 
-### 1.4 既存ファイルとの関係
+### 既存ファイルとの関係
 - `pasta.shiori.main` → **削除または空ファイル化**（entry.lua に置き換え）
 - `pasta.shiori.res` → entry.lua から利用（エラーレスポンス生成等）
 - `pasta.shiori.event` → entry.lua から利用（EVENT.fire 呼び出し）
 
----
+### インターフェース仕様
 
-## 2. インターフェース仕様
+#### SHIORI.load(hinst, load_dir) → boolean
+DLLロード時の初期化処理。
 
-### 2.1 グローバル変数
+#### SHIORI.request(req) → string
+リクエスト処理。`EVENT.fire(req)` に委譲。
 
-| 変数名 | 型 | 説明 |
-|--------|------|------|
-| `SHIORI` | table | SHIORI/3.0 プロトコルハンドラを格納するグローバルテーブル |
+#### SHIORI.unload() → void
+DLLアンロード時のクリーンアップ処理。
 
-### 2.2 SHIORI.load(hinst, load_dir)
-
-Rust側から DLL ロード時に呼び出される。
-
-**シグネチャ:**
-```lua
-function SHIORI.load(hinst, load_dir) -> boolean
-```
-
-**引数:**
-| 名前 | 型 | 説明 |
-|------|------|------|
-| `hinst` | integer | DLL インスタンスハンドル |
-| `load_dir` | string | ゴーストの master/ ディレクトリパス |
-
-**戻り値:**
-| 型 | 説明 |
-|------|------|
-| `boolean` | 初期化成功時 `true`、失敗時 `false` |
-
-**処理内容:**
-1. 必要に応じて初期化処理を行う（将来の拡張ポイント）
-2. `true` を返す
-
-### 2.3 SHIORI.request(req)
-
-Rust側から SHIORI リクエスト受信時に呼び出される。
-
-**シグネチャ:**
-```lua
-function SHIORI.request(req) -> string
-```
-
-**引数:**
-| 名前 | 型 | 説明 |
-|------|------|------|
-| `req` | table | パース済み SHIORI リクエスト |
-
-**req テーブル構造:**
-```lua
-req = {
-    method = "get" | "notify",  -- リクエストメソッド
-    version = 30,               -- SHIORIバージョン (30 = SHIORI/3.0)
-    id = "OnBoot",              -- イベントID
-    charset = "UTF-8",          -- 文字セット
-    sender = "SSP",             -- 送信元（ベースウェア名）
-    reference = {               -- Reference ヘッダー（0-indexed）
-        [0] = "value0",
-        [1] = "value1",
-        -- ...
-    },
-    dic = {                     -- 全ヘッダーの辞書
-        ["ID"] = "OnBoot",
-        ["Charset"] = "UTF-8",
-        -- ...
-    },
-    -- 以下はオプション（存在する場合のみ）
-    base_id = "...",            -- Base ID
-    status = "...",             -- Status
-    security_level = "...",     -- Security Level
-}
-```
-
-**戻り値:**
-| 型 | 説明 |
-|------|------|
-| `string` | SHIORI/3.0 レスポンス文字列 |
-
-**処理内容:**
-1. `EVENT.fire(req)` を呼び出す
-2. 戻り値（レスポンス文字列）をそのまま返す
-
-### 2.4 SHIORI.unload()
-
-Rust側から DLL アンロード時に呼び出される。
-
-**シグネチャ:**
-```lua
-function SHIORI.unload() -> void
-```
-
-**引数:** なし
-
-**戻り値:** なし
-
-**処理内容:**
-1. 必要に応じてクリーンアップ処理を行う（将来の拡張ポイント）
-
----
-
-## 3. 依存モジュール
-
-| モジュール | 用途 |
-|------------|------|
-| `pasta.shiori.event` | `EVENT.fire(req)` の呼び出し |
-| `pasta.shiori.res` | エラーレスポンス生成（将来の拡張用） |
-
----
-
-## 4. 実装例
-```lua
---- @module pasta.shiori.entry
---- SHIORI/3.0 プロトコル エントリーポイント
----
---- Rust側の PastaShiori から呼び出されるグローバル SHIORI テーブルを初期化する。
---- load / request / unload の各関数を提供し、イベント処理は EVENT モジュールに委譲する。
-
--- 1. 依存モジュールの読み込み
-local event = require("pasta.shiori.event")
--- local res = require("pasta.shiori.res")  -- 将来の拡張用
-
--- 2. グローバル SHIORI テーブルの初期化
-SHIORI = SHIORI or {}
-
--- 3. SHIORI.load
---- DLLロード時の初期化処理
---- @param hinst integer DLLインスタンスハンドル
---- @param load_dir string ゴーストのmaster/ディレクトリパス
---- @return boolean 初期化成功時true
-function SHIORI.load(hinst, load_dir)
-    -- 将来の拡張ポイント:
-    -- - 設定ファイルの読み込み
-    -- - セーブデータの復元
-    -- - アクター定義の読み込み
-    return true
-end
-
--- 4. SHIORI.request
---- SHIORIリクエストの処理
---- @param req table パース済みSHIORIリクエスト
---- @return string SHIORI/3.0レスポンス文字列
-function SHIORI.request(req)
-    return event.fire(req)
-end
-
--- 5. SHIORI.unload
---- DLLアンロード時のクリーンアップ処理
-function SHIORI.unload()
-    -- 将来の拡張ポイント:
-    -- - セーブデータの保存
-    -- - リソースの解放
-end
-
--- 6. モジュールとしても返す（オプション）
-return SHIORI
-```
-
----
-
-## 5. Rust側の変更点
-
-### 5.1 PastaLoader での読み込み対象変更
-
-現在 `pasta.shiori.main` を読み込んでいる箇所を `pasta.shiori.entry` に変更する。
-
-**確認事項:**
-- Rust側でモジュール名をハードコードしている箇所があるか？
-- それとも `SHIORI` グローバル変数の存在だけをチェックしているか？
-
-### 5.2 想定される変更なし（確認待ち）
-
-Rust側は `SHIORI.load` / `SHIORI.request` / `SHIORI.unload` の存在をチェックしてキャッシュしているため、Lua側のモジュール名が変わっても影響しない可能性が高い。
-
-ただし、**どこで `require("pasta.shiori.main")` を呼んでいるか**を確認する必要がある。
-
----
-
-## 6. テスト観点
-
-### 6.1 単体テスト
-
-| テストケース | 期待結果 |
-|--------------|----------|
-| `require("pasta.shiori.entry")` | グローバル `SHIORI` テーブルが作成される |
-| `SHIORI.load(0, "/path/to/ghost")` | `true` が返る |
-| `SHIORI.request(valid_req)` | `EVENT.fire` が呼ばれ、レスポンス文字列が返る |
-| `SHIORI.unload()` | エラーなく完了する |
-
-### 6.2 結合テスト
-
-| テストケース | 期待結果 |
-|--------------|----------|
-| Rust側から SHIORI.load 呼び出し | Lua側の SHIORI.load が実行される |
-| Rust側から SHIORI.request 呼び出し | Lua側の SHIORI.request が実行され、レスポンスが返る |
-| OnBoot イベント発火 | `EVENT.fire` → ハンドラ実行 → `RES.ok(...)` 形式のレスポンス |
-
-### 6.3 E2Eテスト（伺か上での動作確認）
-
-| テストケース | 期待結果 |
-|--------------|----------|
-| ゴースト起動 | 「こんにちは」と喋る |
-
----
-
-## 7. 今後の拡張ポイント
-
-### 7.1 SHIORI.load での初期化処理
-- 設定ファイル（config.lua 等）の読み込み
-- pasta スクリプト（*.pasta）のトランスパイル結果読み込み
-- セーブデータの復元
-
-### 7.2 SHIORI.unload でのクリーンアップ処理
-- セーブデータの永続化
-- ログのフラッシュ
-
-### 7.3 エラーハンドリングの強化
-- `EVENT.fire` がエラーを投げた場合の 500 レスポンス生成
-- デバッグ情報の X-Error-Reason ヘッダー付与
-
----
-
-## 8. チェックリスト
-
-- [ ] `pasta/shiori/entry.lua` を新規作成
-- [ ] `pasta.shiori.event` の実装完了を確認（AIさん担当）
-- [ ] Rust側の require 対象を確認・必要なら変更
-- [ ] `pasta/shiori/main.lua` を削除または空ファイル化
-- [ ] ユニットテスト作成
-- [ ] 伺かでの動作確認
-
-## Requirements
-<!-- Will be generated in /kiro:spec-requirements phase -->
+</details>
