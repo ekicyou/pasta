@@ -94,7 +94,9 @@
 3. When 移行が完了した場合、the project shall 以下のテストフィクスチャを `entry.lua` にリネームする：
    - `crates/pasta_shiori/tests/support/scripts/pasta/shiori/main.lua` → `entry.lua`
    - `crates/pasta_shiori/tests/fixtures/shiori_lifecycle/scripts/pasta/shiori/main.lua` → `entry.lua`
-4. If Rust側で `scripts/pasta/shiori/main.lua` がハードコードされている場合、then the project shall `scripts/pasta/shiori/entry.lua` に変更する。
+4. The project shall Rust側の以下の箇所で `scripts/pasta/shiori/main.lua` を `scripts/pasta/shiori/entry.lua` に変更する（必須）：
+   - `crates/pasta_lua/src/runtime/mod.rs:309` (PastaLuaRuntime::new_with_scene_dic)
+   - `crates/pasta_lua/src/runtime/mod.rs:378` (PastaLuaRuntime::from_loader_with_scene_dic)
 5. The entry module shall `lua-coding.md` のモジュール構造規約（標準モジュール構造、UPPER_CASE テーブル）に従う。
 
 ---
@@ -107,7 +109,7 @@
 
 1. The entry module shall Rust側の `pasta_shiori` クレートが期待する `SHIORI.load`、`SHIORI.request`、`SHIORI.unload` のシグネチャと互換性を保つ。
 2. When Rust側から SHIORI 関数が呼び出された場合、the entry module shall 既存のテストケース（`shiori_event_test.rs` 等）が通過する動作を維持する。
-3. If Rust側でエントリーポイントモジュール名がハードコードされている場合、then the implementation shall その箇所を特定し変更する。
+3. The implementation shall Rust側ランタイム初期化時に `entry.lua` を読み込み、グローバル `SHIORI` テーブルの関数を正常にキャッシュできることを保証する。
 
 ---
 
