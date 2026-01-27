@@ -89,7 +89,7 @@
 #### Acceptance Criteria
 
 1. The entry module shall `crates/pasta_lua/scripts/pasta/shiori/entry.lua` に配置される。
-2. When 移行が完了した場合、the project shall `pasta/shiori/main.lua` を削除または空ファイル化する。
+2. When 移行が完了した場合、the project shall `pasta/shiori/main.lua` を削除する（開発者判断: 完全置き換え方針）。
 3. If Rust側で `require("pasta.shiori.main")` がハードコードされている場合、then the project shall `require("pasta.shiori.entry")` に変更する。
 4. The entry module shall `lua-coding.md` のモジュール構造規約（標準モジュール構造、UPPER_CASE テーブル）に従う。
 
