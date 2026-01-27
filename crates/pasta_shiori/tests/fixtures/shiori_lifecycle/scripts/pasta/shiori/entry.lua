@@ -1,4 +1,4 @@
---- @module pasta.shiori.main
+--- @module pasta.shiori.entry
 --- SHIORI/3.0 Protocol Entry Point with Observable Side Effects
 ---
 --- This module provides a SHIORI implementation that demonstrates

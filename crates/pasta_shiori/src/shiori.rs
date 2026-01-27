@@ -456,13 +456,13 @@ mod tests {
         assert!(shiori.runtime.is_some());
         assert_eq!(shiori.hinst, 42);
 
-        // Phase 2: request() - main.lua should provide SHIORI.request
+        // Phase 2: request() - entry.lua should provide SHIORI.request
         // Use valid SHIORI request format (GET method required for parsing)
         let valid_request = "GET SHIORI/3.0\r\nCharset: UTF-8\r\n\r\n";
         let request_result = shiori.request(valid_request);
         assert!(request_result.is_ok());
         let response = request_result.unwrap();
-        // Should return 204 No Content from main.lua (minimal fixture has no SHIORI.request)
+        // Should return 204 No Content from entry.lua (minimal fixture has no SHIORI.request)
         assert!(response.contains("SHIORI/3.0 204 No Content"));
         assert!(response.contains("Charset: UTF-8"));
         assert!(response.contains("Sender: Pasta"));
@@ -559,38 +559,38 @@ mod tests {
     // ========================================================================
 
     #[test]
-    fn test_load_sets_shiori_flags_when_main_lua_exists() {
+    fn test_load_sets_shiori_flags_when_entry_lua_exists() {
         let temp = copy_fixture_to_temp("minimal");
 
         let mut shiori = PastaShiori::default();
         assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
 
-        // main.lua is present in scripts/, so cached functions should be Some
+        // entry.lua is present in scripts/, so cached functions should be Some
         assert!(shiori.load_fn.is_some(), "load_fn should be cached");
         assert!(shiori.request_fn.is_some(), "request_fn should be cached");
     }
 
     #[test]
-    fn test_load_flags_false_without_main_lua() {
+    fn test_load_flags_false_without_entry_lua() {
         let temp = copy_fixture_to_temp("minimal");
 
-        // Remove the main.lua file to simulate missing SHIORI functions
-        let main_lua_path = temp.path().join("scripts/pasta/shiori/main.lua");
-        if main_lua_path.exists() {
-            std::fs::remove_file(&main_lua_path).unwrap();
+        // Remove the entry.lua file to simulate missing SHIORI functions
+        let entry_lua_path = temp.path().join("scripts/pasta/shiori/entry.lua");
+        if entry_lua_path.exists() {
+            std::fs::remove_file(&entry_lua_path).unwrap();
         }
 
         let mut shiori = PastaShiori::default();
         assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
 
-        // main.lua doesn't exist, so cached functions should be None
+        // entry.lua doesn't exist, so cached functions should be None
         assert!(
             shiori.load_fn.is_none(),
-            "load_fn should be None without main.lua"
+            "load_fn should be None without entry.lua"
         );
         assert!(
             shiori.request_fn.is_none(),
-            "request_fn should be None without main.lua"
+            "request_fn should be None without entry.lua"
         );
     }
 
@@ -620,10 +620,10 @@ mod tests {
     fn test_request_returns_default_204_without_main_lua() {
         let temp = copy_fixture_to_temp("minimal");
 
-        // Remove main.lua to test fallback behavior
-        let main_lua_path = temp.path().join("scripts/pasta/shiori/main.lua");
-        if main_lua_path.exists() {
-            std::fs::remove_file(&main_lua_path).unwrap();
+        // Remove entry.lua to test fallback behavior
+        let entry_lua_path = temp.path().join("scripts/pasta/shiori/entry.lua");
+        if entry_lua_path.exists() {
+            std::fs::remove_file(&entry_lua_path).unwrap();
         }
 
         let mut shiori = PastaShiori::default();
@@ -658,9 +658,9 @@ mod tests {
         let temp = copy_fixture_to_temp("minimal");
 
         // Create a Lua script that defines SHIORI.unload and sets a global flag
-        let main_lua_path = temp.path().join("scripts/pasta/shiori/main.lua");
+        let entry_lua_path = temp.path().join("scripts/pasta/shiori/entry.lua");
         std::fs::write(
-            &main_lua_path,
+            &entry_lua_path,
             r#"
 SHIORI = {}
 
@@ -723,9 +723,9 @@ end
         let temp = copy_fixture_to_temp("minimal");
 
         // Create a Lua script with an unload function that always errors
-        let main_lua_path = temp.path().join("scripts/pasta/shiori/main.lua");
+        let entry_lua_path = temp.path().join("scripts/pasta/shiori/entry.lua");
         std::fs::write(
-            &main_lua_path,
+            &entry_lua_path,
             r#"
 SHIORI = {}
 
@@ -766,10 +766,10 @@ end
         let temp1 = copy_fixture_to_temp("minimal");
         let temp2 = copy_fixture_to_temp("minimal");
 
-        // Modify temp2's main.lua to remove SHIORI.load but keep request
-        let main_lua_path2 = temp2.path().join("scripts/pasta/shiori/main.lua");
+        // Modify temp2's entry.lua to remove SHIORI.load but keep request
+        let entry_lua_path2 = temp2.path().join("scripts/pasta/shiori/entry.lua");
         std::fs::write(
-            &main_lua_path2,
+            &entry_lua_path2,
             r#"
 SHIORI = {}
 
@@ -816,10 +816,10 @@ end
         let temp1 = copy_fixture_to_temp("minimal");
         let temp2 = copy_fixture_to_temp("minimal");
 
-        // Modify temp1's main.lua to define all three SHIORI functions
-        let main_lua_path1 = temp1.path().join("scripts/pasta/shiori/main.lua");
+        // Modify temp1's entry.lua to define all three SHIORI functions
+        let entry_lua_path1 = temp1.path().join("scripts/pasta/shiori/entry.lua");
         std::fs::write(
-            &main_lua_path1,
+            &entry_lua_path1,
             r#"
 SHIORI = {}
 
@@ -838,10 +838,10 @@ end
         )
         .unwrap();
 
-        // Modify temp2's main.lua to only define request (no load/unload)
-        let main_lua_path2 = temp2.path().join("scripts/pasta/shiori/main.lua");
+        // Modify temp2's entry.lua to only define request (no load/unload)
+        let entry_lua_path2 = temp2.path().join("scripts/pasta/shiori/entry.lua");
         std::fs::write(
-            &main_lua_path2,
+            &entry_lua_path2,
             r#"
 SHIORI = {}
 
@@ -966,10 +966,10 @@ end
     fn test_request_parsed_table_fields_accessible_in_lua() {
         let temp = copy_shiori_lifecycle_fixture();
 
-        // Override main.lua to echo back req table fields for verification
-        let main_lua_path = temp.path().join("scripts/pasta/shiori/main.lua");
+        // Override entry.lua to echo back req table fields for verification
+        let entry_lua_path = temp.path().join("scripts/pasta/shiori/entry.lua");
         std::fs::write(
-            &main_lua_path,
+            &entry_lua_path,
             r#"
 SHIORI = {}
 

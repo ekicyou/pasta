@@ -1,7 +1,7 @@
---- @module pasta.shiori.main
---- SHIORI/3.0 Protocol Entry Point
+--- @module pasta.shiori.entry
+--- SHIORI/3.0 Protocol Entry Point (Minimal Test Fixture)
 ---
---- This module defines the global SHIORI table with load and request functions.
+--- This module defines the global SHIORI table with load, request, and unload functions.
 --- These are called by PastaShiori (Rust) to handle SHIORI protocol events.
 
 -- Global SHIORI table for protocol handling
@@ -21,14 +21,20 @@ end
 --- Handle SHIORI/3.0 request.
 --- Called for each SHIORI request from the baseware.
 ---
---- @param request_text string Raw SHIORI request text
+--- @param req table Parsed SHIORI request table with fields: id, method, version, charset, sender, reference, dic
 --- @return string SHIORI response (204 No Content in minimal implementation)
-function SHIORI.request(request_text)
+function SHIORI.request(req)
     -- Minimal implementation: return 204 No Content
     return "SHIORI/3.0 204 No Content\r\n" ..
         "Charset: UTF-8\r\n" ..
         "Sender: Pasta\r\n" ..
         "\r\n"
+end
+
+--- Handle SHIORI unload event.
+--- Called when the SHIORI DLL is unloaded by the baseware.
+function SHIORI.unload()
+    -- Minimal implementation: do nothing
 end
 
 return SHIORI

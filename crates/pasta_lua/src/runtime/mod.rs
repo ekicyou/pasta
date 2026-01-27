@@ -303,21 +303,21 @@ impl PastaLuaRuntime {
             tracing::debug!(module = %result.module_name, "Loaded transpiled module");
         }
 
-        // Load main.lua if exists (for SHIORI.load/SHIORI.request functions)
-        let main_lua_path = loader_context
+        // Load entry.lua if exists (for SHIORI.load/SHIORI.request functions)
+        let entry_lua_path = loader_context
             .base_dir
-            .join("scripts/pasta/shiori/main.lua");
-        if main_lua_path.exists() {
-            match std::fs::read_to_string(&main_lua_path) {
+            .join("scripts/pasta/shiori/entry.lua");
+        if entry_lua_path.exists() {
+            match std::fs::read_to_string(&entry_lua_path) {
                 Ok(script) => {
-                    if let Err(e) = runtime.lua.load(&script).set_name("main.lua").exec() {
-                        tracing::warn!(error = %e, "Failed to load main.lua, continuing without SHIORI functions");
+                    if let Err(e) = runtime.lua.load(&script).set_name("entry.lua").exec() {
+                        tracing::warn!(error = %e, "Failed to load entry.lua, continuing without SHIORI functions");
                     } else {
-                        tracing::debug!("Loaded main.lua");
+                        tracing::debug!("Loaded entry.lua");
                     }
                 }
                 Err(e) => {
-                    tracing::warn!(error = %e, "Failed to read main.lua, continuing without SHIORI functions");
+                    tracing::warn!(error = %e, "Failed to read entry.lua, continuing without SHIORI functions");
                 }
             }
         }
@@ -372,21 +372,21 @@ impl PastaLuaRuntime {
         // Register @pasta_persistence module for persistent data storage
         Self::register_persistence_module(&runtime.lua, &runtime.config, &runtime.base_dir)?;
 
-        // Load main.lua first (for SHIORI.load/SHIORI.request functions)
-        let main_lua_path = loader_context
+        // Load entry.lua first (for SHIORI.load/SHIORI.request functions)
+        let entry_lua_path = loader_context
             .base_dir
-            .join("scripts/pasta/shiori/main.lua");
-        if main_lua_path.exists() {
-            match std::fs::read_to_string(&main_lua_path) {
+            .join("scripts/pasta/shiori/entry.lua");
+        if entry_lua_path.exists() {
+            match std::fs::read_to_string(&entry_lua_path) {
                 Ok(script) => {
-                    if let Err(e) = runtime.lua.load(&script).set_name("main.lua").exec() {
-                        tracing::warn!(error = %e, "Failed to load main.lua, continuing without SHIORI functions");
+                    if let Err(e) = runtime.lua.load(&script).set_name("entry.lua").exec() {
+                        tracing::warn!(error = %e, "Failed to load entry.lua, continuing without SHIORI functions");
                     } else {
-                        tracing::debug!("Loaded main.lua");
+                        tracing::debug!("Loaded entry.lua");
                     }
                 }
                 Err(e) => {
-                    tracing::warn!(error = %e, "Failed to read main.lua, continuing without SHIORI functions");
+                    tracing::warn!(error = %e, "Failed to read entry.lua, continuing without SHIORI functions");
                 }
             }
         }
