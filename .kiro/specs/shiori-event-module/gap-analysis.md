@@ -364,31 +364,37 @@ crates/pasta_lua/scripts/pasta/shiori/
 
 ---
 
-#### 議題2: req.idがnilの防御的プログラミング方針
+#### 議題2: req.idがnilの防御的プログラミング方針 ✅ 決定
 
-**背景**: Rust側パーサーが必ずidを設定する保証がない（既存テストにid=nilケースなし）
+**決定**: 選択肢A（Lua標準の挙動に任せる）
 
-**選択肢**:
-
-**A. 防御的プログラミング: `req.id or "NIL"` で処理（推奨）**
+**実装方針**:
 ```lua
-local handler = REG[req.id] or EVENT.no_entry
+function EVENT.fire(req)
+    local handler = REG[req.id] or EVENT.no_entry
+    -- req.id が nil なら REG[nil] → nil → EVENT.no_entry
+    
+    local ok, result = xpcall(function()
+        return handler(req)
+    end, debug.traceback)
+    
+    if ok then
+        return result
+    else
+        return RES.err(result)
+    end
+end
 ```
-- Lua標準の挙動: `req.id` が nil なら `REG[nil]` → nil → `EVENT.no_entry`
-- 明示的な防御は不要（Luaの短絡評価で自然に処理される）
 
-**B. 明示的なnil チェック**
-```lua
-local id = req.id or "UNKNOWN"
-local handler = REG[id] or EVENT.no_entry
-```
-- 利点: より明示的、デバッグ時にidが確認しやすい
-- 欠点: 冗長、Lua標準の挙動を信頼していない
+**理由**:
+- **シンプル**: コードが簡潔で読みやすい
+- **一貫性**: `pasta.shiori.res` の `dic = dic or {}` パターンと同様
+- **Luaらしさ**: 短絡評価と `nil` の扱いを活用
+- Luaの仕様: `REG[nil]` は常に `nil` を返すため、自然に `EVENT.no_entry` へフォールバック
 
-**推奨**: Option A（Lua標準の挙動に任せる）
-- 理由: シンプル、Luaらしい、既存コード（res.lua）と一貫性
-
-**決定**: （開発者確認必要）
+**前提条件**:
+- Rust側が `req` テーブルを必ず渡す（`nil` を渡さない）
+- `req.id` が `nil` でも `EVENT.no_entry(req)` で適切に処理される（204 No Content）
 
 ---
 
