@@ -132,6 +132,18 @@
 
 ---
 
+### Requirement 8: ドキュメント更新
+
+**Objective:** 開発者として、SHIORIエントリーポイント名の変更を正確に把握できる。
+
+#### Acceptance Criteria
+
+1. The project shall `crates/pasta_lua/scripts/README.md` において、main.lua から entry.lua への変更を反映する。
+2. The documentation shall エントリーポイントファイル名として `entry.lua` を明記する。
+3. WHERE 関連ドキュメント（steering等）にmain.luaへの参照が存在する場合、the project shall それらを entry.lua に更新する。
+
+---
+
 ## Original Project Description
 
 <!-- 以下は初期化フェーズで入力されたプロジェクト説明（参照用） -->
