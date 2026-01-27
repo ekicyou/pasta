@@ -398,47 +398,47 @@ end
 
 ---
 
-#### 議題3: エラーレスポンスのtraceback詳細度
+#### 議題3: エラーレスポンスのtraceback詳細度 ✅ 決定
 
-**背景**: `xpcall` でキャッチしたエラーを `RES.err(traceback)` で返すが、本番環境でスタックトレースを露出するかの判断が必要。
+**決定**: 選択肢C（エラーメッセージのみ抽出）
 
-**選択肢**:
-
-**A. 常にtraceback全体を返す（シンプル、推奨）**
+**実装方針**:
 ```lua
-if ok then
-    return result
-else
-    return RES.err(result)  -- result = debug.traceback()
+function EVENT.fire(req)
+    local handler = REG[req.id] or EVENT.no_entry
+    
+    local ok, result = xpcall(function()
+        return handler(req)
+    end, debug.traceback)
+    
+    if ok then
+        return result
+    else
+        -- 最初の行（エラーメッセージ本体）のみを抽出
+        local error_msg = result:match("^[^\n]+") or "Unknown error"
+        return RES.err(error_msg)
+    end
 end
 ```
-- 利点: シンプル、デバッグ容易、初期実装に最適
-- 欠点: 本番環境で内部情報が露出（ただしローカル環境のみで使用想定）
 
-**B. debug_mode フラグで制御（将来拡張）**
-```lua
-local traceback = result
-if not RES.env.debug_mode then
-    traceback = "Internal Server Error (details hidden)"
-end
-return RES.err(traceback)
+**理由**:
+- **プロトコル準拠**: SHIORI/3.0のヘッダー値は改行を含めない
+- `X-Error-Reason` ヘッダーに改行が含まれるとレスポンスパースエラーになる
+- エラーメッセージの最初の行で問題の概要は把握可能
+
+**デバッグ対応**:
+- 詳細なスタックトレースが必要な場合は、将来的にログファイル出力機能を検討
+- 開発時は Lua 側でエラーをキャッチしてログ出力する方式を推奨
+
+**レスポンス例**:
 ```
-- 利点: 本番環境での情報制御が可能
-- 欠点: 初期実装としては過剰設計、RES.envへの拡張が必要
+SHIORI/3.0 500 Internal Server Error
+Charset: UTF-8
+Sender: Pasta
+SecurityLevel: local
+X-Error-Reason: attempt to call a nil value
 
-**C. エラーメッセージのみ抽出**
-```lua
-local error_msg = result:match("^[^\n]+") or "Unknown error"
-return RES.err(error_msg)
 ```
-- 利点: 情報露出を最小化
-- 欠点: デバッグ困難、開発体験悪化
-
-**推奨**: Option A（常にtraceback全体を返す）
-- 理由: SHIORIはローカル環境で動作、デバッグ容易性を優先
-- 将来必要ならOption Bへ拡張可能
-
-**決定**: （開発者確認必要）
 
 ---
 
