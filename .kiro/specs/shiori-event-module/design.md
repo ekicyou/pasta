@@ -361,6 +361,8 @@ classDiagram
 **System Errors (500)**:
 - ハンドラ内例外 → `RES.err(error_msg)` で詳細返却
 - エラーメッセージは最初の行のみ（改行除去）
+- `match()` が nil を返す境界条件（空文字列、改行のみ）では "Unknown error" にフォールバック
+  - 理由: `RES.err(nil)` は文字列連結エラーを発生させるため、`or "Unknown error"` は必須
 
 ---
 
@@ -441,6 +443,31 @@ fn test_event_fire_dispatches_registered_handler() {
 
 #### `test_event_fire_handles_nil_id`
 req.id=nilで204を返すこと。
+
+#### `test_event_fire_handles_empty_error_message`
+エラーメッセージが空の場合に "Unknown error" にフォールバックすること。
+
+```rust
+#[test]
+fn test_event_fire_handles_empty_error_message() {
+    let runtime = create_runtime_with_pasta_path();
+    runtime.exec(r#"
+        local REG = require("pasta.shiori.event.register")
+        local EVENT = require("pasta.shiori.event")
+        
+        -- エラーメッセージが空文字列のハンドラ
+        REG.OnTest = function(req)
+            error("")
+        end
+        
+        local req = { id = "OnTest", method = "get", version = 30 }
+        local response = EVENT.fire(req)
+        
+        assert(response:find("500 Internal Server Error"), "should return 500")
+        assert(response:find("X%-Error%-Reason: Unknown error"), "should fallback to Unknown error")
+    "#).unwrap();
+}
+```
 
 ### Integration Tests
 
