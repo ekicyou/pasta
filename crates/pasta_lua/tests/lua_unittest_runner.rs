@@ -1,4 +1,5 @@
 use mlua::prelude::*;
+use pasta_lua::context::TranspileContext;
 use pasta_lua::loader::PersistenceConfig;
 use std::path::PathBuf;
 
@@ -47,6 +48,13 @@ fn run_lua_unit_tests() -> LuaResult<()> {
     let package: LuaTable = lua.globals().get("package")?;
     let loaded: LuaTable = package.get("loaded")?;
     loaded.set("@pasta_persistence", persistence_table)?;
+
+    // Register @pasta_search module with empty registries (required by pasta.scene)
+    let ctx = TranspileContext::new();
+    let search_context =
+        pasta_lua::search::SearchContext::new(ctx.scene_registry, ctx.word_registry)
+            .expect("Failed to create SearchContext");
+    loaded.set("@pasta_search", lua.create_userdata(search_context)?)?;
 
     // Lua ユニットテストを実行（エントリーポイント: init.lua）
     let test_file = lua_specs_path.join("init.lua");
