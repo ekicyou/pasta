@@ -7,6 +7,7 @@
 
 local STORE = require("pasta.store")
 local WORD = require("pasta.word")
+local SEARCH = require("@pasta_search")
 
 --- @class Scene モジュールテーブル
 local SCENE = {}
@@ -28,6 +29,17 @@ end
 --- シーンテーブルのメタテーブル
 local scene_table_mt = {
     __index = SCENE_TABLE_IMPL
+}
+
+--- シーン検索結果のメタテーブル（__call で直接呼び出し可能）
+--- @class SceneSearchResult
+--- @field global_name string グローバルシーン名
+--- @field local_name string ローカルシーン名
+--- @field func function シーン関数
+local scene_result_mt = {
+    __call = function(self, ...)
+        return self.func(...)
+    end
 }
 
 --- カウンタを取得してインクリメント
@@ -123,6 +135,45 @@ function SCENE.create_scene(base_name, local_name, scene_func)
         SCENE.register(global_name, local_name, scene_func)
     end
     return SCENE.get_global_table(global_name) or SCENE.create_global_table(global_name)
+end
+
+--- シーンを名前で検索（プレフィックス検索）
+---
+--- 指定された名前でシーンを検索し、見つかった場合は呼び出し可能な結果オブジェクトを返す。
+--- global_scene_name が nil の場合はグローバル検索（__start__ を返す）、
+--- 指定された場合はそのシーン内のローカル検索を行う。
+---
+--- @param name string 検索するシーン名
+--- @param global_scene_name string|nil ローカル検索の場合のグローバルシーン名
+--- @return SceneSearchResult|nil 検索結果、またはnil
+function SCENE.search(name, global_scene_name)
+    -- 型チェック: name が文字列でない場合は nil を返す
+    if type(name) ~= "string" then
+        return nil
+    end
+
+    -- @pasta_search を使用してシーンを検索
+    local global_name, local_name = SEARCH:search_scene(name, global_scene_name)
+
+    -- 検索結果がなければ nil を返す
+    if not global_name then
+        return nil
+    end
+
+    -- Lua 側で登録されているシーン関数を取得
+    local func = SCENE.get(global_name, local_name)
+
+    -- シーン関数が登録されていなければ nil を返す
+    if not func then
+        return nil
+    end
+
+    -- 呼び出し可能な結果オブジェクトを返す
+    return setmetatable({
+        global_name = global_name,
+        local_name = local_name,
+        func = func
+    }, scene_result_mt)
 end
 
 return SCENE

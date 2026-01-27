@@ -45,6 +45,7 @@
 | 単語ランダム選択   | `search_module_test.rs`                                          | 🔶 部分 | ランダム性検証        |
 | アクター単語辞書   | `actor_word_dictionary_test.rs`                                  | ✅ 完了 | アクタースコープ単語  |
 | finalize_scene処理 | `finalize_scene_test.rs`                                         | ✅ 完了 | シーン初期化          |
+| SCENE.search() API | `scene_search_test.rs`                                           | ✅ 完了 | 12テスト（新規）      |
 
 ### 2.3 Transpiler層テスト（Lua変換）
 
