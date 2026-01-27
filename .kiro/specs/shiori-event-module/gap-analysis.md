@@ -188,7 +188,7 @@ fn test_event_fire_dispatches_registered_handler() {
 | Req 5 | xpcallエラーハンドリング | `RES.err()` 利用可能 | **実装必要** |
 | Req 6-7 | リクエスト構造理解 | Rust側で完備 | なし |
 | Req 8 | 公開API定義 | モジュールパターン確立済み | 適用のみ |
-| Req 9 | main.lua統合 | `SHIORI.request()` 拡張必要 | **修正必要** |
+| Req 9 | 使用例ドキュメント | なし | **Missing** | ドキュメント追加 |
 
 ### 2.2 ギャップと制約
 
@@ -196,8 +196,11 @@ fn test_event_fire_dispatches_registered_handler() {
 
 1. **新規ファイル**: `crates/pasta_lua/scripts/pasta/shiori/event/init.lua`
 2. **新規ファイル**: `crates/pasta_lua/scripts/pasta/shiori/event/register.lua`
-3. **既存修正**: `crates/pasta_lua/scripts/pasta/shiori/main.lua` の `SHIORI.request()` 関数
-4. **新規テスト**: `crates/pasta_lua/tests/shiori_event_test.rs`
+3. **新規テスト**: `crates/pasta_lua/tests/shiori_event_test.rs`
+
+**スコープ外**:
+- `main.lua` の修正（Rust側統合で対応）
+- Rust側の統合コード（別タスク）
 
 #### 技術的制約（Constraints）
 
@@ -344,28 +347,20 @@ crates/pasta_lua/scripts/pasta/shiori/
 
 以下の3つの設計判断が必要です：
 
-#### 議題1: main.lua統合方法
+#### 議題1: main.lua統合方法 ✅ 決定
 
-**現状**: `pasta.shiori.main.SHIORI.request(request_text)` はハードコードされた204レスポンスを返している。
+**決定**: main.lua統合は本仕様のスコープ外
 
-**選択肢**:
+**理由**:
+- EVENT.fireは独立したイベントハンドリングツールとして実装
+- 実際の統合はRust側（pasta_shiori）で行う
+- Rust側で `SHIORI.request(req)` としてreqテーブルを渡す形式
+- main.luaは現状のまま維持（minimal実装）
 
-**A. Rust側でparse_request → Lua側にreqテーブル渡し（推奨）**
-- Rust側: `lua_request::parse_request()` → reqテーブル生成
-- Lua側: `SHIORI.request(req)` でreqテーブルを受け取る
-- 利点: パース処理をRust側に集約、Lua側はビジネスロジックのみ
-- 欠点: Rust側の修正が必要（`shiori.rs`の変更）
-
-**B. Lua側でparse_request呼び出し（現状維持）**
-- Rust側: `SHIORI.request(request_text)` に文字列渡し
-- Lua側: `local req = lua_request.parse_request(request_text)` を呼び出し
-- 利点: Rust側の変更不要
-- 欠点: Lua側でRust関数を直接呼ぶ複雑性、エラーハンドリングが分散
-
-**推奨**: Option A（Rust側でparse）
-- 理由: 関心の分離が明確、エラーハンドリングをRust側で一元化
-
-**決定**: （開発者確認必要）
+**影響**:
+- 本仕様で実装: `pasta.shiori.event.register`, `pasta.shiori.event.init`
+- 本仕様で実装しない: main.luaの修正、Rust側の統合コード
+- テスト: EVENT.fire単体でテスト可能（reqテーブルをLua側で構築）
 
 ---
 

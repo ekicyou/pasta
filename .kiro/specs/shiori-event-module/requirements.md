@@ -140,14 +140,15 @@
 
 ---
 
-### Requirement 9: 統合使用例
+### Requirement 9: 使用例ドキュメント
 
-**Objective:** ゴースト開発者として、`pasta.shiori.main` からの呼び出しパターンを理解することで、SHIORIリクエスト処理パイプラインを正しく構築したい。
+**Objective:** ゴースト開発者として、EVENT.fireの使用例を理解することで、イベントハンドリングの実装方法を把握したい。
 
 #### Acceptance Criteria
 
-1. When integrated with `pasta.shiori.main`, the EVENT module shall be called as `EVENT.fire(req)` from `SHIORI.request()`.
-2. The EVENT module shall return a valid SHIORI response string in all cases (正常、未登録、エラー).
-3. The EVENT module documentation shall include integration example with `pasta.shiori.main`.
+1. The EVENT module documentation shall include usage examples for handler registration.
+2. The EVENT module documentation shall include usage examples for event dispatching with `EVENT.fire(req)`.
+3. The EVENT module documentation shall clarify that actual integration with SHIORI.request is handled by Rust side (pasta_shiori).
+4. The EVENT module documentation shall provide example req table structure for testing purposes.
 
 ---
