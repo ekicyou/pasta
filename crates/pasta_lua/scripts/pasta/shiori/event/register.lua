@@ -1,0 +1,42 @@
+--- @module pasta.shiori.event.register
+--- イベントハンドラ登録テーブル
+---
+--- ゴースト開発者がイベントハンドラを登録するためのテーブル。
+--- 依存モジュールなし（循環参照回避のため）。
+---
+--- ハンドラシグネチャ:
+---   function(req: table) -> string
+---
+--- reqテーブル構造（Rust側 parse_request() により生成）:
+---   - req.id: イベント名（例: "OnBoot", "OnClose"）
+---   - req.method: "get" | "notify"
+---   - req.version: 30（SHIORI/3.0）
+---   - req.charset: 文字セット（例: "UTF-8"）
+---   - req.sender: 送信者名（例: "SSP"）
+---   - req.reference: 参照テーブル（reference[0], reference[1], ...）
+---   - req.dic: 全ヘッダー辞書
+---
+--- 注意: reqテーブルはread-only契約。ハンドラ内で変更しないこと。
+---
+--- 使用例:
+--- ```lua
+--- local REG = require("pasta.shiori.event.register")
+--- local RES = require("pasta.shiori.res")
+---
+--- REG.OnBoot = function(req)
+---     return RES.ok([[\0\s[0]こんにちは\e]])
+--- end
+---
+--- REG.OnClose = function(req)
+---     return RES.ok([[\0\s[0]さようなら\e]])
+--- end
+---
+--- REG.OnMouseDoubleClick = function(req)
+---     return RES.ok([[\0\s[0]なあに？\e]])
+--- end
+--- ```
+
+--- @type table<string, fun(req: table): string>
+local REG = {}
+
+return REG

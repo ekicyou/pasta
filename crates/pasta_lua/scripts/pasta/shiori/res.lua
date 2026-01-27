@@ -107,12 +107,15 @@ end
 
 --- 500 Internal Server Error レスポンス
 ---
---- @param reason string|nil エラー理由（nilの場合は"Unknown error"）
+--- @param reason string|nil エラー理由（nilまたは空文字列の場合は"Unknown error"）
 --- @param dic HeaderDic|nil 追加ヘッダー辞書
 --- @return string SHIORI/3.0レスポンス文字列
 function RES.err(reason, dic)
     dic = dic or {}
-    dic["X-Error-Reason"] = reason or "Unknown error"
+    if reason == nil or reason == "" then
+        reason = "Unknown error"
+    end
+    dic["X-Error-Reason"] = reason
     return RES.build("500 Internal Server Error", dic)
 end
 
