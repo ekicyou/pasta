@@ -250,9 +250,9 @@ function EVENT.fire(req)
     if ok then
         return result
     else
-        -- 最初の行（エラーメッセージ本体）のみを抽出（改行禁止）
-        local error_msg = result:match("^[^\n]+") or "Unknown error"
-        return RES.err(error_msg)
+        -- エラーメッセージの最初の行のみを抽出（改行除去）
+        local error_msg = result:match("^[^\n]+")
+        return RES.err(error_msg)  -- nil は RES.err 内で "Unknown error" にフォールバック
     end
 end
 
@@ -361,8 +361,7 @@ classDiagram
 **System Errors (500)**:
 - ハンドラ内例外 → `RES.err(error_msg)` で詳細返却
 - エラーメッセージは最初の行のみ（改行除去）
-- `match()` が nil を返す境界条件（空文字列、改行のみ）では "Unknown error" にフォールバック
-  - 理由: `RES.err(nil)` は文字列連結エラーを発生させるため、`or "Unknown error"` は必須
+- `match()` が nil を返す境界条件は `RES.err()` 内で "Unknown error" にフォールバック
 
 ---
 
