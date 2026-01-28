@@ -8,10 +8,10 @@ pasta_luaトランスパイラにおいて、ユーザー定義シーン関数�
 
 ### 影響範囲
 
-| ファイル | 問題箇所 | 影響 |
-|---------|---------|------|
-| [`code_generator.rs`](../../../crates/pasta_lua/src/code_generator.rs) | L533, L595, L663 | 関数呼び出し生成 |
-| [`sample.generated.lua`](../../../crates/pasta_lua/tests/fixtures/sample.generated.lua) | L87 | テストフィクスチャ（要再生成） |
+| ファイル                                                                                | 問題箇所         | 影響                           |
+| --------------------------------------------------------------------------------------- | ---------------- | ------------------------------ |
+| [`code_generator.rs`](../../../crates/pasta_lua/src/code_generator.rs)                  | L533, L595, L663 | 関数呼び出し生成               |
+| [`sample.generated.lua`](../../../crates/pasta_lua/tests/fixtures/sample.generated.lua) | L87              | テストフィクスチャ（要再生成） |
 
 ---
 
@@ -28,9 +28,9 @@ pasta_luaトランスパイラにおいて、ユーザー定義シーン関数�
 3. The LuaCodeGenerator shall 生成パターン`SCENE.関数名(act, 引数...)`を出力する
 
 **検証方法:**
-- [ ] [`code_generator.rs`](../../../crates/pasta_lua/src/code_generator.rs#L533)の`Action::FnCall`ブロックで`ctx`を`act`に置換
-- [ ] トランスパイラテストが`SCENE.関数(act, ...)`形式を出力することを確認
-- [ ] `sample.generated.lua`再生成後、ランタイムエラーが解消されることを確認
+- [x] [`code_generator.rs`](../../../crates/pasta_lua/src/code_generator.rs#L533)の`Action::FnCall`ブロックで`ctx`を`act`に置換
+- [x] トランスパイラテストが`SCENE.関数(act, ...)`形式を出力することを確認
+- [x] `sample.generated.lua`再生成後、ランタイムエラーが解消されることを確認
 
 ---
 
@@ -45,9 +45,9 @@ pasta_luaトランスパイラにおいて、ユーザー定義シーン関数�
 3. The LuaCodeGenerator shall 生成パターン`SCENE.関数名(act, 引数...)`を出力する
 
 **検証方法:**
-- [ ] [`code_generator.rs`](../../../crates/pasta_lua/src/code_generator.rs#L595)の`Expr::FnCall`ブロックで`ctx`を`act`に置換
-- [ ] `save.変数 = SCENE.関数(act, value)`形式が生成されることを確認
-- [ ] 二項演算内の関数呼び出しでもランタイムエラーが発生しないことを確認
+- [x] [`code_generator.rs`](../../../crates/pasta_lua/src/code_generator.rs#L595)の`Expr::FnCall`ブロックで`ctx`を`act`に置換
+- [x] `save.変数 = SCENE.関数(act, value)`形式が生成されることを確認
+- [x] 二項演算内の関数呼び出しでもランタイムエラーが発生しないことを確認
 
 ---
 
@@ -62,9 +62,9 @@ pasta_luaトランスパイラにおいて、ユーザー定義シーン関数�
 3. While 複数の式評価パスが存在する, the LuaCodeGenerator shall すべてのパスで同一の引数規則を適用する
 
 **検証方法:**
-- [ ] [`code_generator.rs`](../../../crates/pasta_lua/src/code_generator.rs#L663)の`generate_expr_to_buffer`内`Expr::FnCall`ブロックで`ctx`を`act`に置換
-- [ ] バッファ経由と直接出力で生成コードが一致することを確認
-- [ ] 既存のトランスパイラ統合テストが全て通過することを確認
+- [x] [`code_generator.rs`](../../../crates/pasta_lua/src/code_generator.rs#L663)の`generate_expr_to_buffer`内`Expr::FnCall`ブロックで`ctx`を`act`に置換
+- [x] バッファ経由と直接出力で生成コードが一致することを確認
+- [x] 既存のトランスパイラ統合テストが全て通過することを確認
 
 ---
 
@@ -79,9 +79,9 @@ pasta_luaトランスパイラにおいて、ユーザー定義シーン関数�
 3. The 新しいフィクスチャ shall `SCENE.関数(ctx, ...)`ではなく`SCENE.関数(act, ...)`を含む
 
 **検証方法:**
-- [ ] `sample.generated.lua`の87行目が`SCENE.関数(act, 2 + 1)`に変更されていることを確認
-- [ ] 関連する`.expected.lua`ファイルも同様に更新されていることを確認
-- [ ] `cargo test --package pasta_lua`が全て成功することを確認
+- [x] `sample.generated.lua`の87行目が`SCENE.関数(act, 2 + 1)`に変更されていることを確認
+- [x] 関連する`.expected.lua`ファイルも同様に更新されていることを確認
+- [x] `cargo test --package pasta_lua`が全て成功することを確認
 
 ---
 
@@ -99,9 +99,9 @@ pasta_luaトランスパイラにおいて、ユーザー定義シーン関数�
 6. Where ステアリング関連領域が影響を受ける, the 実装者 shall [`steering/*`](../../../.kiro/steering/)の該当ファイルを更新する
 
 **検証方法:**
-- [ ] ドキュメント更新チェックリストを完了する
-- [ ] コミットメッセージに`docs:`プレフィックスを含める
-- [ ] レビュー時にドキュメント変更が確認される
+- [x] ドキュメント更新チェックリストを完了する（SOUL.md, SPECIFICATION.md, GRAMMAR.md, TEST_COVERAGE.md - すべて変更不要と確認）
+- [x] コミットメッセージに`fix:`プレフィックスを含める
+- [x] レビュー時にドキュメント変更が確認される
 
 ---
 
