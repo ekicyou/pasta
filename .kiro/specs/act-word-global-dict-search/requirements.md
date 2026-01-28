@@ -96,17 +96,17 @@
 
 ### search_word(key, scope)
 
-| scope | 検索対象 | キー形式 |
-|-------|----------|----------|
-| `nil` | グローバル単語辞書のみ | `key` 前方一致 |
-| `scene_name` | シーンローカル単語辞書のみ | `:scene_name:key` 前方一致 |
-| `"__actor_xxx__"` | アクター単語辞書のみ | `:__actor_xxx__:key` 前方一致 |
+| scope             | 検索対象                   | キー形式                      |
+| ----------------- | -------------------------- | ----------------------------- |
+| `nil`             | グローバル単語辞書のみ     | `key` 前方一致                |
+| `scene_name`      | シーンローカル単語辞書のみ | `:scene_name:key` 前方一致    |
+| `"__actor_xxx__"` | アクター単語辞書のみ       | `:__actor_xxx__:key` 前方一致 |
 
 ### search_scene(key, scope)
 
-| scope | 検索対象 | キー形式 |
-|-------|----------|----------|
-| `nil` | グローバルシーンのみ | `key` 前方一致 |
+| scope          | 検索対象                     | キー形式                     |
+| -------------- | ---------------------------- | ---------------------------- |
+| `nil`          | グローバルシーンのみ         | `key` 前方一致               |
 | `parent_scene` | 親シーンのローカルシーンのみ | `:parent_scene:key` 前方一致 |
 
 ---
@@ -158,11 +158,11 @@
 
 ## Rust側修正対象
 
-| ファイル | 修正内容 |
-| -------- | -------- |
-| [word_table.rs](../../../crates/pasta_core/src/registry/word_table.rs) | `collect_word_candidates()` の自動フォールバック廃止 |
+| ファイル                                                                 | 修正内容                                              |
+| ------------------------------------------------------------------------ | ----------------------------------------------------- |
+| [word_table.rs](../../../crates/pasta_core/src/registry/word_table.rs)   | `collect_word_candidates()` の自動フォールバック廃止  |
 | [scene_table.rs](../../../crates/pasta_core/src/registry/scene_table.rs) | `collect_scene_candidates()` の自動フォールバック廃止 |
-| [finalize.rs](../../../crates/pasta_lua/src/runtime/finalize.rs) | アクター単語辞書収集追加 |
+| [finalize.rs](../../../crates/pasta_lua/src/runtime/finalize.rs)         | アクター単語辞書収集追加                              |
 
 ---
 
