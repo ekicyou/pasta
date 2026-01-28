@@ -523,14 +523,14 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             Action::FnCall {
                 name, args, scope, ..
             } => {
-                // SCENE:関数名(ctx, 引数...)
+                // SCENE:関数名(act, 引数...)
                 let args_str = self.generate_args_string(args)?;
                 let prefix = match scope {
                     pasta_core::parser::FnScope::Local => "SCENE:",
                     pasta_core::parser::FnScope::Global => "SCENE:", // Same for now
                 };
                 self.writeln(&format!(
-                    "act.{}:talk(tostring({}{}(ctx{})))",
+                    "act.{}:talk(tostring({}{}(act{})))",
                     actor,
                     prefix,
                     name,
@@ -592,7 +592,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                 };
                 write!(
                     self.writer,
-                    "{}{}(ctx{})",
+                    "{}{}(act{})",
                     prefix,
                     name,
                     if args_str.is_empty() {
@@ -660,7 +660,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                 };
                 write!(
                     buf,
-                    "{}{}(ctx{})",
+                    "{}{}(act{})",
                     prefix,
                     name,
                     if args_str.is_empty() {
