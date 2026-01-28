@@ -37,15 +37,21 @@
 5. The PROXY_IMPL shall `math.random` による候補選択ロジックを削除する
 6. The PROXY_IMPL shall `WORD.get_actor_words()` / `WORD.get_local_words()` / `WORD.get_global_words()` の呼び出しを削除する
 
-### Requirement 3: アクター単語辞書のRust側収集
+### Requirement 3: アクター単語辞書のRust側収集（finalize.rs修正）
 
 **Objective:** アクター単語辞書もRust側で検索できるようにする。
 
+#### 現状
+- ✅ Lua側: `WORD.get_all_words()` が `actor` を返却済み
+- ✅ Rust側: `WordDefRegistry::register_actor()` API存在
+- ✅ Rust側: `WordTable` がアクター単語検索対応済み（キー形式: `:__actor_xxx__:key`）
+- ❌ `finalize.rs::collect_words()` が `all_words.actor` を処理していない
+
 #### Acceptance Criteria
 
-1. The finalize_scene shall `pasta.word` からアクター単語辞書（`STORE.actor_words`）を収集する
-2. The WordDefRegistry shall アクター単語を登録するAPIを提供する
-3. The SEARCH:search_word shall アクター名を指定した検索をサポートする（将来拡張）
+1. The finalize_scene::collect_words() shall `all_words.actor` からアクター単語辞書を収集する
+2. The build_word_registry() shall 収集したアクター単語を `register_actor()` で登録する
+3. The SEARCH:search_word(name, actor_scope) shall アクター名スコープでの検索をサポートする
 
 ### Requirement 4: 後方互換性の維持
 
@@ -61,14 +67,14 @@
 
 ## 責務分担
 
-| 責務 | 担当 | 備考 |
-|------|------|------|
-| シーンテーブル完全一致 | Lua (ACT_IMPL) | `scene[name]` |
-| GLOBAL完全一致 | Lua (ACT_IMPL) | `GLOBAL[name]` |
-| アクター完全一致 | Lua (PROXY_IMPL) | `actor[name]` |
-| 前方一致検索 | Rust (SEARCH) | `search_word()` |
-| ランダムシャッフル | Rust (WordTable) | キャッシュ付き |
-| 関数値の解決 | Lua | `value(act)` 呼び出し |
+| 責務                   | 担当             | 備考                  |
+| ---------------------- | ---------------- | --------------------- |
+| シーンテーブル完全一致 | Lua (ACT_IMPL)   | `scene[name]`         |
+| GLOBAL完全一致         | Lua (ACT_IMPL)   | `GLOBAL[name]`        |
+| アクター完全一致       | Lua (PROXY_IMPL) | `actor[name]`         |
+| 前方一致検索           | Rust (SEARCH)    | `search_word()`       |
+| ランダムシャッフル     | Rust (WordTable) | キャッシュ付き        |
+| 関数値の解決           | Lua              | `value(act)` 呼び出し |
 
 ---
 
@@ -92,20 +98,20 @@
 
 ## 削除対象コード
 
-| ファイル | 削除対象 |
-|----------|----------|
-| [actor.lua](../../../crates/pasta_lua/scripts/pasta/actor.lua) | `search_prefix_lua()` 関数 |
+| ファイル                                                       | 削除対象                                    |
+| -------------------------------------------------------------- | ------------------------------------------- |
+| [actor.lua](../../../crates/pasta_lua/scripts/pasta/actor.lua) | `search_prefix_lua()` 関数                  |
 | [actor.lua](../../../crates/pasta_lua/scripts/pasta/actor.lua) | `PROXY_IMPL.word()` 内の L2-L6 検索ロジック |
-| [actor.lua](../../../crates/pasta_lua/scripts/pasta/actor.lua) | `math.random` による候補選択 |
-| [actor.lua](../../../crates/pasta_lua/scripts/pasta/actor.lua) | `WORD.get_actor_words()` 等の呼び出し |
+| [actor.lua](../../../crates/pasta_lua/scripts/pasta/actor.lua) | `math.random` による候補選択                |
+| [actor.lua](../../../crates/pasta_lua/scripts/pasta/actor.lua) | `WORD.get_actor_words()` 等の呼び出し       |
 
 ---
 
 ## 関連ファイル
 
-| ファイル | 役割 |
-|----------|------|
-| [act.lua](../../../crates/pasta_lua/scripts/pasta/act.lua) | ACT_IMPL 実装（修正対象） |
-| [actor.lua](../../../crates/pasta_lua/scripts/pasta/actor.lua) | PROXY_IMPL 実装（大幅削除・修正対象） |
+| ファイル                                                         | 役割                                       |
+| ---------------------------------------------------------------- | ------------------------------------------ |
+| [act.lua](../../../crates/pasta_lua/scripts/pasta/act.lua)       | ACT_IMPL 実装（修正対象）                  |
+| [actor.lua](../../../crates/pasta_lua/scripts/pasta/actor.lua)   | PROXY_IMPL 実装（大幅削除・修正対象）      |
 | [finalize.rs](../../../crates/pasta_lua/src/runtime/finalize.rs) | ファイナライズ処理（アクター辞書収集追加） |
-| [context.rs](../../../crates/pasta_lua/src/search/context.rs) | SEARCH モジュール実装 |
+| [context.rs](../../../crates/pasta_lua/src/search/context.rs)    | SEARCH モジュール実装                      |
