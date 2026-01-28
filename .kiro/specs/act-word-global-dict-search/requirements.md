@@ -1,51 +1,51 @@
 # Requirements Document
 
 ## Project Description (Input)
-`act:word(name)` のLua実装において、グローバル単語辞書への検索を実装する。現在はシーンフィールドのみ検索しているが、これを拡張してグローバル単語辞書（`WORD.get_global_words()`）への前方一致検索を追加する。
-
-実装方針として、`PROXY_IMPL.word()`の6レベルフォールバック実装をリファクタリングする。具体的には、アクター辞書参照部分（Level 1, Level 2）を分離し、それ以降の検索ロジック（Level 3-6）を`ACT_IMPL.word()`として共通化する。これにより`PROXY_IMPL.word()`は「アクター辞書検索（L1, L2）→ 失敗時にact:word()へフォールバック」という明確な責務分離を実現する。
+`act:word(name)` のLua実装において、Rust側の `SEARCH:search_word()` API を呼び出すよう修正する。現在 `PROXY_IMPL.word()` にあるLua側の検索・シャッフル・キャッシュロジックを削除し、単語検索の責務をRust側（`@pasta_search` モジュール）に統一する。
 
 ---
 
 ## Introduction
 
-本仕様は、PASTAスクリプトエンジンにおける単語検索機能の拡張を定義する。`act:word(name)` API をグローバル単語辞書まで検索するよう拡張し、既存の `PROXY_IMPL.word()` と検索ロジックを共通化することで、保守性と一貫性を向上させる。
+本仕様は、PASTAスクリプトエンジンにおける単語検索アーキテクチャの整理を定義する。単語の検索・シャッフル・キャッシュはRust側（`WordTable`）の責務であり、Lua側はRust APIを呼び出すだけとする。既存の `PROXY_IMPL.word()` 内のLua検索ロジックを削除し、`SEARCH:search_word()` への委譲に置き換える。
 
 ## Requirements
 
-### Requirement 1: ACT_IMPL.word 4レベルフォールバック検索
+### Requirement 1: ACT_IMPL.word による Rust API 呼び出し
 
-**Objective:** PASTAスクリプト開発者として、`act:word(name)` からアクター非依存の単語検索を行いたい。これにより、シーンローカル単語だけでなくグローバル単語辞書からも単語を取得できる。
+**Objective:** PASTAスクリプト開発者として、`act:word(name)` から単語検索を行いたい。検索・シャッフル・キャッシュはRust側が担当する。
 
 #### Acceptance Criteria
 
 1. When `act:word(name)` が呼び出される, the ACT_IMPL shall 現在のシーンテーブルから `name` に完全一致するエントリを検索する
-2. When シーンテーブルに完全一致がない, the ACT_IMPL shall シーンローカル単語辞書（`WORD.get_local_words(scene_name)`）から前方一致検索を行う
-3. When シーンローカル単語辞書に一致がない, the ACT_IMPL shall グローバルテーブル（`GLOBAL[name]`）から完全一致で検索する
-4. When グローバルテーブルに完全一致がない, the ACT_IMPL shall グローバル単語辞書（`WORD.get_global_words()`）から前方一致検索を行う
-5. If 全レベルで一致がない, then the ACT_IMPL shall `nil` を返す
+2. When シーンテーブルに完全一致で関数が見つかる, the ACT_IMPL shall 関数を `act` を引数として呼び出し、その戻り値を返す
+3. When シーンテーブルに完全一致がない, the ACT_IMPL shall `GLOBAL[name]` から完全一致で検索する
+4. When `GLOBAL[name]` に関数が見つかる, the ACT_IMPL shall 関数を `act` を引数として呼び出し、その戻り値を返す
+5. When 完全一致がない, the ACT_IMPL shall `SEARCH:search_word(name, scene_name)` を呼び出して結果を返す
+6. If `SEARCH:search_word` が `nil` を返す, then the ACT_IMPL shall `nil` を返す
 
-### Requirement 2: PROXY_IMPL.word 責務分離リファクタリング
+### Requirement 2: PROXY_IMPL.word のLua検索ロジック削除
 
-**Objective:** PASTAスクリプトエンジンのメンテナとして、`PROXY_IMPL.word()` と `ACT_IMPL.word()` の検索ロジックを共通化したい。これにより、コードの重複を排除し保守性を向上させる。
-
-#### Acceptance Criteria
-
-1. The PROXY_IMPL.word shall アクター固有検索（Level 1-2）を担当し、それ以降は `act:word()` へ委譲する
-2. When アクター完全一致（Level 1）で見つかる, the PROXY_IMPL shall その値を返し、後続検索を行わない
-3. When アクター辞書前方一致（Level 2）で見つかる, the PROXY_IMPL shall その値を返し、後続検索を行わない
-4. When アクター検索（Level 1-2）で見つからない, the PROXY_IMPL shall `act:word(name)` を呼び出して結果を返す
-
-### Requirement 3: 値解決の一貫性
-
-**Objective:** PASTAスクリプト開発者として、単語検索の結果が関数である場合は実行結果を得たい。これにより、動的単語生成をサポートする。
+**Objective:** 単語検索の責務をRust側に統一し、Lua側の重複実装を削除する。
 
 #### Acceptance Criteria
 
-1. When 検索結果が関数である, the ACT_IMPL shall 関数を `act` オブジェクトを引数として呼び出し、その戻り値を返す
-2. When 検索結果が文字列である, the ACT_IMPL shall その文字列をそのまま返す
-3. When 完全一致で検索結果がテーブルである, the ACT_IMPL shall テーブル内から最初の要素を選択して返す
-4. When 前方一致検索で複数の候補がある, the ACT_IMPL shall ランダムに1つを選択して返す
+1. The PROXY_IMPL.word shall アクター完全一致検索（`actor[name]`）のみLua側で行う
+2. When アクター完全一致で関数が見つかる, the PROXY_IMPL shall 関数を `act` を引数として呼び出し、その戻り値を返す
+3. When アクター完全一致がない, the PROXY_IMPL shall `act:word(name)` を呼び出して結果を返す
+4. The PROXY_IMPL shall `search_prefix_lua()` 関数を削除する
+5. The PROXY_IMPL shall `math.random` による候補選択ロジックを削除する
+6. The PROXY_IMPL shall `WORD.get_actor_words()` / `WORD.get_local_words()` / `WORD.get_global_words()` の呼び出しを削除する
+
+### Requirement 3: アクター単語辞書のRust側収集
+
+**Objective:** アクター単語辞書もRust側で検索できるようにする。
+
+#### Acceptance Criteria
+
+1. The finalize_scene shall `pasta.word` からアクター単語辞書（`STORE.actor_words`）を収集する
+2. The WordDefRegistry shall アクター単語を登録するAPIを提供する
+3. The SEARCH:search_word shall アクター名を指定した検索をサポートする（将来拡張）
 
 ### Requirement 4: 後方互換性の維持
 
@@ -53,30 +53,59 @@
 
 #### Acceptance Criteria
 
-1. The ACT_IMPL shall 既存の `act:word()` 呼び出し箇所で従来通りシーンテーブル検索が動作すること
-2. The PROXY_IMPL shall 既存の `act.さくら:word("通常")` 呼び出し箇所で6レベルフォールバック動作が維持されること
-3. While 既存テストが存在する, the ACT_IMPL shall 全ての既存テストがパスすること
+1. The ACT_IMPL shall 既存の `act:word()` 呼び出し箇所で従来と同等の動作を維持すること
+2. The PROXY_IMPL shall 既存の `act.さくら:word("通常")` 呼び出し箇所で従来と同等の動作を維持すること
+3. While 既存テストが存在する, the システム shall 全ての既存テストがパスすること
 
 ---
 
-## 検索レベル対照表
+## 責務分担
 
-| レベル | PROXY_IMPL.word（従来）    | ACT_IMPL.word（新規）      | 責務分担後 |
-| ------ | -------------------------- | -------------------------- | ---------- |
-| L1     | アクター完全一致           | -                          | PROXY_IMPL |
-| L2     | アクター辞書（前方一致）   | -                          | PROXY_IMPL |
-| L3     | シーン完全一致             | シーン完全一致             | ACT_IMPL   |
-| L4     | シーン辞書（前方一致）     | シーン辞書（前方一致）     | ACT_IMPL   |
-| L5     | グローバル完全一致         | グローバル完全一致         | ACT_IMPL   |
-| L6     | グローバル辞書（前方一致） | グローバル辞書（前方一致） | ACT_IMPL   |
+| 責務 | 担当 | 備考 |
+|------|------|------|
+| シーンテーブル完全一致 | Lua (ACT_IMPL) | `scene[name]` |
+| GLOBAL完全一致 | Lua (ACT_IMPL) | `GLOBAL[name]` |
+| アクター完全一致 | Lua (PROXY_IMPL) | `actor[name]` |
+| 前方一致検索 | Rust (SEARCH) | `search_word()` |
+| ランダムシャッフル | Rust (WordTable) | キャッシュ付き |
+| 関数値の解決 | Lua | `value(act)` 呼び出し |
+
+---
+
+## 検索フロー
+
+### act:word(name)
+```
+1. scene[name] 完全一致? → 関数なら実行、値なら返す
+2. GLOBAL[name] 完全一致? → 関数なら実行、値なら返す
+3. SEARCH:search_word(name, scene_name) → 結果を返す
+4. nil を返す
+```
+
+### proxy:word(name)
+```
+1. actor[name] 完全一致? → 関数なら実行、値なら返す
+2. act:word(name) へ委譲
+```
+
+---
+
+## 削除対象コード
+
+| ファイル | 削除対象 |
+|----------|----------|
+| [actor.lua](../../../crates/pasta_lua/scripts/pasta/actor.lua) | `search_prefix_lua()` 関数 |
+| [actor.lua](../../../crates/pasta_lua/scripts/pasta/actor.lua) | `PROXY_IMPL.word()` 内の L2-L6 検索ロジック |
+| [actor.lua](../../../crates/pasta_lua/scripts/pasta/actor.lua) | `math.random` による候補選択 |
+| [actor.lua](../../../crates/pasta_lua/scripts/pasta/actor.lua) | `WORD.get_actor_words()` 等の呼び出し |
 
 ---
 
 ## 関連ファイル
 
-| ファイル                                                         | 役割                                    |
-| ---------------------------------------------------------------- | --------------------------------------- |
-| [act.lua](../../../crates/pasta_lua/scripts/pasta/act.lua)       | ACT_IMPL 実装（修正対象）               |
-| [actor.lua](../../../crates/pasta_lua/scripts/pasta/actor.lua)   | PROXY_IMPL 実装（リファクタリング対象） |
-| [word.lua](../../../crates/pasta_lua/scripts/pasta/word.lua)     | WORD モジュール（単語辞書アクセス）     |
-| [global.lua](../../../crates/pasta_lua/scripts/pasta/global.lua) | GLOBAL テーブル                         |
+| ファイル | 役割 |
+|----------|------|
+| [act.lua](../../../crates/pasta_lua/scripts/pasta/act.lua) | ACT_IMPL 実装（修正対象） |
+| [actor.lua](../../../crates/pasta_lua/scripts/pasta/actor.lua) | PROXY_IMPL 実装（大幅削除・修正対象） |
+| [finalize.rs](../../../crates/pasta_lua/src/runtime/finalize.rs) | ファイナライズ処理（アクター辞書収集追加） |
+| [context.rs](../../../crates/pasta_lua/src/search/context.rs) | SEARCH モジュール実装 |
