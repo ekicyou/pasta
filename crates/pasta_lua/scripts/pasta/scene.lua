@@ -144,8 +144,9 @@ end
 ---
 --- @param name string 検索するシーン名
 --- @param global_scene_name string|nil ローカル検索の場合のグローバルシーン名
+--- @param attrs table|nil 属性テーブル（将来拡張用、現在は未使用）
 --- @return SceneSearchResult|nil 検索結果、またはnil
-function SCENE.search(name, global_scene_name)
+function SCENE.search(name, global_scene_name, attrs)
     -- 型チェック: name が文字列でない場合は nil を返す
     if type(name) ~= "string" then
         return nil

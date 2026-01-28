@@ -111,18 +111,54 @@ function ACT_IMPL.end_action(self)
     self.ctx:end_action(self)
 end
 
---- シーン呼び出し
+--- シーン呼び出し（4段階検索）
+---
+--- トランスパイラ出力から呼び出され、キーに対応するハンドラーを検索して実行する。
+--- 4段階の優先順位に従い、最初に見つかった有効な関数を実行する。
+---
 --- @param self Act アクションオブジェクト
---- @param search_result table {global_name, local_name}
---- @param opts table|nil オプション
---- @param ... any 追加引数
---- @return nil
-function ACT_IMPL.call(self, search_result, opts, ...)
-    local global_name, local_name = search_result[1], search_result[2]
-    local scene_func = SCENE.get(global_name, local_name)
-    if scene_func then
-        scene_func(self, ...)
+--- @param global_scene_name string|nil グローバルシーン名
+--- @param key string 検索キー
+--- @param attrs table|nil 属性テーブル（将来拡張用、現在は未使用）
+--- @param ... any 可変長引数（ハンドラーに渡す）
+--- @return any ハンドラーの戻り値、またはnil
+function ACT_IMPL.call(self, global_scene_name, key, attrs, ...)
+    local handler = nil
+
+    -- Level 1: シーンローカル検索
+    if self.current_scene then
+        handler = self.current_scene[key]
     end
+
+    -- Level 2: グローバルシーン名スコープ検索
+    if not handler then
+        local result = SCENE.search(key, global_scene_name, attrs)
+        if result then
+            handler = result.func
+        end
+    end
+
+    -- Level 3: グローバル関数モジュール
+    if not handler then
+        local GLOBAL = require("pasta.global")
+        handler = GLOBAL[key]
+    end
+
+    -- Level 4: スコープなし全体検索（フォールバック）
+    if not handler then
+        local result = SCENE.search(key, nil, attrs)
+        if result then
+            handler = result.func
+        end
+    end
+
+    -- ハンドラー実行
+    if handler then
+        return handler(self, ...)
+    end
+
+    -- TODO: ハンドラー未発見時のログ出力（将来実装）
+    return nil
 end
 
 --- スポット設定
