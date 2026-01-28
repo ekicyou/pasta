@@ -71,11 +71,11 @@ graph TB
 
 ### Technology Stack
 
-| Layer | Choice / Version | Role in Feature | Notes |
-|-------|------------------|-----------------|-------|
-| Backend | Rust 2024 edition | WordTable/SceneTable修正 | フォールバック廃止 |
-| Scripting | Lua 5.4 (mlua 0.10) | ACT_IMPL/PROXY_IMPL修正 | フォールバック制御 |
-| Registry | pasta_core | WordDefRegistry | アクター辞書登録 |
+| Layer     | Choice / Version    | Role in Feature          | Notes              |
+| --------- | ------------------- | ------------------------ | ------------------ |
+| Backend   | Rust 2024 edition   | WordTable/SceneTable修正 | フォールバック廃止 |
+| Scripting | Lua 5.4 (mlua 0.10) | ACT_IMPL/PROXY_IMPL修正  | フォールバック制御 |
+| Registry  | pasta_core          | WordDefRegistry          | アクター辞書登録   |
 
 ---
 
@@ -146,14 +146,14 @@ sequenceDiagram
 
 ## Requirements Traceability
 
-| Requirement | Summary | Components | Interfaces | Flows |
-|-------------|---------|------------|------------|-------|
-| 1.1-1.4 | search_word フォールバック廃止 | WordTable | collect_word_candidates | - |
-| 1.5-1.8 | search_scene フォールバック廃止 | SceneTable | collect_scene_candidates | - |
-| 2.1-2.7 | ACT_IMPL.word 実装 | act.lua | ACT_IMPL.word | act:word フロー |
-| 3.1-3.7 | PROXY_IMPL.word 修正 | actor.lua | PROXY_IMPL.word | proxy:word フロー |
-| 4.1-4.2 | アクター辞書収集 | finalize.rs | collect_words, build_word_registry | - |
-| 5.1-5.3 | 後方互換性 | 全体 | - | - |
+| Requirement | Summary                         | Components  | Interfaces                         | Flows             |
+| ----------- | ------------------------------- | ----------- | ---------------------------------- | ----------------- |
+| 1.1-1.4     | search_word フォールバック廃止  | WordTable   | collect_word_candidates            | -                 |
+| 1.5-1.8     | search_scene フォールバック廃止 | SceneTable  | collect_scene_candidates           | -                 |
+| 2.1-2.7     | ACT_IMPL.word 実装              | act.lua     | ACT_IMPL.word                      | act:word フロー   |
+| 3.1-3.7     | PROXY_IMPL.word 修正            | actor.lua   | PROXY_IMPL.word                    | proxy:word フロー |
+| 4.1-4.2     | アクター辞書収集                | finalize.rs | collect_words, build_word_registry | -                 |
+| 5.1-5.3     | 後方互換性                      | 全体        | -                                  | -                 |
 
 ---
 
@@ -161,13 +161,13 @@ sequenceDiagram
 
 ### Summary
 
-| Component | Domain/Layer | Intent | Req Coverage | Key Dependencies | Contracts |
-|-----------|--------------|--------|--------------|------------------|-----------|
-| WordTable | pasta_core/Registry | 単語前方一致検索 | 1.1-1.4 | RadixMap (P0) | Service |
-| SceneTable | pasta_core/Registry | シーン前方一致検索 | 1.5-1.8 | RadixMap (P0) | Service |
-| ACT_IMPL.word | pasta_lua/Lua | 単語検索（シーンスコープ） | 2.1-2.7 | SEARCH (P0), GLOBAL (P1) | - |
-| PROXY_IMPL.word | pasta_lua/Lua | 単語検索（アクタースコープ） | 3.1-3.7 | SEARCH (P0), ACT_IMPL (P0) | - |
-| finalize.rs | pasta_lua/Runtime | Lua→Rust辞書収集 | 4.1-4.2 | WordDefRegistry (P0) | - |
+| Component       | Domain/Layer        | Intent                       | Req Coverage | Key Dependencies           | Contracts |
+| --------------- | ------------------- | ---------------------------- | ------------ | -------------------------- | --------- |
+| WordTable       | pasta_core/Registry | 単語前方一致検索             | 1.1-1.4      | RadixMap (P0)              | Service   |
+| SceneTable      | pasta_core/Registry | シーン前方一致検索           | 1.5-1.8      | RadixMap (P0)              | Service   |
+| ACT_IMPL.word   | pasta_lua/Lua       | 単語検索（シーンスコープ）   | 2.1-2.7      | SEARCH (P0), GLOBAL (P1)   | -         |
+| PROXY_IMPL.word | pasta_lua/Lua       | 単語検索（アクタースコープ） | 3.1-3.7      | SEARCH (P0), ACT_IMPL (P0) | -         |
+| finalize.rs     | pasta_lua/Runtime   | Lua→Rust辞書収集             | 4.1-4.2      | WordDefRegistry (P0)       | -         |
 
 ---
 
@@ -175,10 +175,10 @@ sequenceDiagram
 
 #### WordTable
 
-| Field | Detail |
-|-------|--------|
-| Intent | 単語の前方一致検索、シャッフル、キャッシュ管理 |
-| Requirements | 1.1, 1.2, 1.3, 1.4 |
+| Field        | Detail                                         |
+| ------------ | ---------------------------------------------- |
+| Intent       | 単語の前方一致検索、シャッフル、キャッシュ管理 |
+| Requirements | 1.1, 1.2, 1.3, 1.4                             |
 
 **Responsibilities & Constraints**
 - 前方一致検索（RadixMap使用）
@@ -227,10 +227,10 @@ impl WordTable {
 
 #### SceneTable
 
-| Field | Detail |
-|-------|--------|
-| Intent | シーンの前方一致検索、シャッフル、キャッシュ管理 |
-| Requirements | 1.5, 1.6, 1.7, 1.8 |
+| Field        | Detail                                           |
+| ------------ | ------------------------------------------------ |
+| Intent       | シーンの前方一致検索、シャッフル、キャッシュ管理 |
+| Requirements | 1.5, 1.6, 1.7, 1.8                               |
 
 **Responsibilities & Constraints**
 - 前方一致検索（RadixMap使用）
@@ -281,10 +281,10 @@ impl SceneTable {
 
 #### finalize.rs
 
-| Field | Detail |
-|-------|--------|
-| Intent | Lua側レジストリからRust側への辞書収集 |
-| Requirements | 4.1, 4.2 |
+| Field        | Detail                                |
+| ------------ | ------------------------------------- |
+| Intent       | Lua側レジストリからRust側への辞書収集 |
+| Requirements | 4.1, 4.2                              |
 
 **Responsibilities & Constraints**
 - `WORD.get_all_words()` の全スコープ（global, local, actor）を収集
@@ -329,10 +329,10 @@ fn build_word_registry(entries: &[WordCollectionEntry]) -> WordDefRegistry;
 
 #### ACT_IMPL.word (act.lua)
 
-| Field | Detail |
-|-------|--------|
-| Intent | シーンスコープの単語検索（フォールバック制御） |
-| Requirements | 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7 |
+| Field        | Detail                                         |
+| ------------ | ---------------------------------------------- |
+| Intent       | シーンスコープの単語検索（フォールバック制御） |
+| Requirements | 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7              |
 
 **Responsibilities & Constraints**
 - 完全一致検索（scene, GLOBAL）はLua側で実行
@@ -345,16 +345,39 @@ fn build_word_registry(entries: &[WordCollectionEntry]) -> WordDefRegistry;
 
 **Implementation Notes**
 
+**Rust側SearchContext APIシグネチャ:**
+```rust
+pub fn search_word(
+    &mut self,
+    name: &str,
+    global_scene_name: Option<&str>,
+) -> Result<Option<String>, SearchError>
+```
+- Lua側から `nil` → Rust側 `None` にマッピング（mlua自動変換）
+- Lua側から文字列 → Rust側 `Some(&str)` にマッピング
+
+**Lua実装例:**
 ```lua
 function ACT_IMPL.word(self, name)
     -- 1. シーンテーブル完全一致
     if self.current_scene and self.current_scene[name] then
-        return resolve_value(self.current_scene[name], self)
+        local value = self.current_scene[name]
+        if type(value) == "function" then
+            return value(self)
+        else
+            return tostring(value)
+        end
     end
 
     -- 2. GLOBAL完全一致
+    local GLOBAL = require("pasta.global")
     if GLOBAL[name] then
-        return resolve_value(GLOBAL[name], self)
+        local value = GLOBAL[name]
+        if type(value) == "function" then
+            return value(self)
+        else
+            return tostring(value)
+        end
     end
 
     -- 3. シーンローカル辞書（前方一致）
@@ -363,28 +386,30 @@ function ACT_IMPL.word(self, name)
     if scene_name then
         local result = SEARCH:search_word(name, scene_name)
         if result then
-            return resolve_value(result, self)
+            return result  -- 既に文字列
         end
     end
 
     -- 4. グローバル辞書（前方一致）
     local result = SEARCH:search_word(name, nil)
     if result then
-        return resolve_value(result, self)
+        return result  -- 既に文字列
     end
 
     return nil
 end
 ```
 
+**注**: 関数値解決ロジックを直接インライン実装（`resolve_value` 関数は不要）
+
 ---
 
 #### PROXY_IMPL.word (actor.lua)
 
-| Field | Detail |
-|-------|--------|
-| Intent | アクタースコープの単語検索（ACT_IMPL委譲） |
-| Requirements | 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7 |
+| Field        | Detail                                     |
+| ------------ | ------------------------------------------ |
+| Intent       | アクタースコープの単語検索（ACT_IMPL委譲） |
+| Requirements | 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7          |
 
 **Responsibilities & Constraints**
 - 完全一致検索（actor）のみLua側で実行
@@ -443,9 +468,30 @@ end
 - 後方互換性テスト - 既存スクリプトの動作検証
 
 ### Existing Test Modifications
-- `test_collect_word_candidates_fallback_to_global` → 削除または新仕様に修正
-- `test_collect_scene_candidates_fallback_to_global` → 削除または新仕様に修正
-- `test_collect_*_fallback_local_takes_priority` → 新仕様に修正
+
+**フォールバック関連テスト（新仕様に修正）:**
+
+1. `test_collect_word_candidates_fallback_to_global`
+   - **旧**: ローカル検索失敗時、グローバルにフォールバック
+   - **新**: `module_name="別のモジュール"` でグローバルのみ検索してエラー確認
+   - **削除**: このテストは削除し、新規に `test_collect_word_candidates_global_only` 追加
+
+2. `test_collect_word_candidates_local_takes_priority`
+   - **旧**: ローカル検索成功時、グローバルを含まない
+   - **新**: `module_name="会話_1"` でローカルのみ検索、グローバルは検索されないことを確認
+   - **修正**: アサーション維持、テスト名を `test_collect_word_candidates_local_only` に変更
+
+3. `test_collect_scene_candidates_fallback_to_global`
+   - **削除**: 同様にグローバルのみテストに置き換え
+
+4. `test_collect_scene_candidates_fallback_local_takes_priority`
+   - **修正**: ローカルのみ検索テストに変更
+
+**新規追加テスト:**
+- `test_collect_word_candidates_global_only` - `module_name=""` でグローバルのみ検索
+- `test_collect_word_candidates_local_only` - `module_name` 指定でローカルのみ検索
+- `test_collect_scene_candidates_global_only`
+- `test_collect_scene_candidates_local_only`
 
 ---
 
@@ -456,11 +502,11 @@ end
 - フォールバック失敗は正常な `nil` 返却として処理
 
 ### Error Categories and Responses
-| Error | Category | Response |
-|-------|----------|----------|
-| WordNotFound | Business | `nil` 返却、次のスコープ検索 |
+| Error         | Category | Response                     |
+| ------------- | -------- | ---------------------------- |
+| WordNotFound  | Business | `nil` 返却、次のスコープ検索 |
 | SceneNotFound | Business | `nil` 返却、次のスコープ検索 |
-| InvalidScene | User | 空プレフィックス時のエラー |
+| InvalidScene  | User     | 空プレフィックス時のエラー   |
 
 ---
 
