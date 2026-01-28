@@ -84,7 +84,7 @@ do
         act.さくら:talk("変数を代入。")
         act.うにゅう:talk("中身は内緒や。")
         var.カウンタ = 10
-        save.グローバル = SCENE.関数(ctx, 2 + 1)
+        save.グローバル = SCENE.関数(act, 2 + 1)
         var.場所 = act:word("場所")
     end
 
