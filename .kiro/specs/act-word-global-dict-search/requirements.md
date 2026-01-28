@@ -44,9 +44,9 @@
 #### Acceptance Criteria
 
 1. When `act:word(name)` が呼び出される, the ACT_IMPL shall 現在のシーンテーブルから `name` に完全一致するエントリを検索する
-2. When シーンテーブルに完全一致で関数が見つかる, the ACT_IMPL shall 関数を `act` を引数として呼び出し、その戻り値を返す
+2. When シーンテーブルに完全一致で値が見つかる, the ACT_IMPL shall `WORD.resolve_value(value, self)` で値を解決して返す
 3. When シーンテーブルに完全一致がない, the ACT_IMPL shall `GLOBAL[name]` から完全一致で検索する
-4. When `GLOBAL[name]` に関数が見つかる, the ACT_IMPL shall 関数を `act` を引数として呼び出し、その戻り値を返す
+4. When `GLOBAL[name]` に値が見つかる, the ACT_IMPL shall `WORD.resolve_value(value, self)` で値を解決して返す
 5. When 完全一致がない, the ACT_IMPL shall `SEARCH:search_word(name, scene_name)` を呼び出してシーンローカル辞書を検索する
 6. When シーンローカル辞書に一致がない, the ACT_IMPL shall `SEARCH:search_word(name, nil)` を呼び出してグローバル辞書を検索する
 7. If グローバル辞書にも一致がない, then the ACT_IMPL shall `nil` を返す
@@ -58,12 +58,14 @@
 #### Acceptance Criteria
 
 1. The PROXY_IMPL.word shall アクター完全一致検索（`actor[name]`）のみLua側で行う
-2. When アクター完全一致で関数が見つかる, the PROXY_IMPL shall 関数を `act` を引数として呼び出し、その戻り値を返す
+2. When アクター完全一致で値が見つかる, the PROXY_IMPL shall `WORD.resolve_value(value, self.act)` で値を解決して返す
 3. When アクター完全一致がない, the PROXY_IMPL shall `SEARCH:search_word(name, "__actor_" .. actor.name .. "__")` を呼び出してアクター辞書を検索する
-4. When アクター辞書に一致がない, the PROXY_IMPL shall `act:word(name)` を呼び出して結果を返す（シーン→グローバルのフォールバックは `act:word` 内で実行される）
-5. The PROXY_IMPL shall `search_prefix_lua()` 関数を削除する
-6. The PROXY_IMPL shall `math.random` による候補選択ロジックを削除する
-7. The PROXY_IMPL shall `WORD.get_actor_words()` / `WORD.get_local_words()` / `WORD.get_global_words()` の呼び出しを削除する
+4. When アクター辞書に一致がある, the PROXY_IMPL shall `WORD.resolve_value(value, self.act)` で値を解決して返す
+5. When アクター辞書に一致がない, the PROXY_IMPL shall `act:word(name)` を呼び出して結果を返す（シーン→グローバルのフォールバックは `act:word` 内で実行される）
+6. The PROXY_IMPL shall actor.lua の `search_prefix_lua()` 関数を削除する
+7. The PROXY_IMPL shall actor.lua の `resolve_value()` 関数を削除する（pasta.word に移動）
+8. The PROXY_IMPL shall `math.random` による候補選択ロジックを削除する
+9. The PROXY_IMPL shall `WORD.get_actor_words()` / `WORD.get_local_words()` / `WORD.get_global_words()` の呼び出しを削除する
 
 ### Requirement 4: アクター単語辞書のRust側収集（finalize.rs修正）
 
@@ -80,7 +82,20 @@
 1. The finalize_scene::collect_words() shall `all_words.actor` からアクター単語辞書を収集する
 2. The build_word_registry() shall 収集したアクター単語を `register_actor()` で登録する
 
-### Requirement 5: 後方互換性の維持
+### Requirement 5: WORD.resolve_value() 実装
+
+**Objective:** 完全一致検索時の値解決ロジックを共通化し、ACT_IMPL.word と PROXY_IMPL.word で再利用する。
+
+#### Acceptance Criteria
+
+1. The pasta.word module shall `resolve_value(value, act)` 関数をエクスポートする
+2. When `value` が `nil`, the function shall `nil` を返す
+3. When `value` が関数, the function shall `value(act)` を実行してその戻り値を返す
+4. When `value` が配列（table with #value > 0）, the function shall 最初の要素 `value[1]` を返す
+5. When `value` がその他の型, the function shall `tostring(value)` を返す
+6. The function shall ACT_IMPL.word と PROXY_IMPL.word から呼び出し可能である
+
+### Requirement 6: 後方互換性の維持
 
 **Objective:** 既存のPASTAスクリプトの動作を壊さないこと。
 
@@ -147,12 +162,19 @@
 
 ## 削除対象コード
 
-| ファイル                                                       | 削除対象                                    |
-| -------------------------------------------------------------- | ------------------------------------------- |
-| [actor.lua](../../../crates/pasta_lua/scripts/pasta/actor.lua) | `search_prefix_lua()` 関数                  |
-| [actor.lua](../../../crates/pasta_lua/scripts/pasta/actor.lua) | `PROXY_IMPL.word()` 内の L2-L6 検索ロジック |
-| [actor.lua](../../../crates/pasta_lua/scripts/pasta/actor.lua) | `math.random` による候補選択                |
-| [actor.lua](../../../crates/pasta_lua/scripts/pasta/actor.lua) | `WORD.get_actor_words()` 等の呼び出し       |
+| ファイル                                                       | 削除対象                                                   |
+| -------------------------------------------------------------- | ---------------------------------------------------------- |
+| `crates/pasta_lua/scripts/pasta/actor.lua`                     | `search_prefix_lua()` 関数                                 |
+| `crates/pasta_lua/scripts/pasta/actor.lua`                     | `resolve_value()` 関数（pasta.word に移動）                |
+| `crates/pasta_lua/scripts/pasta/actor.lua`                     | `PROXY_IMPL.word` L2-L6 検索ロジック（`math.random` 含む） |
+| `crates/pasta_core/src/registry/word_table.rs`                 | `collect_word_candidates` Step 2 グローバルフォールバック  |
+| `crates/pasta_core/src/registry/scene_table.rs`                | `collect_scene_candidates` Step 2 グローバルフォールバック |
+| `crates/pasta_core/tests/*`                                    | フォールバック関連テスト（詳細は design.md 参照）          |
+| -------------------------------------------------------------- | -------------------------------------------                |
+| [actor.lua](../../../crates/pasta_lua/scripts/pasta/actor.lua) | `search_prefix_lua()` 関数                                 |
+| [actor.lua](../../../crates/pasta_lua/scripts/pasta/actor.lua) | `PROXY_IMPL.word()` 内の L2-L6 検索ロジック                |
+| [actor.lua](../../../crates/pasta_lua/scripts/pasta/actor.lua) | `math.random` による候補選択                               |
+| [actor.lua](../../../crates/pasta_lua/scripts/pasta/actor.lua) | `WORD.get_actor_words()` 等の呼び出し                      |
 
 ---
 
