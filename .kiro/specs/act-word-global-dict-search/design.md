@@ -151,9 +151,10 @@ sequenceDiagram
 | 1.1-1.4     | search_word フォールバック廃止  | WordTable   | collect_word_candidates            | -                 |
 | 1.5-1.8     | search_scene フォールバック廃止 | SceneTable  | collect_scene_candidates           | -                 |
 | 2.1-2.7     | ACT_IMPL.word 実装              | act.lua     | ACT_IMPL.word                      | act:word フロー   |
-| 3.1-3.7     | PROXY_IMPL.word 修正            | actor.lua   | PROXY_IMPL.word                    | proxy:word フロー |
+| 3.1-3.9     | PROXY_IMPL.word 修正            | actor.lua   | PROXY_IMPL.word                    | proxy:word フロー |
 | 4.1-4.2     | アクター辞書収集                | finalize.rs | collect_words, build_word_registry | -                 |
-| 5.1-5.3     | 後方互換性                      | 全体        | -                                  | -                 |
+| 5.1-5.6     | WORD.resolve_value() 実装      | word.lua    | WORD.resolve_value                 | -                 |
+| 6.1-6.3     | 後方互換性                      | 全体        | -                                  | -                 |
 
 ---
 
@@ -166,8 +167,9 @@ sequenceDiagram
 | WordTable       | pasta_core/Registry | 単語前方一致検索             | 1.1-1.4      | RadixMap (P0)              | Service   |
 | SceneTable      | pasta_core/Registry | シーン前方一致検索           | 1.5-1.8      | RadixMap (P0)              | Service   |
 | ACT_IMPL.word   | pasta_lua/Lua       | 単語検索（シーンスコープ）   | 2.1-2.7      | SEARCH (P0), GLOBAL (P1)   | -         |
-| PROXY_IMPL.word | pasta_lua/Lua       | 単語検索（アクタースコープ） | 3.1-3.7      | SEARCH (P0), ACT_IMPL (P0) | -         |
+| PROXY_IMPL.word | pasta_lua/Lua       | 単語検索（アクタースコープ） | 3.1-3.9      | SEARCH (P0), ACT_IMPL (P0) | -         |
 | finalize.rs     | pasta_lua/Runtime   | Lua→Rust辞書収集             | 4.1-4.2      | WordDefRegistry (P0)       | -         |
+| WORD.resolve_value | pasta_lua/Lua    | 完全一致検索時の値解決       | 5.1-5.6      | -                          | Service   |
 
 ---
 
@@ -327,6 +329,61 @@ fn build_word_registry(entries: &[WordCollectionEntry]) -> WordDefRegistry;
 
 ### pasta_lua/Lua Scripts
 
+#### WORD.resolve_value (word.lua)
+
+| Field        | Detail                                           |
+| ------------ | ------------------------------------------------ |
+| Intent       | 完全一致検索時の値解決（関数実行、配列選択、文字列化） |
+| Requirements | 5.1, 5.2, 5.3, 5.4, 5.5, 5.6                     |
+
+**Responsibilities & Constraints**
+- 関数値の場合、actを引数として実行
+- 配列値の場合、最初の要素を返す
+- その他の値は文字列化
+- ACT_IMPL.word と PROXY_IMPL.word から共通利用
+
+**Dependencies**
+- Outbound: なし
+
+**Contracts**: Service [x]
+
+##### Service Interface
+
+```lua
+--- 値を解決（関数なら実行、配列なら最初の要素、その他はそのまま）
+--- @param value any 検索結果
+--- @param act Act アクションオブジェクト
+--- @return any 解決後の値
+function WORD.resolve_value(value, act)
+    if value == nil then
+        return nil
+    elseif type(value) == "function" then
+        return value(act)
+    elseif type(value) == "table" then
+        if #value > 0 then
+            return value[1]
+        end
+        return nil
+    else
+        return tostring(value)
+    end
+end
+```
+
+- Preconditions: なし
+- Postconditions:
+  - 関数値 → 実行結果
+  - 配列値 → `value[1]`
+  - その他 → `tostring(value)`
+- Invariants: 副作用なし（関数呼び出しを除く）
+
+**Implementation Notes**
+- actor.lua の `resolve_value()` ローカル関数を移植
+- エクスポート用に WORD テーブルに登録
+- ACT_IMPL.word と PROXY_IMPL.word から呼び出し
+
+---
+
 #### ACT_IMPL.word (act.lua)
 
 | Field        | Detail                                         |
@@ -359,25 +416,19 @@ pub fn search_word(
 **Lua実装例:**
 ```lua
 function ACT_IMPL.word(self, name)
+    local WORD = require("pasta.word")
+
     -- 1. シーンテーブル完全一致
     if self.current_scene and self.current_scene[name] then
         local value = self.current_scene[name]
-        if type(value) == "function" then
-            return value(self)
-        else
-            return tostring(value)
-        end
+        return WORD.resolve_value(value, self)
     end
 
     -- 2. GLOBAL完全一致
     local GLOBAL = require("pasta.global")
     if GLOBAL[name] then
         local value = GLOBAL[name]
-        if type(value) == "function" then
-            return value(self)
-        else
-            return tostring(value)
-        end
+        return WORD.resolve_value(value, self)
     end
 
     -- 3. シーンローカル辞書（前方一致）
@@ -400,7 +451,7 @@ function ACT_IMPL.word(self, name)
 end
 ```
 
-**注**: 関数値解決ロジックを直接インライン実装（`resolve_value` 関数は不要）
+**注**: SEARCH API は文字列を返すため、resolve_value() は不要
 
 ---
 
@@ -429,10 +480,12 @@ function PROXY_IMPL.word(self, name)
         return nil
     end
 
+    local WORD = require("pasta.word")
+
     -- 1. アクター完全一致
     local actor_value = self.actor[name]
     if actor_value ~= nil then
-        return resolve_value(actor_value, self.act)
+        return WORD.resolve_value(actor_value, self.act)
     end
 
     -- 2. アクター辞書（前方一致）
@@ -440,7 +493,7 @@ function PROXY_IMPL.word(self, name)
     local actor_scope = "__actor_" .. self.actor.name .. "__"
     local result = SEARCH:search_word(name, actor_scope)
     if result then
-        return resolve_value(result, self.act)
+        return WORD.resolve_value(result, self.act)
     end
 
     -- 3. act:word() に委譲（シーン→グローバル検索）
@@ -450,7 +503,7 @@ end
 
 **削除対象コード:**
 - `search_prefix_lua()` 関数全体
-- `resolve_value()` 関数は維持（引き続き使用）
+- `resolve_value()` ローカル関数（pasta.word に移動）
 - L2-L6 の検索ロジック
 
 ---
