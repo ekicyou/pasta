@@ -82,12 +82,12 @@ flowchart TD
 
 ### Technology Stack
 
-| Layer | Choice / Version | Role in Feature | Notes |
-|-------|------------------|-----------------|-------|
-| Runtime | Lua 5.4 (mlua) | スクリプト実行 | 既存スタック |
-| Module | pasta.act | ACT_IMPL.call実装 | 変更対象 |
-| Module | pasta.scene | SCENE.search提供 | シグネチャ変更 |
-| Module | pasta.global | グローバル関数テーブル | 変更なし |
+| Layer   | Choice / Version | Role in Feature        | Notes          |
+| ------- | ---------------- | ---------------------- | -------------- |
+| Runtime | Lua 5.4 (mlua)   | スクリプト実行         | 既存スタック   |
+| Module  | pasta.act        | ACT_IMPL.call実装      | 変更対象       |
+| Module  | pasta.scene      | SCENE.search提供       | シグネチャ変更 |
+| Module  | pasta.global     | グローバル関数テーブル | 変更なし       |
 
 ---
 
@@ -142,31 +142,31 @@ sequenceDiagram
 
 ## Requirements Traceability
 
-| Requirement | Summary | Components | Interfaces | Flows |
-|-------------|---------|------------|------------|-------|
-| 1.1-1.4 | シグネチャ定義 | ACT_IMPL.call | call signature | - |
-| 2.1-2.5 | 4段階検索 | ACT_IMPL.call | SCENE.search | ハンドラー検索 |
-| 3.1-3.4 | ハンドラー実行 | ACT_IMPL.call | handler invocation | ハンドラー検索 |
-| 4.1-4.3 | attrs渡し | SCENE.search | search signature | - |
-| 5.1-5.3 | 互換性 | ACT_IMPL.call, SCENE.search | - | - |
-| 6.1-6.2 | ログ拡張 | ACT_IMPL.call | - | - |
+| Requirement | Summary        | Components                  | Interfaces         | Flows          |
+| ----------- | -------------- | --------------------------- | ------------------ | -------------- |
+| 1.1-1.4     | シグネチャ定義 | ACT_IMPL.call               | call signature     | -              |
+| 2.1-2.5     | 4段階検索      | ACT_IMPL.call               | SCENE.search       | ハンドラー検索 |
+| 3.1-3.4     | ハンドラー実行 | ACT_IMPL.call               | handler invocation | ハンドラー検索 |
+| 4.1-4.3     | attrs渡し      | SCENE.search                | search signature   | -              |
+| 5.1-5.3     | 互換性         | ACT_IMPL.call, SCENE.search | -                  | -              |
+| 6.1-6.2     | ログ拡張       | ACT_IMPL.call               | -                  | -              |
 
 ---
 
 ## Components and Interfaces
 
-| Component | Domain/Layer | Intent | Req Coverage | Key Dependencies | Contracts |
-|-----------|--------------|--------|--------------|------------------|-----------|
-| ACT_IMPL.call | Runtime/Act | 4段階検索によるハンドラー解決と実行 | 1, 2, 3, 5, 6 | SCENE (P0), pasta.global (P1) | Service |
-| SCENE.search | Runtime/Scene | シーン検索（第3引数拡張） | 4 | @pasta_search (P0) | Service |
+| Component     | Domain/Layer  | Intent                              | Req Coverage  | Key Dependencies              | Contracts |
+| ------------- | ------------- | ----------------------------------- | ------------- | ----------------------------- | --------- |
+| ACT_IMPL.call | Runtime/Act   | 4段階検索によるハンドラー解決と実行 | 1, 2, 3, 5, 6 | SCENE (P0), pasta.global (P1) | Service   |
+| SCENE.search  | Runtime/Scene | シーン検索（第3引数拡張）           | 4             | @pasta_search (P0)            | Service   |
 
 ### Runtime/Act Layer
 
 #### ACT_IMPL.call
 
-| Field | Detail |
-|-------|--------|
-| Intent | 4段階優先順位検索によるハンドラー解決と実行 |
+| Field        | Detail                                      |
+| ------------ | ------------------------------------------- |
+| Intent       | 4段階優先順位検索によるハンドラー解決と実行 |
 | Requirements | 1.1-1.4, 2.1-2.5, 3.1-3.4, 5.1-5.3, 6.1-6.2 |
 
 **Responsibilities & Constraints**
@@ -189,7 +189,7 @@ sequenceDiagram
 --- @param self Act アクションオブジェクト
 --- @param global_scene_name string|nil グローバルシーン名
 --- @param key string 検索キー
---- @param attrs table 属性テーブル（将来拡張用）
+--- @param attrs table|nil 属性テーブル（将来拡張用、現在は未使用）
 --- @param ... any 可変長引数（ハンドラーに渡す）
 --- @return any ハンドラーの戻り値、またはnil
 function ACT_IMPL.call(self, global_scene_name, key, attrs, ...)
@@ -198,7 +198,7 @@ function ACT_IMPL.call(self, global_scene_name, key, attrs, ...)
 - **Preconditions**:
   - `self`は有効なActオブジェクト
   - `key`は文字列（nil不可）
-  - `attrs`はテーブル（空テーブル可）
+  - `attrs`はテーブルまたはnil（トランスパイラは常に`{}`を出力）
 - **Postconditions**:
   - ハンドラーが見つかった場合: `handler(self, ...)`の戻り値を返却
   - ハンドラーが見つからない場合: `nil`を返却
@@ -207,10 +207,11 @@ function ACT_IMPL.call(self, global_scene_name, key, attrs, ...)
   - 副作用なし（ハンドラー実行を除く）
 
 **Implementation Notes**
-- `self.current_scene`がnilの場合、Level 1をスキップ
-- Level 2/4の`SCENE.search`結果から`.func`を取得
-- Level 3は`require("pasta.global")`でモジュールを取得
-- ハンドラー未発見時のTODOコメントでログ拡張ポイントを明示
+- **Level 1 nil安全性**: `self.current_scene`がnilまたは`self.current_scene[key]`がnilの場合、Level 2へ進む
+- **Level 2/4結果取得**: `SCENE.search`の戻り値がnilでない場合、`.func`フィールドを取得
+- **Level 3グローバル参照**: `require("pasta.global")`でモジュールを取得し、`[key]`でハンドラー検索
+- **attrs渡し**: トランスパイラは常に`{}`を出力するため、そのままSCENE.searchに渡す（nil変換不要）
+- **ログ拡張ポイント**: ハンドラー未発見時のTODOコメントで将来のログ機能を明示
 
 ---
 
@@ -218,15 +219,17 @@ function ACT_IMPL.call(self, global_scene_name, key, attrs, ...)
 
 #### SCENE.search（シグネチャ拡張）
 
-| Field | Detail |
-|-------|--------|
-| Intent | 第3引数`attrs`を追加して将来の属性フィルタリングに備える |
-| Requirements | 4.1-4.3 |
+| Field        | Detail                                                   |
+| ------------ | -------------------------------------------------------- |
+| Intent       | 第3引数`attrs`を追加して将来の属性フィルタリングに備える |
+| Requirements | 4.1-4.3                                                  |
 
 **Responsibilities & Constraints**
 - 既存の検索ロジックは変更なし
-- 第3引数`attrs`を受け取るが、現時点では使用しない
-- Luaの余剰引数無視仕様により、2引数呼び出しとの互換性を維持
+- 第3引数`attrs`を受け取るが、現時点では使用しない（将来の属性フィルタリング用に予約）
+- **後方互換性**: Luaは余剰引数を無視するため、既存の2引数呼び出し`SCENE.search(key, global_name)`は動作継続
+  - 新シグネチャ呼び出し例: `SCENE.search("key", "global", {})` 
+  - 既存2引数呼び出し例: `SCENE.search("key", "global")` ← 第3引数nilとして解釈される
 
 **Dependencies**
 - Inbound: ACT_IMPL.call — ハンドラー検索 (P0)
@@ -248,12 +251,13 @@ function SCENE.search(name, global_scene_name, attrs)
 - **Preconditions**:
   - `name`は文字列
   - `global_scene_name`は文字列またはnil
-  - `attrs`はテーブルまたはnil
+  - `attrs`はテーブルまたはnil（ACT_IMPL.callからは常に空テーブル`{}`が渡される）
 - **Postconditions**:
   - 見つかった場合: `{global_name, local_name, func}`を持つ呼び出し可能オブジェクト
   - 見つからない場合: `nil`
 - **Invariants**:
   - `attrs`は現在無視される（将来実装まで）
+  - 2引数呼び出しとの後方互換性を維持（第3引数省略時はnilとして扱われる）
 
 **Implementation Notes**
 - シグネチャ変更のみ、既存ロジックは維持
@@ -269,9 +273,9 @@ function SCENE.search(name, global_scene_name, attrs)
 
 ### Error Categories and Responses
 
-| カテゴリ | 状況 | 対応 |
-|----------|------|------|
-| ハンドラー未発見 | 4段階すべてでnil | nilを返却、将来ログ出力 |
+| カテゴリ             | 状況              | 対応                            |
+| -------------------- | ----------------- | ------------------------------- |
+| ハンドラー未発見     | 4段階すべてでnil  | nilを返却、将来ログ出力         |
 | ハンドラー実行エラー | handler内でエラー | Luaエラーとして伝播（変更なし） |
 
 ### Monitoring
@@ -286,11 +290,13 @@ function SCENE.search(name, global_scene_name, attrs)
 ### Unit Tests (Lua)
 
 1. **Level 1検索**: `current_scene[key]`から正しくハンドラーを取得
-2. **Level 2検索**: `SCENE.search(key, global_scene_name, attrs)`経由で取得
-3. **Level 3検索**: `pasta.global[key]`から取得
-4. **Level 4検索**: `SCENE.search(key, nil, attrs)`フォールバック
-5. **優先順位検証**: 複数レベルに存在する場合、Level 1が優先
-6. **ハンドラー未発見**: 全レベルでnil時、nilを返却
+2. **Level 1 nil安全性**: `self.current_scene == nil`の場合、Level 2へスキップ
+3. **Level 2検索**: `SCENE.search(key, global_scene_name, attrs)`経由で取得
+4. **Level 3検索**: `pasta.global[key]`から取得
+5. **Level 4検索**: `SCENE.search(key, nil, attrs)`フォールバック
+6. **優先順位検証**: 複数レベルに存在する場合、Level 1が優先
+7. **ハンドラー未発見**: 全レベルでnil時、nilを返却
+8. **SCENE.search後方互換性**: 2引数呼び出し`SCENE.search(key, global_name)`が正常動作
 
 ### Integration Tests (Rust経由)
 
