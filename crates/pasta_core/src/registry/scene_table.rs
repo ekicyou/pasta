@@ -354,9 +354,13 @@ impl SceneTable {
     /// * `prefix` - 検索プレフィックス
     ///
     /// # Returns
-    /// Ok(Vec<SceneId>) フォールバック戦略による候補リスト
+    /// Ok(Vec<SceneId>) 候補リスト（フォールバックなし）
     /// Err(SceneNotFound) 候補なし
     /// Err(InvalidScene) prefix が空の場合
+    ///
+    /// # Behavior
+    /// - If `module_name` is empty: search global scenes only
+    /// - If `module_name` is non-empty: search local scenes only (no global fallback)
     pub fn collect_scene_candidates(
         &self,
         module_name: &str,
@@ -369,37 +373,39 @@ impl SceneTable {
             });
         }
 
-        // Step 1: Local search with :{module_name}:{prefix} pattern
-        if !module_name.is_empty() {
-            let local_search_key = format!(":{}:{}", module_name, prefix);
-            let mut local_candidates = Vec::new();
-            for (_key, ids) in self.prefix_index.iter_prefix(local_search_key.as_bytes()) {
-                local_candidates.extend(ids.iter().copied());
+        // If module_name is empty, search global only
+        if module_name.is_empty() {
+            let mut global_candidates = Vec::new();
+            for (key, ids) in self.prefix_index.iter_prefix(prefix.as_bytes()) {
+                // Skip local keys (start with ':')
+                if !key.starts_with(&[b':']) {
+                    global_candidates.extend(ids.iter().copied());
+                }
             }
-            // Fallback: If local candidates found, return them immediately
-            if !local_candidates.is_empty() {
-                return Ok(local_candidates);
+
+            if global_candidates.is_empty() {
+                return Err(SceneTableError::SceneNotFound {
+                    scene: prefix.to_string(),
+                });
             }
+
+            return Ok(global_candidates);
         }
 
-        // Step 2: Global search with {prefix} pattern (exclude : prefix)
-        // Only executed if local search returned no candidates
-        let mut global_candidates = Vec::new();
-        for (key, ids) in self.prefix_index.iter_prefix(prefix.as_bytes()) {
-            // Skip local keys (start with ':')
-            if !key.starts_with(&[b':']) {
-                global_candidates.extend(ids.iter().copied());
-            }
+        // module_name is non-empty: search local only (no fallback)
+        let local_search_key = format!(":{}:{}", module_name, prefix);
+        let mut local_candidates = Vec::new();
+        for (_key, ids) in self.prefix_index.iter_prefix(local_search_key.as_bytes()) {
+            local_candidates.extend(ids.iter().copied());
         }
 
-        // Step 3: Return global candidates or error
-        if global_candidates.is_empty() {
-            Err(SceneTableError::SceneNotFound {
+        if local_candidates.is_empty() {
+            return Err(SceneTableError::SceneNotFound {
                 scene: prefix.to_string(),
-            })
-        } else {
-            Ok(global_candidates)
+            });
         }
+
+        Ok(local_candidates)
     }
 
     /// Find a scene by name, with optional attribute filters (legacy method).
@@ -479,7 +485,7 @@ mod tests {
     }
 
     #[test]
-    fn test_collect_scene_candidates_local_only() {
+    fn test_collect_scene_candidates_local_search() {
         // Test: Local search should find scenes with :module:prefix pattern
         let selector = Box::new(MockRandomSelector::new(vec![]));
         let mut table = SceneTable::new(selector);
@@ -504,8 +510,8 @@ mod tests {
     }
 
     #[test]
-    fn test_collect_scene_candidates_global_only() {
-        // Test: Global search should find scenes without : prefix
+    fn test_collect_scene_candidates_global_search() {
+        // Test: Global search (empty module_name) should find scenes without : prefix
         let selector = Box::new(MockRandomSelector::new(vec![]));
         let mut table = SceneTable::new(selector);
 
@@ -515,8 +521,8 @@ mod tests {
             .prefix_index
             .insert("挨拶".as_bytes(), vec![SceneId(0)]);
 
-        // Search for global scene (module is irrelevant for global)
-        let result = table.collect_scene_candidates("別のモジュール", "挨拶");
+        // Search with empty module_name - should get global
+        let result = table.collect_scene_candidates("", "挨拶");
         assert!(result.is_ok());
         let candidates = result.unwrap();
         assert_eq!(candidates.len(), 1);
@@ -524,8 +530,8 @@ mod tests {
     }
 
     #[test]
-    fn test_collect_scene_candidates_fallback_local_takes_priority() {
-        // Test: Fallback strategy - local candidates found, global not searched
+    fn test_collect_scene_candidates_local_only() {
+        // Test: Local search only - no global fallback
         let selector = Box::new(MockRandomSelector::new(vec![]));
         let mut table = SceneTable::new(selector);
 
@@ -546,7 +552,7 @@ mod tests {
             .prefix_index
             .insert(":会話_1:挨拶".as_bytes(), vec![SceneId(1)]);
 
-        // Search from 会話_1 module - should get ONLY local (fallback strategy)
+        // Search from 会話_1 module - should get ONLY local
         let result = table.collect_scene_candidates("会話_1", "挨拶");
         assert!(result.is_ok());
         let candidates = result.unwrap();
@@ -556,8 +562,8 @@ mod tests {
     }
 
     #[test]
-    fn test_collect_scene_candidates_fallback_to_global() {
-        // Test: Fallback strategy - no local found, fall back to global
+    fn test_collect_scene_candidates_local_not_found_no_fallback() {
+        // Test: No local found, should NOT fall back to global - return error
         let selector = Box::new(MockRandomSelector::new(vec![]));
         let mut table = SceneTable::new(selector);
 
@@ -567,12 +573,33 @@ mod tests {
             .prefix_index
             .insert("挨拶".as_bytes(), vec![SceneId(0)]);
 
-        // Search from 会話_1 module - no local, should fall back to global
+        // Search from 会話_1 module - no local, should NOT fall back to global
         let result = table.collect_scene_candidates("会話_1", "挨拶");
+        assert!(result.is_err());
+        match result {
+            Err(SceneTableError::SceneNotFound { scene }) => assert_eq!(scene, "挨拶"),
+            _ => panic!("Expected SceneNotFound error"),
+        }
+    }
+
+    #[test]
+    fn test_collect_scene_candidates_global_via_empty_module_name() {
+        // Test: Empty module_name should search global only
+        let selector = Box::new(MockRandomSelector::new(vec![]));
+        let mut table = SceneTable::new(selector);
+
+        // Add global scene
+        table.labels.push(create_test_scene_info(0, "挨拶", "挨拶"));
+        table
+            .prefix_index
+            .insert("挨拶".as_bytes(), vec![SceneId(0)]);
+
+        // Search with empty module_name - should get global
+        let result = table.collect_scene_candidates("", "挨拶");
         assert!(result.is_ok());
         let candidates = result.unwrap();
         assert_eq!(candidates.len(), 1);
-        assert!(candidates.contains(&SceneId(0))); // global fallback
+        assert!(candidates.contains(&SceneId(0)));
     }
 
     #[test]
@@ -752,17 +779,33 @@ mod tests {
         let mut table = SceneTable::from_scene_registry(registry, selector).unwrap();
         table.set_shuffle_enabled(false);
 
-        // Resolve global scene from any module
-        let result = table.resolve_scene_id_unified("任意のモジュール", "挨拶", &HashMap::new());
+        // Resolve global scene - must use empty module_name for global search
+        let result = table.resolve_scene_id_unified("", "挨拶", &HashMap::new());
         assert!(result.is_ok());
     }
 
     #[test]
-    fn test_resolve_scene_id_unified_fallback_local_only() {
+    fn test_resolve_scene_id_unified_global_scene_no_fallback() {
         use crate::registry::SceneRegistry;
 
         let mut registry = SceneRegistry::new();
-        // Global scene "挨拶"
+        registry.register_global("挨拶", HashMap::new());
+
+        let selector = Box::new(MockRandomSelector::new(vec![0]));
+        let mut table = SceneTable::from_scene_registry(registry, selector).unwrap();
+        table.set_shuffle_enabled(false);
+
+        // Try to resolve global scene from a module - should fail (no fallback)
+        let result = table.resolve_scene_id_unified("任意のモジュール", "挨拶", &HashMap::new());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_resolve_scene_id_unified_local_found() {
+        use crate::registry::SceneRegistry;
+
+        let mut registry = SceneRegistry::new();
+        // Global scene "挨拶" (should not be found when searching from module)
         registry.register_global("挨拶", HashMap::new());
         // Local scene "挨拶" in module 会話_1
         let (_, counter) = registry.register_global("会話", HashMap::new());
@@ -772,7 +815,7 @@ mod tests {
         let mut table = SceneTable::from_scene_registry(registry, selector).unwrap();
         table.set_shuffle_enabled(false);
 
-        // Resolve from 会話_1 - fallback strategy: should find ONLY local
+        // Resolve from 会話_1 - should find ONLY local (no fallback to global)
         let result = table.resolve_scene_id_unified("会話_1", "挨拶", &HashMap::new());
         assert!(result.is_ok());
         let scene_id = result.unwrap();
@@ -780,7 +823,7 @@ mod tests {
         // Should be local scene (has parent)
         assert!(scene.parent.is_some());
 
-        // Call again - should fail because only 1 local candidate
+        // Call again - should fail because only 1 local candidate (no fallback)
         let result2 = table.resolve_scene_id_unified("会話_1", "挨拶", &HashMap::new());
         assert!(result2.is_err()); // No more scenes
     }

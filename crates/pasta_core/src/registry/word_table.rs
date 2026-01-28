@@ -100,65 +100,75 @@ impl WordTable {
     /// * `key` - Search key
     ///
     /// # Returns
-    /// Ok(word_list) with fallback candidates, Err(WordNotFound) if no match
+    /// Ok(word_list) with matching candidates (no fallback), Err(WordNotFound) if no match
+    ///
+    /// # Behavior
+    /// - If `module_name` is empty: search global entries only
+    /// - If `module_name` is non-empty: search local entries only (no global fallback)
     pub fn collect_word_candidates(
         &self,
         module_name: &str,
         key: &str,
     ) -> Result<Vec<String>, WordTableError> {
-        // Step 1: Local search (if module_name is not empty)
-        if !module_name.is_empty() {
-            let local_key = format!(":{}:{}", module_name, key);
-            let mut local_entry_ids: Vec<usize> = Vec::new();
-            for (_matched_key, ids) in self.prefix_index.iter_prefix(local_key.as_bytes()) {
-                local_entry_ids.extend(ids.iter().copied());
-            }
-
-            // Fallback: If local entries found, return them immediately
-            if !local_entry_ids.is_empty() {
-                let mut local_words: Vec<String> = Vec::new();
-                for id in &local_entry_ids {
-                    if let Some(entry) = self.entries.get(*id) {
-                        local_words.extend(entry.values.iter().cloned());
-                    }
-                }
-                if !local_words.is_empty() {
-                    return Ok(local_words);
+        // If module_name is empty, search global only
+        if module_name.is_empty() {
+            let mut global_entry_ids: Vec<usize> = Vec::new();
+            for (matched_key, ids) in self.prefix_index.iter_prefix(key.as_bytes()) {
+                // Skip local keys (start with ':')
+                if !matched_key.starts_with(&[b':']) {
+                    global_entry_ids.extend(ids.iter().copied());
                 }
             }
-        }
 
-        // Step 2: Global search (only if local search returned no results)
-        let mut global_entry_ids: Vec<usize> = Vec::new();
-        for (matched_key, ids) in self.prefix_index.iter_prefix(key.as_bytes()) {
-            // Skip local keys (start with ':')
-            if !matched_key.starts_with(&[b':']) {
-                global_entry_ids.extend(ids.iter().copied());
+            if global_entry_ids.is_empty() {
+                return Err(WordTableError::WordNotFound {
+                    key: key.to_string(),
+                });
             }
+
+            let mut all_words: Vec<String> = Vec::new();
+            for id in &global_entry_ids {
+                if let Some(entry) = self.entries.get(*id) {
+                    all_words.extend(entry.values.iter().cloned());
+                }
+            }
+
+            if all_words.is_empty() {
+                return Err(WordTableError::WordNotFound {
+                    key: key.to_string(),
+                });
+            }
+
+            return Ok(all_words);
         }
 
-        // No matches found
-        if global_entry_ids.is_empty() {
+        // module_name is non-empty: search local only (no fallback)
+        let local_key = format!(":{}:{}", module_name, key);
+        let mut local_entry_ids: Vec<usize> = Vec::new();
+        for (_matched_key, ids) in self.prefix_index.iter_prefix(local_key.as_bytes()) {
+            local_entry_ids.extend(ids.iter().copied());
+        }
+
+        if local_entry_ids.is_empty() {
             return Err(WordTableError::WordNotFound {
                 key: key.to_string(),
             });
         }
 
-        // Step 3: Collect words from global entries
-        let mut all_words: Vec<String> = Vec::new();
-        for id in &global_entry_ids {
+        let mut local_words: Vec<String> = Vec::new();
+        for id in &local_entry_ids {
             if let Some(entry) = self.entries.get(*id) {
-                all_words.extend(entry.values.iter().cloned());
+                local_words.extend(entry.values.iter().cloned());
             }
         }
 
-        if all_words.is_empty() {
+        if local_words.is_empty() {
             return Err(WordTableError::WordNotFound {
                 key: key.to_string(),
             });
         }
 
-        Ok(all_words)
+        Ok(local_words)
     }
 
     /// Search for a word using 2-stage prefix matching with caching.
@@ -293,14 +303,14 @@ mod tests {
     }
 
     #[test]
-    fn test_collect_word_candidates_local_takes_priority() {
+    fn test_collect_word_candidates_local_only() {
         let registry = create_test_registry();
         let selector = Box::new(MockRandomSelector::new(vec![]));
         let table = WordTable::from_word_def_registry(registry, selector);
 
-        // Fallback strategy: Local search found, global NOT included
+        // Local search only - does NOT include global words
         let candidates = table.collect_word_candidates("会話_1", "挨拶").unwrap();
-        // Should get ONLY local word (やあ) - fallback strategy
+        // Should get ONLY local word (やあ)
         assert_eq!(candidates.len(), 1);
         assert!(candidates.contains(&"やあ".to_string()));
         // Global words NOT included
@@ -309,19 +319,32 @@ mod tests {
     }
 
     #[test]
-    fn test_collect_word_candidates_fallback_to_global() {
+    fn test_collect_word_candidates_local_not_found_no_fallback() {
         let registry = create_test_registry();
         let selector = Box::new(MockRandomSelector::new(vec![]));
         let table = WordTable::from_word_def_registry(registry, selector);
 
-        // No local word for "場所" in module "会話_1", should fall back to global
-        // Note: create_test_registry has local "場所" in 会話_1, so use different module
-        let candidates = table
-            .collect_word_candidates("別のモジュール", "場所")
-            .unwrap();
-        // Should get global words via fallback
-        assert!(candidates.len() >= 1);
-        assert!(candidates.contains(&"東京".to_string()));
+        // No local word for "場所" in module "別のモジュール"
+        // Should NOT fall back to global - should return error
+        let result = table.collect_word_candidates("別のモジュール", "場所");
+        assert!(result.is_err());
+        match result {
+            Err(WordTableError::WordNotFound { key }) => assert_eq!(key, "場所"),
+            _ => panic!("Expected WordNotFound error"),
+        }
+    }
+
+    #[test]
+    fn test_collect_word_candidates_global_only() {
+        let registry = create_test_registry();
+        let selector = Box::new(MockRandomSelector::new(vec![]));
+        let table = WordTable::from_word_def_registry(registry, selector);
+
+        // Empty module_name means global only search
+        let candidates = table.collect_word_candidates("", "挨拶").unwrap();
+        assert_eq!(candidates.len(), 2);
+        assert!(candidates.contains(&"こんにちは".to_string()));
+        assert!(candidates.contains(&"おはよう".to_string()));
     }
 
     #[test]

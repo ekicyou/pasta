@@ -29,6 +29,8 @@ pub struct WordCollectionEntry {
     pub is_local: bool,
     /// Scene name (for local words)
     pub scene_name: Option<String>,
+    /// Actor name (for actor words)
+    pub actor_name: Option<String>,
 }
 
 /// Collect all scenes from Lua `pasta.scene` registry (Requirement 1.1, 1.2).
@@ -112,6 +114,7 @@ pub fn collect_words(lua: &Lua) -> LuaResult<Vec<WordCollectionEntry>> {
                     values,
                     is_local: false,
                     scene_name: None,
+                    actor_name: None,
                 });
             }
         }
@@ -139,6 +142,36 @@ pub fn collect_words(lua: &Lua) -> LuaResult<Vec<WordCollectionEntry>> {
                         values,
                         is_local: true,
                         scene_name: Some(scene_name.clone()),
+                        actor_name: None,
+                    });
+                }
+            }
+        }
+    }
+
+    // Process actor words: {actor_name: {key: [[values]]}}
+    if let Ok(actor_words) = all_words.get::<Table>("actor") {
+        for actor_pair in actor_words.pairs::<String, Table>() {
+            let (actor_name, actor_word_map) = actor_pair?;
+
+            for key_pair in actor_word_map.pairs::<String, Table>() {
+                let (key, values_list) = key_pair?;
+
+                for values_pair in values_list.pairs::<i64, Table>() {
+                    let (_idx, values_table) = values_pair?;
+
+                    let mut values = Vec::new();
+                    for val_pair in values_table.pairs::<i64, String>() {
+                        let (_i, val) = val_pair?;
+                        values.push(val);
+                    }
+
+                    entries.push(WordCollectionEntry {
+                        key: key.clone(),
+                        values,
+                        is_local: false, // Actor words are not scene-local
+                        scene_name: None,
+                        actor_name: Some(actor_name.clone()),
                     });
                 }
             }
@@ -183,7 +216,10 @@ fn build_word_registry(entries: &[WordCollectionEntry]) -> WordDefRegistry {
     let mut registry = WordDefRegistry::new();
 
     for entry in entries {
-        if entry.is_local {
+        if let Some(ref actor_name) = entry.actor_name {
+            // Actor words: register with actor scope
+            registry.register_actor(actor_name, &entry.key, entry.values.clone());
+        } else if entry.is_local {
             if let Some(ref scene_name) = entry.scene_name {
                 registry.register_local(scene_name, &entry.key, entry.values.clone());
             }
