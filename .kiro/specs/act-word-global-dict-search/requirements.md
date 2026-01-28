@@ -32,10 +32,11 @@
 
 1. The PROXY_IMPL.word shall アクター完全一致検索（`actor[name]`）のみLua側で行う
 2. When アクター完全一致で関数が見つかる, the PROXY_IMPL shall 関数を `act` を引数として呼び出し、その戻り値を返す
-3. When アクター完全一致がない, the PROXY_IMPL shall `act:word(name)` を呼び出して結果を返す
-4. The PROXY_IMPL shall `search_prefix_lua()` 関数を削除する
-5. The PROXY_IMPL shall `math.random` による候補選択ロジックを削除する
-6. The PROXY_IMPL shall `WORD.get_actor_words()` / `WORD.get_local_words()` / `WORD.get_global_words()` の呼び出しを削除する
+3. When アクター完全一致がない, the PROXY_IMPL shall `SEARCH:search_word(name, "__actor_" .. actor.name .. "__")` を呼び出してアクター辞書を検索する
+4. When アクター辞書に一致がない, the PROXY_IMPL shall `act:word(name)` を呼び出して結果を返す
+5. The PROXY_IMPL shall `search_prefix_lua()` 関数を削除する
+6. The PROXY_IMPL shall `math.random` による候補選択ロジックを削除する
+7. The PROXY_IMPL shall `WORD.get_actor_words()` / `WORD.get_local_words()` / `WORD.get_global_words()` の呼び出しを削除する
 
 ### Requirement 3: アクター単語辞書のRust側収集（finalize.rs修正）
 
@@ -51,7 +52,6 @@
 
 1. The finalize_scene::collect_words() shall `all_words.actor` からアクター単語辞書を収集する
 2. The build_word_registry() shall 収集したアクター単語を `register_actor()` で登録する
-3. The SEARCH:search_word(name, actor_scope) shall アクター名スコープでの検索をサポートする
 
 ### Requirement 4: 後方互換性の維持
 
@@ -91,7 +91,8 @@
 ### proxy:word(name)
 ```
 1. actor[name] 完全一致? → 関数なら実行、値なら返す
-2. act:word(name) へ委譲
+2. SEARCH:search_word(name, "__actor_" .. actor.name .. "__") → アクター辞書検索
+3. act:word(name) へ委譲（シーン・グローバル検索）
 ```
 
 ---
