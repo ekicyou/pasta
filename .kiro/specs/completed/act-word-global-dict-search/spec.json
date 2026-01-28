@@ -1,0 +1,26 @@
+{
+    "feature_name": "act-word-global-dict-search",
+    "created_at": "2026-01-28T00:00:00Z",
+    "updated_at": "2026-01-28T18:00:00Z",
+    "language": "ja",
+    "phase": "implementation-complete",
+    "approvals": {
+        "requirements": {
+            "generated": true,
+            "approved": true
+        },
+        "design": {
+            "generated": true,
+            "approved": true
+        },
+        "tasks": {
+            "generated": true,
+            "approved": true
+        },
+        "implementation": {
+            "completed": true,
+            "validated": true
+        }
+    },
+    "ready_for_implementation": false
+}
