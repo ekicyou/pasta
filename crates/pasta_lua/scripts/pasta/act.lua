@@ -6,6 +6,7 @@
 
 local ACTOR = require("pasta.actor")
 local SCENE = require("pasta.scene")
+local GLOBAL = require("pasta.global")
 
 --- @class Act アクションオブジェクト
 --- @field ctx CTX 環境オブジェクト
@@ -140,7 +141,6 @@ function ACT_IMPL.call(self, global_scene_name, key, attrs, ...)
 
     -- Level 3: グローバル関数モジュール
     if not handler then
-        local GLOBAL = require("pasta.global")
         handler = GLOBAL[key]
     end
 
