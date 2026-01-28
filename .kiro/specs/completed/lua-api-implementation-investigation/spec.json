@@ -1,7 +1,7 @@
 {
     "feature_name": "lua-api-implementation-investigation",
     "created_at": "2026-01-28T00:00:00Z",
-    "updated_at": "2026-01-28T00:00:00Z",
+    "updated_at": "2026-01-28T12:00:00Z",
     "language": "ja",
     "phase": "completed",
     "approvals": {
@@ -19,6 +19,5 @@
         }
     },
     "ready_for_implementation": false,
-    "implementation_completed": true,
-    "completion_note": "Lua API実装状況の調査完了。17/17 API完全実装確認。トランスパイラ側の残課題1件を特定。"
+    "notes": "調査仕様のため、調査レポートをもって完了とする"
 }
