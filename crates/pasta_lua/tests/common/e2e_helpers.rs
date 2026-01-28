@@ -91,6 +91,7 @@ pub fn create_runtime_with_finalize() -> mlua::Result<Lua> {
 /// # Returns
 /// * `Ok(Lua)` - Configured Lua VM ready for search testing
 /// * `Err(e)` - Initialization failed
+#[allow(dead_code)]
 pub fn create_runtime_with_search(ctx: TranspileContext) -> mlua::Result<Lua> {
     // Create Lua VM with safe standard libraries
     let lua = unsafe { Lua::unsafe_new_with(StdLib::ALL_SAFE, mlua::LuaOptions::default()) };
