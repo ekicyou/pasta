@@ -61,22 +61,22 @@
 
 ## 検索レベル対照表
 
-| レベル | PROXY_IMPL.word（従来） | ACT_IMPL.word（新規） | 責務分担後 |
-|--------|------------------------|----------------------|-----------|
-| L1 | アクター完全一致 | - | PROXY_IMPL |
-| L2 | アクター辞書（前方一致） | - | PROXY_IMPL |
-| L3 | シーン完全一致 | シーン完全一致 | ACT_IMPL |
-| L4 | シーン辞書（前方一致） | シーン辞書（前方一致） | ACT_IMPL |
-| L5 | グローバル完全一致 | グローバル完全一致 | ACT_IMPL |
-| L6 | グローバル辞書（前方一致） | グローバル辞書（前方一致） | ACT_IMPL |
+| レベル | PROXY_IMPL.word（従来）    | ACT_IMPL.word（新規）      | 責務分担後 |
+| ------ | -------------------------- | -------------------------- | ---------- |
+| L1     | アクター完全一致           | -                          | PROXY_IMPL |
+| L2     | アクター辞書（前方一致）   | -                          | PROXY_IMPL |
+| L3     | シーン完全一致             | シーン完全一致             | ACT_IMPL   |
+| L4     | シーン辞書（前方一致）     | シーン辞書（前方一致）     | ACT_IMPL   |
+| L5     | グローバル完全一致         | グローバル完全一致         | ACT_IMPL   |
+| L6     | グローバル辞書（前方一致） | グローバル辞書（前方一致） | ACT_IMPL   |
 
 ---
 
 ## 関連ファイル
 
-| ファイル | 役割 |
-|----------|------|
-| [act.lua](../../../crates/pasta_lua/scripts/pasta/act.lua) | ACT_IMPL 実装（修正対象） |
-| [actor.lua](../../../crates/pasta_lua/scripts/pasta/actor.lua) | PROXY_IMPL 実装（リファクタリング対象） |
-| [word.lua](../../../crates/pasta_lua/scripts/pasta/word.lua) | WORD モジュール（単語辞書アクセス） |
-| [global.lua](../../../crates/pasta_lua/scripts/pasta/global.lua) | GLOBAL テーブル |
+| ファイル                                                         | 役割                                    |
+| ---------------------------------------------------------------- | --------------------------------------- |
+| [act.lua](../../../crates/pasta_lua/scripts/pasta/act.lua)       | ACT_IMPL 実装（修正対象）               |
+| [actor.lua](../../../crates/pasta_lua/scripts/pasta/actor.lua)   | PROXY_IMPL 実装（リファクタリング対象） |
+| [word.lua](../../../crates/pasta_lua/scripts/pasta/word.lua)     | WORD モジュール（単語辞書アクセス）     |
+| [global.lua](../../../crates/pasta_lua/scripts/pasta/global.lua) | GLOBAL テーブル                         |
