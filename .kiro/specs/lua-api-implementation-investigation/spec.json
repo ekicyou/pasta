@@ -3,11 +3,11 @@
     "created_at": "2026-01-28T00:00:00Z",
     "updated_at": "2026-01-28T00:00:00Z",
     "language": "ja",
-    "phase": "requirements-generated",
+    "phase": "completed",
     "approvals": {
         "requirements": {
             "generated": true,
-            "approved": false
+            "approved": true
         },
         "design": {
             "generated": false,
@@ -18,5 +18,7 @@
             "approved": false
         }
     },
-    "ready_for_implementation": false
+    "ready_for_implementation": false,
+    "implementation_completed": true,
+    "completion_note": "Lua API実装状況の調査完了。17/17 API完全実装確認。トランスパイラ側の残課題1件を特定。"
 }
