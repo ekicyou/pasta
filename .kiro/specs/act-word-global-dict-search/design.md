@@ -153,7 +153,7 @@ sequenceDiagram
 | 2.1-2.7     | ACT_IMPL.word 実装              | act.lua     | ACT_IMPL.word                      | act:word フロー   |
 | 3.1-3.9     | PROXY_IMPL.word 修正            | actor.lua   | PROXY_IMPL.word                    | proxy:word フロー |
 | 4.1-4.2     | アクター辞書収集                | finalize.rs | collect_words, build_word_registry | -                 |
-| 5.1-5.6     | WORD.resolve_value() 実装      | word.lua    | WORD.resolve_value                 | -                 |
+| 5.1-5.6     | WORD.resolve_value() 実装       | word.lua    | WORD.resolve_value                 | -                 |
 | 6.1-6.3     | 後方互換性                      | 全体        | -                                  | -                 |
 
 ---
@@ -162,14 +162,14 @@ sequenceDiagram
 
 ### Summary
 
-| Component       | Domain/Layer        | Intent                       | Req Coverage | Key Dependencies           | Contracts |
-| --------------- | ------------------- | ---------------------------- | ------------ | -------------------------- | --------- |
-| WordTable       | pasta_core/Registry | 単語前方一致検索             | 1.1-1.4      | RadixMap (P0)              | Service   |
-| SceneTable      | pasta_core/Registry | シーン前方一致検索           | 1.5-1.8      | RadixMap (P0)              | Service   |
-| ACT_IMPL.word   | pasta_lua/Lua       | 単語検索（シーンスコープ）   | 2.1-2.7      | SEARCH (P0), GLOBAL (P1)   | -         |
-| PROXY_IMPL.word | pasta_lua/Lua       | 単語検索（アクタースコープ） | 3.1-3.9      | SEARCH (P0), ACT_IMPL (P0) | -         |
-| finalize.rs     | pasta_lua/Runtime   | Lua→Rust辞書収集             | 4.1-4.2      | WordDefRegistry (P0)       | -         |
-| WORD.resolve_value | pasta_lua/Lua    | 完全一致検索時の値解決       | 5.1-5.6      | -                          | Service   |
+| Component          | Domain/Layer        | Intent                       | Req Coverage | Key Dependencies           | Contracts |
+| ------------------ | ------------------- | ---------------------------- | ------------ | -------------------------- | --------- |
+| WordTable          | pasta_core/Registry | 単語前方一致検索             | 1.1-1.4      | RadixMap (P0)              | Service   |
+| SceneTable         | pasta_core/Registry | シーン前方一致検索           | 1.5-1.8      | RadixMap (P0)              | Service   |
+| ACT_IMPL.word      | pasta_lua/Lua       | 単語検索（シーンスコープ）   | 2.1-2.7      | SEARCH (P0), GLOBAL (P1)   | -         |
+| PROXY_IMPL.word    | pasta_lua/Lua       | 単語検索（アクタースコープ） | 3.1-3.9      | SEARCH (P0), ACT_IMPL (P0) | -         |
+| finalize.rs        | pasta_lua/Runtime   | Lua→Rust辞書収集             | 4.1-4.2      | WordDefRegistry (P0)       | -         |
+| WORD.resolve_value | pasta_lua/Lua       | 完全一致検索時の値解決       | 5.1-5.6      | -                          | Service   |
 
 ---
 
@@ -331,10 +331,10 @@ fn build_word_registry(entries: &[WordCollectionEntry]) -> WordDefRegistry;
 
 #### WORD.resolve_value (word.lua)
 
-| Field        | Detail                                           |
-| ------------ | ------------------------------------------------ |
+| Field        | Detail                                                 |
+| ------------ | ------------------------------------------------------ |
 | Intent       | 完全一致検索時の値解決（関数実行、配列選択、文字列化） |
-| Requirements | 5.1, 5.2, 5.3, 5.4, 5.5, 5.6                     |
+| Requirements | 5.1, 5.2, 5.3, 5.4, 5.5, 5.6                           |
 
 **Responsibilities & Constraints**
 - 関数値の場合、actを引数として実行

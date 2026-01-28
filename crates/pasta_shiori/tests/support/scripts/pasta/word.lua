@@ -120,4 +120,29 @@ function MOD.create_word(key)
     return MOD.create_global(key)
 end
 
+-------------------------------------------
+-- resolve_value - 共通値解決関数
+-------------------------------------------
+
+--- 値を解決（関数なら実行、配列なら最初の要素、その他はそのまま）
+--- ACT_IMPL.word と PROXY_IMPL.word から共通利用
+--- @param value any 検索結果
+--- @param act Act アクションオブジェクト
+--- @return any 解決後の値
+function MOD.resolve_value(value, act)
+    if value == nil then
+        return nil
+    elseif type(value) == "function" then
+        return value(act)
+    elseif type(value) == "table" then
+        -- 配列なら最初の要素を返す（完全一致の場合）
+        if #value > 0 then
+            return value[1]
+        end
+        return nil
+    else
+        return tostring(value)
+    end
+end
+
 return MOD

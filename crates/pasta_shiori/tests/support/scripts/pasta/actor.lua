@@ -100,57 +100,14 @@ function PROXY:talk(text)
 end
 
 -------------------------------------------
--- 6レベルフォールバック検索ヘルパー
+-- PROXY:word 3レベルフォールバック検索
 -------------------------------------------
 
---- 値を解決（関数なら実行、配列なら最初の要素、その他はそのまま）
---- @param value any 検索結果
---- @param act Act アクションオブジェクト
---- @return any 解決後の値
-local function resolve_value(value, act)
-    if value == nil then
-        return nil
-    elseif type(value) == "function" then
-        return value(act)
-    elseif type(value) == "table" then
-        -- 配列なら最初の要素を返す（完全一致の場合）
-        if #value > 0 then
-            return value[1]
-        end
-        return nil
-    else
-        return tostring(value)
-    end
-end
-
---- 辞書から前方一致検索
---- @param dict table {key → values[][]} 形式の辞書
---- @param prefix string 検索プレフィックス
---- @return table|nil マッチした全候補値の配列、またはnil
-local function search_prefix_lua(dict, prefix)
-    if not dict or prefix == "" then
-        return nil
-    end
-
-    local results = {}
-    for key, value_arrays in pairs(dict) do
-        if key:sub(1, #prefix) == prefix then
-            -- value_arrays は [[値1, 値2], [値3]] 形式
-            for _, values in ipairs(value_arrays) do
-                for _, v in ipairs(values) do
-                    table.insert(results, v)
-                end
-            end
-        end
-    end
-    return #results > 0 and results or nil
-end
-
--------------------------------------------
--- PROXY:word 6レベルフォールバック検索
--------------------------------------------
-
---- word（6レベルフォールバック検索）
+--- word（3レベルフォールバック検索）
+--- 検索順序:
+--- 1. アクター完全一致 (actor[name])
+--- 2. アクター辞書前方一致 (SEARCH:search_word)
+--- 3. act:word() に委譲（シーン→グローバル検索）
 --- @param name string 単語名（＠なし）
 --- @return string|nil 見つかった単語、またはnil
 function PROXY:word(name)
@@ -158,54 +115,25 @@ function PROXY:word(name)
         return nil
     end
 
-    -- Level 1: アクター完全一致（関数 or 値）
+    -- 1. アクター完全一致（関数 or 値）
     local actor_value = self.actor[name]
     if actor_value ~= nil then
-        return resolve_value(actor_value, self.act)
+        return WORD.resolve_value(actor_value, self.act)
     end
 
-    -- Level 2: アクター辞書（前方一致）
-    local actor_dict = WORD.get_actor_words(self.actor.name)
-    if actor_dict then
-        local candidates = search_prefix_lua(actor_dict, name)
-        if candidates and #candidates > 0 then
-            return candidates[math.random(#candidates)]
+    -- 2 & 3. SEARCH APIを通じた前方一致検索 or act:word() に委譲
+    local ok, SEARCH = pcall(require, "@pasta_search")
+    if ok and SEARCH then
+        -- 2. アクター辞書（前方一致）
+        local actor_scope = "__actor_" .. self.actor.name .. "__"
+        local result = SEARCH:search_word(name, actor_scope)
+        if result then
+            return result
         end
     end
 
-    -- Level 3: シーン完全一致（関数 or 値）
-    local scene = self.act.current_scene
-    if scene then
-        local scene_value = scene[name]
-        if scene_value ~= nil then
-            return resolve_value(scene_value, self.act)
-        end
-
-        -- Level 4: シーン辞書（前方一致）
-        local scene_name = scene.__global_name__ or scene.name
-        local scene_dict = WORD.get_local_words(scene_name)
-        if scene_dict then
-            local candidates = search_prefix_lua(scene_dict, name)
-            if candidates and #candidates > 0 then
-                return candidates[math.random(#candidates)]
-            end
-        end
-    end
-
-    -- Level 5: グローバル完全一致（関数 or 値）
-    local global_value = GLOBAL[name]
-    if global_value ~= nil then
-        return resolve_value(global_value, self.act)
-    end
-
-    -- Level 6: グローバル辞書（前方一致）
-    local global_dict = WORD.get_global_words()
-    local candidates = search_prefix_lua(global_dict, name)
-    if candidates and #candidates > 0 then
-        return candidates[math.random(#candidates)]
-    end
-
-    return nil
+    -- 3. act:word() に委譲（シーン→グローバル検索）
+    return self.act:word(name)
 end
 
 return ACTOR

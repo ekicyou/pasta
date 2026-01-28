@@ -51,11 +51,11 @@
 
 ## Architecture Pattern Evaluation
 
-| Option | Description | Strengths | Risks / Limitations | Notes |
-|--------|-------------|-----------|---------------------|-------|
-| A. Lua側フォールバック | Lua側で個別にSEARCH API呼び出し | 柔軟なフォールバック制御、Rust側シンプル化 | Lua側のコード量増加 | 採用 |
-| B. Rust APIオプション | `search_word(key, scope, fallback: bool)` | 後方互換性維持 | API複雑化、内部ロジック分岐 | 不採用 |
-| C. 別API追加 | `search_word_local()`, `search_word_global()` | 明示的、テスト容易 | API数増加 | 不採用 |
+| Option                 | Description                                   | Strengths                                  | Risks / Limitations         | Notes  |
+| ---------------------- | --------------------------------------------- | ------------------------------------------ | --------------------------- | ------ |
+| A. Lua側フォールバック | Lua側で個別にSEARCH API呼び出し               | 柔軟なフォールバック制御、Rust側シンプル化 | Lua側のコード量増加         | 採用   |
+| B. Rust APIオプション  | `search_word(key, scope, fallback: bool)`     | 後方互換性維持                             | API複雑化、内部ロジック分岐 | 不採用 |
+| C. 別API追加           | `search_word_local()`, `search_word_global()` | 明示的、テスト容易                         | API数増加                   | 不採用 |
 
 ## Design Decisions
 
@@ -86,11 +86,11 @@
 
 ## Risks & Mitigations
 
-| Risk | Mitigation |
-|------|------------|
-| 既存テスト失敗 | フォールバック関連テストを新仕様に合わせて修正 |
-| 後方互換性破壊 | 既存の動作を保つようLua側フォールバックを正確に実装 |
-| パフォーマンス低下 | FFI呼び出し回数増加は最大3回程度、許容範囲内 |
+| Risk               | Mitigation                                          |
+| ------------------ | --------------------------------------------------- |
+| 既存テスト失敗     | フォールバック関連テストを新仕様に合わせて修正      |
+| 後方互換性破壊     | 既存の動作を保つようLua側フォールバックを正確に実装 |
+| パフォーマンス低下 | FFI呼び出し回数増加は最大3回程度、許容範囲内        |
 
 ## References
 - [WordTable実装](../../../crates/pasta_core/src/registry/word_table.rs)

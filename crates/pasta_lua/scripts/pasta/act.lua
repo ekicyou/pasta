@@ -82,18 +82,54 @@ function ACT_IMPL.sakura_script(self, text)
     table.insert(self.token, { type = "sakura_script", text = text })
 end
 
---- 単語検索（アクター非依存、3レベル検索）
+--- 単語検索（アクター非依存、4レベル検索）
+--- 検索順序:
+--- 1. シーンテーブル完全一致 (current_scene[name])
+--- 2. GLOBAL完全一致 (GLOBAL[name])
+--- 3. シーンローカル辞書前方一致 (SEARCH:search_word(name, scene_name))
+--- 4. グローバル辞書前方一致 (SEARCH:search_word(name, nil))
 --- @param self Act アクションオブジェクト
 --- @param name string 単語名
 --- @return string|nil 見つかった単語、またはnil
 function ACT_IMPL.word(self, name)
-    -- Level 2: SCENEfield
-    if self.current_scene and self.current_scene[name] then
-        return self.current_scene[name]
+    if not name or name == "" then
+        return nil
     end
-    -- Level 3: グローバルシーン名での検索（Rust関数呼び出し予定）
-    -- Level 4: 全体検索（Rust関数呼び出し予定）
-    return nil -- TODO: Rust search_word 統合
+
+    local WORD = require("pasta.word")
+
+    -- 1. シーンテーブル完全一致
+    if self.current_scene and self.current_scene[name] ~= nil then
+        local value = self.current_scene[name]
+        return WORD.resolve_value(value, self)
+    end
+
+    -- 2. GLOBAL完全一致
+    if GLOBAL[name] ~= nil then
+        local value = GLOBAL[name]
+        return WORD.resolve_value(value, self)
+    end
+
+    -- 3 & 4. SEARCH API を使用した前方一致検索（利用可能な場合のみ）
+    local ok, SEARCH = pcall(require, "@pasta_search")
+    if ok and SEARCH then
+        -- 3. シーンローカル辞書（前方一致）
+        local scene_name = self.current_scene and self.current_scene.__global_name__
+        if scene_name then
+            local result = SEARCH:search_word(name, scene_name)
+            if result then
+                return result -- SEARCH APIは既に文字列を返す
+            end
+        end
+
+        -- 4. グローバル辞書（前方一致）
+        local result = SEARCH:search_word(name, nil)
+        if result then
+            return result -- SEARCH APIは既に文字列を返す
+        end
+    end
+
+    return nil
 end
 
 --- トークン出力とyield

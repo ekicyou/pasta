@@ -2,7 +2,7 @@ local PASTA = require "pasta"
 
 do
     local ACTOR = PASTA.create_actor("さくら")
-    ACTOR:create_word("通常"):entry([=[\s[0]]=])
+    ACTOR:create_word("通常"):entry([=[\s[0]]=], [=[\s[100]]=])
     ACTOR:create_word("照れ"):entry([=[\s[1]]=])
     ACTOR:create_word("驚き"):entry([=[\s[2]]=])
     ACTOR:create_word("ぐんにょり"):entry([=[\s[3]]=])
