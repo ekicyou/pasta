@@ -18,29 +18,6 @@ fn fixtures_path() -> PathBuf {
 }
 
 // ============================================================================
-// Comprehensive Control Flow Snapshot
-// ============================================================================
-
-/// Golden test for comprehensive_control_flow.pasta
-///
-/// NOTE: Currently skipped because comprehensive_control_flow.pasta uses
-/// legacy syntax (全角ハイフン for local scenes) that is no longer supported.
-/// The file needs to be updated to use `・` for local scenes.
-///
-/// TODO: Update comprehensive_control_flow.pasta to current grammar
-#[test]
-#[ignore = "comprehensive_control_flow.pasta uses legacy syntax"]
-fn test_comprehensive_control_flow_snapshot() {
-    let fixture_path = fixtures_path().join("comprehensive_control_flow.pasta");
-    let source = fs::read_to_string(&fixture_path).expect("Failed to read fixture file");
-
-    let lua_code = transpile(&source);
-
-    // Create a sanitized snapshot (remove any system-specific paths)
-    assert_snapshot!("comprehensive_control_flow", lua_code);
-}
-
-// ============================================================================
 // Basic Scene Snapshots
 // ============================================================================
 
