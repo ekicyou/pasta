@@ -1,26 +1,3 @@
-<!--
-  原文: https://www.lua.org/manual/5.5/manual.html#6
-  参考: https://lua.dokyumento.jp/manual/5.4/manual.html#6
-  翻訳日: 2026-01-29
-  レビュー: AI Claude Opus 4.5
-  
-  用語対照表:
-  - library → ライブラリ
-  - coroutine → コルーチン
-  - pattern → パターン
-  - capture → キャプチャ
-  - upvalue → 上位値
-  - userdata → ユーザーデータ
-  - metatable → メタテーブル
-  - registry → レジストリ
-  - chunk → チャンク
-  - closure → クロージャ
-  - iterator → イテレータ
-  - garbage collection → ガベージコレクション
-  - thread → スレッド
-  - hook → フック
-  - traceback → トレースバック
--->
 # 6 – 標準ライブラリ
 
 標準Luaライブラリは、C APIを通じてCで実装された便利な関数を提供します。これらの関数の一部は言語に必須のサービスを提供します（例：[`type`](#type-v) と [`getmetatable`](#getmetatable-object)）。その他は外部サービスへのアクセスを提供します（例：I/O）。また、Lua自体で実装できるものもありますが、さまざまな理由からCでの実装が望ましいものです（例：[`table.sort`](#tablesort-list--comp)）。
@@ -1640,29 +1617,3 @@ C関数の場合、この関数はすべての上位値の名前として空文�
 ### debug.upvaluejoin (f1, n1, f2, n2)
 
 Luaクロージャ `f1` の `n1` 番目の上位値が、Luaクロージャ `f2` の `n2` 番目の上位値を参照するようにします。
-
----
-
-## Lua 5.5 変更点サマリー
-
-本章（§6 標準ライブラリ）における Lua 5.4 からの主な変更点：
-
-### §6.1 ライブラリロード
-- **luaL_openselectedlibs** を追加（ライブラリの選択的ロード）
-
-### §6.2 基本関数
-- **collectgarbage** に 'param' オプションを追加
-- **warn** 関数を追加（警告システム）
-
-### §6.5 文字列操作
-- パターンマッチング: '%g' グラフィカル文字クラスを追加
-
-### §6.8 数学関数
-- **math.ldexp** を追加（5.2で廃止後に復活）
-
-### §6.9 入出力機能
-- **file:write** が書き込みバイト数を4番目の戻り値として返すように変更
-
----
-
-[← 5章 補助ライブラリ](./05-the-auxiliary-library.md) | [目次](./README.md) | [7章 スタンドアロンLua →](./07-standalone.md)
