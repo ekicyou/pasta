@@ -119,7 +119,11 @@
 - **Selected Approach**: 既存動作維持
 - **Rationale**: 後方互換性、ユーザー移行コスト最小化
 - **Default Value**: `["std_all", "assertions", "testing", "regex", "json", "yaml"]`
-- **Note**: `env`はセキュリティ上デフォルト無効
+  - `std_all`: mlua StdLib::ALL_SAFE 相当（std_debug除く全Lua標準ライブラリ）
+  - `assertions`, `testing`: BDD/TDD スタイルスクリプト開発サポート
+  - `regex`, `json`, `yaml`: 外部データ連携・設定解析を標準サポート
+- **Note**: `env`はセキュリティ上デフォルト無効（ファイルシステムアクセス許可）
+- **Alignment with Req5**: `[lua]`セクション省略時も既存挙動維持
 
 ### Decision: 減算記法の処理順序
 

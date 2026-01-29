@@ -260,9 +260,33 @@ impl From<LuaConfig> for RuntimeConfig {
 - Postconditions: to_stdlib()はResult<StdLib, ConfigError>を返す
 - Invariants: 空libsは有効（StdLib::NONE相当）
 
+**Security Validation Contract**
+
+```rust
+/// Validate security-sensitive libraries and emit warnings.
+/// 
+/// # Requirements
+/// - Req3.1: Warn when std_debug or std_all_unsafe is enabled
+/// - Req3.2: Warn when env module is enabled
+pub fn validate_and_warn(&self) {
+    // Trigger: std_debug, std_all_unsafe detected in libs
+    // Action: tracing::warn!("Unsafe Lua libraries enabled: {}", lib_name)
+    //         with security implications explanation
+    
+    // Trigger: env module detected in libs
+    // Action: tracing::warn!("Security-sensitive module enabled: env")
+    //         with filesystem/environment access warning
+}
+```
+
+- Preconditions: self.libsに有効なライブラリ名が含まれる
+- Postconditions: セキュリティリスクのある設定をtracing::warnで出力
+- Side Effects: 標準エラー出力への警告ログ出力
+
 **Implementation Notes**
 - Integration: `PastaLuaRuntime::with_config()`で使用
 - Validation: `to_stdlib()`呼び出し時にparse_lib_name()で検証
+- Security: validate_and_warn()は設定ロード時に必ず呼び出す
 - Risks: std_debug/env誤設定 → validate_and_warn()で警告
 
 ---
