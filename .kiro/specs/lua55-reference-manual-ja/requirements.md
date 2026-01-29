@@ -24,7 +24,8 @@ markdownか、HTMLかは任せますが、マークダウンの方が使い勝�
 2. The ドキュメントシステム shall `crates/pasta_lua/doc/lua55-manual/`ディレクトリに配置する
 3. The ドキュメントシステム shall 目次ファイル（`README.md`または`index.md`）を提供する
 4. The ドキュメントシステム shall 各セクション間のリンクをMarkdown相対リンクで実装する
-5. When セクションが大きい場合, the ドキュメントシステム shall 章ごとに分割したファイル構成を採用する
+5. The ドキュメントシステム shall 章ごとに分割したファイル構成を採用する（1章1ファイル、大きな章はさらに分割）
+6. The 翻訳プロセス shall 前処理として原文HTML・参考日本語HTMLを章単位に分割し、仕様フォルダに保存する（AI処理効率化のため）
 
 ### Requirement 2: マニュアルセクション網羅性
 
