@@ -238,22 +238,140 @@ impl RuntimeConfig {
 
 ---
 
-### 推奨アプローチ: **Option A (完全置換)**
+### Option C: RuntimeConfig役割の再定義（設計判断事項）
 
-統合設計の観点から、すべてのライブラリ設定を`libs`配列に統一する**Option A**を推奨します。
+**背景**: RuntimeConfigの役割について、以下2つのアプローチが考えられる
+
+#### Approach C-1: LoaderConfig主導型
+
+**概要**: RuntimeConfigを内部表現専用とし、LoaderConfigで`libs`配列を管理
+
+```rust
+// loader/config.rs
+#[derive(Deserialize)]
+pub struct LuaConfig {
+    pub libs: Vec<String>,
+}
+
+impl LuaConfig {
+    pub fn to_runtime_config(&self) -> Result<RuntimeConfig, ConfigError> {
+        let stdlib = self.parse_stdlib()?;
+        let enable_testing = self.should_enable_module("testing");
+        let enable_regex = self.should_enable_module("regex");
+        // ...
+        
+        Ok(RuntimeConfig {
+            stdlib,  // StdLib flags
+            enable_testing,
+            enable_regex,
+            // ... 個別フラグに変換
+        })
+    }
+}
+
+// runtime/mod.rs
+pub struct RuntimeConfig {
+    pub(crate) stdlib: StdLib,  // 内部表現
+    pub enable_testing: bool,
+    pub enable_regex: bool,
+    // ... 既存構造維持（内部用）
+}
+```
+
+**メリット:**
+- ✅ LoaderとRuntimeの責務分離が明確
+- ✅ RuntimeConfigはシンプルな内部構造体
+- ✅ 変換ロジックがLoaderに集約
+
+**デメリット:**
+- ❌ プログラムからRuntimeConfig直接構築する際、`libs`配列が使えない
+- ❌ LoaderConfigへの依存が増加
+
+#### Approach C-2: RuntimeConfig主導型（推奨）
+
+**概要**: RuntimeConfigに`libs`配列と変換機能を集約
+
+```rust
+// runtime/mod.rs
+pub struct RuntimeConfig {
+    pub libs: Vec<String>,
+}
+
+impl RuntimeConfig {
+    pub fn to_stdlib(&self) -> Result<StdLib, ConfigError> {
+        // libs配列からStdLibフラグ構築
+    }
+    
+    pub fn should_enable_module(&self, module: &str) -> bool {
+        // libs配列からmlua-stdlibモジュール有効化判定
+    }
+    
+    pub fn default() -> Self {
+        Self {
+            libs: vec![
+                "std_all".into(),
+                "assertions".into(),
+                "testing".into(),
+                "regex".into(),
+                "json".into(),
+                "yaml".into(),
+            ],
+        }
+    }
+}
+
+// loader/config.rs
+#[derive(Deserialize)]
+pub struct LuaConfig {
+    #[serde(default)]
+    pub libs: Vec<String>,
+}
+
+impl From<LuaConfig> for RuntimeConfig {
+    fn from(config: LuaConfig) -> Self {
+        RuntimeConfig { libs: config.libs }
+    }
+}
+```
+
+**メリット:**
+- ✅ RuntimeConfigが自己完結（変換ロジック内包）
+- ✅ プログラムからの直接構築が容易
+- ✅ テスタビリティ向上（RuntimeConfigだけで単体テスト可能）
+- ✅ 既存の`RuntimeConfig::default()`パターンとの親和性
+
+**デメリット:**
+- ❌ RuntimeConfigが設定解析の責務を持つ（本来はLoaderの役割？）
+- ❌ LoaderとRuntimeの境界が若干曖昧に
+
+**推奨理由**: API利用者の利便性とテスタビリティを優先
+
+---
+
+### 推奨アプローチ: **Option A + Approach C-2**
+
+統合設計の観点から、以下の組み合わせを推奨します：
+
+**Option A (完全置換)**: すべてのライブラリ設定を`libs`配列に統一  
+**Approach C-2 (RuntimeConfig主導型)**: RuntimeConfigに`libs`配列と変換ロジックを集約
 
 **理由:**
 1. **設計の一貫性**: 1つの配列ですべてのライブラリ（Lua標準+mlua-stdlib）を制御
 2. **Cargo.toml featuresとの親和性**: ユーザーにとって直感的
 3. **将来の拡張性**: 新しいライブラリ追加が容易
 4. **技術的負債の削減**: 過渡期の二重管理を避ける
+5. **テスタビリティ**: RuntimeConfigだけで変換ロジックを単体テスト可能
+6. **API利便性**: プログラムから`RuntimeConfig { libs: vec!["std_all"] }`で直接構築可能
 
 **移行戦略:**
 - デフォルト値で既存動作を再現（`["std_all", "assertions", "testing", "regex", "json", "yaml"]`）
 - 既存の個別フラグは `#[deprecated]` マークし、ドキュメントで移行方法を説明
+- RuntimeConfigに`to_stdlib()`と`should_enable_module()`メソッドを実装
+- LoaderConfigは`LuaConfig`から`RuntimeConfig`への単純な変換のみ
 - テストは新しい`libs`配列ベースに段階的に更新
 
 ---
+
 ```rust
 // loader/config.rs (または新規 stdlib_config.rs)
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -292,26 +410,6 @@ pub struct RuntimeConfig {
 }
 ```
 
-impl LuaStdLibConfig {
-    pub fn to_stdlib(&self) -> mlua::StdLib {
-        // プリセット + 個別オプション + unsafe検証 → StdLibフラグ
-    }
-}
-
-// runtime/mod.rs
-pub struct RuntimeConfig {
-    pub stdlib: LuaStdLibConfig,
-    // ... other fields (enable_std_libs deprecated)
-}
-```
-
-**トレードオフ:**
-- ✅ 段階的移行が可能
-- ✅ 後方互換性維持
-- ✅ 既存パターンに準拠
-- ✅ テスト影響最小
-- ❌ 一時的にAPI重複（`enable_std_libs` + `stdlib`）
-
 ---
 
 ## 4. 実装複雑度とリスク
@@ -341,24 +439,31 @@ pub struct RuntimeConfig {
 
 ## 5. 設計フェーズへの推奨事項
 
-### 推奨アプローチ: Option A（完全置換）
+### 推奨アプローチ: Option A + Approach C-2
+
+**アーキテクチャ決定:**
+1. **Option A（完全置換）**: すべてのライブラリ設定を`libs`配列に統一（Lua標準+mlua-stdlib）
+2. **Approach C-2（RuntimeConfig主導型）**: RuntimeConfigに`libs`配列と変換ロジックを集約
 
 **理由:**
-1. すべてのライブラリ設定を`libs`配列に統一（Lua標準+mlua-stdlib）
-2. Cargo.toml featuresとの高い親和性
-3. 将来の拡張性（新しいライブラリ追加が容易）
-4. 技術的負債の削減（過渡期の二重管理を避ける）
+1. Cargo.toml featuresとの高い親和性
+2. 将来の拡張性（新しいライブラリ追加が容易）
+3. 技術的負債の削減（過渡期の二重管理を避ける）
+4. テスタビリティ向上（RuntimeConfigだけで単体テスト可能）
+5. API利便性（プログラムから直接構築可能）
 
 ### 設計フェーズで決定が必要な項目
 
-| 検討項目 | 選択肢 |
-|---------|------|
-| デフォルト値 | `["std_all", "assertions", "testing", "regex", "json", "yaml"]` vs 最小構成 |
-| 既存フラグ扱い | 即座に非推奨 vs 段階的移行 |
-| バリデーション戦略 | 厳格（unknown error） vs 寛容（unknown warning） |
-| 警告ログレベル | `tracing::warn` vs `tracing::info` |
+| 検討項目 | 選択肢 | 推奨 |
+|---------|------|------|
+| RuntimeConfig構造 | `libs: Vec<String>` vs `stdlib: StdLib + enable_*: bool` | **libs配列** |
+| デフォルト値 | `["std_all", "assertions", "testing", "regex", "json", "yaml"]` vs 最小構成 | **前者（既存動作維持）** |
+| 変換ロジック配置 | RuntimeConfig vs LoaderConfig | **RuntimeConfig** |
+| 既存フラグ扱い | 即座に非推奨 vs 段階的移行 | **即座に非推奨** |
+| バリデーション戦略 | 厳格（unknown error） vs 寛容（unknown warning） | **厳格** |
+| 警告ログレベル | `tracing::warn` vs `tracing::info` | **warn（std_debug/env）** |
 
 ### 次のステップ
 
 1. **要件承認**: 議題クローズ後、`/kiro-spec-design lua-stdlib-config -y`
-2. **設計フェーズ**: 構造体定義、変換ロジック、TOML schema確定
+2. **設計フェーズ**: RuntimeConfig構造体定義、`to_stdlib()`/`should_enable_module()`メソッド設計

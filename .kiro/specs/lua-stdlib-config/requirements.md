@@ -130,6 +130,27 @@ libs = ["std_all", "assertions", "testing", "regex", "json", "yaml"]
 # 注: env はセキュリティ上の理由からデフォルトでは無効
 ```
 
+**設計判断事項（Design Decision Required）**:
+
+RuntimeConfigの役割について、以下のいずれかのアプローチを設計フェーズで決定する：
+
+- **Option 1**: RuntimeConfigを廃止または内部表現専用とし、LoaderConfigから設定を転記
+  - LoaderConfigが`libs: Vec<String>`を保持
+  - RuntimeConfigは内部的なStdLibフラグ＋モジュールフラグのみ保持
+  - 変換はLoaderまたはRuntimeコンストラクタで実施
+  
+- **Option 2**: RuntimeConfigに`libs`配列の解析・変換機能を集約
+  - RuntimeConfigが`libs: Vec<String>`を保持
+  - `RuntimeConfig::to_stdlib() -> StdLib`メソッド実装
+  - `RuntimeConfig::should_enable_module(name: &str) -> bool`メソッド実装
+  - LoaderConfigはRuntimeConfigを構築するだけ
+
+設計時の考慮点：
+- 責務分離（設定ロード vs ランタイム構成）
+- テスタビリティ（変換ロジックの単体テスト容易性）
+- API利用者の利便性（プログラムからRuntimeConfig直接構築する場合）
+
+
 ## TOML設定例
 
 ### 例1: デフォルト構成（省略時）
