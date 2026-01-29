@@ -259,6 +259,9 @@ impl From<LuaConfig> for RuntimeConfig {
 - Preconditions: libs配列は有効なライブラリ名のみ
 - Postconditions: to_stdlib()はResult<StdLib, ConfigError>を返す
 - Invariants: 空libsは有効（StdLib::NONE相当）
+  - **Design Decision**: 空配列`libs = []`は明示的な最小構成として許可
+  - **Rationale**: デフォルト値（libs省略）が基本。空配列は上級者向けの実験的構成
+  - **Trade-off**: 実用性は低いが、明示的指定を尊重（指定者の責任）
 
 **Security Validation Contract**
 
@@ -435,6 +438,7 @@ flowchart TD
 ### Unit Tests
 - `RuntimeConfig::to_stdlib()` — 各ライブラリ名のパース
 - `RuntimeConfig::to_stdlib()` — 減算記法処理
+- `RuntimeConfig::to_stdlib()` — 空配列`[]`でStdLib::NONE返却（Req1.6）
 - `RuntimeConfig::should_enable_module()` — モジュール判定
 - `LuaConfig` deserialization — TOML配列解析
 - `ConfigError::UnknownLibrary` — エラーメッセージ
@@ -446,6 +450,7 @@ flowchart TD
 
 ### E2E Tests
 - pasta.toml with various libs configurations
+- pasta.toml with `libs = []` — 最小構成（StdLib::NONE）動作確認
 - Security warning output verification
 - Backward compatibility (no [lua] section)
 
