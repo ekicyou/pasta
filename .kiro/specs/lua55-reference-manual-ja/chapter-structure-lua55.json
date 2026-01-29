@@ -1,0 +1,240 @@
+{
+    "version": "5.5",
+    "source": "reference-lua55-en.html",
+    "extracted_at": "2026-01-29T16:30:00Z",
+    "chapters": [
+        {
+            "number": "1",
+            "title": "Introduction",
+            "anchor": "1",
+            "level": "h1",
+            "sections": []
+        },
+        {
+            "number": "2",
+            "title": "Basic Concepts",
+            "anchor": "2",
+            "level": "h1",
+            "sections": [
+                {
+                    "number": "2.1",
+                    "title": "Values and Types",
+                    "anchor": "2.1"
+                },
+                {
+                    "number": "2.2",
+                    "title": "Scopes, Variables, and Environments",
+                    "anchor": "2.2"
+                },
+                {
+                    "number": "2.3",
+                    "title": "Error Handling",
+                    "anchor": "2.3"
+                },
+                {
+                    "number": "2.4",
+                    "title": "Metatables and Metamethods",
+                    "anchor": "2.4"
+                },
+                {
+                    "number": "2.5",
+                    "title": "Garbage Collection",
+                    "anchor": "2.5"
+                },
+                {
+                    "number": "2.6",
+                    "title": "Coroutines",
+                    "anchor": "2.6"
+                }
+            ]
+        },
+        {
+            "number": "3",
+            "title": "The Language",
+            "anchor": "3",
+            "level": "h1",
+            "sections": [
+                {
+                    "number": "3.1",
+                    "title": "Lexical Conventions",
+                    "anchor": "3.1"
+                },
+                {
+                    "number": "3.2",
+                    "title": "Variables",
+                    "anchor": "3.2"
+                },
+                {
+                    "number": "3.3",
+                    "title": "Statements",
+                    "anchor": "3.3"
+                },
+                {
+                    "number": "3.4",
+                    "title": "Expressions",
+                    "anchor": "3.4"
+                }
+            ]
+        },
+        {
+            "number": "4",
+            "title": "The Application Program Interface",
+            "anchor": "4",
+            "level": "h1",
+            "sections": [
+                {
+                    "number": "4.1",
+                    "title": "The Stack",
+                    "anchor": "4.1"
+                },
+                {
+                    "number": "4.2",
+                    "title": "C Closures",
+                    "anchor": "4.2"
+                },
+                {
+                    "number": "4.3",
+                    "title": "Registry",
+                    "anchor": "4.3"
+                },
+                {
+                    "number": "4.4",
+                    "title": "Error Handling in C",
+                    "anchor": "4.4"
+                },
+                {
+                    "number": "4.5",
+                    "title": "Handling Yields in C",
+                    "anchor": "4.5"
+                },
+                {
+                    "number": "4.6",
+                    "title": "Functions and Types",
+                    "anchor": "4.6"
+                },
+                {
+                    "number": "4.7",
+                    "title": "The Debug Interface",
+                    "anchor": "4.7"
+                }
+            ]
+        },
+        {
+            "number": "5",
+            "title": "The Auxiliary Library",
+            "anchor": "5",
+            "level": "h1",
+            "sections": [
+                {
+                    "number": "5.1",
+                    "title": "Functions and Types",
+                    "anchor": "5.1"
+                }
+            ]
+        },
+        {
+            "number": "6",
+            "title": "The Standard Libraries",
+            "anchor": "6",
+            "level": "h1",
+            "sections": [
+                {
+                    "number": "6.1",
+                    "title": "Loading the Libraries in C code",
+                    "anchor": "6.1"
+                },
+                {
+                    "number": "6.2",
+                    "title": "Basic Functions",
+                    "anchor": "6.2"
+                },
+                {
+                    "number": "6.3",
+                    "title": "Coroutine Manipulation",
+                    "anchor": "6.3"
+                },
+                {
+                    "number": "6.4",
+                    "title": "Modules",
+                    "anchor": "6.4"
+                },
+                {
+                    "number": "6.5",
+                    "title": "String Manipulation",
+                    "anchor": "6.5"
+                },
+                {
+                    "number": "6.6",
+                    "title": "UTF-8 Support",
+                    "anchor": "6.6"
+                },
+                {
+                    "number": "6.7",
+                    "title": "Table Manipulation",
+                    "anchor": "6.7"
+                },
+                {
+                    "number": "6.8",
+                    "title": "Mathematical Functions",
+                    "anchor": "6.8"
+                },
+                {
+                    "number": "6.9",
+                    "title": "Input and Output Facilities",
+                    "anchor": "6.9"
+                },
+                {
+                    "number": "6.10",
+                    "title": "Operating System Facilities",
+                    "anchor": "6.10"
+                },
+                {
+                    "number": "6.11",
+                    "title": "The Debug Library",
+                    "anchor": "6.11"
+                }
+            ]
+        },
+        {
+            "number": "7",
+            "title": "Lua Standalone",
+            "anchor": "7",
+            "level": "h1",
+            "sections": []
+        },
+        {
+            "number": "8",
+            "title": "Incompatibilities with the Previous Version",
+            "anchor": "8",
+            "level": "h1",
+            "sections": [
+                {
+                    "number": "8.1",
+                    "title": "Incompatibilities in the Language",
+                    "anchor": "8.1"
+                },
+                {
+                    "number": "8.2",
+                    "title": "Incompatibilities in the Libraries",
+                    "anchor": "8.2"
+                },
+                {
+                    "number": "8.3",
+                    "title": "Incompatibilities in the API",
+                    "anchor": "8.3"
+                }
+            ]
+        },
+        {
+            "number": "9",
+            "title": "The Complete Syntax of Lua",
+            "anchor": "9",
+            "level": "h1",
+            "sections": []
+        }
+    ],
+    "statistics": {
+        "total_chapters": 9,
+        "total_sections": 31
+    }
+}

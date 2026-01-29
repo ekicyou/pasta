@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lua 5.5 - Section 6.2</title>
+</head>
+<body>
+<h2>6.2 – <a name="6.2">コルーチン操作</a></h2>
+
+<p>このライブラリは、<a name="pdf-coroutine"><code>coroutine</code></a> テーブルに含まれるコルーチンを操作する操作で構成されています。コルーチンの概要については、<a href="#2.6">§2.6</a> を参照してください。</p><p>
+</p><hr /><h3><a name="pdf-coroutine.close"><code>coroutine.close (co)</code></a></h3>
+
+
+<p>コルーチン <code>co</code> を閉じます。つまり、保留中のクローズ対象のすべての変数を閉じ、コルーチンをデッド状態にします。指定されたコルーチンは、デッド状態または中断状態である必要があります。エラーが発生した場合（コルーチンを停止させた元のエラー、またはクローズメソッドでのエラー）、<b>false</b> とエラーオブジェクトを返します。それ以外の場合は、<b>true</b> を返します。</p><p>
+</p><hr /><h3><a name="pdf-coroutine.create"><code>coroutine.create (f)</code></a></h3>
+
+
+<p>本体が <code>f</code> の新しいコルーチンを作成します。<code>f</code> は関数である必要があります。この新しいコルーチンを、タイプが <code>"thread"</code> のオブジェクトとして返します。</p><p>
+</p><hr /><h3><a name="pdf-coroutine.isyieldable"><code>coroutine.isyieldable ([co])</code></a></h3>
+
+
+<p>コルーチン <code>co</code> が yield できる場合は <b>true</b> を返します。<code>co</code> のデフォルトは、実行中のコルーチンです。</p><p>コルーチンは、メインスレッドではなく、yield 不可能な C&nbsp;関数内にない場合に yield 可能です。</p><p>
+</p><hr /><h3><a name="pdf-coroutine.resume"><code>coroutine.resume (co [, val1, ···])</code></a></h3>
+
+
+<p>コルーチン <code>co</code> の実行を開始または再開します。コルーチンを最初に再開すると、その本体の実行が開始されます。値 <code>val1</code>, ... は、本体関数の引数として渡されます。コルーチンが yield している場合、<code>resume</code> はそれを再起動します。値 <code>val1</code>, ... は、yield からの結果として渡されます。</p><p>コルーチンがエラーなく実行された場合、<code>resume</code> は <b>true</b> に加えて、<code>yield</code> に渡された任意の値（コルーチンが yield する場合）、または本体関数によって返された任意の値（コルーチンが終了する場合）を返します。エラーが発生した場合、<code>resume</code> は <b>false</b> とエラーメッセージを返します。</p><p>
+</p><hr /><h3><a name="pdf-coroutine.running"><code>coroutine.running ()</code></a></h3>
+
+
+<p>実行中のコルーチンとブール値を返します。実行中のコルーチンがメインのものである場合は <b>true</b> を返します。</p><p>
+</p><hr /><h3><a name="pdf-coroutine.status"><code>coroutine.status (co)</code></a></h3>
+
+
+<p>コルーチン <code>co</code> のステータスを文字列として返します。コルーチンが実行中の場合（つまり、<code>status</code> を呼び出したもの）、<code>"running"</code>。コルーチンが <code>yield</code> の呼び出しで中断されている場合、またはまだ実行を開始していない場合は、<code>"suspended"</code>。コルーチンがアクティブだが実行されていない場合（つまり、別のコルーチンを再開している場合）、<code>"normal"</code>。コルーチンが本体関数を終了した場合、またはエラーで停止した場合は、<code>"dead"</code>。</p><p>
+</p><hr /><h3><a name="pdf-coroutine.wrap"><code>coroutine.wrap (f)</code></a></h3>
+
+
+<p>本体が <code>f</code> の新しいコルーチンを作成します。<code>f</code> は関数である必要があります。呼び出されるたびにコルーチンを再開する関数を返します。この関数に渡された引数は、<code>resume</code> への追加引数として扱われます。この関数は、最初のブール値を除いて、<code>resume</code> によって返されるのと同じ値を返します。エラーが発生した場合、関数はコルーチンを閉じ、エラーを伝播します。</p><p>
+</p><hr /><h3><a name="pdf-coroutine.yield"><code>coroutine.yield (···)</code></a></h3>
+
+
+<p>呼び出し元のコルーチンの実行を中断します。<code>yield</code> への引数は、<code>resume</code> への追加の結果として渡されます。</p>
+</body>
+</html>

@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lua 5.5 - Section 6.10</title>
+</head>
+<body>
+<h2>6.10 &ndash; <a name="6.10">Operating System Facilities</a></h2>
+
+<p>
+This library is implemented through table <a name="pdf-os"><code>os</code></a>.
+
+
+<p>
+<hr><h3><a name="pdf-os.clock"><code>os.clock ()</code></a></h3>
+
+
+<p>
+Returns an approximation of the amount in seconds of CPU time
+used by the program,
+as returned by the underlying ISO&nbsp;C function <code>clock</code>.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-os.date"><code>os.date ([format [, time]])</code></a></h3>
+
+
+<p>
+Returns a string or a table containing date and time,
+formatted according to the given string <code>format</code>.
+
+
+<p>
+If the <code>time</code> argument is present,
+this is the time to be formatted
+(see the <a href="#pdf-os.time"><code>os.time</code></a> function for a description of this value).
+Otherwise, <code>date</code> formats the current time.
+
+
+<p>
+If <code>format</code> starts with '<code>!</code>',
+then the date is formatted in Coordinated Universal Time.
+After this optional character,
+if <code>format</code> is the string "<code>*t</code>",
+then <code>date</code> returns a table with the following fields:
+<code>year</code>, <code>month</code> (1&ndash;12), <code>day</code> (1&ndash;31),
+<code>hour</code> (0&ndash;23), <code>min</code> (0&ndash;59),
+<code>sec</code> (0&ndash;61, due to leap seconds),
+<code>wday</code> (weekday, 1&ndash;7, Sunday is&nbsp;1),
+<code>yday</code> (day of the year, 1&ndash;366),
+and <code>isdst</code> (daylight saving flag, a boolean).
+This last field may be absent
+if the information is not available.
+
+
+<p>
+If <code>format</code> is not "<code>*t</code>",
+then <code>date</code> returns the date as a string,
+formatted according to the same rules as the ISO&nbsp;C function <code>strftime</code>.
+
+
+<p>
+If <code>format</code> is absent, it defaults to "<code>%c</code>",
+which gives a human-readable date and time representation
+using the current locale.
+
+
+<p>
+On non-POSIX systems,
+this function may be not thread safe
+because of its reliance on C&nbsp;function <code>gmtime</code> and C&nbsp;function <code>localtime</code>.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-os.difftime"><code>os.difftime (t2, t1)</code></a></h3>
+
+
+<p>
+Returns the difference, in seconds,
+from time <code>t1</code> to time <code>t2</code>
+(where the times are values returned by <a href="#pdf-os.time"><code>os.time</code></a>).
+In POSIX, Windows, and some other systems,
+this value is exactly <code>t2</code><em>-</em><code>t1</code>.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-os.execute"><code>os.execute ([command])</code></a></h3>
+
+
+<p>
+This function is equivalent to the ISO&nbsp;C function <code>system</code>.
+It passes <code>command</code> to be executed by an operating system shell.
+Its first result is <b>true</b>
+if the command terminated successfully,
+or <b>fail</b> otherwise.
+After this first result
+the function returns a string plus a number,
+as follows:
+
+<ul>
+
+<li><b>"<code>exit</code>"</b>: 
+the command terminated normally;
+the following number is the exit status of the command.
+</li>
+
+<li><b>"<code>signal</code>"</b>: 
+the command was terminated by a signal;
+the following number is the signal that terminated the command.
+</li>
+
+</ul>
+
+<p>
+When called without a <code>command</code>,
+<code>os.execute</code> returns a boolean that is true if a shell is available.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-os.exit"><code>os.exit ([code [, close]])</code></a></h3>
+
+
+<p>
+Calls the ISO&nbsp;C function <code>exit</code> to terminate the host program.
+If <code>code</code> is <b>true</b>,
+the returned status is <code>EXIT_SUCCESS</code>;
+if <code>code</code> is <b>false</b>,
+the returned status is <code>EXIT_FAILURE</code>;
+if <code>code</code> is a number,
+the returned status is this number.
+The default value for <code>code</code> is <b>true</b>.
+
+
+<p>
+If the optional second argument <code>close</code> is true,
+the function closes the Lua state before exiting (see <a href="#lua_close"><code>lua_close</code></a>).
+
+
+
+
+<p>
+<hr><h3><a name="pdf-os.getenv"><code>os.getenv (varname)</code></a></h3>
+
+
+<p>
+Returns the value of the process environment variable <code>varname</code>
+or <b>fail</b> if the variable is not defined.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-os.remove"><code>os.remove (filename)</code></a></h3>
+
+
+<p>
+Deletes the file (or empty directory, on POSIX systems)
+with the given name.
+If this function fails, it returns <b>fail</b>
+plus a string describing the error and the error code.
+Otherwise, it returns true.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-os.rename"><code>os.rename (oldname, newname)</code></a></h3>
+
+
+<p>
+Renames the file or directory named <code>oldname</code> to <code>newname</code>.
+If this function fails, it returns <b>fail</b>,
+plus a string describing the error and the error code.
+Otherwise, it returns true.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-os.setlocale"><code>os.setlocale (locale [, category])</code></a></h3>
+
+
+<p>
+Sets the current locale of the program.
+<code>locale</code> is a system-dependent string specifying a locale;
+<code>category</code> is an optional string describing which category to change:
+<code>"all"</code>, <code>"collate"</code>, <code>"ctype"</code>,
+<code>"monetary"</code>, <code>"numeric"</code>, or <code>"time"</code>;
+the default category is <code>"all"</code>.
+The function returns the name of the new locale,
+or <b>fail</b> if the request cannot be honored.
+
+
+<p>
+If <code>locale</code> is the empty string,
+the current locale is set to an implementation-defined native locale.
+If <code>locale</code> is the string "<code>C</code>",
+the current locale is set to the standard C locale.
+
+
+<p>
+When called with <b>nil</b> as the first argument,
+this function only returns the name of the current locale
+for the given category.
+
+
+<p>
+This function may be not thread safe
+because of its reliance on C&nbsp;function <code>setlocale</code>.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-os.time"><code>os.time ([table])</code></a></h3>
+
+
+<p>
+Returns the current local time when called without arguments,
+or a time representing the local date and time specified by the given table.
+This table must have fields <code>year</code>, <code>month</code>, and <code>day</code>,
+and may have fields
+<code>hour</code> (default is 12),
+<code>min</code> (default is 0),
+<code>sec</code> (default is 0),
+and <code>isdst</code> (default is <b>nil</b>).
+Other fields are ignored.
+For a description of these fields, see the <a href="#pdf-os.date"><code>os.date</code></a> function.
+
+
+<p>
+When the function is called,
+the values in these fields do not need to be inside their valid ranges.
+For instance, if <code>sec</code> is -10,
+it means 10 seconds before the time specified by the other fields;
+if <code>hour</code> is 1000,
+it means 1000 hours after the time specified by the other fields.
+
+
+<p>
+The returned value is a number, whose meaning depends on your system.
+In POSIX, Windows, and some other systems,
+this number counts the number
+of seconds since some given start time (the "epoch").
+In other systems, the meaning is not specified,
+and the number returned by <code>time</code> can be used only as an argument to
+<a href="#pdf-os.date"><code>os.date</code></a> and <a href="#pdf-os.difftime"><code>os.difftime</code></a>.
+
+
+<p>
+When called with a table,
+<code>os.time</code> also normalizes all the fields
+documented in the <a href="#pdf-os.date"><code>os.date</code></a> function,
+so that they represent the same time as before the call
+but with values inside their valid ranges.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-os.tmpname"><code>os.tmpname ()</code></a></h3>
+
+
+<p>
+Returns a string with a file name that can
+be used for a temporary file.
+The file must be explicitly opened before its use
+and explicitly removed when no longer needed.
+
+
+<p>
+In POSIX systems,
+this function also creates a file with that name,
+to avoid security risks.
+(Someone else might create the file with wrong permissions
+in the time between getting the name and creating the file.)
+You still have to open the file to use it
+and to remove it (even if you do not use it).
+
+
+<p>
+When possible,
+you may prefer to use <a href="#pdf-io.tmpfile"><code>io.tmpfile</code></a>,
+which automatically removes the file when the program ends.
+
+
+
+
+
+
+
+
+</body>
+</html>

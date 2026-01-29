@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lua 5.5 - Section 6.7</title>
+</head>
+<body>
+<h2>6.7 – <a name="6.7">数学関数</a></h2>
+
+<p>このライブラリは、基本的な数学関数を提供します。このライブラリは、すべての関数と定数を <a name="pdf-math"><code>math</code></a> テーブル内に提供します。「<code>integer/float</code>」の注釈が付いた関数は、整数引数に対しては整数結果を、非整数引数に対しては浮動小数点結果を返します。丸め関数 <a href="#pdf-math.ceil"><code>math.ceil</code></a>、<a href="#pdf-math.floor"><code>math.floor</code></a>、および <a href="#pdf-math.modf"><code>math.modf</code></a> は、結果が整数の範囲に収まる場合は整数を、それ以外の場合は浮動小数点数を返します。</p><p>
+</p><hr /><h3><a name="pdf-math.abs"><code>math.abs (x)</code></a></h3>
+
+
+<p><code>x</code> と <code>-x</code> の間の最大値を返します。（整数/浮動小数点）</p><p>
+</p><hr /><h3><a name="pdf-math.acos"><code>math.acos (x)</code></a></h3>
+
+
+<p><code>x</code> の逆コサイン（ラジアン単位）を返します。</p><p>
+</p><hr /><h3><a name="pdf-math.asin"><code>math.asin (x)</code></a></h3>
+
+
+<p><code>x</code> の逆サイン（ラジアン単位）を返します。</p><p>
+</p><hr /><h3><a name="pdf-math.atan"><code>math.atan (y [, x])</code></a></h3>
+
+
+<p><code>y/x</code> の逆タンジェント（ラジアン単位）を、両方の引数の符号を使用して結果の象限を求めながら返します。<code>x</code> がゼロの場合も正しく処理します。</p><p><code>x</code> のデフォルト値は 1 であるため、<code>math.atan(y)</code> を呼び出すと <code>y</code> の逆タンジェントが返されます。</p><p>
+</p><hr /><h3><a name="pdf-math.ceil"><code>math.ceil (x)</code></a></h3>
+
+
+<p><code>x</code> 以上の最小の整数値を返します。</p><p>
+</p><hr /><h3><a name="pdf-math.cos"><code>math.cos (x)</code></a></h3>
+
+
+<p><code>x</code> のコサイン（ラジアン単位であると仮定）を返します。</p><p>
+</p><hr /><h3><a name="pdf-math.deg"><code>math.deg (x)</code></a></h3>
+
+
+<p>角度 <code>x</code> をラジアンから度に変換します。</p><p>
+</p><hr /><h3><a name="pdf-math.exp"><code>math.exp (x)</code></a></h3>
+
+
+<p>値 <em>e<sup>x</sup></em> を返します（ここで、<code>e</code> は自然対数の底です）。</p><p>
+</p><hr /><h3><a name="pdf-math.floor"><code>math.floor (x)</code></a></h3>
+
+
+<p><code>x</code> 以下の最大の整数値を返します。</p><p>
+</p><hr /><h3><a name="pdf-math.fmod"><code>math.fmod (x, y)</code></a></h3>
+
+
+<p>商をゼロに向かって丸める、<code>x</code> を <code>y</code> で割った余りを返します。（整数/浮動小数点）</p><p>
+</p><hr /><h3><a name="pdf-math.huge"><code>math.huge</code></a></h3>
+
+
+<p>浮動小数点値 <code>HUGE_VAL</code>。他の任意の数値よりも大きい値です。</p><p>
+</p><hr /><h3><a name="pdf-math.log"><code>math.log (x [, base])</code></a></h3>
+
+
+<p>指定された底での <code>x</code> の対数を返します。<code>base</code> のデフォルトは <em>e</em> です（したがって、関数は <code>x</code> の自然対数を返します）。</p><p>
+</p><hr /><h3><a name="pdf-math.max"><code>math.max (x, ···)</code></a></h3>
+
+
+<p>Lua 演算子 <code>&lt;</code> に従って、最大値を持つ引数を返します。</p><p>
+</p><hr /><h3><a name="pdf-math.maxinteger"><code>math.maxinteger</code></a></h3>整数の最大値を持つ整数。<p>
+</p><hr /><h3><a name="pdf-math.min"><code>math.min (x, ···)</code></a></h3>
+
+
+<p>Luaの演算子<code>&lt;</code>に従って、最小値を持つ引数を返します。</p><p>
+</p><hr /><h3><a name="pdf-math.mininteger"><code>math.mininteger</code></a></h3>整数の最小値を表す整数。<p>
+</p><hr /><h3><a name="pdf-math.modf"><code>math.modf (x)</code></a></h3>
+
+
+<p><code>x</code>の整数部分と小数部分を返します。2番目の結果は常に浮動小数点数です。</p><p>
+</p><hr /><h3><a name="pdf-math.pi"><code>math.pi</code></a></h3>
+
+
+<p><em>π</em>の値。</p><p>
+</p><hr /><h3><a name="pdf-math.rad"><code>math.rad (x)</code></a></h3>
+
+
+<p>角度<code>x</code>を度からラジアンに変換します。</p><p>
+</p><hr /><h3><a name="pdf-math.random"><code>math.random ([m [, n]])</code></a></h3>
+
+
+<p>引数なしで呼び出された場合、範囲<em>[0,1)</em>で一様分布する擬似乱数浮動小数点数を返します。2つの整数<code>m</code>と<code>n</code>で呼び出された場合、<code>math.random</code>は範囲<em>[m, n]</em>で一様分布する擬似乱数整数を返します。正の<code>n</code>に対する呼び出し<code>math.random(n)</code>は、<code>math.random(1,n)</code>と同等です。呼び出し<code>math.random(0)</code>は、すべてのビットが（擬似）ランダムな整数を生成します。</p><p>この関数は、擬似乱数64ビット整数を生成するために<code>xoshiro256**</code>アルゴリズムを使用します。これらは、引数0で呼び出した結果です。他の結果（範囲と浮動小数点数）は、これらの整数から偏りなく抽出されます。</p><p>Luaは、<a href="#pdf-math.randomseed"><code>math.randomseed</code></a>を引数なしで呼び出した場合と同様の方法で擬似乱数ジェネレーターを初期化するため、<code>math.random</code>はプログラムが実行されるたびに異なる結果のシーケンスを生成する必要があります。</p><p>
+</p><hr /><h3><a name="pdf-math.randomseed"><code>math.randomseed ([x [, y]])</code></a></h3>
+
+
+<p>少なくとも1つの引数で呼び出された場合、整数パラメータ<code>x</code>と<code>y</code>は、擬似乱数ジェネレーターを再初期化するために使用される128ビットの<em>シード</em>に結合されます。等しいシードは、等しい数のシーケンスを生成します。<code>y</code>のデフォルトはゼロです。</p><p>引数なしで呼び出された場合、Luaはランダム化を弱く試みたシードを生成します。</p><p>この関数は、実際に使用された2つのシードコンポーネントを返すため、それらを再度設定するとシーケンスが繰り返されます。</p><p>初期状態に必要なレベルのランダム性を確保するため（または逆に、たとえばプログラムのデバッグ時に決定的なシーケンスを持たせるため）、明示的な引数を使用して<a href="#pdf-math.randomseed"><code>math.randomseed</code></a>を呼び出す必要があります。</p><p>
+</p><hr /><h3><a name="pdf-math.sin"><code>math.sin (x)</code></a></h3>
+
+
+<p><code>x</code>のサイン（ラジアン単位とみなされます）を返します。</p><p>
+</p><hr /><h3><a name="pdf-math.sqrt"><code>math.sqrt (x)</code></a></h3>
+
+
+<p><code>x</code>の平方根を返します。（この値を計算するには、式<code>x^0.5</code>を使用することもできます。）</p><p>
+</p><hr /><h3><a name="pdf-math.tan"><code>math.tan (x)</code></a></h3>
+
+
+<p><code>x</code>のタンジェント（ラジアン単位とみなされます）を返します。</p><p>
+</p><hr /><h3><a name="pdf-math.tointeger"><code>math.tointeger (x)</code></a></h3>
+
+
+<p>値<code>x</code>が整数に変換可能な場合、その整数を返します。それ以外の場合は、<b>fail</b>を返します。</p><p>
+</p><hr /><h3><a name="pdf-math.type"><code>math.type (x)</code></a></h3>
+
+
+<p><code>x</code>が整数の場合は "<code>integer</code>"、浮動小数点数の場合は "<code>float</code>"、<code>x</code>が数値でない場合は<b>fail</b>を返します。</p><p>
+</p><hr /><h3><a name="pdf-math.ult"><code>math.ult (m, n)</code></a></h3>
+
+
+<p>整数<code>m</code>が符号なし整数として比較されたときに整数<code>n</code>より小さい場合に限り、ブール値<b>true</b>を返します。</p>
+</body>
+</html>

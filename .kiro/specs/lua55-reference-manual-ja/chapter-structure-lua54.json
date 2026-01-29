@@ -1,0 +1,282 @@
+{
+    "version": "5.4",
+    "source": "reference-lua54-ja.html",
+    "extracted_at": "2026-01-29T16:30:00Z",
+    "chapters": [
+        {
+            "number": "1",
+            "title": "はじめに",
+            "title_en": "Introduction",
+            "anchor": "1",
+            "level": "h1",
+            "sections": []
+        },
+        {
+            "number": "2",
+            "title": "基本概念",
+            "title_en": "Basic Concepts",
+            "anchor": "2",
+            "level": "h1",
+            "sections": [
+                {
+                    "number": "2.1",
+                    "title": "値と型",
+                    "title_en": "Values and Types",
+                    "anchor": "2.1"
+                },
+                {
+                    "number": "2.2",
+                    "title": "環境とグローバル環境",
+                    "title_en": "Environments and the Global Environment",
+                    "anchor": "2.2"
+                },
+                {
+                    "number": "2.3",
+                    "title": "エラー処理",
+                    "title_en": "Error Handling",
+                    "anchor": "2.3"
+                },
+                {
+                    "number": "2.4",
+                    "title": "メタテーブルとメタメソッド",
+                    "title_en": "Metatables and Metamethods",
+                    "anchor": "2.4"
+                },
+                {
+                    "number": "2.5",
+                    "title": "ガベージコレクション",
+                    "title_en": "Garbage Collection",
+                    "anchor": "2.5"
+                },
+                {
+                    "number": "2.6",
+                    "title": "コルーチン",
+                    "title_en": "Coroutines",
+                    "anchor": "2.6"
+                }
+            ]
+        },
+        {
+            "number": "3",
+            "title": "言語",
+            "title_en": "The Language",
+            "anchor": "3",
+            "level": "h1",
+            "sections": [
+                {
+                    "number": "3.1",
+                    "title": "字句規則",
+                    "title_en": "Lexical Conventions",
+                    "anchor": "3.1"
+                },
+                {
+                    "number": "3.2",
+                    "title": "変数",
+                    "title_en": "Variables",
+                    "anchor": "3.2"
+                },
+                {
+                    "number": "3.3",
+                    "title": "ステートメント",
+                    "title_en": "Statements",
+                    "anchor": "3.3"
+                },
+                {
+                    "number": "3.4",
+                    "title": "式",
+                    "title_en": "Expressions",
+                    "anchor": "3.4"
+                },
+                {
+                    "number": "3.5",
+                    "title": "可視性ルール",
+                    "title_en": "Visibility Rules",
+                    "anchor": "3.5"
+                }
+            ]
+        },
+        {
+            "number": "4",
+            "title": "アプリケーションプログラミングインターフェイス",
+            "title_en": "The Application Program Interface",
+            "anchor": "4",
+            "level": "h1",
+            "sections": [
+                {
+                    "number": "4.1",
+                    "title": "スタック",
+                    "title_en": "The Stack",
+                    "anchor": "4.1"
+                },
+                {
+                    "number": "4.2",
+                    "title": "Cクロージャ",
+                    "title_en": "C Closures",
+                    "anchor": "4.2"
+                },
+                {
+                    "number": "4.3",
+                    "title": "レジストリ",
+                    "title_en": "Registry",
+                    "anchor": "4.3"
+                },
+                {
+                    "number": "4.4",
+                    "title": "Cでのエラー処理",
+                    "title_en": "Error Handling in C",
+                    "anchor": "4.4"
+                },
+                {
+                    "number": "4.5",
+                    "title": "Cでの中断の処理",
+                    "title_en": "Handling Yields in C",
+                    "anchor": "4.5"
+                },
+                {
+                    "number": "4.6",
+                    "title": "関数と型",
+                    "title_en": "Functions and Types",
+                    "anchor": "4.6"
+                },
+                {
+                    "number": "4.7",
+                    "title": "デバッグインターフェース",
+                    "title_en": "The Debug Interface",
+                    "anchor": "4.7"
+                }
+            ]
+        },
+        {
+            "number": "5",
+            "title": "補助ライブラリ",
+            "title_en": "The Auxiliary Library",
+            "anchor": "5",
+            "level": "h1",
+            "sections": [
+                {
+                    "number": "5.1",
+                    "title": "関数と型",
+                    "title_en": "Functions and Types",
+                    "anchor": "5.1"
+                }
+            ]
+        },
+        {
+            "number": "6",
+            "title": "標準ライブラリ",
+            "title_en": "The Standard Libraries",
+            "anchor": "6",
+            "level": "h1",
+            "sections": [
+                {
+                    "number": "6.1",
+                    "title": "基本関数",
+                    "title_en": "Basic Functions",
+                    "anchor": "6.1"
+                },
+                {
+                    "number": "6.2",
+                    "title": "コルーチン操作",
+                    "title_en": "Coroutine Manipulation",
+                    "anchor": "6.2"
+                },
+                {
+                    "number": "6.3",
+                    "title": "モジュール",
+                    "title_en": "Modules",
+                    "anchor": "6.3"
+                },
+                {
+                    "number": "6.4",
+                    "title": "文字列操作",
+                    "title_en": "String Manipulation",
+                    "anchor": "6.4"
+                },
+                {
+                    "number": "6.5",
+                    "title": "UTF-8 サポート",
+                    "title_en": "UTF-8 Support",
+                    "anchor": "6.5"
+                },
+                {
+                    "number": "6.6",
+                    "title": "テーブル操作",
+                    "title_en": "Table Manipulation",
+                    "anchor": "6.6"
+                },
+                {
+                    "number": "6.7",
+                    "title": "数学関数",
+                    "title_en": "Mathematical Functions",
+                    "anchor": "6.7"
+                },
+                {
+                    "number": "6.8",
+                    "title": "入出力機能",
+                    "title_en": "Input and Output Facilities",
+                    "anchor": "6.8"
+                },
+                {
+                    "number": "6.9",
+                    "title": "オペレーティングシステム機能",
+                    "title_en": "Operating System Facilities",
+                    "anchor": "6.9"
+                },
+                {
+                    "number": "6.10",
+                    "title": "デバッグライブラリ",
+                    "title_en": "The Debug Library",
+                    "anchor": "6.10"
+                }
+            ]
+        },
+        {
+            "number": "7",
+            "title": "Luaスタンドアロン",
+            "title_en": "Lua Standalone",
+            "anchor": "7",
+            "level": "h1",
+            "sections": []
+        },
+        {
+            "number": "8",
+            "title": "以前のバージョンとの非互換性",
+            "title_en": "Incompatibilities with the Previous Version",
+            "anchor": "8",
+            "level": "h1",
+            "sections": [
+                {
+                    "number": "8.1",
+                    "title": "言語の非互換性",
+                    "title_en": "Incompatibilities in the Language",
+                    "anchor": "8.1"
+                },
+                {
+                    "number": "8.2",
+                    "title": "ライブラリの非互換性",
+                    "title_en": "Incompatibilities in the Libraries",
+                    "anchor": "8.2"
+                },
+                {
+                    "number": "8.3",
+                    "title": "APIの非互換性",
+                    "title_en": "Incompatibilities in the API",
+                    "anchor": "8.3"
+                }
+            ]
+        },
+        {
+            "number": "9",
+            "title": "Luaの完全な構文",
+            "title_en": "The Complete Syntax of Lua",
+            "anchor": "9",
+            "level": "h1",
+            "sections": []
+        }
+    ],
+    "statistics": {
+        "total_chapters": 9,
+        "total_sections": 32
+    },
+    "note": "Lua 5.4では6章の節番号が5.5と異なる（5.5には6.1 Loading the Libraries in C codeが追加されている）"
+}

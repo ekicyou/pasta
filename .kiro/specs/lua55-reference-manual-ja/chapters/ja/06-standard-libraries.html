@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lua 5.5 Reference Manual - Chapter 06</title>
+</head>
+<body>
+<h1>6 – <a name="6">標準ライブラリ</a></h1>
+
+
+
+<p>標準Luaライブラリは、C&nbsp;APIを介してCで実装された便利な関数を提供します。これらの関数の中には、言語に不可欠なサービスを提供するもの（例：<a href="#pdf-type"><code>type</code></a>と<a href="#pdf-getmetatable"><code>getmetatable</code></a>）があります。その他は、外部サービス（例：I/O）へのアクセスを提供します。また、Lua自体で実装できるものもありますが、さまざまな理由でCでの実装に値するものもあります（例：<a href="#pdf-table.sort"><code>table.sort</code></a>）。</p><p>すべてのライブラリは公式のC&nbsp;APIを介して実装され、個別のC&nbsp;モジュールとして提供されます。特に断りのない限り、これらのライブラリ関数は、その引数の数を予期されるパラメータに調整しません。たとえば、<code>foo(arg)</code>としてドキュメント化された関数は、引数なしで呼び出すべきではありません。</p><p><b>fail</b>という表記は、何らかの失敗を表すfalse値を意味します。（現在、<b>fail</b>は<b>nil</b>と等しいですが、将来のバージョンでは変更される可能性があります。推奨されるのは、<code>(status == nil)</code>の代わりに、常に<code>(not status)</code>でこれらの関数の成功をテストすることです。）</p><p>現在、Luaには次の標準ライブラリがあります。</p><ul>
+
+<li>基本ライブラリ（<a href="#6.1">§6.1</a>）;</li>
+
+<li>コルーチンライブラリ（<a href="#6.2">§6.2</a>）;</li>
+
+<li>パッケージライブラリ（<a href="#6.3">§6.3</a>）;</li>
+
+<li>文字列操作（<a href="#6.4">§6.4</a>）;</li>
+
+<li>基本的なUTF-8サポート（<a href="#6.5">§6.5</a>）;</li>
+
+<li>テーブル操作（<a href="#6.6">§6.6</a>）;</li>
+
+<li>数学関数（<a href="#6.7">§6.7</a>）（sin、logなど）;</li>
+
+<li>入出力（<a href="#6.8">§6.8</a>）;</li>
+
+<li>オペレーティングシステム機能（<a href="#6.9">§6.9</a>）;</li>
+
+<li>デバッグ機能（<a href="#6.10">§6.10</a>）。</li>
+
+</ul><p>基本ライブラリとパッケージライブラリを除いて、各ライブラリは、そのすべての関数をグローバルテーブルのフィールドとして、またはそのオブジェクトのメソッドとして提供します。</p><p>これらのライブラリにアクセスするには、C&nbsp;ホストプログラムは、すべての標準ライブラリを開く<a href="#luaL_openlibs"><code>luaL_openlibs</code></a>関数を呼び出す必要があります。または、ホストプログラムは、<a name="pdf-luaopen_base"><code>luaopen_base</code></a>（基本ライブラリの場合）、<a name="pdf-luaopen_package"><code>luaopen_package</code></a>（パッケージライブラリの場合）、<a name="pdf-luaopen_coroutine"><code>luaopen_coroutine</code></a>（コルーチンライブラリの場合）、<a name="pdf-luaopen_string"><code>luaopen_string</code></a>（文字列ライブラリの場合）、<a name="pdf-luaopen_utf8"><code>luaopen_utf8</code></a>（UTF-8ライブラリの場合）、<a name="pdf-luaopen_table"><code>luaopen_table</code></a>（テーブルライブラリの場合）、<a name="pdf-luaopen_math"><code>luaopen_math</code></a>（数学ライブラリの場合）、<a name="pdf-luaopen_io"><code>luaopen_io</code></a>（I/Oライブラリの場合）、<a name="pdf-luaopen_os"><code>luaopen_os</code></a>（オペレーティングシステムライブラリの場合）、および<a name="pdf-luaopen_debug"><code>luaopen_debug</code></a>（デバッグライブラリの場合）を呼び出すために、<a href="#luaL_requiref"><code>luaL_requiref</code></a>を使用して個別に開くことができます。これらの関数は<a name="pdf-lualib.h"><code>lualib.h</code></a>で宣言されています。</p><h2>6.1 – <a name="6.1">基本関数</a></h2>
+
+<p>基本ライブラリは、Luaへのコア関数を提供します。このライブラリをアプリケーションに含めない場合は、その機能の一部に実装を提供する必要があるかどうかを注意深く確認する必要があります。</p><p>
+</p><hr /><h3><a name="pdf-assert"><code>assert (v [, message])</code></a></h3>
+
+
+<p>引数<code>v</code>の値がfalse（つまり、<b>nil</b>または<b>false</b>）の場合、エラーを発生させます。それ以外の場合は、すべての引数を返します。エラーの場合、<code>message</code>はエラーオブジェクトです。存在しない場合は、デフォルトで"<code>assertion failed!</code>"になります。</p><p>
+</p><hr /><h3><a name="pdf-collectgarbage"><code>collectgarbage ([opt [, arg]])</code></a></h3>
+
+
+<p>この関数は、ガベージコレクタへの汎用インターフェイスです。最初の引数<code>opt</code>に従ってさまざまな関数を実行します。</p><ul>
+
+<li><b>"<code>collect</code>": </b>完全なガベージコレクションサイクルを実行します。これはデフォルトのオプションです。</li>
+
+<li><b>"<code>stop</code>": </b>ガベージコレクタの自動実行を停止します。コレクタは、明示的に呼び出された場合にのみ、再起動するまでの間実行されます。</li>
+
+<li><b>"<code>restart</code>": </b>ガベージコレクタの自動実行を再開します。</li>
+
+<li><b>"<code>count</code>": </b>Luaで使用されている総メモリをKbytes単位で返します。この値には小数部があり、1024を掛けると、Luaで使用されている正確なバイト数が得られます。</li>
+
+<li><b>"<code>step</code>": </b>ガベージコレクションステップを実行します。ステップの「サイズ」は<code>arg</code>によって制御されます。ゼロ値の場合、コレクタは1つの基本的な（不可分な）ステップを実行します。ゼロ以外の値の場合、コレクタはLuaによってその量のメモリ（Kbytes単位）が割り当てられたかのように実行します。ステップがコレクションサイクルを終了した場合は<b>true</b>を返します。</li>
+
+<li><b>"<code>isrunning</code>": </b>コレクタが実行中（つまり、停止していない）かどうかを示すブール値を返します。</li>
+
+<li><b>"<code>incremental</code>": </b> コレクタモードをインクリメンタルに変更します。このオプションの後には3つの数字が続きます。ガベージコレクタの一時停止時間、ステップ乗数、ステップサイズです（<a href="#2.5.1">§2.5.1</a>を参照）。0 はその値を変更しないことを意味します。</li>
+
+<li><b>"<code>generational</code>": </b> コレクタモードを世代別に変更します。このオプションの後には2つの数字が続きます。ガベージコレクタのマイナー乗数とメジャー乗数です（<a href="#2.5.2">§2.5.2</a>を参照）。0 はその値を変更しないことを意味します。</li>
+
+</ul><p>ガベージコレクションとこれらのオプションの詳細については、<a href="#2.5">§2.5</a>を参照してください。</p><p>この関数はファイナライザーによって呼び出されるべきではありません。</p><p>
+</p><hr /><h3><a name="pdf-dofile"><code>dofile ([filename])</code></a></h3>指定されたファイルを開き、その内容を Lua のチャンクとして実行します。引数なしで呼び出された場合、<code>dofile</code> は標準入力 (<code>stdin</code>) の内容を実行します。チャンクから返されるすべての値を返します。エラーが発生した場合、<code>dofile</code> はそのエラーを呼び出し元に伝播します（つまり、<code>dofile</code> は保護モードでは実行されません）。<p>
+</p><hr /><h3><a name="pdf-error"><code>error (message [, level])</code></a></h3><code>message</code> をエラーオブジェクトとしてエラーを発生させます（<a href="#2.3">§2.3</a>を参照）。この関数は決して返りません。<p>通常、<code>error</code> は、メッセージが文字列の場合、メッセージの先頭にエラー位置に関する情報を追加します。<code>level</code> 引数は、エラー位置を取得する方法を指定します。level&nbsp;1（デフォルト）では、エラー位置は <code>error</code> 関数が呼び出された場所です。Level&nbsp;2 は、<code>error</code> を呼び出した関数が呼び出された場所をエラーとして示します。以降同様です。level&nbsp;0 を渡すと、メッセージへのエラー位置情報の追加を回避できます。</p><p>
+</p><hr /><h3><a name="pdf-_G"><code>_G</code></a></h3>グローバル環境を保持するグローバル変数（関数ではありません）（<a href="#2.2">§2.2</a>を参照）。Lua 自体はこの変数を使用しません。その値を変更しても、どの環境にも影響しませんし、その逆も同様です。<p>
+</p><hr /><h3><a name="pdf-getmetatable"><code>getmetatable (object)</code></a></h3>
+
+
+<p><code>object</code> がメタテーブルを持っていない場合は、<b>nil</b> を返します。それ以外の場合で、オブジェクトのメタテーブルに <code>__metatable</code> フィールドがある場合は、関連付けられた値を返します。それ以外の場合は、指定されたオブジェクトのメタテーブルを返します。</p><p>
+</p><hr /><h3><a name="pdf-ipairs"><code>ipairs (t)</code></a></h3>
+
+
+<p>3つの値（イテレータ関数、テーブル <code>t</code>、および 0）を返すため、次の構造</p><pre>     for i,v in ipairs(t) do <em>body</em> end
+</pre><p>は、欠落した最初のインデックスまで、（<code>1,t[1]</code>）、（<code>2,t[2]</code>）などのキーと値のペアを反復処理します。</p><p>
+</p><hr /><h3><a name="pdf-load"><code>load (chunk [, chunkname [, mode [, env]]])</code></a></h3>
+
+
+<p>チャンクをロードします。</p><p><code>chunk</code> が文字列の場合、チャンクはこの文字列です。<code>chunk</code> が関数の場合、<code>load</code> はチャンクの断片を取得するために繰り返し呼び出します。<code>chunk</code> の各呼び出しは、以前の結果と連結する文字列を返す必要があります。空の文字列、<b>nil</b>、または値がない場合は、チャンクの終わりを示します。</p><p>構文エラーがない場合、<code>load</code> はコンパイルされたチャンクを関数として返します。それ以外の場合は、<b>fail</b> とエラーメッセージを返します。</p><p>メインチャンクをロードすると、結果の関数には常に1つのアップバリュー（<code>_ENV</code> 変数）があります（<a href="#2.2">§2.2</a>を参照）。ただし、関数から作成されたバイナリチャンクをロードした場合（<a href="#pdf-string.dump"><code>string.dump</code></a>を参照）、結果の関数は任意の数のアップバリューを持つ可能性があり、最初のアップバリューが <code>_ENV</code> 変数であるという保証はありません。（メインでない関数は <code>_ENV</code> アップバリューを持たない場合もあります。）</p><p>いずれの場合も、結果の関数にアップバリューがある場合、その最初のアップバリューは、パラメータが指定されている場合は <code>env</code> の値に設定され、それ以外の場合はグローバル環境の値に設定されます。その他のアップバリューは <b>nil</b> で初期化されます。すべてのアップバリューは新しく、他の関数とは共有されません。</p><p>
+<code>chunkname</code> は、エラーメッセージおよびデバッグ情報用のチャンクの名前として使用されます（<a href="#4.7">§4.7</a>を参照）。省略した場合、<code>chunk</code> が文字列の場合は <code>chunk</code>、それ以外の場合は "<code>=(load)</code>" がデフォルトになります。</p><p>文字列 <code>mode</code> は、チャンクがテキストまたはバイナリ（つまり、プリコンパイルされたチャンク）のどちらにできるかを制御します。文字列 "<code>b</code>"（バイナリチャンクのみ）、"<code>t</code>"（テキストチャンクのみ）、または "<code>bt</code>"（バイナリとテキストの両方）にすることができます。デフォルトは "<code>bt</code>" です。</p><p>不正な形式のバイナリチャンクをロードしても安全です。<code>load</code> は適切なエラーを示します。ただし、Lua はバイナリチャンク内のコードの一貫性をチェックしません。悪意を持って作成されたバイトコードを実行すると、インタプリタがクラッシュする可能性があります。</p><p>
+</p><hr /><h3><a name="pdf-loadfile"><code>loadfile ([filename [, mode [, env]]])</code></a></h3>
+
+
+<p><a href="#pdf-load"><code>load</code></a> と同様ですが、チャンクをファイル <code>filename</code> から、またはファイル名が指定されていない場合は標準入力から取得します。</p><p>
+</p><hr /><h3><a name="pdf-next"><code>next (table [, index])</code></a></h3>
+
+
+<p>プログラムがテーブルのすべてのフィールドを走査できるようにします。最初の引数はテーブルで、2番目の引数はこのテーブルのインデックスです。<code>next</code> を呼び出すと、テーブルの次のインデックスとその関連付けられた値が返されます。2番目の引数として <b>nil</b> を渡して呼び出すと、<code>next</code> は初期インデックスとその関連付けられた値を返します。最後のインデックス、または空のテーブルで <b>nil</b> を渡して呼び出すと、<code>next</code> は <b>nil</b> を返します。2番目の引数が省略された場合、<b>nil</b> として解釈されます。特に、<code>next(t)</code> を使用して、テーブルが空かどうかを確認できます。</p><p>インデックスが列挙される順序は、<em>数値インデックスであっても</em>指定されていません。（テーブルを数値順に走査するには、数値の <b>for</b> を使用します。）</p><p>走査中にテーブルの存在しないフィールドに値を代入しないでください。ただし、既存のフィールドは変更できます。特に、既存のフィールドを nil に設定できます。</p><p>
+</p><hr /><h3><a name="pdf-pairs"><code>pairs (t)</code></a></h3>
+
+
+<p><code>t</code> にメタメソッド <code>__pairs</code> がある場合、<code>t</code> を引数としてそれを呼び出し、呼び出しからの最初の 3 つの結果を返します。</p><p>それ以外の場合は、3 つの値を返します。 <a href="#pdf-next"><code>next</code></a> 関数、テーブル <code>t</code>、および <b>nil</b> を返すため、次の構造</p><pre>     for k,v in pairs(t) do <em>body</em> end
+</pre><p>は、テーブル <code>t</code> のすべてのキーと値のペアを反復処理します。</p><p>テーブルを走査中に変更する場合の注意点については、<a href="#pdf-next"><code>next</code></a> 関数を参照してください。</p><p>
+</p><hr /><h3><a name="pdf-pcall"><code>pcall (f [, arg1, ···])</code></a></h3>
+
+
+<p><em>保護モード</em>で、指定された引数を使用して関数 <code>f</code> を呼び出します。これは、<code>f</code> 内のエラーが伝播されないことを意味します。代わりに、<code>pcall</code> はエラーをキャッチし、ステータスコードを返します。最初の結果はステータスコード（ブール値）であり、呼び出しがエラーなしで成功した場合は <b>true</b> です。その場合、<code>pcall</code> はこの最初の結果の後、呼び出しからのすべての結果も返します。エラーが発生した場合、<code>pcall</code> は <b>false</b> とエラーオブジェクトを返します。<code>pcall</code> によってキャッチされたエラーは、メッセージハンドラーを呼び出さないことに注意してください。</p><p>
+</p><hr /><h3><a name="pdf-print"><code>print (···)</code></a></h3>任意の数の引数を受け取り、それらの値を <a href="#pdf-tostring"><code>tostring</code></a> と同じルールに従って各引数を文字列に変換し、<code>stdout</code> に出力します。<p><code>print</code> 関数は、フォーマットされた出力を目的としたものではなく、たとえばデバッグのために値をすばやく表示するためのものです。出力を完全に制御するには、<a href="#pdf-string.format"><code>string.format</code></a> と <a href="#pdf-io.write"><code>io.write</code></a> を使用してください。</p><p>
+</p><hr /><h3><a name="pdf-rawequal"><code>rawequal (v1, v2)</code></a></h3><code>__eq</code> メタメソッドを呼び出さずに、<code>v1</code> が <code>v2</code> と等しいかどうかを確認します。ブール値を返します。<p>
+</p><hr /><h3><a name="pdf-rawget"><code>rawget (table, index)</code></a></h3><code>__index</code> メタ値を使用せずに、<code>table[index]</code> の実際の値を取得します。<code>table</code> はテーブルである必要があります。<code>index</code> には任意の値を使用できます。<p>
+</p><hr /><h3><a name="pdf-rawlen"><code>rawlen (v)</code></a></h3><code>__len</code> メタメソッドを呼び出さずに、テーブルまたは文字列である必要があるオブジェクト <code>v</code> の長さを返します。整数を返します。<p>
+</p><hr /><h3><a name="pdf-rawset"><code>rawset (table, index, value)</code></a></h3><code>__newindex</code> メタ値を使用せずに、<code>table[index]</code> の実際の値を <code>value</code> に設定します。<code>table</code> はテーブルである必要があり、<code>index</code> は <b>nil</b> および NaN と異なる任意の値、<code>value</code> は任意の Lua 値である必要があります。<p>この関数は <code>table</code> を返します。</p><p>
+</p><hr /><h3><a name="pdf-select"><code>select (index, ···)</code></a></h3>
+
+
+<p><code>index</code> が数値の場合、引数番号 <code>index</code> 以降のすべての引数を返します。負の数は末尾からインデックス付けされます（-1 は最後の引数です）。それ以外の場合、<code>index</code> は文字列 <code>"#"</code> である必要があり、<code>select</code> は受信した余分な引数の合計数を返します。</p><p>
+</p><hr /><h3><a name="pdf-setmetatable"><code>setmetatable (table, metatable)</code></a></h3>
+
+
+<p>指定されたテーブルのメタテーブルを設定します。<code>metatable</code> が <b>nil</b> の場合、指定されたテーブルのメタテーブルを削除します。元のメタテーブルに <code>__metatable</code> フィールドがある場合は、エラーが発生します。</p><p>この関数は <code>table</code> を返します。</p><p>Lua コードから他の型のメタテーブルを変更するには、デバッグライブラリを使用する必要があります（<a href="#6.10">§6.10</a>）。</p><p>
+</p><hr /><h3><a name="pdf-tonumber"><code>tonumber (e [, base])</code></a></h3>
+
+
+<p><code>base</code> を指定せずに呼び出すと、<code>tonumber</code> は引数を数値に変換しようとします。引数がすでに数値であるか、数値に変換可能な文字列である場合、<code>tonumber</code> はこの数値を返します。それ以外の場合は、<b>fail</b> を返します。</p><p>文字列の変換は、Lua の字句規則に従って（<a href="#3.1">§3.1</a>を参照）、整数または浮動小数点数になる可能性があります。文字列には、先頭と末尾のスペースと符号を含めることができます。</p><p><code>base</code> を指定して呼び出すと、<code>e</code> はその基数で整数数値として解釈される文字列である必要があります。基数は、2〜36 の任意の整数にすることができます。10 を超える基数では、文字 '<code>A</code>'（大文字または小文字）は 10 を表し、'<code>B</code>' は 11 を表し、以下同様に '<code>Z</code>' は 35 を表します。文字列 <code>e</code> が指定された基数で有効な数値ではない場合、関数は <b>fail</b> を返します。</p><p>
+</p><hr /><h3><a name="pdf-tostring"><code>tostring (v)</code></a></h3>
+
+
+<p>任意の型の値を受け取り、人間が読める形式の文字列に変換します。</p><p><code>v</code> のメタテーブルに <code>__tostring</code> フィールドがある場合、<code>tostring</code> は <code>v</code> を引数として対応する値を呼び出し、その呼び出しの結果を結果として使用します。それ以外の場合、<code>v</code> のメタテーブルに文字列値を持つ <code>__name</code> フィールドがある場合、<code>tostring</code> はその文字列を最終結果で使用する可能性があります。</p><p>数値がどのように変換されるかを完全に制御するには、<a href="#pdf-string.format"><code>string.format</code></a> を使用してください。</p><p>
+</p><hr /><h3><a name="pdf-type"><code>type (v)</code></a></h3>
+
+
+<p>唯一の引数の型を、文字列としてエンコードして返します。この関数の可能な結果は、"<code>nil</code>"（値 <b>nil</b> ではなく文字列）、"<code>number</code>"、"<code>string</code>"、"<code>boolean</code>"、"<code>table</code>"、"<code>function</code>"、"<code>thread</code>"、および "<code>userdata</code>" です。</p><p>
+</p><hr /><h3><a name="pdf-_VERSION"><code>_VERSION</code></a></h3>
+
+
+<p>実行中の Lua バージョンを含む文字列を保持するグローバル変数（関数ではありません）。この変数の現在の値は "<code>Lua 5.4</code>" です。</p><p>
+</p><hr /><h3><a name="pdf-warn"><code>warn (msg1, ···)</code></a></h3>
+
+
+<p>すべての引数（文字列である必要があります）の連結で構成されるメッセージを含む警告を発行します。</p><p>慣例により、'<code>@</code>' で始まる 1 つのメッセージは、警告システム自体へのメッセージである<em>制御メッセージ</em>であることを意図しています。特に、Lua の標準警告関数は、警告の出力を停止する "<code>@off</code>" と、出力を（再）開始する "<code>@on</code>" という制御メッセージを認識します。不明な制御メッセージは無視されます。</p><p>
+</p><hr /><h3><a name="pdf-xpcall"><code>xpcall (f, msgh [, arg1, ···])</code></a></h3>
+
+
+<p>この関数は、新しいメッセージハンドラ <code>msgh</code> を設定することを除いて、<a href="#pdf-pcall"><code>pcall</code></a> と似ています。</p><h2>6.2 – <a name="6.2">コルーチン操作</a></h2>
+
+<p>このライブラリは、<a name="pdf-coroutine"><code>coroutine</code></a> テーブルに含まれるコルーチンを操作する操作で構成されています。コルーチンの概要については、<a href="#2.6">§2.6</a> を参照してください。</p><p>
+</p><hr /><h3><a name="pdf-coroutine.close"><code>coroutine.close (co)</code></a></h3>
+
+
+<p>コルーチン <code>co</code> を閉じます。つまり、保留中のクローズ対象のすべての変数を閉じ、コルーチンをデッド状態にします。指定されたコルーチンは、デッド状態または中断状態である必要があります。エラーが発生した場合（コルーチンを停止させた元のエラー、またはクローズメソッドでのエラー）、<b>false</b> とエラーオブジェクトを返します。それ以外の場合は、<b>true</b> を返します。</p><p>
+</p><hr /><h3><a name="pdf-coroutine.create"><code>coroutine.create (f)</code></a></h3>
+
+
+<p>本体が <code>f</code> の新しいコルーチンを作成します。<code>f</code> は関数である必要があります。この新しいコルーチンを、タイプが <code>"thread"</code> のオブジェクトとして返します。</p><p>
+</p><hr /><h3><a name="pdf-coroutine.isyieldable"><code>coroutine.isyieldable ([co])</code></a></h3>
+
+
+<p>コルーチン <code>co</code> が yield できる場合は <b>true</b> を返します。<code>co</code> のデフォルトは、実行中のコルーチンです。</p><p>コルーチンは、メインスレッドではなく、yield 不可能な C&nbsp;関数内にない場合に yield 可能です。</p><p>
+</p><hr /><h3><a name="pdf-coroutine.resume"><code>coroutine.resume (co [, val1, ···])</code></a></h3>
+
+
+<p>コルーチン <code>co</code> の実行を開始または再開します。コルーチンを最初に再開すると、その本体の実行が開始されます。値 <code>val1</code>, ... は、本体関数の引数として渡されます。コルーチンが yield している場合、<code>resume</code> はそれを再起動します。値 <code>val1</code>, ... は、yield からの結果として渡されます。</p><p>コルーチンがエラーなく実行された場合、<code>resume</code> は <b>true</b> に加えて、<code>yield</code> に渡された任意の値（コルーチンが yield する場合）、または本体関数によって返された任意の値（コルーチンが終了する場合）を返します。エラーが発生した場合、<code>resume</code> は <b>false</b> とエラーメッセージを返します。</p><p>
+</p><hr /><h3><a name="pdf-coroutine.running"><code>coroutine.running ()</code></a></h3>
+
+
+<p>実行中のコルーチンとブール値を返します。実行中のコルーチンがメインのものである場合は <b>true</b> を返します。</p><p>
+</p><hr /><h3><a name="pdf-coroutine.status"><code>coroutine.status (co)</code></a></h3>
+
+
+<p>コルーチン <code>co</code> のステータスを文字列として返します。コルーチンが実行中の場合（つまり、<code>status</code> を呼び出したもの）、<code>"running"</code>。コルーチンが <code>yield</code> の呼び出しで中断されている場合、またはまだ実行を開始していない場合は、<code>"suspended"</code>。コルーチンがアクティブだが実行されていない場合（つまり、別のコルーチンを再開している場合）、<code>"normal"</code>。コルーチンが本体関数を終了した場合、またはエラーで停止した場合は、<code>"dead"</code>。</p><p>
+</p><hr /><h3><a name="pdf-coroutine.wrap"><code>coroutine.wrap (f)</code></a></h3>
+
+
+<p>本体が <code>f</code> の新しいコルーチンを作成します。<code>f</code> は関数である必要があります。呼び出されるたびにコルーチンを再開する関数を返します。この関数に渡された引数は、<code>resume</code> への追加引数として扱われます。この関数は、最初のブール値を除いて、<code>resume</code> によって返されるのと同じ値を返します。エラーが発生した場合、関数はコルーチンを閉じ、エラーを伝播します。</p><p>
+</p><hr /><h3><a name="pdf-coroutine.yield"><code>coroutine.yield (···)</code></a></h3>
+
+
+<p>呼び出し元のコルーチンの実行を中断します。<code>yield</code> への引数は、<code>resume</code> への追加の結果として渡されます。</p><h2>6.3 – <a name="6.3">モジュール</a></h2>
+
+<p>package ライブラリは、Lua でモジュールをロードするための基本的な機能を提供します。グローバル環境に 1 つの関数 <a href="#pdf-require"><code>require</code></a> を直接エクスポートします。他のすべては、<a name="pdf-package"><code>package</code></a> テーブルにエクスポートされます。</p><p>
+</p><hr /><h3><a name="pdf-require"><code>require (modname)</code></a></h3>
+
+
+<p>指定されたモジュールをロードします。この関数は、<a href="#pdf-package.loaded"><code>package.loaded</code></a> テーブルを調べて、<code>modname</code> がすでにロードされているかどうかを判断することから開始します。ロードされている場合、<code>require</code> は <code>package.loaded[modname]</code> に格納されている値を返します。（この場合、2 番目の結果がないことは、この呼び出しがモジュールをロードする必要がなかったことを示します。）それ以外の場合は、モジュールの<em>ローダー</em>を検索しようとします。</p><p>ローダーを検索するために、<code>require</code> は <a href="#pdf-package.searchers"><code>package.searchers</code></a> テーブルによってガイドされます。このテーブルの各項目は検索関数であり、特定の方法でモジュールを検索します。このテーブルを変更することにより、<code>require</code> がモジュールを検索する方法を変更できます。以下の説明は、<a href="#pdf-package.searchers"><code>package.searchers</code></a> のデフォルト構成に基づいています。</p><p>まず、<code>require</code> は <code>package.preload[modname]</code> をクエリします。値がある場合、この値（関数である必要があります）がローダーです。それ以外の場合、<code>require</code> は <a href="#pdf-package.path"><code>package.path</code></a> に格納されているパスを使用して Lua ローダーを検索します。それも失敗した場合、<a href="#pdf-package.cpath"><code>package.cpath</code></a> に格納されているパスを使用して C&nbsp;ローダーを検索します。それも失敗した場合、<em>オールインワン</em>ローダーを試みます（<a href="#pdf-package.searchers"><code>package.searchers</code></a> を参照）。</p><p>ローダーが見つかると、<code>require</code> はローダーを 2 つの引数、<code>modname</code> と追加の値（<em>ローダーデータ</em>）を付けて呼び出します。ローダーデータは、モジュールにとって有用な任意の値を指定できます。デフォルトの検索機能の場合、ローダーが見つかった場所を示します。（たとえば、ローダーがファイルから来た場合、この追加の値はファイルパスです。）ローダーが nil 以外の値を返す場合、<code>require</code> は返された値を <code>package.loaded[modname]</code> に割り当てます。ローダーが nil 以外の値を返さず、<code>package.loaded[modname]</code> に値を割り当てていない場合、<code>require</code> はこのエントリに <b>true</b> を割り当てます。いずれの場合も、<code>require</code> は <code>package.loaded[modname]</code> の最終値を返します。その値に加えて、<code>require</code> は 2 番目の結果として、検索機能によって返されたローダーデータも返します。これは、<code>require</code> がモジュールをどのように見つけたかを示します。</p><p>モジュールのロードまたは実行中にエラーが発生した場合、またはモジュールのローダーが見つからない場合、<code>require</code> はエラーを発生させます。</p><p>
+</p><hr /><h3><a name="pdf-package.config"><code>package.config</code></a></h3>
+
+
+<p>パッケージのコンパイル時の構成を記述する文字列。この文字列は、行のシーケンスです。</p><ul>
+
+<li>最初の行は、ディレクトリ区切り文字の文字列です。デフォルトは、Windows の場合は '<code>\</code>'、他のすべてのシステムの場合は '<code>/</code>' です。</li>
+
+<li>2 番目の行は、パス内のテンプレートを区切る文字です。デフォルトは '<code>;</code>' です。</li>
+
+<li>3 番目の行は、テンプレート内の置換ポイントをマークする文字列です。デフォルトは '<code>?</code>' です。</li>
+
+<li>4 番目の行は、Windows のパスで、実行可能ファイルのディレクトリに置き換えられる文字列です。デフォルトは '<code>!</code>' です。</li>
+
+<li>5 番目の行は、<code>luaopen_</code> 関数名を構築するときに、その後のすべてのテキストを無視するためのマークです。デフォルトは '<code>-</code>' です。</li>
+
+</ul>
+
+
+
+<p>
+</p><hr /><h3><a name="pdf-package.cpath"><code>package.cpath</code></a></h3>
+
+
+<p><a href="#pdf-require"><code>require</code></a> が C&nbsp;ローダーを検索するために使用するパスを含む文字列。</p><p>Lua は、環境変数 <a name="pdf-LUA_CPATH_5_4"><code>LUA_CPATH_5_4</code></a>、または環境変数 <a name="pdf-LUA_CPATH"><code>LUA_CPATH</code></a>、または <code>luaconf.h</code> で定義されたデフォルトのパスを使用して、Lua パス <a href="#pdf-package.path"><code>package.path</code></a> を初期化するのと同じ方法で C&nbsp;パス <a href="#pdf-package.cpath"><code>package.cpath</code></a> を初期化します。</p><p>
+</p><hr /><h3><a name="pdf-package.loaded"><code>package.loaded</code></a></h3>
+
+
+<p><a href="#pdf-require"><code>require</code></a> がすでにロードされているモジュールを制御するために使用するテーブル。モジュール <code>modname</code> を require するとき、<code>package.loaded[modname]</code> が false でない場合、<a href="#pdf-require"><code>require</code></a> はそこに格納されている値を返します。</p><p>この変数は、実際のテーブルへの参照にすぎません。この変数への代入は、<a href="#pdf-require"><code>require</code></a> が使用するテーブルを変更しません。実際のテーブルは、C レジストリ（<a href="#4.3">§4.3</a> を参照）に格納され、キー <a name="pdf-LUA_LOADED_TABLE"><code>LUA_LOADED_TABLE</code></a>（文字列）でインデックス付けされます。</p><p>
+</p><hr /><h3><a name="pdf-package.loadlib"><code>package.loadlib (libname, funcname)</code></a></h3>
+
+
+<p>ホストプログラムを C&nbsp;ライブラリ <code>libname</code> に動的にリンクします。</p><p><code>funcname</code> が "<code>*</code>" の場合、ライブラリへのリンクのみを行い、ライブラリによってエクスポートされたシンボルを、動的にリンクされた他のライブラリで使用できるようにします。それ以外の場合は、ライブラリ内の関数 <code>funcname</code> を検索し、この関数を C&nbsp;関数として返します。したがって、<code>funcname</code> は <a href="#lua_CFunction"><code>lua_CFunction</code></a> プロトタイプ（<a href="#lua_CFunction"><code>lua_CFunction</code></a> を参照）に従う必要があります。</p><p>これは低レベルの関数です。パッケージおよびモジュールシステムを完全にバイパスします。<a href="#pdf-require"><code>require</code></a> とは異なり、パス検索を実行せず、拡張子を自動的に追加しません。<code>libname</code> は、必要に応じてパスと拡張子を含む、C&nbsp;ライブラリの完全なファイル名である必要があります。<code>funcname</code> は、C&nbsp;ライブラリによってエクスポートされた正確な名前である必要があります（これは、使用される C&nbsp;コンパイラーとリンカーによって異なる場合があります）。</p><p>この機能は ISO&nbsp;C ではサポートされていません。そのため、一部のプラットフォーム（Windows、Linux、Mac OS X、Solaris、BSD、および <code>dlfcn</code> 標準をサポートするその他の Unix システム）でのみ使用できます。</p><p>この関数は本質的に安全ではありません。Lua がシステムの読み取り可能な動的ライブラリ内の任意の関数を呼び出すことができるためです。（Lua は、関数が適切なプロトタイプを持ち、適切なプロトコル（<a href="#lua_CFunction"><code>lua_CFunction</code></a> を参照）を尊重すると仮定して、任意の関数を呼び出します。したがって、任意の動的ライブラリ内の任意の関数を呼び出すと、多くの場合、アクセス違反が発生します。）</p><p>
+</p><hr /><h3><a name="pdf-package.path"><code>package.path</code></a></h3>
+
+
+<p><a href="#pdf-require"><code>require</code></a> が Lua ローダーを検索するために使用するパスを含む文字列。</p><p>起動時に、Lua は環境変数 <a name="pdf-LUA_PATH_5_4"><code>LUA_PATH_5_4</code></a> または環境変数 <a name="pdf-LUA_PATH"><code>LUA_PATH</code></a> の値、またはこれらの環境変数が定義されていない場合は <code>luaconf.h</code> で定義されたデフォルトのパスを使用して、この変数を初期化します。環境変数の値の "<code>;;</code>" は、デフォルトのパスに置き換えられます。</p><p>
+</p><hr /><h3><a name="pdf-package.preload"><code>package.preload</code></a></h3>
+
+
+<p>特定のモジュールのローダーを格納するテーブル（<a href="#pdf-require"><code>require</code></a> を参照）。</p><p>この変数は、実際のテーブルへの参照にすぎません。この変数への代入は、<a href="#pdf-require"><code>require</code></a> が使用するテーブルを変更しません。実際のテーブルは、C レジストリ（<a href="#4.3">§4.3</a> を参照）に格納され、キー <a name="pdf-LUA_PRELOAD_TABLE"><code>LUA_PRELOAD_TABLE</code></a>（文字列）でインデックス付けされます。</p><p>
+</p><hr /><h3><a name="pdf-package.searchers"><code>package.searchers</code></a></h3>
+
+
+<p><a href="#pdf-require"><code>require</code></a> がモジュールを検索する方法を制御するために使用するテーブル。</p><p>このテーブルの各エントリは、<em>検索関数</em>です。モジュールを検索するとき、<a href="#pdf-require"><code>require</code></a> はこれらの検索関数を昇順で呼び出し、モジュール名（<a href="#pdf-require"><code>require</code></a> に指定された引数）を唯一の引数として指定します。検索機能がモジュールを見つけた場合、モジュール<em>ローダー</em>である別の関数と、ローダーに渡され、<a href="#pdf-require"><code>require</code></a> によって 2 番目の結果として返される追加の値（<em>ローダーデータ</em>）を返します。モジュールが見つからない場合は、理由を説明する文字列（または何も言うことがない場合は <b>nil</b>）を返します。</p><p>Lua は、このテーブルを 4 つの検索関数で初期化します。</p><p>最初の検索機能は、<a href="#pdf-package.preload"><code>package.preload</code></a> テーブルでローダーを探すだけです。</p><p>2 番目の検索機能は、<a href="#pdf-package.path"><code>package.path</code></a> に格納されているパスを使用して、Lua ライブラリとしてローダーを探します。検索は、関数 <a href="#pdf-package.searchpath"><code>package.searchpath</code></a> で説明されているように行われます。</p><p>3 番目の検索機能は、変数 <a href="#pdf-package.cpath"><code>package.cpath</code></a> によって指定されたパスを使用して、C&nbsp;ライブラリとしてローダーを探します。ここでも、検索は関数 <a href="#pdf-package.searchpath"><code>package.searchpath</code></a> で説明されているように行われます。たとえば、C&nbsp;パスが文字列の場合</p><pre>     "./?.so;./?.dll;/usr/local/?/init.so"
+</pre><p>モジュール<code>foo</code>の検索器は、<code>./foo.so</code>、<code>./foo.dll</code>、および<code>/usr/local/foo/init.so</code>の順にファイルを開こうとします。Cライブラリが見つかると、この検索器はまず動的リンク機能を使用してアプリケーションをライブラリにリンクします。次に、ローダーとして使用されるライブラリ内のC関数を見つけようとします。このC関数の名前は、文字列"<code>luaopen_</code>"に、モジュール名のコピーを連結したもので、そのコピーでは、すべてのドットがアンダースコアに置き換えられています。さらに、モジュール名にハイフンが含まれている場合、最初のハイフン以降のサフィックス（ハイフンを含む）は削除されます。たとえば、モジュール名が<code>a.b.c-v2.1</code>の場合、関数名は<code>luaopen_a_b_c</code>になります。</p><p>4番目の検索器は、<em>オールインワンローダー</em>を試します。指定されたモジュールのルート名のライブラリをCパスで検索します。たとえば、<code>a.b.c</code>を要求する場合、<code>a</code>のCライブラリを検索します。見つかった場合、サブモジュールのopen関数を検索します。この例では、<code>luaopen_a_b_c</code>になります。この機能を使用すると、パッケージは複数のCサブモジュールを1つのライブラリにまとめることができ、各サブモジュールは元のopen関数を保持します。</p><p>最初の検索器（preload）を除くすべての検索器は、<a href="#pdf-package.searchpath"><code>package.searchpath</code></a>によって返されるように、モジュールが見つかったファイルパスを余分な値として返します。最初の検索器は常に文字列"<code>:preload:</code>"を返します。</p><p>検索器は、Luaでエラーを発生させたり、副作用を持ったりしてはなりません。（Cでは、たとえばアプリケーションをライブラリにリンクするなど、副作用を持つ場合があります。）</p><p>
+</p><hr /><h3><a name="pdf-package.searchpath"><code>package.searchpath (name, path [, sep [, rep]])</code></a></h3>
+
+
+<p>指定された<code>path</code>内で、指定された<code>name</code>を検索します。</p><p>パスは、セミコロンで区切られた<em>テンプレート</em>のシーケンスを含む文字列です。各テンプレートについて、関数はテンプレート内の各疑問符（もしあれば）を、<code>name</code>のコピーで置き換えます。そのコピーでは、<code>sep</code>（デフォルトではドット）のすべての出現箇所が<code>rep</code>（デフォルトではシステムのディレクトリセパレーター）に置き換えられ、結果として得られたファイル名を開こうとします。</p><p>たとえば、パスが次の文字列の場合</p><pre>     "./?.lua;./?.lc;/usr/local/?/init.lua"
+</pre><p>名前<code>foo.a</code>の検索では、ファイル<code>./foo/a.lua</code>、<code>./foo/a.lc</code>、および<code>/usr/local/foo/a/init.lua</code>がこの順に開こうとします。</p><p>読み取りモードで開くことができる最初のファイルの結果の名前（ファイルを閉じた後）を返すか、成功しない場合は、<b>fail</b>とエラーメッセージを返します。（このエラーメッセージは、開こうとしたすべてのファイル名をリストします。）</p><h2>6.4 – <a name="6.4">文字列操作</a></h2>
+
+
+
+<p>このライブラリは、部分文字列の検索や抽出、パターンマッチングなど、文字列操作のための汎用関数を提供します。Luaで文字列をインデックス付けする場合、最初の文字は位置1にあります（Cのように0ではありません）。インデックスは負の値にすることもでき、文字列の末尾から後方に向かってインデックス付けされていると解釈されます。したがって、最後の文字は位置-1にあり、以下同様です。</p><p>文字列ライブラリは、テーブル<a name="pdf-string"><code>string</code></a>内にすべての関数を提供します。また、<code>__index</code>フィールドが<code>string</code>テーブルを指す文字列のメタテーブルも設定します。したがって、オブジェクト指向スタイルで文字列関数を使用できます。たとえば、<code>string.byte(s,i)</code>は<code>s:byte(i)</code>と記述できます。</p><p>文字列ライブラリは、1バイトの文字エンコードを前提としています。</p><p>
+</p><hr /><h3><a name="pdf-string.byte"><code>string.byte (s [, i [, j]])</code></a></h3>文字<code>s[i]</code>、<code>s[i+1]</code>、...、<code>s[j]</code>の内部数値コードを返します。<code>i</code>のデフォルト値は1です。<code>j</code>のデフォルト値は<code>i</code>です。これらのインデックスは、関数<a href="#pdf-string.sub"><code>string.sub</code></a>の同じルールに従って修正されます。<p>数値コードは、プラットフォーム間で必ずしも移植可能ではありません。</p><p>
+</p><hr /><h3><a name="pdf-string.char"><code>string.char (···)</code></a></h3>ゼロ個以上の整数を受け取ります。引数の数と同じ長さの文字列を返します。各文字には、対応する引数に等しい内部数値コードがあります。<p>数値コードは、プラットフォーム間で必ずしも移植可能ではありません。</p><p>
+</p><hr /><h3><a name="pdf-string.dump"><code>string.dump (function [, strip])</code></a></h3>
+
+
+<p>指定された関数のバイナリ表現（<em>バイナリチャンク</em>）を含む文字列を返します。これにより、この文字列の後の<a href="#pdf-load"><code>load</code></a>は、関数のコピー（ただし、新しいアップ値付き）を返します。<code>strip</code>が真の値である場合、バイナリ表現には、スペースを節約するために、関数に関するすべてのデバッグ情報が含まれない場合があります。</p><p>アップ値を持つ関数には、アップ値の数のみが保存されます。ロード（再ロード）されると、これらのアップ値は新しいインスタンスを受け取ります。（これらのアップ値がどのように初期化されるかについての詳細は、<a href="#pdf-load"><code>load</code></a>関数を参照してください。デバッグライブラリを使用して、必要に応じて関数のアップ値をシリアル化および再ロードできます。）</p><p>
+</p><hr /><h3><a name="pdf-string.find"><code>string.find (s, pattern [, init [, plain]])</code></a></h3>
+
+
+<p>文字列<code>s</code>内の<code>pattern</code>（<a href="#6.4.1">§6.4.1</a>を参照）の最初のマッチを検索します。マッチが見つかった場合、<code>find</code>はこの出現の開始と終了の<code>s</code>のインデックスを返します。それ以外の場合は、<b>fail</b>を返します。3番目のオプションの数値引数<code>init</code>は、検索を開始する場所を指定します。デフォルト値は1であり、負の値にすることができます。4番目のオプションの引数<code>plain</code>として<b>true</b>を指定すると、パターンマッチング機能が無効になり、関数は<code>pattern</code>内の文字がマジックと見なされない、プレーンな「部分文字列の検索」操作を実行します。</p><p>パターンにキャプチャがある場合、マッチが成功すると、キャプチャされた値も2つのインデックスの後ろに返されます。</p><p>
+</p><hr /><h3><a name="pdf-string.format"><code>string.format (formatstring, ···)</code></a></h3>
+
+
+<p>最初の引数（文字列である必要があります）に指定された説明に従って、可変数の引数の書式設定されたバージョンを返します。フォーマット文字列は、ISO&nbsp;C関数<code>sprintf</code>と同じルールに従います。唯一の違いは、変換指定子と修飾子<code>F</code>、<code>n</code>、<code>*</code>、<code>h</code>、<code>L</code>、および<code>l</code>がサポートされておらず、追加の指定子<code>q</code>があることです。幅と精度は、存在する場合、どちらも2桁に制限されます。</p><p>指定子<code>q</code>は、ブール値、nil、数値、および文字列を、結果がLuaソースコードで有効な定数になるようにフォーマットします。ブール値とnilは、明白な方法（<code>true</code>、<code>false</code>、<code>nil</code>）で記述されます。浮動小数点数は、完全な精度を維持するために16進数で記述されます。文字列は二重引用符で囲まれ、必要に応じてエスケープシーケンスを使用して、Luaインタープリターで安全に読み戻せるようにします。たとえば、呼び出し</p><pre>     string.format('%q', 'a string with "quotes" and \n new line')
+</pre><p>は、文字列を生成する可能性があります</p><pre>     "a string with \"quotes\" and \
+      new line"
+</pre><p>この指定子は、修飾子（フラグ、幅、精度）をサポートしていません。</p><p>変換指定子<code>A</code>、<code>a</code>、<code>E</code>、<code>e</code>、<code>f</code>、<code>G</code>、および<code>g</code>はすべて、引数として数値を予期します。指定子<code>c</code>、<code>d</code>、<code>i</code>、<code>o</code>、<code>u</code>、<code>X</code>、および<code>x</code>は、整数を予期します。LuaがC89コンパイラーでコンパイルされている場合、指定子<code>A</code>および<code>a</code>（16進浮動小数点）は修飾子をサポートしません。</p><p>指定子<code>s</code>は文字列を予期します。引数が文字列でない場合は、<a href="#pdf-tostring"><code>tostring</code></a>の同じルールに従って文字列に変換されます。指定子に修飾子がある場合、対応する文字列引数に埋め込まれたゼロを含めることはできません。</p><p>指定子<code>p</code>は、<a href="#lua_topointer"><code>lua_topointer</code></a>によって返されるポインターを書式設定します。これにより、テーブル、userdata、スレッド、文字列、および関数の一意の文字列識別子が与えられます。他の値（数値、nil、ブール値）の場合、この指定子はポインター<code>NULL</code>を表す文字列になります。</p><p>
+</p><hr /><h3><a name="pdf-string.gmatch"><code>string.gmatch (s, pattern [, init])</code></a></h3>呼び出されるたびに、文字列<code>s</code>を対象とした<code>pattern</code>（<a href="#6.4.1">§6.4.1</a>を参照）からの次のキャプチャを返すイテレータ関数を返します。<code>pattern</code>がキャプチャを指定しない場合、各呼び出しでマッチ全体が生成されます。3番目のオプションの数値引数<code>init</code>は、検索を開始する場所を指定します。デフォルト値は1であり、負の値にすることができます。<p>例として、次のループは、文字列<code>s</code>のすべての単語を反復処理し、1行に1つずつ出力します。</p><pre>     s = "hello world from Lua"
+     for w in string.gmatch(s, "%a+") do
+       print(w)
+     end
+</pre><p>次の例では、指定された文字列からすべての<code>key=value</code>ペアをテーブルに収集します</p><pre>     t = {}
+     s = "from=world, to=Lua"
+     for k, v in string.gmatch(s, "(%w+)=(%w+)") do
+       t[k] = v
+     end
+</pre>
+
+<p>この関数では、パターンの先頭にあるキャレット '<code>^</code>'はアンカーとして機能しません。これは反復処理を妨げるためです。</p><p>
+</p><hr /><h3><a name="pdf-string.gsub"><code>string.gsub (s, pattern, repl [, n])</code></a></h3><code>s</code>のコピーを返します。その中で、<code>pattern</code>（<a href="#6.4.1">§6.4.1</a>を参照）のすべて（または指定された場合は最初の<code>n</code>）の出現が、<code>repl</code>で指定された置換文字列に置き換えられています。<code>repl</code>は、文字列、テーブル、または関数にすることができます。<code>gsub</code>はまた、2番目の値として、発生したマッチの合計数も返します。<code>gsub</code>という名前は、<em>Global SUBstitution</em>から来ています。<p><code>repl</code>が文字列の場合、その値は置換に使用されます。文字&nbsp;<code>%</code>はエスケープ文字として機能します。<code>repl</code>内の<code>%<em>d</em></code>形式のシーケンス（<em>d</em>は1から9の間）は、<em>d</em>番目のキャプチャされた部分文字列の値を表します。シーケンス<code>%0</code>は、マッチ全体を表します。シーケンス<code>%%</code>は、単一の&nbsp;<code>%</code>を表します。</p><p><code>repl</code>がテーブルの場合、テーブルは、最初のキャプチャをキーとして使用して、すべてのマッチに対してクエリされます。</p><p><code>repl</code>が関数の場合、この関数は、マッチが発生するたびに、キャプチャされたすべての部分文字列を引数として渡して呼び出されます。</p><p>いずれの場合も、パターンがキャプチャを指定しない場合は、パターン全体がキャプチャ内にあるかのように動作します。</p><p>テーブルクエリまたは関数呼び出しによって返される値が文字列または数値の場合、置換文字列として使用されます。それ以外の場合、<b>false</b>または<b>nil</b>の場合、置換はありません（つまり、元のマッチは文字列に保持されます）。</p><p>以下に例をいくつか示します</p><pre>     x = string.gsub("hello world", "(%w+)", "%1 %1")
+     --&gt; x="hello hello world world"
+     
+     x = string.gsub("hello world", "%w+", "%0 %0", 1)
+     --&gt; x="hello hello world"
+     
+     x = string.gsub("hello world from Lua", "(%w+)%s*(%w+)", "%2 %1")
+     --&gt; x="world hello Lua from"
+     
+     x = string.gsub("home = $HOME, user = $USER", "%$(%w+)", os.getenv)
+     --&gt; x="home = /home/roberto, user = roberto"
+     
+     x = string.gsub("4+5 = $return 4+5$", "%$(.-)%$", function (s)
+           return load(s)()
+         end)
+     --&gt; x="4+5 = 9"
+     
+     local t = {name="lua", version="5.4"}
+     x = string.gsub("$name-$version.tar.gz", "%$(%w+)", t)
+     --&gt; x="lua-5.4.tar.gz"
+</pre>
+
+
+
+<p>
+</p><hr /><h3><a name="pdf-string.len"><code>string.len (s)</code></a></h3>
+
+
+<p>文字列を受け取り、その長さを返します。空の文字列<code>""</code>の長さは0です。埋め込まれたゼロがカウントされるため、<code>"a\000bc\000"</code>の長さは5です。</p><p>
+</p><hr /><h3><a name="pdf-string.lower"><code>string.lower (s)</code></a></h3>
+
+
+<p>文字列を受け取り、すべてのuppercaseの文字がlowercaseに変更された、この文字列のコピーを返します。他のすべての文字は変更されません。uppercaseの文字の定義は、現在のロケールに依存します。</p><p>
+</p><hr /><h3><a name="pdf-string.match"><code>string.match (s, pattern [, init])</code></a></h3>
+
+
+<p>文字列<code>s</code>の中で、<code>pattern</code>（<a href="#6.4.1">§6.4.1</a>を参照）に最初に<em>マッチ</em>する箇所を探します。マッチするものが見つかった場合、<code>match</code>はパターンからのキャプチャを返します。それ以外の場合は<b>fail</b>を返します。<code>pattern</code>がキャプチャを指定しない場合は、マッチ全体が返されます。3番目のオプションの数値引数<code>init</code>は、検索を開始する位置を指定します。デフォルト値は1で、負の値も指定できます。</p><p>
+</p><hr /><h3><a name="pdf-string.pack"><code>string.pack (fmt, v1, v2, ···)</code></a></h3>
+
+
+<p>フォーマット文字列<code>fmt</code>（<a href="#6.4.2">§6.4.2</a>を参照）に従って、バイナリ形式でシリアライズ（パック）された値<code>v1</code>、<code>v2</code>などを含むバイナリ文字列を返します。</p><p>
+</p><hr /><h3><a name="pdf-string.packsize"><code>string.packsize (fmt)</code></a></h3>
+
+
+<p><a href="#pdf-string.pack"><code>string.pack</code></a>を、与えられたフォーマットで実行した場合の結果の文字列の長さを返します。フォーマット文字列は、可変長オプションである'<code>s</code>'または'<code>z</code>'を持つことはできません（<a href="#6.4.2">§6.4.2</a>を参照）。</p><p>
+</p><hr /><h3><a name="pdf-string.rep"><code>string.rep (s, n [, sep])</code></a></h3>
+
+
+<p>文字列<code>s</code>を<code>n</code>回コピーし、文字列<code>sep</code>で区切って連結した文字列を返します。<code>sep</code>のデフォルト値は空文字列です（つまり、区切り文字なし）。<code>n</code>が正でない場合は、空文字列を返します。</p><p>（この関数を1回呼び出すだけで、マシンのメモリを使い果たしてしまう可能性があることに注意してください。）</p><p>
+</p><hr /><h3><a name="pdf-string.reverse"><code>string.reverse (s)</code></a></h3>
+
+
+<p>文字列<code>s</code>を反転させた文字列を返します。</p><p>
+</p><hr /><h3><a name="pdf-string.sub"><code>string.sub (s, i [, j])</code></a></h3>
+
+
+<p><code>i</code>から始まり<code>j</code>まで続く、<code>s</code>の部分文字列を返します。<code>i</code>と<code>j</code>は負の値を取ることができます。<code>j</code>が省略された場合、-1（文字列の長さと同じ）とみなされます。特に、<code>string.sub(s,1,j)</code>の呼び出しは、長さ<code>j</code>の<code>s</code>の接頭辞を返し、<code>string.sub(s, -i)</code>（正の<code>i</code>の場合）は、長さ<code>i</code>の<code>s</code>の接尾辞を返します。</p><p>負のインデックスの変換後、<code>i</code>が1未満の場合は1に修正されます。<code>j</code>が文字列の長さよりも大きい場合は、文字列の長さに修正されます。これらの修正後、<code>i</code>が<code>j</code>よりも大きい場合、関数は空文字列を返します。</p><p>
+</p><hr /><h3><a name="pdf-string.unpack"><code>string.unpack (fmt, s [, pos])</code></a></h3>
+
+
+<p>フォーマット文字列<code>fmt</code>（<a href="#6.4.2">§6.4.2</a>を参照）に従って、文字列<code>s</code>にパックされた値（<a href="#pdf-string.pack"><code>string.pack</code></a>を参照）を返します。オプションの<code>pos</code>は、<code>s</code>の読み取りを開始する位置を示します（デフォルトは1）。読み取られた値の後、この関数は<code>s</code>内で最初に読み取られていないバイトのインデックスも返します。</p><p>
+</p><hr /><h3><a name="pdf-string.upper"><code>string.upper (s)</code></a></h3>
+
+
+<p>文字列を受け取り、この文字列のすべての小文字を大文字に変更したコピーを返します。他のすべての文字は変更されません。小文字の定義は、現在のロケールによって異なります。</p><h3>6.4.1 – <a name="6.4.1">パターン</a></h3>
+
+
+
+<p>Luaのパターンは、正規の文字列で記述され、パターンマッチング関数である<a href="#pdf-string.find"><code>string.find</code></a>、<a href="#pdf-string.gmatch"><code>string.gmatch</code></a>、<a href="#pdf-string.gsub"><code>string.gsub</code></a>、および<a href="#pdf-string.match"><code>string.match</code></a>によってパターンとして解釈されます。このセクションでは、これらの文字列の構文と意味（つまり、何にマッチするか）について説明します。</p><h4>文字クラス</h4><p><em>文字クラス</em>は、文字の集合を表すために使用されます。文字クラスを記述する際には、以下の組み合わせが許可されています。</p><ul>
+
+<li><b><em>x</em>: </b>（<em>x</em>が<em>マジック文字</em>である<code>^$()%.[]*+-?</code>のいずれでもない場合）文字<em>x</em>自体を表します。</li>
+
+<li><b><code>.</code>: </b>（ドット）はすべての文字を表します。</li>
+
+<li><b><code>%a</code>: </b>はすべてのアルファベット文字を表します。</li>
+
+<li><b><code>%c</code>: </b>はすべての制御文字を表します。</li>
+
+<li><b><code>%d</code>: </b>はすべての数字を表します。</li>
+
+<li><b><code>%g</code>: </b>はスペースを除くすべての印刷可能な文字を表します。</li>
+
+<li><b><code>%l</code>: </b>はすべての小文字を表します。</li>
+
+<li><b><code>%p</code>: </b>はすべての句読点を表します。</li>
+
+<li><b><code>%s</code>: </b>はすべての空白文字を表します。</li>
+
+<li><b><code>%u</code>: </b>はすべての大文字を表します。</li>
+
+<li><b><code>%w</code>: </b>はすべての英数字を表します。</li>
+
+<li><b><code>%x</code>: </b>はすべての16進数を表します。</li>
+
+<li><b><code>%<em>x</em></code>: </b>（<em>x</em>が任意の非英数字の場合）文字<em>x</em>を表します。これは、マジック文字をエスケープする標準的な方法です。任意の非英数字（すべての句読点文字、さらには非マジック文字も含む）の前に '<code>%</code>' を付けて、パターン内でそれ自体を表すことができます。</li>
+
+<li><b><code>[<em>set</em>]</code>: </b>は、<em>set</em>内のすべての文字の和集合であるクラスを表します。文字の範囲は、範囲の終端文字を昇順で '<code>-</code>' で区切って指定できます。上記で説明したすべてのクラス<code>%</code><em>x</em>も、<em>set</em>内のコンポーネントとして使用できます。<em>set</em>内の他のすべての文字は、それ自体を表します。たとえば、<code>[%w_]</code>（または<code>[_%w]</code>）はすべての英数字とアンダースコアを表し、<code>[0-7]</code>は8進数を表し、<code>[0-7%l%-]</code>は8進数と小文字と '<code>-</code>' 文字を表します。<p>セット内に閉じ角括弧を配置するには、セット内の最初の文字として配置します。セット内にハイフンを配置するには、セット内の最初または最後の文字として配置します。（両方の場合にエスケープを使用することもできます。）</p><p>範囲とクラスの間の相互作用は定義されていません。したがって、<code>[%a-z]</code>や<code>[a-%%]</code>のようなパターンには意味がありません。</p></li>
+
+<li><b><code>[^<em>set</em>]</code>: </b>は、<em>set</em>の補数を表します。ここで、<em>set</em>は上記のように解釈されます。</li>
+
+</ul><p>単一の文字で表されるすべてのクラス（<code>%a</code>、<code>%c</code>など）の場合、対応する大文字はクラスの補数を表します。たとえば、<code>%S</code>は空白以外のすべての文字を表します。</p><p>文字、スペース、その他の文字グループの定義は、現在のロケールによって異なります。特に、クラス<code>[a-z]</code>は<code>%l</code>と等価ではない場合があります。</p><h4>パターン項目</h4><p><em>パターン項目</em>は次のいずれかです。</p><ul>
+
+<li>単一の文字クラス。クラス内の任意の単一の文字にマッチします。</li>
+
+<li>単一の文字クラスの後に '<code>*</code>' が続く場合。クラス内のゼロ個以上の文字のシーケンスにマッチします。これらの繰り返し項目は、常に可能な限り最長のシーケンスにマッチします。</li>
+
+<li>単一の文字クラスの後に '<code>+</code>' が続く場合。クラス内の1つ以上の文字のシーケンスにマッチします。これらの繰り返し項目は、常に可能な限り最長のシーケンスにマッチします。</li>
+
+<li>単一の文字クラスの後に '<code>-</code>' が続く場合。これも、クラス内のゼロ個以上の文字のシーケンスにマッチします。 '<code>*</code>' とは異なり、これらの繰り返し項目は、常に可能な限り最短のシーケンスにマッチします。</li>
+
+<li>単一の文字クラスの後に '<code>?</code>' が続く場合。クラス内の文字のゼロ個または1個の出現にマッチします。可能な場合は常に1つの出現にマッチします。</li>
+
+<li>
+<code>%<em>n</em></code>（<em>n</em>は1から9の間）。このような項目は、<em>n</em>番目のキャプチャされた文字列と等しい部分文字列にマッチします（以下を参照）。</li>
+
+<li>
+<code>%b<em>xy</em></code>。ここで、<em>x</em>と<em>y</em>は2つの異なる文字です。このような項目は、<em>x</em>で始まり、<em>y</em>で終わり、<em>x</em>と<em>y</em>が<em>バランス</em>している文字列にマッチします。これは、文字列を左から右に読み、<em>x</em>の場合は<em>+1</em>、<em>y</em>の場合は<em>-1</em>を数えた場合、最後の<em>y</em>はカウントが0に達する最初の<em>y</em>であることを意味します。たとえば、項目<code>%b()</code>は、バランスの取れた括弧を持つ式にマッチします。</li>
+
+<li>
+<code>%f[<em>set</em>]</code>。<em>フロンティアパターン</em>です。このような項目は、次の文字が<em>set</em>に属し、前の文字が<em>set</em>に属さないような任意の場所にある空文字列にマッチします。セット<em>set</em>は、上記のように解釈されます。サブジェクトの先頭と末尾は、文字 '<code>\0</code>' であるかのように処理されます。</li>
+
+</ul>
+
+
+
+
+<h4>パターン</h4><p><em>パターン</em>は、パターン項目のシーケンスです。パターンの先頭にあるキャレット '<code>^</code>' は、マッチをサブジェクト文字列の先頭に固定します。パターンの末尾にある '<code>$</code>' は、マッチをサブジェクト文字列の末尾に固定します。他の位置では、'<code>^</code>' と '<code>$</code>' は特別な意味を持たず、それ自身を表します。</p><h4>キャプチャ</h4><p>パターンには、括弧で囲まれたサブパターンを含めることができます。これらは<em>キャプチャ</em>を記述します。マッチが成功すると、キャプチャにマッチするサブジェクト文字列の部分文字列が、後で使用するために保存（<em>キャプチャ</em>）されます。キャプチャは、左括弧に従って番号が付けられます。たとえば、パターン<code>"(a*(.)%w(%s*))"</code>では、<code>"a*(.)%w(%s*)"</code>にマッチする文字列の部分が最初のキャプチャとして保存されるため、番号は1になります。 "<code>.</code>"にマッチする文字は番号2でキャプチャされ、"<code>%s*</code>"にマッチする部分は番号3でキャプチャされます。</p><p>特別なケースとして、キャプチャ<code>()</code>は現在の文字列位置（数値）をキャプチャします。たとえば、文字列<code>"flaaap"</code>にパターン<code>"()aa()"</code>を適用した場合、2つのキャプチャ（3と5）が得られます。</p><h4>複数マッチ</h4><p>関数<a href="#pdf-string.gsub"><code>string.gsub</code></a>とイテレータ<a href="#pdf-string.gmatch"><code>string.gmatch</code></a>は、サブジェクト内の指定されたパターンの複数の出現箇所にマッチします。これらの関数では、新しいマッチは、前のマッチの終了位置よりも少なくとも1バイト後で終了する場合にのみ有効と見なされます。言い換えれば、パターンマシンは、別のマッチの直後に空文字列をマッチとして受け入れることはありません。例として、次のコードの結果を考えてみましょう。</p><pre>     &gt; string.gsub("abc", "()a*()", print);
+     --&gt; 1   2
+     --&gt; 3   3
+     --&gt; 4   4
+</pre><p>2番目と3番目の結果は、Luaが '<code>b</code>' の後と '<code>c</code>' の後で空文字列にマッチしたことによるものです。Luaは '<code>a</code>' の後に空文字列をマッチさせません。なぜなら、それは前のマッチと同じ位置で終了するためです。</p><h3>6.4.2 – <a name="6.4.2">PackおよびUnpackのフォーマット文字列</a></h3>
+
+<p><a href="#pdf-string.pack"><code>string.pack</code></a>、<a href="#pdf-string.packsize"><code>string.packsize</code></a>、および<a href="#pdf-string.unpack"><code>string.unpack</code></a>の最初の引数はフォーマット文字列であり、作成または読み取られる構造のレイアウトを記述します。</p><p>フォーマット文字列は、変換オプションのシーケンスです。変換オプションは次のとおりです。</p><ul>
+<li><b><code>&lt;</code>: </b>リトルエンディアンを設定します</li>
+<li><b><code>&gt;</code>: </b>ビッグエンディアンを設定します</li>
+<li><b><code>=</code>: </b>ネイティブエンディアンを設定します</li>
+<li><b><code>![<em>n</em>]</code>: </b>最大アライメントを<code>n</code>に設定します（デフォルトはネイティブアライメント）</li>
+<li><b><code>b</code>: </b>符号付きバイト（<code>char</code>）</li>
+<li><b><code>B</code>: </b>符号なしバイト（<code>char</code>）</li>
+<li><b><code>h</code>: </b>符号付き<code>short</code>（ネイティブサイズ）</li>
+<li><b><code>H</code>: </b>符号なし<code>short</code>（ネイティブサイズ）</li>
+<li><b><code>l</code>: </b>符号付き<code>long</code>（ネイティブサイズ）</li>
+<li><b><code>L</code>: </b>符号なし<code>long</code>（ネイティブサイズ）</li>
+<li><b><code>j</code>: </b><code>lua_Integer</code></li>
+<li><b><code>J</code>: </b><code>lua_Unsigned</code></li>
+<li><b><code>T</code>: </b><code>size_t</code>（ネイティブサイズ）</li>
+<li><b><code>i[<em>n</em>]</code>: </b><code>n</code>バイトの符号付き<code>int</code>（デフォルトはネイティブサイズ）</li>
+<li><b><code>I[<em>n</em>]</code>: </b><code>n</code>バイトの符号なし<code>int</code>（デフォルトはネイティブサイズ）</li>
+<li><b><code>f</code>: </b><code>float</code>（ネイティブサイズ）</li>
+<li><b><code>d</code>: </b><code>double</code>（ネイティブサイズ）</li>
+<li><b><code>n</code>: </b><code>lua_Number</code></li>
+<li><b><code>c<em>n</em></code>: </b><code>n</code>バイトの固定長文字列</li>
+<li><b><code>z</code>: </b>ゼロ終端文字列</li>
+<li><b><code>s[<em>n</em>]</code>: </b>長さが<code>n</code>バイトの符号なし整数としてコード化された長さが前に付いた文字列（デフォルトは<code>size_t</code>）</li>
+<li><b><code>x</code>: </b>1バイトのパディング</li>
+<li><b><code>X<em>op</em></code>: </b>オプション<code>op</code>に従ってアライメントする空の項目（それ以外の場合は無視されます）</li>
+<li><b>'<code> </code>': </b>（スペース）無視されます</li>
+</ul><p>（"<code>[<em>n</em>]</code>" はオプションの整数を意味します。）パディング、スペース、および構成（オプション"<code>xX &lt;=&gt;!</code>"）を除き、各オプションは、<a href="#pdf-string.pack"><code>string.pack</code></a>の引数または<a href="#pdf-string.unpack"><code>string.unpack</code></a>の結果に対応します。</p><p>オプション "<code>!<em>n</em></code>", "<code>s<em>n</em></code>", "<code>i<em>n</em></code>", および "<code>I<em>n</em></code>" では、<code>n</code> は 1 から 16 までの任意の整数です。すべての整数オプションはオーバーフローをチェックします。 <a href="#pdf-string.pack"><code>string.pack</code></a> は、指定された値が指定されたサイズに収まるかどうかをチェックし、<a href="#pdf-string.unpack"><code>string.unpack</code></a> は、読み取った値が Lua 整数に収まるかどうかをチェックします。符号なしオプションの場合、Lua 整数も符号なしの値として扱われます。</p><p>任意のフォーマット文字列は、"<code>!1=</code>" が前に付いているかのように開始します。つまり、最大アライメントが 1（アライメントなし）で、ネイティブエンディアンで開始します。</p><p>ネイティブエンディアンは、システム全体がビッグエンディアンまたはリトルエンディアンのいずれかであると想定します。パッキング関数は、混合エンディアンフォーマットの動作を正しくエミュレートしません。</p><p>アライメントは次のように機能します。各オプションについて、フォーマットは、データの開始オフセットがオプションサイズと最大アライメントの最小値の倍数になるまで、追加のパディングを取得します。この最小値は 2 のべき乗である必要があります。オプション "<code>c</code>" および "<code>z</code>" はアラインされません。オプション "<code>s</code>" は、開始整数のアライメントに従います。</p><p>すべてのパディングは、<a href="#pdf-string.pack"><code>string.pack</code></a> によってゼロで埋められ、<a href="#pdf-string.unpack"><code>string.unpack</code></a> によって無視されます。</p><h2>6.5 – <a name="6.5">UTF-8 サポート</a></h2>
+
+<p>このライブラリは、UTF-8 エンコーディングの基本的なサポートを提供します。このライブラリは、すべての関数を <a name="pdf-utf8"><code>utf8</code></a> テーブル内に提供します。このライブラリは、エンコーディングの処理以外に、Unicode のサポートを提供しません。文字分類など、文字の意味を必要とする操作は、その範囲外です。</p><p>特に明記しない限り、バイト位置をパラメータとして期待するすべての関数は、指定された位置がバイトシーケンスの開始であるか、サブジェクト文字列の長さプラス 1 であると想定します。文字列ライブラリと同様に、負のインデックスは文字列の末尾から数えます。</p><p>バイトシーケンスを作成する関数は、元の UTF-8 仕様で定義されているように、<code>0x7FFFFFFF</code> までのすべての値を受け入れます。これは、最大 6 バイトまでのバイトシーケンスを意味します。</p><p>バイトシーケンスを解釈する関数は、有効なシーケンス（整形式であり、過長でない）のみを受け入れます。デフォルトでは、<code>10FFFF</code> より大きい値とサロゲートを拒否し、有効な Unicode コードポイントになるバイトシーケンスのみを受け入れます。ブール値引数 <code>lax</code> が使用可能な場合、これらのチェックを解除し、<code>0x7FFFFFFF</code> までのすべての値を受け入れるようにします。（整形式でないシーケンスと過長なシーケンスは引き続き拒否されます。）</p><p>
+</p><hr /><h3><a name="pdf-utf8.char"><code>utf8.char (···)</code></a></h3>
+
+
+<p>0 個以上の整数を受け取り、それぞれを対応する UTF-8 バイトシーケンスに変換し、これらのシーケンスすべてを連結した文字列を返します。</p><p>
+</p><hr /><h3><a name="pdf-utf8.charpattern"><code>utf8.charpattern</code></a></h3>
+
+
+<p>パターン（関数ではなく文字列） "<code>[\0-\x7F\xC2-\xFD][\x80-\xBF]*</code>"（<a href="#6.4.1">§6.4.1</a>を参照）は、サブジェクトが有効な UTF-8 文字列であると仮定して、正確に 1 つの UTF-8 バイトシーケンスに一致します。</p><p>
+</p><hr /><h3><a name="pdf-utf8.codes"><code>utf8.codes (s [, lax])</code></a></h3>
+
+
+<p>次の構成で、</p><pre>     for p, c in utf8.codes(s) do <em>body</em> end
+</pre><p>文字列 <code>s</code> 内のすべての UTF-8 文字を反復処理し、<code>p</code> が位置（バイト単位）であり、<code>c</code> が各文字のコードポイントとなるように値を返します。無効なバイトシーケンスが見つかった場合はエラーが発生します。</p><p>
+</p><hr /><h3><a name="pdf-utf8.codepoint"><code>utf8.codepoint (s [, i [, j [, lax]]])</code></a></h3>
+
+
+<p>バイト位置 <code>i</code> と <code>j</code> の間（両方を含む）で開始される、<code>s</code> 内のすべての文字のコードポイント（整数として）を返します。<code>i</code> のデフォルトは 1 で、<code>j</code> のデフォルトは <code>i</code> です。無効なバイトシーケンスが見つかった場合はエラーが発生します。</p><p>
+</p><hr /><h3><a name="pdf-utf8.len"><code>utf8.len (s [, i [, j [, lax]]])</code></a></h3>
+
+
+<p>位置 <code>i</code> と <code>j</code> の間（両方を含む）で開始される文字列 <code>s</code> 内の UTF-8 文字の数を返します。<code>i</code> のデフォルトは 1 で、<code>j</code> のデフォルトは -1 です。無効なバイトシーケンスが見つかった場合は、<b>fail</b> と最初の無効なバイトの位置を返します。</p><p>
+</p><hr /><h3><a name="pdf-utf8.offset"><code>utf8.offset (s, n [, i])</code></a></h3>
+
+
+<p><code>s</code> の <code>n</code> 番目の文字（位置 <code>i</code> から数える）のエンコーディングが開始する位置（バイト単位）を返します。負の <code>n</code> は、位置 <code>i</code> より前の文字を取得します。<code>n</code> が非負の場合、<code>i</code> のデフォルトは 1 であり、それ以外の場合は <code>#s + 1</code> であるため、<code>utf8.offset(s, -n)</code> は文字列の末尾から <code>n</code> 番目の文字のオフセットを取得します。指定された文字がサブジェクト内にもその直後にもない場合、関数は <b>fail</b> を返します。</p><p>特別なケースとして、<code>n</code> が 0 の場合、関数は <code>s</code> の <code>i</code> 番目のバイトを含む文字のエンコーディングの開始を返します。</p><p>この関数は、<code>s</code> が有効な UTF-8 文字列であることを前提としています。</p><h2>6.6 – <a name="6.6">テーブル操作</a></h2>
+
+<p>このライブラリは、テーブル操作のための汎用関数を提供します。このライブラリは、すべての関数を <a name="pdf-table"><code>table</code></a> テーブル内に提供します。</p><p>操作でテーブルの長さが必要な場合は常に、長さ演算子に関するすべての注意が適用されることに注意してください（<a href="#3.4.7">§3.4.7</a>を参照）。すべての関数は、引数として指定されたテーブル内の数値以外のキーを無視します。</p><p>
+</p><hr /><h3><a name="pdf-table.concat"><code>table.concat (list [, sep [, i [, j]]])</code></a></h3>
+
+
+<p>すべての要素が文字列または数値であるリストが与えられた場合、文字列 <code>list[i]..sep..list[i+1] ··· sep..list[j]</code> を返します。<code>sep</code> のデフォルト値は空文字列で、<code>i</code> のデフォルトは 1 で、<code>j</code> のデフォルトは <code>#list</code> です。<code>i</code> が <code>j</code> より大きい場合は、空文字列を返します。</p><p>
+</p><hr /><h3><a name="pdf-table.insert"><code>table.insert (list, [pos,] value)</code></a></h3>
+
+
+<p><code>list</code> の位置 <code>pos</code> に要素 <code>value</code> を挿入し、要素 <code>list[pos], list[pos+1], ···, list[#list]</code> を上にシフトします。<code>pos</code> のデフォルト値は <code>#list+1</code> であるため、<code>table.insert(t,x)</code> を呼び出すと、<code>x</code> がリスト <code>t</code> の末尾に挿入されます。</p><p>
+</p><hr /><h3><a name="pdf-table.move"><code>table.move (a1, f, e, t [,a2])</code></a></h3>
+
+
+<p>テーブル <code>a1</code> からテーブル <code>a2</code> に要素を移動し、次の多重代入と同等の処理を実行します: <code>a2[t],··· = a1[f],···,a1[e]</code>。<code>a2</code> のデフォルトは <code>a1</code> です。移動先範囲は、移動元範囲と重複する可能性があります。移動する要素の数は、Lua 整数に収まる必要があります。</p><p>移動先テーブル <code>a2</code> を返します。</p><p>
+</p><hr /><h3><a name="pdf-table.pack"><code>table.pack (···)</code></a></h3>
+
+
+<p>すべての引数をキー 1、2 などに格納し、引数の総数を持つフィールド "<code>n</code>" を含む新しいテーブルを返します。一部の引数が <b>nil</b> の場合、結果のテーブルがシーケンスではない場合があることに注意してください。</p><p>
+</p><hr /><h3><a name="pdf-table.remove"><code>table.remove (list [, pos])</code></a></h3>
+
+
+<p><code>list</code> から位置 <code>pos</code> の要素を削除し、削除された要素の値を返します。<code>pos</code> が 1 から <code>#list</code> の間の整数である場合、要素 <code>list[pos+1], list[pos+2], ···, list[#list]</code> を下にシフトし、要素 <code>list[#list]</code> を消去します。インデックス <code>pos</code> は、<code>#list</code> が 0 の場合は 0 にすることも、<code>#list + 1</code> にすることもできます。</p><p><code>pos</code> のデフォルト値は <code>#list</code> であるため、<code>table.remove(l)</code> を呼び出すと、リスト <code>l</code> の最後の要素が削除されます。</p><p>
+</p><hr /><h3><a name="pdf-table.sort"><code>table.sort (list [, comp])</code></a></h3>
+
+
+<p>リスト要素を指定された順序で、<em>インプレース</em> で <code>list[1]</code> から <code>list[#list]</code> までソートします。<code>comp</code> が指定されている場合は、2 つのリスト要素を受け取り、最終的な順序で最初の要素が 2 番目の要素の前に来る必要がある場合に true を返す関数である必要があります。したがって、ソート後、<code>i &lt;= j</code> は <code>not comp(list[j],list[i])</code> を意味します。<code>comp</code> が指定されていない場合は、代わりに標準の Lua 演算子 <code>&lt;</code> が使用されます。</p><p><code>comp</code> 関数は、一貫した順序を定義する必要があります。より正式には、関数は厳密な弱順序を定義する必要があります。（弱順序は全順序に似ていますが、比較目的で異なる要素を同等に扱うことができます。）</p><p>ソートアルゴリズムは安定していません。指定された順序で等しいと見なされる異なる要素は、ソートによって相対位置が変更される可能性があります。</p><p>
+</p><hr /><h3><a name="pdf-table.unpack"><code>table.unpack (list [, i [, j]])</code></a></h3>
+
+
+<p>指定されたリストから要素を返します。この関数は、次と同等です。</p><pre>     return list[i], list[i+1], ···, list[j]
+</pre><p>デフォルトでは、<code>i</code> は 1 で、<code>j</code> は <code>#list</code> です。</p><h2>6.7 – <a name="6.7">数学関数</a></h2>
+
+<p>このライブラリは、基本的な数学関数を提供します。このライブラリは、すべての関数と定数を <a name="pdf-math"><code>math</code></a> テーブル内に提供します。「<code>integer/float</code>」の注釈が付いた関数は、整数引数に対しては整数結果を、非整数引数に対しては浮動小数点結果を返します。丸め関数 <a href="#pdf-math.ceil"><code>math.ceil</code></a>、<a href="#pdf-math.floor"><code>math.floor</code></a>、および <a href="#pdf-math.modf"><code>math.modf</code></a> は、結果が整数の範囲に収まる場合は整数を、それ以外の場合は浮動小数点数を返します。</p><p>
+</p><hr /><h3><a name="pdf-math.abs"><code>math.abs (x)</code></a></h3>
+
+
+<p><code>x</code> と <code>-x</code> の間の最大値を返します。（整数/浮動小数点）</p><p>
+</p><hr /><h3><a name="pdf-math.acos"><code>math.acos (x)</code></a></h3>
+
+
+<p><code>x</code> の逆コサイン（ラジアン単位）を返します。</p><p>
+</p><hr /><h3><a name="pdf-math.asin"><code>math.asin (x)</code></a></h3>
+
+
+<p><code>x</code> の逆サイン（ラジアン単位）を返します。</p><p>
+</p><hr /><h3><a name="pdf-math.atan"><code>math.atan (y [, x])</code></a></h3>
+
+
+<p><code>y/x</code> の逆タンジェント（ラジアン単位）を、両方の引数の符号を使用して結果の象限を求めながら返します。<code>x</code> がゼロの場合も正しく処理します。</p><p><code>x</code> のデフォルト値は 1 であるため、<code>math.atan(y)</code> を呼び出すと <code>y</code> の逆タンジェントが返されます。</p><p>
+</p><hr /><h3><a name="pdf-math.ceil"><code>math.ceil (x)</code></a></h3>
+
+
+<p><code>x</code> 以上の最小の整数値を返します。</p><p>
+</p><hr /><h3><a name="pdf-math.cos"><code>math.cos (x)</code></a></h3>
+
+
+<p><code>x</code> のコサイン（ラジアン単位であると仮定）を返します。</p><p>
+</p><hr /><h3><a name="pdf-math.deg"><code>math.deg (x)</code></a></h3>
+
+
+<p>角度 <code>x</code> をラジアンから度に変換します。</p><p>
+</p><hr /><h3><a name="pdf-math.exp"><code>math.exp (x)</code></a></h3>
+
+
+<p>値 <em>e<sup>x</sup></em> を返します（ここで、<code>e</code> は自然対数の底です）。</p><p>
+</p><hr /><h3><a name="pdf-math.floor"><code>math.floor (x)</code></a></h3>
+
+
+<p><code>x</code> 以下の最大の整数値を返します。</p><p>
+</p><hr /><h3><a name="pdf-math.fmod"><code>math.fmod (x, y)</code></a></h3>
+
+
+<p>商をゼロに向かって丸める、<code>x</code> を <code>y</code> で割った余りを返します。（整数/浮動小数点）</p><p>
+</p><hr /><h3><a name="pdf-math.huge"><code>math.huge</code></a></h3>
+
+
+<p>浮動小数点値 <code>HUGE_VAL</code>。他の任意の数値よりも大きい値です。</p><p>
+</p><hr /><h3><a name="pdf-math.log"><code>math.log (x [, base])</code></a></h3>
+
+
+<p>指定された底での <code>x</code> の対数を返します。<code>base</code> のデフォルトは <em>e</em> です（したがって、関数は <code>x</code> の自然対数を返します）。</p><p>
+</p><hr /><h3><a name="pdf-math.max"><code>math.max (x, ···)</code></a></h3>
+
+
+<p>Lua 演算子 <code>&lt;</code> に従って、最大値を持つ引数を返します。</p><p>
+</p><hr /><h3><a name="pdf-math.maxinteger"><code>math.maxinteger</code></a></h3>整数の最大値を持つ整数。<p>
+</p><hr /><h3><a name="pdf-math.min"><code>math.min (x, ···)</code></a></h3>
+
+
+<p>Luaの演算子<code>&lt;</code>に従って、最小値を持つ引数を返します。</p><p>
+</p><hr /><h3><a name="pdf-math.mininteger"><code>math.mininteger</code></a></h3>整数の最小値を表す整数。<p>
+</p><hr /><h3><a name="pdf-math.modf"><code>math.modf (x)</code></a></h3>
+
+
+<p><code>x</code>の整数部分と小数部分を返します。2番目の結果は常に浮動小数点数です。</p><p>
+</p><hr /><h3><a name="pdf-math.pi"><code>math.pi</code></a></h3>
+
+
+<p><em>π</em>の値。</p><p>
+</p><hr /><h3><a name="pdf-math.rad"><code>math.rad (x)</code></a></h3>
+
+
+<p>角度<code>x</code>を度からラジアンに変換します。</p><p>
+</p><hr /><h3><a name="pdf-math.random"><code>math.random ([m [, n]])</code></a></h3>
+
+
+<p>引数なしで呼び出された場合、範囲<em>[0,1)</em>で一様分布する擬似乱数浮動小数点数を返します。2つの整数<code>m</code>と<code>n</code>で呼び出された場合、<code>math.random</code>は範囲<em>[m, n]</em>で一様分布する擬似乱数整数を返します。正の<code>n</code>に対する呼び出し<code>math.random(n)</code>は、<code>math.random(1,n)</code>と同等です。呼び出し<code>math.random(0)</code>は、すべてのビットが（擬似）ランダムな整数を生成します。</p><p>この関数は、擬似乱数64ビット整数を生成するために<code>xoshiro256**</code>アルゴリズムを使用します。これらは、引数0で呼び出した結果です。他の結果（範囲と浮動小数点数）は、これらの整数から偏りなく抽出されます。</p><p>Luaは、<a href="#pdf-math.randomseed"><code>math.randomseed</code></a>を引数なしで呼び出した場合と同様の方法で擬似乱数ジェネレーターを初期化するため、<code>math.random</code>はプログラムが実行されるたびに異なる結果のシーケンスを生成する必要があります。</p><p>
+</p><hr /><h3><a name="pdf-math.randomseed"><code>math.randomseed ([x [, y]])</code></a></h3>
+
+
+<p>少なくとも1つの引数で呼び出された場合、整数パラメータ<code>x</code>と<code>y</code>は、擬似乱数ジェネレーターを再初期化するために使用される128ビットの<em>シード</em>に結合されます。等しいシードは、等しい数のシーケンスを生成します。<code>y</code>のデフォルトはゼロです。</p><p>引数なしで呼び出された場合、Luaはランダム化を弱く試みたシードを生成します。</p><p>この関数は、実際に使用された2つのシードコンポーネントを返すため、それらを再度設定するとシーケンスが繰り返されます。</p><p>初期状態に必要なレベルのランダム性を確保するため（または逆に、たとえばプログラムのデバッグ時に決定的なシーケンスを持たせるため）、明示的な引数を使用して<a href="#pdf-math.randomseed"><code>math.randomseed</code></a>を呼び出す必要があります。</p><p>
+</p><hr /><h3><a name="pdf-math.sin"><code>math.sin (x)</code></a></h3>
+
+
+<p><code>x</code>のサイン（ラジアン単位とみなされます）を返します。</p><p>
+</p><hr /><h3><a name="pdf-math.sqrt"><code>math.sqrt (x)</code></a></h3>
+
+
+<p><code>x</code>の平方根を返します。（この値を計算するには、式<code>x^0.5</code>を使用することもできます。）</p><p>
+</p><hr /><h3><a name="pdf-math.tan"><code>math.tan (x)</code></a></h3>
+
+
+<p><code>x</code>のタンジェント（ラジアン単位とみなされます）を返します。</p><p>
+</p><hr /><h3><a name="pdf-math.tointeger"><code>math.tointeger (x)</code></a></h3>
+
+
+<p>値<code>x</code>が整数に変換可能な場合、その整数を返します。それ以外の場合は、<b>fail</b>を返します。</p><p>
+</p><hr /><h3><a name="pdf-math.type"><code>math.type (x)</code></a></h3>
+
+
+<p><code>x</code>が整数の場合は "<code>integer</code>"、浮動小数点数の場合は "<code>float</code>"、<code>x</code>が数値でない場合は<b>fail</b>を返します。</p><p>
+</p><hr /><h3><a name="pdf-math.ult"><code>math.ult (m, n)</code></a></h3>
+
+
+<p>整数<code>m</code>が符号なし整数として比較されたときに整数<code>n</code>より小さい場合に限り、ブール値<b>true</b>を返します。</p><h2>6.8 – <a name="6.8">入出力機能</a></h2>
+
+<p>I/Oライブラリは、ファイル操作に2つの異なるスタイルを提供します。最初のスタイルは暗黙的なファイルハンドルを使用します。つまり、デフォルトの入力ファイルとデフォルトの出力ファイルを設定する操作があり、すべての入出力操作はこれらのデフォルトファイルに対して行われます。2番目のスタイルは明示的なファイルハンドルを使用します。</p><p>暗黙的なファイルハンドルを使用する場合、すべての操作はテーブル<a name="pdf-io"><code>io</code></a>によって提供されます。明示的なファイルハンドルを使用する場合、操作<a href="#pdf-io.open"><code>io.open</code></a>はファイルハンドルを返し、すべての操作はファイルハンドルのメソッドとして提供されます。</p><p>ファイルハンドルのメタテーブルは、呼び出されたときにファイルを閉じようとする<code>__gc</code>と<code>__close</code>のメタメソッドを提供します。</p><p>テーブル<code>io</code>は、Cからの通常の意味を持つ3つの定義済みのファイルハンドルも提供します。<a name="pdf-io.stdin"><code>io.stdin</code></a>、<a name="pdf-io.stdout"><code>io.stdout</code></a>、および<a name="pdf-io.stderr"><code>io.stderr</code></a>。I/Oライブラリはこれらのファイルを閉じることはありません。</p><p>特に明記されていない限り、すべてのI/O関数は失敗した場合に<b>fail</b>を返し、さらに2番目の結果としてエラーメッセージ、3番目の結果としてシステム依存のエラーコード、成功した場合はfalse以外の値を返します。非POSIXシステムでは、エラーの場合のエラーメッセージとエラーコードの計算は、グローバルC変数<code>errno</code>に依存するため、スレッドセーフでない場合があります。</p><p>
+</p><hr /><h3><a name="pdf-io.close"><code>io.close ([file])</code></a></h3>
+
+
+<p><code>file:close()</code>と同等です。<code>file</code>がない場合は、デフォルトの出力ファイルを閉じます。</p><p>
+</p><hr /><h3><a name="pdf-io.flush"><code>io.flush ()</code></a></h3>
+
+
+<p><code>io.output():flush()</code>と同等です。</p><p>
+</p><hr /><h3><a name="pdf-io.input"><code>io.input ([file])</code></a></h3>
+
+
+<p>ファイル名で呼び出された場合、指定されたファイル（テキストモード）を開き、そのハンドルをデフォルトの入力ファイルとして設定します。ファイルハンドルで呼び出された場合、このファイルハンドルをデフォルトの入力ファイルとして設定します。引数なしで呼び出された場合、現在のデフォルトの入力ファイルを返します。</p><p>エラーの場合、この関数はエラーコードを返すのではなく、エラーを発生させます。</p><p>
+</p><hr /><h3><a name="pdf-io.lines"><code>io.lines ([filename, ···])</code></a></h3>
+
+
+<p>指定されたファイル名を読み取りモードで開き、開いたファイルに対して<code>file:lines(···)</code>のように機能するイテレータ関数を返します。イテレータ関数が値を読み取ることができなかった場合、自動的にファイルを閉じます。イテレータ関数に加えて、<code>io.lines</code>は他の3つの値を返します。プレースホルダーとして2つの<b>nil</b>値、プラス作成されたファイルハンドルです。したがって、ジェネリック<b>for</b>ループで使用する場合、ループがエラーまたは<b>break</b>によって中断された場合でも、ファイルは閉じられます。</p><p>呼び出し<code>io.lines()</code>（ファイル名なし）は<code>io.input():lines("l")</code>と同等です。つまり、デフォルトの入力ファイルの行を反復処理します。この場合、イテレータはループが終了してもファイルを閉じません。</p><p>ファイルを開く際のエラーの場合、この関数はエラーコードを返すのではなく、エラーを発生させます。</p><p>
+</p><hr /><h3><a name="pdf-io.open"><code>io.open (filename [, mode])</code></a></h3>
+
+
+<p>この関数は、文字列<code>mode</code>で指定されたモードでファイルを開きます。成功した場合、新しいファイルハンドルを返します。</p><p><code>mode</code>文字列は、次のいずれかになります。</p><ul>
+<li><b>"<code>r</code>": </b>読み取りモード（デフォルト）;</li>
+<li><b>"<code>w</code>": </b>書き込みモード;</li>
+<li><b>"<code>a</code>": </b>追加モード;</li>
+<li><b>"<code>r+</code>": </b>更新モード、以前のすべてのデータは保持されます;</li>
+<li><b>"<code>w+</code>": </b>更新モード、以前のすべてのデータは消去されます;</li>
+<li><b>"<code>a+</code>": </b>追加更新モード、以前のデータは保持され、書き込みはファイルの最後にのみ許可されます。</li>
+</ul><p><code>mode</code>文字列の末尾には'<code>b</code>'を含めることもできます。これは、一部のシステムでファイルをバイナリモードで開くために必要です。</p><p>
+</p><hr /><h3><a name="pdf-io.output"><code>io.output ([file])</code></a></h3>
+
+
+<p><a href="#pdf-io.input"><code>io.input</code></a>と同様ですが、デフォルトの出力ファイルに対して動作します。</p><p>
+</p><hr /><h3><a name="pdf-io.popen"><code>io.popen (prog [, mode])</code></a></h3>
+
+
+<p>この関数はシステムに依存し、すべてのプラットフォームで使用できるわけではありません。</p><p>別のプロセスでプログラム<code>prog</code>を開始し、このプログラムからデータを読み取る（<code>mode</code>が<code>"r"</code>の場合、デフォルト）か、このプログラムにデータを書き込む（<code>mode</code>が<code>"w"</code>の場合）ために使用できるファイルハンドルを返します。</p><p>
+</p><hr /><h3><a name="pdf-io.read"><code>io.read (···)</code></a></h3>
+
+
+<p><code>io.input():read(···)</code>と同等です。</p><p>
+</p><hr /><h3><a name="pdf-io.tmpfile"><code>io.tmpfile ()</code></a></h3>
+
+
+<p>成功した場合、一時ファイルのハンドルを返します。このファイルは更新モードで開かれ、プログラムが終了すると自動的に削除されます。</p><p>
+</p><hr /><h3><a name="pdf-io.type"><code>io.type (obj)</code></a></h3>
+
+
+<p><code>obj</code>が有効なファイルハンドルであるかどうかを確認します。<code>obj</code>が開いているファイルハンドルの場合は文字列<code>"file"</code>、<code>obj</code>が閉じているファイルハンドルの場合は<code>"closed file"</code>、<code>obj</code>がファイルハンドルではない場合は<b>fail</b>を返します。</p><p>
+</p><hr /><h3><a name="pdf-io.write"><code>io.write (···)</code></a></h3>
+
+
+<p><code>io.output():write(···)</code>と同等です。</p><p>
+</p><hr /><h3><a name="pdf-file:close"><code>file:close ()</code></a></h3>
+
+
+<p><code>file</code>を閉じます。ファイルはハンドルがガベージコレクションされると自動的に閉じられますが、それには予測できない時間がかかることに注意してください。</p><p><a href="#pdf-io.popen"><code>io.popen</code></a>で作成されたファイルハンドルを閉じると、<a href="#pdf-file:close"><code>file:close</code></a>は<a href="#pdf-os.execute"><code>os.execute</code></a>によって返された同じ値を返します。</p><p>
+</p><hr /><h3><a name="pdf-file:flush"><code>file:flush ()</code></a></h3>
+
+
+<p><code>file</code>に書き込まれたデータを保存します。</p><p>
+</p><hr /><h3><a name="pdf-file:lines"><code>file:lines (···)</code></a></h3>
+
+
+<p>呼び出されるたびに、指定された形式に従ってファイルを読み取るイテレータ関数を返します。形式が指定されていない場合は、デフォルトとして "<code>l</code>" を使用します。例として、次の構文は</p><pre>     for c in file:lines(1) do <em>body</em> end
+</pre><p>現在の位置から始まるファイルのすべての文字を反復処理します。<a href="#pdf-io.lines"><code>io.lines</code></a>とは異なり、この関数はループが終了してもファイルを閉じません。</p><p>
+</p><hr /><h3><a name="pdf-file:read"><code>file:read (···)</code></a></h3>
+
+
+<p>何を読み取るかを指定する指定された形式に従って、ファイル<code>file</code>を読み取ります。形式ごとに、関数は読み取られた文字の文字列または数値を返すか、指定された形式でデータを読み取ることができない場合は<b>fail</b>を返します。（後者の場合、関数は後続の形式を読み取りません。）引数なしで呼び出された場合、次の行を読み取るデフォルトの形式を使用します（以下を参照）。</p><p>使用可能な形式は次のとおりです。</p><ul>
+
+<li><b>"<code>n</code>": </b>数値を読み取り、Luaの字句規則に従って浮動小数点数または整数として返します。（数値には、先頭の空白と符号を含めることができます。）この形式は、常に数値の有効なプレフィックスである最長の入力シーケンスを読み取ります。そのプレフィックスが有効な数値を形成しない場合（たとえば、空の文字列、"<code>0x</code>"、または "<code>3.4e-</code>"）、または長すぎる場合（200文字を超える）、破棄され、形式は<b>fail</b>を返します。</li>
+
+<li><b>"<code>a</code>": </b>現在の位置から始まるファイル全体を読み取ります。ファイルの終わりに、空の文字列を返します。この形式は失敗しません。</li>
+
+<li><b>"<code>l</code>": </b>次の行を読み取り、行末をスキップし、ファイルの終わりに<b>fail</b>を返します。これはデフォルトの形式です。</li>
+
+<li><b>"<code>L</code>": </b>行末文字（存在する場合）を保持したまま、次の行を読み取り、ファイルの終わりに<b>fail</b>を返します。</li>
+
+<li><b><em>number</em>: </b>最大でこのバイト数の文字列を読み取り、ファイルの終わりに<b>fail</b>を返します。<code>number</code>がゼロの場合、何も読み取らず、空の文字列を返すか、ファイルの終わりに<b>fail</b>を返します。</li>
+
+</ul><p>形式"<code>l</code>"と"<code>L</code>"はテキストファイルに対してのみ使用する必要があります。</p><p>
+</p><hr /><h3><a name="pdf-file:seek"><code>file:seek ([whence [, offset]])</code></a></h3>
+
+
+<p>ファイルの先頭からのファイル位置を、文字列<code>whence</code>で指定されたベースに<code>offset</code>を加えた位置に設定および取得します。以下のように</p><ul>
+<li><b>"<code>set</code>": </b>ベースは位置0（ファイルの先頭）です。</li>
+<li><b>"<code>cur</code>": </b>ベースは現在の位置です。</li>
+<li><b>"<code>end</code>": </b>ベースはファイルの末尾です。</li>
+</ul><p>成功した場合、<code>seek</code>は、ファイルの先頭からバイト単位で測定された最終的なファイル位置を返します。<code>seek</code>が失敗した場合、<b>fail</b>とエラーを説明する文字列を返します。</p><p><code>whence</code>のデフォルト値は<code>"cur"</code>で、<code>offset</code>のデフォルト値は0です。したがって、呼び出し<code>file:seek()</code>は、現在のファイル位置を返しますが、変更はしません。呼び出し<code>file:seek("set")</code>は、位置をファイルの先頭に設定し（0を返します）。呼び出し<code>file:seek("end")</code>は、位置をファイルの末尾に設定し、そのサイズを返します。</p><p>
+</p><hr /><h3><a name="pdf-file:setvbuf"><code>file:setvbuf (mode [, size])</code></a></h3>
+
+
+<p>ファイルに対するバッファリングモードを設定します。3つのモードが利用可能です。</p><ul>
+<li><b>"<code>no</code>": </b> バッファリングなし。</li>
+<li><b>"<code>full</code>": </b> フルバッファリング。</li>
+<li><b>"<code>line</code>": </b> 行バッファリング。</li>
+</ul>
+
+<p>最後の2つのケースでは、<code>size</code>はバッファのサイズ（バイト単位）のヒントです。デフォルトは適切なサイズです。</p><p>各モードの具体的な動作は移植性がないため、詳細についてはプラットフォームの基盤となるISO&nbsp;C関数<code>setvbuf</code>を確認してください。</p><p>
+</p><hr /><h3><a name="pdf-file:write"><code>file:write (···)</code></a></h3>
+
+
+<p>引数のそれぞれの値を<code>file</code>に書き込みます。引数は文字列または数値である必要があります。</p><p>成功した場合、この関数は<code>file</code>を返します。</p><h2>6.9 – <a name="6.9">オペレーティングシステム機能</a></h2>
+
+<p>このライブラリは、テーブル<a name="pdf-os"><code>os</code></a>を通して実装されています。</p><p>
+</p><hr /><h3><a name="pdf-os.clock"><code>os.clock ()</code></a></h3>
+
+
+<p>プログラムが使用したCPU時間の概算（秒単位）を、基盤となるISO&nbsp;C関数<code>clock</code>によって返される値として返します。</p><p>
+</p><hr /><h3><a name="pdf-os.date"><code>os.date ([format [, time]])</code></a></h3>
+
+
+<p>指定された文字列<code>format</code>に従ってフォーマットされた、日付と時間を含む文字列またはテーブルを返します。</p><p><code>time</code>引数が存在する場合、これはフォーマットされる時間です（この値の説明については<a href="#pdf-os.time"><code>os.time</code></a>関数を参照してください）。それ以外の場合、<code>date</code>は現在の時間をフォーマットします。</p><p><code>format</code>が'<code>!</code>'で始まる場合、日付は協定世界時でフォーマットされます。このオプションの文字の後、<code>format</code>が文字列"<code>*t</code>"の場合、<code>date</code>は次のフィールドを持つテーブルを返します：<code>year</code>、<code>month</code>（1–12）、<code>day</code>（1–31）、<code>hour</code>（0–23）、<code>min</code>（0–59）、<code>sec</code>（うるう秒のため0–61）、<code>wday</code>（曜日、1–7、日曜日は1）、<code>yday</code>（年の日数、1–366）、および<code>isdst</code>（夏時間フラグ、ブール値）。この最後のフィールドは、情報が利用できない場合は存在しない可能性があります。</p><p><code>format</code>が"<code>*t</code>"でない場合、<code>date</code>はISO&nbsp;C関数<code>strftime</code>と同じルールに従ってフォーマットされた日付を文字列として返します。</p><p><code>format</code>がない場合、デフォルトは"<code>%c</code>"になり、これは現在のロケールを使用して人間が読める日付と時刻の表現を提供します。</p><p>非POSIXシステムでは、この関数はC&nbsp;関数<code>gmtime</code>およびC&nbsp;関数<code>localtime</code>に依存しているため、スレッドセーフでない場合があります。</p><p>
+</p><hr /><h3><a name="pdf-os.difftime"><code>os.difftime (t2, t1)</code></a></h3>
+
+
+<p>時間<code>t1</code>から時間<code>t2</code>までの差（秒単位）を返します（ここで、時間は<a href="#pdf-os.time"><code>os.time</code></a>によって返される値です）。POSIX、Windows、および他のいくつかのシステムでは、この値は正確に<code>t2</code><em>-</em><code>t1</code>です。</p><p>
+</p><hr /><h3><a name="pdf-os.execute"><code>os.execute ([command])</code></a></h3>
+
+
+<p>この関数は、ISO&nbsp;C関数<code>system</code>と同等です。オペレーティングシステムのシェルによって実行されるように<code>command</code>を渡します。その最初の結果は、コマンドが正常に終了した場合は<b>true</b>、それ以外の場合は<b>fail</b>です。この最初の結果の後、関数は以下のように、文字列と数値を返します。</p><ul>
+
+<li><b>"<code>exit</code>": </b> コマンドが正常に終了しました。次の数値は、コマンドの終了ステータスです。</li>
+
+<li><b>"<code>signal</code>": </b> コマンドがシグナルによって終了しました。次の数値は、コマンドを終了したシグナルです。</li>
+
+</ul>
+
+<p><code>command</code>なしで呼び出された場合、<code>os.execute</code>はシェルが利用可能な場合はtrueであるブール値を返します。</p><p>
+</p><hr /><h3><a name="pdf-os.exit"><code>os.exit ([code [, close]])</code></a></h3>
+
+
+<p>ホストプログラムを終了するためにISO&nbsp;C関数<code>exit</code>を呼び出します。<code>code</code>が<b>true</b>の場合、返されるステータスは<code>EXIT_SUCCESS</code>です。<code>code</code>が<b>false</b>の場合、返されるステータスは<code>EXIT_FAILURE</code>です。<code>code</code>が数値の場合、返されるステータスはこの数値です。<code>code</code>のデフォルト値は<b>true</b>です。</p><p>オプションの2番目の引数<code>close</code>がtrueの場合、関数は終了する前にLua状態を閉じます（<a href="#lua_close"><code>lua_close</code></a>を参照）。</p><p>
+</p><hr /><h3><a name="pdf-os.getenv"><code>os.getenv (varname)</code></a></h3>
+
+
+<p>プロセス環境変数<code>varname</code>の値を返します。変数定義されていない場合は<b>fail</b>を返します。</p><p>
+</p><hr /><h3><a name="pdf-os.remove"><code>os.remove (filename)</code></a></h3>
+
+
+<p>指定された名前のファイル（またはPOSIXシステム上の空のディレクトリ）を削除します。この関数が失敗した場合、<b>fail</b>に加えて、エラーとエラーコードを説明する文字列を返します。それ以外の場合は、trueを返します。</p><p>
+</p><hr /><h3><a name="pdf-os.rename"><code>os.rename (oldname, newname)</code></a></h3>
+
+
+<p><code>oldname</code>という名前のファイルまたはディレクトリを<code>newname</code>に名前変更します。この関数が失敗した場合、<b>fail</b>に加えて、エラーとエラーコードを説明する文字列を返します。それ以外の場合は、trueを返します。</p><p>
+</p><hr /><h3><a name="pdf-os.setlocale"><code>os.setlocale (locale [, category])</code></a></h3>
+
+
+<p>プログラムの現在のロケールを設定します。<code>locale</code>はロケールを指定するシステム依存の文字列です。<code>category</code>は変更するカテゴリを説明するオプションの文字列です：<code>"all"</code>、<code>"collate"</code>、<code>"ctype"</code>、<code>"monetary"</code>、<code>"numeric"</code>、または<code>"time"</code>。デフォルトのカテゴリは<code>"all"</code>です。この関数は新しいロケールの名前を返します。リクエストが受け入れられない場合は<b>fail</b>を返します。</p><p><code>locale</code>が空の文字列の場合、現在のロケールは実装定義のネイティブロケールに設定されます。<code>locale</code>が文字列"<code>C</code>"の場合、現在のロケールは標準Cロケールに設定されます。</p><p>最初の引数として<b>nil</b>を付けて呼び出された場合、この関数は指定されたカテゴリの現在のロケールの名前のみを返します。</p><p>この関数は、C&nbsp;関数<code>setlocale</code>に依存しているため、スレッドセーフでない場合があります。</p><p>
+</p><hr /><h3><a name="pdf-os.time"><code>os.time ([table])</code></a></h3>
+
+
+<p>引数なしで呼び出された場合は現在の時刻を返します。または、指定されたテーブルで指定されたローカルの日時を表す時刻を返します。このテーブルには、フィールド<code>year</code>、<code>month</code>、および<code>day</code>が必要であり、フィールド<code>hour</code>（デフォルトは12）、<code>min</code>（デフォルトは0）、<code>sec</code>（デフォルトは0）、および<code>isdst</code>（デフォルトは<b>nil</b>）を持つことができます。他のフィールドは無視されます。これらのフィールドの説明については、<a href="#pdf-os.date"><code>os.date</code></a>関数を参照してください。</p><p>関数が呼び出されると、これらのフィールドの値が有効な範囲内にある必要はありません。たとえば、<code>sec</code>が-10の場合、他のフィールドで指定された時間の10秒前を意味します。<code>hour</code>が1000の場合、他のフィールドで指定された時間の1000時間後を意味します。</p><p>返される値は数値であり、その意味はシステムによって異なります。POSIX、Windows、およびその他のいくつかのシステムでは、この数値はある特定の開始時間（「エポック」）からの秒数をカウントします。他のシステムでは、意味は指定されておらず、<code>time</code>によって返される数値は、<a href="#pdf-os.date"><code>os.date</code></a>および<a href="#pdf-os.difftime"><code>os.difftime</code></a>への引数としてのみ使用できます。</p><p>テーブルで呼び出された場合、<code>os.time</code>は<a href="#pdf-os.date"><code>os.date</code></a>関数でドキュメント化されているすべてのフィールドも正規化するため、呼び出し前と同じ時刻を表しますが、値は有効な範囲内になります。</p><p>
+</p><hr /><h3><a name="pdf-os.tmpname"><code>os.tmpname ()</code></a></h3>
+
+
+<p>一時ファイルに使用できるファイル名を持つ文字列を返します。ファイルは、使用する前に明示的に開き、不要になったら明示的に削除する必要があります。</p><p>POSIXシステムでは、この関数はセキュリティリスクを回避するために、その名前のファイルも作成します。（名前を取得してからファイルを作成するまでの間に、別の誰かが間違った権限でファイルを作成する可能性があります。）ファイルを使用するためにファイルを開き、削除する必要があるのは変わりません（たとえ使用しなくても）。</p><p>可能であれば、プログラムが終了したときにファイルを自動的に削除する<a href="#pdf-io.tmpfile"><code>io.tmpfile</code></a>を使用することをお勧めします。</p><h2>6.10 – <a name="6.10">デバッグライブラリ</a></h2>
+
+<p>このライブラリは、Luaプログラムへのデバッグインターフェイス（<a href="#4.7">§4.7</a>）の機能を提供します。このライブラリを使用するときは注意が必要です。そのいくつかの関数は、Luaコードに関する基本的な仮定（たとえば、関数のローカル変数は外部からアクセスできないこと、userdataメタテーブルはLuaコードで変更できないこと、Luaプログラムはクラッシュしないこと）に違反するため、そうでない場合は安全なコードを危険にさらす可能性があります。さらに、このライブラリの一部の関数は遅くなる可能性があります。</p><p>このライブラリのすべての関数は、<a name="pdf-debug"><code>debug</code></a>テーブル内に提供されています。スレッドを操作するすべての関数には、操作するスレッドであるオプションの最初の引数があります。デフォルトは常に現在のスレッドです。</p><p>
+</p><hr /><h3><a name="pdf-debug.debug"><code>debug.debug ()</code></a></h3>
+
+
+<p>ユーザーが入力した各文字列を実行して、ユーザーとの対話モードに入ります。単純なコマンドやその他のデバッグ機能を使用して、ユーザーはグローバル変数とローカル変数を検査したり、それらの値を変更したり、式を評価したりできます。単語<code>cont</code>のみを含む行は、この関数を終了させ、呼び出し元が実行を継続できるようにします。</p><p><code>debug.debug</code>のコマンドは、どの関数にも字句的にネストされていないため、ローカル変数に直接アクセスできないことに注意してください。</p><p>
+</p><hr /><h3><a name="pdf-debug.gethook"><code>debug.gethook ([thread])</code></a></h3>
+
+
+<p>スレッドの現在のフック設定を、3つの値として返します：現在のフック関数、現在のフックマスク、および<a href="#pdf-debug.sethook"><code>debug.sethook</code></a>関数によって設定された現在のフックカウント。</p><p>アクティブなフックがない場合は<b>fail</b>を返します。</p><p>
+</p><hr /><h3><a name="pdf-debug.getinfo"><code>debug.getinfo ([thread,] f [, what])</code></a></h3>
+
+
+<p>関数に関する情報を含むテーブルを返します。関数を直接指定することも、<code>f</code>の値として数値を指定することもできます。これは、指定されたスレッドの呼び出しスタックのレベル<code>f</code>で実行されている関数を意味します：レベル0は現在の関数（<code>getinfo</code>自体）です。レベル1は<code>getinfo</code>を呼び出した関数です（スタックにカウントされない末尾呼び出しを除く）。以下同様です。<code>f</code>がアクティブな関数の数よりも大きい数値の場合、<code>getinfo</code>は<b>fail</b>を返します。</p><p>返されるテーブルには、<a href="#lua_getinfo"><code>lua_getinfo</code></a>によって返されるすべてのフィールドを含めることができ、どのフィールドに入力するかを記述する文字列<code>what</code>を含めることができます。<code>what</code>のデフォルトは、有効な行のテーブルを除く、利用可能なすべての情報を取得することです。存在する場合、オプション「<code>f</code>」は、関数自体を持つ<code>func</code>という名前のフィールドを追加します。存在する場合、オプション「<code>L</code>」は、有効な行のテーブルを持つ<code>activelines</code>という名前のフィールドを追加します。</p><p>たとえば、式<code>debug.getinfo(1,"n").name</code>は、合理的な名前が見つかる場合は、現在の関数の名前を返し、式<code>debug.getinfo(print)</code>は、<a href="#pdf-print"><code>print</code></a>関数に関するすべての利用可能な情報を含むテーブルを返します。</p><p>
+</p><hr /><h3><a name="pdf-debug.getlocal"><code>debug.getlocal ([thread,] f, local)</code></a></h3>
+
+
+<p>この関数は、スタックのレベル<code>f</code>の関数のインデックス<code>local</code>を持つローカル変数の名前と値を返します。この関数は、明示的なローカル変数だけでなく、パラメータと一時的な値にもアクセスします。</p><p>最初のパラメータまたはローカル変数のインデックスは1であり、以下同様に、コードで宣言された順序に従い、関数の現在のスコープでアクティブな変数のみをカウントします。コンパイル時の定数は、コンパイラによって最適化された場合、このリストに表示されない場合があります。負のインデックスはvararg引数を参照します。-1は最初のvararg引数です。指定されたインデックスの変数が存在しない場合、関数は<b>fail</b>を返し、範囲外のレベルで呼び出された場合はエラーが発生します。（<a href="#pdf-debug.getinfo"><code>debug.getinfo</code></a>を呼び出して、レベルが有効かどうかを確認できます。）</p><p>「<code>(</code>」（左括弧）で始まる変数名は、名前が不明な変数（ループ制御変数などの内部変数、およびデバッグ情報なしで保存されたチャンクの変数）を表します。</p><p>パラメータ<code>f</code>は関数である場合もあります。その場合、<code>getlocal</code>は関数パラメータの名前のみを返します。</p><p>
+</p><hr /><h3><a name="pdf-debug.getmetatable"><code>debug.getmetatable (value)</code></a></h3>
+
+
+<p>指定された<code>value</code>のメタテーブルを返します。メタテーブルがない場合は<b>nil</b>を返します。</p><p>
+</p><hr /><h3><a name="pdf-debug.getregistry"><code>debug.getregistry ()</code></a></h3>
+
+
+<p>レジストリテーブルを返します（<a href="#4.3">§4.3</a>を参照）。</p><p>
+</p><hr /><h3><a name="pdf-debug.getupvalue"><code>debug.getupvalue (f, up)</code></a></h3>
+
+
+<p>この関数は、関数<code>f</code>のインデックス<code>up</code>を持つアップバリューの名前と値を返します。指定されたインデックスを持つアップバリューがない場合は、<b>fail</b>を返します。</p><p>（Lua関数の場合、アップバリューとは、関数が使用し、その結果としてクロージャに含まれる外部ローカル変数です。）</p><p>C言語関数の場合、この関数はすべてのアップバリューの名前として空の文字列<code>""</code>を使用します。</p><p>変数名'<code>?</code>'（疑問符）は、名前が不明な変数（デバッグ情報なしで保存されたチャンクからの変数）を表します。</p><p>
+</p><hr /><h3><a name="pdf-debug.getuservalue"><code>debug.getuservalue (u, n)</code></a></h3>
+
+
+<p>userdata <code>u</code>に関連付けられた<code>n</code>番目のユーザー値を返し、さらに、userdataがその値を持っていない場合は<b>false</b>のブール値を返します。</p><p>
+</p><hr /><h3><a name="pdf-debug.sethook"><code>debug.sethook ([thread,] hook, mask [, count])</code></a></h3>
+
+
+<p>指定された関数をデバッグフックとして設定します。文字列<code>mask</code>と数値<code>count</code>は、フックがいつ呼び出されるかを記述します。文字列マスクは、以下の文字を任意の組み合わせで持つことができ、それぞれの意味は以下のとおりです。</p><ul>
+<li><b>'<code>c</code>':</b> Luaが関数を呼び出すたびにフックが呼び出されます。</li>
+<li><b>'<code>r</code>':</b> Luaが関数から戻るたびにフックが呼び出されます。</li>
+<li><b>'<code>l</code>':</b> Luaが新しいコード行に入るたびにフックが呼び出されます。</li>
+</ul><p>さらに、0以外の<code>count</code>を指定すると、<code>count</code>命令ごとにフックが呼び出されます。</p><p>引数なしで呼び出された場合、<a href="#pdf-debug.sethook"><code>debug.sethook</code></a>はフックをオフにします。</p><p>フックが呼び出されると、その最初のパラメータは、呼び出しをトリガーしたイベントを記述する文字列です：<code>"call"</code>、<code>"tail call"</code>、<code>"return"</code>、<code>"line"</code>、および<code>"count"</code>。行イベントの場合、フックは2番目のパラメータとして新しい行番号も取得します。フック内では、レベル2で<code>getinfo</code>を呼び出して、実行中の関数に関する詳細情報を取得できます。（レベル0は<code>getinfo</code>関数、レベル1はフック関数です。）</p><p>
+</p><hr /><h3><a name="pdf-debug.setlocal"><code>debug.setlocal ([thread,] level, local, value)</code></a></h3>
+
+
+<p>この関数は、スタックのレベル<code>level</code>にある関数のインデックス<code>local</code>を持つローカル変数に値<code>value</code>を割り当てます。指定されたインデックスを持つローカル変数がない場合は<b>fail</b>を返し、範囲外の<code>level</code>で呼び出された場合はエラーを発生させます。（<code>getinfo</code>を呼び出して、レベルが有効かどうかを確認できます。）それ以外の場合は、ローカル変数の名前を返します。</p><p>変数インデックスと名前の詳細については、<a href="#pdf-debug.getlocal"><code>debug.getlocal</code></a>を参照してください。</p><p>
+</p><hr /><h3><a name="pdf-debug.setmetatable"><code>debug.setmetatable (value, table)</code></a></h3>
+
+
+<p>指定された<code>value</code>のメタテーブルを指定された<code>table</code>（<b>nil</b>にすることも可能）に設定します。<code>value</code>を返します。</p><p>
+</p><hr /><h3><a name="pdf-debug.setupvalue"><code>debug.setupvalue (f, up, value)</code></a></h3>
+
+
+<p>この関数は、関数<code>f</code>のインデックス<code>up</code>を持つアップバリューに値<code>value</code>を割り当てます。指定されたインデックスを持つアップバリューがない場合は<b>fail</b>を返します。それ以外の場合は、アップバリューの名前を返します。</p><p>アップバリューの詳細については、<a href="#pdf-debug.getupvalue"><code>debug.getupvalue</code></a>を参照してください。</p><p>
+</p><hr /><h3><a name="pdf-debug.setuservalue"><code>debug.setuservalue (udata, value, n)</code></a></h3>
+
+
+<p>指定された<code>value</code>を指定された<code>udata</code>に関連付けられた<code>n</code>番目のユーザー値として設定します。<code>udata</code>は完全なuserdataである必要があります。</p><p><code>udata</code>を返します。userdataがその値を持っていない場合は<b>fail</b>を返します。</p><p>
+</p><hr /><h3><a name="pdf-debug.traceback"><code>debug.traceback ([thread,] [message [, level]])</code></a></h3>
+
+
+<p><code>message</code>が存在するが、文字列でも<b>nil</b>でもない場合、この関数はそれ以上の処理を行わずに<code>message</code>を返します。それ以外の場合は、コールスタックのトレースバックを含む文字列を返します。オプションの<code>message</code>文字列は、トレースバックの先頭に追加されます。オプションの<code>level</code>数値は、トレースバックを開始するレベルを指定します（デフォルトは1、<code>traceback</code>を呼び出す関数です）。</p><p>
+</p><hr /><h3><a name="pdf-debug.upvalueid"><code>debug.upvalueid (f, n)</code></a></h3>
+
+
+<p>指定された関数の<code>n</code>番目のアップバリューの一意の識別子（ライトuserdataとして）を返します。</p><p>これらの固有の識別子により、プログラムは異なるクロージャがアップバリューを共有しているかどうかを確認できます。アップバリューを共有する（つまり、同じ外部ローカル変数にアクセスする）Luaクロージャは、それらのアップバリューインデックスに対して同一のIDを返します。</p><p>
+</p><hr /><h3><a name="pdf-debug.upvaluejoin"><code>debug.upvaluejoin (f1, n1, f2, n2)</code></a></h3>
+
+
+<p>Luaクロージャ<code>f1</code>の<code>n1</code>番目のアップバリューが、Luaクロージャ<code>f2</code>の<code>n2</code>番目のアップバリューを参照するようにします。</p>
+</body>
+</html>

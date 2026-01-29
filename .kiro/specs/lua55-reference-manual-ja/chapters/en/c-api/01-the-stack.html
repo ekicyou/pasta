@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lua 5.5 - Section 4.1</title>
+</head>
+<body>
+<h2>4.1 &ndash; <a name="4.1">The Stack</a></h2>
+
+
+
+<p>
+Lua uses a <em>virtual stack</em> to pass values to and from C.
+Each element in this stack represents a Lua value
+(<b>nil</b>, number, string, etc.).
+Functions in the API can access this stack through the
+Lua state parameter that they receive.
+
+
+<p>
+Whenever Lua calls C, the called function gets a new stack,
+which is independent of previous stacks and of stacks of
+C&nbsp;functions that are still active.
+This stack initially contains any arguments to the C&nbsp;function
+and it is where the C&nbsp;function can store temporary
+Lua values and must push its results
+to be returned to the caller (see <a href="#lua_CFunction"><code>lua_CFunction</code></a>).
+
+
+<p>
+For convenience,
+most query operations in the API do not follow a strict stack discipline.
+Instead, they can refer to any element in the stack
+by using an <em>index</em>:
+A positive index represents an absolute stack position,
+starting at&nbsp;1 as the bottom of the stack;
+a negative index represents an offset relative to the top of the stack.
+More specifically, if the stack has <em>n</em> elements,
+then index&nbsp;1 represents the first element
+(that is, the element that was pushed onto the stack first)
+and
+index&nbsp;<em>n</em> represents the last element;
+index&nbsp;-1 also represents the last element
+(that is, the element at the&nbsp;top)
+and index <em>-n</em> represents the first element.
+
+
+
+
+
+<h3>4.1.1 &ndash; <a name="4.1.1">Stack Size</a></h3>
+
+<p>
+When you interact with the Lua API,
+you are responsible for ensuring consistency.
+In particular,
+<em>you are responsible for controlling stack overflow</em>.
+When you call any API function,
+you must ensure the stack has enough room to accommodate the results.
+
+
+<p>
+There is one exception to the above rule:
+When you call a Lua function
+without a fixed number of results (see <a href="#lua_call"><code>lua_call</code></a>),
+Lua ensures that the stack has enough space for all results.
+However, it does not ensure any extra space.
+So, before pushing anything on the stack after such a call
+you should use <a href="#lua_checkstack"><code>lua_checkstack</code></a>.
+
+
+<p>
+Whenever Lua calls C,
+it ensures that the stack has space for
+at least <a name="pdf-LUA_MINSTACK"><code>LUA_MINSTACK</code></a> extra elements;
+that is, you can safely push up to <code>LUA_MINSTACK</code> values into it.
+<code>LUA_MINSTACK</code> is defined as 20,
+so that usually you do not have to worry about stack space
+unless your code has loops pushing elements onto the stack.
+Whenever necessary,
+you can use the function <a href="#lua_checkstack"><code>lua_checkstack</code></a>
+to ensure that the stack has enough space for pushing new elements.
+
+
+
+
+
+<h3>4.1.2 &ndash; <a name="4.1.2">Valid and Acceptable Indices</a></h3>
+
+<p>
+Any function in the API that receives stack indices
+works only with <em>valid indices</em> or <em>acceptable indices</em>.
+
+
+<p>
+A <em>valid index</em> is an index that refers to a
+position that stores a modifiable Lua value.
+It comprises stack indices between&nbsp;1 and the stack top
+(<code>1 &le; abs(index) &le; top</code>)
+
+plus <em>pseudo-indices</em>,
+which represent some positions that are accessible to C&nbsp;code
+but that are not in the stack.
+Pseudo-indices are used to access the registry (see <a href="#4.3">&sect;4.3</a>)
+and the upvalues of a C&nbsp;function (see <a href="#4.2">&sect;4.2</a>).
+
+
+<p>
+Functions that do not need a specific mutable position,
+but only a value (e.g., query functions),
+can be called with acceptable indices.
+An <em>acceptable index</em> can be any valid index,
+but it also can be any positive index after the stack top
+within the space allocated for the stack,
+that is, indices up to the stack size.
+(Note that 0 is never an acceptable index.)
+Indices to upvalues (see <a href="#4.2">&sect;4.2</a>) greater than the real number
+of upvalues in the current C&nbsp;function are also acceptable (but invalid).
+Except when noted otherwise,
+functions in the API work with acceptable indices.
+
+
+<p>
+Acceptable indices serve to avoid extra tests
+against the stack top when querying the stack.
+For instance, a C&nbsp;function can query its third argument
+without the need to check whether there is a third argument,
+that is, without the need to check whether 3 is a valid index.
+
+
+<p>
+For functions that can be called with acceptable indices,
+any non-valid index is treated as if it
+contains a value of a virtual type <a name="pdf-LUA_TNONE"><code>LUA_TNONE</code></a>,
+which behaves like a nil value.
+
+
+
+
+
+<h3>4.1.3 &ndash; <a name="4.1.3">Pointers to Strings</a></h3>
+
+<p>
+Several functions in the API return pointers (<code>const char*</code>)
+to Lua strings in the stack.
+(See <a href="#lua_pushfstring"><code>lua_pushfstring</code></a>, <a href="#lua_pushlstring"><code>lua_pushlstring</code></a>,
+<a href="#lua_pushstring"><code>lua_pushstring</code></a>, and <a href="#lua_tolstring"><code>lua_tolstring</code></a>.
+See also <a href="#luaL_checklstring"><code>luaL_checklstring</code></a>, <a href="#luaL_checkstring"><code>luaL_checkstring</code></a>,
+and <a href="#luaL_tolstring"><code>luaL_tolstring</code></a> in the auxiliary library.)
+
+
+<p>
+In general,
+Lua's garbage collection can free or move memory
+and then invalidate pointers to strings handled by a Lua state.
+To allow a safe use of these pointers,
+the API guarantees that any pointer to a string in a stack index
+is valid while the string value at that index is not removed from the stack.
+(It can be moved to another index, though.)
+When the index is a pseudo-index (referring to an upvalue),
+the pointer is valid while the corresponding call is active and
+the corresponding upvalue is not modified.
+
+
+<p>
+Some functions in the debug interface
+also return pointers to strings,
+namely <a href="#lua_getlocal"><code>lua_getlocal</code></a>, <a href="#lua_getupvalue"><code>lua_getupvalue</code></a>,
+<a href="#lua_setlocal"><code>lua_setlocal</code></a>, and <a href="#lua_setupvalue"><code>lua_setupvalue</code></a>.
+For these functions, the pointer is guaranteed to
+be valid while the caller function is active and
+the given closure (if one was given) is in the stack.
+
+
+<p>
+Except for these guarantees,
+the garbage collector is free to invalidate
+any pointer to internal strings.
+
+
+
+
+
+
+
+
+</body>
+</html>

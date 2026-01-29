@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lua 5.5 - Section 6.8</title>
+</head>
+<body>
+<h2>6.8 &ndash; <a name="6.8">Mathematical Functions</a></h2>
+
+<p>
+This library provides basic mathematical functions.
+It provides all its functions and constants inside the table <a name="pdf-math"><code>math</code></a>.
+Functions with the annotation "<code>integer/float</code>" give
+integer results for integer arguments
+and float results for non-integer arguments.
+The rounding functions
+<a href="#pdf-math.ceil"><code>math.ceil</code></a>, <a href="#pdf-math.floor"><code>math.floor</code></a>, and <a href="#pdf-math.modf"><code>math.modf</code></a>
+return an integer when the result fits in the range of an integer,
+or a float otherwise.
+
+
+<p>
+<hr><h3><a name="pdf-math.abs"><code>math.abs (x)</code></a></h3>
+
+
+<p>
+Returns the maximum value between <code>x</code> and <code>-x</code>. (integer/float)
+
+
+
+
+<p>
+<hr><h3><a name="pdf-math.acos"><code>math.acos (x)</code></a></h3>
+
+
+<p>
+Returns the arc cosine of <code>x</code> (in radians).
+
+
+
+
+<p>
+<hr><h3><a name="pdf-math.asin"><code>math.asin (x)</code></a></h3>
+
+
+<p>
+Returns the arc sine of <code>x</code> (in radians).
+
+
+
+
+<p>
+<hr><h3><a name="pdf-math.atan"><code>math.atan (y [, x])</code></a></h3>
+
+
+<p>
+ 
+Returns the arc tangent of <code>y/x</code> (in radians),
+using the signs of both arguments to find the
+quadrant of the result.
+It also handles correctly the case of <code>x</code> being zero.
+
+
+<p>
+The default value for <code>x</code> is 1,
+so that the call <code>math.atan(y)</code>
+returns the arc tangent of <code>y</code>.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-math.ceil"><code>math.ceil (x)</code></a></h3>
+
+
+<p>
+Returns the smallest integral value greater than or equal to <code>x</code>.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-math.cos"><code>math.cos (x)</code></a></h3>
+
+
+<p>
+Returns the cosine of <code>x</code> (assumed to be in radians).
+
+
+
+
+<p>
+<hr><h3><a name="pdf-math.deg"><code>math.deg (x)</code></a></h3>
+
+
+<p>
+Converts the angle <code>x</code> from radians to degrees.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-math.exp"><code>math.exp (x)</code></a></h3>
+
+
+<p>
+Returns the value <em>e<sup>x</sup></em>
+(where <code>e</code> is the base of natural logarithms).
+
+
+
+
+<p>
+<hr><h3><a name="pdf-math.floor"><code>math.floor (x)</code></a></h3>
+
+
+<p>
+Returns the largest integral value less than or equal to <code>x</code>.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-math.fmod"><code>math.fmod (x, y)</code></a></h3>
+
+
+<p>
+Returns the remainder of the division of <code>x</code> by <code>y</code>
+that rounds the quotient towards zero. (integer/float)
+
+
+
+
+<p>
+<hr><h3><a name="pdf-math.frexp"><code>math.frexp (x)</code></a></h3>
+
+
+<p>
+Returns two numbers <code>m</code> and <code>e</code> such that <em>x = m2<sup>e</sup></em>,
+where <code>e</code> is an integer.
+When <code>x</code> is zero, NaN, +inf, or -inf,
+<code>m</code> is equal to <code>x</code>;
+otherwise, the absolute value of <code>m</code>
+is in the range  <em>[0.5, 1)</em> .
+
+
+
+
+<p>
+<hr><h3><a name="pdf-math.huge"><code>math.huge</code></a></h3>
+
+
+<p>
+The float value <code>HUGE_VAL</code>,
+a value greater than any other numeric value.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-math.ldexp"><code>math.ldexp (m, e)</code></a></h3>
+
+
+<p>
+Returns <em>m2<sup>e</sup></em>, where <code>e</code> is an integer.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-math.log"><code>math.log (x [, base])</code></a></h3>
+
+
+<p>
+Returns the logarithm of <code>x</code> in the given base.
+The default for <code>base</code> is <em>e</em>
+(so that the function returns the natural logarithm of <code>x</code>).
+
+
+
+
+<p>
+<hr><h3><a name="pdf-math.max"><code>math.max (x, &middot;&middot;&middot;)</code></a></h3>
+
+
+<p>
+Returns the argument with the maximum value,
+according to the Lua operator <code>&lt;</code>.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-math.maxinteger"><code>math.maxinteger</code></a></h3>
+An integer with the maximum value for an integer.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-math.min"><code>math.min (x, &middot;&middot;&middot;)</code></a></h3>
+
+
+<p>
+Returns the argument with the minimum value,
+according to the Lua operator <code>&lt;</code>.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-math.mininteger"><code>math.mininteger</code></a></h3>
+An integer with the minimum value for an integer.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-math.modf"><code>math.modf (x)</code></a></h3>
+
+
+<p>
+Returns the integral part of <code>x</code> and the fractional part of <code>x</code>.
+Its second result is always a float.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-math.pi"><code>math.pi</code></a></h3>
+
+
+<p>
+The value of <em>&pi;</em>.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-math.rad"><code>math.rad (x)</code></a></h3>
+
+
+<p>
+Converts the angle <code>x</code> from degrees to radians.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-math.random"><code>math.random ([m [, n]])</code></a></h3>
+
+
+<p>
+When called without arguments,
+returns a pseudo-random float with uniform distribution
+in the range  <em>[0, 1)</em>.  
+When called with two integers <code>m</code> and <code>n</code>,
+<code>math.random</code> returns a pseudo-random integer
+with uniform distribution in the range <em>[m, n]</em>.
+The call <code>math.random(n)</code>, for a positive <code>n</code>,
+is equivalent to <code>math.random(1,n)</code>.
+The call <code>math.random(0)</code> produces an integer with
+all bits (pseudo)random.
+
+
+<p>
+This function uses the <code>xoshiro256**</code> algorithm to produce
+pseudo-random 64-bit integers,
+which are the results of calls with argument&nbsp;0.
+Other results (ranges and floats)
+are unbiased extracted from these integers.
+
+
+<p>
+Lua initializes its pseudo-random generator with the equivalent of
+a call to <a href="#pdf-math.randomseed"><code>math.randomseed</code></a> with no arguments,
+so that <code>math.random</code> should generate
+different sequences of results each time the program runs.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-math.randomseed"><code>math.randomseed ([x [, y]])</code></a></h3>
+
+
+<p>
+When called with at least one argument,
+the integer parameters <code>x</code> and <code>y</code> are
+joined into a <em>seed</em> that
+is used to reinitialize the pseudo-random generator;
+equal seeds produce equal sequences of numbers.
+The default for <code>y</code> is zero.
+
+
+<p>
+When called with no arguments,
+Lua generates a seed with
+a weak attempt for randomness.
+
+
+<p>
+This function returns the two seed components
+that were effectively used,
+so that setting them again repeats the sequence.
+
+
+<p>
+To ensure a required level of randomness to the initial state
+(or contrarily, to have a deterministic sequence,
+for instance when debugging a program),
+you should call <a href="#pdf-math.randomseed"><code>math.randomseed</code></a> with explicit arguments.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-math.sin"><code>math.sin (x)</code></a></h3>
+
+
+<p>
+Returns the sine of <code>x</code> (assumed to be in radians).
+
+
+
+
+<p>
+<hr><h3><a name="pdf-math.sqrt"><code>math.sqrt (x)</code></a></h3>
+
+
+<p>
+Returns the square root of <code>x</code>.
+(You can also use the expression <code>x^0.5</code> to compute this value.)
+
+
+
+
+<p>
+<hr><h3><a name="pdf-math.tan"><code>math.tan (x)</code></a></h3>
+
+
+<p>
+Returns the tangent of <code>x</code> (assumed to be in radians).
+
+
+
+
+<p>
+<hr><h3><a name="pdf-math.tointeger"><code>math.tointeger (x)</code></a></h3>
+
+
+<p>
+If the value <code>x</code> is convertible to an integer,
+returns that integer.
+Otherwise, returns <b>fail</b>.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-math.type"><code>math.type (x)</code></a></h3>
+
+
+<p>
+Returns "<code>integer</code>" if <code>x</code> is an integer,
+"<code>float</code>" if it is a float,
+or <b>fail</b> if <code>x</code> is not a number.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-math.ult"><code>math.ult (m, n)</code></a></h3>
+
+
+<p>
+Returns a boolean,
+<b>true</b> if and only if integer <code>m</code> is below integer <code>n</code> when
+they are compared as unsigned integers.
+
+
+
+
+
+
+
+
+</body>
+</html>

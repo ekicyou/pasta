@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lua 5.5 - Section 6.1</title>
+</head>
+<body>
+<h2>6.1 &ndash; <a name="6.1">Loading the Libraries in C code</a></h2>
+
+<p>
+A C&nbsp;host program must explicitly load
+the standard libraries into a state,
+if it wants its scripts to use them.
+For that,
+the host program can call the function <a href="#luaL_openlibs"><code>luaL_openlibs</code></a>.
+Alternatively,
+the host can select which libraries to open,
+by using <a href="#luaL_openselectedlibs"><code>luaL_openselectedlibs</code></a>.
+Both functions are declared in the header file <code>lualib.h</code>.
+
+
+
+<p>
+The stand-alone interpreter <code>lua</code> (see <a href="#7">&sect;7</a>)
+already opens all standard libraries.
+
+
+
+<hr><h3><a name="luaL_openlibs"><code>luaL_openlibs</code></a></h3><p>
+<span class="apii">[-0, +0, <em>e</em>]</span>
+<pre>void luaL_openlibs (lua_State *L);</pre>
+
+<p>
+Opens all standard Lua libraries into the given state.
+
+
+
+
+
+<hr><h3><a name="luaL_openselectedlibs"><code>luaL_openselectedlibs</code></a></h3><p>
+<span class="apii">[-0, +0, <em>e</em>]</span>
+<pre>void luaL_openselectedlibs (lua_State *L, int load, int preload);</pre>
+
+<p>
+Opens (loads) and preloads selected standard libraries into the state <code>L</code>.
+(To <em>preload</em> means to add
+the library loader into the table <a href="#pdf-package.preload"><code>package.preload</code></a>,
+so that the library can be required later by the program.
+Keep in mind that <a href="#pdf-require"><code>require</code></a> itself is provided
+by the <em>package</em> library.
+If a program does not load that library,
+it will be unable to require anything.)
+
+
+<p>
+The integer <code>load</code> selects which libraries to load;
+the integer <code>preload</code> selects which to preload, among those not loaded.
+Both are masks formed by a bitwise OR of the following constants:
+
+<ul>
+<li><b><a name="pdf-LUA_GLIBK"><code>LUA_GLIBK</code></a> </b>:  the basic library.</li>
+<li><b><a name="pdf-LUA_LOADLIBK"><code>LUA_LOADLIBK</code></a> </b>:  the package library.</li>
+<li><b><a name="pdf-LUA_COLIBK"><code>LUA_COLIBK</code></a> </b>:  the coroutine library.</li>
+<li><b><a name="pdf-LUA_STRLIBK"><code>LUA_STRLIBK</code></a> </b>:  the string library.</li>
+<li><b><a name="pdf-LUA_UTF8LIBK"><code>LUA_UTF8LIBK</code></a> </b>:  the UTF-8 library.</li>
+<li><b><a name="pdf-LUA_TABLIBK"><code>LUA_TABLIBK</code></a> </b>:  the table library.</li>
+<li><b><a name="pdf-LUA_MATHLIBK"><code>LUA_MATHLIBK</code></a> </b>:  the mathematical library.</li>
+<li><b><a name="pdf-LUA_IOLIBK"><code>LUA_IOLIBK</code></a> </b>:  the I/O library.</li>
+<li><b><a name="pdf-LUA_OSLIBK"><code>LUA_OSLIBK</code></a> </b>:  the operating system library.</li>
+<li><b><a name="pdf-LUA_DBLIBK"><code>LUA_DBLIBK</code></a> </b>:  the debug library.</li>
+</ul>
+
+
+
+
+
+
+
+</body>
+</html>

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lua 5.5 - Section 6.9</title>
+</head>
+<body>
+<h2>6.9 – <a name="6.9">オペレーティングシステム機能</a></h2>
+
+<p>このライブラリは、テーブル<a name="pdf-os"><code>os</code></a>を通して実装されています。</p><p>
+</p><hr /><h3><a name="pdf-os.clock"><code>os.clock ()</code></a></h3>
+
+
+<p>プログラムが使用したCPU時間の概算（秒単位）を、基盤となるISO&nbsp;C関数<code>clock</code>によって返される値として返します。</p><p>
+</p><hr /><h3><a name="pdf-os.date"><code>os.date ([format [, time]])</code></a></h3>
+
+
+<p>指定された文字列<code>format</code>に従ってフォーマットされた、日付と時間を含む文字列またはテーブルを返します。</p><p><code>time</code>引数が存在する場合、これはフォーマットされる時間です（この値の説明については<a href="#pdf-os.time"><code>os.time</code></a>関数を参照してください）。それ以外の場合、<code>date</code>は現在の時間をフォーマットします。</p><p><code>format</code>が'<code>!</code>'で始まる場合、日付は協定世界時でフォーマットされます。このオプションの文字の後、<code>format</code>が文字列"<code>*t</code>"の場合、<code>date</code>は次のフィールドを持つテーブルを返します：<code>year</code>、<code>month</code>（1–12）、<code>day</code>（1–31）、<code>hour</code>（0–23）、<code>min</code>（0–59）、<code>sec</code>（うるう秒のため0–61）、<code>wday</code>（曜日、1–7、日曜日は1）、<code>yday</code>（年の日数、1–366）、および<code>isdst</code>（夏時間フラグ、ブール値）。この最後のフィールドは、情報が利用できない場合は存在しない可能性があります。</p><p><code>format</code>が"<code>*t</code>"でない場合、<code>date</code>はISO&nbsp;C関数<code>strftime</code>と同じルールに従ってフォーマットされた日付を文字列として返します。</p><p><code>format</code>がない場合、デフォルトは"<code>%c</code>"になり、これは現在のロケールを使用して人間が読める日付と時刻の表現を提供します。</p><p>非POSIXシステムでは、この関数はC&nbsp;関数<code>gmtime</code>およびC&nbsp;関数<code>localtime</code>に依存しているため、スレッドセーフでない場合があります。</p><p>
+</p><hr /><h3><a name="pdf-os.difftime"><code>os.difftime (t2, t1)</code></a></h3>
+
+
+<p>時間<code>t1</code>から時間<code>t2</code>までの差（秒単位）を返します（ここで、時間は<a href="#pdf-os.time"><code>os.time</code></a>によって返される値です）。POSIX、Windows、および他のいくつかのシステムでは、この値は正確に<code>t2</code><em>-</em><code>t1</code>です。</p><p>
+</p><hr /><h3><a name="pdf-os.execute"><code>os.execute ([command])</code></a></h3>
+
+
+<p>この関数は、ISO&nbsp;C関数<code>system</code>と同等です。オペレーティングシステムのシェルによって実行されるように<code>command</code>を渡します。その最初の結果は、コマンドが正常に終了した場合は<b>true</b>、それ以外の場合は<b>fail</b>です。この最初の結果の後、関数は以下のように、文字列と数値を返します。</p><ul>
+
+<li><b>"<code>exit</code>": </b> コマンドが正常に終了しました。次の数値は、コマンドの終了ステータスです。</li>
+
+<li><b>"<code>signal</code>": </b> コマンドがシグナルによって終了しました。次の数値は、コマンドを終了したシグナルです。</li>
+
+</ul>
+
+<p><code>command</code>なしで呼び出された場合、<code>os.execute</code>はシェルが利用可能な場合はtrueであるブール値を返します。</p><p>
+</p><hr /><h3><a name="pdf-os.exit"><code>os.exit ([code [, close]])</code></a></h3>
+
+
+<p>ホストプログラムを終了するためにISO&nbsp;C関数<code>exit</code>を呼び出します。<code>code</code>が<b>true</b>の場合、返されるステータスは<code>EXIT_SUCCESS</code>です。<code>code</code>が<b>false</b>の場合、返されるステータスは<code>EXIT_FAILURE</code>です。<code>code</code>が数値の場合、返されるステータスはこの数値です。<code>code</code>のデフォルト値は<b>true</b>です。</p><p>オプションの2番目の引数<code>close</code>がtrueの場合、関数は終了する前にLua状態を閉じます（<a href="#lua_close"><code>lua_close</code></a>を参照）。</p><p>
+</p><hr /><h3><a name="pdf-os.getenv"><code>os.getenv (varname)</code></a></h3>
+
+
+<p>プロセス環境変数<code>varname</code>の値を返します。変数定義されていない場合は<b>fail</b>を返します。</p><p>
+</p><hr /><h3><a name="pdf-os.remove"><code>os.remove (filename)</code></a></h3>
+
+
+<p>指定された名前のファイル（またはPOSIXシステム上の空のディレクトリ）を削除します。この関数が失敗した場合、<b>fail</b>に加えて、エラーとエラーコードを説明する文字列を返します。それ以外の場合は、trueを返します。</p><p>
+</p><hr /><h3><a name="pdf-os.rename"><code>os.rename (oldname, newname)</code></a></h3>
+
+
+<p><code>oldname</code>という名前のファイルまたはディレクトリを<code>newname</code>に名前変更します。この関数が失敗した場合、<b>fail</b>に加えて、エラーとエラーコードを説明する文字列を返します。それ以外の場合は、trueを返します。</p><p>
+</p><hr /><h3><a name="pdf-os.setlocale"><code>os.setlocale (locale [, category])</code></a></h3>
+
+
+<p>プログラムの現在のロケールを設定します。<code>locale</code>はロケールを指定するシステム依存の文字列です。<code>category</code>は変更するカテゴリを説明するオプションの文字列です：<code>"all"</code>、<code>"collate"</code>、<code>"ctype"</code>、<code>"monetary"</code>、<code>"numeric"</code>、または<code>"time"</code>。デフォルトのカテゴリは<code>"all"</code>です。この関数は新しいロケールの名前を返します。リクエストが受け入れられない場合は<b>fail</b>を返します。</p><p><code>locale</code>が空の文字列の場合、現在のロケールは実装定義のネイティブロケールに設定されます。<code>locale</code>が文字列"<code>C</code>"の場合、現在のロケールは標準Cロケールに設定されます。</p><p>最初の引数として<b>nil</b>を付けて呼び出された場合、この関数は指定されたカテゴリの現在のロケールの名前のみを返します。</p><p>この関数は、C&nbsp;関数<code>setlocale</code>に依存しているため、スレッドセーフでない場合があります。</p><p>
+</p><hr /><h3><a name="pdf-os.time"><code>os.time ([table])</code></a></h3>
+
+
+<p>引数なしで呼び出された場合は現在の時刻を返します。または、指定されたテーブルで指定されたローカルの日時を表す時刻を返します。このテーブルには、フィールド<code>year</code>、<code>month</code>、および<code>day</code>が必要であり、フィールド<code>hour</code>（デフォルトは12）、<code>min</code>（デフォルトは0）、<code>sec</code>（デフォルトは0）、および<code>isdst</code>（デフォルトは<b>nil</b>）を持つことができます。他のフィールドは無視されます。これらのフィールドの説明については、<a href="#pdf-os.date"><code>os.date</code></a>関数を参照してください。</p><p>関数が呼び出されると、これらのフィールドの値が有効な範囲内にある必要はありません。たとえば、<code>sec</code>が-10の場合、他のフィールドで指定された時間の10秒前を意味します。<code>hour</code>が1000の場合、他のフィールドで指定された時間の1000時間後を意味します。</p><p>返される値は数値であり、その意味はシステムによって異なります。POSIX、Windows、およびその他のいくつかのシステムでは、この数値はある特定の開始時間（「エポック」）からの秒数をカウントします。他のシステムでは、意味は指定されておらず、<code>time</code>によって返される数値は、<a href="#pdf-os.date"><code>os.date</code></a>および<a href="#pdf-os.difftime"><code>os.difftime</code></a>への引数としてのみ使用できます。</p><p>テーブルで呼び出された場合、<code>os.time</code>は<a href="#pdf-os.date"><code>os.date</code></a>関数でドキュメント化されているすべてのフィールドも正規化するため、呼び出し前と同じ時刻を表しますが、値は有効な範囲内になります。</p><p>
+</p><hr /><h3><a name="pdf-os.tmpname"><code>os.tmpname ()</code></a></h3>
+
+
+<p>一時ファイルに使用できるファイル名を持つ文字列を返します。ファイルは、使用する前に明示的に開き、不要になったら明示的に削除する必要があります。</p><p>POSIXシステムでは、この関数はセキュリティリスクを回避するために、その名前のファイルも作成します。（名前を取得してからファイルを作成するまでの間に、別の誰かが間違った権限でファイルを作成する可能性があります。）ファイルを使用するためにファイルを開き、削除する必要があるのは変わりません（たとえ使用しなくても）。</p><p>可能であれば、プログラムが終了したときにファイルを自動的に削除する<a href="#pdf-io.tmpfile"><code>io.tmpfile</code></a>を使用することをお勧めします。</p>
+</body>
+</html>

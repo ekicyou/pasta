@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lua 5.5 - Section 3.3</title>
+</head>
+<body>
+<h2>3.3 &ndash; <a name="3.3">Statements</a></h2>
+
+
+
+<p>
+Lua supports an almost conventional set of statements,
+similar to those in other conventional languages.
+This set includes
+blocks, assignments, control structures, function calls,
+and variable declarations.
+
+
+
+
+
+<h3>3.3.1 &ndash; <a name="3.3.1">Blocks</a></h3>
+
+<p>
+A block is a list of statements,
+which are executed sequentially:
+
+<pre>
+	block ::= {stat}
+</pre><p>
+Lua has <em>empty statements</em>
+that allow you to separate statements with semicolons,
+start a block with a semicolon
+or write two semicolons in sequence:
+
+<pre>
+	stat ::= &lsquo;<b>;</b>&rsquo;
+</pre>
+
+<p>
+Both function calls and assignments
+can start with an open parenthesis.
+This possibility leads to an ambiguity in Lua's grammar.
+Consider the following fragment:
+
+<pre>
+     a = b + c
+     (print or io.write)('done')
+</pre><p>
+The grammar could see this fragment in two ways:
+
+<pre>
+     a = b + c(print or io.write)('done')
+     
+     a = b + c; (print or io.write)('done')
+</pre><p>
+The current parser always sees such constructions
+in the first way,
+interpreting the open parenthesis
+as the start of the arguments to a call.
+To avoid this ambiguity,
+it is a good practice to always precede with a semicolon
+statements that start with a parenthesis:
+
+<pre>
+     ;(print or io.write)('done')
+</pre>
+
+<p>
+A block can be explicitly delimited to produce a single statement:
+
+<pre>
+	stat ::= <b>do</b> block <b>end</b>
+</pre><p>
+Explicit blocks are useful
+to control the scope of variable declarations.
+Explicit blocks are also sometimes used to
+add a <b>return</b> statement in the middle
+of another block (see <a href="#3.3.4">&sect;3.3.4</a>).
+
+
+
+
+
+<h3>3.3.2 &ndash; <a name="3.3.2">Chunks</a></h3>
+
+<p>
+The unit of compilation of Lua is called a <em>chunk</em>.
+Syntactically,
+a chunk is simply a block:
+
+<pre>
+	chunk ::= block
+</pre>
+
+<p>
+Lua handles a chunk as the body of an anonymous function
+with a variable number of arguments
+(see <a href="#3.4.11">&sect;3.4.11</a>).
+As such, chunks can define local variables,
+receive arguments, and return values.
+Moreover, such anonymous function is compiled as in the
+scope of an external local variable called <code>_ENV</code> (see <a href="#2.2">&sect;2.2</a>).
+The resulting function always has <code>_ENV</code> as its only external variable,
+even if it does not use that variable.
+
+
+<p>
+A chunk can be stored in a file or in a string inside the host program.
+To execute a chunk,
+Lua first <em>loads</em> it,
+precompiling the chunk's code into instructions for a virtual machine,
+and then Lua executes the compiled code
+with an interpreter for the virtual machine.
+
+
+<p>
+Chunks can also be precompiled into binary form;
+see the program <code>luac</code> and the function <a href="#pdf-string.dump"><code>string.dump</code></a> for details.
+Programs in source and compiled forms are interchangeable;
+Lua automatically detects the file type and acts accordingly (see <a href="#pdf-load"><code>load</code></a>).
+Be aware that, unlike source code,
+maliciously crafted binary chunks can crash the interpreter.
+
+
+
+
+
+<h3>3.3.3 &ndash; <a name="3.3.3">Assignment</a></h3>
+
+<p>
+Lua allows multiple assignments.
+Therefore, the syntax for assignment
+defines a list of variables on the left side
+and a list of expressions on the right side.
+The elements in both lists are separated by commas:
+
+<pre>
+	stat ::= varlist &lsquo;<b>=</b>&rsquo; explist
+	varlist ::= var {&lsquo;<b>,</b>&rsquo; var}
+	explist ::= exp {&lsquo;<b>,</b>&rsquo; exp}
+</pre><p>
+Expressions are discussed in <a href="#3.4">&sect;3.4</a>.
+
+
+<p>
+Before the assignment,
+the list of values is <em>adjusted</em> to the length of
+the list of variables (see <a href="#3.4.12">&sect;3.4.12</a>).
+
+
+<p>
+If a variable is both assigned and read
+inside a multiple assignment,
+Lua ensures that all reads get the value of the variable
+before the assignment.
+Thus the code
+
+<pre>
+     i = 3
+     i, a[i] = i+1, 20
+</pre><p>
+sets <code>a[3]</code> to 20, without affecting <code>a[4]</code>
+because the <code>i</code> in <code>a[i]</code> is evaluated (to 3)
+before it is assigned&nbsp;4.
+Similarly, the line
+
+<pre>
+     x, y = y, x
+</pre><p>
+exchanges the values of <code>x</code> and <code>y</code>,
+and
+
+<pre>
+     x, y, z = y, z, x
+</pre><p>
+cyclically permutes the values of <code>x</code>, <code>y</code>, and <code>z</code>.
+
+
+<p>
+Note that this guarantee covers only accesses
+syntactically inside the assignment statement.
+If a function or a metamethod called during the assignment
+changes the value of a variable,
+Lua gives no guarantees about the order of that access.
+
+
+<p>
+An assignment to a global name <code>x = val</code>
+is equivalent to the assignment
+<code>_ENV.x = val</code> (see <a href="#2.2">&sect;2.2</a>).
+
+
+<p>
+The meaning of assignments to table fields and
+global variables (which are actually table fields, too)
+can be changed via metatables (see <a href="#2.4">&sect;2.4</a>).
+
+
+
+
+
+<h3>3.3.4 &ndash; <a name="3.3.4">Control Structures</a></h3><p>
+The control structures
+<b>if</b>, <b>while</b>, and <b>repeat</b> have the usual meaning and
+familiar syntax:
+
+
+
+
+<pre>
+	stat ::= <b>while</b> exp <b>do</b> block <b>end</b>
+	stat ::= <b>repeat</b> block <b>until</b> exp
+	stat ::= <b>if</b> exp <b>then</b> block {<b>elseif</b> exp <b>then</b> block} [<b>else</b> block] <b>end</b>
+</pre><p>
+Lua also has a <b>for</b> statement, in two flavors (see <a href="#3.3.5">&sect;3.3.5</a>).
+
+
+<p>
+The condition expression of a
+control structure can return any value.
+Both <b>false</b> and <b>nil</b> test false.
+All values different from <b>nil</b> and <b>false</b> test true.
+In particular, the number 0 and the empty string also test true.
+
+
+<p>
+In the <b>repeat</b>&ndash;<b>until</b> loop,
+the inner block does not end at the <b>until</b> keyword,
+but only after the condition.
+So, the condition can refer to local variables
+declared inside the loop block.
+
+
+<p>
+The <b>goto</b> statement transfers the program control to a label.
+For syntactical reasons,
+labels in Lua are considered statements too:
+
+
+
+<pre>
+	stat ::= <b>goto</b> Name
+	stat ::= label
+	label ::= &lsquo;<b>::</b>&rsquo; Name &lsquo;<b>::</b>&rsquo;
+</pre>
+
+<p>
+A label is visible in the entire block where it is defined,
+except inside nested functions.
+A goto can jump to any visible label as long as it does not
+enter into the scope of a variable declaration.
+A label should not be declared
+where a previous label with the same name is visible,
+even if this other label has been declared in an enclosing block.
+
+
+<p>
+The <b>break</b> statement terminates the execution of a
+<b>while</b>, <b>repeat</b>, or <b>for</b> loop,
+skipping to the next statement after the loop:
+
+
+<pre>
+	stat ::= <b>break</b>
+</pre><p>
+A <b>break</b> ends the innermost enclosing loop.
+
+
+<p>
+The <b>return</b> statement is used to return values
+from a function or a chunk
+(which is handled as an anonymous function).
+
+Functions can return more than one value,
+so the syntax for the <b>return</b> statement is
+
+<pre>
+	stat ::= <b>return</b> [explist] [&lsquo;<b>;</b>&rsquo;]
+</pre>
+
+<p>
+The <b>return</b> statement can only be written
+as the last statement of a block.
+If it is necessary to <b>return</b> in the middle of a block,
+then an explicit inner block can be used,
+as in the idiom <code>do return end</code>,
+because now <b>return</b> is the last statement in its (inner) block.
+
+
+
+
+
+<h3>3.3.5 &ndash; <a name="3.3.5">For Statement</a></h3>
+
+<p>
+
+The <b>for</b> statement has two forms:
+one numerical and one generic.
+
+
+
+<h4>The numerical <b>for</b> loop</h4>
+
+<p>
+The numerical <b>for</b> loop repeats a block of code while a
+control variable goes through an arithmetic progression.
+It has the following syntax:
+
+<pre>
+	stat ::= <b>for</b> Name &lsquo;<b>=</b>&rsquo; exp &lsquo;<b>,</b>&rsquo; exp [&lsquo;<b>,</b>&rsquo; exp] <b>do</b> block <b>end</b>
+</pre><p>
+The given identifier (Name) defines the control variable,
+which is a new read-only (<code>const</code>) variable local to the loop body
+(<em>block</em>).
+
+
+<p>
+The loop starts by evaluating once the three control expressions.
+Their values are called respectively
+the <em>initial value</em>, the <em>limit</em>, and the <em>step</em>.
+If the step is absent, it defaults to&nbsp;1.
+
+
+<p>
+If both the initial value and the step are integers,
+the loop is done with integers;
+note that the limit may not be an integer.
+Otherwise, the three values are converted to
+floats and the loop is done with floats.
+Beware of floating-point accuracy in this case.
+
+
+<p>
+After that initialization,
+the loop body is repeated with the value of the control variable
+going through an arithmetic progression,
+starting at the initial value,
+with a common difference given by the step.
+A negative step makes a decreasing sequence;
+a step equal to zero raises an error.
+The loop continues while the value is less than
+or equal to the limit
+(greater than or equal to for a negative step).
+If the initial value is already greater than the limit
+(or less than, if the step is negative),
+the body is not executed.
+
+
+<p>
+For integer loops,
+the control variable never wraps around;
+instead, the loop ends in case of an overflow.
+
+
+
+
+
+<h4>The generic <b>for</b> loop</h4>
+
+<p>
+The generic <b>for</b> statement works over functions,
+called <em>iterators</em>.
+On each iteration, the iterator function is called to produce a new value,
+stopping when this new value is <b>nil</b>.
+The generic <b>for</b> loop has the following syntax:
+
+<pre>
+	stat ::= <b>for</b> namelist <b>in</b> explist <b>do</b> block <b>end</b>
+	namelist ::= Name {&lsquo;<b>,</b>&rsquo; Name}
+</pre><p>
+A <b>for</b> statement like
+
+<pre>
+     for <em>var_1</em>, &middot;&middot;&middot;, <em>var_n</em> in <em>explist</em> do <em>body</em> end
+</pre><p>
+works as follows.
+
+
+<p>
+The names <em>var_i</em> declare loop variables local to the loop body.
+The first of these variables is the <em>control variable</em>,
+which is a read-only (<code>const</code>) variable.
+
+
+<p>
+The loop starts by evaluating <em>explist</em>
+to produce four values:
+an <em>iterator function</em>,
+a <em>state</em>,
+an initial value for the control variable,
+and a <em>closing value</em>.
+
+
+<p>
+Then, at each iteration,
+Lua calls the iterator function with two arguments:
+the state and the control variable.
+The results from this call are then assigned to the loop variables,
+following the rules of multiple assignments (see <a href="#3.3.3">&sect;3.3.3</a>).
+If the control variable becomes <b>nil</b>,
+the loop terminates.
+Otherwise, the body is executed and the loop goes
+to the next iteration.
+
+
+<p>
+The closing value behaves like a
+to-be-closed variable (see <a href="#3.3.8">&sect;3.3.8</a>),
+which can be used to release resources when the loop ends.
+Otherwise, it does not interfere with the loop.
+
+
+
+
+
+
+
+<h3>3.3.6 &ndash; <a name="3.3.6">Function Calls as Statements</a></h3><p>
+To allow possible side-effects,
+function calls can be executed as statements:
+
+<pre>
+	stat ::= functioncall
+</pre><p>
+In this case, all returned values are thrown away.
+Function calls are explained in <a href="#3.4.10">&sect;3.4.10</a>.
+
+
+
+
+
+<h3>3.3.7 &ndash; <a name="3.3.7">Variable Declarations</a></h3><p>
+Local and global variables can be declared anywhere inside a block.
+The declaration can include an initialization:
+
+<pre>
+	stat ::= <b>local</b> attnamelist [&lsquo;<b>=</b>&rsquo; explist]
+	stat ::= <b>global</b> attnamelist [&lsquo;<b>=</b>&rsquo; explist]
+</pre><p>
+If there is no initialization,
+local variables are initialized with <b>nil</b>;
+global variables are left unchanged.
+Otherwise, the initialization gets the same adjustment
+of a multiple assignment (see <a href="#3.3.3">&sect;3.3.3</a>).
+Moreover, for global variables,
+the initialization will raise a runtime error
+if the variable is already defined,
+that is, it has a non-nil value.
+
+
+<p>
+The list of names may be prefixed by an attribute
+(a name between angle brackets)
+and each variable name may be postfixed by an attribute:
+
+<pre>
+	attnamelist ::=  [attrib] Name [attrib] {&lsquo;<b>,</b>&rsquo; Name [attrib]}
+	attrib ::= &lsquo;<b>&lt;</b>&rsquo; Name &lsquo;<b>&gt;</b>&rsquo;
+</pre><p>
+A prefixed attribute applies to all names in the list;
+a postfixed attribute applies to its particular name.
+There are two possible attributes:
+<code>const</code>, which declares a <em>constant</em> or <em>read-only</em> variable,
+
+that is, a variable that cannot be used as the left-hand side of an
+assignment,
+and <code>close</code>, which declares a to-be-closed variable (see <a href="#3.3.8">&sect;3.3.8</a>).
+Only local variables can have the <code>close</code> attribute.
+A list of variables can contain at most one to-be-closed variable.
+
+
+<p>
+Lua offers also a collective declaration for global variables:
+
+<pre>
+	stat ::= <b>global</b> [attrib] &lsquo;<b>*</b>&rsquo;
+</pre><p>
+This special form implicitly declares
+as globals all names not explicitly declared previously.
+In particular,
+<code>global&lt;const&gt; *</code> implicitly declares
+as read-only globals all names not explicitly declared previously;
+see the following example:
+
+<pre>
+     global X
+     global&lt;const&gt; *
+     print(math.pi)   -- Ok, 'print' and 'math' are read-only
+     X = 1            -- Ok, declared as read-write
+     Y = 1            -- Error, Y is read-only
+</pre>
+
+<p>
+As noted in <a href="#2.2">&sect;2.2</a>,
+all chunks start with an implicit declaration <code>global *</code>,
+but this preambular declaration becomes void inside
+the scope of any other <b>global</b> declaration.
+Therefore, a program that does not use global declarations
+or start with <code>global *</code>
+has free read-write access to any global;
+a program that starts with <code>global&lt;const&gt; *</code>
+has free read-only access to any global;
+and a program that starts with any other global declaration
+(e.g., <code>global none</code>) can only refer to declared variables.
+
+
+<p>
+Note that, for global variables,
+the effect of any declaration is only syntactical
+(except for the optional assignment):
+
+<pre>
+     global X &lt;const&gt;, _G
+     X = 1           -- ERROR
+     _ENV.X = 1      -- Ok
+     _G.print(X)     -- Ok
+     foo()         -- 'foo' can freely change any global
+</pre>
+
+<p>
+A chunk is also a block (see <a href="#3.3.2">&sect;3.3.2</a>),
+and so variables can be declared in a chunk outside any explicit block.
+
+
+<p>
+The visibility rules for variable declarations
+are explained in <a href="#2.2">&sect;2.2</a>.
+
+
+
+
+
+<h3>3.3.8 &ndash; <a name="3.3.8">To-be-closed Variables</a></h3>
+
+<p>
+A to-be-closed variable behaves like a constant local variable,
+except that its value is <em>closed</em> whenever the variable
+goes out of scope, including normal block termination,
+exiting its block by <b>break</b>/<b>goto</b>/<b>return</b>,
+or exiting by an error.
+
+
+<p>
+Here, to <em>close</em> a value means
+to call its <code>__close</code> metamethod.
+When calling the metamethod,
+the value itself is passed as the first argument.
+If there was an error,
+the error object that caused the exit
+is passed as a second argument;
+otherwise, there is no second argument.
+
+
+<p>
+The value assigned to a to-be-closed variable
+must have a <code>__close</code> metamethod
+or be a false value.
+(<b>nil</b> and <b>false</b> are ignored as to-be-closed values.)
+
+
+<p>
+If several to-be-closed variables go out of scope at the same event,
+they are closed in the reverse order that they were declared.
+
+
+<p>
+If there is any error while running a closing method,
+that error is handled like an error in the regular code
+where the variable was defined.
+After an error,
+the other pending closing methods will still be called.
+
+
+<p>
+If a coroutine yields and is never resumed again,
+some variables may never go out of scope,
+and therefore they will never be closed.
+(These variables are the ones created inside the coroutine
+and in scope at the point where the coroutine yielded.)
+Similarly, if a coroutine ends with an error,
+it does not unwind its stack,
+so it does not close any variable.
+In both cases,
+you can either use finalizers
+or call <a href="#pdf-coroutine.close"><code>coroutine.close</code></a> to close the variables.
+However, if the coroutine was created
+through <a href="#pdf-coroutine.wrap"><code>coroutine.wrap</code></a>,
+then its corresponding function will close the coroutine
+in case of errors.
+
+
+
+
+
+
+
+
+</body>
+</html>

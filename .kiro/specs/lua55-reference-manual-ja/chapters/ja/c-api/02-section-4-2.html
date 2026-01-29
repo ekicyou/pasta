@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lua 5.5 - Section 4.2</title>
+</head>
+<body>
+<h2>4.2 – <a name="4.2">Cクロージャ</a></h2>
+
+<p>C関数が作成されるとき、いくつかの値をそれに関連付けて、<em>Cクロージャ</em>を作成できます（<a href="#lua_pushcclosure"><code>lua_pushcclosure</code></a>を参照）。これらの値は<em>アップバリュー</em>と呼ばれ、呼び出されるたびに関数からアクセスできます。</p><p>C関数が呼び出されるたびに、そのアップバリューは特定の擬似インデックスに配置されます。これらの擬似インデックスは、マクロ<a href="#lua_upvalueindex"><code>lua_upvalueindex</code></a>によって生成されます。関数に関連付けられた最初のアップバリューは、インデックス<code>lua_upvalueindex(1)</code>にあり、以下同様です。<code>lua_upvalueindex(<em>n</em>)</code>へのアクセスは、<em>n</em>が現在の関数のアップバリューの数よりも大きい場合（ただし、クロージャ内のアップバリューの最大数に1を加えた256以下の場合）は、許容可能だが無効なインデックスを生成します。</p><p>Cクロージャは、対応するアップバリューの値を変更することもできます。</p>
+</body>
+</html>

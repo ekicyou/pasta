@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lua 5.5 - Section 3.5</title>
+</head>
+<body>
+<h2>3.5 – <a name="3.5">可視性ルール</a></h2>
+
+<p>Lua は、レキシカルスコープの言語です。ローカル変数のスコープは、宣言の後の最初のステートメントで始まり、宣言を含む最も内側のブロックの最後の非voidステートメントまで続きます。（<em>Voidステートメント</em>は、ラベルと空のステートメントです。）次の例を検討してください。</p><pre>     x = 10                -- global variable
+     do                    -- new block
+       local x = x         -- new 'x', with value 10
+       print(x)            --&gt; 10
+       x = x+1
+       do                  -- another block
+         local x = x+1     -- another 'x'
+         print(x)          --&gt; 12
+       end
+       print(x)            --&gt; 11
+     end
+     print(x)              --&gt; 10  (the global one)
+</pre>
+
+<p><code>local x = x</code> のような宣言では、宣言されている新しい <code>x</code> はまだスコープ内ではないため、2番目の <code>x</code> は外部変数を参照することに注意してください。</p><p>レキシカルスコープルールのため、ローカル変数は、そのスコープ内で定義された関数によって自由にアクセスできます。内側の関数で使用されるローカル変数は、内側の関数内で<em>アップ値</em>（または<em>外部ローカル変数</em>、または単に<em>外部変数</em>）と呼ばれます。</p><p><b>local</b> ステートメントを実行するたびに、新しいローカル変数が定義されることに注意してください。次の例を検討してください。</p><pre>     a = {}
+     local x = 20
+     for i = 1, 10 do
+       local y = 0
+       a[i] = function () y = y + 1; return x + y end
+     end
+</pre><p>ループは、10個のクロージャ（つまり、匿名関数の10個のインスタンス）を作成します。これらの各クロージャは異なる <code>y</code> 変数を使用しますが、すべて同じ <code>x</code> を共有します。</p>
+
+</body>
+</html>

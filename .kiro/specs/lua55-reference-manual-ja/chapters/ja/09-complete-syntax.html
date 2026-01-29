@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lua 5.5 Reference Manual - Chapter 09</title>
+</head>
+<body>
+<h1>9 – <a name="9">Luaの完全な構文</a></h1>
+
+<p>以下は、拡張BNFにおけるLuaの完全な構文です。拡張BNFでは通常、{A}は0個以上のAを、[A]はオプションのAを意味します。(演算子の優先順位については<a href="#3.4.8">§3.4.8</a>を参照してください。終端記号のName、Numeral、LiteralStringの説明については<a href="#3.1">§3.1</a>を参照してください。)</p><pre>
+	chunk ::= block
+
+	block ::= {stat} [retstat]
+
+	stat ::=  ‘<b>;</b>’ | 
+		 varlist ‘<b>=</b>’ explist | 
+		 functioncall | 
+		 label | 
+		 <b>break</b> | 
+		 <b>goto</b> Name | 
+		 <b>do</b> block <b>end</b> | 
+		 <b>while</b> exp <b>do</b> block <b>end</b> | 
+		 <b>repeat</b> block <b>until</b> exp | 
+		 <b>if</b> exp <b>then</b> block {<b>elseif</b> exp <b>then</b> block} [<b>else</b> block] <b>end</b> | 
+		 <b>for</b> Name ‘<b>=</b>’ exp ‘<b>,</b>’ exp [‘<b>,</b>’ exp] <b>do</b> block <b>end</b> | 
+		 <b>for</b> namelist <b>in</b> explist <b>do</b> block <b>end</b> | 
+		 <b>function</b> funcname funcbody | 
+		 <b>local</b> <b>function</b> Name funcbody | 
+		 <b>local</b> attnamelist [‘<b>=</b>’ explist] 
+
+	attnamelist ::=  Name attrib {‘<b>,</b>’ Name attrib}
+
+	attrib ::= [‘<b>&lt;</b>’ Name ‘<b>&gt;</b>’]
+
+	retstat ::= <b>return</b> [explist] [‘<b>;</b>’]
+
+	label ::= ‘<b>::</b>’ Name ‘<b>::</b>’
+
+	funcname ::= Name {‘<b>.</b>’ Name} [‘<b>:</b>’ Name]
+
+	varlist ::= var {‘<b>,</b>’ var}
+
+	var ::=  Name | prefixexp ‘<b>[</b>’ exp ‘<b>]</b>’ | prefixexp ‘<b>.</b>’ Name 
+
+	namelist ::= Name {‘<b>,</b>’ Name}
+
+	explist ::= exp {‘<b>,</b>’ exp}
+
+	exp ::=  <b>nil</b> | <b>false</b> | <b>true</b> | Numeral | LiteralString | ‘<b>...</b>’ | functiondef | 
+		 prefixexp | tableconstructor | exp binop exp | unop exp 
+
+	prefixexp ::= var | functioncall | ‘<b>(</b>’ exp ‘<b>)</b>’
+
+	functioncall ::=  prefixexp args | prefixexp ‘<b>:</b>’ Name args 
+
+	args ::=  ‘<b>(</b>’ [explist] ‘<b>)</b>’ | tableconstructor | LiteralString 
+
+	functiondef ::= <b>function</b> funcbody
+
+	funcbody ::= ‘<b>(</b>’ [parlist] ‘<b>)</b>’ block <b>end</b>
+
+	parlist ::= namelist [‘<b>,</b>’ ‘<b>...</b>’] | ‘<b>...</b>’
+
+	tableconstructor ::= ‘<b>{</b>’ [fieldlist] ‘<b>}</b>’
+
+	fieldlist ::= field {fieldsep field} [fieldsep]
+
+	field ::= ‘<b>[</b>’ exp ‘<b>]</b>’ ‘<b>=</b>’ exp | Name ‘<b>=</b>’ exp | exp
+
+	fieldsep ::= ‘<b>,</b>’ | ‘<b>;</b>’
+
+	binop ::=  ‘<b>+</b>’ | ‘<b>-</b>’ | ‘<b>*</b>’ | ‘<b>/</b>’ | ‘<b>//</b>’ | ‘<b>^</b>’ | ‘<b>%</b>’ | 
+		 ‘<b>&amp;</b>’ | ‘<b>~</b>’ | ‘<b>|</b>’ | ‘<b>&gt;&gt;</b>’ | ‘<b>&lt;&lt;</b>’ | ‘<b>..</b>’ | 
+		 ‘<b>&lt;</b>’ | ‘<b>&lt;=</b>’ | ‘<b>&gt;</b>’ | ‘<b>&gt;=</b>’ | ‘<b>==</b>’ | ‘<b>~=</b>’ | 
+		 <b>and</b> | <b>or</b>
+
+	unop ::= ‘<b>-</b>’ | <b>not</b> | ‘<b>#</b>’ | ‘<b>~</b>’
+
+</pre>
+
+<p>
+
+
+
+
+
+
+
+</p><p class="footer">最終更新日: 2023年5月2日 20:09:38 UTC</p>
+<!--
+Last change: revised for Lua 5.4.6
+-->
+
+
+
+</body></html>
+</body>
+</html>

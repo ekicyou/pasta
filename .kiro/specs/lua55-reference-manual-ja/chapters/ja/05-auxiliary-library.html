@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lua 5.5 Reference Manual - Chapter 05</title>
+</head>
+<body>
+<h1>5 – <a name="5">補助ライブラリ</a></h1>
+
+
+
+<p><em>補助ライブラリ</em>は、CとLuaをインターフェイスするための便利な関数をいくつか提供します。基本的なAPIは、CとLua間のすべての相互作用のためのプリミティブ関数を提供する一方、補助ライブラリはいくつかの一般的なタスクのためのより高レベルの関数を提供します。</p><p>補助ライブラリのすべての関数と型は、ヘッダーファイル<code>lauxlib.h</code>で定義され、接頭辞<code>luaL_</code>が付いています。</p><p>補助ライブラリのすべての関数は、基本的なAPIの上に構築されているため、そのAPIではできないことは何も提供しません。それにもかかわらず、補助ライブラリを使用すると、コードの一貫性が向上します。</p><p>補助ライブラリのいくつかの関数は、内部的にいくつかの追加のスタックスロットを使用します。補助ライブラリの関数が5つ未満のスロットを使用する場合、スタックサイズをチェックしません。十分なスロットがあると単純に想定します。</p><p>補助ライブラリのいくつかの関数は、C関数の引数をチェックするために使用されます。エラーメッセージは引数用にフォーマットされているため（例： "<code>bad argument #1</code>"）、これらの関数を他のスタック値に使用しないでください。</p><p><code>luaL_check*</code>と呼ばれる関数は、チェックが満たされない場合は常にエラーを発生させます。</p><h2>5.1 – <a name="5.1">関数と型</a></h2>
+
+<p>ここでは、補助ライブラリのすべての関数と型をアルファベット順にリストします。</p><hr /><h3><a name="luaL_addchar"><code>luaL_addchar</code></a></h3><p>
+<span class="apii">[-?, +?, <em>m</em>]</span>
+</p><pre>void luaL_addchar (luaL_Buffer *B, char c);</pre>
+
+<p>バイト<code>c</code>をバッファ<code>B</code>に追加します（<a href="#luaL_Buffer"><code>luaL_Buffer</code></a>を参照）。</p><hr /><h3><a name="luaL_addgsub"><code>luaL_addgsub</code></a></h3><p>
+<span class="apii">[-?, +?, <em>m</em>]</span>
+</p><pre>const void luaL_addgsub (luaL_Buffer *B, const char *s,
+                         const char *p, const char *r);</pre>
+
+<p>文字列<code>s</code>のコピーをバッファ<code>B</code>に追加します（<a href="#luaL_Buffer"><code>luaL_Buffer</code></a>を参照）。文字列<code>p</code>の出現箇所を文字列<code>r</code>で置き換えます。</p><hr /><h3><a name="luaL_addlstring"><code>luaL_addlstring</code></a></h3><p>
+<span class="apii">[-?, +?, <em>m</em>]</span>
+</p><pre>void luaL_addlstring (luaL_Buffer *B, const char *s, size_t l);</pre>
+
+<p>長さ<code>l</code>の<code>s</code>が指す文字列をバッファ<code>B</code>に追加します（<a href="#luaL_Buffer"><code>luaL_Buffer</code></a>を参照）。文字列には埋め込まれたゼロを含めることができます。</p><hr /><h3><a name="luaL_addsize"><code>luaL_addsize</code></a></h3><p>
+<span class="apii">[-?, +?, –]</span>
+</p><pre>void luaL_addsize (luaL_Buffer *B, size_t n);</pre>
+
+<p>以前にバッファ領域にコピーされた長さ<code>n</code>の文字列をバッファ<code>B</code>に追加します（<a href="#luaL_prepbuffer"><code>luaL_prepbuffer</code></a>を参照）。</p><hr /><h3><a name="luaL_addstring"><code>luaL_addstring</code></a></h3><p>
+<span class="apii">[-?, +?, <em>m</em>]</span>
+</p><pre>void luaL_addstring (luaL_Buffer *B, const char *s);</pre>
+
+<p><code>s</code>が指すゼロ終端文字列をバッファ<code>B</code>に追加します（<a href="#luaL_Buffer"><code>luaL_Buffer</code></a>を参照）。</p><hr /><h3><a name="luaL_addvalue"><code>luaL_addvalue</code></a></h3><p>
+<span class="apii">[-?, +?, <em>m</em>]</span>
+</p><pre>void luaL_addvalue (luaL_Buffer *B);</pre>
+
+<p>スタックの最上位にある値をバッファ<code>B</code>（<a href="#luaL_Buffer"><code>luaL_Buffer</code></a>を参照）に追加します。値はポップされます。</p><p>これは文字列バッファに関する唯一の関数で、スタックに追加する値がスタックにある状態で呼び出すことができます（また、そうする必要があります）。</p><hr /><h3><a name="luaL_argcheck"><code>luaL_argcheck</code></a></h3><p>
+<span class="apii">[-0, +0, <em>v</em>]</span>
+</p><pre>void luaL_argcheck (lua_State *L,
+                    int cond,
+                    int arg,
+                    const char *extramsg);</pre>
+
+<p><code>cond</code>が真であるかどうかをチェックします。真でない場合、標準メッセージ（<a href="#luaL_argerror"><code>luaL_argerror</code></a>を参照）とともにエラーを発生させます。</p><hr /><h3><a name="luaL_argerror"><code>luaL_argerror</code></a></h3><p>
+<span class="apii">[-0, +0, <em>v</em>]</span>
+</p><pre>int luaL_argerror (lua_State *L, int arg, const char *extramsg);</pre>
+
+<p>C関数を呼び出した引数<code>arg</code>に関する問題を報告するエラーを発生させます。標準メッセージには、コメントとして<code>extramsg</code>が含まれます。</p><pre>     bad argument #<em>arg</em> to '<em>funcname</em>' (<em>extramsg</em>)
+</pre><p>この関数は決して戻りません。</p><hr /><h3><a name="luaL_argexpected"><code>luaL_argexpected</code></a></h3><p>
+<span class="apii">[-0, +0, <em>v</em>]</span>
+</p><pre>void luaL_argexpected (lua_State *L,
+                       int cond,
+                       int arg,
+                       const char *tname);</pre>
+
+<p><code>cond</code>が真であるかどうかをチェックします。真でない場合、標準メッセージ（<a href="#luaL_typeerror"><code>luaL_typeerror</code></a>を参照）とともに引数<code>arg</code>の型に関するエラーを発生させます。</p><hr /><h3><a name="luaL_Buffer"><code>luaL_Buffer</code></a></h3>
+<pre>typedef struct luaL_Buffer luaL_Buffer;</pre>
+
+<p><em>文字列バッファ</em>の型。</p><p>文字列バッファを使用すると、CコードでLua文字列を段階的に構築できます。その使用パターンは以下のとおりです。</p><ul>
+
+<li>まず、<a href="#luaL_Buffer"><code>luaL_Buffer</code></a>型の変数<code>b</code>を宣言します。</li>
+
+<li>次に、<code>luaL_buffinit(L, &amp;b)</code>を呼び出して初期化します。</li>
+
+<li>次に、<code>luaL_add*</code>関数を呼び出して、文字列の断片をバッファに追加します。</li>
+
+<li>最後に、<code>luaL_pushresult(&amp;b)</code>を呼び出して完了します。この呼び出しは、最終的な文字列をスタックの最上位に残します。</li>
+
+</ul>
+
+<p>結果の文字列の最大サイズを事前に知っている場合は、次のようにバッファを使用できます。</p><ul>
+
+<li>まず、<a href="#luaL_Buffer"><code>luaL_Buffer</code></a>型の変数<code>b</code>を宣言します。</li>
+
+<li>次に、<code>luaL_buffinitsize(L, &amp;b, sz)</code>を呼び出して初期化し、サイズ<code>sz</code>の領域を事前割り当てします。</li>
+
+<li>次に、その領域に文字列を生成します。</li>
+
+<li>最後に、<code>luaL_pushresultsize(&amp;b, sz)</code>を呼び出して完了します。<code>sz</code>は、その領域にコピーされた結果の文字列の合計サイズです（事前割り当てされたサイズ以下になる可能性があります）。</li>
+
+</ul>
+
+<p>通常の操作中、文字列バッファは可変数のスタックスロットを使用します。そのため、バッファを使用している間は、スタックの最上位がどこにあるかわからないことを前提とする必要があります。スタックは、その使用がバランスが取れている限り、バッファ操作への連続した呼び出しの間で使用できます。つまり、バッファ操作を呼び出すとき、スタックは前のバッファ操作直後と同じレベルにある必要があります。（この規則の唯一の例外は<a href="#luaL_addvalue"><code>luaL_addvalue</code></a>です。）<a href="#luaL_pushresult"><code>luaL_pushresult</code></a>を呼び出した後、スタックはバッファが初期化されたときと同じレベルに戻り、さらにその最上位に最終的な文字列が追加されます。</p><hr /><h3><a name="luaL_buffaddr"><code>luaL_buffaddr</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>char *luaL_buffaddr (luaL_Buffer *B);</pre>
+
+<p>バッファ<code>B</code>（<a href="#luaL_Buffer"><code>luaL_Buffer</code></a>を参照）の現在の内容のアドレスを返します。バッファへの追加は、このアドレスを無効にする可能性があることに注意してください。</p><hr /><h3><a name="luaL_buffinit"><code>luaL_buffinit</code></a></h3><p>
+<span class="apii">[-0, +?, –]</span>
+</p><pre>void luaL_buffinit (lua_State *L, luaL_Buffer *B);</pre>
+
+<p>バッファ<code>B</code>（<a href="#luaL_Buffer"><code>luaL_Buffer</code></a>を参照）を初期化します。この関数は領域を割り当てません。バッファは変数として宣言する必要があります。</p><hr /><h3><a name="luaL_bufflen"><code>luaL_bufflen</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>size_t luaL_bufflen (luaL_Buffer *B);</pre>
+
+<p>バッファ<code>B</code>（<a href="#luaL_Buffer"><code>luaL_Buffer</code></a>を参照）の現在の内容の長さを返します。</p><hr /><h3><a name="luaL_buffinitsize"><code>luaL_buffinitsize</code></a></h3><p>
+<span class="apii">[-?, +?, <em>m</em>]</span>
+</p><pre>char *luaL_buffinitsize (lua_State *L, luaL_Buffer *B, size_t sz);</pre>
+
+<p><a href="#luaL_buffinit"><code>luaL_buffinit</code></a>, <a href="#luaL_prepbuffsize"><code>luaL_prepbuffsize</code></a>のシーケンスと同等です。</p><hr /><h3><a name="luaL_buffsub"><code>luaL_buffsub</code></a></h3><p>
+<span class="apii">[-?, +?, –]</span>
+</p><pre>void luaL_buffsub (luaL_Buffer *B, int n);</pre>
+
+<p>バッファ<code>B</code>（<a href="#luaL_Buffer"><code>luaL_Buffer</code></a>を参照）から<code>n</code>バイトを削除します。バッファには少なくともそれだけのバイト数が必要です。</p><hr /><h3><a name="luaL_callmeta"><code>luaL_callmeta</code></a></h3><p>
+<span class="apii">[-0, +(0|1), <em>e</em>]</span>
+</p><pre>int luaL_callmeta (lua_State *L, int obj, const char *e);</pre>
+
+<p>メタメソッドを呼び出します。</p><p>インデックス<code>obj</code>にあるオブジェクトがメタテーブルを持ち、このメタテーブルにフィールド<code>e</code>がある場合、この関数はこのフィールドを呼び出し、オブジェクトを唯一の引数として渡します。この場合、この関数はtrueを返し、呼び出しによって返された値をスタックにプッシュします。メタテーブルがない場合、またはメタメソッドがない場合、この関数は値をスタックにプッシュせずにfalseを返します。</p><hr /><h3><a name="luaL_checkany"><code>luaL_checkany</code></a></h3><p>
+<span class="apii">[-0, +0, <em>v</em>]</span>
+</p><pre>void luaL_checkany (lua_State *L, int arg);</pre>
+
+<p>関数が位置<code>arg</code>に任意の型（<b>nil</b>を含む）の引数を持っているかどうかをチェックします。</p><hr /><h3><a name="luaL_checkinteger"><code>luaL_checkinteger</code></a></h3><p>
+<span class="apii">[-0, +0, <em>v</em>]</span>
+</p><pre>lua_Integer luaL_checkinteger (lua_State *L, int arg);</pre>
+
+<p>関数引数<code>arg</code>が整数である（または整数に変換できる）かどうかをチェックし、この整数を返します。</p><hr /><h3><a name="luaL_checklstring"><code>luaL_checklstring</code></a></h3><p>
+<span class="apii">[-0, +0, <em>v</em>]</span>
+</p><pre>const char *luaL_checklstring (lua_State *L, int arg, size_t *l);</pre>
+
+<p>関数引数<code>arg</code>が文字列であるかどうかをチェックし、この文字列を返します。<code>l</code>が<code>NULL</code>でない場合は、その参照を文字列の長さで埋めます。</p><p>この関数は、結果を取得するために<a href="#lua_tolstring"><code>lua_tolstring</code></a>を使用するため、その関数のすべての変換と注意点がここで適用されます。</p><hr /><h3><a name="luaL_checknumber"><code>luaL_checknumber</code></a></h3><p>
+<span class="apii">[-0, +0, <em>v</em>]</span>
+</p><pre>lua_Number luaL_checknumber (lua_State *L, int arg);</pre>
+
+<p>関数引数<code>arg</code>が数値であるかどうかをチェックし、この数値を<code>lua_Number</code>に変換して返します。</p><hr /><h3><a name="luaL_checkoption"><code>luaL_checkoption</code></a></h3><p>
+<span class="apii">[-0, +0, <em>v</em>]</span>
+</p><pre>int luaL_checkoption (lua_State *L,
+                      int arg,
+                      const char *def,
+                      const char *const lst[]);</pre>
+
+<p>関数引数<code>arg</code>が文字列であるかどうかをチェックし、この文字列を配列<code>lst</code>（NULL終端である必要があります）で検索します。文字列が見つかった配列のインデックスを返します。引数が文字列でない場合、または文字列が見つからない場合は、エラーを発生させます。</p><p><code>def</code>が<code>NULL</code>でない場合、この関数は、引数<code>arg</code>がない場合、またはこの引数が<b>nil</b>の場合に、<code>def</code>をデフォルト値として使用します。</p><p>これは、文字列をC列挙型にマッピングするのに役立つ関数です。（Luaライブラリでの一般的な規約は、オプションを選択するために数値の代わりに文字列を使用することです。）</p><hr /><h3><a name="luaL_checkstack"><code>luaL_checkstack</code></a></h3><p>
+<span class="apii">[-0, +0, <em>v</em>]</span>
+</p><pre>void luaL_checkstack (lua_State *L, int sz, const char *msg);</pre>
+
+<p>スタックサイズを<code>top + sz</code>要素まで増やします。スタックがそのサイズまで増やせない場合は、エラーを発生させます。<code>msg</code>は、エラーメッセージに追加するテキスト（追加のテキストがない場合は<code>NULL</code>）です。</p><hr /><h3><a name="luaL_checkstring"><code>luaL_checkstring</code></a></h3><p>
+<span class="apii">[-0, +0, <em>v</em>]</span>
+</p><pre>const char *luaL_checkstring (lua_State *L, int arg);</pre>
+
+<p>関数引数<code>arg</code>が文字列であるかどうかをチェックし、この文字列を返します。</p><p>この関数は、結果を取得するために<a href="#lua_tolstring"><code>lua_tolstring</code></a>を使用するため、その関数のすべての変換と注意点がここで適用されます。</p><hr /><h3><a name="luaL_checktype"><code>luaL_checktype</code></a></h3><p>
+<span class="apii">[-0, +0, <em>v</em>]</span>
+</p><pre>void luaL_checktype (lua_State *L, int arg, int t);</pre>
+
+<p>関数引数<code>arg</code>が型<code>t</code>を持っているかどうかをチェックします。<code>t</code>の型のエンコーディングについては<a href="#lua_type"><code>lua_type</code></a>を参照してください。</p><hr /><h3><a name="luaL_checkudata"><code>luaL_checkudata</code></a></h3><p>
+<span class="apii">[-0, +0, <em>v</em>]</span>
+</p><pre>void *luaL_checkudata (lua_State *L, int arg, const char *tname);</pre>
+
+<p>関数引数<code>arg</code>が型<code>tname</code>（<a href="#luaL_newmetatable"><code>luaL_newmetatable</code></a>を参照）のuserdataであるかどうかをチェックし、userdataのメモリブロックアドレス（<a href="#lua_touserdata"><code>lua_touserdata</code></a>を参照）を返します。</p><hr /><h3><a name="luaL_checkversion"><code>luaL_checkversion</code></a></h3><p>
+<span class="apii">[-0, +0, <em>v</em>]</span>
+</p><pre>void luaL_checkversion (lua_State *L);</pre>
+
+<p>呼び出しを行うコードと呼び出されているLuaライブラリが、同じバージョンのLuaと、同じ数値型を使用しているかどうかをチェックします。</p><hr /><h3><a name="luaL_dofile"><code>luaL_dofile</code></a></h3><p>
+<span class="apii">[-0, +?, <em>m</em>]</span>
+</p><pre>int luaL_dofile (lua_State *L, const char *filename);</pre>
+
+<p>指定されたファイルをロードして実行します。これは、次のマクロとして定義されます。</p><pre>     (luaL_loadfile(L, filename) || lua_pcall(L, 0, LUA_MULTRET, 0))
+</pre><p>エラーがない場合は0（<a href="#pdf-LUA_OK"><code>LUA_OK</code></a>）を返し、エラーの場合は1を返します。</p><hr /><h3><a name="luaL_dostring"><code>luaL_dostring</code></a></h3><p>
+<span class="apii">[-0, +?, –]</span>
+</p><pre>int luaL_dostring (lua_State *L, const char *str);</pre>
+
+<p>指定された文字列をロードして実行します。これは、次のマクロとして定義されます。</p><pre>     (luaL_loadstring(L, str) || lua_pcall(L, 0, LUA_MULTRET, 0))
+</pre><p>エラーがない場合は0（<a href="#pdf-LUA_OK"><code>LUA_OK</code></a>）を返し、エラーの場合は1を返します。</p><hr /><h3><a name="luaL_error"><code>luaL_error</code></a></h3><p>
+<span class="apii">[-0, +0, <em>v</em>]</span>
+</p><pre>int luaL_error (lua_State *L, const char *fmt, ...);</pre>
+
+<p>エラーを発生させます。エラーメッセージの形式は、<a href="#lua_pushfstring"><code>lua_pushfstring</code></a>と同じルールに従って、<code>fmt</code>と追加の引数によって指定されます。また、メッセージの先頭に、エラーが発生したファイル名と行番号を追加します（この情報が利用可能な場合）。</p><p>この関数は決して戻りませんが、C関数では<code>return luaL_error(<em>args</em>)</code>として使用するのが慣例です。</p><hr /><h3><a name="luaL_execresult"><code>luaL_execresult</code></a></h3><p>
+<span class="apii">[-0, +3, <em>m</em>]</span>
+</p><pre>int luaL_execresult (lua_State *L, int stat);</pre>
+
+<p>この関数は、標準ライブラリ（<a href="#pdf-os.execute"><code>os.execute</code></a>および<a href="#pdf-io.close"><code>io.close</code></a>）のプロセス関連関数の戻り値を生成します。</p><hr /><h3><a name="luaL_fileresult"><code>luaL_fileresult</code></a></h3><p>
+<span class="apii">[-0, +(1|3), <em>m</em>]</span>
+</p><pre>int luaL_fileresult (lua_State *L, int stat, const char *fname);</pre>
+
+<p>この関数は、標準ライブラリ（<a href="#pdf-io.open"><code>io.open</code></a>、<a href="#pdf-os.rename"><code>os.rename</code></a>、<a href="#pdf-file:seek"><code>file:seek</code></a>など）のファイル関連関数の戻り値を生成します。</p><hr /><h3><a name="luaL_getmetafield"><code>luaL_getmetafield</code></a></h3><p>
+<span class="apii">[-0, +(0|1), <em>m</em>]</span>
+</p><pre>int luaL_getmetafield (lua_State *L, int obj, const char *e);</pre>
+
+<p>インデックス<code>obj</code>にあるオブジェクトのメタテーブルからフィールド<code>e</code>をスタックにプッシュし、プッシュされた値の型を返します。オブジェクトにメタテーブルがない場合、またはメタテーブルにこのフィールドがない場合は、何もプッシュせずに<code>LUA_TNIL</code>を返します。</p><hr /><h3><a name="luaL_getmetatable"><code>luaL_getmetatable</code></a></h3><p>
+<span class="apii">[-0, +1, <em>m</em>]</span>
+</p><pre>int luaL_getmetatable (lua_State *L, const char *tname);</pre>
+
+<p>レジストリ内の名前<code>tname</code>に関連付けられたメタテーブル（<a href="#luaL_newmetatable"><code>luaL_newmetatable</code></a>を参照）をスタックにプッシュします。その名前に関連付けられたメタテーブルがない場合は<b>nil</b>をプッシュします。プッシュされた値の型を返します。</p><hr /><h3><a name="luaL_getsubtable"><code>luaL_getsubtable</code></a></h3><p>
+<span class="apii">[-0, +1, <em>e</em>]</span>
+</p><pre>int luaL_getsubtable (lua_State *L, int idx, const char *fname);</pre>
+
+<p>インデックス<code>idx</code>にある値<code>t</code>において、<code>t[fname]</code>がテーブルであることを確認し、そのテーブルをスタックにプッシュします。そこに以前のテーブルがある場合はtrueを返し、新しいテーブルを作成した場合はfalseを返します。</p><hr /><h3><a name="luaL_gsub"><code>luaL_gsub</code></a></h3><p>
+<span class="apii">[-0, +1, <em>m</em>]</span>
+</p><pre>const char *luaL_gsub (lua_State *L,
+                       const char *s,
+                       const char *p,
+                       const char *r);</pre>
+
+<p>文字列<code>s</code>のコピーを作成し、文字列<code>p</code>の出現箇所をすべて文字列<code>r</code>に置き換えます。結果の文字列をスタックにプッシュして返します。</p><hr /><h3><a name="luaL_len"><code>luaL_len</code></a></h3><p>
+<span class="apii">[-0, +0, <em>e</em>]</span>
+</p><pre>lua_Integer luaL_len (lua_State *L, int index);</pre>
+
+<p>指定されたインデックスにある値の「長さ」を数値として返します。これはLuaの '<code>#</code>' 演算子（<a href="#3.4.7">§3.4.7</a>を参照）と同等です。操作の結果が整数でない場合は、エラーを発生させます。（このケースは、メタメソッドを通じてのみ発生する可能性があります。）</p><hr /><h3><a name="luaL_loadbuffer"><code>luaL_loadbuffer</code></a></h3><p>
+<span class="apii">[-0, +1, –]</span>
+</p><pre>int luaL_loadbuffer (lua_State *L,
+                     const char *buff,
+                     size_t sz,
+                     const char *name);</pre>
+
+<p><code>mode</code>が<code>NULL</code>である<a href="#luaL_loadbufferx"><code>luaL_loadbufferx</code></a>と同等です。</p><hr /><h3><a name="luaL_loadbufferx"><code>luaL_loadbufferx</code></a></h3><p>
+<span class="apii">[-0, +1, –]</span>
+</p><pre>int luaL_loadbufferx (lua_State *L,
+                      const char *buff,
+                      size_t sz,
+                      const char *name,
+                      const char *mode);</pre>
+
+<p>バッファをLuaチャンクとしてロードします。この関数は、<a href="#lua_load"><code>lua_load</code></a>を使用して、サイズ<code>sz</code>の<code>buff</code>によって指されるバッファ内のチャンクをロードします。</p><p>この関数は、<a href="#lua_load"><code>lua_load</code></a>と同じ結果を返します。<code>name</code>は、デバッグ情報とエラーメッセージに使用されるチャンク名です。文字列<code>mode</code>は、関数<a href="#lua_load"><code>lua_load</code></a>の場合と同様に機能します。</p><hr /><h3><a name="luaL_loadfile"><code>luaL_loadfile</code></a></h3><p>
+<span class="apii">[-0, +1, <em>m</em>]</span>
+</p><pre>int luaL_loadfile (lua_State *L, const char *filename);</pre>
+
+<p><code>mode</code>が<code>NULL</code>である<a href="#luaL_loadfilex"><code>luaL_loadfilex</code></a>と同等です。</p><hr /><h3><a name="luaL_loadfilex"><code>luaL_loadfilex</code></a></h3><p>
+<span class="apii">[-0, +1, <em>m</em>]</span>
+</p><pre>int luaL_loadfilex (lua_State *L, const char *filename,
+                                            const char *mode);</pre>
+
+<p>ファイルをLuaチャンクとしてロードします。この関数は、<a href="#lua_load"><code>lua_load</code></a>を使用して、<code>filename</code>という名前のファイル内のチャンクをロードします。<code>filename</code>が<code>NULL</code>の場合、標準入力からロードします。ファイルの最初の行が<code>#</code>で始まる場合は無視されます。</p><p>文字列<code>mode</code>は、関数<a href="#lua_load"><code>lua_load</code></a>の場合と同様に機能します。</p><p>この関数は、<a href="#lua_load"><code>lua_load</code></a>と同じ結果を返します。ファイル関連のエラーの場合は、<a href="#pdf-LUA_ERRFILE"><code>LUA_ERRFILE</code></a>を返します。</p><p><a href="#lua_load"><code>lua_load</code></a>と同様に、この関数はチャンクをロードするだけで、実行はしません。</p><hr /><h3><a name="luaL_loadstring"><code>luaL_loadstring</code></a></h3><p>
+<span class="apii">[-0, +1, –]</span>
+</p><pre>int luaL_loadstring (lua_State *L, const char *s);</pre>
+
+<p>文字列をLuaチャンクとしてロードします。この関数は、<a href="#lua_load"><code>lua_load</code></a>を使用して、NULL終端文字列<code>s</code>内のチャンクをロードします。</p><p>この関数は、<a href="#lua_load"><code>lua_load</code></a>と同じ結果を返します。</p><p><a href="#lua_load"><code>lua_load</code></a>と同様に、この関数はチャンクをロードするだけで、実行はしません。</p><hr /><h3><a name="luaL_newlib"><code>luaL_newlib</code></a></h3><p>
+<span class="apii">[-0, +1, <em>m</em>]</span>
+</p><pre>void luaL_newlib (lua_State *L, const luaL_Reg l[]);</pre>
+
+<p>新しいテーブルを作成し、リスト<code>l</code>内の関数を登録します。</p><p>これは、次のマクロとして実装されます。</p><pre>     (luaL_newlibtable(L,l), luaL_setfuncs(L,l,0))
+</pre><p>配列<code>l</code>は、実際の配列である必要があり、ポインタであってはなりません。</p><hr /><h3><a name="luaL_newlibtable"><code>luaL_newlibtable</code></a></h3><p>
+<span class="apii">[-0, +1, <em>m</em>]</span>
+</p><pre>void luaL_newlibtable (lua_State *L, const luaL_Reg l[]);</pre>
+
+<p>配列<code>l</code>内のすべてのエントリを格納するために最適化されたサイズで新しいテーブルを作成します（ただし、実際には格納しません）。これは、<a href="#luaL_setfuncs"><code>luaL_setfuncs</code></a>（<a href="#luaL_newlib"><code>luaL_newlib</code></a>を参照）と組み合わせて使用​​することを目的としています。</p><p>これはマクロとして実装されます。配列<code>l</code>は、実際の配列である必要があり、ポインタであってはなりません。</p><hr /><h3><a name="luaL_newmetatable"><code>luaL_newmetatable</code></a></h3><p>
+<span class="apii">[-0, +1, <em>m</em>]</span>
+</p><pre>int luaL_newmetatable (lua_State *L, const char *tname);</pre>
+
+<p>レジストリにすでにキー<code>tname</code>がある場合は0を返します。そうでない場合は、userdataのメタテーブルとして使用する新しいテーブルを作成し、この新しいテーブルにペア<code>__name = tname</code>を追加し、レジストリにペア<code>[tname] = new table</code>を追加して1を返します。</p><p>どちらの場合も、この関数は、レジストリ内の<code>tname</code>に関連付けられた最終的な値をスタックにプッシュします。</p><hr /><h3><a name="luaL_newstate"><code>luaL_newstate</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>lua_State *luaL_newstate (void);</pre>
+
+<p>新しいLuaステートを作成します。ISO&nbsp;Cのメモリ割り当て関数に基づくアロケータで<a href="#lua_newstate"><code>lua_newstate</code></a>を呼び出し、その後、標準エラー出力にメッセージを出力する警告関数とパニック関数（<a href="#4.4">§4.4</a>を参照）を設定します。</p><p>新しいステートを返します。メモリ割り当てエラーが発生した場合は<code>NULL</code>を返します。</p><hr /><h3><a name="luaL_openlibs"><code>luaL_openlibs</code></a></h3><p>
+<span class="apii">[-0, +0, <em>e</em>]</span>
+</p><pre>void luaL_openlibs (lua_State *L);</pre>
+
+<p>与えられたステートにすべての標準Luaライブラリを開きます。</p><hr /><h3><a name="luaL_opt"><code>luaL_opt</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>T luaL_opt (L, func, arg, dflt);</pre>
+
+<p>このマクロは次のように定義されます。</p><pre>     (lua_isnoneornil(L,(arg)) ? (dflt) : func(L,(arg)))
+</pre><p>言葉で言うと、引数<code>arg</code>がnilまたは存在しない場合、マクロの結果はデフォルトの<code>dflt</code>になります。それ以外の場合は、ステート<code>L</code>と引数インデックス<code>arg</code>を引数として<code>func</code>を呼び出した結果になります。必要な場合にのみ式<code>dflt</code>が評価されることに注意してください。</p><hr /><h3><a name="luaL_optinteger"><code>luaL_optinteger</code></a></h3><p>
+<span class="apii">[-0, +0, <em>v</em>]</span>
+</p><pre>lua_Integer luaL_optinteger (lua_State *L,
+                             int arg,
+                             lua_Integer d);</pre>
+
+<p>関数引数<code>arg</code>が整数である（または整数に変換可能である）場合、この整数を返します。この引数が存在しないか、<b>nil</b>の場合は、<code>d</code>を返します。それ以外の場合は、エラーを発生させます。</p><hr /><h3><a name="luaL_optlstring"><code>luaL_optlstring</code></a></h3><p>
+<span class="apii">[-0, +0, <em>v</em>]</span>
+</p><pre>const char *luaL_optlstring (lua_State *L,
+                             int arg,
+                             const char *d,
+                             size_t *l);</pre>
+
+<p>関数引数<code>arg</code>が文字列である場合、この文字列を返します。この引数が存在しないか、<b>nil</b>の場合は、<code>d</code>を返します。それ以外の場合は、エラーを発生させます。</p><p><code>l</code>が<code>NULL</code>でない場合、その参照先を結果の長さで埋めます。結果が<code>NULL</code>（<code>d</code>を返し、<code>d == NULL</code>の場合のみ可能）の場合、その長さはゼロとみなされます。</p><p>この関数は、結果を取得するために<a href="#lua_tolstring"><code>lua_tolstring</code></a>を使用するため、その関数のすべての変換と注意点がここで適用されます。</p><hr /><h3><a name="luaL_optnumber"><code>luaL_optnumber</code></a></h3><p>
+<span class="apii">[-0, +0, <em>v</em>]</span>
+</p><pre>lua_Number luaL_optnumber (lua_State *L, int arg, lua_Number d);</pre>
+
+<p>関数引数<code>arg</code>が数値である場合、この数値を<code>lua_Number</code>として返します。この引数が存在しないか、<b>nil</b>の場合は、<code>d</code>を返します。それ以外の場合は、エラーを発生させます。</p><hr /><h3><a name="luaL_optstring"><code>luaL_optstring</code></a></h3><p>
+<span class="apii">[-0, +0, <em>v</em>]</span>
+</p><pre>const char *luaL_optstring (lua_State *L,
+                            int arg,
+                            const char *d);</pre>
+
+<p>関数引数<code>arg</code>が文字列である場合、この文字列を返します。この引数が存在しないか、<b>nil</b>の場合は、<code>d</code>を返します。それ以外の場合は、エラーを発生させます。</p><hr /><h3><a name="luaL_prepbuffer"><code>luaL_prepbuffer</code></a></h3><p>
+<span class="apii">[-?, +?, <em>m</em>]</span>
+</p><pre>char *luaL_prepbuffer (luaL_Buffer *B);</pre>
+
+<p>定義済みのサイズ<a name="pdf-LUAL_BUFFERSIZE"><code>LUAL_BUFFERSIZE</code></a>で<a href="#luaL_prepbuffsize"><code>luaL_prepbuffsize</code></a>と同等です。</p><hr /><h3><a name="luaL_prepbuffsize"><code>luaL_prepbuffsize</code></a></h3><p>
+<span class="apii">[-?, +?, <em>m</em>]</span>
+</p><pre>char *luaL_prepbuffsize (luaL_Buffer *B, size_t sz);</pre>
+
+<p>バッファ<code>B</code>（<a href="#luaL_Buffer"><code>luaL_Buffer</code></a>を参照）に追加する文字列をコピーできるサイズ<code>sz</code>のスペースのアドレスを返します。このスペースに文字列をコピーした後、文字列のサイズで<a href="#luaL_addsize"><code>luaL_addsize</code></a>を呼び出して、実際にバッファに追加する必要があります。</p><hr /><h3><a name="luaL_pushfail"><code>luaL_pushfail</code></a></h3><p>
+<span class="apii">[-0, +1, –]</span>
+</p><pre>void luaL_pushfail (lua_State *L);</pre>
+
+<p>スタックに<b>fail</b>値をプッシュします（<a href="#6">§6</a>を参照）。</p><hr /><h3><a name="luaL_pushresult"><code>luaL_pushresult</code></a></h3><p>
+<span class="apii">[-?, +1, <em>m</em>]</span>
+</p><pre>void luaL_pushresult (luaL_Buffer *B);</pre>
+
+<p>バッファ<code>B</code>の使用を終了し、最終的な文字列をスタックの最上部に残します。</p><hr /><h3><a name="luaL_pushresultsize"><code>luaL_pushresultsize</code></a></h3><p>
+<span class="apii">[-?, +1, <em>m</em>]</span>
+</p><pre>void luaL_pushresultsize (luaL_Buffer *B, size_t sz);</pre>
+
+<p>シーケンス<a href="#luaL_addsize"><code>luaL_addsize</code></a>、<a href="#luaL_pushresult"><code>luaL_pushresult</code></a>と同等です。</p><hr /><h3><a name="luaL_ref"><code>luaL_ref</code></a></h3><p>
+<span class="apii">[-1, +0, <em>m</em>]</span>
+</p><pre>int luaL_ref (lua_State *L, int t);</pre>
+
+<p>スタックの一番上にあるオブジェクトに対する<em>参照</em>を、インデックス<code>t</code>にあるテーブル内に作成して返します（そしてオブジェクトをポップします）。</p><p>参照は一意の整数キーです。テーブル<code>t</code>に整数キーを手動で追加しない限り、<a href="#luaL_ref"><code>luaL_ref</code></a>は返されるキーの一意性を保証します。参照<code>r</code>で参照されるオブジェクトを取得するには、<code>lua_rawgeti(L, t, r)</code>を呼び出します。関数<a href="#luaL_unref"><code>luaL_unref</code></a>は参照を解放します。</p><p>スタックの最上部にあるオブジェクトが<b>nil</b>の場合、<a href="#luaL_ref"><code>luaL_ref</code></a>は定数<a name="pdf-LUA_REFNIL"><code>LUA_REFNIL</code></a>を返します。定数<a name="pdf-LUA_NOREF"><code>LUA_NOREF</code></a>は、<a href="#luaL_ref"><code>luaL_ref</code></a>によって返されるどの参照とも異なることが保証されています。</p><hr /><h3><a name="luaL_Reg"><code>luaL_Reg</code></a></h3>
+<pre>typedef struct luaL_Reg {
+  const char *name;
+  lua_CFunction func;
+} luaL_Reg;</pre>
+
+<p><a href="#luaL_setfuncs"><code>luaL_setfuncs</code></a>によって登録される関数の配列の型です。<code>name</code>は関数名であり、<code>func</code>は関数へのポインタです。<a href="#luaL_Reg"><code>luaL_Reg</code></a>の配列は、<code>name</code>と<code>func</code>の両方が<code>NULL</code>である番兵エントリで終わる必要があります。</p><hr /><h3><a name="luaL_requiref"><code>luaL_requiref</code></a></h3><p>
+<span class="apii">[-0, +1, <em>e</em>]</span>
+</p><pre>void luaL_requiref (lua_State *L, const char *modname,
+                    lua_CFunction openf, int glb);</pre>
+
+<p><code>package.loaded[modname]</code>がtrueでない場合、文字列<code>modname</code>を引数として関数<code>openf</code>を呼び出し、<a href="#pdf-require"><code>require</code></a>を介して関数が呼び出されたかのように、呼び出し結果を<code>package.loaded[modname]</code>に設定します。</p><p><code>glb</code>がtrueの場合、モジュールをグローバル<code>modname</code>にも保存します。</p><p>スタックにモジュールのコピーを残します。</p><hr /><h3><a name="luaL_setfuncs"><code>luaL_setfuncs</code></a></h3><p>
+<span class="apii">[-nup, +0, <em>m</em>]</span>
+</p><pre>void luaL_setfuncs (lua_State *L, const luaL_Reg *l, int nup);</pre>
+
+<p>配列<code>l</code>（<a href="#luaL_Reg"><code>luaL_Reg</code></a>を参照）内のすべての関数を、スタックの最上部にあるテーブル（オプションのアップバリューの下、次を参照）に登録します。</p><p><code>nup</code>がゼロでない場合、すべての関数は<code>nup</code>個のアップバリューで作成され、ライブラリテーブルの一番上にスタックにプッシュされた<code>nup</code>個の値のコピーで初期化されます。これらの値は、登録後にスタックからポップされます。</p><p><code>NULL</code>値を持つ関数は、<b>false</b>で埋められるプレースホルダを表します。</p><hr /><h3><a name="luaL_setmetatable"><code>luaL_setmetatable</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>void luaL_setmetatable (lua_State *L, const char *tname);</pre>
+
+<p>スタックの最上部にあるオブジェクトのメタテーブルを、レジストリ内の名前<code>tname</code>に関連付けられたメタテーブルとして設定します（<a href="#luaL_newmetatable"><code>luaL_newmetatable</code></a>を参照）。</p><hr /><h3><a name="luaL_Stream"><code>luaL_Stream</code></a></h3>
+<pre>typedef struct luaL_Stream {
+  FILE *f;
+  lua_CFunction closef;
+} luaL_Stream;</pre>
+
+<p>標準I/Oライブラリで使用されるファイルハンドルの標準表現です。</p><p>ファイルハンドルは、<code>LUA_FILEHANDLE</code>というメタテーブルを持つフルユーザーデータとして実装されます（<code>LUA_FILEHANDLE</code>は実際のメタテーブルの名前を持つマクロです）。メタテーブルはI/Oライブラリによって作成されます（<a href="#luaL_newmetatable"><code>luaL_newmetatable</code></a>を参照）。</p><p>このユーザーデータは構造体<code>luaL_Stream</code>で始まる必要があり、この初期構造体の後に他のデータを含めることができます。フィールド<code>f</code>は対応するCストリームを指します（または、不完全に作成されたハンドルを示すために<code>NULL</code>にすることもできます）。フィールド<code>closef</code>は、ハンドルが閉じられたとき、または収集されたときにストリームを閉じるために呼び出されるLua関数を指します。この関数は、ファイルハンドルを唯一の引数として受け取り、成功の場合はtrue値、エラーの場合はfalse値とエラーメッセージを返す必要があります。Luaがこのフィールドを呼び出すと、ハンドルが閉じられたことを示すために、フィールド値を<code>NULL</code>に変更します。</p><hr /><h3><a name="luaL_testudata"><code>luaL_testudata</code></a></h3><p>
+<span class="apii">[-0, +0, <em>m</em>]</span>
+</p><pre>void *luaL_testudata (lua_State *L, int arg, const char *tname);</pre>
+
+<p>この関数は、テストが失敗した場合にエラーを発生させる代わりに<code>NULL</code>を返すことを除いて、<a href="#luaL_checkudata"><code>luaL_checkudata</code></a>のように機能します。</p><hr /><h3><a name="luaL_tolstring"><code>luaL_tolstring</code></a></h3><p>
+<span class="apii">[-0, +1, <em>e</em>]</span>
+</p><pre>const char *luaL_tolstring (lua_State *L, int idx, size_t *len);</pre>
+
+<p>指定されたインデックスにある任意のLua値を、妥当な形式のC文字列に変換します。結果の文字列はスタックにプッシュされ、関数からも返されます（<a href="#4.1.3">§4.1.3</a>を参照）。<code>len</code>が<code>NULL</code>でない場合、関数は<code>*len</code>に文字列の長さも設定します。</p><p>値に<code>__tostring</code>フィールドを持つメタテーブルがある場合、<code>luaL_tolstring</code>は値を引数として対応するメタメソッドを呼び出し、呼び出しの結果を結果として使用します。</p><hr /><h3><a name="luaL_traceback"><code>luaL_traceback</code></a></h3><p>
+<span class="apii">[-0, +1, <em>m</em>]</span>
+</p><pre>void luaL_traceback (lua_State *L, lua_State *L1, const char *msg,
+                     int level);</pre>
+
+<p>スタック<code>L1</code>のトレースバックを作成してプッシュします。<code>msg</code>が<code>NULL</code>でない場合、トレースバックの先頭に追加されます。<code>level</code>パラメータは、トレースバックを開始するレベルを示します。</p><hr /><h3><a name="luaL_typeerror"><code>luaL_typeerror</code></a></h3><p>
+<span class="apii">[-0, +0, <em>v</em>]</span>
+</p><pre>int luaL_typeerror (lua_State *L, int arg, const char *tname);</pre>
+
+<p>標準メッセージを使用して、それを呼び出したC関数の引数<code>arg</code>に対して型エラーを発生させます。<code>tname</code>は、予期される型の「名前」です。この関数は決して返りません。</p><hr /><h3><a name="luaL_typename"><code>luaL_typename</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>const char *luaL_typename (lua_State *L, int index);</pre>
+
+<p>指定されたインデックスにある値の型の名前を返します。</p><hr /><h3><a name="luaL_unref"><code>luaL_unref</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>void luaL_unref (lua_State *L, int t, int ref);</pre>
+
+<p>インデックス<code>t</code>にあるテーブルから参照<code>ref</code>を解放します（<a href="#luaL_ref"><code>luaL_ref</code></a>を参照）。エントリはテーブルから削除されるため、参照されているオブジェクトを収集できます。参照<code>ref</code>も再利用できるように解放されます。</p><p><code>ref</code>が<a href="#pdf-LUA_NOREF"><code>LUA_NOREF</code></a>または<a href="#pdf-LUA_REFNIL"><code>LUA_REFNIL</code></a>の場合、<a href="#luaL_unref"><code>luaL_unref</code></a>は何もしません。</p><hr /><h3><a name="luaL_where"><code>luaL_where</code></a></h3><p>
+<span class="apii">[-0, +1, <em>m</em>]</span>
+</p><pre>void luaL_where (lua_State *L, int lvl);</pre>
+
+<p>スタックに、コールスタック内のレベル<code>lvl</code>でのコントロールの現在の位置を識別する文字列をプッシュします。通常、この文字列は次の形式です。</p><pre>     <em>chunkname</em>:<em>currentline</em>:
+</pre><p>レベル&nbsp;0は実行中の関数、レベル&nbsp;1は実行中の関数を呼び出した関数などです。</p><p>この関数は、エラーメッセージのプレフィックスを構築するために使用されます。</p>
+</body>
+</html>

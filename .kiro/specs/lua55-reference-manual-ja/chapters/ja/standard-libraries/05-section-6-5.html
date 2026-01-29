@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lua 5.5 - Section 6.5</title>
+</head>
+<body>
+<h2>6.5 – <a name="6.5">UTF-8 サポート</a></h2>
+
+<p>このライブラリは、UTF-8 エンコーディングの基本的なサポートを提供します。このライブラリは、すべての関数を <a name="pdf-utf8"><code>utf8</code></a> テーブル内に提供します。このライブラリは、エンコーディングの処理以外に、Unicode のサポートを提供しません。文字分類など、文字の意味を必要とする操作は、その範囲外です。</p><p>特に明記しない限り、バイト位置をパラメータとして期待するすべての関数は、指定された位置がバイトシーケンスの開始であるか、サブジェクト文字列の長さプラス 1 であると想定します。文字列ライブラリと同様に、負のインデックスは文字列の末尾から数えます。</p><p>バイトシーケンスを作成する関数は、元の UTF-8 仕様で定義されているように、<code>0x7FFFFFFF</code> までのすべての値を受け入れます。これは、最大 6 バイトまでのバイトシーケンスを意味します。</p><p>バイトシーケンスを解釈する関数は、有効なシーケンス（整形式であり、過長でない）のみを受け入れます。デフォルトでは、<code>10FFFF</code> より大きい値とサロゲートを拒否し、有効な Unicode コードポイントになるバイトシーケンスのみを受け入れます。ブール値引数 <code>lax</code> が使用可能な場合、これらのチェックを解除し、<code>0x7FFFFFFF</code> までのすべての値を受け入れるようにします。（整形式でないシーケンスと過長なシーケンスは引き続き拒否されます。）</p><p>
+</p><hr /><h3><a name="pdf-utf8.char"><code>utf8.char (···)</code></a></h3>
+
+
+<p>0 個以上の整数を受け取り、それぞれを対応する UTF-8 バイトシーケンスに変換し、これらのシーケンスすべてを連結した文字列を返します。</p><p>
+</p><hr /><h3><a name="pdf-utf8.charpattern"><code>utf8.charpattern</code></a></h3>
+
+
+<p>パターン（関数ではなく文字列） "<code>[\0-\x7F\xC2-\xFD][\x80-\xBF]*</code>"（<a href="#6.4.1">§6.4.1</a>を参照）は、サブジェクトが有効な UTF-8 文字列であると仮定して、正確に 1 つの UTF-8 バイトシーケンスに一致します。</p><p>
+</p><hr /><h3><a name="pdf-utf8.codes"><code>utf8.codes (s [, lax])</code></a></h3>
+
+
+<p>次の構成で、</p><pre>     for p, c in utf8.codes(s) do <em>body</em> end
+</pre><p>文字列 <code>s</code> 内のすべての UTF-8 文字を反復処理し、<code>p</code> が位置（バイト単位）であり、<code>c</code> が各文字のコードポイントとなるように値を返します。無効なバイトシーケンスが見つかった場合はエラーが発生します。</p><p>
+</p><hr /><h3><a name="pdf-utf8.codepoint"><code>utf8.codepoint (s [, i [, j [, lax]]])</code></a></h3>
+
+
+<p>バイト位置 <code>i</code> と <code>j</code> の間（両方を含む）で開始される、<code>s</code> 内のすべての文字のコードポイント（整数として）を返します。<code>i</code> のデフォルトは 1 で、<code>j</code> のデフォルトは <code>i</code> です。無効なバイトシーケンスが見つかった場合はエラーが発生します。</p><p>
+</p><hr /><h3><a name="pdf-utf8.len"><code>utf8.len (s [, i [, j [, lax]]])</code></a></h3>
+
+
+<p>位置 <code>i</code> と <code>j</code> の間（両方を含む）で開始される文字列 <code>s</code> 内の UTF-8 文字の数を返します。<code>i</code> のデフォルトは 1 で、<code>j</code> のデフォルトは -1 です。無効なバイトシーケンスが見つかった場合は、<b>fail</b> と最初の無効なバイトの位置を返します。</p><p>
+</p><hr /><h3><a name="pdf-utf8.offset"><code>utf8.offset (s, n [, i])</code></a></h3>
+
+
+<p><code>s</code> の <code>n</code> 番目の文字（位置 <code>i</code> から数える）のエンコーディングが開始する位置（バイト単位）を返します。負の <code>n</code> は、位置 <code>i</code> より前の文字を取得します。<code>n</code> が非負の場合、<code>i</code> のデフォルトは 1 であり、それ以外の場合は <code>#s + 1</code> であるため、<code>utf8.offset(s, -n)</code> は文字列の末尾から <code>n</code> 番目の文字のオフセットを取得します。指定された文字がサブジェクト内にもその直後にもない場合、関数は <b>fail</b> を返します。</p><p>特別なケースとして、<code>n</code> が 0 の場合、関数は <code>s</code> の <code>i</code> 番目のバイトを含む文字のエンコーディングの開始を返します。</p><p>この関数は、<code>s</code> が有効な UTF-8 文字列であることを前提としています。</p>
+</body>
+</html>

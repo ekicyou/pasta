@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lua 5.5 - Section 6.10</title>
+</head>
+<body>
+<h2>6.10 – <a name="6.10">デバッグライブラリ</a></h2>
+
+<p>このライブラリは、Luaプログラムへのデバッグインターフェイス（<a href="#4.7">§4.7</a>）の機能を提供します。このライブラリを使用するときは注意が必要です。そのいくつかの関数は、Luaコードに関する基本的な仮定（たとえば、関数のローカル変数は外部からアクセスできないこと、userdataメタテーブルはLuaコードで変更できないこと、Luaプログラムはクラッシュしないこと）に違反するため、そうでない場合は安全なコードを危険にさらす可能性があります。さらに、このライブラリの一部の関数は遅くなる可能性があります。</p><p>このライブラリのすべての関数は、<a name="pdf-debug"><code>debug</code></a>テーブル内に提供されています。スレッドを操作するすべての関数には、操作するスレッドであるオプションの最初の引数があります。デフォルトは常に現在のスレッドです。</p><p>
+</p><hr /><h3><a name="pdf-debug.debug"><code>debug.debug ()</code></a></h3>
+
+
+<p>ユーザーが入力した各文字列を実行して、ユーザーとの対話モードに入ります。単純なコマンドやその他のデバッグ機能を使用して、ユーザーはグローバル変数とローカル変数を検査したり、それらの値を変更したり、式を評価したりできます。単語<code>cont</code>のみを含む行は、この関数を終了させ、呼び出し元が実行を継続できるようにします。</p><p><code>debug.debug</code>のコマンドは、どの関数にも字句的にネストされていないため、ローカル変数に直接アクセスできないことに注意してください。</p><p>
+</p><hr /><h3><a name="pdf-debug.gethook"><code>debug.gethook ([thread])</code></a></h3>
+
+
+<p>スレッドの現在のフック設定を、3つの値として返します：現在のフック関数、現在のフックマスク、および<a href="#pdf-debug.sethook"><code>debug.sethook</code></a>関数によって設定された現在のフックカウント。</p><p>アクティブなフックがない場合は<b>fail</b>を返します。</p><p>
+</p><hr /><h3><a name="pdf-debug.getinfo"><code>debug.getinfo ([thread,] f [, what])</code></a></h3>
+
+
+<p>関数に関する情報を含むテーブルを返します。関数を直接指定することも、<code>f</code>の値として数値を指定することもできます。これは、指定されたスレッドの呼び出しスタックのレベル<code>f</code>で実行されている関数を意味します：レベル0は現在の関数（<code>getinfo</code>自体）です。レベル1は<code>getinfo</code>を呼び出した関数です（スタックにカウントされない末尾呼び出しを除く）。以下同様です。<code>f</code>がアクティブな関数の数よりも大きい数値の場合、<code>getinfo</code>は<b>fail</b>を返します。</p><p>返されるテーブルには、<a href="#lua_getinfo"><code>lua_getinfo</code></a>によって返されるすべてのフィールドを含めることができ、どのフィールドに入力するかを記述する文字列<code>what</code>を含めることができます。<code>what</code>のデフォルトは、有効な行のテーブルを除く、利用可能なすべての情報を取得することです。存在する場合、オプション「<code>f</code>」は、関数自体を持つ<code>func</code>という名前のフィールドを追加します。存在する場合、オプション「<code>L</code>」は、有効な行のテーブルを持つ<code>activelines</code>という名前のフィールドを追加します。</p><p>たとえば、式<code>debug.getinfo(1,"n").name</code>は、合理的な名前が見つかる場合は、現在の関数の名前を返し、式<code>debug.getinfo(print)</code>は、<a href="#pdf-print"><code>print</code></a>関数に関するすべての利用可能な情報を含むテーブルを返します。</p><p>
+</p><hr /><h3><a name="pdf-debug.getlocal"><code>debug.getlocal ([thread,] f, local)</code></a></h3>
+
+
+<p>この関数は、スタックのレベル<code>f</code>の関数のインデックス<code>local</code>を持つローカル変数の名前と値を返します。この関数は、明示的なローカル変数だけでなく、パラメータと一時的な値にもアクセスします。</p><p>最初のパラメータまたはローカル変数のインデックスは1であり、以下同様に、コードで宣言された順序に従い、関数の現在のスコープでアクティブな変数のみをカウントします。コンパイル時の定数は、コンパイラによって最適化された場合、このリストに表示されない場合があります。負のインデックスはvararg引数を参照します。-1は最初のvararg引数です。指定されたインデックスの変数が存在しない場合、関数は<b>fail</b>を返し、範囲外のレベルで呼び出された場合はエラーが発生します。（<a href="#pdf-debug.getinfo"><code>debug.getinfo</code></a>を呼び出して、レベルが有効かどうかを確認できます。）</p><p>「<code>(</code>」（左括弧）で始まる変数名は、名前が不明な変数（ループ制御変数などの内部変数、およびデバッグ情報なしで保存されたチャンクの変数）を表します。</p><p>パラメータ<code>f</code>は関数である場合もあります。その場合、<code>getlocal</code>は関数パラメータの名前のみを返します。</p><p>
+</p><hr /><h3><a name="pdf-debug.getmetatable"><code>debug.getmetatable (value)</code></a></h3>
+
+
+<p>指定された<code>value</code>のメタテーブルを返します。メタテーブルがない場合は<b>nil</b>を返します。</p><p>
+</p><hr /><h3><a name="pdf-debug.getregistry"><code>debug.getregistry ()</code></a></h3>
+
+
+<p>レジストリテーブルを返します（<a href="#4.3">§4.3</a>を参照）。</p><p>
+</p><hr /><h3><a name="pdf-debug.getupvalue"><code>debug.getupvalue (f, up)</code></a></h3>
+
+
+<p>この関数は、関数<code>f</code>のインデックス<code>up</code>を持つアップバリューの名前と値を返します。指定されたインデックスを持つアップバリューがない場合は、<b>fail</b>を返します。</p><p>（Lua関数の場合、アップバリューとは、関数が使用し、その結果としてクロージャに含まれる外部ローカル変数です。）</p><p>C言語関数の場合、この関数はすべてのアップバリューの名前として空の文字列<code>""</code>を使用します。</p><p>変数名'<code>?</code>'（疑問符）は、名前が不明な変数（デバッグ情報なしで保存されたチャンクからの変数）を表します。</p><p>
+</p><hr /><h3><a name="pdf-debug.getuservalue"><code>debug.getuservalue (u, n)</code></a></h3>
+
+
+<p>userdata <code>u</code>に関連付けられた<code>n</code>番目のユーザー値を返し、さらに、userdataがその値を持っていない場合は<b>false</b>のブール値を返します。</p><p>
+</p><hr /><h3><a name="pdf-debug.sethook"><code>debug.sethook ([thread,] hook, mask [, count])</code></a></h3>
+
+
+<p>指定された関数をデバッグフックとして設定します。文字列<code>mask</code>と数値<code>count</code>は、フックがいつ呼び出されるかを記述します。文字列マスクは、以下の文字を任意の組み合わせで持つことができ、それぞれの意味は以下のとおりです。</p><ul>
+<li><b>'<code>c</code>':</b> Luaが関数を呼び出すたびにフックが呼び出されます。</li>
+<li><b>'<code>r</code>':</b> Luaが関数から戻るたびにフックが呼び出されます。</li>
+<li><b>'<code>l</code>':</b> Luaが新しいコード行に入るたびにフックが呼び出されます。</li>
+</ul><p>さらに、0以外の<code>count</code>を指定すると、<code>count</code>命令ごとにフックが呼び出されます。</p><p>引数なしで呼び出された場合、<a href="#pdf-debug.sethook"><code>debug.sethook</code></a>はフックをオフにします。</p><p>フックが呼び出されると、その最初のパラメータは、呼び出しをトリガーしたイベントを記述する文字列です：<code>"call"</code>、<code>"tail call"</code>、<code>"return"</code>、<code>"line"</code>、および<code>"count"</code>。行イベントの場合、フックは2番目のパラメータとして新しい行番号も取得します。フック内では、レベル2で<code>getinfo</code>を呼び出して、実行中の関数に関する詳細情報を取得できます。（レベル0は<code>getinfo</code>関数、レベル1はフック関数です。）</p><p>
+</p><hr /><h3><a name="pdf-debug.setlocal"><code>debug.setlocal ([thread,] level, local, value)</code></a></h3>
+
+
+<p>この関数は、スタックのレベル<code>level</code>にある関数のインデックス<code>local</code>を持つローカル変数に値<code>value</code>を割り当てます。指定されたインデックスを持つローカル変数がない場合は<b>fail</b>を返し、範囲外の<code>level</code>で呼び出された場合はエラーを発生させます。（<code>getinfo</code>を呼び出して、レベルが有効かどうかを確認できます。）それ以外の場合は、ローカル変数の名前を返します。</p><p>変数インデックスと名前の詳細については、<a href="#pdf-debug.getlocal"><code>debug.getlocal</code></a>を参照してください。</p><p>
+</p><hr /><h3><a name="pdf-debug.setmetatable"><code>debug.setmetatable (value, table)</code></a></h3>
+
+
+<p>指定された<code>value</code>のメタテーブルを指定された<code>table</code>（<b>nil</b>にすることも可能）に設定します。<code>value</code>を返します。</p><p>
+</p><hr /><h3><a name="pdf-debug.setupvalue"><code>debug.setupvalue (f, up, value)</code></a></h3>
+
+
+<p>この関数は、関数<code>f</code>のインデックス<code>up</code>を持つアップバリューに値<code>value</code>を割り当てます。指定されたインデックスを持つアップバリューがない場合は<b>fail</b>を返します。それ以外の場合は、アップバリューの名前を返します。</p><p>アップバリューの詳細については、<a href="#pdf-debug.getupvalue"><code>debug.getupvalue</code></a>を参照してください。</p><p>
+</p><hr /><h3><a name="pdf-debug.setuservalue"><code>debug.setuservalue (udata, value, n)</code></a></h3>
+
+
+<p>指定された<code>value</code>を指定された<code>udata</code>に関連付けられた<code>n</code>番目のユーザー値として設定します。<code>udata</code>は完全なuserdataである必要があります。</p><p><code>udata</code>を返します。userdataがその値を持っていない場合は<b>fail</b>を返します。</p><p>
+</p><hr /><h3><a name="pdf-debug.traceback"><code>debug.traceback ([thread,] [message [, level]])</code></a></h3>
+
+
+<p><code>message</code>が存在するが、文字列でも<b>nil</b>でもない場合、この関数はそれ以上の処理を行わずに<code>message</code>を返します。それ以外の場合は、コールスタックのトレースバックを含む文字列を返します。オプションの<code>message</code>文字列は、トレースバックの先頭に追加されます。オプションの<code>level</code>数値は、トレースバックを開始するレベルを指定します（デフォルトは1、<code>traceback</code>を呼び出す関数です）。</p><p>
+</p><hr /><h3><a name="pdf-debug.upvalueid"><code>debug.upvalueid (f, n)</code></a></h3>
+
+
+<p>指定された関数の<code>n</code>番目のアップバリューの一意の識別子（ライトuserdataとして）を返します。</p><p>これらの固有の識別子により、プログラムは異なるクロージャがアップバリューを共有しているかどうかを確認できます。アップバリューを共有する（つまり、同じ外部ローカル変数にアクセスする）Luaクロージャは、それらのアップバリューインデックスに対して同一のIDを返します。</p><p>
+</p><hr /><h3><a name="pdf-debug.upvaluejoin"><code>debug.upvaluejoin (f1, n1, f2, n2)</code></a></h3>
+
+
+<p>Luaクロージャ<code>f1</code>の<code>n1</code>番目のアップバリューが、Luaクロージャ<code>f2</code>の<code>n2</code>番目のアップバリューを参照するようにします。</p>
+
+</body>
+</html>

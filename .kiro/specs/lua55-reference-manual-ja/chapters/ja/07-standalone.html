@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lua 5.5 Reference Manual - Chapter 07</title>
+</head>
+<body>
+<h1>7 – <a name="7">Luaスタンドアロン</a></h1>
+
+<p>LuaはホストCプログラムに組み込むための拡張言語として設計されていますが、スタンドアロン言語としても頻繁に使用されます。スタンドアロン言語としてのLuaのインタープリター（単に<code>lua</code>と呼ばれる）は、標準ディストリビューションに付属しています。スタンドアロンインタープリターには、すべての標準ライブラリが含まれています。その使い方は次のとおりです。</p><pre>     lua [options] [script [args]]
+</pre><p>オプションは次のとおりです。</p><ul>
+<li><b><code>-e <em>stat</em></code>:</b> 文字列<em>stat</em>を実行します。</li>
+<li><b><code>-i</code>:</b> <em>script</em>の実行後に対話モードに入ります。</li>
+<li><b><code>-l <em>mod</em></code>:</b> <em>mod</em>を「require」し、結果をグローバル<em>mod</em>に割り当てます。</li>
+<li><b><code>-l <em>g=mod</em></code>:</b> <em>mod</em>を「require」し、結果をグローバル<em>g</em>に割り当てます。</li>
+<li><b><code>-v</code>:</b> バージョン情報を出力します。</li>
+<li><b><code>-E</code>:</b> 環境変数を無視します。</li>
+<li><b><code>-W</code>:</b> 警告をオンにします。</li>
+<li><b><code>--</code>:</b> オプションの処理を停止します。</li>
+<li><b><code>-</code>:</b> <code>stdin</code>をファイルとして実行し、オプションの処理を停止します。</li>
+</ul><p>（<code>-l <em>g=mod</em></code>形式はリリース5.4.4で導入されました。）</p><p>オプションを処理した後、<code>lua</code>は指定された<em>script</em>を実行します。引数なしで呼び出された場合、標準入力（<code>stdin</code>）がターミナルである場合は<code>lua</code>は<code>lua -v -i</code>として動作し、そうでない場合は<code>lua -</code>として動作します。</p><p>オプション<code>-E</code>なしで呼び出された場合、インタープリターは、引数を実行する前に環境変数<a name="pdf-LUA_INIT_5_4"><code>LUA_INIT_5_4</code></a>（またはバージョン付きの名前が定義されていない場合は<a name="pdf-LUA_INIT"><code>LUA_INIT</code></a>）を確認します。変数の内容が<code>@<em>filename</em></code>の形式の場合、<code>lua</code>はそのファイルを実行します。それ以外の場合、<code>lua</code>は文字列自体を実行します。</p><p>オプション<code>-E</code>を指定して呼び出された場合、Luaは環境変数を参照しません。特に、<a href="#pdf-package.path"><code>package.path</code></a>と<a href="#pdf-package.cpath"><code>package.cpath</code></a>の値は、<code>luaconf.h</code>で定義されたデフォルトパスで設定されます。</p><p>オプション<code>-e</code>、<code>-l</code>、および<code>-W</code>は、表示される順序で処理されます。たとえば、次のような呼び出しでは</p><pre>     $ lua -e 'a=1' -llib1 script.lua
+</pre><p>最初に<code>a</code>を1に設定し、次にライブラリ<code>lib1</code>をrequireし、最後に引数なしでファイル<code>script.lua</code>を実行します。（ここで<code>$</code>はシェルプロンプトです。プロンプトは異なる場合があります。）</p><p>コードを実行する前に、<code>lua</code>は、<code>arg</code>という名前のグローバルテーブルにすべてのコマンドライン引数を収集します。スクリプト名はインデックス0に、スクリプト名の後の最初の引数はインデックス1に、というように続きます。スクリプト名より前の引数（つまり、インタープリター名とオプション）は負のインデックスになります。たとえば、次の呼び出しでは</p><pre>     $ lua -la b.lua t1 t2
+</pre><p>テーブルは次のようになります。</p><pre>     arg = { [-2] = "lua", [-1] = "-la",
+             [0] = "b.lua",
+             [1] = "t1", [2] = "t2" }
+</pre><p>呼び出しにスクリプトがない場合、インタープリター名はインデックス0になり、その後に他の引数が続きます。たとえば、次の呼び出しでは</p><pre>     $ lua -e "print(arg[1])"
+</pre><p>「<code>-e</code>」が出力されます。スクリプトがある場合、スクリプトは引数<code>arg[1]</code>、···、<code>arg[#arg]</code>で呼び出されます。Luaのすべてのチャンクと同様に、スクリプトは可変長引数関数としてコンパイルされます。</p><p>対話モードでは、Luaは繰り返しプロンプトを表示して行を待ちます。行を読み取った後、Luaは最初にその行を式として解釈しようとします。成功した場合は、その値を出力します。それ以外の場合は、その行をステートメントとして解釈します。不完全なステートメントを記述した場合、インタープリターは別のプロンプトを発行して完了を待ちます。</p><p>グローバル変数<a name="pdf-_PROMPT"><code>_PROMPT</code></a>に文字列が含まれている場合、その値はプロンプトとして使用されます。同様に、グローバル変数<a name="pdf-_PROMPT2"><code>_PROMPT2</code></a>に文字列が含まれている場合、その値はセカンダリプロンプトとして使用されます（不完全なステートメント中に発行されます）。</p><p>スクリプトで保護されていないエラーが発生した場合、インタープリターは標準エラーストリームにエラーを報告します。エラーオブジェクトが文字列ではなく、メタメソッド<code>__tostring</code>を持つ場合、インタープリターはこのメタメソッドを呼び出して最終的なメッセージを生成します。それ以外の場合、インタープリターはエラーオブジェクトを文字列に変換し、スタックトレースバックを追加します。警告がオンの場合、警告は単に標準エラー出力に出力されます。</p><p>正常に終了すると、インタープリターはメインのLua状態を閉じます（<a href="#lua_close"><code>lua_close</code></a>を参照）。スクリプトは、<a href="#pdf-os.exit"><code>os.exit</code></a>を呼び出して終了することにより、このステップを回避できます。</p><p>UnixシステムでLuaをスクリプトインタープリターとして使用できるようにするために、Luaはファイルチャンクの最初の行が<code>#</code>で始まる場合、その行をスキップします。したがって、Luaスクリプトは、<code>chmod +x</code>と<code>#!</code>形式を使用して、次のように実行可能プログラムにすることができます。</p><pre>     #!/usr/local/bin/lua
+</pre><p>もちろん、Luaインタープリターの場所はマシンによって異なる場合があります。<code>lua</code>が<code>PATH</code>にある場合、</p><pre>     #!/usr/bin/env lua
+</pre><p>よりポータブルなソリューションになります。</p>
+</body>
+</html>

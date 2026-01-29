@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lua 5.5 - Section 6.3</title>
+</head>
+<body>
+<h2>6.3 &ndash; <a name="6.3">Coroutine Manipulation</a></h2>
+
+<p>
+This library comprises the operations to manipulate coroutines,
+which come inside the table <a name="pdf-coroutine"><code>coroutine</code></a>.
+See <a href="#2.6">&sect;2.6</a> for a general description of coroutines.
+
+
+<p>
+<hr><h3><a name="pdf-coroutine.close"><code>coroutine.close ([co])</code></a></h3>
+
+
+<p>
+Closes coroutine <code>co</code>,
+that is,
+closes all its pending to-be-closed variables
+and puts the coroutine in a dead state.
+The default for <code>co</code> is the running coroutine.
+
+
+<p>
+The given coroutine must be dead, suspended,
+or be the running coroutine.
+For the running coroutine,
+this function does not return.
+Instead, the resume that (re)started the coroutine returns.
+
+
+<p>
+For other coroutines,
+in case of error
+(either the original error that stopped the coroutine or
+errors in closing methods),
+this function returns <b>false</b> plus the error object;
+otherwise it returns <b>true</b>.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-coroutine.create"><code>coroutine.create (f)</code></a></h3>
+
+
+<p>
+Creates a new coroutine, with body <code>f</code>.
+<code>f</code> must be a function.
+Returns this new coroutine,
+an object with type <code>"thread"</code>.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-coroutine.isyieldable"><code>coroutine.isyieldable ([co])</code></a></h3>
+
+
+<p>
+Returns <b>true</b> when the coroutine <code>co</code> can yield.
+The default for <code>co</code> is the running coroutine.
+
+
+<p>
+A coroutine is yieldable if it is not the main thread and
+it is not inside a non-yieldable C&nbsp;function.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-coroutine.resume"><code>coroutine.resume (co [, val1, &middot;&middot;&middot;])</code></a></h3>
+
+
+<p>
+Starts or continues the execution of coroutine <code>co</code>.
+The first time you resume a coroutine,
+it starts running its body.
+The values <code>val1</code>, ... are passed
+as the arguments to the body function.
+If the coroutine has yielded,
+<code>resume</code> restarts it;
+the values <code>val1</code>, ... are passed
+as the results from the yield.
+
+
+<p>
+If the coroutine runs without any errors,
+<code>resume</code> returns <b>true</b> plus any values passed to <code>yield</code>
+(when the coroutine yields) or any values returned by the body function
+(when the coroutine terminates).
+If there is any error,
+<code>resume</code> returns <b>false</b> plus the error message.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-coroutine.running"><code>coroutine.running ()</code></a></h3>
+
+
+<p>
+Returns the running coroutine plus a boolean,
+<b>true</b> when the running coroutine is the main one.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-coroutine.status"><code>coroutine.status (co)</code></a></h3>
+
+
+<p>
+Returns the status of the coroutine <code>co</code>, as a string:
+<code>"running"</code>,
+if the coroutine is running
+(that is, it is the one that called <code>status</code>);
+<code>"suspended"</code>, if the coroutine is suspended in a call to <code>yield</code>,
+or if it has not started running yet;
+<code>"normal"</code> if the coroutine is active but not running
+(that is, it has resumed another coroutine);
+and <code>"dead"</code> if the coroutine has finished its body function,
+or if it has stopped with an error.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-coroutine.wrap"><code>coroutine.wrap (f)</code></a></h3>
+
+
+<p>
+Creates a new coroutine, with body <code>f</code>;
+<code>f</code> must be a function.
+Returns a function that resumes the coroutine each time it is called.
+Any arguments passed to this function behave as the
+extra arguments to <code>resume</code>.
+The function returns the same values returned by <code>resume</code>,
+except the first boolean.
+In case of error,
+the function closes the coroutine and propagates the error.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-coroutine.yield"><code>coroutine.yield (&middot;&middot;&middot;)</code></a></h3>
+
+
+<p>
+Suspends the execution of the calling coroutine.
+Any arguments to <code>yield</code> are passed as extra results to <code>resume</code>.
+
+
+
+
+
+
+
+
+</body>
+</html>

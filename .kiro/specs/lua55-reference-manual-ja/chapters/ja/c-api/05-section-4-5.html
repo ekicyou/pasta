@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lua 5.5 - Section 4.5</title>
+</head>
+<body>
+<h2>4.5 – <a name="4.5">Cでの中断の処理</a></h2>
+
+<p>内部的には、LuaはコルーチンをyieldするためにCの<code>longjmp</code>機能を使用します。そのため、C関数<code>foo</code>がAPI関数を呼び出し、このAPI関数が（直接的またはyieldする別の関数を呼び出すことによって間接的に）yieldする場合、<code>longjmp</code>によってCスタックからフレームが削除されるため、Luaはもはや<code>foo</code>に戻ることができません。</p><p>この種の問題を回避するために、LuaはAPI呼び出しをまたいでyieldしようとするたびにエラーを発生させます。ただし、<a href="#lua_yieldk"><code>lua_yieldk</code></a>、<a href="#lua_callk"><code>lua_callk</code></a>、および<a href="#lua_pcallk"><code>lua_pcallk</code></a>の3つの関数は例外です。これらの関数はすべて、yield後に実行を継続するための<em>継続関数</em>（<code>k</code>という名前のパラメータとして）を受け取ります。</p><p>継続を説明するために、いくつかの用語を設定する必要があります。Luaから呼び出されたC関数を、<em>元の関数</em>と呼びます。この元の関数は、C APIのこれら3つの関数のいずれかを呼び出し、これを<em>呼び出し先関数</em>と呼びます。そして、呼び出し先関数が現在のスレッドをyieldします。これは、呼び出し先関数が<a href="#lua_yieldk"><code>lua_yieldk</code></a>である場合、または呼び出し先関数が<a href="#lua_callk"><code>lua_callk</code></a>または<a href="#lua_pcallk"><code>lua_pcallk</code></a>のいずれかであり、それらによって呼び出された関数がyieldする場合に発生します。</p><p>呼び出し先関数の実行中に実行中のスレッドがyieldすると仮定します。スレッドが再開した後、最終的に呼び出し先関数の実行が完了します。ただし、Cスタック内のフレームはyieldによって破棄されているため、呼び出し先関数は元の関数に戻ることができません。代わりに、Luaは<em>継続関数</em>を呼び出します。この継続関数は、呼び出し先関数の引数として渡されたものです。名前が示すように、継続関数は元の関数のタスクを継続する必要があります。</p><p>例として、次の関数を考えてみましょう。</p><pre>     int original_function (lua_State *L) {
+       ...     /* code 1 */
+       status = lua_pcall(L, n, m, h);  /* calls Lua */
+       ...     /* code 2 */
+     }
+</pre><p>ここで、<a href="#lua_pcall"><code>lua_pcall</code></a>によって実行されるLuaコードがyieldできるようにしたいとします。まず、ここで示すように関数を書き直すことができます。</p><pre>     int k (lua_State *L, int status, lua_KContext ctx) {
+       ...  /* code 2 */
+     }
+     
+     int original_function (lua_State *L) {
+       ...     /* code 1 */
+       return k(L, lua_pcall(L, n, m, h), ctx);
+     }
+</pre><p>上記のコードでは、新しい関数<code>k</code>は<em>継続関数</em>（<a href="#lua_KFunction"><code>lua_KFunction</code></a>型）であり、<a href="#lua_pcall"><code>lua_pcall</code></a>を呼び出した後に元の関数が行っていたすべての作業を行う必要があります。次に、<a href="#lua_pcall"><code>lua_pcall</code></a>によって実行されているLuaコードが何らかの方法（エラーまたはyield）で中断された場合に<code>k</code>を呼び出す必要があることをLuaに通知する必要があります。そのため、<a href="#lua_pcall"><code>lua_pcall</code></a>を<a href="#lua_pcallk"><code>lua_pcallk</code></a>に置き換えて、コードをここで示すように書き換えます。</p><pre>     int original_function (lua_State *L) {
+       ...     /* code 1 */
+       return k(L, lua_pcallk(L, n, m, h, ctx2, k), ctx1);
+     }
+</pre><p>継続への外部からの明示的な呼び出しに注意してください。Luaは、エラーが発生した場合やyield後に再開する場合など、必要な場合にのみ継続を呼び出します。呼び出された関数がyieldせずに正常に返った場合、<a href="#lua_pcallk"><code>lua_pcallk</code></a>（および<a href="#lua_callk"><code>lua_callk</code></a>）も正常に返ります。（もちろん、その場合に継続を呼び出す代わりに、元の関数内で同等の作業を直接行うことができます。）</p><p>Luaの状態に加えて、継続関数には他の2つのパラメータがあります。それは呼び出しの最終ステータスと、最初に<a href="#lua_pcallk"><code>lua_pcallk</code></a>に渡されたコンテキスト値（<code>ctx</code>）です。Luaはこのコンテキスト値を使用しません。元の関数から継続関数にこの値を渡すだけです。<a href="#lua_pcallk"><code>lua_pcallk</code></a>の場合、ステータスは<a href="#lua_pcallk"><code>lua_pcallk</code></a>によって返される値と同じですが、yield後に実行されている場合は（<a href="#pdf-LUA_OK"><code>LUA_OK</code></a>ではなく）<a href="#pdf-LUA_YIELD"><code>LUA_YIELD</code></a>になります。<a href="#lua_yieldk"><code>lua_yieldk</code></a>および<a href="#lua_callk"><code>lua_callk</code></a>の場合、Luaが継続を呼び出すときのステータスは常に<a href="#pdf-LUA_YIELD"><code>LUA_YIELD</code></a>です。（これらの2つの関数では、エラーが発生した場合に継続を呼び出すことはありません。エラーを処理しないためです。）同様に、<a href="#lua_callk"><code>lua_callk</code></a>を使用する場合は、ステータスとして<a href="#pdf-LUA_OK"><code>LUA_OK</code></a>を指定して継続関数を呼び出す必要があります。（<a href="#lua_yieldk"><code>lua_yieldk</code></a>の場合、通常<a href="#lua_yieldk"><code>lua_yieldk</code></a>は返さないため、継続関数を直接呼び出すことにあまり意味はありません。）</p><p>Luaは、継続関数を元の関数であるかのように扱います。継続関数は、元の関数と同じLuaスタックを、呼び出し先関数が返された場合と同じ状態で受け取ります。（たとえば、<a href="#lua_callk"><code>lua_callk</code></a>の後、関数とその引数はスタックから削除され、呼び出しの結果に置き換えられます。）また、同じアップ値も持ちます。それが返すものはすべて、元の関数の戻り値としてLuaによって処理されます。</p>
+</body>
+</html>

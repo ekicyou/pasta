@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lua 5.5 - Section 6.6</title>
+</head>
+<body>
+<h2>6.6 – <a name="6.6">テーブル操作</a></h2>
+
+<p>このライブラリは、テーブル操作のための汎用関数を提供します。このライブラリは、すべての関数を <a name="pdf-table"><code>table</code></a> テーブル内に提供します。</p><p>操作でテーブルの長さが必要な場合は常に、長さ演算子に関するすべての注意が適用されることに注意してください（<a href="#3.4.7">§3.4.7</a>を参照）。すべての関数は、引数として指定されたテーブル内の数値以外のキーを無視します。</p><p>
+</p><hr /><h3><a name="pdf-table.concat"><code>table.concat (list [, sep [, i [, j]]])</code></a></h3>
+
+
+<p>すべての要素が文字列または数値であるリストが与えられた場合、文字列 <code>list[i]..sep..list[i+1] ··· sep..list[j]</code> を返します。<code>sep</code> のデフォルト値は空文字列で、<code>i</code> のデフォルトは 1 で、<code>j</code> のデフォルトは <code>#list</code> です。<code>i</code> が <code>j</code> より大きい場合は、空文字列を返します。</p><p>
+</p><hr /><h3><a name="pdf-table.insert"><code>table.insert (list, [pos,] value)</code></a></h3>
+
+
+<p><code>list</code> の位置 <code>pos</code> に要素 <code>value</code> を挿入し、要素 <code>list[pos], list[pos+1], ···, list[#list]</code> を上にシフトします。<code>pos</code> のデフォルト値は <code>#list+1</code> であるため、<code>table.insert(t,x)</code> を呼び出すと、<code>x</code> がリスト <code>t</code> の末尾に挿入されます。</p><p>
+</p><hr /><h3><a name="pdf-table.move"><code>table.move (a1, f, e, t [,a2])</code></a></h3>
+
+
+<p>テーブル <code>a1</code> からテーブル <code>a2</code> に要素を移動し、次の多重代入と同等の処理を実行します: <code>a2[t],··· = a1[f],···,a1[e]</code>。<code>a2</code> のデフォルトは <code>a1</code> です。移動先範囲は、移動元範囲と重複する可能性があります。移動する要素の数は、Lua 整数に収まる必要があります。</p><p>移動先テーブル <code>a2</code> を返します。</p><p>
+</p><hr /><h3><a name="pdf-table.pack"><code>table.pack (···)</code></a></h3>
+
+
+<p>すべての引数をキー 1、2 などに格納し、引数の総数を持つフィールド "<code>n</code>" を含む新しいテーブルを返します。一部の引数が <b>nil</b> の場合、結果のテーブルがシーケンスではない場合があることに注意してください。</p><p>
+</p><hr /><h3><a name="pdf-table.remove"><code>table.remove (list [, pos])</code></a></h3>
+
+
+<p><code>list</code> から位置 <code>pos</code> の要素を削除し、削除された要素の値を返します。<code>pos</code> が 1 から <code>#list</code> の間の整数である場合、要素 <code>list[pos+1], list[pos+2], ···, list[#list]</code> を下にシフトし、要素 <code>list[#list]</code> を消去します。インデックス <code>pos</code> は、<code>#list</code> が 0 の場合は 0 にすることも、<code>#list + 1</code> にすることもできます。</p><p><code>pos</code> のデフォルト値は <code>#list</code> であるため、<code>table.remove(l)</code> を呼び出すと、リスト <code>l</code> の最後の要素が削除されます。</p><p>
+</p><hr /><h3><a name="pdf-table.sort"><code>table.sort (list [, comp])</code></a></h3>
+
+
+<p>リスト要素を指定された順序で、<em>インプレース</em> で <code>list[1]</code> から <code>list[#list]</code> までソートします。<code>comp</code> が指定されている場合は、2 つのリスト要素を受け取り、最終的な順序で最初の要素が 2 番目の要素の前に来る必要がある場合に true を返す関数である必要があります。したがって、ソート後、<code>i &lt;= j</code> は <code>not comp(list[j],list[i])</code> を意味します。<code>comp</code> が指定されていない場合は、代わりに標準の Lua 演算子 <code>&lt;</code> が使用されます。</p><p><code>comp</code> 関数は、一貫した順序を定義する必要があります。より正式には、関数は厳密な弱順序を定義する必要があります。（弱順序は全順序に似ていますが、比較目的で異なる要素を同等に扱うことができます。）</p><p>ソートアルゴリズムは安定していません。指定された順序で等しいと見なされる異なる要素は、ソートによって相対位置が変更される可能性があります。</p><p>
+</p><hr /><h3><a name="pdf-table.unpack"><code>table.unpack (list [, i [, j]])</code></a></h3>
+
+
+<p>指定されたリストから要素を返します。この関数は、次と同等です。</p><pre>     return list[i], list[i+1], ···, list[j]
+</pre><p>デフォルトでは、<code>i</code> は 1 で、<code>j</code> は <code>#list</code> です。</p>
+</body>
+</html>

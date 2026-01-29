@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lua 5.5 Reference Manual - Chapter 09</title>
+</head>
+<body>
+<h1>9 &ndash; <a name="9">The Complete Syntax of Lua</a></h1>
+
+<p>
+Here is the complete syntax of Lua in extended BNF.
+As usual in extended BNF,
+{A} means 0 or more As,
+and [A] means an optional A.
+(For operator precedences, see <a href="#3.4.8">&sect;3.4.8</a>;
+for a description of the terminals
+Name, Numeral,
+and LiteralString, see <a href="#3.1">&sect;3.1</a>.)
+
+
+
+
+<pre>
+
+	chunk ::= block
+
+	block ::= {stat} [retstat]
+
+	stat ::=  &lsquo;<b>;</b>&rsquo; | 
+		 varlist &lsquo;<b>=</b>&rsquo; explist | 
+		 functioncall | 
+		 label | 
+		 <b>break</b> | 
+		 <b>goto</b> Name | 
+		 <b>do</b> block <b>end</b> | 
+		 <b>while</b> exp <b>do</b> block <b>end</b> | 
+		 <b>repeat</b> block <b>until</b> exp | 
+		 <b>if</b> exp <b>then</b> block {<b>elseif</b> exp <b>then</b> block} [<b>else</b> block] <b>end</b> | 
+		 <b>for</b> Name &lsquo;<b>=</b>&rsquo; exp &lsquo;<b>,</b>&rsquo; exp [&lsquo;<b>,</b>&rsquo; exp] <b>do</b> block <b>end</b> | 
+		 <b>for</b> namelist <b>in</b> explist <b>do</b> block <b>end</b> | 
+		 <b>function</b> funcname funcbody | 
+		 <b>local</b> <b>function</b> Name funcbody | 
+		 <b>global</b> <b>function</b> Name funcbody | 
+		 <b>local</b> attnamelist [&lsquo;<b>=</b>&rsquo; explist] | 
+		 <b>global</b> attnamelist | 
+		 <b>global</b> [attrib] &lsquo;<b>*</b>&rsquo; 
+
+	attnamelist ::=  [attrib] Name [attrib] {&lsquo;<b>,</b>&rsquo; Name [attrib]}
+
+	attrib ::= &lsquo;<b>&lt;</b>&rsquo; Name &lsquo;<b>&gt;</b>&rsquo;
+
+	retstat ::= <b>return</b> [explist] [&lsquo;<b>;</b>&rsquo;]
+
+	label ::= &lsquo;<b>::</b>&rsquo; Name &lsquo;<b>::</b>&rsquo;
+
+	funcname ::= Name {&lsquo;<b>.</b>&rsquo; Name} [&lsquo;<b>:</b>&rsquo; Name]
+
+	varlist ::= var {&lsquo;<b>,</b>&rsquo; var}
+
+	var ::=  Name | prefixexp &lsquo;<b>[</b>&rsquo; exp &lsquo;<b>]</b>&rsquo; | prefixexp &lsquo;<b>.</b>&rsquo; Name 
+
+	namelist ::= Name {&lsquo;<b>,</b>&rsquo; Name}
+
+	explist ::= exp {&lsquo;<b>,</b>&rsquo; exp}
+
+	exp ::=  <b>nil</b> | <b>false</b> | <b>true</b> | Numeral | LiteralString | &lsquo;<b>...</b>&rsquo; | functiondef | 
+		 prefixexp | tableconstructor | exp binop exp | unop exp 
+
+	prefixexp ::= var | functioncall | &lsquo;<b>(</b>&rsquo; exp &lsquo;<b>)</b>&rsquo;
+
+	functioncall ::=  prefixexp args | prefixexp &lsquo;<b>:</b>&rsquo; Name args 
+
+	args ::=  &lsquo;<b>(</b>&rsquo; [explist] &lsquo;<b>)</b>&rsquo; | tableconstructor | LiteralString 
+
+	functiondef ::= <b>function</b> funcbody
+
+	funcbody ::= &lsquo;<b>(</b>&rsquo; [parlist] &lsquo;<b>)</b>&rsquo; block <b>end</b>
+
+	parlist ::= namelist [&lsquo;<b>,</b>&rsquo; varargparam] | varargparam
+
+	varargparam ::= &lsquo;<b>...</b>&rsquo; [Name]
+
+	tableconstructor ::= &lsquo;<b>{</b>&rsquo; [fieldlist] &lsquo;<b>}</b>&rsquo;
+
+	fieldlist ::= field {fieldsep field} [fieldsep]
+
+	field ::= &lsquo;<b>[</b>&rsquo; exp &lsquo;<b>]</b>&rsquo; &lsquo;<b>=</b>&rsquo; exp | Name &lsquo;<b>=</b>&rsquo; exp | exp
+
+	fieldsep ::= &lsquo;<b>,</b>&rsquo; | &lsquo;<b>;</b>&rsquo;
+
+	binop ::=  &lsquo;<b>+</b>&rsquo; | &lsquo;<b>-</b>&rsquo; | &lsquo;<b>*</b>&rsquo; | &lsquo;<b>/</b>&rsquo; | &lsquo;<b>//</b>&rsquo; | &lsquo;<b>^</b>&rsquo; | &lsquo;<b>%</b>&rsquo; | 
+		 &lsquo;<b>&amp;</b>&rsquo; | &lsquo;<b>~</b>&rsquo; | &lsquo;<b>|</b>&rsquo; | &lsquo;<b>&gt;&gt;</b>&rsquo; | &lsquo;<b>&lt;&lt;</b>&rsquo; | &lsquo;<b>..</b>&rsquo; | 
+		 &lsquo;<b>&lt;</b>&rsquo; | &lsquo;<b>&lt;=</b>&rsquo; | &lsquo;<b>&gt;</b>&rsquo; | &lsquo;<b>&gt;=</b>&rsquo; | &lsquo;<b>==</b>&rsquo; | &lsquo;<b>~=</b>&rsquo; | 
+		 <b>and</b> | <b>or</b>
+
+	unop ::= &lsquo;<b>-</b>&rsquo; | <b>not</b> | &lsquo;<b>#</b>&rsquo; | &lsquo;<b>~</b>&rsquo;
+
+</pre>
+
+<p>
+
+
+
+
+
+
+<P CLASS="footer">
+Last update:
+Mon Dec 15 21:02:05 UTC 2025
+</P>
+<!--
+Last change: revised for Lua 5.5.0
+-->
+
+</body></html>
+
+
+</body>
+</html>

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lua 5.5 - Section 4.4</title>
+</head>
+<body>
+<h2>4.4 – <a name="4.4">Cでのエラー処理</a></h2>
+
+
+
+<p>内部的に、LuaはCの<code>longjmp</code>機能を使用してエラーを処理します。（Luaは、C++としてコンパイルした場合、例外を使用します。詳細については、ソースコードで<code>LUAI_THROW</code>を検索してください。）Luaは、メモリ割り当てエラーや型エラーなどのエラーに直面すると、エラーを<em>発生</em>させます。つまり、long jumpを実行します。<em>保護された環境</em>は<code>setjmp</code>を使用してリカバリポイントを設定します。エラーは、最も最近のアクティブなリカバリポイントにジャンプします。</p><p>C関数内では、<a href="#lua_error"><code>lua_error</code></a>を呼び出すことで、エラーを明示的に発生させることができます。</p><p>APIのほとんどの関数は、たとえばメモリ割り当てエラーが原因でエラーを発生させる可能性があります。各関数のドキュメントには、エラーを発生させる可能性があるかどうかが示されています。</p><p>保護された環境の外でエラーが発生した場合、Luaは<em>パニック関数</em>（<a href="#lua_atpanic"><code>lua_atpanic</code></a>を参照）を呼び出し、次に<code>abort</code>を呼び出して、ホストアプリケーションを終了します。パニック関数は、（たとえば、Luaの外の独自のリカバリポイントにlong jumpを実行して）戻らないことで、この終了を回避できます。</p><p>パニック関数は、名前が示すように、最後の手段のメカニズムです。プログラムはそれを避ける必要があります。原則として、C関数がLua状態を持つLuaによって呼び出される場合、すでに保護されているため、そのLua状態に対して必要なことを実行できます。ただし、Cコードが他のLua状態（たとえば、関数へのLua状態引数、レジストリに格納されているLua状態、または<a href="#lua_newthread"><code>lua_newthread</code></a>の結果）を操作する場合、エラーを発生させないAPI呼び出しでのみそれらを使用する必要があります。</p><p>パニック関数は、メッセージハンドラのように実行されます（<a href="#2.3">§2.3</a>を参照）。特に、エラーオブジェクトはスタックの最上部にあります。ただし、スタック領域については保証はありません。スタックに何かをプッシュするには、パニック関数は最初に利用可能なスペースを確認する必要があります（<a href="#4.1.1">§4.1.1</a>を参照）。</p><h3>4.4.1 – <a name="4.4.1">ステータスコード</a></h3>
+
+<p>APIでエラーを報告するいくつかの関数は、さまざまな種類のエラーまたはその他の状態を示すために、次のステータスコードを使用します</p><ul>
+
+<li><b><a name="pdf-LUA_OK"><code>LUA_OK</code></a> (0): </b> エラーなし。</li>
+
+<li><b><a name="pdf-LUA_ERRRUN"><code>LUA_ERRRUN</code></a>: </b> ランタイムエラー。</li>
+
+<li><b><a name="pdf-LUA_ERRMEM"><code>LUA_ERRMEM</code></a>: </b> メモリ割り当てエラー。このようなエラーの場合、Luaはメッセージハンドラを呼び出しません。</li>
+
+<li><b><a name="pdf-LUA_ERRERR"><code>LUA_ERRERR</code></a>: </b> メッセージハンドラの実行中にエラーが発生しました。</li>
+
+<li><b><a name="pdf-LUA_ERRSYNTAX"><code>LUA_ERRSYNTAX</code></a>: </b> 事前コンパイル中の構文エラー。</li>
+
+<li><b><a name="pdf-LUA_YIELD"><code>LUA_YIELD</code></a>: </b> スレッド（コルーチン）が中断されました。</li>
+
+<li><b><a name="pdf-LUA_ERRFILE"><code>LUA_ERRFILE</code></a>: </b> ファイル関連のエラー。たとえば、ファイルを開いたり読み取ったりできません。</li>
+
+</ul><p>これらの定数は、ヘッダーファイル<code>lua.h</code>で定義されています。</p>
+</body>
+</html>

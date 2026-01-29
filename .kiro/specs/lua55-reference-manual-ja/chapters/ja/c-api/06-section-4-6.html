@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lua 5.5 - Section 4.6</title>
+</head>
+<body>
+<h2>4.6 – <a name="4.6">関数と型</a></h2>
+
+<p>ここでは、C&nbsp;APIのすべての関数と型をアルファベット順にリストします。各関数には、次のようなインジケータがあります: <span class="apii">[-o, +p, <em>x</em>]</span></p><p>最初のフィールド<code>o</code>は、関数がスタックからポップする要素の数です。2番目のフィールド<code>p</code>は、関数がスタックにプッシュする要素の数です。（すべての関数は常に、引数をポップした後で結果をプッシュします。）<code>x|y</code>形式のフィールドは、関数が状況に応じて<code>x</code>または<code>y</code>要素をプッシュ（またはポップ）できることを意味します。疑問符'<code>?</code>'は、引数だけを見て関数がポップ/プッシュする要素の数を知ることができないことを意味します。（たとえば、スタックの内容に依存する場合があります。）3番目のフィールド<code>x</code>は、関数がエラーを発生させる可能性があるかどうかを示します。 '<code>-</code>'は関数がエラーを発生させないことを意味します。 '<code>m</code>'は関数がメモリ不足エラーのみを発生させる可能性があることを意味します。 '<code>v</code>'は、テキストで説明されているエラーを関数が発生させる可能性があることを意味します。 '<code>e</code>'は関数が直接またはメタメソッドを通じて任意のLuaコードを実行できるため、任意のエラーが発生する可能性があることを意味します。</p><hr /><h3><a name="lua_absindex"><code>lua_absindex</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>int lua_absindex (lua_State *L, int idx);</pre>
+
+<p>許容可能なインデックス<code>idx</code>を、同等の絶対インデックス（つまり、スタックサイズに依存しないインデックス）に変換します。</p><hr /><h3><a name="lua_Alloc"><code>lua_Alloc</code></a></h3>
+<pre>typedef void * (*lua_Alloc) (void *ud,
+                             void *ptr,
+                             size_t osize,
+                             size_t nsize);</pre>
+
+<p>Luaの状態によって使用されるメモリアロケーション関数の型。アロケータ関数は、<code>realloc</code>に似た機能を提供する必要がありますが、まったく同じではありません。その引数は、<a href="#lua_newstate"><code>lua_newstate</code></a>に渡される不透明なポインタである<code>ud</code>、割り当て/再割り当て/解放されるブロックへのポインタである<code>ptr</code>、ブロックの元のサイズまたは割り当てられているものに関するコードである<code>osize</code>、およびブロックの新しいサイズである<code>nsize</code>です。</p><p><code>ptr</code>が<code>NULL</code>でない場合、<code>osize</code>は<code>ptr</code>によって指されるブロックのサイズ、つまり、割り当てまたは再割り当て時に指定されたサイズです。</p><p><code>ptr</code>が<code>NULL</code>の場合、<code>osize</code>はLuaが割り当てているオブジェクトの種類をエンコードします。<code>osize</code>は、Luaがその型の新しいオブジェクトを作成している場合（およびその場合にのみ）、<a href="#pdf-LUA_TSTRING"><code>LUA_TSTRING</code></a>、<a href="#pdf-LUA_TTABLE"><code>LUA_TTABLE</code></a>、<a href="#pdf-LUA_TFUNCTION"><code>LUA_TFUNCTION</code></a>、<a href="#pdf-LUA_TUSERDATA"><code>LUA_TUSERDATA</code></a>、または<a href="#pdf-LUA_TTHREAD"><code>LUA_TTHREAD</code></a>のいずれかになります。<code>osize</code>が他の値である場合、Luaは他の何かに対してメモリを割り当てています。</p><p>Luaは、アロケータ関数から次の動作を想定します。</p><p><code>nsize</code>がゼロの場合、アロケータは<code>free</code>のように動作し、<code>NULL</code>を返す必要があります。</p><p><code>nsize</code>がゼロでない場合、アロケータは<code>realloc</code>のように動作する必要があります。特に、アロケータはリクエストを完了できない場合にのみ<code>NULL</code>を返します。</p><p>アロケータ関数の簡単な実装を次に示します。これは、補助ライブラリで<a href="#luaL_newstate"><code>luaL_newstate</code></a>によって使用されます。</p><pre>     static void *l_alloc (void *ud, void *ptr, size_t osize,
+                                                size_t nsize) {
+       (void)ud;  (void)osize;  /* not used */
+       if (nsize == 0) {
+         free(ptr);
+         return NULL;
+       }
+       else
+         return realloc(ptr, nsize);
+     }
+</pre><p>ISO&nbsp;Cでは、<code>free(NULL)</code>には効果がなく、<code>realloc(NULL,size)</code>は<code>malloc(size)</code>と同等であることが保証されていることに注意してください。</p><hr /><h3><a name="lua_arith"><code>lua_arith</code></a></h3><p>
+<span class="apii">[-(2|1), +1, <em>e</em>]</span>
+</p><pre>void lua_arith (lua_State *L, int op);</pre>
+
+<p>スタックの先頭にある2つの値（または否定の場合には1つ）に対して算術演算またはビット演算を実行します。スタックの先頭の値が2番目のオペランドになります。これらの値をポップし、演算の結果をプッシュします。この関数は、対応するLua演算子のセマンティクスに従います（つまり、メタメソッドを呼び出す場合があります）。</p><p><code>op</code>の値は、次の定数のいずれかである必要があります。</p><ul>
+
+<li><b><a name="pdf-LUA_OPADD"><code>LUA_OPADD</code></a>: </b> 加算（<code>+</code>）を実行</li>
+<li><b><a name="pdf-LUA_OPSUB"><code>LUA_OPSUB</code></a>: </b> 減算（<code>-</code>）を実行</li>
+<li><b><a name="pdf-LUA_OPMUL"><code>LUA_OPMUL</code></a>: </b> 乗算（<code>*</code>）を実行</li>
+<li><b><a name="pdf-LUA_OPDIV"><code>LUA_OPDIV</code></a>: </b> 浮動小数点除算（<code>/</code>）を実行</li>
+<li><b><a name="pdf-LUA_OPIDIV"><code>LUA_OPIDIV</code></a>: </b> 床除算（<code>//</code>）を実行</li>
+<li><b><a name="pdf-LUA_OPMOD"><code>LUA_OPMOD</code></a>: </b> モジュロ（<code>%</code>）を実行</li>
+<li><b><a name="pdf-LUA_OPPOW"><code>LUA_OPPOW</code></a>: </b> 指数演算（<code>^</code>）を実行</li>
+<li><b><a name="pdf-LUA_OPUNM"><code>LUA_OPUNM</code></a>: </b> 数学的な否定（単項<code>-</code>）を実行</li>
+<li><b><a name="pdf-LUA_OPBNOT"><code>LUA_OPBNOT</code></a>: </b> ビット単位のNOT（<code>~</code>）を実行</li>
+<li><b><a name="pdf-LUA_OPBAND"><code>LUA_OPBAND</code></a>: </b> ビット単位のAND（<code>&amp;</code>）を実行</li>
+<li><b><a name="pdf-LUA_OPBOR"><code>LUA_OPBOR</code></a>: </b> ビット単位のOR（<code>|</code>）を実行</li>
+<li><b><a name="pdf-LUA_OPBXOR"><code>LUA_OPBXOR</code></a>: </b> ビット単位の排他的OR（<code>~</code>）を実行</li>
+<li><b><a name="pdf-LUA_OPSHL"><code>LUA_OPSHL</code></a>: </b> 左シフト（<code>&lt;&lt;</code>）を実行</li>
+<li><b><a name="pdf-LUA_OPSHR"><code>LUA_OPSHR</code></a>: </b> 右シフト（<code>&gt;&gt;</code>）を実行</li>
+
+</ul>
+
+
+
+
+<hr /><h3><a name="lua_atpanic"><code>lua_atpanic</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>lua_CFunction lua_atpanic (lua_State *L, lua_CFunction panicf);</pre>
+
+<p>新しいパニック関数を設定し、古い関数を返します（<a href="#4.4">§4.4</a>を参照）。</p><hr /><h3><a name="lua_call"><code>lua_call</code></a></h3><p>
+<span class="apii">[-(nargs+1), +nresults, <em>e</em>]</span>
+</p><pre>void lua_call (lua_State *L, int nargs, int nresults);</pre>
+
+<p>関数を呼び出します。通常のLua呼び出しと同様に、<code>lua_call</code>は<code>__call</code>メタメソッドを尊重します。したがって、ここで「関数」という言葉は、呼び出し可能な値を意味します。</p><p>呼び出しを行うには、次のプロトコルを使用する必要があります。最初に、呼び出す関数をスタックにプッシュします。次に、呼び出しの引数を直接の順序でプッシュします。つまり、最初の引数が最初にプッシュされます。最後に<a href="#lua_call"><code>lua_call</code></a>を呼び出します。<code>nargs</code>はスタックにプッシュした引数の数です。関数が戻ると、すべての引数と関数値がポップされ、呼び出し結果がスタックにプッシュされます。結果の数は<code>nresults</code>に調整されます。ただし、<code>nresults</code>が<a name="pdf-LUA_MULTRET"><code>LUA_MULTRET</code></a>の場合を除きます。この場合、関数からのすべての結果がプッシュされます。Luaは、返された値がスタックスペースに収まるようにしますが、スタック内の追加のスペースを保証しません。関数の結果は直接の順序で（最初の結果が最初にプッシュされる）スタックにプッシュされるため、呼び出し後、最後の結果がスタックの先頭になります。</p><p>関数の呼び出しおよび実行中のエラーはすべて、上位に（<code>longjmp</code>を使用して）伝播されます。</p><p>次の例は、ホストプログラムがこのLuaコードと同等の処理をどのように実行できるかを示しています。</p><pre>     a = f("how", t.x, 14)
+</pre><p>以下はCでの記述です。</p><pre>     lua_getglobal(L, "f");                  /* function to be called */
+     lua_pushliteral(L, "how");                       /* 1st argument */
+     lua_getglobal(L, "t");                    /* table to be indexed */
+     lua_getfield(L, -1, "x");        /* push result of t.x (2nd arg) */
+     lua_remove(L, -2);                  /* remove 't' from the stack */
+     lua_pushinteger(L, 14);                          /* 3rd argument */
+     lua_call(L, 3, 1);     /* call 'f' with 3 arguments and 1 result */
+     lua_setglobal(L, "a");                         /* set global 'a' */
+</pre><p>上記のコードは<em>バランスが取れている</em>ことに注意してください。最後に、スタックは元の構成に戻ります。これは、優れたプログラミングの習慣と見なされます。</p><hr /><h3><a name="lua_callk"><code>lua_callk</code></a></h3><p>
+<span class="apii">[-(nargs + 1), +nresults, <em>e</em>]</span>
+</p><pre>void lua_callk (lua_State *L,
+                int nargs,
+                int nresults,
+                lua_KContext ctx,
+                lua_KFunction k);</pre>
+
+<p>この関数は、<a href="#lua_call"><code>lua_call</code></a>とまったく同じように動作しますが、呼び出された関数がyieldできるようにします（<a href="#4.5">§4.5</a>を参照）。</p><hr /><h3><a name="lua_CFunction"><code>lua_CFunction</code></a></h3>
+<pre>typedef int (*lua_CFunction) (lua_State *L);</pre>
+
+<p>C&nbsp;関数の型。</p><p>Luaと正しく通信するために、C関数は次のプロトコルに従う必要があります。このプロトコルは、パラメータと結果がどのように渡されるかを定義します。C関数は、Luaから引数をスタックに直接順に受け取ります（最初の引数が最初にプッシュされます）。したがって、関数が開始すると、<code>lua_gettop(L)</code>は関数が受け取った引数の数を返します。最初の引数（存在する場合）はインデックス1にあり、最後の引数はインデックス<code>lua_gettop(L)</code>にあります。Luaに値を返すには、C関数はそれらをスタックに直接順にプッシュし（最初の結果が最初にプッシュされます）、Cで結果の数を返します。結果の下のスタックにある他の値は、Luaによって適切に破棄されます。Lua関数と同様に、Luaによって呼び出されるC関数も多くの結果を返すことができます。</p><p>例として、次の関数は可変数の数値引数を受け取り、それらの平均と合計を返します。</p><pre>     static int foo (lua_State *L) {
+       int n = lua_gettop(L);    /* number of arguments */
+       lua_Number sum = 0.0;
+       int i;
+       for (i = 1; i &lt;= n; i++) {
+         if (!lua_isnumber(L, i)) {
+           lua_pushliteral(L, "incorrect argument");
+           lua_error(L);
+         }
+         sum += lua_tonumber(L, i);
+       }
+       lua_pushnumber(L, sum/n);        /* first result */
+       lua_pushnumber(L, sum);         /* second result */
+       return 2;                   /* number of results */
+     }
+</pre>
+
+
+
+
+<hr /><h3><a name="lua_checkstack"><code>lua_checkstack</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>int lua_checkstack (lua_State *L, int n);</pre>
+
+<p>スタックに少なくとも<code>n</code>個の追加要素のためのスペースがあること、つまり、最大<code>n</code>個の値を安全にプッシュできることを保証します。スタックが固定の最大サイズ（通常、数千個以上の要素）を超える場合、または追加のスペース用のメモリを割り当てることができないために、要求を満たすことができない場合は、falseを返します。この関数はスタックを縮小することはありません。スタックにすでに余分な要素のためのスペースがある場合、変更されずに残ります。</p><hr /><h3><a name="lua_close"><code>lua_close</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>void lua_close (lua_State *L);</pre>
+
+<p>メインスレッドでアクティブなすべてのクローズ対象変数を閉じ、指定されたLua状態のすべてのオブジェクトを解放し（対応するガベージコレクションメタメソッド（存在する場合）を呼び出し）、この状態によって使用されるすべての動的メモリを解放します。</p><p>一部のプラットフォームでは、ホストプログラムが終了するとすべてのリソースが自然に解放されるため、この関数を呼び出す必要がない場合があります。一方、デーモンやWebサーバーなど、複数の状態を作成する長時間実行されるプログラムは、不要になった状態をできるだけ早く閉じる必要があるでしょう。</p><hr /><h3><a name="lua_closeslot"><code>lua_closeslot</code></a></h3><p>
+<span class="apii">[-0, +0, <em>e</em>]</span>
+</p><pre>void lua_closeslot (lua_State *L, int index);</pre>
+
+<p>指定されたインデックスにあるクローズ対象のスロットを閉じ、その値を<b>nil</b>に設定します。インデックスは、まだアクティブ（つまり、まだ閉じられていない）である、以前にクローズ対象としてマークされた最後のインデックス（<a href="#lua_toclose"><code>lua_toclose</code></a>を参照）である必要があります。</p><p>この関数を介して呼び出された場合、<code>__close</code>メタメソッドはyieldできません。</p><p>（この関数はリリース5.4.3で導入されました。）</p><hr /><h3><a name="lua_closethread"><code>lua_closethread</code></a></h3><p>
+<span class="apii">[-0, +?, –]</span>
+</p><pre>int lua_closethread (lua_State *L, lua_State *from);</pre>
+
+<p>スレッドをリセットし、そのコールスタックをクリーンアップし、保留中のすべてのクローズ対象変数を閉じます。ステータスコードを返します。スレッドにエラーがない場合は<a href="#pdf-LUA_OK"><code>LUA_OK</code></a>（スレッドを停止させた元のエラー、またはクローズメソッドのエラー）、それ以外の場合はエラー状態です。エラーの場合、スタックのトップにエラーオブジェクトを残します。</p><p>パラメータ<code>from</code>は、<code>L</code>をリセットしているコルーチンを表します。そのようなコルーチンがない場合、このパラメータは<code>NULL</code>にすることができます。</p><p>（この関数はリリース5.4.6で導入されました。）</p><hr /><h3><a name="lua_compare"><code>lua_compare</code></a></h3><p>
+<span class="apii">[-0, +0, <em>e</em>]</span>
+</p><pre>int lua_compare (lua_State *L, int index1, int index2, int op);</pre>
+
+<p>2つのLua値を比較します。インデックス<code>index1</code>の値が、対応するLua演算子のセマンティクスに従って（つまり、メタメソッドを呼び出す可能性がある）、インデックス<code>index2</code>の値と比較した場合に<code>op</code>を満たす場合は1を返します。それ以外の場合は0を返します。また、いずれかのインデックスが無効な場合も0を返します。</p><p><code>op</code>の値は、次の定数のいずれかである必要があります。</p><ul>
+
+<li><b><a name="pdf-LUA_OPEQ"><code>LUA_OPEQ</code></a>: </b>等価性（<code>==</code>）を比較します</li>
+<li><b><a name="pdf-LUA_OPLT"><code>LUA_OPLT</code></a>: </b>より小さい（<code>&lt;</code>）を比較します</li>
+<li><b><a name="pdf-LUA_OPLE"><code>LUA_OPLE</code></a>: </b>以下（<code>&lt;=</code>）を比較します</li>
+
+</ul>
+
+
+
+
+<hr /><h3><a name="lua_concat"><code>lua_concat</code></a></h3><p>
+<span class="apii">[-n, +1, <em>e</em>]</span>
+</p><pre>void lua_concat (lua_State *L, int n);</pre>
+
+<p>スタックのトップにある<code>n</code>個の値を連結し、それらをポップし、結果をトップに残します。<code>n</code>が1の場合、結果はスタック上の単一の値です（つまり、関数は何もしません）。<code>n</code>が0の場合、結果は空の文字列です。連結はLuaの通常のセマンティクスに従って実行されます（<a href="#3.4.6">§3.4.6</a>を参照）。</p><hr /><h3><a name="lua_copy"><code>lua_copy</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>void lua_copy (lua_State *L, int fromidx, int toidx);</pre>
+
+<p>インデックス<code>fromidx</code>にある要素を有効なインデックス<code>toidx</code>にコピーし、その位置の値を置き換えます。他の位置の値は影響を受けません。</p><hr /><h3><a name="lua_createtable"><code>lua_createtable</code></a></h3><p>
+<span class="apii">[-0, +1, <em>m</em>]</span>
+</p><pre>void lua_createtable (lua_State *L, int narr, int nrec);</pre>
+
+<p>新しい空のテーブルを作成し、スタックにプッシュします。パラメータ<code>narr</code>は、テーブルがシーケンスとして持つ要素数のヒントです。パラメータ<code>nrec</code>は、テーブルが持つ他の要素数のヒントです。Luaは、これらのヒントを使用して、新しいテーブルのメモリを事前に割り当てることができます。この事前割り当ては、テーブルにいくつの要素があるかを事前に知っている場合にパフォーマンスを向上させるのに役立つ場合があります。それ以外の場合は、関数<a href="#lua_newtable"><code>lua_newtable</code></a>を使用できます。</p><hr /><h3><a name="lua_dump"><code>lua_dump</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>int lua_dump (lua_State *L,
+                        lua_Writer writer,
+                        void *data,
+                        int strip);</pre>
+
+<p>関数をバイナリチャンクとしてダンプします。スタックのトップにあるLua関数を受け取り、再度ロードした場合、ダンプされたものと同等の関数になるバイナリチャンクを生成します。チャンクの一部を生成するときに、<a href="#lua_dump"><code>lua_dump</code></a>は、指定された<code>data</code>を使用してそれらを書き込むために関数<code>writer</code>（<a href="#lua_Writer"><code>lua_Writer</code></a>を参照）を呼び出します。</p><p><code>strip</code>がtrueの場合、バイナリ表現には、スペースを節約するために関数のすべてのデバッグ情報が含まれない場合があります。</p><p>返される値は、ライターへの最後の呼び出しによって返されるエラーコードです。0はエラーがないことを意味します。</p><p>この関数はスタックからLua関数をポップしません。</p><hr /><h3><a name="lua_error"><code>lua_error</code></a></h3><p>
+<span class="apii">[-1, +0, <em>v</em>]</span>
+</p><pre>int lua_error (lua_State *L);</pre>
+
+<p>スタックのトップにある値をエラーオブジェクトとして使用して、Luaエラーを発生させます。この関数はロングジャンプを実行するため、決して戻りません（<a href="#luaL_error"><code>luaL_error</code></a>を参照）。</p><hr /><h3><a name="lua_gc"><code>lua_gc</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>int lua_gc (lua_State *L, int what, ...);</pre>
+
+<p>ガベージコレクタを制御します。</p><p>この関数は、パラメータ<code>what</code>の値に応じて、いくつかのタスクを実行します。追加の引数を必要とするオプションの場合、オプションの後にそれらがリストされます。</p><ul>
+
+<li><b><code>LUA_GCCOLLECT</code>: </b>完全なガベージコレクションサイクルを実行します。</li>
+
+<li><b><code>LUA_GCSTOP</code>: </b>ガベージコレクタを停止します。</li>
+
+<li><b><code>LUA_GCRESTART</code>: </b>ガベージコレクタを再起動します。</li>
+
+<li><b><code>LUA_GCCOUNT</code>: </b>Luaで使用されている現在のメモリ量（Kバイト単位）を返します。</li>
+
+<li><b><code>LUA_GCCOUNTB</code>: </b>Luaで使用されている現在のメモリ量（バイト単位）を1024で割った余りを返します。</li>
+
+<li><b><code>LUA_GCSTEP</code> <code>(int stepsize)</code>: </b><code>stepsize</code> Kバイトの割り当てに対応する、ガベージコレクションの増分ステップを実行します。</li>
+
+<li><b><code>LUA_GCISRUNNING</code>: </b>コレクターが実行中かどうか（つまり、停止していない）を示すブール値を返します。</li>
+
+<li><b><code>LUA_GCINC</code> (int pause, int stepmul, stepsize): </b>指定されたパラメータを使用して、コレクターを増分モードに変更します（<a href="#2.5.1">§2.5.1</a>を参照）。以前のモード（<code>LUA_GCGEN</code>または<code>LUA_GCINC</code>）を返します。</li>
+
+<li><b><code>LUA_GCGEN</code> (int minormul, int majormul): </b>指定されたパラメータを使用して、コレクターを世代モードに変更します（<a href="#2.5.2">§2.5.2</a>を参照）。以前のモード（<code>LUA_GCGEN</code>または<code>LUA_GCINC</code>）を返します。</li>
+
+</ul><p>これらのオプションの詳細については、<a href="#pdf-collectgarbage"><code>collectgarbage</code></a>を参照してください。</p><p>この関数はファイナライザーによって呼び出されるべきではありません。</p><hr /><h3><a name="lua_getallocf"><code>lua_getallocf</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>lua_Alloc lua_getallocf (lua_State *L, void **ud);</pre>
+
+<p>指定された状態のメモリ割り当て関数を返します。<code>ud</code>が<code>NULL</code>でない場合、Luaはメモリ割り当て関数が設定されたときに与えられた不透明なポインタを<code>*ud</code>に格納します。</p><hr /><h3><a name="lua_getfield"><code>lua_getfield</code></a></h3><p>
+<span class="apii">[-0, +1, <em>e</em>]</span>
+</p><pre>int lua_getfield (lua_State *L, int index, const char *k);</pre>
+
+<p>スタックに値<code>t[k]</code>をプッシュします。ここで、<code>t</code>は指定されたインデックスにある値です。Luaと同様に、この関数は「index」イベントのメタメソッドをトリガーする場合があります（<a href="#2.4">§2.4</a>を参照）。</p><p>プッシュされた値の型を返します。</p><hr /><h3><a name="lua_getextraspace"><code>lua_getextraspace</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>void *lua_getextraspace (lua_State *L);</pre>
+
+<p>指定されたLua状態に関連付けられた生のメモリ領域へのポインタを返します。アプリケーションはこの領域を任意の目的で使用できます。Luaはそれを使用しません。</p><p>各新しいスレッドには、メインスレッドの領域のコピーで初期化されたこの領域があります。</p><p>デフォルトでは、この領域はvoidへのポインタのサイズですが、この領域の異なるサイズでLuaを再コンパイルできます。（<code>luaconf.h</code>の<code>LUA_EXTRASPACE</code>を参照）。</p><hr /><h3><a name="lua_getglobal"><code>lua_getglobal</code></a></h3><p>
+<span class="apii">[-0, +1, <em>e</em>]</span>
+</p><pre>int lua_getglobal (lua_State *L, const char *name);</pre>
+
+<p>グローバル<code>name</code>の値をスタックにプッシュします。その値の型を返します。</p><hr /><h3><a name="lua_geti"><code>lua_geti</code></a></h3><p>
+<span class="apii">[-0, +1, <em>e</em>]</span>
+</p><pre>int lua_geti (lua_State *L, int index, lua_Integer i);</pre>
+
+<p>スタックに値<code>t[i]</code>をプッシュします。ここで、<code>t</code>は指定されたインデックスにある値です。Luaと同様に、この関数は「index」イベントのメタメソッドをトリガーする場合があります（<a href="#2.4">§2.4</a>を参照）。</p><p>プッシュされた値の型を返します。</p><hr /><h3><a name="lua_getmetatable"><code>lua_getmetatable</code></a></h3><p>
+<span class="apii">[-0, +(0|1), –]</span>
+</p><pre>int lua_getmetatable (lua_State *L, int index);</pre>
+
+<p>指定されたインデックスの値にメタテーブルがある場合、関数はそのメタテーブルをスタックにプッシュし、1を返します。それ以外の場合、関数は0を返し、スタックには何もプッシュしません。</p><hr /><h3><a name="lua_gettable"><code>lua_gettable</code></a></h3><p>
+<span class="apii">[-1, +1, <em>e</em>]</span>
+</p><pre>int lua_gettable (lua_State *L, int index);</pre>
+
+<p>スタックに値<code>t[k]</code>をプッシュします。ここで、<code>t</code>は指定されたインデックスにある値であり、<code>k</code>はスタックのトップにある値です。</p><p>この関数は、スタックからキーをポップし、その場所に結果の値をプッシュします。Luaと同様に、この関数は「index」イベントのメタメソッドをトリガーする場合があります（<a href="#2.4">§2.4</a>を参照）。</p><p>プッシュされた値の型を返します。</p><hr /><h3><a name="lua_gettop"><code>lua_gettop</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>int lua_gettop (lua_State *L);</pre>
+
+<p>スタックのトップ要素のインデックスを返します。インデックスは1から始まるため、この結果はスタック内の要素数と同じです。特に、0は空のスタックを意味します。</p><hr /><h3><a name="lua_getiuservalue"><code>lua_getiuservalue</code></a></h3><p>
+<span class="apii">[-0, +1, –]</span>
+</p><pre>int lua_getiuservalue (lua_State *L, int index, int n);</pre>
+
+<p>スタックに、指定されたインデックスにあるフルユーザーデータに関連付けられた<code>n</code>番目のユーザー値をプッシュし、プッシュされた値の型を返します。</p><p>ユーザーデータにその値がない場合、<b>nil</b>をプッシュし、<a href="#pdf-LUA_TNONE"><code>LUA_TNONE</code></a>を返します。</p><hr /><h3><a name="lua_insert"><code>lua_insert</code></a></h3><p>
+<span class="apii">[-1, +1, –]</span>
+</p><pre>void lua_insert (lua_State *L, int index);</pre>
+
+<p>トップ要素を指定された有効なインデックスに移動し、このインデックスの上にある要素を上にシフトしてスペースを開きます。擬似インデックスは実際のスタック位置ではないため、この関数を擬似インデックスで呼び出すことはできません。</p><hr /><h3><a name="lua_Integer"><code>lua_Integer</code></a></h3>
+<pre>typedef ... lua_Integer;</pre>
+
+<p>Luaの整数の型。</p><p>デフォルトでは、この型は<code>long long</code>（通常は64ビットの2の補数整数）ですが、<code>long</code>または<code>int</code>（通常は32ビットの2の補数整数）に変更できます。（<code>luaconf.h</code>の<code>LUA_INT_TYPE</code>を参照）。</p><p>Luaは、この型に収まる最小値と最大値を使用して、定数<a name="pdf-LUA_MININTEGER"><code>LUA_MININTEGER</code></a>と<a name="pdf-LUA_MAXINTEGER"><code>LUA_MAXINTEGER</code></a>も定義します。</p><hr /><h3><a name="lua_isboolean"><code>lua_isboolean</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>int lua_isboolean (lua_State *L, int index);</pre>
+
+<p>指定されたインデックスの値がブール値の場合は1を返し、それ以外の場合は0を返します。</p><hr /><h3><a name="lua_iscfunction"><code>lua_iscfunction</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>int lua_iscfunction (lua_State *L, int index);</pre>
+
+<p>指定されたインデックスの値がC関数の場合は1を返し、それ以外の場合は0を返します。</p><hr /><h3><a name="lua_isfunction"><code>lua_isfunction</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>int lua_isfunction (lua_State *L, int index);</pre>
+
+<p>指定されたインデックスの値が関数（CまたはLua）の場合は1を返し、それ以外の場合は0を返します。</p><hr /><h3><a name="lua_isinteger"><code>lua_isinteger</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>int lua_isinteger (lua_State *L, int index);</pre>
+
+<p>指定されたインデックスの値が整数（つまり、値が数値であり、整数として表現されている）であれば 1 を返し、そうでなければ 0 を返します。</p><hr /><h3><a name="lua_islightuserdata"><code>lua_islightuserdata</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>int lua_islightuserdata (lua_State *L, int index);</pre>
+
+<p>指定されたインデックスの値がライトユーザーデータであれば 1 を返し、そうでなければ 0 を返します。</p><hr /><h3><a name="lua_isnil"><code>lua_isnil</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>int lua_isnil (lua_State *L, int index);</pre>
+
+<p>指定されたインデックスの値が <b>nil</b> であれば 1 を返し、そうでなければ 0 を返します。</p><hr /><h3><a name="lua_isnone"><code>lua_isnone</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>int lua_isnone (lua_State *L, int index);</pre>
+
+<p>指定されたインデックスが無効であれば 1 を返し、そうでなければ 0 を返します。</p><hr /><h3><a name="lua_isnoneornil"><code>lua_isnoneornil</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>int lua_isnoneornil (lua_State *L, int index);</pre>
+
+<p>指定されたインデックスが無効であるか、そのインデックスの値が <b>nil</b> であれば 1 を返し、そうでなければ 0 を返します。</p><hr /><h3><a name="lua_isnumber"><code>lua_isnumber</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>int lua_isnumber (lua_State *L, int index);</pre>
+
+<p>指定されたインデックスの値が数値または数値に変換可能な文字列であれば 1 を返し、そうでなければ 0 を返します。</p><hr /><h3><a name="lua_isstring"><code>lua_isstring</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>int lua_isstring (lua_State *L, int index);</pre>
+
+<p>指定されたインデックスの値が文字列または数値（常に文字列に変換可能）であれば 1 を返し、そうでなければ 0 を返します。</p><hr /><h3><a name="lua_istable"><code>lua_istable</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>int lua_istable (lua_State *L, int index);</pre>
+
+<p>指定されたインデックスの値がテーブルであれば 1 を返し、そうでなければ 0 を返します。</p><hr /><h3><a name="lua_isthread"><code>lua_isthread</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>int lua_isthread (lua_State *L, int index);</pre>
+
+<p>指定されたインデックスの値がスレッドであれば 1 を返し、そうでなければ 0 を返します。</p><hr /><h3><a name="lua_isuserdata"><code>lua_isuserdata</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>int lua_isuserdata (lua_State *L, int index);</pre>
+
+<p>指定されたインデックスの値がユーザーデータ（フルまたはライト）であれば 1 を返し、そうでなければ 0 を返します。</p><hr /><h3><a name="lua_isyieldable"><code>lua_isyieldable</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>int lua_isyieldable (lua_State *L);</pre>
+
+<p>指定されたコルーチンが yield できる場合は 1 を返し、それ以外の場合は 0 を返します。</p><hr /><h3><a name="lua_KContext"><code>lua_KContext</code></a></h3>
+<pre>typedef ... lua_KContext;</pre>
+
+<p>継続関数コンテキストの型。数値型でなければなりません。この型は、<code>intptr_t</code> が利用可能な場合は <code>intptr_t</code> として定義され、ポインタも格納できるようにします。それ以外の場合は、<code>ptrdiff_t</code> として定義されます。</p><hr /><h3><a name="lua_KFunction"><code>lua_KFunction</code></a></h3>
+<pre>typedef int (*lua_KFunction) (lua_State *L, int status, lua_KContext ctx);</pre>
+
+<p>継続関数の型（<a href="#4.5">§4.5</a> を参照）。</p><hr /><h3><a name="lua_len"><code>lua_len</code></a></h3><p>
+<span class="apii">[-0, +1, <em>e</em>]</span>
+</p><pre>void lua_len (lua_State *L, int index);</pre>
+
+<p>指定されたインデックスの値の長さを返します。Lua の '<code>#</code>' 演算子（<a href="#3.4.7">§3.4.7</a> を参照）と同等であり、「length」イベントのメタメソッドをトリガーする場合があります（<a href="#2.4">§2.4</a> を参照）。結果はスタックにプッシュされます。</p><hr /><h3><a name="lua_load"><code>lua_load</code></a></h3><p>
+<span class="apii">[-0, +1, –]</span>
+</p><pre>int lua_load (lua_State *L,
+              lua_Reader reader,
+              void *data,
+              const char *chunkname,
+              const char *mode);</pre>
+
+<p>Lua のチャンクを実行せずにロードします。エラーがない場合、<code>lua_load</code> はコンパイルされたチャンクを Lua 関数としてスタックの一番上にプッシュします。それ以外の場合は、エラーメッセージをプッシュします。</p><p><code>lua_load</code> 関数は、チャンクを読み込むためにユーザーが提供する <code>reader</code> 関数を使用します（<a href="#lua_Reader"><code>lua_Reader</code></a> を参照）。<code>data</code> 引数は、reader 関数に渡される不透明な値です。</p><p><code>chunkname</code> 引数は、エラーメッセージやデバッグ情報で使用されるチャンクの名前を指定します（<a href="#4.7">§4.7</a> を参照）。</p><p>
+<code>lua_load</code> は、チャンクがテキスト形式かバイナリ形式かを自動的に検出し、それに応じてロードします（プログラム <code>luac</code> を参照）。文字列 <code>mode</code> は、関数 <a href="#pdf-load"><code>load</code></a> と同様に動作しますが、<code>NULL</code> 値は文字列 "<code>bt</code>" と同等であるという追加があります。</p><p>
+<code>lua_load</code> は内部でスタックを使用するため、reader 関数は常に、戻る際にスタックを変更しないようにする必要があります。</p><p>
+<code>lua_load</code> は <a href="#pdf-LUA_OK"><code>LUA_OK</code></a>、<a href="#pdf-LUA_ERRSYNTAX"><code>LUA_ERRSYNTAX</code></a>、または <a href="#pdf-LUA_ERRMEM"><code>LUA_ERRMEM</code></a> を返すことができます。この関数は、読み取り関数によって発生したエラーに対応する他の値を返す場合もあります（<a href="#4.4.1">§4.4.1</a> を参照）。</p><p>結果の関数にアップバリューがある場合、その最初のアップバリューは、レジストリのインデックス <code>LUA_RIDX_GLOBALS</code> に格納されているグローバル環境の値に設定されます（<a href="#4.3">§4.3</a> を参照）。メインチャンクをロードする場合、このアップバリューは <code>_ENV</code> 変数になります（<a href="#2.2">§2.2</a> を参照）。他のアップバリューは <b>nil</b> で初期化されます。</p><hr /><h3><a name="lua_newstate"><code>lua_newstate</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>lua_State *lua_newstate (lua_Alloc f, void *ud);</pre>
+
+<p>新しい独立した状態を作成し、そのメスレッドを返します。状態を作成できない場合（メモリ不足が原因）は <code>NULL</code> を返します。引数 <code>f</code> はアロケーター関数です。Lua は、この状態のすべてのメモリ割り当てをこの関数を介して行います（<a href="#lua_Alloc"><code>lua_Alloc</code></a> を参照）。2 番目の引数 <code>ud</code> は、Lua がすべての呼び出しでアロケーターに渡す不透明なポインタです。</p><hr /><h3><a name="lua_newtable"><code>lua_newtable</code></a></h3><p>
+<span class="apii">[-0, +1, <em>m</em>]</span>
+</p><pre>void lua_newtable (lua_State *L);</pre>
+
+<p>新しい空のテーブルを作成し、それをスタックにプッシュします。これは <code>lua_createtable(L, 0, 0)</code> と同等です。</p><hr /><h3><a name="lua_newthread"><code>lua_newthread</code></a></h3><p>
+<span class="apii">[-0, +1, <em>m</em>]</span>
+</p><pre>lua_State *lua_newthread (lua_State *L);</pre>
+
+<p>新しいスレッドを作成し、スタックにプッシュし、この新しいスレッドを表す <a href="#lua_State"><code>lua_State</code></a> へのポインタを返します。この関数によって返される新しいスレッドは、元のスレッドとグローバル環境を共有しますが、独立した実行スタックを持ちます。</p><p>スレッドは、他の Lua オブジェクトと同様に、ガベージコレクションの対象となります。</p><hr /><h3><a name="lua_newuserdatauv"><code>lua_newuserdatauv</code></a></h3><p>
+<span class="apii">[-0, +1, <em>m</em>]</span>
+</p><pre>void *lua_newuserdatauv (lua_State *L, size_t size, int nuvalue);</pre>
+
+<p>この関数は、新しいフルユーザーデータをスタックに作成してプッシュします。このユーザーデータには、<code>nuvalue</code> 個の関連する Lua 値（<code>ユーザー値</code> と呼ばれます）と、<code>size</code> バイトの関連する生のメモリブロックがあります。（ユーザー値は、関数 <a href="#lua_setiuservalue"><code>lua_setiuservalue</code></a> および <a href="#lua_getiuservalue"><code>lua_getiuservalue</code></a> で設定および読み取ることができます。）</p><p>この関数は、メモリブロックのアドレスを返します。Lua は、対応するユーザーデータが存続している限り、このアドレスが有効であることを保証します（<a href="#2.5">§2.5</a> を参照）。さらに、ユーザーデータがファイナライズのためにマークされている場合（<a href="#2.5.3">§2.5.3</a> を参照）、そのアドレスは少なくともファイナライザーの呼び出しまで有効です。</p><hr /><h3><a name="lua_next"><code>lua_next</code></a></h3><p>
+<span class="apii">[-1, +(2|0), <em>v</em>]</span>
+</p><pre>int lua_next (lua_State *L, int index);</pre>
+
+<p>スタックからキーをポップし、指定されたインデックスのテーブルからキーと値のペア（指定されたキーの「次の」ペア）をプッシュします。テーブルに要素がなくなると、<a href="#lua_next"><code>lua_next</code></a> は 0 を返し、何もプッシュしません。</p><p>一般的なテーブルトラバーサルは次のようになります。</p><pre>     /* table is in the stack at index 't' */
+     lua_pushnil(L);  /* first key */
+     while (lua_next(L, t) != 0) {
+       /* uses 'key' (at index -2) and 'value' (at index -1) */
+       printf("%s - %s\n",
+              lua_typename(L, lua_type(L, -2)),
+              lua_typename(L, lua_type(L, -1)));
+       /* removes 'value'; keeps 'key' for next iteration */
+       lua_pop(L, 1);
+     }
+</pre>
+
+<p>テーブルのトラバーサル中は、キーが実際に文字列であることがわかっている場合を除き、キーに対して直接 <a href="#lua_tolstring"><code>lua_tolstring</code></a> を呼び出すことは避けてください。<a href="#lua_tolstring"><code>lua_tolstring</code></a> は指定されたインデックスの値を変更する可能性があることに注意してください。これは、<a href="#lua_next"><code>lua_next</code></a> の次の呼び出しを混乱させます。</p><p>指定されたキーが <b>nil</b> でもない場合、テーブルに存在しない場合は、この関数がエラーを発生させる可能性があります。テーブルのトラバーサル中にテーブルを変更する場合の注意点については、関数 <a href="#pdf-next"><code>next</code></a> を参照してください。</p><hr /><h3><a name="lua_Number"><code>lua_Number</code></a></h3>
+<pre>typedef ... lua_Number;</pre>
+
+<p>Lua の浮動小数点数の型。</p><p>デフォルトでは、この型は double ですが、単精度 float または long double に変更できます。（<code>luaconf.h</code> の <code>LUA_FLOAT_TYPE</code> を参照。）</p><hr /><h3><a name="lua_numbertointeger"><code>lua_numbertointeger</code></a></h3>
+<pre>int lua_numbertointeger (lua_Number n, lua_Integer *p);</pre>
+
+<p>Lua の浮動小数点数を Lua の整数に変換しようとします。浮動小数点数 <code>n</code> は整数値でなければなりません。その値が Lua の整数の範囲内にある場合は、整数に変換され、<code>*p</code> に代入されます。このマクロは、変換が成功したかどうかを示すブール値を返します。（この範囲テストは、このマクロがないと正しく行うのが難しい場合があることに注意してください。）</p><p>このマクロは、引数を複数回評価する場合があります。</p><hr /><h3><a name="lua_pcall"><code>lua_pcall</code></a></h3><p>
+<span class="apii">[-(nargs + 1), +(nresults|1), –]</span>
+</p><pre>int lua_pcall (lua_State *L, int nargs, int nresults, int msgh);</pre>
+
+<p>関数（または呼び出し可能なオブジェクト）を保護モードで呼び出します。</p><p><code>nargs</code> と <code>nresults</code> の両方とも、<a href="#lua_call"><code>lua_call</code></a> と同じ意味を持ちます。呼び出し中にエラーがない場合、<a href="#lua_pcall"><code>lua_pcall</code></a> は <a href="#lua_call"><code>lua_call</code></a> とまったく同じように動作します。ただし、エラーが発生した場合、<a href="#lua_pcall"><code>lua_pcall</code></a> はそれをキャッチし、単一の値をスタックにプッシュし（エラーオブジェクト）、エラーコードを返します。<a href="#lua_call"><code>lua_call</code></a> と同様に、<a href="#lua_pcall"><code>lua_pcall</code></a> は常にスタックから関数とその引数を削除します。</p><p><code>msgh</code> が 0 の場合、スタックに返されるエラーオブジェクトは元のエラーオブジェクトとまったく同じです。それ以外の場合、<code>msgh</code> は<em>メッセージハンドラー</em>のスタックインデックスです。（このインデックスは疑似インデックスにすることはできません。）ランタイムエラーが発生した場合、このハンドラーはエラーオブジェクトとともに呼び出され、その戻り値は <a href="#lua_pcall"><code>lua_pcall</code></a> によってスタックに返されるオブジェクトになります。</p><p>通常、メッセージハンドラーは、スタックトレースバックなど、エラーオブジェクトに詳細なデバッグ情報を追加するために使用されます。このような情報は、<a href="#lua_pcall"><code>lua_pcall</code></a> の戻り後には収集できません。スタックが巻き戻されているためです。</p><p><a href="#lua_pcall"><code>lua_pcall</code></a> 関数は、次のステータスコードのいずれかを返します。<a href="#pdf-LUA_OK"><code>LUA_OK</code></a>、<a href="#pdf-LUA_ERRRUN"><code>LUA_ERRRUN</code></a>、<a href="#pdf-LUA_ERRMEM"><code>LUA_ERRMEM</code></a>、または <a href="#pdf-LUA_ERRERR"><code>LUA_ERRERR</code></a>。</p><hr /><h3><a name="lua_pcallk"><code>lua_pcallk</code></a></h3><p>
+<span class="apii">[-(nargs + 1), +(nresults|1), –]</span>
+</p><pre>int lua_pcallk (lua_State *L,
+                int nargs,
+                int nresults,
+                int msgh,
+                lua_KContext ctx,
+                lua_KFunction k);</pre>
+
+<p>この関数は、呼び出された関数が yield できることを除いて（<a href="#4.5">§4.5</a> を参照）、<a href="#lua_pcall"><code>lua_pcall</code></a> とまったく同じように動作します。</p><hr /><h3><a name="lua_pop"><code>lua_pop</code></a></h3><p>
+<span class="apii">[-n, +0, <em>e</em>]</span>
+</p><pre>void lua_pop (lua_State *L, int n);</pre>
+
+<p>スタックから <code>n</code> 個の要素をポップします。これは、<a href="#lua_settop"><code>lua_settop</code></a> に対するマクロとして実装されています。</p><hr /><h3><a name="lua_pushboolean"><code>lua_pushboolean</code></a></h3><p>
+<span class="apii">[-0, +1, –]</span>
+</p><pre>void lua_pushboolean (lua_State *L, int b);</pre>
+
+<p>値 <code>b</code> を持つブール値をスタックにプッシュします。</p><hr /><h3><a name="lua_pushcclosure"><code>lua_pushcclosure</code></a></h3><p>
+<span class="apii">[-n, +1, <em>m</em>]</span>
+</p><pre>void lua_pushcclosure (lua_State *L, lua_CFunction fn, int n);</pre>
+
+<p>新しい C&nbsp;クロージャをスタックにプッシュします。この関数は C&nbsp;関数へのポインタを受け取り、対応する C&nbsp;関数を呼び出す、呼び出し時に <code>function</code> 型の Lua 値をスタックにプッシュします。パラメーター <code>n</code> は、この関数が持つアップバリューの数を指定します（<a href="#4.2">§4.2</a> を参照）。</p><p>Lua から呼び出し可能なすべての関数は、パラメーターを受け取り、結果を返すための正しいプロトコルに従う必要があります（<a href="#lua_CFunction"><code>lua_CFunction</code></a> を参照）。</p><p>C&nbsp;関数が作成されるとき、アップバリューと呼ばれるいくつかの値をそれに関連付けることができます。これらのアップバリューは、関数が呼び出されるたびにアクセスできます。この関連付けは C&nbsp;クロージャと呼ばれます（<a href="#4.2">§4.2</a> を参照）。C&nbsp;クロージャを作成するには、最初にアップバリューの初期値をスタックにプッシュする必要があります。（複数のアップバリューがある場合、最初の値が最初にプッシュされます。）次に、<a href="#lua_pushcclosure"><code>lua_pushcclosure</code></a> を呼び出して、C&nbsp;関数をスタックに作成してプッシュします。引数 <code>n</code> は、関数に関連付けられる値の数を指定します。<a href="#lua_pushcclosure"><code>lua_pushcclosure</code></a> は、これらの値もスタックからポップします。</p><p><code>n</code> の最大値は 255 です。</p><p><code>n</code> が 0 の場合、この関数は<em>ライト C&nbsp;関数</em>を作成します。これは C&nbsp;関数へのポインタにすぎません。その場合、メモリエラーが発生することはありません。</p><hr /><h3><a name="lua_pushcfunction"><code>lua_pushcfunction</code></a></h3><p>
+<span class="apii">[-0, +1, –]</span>
+</p><pre>void lua_pushcfunction (lua_State *L, lua_CFunction f);</pre>
+
+<p>C&nbsp;関数をスタックにプッシュします。この関数は、アップバリューがない <a href="#lua_pushcclosure"><code>lua_pushcclosure</code></a> と同等です。</p><hr /><h3><a name="lua_pushfstring"><code>lua_pushfstring</code></a></h3><p>
+<span class="apii">[-0, +1, <em>v</em>]</span>
+</p><pre>const char *lua_pushfstring (lua_State *L, const char *fmt, ...);</pre>
+
+<p>書式設定された文字列をスタックにプッシュし、この文字列へのポインタを返します（<a href="#4.1.3">§4.1.3</a> を参照）。これは ISO&nbsp;C 関数 <code>sprintf</code> に似ていますが、2 つの重要な違いがあります。まず、結果のスペースを割り当てる必要はありません。結果は Lua 文字列であり、Lua がメモリ割り当て（およびガベージコレクションによる割り当て解除）を処理します。2 番目に、変換指定子はかなり制限されています。フラグ、幅、または精度はありません。変換指定子は '<code>%%</code>' (文字 '<code>%</code>' を挿入)、'<code>%s</code>' (ヌル終端文字列を挿入、サイズ制限なし)、'<code>%f</code>' (<a href="#lua_Number"><code>lua_Number</code></a> を挿入)、'<code>%I</code>' (<a href="#lua_Integer"><code>lua_Integer</code></a> を挿入)、'<code>%p</code>' (ポインタを挿入)、'<code>%d</code>' (<code>int</code> を挿入)、'<code>%c</code>' (1 バイト文字として <code>int</code> を挿入)、および '<code>%U</code>' (UTF-8 バイトシーケンスとして <code>long int</code> を挿入) のみです。</p><p>この関数は、メモリオーバーフローまたは無効な変換指定子によるエラーを発生させる場合があります。</p><hr /><h3><a name="lua_pushglobaltable"><code>lua_pushglobaltable</code></a></h3><p>
+<span class="apii">[-0, +1, –]</span>
+</p><pre>void lua_pushglobaltable (lua_State *L);</pre>
+
+<p>グローバル環境をスタックにプッシュします。</p><hr /><h3><a name="lua_pushinteger"><code>lua_pushinteger</code></a></h3><p>
+<span class="apii">[-0, +1, –]</span>
+</p><pre>void lua_pushinteger (lua_State *L, lua_Integer n);</pre>
+
+<p>値 <code>n</code> を持つ整数をスタックにプッシュします。</p><hr /><h3><a name="lua_pushlightuserdata"><code>lua_pushlightuserdata</code></a></h3><p>
+<span class="apii">[-0, +1, –]</span>
+</p><pre>void lua_pushlightuserdata (lua_State *L, void *p);</pre>
+
+<p>ライトユーザーデータをスタックにプッシュします。</p><p>ユーザーデータは Lua で C&nbsp;値を表します。<em>ライトユーザーデータ</em>はポインタ（<code>void*</code>）を表します。これは値（数値のような）であり、作成されず、個別のメタテーブルを持たず、収集されません（作成されなかったため）。ライトユーザーデータは、同じ C&nbsp;アドレスを持つ「任意」のライトユーザーデータと等しくなります。</p><hr /><h3><a name="lua_pushliteral"><code>lua_pushliteral</code></a></h3><p>
+<span class="apii">[-0, +1, <em>m</em>]</span>
+</p><pre>const char *lua_pushliteral (lua_State *L, const char *s);</pre>
+
+<p>このマクロは <a href="#lua_pushstring"><code>lua_pushstring</code></a> と同等ですが、<code>s</code> がリテラル文字列の場合にのみ使用する必要があります。（Lua はこのケースを最適化する場合があります。）</p><hr /><h3><a name="lua_pushlstring"><code>lua_pushlstring</code></a></h3><p>
+<span class="apii">[-0, +1, <em>m</em>]</span>
+</p><pre>const char *lua_pushlstring (lua_State *L, const char *s, size_t len);</pre>
+
+<p>サイズ <code>len</code> の <code>s</code> が指す文字列をスタックにプッシュします。Lua は指定された文字列の内部コピーを作成または再利用するため、関数が戻った直後に <code>s</code> のメモリを解放または再利用できます。文字列には、埋め込みゼロを含む任意のバイナリデータを含めることができます。</p><p>文字列の内部コピーへのポインタを返します（<a href="#4.1.3">§4.1.3</a> を参照）。</p><hr /><h3><a name="lua_pushnil"><code>lua_pushnil</code></a></h3><p>
+<span class="apii">[-0, +1, –]</span>
+</p><pre>void lua_pushnil (lua_State *L);</pre>
+
+<p>スタックにnil値をプッシュします。</p><hr /><h3><a name="lua_pushnumber"><code>lua_pushnumber</code></a></h3><p>
+<span class="apii">[-0, +1, –]</span>
+</p><pre>void lua_pushnumber (lua_State *L, lua_Number n);</pre>
+
+<p>スタックに値が<code>n</code>であるfloat値をプッシュします。</p><hr /><h3><a name="lua_pushstring"><code>lua_pushstring</code></a></h3><p>
+<span class="apii">[-0, +1, <em>m</em>]</span>
+</p><pre>const char *lua_pushstring (lua_State *L, const char *s);</pre>
+
+<p><code>s</code>が指すゼロ終端文字列をスタックにプッシュします。Luaは与えられた文字列の内部コピーを作成または再利用するため、関数が戻った直後に<code>s</code>のメモリを解放または再利用できます。</p><p>文字列の内部コピーへのポインタを返します（<a href="#4.1.3">§4.1.3</a> を参照）。</p><p><code>s</code>が<code>NULL</code>の場合、<b>nil</b>をプッシュして<code>NULL</code>を返します。</p><hr /><h3><a name="lua_pushthread"><code>lua_pushthread</code></a></h3><p>
+<span class="apii">[-0, +1, –]</span>
+</p><pre>int lua_pushthread (lua_State *L);</pre>
+
+<p><code>L</code>で表されるスレッドをスタックにプッシュします。このスレッドがそのステートのメインスレッドである場合は1を返します。</p><hr /><h3><a name="lua_pushvalue"><code>lua_pushvalue</code></a></h3><p>
+<span class="apii">[-0, +1, –]</span>
+</p><pre>void lua_pushvalue (lua_State *L, int index);</pre>
+
+<p>与えられたインデックスにある要素のコピーをスタックにプッシュします。</p><hr /><h3><a name="lua_pushvfstring"><code>lua_pushvfstring</code></a></h3><p>
+<span class="apii">[-0, +1, <em>v</em>]</span>
+</p><pre>const char *lua_pushvfstring (lua_State *L,
+                              const char *fmt,
+                              va_list argp);</pre>
+
+<p><a href="#lua_pushfstring"><code>lua_pushfstring</code></a>と同等ですが、可変個数の引数の代わりに<code>va_list</code>を受け取ります。</p><hr /><h3><a name="lua_rawequal"><code>lua_rawequal</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>int lua_rawequal (lua_State *L, int index1, int index2);</pre>
+
+<p>インデックス<code>index1</code>と<code>index2</code>にある2つの値がプリミティブに等しい（つまり、<code>__eq</code>メタメソッドを呼び出さずに等しい）場合は1を返します。それ以外の場合は0を返します。いずれかのインデックスが無効な場合も0を返します。</p><hr /><h3><a name="lua_rawget"><code>lua_rawget</code></a></h3><p>
+<span class="apii">[-1, +1, –]</span>
+</p><pre>int lua_rawget (lua_State *L, int index);</pre>
+
+<p><a href="#lua_gettable"><code>lua_gettable</code></a>に似ていますが、生のアクセス（つまり、メタメソッドなし）を行います。<code>index</code>の値はテーブルでなければなりません。</p><hr /><h3><a name="lua_rawgeti"><code>lua_rawgeti</code></a></h3><p>
+<span class="apii">[-0, +1, –]</span>
+</p><pre>int lua_rawgeti (lua_State *L, int index, lua_Integer n);</pre>
+
+<p>スタックに値<code>t[n]</code>をプッシュします。ここで、<code>t</code>は与えられたインデックスにあるテーブルです。アクセスは生であり、<code>__index</code>メタ値を使用しません。</p><p>プッシュされた値の型を返します。</p><hr /><h3><a name="lua_rawgetp"><code>lua_rawgetp</code></a></h3><p>
+<span class="apii">[-0, +1, –]</span>
+</p><pre>int lua_rawgetp (lua_State *L, int index, const void *p);</pre>
+
+<p>スタックに値<code>t[k]</code>をプッシュします。ここで、<code>t</code>は与えられたインデックスにあるテーブルであり、<code>k</code>はライトユーザーデータとして表現されたポインタ<code>p</code>です。アクセスは生であり、つまり<code>__index</code>メタ値を使用しません。</p><p>プッシュされた値の型を返します。</p><hr /><h3><a name="lua_rawlen"><code>lua_rawlen</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>lua_Unsigned lua_rawlen (lua_State *L, int index);</pre>
+
+<p>与えられたインデックスの値の生の「長さ」を返します。文字列の場合は文字列の長さ、テーブルの場合はメタメソッドなしの長さ演算子（'<code>#</code>'）の結果、ユーザーデータの場合はユーザーデータに割り当てられたメモリブロックのサイズです。その他の値の場合、この呼び出しは0を返します。</p><hr /><h3><a name="lua_rawset"><code>lua_rawset</code></a></h3><p>
+<span class="apii">[-2, +0, <em>m</em>]</span>
+</p><pre>void lua_rawset (lua_State *L, int index);</pre>
+
+<p><a href="#lua_settable"><code>lua_settable</code></a>に似ていますが、生の代入（つまり、メタメソッドなし）を行います。<code>index</code>の値はテーブルでなければなりません。</p><hr /><h3><a name="lua_rawseti"><code>lua_rawseti</code></a></h3><p>
+<span class="apii">[-1, +0, <em>m</em>]</span>
+</p><pre>void lua_rawseti (lua_State *L, int index, lua_Integer i);</pre>
+
+<p><code>t[i] = v</code>と同等の処理を行います。ここで、<code>t</code>は与えられたインデックスにあるテーブルであり、<code>v</code>はスタックの一番上の値です。</p><p>この関数はスタックから値をポップします。代入は生であり、つまり<code>__newindex</code>メタ値を使用しません。</p><hr /><h3><a name="lua_rawsetp"><code>lua_rawsetp</code></a></h3><p>
+<span class="apii">[-1, +0, <em>m</em>]</span>
+</p><pre>void lua_rawsetp (lua_State *L, int index, const void *p);</pre>
+
+<p><code>t[p] = v</code>と同等の処理を行います。ここで、<code>t</code>は与えられたインデックスにあるテーブル、<code>p</code>はライトユーザーデータとしてエンコードされ、<code>v</code>はスタックの一番上の値です。</p><p>この関数はスタックから値をポップします。代入は生であり、つまり<code>__newindex</code>メタ値を使用しません。</p><hr /><h3><a name="lua_Reader"><code>lua_Reader</code></a></h3>
+<pre>typedef const char * (*lua_Reader) (lua_State *L,
+                                    void *data,
+                                    size_t *size);</pre>
+
+<p><a href="#lua_load"><code>lua_load</code></a>で使用されるリーダ関数。 <a href="#lua_load"><code>lua_load</code></a>がチャンクの別の部分を必要とするたびに、リーダを呼び出し、その<code>data</code>パラメータを渡します。リーダは、チャンクの新しい部分を持つメモリブロックへのポインタを返し、<code>size</code>をブロックサイズに設定する必要があります。ブロックは、リーダ関数が再度呼び出されるまで存在する必要があります。チャンクの終わりを知らせるために、リーダは<code>NULL</code>を返すか、<code>size</code>をゼロに設定する必要があります。リーダ関数は、ゼロより大きい任意のサイズのピースを返すことができます。</p><hr /><h3><a name="lua_register"><code>lua_register</code></a></h3><p>
+<span class="apii">[-0, +0, <em>e</em>]</span>
+</p><pre>void lua_register (lua_State *L, const char *name, lua_CFunction f);</pre>
+
+<p>グローバル変数<code>name</code>の新しい値としてC関数<code>f</code>を設定します。これはマクロとして定義されています</p><pre>     #define lua_register(L,n,f) \
+            (lua_pushcfunction(L, f), lua_setglobal(L, n))
+</pre>
+
+
+
+
+<hr /><h3><a name="lua_remove"><code>lua_remove</code></a></h3><p>
+<span class="apii">[-1, +0, –]</span>
+</p><pre>void lua_remove (lua_State *L, int index);</pre>
+
+<p>指定された有効なインデックスにある要素を削除し、このインデックスより上の要素を下に移動してギャップを埋めます。疑似インデックスは実際のスタック位置ではないため、この関数を疑似インデックスで呼び出すことはできません。</p><hr /><h3><a name="lua_replace"><code>lua_replace</code></a></h3><p>
+<span class="apii">[-1, +0, –]</span>
+</p><pre>void lua_replace (lua_State *L, int index);</pre>
+
+<p>スタックの一番上の要素を与えられた有効なインデックスに移動し、他の要素をシフトすることなく（したがって、指定されたインデックスの値を置き換え）、一番上の要素をポップします。</p><hr /><h3><a name="lua_resetthread"><code>lua_resetthread</code></a></h3><p>
+<span class="apii">[-0, +?, –]</span>
+</p><pre>int lua_resetthread (lua_State *L);</pre>
+
+<p>この関数は非推奨です。<code>from</code>が<code>NULL</code>である<a href="#lua_closethread"><code>lua_closethread</code></a>と同等です。</p><hr /><h3><a name="lua_resume"><code>lua_resume</code></a></h3><p>
+<span class="apii">[-?, +?, –]</span>
+</p><pre>int lua_resume (lua_State *L, lua_State *from, int nargs,
+                          int *nresults);</pre>
+
+<p>与えられたスレッド<code>L</code>でコルーチンを開始および再開します。</p><p>コルーチンを開始するには、メイン関数と任意の引数をスレッドの空のスタックにプッシュします。次に、<a href="#lua_resume"><code>lua_resume</code></a>を呼び出し、<code>nargs</code>を引数の数とします。この呼び出しは、コルーチンが中断するか実行を終了したときに戻ります。戻ると、<code>*nresults</code>が更新され、スタックの一番上には<a href="#lua_yield"><code>lua_yield</code></a>に渡された値、または本体関数によって返された値である<code>*nresults</code>値が含まれています。コルーチンが中断した場合、<a href="#lua_resume"><code>lua_resume</code></a>は<a href="#pdf-LUA_YIELD"><code>LUA_YIELD</code></a>を返します。コルーチンがエラーなしで実行を終了した場合は<a href="#pdf-LUA_OK"><code>LUA_OK</code></a>を返し、エラーの場合はエラーコードを返します（<a href="#4.4.1">§4.4.1</a>を参照）。エラーの場合、エラーオブジェクトはスタックの一番上にあります。</p><p>コルーチンを再開するには、スタックから<code>*nresults</code>のyieldされた値を削除し、<code>yield</code>の結果として渡される値をプッシュしてから、<a href="#lua_resume"><code>lua_resume</code></a>を呼び出します。</p><p>パラメータ<code>from</code>は<code>L</code>を再開するコルーチンを表します。そのようなコルーチンがない場合、このパラメータは<code>NULL</code>にすることができます。</p><hr /><h3><a name="lua_rotate"><code>lua_rotate</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>void lua_rotate (lua_State *L, int idx, int n);</pre>
+
+<p>有効なインデックス<code>idx</code>とスタックの一番上の要素の間でスタック要素を回転させます。要素は、正の<code>n</code>の場合は一番上の方向に<code>n</code>の位置だけ、または負の<code>n</code>の場合は一番下の方向に<code>-n</code>の位置だけ回転します。<code>n</code>の絶対値は、回転されるスライスのサイズを超えてはなりません。疑似インデックスは実際のスタック位置ではないため、この関数を疑似インデックスで呼び出すことはできません。</p><hr /><h3><a name="lua_setallocf"><code>lua_setallocf</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>void lua_setallocf (lua_State *L, lua_Alloc f, void *ud);</pre>
+
+<p>与えられたステートのアロケータ関数を、ユーザーデータ<code>ud</code>を使用して<code>f</code>に変更します。</p><hr /><h3><a name="lua_setfield"><code>lua_setfield</code></a></h3><p>
+<span class="apii">[-1, +0, <em>e</em>]</span>
+</p><pre>void lua_setfield (lua_State *L, int index, const char *k);</pre>
+
+<p><code>t[k] = v</code>と同等の処理を行います。ここで、<code>t</code>は与えられたインデックスの値であり、<code>v</code>はスタックの一番上の値です。</p><p>この関数はスタックから値をポップします。 Luaの場合と同様に、この関数は「newindex」イベントのメタメソッドをトリガーする可能性があります（<a href="#2.4">§2.4</a>を参照）。</p><hr /><h3><a name="lua_setglobal"><code>lua_setglobal</code></a></h3><p>
+<span class="apii">[-1, +0, <em>e</em>]</span>
+</p><pre>void lua_setglobal (lua_State *L, const char *name);</pre>
+
+<p>スタックから値をポップし、グローバル変数<code>name</code>の新しい値として設定します。</p><hr /><h3><a name="lua_seti"><code>lua_seti</code></a></h3><p>
+<span class="apii">[-1, +0, <em>e</em>]</span>
+</p><pre>void lua_seti (lua_State *L, int index, lua_Integer n);</pre>
+
+<p><code>t[n] = v</code>と同等の処理を行います。ここで、<code>t</code>は与えられたインデックスの値であり、<code>v</code>はスタックの一番上の値です。</p><p>この関数はスタックから値をポップします。 Luaの場合と同様に、この関数は「newindex」イベントのメタメソッドをトリガーする可能性があります（<a href="#2.4">§2.4</a>を参照）。</p><hr /><h3><a name="lua_setiuservalue"><code>lua_setiuservalue</code></a></h3><p>
+<span class="apii">[-1, +0, –]</span>
+</p><pre>int lua_setiuservalue (lua_State *L, int index, int n);</pre>
+
+<p>スタックから値をポップし、与えられたインデックスにあるフルユーザーデータに関連付けられた新しい<code>n</code>番目のユーザー値として設定します。ユーザーデータにその値がない場合は0を返します。</p><hr /><h3><a name="lua_setmetatable"><code>lua_setmetatable</code></a></h3><p>
+<span class="apii">[-1, +0, –]</span>
+</p><pre>int lua_setmetatable (lua_State *L, int index);</pre>
+
+<p>スタックからテーブルまたは<b>nil</b>をポップし、その値を、指定されたインデックスの値の新しいメタテーブルとして設定します（<b>nil</b>はメタテーブルがないことを意味します）。</p><p>（歴史的な理由から、この関数は<code>int</code>を返しますが、現在は常に1です。）</p><hr /><h3><a name="lua_settable"><code>lua_settable</code></a></h3><p>
+<span class="apii">[-2, +0, <em>e</em>]</span>
+</p><pre>void lua_settable (lua_State *L, int index);</pre>
+
+<p><code>t[k] = v</code>と同等の処理を行います。ここで、<code>t</code>は与えられたインデックスの値、<code>v</code>はスタックの一番上の値、<code>k</code>は一番上の値のすぐ下の値です。</p><p>この関数は、キーと値の両方をスタックからポップします。 Luaの場合と同様に、この関数は「newindex」イベントのメタメソッドをトリガーする可能性があります（<a href="#2.4">§2.4</a>を参照）。</p><hr /><h3><a name="lua_settop"><code>lua_settop</code></a></h3><p>
+<span class="apii">[-?, +?, <em>e</em>]</span>
+</p><pre>void lua_settop (lua_State *L, int index);</pre>
+
+<p>任意のインデックス、または0を受け入れ、スタックの一番上をこのインデックスに設定します。新しい一番上が古いものよりも大きい場合、新しい要素は<b>nil</b>で埋められます。<code>index</code>が0の場合、すべてのスタック要素が削除されます。</p><p>この関数は、スタックから閉じられるとマークされたインデックスを削除するときに、任意のコードを実行できます。</p><hr /><h3><a name="lua_setwarnf"><code>lua_setwarnf</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>void lua_setwarnf (lua_State *L, lua_WarnFunction f, void *ud);</pre>
+
+<p>Luaが警告を発行するために使用する警告関数を設定します（<a href="#lua_WarnFunction"><code>lua_WarnFunction</code></a>を参照）。<code>ud</code>パラメータは、警告関数に渡される値<code>ud</code>を設定します。</p><hr /><h3><a name="lua_State"><code>lua_State</code></a></h3>
+<pre>typedef struct lua_State lua_State;</pre>
+
+<p>スレッド、および（スレッドを介して間接的に）Luaインタープリターの全体の状態を指す不透明な構造体。 Luaライブラリは完全に再入可能です。グローバル変数はありません。ステートに関するすべての情報は、この構造体を介してアクセスできます。</p><p>この構造体へのポインタは、Luaステートを最初から作成する<a href="#lua_newstate"><code>lua_newstate</code></a>を除く、ライブラリ内のすべての関数への最初の引数として渡す必要があります。</p><hr /><h3><a name="lua_status"><code>lua_status</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>int lua_status (lua_State *L);</pre>
+
+<p>スレッド<code>L</code>のステータスを返します。</p><p>ステータスは、通常のスレッドの場合は<a href="#pdf-LUA_OK"><code>LUA_OK</code></a>、スレッドがエラーで<a href="#lua_resume"><code>lua_resume</code></a>の実行を終了した場合はエラーコード、スレッドが中断されている場合は<a href="#pdf-LUA_YIELD"><code>LUA_YIELD</code></a>になります。</p><p><a href="#pdf-LUA_OK"><code>LUA_OK</code></a>ステータスのスレッドでのみ関数を呼び出すことができます。<a href="#pdf-LUA_OK"><code>LUA_OK</code></a>（新しいコルーチンを開始する）または<a href="#pdf-LUA_YIELD"><code>LUA_YIELD</code></a>（コルーチンを再開する）ステータスのスレッドを再開できます。</p><hr /><h3><a name="lua_stringtonumber"><code>lua_stringtonumber</code></a></h3><p>
+<span class="apii">[-0, +1, –]</span>
+</p><pre>size_t lua_stringtonumber (lua_State *L, const char *s);</pre>
+
+<p>ゼロ終端文字列<code>s</code>を数値に変換し、その数値をスタックにプッシュし、文字列の合計サイズ、つまりその長さ+1を返します。変換は、Luaの字句規則に従って、整数または浮動小数点数になる場合があります（<a href="#3.1">§3.1</a>を参照）。文字列には、先頭と末尾の空白と符号が含まれている場合があります。文字列が有効な数値でない場合は、0を返し、何もプッシュしません（結果はブール値として使用でき、変換が成功した場合はtrueになります）。</p><hr /><h3><a name="lua_toboolean"><code>lua_toboolean</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>int lua_toboolean (lua_State *L, int index);</pre>
+
+<p>与えられたインデックスにあるLua値をCのブール値（0または1）に変換します。 Luaのすべてのテストと同様に、<a href="#lua_toboolean"><code>lua_toboolean</code></a>は、<b>false</b>および<b>nil</b>とは異なるLua値に対してtrueを返し、それ以外の場合はfalseを返します。（実際のブール値のみを受け入れる場合は、<a href="#lua_isboolean"><code>lua_isboolean</code></a>を使用して値の型をテストします。）</p><hr /><h3><a name="lua_tocfunction"><code>lua_tocfunction</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>lua_CFunction lua_tocfunction (lua_State *L, int index);</pre>
+
+<p>与えられたインデックスの値C関数に変換します。その値はC関数である必要があります。それ以外の場合は、<code>NULL</code>を返します。</p><hr /><h3><a name="lua_toclose"><code>lua_toclose</code></a></h3><p>
+<span class="apii">[-0, +0, <em>m</em>]</span>
+</p><pre>void lua_toclose (lua_State *L, int index);</pre>
+
+<p>スタックの指定されたインデックスを、閉じられるスロットとしてマークします（<a href="#3.3.8">§3.3.8</a>を参照）。 Luaの閉じられる変数と同様に、スタックのそのスロットの値は、スコープ外になると閉じられます。ここで、C関数のコンテキストでは、スコープ外になるとは、実行中の関数がLuaに戻るか、エラーが発生するか、<a href="#lua_settop"><code>lua_settop</code></a>または<a href="#lua_pop"><code>lua_pop</code></a>を使用してスロットがスタックから削除されるか、<a href="#lua_closeslot"><code>lua_closeslot</code></a>が呼び出されることを意味します。閉じられるとマークされたスロットは、<a href="#lua_closeslot"><code>lua_closeslot</code></a>によって事前に非アクティブ化されない限り、<a href="#lua_settop"><code>lua_settop</code></a>または<a href="#lua_pop"><code>lua_pop</code></a>以外のAPIの他の関数によってスタックから削除しないでください。</p><p>この関数は、アクティブな閉じられるスロットと同じか下にあるインデックスに対して呼び出さないでください。</p><p>エラーの場合も通常の戻りの場合も、<code>__close</code>メタメソッドが実行されるまでに、Cスタックはすでに巻き戻されているため、呼び出し関数で宣言された自動C変数（例：バッファ）はスコープ外になることに注意してください。</p><hr /><h3><a name="lua_tointeger"><code>lua_tointeger</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>lua_Integer lua_tointeger (lua_State *L, int index);</pre>
+
+<p><code>isnum</code>が<code>NULL</code>に等しい<a href="#lua_tointegerx"><code>lua_tointegerx</code></a>と同等です。</p><hr /><h3><a name="lua_tointegerx"><code>lua_tointegerx</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>lua_Integer lua_tointegerx (lua_State *L, int index, int *isnum);</pre>
+
+<p>指定されたインデックスにある Lua の値を、符号付き整数型 <a href="#lua_Integer"><code>lua_Integer</code></a> に変換します。Lua の値は整数であるか、整数に変換可能な数値または文字列である必要があります（<a href="#3.4.3">§3.4.3</a>を参照）。それ以外の場合、<code>lua_tointegerx</code> は 0 を返します。</p><p><code>isnum</code> が <code>NULL</code> でない場合、操作が成功したかどうかを示すブール値が、その参照先に代入されます。</p><hr /><h3><a name="lua_tolstring"><code>lua_tolstring</code></a></h3><p>
+<span class="apii">[-0, +0, <em>m</em>]</span>
+</p><pre>const char *lua_tolstring (lua_State *L, int index, size_t *len);</pre>
+
+<p>指定されたインデックスにある Lua の値を C 文字列に変換します。<code>len</code> が <code>NULL</code> でない場合、<code>*len</code> に文字列の長さが設定されます。Lua の値は文字列または数値である必要があります。それ以外の場合、関数は <code>NULL</code> を返します。値が数値の場合、<code>lua_tolstring</code> は<em>スタック内の実際の値も文字列に変更します</em>。（この変更は、テーブルトラバース中に <code>lua_tolstring</code> がキーに適用されると、<a href="#lua_next"><code>lua_next</code></a> を混乱させます。）</p><p>
+<code>lua_tolstring</code> は Lua の状態内の文字列へのポインタを返します（<a href="#4.1.3">§4.1.3</a>を参照）。この文字列は常に最後の文字の後にゼロ ('<code>\0</code>') がありますが（C のように）、本体には他のゼロを含めることができます。</p><hr /><h3><a name="lua_tonumber"><code>lua_tonumber</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>lua_Number lua_tonumber (lua_State *L, int index);</pre>
+
+<p><code>isnum</code> が <code>NULL</code> である <a href="#lua_tonumberx"><code>lua_tonumberx</code></a> と同等です。</p><hr /><h3><a name="lua_tonumberx"><code>lua_tonumberx</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>lua_Number lua_tonumberx (lua_State *L, int index, int *isnum);</pre>
+
+<p>指定されたインデックスにある Lua の値を C 型 <a href="#lua_Number"><code>lua_Number</code></a> に変換します（<a href="#lua_Number"><code>lua_Number</code></a>を参照）。Lua の値は数値であるか、数値に変換可能な文字列である必要があります（<a href="#3.4.3">§3.4.3</a>を参照）。それ以外の場合、<a href="#lua_tonumberx"><code>lua_tonumberx</code></a> は 0 を返します。</p><p><code>isnum</code> が <code>NULL</code> でない場合、操作が成功したかどうかを示すブール値が、その参照先に代入されます。</p><hr /><h3><a name="lua_topointer"><code>lua_topointer</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>const void *lua_topointer (lua_State *L, int index);</pre>
+
+<p>指定されたインデックスにある値を汎用 C ポインタ (<code>void*</code>) に変換します。値は userdata、テーブル、スレッド、文字列、または関数である可能性があります。それ以外の場合、<code>lua_topointer</code> は <code>NULL</code> を返します。異なるオブジェクトは異なるポインタを提供します。ポインタを元の値に戻す方法はありません。</p><p>通常、この関数はハッシュとデバッグ情報にのみ使用されます。</p><hr /><h3><a name="lua_tostring"><code>lua_tostring</code></a></h3><p>
+<span class="apii">[-0, +0, <em>m</em>]</span>
+</p><pre>const char *lua_tostring (lua_State *L, int index);</pre>
+
+<p><code>len</code> が <code>NULL</code> である <a href="#lua_tolstring"><code>lua_tolstring</code></a> と同等です。</p><hr /><h3><a name="lua_tothread"><code>lua_tothread</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>lua_State *lua_tothread (lua_State *L, int index);</pre>
+
+<p>指定されたインデックスにある値を Lua スレッド (<code>lua_State*</code> として表現) に変換します。この値はスレッドである必要があります。それ以外の場合、関数は <code>NULL</code> を返します。</p><hr /><h3><a name="lua_touserdata"><code>lua_touserdata</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>void *lua_touserdata (lua_State *L, int index);</pre>
+
+<p>指定されたインデックスの値が完全な userdata の場合、そのメモリーブロックアドレスを返します。値が light userdata の場合、その値 (ポインタ) を返します。それ以外の場合は、<code>NULL</code> を返します。</p><hr /><h3><a name="lua_type"><code>lua_type</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>int lua_type (lua_State *L, int index);</pre>
+
+<p>指定された有効なインデックスにある値の型を返します。または、無効ではあるが許容可能なインデックスの場合は <code>LUA_TNONE</code> を返します。<a href="#lua_type"><code>lua_type</code></a> によって返される型は、<code>lua.h</code> で定義された次の定数によってコード化されます。 <a name="pdf-LUA_TNIL"><code>LUA_TNIL</code></a>, <a name="pdf-LUA_TNUMBER"><code>LUA_TNUMBER</code></a>, <a name="pdf-LUA_TBOOLEAN"><code>LUA_TBOOLEAN</code></a>, <a name="pdf-LUA_TSTRING"><code>LUA_TSTRING</code></a>, <a name="pdf-LUA_TTABLE"><code>LUA_TTABLE</code></a>, <a name="pdf-LUA_TFUNCTION"><code>LUA_TFUNCTION</code></a>, <a name="pdf-LUA_TUSERDATA"><code>LUA_TUSERDATA</code></a>, <a name="pdf-LUA_TTHREAD"><code>LUA_TTHREAD</code></a>, および <a name="pdf-LUA_TLIGHTUSERDATA"><code>LUA_TLIGHTUSERDATA</code></a>。</p><hr /><h3><a name="lua_typename"><code>lua_typename</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>const char *lua_typename (lua_State *L, int tp);</pre>
+
+<p><a href="#lua_type"><code>lua_type</code></a> によって返された値のいずれかである必要がある値 <code>tp</code> によってエンコードされた型の名前を返します。</p><hr /><h3><a name="lua_Unsigned"><code>lua_Unsigned</code></a></h3>
+<pre>typedef ... lua_Unsigned;</pre>
+
+<p><a href="#lua_Integer"><code>lua_Integer</code></a> の符号なしバージョン。</p><hr /><h3><a name="lua_upvalueindex"><code>lua_upvalueindex</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>int lua_upvalueindex (int i);</pre>
+
+<p>実行中の関数の <code>i</code> 番目のアップバリューを表す疑似インデックスを返します（<a href="#4.2">§4.2</a>を参照）。<code>i</code> は <em>[1,256]</em> の範囲内である必要があります。</p><hr /><h3><a name="lua_version"><code>lua_version</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>lua_Number lua_version (lua_State *L);</pre>
+
+<p>このコアのバージョン番号を返します。</p><hr /><h3><a name="lua_WarnFunction"><code>lua_WarnFunction</code></a></h3>
+<pre>typedef void (*lua_WarnFunction) (void *ud, const char *msg, int tocont);</pre>
+
+<p>Lua によって警告を生成するために呼び出される警告関数の型です。最初のパラメータは、<a href="#lua_setwarnf"><code>lua_setwarnf</code></a> によって設定された不透明なポインタです。2番目のパラメータは警告メッセージです。3番目のパラメータは、メッセージを次の呼び出しのメッセージで継続する必要があるかどうかを示すブール値です。</p><p>警告の詳細については、<a href="#pdf-warn"><code>warn</code></a> を参照してください。</p><hr /><h3><a name="lua_warning"><code>lua_warning</code></a></h3><p>
+<span class="apii">[-0, +0, –]</span>
+</p><pre>void lua_warning (lua_State *L, const char *msg, int tocont);</pre>
+
+<p>指定されたメッセージで警告を発行します。<code>tocont</code> が true の呼び出しでのメッセージは、この関数の別の呼び出しで継続する必要があります。</p><p>警告の詳細については、<a href="#pdf-warn"><code>warn</code></a> を参照してください。</p><hr /><h3><a name="lua_Writer"><code>lua_Writer</code></a></h3>
+<pre>typedef int (*lua_Writer) (lua_State *L,
+                           const void* p,
+                           size_t sz,
+                           void* ud);</pre>
+
+<p><a href="#lua_dump"><code>lua_dump</code></a> によって使用されるライター関数の型です。<a href="#lua_dump"><code>lua_dump</code></a> がチャンクの別の部分を生成するたびに、ライターを呼び出し、書き込まれるバッファ (<code>p</code>)、そのサイズ (<code>sz</code>)、および <a href="#lua_dump"><code>lua_dump</code></a> に提供された <code>ud</code> パラメータを渡します。</p><p>ライターはエラーコードを返します。0 はエラーがないことを意味します。それ以外の値はエラーを意味し、<a href="#lua_dump"><code>lua_dump</code></a> がライターを再度呼び出すのを停止します。</p><hr /><h3><a name="lua_xmove"><code>lua_xmove</code></a></h3><p>
+<span class="apii">[-?, +?, –]</span>
+</p><pre>void lua_xmove (lua_State *from, lua_State *to, int n);</pre>
+
+<p>同じ状態の異なるスレッド間で値を交換します。</p><p>この関数は、スタック <code>from</code> から <code>n</code> 個の値をポップし、スタック <code>to</code> にプッシュします。</p><hr /><h3><a name="lua_yield"><code>lua_yield</code></a></h3><p>
+<span class="apii">[-?, +?, <em>v</em>]</span>
+</p><pre>int lua_yield (lua_State *L, int nresults);</pre>
+
+<p>この関数は <a href="#lua_yieldk"><code>lua_yieldk</code></a> と同等ですが、継続がありません (<a href="#4.5">§4.5</a> を参照)。したがって、スレッドが再開されると、<code>lua_yield</code> を呼び出す関数を呼び出した関数が続行されます。予期しない事態を避けるために、この関数は末尾呼び出しでのみ呼び出す必要があります。</p><hr /><h3><a name="lua_yieldk"><code>lua_yieldk</code></a></h3><p>
+<span class="apii">[-?, +?, <em>v</em>]</span>
+</p><pre>int lua_yieldk (lua_State *L,
+                int nresults,
+                lua_KContext ctx,
+                lua_KFunction k);</pre>
+
+<p>コルーチン（スレッド）を譲ります。</p><p>C 関数が <a href="#lua_yieldk"><code>lua_yieldk</code></a> を呼び出すと、実行中のコルーチンはその実行を中断し、このコルーチンを開始した <a href="#lua_resume"><code>lua_resume</code></a> の呼び出しが戻ります。パラメータ <code>nresults</code> は、<a href="#lua_resume"><code>lua_resume</code></a> の結果として渡されるスタックからの値の数です。</p><p>コルーチンが再び再開されると、Lua は与えられた継続関数 <code>k</code> を呼び出して、譲った C 関数の実行を継続します (<a href="#4.5">§4.5</a> を参照)。この継続関数は、前の関数と同じスタックを、<code>n</code> 個の結果を削除し、<a href="#lua_resume"><code>lua_resume</code></a> に渡された引数に置き換えて受け取ります。さらに、継続関数は、<a href="#lua_yieldk"><code>lua_yieldk</code></a> に渡された値 <code>ctx</code> を受け取ります。</p><p>通常、この関数は戻りません。コルーチンが最終的に再開すると、継続関数の実行を続行します。ただし、1つの特別なケースがあります。それは、この関数がラインまたはカウントフックの中から呼び出された場合です（<a href="#4.7">§4.7</a> を参照）。その場合、<code>lua_yieldk</code> は継続なしで（おそらく <a href="#lua_yield"><code>lua_yield</code></a> の形式で）および結果なしで呼び出す必要があり、フックは呼び出し後すぐに戻る必要があります。Lua は譲り、コルーチンが再び再開すると、フックをトリガーした (Lua) 関数の通常の実行を続行します。</p><p>継続関数を持たない保留中の C 呼び出しがあるスレッド（<em>C 呼び出し境界</em>と呼ばれる）から呼び出された場合、または再開内で実行されていないスレッド（通常はメインスレッド）から呼び出された場合、この関数はエラーを発生させる可能性があります。</p>
+</body>
+</html>

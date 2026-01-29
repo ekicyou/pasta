@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lua 5.5 - Section 6.4</title>
+</head>
+<body>
+<h2>6.4 – <a name="6.4">文字列操作</a></h2>
+
+
+
+<p>このライブラリは、部分文字列の検索や抽出、パターンマッチングなど、文字列操作のための汎用関数を提供します。Luaで文字列をインデックス付けする場合、最初の文字は位置1にあります（Cのように0ではありません）。インデックスは負の値にすることもでき、文字列の末尾から後方に向かってインデックス付けされていると解釈されます。したがって、最後の文字は位置-1にあり、以下同様です。</p><p>文字列ライブラリは、テーブル<a name="pdf-string"><code>string</code></a>内にすべての関数を提供します。また、<code>__index</code>フィールドが<code>string</code>テーブルを指す文字列のメタテーブルも設定します。したがって、オブジェクト指向スタイルで文字列関数を使用できます。たとえば、<code>string.byte(s,i)</code>は<code>s:byte(i)</code>と記述できます。</p><p>文字列ライブラリは、1バイトの文字エンコードを前提としています。</p><p>
+</p><hr /><h3><a name="pdf-string.byte"><code>string.byte (s [, i [, j]])</code></a></h3>文字<code>s[i]</code>、<code>s[i+1]</code>、...、<code>s[j]</code>の内部数値コードを返します。<code>i</code>のデフォルト値は1です。<code>j</code>のデフォルト値は<code>i</code>です。これらのインデックスは、関数<a href="#pdf-string.sub"><code>string.sub</code></a>の同じルールに従って修正されます。<p>数値コードは、プラットフォーム間で必ずしも移植可能ではありません。</p><p>
+</p><hr /><h3><a name="pdf-string.char"><code>string.char (···)</code></a></h3>ゼロ個以上の整数を受け取ります。引数の数と同じ長さの文字列を返します。各文字には、対応する引数に等しい内部数値コードがあります。<p>数値コードは、プラットフォーム間で必ずしも移植可能ではありません。</p><p>
+</p><hr /><h3><a name="pdf-string.dump"><code>string.dump (function [, strip])</code></a></h3>
+
+
+<p>指定された関数のバイナリ表現（<em>バイナリチャンク</em>）を含む文字列を返します。これにより、この文字列の後の<a href="#pdf-load"><code>load</code></a>は、関数のコピー（ただし、新しいアップ値付き）を返します。<code>strip</code>が真の値である場合、バイナリ表現には、スペースを節約するために、関数に関するすべてのデバッグ情報が含まれない場合があります。</p><p>アップ値を持つ関数には、アップ値の数のみが保存されます。ロード（再ロード）されると、これらのアップ値は新しいインスタンスを受け取ります。（これらのアップ値がどのように初期化されるかについての詳細は、<a href="#pdf-load"><code>load</code></a>関数を参照してください。デバッグライブラリを使用して、必要に応じて関数のアップ値をシリアル化および再ロードできます。）</p><p>
+</p><hr /><h3><a name="pdf-string.find"><code>string.find (s, pattern [, init [, plain]])</code></a></h3>
+
+
+<p>文字列<code>s</code>内の<code>pattern</code>（<a href="#6.4.1">§6.4.1</a>を参照）の最初のマッチを検索します。マッチが見つかった場合、<code>find</code>はこの出現の開始と終了の<code>s</code>のインデックスを返します。それ以外の場合は、<b>fail</b>を返します。3番目のオプションの数値引数<code>init</code>は、検索を開始する場所を指定します。デフォルト値は1であり、負の値にすることができます。4番目のオプションの引数<code>plain</code>として<b>true</b>を指定すると、パターンマッチング機能が無効になり、関数は<code>pattern</code>内の文字がマジックと見なされない、プレーンな「部分文字列の検索」操作を実行します。</p><p>パターンにキャプチャがある場合、マッチが成功すると、キャプチャされた値も2つのインデックスの後ろに返されます。</p><p>
+</p><hr /><h3><a name="pdf-string.format"><code>string.format (formatstring, ···)</code></a></h3>
+
+
+<p>最初の引数（文字列である必要があります）に指定された説明に従って、可変数の引数の書式設定されたバージョンを返します。フォーマット文字列は、ISO&nbsp;C関数<code>sprintf</code>と同じルールに従います。唯一の違いは、変換指定子と修飾子<code>F</code>、<code>n</code>、<code>*</code>、<code>h</code>、<code>L</code>、および<code>l</code>がサポートされておらず、追加の指定子<code>q</code>があることです。幅と精度は、存在する場合、どちらも2桁に制限されます。</p><p>指定子<code>q</code>は、ブール値、nil、数値、および文字列を、結果がLuaソースコードで有効な定数になるようにフォーマットします。ブール値とnilは、明白な方法（<code>true</code>、<code>false</code>、<code>nil</code>）で記述されます。浮動小数点数は、完全な精度を維持するために16進数で記述されます。文字列は二重引用符で囲まれ、必要に応じてエスケープシーケンスを使用して、Luaインタープリターで安全に読み戻せるようにします。たとえば、呼び出し</p><pre>     string.format('%q', 'a string with "quotes" and \n new line')
+</pre><p>は、文字列を生成する可能性があります</p><pre>     "a string with \"quotes\" and \
+      new line"
+</pre><p>この指定子は、修飾子（フラグ、幅、精度）をサポートしていません。</p><p>変換指定子<code>A</code>、<code>a</code>、<code>E</code>、<code>e</code>、<code>f</code>、<code>G</code>、および<code>g</code>はすべて、引数として数値を予期します。指定子<code>c</code>、<code>d</code>、<code>i</code>、<code>o</code>、<code>u</code>、<code>X</code>、および<code>x</code>は、整数を予期します。LuaがC89コンパイラーでコンパイルされている場合、指定子<code>A</code>および<code>a</code>（16進浮動小数点）は修飾子をサポートしません。</p><p>指定子<code>s</code>は文字列を予期します。引数が文字列でない場合は、<a href="#pdf-tostring"><code>tostring</code></a>の同じルールに従って文字列に変換されます。指定子に修飾子がある場合、対応する文字列引数に埋め込まれたゼロを含めることはできません。</p><p>指定子<code>p</code>は、<a href="#lua_topointer"><code>lua_topointer</code></a>によって返されるポインターを書式設定します。これにより、テーブル、userdata、スレッド、文字列、および関数の一意の文字列識別子が与えられます。他の値（数値、nil、ブール値）の場合、この指定子はポインター<code>NULL</code>を表す文字列になります。</p><p>
+</p><hr /><h3><a name="pdf-string.gmatch"><code>string.gmatch (s, pattern [, init])</code></a></h3>呼び出されるたびに、文字列<code>s</code>を対象とした<code>pattern</code>（<a href="#6.4.1">§6.4.1</a>を参照）からの次のキャプチャを返すイテレータ関数を返します。<code>pattern</code>がキャプチャを指定しない場合、各呼び出しでマッチ全体が生成されます。3番目のオプションの数値引数<code>init</code>は、検索を開始する場所を指定します。デフォルト値は1であり、負の値にすることができます。<p>例として、次のループは、文字列<code>s</code>のすべての単語を反復処理し、1行に1つずつ出力します。</p><pre>     s = "hello world from Lua"
+     for w in string.gmatch(s, "%a+") do
+       print(w)
+     end
+</pre><p>次の例では、指定された文字列からすべての<code>key=value</code>ペアをテーブルに収集します</p><pre>     t = {}
+     s = "from=world, to=Lua"
+     for k, v in string.gmatch(s, "(%w+)=(%w+)") do
+       t[k] = v
+     end
+</pre>
+
+<p>この関数では、パターンの先頭にあるキャレット '<code>^</code>'はアンカーとして機能しません。これは反復処理を妨げるためです。</p><p>
+</p><hr /><h3><a name="pdf-string.gsub"><code>string.gsub (s, pattern, repl [, n])</code></a></h3><code>s</code>のコピーを返します。その中で、<code>pattern</code>（<a href="#6.4.1">§6.4.1</a>を参照）のすべて（または指定された場合は最初の<code>n</code>）の出現が、<code>repl</code>で指定された置換文字列に置き換えられています。<code>repl</code>は、文字列、テーブル、または関数にすることができます。<code>gsub</code>はまた、2番目の値として、発生したマッチの合計数も返します。<code>gsub</code>という名前は、<em>Global SUBstitution</em>から来ています。<p><code>repl</code>が文字列の場合、その値は置換に使用されます。文字&nbsp;<code>%</code>はエスケープ文字として機能します。<code>repl</code>内の<code>%<em>d</em></code>形式のシーケンス（<em>d</em>は1から9の間）は、<em>d</em>番目のキャプチャされた部分文字列の値を表します。シーケンス<code>%0</code>は、マッチ全体を表します。シーケンス<code>%%</code>は、単一の&nbsp;<code>%</code>を表します。</p><p><code>repl</code>がテーブルの場合、テーブルは、最初のキャプチャをキーとして使用して、すべてのマッチに対してクエリされます。</p><p><code>repl</code>が関数の場合、この関数は、マッチが発生するたびに、キャプチャされたすべての部分文字列を引数として渡して呼び出されます。</p><p>いずれの場合も、パターンがキャプチャを指定しない場合は、パターン全体がキャプチャ内にあるかのように動作します。</p><p>テーブルクエリまたは関数呼び出しによって返される値が文字列または数値の場合、置換文字列として使用されます。それ以外の場合、<b>false</b>または<b>nil</b>の場合、置換はありません（つまり、元のマッチは文字列に保持されます）。</p><p>以下に例をいくつか示します</p><pre>     x = string.gsub("hello world", "(%w+)", "%1 %1")
+     --&gt; x="hello hello world world"
+     
+     x = string.gsub("hello world", "%w+", "%0 %0", 1)
+     --&gt; x="hello hello world"
+     
+     x = string.gsub("hello world from Lua", "(%w+)%s*(%w+)", "%2 %1")
+     --&gt; x="world hello Lua from"
+     
+     x = string.gsub("home = $HOME, user = $USER", "%$(%w+)", os.getenv)
+     --&gt; x="home = /home/roberto, user = roberto"
+     
+     x = string.gsub("4+5 = $return 4+5$", "%$(.-)%$", function (s)
+           return load(s)()
+         end)
+     --&gt; x="4+5 = 9"
+     
+     local t = {name="lua", version="5.4"}
+     x = string.gsub("$name-$version.tar.gz", "%$(%w+)", t)
+     --&gt; x="lua-5.4.tar.gz"
+</pre>
+
+
+
+<p>
+</p><hr /><h3><a name="pdf-string.len"><code>string.len (s)</code></a></h3>
+
+
+<p>文字列を受け取り、その長さを返します。空の文字列<code>""</code>の長さは0です。埋め込まれたゼロがカウントされるため、<code>"a\000bc\000"</code>の長さは5です。</p><p>
+</p><hr /><h3><a name="pdf-string.lower"><code>string.lower (s)</code></a></h3>
+
+
+<p>文字列を受け取り、すべてのuppercaseの文字がlowercaseに変更された、この文字列のコピーを返します。他のすべての文字は変更されません。uppercaseの文字の定義は、現在のロケールに依存します。</p><p>
+</p><hr /><h3><a name="pdf-string.match"><code>string.match (s, pattern [, init])</code></a></h3>
+
+
+<p>文字列<code>s</code>の中で、<code>pattern</code>（<a href="#6.4.1">§6.4.1</a>を参照）に最初に<em>マッチ</em>する箇所を探します。マッチするものが見つかった場合、<code>match</code>はパターンからのキャプチャを返します。それ以外の場合は<b>fail</b>を返します。<code>pattern</code>がキャプチャを指定しない場合は、マッチ全体が返されます。3番目のオプションの数値引数<code>init</code>は、検索を開始する位置を指定します。デフォルト値は1で、負の値も指定できます。</p><p>
+</p><hr /><h3><a name="pdf-string.pack"><code>string.pack (fmt, v1, v2, ···)</code></a></h3>
+
+
+<p>フォーマット文字列<code>fmt</code>（<a href="#6.4.2">§6.4.2</a>を参照）に従って、バイナリ形式でシリアライズ（パック）された値<code>v1</code>、<code>v2</code>などを含むバイナリ文字列を返します。</p><p>
+</p><hr /><h3><a name="pdf-string.packsize"><code>string.packsize (fmt)</code></a></h3>
+
+
+<p><a href="#pdf-string.pack"><code>string.pack</code></a>を、与えられたフォーマットで実行した場合の結果の文字列の長さを返します。フォーマット文字列は、可変長オプションである'<code>s</code>'または'<code>z</code>'を持つことはできません（<a href="#6.4.2">§6.4.2</a>を参照）。</p><p>
+</p><hr /><h3><a name="pdf-string.rep"><code>string.rep (s, n [, sep])</code></a></h3>
+
+
+<p>文字列<code>s</code>を<code>n</code>回コピーし、文字列<code>sep</code>で区切って連結した文字列を返します。<code>sep</code>のデフォルト値は空文字列です（つまり、区切り文字なし）。<code>n</code>が正でない場合は、空文字列を返します。</p><p>（この関数を1回呼び出すだけで、マシンのメモリを使い果たしてしまう可能性があることに注意してください。）</p><p>
+</p><hr /><h3><a name="pdf-string.reverse"><code>string.reverse (s)</code></a></h3>
+
+
+<p>文字列<code>s</code>を反転させた文字列を返します。</p><p>
+</p><hr /><h3><a name="pdf-string.sub"><code>string.sub (s, i [, j])</code></a></h3>
+
+
+<p><code>i</code>から始まり<code>j</code>まで続く、<code>s</code>の部分文字列を返します。<code>i</code>と<code>j</code>は負の値を取ることができます。<code>j</code>が省略された場合、-1（文字列の長さと同じ）とみなされます。特に、<code>string.sub(s,1,j)</code>の呼び出しは、長さ<code>j</code>の<code>s</code>の接頭辞を返し、<code>string.sub(s, -i)</code>（正の<code>i</code>の場合）は、長さ<code>i</code>の<code>s</code>の接尾辞を返します。</p><p>負のインデックスの変換後、<code>i</code>が1未満の場合は1に修正されます。<code>j</code>が文字列の長さよりも大きい場合は、文字列の長さに修正されます。これらの修正後、<code>i</code>が<code>j</code>よりも大きい場合、関数は空文字列を返します。</p><p>
+</p><hr /><h3><a name="pdf-string.unpack"><code>string.unpack (fmt, s [, pos])</code></a></h3>
+
+
+<p>フォーマット文字列<code>fmt</code>（<a href="#6.4.2">§6.4.2</a>を参照）に従って、文字列<code>s</code>にパックされた値（<a href="#pdf-string.pack"><code>string.pack</code></a>を参照）を返します。オプションの<code>pos</code>は、<code>s</code>の読み取りを開始する位置を示します（デフォルトは1）。読み取られた値の後、この関数は<code>s</code>内で最初に読み取られていないバイトのインデックスも返します。</p><p>
+</p><hr /><h3><a name="pdf-string.upper"><code>string.upper (s)</code></a></h3>
+
+
+<p>文字列を受け取り、この文字列のすべての小文字を大文字に変更したコピーを返します。他のすべての文字は変更されません。小文字の定義は、現在のロケールによって異なります。</p><h3>6.4.1 – <a name="6.4.1">パターン</a></h3>
+
+
+
+<p>Luaのパターンは、正規の文字列で記述され、パターンマッチング関数である<a href="#pdf-string.find"><code>string.find</code></a>、<a href="#pdf-string.gmatch"><code>string.gmatch</code></a>、<a href="#pdf-string.gsub"><code>string.gsub</code></a>、および<a href="#pdf-string.match"><code>string.match</code></a>によってパターンとして解釈されます。このセクションでは、これらの文字列の構文と意味（つまり、何にマッチするか）について説明します。</p><h4>文字クラス</h4><p><em>文字クラス</em>は、文字の集合を表すために使用されます。文字クラスを記述する際には、以下の組み合わせが許可されています。</p><ul>
+
+<li><b><em>x</em>: </b>（<em>x</em>が<em>マジック文字</em>である<code>^$()%.[]*+-?</code>のいずれでもない場合）文字<em>x</em>自体を表します。</li>
+
+<li><b><code>.</code>: </b>（ドット）はすべての文字を表します。</li>
+
+<li><b><code>%a</code>: </b>はすべてのアルファベット文字を表します。</li>
+
+<li><b><code>%c</code>: </b>はすべての制御文字を表します。</li>
+
+<li><b><code>%d</code>: </b>はすべての数字を表します。</li>
+
+<li><b><code>%g</code>: </b>はスペースを除くすべての印刷可能な文字を表します。</li>
+
+<li><b><code>%l</code>: </b>はすべての小文字を表します。</li>
+
+<li><b><code>%p</code>: </b>はすべての句読点を表します。</li>
+
+<li><b><code>%s</code>: </b>はすべての空白文字を表します。</li>
+
+<li><b><code>%u</code>: </b>はすべての大文字を表します。</li>
+
+<li><b><code>%w</code>: </b>はすべての英数字を表します。</li>
+
+<li><b><code>%x</code>: </b>はすべての16進数を表します。</li>
+
+<li><b><code>%<em>x</em></code>: </b>（<em>x</em>が任意の非英数字の場合）文字<em>x</em>を表します。これは、マジック文字をエスケープする標準的な方法です。任意の非英数字（すべての句読点文字、さらには非マジック文字も含む）の前に '<code>%</code>' を付けて、パターン内でそれ自体を表すことができます。</li>
+
+<li><b><code>[<em>set</em>]</code>: </b>は、<em>set</em>内のすべての文字の和集合であるクラスを表します。文字の範囲は、範囲の終端文字を昇順で '<code>-</code>' で区切って指定できます。上記で説明したすべてのクラス<code>%</code><em>x</em>も、<em>set</em>内のコンポーネントとして使用できます。<em>set</em>内の他のすべての文字は、それ自体を表します。たとえば、<code>[%w_]</code>（または<code>[_%w]</code>）はすべての英数字とアンダースコアを表し、<code>[0-7]</code>は8進数を表し、<code>[0-7%l%-]</code>は8進数と小文字と '<code>-</code>' 文字を表します。<p>セット内に閉じ角括弧を配置するには、セット内の最初の文字として配置します。セット内にハイフンを配置するには、セット内の最初または最後の文字として配置します。（両方の場合にエスケープを使用することもできます。）</p><p>範囲とクラスの間の相互作用は定義されていません。したがって、<code>[%a-z]</code>や<code>[a-%%]</code>のようなパターンには意味がありません。</p></li>
+
+<li><b><code>[^<em>set</em>]</code>: </b>は、<em>set</em>の補数を表します。ここで、<em>set</em>は上記のように解釈されます。</li>
+
+</ul><p>単一の文字で表されるすべてのクラス（<code>%a</code>、<code>%c</code>など）の場合、対応する大文字はクラスの補数を表します。たとえば、<code>%S</code>は空白以外のすべての文字を表します。</p><p>文字、スペース、その他の文字グループの定義は、現在のロケールによって異なります。特に、クラス<code>[a-z]</code>は<code>%l</code>と等価ではない場合があります。</p><h4>パターン項目</h4><p><em>パターン項目</em>は次のいずれかです。</p><ul>
+
+<li>単一の文字クラス。クラス内の任意の単一の文字にマッチします。</li>
+
+<li>単一の文字クラスの後に '<code>*</code>' が続く場合。クラス内のゼロ個以上の文字のシーケンスにマッチします。これらの繰り返し項目は、常に可能な限り最長のシーケンスにマッチします。</li>
+
+<li>単一の文字クラスの後に '<code>+</code>' が続く場合。クラス内の1つ以上の文字のシーケンスにマッチします。これらの繰り返し項目は、常に可能な限り最長のシーケンスにマッチします。</li>
+
+<li>単一の文字クラスの後に '<code>-</code>' が続く場合。これも、クラス内のゼロ個以上の文字のシーケンスにマッチします。 '<code>*</code>' とは異なり、これらの繰り返し項目は、常に可能な限り最短のシーケンスにマッチします。</li>
+
+<li>単一の文字クラスの後に '<code>?</code>' が続く場合。クラス内の文字のゼロ個または1個の出現にマッチします。可能な場合は常に1つの出現にマッチします。</li>
+
+<li>
+<code>%<em>n</em></code>（<em>n</em>は1から9の間）。このような項目は、<em>n</em>番目のキャプチャされた文字列と等しい部分文字列にマッチします（以下を参照）。</li>
+
+<li>
+<code>%b<em>xy</em></code>。ここで、<em>x</em>と<em>y</em>は2つの異なる文字です。このような項目は、<em>x</em>で始まり、<em>y</em>で終わり、<em>x</em>と<em>y</em>が<em>バランス</em>している文字列にマッチします。これは、文字列を左から右に読み、<em>x</em>の場合は<em>+1</em>、<em>y</em>の場合は<em>-1</em>を数えた場合、最後の<em>y</em>はカウントが0に達する最初の<em>y</em>であることを意味します。たとえば、項目<code>%b()</code>は、バランスの取れた括弧を持つ式にマッチします。</li>
+
+<li>
+<code>%f[<em>set</em>]</code>。<em>フロンティアパターン</em>です。このような項目は、次の文字が<em>set</em>に属し、前の文字が<em>set</em>に属さないような任意の場所にある空文字列にマッチします。セット<em>set</em>は、上記のように解釈されます。サブジェクトの先頭と末尾は、文字 '<code>\0</code>' であるかのように処理されます。</li>
+
+</ul>
+
+
+
+
+<h4>パターン</h4><p><em>パターン</em>は、パターン項目のシーケンスです。パターンの先頭にあるキャレット '<code>^</code>' は、マッチをサブジェクト文字列の先頭に固定します。パターンの末尾にある '<code>$</code>' は、マッチをサブジェクト文字列の末尾に固定します。他の位置では、'<code>^</code>' と '<code>$</code>' は特別な意味を持たず、それ自身を表します。</p><h4>キャプチャ</h4><p>パターンには、括弧で囲まれたサブパターンを含めることができます。これらは<em>キャプチャ</em>を記述します。マッチが成功すると、キャプチャにマッチするサブジェクト文字列の部分文字列が、後で使用するために保存（<em>キャプチャ</em>）されます。キャプチャは、左括弧に従って番号が付けられます。たとえば、パターン<code>"(a*(.)%w(%s*))"</code>では、<code>"a*(.)%w(%s*)"</code>にマッチする文字列の部分が最初のキャプチャとして保存されるため、番号は1になります。 "<code>.</code>"にマッチする文字は番号2でキャプチャされ、"<code>%s*</code>"にマッチする部分は番号3でキャプチャされます。</p><p>特別なケースとして、キャプチャ<code>()</code>は現在の文字列位置（数値）をキャプチャします。たとえば、文字列<code>"flaaap"</code>にパターン<code>"()aa()"</code>を適用した場合、2つのキャプチャ（3と5）が得られます。</p><h4>複数マッチ</h4><p>関数<a href="#pdf-string.gsub"><code>string.gsub</code></a>とイテレータ<a href="#pdf-string.gmatch"><code>string.gmatch</code></a>は、サブジェクト内の指定されたパターンの複数の出現箇所にマッチします。これらの関数では、新しいマッチは、前のマッチの終了位置よりも少なくとも1バイト後で終了する場合にのみ有効と見なされます。言い換えれば、パターンマシンは、別のマッチの直後に空文字列をマッチとして受け入れることはありません。例として、次のコードの結果を考えてみましょう。</p><pre>     &gt; string.gsub("abc", "()a*()", print);
+     --&gt; 1   2
+     --&gt; 3   3
+     --&gt; 4   4
+</pre><p>2番目と3番目の結果は、Luaが '<code>b</code>' の後と '<code>c</code>' の後で空文字列にマッチしたことによるものです。Luaは '<code>a</code>' の後に空文字列をマッチさせません。なぜなら、それは前のマッチと同じ位置で終了するためです。</p><h3>6.4.2 – <a name="6.4.2">PackおよびUnpackのフォーマット文字列</a></h3>
+
+<p><a href="#pdf-string.pack"><code>string.pack</code></a>、<a href="#pdf-string.packsize"><code>string.packsize</code></a>、および<a href="#pdf-string.unpack"><code>string.unpack</code></a>の最初の引数はフォーマット文字列であり、作成または読み取られる構造のレイアウトを記述します。</p><p>フォーマット文字列は、変換オプションのシーケンスです。変換オプションは次のとおりです。</p><ul>
+<li><b><code>&lt;</code>: </b>リトルエンディアンを設定します</li>
+<li><b><code>&gt;</code>: </b>ビッグエンディアンを設定します</li>
+<li><b><code>=</code>: </b>ネイティブエンディアンを設定します</li>
+<li><b><code>![<em>n</em>]</code>: </b>最大アライメントを<code>n</code>に設定します（デフォルトはネイティブアライメント）</li>
+<li><b><code>b</code>: </b>符号付きバイト（<code>char</code>）</li>
+<li><b><code>B</code>: </b>符号なしバイト（<code>char</code>）</li>
+<li><b><code>h</code>: </b>符号付き<code>short</code>（ネイティブサイズ）</li>
+<li><b><code>H</code>: </b>符号なし<code>short</code>（ネイティブサイズ）</li>
+<li><b><code>l</code>: </b>符号付き<code>long</code>（ネイティブサイズ）</li>
+<li><b><code>L</code>: </b>符号なし<code>long</code>（ネイティブサイズ）</li>
+<li><b><code>j</code>: </b><code>lua_Integer</code></li>
+<li><b><code>J</code>: </b><code>lua_Unsigned</code></li>
+<li><b><code>T</code>: </b><code>size_t</code>（ネイティブサイズ）</li>
+<li><b><code>i[<em>n</em>]</code>: </b><code>n</code>バイトの符号付き<code>int</code>（デフォルトはネイティブサイズ）</li>
+<li><b><code>I[<em>n</em>]</code>: </b><code>n</code>バイトの符号なし<code>int</code>（デフォルトはネイティブサイズ）</li>
+<li><b><code>f</code>: </b><code>float</code>（ネイティブサイズ）</li>
+<li><b><code>d</code>: </b><code>double</code>（ネイティブサイズ）</li>
+<li><b><code>n</code>: </b><code>lua_Number</code></li>
+<li><b><code>c<em>n</em></code>: </b><code>n</code>バイトの固定長文字列</li>
+<li><b><code>z</code>: </b>ゼロ終端文字列</li>
+<li><b><code>s[<em>n</em>]</code>: </b>長さが<code>n</code>バイトの符号なし整数としてコード化された長さが前に付いた文字列（デフォルトは<code>size_t</code>）</li>
+<li><b><code>x</code>: </b>1バイトのパディング</li>
+<li><b><code>X<em>op</em></code>: </b>オプション<code>op</code>に従ってアライメントする空の項目（それ以外の場合は無視されます）</li>
+<li><b>'<code> </code>': </b>（スペース）無視されます</li>
+</ul><p>（"<code>[<em>n</em>]</code>" はオプションの整数を意味します。）パディング、スペース、および構成（オプション"<code>xX &lt;=&gt;!</code>"）を除き、各オプションは、<a href="#pdf-string.pack"><code>string.pack</code></a>の引数または<a href="#pdf-string.unpack"><code>string.unpack</code></a>の結果に対応します。</p><p>オプション "<code>!<em>n</em></code>", "<code>s<em>n</em></code>", "<code>i<em>n</em></code>", および "<code>I<em>n</em></code>" では、<code>n</code> は 1 から 16 までの任意の整数です。すべての整数オプションはオーバーフローをチェックします。 <a href="#pdf-string.pack"><code>string.pack</code></a> は、指定された値が指定されたサイズに収まるかどうかをチェックし、<a href="#pdf-string.unpack"><code>string.unpack</code></a> は、読み取った値が Lua 整数に収まるかどうかをチェックします。符号なしオプションの場合、Lua 整数も符号なしの値として扱われます。</p><p>任意のフォーマット文字列は、"<code>!1=</code>" が前に付いているかのように開始します。つまり、最大アライメントが 1（アライメントなし）で、ネイティブエンディアンで開始します。</p><p>ネイティブエンディアンは、システム全体がビッグエンディアンまたはリトルエンディアンのいずれかであると想定します。パッキング関数は、混合エンディアンフォーマットの動作を正しくエミュレートしません。</p><p>アライメントは次のように機能します。各オプションについて、フォーマットは、データの開始オフセットがオプションサイズと最大アライメントの最小値の倍数になるまで、追加のパディングを取得します。この最小値は 2 のべき乗である必要があります。オプション "<code>c</code>" および "<code>z</code>" はアラインされません。オプション "<code>s</code>" は、開始整数のアライメントに従います。</p><p>すべてのパディングは、<a href="#pdf-string.pack"><code>string.pack</code></a> によってゼロで埋められ、<a href="#pdf-string.unpack"><code>string.unpack</code></a> によって無視されます。</p>
+</body>
+</html>

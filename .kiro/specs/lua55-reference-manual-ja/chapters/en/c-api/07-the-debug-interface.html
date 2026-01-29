@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lua 5.5 - Section 4.7</title>
+</head>
+<body>
+<h2>4.7 &ndash; <a name="4.7">The Debug Interface</a></h2>
+
+<p>
+Lua has no built-in debugging facilities.
+Instead, it offers a special interface
+by means of functions and <em>hooks</em>.
+This interface allows the construction of different
+kinds of debuggers, profilers, and other tools
+that need "inside information" from the interpreter.
+
+
+
+<hr><h3><a name="lua_Debug"><code>lua_Debug</code></a></h3>
+<pre>typedef struct lua_Debug {
+  int event;
+  const char *name;           /* (n) */
+  const char *namewhat;       /* (n) */
+  const char *what;           /* (S) */
+  const char *source;         /* (S) */
+  size_t srclen;              /* (S) */
+  int currentline;            /* (l) */
+  int linedefined;            /* (S) */
+  int lastlinedefined;        /* (S) */
+  unsigned char nups;         /* (u) number of upvalues */
+  unsigned char nparams;      /* (u) number of parameters */
+  char isvararg;              /* (u) */
+  unsigned char extraargs;    /* (t) number of extra arguments */
+  char istailcall;            /* (t) */
+  int ftransfer;              /* (r) index of first value transferred */
+  int ntransfer;              /* (r) number of transferred values */
+  char short_src[LUA_IDSIZE]; /* (S) */
+  /* private part */
+  <em>other fields</em>
+} lua_Debug;</pre>
+
+<p>
+A structure used to carry different pieces of
+information about a function or an activation record.
+<a href="#lua_getstack"><code>lua_getstack</code></a> fills only the private part
+of this structure, for later use.
+To fill the other fields of <a href="#lua_Debug"><code>lua_Debug</code></a> with useful information,
+you must call <a href="#lua_getinfo"><code>lua_getinfo</code></a> with an appropriate parameter.
+(Specifically, to get a field,
+you must add the letter between parentheses in the field's comment
+to the parameter <code>what</code> of <a href="#lua_getinfo"><code>lua_getinfo</code></a>.)
+
+
+<p>
+The fields of <a href="#lua_Debug"><code>lua_Debug</code></a> have the following meaning:
+
+<ul>
+
+<li><b><code>source</code></b>: 
+the source of the chunk that created the function.
+If <code>source</code> starts with a '<code>@</code>',
+it means that the function was defined in a file where
+the file name follows the '<code>@</code>'.
+If <code>source</code> starts with a '<code>=</code>',
+the remainder of its contents describes the source in a user-dependent manner.
+Otherwise,
+the function was defined in a string where
+<code>source</code> is that string.
+</li>
+
+<li><b><code>srclen</code></b>: 
+The length of the string <code>source</code>.
+</li>
+
+<li><b><code>short_src</code></b>: 
+a "printable" version of <code>source</code>, to be used in error messages.
+</li>
+
+<li><b><code>linedefined</code></b>: 
+the line number where the definition of the function starts.
+</li>
+
+<li><b><code>lastlinedefined</code></b>: 
+the line number where the definition of the function ends.
+</li>
+
+<li><b><code>what</code></b>: 
+the string <code>"Lua"</code> if the function is a Lua function,
+<code>"C"</code> if it is a C&nbsp;function,
+<code>"main"</code> if it is the main part of a chunk.
+</li>
+
+<li><b><code>currentline</code></b>: 
+the current line where the given function is executing.
+When no line information is available,
+<code>currentline</code> is set to -1.
+</li>
+
+<li><b><code>name</code></b>: 
+a reasonable name for the given function.
+Because functions in Lua are first-class values,
+they do not have a fixed name:
+some functions can be the value of multiple global variables,
+while others can be stored only in a table field.
+The <code>lua_getinfo</code> function checks how the function was
+called to find a suitable name.
+If it cannot find a name,
+then <code>name</code> is set to <code>NULL</code>.
+</li>
+
+<li><b><code>namewhat</code></b>: 
+explains the <code>name</code> field.
+The value of <code>namewhat</code> can be
+<code>"global"</code>, <code>"local"</code>, <code>"upvalue"</code>,
+<code>"field"</code>, <code>""</code> (the empty string), plus some other options,
+according to how the function was called.
+(Lua uses the empty string when no other option seems to apply.)
+</li>
+
+<li><b><code>istailcall</code></b>: 
+true if this function invocation was called by a tail call.
+In this case, the caller of this level is not in the stack.
+</li>
+
+<li><b><code>extraargs</code></b>: 
+The number of extra arguments added by the call
+to functions called through <code>__call</code> metamethods.
+(Each <code>__call</code> metavalue adds a single extra argument,
+the object being called,
+but there may be a chain of <code>__call</code> metavalues.)
+</li>
+
+<li><b><code>nups</code></b>: 
+the number of upvalues of the function.
+</li>
+
+<li><b><code>nparams</code></b>: 
+the number of parameters of the function
+(always 0&nbsp;for C&nbsp;functions).
+</li>
+
+<li><b><code>isvararg</code></b>: 
+true if the function is a variadic function
+(always true for C&nbsp;functions).
+</li>
+
+<li><b><code>ftransfer</code></b>: 
+the index in the stack of the first value being "transferred",
+that is, parameters in a call or return values in a return.
+(The other values are in consecutive indices.)
+Using this index, you can access and modify these values
+through <a href="#lua_getlocal"><code>lua_getlocal</code></a> and <a href="#lua_setlocal"><code>lua_setlocal</code></a>.
+This field is only meaningful during a
+call hook, denoting the first parameter,
+or a return hook, denoting the first value being returned.
+(For call hooks, this value is always 1.)
+</li>
+
+<li><b><code>ntransfer</code></b>: 
+The number of values being transferred (see previous item).
+(For calls of Lua functions,
+this value is always equal to <code>nparams</code>.)
+</li>
+
+</ul>
+
+
+
+
+<hr><h3><a name="lua_gethook"><code>lua_gethook</code></a></h3><p>
+<span class="apii">[-0, +0, &ndash;]</span>
+<pre>lua_Hook lua_gethook (lua_State *L);</pre>
+
+<p>
+Returns the current hook function.
+
+
+
+
+
+<hr><h3><a name="lua_gethookcount"><code>lua_gethookcount</code></a></h3><p>
+<span class="apii">[-0, +0, &ndash;]</span>
+<pre>int lua_gethookcount (lua_State *L);</pre>
+
+<p>
+Returns the current hook count.
+
+
+
+
+
+<hr><h3><a name="lua_gethookmask"><code>lua_gethookmask</code></a></h3><p>
+<span class="apii">[-0, +0, &ndash;]</span>
+<pre>int lua_gethookmask (lua_State *L);</pre>
+
+<p>
+Returns the current hook mask.
+
+
+
+
+
+<hr><h3><a name="lua_getinfo"><code>lua_getinfo</code></a></h3><p>
+<span class="apii">[-(0|1), +(0|1|2), <em>m</em>]</span>
+<pre>int lua_getinfo (lua_State *L, const char *what, lua_Debug *ar);</pre>
+
+<p>
+Gets information about a specific function or function invocation.
+
+
+<p>
+To get information about a function invocation,
+the parameter <code>ar</code> must be a valid activation record that was
+filled by a previous call to <a href="#lua_getstack"><code>lua_getstack</code></a> or
+given as argument to a hook (see <a href="#lua_Hook"><code>lua_Hook</code></a>).
+
+
+<p>
+To get information about a function, you push it onto the stack
+and start the <code>what</code> string with the character '<code>&gt;</code>'.
+(In that case,
+<code>lua_getinfo</code> pops the function from the top of the stack.)
+For instance, to know in which line a function <code>f</code> was defined,
+you can write the following code:
+
+<pre>
+     lua_Debug ar;
+     lua_getglobal(L, "f");  /* get global 'f' */
+     lua_getinfo(L, "&gt;S", &amp;ar);
+     printf("%d\n", ar.linedefined);
+</pre>
+
+<p>
+Each character in the string <code>what</code>
+selects some fields of the structure <code>ar</code> to be filled or
+a value to be pushed on the stack.
+(These characters are also documented in the declaration of
+the structure <a href="#lua_Debug"><code>lua_Debug</code></a>,
+between parentheses in the comments following each field.)
+
+<ul>
+
+<li><b>'<code>f</code>'</b>: 
+pushes onto the stack the function that is
+running at the given level;
+</li>
+
+<li><b>'<code>l</code>'</b>:  fills in the field <code>currentline</code>;
+</li>
+
+<li><b>'<code>n</code>'</b>:  fills in the fields <code>name</code> and <code>namewhat</code>;
+</li>
+
+<li><b>'<code>r</code>'</b>:  fills in the fields <code>ftransfer</code> and <code>ntransfer</code>;
+</li>
+
+<li><b>'<code>S</code>'</b>: 
+fills in the fields <code>source</code>, <code>short_src</code>,
+<code>linedefined</code>, <code>lastlinedefined</code>, and <code>what</code>;
+</li>
+
+<li><b>'<code>t</code>'</b>:  fills in the fields <code>istailcall</code> and <code>extraargs</code>;
+</li>
+
+<li><b>'<code>u</code>'</b>:  fills in the fields
+<code>nups</code>, <code>nparams</code>, and <code>isvararg</code>;
+</li>
+
+<li><b>'<code>L</code>'</b>: 
+pushes onto the stack a table whose indices are
+the lines on the function with some associated code,
+that is, the lines where you can put a break point.
+(Lines with no code include empty lines and comments.)
+If this option is given together with option '<code>f</code>',
+its table is pushed after the function.
+This is the only option that can raise a memory error.
+</li>
+
+</ul>
+
+<p>
+This function returns 0 to signal an invalid option in <code>what</code>;
+even then the valid options are handled correctly.
+
+
+
+
+
+<hr><h3><a name="lua_getlocal"><code>lua_getlocal</code></a></h3><p>
+<span class="apii">[-0, +(0|1), &ndash;]</span>
+<pre>const char *lua_getlocal (lua_State *L, const lua_Debug *ar, int n);</pre>
+
+<p>
+Gets information about a local variable or a temporary value
+of a given activation record or a given function.
+
+
+<p>
+In the first case,
+the parameter <code>ar</code> must be a valid activation record that was
+filled by a previous call to <a href="#lua_getstack"><code>lua_getstack</code></a> or
+given as argument to a hook (see <a href="#lua_Hook"><code>lua_Hook</code></a>).
+The index <code>n</code> selects which local variable to inspect;
+see <a href="#pdf-debug.getlocal"><code>debug.getlocal</code></a> for details about variable indices
+and names.
+
+
+<p>
+<a href="#lua_getlocal"><code>lua_getlocal</code></a> pushes the variable's value onto the stack
+and returns its name.
+
+
+<p>
+In the second case, <code>ar</code> must be <code>NULL</code> and the function
+to be inspected must be on the top of the stack.
+In this case, only parameters of Lua functions are visible
+(as there is no information about what variables are active)
+and no values are pushed onto the stack.
+
+
+<p>
+Returns <code>NULL</code> (and pushes nothing)
+when the index is greater than
+the number of active local variables.
+
+
+
+
+
+<hr><h3><a name="lua_getstack"><code>lua_getstack</code></a></h3><p>
+<span class="apii">[-0, +0, &ndash;]</span>
+<pre>int lua_getstack (lua_State *L, int level, lua_Debug *ar);</pre>
+
+<p>
+Gets information about the interpreter runtime stack.
+
+
+<p>
+This function fills parts of a <a href="#lua_Debug"><code>lua_Debug</code></a> structure with
+an identification of the <em>activation record</em>
+of the function executing at a given level.
+Level&nbsp;0 is the current running function,
+whereas level <em>n+1</em> is the function that has called level <em>n</em>
+(except for tail calls, which do not count in the stack).
+When called with a level greater than the stack depth,
+<a href="#lua_getstack"><code>lua_getstack</code></a> returns 0;
+otherwise it returns 1.
+
+
+
+
+
+<hr><h3><a name="lua_getupvalue"><code>lua_getupvalue</code></a></h3><p>
+<span class="apii">[-0, +(0|1), &ndash;]</span>
+<pre>const char *lua_getupvalue (lua_State *L, int funcindex, int n);</pre>
+
+<p>
+Gets information about the <code>n</code>-th upvalue
+of the closure at index <code>funcindex</code>.
+It pushes the upvalue's value onto the stack
+and returns its name.
+Returns <code>NULL</code> (and pushes nothing)
+when the index <code>n</code> is greater than the number of upvalues.
+
+
+<p>
+See <a href="#pdf-debug.getupvalue"><code>debug.getupvalue</code></a> for more information about upvalues.
+
+
+
+
+
+<hr><h3><a name="lua_Hook"><code>lua_Hook</code></a></h3>
+<pre>typedef void (*lua_Hook) (lua_State *L, lua_Debug *ar);</pre>
+
+<p>
+Type for debugging hook functions.
+
+
+<p>
+Whenever a hook is called, its <code>ar</code> argument has its field
+<code>event</code> set to the specific event that triggered the hook.
+Lua identifies these events with the following constants:
+<a name="pdf-LUA_HOOKCALL"><code>LUA_HOOKCALL</code></a>, <a name="pdf-LUA_HOOKRET"><code>LUA_HOOKRET</code></a>,
+<a name="pdf-LUA_HOOKTAILCALL"><code>LUA_HOOKTAILCALL</code></a>, <a name="pdf-LUA_HOOKLINE"><code>LUA_HOOKLINE</code></a>,
+and <a name="pdf-LUA_HOOKCOUNT"><code>LUA_HOOKCOUNT</code></a>.
+Moreover, for line events, the field <code>currentline</code> is also set.
+To get the value of any other field in <code>ar</code>,
+the hook must call <a href="#lua_getinfo"><code>lua_getinfo</code></a>.
+
+
+<p>
+For call events, <code>event</code> can be <code>LUA_HOOKCALL</code>,
+the normal value, or <code>LUA_HOOKTAILCALL</code>, for a tail call;
+in this case, there will be no corresponding return event.
+
+
+<p>
+While Lua is running a hook, it disables other calls to hooks.
+Therefore, if a hook calls back Lua to execute a function or a chunk,
+this execution occurs without any calls to hooks.
+
+
+<p>
+Hook functions cannot have continuations,
+that is, they cannot call <a href="#lua_yieldk"><code>lua_yieldk</code></a>,
+<a href="#lua_pcallk"><code>lua_pcallk</code></a>, or <a href="#lua_callk"><code>lua_callk</code></a> with a non-null <code>k</code>.
+
+
+<p>
+Hook functions can yield under the following conditions:
+Only count and line events can yield;
+to yield, a hook function must finish its execution
+calling <a href="#lua_yield"><code>lua_yield</code></a> with <code>nresults</code> equal to zero
+(that is, with no values).
+
+
+
+
+
+<hr><h3><a name="lua_sethook"><code>lua_sethook</code></a></h3><p>
+<span class="apii">[-0, +0, &ndash;]</span>
+<pre>void lua_sethook (lua_State *L, lua_Hook f, int mask, int count);</pre>
+
+<p>
+Sets the debugging hook function.
+
+
+<p>
+Argument <code>f</code> is the hook function.
+<code>mask</code> specifies on which events the hook will be called:
+it is formed by a bitwise OR of the constants
+<a name="pdf-LUA_MASKCALL"><code>LUA_MASKCALL</code></a>,
+<a name="pdf-LUA_MASKRET"><code>LUA_MASKRET</code></a>,
+<a name="pdf-LUA_MASKLINE"><code>LUA_MASKLINE</code></a>,
+and <a name="pdf-LUA_MASKCOUNT"><code>LUA_MASKCOUNT</code></a>.
+The <code>count</code> argument is only meaningful when the mask
+includes <code>LUA_MASKCOUNT</code>.
+For each event, the hook is called as explained below:
+
+<ul>
+
+<li><b>The call hook</b>:  is called when the interpreter calls a function.
+The hook is called just after Lua enters the new function.
+</li>
+
+<li><b>The return hook</b>:  is called when the interpreter returns from a function.
+The hook is called just before Lua leaves the function.
+</li>
+
+<li><b>The line hook</b>:  is called when the interpreter is about to
+start the execution of a new line of code,
+or when it jumps back in the code (even to the same line).
+This event only happens while Lua is executing a Lua function.
+</li>
+
+<li><b>The count hook</b>:  is called after the interpreter executes every
+<code>count</code> instructions.
+This event only happens while Lua is executing a Lua function.
+</li>
+
+</ul>
+
+<p>
+Hooks are disabled by setting <code>mask</code> to zero.
+
+
+
+
+
+<hr><h3><a name="lua_setlocal"><code>lua_setlocal</code></a></h3><p>
+<span class="apii">[-(0|1), +0, &ndash;]</span>
+<pre>const char *lua_setlocal (lua_State *L, const lua_Debug *ar, int n);</pre>
+
+<p>
+Sets the value of a local variable of a given activation record.
+It assigns the value on the top of the stack
+to the variable and returns its name.
+It also pops the value from the stack.
+
+
+<p>
+Returns <code>NULL</code> (and pops nothing)
+when the index is greater than
+the number of active local variables.
+
+
+<p>
+Parameters <code>ar</code> and <code>n</code> are as in the function <a href="#lua_getlocal"><code>lua_getlocal</code></a>.
+
+
+
+
+
+<hr><h3><a name="lua_setupvalue"><code>lua_setupvalue</code></a></h3><p>
+<span class="apii">[-(0|1), +0, &ndash;]</span>
+<pre>const char *lua_setupvalue (lua_State *L, int funcindex, int n);</pre>
+
+<p>
+Sets the value of a closure's upvalue.
+It assigns the value on the top of the stack
+to the upvalue and returns its name.
+It also pops the value from the stack.
+
+
+<p>
+Returns <code>NULL</code> (and pops nothing)
+when the index <code>n</code> is greater than the number of upvalues.
+
+
+<p>
+Parameters <code>funcindex</code> and <code>n</code> are as in
+the function <a href="#lua_getupvalue"><code>lua_getupvalue</code></a>.
+
+
+
+
+
+<hr><h3><a name="lua_upvalueid"><code>lua_upvalueid</code></a></h3><p>
+<span class="apii">[-0, +0, &ndash;]</span>
+<pre>void *lua_upvalueid (lua_State *L, int funcindex, int n);</pre>
+
+<p>
+Returns a unique identifier for the upvalue numbered <code>n</code>
+from the closure at index <code>funcindex</code>.
+
+
+<p>
+These unique identifiers allow a program to check whether different
+closures share upvalues.
+Lua closures that share an upvalue
+(that is, that access a same external local variable)
+will return identical ids for those upvalue indices.
+
+
+<p>
+Parameters <code>funcindex</code> and <code>n</code> are as in
+the function <a href="#lua_getupvalue"><code>lua_getupvalue</code></a>,
+but <code>n</code> cannot be greater than the number of upvalues.
+
+
+
+
+
+<hr><h3><a name="lua_upvaluejoin"><code>lua_upvaluejoin</code></a></h3><p>
+<span class="apii">[-0, +0, &ndash;]</span>
+<pre>void lua_upvaluejoin (lua_State *L, int funcindex1, int n1,
+                                    int funcindex2, int n2);</pre>
+
+<p>
+Make the <code>n1</code>-th upvalue of the Lua closure at index <code>funcindex1</code>
+refer to the <code>n2</code>-th upvalue of the Lua closure at index <code>funcindex2</code>.
+
+
+
+
+
+
+
+
+
+</body>
+</html>

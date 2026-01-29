@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lua 5.5 - Section 6.2</title>
+</head>
+<body>
+<h2>6.2 &ndash; <a name="6.2">Basic Functions</a></h2>
+
+<p>
+The basic library provides core functions to Lua.
+If you do not include this library in your application,
+you should check carefully whether you need to provide
+implementations for some of its facilities.
+
+
+<p>
+<hr><h3><a name="pdf-assert"><code>assert (v [, message])</code></a></h3>
+
+
+<p>
+Raises an error if
+the value of its argument <code>v</code> is false (i.e., <b>nil</b> or <b>false</b>);
+otherwise, returns all its arguments.
+In case of error,
+<code>message</code> is the error object;
+when absent, it defaults to "<code>assertion failed!</code>"
+
+
+
+
+<p>
+<hr><h3><a name="pdf-collectgarbage"><code>collectgarbage ([opt [, arg]])</code></a></h3>
+
+
+<p>
+This function is a generic interface to the garbage collector.
+It performs different functions according to its first argument, <code>opt</code>:
+
+<ul>
+
+<li><b>"<code>collect</code>"</b>: 
+Performs a full garbage-collection cycle.
+This is the default option.
+</li>
+
+<li><b>"<code>stop</code>"</b>: 
+Stops automatic execution of the garbage collector.
+The collector will run only when explicitly invoked,
+until a call to restart it.
+</li>
+
+<li><b>"<code>restart</code>"</b>: 
+Restarts automatic execution of the garbage collector.
+</li>
+
+<li><b>"<code>count</code>"</b>: 
+Returns the total memory in use by Lua in Kbytes.
+The value has a fractional part,
+so that it multiplied by 1024
+gives the exact number of bytes in use by Lua.
+</li>
+
+<li><b>"<code>step</code>"</b>: 
+Performs a garbage-collection step.
+This option may be followed by an extra argument,
+an integer with the step size.
+
+
+<p>
+If the size is a positive <code>n</code>,
+the collector acts as if <code>n</code> new bytes have been allocated.
+If the size is zero,
+the collector performs a basic step.
+In incremental mode,
+a basic step corresponds to the current step size.
+In generational mode,
+a basic step performs a full minor collection or
+an incremental step,
+if the collector has scheduled one.
+
+
+<p>
+In incremental mode,
+the function returns <b>true</b> if the step finished a collection cycle.
+In generational mode,
+the function returns <b>true</b> if the step finished a major collection.
+</li>
+
+<li><b>"<code>isrunning</code>"</b>: 
+Returns a boolean that tells whether the collector is running
+(i.e., not stopped).
+</li>
+
+<li><b>"<code>incremental</code>"</b>: 
+Changes the collector mode to incremental and returns the previous mode.
+</li>
+
+<li><b>"<code>generational</code>"</b>: 
+Changes the collector mode to generational and returns the previous mode.
+</li>
+
+<li><b>"<code>param</code>"</b>: 
+Changes and/or retrieves the values of a parameter of the collector.
+This option must be followed by one or two extra arguments:
+The name of the parameter being changed or retrieved (a string)
+and an optional new value for that parameter,
+an integer in the range <em>[0,100000]</em>.
+The first argument must have one of the following values:
+
+<ul>
+<li><b>"<code>minormul</code>"</b>:  The minor multiplier. </li>
+<li><b>"<code>majorminor</code>"</b>:  The major-minor multiplier. </li>
+<li><b>"<code>minormajor</code>"</b>:  The minor-major multiplier. </li>
+<li><b>"<code>pause</code>"</b>:  The garbage-collector pause. </li>
+<li><b>"<code>stepmul</code>"</b>:  The step multiplier. </li>
+<li><b>"<code>stepsize</code>"</b>:  The step size. </li>
+</ul><p>
+The call always returns the previous value of the parameter.
+If the call does not give a new value,
+the value is left unchanged.
+
+
+<p>
+Lua stores these values in a compressed format,
+so, the value returned as the previous value may not be
+exactly the last value set.
+</li>
+
+</ul><p>
+See <a href="#2.5">&sect;2.5</a> for more details about garbage collection
+and some of these options.
+
+
+<p>
+This function should not be called by a finalizer.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-dofile"><code>dofile ([filename])</code></a></h3>
+Opens the named file and executes its content as a Lua chunk,
+returning all values returned by the chunk.
+When called without arguments,
+<code>dofile</code> executes the content of the standard input (<code>stdin</code>).
+In case of errors, <code>dofile</code> propagates the error
+to its caller.
+(That is, <code>dofile</code> does not run in protected mode.)
+
+
+
+
+<p>
+<hr><h3><a name="pdf-error"><code>error (message [, level])</code></a></h3>
+Raises an error (see <a href="#2.3">&sect;2.3</a>) with <code>message</code> as the error object.
+This function never returns.
+
+
+<p>
+Usually, <code>error</code> adds some information about the error position
+at the beginning of the message, if the message is a string.
+The <code>level</code> argument specifies how to get the error position.
+With level&nbsp;1 (the default), the error position is where the
+<code>error</code> function was called.
+Level&nbsp;2 points the error to where the function
+that called <code>error</code> was called; and so on.
+Passing a level&nbsp;0 avoids the addition of error position information
+to the message.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-_G"><code>_G</code></a></h3>
+A global variable (not a function) that
+holds the global environment (see <a href="#2.2">&sect;2.2</a>).
+Lua itself does not use this variable;
+changing its value does not affect any environment,
+nor vice versa.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-getmetatable"><code>getmetatable (object)</code></a></h3>
+
+
+<p>
+If <code>object</code> does not have a metatable, returns <b>nil</b>.
+Otherwise,
+if the object's metatable has a <code>__metatable</code> field,
+returns the associated value.
+Otherwise, returns the metatable of the given object.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-ipairs"><code>ipairs (t)</code></a></h3>
+
+
+<p>
+Returns three values (an iterator function, the value <code>t</code>, and 0)
+so that the construction
+
+<pre>
+     for i,v in ipairs(t) do <em>body</em> end
+</pre><p>
+will iterate over the key&ndash;value pairs
+(<code>1,t[1]</code>), (<code>2,t[2]</code>), ...,
+up to the first absent index.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-load"><code>load (chunk [, chunkname [, mode [, env]]])</code></a></h3>
+
+
+<p>
+Loads a chunk.
+
+
+<p>
+If <code>chunk</code> is a string, the chunk is this string.
+If <code>chunk</code> is a function,
+<code>load</code> calls it repeatedly to get the chunk pieces.
+Each call to <code>chunk</code> must return a string that concatenates
+with previous results.
+A return of an empty string, <b>nil</b>, or no value signals the end of the chunk.
+
+
+<p>
+If there are no syntactic errors,
+<code>load</code> returns the compiled chunk as a function;
+otherwise, it returns <b>fail</b> plus the error message.
+
+
+<p>
+When you load a main chunk,
+the resulting function will always have exactly one upvalue,
+the <code>_ENV</code> variable (see <a href="#2.2">&sect;2.2</a>).
+However,
+when you load a binary chunk created from a function (see <a href="#pdf-string.dump"><code>string.dump</code></a>),
+the resulting function can have an arbitrary number of upvalues,
+and there is no guarantee that its first upvalue will be
+the <code>_ENV</code> variable.
+(A non-main function may not even have an <code>_ENV</code> upvalue.)
+
+
+<p>
+Regardless, if the resulting function has any upvalues,
+its first upvalue is set to the value of <code>env</code>,
+if that parameter is given,
+or to the value of the global environment.
+Other upvalues are initialized with <b>nil</b>.
+All upvalues are fresh, that is,
+they are not shared with any other function.
+
+
+<p>
+<code>chunkname</code> is used as the name of the chunk for error messages
+and debug information (see <a href="#4.7">&sect;4.7</a>).
+When absent,
+it defaults to <code>chunk</code>, if <code>chunk</code> is a string,
+or to "<code>=(load)</code>" otherwise.
+
+
+<p>
+The string <code>mode</code> controls whether the chunk can be text or binary
+(that is, a precompiled chunk).
+It may be the string "<code>b</code>" (only binary chunks),
+"<code>t</code>" (only text chunks),
+or "<code>bt</code>" (both binary and text).
+The default is "<code>bt</code>".
+
+
+<p>
+Lua does not check the consistency of binary chunks.
+Maliciously crafted binary chunks can crash
+the interpreter.
+You can use the <code>mode</code> parameter to prevent loading binary chunks.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-loadfile"><code>loadfile ([filename [, mode [, env]]])</code></a></h3>
+
+
+<p>
+Similar to <a href="#pdf-load"><code>load</code></a>,
+but gets the chunk from file <code>filename</code>
+or from the standard input,
+if no file name is given.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-next"><code>next (table [, index])</code></a></h3>
+
+
+<p>
+Allows a program to traverse all fields of a table.
+Its first argument is a table and its second argument
+is an index in this table.
+A call to <code>next</code> returns the next index of the table
+and its associated value.
+When called with <b>nil</b> as its second argument,
+<code>next</code> returns an initial index
+and its associated value.
+When called with the last index,
+or with <b>nil</b> in an empty table,
+<code>next</code> returns <b>nil</b>.
+If the second argument is absent, then it is interpreted as <b>nil</b>.
+In particular,
+you can use <code>next(t)</code> to check whether a table is empty.
+
+
+<p>
+The order in which the indices are enumerated is not specified,
+<em>even for numeric indices</em>.
+(To traverse a table in numerical order,
+use a numerical <b>for</b>.)
+
+
+<p>
+You should not assign any value to a non-existent field in a table
+during its traversal.
+You may however modify existing fields.
+In particular, you may set existing fields to nil.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-pairs"><code>pairs (t)</code></a></h3>
+
+
+<p>
+If <code>t</code> has a metamethod <code>__pairs</code>,
+calls it with <code>t</code> as argument and returns the first four
+results from the call.
+
+
+<p>
+Otherwise,
+returns the <a href="#pdf-next"><code>next</code></a> function, the table <code>t</code>, plus two <b>nil</b> values,
+so that the construction
+
+<pre>
+     for k,v in pairs(t) do <em>body</em> end
+</pre><p>
+will iterate over all key&ndash;value pairs of table <code>t</code>.
+
+
+<p>
+See function <a href="#pdf-next"><code>next</code></a> for the caveats of modifying
+the table during its traversal.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-pcall"><code>pcall (f [, arg1, &middot;&middot;&middot;])</code></a></h3>
+
+
+<p>
+Calls the function <code>f</code> with
+the given arguments in <em>protected mode</em>.
+This means that any error inside&nbsp;<code>f</code> is not propagated;
+instead, <code>pcall</code> catches the error
+and returns a status code.
+Its first result is the status code (a boolean),
+which is <b>true</b> if the call succeeds without errors.
+In such case, <code>pcall</code> also returns all results from the call,
+after this first result.
+In case of any error, <code>pcall</code> returns <b>false</b> plus the error object.
+Note that errors caught by <code>pcall</code> do not call a message handler.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-print"><code>print (&middot;&middot;&middot;)</code></a></h3>
+Receives any number of arguments
+and prints their values to <code>stdout</code>,
+converting each argument to a string
+following the same rules of <a href="#pdf-tostring"><code>tostring</code></a>.
+
+
+<p>
+The function <code>print</code> is not intended for formatted output,
+but only as a quick way to show a value,
+for instance for debugging.
+For complete control over the output,
+use <a href="#pdf-string.format"><code>string.format</code></a> and <a href="#pdf-io.write"><code>io.write</code></a>.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-rawequal"><code>rawequal (v1, v2)</code></a></h3>
+Checks whether <code>v1</code> is equal to <code>v2</code>,
+without invoking the <code>__eq</code> metamethod.
+Returns a boolean.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-rawget"><code>rawget (table, index)</code></a></h3>
+Gets the real value of <code>table[index]</code>,
+without using the <code>__index</code> metavalue.
+<code>table</code> must be a table;
+<code>index</code> may be any value.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-rawlen"><code>rawlen (v)</code></a></h3>
+Returns the length of the object <code>v</code>,
+which must be a table or a string,
+without invoking the <code>__len</code> metamethod.
+Returns an integer.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-rawset"><code>rawset (table, index, value)</code></a></h3>
+Sets the real value of <code>table[index]</code> to <code>value</code>,
+without using the <code>__newindex</code> metavalue.
+<code>table</code> must be a table,
+<code>index</code> any value different from <b>nil</b> and NaN,
+and <code>value</code> any Lua value.
+
+
+<p>
+This function returns <code>table</code>.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-select"><code>select (index, &middot;&middot;&middot;)</code></a></h3>
+
+
+<p>
+If <code>index</code> is a number,
+returns all arguments after argument number <code>index</code>;
+a negative number indexes from the end (-1 is the last argument).
+Otherwise, <code>index</code> must be the string <code>"#"</code>,
+and <code>select</code> returns the total number of extra arguments it received.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-setmetatable"><code>setmetatable (table, metatable)</code></a></h3>
+
+
+<p>
+Sets the metatable for the given table.
+If <code>metatable</code> is <b>nil</b>,
+removes the metatable of the given table.
+If the original metatable has a <code>__metatable</code> field,
+raises an error.
+
+
+<p>
+This function returns <code>table</code>.
+
+
+<p>
+To change the metatable of other types from Lua code,
+you must use the debug library (<a href="#6.11">&sect;6.11</a>).
+
+
+
+
+<p>
+<hr><h3><a name="pdf-tonumber"><code>tonumber (e [, base])</code></a></h3>
+
+
+<p>
+When called with no <code>base</code>,
+<code>tonumber</code> tries to convert its argument to a number.
+If the argument is already a number or
+a string convertible to a number,
+then <code>tonumber</code> returns this number;
+otherwise, it returns <b>fail</b>.
+
+
+<p>
+The conversion of strings can result in integers or floats,
+according to the lexical conventions of Lua (see <a href="#3.1">&sect;3.1</a>).
+The string may have leading and trailing spaces and a sign.
+
+
+<p>
+When called with <code>base</code>,
+then <code>e</code> must be a string to be interpreted as
+an integer numeral in that base.
+The base may be any integer between 2 and 36, inclusive.
+In bases above&nbsp;10, the letter '<code>A</code>' (in either upper or lower case)
+represents&nbsp;10, '<code>B</code>' represents&nbsp;11, and so forth,
+with '<code>Z</code>' representing 35.
+If the string <code>e</code> is not a valid numeral in the given base,
+the function returns <b>fail</b>.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-tostring"><code>tostring (v)</code></a></h3>
+
+
+<p>
+Receives a value of any type and
+converts it to a string in a human-readable format.
+
+
+<p>
+If the metatable of <code>v</code> has a <code>__tostring</code> field,
+then <code>tostring</code> calls the corresponding value
+with <code>v</code> as argument,
+and uses the result of the call as its result.
+Otherwise, if the metatable of <code>v</code> has a <code>__name</code> field
+with a string value,
+<code>tostring</code> may use that string in its final result.
+
+
+<p>
+For complete control of how numbers are converted,
+use <a href="#pdf-string.format"><code>string.format</code></a>.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-type"><code>type (v)</code></a></h3>
+
+
+<p>
+Returns the type of its only argument, coded as a string.
+The possible results of this function are
+"<code>nil</code>" (a string, not the value <b>nil</b>),
+"<code>number</code>",
+"<code>string</code>",
+"<code>boolean</code>",
+"<code>table</code>",
+"<code>function</code>",
+"<code>thread</code>",
+and "<code>userdata</code>".
+
+
+
+
+<p>
+<hr><h3><a name="pdf-_VERSION"><code>_VERSION</code></a></h3>
+
+
+<p>
+A global variable (not a function) that
+holds a string containing the running Lua version.
+The current value of this variable is "<code>Lua 5.5</code>".
+
+
+
+
+<p>
+<hr><h3><a name="pdf-warn"><code>warn (msg1, &middot;&middot;&middot;)</code></a></h3>
+
+
+<p>
+Emits a warning with a message composed by the concatenation
+of all its arguments (which should be strings).
+
+
+<p>
+By convention,
+a one-piece message starting with '<code>@</code>'
+is intended to be a <em>control message</em>,
+which is a message to the warning system itself.
+In particular, the standard warning function in Lua
+recognizes the control messages "<code>@off</code>",
+to stop the emission of warnings,
+and "<code>@on</code>", to (re)start the emission;
+it ignores unknown control messages.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-xpcall"><code>xpcall (f, msgh [, arg1, &middot;&middot;&middot;])</code></a></h3>
+
+
+<p>
+This function is similar to <a href="#pdf-pcall"><code>pcall</code></a>,
+except that it sets a new message handler <code>msgh</code>.
+
+
+
+
+
+
+
+
+</body>
+</html>

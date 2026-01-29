@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lua 5.5 - Section 4.2</title>
+</head>
+<body>
+<h2>4.2 &ndash; <a name="4.2">C Closures</a></h2>
+
+<p>
+When a C&nbsp;function is created,
+it is possible to associate some values with it,
+thus creating a <em>C&nbsp;closure</em>
+(see <a href="#lua_pushcclosure"><code>lua_pushcclosure</code></a>);
+these values are called <em>upvalues</em> and are
+accessible to the function whenever it is called.
+
+
+<p>
+Whenever a C&nbsp;function is called,
+its upvalues are located at specific pseudo-indices.
+These pseudo-indices are produced by the macro
+<a href="#lua_upvalueindex"><code>lua_upvalueindex</code></a>.
+The first upvalue associated with a function is at index
+<code>lua_upvalueindex(1)</code>, and so on.
+Any access to <code>lua_upvalueindex(<em>n</em>)</code>,
+where <em>n</em> is greater than the number of upvalues of the
+current function
+(but not greater than 256,
+which is one plus the maximum number of upvalues in a closure),
+produces an acceptable but invalid index.
+
+
+<p>
+A C&nbsp;closure can also change the values
+of its corresponding upvalues.
+
+
+
+
+
+
+</body>
+</html>

@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lua 5.5 - Section 6.4</title>
+</head>
+<body>
+<h2>6.4 &ndash; <a name="6.4">Modules</a></h2>
+
+<p>
+The package library provides basic
+facilities for loading modules in Lua.
+It exports one function directly in the global environment:
+<a href="#pdf-require"><code>require</code></a>.
+Everything else is exported in the table <a name="pdf-package"><code>package</code></a>.
+
+
+<p>
+<hr><h3><a name="pdf-require"><code>require (modname)</code></a></h3>
+
+
+<p>
+Loads the given module.
+The function starts by looking into the <a href="#pdf-package.loaded"><code>package.loaded</code></a> table
+to determine whether <code>modname</code> is already loaded.
+If it is, then <code>require</code> returns the value stored
+at <code>package.loaded[modname]</code>.
+(The absence of a second result in this case
+signals that this call did not have to load the module.)
+Otherwise, it tries to find a <em>loader</em> for the module.
+
+
+<p>
+To find a loader,
+<code>require</code> is guided by the table <a href="#pdf-package.searchers"><code>package.searchers</code></a>.
+Each item in this table is a search function,
+that searches for the module in a particular way.
+By changing this table,
+we can change how <code>require</code> looks for a module.
+The following explanation is based on the default configuration
+for <a href="#pdf-package.searchers"><code>package.searchers</code></a>.
+
+
+<p>
+First <code>require</code> queries <code>package.preload[modname]</code>.
+If it has a value,
+this value (which must be a function) is the loader.
+Otherwise <code>require</code> searches for a Lua loader using the
+path stored in <a href="#pdf-package.path"><code>package.path</code></a>.
+If that also fails, it searches for a C&nbsp;loader using the
+path stored in <a href="#pdf-package.cpath"><code>package.cpath</code></a>.
+If that also fails,
+it tries an <em>all-in-one</em> loader (see <a href="#pdf-package.searchers"><code>package.searchers</code></a>).
+
+
+<p>
+Once a loader is found,
+<code>require</code> calls the loader with two arguments:
+<code>modname</code> and an extra value,
+a <em>loader data</em>,
+also returned by the searcher.
+The loader data can be any value useful to the module;
+for the default searchers,
+it indicates where the loader was found.
+(For instance, if the loader came from a file,
+this extra value is the file path.)
+If the loader returns any non-nil value,
+<code>require</code> assigns the returned value to <code>package.loaded[modname]</code>.
+If the loader does not return a non-nil value and
+has not assigned any value to <code>package.loaded[modname]</code>,
+then <code>require</code> assigns <b>true</b> to this entry.
+In any case, <code>require</code> returns the
+final value of <code>package.loaded[modname]</code>.
+Besides that value, <code>require</code> also returns as a second result
+the loader data returned by the searcher,
+which indicates how <code>require</code> found the module.
+
+
+<p>
+If there is any error loading or running the module,
+or if it cannot find any loader for the module,
+then <code>require</code> raises an error.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-package.config"><code>package.config</code></a></h3>
+
+
+<p>
+A string describing some compile-time configurations for packages.
+This string is a sequence of lines:
+
+<ul>
+
+<li>The first line is the directory separator string.
+Default is '<code>\</code>' for Windows and '<code>/</code>' for all other systems.</li>
+
+<li>The second line is the character that separates templates in a path.
+Default is '<code>;</code>'.</li>
+
+<li>The third line is the string that marks the
+substitution points in a template.
+Default is '<code>?</code>'.</li>
+
+<li>The fourth line is a string that, in a path in Windows,
+is replaced by the executable's directory.
+Default is '<code>!</code>'.</li>
+
+<li>The fifth line is a mark to ignore all text after it
+when building the <code>luaopen_</code> function name.
+Default is '<code>-</code>'.</li>
+
+</ul>
+
+
+
+<p>
+<hr><h3><a name="pdf-package.cpath"><code>package.cpath</code></a></h3>
+
+
+<p>
+A string with the path used by <a href="#pdf-require"><code>require</code></a>
+to search for a C&nbsp;loader.
+
+
+<p>
+Lua initializes the C&nbsp;path <a href="#pdf-package.cpath"><code>package.cpath</code></a> in the same way
+it initializes the Lua path <a href="#pdf-package.path"><code>package.path</code></a>,
+using the environment variable <a name="pdf-LUA_CPATH_5_5"><code>LUA_CPATH_5_5</code></a>,
+or the environment variable <a name="pdf-LUA_CPATH"><code>LUA_CPATH</code></a>,
+or a default path defined in <code>luaconf.h</code>.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-package.loaded"><code>package.loaded</code></a></h3>
+
+
+<p>
+A table used by <a href="#pdf-require"><code>require</code></a> to control which
+modules are already loaded.
+When you require a module <code>modname</code> and
+<code>package.loaded[modname]</code> is not false,
+<a href="#pdf-require"><code>require</code></a> simply returns the value stored there.
+
+
+<p>
+This variable is only a reference to the real table;
+assignments to this variable do not change the
+table used by <a href="#pdf-require"><code>require</code></a>.
+The real table is stored in the C registry (see <a href="#4.3">&sect;4.3</a>),
+indexed by the key <a name="pdf-LUA_LOADED_TABLE"><code>LUA_LOADED_TABLE</code></a>, a string.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-package.loadlib"><code>package.loadlib (libname, funcname)</code></a></h3>
+
+
+<p>
+Dynamically links the host program with the C&nbsp;library <code>libname</code>.
+
+
+<p>
+If <code>funcname</code> is "<code>*</code>",
+then it only links with the library,
+making the symbols exported by the library
+available to other dynamically linked libraries.
+Otherwise,
+it looks for a function <code>funcname</code> inside the library
+and returns this function as a C&nbsp;function.
+So, <code>funcname</code> must follow the <a href="#lua_CFunction"><code>lua_CFunction</code></a> prototype
+(see <a href="#lua_CFunction"><code>lua_CFunction</code></a>).
+
+
+<p>
+This is a low-level function.
+It completely bypasses the package and module system.
+Unlike <a href="#pdf-require"><code>require</code></a>,
+it does not perform any path searching and
+does not automatically adds extensions.
+<code>libname</code> must be the complete file name of the C&nbsp;library,
+including if necessary a path and an extension.
+<code>funcname</code> must be the exact name exported by the C&nbsp;library
+(which may depend on the C&nbsp;compiler and linker used).
+
+
+<p>
+This functionality is not supported by ISO&nbsp;C.
+As such, <code>loadlib</code> is only available on some platforms:
+Linux, Windows, Mac OS X, Solaris, BSD,
+plus other Unix systems that support the <code>dlfcn</code> standard.
+
+
+<p>
+This function is inherently insecure,
+as it allows Lua to call any function in any readable dynamic
+library in the system.
+(Lua calls any function assuming the function
+has a proper prototype and respects a proper protocol
+(see <a href="#lua_CFunction"><code>lua_CFunction</code></a>).
+Therefore,
+calling an arbitrary function in an arbitrary dynamic library
+more often than not results in an access violation.)
+
+
+
+
+<p>
+<hr><h3><a name="pdf-package.path"><code>package.path</code></a></h3>
+
+
+<p>
+A string with the path used by <a href="#pdf-require"><code>require</code></a>
+to search for a Lua loader.
+
+
+<p>
+At start-up, Lua initializes this variable with
+the value of the environment variable <a name="pdf-LUA_PATH_5_5"><code>LUA_PATH_5_5</code></a> or
+the environment variable <a name="pdf-LUA_PATH"><code>LUA_PATH</code></a> or
+with a default path defined in <code>luaconf.h</code>,
+if those environment variables are not defined.
+A "<code>;;</code>" in the value of the environment variable
+is replaced by the default path.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-package.preload"><code>package.preload</code></a></h3>
+
+
+<p>
+A table to store loaders for specific modules
+(see <a href="#pdf-require"><code>require</code></a>).
+
+
+<p>
+This variable is only a reference to the real table;
+assignments to this variable do not change the
+table used by <a href="#pdf-require"><code>require</code></a>.
+The real table is stored in the C registry (see <a href="#4.3">&sect;4.3</a>),
+indexed by the key <a name="pdf-LUA_PRELOAD_TABLE"><code>LUA_PRELOAD_TABLE</code></a>, a string.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-package.searchers"><code>package.searchers</code></a></h3>
+
+
+<p>
+A table used by <a href="#pdf-require"><code>require</code></a> to control how to find modules.
+
+
+<p>
+Each entry in this table is a <em>searcher function</em>.
+When looking for a module,
+<a href="#pdf-require"><code>require</code></a> calls each of these searchers in ascending order,
+with the module name (the argument given to <a href="#pdf-require"><code>require</code></a>) as its
+sole argument.
+If the searcher finds the module,
+it returns another function, the module <em>loader</em>,
+plus an extra value, a <em>loader data</em>,
+that will be passed to that loader and
+returned as a second result by <a href="#pdf-require"><code>require</code></a>.
+If it cannot find the module,
+it returns a string explaining why
+(or <b>nil</b> if it has nothing to say).
+
+
+<p>
+Lua initializes this table with four searcher functions.
+
+
+<p>
+The first searcher simply looks for a loader in the
+<a href="#pdf-package.preload"><code>package.preload</code></a> table.
+
+
+<p>
+The second searcher looks for a loader as a Lua library,
+using the path stored at <a href="#pdf-package.path"><code>package.path</code></a>.
+The search is done as described in function <a href="#pdf-package.searchpath"><code>package.searchpath</code></a>.
+
+
+<p>
+The third searcher looks for a loader as a C&nbsp;library,
+using the path given by the variable <a href="#pdf-package.cpath"><code>package.cpath</code></a>.
+Again,
+the search is done as described in function <a href="#pdf-package.searchpath"><code>package.searchpath</code></a>.
+For instance,
+if the C&nbsp;path is the string
+
+<pre>
+     "./?.so;./?.dll;/usr/local/?/init.so"
+</pre><p>
+the searcher for module <code>foo</code>
+will try to open the files <code>./foo.so</code>, <code>./foo.dll</code>,
+and <code>/usr/local/foo/init.so</code>, in that order.
+Once it finds a C&nbsp;library,
+this searcher first uses a dynamic link facility to link the
+application with the library.
+Then it tries to find a C&nbsp;function inside the library to
+be used as the loader.
+The name of this C&nbsp;function is the string "<code>luaopen_</code>"
+concatenated with a copy of the module name where each dot
+is replaced by an underscore.
+Moreover, if the module name has a hyphen,
+its suffix after (and including) the first hyphen is removed.
+For instance, if the module name is <code>a.b.c-v2.1</code>,
+the function name will be <code>luaopen_a_b_c</code>.
+
+
+<p>
+The fourth searcher tries an <em>all-in-one loader</em>.
+It searches the C&nbsp;path for a library for
+the root name of the given module.
+For instance, when requiring <code>a.b.c</code>,
+it will search for a C&nbsp;library for <code>a</code>.
+If found, it looks into it for an open function for
+the submodule;
+in our example, that would be <code>luaopen_a_b_c</code>.
+With this facility, a package can pack several C&nbsp;submodules
+into one single library,
+with each submodule keeping its original open function.
+
+
+<p>
+All searchers except the first one (preload) return as the extra value
+the file path where the module was found,
+as returned by <a href="#pdf-package.searchpath"><code>package.searchpath</code></a>.
+The first searcher always returns the string "<code>:preload:</code>".
+
+
+<p>
+Searchers should raise no errors and have no side effects in Lua.
+(They may have side effects in C,
+for instance by linking the application with a library.)
+
+
+
+
+<p>
+<hr><h3><a name="pdf-package.searchpath"><code>package.searchpath (name, path [, sep [, rep]])</code></a></h3>
+
+
+<p>
+Searches for the given <code>name</code> in the given <code>path</code>.
+
+
+<p>
+A path is a string containing a sequence of
+<em>templates</em> separated by semicolons.
+For each template,
+the function replaces each interrogation mark (if any)
+in the template with a copy of <code>name</code>
+wherein all occurrences of <code>sep</code>
+(a dot, by default)
+were replaced by <code>rep</code>
+(the system's directory separator, by default),
+and then tries to open the resulting file name.
+
+
+<p>
+For instance, if the path is the string
+
+<pre>
+     "./?.lua;./?.lc;/usr/local/?/init.lua"
+</pre><p>
+the search for the name <code>foo.a</code>
+will try to open the files
+<code>./foo/a.lua</code>, <code>./foo/a.lc</code>, and
+<code>/usr/local/foo/a/init.lua</code>, in that order.
+
+
+<p>
+Returns the resulting name of the first file that it can
+open in read mode (after closing the file),
+or <b>fail</b> plus an error message if none succeeds.
+(This error message lists all file names it tried to open.)
+
+
+
+
+
+
+
+
+</body>
+</html>

@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lua 5.5 - Section 6.5</title>
+</head>
+<body>
+<h2>6.5 &ndash; <a name="6.5">String Manipulation</a></h2>
+
+
+
+<p>
+This library provides generic functions for string manipulation,
+such as finding and extracting substrings, and pattern matching.
+When indexing a string in Lua, the first character is at position&nbsp;1
+(not at&nbsp;0, as in C).
+Indices are allowed to be negative and are interpreted as indexing backwards,
+from the end of the string.
+Thus, the last character is at position -1, and so on.
+
+
+<p>
+The string library provides all its functions inside the table
+<a name="pdf-string"><code>string</code></a>.
+It also sets a metatable for strings
+where the <code>__index</code> field points to the <code>string</code> table.
+Therefore, you can use the string functions in object-oriented style.
+For instance, <code>string.byte(s,i)</code>
+can be written as <code>s:byte(i)</code>.
+
+
+<p>
+The string library assumes one-byte character encodings.
+
+
+<p>
+<hr><h3><a name="pdf-string.byte"><code>string.byte (s [, i [, j]])</code></a></h3>
+Returns the internal numeric codes of the characters <code>s[i]</code>,
+<code>s[i+1]</code>, ..., <code>s[j]</code>.
+The default value for <code>i</code> is&nbsp;1;
+the default value for <code>j</code> is&nbsp;<code>i</code>.
+These indices are corrected
+following the same rules of function <a href="#pdf-string.sub"><code>string.sub</code></a>.
+
+
+<p>
+Numeric codes are not necessarily portable across platforms.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-string.char"><code>string.char (&middot;&middot;&middot;)</code></a></h3>
+Receives zero or more integers.
+Returns a string with length equal to the number of arguments,
+in which each character has the internal numeric code equal
+to its corresponding argument.
+
+
+<p>
+Numeric codes are not necessarily portable across platforms.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-string.dump"><code>string.dump (function [, strip])</code></a></h3>
+
+
+<p>
+Returns a string containing a binary representation
+(a <em>binary chunk</em>)
+of the given function,
+so that a later <a href="#pdf-load"><code>load</code></a> on this string returns
+a copy of the function (but with new upvalues).
+If <code>strip</code> is a true value,
+the binary representation may not include all debug information
+about the function,
+to save space.
+
+
+<p>
+Functions with upvalues have only their number of upvalues saved.
+When (re)loaded,
+those upvalues receive fresh instances.
+(See the <a href="#pdf-load"><code>load</code></a> function for details about
+how these upvalues are initialized.
+You can use the debug library to serialize
+and reload the upvalues of a function
+in a way adequate to your needs.)
+
+
+
+
+<p>
+<hr><h3><a name="pdf-string.find"><code>string.find (s, pattern [, init [, plain]])</code></a></h3>
+
+
+<p>
+Looks for the first match of
+<code>pattern</code> (see <a href="#6.5.1">&sect;6.5.1</a>) in the string <code>s</code>.
+If it finds a match, then <code>find</code> returns the indices of&nbsp;<code>s</code>
+where this occurrence starts and ends;
+otherwise, it returns <b>fail</b>.
+A third, optional numeric argument <code>init</code> specifies
+where to start the search;
+its default value is&nbsp;1 and can be negative.
+A <b>true</b> as a fourth, optional argument <code>plain</code>
+turns off the pattern matching facilities,
+so the function does a plain "find substring" operation,
+with no characters in <code>pattern</code> being considered magic.
+
+
+<p>
+If the pattern has captures,
+then in a successful match
+the captured values are also returned,
+after the two indices.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-string.format"><code>string.format (formatstring, &middot;&middot;&middot;)</code></a></h3>
+
+
+<p>
+Returns a formatted version of its variable number of arguments
+following the description given in its first argument,
+which must be a string.
+The format string follows the same rules as the ISO&nbsp;C function <code>sprintf</code>.
+The accepted conversion specifiers are
+<code>A</code>, <code>a</code>, <code>c</code>, <code>d</code>, <code>E</code>, <code>e</code>, <code>f</code>, <code>G</code>, <code>g</code>,
+<code>i</code>, <code>o</code>, <code>p</code>, <code>s</code>, <code>u</code>, <code>X</code>, <code>x</code>, and '<code>%</code>',
+plus a non-C specifier <code>q</code>.
+The accepted flags are '<code>-</code>', '<code>+</code>', '<code>#</code>',
+'<code>0</code>', and '<code> </code>' (space).
+Both width and precision, when present,
+are limited to two digits.
+
+
+<p>
+The specifier <code>q</code> formats booleans, nil, numbers, and strings
+in a way that the result is a valid constant in Lua source code.
+Booleans and nil are written in the obvious way
+(<code>true</code>, <code>false</code>, <code>nil</code>).
+Floats are written in hexadecimal,
+to preserve full precision.
+A string is written between double quotes,
+using escape sequences when necessary to ensure that
+it can safely be read back by the Lua interpreter.
+For instance, the call
+
+<pre>
+     string.format('%q', 'a string with "quotes" and \n new line')
+</pre><p>
+may produce the string:
+
+<pre>
+     "a string with \"quotes\" and \
+      new line"
+</pre><p>
+This specifier does not support modifiers (flags, width, precision).
+
+
+<p>
+The conversion specifiers
+<code>A</code>, <code>a</code>, <code>E</code>, <code>e</code>, <code>f</code>,
+<code>G</code>, and <code>g</code> all expect a number as argument.
+The specifiers <code>c</code>, <code>d</code>,
+<code>i</code>, <code>o</code>, <code>u</code>, <code>X</code>, and <code>x</code>
+expect an integer.
+When Lua is compiled with a C89 compiler,
+the specifiers <code>A</code> and <code>a</code> (hexadecimal floats)
+do not support modifiers.
+
+
+<p>
+The specifier <code>s</code> expects a string;
+if its argument is not a string,
+it is converted to one following the same rules of <a href="#pdf-tostring"><code>tostring</code></a>.
+If the specifier has any modifier,
+the corresponding string argument should not contain embedded zeros.
+
+
+<p>
+The specifier <code>p</code> formats the pointer
+returned by <a href="#lua_topointer"><code>lua_topointer</code></a>.
+That gives a unique string identifier for tables, userdata,
+threads, strings, and functions.
+For other values (numbers, nil, booleans),
+this specifier results in a string representing
+the pointer <code>NULL</code>.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-string.gmatch"><code>string.gmatch (s, pattern [, init])</code></a></h3>
+Returns an iterator function that,
+each time it is called,
+returns the next captures from <code>pattern</code> (see <a href="#6.5.1">&sect;6.5.1</a>)
+over the string <code>s</code>.
+If <code>pattern</code> specifies no captures,
+then the whole match is produced in each call.
+A third, optional numeric argument <code>init</code> specifies
+where to start the search;
+its default value is&nbsp;1 and can be negative.
+
+
+<p>
+As an example, the following loop
+will iterate over all the words from string <code>s</code>,
+printing one per line:
+
+<pre>
+     s = "hello world from Lua"
+     for w in string.gmatch(s, "%a+") do
+       print(w)
+     end
+</pre><p>
+The next example collects all pairs <code>key=value</code> from the
+given string into a table:
+
+<pre>
+     t = {}
+     s = "from=world, to=Lua"
+     for k, v in string.gmatch(s, "(%w+)=(%w+)") do
+       t[k] = v
+     end
+</pre>
+
+<p>
+For this function, a caret '<code>^</code>' at the start of a pattern does not
+work as an anchor, as this would prevent the iteration.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-string.gsub"><code>string.gsub (s, pattern, repl [, n])</code></a></h3>
+Returns a copy of <code>s</code>
+in which all (or the first <code>n</code>, if given)
+occurrences of the <code>pattern</code> (see <a href="#6.5.1">&sect;6.5.1</a>) have been
+replaced by a replacement string specified by <code>repl</code>,
+which can be a string, a table, or a function.
+<code>gsub</code> also returns, as its second value,
+the total number of matches that occurred.
+The name <code>gsub</code> comes from <em>Global SUBstitution</em>.
+
+
+<p>
+If <code>repl</code> is a string, then its value is used for replacement.
+The character&nbsp;<code>%</code> works as an escape character:
+any sequence in <code>repl</code> of the form <code>%<em>d</em></code>,
+with <em>d</em> between 1 and 9,
+stands for the value of the <em>d</em>-th captured substring;
+the sequence <code>%0</code> stands for the whole match;
+the sequence <code>%%</code> stands for a single&nbsp;<code>%</code>.
+
+
+<p>
+If <code>repl</code> is a table, then the table is queried for every match,
+using the first capture as the key.
+
+
+<p>
+If <code>repl</code> is a function, then this function is called every time a
+match occurs, with all captured substrings passed as arguments,
+in order.
+
+
+<p>
+In any case,
+if the pattern specifies no captures,
+then it behaves as if the whole pattern was inside a capture.
+
+
+<p>
+If the value returned by the table query or by the function call
+is a string or a number,
+then it is used as the replacement string;
+otherwise, if it is <b>false</b> or <b>nil</b>,
+then there is no replacement
+(that is, the original match is kept in the string).
+
+
+<p>
+Here are some examples:
+
+<pre>
+     x = string.gsub("hello world", "(%w+)", "%1 %1")
+     -- x="hello hello world world"
+     
+     x = string.gsub("hello world", "%w+", "%0 %0", 1)
+     -- x="hello hello world"
+     
+     x = string.gsub("hello world from Lua", "(%w+)%s*(%w+)", "%2 %1")
+     -- x="world hello Lua from"
+     
+     x = string.gsub("home = $HOME, user = $USER", "%$(%w+)", os.getenv)
+     -- x="home = /home/roberto, user = roberto"
+     
+     x = string.gsub("4+5 = $return 4+5$", "%$(.-)%$", function (s)
+           return load(s)()
+         end)
+     -- x="4+5 = 9"
+     
+     local t = {name="lua", version="5.5"}
+     x = string.gsub("$name-$version.tar.gz", "%$(%w+)", t)
+     -- x="lua-5.5.tar.gz"
+</pre>
+
+
+
+<p>
+<hr><h3><a name="pdf-string.len"><code>string.len (s)</code></a></h3>
+
+
+<p>
+Receives a string and returns its length.
+The empty string <code>""</code> has length 0.
+Embedded zeros are counted,
+so <code>"a\000bc\000"</code> has length 5.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-string.lower"><code>string.lower (s)</code></a></h3>
+
+
+<p>
+Receives a string and returns a copy of this string with all
+uppercase letters changed to lowercase.
+All other characters are left unchanged.
+The definition of what an uppercase letter is depends on the current locale.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-string.match"><code>string.match (s, pattern [, init])</code></a></h3>
+
+
+<p>
+Looks for the first <em>match</em> of
+the <code>pattern</code> (see <a href="#6.5.1">&sect;6.5.1</a>) in the string <code>s</code>.
+If it finds one, then <code>match</code> returns
+the captures from the pattern;
+otherwise it returns <b>fail</b>.
+If <code>pattern</code> specifies no captures,
+then the whole match is returned.
+A third, optional numeric argument <code>init</code> specifies
+where to start the search;
+its default value is&nbsp;1 and can be negative.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-string.pack"><code>string.pack (fmt, v1, v2, &middot;&middot;&middot;)</code></a></h3>
+
+
+<p>
+Returns a binary string containing the values <code>v1</code>, <code>v2</code>, etc.
+serialized in binary form (packed)
+according to the format string <code>fmt</code> (see <a href="#6.5.2">&sect;6.5.2</a>).
+
+
+
+
+<p>
+<hr><h3><a name="pdf-string.packsize"><code>string.packsize (fmt)</code></a></h3>
+
+
+<p>
+Returns the length of a string resulting from <a href="#pdf-string.pack"><code>string.pack</code></a>
+with the given format.
+The format string cannot have the variable-length options
+'<code>s</code>' or '<code>z</code>' (see <a href="#6.5.2">&sect;6.5.2</a>).
+
+
+
+
+<p>
+<hr><h3><a name="pdf-string.rep"><code>string.rep (s, n [, sep])</code></a></h3>
+
+
+<p>
+Returns a string that is the concatenation of <code>n</code> copies of
+the string <code>s</code> separated by the string <code>sep</code>.
+The default value for <code>sep</code> is the empty string
+(that is, no separator).
+Returns the empty string if <code>n</code> is not positive.
+
+
+<p>
+(Note that it is very easy to exhaust the memory of your machine
+with a single call to this function.)
+
+
+
+
+<p>
+<hr><h3><a name="pdf-string.reverse"><code>string.reverse (s)</code></a></h3>
+
+
+<p>
+Returns a string that is the string <code>s</code> reversed.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-string.sub"><code>string.sub (s, i [, j])</code></a></h3>
+
+
+<p>
+Returns the substring of <code>s</code> that
+starts at <code>i</code>  and continues until <code>j</code>;
+<code>i</code> and <code>j</code> can be negative.
+If <code>j</code> is absent, then it is assumed to be equal to -1
+(which is the same as the string length).
+In particular,
+the call <code>string.sub(s,1,j)</code> returns a prefix of <code>s</code>
+with length <code>j</code>,
+and <code>string.sub(s,-i)</code> (for a positive <code>i</code>)
+returns a suffix of <code>s</code>
+with length <code>i</code>.
+
+
+<p>
+If, after the translation of negative indices,
+<code>i</code> is less than 1,
+it is corrected to 1.
+If <code>j</code> is greater than the string length,
+it is corrected to that length.
+If, after these corrections,
+<code>i</code> is greater than <code>j</code>,
+the function returns the empty string.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-string.unpack"><code>string.unpack (fmt, s [, pos])</code></a></h3>
+
+
+<p>
+Returns the values packed in string <code>s</code> (see <a href="#pdf-string.pack"><code>string.pack</code></a>)
+according to the format string <code>fmt</code> (see <a href="#6.5.2">&sect;6.5.2</a>).
+An optional <code>pos</code> marks where
+to start reading in <code>s</code> (default is 1).
+After the read values,
+this function also returns the index of the first unread byte in <code>s</code>.
+
+
+
+
+<p>
+<hr><h3><a name="pdf-string.upper"><code>string.upper (s)</code></a></h3>
+
+
+<p>
+Receives a string and returns a copy of this string with all
+lowercase letters changed to uppercase.
+All other characters are left unchanged.
+The definition of what a lowercase letter is depends on the current locale.
+
+
+
+
+
+
+
+<h3>6.5.1 &ndash; <a name="6.5.1">Patterns</a></h3>
+
+
+
+<p>
+Patterns in Lua are described by regular strings,
+which are interpreted as patterns by the pattern-matching functions
+<a href="#pdf-string.find"><code>string.find</code></a>,
+<a href="#pdf-string.gmatch"><code>string.gmatch</code></a>,
+<a href="#pdf-string.gsub"><code>string.gsub</code></a>,
+and <a href="#pdf-string.match"><code>string.match</code></a>.
+This section describes the syntax and the meaning
+(that is, what they match) of these strings.
+
+
+
+
+
+<h4>Character Class:</h4><p>
+A <em>character class</em> is used to represent a set of characters.
+The following combinations are allowed in describing a character class:
+
+<ul>
+
+<li><b><em>x</em></b>: 
+(where <em>x</em> is not one of the <em>magic characters</em>
+<code>^$()%.[]*+-?</code>)
+represents the character <em>x</em> itself.
+</li>
+
+<li><b><code>.</code></b>:  (a dot) represents all characters.</li>
+
+<li><b><code>%a</code></b>:  represents all letters.</li>
+
+<li><b><code>%c</code></b>:  represents all control characters.</li>
+
+<li><b><code>%d</code></b>:  represents all digits.</li>
+
+<li><b><code>%g</code></b>:  represents all printable characters except space.</li>
+
+<li><b><code>%l</code></b>:  represents all lowercase letters.</li>
+
+<li><b><code>%p</code></b>:  represents all punctuation characters.</li>
+
+<li><b><code>%s</code></b>:  represents all space characters.</li>
+
+<li><b><code>%u</code></b>:  represents all uppercase letters.</li>
+
+<li><b><code>%w</code></b>:  represents all alphanumeric characters.</li>
+
+<li><b><code>%x</code></b>:  represents all hexadecimal digits.</li>
+
+<li><b><code>%<em>x</em></code></b>:  (where <em>x</em> is any non-alphanumeric character)
+represents the character <em>x</em>.
+This is the standard way to escape the magic characters.
+Any non-alphanumeric character
+(including all punctuation characters, even the non-magical)
+can be preceded by a '<code>%</code>' to represent itself in a pattern.
+</li>
+
+<li><b><code>[<em>set</em>]</code></b>: 
+represents the class which is the union of all
+characters in <em>set</em>.
+A range of characters can be specified by
+separating the end characters of the range,
+in ascending order, with a '<code>-</code>'.
+All classes <code>%</code><em>x</em> described above can also be used as
+components in <em>set</em>.
+All other characters in <em>set</em> represent themselves.
+For example, <code>[%w_]</code> (or <code>[_%w]</code>)
+represents all alphanumeric characters plus the underscore,
+<code>[0-7]</code> represents the octal digits,
+and <code>[0-7%l%-]</code> represents the octal digits plus
+the lowercase letters plus the '<code>-</code>' character.
+
+
+<p>
+You can put a closing square bracket in a set
+by positioning it as the first character in the set.
+You can put a hyphen in a set
+by positioning it as the first or the last character in the set.
+(You can also use an escape for both cases.)
+
+
+<p>
+The interaction between ranges and classes is not defined.
+Therefore, patterns like <code>[%a-z]</code> or <code>[a-%%]</code>
+have no meaning.
+</li>
+
+<li><b><code>[^<em>set</em>]</code></b>: 
+represents the complement of <em>set</em>,
+where <em>set</em> is interpreted as above.
+</li>
+
+</ul><p>
+For all classes represented by single letters (<code>%a</code>, <code>%c</code>, etc.),
+the corresponding uppercase letter represents the complement of the class.
+For instance, <code>%S</code> represents all non-space characters.
+
+
+<p>
+The definitions of letter, space, and other character groups
+depend on the current locale.
+In particular, the class <code>[a-z]</code> may not be equivalent to <code>%l</code>.
+
+
+
+
+
+<h4>Pattern Item:</h4><p>
+A <em>pattern item</em> can be
+
+<ul>
+
+<li>
+a single character class,
+which matches any single character in the class;
+</li>
+
+<li>
+a single character class followed by '<code>*</code>',
+which matches sequences of zero or more characters in the class.
+These repetition items will always match the longest possible sequence;
+</li>
+
+<li>
+a single character class followed by '<code>+</code>',
+which matches sequences of one or more characters in the class.
+These repetition items will always match the longest possible sequence;
+</li>
+
+<li>
+a single character class followed by '<code>-</code>',
+which also matches sequences of zero or more characters in the class.
+Unlike '<code>*</code>',
+these repetition items will always match the shortest possible sequence;
+</li>
+
+<li>
+a single character class followed by '<code>?</code>',
+which matches zero or one occurrence of a character in the class.
+It always matches one occurrence if possible;
+</li>
+
+<li>
+<code>%<em>n</em></code>, for <em>n</em> between 1 and 9;
+such item matches a substring equal to the <em>n</em>-th captured string
+(see below);
+</li>
+
+<li>
+<code>%b<em>xy</em></code>, where <em>x</em> and <em>y</em> are two distinct characters;
+such item matches strings that start with&nbsp;<em>x</em>, end with&nbsp;<em>y</em>,
+and where the <em>x</em> and <em>y</em> are <em>balanced</em>.
+This means that, if one reads the string from left to right,
+counting <em>+1</em> for an <em>x</em> and <em>-1</em> for a <em>y</em>,
+the ending <em>y</em> is the first <em>y</em> where the count reaches 0.
+For instance, the item <code>%b()</code> matches expressions with
+balanced parentheses.
+</li>
+
+<li>
+<code>%f[<em>set</em>]</code>, a <em>frontier pattern</em>;
+such item matches an empty string at any position such that
+the next character belongs to <em>set</em>
+and the previous character does not belong to <em>set</em>.
+The set <em>set</em> is interpreted as previously described.
+The beginning and the end of the subject are handled as if
+they were the character '<code>\0</code>'.
+</li>
+
+</ul>
+
+
+
+
+<h4>Pattern:</h4><p>
+A <em>pattern</em> is a sequence of pattern items.
+A caret '<code>^</code>' at the beginning of a pattern anchors the match at the
+beginning of the subject string.
+A '<code>$</code>' at the end of a pattern anchors the match at the
+end of the subject string.
+At other positions,
+'<code>^</code>' and '<code>$</code>' have no special meaning and represent themselves.
+
+
+
+
+
+<h4>Captures:</h4><p>
+A pattern can contain sub-patterns enclosed in parentheses;
+they describe <em>captures</em>.
+When a match succeeds, the substrings of the subject string
+that match captures are stored (<em>captured</em>) for future use.
+Captures are numbered according to their left parentheses.
+For instance, in the pattern <code>"(a*(.)%w(%s*))"</code>,
+the part of the string matching <code>"a*(.)%w(%s*)"</code> is
+stored as the first capture, and therefore has number&nbsp;1;
+the character matching "<code>.</code>" is captured with number&nbsp;2,
+and the part matching "<code>%s*</code>" has number&nbsp;3.
+
+
+<p>
+As a special case, the capture <code>()</code> captures
+the current string position (a number).
+For instance, if we apply the pattern <code>"()aa()"</code> on the
+string <code>"flaaap"</code>, there will be two captures: 3&nbsp;and&nbsp;5.
+
+
+
+
+
+<h4>Multiple matches:</h4><p>
+The function <a href="#pdf-string.gsub"><code>string.gsub</code></a> and the iterator <a href="#pdf-string.gmatch"><code>string.gmatch</code></a>
+match multiple occurrences of the given pattern in the subject.
+For these functions,
+a new match is considered valid only
+if it ends at least one byte after the end of the previous match.
+In other words, the pattern machine never accepts the
+empty string as a match immediately after another match.
+As an example,
+consider the results of the following code:
+
+<pre>
+     &gt; string.gsub("abc", "()a*()", print);
+     --&gt; 1   2
+     --&gt; 3   3
+     --&gt; 4   4
+</pre><p>
+The second and third results come from Lua matching an empty
+string after '<code>b</code>' and another one after '<code>c</code>'.
+Lua does not match an empty string after '<code>a</code>',
+because it would end at the same position of the previous match.
+
+
+
+
+
+
+
+<h3>6.5.2 &ndash; <a name="6.5.2">Format Strings for Pack and Unpack</a></h3>
+
+<p>
+The first argument to <a href="#pdf-string.pack"><code>string.pack</code></a>,
+<a href="#pdf-string.packsize"><code>string.packsize</code></a>, and <a href="#pdf-string.unpack"><code>string.unpack</code></a>
+is a format string,
+which describes the layout of the structure being created or read.
+
+
+<p>
+A format string is a sequence of conversion options.
+The conversion options are as follows:
+
+<ul>
+<li><b><code>&lt;</code></b>: sets little endian</li>
+<li><b><code>&gt;</code></b>: sets big endian</li>
+<li><b><code>=</code></b>: sets native endian</li>
+<li><b><code>![<em>n</em>]</code></b>: sets maximum alignment to <code>n</code>
+(default is native alignment)</li>
+<li><b><code>b</code></b>: a signed byte (<code>char</code>)</li>
+<li><b><code>B</code></b>: an unsigned byte (<code>char</code>)</li>
+<li><b><code>h</code></b>: a signed <code>short</code> (native size)</li>
+<li><b><code>H</code></b>: an unsigned <code>short</code> (native size)</li>
+<li><b><code>l</code></b>: a signed <code>long</code> (native size)</li>
+<li><b><code>L</code></b>: an unsigned <code>long</code> (native size)</li>
+<li><b><code>j</code></b>: a <code>lua_Integer</code></li>
+<li><b><code>J</code></b>: a <code>lua_Unsigned</code></li>
+<li><b><code>T</code></b>: a <code>size_t</code> (native size)</li>
+<li><b><code>i[<em>n</em>]</code></b>: a signed <code>int</code> with <code>n</code> bytes
+(default is native size)</li>
+<li><b><code>I[<em>n</em>]</code></b>: an unsigned <code>int</code> with <code>n</code> bytes
+(default is native size)</li>
+<li><b><code>f</code></b>: a <code>float</code> (native size)</li>
+<li><b><code>d</code></b>: a <code>double</code> (native size)</li>
+<li><b><code>n</code></b>: a <code>lua_Number</code></li>
+<li><b><code>c<em>n</em></code></b>: a fixed-sized string with <code>n</code> bytes</li>
+<li><b><code>z</code></b>: a zero-terminated string</li>
+<li><b><code>s[<em>n</em>]</code></b>: a string preceded by its length
+coded as an unsigned integer with <code>n</code> bytes
+(default is a <code>size_t</code>)</li>
+<li><b><code>x</code></b>: one byte of padding</li>
+<li><b><code>X<em>op</em></code></b>: an empty item that aligns
+according to option <code>op</code>
+(which is otherwise ignored)</li>
+<li><b>'<code> </code>'</b>: (space) ignored</li>
+</ul><p>
+(A "<code>[<em>n</em>]</code>" means an optional integral numeral.)
+Except for padding, spaces, and configurations
+(options "<code>xX &lt;=&gt;!</code>"),
+each option corresponds to an argument in <a href="#pdf-string.pack"><code>string.pack</code></a>
+or a result in <a href="#pdf-string.unpack"><code>string.unpack</code></a>.
+
+
+<p>
+For options "<code>!<em>n</em></code>", "<code>s<em>n</em></code>", "<code>i<em>n</em></code>", and "<code>I<em>n</em></code>",
+<code>n</code> can be any integer between 1 and 16.
+All integral options check overflows;
+<a href="#pdf-string.pack"><code>string.pack</code></a> checks whether the given value fits in the given size;
+<a href="#pdf-string.unpack"><code>string.unpack</code></a> checks whether the read value fits in a Lua integer.
+For the unsigned options,
+Lua integers are treated as unsigned values too.
+
+
+<p>
+Any format string starts as if prefixed by "<code>!1=</code>",
+that is,
+with maximum alignment of 1 (no alignment)
+and native endianness.
+
+
+<p>
+Native endianness assumes that the whole system is
+either big or little endian.
+The packing functions will not emulate correctly the behavior
+of mixed-endian formats.
+
+
+<p>
+Alignment works as follows:
+For each option,
+the format gets extra padding until the data starts
+at an offset that is a multiple of the minimum between the
+option size and the maximum alignment;
+this minimum must be a power of 2.
+Options "<code>c</code>" and "<code>z</code>" are not aligned;
+option "<code>s</code>" follows the alignment of its starting integer.
+
+
+<p>
+All padding is filled with zeros by <a href="#pdf-string.pack"><code>string.pack</code></a>
+and ignored by <a href="#pdf-string.unpack"><code>string.unpack</code></a>.
+
+
+
+
+
+
+
+
+</body>
+</html>

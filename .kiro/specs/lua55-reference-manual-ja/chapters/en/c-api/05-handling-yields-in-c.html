@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lua 5.5 - Section 4.5</title>
+</head>
+<body>
+<h2>4.5 &ndash; <a name="4.5">Handling Yields in C</a></h2>
+
+<p>
+Internally, Lua uses the C <code>longjmp</code> facility to yield a coroutine.
+Therefore, if a C&nbsp;function <code>foo</code> calls an API function
+and this API function yields
+(directly or indirectly by calling another function that yields),
+Lua cannot return to <code>foo</code> any more,
+because the <code>longjmp</code> removes its frame from the C&nbsp;stack.
+
+
+<p>
+To avoid this kind of problem,
+Lua raises an error whenever it tries to yield across an API call,
+except for three functions:
+<a href="#lua_yieldk"><code>lua_yieldk</code></a>, <a href="#lua_callk"><code>lua_callk</code></a>, and <a href="#lua_pcallk"><code>lua_pcallk</code></a>.
+All those functions receive a <em>continuation function</em>
+(as a parameter named <code>k</code>) to continue execution after a yield.
+
+
+<p>
+We need to set some terminology to explain continuations.
+We have a C&nbsp;function called from Lua which we will call
+the <em>original function</em>.
+This original function then calls one of those three functions in the C API,
+which we will call the <em>callee function</em>,
+that then yields the current thread.
+This can happen when the callee function is <a href="#lua_yieldk"><code>lua_yieldk</code></a>,
+or when the callee function is either <a href="#lua_callk"><code>lua_callk</code></a> or <a href="#lua_pcallk"><code>lua_pcallk</code></a>
+and the function called by them yields.
+
+
+<p>
+Suppose the running thread yields while executing the callee function.
+After the thread resumes,
+it eventually will finish running the callee function.
+However,
+the callee function cannot return to the original function,
+because its frame in the C&nbsp;stack was destroyed by the yield.
+Instead, Lua calls a <em>continuation function</em>,
+which was given as an argument to the callee function.
+As the name implies,
+the continuation function should continue the task
+of the original function.
+
+
+<p>
+As an illustration, consider the following function:
+
+<pre>
+     int original_function (lua_State *L) {
+       ...     /* code 1 */
+       status = lua_pcall(L, n, m, h);  /* calls Lua */
+       ...     /* code 2 */
+     }
+</pre><p>
+Now we want to allow
+the Lua code being run by <a href="#lua_pcall"><code>lua_pcall</code></a> to yield.
+First, we can rewrite our function like here:
+
+<pre>
+     int k (lua_State *L, int status, lua_KContext ctx) {
+       ...  /* code 2 */
+     }
+     
+     int original_function (lua_State *L) {
+       ...     /* code 1 */
+       return k(L, lua_pcall(L, n, m, h), ctx);
+     }
+</pre><p>
+In the above code,
+the new function <code>k</code> is a
+<em>continuation function</em> (with type <a href="#lua_KFunction"><code>lua_KFunction</code></a>),
+which should do all the work that the original function
+was doing after calling <a href="#lua_pcall"><code>lua_pcall</code></a>.
+Now, we must inform Lua that it must call <code>k</code> if the Lua code
+being executed by <a href="#lua_pcall"><code>lua_pcall</code></a> gets interrupted in some way
+(errors or yielding),
+so we rewrite the code as here,
+replacing <a href="#lua_pcall"><code>lua_pcall</code></a> by <a href="#lua_pcallk"><code>lua_pcallk</code></a>:
+
+<pre>
+     int original_function (lua_State *L) {
+       ...     /* code 1 */
+       return k(L, lua_pcallk(L, n, m, h, ctx2, k), ctx1);
+     }
+</pre><p>
+Note the external, explicit call to the continuation:
+Lua will call the continuation only if needed, that is,
+in case of errors or resuming after a yield.
+If the called function returns normally without ever yielding,
+<a href="#lua_pcallk"><code>lua_pcallk</code></a> (and <a href="#lua_callk"><code>lua_callk</code></a>) will also return normally.
+(Of course, instead of calling the continuation in that case,
+you can do the equivalent work directly inside the original function.)
+
+
+<p>
+Besides the Lua state,
+the continuation function has two other parameters:
+the final status of the call and the context value (<code>ctx</code>) that
+was passed originally to <a href="#lua_pcallk"><code>lua_pcallk</code></a>.
+Lua does not use this context value;
+it only passes this value from the original function to the
+continuation function.
+For <a href="#lua_pcallk"><code>lua_pcallk</code></a>,
+the status is the same value that would be returned by <a href="#lua_pcallk"><code>lua_pcallk</code></a>,
+except that it is <a href="#pdf-LUA_YIELD"><code>LUA_YIELD</code></a> when being executed after a yield
+(instead of <a href="#pdf-LUA_OK"><code>LUA_OK</code></a>).
+For <a href="#lua_yieldk"><code>lua_yieldk</code></a> and <a href="#lua_callk"><code>lua_callk</code></a>,
+the status is always <a href="#pdf-LUA_YIELD"><code>LUA_YIELD</code></a> when Lua calls the continuation.
+(For these two functions,
+Lua will not call the continuation in case of errors,
+because they do not handle errors.)
+Similarly, when using <a href="#lua_callk"><code>lua_callk</code></a>,
+you should call the continuation function
+with <a href="#pdf-LUA_OK"><code>LUA_OK</code></a> as the status.
+(For <a href="#lua_yieldk"><code>lua_yieldk</code></a>, there is not much point in calling
+directly the continuation function,
+because <a href="#lua_yieldk"><code>lua_yieldk</code></a> usually does not return.)
+
+
+<p>
+Lua treats the continuation function as if it were the original function.
+The continuation function receives the same Lua stack
+from the original function,
+in the same state it would be if the callee function had returned.
+(For instance,
+after a <a href="#lua_callk"><code>lua_callk</code></a> the function and its arguments are
+removed from the stack and replaced by the results from the call.)
+It also has the same upvalues.
+Whatever it returns is handled by Lua as if it were the return
+of the original function.
+
+
+
+
+
+
+</body>
+</html>

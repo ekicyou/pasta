@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lua 5.5 - Section 6.1</title>
+</head>
+<body>
+<h2>6.1 – <a name="6.1">基本関数</a></h2>
+
+<p>基本ライブラリは、Luaへのコア関数を提供します。このライブラリをアプリケーションに含めない場合は、その機能の一部に実装を提供する必要があるかどうかを注意深く確認する必要があります。</p><p>
+</p><hr /><h3><a name="pdf-assert"><code>assert (v [, message])</code></a></h3>
+
+
+<p>引数<code>v</code>の値がfalse（つまり、<b>nil</b>または<b>false</b>）の場合、エラーを発生させます。それ以外の場合は、すべての引数を返します。エラーの場合、<code>message</code>はエラーオブジェクトです。存在しない場合は、デフォルトで"<code>assertion failed!</code>"になります。</p><p>
+</p><hr /><h3><a name="pdf-collectgarbage"><code>collectgarbage ([opt [, arg]])</code></a></h3>
+
+
+<p>この関数は、ガベージコレクタへの汎用インターフェイスです。最初の引数<code>opt</code>に従ってさまざまな関数を実行します。</p><ul>
+
+<li><b>"<code>collect</code>": </b>完全なガベージコレクションサイクルを実行します。これはデフォルトのオプションです。</li>
+
+<li><b>"<code>stop</code>": </b>ガベージコレクタの自動実行を停止します。コレクタは、明示的に呼び出された場合にのみ、再起動するまでの間実行されます。</li>
+
+<li><b>"<code>restart</code>": </b>ガベージコレクタの自動実行を再開します。</li>
+
+<li><b>"<code>count</code>": </b>Luaで使用されている総メモリをKbytes単位で返します。この値には小数部があり、1024を掛けると、Luaで使用されている正確なバイト数が得られます。</li>
+
+<li><b>"<code>step</code>": </b>ガベージコレクションステップを実行します。ステップの「サイズ」は<code>arg</code>によって制御されます。ゼロ値の場合、コレクタは1つの基本的な（不可分な）ステップを実行します。ゼロ以外の値の場合、コレクタはLuaによってその量のメモリ（Kbytes単位）が割り当てられたかのように実行します。ステップがコレクションサイクルを終了した場合は<b>true</b>を返します。</li>
+
+<li><b>"<code>isrunning</code>": </b>コレクタが実行中（つまり、停止していない）かどうかを示すブール値を返します。</li>
+
+<li><b>"<code>incremental</code>": </b> コレクタモードをインクリメンタルに変更します。このオプションの後には3つの数字が続きます。ガベージコレクタの一時停止時間、ステップ乗数、ステップサイズです（<a href="#2.5.1">§2.5.1</a>を参照）。0 はその値を変更しないことを意味します。</li>
+
+<li><b>"<code>generational</code>": </b> コレクタモードを世代別に変更します。このオプションの後には2つの数字が続きます。ガベージコレクタのマイナー乗数とメジャー乗数です（<a href="#2.5.2">§2.5.2</a>を参照）。0 はその値を変更しないことを意味します。</li>
+
+</ul><p>ガベージコレクションとこれらのオプションの詳細については、<a href="#2.5">§2.5</a>を参照してください。</p><p>この関数はファイナライザーによって呼び出されるべきではありません。</p><p>
+</p><hr /><h3><a name="pdf-dofile"><code>dofile ([filename])</code></a></h3>指定されたファイルを開き、その内容を Lua のチャンクとして実行します。引数なしで呼び出された場合、<code>dofile</code> は標準入力 (<code>stdin</code>) の内容を実行します。チャンクから返されるすべての値を返します。エラーが発生した場合、<code>dofile</code> はそのエラーを呼び出し元に伝播します（つまり、<code>dofile</code> は保護モードでは実行されません）。<p>
+</p><hr /><h3><a name="pdf-error"><code>error (message [, level])</code></a></h3><code>message</code> をエラーオブジェクトとしてエラーを発生させます（<a href="#2.3">§2.3</a>を参照）。この関数は決して返りません。<p>通常、<code>error</code> は、メッセージが文字列の場合、メッセージの先頭にエラー位置に関する情報を追加します。<code>level</code> 引数は、エラー位置を取得する方法を指定します。level&nbsp;1（デフォルト）では、エラー位置は <code>error</code> 関数が呼び出された場所です。Level&nbsp;2 は、<code>error</code> を呼び出した関数が呼び出された場所をエラーとして示します。以降同様です。level&nbsp;0 を渡すと、メッセージへのエラー位置情報の追加を回避できます。</p><p>
+</p><hr /><h3><a name="pdf-_G"><code>_G</code></a></h3>グローバル環境を保持するグローバル変数（関数ではありません）（<a href="#2.2">§2.2</a>を参照）。Lua 自体はこの変数を使用しません。その値を変更しても、どの環境にも影響しませんし、その逆も同様です。<p>
+</p><hr /><h3><a name="pdf-getmetatable"><code>getmetatable (object)</code></a></h3>
+
+
+<p><code>object</code> がメタテーブルを持っていない場合は、<b>nil</b> を返します。それ以外の場合で、オブジェクトのメタテーブルに <code>__metatable</code> フィールドがある場合は、関連付けられた値を返します。それ以外の場合は、指定されたオブジェクトのメタテーブルを返します。</p><p>
+</p><hr /><h3><a name="pdf-ipairs"><code>ipairs (t)</code></a></h3>
+
+
+<p>3つの値（イテレータ関数、テーブル <code>t</code>、および 0）を返すため、次の構造</p><pre>     for i,v in ipairs(t) do <em>body</em> end
+</pre><p>は、欠落した最初のインデックスまで、（<code>1,t[1]</code>）、（<code>2,t[2]</code>）などのキーと値のペアを反復処理します。</p><p>
+</p><hr /><h3><a name="pdf-load"><code>load (chunk [, chunkname [, mode [, env]]])</code></a></h3>
+
+
+<p>チャンクをロードします。</p><p><code>chunk</code> が文字列の場合、チャンクはこの文字列です。<code>chunk</code> が関数の場合、<code>load</code> はチャンクの断片を取得するために繰り返し呼び出します。<code>chunk</code> の各呼び出しは、以前の結果と連結する文字列を返す必要があります。空の文字列、<b>nil</b>、または値がない場合は、チャンクの終わりを示します。</p><p>構文エラーがない場合、<code>load</code> はコンパイルされたチャンクを関数として返します。それ以外の場合は、<b>fail</b> とエラーメッセージを返します。</p><p>メインチャンクをロードすると、結果の関数には常に1つのアップバリュー（<code>_ENV</code> 変数）があります（<a href="#2.2">§2.2</a>を参照）。ただし、関数から作成されたバイナリチャンクをロードした場合（<a href="#pdf-string.dump"><code>string.dump</code></a>を参照）、結果の関数は任意の数のアップバリューを持つ可能性があり、最初のアップバリューが <code>_ENV</code> 変数であるという保証はありません。（メインでない関数は <code>_ENV</code> アップバリューを持たない場合もあります。）</p><p>いずれの場合も、結果の関数にアップバリューがある場合、その最初のアップバリューは、パラメータが指定されている場合は <code>env</code> の値に設定され、それ以外の場合はグローバル環境の値に設定されます。その他のアップバリューは <b>nil</b> で初期化されます。すべてのアップバリューは新しく、他の関数とは共有されません。</p><p>
+<code>chunkname</code> は、エラーメッセージおよびデバッグ情報用のチャンクの名前として使用されます（<a href="#4.7">§4.7</a>を参照）。省略した場合、<code>chunk</code> が文字列の場合は <code>chunk</code>、それ以外の場合は "<code>=(load)</code>" がデフォルトになります。</p><p>文字列 <code>mode</code> は、チャンクがテキストまたはバイナリ（つまり、プリコンパイルされたチャンク）のどちらにできるかを制御します。文字列 "<code>b</code>"（バイナリチャンクのみ）、"<code>t</code>"（テキストチャンクのみ）、または "<code>bt</code>"（バイナリとテキストの両方）にすることができます。デフォルトは "<code>bt</code>" です。</p><p>不正な形式のバイナリチャンクをロードしても安全です。<code>load</code> は適切なエラーを示します。ただし、Lua はバイナリチャンク内のコードの一貫性をチェックしません。悪意を持って作成されたバイトコードを実行すると、インタプリタがクラッシュする可能性があります。</p><p>
+</p><hr /><h3><a name="pdf-loadfile"><code>loadfile ([filename [, mode [, env]]])</code></a></h3>
+
+
+<p><a href="#pdf-load"><code>load</code></a> と同様ですが、チャンクをファイル <code>filename</code> から、またはファイル名が指定されていない場合は標準入力から取得します。</p><p>
+</p><hr /><h3><a name="pdf-next"><code>next (table [, index])</code></a></h3>
+
+
+<p>プログラムがテーブルのすべてのフィールドを走査できるようにします。最初の引数はテーブルで、2番目の引数はこのテーブルのインデックスです。<code>next</code> を呼び出すと、テーブルの次のインデックスとその関連付けられた値が返されます。2番目の引数として <b>nil</b> を渡して呼び出すと、<code>next</code> は初期インデックスとその関連付けられた値を返します。最後のインデックス、または空のテーブルで <b>nil</b> を渡して呼び出すと、<code>next</code> は <b>nil</b> を返します。2番目の引数が省略された場合、<b>nil</b> として解釈されます。特に、<code>next(t)</code> を使用して、テーブルが空かどうかを確認できます。</p><p>インデックスが列挙される順序は、<em>数値インデックスであっても</em>指定されていません。（テーブルを数値順に走査するには、数値の <b>for</b> を使用します。）</p><p>走査中にテーブルの存在しないフィールドに値を代入しないでください。ただし、既存のフィールドは変更できます。特に、既存のフィールドを nil に設定できます。</p><p>
+</p><hr /><h3><a name="pdf-pairs"><code>pairs (t)</code></a></h3>
+
+
+<p><code>t</code> にメタメソッド <code>__pairs</code> がある場合、<code>t</code> を引数としてそれを呼び出し、呼び出しからの最初の 3 つの結果を返します。</p><p>それ以外の場合は、3 つの値を返します。 <a href="#pdf-next"><code>next</code></a> 関数、テーブル <code>t</code>、および <b>nil</b> を返すため、次の構造</p><pre>     for k,v in pairs(t) do <em>body</em> end
+</pre><p>は、テーブル <code>t</code> のすべてのキーと値のペアを反復処理します。</p><p>テーブルを走査中に変更する場合の注意点については、<a href="#pdf-next"><code>next</code></a> 関数を参照してください。</p><p>
+</p><hr /><h3><a name="pdf-pcall"><code>pcall (f [, arg1, ···])</code></a></h3>
+
+
+<p><em>保護モード</em>で、指定された引数を使用して関数 <code>f</code> を呼び出します。これは、<code>f</code> 内のエラーが伝播されないことを意味します。代わりに、<code>pcall</code> はエラーをキャッチし、ステータスコードを返します。最初の結果はステータスコード（ブール値）であり、呼び出しがエラーなしで成功した場合は <b>true</b> です。その場合、<code>pcall</code> はこの最初の結果の後、呼び出しからのすべての結果も返します。エラーが発生した場合、<code>pcall</code> は <b>false</b> とエラーオブジェクトを返します。<code>pcall</code> によってキャッチされたエラーは、メッセージハンドラーを呼び出さないことに注意してください。</p><p>
+</p><hr /><h3><a name="pdf-print"><code>print (···)</code></a></h3>任意の数の引数を受け取り、それらの値を <a href="#pdf-tostring"><code>tostring</code></a> と同じルールに従って各引数を文字列に変換し、<code>stdout</code> に出力します。<p><code>print</code> 関数は、フォーマットされた出力を目的としたものではなく、たとえばデバッグのために値をすばやく表示するためのものです。出力を完全に制御するには、<a href="#pdf-string.format"><code>string.format</code></a> と <a href="#pdf-io.write"><code>io.write</code></a> を使用してください。</p><p>
+</p><hr /><h3><a name="pdf-rawequal"><code>rawequal (v1, v2)</code></a></h3><code>__eq</code> メタメソッドを呼び出さずに、<code>v1</code> が <code>v2</code> と等しいかどうかを確認します。ブール値を返します。<p>
+</p><hr /><h3><a name="pdf-rawget"><code>rawget (table, index)</code></a></h3><code>__index</code> メタ値を使用せずに、<code>table[index]</code> の実際の値を取得します。<code>table</code> はテーブルである必要があります。<code>index</code> には任意の値を使用できます。<p>
+</p><hr /><h3><a name="pdf-rawlen"><code>rawlen (v)</code></a></h3><code>__len</code> メタメソッドを呼び出さずに、テーブルまたは文字列である必要があるオブジェクト <code>v</code> の長さを返します。整数を返します。<p>
+</p><hr /><h3><a name="pdf-rawset"><code>rawset (table, index, value)</code></a></h3><code>__newindex</code> メタ値を使用せずに、<code>table[index]</code> の実際の値を <code>value</code> に設定します。<code>table</code> はテーブルである必要があり、<code>index</code> は <b>nil</b> および NaN と異なる任意の値、<code>value</code> は任意の Lua 値である必要があります。<p>この関数は <code>table</code> を返します。</p><p>
+</p><hr /><h3><a name="pdf-select"><code>select (index, ···)</code></a></h3>
+
+
+<p><code>index</code> が数値の場合、引数番号 <code>index</code> 以降のすべての引数を返します。負の数は末尾からインデックス付けされます（-1 は最後の引数です）。それ以外の場合、<code>index</code> は文字列 <code>"#"</code> である必要があり、<code>select</code> は受信した余分な引数の合計数を返します。</p><p>
+</p><hr /><h3><a name="pdf-setmetatable"><code>setmetatable (table, metatable)</code></a></h3>
+
+
+<p>指定されたテーブルのメタテーブルを設定します。<code>metatable</code> が <b>nil</b> の場合、指定されたテーブルのメタテーブルを削除します。元のメタテーブルに <code>__metatable</code> フィールドがある場合は、エラーが発生します。</p><p>この関数は <code>table</code> を返します。</p><p>Lua コードから他の型のメタテーブルを変更するには、デバッグライブラリを使用する必要があります（<a href="#6.10">§6.10</a>）。</p><p>
+</p><hr /><h3><a name="pdf-tonumber"><code>tonumber (e [, base])</code></a></h3>
+
+
+<p><code>base</code> を指定せずに呼び出すと、<code>tonumber</code> は引数を数値に変換しようとします。引数がすでに数値であるか、数値に変換可能な文字列である場合、<code>tonumber</code> はこの数値を返します。それ以外の場合は、<b>fail</b> を返します。</p><p>文字列の変換は、Lua の字句規則に従って（<a href="#3.1">§3.1</a>を参照）、整数または浮動小数点数になる可能性があります。文字列には、先頭と末尾のスペースと符号を含めることができます。</p><p><code>base</code> を指定して呼び出すと、<code>e</code> はその基数で整数数値として解釈される文字列である必要があります。基数は、2〜36 の任意の整数にすることができます。10 を超える基数では、文字 '<code>A</code>'（大文字または小文字）は 10 を表し、'<code>B</code>' は 11 を表し、以下同様に '<code>Z</code>' は 35 を表します。文字列 <code>e</code> が指定された基数で有効な数値ではない場合、関数は <b>fail</b> を返します。</p><p>
+</p><hr /><h3><a name="pdf-tostring"><code>tostring (v)</code></a></h3>
+
+
+<p>任意の型の値を受け取り、人間が読める形式の文字列に変換します。</p><p><code>v</code> のメタテーブルに <code>__tostring</code> フィールドがある場合、<code>tostring</code> は <code>v</code> を引数として対応する値を呼び出し、その呼び出しの結果を結果として使用します。それ以外の場合、<code>v</code> のメタテーブルに文字列値を持つ <code>__name</code> フィールドがある場合、<code>tostring</code> はその文字列を最終結果で使用する可能性があります。</p><p>数値がどのように変換されるかを完全に制御するには、<a href="#pdf-string.format"><code>string.format</code></a> を使用してください。</p><p>
+</p><hr /><h3><a name="pdf-type"><code>type (v)</code></a></h3>
+
+
+<p>唯一の引数の型を、文字列としてエンコードして返します。この関数の可能な結果は、"<code>nil</code>"（値 <b>nil</b> ではなく文字列）、"<code>number</code>"、"<code>string</code>"、"<code>boolean</code>"、"<code>table</code>"、"<code>function</code>"、"<code>thread</code>"、および "<code>userdata</code>" です。</p><p>
+</p><hr /><h3><a name="pdf-_VERSION"><code>_VERSION</code></a></h3>
+
+
+<p>実行中の Lua バージョンを含む文字列を保持するグローバル変数（関数ではありません）。この変数の現在の値は "<code>Lua 5.4</code>" です。</p><p>
+</p><hr /><h3><a name="pdf-warn"><code>warn (msg1, ···)</code></a></h3>
+
+
+<p>すべての引数（文字列である必要があります）の連結で構成されるメッセージを含む警告を発行します。</p><p>慣例により、'<code>@</code>' で始まる 1 つのメッセージは、警告システム自体へのメッセージである<em>制御メッセージ</em>であることを意図しています。特に、Lua の標準警告関数は、警告の出力を停止する "<code>@off</code>" と、出力を（再）開始する "<code>@on</code>" という制御メッセージを認識します。不明な制御メッセージは無視されます。</p><p>
+</p><hr /><h3><a name="pdf-xpcall"><code>xpcall (f, msgh [, arg1, ···])</code></a></h3>
+
+
+<p>この関数は、新しいメッセージハンドラ <code>msgh</code> を設定することを除いて、<a href="#pdf-pcall"><code>pcall</code></a> と似ています。</p>
+</body>
+</html>

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lua 5.5 - Section 6.3</title>
+</head>
+<body>
+<h2>6.3 – <a name="6.3">モジュール</a></h2>
+
+<p>package ライブラリは、Lua でモジュールをロードするための基本的な機能を提供します。グローバル環境に 1 つの関数 <a href="#pdf-require"><code>require</code></a> を直接エクスポートします。他のすべては、<a name="pdf-package"><code>package</code></a> テーブルにエクスポートされます。</p><p>
+</p><hr /><h3><a name="pdf-require"><code>require (modname)</code></a></h3>
+
+
+<p>指定されたモジュールをロードします。この関数は、<a href="#pdf-package.loaded"><code>package.loaded</code></a> テーブルを調べて、<code>modname</code> がすでにロードされているかどうかを判断することから開始します。ロードされている場合、<code>require</code> は <code>package.loaded[modname]</code> に格納されている値を返します。（この場合、2 番目の結果がないことは、この呼び出しがモジュールをロードする必要がなかったことを示します。）それ以外の場合は、モジュールの<em>ローダー</em>を検索しようとします。</p><p>ローダーを検索するために、<code>require</code> は <a href="#pdf-package.searchers"><code>package.searchers</code></a> テーブルによってガイドされます。このテーブルの各項目は検索関数であり、特定の方法でモジュールを検索します。このテーブルを変更することにより、<code>require</code> がモジュールを検索する方法を変更できます。以下の説明は、<a href="#pdf-package.searchers"><code>package.searchers</code></a> のデフォルト構成に基づいています。</p><p>まず、<code>require</code> は <code>package.preload[modname]</code> をクエリします。値がある場合、この値（関数である必要があります）がローダーです。それ以外の場合、<code>require</code> は <a href="#pdf-package.path"><code>package.path</code></a> に格納されているパスを使用して Lua ローダーを検索します。それも失敗した場合、<a href="#pdf-package.cpath"><code>package.cpath</code></a> に格納されているパスを使用して C&nbsp;ローダーを検索します。それも失敗した場合、<em>オールインワン</em>ローダーを試みます（<a href="#pdf-package.searchers"><code>package.searchers</code></a> を参照）。</p><p>ローダーが見つかると、<code>require</code> はローダーを 2 つの引数、<code>modname</code> と追加の値（<em>ローダーデータ</em>）を付けて呼び出します。ローダーデータは、モジュールにとって有用な任意の値を指定できます。デフォルトの検索機能の場合、ローダーが見つかった場所を示します。（たとえば、ローダーがファイルから来た場合、この追加の値はファイルパスです。）ローダーが nil 以外の値を返す場合、<code>require</code> は返された値を <code>package.loaded[modname]</code> に割り当てます。ローダーが nil 以外の値を返さず、<code>package.loaded[modname]</code> に値を割り当てていない場合、<code>require</code> はこのエントリに <b>true</b> を割り当てます。いずれの場合も、<code>require</code> は <code>package.loaded[modname]</code> の最終値を返します。その値に加えて、<code>require</code> は 2 番目の結果として、検索機能によって返されたローダーデータも返します。これは、<code>require</code> がモジュールをどのように見つけたかを示します。</p><p>モジュールのロードまたは実行中にエラーが発生した場合、またはモジュールのローダーが見つからない場合、<code>require</code> はエラーを発生させます。</p><p>
+</p><hr /><h3><a name="pdf-package.config"><code>package.config</code></a></h3>
+
+
+<p>パッケージのコンパイル時の構成を記述する文字列。この文字列は、行のシーケンスです。</p><ul>
+
+<li>最初の行は、ディレクトリ区切り文字の文字列です。デフォルトは、Windows の場合は '<code>\</code>'、他のすべてのシステムの場合は '<code>/</code>' です。</li>
+
+<li>2 番目の行は、パス内のテンプレートを区切る文字です。デフォルトは '<code>;</code>' です。</li>
+
+<li>3 番目の行は、テンプレート内の置換ポイントをマークする文字列です。デフォルトは '<code>?</code>' です。</li>
+
+<li>4 番目の行は、Windows のパスで、実行可能ファイルのディレクトリに置き換えられる文字列です。デフォルトは '<code>!</code>' です。</li>
+
+<li>5 番目の行は、<code>luaopen_</code> 関数名を構築するときに、その後のすべてのテキストを無視するためのマークです。デフォルトは '<code>-</code>' です。</li>
+
+</ul>
+
+
+
+<p>
+</p><hr /><h3><a name="pdf-package.cpath"><code>package.cpath</code></a></h3>
+
+
+<p><a href="#pdf-require"><code>require</code></a> が C&nbsp;ローダーを検索するために使用するパスを含む文字列。</p><p>Lua は、環境変数 <a name="pdf-LUA_CPATH_5_4"><code>LUA_CPATH_5_4</code></a>、または環境変数 <a name="pdf-LUA_CPATH"><code>LUA_CPATH</code></a>、または <code>luaconf.h</code> で定義されたデフォルトのパスを使用して、Lua パス <a href="#pdf-package.path"><code>package.path</code></a> を初期化するのと同じ方法で C&nbsp;パス <a href="#pdf-package.cpath"><code>package.cpath</code></a> を初期化します。</p><p>
+</p><hr /><h3><a name="pdf-package.loaded"><code>package.loaded</code></a></h3>
+
+
+<p><a href="#pdf-require"><code>require</code></a> がすでにロードされているモジュールを制御するために使用するテーブル。モジュール <code>modname</code> を require するとき、<code>package.loaded[modname]</code> が false でない場合、<a href="#pdf-require"><code>require</code></a> はそこに格納されている値を返します。</p><p>この変数は、実際のテーブルへの参照にすぎません。この変数への代入は、<a href="#pdf-require"><code>require</code></a> が使用するテーブルを変更しません。実際のテーブルは、C レジストリ（<a href="#4.3">§4.3</a> を参照）に格納され、キー <a name="pdf-LUA_LOADED_TABLE"><code>LUA_LOADED_TABLE</code></a>（文字列）でインデックス付けされます。</p><p>
+</p><hr /><h3><a name="pdf-package.loadlib"><code>package.loadlib (libname, funcname)</code></a></h3>
+
+
+<p>ホストプログラムを C&nbsp;ライブラリ <code>libname</code> に動的にリンクします。</p><p><code>funcname</code> が "<code>*</code>" の場合、ライブラリへのリンクのみを行い、ライブラリによってエクスポートされたシンボルを、動的にリンクされた他のライブラリで使用できるようにします。それ以外の場合は、ライブラリ内の関数 <code>funcname</code> を検索し、この関数を C&nbsp;関数として返します。したがって、<code>funcname</code> は <a href="#lua_CFunction"><code>lua_CFunction</code></a> プロトタイプ（<a href="#lua_CFunction"><code>lua_CFunction</code></a> を参照）に従う必要があります。</p><p>これは低レベルの関数です。パッケージおよびモジュールシステムを完全にバイパスします。<a href="#pdf-require"><code>require</code></a> とは異なり、パス検索を実行せず、拡張子を自動的に追加しません。<code>libname</code> は、必要に応じてパスと拡張子を含む、C&nbsp;ライブラリの完全なファイル名である必要があります。<code>funcname</code> は、C&nbsp;ライブラリによってエクスポートされた正確な名前である必要があります（これは、使用される C&nbsp;コンパイラーとリンカーによって異なる場合があります）。</p><p>この機能は ISO&nbsp;C ではサポートされていません。そのため、一部のプラットフォーム（Windows、Linux、Mac OS X、Solaris、BSD、および <code>dlfcn</code> 標準をサポートするその他の Unix システム）でのみ使用できます。</p><p>この関数は本質的に安全ではありません。Lua がシステムの読み取り可能な動的ライブラリ内の任意の関数を呼び出すことができるためです。（Lua は、関数が適切なプロトタイプを持ち、適切なプロトコル（<a href="#lua_CFunction"><code>lua_CFunction</code></a> を参照）を尊重すると仮定して、任意の関数を呼び出します。したがって、任意の動的ライブラリ内の任意の関数を呼び出すと、多くの場合、アクセス違反が発生します。）</p><p>
+</p><hr /><h3><a name="pdf-package.path"><code>package.path</code></a></h3>
+
+
+<p><a href="#pdf-require"><code>require</code></a> が Lua ローダーを検索するために使用するパスを含む文字列。</p><p>起動時に、Lua は環境変数 <a name="pdf-LUA_PATH_5_4"><code>LUA_PATH_5_4</code></a> または環境変数 <a name="pdf-LUA_PATH"><code>LUA_PATH</code></a> の値、またはこれらの環境変数が定義されていない場合は <code>luaconf.h</code> で定義されたデフォルトのパスを使用して、この変数を初期化します。環境変数の値の "<code>;;</code>" は、デフォルトのパスに置き換えられます。</p><p>
+</p><hr /><h3><a name="pdf-package.preload"><code>package.preload</code></a></h3>
+
+
+<p>特定のモジュールのローダーを格納するテーブル（<a href="#pdf-require"><code>require</code></a> を参照）。</p><p>この変数は、実際のテーブルへの参照にすぎません。この変数への代入は、<a href="#pdf-require"><code>require</code></a> が使用するテーブルを変更しません。実際のテーブルは、C レジストリ（<a href="#4.3">§4.3</a> を参照）に格納され、キー <a name="pdf-LUA_PRELOAD_TABLE"><code>LUA_PRELOAD_TABLE</code></a>（文字列）でインデックス付けされます。</p><p>
+</p><hr /><h3><a name="pdf-package.searchers"><code>package.searchers</code></a></h3>
+
+
+<p><a href="#pdf-require"><code>require</code></a> がモジュールを検索する方法を制御するために使用するテーブル。</p><p>このテーブルの各エントリは、<em>検索関数</em>です。モジュールを検索するとき、<a href="#pdf-require"><code>require</code></a> はこれらの検索関数を昇順で呼び出し、モジュール名（<a href="#pdf-require"><code>require</code></a> に指定された引数）を唯一の引数として指定します。検索機能がモジュールを見つけた場合、モジュール<em>ローダー</em>である別の関数と、ローダーに渡され、<a href="#pdf-require"><code>require</code></a> によって 2 番目の結果として返される追加の値（<em>ローダーデータ</em>）を返します。モジュールが見つからない場合は、理由を説明する文字列（または何も言うことがない場合は <b>nil</b>）を返します。</p><p>Lua は、このテーブルを 4 つの検索関数で初期化します。</p><p>最初の検索機能は、<a href="#pdf-package.preload"><code>package.preload</code></a> テーブルでローダーを探すだけです。</p><p>2 番目の検索機能は、<a href="#pdf-package.path"><code>package.path</code></a> に格納されているパスを使用して、Lua ライブラリとしてローダーを探します。検索は、関数 <a href="#pdf-package.searchpath"><code>package.searchpath</code></a> で説明されているように行われます。</p><p>3 番目の検索機能は、変数 <a href="#pdf-package.cpath"><code>package.cpath</code></a> によって指定されたパスを使用して、C&nbsp;ライブラリとしてローダーを探します。ここでも、検索は関数 <a href="#pdf-package.searchpath"><code>package.searchpath</code></a> で説明されているように行われます。たとえば、C&nbsp;パスが文字列の場合</p><pre>     "./?.so;./?.dll;/usr/local/?/init.so"
+</pre><p>モジュール<code>foo</code>の検索器は、<code>./foo.so</code>、<code>./foo.dll</code>、および<code>/usr/local/foo/init.so</code>の順にファイルを開こうとします。Cライブラリが見つかると、この検索器はまず動的リンク機能を使用してアプリケーションをライブラリにリンクします。次に、ローダーとして使用されるライブラリ内のC関数を見つけようとします。このC関数の名前は、文字列"<code>luaopen_</code>"に、モジュール名のコピーを連結したもので、そのコピーでは、すべてのドットがアンダースコアに置き換えられています。さらに、モジュール名にハイフンが含まれている場合、最初のハイフン以降のサフィックス（ハイフンを含む）は削除されます。たとえば、モジュール名が<code>a.b.c-v2.1</code>の場合、関数名は<code>luaopen_a_b_c</code>になります。</p><p>4番目の検索器は、<em>オールインワンローダー</em>を試します。指定されたモジュールのルート名のライブラリをCパスで検索します。たとえば、<code>a.b.c</code>を要求する場合、<code>a</code>のCライブラリを検索します。見つかった場合、サブモジュールのopen関数を検索します。この例では、<code>luaopen_a_b_c</code>になります。この機能を使用すると、パッケージは複数のCサブモジュールを1つのライブラリにまとめることができ、各サブモジュールは元のopen関数を保持します。</p><p>最初の検索器（preload）を除くすべての検索器は、<a href="#pdf-package.searchpath"><code>package.searchpath</code></a>によって返されるように、モジュールが見つかったファイルパスを余分な値として返します。最初の検索器は常に文字列"<code>:preload:</code>"を返します。</p><p>検索器は、Luaでエラーを発生させたり、副作用を持ったりしてはなりません。（Cでは、たとえばアプリケーションをライブラリにリンクするなど、副作用を持つ場合があります。）</p><p>
+</p><hr /><h3><a name="pdf-package.searchpath"><code>package.searchpath (name, path [, sep [, rep]])</code></a></h3>
+
+
+<p>指定された<code>path</code>内で、指定された<code>name</code>を検索します。</p><p>パスは、セミコロンで区切られた<em>テンプレート</em>のシーケンスを含む文字列です。各テンプレートについて、関数はテンプレート内の各疑問符（もしあれば）を、<code>name</code>のコピーで置き換えます。そのコピーでは、<code>sep</code>（デフォルトではドット）のすべての出現箇所が<code>rep</code>（デフォルトではシステムのディレクトリセパレーター）に置き換えられ、結果として得られたファイル名を開こうとします。</p><p>たとえば、パスが次の文字列の場合</p><pre>     "./?.lua;./?.lc;/usr/local/?/init.lua"
+</pre><p>名前<code>foo.a</code>の検索では、ファイル<code>./foo/a.lua</code>、<code>./foo/a.lc</code>、および<code>/usr/local/foo/a/init.lua</code>がこの順に開こうとします。</p><p>読み取りモードで開くことができる最初のファイルの結果の名前（ファイルを閉じた後）を返すか、成功しない場合は、<b>fail</b>とエラーメッセージを返します。（このエラーメッセージは、開こうとしたすべてのファイル名をリストします。）</p>
+</body>
+</html>

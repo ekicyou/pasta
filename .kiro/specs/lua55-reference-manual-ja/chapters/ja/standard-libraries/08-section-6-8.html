@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Lua 5.5 - Section 6.8</title>
+</head>
+<body>
+<h2>6.8 – <a name="6.8">入出力機能</a></h2>
+
+<p>I/Oライブラリは、ファイル操作に2つの異なるスタイルを提供します。最初のスタイルは暗黙的なファイルハンドルを使用します。つまり、デフォルトの入力ファイルとデフォルトの出力ファイルを設定する操作があり、すべての入出力操作はこれらのデフォルトファイルに対して行われます。2番目のスタイルは明示的なファイルハンドルを使用します。</p><p>暗黙的なファイルハンドルを使用する場合、すべての操作はテーブル<a name="pdf-io"><code>io</code></a>によって提供されます。明示的なファイルハンドルを使用する場合、操作<a href="#pdf-io.open"><code>io.open</code></a>はファイルハンドルを返し、すべての操作はファイルハンドルのメソッドとして提供されます。</p><p>ファイルハンドルのメタテーブルは、呼び出されたときにファイルを閉じようとする<code>__gc</code>と<code>__close</code>のメタメソッドを提供します。</p><p>テーブル<code>io</code>は、Cからの通常の意味を持つ3つの定義済みのファイルハンドルも提供します。<a name="pdf-io.stdin"><code>io.stdin</code></a>、<a name="pdf-io.stdout"><code>io.stdout</code></a>、および<a name="pdf-io.stderr"><code>io.stderr</code></a>。I/Oライブラリはこれらのファイルを閉じることはありません。</p><p>特に明記されていない限り、すべてのI/O関数は失敗した場合に<b>fail</b>を返し、さらに2番目の結果としてエラーメッセージ、3番目の結果としてシステム依存のエラーコード、成功した場合はfalse以外の値を返します。非POSIXシステムでは、エラーの場合のエラーメッセージとエラーコードの計算は、グローバルC変数<code>errno</code>に依存するため、スレッドセーフでない場合があります。</p><p>
+</p><hr /><h3><a name="pdf-io.close"><code>io.close ([file])</code></a></h3>
+
+
+<p><code>file:close()</code>と同等です。<code>file</code>がない場合は、デフォルトの出力ファイルを閉じます。</p><p>
+</p><hr /><h3><a name="pdf-io.flush"><code>io.flush ()</code></a></h3>
+
+
+<p><code>io.output():flush()</code>と同等です。</p><p>
+</p><hr /><h3><a name="pdf-io.input"><code>io.input ([file])</code></a></h3>
+
+
+<p>ファイル名で呼び出された場合、指定されたファイル（テキストモード）を開き、そのハンドルをデフォルトの入力ファイルとして設定します。ファイルハンドルで呼び出された場合、このファイルハンドルをデフォルトの入力ファイルとして設定します。引数なしで呼び出された場合、現在のデフォルトの入力ファイルを返します。</p><p>エラーの場合、この関数はエラーコードを返すのではなく、エラーを発生させます。</p><p>
+</p><hr /><h3><a name="pdf-io.lines"><code>io.lines ([filename, ···])</code></a></h3>
+
+
+<p>指定されたファイル名を読み取りモードで開き、開いたファイルに対して<code>file:lines(···)</code>のように機能するイテレータ関数を返します。イテレータ関数が値を読み取ることができなかった場合、自動的にファイルを閉じます。イテレータ関数に加えて、<code>io.lines</code>は他の3つの値を返します。プレースホルダーとして2つの<b>nil</b>値、プラス作成されたファイルハンドルです。したがって、ジェネリック<b>for</b>ループで使用する場合、ループがエラーまたは<b>break</b>によって中断された場合でも、ファイルは閉じられます。</p><p>呼び出し<code>io.lines()</code>（ファイル名なし）は<code>io.input():lines("l")</code>と同等です。つまり、デフォルトの入力ファイルの行を反復処理します。この場合、イテレータはループが終了してもファイルを閉じません。</p><p>ファイルを開く際のエラーの場合、この関数はエラーコードを返すのではなく、エラーを発生させます。</p><p>
+</p><hr /><h3><a name="pdf-io.open"><code>io.open (filename [, mode])</code></a></h3>
+
+
+<p>この関数は、文字列<code>mode</code>で指定されたモードでファイルを開きます。成功した場合、新しいファイルハンドルを返します。</p><p><code>mode</code>文字列は、次のいずれかになります。</p><ul>
+<li><b>"<code>r</code>": </b>読み取りモード（デフォルト）;</li>
+<li><b>"<code>w</code>": </b>書き込みモード;</li>
+<li><b>"<code>a</code>": </b>追加モード;</li>
+<li><b>"<code>r+</code>": </b>更新モード、以前のすべてのデータは保持されます;</li>
+<li><b>"<code>w+</code>": </b>更新モード、以前のすべてのデータは消去されます;</li>
+<li><b>"<code>a+</code>": </b>追加更新モード、以前のデータは保持され、書き込みはファイルの最後にのみ許可されます。</li>
+</ul><p><code>mode</code>文字列の末尾には'<code>b</code>'を含めることもできます。これは、一部のシステムでファイルをバイナリモードで開くために必要です。</p><p>
+</p><hr /><h3><a name="pdf-io.output"><code>io.output ([file])</code></a></h3>
+
+
+<p><a href="#pdf-io.input"><code>io.input</code></a>と同様ですが、デフォルトの出力ファイルに対して動作します。</p><p>
+</p><hr /><h3><a name="pdf-io.popen"><code>io.popen (prog [, mode])</code></a></h3>
+
+
+<p>この関数はシステムに依存し、すべてのプラットフォームで使用できるわけではありません。</p><p>別のプロセスでプログラム<code>prog</code>を開始し、このプログラムからデータを読み取る（<code>mode</code>が<code>"r"</code>の場合、デフォルト）か、このプログラムにデータを書き込む（<code>mode</code>が<code>"w"</code>の場合）ために使用できるファイルハンドルを返します。</p><p>
+</p><hr /><h3><a name="pdf-io.read"><code>io.read (···)</code></a></h3>
+
+
+<p><code>io.input():read(···)</code>と同等です。</p><p>
+</p><hr /><h3><a name="pdf-io.tmpfile"><code>io.tmpfile ()</code></a></h3>
+
+
+<p>成功した場合、一時ファイルのハンドルを返します。このファイルは更新モードで開かれ、プログラムが終了すると自動的に削除されます。</p><p>
+</p><hr /><h3><a name="pdf-io.type"><code>io.type (obj)</code></a></h3>
+
+
+<p><code>obj</code>が有効なファイルハンドルであるかどうかを確認します。<code>obj</code>が開いているファイルハンドルの場合は文字列<code>"file"</code>、<code>obj</code>が閉じているファイルハンドルの場合は<code>"closed file"</code>、<code>obj</code>がファイルハンドルではない場合は<b>fail</b>を返します。</p><p>
+</p><hr /><h3><a name="pdf-io.write"><code>io.write (···)</code></a></h3>
+
+
+<p><code>io.output():write(···)</code>と同等です。</p><p>
+</p><hr /><h3><a name="pdf-file:close"><code>file:close ()</code></a></h3>
+
+
+<p><code>file</code>を閉じます。ファイルはハンドルがガベージコレクションされると自動的に閉じられますが、それには予測できない時間がかかることに注意してください。</p><p><a href="#pdf-io.popen"><code>io.popen</code></a>で作成されたファイルハンドルを閉じると、<a href="#pdf-file:close"><code>file:close</code></a>は<a href="#pdf-os.execute"><code>os.execute</code></a>によって返された同じ値を返します。</p><p>
+</p><hr /><h3><a name="pdf-file:flush"><code>file:flush ()</code></a></h3>
+
+
+<p><code>file</code>に書き込まれたデータを保存します。</p><p>
+</p><hr /><h3><a name="pdf-file:lines"><code>file:lines (···)</code></a></h3>
+
+
+<p>呼び出されるたびに、指定された形式に従ってファイルを読み取るイテレータ関数を返します。形式が指定されていない場合は、デフォルトとして "<code>l</code>" を使用します。例として、次の構文は</p><pre>     for c in file:lines(1) do <em>body</em> end
+</pre><p>現在の位置から始まるファイルのすべての文字を反復処理します。<a href="#pdf-io.lines"><code>io.lines</code></a>とは異なり、この関数はループが終了してもファイルを閉じません。</p><p>
+</p><hr /><h3><a name="pdf-file:read"><code>file:read (···)</code></a></h3>
+
+
+<p>何を読み取るかを指定する指定された形式に従って、ファイル<code>file</code>を読み取ります。形式ごとに、関数は読み取られた文字の文字列または数値を返すか、指定された形式でデータを読み取ることができない場合は<b>fail</b>を返します。（後者の場合、関数は後続の形式を読み取りません。）引数なしで呼び出された場合、次の行を読み取るデフォルトの形式を使用します（以下を参照）。</p><p>使用可能な形式は次のとおりです。</p><ul>
+
+<li><b>"<code>n</code>": </b>数値を読み取り、Luaの字句規則に従って浮動小数点数または整数として返します。（数値には、先頭の空白と符号を含めることができます。）この形式は、常に数値の有効なプレフィックスである最長の入力シーケンスを読み取ります。そのプレフィックスが有効な数値を形成しない場合（たとえば、空の文字列、"<code>0x</code>"、または "<code>3.4e-</code>"）、または長すぎる場合（200文字を超える）、破棄され、形式は<b>fail</b>を返します。</li>
+
+<li><b>"<code>a</code>": </b>現在の位置から始まるファイル全体を読み取ります。ファイルの終わりに、空の文字列を返します。この形式は失敗しません。</li>
+
+<li><b>"<code>l</code>": </b>次の行を読み取り、行末をスキップし、ファイルの終わりに<b>fail</b>を返します。これはデフォルトの形式です。</li>
+
+<li><b>"<code>L</code>": </b>行末文字（存在する場合）を保持したまま、次の行を読み取り、ファイルの終わりに<b>fail</b>を返します。</li>
+
+<li><b><em>number</em>: </b>最大でこのバイト数の文字列を読み取り、ファイルの終わりに<b>fail</b>を返します。<code>number</code>がゼロの場合、何も読み取らず、空の文字列を返すか、ファイルの終わりに<b>fail</b>を返します。</li>
+
+</ul><p>形式"<code>l</code>"と"<code>L</code>"はテキストファイルに対してのみ使用する必要があります。</p><p>
+</p><hr /><h3><a name="pdf-file:seek"><code>file:seek ([whence [, offset]])</code></a></h3>
+
+
+<p>ファイルの先頭からのファイル位置を、文字列<code>whence</code>で指定されたベースに<code>offset</code>を加えた位置に設定および取得します。以下のように</p><ul>
+<li><b>"<code>set</code>": </b>ベースは位置0（ファイルの先頭）です。</li>
+<li><b>"<code>cur</code>": </b>ベースは現在の位置です。</li>
+<li><b>"<code>end</code>": </b>ベースはファイルの末尾です。</li>
+</ul><p>成功した場合、<code>seek</code>は、ファイルの先頭からバイト単位で測定された最終的なファイル位置を返します。<code>seek</code>が失敗した場合、<b>fail</b>とエラーを説明する文字列を返します。</p><p><code>whence</code>のデフォルト値は<code>"cur"</code>で、<code>offset</code>のデフォルト値は0です。したがって、呼び出し<code>file:seek()</code>は、現在のファイル位置を返しますが、変更はしません。呼び出し<code>file:seek("set")</code>は、位置をファイルの先頭に設定し（0を返します）。呼び出し<code>file:seek("end")</code>は、位置をファイルの末尾に設定し、そのサイズを返します。</p><p>
+</p><hr /><h3><a name="pdf-file:setvbuf"><code>file:setvbuf (mode [, size])</code></a></h3>
+
+
+<p>ファイルに対するバッファリングモードを設定します。3つのモードが利用可能です。</p><ul>
+<li><b>"<code>no</code>": </b> バッファリングなし。</li>
+<li><b>"<code>full</code>": </b> フルバッファリング。</li>
+<li><b>"<code>line</code>": </b> 行バッファリング。</li>
+</ul>
+
+<p>最後の2つのケースでは、<code>size</code>はバッファのサイズ（バイト単位）のヒントです。デフォルトは適切なサイズです。</p><p>各モードの具体的な動作は移植性がないため、詳細についてはプラットフォームの基盤となるISO&nbsp;C関数<code>setvbuf</code>を確認してください。</p><p>
+</p><hr /><h3><a name="pdf-file:write"><code>file:write (···)</code></a></h3>
+
+
+<p>引数のそれぞれの値を<code>file</code>に書き込みます。引数は文字列または数値である必要があります。</p><p>成功した場合、この関数は<code>file</code>を返します。</p>
+</body>
+</html>
