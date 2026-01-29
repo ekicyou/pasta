@@ -57,9 +57,9 @@ pub struct RuntimeConfig {
 
 | 要件 | 必要な実装 | ギャップ状態 |
 |-----|-----------|------------|
-| Req1: 個別ライブラリ制御 | `LuaStdLibConfig`構造体 + TOML解析 | **Missing** |
-| Req2: プリセット設定 | `Preset` enum + 解決ロジック | **Missing** |
-| Req3: debug有効化 | `debug`フラグ + 警告ログ | **Missing** |
+| Req1: Cargo風配列記法 | `LuaStdLibConfig`構造体 + TOML配列解析 | **Missing** |
+| Req2: 減算記法 | 加算/減算処理ロジック | **Missing** |
+| Req3: debug警告 | 警告ログ出力 | **Missing** |
 | Req4: バリデーション | serde + カスタムバリデータ | **Missing** |
 | Req5: 後方互換性 | デフォルト値、既存API維持 | **OK（設計配慮必要）** |
 
@@ -185,20 +185,39 @@ impl PastaLuaRuntime {
 // loader/config.rs (または新規 stdlib_config.rs)
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct LuaStdLibConfig {
-    #[serde(default = "default_preset")]
-    pub preset: StdLibPreset,
-    #[serde(default)]
-    pub allow_unsafe: bool,
-    pub coroutine: Option<bool>,
-    pub table: Option<bool>,
-    pub io: Option<bool>,
-    pub os: Option<bool>,
-    pub string: Option<bool>,
-    pub utf8: Option<bool>,
-    pub math: Option<bool>,
-    pub package: Option<bool>,
-    pub debug: Option<bool>,
+    #[serde(default = "default_stdlib")]
+    pub libs: Vec<String>,  // ["all"], ["coroutine", "table"], etc.
 }
+
+fn default_stdlib() -> Vec<String> {
+    vec!["all".to_string()]
+}
+
+impl LuaStdLibConfig {
+    pub fn to_stdlib(&self) -> mlua::StdLib {
+        let mut result = StdLib::NONE;
+        let mut subtractions = StdLib::NONE;
+        
+        for lib in &self.libs {
+            if let Some(name) = lib.strip_prefix('-') {
+                // 減算記法
+                subtractions |= parse_lib_name(name);
+            } else {
+                // 加算記法
+                result |= parse_lib_name(lib);
+            }
+        }
+        
+        result & !subtractions
+    }
+}
+
+// runtime/mod.rs
+pub struct RuntimeConfig {
+    pub stdlib: LuaStdLibConfig,
+    // ... other fields
+}
+```
 
 impl LuaStdLibConfig {
     pub fn to_stdlib(&self) -> mlua::StdLib {
