@@ -2,7 +2,9 @@
 
 ## Introduction
 
-Lua 5.5公式リファレンスマニュアル（https://www.lua.org/manual/5.5/）を日本語に翻訳し、`crates/pasta_lua/doc/`に配置するドキュメンテーションプロジェクト。pasta_luaクレートの開発者が日本語でLua言語仕様を参照できるようにすることを目的とする。
+Lua 5.5公式リファレンスマニュアル（https://www.lua.org/manual/5.5/）を日本語に翻訳し、`crates/pasta_lua/doc/`に配置するドキュメンテーションプロジェクト。Lua言語仕様を日本語で参照できるようにすることを目的とする。
+
+**独立性の原則**: 本翻訳はLua 5.5公式リファレンスの日本語版として完全に独立した文書であり、pasta_lua固有の用語・概念・リンクを一切含まない。
 
 ## Project Description (Input)
 Lua 5.5 Reference Manual をフェッチして取り込み、日本語に訳したうえで、「pasta_lua/doc/」あたりに配置して欲しい。
@@ -15,7 +17,7 @@ markdownか、HTMLかは任せますが、マークダウンの方が使い勝�
 
 ### Requirement 1: ドキュメント構造とフォーマット
 
-**Objective:** As a pasta_lua開発者, I want Lua 5.5リファレンスマニュアルをMarkdown形式で参照できること, so that VS Codeやgitリポジトリ上で快適に閲覧・検索できる
+**Objective:** As a Lua開発者, I want Lua 5.5リファレンスマニュアルをMarkdown形式で参照できること, so that VS Codeやgitリポジトリ上で快適に閲覧・検索できる
 
 #### Acceptance Criteria
 1. The ドキュメントシステム shall 全マニュアルをMarkdown形式（`.md`）で提供する
@@ -26,7 +28,7 @@ markdownか、HTMLかは任せますが、マークダウンの方が使い勝�
 
 ### Requirement 2: マニュアルセクション網羅性
 
-**Objective:** As a pasta_lua開発者, I want 公式マニュアルの全セクションが日本語で参照できること, so that 言語仕様の全体像を把握できる
+**Objective:** As a Lua開発者, I want 公式マニュアルの全セクションが日本語で参照できること, so that 言語仕様の全体像を把握できる
 
 #### Acceptance Criteria
 1. The ドキュメントシステム shall 以下の全章を含むこと：
@@ -43,13 +45,18 @@ markdownか、HTMLかは任せますが、マークダウンの方が使い勝�
 
 ### Requirement 3: 翻訳品質
 
-**Objective:** As a pasta_lua開発者, I want 技術的に正確な日本語翻訳を参照できること, so that 実装時の理解に支障がない
+**Objective:** As a Lua開発者, I want 技術的に正確な日本語翻訳を参照できること, so that 実装時の理解に支障がない
 
 **Translation Method (確定):** AI多段階品質改善方式
 - Phase 1: AI一括翻訳（LLM使用）
 - Phase 2: AI品質レビュー（用語統一、技術的正確性）
 - Phase 3: AIブラッシュアップ（リンク整合性、表現改善）
 - Phase 4: AI最終検証（全体整合性、用語対応表更新）
+
+**用語対応表の方針 (確定):**
+- 網羅的な用語対応表（100語以上）をAI翻訳Phase 1で初版作成
+- Phase 2-4で段階的に洗練
+- 後から人間が修正可能な原本として機能
 
 #### Acceptance Criteria
 1. The 翻訳 shall 技術用語を一貫して使用する（用語集の整備を含む）
@@ -61,7 +68,7 @@ markdownか、HTMLかは任せますが、マークダウンの方が使い勝�
 
 ### Requirement 4: ナビゲーションと検索性
 
-**Objective:** As a pasta_lua開発者, I want 必要な情報に素早くアクセスできること, so that 開発効率が向上する
+**Objective:** As a Lua開発者, I want 必要な情報に素早くアクセスできること, so that 開発効率が向上する
 
 #### Acceptance Criteria
 1. The ドキュメントシステム shall 階層的な目次構造を提供する
@@ -72,7 +79,7 @@ markdownか、HTMLかは任せますが、マークダウンの方が使い勝�
 
 ### Requirement 5: メンテナンス性
 
-**Objective:** As a pasta_luaメンテナ, I want ドキュメントの更新・管理が容易であること, so that 将来のLuaバージョン更新に対応できる
+**Objective:** As a ドキュメントメンテナ, I want ドキュメントの更新・管理が容易であること, so that 将来のLuaバージョン更新に対応できる
 
 #### Acceptance Criteria
 1. The ドキュメントシステム shall 原文バージョン（Lua 5.5）と翻訳日時を記録する
@@ -87,8 +94,9 @@ markdownか、HTMLかは任せますが、マークダウンの方が使い勝�
 
 #### Acceptance Criteria
 1. The ドキュメントシステム shall Luaのライセンス（MIT License）の原文を含める
-2. The ドキュメントシステム shall 翻訳が公式のものではなく、pasta_luaプロジェクトによる翻訳であることを明記する
+2. The ドキュメントシステム shall 翻訳が公式のものではなく、非公式な日本語翻訳であることを明記する
 3. The ドキュメントシステム shall 原著作権表示（Copyright © 2020–2025 Lua.org, PUC-Rio）を保持する
+4. The ドキュメントシステム shall pasta_lua固有の用語・概念・リンクを一切含まない（Lua 5.5翻訳として完全に独立）
 
 ## Non-Requirements (スコープ外)
 
