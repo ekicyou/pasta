@@ -31,15 +31,16 @@ let lua = if config.enable_std_libs {
 **既存RuntimeConfig構造:**
 ```rust
 pub struct RuntimeConfig {
-    pub enable_std_libs: bool,      // 標準ライブラリ一括有効化
-    pub enable_assertions: bool,    // mlua-stdlib @assertions
-    pub enable_testing: bool,       // mlua-stdlib @testing
-    pub enable_env: bool,           // mlua-stdlib @env（unsafe）
-    pub enable_regex: bool,         // mlua-stdlib @regex
-    pub enable_json: bool,          // mlua-stdlib @json
-    pub enable_yaml: bool,          // mlua-stdlib @yaml
+    pub enable_std_libs: bool,      // 標準ライブラリ一括有効化 → libs配列で置き換え
+    pub enable_assertions: bool,    // mlua-stdlib @assertions → libs配列で置き換え
+    pub enable_testing: bool,       // mlua-stdlib @testing → libs配列で置き換え
+    pub enable_env: bool,           // mlua-stdlib @env（unsafe） → libs配列で置き換え
+    pub enable_regex: bool,         // mlua-stdlib @regex → libs配列で置き換え
+    pub enable_json: bool,          // mlua-stdlib @json → libs配列で置き換え
+    pub enable_yaml: bool,          // mlua-stdlib @yaml → libs配列で置き換え
 }
 ```
+**→ すべてのフラグを`libs`配列に統合予定**
 
 ### 1.3 統合サーフェス
 
@@ -57,130 +58,202 @@ pub struct RuntimeConfig {
 
 | 要件 | 必要な実装 | ギャップ状態 |
 |-----|-----------|------------|
-| Req1: Cargo風配列記法 | `LuaStdLibConfig`構造体 + TOML配列解析 | **Missing** |
+| Req1: Cargo風配列記法 | `LuaLibConfig`構造体 + TOML配列解析 | **Missing** |
 | Req2: 減算記法 | 加算/減算処理ロジック | **Missing** |
-| Req3: debug警告 | 警告ログ出力 | **Missing** |
+| Req3: セキュリティ警告 | std_debug/env警告ログ | **Missing** |
 | Req4: バリデーション | serde + カスタムバリデータ | **Missing** |
-| Req5: 後方互換性 | デフォルト値、既存API維持 | **OK（設計配慮必要）** |
+| Req5: 後方互換性 | デフォルト値、既存フラグ非推奨化 | **OK（設計配慮必要）** |
 
 ### 2.2 mlua StdLibフラグ対応（Lua 5.5）
 
-| 要件ライブラリ | mlua定数 | Lua 5.5対応 | セーフティ |
+| ライブラリ（TOML要素） | mlua定数 | Lua 5.5対応 | セーフティ |
 |--------------|----------|------------|-----------|
-| coroutine | `StdLib::COROUTINE` | ✅ | Safe |
-| table | `StdLib::TABLE` | ✅ | Safe |
-| io | `StdLib::IO` | ✅ | Safe |
-| os | `StdLib::OS` | ✅ | Safe |
-| string | `StdLib::STRING` | ✅ | Safe |
-| utf8 | `StdLib::UTF8` | ✅ | Safe |
-| math | `StdLib::MATH` | ✅ | Safe |
-| package | `StdLib::PACKAGE` | ✅ | Safe |
-| debug | `StdLib::DEBUG` | ✅ | **Unsafe** |
+| std_coroutine | `StdLib::COROUTINE` | ✅ | Safe |
+| std_table | `StdLib::TABLE` | ✅ | Safe |
+| std_io | `StdLib::IO` | ✅ | Safe |
+| std_os | `StdLib::OS` | ✅ | Safe |
+| std_string | `StdLib::STRING` | ✅ | Safe |
+| std_utf8 | `StdLib::UTF8` | ✅ | Safe |
+| std_math | `StdLib::MATH` | ✅ | Safe |
+| std_package | `StdLib::PACKAGE` | ✅ | Safe |
+| std_debug | `StdLib::DEBUG` | ✅ | **Unsafe** |
+
+### 2.3 mlua-stdlibモジュール対応
+
+| モジュール（TOML要素） | mlua-stdlib | 備考 |
+|--------------|-----------|------|
+| assertions | `@assertions` | アサーション・検証 |
+| testing | `@testing` | テストフレームワーク |
+| env | `@env` | 環境変数・FS（セキュリティ注意） |
+| regex | `@regex` | 正規表現 |
+| json | `@json` | JSON |
+| yaml | `@yaml` | YAML |
 
 **確定事項**: `ALL_SAFE = StdLib((1 << 30) - 1)` = 全ライブラリ - DEBUG - FFI  
-io, os, packageは`ALL_SAFE`に含まれる（safeライブラリ扱い）
+std_io, std_os, std_packageは`ALL_SAFE`に含まれる（safeライブラリ扱い）
 
-### 2.3 制約と課題
+### 2.4 制約と課題
 
 | 制約/課題 | 詳細 | 対応方針 |
 |---------|------|---------|
-| 既存`enable_std_libs`フラグ | bool一括制御のみ | 拡張または置換 |
+| 既存個別フラグ | `enable_std_libs`, `enable_testing`等 | `libs`配列で置換・非推奨化 |
 | `Lua::new()` vs `unsafe_new_with` | 現状の分岐ロジック | `StdLib`フラグ動的構築に変更 |
-| テスト互換性 | 多数のテストが`Lua::new()`使用 | テスト影響軽微 |
+| mlua-stdlibモジュール登録 | 個別フラグで制御中 | 動的登録に変更 |
 
 ---
 
 ## 3. 実装アプローチオプション
 
-### Option A: RuntimeConfig拡張
+### Option A: RuntimeConfig完全置換
 
-**概要**: 既存の`RuntimeConfig`に`LuaStdLibConfig`をネストして追加
+**概要**: 既存の`RuntimeConfig`の個別フラグを廃止し、`LuaLibConfig`に統合
 
 **変更対象:**
-- `runtime/mod.rs`: `RuntimeConfig`にフィールド追加
-- `runtime/mod.rs`: `with_config`でStdLib構築ロジック追加
-- `loader/config.rs`: `[lua.stdlib]`セクション解析追加
+- `runtime/mod.rs`: `RuntimeConfig`のすべてのフラグを`libs: Vec<String>`に置換
+- `runtime/mod.rs`: `with_config`でStdLib構築+mlua-stdlib登録ロジック追加
+- `loader/config.rs`: `[lua]`セクション解析追加
 
 **コード例:**
 ```rust
 pub struct RuntimeConfig {
-    pub stdlib: LuaStdLibConfig,  // NEW
-    pub enable_assertions: bool,
-    pub enable_testing: bool,
-    // ... existing fields
+    pub libs: Vec<String>,  // NEW: ["std_all", "testing", "regex", ...}
 }
 
-pub struct LuaStdLibConfig {
-    pub preset: StdLibPreset,
-    pub allow_unsafe: bool,
-    pub coroutine: Option<bool>,
-    pub table: Option<bool>,
-    // ... individual options
+impl RuntimeConfig {
+    /// libs配列からStdLib（Lua標準ライブラリ）を構築
+    pub fn to_stdlib(&self) -> Result<StdLib, ConfigError> {
+        let mut result = StdLib::NONE;
+        let mut subtract = StdLib::NONE;
+        
+        for lib in &self.libs {
+            if let Some(name) = lib.strip_prefix('-') {
+                // 減算記法
+                subtract |= Self::parse_std_lib(name)?;
+            } else {
+                // 加算記法
+                result |= Self::parse_std_lib(lib)?;
+            }
+        }
+        
+        Ok(result & !subtract)
+    }
+    
+    fn parse_std_lib(name: &str) -> Result<StdLib, ConfigError> {
+        match name {
+            "std_all" => Ok(StdLib::ALL_SAFE),
+            "std_all_unsafe" => Ok(StdLib::ALL),
+            "std_coroutine" => Ok(StdLib::COROUTINE),
+            "std_table" => Ok(StdLib::TABLE),
+            "std_io" => Ok(StdLib::IO),
+            "std_os" => Ok(StdLib::OS),
+            "std_string" => Ok(StdLib::STRING),
+            "std_utf8" => Ok(StdLib::UTF8),
+            "std_math" => Ok(StdLib::MATH),
+            "std_package" => Ok(StdLib::PACKAGE),
+            "std_debug" => Ok(StdLib::DEBUG),
+            _ => Err(ConfigError::UnknownLibrary(name.to_string())),
+        }
+    }
+    
+    /// mlua-stdlibモジュール登録が必要か確認
+    pub fn should_enable_module(&self, module: &str) -> bool {
+        self.libs.iter().any(|lib| {
+            lib == module || (!lib.starts_with('-') && lib == module)
+        }) && !self.libs.iter().any(|lib| lib == &format!("-{}", module))
+    }
 }
 ```
 
+**メリット:**
+- すべてのライブラリ設定を1つの配列に統一
+- 既存の個別フラグを段階的に廃止可能
+- 将来的な拡張性が高い
+
+**デメリット:**
+- 既存コードの影響範囲が広い
+- 移行期間の互換性維持が必要
+
 **トレードオフ:**
-- ✅ 最小限のファイル変更
-- ✅ 既存テストへの影響最小
-- ✅ `enable_std_libs`を`stdlib.preset`で代替可能
-- ❌ `RuntimeConfig`が肥大化
-- ❌ ファイル設定とコード設定の統合が複雑
+- ✅ 設計の統一性（1つの配列ですべて制御）
+- ✅ 将来の拡張性（新しいライブラリ追加が容易）
+- ✅ Cargo.toml featuresとの類似性（学習コスト低）
+- ❌ 既存テストの修正範囲が広い
+- ❌ 移行期間の後方互換処理が必要
 
 ---
 
-### Option B: 設定階層の分離
+### Option B: 段階的移行アプローチ
 
-**概要**: `LuaStdLibConfig`を独立構造体として、`PastaConfig`に追加
+**概要**: 既存フラグを残したまま、`libs`配列を優先する設計
 
 **変更対象:**
-- `loader/config.rs`: `LuaStdLibConfig`追加、`PastaConfig::lua_stdlib()`メソッド
-- `runtime/mod.rs`: `RuntimeConfig`から`enable_std_libs`削除、`LuaStdLibConfig`受け取り
-- `loader/mod.rs`: ローダーで設定統合
+- `runtime/mod.rs`: `RuntimeConfig`に`libs: Option<Vec<String>>`追加
+- `runtime/mod.rs`: `libs`が指定されていれば優先、なければ既存フラグ使用
+- `loader/config.rs`: `[lua]`セクション解析追加
 
 **コード例:**
 ```rust
-// loader/config.rs
-pub struct LuaStdLibConfig { ... }
-
-impl PastaConfig {
-    pub fn lua_stdlib(&self) -> Option<LuaStdLibConfig> {
-        self.custom_fields.get("lua")
-            .and_then(|v| v.get("stdlib"))
-            .and_then(|v| v.clone().try_into().ok())
-    }
+pub struct RuntimeConfig {
+    pub libs: Option<Vec<String>>,  // NEW（優先）
+    #[deprecated = "Use libs array instead"]
+    pub enable_std_libs: bool,
+    #[deprecated = "Use libs array instead"]
+    pub enable_testing: bool,
+    // ... other flags
 }
 
-// runtime/mod.rs
-impl PastaLuaRuntime {
-    pub fn with_stdlib_config(context, stdlib: LuaStdLibConfig) -> LuaResult<Self> { ... }
+impl RuntimeConfig {
+    pub fn effective_libs(&self) -> Vec<String> {
+        if let Some(libs) = &self.libs {
+            libs.clone()
+        } else {
+            // 既存フラグからlibsを生成（後方互換）
+            let mut result = vec![];
+            if self.enable_std_libs {
+                result.push("std_all".to_string());
+            }
+            if self.enable_testing {
+                result.push("testing".to_string());
+            }
+            // ... 他のフラグ
+            result
+        }
+    }
 }
 ```
 
+**メリット:**
+- 完全な後方互換性維持
+- 段階的な移行が可能
+
+**デメリット:**
+- 過渡期のコード複雑化
+- 二重メンテナンス期間が発生
+
 **トレードオフ:**
-- ✅ 設定とランタイムの責務分離
-- ✅ TOML設定に自然にマップ
-- ✅ `PastaConfig`の既存パターンに準拠
-- ❌ 既存の`RuntimeConfig::enable_std_libs`との整合性
-- ❌ API変更が広範
+- ✅ 既存コードへの影響ゼロ
+- ✅ ユーザー側の移行コスト最小
+- ❌ コードベースの二重管理
+- ❌ 最終的には個別フラグ削除が必要
 
 ---
 
-### Option C: ハイブリッドアプローチ（推奨）
+### 推奨アプローチ: **Option A (完全置換)**
 
-**概要**: `LuaStdLibConfig`を`loader/config.rs`に追加し、`RuntimeConfig`はそれを参照
+統合設計の観点から、すべてのライブラリ設定を`libs`配列に統一する**Option A**を推奨します。
 
-**変更対象:**
-- `loader/config.rs`: `LuaStdLibConfig`構造体追加
-- `runtime/mod.rs`: `RuntimeConfig`に`pub stdlib: LuaStdLibConfig`追加
-- `runtime/mod.rs`: Lua VM初期化ロジック更新
-- `lib.rs`: `LuaStdLibConfig`をre-export
+**理由:**
+1. **設計の一貫性**: 1つの配列ですべてのライブラリ（Lua標準+mlua-stdlib）を制御
+2. **Cargo.toml featuresとの親和性**: ユーザーにとって直感的
+3. **将来の拡張性**: 新しいライブラリ追加が容易
+4. **技術的負債の削減**: 過渡期の二重管理を避ける
 
-**段階的実装:**
-1. Phase 1: `LuaStdLibConfig`追加、デフォルト値で後方互換維持
-2. Phase 2: TOML解析統合
-3. Phase 3: `enable_std_libs`を`stdlib.preset`で代替（非推奨化）
+**移行戦略:**
+- デフォルト値で既存動作を再現（`["std_all", "assertions", "testing", "regex", "json", "yaml"]`）
+- 既存の個別フラグは `#[deprecated]` マークし、ドキュメントで移行方法を説明
+- テストは新しい`libs`配列ベースに段階的に更新
 
-**コード例:**
+---
 ```rust
 // loader/config.rs (または新規 stdlib_config.rs)
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -247,42 +320,45 @@ pub struct RuntimeConfig {
 
 | 項目 | 見積もり | 根拠 |
 |-----|---------|------|
-| 全体 | **M（3-7日）** | 新規構造体追加 + 既存統合 |
-| `LuaStdLibConfig`構造体 | S（1日） | serde derive活用 |
-| StdLib変換ロジック | S（1日） | ビットフラグ操作 |
-| TOML解析統合 | S（1日） | 既存パターン踏襲 |
-| RuntimeConfig統合 | M（2日） | 後方互換維持が複雑 |
-| テスト作成 | M（2日） | 網羅的テスト必要 |
+| 全体 | **M（3-5日）** | RuntimeConfig統合 + mlua-stdlib登録 |
+| `libs`配列パース処理 | S（0.5日） | serde Vec<String> |
+| StdLib変換ロジック | S（1日） | ビットフラグ操作 + 減算処理 |
+| mlua-stdlib動的登録 | M（1日） | 条件分岐追加 |
+| TOML解析統合 | S（0.5日） | 既存パターン踏襲 |
+| RuntimeConfig統合 | M（1-2日） | 既存フラグ非推奨化 |
+| テスト作成 | M（1日） | 配列パース、減算記法、バリデーション |
 
 ### リスク評価
 
 | リスク | レベル | 緩和策 |
 |-------|-------|-------|
-| 後方互換性破壊 | **中** | デフォルト値で既存動作維持 |
-| unsafeフラグの誤設定 | **低** | バリデーション + 警告ログ |
-| テストリグレッション | **低** | 既存テストは`RuntimeConfig::new()`使用 |
+| 後方互換性破壊 | **低** | デフォルト値で既存動作維持 |
+| std_debug/env誤設定 | **中** | バリデーション + 警告ログ |
+| 既存テスト影響 | **中** | 既存フラグからlibsへ移行 |
 | mlua API変更 | **低** | mlua 0.11はstable |
 
 ---
 
 ## 5. 設計フェーズへの推奨事項
 
-### 推奨アプローチ: Option C（ハイブリッド）
+### 推奨アプローチ: Option A（完全置換）
 
 **理由:**
-1. 既存の`PastaConfig`パターン（`logging()`, `persistence()`）に準拠
-2. 段階的移行で後方互換性維持
-3. ランタイム設定とファイル設定の責務分離
+1. すべてのライブラリ設定を`libs`配列に統一（Lua標準+mlua-stdlib）
+2. Cargo.toml featuresとの高い親和性
+3. 将来の拡張性（新しいライブラリ追加が容易）
+4. 技術的負債の削減（過渡期の二重管理を避ける）
 
-### 設計フェーズで調査が必要な項目
+### 設計フェーズで決定が必要な項目
 
-| 調査項目 | 目的 |
+| 検討項目 | 選択肢 |
 |---------|------|
-| `StdLib::ALL_SAFE`の正確な内容 | io/os/packageが含まれるか確認 |
-| `Lua::new()`の初期化ライブラリ | デフォルト挙動の確認 |
-| serde flatten vs nested | TOML構造の最適化 |
+| デフォルト値 | `["std_all", "assertions", "testing", "regex", "json", "yaml"]` vs 最小構成 |
+| 既存フラグ扱い | 即座に非推奨 vs 段階的移行 |
+| バリデーション戦略 | 厳格（unknown error） vs 寛容（unknown warning） |
+| 警告ログレベル | `tracing::warn` vs `tracing::info` |
 
 ### 次のステップ
 
-1. **要件承認**: `/kiro-spec-requirements lua-stdlib-config`で承認
-2. **設計フェーズ**: `/kiro-spec-design lua-stdlib-config -y`で設計ドキュメント生成
+1. **要件承認**: 議題クローズ後、`/kiro-spec-design lua-stdlib-config -y`
+2. **設計フェーズ**: 構造体定義、変換ロジック、TOML schema確定

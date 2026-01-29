@@ -1,7 +1,7 @@
 # Requirements Document
 
 ## Project Description (Input)
-pasta_luaのtomlコンフィグにて、`[lua]`セクションの`stdlib`フィールドにCargo風の配列記法で標準Luaライブラリの使用を制御できる機能を追加。
+pasta_luaのtomlコンフィグにて、`[lua]`セクションの`libs`フィールドにCargo風の配列記法でLua標準ライブラリ及びmlua-stdlibモジュールの使用を統合制御できる機能を追加。
 
 参考：
 - https://docs.rs/mlua/latest/mlua/struct.Lua.html#method.new_with
@@ -9,16 +9,20 @@ pasta_luaのtomlコンフィグにて、`[lua]`セクションの`stdlib`フィ�
 
 ```toml
 [lua]
-stdlib = ["all"]  # デフォルト（StdLib::ALL_SAFE相当）
-# または
-stdlib = ["all_unsafe"]  # debug含む全ライブラリ（StdLib::ALL相当）
-# または
-stdlib = ["string", "table", "math"]  # 個別指定
-# または
-stdlib = ["all", "-debug"]  # 減算記法
+# Lua標準ライブラリは std_ プレフィックス
+libs = ["std_all"]  # デフォルト（StdLib::ALL_SAFE相当）
+
+# mlua-stdlibモジュールも同じ配列で指定
+libs = ["std_all", "testing", "regex", "json"]
+
+# 個別指定
+libs = ["std_string", "std_table", "std_math", "testing"]
+
+# 減算記法
+libs = ["std_all", "testing", "regex", "-env"]
 ```
 
-指定しない場合、`["all"]`（StdLib::ALL_SAFE相当）とする。`"all_unsafe"`でdebugを含むすべてのライブラリを有効化可能。また、lua55で指定できるオプションを配列要素として指定可能とする。
+指定しない場合、デフォルト値を適用する。`std_all_unsafe`でdebugを含むすべてのLua標準ライブラリを有効化可能。lua55で指定できるオプション及びmlua-stdlib v0.1のモジュールを配列要素として指定可能とする。
 
 ## Introduction
 
@@ -26,53 +30,65 @@ stdlib = ["all", "-debug"]  # 減算記法
 
 ## Requirements
 
-### Requirement 1: Cargo風配列記法によるLua標準ライブラリの制御
+### Requirement 1: Cargo風配列記法による統合ライブラリ制御
 
-**Objective:** ゴースト開発者として、Cargo.tomlのfeatures記法と同様の配列形式でLua標準ライブラリを制御したい。これにより、直感的で簡潔な設定が可能になり、セキュリティ要件に応じた柔軟なライブラリ構成を実現できる。
+**Objective:** ゴースト開発者として、Cargo.tomlのfeatures記法と同様の配列形式でLua標準ライブラリとmlua-stdlibモジュールを統合して制御したい。これにより、直感的で簡潔な設定が可能になり、すべてのライブラリ構成を一箇所で管理できる。
 
 #### Acceptance Criteria
 
-1. When `[lua]`セクションの`stdlib`フィールドが存在する場合, the pasta_lua Runtime shall 指定された配列要素に基づいてLua VMを初期化する
-2. When `stdlib`フィールドが省略された場合, the pasta_lua Runtime shall デフォルト値`["all"]`を適用する（`StdLib::ALL_SAFE`相当）
-3. The pasta_lua Runtime shall 以下の配列要素をサポートする:
-   - `"all"` - 安全なライブラリすべて（`StdLib::ALL_SAFE`、debugを除く）
-   - `"all_unsafe"` - debugを含むすべてのライブラリ（`StdLib::ALL`）
-   - `"coroutine"` - コルーチンライブラリ
-   - `"table"` - テーブル操作ライブラリ
-   - `"io"` - I/Oライブラリ
-   - `"os"` - OSライブラリ
-   - `"string"` - 文字列ライブラリ
-   - `"utf8"` - UTF-8ライブラリ
-   - `"math"` - 数学ライブラリ
-   - `"package"` - パッケージ/モジュールライブラリ
-   - `"debug"` - デバッグライブラリ（unsafe）
-4. The pasta_lua Runtime shall 複数の個別ライブラリ指定をOR結合（ビット演算`|`）で処理する
-5. The pasta_lua Runtime shall 空配列`[]`を`StdLib::NONE`（ライブラリなし）として扱う
+1. When `[lua]`セクションの`libs`フィールドが存在する場合, the pasta_lua Runtime shall 指定された配列要素に基づいてLua VMとmlua-stdlibモジュールを初期化する
+2. When `libs`フィールドが省略された場合, the pasta_lua Runtime shall デフォルト値を適用する
+3. The pasta_lua Runtime shall Lua標準ライブラリとして以下の`std_`プレフィックス付き要素をサポートする:
+   - `std_all` - 安全なLua標準ライブラリすべて（`StdLib::ALL_SAFE`、std_debug除く）
+   - `std_all_unsafe` - std_debugを含むすべてのLua標準ライブラリ（`StdLib::ALL`）
+   - `std_coroutine` - コルーチンライブラリ
+   - `std_table` - テーブル操作ライブラリ
+   - `std_io` - I/Oライブラリ
+   - `std_os` - OSライブラリ
+   - `std_string` - 文字列ライブラリ
+   - `std_utf8` - UTF-8ライブラリ
+   - `std_math` - 数学ライブラリ
+   - `std_package` - パッケージ/モジュールライブラリ
+   - `std_debug` - デバッグライブラリ（unsafe）
+4. The pasta_lua Runtime shall mlua-stdlibモジュールとして以下の要素をサポートする:
+   - `assertions` - @assertions（アサーション・検証機能）
+   - `testing` - @testing（テストフレームワーク）
+   - `env` - @env（環境変数・ファイルシステムアクセス、セキュリティ考慮）
+   - `regex` - @regex（正規表現）
+   - `json` - @json（JSON エンコード・デコード）
+   - `yaml` - @yaml（YAML エンコード・デコード）
+5. The pasta_lua Runtime shall 複数のライブラリ指定をOR結合（Lua標準）またはモジュール登録（mlua-stdlib）で処理する
+6. The pasta_lua Runtime shall 空配列`[]`を最小構成（ライブラリなし）として扱う
 
 ### Requirement 2: 減算記法によるライブラリ除外
 
-**Objective:** ゴースト開発者として、特定のライブラリを除外する減算記法を使用したい。これにより、「ほぼすべて有効だが特定のライブラリのみ無効化」といった設定を簡潔に記述できる。
+**Objective:** ゴースト開発者として、特定のライブラリ・モジュールを除外する減算記法を使用したい。これにより、「ほぼすべて有効だが特定のものだけ無効化」といった設定を簡潔に記述できる。
 
 #### Acceptance Criteria
 
-1. When 配列要素が`"-"`で始まる場合, the pasta_lua Runtime shall 該当ライブラリをビット演算`& !(StdLib::XXX)`で除外する
-2. The pasta_lua Runtime shall 減算記法として以下をサポートする:
-   - `"-debug"` - debugライブラリを除外
-   - `"-io"`, `"-os"`, `"-package"` 等、すべてのライブラリに対応
-3. The pasta_lua Runtime shall 加算要素を先に処理し、その後減算要素を処理する
-4. If `["all", "-debug"]`のように指定された場合, the pasta_lua Runtime shall `StdLib::ALL_SAFE`と同等の結果を生成する
+1. When 配列要素が`"-"`で始まる場合, the pasta_lua Runtime shall 該当ライブラリ・モジュールを除外する
+2. The pasta_lua Runtime shall Lua標準ライブラリの減算記法として以下をサポートする:
+   - `"-std_debug"` - std_debugライブラリを除外
+   - `"-std_io"`, `"-std_os"`, `"-std_package"` 等、すべてのstd_系に対応
+3. The pasta_lua Runtime shall mlua-stdlibモジュールの減算記法として以下をサポートする:
+   - `"-env"`, `"-testing"`, `"-regex"` 等、すべてのモジュールに対応
+4. The pasta_lua Runtime shall 加算要素を先に処理し、その後減算要素を処理する
+5. If `["std_all", "-std_debug"]`のように指定された場合, the pasta_lua Runtime shall `StdLib::ALL_SAFE`と同等の結果を生成する
 
-### Requirement 3: debugライブラリ有効化時の警告
+### Requirement 3: セキュリティ関連ライブラリ有効化時の警告
 
-**Objective:** ゴースト開発者として、unsafeなdebugライブラリが有効化された際に警告を受け取りたい。これにより、意図しないセキュリティリスクを認識できる。
+**Objective:** ゴースト開発者として、セキュリティリスクのあるライブラリ・モジュールが有効化された際に警告を受け取りたい。これにより、意図しないセキュリティリスクを認識できる。
 
 #### Acceptance Criteria
 
-1. When `"debug"`または`"all_unsafe"`が配列に含まれる場合, the pasta_lua Config shall 警告ログを出力する（tracing::warn: "Debug library enabled - potential security risk"）
-2. When `["all", "-debug"]`のようにdebugが明示的に除外された場合, the pasta_lua Config shall 警告を出力しない
-3. The pasta_lua Config shall 有効化されるライブラリ一覧をデバッグログに出力する（tracing::debug）
+1. When `"std_debug"`または`"std_all_unsafe"`が配列に含まれる場合, the pasta_lua Config shall 警告ログを出力する（tracing::warn: "std_debug library enabled - potential security risk"）
+2. When `"env"`が配列に含まれる場合, the pasta_lua Config shall 警告ログを出力する（tracing::warn: "env module enabled - filesystem and environment access permitted"）
+3. When `["std_all", "-std_debug"]`のようにstd_debugが明示的に除外された場合, the pasta_lua Config shall std_debug関連の警告を出力しない
+4. The pasta_lua Config shall 有効化されるライブラリ・モジュール一覧をデバッグログに出力する（tracing::debug）
 
-**注記**: mluaにおいて、`StdLib::ALL_SAFE`はdebug以外のすべての標準ライブラリを含む。io, os, packageはsafeライブラリとして扱われる。
+**注記**: 
+- mluaにおいて、`StdLib::ALL_SAFE`はstd_debug以外のすべてのLua標準ライブラリを含む
+- mlua-stdlibの`env`モジュールはファイルシステム・環境変数アクセスを提供するためセキュリティ考慮が必要
 
 ### Requirement 4: 設定バリデーションとエラーハンドリング
 
@@ -102,57 +118,76 @@ stdlib = ["all", "-debug"]  # 減算記法
 
 #### Acceptance Criteria
 
-1. The pasta_lua Runtime shall `[lua]`セクションまたは`stdlib`フィールドが存在しない場合、デフォルト値`["all"]`を適用する（既存動作維持）
-2. The pasta_lua Config shall 既存の`TranspilerConfig`とは独立した設定項目として`LuaStdLibConfig`を管理する
-3. The pasta_lua Runtime shall 既存の`RuntimeConfig::enable_std_libs`フラグとの整合性を保つ（非推奨化を検討）
+1. The pasta_lua Runtime shall `[lua]`セクションまたは`libs`フィールドが存在しない場合、デフォルト値を適用する（既存動作維持）
+2. The pasta_lua Config shall 既存の`TranspilerConfig`とは独立した設定項目として`LuaLibConfig`を管理する
+3. The pasta_lua Runtime shall 既存の`RuntimeConfig`の個別フラグ（`enable_std_libs`, `enable_testing`等）を`libs`配列で置き換え、段階的に非推奨化する
+
+**デフォルト値の定義**:
+```toml
+[lua]
+# 省略時のデフォルト
+libs = ["std_all", "assertions", "testing", "regex", "json", "yaml"]
+# 注: env はセキュリティ上の理由からデフォルトでは無効
+```
 
 ## TOML設定例
 
-### パターン1: デフォルト（安全なライブラリすべて）
+### 例1: デフォルト構成（省略時）
 ```toml
-[lua]
-# 省略時のデフォルト: stdlib = ["all"]
+# [lua]セクション自体を省略可能
+# デフォルト: ["std_all", "assertions", "testing", "regex", "json", "yaml"]
 ```
 
-### パターン2: 明示的にデフォルト指定
+### 例2: すべて有効化（std_debug含む、env含む）
 ```toml
 [lua]
-stdlib = ["all"]  # StdLib::ALL_SAFE相当（debugを除く全ライブラリ）
+libs = ["std_all_unsafe", "assertions", "testing", "env", "regex", "json", "yaml"]
 ```
 
-### パターン3: 最小構成
+### 例3: 最小構成（ライブラリなし）
 ```toml
 [lua]
-stdlib = ["string", "table", "math"]
+libs = []
 ```
 
-### パターン4: デバッグ有効化（全ライブラリ）
+### 例4: 個別指定（必要最小限）
 ```toml
 [lua]
-stdlib = ["all_unsafe"]  # StdLib::ALL相当（debug含む）
+libs = ["std_string", "std_table", "std_math"]
 ```
 
-### パターン5: 個別ライブラリの除外（減算記法）
+### 例5: テスト開発向け（std_debugとtesting）
 ```toml
 [lua]
-stdlib = ["all", "-os", "-io"]  # OS・IO以外のすべて
+libs = ["std_all_unsafe", "assertions", "testing", "regex"]
 ```
 
-### パターン6: ライブラリなし
+### 例6: セキュアな本番環境（std_debugとenv除外）
 ```toml
 [lua]
-stdlib = []  # StdLib::NONE相当
+libs = ["std_all", "assertions", "regex", "json", "yaml"]
+# デフォルトと同等（testingのみ追加で除外する場合は "-testing" を追加）
 ```
 
-### パターン7: 特定ライブラリの追加
+### 例7: 減算記法の使用
 ```toml
 [lua]
-stdlib = ["string", "table", "math", "coroutine", "utf8"]
+libs = ["std_all", "assertions", "testing", "regex", "json", "yaml", "-testing", "-env"]
+# デフォルトからtestingとenvを除外
+```
+
+### 例8: std_all_unsafeからstd_debugのみ除外
+```toml
+[lua]
+libs = ["std_all_unsafe", "-std_debug", "assertions", "testing", "regex", "json"]
+# std_all_unsafeは不要。std_allと同等になる
 ```
 
 ## 技術的制約
 
-- mlua 0.11の`StdLib`フラグを使用
+- mlua 0.11の`StdLib`フラグを使用（Lua標準ライブラリ）
+- mlua-stdlib 0.1のモジュール登録APIを使用
 - Lua 5.5（`lua55`フィーチャー）で利用可能なオプションのみサポート
 - 設定解析には既存の`toml`クレートを使用
-- `StdLib::ALL_SAFE` = 全ライブラリ - debug（io, os, packageはsafeとして含まれる）
+- `StdLib::ALL_SAFE` = 全Lua標準ライブラリ - std_debug（std_io, std_os, std_packageはsafeとして含まれる）
+- mlua-stdlibの`@assertions`, `@testing`, `@regex`, `@json`, `@yaml`, `@env`はLua VMに動的に登録
