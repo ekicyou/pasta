@@ -8,7 +8,7 @@
 
 ### 1. Config Layer: LuaConfig構造体実装
 
-- [ ] 1.1 (P) LuaConfig構造体とデシリアライゼーション実装
+- [x] 1.1 (P) LuaConfig構造体とデシリアライゼーション実装
   - `loader/config.rs`に`LuaConfig`構造体を追加
   - `libs: Vec<String>`フィールドをserde Deserializeで実装
   - `default_libs()`関数でデフォルト値を返す（`["std_all", "assertions", "testing", "regex", "json", "yaml"]`）
@@ -16,7 +16,7 @@
   - `Default` traitを実装
   - _Requirements: 1.1, 1.2, 5.1_
 
-- [ ] 1.2 (P) PastaConfigへのlua()メソッド追加
+- [x] 1.2 (P) PastaConfigへのlua()メソッド追加
   - `PastaConfig`に`pub fn lua(&self) -> Option<LuaConfig>`メソッド追加
   - custom_fieldsから`[lua]`セクションを取得し、`LuaConfig`へデシリアライズ
   - 既存の`logging()`, `persistence()`メソッドパターンに準拠
@@ -24,7 +24,7 @@
 
 ### 2. Runtime Layer: RuntimeConfig刷新
 
-- [ ] 2.1 RuntimeConfig構造体のlibs配列化
+- [x] 2.1 RuntimeConfig構造体のlibs配列化
   - `RuntimeConfig`の既存フィールド（`enable_std_libs`, `enable_testing`等）を削除
   - `libs: Vec<String>`フィールドに置換
   - `Default::default()`で`LuaConfig::default_libs()`と同等の値を返す
@@ -32,7 +32,7 @@
   - `From<LuaConfig>` trait実装で`LuaConfig`から`RuntimeConfig`への変換
   - _Requirements: 1.1, 1.2, 5.1, 5.3_
 
-- [ ] 2.2 StdLib変換ロジック実装（to_stdlib()メソッド）
+- [x] 2.2 StdLib変換ロジック実装（to_stdlib()メソッド）
   - `RuntimeConfig::to_stdlib() -> Result<StdLib, ConfigError>`メソッド実装
   - 加算要素を先に処理し、減算要素を後に処理（順序非依存）
   - `std_`プレフィックス付き要素をStdLibビットフラグに変換
@@ -41,13 +41,13 @@
   - 不明ライブラリ名で`ConfigError::UnknownLibrary`を返す
   - _Requirements: 1.3, 1.4, 1.5, 1.6, 2.1, 2.2, 2.3, 2.4, 2.5, 4.1, 4.3, 4.4_
 
-- [ ] 2.3 (P) mlua-stdlibモジュール判定ロジック実装
+- [x] 2.3 (P) mlua-stdlibモジュール判定ロジック実装
   - `RuntimeConfig::should_enable_module(&self, module: &str) -> bool`メソッド実装
   - `libs`配列にモジュール名が含まれるか判定
   - 減算記法（`"-module"`）で除外されている場合はfalseを返す
   - _Requirements: 1.4, 1.5, 2.3_
 
-- [ ] 2.4 (P) セキュリティ警告ロジック実装
+- [x] 2.4 (P) セキュリティ警告ロジック実装
   - `RuntimeConfig::validate_and_warn(&self)`メソッド実装
   - `std_debug`または`std_all_unsafe`検出時に`tracing::warn!`で警告出力
   - `env`モジュール検出時に`tracing::warn!`で警告出力
@@ -57,7 +57,7 @@
 
 ### 3. Error Handling: ConfigErrorエラー型実装
 
-- [ ] 3.1 (P) ConfigError列挙型実装
+- [x] 3.1 (P) ConfigError列挙型実装
   - `error.rs`に`ConfigError`列挙型を追加
   - `UnknownLibrary(String)`バリアントを実装
   - `thiserror::Error`でエラーメッセージ実装（有効ライブラリ名一覧を含める）
@@ -65,7 +65,7 @@
 
 ### 4. Runtime Integration: PastaLuaRuntimeへの統合
 
-- [ ] 4.1 PastaLuaRuntimeでのRuntimeConfig使用
+- [x] 4.1 PastaLuaRuntimeでのRuntimeConfig使用
   - `PastaLuaRuntime::with_config()`でRuntimeConfigを受け取る
   - `RuntimeConfig::validate_and_warn()`を呼び出す
   - `RuntimeConfig::to_stdlib()?`でStdLibフラグを取得
@@ -73,7 +73,7 @@
   - エラー処理を適切に実装
   - _Requirements: 1.1, 3.1, 3.2, 4.4_
 
-- [ ] 4.2 mlua-stdlibモジュール動的登録
+- [x] 4.2 mlua-stdlibモジュール動的登録
   - `RuntimeConfig::should_enable_module()`で各モジュールの有効化判定
   - `assertions`, `testing`, `env`, `regex`, `json`, `yaml`モジュールを条件付き登録
   - 既存のmlua-stdlib登録ロジックを`should_enable_module()`による制御に変更
@@ -81,7 +81,7 @@
 
 ### 5. Testing: テストスイート実装
 
-- [ ] 5.1 RuntimeConfig単体テスト
+- [x] 5.1 RuntimeConfig単体テスト
   - `to_stdlib()`での各ライブラリ名パーステスト
   - 減算記法処理テスト（`["std_all", "-std_debug"]` → `ALL_SAFE`）
   - 空配列テスト（`[]` → `StdLib::NONE`）
@@ -90,13 +90,13 @@
   - `validate_and_warn()`での警告出力テスト（tracing-subscriber使用）
   - _Requirements: 1.3, 1.4, 1.5, 1.6, 2.1, 2.2, 2.4, 2.5, 3.1, 3.2, 4.1_
 
-- [ ] 5.2 LuaConfig統合テスト
+- [x] 5.2 LuaConfig統合テスト
   - TOML配列デシリアライゼーションテスト
   - デフォルト値適用テスト（libs省略時）
   - `PastaConfig::lua()`メソッドテスト
   - _Requirements: 1.1, 1.2, 5.1_
 
-- [ ] 5.3 E2Eテスト
+- [x] 5.3 E2Eテスト
   - 様々なlibs配列パターンでのpasta.toml読み込みテスト
   - 空配列`libs = []`での最小構成動作確認
   - セキュリティ警告出力検証
@@ -105,7 +105,7 @@
 
 ### 6. Documentation and Migration: ドキュメント整合性確認
 
-- [ ] 6.1 ドキュメント整合性の確認と更新
+- [x] 6.1 ドキュメント整合性の確認と更新
   - SOUL.md - コアバリュー・設計原則との整合性確認
   - SPECIFICATION.md - 言語仕様の更新（該当なし）
   - GRAMMAR.md - 文法リファレンスの同期（該当なし）

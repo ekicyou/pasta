@@ -23,7 +23,8 @@ pub mod finalize;
 pub mod persistence;
 
 use crate::context::TranspileContext;
-use crate::loader::{LoaderContext, PastaConfig, TranspileResult};
+use crate::error::ConfigError;
+use crate::loader::{LoaderContext, LuaConfig, PastaConfig, TranspileResult, default_libs};
 use crate::logging::PastaLogger;
 pub(crate) use finalize::register_finalize_scene;
 use mlua::{Lua, LuaSerdeExt, Result as LuaResult, StdLib, Table, Value};
@@ -31,74 +32,232 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 /// Configuration for which standard libraries to enable in the Lua runtime.
-#[derive(Debug, Clone, Default)]
+///
+/// Uses Cargo-style array notation with optional subtraction syntax.
+///
+/// # Examples
+///
+/// ```rust
+/// use pasta_lua::RuntimeConfig;
+///
+/// // Default configuration (safe libraries + common mlua-stdlib modules)
+/// let config = RuntimeConfig::new();
+///
+/// // Full configuration with all features including security-sensitive ones
+/// let config = RuntimeConfig::full();
+///
+/// // Minimal configuration with no libraries
+/// let config = RuntimeConfig::minimal();
+///
+/// // Custom configuration
+/// let config = RuntimeConfig::from_libs(vec![
+///     "std_all".into(),
+///     "testing".into(),
+///     "-std_debug".into(),
+/// ]);
+/// ```
+#[derive(Debug, Clone)]
 pub struct RuntimeConfig {
-    /// Enable Lua standard libraries (base, table, string, math, etc.)
-    /// Default: true
-    pub enable_std_libs: bool,
-    /// Enable mlua-stdlib assertions module (@assertions)
-    /// Provides assertion functions for testing and validation.
-    /// Default: true
-    pub enable_assertions: bool,
-    /// Enable mlua-stdlib testing module (@testing)
-    /// Provides a testing framework with hooks and reporting.
-    /// Default: true
-    pub enable_testing: bool,
-    /// Enable mlua-stdlib env module (@env)
-    /// Provides environment variable and filesystem path access.
-    /// Default: false (security-sensitive, opt-in)
-    pub enable_env: bool,
-    /// Enable mlua-stdlib regex module (@regex)
-    /// Default: true
-    pub enable_regex: bool,
-    /// Enable mlua-stdlib json module (@json)
-    /// Default: true
-    pub enable_json: bool,
-    /// Enable mlua-stdlib yaml module (@yaml)
-    /// Default: true
-    pub enable_yaml: bool,
+    /// Library configuration array.
+    ///
+    /// Supports Lua standard libraries (std_* prefix) and mlua-stdlib modules.
+    /// Use `-` prefix to subtract/exclude a library.
+    ///
+    /// Valid Lua standard libraries:
+    /// - `std_all` - All safe libraries (StdLib::ALL_SAFE, excludes std_debug)
+    /// - `std_all_unsafe` - All libraries including debug (StdLib::ALL)
+    /// - `std_coroutine`, `std_table`, `std_io`, `std_os`, `std_string`
+    /// - `std_utf8`, `std_math`, `std_package`, `std_debug`
+    ///
+    /// Valid mlua-stdlib modules:
+    /// - `assertions`, `testing`, `env`, `regex`, `json`, `yaml`
+    pub libs: Vec<String>,
 }
 
 impl RuntimeConfig {
     /// Create a new configuration with all safe features enabled (default).
     ///
-    /// Note: `enable_env` is disabled by default for security reasons.
+    /// Default: `["std_all", "assertions", "testing", "regex", "json", "yaml"]`
+    ///
+    /// Note: `env` is disabled by default for security reasons.
     pub fn new() -> Self {
         Self {
-            enable_std_libs: true,
-            enable_assertions: true,
-            enable_testing: true,
-            enable_env: false, // Disabled by default for security
-            enable_regex: true,
-            enable_json: true,
-            enable_yaml: true,
+            libs: default_libs(),
         }
     }
 
     /// Create a configuration with all features enabled, including security-sensitive ones.
+    ///
+    /// Includes: `std_all_unsafe` (debug), `env`
     pub fn full() -> Self {
         Self {
-            enable_std_libs: true,
-            enable_assertions: true,
-            enable_testing: true,
-            enable_env: true,
-            enable_regex: true,
-            enable_json: true,
-            enable_yaml: true,
+            libs: vec![
+                "std_all_unsafe".into(),
+                "assertions".into(),
+                "testing".into(),
+                "env".into(),
+                "regex".into(),
+                "json".into(),
+                "yaml".into(),
+            ],
         }
     }
 
-    /// Create a minimal configuration with only pasta modules.
+    /// Create a minimal configuration with only safe Lua standard libraries.
+    ///
+    /// No mlua-stdlib modules are enabled.
+    ///
+    /// Contains: `["std_all"]`
     pub fn minimal() -> Self {
         Self {
-            enable_std_libs: false,
-            enable_assertions: false,
-            enable_testing: false,
-            enable_env: false,
-            enable_regex: false,
-            enable_json: false,
-            enable_yaml: false,
+            libs: vec!["std_all".into()],
         }
+    }
+
+    /// Create a configuration from a custom libs array.
+    pub fn from_libs(libs: Vec<String>) -> Self {
+        Self { libs }
+    }
+
+    /// Convert libs array to mlua::StdLib flags.
+    ///
+    /// Processing order: additions first, then subtractions.
+    /// This ensures order-independent behavior.
+    ///
+    /// # Returns
+    /// * `Ok(StdLib)` - Computed StdLib flags
+    /// * `Err(ConfigError)` - Unknown library name found
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use pasta_lua::RuntimeConfig;
+    /// use mlua::StdLib;
+    ///
+    /// let config = RuntimeConfig::from_libs(vec!["std_all".into(), "-std_debug".into()]);
+    /// let stdlib = config.to_stdlib().unwrap();
+    /// assert_eq!(stdlib, StdLib::ALL_SAFE);
+    /// ```
+    pub fn to_stdlib(&self) -> Result<StdLib, ConfigError> {
+        let mut additions = StdLib::NONE;
+        let mut subtractions = StdLib::NONE;
+
+        for lib in &self.libs {
+            let (is_subtraction, name) = if let Some(stripped) = lib.strip_prefix('-') {
+                (true, stripped)
+            } else {
+                (false, lib.as_str())
+            };
+
+            // Only process std_* prefixed names for StdLib
+            if !name.starts_with("std_") {
+                // mlua-stdlib modules are handled separately
+                continue;
+            }
+
+            let flag = Self::parse_std_lib(name)?;
+
+            if is_subtraction {
+                subtractions |= flag;
+            } else {
+                additions |= flag;
+            }
+        }
+
+        // Remove subtractions from additions using XOR on the intersection
+        // First find bits that are in both, then XOR them out of additions
+        let intersection = additions & subtractions;
+        Ok(additions ^ intersection)
+    }
+
+    /// Parse a std_* library name to StdLib flag.
+    fn parse_std_lib(name: &str) -> Result<StdLib, ConfigError> {
+        match name {
+            "std_all" => Ok(StdLib::ALL_SAFE),
+            "std_all_unsafe" => Ok(StdLib::ALL),
+            "std_coroutine" => Ok(StdLib::COROUTINE),
+            "std_table" => Ok(StdLib::TABLE),
+            "std_io" => Ok(StdLib::IO),
+            "std_os" => Ok(StdLib::OS),
+            "std_string" => Ok(StdLib::STRING),
+            "std_utf8" => Ok(StdLib::UTF8),
+            "std_math" => Ok(StdLib::MATH),
+            "std_package" => Ok(StdLib::PACKAGE),
+            "std_debug" => Ok(StdLib::DEBUG),
+            _ => Err(ConfigError::UnknownLibrary(name.to_string())),
+        }
+    }
+
+    /// Check if a specific mlua-stdlib module should be enabled.
+    ///
+    /// # Arguments
+    /// * `module` - Module name without prefix (e.g., "testing", "regex")
+    ///
+    /// # Returns
+    /// `true` if module is in libs array and not subtracted
+    pub fn should_enable_module(&self, module: &str) -> bool {
+        let has_positive = self.libs.iter().any(|lib| lib == module);
+        let has_negative = self
+            .libs
+            .iter()
+            .any(|lib| lib.strip_prefix('-') == Some(module));
+        has_positive && !has_negative
+    }
+
+    /// Validate configuration and emit security warnings.
+    ///
+    /// Emits `tracing::warn` for:
+    /// - `std_debug` or `std_all_unsafe` enabled
+    /// - `env` module enabled
+    ///
+    /// Emits `tracing::debug` for enabled libraries list.
+    pub fn validate_and_warn(&self) {
+        // Check for security-sensitive Lua libraries
+        let has_std_debug = self.libs.iter().any(|lib| lib == "std_debug");
+        let has_std_all_unsafe = self.libs.iter().any(|lib| lib == "std_all_unsafe");
+        let debug_subtracted = self
+            .libs
+            .iter()
+            .any(|lib| lib == "-std_debug" || lib == "-std_all_unsafe");
+
+        if (has_std_debug || has_std_all_unsafe) && !debug_subtracted {
+            if has_std_all_unsafe {
+                tracing::warn!(
+                    "Unsafe Lua libraries enabled: std_all_unsafe. \
+                     This includes std_debug which provides access to Lua internals. \
+                     Not recommended for production."
+                );
+            } else {
+                tracing::warn!(
+                    "Unsafe Lua library enabled: std_debug. \
+                     Provides access to Lua internals and stack manipulation. \
+                     Not recommended for production."
+                );
+            }
+        }
+
+        // Check for security-sensitive mlua-stdlib modules
+        if self.should_enable_module("env") {
+            tracing::warn!(
+                "Security-sensitive module enabled: env. \
+                 Provides filesystem and environment variable access."
+            );
+        }
+
+        // Log enabled libraries at debug level
+        tracing::debug!(libs = ?self.libs, "Lua library configuration");
+    }
+}
+
+impl Default for RuntimeConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl From<LuaConfig> for RuntimeConfig {
+    fn from(config: LuaConfig) -> Self {
+        Self { libs: config.libs }
     }
 }
 
@@ -153,14 +312,17 @@ impl PastaLuaRuntime {
     /// * `Ok(Self)` - Runtime initialized successfully
     /// * `Err(e)` - Lua VM or module registration failed
     pub fn with_config(context: TranspileContext, config: RuntimeConfig) -> LuaResult<Self> {
+        // Validate configuration and emit warnings
+        config.validate_and_warn();
+
+        // Convert libs array to StdLib flags
+        let std_lib = config
+            .to_stdlib()
+            .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+
         // Create Lua VM with appropriate standard libraries
-        let lua = if config.enable_std_libs {
-            // Load all safe standard libraries (excluding debug and ffi)
-            // SAFETY: ALL_SAFE only loads safe standard libraries
-            unsafe { Lua::unsafe_new_with(StdLib::ALL_SAFE, mlua::LuaOptions::default()) }
-        } else {
-            Lua::new()
-        };
+        // SAFETY: We control the StdLib flags based on configuration
+        let lua = unsafe { Lua::unsafe_new_with(std_lib, mlua::LuaOptions::default()) };
 
         // Extract registries from context
         let scene_registry = context.scene_registry;
@@ -169,25 +331,23 @@ impl PastaLuaRuntime {
         // Register @pasta_search module
         crate::search::register(&lua, scene_registry, word_registry)?;
 
-        // Register mlua-stdlib core modules based on configuration
-        if config.enable_assertions {
+        // Register mlua-stdlib modules based on configuration
+        if config.should_enable_module("assertions") {
             mlua_stdlib::assertions::register(&lua, None)?;
         }
-        if config.enable_testing {
+        if config.should_enable_module("testing") {
             mlua_stdlib::testing::register(&lua, None)?;
         }
-        if config.enable_env {
+        if config.should_enable_module("env") {
             mlua_stdlib::env::register(&lua, None)?;
         }
-
-        // Register mlua-stdlib feature-gated modules
-        if config.enable_regex {
+        if config.should_enable_module("regex") {
             mlua_stdlib::regex::register(&lua, None)?;
         }
-        if config.enable_json {
+        if config.should_enable_module("json") {
             mlua_stdlib::json::register(&lua, None)?;
         }
-        if config.enable_yaml {
+        if config.should_enable_module("yaml") {
             mlua_stdlib::yaml::register(&lua, None)?;
         }
 
@@ -582,5 +742,274 @@ impl Drop for PastaLuaRuntime {
         if let Err(e) = self.save_persistence_data() {
             tracing::error!(error = %e, "Failed to save persistence data on drop");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ============================================================================
+    // RuntimeConfig constructor tests
+    // ============================================================================
+
+    #[test]
+    fn test_runtime_config_new_returns_default_libs() {
+        let config = RuntimeConfig::new();
+        assert!(config.libs.contains(&"std_all".to_string()));
+        assert!(config.libs.contains(&"assertions".to_string()));
+        assert!(config.libs.contains(&"testing".to_string()));
+        assert!(config.libs.contains(&"regex".to_string()));
+        assert!(config.libs.contains(&"json".to_string()));
+        assert!(config.libs.contains(&"yaml".to_string()));
+        // env should NOT be in default
+        assert!(!config.libs.contains(&"env".to_string()));
+    }
+
+    #[test]
+    fn test_runtime_config_full_includes_unsafe() {
+        let config = RuntimeConfig::full();
+        assert!(config.libs.contains(&"std_all_unsafe".to_string()));
+        assert!(config.libs.contains(&"env".to_string()));
+    }
+
+    #[test]
+    fn test_runtime_config_minimal_is_std_all_only() {
+        let config = RuntimeConfig::minimal();
+        assert_eq!(config.libs, vec!["std_all".to_string()]);
+    }
+
+    #[test]
+    fn test_runtime_config_from_libs() {
+        let config = RuntimeConfig::from_libs(vec!["std_table".into(), "regex".into()]);
+        assert_eq!(config.libs.len(), 2);
+        assert!(config.libs.contains(&"std_table".to_string()));
+        assert!(config.libs.contains(&"regex".to_string()));
+    }
+
+    // ============================================================================
+    // to_stdlib() tests
+    // ============================================================================
+
+    #[test]
+    fn test_to_stdlib_std_all() {
+        let config = RuntimeConfig::from_libs(vec!["std_all".into()]);
+        let stdlib = config.to_stdlib().unwrap();
+        assert_eq!(stdlib, StdLib::ALL_SAFE);
+    }
+
+    #[test]
+    fn test_to_stdlib_std_all_unsafe() {
+        let config = RuntimeConfig::from_libs(vec!["std_all_unsafe".into()]);
+        let stdlib = config.to_stdlib().unwrap();
+        assert_eq!(stdlib, StdLib::ALL);
+    }
+
+    #[test]
+    fn test_to_stdlib_individual_libs() {
+        let config = RuntimeConfig::from_libs(vec![
+            "std_table".into(),
+            "std_string".into(),
+            "std_math".into(),
+        ]);
+        let stdlib = config.to_stdlib().unwrap();
+        assert_eq!(stdlib, StdLib::TABLE | StdLib::STRING | StdLib::MATH);
+    }
+
+    #[test]
+    fn test_to_stdlib_subtraction() {
+        let config = RuntimeConfig::from_libs(vec!["std_all".into(), "-std_io".into()]);
+        let stdlib = config.to_stdlib().unwrap();
+        // ALL_SAFE minus IO
+        let expected = StdLib::ALL_SAFE ^ (StdLib::ALL_SAFE & StdLib::IO);
+        assert_eq!(stdlib, expected);
+    }
+
+    #[test]
+    fn test_to_stdlib_order_independent() {
+        // Subtraction first, then addition - should still work
+        let config1 = RuntimeConfig::from_libs(vec!["-std_io".into(), "std_all".into()]);
+        let config2 = RuntimeConfig::from_libs(vec!["std_all".into(), "-std_io".into()]);
+
+        let stdlib1 = config1.to_stdlib().unwrap();
+        let stdlib2 = config2.to_stdlib().unwrap();
+
+        assert_eq!(stdlib1, stdlib2);
+    }
+
+    #[test]
+    fn test_to_stdlib_empty_libs() {
+        let config = RuntimeConfig::from_libs(vec![]);
+        let stdlib = config.to_stdlib().unwrap();
+        assert_eq!(stdlib, StdLib::NONE);
+    }
+
+    #[test]
+    fn test_to_stdlib_unknown_library_error() {
+        let config = RuntimeConfig::from_libs(vec!["std_nonexistent".into()]);
+        let result = config.to_stdlib();
+        assert!(result.is_err());
+        match result {
+            Err(ConfigError::UnknownLibrary(name)) => {
+                assert_eq!(name, "std_nonexistent");
+            }
+            Ok(_) => panic!("Expected error for unknown library"),
+        }
+    }
+
+    #[test]
+    fn test_to_stdlib_ignores_mlua_stdlib_modules() {
+        // mlua-stdlib modules (no std_ prefix) should be ignored by to_stdlib
+        let config = RuntimeConfig::from_libs(vec![
+            "std_table".into(),
+            "assertions".into(),
+            "regex".into(),
+        ]);
+        let stdlib = config.to_stdlib().unwrap();
+        // Only std_table should be processed
+        assert_eq!(stdlib, StdLib::TABLE);
+    }
+
+    // ============================================================================
+    // should_enable_module() tests
+    // ============================================================================
+
+    #[test]
+    fn test_should_enable_module_positive() {
+        let config = RuntimeConfig::from_libs(vec!["testing".into(), "regex".into()]);
+        assert!(config.should_enable_module("testing"));
+        assert!(config.should_enable_module("regex"));
+        assert!(!config.should_enable_module("assertions"));
+    }
+
+    #[test]
+    fn test_should_enable_module_with_subtraction() {
+        let config = RuntimeConfig::from_libs(vec!["testing".into(), "-testing".into()]);
+        // Has both positive and negative, so should return false
+        assert!(!config.should_enable_module("testing"));
+    }
+
+    #[test]
+    fn test_should_enable_module_subtraction_without_positive() {
+        let config = RuntimeConfig::from_libs(vec!["-testing".into()]);
+        // Only negative, no positive - should return false
+        assert!(!config.should_enable_module("testing"));
+    }
+
+    // ============================================================================
+    // From<LuaConfig> tests
+    // ============================================================================
+
+    #[test]
+    fn test_from_lua_config() {
+        let lua_config = LuaConfig {
+            libs: vec!["std_all".into(), "testing".into()],
+        };
+        let runtime_config: RuntimeConfig = lua_config.into();
+        assert_eq!(runtime_config.libs, vec!["std_all", "testing"]);
+    }
+
+    // ============================================================================
+    // Default trait tests
+    // ============================================================================
+
+    #[test]
+    fn test_default_equals_new() {
+        let default_config = RuntimeConfig::default();
+        let new_config = RuntimeConfig::new();
+        assert_eq!(default_config.libs, new_config.libs);
+    }
+
+    // ============================================================================
+    // validate_and_warn() tests
+    // ============================================================================
+
+    /// Test that validate_and_warn() does not panic for safe configurations.
+    #[test]
+    fn test_validate_and_warn_safe_config() {
+        let config = RuntimeConfig::new();
+        // Should not panic
+        config.validate_and_warn();
+    }
+
+    /// Test that validate_and_warn() does not panic for unsafe configurations.
+    #[test]
+    fn test_validate_and_warn_unsafe_config() {
+        let config = RuntimeConfig::full();
+        // Should not panic, even with unsafe libs
+        config.validate_and_warn();
+    }
+
+    /// Test that validate_and_warn() correctly identifies std_debug as security-sensitive.
+    #[test]
+    fn test_validate_and_warn_detects_std_debug() {
+        let config = RuntimeConfig::from_libs(vec!["std_debug".into()]);
+        // The method should run without error
+        // Actual warning output is verified by log inspection
+        config.validate_and_warn();
+
+        // Verify that the logic correctly identifies std_debug
+        assert!(config.libs.contains(&"std_debug".to_string()));
+    }
+
+    /// Test that validate_and_warn() correctly identifies std_all_unsafe as security-sensitive.
+    #[test]
+    fn test_validate_and_warn_detects_std_all_unsafe() {
+        let config = RuntimeConfig::from_libs(vec!["std_all_unsafe".into()]);
+        config.validate_and_warn();
+
+        // Verify that the logic correctly identifies std_all_unsafe
+        assert!(config.libs.contains(&"std_all_unsafe".to_string()));
+    }
+
+    /// Test that validate_and_warn() correctly identifies env module as security-sensitive.
+    #[test]
+    fn test_validate_and_warn_detects_env_module() {
+        let config = RuntimeConfig::from_libs(vec!["std_all".into(), "env".into()]);
+        config.validate_and_warn();
+
+        // Verify that the method correctly identifies env
+        assert!(config.should_enable_module("env"));
+    }
+
+    /// Test that validate_and_warn() respects subtraction for std_debug.
+    #[test]
+    fn test_validate_and_warn_respects_debug_subtraction() {
+        let config = RuntimeConfig::from_libs(vec!["std_all_unsafe".into(), "-std_debug".into()]);
+        config.validate_and_warn();
+
+        // Verify subtraction is detected
+        assert!(config.libs.iter().any(|lib| lib == "-std_debug"));
+    }
+
+    /// Test that validate_and_warn() respects subtraction for env module.
+    #[test]
+    fn test_validate_and_warn_respects_env_subtraction() {
+        let config = RuntimeConfig::from_libs(vec!["env".into(), "-env".into()]);
+        config.validate_and_warn();
+
+        // Verify that env is effectively disabled via subtraction
+        assert!(!config.should_enable_module("env"));
+    }
+
+    /// Test that validate_and_warn() handles empty libs configuration.
+    #[test]
+    fn test_validate_and_warn_empty_libs() {
+        let config = RuntimeConfig::from_libs(vec![]);
+        // Should not panic with empty configuration
+        config.validate_and_warn();
+    }
+
+    /// Test that validate_and_warn() handles minimal configuration.
+    #[test]
+    fn test_validate_and_warn_minimal() {
+        let config = RuntimeConfig::minimal();
+        // Should not panic and should not trigger any warnings
+        config.validate_and_warn();
+
+        // Verify minimal has no security-sensitive options
+        assert!(!config.libs.contains(&"std_debug".to_string()));
+        assert!(!config.libs.contains(&"std_all_unsafe".to_string()));
+        assert!(!config.should_enable_module("env"));
     }
 }

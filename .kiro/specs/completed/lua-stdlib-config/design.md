@@ -212,7 +212,10 @@ impl RuntimeConfig {
     /// Includes: std_all_unsafe (debug), env
     pub fn full() -> Self;
     
-    /// Create minimal configuration with no libraries.
+    /// Create minimal configuration with only safe Lua standard libraries.
+    ///
+    /// No mlua-stdlib modules are enabled.
+    /// Contains: `["std_all"]`
     pub fn minimal() -> Self;
     
     /// Convert libs array to mlua::StdLib flags.

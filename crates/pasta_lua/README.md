@@ -110,11 +110,80 @@ file_path = "profile/pasta/logs/pasta.log"
 # デフォルト: 7
 rotation_days = 7
 
+[lua]
+# 有効にするライブラリの配列（Cargo風記法）
+# デフォルト: ["std_all", "assertions", "testing", "regex", "json", "yaml"]
+libs = [
+    "std_all",      # Lua安全標準ライブラリ (coroutine, table, io, os, string, utf8, math, package)
+    "assertions",   # @assertions モジュール
+    "testing",      # @testing モジュール
+    "regex",        # @regex モジュール
+    "json",         # @json モジュール
+    "yaml",         # @yaml モジュール
+    # "-std_io",    # 減算記法: std_io を除外
+    # "env",        # @env モジュール（セキュリティ上デフォルト無効）
+    # "std_debug",  # debug ライブラリ（セキュリティ上デフォルト無効）
+]
+
 # カスタムフィールド（Lua から @pasta_config で参照可能）
 [user]
 ghost_name = "MyGhost"
 version = "1.0.0"
 ```
+
+### [lua] セクション詳細
+
+`libs` 配列はCargo風の記法をサポートし、Lua標準ライブラリとmlua-stdlibモジュールを統合制御します。
+
+#### 有効なライブラリ名
+
+**Lua標準ライブラリ（`std_*` プレフィックス）:**
+
+| ライブラリ名      | 説明                                        |
+| ----------------- | ------------------------------------------- |
+| `std_all`         | 安全な標準ライブラリ全部（debug除く）       |
+| `std_all_unsafe`  | **全ライブラリ（debug含む、要注意）**       |
+| `std_coroutine`   | coroutine ライブラリ                        |
+| `std_table`       | table ライブラリ                            |
+| `std_io`          | io ライブラリ                               |
+| `std_os`          | os ライブラリ                               |
+| `std_string`      | string ライブラリ                           |
+| `std_utf8`        | utf8 ライブラリ                             |
+| `std_math`        | math ライブラリ                             |
+| `std_package`     | package ライブラリ（require等）             |
+| `std_debug`       | **debug ライブラリ（セキュリティ警告発生）**|
+
+**mlua-stdlib モジュール:**
+
+| モジュール名 | 説明                      |
+| ------------ | ------------------------- |
+| `assertions` | @assertions モジュール    |
+| `testing`    | @testing モジュール       |
+| `env`        | **@env モジュール（警告）** |
+| `regex`      | @regex モジュール         |
+| `json`       | @json モジュール          |
+| `yaml`       | @yaml モジュール          |
+
+#### 減算記法
+
+`-` プレフィックスでライブラリを除外できます：
+
+```toml
+[lua]
+libs = [
+    "std_all",     # 安全な標準ライブラリをすべて有効化
+    "-std_io",     # io ライブラリを除外
+    "-std_os",     # os ライブラリを除外
+    "json",        # json モジュールを有効化
+]
+```
+
+#### セキュリティ警告
+
+以下のライブラリを有効にすると、ログに警告が出力されます：
+
+- `std_debug` または `std_all_unsafe`: デバッグライブラリはサンドボックス回避に使用される可能性があります
+- `env`: ファイルシステムと環境変数へのアクセスを提供します
 
 ## Lua モジュール検索パス
 
@@ -194,8 +263,24 @@ let result = runtime.exec("return 1 + 1")?;
 ```rust
 use pasta_lua::{PastaLoader, RuntimeConfig};
 
-// 全機能有効（@env モジュール含む）
+// デフォルト設定（std_all + assertions, testing, regex, json, yaml）
+let config = RuntimeConfig::new();
+let runtime = PastaLoader::load_with_config("path/to/base", config)?;
+
+// 全機能有効（std_all_unsafe + @env モジュール含む）
 let config = RuntimeConfig::full();
+let runtime = PastaLoader::load_with_config("path/to/base", config)?;
+
+// 最小構成（std_all のみ、mlua-stdlib モジュールなし）
+let config = RuntimeConfig::minimal();
+let runtime = PastaLoader::load_with_config("path/to/base", config)?;
+
+// カスタム構成
+let config = RuntimeConfig::from_libs(vec![
+    "std_all".into(),
+    "regex".into(),
+    "-std_io".into(),  // io を除外
+]);
 let runtime = PastaLoader::load_with_config("path/to/base", config)?;
 ```
 

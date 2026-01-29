@@ -47,10 +47,10 @@ pub use code_generator::LuaCodeGenerator;
 pub use config::{LineEnding, TranspilerConfig};
 pub use context::TranspileContext;
 pub use encoding::{Encoder, Encoding};
-pub use error::TranspileError;
+pub use error::{ConfigError, TranspileError};
 pub use loader::{
-    CacheManager, LoaderConfig, LoaderContext, LoaderError, LoggingConfig, PastaConfig,
-    PastaLoader, TranspileFailure, TranspileResult,
+    CacheManager, LoaderConfig, LoaderContext, LoaderError, LoggingConfig, LuaConfig, PastaConfig,
+    PastaLoader, TranspileFailure, TranspileResult, default_libs,
 };
 pub use logging::{
     GlobalLoggerRegistry, LoadDirGuard, PastaLogger, get_current_load_dir, set_current_load_dir,
