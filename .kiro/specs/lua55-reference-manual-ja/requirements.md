@@ -28,20 +28,23 @@ markdownか、HTMLかは任せますが、マークダウンの方が使い勝�
 
 ### Requirement 2: マニュアルセクション網羅性
 
-**Objective:** As a Lua開発者, I want 公式マニュアルの全セクションが日本語で参照できること, so that 言語仕様の全体像を把握できる
+**Objective:** As a Lua開発者, I want 公式マニュアルの全セクション・全文が日本語で参照できること, so that 言語仕様の詳細を完全に理解できる
 
 #### Acceptance Criteria
-1. The ドキュメントシステム shall 以下の全章を含むこと：
+1. The ドキュメントシステム shall 以下の全章の**全文（目次だけでなく詳細本文すべて）**を含むこと：
    - 1 – イントロダクション
    - 2 – 基本概念（値と型、スコープ、エラー処理、メタテーブル、ガベージコレクション、コルーチン）
    - 3 – 言語仕様（字句規約、変数、文、式）
-   - 4 – アプリケーションプログラムインターフェース（C API）
-   - 5 – 補助ライブラリ
-   - 6 – 標準ライブラリ（基本関数、coroutine、package、string、utf8、table、math、io、os、debug）
+   - 4 – アプリケーションプログラムインターフェース（C API）**すべてのAPI関数の詳細仕様を含む**
+   - 5 – 補助ライブラリ **すべての補助関数の詳細仕様を含む**
+   - 6 – 標準ライブラリ（基本関数、coroutine、package、string、utf8、table、math、io、os、debug）**すべての標準ライブラリ関数の詳細仕様を含む**
    - 7 – スタンドアロンLua
    - 8 – 前バージョンとの非互換性
    - 9 – Lua完全構文
 2. The ドキュメントシステム shall 索引（Index）セクションを提供する
+3. The ドキュメントシステム shall 各関数・API・メタメソッドの詳細説明（パラメータ、戻り値、動作説明、使用例）を含む
+4. The ドキュメントシステム shall すべてのコード例を含む
+5. The 翻訳対象 shall 公式マニュアルHTML（約369KB）の全文とする（概要・抜粋ではない）
 
 ### Requirement 3: 翻訳品質
 
@@ -54,12 +57,16 @@ markdownか、HTMLかは任せますが、マークダウンの方が使い勝�
 - Phase 4: AI最終検証（全体整合性、用語対応表更新）
 
 **参考文献 (確定):** Lua 5.4日本語マニュアル
-- 日本語版: https://lua.dokyumento.jp/manual/5.4/
+- 日本語版: https://lua.dokyumento.jp/manual/5.4/manual.html（約430KB HTML、仕様フォルダに`reference-lua54-ja.html`として保存済み）
 - 英語原文: https://www.lua.org/manual/5.4/
 - 使用目的: 技術用語の参考、翻訳一貫性の確保
 
+**翻訳ソース (確定):** Lua 5.5英語マニュアル
+- 英語原文: https://www.lua.org/manual/5.5/manual.html（約369KB HTML、仕様フォルダに`reference-lua55-en.html`として保存済み）
+- 全文翻訳対象: 約369KBの完全版HTMLドキュメント
+
 **用語対応表の方針 (確定):**
-- 網羅的な用語対応表（100語以上）をAI翻訳Phase 1で初版作成
+- 網羅的な用語対応表（200-300語程度）をAI翻訳Phase 1で初版作成（全文翻訳のため語数増加）
 - Phase 2-4で段階的に洗練
 - 後から人間が修正可能な原本として機能
 
