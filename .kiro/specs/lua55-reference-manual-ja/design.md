@@ -310,7 +310,8 @@ Output:
 ##### State Management
 - **State model**: GLOSSARY.md（Markdown表形式）
 - **Persistence**: ファイルシステム
-- **Concurrency strategy**: Phase単位で更新（並列更新なし）
+- **Concurrency strategy**: すべてのPhaseで直列実行（Phase内並列化なし）
+- **Update policy**: Phase単位でGLOSSARY.mdを更新（Phase 1→v1, Phase 2→v2）
 
 **GLOSSARY.mdフォーマット**:
 ```markdown
@@ -638,5 +639,5 @@ crates/pasta_lua/doc/lua55-manual/
 
 - 本設計は**ドキュメンテーションプロジェクト**であり、Rustコードの変更は発生しない
 - 全工程でAI（Claude Opus 4.5）を使用し、人間レビューは不要
-- Phase 0完了後、章ごとの並列作業が可能（実装判断）
+- **すべてのPhaseで直列実行**（並列化なし、章は順次処理）
 - 想定総工数: 32-60時間（Phase 0-4合計）
