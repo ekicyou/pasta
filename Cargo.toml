@@ -24,9 +24,9 @@ tempfile = "3"
 insta = { version = "1.42", features = ["glob"] }
 
 # pasta_lua dependencies
-lua-src = { version = ">= 548.1.0, < 549.0.0", features = ["ucid"] }
-mlua = { version = "0.11", features = ["lua54", "vendored", "serialize"] }
-mlua-stdlib = { version = "0.1", features = ["lua54", "vendored", "json", "regex", "yaml"] }
+lua-src = { version = ">= 550.0.0, < 560.0.0", features = ["ucid"] }
+mlua = { version = "0.11", features = ["lua55", "vendored", "serialize"] }
+mlua-stdlib = { version = "0.1", features = ["json", "regex", "yaml"] }
 toml = "0.9.8"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

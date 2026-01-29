@@ -22,7 +22,7 @@ glob.workspace = true
 flate2.workspace = true
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.59", features = ["Win32_Globalization"] }
+windows-sys = { version = "0.61.2", features = ["Win32_Globalization"] }
 
 [build-dependencies]
 lua-src.workspace = true
