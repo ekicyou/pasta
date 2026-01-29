@@ -195,15 +195,24 @@ sequenceDiagram
 | Requirements | 1.5, 1.6 |
 
 **Responsibilities & Constraints**
-- `<h2>`タグを境界として章を分割
-- 各章を`chapters/en/`および`chapters/ja/`に保存
-- 章構成マップ（chapter-map.md）を生成
+- **Phase 0-1: 章構成比較調査**
+  - Lua 5.5英語版の章・節構成（`<h2>`, `<h3>`階層）を抽出
+  - Lua 5.4日本語版の対応する章・節構成を抽出
+  - 両者の構成差分を分析（章番号・節ID・見出しテキストの対応）
+  - 章構成マッピング表（chapter-structure-map.md）を生成
+- **Phase 0-2: 章分割実行**
+  - `<h2>`タグを境界として主要章を分割
+  - 40KB以上の大規模章は`<h3>`タグでサブ分割（マッピング表に基づき対応が取れる位置で分割）
+  - 各章・節を`chapters/en/`および`chapters/ja/`に保存
+  - 章構成マップ（chapter-map.md）を生成
 
 **Dependencies**
 - Inbound: reference-lua55-en.html（369KB）— 翻訳ソース (P0)
 - Inbound: reference-lua54-ja.html（430KB）— 参考日本語版 (P0)
 - Outbound: chapters/en/*.html — 分割済み章 (P0)
 - Outbound: chapters/ja/*.html — 分割済み参考章 (P0)
+- Outbound: chapter-structure-map.md — 章構成マッピング表（Lua 5.5 ⇔ 5.4対応関係） (P0)
+- Outbound: chapter-map.md — 章構成マップ（ファイル名・タイトル対応表） (P0)
 
 **Contracts**: Batch [x]
 
@@ -214,22 +223,53 @@ sequenceDiagram
 - **Output**: 
   - `chapters/en/01-introduction.html` ... `chapters/en/09-complete-syntax.html`, `chapters/en/index.html`
   - `chapters/ja/01-introduction.html` ... `chapters/ja/09-complete-syntax.html`, `chapters/ja/index.html`
+  - `chapter-structure-map.md`（Lua 5.5 ⇔ 5.4章構成対応表、構成差分分析結果）
   - `chapter-map.md`（章番号・タイトル・ファイル名対応表）
 - **Idempotency**: 再実行で上書き
 
+**章構成マッピング表（chapter-structure-map.md）フォーマット**:
+```markdown
+# Lua 5.5 ⇔ 5.4 章構成マッピング表
+
+## 1章: Introduction
+| Lua 5.5 (en) | Lua 5.4 (ja) | 対応状態 | 備考 |
+|--------------|--------------|---------|------|
+| 1 – Introduction | 1 – イントロダクション | ✅完全一致 | |
+
+## 2章: Basic Concepts
+| Lua 5.5 (en) | Lua 5.4 (ja) | 対応状態 | 備考 |
+|--------------|--------------|---------|------|
+| 2.1 – Values and Types | 2.1 – 値と型 | ✅完全一致 | |
+| 2.2 – Environments and ... | 2.2 – 環境と... | ✅完全一致 | |
+...
+
+## 4章: The Application Program Interface（サブ分割対象）
+| Lua 5.5 (en) | Lua 5.4 (ja) | 対応状態 | 分割判断 |
+|--------------|--------------|---------|----------|
+| 4.1 – The Stack | 4.1 – スタック | ✅完全一致 | → 04-c-api/01-stack.html |
+| 4.2 – Stack Size | 4.2 – スタックサイズ | ✅完全一致 | → 04-c-api/01-stack.html（統合）|
+| 4.3 – Valid and ... | 4.3 – 有効な... | ✅完全一致 | → 04-c-api/02-valid-indices.html |
+...
+```
+
 **分割ルール**:
-| 章番号 | HTMLセクション | 出力ファイル | 推定サイズ |
-|--------|---------------|-------------|-----------|
-| 1 | `<h2>1 – Introduction</h2>` | 01-introduction.html | 2-3KB |
-| 2 | `<h2>2 – Basic Concepts</h2>` | 02-basic-concepts.html | 30-40KB |
-| 3 | `<h2>3 – The Language</h2>` | 03-language.html | 40-50KB |
-| 4 | `<h2>4 – The Application Program Interface</h2>` | 04-c-api.html | 80-100KB |
-| 5 | `<h2>5 – The Auxiliary Library</h2>` | 05-auxiliary-library.html | 30-40KB |
-| 6 | `<h2>6 – The Standard Libraries</h2>` | 06-standard-libraries.html | 80-100KB |
-| 7 | `<h2>7 – Lua Standalone</h2>` | 07-standalone.html | 3-5KB |
-| 8 | `<h2>8 – Incompatibilities...</h2>` | 08-incompatibilities.html | 5-10KB |
-| 9 | `<h2>9 – The Complete Syntax...</h2>` | 09-complete-syntax.html | 5-10KB |
-| Index | `<h2>Index</h2>` または末尾 | index.html | 10-15KB |
+| 章番号 | HTMLセクション | 推定サイズ | サブ分割判断 | 出力ファイル |
+|--------|---------------|-----------|-------------|-------------|
+| 1 | `<h2>1 – Introduction</h2>` | 2-3KB | なし | 01-introduction.html |
+| 2 | `<h2>2 – Basic Concepts</h2>` | 30-40KB | なし | 02-basic-concepts.html |
+| 3 | `<h2>3 – The Language</h2>` | 40-50KB | **あり**（40KB超） | 03-language/*.html |
+| 4 | `<h2>4 – The Application Program Interface</h2>` | 80-100KB | **あり**（40KB超） | 04-c-api/*.html |
+| 5 | `<h2>5 – The Auxiliary Library</h2>` | 30-40KB | なし | 05-auxiliary-library.html |
+| 6 | `<h2>6 – The Standard Libraries</h2>` | 80-100KB | **あり**（40KB超） | 06-standard-libraries/*.html |
+| 7 | `<h2>7 – Lua Standalone</h2>` | 3-5KB | なし | 07-standalone.html |
+| 8 | `<h2>8 – Incompatibilities...</h2>` | 5-10KB | なし | 08-incompatibilities.html |
+| 9 | `<h2>9 – The Complete Syntax...</h2>` | 5-10KB | なし | 09-complete-syntax.html |
+| Index | `<h2>Index</h2>` または末尾 | 10-15KB | なし | index.html |
+
+**サブ分割基準**:
+- **閾値**: 40KB以上の章は`<h3>`タグ単位でサブ分割検討
+- **対応保証**: chapter-structure-map.mdのマッピング結果に基づき、Lua 5.4日本語版と対応が取れる位置でのみ分割
+- **分割禁止**: Lua 5.5と5.4で節構成が異なる箇所は分割せず、1ファイルのまま保持
 
 ### Phase 1: AI章別翻訳
 
@@ -542,15 +582,29 @@ crates/pasta_lua/doc/lua55-manual/
 ├── GLOSSARY.md                  # 用語対応表（200-300語）
 ├── 01-introduction.md           # 1章: イントロダクション
 ├── 02-basic-concepts.md         # 2章: 基本概念
-├── 03-language.md               # 3章: 言語仕様
-├── 04-c-api.md                  # 4章: C API（大規模、80-100KB）
+├── 03-language/                 # 3章: 言語仕様（サブ分割）
+│   ├── README.md                # 3章目次
+│   ├── 01-lexical-conventions.md
+│   ├── 02-variables.md
+│   └── ...
+├── 04-c-api/                    # 4章: C API（サブ分割、大規模）
+│   ├── README.md                # 4章目次
+│   ├── 01-stack.md
+│   ├── 02-valid-indices.md
+│   └── ...
 ├── 05-auxiliary-library.md      # 5章: 補助ライブラリ
-├── 06-standard-libraries.md     # 6章: 標準ライブラリ（大規模、80-100KB）
+├── 06-standard-libraries/       # 6章: 標準ライブラリ（サブ分割、大規模）
+│   ├── README.md                # 6章目次
+│   ├── 01-basic-functions.md
+│   ├── 02-coroutine.md
+│   └── ...
 ├── 07-standalone.md             # 7章: スタンドアロンLua
 ├── 08-incompatibilities.md      # 8章: 非互換性
 ├── 09-complete-syntax.md        # 9章: 完全構文
 └── index.md                     # 索引（関数・型一覧）
 ```
+
+**注記**: サブ分割は章構成マッピング表（chapter-structure-map.md）の分析結果に基づき、Lua 5.4日本語版と対応が取れる位置でのみ実施
 
 ### 作業用中間ファイル構成
 
@@ -564,18 +618,21 @@ crates/pasta_lua/doc/lua55-manual/
 ├── tasks.md                     # タスク定義
 ├── reference-lua55-en.html      # Lua 5.5英語原文（369KB）
 ├── reference-lua54-ja.html      # Lua 5.4日本語参考（430KB）
+├── chapter-structure-map.md     # 章構成マッピング表（Lua 5.5 ⇔ 5.4対応）
 ├── chapter-map.md               # 章構成マップ
 └── chapters/
     ├── en/                      # 分割済み英語章
     │   ├── 01-introduction.html
     │   ├── 02-basic-concepts.html
-    │   ├── ...
-    │   └── index.html
-    └── ja/                      # 分割済み日本語参考章
-        ├── 01-introduction.html
-        ├── 02-basic-concepts.html
-        ├── ...
-        └── index.html
+    │   ├── 03-language/
+    │   │   ├── 01-lexical-conventions.html
+    │   │   └── ...
+    │   ├── 04-c-api/
+    │   │   ├── 01-stack.html
+    │   │   └── ...
+    │   └── ...
+    └── ja/                      # 分割済み日本語参考章（同構成）
+        └── ...
 ```
 
 ### Markdownファイルヘッダー仕様
@@ -602,10 +659,12 @@ crates/pasta_lua/doc/lua55-manual/
 ## 実装フェーズ別タスク概要
 
 ### Phase 0: 前処理（2-4h）
-1. HTMLパーサー/正規表現で章分割スクリプト作成
-2. reference-lua55-en.html を10ファイルに分割
-3. reference-lua54-ja.html を10ファイルに分割
-4. chapter-map.md 生成
+1. **章構成比較調査**: Lua 5.5英語版とLua 5.4日本語版の章・節構成を抽出・比較
+2. **章構成マッピング表作成**: chapter-structure-map.md生成（対応関係・差分分析）
+3. **章分割スクリプト作成**: HTMLパーサー/正規表現でマッピング表に基づく分割処理
+4. reference-lua55-en.html を10+ファイルに分割（40KB超の章はサブ分割）
+5. reference-lua54-ja.html を対応するファイルに分割
+6. chapter-map.md 生成
 
 ### Phase 1: AI章別翻訳（6-12h）
 1. GLOSSARY.md 初版作成（50-80語）
