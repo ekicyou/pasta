@@ -7,7 +7,9 @@
     "description": "OnTalk/OnHour仮想イベントの条件判定・発行機構。OnSecondChangeをトリガーとし、状態管理（ctx.save.virtual_event.*）、pasta.toml設定読み込み、req.date時刻判定を実装。",
     "category": "SHIORI基盤",
     "size_estimate": "M",
-    "dependencies": ["alpha01-shiori-alpha-events"],
+    "dependencies": [
+        "alpha01-shiori-alpha-events"
+    ],
     "parent_spec": "alpha-release-planning",
     "approvals": {
         "requirements": {
