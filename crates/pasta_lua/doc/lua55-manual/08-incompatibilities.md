@@ -2,11 +2,15 @@
 
 ---
 
-# 8 – 以前のバージョンとの非互換性
+<!--
+  原文: https://www.lua.org/manual/5.5/manual.html#8
+  参考: https://lua.dokyumento.jp/manual/5.4/manual.html#8
+  翻訳日: 2026-01-29
+  レビュー: AI Claude Opus 4.5
+  用語対照: GLOSSARY.md参照
+-->
 
-> **Source**: Lua 5.5 Reference Manual - Chapter 8 (Incompatibilities with the Previous Version)
-> **Translation**: AI-generated from Lua 5.5 English source
-> **Glossary**: See [GLOSSARY.md](GLOSSARY.md) for terminology
+# 8 – 以前のバージョンとの非互換性
 
 ---
 

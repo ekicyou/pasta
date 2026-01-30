@@ -2,11 +2,15 @@
 
 ---
 
-# 7 – Luaスタンドアロン
+<!--
+  原文: https://www.lua.org/manual/5.5/manual.html#7
+  参考: https://lua.dokyumento.jp/manual/5.4/manual.html#7
+  翻訳日: 2026-01-29
+  レビュー: AI Claude Opus 4.5
+  用語対照: GLOSSARY.md参照
+-->
 
-> **Source**: Lua 5.5 Reference Manual - Chapter 7 (Lua Standalone)
-> **Translation**: AI-generated based on Lua 5.4 Japanese reference with Lua 5.5 updates
-> **Glossary**: See [GLOSSARY.md](GLOSSARY.md) for terminology
+# 7 – Luaスタンドアロン
 
 ---
 
