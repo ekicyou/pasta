@@ -7,7 +7,7 @@
 
 # 1 – はじめに
 
-[← 目次](./README.md) | [2章 基本概念 →](./02-basic-concepts.md)
+[← 目次](./README.md) | [次へ: 2 – 基本概念 →](02-basic-concepts.md)
 
 ---
 
@@ -25,4 +25,4 @@ Luaはフリーソフトウェアであり、そのライセンスに記載さ�
 
 ---
 
-[← 目次](./README.md) | [2章 基本概念 →](./02-basic-concepts.md)
+[← 目次](./README.md) | [次へ: 2 – 基本概念 →](02-basic-concepts.md)

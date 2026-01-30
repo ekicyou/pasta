@@ -21,6 +21,11 @@
   - hook → フック
   - traceback → トレースバック
 -->
+
+[← 前へ: 5 – 補助ライブラリ](05-auxiliary-library.md) | [目次](./README.md) | [次へ: 7 – スタンドアロン →](07-standalone.md)
+
+---
+
 # 6 – 標準ライブラリ
 
 標準Luaライブラリは、C APIを通じてCで実装された便利な関数を提供します。これらの関数の一部は言語に必須のサービスを提供します（例：[`type`](#type-v) と [`getmetatable`](#getmetatable-object)）。その他は外部サービスへのアクセスを提供します（例：I/O）。また、Lua自体で実装できるものもありますが、さまざまな理由からCでの実装が望ましいものです（例：[`table.sort`](#tablesort-list--comp)）。

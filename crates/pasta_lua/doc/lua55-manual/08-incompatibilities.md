@@ -1,3 +1,7 @@
+[← 前へ: 7 – スタンドアロン](07-standalone.md) | [目次](./README.md) | [次へ: 9 – 完全な構文 →](09-complete-syntax.md)
+
+---
+
 # 8 – 以前のバージョンとの非互換性
 
 > **Source**: Lua 5.5 Reference Manual - Chapter 8 (Incompatibilities with the Previous Version)

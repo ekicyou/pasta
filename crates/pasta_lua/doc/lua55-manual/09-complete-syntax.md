@@ -1,3 +1,7 @@
+[← 前へ: 8 – 非互換性](08-incompatibilities.md) | [目次](./README.md)
+
+---
+
 # 9 – Luaの完全な構文
 
 > **Source**: Lua 5.5 Reference Manual - Chapter 9 (The Complete Syntax of Lua)

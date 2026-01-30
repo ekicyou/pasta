@@ -1,3 +1,7 @@
+[← 前へ: 4 – C API](04-c-api.md) | [目次](./README.md) | [次へ: 6 – 標準ライブラリ →](06-standard-libraries.md)
+
+---
+
 # 5 – 補助ライブラリ
 
 > **Source**: Lua 5.5 Reference Manual - Chapter 5 (Auxiliary Library)

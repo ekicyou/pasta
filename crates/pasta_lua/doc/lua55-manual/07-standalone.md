@@ -1,3 +1,7 @@
+[← 前へ: 6 – 標準ライブラリ](06-standard-libraries.md) | [目次](./README.md) | [次へ: 8 – 非互換性 →](08-incompatibilities.md)
+
+---
+
 # 7 – Luaスタンドアロン
 
 > **Source**: Lua 5.5 Reference Manual - Chapter 7 (Lua Standalone)

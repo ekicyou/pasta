@@ -1,3 +1,7 @@
+[← 目次](./README.md)
+
+---
+
 # ライセンス
 
 ## Lua 5.5 License
