@@ -277,6 +277,14 @@ end
 - ディレクトリ構成テンプレート定義
 - シンプルシェル（ピクトグラム風PNG）独自作成
 
+**シェル素材仕様**
+- **サイズ**: 幅 96～128 × 高さ 256 ピクセル（3頭身バランス）
+- **形式**: 透過PNG
+- **キャラクター**: 2体
+  - **女の子** (sakura): surface0-8（9種）
+  - **男の子** (kero): surface10-18（9種）
+- **表情**: ピクトグラム風の記号表現（例: `^ ^` 笑顔、`> <` 照れ、`o o` 驚き等）
+
 **Dependencies**
 - Inbound: alpha01 — SHIORI EVENT ハンドラ (P0)
 - Inbound: alpha02 — 仮想イベント発行 (P0)
@@ -296,8 +304,13 @@ ghost/master/
 │   └── custom.lua
 └── shell/master/           # シェル素材
     ├── descript.txt        # シェル設定
-    ├── surface0.png        # メインキャラ
-    ├── surface1.png        # サブキャラ（任意）
+    ├── surface0.png        # 女の子 基本
+    ├── surface1.png        # 女の子 笑顔
+    ├── surface2.png        # 女の子 照れ
+    ├── ...                 # surface3-8
+    ├── surface10.png       # 男の子 基本
+    ├── surface11.png       # 男の子 笑顔
+    ├── ...                 # surface12-18
     └── surfaces.txt        # サーフェス定義
 ```
 
