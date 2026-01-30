@@ -177,14 +177,16 @@ on:
 
 jobs:
   build:
-    name: build-${{ matrix.target }}
+    name: build-${{ matrix.arch }}
     runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
-        target:
-          - i686-pc-windows-msvc
-          - x86_64-pc-windows-msvc
+        include:
+          - target: i686-pc-windows-msvc
+            arch: x86
+          - target: x86_64-pc-windows-msvc
+            arch: x64
 
     steps:
       - name: Checkout repository
@@ -204,13 +206,13 @@ jobs:
         run: cargo build --release --target ${{ matrix.target }} -p pasta_shiori
 
       - name: Run tests
-        if: matrix.target == 'x86_64-pc-windows-msvc'
+        if: matrix.arch == 'x64'
         run: cargo test --all
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: pasta-dll-${{ matrix.target == 'i686-pc-windows-msvc' && 'x86' || 'x64' }}
+          name: pasta-dll-${{ matrix.arch }}
           path: target/${{ matrix.target }}/release/pasta.dll
           retention-days: 7
 ```
