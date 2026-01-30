@@ -264,11 +264,27 @@ end
 ## 2. SHIORI EVENT ハンドラ
 
 ### 2.1 概要
+SHIORI/3.0 プロトコルのイベントハンドリング機構の説明
+
 ### 2.2 REG テーブルへの登録
+ハンドラ関数の登録方法とサンプルコード
+
 ### 2.3 サポートイベント一覧
+7種のイベント（OnFirstBoot, OnBoot, OnClose, OnGhostChanged, OnSecondChange, OnMinuteChange, OnMouseDoubleClick）の詳細
+
+各イベントごとに以下を記載:
+- 発火タイミング
+- Reference パラメータの意味（Requirement 3 の仕様を反映）
+- 応答サンプルコード
+
 ### 2.4 RES レスポンス生成
+RES.ok(), RES.no_content(), RES.err() の使用方法
+
 ### 2.5 シーン関数フォールバック
+Pastaスクリプトでのイベントハンドリング（＊OnBoot 等のグローバルシーン利用）
+
 ### 2.6 エラーハンドリング
+xpcall によるエラーキャッチと RES.err() の使用
 ```
 
 ## 5. Data Models
@@ -278,9 +294,24 @@ end
 ```lua
 --- @class ShioriRequest
 --- @field id string イベント ID（例: "OnBoot"）
---- @field ref table Reference ヘッダのテーブル（0始まり）
+--- @field reference table Reference ヘッダのテーブル（0始まりインデックス）
 --- @field raw string 生の SHIORI リクエスト文字列
 ```
+
+**Reference パラメータ仕様**:
+- `req.reference[0]` ～ `req.reference[7]` で各イベント固有パラメータにアクセス
+- 存在しない Reference にアクセスした場合は `nil` を返す
+- 各イベントの Reference 意味は以下の通り:
+
+| イベント | Reference0 | Reference1 | その他 |
+|---------|-----------|-----------|--------|
+| **OnFirstBoot** | バニッシュ復帰フラグ ("0" or "1") | - | - |
+| **OnBoot** | シェル名 | - | Reference6: シェルパス, Reference7: ゴーストパス |
+| **OnClose** | 終了理由 ("user", "shutdown" 等) | - | - |
+| **OnGhostChanged** | 切り替え先ゴースト名 | 切り替え元ゴースト名 | - |
+| **OnSecondChange** | 現在秒 | 累積秒 | - |
+| **OnMinuteChange** | 現在分 | 現在時 | - |
+| **OnMouseDoubleClick** | スコープ (0: sakura, 1: kero) | - | Reference4: 当たり判定 ID |
 
 ### 5.2 Response 文字列
 
