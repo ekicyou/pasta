@@ -190,10 +190,10 @@ sequenceDiagram
 
 ##### State Management
 - State model:
-  - `last_talk_time`: 前回トーク発行時刻（unix timestamp）
-  - `last_hour_time`: 前回時報発行時刻（unix timestamp）
-  - `is_talking`: トーク中フラグ（boolean）
-- Persistence: メモリ内（セッション中のみ）
+  - `ctx.save.virtual_event.last_talk_time`: 前回トーク発行時刻（unix timestamp）
+  - `ctx.save.virtual_event.last_hour_time`: 前回時報発行時刻（unix timestamp）
+  - `ctx.save.virtual_event.is_talking`: トーク中フラグ（boolean）
+- Persistence: `ctx.save` テーブル経由で自動永続化（`@pasta_persistence` モジュール）
 - Concurrency: シングルスレッド（SHIORI はシーケンシャル）
 
 ##### Event Contract
