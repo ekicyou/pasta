@@ -11,52 +11,52 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 
 ## 機能の優先順位
 
-### Phase 0: 一次設計の再構築（進行中）⚠️
-**現状**: 過去11仕様は完了扱いだが、実装品質が要件定義意図を満たしておらず、**大規模な差し戻し・再設計中**
+### Phase 0: 一次設計の再構築 ✅ 完了
+**最終更新**: 2026-01-30
 
-- [ ] 「パスタスクリプト」DSL設計の見直し
-- [ ] ２パストランスパイル設計の再検討
-- [ ] シーンジャンプテーブル設計の修正
-- [ ] 宣言的制御フロー（Call/Jump文）の再実装
+- [x] 「パスタスクリプト」DSL設計の見直し → [SPECIFICATION.md](../../../SPECIFICATION.md) 完成
+- [x] ２パストランスパイル設計の再検討 → `pasta-lua-cache-transpiler` 完了
+- [x] シーンジャンプテーブル設計の修正 → `scene-search-integration` 完了
+- [x] 宣言的制御フロー（Call/Jump文）の再実装 → `act-impl-call` 完了
 
-**完了仕様**: 
-- ✅ **scene-search-integration** (2026-01-27)
-  - SCENE.search() 動的シーン検索機能実装
-  - 14テスト全合格、リグレッション0件
-  - [VALIDATION_REPORT.md](./.kiro/specs/completed/scene-search-integration/VALIDATION_REPORT.md)
-- ✅ **pasta-transpiler-variable-expansion** (2025-12-21)
-  - 変数スコープ管理（Local/Global）実装完了
-  - 20テスト合格、リグレッション0件
-  - [IMPLEMENTATION_COMPLETION_REPORT.md](./.kiro/specs/completed/pasta-transpiler-variable-expansion/IMPLEMENTATION_COMPLETION_REPORT.md)
-- ✅ **remove-root-crate** (2025-12-31)
-  - Pure Virtual Workspace 化（ルートクレート削除）
-  - 全タスク完了、182テスト成功
-  - [COMPLETION_REPORT.md](./.kiro/specs/completed/remove-root-crate/COMPLETION_REPORT.md)
+**完了仕様**: 26件（`.kiro/specs/completed/` に格納）
 
-**課題**:
-- DSL文法の曖昧性・不完全性
-- トランスパイル結果の品質問題
-- シーンテーブル設計の不備
-- 要件と実装の乖離
+**主要成果**:
+- ✅ **act-impl-call** - `ACT_IMPL.call` 4段階優先順位検索実装
+- ✅ **scene-search-integration** - `SCENE.search()` 動的シーン検索機能
+- ✅ **pasta-transpiler-variable-expansion** - 変数スコープ管理（Local/Global）
+- ✅ **remove-root-crate** - Pure Virtual Workspace化
+- ✅ **pasta_search_module** - Rust/Lua間の辞書検索バインディング
+- ✅ **shiori-entry** - SHIORI APIエントリポイント
 
-**過去の「完了」仕様**: 31件（完了済み）
+**品質指標**: 340+ テスト全パス、リグレッション0件
 
-### Phase 1: 基盤確立（未達）
-Phase 0の再構築が完了するまで、基盤確立とは言えない状態。
+### Phase 1: 基盤確立 ✅ 完了
+**現状**: Phase 0の再構築により基盤確立完了
 
-### Phase 2: コア機能実装（保留）
+- [x] パーサー（pasta_core）- Pasta DSL解析
+- [x] トランスパイラ（pasta_lua）- Lua コード生成
+- [x] ランタイム（pasta_lua）- Lua 5.5 実行環境
+- [x] SHIORI インターフェース（pasta_shiori）- DLL エクスポート
 
-**進行中仕様**: 8件（Phase 0完了後に着手）
+### Phase 2: コア機能拡張（進行中）🔄
+
+**進行中仕様**: 1件
+- 🔄 **lua55-manual-consistency** - Lua 5.5 リファレンスマニュアル日本語化整合性
+
+**保留/評価中仕様**:
+- ⏸️ **pasta-conversation-inline-multi-stage-resolution** - 動的単語参照（Phase 3相当、削除検討中）
+- ⏸️ **ukagaka-desktop-mascot** - メタ仕様（Phase 4相当）
 
 ### Phase 3: 高度機能（計画中）
 - [ ] シーン継続チェーン（`pasta-label-continuation`）
-- [ ] インライン多段解決（`pasta-conversation-inline-multi-stage-resolution`）
-- [ ] rune側ランタイムを拡充し、使い勝手を向上させる
+- [ ] 動的単語参照（`＠＄変数` - SPECIFICATION.md 11.7で文法予約済み）
+- [ ] ランタイム拡充・使い勝手向上
 - [ ] イベントハンドリングの拡充
 
 ### Phase 4: エコシステム統合（将来）
 - [ ] SHIORI.DLLとしてのコンパイル
-- [ ] arekaへの投入（`ukagaka-desktop-mascot`メタ仕様 - 32子仕様管理中）
-- [ ] MCPまたはLLMとの連携（`areka-P0-mcp-server`）
+- [ ] arekaへの投入（`ukagaka-desktop-mascot`メタ仕様）
+- [ ] MCPまたはLLMとの連携
 
-**現在地**: Phase 0（一次設計再構築中）- **基盤未確立**
+**現在地**: Phase 2（コア機能拡張）- **基盤確立済み** ✅
