@@ -69,13 +69,13 @@
 - [5.1 – 関数と型](05-auxiliary-library.md#51--関数と型)
 
 [6 – 標準ライブラリ](06-standard-libraries.md)
-- [6.1 – Cコードでのライブラリのロード](06-standard-libraries.md#61--cコードでのライブラリのロード) ⭐ *5.5新規セクション*
+- [6.1 – Cコードでのライブラリロード](06-standard-libraries.md#61--cコードでのライブラリロード) ⭐ *5.5新規セクション*
 - [6.2 – 基本関数](06-standard-libraries.md#62--基本関数)
 - [6.3 – コルーチン操作](06-standard-libraries.md#63--コルーチン操作)
 - [6.4 – モジュール](06-standard-libraries.md#64--モジュール)
 - [6.5 – 文字列操作](06-standard-libraries.md#65--文字列操作)
   - [6.5.1 – パターン](06-standard-libraries.md#651--パターン)
-  - [6.5.2 – Pack/Unpackのフォーマット文字列](06-standard-libraries.md#652--packunpackのフォーマット文字列)
+  - [6.5.2 – PackとUnpackの書式文字列](06-standard-libraries.md#652--packとunpackの書式文字列)
 - [6.6 – UTF-8サポート](06-standard-libraries.md#66--utf-8サポート)
 - [6.7 – テーブル操作](06-standard-libraries.md#67--テーブル操作)
 - [6.8 – 数学関数](06-standard-libraries.md#68--数学関数)
