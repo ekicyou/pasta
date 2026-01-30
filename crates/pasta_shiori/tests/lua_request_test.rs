@@ -52,6 +52,10 @@ mod lua_date_tests {
         assert_eq!(sec, 45);
         assert_eq!(ns, 123_456_789);
 
+        // Unix timestamp (2025-01-02T15:30:45 UTC+9 = 2025-01-02T06:30:45 UTC)
+        let unix: i64 = table.get("unix").unwrap();
+        assert_eq!(unix, dt.unix_timestamp());
+
         // 2025-01-02 is the 2nd day of the year
         let yday: u16 = table.get("yday").unwrap();
         let ordinal: u16 = table.get("ordinal").unwrap();

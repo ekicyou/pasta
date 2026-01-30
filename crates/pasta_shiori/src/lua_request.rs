@@ -10,6 +10,7 @@ use time::OffsetDateTime;
 /// テスト時に固定時刻を渡せるようにするための基盤関数です。
 pub fn lua_date_from(lua: &Lua, dt: OffsetDateTime) -> MyResult<Table> {
     let t = lua.create_table()?;
+    t.set("unix", dt.unix_timestamp())?;
     t.set("year", dt.year())?;
     t.set("month", dt.month() as u8)?;
     t.set("day", dt.day())?;
