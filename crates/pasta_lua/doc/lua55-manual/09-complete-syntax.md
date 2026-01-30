@@ -2,7 +2,7 @@
 
 > **Source**: Lua 5.5 Reference Manual - Chapter 9 (The Complete Syntax of Lua)
 > **Translation**: AI-generated from Lua 5.5 English source
-> **Glossary**: See [GLOSSARY.md](../GLOSSARY.md) for terminology
+> **Glossary**: See [GLOSSARY.md](GLOSSARY.md) for terminology
 
 ---
 

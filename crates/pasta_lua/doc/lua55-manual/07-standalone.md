@@ -2,7 +2,7 @@
 
 > **Source**: Lua 5.5 Reference Manual - Chapter 7 (Lua Standalone)
 > **Translation**: AI-generated based on Lua 5.4 Japanese reference with Lua 5.5 updates
-> **Glossary**: See [GLOSSARY.md](../GLOSSARY.md) for terminology
+> **Glossary**: See [GLOSSARY.md](GLOSSARY.md) for terminology
 
 ---
 
