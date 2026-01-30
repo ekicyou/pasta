@@ -206,7 +206,16 @@ end
 
 **動作フロー**:
 1. `_buffer` 内のすべての文字列を `table.concat()` で結合
-2. 結合結果を返却（バッファはクリアしない）
+2. 結合結果の末尾に `\e`（スクリプト終端）を追加
+3. 完成したさくらスクリプト文字列を返却（バッファはクリアしない）
+
+**実装例**:
+```lua
+function SHIORI_ACT_IMPL:build()
+    local script = table.concat(self._buffer)
+    return script .. "\\e"
+end
+```
 
 #### 3.3.7 `reset()`
 
@@ -304,6 +313,7 @@ ACT.IMPL = ACT_IMPL
 ---
 
 ## 6. Error Handling
+| `build()` 空バッファ | `\e` のみ返却 | 警告なし（正常動作） |
 
 ### 6.1 Error Scenarios
 
@@ -359,29 +369,19 @@ describe("SHIORI_ACT", function()
         it("appends scope tag on actor switch", function()
             local act = SHIORI_ACT.new(ctx)
             act:talk(sakura, "Hello")
-            act:talk(kero, "Hi")
-            expect(act:build()).to_match("\\0Hello\\n\\1Hi\\n")
+            act:talk(kero, "Hi")\\e$")
         end)
 
         it("does not append scope tag on same actor", function()
             local act = SHIORI_ACT.new(ctx)
             act:talk(sakura, "Hello")
             act:talk(sakura, "World")
-            expect(act:build()).to_match("\\0Hello\\nWorld\\n")
-        end)
-    end)
-
-    describe("surface()", function()
-        it("appends surface tag with number", function()
-            local act = SHIORI_ACT.new(ctx)
-            act:surface(5)
-            expect(act:build()).to_eq("\\s[5]")
-        end)
+            expect(act:build()).to_match("\\0Hello\\nWorld\\n\\e$
 
         it("appends surface tag with alias", function()
             local act = SHIORI_ACT.new(ctx)
             act:surface("smile")
-            expect(act:build()).to_eq("\\s[smile]")
+            expect(act:build()).to_eq("\\s[smile]\\e")
         end)
     end)
 
@@ -389,7 +389,7 @@ describe("SHIORI_ACT", function()
         it("appends wait tag", function()
             local act = SHIORI_ACT.new(ctx)
             act:wait(500)
-            expect(act:build()).to_eq("\\w[500]")
+            expect(act:build()).to_eq("\\w[500]\\e")
         end)
     end)
 
@@ -397,11 +397,21 @@ describe("SHIORI_ACT", function()
         it("appends single newline by default", function()
             local act = SHIORI_ACT.new(ctx)
             act:newline()
-            expect(act:build()).to_eq("\\n")
+            expect(act:build()).to_eq("\\n\\e")
         end)
 
         it("appends multiple newlines", function()
             local act = SHIORI_ACT.new(ctx)
+            act:newline(3)
+            expect(act:build()).to_eq("\\n\\n\\n\\e")
+        end)
+    end)
+
+    describe("clear()", function()
+        it("appends clear tag", function()
+            local act = SHIORI_ACT.new(ctx)
+            act:clear()
+            expect(act:build()).to_eq("\\c\\e)
             act:newline(3)
             expect(act:build()).to_eq("\\n\\n\\n")
         end)
@@ -410,7 +420,7 @@ describe("SHIORI_ACT", function()
     describe("clear()", function()
         it("appends clear tag", function()
             local act = SHIORI_ACT.new(ctx)
-            act:clear()
+            act:clear()\\e")  -- 空バッファでも \e は付与
             expect(act:build()).to_eq("\\c")
         end)
     end)
