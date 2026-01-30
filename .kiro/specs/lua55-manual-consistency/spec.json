@@ -1,16 +1,16 @@
 {
     "feature_name": "lua55-manual-consistency",
     "created_at": "2026-01-30T00:00:00Z",
-    "updated_at": "2026-01-30T12:00:00Z",
+    "updated_at": "2026-01-30T15:00:00Z",
     "language": "ja",
-    "phase": "requirements-generated",
+    "phase": "design-generated",
     "approvals": {
         "requirements": {
             "generated": true,
-            "approved": false
+            "approved": true
         },
         "design": {
-            "generated": false,
+            "generated": true,
             "approved": false
         },
         "tasks": {
