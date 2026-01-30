@@ -261,3 +261,7 @@ Phase 5: ファイル構成変更 (README←index, ABOUT←README)
 - 各タスク完了時にコミット
 - コミットメッセージ形式: `docs(lua55-manual): [Phase.Task] 説明`
 - 例: `docs(lua55-manual): [1.2] add navigation to 05-auxiliary-library`
+
+### ドキュメント整合性タスクについて
+
+**注記**: 本仕様は参照用マニュアル（lua55-manual）の整備であり、pastaプロジェクトの実装には直接影響しない。したがって、workflow.mdに規定される「ドキュメント整合性確認タスク」（SOUL.md、SPECIFICATION.md、TEST_COVERAGE.md等との同期）は不要とする。
