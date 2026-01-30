@@ -1,0 +1,27 @@
+{
+    "feature_name": "alpha05-build-ci",
+    "created_at": "2026-01-30T18:10:00Z",
+    "updated_at": "2026-01-30T18:10:00Z",
+    "language": "ja",
+    "phase": "requirements-pending",
+    "description": "GitHub Actionsによるx86/x64 DLLビルドCI。i686-pc-windows-msvc / x86_64-pc-windows-msvcの両ターゲット、cargo test実行を含む。",
+    "category": "リリース準備",
+    "size_estimate": "S",
+    "dependencies": [],
+    "parent_spec": "alpha-release-planning",
+    "approvals": {
+        "requirements": {
+            "generated": false,
+            "approved": false
+        },
+        "design": {
+            "generated": false,
+            "approved": false
+        },
+        "tasks": {
+            "generated": false,
+            "approved": false
+        }
+    },
+    "ready_for_implementation": false
+}

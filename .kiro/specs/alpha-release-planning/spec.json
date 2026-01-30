@@ -1,9 +1,9 @@
 {
     "feature_name": "alpha-release-planning",
     "created_at": "2026-01-30T00:00:00Z",
-    "updated_at": "2026-01-30T18:05:00Z",
+    "updated_at": "2026-01-30T18:20:00Z",
     "language": "ja",
-    "phase": "in-progress",
+    "phase": "completed",
     "approvals": {
         "requirements": {
             "generated": true,
@@ -18,5 +18,13 @@
             "approved": true
         }
     },
-    "ready_for_implementation": true
+    "ready_for_implementation": true,
+    "child_specs": [
+        "alpha01-shiori-alpha-events",
+        "alpha02-virtual-event-dispatcher",
+        "alpha03-shiori-act-sakura",
+        "alpha04-sample-ghost",
+        "alpha05-build-ci",
+        "alpha06-release-packaging"
+    ]
 }
