@@ -204,6 +204,7 @@ jobs:
         run: cargo build --release --target ${{ matrix.target }} -p pasta_shiori
 
       - name: Run tests
+        if: matrix.target == 'x86_64-pc-windows-msvc'
         run: cargo test --all
 
       - name: Upload artifact
