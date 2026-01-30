@@ -85,7 +85,7 @@
 | 要件 | 既存資産 | Gap | 備考 |
 |------|---------|-----|------|
 | **Req 1**: 子仕様体系設計 | - | N/A | 新規ドキュメント作成 |
-| **Req 2**: SHIORI基盤子仕様 | EVENT/REG/RES完成 | **Low** | ハンドラ実装のみ追加 |
+| **Req 2**: SHIORI基盤子仕様 | EVENT/REG/RES完成 | **Medium** | ハンドラ実装 + pasta.shiori.act新規作成 |
 | **Req 3**: サンプルゴースト子仕様 | テストfixture参考可 | **Medium** | 配布用構成新規作成 |
 | **Req 4**: リリース準備子仕様 | DLLビルド設定済み | **Medium** | CI/CD新規構築 |
 | **Req 5**: ロードマップ作成 | - | N/A | 新規ドキュメント作成 |
@@ -155,18 +155,20 @@ ghost/master/                    # load_dir
 - ✅ 並行作業しやすい
 - ❌ 子仕様間の依存管理が複雑
 
-#### Option C: 推奨構成（4子仕様）
+#### Option C: 推奨構成（5子仕様）
 
 | 子仕様 | スコープ | 規模 | 依存 |
 |--------|---------|------|------|
 | alpha01-shiori-alpha-events | 必要最低限SHIORI EVENT（6種） | M | - |
-| alpha02-sample-ghost | サンプルゴースト完全版 | M | alpha01 |
-| alpha03-build-ci | GitHub Actions + DLLビルド | S | - |
-| alpha04-release-packaging | 配布パッケージ + README | M | alpha01, alpha02, alpha03 |
+| alpha02-shiori-act-sakura | pasta.shiori.act モジュール（さくらスクリプト組み立て） | M | - |
+| alpha03-sample-ghost | サンプルゴースト完全版 | M | alpha01, alpha02 |
+| alpha04-build-ci | GitHub Actions + DLLビルド（x86/x64） | S | - |
+| alpha05-release-packaging | 配布パッケージ（x86） + README | M | alpha01, alpha02, alpha03, alpha04 |
 
 **Trade-offs**:
 - ✅ 適度な粒度で管理しやすい
-- ✅ 依存関係がシンプル
+- ✅ pasta.shiori.act を独立した子仕様として実装
+- ✅ 依存関係が明確
 - ✅ Phase A/B/Cに自然にマッピング
 
 ---
@@ -177,7 +179,8 @@ ghost/master/                    # load_dir
 
 | 子仕様カテゴリ | 規模 | リスク | 根拠 |
 |---------------|------|--------|------|
-| SHIORI基盤 | **S** | **Low** | 既存EVENT機構にハンドラ追加のみ |
+| SHIORI EVENT | **M** | **Low** | 既存EVENT機構にハンドラ追加のみ |
+| pasta.shiori.act | **M** | **Medium** | 新規モジュール、さくらスクリプト仕様理解必要 |
 | サンプルゴースト | **M** | **Medium** | 新規コンテンツ作成、動作検証必要 |
 | ビルドCI | **S** | **Low** | x86/x64両ビルド確認、標準的なGitHub Actions設定 |
 | リリースパッケージ | **M** | **Medium** | x86版DLL + アーカイブ構成・ドキュメント作成 |
@@ -186,10 +189,10 @@ ghost/master/                    # load_dir
 
 | 項目 | 見積もり |
 |------|---------|
-| 総子仕様数 | 4件（推奨Option C） |
-| 総工数 | **2-3週間**（1人作業想定） |
-| クリティカルパス | alpha01 → alpha02 → alpha04 |
-| 並行可能 | alpha03（CI構築）は独立して進行可能 |
+| 総子仕様数 | 5件（推奨Option C） |
+| 総工数 | **3-4週間**（1人作業想定） |
+| クリティカルパス | alpha01, alpha02 → alpha03 → alpha05 |
+| 並行可能 | alpha04（CI構築）は独立して進行可能 |
 
 ---
 
@@ -219,19 +222,21 @@ ghost/master/                    # load_dir
 
 ### 6.1 推奨アプローチ
 
-**Option C（4子仕様構成）を推奨**。以下の理由による：
+**Option C（5子仕様構成）を推奨**。以下の理由による:
 
-1. **既存資産を最大活用**: EVENT/REG機構にハンドラ追加で SHIORI基盤完成
-2. **依存関係がシンプル**: Phase A→B→Cの直線的フロー
-3. **並行作業可能**: alpha03（CI）は独立進行
+1. **既存資産を最大活用**: EVENT/REG機構にハンドラ追加で SHIORI EVENT完成
+2. **pasta.shiori.act を独立子仕様化**: さくらスクリプト組み立て機能を明確に分離
+3. **依存関係が明確**: Phase A（基盤）→ Phase B（ゴースト）→ Phase C（リリース）
+4. **並行作業可能**: alpha04（CI）は独立進行
 
 ### 6.2 子仕様立ち上げ順序
 
 ```mermaid
 graph LR
-    A[alpha01-shiori-alpha-events] --> B[alpha02-sample-ghost]
-    C[alpha03-build-ci] --> D[alpha04-release-packaging]
-    B --> D
+    A[alpha01-shiori-alpha-events] --> C[alpha03-sample-ghost]
+    B[alpha02-shiori-act-sakura] --> C
+    D[alpha04-build-ci] --> E[alpha05-release-packaging]
+    C --> E
 ```
 
 ### 6.3 ukagaka-desktop-mascot との関係
@@ -250,6 +255,7 @@ graph LR
 |---------|---------|-----------|
 | SHIORI EVENT機構 | ✅ 完成済み | - |
 | イベントハンドラ | ⚠️ 個別実装必要 | Low |
+| pasta.shiori.act | ❌ 未実装 | Medium |
 | DLLビルド設定 | ✅ 完成済み | - |
 | CI/CD | ❌ 未構築 | Low |
 | サンプルゴースト | ❌ 未作成 | Medium |
