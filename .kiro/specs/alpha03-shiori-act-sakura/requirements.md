@@ -76,7 +76,7 @@
 
 1. The `pasta.shiori.act` shall `act:talk(actor, text)` メソッドをオーバーライドする
 2. When `talk` が呼び出され `self.now_actor` と `actor` が異なる場合, the メソッド shall 以下を実行する:
-   - If `self.now_actor` が nil でない場合, 改行タグ `\n` を追加する
+   - If `self.now_actor` が nil でない場合, `self:newline()` を呼び出して改行を追加する
    - `actor.spot` に基づいてスコープ切り替えタグを追加する:
      - `spot == 0`: `\0` を追加
      - `spot == 1`: `\1` を追加
@@ -111,8 +111,11 @@
 
 1. The `pasta.shiori.act` shall `act:wait(ms)` メソッドを提供する
 2. When `wait(ms)` が呼び出された場合, the メソッド shall 内部バッファに `\w[ms]` を追加する
-3. The `pasta.shiori.act` shall `act:newline()` メソッドを提供する
-4. When `newline()` が呼び出された場合, the メソッド shall 内部バッファに `\n` を追加する
+3. The `pasta.shiori.act` shall `act:newline(n)` メソッドを提供する
+4. When `newline(n)` が呼び出された場合, the メソッド shall 以下を実行する:
+   - If `n` が nil または省略された場合, `n = 1` とする（デフォルト1行）
+   - If `n == 1` の場合, `\n` を追加する
+   - If `n > 1` の場合, `\n` を n 回繰り返して追加する
 5. The `pasta.shiori.act` shall `act:clear()` メソッドを提供する
 6. When `clear()` が呼び出された場合, the メソッド shall 内部バッファに `\c` を追加する
 7. The 各メソッド shall メソッドチェーン可能（`return self`）とする
