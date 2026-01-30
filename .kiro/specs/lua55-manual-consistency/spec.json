@@ -1,7 +1,7 @@
 {
-    "feature_name": "parenthesis-direct-function-call",
-    "created_at": "2025-12-21T00:00:00Z",
-    "updated_at": "2025-12-21T00:00:00Z",
+    "feature_name": "lua55-manual-consistency",
+    "created_at": "2026-01-30T00:00:00Z",
+    "updated_at": "2026-01-30T12:00:00Z",
     "language": "ja",
     "phase": "requirements-generated",
     "approvals": {
