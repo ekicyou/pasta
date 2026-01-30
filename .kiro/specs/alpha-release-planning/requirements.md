@@ -68,7 +68,7 @@
    - `pasta.toml`: 設定ファイル
    - `dic/*.pasta`: Pasta DSLスクリプト
    - `scripts/pasta/shiori/`: Luaエントリーポイント
-4. While サンプルゴースト仕様策定中, the alpha-release-planning shall シェル（見た目）については最小限の参照実装（SSP標準シェルまたは既存素材利用）とする方針を決定する
+4. The alpha-release-planning shall シェル（見た目）については記号的なシンプルシェル（男の子・女の子のピクトグラム風PNG画像）を独自作成する方針とする
 
 ---
 
