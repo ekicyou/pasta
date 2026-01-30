@@ -99,9 +99,11 @@
 | OnBoot | ✅ デフォルト実装あり（204返却） | カスタム応答追加 |
 | OnClose | ❌ 未実装 | 新規ハンドラ追加 |
 | OnGhostChanged | ❌ 未実装 | 新規ハンドラ追加 |
-| OnSecondChange | ❌ 未実装 | 新規ハンドラ追加（オプション） |
-| OnMinuteChange | ❌ 未実装 | 新規ハンドラ追加（オプション） |
+| OnSecondChange | ❌ 未実装 | 仮想イベント発行機構（OnTalk/OnHour判定） |
+| OnMinuteChange | ❌ 未実装 | 新規ハンドラ追加 |
 | OnMouseDoubleClick | ❌ 未実装 | 新規ハンドラ追加 |
+| OnTalk（仮想） | ❌ 未実装 | 定期トーク発行機構 |
+| OnHour（仮想） | ❌ 未実装 | 時報発行機構 |
 
 **備考**: 既存のEVENT機構により、ハンドラ追加は `REG.EventName = function(req) ... end` で簡潔に実装可能。
 
@@ -179,7 +181,7 @@ ghost/master/                    # load_dir
 
 | 子仕様カテゴリ | 規模 | リスク | 根拠 |
 |---------------|------|--------|------|
-| SHIORI EVENT | **M** | **Low** | 既存EVENT機構にハンドラ追加のみ |
+| SHIORI EVENT | **M** | **Medium** | ハンドラ追加 + 仮想イベント発行機構（OnTalk/OnHour） |
 | pasta.shiori.act | **M** | **Medium** | 新規モジュール、さくらスクリプト仕様理解必要 |
 | サンプルゴースト | **M** | **Medium** | 新規コンテンツ作成、動作検証必要 |
 | ビルドCI | **S** | **Low** | x86/x64両ビルド確認、標準的なGitHub Actions設定 |
@@ -254,8 +256,7 @@ graph LR
 | カテゴリ | ギャップ | 対応難易度 |
 |---------|---------|-----------|
 | SHIORI EVENT機構 | ✅ 完成済み | - |
-| イベントハンドラ | ⚠️ 個別実装必要 | Low |
-| pasta.shiori.act | ❌ 未実装 | Medium |
+| イベントハンドラ | ⚠️ 個別実装必要 | Low || 仮想イベント発行 | ❌ 未実装 | Medium || pasta.shiori.act | ❌ 未実装 | Medium |
 | DLLビルド設定 | ✅ 完成済み | - |
 | CI/CD | ❌ 未構築 | Low |
 | サンプルゴースト | ❌ 未作成 | Medium |
