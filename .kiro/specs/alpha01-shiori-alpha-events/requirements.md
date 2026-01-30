@@ -10,6 +10,18 @@
 - **現状**: EVENT/REG モジュール実装済み、基本的なイベントディスパッチ機構動作確認済み
 - **目的**: ベースウェア（SSP等）からの SHIORI EVENT を受信し、適切にハンドリングする基盤を確立
 
+### 既存実装
+
+本仕様は既存の以下モジュールを活用・拡張する:
+
+| モジュール | パス | 役割 |
+|-----------|------|------|
+| REG | `pasta.shiori.event.register` | ハンドラ登録テーブル（空テーブル） |
+| EVENT | `pasta.shiori.event` | イベント振り分け、`fire(req)` API |
+| RES | `pasta.shiori.res` | レスポンス組み立て（`ok`, `no_content`, `err`） |
+| SHIORI | `pasta.shiori.entry` | エントリポイント（`load`, `request`, `unload`） |
+| boot.lua | `pasta.shiori.event.boot` | OnBootデフォルトハンドラ（204 No Content） |
+
 ### 対象イベント
 
 1. **OnFirstBoot** - ゴースト初回起動
@@ -30,9 +42,9 @@
 
 #### Acceptance Criteria
 
-1. The alpha01-shiori-alpha-events shall 既存の `REG` モジュール（`pasta.shiori.event.register`）を活用してイベントハンドラを登録する
-2. The イベントハンドラ shall `REG.OnBoot = function(req) ... end` パターンで登録可能とする
-3. The alpha01-shiori-alpha-events shall 7種のイベント全てに対してハンドラ登録スロットを提供する
+1. The pasta.shiori.event.register shall ゴースト開発者が `REG.OnBoot = function(req) ... end` パターンでハンドラを登録できる API を提供する
+2. The pasta.shiori.event shall 7種のイベント（OnFirstBoot, OnBoot, OnClose, OnGhostChanged, OnSecondChange, OnMinuteChange, OnMouseDoubleClick）すべてのハンドラ登録を受け付ける
+3. When ゴースト開発者が REG テーブルにハンドラ関数を設定した場合, the pasta.shiori.event shall 既存のデフォルトハンドラを上書きしてディスパッチする
 
 ---
 
@@ -42,61 +54,102 @@
 
 #### Acceptance Criteria
 
-1. The alpha01-shiori-alpha-events shall 既存の `EVENT` モジュール（`pasta.shiori.event`）を活用してイベントをディスパッチする
-2. When ベースウェアから SHIORI EVENT が送信された場合, then 対応するハンドラ関数が呼び出される
-3. If ハンドラが登録されていない場合, then 空レスポンス（`204 No Content`相当）を返す
+1. When ベースウェアから SHIORI EVENT リクエストが送信された場合, the pasta.shiori.event shall `req.id` に対応するハンドラ関数を呼び出す
+2. If ハンドラが登録されていない場合, the pasta.shiori.event shall `204 No Content` レスポンスを返す
+3. If ハンドラ実行中にエラーが発生した場合, the pasta.shiori.event shall エラーをキャッチし `500 Internal Server Error` 相当のレスポンスを返す
+4. The pasta.shiori.event shall `req` テーブルを read-only 契約としてハンドラに渡す
 
 ---
 
-### Requirement 3: Reference パラメータ解析
+### Requirement 3: Reference パラメータアクセス
 
-**Objective:** As a ゴースト開発者, I want イベントのReference0〜Reference7を解析したい, so that イベント固有の情報を活用できる
+**Objective:** As a ゴースト開発者, I want イベントのReference0〜Reference7を利用したい, so that イベント固有の情報を活用できる
 
 #### Acceptance Criteria
 
-1. The alpha01-shiori-alpha-events shall `req.Reference0` ～ `req.Reference7` でReferenceパラメータにアクセス可能とする
-2. The alpha01-shiori-alpha-events shall 各イベントで使用されるReferenceの意味をドキュメント化する:
-   - OnFirstBoot: Reference0 = バニッシュからの復帰フラグ
-   - OnBoot: Reference0 = シェル名, Reference6 = シェルパス, Reference7 = ゴーストパス
-   - OnClose: Reference0 = 終了理由
-   - OnGhostChanged: Reference0 = 切り替え先ゴースト名
-   - OnMouseDoubleClick: Reference0 = スコープ(0/1), Reference4 = 当たり判定ID
+1. The pasta.shiori.event shall `req.reference[0]` ～ `req.reference[7]` で Reference パラメータへのアクセスを提供する
+2. The SHIORI EVENT ドキュメント shall 各イベントで使用される Reference の意味を明記する:
+   - **OnFirstBoot**: Reference0 = バニッシュからの復帰フラグ ("0" or "1")
+   - **OnBoot**: Reference0 = シェル名, Reference6 = シェルパス, Reference7 = ゴーストパス
+   - **OnClose**: Reference0 = 終了理由 ("user", "shutdown" 等)
+   - **OnGhostChanged**: Reference0 = 切り替え先ゴースト名, Reference1 = 切り替え元ゴースト名
+   - **OnSecondChange**: Reference0 = 現在秒, Reference1 = 累積秒
+   - **OnMinuteChange**: Reference0 = 現在分, Reference1 = 現在時
+   - **OnMouseDoubleClick**: Reference0 = スコープ (0: sakura, 1: kero), Reference4 = 当たり判定 ID
+3. If Reference パラメータが存在しない場合, the pasta.shiori.event shall `nil` を返す
 
 ---
 
-### Requirement 4: スタブ応答実装
+### Requirement 4: デフォルトハンドラ実装
 
-**Objective:** As a 開発者, I want 各イベントに対する最低限のスタブ応答がほしい, so that 動作確認ができる
+**Objective:** As a 開発者, I want 各イベントに対するデフォルト動作がほしい, so that 最小構成で動作確認ができる
 
 #### Acceptance Criteria
 
-1. The alpha01-shiori-alpha-events shall 各イベントに対してデフォルトスタブ応答を提供する:
-   - OnFirstBoot: `\\0初めまして。\\e` スタイルの応答例
-   - OnBoot: `\\0こんにちは。\\e` スタイルの応答例
-   - OnClose: `\\0さようなら。\\e` スタイルの応答例
-   - OnMouseDoubleClick: `\\0なに？\\e` スタイルの応答例
-   - OnSecondChange/OnMinuteChange: 空応答（他仕様で拡張）
-2. The スタブ応答 shall `pasta.shiori.act` モジュール（alpha03）との統合を想定した設計とする
+1. The pasta.shiori.event.boot shall OnBoot イベントに対してデフォルトハンドラを提供し `204 No Content` を返す
+2. The pasta.shiori.event shall OnFirstBoot, OnClose, OnGhostChanged, OnSecondChange, OnMinuteChange, OnMouseDoubleClick に対して未登録時は `204 No Content` を返す
+3. The デフォルトハンドラ shall ゴースト開発者による上書きを許容する設計とする
 
 ---
 
-### Requirement 5: テスト要件
+### Requirement 5: スタブ応答サンプル
+
+**Objective:** As a ゴースト開発者, I want 各イベントの応答サンプルコードがほしい, so that 実装の参考にできる
+
+#### Acceptance Criteria
+
+1. The ドキュメント shall 各イベントに対するさくらスクリプト応答のサンプルコードを提供する:
+   - **OnFirstBoot**: `RES.ok([[\0\s[0]初めまして。\e]])`
+   - **OnBoot**: `RES.ok([[\0\s[0]こんにちは。\e]])`
+   - **OnClose**: `RES.ok([[\0\s[0]さようなら。\e]])`
+   - **OnGhostChanged**: `RES.ok([[\0\s[0]いらっしゃい。\e]])`
+   - **OnMouseDoubleClick**: `RES.ok([[\0\s[0]なに？\e]])`
+   - **OnSecondChange/OnMinuteChange**: `RES.no_content()` （通常は空応答、alpha02 で仮想イベント発行に拡張）
+2. The サンプルコード shall `pasta.shiori.res` モジュールの API を使用する
+3. The サンプルコード shall `pasta.shiori.act` モジュール（alpha03）との将来統合を想定したコメントを含む
+
+---
+
+### Requirement 6: テスト要件
 
 **Objective:** As a 開発者, I want イベントハンドリングのテストを実行したい, so that 実装の品質を保証できる
 
 #### Acceptance Criteria
 
-1. The alpha01-shiori-alpha-events shall 各イベントのハンドラ呼び出しをテストする統合テストを提供する
+1. The alpha01-shiori-alpha-events shall 7種のイベント各々に対するハンドラ登録・呼び出しテストを提供する
 2. The テスト shall Reference パラメータの解析が正しく動作することを検証する
-3. The テスト shall 未登録イベントへの空応答を検証する
+3. The テスト shall 未登録イベントに対して `204 No Content` が返されることを検証する
+4. The テスト shall ハンドラ内エラー発生時のエラーレスポンス生成を検証する
+5. The テスト shall 既存の `shiori_event_test.rs` テストスイートを拡張して実装する
+
+---
+
+### Requirement 7: ドキュメント要件
+
+**Objective:** As a ゴースト開発者, I want SHIORI EVENT の使い方ドキュメントがほしい, so that イベント駆動開発を始められる
+
+#### Acceptance Criteria
+
+1. The ドキュメント shall 7種の SHIORI EVENT それぞれの目的・発火タイミング・Reference 構造を説明する
+2. The ドキュメント shall ハンドラ登録パターン（REG テーブルへの代入）を説明する
+3. The ドキュメント shall RES モジュールを使ったレスポンス組み立て方法を説明する
+4. The ドキュメント shall `crates/pasta_lua/doc/` 配下または `LUA_API.md` に追記する
 
 ---
 
 ## Out of Scope
 
-- OnTalk/OnHour 仮想イベントの発行（alpha02 で実装）
-- さくらスクリプト組み立てロジック（alpha03 で実装）
-- 複雑な会話ロジック・ランダムトーク
+- **OnTalk/OnHour 仮想イベントの発行** - alpha02-virtual-event-dispatcher で実装
+- **さくらスクリプト組み立てロジック** - alpha03-shiori-act-sakura で実装
+- **複雑な会話ロジック・ランダムトーク** - サンプルゴースト（alpha04）で実装
+- **OnMouseMove, OnSurfaceChange 等の他イベント** - 本仕様では7種に限定
+
+---
+
+## Dependencies
+
+- **既存モジュール**: pasta.shiori.event, pasta.shiori.event.register, pasta.shiori.res（実装済み）
+- **後続仕様**: alpha02（仮想イベント）、alpha03（さくらスクリプト）は本仕様のハンドラ機構を活用
 
 ---
 
