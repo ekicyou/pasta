@@ -46,14 +46,14 @@
 1. When alpha-release-planning を承認した際, the alpha-release-planning shall 以下のSHIORI EVENTカテゴリをサポート対象として子仕様化する:
    - **ライフサイクル**: OnFirstBoot, OnBoot, OnClose, OnGhostChanged
    - **時刻イベント**: OnSecondChange, OnMinuteChange
-   - **仮想イベント**: OnTalk（定期トーク）, OnHour（時報）
    - **ユーザー操作**: OnMouseDoubleClick（キャラクターへのダブルクリック）
 2. If 既にイベントハンドラ機構が実装済みの場合, then the 子仕様 shall 既存の `REG` / `EVENT` モジュール機構を活用する設計とする
-3. The alpha-release-planning shall 仮想イベント発行機構を子仕様として立ち上げる:
+3. The alpha-release-planning shall 仮想イベント発行機構を独立した子仕様として立ち上げる:
    - **OnTalk仮想イベント**: OnSecondChangeで発行、条件（非トーク中 AND 前回トークからXX秒経過 AND 時報までXX秒以上）
    - **OnHour仮想イベント**: OnSecondChangeで発行、条件（正時超過 AND 非トーク中）
    - 設定値は `pasta.toml` の `[ghost]` セクションから取得
    - 時刻判定には Rust提供の `req.date` テーブルを使用
+   - 状態管理（前回トーク時刻、前回時報時刻、トーク中フラグ等）を実装
 4. The alpha-release-planning shall さくらスクリプト組み立て機能（`pasta.shiori.act` モジュール）の実装を子仕様として立ち上げる
 5. The `pasta.shiori.act` 子仕様 shall `pasta.act` モジュールを継承し、`act:talk()` 等によるさくらスクリプト生成インターフェースを提供する
 6. The alpha-release-planning shall 各SHIORI EVENTに対して最低限のスタブ応答仕様を定義する子仕様を立ち上げる

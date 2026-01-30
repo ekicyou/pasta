@@ -39,20 +39,29 @@ requirements → design → tasks → implementation → implementation-complete
 ## 実装完了時アクション
 
 ### 1. コミット
-```bash
-git add -A && git commit -m "<type>(<scope>): <summary>"
+```powershell
+git add -A; git commit -m "<type>(<scope>): <summary>"
 ```
 タイプ: `feat`, `fix`, `refactor`, `docs`, `test`
 
 ### 2. リモート同期
-```bash
+```powershell
 git push origin <branch>
 ```
 
 ### 3. 仕様アーカイブ
-```bash
-mv .kiro/specs/<spec-name> .kiro/specs/completed/
-git add -A && git commit -m "chore(spec): <spec-name>をcompletedへ移動"
+
+**重要**: spec.json更新は仕様移動の**直後**に実行（移動前に更新するとVSCode仕様でファイルが復活する場合がある）
+
+```powershell
+# 1. 仕様ディレクトリを移動
+Move-Item .kiro/specs/<spec-name> .kiro/specs/completed/
+
+# 2. spec.jsonのphaseを"completed"に更新
+# （エディタまたはjqコマンドで .kiro/specs/completed/<spec-name>/spec.json を編集）
+
+# 3. コミット＆プッシュ
+git add -A; git commit -m "chore(spec): <spec-name>をcompletedへ移動"
 git push origin <branch>
 ```
 
