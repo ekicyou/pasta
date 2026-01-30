@@ -119,12 +119,27 @@
 1. The alpha01-shiori-alpha-events shall 7種のイベント各々に対するハンドラ登録・呼び出しテストを提供する
 2. The テスト shall Reference パラメータの解析が正しく動作することを検証する
 3. The テスト shall 未登録イベントに対して `204 No Content` が返されることを検証する
-4. The テスト shall ハンドラ内エラー発生時のエラーレスポンス生成を検証する
-5. The テスト shall 既存の `shiori_event_test.rs` テストスイートを拡張して実装する
+4. The テスト shall シーン関数フォールバック機構（`＊OnBoot` 等のグローバルシーン検索）を検証する
+5. The テスト shall ハンドラ内エラー発生時のエラーレスポンス生成を検証する
+6. The テスト shall 既存の `shiori_event_test.rs` テストスイートを拡張して実装する
 
 ---
 
-### Requirement 7: ドキュメント要件
+### Requirement 7: シーン関数によるイベントハンドリング
+
+**Objective:** As a ゴースト開発者, I want Pastaスクリプトでイベントハンドラを定義したい, so that Luaコードを書かずにイベント駆動ロジックを実装できる
+
+#### Acceptance Criteria
+
+1. When REG テーブルにハンドラが登録されていない場合, the pasta.shiori.event shall グローバルシーン検索によるフォールバックを試みる
+2. The pasta.shiori.event shall `＊{req.id}` パターンでグローバルシーンを検索する（例: `＊OnFirstBoot`, `＊OnBoot`）
+3. If 対応するグローバルシーンが見つかった場合, the pasta.shiori.event shall そのシーン関数を実行してレスポンスを生成する
+4. If グローバルシーンも見つからない場合, the pasta.shiori.event shall `204 No Content` を返す
+5. The シーン関数 shall `act` オブジェクトを通じてさくらスクリプト生成を行える（alpha03 統合を想定）
+
+---
+
+### Requirement 8: ドキュメント要件
 
 **Objective:** As a ゴースト開発者, I want SHIORI EVENT の使い方ドキュメントがほしい, so that イベント駆動開発を始められる
 
@@ -132,8 +147,9 @@
 
 1. The ドキュメント shall 7種の SHIORI EVENT それぞれの目的・発火タイミング・Reference 構造を説明する
 2. The ドキュメント shall ハンドラ登録パターン（REG テーブルへの代入）を説明する
-3. The ドキュメント shall RES モジュールを使ったレスポンス組み立て方法を説明する
-4. The ドキュメント shall `crates/pasta_lua/doc/` 配下または `LUA_API.md` に追記する
+3. The ドキュメント shall シーン関数フォールバック機構を説明する（`＊OnBoot` 等のグローバルシーン利用）
+4. The ドキュメント shall RES モジュールを使ったレスポンス組み立て方法を説明する
+5. The ドキュメント shall `LUA_API.md` の前方セクション（セクション2または3）に「SHIORI EVENT ハンドリング」として追記する
 
 ---
 
