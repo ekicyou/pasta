@@ -37,10 +37,12 @@
 
 #### Acceptance Criteria
 
-1. The `pasta.shiori.act` shall `require("pasta.act")` により親モジュールを参照する
-2. The `pasta.shiori.act` shall `setmetatable` を使用して `pasta.act` の全メソッドを継承する
-3. When `pasta.shiori.act` で未定義のメソッドが呼び出された場合, the `SHIORI_ACT_IMPL.__index` shall `pasta.act` から該当メソッドを返す
-4. The 継承 shall `talk`, `call`, `word`, `yield`, `end_action`, `init_scene` 等の既存メソッドを利用可能とする
+1. The `pasta.act` shall `ACT.IMPL = ACT_IMPL` として実装メタテーブルを公開する
+2. The `pasta.shiori.act` shall `require("pasta.act")` により親モジュールを参照する
+3. The `pasta.shiori.act` shall `setmetatable(SHIORI_ACT_IMPL, {__index = ACT.IMPL})` により継承チェーンを構築する
+4. When `pasta.shiori.act` で未定義のメソッドが呼び出された場合, the `SHIORI_ACT_IMPL.__index` shall `ACT.IMPL` から該当メソッドを検索する
+5. The 継承 shall `talk`, `call`, `word`, `yield`, `end_action`, `init_scene` 等の既存メソッドを利用可能とする
+6. The 継承 shall `ACT_IMPL.__index` のアクタープロキシ動的生成機能も継承する
 
 ---
 
@@ -51,15 +53,18 @@
 #### Acceptance Criteria
 
 1. The `pasta.shiori.act` shall `SHIORI_ACT.new(ctx)` コンストラクタを提供する
-2. When `new` が呼び出された場合, the `SHIORI_ACT` shall 以下を持つ新規インスタンスを返す:
-   - `ctx`: 環境オブジェクト（引数から）
-   - `var`: アクションローカル変数テーブル（空テーブル）
-   - `token`: トークンバッファ（空テーブル）
-   - `_buffer`: さくらスクリプトバッファ（空テーブル）
-   - `now_actor`: 現在のアクター（nil）
-   - `current_scene`: 現在のシーンテーブル（nil）
-3. The インスタンス shall メタテーブル `SHIORI_ACT_IMPL` を設定する
-4. The `SHIORI_ACT_IMPL.__index` shall 自身のメソッドを優先し、未定義なら `pasta.act` のメソッドを返す
+2. When `new` が呼び出された場合, the `SHIORI_ACT` shall 以下を実行する:
+   - `ACT.new(ctx)` を呼び出してベースインスタンスを生成
+   - `_buffer` フィールド（空テーブル）を追加
+   - `setmetatable(obj, SHIORI_ACT_IMPL)` でメタテーブルを設定
+   - 生成したインスタンスを返す
+3. The インスタンス shall `pasta.act` 由来の以下のフィールドを保持する:
+   - `ctx`: 環境オブジェクト
+   - `var`: アクションローカル変数テーブル
+   - `token`: トークンバッファ
+   - `now_actor`: 現在のアクター
+   - `current_scene`: 現在のシーンテーブル
+4. The `SHIORI_ACT_IMPL` shall メタテーブルとして `{__index = ACT.IMPL}` を設定することで継承チェーンを構築する
 
 ---
 
