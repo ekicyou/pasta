@@ -25,13 +25,14 @@ lua55-manualのドキュメント整合性を修正する。具体的には：
 4. When 最後の章（9章）の場合, the lua55-manual shall 「[← 前へ: N-1 – タイトル](前ファイル) | [目次](./README.md)」形式を使用する
 5. The lua55-manual shall ナビゲーションリンクと本文の間に「---」セパレータを配置する
 
-### Requirement 2: メタデータコメント統一
-**Objective:** ドキュメント管理者として、全ページで統一されたメタデータコメントを確保したい。これにより翻訳の出典と品質管理が容易になる。
+### Requirement 2: メタデータコメント統一（HTMLコメント形式）
+**Objective:** ドキュメント管理者として、全ページで統一されたHTMLコメント形式のメタデータを確保したい。これにより翻訳の出典と品質管理が容易になり、HTML変換時には非表示となる。
 
 #### Acceptance Criteria
 1. The lua55-manual shall 各ドキュメントの冒頭にHTMLコメント形式でメタデータを含める
-2. When メタデータを記載するとき, the lua55-manual shall 原文URL、参考URL、翻訳日、レビュー情報を含める
-3. If メタデータが欠落している場合, the lua55-manual shall 統一フォーマットでメタデータを追加する
+2. When メタデータを記載するとき, the lua55-manual shall 「原文URL、参考URL、翻訳日、レビュー情報」を含める
+3. If blockquote形式のメタデータが存在する場合, the lua55-manual shall HTMLコメント形式に変換する
+4. The lua55-manual shall 用語対照表が必要な場合はメタデータ内に簡潔に含めるか、GLOSSARY.mdへのリンクを記載する
 
 ### Requirement 3: 6章セクション番号重複修正
 **Objective:** ドキュメント閲覧者として、6章の構造が論理的で読みやすいことを期待する。現在は「6.2 – 基本関数（パートA）」「6.2 – 基本関数（パートB）」のように同じセクション番号が繰り返されており、これを修正する。
