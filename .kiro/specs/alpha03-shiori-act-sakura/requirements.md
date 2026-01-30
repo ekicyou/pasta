@@ -63,24 +63,19 @@
 
 ---
 
-### Requirement 3: talk メソッドのオーバーライド
+### Requirement 3: キャラクター切り替えタグ生成
 
-**Objective:** As a ゴースト開発者, I want `talk(actor, text)` でキャラクター切り替えとテキストを組み立てたい, so that さくらスクリプトを自然に生成できる
+**Objective:** As a ゴースト開発者, I want キャラクターを切り替えるタグを生成したい, so that sakura/kero の発話を制御できる
 
 #### Acceptance Criteria
 
-1. The `pasta.shiori.act` shall `act:talk(actor, text)` メソッドをオーバーライドする
-2. When `talk` が呼び出され `self.now_actor` と `actor` が異なる場合, the メソッド shall 以下を実行する:
-   - If `self.now_actor` が nil でない場合, 改行タグ `\n` を追加する
-   - `actor.spot` に基づいてスコープ切り替えタグを追加する:
-     - `spot == 0`: `\0` を追加
-     - `spot == 1`: `\1` を追加
-     - その他: `\p[spot]` を追加
-   - `self.now_actor` を `actor` に更新する
-3. The `talk` shall テキストをエスケープして内部バッファに追加する:
-   - バックスラッシュ `\` を `\\` にエスケープ
-   - パーセント `%` を `%%` にエスケープ
-4. The メソッド shall メソッドチェーン可能（`return self`）とする
+1. The `pasta.shiori.act` shall `act:sakura()` メソッドを提供する
+2. When `sakura()` が呼び出された場合, the メソッド shall 内部バッファに `\0` を追加する
+3. The `pasta.shiori.act` shall `act:kero()` メソッドを提供する
+4. When `kero()` が呼び出された場合, the メソッド shall 内部バッファに `\1` を追加する
+5. The `pasta.shiori.act` shall `act:char(n)` メソッドを提供する
+6. When `char(n)` が呼び出された場合, the メソッド shall 内部バッファに `\p[n]` を追加する
+7. The 各メソッド shall メソッドチェーン可能（`return self`）とする
 
 ---
 
@@ -114,7 +109,33 @@
 
 ---
 
-### Requirement 6: build メソッド
+### Requirement 6: テキスト追加
+
+**Objective:** As a ゴースト開発者, I want テキストをさくらスクリプトに追加したい, so that 会話内容を組み立てられる
+
+#### Acceptance Criteria
+
+1. The `pasta.shiori.act` shall `act:text(str)` メソッドを提供する
+2. When `text(str)` が呼び出された場合, the メソッド shall 内部バッファにテキストを追加する
+3. The `text` shall バックスラッシュ `\` を `\\` にエスケープする
+4. The `text` shall パーセント `%` を `%%` にエスケープする（ベースウェア依存）
+5. The メソッド shall メソッドチェーン可能（`return self`）とする
+
+---
+
+### Requirement 7: 生タグ追加
+
+**Objective:** As a 上級ゴースト開発者, I want 任意のさくらスクリプトタグを直接追加したい, so that 拡張タグを使用できる
+
+#### Acceptance Criteria
+
+1. The `pasta.shiori.act` shall `act:raw(tag)` メソッドを提供する
+2. When `raw(tag)` が呼び出された場合, the メソッド shall 内部バッファにタグをエスケープなしで追加する
+3. The メソッド shall メソッドチェーン可能（`return self`）とする
+
+---
+
+### Requirement 8: build メソッド
 
 **Objective:** As a 開発者, I want 組み立てたさくらスクリプトを文字列として取得したい, so that SHIORIレスポンスに含められる
 
@@ -128,7 +149,7 @@
 
 ---
 
-### Requirement 7: reset メソッド
+### Requirement 9: reset メソッド
 
 **Objective:** As a 開発者, I want 内部バッファをリセットしたい, so that 新しいスクリプトを組み立てられる
 
@@ -136,13 +157,12 @@
 
 1. The `pasta.shiori.act` shall `act:reset()` メソッドを提供する
 2. When `reset()` が呼び出された場合, the メソッド shall 内部バッファ（`_buffer`）を空テーブルにリセットする
-3. The `reset` shall `now_actor` を nil にリセットする（次回 `talk()` でスコープタグ発行）
-4. The `reset` shall `token` バッファはリセットしない（pasta.act 互換性維持）
-5. The メソッド shall メソッドチェーン可能（`return self`）とする
+3. The `reset` shall `token` バッファはリセットしない（pasta.act 互換性維持）
+4. The メソッド shall メソッドチェーン可能（`return self`）とする
 
 ---
 
-### Requirement 8: モジュール構造
+### Requirement 10: モジュール構造
 
 **Objective:** As a 開発者, I want モジュールが pasta_lua の規約に準拠してほしい, so that 他のモジュールと整合性がある
 
@@ -156,22 +176,18 @@
 
 ---
 
-### Requirement 9: テスト要件
+### Requirement 11: テスト要件
 
 **Objective:** As a 開発者, I want さくらスクリプト生成のテストを実行したい, so that 実装の品質を保証できる
 
 #### Acceptance Criteria
 
 1. The テストファイル shall `crates/pasta_lua/tests/lua_specs/shiori_act_test.lua` に配置する
-2. The テスト shall `talk(actor, text)` のスコープ切り替え動作を検証する:
-   - actor 切り替え時にスコープタグ（`\0`, `\1`, `\p[n]`）が発行されること
-   - 2回目以降の同一 actor での `talk()` でスコープタグが再発行されないこと
-   - actor 切り替え時に改行が自動挿入されること
-3. The テスト shall サーフェス・待機タグ生成メソッドの出力を検証する
-4. The テスト shall メソッドチェーンの動作を検証する
-5. The テスト shall エスケープ処理の正確性を検証する（`\` → `\\`, `%` → `%%`）
-6. The テスト shall `build()` の出力が期待どおりであることを検証する（`\e` 終端付与を含む）
-7. The テスト shall `reset()` が `_buffer` と `now_actor` をクリアすることを検証する
+2. The テスト shall 各タグ生成メソッドの出力を検証する
+3. The テスト shall メソッドチェーンの動作を検証する
+4. The テスト shall エスケープ処理の正確性を検証する
+5. The テスト shall `build()` の出力が期待どおりであることを検証する（`\e` 終端付与を含む）
+6. The テスト shall `pasta.act` からの継承が正しく動作することを検証する
 
 ---
 
