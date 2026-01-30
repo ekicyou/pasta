@@ -35,14 +35,15 @@ lua55-manualのドキュメント整合性を修正する。具体的には：
 3. If blockquote形式のメタデータが存在する場合, the lua55-manual shall HTMLコメント形式に変換する
 4. The lua55-manual shall 用語対照表が必要な場合はメタデータ内に簡潔に含めるか、GLOSSARY.mdへのリンクを記載する
 
-### Requirement 3: 6章セクション番号重複修正
+### Requirement 3: 6章セクション番号重複修正（正規化ID形式）
 **Objective:** ドキュメント閲覧者として、6章の構造が論理的で読みやすいことを期待する。現在は「6.2 – 基本関数（パートA）」「6.2 – 基本関数（パートB）」のように同じセクション番号が繰り返されており、これを修正する。
 
 #### Acceptance Criteria
 1. When 6章を閲覧するとき, the lua55-manual shall 各セクション番号が一意であり重複しない
 2. If 現在のパート分割が「6.2（パートA〜E）」のように存在する場合, the lua55-manual shall 単一の「6.2 – 基本関数」見出しの下に全関数をまとめる
 3. The lua55-manual shall 6章の全サブセクション（6.1〜6.11）を、パート分割なしの連続した構造にする
-4. When index.mdのリンクを確認するとき, the lua55-manual shall 6章の各セクションへのアンカーリンクが正しく機能する
+4. When アンカーIDを生成するとき, the lua55-manual shall 正規化形式（シングルハイフン）を使用する（例: `#62-基本関数`、not `#62--基本関数`）
+5. When index.mdのリンクを確認するとき, the lua55-manual shall 6章の各セクションへのアンカーリンクが正しく機能する
 
 ### Requirement 4: README.mdを目次とする役割整理
 **Objective:** ドキュメント利用者として、README.mdが完全な目次であることを期待する。現在README.mdとindex.mdの役割が曖昧であり、README.mdを目次として確立する。
