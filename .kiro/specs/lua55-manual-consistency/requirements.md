@@ -45,22 +45,23 @@ lua55-manualのドキュメント整合性を修正する。具体的には：
 4. When アンカーIDを生成するとき, the lua55-manual shall 正規化形式（シングルハイフン）を使用する（例: `#62-基本関数`、not `#62--基本関数`）
 5. When index.mdのリンクを確認するとき, the lua55-manual shall 6章の各セクションへのアンカーリンクが正しく機能する
 
-### Requirement 4: README.mdを目次とする役割整理
-**Objective:** ドキュメント利用者として、README.mdが完全な目次であることを期待する。現在README.mdとindex.mdの役割が曖昧であり、README.mdを目次として確立する。
+### Requirement 4: README.mdを完全な目次とするファイル構成
+**Objective:** ドキュメント利用者として、GitHubでデフォルト表示されるREADME.mdが詳細目次（全セクションリンク付き）+索引を含む完全なエントリーポイントであることを期待する。現在はindex.mdが詳細目次を持ち、README.mdは簡易目次のみであり、役割を逆転する。
 
 #### Acceptance Criteria
-1. The lua55-manual shall README.mdをドキュメントのメインエントリーポイント兼完全な目次として使用する
-2. When README.mdを開いたとき, the lua55-manual shall 概要、詳細目次（全セクションへのリンク付き）、付録リンクを含む
-3. When ナビゲーションリンクで「目次」を参照するとき, the lua55-manual shall 一貫してREADME.mdを指す
-4. If index.mdを関数・型索引専用にする場合, the lua55-manual shall ファイル名を `API_INDEX.md` などに変更し、README.mdからリンクする
-5. The lua55-manual shall README.md一本化（index.md統合）も許容する
+1. The lua55-manual shall 現在のindex.mdの内容（詳細目次+索引）をREADME.mdに移植する
+2. The lua55-manual shall 現在のREADME.mdの内容（概要、翻訳方針、免責事項）をABOUT.mdに移動する
+3. The lua55-manual shall index.mdを削除する
+4. When README.mdを開いたとき, the lua55-manual shall 詳細目次（全セクションへのリンク付き）、Lua関数索引、C API索引、型索引を表示する
+5. When ナビゲーションリンクで「目次」を参照するとき, the lua55-manual shall 一貫してREADME.mdを指す
+6. The lua55-manual shall 新README.mdの末尾にABOUT.mdへのリンクを含める（例: 「翻訳についての詳細は[ABOUT.md](ABOUT.md)を参照」）
 
 ### Requirement 5: 目次・索引のリンク検証
-**Objective:** ドキュメント利用者として、目次および索引のすべてのリンクが機能することを期待する。
+**Objective:** ドキュメント利用者として、README.md内の目次および索引のすべてのリンクが機能することを期待する。
 
 #### Acceptance Criteria
 1. When README.mdの目次リンクをクリックしたとき, the lua55-manual shall 対象ページの正しいアンカー位置に移動する
-2. If アンカーID（例: `#62--基本関数`）が変更された場合, the lua55-manual shall README.md（および存在する場合はAPI_INDEX.md）内の対応リンクも更新する
+2. If アンカーID（例: `#62--基本関数`）が変更された場合, the lua55-manual shall README.md内の対応リンクも更新する
 3. The lua55-manual shall 全てのLua関数リンク、C API関数リンク、型リンクが有効である
 
 ### Requirement 6: 付録ファイルの整合性
