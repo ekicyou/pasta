@@ -79,8 +79,8 @@
 #### Acceptance Criteria
 
 1. The alpha-release-planning shall 以下のリリース準備タスクを子仕様化する:
-   - **ビルドCI**: Windows x64向け `pasta.dll` の自動ビルド（GitHub Actions）
-   - **配布パッケージ**: サンプルゴースト同梱の配布アーカイブ作成
+   - **ビルドCI**: Windows x86/x64 両アーキテクチャでの `pasta.dll` ビルド確認（GitHub Actions）
+   - **配布パッケージ**: x86（32bit）版 `pasta.dll` + サンプルゴースト同梱の配布アーカイブ作成
    - **READMEドキュメント**: インストール手順・動作確認方法
 2. If GitHub Releases を配布チャネルとする場合, then the 子仕様 shall リリースワークフロー（タグ → ビルド → アップロード）を仕様に含める
 3. The alpha-release-planning shall バージョン番号体系（例: `0.1.0-alpha.1`）を決定する

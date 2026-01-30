@@ -179,8 +179,8 @@ ghost/master/                    # load_dir
 |---------------|------|--------|------|
 | SHIORI基盤 | **S** | **Low** | 既存EVENT機構にハンドラ追加のみ |
 | サンプルゴースト | **M** | **Medium** | 新規コンテンツ作成、動作検証必要 |
-| ビルドCI | **S** | **Low** | 標準的なGitHub Actions設定 |
-| リリースパッケージ | **M** | **Medium** | アーカイブ構成・ドキュメント作成 |
+| ビルドCI | **S** | **Low** | x86/x64両ビルド確認、標準的なGitHub Actions設定 |
+| リリースパッケージ | **M** | **Medium** | x86版DLL + アーカイブ構成・ドキュメント作成 |
 
 ### 4.2 全体見積もり
 
@@ -198,7 +198,8 @@ ghost/master/                    # load_dir
 以下の項目は設計フェーズで詳細調査が必要：
 
 1. **GitHub Actions Windows ビルド環境**
-   - `x86_64-pc-windows-msvc` ターゲット設定
+   - `i686-pc-windows-msvc` (x86) + `x86_64-pc-windows-msvc` (x64) 両ターゲット
+   - リリース配布は x86 のみ（伺かゴースト互換性）
    - Cross-compilation vs Native Windows Runner
 
 2. **配布アーカイブ形式**
