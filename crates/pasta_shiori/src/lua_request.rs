@@ -6,27 +6,33 @@ use pest::Parser as _;
 use pest::iterators::FlatPairs;
 use time::OffsetDateTime;
 
-/// 現在時刻でdateテーブルを作成します。
-#[allow(dead_code)]
-pub fn lua_date(lua: &Lua) -> MyResult<Table> {
-    let now = OffsetDateTime::now_local()?;
+/// 指定時刻でdateテーブルを作成します。
+/// テスト時に固定時刻を渡せるようにするための基盤関数です。
+pub fn lua_date_from(lua: &Lua, dt: OffsetDateTime) -> MyResult<Table> {
     let t = lua.create_table()?;
-    t.set("year", now.year())?;
-    t.set("month", now.month() as u8)?;
-    t.set("day", now.day())?;
-    t.set("hour", now.hour())?;
-    t.set("min", now.minute())?;
-    t.set("sec", now.second())?;
-    t.set("ns", now.nanosecond())?;
+    t.set("year", dt.year())?;
+    t.set("month", dt.month() as u8)?;
+    t.set("day", dt.day())?;
+    t.set("hour", dt.hour())?;
+    t.set("min", dt.minute())?;
+    t.set("sec", dt.second())?;
+    t.set("ns", dt.nanosecond())?;
 
-    let ordinal = now.ordinal();
-    let num_days_from_sunday = now.weekday().number_days_from_sunday();
+    let ordinal = dt.ordinal();
+    let num_days_from_sunday = dt.weekday().number_days_from_sunday();
 
     t.set("yday", ordinal)?;
     t.set("ordinal", ordinal)?;
     t.set("wday", num_days_from_sunday)?;
     t.set("num_days_from_sunday", num_days_from_sunday)?;
     Ok(t)
+}
+
+/// 現在時刻でdateテーブルを作成します。
+#[allow(dead_code)]
+pub fn lua_date(lua: &Lua) -> MyResult<Table> {
+    let now = OffsetDateTime::now_local()?;
+    lua_date_from(lua, now)
 }
 
 /// SHIORI REQUESTを解析し、luaオブジェクトに展開します。
@@ -44,6 +50,7 @@ pub fn parse_request(lua: &Lua, text: &str) -> MyResult<Table> {
     let t = lua.create_table()?;
     t.set("reference", lua.create_table()?)?;
     t.set("dic", lua.create_table()?)?;
+    t.set("date", lua_date(lua)?)?;
     let it = Parser::parse(Rule::req, text)?.flatten();
     parse1(&t, it)?;
     Ok(t)

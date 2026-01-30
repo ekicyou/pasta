@@ -20,7 +20,98 @@ fn create_test_lua() -> Lua {
 
 mod lua_date_tests {
     use super::*;
-    use pasta::lua_request::lua_date;
+    use pasta::lua_request::{lua_date, lua_date_from};
+    use time::{Date, Month, PrimitiveDateTime, Time, UtcOffset};
+
+    #[test]
+    fn test_lua_date_from_with_fixed_datetime() {
+        let lua = create_test_lua();
+
+        // 2025年1月2日 15:30:45.123456789 (UTC+9, 木曜日)
+        let date = Date::from_calendar_date(2025, Month::January, 2).unwrap();
+        let time = Time::from_hms_nano(15, 30, 45, 123_456_789).unwrap();
+        let primitive = PrimitiveDateTime::new(date, time);
+        let dt = primitive.assume_offset(UtcOffset::from_hms(9, 0, 0).unwrap());
+
+        let table = lua_date_from(&lua, dt).expect("lua_date_from should succeed");
+
+        // Verify exact values
+        let year: i32 = table.get("year").unwrap();
+        let month: u8 = table.get("month").unwrap();
+        let day: u8 = table.get("day").unwrap();
+        let hour: u8 = table.get("hour").unwrap();
+        let min: u8 = table.get("min").unwrap();
+        let sec: u8 = table.get("sec").unwrap();
+        let ns: u32 = table.get("ns").unwrap();
+
+        assert_eq!(year, 2025);
+        assert_eq!(month, 1); // January
+        assert_eq!(day, 2);
+        assert_eq!(hour, 15);
+        assert_eq!(min, 30);
+        assert_eq!(sec, 45);
+        assert_eq!(ns, 123_456_789);
+
+        // 2025-01-02 is the 2nd day of the year
+        let yday: u16 = table.get("yday").unwrap();
+        let ordinal: u16 = table.get("ordinal").unwrap();
+        assert_eq!(yday, 2);
+        assert_eq!(ordinal, 2);
+
+        // 2025-01-02 is Thursday (4 days from Sunday)
+        let wday: u8 = table.get("wday").unwrap();
+        let num_days_from_sunday: u8 = table.get("num_days_from_sunday").unwrap();
+        assert_eq!(wday, 4); // Thursday
+        assert_eq!(num_days_from_sunday, 4);
+    }
+
+    #[test]
+    fn test_lua_date_from_sunday() {
+        let lua = create_test_lua();
+
+        // 2025年1月5日 (日曜日)
+        let date = Date::from_calendar_date(2025, Month::January, 5).unwrap();
+        let time = Time::from_hms(0, 0, 0).unwrap();
+        let primitive = PrimitiveDateTime::new(date, time);
+        let dt = primitive.assume_offset(UtcOffset::UTC);
+
+        let table = lua_date_from(&lua, dt).expect("lua_date_from should succeed");
+
+        let wday: u8 = table.get("wday").unwrap();
+        assert_eq!(wday, 0, "Sunday should be 0");
+    }
+
+    #[test]
+    fn test_lua_date_from_saturday() {
+        let lua = create_test_lua();
+
+        // 2025年1月4日 (土曜日)
+        let date = Date::from_calendar_date(2025, Month::January, 4).unwrap();
+        let time = Time::from_hms(23, 59, 59).unwrap();
+        let primitive = PrimitiveDateTime::new(date, time);
+        let dt = primitive.assume_offset(UtcOffset::UTC);
+
+        let table = lua_date_from(&lua, dt).expect("lua_date_from should succeed");
+
+        let wday: u8 = table.get("wday").unwrap();
+        assert_eq!(wday, 6, "Saturday should be 6");
+    }
+
+    #[test]
+    fn test_lua_date_from_leap_year() {
+        let lua = create_test_lua();
+
+        // 2024年12月31日 (うるう年の最終日 = 366日目)
+        let date = Date::from_calendar_date(2024, Month::December, 31).unwrap();
+        let time = Time::from_hms(12, 0, 0).unwrap();
+        let primitive = PrimitiveDateTime::new(date, time);
+        let dt = primitive.assume_offset(UtcOffset::UTC);
+
+        let table = lua_date_from(&lua, dt).expect("lua_date_from should succeed");
+
+        let yday: u16 = table.get("yday").unwrap();
+        assert_eq!(yday, 366, "Leap year should have 366 days");
+    }
 
     #[test]
     fn test_lua_date_returns_table_with_basic_datetime_fields() {
@@ -187,6 +278,34 @@ mod parse_request_basic_tests {
 
         let method: String = table.get("method").expect("method should exist");
         assert_eq!(method, "notify", "method should be 'notify'");
+    }
+
+    #[test]
+    fn test_parse_request_contains_date_subtable() {
+        let lua = create_test_lua();
+        let table = parse_request(&lua, SHIORI3_GET_REQUEST).expect("parse_request should succeed");
+
+        // Verify date subtable exists and contains expected fields
+        let date: pasta_lua::mlua::Table = table.get("date").expect("date table should exist");
+
+        // Verify all expected fields exist
+        let year: i32 = date.get("year").expect("date.year should exist");
+        let month: u8 = date.get("month").expect("date.month should exist");
+        let day: u8 = date.get("day").expect("date.day should exist");
+        let hour: u8 = date.get("hour").expect("date.hour should exist");
+        let min: u8 = date.get("min").expect("date.min should exist");
+        let sec: u8 = date.get("sec").expect("date.sec should exist");
+        let _ns: u32 = date.get("ns").expect("date.ns should exist");
+        let _yday: u16 = date.get("yday").expect("date.yday should exist");
+        let _wday: u8 = date.get("wday").expect("date.wday should exist");
+
+        // Sanity checks
+        assert!(year >= 2020 && year <= 2100, "year should be reasonable");
+        assert!(month >= 1 && month <= 12, "month should be 1-12");
+        assert!(day >= 1 && day <= 31, "day should be 1-31");
+        assert!(hour <= 23, "hour should be 0-23");
+        assert!(min <= 59, "min should be 0-59");
+        assert!(sec <= 59, "sec should be 0-59");
     }
 }
 
