@@ -528,19 +528,44 @@ flowchart TB
 
 ```rust
 // 議題 #3 で決定: 既存パターン踏襲
+// 議題 #5 で決定: ヘルパー関数による堅牢化
+
+// tests/common/mod.rs - テスト用ヘルパー
+pub fn copy_pasta_lua_runtime(dest_ghost_master: &Path) -> Result<(), std::io::Error> {
+    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let workspace_root = manifest_dir
+        .parent()
+        .and_then(|p| p.parent())
+        .ok_or_else(|| std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "ワークスペースルートが見つかりません"
+        ))?;
+    
+    let scripts_src = workspace_root.join("crates/pasta_lua/scripts");
+    let scriptlibs_src = workspace_root.join("crates/pasta_lua/scriptlibs");
+    
+    if !scripts_src.exists() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("pasta_lua scripts not found: {:?}", scripts_src)
+        ));
+    }
+    
+    copy_dir_all(&scripts_src, &dest_ghost_master.join("scripts"))?;
+    copy_dir_all(&scriptlibs_src, &dest_ghost_master.join("scriptlibs"))?;
+    
+    Ok(())
+}
+
+// tests/integration_test.rs - 統合テスト
 #[test]
 fn test_sample_ghost_generation() {
     let temp = tempfile::tempdir().unwrap();
     let ghost_root = temp.path().join("hello-pasta");
+    let ghost_master = ghost_root.join("ghost/master");
     
-    // ワークスペースルートから pasta_lua のランタイムをコピー
-    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let workspace_root = manifest_dir.parent().unwrap().parent().unwrap();
-    let scripts_src = workspace_root.join("crates/pasta_lua/scripts");
-    let scriptlibs_src = workspace_root.join("crates/pasta_lua/scriptlibs");
-    
-    copy_dir_all(&scripts_src, &ghost_root.join("ghost/master/scripts")).unwrap();
-    copy_dir_all(&scriptlibs_src, &ghost_root.join("ghost/master/scriptlibs")).unwrap();
+    // pasta_lua ランタイムをコピー（ヘルパー使用）
+    common::copy_pasta_lua_runtime(&ghost_master).unwrap();
     
     // ゴースト生成（画像、設定ファイル、pastaスクリプト）
     pasta_sample_ghost::generate_ghost(&ghost_root, &default_config()).unwrap();
@@ -549,15 +574,17 @@ fn test_sample_ghost_generation() {
     assert!(ghost_root.join("install.txt").exists());
     assert!(ghost_root.join("ghost/master/descript.txt").exists());
     assert!(ghost_root.join("ghost/master/pasta.toml").exists());
+    assert!(ghost_root.join("ghost/master/dic/boot.pasta").exists());
     assert!(ghost_root.join("shell/master/surface0.png").exists());
     assert!(ghost_root.join("shell/master/surface10.png").exists());
 }
 ```
 
 **パス解決の信頼性向上**:
-- `env!("CARGO_MANIFEST_DIR")` → クレートルート
-- `.parent().unwrap().parent().unwrap()` → ワークスペースルート
-- 明示的な `crates/pasta_lua/` パスでワークスペース構成に依存
+- ヘルパー関数 `copy_pasta_lua_runtime()` でエラーハンドリング明示
+- ワークスペースルート取得失敗時に具体的なエラーメッセージ
+- `scripts/scriptlibs` の存在確認を実施
+- CI環境での再現性を保証
 
 ### CI/CD統合
 
