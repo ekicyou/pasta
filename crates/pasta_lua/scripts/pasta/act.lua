@@ -218,4 +218,7 @@ function ACT_IMPL.clear_spot(self)
     end
 end
 
+--- 継承用に実装メタテーブルを公開
+ACT.IMPL = ACT_IMPL
+
 return ACT

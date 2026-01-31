@@ -11,6 +11,7 @@ local specs = {
     "store_save_test",    -- store-save-table feature tests
     "persistence_spec",   -- store-save-persistence feature tests
     "act_impl_call_test", -- ACT_IMPL.call 4段階検索テスト
+    "shiori_act_test",    -- pasta.shiori.act さくらスクリプトビルダーテスト
     -- 将来のテストスイートをここに追加
     -- "code_generator_test",
     -- "context_test",

@@ -10,14 +10,14 @@
 
 ### 1. 親モジュール（pasta.act）の拡張
 
-- [ ] 1.1 ACT_IMPL の公開
+- [x] 1.1 ACT_IMPL の公開
   - `pasta/act.lua` の末尾に `ACT.IMPL = ACT_IMPL` を追加
   - 既存テストで回帰確認（`cargo test` で pasta.act の動作確認）
   - _Requirements: 1_
 
 ### 2. pasta.shiori.act モジュールの基盤構築
 
-- [ ] 2.1 (P) モジュールファイルの作成と骨格実装
+- [x] 2.1 (P) モジュールファイルの作成と骨格実装
   - `crates/pasta_lua/scripts/pasta/shiori/act.lua` を作成
   - モジュールテーブル `SHIORI_ACT` と実装メタテーブル `SHIORI_ACT_IMPL` を定義
   - `require("pasta.act")` で親モジュールを参照
@@ -25,7 +25,7 @@
   - `SHIORI_ACT.IMPL = SHIORI_ACT_IMPL` で公開
   - _Requirements: 1, 8_
 
-- [ ] 2.2 (P) コンストラクタの実装
+- [x] 2.2 (P) コンストラクタの実装
   - `SHIORI_ACT.new(ctx)` を実装
   - `ACT.new(ctx)` を呼び出してベースインスタンスを生成
   - `_buffer` フィールド（空テーブル）を追加
@@ -36,13 +36,13 @@
 
 ### 3. さくらスクリプトタグ生成メソッドの実装
 
-- [ ] 3.1 (P) バッファ操作メソッドの実装
+- [x] 3.1 (P) バッファ操作メソッドの実装
   - `build()`: `_buffer` を `table.concat()` で結合し、末尾に `\e` を追加して返却
   - `reset()`: `_buffer` を空テーブルにリセット、`_current_scope` を nil にリセット
   - メソッドチェーン対応（`return self`）
   - _Requirements: 6, 7_
 
-- [ ] 3.2 (P) 基本タグ生成メソッドの実装
+- [x] 3.2 (P) 基本タグ生成メソッドの実装
   - `surface(id)`: `\s[id]` をバッファに追加（数値・文字列両対応）
   - `wait(ms)`: `\w[ms]` をバッファに追加（負数は 0 に補正）
   - `newline(n)`: `\n` を n 回バッファに追加（デフォルト n=1、n<1 時は何もしない）
@@ -50,7 +50,7 @@
   - メソッドチェーン対応（`return self`）
   - _Requirements: 4, 5_
 
-- [ ] 3.3 talk メソッドのオーバーライド実装
+- [x] 3.3 talk メソッドのオーバーライド実装
   - `talk(actor, text)` メソッドを実装
   - `actor.spot` からスコープ番号を決定（`"sakura"` → 0, `"kero"` → 1, `"char<N>"` → N）
   - `_current_scope` と異なる場合: スコープタグ（`\0`, `\1`, `\p[N]`）とスコープ切り替え時の改行を追加
@@ -63,39 +63,39 @@
 
 ### 4. テストの実装
 
-- [ ] 4.1 継承検証テストの作成
+- [x] 4.1 継承検証テストの作成
   - `crates/pasta_lua/tests/lua_specs/shiori_act_spec.lua` を作成
   - 親クラスメソッド（`sakura_script()` 等）の継承動作を検証
   - `SHIORI_ACT_IMPL` のメタテーブルチェーンが正しく設定されていることを確認
   - _Requirements: 9_
 
-- [ ] 4.2 (P) talk メソッドのテスト
+- [x] 4.2 (P) talk メソッドのテスト
   - スコープ切り替え動作を検証（actor 変更時にスコープタグと改行が発行される）
   - 同一 actor での連続 `talk()` でスコープタグが再発行されないことを確認
   - スコープタグのパターン検証（`\0`, `\1`, `\p[2]` 等）
   - _Requirements: 9_
 
-- [ ] 4.3 (P) タグ生成メソッドのテスト
+- [x] 4.3 (P) タグ生成メソッドのテスト
   - `surface(5)` → `\s[5]\e`, `surface("smile")` → `\s[smile]\e`
   - `wait(500)` → `\w[500]\e`
   - `newline()` → `\n\e`, `newline(3)` → `\n\n\n\e`
   - `clear()` → `\c\e`
   - _Requirements: 9_
 
-- [ ] 4.4 (P) エスケープ処理のテスト
+- [x] 4.4 (P) エスケープ処理のテスト
   - バックスラッシュ（`\` → `\\`）のエスケープ検証
   - パーセント（`%` → `%%`）のエスケープ検証
   - 複数特殊文字の組み合わせ検証
   - _Requirements: 9_
 
-- [ ] 4.5 (P) build/reset メソッドのテスト
+- [x] 4.5 (P) build/reset メソッドのテスト
   - `build()` が `\e` 終端を付与することを検証
   - 空バッファ時に `\e` のみ返却されることを確認
   - `reset()` がバッファとスコープをクリアすることを検証
   - メソッドチェーンの動作を確認
   - _Requirements: 9_
 
-- [ ] 4.6 (P) E2Eシナリオテスト
+- [x] 4.6 (P) E2Eシナリオテスト
   - 複数メソッドを組み合わせた実践的なスクリプト生成を検証
   - 例: `act:talk(sakura, "こんにちは"):surface(5):wait(500):talk(kero, "やあ"):build()`
   - 生成されたさくらスクリプトが期待通りの構造であることを確認
@@ -103,11 +103,11 @@
 
 ### 5. ドキュメント整合性の確認と更新
 
-- [ ] 5.1 実装完了後のドキュメント整合性確認
+- [x] 5.1 実装完了後のドキュメント整合性確認
   - SOUL.md - コアバリュー・設計原則との整合性確認（SHIORI基盤の提供、日本語フレンドリー）
   - SPECIFICATION.md - 言語仕様の更新（該当なし）
   - GRAMMAR.md - 文法リファレンスの同期（該当なし）
-  - TEST_COVERAGE.md - 新規テストのマッピング追加（`shiori_act_spec.lua`）
+  - TEST_COVERAGE.md - 新規テストのマッピング追加（`shiori_act_test.lua`）
   - クレート README - API変更の反映（`pasta_lua/README.md` に `pasta.shiori.act` 追加の検討）
   - steering/* - 該当領域のステアリング更新（lua-coding.md の整合性確認）
   - 特にコアバリュー（日本語フレンドリー、SHIORI 対応）への影響を確認

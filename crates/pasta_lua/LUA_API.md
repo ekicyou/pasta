@@ -11,6 +11,7 @@ pasta_lua クレートが Rust 側から Lua VM に公開しているモジュ�
 5. [@pasta_config モジュール](#5-pasta_config-モジュール)
 6. [pasta.finalize_scene 関数](#6-pastafinalize_scene-関数)
 7. [mlua-stdlib 統合モジュール](#7-mlua-stdlib-統合モジュール)
+8. [SHIORI EVENT ハンドラ](#8-shiori-event-ハンドラ)
 
 ---
 
@@ -24,6 +25,14 @@ pasta_lua クレートが Rust 側から Lua VM に公開しているモジュ�
 | `@pasta_persistence` | 永続化系 | 0.1.0 | セーブデータの保存・読み込み |
 | `@enc` | エンコーディング系 | 0.1.0 | UTF-8 ⇔ ANSI 文字コード変換 |
 | `@pasta_config` | 設定系 | — | pasta.toml のカスタムフィールドへのアクセス |
+
+### SHIORI 系モジュール
+
+| モジュール名 | カテゴリ | 説明 |
+|-------------|----------|------|
+| `pasta.shiori.event` | イベント系 | SHIORI/3.0 イベントディスパッチ |
+| `pasta.shiori.event.register` | イベント系 | イベントハンドラ登録テーブル (REG) |
+| `pasta.shiori.res` | レスポンス系 | SHIORI/3.0 レスポンス生成 (RES) |
 
 ### mlua-stdlib 統合モジュール
 
@@ -706,8 +715,259 @@ let config = RuntimeConfig {
 
 ---
 
+## 8. SHIORI EVENT ハンドラ
+
+SHIORI/3.0 プロトコルにおけるイベントハンドリング機構を提供するモジュール群です。
+
+### 8.1 概要
+
+SSP (ベースウェア) からの SHIORI/3.0 リクエストを受け取り、Lua 関数で処理するための機構を提供します。
+
+```mermaid
+graph LR
+    SSP[SSP] -->|"SHIORI/3.0 request"| SHIORI[pasta_shiori]
+    SHIORI --> EVENT[EVENT.fire]
+    EVENT --> REG[REG テーブル]
+    EVENT --> SCENE[SCENE.search]
+    EVENT --> RES[RES モジュール]
+    RES -->|"SHIORI/3.0 response"| SSP
+```
+
+### 8.2 REG テーブルへの登録
+
+イベントハンドラは `pasta.shiori.event.register` (REG テーブル) に登録します。
+
+```lua
+local REG = require("pasta.shiori.event.register")
+local RES = require("pasta.shiori.res")
+
+-- イベントハンドラの登録
+REG.OnBoot = function(req)
+    return RES.ok("\\h\\s[0]起動しました。\\e")
+end
+
+REG.OnClose = function(req)
+    return RES.ok("\\h\\s[0]終了します。\\e")
+end
+```
+
+### 8.3 サポートイベント一覧
+
+#### 8.3.1 OnFirstBoot — 初回起動
+
+ゴーストが初めて起動されたとき、またはバニッシュから復帰したときに発火します。
+
+| Reference | 型 | 説明 |
+|-----------|-----|------|
+| `req.reference[0]` | string | バニッシュ復帰フラグ ("0": 初回, "1": 復帰) |
+
+```lua
+REG.OnFirstBoot = function(req)
+    local is_vanish_return = req.reference[0] == "1"
+    if is_vanish_return then
+        return RES.ok("\\h\\s[0]帰ってきたわ。\\e")
+    end
+    return RES.ok("\\h\\s[0]はじめまして。\\e")
+end
+```
+
+#### 8.3.2 OnBoot — 通常起動
+
+ゴーストが起動されるたびに発火します。
+
+| Reference | 型 | 説明 |
+|-----------|-----|------|
+| `req.reference[0]` | string | シェル名 |
+| `req.reference[6]` | string | シェルパス |
+| `req.reference[7]` | string | ゴーストパス |
+
+```lua
+REG.OnBoot = function(req)
+    local shell_name = req.reference[0]
+    return RES.ok("\\h\\s[0]起動しました。シェル: " .. (shell_name or "不明") .. "\\e")
+end
+```
+
+#### 8.3.3 OnClose — 終了
+
+ゴーストが終了するときに発火します。
+
+| Reference | 型 | 説明 |
+|-----------|-----|------|
+| `req.reference[0]` | string | 終了理由 ("user", "shutdown" 等) |
+
+```lua
+REG.OnClose = function(req)
+    local reason = req.reference[0]
+    if reason == "user" then
+        return RES.ok("\\h\\s[0]またね。\\e")
+    end
+    return RES.ok("\\h\\s[0]終了します。\\e")
+end
+```
+
+#### 8.3.4 OnGhostChanged — ゴースト切り替え
+
+他のゴーストに切り替わるときに発火します。
+
+| Reference | 型 | 説明 |
+|-----------|-----|------|
+| `req.reference[0]` | string | 切り替え先ゴースト名 |
+| `req.reference[1]` | string | 切り替え元ゴースト名 |
+
+```lua
+REG.OnGhostChanged = function(req)
+    local to_ghost = req.reference[0]
+    return RES.ok("\\h\\s[0]" .. (to_ghost or "別のゴースト") .. "に交代するわ。\\e")
+end
+```
+
+#### 8.3.5 OnSecondChange — 毎秒
+
+毎秒発火します（高頻度）。
+
+| Reference | 型 | 説明 |
+|-----------|-----|------|
+| `req.reference[0]` | string | 現在秒 (0-59) |
+| `req.reference[1]` | string | 累積秒 |
+
+```lua
+REG.OnSecondChange = function(req)
+    -- 通常は空応答（alpha02 で仮想イベント発行に利用予定）
+    return RES.no_content()
+end
+```
+
+#### 8.3.6 OnMinuteChange — 毎分
+
+毎分発火します。
+
+| Reference | 型 | 説明 |
+|-----------|-----|------|
+| `req.reference[0]` | string | 現在分 (0-59) |
+| `req.reference[1]` | string | 現在時 (0-23) |
+
+```lua
+REG.OnMinuteChange = function(req)
+    local minute = req.reference[0]
+    local hour = req.reference[1]
+    -- 正時のみ時報
+    if minute == "0" then
+        return RES.ok("\\h\\s[0]" .. hour .. "時よ。\\e")
+    end
+    return RES.no_content()
+end
+```
+
+#### 8.3.7 OnMouseDoubleClick — ダブルクリック
+
+キャラクターをダブルクリックしたときに発火します。
+
+| Reference | 型 | 説明 |
+|-----------|-----|------|
+| `req.reference[0]` | string | スコープ ("0": sakura, "1": kero) |
+| `req.reference[4]` | string | 当たり判定 ID |
+
+```lua
+REG.OnMouseDoubleClick = function(req)
+    local scope = req.reference[0]
+    local hit_area = req.reference[4]
+    if scope == "0" then
+        return RES.ok("\\h\\s[0]なあに？\\e")
+    else
+        return RES.ok("\\u\\s[0]呼んだ？\\e")
+    end
+end
+```
+
+### 8.4 RES レスポンス生成
+
+`pasta.shiori.res` モジュールは SHIORI/3.0 レスポンス文字列を生成します。
+
+```lua
+local RES = require("pasta.shiori.res")
+```
+
+| 関数 | 説明 | 生成されるステータス |
+|------|------|---------------------|
+| `RES.ok(value)` | 成功レスポンス + Value | 200 OK |
+| `RES.ok_with(headers)` | 成功レスポンス + 複数ヘッダ | 200 OK |
+| `RES.no_content()` | 空レスポンス | 204 No Content |
+| `RES.err(message)` | エラーレスポンス | 500 Internal Server Error |
+
+#### 使用例
+
+```lua
+-- 基本的な応答
+return RES.ok("\\h\\s[0]こんにちは\\e")
+
+-- 空応答（イベントを処理したが表示なし）
+return RES.no_content()
+
+-- エラー応答
+return RES.err("設定ファイルが見つかりません")
+```
+
+### 8.5 シーン関数フォールバック
+
+REG テーブルにハンドラが登録されていない場合、`SCENE.search` でグローバルシーンを検索します。
+
+```mermaid
+graph TD
+    A[EVENT.fire] --> B{REG[req.id] 存在?}
+    B -->|Yes| C[ハンドラ実行]
+    B -->|No| D[EVENT.no_entry]
+    D --> E{SCENE.search}
+    E -->|見つかった| F[シーン関数実行]
+    E -->|見つからない| G[204 No Content]
+    F --> H[204 No Content]
+```
+
+Pasta スクリプトで定義したシーンは、イベント名と同じグローバルシーン名で検索されます：
+
+```
+＊OnBoot
+こんにちは。
+```
+
+上記のシーンは `OnBoot` イベントで REG ハンドラがない場合に自動的に呼び出されます（alpha01 では 204 固定応答、alpha03 でさくらスクリプト生成予定）。
+
+### 8.6 エラーハンドリング
+
+イベントハンドラ実行時の例外は `xpcall` でキャッチされ、`RES.err()` でエラーレスポンスが生成されます。
+
+```lua
+REG.OnBoot = function(req)
+    -- エラーが発生した場合
+    error("何かがおかしい")
+    -- → SHIORI/3.0 500 Internal Server Error
+end
+```
+
+シーン関数フォールバック時も同様に `pcall` でエラーがキャッチされます。
+
+### 8.7 Reference パラメータへのアクセス
+
+`req.reference` テーブルで SHIORI Reference ヘッダにアクセスできます。
+
+```lua
+-- 0始まりインデックス
+local ref0 = req.reference[0]  -- Reference0 の値
+local ref1 = req.reference[1]  -- Reference1 の値
+-- ...
+local ref7 = req.reference[7]  -- Reference7 の値
+
+-- 存在しない Reference は nil
+if req.reference[5] == nil then
+    print("Reference5 は送信されていません")
+end
+```
+
+---
+
 ## 更新履歴
 
 | 日付 | バージョン | 変更内容 |
 |------|------------|----------|
 | 2026-01-27 | 1.0.0 | 初版作成 |
+| 2026-01-27 | 1.1.0 | SHIORI EVENT ハンドラセクション追加 |

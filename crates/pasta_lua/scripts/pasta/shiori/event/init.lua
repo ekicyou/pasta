@@ -3,7 +3,8 @@
 ---
 --- SHIORI リクエストのイベント ID に応じてハンドラを呼び分ける。
 --- 未登録イベントはデフォルトハンドラ（no_entry）で処理する。
---- エラー発生時は xpcall でキャッチし、エラーレスポンスに変換する。
+--- no_entry ではシーン関数フォールバックを試み、見つからなければ 204 を返す。
+--- エラー発生時は xpcall/pcall でキャッチし、エラーレスポンスに変換する。
 ---
 --- ハンドラシグネチャ:
 ---   function(req: table) -> string
@@ -38,6 +39,11 @@
 --- end
 --- ```
 ---
+--- シーン関数フォールバック（alpha01）:
+--- REG にハンドラが未登録の場合、SCENE.search(req.id) でグローバルシーンを検索。
+--- 見つかった場合はシーン関数を実行（alpha01 では戻り値無視、204 返却）。
+--- alpha03 で act オブジェクト生成・さくらスクリプト変換を統合予定。
+---
 --- テスト用reqテーブル:
 --- ```lua
 --- local test_req = {
@@ -61,9 +67,31 @@ local EVENT = {}
 -- 3. 公開関数
 
 --- デフォルトハンドラ（未登録イベント用）
+--- シーン関数フォールバックを試み、見つからなければ 204 No Content を返す。
 --- @param req table リクエストテーブル
---- @return string SHIORI レスポンス（204 No Content）
+--- @return string SHIORI レスポンス（204 No Content または 500 Error）
 function EVENT.no_entry(req)
+    -- シーン関数をイベント名で検索（遅延ロードで循環参照回避）
+    local SCENE = require("pasta.scene")
+    local scene_result = SCENE.search(req.id, nil, nil)
+
+    if scene_result then
+        -- シーン関数が見つかった場合、pcall で実行
+        -- alpha01: 戻り値は無視、204 No Content を返す
+        -- alpha03: act オブジェクト生成、さくらスクリプト変換を統合予定
+        local ok, err = pcall(function()
+            return scene_result()
+        end)
+        if not ok then
+            -- シーン関数実行時のエラーは 500 で返す
+            local err_msg = err
+            if type(err) == "string" then
+                err_msg = err:match("^[^\n]+") or err
+            end
+            return RES.err(err_msg)
+        end
+    end
+
     return RES.no_content()
 end
 

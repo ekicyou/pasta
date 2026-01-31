@@ -67,6 +67,7 @@
 | STORE.save/CTX注入       | `store_save_test.lua`        | ✅ 完了 | 永続変数・参照同一性 |
 | SHIORIレスポンスビルダー | `shiori_res_test.rs`         | ✅ 完了 | 14テスト             |
 | SHIORIイベントディスパッチ | `shiori_event_test.rs`     | ✅ 完了 | 16テスト（新規）     |
+| SHIORI_ACT さくらスクリプト生成 | `shiori_act_test.lua`     | ✅ 完了 | 40テスト（新規）     |
 | RuntimeConfig libs配列   | `runtime::tests`             | ✅ 完了 | 17テスト（新規）     |
 | LuaConfig TOML設定       | `loader::config::tests`      | ✅ 完了 | 6テスト（新規）      |
 
@@ -143,9 +144,9 @@
 | クレート     | テスト数 | パス    | 失敗  | カバレッジ評価 |
 | ------------ | -------- | ------- | ----- | -------------- |
 | pasta_core   | 94       | 94      | 0     | ⭐⭐⭐⭐⭐ 優秀     |
-| pasta_lua    | 312      | 312     | 0     | ⭐⭐⭐⭐⭐ 優秀     |
+| pasta_lua    | 352      | 352     | 0     | ⭐⭐⭐⭐⭐ 優秀     |
 | pasta_shiori | 28       | 28      | 0     | ⭐⭐⭐⭐⭐ 優秀     |
-| **合計**     | **546**  | **546** | **0** | **100%パス率** |
+| **合計**     | **586**  | **586** | **0** | **100%パス率** |
 
 ---
 

@@ -10,61 +10,61 @@
 
 ## タスク一覧
 
-- [ ] 1. EVENT.no_entry にシーン関数フォールバック機構を実装
-- [ ] 1.1 (P) シーン関数検索ロジックの実装
+- [x] 1. EVENT.no_entry にシーン関数フォールバック機構を実装
+- [x] 1.1 (P) シーン関数検索ロジックの実装
   - `SCENE.search(req.id, nil, nil)` でグローバルシーン検索
   - シーン関数が見つかった場合は pcall で実行
   - エラー発生時は `RES.err(err)` を返却
   - シーン関数未発見時は `RES.no_content()` を返却（従来動作）
   - _Requirements: 7_
 
-- [ ] 1.2 (P) エラーハンドリングの検証
+- [x] 1.2 (P) エラーハンドリングの検証
   - pcall でシーン関数実行時の例外をキャッチ
   - エラーメッセージを RES.err で包んで返却
   - 既存の xpcall（EVENT.fire）との一貫性確認
   - _Requirements: 7, 4_
 
-- [ ] 2. 7種イベントのテスト拡張
-- [ ] 2.1 (P) OnFirstBoot/OnBoot/OnClose イベントテスト
+- [x] 2. 7種イベントのテスト拡張
+- [x] 2.1 (P) OnFirstBoot/OnBoot/OnClose イベントテスト
   - OnFirstBoot: Reference0（バニッシュ復帰フラグ "0"/"1"）の解析確認
   - OnBoot: Reference0（シェル名）、Reference6（シェルパス）、Reference7（ゴーストパス）の解析確認
   - OnClose: Reference0（終了理由 "user"/"shutdown"）の解析確認
   - ハンドラ登録・呼び出し・レスポンス検証
   - _Requirements: 1, 2, 3, 6_
 
-- [ ] 2.2 (P) OnGhostChanged/OnSecondChange/OnMinuteChange イベントテスト
+- [x] 2.2 (P) OnGhostChanged/OnSecondChange/OnMinuteChange イベントテスト
   - OnGhostChanged: Reference0（切り替え先）、Reference1（切り替え元）の解析確認
   - OnSecondChange: Reference0（現在秒）、Reference1（累積秒）の解析確認
   - OnMinuteChange: Reference0（現在分）、Reference1（現在時）の解析確認
   - ハンドラ登録・呼び出し・レスポンス検証
   - _Requirements: 1, 2, 3, 6_
 
-- [ ] 2.3 (P) OnMouseDoubleClick イベントテスト
+- [x] 2.3 (P) OnMouseDoubleClick イベントテスト
   - Reference0（スコープ 0: sakura, 1: kero）の解析確認
   - Reference4（当たり判定 ID）の解析確認
   - ハンドラ登録・呼び出し・レスポンス検証
   - _Requirements: 1, 2, 3, 6_
 
-- [ ] 2.4 未登録イベントのフォールバックテスト
+- [x] 2.4 未登録イベントのフォールバックテスト
   - REG テーブル未登録時に 204 No Content が返されることを確認
   - 既存の基本動作テストとの一貫性確認
   - _Requirements: 2, 4_
 
-- [ ] 2.5 (P) シーン関数フォールバックテスト
+- [x] 2.5 (P) シーン関数フォールバックテスト
   - `＊OnBoot` 等のグローバルシーンが検索・実行されることを確認
   - シーン関数実行時のエラーハンドリング確認
   - シーン関数未発見時の 204 No Content 返却確認
   - alpha01 では戻り値無視・204 返却を確認（alpha03 統合は将来）
   - _Requirements: 6, 7_
 
-- [ ] 2.6 (P) エラーハンドリングテスト
+- [x] 2.6 (P) エラーハンドリングテスト
   - ハンドラ実行時例外のキャッチ・500 レスポンス生成確認
   - traceback 情報の RES.err 包含確認
   - xpcall（EVENT.fire）と pcall（EVENT.no_entry）の整合性確認
   - _Requirements: 2, 4, 6_
 
-- [ ] 3. LUA_API.md に SHIORI EVENT セクションを追加
-- [ ] 3.1 (P) セクション 2: SHIORI EVENT ハンドラの執筆
+- [x] 3. LUA_API.md に SHIORI EVENT セクションを追加
+- [x] 3.1 (P) セクション 2: SHIORI EVENT ハンドラの執筆
   - 2.1 概要: SHIORI/3.0 イベントハンドリング機構の説明
   - 2.2 REG テーブルへの登録: ハンドラ関数登録方法とサンプルコード
   - 2.3 サポートイベント一覧: 7種イベントの発火タイミング・Reference 意味・応答サンプル
@@ -73,20 +73,20 @@
   - 2.6 エラーハンドリング: xpcall/pcall によるエラーキャッチと RES.err 使用
   - _Requirements: 8_
 
-- [ ] 3.2 (P) Reference パラメータ仕様の記載
+- [x] 3.2 (P) Reference パラメータ仕様の記載
   - 各イベントの Reference0～Reference7 の意味を明記
   - OnFirstBoot/OnBoot/OnClose/OnGhostChanged/OnSecondChange/OnMinuteChange/OnMouseDoubleClick 各々の Reference 構造をテーブル化
   - `req.reference[n]` アクセス方法とサンプルコード
   - _Requirements: 3, 8_
 
-- [ ] 3.3 (P) スタブ応答サンプルコードの追加
+- [x] 3.3 (P) スタブ応答サンプルコードの追加
   - OnFirstBoot/OnBoot/OnClose/OnGhostChanged/OnMouseDoubleClick の応答例
   - OnSecondChange/OnMinuteChange の空応答例（alpha02 での仮想イベント発行への言及）
   - RES モジュール API の使用パターン
   - alpha03（さくらスクリプト組み立て）との将来統合を想定したコメント
   - _Requirements: 5, 8_
 
-- [ ] 4. ドキュメント整合性の確認と更新
+- [x] 4. ドキュメント整合性の確認と更新
   - SOUL.md: コアバリュー・設計原則との整合性確認（SHIORI基盤として適合）
   - SPECIFICATION.md: 言語仕様への影響なし（Lua側実装のみ）
   - GRAMMAR.md: 文法リファレンスへの影響なし
@@ -130,9 +130,9 @@
 
 ## 実装完了後のチェックリスト
 
-- [ ] `cargo test --all` が成功
-- [ ] 既存の 470 行テストスイート（shiori_event_test.rs）にリグレッションなし
-- [ ] 7種イベント各々のテストケースが追加されている
-- [ ] LUA_API.md に SHIORI EVENT セクションが追加されている
-- [ ] TEST_COVERAGE.md に新規テストがマッピングされている
-- [ ] spec.json の phase が "implementation-complete" に更新されている
+- [x] `cargo test --all` が成功
+- [x] 既存の 470 行テストスイート（shiori_event_test.rs）にリグレッションなし
+- [x] 7種イベント各々のテストケースが追加されている
+- [x] LUA_API.md に SHIORI EVENT セクションが追加されている
+- [x] TEST_COVERAGE.md に新規テストがマッピングされている
+- [x] spec.json の phase が "implementation-complete" に更新されている
