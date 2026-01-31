@@ -49,20 +49,29 @@
 
 1. The `pasta.shiori.act` shall `act:yield()` メソッドをオーバーライドする
 2. When `yield()` が呼び出された場合, the メソッド shall 以下を順番に実行する:
-   - `local script = self:build()` でさくらスクリプトを構築（`\e` 終端付き）
-   - `self:reset()` でバッファをリセット
-   - `local rc = coroutine.yield(script)` でスクリプトをyield
+   - `local rc = coroutine.yield(self:build())` でスクリプトをyield（build内で自動リセット）
    - `self._resume_value = rc` でレジューム値を保存
    - `return rc` でレジューム値を返す
 3. The `_resume_value` フィールド shall yieldから戻った値を保持し、次回アクセス可能とする
-4. If `yield()` がコルーチン外で呼び出された場合, the メソッド shall エラーを発生させる
+4. If `yield()` がコルーチン外で呼び出された場合, the メソッド shall エラーを発生させる（Luaネイティブエラー）
 5. The 既存の `ACT_IMPL.yield()` との互換性 shall トークンベースではなく、さくらスクリプト文字列をyieldする点が異なる
+
+### Requirement 1.1: build()メソッドの自動リセット
+
+**Objective:** As a 開発者, I want `act:build()`でスクリプト構築後に自動リセットしたい, so that 次のスクリプト構築がクリーンな状態で始まる
+
+#### Acceptance Criteria
+
+1. The `build()` メソッド shall さくらスクリプト文字列を構築して返す（既存動作）
+2. The `build()` メソッド shall 文字列返却前に `self:reset()` を呼び出してバッファをリセットする
+3. The 設計方針 shall 「build = 構築して吐き出す（副作用込み）」とする
+4. The 既存テスト shall build()後のバッファ状態検証を更新する（空になることを期待）
 
 ---
 
 ### Requirement 2: init_script メソッド
 
-**Objective:** As a 開発者, I want `act:init_script()`でさくらスクリプト組み立て状態を初期化したい, so that yield後やコンストラクタで明確に初期化できる
+**Objective:** As a 開発者, I want `act:init_script()`でさくらスクリプト組み立て状態を初期化したい, so that コンストラクタや手動リセット時に明確に初期化できる
 
 #### Acceptance Criteria
 
@@ -73,7 +82,9 @@
    - `self._resume_value = nil` でレジューム値をリセット
 3. The メソッド shall メソッドチェーン可能（`return self`）とする
 4. The `SHIORI_ACT.new()` コンストラクタ shall 内部で `init_script()` を呼び出して初期化を統一する
-5. The 既存 `reset()` メソッドとの違い shall `reset()`はバッファとスコープのみリセット、`init_script()`は`_resume_value`も含む完全初期化
+5. The 用途 shall コンストラクタでの初期化、および手動での完全リセット（`_resume_value`含む）
+
+**Note:** `build()` は自動で `reset()` を呼ぶため、通常のyield後リセットは不要。`init_script()` は `_resume_value` も含む完全初期化が必要な場合に使用。
 
 ---
 
@@ -179,7 +190,7 @@ SHIORI_ACT_IMPL.surface(self, id) → self
 SHIORI_ACT_IMPL.wait(self, ms) → self
 SHIORI_ACT_IMPL.newline(self, n) → self
 SHIORI_ACT_IMPL.clear(self) → self
-SHIORI_ACT_IMPL.build(self) → string
+SHIORI_ACT_IMPL.build(self) → string  -- ★自動リセット追加（破壊的変更）
 SHIORI_ACT_IMPL.reset(self) → self
 
 -- pasta.act (継承元)
