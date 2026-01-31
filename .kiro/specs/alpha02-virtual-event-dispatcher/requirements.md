@@ -110,7 +110,7 @@ pasta.shiori.event.virtual_dispatcher モジュール
 #### Acceptance Criteria
 
 1. The virtual_dispatcher shall Rust 側から提供される `req.date` テーブルを使用して時刻判定を行う
-2. The Rust 側 shall OnSecondChange リクエストに以下のフィールドを持つ `req.date` テーブルを付与する（既存実装に準拠）:
+2. The Rust 側 shall OnSecondChange リクエストに以下のフィールドを持つ `req.date` テーブルを付与する（**実装済み**: `pasta_shiori/src/lua_request.rs::parse_request()` L54で`lua_date()`により生成）:
    - `year` - 年（整数）
    - `month` - 月（1-12）
    - `day` - 日（1-31）

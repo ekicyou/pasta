@@ -351,7 +351,13 @@ local function execute_scene(event_name)
     
     local ok, result = pcall(scene_fn)
     if not ok then
-        -- エラーログ出力（将来的に）
+        -- エラーログ出力（既存EVENT.no_entry()パターンに準拠）
+        -- 将来的にはtracing/loggingモジュールに切り替え予定
+        local err_msg = result
+        if type(result) == "string" then
+            err_msg = result:match("^[^\n]+") or result
+        end
+        print("[virtual_dispatcher] Scene execution error (" .. event_name .. "): " .. tostring(err_msg))
         return nil
     end
     
@@ -545,6 +551,8 @@ local cached_config = nil     -- 設定キャッシュ
 | `cached_config` | table\|nil | nil | ✗ | 設定キャッシュ |
 
 ### 5.2 Time Model (req.date)
+
+**Rust側実装確認済み**: `pasta_shiori/src/lua_request.rs::parse_request()` L54で`lua_date()`により生成。全てのSHIORI REQUESTに自動付与される。
 
 ```lua
 ---@class ReqDate
