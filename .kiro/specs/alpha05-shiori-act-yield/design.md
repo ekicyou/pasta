@@ -151,7 +151,8 @@ end
 ```
 
 **破壊的変更の影響**:
-- 既存テストで `build()` を複数回呼ぶケースは修正が必要
+- `build()` を複数回呼ぶテスト: 修正が必要（2回目は空文字列+`\e`）
+- スポット切り替え改行: 既存の固定`\n`を`\n[percent]`に置き換え（テスト期待値更新）
 - 新しい期待: `build()` 後は `_buffer` が空、`_current_spot` が nil
 
 ---
@@ -227,15 +228,11 @@ function SHIORI_ACT_IMPL.talk(self, actor, text)
     local spot_id = spot_to_id(actor.spot)
     
     if self._current_spot ~= spot_id then
-        -- [既存ロジック] 既存トークがあれば改行を追加
-        if self._current_spot ~= nil then
-            table.insert(self._buffer, "\\n")
-        end
-        
         -- スポットタグを先に挿入
         table.insert(self._buffer, spot_to_tag(spot_id))
         
-        -- [新規] スポット切り替え時の段落区切り改行（スポットタグの後）
+        -- スポット切り替え時の段落区切り改行（スポットタグの後）
+        -- 既存の固定改行(\n)を設定可能な\n[percent]に置き換え
         if self._current_spot ~= nil and self._spot_switch_newlines > 0 then
             local percent = math.floor(self._spot_switch_newlines * 100)
             table.insert(self._buffer, string.format("\\n[%d]", percent))
@@ -257,14 +254,14 @@ end
 ```
 
 **出力例**:
-| 設定値 | 出力タグ | 改行幅 | 備考 |
-|--------|----------|--------|------|
-| 0 | `\n\p[ID]` | 既存改行のみ | 段落区切りなし |
-| 1.0 | `\n\p[ID]\n[100]` | 既存改行 + 1行 | 合計2行相当 |
-| 1.5 | `\n\p[ID]\n[150]` | 既存改行 + 1.5行 | 合計2.5行相当 |
-| 2.0 | `\n\p[ID]\n[200]` | 既存改行 + 2行 | 合計3行相当 |
+| 設定値 | 出力タグ | 改行幅 |
+|--------|----------|--------|
+| 0 | `\p[ID]` | 改行なし |
+| 1.0 | `\p[ID]\n[100]` | 1行 |
+| 1.5 | `\p[ID]\n[150]` | 1.5行 |
+| 2.0 | `\p[ID]\n[200]` | 2行 |
 
-**注**: 既存ロジック（`_current_spot != nil`時に`\n`挿入）を保持し、スポット切り替え改行は追加的に挿入される。
+**注**: 既存の固定改行(`\n`)を削除し、設定可能な段落区切り改行(`\n[percent]`)に置き換える。
 
 ---
 
