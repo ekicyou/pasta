@@ -3,7 +3,7 @@
     "created_at": "2026-01-31T00:00:00Z",
     "updated_at": "2026-01-31T00:00:00Z",
     "language": "ja",
-    "phase": "tasks-generated",
+    "phase": "implemented",
     "approvals": {
         "requirements": {
             "generated": true,
@@ -16,7 +16,12 @@
         "tasks": {
             "generated": true,
             "approved": true
+        },
+        "implementation": {
+            "completed": true,
+            "validated": true
         }
     },
-    "ready_for_implementation": true
+    "ready_for_implementation": false,
+    "implementation_complete": true
 }
