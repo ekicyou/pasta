@@ -282,11 +282,15 @@ print(config.user_data.nested.inner)  -- "data"
 debug_mode = true
 ```
 
-### 案B: 推奨構成（Cargo.toml風メタデータ付き） ✅ 採用
+### 案B: 推奨構成 ✅ 採用
+
+**理由**: 
+- 将来的な pasta_lua 拡張用サンプルとして `[package]` を含める
+- 伺かゴーストでは `[package]` は省略可能（install.txt/readme.txt で代替）
 
 ```toml
-# === パッケージメタデータ ===
-# Cargo.toml の [package] セクションを参考にした構造
+# === パッケージメタデータ（省略可能） ===
+# 将来的な pasta_lua 拡張（ノベルゲーム等）用サンプル
 [package]
 name = "hello-pasta"
 version = "0.1.0"
