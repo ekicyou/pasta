@@ -26,33 +26,37 @@
 
 #### Acceptance Criteria
 
-1. The alpha04-sample-ghost shall 以下のディレクトリ構成を定義する:
+1. The alpha04-sample-ghost shall 専用クレートとして以下のディレクトリ構成を定義する:
    ```
-   examples/sample-ghost/
-   └── hello-pasta/            # ゴーストID
-       ├── install.txt         # インストール設定
-       ├── readme.txt          # 説明ファイル
-       ├── thumbnail.png       # サムネイル画像
-       ├── ghost/
-       │   └── master/
-       │       ├── pasta.toml  # pasta 設定ファイル
-       │       ├── dic/        # Pasta DSL スクリプト
-       │       │   ├── boot.pasta  # 起動・終了トーク
-       │       │   ├── talk.pasta  # ランダムトーク
-       │       │   └── click.pasta # クリック反応
-       │       └── scripts/    # Lua スクリプト
-       │           └── pasta/shiori/ # SHIORI エントリーポイント
-       └── shell/
-           └── master/         # シェル（見た目）
-               ├── descript.txt    # シェル設定
-               ├── surfaces.txt    # サーフェス定義
-               ├── surface0.png    # sakura 通常
-               ├── surface1.png    # sakura 笑顔
-               └── ...
+   crates/pasta_sample_ghost/     # 専用クレート（pasta_luaから責務分離）
+   ├── Cargo.toml                 # クレート設定
+   ├── README.md                  # クレート説明
+   ├── src/
+   │   └── lib.rs                 # シェル画像生成ロジック
+   ├── tests/
+   │   └── integration_test.rs    # 統合テスト
+   ├── install.txt                # インストール設定
+   ├── readme.txt                 # 説明ファイル
+   ├── pasta.toml                 # pasta 設定ファイル
+   ├── ghost/
+   │   └── master/
+   │       ├── descript.txt       # ゴースト設定（ukadoc準拠）
+   │       └── dic/               # Pasta DSL スクリプト
+   │           ├── boot.pasta     # 起動・終了トーク
+   │           ├── talk.pasta     # ランダムトーク
+   │           └── click.pasta    # クリック反応
+   └── shell/
+       └── master/                # シェル（見た目）
+           ├── descript.txt       # シェル設定（ukadoc準拠）
+           ├── surfaces.txt       # サーフェス定義
+           ├── surface0.png       # sakura 通常（build時生成）
+           ├── surface1.png       # sakura 笑顔（build時生成）
+           └── ...                # surface0-8, surface10-18
    ```
 2. The alpha04-sample-ghost shall 各ファイルのテンプレート内容を定義する
 3. The alpha04-sample-ghost shall install.txt に適切なインストール設定を定義する
-4. The alpha04-sample-ghost shall `examples/sample-ghost/hello-pasta/` に配置される
+4. The alpha04-sample-ghost shall `crates/pasta_sample_ghost/` に配置される（ルート汚染回避）
+5. The alpha04-sample-ghost shall pasta_luaから完全に独立したクレートとする（責務分離）
 
 ---
 
@@ -111,15 +115,18 @@
 
 #### Acceptance Criteria
 
-1. The alpha04-sample-ghost shall 以下の仕様でシェル素材を作成する:
+1. The alpha04-sample-ghost shall 以下の仕様でシェル素材を自動生成する:
    - **サイズ**: 幅 96〜128 × 高さ 256 ピクセル（3頭身バランス）
    - **形式**: 透過 PNG
    - **キャラクター**: 2体
      - 女の子（sakura）: surface0-8（9種）
      - 男の子（kero）: surface10-18（9種）
+   - **生成方法**: Rustコードによるプログラマティック生成（`src/lib.rs`）
+   - **依存**: `image`, `imageproc` 等の画像処理クレート
 2. The 表情 shall ピクトグラム風の記号表現とする:
    - `^ ^` 笑顔, `- -` 通常, `> <` 照れ, `o o` 驚き, `; ;` 泣き, `@ @` 困惑, `* *` キラキラ, `= =` 眠い, `# #` 怒り
-3. The シェル shall descript.txt でサーフェス定義を行う
+3. The シェル shall descript.txt でサーフェス定義を行う（ukadoc準拠）
+4. The 画像生成 shall CIで再現可能であること（外部依存なし）
 
 ---
 
@@ -130,10 +137,23 @@
 #### Acceptance Criteria
 
 1. The alpha04-sample-ghost shall `pasta.toml` に以下を定義する:
-   - `[ghost]` セクション: ゴースト名、作者、バージョン
-   - `[ghost.talk]` セクション: トーク間隔設定
-   - `[shiori]` セクション: SHIORI 設定
-2. The 設定 shall alpha02（仮想イベント）で読み込まれる
+   ```toml
+   [package]
+   name = "hello-pasta"
+   version = "0.1.0"
+   authors = ["どっとステーション駅長"]
+
+   [loader]
+   debug_mode = true
+
+   [ghost]
+   spot_switch_newlines = 1.5
+   talk_interval_min = 60   # 1分（テスト用に短縮）
+   talk_interval_max = 120  # 2分（テスト用に短縮）
+   hour_margin = 30
+   ```
+2. The 設定 shall [pasta.toml設定仕様書](research/pasta-toml-spec.md) に準拠する
+3. The 設定 shall alpha02（仮想イベント）で読み込まれる
 
 ---
 
@@ -143,9 +163,39 @@
 
 #### Acceptance Criteria
 
-1. The alpha04-sample-ghost shall 各イベントハンドラの動作を検証する統合テストを提供する
-2. The テスト shall さくらスクリプト出力の正確性を検証する
-3. The テスト shall pasta.toml 設定の読み込みを検証する
+1. The alpha04-sample-ghost shall `crates/pasta_sample_ghost/tests/` に統合テストを配置する
+2. The テスト shall PastaLoaderを使用して各イベントハンドラの動作を検証する
+3. The テスト shall さくらスクリプト出力の正確性を検証する
+4. The テスト shall pasta.toml 設定の読み込みを検証する
+5. The テスト shall `cargo test --workspace` でCI実行可能であること
+6. The テスト shall 実SSP不要（モックSHIORI環境）で完結すること
+
+---
+
+### Requirement 9: ukadoc設定ファイル
+
+**Objective:** As a SSPユーザー, I want SSP標準の設定ファイルを持つゴーストがほしい, so that SSPで正常に動作できる
+
+#### Acceptance Criteria
+
+1. The alpha04-sample-ghost shall install.txt に以下を定義する:
+   - `type`: ghost
+   - `name`: hello-pasta
+   - `directory`: hello-pasta
+   - `accept`: 依存なし
+2. The alpha04-sample-ghost shall ghost/master/descript.txt に以下を定義する:
+   - `sakura.name`: 女の子
+   - `kero.name`: 男の子
+   - `craftman`: ekicyou
+   - `craftmanw`: どっとステーション駅長
+   - `homeurl`: https://github.com/ekicyou/pasta
+3. The alpha04-sample-ghost shall shell/master/descript.txt に以下を定義する:
+   - `name`: master
+   - `craftman`: ekicyou
+   - `craftmanw`: どっとステーション駅長
+   - `sakura.balloon.offsetx/y`: 自動生成画像サイズに基づき調整
+   - `kero.balloon.offsetx/y`: 自動生成画像サイズに基づき調整
+4. The 設定ファイル shall [ukadoc設定ファイル仕様書](research/ukadoc-config-spec.md) に準拠する
 
 ---
 
