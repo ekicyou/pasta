@@ -15,6 +15,7 @@
 --- @field global_words table<string, table> グローバル単語レジストリ（key → values[][]）
 --- @field local_words table<string, table> ローカル単語レジストリ（scene_name → {key → values[][]}）
 --- @field actor_words table<string, table> アクター単語レジストリ（actor_name → {key → values[][]}）
+--- @field app_ctx table アプリケーション実行中の汎用コンテキストデータ
 local STORE = {}
 
 --- アクターキャッシュ（名前→アクター）
@@ -41,11 +42,16 @@ STORE.local_words = {}
 --- @type table<string, table>
 STORE.actor_words = {}
 
+--- アプリケーション実行中の汎用コンテキストデータ
+--- @type table
+STORE.app_ctx = {}
+
 --- 全データをリセット
 --- @return nil
 function STORE.reset()
     STORE.actors = {}
     STORE.scenes = {}
+    STORE.app_ctx = {}
     STORE.counters = {}
     STORE.global_words = {}
     STORE.local_words = {}

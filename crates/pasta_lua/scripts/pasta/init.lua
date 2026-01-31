@@ -5,7 +5,6 @@
 --- このモジュールはpasta言語ランタイムのエントリーポイントとなる。
 --- 各機能モジュールへのリダイレクト点として設計されている。
 
-local CTX = require("pasta.ctx")
 local ACTOR = require("pasta.actor")
 local SCENE = require("pasta.scene")
 local WORD = require("pasta.word")
@@ -39,8 +38,6 @@ function PASTA.finalize_scene()
 end
 
 --- サブモジュール参照（内部使用・高度な用途向け）
---- @type CTX
-PASTA.CTX = CTX
 --- @type table
 PASTA.ACTOR = ACTOR
 --- @type Scene

@@ -4,17 +4,12 @@ local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect
 
--- Mock context for testing
-local function create_mock_ctx()
+-- Mock actors for testing
+local function create_mock_actors()
     return {
-        actors = {
-            sakura = { name = "さくら", spot = "sakura" },
-            kero = { name = "うにゅう", spot = "kero" },
-            char2 = { name = "キャラ2", spot = "char2" },
-        },
-        save = {},
-        yield = function() end,
-        end_action = function() end,
+        sakura = { name = "さくら", spot = "sakura" },
+        kero = { name = "うにゅう", spot = "kero" },
+        char2 = { name = "キャラ2", spot = "char2" },
     }
 end
 
@@ -22,8 +17,8 @@ end
 describe("SHIORI_ACT - inheritance", function()
     test("inherits ACT.IMPL methods", function()
         local SHIORI_ACT = require("pasta.shiori.act")
-        local ctx = create_mock_ctx()
-        local act = SHIORI_ACT.new(ctx)
+        local actors = create_mock_actors()
+        local act = SHIORI_ACT.new(actors)
 
         -- sakura_script() is inherited from ACT_IMPL
         act:sakura_script("\\e")
@@ -41,8 +36,8 @@ describe("SHIORI_ACT - inheritance", function()
 
     test("inherits word() method", function()
         local SHIORI_ACT = require("pasta.shiori.act")
-        local ctx = create_mock_ctx()
-        local act = SHIORI_ACT.new(ctx)
+        local actors = create_mock_actors()
+        local act = SHIORI_ACT.new(actors)
 
         -- word() method should be accessible (returns nil for unknown word)
         local result = act:word("unknown_word")
@@ -54,10 +49,10 @@ end)
 describe("SHIORI_ACT - talk()", function()
     test("appends scope tag on first actor", function()
         local SHIORI_ACT = require("pasta.shiori.act")
-        local ctx = create_mock_ctx()
-        local act = SHIORI_ACT.new(ctx)
+        local actors = create_mock_actors()
+        local act = SHIORI_ACT.new(actors)
 
-        act:talk(ctx.actors.sakura, "Hello")
+        act:talk(actors.sakura, "Hello")
         local result = act:build()
 
         -- Should contain: \0 (scope) + Hello + \n + \e
@@ -68,11 +63,11 @@ describe("SHIORI_ACT - talk()", function()
 
     test("appends scope tag on actor switch", function()
         local SHIORI_ACT = require("pasta.shiori.act")
-        local ctx = create_mock_ctx()
-        local act = SHIORI_ACT.new(ctx)
+        local actors = create_mock_actors()
+        local act = SHIORI_ACT.new(actors)
 
-        act:talk(ctx.actors.sakura, "Hello")
-        act:talk(ctx.actors.kero, "Hi")
+        act:talk(actors.sakura, "Hello")
+        act:talk(actors.kero, "Hi")
         local result = act:build()
 
         -- Should contain both scope tags
@@ -82,11 +77,11 @@ describe("SHIORI_ACT - talk()", function()
 
     test("does not append scope tag on same actor", function()
         local SHIORI_ACT = require("pasta.shiori.act")
-        local ctx = create_mock_ctx()
-        local act = SHIORI_ACT.new(ctx)
+        local actors = create_mock_actors()
+        local act = SHIORI_ACT.new(actors)
 
-        act:talk(ctx.actors.sakura, "Hello")
-        act:talk(ctx.actors.sakura, "World")
+        act:talk(actors.sakura, "Hello")
+        act:talk(actors.sakura, "World")
         local result = act:build()
 
         -- \0 should appear only once
@@ -96,10 +91,10 @@ describe("SHIORI_ACT - talk()", function()
 
     test("uses \\p[N] for char2+ actors", function()
         local SHIORI_ACT = require("pasta.shiori.act")
-        local ctx = create_mock_ctx()
-        local act = SHIORI_ACT.new(ctx)
+        local actors = create_mock_actors()
+        local act = SHIORI_ACT.new(actors)
 
-        act:talk(ctx.actors.char2, "Third character")
+        act:talk(actors.char2, "Third character")
         local result = act:build()
 
         expect(result:find("\\p%[2%]")):toBeTruthy()
@@ -107,11 +102,11 @@ describe("SHIORI_ACT - talk()", function()
 
     test("adds newline after scope switch", function()
         local SHIORI_ACT = require("pasta.shiori.act")
-        local ctx = create_mock_ctx()
-        local act = SHIORI_ACT.new(ctx)
+        local actors = create_mock_actors()
+        local act = SHIORI_ACT.new(actors)
 
-        act:talk(ctx.actors.sakura, "Hello")
-        act:talk(ctx.actors.kero, "Hi")
+        act:talk(actors.sakura, "Hello")
+        act:talk(actors.kero, "Hi")
         local result = act:build()
 
         -- There should be \n before \1 (after first talk)
@@ -120,19 +115,19 @@ describe("SHIORI_ACT - talk()", function()
 
     test("supports method chaining", function()
         local SHIORI_ACT = require("pasta.shiori.act")
-        local ctx = create_mock_ctx()
-        local act = SHIORI_ACT.new(ctx)
+        local actors = create_mock_actors()
+        local act = SHIORI_ACT.new(actors)
 
-        local returned = act:talk(ctx.actors.sakura, "Hello")
+        local returned = act:talk(actors.sakura, "Hello")
         expect(returned):toBe(act)
     end)
 
     test("also updates token buffer (parent behavior)", function()
         local SHIORI_ACT = require("pasta.shiori.act")
-        local ctx = create_mock_ctx()
-        local act = SHIORI_ACT.new(ctx)
+        local actors = create_mock_actors()
+        local act = SHIORI_ACT.new(actors)
 
-        act:talk(ctx.actors.sakura, "Hello")
+        act:talk(actors.sakura, "Hello")
         expect(#act.token):toBeGraterThan(0)
     end)
 end)
@@ -141,8 +136,8 @@ end)
 describe("SHIORI_ACT - surface()", function()
     test("appends surface tag with number", function()
         local SHIORI_ACT = require("pasta.shiori.act")
-        local ctx = create_mock_ctx()
-        local act = SHIORI_ACT.new(ctx)
+        local actors = create_mock_actors()
+        local act = SHIORI_ACT.new(actors)
 
         act:surface(5)
         local result = act:build()
@@ -152,8 +147,8 @@ describe("SHIORI_ACT - surface()", function()
 
     test("appends surface tag with alias string", function()
         local SHIORI_ACT = require("pasta.shiori.act")
-        local ctx = create_mock_ctx()
-        local act = SHIORI_ACT.new(ctx)
+        local actors = create_mock_actors()
+        local act = SHIORI_ACT.new(actors)
 
         act:surface("smile")
         local result = act:build()
@@ -163,8 +158,8 @@ describe("SHIORI_ACT - surface()", function()
 
     test("supports method chaining", function()
         local SHIORI_ACT = require("pasta.shiori.act")
-        local ctx = create_mock_ctx()
-        local act = SHIORI_ACT.new(ctx)
+        local actors = create_mock_actors()
+        local act = SHIORI_ACT.new(actors)
 
         local returned = act:surface(5)
         expect(returned):toBe(act)
@@ -175,8 +170,8 @@ end)
 describe("SHIORI_ACT - wait()", function()
     test("appends wait tag", function()
         local SHIORI_ACT = require("pasta.shiori.act")
-        local ctx = create_mock_ctx()
-        local act = SHIORI_ACT.new(ctx)
+        local actors = create_mock_actors()
+        local act = SHIORI_ACT.new(actors)
 
         act:wait(500)
         local result = act:build()
@@ -186,8 +181,8 @@ describe("SHIORI_ACT - wait()", function()
 
     test("handles negative values as 0", function()
         local SHIORI_ACT = require("pasta.shiori.act")
-        local ctx = create_mock_ctx()
-        local act = SHIORI_ACT.new(ctx)
+        local actors = create_mock_actors()
+        local act = SHIORI_ACT.new(actors)
 
         act:wait(-100)
         local result = act:build()
@@ -197,8 +192,8 @@ describe("SHIORI_ACT - wait()", function()
 
     test("truncates float to integer", function()
         local SHIORI_ACT = require("pasta.shiori.act")
-        local ctx = create_mock_ctx()
-        local act = SHIORI_ACT.new(ctx)
+        local actors = create_mock_actors()
+        local act = SHIORI_ACT.new(actors)
 
         act:wait(500.7)
         local result = act:build()
@@ -208,8 +203,8 @@ describe("SHIORI_ACT - wait()", function()
 
     test("supports method chaining", function()
         local SHIORI_ACT = require("pasta.shiori.act")
-        local ctx = create_mock_ctx()
-        local act = SHIORI_ACT.new(ctx)
+        local actors = create_mock_actors()
+        local act = SHIORI_ACT.new(actors)
 
         local returned = act:wait(500)
         expect(returned):toBe(act)
@@ -220,8 +215,8 @@ end)
 describe("SHIORI_ACT - newline()", function()
     test("appends single newline by default", function()
         local SHIORI_ACT = require("pasta.shiori.act")
-        local ctx = create_mock_ctx()
-        local act = SHIORI_ACT.new(ctx)
+        local actors = create_mock_actors()
+        local act = SHIORI_ACT.new(actors)
 
         act:newline()
         local result = act:build()
@@ -231,8 +226,8 @@ describe("SHIORI_ACT - newline()", function()
 
     test("appends multiple newlines", function()
         local SHIORI_ACT = require("pasta.shiori.act")
-        local ctx = create_mock_ctx()
-        local act = SHIORI_ACT.new(ctx)
+        local actors = create_mock_actors()
+        local act = SHIORI_ACT.new(actors)
 
         act:newline(3)
         local result = act:build()
@@ -242,8 +237,8 @@ describe("SHIORI_ACT - newline()", function()
 
     test("does nothing for n < 1", function()
         local SHIORI_ACT = require("pasta.shiori.act")
-        local ctx = create_mock_ctx()
-        local act = SHIORI_ACT.new(ctx)
+        local actors = create_mock_actors()
+        local act = SHIORI_ACT.new(actors)
 
         act:newline(0)
         act:newline(-1)
@@ -254,8 +249,8 @@ describe("SHIORI_ACT - newline()", function()
 
     test("supports method chaining", function()
         local SHIORI_ACT = require("pasta.shiori.act")
-        local ctx = create_mock_ctx()
-        local act = SHIORI_ACT.new(ctx)
+        local actors = create_mock_actors()
+        local act = SHIORI_ACT.new(actors)
 
         local returned = act:newline()
         expect(returned):toBe(act)
@@ -266,8 +261,8 @@ end)
 describe("SHIORI_ACT - clear()", function()
     test("appends clear tag", function()
         local SHIORI_ACT = require("pasta.shiori.act")
-        local ctx = create_mock_ctx()
-        local act = SHIORI_ACT.new(ctx)
+        local actors = create_mock_actors()
+        local act = SHIORI_ACT.new(actors)
 
         act:clear()
         local result = act:build()
@@ -277,8 +272,8 @@ describe("SHIORI_ACT - clear()", function()
 
     test("supports method chaining", function()
         local SHIORI_ACT = require("pasta.shiori.act")
-        local ctx = create_mock_ctx()
-        local act = SHIORI_ACT.new(ctx)
+        local actors = create_mock_actors()
+        local act = SHIORI_ACT.new(actors)
 
         local returned = act:clear()
         expect(returned):toBe(act)
@@ -289,8 +284,8 @@ end)
 describe("SHIORI_ACT - build()", function()
     test("returns \\e for empty buffer", function()
         local SHIORI_ACT = require("pasta.shiori.act")
-        local ctx = create_mock_ctx()
-        local act = SHIORI_ACT.new(ctx)
+        local actors = create_mock_actors()
+        local act = SHIORI_ACT.new(actors)
 
         local result = act:build()
 
@@ -299,8 +294,8 @@ describe("SHIORI_ACT - build()", function()
 
     test("appends \\e to end", function()
         local SHIORI_ACT = require("pasta.shiori.act")
-        local ctx = create_mock_ctx()
-        local act = SHIORI_ACT.new(ctx)
+        local actors = create_mock_actors()
+        local act = SHIORI_ACT.new(actors)
 
         act:surface(5):wait(100)
         local result = act:build()
@@ -310,8 +305,8 @@ describe("SHIORI_ACT - build()", function()
 
     test("can be called multiple times", function()
         local SHIORI_ACT = require("pasta.shiori.act")
-        local ctx = create_mock_ctx()
-        local act = SHIORI_ACT.new(ctx)
+        local actors = create_mock_actors()
+        local act = SHIORI_ACT.new(actors)
 
         act:surface(5)
         local result1 = act:build()
@@ -325,8 +320,8 @@ end)
 describe("SHIORI_ACT - reset()", function()
     test("clears buffer", function()
         local SHIORI_ACT = require("pasta.shiori.act")
-        local ctx = create_mock_ctx()
-        local act = SHIORI_ACT.new(ctx)
+        local actors = create_mock_actors()
+        local act = SHIORI_ACT.new(actors)
 
         act:surface(5):wait(100)
         act:reset()
@@ -337,12 +332,12 @@ describe("SHIORI_ACT - reset()", function()
 
     test("clears scope state", function()
         local SHIORI_ACT = require("pasta.shiori.act")
-        local ctx = create_mock_ctx()
-        local act = SHIORI_ACT.new(ctx)
+        local actors = create_mock_actors()
+        local act = SHIORI_ACT.new(actors)
 
-        act:talk(ctx.actors.sakura, "Hello")
+        act:talk(actors.sakura, "Hello")
         act:reset()
-        act:talk(ctx.actors.sakura, "Hello again")
+        act:talk(actors.sakura, "Hello again")
         local result = act:build()
 
         -- After reset, scope tag should be emitted again
@@ -351,10 +346,10 @@ describe("SHIORI_ACT - reset()", function()
 
     test("does not clear token buffer (parent behavior)", function()
         local SHIORI_ACT = require("pasta.shiori.act")
-        local ctx = create_mock_ctx()
-        local act = SHIORI_ACT.new(ctx)
+        local actors = create_mock_actors()
+        local act = SHIORI_ACT.new(actors)
 
-        act:talk(ctx.actors.sakura, "Hello")
+        act:talk(actors.sakura, "Hello")
         local token_count = #act.token
         act:reset()
 
@@ -363,8 +358,8 @@ describe("SHIORI_ACT - reset()", function()
 
     test("supports method chaining", function()
         local SHIORI_ACT = require("pasta.shiori.act")
-        local ctx = create_mock_ctx()
-        local act = SHIORI_ACT.new(ctx)
+        local actors = create_mock_actors()
+        local act = SHIORI_ACT.new(actors)
 
         local returned = act:reset()
         expect(returned):toBe(act)
@@ -375,10 +370,10 @@ end)
 describe("SHIORI_ACT - escape", function()
     test("escapes backslash", function()
         local SHIORI_ACT = require("pasta.shiori.act")
-        local ctx = create_mock_ctx()
-        local act = SHIORI_ACT.new(ctx)
+        local actors = create_mock_actors()
+        local act = SHIORI_ACT.new(actors)
 
-        act:talk(ctx.actors.sakura, "path\\to\\file")
+        act:talk(actors.sakura, "path\\to\\file")
         local result = act:build()
 
         expect(result:find("path\\\\to\\\\file")):toBeTruthy()
@@ -386,10 +381,10 @@ describe("SHIORI_ACT - escape", function()
 
     test("escapes percent", function()
         local SHIORI_ACT = require("pasta.shiori.act")
-        local ctx = create_mock_ctx()
-        local act = SHIORI_ACT.new(ctx)
+        local actors = create_mock_actors()
+        local act = SHIORI_ACT.new(actors)
 
-        act:talk(ctx.actors.sakura, "100%")
+        act:talk(actors.sakura, "100%")
         local result = act:build()
 
         expect(result:find("100%%%%")):toBeTruthy()
@@ -397,10 +392,10 @@ describe("SHIORI_ACT - escape", function()
 
     test("escapes mixed special characters", function()
         local SHIORI_ACT = require("pasta.shiori.act")
-        local ctx = create_mock_ctx()
-        local act = SHIORI_ACT.new(ctx)
+        local actors = create_mock_actors()
+        local act = SHIORI_ACT.new(actors)
 
-        act:talk(ctx.actors.sakura, "50% off \\ sale")
+        act:talk(actors.sakura, "50% off \\ sale")
         local result = act:build()
 
         expect(result:find("50%%%%")):toBeTruthy()
@@ -412,13 +407,13 @@ end)
 describe("SHIORI_ACT - E2E scenario", function()
     test("complex script generation", function()
         local SHIORI_ACT = require("pasta.shiori.act")
-        local ctx = create_mock_ctx()
-        local act = SHIORI_ACT.new(ctx)
+        local actors = create_mock_actors()
+        local act = SHIORI_ACT.new(actors)
 
-        act:talk(ctx.actors.sakura, "こんにちは")
+        act:talk(actors.sakura, "こんにちは")
             :surface(5)
             :wait(500)
-            :talk(ctx.actors.kero, "やあ")
+            :talk(actors.kero, "やあ")
             :clear()
 
         local result = act:build()
@@ -436,17 +431,17 @@ describe("SHIORI_ACT - E2E scenario", function()
 
     test("multiple rounds with reset", function()
         local SHIORI_ACT = require("pasta.shiori.act")
-        local ctx = create_mock_ctx()
-        local act = SHIORI_ACT.new(ctx)
+        local actors = create_mock_actors()
+        local act = SHIORI_ACT.new(actors)
 
         -- First round
-        act:talk(ctx.actors.sakura, "First")
+        act:talk(actors.sakura, "First")
         local result1 = act:build()
         expect(result1:find("First")):toBeTruthy()
 
         -- Reset and second round
         act:reset()
-        act:talk(ctx.actors.kero, "Second")
+        act:talk(actors.kero, "Second")
         local result2 = act:build()
 
         expect(result2:find("First")):toBeFalsy() -- First should be cleared

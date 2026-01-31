@@ -708,12 +708,12 @@ impl PastaLuaRuntime {
         let base_dir = self.base_dir.as_deref().unwrap_or(Path::new("."));
         let file_path = base_dir.join(persistence_config.effective_file_path());
 
-        // Try to get ctx.save from Lua
-        let save_table: Table = match self.lua.load(r#"require("pasta.ctx").save"#).eval() {
+        // Try to get save from Lua
+        let save_table: Table = match self.lua.load(r#"require("pasta.save")"#).eval() {
             Ok(t) => t,
             Err(e) => {
-                // ctx.save might not exist if runtime wasn't fully initialized
-                tracing::debug!(error = %e, "Could not access ctx.save, skipping persistence save");
+                // save might not exist if runtime wasn't fully initialized
+                tracing::debug!(error = %e, "Could not access pasta.save, skipping persistence save");
                 return Ok(());
             }
         };

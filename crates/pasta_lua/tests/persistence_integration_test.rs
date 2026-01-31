@@ -147,18 +147,18 @@ fn test_pasta_save_ctx_integration() {
         .unwrap();
     assert_eq!(save_type, "table");
 
-    // ctx.save should reference pasta.save
+    // act.save should reference pasta.save
     lua.load(
         r#"
         local SAVE = require("pasta.save")
-        local CTX = require("pasta.ctx")
-        local ctx = CTX.new()
+        local ACT = require("pasta.act")
+        local act = ACT.new({})
         
         -- They should be the same reference
-        assert(ctx.save == SAVE, "ctx.save should reference pasta.save")
+        assert(act.save == SAVE, "act.save should reference pasta.save")
         
         -- Changes in one should reflect in the other
-        ctx.save.test_key = "test_value"
+        act.save.test_key = "test_value"
         assert(SAVE.test_key == "test_value", "Changes should reflect")
     "#,
     )

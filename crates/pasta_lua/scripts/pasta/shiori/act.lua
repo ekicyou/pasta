@@ -23,10 +23,10 @@ SHIORI_ACT_IMPL.__index = SHIORI_ACT_IMPL
 SHIORI_ACT.IMPL = SHIORI_ACT_IMPL
 
 --- 新規ShioriActを作成
---- @param ctx CTX 環境オブジェクト
+--- @param actors table<string, Actor> 登録アクター
 --- @return ShioriAct アクションオブジェクト
-function SHIORI_ACT.new(ctx)
-    local base = ACT.new(ctx)
+function SHIORI_ACT.new(actors)
+    local base = ACT.new(actors)
     base._buffer = {}
     base._current_scope = nil
     return setmetatable(base, SHIORI_ACT_IMPL)

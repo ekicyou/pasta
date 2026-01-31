@@ -90,34 +90,34 @@ describe("pasta.save module (via @pasta_persistence)", function()
     end)
 end)
 
-describe("ctx.save integration with persistence", function()
-    test("ctx.save references pasta.save", function()
-        local CTX = require("pasta.ctx")
+describe("act.save integration with persistence", function()
+    test("act.save references pasta.save", function()
+        local ACT = require("pasta.act")
         local SAVE = require("pasta.save")
-        local ctx = CTX.new()
+        local act = ACT.new({})
 
-        -- ctx.save should be the same table as pasta.save
-        expect(ctx.save):toBe(SAVE)
+        -- act.save should be the same table as pasta.save
+        expect(act.save):toBe(SAVE)
     end)
 
-    test("changes in ctx.save reflect in pasta.save", function()
-        local CTX = require("pasta.ctx")
+    test("changes in act.save reflect in pasta.save", function()
+        local ACT = require("pasta.act")
         local SAVE = require("pasta.save")
-        local ctx = CTX.new()
+        local act = ACT.new({})
 
-        -- Modify via ctx.save
-        ctx.save.ctx_persist_key = "ctx_persist_value"
-        expect(SAVE.ctx_persist_key):toBe("ctx_persist_value")
+        -- Modify via act.save
+        act.save.act_persist_key = "act_persist_value"
+        expect(SAVE.act_persist_key):toBe("act_persist_value")
     end)
 
-    test("changes in pasta.save reflect in ctx.save", function()
-        local CTX = require("pasta.ctx")
+    test("changes in pasta.save reflect in act.save", function()
+        local ACT = require("pasta.act")
         local SAVE = require("pasta.save")
-        local ctx = CTX.new()
+        local act = ACT.new({})
 
         -- Modify via SAVE
         SAVE.save_persist_key = "save_persist_value"
-        expect(ctx.save.save_persist_key):toBe("save_persist_value")
+        expect(act.save.save_persist_key):toBe("save_persist_value")
     end)
 end)
 

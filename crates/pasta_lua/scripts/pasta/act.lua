@@ -9,7 +9,9 @@ local SCENE = require("pasta.scene")
 local GLOBAL = require("pasta.global")
 
 --- @class Act アクションオブジェクト
---- @field ctx CTX 環境オブジェクト
+--- @field actors table<string, Actor> 登録アクター（名前→アクター）
+--- @field save table 永続変数テーブル
+--- @field app_ctx table アプリケーション実行中の汎用コンテキストデータ
 --- @field var table アクションローカル変数
 --- @field token table[] 構築中のスクリプトトークン
 --- @field now_actor Actor|nil 現在のアクター
@@ -29,7 +31,7 @@ function ACT_IMPL.__index(self, key)
     if method then return method end
 
     -- 2. アクター名としてプロキシ生成
-    local actor = self.ctx.actors[key]
+    local actor = self.actors[key]
     if actor then
         return ACTOR.create_proxy(actor, self)
     end
@@ -38,11 +40,13 @@ function ACT_IMPL.__index(self, key)
 end
 
 --- 新規Actを作成
---- @param ctx CTX 環境オブジェクト
+--- @param actors table<string, Actor> 登録アクター
 --- @return Act アクションオブジェクト
-function ACT.new(ctx)
+function ACT.new(actors)
     local obj = {
-        ctx = ctx,
+        actors = actors or {},
+        save = require("pasta.save"),
+        app_ctx = require("pasta.store").app_ctx,
         var = {},
         token = {},
         now_actor = nil,
@@ -58,7 +62,7 @@ end
 --- @return table var アクションローカル変数テーブル
 function ACT_IMPL.init_scene(self, scene)
     self.current_scene = scene
-    return self.ctx.save, self.var
+    return self.save, self.var
 end
 
 --- talkトークン蓄積
@@ -137,7 +141,10 @@ end
 --- @return nil
 function ACT_IMPL.yield(self)
     table.insert(self.token, { type = "yield" })
-    self.ctx:yield(self)
+    local token = self.token
+    self.token = {}
+    self.now_actor = nil
+    coroutine.yield({ type = "yield", token = token })
 end
 
 --- アクション終了
@@ -145,7 +152,9 @@ end
 --- @return nil
 function ACT_IMPL.end_action(self)
     table.insert(self.token, { type = "end_action" })
-    self.ctx:end_action(self)
+    local token = self.token
+    self.token = {}
+    coroutine.yield({ type = "end_action", token = token })
 end
 
 --- シーン呼び出し（4段階検索）
@@ -203,7 +212,7 @@ end
 --- @param number integer 位置
 --- @return nil
 function ACT_IMPL.set_spot(self, name, number)
-    local actor = self.ctx.actors[name]
+    local actor = self.actors[name]
     if actor then
         actor.spot = number
     end
@@ -213,7 +222,7 @@ end
 --- @param self Act アクションオブジェクト
 --- @return nil
 function ACT_IMPL.clear_spot(self)
-    for _, actor in pairs(self.ctx.actors) do
+    for _, actor in pairs(self.actors) do
         actor.spot = nil
     end
 end
