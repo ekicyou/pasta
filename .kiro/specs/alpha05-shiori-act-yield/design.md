@@ -227,30 +227,44 @@ function SHIORI_ACT_IMPL.talk(self, actor, text)
     local spot_id = spot_to_id(actor.spot)
     
     if self._current_spot ~= spot_id then
-        -- スポット復帰時の段落区切り改行
+        -- [既存ロジック] 既存トークがあれば改行を追加
+        if self._current_spot ~= nil then
+            table.insert(self._buffer, "\\n")
+        end
+        
+        -- スポットタグを先に挿入
+        table.insert(self._buffer, spot_to_tag(spot_id))
+        
+        -- [新規] スポット切り替え時の段落区切り改行（スポットタグの後）
         if self._current_spot ~= nil and self._spot_switch_newlines > 0 then
             local percent = math.floor(self._spot_switch_newlines * 100)
             table.insert(self._buffer, string.format("\\n[%d]", percent))
         end
-        -- スポットタグ
-        table.insert(self._buffer, spot_to_tag(spot_id))
+        
         self._current_spot = spot_id
     end
     
+    -- エスケープ済みテキストを追加
     table.insert(self._buffer, escape_sakura(text))
+    
+    -- テキスト後の改行
     table.insert(self._buffer, "\\n")
+    
+    -- 親クラスのtalk()を呼び出し（tokenバッファ用）
     ACT.IMPL.talk(self, actor, text)
     return self
 end
 ```
 
 **出力例**:
-| 設定値 | 出力タグ | 改行幅 |
-|--------|----------|--------|
-| 0 | なし | 改行なし |
-| 1.0 | `\n[100]` | 1行 |
-| 1.5 | `\n[150]` | 1.5行 |
-| 2.0 | `\n[200]` | 2行 |
+| 設定値 | 出力タグ | 改行幅 | 備考 |
+|--------|----------|--------|------|
+| 0 | `\n\p[ID]` | 既存改行のみ | 段落区切りなし |
+| 1.0 | `\n\p[ID]\n[100]` | 既存改行 + 1行 | 合計2行相当 |
+| 1.5 | `\n\p[ID]\n[150]` | 既存改行 + 1.5行 | 合計2.5行相当 |
+| 2.0 | `\n\p[ID]\n[200]` | 既存改行 + 2行 | 合計3行相当 |
+
+**注**: 既存ロジック（`_current_spot != nil`時に`\n`挿入）を保持し、スポット切り替え改行は追加的に挿入される。
 
 ---
 
