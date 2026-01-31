@@ -175,7 +175,38 @@ libs = ["std_all", "-std_io", "testing"]  # std_io を除外
 
 ---
 
-## 5. [ghost] セクション
+## 5. [package] セクション（省略可能）
+
+**処理元**: Lua側で `@pasta_config` から参照（現在は未使用）  
+**参照方法**: `require("@pasta_config").package`  
+**用途**: 将来的な pasta_lua 拡張用（ノベルゲームエンジン等）
+
+### フィールド
+
+| キー | 型 | デフォルト値 | 説明 |
+|------|-----|--------------|------|
+| `name` | `string` | なし | パッケージ名 |
+| `version` | `string` | なし | バージョン（セマンティックバージョニング推奨） |
+| `authors` | `string[]` | なし | 作者リスト |
+
+### 特記事項
+
+- **省略可能**: 伺かゴーストでは install.txt/readme.txt でメタデータを管理するため、このセクションは不要
+- **将来的な拡張**: pasta_lua をノベルゲームエンジン等に転用する場合に備えた定義
+- **現在の利用**: PastaConfig では読み込まれるが、システム側では使用されない
+
+### 記述例
+
+```toml
+[package]
+name = "hello-pasta"
+version = "0.1.0"
+authors = ["どっとステーション駅長"]
+```
+
+---
+
+## 6. [ghost] セクション
 
 **処理元**: Lua側で `@pasta_config` から参照  
 **参照方法**: `require("@pasta_config").ghost` または `pasta.config.get("ghost", key, default)`
@@ -201,7 +232,7 @@ hour_margin = 45
 
 ---
 
-## 6. カスタムセクション
+## 7. カスタムセクション
 
 `[loader]` 以外の任意のセクション/キーは `@pasta_config` から参照可能。
 
@@ -242,7 +273,7 @@ print(config.user_data.nested.inner)  -- "data"
 
 ---
 
-## 7. hello-pasta 向け pasta.toml 設計案
+## 8. hello-pasta 向け pasta.toml 設計案
 
 ### 案A: 最小構成
 
