@@ -163,7 +163,12 @@ return config.user_data.nested.inner  -- ネストされたテーブル
 2. **互換性方針**:
    - `@pasta_config` はそのまま使用可能（下位互換性維持）
    - `pasta.config` は新規ラッパーとして追加（オプション的利用）
-   - 既存コードは修正不要
+   - 既存Luaコードは修正不要
+
+3. **既存Luaモジュール調査結果**:
+   - ✅ 調査完了: `crates/pasta_lua/scripts/**/*.lua` 全検索
+   - ✅ 結果: `@pasta_config` を直接使用している箇所なし
+   - ✅ リファクタリング対象: なし
 
 #### Acceptance Criteria
 
@@ -176,6 +181,7 @@ return config.user_data.nested.inner  -- ネストされたテーブル
 5. When 設定値が存在しない場合, the メソッド shall `default` 引数を返す
 6. The 既存の `@pasta_config` 直接アクセス shall 引き続き動作する（下位互換性）
 7. The 既存テスト（`loader_integration_test.rs`）shall パスする（リグレッションなし）
+8. **将来の方針**: 新規コードでは `pasta.config` を使用することを推奨（既存コードのリファクタリングは不要）
 
 ---
 
