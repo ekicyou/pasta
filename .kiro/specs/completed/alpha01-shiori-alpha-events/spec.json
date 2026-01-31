@@ -3,7 +3,7 @@
     "created_at": "2026-01-30T18:10:00Z",
     "updated_at": "2026-01-31T12:30:00Z",
     "language": "ja",
-    "phase": "implementation-complete",
+    "phase": "completed",
     "description": "SHIORI EVENT 7種（OnFirstBoot, OnBoot, OnClose, OnGhostChanged, OnSecondChange, OnMinuteChange, OnMouseDoubleClick）のハンドラ登録・スタブ応答実装。既存REG/EVENTモジュール機構を活用し、Reference0〜Reference7の解析・利用方法を仕様に含める。",
     "category": "SHIORI基盤",
     "size_estimate": "M",
