@@ -963,6 +963,78 @@ if req.reference[5] == nil then
 end
 ```
 
+### 8.8 virtual_dispatcher モジュール
+
+`pasta.shiori.event.virtual_dispatcher` は OnSecondChange をトリガーとして OnTalk/OnHour 仮想イベントを発行するモジュールです。
+
+```lua
+local dispatcher = require("pasta.shiori.event.virtual_dispatcher")
+```
+
+#### 8.8.1 dispatch(req)
+
+メインエントリポイント。OnSecondChange リクエストから OnHour/OnTalk イベントを判定・発行します。
+
+```lua
+---@param req table リクエストテーブル (req.date.unix 必須)
+---@return string|nil "fired" (発行成功), nil (発行なし)
+local result = dispatcher.dispatch(req)
+```
+
+- OnHour を優先判定し、発火しなければ OnTalk を判定
+- `req.date` フィールドがない場合は `nil` を返却
+- `req.status == "talking"` の場合はスキップ
+
+#### 8.8.2 check_hour(req)
+
+OnHour イベントの判定・発行のみを行います。
+
+```lua
+---@param req table リクエストテーブル
+---@return string|nil "fired" or nil
+local result = dispatcher.check_hour(req)
+```
+
+- 初回呼び出し時は次の正時を計算してスキップ
+- 正時超過時に OnHour シーンを検索・実行
+
+#### 8.8.3 check_talk(req)
+
+OnTalk イベントの判定・発行のみを行います。
+
+```lua
+---@param req table リクエストテーブル
+---@return string|nil "fired" or nil
+local result = dispatcher.check_talk(req)
+```
+
+- `pasta.toml` の `[ghost]` セクションから設定を読み込み
+  - `talk_interval_min`: 最小トーク間隔（秒、デフォルト180）
+  - `talk_interval_max`: 最大トーク間隔（秒、デフォルト300）
+  - `hour_margin`: 時報前スキップマージン（秒、デフォルト30）
+- 時報前マージン内の場合はスキップ
+
+#### 8.8.4 テスト用関数
+
+```lua
+-- 状態リセット（セッション開始時相当）
+dispatcher._reset()
+
+-- 内部状態取得
+local state = dispatcher._get_internal_state()
+-- { next_hour_unix, next_talk_time, cached_config }
+
+-- シーン実行関数のモック差し替え
+dispatcher._set_scene_executor(function(event_name)
+    return "mocked_result"
+end)
+```
+
+#### 8.8.5 セッション定義
+
+- **セッション** = SHIORI load 〜 unload 間
+- unload 時に Lua VM ごとドロップされるため、モジュールローカル変数は自動リセット
+
 ---
 
 ## 更新履歴

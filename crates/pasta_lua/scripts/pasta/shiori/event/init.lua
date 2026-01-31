@@ -59,6 +59,7 @@ local RES = require("pasta.shiori.res")
 
 -- 1.5. デフォルトイベントハンドラをロード
 require("pasta.shiori.event.boot")
+require("pasta.shiori.event.second_change")
 
 -- 2. モジュールテーブル宣言
 --- @class EVENT
