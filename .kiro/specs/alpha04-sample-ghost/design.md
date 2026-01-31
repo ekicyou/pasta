@@ -97,6 +97,7 @@ crates/pasta_sample_ghost/
         ├── ghost/master/
         │   ├── descript.txt
         │   ├── pasta.toml
+        │   ├── pasta.dll       # SHIORI DLL（テスト時コピー）
         │   └── dic/        # Pasta DSLスクリプト（実行時ロード）
         │       ├── boot.pasta
         │       ├── talk.pasta
@@ -112,6 +113,7 @@ crates/pasta_sample_ghost/
 - 画像ファイル（surface*.png）は `image_generator.rs` で動的生成
 - 設定ファイル（*.txt, pasta.toml）は `config_templates.rs` で生成
 - pastaスクリプト（*.pasta）は `scripts.rs` の文字列定数から出力
+- SHIORI DLL（pasta.dll）はテストヘルパー `copy_pasta_shiori_dll()` でコピー
 
 ### 依存関係
 

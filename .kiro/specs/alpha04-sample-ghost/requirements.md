@@ -43,6 +43,7 @@
            │   └── master/
            │       ├── pasta.toml # pasta 設定ファイル
            │       ├── descript.txt # ゴースト設定（ukadoc準拠）
+           │       ├── pasta.dll  # SHIORI DLL（テスト時コピー）
            │       └── dic/       # Pasta DSL スクリプト
            │           ├── boot.pasta
            │           ├── talk.pasta
