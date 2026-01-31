@@ -6,10 +6,12 @@
 --- build()で完成したさくらスクリプト文字列を取得する。
 
 local ACT = require("pasta.act")
+local CONFIG = require("pasta.config")
 
 --- @class ShioriAct : Act SHIORI専用アクションオブジェクト
 --- @field _buffer string[] さくらスクリプト蓄積バッファ
---- @field _current_scope number|nil 現在のスコープ番号
+--- @field _current_spot number|nil 現在のスポット番号
+--- @field _spot_switch_newlines number スポット切り替え時の改行数（デフォルト1.5）
 local SHIORI_ACT = {}
 
 --- SHIORI_ACT実装メタテーブル
@@ -37,7 +39,9 @@ SHIORI_ACT.IMPL = SHIORI_ACT_IMPL
 function SHIORI_ACT.new(actors)
     local base = ACT.new(actors)
     base._buffer = {}
-    base._current_scope = nil
+    base._current_spot = nil
+    -- pasta.tomlの[ghost]セクションからspot_switch_newlinesを読み込み（デフォルト1.5）
+    base._spot_switch_newlines = CONFIG.get("ghost", "spot_switch_newlines", 1.5)
     return setmetatable(base, SHIORI_ACT_IMPL)
 end
 
@@ -51,10 +55,10 @@ local function escape_sakura(text)
     return escaped
 end
 
---- spotからスコープ番号を決定
+--- spotからスポットID番号を決定
 --- @param spot any スポット値
---- @return number スコープ番号
-local function spot_to_scope(spot)
+--- @return number スポットID番号
+local function spot_to_id(spot)
     if spot == "sakura" or spot == 0 then
         return 0
     elseif spot == "kero" or spot == 1 then
@@ -71,17 +75,11 @@ local function spot_to_scope(spot)
     return 0 -- デフォルトはsakura
 end
 
---- スコープタグを生成
---- @param scope number スコープ番号
---- @return string スコープタグ
-local function scope_to_tag(scope)
-    if scope == 0 then
-        return "\\0"
-    elseif scope == 1 then
-        return "\\1"
-    else
-        return string.format("\\p[%d]", scope)
-    end
+--- スポットタグを生成（SSP ukadoc準拠: 常に\p[ID]形式）
+--- @param spot_id number スポットID番号
+--- @return string スポットタグ
+local function spot_to_tag(spot_id)
+    return string.format("\\p[%d]", spot_id)
 end
 
 --- talkメソッド（オーバーライド）
@@ -95,23 +93,24 @@ function SHIORI_ACT_IMPL.talk(self, actor, text)
         error("actor is required")
     end
 
-    local scope = spot_to_scope(actor.spot)
+    local spot_id = spot_to_id(actor.spot)
 
-    -- スコープ切り替え判定
-    if self._current_scope ~= scope then
-        -- 既存トークがあれば改行を追加
-        if self._current_scope ~= nil then
-            table.insert(self._buffer, "\\n")
+    -- スポット切り替え判定
+    if self._current_spot ~= spot_id then
+        -- スポットタグを追加
+        table.insert(self._buffer, spot_to_tag(spot_id))
+        -- 既存トークがあれば段落区切り改行を追加（スポットタグの後）
+        if self._current_spot ~= nil then
+            local percent = math.floor(self._spot_switch_newlines * 100)
+            table.insert(self._buffer, string.format("\\n[%d]", percent))
         end
-        -- スコープタグを追加
-        table.insert(self._buffer, scope_to_tag(scope))
-        self._current_scope = scope
+        self._current_spot = spot_id
     end
 
     -- エスケープ済みテキストを追加
     table.insert(self._buffer, escape_sakura(text))
 
-    -- テキスト後の改行
+    -- テキスト後の改行（固定\n）
     table.insert(self._buffer, "\\n")
 
     -- 親クラスのtalk()を呼び出し（tokenバッファ用）
@@ -161,20 +160,31 @@ function SHIORI_ACT_IMPL.clear(self)
     return self
 end
 
---- バッファを結合してさくらスクリプト文字列を返却
+--- バッファを結合してさくらスクリプト文字列を返却（自動リセット付き）
 --- @param self ShioriAct アクションオブジェクト
 --- @return string さくらスクリプト文字列
 function SHIORI_ACT_IMPL.build(self)
     local script = table.concat(self._buffer)
+    self:reset() -- 1 yield = 1 build: 自動リセット
     return script .. "\\e"
 end
 
---- バッファとスコープをリセット
+--- さくらスクリプト文字列をyield（コルーチン用）
+--- build()を呼び出してyieldし、再開後にリセット済みのselfを返す
+--- @param self ShioriAct アクションオブジェクト
+--- @return ShioriAct self リセット済みのself（メソッドチェーン用）
+function SHIORI_ACT_IMPL.yield(self)
+    local script = self:build()
+    coroutine.yield(script)
+    return self
+end
+
+--- バッファとスポット状態をリセット
 --- @param self ShioriAct アクションオブジェクト
 --- @return ShioriAct self メソッドチェーン用
 function SHIORI_ACT_IMPL.reset(self)
     self._buffer = {}
-    self._current_scope = nil
+    self._current_spot = nil
     return self
 end
 

@@ -70,7 +70,7 @@ describe("SHIORI_ACT - inheritance", function()
         local result = act:build()
 
         -- Should contain scope tag and text (same as direct call)
-        expect(result:find("\\0")):toBeTruthy()
+        expect(result:find("\\p%[0%]")):toBeTruthy()
         expect(result:find("Hello via proxy")):toBeTruthy()
         expect(result:sub(-2)):toBe("\\e")
     end)
@@ -86,10 +86,10 @@ describe("SHIORI_ACT - inheritance", function()
         act.kero:talk("Second")
         local result = act:build()
 
-        expect(result:find("\\0")):toBeTruthy()
+        expect(result:find("\\p%[0%]")):toBeTruthy()
         expect(result:find("First")):toBeTruthy()
         expect(result:find("\\s%[5%]")):toBeTruthy()
-        expect(result:find("\\1")):toBeTruthy()
+        expect(result:find("\\p%[1%]")):toBeTruthy()
         expect(result:find("Second")):toBeTruthy()
     end)
 end)
@@ -104,8 +104,8 @@ describe("SHIORI_ACT - talk()", function()
         act:talk(actors.sakura, "Hello")
         local result = act:build()
 
-        -- Should contain: \0 (scope) + Hello + \n + \e
-        expect(result:find("\\0")):toBeTruthy()
+        -- Should contain: \p[0] (spot) + Hello + \n + \e
+        expect(result:find("\\p%[0%]")):toBeTruthy()
         expect(result:find("Hello")):toBeTruthy()
         expect(result:sub(-2)):toBe("\\e")
     end)
@@ -119,9 +119,9 @@ describe("SHIORI_ACT - talk()", function()
         act:talk(actors.kero, "Hi")
         local result = act:build()
 
-        -- Should contain both scope tags
-        expect(result:find("\\0")):toBeTruthy()
-        expect(result:find("\\1")):toBeTruthy()
+        -- Should contain both spot tags (SSP compliant)
+        expect(result:find("\\p%[0%]")):toBeTruthy()
+        expect(result:find("\\p%[1%]")):toBeTruthy()
     end)
 
     test("does not append scope tag on same actor", function()
@@ -133,8 +133,8 @@ describe("SHIORI_ACT - talk()", function()
         act:talk(actors.sakura, "World")
         local result = act:build()
 
-        -- \0 should appear only once
-        local _, count = result:gsub("\\0", "")
+        -- \p[0] should appear only once
+        local _, count = result:gsub("\\p%[0%]", "")
         expect(count):toBe(1)
     end)
 
@@ -149,7 +149,7 @@ describe("SHIORI_ACT - talk()", function()
         expect(result:find("\\p%[2%]")):toBeTruthy()
     end)
 
-    test("adds newline after scope switch", function()
+    test("adds newline after spot switch", function()
         local SHIORI_ACT = require("pasta.shiori.act")
         local actors = create_mock_actors()
         local act = SHIORI_ACT.new(actors)
@@ -158,8 +158,8 @@ describe("SHIORI_ACT - talk()", function()
         act:talk(actors.kero, "Hi")
         local result = act:build()
 
-        -- There should be \n before \1 (after first talk)
-        expect(result:find("\\n\\1")):toBeTruthy()
+        -- Spot tag comes first, then newline: \p[1]\n[150] (after spot switch)
+        expect(result:find("\\p%[1%]\\n%[150%]")):toBeTruthy()
     end)
 
     test("supports method chaining", function()
@@ -352,16 +352,18 @@ describe("SHIORI_ACT - build()", function()
         expect(result:sub(-2)):toBe("\\e")
     end)
 
-    test("can be called multiple times", function()
+    test("auto-resets after build", function()
         local SHIORI_ACT = require("pasta.shiori.act")
         local actors = create_mock_actors()
         local act = SHIORI_ACT.new(actors)
 
         act:surface(5)
         local result1 = act:build()
+        -- After build(), buffer is auto-reset
         local result2 = act:build()
 
-        expect(result1):toBe(result2)
+        expect(result1):toBe("\\s[5]\\e")
+        expect(result2):toBe("\\e") -- empty after auto-reset
     end)
 end)
 
@@ -379,7 +381,7 @@ describe("SHIORI_ACT - reset()", function()
         expect(result):toBe("\\e")
     end)
 
-    test("clears scope state", function()
+    test("clears spot state", function()
         local SHIORI_ACT = require("pasta.shiori.act")
         local actors = create_mock_actors()
         local act = SHIORI_ACT.new(actors)
@@ -389,8 +391,8 @@ describe("SHIORI_ACT - reset()", function()
         act:talk(actors.sakura, "Hello again")
         local result = act:build()
 
-        -- After reset, scope tag should be emitted again
-        expect(result:find("\\0")):toBeTruthy()
+        -- After reset, spot tag should be emitted again
+        expect(result:find("\\p%[0%]")):toBeTruthy()
     end)
 
     test("does not clear token buffer (parent behavior)", function()
@@ -412,6 +414,105 @@ describe("SHIORI_ACT - reset()", function()
 
         local returned = act:reset()
         expect(returned):toBe(act)
+    end)
+end)
+
+-- Test yield() method
+describe("SHIORI_ACT - yield()", function()
+    test("yields sakura script string", function()
+        local SHIORI_ACT = require("pasta.shiori.act")
+        local co = require("pasta.co")
+        local actors = create_mock_actors()
+
+        local fn = function()
+            local act = SHIORI_ACT.new(actors)
+            act:talk(actors.sakura, "Hello")
+            act:yield()
+            return "done"
+        end
+
+        local err, result = co.safe_wrap(fn)()
+        expect(err):toBe(nil)
+        -- First resume yields the script
+        expect(result:find("\\p%[0%]")):toBeTruthy()
+        expect(result:find("Hello")):toBeTruthy()
+        expect(result:sub(-2)):toBe("\\e")
+    end)
+
+    test("yields multiple times", function()
+        local SHIORI_ACT = require("pasta.shiori.act")
+        local co = require("pasta.co")
+        local actors = create_mock_actors()
+
+        local fn = function()
+            local act = SHIORI_ACT.new(actors)
+            act:talk(actors.sakura, "First")
+            act:yield()
+            act:talk(actors.kero, "Second")
+            act:yield()
+            return "done"
+        end
+
+        local wrapped = co.safe_wrap(fn)
+        local err1, result1 = wrapped()
+        local err2, result2 = wrapped()
+        local err3, result3 = wrapped()
+
+        expect(err1):toBe(nil)
+        expect(result1:find("First")):toBeTruthy()
+        expect(err2):toBe(nil)
+        expect(result2:find("Second")):toBeTruthy()
+        expect(err3):toBe(nil)
+        expect(result3):toBe("done")
+    end)
+
+    test("auto-resets after yield", function()
+        local SHIORI_ACT = require("pasta.shiori.act")
+        local co = require("pasta.co")
+        local actors = create_mock_actors()
+
+        local fn = function()
+            local act = SHIORI_ACT.new(actors)
+            act:talk(actors.sakura, "First")
+            act:yield()
+            -- After yield, buffer should be reset
+            act:talk(actors.kero, "Second")
+            act:yield()
+            return "done"
+        end
+
+        local wrapped = co.safe_wrap(fn)
+        local _, result1 = wrapped()
+        local _, result2 = wrapped()
+
+        -- Second result should not contain "First"
+        expect(result2:find("First")):toBeFalsy()
+        expect(result2:find("Second")):toBeTruthy()
+        -- Second result should have spot tag (reset clears spot state)
+        expect(result2:find("\\p%[1%]")):toBeTruthy()
+    end)
+
+    test("supports method chaining after yield", function()
+        local SHIORI_ACT = require("pasta.shiori.act")
+        local co = require("pasta.co")
+        local actors = create_mock_actors()
+
+        local fn = function()
+            local act = SHIORI_ACT.new(actors)
+            local returned = act:talk(actors.sakura, "Hello"):yield()
+            -- yield() should return self after resume
+            returned:talk(actors.sakura, "World")
+            act:yield()
+            return "done"
+        end
+
+        local wrapped = co.safe_wrap(fn)
+        local err1, result1 = wrapped()
+        local err2, result2 = wrapped()
+
+        expect(err1):toBe(nil)
+        expect(err2):toBe(nil)
+        expect(result2:find("World")):toBeTruthy()
     end)
 end)
 
@@ -467,18 +568,18 @@ describe("SHIORI_ACT - E2E scenario", function()
 
         local result = act:build()
 
-        -- Verify structure
-        expect(result:find("\\0")):toBeTruthy()        -- sakura scope
+        -- Verify structure (SSP compliant: \p[ID] format)
+        expect(result:find("\\p%[0%]")):toBeTruthy()   -- sakura spot
         expect(result:find("こんにちは")):toBeTruthy()
         expect(result:find("\\s%[5%]")):toBeTruthy()   -- surface
         expect(result:find("\\w%[500%]")):toBeTruthy() -- wait
-        expect(result:find("\\1")):toBeTruthy()        -- kero scope
+        expect(result:find("\\p%[1%]")):toBeTruthy()   -- kero spot
         expect(result:find("やあ")):toBeTruthy()
         expect(result:find("\\c")):toBeTruthy()        -- clear
         expect(result:sub(-2)):toBe("\\e")             -- end
     end)
 
-    test("multiple rounds with reset", function()
+    test("multiple rounds (build auto-resets)", function()
         local SHIORI_ACT = require("pasta.shiori.act")
         local actors = create_mock_actors()
         local act = SHIORI_ACT.new(actors)
@@ -488,13 +589,12 @@ describe("SHIORI_ACT - E2E scenario", function()
         local result1 = act:build()
         expect(result1:find("First")):toBeTruthy()
 
-        -- Reset and second round
-        act:reset()
+        -- Second round (build auto-resets, so no manual reset needed)
         act:talk(actors.kero, "Second")
         local result2 = act:build()
 
-        expect(result2:find("First")):toBeFalsy() -- First should be cleared
+        expect(result2:find("First")):toBeFalsy()     -- First should be cleared by auto-reset
         expect(result2:find("Second")):toBeTruthy()
-        expect(result2:find("\\1")):toBeTruthy()  -- kero scope
+        expect(result2:find("\\p%[1%]")):toBeTruthy() -- kero spot
     end)
 end)
