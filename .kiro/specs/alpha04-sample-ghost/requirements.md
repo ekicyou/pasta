@@ -28,21 +28,31 @@
 
 1. The alpha04-sample-ghost shall 以下のディレクトリ構成を定義する:
    ```
-   ghost/master/
-   ├── pasta.toml              # 設定ファイル
-   ├── dic/                    # Pasta DSL スクリプト
-   │   ├── boot.pasta          # 起動・終了トーク
-   │   ├── talk.pasta          # ランダムトーク
-   │   └── click.pasta         # クリック反応
-   ├── scripts/                # Lua スクリプト
-   │   └── pasta/shiori/       # SHIORI エントリーポイント
-   └── shell/master/           # シェル（見た目）
-       ├── descript.txt        # シェル設定
-       ├── surface0.png        # sakura 通常
-       ├── surface1.png        # sakura 笑顔
-       └── ...
+   examples/sample-ghost/
+   └── hello-pasta/            # ゴーストID
+       ├── install.txt         # インストール設定
+       ├── readme.txt          # 説明ファイル
+       ├── thumbnail.png       # サムネイル画像
+       ├── ghost/
+       │   └── master/
+       │       ├── pasta.toml  # pasta 設定ファイル
+       │       ├── dic/        # Pasta DSL スクリプト
+       │       │   ├── boot.pasta  # 起動・終了トーク
+       │       │   ├── talk.pasta  # ランダムトーク
+       │       │   └── click.pasta # クリック反応
+       │       └── scripts/    # Lua スクリプト
+       │           └── pasta/shiori/ # SHIORI エントリーポイント
+       └── shell/
+           └── master/         # シェル（見た目）
+               ├── descript.txt    # シェル設定
+               ├── surfaces.txt    # サーフェス定義
+               ├── surface0.png    # sakura 通常
+               ├── surface1.png    # sakura 笑顔
+               └── ...
    ```
 2. The alpha04-sample-ghost shall 各ファイルのテンプレート内容を定義する
+3. The alpha04-sample-ghost shall install.txt に適切なインストール設定を定義する
+4. The alpha04-sample-ghost shall `examples/sample-ghost/hello-pasta/` に配置される
 
 ---
 
@@ -152,6 +162,7 @@
 
 | 用語 | 説明 |
 |------|------|
+| hello-pasta | サンプルゴーストのゴーストID |
 | sakura | メインキャラクター（女の子） |
 | kero | サブキャラクター（男の子） |
 | サーフェス | キャラクターの表情画像 |
