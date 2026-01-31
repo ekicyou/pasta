@@ -45,14 +45,6 @@
 2. The `pasta.shiori.event` shall 取得したアクター辞書を `SHIORI_ACT.new(actors, req)` の第1引数に渡す
 3. The `pasta.shiori.event` shall テスタビリティのため、act 生成時に actors を直接注入する設計を維持する（`SHIORI_ACT.new()` 内で STORE を直接参照しない）
 
-### Requirement 4: 後方互換性の維持
-**Objective:** As a 既存コードの保守者, I want 既存のハンドラシグネチャとの互換性を維持したい, so that 移行コストなく新機能を利用できる
-
-#### Acceptance Criteria
-1. The `pasta.shiori.event` shall 既存のハンドラシグネチャ `function(req)` を引き続きサポートする
-2. The `pasta.shiori.event` shall 新しいハンドラシグネチャ `function(req, act)` もサポートする
-3. The `pasta.shiori.act` shall 既存の `SHIORI_ACT.new(actors)` 呼び出しを引き続きサポートする（req は nil 扱い）
-
 ## Technical Notes
 
 ### 影響範囲
@@ -83,11 +75,11 @@ REG.OnMouseClick = function(req, act)
     act.女の子:talk("クリック座標: " .. x)
     return RES.ok(act:build())
 end
-
--- シーン関数での利用（alpha03以降）
-function OnTalk(act)
-    local hour = act.req.date.hour
-    act.女の子:talk("今は" .. hour .. "時だよ")
+実装後）
+```lua
+-- ハンドラでの利用（actのみを受け取る）
+REG.OnMouseClick = function(act)
+    local x = act.lk("今は" .. hour .. "時だよ")
     act:yield()
 end
 ```

@@ -11,11 +11,10 @@
 ### Goals
 - シーン関数から `act.req` を通じてSHIORIリクエスト情報にアクセス可能にする
 - イベントディスパッチ処理で `act` オブジェクトを生成し、ハンドラ・シーン関数に引き渡す
-- 既存のハンドラシグネチャ `function(req)` との後方互換性を維持する
+- すべてのハンドラ・シーン関数のシグネチャを `function(act)` に統一する
 
 ### Non-Goals
 - `req` テーブルの構造変更（Rust側 `parse_request()` は変更なし）
-- ハンドラからの `act:build()` によるさくらスクリプト返却（将来の別仕様）
 - `act.req` の書き込み保護（推奨レベルで読み取り専用）
 
 ---
@@ -82,12 +81,10 @@ graph TB
 | 1.1, 1.2, 1.3 | act.req フィールド追加 | SHIORI_ACT | SHIORI_ACT.new(actors, req) | - |
 | 1.4 | req 読み取り専用 | SHIORI_ACT | - | - |
 | 2.1, 2.3 | イベントディスパッチでact生成 | EVENT | EVENT.fire(req), create_act(req) | fire → create_act → handler |
-| 2.2 | シーン関数フォールバックでact引き渡し | EVENT | EVENT.no_entry(req, act) | no_entry → scene_result(act) |
+| 2.2 | シーン関数フォールバックでact引き渡し | EVENT | EVENT.no_entry(act) | no_entry → scene_result(act) |
 | 2.4 | エラー時500レスポンス | EVENT | - | 既存パターン維持 |
 | 3.1, 3.2 | STORE.actors から取得 | EVENT | create_act(req) | fire → STORE.actors |
 | 3.3 | テスタビリティ維持（DI） | SHIORI_ACT | SHIORI_ACT.new(actors, req) | - |
-| 4.1, 4.2 | ハンドラ後方互換 | EVENT | handler(req, act) | Lua可変長引数 |
-| 4.3 | SHIORI_ACT.new後方互換 | SHIORI_ACT | SHIORI_ACT.new(actors) | req省略時nil |
 
 ---
 
@@ -97,8 +94,8 @@ graph TB
 |-----------|--------------|--------|--------------|------------------|-----------|
 | SHIORI_ACT | ACT Layer | SHIORI専用actオブジェクト、req保持 | 1.1-1.4, 3.3, 4.3 | ACT (P0), CONFIG (P1) | Service |
 | EVENT | Event Layer | イベント振り分け、act生成 | 2.1-2.4, 3.1-3.2, 4.1-4.2 | SHIORI_ACT (P0), STORE (P0), REG (P0) | Service |
-| virtual_dispatcher | Event Layer | 仮想イベント発行、act引き渡し | 2.2 | SCENE (P1) | Service |
-
+| virtual_dispatcher | Event Layer | 仮想イベント発行、act引き渡し | 2.2 | SCE | ACT (P0), CONFIG (P1) | Service |
+| EVENT | Event Layer | イベント振り分け、act生成 | 2.1-2.4, 3.1-3
 ### ACT Layer
 
 #### SHIORI_ACT (`pasta.shiori.act`)
@@ -108,11 +105,10 @@ graph TB
 | Intent | SHIORI専用actオブジェクトにreqフィールドを追加し、リクエスト情報へのアクセスを提供 |
 | Requirements | 1.1, 1.2, 1.3, 1.4, 3.3, 4.3 |
 
+**Responsibilities & Constraints** |
+
 **Responsibilities & Constraints**
 - `SHIORI_ACT.new(actors, req)` で req を受け取り、`base.req` に格納
-- req パラメータは省略可能（nil扱い）で後方互換性維持
-- `act.req` は読み取り専用として推奨（Luaの制限上、強制は不可）
-
 **Dependencies**
 - Inbound: EVENT — act生成時に呼び出し (P0)
 - Outbound: ACT — 親クラスとして継承 (P0)
@@ -139,9 +135,9 @@ function SHIORI_ACT.new(actors, req)
 - Preconditions: actors は table（空テーブル可）
 - Postconditions: 戻り値の `req` フィールドに引数 req が設定される（nilの場合はnil）
 - Invariants: 既存の SHIORI_ACT.new(actors) 呼び出しは引き続き動作する
-
-**Implementation Notes**
-- Integration: `base.req = req` を追加するのみ、親クラスに影響なし
+、req は有効なSHIORIリクエストテーブル
+- Postconditions: 戻り値の `req` フィールドに引数 req が設定される
+- Invariants: なし
 - Validation: req の型チェックは行わない（呼び出し元が保証）
 - Risks: なし（軽微な拡張）
 
@@ -157,13 +153,13 @@ function SHIORI_ACT.new(actors, req)
 | Requirements | 2.1, 2.2, 2.3, 2.4, 3.1, 3.2, 4.1, 4.2 |
 
 **Responsibilities & Constraints**
-- `EVENT.fire()` 冒頭で `create_act(req)` により act を生成
-- ハンドラ呼び出しを `handler(req, act)` に変更
-- `EVENT.no_entry(req, act)` でシーン関数に `act` を引き渡す
-- 既存ハンドラは第2引数を無視して動作（Lua仕様）
+- `EVENT.fire()` 冒頭で `create_act(req)` により ac |
 
-**Dependencies**
-- Inbound: pasta.shiori.entry — SHIORI.request() から呼び出し (P0)
+**Responsibilities & Constraints**
+- `EVENT.fire()` 冒頭で `create_act(req)` により act を生成
+- ハンドラ呼び出しを `handler(act)` に変更（reqは渡さない）
+- `EVENT.no_entry(act)` でシーン関数に `act` を引き渡す
+- すべての既存ハンドラ（boot.lua, second_change.lua等）のシグネチャを `function(act)` に変更ry — SHIORI.request() から呼び出し (P0)
 - Outbound: SHIORI_ACT — act生成 (P0)
 - Outbound: STORE — actors取得 (P0)
 - Outbound: REG — ハンドラ検索 (P0)
@@ -193,14 +189,13 @@ function EVENT.fire(req)
 --- @param req table リクエストテーブル
 --- @param act ShioriAct|nil アクションオブジェクト
 --- @return string SHIORI レスポンス
-function EVENT.no_entry(req, act)
-```
-
-- Preconditions: req は有効なSHIORIリクエストテーブル
+function EVact ShioriAct アクションオブジェクト
+--- @return string SHIORI レスポンス
+function EVENT.no_entry(RIリクエストテーブル
 - Postconditions: ハンドラ/シーン関数に act が渡される
 - Invariants: 既存ハンドラ `function(req)` は引き続き動作
 
-**Implementation Notes**
+**Implementatiなし
 - Integration: require文に `STORE`, `SHIORI_ACT` を追加（遅延ロードも可）
 - Validation: act生成エラーは既存の xpcall でキャッチ
 - Risks: 循環参照なし（STORE→他モジュールは既存パターン）
@@ -231,25 +226,24 @@ function EVENT.no_entry(req, act)
 --- @param event_name string イベント名
 --- @param act ShioriAct|nil アクションオブジェクト
 --- @return string|nil 実行結果
+local function execute_s アクションオブジェクト
+--- @return string|nil 実行結果
 local function execute_scene(event_name, act)
 
 --- 仮想イベントディスパッチ
---- @param req table リクエストテーブル
---- @param act ShioriAct|nil アクションオブジェクト
+--- @param act ShioriAct アクションオブジェクト
 --- @return string|nil シーン実行結果
-function M.dispatch(req, act)
-```
-
+function M.dispatch(
 **Implementation Notes**
 - Integration: M.dispatch, check_hour, check_talk に act 引数追加
 - Validation: act が nil の場合も動作（シーン関数が対応）
 - Caller Changes: 
-  - `second_change.lua`: ハンドラシグネチャを `function(req, act)` に変更
-  - EVENT.fire() から渡された act を `dispatcher.dispatch(req, act)` に引き渡す
-  - second_change.lua 内での act 生成は不要（EVENT.fire() で生成済み）
-
----
-
+  - `second_change.lua`: ハンドラシグネチャを `function(req,から req 引数を削除し、act のみを受け取る
+- Validation: act.req から必要な情報（イベント名、日時等）を取得
+- Caller Changes: 
+  - `second_change.lua`: ハンドラシグネチャを `function(act)` に変更
+  - EVENT.fire() から渡された act を `dispatcher.dispatch(act)` に引き渡す（reqは不要）
+  - 既存の OnBoot.lua など全ハンドラも `function(act)` に統一
 ## Data Models
 
 ### Domain Model
@@ -317,14 +311,15 @@ sequenceDiagram
     Event->>Handler: handler(req, act)
     Handler-->>Event: response
     Event-->>Entry: response
+```act)
+    Handler-->>Event: response
+    Event-->>Entry: response
 ```
 
 **Key Decisions**:
 - act生成は `EVENT.fire()` の冒頭で1回のみ実行
-- ハンドラが未登録の場合、`EVENT.no_entry(req, act)` が呼ばれ、シーン関数に `act` が渡される
-
----
-
+- ハンドラには `act` のみを渡す（req は `act.req` から取得可能）
+- ハンドラが未登録の場合、`EVENT.no_entry(
 ## Error Handling
 
 ### Error Strategy
@@ -347,9 +342,9 @@ sequenceDiagram
 ### Integration Tests
 1. `EVENT.fire()` - act がハンドラに渡されることを確認
 2. `EVENT.no_entry()` - act がシーン関数に渡されることを確認
-3. 既存ハンドラ `function(req)` - 第2引数無視で動作確認
+3. ハンドラ `function(act)` - act.req からリクエスト情報取得を確認
 4. `virtual_dispatcher.dispatch()` - act がシーン関数に渡されることを確認
 
 ### Regression Tests
 1. 既存の `shiori_act_test.lua` 全テストがパスすること
-2. 既存の `shiori_event_test.rs` 全テストがパスすること
+2. 既存の `shiori_event_test.rs` 全テストがパスすること（ハンドラシグネチャ変更後）
