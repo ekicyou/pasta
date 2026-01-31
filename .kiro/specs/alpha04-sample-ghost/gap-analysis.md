@@ -362,22 +362,50 @@ fn test_onboot_response() {
 3. `imageproc` で必要な描画機能が揃っている（塗りつぶし円・ポリゴン・線）
 4. フォント依存なし（CI環境差異を回避）
 
-### 4.2 スクリプト配置先の推奨変更
+### 4.2 テスト環境構築方針
 
-**現状の懸念**:
-- テストで `pasta_lua/scripts/` と `pasta_lua/scriptlibs/` が必要
-- `pasta_sample_ghost` から参照する方法を検討要
+**採用アプローチ**: **既存パターン踏襲（コピー方式）**
 
-**解決策**:
+**理由**:
+- pasta_lua のテストで実績のあるパターン
+- TempDir で独立したテスト環境を構築（テスト間の干渉なし）
+- scripts/, scriptlibs/ を自動コピーすることで、パス解決問題を回避
+
+**実装方針**:
 ```rust
-// テストで pasta_lua のパスを取得
-let pasta_lua_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-    .parent().unwrap()  // crates/
-    .join("pasta_lua");
+// crates/pasta_sample_ghost/tests/integration_test.rs
+use pasta_lua::loader::PastaLoader;
+use tempfile::TempDir;
 
-// scripts/, scriptlibs/ をテンポラリにコピー
-copy_dir_recursive(&pasta_lua_root.join("scripts"), &temp.path().join("scripts"));
-copy_dir_recursive(&pasta_lua_root.join("scriptlibs"), &temp.path().join("scriptlibs"));
+fn copy_ghost_to_temp() -> TempDir {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let ghost_src = manifest_dir.join("ghosts/hello-pasta/ghost/master");
+    let temp = TempDir::new().unwrap();
+    
+    // ゴーストファイルをコピー
+    copy_dir_recursive(&ghost_src, temp.path()).unwrap();
+    
+    // pasta_lua の scripts/, scriptlibs/ をコピー
+    let pasta_lua_dir = manifest_dir.parent().unwrap().join("pasta_lua");
+    copy_dir_recursive(&pasta_lua_dir.join("scripts"), &temp.path().join("scripts")).unwrap();
+    copy_dir_recursive(&pasta_lua_dir.join("scriptlibs"), &temp.path().join("scriptlibs")).unwrap();
+    
+    temp
+}
+
+#[test]
+fn test_onboot_response() {
+    let temp = copy_ghost_to_temp();
+    let runtime = PastaLoader::load(temp.path()).unwrap();
+    // テスト実行
+}
+```
+
+**dev-dependencies**:
+```toml
+[dev-dependencies]
+pasta_lua = { path = "../pasta_lua" }
+tempfile = "3"
 ```
 
 ### 4.3 工数見積
