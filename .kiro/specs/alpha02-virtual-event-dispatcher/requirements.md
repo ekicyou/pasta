@@ -111,15 +111,15 @@ pasta.shiori.event.virtual_dispatcher モジュール
 #### Acceptance Criteria
 
 1. The virtual_dispatcher shall Rust 側から提供される `req.date` テーブルを使用して時刻判定を行う
-2. The Rust 側 shall OnSecondChange リクエストに以下のフィールドを持つ `req.date` テーブルを付与する:
+2. The Rust 側 shall OnSecondChange リクエストに以下のフィールドを持つ `req.date` テーブルを付与する（既存実装に準拠）:
    - `year` - 年（整数）
    - `month` - 月（1-12）
    - `day` - 日（1-31）
    - `hour` - 時（0-23）
    - `min` - 分（0-59）
    - `sec` - 秒（0-59）
-   - `weekday` - 曜日（0=日曜 〜 6=土曜）
-   - `timestamp` - Unix timestamp（秒）
+   - `wday` - 曜日（0=日曜 〜 6=土曜）
+   - `unix` - Unix timestamp（秒）
 3. If `req.date` が存在しない場合, the virtual_dispatcher shall 現在時刻判定をスキップし `204 No Content` を返す
 
 ---
@@ -208,8 +208,8 @@ pasta.shiori.event.virtual_dispatcher モジュール
 | virtual_dispatcher | 仮想イベントの条件判定・発行を行うモジュール |
 | ctx.save | セッション永続化テーブル（`@pasta_persistence` モジュール経由） |
 | pasta.toml | ゴースト設定ファイル |
-| req.date | Rust側から提供される時刻情報テーブル |
-| Unix timestamp | 1970年1月1日からの経過秒数 |
+| req.date | Rust側から提供される時刻情報テーブル（`unix`, `year`, `month`, `day`, `hour`, `min`, `sec`, `wday` 等） |
+| Unix timestamp | 1970年1月1日からの経過秒数（`req.date.unix`） |
 
 ---
 

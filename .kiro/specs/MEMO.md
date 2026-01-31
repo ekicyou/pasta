@@ -11,35 +11,6 @@
 ## 実装完了処理
 ステアリング（workflow.md）を読み込んだら以下を実施。実装完了を承認します。完了フローを実施。お疲れ様でした！
 
-# ACT_IMPL.callの本格実装
+## 正時の判定方法
+1
 
-`act:call(SCENE.__global_name__, "グローバル単語呼び出し", {}, table.unpack(args))`などと、トランスパイルされる`ACT_IMPL.call()`メソッドについて、本格的な実装に置き換える。
-
-## 基本
-
-+ 入力引数
-  + self(=act)
-  + global_scene_name
-  + key
-  + attrs 属性テーブル
-  + ... 可変長引数（handlerにそのまま渡す）
-+ 処理
-  + 検索処理により、関数ハンドラー`handler`を取得する。
-  + handler == nilだったときは何もしない。（将来的にログを出す）
-  + `return handler(act, ...)`として呼び出す。
-
-## 検索処理
-
-以下の優先順位で最初に見つけた有効な関数を結果とする。
-
-1. `self.current_scene[key]`
-2. `SCENE.search(key, global_scene_name, attrs)`
-3. `requre("pasta.global")[key]`
-4. `SCENE.search(key, nil, attrs)`
-
-## 備考
-入力引数`attrs`は現在は使用していないが、将来的に`SCENE.search(key, global_scene_name, attrs)`などとしてsearchの第三引数として使われる。
-
-
-
-##
