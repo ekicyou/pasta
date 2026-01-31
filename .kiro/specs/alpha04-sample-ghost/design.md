@@ -353,6 +353,52 @@ flowchart TD
 
 **配置**: `ghosts/hello-pasta/ghost/master/dic/*.pasta`（要件定義で確定済み）
 
+#### pasta DSL とイベントシステムの連携
+
+pasta DSL は行指向の宣言的言語であり、SHIORI イベントハンドラを直接定義する構文を持ちませんわ。代わりに、**シーン関数フォールバック**機能を活用して、pasta DSL のみでイベント処理を記述できますの。
+
+```mermaid
+sequenceDiagram
+    participant SSP as SSP/ベースウェア
+    participant SHIORI as pasta_shiori
+    participant EVENT as EVENT.fire()
+    participant REG as REG テーブル
+    participant SCENE as SCENE.search()
+    participant DSL as *.pasta シーン
+
+    SSP->>SHIORI: OnBoot イベント
+    SHIORI->>EVENT: fire({id:"OnBoot"})
+    EVENT->>REG: REG.OnBoot 検索
+    REG-->>EVENT: nil（未登録）
+    EVENT->>SCENE: search("OnBoot")
+    SCENE-->>EVENT: シーン関数発見
+    EVENT->>DSL: シーン実行
+    DSL-->>EVENT: アクション実行
+    EVENT-->>SHIORI: レスポンス
+    SHIORI-->>SSP: Value: \0\s[0]...
+```
+
+**イベント処理の流れ**:
+
+1. **ベースウェア** が SHIORI イベント（OnBoot, OnClose 等）を送信
+2. **EVENT.fire()** が `REG.イベント名` でハンドラを検索
+3. **未登録の場合**、`SCENE.search(req.id)` でシーン名を前方一致検索
+4. **シーン発見時**、そのシーン関数を実行
+5. アクター発言がさくらスクリプトに変換され、レスポンス返却
+
+**pasta DSL の基本構文**:
+
+| マーカー | 意味 | 例 |
+|---------|------|-----|
+| `＃` | コメント | `＃ これはコメント` |
+| `％` | アクター辞書定義 | `％Pasta` |
+| `＠` | 単語定義/表情指定 | `＠笑顔：\s[1]` |
+| `＊` | グローバルシーン定義 | `＊OnBoot` |
+| `・` | ローカルシーン定義 | `・挨拶` |
+| `アクター：` | アクション行 | `Pasta：こんにちは！` |
+| `＄` | 変数参照/代入 | `＄カウンタ＝１０` |
+| `＞` | シーン呼び出し | `＞挨拶` |
+
 **ファイル構成**:
 
 | ファイル | イベント | 内容 |
@@ -366,53 +412,138 @@ flowchart TD
 **boot.pasta 設計**:
 
 ```pasta
-# 初回起動
-@OnFirstBoot
-  初めまして！
-  私は Pasta、よろしくね。
+＃ boot.pasta - 起動/終了イベント用シーン定義
+＃ pasta DSL では「シーン関数フォールバック」機能を利用
+＃ シーン名とSHIORIイベント名を一致させることで、自動ディスパッチされる
 
-# 通常起動
-@OnBoot
-  - おはよう！今日も頑張ろう！
-  - やあ、また会えたね。
-  - 起動完了。準備OKだよ。
+＃ アクター辞書（このファイルで使用するアクター）
+％Pasta
+　＠通常：\s[0]
+　＠笑顔：\s[1]
+　＠眠い：\s[2]
 
-# 終了
-@OnClose
-  - またね！
-  - お疲れ様！
-  - See you!
+％Lua
+　＠通常：\s[10]
+　＠元気：\s[11]
+
+＃ グローバル単語定義（ランダム選択用）
+＠起動挨拶：おはよう！今日も頑張ろう！　やあ、また会えたね。　起動完了。準備OKだよ。
+＠終了挨拶：またね！　お疲れ様！　See you!
+
+＃ OnBoot イベント - 通常起動時（シーン関数フォールバックで呼び出し）
+＊OnBoot
+　Pasta：＠笑顔　＠起動挨拶
+　Lua　：＠元気　よろしくやで！
+
+＃ OnBoot イベント - 別パターン（同名シーンでランダム選択）
+＊OnBoot
+　Pasta：＠通常　起動したよー。
+　Lua　：＠通常　さあ、始めよか。
+
+＃ OnFirstBoot イベント - 初回起動時
+＊OnFirstBoot
+　Pasta：＠笑顔　初めまして！\n私は Pasta、よろしくね。
+　Lua　：＠元気　ワイは Lua や！一緒に頑張ろな！
+
+＃ OnClose イベント - 終了時
+＊OnClose
+　Pasta：＠通常　＠終了挨拶
+　Lua　：＠通常　ほな、また！
 ```
+
+**シーン関数フォールバックの仕組み**:
+- SHIORI イベント発生時、`REG.イベント名` ハンドラを検索
+- 未登録の場合、`SCENE.search(req.id)` でシーン名と一致するシーンを検索
+- 見つかった場合、そのシーン関数を実行
+- これにより pasta DSL のみでイベントハンドラを記述可能
 
 **talk.pasta 設計**:
 
 ```pasta
-# ランダムトーク（2分間隔）
-@OnTalk
-  - 何か用？
-  - 暇だなあ...
-  - Pasta DSL、使ってみてね。
-  - ねえねえ、聞いてる？
-  - うーん、眠くなってきた...
+＃ talk.pasta - ランダムトーク/時報用シーン定義
+＃ OnSecondChange (毎秒) → 仮想イベントディスパッチャ → ランダムトーク/時報
 
-# 時報（毎時0分）
-@OnHour
-  今 {hour} 時だよ！
+＃ アクター辞書
+％Pasta
+　＠通常：\s[0]
+　＠笑顔：\s[1]
+　＠眠い：\s[2]
+　＠考え：\s[3]
+
+％Lua
+　＠通常：\s[10]
+　＠元気：\s[11]
+
+＃ ランダムトーク用単語（ランダム選択）
+＠雑談：何か用？　暇だなあ...　ねえねえ、聞いてる？　うーん、眠くなってきた...
+
+＃ ランダムトーク - 仮想イベント OnAITalk（ベースウェア設定による）
+＊OnAITalk
+　Pasta：＠通常　＠雑談
+
+＊OnAITalk
+　Pasta：＠笑顔　Pasta DSL、使ってみてね。
+　Lua　：＠元気　Lua 側も触ってみてや！
+
+＊OnAITalk
+　Pasta：＠眠い　ふぁ〜あ...
+　Lua　：＠通常　寝るなや。
+
+＊OnAITalk
+　Pasta：＠考え　今日は何しようかな...
+　Lua　：＠通常　ワイに任せとき！
+
+＃ 時報 - 毎時0分に発生
+＊OnHour
+　Pasta：＠笑顔　今＄時だよ！\n＠時報メッセージ
+　Lua　：＠通常　時間の確認は大事やで。
+
+＃ 時報メッセージ（時間帯別に追加可能）
+＠時報メッセージ：お昼ごはん食べた？　おやつの時間かも！　そろそろ休憩しよう。
 ```
+
+**仮想イベントディスパッチ**:
+- `OnSecondChange` イベントで仮想イベントディスパッチャが動作
+- `OnAITalk`（ランダムトーク）、`OnHour`（時報）等を時間条件で発火
+- pasta DSL 側はシーン名を一致させるだけで連携可能
 
 **click.pasta 設計**:
 
 ```pasta
-# ダブルクリック
-@OnMouseDoubleClick
-  @if p0 == 0  # sakura側
-    - なになに？
-    - はいはい。
-    - ダブルクリックされた！
-  @else  # kero側
-    - 呼んだ？
-    - ん？
+＃ click.pasta - クリックイベント用シーン定義
+＃ OnMouseDoubleClick イベントをシーン関数フォールバックで処理
+
+＃ アクター辞書
+％Pasta
+　＠通常：\s[0]
+　＠驚き：\s[2]
+　＠照れ：\s[1]
+
+％Lua
+　＠通常：\s[10]
+　＠元気：\s[11]
+
+＃ ダブルクリック反応の単語定義
+＠Pasta反応：なになに？　はいはい。　ダブルクリックされた！
+＠Lua反応：呼んだ？　ん？　なんや？
+
+＃ OnMouseDoubleClick イベント - Pasta側クリック
+＃ Reference0 = 0 で Pasta（\0側）がクリックされた場合
+＊OnMouseDoubleClick
+　Pasta：＠驚き　＠Pasta反応
+
+＊OnMouseDoubleClick
+　Pasta：＠照れ　え、なに？
+　Lua　：＠通常　こっちに用があるんちゃうん？
+
+＃ 注意: Reference による分岐は alpha04 時点では未実装
+＃ 将来的には条件分岐（＄０ == "0"）や属性（＆where:0）で分岐可能予定
 ```
+
+**現在の制約と将来の拡張**:
+- alpha04 時点では Reference 値による条件分岐は pasta DSL に未実装
+- Lua ハンドラで req.reference[0] を判定する高度なパターンも可能
+- 将来の拡張で属性ベースの条件分岐 `＆where:0` 等を検討
 
 ---
 
