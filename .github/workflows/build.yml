@@ -33,6 +33,12 @@ jobs:
         with:
           key: ${{ matrix.target }}
 
+      - name: Set Japanese locale for Shift-JIS support
+        run: |
+          Set-WinSystemLocale ja-JP
+          Set-Culture ja-JP
+        shell: powershell
+
       - name: Build pasta_shiori
         run: cargo build --release --target ${{ matrix.target }} -p pasta_shiori
 
