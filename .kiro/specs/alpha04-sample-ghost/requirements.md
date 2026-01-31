@@ -168,14 +168,25 @@
 
 **Objective:** As a 開発者, I want サンプルゴーストの動作テストを実行したい, so that 品質を保証できる
 
+#### Test Prerequisites
+
+1. The テスト実行前 shall pasta_shiori をリリースビルドすること:
+   ```powershell
+   cargo build --release --target i686-pc-windows-msvc -p pasta_shiori
+   ```
+2. The テスト shall ビルド成果物 `target/i686-pc-windows-msvc/release/pasta_shiori.dll` を自動検出・コピーする
+3. The テスト shall DLL不在時に明確なエラーメッセージを表示する
+
 #### Acceptance Criteria
 
 1. The alpha04-sample-ghost shall `crates/pasta_sample_ghost/tests/` に統合テストを配置する
-2. The テスト shall PastaLoaderを使用して各イベントハンドラの動作を検証する
-3. The テスト shall さくらスクリプト出力の正確性を検証する
-4. The テスト shall pasta.toml 設定の読み込みを検証する
-5. The テスト shall `cargo test --workspace` でCI実行可能であること
-6. The テスト shall 実SSP不要（モックSHIORI環境）で完結すること
+2. The テスト shall `tests/common/mod.rs` にヘルパー関数 `copy_pasta_shiori_dll()` を実装する
+3. The テスト shall PastaLoaderを使用して各イベントハンドラの動作を検証する
+4. The テスト shall さくらスクリプト出力の正確性を検証する
+5. The テスト shall pasta.toml 設定の読み込みを検証する
+6. The テスト shall `cargo test --workspace` でCI実行可能であること（事前ビルド必須）
+7. The テスト shall 実SSP不要（モックSHIORI環境）で完結すること
+8. The 配布物 shall `ghost/master/pasta.dll` にSHIORI DLLを含むこと
 
 ---
 

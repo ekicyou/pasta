@@ -398,6 +398,7 @@ ghosts/hello-pasta/
 │   └── master/
 │       ├── descript.txt            # REQ-009
 │       ├── pasta.toml              # REQ-007
+│       ├── pasta.dll               # REQ-008 (SHIORI DLL - テスト時コピー)
 │       └── dic/                    # Pasta DSLスクリプト配置ディレクトリ
 │           ├── boot.pasta          # REQ-002
 │           ├── talk.pasta          # REQ-004, REQ-005
@@ -529,8 +530,51 @@ flowchart TB
 ```rust
 // 議題 #3 で決定: 既存パターン踏襲
 // 議題 #5 で決定: ヘルパー関数による堅牢化
+// 議題 #6 で決定: pasta.dll 自動コピー（オプションA）
 
 // tests/common/mod.rs - テスト用ヘルパー
+
+/// pasta_shiori DLL をコピー（テスト前提: リリースビルド済み）
+pub fn copy_pasta_shiori_dll(dest_ghost_master: &Path) -> Result<(), std::io::Error> {
+    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let workspace_root = manifest_dir
+        .parent()
+        .and_then(|p| p.parent())
+        .ok_or_else(|| std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "ワークスペースルートが見つかりません"
+        ))?;
+    
+    #[cfg(target_os = "windows")]
+    let dll_src = workspace_root
+        .join("target/i686-pc-windows-msvc/release/pasta_shiori.dll");
+    
+    #[cfg(target_os = "linux")]
+    let dll_src = workspace_root
+        .join("target/release/libpasta_shiori.so");
+    
+    if !dll_src.exists() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!(
+                "pasta_shiori DLL not found: {:?}\n\n\
+                テスト前に以下を実行してください:\n\
+                cargo build --release --target i686-pc-windows-msvc -p pasta_shiori",
+                dll_src
+            )
+        ));
+    }
+    
+    #[cfg(target_os = "windows")]
+    let dll_dest = dest_ghost_master.join("pasta.dll");
+    
+    #[cfg(target_os = "linux")]
+    let dll_dest = dest_ghost_master.join("pasta.so");
+    
+    std::fs::copy(&dll_src, &dll_dest)?;
+    Ok(())
+}
+
 pub fn copy_pasta_lua_runtime(dest_ghost_master: &Path) -> Result<(), std::io::Error> {
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
     let workspace_root = manifest_dir
@@ -564,6 +608,10 @@ fn test_sample_ghost_generation() {
     let ghost_root = temp.path().join("hello-pasta");
     let ghost_master = ghost_root.join("ghost/master");
     
+    // pasta_shiori DLL をコピー（議題 #6: オプションA）
+    common::copy_pasta_shiori_dll(&ghost_master)
+        .expect("pasta_shiori.dll のコピーに失敗。テスト前にビルドしてください。");
+    
     // pasta_lua ランタイムをコピー（ヘルパー使用）
     common::copy_pasta_lua_runtime(&ghost_master).unwrap();
     
@@ -574,6 +622,7 @@ fn test_sample_ghost_generation() {
     assert!(ghost_root.join("install.txt").exists());
     assert!(ghost_root.join("ghost/master/descript.txt").exists());
     assert!(ghost_root.join("ghost/master/pasta.toml").exists());
+    assert!(ghost_root.join("ghost/master/pasta.dll").exists()); // DLL存在確認
     assert!(ghost_root.join("ghost/master/dic/boot.pasta").exists());
     assert!(ghost_root.join("shell/master/surface0.png").exists());
     assert!(ghost_root.join("shell/master/surface10.png").exists());
