@@ -46,15 +46,14 @@
 
 - **Context**: シーン関数呼び出し時のコンテキスト提供
 - **Sources Consulted**: 
-  - `crates/pasta_lua/scripts/pasta/act.lua`
-  - `crates/pasta_lua/scripts/pasta/ctx.lua`
+  - `crates/pasta_lua/scripts/pasta/shiori/act.lua`
 - **Findings**:
-  - `ACT.new(ctx)`: 新規 act オブジェクト作成
+  - `ACT.new(req)`: 新規 act オブジェクト作成（req から直接初期化）
   - シーン関数は `function SCENE.__name__(act, ...)` シグネチャ
   - act はトークン蓄積、アクタープロキシ、変数管理を担当
   - シーン関数実行後、`act.token` からさくらスクリプト生成（alpha03 で実装）
 - **Implications**: 
-  - シーン関数フォールバックでは簡易 act を生成するか、直接文字列返却を期待
+  - シーン関数フォールバックでは `pasta.shiori.act` を使用
   - alpha03 統合前は `RES.no_content()` フォールバックで十分
 
 ## Architecture Pattern Evaluation

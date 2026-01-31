@@ -111,8 +111,7 @@ graph LR
     end
     
     subgraph "Action System"
-        ACT[pasta.act]
-        CTX[pasta.ctx]
+        ACT[pasta.shiori.act]
     end
     
     EVENT --> REG
@@ -121,7 +120,6 @@ graph LR
     BOOT --> REG
     BOOT --> RES
     SCENE --> SEARCH
-    ACT --> CTX
 ```
 
 ## 3. Component Design
@@ -367,14 +365,12 @@ Value: error message with traceback
 ```lua
 function EVENT.no_entry(req)
     local SCENE = require("pasta.scene")
-    local ACT = require("pasta.act")
-    local CTX = require("pasta.ctx")
+    local ACT = require("pasta.shiori.act")
     
     local scene_result = SCENE.search(req.id, nil, nil)
     
     if scene_result then
-        local ctx = CTX.new(req)
-        local act = ACT.new(ctx)
+        local act = ACT.new(req)
         local ok, err = pcall(scene_result, act)
         if not ok then
             return RES.err(err)

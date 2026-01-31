@@ -19,8 +19,8 @@
 | EVENT | `pasta.shiori.event` | イベント振り分け、`fire(req)` API |
 | REG | `pasta.shiori.event.register` | ハンドラ登録テーブル |
 | RES | `pasta.shiori.res` | レスポンス組み立て |
-| CTX | `pasta.ctx` | 環境コンテキスト、`ctx.save` 永続化テーブル |
 | SCENE | `pasta.scene` | シーン検索 |
+| @pasta_config | Rust提供 | pasta.toml設定読み込み |
 
 ### 対象仮想イベント
 
@@ -56,13 +56,15 @@ pasta.shiori.event.virtual_dispatcher モジュール
 #### Acceptance Criteria
 
 1. When OnSecondChange イベントを受信した場合, the virtual_dispatcher shall OnTalk 発行判定を実行する
-2. While 以下の条件を全て満たす場合, the virtual_dispatcher shall OnTalk 仮想イベントを発行する:
-   - 非トーク中（`ctx.save.virtual_event.is_talking == false`）
-   - 前回トークから設定秒数が経過している
+2. The virtual_dispatcher shall 次回トーク予定時刻（`next_talk_time`）をモジュールローカル変数で保持する（初期値: 0）
+3. If `next_talk_time == 0` の場合（初回起動時）, the virtual_dispatcher shall ランダム間隔を計算して次回トーク時刻を設定し、OnTalk 発行をスキップする
+4. While 以下の条件を全て満たす場合, the virtual_dispatcher shall OnTalk 仮想イベントを発行する:
+   - 非トーク中（`req.status ~= "talking"`）
+   - 現在時刻が次回トーク予定時刻を超過している（`req.date.unix >= next_talk_time`）
    - 次の正時までの余裕時間が `hour_margin` 秒以上ある
-3. When OnTalk を発行する場合, the virtual_dispatcher shall `SCENE.search("OnTalk")` でシーン関数を検索し実行する
-4. If OnTalk シーン関数が存在しない場合, the virtual_dispatcher shall `204 No Content` を返す
-5. When OnTalk を発行した場合, the virtual_dispatcher shall `ctx.save.virtual_event.last_talk_time` を現在時刻で更新する
+5. When OnTalk を発行する場合, the virtual_dispatcher shall `SCENE.search("OnTalk")` でシーン関数を検索し実行する
+6. If OnTalk シーン関数が存在しない場合, the virtual_dispatcher shall `204 No Content` を返す
+7. When OnTalk を発行した場合（成否に関わらず）, the virtual_dispatcher shall 次回トーク予定時刻を再計算・更新する
 
 ---
 
@@ -76,9 +78,9 @@ pasta.shiori.event.virtual_dispatcher モジュール
 2. The virtual_dispatcher shall 次の正時タイムスタンプ（`next_hour_unix`）をモジュールローカル変数で保持する（初期値: 0）
 3. If `next_hour_unix == 0` の場合（初回起動時）, the virtual_dispatcher shall 次の正時タイムスタンプを計算・設定し、OnHour 発行をスキップする
 4. While 以下の条件を全て満たす場合, the virtual_dispatcher shall OnHour 仮想イベントを発行する:
+   - 非トーク中（`req.status ~= "talking"`）
    - `next_hour_unix` が初期化済み（`next_hour_unix > 0`）
    - 現在時刻が次の正時を超過している（`req.date.unix >= next_hour_unix`）
-   - 非トーク中（`ctx.save.virtual_event.is_talking == false`）
 5. When OnHour を発行する場合, the virtual_dispatcher shall `SCENE.search("OnHour")` でシーン関数を検索し実行する
 6. If OnHour シーン関数が存在しない場合, the virtual_dispatcher shall `204 No Content` を返す
 7. When OnHour を発行した場合, the virtual_dispatcher shall 次の正時タイムスタンプを計算して更新する（現在時刻から次の00分00秒）
@@ -86,22 +88,18 @@ pasta.shiori.event.virtual_dispatcher モジュール
 
 ---
 
-### Requirement 3: 状態管理
+### Requirement 3: モジュール内部状態
 
-**Objective:** As a ゴースト開発者, I want 仮想イベントの状態がセッションを跨いで保持されることを期待する, so that 再起動後も適切なタイミングでトークが発動する
+**Objective:** As a 開発者, I want 仮想イベント判定に必要な状態をモジュール内で管理したい, so that シンプルかつ予測可能な動作を実現する
 
 #### Acceptance Criteria
 
-1. The virtual_dispatcher shall 以下の状態を `ctx.save.virtual_event` テーブルで管理する:
-   - `last_talk_time` - 前回トーク発行時刻（Unix timestamp、秒）
-   - `is_talking` - トーク中フラグ（boolean）
-2. When virtual_dispatcher が初回起動する場合（`ctx.save.virtual_event == nil`）, the virtual_dispatcher shall デフォルト値で初期化する:
-   - `last_talk_time = 0`
-   - `is_talking = false`
-3. The `ctx.save` テーブル shall `@pasta_persistence` モジュールにより自動永続化される（Drop時保存）
-4. When トーク・時報発行後のシーン実行が開始する場合, the virtual_dispatcher shall `is_talking = true` を設定する
-5. When シーン実行が完了した場合, the シーン shall `is_talking = false` を設定する（alpha03 act モジュール統合時に実装）
-6. The virtual_dispatcher shall 次の正時タイムスタンプ（`next_hour_unix`）をモジュールローカル変数で保持する（永続化不要）
+1. The virtual_dispatcher shall 以下の状態をモジュールローカル変数で保持する:
+   - `next_hour_unix` - 次の正時タイムスタンプ（初期値: 0）
+   - `next_talk_time` - 次回トーク予定時刻（初期値: 0）
+   - `cached_config` - 設定キャッシュ（初期値: nil）
+2. The 上記の状態 shall セッション中のみ有効で、再起動時に初期値にリセットされる
+3. The トーク中判定 shall ベースウェア（SSP）から提供される `req.status` フィールドを使用する（`req.status == "talking"` の場合は発行スキップ）
 
 ---
 
@@ -121,7 +119,10 @@ pasta.shiori.event.virtual_dispatcher モジュール
    - `sec` - 秒（0-59）
    - `wday` - 曜日（0=日曜 〜 6=土曜）
    - `unix` - Unix timestamp（秒）
-3. If `req.date` が存在しない場合, the virtual_dispatcher shall 現在時刻判定をスキップし `204 No Content` を返す
+3. The Rust 側 shall `req.status` フィールドでベースウェアからの状態情報を提供する:
+   - `"starting"` - 起動中
+   - `"talking"` - 会話中（トーク実行中）
+   - その他 - 待機中
 
 ---
 
@@ -185,7 +186,7 @@ pasta.shiori.event.virtual_dispatcher モジュール
 3. The ドキュメント shall シーン関数でのハンドラ実装例を提供する:
    - `＊OnTalk` グローバルシーンの定義例
    - `＊OnHour` グローバルシーンの定義例
-4. The ドキュメント shall `ctx.save.virtual_event` 状態テーブルの構造を説明する
+4. The ドキュメント shall モジュール内部状態（`next_hour_unix`, `next_talk_time`）の動作を説明する
 
 ---
 
@@ -194,7 +195,6 @@ pasta.shiori.event.virtual_dispatcher モジュール
 - 実際のトーク内容生成（alpha04 で実装）
 - さくらスクリプト組み立て・act オブジェクト統合（alpha03 で実装）
 - 複雑なトーク条件（天気、記念日等）
-- `is_talking` フラグの自動解除（alpha03 act モジュール統合時に実装）
 
 ---
 
@@ -206,8 +206,9 @@ pasta.shiori.event.virtual_dispatcher モジュール
 | OnHour | 時報発動の仮想イベント |
 | 仮想イベント | OnSecondChange をトリガーとして条件判定により発行されるイベント |
 | virtual_dispatcher | 仮想イベントの条件判定・発行を行うモジュール |
-| next_hour_unix | 次の正時のUnixタイムスタンプ（モジュールローカル変数で保持） |
-| ctx.save | セッション永続化テーブル（`@pasta_persistence` モジュール経由） |
+| next_hour_unix | 次の正時のUnixタイムスタンプ（モジュールローカル変数、初期値0） |
+| next_talk_time | 次回トーク予定時刻のUnixタイムスタンプ（モジュールローカル変数、初期値0） |
+| req.status | ベースウェア（SSP）から提供される状態情報（`"starting"`, `"talking"` 等） |
 | pasta.toml | ゴースト設定ファイル |
 | req.date | Rust側から提供される時刻情報テーブル（`unix`, `year`, `month`, `day`, `hour`, `min`, `sec`, `wday` 等） |
 | Unix timestamp | 1970年1月1日からの経過秒数（`req.date.unix`） |
@@ -226,5 +227,5 @@ pasta.shiori.event.virtual_dispatcher モジュール
 
 | 仕様 | 依存内容 |
 |------|----------|
-| alpha03 | act オブジェクト統合、さくらスクリプト生成、`is_talking` 自動管理 |
+| alpha03 | act オブジェクト統合、さくらスクリプト生成 |
 | alpha04 | 実際のトーク内容生成、シーン選択ロジック |

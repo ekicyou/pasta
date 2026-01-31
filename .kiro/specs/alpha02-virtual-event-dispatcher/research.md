@@ -104,23 +104,21 @@ hour_margin = 30
 
 ---
 
-## 4. 永続化パターン
+## 4. モジュールローカル状態
 
-### 4.1 ctx.save テーブル
+### 4.1 状態変数（永続化不要）
 
-**ファイル**: `crates/pasta_lua/scripts/pasta/ctx.lua`
+virtual_dispatcher モジュール内で保持する状態:
 
 ```lua
--- ctx.save は @pasta_persistence により自動永続化
-ctx.save.virtual_event = ctx.save.virtual_event or {
-    last_talk_time = 0,
-    is_talking = false,
-}
+local next_hour_unix = 0      -- 次の正時タイムスタンプ
+local next_talk_time = 0      -- 次回トーク予定時刻
+local cached_config = nil     -- 設定キャッシュ
 ```
 
-**注意**:
-- モジュールローカル変数（`next_hour_unix`）は永続化対象外
-- 起動時にモジュールローカル変数は `0` に初期化
+**永続化が不要な理由**:
+- 再起動後は新鮮な状態で開始するのが自然
+- トーク中判定は `req.status` でベースウェアから提供される
 
 ---
 
@@ -143,7 +141,27 @@ req.date = {
 }
 ```
 
-### 5.2 次の正時計算
+### 5.2 req.status フィールド
+
+SSPから送信される `Status:` ヘッダーの値:
+
+```lua
+req.status = "talking"   -- 会話中（トーク実行中）
+req.status = "starting"  -- 起動中
+req.status = nil         -- ステータス未設定
+```
+
+**トーク中判定**:
+```lua
+if req.status == "talking" then
+    -- トーク中なのでOnTalk/OnHour発行スキップ
+    return nil
+end
+```
+
+**メリット**: ベースウェアが状態を管理するため、自己管理不要
+
+### 5.3 次の正時計算
 
 ```lua
 -- 現在時刻から次の正時を計算
@@ -246,22 +264,18 @@ end
 
 **根拠**: 分単位判定（min==0）より堅牢、秒単位の誤差許容
 
-### D4: 状態テーブル初期化
+### D4: トーク中判定
 
-**決定**: virtual_dispatcher 内で初期化
+**決定**: SSP提供の `req.status` を使用
 
 ```lua
-local function ensure_state()
-    if not ctx.save.virtual_event then
-        ctx.save.virtual_event = {
-            last_talk_time = 0,
-            is_talking = false,
-        }
-    end
+-- トーク中ならスキップ
+if req.status == "talking" then
+    return nil
 end
 ```
 
-**根拠**: ctx モジュールへの依存を最小限に
+**根拠**: ベースウェアが状態を管理しており、自己管理不要
 
 ---
 
@@ -284,6 +298,5 @@ end
 | リスク | 軽減策 |
 |--------|--------|
 | 毎秒呼び出しによるパフォーマンス影響 | 設定キャッシュ、早期リターン |
-| req.date 不在時のクラッシュ | nil チェック、204 返却 |
+| req.date 不在時のクラッシュ | nil チェック、nil 返却 |
 | 時刻ずれによる OnHour 重複発行 | Unix タイムスタンプ比較で厳密判定 |
-| is_talking 状態の不整合 | alpha03 で act モジュール統合時に解決予定 |

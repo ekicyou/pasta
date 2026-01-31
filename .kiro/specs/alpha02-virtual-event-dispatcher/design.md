@@ -14,7 +14,7 @@ OnSecondChange イベントをトリガーとして、OnTalk（ランダムト�
 
 **In Scope:**
 - OnTalk/OnHour 発行条件判定ロジック
-- 状態管理（ctx.save.virtual_event）
+- モジュール内部状態管理（next_hour_unix, next_talk_time）
 - 設定読み込み（pasta.toml [ghost]セクション）
 - OnSecondChange デフォルトハンドラ
 - シーン関数呼び出し（SCENE.search）
@@ -22,7 +22,6 @@ OnSecondChange イベントをトリガーとして、OnTalk（ランダムト�
 **Out of Scope:**
 - さくらスクリプト組み立て（alpha03）
 - 実際のトーク内容生成（alpha04）
-- is_talking フラグ自動解除（alpha03）
 
 ### Requirements Traceability
 
@@ -107,7 +106,6 @@ second_change.lua
              ├──▶ pasta.shiori.event.register (REG)
              ├──▶ pasta.shiori.res (RES)
              ├──▶ pasta.scene (SCENE)
-             ├──▶ pasta.ctx (CTX)
              └──▶ @pasta_config (設定)
 ```
 
@@ -137,14 +135,14 @@ second_change.lua
         │ No
         ▼
 ┌───────────────┐     ┌───────────────┐
-│ is_talking    │ Yes │ return nil    │
-│ チェック      │────▶│ (スキップ)    │
+│ req.status    │ Yes │ return nil    │
+│ == "talking" │────▶│ (スキップ)    │
 └───────┬───────┘     └───────────────┘
-        │ No (false)
+        │ No
         ▼
 ┌───────────────┐     ┌───────────────┐
-│ 経過時間      │ No  │ return nil    │
-│ >= interval   │────▶│ (スキップ)    │
+│ next_talk_time│ No  │ return nil    │
+│ == 0 (初回)   │────▶│ (初期化のみ)  │
 └───────┬───────┘     └───────────────┘
         │ Yes
         ▼
@@ -167,20 +165,8 @@ second_change.lua
         │ Yes
         ▼
 ┌───────────────┐
-│ is_talking    │
-│ = true        │
-└───────┬───────┘
-        │
-        ▼
-┌───────────────┐
-│ last_talk_time│
-│ = 現在時刻    │
-└───────┬───────┘
-        │
-        ▼
-┌───────────────┐
-│ 次回interval  │
-│ 再計算        │
+│ next_talk_time│
+│ = 次回予定    │
 └───────┬───────┘
         │
         ▼
@@ -218,10 +204,10 @@ second_change.lua
         │ Yes
         ▼
 ┌───────────────┐     ┌───────────────┐
-│ is_talking    │ Yes │ return nil    │
-│ チェック      │────▶│ (スキップ)    │
+│ req.status    │ Yes │ return nil    │
+│ == "talking" │────▶│ (スキップ)    │
 └───────┬───────┘     └───────────────┘
-        │ No (false)
+        │ No
         ▼
 ┌───────────────┐
 │ next_hour_unix│
@@ -240,12 +226,6 @@ second_change.lua
 │ 存在チェック  │────▶│ (スキップ)    │
 └───────┬───────┘     └───────────────┘
         │ Yes
-        ▼
-┌───────────────┐
-│ is_talking    │
-│ = true        │
-└───────┬───────┘
-        │
         ▼
 ┌───────────────┐
 │ シーン関数    │
@@ -341,17 +321,6 @@ local function get_config()
     return cached_config
 end
 
---- 状態テーブル初期化
-local function ensure_state()
-    local CTX = require("pasta.ctx")
-    if not CTX.save.virtual_event then
-        CTX.save.virtual_event = {
-            last_talk_time = 0,
-            is_talking = false,
-        }
-    end
-end
-
 --- 次の正時タイムスタンプを計算
 ---@param current_unix number 現在のUnixタイムスタンプ
 ---@return number 次の正時のUnixタイムスタンプ
@@ -393,9 +362,8 @@ end
 
 --- OnHour 判定・発行
 ---@param req table リクエストテーブル
----@param state table 状態テーブル
 ---@return string|nil "fired" (発行成功), nil (発行なし)
-function M.check_hour(req, state)
+function M.check_hour(req)
     local current_unix = req.date.unix
     
     -- 初回起動: 次の正時を計算して設定、発行スキップ
@@ -409,8 +377,8 @@ function M.check_hour(req, state)
         return nil
     end
     
-    -- トーク中はスキップ
-    if state.is_talking then
+    -- トーク中はスキップ（SSPからの状態情報を使用）
+    if req.status == "talking" then
         return nil
     end
     
@@ -419,23 +387,19 @@ function M.check_hour(req, state)
     
     -- シーン実行
     local result = execute_scene("OnHour")
-    if result then
-        state.is_talking = true
-    end
     
     return result and "fired" or nil
 end
 
 --- OnTalk 判定・発行
 ---@param req table リクエストテーブル
----@param state table 状態テーブル
 ---@return string|nil "fired" (発行成功), nil (発行なし)
-function M.check_talk(req, state)
+function M.check_talk(req)
     local current_unix = req.date.unix
     local cfg = get_config()
     
-    -- トーク中はスキップ
-    if state.is_talking then
+    -- トーク中はスキップ（SSPからの状態情報を使用）
+    if req.status == "talking" then
         return nil
     end
     
@@ -458,10 +422,6 @@ function M.check_talk(req, state)
     
     -- シーン実行
     local result = execute_scene("OnTalk")
-    if result then
-        state.is_talking = true
-        state.last_talk_time = current_unix
-    end
     
     -- 次回トーク時刻を再計算（発行成否に関わらず）
     next_talk_time = calculate_next_talk_time(current_unix)
@@ -478,19 +438,14 @@ function M.dispatch(req)
         return nil
     end
     
-    -- 状態初期化
-    ensure_state()
-    local CTX = require("pasta.ctx")
-    local state = CTX.save.virtual_event
-    
     -- OnHour 判定（優先）
-    local hour_result = M.check_hour(req, state)
+    local hour_result = M.check_hour(req)
     if hour_result then
         return hour_result
     end
     
     -- OnTalk 判定
-    local talk_result = M.check_talk(req, state)
+    local talk_result = M.check_talk(req)
     return talk_result
 end
 
@@ -522,8 +477,8 @@ return M
 | 関数 | 引数 | 戻り値 | 説明 |
 |------|------|--------|------|
 | `dispatch(req)` | req: table | string\|nil | メインエントリ。OnHour/OnTalk を判定・発行 |
-| `check_hour(req, state)` | req, state | "fired"\|nil | OnHour 判定 |
-| `check_talk(req, state)` | req, state | "fired"\|nil | OnTalk 判定 |
+| `check_hour(req)` | req | "fired"\|nil | OnHour 判定 |
+| `check_talk(req)` | req | "fired"\|nil | OnTalk 判定 |
 | `_reset()` | なし | なし | テスト用内部状態リセット |
 | `_get_internal_state()` | なし | table | テスト用内部状態取得 |
 
@@ -574,22 +529,20 @@ require("pasta.shiori.event.second_change")  -- 追加
 
 ## 5. Data Models
 
-### 5.1 State Model (ctx.save.virtual_event)
+### 5.1 Module Local State
 
 ```lua
----@class VirtualEventState
----@field last_talk_time number 前回トーク発行時刻（Unix timestamp）
----@field is_talking boolean トーク中フラグ
-ctx.save.virtual_event = {
-    last_talk_time = 0,
-    is_talking = false,
-}
+-- モジュールローカル変数（セッション中のみ有効）
+local next_hour_unix = 0      -- 次の正時タイムスタンプ
+local next_talk_time = 0      -- 次回トーク予定時刻
+local cached_config = nil     -- 設定キャッシュ
 ```
 
-| フィールド | 型 | 初期値 | 永続化 | 説明 |
-|-----------|-----|--------|--------|------|
-| `last_talk_time` | number | 0 | ✓ | 前回トーク発行時刻（Unix秒） |
-| `is_talking` | boolean | false | ✓ | トーク中フラグ |
+| 変数 | 型 | 初期値 | 永続化 | 説明 |
+|-----|-----|--------|--------|------|
+| `next_hour_unix` | number | 0 | ✗ | 次の正時タイムスタンプ（セッション中有効） |
+| `next_talk_time` | number | 0 | ✗ | 次回トーク予定時刻（セッション中有効） |
+| `cached_config` | table\|nil | nil | ✗ | 設定キャッシュ |
 
 ### 5.2 Time Model (req.date)
 
@@ -630,21 +583,6 @@ hour_margin = 30          # 時報前マージン（秒）
 | `talk_interval_max` | number | 300 | トーク最大間隔（秒） |
 | `hour_margin` | number | 30 | 時報前マージン（秒） |
 
-### 5.4 Internal State (Module Local)
-
-```lua
--- モジュールローカル変数（永続化対象外）
-local next_hour_unix = 0      -- 次の正時タイムスタンプ
-local next_talk_time = 0      -- 次回トーク発行予定時刻
-local cached_config = nil     -- 設定キャッシュ
-```
-
-| 変数 | 型 | 初期値 | 永続化 | 説明 |
-|-----|-----|--------|--------|------|
-| `next_hour_unix` | number | 0 | ✗ | 次の正時タイムスタンプ |
-| `next_talk_time` | number | 0 | ✗ | 次回トーク発行予定時刻 |
-| `cached_config` | table\|nil | nil | ✗ | 設定キャッシュ |
-
 ---
 
 ## 6. Testing Strategy
@@ -660,13 +598,13 @@ local cached_config = nil     -- 設定キャッシュ
 | `test_dispatch_without_req_date` | req.date 不在時に nil 返却 |
 | `test_onhour_first_run_skip` | 初回起動時は OnHour 発行スキップ |
 | `test_onhour_fires_at_hour` | 正時超過時に OnHour 発行 |
-| `test_onhour_skips_when_talking` | is_talking=true 時はスキップ |
 | `test_ontalk_interval_check` | interval 経過前はスキップ |
 | `test_ontalk_fires_after_interval` | interval 経過後に発行 |
 | `test_ontalk_hour_margin_skip` | 時報前マージン内はスキップ |
 | `test_onhour_priority_over_ontalk` | OnHour が OnTalk より優先 |
 | `test_config_default_values` | 設定未定義時のデフォルト値 |
-| `test_state_initialization` | ctx.save.virtual_event 初期化 |
+| `test_module_state_reset` | モジュール再読み込み時の状態リセット |
+| `test_skip_when_talking` | req.status=="talking"時はスキップ |
 
 ### 6.3 Lua ユニットテスト
 
@@ -752,7 +690,6 @@ hour_margin = 30
 
 ### 8.3 alpha03 への引き継ぎ事項
 
-- `is_talking` フラグの自動解除ロジック（act モジュール統合時）
 - シーン実行結果のさくらスクリプト変換
 - `dispatch()` の戻り値を 200 OK レスポンスに変換
 
