@@ -138,14 +138,44 @@
 
 **Objective:** As a 開発者, I want pasta.toml設定をLuaから読み取りたい, so that ランタイム設定を動的に取得できる
 
+#### 既存実装状況
+
+**Rust側（`crates/pasta_lua/src/runtime/mod.rs`）**:
+- `@pasta_config` モジュールが既に登録済み（`register_config_module`）
+- `custom_fields`（TOMLテーブル）がLuaテーブルとして提供される
+- `[loader]` セクションはセキュリティ上除外済み
+- 既存テスト: `loader_integration_test.rs` で動作確認済み
+
+**既存のアクセスパターン**:
+```lua
+local config = require("@pasta_config")
+return config.ghost_name  -- 直接テーブルアクセス
+return config.user_data.nested.inner  -- ネストされたテーブル
+```
+
+#### リグレッション考慮事項
+
+1. **既存テストへの影響**:
+   - `loader_integration_test.rs` の `@pasta_config` 直接アクセステストは維持
+   - 新しい `pasta.config` ラッパーは追加的な機能として提供
+   - `@pasta_config` の動作は変更しない
+
+2. **互換性方針**:
+   - `@pasta_config` はそのまま使用可能（下位互換性維持）
+   - `pasta.config` は新規ラッパーとして追加（オプション的利用）
+   - 既存コードは修正不要
+
 #### Acceptance Criteria
 
 1. The `pasta.config` モジュール shall `crates/pasta_lua/scripts/pasta/config.lua` に配置する
-2. The モジュール shall `PASTA_CONFIG.get(section, key, default)` メソッドを提供する
-3. When 設定値が存在する場合, the メソッド shall 設定値を返す
-4. When 設定値が存在しない場合, the メソッド shall `default` 引数を返す
-5. The モジュール shall pasta.toml解析済みテーブルをキャッシュする（ロード時に1回のみ解析）
-6. If pasta.tomlが存在しない場合, the モジュール shall 空テーブルをキャッシュする
+2. The モジュール shall 内部で `require("@pasta_config")` を使用する
+3. The モジュール shall `PASTA_CONFIG.get(section, key, default)` メソッドを提供する
+   - 例: `pasta.config.get("ghost", "spot_switch_newlines", 1.5)`
+   - セクション省略時: `pasta.config.get(nil, "ghost_name", "DefaultGhost")`（トップレベル検索）
+4. When 設定値が存在する場合, the メソッド shall 設定値を返す
+5. When 設定値が存在しない場合, the メソッド shall `default` 引数を返す
+6. The 既存の `@pasta_config` 直接アクセス shall 引き続き動作する（下位互換性）
+7. The 既存テスト（`loader_integration_test.rs`）shall パスする（リグレッションなし）
 
 ---
 
