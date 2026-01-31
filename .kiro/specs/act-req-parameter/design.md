@@ -243,7 +243,10 @@ function M.dispatch(req, act)
 **Implementation Notes**
 - Integration: M.dispatch, check_hour, check_talk に act 引数追加
 - Validation: act が nil の場合も動作（シーン関数が対応）
-- Risks: second_change.lua からの呼び出し変更が必要
+- Caller Changes: 
+  - `second_change.lua`: ハンドラシグネチャを `function(req, act)` に変更
+  - EVENT.fire() から渡された act を `dispatcher.dispatch(req, act)` に引き渡す
+  - second_change.lua 内での act 生成は不要（EVENT.fire() で生成済み）
 
 ---
 
