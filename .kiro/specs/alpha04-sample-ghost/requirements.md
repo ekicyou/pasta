@@ -35,25 +35,26 @@
    │   └── lib.rs                 # シェル画像生成ロジック
    ├── tests/
    │   └── integration_test.rs    # 統合テスト
-   └── hello-pasta/               # ゴーストID（配布物ルート）
-       ├── install.txt            # インストール設定
-       ├── readme.txt             # 説明ファイル
-       ├── ghost/
-       │   └── master/
-       │       ├── pasta.toml     # pasta 設定ファイル
-       │       ├── descript.txt   # ゴースト設定（ukadoc準拠）
-       │       └── dic/           # Pasta DSL スクリプト
-       │           ├── boot.pasta # 起動・終了トーク
-       │           ├── talk.pasta # ランダムトーク
-       │           └── click.pasta# クリック反応
-       └── shell/
-           └── master/            # シェル（見た目）
-               ├── descript.txt   # シェル設定（ukadoc準拠）
-               ├── surfaces.txt   # サーフェス定義
-               └── surface*.png   # サーフェス画像（build時生成）
+   └── ghosts/                    # ゴースト配布物ルート
+       └── hello-pasta/           # ゴーストID
+           ├── install.txt        # インストール設定
+           ├── readme.txt         # 説明ファイル
+           ├── ghost/
+           │   └── master/
+           │       ├── pasta.toml # pasta 設定ファイル
+           │       ├── descript.txt # ゴースト設定（ukadoc準拠）
+           │       └── dic/       # Pasta DSL スクリプト
+           │           ├── boot.pasta
+           │           ├── talk.pasta
+           │           └── click.pasta
+           └── shell/
+               └── master/        # シェル（見た目）
+                   ├── descript.txt
+                   ├── surfaces.txt
+                   └── surface*.png # サーフェス画像（build時生成）
    ```
-2. The alpha04-sample-ghost shall Rustクレート部分（src/, tests/, Cargo.toml）とゴースト配布物（hello-pasta/）を明確に分離する
-3. The alpha04-sample-ghost shall ゴーストIDディレクトリ `hello-pasta/` を配布物ルートとする
+2. The alpha04-sample-ghost shall Rustクレート部分（src/, tests/, Cargo.toml）とゴースト配布物（ghosts/）を明確に分離する
+3. The alpha04-sample-ghost shall `ghosts/` を配布物ルート、`ghosts/hello-pasta/` をゴーストIDディレクトリとする
 4. The alpha04-sample-ghost shall `crates/pasta_sample_ghost/` に配置される（ルート汚染回避）
 5. The alpha04-sample-ghost shall pasta_luaから完全に独立したクレートとする（責務分離）
 
@@ -135,7 +136,7 @@
 
 #### Acceptance Criteria
 
-1. The alpha04-sample-ghost shall `hello-pasta/ghost/master/pasta.toml` に以下を定義する:
+1. The alpha04-sample-ghost shall `ghosts/hello-pasta/ghost/master/pasta.toml` に以下を定義する:
    ```toml
    [package]
    name = "hello-pasta"
@@ -177,18 +178,18 @@
 
 #### Acceptance Criteria
 
-1. The alpha04-sample-ghost shall `hello-pasta/install.txt` に以下を定義する:
+1. The alpha04-sample-ghost shall `ghosts/hello-pasta/install.txt` に以下を定義する:
    - `type`: ghost
    - `name`: hello-pasta
    - `directory`: hello-pasta
    - `accept`: 依存なし
-2. The alpha04-sample-ghost shall `hello-pasta/ghost/master/descript.txt` に以下を定義する:
+2. The alpha04-sample-ghost shall `ghosts/hello-pasta/ghost/master/descript.txt` に以下を定義する:
    - `sakura.name`: 女の子
    - `kero.name`: 男の子
    - `craftman`: ekicyou
    - `craftmanw`: どっとステーション駅長
    - `homeurl`: https://github.com/ekicyou/pasta
-3. The alpha04-sample-ghost shall `hello-pasta/shell/master/descript.txt` に以下を定義する:
+3. The alpha04-sample-ghost shall `ghosts/hello-pasta/shell/master/descript.txt` に以下を定義する:
    - `name`: master
    - `craftman`: ekicyou
    - `craftmanw`: どっとステーション駅長
