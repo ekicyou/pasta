@@ -17,7 +17,16 @@ local SHIORI_ACT_IMPL = {}
 
 -- 継承チェーン設定: SHIORI_ACT_IMPL → ACT.IMPL
 setmetatable(SHIORI_ACT_IMPL, { __index = ACT.IMPL })
-SHIORI_ACT_IMPL.__index = SHIORI_ACT_IMPL
+
+-- __index メソッドを定義（メソッド検索 + アクタープロキシ生成）
+function SHIORI_ACT_IMPL.__index(self, key)
+    -- 1. SHIORI_ACT_IMPLメソッドを検索
+    local method = rawget(SHIORI_ACT_IMPL, key)
+    if method then return method end
+    
+    -- 2. ACT.IMPLにフォールバック（アクタープロキシ生成を含む）
+    return ACT.IMPL.__index(self, key)
+end
 
 --- 継承用に実装メタテーブルを公開
 SHIORI_ACT.IMPL = SHIORI_ACT_IMPL

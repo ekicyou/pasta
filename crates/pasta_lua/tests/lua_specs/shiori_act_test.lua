@@ -13,6 +13,22 @@ local function create_mock_actors()
     }
 end
 
+-- Create mock context (full CTX-like structure)
+local function create_mock_ctx()
+    local ACTOR = require("pasta.actor")
+    local sakura = ACTOR.get_or_create("さくら")
+    sakura.spot = "sakura"
+    local kero = ACTOR.get_or_create("うにゅう")
+    kero.spot = "kero"
+    
+    return {
+        actors = {
+            sakura = sakura,
+            kero = kero,
+        }
+    }
+end
+
 -- Test inheritance from pasta.act
 describe("SHIORI_ACT - inheritance", function()
     test("inherits ACT.IMPL methods", function()
@@ -42,6 +58,39 @@ describe("SHIORI_ACT - inheritance", function()
         -- word() method should be accessible (returns nil for unknown word)
         local result = act:word("unknown_word")
         expect(result):toBe(nil)
+    end)
+
+    test("supports actor proxy (act.sakura:talk)", function()
+        local SHIORI_ACT = require("pasta.shiori.act")
+        local ctx = create_mock_ctx()
+        local act = SHIORI_ACT.new(ctx.actors)
+
+        -- act.sakura should create a proxy that redirects to act:talk(sakura, text)
+        act.sakura:talk("Hello via proxy")
+        local result = act:build()
+
+        -- Should contain scope tag and text (same as direct call)
+        expect(result:find("\\0")):toBeTruthy()
+        expect(result:find("Hello via proxy")):toBeTruthy()
+        expect(result:sub(-2)):toBe("\\e")
+    end)
+
+    test("actor proxy supports method chaining", function()
+        local SHIORI_ACT = require("pasta.shiori.act")
+        local ctx = create_mock_ctx()
+        local act = SHIORI_ACT.new(ctx.actors)
+
+        -- Proxy talk returns nil, but act methods can chain
+        act.sakura:talk("First")
+        act:surface(5)
+        act.kero:talk("Second")
+        local result = act:build()
+
+        expect(result:find("\\0")):toBeTruthy()
+        expect(result:find("First")):toBeTruthy()
+        expect(result:find("\\s%[5%]")):toBeTruthy()
+        expect(result:find("\\1")):toBeTruthy()
+        expect(result:find("Second")):toBeTruthy()
     end)
 end)
 
