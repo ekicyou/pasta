@@ -12,6 +12,7 @@ local CONFIG = require("pasta.config")
 --- @field _buffer string[] さくらスクリプト蓄積バッファ
 --- @field _current_spot number|nil 現在のスポット番号
 --- @field _spot_switch_newlines number スポット切り替え時の改行数（デフォルト1.5）
+--- @field req ShioriRequest|nil SHIORIリクエストオブジェクト（読み取り専用として扱うこと）
 local SHIORI_ACT = {}
 
 --- SHIORI_ACT実装メタテーブル
@@ -35,13 +36,20 @@ SHIORI_ACT.IMPL = SHIORI_ACT_IMPL
 
 --- 新規ShioriActを作成
 --- @param actors table<string, Actor> 登録アクター
+--- @param req ShioriRequest|nil SHIORIリクエストオブジェクト（任意）
 --- @return ShioriAct アクションオブジェクト
-function SHIORI_ACT.new(actors)
+---
+--- req は SHIORI リクエストの情報を保持するテーブルです。
+--- イベントハンドラ内で `act.req` を通じてリクエスト情報にアクセスできます。
+--- **注意**: act.req は読み取り専用として扱ってください。変更は未定義動作となります。
+function SHIORI_ACT.new(actors, req)
     local base = ACT.new(actors)
     base._buffer = {}
     base._current_spot = nil
     -- pasta.tomlの[ghost]セクションからspot_switch_newlinesを読み込み（デフォルト1.5）
     base._spot_switch_newlines = CONFIG.get("ghost", "spot_switch_newlines", 1.5)
+    -- SHIORIリクエストオブジェクトを設定（任意）
+    base.req = req
     return setmetatable(base, SHIORI_ACT_IMPL)
 end
 

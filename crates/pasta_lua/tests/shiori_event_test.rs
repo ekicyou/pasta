@@ -28,6 +28,30 @@ fn create_runtime_with_pasta_path() -> PastaLuaRuntime {
             r#"package.path = "{scripts_dir}/?.lua;{scripts_dir}/?/init.lua;" .. package.path"#
         ))
         .expect("Failed to configure package.path");
+
+    // Mock @pasta_persistence module (required by pasta.save which is required by act)
+    runtime
+        .exec(
+            r#"
+            package.loaded["@pasta_persistence"] = {
+                load = function() return {} end,
+                save = function(data) return true end
+            }
+            "#,
+        )
+        .expect("Failed to mock @pasta_persistence");
+
+    // Mock @pasta_search module (required by pasta.scene)
+    runtime
+        .exec(
+            r#"
+            package.loaded["@pasta_search"] = setmetatable({}, {
+                __index = function() return function() return nil end end
+            })
+            "#,
+        )
+        .expect("Failed to mock @pasta_search");
+
     runtime
 }
 
@@ -74,7 +98,7 @@ fn test_reg_allows_handler_registration() {
     let result = runtime.exec(
         r#"
         local REG = require "pasta.shiori.event.register"
-        REG.OnBoot = function(req) return "test" end
+        REG.OnBoot = function(act) return "test" end
         return type(REG.OnBoot) == "function"
     "#,
     );
@@ -113,8 +137,8 @@ fn test_event_no_entry_returns_204() {
     let result = runtime.exec(
         r#"
         local EVENT = require "pasta.shiori.event"
-        local req = { id = "UnknownEvent", method = "get", version = 30 }
-        local response = EVENT.no_entry(req)
+        local act = { req = { id = "UnknownEvent", method = "get", version = 30 } }
+        local response = EVENT.no_entry(act)
         return response:find("204 No Content") ~= nil
     "#,
     );
@@ -137,7 +161,7 @@ fn test_event_fire_dispatches_registered_handler() {
         local EVENT = require "pasta.shiori.event"
         local RES = require "pasta.shiori.res"
         
-        REG.OnTest = function(req)
+        REG.OnTest = function(act)
             return RES.ok("test response")
         end
         
@@ -186,6 +210,8 @@ fn test_event_fire_handles_nil_id() {
         local EVENT = require "pasta.shiori.event"
         local req = { method = "get", version = 30 }  -- no id field
         local response = EVENT.fire(req)
+        -- When req.id is nil, REG[nil] is nil, so no_entry is called
+        -- no_entry expects act.req.id but will get nil from act.req
         return response:find("204 No Content") ~= nil
     "#,
     );
@@ -207,7 +233,7 @@ fn test_event_fire_catches_handler_error() {
         local REG = require "pasta.shiori.event.register"
         local EVENT = require "pasta.shiori.event"
         
-        REG.OnError = function(req)
+        REG.OnError = function(act)
             error("Test error message")
         end
         
@@ -235,7 +261,7 @@ fn test_error_message_no_newline() {
         local REG = require "pasta.shiori.event.register"
         local EVENT = require "pasta.shiori.event"
         
-        REG.OnMultilineError = function(req)
+        REG.OnMultilineError = function(act)
             error("First line\nSecond line\nThird line")
         end
         
@@ -271,7 +297,7 @@ fn test_event_fire_handles_empty_error_message() {
         local REG = require "pasta.shiori.event.register"
         local EVENT = require "pasta.shiori.event"
         
-        REG.OnEmptyError = function(req)
+        REG.OnEmptyError = function(act)
             error("")
         end
         
@@ -310,7 +336,7 @@ fn test_event_module_with_res_module() {
         local RES = require "pasta.shiori.res"
         
         -- Test 1: RES.ok integration via handler
-        REG.TestOk = function(req)
+        REG.TestOk = function(act)
             return RES.ok("Hello World")
         end
         local res1 = EVENT.fire({ id = "TestOk", method = "get", version = 30 })
@@ -321,7 +347,7 @@ fn test_event_module_with_res_module() {
         local no_content_works = res2:find("204 No Content") ~= nil
         
         -- Test 3: RES.err integration via error handling
-        REG.TestErr = function(req)
+        REG.TestErr = function(act)
             error("Intentional error")
         end
         local res3 = EVENT.fire({ id = "TestErr", method = "get", version = 30 })
@@ -351,15 +377,15 @@ fn test_handler_registration_and_dispatch() {
         local RES = require "pasta.shiori.res"
         
         -- Register multiple handlers
-        REG.OnBoot = function(req)
+        REG.OnBoot = function(act)
             return RES.ok("Booting up!")
         end
         
-        REG.OnClose = function(req)
+        REG.OnClose = function(act)
             return RES.ok("Shutting down!")
         end
         
-        REG.OnGhostChanged = function(req)
+        REG.OnGhostChanged = function(act)
             return RES.ok("Ghost changed!")
         end
         
@@ -449,7 +475,7 @@ fn test_custom_onboot_overrides_default() {
         local RES = require "pasta.shiori.res"
         
         -- Override default OnBoot
-        REG.OnBoot = function(req)
+        REG.OnBoot = function(act)
             return RES.ok("Custom Boot!")
         end
         
@@ -490,6 +516,20 @@ fn test_no_entry_attempts_scene_fallback() {
             r#"package.path = "{scripts_dir}/?.lua;{scripts_dir}/?/init.lua;" .. package.path"#
         ))
         .expect("Failed to configure package.path");
+
+    // Mock @pasta_persistence module (required by pasta.save)
+    // Note: Do NOT mock @pasta_search here - PastaLuaRuntime::new(ctx) already registered it
+    //       with the scene_registry that has "OnTestEvent" registered
+    runtime
+        .exec(
+            r#"
+            package.loaded["@pasta_persistence"] = {
+                load = function() return {} end,
+                save = function(data) return true end
+            }
+            "#,
+        )
+        .expect("Failed to mock @pasta_persistence");
 
     let result = runtime.exec(&format!(
         r#"
@@ -564,6 +604,20 @@ fn test_scene_fallback_catches_errors() {
         ))
         .expect("Failed to configure package.path");
 
+    // Mock @pasta_persistence module (required by pasta.save)
+    // Note: Do NOT mock @pasta_search here - PastaLuaRuntime::new(ctx) already registered it
+    //       with the scene_registry that has "OnErrorScene" registered
+    runtime
+        .exec(
+            r#"
+            package.loaded["@pasta_persistence"] = {
+                load = function() return {} end,
+                save = function(data) return true end
+            }
+            "#,
+        )
+        .expect("Failed to mock @pasta_persistence");
+
     let result = runtime.exec(&format!(
         r#"
         local EVENT = require "pasta.shiori.event"
@@ -607,8 +661,8 @@ fn test_onfirstboot_handler_with_reference() {
         local RES = require "pasta.shiori.res"
         
         local vanish_flag = nil
-        REG.OnFirstBoot = function(req)
-            vanish_flag = req.reference[0]  -- バニッシュ復帰フラグ
+        REG.OnFirstBoot = function(act)
+            vanish_flag = act.req.reference[0]  -- バニッシュ復帰フラグ
             return RES.ok("First Boot!")
         end
         
@@ -644,10 +698,10 @@ fn test_onboot_handler_with_references() {
         local RES = require "pasta.shiori.res"
         
         local shell_name, shell_path, ghost_path = nil, nil, nil
-        REG.OnBoot = function(req)
-            shell_name = req.reference[0]
-            shell_path = req.reference[6]
-            ghost_path = req.reference[7]
+        REG.OnBoot = function(act)
+            shell_name = act.req.reference[0]
+            shell_path = act.req.reference[6]
+            ghost_path = act.req.reference[7]
             return RES.ok("Boot!")
         end
         
@@ -690,8 +744,8 @@ fn test_onclose_handler_with_reference() {
         local RES = require "pasta.shiori.res"
         
         local close_reason = nil
-        REG.OnClose = function(req)
-            close_reason = req.reference[0]
+        REG.OnClose = function(act)
+            close_reason = act.req.reference[0]
             return RES.ok("Goodbye!")
         end
         
@@ -731,9 +785,9 @@ fn test_onghostchanged_handler_with_references() {
         local RES = require "pasta.shiori.res"
         
         local to_ghost, from_ghost = nil, nil
-        REG.OnGhostChanged = function(req)
-            to_ghost = req.reference[0]
-            from_ghost = req.reference[1]
+        REG.OnGhostChanged = function(act)
+            to_ghost = act.req.reference[0]
+            from_ghost = act.req.reference[1]
             return RES.ok("Changed!")
         end
         
@@ -774,9 +828,9 @@ fn test_onsecondchange_handler_with_references() {
         local RES = require "pasta.shiori.res"
         
         local current_sec, total_sec = nil, nil
-        REG.OnSecondChange = function(req)
-            current_sec = req.reference[0]
-            total_sec = req.reference[1]
+        REG.OnSecondChange = function(act)
+            current_sec = act.req.reference[0]
+            total_sec = act.req.reference[1]
             return RES.no_content()  -- 通常は空応答
         end
         
@@ -817,9 +871,9 @@ fn test_onminutechange_handler_with_references() {
         local RES = require "pasta.shiori.res"
         
         local current_min, current_hour = nil, nil
-        REG.OnMinuteChange = function(req)
-            current_min = req.reference[0]
-            current_hour = req.reference[1]
+        REG.OnMinuteChange = function(act)
+            current_min = act.req.reference[0]
+            current_hour = act.req.reference[1]
             return RES.no_content()
         end
         
@@ -864,9 +918,9 @@ fn test_onmousedoubleclick_handler_with_references() {
         local RES = require "pasta.shiori.res"
         
         local scope, hit_area = nil, nil
-        REG.OnMouseDoubleClick = function(req)
-            scope = req.reference[0]     -- 0: sakura, 1: kero
-            hit_area = req.reference[4]  -- 当たり判定ID
+        REG.OnMouseDoubleClick = function(act)
+            scope = act.req.reference[0]     -- 0: sakura, 1: kero
+            hit_area = act.req.reference[4]  -- 当たり判定ID
             return RES.ok("Clicked!")
         end
         
@@ -911,9 +965,9 @@ fn test_nil_reference_access() {
         local RES = require "pasta.shiori.res"
         
         local ref5, ref7 = "unset", "unset"
-        REG.OnTestNil = function(req)
-            ref5 = req.reference[5]
-            ref7 = req.reference[7]
+        REG.OnTestNil = function(act)
+            ref5 = act.req.reference[5]
+            ref7 = act.req.reference[7]
             return RES.ok("OK")
         end
         

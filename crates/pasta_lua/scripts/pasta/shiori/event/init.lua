@@ -7,18 +7,19 @@
 --- エラー発生時は xpcall/pcall でキャッチし、エラーレスポンスに変換する。
 ---
 --- ハンドラシグネチャ:
----   function(req: table) -> string
+---   function(act: ShioriAct) -> string
 ---
---- reqテーブル構造（Rust側 parse_request() により生成）:
----   - req.id: イベント名（例: "OnBoot", "OnClose"）
----   - req.method: "get" | "notify"
----   - req.version: 30（SHIORI/3.0）
----   - req.charset: 文字セット（例: "UTF-8"）
----   - req.sender: 送信者名（例: "SSP"）
----   - req.reference: 参照テーブル（reference[0], reference[1], ...）
----   - req.dic: 全ヘッダー辞書
+--- act オブジェクト経由で SHIORI リクエスト情報にアクセス:
+---   - act.req.id: イベント名（例: "OnBoot", "OnClose"）
+---   - act.req.method: "get" | "notify"
+---   - act.req.version: 30（SHIORI/3.0）
+---   - act.req.charset: 文字セット（例: "UTF-8"）
+---   - act.req.sender: 送信者名（例: "SSP"）
+---   - act.req.reference: 参照テーブル（reference[0], reference[1], ...）
+---   - act.req.dic: 全ヘッダー辞書
+---   - act.req.date: 日付情報（date.unix, date.hour, date.min, date.sec, etc.）
 ---
---- 注意: reqテーブルはread-only契約。ハンドラ内で変更しないこと。
+--- 注意: act.req は読み取り専用として扱うこと。変更は未定義動作となる。
 ---
 --- Rust側統合パターン（main.lua）:
 --- ```lua
@@ -34,8 +35,9 @@
 --- local REG = require("pasta.shiori.event.register")
 --- local RES = require("pasta.shiori.res")
 ---
---- REG.OnBoot = function(req)
----     return RES.ok([[\0\s[0]こんにちは\e]])
+--- REG.OnBoot = function(act)
+---     act.sakura:talk("こんにちは")
+---     return RES.ok(act:build())
 --- end
 --- ```
 ---
@@ -56,6 +58,8 @@
 -- 1. require文
 local REG = require("pasta.shiori.event.register")
 local RES = require("pasta.shiori.res")
+local SHIORI_ACT = require("pasta.shiori.act")
+local STORE = require("pasta.store")
 
 -- 1.5. デフォルトイベントハンドラをロード
 require("pasta.shiori.event.boot")
@@ -65,16 +69,25 @@ require("pasta.shiori.event.second_change")
 --- @class EVENT
 local EVENT = {}
 
--- 3. 公開関数
+-- 3. 内部関数
+
+--- actオブジェクトを作成
+--- @param req table SHIORIリクエストテーブル
+--- @return ShioriAct actオブジェクト
+local function create_act(req)
+    return SHIORI_ACT.new(STORE.actors, req)
+end
+
+-- 4. 公開関数
 
 --- デフォルトハンドラ（未登録イベント用）
 --- シーン関数フォールバックを試み、見つからなければ 204 No Content を返す。
---- @param req table リクエストテーブル
+--- @param act ShioriAct actオブジェクト
 --- @return string SHIORI レスポンス（204 No Content または 500 Error）
-function EVENT.no_entry(req)
+function EVENT.no_entry(act)
     -- シーン関数をイベント名で検索（遅延ロードで循環参照回避）
     local SCENE = require("pasta.scene")
-    local scene_result = SCENE.search(req.id, nil, nil)
+    local scene_result = SCENE.search(act.req.id, nil, nil)
 
     if scene_result then
         -- シーン関数が見つかった場合、pcall で実行
@@ -100,10 +113,13 @@ end
 --- @param req table リクエストテーブル（req.id にイベント名）
 --- @return string SHIORI レスポンス
 function EVENT.fire(req)
+    -- act オブジェクトを作成
+    local act = create_act(req)
+
     local handler = REG[req.id] or EVENT.no_entry
 
     local ok, result = xpcall(function()
-        return handler(req)
+        return handler(act)
     end, function(err)
         -- エラーメッセージの最初の行のみを抽出（改行除去）
         -- debug.traceback は ALL_SAFE では使用不可のため、エラーメッセージのみ使用
@@ -121,5 +137,5 @@ function EVENT.fire(req)
     end
 end
 
--- 4. 末尾で返却
+-- 5. 末尾で返却
 return EVENT

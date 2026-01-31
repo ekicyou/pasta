@@ -10,7 +10,7 @@
 --- 使用例:
 --- ```lua
 --- local dispatcher = require("pasta.shiori.event.virtual_dispatcher")
---- local result = dispatcher.dispatch(req)
+--- local result = dispatcher.dispatch(act)
 --- ```
 
 -- 1. require文（遅延ロードで循環参照回避）
@@ -95,10 +95,10 @@ end
 -- 5. 公開関数
 
 --- OnHour 判定・発行
----@param req table リクエストテーブル
+---@param act ShioriAct actオブジェクト（act.req でリクエスト情報にアクセス）
 ---@return string|nil "fired" (発行成功), nil (発行なし)
-function M.check_hour(req)
-    local current_unix = req.date.unix
+function M.check_hour(act)
+    local current_unix = act.req.date.unix
 
     -- 初回起動: 次の正時を計算して設定、発行スキップ
     if next_hour_unix == 0 then
@@ -112,7 +112,7 @@ function M.check_hour(req)
     end
 
     -- トーク中はスキップ（SSPからの状態情報を使用）
-    if req.status == "talking" then
+    if act.req.status == "talking" then
         return nil
     end
 
@@ -126,14 +126,14 @@ function M.check_hour(req)
 end
 
 --- OnTalk 判定・発行
----@param req table リクエストテーブル
+---@param act ShioriAct actオブジェクト（act.req でリクエスト情報にアクセス）
 ---@return string|nil "fired" (発行成功), nil (発行なし)
-function M.check_talk(req)
-    local current_unix = req.date.unix
+function M.check_talk(act)
+    local current_unix = act.req.date.unix
     local cfg = get_config()
 
     -- トーク中はスキップ（SSPからの状態情報を使用）
-    if req.status == "talking" then
+    if act.req.status == "talking" then
         return nil
     end
 
@@ -164,22 +164,22 @@ function M.check_talk(req)
 end
 
 --- 仮想イベントディスパッチ（メインエントリポイント）
----@param req table リクエストテーブル
+---@param act ShioriAct actオブジェクト（act.req でリクエスト情報にアクセス）
 ---@return string|nil シーン実行結果 or nil
-function M.dispatch(req)
-    -- req.date 存在チェック
-    if not req.date then
+function M.dispatch(act)
+    -- act.req.date 存在チェック
+    if not act.req or not act.req.date then
         return nil
     end
 
     -- OnHour 判定（優先）
-    local hour_result = M.check_hour(req)
+    local hour_result = M.check_hour(act)
     if hour_result then
         return hour_result
     end
 
     -- OnTalk 判定
-    local talk_result = M.check_talk(req)
+    local talk_result = M.check_talk(act)
     return talk_result
 end
 

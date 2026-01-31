@@ -598,3 +598,57 @@ describe("SHIORI_ACT - E2E scenario", function()
         expect(result2:find("\\p%[1%]")):toBeTruthy() -- kero spot
     end)
 end)
+
+-- Test act.req field
+describe("SHIORI_ACT - req field", function()
+    test("stores req parameter in act.req", function()
+        local SHIORI_ACT = require("pasta.shiori.act")
+        local actors = create_mock_actors()
+        local req = {
+            id = "OnTest",
+            method = "get",
+            version = 30,
+            reference = { "ref0", "ref1" },
+        }
+
+        local act = SHIORI_ACT.new(actors, req)
+
+        expect(act.req):toBe(req)
+        expect(act.req.id):toBe("OnTest")
+        expect(act.req.method):toBe("get")
+        expect(act.req.version):toBe(30)
+    end)
+
+    test("req reference is same object (not a copy)", function()
+        local SHIORI_ACT = require("pasta.shiori.act")
+        local actors = create_mock_actors()
+        local req = {
+            id = "OnBoot",
+            reference = { "value0" },
+        }
+
+        local act = SHIORI_ACT.new(actors, req)
+
+        -- Same reference check
+        expect(act.req == req):toBe(true)
+        expect(act.req.reference[1]):toBe("value0")
+    end)
+
+    test("act.req.date contains date info when provided", function()
+        local SHIORI_ACT = require("pasta.shiori.act")
+        local actors = create_mock_actors()
+        local req = {
+            id = "OnSecondChange",
+            date = {
+                unix = 1704067200,
+                hour = 12,
+                minute = 0,
+            },
+        }
+
+        local act = SHIORI_ACT.new(actors, req)
+
+        expect(act.req.date.unix):toBe(1704067200)
+        expect(act.req.date.hour):toBe(12)
+    end)
+end)

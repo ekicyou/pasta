@@ -11,9 +11,9 @@ local RES = require "pasta.shiori.res"
 ---Default OnBoot handler.
 ---Returns a simple 204 No Content response.
 ---Override this by setting REG.OnBoot to your own function.
----@param req table SHIORI request table
+---@param act ShioriAct actオブジェクト（act.req でリクエスト情報にアクセス可能）
 ---@return string SHIORI response
-REG.OnBoot = function(req)
+REG.OnBoot = function(act)
     return RES.no_content()
 end
 
