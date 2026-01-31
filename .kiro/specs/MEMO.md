@@ -19,3 +19,5 @@
 
 
 
+/kiro-validate-gap alpha04-sample-ghost
+現在の要件で再度ギャップ分析して欲しい。
