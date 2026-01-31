@@ -4,14 +4,14 @@
 
 ### ワークフロー作成と基本設定
 
-- [ ] 1. GitHub Actions ワークフローファイル作成 (P)
+- [x] 1. GitHub Actions ワークフローファイル作成 (P)
   - `.github/workflows/build.yml` を新規作成
   - ワークフロー名を "Build" に設定
   - push/pull_request/workflow_dispatch トリガーを構成（main ブランチ対象）
   - windows-latest ランナーを指定
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 8.4_
 
-- [ ] 2. マトリックスビルド構成 (P)
+- [x] 2. マトリックスビルド構成 (P)
   - matrix.include 構造で target と arch の組み合わせを定義
   - i686-pc-windows-msvc (arch: x86) と x86_64-pc-windows-msvc (arch: x64) を追加
   - fail-fast を false に設定（一方の失敗が他方に影響しない）
@@ -20,18 +20,18 @@
 
 ### ビルド環境セットアップ
 
-- [ ] 3. リポジトリチェックアウトステップ追加 (P)
+- [x] 3. リポジトリチェックアウトステップ追加 (P)
   - actions/checkout@v6 を使用
   - ステップ名を "Checkout repository" に設定
   - _Requirements: 8.1_
 
-- [ ] 4. Rust ツールチェーンインストール (P)
+- [x] 4. Rust ツールチェーンインストール (P)
   - dtolnay/rust-toolchain@stable を使用
   - matrix.target をターゲットとして指定
   - ステップ名を "Install Rust toolchain" に設定
   - _Requirements: 2.1, 2.2, 2.3, 8.1_
 
-- [ ] 5. ビルドキャッシュ設定 (P)
+- [x] 5. ビルドキャッシュ設定 (P)
   - Swatinem/rust-cache@v2 を使用
   - キャッシュキーに matrix.target を指定（ターゲットごとに分離）
   - ステップ名を "Setup Rust cache" に設定
@@ -39,13 +39,13 @@
 
 ### ビルドとテスト
 
-- [ ] 6. pasta_shiori DLL ビルド
+- [x] 6. pasta_shiori DLL ビルド
   - `cargo build --release --target ${{ matrix.target }} -p pasta_shiori` を実行
   - ステップ名を "Build pasta_shiori" に設定
   - ビルドエラー時は非ゼロ終了コードでジョブ失敗
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 8.1_
 
-- [ ] 7. テスト実行（x64 のみ）
+- [x] 7. テスト実行（x64 のみ）
   - x64 ターゲットの場合のみ `cargo test --all` を実行
   - if 条件: `matrix.arch == 'x64'`
   - ステップ名を "Run tests" に設定
@@ -54,7 +54,7 @@
 
 ### アーティファクト保存
 
-- [ ] 8. ビルド成果物アップロード
+- [x] 8. ビルド成果物アップロード
   - actions/upload-artifact@v4 を使用
   - アーティファクト名: `pasta-dll-${{ matrix.arch }}`
   - パス: `target/${{ matrix.target }}/release/pasta.dll`
@@ -64,7 +64,7 @@
 
 ### 検証と完了
 
-- [ ] 9. ワークフロー検証
+- [x] 9. ワークフロー検証
   - YAML 構文エラーがないことを確認
   - 実際の push で両ターゲット（x86/x64）がビルドされることを確認
   - PR 作成時にワークフローがトリガーされることを確認
@@ -72,7 +72,7 @@
   - キャッシュヒット時のビルド時間短縮を確認
   - _Requirements: 2.4, 8.3_
 
-- [ ] 10. ドキュメント整合性の確認と更新
+- [x] 10. ドキュメント整合性の確認と更新
   - SOUL.md: コアバリュー・設計原則との整合性確認
   - TEST_COVERAGE.md: CI/CD テストのマッピング追加
   - README.md: CI バッジ追加（該当する場合）

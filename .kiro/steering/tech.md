@@ -146,6 +146,12 @@ cargo test -p pasta_rune    # pasta_runeテスト
 ```
 
 ### 将来計画
-- CI/CD: GitHub Actions
 - SHIORI.DLL: C FFIラッパー
 - areka統合: 動的リンク、MCP Server
+
+### CI/CD
+- **GitHub Actions**: `.github/workflows/build.yml`
+  - push/PR/手動実行トリガー
+  - マトリックスビルド: x86 (`i686-pc-windows-msvc`) + x64 (`x86_64-pc-windows-msvc`)
+  - Rust キャッシュ: `Swatinem/rust-cache@v2`
+  - アーティファクト: `pasta-dll-x86`, `pasta-dll-x64`（7日間保持）

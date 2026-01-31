@@ -1,0 +1,50 @@
+# .github/workflows/build.yml
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:  # 手動実行
+
+jobs:
+  build:
+    name: build-${{ matrix.arch }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: i686-pc-windows-msvc
+            arch: x86
+          - target: x86_64-pc-windows-msvc
+            arch: x64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Build pasta_shiori
+        run: cargo build --release --target ${{ matrix.target }} -p pasta_shiori
+
+      - name: Run tests
+        if: matrix.arch == 'x64'
+        run: cargo test --all
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pasta-dll-${{ matrix.arch }}
+          path: target/${{ matrix.target }}/release/pasta.dll
+          retention-days: 7

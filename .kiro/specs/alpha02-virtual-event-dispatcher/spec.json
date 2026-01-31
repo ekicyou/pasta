@@ -1,9 +1,9 @@
 {
     "feature_name": "alpha02-virtual-event-dispatcher",
     "created_at": "2026-01-30T18:10:00Z",
-    "updated_at": "2026-01-31T10:00:00Z",
+    "updated_at": "2026-01-31T11:00:00Z",
     "language": "ja",
-    "phase": "requirements-generated",
+    "phase": "design-generated",
     "description": "OnTalk/OnHour仮想イベントの条件判定・発行機構。OnSecondChangeをトリガーとし、状態管理（ctx.save.virtual_event.*）、pasta.toml設定読み込み、req.date時刻判定を実装。",
     "category": "SHIORI基盤",
     "size_estimate": "M",
@@ -14,10 +14,10 @@
     "approvals": {
         "requirements": {
             "generated": true,
-            "approved": false
+            "approved": true
         },
         "design": {
-            "generated": false,
+            "generated": true,
             "approved": false
         },
         "tasks": {
