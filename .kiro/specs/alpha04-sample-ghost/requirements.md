@@ -208,39 +208,30 @@
 - サイズ: 96〜128 × 256ピクセル（3頭身バランス）
 - 形式: 透過PNG
 
-### 議題 #5: pasta.toml 設定項目の詳細仕様 🔄 再議論
+### 議題 #5: pasta.toml 設定項目の詳細仕様 ✅ 解決済み
 
 **調査結果:** [pasta.toml設定仕様書](research/pasta-toml-spec.md) を参照
 
-**既存実装で定義済みのセクション:**
+**決定事項:**
 
-| セクション | 用途 | Rust/Lua |
-|-----------|------|----------|
-| `[loader]` | ローダー設定（パターン、パス等） | Rust専用 |
-| `[logging]` | ログ設定 | Rust専用 |
-| `[persistence]` | 永続化設定 | Rust専用 |
-| `[lua]` | Luaライブラリ設定 | Rust専用 |
-| `[ghost]` | ゴースト動作設定 | Lua側で参照 |
+```toml
+[package]
+name = "hello-pasta"
+version = "0.1.0"
+authors = ["どっとステーション駅長"]
 
-**[ghost] セクションで定義済みのフィールド:**
+[loader]
+debug_mode = true
 
-| キー | デフォルト | 説明 |
-|------|-----------|------|
-| `spot_switch_newlines` | `1.5` | スポット切替改行数 |
-| `talk_interval_min` | `180` | トーク最小間隔（秒） |
-| `talk_interval_max` | `300` | トーク最大間隔（秒） |
-| `hour_margin` | `30` | 時報前スキップマージン（秒） |
+[ghost]
+spot_switch_newlines = 1.5
+talk_interval_min = 60   # 1分（テスト用に短縮）
+talk_interval_max = 120  # 2分（テスト用に短縮）
+hour_margin = 30
+```
 
-**検討中: [package] セクションの導入**
-
-現状 `[package]` は未定義（custom_fieldsとして参照可能）。
-Cargo.toml風のメタデータセクションを正式導入するか？
-
-| 案 | 内容 |
-|----|------|
-| A | 現状維持（custom_fieldsで参照） |
-| B | `[package]` を正式サポート（name, version, authors） |
-
+**採用構成:** 案B（必要最小限 + ゴースト動作設定）  
+**[package] セクション:** 正式導入（Cargo.toml準拠）  
 **参照:** [pasta.toml設定仕様書](research/pasta-toml-spec.md)
 
 ### 議題 #6: テスト要件の実装範囲

@@ -251,7 +251,7 @@ print(config.user_data.nested.inner)  -- "data"
 debug_mode = true
 ```
 
-### 案B: 推奨構成（Cargo.toml風メタデータ付き）
+### 案B: 推奨構成（Cargo.toml風メタデータ付き） ✅ 採用
 
 ```toml
 # === パッケージメタデータ ===
@@ -270,9 +270,9 @@ debug_mode = true
 # スポット切替時の改行（1.5 = 150ms相当の改行）
 spot_switch_newlines = 1.5
 
-# ランダムトーク間隔（秒）
-talk_interval_min = 180
-talk_interval_max = 300
+# ランダムトーク間隔（秒）- テスト用に短縮
+talk_interval_min = 60   # 1分
+talk_interval_max = 120  # 2分
 
 # 時報前のトークスキップマージン（秒）
 hour_margin = 30
