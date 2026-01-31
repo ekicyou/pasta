@@ -296,10 +296,39 @@ pub struct GhostConfig {
     pub name: String,           // "hello-pasta"
     pub sakura_name: String,    // "Pasta"
     pub kero_name: String,      // "Lua"
-    pub craftman: String,       // "pasta-team"
-    pub craftman_w: String,     // "pasta開発チーム"
+    pub craftman: String,       // "ekicyou"
+    pub craftman_w: String,     // "どっとステーション駅長"
     pub shiori: String,         // "pasta.dll"
+    pub homeurl: String,        // "https://github.com/ekicyou/pasta"
 }
+```
+
+**ghost/master/descript.txt テンプレート**:
+
+```
+charset,UTF-8
+type,ghost
+name,{name}
+sakura.name,{sakura_name}
+kero.name,{kero_name}
+craftman,{craftman}
+craftmanw,{craftman_w}
+shiori,{shiori}
+homeurl,{homeurl}
+```
+
+**生成例**:
+
+```
+charset,UTF-8
+type,ghost
+name,hello-pasta
+sakura.name,Pasta
+kero.name,Lua
+craftman,ekicyou
+craftmanw,どっとステーション駅長
+shiori,pasta.dll
+homeurl,https://github.com/ekicyou/pasta
 ```
 
 **ファイル生成フロー**:

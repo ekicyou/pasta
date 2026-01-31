@@ -202,10 +202,14 @@
    - `directory`: hello-pasta
    - `accept`: 依存なし
 2. The alpha04-sample-ghost shall `ghosts/hello-pasta/ghost/master/descript.txt` に以下を定義する:
-   - `sakura.name`: 女の子
-   - `kero.name`: 男の子
+   - `charset`: UTF-8
+   - `type`: ghost
+   - `name`: hello-pasta
+   - `sakura.name`: Pasta
+   - `kero.name`: Lua
    - `craftman`: ekicyou
    - `craftmanw`: どっとステーション駅長
+   - `shiori`: pasta.dll（SHIORI DLL指定 - 必須）
    - `homeurl`: https://github.com/ekicyou/pasta
 3. The alpha04-sample-ghost shall `ghosts/hello-pasta/shell/master/descript.txt` に以下を定義する:
    - `name`: master
