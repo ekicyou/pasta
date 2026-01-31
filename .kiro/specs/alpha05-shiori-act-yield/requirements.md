@@ -45,14 +45,16 @@
 
 **Objective:** As a ゴースト開発者, I want `act:yield()`でさくらスクリプトをビルドしてyieldしたい, so that 会話の途中で一度確定してベースウェアに送信できる
 
+#### 設計原則
+
+- **「1 yield = 1 build」**: 1回のyield内で build() は1回のみ呼ぶ
+- **単純なyield**: さくらスクリプト文字列（または nil）を返すのみ（レジューム値保存なし）
+
 #### Acceptance Criteria
 
 1. The `pasta.shiori.act` shall `act:yield()` メソッドをオーバーライドする
-2. When `yield()` が呼び出された場合, the メソッド shall 以下を順番に実行する:
-   - `local rc = coroutine.yield(self:build())` でスクリプトをyield（build内で自動リセット）
-   - `self._resume_value = rc` でレジューム値を保存
-   - `return rc` でレジューム値を返す
-3. The `_resume_value` フィールド shall yieldから戻った値を保持し、次回アクセス可能とする
+2. When `yield()` が呼び出された場合, the メソッド shall `coroutine.yield(self:build())` でさくらスクリプト文字列をyieldする
+3. The `build()` 内で自動リセットされるため、yield後は次のスクリプト構築準備が完了している
 4. If `yield()` がコルーチン外で呼び出された場合, the メソッド shall エラーを発生させる（Luaネイティブエラー）
 5. The 既存の `ACT_IMPL.yield()` との互換性 shall トークンベースではなく、さくらスクリプト文字列をyieldする点が異なる
 
@@ -71,9 +73,10 @@
 
 1. The `build()` メソッド shall さくらスクリプト文字列を構築して返す（既存動作）
 2. The `build()` メソッド shall 文字列返却前に `self:reset()` を呼び出してバッファをリセットする
-3. The 設計方針 shall 「build = 構築して吐き出す（副作用込み）」とする
+3. The 設計方針 shall 「build = 構築して吐き出す（副作用込み）」とする（メソッド名の性質上、自然）
 4. The リセット後 shall `_current_scope = nil` となり、次のtalk()でスコープタグが再出力される
 5. The 既存テスト shall build()後のバッファ状態検証を更新する（空になることを期待）
+6. **実装時確認事項**: 既存テストで build() を複数回呼んで同じスクリプトを取得するパターンがあれば、テストを修正する
 
 ---
 
@@ -86,12 +89,11 @@
 1. The `pasta.shiori.act` shall `act:init_script()` メソッドを提供する
 2. When `init_script()` が呼び出された場合, the メソッド shall 以下を実行する:
    - `self._buffer = {}` でバッファを空にする
-   - `self._current_scope = nil` でスコープをリセット
-   - `self._resume_value = nil` でレジューム値をリセット
 3. The メソッド shall メソッドチェーン可能（`return self`）とする
 4. The `SHIORI_ACT.new()` コンストラクタ shall 内部で `init_script()` を呼び出して初期化を統一する
-5. The 用途 shall コンストラクタでの初期化、および手動での完全リセット（`_resume_value`含む）
+5. The 用途 shall コンストラクタでの初期化、および手動での完全リセット
 
+**Note:** `build()` は自動で `reset()` を呼ぶため、通常のyield後リセットは不要
 **Note:** `build()` は自動で `reset()` を呼ぶため、通常のyield後リセットは不要。`init_script()` は `_resume_value` も含む完全初期化が必要な場合に使用。
 
 ---
