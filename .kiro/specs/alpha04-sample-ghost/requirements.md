@@ -164,8 +164,9 @@
 ### 議題 #1: Ghost配置場所とID ✅ 解決済み
 
 **決定事項:**
-- 配置場所: `examples/sample-ghost/hello-pasta/`
+- 配置場所: `crates/pasta_sample_ghost/`（専用クレート）
 - ゴーストID: `hello-pasta`
+- 責務: pastaエンジンの利用例・動作検証（pasta_luaから完全独立）
 
 ### 議題 #2: Shell素材準備 ✅ 解決済み
 
@@ -234,21 +235,44 @@ hour_margin = 30
 **[package] セクション:** 正式導入（Cargo.toml準拠）  
 **参照:** [pasta.toml設定仕様書](research/pasta-toml-spec.md)
 
-### 議題 #6: テスト要件の実装範囲
+### 議題 #6: テスト要件の実装範囲 ✅ 解決済み
 
-**既定義（Requirement 8より）:**
-- 各イベントハンドラの動作検証
-- さくらスクリプト出力の正確性検証
-- pasta.toml 設定の読み込み検証
+**決定事項:**
 
-**決定が必要な項目:**
+専用クレート構成を採用し、責務を明確に分離：
 
-| 項目 | 選択肢 | 備考 |
-|------|--------|------|
-| テスト環境 | モックSHIORI / 実SSP統合 | 実行環境 |
-| テスト配置 | `tests/` / `examples/sample-ghost/tests/` | テストコード配置場所 |
-| テストデータ | 固定fixture / 動的生成 | テスト用ゴーストデータ |
-| CIでの実行 | 有効 / 無効 | 自動テスト実行 |
+```
+crates/pasta_sample_ghost/
+├─ Cargo.toml
+├─ README.md
+├─ src/
+│  └─ lib.rs (シェル画像生成ロジック)
+├─ tests/
+│  └─ integration_test.rs (統合テスト)
+├─ ghost/
+│  └─ master/
+│     ├─ descript.txt
+│     └─ dic/ (*.pasta)
+├─ shell/
+│  └─ master/
+│     ├─ descript.txt
+│     └─ surface*.png (build時生成)
+├─ install.txt
+└─ pasta.toml
+```
+
+| 項目 | 決定内容 | 理由 |
+|------|---------|------|
+| **クレート配置** | `crates/pasta_sample_ghost/` | pasta_luaから責務分離、ルート汚染回避 |
+| **ゴースト配置** | クレート内（`ghost/`, `shell/`等） | 完全な独立性、配布物として完結 |
+| **テスト配置** | `crates/pasta_sample_ghost/tests/` | クレート標準構成 |
+| **テスト環境** | 統合テスト（PastaLoader使用） | 実SSP不要、CI実行可能 |
+| **画像生成** | `src/lib.rs` + build時生成 | 再現性・自動化 |
+| **CIでの実行** | 有効（`cargo test --workspace`） | リグレッション検出 |
+
+**責務定義:**
+- pasta_sample_ghost: pastaエンジンの**利用例**および**動作検証**
+- pasta_lua: エンジン本体（サンプルゴーストへの依存なし）
 
 ---
 
