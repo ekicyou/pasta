@@ -98,7 +98,7 @@ pasta.shiori.event.virtual_dispatcher モジュール
    - `next_hour_unix` - 次の正時タイムスタンプ（初期値: 0）
    - `next_talk_time` - 次回トーク予定時刻（初期値: 0）
    - `cached_config` - 設定キャッシュ（初期値: nil）
-2. The 上記の状態 shall セッション中のみ有効で、再起動時に初期値にリセットされる
+2. The 上記の状態 shall **SHIORIセッション中（load〜unload間）のみ有効**で、SHIORI unload時にランタイムドロップにより初期値にリセットされる
 3. The トーク中判定 shall ベースウェア（SSP）から提供される `req.status` フィールドを使用する（`req.status == "talking"` の場合は発行スキップ）
 
 ---

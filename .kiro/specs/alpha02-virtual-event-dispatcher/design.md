@@ -537,8 +537,10 @@ require("pasta.shiori.event.second_change")  -- 追加
 
 ### 5.1 Module Local State
 
+**セッション定義**: SHIORI load〜unload間。unloadでランタイムドロップにより全状態がリセットされる。
+
 ```lua
--- モジュールローカル変数（セッション中のみ有効）
+-- モジュールローカル変数（SHIORIセッション中のみ有効）
 local next_hour_unix = 0      -- 次の正時タイムスタンプ
 local next_talk_time = 0      -- 次回トーク予定時刻
 local cached_config = nil     -- 設定キャッシュ
@@ -546,9 +548,9 @@ local cached_config = nil     -- 設定キャッシュ
 
 | 変数 | 型 | 初期値 | 永続化 | 説明 |
 |-----|-----|--------|--------|------|
-| `next_hour_unix` | number | 0 | ✗ | 次の正時タイムスタンプ（セッション中有効） |
-| `next_talk_time` | number | 0 | ✗ | 次回トーク予定時刻（セッション中有効） |
-| `cached_config` | table\|nil | nil | ✗ | 設定キャッシュ |
+| `next_hour_unix` | number | 0 | ✗ | 次の正時タイムスタンプ（SHIORI load〜unload間有効） |
+| `next_talk_time` | number | 0 | ✗ | 次回トーク予定時刻（SHIORI load〜unload間有効） |
+| `cached_config` | table\|nil | nil | ✗ | 設定キャッシュ（SHIORI load〜unload間有効） |
 
 ### 5.2 Time Model (req.date)
 
