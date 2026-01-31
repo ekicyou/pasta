@@ -8,7 +8,7 @@
 
 - **親仕様**: alpha-release-planning（アルファリリース計画）
 - **依存**: alpha03-shiori-act-sakura（completed）- 基本さくらスクリプト生成
-- **目的**: SHIORI会話フローにおけるyield制御、スコープ切り替え時の改行設定、総合テストを実現
+- **目的**: SHIORI会話フローにおけるyield制御、スポット切り替え時の改行設定、総合テストを実現
 
 ### 技術的背景
 
@@ -21,13 +21,13 @@
 
 以下のメソッドは実装済み：
 - `SHIORI_ACT.new(actors)` - コンストラクタ
-- `act:talk(actor, text)` - スコープ切り替え + テキスト追加
+- `act:talk(actor, text)` - スポット切り替え + テキスト追加
 - `act:surface(id)` - サーフェス変更タグ
 - `act:wait(ms)` - 待機タグ
 - `act:newline(n)` - 改行タグ
 - `act:clear()` - クリアタグ
 - `act:build()` - さくらスクリプト文字列生成（`\e`終端付与）
-- `act:reset()` - バッファ・スコープリセット
+- `act:reset()` - バッファ・現在スポットリセット
 
 継承元（`pasta.act`）から利用可能：
 - `act:yield()` - トークン出力（`coroutine.yield`呼び出し）
@@ -66,66 +66,52 @@
 
 - **チェイントーク**: 1回の会話終了後、時間経過後に続けて続きの会話を行う制御
 - 各さくらスクリプトは**完全に終了**（`\e`終端）
-- 次の会話は**初めからセッティングやり直し**（スコープタグ再出力含む）
-- yield後に同じアクターから継続しても、スコープタグ（`\0`等）が再出力されるのは意図通り
+- 次の会話は**初めからセッティングやり直し**（スポットタグ再出力含む）
+- yield後に同じアクターから継続しても、スポットタグ（`\0`等）が再出力されるのは意図通り
 
 #### Acceptance Criteria
 
 1. The `build()` メソッド shall さくらスクリプト文字列を構築して返す（既存動作）
 2. The `build()` メソッド shall 文字列返却前に `self:reset()` を呼び出してバッファをリセットする
 3. The 設計方針 shall 「build = 構築して吐き出す（副作用込み）」とする（メソッド名の性質上、自然）
-4. The リセット後 shall `_current_scope = nil` となり、次のtalk()でスコープタグが再出力される
-5. The 既存テスト shall build()後のバッファ状態検証を更新する（空になることを期待）
-6. **実装時確認事項**: 既存テストで build() を複数回呼んで同じスクリプトを取得するパターンがあれば、テストを修正する
+4. The リセット後 shall `_current_spot = nil` となり、次のtalk()でスポットタグが再出力される
+5. The 変数名 shall `_current_scope` から `_current_spot` に改名する（実装時）
+6. The 既存テスト shall build()後のバッファ状態検証を更新する（空になることを期待）
+7. **実装時確認事項**: 既存テストで build() を複数回呼んで同じスクリプトを取得するパターンがあれば、テストを修正する
 
 ---
 
-### Requirement 2: init_script メソッド
-
-**Objective:** As a 開発者, I want `act:init_script()`でさくらスクリプト組み立て状態を初期化したい, so that コンストラクタや手動リセット時に明確に初期化できる
-
-#### Acceptance Criteria
-
-1. The `pasta.shiori.act` shall `act:init_script()` メソッドを提供する
-2. When `init_script()` が呼び出された場合, the メソッド shall 以下を実行する:
-   - `self._buffer = {}` でバッファを空にする
-3. The メソッド shall メソッドチェーン可能（`return self`）とする
-4. The `SHIORI_ACT.new()` コンストラクタ shall 内部で `init_script()` を呼び出して初期化を統一する
-5. The 用途 shall コンストラクタでの初期化、および手動での完全リセット
-
-**Note:** `build()` は自動で `reset()` を呼ぶため、通常のyield後リセットは不要
-**Note:** `build()` は自動で `reset()` を呼ぶため、通常のyield後リセットは不要。`init_script()` は `_resume_value` も含む完全初期化が必要な場合に使用。
-
 ---
 
-### Requirement 3: pasta.toml スコープ切り替え改行設定
+### Requirement 2: pasta.toml スポット切り替え改行設定
 
-**Objective:** As a ゴースト開発者, I want スコープ切り替え時の改行数を設定ファイルで制御したい, so that ゴーストごとに表示スタイルをカスタマイズできる
+**Objective:** As a ゴースト開発者, I want スポット切り替え時の改行数を設定ファイルで制御したい, so that ゴーストごとに表示スタイルをカスタマイズできる
 
 #### 段落区切り改行の発生条件
 
-- スコープを持った「最初の」発言では改行不要
-- 相手にスコープが移り、相手が発言後、スコープが戻ってきた時に段落区切りが発生
-- `scope_switch_newlines` はこの段落区切り改行の数を制御
+- スポットを持った「最初の」発言では改行不要
+- 相手にスポットが移り、相手が発言後、スポットが戻ってきた時に段落区切りが発生
+- `spot_switch_newlines` はこの段落区切り改行の数を制御
+- 制御変数: `_current_spot`（現在のスポット番号、nilは未設定）
 
 **Note:** テキスト後の改行（`newline()`メソッド呼び出し）はスクリプト作成者が明示的に制御するものであり、本設定の対象外。
 
 #### Acceptance Criteria
 
 1. The `pasta.toml` shall `[ghost]` セクションをサポートする
-2. The `[ghost]` セクション shall `scope_switch_newlines` 設定を持つ:
+2. The `[ghost]` セクション shall `spot_switch_newlines` 設定を持つ:
    - 型: 整数
    - デフォルト: 1
-   - 意味: スコープ復帰時（actor変更時、2回目以降）に挿入する段落区切り`\n`の数
-3. When `scope_switch_newlines = 0` の場合, the `talk()` メソッド shall スコープ復帰時に改行を挿入しない
-4. When `scope_switch_newlines = 2` の場合, the `talk()` メソッド shall スコープ復帰時に`\n\n`を挿入する
+   - 意味: スポット復帰時（actor変更時、2回目以降）に挿入する段落区切り`\n`の数
+3. When `spot_switch_newlines = 0` の場合, the `talk()` メソッド shall スポット復帰時に改行を挿入しない
+4. When `spot_switch_newlines = 2` の場合, the `talk()` メソッド shall スポット復帰時に`\n\n`を挿入する
 5. The 設定読み込み shall Luaモジュール `pasta.config` 経由で行う
-6. The `SHIORI_ACT.new()` shall 設定を読み込み、インスタンスに保持する（`self._scope_switch_newlines`）
+6. The `SHIORI_ACT.new()` shall 設定を読み込み、インスタンスに保持する（`self._spot_switch_newlines`）
 7. If 設定ファイルが存在しないまたは設定未定義の場合, the デフォルト値（1）を使用する
 
 ---
 
-### Requirement 4: pasta.config モジュール
+### Requirement 3: pasta.config モジュール
 
 **Objective:** As a 開発者, I want pasta.toml設定をLuaから読み取りたい, so that ランタイム設定を動的に取得できる
 
@@ -140,7 +126,7 @@
 
 ---
 
-### Requirement 5: 総合フィーチャーテスト
+### Requirement 4: 総合フィーチャーテスト
 
 **Objective:** As a 開発者, I want pasta.shiori.actの全機能を網羅する総合テストを実行したい, so that 実装の品質と回帰を検証できる
 
@@ -148,7 +134,7 @@
 
 1. The 総合テスト shall `crates/pasta_lua/tests/lua_specs/shiori_act_integration_test.lua` に配置する
 2. The テスト shall 以下のシナリオを検証する:
-   - 複数アクター会話（sakura, kero, char2）のスコープ切り替え
+   - 複数アクター会話（sakura, kero, char2）のスポット切り替え
    - 表情変更（surface）とテキストの組み合わせ
    - 待機（wait）と改行（newline）のタイミング制御
    - メソッドチェーン（`act:talk(...):surface(5):wait(500)`）
@@ -160,20 +146,16 @@
 
 ---
 
-### Requirement 6: 既存テストの拡充
+### Requirement 5: 既存テストの拡充
 
-**Objective:** As a 開発者, I want 既存テストにyield・init_script・設定関連のテストを追加したい, so that 単体レベルでも品質を保証できる
+**Objective:** As a 開発者, I want 既存テストにyield・設定関連のテストを追加したい, so that 単体レベルでも品質を保証できる
 
 #### Acceptance Criteria
 
 1. The `shiori_act_test.lua` shall `yield()` メソッドのテストを追加する:
    - さくらスクリプト文字列がyieldされること
    - yield後にバッファがリセットされること
-   - `_resume_value` が正しく設定されること
-2. The テスト shall `init_script()` メソッドのテストを追加する:
-   - バッファ、スコープ、レジューム値がすべてリセットされること
-   - メソッドチェーンが動作すること
-3. The テスト shall 設定読み込み（`pasta.config`）のテストを追加する:
+2. The テスト shall 設定読み込み（`pasta.config`）のテストを追加する:
    - デフォルト値の取得
    - 設定値の取得
    - 存在しないキーのデフォルト値フォールバック
@@ -223,8 +205,7 @@ ACT_IMPL.word(self, name) → string|nil
 
 ```lua
 -- pasta.shiori.act 追加メソッド
-SHIORI_ACT_IMPL.yield(self) → any (resume value)
-SHIORI_ACT_IMPL.init_script(self) → self
+SHIORI_ACT_IMPL.yield(self) → nil
 
 -- pasta.config 新規モジュール
 PASTA_CONFIG.get(section, key, default) → any
@@ -237,8 +218,8 @@ PASTA_CONFIG.get(section, key, default) → any
 | 用語 | 説明 |
 |------|------|
 | yield | コルーチンの中断・再開ポイント |
-| resume value | coroutine.resumeで渡された値（yield戻り値） |
-| スコープ切り替え | sakura↔kero等のキャラクター切り替え |
+| スポット（spot） | キャラクターの照明位置（sakura=0, kero=1, char2=2等） |
+| スポットタグ | `\0`, `\1`, `\p[N]` でスポット切り替えを指示 |
+| スポット切り替え | sakura↔kero等のキャラクター切り替え |
 | pasta.toml | Pasta設定ファイル（TOML形式） |
-| init_script | さくらスクリプト組み立て状態の完全初期化 |
 | 総合フィーチャーテスト | シナリオベースの統合テスト |
