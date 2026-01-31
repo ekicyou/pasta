@@ -88,7 +88,7 @@ crates/pasta_sample_ghost/
 │   ├── lib.rs              # 公開API: generate_ghost()
 │   ├── image_generator.rs  # ピクトグラム画像生成
 │   ├── config_templates.rs # pasta.toml/ukadocテンプレート
-│   └── scripts.rs          # 埋め込みpastaスクリプト
+│   └── scripts.rs          # pastaスクリプトテンプレート（文字列定数）
 ├── tests/
 │   └── integration_test.rs # 統合テスト
 └── ghosts/                 # 配布物テンプレート（テスト時に生成）
@@ -97,7 +97,10 @@ crates/pasta_sample_ghost/
         ├── ghost/master/
         │   ├── descript.txt
         │   ├── pasta.toml
-        │   └── *.pasta
+        │   └── dic/        # Pasta DSLスクリプト（実行時ロード）
+        │       ├── boot.pasta
+        │       ├── talk.pasta
+        │       └── click.pasta
         └── shell/master/
             ├── descript.txt
             ├── surfaces.txt
@@ -108,7 +111,7 @@ crates/pasta_sample_ghost/
 - テスト実行時に `ghosts/hello-pasta/` 配下へファイル生成
 - 画像ファイル（surface*.png）は `image_generator.rs` で動的生成
 - 設定ファイル（*.txt, pasta.toml）は `config_templates.rs` で生成
-- pastaスクリプト（*.pasta）は `scripts.rs` から出力
+- pastaスクリプト（*.pasta）は `scripts.rs` の文字列定数から出力
 
 ### 依存関係
 
@@ -313,9 +316,11 @@ flowchart TD
 
 ---
 
-### Component 3: Scripts（埋め込みpastaスクリプト）
+### Component 3: Scripts（Pasta DSLスクリプト）
 
 **責務**: サンプルイベントハンドラの提供
+
+**配置**: `ghosts/hello-pasta/ghost/master/dic/*.pasta`（要件定義で確定済み）
 
 **ファイル構成**:
 
@@ -324,6 +329,8 @@ flowchart TD
 | `boot.pasta` | OnFirstBoot, OnBoot, OnClose | 起動/終了トーク |
 | `talk.pasta` | OnTalk, OnHour | ランダムトーク、時報 |
 | `click.pasta` | OnMouseDoubleClick | ダブルクリック反応 |
+
+**生成方法**: `config_templates.rs` からテンプレート文字列として出力
 
 **boot.pasta 設計**:
 
@@ -391,9 +398,10 @@ ghosts/hello-pasta/
 │   └── master/
 │       ├── descript.txt            # REQ-009
 │       ├── pasta.toml              # REQ-007
-│       ├── boot.pasta              # REQ-002
-│       ├── talk.pasta              # REQ-004, REQ-005
-│       └── click.pasta             # REQ-003
+│       └── dic/                    # Pasta DSLスクリプト配置ディレクトリ
+│           ├── boot.pasta          # REQ-002
+│           ├── talk.pasta          # REQ-004, REQ-005
+│           └── click.pasta         # REQ-003
 └── shell/
     └── master/
         ├── descript.txt            # REQ-009
