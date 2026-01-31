@@ -73,14 +73,16 @@ pasta.shiori.event.virtual_dispatcher モジュール
 #### Acceptance Criteria
 
 1. When OnSecondChange イベントを受信した場合, the virtual_dispatcher shall OnTalk より先に OnHour 発行判定を実行する
-2. While 以下の条件を全て満たす場合, the virtual_dispatcher shall OnHour 仮想イベントを発行する:
+2. The virtual_dispatcher shall 次の正時タイムスタンプ（`next_hour_unix`）をモジュールローカル変数で保持する（初期値: 0）
+3. If `next_hour_unix == 0` の場合（初回起動時）, the virtual_dispatcher shall 次の正時タイムスタンプを計算・設定し、OnHour 発行をスキップする
+4. While 以下の条件を全て満たす場合, the virtual_dispatcher shall OnHour 仮想イベントを発行する:
+   - `next_hour_unix` が初期化済み（`next_hour_unix > 0`）
    - 現在時刻が次の正時を超過している（`req.date.unix >= next_hour_unix`）
    - 非トーク中（`ctx.save.virtual_event.is_talking == false`）
-3. The virtual_dispatcher shall 次の正時タイムスタンプ（`next_hour_unix`）をモジュールローカル変数で保持する
-4. When OnHour を発行する場合, the virtual_dispatcher shall `SCENE.search("OnHour")` でシーン関数を検索し実行する
-5. If OnHour シーン関数が存在しない場合, the virtual_dispatcher shall `204 No Content` を返す
-6. When OnHour を発行した場合, the virtual_dispatcher shall 次の正時タイムスタンプを計算して更新する（現在時刻から次の00分00秒）
-7. The virtual_dispatcher shall OnHour を OnTalk より優先して判定する（OnHour 発行時は OnTalk 判定をスキップ）
+5. When OnHour を発行する場合, the virtual_dispatcher shall `SCENE.search("OnHour")` でシーン関数を検索し実行する
+6. If OnHour シーン関数が存在しない場合, the virtual_dispatcher shall `204 No Content` を返す
+7. When OnHour を発行した場合, the virtual_dispatcher shall 次の正時タイムスタンプを計算して更新する（現在時刻から次の00分00秒）
+8. The virtual_dispatcher shall OnHour を OnTalk より優先して判定する（OnHour 発行時は OnTalk 判定をスキップ）
 
 ---
 
