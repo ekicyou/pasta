@@ -281,19 +281,14 @@ local raw_config = require("@pasta_config")
 local PASTA_CONFIG = {}
 
 --- 設定値を取得
---- @param section string|nil セクション名（nilでトップレベル）
+--- @param section string セクション名
 --- @param key string キー名
 --- @param default any デフォルト値
 --- @return any 設定値またはデフォルト
 function PASTA_CONFIG.get(section, key, default)
-    local target
-    if section then
-        target = raw_config[section]
-        if type(target) ~= "table" then
-            return default
-        end
-    else
-        target = raw_config
+    local target = raw_config[section]
+    if type(target) ~= "table" then
+        return default
     end
     
     local value = target[key]
@@ -310,11 +305,9 @@ return PASTA_CONFIG
 ```lua
 local config = require("pasta.config")
 
--- セクション指定
+-- セクション指定（必須）
 local newlines = config.get("ghost", "spot_switch_newlines", 1.5)
-
--- トップレベル
-local ghost_name = config.get(nil, "ghost_name", "DefaultGhost")
+local ghost_name = config.get("ghost", "name", "DefaultGhost")
 ```
 
 ---
@@ -391,7 +384,7 @@ SHIORI_ACT_IMPL.reset(self) -> ShioriAct
 SHIORI_ACT_IMPL.yield(self) -> nil     -- ★新規
 
 -- pasta.config
-PASTA_CONFIG.get(section: string|nil, key: string, default: any) -> any
+PASTA_CONFIG.get(section: string, key: string, default: any) -> any
 ```
 
 ### さくらスクリプト出力形式
