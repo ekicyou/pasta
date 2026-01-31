@@ -685,7 +685,15 @@ flowchart TB
 | `test_hourly_chime` | REQ-005 | OnHour 時報出力 |
 | `test_shell_images` | REQ-006 | PNG 存在/サイズ/透過背景 |
 | `test_pasta_toml` | REQ-007 | 設定パース可能/キー存在 |
+| `test_actor_dictionary` | REQ-002/003/004 | アクター辞書定義→表情参照→さくらスクリプト変換 |
 | `test_ukadoc_compliance` | REQ-009 | 必須フィールド存在 |
+
+**test_actor_dictionary 検証内容**:
+- アクター辞書定義（`％Pasta`, `％Lua`）のパース成功
+- 表情指定（`＠笑顔：\s[1]`）の登録確認
+- アクション行での表情参照（`Pasta：＠笑顔　こんにちは`）
+- さくらスクリプトへの正しい変換（`\s[1]こんにちは`）
+- alpha01-shiori-alpha-events との統合確認
 
 ### テストパターン（TempDir + コピー方式）
 
