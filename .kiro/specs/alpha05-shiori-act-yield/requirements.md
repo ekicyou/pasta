@@ -189,10 +189,24 @@ return config.user_data.nested.inner  -- ネストされたテーブル
 
 **Objective:** As a 開発者, I want pasta.shiori.actの全機能を網羅する総合テストを実行したい, so that 実装の品質と回帰を検証できる
 
+#### 実装時確認事項・既知の懸念点
+
+1. **会話開始時の初期化**:
+   - 会話最初の初期表情指定を行う方法がシーン関数に存在しない
+   - 現状: 最初の `talk()` 呼び出しでスポットタグ（`\0`, `\1`）は出力されるが、初期サーフェスは未指定
+   - テストでの対応: この制約を明示的に検証し、将来の拡張余地を残す
+   - **本仕様完了後に追加調整が必要になる可能性あり**
+
+2. **初期化周りの抜け漏れリスク**:
+   - `reset()` の完全性（すべてのフィールドがクリアされるか）
+   - `build()` 後の状態が次の `talk()` で正しく動作するか
+   - 特に注意: 会話開始直後の状態とyield後の状態の一貫性
+
 #### Acceptance Criteria
 
 1. The 総合テスト shall `crates/pasta_lua/tests/lua_specs/shiori_act_integration_test.lua` に配置する
 2. The テスト shall 以下のシナリオを検証する:
+   - **会話開始時の動作**（初期化状態の確認）
    - 複数アクター会話（sakura, kero, char2）のスポット切り替え
    - 表情変更（surface）とテキストの組み合わせ
    - 待機（wait）と改行（newline）のタイミング制御
@@ -202,6 +216,7 @@ return config.user_data.nested.inner  -- ネストされたテーブル
 3. The テスト shall 期待されるさくらスクリプト出力との完全一致を検証する
 4. The テスト shall エラーケース（無効なactor、コルーチン外yield等）を検証する
 5. The テスト shall 既存の `shiori_act_test.lua` とは別ファイルで、シナリオベースの統合テストとする
+6. **実装後レビュー**: テスト実行後、初期表情指定の必要性を再評価し、必要に応じて別仕様で対応
 
 ---
 
