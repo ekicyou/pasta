@@ -18,8 +18,6 @@ jobs:
         include:
           - target: i686-pc-windows-msvc
             arch: x86
-          - target: x86_64-pc-windows-msvc
-            arch: x64
 
     steps:
       - name: Checkout repository
@@ -39,7 +37,6 @@ jobs:
         run: cargo build --release --target ${{ matrix.target }} -p pasta_shiori
 
       - name: Run tests
-        if: matrix.arch == 'x64'
         run: cargo test --all
 
       - name: Upload artifact
