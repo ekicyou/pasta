@@ -16,10 +16,10 @@
 -- 1. require文（遅延ロードで循環参照回避）
 
 -- 2. モジュールローカル変数（SHIORIセッション中のみ有効）
-local next_hour_unix = 0      -- 次の正時タイムスタンプ
-local next_talk_time = 0      -- 次回トーク発行予定時刻
-local cached_config = nil     -- 設定キャッシュ
-local scene_executor = nil    -- テスト用: シーン実行関数のオーバーライド
+local next_hour_unix = 0   -- 次の正時タイムスタンプ
+local next_talk_time = 0   -- 次回トーク発行予定時刻
+local cached_config = nil  -- 設定キャッシュ
+local scene_executor = nil -- テスト用: シーン実行関数のオーバーライド
 
 -- 3. モジュールテーブル宣言
 ---@class VirtualDispatcher

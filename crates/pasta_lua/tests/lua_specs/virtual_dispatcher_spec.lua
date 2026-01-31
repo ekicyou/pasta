@@ -91,11 +91,11 @@ describe("check_hour function", function()
         local req = {
             id = "OnSecondChange",
             status = "idle",
-            date = { unix = 1702648800 }  -- 14:00:00
+            date = { unix = 1702648800 } -- 14:00:00
         }
         local result = dispatcher.check_hour(req)
         local state = dispatcher._get_internal_state()
-        
+
         expect(result):toBe(nil)
         expect(state.next_hour_unix > 0):toBe(true)
     end)
@@ -105,11 +105,11 @@ describe("check_hour function", function()
         -- Initialize
         local req1 = { id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } }
         dispatcher.check_hour(req1)
-        
+
         -- At next hour
         local req2 = { id = "OnSecondChange", status = "idle", date = { unix = 1702652400 } }
         local result = dispatcher.check_hour(req2)
-        
+
         expect(result):toBe("fired")
     end)
 
@@ -118,11 +118,11 @@ describe("check_hour function", function()
         -- Initialize
         local req1 = { id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } }
         dispatcher.check_hour(req1)
-        
+
         -- At next hour but talking
         local req2 = { id = "OnSecondChange", status = "talking", date = { unix = 1702652400 } }
         local result = dispatcher.check_hour(req2)
-        
+
         expect(result):toBe(nil)
     end)
 
@@ -131,11 +131,11 @@ describe("check_hour function", function()
         -- Initialize
         local req1 = { id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } }
         dispatcher.check_hour(req1)
-        
+
         -- Not yet at next hour
         local req2 = { id = "OnSecondChange", status = "idle", date = { unix = 1702649000 } }
         local result = dispatcher.check_hour(req2)
-        
+
         expect(result):toBe(nil)
     end)
 end)
@@ -159,7 +159,7 @@ describe("check_talk function", function()
         local req = { id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } }
         local result = dispatcher.check_talk(req)
         local state = dispatcher._get_internal_state()
-        
+
         expect(result):toBe(nil)
         expect(state.next_talk_time > 0):toBe(true)
     end)
@@ -168,14 +168,14 @@ describe("check_talk function", function()
         setup()
         -- Initialize
         local req1 = { id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } }
-        dispatcher.dispatch(req1)  -- Initialize both timers
-        
+        dispatcher.dispatch(req1) -- Initialize both timers
+
         local state = dispatcher._get_internal_state()
-        
+
         -- After interval
         local req2 = { id = "OnSecondChange", status = "idle", date = { unix = state.next_talk_time + 1 } }
         local result = dispatcher.check_talk(req2)
-        
+
         expect(result):toBe("fired")
     end)
 
@@ -184,13 +184,13 @@ describe("check_talk function", function()
         -- Initialize
         local req1 = { id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } }
         dispatcher.dispatch(req1)
-        
+
         local state = dispatcher._get_internal_state()
-        
+
         -- After interval but talking
         local req2 = { id = "OnSecondChange", status = "talking", date = { unix = state.next_talk_time + 1 } }
         local result = dispatcher.check_talk(req2)
-        
+
         expect(result):toBe(nil)
     end)
 
@@ -199,11 +199,11 @@ describe("check_talk function", function()
         -- Initialize
         local req1 = { id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } }
         dispatcher.dispatch(req1)
-        
+
         -- Before interval
         local req2 = { id = "OnSecondChange", status = "idle", date = { unix = 1702648810 } }
         local result = dispatcher.check_talk(req2)
-        
+
         expect(result):toBe(nil)
     end)
 end)
@@ -224,11 +224,11 @@ describe("priority and integration", function()
         -- Initialize both
         local req1 = { id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } }
         dispatcher.dispatch(req1)
-        
+
         -- At next hour (OnHour should fire, OnTalk should not)
         local req2 = { id = "OnSecondChange", status = "idle", date = { unix = 1702652400 } }
         local result = dispatcher.dispatch(req2)
-        
+
         -- Should return "fired" from check_hour
         expect(result):toBe("fired")
     end)
@@ -238,13 +238,13 @@ describe("priority and integration", function()
         -- Set some state
         local req = { id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } }
         dispatcher.dispatch(req)
-        
+
         local state_before = dispatcher._get_internal_state()
         expect(state_before.next_hour_unix > 0):toBe(true)
-        
+
         -- Reset
         dispatcher._reset()
-        
+
         local state_after = dispatcher._get_internal_state()
         expect(state_after.next_hour_unix):toBe(0)
         expect(state_after.next_talk_time):toBe(0)

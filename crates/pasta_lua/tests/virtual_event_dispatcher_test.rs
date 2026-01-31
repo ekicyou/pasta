@@ -497,11 +497,7 @@ fn test_module_state_reset() {
     "#,
     );
 
-    assert!(
-        result.is_ok(),
-        "State should reset properly: {:?}",
-        result
-    );
+    assert!(result.is_ok(), "State should reset properly: {:?}", result);
     assert!(result.unwrap().as_boolean().unwrap_or(false));
 }
 
