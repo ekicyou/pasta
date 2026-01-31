@@ -74,13 +74,13 @@ pasta.shiori.event.virtual_dispatcher モジュール
 
 1. When OnSecondChange イベントを受信した場合, the virtual_dispatcher shall OnTalk より先に OnHour 発行判定を実行する
 2. While 以下の条件を全て満たす場合, the virtual_dispatcher shall OnHour 仮想イベントを発行する:
-   - 正時を超過している（`req.date.min == 0` かつ `req.date.sec` が設定許容範囲内）
+   - 現在時刻が次の正時を超過している（`req.date.unix >= next_hour_unix`）
    - 非トーク中（`ctx.save.virtual_event.is_talking == false`）
-   - 前回時報から60分以上経過している
-3. When OnHour を発行する場合, the virtual_dispatcher shall `SCENE.search("OnHour")` でシーン関数を検索し実行する
-4. If OnHour シーン関数が存在しない場合, the virtual_dispatcher shall `204 No Content` を返す
-5. When OnHour を発行した場合, the virtual_dispatcher shall `ctx.save.virtual_event.last_hour_time` を現在時刻で更新する
-6. The virtual_dispatcher shall OnHour を OnTalk より優先して判定する（OnHour 発行時は OnTalk 判定をスキップ）
+3. The virtual_dispatcher shall 次の正時タイムスタンプ（`next_hour_unix`）をモジュールローカル変数で保持する
+4. When OnHour を発行する場合, the virtual_dispatcher shall `SCENE.search("OnHour")` でシーン関数を検索し実行する
+5. If OnHour シーン関数が存在しない場合, the virtual_dispatcher shall `204 No Content` を返す
+6. When OnHour を発行した場合, the virtual_dispatcher shall 次の正時タイムスタンプを計算して更新する（現在時刻から次の00分00秒）
+7. The virtual_dispatcher shall OnHour を OnTalk より優先して判定する（OnHour 発行時は OnTalk 判定をスキップ）
 
 ---
 
@@ -92,15 +92,14 @@ pasta.shiori.event.virtual_dispatcher モジュール
 
 1. The virtual_dispatcher shall 以下の状態を `ctx.save.virtual_event` テーブルで管理する:
    - `last_talk_time` - 前回トーク発行時刻（Unix timestamp、秒）
-   - `last_hour_time` - 前回時報発行時刻（Unix timestamp、秒）
    - `is_talking` - トーク中フラグ（boolean）
 2. When virtual_dispatcher が初回起動する場合（`ctx.save.virtual_event == nil`）, the virtual_dispatcher shall デフォルト値で初期化する:
    - `last_talk_time = 0`
-   - `last_hour_time = 0`
    - `is_talking = false`
 3. The `ctx.save` テーブル shall `@pasta_persistence` モジュールにより自動永続化される（Drop時保存）
 4. When トーク・時報発行後のシーン実行が開始する場合, the virtual_dispatcher shall `is_talking = true` を設定する
 5. When シーン実行が完了した場合, the シーン shall `is_talking = false` を設定する（alpha03 act モジュール統合時に実装）
+6. The virtual_dispatcher shall 次の正時タイムスタンプ（`next_hour_unix`）をモジュールローカル変数で保持する（永続化不要）
 
 ---
 
@@ -134,7 +133,6 @@ pasta.shiori.event.virtual_dispatcher モジュール
    - `talk_interval_min` - トーク最小間隔（秒、デフォルト: 180）
    - `talk_interval_max` - トーク最大間隔（秒、デフォルト: 300）
    - `hour_margin` - 時報前マージン（秒、デフォルト: 30）
-   - `hour_tolerance` - 時報許容遅延（秒、デフォルト: 5）
 2. If 設定が存在しない場合, the virtual_dispatcher shall デフォルト値を使用する
 3. When トーク間隔を決定する場合, the virtual_dispatcher shall `talk_interval_min` と `talk_interval_max` の間でランダムに選択する
 4. The 設定読み込み shall 起動時に1回のみ実行し、結果をキャッシュする
@@ -206,6 +204,7 @@ pasta.shiori.event.virtual_dispatcher モジュール
 | OnHour | 時報発動の仮想イベント |
 | 仮想イベント | OnSecondChange をトリガーとして条件判定により発行されるイベント |
 | virtual_dispatcher | 仮想イベントの条件判定・発行を行うモジュール |
+| next_hour_unix | 次の正時のUnixタイムスタンプ（モジュールローカル変数で保持） |
 | ctx.save | セッション永続化テーブル（`@pasta_persistence` モジュール経由） |
 | pasta.toml | ゴースト設定ファイル |
 | req.date | Rust側から提供される時刻情報テーブル（`unix`, `year`, `month`, `day`, `hour`, `min`, `sec`, `wday` 等） |
