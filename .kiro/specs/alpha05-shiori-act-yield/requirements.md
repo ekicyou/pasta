@@ -79,7 +79,19 @@
 6. The 既存テスト shall build()後のバッファ状態検証を更新する（空になることを期待）
 7. **実装時確認事項**: 既存テストで build() を複数回呼んで同じスクリプトを取得するパターンがあれば、テストを修正する
 
----
+### Requirement 1.2: newline()メソッドの引数対応
+
+**Objective:** As a スクリプト作成者, I want `newline(n)`で任意幅の改行を挿入したい, so that テキスト後の改行数を柔軟に制御できる
+
+#### Acceptance Criteria
+
+1. The `newline(n)` メソッド shall 数値引数 `n` を受け取る
+2. When `n` が nil以外の有効な数値の場合, the メソッド shall `n`個の `\n` タグを挿入する
+   - 例: `newline(2)` → `\n\n`
+   - 例: `newline(3)` → `\n\n\n`
+3. When `n` が nil または省略の場合, the メソッド shall デフォルト値（1）を使用する
+4. When `n` が 0 以下の場合, the メソッド shall 何も挿入しない
+5. The 既存の `newline()` 呼び出し（引数なし） shall 下位互換性を保つ（`\n` 1個挿入）
 
 ---
 
