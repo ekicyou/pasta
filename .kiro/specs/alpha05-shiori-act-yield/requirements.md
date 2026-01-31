@@ -92,18 +92,28 @@
 
 **Objective:** As a ゴースト開発者, I want スコープ切り替え時の改行数を設定ファイルで制御したい, so that ゴーストごとに表示スタイルをカスタマイズできる
 
+#### 改行の種類
+
+| 改行種別 | タイミング | 設定対象 |
+|----------|------------|----------|
+| 文面的改行 | テキスト後（常時） | ❌ 対象外（常に1） |
+| 段落区切り改行 | スコープ復帰時（2回目以降） | ✅ `scope_switch_newlines` |
+
+**設計意図**: スコープを持った「最初の」発言では改行不要。相手にスコープが移り、相手が発言後、スコープが戻ってきた時に初めて段落区切りとしての改行が発生する。
+
 #### Acceptance Criteria
 
 1. The `pasta.toml` shall `[ghost]` セクションをサポートする
 2. The `[ghost]` セクション shall `scope_switch_newlines` 設定を持つ:
    - 型: 整数
    - デフォルト: 1
-   - 意味: スコープ切り替え時（actor変更時）に挿入する`\n`の数
-3. When `scope_switch_newlines = 0` の場合, the `talk()` メソッド shall スコープ切り替え時に改行を挿入しない
-4. When `scope_switch_newlines = 2` の場合, the `talk()` メソッド shall スコープ切り替え時に`\n\n`を挿入する
-5. The 設定読み込み shall Luaモジュール `pasta.config` 経由で行う
-6. The `SHIORI_ACT.new()` shall 設定を読み込み、インスタンスに保持する（`self._scope_switch_newlines`）
-7. If 設定ファイルが存在しないまたは設定未定義の場合, the デフォルト値（1）を使用する
+   - 意味: スコープ復帰時（actor変更時、2回目以降）に挿入する段落区切り`\n`の数
+3. When `scope_switch_newlines = 0` の場合, the `talk()` メソッド shall スコープ復帰時に改行を挿入しない
+4. When `scope_switch_newlines = 2` の場合, the `talk()` メソッド shall スコープ復帰時に`\n\n`を挿入する
+5. The 文面的改行（テキスト後）は常に1で固定とする
+6. The 設定読み込み shall Luaモジュール `pasta.config` 経由で行う
+7. The `SHIORI_ACT.new()` shall 設定を読み込み、インスタンスに保持する（`self._scope_switch_newlines`）
+8. If 設定ファイルが存在しないまたは設定未定義の場合, the デフォルト値（1）を使用する
 
 ---
 
