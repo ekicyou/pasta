@@ -23,7 +23,7 @@ function SHIORI_ACT_IMPL.__index(self, key)
     -- 1. SHIORI_ACT_IMPLメソッドを検索
     local method = rawget(SHIORI_ACT_IMPL, key)
     if method then return method end
-    
+
     -- 2. ACT.IMPLにフォールバック（アクタープロキシ生成を含む）
     return ACT.IMPL.__index(self, key)
 end

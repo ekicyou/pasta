@@ -20,7 +20,7 @@ local function create_mock_ctx()
     sakura.spot = "sakura"
     local kero = ACTOR.get_or_create("うにゅう")
     kero.spot = "kero"
-    
+
     return {
         actors = {
             sakura = sakura,
