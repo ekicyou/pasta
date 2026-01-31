@@ -51,7 +51,7 @@
 3. The CI shall ビルドターゲットに応じて以下のターゲットを追加する:
    - `i686-pc-windows-msvc`（x86ビルド用）
    - `x86_64-pc-windows-msvc`（x64ビルド用）
-4. When ツールチェーンインストールが完了した時, the CI shall `rustc --version` でバージョンを出力する
+4. The ツールチェーンバージョン shall GitHub Actions のログで確認可能である（dtolnay/rust-toolchain が自動出力）
 
 ---
 
