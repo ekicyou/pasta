@@ -224,15 +224,38 @@ return config.user_data.nested.inner  -- ネストされたテーブル
 
 **Objective:** As a 開発者, I want 既存テストにyield・設定関連のテストを追加したい, so that 単体レベルでも品質を保証できる
 
+#### 実装方針
+
+**コルーチンテストの実装**:
+- `pasta.co.safe_wrap()` を使用してコルーチンをラップする
+- エラーハンドリングを含めた安全なyieldテストを実現
+
+**Fixtureの流用**:
+- `crates/pasta_lua/tests/fixtures/loader/with_config/pasta.toml` を流用
+- 必要に応じて `[ghost]` セクションを追加したfixture作成
+
+**リグレッション対応**:
+- 既存テストが `pasta.co` の追加で影響を受けないことを確認
+- Fixture追加によるloader_integration_testへの影響を検証
+
 #### Acceptance Criteria
 
 1. The `shiori_act_test.lua` shall `yield()` メソッドのテストを追加する:
-   - さくらスクリプト文字列がyieldされること
-   - yield後にバッファがリセットされること
+   - `pasta.co.safe_wrap()` でコルーチンをラップしてテスト実行
+   - さくらスクリプト文字列がyieldされること（`err=nil`を確認）
+   - yield後にバッファがリセットされること（`_buffer`が空、`_current_spot`がnil）
+   - エラーケース: コルーチン外でyield呼び出し時のエラー検証
 2. The テスト shall 設定読み込み（`pasta.config`）のテストを追加する:
-   - デフォルト値の取得
-   - 設定値の取得
+   - デフォルト値の取得（セクション・キー未定義時）
+   - 設定値の取得（存在するキー）
    - 存在しないキーのデフォルト値フォールバック
+   - セクション指定の動作確認（`[ghost]` セクション等）
+3. The Fixture準備 shall 必要に応じて行う:
+   - 既存 `with_config/pasta.toml` に `[ghost]` セクション追加、または
+   - 新規 `with_ghost_config/pasta.toml` fixture作成
+4. The リグレッション検証 shall 実施する:
+   - 既存の全テストケースがパスすること
+   - `loader_integration_test.rs` が影響を受けないこと
 
 ---
 
