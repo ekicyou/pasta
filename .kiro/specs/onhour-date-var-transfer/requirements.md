@@ -28,10 +28,11 @@
      - `var.時` ← `req.date.hour`
      - `var.分` ← `req.date.min`
      - `var.秒` ← `req.date.sec`
-     - `var.年内通算日` ← `req.date.yday`
-     - `var.曜日` ← `req.date.wday`
-   - Unix timestamp (`unix`) および ナノ秒 (`ns`) は転記しない
+     - `var.曜日` ← 日本語曜日文言（"日曜日", "月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日"）
+     - `var.week` ← 英語曜日名（"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"）
+   - Unix timestamp (`unix`), ナノ秒 (`ns`), 年内通算日 (`yday`) は転記しない
    - エイリアスフィールド (`ordinal`, `num_days_from_sunday`) は転記しない
+   - 曜日変換は `req.date.wday` (0=日曜日, 1=月曜日, ..., 6=土曜日) を元に行う
 3. If `self.req` または `self.req.date` が存在しない, then the SHIORI_ACT shall 何もせずに正常終了する
 4. The SHIORI_ACT shall 英語フィールド名と日本語変数名の両方で同じ値にアクセス可能にする
 
