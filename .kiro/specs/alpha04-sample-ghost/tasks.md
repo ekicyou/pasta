@@ -81,7 +81,8 @@ hello-pasta ゴーストの完全実装。専用クレート構成、画像自�
 - [x] 5. 統合テスト実装
 - [x] 5.1 テストヘルパー実装
   - tests/common/mod.rs 作成
-  - `copy_pasta_shiori_dll()` 実装（target/i686-pc-windows-msvc/release/pasta_shiori.dll 検出・コピー）
+  - `copy_pasta_shiori_dll()` 実装（target/i686-pc-windows-msvc/release/pasta.dll 検出・コピー）
+    - **注**: Cargo.toml の `[lib] name = "pasta"` により `pasta.dll`（`pasta_shiori.dll` ではない）
   - DLL 不在時の明確なエラーメッセージ
   - _Requirements: 8.1, 8.2, 8.3_
 
@@ -107,10 +108,11 @@ hello-pasta ゴーストの完全実装。専用クレート構成、画像自�
   - `scripts/build-ghost.ps1` PowerShell スクリプト作成
   - pasta_shiori.dll ビルド（32bit Windows ターゲット i686-pc-windows-msvc）
   - テンプレートコピー（crates/pasta_sample_ghost/ghosts/hello-pasta/ → dist/hello-pasta/）
-  - pasta.dll 配置（リネームコピー）
-  - Lua ランタイムコピー（crates/pasta_lua/scripts/ → dist/hello-pasta/ghost/master/scripts/）
-  - pasta.toml に `lua_search_paths` 設定を追加
-  - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5_
+  - DLLコピー: `target/i686-pc-windows-msvc/release/pasta.dll` → `dist/hello-pasta/ghost/master/pasta.dll`
+    - **注**: Cargo.toml の `[lib] name = "pasta"` により出力は `pasta.dll`（`pasta_shiori.dll` ではない）
+  - Lua ランタイム再帰コピー（crates/pasta_lua/scripts/ → dist/hello-pasta/ghost/master/scripts/）
+  - pasta.toml に `lua_search_paths = ["scripts/pasta", "scripts"]` 設定済み
+  - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 10.6_
 
 - [x] 6. Soul Gate: SOUL.md 整合性確認
   - alpha04-sample-ghost が SOUL.md のビジョン・コアバリュー・設計原則と整合していることを確認
@@ -139,10 +141,10 @@ hello-pasta ゴーストの完全実装。専用クレート構成、画像自�
 | 3.1-3.4 | ダブルクリック反応 | 4.2 |
 | 4.1-4.3 | ランダムトーク | 4.3 |
 | 5.1-5.4 | 時報 | 4.4 |
-| 6.1-6.4 | シェル素材 | 2.1, 2.2 |
-| 7.1-7.4 | 設定ファイル（pasta.toml） | 3.2 |
+| 6.1-6.5 | シェル素材 | 2.1, 2.2 |
+| 7.1-7.5 | 設定ファイル（pasta.toml） | 3.2 |
 | 8.1-8.8 | テスト要件 | 5.1, 5.2, 5.3, 5.4 |
 | 9.1-9.4 | ukadoc設定ファイル | 3.1 |
-| 10.1-10.5 | 配布ビルド自動化 | 5.5 |
+| 10.1-10.6 | 配布ビルド自動化 | 5.5 |
 
-全10要件、32個のAcceptance Criteriaをカバー。
+全10要件、36個のAcceptance Criteriaをカバー。
