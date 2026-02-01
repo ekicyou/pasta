@@ -84,7 +84,7 @@
 #### Acceptance Criteria
 
 1. The alpha04-sample-ghost shall OnFirstBoot 時に初回起動メッセージを表示する
-2. The alpha04-sample-ghost shall OnBoot 時に起動挨拶を表示する（時間帯に応じた挨拶）
+2. The alpha04-sample-ghost shall OnBoot 時に起動挨拶を表示する
 3. The alpha04-sample-ghost shall OnClose 時に終了挨拶を表示する
 4. The トーク shall `pasta.shiori.act` を使用してさくらスクリプトを生成する
 
