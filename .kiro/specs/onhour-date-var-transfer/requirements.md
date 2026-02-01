@@ -1,7 +1,37 @@
 # Requirements Document
 
-## Project Description (Input)
-OnHour仮想イベント発行時に、req.date.XXXフィールドを、act.var.XXXフィールドに転記して、シーン関数から利用しやすくする。
+## Introduction
+
+本仕様は、OnHour仮想イベント発行時にSHIORIリクエストの日時情報（`req.date.XXX`）をアクションローカル変数（`act.var.XXX`）へ自動転記する機能を定義する。これにより、シーン関数から日時情報に容易にアクセス可能となる。
+
+**スコープ**: Lua ランタイム層（virtual_dispatcher.lua）のみ。トランスパイラー層の変数名マッピング（`＄時` → `var.hour` 等）は別仕様とする。
 
 ## Requirements
-<!-- Will be generated in /kiro:spec-requirements phase -->
+
+### Requirement 1: OnHour イベント発火時の日時変数自動設定
+
+**Objective:** As a ゴースト開発者, I want OnHour発火時に日時情報がact.varに自動設定される, so that シーン関数から日時フィールドにアクセスできる
+
+#### Acceptance Criteria
+
+1. When OnHour仮想イベントが発火する, the virtual_dispatcher shall `req.date` の全フィールドを `act.var` に転記する
+2. When シーン関数が実行される, the scene function shall `act.var.hour`, `act.var.minute` 等で転記された日時フィールドにアクセスできる
+
+### Requirement 2: 日時フィールドの転記対象定義
+
+**Objective:** As a ゴースト開発者, I want どの日時フィールドが転記されるか明確に定義されている, so that 利用可能な変数を把握できる
+
+#### Acceptance Criteria
+
+1. The virtual_dispatcher shall `req.date` テーブルの全キー・値ペアを `act.var` へ転記する
+2. If `req.date` の特定フィールドが存在しない, then the virtual_dispatcher shall 該当する `act.var` フィールドを設定しない（nilのまま）
+
+### Requirement 3: 既存動作との互換性
+
+**Objective:** As a システム管理者, I want 既存のOnHour/OnTalk処理に影響がない, so that 既存ゴーストが正常に動作し続ける
+
+#### Acceptance Criteria
+
+1. When OnHour以外のイベント（OnTalk, OnBoot等）が発生する, the virtual_dispatcher shall `act.var` への日時転記を行わない
+2. While 日時転記処理が失敗した場合, the virtual_dispatcher shall シーン実行は継続し、エラーをログ出力する
+3. The virtual_dispatcher shall 既存のOnHour判定ロジック（正時検出、優先度制御）を変更しない
