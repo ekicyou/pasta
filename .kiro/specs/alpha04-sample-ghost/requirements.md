@@ -135,22 +135,33 @@
 #### Acceptance Criteria
 
 1. The alpha04-sample-ghost shall 以下の仕様でシェル素材を自動生成する:
-   - **サイズ**: 幅 96〜128 × 高さ 256 ピクセル（3頭身バランス）
+   - **サイズ**: 幅 128 × 高さ 256 ピクセル（固定）
+   - **比率**: 3頭身（頭部半径 42px、頭部は全体の約1/3）
    - **形式**: 透過 PNG
    - **キャラクター**: 2体
-     - 女の子（sakura）: surface0-8（9種）
-     - 男の子（kero）: surface10-18（9種）
-   - **生成方法**: Rustコードによるプログラマティック生成（`src/lib.rs`）
-   - **依存**: `image`, `imageproc`（塗りつぶし円・ポリゴン・線描画）
+     - 女の子（sakura）: surface0-8（9種）- 赤色 `#DC3545`
+     - 男の子（kero）: surface10-18（9種）- 青色 `#007BFF`
+   - **生成方法**: Rustコードによるプログラマティック生成（`src/image_generator.rs`）
+   - **依存**: `image`, `imageproc`（塗りつぶし円・ポリゴン描画）
+
 2. The ピクトグラム shall トイレマーク風の人型アイコンとする:
-   - 頭部: 塗りつぶし円
-   - 胴体: 男の子は四角形、女の子はスカート（台形/三角形）
-   - 手足: 線描画
+   - **頭部**: 塗りつぶし円（半径 42px）
+   - **胴体**: 純粋な三角形のみ（台形は不可、手足なし）
+     - 女の子: `○ + △`（正三角形、スカート風、頂点が上）
+     - 男の子: `○ + ▽`（逆三角形、頂点が下）
+   - **装飾**: 手足・耳などの装飾は一切付けない（シンプルさ優先）
+
 3. The 表情 shall 顔部分に線描画で重ねる:
-   - `^ ^` 笑顔, `- -` 通常, `> <` 照れ, `o o` 驚き, `; ;` 泣き, `@ @` 困惑, `* *` キラキラ, `= =` 眠い, `# #` 怒り
+   - **線の太さ**: 3px（視認性確保）
+   - **目の間隔**: 36px
+   - **表情種類**（9種）:
+     - `^ ^` 笑顔, `- -` 通常, `> <` 照れ, `o o` 驚き, `; ;` 泣き
+     - `@ @` 困惑, `* *` キラキラ, `= =` 眠い, `# #` 怒り
    - フォント不要（CI再現性確保）
-3. The シェル shall descript.txt でサーフェス定義を行う（ukadoc準拠）
-4. The 画像生成 shall CIで再現可能であること（外部依存なし）
+
+4. The シェル shall `shell/master/descript.txt` でサーフェス定義を行う（ukadoc準拠）
+
+5. The 画像生成 shall CIで再現可能であること（外部依存なし）
 
 ---
 
@@ -162,28 +173,35 @@
 
 1. The alpha04-sample-ghost shall `ghosts/hello-pasta/ghost/master/pasta.toml` に以下を定義する:
    ```toml
-   # hello-pasta ゴースト設定ファイル
-   # pasta alpha04 サンプル
-
-   # [教育的サンプル] 伺かゴーストでは省略可能（install.txt/readme.txt で代替可能）
-   # 将来的な pasta_lua 汎用用途（ノベルゲーム、ツール等）のサンプルとして含める
    [package]
    name = "hello-pasta"
-   version = "0.1.0"
-   authors = ["どっとステーション駅長"]
+   version = "1.0.0"
+   edition = "2024"
 
    [loader]
-   debug_mode = true
+   pasta_patterns = ["dic/*.pasta"]
+   lua_search_paths = [
+       "profile/pasta/save/lua",
+       "scripts",
+       "profile/pasta/cache/lua",
+       "scriptlibs"
+   ]
+   transpiled_output_dir = "profile/pasta/cache/lua"
 
    [ghost]
-   spot_switch_newlines = 1.5
-   talk_interval_min = 60   # 1分（テスト用に短縮）
-   talk_interval_max = 120  # 2分（テスト用に短縮）
-   hour_margin = 30
+   random_talk_interval = 180
    ```
-2. The `[package]` セクション shall 教育的サンプルとして含め、コメントで伺かゴーストでは省略可能であることを説明する
-3. The `[package]` セクション shall 将来的な pasta_lua 汎用用途（ノベルゲーム、ツール等）のサンプルとして機能する
+
+2. The `lua_search_paths` shall 以下の順序で Lua モジュールを検索する:
+   - `profile/pasta/save/lua`: ユーザー保存スクリプト
+   - `scripts`: pasta 標準ランタイム（`crates/pasta_lua/scripts/` からコピー）
+   - `profile/pasta/cache/lua`: トランスパイル済みキャッシュ
+   - `scriptlibs`: 追加ライブラリ
+
+3. The `[package]` セクション shall 教育的コメント付きで含め、伺かゴーストでは省略可能であることを説明する
+
 4. The 設定 shall [pasta.toml設定仕様書](research/pasta-toml-spec.md) に準拠する
+
 5. The 設定 shall alpha02（仮想イベント）で読み込まれる
 
 ---
@@ -198,7 +216,8 @@
    ```powershell
    cargo build --release --target i686-pc-windows-msvc -p pasta_shiori
    ```
-2. The テスト shall ビルド成果物 `target/i686-pc-windows-msvc/release/pasta_shiori.dll` を自動検出・コピーする
+2. The ビルド成果物 shall `target/i686-pc-windows-msvc/release/pasta.dll` として出力される
+   - 注: `pasta_shiori` クレートの `[lib] name = "pasta"` により、出力ファイル名は `pasta.dll`
 3. The テスト shall DLL不在時に明確なエラーメッセージを表示する
 
 #### Acceptance Criteria
@@ -221,26 +240,34 @@
 #### Acceptance Criteria
 
 1. The alpha04-sample-ghost shall `ghosts/hello-pasta/install.txt` に以下を定義する:
+   - `charset`: UTF-8
    - `type`: ghost
    - `name`: hello-pasta
    - `directory`: hello-pasta
-   - `accept`: 依存なし
+
 2. The alpha04-sample-ghost shall `ghosts/hello-pasta/ghost/master/descript.txt` に以下を定義する:
    - `charset`: UTF-8
-   - `type`: ghost
+   - `type`: ghost（**必須**）
+   - `shiori`: pasta.dll（SHIORI DLL指定 - **必須**）
    - `name`: hello-pasta
    - `sakura.name`: 女の子
    - `kero.name`: 男の子
    - `craftman`: ekicyou
    - `craftmanw`: どっとステーション駅長
-   - `shiori`: pasta.dll（SHIORI DLL指定 - 必須）
    - `homeurl`: https://github.com/ekicyou/pasta
+
 3. The alpha04-sample-ghost shall `ghosts/hello-pasta/shell/master/descript.txt` に以下を定義する:
+   - `charset`: UTF-8
    - `name`: master
+   - `type`: shell（**必須**）
    - `craftman`: ekicyou
    - `craftmanw`: どっとステーション駅長
-   - `sakura.balloon.offsetx/y`: 自動生成画像サイズに基づき調整
-   - `kero.balloon.offsetx/y`: 自動生成画像サイズに基づき調整
+   - `seriko.use_self_alpha`: 1
+   - `sakura.balloon.offsetx`: 64（画像幅の半分）
+   - `sakura.balloon.offsety`: 0
+   - `kero.balloon.offsetx`: 64
+   - `kero.balloon.offsety`: 0
+
 4. The 設定ファイル shall [ukadoc設定ファイル仕様書](research/ukadoc-config-spec.md) に準拠する
 
 ---
@@ -252,14 +279,31 @@
 #### Acceptance Criteria
 
 1. The alpha04-sample-ghost shall `scripts/build-ghost.ps1` PowerShell スクリプトを提供する
+
 2. The スクリプト shall 以下を自動実行する:
-   - `pasta_shiori.dll` のビルド（32bit Windows ターゲット）
-   - テンプレートディレクトリのコピー
-   - ビルド成果物の配置（`pasta.dll` としてリネーム）
-   - Lua ランタイム（`crates/pasta_lua/scripts/`）のコピー
-3. The 出力 shall `dist/hello-pasta/` に配布可能な完全なゴーストとして生成する
-4. The pasta.toml shall `lua_search_paths` 設定を含み、Lua モジュール検索パスを定義する
-5. The 自動化 shall Rust と PowerShell のみを使用する（Makefile 不使用）
+   - 32bit Windows ターゲット（`i686-pc-windows-msvc`）でのDLLビルド
+   - テンプレートディレクトリ（`ghosts/hello-pasta/`）のコピー
+   - ビルド成果物の配置
+   - Lua ランタイムのコピー（後述）
+
+3. The DLLコピー shall 以下の仕様に従う:
+   - **ソースパス**: `target/i686-pc-windows-msvc/release/pasta.dll`
+   - **出力パス**: `dist/hello-pasta/ghost/master/pasta.dll`
+   - **重要**: Cargo.tomlの `[lib] name = "pasta"` により出力ファイル名は `pasta.dll`（`pasta_shiori.dll` ではない）
+
+4. The Luaランタイムコピー shall 以下の仕様に従う:
+   - **ソースディレクトリ**: `crates/pasta_lua/scripts/`（全サブディレクトリ含む再帰コピー）
+   - **出力ディレクトリ**: `dist/hello-pasta/ghost/master/scripts/`
+   - **必須ファイル**: `pasta/*.lua`（コアモジュール）、`hello.lua`（サンプル）
+
+5. The 出力 shall `dist/hello-pasta/` に配布可能な完全なゴーストとして生成する:
+   - `ghost/master/pasta.dll` - SHIORI DLL
+   - `ghost/master/pasta.toml` - 設定ファイル
+   - `ghost/master/scripts/` - Lua ランタイム
+   - `shell/master/` - シェル素材（surfaces, descript.txt）
+   - `install.txt` - インストール情報
+
+6. The 自動化 shall Rust と PowerShell のみを使用する（Makefile 不使用）
 
 ---
 
