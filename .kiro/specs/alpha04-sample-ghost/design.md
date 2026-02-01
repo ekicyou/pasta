@@ -659,22 +659,12 @@ description = "pasta入門用サンプルゴースト"
 
 **alpha04 での実装方針**:
 - **pasta DSL のみ**（シンプル優先）: 共通反応をランダム選択で多様化
-- キャラクター別の詳細な分岐は将来の拡張例として保留
+- キャラクター別の詳細な分岐は pasta DSL の範囲外（act.req は利用可能だが、alpha04 では使用しない）
 
-**将来の拡張例**（Lua ハンドラによる分岐）:
-```lua
--- dic/handlers/mouseclick.lua (参考例)
-REG.OnMouseDoubleClick = function(act)
-    local scope = act.req.reference[0]
-    local scene_name = (scope == "0") and "女の子クリック" or "男の子クリック"
-    local scene_fn = SCENE.search(scene_name, nil, nil)
-    if scene_fn then
-        scene_fn(act)
-        return RES.ok(act:build())
-    end
-    return nil
-end
-```
+**技術的補足**:
+- `act.req.reference[0]` によるキャラクター判定は実装済み（act-req-parameter 仕様）
+- Lua 側で Reference 分岐を実装することも技術的には可能
+- ただし alpha04 はシンプルさを優先し、pasta DSL のみで完結させる
 
 ---
 
