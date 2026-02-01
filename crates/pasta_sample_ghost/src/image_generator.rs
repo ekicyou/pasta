@@ -78,8 +78,8 @@ const HEIGHT: u32 = 256;
 /// キャラクター色
 fn character_color(character: Character) -> Rgba<u8> {
     match character {
-        Character::Sakura => Rgba([74, 144, 217, 255]),  // ライトブルー #4A90D9
-        Character::Kero => Rgba([74, 217, 138, 255]),    // ライトグリーン #4AD98A
+        Character::Sakura => Rgba([74, 144, 217, 255]), // ライトブルー #4A90D9
+        Character::Kero => Rgba([74, 217, 138, 255]),   // ライトグリーン #4AD98A
     }
 }
 
@@ -139,7 +139,7 @@ fn draw_body(img: &mut RgbaImage, character: Character, color: Rgba<u8>) {
 
     // キャラクターによって幅を変える
     let (top_left, top_right, bottom_left, bottom_right) = match character {
-        Character::Sakura => (44, 84, 34, 94),  // スカート風に下が広い
+        Character::Sakura => (44, 84, 34, 94), // スカート風に下が広い
         Character::Kero => (44, 84, 44, 84),   // ズボン風にストレート
     };
 
@@ -194,22 +194,72 @@ fn draw_expression(img: &mut RgbaImage, expression: Expression) {
     match expression {
         Expression::Happy => {
             // ^ ^ 笑顔
-            draw_line_segment_mut(img, (left_eye_x - 5.0, eye_y + 3.0), (left_eye_x, eye_y - 3.0), black);
-            draw_line_segment_mut(img, (left_eye_x, eye_y - 3.0), (left_eye_x + 5.0, eye_y + 3.0), black);
-            draw_line_segment_mut(img, (right_eye_x - 5.0, eye_y + 3.0), (right_eye_x, eye_y - 3.0), black);
-            draw_line_segment_mut(img, (right_eye_x, eye_y - 3.0), (right_eye_x + 5.0, eye_y + 3.0), black);
+            draw_line_segment_mut(
+                img,
+                (left_eye_x - 5.0, eye_y + 3.0),
+                (left_eye_x, eye_y - 3.0),
+                black,
+            );
+            draw_line_segment_mut(
+                img,
+                (left_eye_x, eye_y - 3.0),
+                (left_eye_x + 5.0, eye_y + 3.0),
+                black,
+            );
+            draw_line_segment_mut(
+                img,
+                (right_eye_x - 5.0, eye_y + 3.0),
+                (right_eye_x, eye_y - 3.0),
+                black,
+            );
+            draw_line_segment_mut(
+                img,
+                (right_eye_x, eye_y - 3.0),
+                (right_eye_x + 5.0, eye_y + 3.0),
+                black,
+            );
         }
         Expression::Normal => {
             // - - 通常
-            draw_line_segment_mut(img, (left_eye_x - 5.0, eye_y), (left_eye_x + 5.0, eye_y), black);
-            draw_line_segment_mut(img, (right_eye_x - 5.0, eye_y), (right_eye_x + 5.0, eye_y), black);
+            draw_line_segment_mut(
+                img,
+                (left_eye_x - 5.0, eye_y),
+                (left_eye_x + 5.0, eye_y),
+                black,
+            );
+            draw_line_segment_mut(
+                img,
+                (right_eye_x - 5.0, eye_y),
+                (right_eye_x + 5.0, eye_y),
+                black,
+            );
         }
         Expression::Shy => {
             // > < 照れ
-            draw_line_segment_mut(img, (left_eye_x - 5.0, eye_y - 3.0), (left_eye_x, eye_y), black);
-            draw_line_segment_mut(img, (left_eye_x, eye_y), (left_eye_x - 5.0, eye_y + 3.0), black);
-            draw_line_segment_mut(img, (right_eye_x + 5.0, eye_y - 3.0), (right_eye_x, eye_y), black);
-            draw_line_segment_mut(img, (right_eye_x, eye_y), (right_eye_x + 5.0, eye_y + 3.0), black);
+            draw_line_segment_mut(
+                img,
+                (left_eye_x - 5.0, eye_y - 3.0),
+                (left_eye_x, eye_y),
+                black,
+            );
+            draw_line_segment_mut(
+                img,
+                (left_eye_x, eye_y),
+                (left_eye_x - 5.0, eye_y + 3.0),
+                black,
+            );
+            draw_line_segment_mut(
+                img,
+                (right_eye_x + 5.0, eye_y - 3.0),
+                (right_eye_x, eye_y),
+                black,
+            );
+            draw_line_segment_mut(
+                img,
+                (right_eye_x, eye_y),
+                (right_eye_x + 5.0, eye_y + 3.0),
+                black,
+            );
         }
         Expression::Surprised => {
             // o o 驚き
@@ -218,48 +268,178 @@ fn draw_expression(img: &mut RgbaImage, expression: Expression) {
         }
         Expression::Crying => {
             // ; ; 泣き
-            draw_line_segment_mut(img, (left_eye_x, eye_y - 3.0), (left_eye_x, eye_y + 8.0), black);
-            draw_line_segment_mut(img, (left_eye_x - 3.0, eye_y + 2.0), (left_eye_x - 3.0, eye_y + 10.0), black);
-            draw_line_segment_mut(img, (right_eye_x, eye_y - 3.0), (right_eye_x, eye_y + 8.0), black);
-            draw_line_segment_mut(img, (right_eye_x + 3.0, eye_y + 2.0), (right_eye_x + 3.0, eye_y + 10.0), black);
+            draw_line_segment_mut(
+                img,
+                (left_eye_x, eye_y - 3.0),
+                (left_eye_x, eye_y + 8.0),
+                black,
+            );
+            draw_line_segment_mut(
+                img,
+                (left_eye_x - 3.0, eye_y + 2.0),
+                (left_eye_x - 3.0, eye_y + 10.0),
+                black,
+            );
+            draw_line_segment_mut(
+                img,
+                (right_eye_x, eye_y - 3.0),
+                (right_eye_x, eye_y + 8.0),
+                black,
+            );
+            draw_line_segment_mut(
+                img,
+                (right_eye_x + 3.0, eye_y + 2.0),
+                (right_eye_x + 3.0, eye_y + 10.0),
+                black,
+            );
         }
         Expression::Confused => {
             // @ @ 困惑（渦巻き風）
             draw_filled_circle_mut(img, (left_eye_x as i32, eye_y as i32), 5, black);
-            draw_filled_circle_mut(img, (left_eye_x as i32, eye_y as i32), 2, Rgba([255, 255, 255, 255]));
+            draw_filled_circle_mut(
+                img,
+                (left_eye_x as i32, eye_y as i32),
+                2,
+                Rgba([255, 255, 255, 255]),
+            );
             draw_filled_circle_mut(img, (right_eye_x as i32, eye_y as i32), 5, black);
-            draw_filled_circle_mut(img, (right_eye_x as i32, eye_y as i32), 2, Rgba([255, 255, 255, 255]));
+            draw_filled_circle_mut(
+                img,
+                (right_eye_x as i32, eye_y as i32),
+                2,
+                Rgba([255, 255, 255, 255]),
+            );
         }
         Expression::Sparkle => {
             // * * キラキラ
-            draw_line_segment_mut(img, (left_eye_x - 5.0, eye_y), (left_eye_x + 5.0, eye_y), black);
-            draw_line_segment_mut(img, (left_eye_x, eye_y - 5.0), (left_eye_x, eye_y + 5.0), black);
-            draw_line_segment_mut(img, (left_eye_x - 4.0, eye_y - 4.0), (left_eye_x + 4.0, eye_y + 4.0), black);
-            draw_line_segment_mut(img, (left_eye_x - 4.0, eye_y + 4.0), (left_eye_x + 4.0, eye_y - 4.0), black);
+            draw_line_segment_mut(
+                img,
+                (left_eye_x - 5.0, eye_y),
+                (left_eye_x + 5.0, eye_y),
+                black,
+            );
+            draw_line_segment_mut(
+                img,
+                (left_eye_x, eye_y - 5.0),
+                (left_eye_x, eye_y + 5.0),
+                black,
+            );
+            draw_line_segment_mut(
+                img,
+                (left_eye_x - 4.0, eye_y - 4.0),
+                (left_eye_x + 4.0, eye_y + 4.0),
+                black,
+            );
+            draw_line_segment_mut(
+                img,
+                (left_eye_x - 4.0, eye_y + 4.0),
+                (left_eye_x + 4.0, eye_y - 4.0),
+                black,
+            );
 
-            draw_line_segment_mut(img, (right_eye_x - 5.0, eye_y), (right_eye_x + 5.0, eye_y), black);
-            draw_line_segment_mut(img, (right_eye_x, eye_y - 5.0), (right_eye_x, eye_y + 5.0), black);
-            draw_line_segment_mut(img, (right_eye_x - 4.0, eye_y - 4.0), (right_eye_x + 4.0, eye_y + 4.0), black);
-            draw_line_segment_mut(img, (right_eye_x - 4.0, eye_y + 4.0), (right_eye_x + 4.0, eye_y - 4.0), black);
+            draw_line_segment_mut(
+                img,
+                (right_eye_x - 5.0, eye_y),
+                (right_eye_x + 5.0, eye_y),
+                black,
+            );
+            draw_line_segment_mut(
+                img,
+                (right_eye_x, eye_y - 5.0),
+                (right_eye_x, eye_y + 5.0),
+                black,
+            );
+            draw_line_segment_mut(
+                img,
+                (right_eye_x - 4.0, eye_y - 4.0),
+                (right_eye_x + 4.0, eye_y + 4.0),
+                black,
+            );
+            draw_line_segment_mut(
+                img,
+                (right_eye_x - 4.0, eye_y + 4.0),
+                (right_eye_x + 4.0, eye_y - 4.0),
+                black,
+            );
         }
         Expression::Sleepy => {
             // = = 眠い
-            draw_line_segment_mut(img, (left_eye_x - 5.0, eye_y - 2.0), (left_eye_x + 5.0, eye_y - 2.0), black);
-            draw_line_segment_mut(img, (left_eye_x - 5.0, eye_y + 2.0), (left_eye_x + 5.0, eye_y + 2.0), black);
-            draw_line_segment_mut(img, (right_eye_x - 5.0, eye_y - 2.0), (right_eye_x + 5.0, eye_y - 2.0), black);
-            draw_line_segment_mut(img, (right_eye_x - 5.0, eye_y + 2.0), (right_eye_x + 5.0, eye_y + 2.0), black);
+            draw_line_segment_mut(
+                img,
+                (left_eye_x - 5.0, eye_y - 2.0),
+                (left_eye_x + 5.0, eye_y - 2.0),
+                black,
+            );
+            draw_line_segment_mut(
+                img,
+                (left_eye_x - 5.0, eye_y + 2.0),
+                (left_eye_x + 5.0, eye_y + 2.0),
+                black,
+            );
+            draw_line_segment_mut(
+                img,
+                (right_eye_x - 5.0, eye_y - 2.0),
+                (right_eye_x + 5.0, eye_y - 2.0),
+                black,
+            );
+            draw_line_segment_mut(
+                img,
+                (right_eye_x - 5.0, eye_y + 2.0),
+                (right_eye_x + 5.0, eye_y + 2.0),
+                black,
+            );
         }
         Expression::Angry => {
             // # # 怒り（ハッシュマーク風）
-            draw_line_segment_mut(img, (left_eye_x - 5.0, eye_y - 2.0), (left_eye_x + 5.0, eye_y - 2.0), black);
-            draw_line_segment_mut(img, (left_eye_x - 5.0, eye_y + 2.0), (left_eye_x + 5.0, eye_y + 2.0), black);
-            draw_line_segment_mut(img, (left_eye_x - 2.0, eye_y - 5.0), (left_eye_x - 2.0, eye_y + 5.0), black);
-            draw_line_segment_mut(img, (left_eye_x + 2.0, eye_y - 5.0), (left_eye_x + 2.0, eye_y + 5.0), black);
+            draw_line_segment_mut(
+                img,
+                (left_eye_x - 5.0, eye_y - 2.0),
+                (left_eye_x + 5.0, eye_y - 2.0),
+                black,
+            );
+            draw_line_segment_mut(
+                img,
+                (left_eye_x - 5.0, eye_y + 2.0),
+                (left_eye_x + 5.0, eye_y + 2.0),
+                black,
+            );
+            draw_line_segment_mut(
+                img,
+                (left_eye_x - 2.0, eye_y - 5.0),
+                (left_eye_x - 2.0, eye_y + 5.0),
+                black,
+            );
+            draw_line_segment_mut(
+                img,
+                (left_eye_x + 2.0, eye_y - 5.0),
+                (left_eye_x + 2.0, eye_y + 5.0),
+                black,
+            );
 
-            draw_line_segment_mut(img, (right_eye_x - 5.0, eye_y - 2.0), (right_eye_x + 5.0, eye_y - 2.0), black);
-            draw_line_segment_mut(img, (right_eye_x - 5.0, eye_y + 2.0), (right_eye_x + 5.0, eye_y + 2.0), black);
-            draw_line_segment_mut(img, (right_eye_x - 2.0, eye_y - 5.0), (right_eye_x - 2.0, eye_y + 5.0), black);
-            draw_line_segment_mut(img, (right_eye_x + 2.0, eye_y - 5.0), (right_eye_x + 2.0, eye_y + 5.0), black);
+            draw_line_segment_mut(
+                img,
+                (right_eye_x - 5.0, eye_y - 2.0),
+                (right_eye_x + 5.0, eye_y - 2.0),
+                black,
+            );
+            draw_line_segment_mut(
+                img,
+                (right_eye_x - 5.0, eye_y + 2.0),
+                (right_eye_x + 5.0, eye_y + 2.0),
+                black,
+            );
+            draw_line_segment_mut(
+                img,
+                (right_eye_x - 2.0, eye_y - 5.0),
+                (right_eye_x - 2.0, eye_y + 5.0),
+                black,
+            );
+            draw_line_segment_mut(
+                img,
+                (right_eye_x + 2.0, eye_y - 5.0),
+                (right_eye_x + 2.0, eye_y + 5.0),
+                black,
+            );
         }
     }
 }

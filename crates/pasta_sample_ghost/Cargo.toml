@@ -6,6 +6,10 @@ edition.workspace = true
 authors.workspace = true
 license.workspace = true
 
+[[bin]]
+name = "generate-surfaces"
+path = "src/bin/generate_surfaces.rs"
+
 [dependencies]
 # 画像生成
 image = "0.25"

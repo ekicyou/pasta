@@ -18,9 +18,15 @@ pub fn generate_structure(output_dir: &Path, config: &GhostConfig) -> Result<(),
 
     // 各設定ファイルを生成
     fs::write(output_dir.join("install.txt"), generate_install_txt(config))?;
-    fs::write(ghost_master.join("descript.txt"), generate_ghost_descript(config))?;
+    fs::write(
+        ghost_master.join("descript.txt"),
+        generate_ghost_descript(config),
+    )?;
     fs::write(ghost_master.join("pasta.toml"), generate_pasta_toml(config))?;
-    fs::write(shell_master.join("descript.txt"), generate_shell_descript(config))?;
+    fs::write(
+        shell_master.join("descript.txt"),
+        generate_shell_descript(config),
+    )?;
     fs::write(shell_master.join("surfaces.txt"), generate_surfaces_txt())?;
 
     Ok(())
