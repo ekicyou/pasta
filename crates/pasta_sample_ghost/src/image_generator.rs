@@ -1,7 +1,7 @@
 //! ピクトグラム画像生成
 //!
 //! トイレマーク風のシンプルな人型アイコンを生成します。
-//! 構成：○（頭）+ △/□（胴体）のみ。手足なし。
+//! 構成：○（頭）+ △/▽（胴体）のみ。手足なし。
 
 use crate::GhostError;
 use image::{Rgba, RgbaImage};
@@ -11,9 +11,9 @@ use std::path::Path;
 /// キャラクター種別
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Character {
-    /// 女の子（sakura）- スカート（三角形）
+    /// 女の子（sakura）- スカート（△ 上向き三角形）
     Sakura,
-    /// 男の子（kero）- ズボン（四角形）
+    /// 男の子（kero）- ズボン（▽ 下向き三角形）
     Kero,
 }
 
@@ -76,20 +76,20 @@ impl Expression {
 const WIDTH: u32 = 128;
 const HEIGHT: u32 = 256;
 
-/// 頭の半径（約40px、3頭身の1頭分）
-const HEAD_RADIUS: i32 = 35;
-/// 頭の中心Y座標
-const HEAD_CENTER_Y: i32 = 45;
-/// 胴体開始Y座標（頭の下端 + 少し隙間）
-const BODY_TOP_Y: i32 = HEAD_CENTER_Y + HEAD_RADIUS + 5;
-/// 胴体高さ（画像下端まで）
-const BODY_HEIGHT: i32 = HEIGHT as i32 - BODY_TOP_Y - 5;
+/// 3頭身の1頭分（256/3 ≈ 85px、半径は42px）
+const HEAD_RADIUS: i32 = 42;
+/// 頭の中心Y座標（頭の直径分の余白を上に）
+const HEAD_CENTER_Y: i32 = HEAD_RADIUS + 2;
+/// 胴体開始Y座標（頭の下端）
+const BODY_TOP_Y: i32 = HEAD_CENTER_Y + HEAD_RADIUS;
+/// 胴体高さ（残り2頭分）
+const BODY_HEIGHT: i32 = HEAD_RADIUS * 4; // 2頭分 = 直径×2
 
-/// キャラクター色
+/// キャラクター色（トイレマーク標準色）
 fn character_color(character: Character) -> Rgba<u8> {
     match character {
-        Character::Sakura => Rgba([74, 144, 217, 255]), // ライトブルー #4A90D9
-        Character::Kero => Rgba([74, 217, 138, 255]),   // ライトグリーン #4AD98A
+        Character::Sakura => Rgba([220, 53, 69, 255]),  // 赤 #DC3545
+        Character::Kero => Rgba([0, 123, 255, 255]),    // 青 #007BFF
     }
 }
 
@@ -118,7 +118,7 @@ pub fn generate_surfaces(output_dir: &Path) -> Result<(), GhostError> {
 ///
 /// トイレピクトグラム風のシンプル構成:
 /// - 頭部: 塗りつぶし円
-/// - 胴体: 女の子=三角形（スカート）、男の子=四角形
+/// - 胴体: 女の子=△（上向き三角形）、男の子=▽（下向き三角形）
 /// - 手足: なし
 pub fn generate_surface(character: Character, expression: Expression) -> RgbaImage {
     let mut img = RgbaImage::new(WIDTH, HEIGHT);
@@ -139,39 +139,41 @@ pub fn generate_surface(character: Character, expression: Expression) -> RgbaIma
 
 /// 胴体を描画
 ///
-/// - 女の子: 三角形（スカート）- 上が細く下が広い
-/// - 男の子: 四角形（ズボン）- ストレート
+/// - 女の子: △（上向き三角形）- 頂点が上、底辺が下（スカート）
+/// - 男の子: ▽（下向き三角形）- 底辺が上、頂点が下（ズボン）
 fn draw_body(img: &mut RgbaImage, character: Character, color: Rgba<u8>) {
     let center_x = WIDTH as i32 / 2;
-    let body_bottom_y = BODY_TOP_Y + BODY_HEIGHT;
+    let body_bottom_y = (BODY_TOP_Y + BODY_HEIGHT).min(HEIGHT as i32 - 1);
 
     match character {
         Character::Sakura => {
-            // 三角形（スカート）: 頂点が上、底辺が下
-            // 上端は狭く（肩幅程度）、下端は広く
-            let top_half_width = 20; // 上端の半幅
-            let bottom_half_width = 55; // 下端の半幅
+            // △ 上向き三角形（スカート）: 頂点が上、底辺が下
+            // 頂点から始まり、下に向かって広がる
+            let bottom_half_width = 55; // 底辺の半幅
 
             for y in BODY_TOP_Y..body_bottom_y {
                 let ratio = (y - BODY_TOP_Y) as f32 / BODY_HEIGHT as f32;
-                let half_width =
-                    top_half_width as f32 + (bottom_half_width - top_half_width) as f32 * ratio;
-                let left = (center_x as f32 - half_width) as u32;
-                let right = (center_x as f32 + half_width) as u32;
+                let half_width = bottom_half_width as f32 * ratio;
+                let left = (center_x as f32 - half_width).max(0.0) as u32;
+                let right = (center_x as f32 + half_width).min(WIDTH as f32) as u32;
 
-                for x in left..right.min(WIDTH) {
+                for x in left..right {
                     img.put_pixel(x, y as u32, color);
                 }
             }
         }
         Character::Kero => {
-            // 四角形（ズボン）: 一定幅のストレート
-            let half_width = 30; // 固定幅
-            let left = (center_x - half_width) as u32;
-            let right = (center_x + half_width) as u32;
+            // ▽ 下向き三角形（ズボン）: 底辺が上、頂点が下
+            // 上から始まり、下に向かって狭まる
+            let top_half_width = 55; // 上辺の半幅
 
             for y in BODY_TOP_Y..body_bottom_y {
-                for x in left..right.min(WIDTH) {
+                let ratio = (y - BODY_TOP_Y) as f32 / BODY_HEIGHT as f32;
+                let half_width = top_half_width as f32 * (1.0 - ratio);
+                let left = (center_x as f32 - half_width).max(0.0) as u32;
+                let right = (center_x as f32 + half_width).min(WIDTH as f32) as u32;
+
+                for x in left..right {
                     img.put_pixel(x, y as u32, color);
                 }
             }
@@ -384,11 +386,12 @@ mod tests {
 
     #[test]
     fn test_character_color() {
+        // 女の子=赤、男の子=青（トイレマーク標準色）
         let sakura_color = character_color(Character::Sakura);
-        assert_eq!(sakura_color, Rgba([74, 144, 217, 255]));
+        assert_eq!(sakura_color, Rgba([220, 53, 69, 255])); // 赤
 
         let kero_color = character_color(Character::Kero);
-        assert_eq!(kero_color, Rgba([74, 217, 138, 255]));
+        assert_eq!(kero_color, Rgba([0, 123, 255, 255])); // 青
     }
 
     #[test]
@@ -404,8 +407,9 @@ mod tests {
         assert_eq!(img.width(), WIDTH);
         assert_eq!(img.height(), HEIGHT);
 
-        // 3頭身の確認：頭が全体の1/3程度
-        // 頭の直径 = 80px, 全体高さ = 256px → 約31%
+        // 3頭身の確認：頭の直径 = 84px (42*2), 全体高さ = 256px
+        // 1頭分 ≈ 256/3 ≈ 85px なので正しい3頭身
+        assert_eq!(HEAD_RADIUS * 2, 84); // 頭の直径
     }
 
     #[test]
@@ -415,35 +419,44 @@ mod tests {
     }
 
     #[test]
-    fn test_sakura_is_triangle_kero_is_rectangle() {
-        // 女の子のサーフェス生成
+    fn test_sakura_triangle_up_kero_triangle_down() {
+        // 女の子: △（上向き）= 下端が広い
+        // 男の子: ▽（下向き）= 上端が広い
         let sakura = generate_surface(Character::Sakura, Expression::Normal);
-        // 男の子のサーフェス生成
         let kero = generate_surface(Character::Kero, Expression::Normal);
 
-        // 胴体下端の幅をチェック
-        let bottom_y = (BODY_TOP_Y + BODY_HEIGHT - 1) as u32;
+        // 胴体上端と下端の幅を比較
+        let top_y = (BODY_TOP_Y + 10) as u32; // 上端付近
+        let bottom_y = (BODY_TOP_Y + BODY_HEIGHT - 10).min(HEIGHT as i32 - 1) as u32; // 下端付近
 
-        // sakura: 下端が広い（三角形）- 左端から右端までの幅を測定
-        let sakura_left = (0..WIDTH).find(|&x| sakura.get_pixel(x, bottom_y)[3] > 0);
-        let sakura_right = (0..WIDTH).rev().find(|&x| sakura.get_pixel(x, bottom_y)[3] > 0);
+        // sakura: 下端 > 上端（△）
+        let sakura_top_width = measure_width(&sakura, top_y);
+        let sakura_bottom_width = measure_width(&sakura, bottom_y);
+        assert!(
+            sakura_bottom_width > sakura_top_width,
+            "Sakura △: bottom ({}) should be wider than top ({})",
+            sakura_bottom_width,
+            sakura_top_width
+        );
 
-        // kero: 一定幅（四角形）
-        let kero_left = (0..WIDTH).find(|&x| kero.get_pixel(x, bottom_y)[3] > 0);
-        let kero_right = (0..WIDTH).rev().find(|&x| kero.get_pixel(x, bottom_y)[3] > 0);
+        // kero: 上端 > 下端（▽）
+        let kero_top_width = measure_width(&kero, top_y);
+        let kero_bottom_width = measure_width(&kero, bottom_y);
+        assert!(
+            kero_top_width > kero_bottom_width,
+            "Kero ▽: top ({}) should be wider than bottom ({})",
+            kero_top_width,
+            kero_bottom_width
+        );
+    }
 
-        // sakura の幅 > kero の幅（下端で）
-        if let (Some(sl), Some(sr), Some(kl), Some(kr)) =
-            (sakura_left, sakura_right, kero_left, kero_right)
-        {
-            let sakura_width = sr - sl;
-            let kero_width = kr - kl;
-            assert!(
-                sakura_width > kero_width,
-                "Sakura should have wider bottom (triangle: {}) than Kero (rectangle: {})",
-                sakura_width,
-                kero_width
-            );
+    /// 指定Y座標での不透明ピクセル幅を測定
+    fn measure_width(img: &RgbaImage, y: u32) -> u32 {
+        let left = (0..WIDTH).find(|&x| img.get_pixel(x, y)[3] > 0);
+        let right = (0..WIDTH).rev().find(|&x| img.get_pixel(x, y)[3] > 0);
+        match (left, right) {
+            (Some(l), Some(r)) => r - l,
+            _ => 0,
         }
     }
 }
