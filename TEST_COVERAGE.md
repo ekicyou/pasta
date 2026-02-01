@@ -67,7 +67,8 @@
 | STORE.save/CTX注入       | `store_save_test.lua`        | ✅ 完了 | 永続変数・参照同一性 |
 | SHIORIレスポンスビルダー | `shiori_res_test.rs`         | ✅ 完了 | 14テスト             |
 | SHIORIイベントディスパッチ | `shiori_event_test.rs`     | ✅ 完了 | 16テスト（新規）     |
-| SHIORI_ACT さくらスクリプト生成 | `shiori_act_test.lua`     | ✅ 完了 | 40テスト（新規）     |
+| SHIORI_ACT さくらスクリプト生成 | `shiori_act_test.lua`     | ✅ 完了 | 47テスト（transfer_date_to_var 7テスト追加）     |
+| SHIORI_ACT 日時転記機能 | `shiori_act_test.lua`     | ✅ 完了 | 7テスト（onhour-date-var-transfer）     |
 | RuntimeConfig libs配列   | `runtime::tests`             | ✅ 完了 | 17テスト（新規）     |
 | LuaConfig TOML設定       | `loader::config::tests`      | ✅ 完了 | 6テスト（新規）      |
 
@@ -79,7 +80,7 @@
 | SHIORI リクエスト処理       | `lua_request_test.rs`      | ✅ 完了 | 18+テスト        |
 | Runtime E2E                 | `runtime_e2e_test.rs`      | ✅ 完了 | 16テスト（新規） |
 | Finalize Scene              | `finalize_scene_test.rs`   | ✅ 完了 | 14テスト         |
-| Virtual Event Dispatcher    | `virtual_event_dispatcher_test.rs`<br>`virtual_dispatcher_spec.lua` | ✅ 完了 | 15+15テスト（alpha02） |
+| Virtual Event Dispatcher    | `virtual_event_dispatcher_test.rs`<br>`virtual_dispatcher_spec.lua` | ✅ 完了 | 15+20テスト（onhour-date-var-transfer 5テスト追加） |
 
 ---
 

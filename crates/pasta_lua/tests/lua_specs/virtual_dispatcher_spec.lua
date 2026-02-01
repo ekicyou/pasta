@@ -256,3 +256,195 @@ describe("priority and integration", function()
         expect(state_after.cached_config):toBe(nil)
     end)
 end)
+
+-- ============================================================================
+-- Task 4.2: check_hour() 統合テスト - transfer_date_to_var() 呼び出し確認
+-- Requirements: 2.1
+-- ============================================================================
+
+describe("check_hour - transfer_date_to_var integration", function()
+    local dispatcher
+    local SHIORI_ACT
+
+    local function setup()
+        dispatcher = require("pasta.shiori.event.virtual_dispatcher")
+        SHIORI_ACT = require("pasta.shiori.act")
+        dispatcher._reset()
+        -- 常にシーン実行成功を返すモック
+        dispatcher._set_scene_executor(function(event_name, act)
+            return "scene_result"
+        end)
+    end
+
+    test("calls transfer_date_to_var when OnHour fires", function()
+        setup()
+        local actors = { sakura = { name = "さくら", spot = "sakura" } }
+        local act = SHIORI_ACT.new(actors, {
+            id = "OnSecondChange",
+            status = "idle",
+            date = { unix = 1702648800, year = 2026, month = 2, day = 1, hour = 14, min = 0, sec = 0, wday = 0 },
+        })
+
+        -- First call: initialize
+        dispatcher.check_hour(act)
+
+        -- Advance to next hour
+        act.req.date.unix = 1702652400
+
+        -- Second call: should fire and call transfer_date_to_var
+        local result = dispatcher.check_hour(act)
+
+        expect(result):toBe("fired")
+        -- 日時変数が設定されていること
+        expect(act.var.year):toBe(2026)
+        expect(act.var["年"]):toBe("2026年")
+        expect(act.var["時１２"]):toBe("午後2時") -- hour 14
+    end)
+
+    test("sets Japanese date variables on OnHour fire", function()
+        setup()
+        local actors = { sakura = { name = "さくら", spot = "sakura" } }
+        local act = SHIORI_ACT.new(actors, {
+            id = "OnSecondChange",
+            status = "idle",
+            date = { unix = 0, year = 2026, month = 2, day = 1, hour = 12, min = 0, sec = 0, wday = 0 },
+        })
+
+        -- Initialize
+        dispatcher.check_hour(act)
+
+        -- Fire (unix > next_hour_unix)
+        act.req.date.unix = 3600
+
+        local result = dispatcher.check_hour(act)
+
+        expect(result):toBe("fired")
+        expect(act.var["曜日"]):toBe("日曜日")
+        expect(act.var.week):toBe("Sunday")
+        expect(act.var["時１２"]):toBe("正午") -- hour 12
+    end)
+end)
+
+-- ============================================================================
+-- Task 4.3: execute_scene() 統合テスト - act がシーン関数に渡される確認
+-- Requirements: 3.1, 3.2
+-- ============================================================================
+
+describe("execute_scene - act parameter passing", function()
+    local dispatcher
+
+    local function setup()
+        dispatcher = require("pasta.shiori.event.virtual_dispatcher")
+        dispatcher._reset()
+    end
+
+    test("scene_executor receives act parameter", function()
+        setup()
+        local received_act = nil
+        local received_event_name = nil
+
+        dispatcher._set_scene_executor(function(event_name, act)
+            received_event_name = event_name
+            received_act = act
+            return "scene_result"
+        end)
+
+        local SHIORI_ACT = require("pasta.shiori.act")
+        local actors = { sakura = { name = "さくら", spot = "sakura" } }
+        local act = SHIORI_ACT.new(actors, {
+            id = "OnSecondChange",
+            status = "idle",
+            date = { unix = 0, year = 2026, month = 2, day = 1, hour = 14, min = 0, sec = 0, wday = 0 },
+        })
+
+        -- Initialize
+        dispatcher.check_hour(act)
+
+        -- Fire
+        act.req.date.unix = 3600
+        dispatcher.check_hour(act)
+
+        expect(received_event_name):toBe("OnHour")
+        expect(received_act):toBe(act)
+    end)
+end)
+
+-- ============================================================================
+-- Task 4.4: check_talk() 統合テスト - transfer_date_to_var() が呼び出されないこと確認
+-- Requirements: 4.1, 3.3
+-- ============================================================================
+
+describe("check_talk - no transfer_date_to_var", function()
+    local dispatcher
+    local SHIORI_ACT
+
+    local function setup()
+        dispatcher = require("pasta.shiori.event.virtual_dispatcher")
+        SHIORI_ACT = require("pasta.shiori.act")
+        dispatcher._reset()
+        dispatcher._set_scene_executor(function(event_name, act)
+            return "scene_result"
+        end)
+    end
+
+    test("does not call transfer_date_to_var on OnTalk", function()
+        setup()
+        local actors = { sakura = { name = "さくら", spot = "sakura" } }
+        local act = SHIORI_ACT.new(actors, {
+            id = "OnSecondChange",
+            status = "idle",
+            date = { unix = 0, year = 2026, month = 2, day = 1, hour = 14, min = 0, sec = 0, wday = 0 },
+        })
+
+        -- Initialize check_talk
+        dispatcher.check_talk(act)
+
+        -- Advance time past talk interval (300+ seconds)
+        act.req.date.unix = 500
+
+        -- Also need to initialize check_hour to set next_hour_unix
+        dispatcher.check_hour(act)
+        act.req.date.unix = 501
+
+        local result = dispatcher.check_talk(act)
+
+        -- OnTalk may or may not fire depending on random interval
+        -- but act.var should NOT have date variables set
+        expect(act.var.year):toBe(nil)
+        expect(act.var["年"]):toBe(nil)
+    end)
+
+    test("passes act to scene_executor for OnTalk", function()
+        setup()
+        local received_act = nil
+
+        dispatcher._set_scene_executor(function(event_name, act)
+            received_act = act
+            return "scene_result"
+        end)
+
+        local actors = { sakura = { name = "さくら", spot = "sakura" } }
+        local act = SHIORI_ACT.new(actors, {
+            id = "OnSecondChange",
+            status = "idle",
+            date = { unix = 0, year = 2026, month = 2, day = 1, hour = 14, min = 0, sec = 0, wday = 0 },
+        })
+
+        -- Initialize both to set up state
+        dispatcher.check_hour(act)
+        dispatcher.check_talk(act)
+
+        -- Advance time significantly (past talk interval, but not near hour)
+        -- next_hour_unix is about 3600, hour_margin is 30, so safe at unix=500
+        act.req.date.unix = 500
+
+        -- Force fire by advancing past next_talk_time
+        local result = dispatcher.check_talk(act)
+
+        -- Even if it doesn't fire (random), the act should be passed when it does
+        -- We can't guarantee a fire, but we can test the executor signature
+        if result == "fired" then
+            expect(received_act):toBe(act)
+        end
+    end)
+end)

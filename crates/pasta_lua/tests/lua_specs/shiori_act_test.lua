@@ -652,3 +652,164 @@ describe("SHIORI_ACT - req field", function()
         expect(act.req.date.hour):toBe(12)
     end)
 end)
+
+-- ============================================================================
+-- Task 4.1: transfer_date_to_var() テスト
+-- Requirements: 1.1, 1.2, 1.3, 1.4
+-- ============================================================================
+
+describe("SHIORI_ACT - transfer_date_to_var()", function()
+    -- 正常系: 全フィールド転記確認（英語・数値型）
+    test("transfers all date fields from req.date to var", function()
+        local SHIORI_ACT = require("pasta.shiori.act")
+        local actors = create_mock_actors()
+        local req = {
+            id = "OnSecondChange",
+            date = {
+                year = 2026,
+                month = 2,
+                day = 1,
+                hour = 14,
+                min = 37,
+                sec = 45,
+                wday = 0,
+                unix = 1769932665,
+                ns = 123456789,
+                yday = 32,
+            },
+        }
+
+        local act = SHIORI_ACT.new(actors, req)
+        act:transfer_date_to_var()
+
+        -- 英語フィールド（数値型）確認
+        expect(act.var.year):toBe(2026)
+        expect(act.var.month):toBe(2)
+        expect(act.var.day):toBe(1)
+        expect(act.var.hour):toBe(14)
+        expect(act.var.min):toBe(37)
+        expect(act.var.sec):toBe(45)
+        expect(act.var.wday):toBe(0)
+
+        -- 転記対象外の確認（unix, ns, yday は転記されない）
+        expect(act.var.unix):toBe(nil)
+        expect(act.var.ns):toBe(nil)
+        expect(act.var.yday):toBe(nil)
+    end)
+
+    -- req 不在時の安全終了
+    test("returns self safely when req is nil", function()
+        local SHIORI_ACT = require("pasta.shiori.act")
+        local actors = create_mock_actors()
+
+        local act = SHIORI_ACT.new(actors, nil)
+        local result = act:transfer_date_to_var()
+
+        -- 何もせず正常終了、メソッドチェーン用に self を返す
+        expect(result):toBe(act)
+    end)
+
+    -- req.date 不在時の安全終了
+    test("returns self safely when req.date is nil", function()
+        local SHIORI_ACT = require("pasta.shiori.act")
+        local actors = create_mock_actors()
+        local req = { id = "OnSecondChange" }
+
+        local act = SHIORI_ACT.new(actors, req)
+        local result = act:transfer_date_to_var()
+
+        -- 何もせず正常終了、メソッドチェーン用に self を返す
+        expect(result):toBe(act)
+    end)
+
+    -- 日本語変数マッピング確認（年月日時分秒）
+    test("maps Japanese variable names with formatted strings", function()
+        local SHIORI_ACT = require("pasta.shiori.act")
+        local actors = create_mock_actors()
+        local req = {
+            id = "OnSecondChange",
+            date = {
+                year = 2026,
+                month = 2,
+                day = 1,
+                hour = 14,
+                min = 37,
+                sec = 45,
+                wday = 0,
+            },
+        }
+
+        local act = SHIORI_ACT.new(actors, req)
+        act:transfer_date_to_var()
+
+        -- 日本語変数（文字列型）確認
+        expect(act.var["年"]):toBe("2026年")
+        expect(act.var["月"]):toBe("2月")
+        expect(act.var["日"]):toBe("1日")
+        expect(act.var["時"]):toBe("14時")
+        expect(act.var["分"]):toBe("37分")
+        expect(act.var["秒"]):toBe("45秒")
+    end)
+
+    -- 曜日変換確認（wday 0-6 全パターン）
+    test("converts wday to Japanese and English weekday names", function()
+        local SHIORI_ACT = require("pasta.shiori.act")
+        local actors = create_mock_actors()
+
+        local weekdays_ja = { "日曜日", "月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日" }
+        local weekdays_en = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" }
+
+        for wday = 0, 6 do
+            local req = {
+                id = "OnSecondChange",
+                date = { year = 2026, month = 2, day = 1, hour = 0, min = 0, sec = 0, wday = wday },
+            }
+            local act = SHIORI_ACT.new(actors, req)
+            act:transfer_date_to_var()
+
+            expect(act.var["曜日"]):toBe(weekdays_ja[wday + 1])
+            expect(act.var.week):toBe(weekdays_en[wday + 1])
+        end
+    end)
+
+    -- 12時間制変換確認（hour 0, 1, 11, 12, 13, 23 のケース）
+    test("converts hour to 12-hour format with 深夜0時/正午 special cases", function()
+        local SHIORI_ACT = require("pasta.shiori.act")
+        local actors = create_mock_actors()
+
+        local test_cases = {
+            { hour = 0, expected = "深夜0時" },
+            { hour = 1, expected = "午前1時" },
+            { hour = 11, expected = "午前11時" },
+            { hour = 12, expected = "正午" },
+            { hour = 13, expected = "午後1時" },
+            { hour = 23, expected = "午後11時" },
+        }
+
+        for _, tc in ipairs(test_cases) do
+            local req = {
+                id = "OnSecondChange",
+                date = { year = 2026, month = 2, day = 1, hour = tc.hour, min = 0, sec = 0, wday = 0 },
+            }
+            local act = SHIORI_ACT.new(actors, req)
+            act:transfer_date_to_var()
+
+            expect(act.var["時１２"]):toBe(tc.expected)
+        end
+    end)
+
+    -- メソッドチェーン用に self を返す
+    test("returns self for method chaining", function()
+        local SHIORI_ACT = require("pasta.shiori.act")
+        local actors = create_mock_actors()
+        local req = {
+            id = "OnSecondChange",
+            date = { year = 2026, month = 2, day = 1, hour = 14, min = 37, sec = 45, wday = 0 },
+        }
+
+        local act = SHIORI_ACT.new(actors, req)
+        local result = act:transfer_date_to_var()
+
+        expect(result):toBe(act)
+    end)
+end)

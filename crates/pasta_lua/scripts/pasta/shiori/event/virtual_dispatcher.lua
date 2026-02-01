@@ -63,11 +63,12 @@ end
 
 --- シーン関数を実行
 ---@param event_name string イベント名 ("OnTalk" or "OnHour")
+---@param act ShioriAct actオブジェクト
 ---@return string|nil 実行結果（エラー時は nil）
-local function execute_scene(event_name)
+local function execute_scene(event_name, act)
     -- テスト用オーバーライドがあれば使用
     if scene_executor then
-        return scene_executor(event_name)
+        return scene_executor(event_name, act)
     end
 
     local SCENE = require("pasta.scene")
@@ -77,7 +78,7 @@ local function execute_scene(event_name)
         return nil
     end
 
-    local ok, result = pcall(scene_fn)
+    local ok, result = pcall(scene_fn, act)
     if not ok then
         -- エラーログ出力（既存EVENT.no_entry()パターンに準拠）
         -- 将来的にはtracing/loggingモジュールに切り替え予定
@@ -119,8 +120,19 @@ function M.check_hour(act)
     -- 次の正時を更新
     next_hour_unix = calculate_next_hour_unix(current_unix)
 
-    -- シーン実行
-    local result = execute_scene("OnHour")
+    -- 日時変数を転記（OnHour発火時のみ）
+    -- 転記処理の失敗はログ出力のみ、シーン実行は継続
+    local transfer_ok, transfer_err = pcall(function()
+        if act.transfer_date_to_var then
+            act:transfer_date_to_var()
+        end
+    end)
+    if not transfer_ok then
+        print("[virtual_dispatcher] transfer_date_to_var error: " .. tostring(transfer_err))
+    end
+
+    -- シーン実行（actを渡す）
+    local result = execute_scene("OnHour", act)
 
     return result and "fired" or nil
 end
@@ -154,8 +166,8 @@ function M.check_talk(act)
         return nil
     end
 
-    -- シーン実行
-    local result = execute_scene("OnTalk")
+    -- シーン実行（actを渡す、OnTalkではtransfer_date_to_varを呼び出さない）
+    local result = execute_scene("OnTalk", act)
 
     -- 次回トーク時刻を再計算（発行成否に関わらず）
     next_talk_time = calculate_next_talk_time(current_unix)
@@ -204,7 +216,7 @@ function M._get_internal_state()
 end
 
 --- テスト用: シーン実行関数をモックで差し替え
----@param executor function|nil シーン実行関数 (event_name) -> result
+---@param executor function|nil シーン実行関数 (event_name, act) -> result
 function M._set_scene_executor(executor)
     scene_executor = executor
 end
