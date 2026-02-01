@@ -7,8 +7,8 @@
 **スコープ**: 
 - Lua ランタイム層（SHIORI_ACT, virtual_dispatcher.lua）
 - SHIORI_ACT に日時転記メソッドを追加（将来的な再利用のため）
+- 日本語変数名マッピング（`var.時`, `var.分` 等）の実装を含む
 - execute_scene への act 引き渡し修正を含む（act-req-parameter 実装ミス修正）
-- トランスパイラー層の変数名マッピング（`＄時` → `var.hour` 等）は別仕様とする
 
 ## Requirements
 
@@ -19,8 +19,21 @@
 #### Acceptance Criteria
 
 1. The SHIORI_ACT shall `transfer_date_to_var()` メソッドを提供する
-2. When `transfer_date_to_var()` が呼び出される, the SHIORI_ACT shall `self.req.date` の全キー・値ペアを `self.var` へ転記する
+2. When `transfer_date_to_var()` が呼び出される, the SHIORI_ACT shall 以下の処理を行う:
+   - `self.req.date` の全キー・値ペアを `self.var` へそのまま転記する（英語フィールド名）
+   - 以下の日本語変数マッピングを追加で設定する:
+     - `var.年` ← `req.date.year`
+     - `var.月` ← `req.date.month`
+     - `var.日` ← `req.date.day`
+     - `var.時` ← `req.date.hour`
+     - `var.分` ← `req.date.min`
+     - `var.秒` ← `req.date.sec`
+     - `var.年内通算日` ← `req.date.yday`
+     - `var.曜日` ← `req.date.wday`
+   - Unix timestamp (`unix`) および ナノ秒 (`ns`) は転記しない
+   - エイリアスフィールド (`ordinal`, `num_days_from_sunday`) は転記しない
 3. If `self.req` または `self.req.date` が存在しない, then the SHIORI_ACT shall 何もせずに正常終了する
+4. The SHIORI_ACT shall 英語フィールド名と日本語変数名の両方で同じ値にアクセス可能にする
 
 ### Requirement 2: OnHour イベント発火時の日時変数自動設定
 
