@@ -295,11 +295,13 @@
    - **ソースディレクトリ**: `crates/pasta_lua/scripts/`（全サブディレクトリ含む再帰コピー）
    - **出力ディレクトリ**: `dist/hello-pasta/ghost/master/scripts/`
    - **必須ファイル**: `pasta/*.lua`（コアモジュール）、`hello.lua`（サンプル）
+   - **除外**: `crates/pasta_lua/scriptlibs/` はテスト用ライブラリ（luacheck, lua_test）のため配布に含めない
 
 5. The 出力 shall `dist/hello-pasta/` に配布可能な完全なゴーストとして生成する:
    - `ghost/master/pasta.dll` - SHIORI DLL
    - `ghost/master/pasta.toml` - 設定ファイル
-   - `ghost/master/scripts/` - Lua ランタイム
+   - `ghost/master/scripts/` - Lua ランタイム（`crates/pasta_lua/scripts/` 由来）
+   - `ghost/master/scriptlibs/` - **配布に含めない**（テスト用）
    - `shell/master/` - シェル素材（surfaces, descript.txt）
    - `install.txt` - インストール情報
 
