@@ -122,9 +122,9 @@
 #### Acceptance Criteria
 
 1. The alpha04-sample-ghost shall OnHour 仮想イベント時に時報トークを表示する
-2. The 時報 shall 現在時刻（`act.var.時` または `act.var.時１２`）を含める
-3. The 時報 shall 時間帯に応じたバリエーション（24時間制/12時間制）を持つ
-4. The alpha04-sample-ghost shall `onhour-date-var-transfer` 仕様により、OnHour 発火時に日時変数が自動設定されること
+2. The 時報 shall 現在時刻（`act.var.時１２`）を含める
+   - `act.var.時１２` は「午前7時」「午後3時」のような12時間表記文字列
+3. The alpha04-sample-ghost shall `onhour-date-var-transfer` 仕様により、OnHour 発火時に日時変数が自動設定されること
 
 ---
 
