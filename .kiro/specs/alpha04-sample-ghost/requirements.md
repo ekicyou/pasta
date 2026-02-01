@@ -7,7 +7,12 @@
 ### 背景
 
 - **親仕様**: alpha-release-planning（アルファリリース計画）
-- **依存**: alpha01（SHIORI EVENT）, alpha02（仮想イベント）, alpha03（さくらスクリプト）
+- **依存**: 
+  - alpha01（SHIORI EVENT）
+  - alpha02（仮想イベント）
+  - alpha03（さくらスクリプト）
+  - act-req-parameter（シーン関数への act 引き渡し）
+  - onhour-date-var-transfer（OnHour 時の日時変数自動設定）
 - **目的**: pasta エンジンの動作を体験できる完全なサンプルゴーストを提供
 
 ### サンプルゴースト概要
@@ -81,8 +86,11 @@
 #### Acceptance Criteria
 
 1. The alpha04-sample-ghost shall OnMouseDoubleClick 時に反応トークを表示する
-2. The 反応 shall クリックしたキャラクター（sakura/kero）によって異なる
-3. The 反応 shall Reference0（スコープ）を解析してキャラクターを判定する
+2. The 反応 shall クリックしたキャラクター（sakura/kero）によって異なる（`act.req.reference[0]` で判定可能）
+3. The 反応 shall 以下のいずれかで実装する:
+   - **Option A（推奨）**: pasta DSL のみの共通反応（ランダム選択で多様性を確保）
+   - **Option B**: Lua ハンドラで `act.req.reference[0]` を判定し、キャラクター別シーンを呼び出し
+4. The alpha04-sample-ghost shall `act-req-parameter` 仕様により、シーン関数で `act.req` にアクセス可能であること
 
 ---
 
@@ -105,8 +113,9 @@
 #### Acceptance Criteria
 
 1. The alpha04-sample-ghost shall OnHour 仮想イベント時に時報トークを表示する
-2. The 時報 shall 現在時刻（`req.date.hour`）を含める
-3. The 時報 shall 時間帯に応じたバリエーション（朝/昼/夕/夜）を持つ
+2. The 時報 shall 現在時刻（`act.var.時` または `act.var.時１２`）を含める
+3. The 時報 shall 時間帯に応じたバリエーション（24時間制/12時間制）を持つ
+4. The alpha04-sample-ghost shall `onhour-date-var-transfer` 仕様により、OnHour 発火時に日時変数が自動設定されること
 
 ---
 

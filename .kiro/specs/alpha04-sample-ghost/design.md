@@ -493,10 +493,15 @@ sequenceDiagram
 　女の子：＠考え　今日は何しようかな...
 　男の子：＠通常　ワイに任せとき！
 
-＃ 時報 - 毎時0分に発生（alpha04: 時刻変数は未実装）
+＃ 時報 - 毎時0分に発生（＄時 変数で時刻表示）
 ＊OnHour
-　女の子：＠笑顔　正時になったよ！\n＠時報メッセージ
+　女の子：＠笑顔　今＄時　だよ！\n＠時報メッセージ
 　男の子：＠通常　時間の確認は大事やで。
+
+＃ 時報シーン - 12時間制表示バリエーション
+＊OnHour
+　女の子：＠通常　＄時１２　になったよ。
+　男の子：＠元気　時刻確認 OK や！
 
 ＃ 時報メッセージ（時間帯別に追加可能）
 ＠時報メッセージ：お昼ごはん食べた？、おやつの時間かも！、そろそろ休憩しよう。
@@ -527,8 +532,7 @@ sequenceDiagram
 ＠女の子反応：なになに？、はいはい。、ダブルクリックされた！
 ＠男の子反応：呼んだ？、ん？、なんや？
 
-＃ OnMouseDoubleClick イベント - 女の子側クリック
-＃ Reference0 = 0 で女の子（\0側）がクリックされた場合
+＃ OnMouseDoubleClick イベント - 共通反応（ランダム選択）
 ＊OnMouseDoubleClick
 　女の子：＠驚き　＠女の子反応
 
@@ -536,14 +540,45 @@ sequenceDiagram
 　女の子：＠照れ　え、なに？
 　男の子：＠通常　こっちに用があるんちゃうん？
 
-＃ 注意: Reference による分岐は alpha04 時点では未実装
-＃ 将来的には条件分岐（＄０ == "0"）や属性（＆where:0）で分岐可能予定
+＃ Reference 分岐シーン - Lua ハンドラから呼び出し（Option B 採用時）
+＊女の子クリック
+　女の子：＠照れ　私をクリックしたね！
+　男の子：＠通常　そっちに用があるんか。
+
+＊男の子クリック
+　男の子：＠元気　ワイを呼んだな！
+　女の子：＠通常　向こうに用事みたい。
 ```
 
-**現在の制約と将来の拡張**:
-- alpha04 時点では Reference 値による条件分岐は pasta DSL に未実装
-- Lua ハンドラで req.reference[0] を判定する高度なパターンも可能
-- 将来の拡張で属性ベースの条件分岐 `＆where:0` 等を検討
+**Reference 分岐の実装オプション**:
+
+| Option | 方式 | 実装場所 | 特徴 |
+|--------|------|----------|------|
+| **A（推奨）** | 共通反応 | pasta DSL のみ | シンプル、要件の一部は未達成 |
+| **B** | Lua ハンドラ分岐 | `dic/handlers/mouseclick.lua` | 完全対応、やや複雑 |
+
+**Option B 採用時の Lua ハンドラ例**:
+```lua
+-- dic/handlers/mouseclick.lua
+local REG = require("pasta.shiori.event.register")
+local RES = require("pasta.shiori.res")
+local SCENE = require("pasta.scene")
+
+REG.OnMouseDoubleClick = function(act)
+    local scope = act.req.reference[0] or "0"
+    local scene_name = (scope == "0") and "女の子クリック" or "男の子クリック"
+    local scene_fn = SCENE.search(scene_name, nil, nil)
+    if scene_fn then
+        scene_fn(act)
+        return RES.ok(act:build())
+    end
+    return nil -- フォールバックへ
+end
+```
+
+**alpha04 での推奨**:
+- **Option A**（共通反応）を推奨 - pasta DSL 入門サンプルとしてシンプルさを優先
+- REQ-003 の「キャラクターによって異なる反応」は、トーク内容のバリエーションで表現
 
 ---
 
@@ -617,32 +652,59 @@ authors = ["pasta-team"]
 description = "pasta入門用サンプルゴースト"
 ```
 
-### 変数モデル（時刻変数の実装方針）
+### 変数モデル（時刻変数の実装）
 
-**現状**（alpha04時点）:
-- `＄時` 変数は pasta DSL スクリプト内で参照されているが、仮想イベントディスパッチャからの自動設定は未実装
-- OnHour イベントでは req.date.hour から時刻情報を取得可能だが、act.var.hour への自動設定機能は存在しない
+**実装済み**（onhour-date-var-transfer 仕様により）:
+- OnHour イベント発火時に `act:transfer_date_to_var()` が自動呼び出しされる
+- シーン関数では `act.var.時`（文字列「14時」形式）で時刻参照可能
+- pasta DSL では `＄時` でアクセス可能
 
-**将来実装** (alpha05以降):
-- 仮想イベントディスパッチャ（`pasta.shiori.event.virtual_dispatcher`）を拡張
-- OnHour イベント発火時に `req.date.hour` を `act.var.hour` に自動設定
-- pasta DSL 側では `＄＊時` でグローバル変数として参照可能に
+**利用可能な日時変数**:
 
-**alpha04 での対応**:
-- talk.pasta の OnHour シーンでは `＄時` 変数参照を**コメントアウト**または**削除**
-- 代わりに固定メッセージ（「正時になったよ！」など）を使用
-- または、時刻表示なしの時報メッセージのみ表示
+| 英語変数 | 型 | 日本語変数 | 型 | 例 |
+|---------|------|----------|------|-----|
+| `act.var.year` | number | `act.var.年` | string | "2026年" |
+| `act.var.month` | number | `act.var.月` | string | "2月" |
+| `act.var.day` | number | `act.var.日` | string | "1日" |
+| `act.var.hour` | number | `act.var.時` | string | "14時" |
+| `act.var.min` | number | `act.var.分` | string | "37分" |
+| `act.var.sec` | number | `act.var.秒` | string | "45秒" |
+| `act.var.wday` | number | `act.var.曜日` | string | "月曜日" |
+| - | - | `act.var.week` | string | "Monday" |
+| - | - | `act.var.時１２` | string | "午後2時" |
 
-**修正後の OnHour シーン例**:
-
+**pasta DSL での使用例**:
 ```pasta
-＃ 時報 - 毎時0分に発生（alpha04: 時刻変数なし）
 ＊OnHour
-　女の子：＠笑顔　正時になったよ！\n＠時報メッセージ
-　男の子：＠通常　時間の確認は大事やで。
+　女の子：＠笑顔　今＄時　だよ！\n＠時報メッセージ
 ```
 
-**注意**: 変数参照の後には全角スペースが必要（例: `＄時　だよ` ）。これは pasta DSL の構文要件。
+**注意**: 変数参照の後には全角スペースが必要（例: `＄時　だよ`）。これは pasta DSL の構文要件。
+
+### Reference 分岐モデル（act.req による実装）
+
+**実装済み**（act-req-parameter 仕様により）:
+- シーン関数の第1引数として `act` オブジェクトが渡される
+- `act.req.reference[0]` でクリック対象（"0"=sakura, "1"=kero）を判定可能
+- イベントID（`act.req.id`）やその他の Reference にもアクセス可能
+
+**Lua ハンドラでの Reference 分岐例**:
+```lua
+-- pasta/shiori/event/handlers/mouseclick.lua
+REG.OnMouseDoubleClick = function(act)
+    local scope = act.req.reference[0]
+    if scope == "0" then
+        SCENE.search("女の子クリック", nil, nil)(act)
+    else
+        SCENE.search("男の子クリック", nil, nil)(act)
+    end
+    return RES.ok(act:build())
+end
+```
+
+**alpha04 での対応オプション**:
+- **Option A**（推奨）: pasta DSL のみ、共通反応（ランダム選択）
+- **Option B**: Lua ハンドラを `dic/handlers/` に追加して分岐実装
 
 ---
 
@@ -861,3 +923,18 @@ fn test_sample_ghost_generation() {
 - **決定**: TempDir + コピー方式（既存 pasta_lua パターン踏襲）
 - **根拠**: 実績あるパターン、依存関係の明確化
 - **コミット**: `595d868`
+
+### 議題 #9: 時刻変数の実装方針
+
+- **決定**: `onhour-date-var-transfer` 仕様により解決済み
+- **実装**: OnHour 発火時に `act:transfer_date_to_var()` が自動呼び出し
+- **結果**: pasta DSL で `＄時`、`＄時１２`、`＄曜日` 等が利用可能
+- **解決日**: 2026-02-01
+
+### 議題 #10: Reference 分岐の実装方針
+
+- **決定**: `act-req-parameter` 仕様により技術的に解決済み
+- **実装**: シーン関数で `act.req.reference[0]` にアクセス可能
+- **alpha04 方針**: Option A（共通反応、pasta DSL のみ）を推奨
+- **根拠**: サンプルゴーストはシンプルさを優先、高度な分岐は Option B で可能
+- **解決日**: 2026-02-01

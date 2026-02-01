@@ -10,7 +10,9 @@
     "dependencies": [
         "alpha01-shiori-alpha-events",
         "alpha02-virtual-event-dispatcher",
-        "alpha03-shiori-act-sakura"
+        "alpha03-shiori-act-sakura",
+        "act-req-parameter",
+        "onhour-date-var-transfer"
     ],
     "parent_spec": "alpha-release-planning",
     "approvals": {
