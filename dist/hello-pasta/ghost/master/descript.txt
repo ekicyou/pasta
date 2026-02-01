@@ -1,8 +1,0 @@
-charset,UTF-8
-shiori,pasta.dll
-name,hello-pasta
-craftman,ekicyou
-craftmanw,どっとステーション駅長
-sakura.name,女の子
-kero.name,男の子
-homeurl,https://github.com/ekicyou/pasta

@@ -3,6 +3,9 @@
 debug
 target
 
+# ビルドスクリプト出力（配布物）
+dist
+
 # ライブラリクレートなのでCargo.lockは無視
 Cargo.lock
 

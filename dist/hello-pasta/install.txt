@@ -1,4 +1,0 @@
-charset,UTF-8
-type,ghost
-directory,hello-pasta
-name,hello-pasta
