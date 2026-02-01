@@ -4,7 +4,10 @@
 
 本仕様は、OnHour仮想イベント発行時にSHIORIリクエストの日時情報（`req.date.XXX`）をアクションローカル変数（`act.var.XXX`）へ自動転記する機能を定義する。これにより、シーン関数から日時情報に容易にアクセス可能となる。
 
-**スコープ**: Lua ランタイム層（virtual_dispatcher.lua）のみ。トランスパイラー層の変数名マッピング（`＄時` → `var.hour` 等）は別仕様とする。
+**スコープ**: 
+- Lua ランタイム層（virtual_dispatcher.lua）のみ
+- execute_scene への act 引き渡し修正を含む（act-req-parameter 実装ミス修正）
+- トランスパイラー層の変数名マッピング（`＄時` → `var.hour` 等）は別仕様とする
 
 ## Requirements
 
@@ -26,7 +29,17 @@
 1. The virtual_dispatcher shall `req.date` テーブルの全キー・値ペアを `act.var` へ転記する
 2. If `req.date` の特定フィールドが存在しない, then the virtual_dispatcher shall 該当する `act.var` フィールドを設定しない（nilのまま）
 
-### Requirement 3: 既存動作との互換性
+### Requirement 3: execute_scene への act 引き渡し修正
+
+**Objective:** As a システム開発者, I want execute_scene がシーン関数に act を正しく渡す, so that シーン関数が act.var にアクセスできる
+
+#### Acceptance Criteria
+
+1. When execute_scene がシーン関数を呼び出す, the virtual_dispatcher shall `pcall(scene_fn, act)` で act を引数として渡す
+2. When テスト用 scene_executor が設定されている, the virtual_dispatcher shall `scene_executor(event_name, act)` で act を引数として渡す
+3. The virtual_dispatcher shall check_hour および check_talk から execute_scene を呼び出す際に act を渡す
+
+### Requirement 4: 既存動作との互換性
 
 **Objective:** As a システム管理者, I want 既存のOnHour/OnTalk処理に影響がない, so that 既存ゴーストが正常に動作し続ける
 
