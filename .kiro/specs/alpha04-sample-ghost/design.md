@@ -271,6 +271,18 @@ pub fn draw_pictogram(img: &mut RgbaImage, character: Character) {
 }
 ```
 
+**技術検証メモ**:
+- `imageproc::drawing::draw_polygon_mut` API の互換性確認は実装時に検証
+- ポリゴン座標計算の具体例: 台形4点（上辺88-168, 下辺76-180）
+- フォールバック: API 非互換時は `image` クレートで pixel-by-pixel 描画に切り替え可能
+
+**座標計算例**:
+
+| 図形 | 座標 | 備考 |
+|------|------|------|
+| 台形（胴体） | (88,150), (168,150), (180,350), (76,350) | 上辺80px, 下辺104px |
+| 三角形（耳） | (50,60), (70,40), (70,60) | kero 専用装飾 |
+
 ---
 
 ### Component 2: ConfigTemplates

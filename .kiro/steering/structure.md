@@ -49,14 +49,17 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │   │       └── fixtures/    # テスト用Pastaスクリプト
 │   └── pasta_lua/           # Lua言語バックエンド層
 │       ├── Cargo.toml       # pasta_lua設定（pasta_core依存）
-│       └── src/
-│           ├── lib.rs       # クレートエントリーポイント
-│           ├── config.rs    # 設定管理
-│           ├── code_generator.rs # Lua コード生成
-│           ├── context.rs   # トランスパイルコンテキスト
-│           ├── error.rs     # エラー型
-│           ├── runtime/     # ランタイムレイヤー
-│           └── stdlib/      # Lua標準ライブラリ
+│       ├── src/
+│       │   ├── lib.rs       # クレートエントリーポイント
+│       │   ├── config.rs    # 設定管理
+│       │   ├── code_generator.rs # Lua コード生成
+│       │   ├── context.rs   # トランスパイルコンテキスト
+│       │   ├── error.rs     # エラー型
+│       │   ├── runtime/     # ランタイムレイヤー
+│       │   └── stdlib/      # Lua標準ライブラリ
+│       └── tests/           # pasta_lua統合テスト
+│           ├── common/      # テスト共通ユーティリティ
+│           └── fixtures/    # テスト用Pastaスクリプト
 ├── tests/                    # ワークスペースレベル統合テスト
 │   ├── common/              # テスト共通ユーティリティ
 │   └── fixtures/            # テスト用Pastaスクリプト
@@ -88,7 +91,10 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 └── AGENTS.md                # AI開発支援ドキュメント
 ```
 
-**注**: ルートクレート (`src/`) は削除済み。すべての実装コードは `crates/*/src/` 配下に配置。
+**注**: 
+- ルートクレート (`src/`) は削除済み。すべての実装コードは `crates/*/src/` 配下に配置。
+- 各クレートは独自の `tests/` ディレクトリを持つことができる（例: pasta_rune, pasta_lua, pasta_sample_ghost）
+- ワークスペースレベルの `tests/` は複数クレートにまたがる統合テスト用
 
 ## ファイル命名規則
 
@@ -101,6 +107,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 - 統合テスト: `crates/<crate>/tests/<feature>_test.rs`（アンダースコア区切り、単数形）
 - フィクスチャ: `crates/<crate>/tests/fixtures/<scenario>.pasta`
 - 共通ユーティリティ: `crates/<crate>/tests/common/mod.rs`
+- クレート専用テスト: 各クレート配下の `tests/` に配置可能
 
 ### 文法定義
 - Pest文法: `src/parser/pasta.pest`
