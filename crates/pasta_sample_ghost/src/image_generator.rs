@@ -88,8 +88,8 @@ const BODY_HEIGHT: i32 = HEAD_RADIUS * 4; // 2頭分 = 直径×2
 /// キャラクター色（トイレマーク標準色）
 fn character_color(character: Character) -> Rgba<u8> {
     match character {
-        Character::Sakura => Rgba([220, 53, 69, 255]),  // 赤 #DC3545
-        Character::Kero => Rgba([0, 123, 255, 255]),    // 青 #007BFF
+        Character::Sakura => Rgba([220, 53, 69, 255]), // 赤 #DC3545
+        Character::Kero => Rgba([0, 123, 255, 255]),   // 青 #007BFF
     }
 }
 
@@ -185,9 +185,9 @@ fn draw_body(img: &mut RgbaImage, character: Character, color: Rgba<u8>) {
 fn draw_expression(img: &mut RgbaImage, expression: Expression, character: Character) {
     let white = Rgba([255, 255, 255, 255]);
     let center_x = WIDTH as i32 / 2;
-    let eye_y = HEAD_CENTER_Y - 5; // 顔の中央やや上
-    let left_eye_x = center_x - 12;
-    let right_eye_x = center_x + 12;
+    let eye_y = HEAD_CENTER_Y; // 顔の中央
+    let left_eye_x = center_x - 18; // 目の間隔を広く
+    let right_eye_x = center_x + 18;
 
     // @マーク用に背景色を取得
     let bg_color = character_color(character);
@@ -200,8 +200,8 @@ fn draw_expression(img: &mut RgbaImage, expression: Expression, character: Chara
         }
         Expression::Normal => {
             // - - 通常（横線）
-            draw_horizontal_line(img, left_eye_x, eye_y, 8, white);
-            draw_horizontal_line(img, right_eye_x, eye_y, 8, white);
+            draw_thick_horizontal_line(img, left_eye_x, eye_y, 10, 3, white);
+            draw_thick_horizontal_line(img, right_eye_x, eye_y, 10, 3, white);
         }
         Expression::Shy => {
             // > < 照れ
@@ -210,8 +210,8 @@ fn draw_expression(img: &mut RgbaImage, expression: Expression, character: Chara
         }
         Expression::Surprised => {
             // o o 驚き（円）
-            draw_filled_circle_mut(img, (left_eye_x, eye_y), 5, white);
-            draw_filled_circle_mut(img, (right_eye_x, eye_y), 5, white);
+            draw_filled_circle_mut(img, (left_eye_x, eye_y), 8, white);
+            draw_filled_circle_mut(img, (right_eye_x, eye_y), 8, white);
         }
         Expression::Crying => {
             // ; ; 泣き（セミコロン）
@@ -230,10 +230,10 @@ fn draw_expression(img: &mut RgbaImage, expression: Expression, character: Chara
         }
         Expression::Sleepy => {
             // = = 眠い（二重線）
-            draw_horizontal_line(img, left_eye_x, eye_y - 3, 8, white);
-            draw_horizontal_line(img, left_eye_x, eye_y + 3, 8, white);
-            draw_horizontal_line(img, right_eye_x, eye_y - 3, 8, white);
-            draw_horizontal_line(img, right_eye_x, eye_y + 3, 8, white);
+            draw_thick_horizontal_line(img, left_eye_x, eye_y - 5, 10, 3, white);
+            draw_thick_horizontal_line(img, left_eye_x, eye_y + 5, 10, 3, white);
+            draw_thick_horizontal_line(img, right_eye_x, eye_y - 5, 10, 3, white);
+            draw_thick_horizontal_line(img, right_eye_x, eye_y + 5, 10, 3, white);
         }
         Expression::Angry => {
             // # # 怒り（ハッシュ）
@@ -245,139 +245,210 @@ fn draw_expression(img: &mut RgbaImage, expression: Expression, character: Chara
 
 // === 表情用ヘルパー関数 ===
 
-/// 横線を描画
-fn draw_horizontal_line(img: &mut RgbaImage, cx: i32, cy: i32, half_len: i32, color: Rgba<u8>) {
-    for dx in -half_len..=half_len {
-        let x = (cx + dx) as u32;
-        let y = cy as u32;
-        if x < WIDTH && y < HEIGHT {
-            img.put_pixel(x, y, color);
+/// 太い横線を描画
+fn draw_thick_horizontal_line(
+    img: &mut RgbaImage,
+    cx: i32,
+    cy: i32,
+    half_len: i32,
+    thickness: i32,
+    color: Rgba<u8>,
+) {
+    let half_thick = thickness / 2;
+    for dy in -half_thick..=half_thick {
+        for dx in -half_len..=half_len {
+            let x = (cx + dx) as u32;
+            let y = (cy + dy) as u32;
+            if x < WIDTH && y < HEIGHT {
+                img.put_pixel(x, y, color);
+            }
         }
     }
 }
 
-/// 縦線を描画
-fn draw_vertical_line(img: &mut RgbaImage, cx: i32, cy: i32, half_len: i32, color: Rgba<u8>) {
-    for dy in -half_len..=half_len {
-        let x = cx as u32;
-        let y = (cy + dy) as u32;
-        if x < WIDTH && y < HEIGHT {
-            img.put_pixel(x, y, color);
+/// 太い縦線を描画
+fn draw_thick_vertical_line(
+    img: &mut RgbaImage,
+    cx: i32,
+    cy: i32,
+    half_len: i32,
+    thickness: i32,
+    color: Rgba<u8>,
+) {
+    let half_thick = thickness / 2;
+    for dx in -half_thick..=half_thick {
+        for dy in -half_len..=half_len {
+            let x = (cx + dx) as u32;
+            let y = (cy + dy) as u32;
+            if x < WIDTH && y < HEIGHT {
+                img.put_pixel(x, y, color);
+            }
         }
     }
 }
 
-/// ^ 山形を描画
+/// ^ 山形を描画（太い線）
 fn draw_caret(img: &mut RgbaImage, cx: i32, cy: i32, color: Rgba<u8>) {
-    // 左斜線
-    for i in 0..6 {
-        let x = (cx - 5 + i) as u32;
-        let y = (cy + 4 - i) as u32;
-        if x < WIDTH && y < HEIGHT {
-            img.put_pixel(x, y, color);
+    let size = 10; // 大きさ
+    let thickness = 3; // 太さ
+
+    // 左斜線 (左下から中央上へ)
+    for i in 0..=size {
+        let base_x = cx - size / 2 + i;
+        let base_y = cy + size / 2 - i;
+        // 太さを出すために周囲も塗る
+        for t in 0..thickness {
+            let x = (base_x + t - thickness / 2) as u32;
+            let y = base_y as u32;
+            if x < WIDTH && y < HEIGHT {
+                img.put_pixel(x, y, color);
+            }
         }
     }
-    // 右斜線
-    for i in 0..6 {
-        let x = (cx + i) as u32;
-        let y = (cy - 1 + i) as u32;
-        if x < WIDTH && y < HEIGHT {
-            img.put_pixel(x, y, color);
+    // 右斜線 (中央上から右下へ)
+    for i in 0..=size {
+        let base_x = cx + i;
+        let base_y = cy - size / 2 + i;
+        for t in 0..thickness {
+            let x = (base_x + t - thickness / 2) as u32;
+            let y = base_y as u32;
+            if x < WIDTH && y < HEIGHT {
+                img.put_pixel(x, y, color);
+            }
         }
     }
 }
 
-/// > を描画
+/// > を描画（太い線）
 fn draw_greater_than(img: &mut RgbaImage, cx: i32, cy: i32, color: Rgba<u8>) {
-    for i in 0..5 {
-        let x = (cx - 3 + i) as u32;
-        let y = (cy - 4 + i) as u32;
-        if x < WIDTH && y < HEIGHT {
-            img.put_pixel(x, y, color);
+    let size = 8;
+    let thickness = 3;
+
+    // 上半分 (左上から中央へ)
+    for i in 0..=size {
+        let base_x = cx - size / 2 + i;
+        let base_y = cy - size + i;
+        for t in 0..thickness {
+            let x = base_x as u32;
+            let y = (base_y + t - thickness / 2) as u32;
+            if x < WIDTH && y < HEIGHT {
+                img.put_pixel(x, y, color);
+            }
         }
     }
-    for i in 0..5 {
-        let x = (cx + 1 - i) as u32;
-        let y = (cy + i) as u32;
-        if x < WIDTH && y < HEIGHT {
-            img.put_pixel(x, y, color);
+    // 下半分 (中央から左下へ)
+    for i in 0..=size {
+        let base_x = cx + size / 2 - i;
+        let base_y = cy + i;
+        for t in 0..thickness {
+            let x = base_x as u32;
+            let y = (base_y + t - thickness / 2) as u32;
+            if x < WIDTH && y < HEIGHT {
+                img.put_pixel(x, y, color);
+            }
         }
     }
 }
 
-/// < を描画
+/// < を描画（太い線）
 fn draw_less_than(img: &mut RgbaImage, cx: i32, cy: i32, color: Rgba<u8>) {
-    for i in 0..5 {
-        let x = (cx + 3 - i) as u32;
-        let y = (cy - 4 + i) as u32;
-        if x < WIDTH && y < HEIGHT {
-            img.put_pixel(x, y, color);
+    let size = 8;
+    let thickness = 3;
+
+    // 上半分 (右上から中央へ)
+    for i in 0..=size {
+        let base_x = cx + size / 2 - i;
+        let base_y = cy - size + i;
+        for t in 0..thickness {
+            let x = base_x as u32;
+            let y = (base_y + t - thickness / 2) as u32;
+            if x < WIDTH && y < HEIGHT {
+                img.put_pixel(x, y, color);
+            }
         }
     }
-    for i in 0..5 {
-        let x = (cx - 1 + i) as u32;
-        let y = (cy + i) as u32;
-        if x < WIDTH && y < HEIGHT {
-            img.put_pixel(x, y, color);
+    // 下半分 (中央から右下へ)
+    for i in 0..=size {
+        let base_x = cx - size / 2 + i;
+        let base_y = cy + i;
+        for t in 0..thickness {
+            let x = base_x as u32;
+            let y = (base_y + t - thickness / 2) as u32;
+            if x < WIDTH && y < HEIGHT {
+                img.put_pixel(x, y, color);
+            }
         }
     }
 }
 
-/// ; セミコロンを描画
+/// ; セミコロンを描画（大きく）
 fn draw_semicolon(img: &mut RgbaImage, cx: i32, cy: i32, color: Rgba<u8>) {
-    // 上の点
-    draw_filled_circle_mut(img, (cx, cy - 4), 2, color);
-    // 下の点（少し下に流れる）
-    draw_filled_circle_mut(img, (cx, cy + 2), 2, color);
-    // 涙のしずく
-    for i in 0..4 {
-        let x = cx as u32;
-        let y = (cy + 4 + i) as u32;
-        if x < WIDTH && y < HEIGHT {
-            img.put_pixel(x, y, color);
+    // 上の点（大きく）
+    draw_filled_circle_mut(img, (cx, cy - 6), 4, color);
+    // 下の点
+    draw_filled_circle_mut(img, (cx, cy + 4), 4, color);
+    // 涙のしずく（太く）
+    for i in 0..8 {
+        for t in -2..=2 {
+            let x = (cx + t) as u32;
+            let y = (cy + 8 + i) as u32;
+            if x < WIDTH && y < HEIGHT {
+                img.put_pixel(x, y, color);
+            }
         }
     }
 }
 
-/// @ 渦巻きを描画（簡略版：二重円）
+/// @ 渦巻きを描画（大きく）
 fn draw_at_sign(img: &mut RgbaImage, cx: i32, cy: i32, color: Rgba<u8>, bg_color: Rgba<u8>) {
-    // 外円
-    draw_filled_circle_mut(img, (cx, cy), 6, color);
+    // 外円（大きく）
+    draw_filled_circle_mut(img, (cx, cy), 10, color);
     // 内円（背景色で抜く）→ドーナツ状
-    draw_filled_circle_mut(img, (cx, cy), 3, bg_color);
+    draw_filled_circle_mut(img, (cx, cy), 5, bg_color);
     // 中央に点
-    draw_filled_circle_mut(img, (cx, cy), 1, color);
+    draw_filled_circle_mut(img, (cx, cy), 2, color);
 }
 
-/// * 星を描画（十字+斜め十字）
+/// * 星を描画（大きく太く）
 fn draw_star(img: &mut RgbaImage, cx: i32, cy: i32, color: Rgba<u8>) {
-    draw_horizontal_line(img, cx, cy, 5, color);
-    draw_vertical_line(img, cx, cy, 5, color);
-    // 斜め線
-    for i in -4..=4 {
-        let x = (cx + i) as u32;
-        let y = (cy + i) as u32;
-        if x < WIDTH && y < HEIGHT {
-            img.put_pixel(x, y, color);
-        }
-    }
-    for i in -4..=4 {
-        let x = (cx + i) as u32;
-        let y = (cy - i) as u32;
-        if x < WIDTH && y < HEIGHT {
-            img.put_pixel(x, y, color);
+    let size = 8;
+    let thickness = 3;
+
+    // 十字
+    draw_thick_horizontal_line(img, cx, cy, size, thickness, color);
+    draw_thick_vertical_line(img, cx, cy, size, thickness, color);
+
+    // 斜め線（太く）
+    for i in -size..=size {
+        for t in -1..=1 {
+            // 右下がり
+            let x1 = (cx + i) as u32;
+            let y1 = (cy + i + t) as u32;
+            if x1 < WIDTH && y1 < HEIGHT {
+                img.put_pixel(x1, y1, color);
+            }
+            // 右上がり
+            let x2 = (cx + i) as u32;
+            let y2 = (cy - i + t) as u32;
+            if x2 < WIDTH && y2 < HEIGHT {
+                img.put_pixel(x2, y2, color);
+            }
         }
     }
 }
 
-/// # ハッシュを描画
+/// # ハッシュを描画（大きく太く）
 fn draw_hash(img: &mut RgbaImage, cx: i32, cy: i32, color: Rgba<u8>) {
+    let size = 8;
+    let thickness = 3;
+    let spacing = 5;
+
     // 横線2本
-    draw_horizontal_line(img, cx, cy - 3, 6, color);
-    draw_horizontal_line(img, cx, cy + 3, 6, color);
+    draw_thick_horizontal_line(img, cx, cy - spacing, size, thickness, color);
+    draw_thick_horizontal_line(img, cx, cy + spacing, size, thickness, color);
     // 縦線2本
-    draw_vertical_line(img, cx - 3, cy, 6, color);
-    draw_vertical_line(img, cx + 3, cy, 6, color);
+    draw_thick_vertical_line(img, cx - spacing, cy, size, thickness, color);
+    draw_thick_vertical_line(img, cx + spacing, cy, size, thickness, color);
 }
 
 #[cfg(test)]
