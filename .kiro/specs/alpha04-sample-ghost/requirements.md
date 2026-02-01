@@ -42,38 +42,38 @@
 
 #### Acceptance Criteria
 
-1. The alpha04-sample-ghost shall 専用クレートとして以下のディレクトリ構成を定義する:
+1. The alpha04-sample-ghost shall 以下の配布物構成を定義する（`dist/hello-pasta/` として出力）:
    ```
-   crates/pasta_sample_ghost/     # Rustクレート（pasta_luaから責務分離）
-   ├── Cargo.toml                 # クレート設定
-   ├── README.md                  # クレート説明
-   ├── src/
-   │   └── lib.rs                 # シェル画像生成ロジック
-   ├── tests/
-   │   └── integration_test.rs    # 統合テスト
-   └── ghosts/                    # ゴースト配布物ルート
-       └── hello-pasta/           # ゴーストID
-           ├── install.txt        # インストール設定
-           ├── readme.txt         # 説明ファイル
-           ├── ghost/
-           │   └── master/
-           │       ├── pasta.toml # pasta 設定ファイル
-           │       ├── descript.txt # ゴースト設定（ukadoc準拠）
-           │       ├── pasta.dll  # SHIORI DLL（テスト時コピー）
-           │       └── dic/       # Pasta DSL スクリプト
-           │           ├── boot.pasta
-           │           ├── talk.pasta
-           │           └── click.pasta
-           └── shell/
-               └── master/        # シェル（見た目）
-                   ├── descript.txt
-                   ├── surfaces.txt
-                   └── surface*.png # サーフェス画像（build時生成）
+   dist/hello-pasta/              # 配布可能なゴースト（ビルド成果物）
+   ├── install.txt                # インストール設定
+   ├── readme.txt                 # 説明ファイル
+   ├── ghost/
+   │   └── master/
+   │       ├── pasta.toml         # pasta 設定ファイル
+   │       ├── descript.txt       # ゴースト設定（ukadoc準拠）
+   │       ├── pasta.dll          # SHIORI DLL（ビルド時コピー）
+   │       ├── scripts/           # Lua ランタイム（ビルド時コピー）
+   │       │   ├── pasta/         # pasta標準モジュール
+   │       │   └── hello.lua      # サンプルスクリプト
+   │       └── dic/               # Pasta DSL スクリプト（ビルド時生成）
+   │           ├── boot.pasta     # 起動・終了イベント
+   │           ├── talk.pasta     # ランダムトーク・時報
+   │           └── click.pasta    # ダブルクリック反応
+   └── shell/
+       └── master/                # シェル（見た目）
+           ├── descript.txt       # シェル設定
+           ├── surfaces.txt       # サーフェス定義
+           └── surface*.png       # サーフェス画像（18ファイル、ビルド時生成）
+   
+   # 補足: ソースは crates/pasta_sample_ghost/ に配置
+   # - src/scripts.rs: pasta DSL テンプレート
+   # - src/image_generator.rs: サーフェス画像生成
+   # - src/config_templates.rs: 設定ファイルテンプレート
    ```
-2. The alpha04-sample-ghost shall Rustクレート部分（src/, tests/, Cargo.toml）とゴースト配布物（ghosts/）を明確に分離する
-3. The alpha04-sample-ghost shall `ghosts/` を配布物ルート、`ghosts/hello-pasta/` をゴーストIDディレクトリとする
-4. The alpha04-sample-ghost shall `crates/pasta_sample_ghost/` に配置される（ルート汚染回避）
-5. The alpha04-sample-ghost shall pasta_luaから完全に独立したクレートとする（責務分離）
+2. The alpha04-sample-ghost shall ビルドにより `dist/hello-pasta/` に配布可能な完全なゴーストを出力する
+3. The alpha04-sample-ghost shall ソースを `crates/pasta_sample_ghost/` に配置する（ルート汚染回避）
+4. The alpha04-sample-ghost shall pasta_luaから完全に独立したクレートとする（責務分離）
+5. The alpha04-sample-ghost shall テンプレート（`ghosts/hello-pasta/`）から静的ファイルをコピーし、動的ファイル（.pasta, .png, .dll）をビルド時生成する
 
 ---
 
