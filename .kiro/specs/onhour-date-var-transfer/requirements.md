@@ -20,14 +20,19 @@
 
 1. The SHIORI_ACT shall `transfer_date_to_var()` メソッドを提供する
 2. When `transfer_date_to_var()` が呼び出される, the SHIORI_ACT shall 以下の処理を行う:
-   - `self.req.date` の全キー・値ペアを `self.var` へそのまま転記する（英語フィールド名）
+   - `self.req.date` の全キー・値ペアを `self.var` へそのまま転記する（英語フィールド名、数値型）
    - 以下の日本語変数マッピングを追加で設定する:
-     - `var.年` ← `req.date.year`
-     - `var.月` ← `req.date.month`
-     - `var.日` ← `req.date.day`
-     - `var.時` ← `req.date.hour`
-     - `var.分` ← `req.date.min`
-     - `var.秒` ← `req.date.sec`
+     - `var.年` ← `"{year}年"` 形式の文字列（例: "2026年"）
+     - `var.月` ← `"{month}月"` 形式の文字列（例: "2月"）
+     - `var.日` ← `"{day}日"` 形式の文字列（例: "1日"）
+     - `var.時` ← `"{hour}時"` 形式の文字列、24時間制（例: "9時", "14時"）
+     - `var.分` ← `"{min}分"` 形式の文字列（例: "37分"）
+     - `var.秒` ← `"{sec}秒"` 形式の文字列（例: "45秒"）
+     - `var.時１２` ← 午前/午後付き12時間制文字列（例: "午前9時", "午後2時"）
+       - 0時 → "午前0時"
+       - 1-11時 → "午前{hour}時"
+       - 12時 → "午後0時"
+       - 13-23時 → "午後{hour-12}時"
      - `var.曜日` ← 日本語曜日文言（"日曜日", "月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日"）
      - `var.week` ← 英語曜日名（"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"）
    - Unix timestamp (`unix`), ナノ秒 (`ns`), 年内通算日 (`yday`) は転記しない
