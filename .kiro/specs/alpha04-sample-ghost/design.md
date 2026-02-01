@@ -296,8 +296,8 @@ pub fn generate_pasta_toml(config: &GhostConfig) -> String;
 ```rust
 pub struct GhostConfig {
     pub name: String,           // "hello-pasta"
-    pub sakura_name: String,    // "Pasta"
-    pub kero_name: String,      // "Lua"
+    pub sakura_name: String,    // "女の子"
+    pub kero_name: String,      // "男の子"
     pub craftman: String,       // "ekicyou"
     pub craftman_w: String,     // "どっとステーション駅長"
     pub shiori: String,         // "pasta.dll"
@@ -325,8 +325,8 @@ homeurl,{homeurl}
 charset,UTF-8
 type,ghost
 name,hello-pasta
-sakura.name,Pasta
-kero.name,Lua
+sakura.name,女の子
+kero.name,男の子
 craftman,ekicyou
 craftmanw,どっとステーション駅長
 shiori,pasta.dll
@@ -448,7 +448,7 @@ sequenceDiagram
 ＃ OnClose イベント - 終了時
 ＊OnClose
 　女の子：＠通常　＠終了挨拶
-　Lua　：＠通常　ほな、また！
+　男の子：＠通常　ほな、また！
 ```
 
 **シーン関数フォールバックの仕組み**:

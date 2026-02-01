@@ -213,8 +213,8 @@
    - `charset`: UTF-8
    - `type`: ghost
    - `name`: hello-pasta
-   - `sakura.name`: Pasta
-   - `kero.name`: Lua
+   - `sakura.name`: 女の子
+   - `kero.name`: 男の子
    - `craftman`: ekicyou
    - `craftmanw`: どっとステーション駅長
    - `shiori`: pasta.dll（SHIORI DLL指定 - 必須）
