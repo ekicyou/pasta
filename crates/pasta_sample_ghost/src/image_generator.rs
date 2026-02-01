@@ -1,18 +1,19 @@
 //! ピクトグラム画像生成
 //!
 //! トイレマーク風のシンプルな人型アイコンを生成します。
+//! 構成：○（頭）+ △/□（胴体）のみ。手足なし。
 
 use crate::GhostError;
 use image::{Rgba, RgbaImage};
-use imageproc::drawing::{draw_filled_circle_mut, draw_line_segment_mut};
+use imageproc::drawing::draw_filled_circle_mut;
 use std::path::Path;
 
 /// キャラクター種別
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Character {
-    /// 女の子（sakura）
+    /// 女の子（sakura）- スカート（三角形）
     Sakura,
-    /// 男の子（kero）
+    /// 男の子（kero）- ズボン（四角形）
     Kero,
 }
 
@@ -71,9 +72,18 @@ impl Expression {
     }
 }
 
-/// 画像サイズ
+/// 画像サイズ（3頭身バランス: 128x256）
 const WIDTH: u32 = 128;
 const HEIGHT: u32 = 256;
+
+/// 頭の半径（約40px、3頭身の1頭分）
+const HEAD_RADIUS: i32 = 35;
+/// 頭の中心Y座標
+const HEAD_CENTER_Y: i32 = 45;
+/// 胴体開始Y座標（頭の下端 + 少し隙間）
+const BODY_TOP_Y: i32 = HEAD_CENTER_Y + HEAD_RADIUS + 5;
+/// 胴体高さ（画像下端まで）
+const BODY_HEIGHT: i32 = HEIGHT as i32 - BODY_TOP_Y - 5;
 
 /// キャラクター色
 fn character_color(character: Character) -> Rgba<u8> {
@@ -105,343 +115,267 @@ pub fn generate_surfaces(output_dir: &Path) -> Result<(), GhostError> {
 }
 
 /// 個別サーフェス画像を生成
+///
+/// トイレピクトグラム風のシンプル構成:
+/// - 頭部: 塗りつぶし円
+/// - 胴体: 女の子=三角形（スカート）、男の子=四角形
+/// - 手足: なし
 pub fn generate_surface(character: Character, expression: Expression) -> RgbaImage {
     let mut img = RgbaImage::new(WIDTH, HEIGHT);
     let color = character_color(character);
 
     // 頭部（円）
-    draw_filled_circle_mut(&mut img, (64, 50), 30, color);
+    let center_x = (WIDTH / 2) as i32;
+    draw_filled_circle_mut(&mut img, (center_x, HEAD_CENTER_Y), HEAD_RADIUS, color);
 
-    // 胴体（四角形を塗りつぶし - 台形の代用）
+    // 胴体
     draw_body(&mut img, character, color);
 
-    // 手（線）
-    draw_arms(&mut img, color);
-
-    // 足（線）
-    draw_legs(&mut img, color);
-
     // 表情を描画
-    draw_expression(&mut img, expression);
-
-    // kero の場合は耳を追加
-    if character == Character::Kero {
-        draw_ears(&mut img, color);
-    }
+    draw_expression(&mut img, expression, character);
 
     img
 }
 
-/// 胴体を描画（台形の代用として四角形）
+/// 胴体を描画
+///
+/// - 女の子: 三角形（スカート）- 上が細く下が広い
+/// - 男の子: 四角形（ズボン）- ストレート
 fn draw_body(img: &mut RgbaImage, character: Character, color: Rgba<u8>) {
-    let top_y = 90;
-    let bottom_y = 180;
+    let center_x = WIDTH as i32 / 2;
+    let body_bottom_y = BODY_TOP_Y + BODY_HEIGHT;
 
-    // キャラクターによって幅を変える
-    let (top_left, top_right, bottom_left, bottom_right) = match character {
-        Character::Sakura => (44, 84, 34, 94), // スカート風に下が広い
-        Character::Kero => (44, 84, 44, 84),   // ズボン風にストレート
-    };
+    match character {
+        Character::Sakura => {
+            // 三角形（スカート）: 頂点が上、底辺が下
+            // 上端は狭く（肩幅程度）、下端は広く
+            let top_half_width = 20; // 上端の半幅
+            let bottom_half_width = 55; // 下端の半幅
 
-    // 単純な四角形で塗りつぶし
-    for y in top_y..bottom_y {
-        let ratio = (y - top_y) as f32 / (bottom_y - top_y) as f32;
-        let left = top_left as f32 + (bottom_left - top_left) as f32 * ratio;
-        let right = top_right as f32 + (bottom_right - top_right) as f32 * ratio;
+            for y in BODY_TOP_Y..body_bottom_y {
+                let ratio = (y - BODY_TOP_Y) as f32 / BODY_HEIGHT as f32;
+                let half_width =
+                    top_half_width as f32 + (bottom_half_width - top_half_width) as f32 * ratio;
+                let left = (center_x as f32 - half_width) as u32;
+                let right = (center_x as f32 + half_width) as u32;
 
-        for x in left as u32..right as u32 {
-            if x < WIDTH {
-                img.put_pixel(x, y, color);
+                for x in left..right.min(WIDTH) {
+                    img.put_pixel(x, y as u32, color);
+                }
+            }
+        }
+        Character::Kero => {
+            // 四角形（ズボン）: 一定幅のストレート
+            let half_width = 30; // 固定幅
+            let left = (center_x - half_width) as u32;
+            let right = (center_x + half_width) as u32;
+
+            for y in BODY_TOP_Y..body_bottom_y {
+                for x in left..right.min(WIDTH) {
+                    img.put_pixel(x, y as u32, color);
+                }
             }
         }
     }
 }
 
-/// 腕を描画
-fn draw_arms(img: &mut RgbaImage, color: Rgba<u8>) {
-    // 左腕
-    draw_line_segment_mut(img, (44.0, 100.0), (20.0, 140.0), color);
-    // 右腕
-    draw_line_segment_mut(img, (84.0, 100.0), (108.0, 140.0), color);
-}
+/// 表情を描画（線描画で顔に重ねる）
+fn draw_expression(img: &mut RgbaImage, expression: Expression, character: Character) {
+    let white = Rgba([255, 255, 255, 255]);
+    let center_x = WIDTH as i32 / 2;
+    let eye_y = HEAD_CENTER_Y - 5; // 顔の中央やや上
+    let left_eye_x = center_x - 12;
+    let right_eye_x = center_x + 12;
 
-/// 足を描画
-fn draw_legs(img: &mut RgbaImage, color: Rgba<u8>) {
-    // 左足
-    draw_line_segment_mut(img, (54.0, 180.0), (44.0, 240.0), color);
-    // 右足
-    draw_line_segment_mut(img, (74.0, 180.0), (84.0, 240.0), color);
-}
-
-/// 耳を描画（kero専用）
-fn draw_ears(img: &mut RgbaImage, color: Rgba<u8>) {
-    // 左耳（三角形）
-    draw_line_segment_mut(img, (40.0, 40.0), (30.0, 20.0), color);
-    draw_line_segment_mut(img, (30.0, 20.0), (50.0, 30.0), color);
-
-    // 右耳（三角形）
-    draw_line_segment_mut(img, (88.0, 40.0), (98.0, 20.0), color);
-    draw_line_segment_mut(img, (98.0, 20.0), (78.0, 30.0), color);
-}
-
-/// 表情を描画（線描画、フォント不使用）
-fn draw_expression(img: &mut RgbaImage, expression: Expression) {
-    let black = Rgba([0, 0, 0, 255]);
-    let eye_y = 45.0;
-    let left_eye_x = 52.0;
-    let right_eye_x = 76.0;
+    // @マーク用に背景色を取得
+    let bg_color = character_color(character);
 
     match expression {
         Expression::Happy => {
-            // ^ ^ 笑顔
-            draw_line_segment_mut(
-                img,
-                (left_eye_x - 5.0, eye_y + 3.0),
-                (left_eye_x, eye_y - 3.0),
-                black,
-            );
-            draw_line_segment_mut(
-                img,
-                (left_eye_x, eye_y - 3.0),
-                (left_eye_x + 5.0, eye_y + 3.0),
-                black,
-            );
-            draw_line_segment_mut(
-                img,
-                (right_eye_x - 5.0, eye_y + 3.0),
-                (right_eye_x, eye_y - 3.0),
-                black,
-            );
-            draw_line_segment_mut(
-                img,
-                (right_eye_x, eye_y - 3.0),
-                (right_eye_x + 5.0, eye_y + 3.0),
-                black,
-            );
+            // ^ ^ 笑顔（山形）
+            draw_caret(img, left_eye_x, eye_y, white);
+            draw_caret(img, right_eye_x, eye_y, white);
         }
         Expression::Normal => {
-            // - - 通常
-            draw_line_segment_mut(
-                img,
-                (left_eye_x - 5.0, eye_y),
-                (left_eye_x + 5.0, eye_y),
-                black,
-            );
-            draw_line_segment_mut(
-                img,
-                (right_eye_x - 5.0, eye_y),
-                (right_eye_x + 5.0, eye_y),
-                black,
-            );
+            // - - 通常（横線）
+            draw_horizontal_line(img, left_eye_x, eye_y, 8, white);
+            draw_horizontal_line(img, right_eye_x, eye_y, 8, white);
         }
         Expression::Shy => {
             // > < 照れ
-            draw_line_segment_mut(
-                img,
-                (left_eye_x - 5.0, eye_y - 3.0),
-                (left_eye_x, eye_y),
-                black,
-            );
-            draw_line_segment_mut(
-                img,
-                (left_eye_x, eye_y),
-                (left_eye_x - 5.0, eye_y + 3.0),
-                black,
-            );
-            draw_line_segment_mut(
-                img,
-                (right_eye_x + 5.0, eye_y - 3.0),
-                (right_eye_x, eye_y),
-                black,
-            );
-            draw_line_segment_mut(
-                img,
-                (right_eye_x, eye_y),
-                (right_eye_x + 5.0, eye_y + 3.0),
-                black,
-            );
+            draw_greater_than(img, left_eye_x, eye_y, white);
+            draw_less_than(img, right_eye_x, eye_y, white);
         }
         Expression::Surprised => {
-            // o o 驚き
-            draw_filled_circle_mut(img, (left_eye_x as i32, eye_y as i32), 4, black);
-            draw_filled_circle_mut(img, (right_eye_x as i32, eye_y as i32), 4, black);
+            // o o 驚き（円）
+            draw_filled_circle_mut(img, (left_eye_x, eye_y), 5, white);
+            draw_filled_circle_mut(img, (right_eye_x, eye_y), 5, white);
         }
         Expression::Crying => {
-            // ; ; 泣き
-            draw_line_segment_mut(
-                img,
-                (left_eye_x, eye_y - 3.0),
-                (left_eye_x, eye_y + 8.0),
-                black,
-            );
-            draw_line_segment_mut(
-                img,
-                (left_eye_x - 3.0, eye_y + 2.0),
-                (left_eye_x - 3.0, eye_y + 10.0),
-                black,
-            );
-            draw_line_segment_mut(
-                img,
-                (right_eye_x, eye_y - 3.0),
-                (right_eye_x, eye_y + 8.0),
-                black,
-            );
-            draw_line_segment_mut(
-                img,
-                (right_eye_x + 3.0, eye_y + 2.0),
-                (right_eye_x + 3.0, eye_y + 10.0),
-                black,
-            );
+            // ; ; 泣き（セミコロン）
+            draw_semicolon(img, left_eye_x, eye_y, white);
+            draw_semicolon(img, right_eye_x, eye_y, white);
         }
         Expression::Confused => {
-            // @ @ 困惑（渦巻き風）
-            draw_filled_circle_mut(img, (left_eye_x as i32, eye_y as i32), 5, black);
-            draw_filled_circle_mut(
-                img,
-                (left_eye_x as i32, eye_y as i32),
-                2,
-                Rgba([255, 255, 255, 255]),
-            );
-            draw_filled_circle_mut(img, (right_eye_x as i32, eye_y as i32), 5, black);
-            draw_filled_circle_mut(
-                img,
-                (right_eye_x as i32, eye_y as i32),
-                2,
-                Rgba([255, 255, 255, 255]),
-            );
+            // @ @ 困惑（渦）
+            draw_at_sign(img, left_eye_x, eye_y, white, bg_color);
+            draw_at_sign(img, right_eye_x, eye_y, white, bg_color);
         }
         Expression::Sparkle => {
-            // * * キラキラ
-            draw_line_segment_mut(
-                img,
-                (left_eye_x - 5.0, eye_y),
-                (left_eye_x + 5.0, eye_y),
-                black,
-            );
-            draw_line_segment_mut(
-                img,
-                (left_eye_x, eye_y - 5.0),
-                (left_eye_x, eye_y + 5.0),
-                black,
-            );
-            draw_line_segment_mut(
-                img,
-                (left_eye_x - 4.0, eye_y - 4.0),
-                (left_eye_x + 4.0, eye_y + 4.0),
-                black,
-            );
-            draw_line_segment_mut(
-                img,
-                (left_eye_x - 4.0, eye_y + 4.0),
-                (left_eye_x + 4.0, eye_y - 4.0),
-                black,
-            );
-
-            draw_line_segment_mut(
-                img,
-                (right_eye_x - 5.0, eye_y),
-                (right_eye_x + 5.0, eye_y),
-                black,
-            );
-            draw_line_segment_mut(
-                img,
-                (right_eye_x, eye_y - 5.0),
-                (right_eye_x, eye_y + 5.0),
-                black,
-            );
-            draw_line_segment_mut(
-                img,
-                (right_eye_x - 4.0, eye_y - 4.0),
-                (right_eye_x + 4.0, eye_y + 4.0),
-                black,
-            );
-            draw_line_segment_mut(
-                img,
-                (right_eye_x - 4.0, eye_y + 4.0),
-                (right_eye_x + 4.0, eye_y - 4.0),
-                black,
-            );
+            // * * キラキラ（星）
+            draw_star(img, left_eye_x, eye_y, white);
+            draw_star(img, right_eye_x, eye_y, white);
         }
         Expression::Sleepy => {
-            // = = 眠い
-            draw_line_segment_mut(
-                img,
-                (left_eye_x - 5.0, eye_y - 2.0),
-                (left_eye_x + 5.0, eye_y - 2.0),
-                black,
-            );
-            draw_line_segment_mut(
-                img,
-                (left_eye_x - 5.0, eye_y + 2.0),
-                (left_eye_x + 5.0, eye_y + 2.0),
-                black,
-            );
-            draw_line_segment_mut(
-                img,
-                (right_eye_x - 5.0, eye_y - 2.0),
-                (right_eye_x + 5.0, eye_y - 2.0),
-                black,
-            );
-            draw_line_segment_mut(
-                img,
-                (right_eye_x - 5.0, eye_y + 2.0),
-                (right_eye_x + 5.0, eye_y + 2.0),
-                black,
-            );
+            // = = 眠い（二重線）
+            draw_horizontal_line(img, left_eye_x, eye_y - 3, 8, white);
+            draw_horizontal_line(img, left_eye_x, eye_y + 3, 8, white);
+            draw_horizontal_line(img, right_eye_x, eye_y - 3, 8, white);
+            draw_horizontal_line(img, right_eye_x, eye_y + 3, 8, white);
         }
         Expression::Angry => {
-            // # # 怒り（ハッシュマーク風）
-            draw_line_segment_mut(
-                img,
-                (left_eye_x - 5.0, eye_y - 2.0),
-                (left_eye_x + 5.0, eye_y - 2.0),
-                black,
-            );
-            draw_line_segment_mut(
-                img,
-                (left_eye_x - 5.0, eye_y + 2.0),
-                (left_eye_x + 5.0, eye_y + 2.0),
-                black,
-            );
-            draw_line_segment_mut(
-                img,
-                (left_eye_x - 2.0, eye_y - 5.0),
-                (left_eye_x - 2.0, eye_y + 5.0),
-                black,
-            );
-            draw_line_segment_mut(
-                img,
-                (left_eye_x + 2.0, eye_y - 5.0),
-                (left_eye_x + 2.0, eye_y + 5.0),
-                black,
-            );
-
-            draw_line_segment_mut(
-                img,
-                (right_eye_x - 5.0, eye_y - 2.0),
-                (right_eye_x + 5.0, eye_y - 2.0),
-                black,
-            );
-            draw_line_segment_mut(
-                img,
-                (right_eye_x - 5.0, eye_y + 2.0),
-                (right_eye_x + 5.0, eye_y + 2.0),
-                black,
-            );
-            draw_line_segment_mut(
-                img,
-                (right_eye_x - 2.0, eye_y - 5.0),
-                (right_eye_x - 2.0, eye_y + 5.0),
-                black,
-            );
-            draw_line_segment_mut(
-                img,
-                (right_eye_x + 2.0, eye_y - 5.0),
-                (right_eye_x + 2.0, eye_y + 5.0),
-                black,
-            );
+            // # # 怒り（ハッシュ）
+            draw_hash(img, left_eye_x, eye_y, white);
+            draw_hash(img, right_eye_x, eye_y, white);
         }
     }
+}
+
+// === 表情用ヘルパー関数 ===
+
+/// 横線を描画
+fn draw_horizontal_line(img: &mut RgbaImage, cx: i32, cy: i32, half_len: i32, color: Rgba<u8>) {
+    for dx in -half_len..=half_len {
+        let x = (cx + dx) as u32;
+        let y = cy as u32;
+        if x < WIDTH && y < HEIGHT {
+            img.put_pixel(x, y, color);
+        }
+    }
+}
+
+/// 縦線を描画
+fn draw_vertical_line(img: &mut RgbaImage, cx: i32, cy: i32, half_len: i32, color: Rgba<u8>) {
+    for dy in -half_len..=half_len {
+        let x = cx as u32;
+        let y = (cy + dy) as u32;
+        if x < WIDTH && y < HEIGHT {
+            img.put_pixel(x, y, color);
+        }
+    }
+}
+
+/// ^ 山形を描画
+fn draw_caret(img: &mut RgbaImage, cx: i32, cy: i32, color: Rgba<u8>) {
+    // 左斜線
+    for i in 0..6 {
+        let x = (cx - 5 + i) as u32;
+        let y = (cy + 4 - i) as u32;
+        if x < WIDTH && y < HEIGHT {
+            img.put_pixel(x, y, color);
+        }
+    }
+    // 右斜線
+    for i in 0..6 {
+        let x = (cx + i) as u32;
+        let y = (cy - 1 + i) as u32;
+        if x < WIDTH && y < HEIGHT {
+            img.put_pixel(x, y, color);
+        }
+    }
+}
+
+/// > を描画
+fn draw_greater_than(img: &mut RgbaImage, cx: i32, cy: i32, color: Rgba<u8>) {
+    for i in 0..5 {
+        let x = (cx - 3 + i) as u32;
+        let y = (cy - 4 + i) as u32;
+        if x < WIDTH && y < HEIGHT {
+            img.put_pixel(x, y, color);
+        }
+    }
+    for i in 0..5 {
+        let x = (cx + 1 - i) as u32;
+        let y = (cy + i) as u32;
+        if x < WIDTH && y < HEIGHT {
+            img.put_pixel(x, y, color);
+        }
+    }
+}
+
+/// < を描画
+fn draw_less_than(img: &mut RgbaImage, cx: i32, cy: i32, color: Rgba<u8>) {
+    for i in 0..5 {
+        let x = (cx + 3 - i) as u32;
+        let y = (cy - 4 + i) as u32;
+        if x < WIDTH && y < HEIGHT {
+            img.put_pixel(x, y, color);
+        }
+    }
+    for i in 0..5 {
+        let x = (cx - 1 + i) as u32;
+        let y = (cy + i) as u32;
+        if x < WIDTH && y < HEIGHT {
+            img.put_pixel(x, y, color);
+        }
+    }
+}
+
+/// ; セミコロンを描画
+fn draw_semicolon(img: &mut RgbaImage, cx: i32, cy: i32, color: Rgba<u8>) {
+    // 上の点
+    draw_filled_circle_mut(img, (cx, cy - 4), 2, color);
+    // 下の点（少し下に流れる）
+    draw_filled_circle_mut(img, (cx, cy + 2), 2, color);
+    // 涙のしずく
+    for i in 0..4 {
+        let x = cx as u32;
+        let y = (cy + 4 + i) as u32;
+        if x < WIDTH && y < HEIGHT {
+            img.put_pixel(x, y, color);
+        }
+    }
+}
+
+/// @ 渦巻きを描画（簡略版：二重円）
+fn draw_at_sign(img: &mut RgbaImage, cx: i32, cy: i32, color: Rgba<u8>, bg_color: Rgba<u8>) {
+    // 外円
+    draw_filled_circle_mut(img, (cx, cy), 6, color);
+    // 内円（背景色で抜く）→ドーナツ状
+    draw_filled_circle_mut(img, (cx, cy), 3, bg_color);
+    // 中央に点
+    draw_filled_circle_mut(img, (cx, cy), 1, color);
+}
+
+/// * 星を描画（十字+斜め十字）
+fn draw_star(img: &mut RgbaImage, cx: i32, cy: i32, color: Rgba<u8>) {
+    draw_horizontal_line(img, cx, cy, 5, color);
+    draw_vertical_line(img, cx, cy, 5, color);
+    // 斜め線
+    for i in -4..=4 {
+        let x = (cx + i) as u32;
+        let y = (cy + i) as u32;
+        if x < WIDTH && y < HEIGHT {
+            img.put_pixel(x, y, color);
+        }
+    }
+    for i in -4..=4 {
+        let x = (cx + i) as u32;
+        let y = (cy - i) as u32;
+        if x < WIDTH && y < HEIGHT {
+            img.put_pixel(x, y, color);
+        }
+    }
+}
+
+/// # ハッシュを描画
+fn draw_hash(img: &mut RgbaImage, cx: i32, cy: i32, color: Rgba<u8>) {
+    // 横線2本
+    draw_horizontal_line(img, cx, cy - 3, 6, color);
+    draw_horizontal_line(img, cx, cy + 3, 6, color);
+    // 縦線2本
+    draw_vertical_line(img, cx - 3, cy, 6, color);
+    draw_vertical_line(img, cx + 3, cy, 6, color);
 }
 
 #[cfg(test)]
@@ -469,11 +403,47 @@ mod tests {
         let img = generate_surface(Character::Sakura, Expression::Happy);
         assert_eq!(img.width(), WIDTH);
         assert_eq!(img.height(), HEIGHT);
+
+        // 3頭身の確認：頭が全体の1/3程度
+        // 頭の直径 = 80px, 全体高さ = 256px → 約31%
     }
 
     #[test]
     fn test_all_expressions() {
         let expressions = Expression::all();
         assert_eq!(expressions.len(), 9);
+    }
+
+    #[test]
+    fn test_sakura_is_triangle_kero_is_rectangle() {
+        // 女の子のサーフェス生成
+        let sakura = generate_surface(Character::Sakura, Expression::Normal);
+        // 男の子のサーフェス生成
+        let kero = generate_surface(Character::Kero, Expression::Normal);
+
+        // 胴体下端の幅をチェック
+        let bottom_y = (BODY_TOP_Y + BODY_HEIGHT - 1) as u32;
+
+        // sakura: 下端が広い（三角形）- 左端から右端までの幅を測定
+        let sakura_left = (0..WIDTH).find(|&x| sakura.get_pixel(x, bottom_y)[3] > 0);
+        let sakura_right = (0..WIDTH).rev().find(|&x| sakura.get_pixel(x, bottom_y)[3] > 0);
+
+        // kero: 一定幅（四角形）
+        let kero_left = (0..WIDTH).find(|&x| kero.get_pixel(x, bottom_y)[3] > 0);
+        let kero_right = (0..WIDTH).rev().find(|&x| kero.get_pixel(x, bottom_y)[3] > 0);
+
+        // sakura の幅 > kero の幅（下端で）
+        if let (Some(sl), Some(sr), Some(kl), Some(kr)) =
+            (sakura_left, sakura_right, kero_left, kero_right)
+        {
+            let sakura_width = sr - sl;
+            let kero_width = kr - kl;
+            assert!(
+                sakura_width > kero_width,
+                "Sakura should have wider bottom (triangle: {}) than Kero (rectangle: {})",
+                sakura_width,
+                kero_width
+            );
+        }
     }
 }

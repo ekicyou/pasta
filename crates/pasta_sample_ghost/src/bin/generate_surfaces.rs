@@ -8,8 +8,7 @@ use std::path::PathBuf;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // クレートルートからの相対パス
-    let manifest_dir = env::var("CARGO_MANIFEST_DIR")
-        .unwrap_or_else(|_| ".".to_string());
+    let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
     let shell_dir = PathBuf::from(&manifest_dir)
         .join("ghosts")
         .join("hello-pasta")
