@@ -1,30 +1,92 @@
 charset,UTF-8
-descript
+
+surface0
 {
-    version,1
+element0,overlay,surface0.png,0,0
 }
 
-// サーフェス定義（女の子: surface0-8、男の子: surface10-18）
-// 各画像はピクトグラム風の人型アイコン
+surface1
+{
+element0,overlay,surface1.png,0,0
+}
 
-// 女の子（sakura）サーフェス
-surface0 { element0,base,surface0.png,0,0 }
-surface1 { element0,base,surface1.png,0,0 }
-surface2 { element0,base,surface2.png,0,0 }
-surface3 { element0,base,surface3.png,0,0 }
-surface4 { element0,base,surface4.png,0,0 }
-surface5 { element0,base,surface5.png,0,0 }
-surface6 { element0,base,surface6.png,0,0 }
-surface7 { element0,base,surface7.png,0,0 }
-surface8 { element0,base,surface8.png,0,0 }
+surface2
+{
+element0,overlay,surface2.png,0,0
+}
 
-// 男の子（kero）サーフェス
-surface10 { element0,base,surface10.png,0,0 }
-surface11 { element0,base,surface11.png,0,0 }
-surface12 { element0,base,surface12.png,0,0 }
-surface13 { element0,base,surface13.png,0,0 }
-surface14 { element0,base,surface14.png,0,0 }
-surface15 { element0,base,surface15.png,0,0 }
-surface16 { element0,base,surface16.png,0,0 }
-surface17 { element0,base,surface17.png,0,0 }
-surface18 { element0,base,surface18.png,0,0 }
+surface3
+{
+element0,overlay,surface3.png,0,0
+}
+
+surface4
+{
+element0,overlay,surface4.png,0,0
+}
+
+surface5
+{
+element0,overlay,surface5.png,0,0
+}
+
+surface6
+{
+element0,overlay,surface6.png,0,0
+}
+
+surface7
+{
+element0,overlay,surface7.png,0,0
+}
+
+surface8
+{
+element0,overlay,surface8.png,0,0
+}
+
+surface10
+{
+element0,overlay,surface10.png,0,0
+}
+
+surface11
+{
+element0,overlay,surface11.png,0,0
+}
+
+surface12
+{
+element0,overlay,surface12.png,0,0
+}
+
+surface13
+{
+element0,overlay,surface13.png,0,0
+}
+
+surface14
+{
+element0,overlay,surface14.png,0,0
+}
+
+surface15
+{
+element0,overlay,surface15.png,0,0
+}
+
+surface16
+{
+element0,overlay,surface16.png,0,0
+}
+
+surface17
+{
+element0,overlay,surface17.png,0,0
+}
+
+surface18
+{
+element0,overlay,surface18.png,0,0
+}
+

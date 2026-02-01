@@ -3,28 +3,33 @@
 # このファイルは pasta システムの動作を設定します。
 # 必須項目は [package] と [loader] のみです。
 
+# [教育的サンプル]
+# [package] セクションは伺かゴーストでは省略可能です。
+# install.txt/readme.txt で同様の情報を管理できます。
+# 将来的な pasta_lua の汎用用途（ノベルゲーム、ツール等）では
+# このセクションが必須になる可能性があります。
 [package]
-# 基本情報（descript.txt と同期推奨）
 name = "hello-pasta"
 version = "1.0.0"
-edition = "2024"  # pasta DSL エディション
+edition = "2024"
 
 [loader]
-# 読み込み設定
-pasta_patterns = ["dic/*.pasta"]  # DSLファイルのパターン
-
+# pasta DSL ファイルパターン
+pasta_patterns = ["dic/*.pasta"]
 # Lua モジュール検索パス（優先順位順）
-# デフォルト: ["profile/pasta/save/lua", "scripts", "profile/pasta/cache/lua", "scriptlibs"]
 lua_search_paths = [
     "profile/pasta/save/lua",   # ユーザー保存スクリプト
-    "scripts",                   # pasta 標準ランタイム（pasta_lua/scripts/をコピー）
+    "scripts",                   # pasta 標準ランタイム
     "profile/pasta/cache/lua",   # トランスパイル済みキャッシュ
     "scriptlibs",                # 追加ライブラリ
 ]
-
-# トランスパイル出力ディレクトリ
+# トランスパイル出力先
 transpiled_output_dir = "profile/pasta/cache/lua"
 
 [ghost]
-# ゴースト固有設定（オプション）
-random_talk_interval = 180  # ランダムトーク間隔（秒）
+# ランダムトーク発生間隔（秒）
+random_talk_interval = 180
+
+[persistence]
+# 永続化データディレクトリ
+data_dir = "profile/pasta/save"

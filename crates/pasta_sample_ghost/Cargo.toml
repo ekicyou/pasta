@@ -6,9 +6,10 @@ edition.workspace = true
 authors.workspace = true
 license.workspace = true
 
+# メインバイナリ：ゴースト配布物生成ツール
 [[bin]]
-name = "generate-surfaces"
-path = "src/bin/generate_surfaces.rs"
+name = "pasta_sample_ghost"
+path = "src/main.rs"
 
 [dependencies]
 # 画像生成
@@ -27,3 +28,4 @@ pasta_lua = { path = "../pasta_lua" }
 
 # テスト用一時ディレクトリ
 tempfile.workspace = true
+

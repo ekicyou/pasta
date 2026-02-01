@@ -1,6 +1,6 @@
 @echo off
-REM setup.bat - hello-pasta Sample Ghost Setup
-REM Double-click this file to setup the ghost
+REM setup.bat - hello-pasta Full Setup Script
+REM Double-click this file to build and setup the ghost distribution
 
 setlocal enabledelayedexpansion
 
@@ -10,32 +10,21 @@ set WORKSPACE_ROOT=%SCRIPT_DIR%..\..
 set GHOST_DIR=%SCRIPT_DIR%ghosts\hello-pasta
 
 echo ========================================
-echo   hello-pasta Sample Ghost Setup
+echo   hello-pasta Full Setup
 echo ========================================
 echo.
 echo Workspace: %WORKSPACE_ROOT%
 echo Ghost Dir: %GHOST_DIR%
 echo.
 
-REM Step 1: Generate surface images
-echo [1/3] Generating surface images...
-cargo run --bin generate-surfaces
-if errorlevel 1 (
-    echo.
-    echo WARNING: Surface image generation failed
-    echo          Images will be generated on first test run
-)
-echo.
-
-REM Step 2: Build pasta_shiori.dll (32bit Windows)
-echo [2/3] Building pasta.dll...
-echo   Target: i686-pc-windows-msvc (32bit Windows)
-
 cd /d %WORKSPACE_ROOT%
-cargo build --release --target i686-pc-windows-msvc -p pasta_shiori
+
+REM Step 1: Build pasta_sample_ghost
+echo [1/4] Building pasta_sample_ghost...
+cargo build -p pasta_sample_ghost --quiet
 if errorlevel 1 (
     echo.
-    echo ERROR: pasta_shiori build failed
+    echo ERROR: pasta_sample_ghost build failed
     echo.
     pause
     exit /b 1
@@ -43,20 +32,51 @@ if errorlevel 1 (
 echo   Build completed
 echo.
 
-REM Step 3: Copy pasta.dll and scripts/
-echo [3/3] Copying files...
+REM Step 2: Run pasta_sample_ghost (generate ghost files + images)
+echo [2/4] Generating ghost distribution...
+cargo run -p pasta_sample_ghost --quiet
+if errorlevel 1 (
+    echo.
+    echo ERROR: Ghost generation failed
+    echo.
+    pause
+    exit /b 1
+)
+echo   Ghost files generated
+echo.
 
-REM pasta.dll
+REM Step 3: Build pasta_shiori.dll (32bit Windows release)
+echo [3/4] Building pasta.dll (32bit release)...
+echo   Target: i686-pc-windows-msvc
+cargo build --release --target i686-pc-windows-msvc -p pasta_shiori --quiet
+if errorlevel 1 (
+    echo.
+    echo ERROR: pasta_shiori build failed
+    echo.
+    echo Make sure you have the i686-pc-windows-msvc target installed:
+    echo   rustup target add i686-pc-windows-msvc
+    echo.
+    pause
+    exit /b 1
+)
+echo   Build completed
+echo.
+
+REM Step 4: Copy pasta.dll and scripts/
+echo [4/4] Copying files...
+
+REM Ensure destination directory exists
+if not exist "%GHOST_DIR%\ghost\master" (
+    mkdir "%GHOST_DIR%\ghost\master"
+)
+
+REM Copy pasta.dll
 set DLL_SRC=%WORKSPACE_ROOT%\target\i686-pc-windows-msvc\release\pasta.dll
 set DLL_DEST=%GHOST_DIR%\ghost\master\pasta.dll
 
 if not exist "%DLL_SRC%" (
     echo.
-    echo ERROR: pasta.dll not found
-    echo Path: %DLL_SRC%
-    echo.
-    echo Please build with:
-    echo   cargo build --release --target i686-pc-windows-msvc -p pasta_shiori
+    echo ERROR: pasta.dll not found at %DLL_SRC%
     echo.
     pause
     exit /b 1
@@ -65,24 +85,25 @@ if not exist "%DLL_SRC%" (
 copy /Y "%DLL_SRC%" "%DLL_DEST%" >nul
 echo   Copied pasta.dll
 
-REM Lua runtime
+REM Copy Lua runtime scripts
 set SCRIPTS_SRC=%WORKSPACE_ROOT%\crates\pasta_lua\scripts
 set SCRIPTS_DEST=%GHOST_DIR%\ghost\master\scripts
 
 if not exist "%SCRIPTS_SRC%" (
     echo.
-    echo ERROR: pasta_lua scripts not found
-    echo Path: %SCRIPTS_SRC%
-    echo.
-    pause
-    exit /b 1
+    echo WARNING: Lua scripts not found at %SCRIPTS_SRC%
+    echo          Skipping scripts copy
+) else (
+    if exist "%SCRIPTS_DEST%" (
+        rmdir /S /Q "%SCRIPTS_DEST%"
+    )
+    xcopy /E /I /Y /Q "%SCRIPTS_SRC%" "%SCRIPTS_DEST%" >nul
+    echo   Copied scripts/
 )
 
-if exist "%SCRIPTS_DEST%" (
-    rmdir /S /Q "%SCRIPTS_DEST%"
-)
-xcopy /E /I /Y /Q "%SCRIPTS_SRC%" "%SCRIPTS_DEST%" >nul
-echo   Copied scripts/
+REM Count files
+set /a FILE_COUNT=0
+for /R "%GHOST_DIR%" %%f in (*) do set /a FILE_COUNT+=1
 
 REM Complete
 echo.
@@ -90,10 +111,11 @@ echo ========================================
 echo   Setup Complete!
 echo ========================================
 echo.
-echo Distribution: %GHOST_DIR%
+echo   Distribution: %GHOST_DIR%
+echo   Files:        %FILE_COUNT%
 echo.
 echo Next steps:
-echo   1. cargo test -p pasta_sample_ghost
-echo   2. Install the above folder to SSP
+echo   1. Run tests: cargo test -p pasta_sample_ghost
+echo   2. Install the ghost folder to SSP
 echo.
 pause
