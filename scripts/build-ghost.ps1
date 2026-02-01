@@ -53,11 +53,12 @@ Write-Host "  -> テンプレートをコピー" -ForegroundColor Green
 
 # 3. pasta.dll をコピー
 Write-Host "[3/4] pasta.dll をコピー中..." -ForegroundColor Yellow
-$DllSrc = Join-Path $WorkspaceRoot "target/i686-pc-windows-msvc/release/pasta_shiori.dll"
+# 注: pasta_shiori クレートは [lib] name = "pasta" なので、出力は pasta.dll
+$DllSrc = Join-Path $WorkspaceRoot "target/i686-pc-windows-msvc/release/pasta.dll"
 $DllDest = Join-Path $DistPath "ghost/master/pasta.dll"
 
 if (-not (Test-Path $DllSrc)) {
-    throw "pasta_shiori.dll が見つかりません: $DllSrc"
+    throw "pasta.dll が見つかりません: $DllSrc`n32bit ビルドを実行してください: cargo build --release --target i686-pc-windows-msvc -p pasta_shiori"
 }
 Copy-Item $DllSrc $DllDest
 Write-Host "  -> pasta.dll をコピー" -ForegroundColor Green

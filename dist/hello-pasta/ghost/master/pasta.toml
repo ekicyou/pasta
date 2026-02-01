@@ -1,0 +1,30 @@
+# pasta.toml - pasta ゴースト設定ファイル
+#
+# このファイルは pasta システムの動作を設定します。
+# 必須項目は [package] と [loader] のみです。
+
+[package]
+# 基本情報（descript.txt と同期推奨）
+name = "hello-pasta"
+version = "1.0.0"
+edition = "2024"  # pasta DSL エディション
+
+[loader]
+# 読み込み設定
+pasta_patterns = ["dic/*.pasta"]  # DSLファイルのパターン
+
+# Lua モジュール検索パス（優先順位順）
+# デフォルト: ["profile/pasta/save/lua", "scripts", "profile/pasta/cache/lua", "scriptlibs"]
+lua_search_paths = [
+    "profile/pasta/save/lua",   # ユーザー保存スクリプト
+    "scripts",                   # pasta 標準ランタイム（pasta_lua/scripts/をコピー）
+    "profile/pasta/cache/lua",   # トランスパイル済みキャッシュ
+    "scriptlibs",                # 追加ライブラリ
+]
+
+# トランスパイル出力ディレクトリ
+transpiled_output_dir = "profile/pasta/cache/lua"
+
+[ghost]
+# ゴースト固有設定（オプション）
+random_talk_interval = 180  # ランダムトーク間隔（秒）
