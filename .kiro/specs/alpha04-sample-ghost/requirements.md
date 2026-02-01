@@ -159,7 +159,7 @@
      - `@ @` 困惑, `* *` キラキラ, `= =` 眠い, `# #` 怒り
    - フォント不要（CI再現性確保）
 
-4. The シェル shall `shell/master/descript.txt` でサーフェス定義を行う（ukadoc準拠）
+4. The シェル shall `shell/master/surfaces.txt` でサーフェス定義を行う（ukadoc準拠）
 
 5. The 画像生成 shall CIで再現可能であること（外部依存なし）
 
@@ -201,8 +201,6 @@
 3. The `[package]` セクション shall 教育的コメント付きで含め、伺かゴーストでは省略可能であることを説明する
 
 4. The 設定 shall [pasta.toml設定仕様書](research/pasta-toml-spec.md) に準拠する
-
-5. The 設定 shall alpha02（仮想イベント）で読み込まれる
 
 ---
 
