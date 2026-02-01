@@ -17,8 +17,18 @@ echo Workspace: %WORKSPACE_ROOT%
 echo Ghost Dir: %GHOST_DIR%
 echo.
 
-REM Step 1: Build pasta_shiori.dll (32bit Windows)
-echo [1/2] Building pasta.dll...
+REM Step 1: Generate surface images
+echo [1/3] Generating surface images...
+cargo run --bin generate-surfaces
+if errorlevel 1 (
+    echo.
+    echo WARNING: Surface image generation failed
+    echo          Images will be generated on first test run
+)
+echo.
+
+REM Step 2: Build pasta_shiori.dll (32bit Windows)
+echo [2/3] Building pasta.dll...
 echo   Target: i686-pc-windows-msvc (32bit Windows)
 
 cd /d %WORKSPACE_ROOT%
@@ -33,8 +43,8 @@ if errorlevel 1 (
 echo   Build completed
 echo.
 
-REM Step 2: Copy pasta.dll and scripts/
-echo [2/2] Copying files...
+REM Step 3: Copy pasta.dll and scripts/
+echo [3/3] Copying files...
 
 REM pasta.dll
 set DLL_SRC=%WORKSPACE_ROOT%\target\i686-pc-windows-msvc\release\pasta.dll

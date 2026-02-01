@@ -34,10 +34,21 @@ fn main() {
         // ビルドを失敗させない（オプショナル生成）
     }
 
+    // ダミー画像を生成（実際の画像はテスト実行時に生成される）
+    if let Err(e) = generate_placeholder_images(&ghosts_dir) {
+        eprintln!("Info: Placeholder images not created: {}", e);
+    }
+
+    // scripts/ をコピー（存在する場合）
+    if let Err(e) = copy_lua_scripts(workspace_root, &ghosts_dir) {
+        eprintln!("Info: Lua scripts not copied: {}", e);
+        eprintln!("      Run setup.bat to copy scripts/ manually.");
+    }
+
     // pasta.dll を自動コピー（存在する場合）
     if let Err(e) = copy_pasta_dll(workspace_root, &ghosts_dir) {
         eprintln!("Info: pasta.dll not copied: {}", e);
-        eprintln!("      Run setup.ps1 to copy pasta.dll manually.");
+        eprintln!("      Run setup.bat to copy pasta.dll manually.");
     }
 }
 
@@ -368,6 +379,18 @@ const CLICK_PASTA_TEMPLATE: &str = r#"＃ click.pasta - ダブルクリック反
 　女の子：＠驚き　えっ？そんなんじゃないよ！
 "#;
 
+/// ダミー画像を生成する（実際の画像は generate-surfaces バイナリで生成）
+fn generate_placeholder_images(ghosts_dir: &Path) -> std::io::Result<()> {
+    let shell_dir = ghosts_dir.join("shell").join("master");
+    fs::create_dir_all(&shell_dir)?;
+
+    eprintln!("Info: Placeholder images created.");
+    eprintln!("      Run 'cargo run --bin generate-surfaces' to generate real surface images.");
+
+    // 実際の画像は generate-surfaces バイナリまたはテスト実行時に生成される
+    Ok(())
+}
+
 /// pasta.dll を自動的にコピーする
 ///
 /// 32bit Windows ビルドの pasta.dll が存在する場合、
@@ -403,6 +426,59 @@ fn copy_pasta_dll(workspace_root: &Path, ghosts_dir: &Path) -> std::io::Result<(
         dll_src.display(),
         dll_dest.display()
     );
+
+    Ok(())
+}
+
+/// サーフェス画像を生成する
+/// Lua スクリプトをコピーする
+fn copy_lua_scripts(workspace_root: &Path, ghosts_dir: &Path) -> std::io::Result<()> {
+    let scripts_src = workspace_root
+        .join("crates")
+        .join("pasta_lua")
+        .join("scripts");
+    let scripts_dest = ghosts_dir.join("ghost").join("master").join("scripts");
+
+    if !scripts_src.exists() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("Scripts not found at {}", scripts_src.display()),
+        ));
+    }
+
+    // 既存の scripts ディレクトリがあれば削除
+    if scripts_dest.exists() {
+        fs::remove_dir_all(&scripts_dest)?;
+    }
+
+    // ディレクトリごとコピー
+    copy_dir_all(&scripts_src, &scripts_dest)?;
+
+    println!(
+        "cargo::warning=Copied Lua scripts from {} to {}",
+        scripts_src.display(),
+        scripts_dest.display()
+    );
+
+    Ok(())
+}
+
+/// ディレクトリを再帰的にコピーする
+fn copy_dir_all(src: &Path, dst: &Path) -> std::io::Result<()> {
+    fs::create_dir_all(dst)?;
+
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        let src_path = entry.path();
+        let dst_path = dst.join(entry.file_name());
+
+        if ty.is_dir() {
+            copy_dir_all(&src_path, &dst_path)?;
+        } else {
+            fs::copy(&src_path, &dst_path)?;
+        }
+    }
 
     Ok(())
 }
