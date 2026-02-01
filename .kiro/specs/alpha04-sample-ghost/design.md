@@ -528,57 +528,26 @@ sequenceDiagram
 　＠通常：\s[10]
 　＠元気：\s[11]
 
-＃ ダブルクリック反応の単語定義
-＠女の子反応：なになに？、はいはい。、ダブルクリックされた！
-＠男の子反応：呼んだ？、ん？、なんや？
+＃ ダブルクリック反応の単語定義（ランダム選択）
+＠クリック反応：なになに？、はいはい。、ダブルクリックされた！、呼んだ？、ん？、なんや？
 
 ＃ OnMouseDoubleClick イベント - 共通反応（ランダム選択）
 ＊OnMouseDoubleClick
-　女の子：＠驚き　＠女の子反応
+　女の子：＠驚き　＠クリック反応
 
 ＊OnMouseDoubleClick
 　女の子：＠照れ　え、なに？
 　男の子：＠通常　こっちに用があるんちゃうん？
 
-＃ Reference 分岐シーン - Lua ハンドラから呼び出し（Option B 採用時）
-＊女の子クリック
-　女の子：＠照れ　私をクリックしたね！
-　男の子：＠通常　そっちに用があるんか。
-
-＊男の子クリック
-　男の子：＠元気　ワイを呼んだな！
-　女の子：＠通常　向こうに用事みたい。
+＊OnMouseDoubleClick
+　女の子：＠通常　またクリックしたの？
+　男の子：＠元気　よう呼んだな！
 ```
 
-**Reference 分岐の実装オプション**:
-
-| Option | 方式 | 実装場所 | 特徴 |
-|--------|------|----------|------|
-| **A（推奨）** | 共通反応 | pasta DSL のみ | シンプル、要件の一部は未達成 |
-| **B** | Lua ハンドラ分岐 | `dic/handlers/mouseclick.lua` | 完全対応、やや複雑 |
-
-**Option B 採用時の Lua ハンドラ例**:
-```lua
--- dic/handlers/mouseclick.lua
-local REG = require("pasta.shiori.event.register")
-local RES = require("pasta.shiori.res")
-local SCENE = require("pasta.scene")
-
-REG.OnMouseDoubleClick = function(act)
-    local scope = act.req.reference[0] or "0"
-    local scene_name = (scope == "0") and "女の子クリック" or "男の子クリック"
-    local scene_fn = SCENE.search(scene_name, nil, nil)
-    if scene_fn then
-        scene_fn(act)
-        return RES.ok(act:build())
-    end
-    return nil -- フォールバックへ
-end
-```
-
-**alpha04 での推奨**:
-- **Option A**（共通反応）を推奨 - pasta DSL 入門サンプルとしてシンプルさを優先
-- REQ-003 の「キャラクターによって異なる反応」は、トーク内容のバリエーションで表現
+**実装方針**:
+- pasta DSL のみで実装（シンプル優先）
+- ランダム選択で反応の多様性を確保（5種以上のバリエーション）
+- `act.req.reference[0]` を使用したキャラクター別分岐は将来の拡張例として保留
 
 ---
 
@@ -688,23 +657,24 @@ description = "pasta入門用サンプルゴースト"
 - `act.req.reference[0]` でクリック対象（"0"=sakura, "1"=kero）を判定可能
 - イベントID（`act.req.id`）やその他の Reference にもアクセス可能
 
-**Lua ハンドラでの Reference 分岐例**:
+**alpha04 での実装方針**:
+- **pasta DSL のみ**（シンプル優先）: 共通反応をランダム選択で多様化
+- キャラクター別の詳細な分岐は将来の拡張例として保留
+
+**将来の拡張例**（Lua ハンドラによる分岐）:
 ```lua
--- pasta/shiori/event/handlers/mouseclick.lua
+-- dic/handlers/mouseclick.lua (参考例)
 REG.OnMouseDoubleClick = function(act)
     local scope = act.req.reference[0]
-    if scope == "0" then
-        SCENE.search("女の子クリック", nil, nil)(act)
-    else
-        SCENE.search("男の子クリック", nil, nil)(act)
+    local scene_name = (scope == "0") and "女の子クリック" or "男の子クリック"
+    local scene_fn = SCENE.search(scene_name, nil, nil)
+    if scene_fn then
+        scene_fn(act)
+        return RES.ok(act:build())
     end
-    return RES.ok(act:build())
+    return nil
 end
 ```
-
-**alpha04 での対応オプション**:
-- **Option A**（推奨）: pasta DSL のみ、共通反応（ランダム選択）
-- **Option B**: Lua ハンドラを `dic/handlers/` に追加して分岐実装
 
 ---
 

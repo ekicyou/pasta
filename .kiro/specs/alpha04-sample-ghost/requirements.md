@@ -86,11 +86,9 @@
 #### Acceptance Criteria
 
 1. The alpha04-sample-ghost shall OnMouseDoubleClick 時に反応トークを表示する
-2. The 反応 shall クリックしたキャラクター（sakura/kero）によって異なる（`act.req.reference[0]` で判定可能）
-3. The 反応 shall 以下のいずれかで実装する:
-   - **Option A（推奨）**: pasta DSL のみの共通反応（ランダム選択で多様性を確保）
-   - **Option B**: Lua ハンドラで `act.req.reference[0]` を判定し、キャラクター別シーンを呼び出し
-4. The alpha04-sample-ghost shall `act-req-parameter` 仕様により、シーン関数で `act.req` にアクセス可能であること
+2. The 反応 shall pasta DSL のみで実装し、ランダム選択により反応の多様性を確保する
+3. The 反応 shall 複数バリエーション（5種以上）を用意し、クリック毎に異なる反応を示すこと
+4. The alpha04-sample-ghost shall シンプルさを優先し、入門者が理解しやすい実装とすること
 
 ---
 
