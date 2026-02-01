@@ -65,6 +65,7 @@ https://github.com/ekicyou/pasta
     fs::write(
         output_dir.join("ghost/master/descript.txt"),
         r#"charset,UTF-8
+type,ghost
 shiori,pasta.dll
 name,hello-pasta
 craftman,ekicyou
@@ -117,7 +118,13 @@ random_talk_interval = 180  # ランダムトーク間隔（秒）
         r#"charset,UTF-8
 name,master
 type,shell
+craftman,ekicyou
+craftmanw,どっとステーション駅長
 seriko.use_self_alpha,1
+sakura.balloon.offsetx,64
+sakura.balloon.offsety,0
+kero.balloon.offsetx,64
+kero.balloon.offsety,0
 sakura.surface.alias,表,surface0
 sakura.surface.alias,笑,surface1
 sakura.surface.alias,照,surface2

@@ -1,4 +1,5 @@
 charset,UTF-8
+type,ghost
 shiori,pasta.dll
 name,hello-pasta
 craftman,ekicyou
