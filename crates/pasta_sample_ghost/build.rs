@@ -91,7 +91,19 @@ edition = "2024"  # pasta DSL エディション
 
 [loader]
 # 読み込み設定
-dic = ["dic/*.pasta"]  # DSLファイルのパターン
+pasta_patterns = ["dic/*.pasta"]  # DSLファイルのパターン
+
+# Lua モジュール検索パス（優先順位順）
+# デフォルト: ["profile/pasta/save/lua", "scripts", "profile/pasta/cache/lua", "scriptlibs"]
+lua_search_paths = [
+    "profile/pasta/save/lua",   # ユーザー保存スクリプト
+    "scripts",                   # pasta 標準ランタイム（pasta_lua/scripts/をコピー）
+    "profile/pasta/cache/lua",   # トランスパイル済みキャッシュ
+    "scriptlibs",                # 追加ライブラリ
+]
+
+# トランスパイル出力ディレクトリ
+transpiled_output_dir = "profile/pasta/cache/lua"
 
 [ghost]
 # ゴースト固有設定（オプション）

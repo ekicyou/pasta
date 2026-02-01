@@ -18,8 +18,8 @@ SHIORI/3.0 プロトコルで動作するミニマルなゴーストとして、
 
 | キャラ | 一人称 | 口調 | 色 |
 |--------|--------|------|-----|
-| **女の子** (sakura) | わたし | 標準語、丁寧めでかわいい | ライトブルー (#4A90D9) |
-| **男の子** (kero) | ぼく | 標準語、少し生意気 | ライトグリーン (#4AD98A) |
+| **女の子** (sakura) | わたし | 標準語、丁寧めでかわいい | 赤 (#DC3545) |
+| **男の子** (kero) | ぼく | 標準語、少し生意気 | 青 (#007BFF) |
 
 ## ディレクトリ構成
 
@@ -34,12 +34,46 @@ crates/pasta_sample_ghost/
 │   ├── common/mod.rs       # テストヘルパー
 │   └── integration_test.rs # 統合テスト
 └── ghosts/                 # 生成された配布物
-    └── hello-pasta/        # ゴーストID
+    └── hello-pasta/        # ゴーストID（テンプレート）
 ```
 
 ## 使用方法
 
-### ゴースト生成
+### 配布可能なゴーストをビルド
+
+**推奨: PowerShell スクリプトを使用**
+
+```powershell
+# ワークスペースルートで実行
+.\scripts\build-ghost.ps1
+
+# 出力: dist/hello-pasta/
+```
+
+スクリプトは以下を自動実行します:
+1. `pasta_shiori.dll` のビルド（32bit Windows）
+2. テンプレートのコピー
+3. `pasta.dll` の配置
+4. Lua ランタイム (`scripts/`) のコピー
+
+### 手動ビルド手順
+
+```powershell
+# 1. pasta_shiori DLL をビルド
+cargo build --release --target i686-pc-windows-msvc -p pasta_shiori
+
+# 2. 配布ディレクトリを作成
+$dist = "dist/hello-pasta"
+Copy-Item -Recurse "crates/pasta_sample_ghost/ghosts/hello-pasta" $dist
+
+# 3. DLL をコピー
+Copy-Item "target/i686-pc-windows-msvc/release/pasta_shiori.dll" "$dist/ghost/master/pasta.dll"
+
+# 4. Lua ランタイムをコピー
+Copy-Item -Recurse "crates/pasta_lua/scripts" "$dist/ghost/master/scripts"
+```
+
+### ゴースト生成API
 
 ```rust
 use pasta_sample_ghost::{generate_ghost, GhostConfig};
@@ -51,11 +85,32 @@ generate_ghost(Path::new("./output"), &config)?;
 ### テスト実行
 
 ```powershell
-# pasta_shiori DLL を先にビルド
-cargo build --release --target i686-pc-windows-msvc -p pasta_shiori
-
-# テスト実行
 cargo test -p pasta_sample_ghost
+```
+
+## 配布物の構成
+
+ビルド後の `dist/hello-pasta/` の構成:
+
+```
+hello-pasta/
+├── install.txt
+├── readme.txt
+├── ghost/
+│   └── master/
+│       ├── pasta.dll           # SHIORI DLL
+│       ├── pasta.toml          # pasta 設定
+│       ├── descript.txt        # ゴースト設定
+│       ├── dic/                # pasta DSL スクリプト
+│       │   ├── boot.pasta
+│       │   ├── talk.pasta
+│       │   └── click.pasta
+│       └── scripts/            # Lua ランタイム（pasta_lua/scripts/）
+└── shell/
+    └── master/
+        ├── descript.txt
+        ├── surfaces.txt
+        └── surface*.png        # ピクトグラム画像
 ```
 
 ## ライセンス

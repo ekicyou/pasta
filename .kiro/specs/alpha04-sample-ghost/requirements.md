@@ -245,6 +245,24 @@
 
 ---
 
+### Requirement 10: 配布ビルド自動化
+
+**Objective:** As a ゴースト開発者, I want ワンコマンドで配布可能なゴーストをビルドしたい, so that 手作業を減らせる
+
+#### Acceptance Criteria
+
+1. The alpha04-sample-ghost shall `scripts/build-ghost.ps1` PowerShell スクリプトを提供する
+2. The スクリプト shall 以下を自動実行する:
+   - `pasta_shiori.dll` のビルド（32bit Windows ターゲット）
+   - テンプレートディレクトリのコピー
+   - ビルド成果物の配置（`pasta.dll` としてリネーム）
+   - Lua ランタイム（`crates/pasta_lua/scripts/`）のコピー
+3. The 出力 shall `dist/hello-pasta/` に配布可能な完全なゴーストとして生成する
+4. The pasta.toml shall `lua_search_paths` 設定を含み、Lua モジュール検索パスを定義する
+5. The 自動化 shall Rust と PowerShell のみを使用する（Makefile 不使用）
+
+---
+
 ## Out of Scope
 
 - 高度な会話ロジック（コンテキスト保持、学習等）

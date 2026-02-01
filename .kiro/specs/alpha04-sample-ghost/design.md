@@ -233,12 +233,14 @@ flowchart TB
 
 | 要素 | sakura (surface0) | kero (surface10) |
 |-----|-------------------|------------------|
-| サイズ | 256x512 px | 256x512 px |
-| 頭部 | 円（半径40px） | 円（半径40px） |
-| 胴体 | 台形 | 台形 |
-| 装飾 | なし | 三角形の耳 |
-| 色 | ライトブルー (#4A90D9) | ライトグリーン (#4AD98A) |
+| サイズ | 128x256 px | 128x256 px |
+| 比率 | 3頭身（頭部半径42px） | 3頭身（頭部半径42px） |
+| 頭部 | ○（円） | ○（円） |
+| 胴体 | △（正三角形、スカート風） | ▽（逆三角形） |
+| 装飾 | なし（手足なし） | なし（手足なし） |
+| 色 | 赤 (#DC3545) | 青 (#007BFF) |
 | 背景 | 透明 | 透明 |
+| 表情線 | 太さ3px、間隔36px | 太さ3px、間隔36px |
 
 **実装方針**:
 
@@ -246,28 +248,43 @@ flowchart TB
 use image::{RgbaImage, Rgba};
 use imageproc::drawing::{draw_filled_circle_mut, draw_polygon_mut};
 
+// 定数（3頭身比率: 128x256px）
+const WIDTH: u32 = 128;
+const HEIGHT: u32 = 256;
+const HEAD_RADIUS: i32 = 42;  // 頭部は全体の約1/3
+
 pub fn draw_pictogram(img: &mut RgbaImage, character: Character) {
     let color = match character {
-        Character::Sakura => Rgba([74, 144, 217, 255]),
-        Character::Kero => Rgba([74, 217, 138, 255]),
+        Character::Sakura => Rgba([220, 53, 69, 255]),   // 赤 #DC3545
+        Character::Kero => Rgba([0, 123, 255, 255]),     // 青 #007BFF
     };
     
-    // 頭部（円）
-    draw_filled_circle_mut(img, (128, 80), 40, color);
+    let center_x = (WIDTH / 2) as i32;
+    let head_y = HEAD_RADIUS + 5;
     
-    // 胴体（台形 - ポリゴンとして描画）
-    let body = [
-        Point::new(88, 150),
-        Point::new(168, 150),
-        Point::new(180, 350),
-        Point::new(76, 350),
-    ];
+    // 頭部（○）
+    draw_filled_circle_mut(img, (center_x, head_y), HEAD_RADIUS, color);
+    
+    // 胴体（△ or ▽）- 手足なし
+    let body_top = head_y + HEAD_RADIUS + 5;
+    let body_bottom = HEIGHT as i32 - 10;
+    let body_width = 100;
+    
+    let body = match character {
+        // 女の子: △（正三角形、スカート風）
+        Character::Sakura => [
+            Point::new(center_x, body_top),
+            Point::new(center_x - body_width / 2, body_bottom),
+            Point::new(center_x + body_width / 2, body_bottom),
+        ],
+        // 男の子: ▽（逆三角形）
+        Character::Kero => [
+            Point::new(center_x - body_width / 2, body_top),
+            Point::new(center_x + body_width / 2, body_top),
+            Point::new(center_x, body_bottom),
+        ],
+    };
     draw_polygon_mut(img, &body, color);
-    
-    // keroの場合は耳を追加
-    if matches!(character, Character::Kero) {
-        draw_ear(img, color);
-    }
 }
 ```
 
@@ -276,12 +293,14 @@ pub fn draw_pictogram(img: &mut RgbaImage, character: Character) {
 - ポリゴン座標計算の具体例: 台形4点（上辺88-168, 下辺76-180）
 - フォールバック: API 非互換時は `image` クレートで pixel-by-pixel 描画に切り替え可能
 
-**座標計算例**:
+**座標計算例** (128x256px, 3頭身):
 
 | 図形 | 座標 | 備考 |
 |------|------|------|
-| 台形（胴体） | (88,150), (168,150), (180,350), (76,350) | 上辺80px, 下辺104px |
-| 三角形（耳） | (50,60), (70,40), (70,60) | kero 専用装飾 |
+| 頭部（○） | 中心(64, 47), 半径42px | 3頭身の1/3 |
+| △胴体（sakura） | (64,94), (14,246), (114,246) | 正三角形、スカート風 |
+| ▽胴体（kero） | (14,94), (114,94), (64,246) | 逆三角形 |
+| 表情 | 目間隔36px, 線太さ3px | 視認性重視 |
 
 ---
 
@@ -887,6 +906,59 @@ fn test_sample_ghost_generation() {
 # .github/workflows/test.yml（既存に追加）
 - name: Test sample ghost
   run: cargo test -p pasta_sample_ghost --all-features
+```
+
+---
+
+## Component 6: Distribution Build Script
+
+**責務**: 配布可能なゴーストのワンコマンドビルド
+
+**ファイル**: `scripts/build-ghost.ps1`
+
+**フロー**:
+
+```mermaid
+flowchart TB
+    A[build-ghost.ps1 実行] --> B[pasta_shiori.dll ビルド]
+    B --> C[テンプレートコピー]
+    C --> D[pasta.dll 配置]
+    D --> E[Lua ランタイムコピー]
+    E --> F[dist/hello-pasta/ 完成]
+```
+
+**実行ステップ**:
+
+```powershell
+# scripts/build-ghost.ps1
+
+# 1. 32bit Windows 用 SHIORI DLL ビルド
+cargo build --release --target i686-pc-windows-msvc -p pasta_shiori
+
+# 2. 出力ディレクトリ準備
+$dist = "dist/hello-pasta"
+Remove-Item -Recurse -Force $dist -ErrorAction SilentlyContinue
+Copy-Item -Recurse "crates/pasta_sample_ghost/ghosts/hello-pasta" $dist
+
+# 3. pasta.dll 配置
+$srcDll = "target/i686-pc-windows-msvc/release/pasta_shiori.dll"
+$destDll = "$dist/ghost/master/pasta.dll"
+Copy-Item $srcDll $destDll
+
+# 4. Lua ランタイムコピー
+Copy-Item -Recurse "crates/pasta_lua/scripts" "$dist/ghost/master/scripts"
+```
+
+**pasta.toml 設定**:
+
+```toml
+# Lua モジュール検索パス
+lua_search_paths = [
+    "profile/pasta/save/lua",  # ユーザー保存スクリプト
+    "scripts",                  # pasta_lua ランタイム
+    "profile/pasta/cache/lua", # キャッシュ
+    "scriptlibs"               # 外部ライブラリ
+]
 ```
 
 ---
