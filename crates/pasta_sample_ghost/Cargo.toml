@@ -1,0 +1,22 @@
+[package]
+name = "pasta_sample_ghost"
+version = "0.1.0"
+description = "Sample ghost implementation for pasta - hello-pasta"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+# 画像生成
+image = "0.25"
+imageproc = "0.25"
+
+# エラー処理
+thiserror.workspace = true
+
+[dev-dependencies]
+# pasta_lua ランタイム（テスト用）
+pasta_lua = { path = "../pasta_lua" }
+
+# テスト用一時ディレクトリ
+tempfile.workspace = true
