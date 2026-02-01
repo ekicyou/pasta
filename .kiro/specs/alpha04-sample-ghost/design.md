@@ -600,6 +600,17 @@ ghosts/hello-pasta/
 # hello-pasta ゴースト設定ファイル
 # pasta alpha04 サンプル
 
+# [教育的サンプル] 
+# [package] セクションは伺かゴーストでは省略可能です。
+# install.txt/readme.txt で同様の情報を管理できます。
+# 将来的な pasta_lua の汎用用途（ノベルゲーム、ツール等）では
+# このセクションが必須になる可能性があります。
+[package]
+name = "hello-pasta"
+version = "0.1.0"
+authors = ["どっとステーション駅長"]
+description = "pasta入門用サンプルゴースト"
+
 [loader]
 # スクリプトファイルパターン
 patterns = ["**/*.pasta"]
@@ -624,10 +635,14 @@ memory_limit = 128
 # 追加モジュール検索パス
 module_path = ["./scripts", "./lib"]
 
-# [package] セクション（将来の拡張用サンプル）
-# 議題 #1 で決定: 省略可能だが将来的な拡張サンプルとして含める
-[package]
-name = "hello-pasta"
+[ghost]
+# 改行マーカー切替待機時間（秒）
+spot_switch_newlines = 1.5
+# ランダムトーク間隔（秒）
+talk_interval_min = 60   # 1分（テスト用に短縮）
+talk_interval_max = 120  # 2分（テスト用に短縮）
+# 時報マージン（秒）
+hour_margin = 30
 version = "1.0.0"
 authors = ["pasta-team"]
 description = "pasta入門用サンプルゴースト"

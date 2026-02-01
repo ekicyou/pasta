@@ -162,7 +162,12 @@
 
 1. The alpha04-sample-ghost shall `ghosts/hello-pasta/ghost/master/pasta.toml` に以下を定義する:
    ```toml
-   [package]  # 省略可能（将来的な拡張用）
+   # hello-pasta ゴースト設定ファイル
+   # pasta alpha04 サンプル
+
+   # [教育的サンプル] 伺かゴーストでは省略可能（install.txt/readme.txt で代替可能）
+   # 将来的な pasta_lua 汎用用途（ノベルゲーム、ツール等）のサンプルとして含める
+   [package]
    name = "hello-pasta"
    version = "0.1.0"
    authors = ["どっとステーション駅長"]
@@ -176,8 +181,8 @@
    talk_interval_max = 120  # 2分（テスト用に短縮）
    hour_margin = 30
    ```
-2. The `[package]` セクション shall 省略可能とする（伺かゴーストでは install.txt/readme.txt で代替可能）
-3. The `[package]` セクション shall 将来的な pasta_lua 別用途（ノベルゲーム等）のサンプルとして含める
+2. The `[package]` セクション shall 教育的サンプルとして含め、コメントで伺かゴーストでは省略可能であることを説明する
+3. The `[package]` セクション shall 将来的な pasta_lua 汎用用途（ノベルゲーム、ツール等）のサンプルとして機能する
 4. The 設定 shall [pasta.toml設定仕様書](research/pasta-toml-spec.md) に準拠する
 5. The 設定 shall alpha02（仮想イベント）で読み込まれる
 
