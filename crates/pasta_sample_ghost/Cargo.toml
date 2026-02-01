@@ -19,6 +19,9 @@ imageproc = "0.25"
 thiserror.workspace = true
 
 [dev-dependencies]
+# pasta_shiori（DLL ビルド時に自動的に pasta.dll がコピーされる）
+pasta_shiori = { path = "../pasta_shiori" }
+
 # pasta_lua ランタイム（テスト用）
 pasta_lua = { path = "../pasta_lua" }
 

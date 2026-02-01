@@ -1,6 +1,7 @@
 //! Build script for pasta_sample_ghost
 //!
 //! ビルド時に ghosts/hello-pasta/ ディレクトリにサンプルゴーストを生成します。
+//! pasta_shiori のソース変更を検知し、pasta.dll を自動的にコピーします。
 
 use std::env;
 use std::fs;
@@ -11,8 +12,19 @@ fn main() {
     println!("cargo::rerun-if-changed=build.rs");
     println!("cargo::rerun-if-changed=src/");
 
-    // クレートルートを取得
+    // pasta_shiori のソース変更を監視
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
+    let workspace_root = Path::new(&manifest_dir)
+        .parent()
+        .and_then(|p| p.parent())
+        .expect("Failed to get workspace root");
+
+    let pasta_shiori_src = workspace_root.join("crates/pasta_shiori/src");
+    if pasta_shiori_src.exists() {
+        println!("cargo::rerun-if-changed={}", pasta_shiori_src.display());
+    }
+
+    // クレートルートを取得
     let crate_root = Path::new(&manifest_dir);
     let ghosts_dir = crate_root.join("ghosts").join("hello-pasta");
 
@@ -20,6 +32,12 @@ fn main() {
     if let Err(e) = generate_ghost_files(&ghosts_dir) {
         eprintln!("Warning: Failed to generate ghost files: {}", e);
         // ビルドを失敗させない（オプショナル生成）
+    }
+
+    // pasta.dll を自動コピー（存在する場合）
+    if let Err(e) = copy_pasta_dll(workspace_root, &ghosts_dir) {
+        eprintln!("Info: pasta.dll not copied: {}", e);
+        eprintln!("      Run setup.ps1 to copy pasta.dll manually.");
     }
 }
 
@@ -184,6 +202,11 @@ surface18 { element0,base,surface18.png,0,0 }
 
     // pasta DSL スクリプト
     fs::write(
+        output_dir.join("ghost/master/dic/actors.pasta"),
+        ACTORS_PASTA_TEMPLATE,
+    )?;
+
+    fs::write(
         output_dir.join("ghost/master/dic/boot.pasta"),
         BOOT_PASTA_TEMPLATE,
     )?;
@@ -201,59 +224,185 @@ surface18 { element0,base,surface18.png,0,0 }
     Ok(())
 }
 
-const BOOT_PASTA_TEMPLATE: &str = r#"## boot.pasta - 起動・終了時のイベントハンドラ
+const ACTORS_PASTA_TEMPLATE: &str = r#"＃ actors.pasta - アクター辞書（共通定義）
+＃ 全ての .pasta ファイルで共有されるアクター定義
+＃ pasta DSL ローダーが dic/*.pasta パターンで自動読み込み
 
-@OnFirstBoot
----
-\\1\\s[10]やあ、初めまして！\\n\\n[half]\\0\\s[0]初めまして〜！\\n\\nわたしたち、pasta システムのサンプルゴーストです。\\n\\n[half]よろしくね！\\e
+＃ 女の子（sakura）- 赤色ピクトグラム surface0-8
+％女の子
+　＠笑顔：\s[0]
+　＠通常：\s[1]
+　＠照れ：\s[2]
+　＠驚き：\s[3]
+　＠泣き：\s[4]
+　＠困惑：\s[5]
+　＠キラキラ：\s[6]
+　＠眠い：\s[7]
+　＠怒り：\s[8]
 
-@OnBoot
----
-\\1\\s[10]また来たね。\\n\\n[half]\\0\\s[1]おかえりなさ〜い！\\e
-
-@OnClose[act]
----
-\\0\\s[0]またね〜！\\n\\n[half]\\1\\s[10]じゃあね。\\e
+＃ 男の子（kero）- 青色ピクトグラム surface10-18
+％男の子
+　＠笑顔：\s[10]
+　＠通常：\s[11]
+　＠照れ：\s[12]
+　＠驚き：\s[13]
+　＠泣き：\s[14]
+　＠困惑：\s[15]
+　＠キラキラ：\s[16]
+　＠眠い：\s[17]
+　＠怒り：\s[18]
 "#;
 
-const TALK_PASTA_TEMPLATE: &str = r#"## talk.pasta - ランダムトーク・時報
+const BOOT_PASTA_TEMPLATE: &str = r#"＃ boot.pasta - 起動/終了イベント用シーン定義
+＃ pasta DSL では「シーン関数フォールバック」機能を利用
+＃ シーン名とSHIORIイベント名を一致させることで、自動ディスパッチされる
+＃ ※アクター辞書は actors.pasta で共通定義
 
-@OnTalk
----
-\\0\\s[0]今日もいい天気だね〜。\\n\\n[half]\\1\\s[10]そうだね、外に出たいな。\\e
----
-\\0\\s[1]ねえねえ、pasta って面白いよね！\\n\\n[half]\\1\\s[11]まあ、ぼくには簡単だけどね。\\e
----
-\\0\\s[2]えへへ〜、なんだか照れちゃう。\\n\\n[half]\\1\\s[10]なに照れてるのさ。\\e
----
-\\1\\s[10]暇だな〜。\\n\\n[half]\\0\\s[0]じゃあ、お話しようよ！\\e
----
-\\0\\s[6]わあ、きらきら〜！\\n\\n[half]\\1\\s[16]なにがそんなに楽しいの？\\e
----
-\\0\\s[0]pasta DSL、覚えてくれた？\\n\\n[half]\\1\\s[11]ま、すぐ覚えられるよ。\\e
----
-\\1\\s[17]眠い...\\n\\n[half]\\0\\s[7]わたしも眠くなってきちゃった...\\e
+＃ グローバル単語定義（ランダム選択用）
+＠起動挨拶：おはよう！今日もよろしくね！、やっほー、また会えたね！、起動完了！準備OKだよ。
+＠終了挨拶：またね～！、お疲れ様！、ばいばーい！
 
-@OnHour[act]
----
-\\0\\s[0]【act.var.時】時だよ〜！\\n\\n[half]\\1\\s[10]時報か。\\e
+＃ OnBoot イベント - 通常起動時（シーン関数フォールバックで呼び出し）
+＊OnBoot
+　女の子：＠笑顔　＠起動挨拶
+　男の子：＠元気　へえ、また来たんだ。
+
+＃ OnBoot イベント - 別パターン（同名シーンでランダム選択）
+＊OnBoot
+　女の子：＠通常　起動したよ～。
+　男の子：＠通常　さあ、始めようか。
+
+＃ OnFirstBoot イベント - 初回起動時
+＊OnFirstBoot
+　女の子：＠笑顔　初めまして！\nわたしは女の子、よろしくね。
+　男の子：＠元気　ぼくは男の子。ちゃんと使ってよね。
+
+＃ OnClose イベント - 終了時
+＊OnClose
+　女の子：＠通常　＠終了挨拶
+　男の子：＠通常　また呼んでよね。
+
+＃ OnClose イベント - 別パターン
+＊OnClose
+　女の子：＠眠い　おやすみなさい...
+　男の子：＠通常　じゃあね。
 "#;
 
-const CLICK_PASTA_TEMPLATE: &str = r#"## click.pasta - クリック反応
+const TALK_PASTA_TEMPLATE: &str = r#"＃ talk.pasta - ランダムトーク/時報用シーン定義
+＃ OnSecondChange (毎秒) → 仮想イベントディスパッチャ → ランダムトーク/時報
+＃ ※アクター辞書は actors.pasta で共通定義
 
-@OnMouseDoubleClick
----
-\\0\\s[3]わっ、びっくりした！\\e
----
-\\0\\s[1]えへへ、くすぐったいな〜。\\e
----
-\\0\\s[2]そ、そんなに見つめないで...。\\e
----
-\\1\\s[13]うわっ！なに！？\\e
----
-\\1\\s[18]ちょっと、やめてよ！\\e
----
-\\0\\s[6]わ〜い、遊んでくれるの？\\e
----
-\\1\\s[11]ふふん、ぼくのことが気になる？\\e
+＃ ランダムトーク用単語（ランダム選択）
+＠雑談：何か用？、暇だなあ...、ねえねえ、聞いてる？、うーん、眠くなってきた...
+
+＃ ランダムトーク - 仮想イベント OnTalk
+＊OnTalk
+　女の子：＠通常　＠雑談
+
+＊OnTalk
+　女の子：＠笑顔　Pasta DSL、使ってみてね！
+　男の子：＠元気　Lua 側も触ってみなよ。
+
+＊OnTalk
+　女の子：＠考え　今日は何しようかな...
+　男の子：＠通常　宿題やったの？
+
+＊OnTalk
+　女の子：＠通常　ねえ、今日の天気どう思う？
+　男の子：＠考え　さあ、外見てないからわかんないや。
+
+＊OnTalk
+　女の子：＠笑顔　一緒にお話しよう！
+　男の子：＠元気　しょうがないなあ。
+
+＊OnTalk
+　女の子：＠眠い　ふわあ...ちょっと眠いかも。
+　男の子：＠通常　寝てていいよ、ぼくが見てるから。
+
+＃ 時報 - 仮想イベント OnHour
+＃ ＄時１２ 変数は onhour-date-var-transfer により自動設定される（12時間表記）
+＊OnHour
+　女の子：＠笑顔　＄時１２　だよ！時報だよ～。
+　男の子：＠元気　もう　＄時１２　か、早いね。
+
+＊OnHour
+　女の子：＠通常　今　＄時１２　だって。
+　男の子：＠通常　へえ、そうなんだ。
+
+＊OnHour
+　女の子：＠考え　＄時１２　...時間が経つのって不思議だね。
+　男の子：＠考え　哲学的だね。
 "#;
+
+const CLICK_PASTA_TEMPLATE: &str = r#"＃ click.pasta - ダブルクリック反応用シーン定義
+＃ OnMouseDoubleClick イベントに反応
+＃ ※アクター辞書は actors.pasta で共通定義
+
+＃ ダブルクリック反応（ランダム選択）7種以上
+＊OnMouseDoubleClick
+　女の子：＠驚き　わっ、びっくりした！
+　男の子：＠元気　どうしたの？
+
+＊OnMouseDoubleClick
+　女の子：＠笑顔　なあに？呼んだ？
+　男の子：＠通常　こっちに用があるんじゃない？
+
+＊OnMouseDoubleClick
+　女の子：＠照れ　え、なに？
+　男の子：＠元気　照れてるの？
+
+＊OnMouseDoubleClick
+　男の子：＠驚き　うわっ！なに！？
+　女の子：＠笑顔　反応してくれたね。
+
+＊OnMouseDoubleClick
+　女の子：＠怒り　もう、そんなにクリックしないで！
+　男の子：＠驚き　お、怒った怒った。
+
+＊OnMouseDoubleClick
+　女の子：＠笑顔　わ〜い、遊んでくれるの？
+　男の子：＠通常　まあ、暇だしね。
+
+＊OnMouseDoubleClick
+　男の子：＠元気　ふふん、ぼくのことが気になる？
+　女の子：＠驚き　えっ？そんなんじゃないよ！
+"#;
+
+/// pasta.dll を自動的にコピーする
+///
+/// 32bit Windows ビルドの pasta.dll が存在する場合、
+/// ghosts/hello-pasta/ghost/master/ にコピーします。
+fn copy_pasta_dll(workspace_root: &Path, ghosts_dir: &Path) -> std::io::Result<()> {
+    // pasta.dll のソースパス
+    let dll_src = workspace_root
+        .join("target")
+        .join("i686-pc-windows-msvc")
+        .join("release")
+        .join("pasta.dll");
+
+    if !dll_src.exists() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("pasta.dll not found at {}", dll_src.display()),
+        ));
+    }
+
+    // pasta.dll のコピー先
+    let dll_dest = ghosts_dir.join("ghost").join("master").join("pasta.dll");
+
+    // ディレクトリが存在することを確認
+    if let Some(parent) = dll_dest.parent() {
+        fs::create_dir_all(parent)?;
+    }
+
+    // ファイルをコピー
+    fs::copy(&dll_src, &dll_dest)?;
+
+    println!(
+        "cargo::warning=Copied pasta.dll from {} to {}",
+        dll_src.display(),
+        dll_dest.display()
+    );
+
+    Ok(())
+}

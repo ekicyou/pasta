@@ -29,6 +29,8 @@ pub enum GhostError {
 pub struct GhostConfig {
     /// ゴースト名
     pub name: String,
+    /// バージョン
+    pub version: String,
     /// sakura キャラクター名
     pub sakura_name: String,
     /// kero キャラクター名
@@ -47,6 +49,7 @@ impl Default for GhostConfig {
     fn default() -> Self {
         Self {
             name: "hello-pasta".to_string(),
+            version: "1.0.0".to_string(),
             sakura_name: "女の子".to_string(),
             kero_name: "男の子".to_string(),
             craftman: "ekicyou".to_string(),

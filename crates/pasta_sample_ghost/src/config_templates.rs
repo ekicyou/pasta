@@ -68,6 +68,8 @@ homeurl,{homeurl}
 }
 
 /// shell/master/descript.txt を生成
+///
+/// 仕様準拠: requirements.md Requirement 9.3
 pub fn generate_shell_descript(config: &GhostConfig) -> String {
     format!(
         r#"charset,UTF-8
@@ -75,10 +77,11 @@ type,shell
 name,master
 craftman,{craftman}
 craftmanw,{craftman_w}
-sakura.balloon.offsetx,0
-sakura.balloon.offsety,80
-kero.balloon.offsetx,0
-kero.balloon.offsety,80
+seriko.use_self_alpha,1
+sakura.balloon.offsetx,64
+sakura.balloon.offsety,0
+kero.balloon.offsetx,64
+kero.balloon.offsety,0
 "#,
         craftman = config.craftman,
         craftman_w = config.craftman_w
@@ -117,10 +120,14 @@ element0,overlay,surface{i}.png,0,0
 }
 
 /// pasta.toml を生成（教育的コメント付き）
+///
+/// 仕様準拠: requirements.md Requirement 7.1-7.4
 pub fn generate_pasta_toml(config: &GhostConfig) -> String {
     format!(
-        r#"# {name} ゴースト設定ファイル
-# pasta alpha04 サンプル
+        r#"# pasta.toml - pasta ゴースト設定ファイル
+#
+# このファイルは pasta システムの動作を設定します。
+# 必須項目は [package] と [loader] のみです。
 
 # [教育的サンプル]
 # [package] セクションは伺かゴーストでは省略可能です。
@@ -129,47 +136,32 @@ pub fn generate_pasta_toml(config: &GhostConfig) -> String {
 # このセクションが必須になる可能性があります。
 [package]
 name = "{name}"
-version = "0.1.0"
-authors = ["{craftman_w}"]
-description = "pasta入門用サンプルゴースト"
+version = "{version}"
+edition = "2024"
 
 [loader]
-# スクリプトファイルパターン
-patterns = ["**/*.pasta"]
-# 起動時自動ロード
-auto_load = true
-# デバッグモード
-debug_mode = true
-
-[logging]
-# ログレベル: off, error, warn, info, debug, trace
-level = "info"
-# ログ出力先（ベースシェルのログフォルダ）
-output = "log"
-
-[persistence]
-# 永続化ファイル名
-filename = "save.lua"
-# 自動保存間隔（秒）- OnCloseでも保存
-auto_save_interval = 300
-
-[lua]
-# メモリ制限（MB）- 0で無制限
-memory_limit = 128
-# 追加モジュール検索パス
-module_path = ["./scripts", "./lib"]
+# pasta DSL ファイルパターン
+pasta_patterns = ["dic/*.pasta"]
+# Lua モジュール検索パス（優先順位順）
+lua_search_paths = [
+    "profile/pasta/save/lua",   # ユーザー保存スクリプト
+    "scripts",                   # pasta 標準ランタイム
+    "profile/pasta/cache/lua",   # トランスパイル済みキャッシュ
+    "scriptlibs",                # 追加ライブラリ
+]
+# トランスパイル出力先
+transpiled_output_dir = "profile/pasta/cache/lua"
 
 [ghost]
-# 改行マーカー切替待機時間（秒）
-spot_switch_newlines = 1.5
-# ランダムトーク間隔（秒）
-talk_interval_min = 60   # 1分（テスト用に短縮）
-talk_interval_max = 120  # 2分（テスト用に短縮）
-# 時報マージン（秒）
-hour_margin = 30
+# ランダムトーク発生間隔（秒）
+random_talk_interval = 180
+
+[persistence]
+# 永続化データディレクトリ
+data_dir = "profile/pasta/save"
 "#,
         name = config.name,
-        craftman_w = config.craftman_w
+        version = config.version
     )
 }
 

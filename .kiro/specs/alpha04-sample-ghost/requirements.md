@@ -4,7 +4,7 @@
 
 **本仕様の唯一無二の目的は、pasta.dll を使った実働するサンプルゴースト配布物を作ることである。**
 
-- SSPにインストール可能な完全な配布物（`dist/hello-pasta/`）を出力すること
+- SSPにインストール可能な完全な配布物（`crates/pasta_sample_ghost/ghosts/hello-pasta/`）を提供すること
 - pasta.dll（SHIORI）が実際に動作し、起動・トーク・終了が機能すること
 - 配布物をそのままSSPで実行可能であること
 - 「動かないサンプル」「参考資料」ではなく、**実働する製品**であること
@@ -20,7 +20,7 @@
 ### 背景
 
 - **親仕様**: alpha-release-planning（アルファリリース計画）
-- **依存**: 
+- **依存**:
   - alpha01（SHIORI EVENT）
   - alpha02（仮想イベント）
   - alpha03（さくらスクリプト）
@@ -55,38 +55,46 @@
 
 #### Acceptance Criteria
 
-1. The alpha04-sample-ghost shall 以下の配布物構成を定義する（`dist/hello-pasta/` として出力）:
+1. The alpha04-sample-ghost shall 以下の配布物構成を定義する（`crates/pasta_sample_ghost/ghosts/hello-pasta/`）:
    ```
-   dist/hello-pasta/              # 配布可能なゴースト（ビルド成果物）
-   ├── install.txt                # インストール設定
-   ├── readme.txt                 # 説明ファイル
-   ├── ghost/
-   │   └── master/
-   │       ├── pasta.toml         # pasta 設定ファイル
-   │       ├── descript.txt       # ゴースト設定（ukadoc準拠）
-   │       ├── pasta.dll          # SHIORI DLL（ビルド時コピー）
-   │       ├── scripts/           # Lua ランタイム（ビルド時コピー）
-   │       │   ├── pasta/         # pasta標準モジュール
-   │       │   └── hello.lua      # サンプルスクリプト
-   │       └── dic/               # Pasta DSL スクリプト（ビルド時生成）
-   │           ├── boot.pasta     # 起動・終了イベント
-   │           ├── talk.pasta     # ランダムトーク・時報
-   │           └── click.pasta    # ダブルクリック反応
-   └── shell/
-       └── master/                # シェル（見た目）
-           ├── descript.txt       # シェル設定
-           ├── surfaces.txt       # サーフェス定義
-           └── surface*.png       # サーフェス画像（18ファイル、ビルド時生成）
-   
-   # 補足: ソースは crates/pasta_sample_ghost/ に配置
-   # - src/scripts.rs: pasta DSL テンプレート
-   # - src/image_generator.rs: サーフェス画像生成
-   # - src/config_templates.rs: 設定ファイルテンプレート
+   crates/pasta_sample_ghost/
+   ├── Cargo.toml                 # クレート設定
+   ├── README.md                  # クレート説明
+   ├── src/
+   │   ├── lib.rs                 # シェル画像生成ロジック
+   │   ├── scripts.rs             # pasta DSL テンプレート
+   │   ├── image_generator.rs     # サーフェス画像生成
+   │   └── config_templates.rs    # 設定ファイルテンプレート
+   ├── tests/
+   │   └── integration_test.rs    # 統合テスト
+   ├── build.rs                   # ビルドスクリプト（.pasta, .png 生成）
+   └── ghosts/hello-pasta/        # 配布可能なゴースト（完成形）
+       ├── install.txt            # インストール設定
+       ├── readme.txt             # 説明ファイル
+       ├── ghost/
+       │   └── master/
+       │       ├── pasta.toml     # pasta 設定ファイル
+       │       ├── descript.txt   # ゴースト設定（ukadoc準拠）
+       │       ├── pasta.dll      # SHIORI DLL（手動配置 or スクリプト）
+       │       ├── scripts/       # Lua ランタイム（手動配置 or スクリプト）
+       │       │   ├── pasta/     # pasta標準モジュール
+       │       │   └── hello.lua  # サンプルスクリプト
+       │       └── dic/           # Pasta DSL スクリプト（build.rs 生成）
+       │           ├── actors.pasta   # アクター辞書（共通定義）
+       │           ├── boot.pasta     # 起動・終了イベント
+       │           ├── talk.pasta     # ランダムトーク・時報
+       │           └── click.pasta    # ダブルクリック反応
+       └── shell/
+           └── master/            # シェル（見た目）
+               ├── descript.txt   # シェル設定
+               ├── surfaces.txt   # サーフェス定義
+               └── surface*.png   # サーフェス画像（18ファイル、build.rs 生成）
    ```
-2. The alpha04-sample-ghost shall ビルドにより `dist/hello-pasta/` に配布可能な完全なゴーストを出力する
+2. The alpha04-sample-ghost shall `build.rs` により `ghosts/hello-pasta/` 内に動的ファイル（.pasta, .png）を生成する
 3. The alpha04-sample-ghost shall ソースを `crates/pasta_sample_ghost/` に配置する（ルート汚染回避）
-4. The alpha04-sample-ghost shall pasta_luaから完全に独立したクレートとする（責務分離）
-5. The alpha04-sample-ghost shall テンプレート（`ghosts/hello-pasta/`）から静的ファイルをコピーし、動的ファイル（.pasta, .png, .dll）をビルド時生成する
+4. The alpha04-sample-ghost shall pasta_luaから完全に独立したクレートとする（責務分離、dev-dependencies のみ許可）
+5. The alpha04-sample-ghost shall `ghosts/hello-pasta/` に静的ファイル（install.txt, readme.txt, descript.txt, pasta.toml, surfaces.txt）を配置し、動的ファイル（.pasta, .png）を build.rs で生成する
+6. The alpha04-sample-ghost shall `pasta.dll` と `scripts/` は手動配置またはヘルパースクリプトで配置する（build.rs の責務外）
 
 ---
 
@@ -283,40 +291,87 @@
 
 ---
 
-### Requirement 10: 配布ビルド自動化
+### Requirement 10: DLL・Luaランタイム配置のヘルパー
 
-**Objective:** As a ゴースト開発者, I want ワンコマンドで配布可能なゴーストをビルドしたい, so that 手作業を減らせる
+**Objective:** As a ゴースト開発者, I want pasta.dll と Lua ランタイムを簡単に配置したい, so that 手作業を減らせる
 
 #### Acceptance Criteria
 
-1. The alpha04-sample-ghost shall `scripts/build-ghost.ps1` PowerShell スクリプトを提供する
+1. The alpha04-sample-ghost shall `scripts/setup-ghost.ps1` PowerShell スクリプトを提供する（オプション）
 
 2. The スクリプト shall 以下を自動実行する:
    - 32bit Windows ターゲット（`i686-pc-windows-msvc`）でのDLLビルド
-   - テンプレートディレクトリ（`ghosts/hello-pasta/`）のコピー
-   - ビルド成果物の配置
-   - Lua ランタイムのコピー（後述）
+   - pasta.dll を `ghosts/hello-pasta/ghost/master/` にコピー
+   - Lua ランタイムを `ghosts/hello-pasta/ghost/master/scripts/` にコピー
 
 3. The DLLコピー shall 以下の仕様に従う:
    - **ソースパス**: `target/i686-pc-windows-msvc/release/pasta.dll`
-   - **出力パス**: `dist/hello-pasta/ghost/master/pasta.dll`
+   - **出力パス**: `crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/pasta.dll`
    - **重要**: Cargo.tomlの `[lib] name = "pasta"` により出力ファイル名は `pasta.dll`（`pasta_shiori.dll` ではない）
 
 4. The Luaランタイムコピー shall 以下の仕様に従う:
    - **ソースディレクトリ**: `crates/pasta_lua/scripts/`（全サブディレクトリ含む再帰コピー）
-   - **出力ディレクトリ**: `dist/hello-pasta/ghost/master/scripts/`
+   - **出力ディレクトリ**: `crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/scripts/`
    - **必須ファイル**: `pasta/*.lua`（コアモジュール）、`hello.lua`（サンプル）
-   - **除外**: `crates/pasta_lua/scriptlibs/` はテスト用ライブラリ（luacheck, lua_test）のため配布に含めない
+   - **除外**: `crates/pasta_lua/scriptlibs/` はテスト用ライブラリのため配布に含めない
 
-5. The 出力 shall `dist/hello-pasta/` に配布可能な完全なゴーストとして生成する:
+5. The 配布物 shall `crates/pasta_sample_ghost/ghosts/hello-pasta/` として完成する:
    - `ghost/master/pasta.dll` - SHIORI DLL
    - `ghost/master/pasta.toml` - 設定ファイル
    - `ghost/master/scripts/` - Lua ランタイム（`crates/pasta_lua/scripts/` 由来）
-   - `ghost/master/scriptlibs/` - **配布に含めない**（テスト用）
-   - `shell/master/` - シェル素材（surfaces, descript.txt）
-   - `install.txt` - インストール情報
+   - `ghost/master/dic/` - Pasta DSL スクリプト（build.rs 生成）
+   - `shell/master/` - シェル素材（build.rs 生成 + 静的ファイル）
+   - `install.txt`, `readme.txt` - 静的ファイル
 
 6. The 自動化 shall Rust と PowerShell のみを使用する（Makefile 不使用）
+
+7. The `pasta.dll` と `scripts/` shall `.gitignore` で除外する（ビルド成果物のため）
+
+---
+
+### Requirement 11: アクター辞書の分離
+
+**Objective:** As a ゴースト開発者, I want アクター辞書を専用ファイルに分離したい, so that 重複定義を避けてメンテナンス性を向上できる
+
+#### Acceptance Criteria
+
+1. The alpha04-sample-ghost shall `dic/actors.pasta` にアクター辞書を集約する:
+   ```pasta
+   ＃ actors.pasta - アクター辞書（共通定義）
+   ＃ 全ての .pasta ファイルで共有されるアクター定義
+   
+   ＃ 女の子（sakura）- 赤色ピクトグラム
+   ％女の子
+   　＠通常：\s[1]
+   　＠笑顔：\s[0]
+   　＠照れ：\s[2]
+   　＠驚き：\s[3]
+   　＠泣き：\s[4]
+   　＠困惑：\s[5]
+   　＠キラキラ：\s[6]
+   　＠眠い：\s[7]
+   　＠怒り：\s[8]
+   
+   ＃ 男の子（kero）- 青色ピクトグラム
+   ％男の子
+   　＠通常：\s[11]
+   　＠笑顔：\s[10]
+   　＠照れ：\s[12]
+   　＠驚き：\s[13]
+   　＠泣き：\s[14]
+   　＠困惑：\s[15]
+   　＠キラキラ：\s[16]
+   　＠眠い：\s[17]
+   　＠怒り：\s[18]
+   ```
+
+2. The actors.pasta shall 各キャラクターの全9表情を定義する（surface0-8, surface10-18 に対応）
+
+3. The boot.pasta, talk.pasta, click.pasta shall アクター辞書定義を**含めない**（actors.pasta に委譲）
+
+4. The pasta DSL ローダー shall `dic/*.pasta` パターンで actors.pasta を自動読み込みする
+
+5. The アクター辞書 shall SPECIFICATION.md Section 11「Actor Dictionary」に準拠する
 
 ---
 

@@ -39,15 +39,37 @@ crates/pasta_sample_ghost/
 
 ## 使用方法
 
-### 配布可能なゴーストをビルド
+### セットアップ（初回のみ）
 
-**推奨: PowerShell スクリプトを使用**
+**pasta.dll と Lua ランタイムを配置**
 
 ```powershell
-# ワークスペースルートで実行
-.\scripts\build-ghost.ps1
+# crates/pasta_sample_ghost/ フォルダで setup.ps1 をダブルクリック
+# または PowerShell で実行
+.\setup.ps1
 
-# 出力: dist/hello-pasta/
+# DLL ビルドをスキップする場合（既にビルド済みの場合）
+.\setup.ps1 -SkipDllBuild
+```
+
+このスクリプトは以下を実行します：
+1. pasta_shiori.dll (32bit) をビルド
+2. ghosts/hello-pasta/ghost/master/ に pasta.dll として配置
+3. crates/pasta_lua/scripts/ を scripts/ にコピー
+
+**注意**: .pasta ファイルと .png ファイルは `build.rs` で自動生成されます（`cargo build` または `cargo test` 時）。
+
+### 配布物の確認
+
+```powershell
+# テストを実行（.pasta と .png が自動生成される）
+cargo test -p pasta_sample_ghost
+
+# 配布物の場所
+crates/pasta_sample_ghost/ghosts/hello-pasta/
+```
+
+この `ghosts/hello-pasta/` フォルダをそのまま SSP にインストール可能です。
 ```
 
 スクリプトは以下を自動実行します:
@@ -67,7 +89,7 @@ $dist = "dist/hello-pasta"
 Copy-Item -Recurse "crates/pasta_sample_ghost/ghosts/hello-pasta" $dist
 
 # 3. DLL をコピー
-Copy-Item "target/i686-pc-windows-msvc/release/pasta_shiori.dll" "$dist/ghost/master/pasta.dll"
+Copy-Item "target/i686-pc-windows-msvc/release/pasta.dll" "$dist/ghost/master/pasta.dll"
 
 # 4. Lua ランタイムをコピー
 Copy-Item -Recurse "crates/pasta_lua/scripts" "$dist/ghost/master/scripts"
