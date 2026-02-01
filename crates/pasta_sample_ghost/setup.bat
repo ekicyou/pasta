@@ -1,6 +1,12 @@
 @echo off
 REM setup.bat - hello-pasta Full Setup Script
 REM Double-click this file to build and setup the ghost distribution
+REM
+REM Optimized workflow:
+REM   1. Build pasta.dll (32bit) - heavy operation first
+REM   2. Run pasta_sample_ghost - generate ghost files
+REM   3. Copy pasta.dll and scripts/
+REM   4. Finalize - generate updates2.dau and updates.txt
 
 setlocal enabledelayedexpansion
 
@@ -19,12 +25,16 @@ echo.
 
 cd /d %WORKSPACE_ROOT%
 
-REM Step 1: Build pasta_sample_ghost
-echo [1/4] Building pasta_sample_ghost...
-cargo build -p pasta_sample_ghost --quiet
+REM Step 1: Build pasta_shiori.dll (32bit Windows release) - FIRST
+echo [1/4] Building pasta.dll (32bit release)...
+echo   Target: i686-pc-windows-msvc
+cargo build --release --target i686-pc-windows-msvc -p pasta_shiori --quiet
 if errorlevel 1 (
     echo.
-    echo ERROR: pasta_sample_ghost build failed
+    echo ERROR: pasta_shiori build failed
+    echo.
+    echo Make sure you have the i686-pc-windows-msvc target installed:
+    echo   rustup target add i686-pc-windows-msvc
     echo.
     pause
     exit /b 1
@@ -45,25 +55,8 @@ if errorlevel 1 (
 echo   Ghost files generated
 echo.
 
-REM Step 3: Build pasta_shiori.dll (32bit Windows release)
-echo [3/4] Building pasta.dll (32bit release)...
-echo   Target: i686-pc-windows-msvc
-cargo build --release --target i686-pc-windows-msvc -p pasta_shiori --quiet
-if errorlevel 1 (
-    echo.
-    echo ERROR: pasta_shiori build failed
-    echo.
-    echo Make sure you have the i686-pc-windows-msvc target installed:
-    echo   rustup target add i686-pc-windows-msvc
-    echo.
-    pause
-    exit /b 1
-)
-echo   Build completed
-echo.
-
-REM Step 4: Copy pasta.dll and scripts/
-echo [4/4] Copying files...
+REM Step 3: Copy pasta.dll and scripts/
+echo [3/4] Copying files...
 
 REM Ensure destination directory exists
 if not exist "%GHOST_DIR%\ghost\master" (
@@ -100,6 +93,19 @@ if not exist "%SCRIPTS_SRC%" (
     xcopy /E /I /Y /Q "%SCRIPTS_SRC%" "%SCRIPTS_DEST%" >nul
     echo   Copied scripts/
 )
+echo.
+
+REM Step 4: Finalize - generate updates2.dau and updates.txt
+echo [4/4] Generating update files...
+cargo run -p pasta_sample_ghost --quiet -- --finalize
+if errorlevel 1 (
+    echo.
+    echo ERROR: Finalize failed
+    echo.
+    pause
+    exit /b 1
+)
+echo   Update files generated
 
 REM Count files
 set /a FILE_COUNT=0
@@ -113,6 +119,10 @@ echo ========================================
 echo.
 echo   Distribution: %GHOST_DIR%
 echo   Files:        %FILE_COUNT%
+echo.
+echo Generated update files:
+echo   - updates2.dau (SSP binary format)
+echo   - updates.txt  (SSP text format)
 echo.
 echo Next steps:
 echo   1. Run tests: cargo test -p pasta_sample_ghost

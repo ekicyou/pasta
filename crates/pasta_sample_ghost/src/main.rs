@@ -10,6 +10,10 @@
 //!
 //! # カスタム出力先
 //! cargo run -p pasta_sample_ghost -- /path/to/output
+//!
+//! # finalize モード（更新ファイルのみ生成）
+//! cargo run -p pasta_sample_ghost -- --finalize
+//! cargo run -p pasta_sample_ghost -- --finalize /path/to/output
 //! ```
 //!
 //! # 生成されるファイル
@@ -19,19 +23,37 @@
 //! - ghost/master/dic/*.pasta（4ファイル）
 //! - shell/master/descript.txt, surfaces.txt
 //! - shell/master/surface*.png（18ファイル）
+//! - updates2.dau, updates.txt（finalize モード時）
 //!
 //! # 注意
 //!
 //! pasta.dll と scripts/ は setup.bat で別途コピーされます。
+//! 更新ファイル（updates2.dau, updates.txt）は --finalize オプションで生成します。
 
-use pasta_sample_ghost::{GhostConfig, generate_ghost};
+use pasta_sample_ghost::{GhostConfig, finalize_ghost, generate_ghost};
 use std::env;
 use std::path::PathBuf;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // 出力先を決定
-    let output_dir = get_output_dir();
+    let args: Vec<String> = env::args().collect();
 
+    // --finalize オプションをチェック
+    let finalize_mode = args.iter().any(|arg| arg == "--finalize");
+
+    // 出力先を決定（--finalize 以外の引数を探す）
+    let output_dir = get_output_dir(&args);
+
+    if finalize_mode {
+        run_finalize_mode(&output_dir)?;
+    } else {
+        run_generate_mode(&output_dir)?;
+    }
+
+    Ok(())
+}
+
+/// 通常モード：ゴースト配布物を生成
+fn run_generate_mode(output_dir: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     println!("========================================");
     println!("  pasta_sample_ghost Generator");
     println!("========================================");
@@ -44,10 +66,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ゴースト生成
     println!("Generating ghost distribution...");
-    generate_ghost(&output_dir, &config)?;
+    generate_ghost(output_dir, &config)?;
 
     // 生成されたファイルをカウント
-    let file_count = count_files(&output_dir);
+    let file_count = count_files(output_dir);
 
     println!();
     println!("========================================");
@@ -59,19 +81,55 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!();
     println!("Next steps:");
     println!("  1. Run setup.bat to copy pasta.dll and scripts/");
-    println!("  2. Or manually copy:");
-    println!("     - target/i686-pc-windows-msvc/release/pasta.dll");
-    println!("     - crates/pasta_lua/scripts/");
+    println!("  2. setup.bat will also generate updates2.dau and updates.txt");
+    println!();
+
+    Ok(())
+}
+
+/// finalize モード：更新ファイルのみ生成
+fn run_finalize_mode(output_dir: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+    println!("========================================");
+    println!("  pasta_sample_ghost Finalize");
+    println!("========================================");
+    println!();
+    println!("Target: {}", output_dir.display());
+    println!();
+
+    // 出力ディレクトリが存在するか確認
+    if !output_dir.exists() {
+        eprintln!("ERROR: Directory does not exist: {}", output_dir.display());
+        eprintln!("       Run without --finalize first to generate the ghost.");
+        std::process::exit(1);
+    }
+
+    // 更新ファイルを生成
+    println!("Generating update files...");
+    let entry_count = finalize_ghost(output_dir)?;
+
+    println!();
+    println!("========================================");
+    println!("  Finalize Complete!");
+    println!("========================================");
+    println!();
+    println!("  Location: {}", output_dir.display());
+    println!("  Entries:  {} files indexed", entry_count);
+    println!();
+    println!("Generated files:");
+    println!("  - updates2.dau (SSP binary format)");
+    println!("  - updates.txt  (SSP text format)");
     println!();
 
     Ok(())
 }
 
 /// 出力先ディレクトリを決定する
-fn get_output_dir() -> PathBuf {
-    // コマンドライン引数があればそれを使う
-    if let Some(arg) = env::args().nth(1) {
-        return PathBuf::from(arg);
+fn get_output_dir(args: &[String]) -> PathBuf {
+    // --finalize 以外の引数を探す
+    for arg in args.iter().skip(1) {
+        if arg != "--finalize" && !arg.starts_with('-') {
+            return PathBuf::from(arg);
+        }
     }
 
     // デフォルト: crate_root/ghosts/hello-pasta

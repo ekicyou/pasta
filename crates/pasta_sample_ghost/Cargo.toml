@@ -16,6 +16,12 @@ path = "src/main.rs"
 image = "0.25"
 imageproc = "0.25"
 
+# MD5ハッシュ計算
+md5 = "0.7"
+
+# Shift_JISエンコーディング
+encoding_rs = "0.8"
+
 # エラー処理
 thiserror.workspace = true
 
