@@ -23,6 +23,13 @@
 ## 濁点・半濁点のウェイト実装
 
 
+## シーン再生コルーチン
+EVENT.fire内部をコルーチン化し、継続が残った場合、STORE.co_fireに保存する。
+
+1. EVENT.fireが取得するhandlerをCO.safe_wrap()でコルーチン関数`co_fire`化
+
+
+
 
 
 /kiro-validate-gap alpha04-sample-ghost

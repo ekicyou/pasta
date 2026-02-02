@@ -231,14 +231,14 @@ fn test_event_fire_catches_handler_error() {
     let result = runtime.exec(
         r#"
         local REG = require "pasta.shiori.event.register"
-        local EVENT = require "pasta.shiori.event"
+        local SHIORI = require "pasta.shiori.entry"
         
         REG.OnError = function(act)
             error("Test error message")
         end
         
         local req = { id = "OnError", method = "get", version = 30 }
-        local response = EVENT.fire(req)
+        local response = SHIORI.request(req)
         
         return response:find("500 Internal Server Error") ~= nil
     "#,
@@ -246,7 +246,7 @@ fn test_event_fire_catches_handler_error() {
 
     assert!(
         result.is_ok(),
-        "EVENT.fire should return 500 on handler error: {:?}",
+        "SHIORI.request should return 500 on handler error: {:?}",
         result
     );
     assert!(result.unwrap().as_boolean().unwrap_or(false));
@@ -259,14 +259,14 @@ fn test_error_message_no_newline() {
     let result = runtime.exec(
         r#"
         local REG = require "pasta.shiori.event.register"
-        local EVENT = require "pasta.shiori.event"
+        local SHIORI = require "pasta.shiori.entry"
         
         REG.OnMultilineError = function(act)
             error("First line\nSecond line\nThird line")
         end
         
         local req = { id = "OnMultilineError", method = "get", version = 30 }
-        local response = EVENT.fire(req)
+        local response = SHIORI.request(req)
         
         -- X-Error-Reason should contain only the first line
         local has_500 = response:find("500 Internal Server Error") ~= nil
@@ -295,14 +295,14 @@ fn test_event_fire_handles_empty_error_message() {
     let result = runtime.exec(
         r#"
         local REG = require "pasta.shiori.event.register"
-        local EVENT = require "pasta.shiori.event"
+        local SHIORI = require "pasta.shiori.entry"
         
         REG.OnEmptyError = function(act)
             error("")
         end
         
         local req = { id = "OnEmptyError", method = "get", version = 30 }
-        local response = EVENT.fire(req)
+        local response = SHIORI.request(req)
         
         -- Should return 500 with file location info (mlua adds it automatically)
         local has_500 = response:find("500 Internal Server Error") ~= nil
@@ -333,6 +333,7 @@ fn test_event_module_with_res_module() {
         r#"
         local REG = require "pasta.shiori.event.register"
         local EVENT = require "pasta.shiori.event"
+        local SHIORI = require "pasta.shiori.entry"
         local RES = require "pasta.shiori.res"
         
         -- Test 1: RES.ok integration via handler
@@ -346,11 +347,11 @@ fn test_event_module_with_res_module() {
         local res2 = EVENT.fire({ id = "Unregistered", method = "get", version = 30 })
         local no_content_works = res2:find("204 No Content") ~= nil
         
-        -- Test 3: RES.err integration via error handling
+        -- Test 3: RES.err integration via error handling (use SHIORI.request for xpcall)
         REG.TestErr = function(act)
             error("Intentional error")
         end
-        local res3 = EVENT.fire({ id = "TestErr", method = "get", version = 30 })
+        local res3 = SHIORI.request({ id = "TestErr", method = "get", version = 30 })
         local err_works = res3:find("500 Internal Server Error") ~= nil and res3:find("X%-Error%-Reason:") ~= nil
         
         return ok_works and no_content_works and err_works
@@ -620,7 +621,7 @@ fn test_scene_fallback_catches_errors() {
 
     let result = runtime.exec(&format!(
         r#"
-        local EVENT = require "pasta.shiori.event"
+        local SHIORI = require "pasta.shiori.entry"
         local SCENE = require "pasta.scene"
         
         -- Register a scene function that throws an error
@@ -630,7 +631,7 @@ fn test_scene_fallback_catches_errors() {
         end)
         
         local req = {{ id = "OnErrorScene", method = "get", version = 30 }}
-        local response = EVENT.fire(req)
+        local response = SHIORI.request(req)
         
         return response:find("500 Internal Server Error") ~= nil
     "#,

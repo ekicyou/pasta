@@ -78,19 +78,9 @@ local function execute_scene(event_name, act)
         return nil
     end
 
-    local ok, result = pcall(scene_fn, act)
-    if not ok then
-        -- エラーログ出力（既存EVENT.no_entry()パターンに準拠）
-        -- 将来的にはtracing/loggingモジュールに切り替え予定
-        local err_msg = result
-        if type(result) == "string" then
-            err_msg = result:match("^[^\n]+") or result
-        end
-        print("[virtual_dispatcher] Scene execution error (" .. event_name .. "): " .. tostring(err_msg))
-        return nil
-    end
-
-    return result
+    -- シーン関数を直接実行
+    -- エラーは SHIORI.request の xpcall でキャッチされる
+    return scene_fn(act)
 end
 
 -- 5. 公開関数
@@ -121,14 +111,9 @@ function M.check_hour(act)
     next_hour_unix = calculate_next_hour_unix(current_unix)
 
     -- 日時変数を転記（OnHour発火時のみ）
-    -- 転記処理の失敗はログ出力のみ、シーン実行は継続
-    local transfer_ok, transfer_err = pcall(function()
-        if act.transfer_date_to_var then
-            act:transfer_date_to_var()
-        end
-    end)
-    if not transfer_ok then
-        print("[virtual_dispatcher] transfer_date_to_var error: " .. tostring(transfer_err))
+    -- エラーは SHIORI.request の xpcall でキャッチされる
+    if act.transfer_date_to_var then
+        act:transfer_date_to_var()
     end
 
     -- シーン実行（actを渡す）
@@ -221,5 +206,4 @@ function M._set_scene_executor(executor)
     scene_executor = executor
 end
 
--- 7. 末尾で返却
 return M

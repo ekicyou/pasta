@@ -431,8 +431,8 @@ describe("SHIORI_ACT - yield()", function()
             return "done"
         end
 
-        local err, result = co.safe_wrap(fn)()
-        expect(err):toBe(nil)
+        local tag, result = co.safe_wrap(fn)()
+        expect(tag):toBe("yield")
         -- First resume yields the script
         expect(result:find("\\p%[0%]")):toBeTruthy()
         expect(result:find("Hello")):toBeTruthy()
@@ -454,15 +454,15 @@ describe("SHIORI_ACT - yield()", function()
         end
 
         local wrapped = co.safe_wrap(fn)
-        local err1, result1 = wrapped()
-        local err2, result2 = wrapped()
-        local err3, result3 = wrapped()
+        local tag1, result1 = wrapped()
+        local tag2, result2 = wrapped()
+        local tag3, result3 = wrapped()
 
-        expect(err1):toBe(nil)
+        expect(tag1):toBe("yield")
         expect(result1:find("First")):toBeTruthy()
-        expect(err2):toBe(nil)
+        expect(tag2):toBe("yield")
         expect(result2:find("Second")):toBeTruthy()
-        expect(err3):toBe(nil)
+        expect(tag3):toBe("return")
         expect(result3):toBe("done")
     end)
 
@@ -482,9 +482,11 @@ describe("SHIORI_ACT - yield()", function()
         end
 
         local wrapped = co.safe_wrap(fn)
-        local _, result1 = wrapped()
-        local _, result2 = wrapped()
+        local tag1, result1 = wrapped()
+        local tag2, result2 = wrapped()
 
+        expect(tag1):toBe("yield")
+        expect(tag2):toBe("yield")
         -- Second result should not contain "First"
         expect(result2:find("First")):toBeFalsy()
         expect(result2:find("Second")):toBeTruthy()
@@ -507,12 +509,98 @@ describe("SHIORI_ACT - yield()", function()
         end
 
         local wrapped = co.safe_wrap(fn)
-        local err1, result1 = wrapped()
-        local err2, result2 = wrapped()
+        local tag1, result1 = wrapped()
+        local tag2, result2 = wrapped()
 
-        expect(err1):toBe(nil)
-        expect(err2):toBe(nil)
+        expect(tag1):toBe("yield")
+        expect(tag2):toBe("yield")
         expect(result2:find("World")):toBeTruthy()
+    end)
+end)
+
+-- Test CO.safe_wrap error handling
+describe("CO.safe_wrap - error handling", function()
+    test("returns nil and error message on error", function()
+        local co = require("pasta.co")
+
+        local fn = function()
+            error("intentional error")
+        end
+
+        local tag, err = co.safe_wrap(fn)()
+        expect(tag):toBe(nil)
+        expect(err:find("intentional error")):toBeTruthy()
+    end)
+
+    test("returns nil, 'dead' when resuming dead coroutine", function()
+        local co = require("pasta.co")
+
+        local fn = function()
+            return "done"
+        end
+
+        local wrapped = co.safe_wrap(fn)
+        local tag1, result1 = wrapped()
+        local tag2, result2 = wrapped()
+
+        expect(tag1):toBe("return")
+        expect(result1):toBe("done")
+        expect(tag2):toBe(nil)
+        expect(result2):toBe("dead")
+    end)
+
+    test("returns only tag when yield has no arguments", function()
+        local co = require("pasta.co")
+
+        local fn = function()
+            coroutine.yield()
+            return "done"
+        end
+
+        local wrapped = co.safe_wrap(fn)
+        local tag1, arg1 = wrapped()
+        local tag2, arg2 = wrapped()
+
+        expect(tag1):toBe("yield")
+        expect(arg1):toBe(nil)
+        expect(tag2):toBe("return")
+        expect(arg2):toBe("done")
+    end)
+
+    test("returns only tag when return has no value", function()
+        local co = require("pasta.co")
+
+        local fn = function()
+            return
+        end
+
+        local wrapped = co.safe_wrap(fn)
+        local tag, result = wrapped()
+
+        expect(tag):toBe("return")
+        expect(result):toBe(nil)
+    end)
+
+    test("preserves multiple return values", function()
+        local co = require("pasta.co")
+
+        local fn = function()
+            coroutine.yield("a", "b", "c")
+            return 1, 2, 3
+        end
+
+        local wrapped = co.safe_wrap(fn)
+        local tag1, a, b, c = wrapped()
+        local tag2, x, y, z = wrapped()
+
+        expect(tag1):toBe("yield")
+        expect(a):toBe("a")
+        expect(b):toBe("b")
+        expect(c):toBe("c")
+        expect(tag2):toBe("return")
+        expect(x):toBe(1)
+        expect(y):toBe(2)
+        expect(z):toBe(3)
     end)
 end)
 

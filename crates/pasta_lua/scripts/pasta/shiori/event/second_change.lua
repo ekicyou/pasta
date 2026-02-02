@@ -15,8 +15,6 @@ REG.OnSecondChange = function(act)
     local result = dispatcher.dispatch(act)
 
     if result then
-        -- alpha01: シーン実行成功でも 204 を返す
-        -- alpha03: さくらスクリプト変換・200 OK を返す
         return RES.no_content()
     end
 

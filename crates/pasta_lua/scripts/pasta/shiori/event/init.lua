@@ -4,7 +4,7 @@
 --- SHIORI リクエストのイベント ID に応じてハンドラを呼び分ける。
 --- 未登録イベントはデフォルトハンドラ（no_entry）で処理する。
 --- no_entry ではシーン関数フォールバックを試み、見つからなければ 204 を返す。
---- エラー発生時は xpcall/pcall でキャッチし、エラーレスポンスに変換する。
+--- エラーは呼び出し元（SHIORI.request）の xpcall でキャッチされる。
 ---
 --- ハンドラシグネチャ:
 ---   function(act: ShioriAct) -> string
@@ -90,20 +90,11 @@ function EVENT.no_entry(act)
     local scene_result = SCENE.search(act.req.id, nil, nil)
 
     if scene_result then
-        -- シーン関数が見つかった場合、pcall で実行
+        -- シーン関数が見つかった場合、直接実行
+        -- エラーは SHIORI.request の xpcall でキャッチされる
         -- alpha01: 戻り値は無視、204 No Content を返す
         -- alpha03: act オブジェクト生成、さくらスクリプト変換を統合予定
-        local ok, err = pcall(function()
-            return scene_result()
-        end)
-        if not ok then
-            -- シーン関数実行時のエラーは 500 で返す
-            local err_msg = err
-            if type(err) == "string" then
-                err_msg = err:match("^[^\n]+") or err
-            end
-            return RES.err(err_msg)
-        end
+        scene_result()
     end
 
     return RES.no_content()
@@ -118,23 +109,9 @@ function EVENT.fire(req)
 
     local handler = REG[req.id] or EVENT.no_entry
 
-    local ok, result = xpcall(function()
-        return handler(act)
-    end, function(err)
-        -- エラーメッセージの最初の行のみを抽出（改行除去）
-        -- debug.traceback は ALL_SAFE では使用不可のため、エラーメッセージのみ使用
-        if type(err) == "string" then
-            return err:match("^[^\n]+")
-        else
-            return nil
-        end
-    end)
-
-    if ok then
-        return result
-    else
-        return RES.err(result) -- nil は RES.err 内で "Unknown error" にフォールバック
-    end
+    -- ハンドラを直接呼び出し
+    -- エラーは SHIORI.request の xpcall でキャッチされる
+    return handler(act)
 end
 
 -- 5. 末尾で返却
