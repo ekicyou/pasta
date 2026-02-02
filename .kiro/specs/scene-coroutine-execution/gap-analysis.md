@@ -1,55 +1,128 @@
-# Gap Analysis: scene-coroutine-execution
+# ギャップ分析: scene-coroutine-execution
 
-## 1. Current State Investigation
+**分析日**: 2026-02-02
+**ステータス**: 再分析完了（要件更新後）
 
-### 1.1 Domain-Related Assets
+## 1. 分析サマリー
 
-| アセット | パス | 状態 | 備考 |
-|----------|------|------|------|
-| COモジュール | `scripts/pasta/co.lua` | ✅ 存在 | `CO.safe_wrap()` 既に実装済み |
-| STOREモジュール | `scripts/pasta/store.lua` | ✅ 存在 | `co_handler` フィールド未定義 |
-| EVENTモジュール | `scripts/pasta/shiori/event/init.lua` | ✅ 存在 | コルーチン対応なし |
-| ShioriActクラス | `scripts/pasta/shiori/act.lua` | ✅ 存在 | `act:yield()` 既に実装済み |
-| VirtualDispatcher | `scripts/pasta/shiori/event/virtual_dispatcher.lua` | ✅ 存在 | シーン直接実行中 |
-| RESモジュール | `scripts/pasta/shiori/res.lua` | ✅ 存在 | `RES.ok()`, `RES.no_content()` 利用可能 |
-| SCENEモジュール | `scripts/pasta/scene.lua` | ✅ 存在 | `SCENE.search()` 関数あり |
-| second_change.lua | `scripts/pasta/shiori/event/second_change.lua` | ✅ 存在 | dispatcher結果の処理要改修 |
+### 主要発見事項
 
-### 1.2 Existing Implementations (Key Discovery)
+1. **act:yield()は既に実装済み** - SHIORI_ACT_IMPL.yield()がcoroutine.yield()を呼び出す実装が存在
+2. **STOREにco_threadフィールドなし** - 追加が必要
+3. **EVENT.fireはhandlerを直接呼び出しているのみ** - thread判定・resume処理の追加が必要
+4. **virtual_dispatcherはシーンを直接実行している** - threadを返す形式に変更が必要
+5. **EVENT.no_entryもシーンを直接実行している** - threadを返す形式に変更が必要
+6. **CO.safe_wrap()は使用しない** - coroutine.create()直接管理でcoroutine.close()を保証
 
-#### CO.safe_wrap() - 既存実装（完全適合）
+### 実装複雑度
 
+- **Effort**: M（3〜7日）- 既存パターンの拡張だが、複数モジュールにまたがる変更
+- **Risk**: Medium - コルーチン管理は新パターンだが、Luaの標準APIを使用
+
+---
+
+## 2. 要件-アセットマップ
+
+| 要件 | 関連アセット | ギャップ |
+|------|-------------|---------|
+| R1: コルーチン直接管理 | (新規パターン) | **New** - coroutine.create/resume/close使用パターンを導入 |
+| R2: EVENT.fire拡張 | `pasta/shiori/event/init.lua` | **Missing** - thread判定、resume、状態保存ロジック |
+| R3: ハンドラ戻り値 | virtual_dispatcher, EVENT.no_entry | **Change** - 実行からthread返却に変更 |
+| R4: virtual_dispatcher改良 | `pasta/shiori/event/virtual_dispatcher.lua` | **Change** - execute_scene()をthread生成に変更 |
+| R5: チェイントーク継続 | check_talk | **Missing** - STORE.co_thread確認ロジック |
+| R6: act:yield() | `pasta/shiori/act.lua` L184-188 | **Exists** - ✅ 既存実装で対応可 |
+| R7: STOREモジュール | `pasta/store.lua` | **Missing** - co_threadフィールド、reset()のclose処理 |
+| R8: テスト | (新規) | **New** - 統合テスト作成が必要 |
+
+---
+
+## 3. 既存コード分析
+
+### 3.1 EVENT.fire (init.lua L102-112)
+
+**現状**:
 ```lua
--- scripts/pasta/co.lua より
-function CO.safe_wrap(func)
-    local co = coroutine.create(func)
-    return function(...)
-        if coroutine.status(co) == "dead" then
-            return nil, "dead"
-        end
-        local results = { coroutine.resume(co, ...) }
-        local ok = results[1]
-        if not ok then
-            return nil, results[2]  -- エラー
-        else
-            local status = coroutine.status(co)
-            table.remove(results, 1)
-            if status == "suspended" then
-                return "yield", table.unpack(results)
-            else
-                return "return", table.unpack(results)
-            end
-        end
-    end
+function EVENT.fire(req)
+    local act = create_act(req)
+    local handler = REG[req.id] or EVENT.no_entry
+    return handler(act)  -- ← 直接呼び出し、戻り値をそのまま返す
 end
 ```
 
-**分析**: 要件1の `CO.safe_wrap()` は**既に完全実装済み**。戻り値は `(status, value)` 形式で、要件と完全一致。
+**変更必要箇所**:
+- handler(act)の戻り値がthreadかstring/nilか判定
+- threadの場合: coroutine.resume(result, act)を実行
+- resume後のstatus確認（suspended→STORE.co_thread保存、dead→クリア）
+- エラー処理: coroutine.close()でリソース解放
 
-#### act:yield() - 既存実装
+### 3.2 EVENT.no_entry (init.lua L82-98)
 
+**現状**:
 ```lua
--- scripts/pasta/shiori/act.lua:186 より
+function EVENT.no_entry(act)
+    local SCENE = require("pasta.scene")
+    local scene_result = SCENE.search(act.req.id, nil, nil)
+    if scene_result then
+        scene_result()  -- ← 直接実行
+    end
+    return RES.no_content()
+end
+```
+
+**変更必要箇所**:
+- scene_resultが見つかった場合: coroutine.create(scene_result)でthreadを返す
+- 見つからない場合: nilを返す（EVENT.fireがno_content処理）
+
+### 3.3 virtual_dispatcher execute_scene (L73-82)
+
+**現状**:
+```lua
+local function execute_scene(event_name, act)
+    if scene_executor then
+        return scene_executor(event_name, act)
+    end
+    local SCENE = require("pasta.scene")
+    local scene_fn = SCENE.search(event_name, nil, nil)
+    if not scene_fn then return nil end
+    return scene_fn(act)  -- ← 直接実行
+end
+```
+
+**変更必要箇所**:
+- 関数名を`create_scene_thread`などに変更検討
+- scene_fnが見つかった場合: coroutine.create()でthreadを返す
+
+### 3.4 check_talk (L126-159)
+
+**現状**:
+```lua
+function M.check_talk(act)
+    -- 時刻判定ロジック...
+    local result = execute_scene("OnTalk", act)
+    next_talk_time = calculate_next_talk_time(current_unix)
+    return result and "fired" or nil
+end
+```
+
+**変更必要箇所**（R5: チェイントーク継続）:
+- 最初にSTORE.co_threadを確認
+- co_threadがsuspendedなら、そのthreadを返す（新規シーン検索スキップ）
+- co_threadがnilなら、新規シーン検索してthread生成
+
+### 3.5 STORE (store.lua)
+
+**現状**:
+- co_threadフィールドなし
+- reset()にclose処理なし
+
+**変更必要箇所**:
+- `STORE.co_thread = nil` フィールド追加
+- reset()内でSTORE.co_threadがsuspendedならcoroutine.close()してからnil
+
+### 3.6 act:yield() (shiori/act.lua L184-188)
+
+**現状**:
+```lua
 function SHIORI_ACT_IMPL.yield(self)
     local script = self:build()
     coroutine.yield(script)
@@ -57,167 +130,118 @@ function SHIORI_ACT_IMPL.yield(self)
 end
 ```
 
-**分析**: 要件6の `act:yield()` は**既に実装済み**。`build()` を呼び出してからyieldし、リセット済みselfを返す。
-
-### 1.3 Conventions & Patterns
-
-| 項目 | 規約 |
-|------|------|
-| モジュールテーブル命名 | UPPER_CASE（例: `EVENT`, `STORE`, `RES`） |
-| 循環参照回避 | STOREは他モジュールをrequireしない |
-| テストパターン | lua_testフレームワーク使用、BDDスタイル |
-| エラーハンドリング | 上位のxpcallでキャッチ |
-
-### 1.4 Integration Surfaces
-
-- **EVENT.fire** ← **REG[req.id]** ハンドラテーブル
-- **second_change.lua** → **dispatcher.dispatch(act)**
-- **dispatcher** → **SCENE.search()** → **scene_fn(act)**
+**ステータス**: ✅ **既存実装で対応可能**
+- build()でさくらスクリプトを生成
+- coroutine.yield()でスクリプト文字列をyield
+- 再開後にself（リセット済み）を返す
 
 ---
 
-## 2. Requirements Feasibility Analysis
+## 4. 実装アプローチ評価
 
-### 2.1 Technical Needs from Requirements
+### Option A: 既存コンポーネント拡張（推奨）
 
-| 要件 | 技術的必要性 | 既存資産 | ギャップ |
-|------|-------------|----------|---------|
-| Req1: COモジュール | `CO.safe_wrap()` | ✅ 完全実装済み | なし |
-| Req2: EVENT.fire改良 | コルーチン処理ロジック | ❌ 未対応 | **新規実装必要** |
-| Req3: ハンドラ変換 | `CO.safe_wrap()` でラップ | ❌ 未対応 | **改修必要** |
-| Req4: dispatch()改良 | co_handler返却 | ❌ 直接実行中 | **改修必要** |
-| Req5: チェイントーク | `STORE.co_handler` 管理 | ❌ フィールドなし | **追加必要** |
-| Req6: act:yield() | `coroutine.yield()` 呼び出し | ✅ 実装済み | なし |
-| Req7: STORE拡張 | `co_handler` フィールド | ❌ 未定義 | **追加必要** |
-| Req8: E2Eテスト | テストケース | ❌ 未作成 | **新規作成必要** |
-
-### 2.2 Gap Summary
-
-| ステータス | 項目数 | 詳細 |
-|-----------|--------|------|
-| ✅ 既存で充足 | 2 | CO.safe_wrap(), act:yield() |
-| 🔧 改修必要 | 4 | EVENT.fire, dispatch(), check_hour, check_talk |
-| ➕ 新規追加 | 2 | STORE.co_handler, E2Eテスト |
-
-### 2.3 Complexity Signals
-
-- **アルゴリズムロジック**: コルーチン状態管理（中程度）
-- **インテグレーション**: EVENT → dispatcher → SCENE チェーン改修（中程度）
-- **テスト**: 既存BDDフレームワーク活用可能（低）
-
----
-
-## 3. Implementation Approach Options
-
-### Option A: Extend Existing Components (推奨)
-
-**概要**: 既存ファイルを最小限改修し、コルーチン対応を追加
-
-**変更対象ファイル**:
-
-| ファイル | 変更内容 | 影響度 |
-|----------|----------|--------|
-| `store.lua` | `STORE.co_handler = nil` 追加、`reset()` 修正 | 低 |
-| `event/init.lua` | `EVENT.fire` のコルーチン処理ロジック追加 | 中 |
-| `virtual_dispatcher.lua` | `execute_scene` → co_handler返却、check_talk改修 | 中 |
-| `second_change.lua` | dispatcher結果処理の改修 | 低 |
+**変更対象**:
+1. `pasta/shiori/event/init.lua` - EVENT.fire, EVENT.no_entry
+2. `pasta/shiori/event/virtual_dispatcher.lua` - execute_scene → create_scene_thread
+3. `pasta/store.lua` - co_threadフィールド、reset()
 
 **Trade-offs**:
-- ✅ 既存パターンを維持、学習コスト低
-- ✅ ファイル増加なし
-- ✅ 既存テストとの互換性維持しやすい
-- ❌ EVENT.fireの責務が増加（コルーチン管理）
+- ✅ 最小限の新規ファイル
+- ✅ 既存アーキテクチャを維持
+- ✅ 後方互換性をEVENT.fireで一元管理
+- ❌ 複数ファイルにまたがる変更
 
-### Option B: Create New Components
+**推奨度**: ⭐⭐⭐⭐⭐
 
-**概要**: コルーチン管理専用モジュールを新規作成
+### Option B: 新規コルーチンマネージャ作成
 
-**新規ファイル**:
-- `scripts/pasta/shiori/coroutine_manager.lua` - コルーチン状態管理
+**新規作成**:
+- `pasta/shiori/coroutine_manager.lua` - コルーチン管理専用モジュール
 
 **Trade-offs**:
-- ✅ 責務分離が明確
-- ✅ テスト容易性向上
-- ❌ ファイル増加
-- ❌ 既存フローとの統合ポイント増加
-- ❌ 循環参照リスク（STOREとの関係）
+- ✅ コルーチン管理ロジックを一箇所に集約
+- ❌ 過剰な抽象化（現段階では不要）
+- ❌ 既存コードとの統合ポイントが増える
 
-### Option C: Hybrid Approach
-
-**概要**: 状態管理はSTORE拡張、処理ロジックは既存ファイル改修
-
-**方針**:
-1. `STORE.co_handler` を追加（状態管理はSTORE一元化）
-2. `EVENT.fire` にコルーチン処理ロジック追加
-3. `virtual_dispatcher` はハンドラ返却に改修
-4. `second_change` はEVENT.fireに処理委譲
-
-これは実質 **Option A** と同等だが、STORE一元化を明示的に設計原則とする。
+**推奨度**: ⭐⭐
 
 ---
 
-## 4. Implementation Complexity & Risk
+## 5. 実装順序（推奨）
 
-### Effort Estimate: **M (3-7 days)**
-
-**根拠**:
-- 既存モジュール（CO, act:yield）が再利用可能
-- 改修対象は4-5ファイル、各ファイル中程度の変更
-- テスト作成に1-2日
-
-### Risk Level: **Medium**
-
-**根拠**:
-- **既知技術**: Lua coroutineは既にCOモジュールで使用実績あり
-- **統合複雑性**: EVENT → dispatcher → SCENE のチェーンを改修
-- **リグレッションリスク**: 既存イベント処理への影響（テストでカバー可能）
-
-**リスク軽減策**:
-- 既存テスト（virtual_dispatcher_spec.lua）の拡張
-- 段階的実装（STORE → dispatcher → EVENT.fire）
+1. **STORE拡張** - co_threadフィールド追加、reset()にclose処理
+2. **EVENT.fire拡張** - thread判定、resume、状態保存
+3. **EVENT.no_entry変更** - thread返却
+4. **virtual_dispatcher変更** - thread返却、check_talkにチェイントーク継続
+5. **統合テスト** - E2Eテスト作成
 
 ---
 
-## 5. Recommendations for Design Phase
+## 6. 潜在的課題（設計フェーズで検討）
 
-### Preferred Approach: **Option A（Extend Existing Components）**
+### 6.1 actオブジェクトのスコープ
 
-**理由**:
-1. CO.safe_wrap() / act:yield() が既に完全実装済み（50%のコード資産活用）
-2. 既存のモジュール構造・循環参照回避パターンを維持
-3. 変更範囲が明確で、リグレッションテストが容易
+**課題**: check_talkでSTORE.co_threadを返す場合、前回のactと今回のactが異なる可能性
 
-### Key Design Decisions
+**要検討**: 
+- コルーチン再開時に新しいactをresume引数として渡す設計が必要
+- シーン関数側でact = coroutine.yield(script)のパターンで更新されたactを受け取る
 
-1. **EVENT.fire の責務拡張**: コルーチン状態管理をEVENT.fireに集約
-2. **dispatcher の役割変更**: シーン実行 → ハンドラ取得・返却
-3. **second_change の簡素化**: dispatcher結果をそのままEVENT.fireに渡す
+**現状のact:yield()実装**:
+```lua
+function SHIORI_ACT_IMPL.yield(self)
+    local script = self:build()
+    coroutine.yield(script)  -- ← 戻り値を無視している
+    return self  -- ← 古いselfを返す
+end
+```
 
-### Research Items to Carry Forward
+**潜在的問題**: 再開時にactが更新されない可能性あり → 設計フェーズで検討
 
-| 項目 | 詳細 | 優先度 |
-|------|------|--------|
-| OnHour継続可否 | OnHourもチェイントーク対象か？ | 中（設計時確認） |
-| エラー時のco_handler処理 | エラー発生時にco_handlerをクリアするか？ | 高 |
-| REGハンドラのco_handler対応 | REG[req.id]ハンドラもco_handler化するか？ | 高（設計時決定） |
+### 6.2 check_hour/check_talkの戻り値統一
+
+**現状**: 
+- check_hour: `"fired"` or `nil`
+- check_talk: `"fired"` or `nil`
+
+**変更後**: 両方ともthread or nilを返す
+
+**影響**: dispatch()の戻り値処理も変更が必要
+
+### 6.3 シーン実行と時刻更新のタイミング
+
+**現状**: check_talkは実行後にnext_talk_timeを更新
+
+**変更後**: threadを返すだけなので、時刻更新タイミングを検討
+- 選択肢A: thread返却時に更新（現状踏襲）
+- 選択肢B: resume完了後に更新（EVENT.fire側で制御）
 
 ---
 
-## 6. Appendix: File Modification Map
+## 7. ファイル変更マップ
 
 ```
 scripts/pasta/
-├── co.lua                          # ✅ 変更不要（既存実装で充足）
-├── store.lua                       # 🔧 co_handler フィールド追加
+├── co.lua                          # ⚠️ 使用しない（coroutine.create直接管理）
+├── store.lua                       # 🔧 co_thread フィールド追加、reset()改修
 └── shiori/
     ├── act.lua                     # ✅ 変更不要（yield()実装済み）
     ├── res.lua                     # ✅ 変更不要
     └── event/
-        ├── init.lua                # 🔧 EVENT.fire コルーチン対応
+        ├── init.lua                # 🔧 EVENT.fire, EVENT.no_entry 改修
         ├── register.lua            # ✅ 変更不要
-        ├── second_change.lua       # 🔧 dispatcher結果処理改修
-        └── virtual_dispatcher.lua  # 🔧 co_handler返却、check_talk改修
+        ├── second_change.lua       # 🔧 dispatcher結果処理改修（必要に応じて）
+        └── virtual_dispatcher.lua  # 🔧 thread返却、check_talk改修
 
 tests/lua_specs/
 └── coroutine_chain_spec.lua        # ➕ 新規作成（E2Eテスト）
 ```
+
+---
+
+## 8. 次のステップ
+
+1. 上記の潜在的課題について開発者と議論
+2. `/kiro-spec-design scene-coroutine-execution` で設計ドキュメント生成
+3. 設計レビュー後に実装開始
