@@ -182,86 +182,37 @@ sequenceDiagram
 
 ### OnSecondChange統合フロー
 
-**統合ポイント**: `OnSecondChange`ハンドラは`virtual_dispatcher.dispatch()`からthreadを受け取り、EVENT.fireのthread処理ロジックに渡す。
+**統合原則**: 
+- **threadの作成**: EVENT.fire呼び出し先の責務（dispatcher.dispatch等）
+- **threadの消費**: EVENT.fireの責務（resume、状態管理）
 
-**統合パターン（2つのアプローチ）**:
-
-#### アプローチA: OnSecondChange内で直接resume（シンプル、低結合）
+**実装パターン**:
 
 ```lua
+--- OnSecondChange デフォルトハンドラ
+--- virtual_dispatcherにthread生成を委譲し、結果をそのまま返す
+--- @param act ShioriAct actオブジェクト
+--- @return thread|nil コルーチンまたはnil
 REG.OnSecondChange = function(act)
-    local thread = dispatcher.dispatch(act)
-    
-    if thread then
-        -- 直接resume実行
-        local ok, yielded_value = coroutine.resume(thread, act)
-        if not ok then
-            coroutine.close(thread)
-            error(yielded_value)
-        end
-        
-        -- 状態保存（EVENT.fireのロジックと同様）
-        local function set_co_scene(co)
-            if co and coroutine.status(co) ~= "suspended" then
-                coroutine.close(co)
-                co = nil
-            end
-            if STORE.co_scene == co then return end
-            if STORE.co_scene then coroutine.close(STORE.co_scene) end
-            STORE.co_scene = co
-        end
-        
-        set_co_scene(thread)
-        return RES.ok(yielded_value)
-    end
-    
-    return RES.no_content()
+    -- dispatcher.dispatch()がthread生成を担当
+    -- 戻り値（threadまたはnil）をそのまま返す
+    -- EVENT.fireがthread消費（resume、状態管理）を担当
+    return dispatcher.dispatch(act)
 end
 ```
 
-#### アプローチB: EVENT.fire共通ロジック再利用（統一性、再利用性）
+**フロー**:
+1. SHIORI.request → EVENT.fire(req)
+2. EVENT.fire → REG.OnSecondChange(act) [ハンドラ呼び出し]
+3. REG.OnSecondChange → dispatcher.dispatch(act) [thread生成委譲]
+4. dispatcher.dispatch → thread生成 & 返却
+5. REG.OnSecondChange → threadをそのまま返却
+6. EVENT.fire → threadを消費（resume、set_co_scene）
 
-```lua
--- EVENT.fire内に共通ヘルパーを追加
-local function handle_thread_result(thread, act)
-    local ok, yielded_value = coroutine.resume(thread, act)
-    if not ok then
-        set_co_scene(thread)
-        error(yielded_value)
-    end
-    set_co_scene(thread)
-    return RES.ok(yielded_value)
-end
-
--- EVENT.fire本体
-function EVENT.fire(req)
-    local act = create_act(req)
-    local handler = REG[req.id] or EVENT.no_entry
-    local result = handler(act)
-    
-    if type(result) == "thread" then
-        return handle_thread_result(result, act)  -- 共通処理
-    elseif type(result) == "string" then
-        return RES.ok(result)
-    else
-        return RES.no_content()
-    end
-end
-
--- OnSecondChangeから呼び出し
-REG.OnSecondChange = function(act)
-    local thread = dispatcher.dispatch(act)
-    
-    if thread then
-        -- EVENT.fireの共通ロジックを再利用
-        return handle_thread_result(thread, act)
-    end
-    
-    return RES.no_content()
-end
-```
-
-**アーキテクチャ判断**: アプローチの選択は実装フェーズで決定（議題1参照）
+**責務分離**:
+- OnSecondChange: 橋渡し役（thread生成を委譲、結果を返す）
+- virtual_dispatcher: thread生成（仮想イベント判定 & シーン検索 & coroutine.create）
+- EVENT.fire: thread消費（resume、エラー処理、状態管理）
 
 ---
 
