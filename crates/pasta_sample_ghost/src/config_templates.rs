@@ -1,10 +1,17 @@
 //! 設定ファイルテンプレート生成
 //!
 //! ukadoc 準拠の設定ファイルと pasta.toml を生成します。
+//! テンプレートファイルは `templates/` ディレクトリから読み込まれます。
 
 use crate::{GhostConfig, GhostError};
 use std::fs;
 use std::path::Path;
+
+// テンプレートファイルをコンパイル時にインクルード
+const INSTALL_TXT_TEMPLATE: &str = include_str!("../templates/install.txt.template");
+const GHOST_DESCRIPT_TEMPLATE: &str = include_str!("../templates/ghost_descript.txt.template");
+const SHELL_DESCRIPT_TEMPLATE: &str = include_str!("../templates/shell_descript.txt.template");
+const PASTA_TOML_TEMPLATE: &str = include_str!("../templates/pasta.toml.template");
 
 /// ゴースト配布物のディレクトリ構造を生成
 pub fn generate_structure(output_dir: &Path, config: &GhostConfig) -> Result<(), GhostError> {
@@ -34,58 +41,28 @@ pub fn generate_structure(output_dir: &Path, config: &GhostConfig) -> Result<(),
 
 /// install.txt を生成
 pub fn generate_install_txt(config: &GhostConfig) -> String {
-    format!(
-        r#"type,ghost
-name,{name}
-directory,{name}
-accept,
-"#,
-        name = config.name
-    )
+    INSTALL_TXT_TEMPLATE.replace("{{name}}", &config.name)
 }
 
 /// ghost/master/descript.txt を生成
 pub fn generate_ghost_descript(config: &GhostConfig) -> String {
-    format!(
-        r#"charset,UTF-8
-type,ghost
-name,{name}
-sakura.name,{sakura_name}
-kero.name,{kero_name}
-craftman,{craftman}
-craftmanw,{craftman_w}
-shiori,{shiori}
-homeurl,{homeurl}
-"#,
-        name = config.name,
-        sakura_name = config.sakura_name,
-        kero_name = config.kero_name,
-        craftman = config.craftman,
-        craftman_w = config.craftman_w,
-        shiori = config.shiori,
-        homeurl = config.homeurl
-    )
+    GHOST_DESCRIPT_TEMPLATE
+        .replace("{{name}}", &config.name)
+        .replace("{{sakura_name}}", &config.sakura_name)
+        .replace("{{kero_name}}", &config.kero_name)
+        .replace("{{craftman}}", &config.craftman)
+        .replace("{{craftman_w}}", &config.craftman_w)
+        .replace("{{shiori}}", &config.shiori)
+        .replace("{{homeurl}}", &config.homeurl)
 }
 
 /// shell/master/descript.txt を生成
 ///
 /// 仕様準拠: requirements.md Requirement 9.3
 pub fn generate_shell_descript(config: &GhostConfig) -> String {
-    format!(
-        r#"charset,UTF-8
-type,shell
-name,master
-craftman,{craftman}
-craftmanw,{craftman_w}
-seriko.use_self_alpha,1
-sakura.balloon.offsetx,64
-sakura.balloon.offsety,0
-kero.balloon.offsetx,64
-kero.balloon.offsety,0
-"#,
-        craftman = config.craftman,
-        craftman_w = config.craftman_w
-    )
+    SHELL_DESCRIPT_TEMPLATE
+        .replace("{{craftman}}", &config.craftman)
+        .replace("{{craftman_w}}", &config.craftman_w)
 }
 
 /// surfaces.txt を生成
@@ -123,46 +100,9 @@ element0,overlay,surface{i}.png,0,0
 ///
 /// 仕様準拠: requirements.md Requirement 7.1-7.4
 pub fn generate_pasta_toml(config: &GhostConfig) -> String {
-    format!(
-        r#"# pasta.toml - pasta ゴースト設定ファイル
-#
-# このファイルは pasta システムの動作を設定します。
-# 必須項目は [package] と [loader] のみです。
-
-# [教育的サンプル]
-# [package] セクションは伺かゴーストでは省略可能です。
-# install.txt/readme.txt で同様の情報を管理できます。
-# 将来的な pasta_lua の汎用用途（ノベルゲーム、ツール等）では
-# このセクションが必須になる可能性があります。
-[package]
-name = "{name}"
-version = "{version}"
-edition = "2024"
-
-[loader]
-# pasta DSL ファイルパターン
-pasta_patterns = ["dic/*.pasta"]
-# Lua モジュール検索パス（優先順位順）
-lua_search_paths = [
-    "profile/pasta/save/lua",   # ユーザー保存スクリプト
-    "scripts",                   # pasta 標準ランタイム
-    "profile/pasta/cache/lua",   # トランスパイル済みキャッシュ
-    "scriptlibs",                # 追加ライブラリ
-]
-# トランスパイル出力先
-transpiled_output_dir = "profile/pasta/cache/lua"
-
-[ghost]
-# ランダムトーク発生間隔（秒）
-random_talk_interval = 180
-
-[persistence]
-# 永続化データディレクトリ
-data_dir = "profile/pasta/save"
-"#,
-        name = config.name,
-        version = config.version
-    )
+    PASTA_TOML_TEMPLATE
+        .replace("{{name}}", &config.name)
+        .replace("{{version}}", &config.version)
 }
 
 #[cfg(test)]
@@ -195,6 +135,12 @@ mod tests {
         assert!(content.contains("[package]"));
         assert!(content.contains("[loader]"));
         assert!(content.contains("[ghost]"));
+        assert!(content.contains("[logging]"));
+        assert!(content.contains("level = \"debug\""));
+        assert!(content.contains("# filter = \"debug\""));
+        assert!(content.contains("talk_interval_min = 180"));
+        assert!(content.contains("talk_interval_max = 300"));
+        assert!(content.contains("hour_margin"));
         assert!(content.contains("教育的サンプル"));
     }
 

@@ -11,6 +11,7 @@ fn main() {
     // ビルドスクリプト再実行トリガー
     println!("cargo::rerun-if-changed=build.rs");
     println!("cargo::rerun-if-changed=src/");
+    println!("cargo::rerun-if-changed=templates/");
 
     // pasta_shiori のソース変更を監視
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");

@@ -1,0 +1,10 @@
+charset,UTF-8
+type,shell
+name,master
+craftman,{{craftman}}
+craftmanw,{{craftman_w}}
+seriko.use_self_alpha,1
+sakura.balloon.offsetx,64
+sakura.balloon.offsety,0
+kero.balloon.offsetx,64
+kero.balloon.offsety,0

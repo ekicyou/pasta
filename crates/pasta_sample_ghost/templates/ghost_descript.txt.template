@@ -1,0 +1,9 @@
+charset,UTF-8
+type,ghost
+name,{{name}}
+sakura.name,{{sakura_name}}
+kero.name,{{kero_name}}
+craftman,{{craftman}}
+craftmanw,{{craftman_w}}
+shiori,{{shiori}}
+homeurl,{{homeurl}}
