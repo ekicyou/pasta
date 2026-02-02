@@ -21,7 +21,7 @@
 #### 受け入れ基準
 
 1. The システム shall シーン関数を `coroutine.create(fn)` でコルーチン（thread）として生成する
-2. When コルーチンを実行するとき, the システム shall `coroutine.resume(co, ...)` を使用する
+2. When コルーチンを実行するとき, the システム shall `coroutine.resume(co, act)` を使用する（EVENT.fireの文脈）
 3. When `coroutine.resume()` が `(false, error_message)` を返したとき, the システム shall エラーとして扱う
 4. When `coroutine.resume()` が `(true, ...)` を返し、`coroutine.status(co)` が "suspended" のとき, the システム shall yieldとして扱う
 5. When `coroutine.resume()` が `(true, ...)` を返し、`coroutine.status(co)` が "dead" のとき, the システム shall 正常終了として扱う
@@ -47,7 +47,7 @@ EVENT.fireのみがstring/nil互換を処理（既存コードベースとの後
 #### 受け入れ基準
 
 1. When EVENT.fireがhandlerを呼び出したとき, the EVENT module shall `local result = handler(act)` を実行する
-2. If resultがthread（コルーチン）の場合, the EVENT module shall `local ok, yielded_value = coroutine.resume(result)` を実行する（**actは渡さない** - DD4参照）
+2. If resultがthread（コルーチン）の場合, the EVENT module shall `local ok, yielded_value = coroutine.resume(result, act)` を実行する
 3. When `coroutine.resume()` が `(false, error_message)` を返したとき, the EVENT module shall コルーチンを `coroutine.close()` で解放し、`error(error_message)` を発生させる
 4. When `coroutine.resume()` 後に `coroutine.status(co)` が "suspended" のとき, the EVENT module shall `STORE.co_thread` にコルーチンを保存し、`RES.ok(yielded_value)` を返す（yieldされた値をレスポンスに使用）
 5. When `coroutine.resume()` 後に `coroutine.status(co)` が "dead" のとき, the EVENT module shall `STORE.co_thread` を nil にクリアし、適切なレスポンスを返す
@@ -67,8 +67,8 @@ EVENT.fireのみがstring/nil互換を処理（既存コードベースとの後
 
 #### 受け入れ基準
 
-1. When virtual_dispatcherがシーン関数を取得したとき, the dispatcher shall `coroutine.create(function() scene_fn(act) end)` でactをキャプチャしたコルーチンを生成し、**必ずthreadを返す**（DD4参照）
-2. When EVENT.no_entryがシーン関数を取得したとき, the EVENT module shall `coroutine.create(function() scene_fn(act) end)` でコルーチンを生成し、**threadを返す**（見つからない場合はnilを返してEVENT.fireがno_content処理）
+1. When virtual_dispatcherがシーン関数を取得したとき, the dispatcher shall `coroutine.create(scene_fn)` でコルーチンを生成し、**必ずthreadを返す**（actはresume時に渡す - DD4参照）
+2. When EVENT.no_entryがシーン関数を取得したとき, the EVENT module shall `coroutine.create(scene_fn)` でコルーチンを生成し、**threadを返す**（見つからない場合はnilを返してEVENT.fireがno_content処理）
 3. The コルーチン生成 shall シーン関数を返すハンドラ内で行われ、EVENT.fireにはthreadが渡される
 4. The 既存のREGハンドラ（stringを返す）shall 変更なしで動作し続ける（EVENT.fireレベルで後方互換性を保証）
 
@@ -184,30 +184,29 @@ EVENT.fireのみがstring/nil互換を処理（既存コードベースとの後
 
 ### DD4: actオブジェクトのスコープ管理 ✅ 決定
 
-**判断**: シーン開始時のactを継続利用（新規act不要）
+**判断**: シーン開始時のactを継続利用
 
 **設計原則**:
-- **シーン関数はコルーチン生成時のactをクロージャでキャプチャ**
-- **coroutine.resume()時に新しいactは渡さない**
-- **OnTalk時の新しいactは基本的に無視される**（チェイントーク継続中は撮影開始時のactで続きを実行）
+- **EVENT.fireはcoroutine.resume(co, act)でactを渡す**
+- **初回実行時**: 新しいactを渡してシーン関数を開始
+- **継続実行時（チェイントーク）**: 同じactを渡す（シーン関数内で最初のactを使い続ける）
 
 **実装パターン**:
 ```lua
--- コルーチン生成時にactをキャプチャ
-local co = coroutine.create(function()
-    scene_fn(act)  -- ← actはクロージャでキャプチャ
-end)
+-- コルーチン生成（シーン関数をそのまま使用）
+local co = coroutine.create(scene_fn)
 
--- resume時は引数なし、戻り値はyieldされた値
-local ok, script = coroutine.resume(co)
+-- resume時にactを渡す（初回・継続両方）
+local ok, script = coroutine.resume(co, act)
 if ok and coroutine.status(co) == "suspended" then
     return RES.ok(script)  -- ← yieldされたscriptを使う
 end
 ```
 
 **影響**: 
-- Requirement 2: resume時の引数仕様（引数なし）、戻り値処理（yieldされた値を使う）
-- Requirement 3: coroutine.create()のラッパー関数パターン
+- Requirement 1.2: `coroutine.resume(co, act)` でactを渡す
+- Requirement 2.2: `coroutine.resume(result, act)` でactを渡す
+- Requirement 3: `coroutine.create(scene_fn)` でシーン関数を直接使用
 - act:yield()はcoroutine.yield(script)でscriptをyield、EVENT.fireがそれを受け取る
 
 ### DD5: yieldされた値がnil/空文字列の場合の処理 ✅ 決定
