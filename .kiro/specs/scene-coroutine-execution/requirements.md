@@ -47,7 +47,7 @@ EVENT.fireのみがstring/nil互換を処理（既存コードベースとの後
 #### 受け入れ基準
 
 1. When EVENT.fireがhandlerを呼び出したとき, the EVENT module shall `local result = handler(act)` を実行する
-2. If resultがthread（コルーチン）の場合, the EVENT module shall `coroutine.resume(result, act)` を実行する
+2. If resultがthread（コルーチン）の場合, the EVENT module shall `coroutine.resume(result)` を実行する（**actは渡さない** - DD4参照）
 3. When `coroutine.resume()` が `(false, error_message)` を返したとき, the EVENT module shall コルーチンを `coroutine.close()` で解放し、`error(error_message)` を発生させる
 4. When `coroutine.resume()` 後に `coroutine.status(co)` が "suspended" のとき, the EVENT module shall `STORE.co_thread` にコルーチンを保存する
 5. When `coroutine.resume()` 後に `coroutine.status(co)` が "dead" のとき, the EVENT module shall `STORE.co_thread` を nil にクリアする
@@ -67,8 +67,8 @@ EVENT.fireのみがstring/nil互換を処理（既存コードベースとの後
 
 #### 受け入れ基準
 
-1. When virtual_dispatcherがシーン関数を取得したとき, the dispatcher shall `coroutine.create(scene_fn)` でコルーチンを生成し、**必ずthreadを返す**
-2. When EVENT.no_entryがシーン関数を取得したとき, the EVENT module shall `coroutine.create(scene_fn)` でコルーチンを生成し、**threadを返す**（見つからない場合はnilを返してEVENT.fireがno_content処理）
+1. When virtual_dispatcherがシーン関数を取得したとき, the dispatcher shall `coroutine.create(function() scene_fn(act) end)` でactをキャプチャしたコルーチンを生成し、**必ずthreadを返す**（DD4参照）
+2. When EVENT.no_entryがシーン関数を取得したとき, the EVENT module shall `coroutine.create(function() scene_fn(act) end)` でコルーチンを生成し、**threadを返す**（見つからない場合はnilを返してEVENT.fireがno_content処理）
 3. The コルーチン生成 shall シーン関数を返すハンドラ内で行われ、EVENT.fireにはthreadが渡される
 4. The 既存のREGハンドラ（stringを返す）shall 変更なしで動作し続ける（EVENT.fireレベルで後方互換性を保証）
 
@@ -171,3 +171,28 @@ EVENT.fireのみがstring/nil互換を処理（既存コードベースとの後
 - 次回OnTalkは新しいシーンから開始
 
 **影響**: Requirement 2.3に反映済み
+
+### DD4: actオブジェクトのスコープ管理 ✅ 決定
+
+**判断**: シーン開始時のactを継続利用（新規act不要）
+
+**設計原則**:
+- **シーン関数はコルーチン生成時のactをクロージャでキャプチャ**
+- **coroutine.resume()時に新しいactは渡さない**
+- **OnTalk時の新しいactは基本的に無視される**（チェイントーク継続中は撮影開始時のactで続きを実行）
+
+**実装パターン**:
+```lua
+-- コルーチン生成時にactをキャプチャ
+local co = coroutine.create(function()
+    scene_fn(act)  -- ← actはクロージャでキャプチャ
+end)
+
+-- resume時は引数なし
+coroutine.resume(co)  -- 新しいactは渡さない
+```
+
+**影響**: 
+- Requirement 2: resume時の引数仕様
+- Requirement 3: coroutine.create()のラッパー関数パターン
+- act:yield()の戻り値無視は正しい実装
