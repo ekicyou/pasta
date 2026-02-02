@@ -73,6 +73,10 @@ GlobalLoggerRegistryのログ出力
 2. When SHIORIリクエストが200 OKレスポンスを返す, the pasta_shiori shall レスポンス文字列をDEBUGレベルでログ出力
 3. The ログ出力 shall リクエスト/レスポンス文字列の長さ制限を設けない（フル出力）
 
+#### Design Rationale
+
+DEBUGレベルを採用することで、通常運用時（INFOレベル）ではログ出力を抑制し、デバッグ時のみフル詳細を確認できる。これによりログファイル肥大化を防ぎつつ、必要時には完全な情報が得られる。
+
 ### Requirement 5: pasta.toml設定スキーマ
 
 **Objective:** As a ゴースト開発者, I want `[logging]`セクションの設定が明確に文書化されている, so that 設定方法を容易に理解できる
