@@ -152,6 +152,7 @@ sequenceDiagram
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies | Contracts |
 |-----------|--------------|--------|--------------|------------------|-----------|
 | LoggingConfig | pasta_lua/loader | pasta.toml [logging]設定 | 1, 5, 8 | serde (P0) | State |
+| PastaLuaRuntime::config (新規) | pasta_lua/runtime | PastaConfigへのアクセサ | - | - | Service |
 | init_tracing_with_config | pasta_shiori/shiori | tracing subscriber初期化 | 2, 6 | tracing-subscriber (P0), LoggingConfig (P0) | Service |
 | PastaShiori::load (変更) | pasta_shiori/shiori | subscriber初期化後のログ出力 | 7 | - | - |
 | call_lua_request (変更) | pasta_shiori/shiori | 200 OKログ追加 | 4 | - | Service |
@@ -223,9 +224,61 @@ fn default_log_level() -> String {
 }
 ```
 
+##### Default Implementation
+
+```rust
+impl Default for LoggingConfig {
+    fn default() -> Self {
+        Self {
+            file_path: default_log_file_path(),
+            rotation_days: default_rotation_days(),
+            level: default_log_level(),
+            filter: None,
+        }
+    }
+}
+```
+
 - **State model**: イミュータブル設定値
 - **Persistence**: pasta.tomlからの読み込み
 - **Concurrency**: 読み取り専用、スレッドセーフ
+
+### pasta_lua/runtime
+
+#### PastaLuaRuntime::config
+
+| Field | Detail |
+|-------|--------|
+| Intent | PastaLuaRuntimeが保持するPastaConfigへの参照を提供 |
+| Requirements | - (インフラ機能) |
+
+**Responsibilities & Constraints**
+- `PastaLoader::load()`によって初期化されたPastaConfigへの不変参照を返す
+- Configが設定されていない場合は`None`を返す
+
+**Dependencies**
+- Inbound: PastaShiori::load — LoggingConfig取得のため呼び出し (P0)
+
+**Contracts**: Service [x]
+
+##### Service Interface
+
+```rust
+impl PastaLuaRuntime {
+    /// Get reference to PastaConfig if available.
+    ///
+    /// # Returns
+    /// * `Some(&PastaConfig)` - Config was set during load
+    /// * `None` - Config not available (e.g., runtime created without loader)
+    pub fn config(&self) -> Option<&PastaConfig> {
+        self.config.as_ref()
+    }
+}
+```
+
+- **Preconditions**: なし
+- **Postconditions**: PastaConfigへの不変参照を返す（存在する場合）
+- **Invariants**: 戻り値のライフタイムは`self`に紐づく
 
 ### pasta_shiori
 
@@ -313,19 +366,29 @@ pub fn init_tracing_with_config(config: &LoggingConfig) {
 // PastaShiori::load()内、PastaLoader::load()完了後
 match PastaLoader::load(&load_dir_path) {
     Ok(runtime) => {
-        // LoggingConfigを取得
+        // PastaConfigからLoggingConfigを取得
+        // pasta.tomlに[logging]がない場合はデフォルト値を使用
         let logging_config = runtime.config()
             .and_then(|c| c.logging())
-            .unwrap_or_default();
+            .unwrap_or_else(|| LoggingConfig::default());
         
         // tracing subscriber初期化
         init_tracing_with_config(&logging_config);
         
-        // 即座にロードディレクトリをログ出力
+        // 即座にロードディレクトリをINFOログ出力
         info!(
             load_dir = %load_dir_path.display(),
             "Logger initialized for ghost directory"
         );
+        
+        // Register runtime's logger with global registry for log routing
+        if let Some(logger) = runtime.logger() {
+            GlobalLoggerRegistry::instance().register(load_dir_path.clone(), logger);
+            debug!(load_dir = %load_dir_path.display(), "Registered logger with GlobalLoggerRegistry");
+        }
+        
+        // Cache SHIORI functions (load/request/unload)
+        self.cache_lua_functions(&runtime);
         
         // 以降の既存処理...
     }
