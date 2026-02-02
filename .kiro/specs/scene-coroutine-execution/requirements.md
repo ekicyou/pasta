@@ -49,11 +49,13 @@ EVENT.fireのみがstring/nil互換を処理（既存コードベースとの後
 1. When EVENT.fireがhandlerを呼び出したとき, the EVENT module shall `local result = handler(act)` を実行する
 2. If resultがthread（コルーチン）の場合, the EVENT module shall `local ok, yielded_value = coroutine.resume(result, act)` を実行する
 3. When `coroutine.resume()` が `(false, error_message)` を返したとき, the EVENT module shall コルーチンを `coroutine.close()` で解放し、`error(error_message)` を発生させる
-4. When `coroutine.resume()` 後に `coroutine.status(co)` が "suspended" のとき, the EVENT module shall `STORE.co_scene` にコルーチンを保存し、`RES.ok(yielded_value)` を返す（yieldされた値をレスポンスに使用）
-5. When `coroutine.resume()` 後に `coroutine.status(co)` が "dead" のとき, the EVENT module shall `STORE.co_scene` を nil にクリアし、適切なレスポンスを返す
-6. If resultがstringの場合, the EVENT module shall `RES.ok(result)` を返す（空文字列の場合は `RES.no_content()`）
-7. If resultがnilの場合, the EVENT module shall `RES.no_content()` を返す
-8. When 新しいコルーチンを `STORE.co_scene` に設定しようとしたとき、既存の `STORE.co_scene` が存在しsuspended状態の場合, the EVENT module shall 先に `coroutine.close(STORE.co_scene)` で解放してから更新する
+4. The EVENT module shall STORE.co_sceneの更新を統一的に処理する `set_co_scene(new_co)` ローカル関数を持つ：
+   - 既存の `STORE.co_scene` が存在しsuspended状態の場合、`coroutine.close(STORE.co_scene)` で解放する
+   - `STORE.co_scene = new_co` で更新する（new_coはコルーチンまたはnil）
+5. When `coroutine.resume()` 後に `coroutine.status(co)` が "suspended" のとき, the EVENT module shall `set_co_scene(co)` でコルーチンを保存し、`RES.ok(yielded_value)` を返す
+6. When `coroutine.resume()` 後に `coroutine.status(co)` が "dead" のとき, the EVENT module shall `set_co_scene(nil)` でクリアし、適切なレスポンスを返す
+7. If resultがstringの場合, the EVENT module shall `RES.ok(result)` を返す（空文字列の場合は `RES.no_content()`）
+8. If resultがnilの場合, the EVENT module shall `RES.no_content()` を返す
 
 ### Requirement 3: シーン関数ハンドラの戻り値
 
