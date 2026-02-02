@@ -85,7 +85,7 @@ describe("check_hour function", function()
         dispatcher._reset()
         dispatcher._set_scene_executor(function(event_name)
             if event_name == "OnHour" then
-                return "hour_result"
+                return coroutine.create(function() return "hour_result" end)
             end
             return nil
         end)
@@ -115,7 +115,7 @@ describe("check_hour function", function()
         local act2 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = 1702652400 } })
         local result = dispatcher.check_hour(act2)
 
-        expect(result):toBe("fired")
+        expect(type(result)):toBe("thread")
     end)
 
     test("skips when status is talking", function()
@@ -153,7 +153,7 @@ describe("check_talk function", function()
         dispatcher._reset()
         dispatcher._set_scene_executor(function(event_name)
             if event_name == "OnTalk" then
-                return "talk_result"
+                return coroutine.create(function() return "talk_result" end)
             end
             return nil
         end)
@@ -181,7 +181,7 @@ describe("check_talk function", function()
         local act2 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = state.next_talk_time + 1 } })
         local result = dispatcher.check_talk(act2)
 
-        expect(result):toBe("fired")
+        expect(type(result)):toBe("thread")
     end)
 
     test("skips when status is talking", function()
@@ -220,7 +220,7 @@ describe("priority and integration", function()
         dispatcher = require("pasta.shiori.event.virtual_dispatcher")
         dispatcher._reset()
         dispatcher._set_scene_executor(function(event_name)
-            return event_name .. "_result"
+            return coroutine.create(function() return event_name .. "_result" end)
         end)
     end
 
@@ -234,8 +234,8 @@ describe("priority and integration", function()
         local act2 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = 1702652400 } })
         local result = dispatcher.dispatch(act2)
 
-        -- Should return "fired" from check_hour
-        expect(result):toBe("fired")
+        -- Should return thread from check_hour
+        expect(type(result)):toBe("thread")
     end)
 
     test("_reset clears all state", function()
@@ -270,9 +270,9 @@ describe("check_hour - transfer_date_to_var integration", function()
         dispatcher = require("pasta.shiori.event.virtual_dispatcher")
         SHIORI_ACT = require("pasta.shiori.act")
         dispatcher._reset()
-        -- 常にシーン実行成功を返すモック
+        -- 常にシーン実行成功を返すモック（thread返却）
         dispatcher._set_scene_executor(function(event_name, act)
-            return "scene_result"
+            return coroutine.create(function() return "scene_result" end)
         end)
     end
 
@@ -294,7 +294,7 @@ describe("check_hour - transfer_date_to_var integration", function()
         -- Second call: should fire and call transfer_date_to_var
         local result = dispatcher.check_hour(act)
 
-        expect(result):toBe("fired")
+        expect(type(result)):toBe("thread")
         -- 日時変数が設定されていること
         expect(act.var.year):toBe(2026)
         expect(act.var["年"]):toBe("2026年")
@@ -318,7 +318,7 @@ describe("check_hour - transfer_date_to_var integration", function()
 
         local result = dispatcher.check_hour(act)
 
-        expect(result):toBe("fired")
+        expect(type(result)):toBe("thread")
         expect(act.var["曜日"]):toBe("日曜日")
         expect(act.var.week):toBe("Sunday")
         expect(act.var["時１２"]):toBe("正午") -- hour 12
@@ -346,7 +346,7 @@ describe("execute_scene - act parameter passing", function()
         dispatcher._set_scene_executor(function(event_name, act)
             received_event_name = event_name
             received_act = act
-            return "scene_result"
+            return coroutine.create(function() return "scene_result" end)
         end)
 
         local SHIORI_ACT = require("pasta.shiori.act")
@@ -383,7 +383,7 @@ describe("check_talk - no transfer_date_to_var", function()
         SHIORI_ACT = require("pasta.shiori.act")
         dispatcher._reset()
         dispatcher._set_scene_executor(function(event_name, act)
-            return "scene_result"
+            return coroutine.create(function() return "scene_result" end)
         end)
     end
 
@@ -420,7 +420,7 @@ describe("check_talk - no transfer_date_to_var", function()
 
         dispatcher._set_scene_executor(function(event_name, act)
             received_act = act
-            return "scene_result"
+            return coroutine.create(function() return "scene_result" end)
         end)
 
         local actors = { sakura = { name = "さくら", spot = "sakura" } }
@@ -443,7 +443,7 @@ describe("check_talk - no transfer_date_to_var", function()
 
         -- Even if it doesn't fire (random), the act should be passed when it does
         -- We can't guarantee a fire, but we can test the executor signature
-        if result == "fired" then
+        if type(result) == "thread" then
             expect(received_act):toBe(act)
         end
     end)

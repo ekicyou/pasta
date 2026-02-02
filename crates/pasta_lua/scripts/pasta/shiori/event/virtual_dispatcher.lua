@@ -61,33 +61,33 @@ local function calculate_next_talk_time(current_unix)
     return current_unix + interval
 end
 
---- シーン関数を実行
+--- シーン関数からthreadを生成（実行しない）
 ---@param event_name string イベント名 ("OnTalk" or "OnHour")
----@param act ShioriAct actオブジェクト
----@return string|nil 実行結果（エラー時は nil）
-local function execute_scene(event_name, act)
+---@param act ShioriAct actオブジェクト（未使用、将来拡張用）
+---@return thread|nil コルーチンまたはnil
+local function create_scene_thread(event_name, act)
     -- テスト用オーバーライドがあれば使用
     if scene_executor then
         return scene_executor(event_name, act)
     end
 
     local SCENE = require("pasta.scene")
-    local scene_fn = SCENE.search(event_name, nil, nil)
+    local scene_result = SCENE.search(event_name, nil, nil)
 
-    if not scene_fn then
+    if not scene_result then
         return nil
     end
 
-    -- シーン関数を直接実行
-    -- エラーは SHIORI.request の xpcall でキャッチされる
-    return scene_fn(act)
+    -- SCENE.search()はSceneSearchResultテーブルを返す
+    -- .funcフィールドからシーン関数を取得してthreadを生成
+    return coroutine.create(scene_result.func)
 end
 
 -- 5. 公開関数
 
---- OnHour 判定・発行
+--- OnHour 判定・発行（thread返却形式）
 ---@param act ShioriAct actオブジェクト（act.req でリクエスト情報にアクセス）
----@return string|nil "fired" (発行成功), nil (発行なし)
+---@return thread|nil コルーチンまたはnil
 function M.check_hour(act)
     local current_unix = act.req.date.unix
 
@@ -116,16 +116,22 @@ function M.check_hour(act)
         act:transfer_date_to_var()
     end
 
-    -- シーン実行（actを渡す）
-    local result = execute_scene("OnHour", act)
-
-    return result and "fired" or nil
+    -- threadを返す（実行しない）
+    return create_scene_thread("OnHour", act)
 end
 
---- OnTalk 判定・発行
+--- OnTalk 判定・発行（thread返却形式、チェイントーク対応）
 ---@param act ShioriAct actオブジェクト（act.req でリクエスト情報にアクセス）
----@return string|nil "fired" (発行成功), nil (発行なし)
+---@return thread|nil コルーチンまたはnil
 function M.check_talk(act)
+    local STORE = require("pasta.store")
+
+    -- チェイントーク継続確認
+    if STORE.co_scene then
+        -- 継続用コルーチンを返す（新規シーン検索スキップ）
+        return STORE.co_scene
+    end
+
     local current_unix = act.req.date.unix
     local cfg = get_config()
 
@@ -151,18 +157,16 @@ function M.check_talk(act)
         return nil
     end
 
-    -- シーン実行（actを渡す、OnTalkではtransfer_date_to_varを呼び出さない）
-    local result = execute_scene("OnTalk", act)
-
     -- 次回トーク時刻を再計算（発行成否に関わらず）
     next_talk_time = calculate_next_talk_time(current_unix)
 
-    return result and "fired" or nil
+    -- threadを返す（実行しない）
+    return create_scene_thread("OnTalk", act)
 end
 
---- 仮想イベントディスパッチ（メインエントリポイント）
+--- 仮想イベントディスパッチ（メインエントリポイント、thread返却形式）
 ---@param act ShioriAct actオブジェクト（act.req でリクエスト情報にアクセス）
----@return string|nil シーン実行結果 or nil
+---@return thread|nil コルーチンまたはnil
 function M.dispatch(act)
     -- act.req.date 存在チェック
     if not act.req or not act.req.date then

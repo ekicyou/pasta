@@ -78,29 +78,53 @@ local function create_act(req)
     return SHIORI_ACT.new(STORE.actors, req)
 end
 
+--- STORE.co_sceneを統一管理するローカル関数
+--- @param co thread|nil コルーチンまたはnil
+local function set_co_scene(co)
+    -- 1. 引数検証（suspended以外はclose）
+    if co and coroutine.status(co) ~= "suspended" then
+        coroutine.close(co)
+        co = nil
+    end
+
+    -- 2. 同一オブジェクトチェック
+    if STORE.co_scene == co then
+        return
+    end
+
+    -- 3. 旧コルーチンをclose（存在すれば無条件）
+    if STORE.co_scene then
+        coroutine.close(STORE.co_scene)
+    end
+
+    -- 4. 上書き（coはsuspendedまたはnil確定）
+    STORE.co_scene = co
+end
+
 -- 4. 公開関数
 
 --- デフォルトハンドラ（未登録イベント用）
---- シーン関数フォールバックを試み、見つからなければ 204 No Content を返す。
+--- シーン関数をイベント名で検索し、見つかった場合はthreadを返す。
+--- 見つからない場合はnilを返す（EVENT.fireでRES.no_content()に変換される）。
 --- @param act ShioriAct actオブジェクト
---- @return string SHIORI レスポンス（204 No Content または 500 Error）
+--- @return thread|nil シーンコルーチン、またはnil
 function EVENT.no_entry(act)
     -- シーン関数をイベント名で検索（遅延ロードで循環参照回避）
     local SCENE = require("pasta.scene")
     local scene_result = SCENE.search(act.req.id, nil, nil)
 
     if scene_result then
-        -- シーン関数が見つかった場合、直接実行
-        -- エラーは SHIORI.request の xpcall でキャッチされる
-        -- alpha01: 戻り値は無視、204 No Content を返す
-        -- alpha03: act オブジェクト生成、さくらスクリプト変換を統合予定
-        scene_result()
+        -- SCENE.search()はSceneSearchResultテーブルを返す
+        -- .funcフィールドからシーン関数を取得してthreadを生成
+        return coroutine.create(scene_result.func)
     end
 
-    return RES.no_content()
+    -- シーン関数が見つからない場合はnilを返す
+    return nil
 end
 
 --- イベント振り分け
+--- ハンドラを実行し、コルーチンの場合はresumeして状態管理を行う
 --- @param req table リクエストテーブル（req.id にイベント名）
 --- @return string SHIORI レスポンス
 function EVENT.fire(req)
@@ -109,9 +133,29 @@ function EVENT.fire(req)
 
     local handler = REG[req.id] or EVENT.no_entry
 
-    -- ハンドラを直接呼び出し
+    -- ハンドラを呼び出し
     -- エラーは SHIORI.request の xpcall でキャッチされる
-    return handler(act)
+    local result = handler(act)
+
+    -- 型判定
+    if type(result) == "thread" then
+        -- コルーチン実行
+        local ok, yielded_value = coroutine.resume(result, act)
+        if not ok then
+            -- エラー処理: close & 例外伝搬
+            set_co_scene(result) -- closeされる（dead状態のため）
+            error(yielded_value)
+        end
+        -- 状態保存（set_co_scene内部でstatus判断）
+        set_co_scene(result)
+        return RES.ok(yielded_value)
+    elseif type(result) == "string" then
+        -- 既存互換: 文字列をそのまま返す
+        return RES.ok(result)
+    else
+        -- nil
+        return RES.no_content()
+    end
 end
 
 -- 5. 末尾で返却

@@ -150,13 +150,14 @@ fn test_onhour_fires_at_hour() {
         local dispatcher = require "pasta.shiori.event.virtual_dispatcher"
         dispatcher._reset()
         
-        -- Set up mock scene executor
-        local scene_results = {
-            OnHour = "hour_result",
-            OnTalk = "talk_result"
+        -- Set up mock scene executor that returns a thread directly
+        -- (since scene_executor bypass returns its result as-is)
+        local scene_threads = {
+            OnHour = coroutine.create(function() return "hour_result" end),
+            OnTalk = coroutine.create(function() return "talk_result" end)
         }
         dispatcher._set_scene_executor(function(event_name)
-            return scene_results[event_name]
+            return scene_threads[event_name]
         end)
         
         -- First call to initialize
@@ -175,7 +176,8 @@ fn test_onhour_fires_at_hour() {
         } }
         local result = dispatcher.check_hour(act2)
         
-        return result == "fired"
+        -- Now returns a thread instead of "fired"
+        return type(result) == "thread"
     "#,
     );
 
@@ -196,13 +198,13 @@ fn test_onhour_priority_over_ontalk() {
         local dispatcher = require "pasta.shiori.event.virtual_dispatcher"
         dispatcher._reset()
         
-        -- Set up mock scene executor
-        local scene_results = {
-            OnHour = "hour",
-            OnTalk = "talk"
+        -- Set up mock scene executor that returns threads directly
+        local scene_threads = {
+            OnHour = coroutine.create(function() return "hour" end),
+            OnTalk = coroutine.create(function() return "talk" end)
         }
         dispatcher._set_scene_executor(function(event_name)
-            return scene_results[event_name]
+            return scene_threads[event_name]
         end)
         
         -- Initialize both timers
@@ -221,8 +223,8 @@ fn test_onhour_priority_over_ontalk() {
         } }
         local result = dispatcher.dispatch(act2)
         
-        -- If OnHour fires, result should be "fired" (from check_hour)
-        return result == "fired"
+        -- If OnHour fires, result should be a thread now
+        return type(result) == "thread"
     "#,
     );
 
@@ -284,10 +286,10 @@ fn test_ontalk_fires_after_interval() {
         local dispatcher = require "pasta.shiori.event.virtual_dispatcher"
         dispatcher._reset()
         
-        -- Set up mock scene executor
+        -- Set up mock scene executor that returns a thread directly
         dispatcher._set_scene_executor(function(event_name)
             if event_name == "OnTalk" then
-                return "talk_result"
+                return coroutine.create(function() return "talk_result" end)
             end
             return nil
         end)
@@ -312,7 +314,8 @@ fn test_ontalk_fires_after_interval() {
         } }
         local result = dispatcher.check_talk(act2)
         
-        return result == "fired"
+        -- Now returns a thread instead of "fired"
+        return type(result) == "thread"
     "#,
     );
 

@@ -131,7 +131,7 @@ fn test_event_module_loads() {
 }
 
 #[test]
-fn test_event_no_entry_returns_204() {
+fn test_event_no_entry_returns_nil_when_scene_not_found() {
     let runtime = create_runtime_with_pasta_path();
 
     let result = runtime.exec(
@@ -139,13 +139,15 @@ fn test_event_no_entry_returns_204() {
         local EVENT = require "pasta.shiori.event"
         local act = { req = { id = "UnknownEvent", method = "get", version = 30 } }
         local response = EVENT.no_entry(act)
-        return response:find("204 No Content") ~= nil
+        -- EVENT.no_entry now returns thread|nil, not SHIORI response
+        -- When no scene is found, it returns nil
+        return response == nil
     "#,
     );
 
     assert!(
         result.is_ok(),
-        "EVENT.no_entry should return 204: {:?}",
+        "EVENT.no_entry should return nil when scene not found: {:?}",
         result
     );
     assert!(result.unwrap().as_boolean().unwrap_or(false));
@@ -500,6 +502,7 @@ fn test_custom_onboot_overrides_default() {
 // ============================================================================
 
 /// Tests that EVENT.no_entry attempts scene function fallback search
+/// and EVENT.fire correctly resumes the returned coroutine
 #[test]
 fn test_no_entry_attempts_scene_fallback() {
     // Create context with a scene registered for event fallback
@@ -536,19 +539,27 @@ fn test_no_entry_attempts_scene_fallback() {
         r#"
         local EVENT = require "pasta.shiori.event"
         local SCENE = require "pasta.scene"
+        local STORE = require "pasta.store"
+        
+        -- Setup actors for SHIORI_ACT
+        STORE.actors = {{ sakura = {{ name = "さくら", spot = "sakura" }} }}
         
         -- Register a scene function with event name pattern (Lua側)
         -- Rust側でregister_global("OnTestEvent")すると"OnTestEvent_1"として登録される
         local called = false
         SCENE.register("OnTestEvent_{counter}", "__start__", function(act, ...)
             called = true
+            -- Scene function must return a string for RES.ok() to generate 200 OK
+            -- or nil for 204 No Content
+            return nil
         end)
         
-        -- Fire unregistered event - should attempt scene fallback
+        -- Fire unregistered event - should attempt scene fallback via EVENT.no_entry
+        -- EVENT.fire will resume the thread and generate appropriate response
         local req = {{ id = "OnTestEvent", method = "get", version = 30 }}
         local response = EVENT.fire(req)
         
-        -- alpha01: scene function is called but returns 204 (no act output yet)
+        -- Scene function returns nil, so RES.ok(nil) -> RES.no_content() -> 204
         return response:find("204 No Content") ~= nil and called == true
     "#,
         counter = counter

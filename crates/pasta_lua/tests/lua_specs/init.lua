@@ -7,12 +7,19 @@
 
 local specs = {
     "transpiler_test",
-    "actor_word_test",         -- actor-word-dictionary feature tests
-    "store_save_test",         -- store-save-table feature tests
-    "persistence_spec",        -- store-save-persistence feature tests
-    "act_impl_call_test",      -- ACT_IMPL.call 4段階検索テスト
-    "shiori_act_test",         -- pasta.shiori.act さくらスクリプトビルダーテスト
-    "virtual_dispatcher_spec", -- OnTalk/OnHour virtual event dispatcher tests
+    "actor_word_test",                -- actor-word-dictionary feature tests
+    "store_save_test",                -- store-save-table feature tests
+    "persistence_spec",               -- store-save-persistence feature tests
+    "act_impl_call_test",             -- ACT_IMPL.call 4段階検索テスト
+    "shiori_act_test",                -- pasta.shiori.act さくらスクリプトビルダーテスト
+    "virtual_dispatcher_spec",        -- OnTalk/OnHour virtual event dispatcher tests
+    "store_coroutine_test",           -- STORE.co_scene coroutine management tests
+    "event_coroutine_test",           -- EVENT.fire coroutine support tests
+    "virtual_dispatcher_thread_test", -- virtual_dispatcher thread return tests
+    "event_no_entry_test",            -- EVENT.no_entry thread return tests
+    "second_change_thread_test",      -- OnSecondChange thread passthrough tests
+    "res_ok_test",                    -- RES.ok nil/empty string handling tests
+    "integration_coroutine_test",     -- E2E chain talk and error handling tests
     -- 将来のテストスイートをここに追加
     -- "code_generator_test",
     -- "context_test",
