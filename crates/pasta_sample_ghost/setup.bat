@@ -128,4 +128,3 @@ echo Next steps:
 echo   1. Run tests: cargo test -p pasta_sample_ghost
 echo   2. Install the ghost folder to SSP
 echo.
-pause
