@@ -403,12 +403,12 @@ match PastaLoader::load(&load_dir_path) {
 | Requirements | 4.1, 4.2, 4.3 |
 
 **Responsibilities & Constraints**
-- レスポンスに`"SHIORI/3.0 200 OK"`が含まれる場合、DEBUGログを追加
+- レスポンスが`"SHIORI/3.0 200 OK"`で始まる場合、DEBUGログを追加
 - リクエスト/レスポンス文字列をフル出力（長さ制限なし）
 - 既存のエラーハンドリングは変更しない
 
 **Implementation Notes**
-- 200 OK判定: `response.contains("SHIORI/3.0 200 OK")`
+- 200 OK判定: `response.starts_with("SHIORI/3.0 200 OK")`（ステータス行は必ず先頭）
 - DEBUGレベルなので通常運用時（INFO以上）は出力されない
 
 ```rust
@@ -416,7 +416,7 @@ match PastaLoader::load(&load_dir_path) {
 match request_fn.call::<String>(req_table) {
     Ok(response) => {
         // 200 OKの場合、リクエスト/レスポンスをDEBUGログ
-        if response.contains("SHIORI/3.0 200 OK") {
+        if response.starts_with("SHIORI/3.0 200 OK") {
             debug!(request = %request, "SHIORI request (200 OK)");
             debug!(response = %response, "SHIORI response (200 OK)");
         }
