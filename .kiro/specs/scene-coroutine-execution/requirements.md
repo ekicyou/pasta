@@ -47,10 +47,10 @@ EVENT.fireのみがstring/nil互換を処理（既存コードベースとの後
 #### 受け入れ基準
 
 1. When EVENT.fireがhandlerを呼び出したとき, the EVENT module shall `local result = handler(act)` を実行する
-2. If resultがthread（コルーチン）の場合, the EVENT module shall `coroutine.resume(result)` を実行する（**actは渡さない** - DD4参照）
+2. If resultがthread（コルーチン）の場合, the EVENT module shall `local ok, yielded_value = coroutine.resume(result)` を実行する（**actは渡さない** - DD4参照）
 3. When `coroutine.resume()` が `(false, error_message)` を返したとき, the EVENT module shall コルーチンを `coroutine.close()` で解放し、`error(error_message)` を発生させる
-4. When `coroutine.resume()` 後に `coroutine.status(co)` が "suspended" のとき, the EVENT module shall `STORE.co_thread` にコルーチンを保存する
-5. When `coroutine.resume()` 後に `coroutine.status(co)` が "dead" のとき, the EVENT module shall `STORE.co_thread` を nil にクリアする
+4. When `coroutine.resume()` 後に `coroutine.status(co)` が "suspended" のとき, the EVENT module shall `STORE.co_thread` にコルーチンを保存し、`RES.ok(yielded_value)` を返す（yieldされた値をレスポンスに使用）
+5. When `coroutine.resume()` 後に `coroutine.status(co)` が "dead" のとき, the EVENT module shall `STORE.co_thread` を nil にクリアし、適切なレスポンスを返す
 6. If resultがstringの場合, the EVENT module shall `RES.ok(result)` を返す（空文字列の場合は `RES.no_content()`）
 7. If resultがnilの場合, the EVENT module shall `RES.no_content()` を返す
 8. When 新しいコルーチンを `STORE.co_thread` に設定しようとしたとき、既存の `STORE.co_thread` が存在しsuspended状態の場合, the EVENT module shall 先に `coroutine.close(STORE.co_thread)` で解放してから更新する
@@ -188,11 +188,14 @@ local co = coroutine.create(function()
     scene_fn(act)  -- ← actはクロージャでキャプチャ
 end)
 
--- resume時は引数なし
-coroutine.resume(co)  -- 新しいactは渡さない
+-- resume時は引数なし、戻り値はyieldされた値
+local ok, script = coroutine.resume(co)
+if ok and coroutine.status(co) == "suspended" then
+    return RES.ok(script)  -- ← yieldされたscriptを使う
+end
 ```
 
 **影響**: 
-- Requirement 2: resume時の引数仕様
+- Requirement 2: resume時の引数仕様（引数なし）、戻り値処理（yieldされた値を使う）
 - Requirement 3: coroutine.create()のラッパー関数パターン
-- act:yield()の戻り値無視は正しい実装
+- act:yield()はcoroutine.yield(script)でscriptをyield、EVENT.fireがそれを受け取る
