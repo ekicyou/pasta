@@ -46,9 +46,21 @@ STORE.actor_words = {}
 --- @type table
 STORE.app_ctx = {}
 
+--- 継続用コルーチン（OnTalkチェイントーク用）
+--- @type thread|nil
+STORE.co_scene = nil
+
 --- 全データをリセット
 --- @return nil
 function STORE.reset()
+    -- co_sceneのクリーンアップ（suspendedコルーチンをclose）
+    if STORE.co_scene then
+        if coroutine.status(STORE.co_scene) == "suspended" then
+            coroutine.close(STORE.co_scene)
+        end
+        STORE.co_scene = nil
+    end
+
     STORE.actors = {}
     STORE.scenes = {}
     STORE.app_ctx = {}

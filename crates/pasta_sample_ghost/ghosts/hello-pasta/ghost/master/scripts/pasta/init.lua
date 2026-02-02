@@ -37,12 +37,4 @@ function PASTA.finalize_scene()
     -- This function is overwritten by Rust's register_finalize_scene()
 end
 
---- サブモジュール参照（内部使用・高度な用途向け）
---- @type table
-PASTA.ACTOR = ACTOR
---- @type Scene
-PASTA.SCENE = SCENE
---- @type Word
-PASTA.WORD = WORD
-
 return PASTA

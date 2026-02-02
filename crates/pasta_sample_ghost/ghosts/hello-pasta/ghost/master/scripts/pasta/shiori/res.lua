@@ -62,11 +62,17 @@ end
 
 --- 200 OK レスポンス
 --- Valueヘッダー付きの正常レスポンスを生成する。
+--- valueがnilまたは空文字列の場合は、204 No Contentを返す。
 ---
---- @param value string Value ヘッダーの値
+--- @param value string|nil Value ヘッダーの値
 --- @param dic HeaderDic|nil 追加ヘッダー辞書
 --- @return string SHIORI/3.0レスポンス文字列
 function RES.ok(value, dic)
+    -- nil または空文字列の場合は 204 No Content を返す
+    if value == nil or value == "" then
+        return RES.no_content(dic)
+    end
+
     dic = dic or {}
     dic["Value"] = value
     return RES.build("200 OK", dic)
