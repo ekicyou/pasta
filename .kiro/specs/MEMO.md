@@ -23,14 +23,32 @@
 ## 濁点・半濁点のウェイト実装
 
 
-## シーン再生コルーチン
+## シーンをコルーチンとして実行できるようにする。
+EVENT.fireで実行されたハンドラ関数が終了せず、サスペンド（続きのトークが存在）している場合に、次回のOnTalkイベントのタイミングでチェイントークが発動するようにする。
+
+### EVENT.fire関数がコルーチンを処理するようにする
 EVENT.fire内部をコルーチン化し、継続が残った場合、STORE.co_fireに保存する。
 
-1. EVENT.fireが取得するhandlerをCO.safe_wrap()でコルーチン関数`co_fire`化
+1. EVENT.fireが取得するhandlerは、CO.safe_wrap()でコルーチン関数した`co_handler`とすること（呼び出し先の仕様変更）
+2. EVENT.fireは、`local co, value = co_handler(act)`を１回実行すること。
+3. EVENT.fireは、co==nil（error）だった場合、error(value)を発行すること
+4. EVENT.fireは、co=="yield"だった場合、STORE.co_handler = co_handlerを設定すること
+5. EVENT.fireは、co=="return"だった場合、STORE.co_handler = nilを設定すること
+6. EVENT.fireは、co=~nilだった場合、valueが有効な文字列であればRES.ok(value)、valueがnilまたは0文字長だった場合はRES.no_content()を返すこと
 
+### EVENT.fire関数から呼び出される関数は、co_handlerを返すこと
+1. 実際にシーン関数を実行せず、ハンドラを返すこと
+2. ハンドラを返すときに、CO.safe_wrap()でコルーチン関数した`co_handler`とすること
 
+### virtual_dispatcher.luaのdispatch()関数の改良
+1. check_hour / check_talkは、シーン関数を実行するのではなく、シーン関数のハンドラを返す。
+2. dispatch()関数は戻ってきたハンドラをそのまま返す。
 
+### virtual_dispatcher.luaのcheck_talk()関数がSTORE.co_handlerを返すようにする
+1. 発話出来るタイミングのとき、STORE.co_handlerを確認し、nilでなければSTORE.co_handlerを返す。
+2. もしくは、 execute_scene("OnTalk", act)をco_handlerに変換して返す。
 
+### シーン関数にact.yield()を含めてテストを行う。
 
 /kiro-validate-gap alpha04-sample-ghost
 現在の要件で再度ギャップ分析して欲しい。
