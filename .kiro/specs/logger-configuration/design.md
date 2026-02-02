@@ -14,6 +14,7 @@
 - `PASTA_LOG`環境変数によるデバッグ用オーバーライドを提供
 - 頻出内部ログを適切なレベルに調整（TRACE/INFO/WARN）
 - 200 OKレスポンス時のリクエスト/レスポンスDEBUGログを追加
+- subscriber初期化直後にロードディレクトリをINFOログとして出力
 
 ### Non-Goals
 
@@ -124,6 +125,9 @@ sequenceDiagram
     
     EnvFilter->>Subscriber: registry().with(layer.with_filter())
     Subscriber-->>Subscriber: try_init()
+    
+    Note over PastaShiori: subscriber初期化完了後、即座にログ出力
+    PastaShiori->>PastaShiori: info!(load_dir, "Logger initialized")
 ```
 
 ---
@@ -138,15 +142,17 @@ sequenceDiagram
 | 4.1-4.3 | リクエスト/レスポンスログ | call_lua_request | DEBUGログ追加 | - |
 | 5.1-5.3 | 設定スキーマ | LoggingConfig | serdeデシリアライズ | - |
 | 6.1-6.5 | tracing subscriber遅延初期化 | windows.rs, shiori.rs | `init_tracing_with_config()` | 初期化フロー |
-| 7.1-7.3 | 後方互換性 | LoggingConfig | デフォルト値 | - |
+| 7.1-7.3 | ロードディレクトリ記録 | shiori.rs | INFOログ出力 | 初期化フロー |
+| 8.1-8.3 | 後方互換性 | LoggingConfig | デフォルト値 | - |
 
 ---
 
 ## Components and Interfaces
 
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies | Contracts |
-|-----------|--------------|--------|--------------|------------------|-----------|
-| LoggingConfig | pasta_lua/loader | ログ設定の保持 | 1, 5, 7 | serde (P0) | State |
+|-----------|--------------|--------|--------------|-8 | serde (P0) | State |
+| init_tracing_with_config | pasta_shiori/shiori | tracing subscriber初期化 | 2, 6 | tracing-subscriber (P0), LoggingConfig (P0) | Service |
+| PastaShiori::load (変更) | pasta_shiori/shiori | subscriber初期化後のログ出力 | 7 | - | -
 | init_tracing_with_config | pasta_shiori/shiori | tracing subscriber初期化 | 2, 6 | tracing-subscriber (P0), LoggingConfig (P0) | Service |
 | call_lua_request (変更) | pasta_shiori/shiori | 200 OKログ追加 | 4 | - | Service |
 | ログレベル調整 | pasta_shiori, pasta_lua | マクロ変更 | 3 | tracing (P0) | - |
@@ -157,7 +163,7 @@ sequenceDiagram
 
 | Field | Detail |
 |-------|--------|
-| Intent | pasta.toml [logging]セクションの設定を保持 |
+| Intent | pasta.toml [logging]セクションの設定を保持 |8.1, 8.2, 8
 | Requirements | 1.1, 1.2, 1.3, 1.4, 5.1, 5.2, 5.3, 7.1, 7.2, 7.3 |
 
 **Responsibilities & Constraints**
@@ -287,6 +293,45 @@ pub fn init_tracing_with_config(config: &LoggingConfig) {
 - **Postconditions**: グローバルtracing subscriberが設定される
 - **Invariants**: 一度のみ設定可能（2回目以降は無視）
 
+**Called from**: `PastaShiori::load()`, after `PastaLoader::load()` returns successfully
+
+#### PastaShiori::load (変更)
+
+| Field | Detail |
+|-------|--------|
+| Intent | subscriber初期化直後にロードディレクトリをINFOログとして出力 |
+| Requirements | 7.1, 7.2, 7.3 |
+
+**Responsibilities & Constraints**
+- `init_tracing_with_config()`呼び出し直後に実行
+- load_dir（ロードディレクトリ）の絶対パスをINFOレベルでログ出力
+- subscriber初期化成功後の最初のログとして記録される
+
+**Implementation Notes**
+
+```rust
+// PastaShiori::load()内、PastaLoader::load()完了後
+match PastaLoader::load(&load_dir_path) {
+    Ok(runtime) => {
+        // LoggingConfigを取得
+        let logging_config = runtime.config()
+            .and_then(|c| c.logging())
+            .unwrap_or_default();
+        
+        // tracing subscriber初期化
+        init_tracing_with_config(&logging_config);
+        
+        // 即座にロードディレクトリをログ出力
+        info!(
+            load_dir = %load_dir_path.display(),
+            "Logger initialized for ghost directory"
+        );
+        
+        // 以降の既存処理...
+    }
+}
+```
+
 #### call_lua_request (変更)
 
 | Field | Detail |
@@ -392,6 +437,7 @@ match request_fn.call::<String>(req_table) {
 - サンプルゴーストでのログ出力確認
 - ログレベル変更（TRACE/INFO/WARN）の反映確認
 - 200 OKレスポンス時のDEBUGログ出力確認
+- **subscriber初期化直後のロードディレクトリINFOログ出力確認**
 
 ---
 

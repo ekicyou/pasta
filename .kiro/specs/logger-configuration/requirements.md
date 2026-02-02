@@ -107,8 +107,23 @@ DEBUGレベルを採用することで、通常運用時（INFOレベル）で�
 
 - DllMain時点ではtracing subscriberを設定しない（load_dirが不明でpasta.tomlが読めないため）
 - DllMain〜load()間のログは出力されない（正常系では問題なし、エラー時のみ影響）
+- init_tracing_with_config()完了直後に、load_dirをINFOログとして出力し、ロードディレクトリ情報を確実に記録
 
-### Requirement 7: 後方互換性
+### Requirement 7: ロードディレクトリ情報の確実な記録
+
+**Objective:** As a ゴースト開発者, I want tracing subscriber初期化前に失われたログ情報（特にロードディレクトリ）を確実に記録, so that ログファイルにゴースト起動情報が必ず残る
+
+#### Acceptance Criteria
+
+1. The pasta_shiori shall `init_tracing_with_config()`完了直後に、load_dirパスをINFOレベルでログ出力
+2. The ログメッセージ shall ロードディレクトリの絶対パスを含む
+3. The ログ出力 shall tracing subscriber初期化成功後の最初のログとして出力される
+
+#### Design Rationale
+
+DllMain〜init_tracing_with_config()間のログ（`info!("Starting PastaShiori load")`など）は失われるため、最低限の起動情報（ロードディレクトリ）をsubscriber初期化直後に出力することで、ログファイルに必ず記録されるようにする。
+
+### Requirement 8: 後方互換性
 
 **Objective:** As a 既存ゴースト開発者, I want 既存のpasta.toml設定が引き続き動作, so that 移行コストが発生しない
 
@@ -117,8 +132,6 @@ DEBUGレベルを採用することで、通常運用時（INFOレベル）で�
 1. The LoggingConfig shall `level`/`filter`未設定時に既存の動作（全DEBUGログ出力）を維持
 2. The `file_path`および`rotation_days`フィールド shall 既存の動作を変更しない
 3. When 既存のpasta.tomlに`[logging]`セクションがない場合, the システム shall デフォルト設定で動作
-
----
 
 ## Technical Notes
 
