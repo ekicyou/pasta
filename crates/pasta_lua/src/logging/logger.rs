@@ -189,6 +189,8 @@ mod tests {
         let config = LoggingConfig {
             file_path: "../outside.log".to_string(),
             rotation_days: 7,
+            level: "debug".to_string(),
+            filter: None,
         };
 
         let result = PastaLogger::new(base_dir, Some(&config));
@@ -203,6 +205,8 @@ mod tests {
         let config = LoggingConfig {
             file_path: "other/logs/pasta.log".to_string(),
             rotation_days: 7,
+            level: "debug".to_string(),
+            filter: None,
         };
 
         let result = PastaLogger::new(base_dir, Some(&config));

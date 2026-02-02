@@ -167,7 +167,7 @@ fn load_impl(lua: &Lua, state: &PersistenceState) -> LuaResult<Table> {
         }
         Err(PersistenceError::IoError(ref e)) if e.kind() == std::io::ErrorKind::NotFound => {
             // File not found is expected on first run
-            tracing::debug!(path = %state.file_path.display(), "Persistence file not found, using empty table");
+            tracing::warn!(path = %state.file_path.display(), "Persistence file not found, using empty table");
             lua.create_table()
         }
         Err(e) => {

@@ -400,6 +400,17 @@ impl PastaLuaRuntime {
         self.logger.clone()
     }
 
+    /// Get reference to PastaConfig if available.
+    ///
+    /// Returns the configuration loaded from pasta.toml during PastaLoader::load().
+    ///
+    /// # Returns
+    /// * `Some(&PastaConfig)` - Config was set during load
+    /// * `None` - Config not available (e.g., runtime created without loader)
+    pub fn config(&self) -> Option<&PastaConfig> {
+        self.config.as_ref()
+    }
+
     /// Register a custom module with the runtime.
     ///
     /// # Arguments

@@ -171,7 +171,7 @@ fn default_debug_mode() -> bool {
 
 /// Logging configuration from [logging] section in pasta.toml.
 ///
-/// Configures instance-specific logging with file rotation.
+/// Configures instance-specific logging with file rotation and log level filtering.
 #[derive(Debug, Clone, Deserialize)]
 pub struct LoggingConfig {
     /// Log file path relative to load_dir.
@@ -183,6 +183,18 @@ pub struct LoggingConfig {
     /// Default: 7
     #[serde(default = "default_rotation_days")]
     pub rotation_days: usize,
+
+    /// Default log level.
+    /// Default: "debug"
+    /// Valid: "error", "warn", "info", "debug", "trace"
+    #[serde(default = "default_log_level")]
+    pub level: String,
+
+    /// EnvFilter directive string.
+    /// When set, takes precedence over `level`.
+    /// Example: "debug,pasta_shiori=info,pasta_lua=warn"
+    #[serde(default)]
+    pub filter: Option<String>,
 }
 
 impl Default for LoggingConfig {
@@ -190,6 +202,20 @@ impl Default for LoggingConfig {
         Self {
             file_path: default_log_file_path(),
             rotation_days: default_rotation_days(),
+            level: default_log_level(),
+            filter: None,
+        }
+    }
+}
+
+impl LoggingConfig {
+    /// Build EnvFilter directive string.
+    /// Priority: filter > level > default ("debug")
+    pub fn to_filter_directive(&self) -> String {
+        if let Some(ref filter) = self.filter {
+            filter.clone()
+        } else {
+            self.level.clone()
         }
     }
 }
@@ -200,6 +226,10 @@ fn default_log_file_path() -> String {
 
 fn default_rotation_days() -> usize {
     7
+}
+
+fn default_log_level() -> String {
+    "debug".to_string()
 }
 
 /// Persistence configuration from [persistence] section in pasta.toml.
@@ -431,6 +461,39 @@ ghost_name = "NoLoaderGhost"
         let config = LoggingConfig::default();
         assert_eq!(config.file_path, "profile/pasta/logs/pasta.log");
         assert_eq!(config.rotation_days, 7);
+        assert_eq!(config.level, "debug");
+        assert!(config.filter.is_none());
+    }
+
+    #[test]
+    fn test_logging_config_to_filter_directive_with_filter() {
+        // filter優先: filterが設定されている場合はfilterを返す
+        let config = LoggingConfig {
+            file_path: default_log_file_path(),
+            rotation_days: 7,
+            level: "info".to_string(),
+            filter: Some("debug,pasta_shiori=trace".to_string()),
+        };
+        assert_eq!(config.to_filter_directive(), "debug,pasta_shiori=trace");
+    }
+
+    #[test]
+    fn test_logging_config_to_filter_directive_with_level_only() {
+        // filterなし: levelを返す
+        let config = LoggingConfig {
+            file_path: default_log_file_path(),
+            rotation_days: 7,
+            level: "warn".to_string(),
+            filter: None,
+        };
+        assert_eq!(config.to_filter_directive(), "warn");
+    }
+
+    #[test]
+    fn test_logging_config_to_filter_directive_default() {
+        // デフォルト: "debug"
+        let config = LoggingConfig::default();
+        assert_eq!(config.to_filter_directive(), "debug");
     }
 
     #[test]
@@ -447,6 +510,42 @@ rotation_days = 14
         let logging = config.logging().expect("logging section should exist");
         assert_eq!(logging.file_path, "profile/custom/logs/my.log");
         assert_eq!(logging.rotation_days, 14);
+        assert_eq!(logging.level, "debug"); // default
+        assert!(logging.filter.is_none());
+    }
+
+    #[test]
+    fn test_logging_config_from_toml_with_level() {
+        let toml_str = r#"
+[logging]
+level = "info"
+"#;
+        let config = PastaConfig::from_str(toml_str).unwrap();
+        let logging = config.logging().expect("logging section should exist");
+        assert_eq!(logging.level, "info");
+        assert!(logging.filter.is_none());
+        assert_eq!(logging.to_filter_directive(), "info");
+    }
+
+    #[test]
+    fn test_logging_config_from_toml_with_filter() {
+        let toml_str = r#"
+[logging]
+level = "info"
+filter = "debug,pasta_shiori=warn,pasta_lua::runtime=trace"
+"#;
+        let config = PastaConfig::from_str(toml_str).unwrap();
+        let logging = config.logging().expect("logging section should exist");
+        assert_eq!(logging.level, "info");
+        assert_eq!(
+            logging.filter,
+            Some("debug,pasta_shiori=warn,pasta_lua::runtime=trace".to_string())
+        );
+        // filter優先
+        assert_eq!(
+            logging.to_filter_directive(),
+            "debug,pasta_shiori=warn,pasta_lua::runtime=trace"
+        );
     }
 
     #[test]

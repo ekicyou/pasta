@@ -1,9 +1,50 @@
 use crate::error::*;
 use crate::lua_request;
+use pasta_lua::loader::LoggingConfig;
 use pasta_lua::mlua::{Function, Table};
 use pasta_lua::{GlobalLoggerRegistry, LoadDirGuard, PastaLoader, PastaLuaRuntime};
 use std::{ffi::*, path::*};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, trace, warn};
+
+/// Initialize global tracing subscriber with LoggingConfig.
+///
+/// # Filter Priority
+/// 1. PASTA_LOG environment variable (highest)
+/// 2. pasta.toml [logging].filter
+/// 3. pasta.toml [logging].level
+/// 4. Default: "debug"
+///
+/// # Note
+/// Never fails - falls back to default filter on any error.
+/// Uses try_init() so subsequent calls are safely ignored.
+pub fn init_tracing_with_config(config: &LoggingConfig) {
+    use tracing_subscriber::filter::EnvFilter;
+    use tracing_subscriber::fmt;
+    use tracing_subscriber::prelude::*;
+
+    // Build filter with priority: PASTA_LOG > config.filter > config.level > default
+    let filter = EnvFilter::try_from_env("PASTA_LOG")
+        .or_else(|_| EnvFilter::try_new(config.to_filter_directive()))
+        .unwrap_or_else(|e| {
+            eprintln!(
+                "Warning: Failed to parse log filter '{}', using default: {}",
+                config.to_filter_directive(),
+                e
+            );
+            EnvFilter::new("debug")
+        });
+
+    let _ = tracing_subscriber::registry()
+        .with(
+            fmt::layer()
+                .with_writer(GlobalLoggerRegistry::instance().clone())
+                .with_ansi(false)
+                .with_target(true)
+                .with_level(true)
+                .with_filter(filter),
+        )
+        .try_init();
+}
 
 pub trait Shiori {
     fn load<S: AsRef<OsStr>>(&mut self, hinst: isize, load_dir: S) -> MyResult<bool>;
@@ -102,6 +143,20 @@ impl Shiori for PastaShiori {
         // Load runtime via PastaLoader (logger is created inside)
         match PastaLoader::load(&load_dir_path) {
             Ok(runtime) => {
+                // Initialize tracing subscriber with config from pasta.toml (Requirement 6)
+                // Priority: PASTA_LOG env var > filter > level > default ("debug")
+                let logging_config = runtime
+                    .config()
+                    .and_then(|c| c.logging())
+                    .unwrap_or_default();
+                init_tracing_with_config(&logging_config);
+
+                // Immediately log load_dir after tracing initialization (Requirement 7)
+                info!(
+                    load_dir = %load_dir_path.display(),
+                    "Logger initialized for ghost directory"
+                );
+
                 // Register runtime's logger with global registry for log routing
                 if let Some(logger) = runtime.logger() {
                     GlobalLoggerRegistry::instance().register(load_dir_path.clone(), logger);
@@ -141,7 +196,7 @@ impl Shiori for PastaShiori {
         let _guard = self.load_dir.as_ref().map(|p| LoadDirGuard::new(p.clone()));
 
         let req = req.as_ref();
-        debug!(request_len = req.len(), "Processing SHIORI request");
+        trace!(request_len = req.len(), "Processing SHIORI request");
 
         // Call SHIORI.request using cached function
         self.call_lua_request(req)
@@ -168,7 +223,7 @@ impl PastaShiori {
                 // Cache SHIORI.load function
                 self.load_fn = match table.get::<Function>("load") {
                     Ok(f) => {
-                        debug!("SHIORI.load function cached");
+                        trace!("SHIORI.load function cached");
                         Some(f)
                     }
                     Err(_) => {
@@ -180,7 +235,7 @@ impl PastaShiori {
                 // Cache SHIORI.request function
                 self.request_fn = match table.get::<Function>("request") {
                     Ok(f) => {
-                        debug!("SHIORI.request function cached");
+                        trace!("SHIORI.request function cached");
                         Some(f)
                     }
                     Err(_) => {
@@ -192,7 +247,7 @@ impl PastaShiori {
                 // Cache SHIORI.unload function
                 self.unload_fn = match table.get::<Function>("unload") {
                     Ok(f) => {
-                        debug!("SHIORI.unload function cached");
+                        trace!("SHIORI.unload function cached");
                         Some(f)
                     }
                     Err(_) => {
@@ -235,7 +290,7 @@ impl PastaShiori {
         let load_dir_str = load_dir.to_string_lossy().to_string();
         match load_fn.call::<bool>((hinst, load_dir_str)) {
             Ok(true) => {
-                debug!("SHIORI.load returned true");
+                trace!("SHIORI.load returned true");
                 true
             }
             Ok(false) => {
@@ -279,7 +334,12 @@ impl PastaShiori {
         // Call SHIORI.request(req) with parsed table
         match request_fn.call::<String>(req_table) {
             Ok(response) => {
-                debug!(response_len = response.len(), "SHIORI.request completed");
+                // Log request/response at DEBUG level for 200 OK responses (Requirement 4)
+                if response.starts_with("SHIORI/3.0 200 OK") {
+                    debug!(request = %request, "SHIORI request (200 OK)");
+                    debug!(response = %response, "SHIORI response (200 OK)");
+                }
+                trace!(response_len = response.len(), "SHIORI.request completed");
                 Ok(response)
             }
             Err(e) => {
@@ -308,7 +368,7 @@ impl PastaShiori {
         if let Err(e) = unload_fn.call::<()>(()) {
             warn!(error = %e, "SHIORI.unload failed");
         } else {
-            debug!("SHIORI.unload called successfully");
+            info!("SHIORI.unload called successfully");
         }
     }
 
