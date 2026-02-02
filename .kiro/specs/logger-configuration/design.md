@@ -163,8 +163,8 @@ sequenceDiagram
 
 | Field | Detail |
 |-------|--------|
-| Intent | pasta.toml [logging]セクションの設定を保持 |8.1, 8.2, 8
-| Requirements | 1.1, 1.2, 1.3, 1.4, 5.1, 5.2, 5.3, 7.1, 7.2, 7.3 |
+| Intent | pasta.toml [logging]セクションの設定を保持 |
+| Requirements | 1.1, 1.2, 1.3, 1.4, 5.1, 5.2, 5.3, 7.1, 7.2, 7.3, 8.1, 8.2, 8.3 |
 
 **Responsibilities & Constraints**
 - pasta.tomlの`[logging]`セクションをデシリアライズ
