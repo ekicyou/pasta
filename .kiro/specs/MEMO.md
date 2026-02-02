@@ -50,5 +50,8 @@ EVENT.fire内部をコルーチン化し、継続が残った場合、STORE.co_f
 
 ### シーン関数にact.yield()を含めてテストを行う。
 
+
+
+
 /kiro-validate-gap alpha04-sample-ghost
 現在の要件で再度ギャップ分析して欲しい。

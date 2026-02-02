@@ -137,24 +137,26 @@ handlerは以下のいずれかを返す：
 
 **影響**: Requirement 4, 5の実装方法
 
-### DD2: ユーザー定義ハンドラ（REG）のco_handler化
+### DD2: ユーザー定義ハンドラ（REG）のco_handler化 ✅ 決定
 
-**判断事項**: REG[req.id]で登録されたカスタムイベントハンドラもコルーチン対応すべきか？
+**判断**: 戻り値型による自動判別（後方互換方式）
 
-**選択肢**:
-- **A**: 仮想イベント（OnTalk/OnHour）のみコルーチン対応
-- **B**: 全てのイベントハンドラをco_handler化（後方互換性注意）
-- **C**: オプトイン方式（開発者が明示的にCO.safe_wrapを呼ぶ）
+**理由**:
+- handlerは `thread or string or nil` を返す仕様
+- threadの場合: EVENT.fireがcoroutine.resume()で実行
+- stringの場合: そのまま返す（既存REGハンドラ互換）
+- nilの場合: no_content()を返す
 
-**影響**: Requirement 2, 3の実装範囲
+**影響**: Requirement 2, 3に反映済み
 
-### DD3: エラー発生時の継続状態管理
+### DD3: エラー発生時の継続状態管理 ✅ 決定
 
-**判断事項**: コルーチンでエラーが発生した場合、STORE.co_handlerをどう扱うか？
+**判断**: 選択肢A - エラー時に即座にクリア（安全側）
 
-**選択肢**:
-- **A**: エラー時に即座にクリア（安全側、次回は新しいシーン）
-- **B**: エラーを伝搬するがco_handlerは保持（リトライ可能）
-- **C**: エラー種別により判断（Lua errorはクリア、nilはスキップ）
+**理由**:
+- エラー発生時は`coroutine.close()`でリソース解放
+- STORE.co_threadをnilにクリア
+- エラーを伝搬させてログ出力
+- 次回OnTalkは新しいシーンから開始
 
-**影響**: Requirement 2の実装詳細、テスト戦略
+**影響**: Requirement 2.3に反映済み
