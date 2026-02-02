@@ -124,14 +124,6 @@ end
 ---@param act ShioriAct actオブジェクト（act.req でリクエスト情報にアクセス）
 ---@return thread|nil コルーチンまたはnil
 function M.check_talk(act)
-    local STORE = require("pasta.store")
-
-    -- チェイントーク継続確認
-    if STORE.co_scene then
-        -- 継続用コルーチンを返す（新規シーン検索スキップ）
-        return STORE.co_scene
-    end
-
     local current_unix = act.req.date.unix
     local cfg = get_config()
 
@@ -160,7 +152,14 @@ function M.check_talk(act)
     -- 次回トーク時刻を再計算（発行成否に関わらず）
     next_talk_time = calculate_next_talk_time(current_unix)
 
-    -- threadを返す（実行しない）
+    -- チェイントーク継続確認（OnTalk発動タイミングで判定）
+    local STORE = require("pasta.store")
+    if STORE.co_scene then
+        -- 継続用コルーチンを返す（新規シーン検索スキップ）
+        return STORE.co_scene
+    end
+
+    -- 新規シーンのthreadを返す（実行しない）
     return create_scene_thread("OnTalk", act)
 end
 
@@ -180,8 +179,7 @@ function M.dispatch(act)
     end
 
     -- OnTalk 判定
-    local talk_result = M.check_talk(act)
-    return talk_result
+    return M.check_talk(act)
 end
 
 -- 6. テスト用関数（内部状態リセット）

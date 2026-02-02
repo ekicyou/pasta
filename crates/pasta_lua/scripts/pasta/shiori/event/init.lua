@@ -131,10 +131,9 @@ function EVENT.fire(req)
     -- act オブジェクトを作成
     local act = create_act(req)
 
-    local handler = REG[req.id] or EVENT.no_entry
-
     -- ハンドラを呼び出し
     -- エラーは SHIORI.request の xpcall でキャッチされる
+    local handler = REG[req.id] or EVENT.no_entry
     local result = handler(act)
 
     -- 型判定

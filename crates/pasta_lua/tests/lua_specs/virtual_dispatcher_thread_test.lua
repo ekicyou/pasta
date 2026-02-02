@@ -153,13 +153,23 @@ describe("virtual_dispatcher - チェイントーク継続", function()
             return "final"
         end)
         coroutine.resume(existing_co) -- suspended状態に
-        STORE.co_scene = existing_co
 
         local act = create_mock_act({
             id = "OnSecondChange",
             status = "idle",
-            date = { unix = 1702648800 }
+            date = { unix = 0 }
         })
+
+        -- 初期化: next_hour_unixとnext_talk_timeを設定
+        dispatcher.check_hour(act)
+        dispatcher.check_talk(act)
+
+        -- OnTalk発動タイミングにする（next_talk_timeを過ぎる）
+        local state = dispatcher._get_internal_state()
+        act.req.date.unix = state.next_talk_time + 1
+
+        -- ここでSTORE.co_sceneを設定（OnTalk発動タイミングで継続確認される）
+        STORE.co_scene = existing_co
 
         -- check_talkは既存のコルーチンを返すべき
         local result = dispatcher.check_talk(act)
