@@ -8,7 +8,7 @@
 ### 主要発見事項
 
 1. **act:yield()は既に実装済み** - SHIORI_ACT_IMPL.yield()がcoroutine.yield()を呼び出す実装が存在
-2. **STOREにco_threadフィールドなし** - 追加が必要
+2. **STOREにco_sceneフィールドなし** - 追加が必要
 3. **EVENT.fireはhandlerを直接呼び出しているのみ** - thread判定・resume処理の追加が必要
 4. **virtual_dispatcherはシーンを直接実行している** - threadを返す形式に変更が必要
 5. **EVENT.no_entryもシーンを直接実行している** - threadを返す形式に変更が必要
@@ -29,9 +29,9 @@
 | R2: EVENT.fire拡張 | `pasta/shiori/event/init.lua` | **Missing** - thread判定、resume、状態保存ロジック |
 | R3: ハンドラ戻り値 | virtual_dispatcher, EVENT.no_entry | **Change** - 実行からthread返却に変更 |
 | R4: virtual_dispatcher改良 | `pasta/shiori/event/virtual_dispatcher.lua` | **Change** - execute_scene()をthread生成に変更 |
-| R5: チェイントーク継続 | check_talk | **Missing** - STORE.co_thread確認ロジック |
+| R5: チェイントーク継続 | check_talk | **Missing** - STORE.co_scene確認ロジック |
 | R6: act:yield() | `pasta/shiori/act.lua` L184-188 | **Exists** - ✅ 既存実装で対応可 |
-| R7: STOREモジュール | `pasta/store.lua` | **Missing** - co_threadフィールド、reset()のclose処理 |
+| R7: STOREモジュール | `pasta/store.lua` | **Missing** - co_sceneフィールド、reset()のclose処理 |
 | R8: テスト | (新規) | **New** - 統合テスト作成が必要 |
 
 ---
@@ -52,7 +52,7 @@ end
 **変更必要箇所**:
 - handler(act)の戻り値がthreadかstring/nilか判定
 - threadの場合: coroutine.resume(result, act)を実行
-- resume後のstatus確認（suspended→STORE.co_thread保存、dead→クリア）
+- resume後のstatus確認（suspended→STORE.co_scene保存、dead→クリア）
 - エラー処理: coroutine.close()でリソース解放
 
 ### 3.2 EVENT.no_entry (init.lua L82-98)
@@ -105,19 +105,19 @@ end
 ```
 
 **変更必要箇所**（R5: チェイントーク継続）:
-- 最初にSTORE.co_threadを確認
-- co_threadがsuspendedなら、そのthreadを返す（新規シーン検索スキップ）
-- co_threadがnilなら、新規シーン検索してthread生成
+- 最初にSTORE.co_sceneを確認
+- co_sceneがsuspendedなら、そのthreadを返す（新規シーン検索スキップ）
+- co_sceneがnilなら、新規シーン検索してthread生成
 
 ### 3.5 STORE (store.lua)
 
 **現状**:
-- co_threadフィールドなし
+- co_sceneフィールドなし
 - reset()にclose処理なし
 
 **変更必要箇所**:
-- `STORE.co_thread = nil` フィールド追加
-- reset()内でSTORE.co_threadがsuspendedならcoroutine.close()してからnil
+- `STORE.co_scene = nil` フィールド追加
+- reset()内でSTORE.co_sceneがsuspendedならcoroutine.close()してからnil
 
 ### 3.6 act:yield() (shiori/act.lua L184-188)
 
@@ -144,7 +144,7 @@ end
 **変更対象**:
 1. `pasta/shiori/event/init.lua` - EVENT.fire, EVENT.no_entry
 2. `pasta/shiori/event/virtual_dispatcher.lua` - execute_scene → create_scene_thread
-3. `pasta/store.lua` - co_threadフィールド、reset()
+3. `pasta/store.lua` - co_sceneフィールド、reset()
 
 **Trade-offs**:
 - ✅ 最小限の新規ファイル
@@ -170,7 +170,7 @@ end
 
 ## 5. 実装順序（推奨）
 
-1. **STORE拡張** - co_threadフィールド追加、reset()にclose処理
+1. **STORE拡張** - co_sceneフィールド追加、reset()にclose処理
 2. **EVENT.fire拡張** - thread判定、resume、状態保存
 3. **EVENT.no_entry変更** - thread返却
 4. **virtual_dispatcher変更** - thread返却、check_talkにチェイントーク継続
@@ -182,7 +182,7 @@ end
 
 ### 6.1 actオブジェクトのスコープ
 
-**課題**: check_talkでSTORE.co_threadを返す場合、前回のactと今回のactが異なる可能性
+**課題**: check_talkでSTORE.co_sceneを返す場合、前回のactと今回のactが異なる可能性
 
 **要検討**: 
 - コルーチン再開時に新しいactをresume引数として渡す設計が必要
@@ -224,7 +224,7 @@ end
 ```
 scripts/pasta/
 ├── co.lua                          # ⚠️ 使用しない（coroutine.create直接管理）
-├── store.lua                       # 🔧 co_thread フィールド追加、reset()改修
+├── store.lua                       # 🔧 co_scene フィールド追加、reset()改修
 └── shiori/
     ├── act.lua                     # ✅ 変更不要（yield()実装済み）
     ├── res.lua                     # ✅ 変更不要

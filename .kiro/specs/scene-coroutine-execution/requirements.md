@@ -49,11 +49,11 @@ EVENT.fireのみがstring/nil互換を処理（既存コードベースとの後
 1. When EVENT.fireがhandlerを呼び出したとき, the EVENT module shall `local result = handler(act)` を実行する
 2. If resultがthread（コルーチン）の場合, the EVENT module shall `local ok, yielded_value = coroutine.resume(result, act)` を実行する
 3. When `coroutine.resume()` が `(false, error_message)` を返したとき, the EVENT module shall コルーチンを `coroutine.close()` で解放し、`error(error_message)` を発生させる
-4. When `coroutine.resume()` 後に `coroutine.status(co)` が "suspended" のとき, the EVENT module shall `STORE.co_thread` にコルーチンを保存し、`RES.ok(yielded_value)` を返す（yieldされた値をレスポンスに使用）
-5. When `coroutine.resume()` 後に `coroutine.status(co)` が "dead" のとき, the EVENT module shall `STORE.co_thread` を nil にクリアし、適切なレスポンスを返す
+4. When `coroutine.resume()` 後に `coroutine.status(co)` が "suspended" のとき, the EVENT module shall `STORE.co_scene` にコルーチンを保存し、`RES.ok(yielded_value)` を返す（yieldされた値をレスポンスに使用）
+5. When `coroutine.resume()` 後に `coroutine.status(co)` が "dead" のとき, the EVENT module shall `STORE.co_scene` を nil にクリアし、適切なレスポンスを返す
 6. If resultがstringの場合, the EVENT module shall `RES.ok(result)` を返す（空文字列の場合は `RES.no_content()`）
 7. If resultがnilの場合, the EVENT module shall `RES.no_content()` を返す
-8. When 新しいコルーチンを `STORE.co_thread` に設定しようとしたとき、既存の `STORE.co_thread` が存在しsuspended状態の場合, the EVENT module shall 先に `coroutine.close(STORE.co_thread)` で解放してから更新する
+8. When 新しいコルーチンを `STORE.co_scene` に設定しようとしたとき、既存の `STORE.co_scene` が存在しsuspended状態の場合, the EVENT module shall 先に `coroutine.close(STORE.co_scene)` で解放してから更新する
 
 ### Requirement 3: シーン関数ハンドラの戻り値
 
@@ -85,7 +85,7 @@ EVENT.fireのみがstring/nil互換を処理（既存コードベースとの後
 3. When dispatch()がcheck_hourまたはcheck_talkから非nilハンドラを受け取ったとき, the virtual_dispatcher module shall それを呼び出し元に返す
 4. The virtual_dispatcher module shall シーン関数を直接実行しない; 実行はEVENT.fireに委譲される
 
-### Requirement 5: チェイントーク継続（STORE.co_thread）
+### Requirement 5: チェイントーク継続（STORE.co_scene）
 
 **目的:** OnTalkハンドラとして、前回中断したコルーチンを継続できるようにし、複数回に分けた対話が自然に繋がるようにする
 
@@ -93,11 +93,11 @@ EVENT.fireのみがstring/nil互換を処理（既存コードベースとの後
 
 #### 受け入れ基準
 
-1. When OnTalkタイミングに到達し、`STORE.co_thread` が nil でないとき, the check_talk関数 shall `STORE.co_thread` (継続用コルーチン) を返す
-2. When OnTalkタイミングに到達し、`STORE.co_thread` が nil のとき, the check_talk関数 shall 新しいOnTalkシーンを検索して返す
-3. While コルーチンがsuspended状態の間（`STORE.co_thread` が設定されている）, 新しいOnTalkシーン shall 継続を優先してスキップされる
-4. If 継続されたコルーチンが正常終了した場合, the STORE.co_thread shall クリアされる
-5. The OnHourイベント shall チェイントーク機能を使用せず、常に完結実行する（STORE.co_threadに影響されない）
+1. When OnTalkタイミングに到達し、`STORE.co_scene` が nil でないとき, the check_talk関数 shall `STORE.co_scene` (継続用コルーチン) を返す
+2. When OnTalkタイミングに到達し、`STORE.co_scene` が nil のとき, the check_talk関数 shall 新しいOnTalkシーンを検索して返す
+3. While コルーチンがsuspended状態の間（`STORE.co_scene` が設定されている）, 新しいOnTalkシーン shall 継続を優先してスキップされる
+4. If 継続されたコルーチンが正常終了した場合, the STORE.co_scene shall クリアされる
+5. The OnHourイベント shall チェイントーク機能を使用せず、常に完結実行する（STORE.co_sceneに影響されない）
 
 ### Requirement 6: act.yield() 機能
 
@@ -116,9 +116,9 @@ EVENT.fireのみがstring/nil互換を処理（既存コードベースとの後
 
 #### 受け入れ基準
 
-1. The STOREモジュール shall nilで初期化された `STORE.co_thread` フィールドを持つ
-2. When STORE.reset()が呼び出されたとき, the STOREモジュール shall 既存の `STORE.co_thread` がsuspended状態なら `coroutine.close()` で解放し、その後 nil にクリアする
-3. The STORE.co_threadフィールド shall コルーチン（thread）またはnilを保持する
+1. The STOREモジュール shall nilで初期化された `STORE.co_scene` フィールドを持つ
+2. When STORE.reset()が呼び出されたとき, the STOREモジュール shall 既存の `STORE.co_scene` がsuspended状態なら `coroutine.close()` で解放し、その後 nil にクリアする
+3. The STORE.co_sceneフィールド shall コルーチン（thread）またはnilを保持する
 
 ### Requirement 8: テストによる検証
 
@@ -126,9 +126,9 @@ EVENT.fireのみがstring/nil互換を処理（既存コードベースとの後
 
 #### 受け入れ基準
 
-1. When `act:yield()` を含むシーン関数が実行されたとき, the テスト shall `STORE.co_thread` が設定されていることを検証する
+1. When `act:yield()` を含むシーン関数が実行されたとき, the テスト shall `STORE.co_scene` が設定されていることを検証する
 2. When 次のOnTalkイベントが発生したとき, the テスト shall 継続が再開されることを検証する
-3. When 継続後にシーン関数が正常にreturnしたとき, the テスト shall `STORE.co_thread` がクリアされていることを検証する
+3. When 継続後にシーン関数が正常にreturnしたとき, the テスト shall `STORE.co_scene` がクリアされていることを検証する
 4. The テスト shall コルーチンがエラーを発生させたときのエラー伝搬と `coroutine.close()` による解放を検証する
 5. The テスト shall 既存のsuspendedコルーチンがある状態で新しいコルーチンを設定したとき、既存コルーチンが `coroutine.close()` で解放されることを検証する
 
@@ -153,7 +153,7 @@ EVENT.fireのみがstring/nil互換を処理（既存コードベースとの後
 **理由**:
 - OnHourは時報であり、1回完結が自然
 - OnHourは通常の一般イベントハンドラと同じ扱い
-- STORE.co_threadの管理がシンプル
+- STORE.co_sceneの管理がシンプル
 
 **影響**: Requirement 4, 5に反映済み
 
@@ -176,7 +176,7 @@ EVENT.fireのみがstring/nil互換を処理（既存コードベースとの後
 
 **理由**:
 - エラー発生時は`coroutine.close()`でリソース解放
-- STORE.co_threadをnilにクリア
+- STORE.co_sceneをnilにクリア
 - エラーを伝搬させてログ出力
 - 次回OnTalkは新しいシーンから開始
 
