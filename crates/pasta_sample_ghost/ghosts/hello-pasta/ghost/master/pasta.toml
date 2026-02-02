@@ -33,3 +33,9 @@ random_talk_interval = 180
 [persistence]
 # 永続化データディレクトリ
 data_dir = "profile/pasta/save"
+
+[logging]
+# ログファイルパス（load_dir からの相対パス）
+file_path = "profile/pasta/logs/pasta.log"
+# ログローテーション日数
+rotation_days = 7
