@@ -251,6 +251,7 @@ impl Default for LoggingConfig {
 |-------|--------|
 | Intent | PastaLuaRuntimeが保持するPastaConfigへの参照を提供 |
 | Requirements | - (インフラ機能) |
+| File | crates/pasta_lua/src/runtime/mod.rs |
 
 **Responsibilities & Constraints**
 - `PastaLoader::load()`によって初期化されたPastaConfigへの不変参照を返す
