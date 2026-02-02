@@ -29,27 +29,36 @@
 
 ### Requirement 2: EVENT.fire コルーチン対応
 
-**目的:** SHIORIランタイムとして、EVENT.fireがコルーチン（thread）を直接管理し、シーン関数の中断と継続が透過的に行えるようにする
+**目的:** SHIORIランタイムとして、EVENT.fireがハンドラの戻り値に応じて柔軟に処理し、シーン関数の中断と継続が透過的に行えるようにする
+
+#### ハンドラ戻り値の仕様
+
+handlerは以下のいずれかを返す：
+- `thread`（コルーチン）: EVENT.fireがresumeして実行
+- `string`（SHIORIレスポンス）: そのまま返す
+- `nil`: no_contentを返す
 
 #### 受け入れ基準
 
-1. When EVENT.fireがシーン関数を受け取ったとき, the EVENT module shall `coroutine.create(fn)` でコルーチンを生成する
-2. When `coroutine.resume(co, act)` が `(false, error_message)` を返したとき, the EVENT module shall コルーチンを `coroutine.close(co)` で解放し、`error(error_message)` を発生させる
-3. When `coroutine.resume()` 後に `coroutine.status(co)` が "suspended" のとき, the EVENT module shall `STORE.co_thread` にコルーチンを保存する
-4. When `coroutine.resume()` 後に `coroutine.status(co)` が "dead" のとき, the EVENT module shall `STORE.co_thread` を nil にクリアする
-5. If valueが空でない文字列の場合, the EVENT module shall `RES.ok(value)` を返す
-6. If valueがnilまたは空文字列の場合, the EVENT module shall `RES.no_content()` を返す
-7. When 新しいコルーチンを設定しようとしたとき、既存の `STORE.co_thread` が存在しsuspended状態の場合, the EVENT module shall 先に `coroutine.close(STORE.co_thread)` で解放してから更新する
+1. When EVENT.fireがhandlerを呼び出したとき, the EVENT module shall `local result = handler(act)` を実行する
+2. If resultがthread（コルーチン）の場合, the EVENT module shall `coroutine.resume(result, act)` を実行する
+3. When `coroutine.resume()` が `(false, error_message)` を返したとき, the EVENT module shall コルーチンを `coroutine.close()` で解放し、`error(error_message)` を発生させる
+4. When `coroutine.resume()` 後に `coroutine.status(co)` が "suspended" のとき, the EVENT module shall `STORE.co_thread` にコルーチンを保存する
+5. When `coroutine.resume()` 後に `coroutine.status(co)` が "dead" のとき, the EVENT module shall `STORE.co_thread` を nil にクリアする
+6. If resultがstringの場合, the EVENT module shall `RES.ok(result)` を返す（空文字列の場合は `RES.no_content()`）
+7. If resultがnilの場合, the EVENT module shall `RES.no_content()` を返す
+8. When 新しいコルーチンを `STORE.co_thread` に設定しようとしたとき、既存の `STORE.co_thread` が存在しsuspended状態の場合, the EVENT module shall 先に `coroutine.close(STORE.co_thread)` で解放してから更新する
 
-### Requirement 3: シーン関数取得とコルーチン生成
+### Requirement 3: シーン関数ハンドラの戻り値
 
-**目的:** イベントシステムとして、シーン関数を取得し、EVENT.fireに渡すことで、EVENT.fireが統一的にコルーチンを生成・処理できるようにする
+**目的:** イベントシステムとして、シーン関数をコルーチンとして返すことで、EVENT.fireが統一的に処理できるようにする
 
 #### 受け入れ基準
 
-1. When SCENE.searchがシーン関数を返すとき, the 呼び出し元 shall シーン関数をそのままEVENT.fireに渡す
-2. When EVENT.no_entryがシーン関数を取得するとき, the EVENT module shall シーン関数をそのまま処理に渡す
-3. The コルーチン生成 shall EVENT.fire内部で `coroutine.create()` により行われる
+1. When virtual_dispatcherがシーン関数を取得したとき, the dispatcher shall `coroutine.create(scene_fn)` でコルーチンを生成し、threadを返す
+2. When EVENT.no_entryがシーン関数を取得したとき, the EVENT module shall `coroutine.create(scene_fn)` でコルーチンを生成し、threadを返す
+3. The コルーチン生成 shall シーン関数を返すハンドラ内で行われ、EVENT.fireにはthreadが渡される
+4. The 既存のREGハンドラ（stringを返す）shall 変更なしで動作し続ける（後方互換性）
 
 ### Requirement 4: virtual_dispatcher.lua dispatch()関数の改良
 
