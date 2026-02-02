@@ -135,19 +135,17 @@ EVENT.fireのみがstring/nil互換を処理（既存コードベースとの後
 ---
 
 ## 設計判断事項（Design Decisions）
- ✅ 決定
+
+### DD1: チェイントーク対象イベント ✅ 決定
 
 **判断**: OnTalkのみチェイントーク対応（選択肢A）
 
 **理由**:
 - OnHourは時報であり、1回完結が自然
 - OnHourは通常の一般イベントハンドラと同じ扱い
-- STORE.co_handlerの管理がシンプル
+- STORE.co_threadの管理がシンプル
 
-**影響**: Requirement 4, 5に反映済みORE.co_handlerを共有）
-- **C**: OnHour専用の継続ストレージを用意（STORE.co_handler_hour）
-
-**影響**: Requirement 4, 5の実装方法
+**影響**: Requirement 4, 5に反映済み
 
 ### DD2: ユーザー定義ハンドラ（REG）のco_handler化 ✅ 決定
 
