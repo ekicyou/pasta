@@ -150,10 +150,10 @@ sequenceDiagram
 ## Components and Interfaces
 
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies | Contracts |
-|-----------|--------------|--------|--------------|-8 | serde (P0) | State |
+|-----------|--------------|--------|--------------|------------------|-----------|
+| LoggingConfig | pasta_lua/loader | pasta.toml [logging]設定 | 1, 5, 8 | serde (P0) | State |
 | init_tracing_with_config | pasta_shiori/shiori | tracing subscriber初期化 | 2, 6 | tracing-subscriber (P0), LoggingConfig (P0) | Service |
-| PastaShiori::load (変更) | pasta_shiori/shiori | subscriber初期化後のログ出力 | 7 | - | -
-| init_tracing_with_config | pasta_shiori/shiori | tracing subscriber初期化 | 2, 6 | tracing-subscriber (P0), LoggingConfig (P0) | Service |
+| PastaShiori::load (変更) | pasta_shiori/shiori | subscriber初期化後のログ出力 | 7 | - | - |
 | call_lua_request (変更) | pasta_shiori/shiori | 200 OKログ追加 | 4 | - | Service |
 | ログレベル調整 | pasta_shiori, pasta_lua | マクロ変更 | 3 | tracing (P0) | - |
 
