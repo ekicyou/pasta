@@ -50,11 +50,13 @@
 
 ### Requirement 4: virtual_dispatcher.lua dispatch()関数の改良
 
-**目的:** 仮想イベントディスパッチャとして、check_hour/check_talkがco_handlerを返すことで、呼び出し元がコルーチン継続を管理できるようにする
+**目的:** 仮想イベントディスパッチャとして、co_handlerを返すことで、呼び出し元が統一的にハンドラを処理できるようにする
+
+**注**: OnHourは通常イベントと同じ扱い（チェイントーク非対応）、OnTalkのみチェイントーク対応
 
 #### 受け入れ基準
 
-1. When check_hourがOnHourシーンを見つけたとき, the virtual_dispatcher module shall 実行せずに `co_handler` を返す
+1. When check_hourがOnHourシーンを見つけたとき, the virtual_dispatcher module shall 実行せずに `co_handler` を返す（通常イベントと同様、毎回完結実行）
 2. When check_talkがOnTalkシーンを見つけたとき, the virtual_dispatcher module shall 実行せずに `co_handler` を返す
 3. When dispatch()がcheck_hourまたはcheck_talkから非nilハンドラを受け取ったとき, the virtual_dispatcher module shall それを呼び出し元に返す
 4. The virtual_dispatcher module shall シーン関数を直接実行しない; 実行はEVENT.fireに委譲される
@@ -63,12 +65,15 @@
 
 **目的:** OnTalkハンドラとして、前回中断したコルーチンを継続できるようにし、複数回に分けた対話が自然に繋がるようにする
 
+**スコープ**: チェイントーク機能はOnTalkイベントのみ対応。OnHourおよび他の通常イベントは対象外
+
 #### 受け入れ基準
 
 1. When OnTalkタイミングに到達し、`STORE.co_handler` が nil でないとき, the check_talk関数 shall `STORE.co_handler` (継続) を返す
 2. When OnTalkタイミングに到達し、`STORE.co_handler` が nil のとき, the check_talk関数 shall 新しいOnTalkシーンを検索し、`CO.safe_wrap()` でラップする
 3. While コルーチンがyieldされている間（`STORE.co_handler` が設定されている）, 新しいOnTalkシーン shall 継続を優先してスキップされる
 4. If 継続されたコルーチンが ("return", value) を返した場合, the STORE.co_handler shall クリアされる
+5. The OnHourイベント shall チェイントーク機能を使用せず、常に完結実行する（STORE.co_handlerに影響されない）
 
 ### Requirement 6: act.yield() 機能
 
@@ -105,16 +110,16 @@
 ---
 
 ## 設計判断事項（Design Decisions）
+ ✅ 決定
 
-以下の項目は設計フェーズで判断する：
+**判断**: OnTalkのみチェイントーク対応（選択肢A）
 
-### DD1: OnHourシーンのコルーチン対応
+**理由**:
+- OnHourは時報であり、1回完結が自然
+- OnHourは通常の一般イベントハンドラと同じ扱い
+- STORE.co_handlerの管理がシンプル
 
-**判断事項**: OnHourイベントもチェイントーク（継続）を許可するか？
-
-**選択肢**:
-- **A**: OnTalkのみコルーチン継続を許可（OnHourは常に完結実行）
-- **B**: OnHourもコルーチン継続を許可（STORE.co_handlerを共有）
+**影響**: Requirement 4, 5に反映済みORE.co_handlerを共有）
 - **C**: OnHour専用の継続ストレージを用意（STORE.co_handler_hour）
 
 **影響**: Requirement 4, 5の実装方法
