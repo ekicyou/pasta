@@ -132,6 +132,16 @@ EVENT.fireのみがstring/nil互換を処理（既存コードベースとの後
 4. The テスト shall コルーチンがエラーを発生させたときのエラー伝搬と `coroutine.close()` による解放を検証する
 5. The テスト shall 既存のsuspendedコルーチンがある状態で新しいコルーチンを設定したとき、既存コルーチンが `coroutine.close()` で解放されることを検証する
 
+### Requirement 9: RES.ok()の空文字列処理拡張
+
+**目的:** レスポンス生成モジュールとして、nil/空文字列を統一的にno_contentに変換し、イベント処理層での空チェックを不要にする
+
+#### 受け入れ基準
+
+1. When `RES.ok(script)` が呼び出され、scriptがnilの場合, the RESモジュール shall `RES.no_content()` を返す
+2. When `RES.ok(script)` が呼び出され、scriptが空文字列 `""` の場合, the RESモジュール shall `RES.no_content()` を返す
+3. When `RES.ok(script)` が呼び出され、scriptが有効な文字列の場合, the RESモジュール shall 通常のSHIORIレスポンスを生成して返す
+
 ---
 
 ## 設計判断事項（Design Decisions）
@@ -199,3 +209,27 @@ end
 - Requirement 2: resume時の引数仕様（引数なし）、戻り値処理（yieldされた値を使う）
 - Requirement 3: coroutine.create()のラッパー関数パターン
 - act:yield()はcoroutine.yield(script)でscriptをyield、EVENT.fireがそれを受け取る
+
+### DD5: yieldされた値がnil/空文字列の場合の処理 ✅ 決定
+
+**判断**: 選択肢B - RES.ok()内部でチェック
+
+**設計原則**:
+- **RES.ok()はnil/空文字列を自動的にno_contentに変換**
+- EVENT.fire側では空チェック不要（RES.ok()に委譲）
+- 統一的な空文字列処理（全てのRES.ok()呼び出しで一貫性）
+
+**実装パターン**:
+```lua
+-- res.lua内部
+function RES.ok(script)
+    if script == nil or script == "" then
+        return RES.no_content()
+    end
+    -- 通常のレスポンス生成
+end
+```
+
+**影響**:
+- 新規Requirement 9: RES.ok()の拡張
+- Requirement 2.4: yielded_valueの空チェックは不要（RES.ok()が処理）
