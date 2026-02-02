@@ -180,6 +180,89 @@ sequenceDiagram
     EF->>EF: error(error_message)
 ```
 
+### OnSecondChange統合フロー
+
+**統合ポイント**: `OnSecondChange`ハンドラは`virtual_dispatcher.dispatch()`からthreadを受け取り、EVENT.fireのthread処理ロジックに渡す。
+
+**統合パターン（2つのアプローチ）**:
+
+#### アプローチA: OnSecondChange内で直接resume（シンプル、低結合）
+
+```lua
+REG.OnSecondChange = function(act)
+    local thread = dispatcher.dispatch(act)
+    
+    if thread then
+        -- 直接resume実行
+        local ok, yielded_value = coroutine.resume(thread, act)
+        if not ok then
+            coroutine.close(thread)
+            error(yielded_value)
+        end
+        
+        -- 状態保存（EVENT.fireのロジックと同様）
+        local function set_co_scene(co)
+            if co and coroutine.status(co) ~= "suspended" then
+                coroutine.close(co)
+                co = nil
+            end
+            if STORE.co_scene == co then return end
+            if STORE.co_scene then coroutine.close(STORE.co_scene) end
+            STORE.co_scene = co
+        end
+        
+        set_co_scene(thread)
+        return RES.ok(yielded_value)
+    end
+    
+    return RES.no_content()
+end
+```
+
+#### アプローチB: EVENT.fire共通ロジック再利用（統一性、再利用性）
+
+```lua
+-- EVENT.fire内に共通ヘルパーを追加
+local function handle_thread_result(thread, act)
+    local ok, yielded_value = coroutine.resume(thread, act)
+    if not ok then
+        set_co_scene(thread)
+        error(yielded_value)
+    end
+    set_co_scene(thread)
+    return RES.ok(yielded_value)
+end
+
+-- EVENT.fire本体
+function EVENT.fire(req)
+    local act = create_act(req)
+    local handler = REG[req.id] or EVENT.no_entry
+    local result = handler(act)
+    
+    if type(result) == "thread" then
+        return handle_thread_result(result, act)  -- 共通処理
+    elseif type(result) == "string" then
+        return RES.ok(result)
+    else
+        return RES.no_content()
+    end
+end
+
+-- OnSecondChangeから呼び出し
+REG.OnSecondChange = function(act)
+    local thread = dispatcher.dispatch(act)
+    
+    if thread then
+        -- EVENT.fireの共通ロジックを再利用
+        return handle_thread_result(thread, act)
+    end
+    
+    return RES.no_content()
+end
+```
+
+**アーキテクチャ判断**: アプローチの選択は実装フェーズで決定（議題1参照）
+
 ---
 
 ## Requirements Traceability
