@@ -86,19 +86,19 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 ```
 DllMain (DLL_PROCESS_ATTACH)
   └─ RawShiori::new()
-       └─ init_tracing() ← ここでsubscriber設定
+       └─ init_tracing() ← 現在ここでsubscriber設定
           （load_dir不明、pasta.toml読めない）
 
 load() エントリポイント
   └─ PastaShiori::load()
-       └─ PastaLoader::load()
-            └─ PastaConfig::load() ← ここでpasta.toml読み込み
+       └─ PastaLoader::load() ← ここでpasta.toml読み込み
 ```
 
-**解決オプション:**
-1. **デフォルトフィルタで初期化** → 実行時変更不可（tracing制約）
-2. **環境変数連携** → `PASTA_LOG`環境変数でオーバーライド
-3. **reload機能** → `tracing_subscriber::reload`レイヤー使用（複雑）
+**解決策（採用）:**
+`init_tracing()`を`PastaLoader::load()`完了後に遅延させる。これにより：
+- pasta.tomlの`[logging]`設定が即時反映される
+- DllMain〜load()間のログは出力されない（正常系では問題なし）
+- `PASTA_LOG`環境変数はデバッグ用オーバーライドとして残す
 
 ### 2.3 Complexity Signals
 
@@ -240,21 +240,26 @@ fn update_filter(config: &LoggingConfig) {
 
 ## 5. Recommendations for Design Phase
 
-### 推奨アプローチ
+### 採用アプローチ
 
-**Option B: Environment Variable Override** を推奨
+**init_tracing遅延初期化 + 環境変数オーバーライド**
+
+開発者との議論により決定：
+1. `init_tracing()`を`PastaLoader::load()`完了後に遅延
+2. LoggingConfigからEnvFilterを構築
+3. `PASTA_LOG`環境変数がある場合は優先（デバッグ用）
 
 **理由:**
-1. 実装が単純で予測可能
-2. 開発者向けデバッグ機能として`PASTA_LOG`環境変数は有用
-3. pasta.toml設定はデフォルト値として機能（起動時適用）
-4. 将来的にOption C（reload）への移行パスを残せる
+1. pasta.toml設定が即時反映される（ユーザー期待に合致）
+2. 実装がシンプル（reload不要）
+3. 環境変数オーバーライドでデバッグ柔軟性を確保
 
 ### Key Decisions for Design Phase
 
 1. **フィルタ優先順位**: `PASTA_LOG`環境変数 > pasta.toml > ハードコードデフォルト
 2. **デフォルトフィルタ文字列**: Requirement 3のレベル調整を反映した静的フィルタ
 3. **200 OK判定方法**: レスポンス文字列に`"SHIORI/3.0 200 OK"`が含まれるかチェック
+4. **DllMain〜load()間のログ**: 出力されない（許容）
 
 ### Research Items to Carry Forward
 
@@ -267,8 +272,9 @@ fn update_filter(config: &LoggingConfig) {
 
 | 項目 | 状況 |
 |------|------|
-| **主要ギャップ** | init_tracingタイミング問題（pasta.toml読み込み前に実行） |
+| **解決策** | init_tracing遅延初期化（PastaLoader::load()完了後） |
 | **既存資産** | `env-filter`機能有効、LoggingConfig・init_tracing存在 |
-| **推奨アプローチ** | Option B（環境変数オーバーライド） |
+| **フィルタ優先順位** | PASTA_LOG環境変数 > pasta.toml > デフォルト |
 | **工数** | S (1-2日) |
 | **リスク** | Low |
+| **トレードオフ** | DllMain〜load()間のログは出力されない（許容） |

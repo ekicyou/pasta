@@ -4,7 +4,7 @@
 
 本仕様は、pasta.tomlの`[logging]`セクションを通じてGlobalLoggerRegistryのログ出力を制御する機能を定義します。`tracing-subscriber`の`EnvFilter`ディレクティブ構文を活用し、ターゲット別・レベル別のログフィルタリングをTOML設定で宣言的に記述できるようにします。
 
-**制約事項:** DLL初期化時（DllMain）にはpasta.tomlが読み込めないため、pasta.toml設定は次回起動時に反映されます。即時にログフィルタを変更したい場合は`PASTA_LOG`環境変数を使用します。
+**アーキテクチャ決定:** tracing subscriber初期化を`PastaLoader::load()`完了後に遅延させることで、pasta.toml設定を即時反映する。`PASTA_LOG`環境変数はデバッグ用のオーバーライド手段として提供する。
 
 ## Project Description (Original Input)
 
@@ -87,25 +87,22 @@ GlobalLoggerRegistryのログ出力
 2. When `level`と`filter`の両方が設定されている, the LoggingConfig shall `filter`を優先
 3. The pasta.toml shall `[logging]`セクション未設定時にデフォルト値を使用
 
-#### Note
+### Requirement 6: tracing subscriber遅延初期化
 
-pasta.toml設定はDLL初期化後のload()時に読み込まれるため、設定変更は次回起動時に反映される。即時反映が必要な場合は`PASTA_LOG`環境変数を使用する。
-
-### Requirement 6: init_tracing EnvFilter統合
-
-**Objective:** As a ゴースト開発者, I want 環境変数でログフィルタを指定可能, so that デバッグ時に柔軟にログ制御できる
+**Objective:** As a ゴースト開発者, I want pasta.toml設定が起動時に即時反映される, so that 設定変更後の再起動で新しいログ設定が有効になる
 
 #### Acceptance Criteria
 
-1. The RawShiori::init_tracing shall `PASTA_LOG`環境変数からEnvFilterを構築
-2. When `PASTA_LOG`環境変数が未設定の場合, the init_tracing shall デフォルトのDEBUGレベルフィルタを使用
-3. When EnvFilterの構築に失敗した場合, the init_tracing shall デフォルトのDEBUGレベルフィルタにフォールバック
-4. The EnvFilter shall `tracing_subscriber::registry().with(fmt::layer().with_filter(env_filter))`パターンで適用
+1. The pasta_shiori shall `init_tracing()`を`PastaLoader::load()`完了後に実行
+2. The init_tracing shall LoggingConfigからEnvFilterを構築
+3. When `PASTA_LOG`環境変数が設定されている場合, the init_tracing shall 環境変数を優先（デバッグ用オーバーライド）
+4. When EnvFilterの構築に失敗した場合, the init_tracing shall デフォルトのDEBUGレベルフィルタにフォールバック
+5. The EnvFilter shall `tracing_subscriber::registry().with(fmt::layer().with_filter(env_filter))`パターンで適用
 
-#### Technical Constraint
+#### Design Decision
 
-- pasta.tomlの読み込みはDLL初期化後のload()時に行われるため、`[logging]`セクションの設定は次回起動時に反映される
-- 即時反映が必要な場合は`PASTA_LOG`環境変数を使用
+- DllMain時点ではtracing subscriberを設定しない（load_dirが不明でpasta.tomlが読めないため）
+- DllMain〜load()間のログは出力されない（正常系では問題なし、エラー時のみ影響）
 
 ### Requirement 7: 後方互換性
 
