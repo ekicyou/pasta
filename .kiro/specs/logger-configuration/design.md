@@ -432,9 +432,9 @@ match request_fn.call::<String>(req_table) {
 | 対象 | 現在 | 変更後 | ファイル:行 |
 |------|------|--------|-------------|
 | `SHIORI.load function cached` | DEBUG | TRACE | shiori.rs:171 |
-| `SHIORI.request function cached` | DEBUG | TRACE | shiori.rs:180 |
-| `SHIORI.unload function cached` | DEBUG | TRACE | shiori.rs:189 |
-| `SHIORI.load returned true` | DEBUG | TRACE | shiori.rs:244 |
+| `SHIORI.request function cached` | DEBUG | TRACE | shiori.rs:183 |
+| `SHIORI.unload function cached` | DEBUG | TRACE | shiori.rs:195 |
+| `SHIORI.load returned true` | DEBUG | TRACE | shiori.rs:238 |
 | `Processing SHIORI request` | DEBUG | TRACE | shiori.rs:144 |
 | `SHIORI.request completed` | DEBUG | TRACE | shiori.rs:282 |
 | `Persistence file not found` | DEBUG | WARN | persistence.rs:170 |
