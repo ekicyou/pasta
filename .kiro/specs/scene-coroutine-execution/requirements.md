@@ -35,8 +35,14 @@
 
 handlerは以下のいずれかを返す：
 - `thread`（コルーチン）: EVENT.fireがresumeして実行
-- `string`（SHIORIレスポンス）: そのまま返す
+- `string`（SHIORIレスポンス）: そのまま返す（既存互換のみ）
 - `nil`: no_contentを返す
+
+#### 実装規約
+
+**全ての新規実装ハンドラは必ずthreadを返すこと**（virtual_dispatcher, EVENT.no_entry, 新規REGハンドラ等）
+
+EVENT.fireのみがstring/nil互換を処理（既存コードベースとの後方互換用）
 
 #### 受け入れ基準
 
@@ -53,12 +59,18 @@ handlerは以下のいずれかを返す：
 
 **目的:** イベントシステムとして、シーン関数をコルーチンとして返すことで、EVENT.fireが統一的に処理できるようにする
 
+#### 実装規約
+
+**virtual_dispatcherとEVENT.no_entryは必ずthreadを返す**
+
+シーン関数が見つからない場合でも、空のコルーチンまたはnilを返す（実装判断）
+
 #### 受け入れ基準
 
-1. When virtual_dispatcherがシーン関数を取得したとき, the dispatcher shall `coroutine.create(scene_fn)` でコルーチンを生成し、threadを返す
-2. When EVENT.no_entryがシーン関数を取得したとき, the EVENT module shall `coroutine.create(scene_fn)` でコルーチンを生成し、threadを返す
+1. When virtual_dispatcherがシーン関数を取得したとき, the dispatcher shall `coroutine.create(scene_fn)` でコルーチンを生成し、**必ずthreadを返す**
+2. When EVENT.no_entryがシーン関数を取得したとき, the EVENT module shall `coroutine.create(scene_fn)` でコルーチンを生成し、**threadを返す**（見つからない場合はnilを返してEVENT.fireがno_content処理）
 3. The コルーチン生成 shall シーン関数を返すハンドラ内で行われ、EVENT.fireにはthreadが渡される
-4. The 既存のREGハンドラ（stringを返す）shall 変更なしで動作し続ける（後方互換性）
+4. The 既存のREGハンドラ（stringを返す）shall 変更なしで動作し続ける（EVENT.fireレベルで後方互換性を保証）
 
 ### Requirement 4: virtual_dispatcher.lua dispatch()関数の改良
 
@@ -139,12 +151,13 @@ handlerは以下のいずれかを返す：
 
 ### DD2: ユーザー定義ハンドラ（REG）のco_handler化 ✅ 決定
 
-**判断**: 戻り値型による自動判別（後方互換方式）
+**判断**: 新規実装はthread必須、既存互換はEVENT.fireで吸収
 
-**理由**:
-- handlerは `thread or string or nil` を返す仕様
+**設計原則**:
+- **全ての新規実装ハンドラは必ずthreadを返す**（virtual_dispatcher, EVENT.no_entry, 新規REGハンドラ）
+- EVENT.fireのみが `thread or string or nil` を処理（既存コードベースとの後方互換用）
 - threadの場合: EVENT.fireがcoroutine.resume()で実行
-- stringの場合: そのまま返す（既存REGハンドラ互換）
+- stringの場合: そのまま返す（レガシー互換）
 - nilの場合: no_content()を返す
 
 **影響**: Requirement 2, 3に反映済み
