@@ -2,7 +2,9 @@
 
 ## Introduction
 
-`pasta.shiori.act`モジュールは現在、`act._buffer`に直接さくらスクリプト文字列を構築している。しかし、これは親クラス`pasta.act`が定める`act.token`を用いた構造化トークン蓄積ルールに違反している。本仕様は、この設計違反を解消し、責務分離を実現するためのリファクタリングを定義する。
+`pasta.shiori.act`モジュールは現在、`act._buffer`に直接さくらスクリプト文字列を構築しているが、これは親クラス`pasta.act`が定める`act.token`を用いた構造化トークン蓄積ルールに違反している。また、スポット切り替え検出という本来親クラスが担うべき責務を子クラスで重複実装している。
+
+本仕様は、この設計違反を解消し、正しい責務分離を実現するための総合的なリファクタリングを定義する。親クラス`pasta.act`と子クラス`pasta.shiori.act`の両方を修正対象とする。
 
 ## Project Description (Input)
 `pasta.shiori.act`のメソッド群は現在、act._bufferに直接さくらスクリプトを構築しているが、これは親クラスの`pasta.act`のact.tokenを用いた構築ルールに違反する。
@@ -25,46 +27,57 @@ pasta.shiori.actのtalk関数にて、以下の処理を行っているが不要
 
 ## Requirements
 
-### Requirement 1: トークン蓄積への移行
-**Objective:** 開発者として、`pasta.shiori.act`のメソッド群が構造化トークンを蓄積する仕組みを求める。これにより、さくらスクリプト生成ロジックを分離し、将来の拡張性と保守性を確保したい。
+### Requirement 1: 親クラスでのスポット切り替え検出とトークン蓄積
+**Objective:** 開発者として、スポット（アクター位置）切り替え検出を親クラス`pasta.act`の責務としたい。これにより、子クラスでの重複実装を排除し、責務を明確化する。
 
 #### Acceptance Criteria
-1. When `SHIORI_ACT_IMPL.talk()`が呼び出されたとき, the `pasta.shiori.act` shall `_buffer`への直接文字列追加を行わず、代わりに`{ type = "talk", text = text }`形式のトークンを`self.token`に追加する
-2. When `SHIORI_ACT_IMPL.surface()`が呼び出されたとき, the `pasta.shiori.act` shall `{ type = "surface", id = id }`形式のトークンを`self.token`に追加する
-3. When `SHIORI_ACT_IMPL.wait()`が呼び出されたとき, the `pasta.shiori.act` shall `{ type = "wait", ms = ms }`形式のトークンを`self.token`に追加する
-4. When `SHIORI_ACT_IMPL.newline()`が呼び出されたとき, the `pasta.shiori.act` shall `{ type = "newline", n = n }`形式のトークンを`self.token`に追加する
-5. When `SHIORI_ACT_IMPL.clear()`が呼び出されたとき, the `pasta.shiori.act` shall `{ type = "clear" }`形式のトークンを`self.token`に追加する
-6. The `pasta.shiori.act` shall さくらスクリプト変換処理（エスケープ、タグ生成等）をトークン蓄積時点では行わない
+1. The `pasta.act` shall 新規フィールド`_current_spot`を追加し、現在のスポットIDを追跡する
+2. When `ACT_IMPL.talk()`が呼び出され、かつ`actor.spot`が前回と異なるとき, the `pasta.act` shall `{ type = "spot_switch" }`トークンを`actor`トークンと`talk`トークンの間に挿入する
+3. When スポット切り替えが検出されたとき, the `pasta.act` shall `self._current_spot`を新しいスポットIDに更新する
+4. The `pasta.act` shall `ACT.new()`で`_current_spot = nil`を初期化する
+5. The `pasta.act` shall `yield()`および`end_action()`実行時に`_current_spot`をリセット（`nil`に設定）する
 
-### Requirement 2: スポット切り替えトークンの蓄積
-**Objective:** 開発者として、スポット（アクター位置）の切り替え情報をトークンとして記録したい。これにより、build時に適切なスポットタグ（`\p[n]`）と段落区切り改行を生成できるようにする。
-
-#### Acceptance Criteria
-1. When `SHIORI_ACT_IMPL.talk()`でスポット切り替えが発生したとき, the `pasta.shiori.act` shall 親クラス`ACT.IMPL.talk()`を呼び出す前に`{ type = "spot_switch", newlines = <設定値> }`トークンを挿入する
-2. When `SHIORI_ACT_IMPL.talk()`が呼び出されたとき, the `pasta.shiori.act` shall 親クラス`ACT.IMPL.talk(self, actor, text)`に委譲し、actor/talkトークンの蓄積を行う
-3. The `pasta.shiori.act` shall スポット切り替え検出のため`self._current_spot`を追跡する
-
-### Requirement 3: talk後の固定改行の除去
-**Objective:** 開発者として、`talk()`後に自動挿入される固定改行（`\n`）を除去したい。これにより、さくらスクリプト出力の柔軟性を向上させる。
+### Requirement 2: 親クラスでのトークン型拡張
+**Objective:** 開発者として、SHIORI固有のUI操作（surface/wait/newline/clear）を親クラスの基本トークン型として定義したい。これにより、将来の他のUI実装でも再利用可能にする。
 
 #### Acceptance Criteria
-1. When `SHIORI_ACT_IMPL.talk()`が呼び出されたとき, the `pasta.shiori.act` shall テキスト後に固定改行（`\n`）を自動挿入しない
+1. The `pasta.act` shall `surface(id)`メソッドを追加し、`{ type = "surface", id = id }`トークンを蓄積する
+2. The `pasta.act` shall `wait(ms)`メソッドを追加し、`{ type = "wait", ms = ms }`トークンを蓄積する
+3. The `pasta.act` shall `newline(n)`メソッドを追加し、`{ type = "newline", n = n or 1 }`トークンを蓄積する
+4. The `pasta.act` shall `clear()`メソッドを追加し、`{ type = "clear" }`トークンを蓄積する
+5. The `pasta.act` shall これらのメソッドはメソッドチェーン用に`self`を返す
+子クラスの簡素化 - talk()オーバーライド削除
+**Objective:** 開発者として、`pasta.shiori.act`のtalk()オーバーライドを削除したい。スポット切り替え検出は親クラスに移譲されたため、子クラス固有の処理は不要になった。
+
+#### Acceptance Criteria
+1. The `pasta.shiori.act` shall `SHIORI_ACT_IMPL.talk()`メソッドを削除する（親クラスのtalk()をそのまま使用）
+2. The `pasta.shiori.act` shall `_current_spot`フィールドを削除する（親クラスが管理）
+3. The `pasta.shiori.act` shall talk()後の固定改行（`\n`）自動挿入を行わない（トークンベースで改行制御）all テキスト後に固定改行（`\n`）を自動挿入しない
 2. The `pasta.shiori.act` shall 明示的な`newline()`呼び出しによってのみ改行トークンを追加する
+子クラスのUI操作メソッド削除
+**Objective:** 開発者として、`pasta.shiori.act`のUI操作メソッド（surface/wait/newline/clear）を削除したい。これらは親クラスに移譲されたため、子クラスでのオーバーライドは不要になった。
 
-### Requirement 4: sakura_builderモジュールの新設
+#### Acceptance Criteria
+1. The `pasta.shiori.act` shall `SHIORI_ACT_IMPL.surface()`メソッドを削除する（親クラスのsurface()を使用）
+2. The `pasta.shiori.act` shall `SHIORI_ACT_IMPL.wait()`メソッドを削除する（親クラスのwait()を使用）
+3. The `pasta.shiori.act` shall `SHIORI_ACT_IMPL.newline()`メソッドを削除する（親クラスのnewline()を使用）
+4. The `pasta.shiori.act` shall `SHIORI_ACT_IMPL.clear()`メソッドを削除する（親クラスのclear()を使用）
+
+### Requirement 5: sakura_builderモジュールの新設
 **Objective:** 開発者として、さくらスクリプト構築ロジックを専用モジュールに分離したい。これにより、単一責務原則を遵守し、テスト容易性を向上させる。
 
 #### Acceptance Criteria
 1. The `pasta.shiori.sakura_builder` shall 新規モジュールとして`pasta/shiori/sakura_builder.lua`に作成される
-2. The `pasta.shiori.sakura_builder` shall トークン配列を受け取り、さくらスクリプト文字列を返却する`build(tokens)`関数を公開する
+2. The `pasta.shiori.sakura_builder` shall トークン配列とCONFIG設定を受け取り、さくらスクリプト文字列を返却する`build(tokens, config)`関数を公開する
 3. When `build()`が呼び出されたとき, the `pasta.shiori.sakura_builder` shall 各トークンタイプに応じた変換処理を実行する:
    - `talk` → エスケープ済みテキスト
    - `actor` → スポットタグ（`\p[n]`）（actor.spotから決定）
-   - `spot_switch` → 段落区切り改行（`\n[percent]`）（newlinesパラメーターから計算）
+   - `spot_switch` → 段落区切り改行（`\n[percent]`）（configのspot_switch_newlinesから計算）
    - `surface` → サーフェスタグ（`\s[id]`）
    - `wait` → 待機タグ（`\w[ms]`）
    - `newline` → 改行タグ（`\n`）× n回
    - `clear` → クリアタグ（`\c`）
+   - `sakura_script` → そのまま出力（
    - `sakura_script` → そのまま出力（親クラス由来、エスケープなし）
 4. When `build()`が完了したとき, the `pasta.shiori.sakura_builder` shall 出力文字列の末尾に`\e`を付与する
 5. The `pasta.shiori.sakura_builder` shall さくらスクリプト用エスケープ処理（`\` → `\\`、`%` → `%%`）を内包する
@@ -79,19 +92,25 @@ pasta.shiori.actのtalk関数にて、以下の処理を行っているが不要
 3. When `build()`が完了したとき, the `pasta.shiori.act` shall `self.now_actor`と`self._current_spot`をリセットする
 4. The `pasta.shiori.act` shall `_buffer`フィールドを完全に削除する
 
-### Requirement 6: 既存APIの互換性維持
+### Requirement 7: 親クラスreset()の更新
+**Objective:** 開発者として、親クラスの`reset()`メソッドが`_current_spot`もリセットすることを求める。これにより、状態管理の一貫性を保つ。
+
+#### Acceptance Criteria
+1. When `ACT_IMPL.yield()`または`end_action()`が呼び出されたとき, the `pasta.act` shall `self._current_spot = nil`をリセットする
+2. The `pasta.act` shall 既存の`self.token = {}`および`self.now_actor = nil`リセット処理を維持する
+
+### Requirement 8: 子クラスreset()の簡素化
+**Objective:** 開発者として、`pasta.shiori.act`の`reset()`を簡素化したい。`_buffer`と`_current_spot`は削除されたため、リセット処理は不要になった。
+
+#### Acceptance Criteria
+1. The `pasta.shiori.act` shall `SHIORI_ACT_IMPL.reset()`メソッドを削除する（親クラスのreset()で十分）
+2. The `pasta.shiori.act` shall `_buffer`フィールドへの参照を完全に削除する
+
+### Requirement 9: 既存APIの互換性維持
 **Objective:** 開発者として、既存のゴーストスクリプトが変更なしで動作することを保証したい。これにより、後方互換性を維持する。
 
 #### Acceptance Criteria
-1. The `pasta.shiori.act` shall 既存の公開メソッドシグネチャ（`talk`, `surface`, `wait`, `newline`, `clear`, `build`, `yield`, `reset`）を維持する
-2. The `pasta.shiori.act` shall メソッドチェーン（`return self`）パターンを維持する
+1. The `pasta.shiori.act` shall 既存の公開メソッドシグネチャ（`talk`, `surface`, `wait`, `newline`, `clear`, `build`, `yield`）をすべて利用可能に保つ（親クラス継承含む）
+2. The `pasta.act` および `pasta.shiori.act` shall メソッドチェーン（`return self`）パターンを維持する
 3. When `yield()`が呼び出されたとき, the `pasta.shiori.act` shall 内部で`build()`を呼び出し、生成されたさくらスクリプト文字列をcoroutine.yieldする
 4. The `pasta.shiori.act` shall `transfer_date_to_var()`メソッドの動作を変更しない
-
-### Requirement 7: reset()メソッドの更新
-**Objective:** 開発者として、`reset()`メソッドが新しいトークンベースのアーキテクチャに対応することを求める。
-
-#### Acceptance Criteria
-1. When `reset()`が呼び出されたとき, the `pasta.shiori.act` shall `self.token`を空配列に初期化する
-2. When `reset()`が呼び出されたとき, the `pasta.shiori.act` shall `self._current_spot`と`self.now_actor`を`nil`にリセットする
-3. The `pasta.shiori.act` shall `self._buffer`への参照を完全に削除する
