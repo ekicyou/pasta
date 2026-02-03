@@ -11,6 +11,8 @@ local specs = {
     "store_save_test",                -- store-save-table feature tests
     "persistence_spec",               -- store-save-persistence feature tests
     "act_impl_call_test",             -- ACT_IMPL.call 4段階検索テスト
+    "act_test",                       -- pasta.act トークンバッファリファクタリング tests
+    "sakura_builder_test",            -- pasta.shiori.sakura_builder トークン変換テスト
     "shiori_act_test",                -- pasta.shiori.act さくらスクリプトビルダーテスト
     "virtual_dispatcher_spec",        -- OnTalk/OnHour virtual event dispatcher tests
     "store_coroutine_test",           -- STORE.co_scene coroutine management tests

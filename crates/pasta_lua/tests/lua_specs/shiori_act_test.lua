@@ -367,55 +367,9 @@ describe("SHIORI_ACT - build()", function()
     end)
 end)
 
--- Test reset() method
-describe("SHIORI_ACT - reset()", function()
-    test("clears buffer", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-        local act = SHIORI_ACT.new(actors)
-
-        act:surface(5):wait(100)
-        act:reset()
-        local result = act:build()
-
-        expect(result):toBe("\\e")
-    end)
-
-    test("clears spot state", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-        local act = SHIORI_ACT.new(actors)
-
-        act:talk(actors.sakura, "Hello")
-        act:reset()
-        act:talk(actors.sakura, "Hello again")
-        local result = act:build()
-
-        -- After reset, spot tag should be emitted again
-        expect(result:find("\\p%[0%]")):toBeTruthy()
-    end)
-
-    test("does not clear token buffer (parent behavior)", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-        local act = SHIORI_ACT.new(actors)
-
-        act:talk(actors.sakura, "Hello")
-        local token_count = #act.token
-        act:reset()
-
-        expect(#act.token):toBe(token_count)
-    end)
-
-    test("supports method chaining", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-        local act = SHIORI_ACT.new(actors)
-
-        local returned = act:reset()
-        expect(returned):toBe(act)
-    end)
-end)
+-- Test reset() method - REMOVED (reset is no longer a public API)
+-- The reset functionality is now integrated into build() method.
+-- build() automatically resets the token buffer and spot state.
 
 -- Test escape processing
 describe("SHIORI_ACT - escape", function()

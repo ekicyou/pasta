@@ -64,17 +64,17 @@ SHIORI Integration (プロトコル処理)
 
 ### ディレクトリ詳細
 
-| パス                            | 用途                      | 備考                                     |
-| ------------------------------- | ------------------------- | ---------------------------------------- |
-| `pasta.toml`                    | 設定ファイル              | 必須。存在しない場合はエラー             |
-| `dic/*/*.pasta`                 | Pasta DSL ソース          | デフォルトの検出パターン                 |
-| `scripts/`                      | 自作 Lua スクリプト       | package.path に含まれる                  |
-| `scripts/pasta/`                | Pasta ランタイム          | トランスパイル済みコードから呼び出される |
+| パス                             | 用途                      | 備考                                     |
+| -------------------------------- | ------------------------- | ---------------------------------------- |
+| `pasta.toml`                     | 設定ファイル              | 必須。存在しない場合はエラー             |
+| `dic/*/*.pasta`                  | Pasta DSL ソース          | デフォルトの検出パターン                 |
+| `scripts/`                       | 自作 Lua スクリプト       | package.path に含まれる                  |
+| `scripts/pasta/`                 | Pasta ランタイム          | トランスパイル済みコードから呼び出される |
 | `scripts/pasta/shiori/entry.lua` | SHIORI エントリーポイント | 存在すれば自動ロード                     |
-| `scriptlibs/`                   | 外部ライブラリ            | package.path の最後に追加                |
-| `profile/pasta/save/lua/`       | 永続化モジュール          | 最優先で検索される                       |
-| `profile/pasta/cache/lua/`      | Lua キャッシュ            | debug_mode 時に出力                      |
-| `profile/pasta/logs/`           | ログ出力先                | ローテーション対応                       |
+| `scriptlibs/`                    | 外部ライブラリ            | package.path の最後に追加                |
+| `profile/pasta/save/lua/`        | 永続化モジュール          | 最優先で検索される                       |
+| `profile/pasta/cache/lua/`       | Lua キャッシュ            | debug_mode 時に出力                      |
+| `profile/pasta/logs/`            | ログ出力先                | ローテーション対応                       |
 
 ## 設定ファイル（pasta.toml）
 
@@ -139,30 +139,30 @@ version = "1.0.0"
 
 **Lua標準ライブラリ（`std_*` プレフィックス）:**
 
-| ライブラリ名      | 説明                                        |
-| ----------------- | ------------------------------------------- |
-| `std_all`         | 安全な標準ライブラリ全部（debug除く）       |
-| `std_all_unsafe`  | **全ライブラリ（debug含む、要注意）**       |
-| `std_coroutine`   | coroutine ライブラリ                        |
-| `std_table`       | table ライブラリ                            |
-| `std_io`          | io ライブラリ                               |
-| `std_os`          | os ライブラリ                               |
-| `std_string`      | string ライブラリ                           |
-| `std_utf8`        | utf8 ライブラリ                             |
-| `std_math`        | math ライブラリ                             |
-| `std_package`     | package ライブラリ（require等）             |
-| `std_debug`       | **debug ライブラリ（セキュリティ警告発生）**|
+| ライブラリ名     | 説明                                         |
+| ---------------- | -------------------------------------------- |
+| `std_all`        | 安全な標準ライブラリ全部（debug除く）        |
+| `std_all_unsafe` | **全ライブラリ（debug含む、要注意）**        |
+| `std_coroutine`  | coroutine ライブラリ                         |
+| `std_table`      | table ライブラリ                             |
+| `std_io`         | io ライブラリ                                |
+| `std_os`         | os ライブラリ                                |
+| `std_string`     | string ライブラリ                            |
+| `std_utf8`       | utf8 ライブラリ                              |
+| `std_math`       | math ライブラリ                              |
+| `std_package`    | package ライブラリ（require等）              |
+| `std_debug`      | **debug ライブラリ（セキュリティ警告発生）** |
 
 **mlua-stdlib モジュール:**
 
-| モジュール名 | 説明                      |
-| ------------ | ------------------------- |
-| `assertions` | @assertions モジュール    |
-| `testing`    | @testing モジュール       |
+| モジュール名 | 説明                        |
+| ------------ | --------------------------- |
+| `assertions` | @assertions モジュール      |
+| `testing`    | @testing モジュール         |
 | `env`        | **@env モジュール（警告）** |
-| `regex`      | @regex モジュール         |
-| `json`       | @json モジュール          |
-| `yaml`       | @yaml モジュール          |
+| `regex`      | @regex モジュール           |
+| `json`       | @json モジュール            |
+| `yaml`       | @yaml モジュール            |
 
 #### 減算記法
 
@@ -357,16 +357,16 @@ return RES.advice()      -- 312 Advice
 
 **利用可能な関数**:
 
-| 関数                   | ステータス                   | 説明                               |
-| ---------------------- | ---------------------------- | ---------------------------------- |
-| `RES.ok(value, dic)`   | 200 OK                       | Value ヘッダー付き成功レスポンス   |
-| `RES.no_content(dic)`  | 204 No Content               | 値なし成功レスポンス               |
-| `RES.not_enough(dic)`  | 311 Not Enough               | TEACH イベント（情報不足）         |
-| `RES.advice(dic)`      | 312 Advice                   | TEACH イベント（アドバイス）       |
-| `RES.bad_request(dic)` | 400 Bad Request              | クライアントエラー                 |
-| `RES.err(reason, dic)` | 500 Internal Server Error    | サーバーエラー（X-Error-Reason 付） |
-| `RES.warn(reason, dic)`| 204 No Content               | 警告付きレスポンス（X-Warn-Reason） |
-| `RES.build(code, dic)` | 任意                         | 汎用ビルダー（上記の基盤）         |
+| 関数                    | ステータス                | 説明                                |
+| ----------------------- | ------------------------- | ----------------------------------- |
+| `RES.ok(value, dic)`    | 200 OK                    | Value ヘッダー付き成功レスポンス    |
+| `RES.no_content(dic)`   | 204 No Content            | 値なし成功レスポンス                |
+| `RES.not_enough(dic)`   | 311 Not Enough            | TEACH イベント（情報不足）          |
+| `RES.advice(dic)`       | 312 Advice                | TEACH イベント（アドバイス）        |
+| `RES.bad_request(dic)`  | 400 Bad Request           | クライアントエラー                  |
+| `RES.err(reason, dic)`  | 500 Internal Server Error | サーバーエラー（X-Error-Reason 付） |
+| `RES.warn(reason, dic)` | 204 No Content            | 警告付きレスポンス（X-Warn-Reason） |
+| `RES.build(code, dic)`  | 任意                      | 汎用ビルダー（上記の基盤）          |
 
 **環境設定**:
 
@@ -375,6 +375,39 @@ RES.env.charset = "UTF-8"       -- デフォルト
 RES.env.sender = "Pasta"        -- デフォルト
 RES.env.security_level = "local" -- デフォルト
 ```
+
+### pasta.shiori.sakura_builder モジュール
+
+トークン配列からさくらスクリプト文字列を生成するための純粋関数モジュールです。`pasta.shiori.act` の `build()` メソッド内部で使用されます。
+
+```lua
+local BUILDER = require "pasta.shiori.sakura_builder"
+
+-- トークン配列をさくらスクリプトに変換
+local tokens = {
+    { type = "actor", actor = { spot = 0 } },
+    { type = "talk", text = "こんにちは！" },
+    { type = "surface", id = 5 },
+    { type = "wait", ms = 1000 },
+}
+local config = { spot_switch_newlines = 0.5 }
+local script = BUILDER.build(tokens, config)
+-- 結果: "\p[0]こんにちは！\s[5]\w[1000]\e"
+```
+
+**トークンタイプ**:
+
+| タイプ          | フィールド   | 出力例                     |
+| --------------- | ------------ | -------------------------- |
+| `talk`          | `text`       | エスケープ済みテキスト     |
+| `actor`         | `actor.spot` | `\p[n]` (スポットタグ)     |
+| `spot_switch`   | -            | `\n[percent]` (段落区切り) |
+| `surface`       | `id`         | `\s[id]`                   |
+| `wait`          | `ms`         | `\w[ms]`                   |
+| `newline`       | `n`          | `\n` × n回                 |
+| `clear`         | -            | `\c`                       |
+| `sakura_script` | `script`     | そのまま出力               |
+| `yield`         | -            | 無視（出力対象外）         |
 
 ## ファイル検出パターン
 

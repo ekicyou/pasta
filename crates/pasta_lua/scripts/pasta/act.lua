@@ -15,6 +15,7 @@ local GLOBAL = require("pasta.global")
 --- @field var table アクションローカル変数
 --- @field token table[] 構築中のスクリプトトークン
 --- @field now_actor Actor|nil 現在のアクター
+--- @field _current_spot number|nil 現在のスポットID（スポット切り替え検出用）
 --- @field current_scene SceneTable|nil 現在のシーンテーブル
 local ACT = {}
 
@@ -50,6 +51,7 @@ function ACT.new(actors)
         var = {},
         token = {},
         now_actor = nil,
+        _current_spot = nil,
         current_scene = nil,
     }
     return setmetatable(obj, ACT_IMPL)
@@ -69,21 +71,65 @@ end
 --- @param self Act アクションオブジェクト
 --- @param actor Actor アクターオブジェクト
 --- @param text string 発話テキスト
---- @return nil
+--- @return Act self メソッドチェーン用
 function ACT_IMPL.talk(self, actor, text)
     if self.now_actor ~= actor then
         table.insert(self.token, { type = "actor", actor = actor })
+        -- スポット切り替え検出
+        local spot_id = actor.spot or 0
+        if self._current_spot ~= nil and self._current_spot ~= spot_id then
+            table.insert(self.token, { type = "spot_switch" })
+        end
+        self._current_spot = spot_id
         self.now_actor = actor
     end
     table.insert(self.token, { type = "talk", text = text })
+    return self
 end
 
 --- sakura_scriptトークン蓄積
 --- @param self Act アクションオブジェクト
 --- @param text string さくらスクリプト
---- @return nil
+--- @return Act self メソッドチェーン用
 function ACT_IMPL.sakura_script(self, text)
     table.insert(self.token, { type = "sakura_script", text = text })
+    return self
+end
+
+--- surfaceトークン蓄積
+--- @param self Act アクションオブジェクト
+--- @param id number|string サーフェスID
+--- @return Act self メソッドチェーン用
+function ACT_IMPL.surface(self, id)
+    table.insert(self.token, { type = "surface", id = id })
+    return self
+end
+
+--- waitトークン蓄積
+--- @param self Act アクションオブジェクト
+--- @param ms number 待機時間（ミリ秒）
+--- @return Act self メソッドチェーン用
+function ACT_IMPL.wait(self, ms)
+    ms = math.max(0, math.floor(ms or 0))
+    table.insert(self.token, { type = "wait", ms = ms })
+    return self
+end
+
+--- newlineトークン蓄積
+--- @param self Act アクションオブジェクト
+--- @param n number|nil 改行回数（デフォルト1）
+--- @return Act self メソッドチェーン用
+function ACT_IMPL.newline(self, n)
+    table.insert(self.token, { type = "newline", n = n or 1 })
+    return self
+end
+
+--- clearトークン蓄積
+--- @param self Act アクションオブジェクト
+--- @return Act self メソッドチェーン用
+function ACT_IMPL.clear(self)
+    table.insert(self.token, { type = "clear" })
+    return self
 end
 
 --- 単語検索（アクター非依存、4レベル検索）
@@ -136,25 +182,24 @@ function ACT_IMPL.word(self, name)
     return nil
 end
 
---- トークン出力とyield
+--- トークン取得とリセット
 --- @param self Act アクションオブジェクト
---- @return nil
-function ACT_IMPL.yield(self)
-    table.insert(self.token, { type = "yield" })
+--- @return table[] トークン配列
+function ACT_IMPL.build(self)
     local token = self.token
     self.token = {}
     self.now_actor = nil
-    coroutine.yield({ type = "yield", token = token })
+    self._current_spot = nil
+    return token
 end
 
---- アクション終了
+--- build()結果をyield
 --- @param self Act アクションオブジェクト
---- @return nil
-function ACT_IMPL.end_action(self)
-    table.insert(self.token, { type = "end_action" })
-    local token = self.token
-    self.token = {}
-    coroutine.yield({ type = "end_action", token = token })
+--- @return Act self メソッドチェーン用
+function ACT_IMPL.yield(self)
+    local result = self:build()
+    coroutine.yield(result)
+    return self
 end
 
 --- シーン呼び出し（4段階検索）

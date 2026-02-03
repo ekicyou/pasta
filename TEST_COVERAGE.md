@@ -2,8 +2,8 @@
 
 このドキュメントは、[SOUL.md](SOUL.md) で定義されたコア機能と、それを検証するテストの対応関係を示します。
 
-**最終更新**: 2025-06-15  
-**総テスト数**: 620+テスト（全パス ✅）
+**最終更新**: 2025-06-16  
+**総テスト数**: 680+テスト（全パス ✅）
 
 ---
 
@@ -58,28 +58,30 @@
 
 ### 2.4 Runtime層テスト（実行エンジン）
 
-| 機能                     | テストファイル               | 状態   | 説明                 |
-| ------------------------ | ---------------------------- | ------ | -------------------- |
-| Luaスクリプトローダー    | `loader_integration_test.rs` | ✅ 完了 | スクリプト読み込み   |
-| 標準ライブラリモジュール | `stdlib_modules_test.rs`     | ✅ 完了 | stdlib機能           |
-| 正規表現モジュール       | `stdlib_regex_test.rs`       | ✅ 完了 | 14テスト             |
-| Lua単体テスト実行        | `lua_unittest_runner.rs`     | ✅ 完了 | Luaテストランナー    |
-| STORE.save/CTX注入       | `store_save_test.lua`        | ✅ 完了 | 永続変数・参照同一性 |
-| SHIORIレスポンスビルダー | `shiori_res_test.rs`         | ✅ 完了 | 14テスト             |
-| SHIORIイベントディスパッチ | `shiori_event_test.rs`     | ✅ 完了 | 16テスト（新規）     |
-| SHIORI_ACT さくらスクリプト生成 | `shiori_act_test.lua`     | ✅ 完了 | 47テスト（transfer_date_to_var 7テスト追加）     |
-| SHIORI_ACT 日時転記機能 | `shiori_act_test.lua`     | ✅ 完了 | 7テスト（onhour-date-var-transfer）     |
-| RuntimeConfig libs配列   | `runtime::tests`             | ✅ 完了 | 17テスト（新規）     |
-| LuaConfig TOML設定       | `loader::config::tests`      | ✅ 完了 | 6テスト（新規）      |
+| 機能                             | テストファイル               | 状態   | 説明                                         |
+| -------------------------------- | ---------------------------- | ------ | -------------------------------------------- |
+| Luaスクリプトローダー            | `loader_integration_test.rs` | ✅ 完了 | スクリプト読み込み                           |
+| 標準ライブラリモジュール         | `stdlib_modules_test.rs`     | ✅ 完了 | stdlib機能                                   |
+| 正規表現モジュール               | `stdlib_regex_test.rs`       | ✅ 完了 | 14テスト                                     |
+| Lua単体テスト実行                | `lua_unittest_runner.rs`     | ✅ 完了 | Luaテストランナー                            |
+| STORE.save/CTX注入               | `store_save_test.lua`        | ✅ 完了 | 永続変数・参照同一性                         |
+| SHIORIレスポンスビルダー         | `shiori_res_test.rs`         | ✅ 完了 | 14テスト                                     |
+| SHIORIイベントディスパッチ       | `shiori_event_test.rs`       | ✅ 完了 | 16テスト（新規）                             |
+| SHIORI_ACT さくらスクリプト生成  | `shiori_act_test.lua`        | ✅ 完了 | 47テスト（transfer_date_to_var 7テスト追加） |
+| SHIORI_ACT 日時転記機能          | `shiori_act_test.lua`        | ✅ 完了 | 7テスト（onhour-date-var-transfer）          |
+| ACT トークンバッファ（親クラス） | `act_test.lua`               | ✅ 完了 | 32テスト（act-token-buffer-refactor）        |
+| sakura_builder トークン変換      | `sakura_builder_test.lua`    | ✅ 完了 | 24テスト（act-token-buffer-refactor）        |
+| RuntimeConfig libs配列           | `runtime::tests`             | ✅ 完了 | 17テスト（新規）                             |
+| LuaConfig TOML設定               | `loader::config::tests`      | ✅ 完了 | 6テスト（新規）                              |
 
 ### 2.5 統合テスト（E2E）
 
-| 機能                        | テストファイル             | 状態   | 説明             |
-| --------------------------- | -------------------------- | ------ | ---------------- |
-| SHIORI.DLL インターフェース | `shiori_lifecycle_test.rs` | ✅ 完了 | 5テスト全パス    |
-| SHIORI リクエスト処理       | `lua_request_test.rs`      | ✅ 完了 | 18+テスト        |
-| Runtime E2E                 | `runtime_e2e_test.rs`      | ✅ 完了 | 16テスト（新規） |
-| Finalize Scene              | `finalize_scene_test.rs`   | ✅ 完了 | 14テスト         |
+| 機能                        | テストファイル                                                      | 状態   | 説明                                                |
+| --------------------------- | ------------------------------------------------------------------- | ------ | --------------------------------------------------- |
+| SHIORI.DLL インターフェース | `shiori_lifecycle_test.rs`                                          | ✅ 完了 | 5テスト全パス                                       |
+| SHIORI リクエスト処理       | `lua_request_test.rs`                                               | ✅ 完了 | 18+テスト                                           |
+| Runtime E2E                 | `runtime_e2e_test.rs`                                               | ✅ 完了 | 16テスト（新規）                                    |
+| Finalize Scene              | `finalize_scene_test.rs`                                            | ✅ 完了 | 14テスト                                            |
 | Virtual Event Dispatcher    | `virtual_event_dispatcher_test.rs`<br>`virtual_dispatcher_spec.lua` | ✅ 完了 | 15+20テスト（onhour-date-var-transfer 5テスト追加） |
 
 ---
@@ -143,12 +145,12 @@
 
 ## 5. テストカバレッジサマリー
 
-| クレート     | テスト数 | パス    | 失敗  | カバレッジ評価 |
-| ------------ | -------- | ------- | ----- | -------------- |
-| pasta_core   | 94       | 94      | 0     | ⭐⭐⭐⭐⭐ 優秀     |
-| pasta_lua    | 385      | 385     | 0     | ⭐⭐⭐⭐⭐ 優秀     |
-| pasta_shiori | 28       | 28      | 0     | ⭐⭐⭐⭐⭐ 優秀     |
-| **合計**     | **620+** | **620+** | **0** | **100%パス率** |
+| クレート     | テスト数 | パス     | 失敗  | カバレッジ評価 |
+| ------------ | -------- | -------- | ----- | -------------- |
+| pasta_core   | 94       | 94       | 0     | ⭐⭐⭐⭐⭐ 優秀     |
+| pasta_lua    | 445      | 445      | 0     | ⭐⭐⭐⭐⭐ 優秀     |
+| pasta_shiori | 28       | 28       | 0     | ⭐⭐⭐⭐⭐ 優秀     |
+| **合計**     | **680+** | **680+** | **0** | **100%パス率** |
 
 ---
 
@@ -156,16 +158,16 @@
 
 ### GitHub Actions ワークフロー
 
-| ワークフロー | ファイル | トリガー | 説明 |
-|-------------|----------|----------|------|
-| Build | `.github/workflows/build.yml` | push/PR/手動 | x86/x64 DLL ビルド・テスト |
+| ワークフロー | ファイル                      | トリガー     | 説明                       |
+| ------------ | ----------------------------- | ------------ | -------------------------- |
+| Build        | `.github/workflows/build.yml` | push/PR/手動 | x86/x64 DLL ビルド・テスト |
 
 ### ビルドマトリックス
 
-| ターゲット | アーキテクチャ | テスト実行 | アーティファクト |
-|-----------|---------------|-----------|-----------------|
-| `i686-pc-windows-msvc` | x86 | ❌ ビルドのみ | `pasta-dll-x86` |
-| `x86_64-pc-windows-msvc` | x64 | ✅ `cargo test --all` | `pasta-dll-x64` |
+| ターゲット               | アーキテクチャ | テスト実行           | アーティファクト |
+| ------------------------ | -------------- | -------------------- | ---------------- |
+| `i686-pc-windows-msvc`   | x86            | ❌ ビルドのみ         | `pasta-dll-x86`  |
+| `x86_64-pc-windows-msvc` | x64            | ✅ `cargo test --all` | `pasta-dll-x64`  |
 
 ### CI検証項目
 
