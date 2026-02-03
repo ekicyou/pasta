@@ -70,6 +70,7 @@
 | SHIORI_ACT さくらスクリプト生成  | `shiori_act_test.lua`        | ✅ 完了 | 47テスト（transfer_date_to_var 7テスト追加） |
 | SHIORI_ACT 日時転記機能          | `shiori_act_test.lua`        | ✅ 完了 | 7テスト（onhour-date-var-transfer）          |
 | ACT トークンバッファ（親クラス） | `act_test.lua`               | ✅ 完了 | 32テスト（act-token-buffer-refactor）        |
+| ACT トークングループ化           | `act_grouping_test.lua`      | ✅ 完了 | 19テスト（actor-talk-grouping）              |
 | sakura_builder トークン変換      | `sakura_builder_test.lua`    | ✅ 完了 | 24テスト（act-token-buffer-refactor）        |
 | RuntimeConfig libs配列           | `runtime::tests`             | ✅ 完了 | 17テスト（新規）                             |
 | LuaConfig TOML設定               | `loader::config::tests`      | ✅ 完了 | 6テスト（新規）                              |

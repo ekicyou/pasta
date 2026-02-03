@@ -6,7 +6,7 @@
 ---
 --- @usage
 --- local config = require("pasta.config")
---- local value = config.get("ghost", "spot_switch_newlines", 1.5)
+--- local value = config.get("ghost", "spot_newlines", 1.5)
 
 -- @pasta_configはRust側で登録されるモジュール
 -- テスト環境など利用不可の場合は空テーブルを使用

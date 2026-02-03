@@ -393,7 +393,7 @@ describe("ACT - talk()固定改行除去", function()
 end)
 
 -- ============================================================================
--- Requirement 7: 親build()メソッド
+-- Requirement 7: 親build()メソッド（グループ化対応版）
 -- ============================================================================
 
 describe("ACT - build()", function()
@@ -402,14 +402,22 @@ describe("ACT - build()", function()
         local actors = create_mock_actors()
         local act = ACT.new(actors)
 
+        -- グループ化後: talkがないとactorグループが作成されないため、
+        -- talkを追加してsurface/waitをグループ内に含める
+        act:talk(actors.sakura, "test")
         act:surface(5)
         act:wait(100)
-        local token = act:build()
+        local result = act:build()
 
-        expect(type(token)):toBe("table")
-        expect(#token):toBe(2)
-        expect(token[1].type):toBe("surface")
-        expect(token[2].type):toBe("wait")
+        expect(type(result)):toBe("table")
+        expect(#result):toBe(1)
+        expect(result[1].type):toBe("actor")
+        -- グループ内に3トークン: talk(統合済み), surface, wait
+        -- 注: 連続talkは統合されるが、ここでは1つのみ
+        expect(#result[1].tokens):toBe(3)
+        expect(result[1].tokens[1].type):toBe("talk")
+        expect(result[1].tokens[2].type):toBe("surface")
+        expect(result[1].tokens[3].type):toBe("wait")
     end)
 
     test("build()後にself.tokenを空配列にリセットする", function()
@@ -435,7 +443,7 @@ describe("ACT - build()", function()
 end)
 
 -- ============================================================================
--- Requirement 8: 親yield()責務統一
+-- Requirement 8: 親yield()責務統一（グループ化対応版）
 -- ============================================================================
 
 describe("ACT - yield()", function()
@@ -444,6 +452,8 @@ describe("ACT - yield()", function()
         local actors = create_mock_actors()
         local act = ACT.new(actors)
 
+        -- グループ化後: talkでactorグループを作成し、surfaceを含める
+        act:talk(actors.sakura, "test")
         act:surface(5)
 
         local co = coroutine.create(function()
@@ -455,7 +465,11 @@ describe("ACT - yield()", function()
         expect(ok):toBe(true)
         expect(type(result)):toBe("table") -- build()の結果
         expect(#result):toBe(1)
-        expect(result[1].type):toBe("surface")
+        expect(result[1].type):toBe("actor")
+        -- グループ内: talk(統合済み), surface
+        expect(#result[1].tokens):toBe(2)
+        expect(result[1].tokens[1].type):toBe("talk")
+        expect(result[1].tokens[2].type):toBe("surface")
     end)
 
     test("yield()後にトークンがリセットされる", function()
@@ -463,6 +477,7 @@ describe("ACT - yield()", function()
         local actors = create_mock_actors()
         local act = ACT.new(actors)
 
+        act:talk(actors.sakura, "test")
         act:surface(5)
 
         local co = coroutine.create(function()
@@ -479,6 +494,7 @@ describe("ACT - yield()", function()
         local actors = create_mock_actors()
         local act = ACT.new(actors)
 
+        act:talk(actors.sakura, "test")
         act:surface(5)
 
         local co = coroutine.create(function()

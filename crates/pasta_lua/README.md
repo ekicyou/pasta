@@ -380,34 +380,56 @@ RES.env.security_level = "local" -- デフォルト
 
 トークン配列からさくらスクリプト文字列を生成するための純粋関数モジュールです。`pasta.shiori.act` の `build()` メソッド内部で使用されます。
 
+#### グループ化トークン形式（推奨）
+
+`ACT_IMPL.build()` は **グループ化されたトークン配列** を返します（actor-talk-grouping 機能）:
+
 ```lua
 local BUILDER = require "pasta.shiori.sakura_builder"
 
--- トークン配列をさくらスクリプトに変換
+-- グループ化形式: type="actor" がトークングループを保持
+local grouped_tokens = {
+    { type = "spot", actor = sakura, spot = 0 },
+    { type = "actor", actor = sakura, tokens = {
+        { type = "talk", actor = sakura, text = "こんにちは！" },
+        { type = "surface", id = 5 },
+        { type = "wait", ms = 1000 },
+    }},
+}
+local config = { spot_newlines = 0.5 }
+local script = BUILDER.build(grouped_tokens, config)
+-- 結果: "\p[0]こんにちは！\s[5]\w[1000]\e"
+```
+
+#### レガシーフラット形式（後方互換）
+
+```lua
+-- フラット形式: 個別トークンの配列（後方互換のため引き続きサポート）
 local tokens = {
     { type = "actor", actor = { spot = 0 } },
     { type = "talk", text = "こんにちは！" },
     { type = "surface", id = 5 },
     { type = "wait", ms = 1000 },
 }
-local config = { spot_newlines = 0.5 }
 local script = BUILDER.build(tokens, config)
--- 結果: "\p[0]こんにちは！\s[5]\w[1000]\e"
 ```
 
 **トークンタイプ**:
 
-| タイプ          | フィールド   | 出力例                     |
-| --------------- | ------------ | -------------------------- |
-| `talk`          | `text`       | エスケープ済みテキスト     |
-| `actor`         | `actor.spot` | `\p[n]` (スポットタグ)     |
-| `spot_switch`   | -            | `\n[percent]` (段落区切り) |
-| `surface`       | `id`         | `\s[id]`                   |
-| `wait`          | `ms`         | `\w[ms]`                   |
-| `newline`       | `n`          | `\n` × n回                 |
-| `clear`         | -            | `\c`                       |
-| `sakura_script` | `script`     | そのまま出力               |
-| `yield`         | -            | 無視（出力対象外）         |
+| タイプ          | フィールド         | 出力例                               |
+| --------------- | ------------------ | ------------------------------------ |
+| `talk`          | `text`             | エスケープ済みテキスト               |
+| `actor`         | `actor`, `tokens`  | グループ内トークンを順次処理         |
+| `actor`(legacy) | `actor.spot`       | `\p[n]` (スポットタグ)               |
+| `spot`          | `actor`, `spot`    | 内部状態更新（出力なし）             |
+| `clear_spot`    | -                  | 内部状態リセット（出力なし）         |
+| `spot_switch`   | -                  | `\n[percent]` (段落区切り、レガシー) |
+| `surface`       | `id`               | `\s[id]`                             |
+| `wait`          | `ms`               | `\w[ms]`                             |
+| `newline`       | `n`                | `\n` × n回                           |
+| `clear`         | -                  | `\c`                                 |
+| `sakura_script` | `text`             | そのまま出力                         |
+| `yield`         | -                  | 無視（出力対象外）                   |
 
 ## ファイル検出パターン
 

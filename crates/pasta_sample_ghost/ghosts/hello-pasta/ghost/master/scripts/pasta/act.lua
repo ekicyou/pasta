@@ -8,13 +8,120 @@ local ACTOR = require("pasta.actor")
 local SCENE = require("pasta.scene")
 local GLOBAL = require("pasta.global")
 
+-- ============================================================================
+-- グループ化ローカル関数（actor-talk-grouping feature）
+-- ============================================================================
+
+--- トークン配列をアクター切り替え境界でグループ化
+--- @param tokens table[] フラットなトークン配列
+--- @return table[] グループ化されたトークン配列
+local function group_by_actor(tokens)
+    if not tokens or #tokens == 0 then
+        return {}
+    end
+
+    local result = {}
+    local current_actor_token = nil -- 現在の type="actor" トークン
+    local current_actor = nil       -- 現在のアクター（nilは未設定）
+
+    for _, token in ipairs(tokens) do
+        local t = token.type
+
+        -- アクター属性設定トークン: 独立して出力
+        if t == "spot" or t == "clear_spot" then
+            table.insert(result, token)
+        elseif t == "talk" then
+            local talk_actor = token.actor
+            -- アクター変更検出（最初のtalkまたはアクター変更時）
+            if current_actor_token == nil or talk_actor ~= current_actor then
+                -- 新しい type="actor" トークンを開始
+                current_actor_token = {
+                    type = "actor",
+                    actor = talk_actor,
+                    tokens = {}
+                }
+                table.insert(result, current_actor_token)
+                current_actor = talk_actor
+            end
+            table.insert(current_actor_token.tokens, token)
+        else
+            -- アクター行動トークン（surface, wait, newline, clear, sakura_script）
+            -- 現在のアクターグループ内に追加
+            if current_actor_token then
+                table.insert(current_actor_token.tokens, token)
+            end
+            -- 注: current_actor_tokenがnilの場合（talkより先にアクター行動が来た場合）は無視
+            -- 現在の設計ではこの状況は発生しない
+        end
+    end
+
+    return result
+end
+
+--- グループ化トークン内の連続talkトークンを統合
+--- @param grouped table[] グループ化されたトークン配列
+--- @return table[] 統合済みトークン配列
+local function merge_consecutive_talks(grouped)
+    local result = {}
+
+    for _, token in ipairs(grouped) do
+        if token.type == "actor" then
+            -- type="actor" トークン内のtalkを統合
+            local merged_tokens = {}
+            local pending_talk = nil
+
+            for _, inner in ipairs(token.tokens) do
+                if inner.type == "talk" then
+                    if pending_talk then
+                        -- 連続talk: テキスト結合
+                        pending_talk.text = pending_talk.text .. inner.text
+                    else
+                        -- 新規talk開始
+                        pending_talk = {
+                            type = "talk",
+                            actor = inner.actor,
+                            text = inner.text
+                        }
+                    end
+                else
+                    -- 非talkトークン: pending_talkをフラッシュ
+                    if pending_talk then
+                        table.insert(merged_tokens, pending_talk)
+                        pending_talk = nil
+                    end
+                    table.insert(merged_tokens, inner)
+                end
+            end
+
+            -- 最後のpending_talkをフラッシュ
+            if pending_talk then
+                table.insert(merged_tokens, pending_talk)
+            end
+
+            table.insert(result, {
+                type = "actor",
+                actor = token.actor,
+                tokens = merged_tokens
+            })
+        else
+            -- spot, clear_spot はそのまま出力
+            table.insert(result, token)
+        end
+    end
+
+    return result
+end
+
+-- ============================================================================
+-- Actクラス定義
+-- ============================================================================
+
 --- @class Act アクションオブジェクト
 --- @field actors table<string, Actor> 登録アクター（名前→アクター）
 --- @field save table 永続変数テーブル
 --- @field app_ctx table アプリケーション実行中の汎用コンテキストデータ
 --- @field var table アクションローカル変数
 --- @field token table[] 構築中のスクリプトトークン
---- @field now_actor Actor|nil 現在のアクター
 --- @field current_scene SceneTable|nil 現在のシーンテーブル
 local ACT = {}
 
@@ -49,7 +156,6 @@ function ACT.new(actors)
         app_ctx = require("pasta.store").app_ctx,
         var = {},
         token = {},
-        now_actor = nil,
         current_scene = nil,
     }
     return setmetatable(obj, ACT_IMPL)
@@ -65,25 +171,59 @@ function ACT_IMPL.init_scene(self, scene)
     return self.save, self.var
 end
 
---- talkトークン蓄積
+--- talkトークン蓄積（状態レス化: actorトークン/spot_switch生成を削除）
 --- @param self Act アクションオブジェクト
 --- @param actor Actor アクターオブジェクト
 --- @param text string 発話テキスト
---- @return nil
+--- @return Act self メソッドチェーン用
 function ACT_IMPL.talk(self, actor, text)
-    if self.now_actor ~= actor then
-        table.insert(self.token, { type = "actor", actor = actor })
-        self.now_actor = actor
-    end
-    table.insert(self.token, { type = "talk", text = text })
+    table.insert(self.token, { type = "talk", actor = actor, text = text })
+    return self
 end
 
 --- sakura_scriptトークン蓄積
 --- @param self Act アクションオブジェクト
 --- @param text string さくらスクリプト
---- @return nil
+--- @return Act self メソッドチェーン用
 function ACT_IMPL.sakura_script(self, text)
     table.insert(self.token, { type = "sakura_script", text = text })
+    return self
+end
+
+--- surfaceトークン蓄積
+--- @param self Act アクションオブジェクト
+--- @param id number|string サーフェスID
+--- @return Act self メソッドチェーン用
+function ACT_IMPL.surface(self, id)
+    table.insert(self.token, { type = "surface", id = id })
+    return self
+end
+
+--- waitトークン蓄積
+--- @param self Act アクションオブジェクト
+--- @param ms number 待機時間（ミリ秒）
+--- @return Act self メソッドチェーン用
+function ACT_IMPL.wait(self, ms)
+    ms = math.max(0, math.floor(ms or 0))
+    table.insert(self.token, { type = "wait", ms = ms })
+    return self
+end
+
+--- newlineトークン蓄積
+--- @param self Act アクションオブジェクト
+--- @param n number|nil 改行回数（デフォルト1）
+--- @return Act self メソッドチェーン用
+function ACT_IMPL.newline(self, n)
+    table.insert(self.token, { type = "newline", n = n or 1 })
+    return self
+end
+
+--- clearトークン蓄積
+--- @param self Act アクションオブジェクト
+--- @return Act self メソッドチェーン用
+function ACT_IMPL.clear(self)
+    table.insert(self.token, { type = "clear" })
+    return self
 end
 
 --- 単語検索（アクター非依存、4レベル検索）
@@ -136,25 +276,29 @@ function ACT_IMPL.word(self, name)
     return nil
 end
 
---- トークン出力とyield
+--- トークン取得とリセット（グループ化・統合済み）
 --- @param self Act アクションオブジェクト
---- @return nil
-function ACT_IMPL.yield(self)
-    table.insert(self.token, { type = "yield" })
-    local token = self.token
+--- @return table[] グループ化されたトークン配列
+function ACT_IMPL.build(self)
+    local tokens = self.token
     self.token = {}
-    self.now_actor = nil
-    coroutine.yield({ type = "yield", token = token })
+
+    -- Phase 1: アクター切り替え境界でグループ化
+    local grouped = group_by_actor(tokens)
+
+    -- Phase 2: 連続talkを統合
+    local merged = merge_consecutive_talks(grouped)
+
+    return merged
 end
 
---- アクション終了
+--- build()結果をyield
 --- @param self Act アクションオブジェクト
---- @return nil
-function ACT_IMPL.end_action(self)
-    table.insert(self.token, { type = "end_action" })
-    local token = self.token
-    self.token = {}
-    coroutine.yield({ type = "end_action", token = token })
+--- @return Act self メソッドチェーン用
+function ACT_IMPL.yield(self)
+    local result = self:build()
+    coroutine.yield(result)
+    return self
 end
 
 --- シーン呼び出し（4段階検索）
@@ -206,7 +350,7 @@ function ACT_IMPL.call(self, global_scene_name, key, attrs, ...)
     return nil
 end
 
---- スポット設定
+--- スポット設定トークン生成（状態レス化）
 --- @param self Act アクションオブジェクト
 --- @param name string アクター名
 --- @param number integer 位置
@@ -214,17 +358,15 @@ end
 function ACT_IMPL.set_spot(self, name, number)
     local actor = self.actors[name]
     if actor then
-        actor.spot = number
+        table.insert(self.token, { type = "spot", actor = actor, spot = number })
     end
 end
 
---- 全スポットクリア
+--- 全スポットクリアトークン生成（状態レス化）
 --- @param self Act アクションオブジェクト
 --- @return nil
 function ACT_IMPL.clear_spot(self)
-    for _, actor in pairs(self.actors) do
-        actor.spot = nil
-    end
+    table.insert(self.token, { type = "clear_spot" })
 end
 
 --- 継承用に実装メタテーブルを公開

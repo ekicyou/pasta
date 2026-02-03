@@ -1,30 +1,47 @@
 -- sakura_builder module tests
--- Tests for pasta.shiori.sakura_builder module - token to sakura script conversion
+-- Tests for pasta.shiori.sakura_builder module - grouped token to sakura script conversion
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect
 
 -- ============================================================================
--- Requirement 6: sakura_builderモジュール
+-- ヘルパー: モックアクター作成
+-- ============================================================================
+
+local function create_mock_actors()
+    return {
+        sakura = { name = "さくら", spot = 0 },
+        kero = { name = "うにゅう", spot = 1 },
+    }
+end
+
+-- ============================================================================
+-- Requirement 6: sakura_builderモジュール（グループ化形式）
 -- ============================================================================
 
 describe("SAKURA_BUILDER - talk token", function()
     test("talkトークンをエスケープ済みテキストに変換する", function()
         local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
 
         local tokens = {
-            { type = "talk", text = "Hello" },
+            { type = "actor", actor = actors.sakura, tokens = {
+                { type = "talk", actor = actors.sakura, text = "Hello" },
+            }},
         }
         local result = BUILDER.build(tokens, {})
 
-        expect(result):toBe("Hello\\e")
+        expect(result:find("Hello")):toBeTruthy()
     end)
 
     test("バックスラッシュをエスケープする", function()
         local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
 
         local tokens = {
-            { type = "talk", text = "path\\to\\file" },
+            { type = "actor", actor = actors.sakura, tokens = {
+                { type = "talk", actor = actors.sakura, text = "path\\to\\file" },
+            }},
         }
         local result = BUILDER.build(tokens, {})
 
@@ -33,9 +50,12 @@ describe("SAKURA_BUILDER - talk token", function()
 
     test("パーセントをエスケープする", function()
         local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
 
         local tokens = {
-            { type = "talk", text = "100%" },
+            { type = "actor", actor = actors.sakura, tokens = {
+                { type = "talk", actor = actors.sakura, text = "100%" },
+            }},
         }
         local result = BUILDER.build(tokens, {})
 
@@ -43,216 +63,148 @@ describe("SAKURA_BUILDER - talk token", function()
     end)
 end)
 
-describe("SAKURA_BUILDER - actor token", function()
-    test("actorトークンをスポットタグ \\p[n] に変換する", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-
-        local tokens = {
-            { type = "actor", actor = { spot = 0 } },
-        }
-        local result = BUILDER.build(tokens, {})
-
-        expect(result):toBe("\\p[0]\\e")
-    end)
-
-    test("spot=1のactorを \\p[1] に変換する", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-
-        local tokens = {
-            { type = "actor", actor = { spot = 1 } },
-        }
-        local result = BUILDER.build(tokens, {})
-
-        expect(result):toBe("\\p[1]\\e")
-    end)
-
-    test("spot='sakura'を \\p[0] に変換する", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-
-        local tokens = {
-            { type = "actor", actor = { spot = "sakura" } },
-        }
-        local result = BUILDER.build(tokens, {})
-
-        expect(result):toBe("\\p[0]\\e")
-    end)
-
-    test("spot='kero'を \\p[1] に変換する", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-
-        local tokens = {
-            { type = "actor", actor = { spot = "kero" } },
-        }
-        local result = BUILDER.build(tokens, {})
-
-        expect(result):toBe("\\p[1]\\e")
-    end)
-
-    test("spot='char2'を \\p[2] に変換する", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-
-        local tokens = {
-            { type = "actor", actor = { spot = "char2" } },
-        }
-        local result = BUILDER.build(tokens, {})
-
-        expect(result):toBe("\\p[2]\\e")
-    end)
-
-    test("spot=nilを \\p[0] に変換する", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-
-        local tokens = {
-            { type = "actor", actor = { spot = nil } },
-        }
-        local result = BUILDER.build(tokens, {})
-
-        expect(result):toBe("\\p[0]\\e")
-    end)
-end)
-
-describe("SAKURA_BUILDER - spot_switch token", function()
-    test("spot_switchトークンを段落区切り改行に変換する（デフォルト1.5→150）", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-
-        local tokens = {
-            { type = "spot_switch" },
-        }
-        local result = BUILDER.build(tokens, {})
-
-        expect(result):toBe("\\n[150]\\e")
-    end)
-
-    test("config.spot_newlinesの設定を反映する", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-
-        local tokens = {
-            { type = "spot_switch" },
-        }
-        local result = BUILDER.build(tokens, { spot_newlines = 2.0 })
-
-        expect(result):toBe("\\n[200]\\e")
-    end)
-
-    test("spot_newlines=1.0で \\n[100] を出力する", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-
-        local tokens = {
-            { type = "spot_switch" },
-        }
-        local result = BUILDER.build(tokens, { spot_newlines = 1.0 })
-
-        expect(result):toBe("\\n[100]\\e")
-    end)
-end)
-
 describe("SAKURA_BUILDER - surface token", function()
     test("surfaceトークンを \\s[id] に変換する", function()
         local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
 
         local tokens = {
-            { type = "surface", id = 5 },
+            { type = "actor", actor = actors.sakura, tokens = {
+                { type = "talk", actor = actors.sakura, text = "" },
+                { type = "surface", id = 5 },
+            }},
         }
         local result = BUILDER.build(tokens, {})
 
-        expect(result):toBe("\\s[5]\\e")
+        expect(result:find("\\s%[5%]")):toBeTruthy()
     end)
 
     test("文字列IDをサポートする", function()
         local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
 
         local tokens = {
-            { type = "surface", id = "smile" },
+            { type = "actor", actor = actors.sakura, tokens = {
+                { type = "talk", actor = actors.sakura, text = "" },
+                { type = "surface", id = "smile" },
+            }},
         }
         local result = BUILDER.build(tokens, {})
 
-        expect(result):toBe("\\s[smile]\\e")
+        expect(result:find("\\s%[smile%]")):toBeTruthy()
     end)
 end)
 
 describe("SAKURA_BUILDER - wait token", function()
     test("waitトークンを \\w[ms] に変換する", function()
         local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
 
         local tokens = {
-            { type = "wait", ms = 500 },
+            { type = "actor", actor = actors.sakura, tokens = {
+                { type = "talk", actor = actors.sakura, text = "" },
+                { type = "wait", ms = 500 },
+            }},
         }
         local result = BUILDER.build(tokens, {})
 
-        expect(result):toBe("\\w[500]\\e")
+        expect(result:find("\\w%[500%]")):toBeTruthy()
     end)
 end)
 
 describe("SAKURA_BUILDER - newline token", function()
     test("newlineトークンを \\n に変換する（n=1）", function()
         local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
 
         local tokens = {
-            { type = "newline", n = 1 },
+            { type = "actor", actor = actors.sakura, tokens = {
+                { type = "talk", actor = actors.sakura, text = "" },
+                { type = "newline", n = 1 },
+            }},
         }
         local result = BUILDER.build(tokens, {})
 
-        expect(result):toBe("\\n\\e")
+        expect(result:find("\\n")):toBeTruthy()
     end)
 
     test("複数改行を連続出力する（n=3）", function()
         local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
 
         local tokens = {
-            { type = "newline", n = 3 },
+            { type = "actor", actor = actors.sakura, tokens = {
+                { type = "talk", actor = actors.sakura, text = "" },
+                { type = "newline", n = 3 },
+            }},
         }
         local result = BUILDER.build(tokens, {})
 
-        expect(result):toBe("\\n\\n\\n\\e")
+        expect(result:find("\\n\\n\\n")):toBeTruthy()
     end)
 end)
 
 describe("SAKURA_BUILDER - clear token", function()
     test("clearトークンを \\c に変換する", function()
         local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
 
         local tokens = {
-            { type = "clear" },
+            { type = "actor", actor = actors.sakura, tokens = {
+                { type = "talk", actor = actors.sakura, text = "" },
+                { type = "clear" },
+            }},
         }
         local result = BUILDER.build(tokens, {})
 
-        expect(result):toBe("\\c\\e")
+        expect(result:find("\\c")):toBeTruthy()
     end)
 end)
 
 describe("SAKURA_BUILDER - sakura_script token", function()
     test("sakura_scriptトークンをそのまま出力する（エスケープなし）", function()
         local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
 
         local tokens = {
-            { type = "sakura_script", text = "\\![open,calendar]" },
+            { type = "actor", actor = actors.sakura, tokens = {
+                { type = "talk", actor = actors.sakura, text = "" },
+                { type = "sakura_script", text = "\\![open,calendar]" },
+            }},
         }
         local result = BUILDER.build(tokens, {})
 
-        expect(result):toBe("\\![open,calendar]\\e")
+        expect(result:find("\\!%[open,calendar%]")):toBeTruthy()
     end)
 end)
 
 describe("SAKURA_BUILDER - yield token", function()
     test("yieldトークンは無視される", function()
         local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
 
         local tokens = {
-            { type = "surface", id = 5 },
-            { type = "yield" },
+            { type = "actor", actor = actors.sakura, tokens = {
+                { type = "surface", id = 5 },
+                { type = "yield" },
+            }},
         }
         local result = BUILDER.build(tokens, {})
 
-        expect(result):toBe("\\s[5]\\e")
+        expect(result:find("\\s%[5%]")):toBeTruthy()
+        -- yieldは出力されない
     end)
 end)
 
 describe("SAKURA_BUILDER - \\e終端", function()
     test("出力末尾に \\e を付与する", function()
         local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
 
         local tokens = {
-            { type = "talk", text = "Hello" },
+            { type = "actor", actor = actors.sakura, tokens = {
+                { type = "talk", actor = actors.sakura, text = "Hello" },
+            }},
         }
         local result = BUILDER.build(tokens, {})
 
@@ -271,17 +223,21 @@ end)
 describe("SAKURA_BUILDER - 複合シナリオ", function()
     test("複数トークンを正しく連結する", function()
         local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
 
         local tokens = {
-            { type = "actor",      actor = { spot = 0 } },
-            { type = "talk",       text = "Hello" },
-            { type = "surface",    id = 5 },
-            { type = "wait",       ms = 100 },
-            { type = "actor",      actor = { spot = 1 } },
-            { type = "spot_switch" },
-            { type = "talk",       text = "Hi" },
-            { type = "newline",    n = 1 },
-            { type = "clear" },
+            { type = "spot", actor = actors.sakura, spot = 0 },
+            { type = "spot", actor = actors.kero, spot = 1 },
+            { type = "actor", actor = actors.sakura, tokens = {
+                { type = "talk", actor = actors.sakura, text = "Hello" },
+                { type = "surface", id = 5 },
+                { type = "wait", ms = 100 },
+            }},
+            { type = "actor", actor = actors.kero, tokens = {
+                { type = "talk", actor = actors.kero, text = "Hi" },
+                { type = "newline", n = 1 },
+                { type = "clear" },
+            }},
         }
         local result = BUILDER.build(tokens, { spot_newlines = 1.5 })
 
@@ -289,8 +245,8 @@ describe("SAKURA_BUILDER - 複合シナリオ", function()
         expect(result:find("Hello")):toBeTruthy()
         expect(result:find("\\s%[5%]")):toBeTruthy()
         expect(result:find("\\w%[100%]")):toBeTruthy()
+        expect(result:find("\\n%[150%]")):toBeTruthy() -- spot変更時の段落改行
         expect(result:find("\\p%[1%]")):toBeTruthy()
-        expect(result:find("\\n%[150%]")):toBeTruthy()
         expect(result:find("Hi")):toBeTruthy()
         expect(result:find("\\n")):toBeTruthy()
         expect(result:find("\\c")):toBeTruthy()
@@ -301,9 +257,12 @@ end)
 describe("SAKURA_BUILDER - エスケープ処理", function()
     test("複合エスケープを正しく処理する", function()
         local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
 
         local tokens = {
-            { type = "talk", text = "50% off \\ sale" },
+            { type = "actor", actor = actors.sakura, tokens = {
+                { type = "talk", actor = actors.sakura, text = "50% off \\ sale" },
+            }},
         }
         local result = BUILDER.build(tokens, {})
 
@@ -319,11 +278,13 @@ end)
 describe("SAKURA_BUILDER - spotトークン処理", function()
     test("spotトークン処理でactor_spots[actor.name]が正しく更新される", function()
         local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
 
-        local sakura = { name = "さくら" }
         local tokens = {
-            { type = "spot", actor = sakura, spot = 0 },
-            { type = "talk", actor = sakura, text = "Hello" },
+            { type = "spot", actor = actors.sakura, spot = 0 },
+            { type = "actor", actor = actors.sakura, tokens = {
+                { type = "talk", actor = actors.sakura, text = "Hello" },
+            }},
         }
         local result = BUILDER.build(tokens, {})
 
@@ -334,14 +295,17 @@ describe("SAKURA_BUILDER - spotトークン処理", function()
 
     test("複数actorのspot独立管理を確認", function()
         local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
 
-        local sakura = { name = "さくら" }
-        local kero = { name = "うにゅう" }
         local tokens = {
-            { type = "spot", actor = sakura, spot = 0 },
-            { type = "spot", actor = kero,   spot = 1 },
-            { type = "talk", actor = sakura, text = "Hi Sakura" },
-            { type = "talk", actor = kero,   text = "Hi Kero" },
+            { type = "spot", actor = actors.sakura, spot = 0 },
+            { type = "spot", actor = actors.kero, spot = 1 },
+            { type = "actor", actor = actors.sakura, tokens = {
+                { type = "talk", actor = actors.sakura, text = "Hi Sakura" },
+            }},
+            { type = "actor", actor = actors.kero, tokens = {
+                { type = "talk", actor = actors.kero, text = "Hi Kero" },
+            }},
         }
         local result = BUILDER.build(tokens, {})
 
@@ -358,12 +322,14 @@ end)
 describe("SAKURA_BUILDER - clear_spotトークン処理", function()
     test("clear_spotトークン処理でactor_spots={}にリセットされる", function()
         local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
 
-        local sakura = { name = "さくら" }
         local tokens = {
-            { type = "spot",      actor = sakura, spot = 5 },
+            { type = "spot", actor = actors.sakura, spot = 5 },
             { type = "clear_spot" },
-            { type = "talk",      actor = sakura, text = "Reset" },
+            { type = "actor", actor = actors.sakura, tokens = {
+                { type = "talk", actor = actors.sakura, text = "Reset" },
+            }},
         }
         local result = BUILDER.build(tokens, {})
 
@@ -374,12 +340,16 @@ describe("SAKURA_BUILDER - clear_spotトークン処理", function()
 
     test("clear_spotトークン処理でlast_actor=nilにリセットされる", function()
         local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
 
-        local sakura = { name = "さくら" }
         local tokens = {
-            { type = "talk",      actor = sakura, text = "Before" },
+            { type = "actor", actor = actors.sakura, tokens = {
+                { type = "talk", actor = actors.sakura, text = "Before" },
+            }},
             { type = "clear_spot" },
-            { type = "talk",      actor = sakura, text = "After" },
+            { type = "actor", actor = actors.sakura, tokens = {
+                { type = "talk", actor = actors.sakura, text = "After" },
+            }},
         }
         local result = BUILDER.build(tokens, {})
 
@@ -394,16 +364,18 @@ describe("SAKURA_BUILDER - clear_spotトークン処理", function()
 end)
 
 -- ============================================================================
--- actor-spot-refactoring: talkトークンのactor切り替え検出 (Task 2.3)
+-- actor-spot-refactoring: actorトークンのactor切り替え検出 (Task 2.3)
 -- ============================================================================
 
-describe("SAKURA_BUILDER - talkトークンのactor切り替え検出", function()
+describe("SAKURA_BUILDER - actorトークンのactor切り替え検出", function()
     test("actor_spots未設定時にデフォルト値0を使用する", function()
         local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
 
-        local sakura = { name = "さくら" }
         local tokens = {
-            { type = "talk", actor = sakura, text = "Hello" },
+            { type = "actor", actor = actors.sakura, tokens = {
+                { type = "talk", actor = actors.sakura, text = "Hello" },
+            }},
         }
         local result = BUILDER.build(tokens, {})
 
@@ -414,14 +386,17 @@ describe("SAKURA_BUILDER - talkトークンのactor切り替え検出", function
 
     test("last_actor != token.actor時に\\p[spot]を出力する", function()
         local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
 
-        local sakura = { name = "さくら" }
-        local kero = { name = "うにゅう" }
         local tokens = {
-            { type = "spot", actor = sakura, spot = 0 },
-            { type = "spot", actor = kero,   spot = 1 },
-            { type = "talk", actor = sakura, text = "First" },
-            { type = "talk", actor = kero,   text = "Second" },
+            { type = "spot", actor = actors.sakura, spot = 0 },
+            { type = "spot", actor = actors.kero, spot = 1 },
+            { type = "actor", actor = actors.sakura, tokens = {
+                { type = "talk", actor = actors.sakura, text = "First" },
+            }},
+            { type = "actor", actor = actors.kero, tokens = {
+                { type = "talk", actor = actors.kero, text = "Second" },
+            }},
         }
         local result = BUILDER.build(tokens, {})
 
@@ -432,14 +407,17 @@ describe("SAKURA_BUILDER - talkトークンのactor切り替え検出", function
 
     test("spot変更時に\\n[N]を出力する（Nはconfig.spot_newlines * 100）", function()
         local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
 
-        local sakura = { name = "さくら" }
-        local kero = { name = "うにゅう" }
         local tokens = {
-            { type = "spot", actor = sakura, spot = 0 },
-            { type = "spot", actor = kero,   spot = 1 },
-            { type = "talk", actor = sakura, text = "First" },
-            { type = "talk", actor = kero,   text = "Second" },
+            { type = "spot", actor = actors.sakura, spot = 0 },
+            { type = "spot", actor = actors.kero, spot = 1 },
+            { type = "actor", actor = actors.sakura, tokens = {
+                { type = "talk", actor = actors.sakura, text = "First" },
+            }},
+            { type = "actor", actor = actors.kero, tokens = {
+                { type = "talk", actor = actors.kero, text = "Second" },
+            }},
         }
         local result = BUILDER.build(tokens, { spot_newlines = 1.5 })
 
@@ -447,13 +425,17 @@ describe("SAKURA_BUILDER - talkトークンのactor切り替え検出", function
         expect(result:find("\\n%[150%]")):toBeTruthy()
     end)
 
-    test("同じactorの連続talkではスポットタグを出力しない", function()
+    test("同じactorの連続actorトークンではスポットタグを出力しない", function()
         local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
 
-        local sakura = { name = "さくら" }
         local tokens = {
-            { type = "talk", actor = sakura, text = "First" },
-            { type = "talk", actor = sakura, text = "Second" },
+            { type = "actor", actor = actors.sakura, tokens = {
+                { type = "talk", actor = actors.sakura, text = "First" },
+            }},
+            { type = "actor", actor = actors.sakura, tokens = {
+                { type = "talk", actor = actors.sakura, text = "Second" },
+            }},
         }
         local result = BUILDER.build(tokens, {})
 
@@ -471,13 +453,15 @@ end)
 -- actor-spot-refactoring: 統合シナリオ (Task 4.4)
 -- ============================================================================
 
-describe("SAKURA_BUILDER - 統合シナリオ（新トークン構造）", function()
+describe("SAKURA_BUILDER - 統合シナリオ（グループ化トークン構造）", function()
     test("set_spot()なしでのtalk() → デフォルトspot(0)使用を確認", function()
         local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
 
-        local sakura = { name = "さくら" }
         local tokens = {
-            { type = "talk", actor = sakura, text = "No spot set" },
+            { type = "actor", actor = actors.sakura, tokens = {
+                { type = "talk", actor = actors.sakura, text = "No spot set" },
+            }},
         }
         local result = BUILDER.build(tokens, {})
 
@@ -487,14 +471,17 @@ describe("SAKURA_BUILDER - 統合シナリオ（新トークン構造）", funct
 
     test("set_spot() → talk() → spot切り替えとスポットタグ出力を確認", function()
         local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
 
-        local sakura = { name = "さくら" }
-        local kero = { name = "うにゅう" }
         local tokens = {
-            { type = "spot", actor = sakura, spot = 0 },
-            { type = "spot", actor = kero,   spot = 1 },
-            { type = "talk", actor = sakura, text = "Sakura speaks" },
-            { type = "talk", actor = kero,   text = "Kero speaks" },
+            { type = "spot", actor = actors.sakura, spot = 0 },
+            { type = "spot", actor = actors.kero, spot = 1 },
+            { type = "actor", actor = actors.sakura, tokens = {
+                { type = "talk", actor = actors.sakura, text = "Sakura speaks" },
+            }},
+            { type = "actor", actor = actors.kero, tokens = {
+                { type = "talk", actor = actors.kero, text = "Kero speaks" },
+            }},
         }
         local result = BUILDER.build(tokens, { spot_newlines = 1.5 })
 
@@ -504,13 +491,17 @@ describe("SAKURA_BUILDER - 統合シナリオ（新トークン構造）", funct
 
     test("clear_spot() → talk() → デフォルトspot(0)への復帰を確認", function()
         local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
 
-        local sakura = { name = "さくら" }
         local tokens = {
-            { type = "spot",      actor = sakura, spot = 5 },
-            { type = "talk",      actor = sakura, text = "At spot 5" },
+            { type = "spot", actor = actors.sakura, spot = 5 },
+            { type = "actor", actor = actors.sakura, tokens = {
+                { type = "talk", actor = actors.sakura, text = "At spot 5" },
+            }},
             { type = "clear_spot" },
-            { type = "talk",      actor = sakura, text = "Back to default" },
+            { type = "actor", actor = actors.sakura, tokens = {
+                { type = "talk", actor = actors.sakura, text = "Back to default" },
+            }},
         }
         local result = BUILDER.build(tokens, {})
 

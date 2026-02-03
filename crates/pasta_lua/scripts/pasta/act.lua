@@ -8,6 +8,114 @@ local ACTOR = require("pasta.actor")
 local SCENE = require("pasta.scene")
 local GLOBAL = require("pasta.global")
 
+-- ============================================================================
+-- グループ化ローカル関数（actor-talk-grouping feature）
+-- ============================================================================
+
+--- トークン配列をアクター切り替え境界でグループ化
+--- @param tokens table[] フラットなトークン配列
+--- @return table[] グループ化されたトークン配列
+local function group_by_actor(tokens)
+    if not tokens or #tokens == 0 then
+        return {}
+    end
+
+    local result = {}
+    local current_actor_token = nil -- 現在の type="actor" トークン
+    local current_actor = nil       -- 現在のアクター（nilは未設定）
+
+    for _, token in ipairs(tokens) do
+        local t = token.type
+
+        -- アクター属性設定トークン: 独立して出力
+        if t == "spot" or t == "clear_spot" then
+            table.insert(result, token)
+        elseif t == "talk" then
+            local talk_actor = token.actor
+            -- アクター変更検出（最初のtalkまたはアクター変更時）
+            if current_actor_token == nil or talk_actor ~= current_actor then
+                -- 新しい type="actor" トークンを開始
+                current_actor_token = {
+                    type = "actor",
+                    actor = talk_actor,
+                    tokens = {}
+                }
+                table.insert(result, current_actor_token)
+                current_actor = talk_actor
+            end
+            table.insert(current_actor_token.tokens, token)
+        else
+            -- アクター行動トークン（surface, wait, newline, clear, sakura_script）
+            -- 現在のアクターグループ内に追加
+            if current_actor_token then
+                table.insert(current_actor_token.tokens, token)
+            end
+            -- 注: current_actor_tokenがnilの場合（talkより先にアクター行動が来た場合）は無視
+            -- 現在の設計ではこの状況は発生しない
+        end
+    end
+
+    return result
+end
+
+--- グループ化トークン内の連続talkトークンを統合
+--- @param grouped table[] グループ化されたトークン配列
+--- @return table[] 統合済みトークン配列
+local function merge_consecutive_talks(grouped)
+    local result = {}
+
+    for _, token in ipairs(grouped) do
+        if token.type == "actor" then
+            -- type="actor" トークン内のtalkを統合
+            local merged_tokens = {}
+            local pending_talk = nil
+
+            for _, inner in ipairs(token.tokens) do
+                if inner.type == "talk" then
+                    if pending_talk then
+                        -- 連続talk: テキスト結合
+                        pending_talk.text = pending_talk.text .. inner.text
+                    else
+                        -- 新規talk開始
+                        pending_talk = {
+                            type = "talk",
+                            actor = inner.actor,
+                            text = inner.text
+                        }
+                    end
+                else
+                    -- 非talkトークン: pending_talkをフラッシュ
+                    if pending_talk then
+                        table.insert(merged_tokens, pending_talk)
+                        pending_talk = nil
+                    end
+                    table.insert(merged_tokens, inner)
+                end
+            end
+
+            -- 最後のpending_talkをフラッシュ
+            if pending_talk then
+                table.insert(merged_tokens, pending_talk)
+            end
+
+            table.insert(result, {
+                type = "actor",
+                actor = token.actor,
+                tokens = merged_tokens
+            })
+        else
+            -- spot, clear_spot はそのまま出力
+            table.insert(result, token)
+        end
+    end
+
+    return result
+end
+
+-- ============================================================================
+-- Actクラス定義
+-- ============================================================================
+
 --- @class Act アクションオブジェクト
 --- @field actors table<string, Actor> 登録アクター（名前→アクター）
 --- @field save table 永続変数テーブル
@@ -168,13 +276,20 @@ function ACT_IMPL.word(self, name)
     return nil
 end
 
---- トークン取得とリセット
+--- トークン取得とリセット（グループ化・統合済み）
 --- @param self Act アクションオブジェクト
---- @return table[] トークン配列
+--- @return table[] グループ化されたトークン配列
 function ACT_IMPL.build(self)
-    local token = self.token
+    local tokens = self.token
     self.token = {}
-    return token
+
+    -- Phase 1: アクター切り替え境界でグループ化
+    local grouped = group_by_actor(tokens)
+
+    -- Phase 2: 連続talkを統合
+    local merged = merge_consecutive_talks(grouped)
+
+    return merged
 end
 
 --- build()結果をyield
