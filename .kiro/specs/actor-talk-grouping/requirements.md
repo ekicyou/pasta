@@ -186,6 +186,11 @@ self.token[]
 
 **Objective:** 開発者として、様々なエッジケースでも安定して動作することを保証したい。
 
+**前提条件（pasta DSL仕様）**:
+- pasta DSL経由で生成されるシーン関数では、`clear_spot`, `spot`, `talk`トークンのみが発生する
+- `surface`, `wait`, `newline`, `clear`, `sakura_script`は`talk`経由でさくらスクリプトとして直接発行されるため、グループ化対象として単独では発生しない
+- 最初のトークンがアクター行動（非talk）の場合は仕様外の挙動となる
+
 #### Acceptance Criteria
 
 1. When actorがnilのtalkトークンが現れた場合, the grouping function shall 「nilアクター」として独立したグループを形成する。
@@ -195,8 +200,6 @@ self.token[]
 3. When talkトークンのtextが空文字列の場合, the merge function shall 空文字列もそのまま結合に含める。
 
 4. When `type="actor"`トークン内にtalkトークンが存在しない場合, the merge function shall そのトークンをそのまま出力する。
-
-5. When 最初のトークンがアクター行動（非talk）の場合, the grouping function shall actor=nilの`type="actor"`トークンを作成して追加する。
 
 ---
 

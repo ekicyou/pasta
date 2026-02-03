@@ -133,19 +133,9 @@ local function group_by_actor(tokens)
                 current_actor = talk_actor
             end
             table.insert(current_actor_token.tokens, token)
-        else
-            -- その他のアクター行動トークン: 現在の type="actor" に追加
-            if current_actor_token == nil then
-                -- type="actor" がなければ actor=nil で作成
-                current_actor_token = {
-                    type = "actor",
-                    actor = nil,
-                    tokens = {}
-                }
-                table.insert(result, current_actor_token)
-            end
-            table.insert(current_actor_token.tokens, token)
         end
+        -- 注: pasta DSL仕様上、talk以外のアクター行動トークン（surface, wait等）は
+        --     単独では発生しないため、elseブロックは不要
     end
 
     return result
@@ -155,7 +145,7 @@ end
 **設計根拠**:
 - `spot`, `clear_spot`は独立トークンとして維持（R2-1）
 - `talk.actor`の変化でグループ分割（R2-2, R2-3）
-- 他のアクター行動は現在のグループに追加（R2-4）
+- pasta DSL仕様上、talk以外のアクター行動トークンは単独では発生しないため、elseブロックは不要
 
 ---
 
@@ -428,7 +418,6 @@ end
 | R5-2 | 断続的actor別グループ | group_by_actor: 参照比較 |
 | R5-3 | 空文字列結合 | merge_consecutive_talks: 文字列結合 |
 | R5-4 | talkなしグループ保持 | merge_consecutive_talks: そのまま出力 |
-| R5-5 | 最初が非talkでもactor=nil作成 | group_by_actor: else分岐 |
 | R6-1 | 既存テストパス | flatten_grouped_tokens保証 |
 | R6-2 | 出力完全一致 | flatten_grouped_tokens保証 |
 | R6-3 | 外部API変更なし | Interface Design |
@@ -487,11 +476,6 @@ describe("ACT - group_by_actor", function()
     
     test("断続的actorは別actorトークン", function()
         -- 検証: A→B→A で3つのactorトークン
-    end)
-    
-    test("最初が非talk→talk", function()
-        -- 入力: surface, talk(actorA)
-        -- 検証: actor=nilグループとactorAグループの2つ（R5-5）
     end)
 end)
 ```
