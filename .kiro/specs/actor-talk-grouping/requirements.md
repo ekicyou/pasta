@@ -99,13 +99,19 @@ self.token[]
 
 **Objective:** 開発者として、トークン配列をアクター切り替え境界で分割したい。これにより、アクター単位での処理が可能になる。
 
+#### 設計根拠
+
+- `spot`トークン: アクターの属性（spot位置）を変更する設定アクション。行動を伴わず、talkの発動まで遅延適用される。
+- `talk`トークン: アクターが実際に行動（会話）する。spot属性はこのタイミングで適用される。
+- **結論**: グループ化のactor判定は`talk.actor`のみで行う。`spot.actor`等の非talkトークンのactorはグループ分割に影響しない。
+
 #### Acceptance Criteria
 
 1. When talkトークンのactorが前のtalkトークンと異なる場合, the `ACT_IMPL.build()` function shall 新しいActorGroupを開始する。
 
 2. When talkトークンのactorが前のtalkトークンと同一の場合, the `ACT_IMPL.build()` function shall 同一ActorGroup内にトークンを追加する。
 
-3. When 非talkトークン（spot, surface, wait, newline, clear, sakura_script等）が現れた場合, the `ACT_IMPL.build()` function shall 現在のActorGroupにそのまま追加する（アクター切り替えとみなさない）。
+3. When 非talkトークン（spot, surface, wait, newline, clear, sakura_script等）が現れた場合, the `ACT_IMPL.build()` function shall 現在のActorGroupにそのまま追加する（非talkトークンのactor属性はグループ分割に影響しない）。
 
 4. While グループ化処理中, the `ACT_IMPL.build()` function shall トークンの順序を保持する。
 
