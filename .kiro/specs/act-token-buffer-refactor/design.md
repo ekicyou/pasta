@@ -142,11 +142,11 @@ sequenceDiagram
 
 ## Components and Interfaces
 
-| Component                   | Domain/Layer   | Intent                 | Req Coverage  | Key Dependencies                    | Contracts |
-| --------------------------- | -------------- | ---------------------- | ------------- | ----------------------------------- | --------- |
+| Component                   | Domain/Layer   | Intent                 | Req Coverage          | Key Dependencies                    | Contracts |
+| --------------------------- | -------------- | ---------------------- | --------------------- | ----------------------------------- | --------- |
 | pasta.act                   | Core/Parent    | トークン蓄積と状態管理 | 1, 2, 5, 7, 8, 10, 11 | actor, scene                        | Service   |
-| pasta.shiori.act            | SHIORI/Child   | さくらスクリプト生成   | 3, 4, 9, 10   | pasta.act (P0), sakura_builder (P0) | Service   |
-| pasta.shiori.sakura_builder | SHIORI/Utility | トークン→文字列変換    | 6             | なし                                | Service   |
+| pasta.shiori.act            | SHIORI/Child   | さくらスクリプト生成   | 3, 4, 9, 10           | pasta.act (P0), sakura_builder (P0) | Service   |
+| pasta.shiori.sakura_builder | SHIORI/Utility | トークン→文字列変換    | 6                     | なし                                | Service   |
 
 ### Core Layer
 
