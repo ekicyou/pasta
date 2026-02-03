@@ -1,15 +1,20 @@
 # Requirements Document
 
 ## Project Description (Input)
+
 ## token→さくらスクリプトbuildの前処理
+
 `pasta.shiori.act`:build()にて、token→さくらスクリプトへのビルドを行っているが、tokenをactor切り替え単位でグループ化する前処理を入れる。
 
 アクター単位で連続したtalkを1つにまとめることで、会話速度調整（文字単位でウェイト）などの後処理フィルター（別仕様）などを投入予定のため。
 
 ### フェーズ1: actor切り替え単位でグループ化
+
 ```json（概念コード）
 [
+  { type: "spot", actor: <うにゅうactor>, spot: 1 },
   {
+    type: "actor",
     actor: <さくらactor>,
     tokens: [
         {type: "talk", text: "今日は"},
@@ -18,6 +23,7 @@
     ]
   },
   {
+    type: "actor",
     actor: <うにゅうactor>,
     tokens: [
         {type: "talk", text: "明日は"},
@@ -29,15 +35,19 @@
 ```
 
 ### フェーズ2: 連続したtalkを1つにまとめる
+
 ```json（概念コード）
 [
+  { type: "spot", actor: <うにゅうactor>, spot: 1 },
   {
+    type: "actor",
     actor: <さくらactor>,
     tokens: [
         {type: "talk", text: "今日は晴れでした。"},
     ]
   },
   {
+    type: "actor",
     actor: <うにゅうactor>,
     tokens: [
         {type: "talk", text: "明日は雨らしいで。"},
@@ -53,6 +63,9 @@
    - `ACT_IMPL.build()` → グループ化されたトークン配列を返す
    - `SHIORI_ACT_IMPL.build()` → グループ化されたトークンを処理してさくらスクリプト生成
 3. **後方互換性**: 最終的な`SHIORI_ACT_IMPL.build()`の出力（さくらスクリプト）は変化なし
+4. **トークン分類（2026-02-03追記）**:
+   - **アクター属性設定**: `spot`, `clear_spot` - グループ化対象外、独立トークンとして維持
+   - **アクター行動**: `talk`, `surface`, `wait`, `newline`, `clear`, `sakura_script` - グループ化対象
 
 ---
 
@@ -62,16 +75,25 @@
 
 現在の`ACT_IMPL.build()`はフラットなトークン配列を返しているが、将来の拡張（会話速度調整、文字単位ウェイト挿入等のフィルター機能）に対応するため、アクター切り替え単位でトークンをグループ化する中間表現を導入する。
 
+### トークン分類
+
+| 分類 | トークン | グループ化 | 説明 |
+|------|---------|-----------|------|
+| アクター属性設定 | `spot`, `clear_spot` | 対象外 | 位置設定、遅延適用される属性 |
+| アクター行動 | `talk`, `surface`, `wait`, `newline`, `clear`, `sakura_script` | 対象 | 直前のアクターに紐づく行動 |
+
 **処理フロー（変更後）**:
+
 ```
 self.token[] 
   → ACT_IMPL.build() [グループ化・talk統合]
-  → ActorGroup[]
+  → grouped_token[] (spot | clear_spot | type="actor")
   → SHIORI_ACT_IMPL.build() [さくらスクリプト生成]
   → さくらスクリプト文字列
 ```
 
 本機能は2段階のフェーズで構成される:
+
 1. **グループ化フェーズ**: アクター切り替え境界でトークンを分割（`pasta.act`）
 2. **Talk統合フェーズ**: グループ内の連続talkトークンを単一talkに結合（`pasta.act`）
 
@@ -79,19 +101,28 @@ self.token[]
 
 ## Requirements
 
-### Requirement 1: ActorGroup構造定義
+### Requirement 1: グループ化後のトークン構造定義
 
-**Objective:** 開発者として、アクター切り替え単位でトークンをグループ化したデータ構造を利用したい。これにより、アクター単位での後処理フィルター（会話速度調整等）の実装が可能になる。
+**Objective:** 開発者として、グループ化後のトークン構造を明確に定義したい。これにより、アクター単位での後処理フィルター（会話速度調整等）の実装が可能になる。
+
+#### 設計根拠
+
+グループ化後の出力は3種類のトークンで構成される：
+
+1. `spot` - アクター属性設定（位置）、独立トークン
+2. `clear_spot` - 全スポット情報クリア、独立トークン
+3. `type="actor"` - アクター行動グループ、内部にtokens配列を持つ
 
 #### Acceptance Criteria
 
-1. The pasta.act module shall define an `ActorGroup` structure containing:
-   - `actor`: アクターオブジェクト参照（nilの場合はデフォルトアクター）
-   - `tokens`: グループ内のトークン配列
+1. The `ACT_IMPL.build()` function shall return an array containing three token types:
+   - `{ type = "spot", actor = <Actor>, spot = <number> }`
+   - `{ type = "clear_spot" }`
+   - `{ type = "actor", actor = <Actor|nil>, tokens = <table[]> }`
 
 2. When トークン配列が空の場合, the `ACT_IMPL.build()` function shall 空の配列を返す。
 
-3. When トークン配列にtalkトークンのみが含まれる場合, the `ACT_IMPL.build()` function shall 単一のActorGroupを生成する。
+3. When トークン配列にtalkトークンのみが含まれる場合, the `ACT_IMPL.build()` function shall 単一の`type="actor"`トークンを生成する。
 
 ---
 
@@ -101,19 +132,21 @@ self.token[]
 
 #### 設計根拠
 
-- `spot`トークン: アクターの属性（spot位置）を変更する設定アクション。行動を伴わず、talkの発動まで遅延適用される。
-- `talk`トークン: アクターが実際に行動（会話）する。spot属性はこのタイミングで適用される。
-- **結論**: グループ化のactor判定は`talk.actor`のみで行う。`spot.actor`等の非talkトークンのactorはグループ分割に影響しない。
+- **アクター属性設定**（`spot`, `clear_spot`）: グループ化対象外。独立トークンとして維持され、行動を伴わない。
+- **アクター行動**（`talk`, `surface`, `wait`, `newline`, `clear`, `sakura_script`）: グループ化対象。直前のアクターに紐づく行動として処理される。
+- **グループ境界**: `talk.actor`の変化のみでグループを分割する。
 
 #### Acceptance Criteria
 
-1. When talkトークンのactorが前のtalkトークンと異なる場合, the `ACT_IMPL.build()` function shall 新しいActorGroupを開始する。
+1. When `spot`または`clear_spot`トークンが現れた場合, the `ACT_IMPL.build()` function shall それらを独立トークンとして出力する（グループに含めない）。
 
-2. When talkトークンのactorが前のtalkトークンと同一の場合, the `ACT_IMPL.build()` function shall 同一ActorGroup内にトークンを追加する。
+2. When `talk`トークンのactorが前の`talk`トークンと異なる場合, the `ACT_IMPL.build()` function shall 新しい`type="actor"`トークンを開始する。
 
-3. When 非talkトークン（spot, surface, wait, newline, clear, sakura_script等）が現れた場合, the `ACT_IMPL.build()` function shall 現在のActorGroupにそのまま追加する（非talkトークンのactor属性はグループ分割に影響しない）。
+3. When `talk`トークンのactorが前の`talk`トークンと同一の場合, the `ACT_IMPL.build()` function shall 同一`type="actor"`トークン内にトークンを追加する。
 
-4. While グループ化処理中, the `ACT_IMPL.build()` function shall トークンの順序を保持する。
+4. When アクター行動トークン（`surface`, `wait`, `newline`, `clear`, `sakura_script`）が現れた場合, the `ACT_IMPL.build()` function shall 現在の`type="actor"`トークン内に追加する。
+
+5. While グループ化処理中, the `ACT_IMPL.build()` function shall トークンの順序を保持する。
 
 ---
 
@@ -123,13 +156,13 @@ self.token[]
 
 #### Acceptance Criteria
 
-1. When 同一ActorGroup内にtalkトークンが連続する場合, the merge function shall それらのtextを結合して単一のtalkトークンを生成する。
+1. When 同一`type="actor"`トークン内にtalkトークンが連続する場合, the merge function shall それらのtextを結合して単一のtalkトークンを生成する。
 
-2. When talkトークンの間に非talkトークン（surface, wait, newline等）が挟まる場合, the merge function shall talkトークンを分離したまま維持する。
+2. When talkトークンの間にアクター行動トークン（`surface`, `wait`, `newline`等）が挟まる場合, the merge function shall talkトークンを分離したまま維持する。
 
 3. When 結合する場合, the merge function shall 最初のtalkトークンのactor情報を保持する。
 
-4. The merge function shall 非talkトークンをそのまま保持する。
+4. The merge function shall アクター行動トークンをそのまま保持する。
 
 ---
 
@@ -139,9 +172,9 @@ self.token[]
 
 #### Acceptance Criteria
 
-1. The `SHIORI_ACT_IMPL.build()` function shall `ACT_IMPL.build()`からActorGroup配列を受け取る。
+1. The `SHIORI_ACT_IMPL.build()` function shall `ACT_IMPL.build()`からグループ化されたトークン配列を受け取る。
 
-2. The `SHIORI_ACT_IMPL.build()` function shall ActorGroup配列をフラット化してsakura_builderに渡す、またはsakura_builderがActorGroupを直接処理する。
+2. The `SHIORI_ACT_IMPL.build()` function shall `type="actor"`トークンをフラット化してsakura_builderに渡す、またはsakura_builderが直接処理する。
 
 3. The `SHIORI_ACT_IMPL.build()` function shall 既存の出力結果（さくらスクリプト）と完全互換を維持する。
 
@@ -157,11 +190,13 @@ self.token[]
 
 1. When actorがnilのtalkトークンが現れた場合, the grouping function shall 「nilアクター」として独立したグループを形成する。
 
-2. When 同一actorが断続的に現れる場合（A→B→A）, the grouping function shall 別々のActorGroupとして扱う。
+2. When 同一actorが断続的に現れる場合（A→B→A）, the grouping function shall 別々の`type="actor"`トークンとして扱う。
 
 3. When talkトークンのtextが空文字列の場合, the merge function shall 空文字列もそのまま結合に含める。
 
-4. When ActorGroup内にtalkトークンが存在しない場合, the merge function shall そのグループをそのまま出力する。
+4. When `type="actor"`トークン内にtalkトークンが存在しない場合, the merge function shall そのトークンをそのまま出力する。
+
+5. When 最初のトークンがアクター行動（非talk）の場合, the grouping function shall actor=nilの`type="actor"`トークンを作成して追加する。
 
 ---
 
@@ -175,7 +210,7 @@ self.token[]
 
 2. While グループ化・統合処理後, the final sakura script output shall 既存出力と完全一致する。
 
-3. The implementation shall 既存の外部API（`ACT.new()`, `SHIORI_ACT_IMPL.build()`のシグネチャ）を変更しない。ただし`ACT_IMPL.build()`の戻り値型は`token[]`から`ActorGroup[]`に変更される。
+3. The implementation shall 既存の外部API（`ACT.new()`, `SHIORI_ACT_IMPL.build()`のシグネチャ）を変更しない。ただし`ACT_IMPL.build()`の戻り値型は`token[]`から`grouped_token[]`に変更される。
 
 ---
 
@@ -185,7 +220,7 @@ self.token[]
 
 #### Acceptance Criteria
 
-1. The ActorGroup structure shall グループ単位でのフィルター関数適用を可能にする設計とする。
+1. The `type="actor"` token structure shall グループ単位でのフィルター関数適用を可能にする設計とする。
 
 2. The merge function shall オプションで無効化可能とする（将来の細粒度制御のため）。
 

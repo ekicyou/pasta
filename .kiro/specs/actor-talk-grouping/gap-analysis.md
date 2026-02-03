@@ -16,6 +16,9 @@
 - **グループ化の実装箇所**: `pasta.act`モジュールの`ACT_IMPL.build()`
 - **後段処理**: `SHIORI_ACT_IMPL.build()`がグループ化されたトークンを処理
 - **後方互換性**: 最終出力（さくらスクリプト）は変化なし
+- **トークン分類（2026-02-03追記）**:
+  - **アクター属性設定**: `spot`, `clear_spot` - グループ化対象外、独立トークンとして維持
+  - **アクター行動**: `talk`, `surface`, `wait`, `newline`, `clear`, `sakura_script` - グループ化対象
 
 ---
 
@@ -38,7 +41,16 @@ self.token[] → ACT_IMPL.build() → token[] → SHIORI_ACT_IMPL.build() → BU
 
 **トークン処理フロー（変更後）**:
 ```
-self.token[] → ACT_IMPL.build() [グループ化] → ActorGroup[] → SHIORI_ACT_IMPL.build() → BUILDER.build() → さくらスクリプト
+self.token[] → ACT_IMPL.build() [グループ化] → grouped_token[] → SHIORI_ACT_IMPL.build() → BUILDER.build() → さくらスクリプト
+```
+
+**グループ化後のトークン構造**:
+```lua
+grouped_token[] = [
+    { type = "spot", actor = <Actor>, spot = 1 },       -- 独立トークン
+    { type = "actor", actor = <Actor>, tokens = [...] }, -- グループ化トークン
+    { type = "clear_spot" },                             -- 独立トークン
+]
 ```
 
 **`ACT_IMPL.build()`の現状**:
@@ -63,7 +75,7 @@ end
 
 | Requirement | 既存資産 | ギャップ |
 |------------|---------|---------|
-| R1: ActorGroup構造定義 | - | **Missing**: 新規データ構造が必要 |
+| R1: グループ化後トークン構造定義 | - | **Missing**: 新規データ構造が必要 |
 | R2: グループ化ロジック | - | **Missing**: `ACT_IMPL.build()`に追加が必要 |
 | R3: 連続talk統合 | - | **Missing**: 新規関数が必要 |
 | R4: SHIORI_ACT対応 | `SHIORI_ACT_IMPL.build()` | **Extend**: グループ化トークン処理に対応 |
@@ -121,8 +133,7 @@ end
 
 **変更対象**:
 - `pasta/act.lua`のみ（1ファイル）
-- `pasta/shiori/act.lua`（グループ対応、またはフラット化）
-- `pasta/shiori/sakura_builder.lua`（必要に応じてグループ対応）
+- `pasta/shiori/act.lua`（グループ対応、フラット化）
 
 **メリット**:
 - ✅ 変更範囲最小
@@ -130,7 +141,7 @@ end
 - ✅ 将来のモジュール分離も容易（リファクタ時に抽出可能）
 
 **デメリット**:
-- ❌ ファイルサイズ増加（~50行追加で~310行に）
+- ❌ ファイルサイズ増加（~60行追加で~320行に）
 
 **Trade-offs**: 最もバランスが取れた選択肢
 
@@ -162,11 +173,12 @@ end
 - アクター比較方法（オブジェクト参照比較）
 - エスケープ処理（既存関数再利用可能）
 
-### 設計フェーズで検討
+### 設計フェーズで検討（解決済み）
 
-- [ ] `SHIORI_ACT_IMPL.build()`でのActorGroup処理方法（フラット化 vs 直接処理）
-- [ ] `BUILDER.build()`のActorGroup対応要否
-- [ ] `merge_consecutive_talks()`のオプション化設計（R7-2: 将来の無効化対応）
+- ✅ `SHIORI_ACT_IMPL.build()`でのグループ処理方法 → フラット化
+- ✅ `BUILDER.build()`のグループ対応要否 → 不要（フラット化で対応）
+- ✅ `merge_consecutive_talks()`のオプション化設計 → 将来対応
+- ✅ `spot`, `clear_spot`の扱い → 独立トークンとして維持
 
 ---
 
@@ -179,28 +191,29 @@ end
 ### 設計フェーズでの決定事項
 
 1. **前処理関数の配置**: `act.lua`内ローカル関数
-2. **ACT_IMPL.build()の変更**: グループ化済みActorGroup配列を返す
-3. **SHIORI_ACT_IMPL.build()の変更**: ActorGroupをフラット化してBUILDER.build()に渡す
+2. **ACT_IMPL.build()の変更**: グループ化済み`grouped_token[]`を返す
+3. **SHIORI_ACT_IMPL.build()の変更**: `type="actor"`をフラット化してBUILDER.build()に渡す
 4. **後方互換性**: 既存テストの全パスを確認
 
 ### テスト戦略
 
 1. 新規テストセクション: `describe("ACT - actor grouping", ...)`
 2. 既存テストは変更なし（回帰テストとして機能）
-3. エッジケース: nil actor、断続的actor、空文字列
+3. エッジケース: nil actor、断続的actor、空文字列、spot/clear_spot独立性
 
 ---
 
 ## Appendix: Token Structure Reference
 
+### 入力トークン（フラット配列）
+
 ```lua
--- talkトークン
-{ type = "talk", actor = <Actor>, text = "発話テキスト" }
-
--- spotトークン
+-- アクター属性設定（グループ化対象外）
 { type = "spot", actor = <Actor>, spot = <number> }
+{ type = "clear_spot" }
 
--- その他トークン
+-- アクター行動（グループ化対象）
+{ type = "talk", actor = <Actor>, text = "発話テキスト" }
 { type = "surface", id = <number|string> }
 { type = "wait", ms = <number> }
 { type = "newline", n = <number> }
@@ -208,18 +221,24 @@ end
 { type = "sakura_script", text = <string> }
 ```
 
-### ActorGroup構造（新規提案）
+### 出力トークン（グループ化後）
 
 ```lua
---- @class ActorGroup
---- @field actor Actor|nil グループのアクター
---- @field tokens table[] グループ内トークン配列
+-- グループ化後の出力は3種類のトークンで構成される
+
+-- 1. spotトークン（独立）
+{ type = "spot", actor = <Actor>, spot = <number> }
+
+-- 2. clear_spotトークン（独立）
+{ type = "clear_spot" }
+
+-- 3. actorトークン（グループ）
 {
+    type = "actor",
     actor = <Actor>,
     tokens = {
-        { type = "talk", actor = <Actor>, text = "今日は" },
-        { type = "talk", actor = <Actor>, text = "晴れ" },
-        { type = "talk", actor = <Actor>, text = "でした。" },
+        { type = "talk", actor = <Actor>, text = "今日は晴れでした。" },
+        { type = "surface", id = 10 },
     }
 }
 ```
