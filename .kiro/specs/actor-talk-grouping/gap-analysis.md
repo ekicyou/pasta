@@ -14,11 +14,15 @@
 ### 設計決定（2026-02-03）
 
 - **グループ化の実装箇所**: `pasta.act`モジュールの`ACT_IMPL.build()`
-- **後段処理**: `SHIORI_ACT_IMPL.build()`がグループ化されたトークンを処理
+- **後段処理**: `sakura_builder.lua`の`BUILDER.build()`がグループ化されたトークンを直接処理
 - **後方互換性**: 最終出力（さくらスクリプト）は変化なし
 - **トークン分類（2026-02-03追記）**:
   - **アクター属性設定**: `spot`, `clear_spot` - グループ化対象外、独立トークンとして維持
-  - **アクター行動**: `talk`, `surface`, `wait`, `newline`, `clear`, `sakura_script` - グループ化対象
+  - **アクター行動**: `talk`のみ（pasta DSL経由）- グループ化対象
+
+**重要な設計変更（2026-02-03）**:
+- `flatten_grouped_tokens()`アプローチは**却下** - sakura_builderがgrouped_token[]を直接処理
+- sakura_builder.luaは大幅改造が必要（BUILDER.build()の処理フロー変更）
 
 ---
 
@@ -78,7 +82,7 @@ end
 | R1: グループ化後トークン構造定義 | - | **Missing**: 新規データ構造が必要 |
 | R2: グループ化ロジック | - | **Missing**: `ACT_IMPL.build()`に追加が必要 |
 | R3: 連続talk統合 | - | **Missing**: 新規関数が必要 |
-| R4: SHIORI_ACT対応 | `SHIORI_ACT_IMPL.build()` | **Extend**: グループ化トークン処理に対応 |
+| R4: sakura_builder改造 | `BUILDER.build()` | **Major Rewrite**: grouped_token[]直接処理に変更 |
 | R5: エッジケース | - | **Missing**: テストケース追加が必要 |
 | R6: 後方互換性 | `sakura_builder_test.lua` (521行) | **OK**: 既存テストで検証可能 |
 | R7: 将来拡張準備 | 純粋関数設計 | **OK**: 設計原則に合致 |
@@ -175,10 +179,11 @@ end
 
 ### 設計フェーズで検討（解決済み）
 
-- ✅ `SHIORI_ACT_IMPL.build()`でのグループ処理方法 → フラット化
-- ✅ `BUILDER.build()`のグループ対応要否 → 不要（フラット化で対応）
+- ✅ `BUILDER.build()`でのグループ処理方法 → grouped_token[]を直接処理
+- ✅ `flatten_grouped_tokens()`の要否 → **不要**（却下）
 - ✅ `merge_consecutive_talks()`のオプション化設計 → 将来対応
 - ✅ `spot`, `clear_spot`の扱い → 独立トークンとして維持
+- ✅ pasta DSL由来トークン → `talk`のみ（他はさくらスクリプト経由）
 
 ---
 
@@ -192,8 +197,9 @@ end
 
 1. **前処理関数の配置**: `act.lua`内ローカル関数
 2. **ACT_IMPL.build()の変更**: グループ化済み`grouped_token[]`を返す
-3. **SHIORI_ACT_IMPL.build()の変更**: `type="actor"`をフラット化してBUILDER.build()に渡す
-4. **後方互換性**: 既存テストの全パスを確認
+3. **BUILDER.build()の変更**: `grouped_token[]`を直接処理してさくらスクリプト生成
+4. **flatten不要**: sakura_builderがグループ対応するため、フラット化関数は作成しない
+5. **後方互換性**: 最終出力（さくらスクリプト）が既存と完全一致することを確認
 
 ### テスト戦略
 

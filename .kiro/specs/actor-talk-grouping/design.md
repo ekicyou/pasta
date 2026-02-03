@@ -252,45 +252,107 @@ end
 
 ---
 
-### Component 4: flatten_grouped_tokens(grouped) ローカル関数
+### Component 4: BUILDER.build()の改造
 
-**責務**: グループ化トークン配列をフラットなトークン配列に変換
+**責務**: グループ化されたトークン配列（`grouped_token[]`）を直接処理してさくらスクリプトを生成
 
-**所属**: `pasta/shiori/act.lua` 内ローカル関数
+**所属**: `pasta/shiori/sakura_builder.lua`
 
 **対応要件**: R4
 
 ```lua
---- グループ化トークン配列をフラットなトークン配列に変換
---- @param grouped grouped_token[] グループ化されたトークン配列
---- @return table[] フラットなトークン配列
-local function flatten_grouped_tokens(grouped)
-    local flat = {}
-    for _, token in ipairs(grouped) do
-        if token.type == "actor" then
-            -- type="actor" の中身を展開
-            for _, inner in ipairs(token.tokens) do
-                table.insert(flat, inner)
+--- トークン配列をさくらスクリプト文字列に変換（grouped_token[]対応版）
+--- @param grouped_tokens grouped_token[] グループ化されたトークン配列
+--- @param config BuildConfig|nil 設定
+--- @return string さくらスクリプト文字列
+function BUILDER.build(grouped_tokens, config)
+    config = config or {}
+    local spot_newlines = config.spot_newlines or 1.5
+    local buffer = {}
+
+    -- ビルダー内部状態（build()呼び出しごとにリセット）
+    local actor_spots = {} -- {[actor_name]: spot_id} actor位置マップ
+    local last_actor = nil -- 最後に発言したActor
+    local last_spot = nil  -- 最後のスポットID
+
+    for _, token in ipairs(grouped_tokens) do
+        local t = token.type
+
+        if t == "spot" then
+            -- spotトークン処理: actor_spots[actor.name] = spot
+            if token.actor and token.actor.name then
+                actor_spots[token.actor.name] = token.spot
             end
-        else
-            -- spot, clear_spot はそのまま追加
-            table.insert(flat, token)
+
+        elseif t == "clear_spot" then
+            -- clear_spotトークン処理: 状態リセット
+            actor_spots = {}
+            last_actor = nil
+            last_spot = nil
+
+        elseif t == "actor" then
+            -- actorトークン処理: グループ内のトークンを順次処理
+            local actor = token.actor
+            local actor_name = actor and actor.name
+
+            -- アクター切り替え検出
+            if actor and last_actor ~= actor then
+                local spot = actor_spots[actor_name] or 0
+
+                -- spot変更時に段落区切り改行を出力
+                if last_spot ~= nil and last_spot ~= spot then
+                    local percent = math.floor(spot_newlines * 100)
+                    table.insert(buffer, string.format("\\n[%d]", percent))
+                end
+
+                table.insert(buffer, spot_to_tag(spot))
+                last_actor = actor
+                last_spot = spot
+            end
+
+            -- グループ内トークンを順次処理
+            for _, inner in ipairs(token.tokens) do
+                local inner_type = inner.type
+
+                if inner_type == "talk" then
+                    table.insert(buffer, escape_sakura(inner.text))
+                elseif inner_type == "surface" then
+                    table.insert(buffer, string.format("\\s[%s]", tostring(inner.id)))
+                elseif inner_type == "wait" then
+                    table.insert(buffer, string.format("\\w[%d]", inner.ms))
+                elseif inner_type == "newline" then
+                    for _ = 1, inner.n do
+                        table.insert(buffer, "\\n")
+                    end
+                elseif inner_type == "clear" then
+                    table.insert(buffer, "\\c")
+                elseif inner_type == "sakura_script" then
+                    table.insert(buffer, inner.text)
+                end
+            end
         end
     end
-    return flat
+
+    return table.concat(buffer) .. "\\e"
 end
 ```
 
 **設計根拠**:
-- sakura_builderは既存のフラットトークン処理を維持（R4-3）
-- 将来的にsakura_builderがグループ対応する際に変更しやすい
-- 最小限の変更で後方互換性を保証（R6）
+- `grouped_token[]`を直接処理することで、フラット化処理が不要になる
+- 将来のフィルター機能（会話速度調整等）をグループ単位で挿入可能
+- `type="actor"`トークン処理時にアクター切り替え検出を行い、既存のさくらスクリプト出力と完全互換を維持
+
+**既存コードとの主な変更点**:
+1. 最上位ループが`grouped_token[]`を処理（旧: フラットな`token[]`）
+2. `type="actor"`トークンを認識し、内部の`tokens`配列を処理
+3. アクター切り替え検出は`type="actor"`トークン処理時に実施
+4. 既存の`actor`, `spot_switch`トークン処理は削除（新形式に統合）
 
 ---
 
 ### Component 5: SHIORI_ACT_IMPL.build() 変更
 
-**責務**: グループ化されたトークンを処理してさくらスクリプト生成
+**責務**: グループ化されたトークンをそのまま`BUILDER.build()`に渡す
 
 **所属**: `pasta/shiori/act.lua`
 
@@ -303,10 +365,8 @@ end
 function SHIORI_ACT_IMPL.build(self)
     -- 親のbuild()でグループ化済みトークン取得
     local grouped = ACT.IMPL.build(self)
-    -- フラット化してsakura_builderに渡す
-    local flat_tokens = flatten_grouped_tokens(grouped)
-    -- sakura_builderで変換
-    local script = BUILDER.build(flat_tokens, {
+    -- sakura_builderで変換（グループ化トークンを直接処理）
+    local script = BUILDER.build(grouped, {
         spot_newlines = self._spot_newlines
     })
     return script
@@ -315,7 +375,8 @@ end
 
 **変更点**:
 - `ACT.IMPL.build(self)`の戻り値が`grouped_token[]`に
-- `flatten_grouped_tokens()`でフラット化後にBUILDER.build()へ
+- `flatten_grouped_tokens()`は不要（削除）
+- `BUILDER.build()`がグループ化トークンを直接処理
 
 ---
 
@@ -382,7 +443,7 @@ end
 - 将来の非SHIORIバックエンド: `ACT_IMPL.build()`を継承する場合、戻り値型の変更を認識する必要がある
 
 **継承に関する注意事項**:
-`ACT_IMPL.build()`は継承を前提とした内部APIであり、子クラスは戻り値型が`grouped_token[]`に変更されたことを認識する必要があります。現在の実装では`SHIORI_ACT_IMPL.build()`が`flatten_grouped_tokens()`でフラット化してから`BUILDER.build()`に渡すことで、後方互換性を保証しています。
+`ACT_IMPL.build()`は継承を前提とした内部APIであり、子クラスは戻り値型が`grouped_token[]`に変更されたことを認識する必要があります。現在の実装では`BUILDER.build()`がグループ化トークンを直接処理することで、後方互換性を保証しています。
 
 ### ローカル関数（新規）
 
@@ -390,7 +451,6 @@ end
 |------|------|-----------|
 | `group_by_actor` | `pasta/act.lua` | `(tokens) -> grouped_token[]` |
 | `merge_consecutive_talks` | `pasta/act.lua` | `(grouped) -> grouped_token[]` |
-| `flatten_grouped_tokens` | `pasta/shiori/act.lua` | `(grouped) -> token[]` |
 
 ---
 
@@ -410,16 +470,19 @@ end
 | R3-2 | アクター行動トークンで分離 | merge_consecutive_talks: else分岐 |
 | R3-3 | 最初のactor保持 | merge_consecutive_talks: 最初のtalk保存 |
 | R3-4 | アクター行動トークン保持 | merge_consecutive_talks: table.insert |
-| R4-1 | grouped_token受け取り | SHIORI_ACT_IMPL.build: ACT.IMPL.build呼び出し |
-| R4-2 | フラット化 | flatten_grouped_tokens + BUILDER.build |
-| R4-3 | 出力互換 | 既存テストで検証 |
-| R4-4 | 外部API変更なし | Interface Design: 変更なし |
+| R4-1 | BUILDER.build()がgrouped_token[]を受け取る | Component 4: BUILDER.build改造 |
+| R4-2 | spot/clear_spot/actorを処理 | Component 4: 3分岐処理 |
+| R4-3 | actorトークン内のtokens配列を処理 | Component 4: inner loop |
+| R4-4 | アクター切り替え検出はactor処理時に実施 | Component 4: last_actor比較 |
+| R4-5 | 既存出力と完全互換 | 既存テストで検証 |
+| R4-6 | SHIORI_ACT_IMPL.build()はgroupedを直接渡す | Component 5: SHIORI_ACT_IMPL.build |
+| R4-7 | 外部API変更なし | Interface Design: 変更なし |
 | R5-1 | nil actor独立グループ | group_by_actor: talk_actor比較 |
 | R5-2 | 断続的actor別グループ | group_by_actor: 参照比較 |
 | R5-3 | 空文字列結合 | merge_consecutive_talks: 文字列結合 |
 | R5-4 | talkなしグループ保持 | merge_consecutive_talks: そのまま出力 |
-| R6-1 | 既存テストパス | flatten_grouped_tokens保証 |
-| R6-2 | 出力完全一致 | flatten_grouped_tokens保証 |
+| R6-1 | 既存テストパス | BUILDER.build()互換性保証 |
+| R6-2 | 出力完全一致 | BUILDER.build()互換性保証 |
 | R6-3 | 外部API変更なし | Interface Design |
 | R7-1 | フィルター適用可能設計 | type="actor"構造 |
 | R7-2 | 統合無効化可能 | 将来対応（現状は常に有効） |

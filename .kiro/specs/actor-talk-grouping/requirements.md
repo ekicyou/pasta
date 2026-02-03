@@ -166,19 +166,31 @@ self.token[]
 
 ---
 
-### Requirement 4: SHIORI_ACT_IMPL.build()のグループ対応
+### Requirement 4: sakura_builderのグループ化トークン対応
 
-**Objective:** 開発者として、`SHIORI_ACT_IMPL.build()`がグループ化されたトークンを処理できるようにしたい。最終出力（さくらスクリプト）は変化なし。
+**Objective:** 開発者として、`sakura_builder.lua`がグループ化されたトークン（`grouped_token[]`）を直接処理できるようにしたい。これにより、フィルター処理を挿入可能な設計となり、最終出力（さくらスクリプト）は既存と完全一致する。
+
+#### 設計根拠
+
+- グループ化されたトークンを処理することで、アクター単位でのフィルター機能（会話速度調整等）が挿入可能になる
+- `flatten_grouped_tokens()`による一時的なフラット化は行わず、`sakura_builder.lua`がネイティブにグループ構造を理解する
+- 最終的なさくらスクリプト出力は既存と完全互換を維持
 
 #### Acceptance Criteria
 
-1. The `SHIORI_ACT_IMPL.build()` function shall `ACT_IMPL.build()`からグループ化されたトークン配列を受け取る。
+1. The `BUILDER.build()` function shall `grouped_token[]`形式のトークン配列を受け取る。
 
-2. The `SHIORI_ACT_IMPL.build()` function shall `type="actor"`トークンをフラット化してsakura_builderに渡す、またはsakura_builderが直接処理する。
+2. The `BUILDER.build()` function shall `type="spot"`トークンを処理し、`actor_spots`マップを更新する。
 
-3. The `SHIORI_ACT_IMPL.build()` function shall 既存の出力結果（さくらスクリプト）と完全互換を維持する。
+3. The `BUILDER.build()` function shall `type="clear_spot"`トークンを処理し、状態をリセットする。
 
-4. While 処理中, the SHIORI_ACT module shall 外部APIに変更を加えない。
+4. The `BUILDER.build()` function shall `type="actor"`トークンを処理し、内部の`tokens`配列を順次処理する。
+
+5. The `BUILDER.build()` function shall 既存の出力結果（さくらスクリプト）と完全互換を維持する。
+
+6. The `SHIORI_ACT_IMPL.build()` function shall グループ化されたトークンをそのまま`BUILDER.build()`に渡す。
+
+7. While 処理中, the SHIORI_ACT module shall 外部APIに変更を加えない。
 
 ---
 
