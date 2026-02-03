@@ -6,7 +6,7 @@
 
 **Users**: Pastaフレームワークを使用するゴースト開発者が、より柔軟で拡張性の高いアクションオブジェクトAPIを利用できるようになる。
 
-**Impact**: 既存の`_buffer`直接構築パターンを廃止し、トークンベースの中間表現を導入。子クラスの責務を最小化し、将来の他UI実装（HTML、Markdown等）への拡張性を確保する。
+**Impact**: 既存の`_buffer`直接構築パターンを廃止し、トークンベースの中間表現を導入。子クラスの責務を最小化し、将来の他UI実装（HTML、Markdown等）への拡張性を確保する。なお、`end_action()`削除は意図的な互換性変更として扱う。
 
 ### Goals
 - `pasta.act`に全トークン蓄積責務を集約
@@ -126,27 +126,63 @@ sequenceDiagram
 
 ## Requirements Traceability
 
-| Requirement | Summary                 | Components       | Interfaces                          | Flows             |
-| ----------- | ----------------------- | ---------------- | ----------------------------------- | ----------------- |
-| 1           | UI操作トークン蓄積      | pasta.act        | ACT_IMPL.surface/wait/newline/clear | トークン蓄積      |
-| 2           | スポット切り替え検出    | pasta.act        | ACT_IMPL.talk                       | トークン蓄積      |
-| 3           | 子クラスメソッド削除    | pasta.shiori.act | -                                   | -                 |
-| 4           | 子クラスフィールド削除  | pasta.shiori.act | SHIORI_ACT.new                      | -                 |
-| 5           | 固定改行除去            | pasta.act        | ACT_IMPL.talk                       | トークン蓄積      |
-| 6           | sakura_builder新設      | sakura_builder   | BUILDER.build                       | 変換フロー        |
-| 7           | 親build()新設           | pasta.act        | ACT_IMPL.build                      | build/yieldフロー |
-| 8           | yield()統一             | pasta.act        | ACT_IMPL.yield                      | yieldフロー       |
-| 9           | 子build()オーバーライド | pasta.shiori.act | SHIORI_ACT_IMPL.build               | 変換フロー        |
-| 10          | 互換性維持              | 全モジュール     | 公開API全て                         | 全フロー          |
-| 11          | end_action()削除        | pasta.act        | ACT_IMPL.end_action                 | -                 |
+| Requirement | Summary                          | Components       | Interfaces                          | Flows             |
+| ----------- | -------------------------------- | ---------------- | ----------------------------------- | ----------------- |
+| 1.1         | surfaceトークン蓄積              | pasta.act        | ACT_IMPL.surface                    | トークン蓄積      |
+| 1.2         | waitトークン蓄積                 | pasta.act        | ACT_IMPL.wait                       | トークン蓄積      |
+| 1.3         | newlineトークン蓄積              | pasta.act        | ACT_IMPL.newline                    | トークン蓄積      |
+| 1.4         | clearトークン蓄積                | pasta.act        | ACT_IMPL.clear                      | トークン蓄積      |
+| 1.5         | メソッドチェーン維持             | pasta.act        | ACT_IMPL.*                          | トークン蓄積      |
+| 2.1         | _current_spot追加                | pasta.act        | ACT.new                             | トークン蓄積      |
+| 2.2         | spot_switch挿入                  | pasta.act        | ACT_IMPL.talk                       | トークン蓄積      |
+| 2.3         | _current_spot更新                | pasta.act        | ACT_IMPL.talk                       | トークン蓄積      |
+| 2.4         | _current_spot初期化              | pasta.act        | ACT.new                             | トークン蓄積      |
+| 2.5         | yield時スポットリセット          | pasta.act        | ACT_IMPL.yield/build                | yieldフロー       |
+| 3.1         | talkオーバーライド削除           | pasta.shiori.act | -                                   | -                 |
+| 3.2         | surfaceオーバーライド削除        | pasta.shiori.act | -                                   | -                 |
+| 3.3         | waitオーバーライド削除           | pasta.shiori.act | -                                   | -                 |
+| 3.4         | newlineオーバーライド削除        | pasta.shiori.act | -                                   | -                 |
+| 3.5         | clearオーバーライド削除          | pasta.shiori.act | -                                   | -                 |
+| 3.6         | resetオーバーライド削除          | pasta.shiori.act | -                                   | -                 |
+| 4.1         | _buffer削除                      | pasta.shiori.act | -                                   | -                 |
+| 4.2         | _current_spot削除                | pasta.shiori.act | -                                   | -                 |
+| 4.3         | _spot_switch_newlines保持        | pasta.shiori.act | SHIORI_ACT.new                      | -                 |
+| 5.1         | talk後固定改行除去               | pasta.act        | ACT_IMPL.talk                       | トークン蓄積      |
+| 5.2         | 改行はnewlineのみ                | pasta.act        | ACT_IMPL.newline                    | トークン蓄積      |
+| 6.1         | sakura_builder新設               | sakura_builder   | module                              | 変換フロー        |
+| 6.2         | build(tokens, config)公開        | sakura_builder   | BUILDER.build                       | 変換フロー        |
+| 6.3         | トークン変換ルール               | sakura_builder   | BUILDER.build                       | 変換フロー        |
+| 6.4         | \e終端付与                      | sakura_builder   | BUILDER.build                       | 変換フロー        |
+| 6.5         | さくらスクリプトエスケープ        | sakura_builder   | escape_sakura                       | 変換フロー        |
+| 6.6         | ヘルパー関数内包                  | sakura_builder   | spot_to_id/spot_to_tag              | 変換フロー        |
+| 7.1         | 親build()新設                     | pasta.act        | ACT_IMPL.build                      | build/yieldフロー |
+| 7.2         | tokenリセット                     | pasta.act        | ACT_IMPL.build                      | build/yieldフロー |
+| 7.3         | now_actor/_current_spotリセット   | pasta.act        | ACT_IMPL.build                      | build/yieldフロー |
+| 7.4         | token返却                         | pasta.act        | ACT_IMPL.build                      | build/yieldフロー |
+| 7.5         | yieldがbuild()を呼ぶ              | pasta.act        | ACT_IMPL.yield                      | yieldフロー       |
+| 8.1         | yieldがself:build()を呼ぶ         | pasta.act        | ACT_IMPL.yield                      | yieldフロー       |
+| 8.2         | yieldがresultをyield              | pasta.act        | ACT_IMPL.yield                      | yieldフロー       |
+| 8.3         | yieldがselfを返す                 | pasta.act        | ACT_IMPL.yield                      | yieldフロー       |
+| 8.4         | shiori.actでyield非オーバーライド | pasta.shiori.act | -                                   | yieldフロー       |
+| 8.5         | SHIORI_ACT_IMPL.yield削除          | pasta.shiori.act | -                                   | -                 |
+| 9.1         | 親build()呼び出し                 | pasta.shiori.act | SHIORI_ACT_IMPL.build               | 変換フロー        |
+| 9.2         | sakura_builder変換呼び出し        | pasta.shiori.act | SHIORI_ACT_IMPL.build               | 変換フロー        |
+| 9.3         | \e終端付与（ビルダー）           | sakura_builder   | BUILDER.build                       | 変換フロー        |
+| 10.1        | 公開メソッドシグネチャ維持        | pasta.shiori.act | 公開API                             | 全フロー          |
+| 10.2        | メソッドチェーン維持              | pasta.act        | ACT_IMPL.*                          | 全フロー          |
+| 10.3        | transfer_date_to_var維持          | pasta.shiori.act | SHIORI_ACT_IMPL.transfer_date_to_var | 全フロー         |
+| 10.4        | アクタープロキシ維持              | pasta.act        | ACT_IMPL.__index                    | 全フロー          |
+| 10.5        | end_action削除の例外明記          | Docs             | design/requirements                 | -                 |
+| 11.1        | end_action削除                    | pasta.act        | ACT_IMPL.end_action                 | -                 |
+| 11.2        | 公開APIから削除                   | pasta.act        | 公開API                             | -                 |
 
 ## Components and Interfaces
 
-| Component                   | Domain/Layer   | Intent                 | Req Coverage          | Key Dependencies                    | Contracts |
-| --------------------------- | -------------- | ---------------------- | --------------------- | ----------------------------------- | --------- |
-| pasta.act                   | Core/Parent    | トークン蓄積と状態管理 | 1, 2, 5, 7, 8, 10, 11 | actor, scene                        | Service   |
-| pasta.shiori.act            | SHIORI/Child   | さくらスクリプト生成   | 3, 4, 9, 10           | pasta.act (P0), sakura_builder (P0) | Service   |
-| pasta.shiori.sakura_builder | SHIORI/Utility | トークン→文字列変換    | 6                     | なし                                | Service   |
+| Component                   | Domain/Layer   | Intent                 | Req Coverage                                                                                                                                                                      | Key Dependencies                    | Contracts |
+| --------------------------- | -------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | --------- |
+| pasta.act                   | Core/Parent    | トークン蓄積と状態管理 | 1.1, 1.2, 1.3, 1.4, 1.5, 2.1, 2.2, 2.3, 2.4, 2.5, 5.1, 5.2, 7.1, 7.2, 7.3, 7.4, 7.5, 8.1, 8.2, 8.3, 10.2, 10.4, 11.1, 11.2 | actor, scene                        | Service   |
+| pasta.shiori.act            | SHIORI/Child   | さくらスクリプト生成   | 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 4.1, 4.2, 4.3, 8.4, 8.5, 9.1, 9.2, 10.1, 10.3                                                       | pasta.act (P0), sakura_builder (P0) | Service   |
+| pasta.shiori.sakura_builder | SHIORI/Utility | トークン→文字列変換    | 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 9.3                                                                                                                                                | なし                                | Service   |
 
 ### Core Layer
 
@@ -155,7 +191,7 @@ sequenceDiagram
 | Field        | Detail                                             |
 | ------------ | -------------------------------------------------- |
 | Intent       | 全アクションのトークン蓄積と状態管理を担う親クラス |
-| Requirements | 1, 2, 5, 7, 8, 10, 11                              |
+| Requirements | 1.1, 1.2, 1.3, 1.4, 1.5, 2.1, 2.2, 2.3, 2.4, 2.5, 5.1, 5.2, 7.1, 7.2, 7.3, 7.4, 7.5, 8.1, 8.2, 8.3, 10.2, 10.4, 11.1, 11.2 |
 
 **Responsibilities & Constraints**
 - トークン配列（`self.token`）への蓄積
@@ -268,7 +304,7 @@ end
 | Field        | Detail                                                           |
 | ------------ | ---------------------------------------------------------------- |
 | Intent       | トークン配列をさくらスクリプト文字列に変換する純粋関数モジュール |
-| Requirements | 6                                                                |
+| Requirements | 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 9.3                                |
 
 **Responsibilities & Constraints**
 - トークン配列と設定を受け取り、さくらスクリプト文字列を返却
@@ -375,7 +411,7 @@ return BUILDER
 | Field        | Detail                                                       |
 | ------------ | ------------------------------------------------------------ |
 | Intent       | SHIORI専用アクションオブジェクト、さくらスクリプト生成に特化 |
-| Requirements | 3, 4, 9, 10                                                  |
+| Requirements | 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 4.1, 4.2, 4.3, 8.4, 8.5, 9.1, 9.2, 10.1, 10.3 |
 
 **Responsibilities & Constraints**
 - `pasta.act`を継承

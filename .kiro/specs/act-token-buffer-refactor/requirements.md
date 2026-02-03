@@ -117,13 +117,14 @@
 3. The `pasta.shiori.act` shall 変換結果に`\e`を付与して返却する
 
 ### Requirement 10: 既存APIの互換性維持
-**Objective:** 開発者として、既存のゴーストスクリプトが変更なしで動作することを保証したい。
+**Objective:** 開発者として、既存のゴーストスクリプトが変更なしで動作することを保証したい。ただし`end_action()`の削除は意図的な互換性変更として扱う。
 
 #### Acceptance Criteria
 1. The `pasta.shiori.act` shall 既存の公開メソッドシグネチャ（`talk`, `surface`, `wait`, `newline`, `clear`, `build`, `yield`）をすべて利用可能に保つ（親クラス継承含む）
 2. The `pasta.act` および `pasta.shiori.act` shall メソッドチェーン（`return self`）パターンを維持する
 3. The `pasta.shiori.act` shall `transfer_date_to_var()`メソッドの動作を変更しない
 4. The `pasta.shiori.act` shall アクタープロキシ経由のメソッド呼び出し（`act.sakura:talk("Hello")`）を引き続きサポートする
+5. The `pasta.act` shall `end_action()`削除を互換性維持の例外として明記する
 
 ### Requirement 11: end_action()の削除
 **Objective:** 開発者として、`ACT_IMPL.end_action()`を公開APIから削除したい。`end_action()`は`build()`と意味が重複しており、出力終端は`sakura_builder`が`\e`を付与することで満たされるため、不要である。
