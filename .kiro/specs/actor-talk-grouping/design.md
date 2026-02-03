@@ -386,6 +386,14 @@ end
 |-----|--------|--------|
 | `ACT_IMPL.build(self)` | `-> token[]` | `-> grouped_token[]` |
 
+**影響範囲**:
+- `ACT_IMPL.build()`を直接呼び出すコード: `pasta/shiori/act.lua`の`SHIORI_ACT_IMPL.build()`内の1箇所のみ
+- テストコード: `act:build()`形式で呼び出し（`SHIORI_ACT`インスタンス経由）、影響なし
+- 将来の非SHIORIバックエンド: `ACT_IMPL.build()`を継承する場合、戻り値型の変更を認識する必要がある
+
+**継承に関する注意事項**:
+`ACT_IMPL.build()`は継承を前提とした内部APIであり、子クラスは戻り値型が`grouped_token[]`に変更されたことを認識する必要があります。現在の実装では`SHIORI_ACT_IMPL.build()`が`flatten_grouped_tokens()`でフラット化してから`BUILDER.build()`に渡すことで、後方互換性を保証しています。
+
 ### ローカル関数（新規）
 
 | 関数 | 所属 | シグネチャ |
@@ -479,6 +487,11 @@ describe("ACT - group_by_actor", function()
     
     test("断続的actorは別actorトークン", function()
         -- 検証: A→B→A で3つのactorトークン
+    end)
+    
+    test("最初が非talk→talk", function()
+        -- 入力: surface, talk(actorA)
+        -- 検証: actor=nilグループとactorAグループの2つ（R5-5）
     end)
 end)
 ```
@@ -592,6 +605,13 @@ end
 ### 新規依存
 
 - なし（ローカル関数のみで実装）
+
+### 将来の拡張に関する注記
+
+将来、非SHIORIバックエンド（例: 別のゲームエンジン向け出力）を実装する場合：
+- `ACT_IMPL.build()`が返す`grouped_token[]`を処理する必要がある
+- `flatten_grouped_tokens()`相当の関数が必要になる可能性がある（現在は`pasta/shiori/act.lua`に配置）
+- または、`grouped_token[]`を直接処理する実装も可能
 
 ---
 
