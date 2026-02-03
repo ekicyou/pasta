@@ -4,11 +4,11 @@
 
 本仕様は「要件/設計/実装」の責務分離原則に基づき、`pasta.act`と`pasta.shiori.act`のアーキテクチャを再設計する。
 
-| 層 | 責務 | モジュール |
-|---|------|-----------|
-| **要件（What）** | 「誰が何をした」の記録 | `pasta.act` |
-| **設計（How）** | トークン→さくらスクリプト変換ルール | `pasta.shiori.sakura_builder` |
-| **実装（Output）** | さくらスクリプト文字列生成 | `pasta.shiori.act.build()` |
+| 層                 | 責務                                | モジュール                    |
+| ------------------ | ----------------------------------- | ----------------------------- |
+| **要件（What）**   | 「誰が何をした」の記録              | `pasta.act`                   |
+| **設計（How）**    | トークン→さくらスクリプト変換ルール | `pasta.shiori.sakura_builder` |
+| **実装（Output）** | さくらスクリプト文字列生成          | `pasta.shiori.act.build()`    |
 
 ### 現状の問題点
 1. `pasta.shiori.act`が`_buffer`に直接さくらスクリプトを構築（要件と実装の混在）
@@ -88,23 +88,35 @@
 5. The `pasta.shiori.sakura_builder` shall さくらスクリプト用エスケープ処理（`\` → `\\`、`%` → `%%`）を内包する
 6. The `pasta.shiori.sakura_builder` shall ヘルパー関数（`escape_sakura`, `spot_to_id`, `spot_to_tag`）を内部に持つ
 
-### Requirement 7: build()メソッドのオーバーライド
-**Objective:** 開発者として、`SHIORI_ACT_IMPL.build()`が`sakura_builder`に処理を委譲するようにしたい。これにより、子クラスの責務をさくらスクリプト生成のみに限定する。
+### Requirement 7: 親クラスにbuild()メソッド新設
+**Objective:** 開発者として、`pasta.act`に`build()`メソッドを新設したい。これにより、トークン取得とリセットの責務を親クラスに集約し、子クラスのbuild()は親を呼び出してフォーマット変換のみを行う。
 
 #### Acceptance Criteria
-1. When `SHIORI_ACT_IMPL.build()`が呼び出されたとき, the `pasta.shiori.act` shall `pasta.shiori.sakura_builder.build(self.token, { spot_switch_newlines = self._spot_switch_newlines })`を呼び出す
-2. When `build()`が完了したとき, the `pasta.shiori.act` shall `self.token = {}`、`self.now_actor = nil`、`self._current_spot = nil`をリセットする
-3. The `pasta.shiori.act` shall build()実行後の自動リセット動作を維持する
+1. The `pasta.act` shall `ACT_IMPL.build()`メソッドを新設する
+2. When `ACT_IMPL.build()`が呼び出されたとき, the `pasta.act` shall 現在のトークン配列を取得し、`self.token = {}`でリセットする
+3. When `ACT_IMPL.build()`が呼び出されたとき, the `pasta.act` shall `self.now_actor = nil`および`self._current_spot = nil`をリセットする
+4. The `pasta.act` shall build()はトークン配列を返却する
+5. The `pasta.act` shall 既存の`yield()`および`end_action()`は内部で`build()`を呼び出すようリファクタリングする
 
-### Requirement 8: yield()メソッドのオーバーライド
-**Objective:** 開発者として、`SHIORI_ACT_IMPL.yield()`がさくらスクリプト文字列を出力するようにしたい。親クラスの`yield()`はトークン配列を出力するため、オーバーライドが必要。
+### Requirement 8: 親クラスのyield()責務統一
+**Objective:** 開発者として、`pasta.act`の`yield()`を「build()の結果をcoroutine.yieldする」という単一責務に統一したい。子クラスはbuild()のみオーバーライドすれば、yield()は自動的に正しい出力形式になる（多態性の活用）。
 
 #### Acceptance Criteria
-1. When `SHIORI_ACT_IMPL.yield()`が呼び出されたとき, the `pasta.shiori.act` shall 内部で`build()`を呼び出す
-2. When `SHIORI_ACT_IMPL.yield()`が呼び出されたとき, the `pasta.shiori.act` shall 生成されたさくらスクリプト文字列を`coroutine.yield`する
-3. The `pasta.shiori.act` shall メソッドチェーン用に`self`を返す
+1. The `pasta.act` shall `ACT_IMPL.yield()`で`self:build()`を呼び出す
+2. The `pasta.act` shall build()の戻り値をそのまま`coroutine.yield(result)`に渡す
+3. The `pasta.act` shall メソッドチェーン用に`self`を返す
+4. The `pasta.shiori.act` shall yield()をオーバーライドしない（親クラスのyield()をそのまま使用）
+5. The `pasta.shiori.act` shall 既存のSHIORI_ACT_IMPL.yield()メソッドを削除する
 
-### Requirement 9: 既存APIの互換性維持
+### Requirement 9: 子クラスのbuild()オーバーライド
+**Objective:** 開発者として、`SHIORI_ACT_IMPL.build()`が親の`build()`を呼び出した後、`sakura_builder`で変換するようにしたい。
+
+#### Acceptance Criteria
+1. When `SHIORI_ACT_IMPL.build()`が呼び出されたとき, the `pasta.shiori.act` shall `ACT.IMPL.build(self)`で親のbuild()を呼び出しトークン配列を取得する
+2. When トークン配列を取得したとき, the `pasta.shiori.act` shall `pasta.shiori.sakura_builder.build(token, { spot_switch_newlines = self._spot_switch_newlines })`で変換する
+3. The `pasta.shiori.act` shall 変換結果に`\e`を付与して返却する
+
+### Requirement 10: 既存APIの互換性維持
 **Objective:** 開発者として、既存のゴーストスクリプトが変更なしで動作することを保証したい。
 
 #### Acceptance Criteria
