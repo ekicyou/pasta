@@ -30,17 +30,6 @@ local WAIT = requre "@pasta_sakura_script_wait";
 
 function SHIORI_ACT_IMPL.talk(self, actor, text)
 ...
-
-
-
-
 ```
 
-
-###
-
-
-
-/kiro-validate-gap alpha04-sample-ghost
-現在の要件で再度ギャップ分析して欲しい。
 
