@@ -40,7 +40,7 @@
 2. When `ACT_IMPL.talk()`が呼び出され、かつスポットが前回と異なるとき, the `pasta.act` shall `{ type = "spot_switch" }`トークンを`actor`トークンの直後に挿入する
 3. When スポット切り替えが検出されたとき, the `pasta.act` shall `self._current_spot`を新しいスポットIDに更新する
 4. The `pasta.act` shall `ACT.new()`で`_current_spot = nil`を初期化する
-5. The `pasta.act` shall `yield()`および`end_action()`実行時に`_current_spot`を`nil`にリセットする
+5. The `pasta.act` shall `yield()`実行時に`_current_spot`を`nil`にリセットする
 
 ### Requirement 3: 子クラスのトークン蓄積メソッド削除
 **Objective:** 開発者として、`pasta.shiori.act`のトークン蓄積メソッドを削除したい。これらは親クラスに移譲されたため、子クラスでのオーバーライドは不要になった。
@@ -83,7 +83,7 @@
    - `newline` → 改行タグ（`\n`）× n回
    - `clear` → クリアタグ（`\c`）
    - `sakura_script` → そのまま出力（エスケープなし）
-   - `yield` / `end_action` → 無視（出力対象外）
+   - `yield` → 無視（出力対象外）
 4. When `build()`が完了したとき, the `pasta.shiori.sakura_builder` shall 出力文字列の末尾に`\e`を付与する
 5. The `pasta.shiori.sakura_builder` shall さくらスクリプト用エスケープ処理（`\` → `\\`、`%` → `%%`）を内包する
 6. The `pasta.shiori.sakura_builder` shall ヘルパー関数（`escape_sakura`, `spot_to_id`, `spot_to_tag`）を内部に持つ
@@ -96,7 +96,7 @@
 2. When `ACT_IMPL.build()`が呼び出されたとき, the `pasta.act` shall 現在のトークン配列を取得し、`self.token = {}`でリセットする
 3. When `ACT_IMPL.build()`が呼び出されたとき, the `pasta.act` shall `self.now_actor = nil`および`self._current_spot = nil`をリセットする
 4. The `pasta.act` shall build()はトークン配列を返却する
-5. The `pasta.act` shall 既存の`yield()`および`end_action()`は内部で`build()`を呼び出すようリファクタリングする
+5. The `pasta.act` shall 既存の`yield()`は内部で`build()`を呼び出すようリファクタリングする
 
 ### Requirement 8: 親クラスのyield()責務統一
 **Objective:** 開発者として、`pasta.act`の`yield()`を「build()の結果をcoroutine.yieldする」という単一責務に統一したい。子クラスはbuild()のみオーバーライドすれば、yield()は自動的に正しい出力形式になる（多態性の活用）。
@@ -124,6 +124,13 @@
 2. The `pasta.act` および `pasta.shiori.act` shall メソッドチェーン（`return self`）パターンを維持する
 3. The `pasta.shiori.act` shall `transfer_date_to_var()`メソッドの動作を変更しない
 4. The `pasta.shiori.act` shall アクタープロキシ経由のメソッド呼び出し（`act.sakura:talk("Hello")`）を引き続きサポートする
+
+### Requirement 11: end_action()の削除
+**Objective:** 開発者として、`ACT_IMPL.end_action()`を公開APIから削除したい。`end_action()`は`build()`と意味が重複しており、出力終端は`sakura_builder`が`\e`を付与することで満たされるため、不要である。
+
+#### Acceptance Criteria
+1. The `pasta.act` shall `ACT_IMPL.end_action()`メソッドを削除する
+2. The `pasta.act` shall 公開APIから`end_action()`を削除する
 
 ## 設計判断事項（設計フェーズで決定）
 

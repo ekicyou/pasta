@@ -30,8 +30,7 @@ pasta.act                    pasta.shiori.act
 ├── token[]                  ├── _buffer[]（さくらスクリプト直接構築）
 ├── talk() → tokenへ追加     ├── talk() → _bufferへ直接追加（親と重複）
 ├── sakura_script()          ├── surface/wait/newline/clear()
-├── yield() → token出力      ├── build() → _buffer連結
-└── end_action()             ├── yield() → build()呼び出し（重複）
+└── yield() → token出力      ├── build() → _buffer連結
                              └── reset()
 ```
 
@@ -88,13 +87,13 @@ graph TB
 
 ### Technology Stack
 
-| Layer | Choice / Version | Role in Feature | Notes |
-|-------|------------------|-----------------|-------|
-| Runtime | Lua 5.4 (mlua) | スクリプト実行 | 既存 |
-| Framework | pasta_lua | Luaバックエンド層 | 既存 |
-| Module | pasta.act | トークン蓄積 | 拡張 |
-| Module | pasta.shiori.act | さくらスクリプト生成 | 簡素化 |
-| Module | pasta.shiori.sakura_builder | 変換ロジック | **新規** |
+| Layer     | Choice / Version            | Role in Feature      | Notes    |
+| --------- | --------------------------- | -------------------- | -------- |
+| Runtime   | Lua 5.4 (mlua)              | スクリプト実行       | 既存     |
+| Framework | pasta_lua                   | Luaバックエンド層    | 既存     |
+| Module    | pasta.act                   | トークン蓄積         | 拡張     |
+| Module    | pasta.shiori.act            | さくらスクリプト生成 | 簡素化   |
+| Module    | pasta.shiori.sakura_builder | 変換ロジック         | **新規** |
 
 ## System Flows
 
@@ -127,35 +126,36 @@ sequenceDiagram
 
 ## Requirements Traceability
 
-| Requirement | Summary | Components | Interfaces | Flows |
-|-------------|---------|------------|------------|-------|
-| 1 | UI操作トークン蓄積 | pasta.act | ACT_IMPL.surface/wait/newline/clear | トークン蓄積 |
-| 2 | スポット切り替え検出 | pasta.act | ACT_IMPL.talk | トークン蓄積 |
-| 3 | 子クラスメソッド削除 | pasta.shiori.act | - | - |
-| 4 | 子クラスフィールド削除 | pasta.shiori.act | SHIORI_ACT.new | - |
-| 5 | 固定改行除去 | pasta.act | ACT_IMPL.talk | トークン蓄積 |
-| 6 | sakura_builder新設 | sakura_builder | BUILDER.build | 変換フロー |
-| 7 | 親build()新設 | pasta.act | ACT_IMPL.build | build/yieldフロー |
-| 8 | yield()統一 | pasta.act | ACT_IMPL.yield | yieldフロー |
-| 9 | 子build()オーバーライド | pasta.shiori.act | SHIORI_ACT_IMPL.build | 変換フロー |
-| 10 | 互換性維持 | 全モジュール | 公開API全て | 全フロー |
+| Requirement | Summary                 | Components       | Interfaces                          | Flows             |
+| ----------- | ----------------------- | ---------------- | ----------------------------------- | ----------------- |
+| 1           | UI操作トークン蓄積      | pasta.act        | ACT_IMPL.surface/wait/newline/clear | トークン蓄積      |
+| 2           | スポット切り替え検出    | pasta.act        | ACT_IMPL.talk                       | トークン蓄積      |
+| 3           | 子クラスメソッド削除    | pasta.shiori.act | -                                   | -                 |
+| 4           | 子クラスフィールド削除  | pasta.shiori.act | SHIORI_ACT.new                      | -                 |
+| 5           | 固定改行除去            | pasta.act        | ACT_IMPL.talk                       | トークン蓄積      |
+| 6           | sakura_builder新設      | sakura_builder   | BUILDER.build                       | 変換フロー        |
+| 7           | 親build()新設           | pasta.act        | ACT_IMPL.build                      | build/yieldフロー |
+| 8           | yield()統一             | pasta.act        | ACT_IMPL.yield                      | yieldフロー       |
+| 9           | 子build()オーバーライド | pasta.shiori.act | SHIORI_ACT_IMPL.build               | 変換フロー        |
+| 10          | 互換性維持              | 全モジュール     | 公開API全て                         | 全フロー          |
+| 11          | end_action()削除        | pasta.act        | ACT_IMPL.end_action                 | -                 |
 
 ## Components and Interfaces
 
-| Component | Domain/Layer | Intent | Req Coverage | Key Dependencies | Contracts |
-|-----------|--------------|--------|--------------|------------------|-----------|
-| pasta.act | Core/Parent | トークン蓄積と状態管理 | 1, 2, 5, 7, 8 | actor, scene | Service |
-| pasta.shiori.act | SHIORI/Child | さくらスクリプト生成 | 3, 4, 9, 10 | pasta.act (P0), sakura_builder (P0) | Service |
-| pasta.shiori.sakura_builder | SHIORI/Utility | トークン→文字列変換 | 6 | なし | Service |
+| Component                   | Domain/Layer   | Intent                 | Req Coverage  | Key Dependencies                    | Contracts |
+| --------------------------- | -------------- | ---------------------- | ------------- | ----------------------------------- | --------- |
+| pasta.act                   | Core/Parent    | トークン蓄積と状態管理 | 1, 2, 5, 7, 8, 10, 11 | actor, scene                        | Service   |
+| pasta.shiori.act            | SHIORI/Child   | さくらスクリプト生成   | 3, 4, 9, 10   | pasta.act (P0), sakura_builder (P0) | Service   |
+| pasta.shiori.sakura_builder | SHIORI/Utility | トークン→文字列変換    | 6             | なし                                | Service   |
 
 ### Core Layer
 
 #### pasta.act
 
-| Field | Detail |
-|-------|--------|
-| Intent | 全アクションのトークン蓄積と状態管理を担う親クラス |
-| Requirements | 1, 2, 5, 7, 8 |
+| Field        | Detail                                             |
+| ------------ | -------------------------------------------------- |
+| Intent       | 全アクションのトークン蓄積と状態管理を担う親クラス |
+| Requirements | 1, 2, 5, 7, 8, 10, 11                              |
 
 **Responsibilities & Constraints**
 - トークン配列（`self.token`）への蓄積
@@ -163,6 +163,7 @@ sequenceDiagram
 - スポット切り替え検出とspot_switchトークン挿入
 - build()でのトークン取得とリセット
 - yield()でのbuild()呼び出しとcoroutine.yield
+- end_action()の公開API削除
 
 **Dependencies**
 - Inbound: pasta.shiori.act — 継承 (P0)
@@ -255,7 +256,7 @@ end
 
 **Implementation Notes**
 - `ACT.new()`で`_current_spot = nil`を初期化
-- 既存の`yield()`と`end_action()`は内部で`build()`を呼び出すようリファクタリング
+- 既存の`yield()`は内部で`build()`を呼び出すようリファクタリング
 - メソッドチェーン用に全メソッドが`self`を返す
 
 ---
@@ -264,10 +265,10 @@ end
 
 #### pasta.shiori.sakura_builder
 
-| Field | Detail |
-|-------|--------|
-| Intent | トークン配列をさくらスクリプト文字列に変換する純粋関数モジュール |
-| Requirements | 6 |
+| Field        | Detail                                                           |
+| ------------ | ---------------------------------------------------------------- |
+| Intent       | トークン配列をさくらスクリプト文字列に変換する純粋関数モジュール |
+| Requirements | 6                                                                |
 
 **Responsibilities & Constraints**
 - トークン配列と設定を受け取り、さくらスクリプト文字列を返却
@@ -353,7 +354,7 @@ function BUILDER.build(tokens, config)
         elseif t == "sakura_script" then
             table.insert(buffer, token.text)
         end
-        -- yield, end_action は無視
+        -- yield は無視
     end
     
     return table.concat(buffer) .. "\\e"
@@ -371,10 +372,10 @@ return BUILDER
 
 #### pasta.shiori.act
 
-| Field | Detail |
-|-------|--------|
-| Intent | SHIORI専用アクションオブジェクト、さくらスクリプト生成に特化 |
-| Requirements | 3, 4, 9, 10 |
+| Field        | Detail                                                       |
+| ------------ | ------------------------------------------------------------ |
+| Intent       | SHIORI専用アクションオブジェクト、さくらスクリプト生成に特化 |
+| Requirements | 3, 4, 9, 10                                                  |
 
 **Responsibilities & Constraints**
 - `pasta.act`を継承
@@ -465,16 +466,16 @@ return SHIORI_ACT
 
 ### Token Format
 
-| Token Type | Structure | Description |
-|------------|-----------|-------------|
-| actor | `{ type = "actor", actor = Actor }` | アクター切り替え |
-| spot_switch | `{ type = "spot_switch" }` | スポット切り替え検出 |
-| talk | `{ type = "talk", text = string }` | 発話テキスト |
-| surface | `{ type = "surface", id = number\|string }` | サーフェス変更 |
-| wait | `{ type = "wait", ms = number }` | 待機 |
-| newline | `{ type = "newline", n = number }` | 改行（n回） |
-| clear | `{ type = "clear" }` | クリア |
-| sakura_script | `{ type = "sakura_script", text = string }` | 生スクリプト |
+| Token Type    | Structure                                   | Description          |
+| ------------- | ------------------------------------------- | -------------------- |
+| actor         | `{ type = "actor", actor = Actor }`         | アクター切り替え     |
+| spot_switch   | `{ type = "spot_switch" }`                  | スポット切り替え検出 |
+| talk          | `{ type = "talk", text = string }`          | 発話テキスト         |
+| surface       | `{ type = "surface", id = number\|string }` | サーフェス変更       |
+| wait          | `{ type = "wait", ms = number }`            | 待機                 |
+| newline       | `{ type = "newline", n = number }`          | 改行（n回）          |
+| clear         | `{ type = "clear" }`                        | クリア               |
+| sakura_script | `{ type = "sakura_script", text = string }` | 生スクリプト         |
 
 ### State Model
 
@@ -522,7 +523,8 @@ return SHIORI_ACT
 1. `pasta.act`に新メソッド追加（surface/wait/newline/clear/build）
 2. `_current_spot`フィールド追加
 3. `talk()`のスポット切り替え検出追加
-4. `yield()`/`end_action()`のリファクタリング
+4. `yield()`のリファクタリング
+5. `end_action()`の削除
 
 ### Phase 2: sakura_builder作成
 1. 新規モジュール`pasta/shiori/sakura_builder.lua`作成

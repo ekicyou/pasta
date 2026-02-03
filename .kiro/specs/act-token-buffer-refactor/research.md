@@ -82,6 +82,16 @@
 - **Trade-offs**: 子クラスでyield()の挙動変更が困難になる（ただし不要）
 - **Follow-up**: 既存SHIORI_ACT_IMPL.yield()の削除
 
+### Decision: end_action()の削除
+- **Context**: end_action()はbuild()と意味が重複し、トランスパイラーからの使用箇所も確認できない
+- **Alternatives Considered**:
+  1. end_action()を残し、build()を内部呼び出しに変更
+  2. end_action()を公開APIから削除
+- **Selected Approach**: Option 2
+- **Rationale**: 責務重複の排除、APIの簡素化
+- **Trade-offs**: 互換性の一部低下（end_action利用者がいる場合に影響）
+- **Follow-up**: 互換性注意点を要件に明記
+
 ### Decision: \eの付与タイミング
 - **Context**: さくらスクリプト終端タグの付与場所
 - **Alternatives Considered**:
@@ -94,7 +104,7 @@
 
 ## Risks & Mitigations
 - **Risk 1**: 既存テスト（717行）の大規模修正が必要
-  - **Mitigation**: 公開APIは維持、内部実装のみ変更
+  - **Mitigation**: 主要公開APIは維持しつつ、`end_action()`削除の影響範囲を確認
 - **Risk 2**: talk()後の固定改行除去による互換性問題
   - **Mitigation**: テストケースで現行動作と新動作を比較検証
 - **Risk 3**: pasta_sample_ghostの同期漏れ
