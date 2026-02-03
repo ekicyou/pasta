@@ -390,7 +390,7 @@ local tokens = {
     { type = "surface", id = 5 },
     { type = "wait", ms = 1000 },
 }
-local config = { spot_switch_newlines = 0.5 }
+local config = { spot_newlines = 0.5 }
 local script = BUILDER.build(tokens, config)
 -- 結果: "\p[0]こんにちは！\s[5]\w[1000]\e"
 ```

@@ -123,24 +123,24 @@ describe("SAKURA_BUILDER - spot_switch token", function()
         expect(result):toBe("\\n[150]\\e")
     end)
 
-    test("config.spot_switch_newlinesの設定を反映する", function()
+    test("config.spot_newlinesの設定を反映する", function()
         local BUILDER = require("pasta.shiori.sakura_builder")
 
         local tokens = {
             { type = "spot_switch" },
         }
-        local result = BUILDER.build(tokens, { spot_switch_newlines = 2.0 })
+        local result = BUILDER.build(tokens, { spot_newlines = 2.0 })
 
         expect(result):toBe("\\n[200]\\e")
     end)
 
-    test("spot_switch_newlines=1.0で \\n[100] を出力する", function()
+    test("spot_newlines=1.0で \\n[100] を出力する", function()
         local BUILDER = require("pasta.shiori.sakura_builder")
 
         local tokens = {
             { type = "spot_switch" },
         }
-        local result = BUILDER.build(tokens, { spot_switch_newlines = 1.0 })
+        local result = BUILDER.build(tokens, { spot_newlines = 1.0 })
 
         expect(result):toBe("\\n[100]\\e")
     end)
@@ -283,7 +283,7 @@ describe("SAKURA_BUILDER - 複合シナリオ", function()
             { type = "newline",    n = 1 },
             { type = "clear" },
         }
-        local result = BUILDER.build(tokens, { spot_switch_newlines = 1.5 })
+        local result = BUILDER.build(tokens, { spot_newlines = 1.5 })
 
         expect(result:find("\\p%[0%]")):toBeTruthy()
         expect(result:find("Hello")):toBeTruthy()
@@ -309,5 +309,212 @@ describe("SAKURA_BUILDER - エスケープ処理", function()
 
         expect(result:find("50%%%%")):toBeTruthy()
         expect(result:find("\\\\")):toBeTruthy()
+    end)
+end)
+
+-- ============================================================================
+-- actor-spot-refactoring: spotトークン処理 (Task 2.1)
+-- ============================================================================
+
+describe("SAKURA_BUILDER - spotトークン処理", function()
+    test("spotトークン処理でactor_spots[actor.name]が正しく更新される", function()
+        local BUILDER = require("pasta.shiori.sakura_builder")
+
+        local sakura = { name = "さくら" }
+        local tokens = {
+            { type = "spot", actor = sakura, spot = 0 },
+            { type = "talk", actor = sakura, text = "Hello" },
+        }
+        local result = BUILDER.build(tokens, {})
+
+        -- spot設定後のtalk → \p[0]が出力される
+        expect(result:find("\\p%[0%]")):toBeTruthy()
+        expect(result:find("Hello")):toBeTruthy()
+    end)
+
+    test("複数actorのspot独立管理を確認", function()
+        local BUILDER = require("pasta.shiori.sakura_builder")
+
+        local sakura = { name = "さくら" }
+        local kero = { name = "うにゅう" }
+        local tokens = {
+            { type = "spot", actor = sakura, spot = 0 },
+            { type = "spot", actor = kero,   spot = 1 },
+            { type = "talk", actor = sakura, text = "Hi Sakura" },
+            { type = "talk", actor = kero,   text = "Hi Kero" },
+        }
+        local result = BUILDER.build(tokens, {})
+
+        -- 両方のスポットタグが出力される
+        expect(result:find("\\p%[0%]")):toBeTruthy()
+        expect(result:find("\\p%[1%]")):toBeTruthy()
+    end)
+end)
+
+-- ============================================================================
+-- actor-spot-refactoring: clear_spotトークン処理 (Task 2.2)
+-- ============================================================================
+
+describe("SAKURA_BUILDER - clear_spotトークン処理", function()
+    test("clear_spotトークン処理でactor_spots={}にリセットされる", function()
+        local BUILDER = require("pasta.shiori.sakura_builder")
+
+        local sakura = { name = "さくら" }
+        local tokens = {
+            { type = "spot",      actor = sakura, spot = 5 },
+            { type = "clear_spot" },
+            { type = "talk",      actor = sakura, text = "Reset" },
+        }
+        local result = BUILDER.build(tokens, {})
+
+        -- clear_spot後はデフォルトspot(0)を使用
+        expect(result:find("\\p%[0%]")):toBeTruthy()
+        expect(result:find("Reset")):toBeTruthy()
+    end)
+
+    test("clear_spotトークン処理でlast_actor=nilにリセットされる", function()
+        local BUILDER = require("pasta.shiori.sakura_builder")
+
+        local sakura = { name = "さくら" }
+        local tokens = {
+            { type = "talk",      actor = sakura, text = "Before" },
+            { type = "clear_spot" },
+            { type = "talk",      actor = sakura, text = "After" },
+        }
+        local result = BUILDER.build(tokens, {})
+
+        -- clear_spot後に同じactorでもスポットタグが再出力される
+        -- \p[0]が2回出現するはず
+        local count = 0
+        for _ in result:gmatch("\\p%[0%]") do
+            count = count + 1
+        end
+        expect(count):toBe(2)
+    end)
+end)
+
+-- ============================================================================
+-- actor-spot-refactoring: talkトークンのactor切り替え検出 (Task 2.3)
+-- ============================================================================
+
+describe("SAKURA_BUILDER - talkトークンのactor切り替え検出", function()
+    test("actor_spots未設定時にデフォルト値0を使用する", function()
+        local BUILDER = require("pasta.shiori.sakura_builder")
+
+        local sakura = { name = "さくら" }
+        local tokens = {
+            { type = "talk", actor = sakura, text = "Hello" },
+        }
+        local result = BUILDER.build(tokens, {})
+
+        -- デフォルトspot(0)が使用される
+        expect(result:find("\\p%[0%]")):toBeTruthy()
+        expect(result:find("Hello")):toBeTruthy()
+    end)
+
+    test("last_actor != token.actor時に\\p[spot]を出力する", function()
+        local BUILDER = require("pasta.shiori.sakura_builder")
+
+        local sakura = { name = "さくら" }
+        local kero = { name = "うにゅう" }
+        local tokens = {
+            { type = "spot", actor = sakura, spot = 0 },
+            { type = "spot", actor = kero,   spot = 1 },
+            { type = "talk", actor = sakura, text = "First" },
+            { type = "talk", actor = kero,   text = "Second" },
+        }
+        local result = BUILDER.build(tokens, {})
+
+        -- actor切り替え時にスポットタグが出力される
+        expect(result:find("\\p%[0%].*First")):toBeTruthy()
+        expect(result:find("\\p%[1%].*Second")):toBeTruthy()
+    end)
+
+    test("spot変更時に\\n[N]を出力する（Nはconfig.spot_newlines * 100）", function()
+        local BUILDER = require("pasta.shiori.sakura_builder")
+
+        local sakura = { name = "さくら" }
+        local kero = { name = "うにゅう" }
+        local tokens = {
+            { type = "spot", actor = sakura, spot = 0 },
+            { type = "spot", actor = kero,   spot = 1 },
+            { type = "talk", actor = sakura, text = "First" },
+            { type = "talk", actor = kero,   text = "Second" },
+        }
+        local result = BUILDER.build(tokens, { spot_newlines = 1.5 })
+
+        -- spot変更時に段落改行が出力される
+        expect(result:find("\\n%[150%]")):toBeTruthy()
+    end)
+
+    test("同じactorの連続talkではスポットタグを出力しない", function()
+        local BUILDER = require("pasta.shiori.sakura_builder")
+
+        local sakura = { name = "さくら" }
+        local tokens = {
+            { type = "talk", actor = sakura, text = "First" },
+            { type = "talk", actor = sakura, text = "Second" },
+        }
+        local result = BUILDER.build(tokens, {})
+
+        -- スポットタグは1回のみ
+        local count = 0
+        for _ in result:gmatch("\\p%[0%]") do
+            count = count + 1
+        end
+        expect(count):toBe(1)
+        expect(result:find("FirstSecond")):toBeTruthy()
+    end)
+end)
+
+-- ============================================================================
+-- actor-spot-refactoring: 統合シナリオ (Task 4.4)
+-- ============================================================================
+
+describe("SAKURA_BUILDER - 統合シナリオ（新トークン構造）", function()
+    test("set_spot()なしでのtalk() → デフォルトspot(0)使用を確認", function()
+        local BUILDER = require("pasta.shiori.sakura_builder")
+
+        local sakura = { name = "さくら" }
+        local tokens = {
+            { type = "talk", actor = sakura, text = "No spot set" },
+        }
+        local result = BUILDER.build(tokens, {})
+
+        expect(result:find("\\p%[0%]")):toBeTruthy()
+        expect(result:find("No spot set")):toBeTruthy()
+    end)
+
+    test("set_spot() → talk() → spot切り替えとスポットタグ出力を確認", function()
+        local BUILDER = require("pasta.shiori.sakura_builder")
+
+        local sakura = { name = "さくら" }
+        local kero = { name = "うにゅう" }
+        local tokens = {
+            { type = "spot", actor = sakura, spot = 0 },
+            { type = "spot", actor = kero,   spot = 1 },
+            { type = "talk", actor = sakura, text = "Sakura speaks" },
+            { type = "talk", actor = kero,   text = "Kero speaks" },
+        }
+        local result = BUILDER.build(tokens, { spot_newlines = 1.5 })
+
+        expect(result:find("\\p%[0%]Sakura speaks")):toBeTruthy()
+        expect(result:find("\\n%[150%]\\p%[1%]Kero speaks")):toBeTruthy()
+    end)
+
+    test("clear_spot() → talk() → デフォルトspot(0)への復帰を確認", function()
+        local BUILDER = require("pasta.shiori.sakura_builder")
+
+        local sakura = { name = "さくら" }
+        local tokens = {
+            { type = "spot",      actor = sakura, spot = 5 },
+            { type = "talk",      actor = sakura, text = "At spot 5" },
+            { type = "clear_spot" },
+            { type = "talk",      actor = sakura, text = "Back to default" },
+        }
+        local result = BUILDER.build(tokens, {})
+
+        expect(result:find("\\p%[5%]")):toBeTruthy()
+        expect(result:find("\\p%[0%]")):toBeTruthy() -- clear後はデフォルト
     end)
 end)

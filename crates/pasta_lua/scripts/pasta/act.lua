@@ -14,8 +14,6 @@ local GLOBAL = require("pasta.global")
 --- @field app_ctx table アプリケーション実行中の汎用コンテキストデータ
 --- @field var table アクションローカル変数
 --- @field token table[] 構築中のスクリプトトークン
---- @field now_actor Actor|nil 現在のアクター
---- @field _current_spot number|nil 現在のスポットID（スポット切り替え検出用）
 --- @field current_scene SceneTable|nil 現在のシーンテーブル
 local ACT = {}
 
@@ -50,8 +48,6 @@ function ACT.new(actors)
         app_ctx = require("pasta.store").app_ctx,
         var = {},
         token = {},
-        now_actor = nil,
-        _current_spot = nil,
         current_scene = nil,
     }
     return setmetatable(obj, ACT_IMPL)
@@ -67,23 +63,13 @@ function ACT_IMPL.init_scene(self, scene)
     return self.save, self.var
 end
 
---- talkトークン蓄積
+--- talkトークン蓄積（状態レス化: actorトークン/spot_switch生成を削除）
 --- @param self Act アクションオブジェクト
 --- @param actor Actor アクターオブジェクト
 --- @param text string 発話テキスト
 --- @return Act self メソッドチェーン用
 function ACT_IMPL.talk(self, actor, text)
-    if self.now_actor ~= actor then
-        table.insert(self.token, { type = "actor", actor = actor })
-        -- スポット切り替え検出
-        local spot_id = actor.spot or 0
-        if self._current_spot ~= nil and self._current_spot ~= spot_id then
-            table.insert(self.token, { type = "spot_switch" })
-        end
-        self._current_spot = spot_id
-        self.now_actor = actor
-    end
-    table.insert(self.token, { type = "talk", text = text })
+    table.insert(self.token, { type = "talk", actor = actor, text = text })
     return self
 end
 
@@ -188,8 +174,6 @@ end
 function ACT_IMPL.build(self)
     local token = self.token
     self.token = {}
-    self.now_actor = nil
-    self._current_spot = nil
     return token
 end
 
@@ -251,7 +235,7 @@ function ACT_IMPL.call(self, global_scene_name, key, attrs, ...)
     return nil
 end
 
---- スポット設定
+--- スポット設定トークン生成（状態レス化）
 --- @param self Act アクションオブジェクト
 --- @param name string アクター名
 --- @param number integer 位置
@@ -259,17 +243,15 @@ end
 function ACT_IMPL.set_spot(self, name, number)
     local actor = self.actors[name]
     if actor then
-        actor.spot = number
+        table.insert(self.token, { type = "spot", actor = actor, spot = number })
     end
 end
 
---- 全スポットクリア
+--- 全スポットクリアトークン生成（状態レス化）
 --- @param self Act アクションオブジェクト
 --- @return nil
 function ACT_IMPL.clear_spot(self)
-    for _, actor in pairs(self.actors) do
-        actor.spot = nil
-    end
+    table.insert(self.token, { type = "clear_spot" })
 end
 
 --- 継承用に実装メタテーブルを公開

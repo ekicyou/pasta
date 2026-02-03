@@ -5,4 +5,4 @@ version = "1.0.0"
 debug_mode = true
 
 [ghost]
-spot_switch_newlines = 2.0
+spot_newlines = 2.0

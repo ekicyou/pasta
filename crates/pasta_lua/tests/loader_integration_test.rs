@@ -167,11 +167,11 @@ fn test_pasta_config_ghost_section() {
         .exec(
             r#"
         local config = require("pasta.config")
-        return config.get("ghost", "spot_switch_newlines", 1.5)
+        return config.get("ghost", "spot_newlines", 1.5)
     "#,
         )
         .unwrap();
-    // with_ghost_config/pasta.toml has spot_switch_newlines = 2.0
+    // with_ghost_config/pasta.toml has spot_newlines = 2.0
     assert_eq!(result.as_f64(), Some(2.0));
 }
 
@@ -185,7 +185,7 @@ fn test_pasta_config_returns_default_for_missing_section() {
         .exec(
             r#"
         local config = require("pasta.config")
-        return config.get("ghost", "spot_switch_newlines", 1.5)
+        return config.get("ghost", "spot_newlines", 1.5)
     "#,
         )
         .unwrap();
@@ -194,20 +194,23 @@ fn test_pasta_config_returns_default_for_missing_section() {
 }
 
 #[test]
-fn test_shiori_act_uses_config_spot_switch_newlines() {
+fn test_shiori_act_uses_config_spot_newlines() {
     let temp = copy_fixture_to_temp("with_ghost_config");
     let runtime = PastaLoader::load(temp.path()).unwrap();
 
-    // Verify SHIORI_ACT uses spot_switch_newlines from config
+    // Verify SHIORI_ACT uses spot_newlines from config
     let result = runtime
         .exec(
             r#"
         local SHIORI_ACT = require("pasta.shiori.act")
         local actors = {
-            sakura = { name = "さくら", spot = "sakura" },
-            kero = { name = "うにゅう", spot = "kero" },
+            sakura = { name = "さくら" },
+            kero = { name = "うにゅう" },
         }
         local act = SHIORI_ACT.new(actors)
+        -- 新アーキテクチャ: set_spot()でスポット位置を明示的に設定
+        act:set_spot("sakura", 0)
+        act:set_spot("kero", 1)
         act:talk(actors.sakura, "Hello")
         act:talk(actors.kero, "Hi")
         return act:build()
@@ -216,7 +219,7 @@ fn test_shiori_act_uses_config_spot_switch_newlines() {
         .unwrap();
 
     let script = value_as_str(&result).unwrap();
-    // spot_switch_newlines = 2.0 → \n[200]
+    // spot_newlines = 2.0 → \n[200]
     assert!(
         script.contains("\\n[200]"),
         "Expected \\n[200] but got: {}",

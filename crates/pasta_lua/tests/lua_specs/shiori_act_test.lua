@@ -80,6 +80,10 @@ describe("SHIORI_ACT - inheritance", function()
         local ctx = create_mock_ctx()
         local act = SHIORI_ACT.new(ctx.actors)
 
+        -- 新アーキテクチャ: set_spot()でスポット位置を明示的に設定
+        act:set_spot("sakura", 0)
+        act:set_spot("kero", 1)
+
         -- Proxy talk returns nil, but act methods can chain
         act.sakura:talk("First")
         act:surface(5)
@@ -104,7 +108,7 @@ describe("SHIORI_ACT - talk()", function()
         act:talk(actors.sakura, "Hello")
         local result = act:build()
 
-        -- Should contain: \p[0] (spot) + Hello + \n + \e
+        -- Should contain: \p[0] (default spot) + Hello + \e
         expect(result:find("\\p%[0%]")):toBeTruthy()
         expect(result:find("Hello")):toBeTruthy()
         expect(result:sub(-2)):toBe("\\e")
@@ -114,6 +118,10 @@ describe("SHIORI_ACT - talk()", function()
         local SHIORI_ACT = require("pasta.shiori.act")
         local actors = create_mock_actors()
         local act = SHIORI_ACT.new(actors)
+
+        -- 新アーキテクチャ: set_spot()でスポット位置を明示的に設定
+        act:set_spot("sakura", 0)
+        act:set_spot("kero", 1)
 
         act:talk(actors.sakura, "Hello")
         act:talk(actors.kero, "Hi")
@@ -143,6 +151,9 @@ describe("SHIORI_ACT - talk()", function()
         local actors = create_mock_actors()
         local act = SHIORI_ACT.new(actors)
 
+        -- 新アーキテクチャ: set_spot()でスポット位置を明示的に設定
+        act:set_spot("char2", 2)
+
         act:talk(actors.char2, "Third character")
         local result = act:build()
 
@@ -154,12 +165,17 @@ describe("SHIORI_ACT - talk()", function()
         local actors = create_mock_actors()
         local act = SHIORI_ACT.new(actors)
 
+        -- 新アーキテクチャ: set_spot()でスポット位置を明示的に設定
+        act:set_spot("sakura", 0)
+        act:set_spot("kero", 1)
+
         act:talk(actors.sakura, "Hello")
         act:talk(actors.kero, "Hi")
         local result = act:build()
 
-        -- Spot tag comes first, then newline: \p[1]\n[150] (after spot switch)
-        expect(result:find("\\p%[1%]\\n%[150%]")):toBeTruthy()
+        -- スポット変更時に段落改行が出力される: \n[150]\p[1]
+        expect(result:find("\\n%[150%]")):toBeTruthy()
+        expect(result:find("\\p%[1%]")):toBeTruthy()
     end)
 
     test("supports method chaining", function()
@@ -415,6 +431,10 @@ describe("SHIORI_ACT - E2E scenario", function()
         local actors = create_mock_actors()
         local act = SHIORI_ACT.new(actors)
 
+        -- 新アーキテクチャ: set_spot()でスポット位置を明示的に設定
+        act:set_spot("sakura", 0)
+        act:set_spot("kero", 1)
+
         act:talk(actors.sakura, "こんにちは")
             :surface(5)
             :wait(500)
@@ -445,6 +465,8 @@ describe("SHIORI_ACT - E2E scenario", function()
         expect(result1:find("First")):toBeTruthy()
 
         -- Second round (build auto-resets, so no manual reset needed)
+        -- 新アーキテクチャ: actor_spotsもbuild()ごとにリセットされる
+        act:set_spot("kero", 1)
         act:talk(actors.kero, "Second")
         local result2 = act:build()
 

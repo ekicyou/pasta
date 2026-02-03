@@ -44,7 +44,7 @@ local function spot_to_tag(spot_id)
 end
 
 --- @class BuildConfig
---- @field spot_switch_newlines number スポット切り替え時の改行量（デフォルト1.5）
+--- @field spot_newlines number スポット変更時の改行量（デフォルト1.5）
 
 --- トークン配列をさくらスクリプト文字列に変換
 --- @param tokens table[] トークン配列
@@ -52,19 +52,57 @@ end
 --- @return string さくらスクリプト文字列
 function BUILDER.build(tokens, config)
     config = config or {}
-    local spot_switch_newlines = config.spot_switch_newlines or 1.5
+    local spot_newlines = config.spot_newlines or 1.5
     local buffer = {}
+
+    -- ビルダー内部状態（build()呼び出しごとにリセット）
+    local actor_spots = {} -- {[actor_name]: spot_id} actor位置マップ
+    local last_actor = nil -- 最後に発言したActor
+    local last_spot = nil  -- 最後のスポットID
 
     for _, token in ipairs(tokens) do
         local t = token.type
-        if t == "actor" then
+
+        if t == "spot" then
+            -- spotトークン処理: actor_spots[actor.name] = spot
+            if token.actor and token.actor.name then
+                actor_spots[token.actor.name] = token.spot
+            end
+        elseif t == "clear_spot" then
+            -- clear_spotトークン処理: 状態リセット
+            actor_spots = {}
+            last_actor = nil
+            last_spot = nil
+        elseif t == "talk" then
+            -- talkトークン処理: actor切り替え検出と出力
+            local actor = token.actor
+            local actor_name = actor and actor.name
+
+            if actor and last_actor ~= actor then
+                -- actor切り替え検出 → スポットタグ出力
+                local spot = actor_spots[actor_name] or 0
+
+                -- spot変更時に段落区切り改行を出力
+                if last_spot ~= nil and last_spot ~= spot then
+                    local percent = math.floor(spot_newlines * 100)
+                    table.insert(buffer, string.format("\\n[%d]", percent))
+                end
+
+                table.insert(buffer, spot_to_tag(spot))
+                last_actor = actor
+                last_spot = spot
+            end
+
+            -- テキスト出力
+            table.insert(buffer, escape_sakura(token.text))
+
+            -- 以下は既存トークン処理（後方互換性のため維持）
+        elseif t == "actor" then
             local spot_id = spot_to_id(token.actor.spot)
             table.insert(buffer, spot_to_tag(spot_id))
         elseif t == "spot_switch" then
-            local percent = math.floor(spot_switch_newlines * 100)
+            local percent = math.floor(spot_newlines * 100)
             table.insert(buffer, string.format("\\n[%d]", percent))
-        elseif t == "talk" then
-            table.insert(buffer, escape_sakura(token.text))
         elseif t == "surface" then
             table.insert(buffer, string.format("\\s[%s]", tostring(token.id)))
         elseif t == "wait" then

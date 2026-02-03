@@ -9,7 +9,7 @@ local BUILDER = require("pasta.shiori.sakura_builder")
 local CONFIG = require("pasta.config")
 
 --- @class ShioriAct : Act SHIORI専用アクションオブジェクト
---- @field _spot_switch_newlines number スポット切り替え時の改行数（デフォルト1.5）
+--- @field _spot_newlines number スポット切り替え時の改行数（デフォルト1.5）
 --- @field req ShioriRequest|nil SHIORIリクエストオブジェクト（読み取り専用として扱うこと）
 local SHIORI_ACT = {}
 
@@ -42,8 +42,8 @@ SHIORI_ACT.IMPL = SHIORI_ACT_IMPL
 --- **注意**: act.req は読み取り専用として扱ってください。変更は未定義動作となります。
 function SHIORI_ACT.new(actors, req)
     local base = ACT.new(actors)
-    -- pasta.tomlの[ghost]セクションからspot_switch_newlinesを読み込み（デフォルト1.5）
-    base._spot_switch_newlines = CONFIG.get("ghost", "spot_switch_newlines", 1.5)
+    -- pasta.tomlの[ghost]セクションからspot_newlinesを読み込み（デフォルト1.5）
+    base._spot_newlines = CONFIG.get("ghost", "spot_newlines", 1.5)
     -- SHIORIリクエストオブジェクトを設定（任意）
     base.req = req
     return setmetatable(base, SHIORI_ACT_IMPL)
@@ -56,9 +56,9 @@ end
 function SHIORI_ACT_IMPL.build(self)
     -- 親のbuild()でトークン取得＆リセット
     local token = ACT.IMPL.build(self)
-    -- sakura_builderで変換
+    -- sakura_builderで変換（新プロパティ名spot_newlinesを使用）
     local script = BUILDER.build(token, {
-        spot_switch_newlines = self._spot_switch_newlines
+        spot_newlines = self._spot_newlines
     })
     return script
 end

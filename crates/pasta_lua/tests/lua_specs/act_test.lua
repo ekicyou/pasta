@@ -151,18 +151,110 @@ describe("ACT - clear()", function()
 end)
 
 -- ============================================================================
--- Requirement 2: スポット切り替え検出
+-- actor-spot-refactoring: set_spot()トークン化 (Task 1.1)
 -- ============================================================================
 
-describe("ACT - スポット切り替え検出", function()
-    test("ACT.new()で_current_spot = nilを初期化する", function()
+describe("ACT - set_spot() トークン化", function()
+    test("set_spot()が正しいトークン構造{type='spot', actor=Actor, spot=N}を生成する", function()
         local ACT = require("pasta.act")
-        local act = ACT.new(create_mock_actors())
+        local actors = create_mock_actors()
+        local act = ACT.new(actors)
 
-        expect(act._current_spot):toBe(nil)
+        act:set_spot("sakura", 0)
+
+        expect(#act.token):toBe(1)
+        expect(act.token[1].type):toBe("spot")
+        expect(act.token[1].actor):toBe(actors.sakura)
+        expect(act.token[1].spot):toBe(0)
     end)
 
-    test("talk()でスポット変更検出時にspot_switchトークンをactorトークン直後に挿入", function()
+    test("set_spot()呼び出し後もactor.spotが変更されていない（状態レス化）", function()
+        local ACT = require("pasta.act")
+        local actors = create_mock_actors()
+        local original_spot = actors.sakura.spot
+        local act = ACT.new(actors)
+
+        act:set_spot("sakura", 5)
+
+        -- actorオブジェクトの状態は変更されていない
+        expect(actors.sakura.spot):toBe(original_spot)
+    end)
+
+    test("set_spot()でspotトークンを生成後、actorのspot属性は不変", function()
+        local ACT = require("pasta.act")
+        local actors = create_mock_actors()
+        local act = ACT.new(actors)
+
+        -- sakuraのspotは0
+        local before = actors.sakura.spot
+        act:set_spot("sakura", 99)
+        local after = actors.sakura.spot
+
+        expect(before):toBe(after)
+        expect(act.token[1].spot):toBe(99)
+    end)
+end)
+
+-- ============================================================================
+-- actor-spot-refactoring: clear_spot()トークン化 (Task 1.2)
+-- ============================================================================
+
+describe("ACT - clear_spot() トークン化", function()
+    test("clear_spot()が正しいトークン構造{type='clear_spot'}を生成する", function()
+        local ACT = require("pasta.act")
+        local actors = create_mock_actors()
+        local act = ACT.new(actors)
+
+        act:clear_spot()
+
+        expect(#act.token):toBe(1)
+        expect(act.token[1].type):toBe("clear_spot")
+    end)
+
+    test("clear_spot()呼び出し後もactorオブジェクトが変更されていない", function()
+        local ACT = require("pasta.act")
+        local actors = create_mock_actors()
+        local act = ACT.new(actors)
+
+        -- 最初にスポットを設定しておく
+        actors.sakura.spot = 0
+        actors.kero.spot = 1
+
+        act:clear_spot()
+
+        -- actorオブジェクトの状態は変更されていない
+        expect(actors.sakura.spot):toBe(0)
+        expect(actors.kero.spot):toBe(1)
+    end)
+end)
+
+-- ============================================================================
+-- actor-spot-refactoring: talk()のactor情報追加 (Task 1.3)
+-- ============================================================================
+
+describe("ACT - talk() actor情報付きトークン生成", function()
+    test("talk()が{type='talk', actor=Actor, text=text}トークンを生成する", function()
+        local ACT = require("pasta.act")
+        local actors = create_mock_actors()
+        local act = ACT.new(actors)
+
+        act:talk(actors.sakura, "こんにちは")
+
+        -- talk トークンにactor情報が含まれる
+        local talk_token = nil
+        for _, t in ipairs(act.token) do
+            if t.type == "talk" then
+                talk_token = t
+                break
+            end
+        end
+
+        expect(talk_token):toBeTruthy()
+        expect(talk_token.actor):toBe(actors.sakura)
+        expect(talk_token.text):toBe("こんにちは")
+    end)
+
+    test("talk()がactorトークンを生成しない（状態レス化）", function()
         local ACT = require("pasta.act")
         local actors = create_mock_actors()
         local act = ACT.new(actors)
@@ -170,74 +262,110 @@ describe("ACT - スポット切り替え検出", function()
         act:talk(actors.sakura, "Hello")
         act:talk(actors.kero, "Hi")
 
-        -- 期待: actor(sakura), talk(Hello), actor(kero), spot_switch, talk(Hi)
-        local types = {}
+        -- {type="actor"}トークンが存在しない
+        local has_actor_token = false
         for _, t in ipairs(act.token) do
-            table.insert(types, t.type)
+            if t.type == "actor" then
+                has_actor_token = true
+            end
         end
 
-        expect(types[1]):toBe("actor")
-        expect(types[2]):toBe("talk")
-        expect(types[3]):toBe("actor")
-        expect(types[4]):toBe("spot_switch")
-        expect(types[5]):toBe("talk")
+        expect(has_actor_token):toBe(false)
     end)
 
-    test("初回のactor追加時はspot_switchを挿入しない", function()
+    test("talk()がspot_switchトークンを生成しない（状態レス化）", function()
         local ACT = require("pasta.act")
         local actors = create_mock_actors()
         local act = ACT.new(actors)
 
         act:talk(actors.sakura, "Hello")
+        act:talk(actors.kero, "Hi")
 
-        -- 期待: actor(sakura), talk(Hello) のみ（spot_switchなし）
+        -- {type="spot_switch"}トークンが存在しない
         local has_spot_switch = false
         for _, t in ipairs(act.token) do
             if t.type == "spot_switch" then
                 has_spot_switch = true
             end
         end
+
         expect(has_spot_switch):toBe(false)
     end)
+end)
 
-    test("同一スポットでの連続talkではspot_switchを挿入しない", function()
+-- ============================================================================
+-- actor-spot-refactoring: 状態フィールド削除 (Task 1.4)
+-- ============================================================================
+
+describe("ACT - 状態フィールド削除", function()
+    test("ACT.new()でnow_actorフィールドが存在しない", function()
+        local ACT = require("pasta.act")
+        local act = ACT.new(create_mock_actors())
+
+        expect(act.now_actor):toBe(nil)
+    end)
+
+    test("ACT.new()で_current_spotフィールドが存在しない", function()
+        local ACT = require("pasta.act")
+        local act = ACT.new(create_mock_actors())
+
+        expect(act._current_spot):toBe(nil)
+    end)
+
+    test("talk()呼び出し後もnow_actorが設定されない", function()
         local ACT = require("pasta.act")
         local actors = create_mock_actors()
         local act = ACT.new(actors)
 
         act:talk(actors.sakura, "Hello")
-        act:talk(actors.sakura, "World")
 
-        -- 期待: actor(sakura), talk(Hello), talk(World) のみ
-        local spot_switch_count = 0
+        expect(act.now_actor):toBe(nil)
+    end)
+end)
+
+-- ============================================================================
+-- actor-spot-refactoring: アクタープロキシの独立性 (Task 4.2)
+-- ============================================================================
+
+describe("ACT - アクタープロキシの独立性", function()
+    test("set_spot()呼び出しなしでact.さくら:talk()が動作する", function()
+        local ACT = require("pasta.act")
+        local actors = { ["さくら"] = { name = "さくら", spot = 0 } }
+        local act = ACT.new(actors)
+
+        -- set_spot()なしでプロキシ経由のtalk()を呼び出し
+        act["さくら"]:talk("こんにちは")
+
+        local talk_token = nil
         for _, t in ipairs(act.token) do
-            if t.type == "spot_switch" then
-                spot_switch_count = spot_switch_count + 1
+            if t.type == "talk" then
+                talk_token = t
+                break
             end
         end
-        expect(spot_switch_count):toBe(0)
+
+        expect(talk_token):toBeTruthy()
+        expect(talk_token.text):toBe("こんにちは")
     end)
 
-    test("スポット切り替え検出時に_current_spotを更新する", function()
+    test("プロキシ経由のtalk()が正しいトークン（actor付き）を生成する", function()
         local ACT = require("pasta.act")
-        local actors = create_mock_actors()
+        local actors = { ["さくら"] = { name = "さくら", spot = 0 } }
         local act = ACT.new(actors)
 
-        act:talk(actors.sakura, "Hello")
-        expect(act._current_spot):toBe(0)
+        act["さくら"]:talk("テスト")
 
-        act:talk(actors.kero, "Hi")
-        expect(act._current_spot):toBe(1)
-    end)
+        local talk_token = nil
+        for _, t in ipairs(act.token) do
+            if t.type == "talk" then
+                talk_token = t
+                break
+            end
+        end
 
-    test("actor.spotがnilの場合は0として扱う", function()
-        local ACT = require("pasta.act")
-        local actors = { unknown = { name = "Unknown", spot = nil } }
-        local act = ACT.new(actors)
-
-        act:talk(actors.unknown, "Hello")
-
-        expect(act._current_spot):toBe(0)
+        expect(talk_token):toBeTruthy()
+        expect(talk_token.actor):toBe(actors["さくら"])
+        expect(talk_token.text):toBe("テスト")
     end)
 end)
 
@@ -293,30 +421,6 @@ describe("ACT - build()", function()
         local _ = act:build()
 
         expect(#act.token):toBe(0)
-    end)
-
-    test("build()後にnow_actorをnilにリセットする", function()
-        local ACT = require("pasta.act")
-        local actors = create_mock_actors()
-        local act = ACT.new(actors)
-
-        act:talk(actors.sakura, "Hello")
-        expect(act.now_actor):toBe(actors.sakura)
-
-        local _ = act:build()
-        expect(act.now_actor):toBe(nil)
-    end)
-
-    test("build()後に_current_spotをnilにリセットする", function()
-        local ACT = require("pasta.act")
-        local actors = create_mock_actors()
-        local act = ACT.new(actors)
-
-        act:talk(actors.sakura, "Hello")
-        expect(act._current_spot):toBe(0)
-
-        local _ = act:build()
-        expect(act._current_spot):toBe(nil)
     end)
 
     test("空のトークン配列を返却できる", function()
@@ -390,23 +494,6 @@ describe("ACT - yield()", function()
         local ok2, returned = coroutine.resume(co)
         expect(ok2):toBe(true)
         expect(returned):toBe(act)
-    end)
-
-    test("yield()後に_current_spotがリセットされる", function()
-        local ACT = require("pasta.act")
-        local actors = create_mock_actors()
-        local act = ACT.new(actors)
-
-        act:talk(actors.sakura, "Hello")
-        expect(act._current_spot):toBe(0)
-
-        local co = coroutine.create(function()
-            return act:yield()
-        end)
-
-        local _, _ = coroutine.resume(co)
-
-        expect(act._current_spot):toBe(nil)
     end)
 end)
 
