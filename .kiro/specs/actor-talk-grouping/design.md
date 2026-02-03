@@ -133,9 +133,17 @@ local function group_by_actor(tokens)
                 current_actor = talk_actor
             end
             table.insert(current_actor_token.tokens, token)
+        else
+            -- 未知のトークン型（将来の拡張やバグ検出用）
+            -- 現在の設計では発生しないが、デバッグ容易性のため警告を出力
+            if current_actor_token then
+                -- アクターグループ内に追加（アクター行動として扱う）
+                table.insert(current_actor_token.tokens, token)
+            else
+                -- アクターグループ外の未知トークン: エラーログ推奨
+                -- 実装時にtracing等でログ出力を検討
+            end
         end
-        -- 注: pasta DSL仕様上、talk以外のアクター行動トークン（surface, wait等）は
-        --     単独では発生しないため、elseブロックは不要
     end
 
     return result
@@ -145,7 +153,7 @@ end
 **設計根拠**:
 - `spot`, `clear_spot`は独立トークンとして維持（R2-1）
 - `talk.actor`の変化でグループ分割（R2-2, R2-3）
-- pasta DSL仕様上、talk以外のアクター行動トークンは単独では発生しないため、elseブロックは不要
+- elseブロック: 将来の拡張性確保とデバッグ容易性のため、未知のトークン型を処理（R7-1）
 
 ---
 
@@ -500,6 +508,7 @@ end
 | tokens = {} | 空配列を返す |
 | token.actor = nil | nilとして比較（別グループ扱い） |
 | token.text = nil | ""として扱う |
+| 未知のトークン型 | アクターグループ内なら追加、グループ外ならログ出力（実装時に検討） |
 
 ### 検証ポリシー
 
@@ -571,6 +580,29 @@ end)
 
 - 既存の`sakura_builder_test.lua`（521行）を全パス
 - 新規テストなしで後方互換性を検証
+
+#### アクター切り替え検出の境界値テスト（新規）
+
+**目的**: R4-4（アクター切り替え検出）の正確性を保証
+
+```lua
+describe("SHIORI_ACT - actor switching detection", function()
+    test("spot後の最初のtalkでアクター切り替え検出", function()
+        -- Given: spot(B) → talk(A)
+        -- Expected: \s\0（Aのスポット）が出力される
+    end)
+    
+    test("clear_spot後の初回talkで状態リセット確認", function()
+        -- Given: talk(A) → clear_spot → talk(A)
+        -- Expected: clear_spot後のAは新規スポット0として扱われる
+    end)
+    
+    test("actor=nilのtalkでスポット切り替え挙動", function()
+        -- Given: talk(A, spot=1) → talk(nil) → talk(A, spot=1)
+        -- Expected: nilアクターはスポット0、その後Aはスポット1に戻る
+    end)
+end)
+```
 
 ### テストファイル
 
