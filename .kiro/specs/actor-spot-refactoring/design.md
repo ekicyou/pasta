@@ -226,9 +226,12 @@ end
 ```
 
 **Implementation Notes**
+- `set_spot()`: `self.actors[name]`でActorオブジェクトを取得し、`{type="spot", actor=actor, spot=spot}`トークン生成
+- `talk()`: 引数のactorをそのまま使用して`{type="talk", actor=actor, text=text}`トークン生成
+- `clear_spot()`: `{type="clear_spot"}`トークン生成のみ（actorオブジェクトの状態は変更しない）
 - `now_actor`, `_current_spot`フィールドを削除
 - `build()`での状態リセット処理も削除
-- 既存のactorトークン生成ロジックを削除
+- 既存のactorトークン生成ロジック（`{type="actor"}`）を削除
 
 ---
 
