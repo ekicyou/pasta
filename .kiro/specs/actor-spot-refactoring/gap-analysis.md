@@ -4,14 +4,14 @@
 
 ### 影響ファイル一覧
 
-| ファイル | 役割 | 変更種別 |
-|----------|------|----------|
-| `crates/pasta_lua/scripts/pasta/act.lua` | トークン生成の親クラス | 修正 |
-| `crates/pasta_lua/scripts/pasta/shiori/sakura_builder.lua` | トークン→さくらスクリプト変換 | 修正 |
-| `crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/scripts/pasta/shiori/act.lua` | SHIORI専用ACT継承クラス | 修正 |
-| `crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/scripts/pasta/config.lua` | 設定ドキュメント例 | 修正（コメント） |
-| `crates/pasta_lua/tests/lua_specs/act_test.lua` | ACTモジュールテスト | 修正 |
-| `crates/pasta_lua/tests/lua_specs/sakura_builder_test.lua` | sakura_builderテスト | 修正 |
+| ファイル                                                                                 | 役割                          | 変更種別         |
+| ---------------------------------------------------------------------------------------- | ----------------------------- | ---------------- |
+| `crates/pasta_lua/scripts/pasta/act.lua`                                                 | トークン生成の親クラス        | 修正             |
+| `crates/pasta_lua/scripts/pasta/shiori/sakura_builder.lua`                               | トークン→さくらスクリプト変換 | 修正             |
+| `crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/scripts/pasta/shiori/act.lua` | SHIORI専用ACT継承クラス       | 修正             |
+| `crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/scripts/pasta/config.lua`     | 設定ドキュメント例            | 修正（コメント） |
+| `crates/pasta_lua/tests/lua_specs/act_test.lua`                                          | ACTモジュールテスト           | 修正             |
+| `crates/pasta_lua/tests/lua_specs/sakura_builder_test.lua`                               | sakura_builderテスト          | 修正             |
 
 ### 現行アーキテクチャパターン
 
@@ -47,24 +47,24 @@ elseif t == "spot_switch" then  -- ← リネーム対象
 
 ### 命名規則・パターン
 
-| 項目 | 現行 | 提案 |
-|------|------|------|
-| トークンタイプ | `"spot_switch"` | `"spot"` |
-| 設定プロパティ | `spot_switch_newlines` | `spot_newlines` |
-| ローカル変数 | `spot_switch_newlines` | `spot_newlines` |
-| フィールド | `_spot_switch_newlines` | `_spot_newlines` |
+| 項目           | 現行                    | 提案             |
+| -------------- | ----------------------- | ---------------- |
+| トークンタイプ | `"spot_switch"`         | `"spot"`         |
+| 設定プロパティ | `spot_switch_newlines`  | `spot_newlines`  |
+| ローカル変数   | `spot_switch_newlines`  | `spot_newlines`  |
+| フィールド     | `_spot_switch_newlines` | `_spot_newlines` |
 
 ## 2. Requirements Feasibility Analysis
 
 ### 技術要件マッピング
 
-| 要件 | 技術ニーズ | ギャップ状態 |
-|------|------------|--------------|
-| Req 1: トークンタイプ名変更 | 文字列リテラル置換 | **対応可能** - 単純なリネーム |
-| Req 2: spotトークン責務明確化 | 既存ロジック維持 | **対応可能** - 変更なし |
-| Req 3: 設定プロパティ名一貫性 | 設定キー置換 | **対応可能** - 単純なリネーム |
-| Req 4: テスト更新 | テスト文字列置換 | **対応可能** - 単純なリネーム |
-| Req 5: actor/spot独立性 | 既存設計維持 | **対応可能** - 変更なし |
+| 要件                          | 技術ニーズ         | ギャップ状態                  |
+| ----------------------------- | ------------------ | ----------------------------- |
+| Req 1: トークンタイプ名変更   | 文字列リテラル置換 | **対応可能** - 単純なリネーム |
+| Req 2: spotトークン責務明確化 | 既存ロジック維持   | **対応可能** - 変更なし       |
+| Req 3: 設定プロパティ名一貫性 | 設定キー置換       | **対応可能** - 単純なリネーム |
+| Req 4: テスト更新             | テスト文字列置換   | **対応可能** - 単純なリネーム |
+| Req 5: actor/spot独立性       | 既存設計維持       | **対応可能** - 変更なし       |
 
 ### 依存関係分析
 
@@ -163,12 +163,12 @@ local spot_newlines = config.spot_newlines or config.spot_switch_newlines or 1.5
 
 ### 設計フェーズへの引き継ぎ事項
 
-| カテゴリ | 項目 |
-|----------|------|
-| 決定事項 | Option Aを採用 |
-| 確認不要 | 外部研究不要 |
+| カテゴリ | 項目                                                                 |
+| -------- | -------------------------------------------------------------------- |
+| 決定事項 | Option Aを採用                                                       |
+| 確認不要 | 外部研究不要                                                         |
 | 実装順序 | 1. act.lua → 2. sakura_builder.lua → 3. サンプルゴースト → 4. テスト |
-| 検証方法 | 既存テストスイート実行（`cargo test`） |
+| 検証方法 | 既存テストスイート実行（`cargo test`）                               |
 
 ## 6. 変更影響サマリー
 

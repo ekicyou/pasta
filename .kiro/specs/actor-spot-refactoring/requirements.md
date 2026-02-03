@@ -70,8 +70,16 @@ act.tokenの"actor"と、"spot_switch"の役割が重複している。実際に
 2. The act module shall `set_spot()`内で状態管理を行わず、トークン生成のみを行う
 3. The system shall `set_spot()`の効果をビルダー層で反映する
 
+### Requirement 6: clear_spot()のトークン化
+**Objective:** 開発者として、`clear_spot()`もトークン化することで、act層の完全な状態レス化を実現したい。
+
+#### Acceptance Criteria
+1. When `act:clear_spot()`が呼ばれたとき, the act module shall `{type="clear_spot"}`トークンを生成する
+2. The act module shall `clear_spot()`内で状態管理を行わず、トークン生成のみを行う
+3. When clear_spotトークンがsakura_builderで処理されるとき, the sakura_builder shall 内部の`actor_spots`状態を空テーブル`{}`にリセットする
+4. When clear_spotトークンがsakura_builderで処理されるとき, the sakura_builder shall `last_actor`状態を`nil`にリセットする
+
 ## Out of Scope
-- `clear_spot()`のトークン化（状態リセットAPIとして現状維持）
 - spot以外の新しいトークンタイプの追加
 - actorオブジェクトの構造変更
 
