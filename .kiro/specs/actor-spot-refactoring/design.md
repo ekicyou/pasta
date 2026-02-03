@@ -431,6 +431,34 @@ local last_actor = nil  -- or Actor object
 2. `{type="actor"}` トークン廃止
 3. `{type="spot_switch"}` トークン廃止
 
+**Test Coverage Enhancement**:
+
+責務分離とアクタープロキシの独立性を確保するため、以下のテストケースを追加する:
+
+1. **act_test.lua**: トークン生成の検証
+   - `set_spot()`がactorオブジェクトの状態を変更しないことを確認
+   - `set_spot()`呼び出し後も`actor.spot`が変更されていないことを検証
+   - `set_spot()`が正しいトークン構造`{type="spot", actor=Actor, spot=N}`を生成することを検証
+   - `clear_spot()`がactorオブジェクトの状態を変更しないことを確認
+   - `talk()`が状態管理（now_actor, _current_spot）を行わないことを確認
+
+2. **act_test.lua**: アクタープロキシの独立性検証
+   - `set_spot()`呼び出しの有無に関わらず`act.さくら:talk()`が動作することを確認
+   - `ACT_IMPL.__index`によるプロキシ生成が正常に機能することを確認
+   - プロキシ経由のtalk()が正しいトークン（actor付き）を生成することを確認
+
+3. **sakura_builder_test.lua**: ビルダー状態管理の検証
+   - `actor_spots`未設定時にデフォルト値0を使用することを確認
+   - spotトークン処理で`actor_spots[actor.name]`が正しく更新されることを確認
+   - talkトークン処理で`actor_spots[actor.name] or 0`によるspot解決を確認
+   - clear_spotトークン処理で`actor_spots={}`と`last_actor=nil`にリセットされることを確認
+
+4. **sakura_builder_test.lua**: 統合シナリオの検証
+   - set_spot()なしでのtalk() → デフォルトspot(0)使用を確認
+   - set_spot() → talk() → spot切り替えとスポットタグ出力を確認
+   - clear_spot() → talk() → デフォルトspot(0)への復帰を確認
+   - 複数actorのspot独立管理を確認
+
 **Test Migration**:
 - 既存テストのトークン期待値を新構造に更新
 - 状態管理テストをact_test.luaからsakura_builder_test.luaに移動
