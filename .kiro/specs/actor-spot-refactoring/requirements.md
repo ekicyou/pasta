@@ -40,7 +40,8 @@ act.tokenの"actor"と、"spot_switch"の役割が重複している。実際に
 #### Acceptance Criteria
 1. When BuildConfigが定義されるとき, the sakura_builder shall `spot_newlines`プロパティを使用する（旧`spot_switch_newlines`）
 2. The sakura_builder shall `spot_newlines`のデフォルト値を1.5として維持する
-3. If 旧プロパティ名`spot_switch_newlines`が使用された場合, the sakura_builder shall 新プロパティ名`spot_newlines`と同様に動作する（後方互換性はオプション）
+
+**Note**: 後方互換性（旧プロパティ名のフォールバック）はOut of Scopeとし、破壊的変更として扱う。
 
 ### Requirement 4: テストの更新
 **Objective:** 開発者として、リファクタリング後もテストが正しく機能し、変更が意図通りであることを検証したい。
