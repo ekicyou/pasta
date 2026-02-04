@@ -360,14 +360,14 @@ end)
 
 -- Test build() method
 describe("SHIORI_ACT - build()", function()
-    test("returns \\e for empty buffer", function()
+    test("returns nil for empty buffer (act-build-early-return)", function()
         local SHIORI_ACT = require("pasta.shiori.act")
         local actors = create_mock_actors()
         local act = SHIORI_ACT.new(actors)
 
         local result = act:build()
 
-        expect(result):toBe("\\e")
+        expect(result):toBe(nil)
     end)
 
     test("appends \\e to end", function()
@@ -394,7 +394,7 @@ describe("SHIORI_ACT - build()", function()
         local result2 = act:build()
 
         expect(result1:find("\\s%[5%]")):toBeTruthy()
-        expect(result2):toBe("\\e") -- empty after auto-reset
+        expect(result2):toBe(nil) -- nil after auto-reset (act-build-early-return)
     end)
 end)
 

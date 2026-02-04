@@ -23,6 +23,7 @@ local specs = {
     "second_change_thread_test",      -- OnSecondChange thread passthrough tests
     "res_ok_test",                    -- RES.ok nil/empty string handling tests
     "integration_coroutine_test",     -- E2E chain talk and error handling tests
+    "act_build_early_return_test",    -- ACT:build() / SHIORI_ACT:build() 早期リターンテスト
     -- 将来のテストスイートをここに追加
     -- "code_generator_test",
     -- "context_test",

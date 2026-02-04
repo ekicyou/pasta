@@ -431,14 +431,13 @@ describe("ACT - build()", function()
         expect(#act.token):toBe(0)
     end)
 
-    test("空のトークン配列を返却できる", function()
+    test("トークン0件時はnilを返す (act-build-early-return)", function()
         local ACT = require("pasta.act")
         local act = ACT.new({})
 
         local token = act:build()
 
-        expect(type(token)):toBe("table")
-        expect(#token):toBe(0)
+        expect(token):toBe(nil)
     end)
 end)
 

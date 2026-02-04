@@ -1,9 +1,9 @@
 {
     "feature_name": "act-build-early-return",
     "created_at": "2026-02-04T00:00:00Z",
-    "updated_at": "2026-02-04T01:15:00Z",
+    "updated_at": "2026-02-04T02:00:00Z",
     "language": "ja",
-    "phase": "ready-for-implementation",
+    "phase": "completed",
     "approvals": {
         "requirements": {
             "generated": true,

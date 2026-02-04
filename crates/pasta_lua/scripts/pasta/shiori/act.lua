@@ -52,10 +52,16 @@ end
 --- build()オーバーライド: さくらスクリプト生成
 --- 親のbuild()でトークン取得＆リセット後、sakura_builderで変換
 --- @param self ShioriAct アクションオブジェクト
---- @return string さくらスクリプト文字列
+--- @return string|nil さくらスクリプト文字列、またはnil（トークン0件時）
 function SHIORI_ACT_IMPL.build(self)
     -- 親のbuild()でトークン取得＆リセット
     local token = ACT.IMPL.build(self)
+
+    -- 早期リターン: ACT.IMPL.build()がnilを返した場合はnilを返す (act-build-early-return)
+    if token == nil then
+        return nil
+    end
+
     -- sakura_builderで変換（新プロパティ名spot_newlinesを使用）
     local script = BUILDER.build(token, {
         spot_newlines = self._spot_newlines

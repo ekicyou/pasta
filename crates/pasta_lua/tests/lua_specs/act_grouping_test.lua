@@ -20,14 +20,14 @@ end
 -- ============================================================================
 
 describe("ACT.build() - group_by_actor()", function()
-    test("空配列で空配列を返す", function()
+    test("トークン0件でnilを返す (act-build-early-return)", function()
         local ACT = require("pasta.act")
         local act = ACT.new(create_mock_actors())
 
         -- トークンなしでbuild
         local result = act:build()
 
-        expect(#result):toBe(0)
+        expect(result):toBe(nil)
     end)
 
     test("単一talkで単一type=actorトークンを生成する", function()
@@ -356,7 +356,7 @@ describe("ACT.build() - 複合シナリオ", function()
         expect(result[3].tokens[1].text):toBe("いいですね")
     end)
 
-    test("build後にtokenがリセットされる", function()
+    test("build後にtokenがリセットされnilを返す (act-build-early-return)", function()
         local ACT = require("pasta.act")
         local actors = create_mock_actors()
         local sakura = actors["さくら"]
@@ -366,6 +366,6 @@ describe("ACT.build() - 複合シナリオ", function()
         local _ = act:build()
         local result2 = act:build()
 
-        expect(#result2):toBe(0)
+        expect(result2):toBe(nil)
     end)
 end)
