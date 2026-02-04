@@ -198,7 +198,17 @@ function SCENE.co_exec(name, global_scene_name, attrs)
     if type(fn) ~= "function" then
         return nil
     end
-    return coroutine.create(fn)
+
+    -- 必ず最後にbuildを呼び出す関数
+    local function wrapped_fn(act, ...)
+        fn(act, ...)
+        local result = act:build()
+        if result ~= nil then
+            return result
+        end
+    end
+
+    return coroutine.create(wrapped_fn)
 end
 
 return SCENE
