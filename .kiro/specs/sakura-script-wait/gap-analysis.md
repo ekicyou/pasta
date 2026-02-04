@@ -17,13 +17,13 @@
 
 ### 1.1 既存モジュール構造
 
-| モジュール           | 配置                         | 登録パターン                         |
-| -------------------- | ---------------------------- | ------------------------------------ |
-| `@pasta_search`      | `src/search/mod.rs`          | `loader()` + `register()` → UserData |
-| `@pasta_persistence` | `src/runtime/persistence.rs` | `register()` → Table                 |
-| `@pasta_config`      | `src/runtime/mod.rs`         | `toml_to_lua()` → Table              |
-| `@enc`               | `src/runtime/enc.rs`         | `register()` → Table                 |
-| `@pasta_sakura_script` (新規) | `src/sakura_script/mod.rs` (予定) | `register()` → Table |
+| モジュール                    | 配置                              | 登録パターン                         |
+| ----------------------------- | --------------------------------- | ------------------------------------ |
+| `@pasta_search`               | `src/search/mod.rs`               | `loader()` + `register()` → UserData |
+| `@pasta_persistence`          | `src/runtime/persistence.rs`      | `register()` → Table                 |
+| `@pasta_config`               | `src/runtime/mod.rs`              | `toml_to_lua()` → Table              |
+| `@enc`                        | `src/runtime/enc.rs`              | `register()` → Table                 |
+| `@pasta_sakura_script` (新規) | `src/sakura_script/mod.rs` (予定) | `register()` → Table                 |
 
 **パターン**: 全モジュールが`package.loaded["@module_name"]`に登録される。
 
