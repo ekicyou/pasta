@@ -79,6 +79,13 @@ flowchart TB
 | Module | @pasta_sakura_script | ウェイト挿入処理 | Rust実装、既存 |
 | Config | pasta.toml | actor設定 | 既存 |
 
+**デフォルトウェイト値** (pasta.toml `[talk]`セクション、config.rs定義):
+- `script_wait_normal`: 50ms（一般文字）
+- `script_wait_period`: 1000ms（句点）
+- `script_wait_comma`: 500ms（読点）
+- `script_wait_strong`: 500ms（強調文字）
+- `script_wait_leader`: 200ms（リーダー文字）
+
 ## Requirements Traceability
 
 | Requirement | Summary | Components | Interfaces | Flows |
@@ -160,10 +167,24 @@ end
 | Requirements | 6.1, 6.2, 6.3 |
 
 **Responsibilities & Constraints**
-- BUILDER.build()の出力を検証
-- 24テストケースの期待値をウェイト挿入形式に更新
 
-**Dependencies**
+**期待値変換パターン** (デフォルトウェイト値適用時):
+
+| 変更前 | 変更後 | 説明 |
+|--------|--------|------|
+| `"こんにちは\\e"` | `"こ\_w[50]ん\_w[50]に\_w[50]ち\_w[50]は\_w[50]\\e"` | 通常文字（各50ms） |
+| `"こんにちは。\\e"` | `"こ\_w[50]ん\_w[50]に\_w[50]ち\_w[50]は\_w[50]。\_w[1000]\\e"` | 句点（1000ms） |
+| `"こんにちは、\\e"` | `"こ\_w[50]ん\_w[50]に\_w[50]ち\_w[50]は\_w[50]、\_w[500]\\e"` | 読点（500ms） |
+| `"あ！\\e"` | `"あ\_w[50]！\_w[500]\\e"` | 強調文字（500ms） |
+
+**対象テストファイル**:
+- `crates/pasta_lua/tests/lua_specs/sakura_builder_test.lua` (24テスト)
+- 各テストの期待値を上記パターンに従って更新
+
+**注意点**:
+- actor固有設定がない場合、上記デフォルト値が適用される
+- 既存さくらスクリプトタグ（`\s[ID]`, `\w[ms]`等）は保護される
+- `\e`終端タグは必ず維持
 - Inbound: sakura_builder — テスト対象 (P0)
 
 **Implementation Notes**
