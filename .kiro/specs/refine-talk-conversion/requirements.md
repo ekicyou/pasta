@@ -56,3 +56,11 @@ local result = SAKURA_SCRIPT.talk_to_script(actor, "こんにちは。")
 1. When テキストが変換される, the sakura_builder shall 有効なさくらスクリプト文字列を出力する
 2. The sakura_builder shall `\e`（スクリプト終端タグ）を維持する
 3. When 既存のさくらスクリプトタグが含まれる, the sakura_builder shall それらを破壊しない（talk_to_scriptがタグを保護する）
+
+### Requirement 6: テスト期待値の更新
+**Objective:** As a テスト保守者, I want テストが新しいウェイト挿入形式を検証する, so that 実装の正確性が保証される
+
+#### Acceptance Criteria
+1. When sakura_builder_test.luaを実行する, the test suite shall 新しいウェイト挿入形式の期待値を使用する
+2. The test suite shall escape_sakuraベースの期待値を削除する
+3. When 他のインテグレーションテストが失敗する, the test maintainer shall さくらスクリプト出力変更による期待値を修正する

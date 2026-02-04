@@ -52,11 +52,16 @@ local result = SAKURA_SCRIPT.talk_to_script(actor, "こんにちは。")
 
 ### 1.4 テストカバレッジ
 
-| テストファイル | カバレッジ |
-|---------------|-----------|
-| `sakura_builder_test.lua` | 24テスト（act-token-buffer-refactor） |
+| テストファイル | カバレッジ | 影響 |
+|---------------|-----------|------|
+| `sakura_builder_test.lua` | 24テスト（act-token-buffer-refactor） | 期待値更新必須 |
+| その他インテグレーションテスト | さくらスクリプト出力を検証 | 期待値更新の可能性 |
 
-**注意**: 現在のテストは`escape_sakura`ベースの動作を検証している。変更後はテストの期待値も更新が必要。
+**影響範囲**:
+- 現在のテストは`escape_sakura`ベースの動作を検証（単純エスケープのみ）
+- 変更後は`talk_to_script`のウェイト挿入形式になる
+- **すべてのさくらスクリプト出力テストの期待値修正が必要**
+- 期待値修正は本仕様のスコープ内とする
 
 ---
 
@@ -70,7 +75,8 @@ local result = SAKURA_SCRIPT.talk_to_script(actor, "こんにちは。")
 | Req 2: モジュール読み込み追加 | ✅ 実現可能 | 1行追加 |
 | Req 3: actor情報受け渡し | ✅ 実現可能 | token.actorで既に利用可能 |
 | Req 4: escape_sakura削除 | ✅ 実現可能 | 関数定義削除 |
-| Req 5: 互換性維持 | ⚠️ 確認必要 | テスト更新必要 |
+| Req 5: 互換性維持 | ✅ 実現可能 | さくらスクリプトタグ保護済み |
+| Req 6: テスト期待値更新 | ✅ 実現可能 | 期待値修正（スコープ内） |
 
 ### 2.2 特記事項
 
@@ -123,13 +129,14 @@ local actors = {
 **変更内容**:
 1. ファイル先頭に`require "@pasta_sakura_script"`追加
 2. 行96-97: `escape_sakura(inner.text)` → `SAKURA_SCRIPT.talk_to_script(actor, inner.text)`に置換
-3. 行12-17: escape_sakura関数定義を削除
+4. sakura_builder_test.luaおよび関連テストの期待値を更新
 
 **トレードオフ**:
-- ✅ 変更範囲が最小（1ファイル）
+- ✅ 変更範囲が最小（実装1ファイル + テスト更新）
 - ✅ 既存パターンを維持
 - ✅ 既存の`@pasta_sakura_script`モジュールを活用
 - ✅ token.actorでactorオブジェクトが利用可能（スコープ内変数として既存）
+- ✅ テスト期待値更新をスコープ内として明確化actorオブジェクトが利用可能（スコープ内変数として既存）
 - ❌ テストの期待値更新が必要
 
 ### Option B: テスト駆動アプローチ
@@ -183,8 +190,8 @@ local actors = {
 
 ### 設計フェーズへの推奨
 
-1. **Option A（最小限の変更）を採用**
-2. **テスト更新を実装タスクに含める**
+1. **Opt期待値更新を実装タスクに含める（スコープ内）**
+3. **actor設定はpasta.toml `[actor.名前]`で既に対応済み
 3. **actor.talk構造は将来拡張として設計に明記**
 
 ### 実装詳細
@@ -210,10 +217,33 @@ if inner_type == "talk" then
 ```lua
 -- 行12-17を削除
 ```
+**変更箇所4**: テスト期待値更新
+- `sakura_builder_test.lua`: ウェイト挿入形式の期待値に更新
+- 他のインテグレーションテスト: さくらスクリプト出力変更による期待値修正
+
+### テスト期待値の変更例
+
+**変更前**（escape_sakuraベース）:
+```lua
+-- エスケープのみ
+expect(result:find("Hello")):toBeTruthy()
+expect(result:find("path\\\\to\\\\file")):toBeTruthy()
+```
+
+**変更後**（talk_to_scriptベース）:
+```lua
+-- ウェイト挿入形式
+expect(result:find("H\\_w%[%d+%]e\\_w%[%d+%]l")):toBeTruthy()  -- パターンマッチ
+-- または具体的なウェイト値で検証
+```
+
 
 ### 調査不要項目
 
-- `@pasta_sakura_script`モジュールの実装詳細（完了済み仕様: sakura-script-wait）
+- `@pasta_sakura_script`モジュールの実装詳細（完了済み仕様
+| 6.1 | sakura_builder_test.lua | 期待値更新必要 |
+| 6.2 | sakura_builder_test.lua | 既存期待値削除必要 |
+| 6.3 | 各インテグレーションテスト | 期待値修正可能性 |: sakura-script-wait）
 - ウェイト挿入ロジック（mod.rs, tokenizer.rs, wait_inserter.rsで実装済み）
 - actorオブジェクトの渡し方（token.actorで利用可能、確認済み）
 
