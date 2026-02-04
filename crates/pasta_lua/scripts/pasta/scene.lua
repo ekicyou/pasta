@@ -179,4 +179,26 @@ function SCENE.search(name, global_scene_name, attrs)
     }, scene_result_mt)
 end
 
+--- シーン実行コルーチンを作成してコルーチンを返す。
+---
+--- シーンを検索し、見つかった場合はシーン関数をコルーチンでラップして返す。
+--- 見つからない場合、またはシーン関数が有効な関数でない場合はnilを返す。
+---
+--- @param name string 検索するシーン名
+--- @param global_scene_name string|nil ローカル検索の場合のグローバルシーン名
+--- @param attrs table|nil 属性テーブル（将来拡張用、現在は未使用）
+--- @return thread|nil シーンコルーチン、またはnil
+function SCENE.co_exec(name, global_scene_name, attrs)
+    local scene_result = SCENE.search(name, global_scene_name, attrs)
+    if not scene_result then
+        return nil
+    end
+    local fn = scene_result.func
+    -- シーン関数が有効な関数であることを確認
+    if type(fn) ~= "function" then
+        return nil
+    end
+    return coroutine.create(fn)
+end
+
 return SCENE
