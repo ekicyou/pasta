@@ -110,6 +110,17 @@ impl PastaConfig {
             .and_then(|v| v.clone().try_into().ok())
     }
 
+    /// Get talk configuration from [talk] section.
+    ///
+    /// # Returns
+    /// * `Some(TalkConfig)` - If [talk] section exists and is valid
+    /// * `None` - If [talk] section is missing or invalid
+    pub fn talk(&self) -> Option<TalkConfig> {
+        self.custom_fields
+            .get("talk")
+            .and_then(|v| v.clone().try_into().ok())
+    }
+
     /// Create from TOML string (for testing).
     #[cfg(test)]
     fn from_str(s: &str) -> Result<Self, toml::de::Error> {
@@ -338,6 +349,77 @@ impl Default for LuaConfig {
     fn default() -> Self {
         Self {
             libs: default_libs(),
+        }
+    }
+}
+
+/// Talk configuration from [talk] section in pasta.toml.
+///
+/// Configures sakura script wait insertion for natural conversation tempo.
+///
+/// # Examples
+///
+/// ```toml
+/// [talk]
+/// # Wait values (milliseconds)
+/// script_wait_normal = 50
+/// script_wait_period = 1000
+/// script_wait_comma = 500
+/// script_wait_strong = 500
+/// script_wait_leader = 200
+///
+/// # Character sets
+/// chars_period = "｡。．."
+/// chars_comma = "、，,"
+/// chars_strong = "？！!?"
+/// chars_leader = "･・‥…"
+/// chars_line_start_prohibited = "゛゜ヽヾゝゞ々ー）］｝」』):;]}｣､･ｰﾞﾟ"
+/// chars_line_end_prohibited = "（［｛「『([{｢"
+/// ```
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct TalkConfig {
+    // Wait values (milliseconds)
+    /// Wait for general characters (default: 50ms)
+    pub script_wait_normal: i64,
+    /// Wait for period characters (default: 1000ms)
+    pub script_wait_period: i64,
+    /// Wait for comma characters (default: 500ms)
+    pub script_wait_comma: i64,
+    /// Wait for strong emphasis characters (default: 500ms)
+    pub script_wait_strong: i64,
+    /// Wait for leader characters (default: 200ms)
+    pub script_wait_leader: i64,
+
+    // Character sets
+    /// Period characters (default: "｡。．.")
+    pub chars_period: String,
+    /// Comma characters (default: "、，,")
+    pub chars_comma: String,
+    /// Strong emphasis characters (default: "？！!?")
+    pub chars_strong: String,
+    /// Leader characters (default: "･・‥…")
+    pub chars_leader: String,
+    /// Line start prohibited characters (行頭禁則)
+    pub chars_line_start_prohibited: String,
+    /// Line end prohibited characters (行末禁則)
+    pub chars_line_end_prohibited: String,
+}
+
+impl Default for TalkConfig {
+    fn default() -> Self {
+        Self {
+            script_wait_normal: 50,
+            script_wait_period: 1000,
+            script_wait_comma: 500,
+            script_wait_strong: 500,
+            script_wait_leader: 200,
+            chars_period: "｡。．.".into(),
+            chars_comma: "、，,".into(),
+            chars_strong: "？！!?".into(),
+            chars_leader: "･・‥…".into(),
+            chars_line_start_prohibited: "゛゜ヽヾゝゞ々ー）］｝」』):;]}｣､･ｰﾞﾟ".into(),
+            chars_line_end_prohibited: "（［｛「『([{｢".into(),
         }
     }
 }

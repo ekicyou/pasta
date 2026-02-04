@@ -20,6 +20,7 @@ serde.workspace = true
 serde_json.workspace = true
 glob.workspace = true
 flate2.workspace = true
+regex.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61.2", features = ["Win32_Globalization"] }

@@ -261,17 +261,18 @@ libs = [
 
 ランタイムに自動登録されるモジュール：
 
-| モジュール名    | 用途                            | デフォルト                 |
-| --------------- | ------------------------------- | -------------------------- |
-| `@pasta_search` | シーン・単語検索 API            | 常に有効                   |
-| `@pasta_config` | pasta.toml のカスタムフィールド | 常に有効                   |
-| `@enc`          | エンコーディング変換            | 常に有効                   |
-| `@assertions`   | アサーション関数                | 有効                       |
-| `@testing`      | テストフレームワーク            | 有効                       |
-| `@regex`        | 正規表現サポート                | 有効                       |
-| `@json`         | JSON エンコード/デコード        | 有効                       |
-| `@yaml`         | YAML エンコード/デコード        | 有効                       |
-| `@env`          | 環境変数アクセス                | **無効**（セキュリティ上） |
+| モジュール名           | 用途                            | デフォルト                 |
+| ---------------------- | ------------------------------- | -------------------------- |
+| `@pasta_search`        | シーン・単語検索 API            | 常に有効                   |
+| `@pasta_config`        | pasta.toml のカスタムフィールド | 常に有効                   |
+| `@pasta_sakura_script` | さくらスクリプト変換 API        | 常に有効                   |
+| `@enc`                 | エンコーディング変換            | 常に有効                   |
+| `@assertions`          | アサーション関数                | 有効                       |
+| `@testing`             | テストフレームワーク            | 有効                       |
+| `@regex`               | 正規表現サポート                | 有効                       |
+| `@json`                | JSON エンコード/デコード        | 有効                       |
+| `@yaml`                | YAML エンコード/デコード        | 有効                       |
+| `@env`                 | 環境変数アクセス                | **無効**（セキュリティ上） |
 
 ### 使用例
 
@@ -283,6 +284,12 @@ local global_name, local_name = SEARCH:search_scene("シーン名", "親シー�
 -- 設定ファイルからカスタム値を取得
 local CONFIG = require "@pasta_config"
 print(CONFIG.ghost_name)  -- pasta.toml の [user].ghost_name
+
+-- さくらスクリプト変換 API
+local SAKURA_SCRIPT = require "@pasta_sakura_script"
+local actor = { talk = { script_wait_default = 50 } }
+local result = SAKURA_SCRIPT.talk_to_script(actor, "こんにちは。")
+-- 結果: "こ\_w[50]ん\_w[50]に\_w[50]ち\_w[50]は\_w[100]。"
 
 -- JSON 処理
 local JSON = require "@json"

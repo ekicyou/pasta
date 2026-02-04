@@ -30,7 +30,7 @@ mod error;
 
 pub use cache::CacheManager;
 pub use config::{
-    LoaderConfig, LoggingConfig, LuaConfig, PastaConfig, PersistenceConfig, default_libs,
+    LoaderConfig, LoggingConfig, LuaConfig, PastaConfig, PersistenceConfig, TalkConfig, default_libs,
 };
 pub use context::LoaderContext;
 pub use error::{LoaderError, TranspileFailure};

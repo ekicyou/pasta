@@ -543,6 +543,9 @@ impl PastaLuaRuntime {
         // Register @pasta_persistence module for persistent data storage
         Self::register_persistence_module(&runtime.lua, &runtime.config, &runtime.base_dir)?;
 
+        // Register @pasta_sakura_script module for wait insertion
+        Self::register_sakura_script_module(&runtime.lua, &runtime.config)?;
+
         // Load entry.lua first (for SHIORI.load/SHIORI.request functions)
         let entry_lua_path = loader_context
             .base_dir
@@ -675,6 +678,23 @@ impl PastaLuaRuntime {
         loaded.set("@pasta_persistence", persistence_table)?;
 
         tracing::debug!("Registered @pasta_persistence module");
+        Ok(())
+    }
+
+    /// Register @pasta_sakura_script module for wait insertion.
+    ///
+    /// Provides talk_to_script function for natural conversation tempo.
+    fn register_sakura_script_module(lua: &Lua, config: &Option<PastaConfig>) -> LuaResult<()> {
+        // Get talk config, use defaults if not specified
+        let talk_config = config.as_ref().and_then(|c| c.talk());
+
+        let sakura_module = crate::sakura_script::register(lua, talk_config.as_ref())?;
+
+        let package: Table = lua.globals().get("package")?;
+        let loaded: Table = package.get("loaded")?;
+        loaded.set("@pasta_sakura_script", sakura_module)?;
+
+        tracing::debug!("Registered @pasta_sakura_script module");
         Ok(())
     }
 

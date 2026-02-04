@@ -38,6 +38,7 @@ pub mod loader;
 pub mod logging;
 pub mod normalize;
 pub mod runtime;
+pub mod sakura_script;
 pub mod search;
 pub mod string_literalizer;
 pub mod transpiler;
@@ -50,7 +51,7 @@ pub use encoding::{Encoder, Encoding};
 pub use error::{ConfigError, TranspileError};
 pub use loader::{
     CacheManager, LoaderConfig, LoaderContext, LoaderError, LoggingConfig, LuaConfig, PastaConfig,
-    PastaLoader, TranspileFailure, TranspileResult, default_libs,
+    PastaLoader, TalkConfig, TranspileFailure, TranspileResult, default_libs,
 };
 pub use logging::{
     GlobalLoggerRegistry, LoadDirGuard, PastaLogger, get_current_load_dir, set_current_load_dir,
