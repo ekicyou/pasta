@@ -52,16 +52,17 @@ ACT:build() / SHIORI_ACT:build()の早期打ち切りパターン。ACT:build()�
 - 撮影トークン0件時に、不要なグループ化処理（group_by_actor, merge_consecutive_talks）をスキップすることで、CPU時間を削減する
 - さくらスクリプト生成処理（BUILDER.build()）のスキップにより、メモリ割り当てを削減する
 
-#### NFR2: 後方互換性
-- ACT:build()とSHIORI_ACT:build()の戻り値型が変更される（`table[]` → `table[]|nil`、`string` → `string|nil`）ため、**Breaking Change**となる
-- 既存の呼び出し元コードがnil処理を行っているか確認が必要
-- 型アノテーション（@return）を更新し、mlua型チェックで検出可能にする
+#### NFR2: テストリグレッション対応
+- 既存テストケース（act_test.lua: 20件以上、shiori_act_test.lua: 22件）が非nil前提で記述されている
+- 既存テストは引き続きパスすることを確認（トークンありケース）
+- 新規テストケース（トークン0件時のnilリターン）を追加
+- 型アノテーション（@return）を更新：`table[]|nil`, `string|nil`
 
 ### Constraints & Assumptions
 
 **制約:**
-- ACT:build()は現在`table[]`を返す前提で設計されているため、nilリターンの導入により既存コードの修正が必要になる可能性がある
-- シーン関数内でSHIORI_ACT:build()の戻り値がnil可能性を考慮する必要がある
+- 既存テストケースが非nil前提で記述されているため、リグレッション確認が必要
+- シーン関数内でSHIORI_ACT:build()の戻り値がnil可能性を考慮する必要がある（将来的な設計ガイドライン）
 
 **前提:**
 - 撮影トークン0件 = 会話未作成と定義する
