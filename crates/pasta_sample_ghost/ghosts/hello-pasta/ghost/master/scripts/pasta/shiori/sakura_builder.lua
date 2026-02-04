@@ -6,15 +6,7 @@
 
 local BUILDER = {}
 
---- さくらスクリプト用エスケープ処理
---- @param text string 入力テキスト
---- @return string エスケープ済みテキスト
-local function escape_sakura(text)
-    if not text then return "" end
-    local escaped = text:gsub("\\", "\\\\")
-    escaped = escaped:gsub("%%", "%%%%")
-    return escaped
-end
+local SAKURA_SCRIPT = require "@pasta_sakura_script"
 
 --- spotからスポットID番号を決定
 --- @param spot any スポット値
@@ -98,7 +90,7 @@ function BUILDER.build(grouped_tokens, config)
                 local inner_type = inner.type
 
                 if inner_type == "talk" then
-                    table.insert(buffer, escape_sakura(inner.text))
+                    table.insert(buffer, SAKURA_SCRIPT.talk_to_script(actor, inner.text))
                 elseif inner_type == "surface" then
                     table.insert(buffer, string.format("\\s[%s]", tostring(inner.id)))
                 elseif inner_type == "wait" then

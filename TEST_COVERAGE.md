@@ -81,13 +81,14 @@
 
 ### 2.5 統合テスト（E2E）
 
-| 機能                        | テストファイル                                                      | 状態   | 説明                                                |
-| --------------------------- | ------------------------------------------------------------------- | ------ | --------------------------------------------------- |
-| SHIORI.DLL インターフェース | `shiori_lifecycle_test.rs`                                          | ✅ 完了 | 5テスト全パス                                       |
-| SHIORI リクエスト処理       | `lua_request_test.rs`                                               | ✅ 完了 | 18+テスト                                           |
-| Runtime E2E                 | `runtime_e2e_test.rs`                                               | ✅ 完了 | 16テスト（新規）                                    |
-| Finalize Scene              | `finalize_scene_test.rs`                                            | ✅ 完了 | 14テスト                                            |
-| Virtual Event Dispatcher    | `virtual_event_dispatcher_test.rs`<br>`virtual_dispatcher_spec.lua` | ✅ 完了 | 15+20テスト（onhour-date-var-transfer 5テスト追加） |
+| 機能                                 | テストファイル                                                      | 状態    | 説明                                                |
+| ------------------------------------ | ------------------------------------------------------------------- | ------- | --------------------------------------------------- |
+| SHIORI.DLL インターフェース          | `shiori_lifecycle_test.rs`                                          | ✅ 完了 | 5テスト全パス                                       |
+| SHIORI リクエスト処理                | `lua_request_test.rs`                                               | ✅ 完了 | 18+テスト                                           |
+| Runtime E2E                          | `runtime_e2e_test.rs`                                               | ✅ 完了 | 16テスト（新規）                                    |
+| Finalize Scene                       | `finalize_scene_test.rs`                                            | ✅ 完了 | 14テスト                                            |
+| Virtual Event Dispatcher             | `virtual_event_dispatcher_test.rs`<br>`virtual_dispatcher_spec.lua` | ✅ 完了 | 15+20テスト（onhour-date-var-transfer 5テスト追加） |
+| Sample Ghost Integration             | `shiori_sample_ghost_test.rs`                                       | ✅ 完了 | 2テスト（hello-pasta実ゴースト使用）                |
 
 ---
 

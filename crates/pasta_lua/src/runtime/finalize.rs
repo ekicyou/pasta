@@ -182,6 +182,9 @@ pub fn collect_words(lua: &Lua) -> LuaResult<Vec<WordCollectionEntry>> {
 }
 
 /// Build SceneRegistry from collected scene data (Requirement 1.4, 5.3).
+///
+/// Uses `register_global_raw` to preserve the full name with counter
+/// as collected from Lua runtime. This avoids double-counting.
 fn build_scene_registry(scenes: &[(String, String)]) -> SceneRegistry {
     let mut registry = SceneRegistry::new();
 
@@ -194,18 +197,10 @@ fn build_scene_registry(scenes: &[(String, String)]) -> SceneRegistry {
             .push(local_name.clone());
     }
 
-    // Register scenes
+    // Register scenes using raw method (full name already includes counter)
     for (global_name, local_names) in grouped {
-        // Register global scene (counter is already embedded in name)
-        let (_, counter) = registry.register_global(&global_name, HashMap::new());
-
-        // Register local scenes
-        for (idx, local_name) in local_names.iter().enumerate() {
-            // Skip __start__ as it's the default entry point
-            if local_name != "__start__" {
-                registry.register_local(local_name, &global_name, counter, idx + 1, HashMap::new());
-            }
-        }
+        // Use register_global_raw to preserve the full name with counter
+        registry.register_global_raw(&global_name, &local_names, HashMap::new());
     }
 
     registry

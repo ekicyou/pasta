@@ -138,6 +138,68 @@ impl SceneRegistry {
         id
     }
 
+    /// Register a global scene with pre-formed fn_name (for finalize).
+    ///
+    /// Unlike `register_global`, this method does not auto-increment counters.
+    /// Used when collecting scenes from Lua runtime where the full name
+    /// (with counter already embedded) is known.
+    ///
+    /// # Arguments
+    ///
+    /// * `full_name` - Full scene name with counter (e.g., "OnBoot1")
+    /// * `local_names` - List of local function names (e.g., ["__start__", "__選択肢_1__"])
+    /// * `attributes` - Attributes for filtering (P1 feature)
+    ///
+    /// # Returns
+    ///
+    /// The assigned ID for the global scene.
+    pub fn register_global_raw(
+        &mut self,
+        full_name: &str,
+        local_names: &[String],
+        attributes: HashMap<String, String>,
+    ) -> i64 {
+        let id = (self.scenes.len() + 1) as i64;
+
+        // fn_name format: "FullName::__start__"
+        let fn_name = format!("{}::__start__", full_name);
+        let fn_path = format!("crate::{}", fn_name);
+
+        let entry = SceneEntry {
+            id,
+            name: full_name.to_string(),
+            attributes: attributes.clone(),
+            fn_path,
+            fn_name,
+            parent: None,
+        };
+
+        self.scenes.push(entry);
+        let global_id = id;
+
+        // Register local scenes (excluding __start__)
+        for local_name in local_names.iter() {
+            if local_name != "__start__" {
+                let local_id = (self.scenes.len() + 1) as i64;
+                let local_fn_name = format!("{}::{}", full_name, local_name);
+                let local_fn_path = format!("crate::{}", local_fn_name);
+
+                let local_entry = SceneEntry {
+                    id: local_id,
+                    name: local_name.clone(),
+                    attributes: attributes.clone(),
+                    fn_path: local_fn_path,
+                    fn_name: local_fn_name,
+                    parent: Some(full_name.to_string()),
+                };
+
+                self.scenes.push(local_entry);
+            }
+        }
+
+        global_id
+    }
+
     /// Get all registered scenes in ID order.
     pub fn all_scenes(&self) -> Vec<&SceneEntry> {
         self.scenes.iter().collect()

@@ -43,6 +43,14 @@ talk_interval_min = 180  # 最小トーク間隔（デフォルト: 180）
 talk_interval_max = 300  # 最大トーク間隔（デフォルト: 300）
 # hour_margin = 30       # OnHour 誤差許容秒数（デフォルト: 30）
 
+[talk]
+# トークウェイト設定（ミリ秒）
+script_wait_normal = 50     # 通常文字ウェイト（デフォルト: 50）
+script_wait_period = 1000   # 句点ウェイト（デフォルト: 1000）
+script_wait_comma = 500     # 読点ウェイト（デフォルト: 500）
+script_wait_strong = 500    # 強調記号ウェイト（デフォルト: 500）
+script_wait_leader = 200    # リーダーウェイト（デフォルト: 200）
+
 [persistence]
 # 永続化データディレクトリ
 data_dir = "profile/pasta/save"

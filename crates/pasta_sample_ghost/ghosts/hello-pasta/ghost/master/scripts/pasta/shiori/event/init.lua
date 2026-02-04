@@ -142,16 +142,7 @@ end
 function EVENT.no_entry(act)
     -- シーン関数をイベント名で検索（遅延ロードで循環参照回避）
     local SCENE = require("pasta.scene")
-    local scene_result = SCENE.search(act.req.id, nil, nil)
-
-    if scene_result then
-        -- SCENE.search()はSceneSearchResultテーブルを返す
-        -- .funcフィールドからシーン関数を取得してthreadを生成
-        return coroutine.create(scene_result.func)
-    end
-
-    -- シーン関数が見つからない場合はnilを返す
-    return nil
+    return SCENE.co_exec(act.req.id, nil, nil)
 end
 
 --- イベント振り分け

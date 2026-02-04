@@ -72,15 +72,7 @@ local function create_scene_thread(event_name, act)
     end
 
     local SCENE = require("pasta.scene")
-    local scene_result = SCENE.search(event_name, nil, nil)
-
-    if not scene_result then
-        return nil
-    end
-
-    -- SCENE.search()はSceneSearchResultテーブルを返す
-    -- .funcフィールドからシーン関数を取得してthreadを生成
-    return coroutine.create(scene_result.func)
+    return SCENE.co_exec(event_name, nil, nil)
 end
 
 -- 5. 公開関数

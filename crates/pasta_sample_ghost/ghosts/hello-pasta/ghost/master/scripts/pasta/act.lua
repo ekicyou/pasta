@@ -278,10 +278,15 @@ end
 
 --- トークン取得とリセット（グループ化・統合済み）
 --- @param self Act アクションオブジェクト
---- @return table[] グループ化されたトークン配列
+--- @return table[]|nil グループ化されたトークン配列、またはnil（トークン0件時）
 function ACT_IMPL.build(self)
     local tokens = self.token
     self.token = {}
+
+    -- 早期リターン: トークン0件時はnilを返す (act-build-early-return)
+    if #tokens == 0 then
+        return nil
+    end
 
     -- Phase 1: アクター切り替え境界でグループ化
     local grouped = group_by_actor(tokens)

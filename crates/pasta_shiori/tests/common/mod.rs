@@ -35,6 +35,34 @@ pub fn copy_fixture_to_temp(fixture_name: &str) -> TempDir {
     temp
 }
 
+/// Copy hello-pasta ghost to a temporary directory for isolated testing.
+///
+/// This function copies the complete hello-pasta ghost from pasta_sample_ghost
+/// to a temporary directory, enabling integration tests with real ghost definitions.
+/// Uses the existing `copy_dir_recursive()` function which automatically skips
+/// profile/ directories.
+///
+/// # Returns
+/// TempDir containing the copied hello-pasta ghost
+///
+/// # Panics
+/// Panics if the ghost directory doesn't exist or copy fails.
+pub fn copy_sample_ghost_to_temp() -> TempDir {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let temp = TempDir::new().expect("Failed to create temp directory");
+
+    // Navigate to pasta_sample_ghost crate
+    let sample_ghost_dir = manifest_dir
+        .parent()
+        .expect("Failed to get parent directory")
+        .join("pasta_sample_ghost/ghosts/hello-pasta/ghost/master");
+
+    // Copy ghost files using existing recursive copy (auto-skips profile/)
+    copy_dir_recursive(&sample_ghost_dir, temp.path()).expect("Failed to copy hello-pasta ghost");
+
+    temp
+}
+
 /// Recursively copy a directory and its contents.
 fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
     if !src.exists() {
