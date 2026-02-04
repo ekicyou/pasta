@@ -5,7 +5,7 @@
 ### 言語・ランタイム
 - **Rust 2024 edition**: メインコンパイラ言語
 - **Rune 0.14**: バックエンドスクリプトVM（generator機能を使用）
-- **Lua 5.x (mlua)**: Luaバックエンドスクリプト実行
+- **Lua 5.5 (mlua 0.11)**: Luaバックエンドスクリプト実行
 - **Pest 2.8**: PEGパーサー生成器（`pasta.pest`文法定義）
 
 ### ワークスペース構成
@@ -34,7 +34,7 @@
 
 **pasta_lua:**
 - **pasta_core**: 言語非依存層
-- **mlua 0.10**: Lua VMバインディング（Lua 5.4）
+- **mlua 0.11**: Lua VMバインディング（Lua 5.5）
 - **thiserror 2**: エラー型定義
 - **toml 0.9.8**: 設定ファイル管理
 - **tracing 0.1**: ロギング・診断
@@ -64,39 +64,39 @@ pasta (workspace)
 └── pasta_shiori        # SHIORI DLLインターフェース
 ```
 
-| クレート | レイヤー | 責務 |
-|----------|---------|------|
-| pasta_core | Parser | DSL→AST変換 |
-| pasta_core | Registry | シーン/単語テーブル管理 |
-| pasta_rune | Transpiler | AST→Runeコード、シーン管理 |
-| pasta_rune | Runtime | Rune VM実行、yield出力 |
-| pasta_rune | Engine | 統合API、キャッシュ |
-| pasta_rune | IR | ScriptEventイベント出力 |
-| pasta_lua | Transpiler | AST→Luaコード変換 |
-| pasta_lua | Runtime | Lua VM実行、コルーチン制御 |
-| pasta_lua | Loader | スクリプト読み込み・キャッシュ |
-| pasta_shiori | SHIORI | DLLエクスポート、リクエスト処理 |
+| クレート     | レイヤー   | 責務                            |
+| ------------ | ---------- | ------------------------------- |
+| pasta_core   | Parser     | DSL→AST変換                     |
+| pasta_core   | Registry   | シーン/単語テーブル管理         |
+| pasta_rune   | Transpiler | AST→Runeコード、シーン管理      |
+| pasta_rune   | Runtime    | Rune VM実行、yield出力          |
+| pasta_rune   | Engine     | 統合API、キャッシュ             |
+| pasta_rune   | IR         | ScriptEventイベント出力         |
+| pasta_lua    | Transpiler | AST→Luaコード変換               |
+| pasta_lua    | Runtime    | Lua VM実行、コルーチン制御      |
+| pasta_lua    | Loader     | スクリプト読み込み・キャッシュ  |
+| pasta_shiori | SHIORI     | DLLエクスポート、リクエスト処理 |
 
 ### 設計哲学
 
-| 原則 | 内容 |
-|------|------|
-| UI独立性 | Wait/Syncはマーカーのみ、areka側で制御 |
-| 宣言的フロー | Call/Jumpで制御、if/while/forなし |
-| Yield型 | 全出力はyield、Generator継続 |
-| 2パス変換 | Pass1: シーン登録、Pass2: コード生成 |
+| 原則         | 内容                                   |
+| ------------ | -------------------------------------- |
+| UI独立性     | Wait/Syncはマーカーのみ、areka側で制御 |
+| 宣言的フロー | Call/Jumpで制御、if/while/forなし      |
+| Yield型      | 全出力はyield、Generator継続           |
+| 2パス変換    | Pass1: シーン登録、Pass2: コード生成   |
 
 **結果**: 完全なユニットテスト可能性を実現
 
 ## コーディング規約
 
-| 項目 | 規約 |
-|------|------|
-| テストファイル | `<feature>_test.rs` |
-| Rust識別子 | スネークケース |
-| DSL識別子 | 日本語/UNICODE可 |
-| エラー型 | `Result<T, PastaError>` |
-| ドキュメント | `///`で公開API |
+| 項目           | 規約                    |
+| -------------- | ----------------------- |
+| テストファイル | `<feature>_test.rs`     |
+| Rust識別子     | スネークケース          |
+| DSL識別子      | 日本語/UNICODE可        |
+| エラー型       | `Result<T, PastaError>` |
+| ドキュメント   | `///`で公開API          |
 
 ### テスト戦略
 - ユニット: レイヤー独立
@@ -106,12 +106,12 @@ pasta (workspace)
 
 ## 品質基準
 
-| 項目 | 基準 |
-|------|------|
-| テスト | 新機能必須、リグレッション防止 |
-| キャッシュ | パース結果をメモリ保持 |
-| 検索性能 | シーンO(1)、前方一致Radix Trie |
-| セキュリティ | Rune VMサンドボックス依存 |
+| 項目         | 基準                           |
+| ------------ | ------------------------------ |
+| テスト       | 新機能必須、リグレッション防止 |
+| キャッシュ   | パース結果をメモリ保持         |
+| 検索性能     | シーンO(1)、前方一致Radix Trie |
+| セキュリティ | Rune VMサンドボックス依存      |
 
 ## 依存関係管理
 
