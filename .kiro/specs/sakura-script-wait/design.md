@@ -73,12 +73,12 @@ graph TB
 
 ### Technology Stack
 
-| Layer | Choice / Version | Role in Feature | Notes |
-|-------|------------------|-----------------|-------|
-| Runtime | mlua 0.11 (Lua 5.5) | Lua VMバインディング、テーブル操作 | 既存 |
-| Regex | regex 1.x | さくらスクリプトタグ検出 | **新規追加** |
-| Config | toml 0.9.8 | pasta.toml設定読み込み | 既存 |
-| Logging | tracing 0.1 | 警告ログ出力 | 既存 |
+| Layer   | Choice / Version    | Role in Feature                    | Notes        |
+| ------- | ------------------- | ---------------------------------- | ------------ |
+| Runtime | mlua 0.11 (Lua 5.5) | Lua VMバインディング、テーブル操作 | 既存         |
+| Regex   | regex 1.x           | さくらスクリプトタグ検出           | **新規追加** |
+| Config  | toml 0.9.8          | pasta.toml設定読み込み             | 既存         |
+| Logging | tracing 0.1         | 警告ログ出力                       | 既存         |
 
 ---
 
@@ -150,24 +150,24 @@ flowchart TD
 
 ## Requirements Traceability
 
-| Requirement | Summary | Components | Interfaces | Flows |
-|-------------|---------|------------|------------|-------|
-| 1.1 | Luaモジュール公開 | SakuraScriptModule | register() | - |
-| 1.2 | talk_to_script関数 | SakuraScriptModule | talk_to_script() | talk_to_script処理フロー |
-| 1.3 | nilフォールバック | SakuraScriptModule, TalkConfig | - | - |
-| 2.1 | actorパラメーター取得 | WaitValueResolver | get_wait_values() | - |
-| 2.2 | デフォルト値フォールバック | WaitValueResolver, TalkConfig | - | - |
-| 2.3 | 型検証 | WaitValueResolver | - | - |
-| 3.1 | [talk]セクション認識 | TalkConfig | talk() | - |
-| 3.2 | 文字セット設定 | TalkConfig | CharSets | - |
-| 3.3 | セクション不在時デフォルト | TalkConfig | Default impl | - |
-| 3.4 | 不正型時警告 | TalkConfig | - | - |
-| 4.1 | トークン分解 | Tokenizer | tokenize() | トークン分解ロジック |
-| 4.2 | Unicode処理 | Tokenizer | - | - |
-| 4.3 | タグ最優先マッチ | Tokenizer | - | - |
-| 5.1-5.6 | ウェイト挿入ルール | WaitInserter | insert_waits() | talk_to_script処理フロー |
-| 6.1-6.3 | エラーハンドリング | SakuraScriptModule | - | - |
-| 7.1-7.3 | 出力例 | - | - | - |
+| Requirement | Summary                    | Components                     | Interfaces        | Flows                    |
+| ----------- | -------------------------- | ------------------------------ | ----------------- | ------------------------ |
+| 1.1         | Luaモジュール公開          | SakuraScriptModule             | register()        | -                        |
+| 1.2         | talk_to_script関数         | SakuraScriptModule             | talk_to_script()  | talk_to_script処理フロー |
+| 1.3         | nilフォールバック          | SakuraScriptModule, TalkConfig | -                 | -                        |
+| 2.1         | actorパラメーター取得      | WaitValueResolver              | get_wait_values() | -                        |
+| 2.2         | デフォルト値フォールバック | WaitValueResolver, TalkConfig  | -                 | -                        |
+| 2.3         | 型検証                     | WaitValueResolver              | -                 | -                        |
+| 3.1         | [talk]セクション認識       | TalkConfig                     | talk()            | -                        |
+| 3.2         | 文字セット設定             | TalkConfig                     | CharSets          | -                        |
+| 3.3         | セクション不在時デフォルト | TalkConfig                     | Default impl      | -                        |
+| 3.4         | 不正型時警告               | TalkConfig                     | -                 | -                        |
+| 4.1         | トークン分解               | Tokenizer                      | tokenize()        | トークン分解ロジック     |
+| 4.2         | Unicode処理                | Tokenizer                      | -                 | -                        |
+| 4.3         | タグ最優先マッチ           | Tokenizer                      | -                 | -                        |
+| 5.1-5.6     | ウェイト挿入ルール         | WaitInserter                   | insert_waits()    | talk_to_script処理フロー |
+| 6.1-6.3     | エラーハンドリング         | SakuraScriptModule             | -                 | -                        |
+| 7.1-7.3     | 出力例                     | -                              | -                 | -                        |
 
 ---
 
@@ -175,13 +175,13 @@ flowchart TD
 
 ### Component Summary
 
-| Component | Domain/Layer | Intent | Req Coverage | Key Dependencies | Contracts |
-|-----------|--------------|--------|--------------|------------------|-----------|
-| TalkConfig | loader/ | [talk]セクション設定管理 | 3.1-3.4 | toml (P1) | State |
-| SakuraScriptModule | sakura_script/ | Luaモジュール公開 | 1.1-1.3, 6.1-6.3 | mlua (P0), TalkConfig (P1) | Service |
-| Tokenizer | sakura_script/ | 文字列トークン分解 | 4.1-4.3 | regex (P1) | Service |
-| WaitInserter | sakura_script/ | ウェイト計算・挿入 | 5.1-5.6 | - | Service |
-| WaitValueResolver | sakura_script/ | ウェイト値解決 | 2.1-2.3 | mlua (P0), TalkConfig (P1) | Service |
+| Component          | Domain/Layer   | Intent                   | Req Coverage     | Key Dependencies           | Contracts |
+| ------------------ | -------------- | ------------------------ | ---------------- | -------------------------- | --------- |
+| TalkConfig         | loader/        | [talk]セクション設定管理 | 3.1-3.4          | toml (P1)                  | State     |
+| SakuraScriptModule | sakura_script/ | Luaモジュール公開        | 1.1-1.3, 6.1-6.3 | mlua (P0), TalkConfig (P1) | Service   |
+| Tokenizer          | sakura_script/ | 文字列トークン分解       | 4.1-4.3          | regex (P1)                 | Service   |
+| WaitInserter       | sakura_script/ | ウェイト計算・挿入       | 5.1-5.6          | -                          | Service   |
+| WaitValueResolver  | sakura_script/ | ウェイト値解決           | 2.1-2.3          | mlua (P0), TalkConfig (P1) | Service   |
 
 ---
 
@@ -189,10 +189,10 @@ flowchart TD
 
 #### TalkConfig
 
-| Field | Detail |
-|-------|--------|
-| Intent | pasta.toml [talk]セクションの設定値を保持 |
-| Requirements | 3.1, 3.2, 3.3, 3.4 |
+| Field        | Detail                                    |
+| ------------ | ----------------------------------------- |
+| Intent       | pasta.toml [talk]セクションの設定値を保持 |
+| Requirements | 3.1, 3.2, 3.3, 3.4                        |
 
 **Responsibilities & Constraints**
 - [talk]セクションのウェイト値と文字セットを保持
@@ -260,10 +260,10 @@ impl Default for TalkConfig {
 
 #### SakuraScriptModule
 
-| Field | Detail |
-|-------|--------|
-| Intent | `@pasta_sakura_script`モジュールをLuaに公開 |
-| Requirements | 1.1, 1.2, 1.3, 6.1, 6.2, 6.3 |
+| Field        | Detail                                      |
+| ------------ | ------------------------------------------- |
+| Intent       | `@pasta_sakura_script`モジュールをLuaに公開 |
+| Requirements | 1.1, 1.2, 1.3, 6.1, 6.2, 6.3                |
 
 **Responsibilities & Constraints**
 - `require "@pasta_sakura_script"` でモジュールテーブルを返す
@@ -284,9 +284,13 @@ impl Default for TalkConfig {
 ```rust
 /// モジュールをLuaに登録
 /// 
+/// # Arguments
+/// * `lua` - Luaステート
+/// * `config` - TalkConfig（Noneの場合はハードコードデフォルト使用）
+/// 
 /// # Returns
 /// `@pasta_sakura_script`モジュールテーブル
-pub fn register(lua: &Lua, config: &TalkConfig) -> LuaResult<Table>;
+pub fn register(lua: &Lua, config: Option<&TalkConfig>) -> LuaResult<Table>;
 
 /// talk文字列にウェイトを挿入（Lua公開関数）
 /// 
@@ -306,15 +310,22 @@ fn talk_to_script(actor: Option<Table>, talk: String) -> LuaResult<String>;
 **Implementation Notes**
 - 配置: `crates/pasta_lua/src/sakura_script/mod.rs`
 - `_VERSION`と`_DESCRIPTION`メタデータを含む
+- `runtime/mod.rs`での登録コード例:
+  ```rust
+  // PastaRuntime::from_loader()内で初期化
+  let talk_config = self.config().and_then(|c| c.talk());
+  let sakura_module = sakura_script::register(&self.lua, talk_config.as_ref())?;
+  self.register_module("@pasta_sakura_script", sakura_module)?;
+  ```
 
 ---
 
 #### Tokenizer
 
-| Field | Detail |
-|-------|--------|
-| Intent | 入力文字列を文字種別ごとにトークン分解 |
-| Requirements | 4.1, 4.2, 4.3 |
+| Field        | Detail                                 |
+| ------------ | -------------------------------------- |
+| Intent       | 入力文字列を文字種別ごとにトークン分解 |
+| Requirements | 4.1, 4.2, 4.3                          |
 
 **Responsibilities & Constraints**
 - さくらスクリプトタグを最優先でマッチング
@@ -384,15 +395,17 @@ pub fn tokenize(input: &str, char_sets: &CharSets) -> Vec<Token>;
 - 配置: `crates/pasta_lua/src/sakura_script/tokenizer.rs`
 - 正規表現パターン: `\\[0-9a-zA-Z_!]+(?:\[[^\]]*\])?`
 - `\`で始まる場合のみ正規表現マッチを試行（最適化）
+- **Unicode結合文字処理**: Rust標準`chars()`イテレータに従い、結合文字は個別charとして扱う（例: `が`→`か`+`゛`の2char）。絵文字等の問題報告時は将来改善を検討
+- **正規表現キャッシュ**: `Tokenizer`を構造体化し、コンパイル済み`Regex`インスタンスを保持することを推奨。または`lazy_static`/`OnceCell`使用でコンパイルコストを1回のみに削減
 
 ---
 
 #### WaitInserter
 
-| Field | Detail |
-|-------|--------|
-| Intent | トークン列にウェイトを挿入してスクリプト文字列を生成 |
-| Requirements | 5.1, 5.2, 5.3, 5.4, 5.5, 5.6 |
+| Field        | Detail                                               |
+| ------------ | ---------------------------------------------------- |
+| Intent       | トークン列にウェイトを挿入してスクリプト文字列を生成 |
+| Requirements | 5.1, 5.2, 5.3, 5.4, 5.5, 5.6                         |
 
 **Responsibilities & Constraints**
 - ウェイト挿入ルールの実装
@@ -440,10 +453,10 @@ pub fn insert_waits(tokens: &[Token], wait_values: &WaitValues) -> String;
 
 #### WaitValueResolver
 
-| Field | Detail |
-|-------|--------|
-| Intent | actorテーブルとTalkConfigからウェイト値を解決 |
-| Requirements | 2.1, 2.2, 2.3 |
+| Field        | Detail                                        |
+| ------------ | --------------------------------------------- |
+| Intent       | actorテーブルとTalkConfigからウェイト値を解決 |
+| Requirements | 2.1, 2.2, 2.3                                 |
 
 **Responsibilities & Constraints**
 - 3段階フォールバック: actor → TalkConfig → ハードコードデフォルト

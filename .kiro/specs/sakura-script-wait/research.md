@@ -50,11 +50,11 @@
 
 ## Architecture Pattern Evaluation
 
-| Option | Description | Strengths | Risks / Limitations | Notes |
-|--------|-------------|-----------|---------------------|-------|
-| A: runtime/拡張 | `src/runtime/sakura_wait.rs`として追加 | 既存配置に統合 | runtime/の責務拡大 | シンプルな追加時向け |
-| B: 独立モジュール | `src/sakura_script/`として独立 | 明確な責務分離、テスト独立性 | ファイル数増加 | 将来の拡張性重視 |
-| C: ハイブリッド | 独立モジュール + 設定はconfig.rs | 責務分離と既存パターン維持の両立 | なし | **推奨** |
+| Option            | Description                            | Strengths                        | Risks / Limitations | Notes                |
+| ----------------- | -------------------------------------- | -------------------------------- | ------------------- | -------------------- |
+| A: runtime/拡張   | `src/runtime/sakura_wait.rs`として追加 | 既存配置に統合                   | runtime/の責務拡大  | シンプルな追加時向け |
+| B: 独立モジュール | `src/sakura_script/`として独立         | 明確な責務分離、テスト独立性     | ファイル数増加      | 将来の拡張性重視     |
+| C: ハイブリッド   | 独立モジュール + 設定はconfig.rs       | 責務分離と既存パターン維持の両立 | なし                | **推奨**             |
 
 **選択**: Option C（ハイブリッドアプローチ）
 
@@ -94,13 +94,36 @@
   3. ハードコードデフォルト値
 - **Rationale**: キャラクター固有設定 > ゴースト全体設定 > システムデフォルト
 
+### Decision: モジュール初期化タイミング
+- **Context**: runtime/mod.rsからの登録タイミングと設定受け渡し方法
+- **Selected Approach**: `PastaRuntime::from_loader()`内で`TalkConfig`をOption渡し
+- **Rationale**: 
+  - `PastaConfig::talk()`はOptionを返すため、`register()`もOption受け入れに対応
+  - pasta.toml不在時もハードコードデフォルトで動作可能
+  - 既存persistenceモジュール（設定必須）とencモジュール（設定不要）の中間パターン
+
+### Decision: Unicode結合文字の扱い
+- **Context**: 絵文字や結合文字（`👨‍👩‍👧‍👦`, `が`=`か`+`゛`）の処理方針
+- **Selected Approach**: Rust標準`chars()`イテレータの挙動に従う
+- **Rationale**:
+  - 日本語会話テキストで絵文字・結合文字は稀
+  - grapheme cluster処理は`unicode-segmentation`クレート追加が必要
+  - 将来問題報告時に改善検討（現時点ではオーバーエンジニアリング）
+
+### Decision: 正規表現コンパイルキャッシュ
+- **Context**: tokenize()呼び出しごとの正規表現コンパイルコスト
+- **Selected Approach**: Tokenizer構造体化でRegexインスタンス保持を推奨
+- **Rationale**:
+  - 単一会話処理への影響は微小だが、最適化余地あり
+  - 実装時の判断に委ねる（lazy_static/OnceCellも代替案）
+
 ## Risks & Mitigations
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| Unicode文字分類の不備 | Low | Medium | 文字セットを設定可能にし、ユーザーがカスタマイズ可能 |
-| さくらスクリプトタグの見逃し | Low | High | 正規表現パターンをテストケースで網羅的に検証 |
-| 性能影響（長文処理） | Low | Low | 文字列処理は1パスで完結、O(n)計算量 |
+| Risk                         | Likelihood | Impact | Mitigation                                           |
+| ---------------------------- | ---------- | ------ | ---------------------------------------------------- |
+| Unicode文字分類の不備        | Low        | Medium | 文字セットを設定可能にし、ユーザーがカスタマイズ可能 |
+| さくらスクリプトタグの見逃し | Low        | High   | 正規表現パターンをテストケースで網羅的に検証         |
+| 性能影響（長文処理）         | Low        | Low    | 文字列処理は1パスで完結、O(n)計算量                  |
 
 ## References
 
