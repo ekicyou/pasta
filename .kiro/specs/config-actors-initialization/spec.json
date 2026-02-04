@@ -1,0 +1,22 @@
+{
+    "feature_name": "config-actors-initialization",
+    "created_at": "2026-02-04T00:00:00Z",
+    "updated_at": "2026-02-04T12:00:00Z",
+    "language": "ja",
+    "phase": "design-generated",
+    "approvals": {
+        "requirements": {
+            "generated": true,
+            "approved": true
+        },
+        "design": {
+            "generated": true,
+            "approved": false
+        },
+        "tasks": {
+            "generated": false,
+            "approved": false
+        }
+    },
+    "ready_for_implementation": false
+}
