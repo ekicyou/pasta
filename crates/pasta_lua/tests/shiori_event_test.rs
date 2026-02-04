@@ -52,6 +52,17 @@ fn create_runtime_with_pasta_path() -> PastaLuaRuntime {
         )
         .expect("Failed to mock @pasta_search");
 
+    // Mock @pasta_sakura_script module (required by pasta.shiori.sakura_builder)
+    runtime
+        .exec(
+            r#"
+            package.loaded["@pasta_sakura_script"] = {
+                talk_to_script = function(actor, text) return text or "" end
+            }
+            "#,
+        )
+        .expect("Failed to mock @pasta_sakura_script");
+
     runtime
 }
 
@@ -535,6 +546,17 @@ fn test_no_entry_attempts_scene_fallback() {
         )
         .expect("Failed to mock @pasta_persistence");
 
+    // Mock @pasta_sakura_script module (required by pasta.shiori.sakura_builder)
+    runtime
+        .exec(
+            r#"
+            package.loaded["@pasta_sakura_script"] = {
+                talk_to_script = function(actor, text) return text or "" end
+            }
+            "#,
+        )
+        .expect("Failed to mock @pasta_sakura_script");
+
     let result = runtime.exec(&format!(
         r#"
         local EVENT = require "pasta.shiori.event"
@@ -629,6 +651,17 @@ fn test_scene_fallback_catches_errors() {
             "#,
         )
         .expect("Failed to mock @pasta_persistence");
+
+    // Mock @pasta_sakura_script module (required by pasta.shiori.sakura_builder)
+    runtime
+        .exec(
+            r#"
+            package.loaded["@pasta_sakura_script"] = {
+                talk_to_script = function(actor, text) return text or "" end
+            }
+            "#,
+        )
+        .expect("Failed to mock @pasta_sakura_script");
 
     let result = runtime.exec(&format!(
         r#"

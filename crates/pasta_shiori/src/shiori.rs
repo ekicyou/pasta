@@ -334,10 +334,10 @@ impl PastaShiori {
         // Call SHIORI.request(req) with parsed table
         match request_fn.call::<String>(req_table) {
             Ok(response) => {
-                // Log request/response at DEBUG level for 200 OK responses (Requirement 4)
-                if response.starts_with("SHIORI/3.0 200 OK") {
-                    debug!(request = %request, "SHIORI request (200 OK)");
-                    debug!(response = %response, "SHIORI response (200 OK)");
+                // Log request/response at DEBUG level for non-204 responses
+                if !response.starts_with("SHIORI/3.0 204 No Content") {
+                    debug!(request = %request, "##SHIORI request\n");
+                    debug!(response = %response, "##SHIORI response\n");
                 }
                 trace!(response_len = response.len(), "SHIORI.request completed");
                 Ok(response)

@@ -402,40 +402,44 @@ end)
 -- The reset functionality is now integrated into build() method.
 -- build() automatically resets the token buffer and spot state.
 
--- Test escape processing
-describe("SHIORI_ACT - escape", function()
-    test("escapes backslash", function()
+-- Test talk_to_script conversion (wait insertion)
+describe("SHIORI_ACT - talk_to_script変換", function()
+    test("通常テキストがそのまま出力される（デフォルト設定）", function()
         local SHIORI_ACT = require("pasta.shiori.act")
         local actors = create_mock_actors()
         local act = SHIORI_ACT.new(actors)
 
-        act:talk(actors.sakura, "path\\to\\file")
+        act:talk(actors.sakura, "Hello")
         local result = act:build()
 
-        expect(result:find("path\\\\to\\\\file")):toBeTruthy()
+        -- デフォルト設定ではウェイトタグなし（effective_wait = 0）
+        expect(result:find("Hello")):toBeTruthy()
     end)
 
-    test("escapes percent", function()
+    test("句点にはウェイトタグが挿入される", function()
         local SHIORI_ACT = require("pasta.shiori.act")
         local actors = create_mock_actors()
         local act = SHIORI_ACT.new(actors)
 
-        act:talk(actors.sakura, "100%")
+        act:talk(actors.sakura, "あ。")
         local result = act:build()
 
-        expect(result:find("100%%%%")):toBeTruthy()
+        -- 句点（。）にはデフォルトでウェイトタグが挿入される
+        -- script_wait_period=1000 → effective=950
+        expect(result:find("\\_w%[950%]")):toBeTruthy()
     end)
 
-    test("escapes mixed special characters", function()
+    test("読点にはウェイトタグが挿入される", function()
         local SHIORI_ACT = require("pasta.shiori.act")
         local actors = create_mock_actors()
         local act = SHIORI_ACT.new(actors)
 
-        act:talk(actors.sakura, "50% off \\ sale")
+        act:talk(actors.sakura, "あ、")
         local result = act:build()
 
-        expect(result:find("50%%%%")):toBeTruthy()
-        expect(result:find("\\\\")):toBeTruthy()
+        -- 読点（、）にはデフォルトでウェイトタグが挿入される
+        -- script_wait_comma=500 → effective=450
+        expect(result:find("\\_w%[450%]")):toBeTruthy()
     end)
 end)
 

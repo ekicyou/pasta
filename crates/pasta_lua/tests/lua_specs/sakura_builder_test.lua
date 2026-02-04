@@ -20,46 +20,65 @@ end
 -- ============================================================================
 
 describe("SAKURA_BUILDER - talk token", function()
-    test("talkトークンをエスケープ済みテキストに変換する", function()
+    test("talkトークンがtalk_to_scriptで変換される", function()
         local BUILDER = require("pasta.shiori.sakura_builder")
         local actors = create_mock_actors()
 
         local tokens = {
-            { type = "actor", actor = actors.sakura, tokens = {
-                { type = "talk", actor = actors.sakura, text = "Hello" },
-            }},
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk", actor = actors.sakura, text = "Hello" },
+                }
+            },
         }
         local result = BUILDER.build(tokens, {})
 
+        -- デフォルト設定（script_wait_normal=50）では
+        -- effective_wait = 50 - 50 = 0 なのでウェイトタグは挿入されない
+        -- 文字列がそのまま含まれることを確認
         expect(result:find("Hello")):toBeTruthy()
     end)
 
-    test("バックスラッシュをエスケープする", function()
+    test("句点にはウェイトタグが挿入される", function()
         local BUILDER = require("pasta.shiori.sakura_builder")
         local actors = create_mock_actors()
 
         local tokens = {
-            { type = "actor", actor = actors.sakura, tokens = {
-                { type = "talk", actor = actors.sakura, text = "path\\to\\file" },
-            }},
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk", actor = actors.sakura, text = "あ。" },
+                }
+            },
         }
         local result = BUILDER.build(tokens, {})
 
-        expect(result:find("path\\\\to\\\\file")):toBeTruthy()
+        -- 句点（。）にはデフォルトでウェイトタグが挿入される
+        -- script_wait_period=1000 → effective=950
+        expect(result:find("\\_w%[950%]")):toBeTruthy()
     end)
 
-    test("パーセントをエスケープする", function()
+    test("読点にはウェイトタグが挿入される", function()
         local BUILDER = require("pasta.shiori.sakura_builder")
         local actors = create_mock_actors()
 
         local tokens = {
-            { type = "actor", actor = actors.sakura, tokens = {
-                { type = "talk", actor = actors.sakura, text = "100%" },
-            }},
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk", actor = actors.sakura, text = "あ、" },
+                }
+            },
         }
         local result = BUILDER.build(tokens, {})
 
-        expect(result:find("100%%%%")):toBeTruthy()
+        -- 読点（、）にはデフォルトでウェイトタグが挿入される
+        -- script_wait_comma=500 → effective=450
+        expect(result:find("\\_w%[450%]")):toBeTruthy()
     end)
 end)
 
@@ -69,10 +88,14 @@ describe("SAKURA_BUILDER - surface token", function()
         local actors = create_mock_actors()
 
         local tokens = {
-            { type = "actor", actor = actors.sakura, tokens = {
-                { type = "talk", actor = actors.sakura, text = "" },
-                { type = "surface", id = 5 },
-            }},
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk",    actor = actors.sakura, text = "" },
+                    { type = "surface", id = 5 },
+                }
+            },
         }
         local result = BUILDER.build(tokens, {})
 
@@ -84,10 +107,14 @@ describe("SAKURA_BUILDER - surface token", function()
         local actors = create_mock_actors()
 
         local tokens = {
-            { type = "actor", actor = actors.sakura, tokens = {
-                { type = "talk", actor = actors.sakura, text = "" },
-                { type = "surface", id = "smile" },
-            }},
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk",    actor = actors.sakura, text = "" },
+                    { type = "surface", id = "smile" },
+                }
+            },
         }
         local result = BUILDER.build(tokens, {})
 
@@ -101,10 +128,14 @@ describe("SAKURA_BUILDER - wait token", function()
         local actors = create_mock_actors()
 
         local tokens = {
-            { type = "actor", actor = actors.sakura, tokens = {
-                { type = "talk", actor = actors.sakura, text = "" },
-                { type = "wait", ms = 500 },
-            }},
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk", actor = actors.sakura, text = "" },
+                    { type = "wait", ms = 500 },
+                }
+            },
         }
         local result = BUILDER.build(tokens, {})
 
@@ -118,10 +149,14 @@ describe("SAKURA_BUILDER - newline token", function()
         local actors = create_mock_actors()
 
         local tokens = {
-            { type = "actor", actor = actors.sakura, tokens = {
-                { type = "talk", actor = actors.sakura, text = "" },
-                { type = "newline", n = 1 },
-            }},
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk",    actor = actors.sakura, text = "" },
+                    { type = "newline", n = 1 },
+                }
+            },
         }
         local result = BUILDER.build(tokens, {})
 
@@ -133,10 +168,14 @@ describe("SAKURA_BUILDER - newline token", function()
         local actors = create_mock_actors()
 
         local tokens = {
-            { type = "actor", actor = actors.sakura, tokens = {
-                { type = "talk", actor = actors.sakura, text = "" },
-                { type = "newline", n = 3 },
-            }},
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk",    actor = actors.sakura, text = "" },
+                    { type = "newline", n = 3 },
+                }
+            },
         }
         local result = BUILDER.build(tokens, {})
 
@@ -150,10 +189,14 @@ describe("SAKURA_BUILDER - clear token", function()
         local actors = create_mock_actors()
 
         local tokens = {
-            { type = "actor", actor = actors.sakura, tokens = {
-                { type = "talk", actor = actors.sakura, text = "" },
-                { type = "clear" },
-            }},
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk", actor = actors.sakura, text = "" },
+                    { type = "clear" },
+                }
+            },
         }
         local result = BUILDER.build(tokens, {})
 
@@ -167,10 +210,14 @@ describe("SAKURA_BUILDER - sakura_script token", function()
         local actors = create_mock_actors()
 
         local tokens = {
-            { type = "actor", actor = actors.sakura, tokens = {
-                { type = "talk", actor = actors.sakura, text = "" },
-                { type = "sakura_script", text = "\\![open,calendar]" },
-            }},
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk",          actor = actors.sakura,      text = "" },
+                    { type = "sakura_script", text = "\\![open,calendar]" },
+                }
+            },
         }
         local result = BUILDER.build(tokens, {})
 
@@ -184,10 +231,14 @@ describe("SAKURA_BUILDER - yield token", function()
         local actors = create_mock_actors()
 
         local tokens = {
-            { type = "actor", actor = actors.sakura, tokens = {
-                { type = "surface", id = 5 },
-                { type = "yield" },
-            }},
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "surface", id = 5 },
+                    { type = "yield" },
+                }
+            },
         }
         local result = BUILDER.build(tokens, {})
 
@@ -202,9 +253,13 @@ describe("SAKURA_BUILDER - \\e終端", function()
         local actors = create_mock_actors()
 
         local tokens = {
-            { type = "actor", actor = actors.sakura, tokens = {
-                { type = "talk", actor = actors.sakura, text = "Hello" },
-            }},
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk", actor = actors.sakura, text = "Hello" },
+                }
+            },
         }
         local result = BUILDER.build(tokens, {})
 
@@ -227,17 +282,25 @@ describe("SAKURA_BUILDER - 複合シナリオ", function()
 
         local tokens = {
             { type = "spot", actor = actors.sakura, spot = 0 },
-            { type = "spot", actor = actors.kero, spot = 1 },
-            { type = "actor", actor = actors.sakura, tokens = {
-                { type = "talk", actor = actors.sakura, text = "Hello" },
-                { type = "surface", id = 5 },
-                { type = "wait", ms = 100 },
-            }},
-            { type = "actor", actor = actors.kero, tokens = {
-                { type = "talk", actor = actors.kero, text = "Hi" },
-                { type = "newline", n = 1 },
-                { type = "clear" },
-            }},
+            { type = "spot", actor = actors.kero,   spot = 1 },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk",    actor = actors.sakura, text = "Hello" },
+                    { type = "surface", id = 5 },
+                    { type = "wait",    ms = 100 },
+                }
+            },
+            {
+                type = "actor",
+                actor = actors.kero,
+                tokens = {
+                    { type = "talk",    actor = actors.kero, text = "Hi" },
+                    { type = "newline", n = 1 },
+                    { type = "clear" },
+                }
+            },
         }
         local result = BUILDER.build(tokens, { spot_newlines = 1.5 })
 
@@ -254,20 +317,25 @@ describe("SAKURA_BUILDER - 複合シナリオ", function()
     end)
 end)
 
-describe("SAKURA_BUILDER - エスケープ処理", function()
-    test("複合エスケープを正しく処理する", function()
+describe("SAKURA_BUILDER - talk_to_script変換", function()
+    test("テキストがtalk_to_scriptで変換される", function()
         local BUILDER = require("pasta.shiori.sakura_builder")
         local actors = create_mock_actors()
 
         local tokens = {
-            { type = "actor", actor = actors.sakura, tokens = {
-                { type = "talk", actor = actors.sakura, text = "50% off \\ sale" },
-            }},
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk", actor = actors.sakura, text = "50 off sale" },
+                }
+            },
         }
         local result = BUILDER.build(tokens, {})
 
-        expect(result:find("50%%%%")):toBeTruthy()
-        expect(result:find("\\\\")):toBeTruthy()
+        -- デフォルト設定ではウェイトタグは挿入されない
+        -- 文字列がそのまま含まれることを確認
+        expect(result:find("50 off sale")):toBeTruthy()
     end)
 end)
 
@@ -282,9 +350,13 @@ describe("SAKURA_BUILDER - spotトークン処理", function()
 
         local tokens = {
             { type = "spot", actor = actors.sakura, spot = 0 },
-            { type = "actor", actor = actors.sakura, tokens = {
-                { type = "talk", actor = actors.sakura, text = "Hello" },
-            }},
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk", actor = actors.sakura, text = "Hello" },
+                }
+            },
         }
         local result = BUILDER.build(tokens, {})
 
@@ -299,13 +371,21 @@ describe("SAKURA_BUILDER - spotトークン処理", function()
 
         local tokens = {
             { type = "spot", actor = actors.sakura, spot = 0 },
-            { type = "spot", actor = actors.kero, spot = 1 },
-            { type = "actor", actor = actors.sakura, tokens = {
-                { type = "talk", actor = actors.sakura, text = "Hi Sakura" },
-            }},
-            { type = "actor", actor = actors.kero, tokens = {
-                { type = "talk", actor = actors.kero, text = "Hi Kero" },
-            }},
+            { type = "spot", actor = actors.kero,   spot = 1 },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk", actor = actors.sakura, text = "Hi Sakura" },
+                }
+            },
+            {
+                type = "actor",
+                actor = actors.kero,
+                tokens = {
+                    { type = "talk", actor = actors.kero, text = "Hi Kero" },
+                }
+            },
         }
         local result = BUILDER.build(tokens, {})
 
@@ -325,11 +405,15 @@ describe("SAKURA_BUILDER - clear_spotトークン処理", function()
         local actors = create_mock_actors()
 
         local tokens = {
-            { type = "spot", actor = actors.sakura, spot = 5 },
+            { type = "spot",      actor = actors.sakura, spot = 5 },
             { type = "clear_spot" },
-            { type = "actor", actor = actors.sakura, tokens = {
-                { type = "talk", actor = actors.sakura, text = "Reset" },
-            }},
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk", actor = actors.sakura, text = "Reset" },
+                }
+            },
         }
         local result = BUILDER.build(tokens, {})
 
@@ -343,13 +427,21 @@ describe("SAKURA_BUILDER - clear_spotトークン処理", function()
         local actors = create_mock_actors()
 
         local tokens = {
-            { type = "actor", actor = actors.sakura, tokens = {
-                { type = "talk", actor = actors.sakura, text = "Before" },
-            }},
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk", actor = actors.sakura, text = "Before" },
+                }
+            },
             { type = "clear_spot" },
-            { type = "actor", actor = actors.sakura, tokens = {
-                { type = "talk", actor = actors.sakura, text = "After" },
-            }},
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk", actor = actors.sakura, text = "After" },
+                }
+            },
         }
         local result = BUILDER.build(tokens, {})
 
@@ -373,9 +465,13 @@ describe("SAKURA_BUILDER - actorトークンのactor切り替え検出", functio
         local actors = create_mock_actors()
 
         local tokens = {
-            { type = "actor", actor = actors.sakura, tokens = {
-                { type = "talk", actor = actors.sakura, text = "Hello" },
-            }},
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk", actor = actors.sakura, text = "Hello" },
+                }
+            },
         }
         local result = BUILDER.build(tokens, {})
 
@@ -390,13 +486,21 @@ describe("SAKURA_BUILDER - actorトークンのactor切り替え検出", functio
 
         local tokens = {
             { type = "spot", actor = actors.sakura, spot = 0 },
-            { type = "spot", actor = actors.kero, spot = 1 },
-            { type = "actor", actor = actors.sakura, tokens = {
-                { type = "talk", actor = actors.sakura, text = "First" },
-            }},
-            { type = "actor", actor = actors.kero, tokens = {
-                { type = "talk", actor = actors.kero, text = "Second" },
-            }},
+            { type = "spot", actor = actors.kero,   spot = 1 },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk", actor = actors.sakura, text = "First" },
+                }
+            },
+            {
+                type = "actor",
+                actor = actors.kero,
+                tokens = {
+                    { type = "talk", actor = actors.kero, text = "Second" },
+                }
+            },
         }
         local result = BUILDER.build(tokens, {})
 
@@ -411,13 +515,21 @@ describe("SAKURA_BUILDER - actorトークンのactor切り替え検出", functio
 
         local tokens = {
             { type = "spot", actor = actors.sakura, spot = 0 },
-            { type = "spot", actor = actors.kero, spot = 1 },
-            { type = "actor", actor = actors.sakura, tokens = {
-                { type = "talk", actor = actors.sakura, text = "First" },
-            }},
-            { type = "actor", actor = actors.kero, tokens = {
-                { type = "talk", actor = actors.kero, text = "Second" },
-            }},
+            { type = "spot", actor = actors.kero,   spot = 1 },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk", actor = actors.sakura, text = "First" },
+                }
+            },
+            {
+                type = "actor",
+                actor = actors.kero,
+                tokens = {
+                    { type = "talk", actor = actors.kero, text = "Second" },
+                }
+            },
         }
         local result = BUILDER.build(tokens, { spot_newlines = 1.5 })
 
@@ -430,12 +542,20 @@ describe("SAKURA_BUILDER - actorトークンのactor切り替え検出", functio
         local actors = create_mock_actors()
 
         local tokens = {
-            { type = "actor", actor = actors.sakura, tokens = {
-                { type = "talk", actor = actors.sakura, text = "First" },
-            }},
-            { type = "actor", actor = actors.sakura, tokens = {
-                { type = "talk", actor = actors.sakura, text = "Second" },
-            }},
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk", actor = actors.sakura, text = "First" },
+                }
+            },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk", actor = actors.sakura, text = "Second" },
+                }
+            },
         }
         local result = BUILDER.build(tokens, {})
 
@@ -459,9 +579,13 @@ describe("SAKURA_BUILDER - 統合シナリオ（グループ化トークン構�
         local actors = create_mock_actors()
 
         local tokens = {
-            { type = "actor", actor = actors.sakura, tokens = {
-                { type = "talk", actor = actors.sakura, text = "No spot set" },
-            }},
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk", actor = actors.sakura, text = "No spot set" },
+                }
+            },
         }
         local result = BUILDER.build(tokens, {})
 
@@ -475,13 +599,21 @@ describe("SAKURA_BUILDER - 統合シナリオ（グループ化トークン構�
 
         local tokens = {
             { type = "spot", actor = actors.sakura, spot = 0 },
-            { type = "spot", actor = actors.kero, spot = 1 },
-            { type = "actor", actor = actors.sakura, tokens = {
-                { type = "talk", actor = actors.sakura, text = "Sakura speaks" },
-            }},
-            { type = "actor", actor = actors.kero, tokens = {
-                { type = "talk", actor = actors.kero, text = "Kero speaks" },
-            }},
+            { type = "spot", actor = actors.kero,   spot = 1 },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk", actor = actors.sakura, text = "Sakura speaks" },
+                }
+            },
+            {
+                type = "actor",
+                actor = actors.kero,
+                tokens = {
+                    { type = "talk", actor = actors.kero, text = "Kero speaks" },
+                }
+            },
         }
         local result = BUILDER.build(tokens, { spot_newlines = 1.5 })
 
@@ -494,14 +626,22 @@ describe("SAKURA_BUILDER - 統合シナリオ（グループ化トークン構�
         local actors = create_mock_actors()
 
         local tokens = {
-            { type = "spot", actor = actors.sakura, spot = 5 },
-            { type = "actor", actor = actors.sakura, tokens = {
-                { type = "talk", actor = actors.sakura, text = "At spot 5" },
-            }},
+            { type = "spot",      actor = actors.sakura, spot = 5 },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk", actor = actors.sakura, text = "At spot 5" },
+                }
+            },
             { type = "clear_spot" },
-            { type = "actor", actor = actors.sakura, tokens = {
-                { type = "talk", actor = actors.sakura, text = "Back to default" },
-            }},
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk", actor = actors.sakura, text = "Back to default" },
+                }
+            },
         }
         local result = BUILDER.build(tokens, {})
 

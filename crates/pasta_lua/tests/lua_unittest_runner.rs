@@ -56,6 +56,10 @@ fn run_lua_unit_tests() -> LuaResult<()> {
             .expect("Failed to create SearchContext");
     loaded.set("@pasta_search", lua.create_userdata(search_context)?)?;
 
+    // Register @pasta_sakura_script module (required by pasta.shiori.sakura_builder)
+    let sakura_module = pasta_lua::sakura_script::register(&lua, None)?;
+    loaded.set("@pasta_sakura_script", sakura_module)?;
+
     // Lua ユニットテストを実行（エントリーポイント: init.lua）
     let test_file = lua_specs_path.join("init.lua");
     println!("Running Lua tests from: {}", test_file.display());

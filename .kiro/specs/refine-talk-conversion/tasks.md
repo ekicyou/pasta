@@ -6,25 +6,25 @@
 
 ## Implementation Tasks
 
-- [ ] 1. sakura_builder.luaの実装変更
-- [ ] 1.1 (P) @pasta_sakura_scriptモジュールの読み込み追加
+- [x] 1. sakura_builder.luaの実装変更
+- [x] 1.1 (P) @pasta_sakura_scriptモジュールの読み込み追加
   - ファイル先頭（local BUILDER = {}の後）に`local SAKURA_SCRIPT = require "@pasta_sakura_script"`を追加
   - SAKURA_SCRIPT変数にモジュール参照を格納
   - _Requirements: 2.1, 2.2_
 
-- [ ] 1.2 (P) escape_sakura関数の削除
+- [x] 1.2 (P) escape_sakura関数の削除
   - 行12-17の`escape_sakura`ローカル関数定義を削除
   - escape_sakuraへの参照が残っていないことを確認
   - _Requirements: 4.1, 4.2_
 
-- [ ] 1.3 talk_to_script呼び出しへの置き換え
+- [x] 1.3 talk_to_script呼び出しへの置き換え
   - 行96の`escape_sakura(inner.text)`を`SAKURA_SCRIPT.talk_to_script(actor, inner.text)`に置換
   - actorオブジェクト（行78で取得済み）を第1引数として渡す
   - actorがnilの場合も適切に処理されることを確認（talk_to_scriptがデフォルト値にフォールバック）
   - _Requirements: 1.1, 1.2, 1.3, 3.1, 3.2, 3.3_
 
-- [ ] 2. テスト期待値の更新
-- [ ] 2.1 sakura_builder_test.luaの期待値更新
+- [x] 2. テスト期待値の更新
+- [x] 2.1 sakura_builder_test.luaの期待値更新
   - 24テストケースの期待値をウェイト挿入形式に更新
   - デフォルトウェイト値を適用した変換パターン：
     - `"こんにちは\\e"` → `"こ\_w[50]ん\_w[50]に\_w[50]ち\_w[50]は\_w[50]\\e"`（通常文字：50ms）
@@ -35,20 +35,20 @@
   - `\e`終端タグが維持されることを確認
   - _Requirements: 6.1, 6.2_
 
-- [ ] 2.2* 関連インテグレーションテストの期待値確認
+- [x] 2.2* 関連インテグレーションテストの期待値確認
   - さくらスクリプト出力を検証する他のインテグレーションテストを実行
   - 失敗したテストの期待値をウェイト挿入形式に修正
   - 既存さくらスクリプトタグ（`\s[ID]`, `\w[ms]`等）が保護されることを確認
   - _Requirements: 6.3, 5.1, 5.2, 5.3_
 
-- [ ] 3. 動作検証と統合確認
-- [ ] 3.1 (P) ビルドとユニットテスト実行
+- [x] 3. 動作検証と統合確認
+- [x] 3.1 (P) ビルドとユニットテスト実行
   - `cargo test -p pasta_lua`を実行
   - すべてのテストがパスすることを確認
   - さくらスクリプト出力の正確性を検証
   - _Requirements: 5.1, 5.2, 5.3_
 
-- [ ] 3.2 (P) ドキュメント整合性の確認と更新
+- [x] 3.2 (P) ドキュメント整合性の確認と更新
   - SOUL.md - コアバリュー・設計原則との整合性確認（変更なし想定）
   - SPECIFICATION.md - 言語仕様の更新確認（変更なし想定）
   - TEST_COVERAGE.md - 新規テストのマッピング追加（該当なし想定）
