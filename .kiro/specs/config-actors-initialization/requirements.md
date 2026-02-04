@@ -57,11 +57,11 @@ default_surface = 10
 2. When `CONFIG.actor` がテーブル型でない（nil, 文字列, 数値等）場合, the pasta.store モジュール shall `STORE.actors = {}` で空テーブルを代入する
 3. the pasta.store モジュール shall メタテーブル設定を行わない（pasta.actor モジュールに委譲）
 
-**pasta.actor モジュール初期化時（依存: @pasta_config, pasta.store）:**
+**pasta.actor モジュール初期化時（依存: pasta.store のみ）:**
 
-4. When `CONFIG.actor` がテーブル型である場合, the pasta.actor モジュール shall `CONFIG.actor` の各要素に `ACTOR_IMPL` メタテーブルを設定する
-5. When `CONFIG.actor[name]` の要素がテーブル型でない場合, the pasta.actor モジュール shall そのエントリをスキップする（エラーにしない）
-6. While `STORE.actors[name]` が CONFIG 由来のアクターで初期化されている場合, the ACTOR.get_or_create shall 既存アクターを返し、上書きしない
+4. the pasta.actor モジュール shall `STORE.actors` の各要素（テーブル型のみ）に `ACTOR_IMPL` メタテーブルを設定する
+5. When `STORE.actors[name]` の要素がテーブル型でない場合, the pasta.actor モジュール shall そのエントリをスキップする（エラーにしない）
+6. While `STORE.actors[name]` にメタテーブルが設定されたアクターが存在する場合, the ACTOR.get_or_create shall 既存アクターを返し、上書きしない
 
 ### Requirement 3: ライブラリモジュールの早期公開
 
