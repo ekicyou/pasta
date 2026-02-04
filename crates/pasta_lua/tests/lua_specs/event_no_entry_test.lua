@@ -112,24 +112,27 @@ describe("EVENT.no_entry thread return", function()
         -- Mock SCENE.search to return a SceneSearchResult-like table
         SCENE.search = function(event_name, arg1, arg2)
             return {
-                func = function()
-                    return "expected scene result"
+                func = function(act)
+                    -- シーン関数はact:talk()などを呼び出してトークン生成
+                    act.sakura:talk("expected scene result")
                 end,
                 global_name = "test",
                 local_name = "__start__"
             }
         end
 
-        local actors = { sakura = { name = "さくら", spot = "sakura" } }
+        local actors = { sakura = { name = "さくら", spot = 0 } }
         local act = SHIORI_ACT.new(actors, { id = "OnTestEvent" })
 
         local thread = EVENT.no_entry(act)
 
-        -- Resume the thread
-        local ok, result = coroutine.resume(thread)
+        -- Resume the thread with act parameter (SCENE.co_exec's wrapped_fn requires it)
+        local ok, result = coroutine.resume(thread, act)
 
         expect(ok):toBe(true)
-        expect(result):toBe("expected scene result")
+        -- wrapped_fn returns act:build() result, which contains the talk content
+        expect(type(result)):toBe("string")
+        expect(result:find("expected scene result")):toBeTruthy()
 
         teardown()
     end)

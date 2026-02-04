@@ -101,6 +101,37 @@ local function set_co_scene(co)
     STORE.co_scene = co
 end
 
+--- nil yieldをスキップして有効値またはdead状態まで繰り返しresumeする
+--- @param co thread コルーチン
+--- @param ... any 初回resume引数（通常はact）
+--- @return boolean ok 処理成功フラグ（エラー時false）
+--- @return any value 有効値またはエラーメッセージ
+local function resume_until_valid(co, ...)
+    -- 初回resumeは引数を渡す
+    local ok, value = coroutine.resume(co, ...)
+
+    -- ループ: nil yieldをスキップ
+    while true do
+        -- エラー時は即座に返す
+        if not ok then
+            return ok, value
+        end
+
+        -- 有効値（nil以外）の場合はループ終了
+        if value ~= nil then
+            return ok, value
+        end
+
+        -- dead状態のnilは有効値として扱う（空シーン）
+        if coroutine.status(co) == "dead" then
+            return ok, value
+        end
+
+        -- nil + suspended: 引数なしで再度resume
+        ok, value = coroutine.resume(co)
+    end
+end
+
 -- 4. 公開関数
 
 --- デフォルトハンドラ（未登録イベント用）
@@ -129,11 +160,11 @@ function EVENT.fire(req)
 
     -- 型判定
     if type(result) == "thread" then
-        -- コルーチン実行
-        local ok, yielded_value = coroutine.resume(result, act)
+        -- コルーチン実行: resume_until_validでnil yieldをスキップ
+        local ok, yielded_value = resume_until_valid(result, act)
         if not ok then
             -- エラー処理: close & 例外伝搬
-            set_co_scene(result) -- closeされる（dead状態のため）
+            set_co_scene(result)
             error(yielded_value)
         end
         -- 状態保存（set_co_scene内部でstatus判断）
@@ -146,6 +177,15 @@ function EVENT.fire(req)
         -- nil
         return RES.no_content()
     end
+end
+
+--- テスト用: resume_until_validを公開
+--- @param co thread コルーチン
+--- @param ... any 初回resume引数
+--- @return boolean ok
+--- @return any value
+function EVENT._resume_until_valid(co, ...)
+    return resume_until_valid(co, ...)
 end
 
 -- 5. 末尾で返却

@@ -76,6 +76,8 @@
 | RuntimeConfig libs配列           | `runtime::tests`                       | ✅ 完了 | 17テスト（新規）                             |
 | LuaConfig TOML設定               | `loader::config::tests`                | ✅ 完了 | 6テスト（新規）                              |
 | さくらスクリプトウェイト挿入     | `sakura_script_integration_test.rs`    | ✅ 完了 | 19テスト（sakura-script-wait）               |
+| EVENT.fire コルーチン対応        | `event_coroutine_test.lua`             | ✅ 完了 | 16テスト（resume_until_valid含む）           |
+| resume_until_valid nil yieldスキップ | `event_coroutine_test.lua`         | ✅ 完了 | 6テスト（coroutine-resume-loop）             |
 
 ### 2.5 統合テスト（E2E）
 
