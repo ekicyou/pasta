@@ -336,8 +336,8 @@ impl PastaShiori {
             Ok(response) => {
                 // Log request/response at DEBUG level for non-204 responses
                 if !response.starts_with("SHIORI/3.0 204 No Content") {
-                    debug!(request = %request, "##SHIORI request\n");
-                    debug!(response = %response, "##SHIORI response\n");
+                    debug!(request = %request, "### SHIORI request ###\n");
+                    debug!(response = %response, "### SHIORI response###\n");
                 }
                 trace!(response_len = response.len(), "SHIORI.request completed");
                 Ok(response)
