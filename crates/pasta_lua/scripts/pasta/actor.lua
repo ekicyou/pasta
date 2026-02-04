@@ -146,4 +146,16 @@ function PROXY_IMPL.word(self, name)
     return self.act:word(name)
 end
 
+-- CONFIG 由来アクターへのメタテーブル設定
+-- STORE.actors の各テーブル要素に ACTOR_IMPL メタテーブルを設定し、name を補完
+for name, actor in pairs(STORE.actors) do
+    if type(actor) == "table" then
+        -- name フィールドがなければ辞書キーから補完
+        if actor.name == nil then
+            actor.name = name
+        end
+        setmetatable(actor, ACTOR_IMPL)
+    end
+end
+
 return ACTOR

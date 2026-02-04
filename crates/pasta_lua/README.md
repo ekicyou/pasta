@@ -129,7 +129,56 @@ libs = [
 [user]
 ghost_name = "MyGhost"
 version = "1.0.0"
+
+# アクター定義（STORE.actors に自動初期化）
+[actor."さくら"]
+spot = 0
+default_surface = 0
+
+[actor."うにゅう"]
+spot = 1
+default_surface = 10
 ```
+
+### [actor.*] セクション
+
+`[actor.*]` セクションで定義したアクター設定は、Lua ランタイム起動時に `STORE.actors` へ自動的に参照共有されます。
+
+```toml
+[actor."さくら"]
+spot = 0
+default_surface = 0
+
+[actor."うにゅう"]  
+spot = 1
+default_surface = 10
+```
+
+**初期化フロー:**
+
+1. `@pasta_config` モジュール（Rust側）が TOML をパースし `CONFIG.actor` テーブルとして公開
+2. `pasta.store` モジュール（Lua）が `STORE.actors = CONFIG.actor` で参照共有
+3. `pasta.actor` モジュール（Lua）が各アクターに `ACTOR_IMPL` メタテーブルを設定
+
+**Lua からのアクセス:**
+
+```lua
+local STORE = require "pasta.store"
+local ACTOR = require "pasta.actor"
+
+-- 直接アクセス
+print(STORE.actors["さくら"].spot)  -- 0
+
+-- ACTOR API経由（推奨）
+local sakura = ACTOR.get_or_create("さくら")
+print(sakura.spot)  -- 0（CONFIG由来プロパティを保持）
+```
+
+**特徴:**
+
+- 参照共有のため、`STORE.actors` への変更は `CONFIG.actor` にも反映される
+- 動的に追加したアクターと CONFIG 由来アクターは共存可能
+- `ACTOR.get_or_create()` は既存アクターを返し、上書きしない
 
 ### [lua] セクション詳細
 
@@ -416,20 +465,20 @@ local script = BUILDER.build(tokens, config)
 
 **トークンタイプ**:
 
-| タイプ          | フィールド         | 出力例                               |
-| --------------- | ------------------ | ------------------------------------ |
-| `talk`          | `text`             | エスケープ済みテキスト               |
-| `actor`         | `actor`, `tokens`  | グループ内トークンを順次処理         |
-| `actor`(legacy) | `actor.spot`       | `\p[n]` (スポットタグ)               |
-| `spot`          | `actor`, `spot`    | 内部状態更新（出力なし）             |
-| `clear_spot`    | -                  | 内部状態リセット（出力なし）         |
-| `spot_switch`   | -                  | `\n[percent]` (段落区切り、レガシー) |
-| `surface`       | `id`               | `\s[id]`                             |
-| `wait`          | `ms`               | `\w[ms]`                             |
-| `newline`       | `n`                | `\n` × n回                           |
-| `clear`         | -                  | `\c`                                 |
-| `sakura_script` | `text`             | そのまま出力                         |
-| `yield`         | -                  | 無視（出力対象外）                   |
+| タイプ          | フィールド        | 出力例                               |
+| --------------- | ----------------- | ------------------------------------ |
+| `talk`          | `text`            | エスケープ済みテキスト               |
+| `actor`         | `actor`, `tokens` | グループ内トークンを順次処理         |
+| `actor`(legacy) | `actor.spot`      | `\p[n]` (スポットタグ)               |
+| `spot`          | `actor`, `spot`   | 内部状態更新（出力なし）             |
+| `clear_spot`    | -                 | 内部状態リセット（出力なし）         |
+| `spot_switch`   | -                 | `\n[percent]` (段落区切り、レガシー) |
+| `surface`       | `id`              | `\s[id]`                             |
+| `wait`          | `ms`              | `\w[ms]`                             |
+| `newline`       | `n`               | `\n` × n回                           |
+| `clear`         | -                 | `\c`                                 |
+| `sakura_script` | `text`            | そのまま出力                         |
+| `yield`         | -                 | 無視（出力対象外）                   |
 
 ## ファイル検出パターン
 

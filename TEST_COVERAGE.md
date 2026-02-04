@@ -58,22 +58,23 @@
 
 ### 2.4 Runtime層テスト（実行エンジン）
 
-| 機能                             | テストファイル               | 状態   | 説明                                         |
-| -------------------------------- | ---------------------------- | ------ | -------------------------------------------- |
-| Luaスクリプトローダー            | `loader_integration_test.rs` | ✅ 完了 | スクリプト読み込み                           |
-| 標準ライブラリモジュール         | `stdlib_modules_test.rs`     | ✅ 完了 | stdlib機能                                   |
-| 正規表現モジュール               | `stdlib_regex_test.rs`       | ✅ 完了 | 14テスト                                     |
-| Lua単体テスト実行                | `lua_unittest_runner.rs`     | ✅ 完了 | Luaテストランナー                            |
-| STORE.save/CTX注入               | `store_save_test.lua`        | ✅ 完了 | 永続変数・参照同一性                         |
-| SHIORIレスポンスビルダー         | `shiori_res_test.rs`         | ✅ 完了 | 14テスト                                     |
-| SHIORIイベントディスパッチ       | `shiori_event_test.rs`       | ✅ 完了 | 16テスト（新規）                             |
-| SHIORI_ACT さくらスクリプト生成  | `shiori_act_test.lua`        | ✅ 完了 | 47テスト（transfer_date_to_var 7テスト追加） |
-| SHIORI_ACT 日時転記機能          | `shiori_act_test.lua`        | ✅ 完了 | 7テスト（onhour-date-var-transfer）          |
-| ACT トークンバッファ（親クラス） | `act_test.lua`               | ✅ 完了 | 32テスト（act-token-buffer-refactor）        |
-| ACT トークングループ化           | `act_grouping_test.lua`      | ✅ 完了 | 19テスト（actor-talk-grouping）              |
-| sakura_builder トークン変換      | `sakura_builder_test.lua`    | ✅ 完了 | 24テスト（act-token-buffer-refactor）        |
-| RuntimeConfig libs配列           | `runtime::tests`             | ✅ 完了 | 17テスト（新規）                             |
-| LuaConfig TOML設定               | `loader::config::tests`      | ✅ 完了 | 6テスト（新規）                              |
+| 機能                             | テストファイル                         | 状態   | 説明                                         |
+| -------------------------------- | -------------------------------------- | ------ | -------------------------------------------- |
+| Luaスクリプトローダー            | `loader_integration_test.rs`           | ✅ 完了 | スクリプト読み込み                           |
+| 標準ライブラリモジュール         | `stdlib_modules_test.rs`               | ✅ 完了 | stdlib機能                                   |
+| 正規表現モジュール               | `stdlib_regex_test.rs`                 | ✅ 完了 | 14テスト                                     |
+| Lua単体テスト実行                | `lua_unittest_runner.rs`               | ✅ 完了 | Luaテストランナー                            |
+| STORE.save/CTX注入               | `store_save_test.lua`                  | ✅ 完了 | 永続変数・参照同一性                         |
+| CONFIG.actor→STORE.actors初期化  | `config_actors_initialization_test.rs` | ✅ 完了 | 8テスト（pasta.tomlアクター設定）            |
+| SHIORIレスポンスビルダー         | `shiori_res_test.rs`                   | ✅ 完了 | 14テスト                                     |
+| SHIORIイベントディスパッチ       | `shiori_event_test.rs`                 | ✅ 完了 | 16テスト（新規）                             |
+| SHIORI_ACT さくらスクリプト生成  | `shiori_act_test.lua`                  | ✅ 完了 | 47テスト（transfer_date_to_var 7テスト追加） |
+| SHIORI_ACT 日時転記機能          | `shiori_act_test.lua`                  | ✅ 完了 | 7テスト（onhour-date-var-transfer）          |
+| ACT トークンバッファ（親クラス） | `act_test.lua`                         | ✅ 完了 | 32テスト（act-token-buffer-refactor）        |
+| ACT トークングループ化           | `act_grouping_test.lua`                | ✅ 完了 | 19テスト（actor-talk-grouping）              |
+| sakura_builder トークン変換      | `sakura_builder_test.lua`              | ✅ 完了 | 24テスト（act-token-buffer-refactor）        |
+| RuntimeConfig libs配列           | `runtime::tests`                       | ✅ 完了 | 17テスト（新規）                             |
+| LuaConfig TOML設定               | `loader::config::tests`                | ✅ 完了 | 6テスト（新規）                              |
 
 ### 2.5 統合テスト（E2E）
 

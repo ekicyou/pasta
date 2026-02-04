@@ -1,0 +1,14 @@
+ghost_name = "ActorConfigTest"
+version = "1.0.0"
+
+[loader]
+debug_mode = true
+
+# Actor definitions (using quoted keys for Japanese names)
+[actor."さくら"]
+spot = 0
+default_surface = 0
+
+[actor."うにゅう"]
+spot = 1
+default_surface = 10

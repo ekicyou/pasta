@@ -38,10 +38,10 @@
 
 ## Architecture Pattern Evaluation
 
-| Option       | Description                   | Strengths        | Risks / Limitations | Notes    |
-| ------------ | ----------------------------- | ---------------- | ------------------- | -------- |
-| 参照共有     | STORE.actors = CONFIG.actor   | シンプル、効率的 | CONFIG 変更反映     | **採用** |
-| ディープコピー | 各オブジェクトをコピー        | 独立性           | コード量増加        | 不採用   |
+| Option         | Description                 | Strengths        | Risks / Limitations | Notes    |
+| -------------- | --------------------------- | ---------------- | ------------------- | -------- |
+| 参照共有       | STORE.actors = CONFIG.actor | シンプル、効率的 | CONFIG 変更反映     | **採用** |
+| ディープコピー | 各オブジェクトをコピー      | 独立性           | コード量増加        | 不採用   |
 
 ## Design Decisions
 

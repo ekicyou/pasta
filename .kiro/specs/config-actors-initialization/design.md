@@ -98,13 +98,13 @@ sequenceDiagram
 
 ## Requirements Traceability
 
-| Requirement | Summary                | Components     | Interfaces            | Flows        |
-| ----------- | ---------------------- | -------------- | --------------------- | ------------ |
-| 1.1-1.4     | TOML→CONFIG.actor 公開 | @pasta_config  | -                     | ✅ 既存実装 |
-| 2.1-2.3     | CONFIG.actor 代入      | pasta.store    | STORE.actors          | 初期化フロー |
-| 2.4-2.6     | ACTOR_IMPL 設定        | pasta.actor    | setmetatable()        | 初期化フロー |
-| 3.1-3.4     | モジュール早期公開     | runtime/mod.rs | -                     | ✅ 既存実装 |
-| 4.1-4.2     | 後方互換性           | pasta.store    | STORE.actors[name]    | -            |
+| Requirement | Summary                | Components     | Interfaces         | Flows        |
+| ----------- | ---------------------- | -------------- | ------------------ | ------------ |
+| 1.1-1.4     | TOML→CONFIG.actor 公開 | @pasta_config  | -                  | ✅ 既存実装   |
+| 2.1-2.3     | CONFIG.actor 代入      | pasta.store    | STORE.actors       | 初期化フロー |
+| 2.4-2.6     | ACTOR_IMPL 設定        | pasta.actor    | setmetatable()     | 初期化フロー |
+| 3.1-3.4     | モジュール早期公開     | runtime/mod.rs | -                  | ✅ 既存実装   |
+| 4.1-4.2     | 後方互換性             | pasta.store    | STORE.actors[name] | -            |
 
 ## Components and Interfaces
 

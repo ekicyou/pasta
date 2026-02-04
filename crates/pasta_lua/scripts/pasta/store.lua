@@ -70,4 +70,12 @@ function STORE.reset()
     STORE.actor_words = {}
 end
 
+-- CONFIG.actor からの初期化
+-- @pasta_config は Rust 組み込みモジュールのため例外扱い（循環参照回避ポリシーの例外）
+-- pcall で保護することで、@pasta_config が無い環境（単体テスト等）でも動作可能にする
+local ok, CONFIG = pcall(require, "@pasta_config")
+if ok and type(CONFIG.actor) == "table" then
+    STORE.actors = CONFIG.actor
+end
+
 return STORE
