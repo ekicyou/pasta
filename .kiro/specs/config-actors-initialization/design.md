@@ -10,7 +10,6 @@
 
 ### Goals
 - CONFIG.actor が存在する場合、STORE.actors を参照共有で初期化
-- 既存の STORE.reset() ロジックを活用し、コード重複を回避
 - ACTOR_IMPL メタテーブルを CONFIG 由来アクターにも設定
 
 ### Non-Goals
@@ -78,11 +77,10 @@ sequenceDiagram
     
     VM->>ST: require "pasta.store"
     ST->>CFG: require "@pasta_config"
-    ST->>ST: STORE.reset()
     alt CONFIG.actor がテーブル型
         ST->>ST: STORE.actors = CONFIG.actor
     else CONFIG.actor が非テーブル
-        ST->>ST: STORE.actors = {} のまま
+        Note over ST: STORE.actors = {} のまま（静的初期化）
     end
     ST-->>VM: return STORE
     
@@ -100,25 +98,20 @@ sequenceDiagram
 
 ## Requirements Traceability
 
-| Requirement | Summary                | Components     | Interfaces            | Flows          |
-| ----------- | ---------------------- | -------------- | --------------------- | -------------- |
-| 1.1-1.4     | TOML→CONFIG.actor 公開 | @pasta_config  | -                     | ✅ 既存実装     |
-| 2.1         | reset() 呼び出し       | pasta.store    | STORE.reset()         | 初期化フロー   |
-| 2.2-2.3     | CONFIG.actor 代入      | pasta.store    | STORE.actors          | 初期化フロー   |
-| 2.4         | メタテーブル委譲       | pasta.store    | -                     | -              |
-| 2.5-2.6     | ACTOR_IMPL 設定        | pasta.actor    | setmetatable()        | 初期化フロー   |
-| 2.7         | get_or_create 既存返却 | pasta.actor    | ACTOR.get_or_create() | -              |
-| 3.1-3.4     | モジュール早期公開     | runtime/mod.rs | -                     | ✅ 既存実装     |
-| 4.1         | 動的追加共存           | pasta.store    | STORE.actors[name]    | -              |
-| 4.2         | CONFIG プロパティ保持  | pasta.actor    | ACTOR.get_or_create() | -              |
-| 4.3-4.4     | reset() 再初期化       | pasta.store    | STORE.reset()         | リセットフロー |
+| Requirement | Summary                | Components     | Interfaces            | Flows        |
+| ----------- | ---------------------- | -------------- | --------------------- | ------------ |
+| 1.1-1.4     | TOML→CONFIG.actor 公開 | @pasta_config  | -                     | ✅ 既存実装 |
+| 2.1-2.3     | CONFIG.actor 代入      | pasta.store    | STORE.actors          | 初期化フロー |
+| 2.4-2.6     | ACTOR_IMPL 設定        | pasta.actor    | setmetatable()        | 初期化フロー |
+| 3.1-3.4     | モジュール早期公開     | runtime/mod.rs | -                     | ✅ 既存実装 |
+| 4.1-4.2     | 後方互換性           | pasta.store    | STORE.actors[name]    | -            |
 
 ## Components and Interfaces
 
-| Component   | Domain/Layer     | Intent                    | Req Coverage          | Key Dependencies   | Contracts |
-| ----------- | ---------------- | ------------------------- | --------------------- | ------------------ | --------- |
-| pasta.store | Data Store       | CONFIG.actor からの初期化 | 2.1-2.4, 4.1, 4.3-4.4 | @pasta_config (P0) | State     |
-| pasta.actor | Actor Management | メタテーブル設定          | 2.5-2.7, 4.2          | pasta.store (P0)   | Service   |
+| Component   | Domain/Layer     | Intent                    | Req Coverage | Key Dependencies   | Contracts |
+| ----------- | ---------------- | ------------------------- | ------------ | ------------------ | --------- |
+| pasta.store | Data Store       | CONFIG.actor からの初期化 | 2.1-2.3, 4.1 | @pasta_config (P0) | State     |
+| pasta.actor | Actor Management | メタテーブル設定          | 2.4-2.6, 4.2 | pasta.store (P0)   | Service   |
 
 ### Data Store Layer
 
@@ -127,7 +120,7 @@ sequenceDiagram
 | Field        | Detail                                        |
 | ------------ | --------------------------------------------- |
 | Intent       | CONFIG.actor を STORE.actors に参照共有で設定 |
-| Requirements | 2.1, 2.2, 2.3, 2.4, 4.1, 4.3, 4.4             |
+| Requirements | 2.1, 2.2, 2.3, 4.1                            |
 
 **Responsibilities & Constraints**
 - STORE.actors の初期化（reset() 内で CONFIG.actor を参照）
@@ -146,31 +139,14 @@ sequenceDiagram
 ```lua
 -- CONFIG.actor からの初期化
 local CONFIG = require "@pasta_config"
-STORE.reset()
 if type(CONFIG.actor) == "table" then
     STORE.actors = CONFIG.actor
 end
 ```
 
-**STORE.reset() 内の変更（actors 初期化部分）**:
-```lua
-function STORE.reset()
-    -- ... 既存のクリーンアップ ...
-    
-    STORE.actors = {}  -- 既存
-    -- CONFIG.actor の再設定
-    local ok, CONFIG = pcall(require, "@pasta_config")
-    if ok and type(CONFIG.actor) == "table" then
-        STORE.actors = CONFIG.actor
-    end
-    
-    -- ... 他フィールドの初期化 ...
-end
-```
-
 **実装上の注意**:
-- `pcall` で `@pasta_config` の require を保護（テスト環境での安全性）
 - 型チェック `type(CONFIG.actor) == "table"` で nil/非テーブル値をガード
+- CONFIG.actor がテーブルでない場合、STORE.actors は既存の静的初期化 `STORE.actors = {}` を維持
 
 ### Actor Management Layer
 
@@ -179,7 +155,7 @@ end
 | Field        | Detail                                                |
 | ------------ | ----------------------------------------------------- |
 | Intent       | STORE.actors の各要素に ACTOR_IMPL メタテーブルを設定 |
-| Requirements | 2.5, 2.6, 2.7, 4.2                                    |
+| Requirements | 2.4, 2.5, 2.6, 4.2                                    |
 
 **Responsibilities & Constraints**
 - モジュール初期化時に STORE.actors を走査
@@ -235,17 +211,16 @@ end
 ## Testing Strategy
 
 ### Unit Tests (pasta.actor, pasta.store)
-- `STORE.reset()` 後に `CONFIG.actor` が `STORE.actors` に反映される
-- `CONFIG.actor` が nil の場合、`STORE.actors` は空テーブル
-- `CONFIG.actor` が非テーブル（文字列等）の場合、`STORE.actors` は空テーブル
-- `STORE.actors` の各要素に `ACTOR_IMPL` メタテーブルが設定される
+- モジュール初期化時に `CONFIG.actor` が `STORE.actors` に反映される
+- `CONFIG.actor` が nil の場合、`STORE.actors` は既存の静的初期化 `{}` を維持
+- `CONFIG.actor` が非テーブル（文字列等）の場合、`STORE.actors` は空テーブルのまま
+- `STORE.actors` の各テーブル要素に `ACTOR_IMPL` メタテーブルが設定される
 - 非テーブル要素はスキップされエラーにならない
 
 ### Integration Tests
 - pasta.toml に `[actor.さくら]` を定義し、`STORE.actors["さくら"].spot` で値取得
 - `ACTOR.get_or_create("さくら")` が CONFIG 由来プロパティを保持
 - 動的追加 `STORE.actors["新規"] = {}` と CONFIG 由来アクターが共存
-- `STORE.reset()` 後に CONFIG 状態に復帰
 
 ### E2E Tests
 - SHIORI イベントループ内でアクター参照が正常動作

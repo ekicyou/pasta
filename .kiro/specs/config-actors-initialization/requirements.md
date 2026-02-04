@@ -53,16 +53,15 @@ default_surface = 10
 
 **pasta.store モジュール初期化時（依存: @pasta_config のみ）:**
 
-1. the pasta.store モジュール shall モジュール読み込み時に `STORE.reset()` を呼び出す（既存フィールドの初期化ロジックを再利用）
-2. When `STORE.reset()` 内で `STORE.actors = {}` が実行された後, the pasta.store モジュール shall `CONFIG.actor` がテーブル型なら `STORE.actors = CONFIG.actor` で上書きする
-3. When `CONFIG.actor` がテーブル型でない（nil, 文字列, 数値等）場合, the pasta.store モジュール shall `STORE.actors` を空テーブル `{}` のままにする
-4. the pasta.store モジュール shall メタテーブル設定を行わない（pasta.actor モジュールに委譲）
+1. When `CONFIG.actor` がテーブル型である場合, the pasta.store モジュール shall モジュール末尾で `STORE.actors = CONFIG.actor` で直接代入する（参照共有）
+2. When `CONFIG.actor` がテーブル型でない（nil, 文字列, 数値等）場合, the pasta.store モジュール shall `STORE.actors` を空テーブル `{}` のまま維持する（既存の静的初期化）
+3. the pasta.store モジュール shall メタテーブル設定を行わない（pasta.actor モジュールに委譲）
 
 **pasta.actor モジュール初期化時（依存: pasta.store のみ）:**
 
-5. the pasta.actor モジュール shall `STORE.actors` の各要素（テーブル型のみ）に `ACTOR_IMPL` メタテーブルを設定する
-6. When `STORE.actors[name]` の要素がテーブル型でない場合, the pasta.actor モジュール shall そのエントリをスキップする（エラーにしない）
-7. While `STORE.actors[name]` にメタテーブルが設定されたアクターが存在する場合, the ACTOR.get_or_create shall 既存アクターを返し、上書きしない
+4. the pasta.actor モジュール shall `STORE.actors` の各要素（テーブル型のみ）に `ACTOR_IMPL` メタテーブルを設定する
+5. When `STORE.actors[name]` の要素がテーブル型でない場合, the pasta.actor モジュール shall そのエントリをスキップする（エラーにしない）
+6. While `STORE.actors[name]` にメタテーブルが設定されたアクターが存在する場合, the ACTOR.get_or_create shall 既存アクターを返し、上書きしない
 
 ### Requirement 3: ライブラリモジュールの早期公開
 
@@ -87,5 +86,3 @@ default_surface = 10
 
 1. When 既存コードが `STORE.actors[name] = {...}` で動的にアクターを追加した場合, the pasta.store モジュール shall CONFIG 由来のアクターと共存させる（`CONFIG.actor` にも反映される）
 2. When ACTOR.get_or_create(name) が呼ばれた場合 and CONFIG 由来のアクターが存在する場合, the pasta.actor モジュール shall CONFIG 由来のプロパティを保持したアクターを返す
-3. When STORE.reset() が呼ばれた場合, the pasta.store モジュール shall 全フィールドをクリアした後、`CONFIG.actor` がテーブル型なら `STORE.actors = CONFIG.actor` で再設定する
-4. When STORE.reset() 後に `STORE.actors` が参照共有されている場合, the `ACTOR_IMPL` メタテーブル shall すでに設定済みのため維持される（pasta.actor の初期化時に設定済み）
