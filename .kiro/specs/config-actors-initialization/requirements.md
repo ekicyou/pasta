@@ -51,11 +51,17 @@ default_surface = 10
 
 #### Acceptance Criteria
 
-1. **前提条件**: When `CONFIG.actor` が存在しテーブル型である場合のみ, the pasta.store モジュール shall 以下の初期化処理を実行する
-2. When `CONFIG.actor` がテーブル型でない（nil, 文字列, 数値等）場合, the pasta.store モジュール shall `STORE.actors` を空テーブル `{}` で初期化し、CONFIG との関連付けを行わない
-3. When `CONFIG.actor` がテーブル型である場合, the pasta.store モジュール shall `CONFIG.actor` の各要素を `STORE.actors` にコピーする
-4. When `CONFIG.actor["アクター名"]` が存在する場合, the pasta.store モジュール shall そのアクターオブジェクトに対して `ACTOR_IMPL` メタテーブルを設定する
-5. While `STORE.actors[name]` が CONFIG 由来のアクターで初期化されている場合, the ACTOR.get_or_create shall 既存アクターを返し、上書きしない
+**pasta.store モジュール初期化時（依存: @pasta_config のみ）:**
+
+1. When `CONFIG.actor` がテーブル型である場合, the pasta.store モジュール shall `STORE.actors = CONFIG.actor` で直接代入する（参照共有）
+2. When `CONFIG.actor` がテーブル型でない（nil, 文字列, 数値等）場合, the pasta.store モジュール shall `STORE.actors = {}` で空テーブルを代入する
+3. the pasta.store モジュール shall メタテーブル設定を行わない（pasta.actor モジュールに委譲）
+
+**pasta.actor モジュール初期化時（依存: @pasta_config, pasta.store）:**
+
+4. When `CONFIG.actor` がテーブル型である場合, the pasta.actor モジュール shall `CONFIG.actor` の各要素に `ACTOR_IMPL` メタテーブルを設定する
+5. When `CONFIG.actor[name]` の要素がテーブル型でない場合, the pasta.actor モジュール shall そのエントリをスキップする（エラーにしない）
+6. While `STORE.actors[name]` が CONFIG 由来のアクターで初期化されている場合, the ACTOR.get_or_create shall 既存アクターを返し、上書きしない
 
 ### Requirement 3: ライブラリモジュールの早期公開
 
@@ -78,7 +84,7 @@ default_surface = 10
 
 #### Acceptance Criteria
 
-1. When 既存コードが `STORE.actors[name] = {...}` で動的にアクターを追加した場合, the pasta.store モジュール shall CONFIG 由来のアクターと共存させる
+1. When 既存コードが `STORE.actors[name] = {...}` で動的にアクターを追加した場合, the pasta.store モジュール shall CONFIG 由来のアクターと共存させる（`CONFIG.actor` にも反映される）
 2. When ACTOR.get_or_create(name) が呼ばれた場合 and CONFIG 由来のアクターが存在する場合, the pasta.actor モジュール shall CONFIG 由来のプロパティを保持したアクターを返す
-3. When STORE.reset() が呼ばれた場合 and `CONFIG.actor` がテーブル型である場合, the pasta.store モジュール shall `STORE.actors` を再度 `CONFIG.actor` で初期化する
-4. When STORE.reset() が呼ばれた場合 and `CONFIG.actor` がテーブル型でない場合, the pasta.store モジュール shall `STORE.actors` を空テーブル `{}` にリセットする
+3. When STORE.reset() が呼ばれた場合, the pasta.store モジュール shall Requirement 2 の初期化処理を再実行する（`STORE.actors = CONFIG.actor or {}`）
+4. When STORE.reset() 後に pasta.actor モジュールが再読み込みされない場合, the 既存の `ACTOR_IMPL` メタテーブル shall 維持される（再設定不要）
