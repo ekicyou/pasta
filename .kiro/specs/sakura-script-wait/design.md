@@ -317,6 +317,7 @@ fn talk_to_script(actor: Option<Table>, talk: String) -> LuaResult<String>;
   let sakura_module = sakura_script::register(&self.lua, talk_config.as_ref())?;
   self.register_module("@pasta_sakura_script", sakura_module)?;
   ```
+- **変換装置の生成**: `register()`内でTokenizerとWaitInserterを初期化し、Lua関数クロージャ経由で渡す（PastaConfig確定後の1回のみ初期化）
 
 ---
 
@@ -376,27 +377,35 @@ impl CharSets {
     pub fn from_config(config: &TalkConfig) -> Self;
 }
 
-/// 入力文字列をトークン分解
-/// 
-/// # Arguments
-/// * `input` - 入力文字列
-/// * `char_sets` - 文字種別判定用セット
-/// 
-/// # Returns
-/// トークン列
-pub fn tokenize(input: &str, char_sets: &CharSets) -> Vec<Token>;
+/// トークナイザー（Regex保持）
+pub struct Tokenizer {
+    sakura_tag_regex: Regex,
+    char_sets: CharSets,
+}
+
+impl Tokenizer {
+    /// TalkConfigから初期化（Regexコンパイル）
+    pub fn new(config: &TalkConfig) -> Result<Self, regex::Error>;
+    
+    /// 入力文字列をトークン分解
+    pub fn tokenize(&self, input: &str) -> Vec<Token>;
+}
 ```
 
-- Preconditions: `input`は有効なUTF-8文字列
+- Preconditions: 
+  - `Tokenizer::new()`でRegexコンパイル成功済み
+  - `input`は有効なUTF-8文字列
 - Postconditions: 全入力文字がいずれかのトークンに含まれる
-- Invariants: トークン順序は入力文字列の出現順を保持
+- Invariants: 
+  - トークン順序は入力文字列の出現順を保持
+  - Regexインスタンスは`register()`時に1回のみコンパイル
 
 **Implementation Notes**
 - 配置: `crates/pasta_lua/src/sakura_script/tokenizer.rs`
 - 正規表現パターン: `\\[0-9a-zA-Z_!]+(?:\[[^\]]*\])?`
 - `\`で始まる場合のみ正規表現マッチを試行（最適化）
 - **Unicode結合文字処理**: Rust標準`chars()`イテレータに従い、結合文字は個別charとして扱う（例: `が`→`か`+`゛`の2char）。絵文字等の問題報告時は将来改善を検討
-- **正規表現キャッシュ**: `Tokenizer`を構造体化し、コンパイル済み`Regex`インスタンスを保持することを推奨。または`lazy_static`/`OnceCell`使用でコンパイルコストを1回のみに削減
+- **正規表現コンパイル**: `register()`時点でTalkConfig確定済みのため、Tokenizer構造体初期化時にRegexコンパイルを実施。lazy_static/OnceCell不要（ローダープロセス完了後はランタイムで設定変更なし）
 
 ---
 

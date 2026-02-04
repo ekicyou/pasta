@@ -110,12 +110,14 @@
   - grapheme cluster処理は`unicode-segmentation`クレート追加が必要
   - 将来問題報告時に改善検討（現時点ではオーバーエンジニアリング）
 
-### Decision: 正規表現コンパイルキャッシュ
-- **Context**: tokenize()呼び出しごとの正規表現コンパイルコスト
-- **Selected Approach**: Tokenizer構造体化でRegexインスタンス保持を推奨
+### Decision: 正規表現コンパイルタイミング
+- **Context**: tokenize()呼び出しごとの正規表現コンパイルコスト削減
+- **Selected Approach**: `register()`時点（PastaConfig確定後）にTokenizer構造体を初期化し、Regexコンパイル
 - **Rationale**:
-  - 単一会話処理への影響は微小だが、最適化余地あり
-  - 実装時の判断に委ねる（lazy_static/OnceCellも代替案）
+  - ローダープロセス完了後、ランタイムで設定変更なし
+  - lazy_static/OnceCell不要（初期化タイミングが明確）
+  - Tokenizer構造体に`sakura_tag_regex: Regex`と`char_sets: CharSets`を保持
+  - Lua関数クロージャ経由でTokenizerインスタンスを渡す
 
 ## Risks & Mitigations
 
