@@ -197,6 +197,7 @@ script_wait_leader = 200
 **Dependencies**
 - Outbound: tempfile — 一時ディレクトリ作成 (P0)
 - Outbound: std::fs — ファイルコピー (P0)
+- Internal: copy_dir_recursive — 既存の common/mod.rs に実装済み (P0)
 
 **Contracts**: Service [x]
 
@@ -207,6 +208,8 @@ script_wait_leader = 200
 ///
 /// This function copies the complete hello-pasta ghost from pasta_sample_ghost
 /// to a temporary directory, enabling integration tests with real ghost definitions.
+/// Uses the existing `copy_dir_recursive()` function which automatically skips
+/// profile/ directories.
 ///
 /// # Returns
 /// TempDir containing the copied hello-pasta ghost
@@ -223,7 +226,7 @@ pub fn copy_sample_ghost_to_temp() -> TempDir {
         .expect("Failed to get parent directory")
         .join("pasta_sample_ghost/ghosts/hello-pasta/ghost/master");
     
-    // Copy ghost files (skip profile/)
+    // Copy ghost files using existing recursive copy (auto-skips profile/)
     copy_dir_recursive(&sample_ghost_dir, temp.path())
         .expect("Failed to copy hello-pasta ghost");
     
@@ -298,6 +301,9 @@ fn test_onboot_response() {
     
     // 表情タグ
     assert!(response.contains("\\s[通常]"));
+    
+    // ウェイトタグ (pasta.toml [talk] セクション反映確認)
+    assert!(response.contains("_w["));
     
     // ウェイトタグ（パターン検証）
     assert!(response.contains("\\_w["));
