@@ -87,8 +87,8 @@
 1. The pasta_sakura_script shall `sakura_script`トークンと`line_end_prohibited`トークンにはウェイトを挿入しない
 2. When `general`トークンの場合, the pasta_sakura_script shall 各文字の直後に`(script_wait_normal - 50)`ミリ秒のウェイトを挿入する（計算結果が0以下の場合は挿入しない）
 3. When `leader`トークンの場合, the pasta_sakura_script shall 各文字の直後に`(script_wait_leader - 50)`ミリ秒のウェイトを挿入する（計算結果が0以下の場合は挿入しない）
-4. While `period`, `comma`, `exclaim`, `line_start_prohibited`トークンが連続している間, the pasta_sakura_script shall ウェイトを挿入しない
-5. When `period`, `comma`, `exclaim`, `line_start_prohibited`トークンの連続が終了したとき, the pasta_sakura_script shall 連続区間内で最大のウェイト値から50ミリ秒を引いた値のウェイトを挿入する
+4. While `period`, `comma`, `strong`, `line_start_prohibited`トークンが連続している間, the pasta_sakura_script shall ウェイトを挿入しない
+5. When `period`, `comma`, `strong`, `line_start_prohibited`トークンの連続が終了したとき, the pasta_sakura_script shall 連続区間内で最大のウェイト値から50ミリ秒を引いた値のウェイトを挿入する
 6. The pasta_sakura_script shall ウェイトを`\_w[ms]`形式のさくらスクリプトとして挿入する
 
 ### Requirement 6: エラーハンドリング
