@@ -68,8 +68,8 @@ flowchart TD
 
 ### Technology Stack
 
-| Layer | Choice / Version | Role in Feature | Notes |
-|-------|------------------|-----------------|-------|
+| Layer   | Choice / Version    | Role in Feature    | Notes                                  |
+| ------- | ------------------- | ------------------ | -------------------------------------- |
 | Runtime | Lua 5.5 (mlua 0.11) | コルーチン実行基盤 | `coroutine.resume`, `coroutine.status` |
 
 ## System Flows
@@ -95,35 +95,35 @@ flowchart TD
 
 ## Requirements Traceability
 
-| Requirement | Summary | Components | Interfaces | Flows |
-|-------------|---------|------------|------------|-------|
-| 1.1 | nil + suspended で再resume | resume_until_valid | - | nil yieldスキップループ |
-| 1.2 | nil以外 or dead でループ終了 | resume_until_valid | - | nil yieldスキップループ |
-| 1.3 | エラー時はエラー伝搬 | resume_until_valid, EVENT.fire | - | nil yieldスキップループ |
-| 1.4 | ローカル関数実装 | resume_until_valid | resume_until_valid | - |
-| 2.1 | EVENT.fireでループ関数使用 | EVENT.fire | - | - |
-| 2.2 | 文字列ハンドラ互換 | EVENT.fire | - | - |
-| 2.3 | nil戻り値互換 | EVENT.fire | - | - |
-| 2.4 | suspended時コルーチン保存 | EVENT.fire, set_co_scene | - | - |
-| 3.1 | エラー時set_co_sceneでclose | EVENT.fire | - | - |
-| 3.2 | エラーメッセージ伝搬 | EVENT.fire | - | - |
-| 3.3 | deadコルーチンclose | set_co_scene（既存） | - | - |
+| Requirement | Summary                      | Components                     | Interfaces         | Flows                   |
+| ----------- | ---------------------------- | ------------------------------ | ------------------ | ----------------------- |
+| 1.1         | nil + suspended で再resume   | resume_until_valid             | -                  | nil yieldスキップループ |
+| 1.2         | nil以外 or dead でループ終了 | resume_until_valid             | -                  | nil yieldスキップループ |
+| 1.3         | エラー時はエラー伝搬         | resume_until_valid, EVENT.fire | -                  | nil yieldスキップループ |
+| 1.4         | ローカル関数実装             | resume_until_valid             | resume_until_valid | -                       |
+| 2.1         | EVENT.fireでループ関数使用   | EVENT.fire                     | -                  | -                       |
+| 2.2         | 文字列ハンドラ互換           | EVENT.fire                     | -                  | -                       |
+| 2.3         | nil戻り値互換                | EVENT.fire                     | -                  | -                       |
+| 2.4         | suspended時コルーチン保存    | EVENT.fire, set_co_scene       | -                  | -                       |
+| 3.1         | エラー時set_co_sceneでclose  | EVENT.fire                     | -                  | -                       |
+| 3.2         | エラーメッセージ伝搬         | EVENT.fire                     | -                  | -                       |
+| 3.3         | deadコルーチンclose          | set_co_scene（既存）           | -                  | -                       |
 
 ## Components and Interfaces
 
-| Component | Domain/Layer | Intent | Req Coverage | Key Dependencies | Contracts |
-|-----------|--------------|--------|--------------|------------------|-----------|
-| resume_until_valid | EVENT/Internal | nil yieldスキップループ | 1.1-1.4 | coroutine (P0) | Service |
-| EVENT.fire | EVENT/Public | イベント振り分け（修正） | 2.1-2.4, 3.1-3.2 | resume_until_valid (P0), set_co_scene (P0), RES (P0) | Service |
+| Component          | Domain/Layer   | Intent                   | Req Coverage     | Key Dependencies                                     | Contracts |
+| ------------------ | -------------- | ------------------------ | ---------------- | ---------------------------------------------------- | --------- |
+| resume_until_valid | EVENT/Internal | nil yieldスキップループ  | 1.1-1.4          | coroutine (P0)                                       | Service   |
+| EVENT.fire         | EVENT/Public   | イベント振り分け（修正） | 2.1-2.4, 3.1-3.2 | resume_until_valid (P0), set_co_scene (P0), RES (P0) | Service   |
 
 ### EVENT / Internal
 
 #### resume_until_valid
 
-| Field | Detail |
-|-------|--------|
-| Intent | コルーチンを有効値またはdead状態まで繰り返しresumeする |
-| Requirements | 1.1, 1.2, 1.3, 1.4 |
+| Field        | Detail                                                 |
+| ------------ | ------------------------------------------------------ |
+| Intent       | コルーチンを有効値またはdead状態まで繰り返しresumeする |
+| Requirements | 1.1, 1.2, 1.3, 1.4                                     |
 
 **Responsibilities & Constraints**
 - nil yieldをスキップし、有効値またはdead状態までループ継続
@@ -141,7 +141,8 @@ flowchart TD
 --- nil yieldをスキップして有効値またはdead状態まで繰り返しresumeする
 --- @param co thread コルーチン
 --- @param ... any 初回resume引数（通常はact）
---- @return boolean, any ok, value（エラー時はok=false, エラーメッセージ）
+--- @return boolean ok 処理成功フラグ（エラー時false）
+--- @return any value 有効値またはエラーメッセージ
 local function resume_until_valid(co, ...)
 ```
 
@@ -158,10 +159,10 @@ local function resume_until_valid(co, ...)
 
 #### EVENT.fire（修正）
 
-| Field | Detail |
-|-------|--------|
-| Intent | SHIORIリクエストを処理し、適切なハンドラを呼び出す |
-| Requirements | 2.1, 2.2, 2.3, 2.4, 3.1, 3.2 |
+| Field        | Detail                                             |
+| ------------ | -------------------------------------------------- |
+| Intent       | SHIORIリクエストを処理し、適切なハンドラを呼び出す |
+| Requirements | 2.1, 2.2, 2.3, 2.4, 3.1, 3.2                       |
 
 **Responsibilities & Constraints**
 - thread型結果に対して`resume_until_valid`を使用
@@ -203,23 +204,25 @@ end
 - **Invariants**: 後方互換性維持
 
 ## Testing Strategy
+**テスト配置**: 既存の`crates/pasta_lua/tests/lua_specs/event_coroutine_test.lua`を拡張し、新規テストブロック`describe("resume_until_valid")`を追加する。
+
 
 ### 単体テスト（resume_until_valid）
 
-| ケース | 入力 | 期待結果 |
-|--------|------|----------|
-| 即座に有効値yield | `yield("value")` | `ok=true, value="value"` |
-| nil後に有効値yield | `yield(nil); yield("value")` | `ok=true, value="value"` |
-| 複数nil後に有効値 | `yield(nil); yield(nil); yield("value")` | `ok=true, value="value"` |
-| nil後にdead（return nil） | `yield(nil); return nil` | `ok=true, value=nil` |
-| 即座にdead（return） | `return "value"` | `ok=true, value="value"` |
-| エラー発生 | `error("test")` | `ok=false, value=エラーメッセージ` |
-| nil後にエラー | `yield(nil); error("test")` | `ok=false, value=エラーメッセージ` |
+| ケース                    | 入力                                     | 期待結果                           |
+| ------------------------- | ---------------------------------------- | ---------------------------------- |
+| 即座に有効値yield         | `yield("value")`                         | `ok=true, value="value"`           |
+| nil後に有効値yield        | `yield(nil); yield("value")`             | `ok=true, value="value"`           |
+| 複数nil後に有効値         | `yield(nil); yield(nil); yield("value")` | `ok=true, value="value"`           |
+| nil後にdead（return nil） | `yield(nil); return nil`                 | `ok=true, value=nil`               |
+| 即座にdead（return）      | `return "value"`                         | `ok=true, value="value"`           |
+| エラー発生                | `error("test")`                          | `ok=false, value=エラーメッセージ` |
+| nil後にエラー             | `yield(nil); error("test")`              | `ok=false, value=エラーメッセージ` |
 
 ### 統合テスト（EVENT.fire）
 
-| ケース | 期待結果 |
-|--------|----------|
-| 既存テストケース全パス | 後方互換性確認 |
-| nil yieldスキップ動作 | 正常レスポンス返却 |
-| 空シーン（nil + dead） | 204 No Content |
+| ケース                 | 期待結果           |
+| ---------------------- | ------------------ |
+| 既存テストケース全パス | 後方互換性確認     |
+| nil yieldスキップ動作  | 正常レスポンス返却 |
+| 空シーン（nil + dead） | 204 No Content     |
