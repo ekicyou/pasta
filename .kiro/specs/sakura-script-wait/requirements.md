@@ -67,7 +67,7 @@
 #### Acceptance Criteria
 
 1. The pasta_sakura_script_wait shall 入力文字列を以下のトークン種別に分解する:
-   - `sakura_script`: さくらスクリプトタグ（正規表現: `\\[0-9a-zA-Z_!*?]+(?:\[[^\]]*\])?`）
+   - `sakura_script`: さくらスクリプトタグ（正規表現: `\\[0-9a-zA-Z_!]+(?:\[[^\]]*\])?`）
    - `period`: 句点文字（pasta.tomlの`chars_period`で定義）
    - `comma`: 読点文字（pasta.tomlの`chars_comma`で定義）
    - `exclaim`: 感嘆詞文字（pasta.tomlの`chars_exclaim`で定義）
