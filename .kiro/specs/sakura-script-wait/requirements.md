@@ -33,7 +33,7 @@
    - `script_wait_normal`: 通常文字のウェイト
    - `script_wait_period`: 濁点（句点）検出ウェイト
    - `script_wait_comma`: 半濁点（読点）検出ウェイト
-   - `script_wait_exclaim`: 感嘆詞検出ウェイト
+   - `script_wait_strong`: 強調記号検出ウェイト
    - `script_wait_leader`: リーダー検出ウェイト
 2. If actorテーブルに特定のウェイト設定キーが存在しない場合, then the pasta_sakura_script shall pasta.tomlの`[talk]`セクションのデフォルト値を使用する
 3. The pasta_sakura_script shall 数値以外の値が設定されている場合、デフォルト値にフォールバックする
@@ -48,12 +48,12 @@
    - `script_wait_normal`: デフォルト50（ミリ秒）
    - `script_wait_period`: デフォルト1000（ミリ秒）
    - `script_wait_comma`: デフォルト500（ミリ秒）
-   - `script_wait_exclaim`: デフォルト500（ミリ秒）
+   - `script_wait_strong`: デフォルト500（ミリ秒）
    - `script_wait_leader`: デフォルト200（ミリ秒）
 2. The pasta_lua shall pasta.tomlの`[talk]`セクションで以下の対象文字セットを設定可能とする:
    - `chars_period`: 句点文字（デフォルト: `｡。．.`）
    - `chars_comma`: 読点文字（デフォルト: `、，,`）
-   - `chars_exclaim`: 感嘆詞文字（デフォルト: `？！!?`）
+   - `chars_strong`: 強調記号（デフォルト: `？！!?`）
    - `chars_leader`: リーダー文字（デフォルト: `･・‥…`）
    - `chars_line_start_prohibited`: 行頭禁則文字（デフォルト: `゛゜ヽヾゝゞ々ー）］｝」』):;]}｣､･ｰﾞﾟ`）
    - `chars_line_end_prohibited`: 行末禁則文字（デフォルト: `（［｛「『([{｢`）
@@ -70,7 +70,7 @@
    - `sakura_script`: さくらスクリプトタグ（正規表現: `\\[0-9a-zA-Z_!]+(?:\[[^\]]*\])?`）
    - `period`: 句点文字（pasta.tomlの`chars_period`で定義）
    - `comma`: 読点文字（pasta.tomlの`chars_comma`で定義）
-   - `exclaim`: 感嘆詞文字（pasta.tomlの`chars_exclaim`で定義）
+   - `strong`: 強調記号（pasta.tomlの`chars_strong`で定義）
    - `leader`: リーダー文字（pasta.tomlの`chars_leader`で定義）
    - `line_start_prohibited`: 行頭禁則文字（pasta.tomlの`chars_line_start_prohibited`で定義）
    - `line_end_prohibited`: 行末禁則文字（pasta.tomlの`chars_line_end_prohibited`で定義）
