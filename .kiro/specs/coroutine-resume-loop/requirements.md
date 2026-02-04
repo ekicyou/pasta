@@ -5,27 +5,31 @@ EVENT.fireでコルーチンの実行部にループを追加。コルーチン�
 
 ## Introduction
 
-SHIORIイベントハンドラーにおいて、シーン関数がコルーチンとして実行される際、nil値をyieldすることで「まだ出力が確定していない」状態を表現できる。本機能は、コルーチンが有効な値（nil以外）を返すか、終了するまで自動的にresumeを継続するループ機構を`EVENT.fire`に導入する。
+SHIORIイベントハンドラーにおいて、シーン関数がコルーチンとして実行される際、想定外の挙動やバグにより途中でnil値をyieldする可能性がある。本機能は、EVENT.fire側で防御的にnil yieldを処理し、有効な値（nil以外）が得られるか、コルーチンが終了する（dead状態）まで自動的にresumeを継続するループ機構を導入する。
 
-これにより、シーン関数は内部処理中に一時的にnilをyieldし、準備ができた時点で有効なさくらスクリプトを返すことが可能となる。
+シーン関数は無限にyieldする可能性があるため、ループ上限は設定しない。`SCENE.co_exec`の`wrapped_fn`は最後に必ず1回`act:build()`を呼び出すことを保証しており、シーンが全く撮影されていない場合（空シーン）にnilを返す。このdead状態で返されるnilは「有効な値」として扱い、`RES.ok(nil)`→`RES.no_content()`変換により正常に処理される。
 
 ## Requirements
 
 ### Requirement 1: コルーチンresumeループ関数の実装
 
-**Objective:** As a シーン開発者, I want コルーチンがnilをyieldした場合に自動的にresumeが継続される, so that 内部処理中の一時停止をシームレスに扱える
+**Objective:** As a SHIORIランタイム, I want 想定外のnil yieldに対して堅牢に処理できる, so that シーン関数のバグや特殊ケースでもシステムが安定動作する
 
 **実装方針**: `pasta.shiori.event.init`モジュール内にローカル関数`resume_until_valid`を新規作成し、既存の`set_co_scene`と同様の責務分離パターンを適用する（ギャップ分析Option B）。
+
+**設計方針**: 
+- シーン関数は無限にyieldする可能性があるため、ループ上限は設定しない
+- `SCENE.co_exec`の`wrapped_fn`は最後に必ず1回`act:build()`を呼び出す
+- dead状態で返されるnilは「有効な値」（空シーン）として扱う
 
 #### Acceptance Criteria
 
 1. When コルーチンのresumeがnilを返す and コルーチンステータスが"suspended"である, the EVENTモジュール shall 再度resumeを実行する
-2. When コルーチンのresumeがnil以外の値を返す, the EVENTモジュール shall ループを終了してその値を返す
-3. When コルーチンステータスが"dead"になる, the EVENTモジュール shall ループを終了する
-4. If コルーチンのresume中にエラーが発生する, then the EVENTモジュール shall エラーを伝搬してコルーチンをcloseする
-5. The EVENTモジュール shall ループ処理を担当するローカル関数`resume_until_valid`を実装する
+2. When コルーチンのresumeがnil以外の値を返す or コルーチンステータスが"dead"になる, the EVENTモジュール shall ループを終了してその値を返す（nilも含む）
+3. If コルーチンのresume中にエラーが発生する, then the EVENTモジュール shall エラーを伝搬してコルーチンをcloseする
+4. The EVENTモジュール shall ループ処理を担当するローカル関数`resume_until_valid`を実装する
 
-**注記**: `RES.ok(nil)`は自動的に`RES.no_content()`に変換されるため、ループ内でのnil判定は`RES.ok`呼び出しの前に行う必要がある。
+**注記**: `RES.ok(nil)`は自動的に`RES.no_content()`に変換されるため、dead状態で返されるnilは正常に204レスポンスとなる。
 
 ### Requirement 2: EVENT.fire統合
 
