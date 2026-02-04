@@ -38,24 +38,13 @@ ACT:build() / SHIORI_ACT:build()の早期打ち切りパターン。ACT:build()�
 - tokenがnilでない場合は、現状通りBUILDER.build()で変換処理を実行する
 
 #### R3: 会話未作成の検出可能性
-**The** 呼び出し元（シーンハンドラ等） **shall** SHIORI_ACT:build()がnilを返した場合に、会話が未作成であることを検出できる。
+**The** シーン関数内部 **shall** SHIORI_ACT:build()がnilを返した場合に、会話が未作成であることを検出できる。
 
 **詳細仕様:**
 - 戻り値の型: `string|nil`（型アノテーションを更新）
-- 呼び出し元は明示的にnil検証を行う（`if script == nil`）
-- nil検証後の標準処理: `RES.no_content()`を返す（SHIORI/3.0の204 No Content）
-- 影響を受ける呼び出し元:
-  - `crates/pasta_lua/scripts/pasta/shiori/event/init.lua` - イベントハンドラドキュメント例
-  - `crates/pasta_lua/scripts/pasta/shiori/event/virtual_dispatcher.lua` - OnTalk/OnHourシーン実行後
-
-#### R4: 呼び出し元のnil処理実装（新規追加）
-**When** イベントハンドラ内でSHIORI_ACT:build()を呼び出した場合、**the** イベントハンドラ **shall** nil戻り値を検証し、適切に処理する。
-
-**詳細仕様:**
-- nil検証パターン: `local script = act:build(); if script == nil then return RES.no_content() end`
-- `RES.ok(nil)`は使用しない（nil渡しによる予期しない挙動を回避）
-- 既存のイベントハンドラドキュメント例（init.lua:40）を更新
-- virtual_dispatcher.luaのシーン実行後処理を確認・修正
+- シーン関数は必要に応じてnil検証を行う（`if script == nil`）
+- nil検出後の処理はシーン作者の責任（本機能のスコープ外）
+- **注記:** OnTalk/OnHourイベントハンドラはコルーチン（thread）を返すだけであり、act:build()は呼ばない
 
 ### Non-Functional Requirements
 
@@ -72,7 +61,7 @@ ACT:build() / SHIORI_ACT:build()の早期打ち切りパターン。ACT:build()�
 
 **制約:**
 - ACT:build()は現在`table[]`を返す前提で設計されているため、nilリターンの導入により既存コードの修正が必要になる可能性がある
-- SHIORI_ACT:build()の呼び出し元が、nil戻り値を適切にハンドリングする必要がある（例: OnTalk, OnHourイベントハンドラ）
+- シーン関数内でSHIORI_ACT:build()の戻り値がnil可能性を考慮する必要がある
 
 **前提:**
 - 撮影トークン0件 = 会話未作成と定義する
@@ -100,9 +89,7 @@ ACT:build() / SHIORI_ACT:build()の早期打ち切りパターン。ACT:build()�
 - ✅ 既存のSHIORI_ACT:build()テストケースが引き続きパスする
 - ✅ 新規テストケース（トークン0件時のnilリターン）が追加されている
 
-#### AC5: 呼び出し元のnil処理確認（Integration Test）
-- ✅ イベントハンドラドキュメント例（init.lua）がnil処理を含む
-- ✅ virtual_dispatcher.luaがSHIORI_ACT:build()のnilを適切に処理する
-- ✅ nilリターン時にRES.no_content()を返す（204 No Content）
-- ✅ 統合テストでnilリターン時にエラーやクラッシュが発生しない
+#### AC5: ドキュメント・型アノテーション整合性
+- ✅ init.lua:40のドキュメント例が、build()の戻り値がnilとなる可能性を記載
+- ✅ 既存シーン関数がnilを考慮しない場合でもクラッシュしない（nil連結等のエラーはシーン作者の責任）
 
