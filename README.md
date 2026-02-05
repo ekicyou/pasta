@@ -3,11 +3,11 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 
 ## 関連ドキュメント
 
-| ドキュメント                 | 説明                                               |
-| ---------------------------- | -------------------------------------------------- |
-| [GRAMMAR.md](GRAMMAR.md)     | Pasta DSL 文法リファレンス（学習用クイックガイド） |
-| [doc/spec/](doc/spec/)       | Pasta DSL 正式言語仕様書（章別分割、実装判断の権威的ソース） |
-| [AGENTS.md](AGENTS.md)       | AI開発支援ドキュメント（Kiro仕様駆動開発）         |
+| ドキュメント             | 説明                                                         |
+| ------------------------ | ------------------------------------------------------------ |
+| [GRAMMAR.md](GRAMMAR.md) | Pasta DSL 文法リファレンス（学習用クイックガイド）           |
+| [doc/spec/](doc/spec/)   | Pasta DSL 正式言語仕様書（章別分割、実装判断の権威的ソース） |
+| [AGENTS.md](AGENTS.md)   | AI開発支援ドキュメント（Kiro仕様駆動開発）                   |
 
 ## アーキテクチャ
 

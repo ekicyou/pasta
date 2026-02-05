@@ -70,9 +70,9 @@ When starting new work, load context in this order:
 
 ### Related Documents
 
-| Document                             | Description                          |
-| ------------------------------------ | ------------------------------------ |
-| [SOUL.md](SOUL.md)                   | プロジェクトの憲法（最優先）         |
-| [README.md](README.md)               | Project overview & architecture      |
-| [GRAMMAR.md](GRAMMAR.md)             | DSL grammar reference（人間向け）    |
-| [doc/spec/](doc/spec/)               | Formal language specification（章別）|
+| Document                 | Description                           |
+| ------------------------ | ------------------------------------- |
+| [SOUL.md](SOUL.md)       | プロジェクトの憲法（最優先）          |
+| [README.md](README.md)   | Project overview & architecture       |
+| [GRAMMAR.md](GRAMMAR.md) | DSL grammar reference（人間向け）     |
+| [doc/spec/](doc/spec/)   | Formal language specification（章別） |
