@@ -226,11 +226,11 @@ Luaの`require()`はモジュールが見つからない場合エラーを返す
 
 ## 6. 要件-資産マッピング（サマリ）
 
-| 要件ID | 既存資産                       | ギャップタグ   | 対応方針                          |
-| ------ | ------------------------------ | -------------- | --------------------------------- |
-| Req 1  | `default_lua_search_paths()`   | **Missing**    | パス追加                          |
+| 要件ID | 既存資産                       | ギャップタグ   | 対応方針                            |
+| ------ | ------------------------------ | -------------- | ----------------------------------- |
+| Req 1  | `default_lua_search_paths()`   | **Missing**    | パス追加                            |
 | Req 2  | `lua.load()`                   | **Constraint** | ヘルパー関数新設、全箇所をrequire化 |
-| Req 3  | `from_loader_with_scene_dic()` | **Missing**    | 順序変更                          |
-| Req 4  | なし                           | **Missing**    | scripts/main.lua新規              |
-| Req 5  | `pasta.toml.template`          | **Missing**    | テンプレート更新                  |
-| Req 6  | デフォルト値機構               | **OK**         | 既存機構で対応                    |
+| Req 3  | `from_loader_with_scene_dic()` | **Missing**    | 順序変更                            |
+| Req 4  | なし                           | **Missing**    | scripts/main.lua新規                |
+| Req 5  | `pasta.toml.template`          | **Missing**    | テンプレート更新                    |
+| Req 6  | デフォルト値機構               | **OK**         | 既存機構で対応                      |
