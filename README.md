@@ -28,7 +28,7 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 
 ## アーキテクチャ
 
-Pastaは、areka デスクトップマスコットアプリケーション向けのスクリプトエンジンです。
+Pastaは、「伺か」などのデスクトップマスコットアプリケーション、あるいはノベルゲーム用途に向いたスクリプトエンジンです。
 
 ### レイヤー構成
 
@@ -42,33 +42,24 @@ Runtime (Lua VM) → IR Output (ScriptEvent)
 
 ### パーサー/トランスパイラーアーキテクチャ
 
-Pastaは `parser2` + `transpiler2` スタックを使用しています：
+Pastaは現行の `parser` + `transpiler` スタックを使用しています：
 
-| モジュール           | 文法ファイル   | 状態               | 用途                  |
-| -------------------- | -------------- | ------------------ | --------------------- |
-| `pasta::parser2`     | `grammar.pest` | **現行**           | engine.rsで使用       |
-| `pasta::transpiler2` | -              | **現行**           | 2-pass トランスパイル |
-| `pasta::parser`      | `pasta.pest`   | レガシー（非推奨） | 後方互換性のため維持  |
-| `pasta::transpiler`  | -              | レガシー（非推奨） | 後方互換性のため維持  |
+| モジュール              | 文法ファイル   | 状態     | 用途                  |
+| ----------------------- | -------------- | -------- | --------------------- |
+| `pasta_core::parser`    | `grammar.pest` | **現行** | engine.rsで使用       |
+| `pasta_lua::transpiler` | -              | **現行** | 2-pass トランスパイル |
 
 #### 使用方法
 
 ```rust
-// 現行スタック（推奨）
+// 現行スタック
 use pasta_core::parser::{parse_str, parse_file};
 use pasta_lua::transpiler::Transpiler;
 ```
 
-#### 移行履歴
+### parserについて
 
-1. **Phase 1**: ✅ parser2モジュールを作成、parser と並存
-2. **Phase 2**: ✅ transpiler2を作成、parser2と連携
-3. **Phase 3**: ✅ engine.rs を parser2/transpiler2 に完全移行
-4. **Phase 4**: （保留）レガシースタックの削除は後方互換性確認後に実施
-
-### parser2について
-
-`parser2`モジュールは、検証済みの`pasta2.pest`文法（`grammar.pest`として配置）に基づいています。
+`parser`モジュールは、`grammar.pest`文法に基づいています。
 
 主な特徴：
 - 3層スコープ構造：`FileScope` ⊃ `GlobalSceneScope` ⊃ `LocalSceneScope`
