@@ -126,12 +126,12 @@ git push origin <branch>
 
 **❌ 絶対禁止**：複数の変更を巻き込む可能性のある破壊的 Git 操作
 
-| 禁止コマンド | 理由 | 代替手段 |
-|-------------|------|----------|
-| `git revert <commit>` | 他セッションの未コミット作業を巻き込む | `git show <commit>` で差分確認後、手動で逆変更 |
-| `git reset --hard` | 未コミット変更を完全消去 | `git status` で確認後、必要なら `git stash` |
-| `git checkout -- <file>` | ファイル単位の強制破棄 | `git diff <file>` で確認後、エディタで手動修正 |
-| `git clean -fd` | 未追跡ファイルの一括削除 | `git clean -fdn` で確認後、個別削除 |
+| 禁止コマンド             | 理由                                   | 代替手段                                       |
+| ------------------------ | -------------------------------------- | ---------------------------------------------- |
+| `git revert <commit>`    | 他セッションの未コミット作業を巻き込む | `git show <commit>` で差分確認後、手動で逆変更 |
+| `git reset --hard`       | 未コミット変更を完全消去               | `git status` で確認後、必要なら `git stash`    |
+| `git checkout -- <file>` | ファイル単位の強制破棄                 | `git diff <file>` で確認後、エディタで手動修正 |
+| `git clean -fd`          | 未追跡ファイルの一括削除               | `git clean -fdn` で確認後、個別削除            |
 
 **✅ 安全な修正手順**：
 
@@ -174,9 +174,9 @@ git push origin <branch>
 
 | 変更種別             | 更新対象ドキュメント                                    |
 | -------------------- | ------------------------------------------------------- |
-| コアバリュー影響     | **SOUL.md（最優先）**、doc/spec/                           |
+| コアバリュー影響     | **SOUL.md（最優先）**、doc/spec/                        |
 | 公開API変更          | クレートREADME、doc/spec/                               |
-| DSL文法変更          | GRAMMAR.md、steering/grammar.md、SOUL.md（設計原則）   |
+| DSL文法変更          | GRAMMAR.md、steering/grammar.md、SOUL.md（設計原則）    |
 | ディレクトリ構造変更 | steering/structure.md、クレートREADME                   |
 | 依存関係変更         | steering/tech.md、クレートREADME                        |
 | 開発フロー変更       | steering/workflow.md、AGENTS.md                         |
@@ -185,16 +185,16 @@ git push origin <branch>
 
 ### 保守責任
 
-| ドキュメント     | 更新トリガー                         |
-| ---------------- | ------------------------------------ |
+| ドキュメント     | 更新トリガー                             |
+| ---------------- | ---------------------------------------- |
 | **SOUL.md**      | **コアバリュー・設計原則変更（最優先）** |
-| README.md        | プロジェクト概要変更、新クレート追加 |
-| AGENTS.md        | AI開発支援コンテキスト変更           |
-| GRAMMAR.md       | DSL文法変更                          |
-| doc/spec/        | 言語仕様変更（権威的）               |
-| TEST_COVERAGE.md | テスト追加・削除・機能変更           |
-| クレートREADME   | クレートAPI/構造変更                 |
-| steering/*       | 対応領域の変更                       |
+| README.md        | プロジェクト概要変更、新クレート追加     |
+| AGENTS.md        | AI開発支援コンテキスト変更               |
+| GRAMMAR.md       | DSL文法変更                              |
+| doc/spec/        | 言語仕様変更（権威的）                   |
+| TEST_COVERAGE.md | テスト追加・削除・機能変更               |
+| クレートREADME   | クレートAPI/構造変更                     |
+| steering/*       | 対応領域の変更                           |
 
 ### 保守ルール
 
