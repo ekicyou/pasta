@@ -14,7 +14,7 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 ### Phase 0: 一次設計の再構築 ✅ 完了
 **最終更新**: 2026-01-30
 
-- [x] 「パスタスクリプト」DSL設計の見直し → [SPECIFICATION.md](../../../SPECIFICATION.md) 完成
+- [x] 「パスタスクリプト」DSL設計の見直し → [doc/spec/](../../../doc/spec/) 完成
 - [x] ２パストランスパイル設計の再検討 → `pasta-lua-cache-transpiler` 完了
 - [x] シーンジャンプテーブル設計の修正 → `scene-search-integration` 完了
 - [x] 宣言的制御フロー（Call/Jump文）の再実装 → `act-impl-call` 完了
@@ -51,7 +51,7 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 
 ### Phase 3: 高度機能（計画中）
 - [ ] シーン継続チェーン（`pasta-label-continuation`）
-- [ ] 動的単語参照（`＠＄変数` - SPECIFICATION.md 11.7で文法予約済み）
+- [ ] 動的単語参照（`＠＄変数` - doc/spec/11-actor-dictionary.mdで文法予約済み）
 - [ ] ランタイム拡充・使い勝手向上
 - [ ] イベントハンドリングの拡充
 
