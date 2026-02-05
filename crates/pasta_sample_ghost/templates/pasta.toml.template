@@ -19,6 +19,7 @@ pasta_patterns = ["dic/*.pasta"]
 # Lua モジュール検索パス（優先順位順）
 lua_search_paths = [
     "profile/pasta/save/lua",   # ユーザー保存スクリプト
+    "user_scripts",              # ユーザー作成スクリプト（カスタマイズ用）
     "scripts",                   # pasta 標準ランタイム
     "profile/pasta/cache/lua",   # トランスパイル済みキャッシュ
     "scriptlibs",                # 追加ライブラリ

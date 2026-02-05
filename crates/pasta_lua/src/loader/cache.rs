@@ -245,6 +245,9 @@ impl CacheManager {
     /// Creates a Lua file that requires all scene modules and calls
     /// finalize_scene() at the end.
     ///
+    /// The generated file is placed at `cache/pasta/scene_dic.lua` to be
+    /// resolved via `require("pasta.scene_dic")`.
+    ///
     /// # Arguments
     /// * `module_names` - List of all module names to require
     ///
@@ -252,7 +255,28 @@ impl CacheManager {
     /// * `Ok(path)` - Path to generated scene_dic.lua
     /// * `Err(LoaderError::SceneDicGenerationError)` - Generation failed
     pub fn generate_scene_dic(&self, module_names: &[String]) -> Result<PathBuf, LoaderError> {
-        let scene_dic_path = self.cache_dir.join("pasta/scene_dic.lua");
+        // Create pasta subdirectory in cache (lua-module-path-resolution spec)
+        let pasta_dir = self.cache_dir.join("pasta");
+        fs::create_dir_all(&pasta_dir)
+            .map_err(|e| LoaderError::scene_dic_generation("Failed to create pasta directory", Some(e)))?;
+
+        // Clean up old scene_dic.lua location (backward compatibility)
+        // Old location: cache_dir/scene_dic.lua (without pasta/ prefix)
+        let old_scene_dic_path = self.cache_dir.join("scene_dic.lua");
+        if old_scene_dic_path.exists() {
+            if let Err(e) = fs::remove_file(&old_scene_dic_path) {
+                warn!(
+                    path = %old_scene_dic_path.display(),
+                    error = %e,
+                    "Failed to remove old scene_dic.lua, continuing"
+                );
+            } else {
+                debug!(path = %old_scene_dic_path.display(), "Removed old scene_dic.lua");
+            }
+        }
+
+        // New location: cache_dir/pasta/scene_dic.lua
+        let scene_dic_path = pasta_dir.join("scene_dic.lua");
 
         // Sort module names alphabetically
         let mut sorted_modules = module_names.to_vec();

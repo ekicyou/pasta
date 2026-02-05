@@ -135,6 +135,11 @@ fn test_pasta_toml_content() {
         content.contains(r#""profile/pasta/save/lua""#),
         "lua_search_paths の順序1がありません"
     );
+    // Task 7.5: user_scripts が検索パスに含まれることを確認
+    assert!(
+        content.contains(r#""user_scripts""#),
+        "lua_search_paths に user_scripts がありません"
+    );
     assert!(
         content.contains(r#""scripts""#),
         "lua_search_paths に scripts がありません"

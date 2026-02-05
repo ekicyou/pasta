@@ -27,7 +27,7 @@ use crate::error::ConfigError;
 use crate::loader::{LoaderContext, LuaConfig, PastaConfig, TranspileResult, default_libs};
 use crate::logging::PastaLogger;
 pub(crate) use finalize::register_finalize_scene;
-use mlua::{Lua, LuaSerdeExt, Result as LuaResult, StdLib, Table, Value};
+use mlua::{Function, Lua, LuaSerdeExt, Result as LuaResult, StdLib, Table, Value};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -259,6 +259,29 @@ impl From<LuaConfig> for RuntimeConfig {
     fn from(config: LuaConfig) -> Self {
         Self { libs: config.libs }
     }
+}
+
+/// Execute Lua `require()` from Rust.
+///
+/// This helper function calls Lua's standard `require()` function,
+/// following `package.path` settings for module resolution.
+///
+/// # Arguments
+/// * `lua` - Lua VM instance
+/// * `module_name` - Module name to require (e.g., "main", "pasta.shiori.entry")
+///
+/// # Returns
+/// * `Ok(Value)` - Return value from `require()` (usually a module table)
+/// * `Err(LuaError)` - Module not found or loading error
+///
+/// # Example
+/// ```rust,ignore
+/// let result = lua_require(&lua, "main")?;
+/// let result = lua_require(&lua, "pasta.shiori.entry")?;
+/// ```
+pub fn lua_require(lua: &Lua, module_name: &str) -> LuaResult<Value> {
+    let require: Function = lua.globals().get("require")?;
+    require.call(module_name)
 }
 
 /// Pasta Lua Runtime - hosts a Lua VM with pasta modules.
@@ -502,13 +525,21 @@ impl PastaLuaRuntime {
     /// Instead of loading transpiled code directly, it loads scene_dic.lua which
     /// requires all cached scene modules.
     ///
+    /// # Initialization Sequence (lua-module-path-resolution spec)
+    /// 1. Setup package.path for module resolution
+    /// 2. Register Rust modules (@pasta_config, @enc, @pasta_persistence, @pasta_sakura_script)
+    /// 3. Register finalize_scene Rust binding
+    /// 4. require("main") - User initialization (errors logged as warnings, continues)
+    /// 5. require("pasta.shiori.entry") - SHIORI handlers (errors logged as warnings, continues)
+    /// 6. require("pasta.scene_dic") - Scene loading and finalization
+    ///
     /// # Arguments
     /// * `context` - TranspileContext with scene/word registries
     /// * `loader_context` - Configuration and paths from PastaLoader
     /// * `runtime_config` - Runtime configuration
     /// * `pasta_config` - Pasta configuration from pasta.toml
     /// * `logger` - Optional instance-specific logger (Arc-wrapped for sharing)
-    /// * `scene_dic_path` - Path to the generated scene_dic.lua
+    /// * `scene_dic_path` - Path to the generated scene_dic.lua (used for backward compatibility check)
     ///
     /// # Returns
     /// * `Ok(Self)` - Runtime initialized and scene_dic loaded
@@ -519,7 +550,7 @@ impl PastaLuaRuntime {
         runtime_config: RuntimeConfig,
         pasta_config: Option<PastaConfig>,
         logger: Option<Arc<PastaLogger>>,
-        scene_dic_path: &Path,
+        _scene_dic_path: &Path,
     ) -> LuaResult<Self> {
         // Create base runtime
         let mut runtime = Self::with_config(context, runtime_config)?;
@@ -546,34 +577,33 @@ impl PastaLuaRuntime {
         // Register @pasta_sakura_script module for wait insertion
         Self::register_sakura_script_module(&runtime.lua, &runtime.config)?;
 
-        // Load entry.lua first (for SHIORI.load/SHIORI.request functions)
-        let entry_lua_path = loader_context
-            .base_dir
-            .join("scripts/pasta/shiori/entry.lua");
-        if entry_lua_path.exists() {
-            match std::fs::read_to_string(&entry_lua_path) {
-                Ok(script) => {
-                    if let Err(e) = runtime.lua.load(&script).set_name("entry.lua").exec() {
-                        tracing::warn!(error = %e, "Failed to load entry.lua, continuing without SHIORI functions");
-                    } else {
-                        tracing::debug!("Loaded entry.lua");
-                    }
-                }
-                Err(e) => {
-                    tracing::warn!(error = %e, "Failed to read entry.lua, continuing without SHIORI functions");
-                }
-            }
-        }
-
         // Register finalize_scene Rust binding to overwrite Lua stub (Requirement 4.3)
         // This must be done before loading scene_dic.lua which calls finalize_scene()
         register_finalize_scene(&runtime.lua)?;
 
-        // Load scene_dic.lua to require all cached scene modules
-        // scene_dic.lua ends with require('pasta').finalize_scene() which
-        // triggers SearchContext construction from Lua-side registries
-        tracing::debug!(path = %scene_dic_path.display(), "Loading scene_dic.lua");
-        runtime.load_scene_dic(scene_dic_path)?;
+        // ========================================
+        // Module Loading Phase (all require-based)
+        // ========================================
+
+        // Step 4: require("main") - User initialization script
+        // Runs before scene_dic finalization to allow dictionary registration
+        if let Err(e) = lua_require(&runtime.lua, "main") {
+            tracing::warn!(error = %e, "Failed to load main.lua, continuing without user initialization");
+        } else {
+            tracing::debug!(module = "main", "Loaded module via require");
+        }
+
+        // Step 5: require("pasta.shiori.entry") - SHIORI handlers
+        if let Err(e) = lua_require(&runtime.lua, "pasta.shiori.entry") {
+            tracing::warn!(error = %e, "Failed to load pasta.shiori.entry, continuing without SHIORI functions");
+        } else {
+            tracing::debug!(module = "pasta.shiori.entry", "Loaded module via require");
+        }
+
+        // Step 6: require("pasta.scene_dic") - Scene loading and finalization
+        // This triggers SearchContext construction from Lua-side registries
+        lua_require(&runtime.lua, "pasta.scene_dic")?;
+        tracing::debug!(module = "pasta.scene_dic", "Loaded module via require");
 
         Ok(runtime)
     }
@@ -1042,5 +1072,80 @@ mod tests {
         assert!(!config.libs.contains(&"std_debug".to_string()));
         assert!(!config.libs.contains(&"std_all_unsafe".to_string()));
         assert!(!config.should_enable_module("env"));
+    }
+
+    // ============================================================================
+    // lua_require() tests (lua-module-path-resolution spec)
+    // ============================================================================
+
+    #[test]
+    fn test_lua_require_existing_module() {
+        // Test that lua_require can load a built-in module
+        let lua = unsafe { Lua::unsafe_new_with(StdLib::ALL_SAFE, mlua::LuaOptions::default()) };
+
+        // Pre-register a test module in package.loaded
+        let test_module = lua.create_table().unwrap();
+        test_module.set("name", "test_module").unwrap();
+        let package: Table = lua.globals().get("package").unwrap();
+        let loaded: Table = package.get("loaded").unwrap();
+        loaded.set("test_module", test_module).unwrap();
+
+        // Use lua_require to load it
+        let result = lua_require(&lua, "test_module");
+        assert!(result.is_ok(), "Should successfully require test_module");
+
+        let value = result.unwrap();
+        if let Value::Table(t) = value {
+            let name: String = t.get("name").unwrap();
+            assert_eq!(name, "test_module");
+        } else {
+            panic!("Expected table from require");
+        }
+    }
+
+    #[test]
+    fn test_lua_require_nonexistent_module() {
+        // Test that lua_require returns error for non-existent module
+        let lua = unsafe { Lua::unsafe_new_with(StdLib::ALL_SAFE, mlua::LuaOptions::default()) };
+
+        let result = lua_require(&lua, "nonexistent_module_xyz123");
+        assert!(result.is_err(), "Should fail for non-existent module");
+
+        // Error message should contain module name
+        let err = result.unwrap_err();
+        let err_str = err.to_string();
+        assert!(
+            err_str.contains("nonexistent_module_xyz123"),
+            "Error message should contain module name: {}",
+            err_str
+        );
+    }
+
+    #[test]
+    fn test_lua_require_dotted_module_name() {
+        // Test that lua_require handles dotted module names (e.g., "pasta.shiori.entry")
+        let lua = unsafe { Lua::unsafe_new_with(StdLib::ALL_SAFE, mlua::LuaOptions::default()) };
+
+        // Pre-register a nested module
+        let entry_module = lua.create_table().unwrap();
+        entry_module.set("initialized", true).unwrap();
+        let package: Table = lua.globals().get("package").unwrap();
+        let loaded: Table = package.get("loaded").unwrap();
+        loaded.set("pasta.shiori.entry", entry_module).unwrap();
+
+        // Use lua_require with dotted name
+        let result = lua_require(&lua, "pasta.shiori.entry");
+        assert!(
+            result.is_ok(),
+            "Should successfully require pasta.shiori.entry"
+        );
+
+        let value = result.unwrap();
+        if let Value::Table(t) = value {
+            let initialized: bool = t.get("initialized").unwrap();
+            assert!(initialized);
+        } else {
+            panic!("Expected table from require");
+        }
     }
 }

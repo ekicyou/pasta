@@ -58,37 +58,41 @@
 
 ### 2.4 Runtime層テスト（実行エンジン）
 
-| 機能                             | テストファイル                         | 状態   | 説明                                         |
-| -------------------------------- | -------------------------------------- | ------ | -------------------------------------------- |
-| Luaスクリプトローダー            | `loader_integration_test.rs`           | ✅ 完了 | スクリプト読み込み                           |
-| 標準ライブラリモジュール         | `stdlib_modules_test.rs`               | ✅ 完了 | stdlib機能                                   |
-| 正規表現モジュール               | `stdlib_regex_test.rs`                 | ✅ 完了 | 14テスト                                     |
-| Lua単体テスト実行                | `lua_unittest_runner.rs`               | ✅ 完了 | Luaテストランナー                            |
-| STORE.save/CTX注入               | `store_save_test.lua`                  | ✅ 完了 | 永続変数・参照同一性                         |
-| CONFIG.actor→STORE.actors初期化  | `config_actors_initialization_test.rs` | ✅ 完了 | 8テスト（pasta.tomlアクター設定）            |
-| SHIORIレスポンスビルダー         | `shiori_res_test.rs`                   | ✅ 完了 | 14テスト                                     |
-| SHIORIイベントディスパッチ       | `shiori_event_test.rs`                 | ✅ 完了 | 16テスト（新規）                             |
-| SHIORI_ACT さくらスクリプト生成  | `shiori_act_test.lua`                  | ✅ 完了 | 47テスト（transfer_date_to_var 7テスト追加） |
-| SHIORI_ACT 日時転記機能          | `shiori_act_test.lua`                  | ✅ 完了 | 7テスト（onhour-date-var-transfer）          |
-| ACT トークンバッファ（親クラス） | `act_test.lua`                         | ✅ 完了 | 32テスト（act-token-buffer-refactor）        |
-| ACT トークングループ化           | `act_grouping_test.lua`                | ✅ 完了 | 19テスト（actor-talk-grouping）              |
-| sakura_builder トークン変換      | `sakura_builder_test.lua`              | ✅ 完了 | 24テスト（act-token-buffer-refactor）        |
-| RuntimeConfig libs配列           | `runtime::tests`                       | ✅ 完了 | 17テスト（新規）                             |
-| LuaConfig TOML設定               | `loader::config::tests`                | ✅ 完了 | 6テスト（新規）                              |
-| さくらスクリプトウェイト挿入     | `sakura_script_integration_test.rs`    | ✅ 完了 | 19テスト（sakura-script-wait）               |
-| EVENT.fire コルーチン対応        | `event_coroutine_test.lua`             | ✅ 完了 | 16テスト（resume_until_valid含む）           |
-| resume_until_valid nil yieldスキップ | `event_coroutine_test.lua`         | ✅ 完了 | 6テスト（coroutine-resume-loop）             |
+| 機能                                 | テストファイル                         | 状態   | 説明                                         |
+| ------------------------------------ | -------------------------------------- | ------ | -------------------------------------------- |
+| Luaスクリプトローダー                | `loader_integration_test.rs`           | ✅ 完了 | スクリプト読み込み                           |
+| 標準ライブラリモジュール             | `stdlib_modules_test.rs`               | ✅ 完了 | stdlib機能                                   |
+| 正規表現モジュール                   | `stdlib_regex_test.rs`                 | ✅ 完了 | 14テスト                                     |
+| Lua単体テスト実行                    | `lua_unittest_runner.rs`               | ✅ 完了 | Luaテストランナー                            |
+| STORE.save/CTX注入                   | `store_save_test.lua`                  | ✅ 完了 | 永続変数・参照同一性                         |
+| CONFIG.actor→STORE.actors初期化      | `config_actors_initialization_test.rs` | ✅ 完了 | 8テスト（pasta.tomlアクター設定）            |
+| SHIORIレスポンスビルダー             | `shiori_res_test.rs`                   | ✅ 完了 | 14テスト                                     |
+| SHIORIイベントディスパッチ           | `shiori_event_test.rs`                 | ✅ 完了 | 16テスト（新規）                             |
+| SHIORI_ACT さくらスクリプト生成      | `shiori_act_test.lua`                  | ✅ 完了 | 47テスト（transfer_date_to_var 7テスト追加） |
+| SHIORI_ACT 日時転記機能              | `shiori_act_test.lua`                  | ✅ 完了 | 7テスト（onhour-date-var-transfer）          |
+| ACT トークンバッファ（親クラス）     | `act_test.lua`                         | ✅ 完了 | 32テスト（act-token-buffer-refactor）        |
+| ACT トークングループ化               | `act_grouping_test.lua`                | ✅ 完了 | 19テスト（actor-talk-grouping）              |
+| sakura_builder トークン変換          | `sakura_builder_test.lua`              | ✅ 完了 | 24テスト（act-token-buffer-refactor）        |
+| RuntimeConfig libs配列               | `runtime::tests`                       | ✅ 完了 | 17テスト（新規）                             |
+| LuaConfig TOML設定                   | `loader::config::tests`                | ✅ 完了 | 6テスト（新規）                              |
+| さくらスクリプトウェイト挿入         | `sakura_script_integration_test.rs`    | ✅ 完了 | 19テスト（sakura-script-wait）               |
+| EVENT.fire コルーチン対応            | `event_coroutine_test.lua`             | ✅ 完了 | 16テスト（resume_until_valid含む）           |
+| resume_until_valid nil yieldスキップ | `event_coroutine_test.lua`             | ✅ 完了 | 6テスト（coroutine-resume-loop）             |
+| user_scripts検索パス優先順位         | `loader_integration_test.rs`           | ✅ 完了 | 2テスト（lua-module-path-resolution）        |
+| main.lua初期化順序                   | `loader_integration_test.rs`           | ✅ 完了 | 2テスト（lua-module-path-resolution）        |
+| scene_dic require化                  | `loader_integration_test.rs`           | ✅ 完了 | 3テスト（lua-module-path-resolution）        |
+| lua_requireヘルパー関数              | `runtime::tests`                       | ✅ 完了 | 3テスト（lua-module-path-resolution）        |
 
 ### 2.5 統合テスト（E2E）
 
-| 機能                                 | テストファイル                                                      | 状態    | 説明                                                |
-| ------------------------------------ | ------------------------------------------------------------------- | ------- | --------------------------------------------------- |
-| SHIORI.DLL インターフェース          | `shiori_lifecycle_test.rs`                                          | ✅ 完了 | 5テスト全パス                                       |
-| SHIORI リクエスト処理                | `lua_request_test.rs`                                               | ✅ 完了 | 18+テスト                                           |
-| Runtime E2E                          | `runtime_e2e_test.rs`                                               | ✅ 完了 | 16テスト（新規）                                    |
-| Finalize Scene                       | `finalize_scene_test.rs`                                            | ✅ 完了 | 14テスト                                            |
-| Virtual Event Dispatcher             | `virtual_event_dispatcher_test.rs`<br>`virtual_dispatcher_spec.lua` | ✅ 完了 | 15+20テスト（onhour-date-var-transfer 5テスト追加） |
-| Sample Ghost Integration             | `shiori_sample_ghost_test.rs`                                       | ✅ 完了 | 2テスト（hello-pasta実ゴースト使用）                |
+| 機能                        | テストファイル                                                      | 状態   | 説明                                                |
+| --------------------------- | ------------------------------------------------------------------- | ------ | --------------------------------------------------- |
+| SHIORI.DLL インターフェース | `shiori_lifecycle_test.rs`                                          | ✅ 完了 | 5テスト全パス                                       |
+| SHIORI リクエスト処理       | `lua_request_test.rs`                                               | ✅ 完了 | 18+テスト                                           |
+| Runtime E2E                 | `runtime_e2e_test.rs`                                               | ✅ 完了 | 16テスト（新規）                                    |
+| Finalize Scene              | `finalize_scene_test.rs`                                            | ✅ 完了 | 14テスト                                            |
+| Virtual Event Dispatcher    | `virtual_event_dispatcher_test.rs`<br>`virtual_dispatcher_spec.lua` | ✅ 完了 | 15+20テスト（onhour-date-var-transfer 5テスト追加） |
+| Sample Ghost Integration    | `shiori_sample_ghost_test.rs`                                       | ✅ 完了 | 2テスト（hello-pasta実ゴースト使用）                |
 
 ---
 
