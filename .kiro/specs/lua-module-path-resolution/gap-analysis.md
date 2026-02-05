@@ -176,21 +176,12 @@ Luaの`require()`はモジュールが見つからない場合エラーを返す
 **Trade-offs**:
 - ✅ 完全なLuaルール準拠
 - ✅ 一貫性のある設計
-- ❌ scene_dic.luaの動的生成とrequireの整合性が複雑
-- ❌ キャッシュディレクトリ構造の変更が必要な可能性
+- ✅ ユーザーが上書きした場合はユーザー責任（例外を設けない原則）
+- ⚠️ scene_dic.luaはキャッシュディレクトリに生成されるが、requireで解決可能
 
-### Option C: ハイブリッドアプローチ（推奨）
+~~### Option C: ハイブリッドアプローチ（推奨）~~
 
-**変更対象**:
-- Option Aのすべて
-- `scene_dic.lua`は生成パス（cache内）に配置されるため、現行の直接読み込みを維持
-- `main.lua`および将来の拡張モジュールはrequireベース
-
-**Trade-offs**:
-- ✅ 現実的な実装コスト
-- ✅ ユーザーが上書き可能な部分はrequireルール準拠
-- ✅ システム生成ファイルは効率的な直接読み込み維持
-- ❌ 読み込み方式が混在（ただし合理的な区分）
+**Option C は廃止**: 例外を設ける理由がないため、Option B（フルrequireアプローチ）を採用。
 
 ---
 
@@ -213,16 +204,17 @@ Luaの`require()`はモジュールが見つからない場合エラーを返す
 
 ## 5. 設計フェーズへの推奨事項
 
-### 優先アプローチ: Option C（ハイブリッドアプローチ）
+### 優先アプローチ: Option B（フルrequireアプローチ）
+
+**設計原則**: Lua検索パス優先順位による上書き可能領域を極限まで広げる。例外は設けない。
 
 ### キー決定事項
 
 1. **requireヘルパー関数**: `globals().get("require")`方式を採用
-2. **初期化順序**: entry.lua → main.lua → scene_dic.lua
-3. **entry.luaの扱い**: 
-   - 短期: 現行の直接読み込み維持（スコープ外）
-   - 中期: `require("pasta.shiori.entry")`への移行検討
-4. **scene_dic.lua**: 直接読み込み維持（動的生成のため）
+2. **初期化順序**: main.lua → entry.lua → scene_dic.lua（全てrequireベース）
+3. **entry.luaの扱い**: `require("pasta.shiori.entry")`に変更（例外なし）
+4. **scene_dic.lua**: `require("pasta.scene_dic")`に変更（例外なし）
+5. **ユーザー上書き時の責任**: ユーザーが上書きした場合の挙動はユーザー責任
 
 ### 次フェーズで検討が必要な項目
 
@@ -234,11 +226,11 @@ Luaの`require()`はモジュールが見つからない場合エラーを返す
 
 ## 6. 要件-資産マッピング（サマリ）
 
-| 要件ID | 既存資産                       | ギャップタグ   | 対応方針             |
-| ------ | ------------------------------ | -------------- | -------------------- |
-| Req 1  | `default_lua_search_paths()`   | **Missing**    | パス追加             |
-| Req 2  | `lua.load()`                   | **Constraint** | ヘルパー関数新設     |
-| Req 3  | `from_loader_with_scene_dic()` | **Missing**    | 順序変更             |
-| Req 4  | なし                           | **Missing**    | scripts/main.lua新規 |
-| Req 5  | `pasta.toml.template`          | **Missing**    | テンプレート更新     |
-| Req 6  | デフォルト値機構               | **OK**         | 既存機構で対応       |
+| 要件ID | 既存資産                       | ギャップタグ   | 対応方針                          |
+| ------ | ------------------------------ | -------------- | --------------------------------- |
+| Req 1  | `default_lua_search_paths()`   | **Missing**    | パス追加                          |
+| Req 2  | `lua.load()`                   | **Constraint** | ヘルパー関数新設、全箇所をrequire化 |
+| Req 3  | `from_loader_with_scene_dic()` | **Missing**    | 順序変更                          |
+| Req 4  | なし                           | **Missing**    | scripts/main.lua新規              |
+| Req 5  | `pasta.toml.template`          | **Missing**    | テンプレート更新                  |
+| Req 6  | デフォルト値機構               | **OK**         | 既存機構で対応                    |

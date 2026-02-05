@@ -77,17 +77,21 @@ scene_dicによるファイナライズより先にmainを解決する。これ�
 
 **Objective:** pasta_luaランタイム開発者として、モジュール読み込みをLua標準の`require()`に統一したい。これにより、Luaの検索パス解決ルールに準拠し、一貫性のあるモジュール解決が実現できる。
 
+**設計原則**: Lua検索パス優先順位による上書き可能領域を極限まで広げる。例外は設けない。ユーザーが上書きした場合の挙動はユーザー責任とする。
+
 #### Acceptance Criteria
 
-1. When main.luaを読み込むとき, the PastaRuntime shall Rustでファイルを直接読み込む代わりに`require("main")`相当の処理を実行する。
+1. When main.luaを読み込むとき, the PastaRuntime shall `require("main")`でモジュールを解決する。
 
-2. When scene_dic.luaを読み込むとき, the PastaRuntime shall `require("pasta.scene_dic")`相当の処理でモジュールを解決する。
+2. When scene_dic.luaを読み込むとき, the PastaRuntime shall `require("pasta.scene_dic")`でモジュールを解決する。
 
-3. The PastaRuntime shall `&Lua`とモジュール名を受け取り`require`を実行するヘルパー関数を提供する。
+3. When entry.luaを読み込むとき, the PastaRuntime shall `require("pasta.shiori.entry")`でモジュールを解決する。
 
-4. If require対象のモジュールが見つからないとき, the PastaRuntime shall 適切なエラーメッセージを返す。
+4. The PastaRuntime shall `&Lua`とモジュール名を受け取り`require`を実行するヘルパー関数を提供する。
 
-5. The require helper function shall Luaの`package.path`設定に従ってモジュールを検索する。
+5. If require対象のモジュールが見つからないとき, the PastaRuntime shall 適切なエラーメッセージを返す。
+
+6. The require helper function shall Luaの`package.path`設定に従ってモジュールを検索する。
 
 ---
 
