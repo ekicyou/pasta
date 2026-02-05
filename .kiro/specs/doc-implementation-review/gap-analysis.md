@@ -460,16 +460,71 @@
 
 ---
 
+### 議題5: SPECIFICATION.md分割管理
+
+**決定日**: 2026-02-05  
+**ステータス**: ✅ 方針決定
+
+**方針**:
+- **SPECIFICATION.mdを`doc/spec/`配下に章別分割**
+- **ルートのSPECIFICATION.mdは廃止**
+- `doc/spec/README.md`をインデックスとして提供
+
+**Implementation時の作業内容**:
+
+1. `doc/spec/`ディレクトリ構造:
+   ```
+   doc/spec/
+   ├── README.md                   # 仕様書インデックス（どの章から読むべきか）
+   ├── 01-grammar-model.md         # 章1: 文法モデルの基本原則
+   ├── 02-markers.md               # 章2: キーワード・マーカー定義
+   ├── 03-block-structure.md       # 章3: 行とブロック構造
+   ├── 04-call-spec.md             # 章4: Callの詳細仕様
+   ├── 05-literals.md              # 章5: リテラル型
+   ├── 06-action-line.md           # 章6: アクション行
+   ├── 07-sakura-script.md         # 章7: Sakuraスクリプト仕様
+   ├── 08-attributes.md            # 章8: 属性
+   ├── 09-variables.md             # 章9: 変数・スコープ
+   ├── 10-words.md                 # 章10: 単語定義
+   ├── 11-actor-dictionary.md      # 章11: アクター辞書
+   └── 12-future.md                # 章12: 未確定事項・検討中の仕様
+   ```
+
+2. `steering/grammar.md`の更新:
+   - 頻出情報（マーカー一覧、基本パターン）を展開
+   - 詳細参照マップ（`doc/spec/02-markers.md#L10`形式）
+
+3. `SPECIFICATION.md`の削除:
+   - ルートから削除
+   - READMEから`doc/spec/README.md`への参照に変更
+
+4. AI Context Loading Priority更新（AGENTS.md）:
+   - **Specifications**: `doc/spec/README.md`（インデックス）
+   - 必要に応じて該当章のみ読み込み
+
+**理由**:
+- ルートをクリーンに保つ（ドキュメントは`doc/`配下に集約）
+- AIのコンテキストサイズ最適化（必要な章だけ読める）
+- SPECIFICATION.md全体（~28KB）を読む必要がなくなる
+- 各章2-4KB程度で独立管理可能
+
+**コンテキスト最適化効果**:
+- 現状: SPECIFICATION.md全体 ~7,000トークン
+- 改善後: 必要な章のみ ~500-1,000トークン/章
+
+---
+
 ## 9. 議題ディスカッション完了サマリー
 
-**全4議題完了**: 2026-02-05
+**全5議題完了**: 2026-02-05
 
-| 議題 | 内容                         | 決定                                       |
-| ---- | ---------------------------- | ------------------------------------------ |
-| #1   | steering/grammar.md役割分離  | AI向け完全参照 vs 人間向けマニュアル       |
-| #2   | CHANGELOG.md作成要否         | Phase 4（外部公開準備時）に初版作成        |
-| #3   | CONTRIBUTING.md作成要否      | 実際のPR発生まで延期（YAGNI原則）          |
-| #4   | 文書階層のSOUL.md記載        | Level 2に品質管理ドキュメント追加          |
+| 議題 | 内容                        | 決定                                    |
+| ---- | --------------------------- | --------------------------------------- |
+| #1   | steering/grammar.md役割分離 | AI向け完全参照 vs 人間向けマニュアル    |
+| #2   | CHANGELOG.md作成要否        | Phase 4（外部公開準備時）に初版作成     |
+| #3   | CONTRIBUTING.md作成要否     | 実際のPR発生まで延期（YAGNI原則）       |
+| #4   | 文書階層のSOUL.md記載       | Level 2に品質管理ドキュメント追加       |
+| #5   | SPECIFICATION.md分割管理    | doc/spec/配下に章別分割、ルート版は廃止 |
 
 **次フェーズ**: Design Phase (`/kiro-spec-design doc-implementation-review`)
 
