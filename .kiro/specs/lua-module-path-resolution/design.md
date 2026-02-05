@@ -203,7 +203,8 @@ sequenceDiagram
     Runtime->>Lua: lua_require("main")
     Lua->>FS: search package.path for main.lua
     FS-->>Lua: user_scripts/main.lua or scripts/main.lua
-    Lua-->>Runtime: main module loaded
+    Lua-->>Runtime: main module loaded (error → warn and continue)
+    Note right of Runtime: Syntax/runtime errors in main.lua<br/>are logged as warnings<br/>but do not stop initialization
     
     Runtime->>Lua: lua_require("pasta.shiori.entry")
     Lua->>FS: search package.path for pasta/shiori/entry.lua
@@ -371,11 +372,12 @@ requireヘルパー関数のエラーは、Luaの標準エラーメッセージ�
 
 ### Error Categories and Responses
 
-| エラー種別       | 発生条件                          | 対応                    |
-| ---------------- | --------------------------------- | ----------------------- |
-| Module not found | require対象が検索パスに存在しない | Luaエラーをそのまま伝播 |
-| Syntax error     | Luaファイルに文法エラー           | Luaエラーをそのまま伝播 |
-| Runtime error    | Luaファイル実行中のエラー         | Luaエラーをそのまま伝播 |
+| エラー種別       | 発生条件                          | 対応                                             |
+| ---------------- | --------------------------------- | ------------------------------------------------ |
+| Module not found | require対象が検索パスに存在しない | Luaエラーをそのまま伝播                          |
+| Syntax error     | Luaファイルに文法エラー           | Luaエラーをそのまま伝播                          |
+| Runtime error    | Luaファイル実行中のエラー         | Luaエラーをそのまま伝播                          |
+| **main.lua特有** | main.luaのシンタックス/実行エラー | **警告ログのみで初期化継続**（entry.luaと同様） |
 
 ### Logging
 
@@ -383,7 +385,11 @@ requireヘルパー関数のエラーは、Luaの標準エラーメッセージ�
 // 成功時
 tracing::debug!(module = %module_name, "Loaded module via require");
 
-// 失敗時（Luaエラーとして伝播するため追加ログ不要）
+// 失敗時（通常はLuaエラーとして伝播）
+// ただしmain.lua/entry.luaは例外: エラーでも警告のみで継続
+if let Err(e) = lua_require(&lua, "main") {
+    tracing::warn!(error = %e, "Failed to load main.lua, continuing without user initialization");
+}
 ```
 
 ---

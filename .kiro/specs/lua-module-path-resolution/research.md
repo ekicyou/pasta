@@ -107,6 +107,21 @@
   - entry.lua内でscene検索を使う場合は動作しない → 現状そのような使用はない
 - **Follow-up**: 初期化順序をドキュメント化
 
+### Decision: main.luaエラー時の挙動（警告のみで継続）
+
+- **Context**: main.luaにシンタックスエラーや実行時エラーがある場合の対応
+- **Alternatives Considered**:
+  1. エラーで初期化失敗（厳格） - 不完全な状態で動作させない
+  2. 警告のみで継続（寛容） - entry.luaと同様の扱い
+- **Selected Approach**: 方式2（警告のみで継続）
+- **Rationale**: 
+  - main.luaはオプショナルな初期化処理
+  - ユーザー辞書登録がなくても基本機能（DSLトランスパイル済みシーン）は動作すべき
+  - entry.luaと一貫した挙動
+- **Trade-offs**: 
+  - ユーザーの意図した初期化が行われないリスク → 警告ログで通知
+- **Follow-up**: Error Handlingセクションに明記
+
 ## Risks & Mitigations
 
 - **Risk 1**: ユーザーがpasta/init.luaを上書きしてシステムが動作しなくなる
