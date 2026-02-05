@@ -56,7 +56,8 @@ Pasta DSL では**式（Expression）を記述できます**。式は変数代�
 
 ````pasta
 ```lua
-function calculate(ctx)
+function SCENE.calculate(act)
+    local save, var = act:init_scene(SCENE)
     local result = 10 + 20 * 3
     return result
 end

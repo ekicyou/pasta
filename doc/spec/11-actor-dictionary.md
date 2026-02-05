@@ -91,7 +91,8 @@
 ％actor_name
   ＠word_name：value
   ```lua
-  function on_actor_event(ctx)
+  function SCENE.on_actor_event(act)
+    local save, var = act:init_scene(SCENE)
     -- アクター固有のイベント処理
   end
   ```

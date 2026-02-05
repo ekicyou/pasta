@@ -229,12 +229,14 @@ Callマーカー ::= "＞" | ">"
 ````pasta
 ＊会話
 ```lua
-function on_init(ctx)
-  ctx:flag("talked", true)
+function SCENE.on_init(act)
+  local save, var = act:init_scene(SCENE)
+  save.talked = true
 end
-function on_event(ctx)
+function SCENE.on_event(act)
+  local save, var = act:init_scene(SCENE)
   for i = 0, 9 do
-    coroutine.yield(ctx:event("loop", i))
+    act.さくら:talk("ループ" .. tostring(i))
   end
 end
 ```
@@ -244,8 +246,9 @@ end
 ````pasta
 ＊会話
 ```
-function update_state(ctx)
-  ctx.score = ctx.score + 1
+function SCENE.update_state(act)
+  local save, var = act:init_scene(SCENE)
+  save.score = (save.score or 0) + 1
 end
 ```
 ````

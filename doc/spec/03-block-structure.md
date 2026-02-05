@@ -101,9 +101,10 @@ Lua ブロックは暗黙ローカル開始ブロック（`__start__`）内に�
 ````
 ＊グローバル名
   ```lua
-  function on_event(ctx)
+  function SCENE.on_event(act)
+    local save, var = act:init_scene(SCENE)
     for i = 0, 9 do
-      coroutine.yield(ctx:event("loop", i))
+      act.さくら:talk("ループ" .. tostring(i))
     end
   end
   ```
@@ -128,8 +129,9 @@ Lua ブロックは暗黙ローカル開始ブロック（`__start__`）内に�
 ＊会話
   ＆author：Alice
   ```lua
-  function initialize(ctx)
-    ctx:flag("talked", true)
+  function SCENE.initialize(act)
+    local save, var = act:init_scene(SCENE)
+    save.talked = true
   end
   ```
   こんにちは

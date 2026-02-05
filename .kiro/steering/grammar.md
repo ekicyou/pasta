@@ -85,7 +85,8 @@
 ````pasta
 ＊計算
 ```lua
-function calculate(ctx)
+function SCENE.calculate(act)
+    local save, var = act:init_scene(SCENE)
     local result = 10 + 20
     return result
 end
@@ -121,11 +122,3 @@ Pastaは以下をそのままIR出力に含める（解釈はareka層）：
 
 参照: [Chapter 7: Sakuraスクリプト仕様](../../doc/spec/07-sakura-script.md)
 
----
-
-## 破壊的変更（2025-12 適用済み）
-
-1. **Jump（？）廃止** → Call（＞）を使用
-2. **Sakura エスケープ**: 半角 `\` のみ（全角 `＼` 不可）
-3. **Sakura 括弧**: 半角 `[]` のみ（全角 `［］` 不可）
-4. **Rune → Lua**: コードブロックはLua言語に移行済み
