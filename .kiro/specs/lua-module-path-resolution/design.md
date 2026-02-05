@@ -246,11 +246,28 @@ pub fn generate_scene_dic(&self, module_names: &[String]) -> Result<PathBuf, Loa
     let pasta_dir = self.cache_dir.join("pasta");
     fs::create_dir_all(&pasta_dir)?;
     
+    // Clean up old scene_dic.lua location (backward compatibility)
+    let old_scene_dic_path = self.cache_dir.join("scene_dic.lua");
+    if old_scene_dic_path.exists() {
+        if let Err(e) = fs::remove_file(&old_scene_dic_path) {
+            tracing::warn!(
+                path = %old_scene_dic_path.display(),
+                error = %e,
+                "Failed to remove old scene_dic.lua, continuing"
+            );
+        } else {
+            tracing::debug!(path = %old_scene_dic_path.display(), "Removed old scene_dic.lua");
+        }
+    }
+    
     let scene_dic_path = pasta_dir.join("scene_dic.lua");
     // ... generate content ...
     Ok(scene_dic_path)
 }
 ```
+
+**Backward Compatibility Note:** 
+旧パス（`cache_dir/scene_dic.lua`）が存在する場合は削除する。削除に失敗してもエラーとせず警告ログのみ出力し、処理を継続する。これにより既存ゴーストの更新時に旧ファイルが残留することを防ぐ。
 
 ---
 
@@ -354,11 +371,11 @@ requireヘルパー関数のエラーは、Luaの標準エラーメッセージ�
 
 ### Error Categories and Responses
 
-| エラー種別 | 発生条件 | 対応 |
-|-----------|----------|------|
+| エラー種別       | 発生条件                          | 対応                    |
+| ---------------- | --------------------------------- | ----------------------- |
 | Module not found | require対象が検索パスに存在しない | Luaエラーをそのまま伝播 |
-| Syntax error | Luaファイルに文法エラー | Luaエラーをそのまま伝播 |
-| Runtime error | Luaファイル実行中のエラー | Luaエラーをそのまま伝播 |
+| Syntax error     | Luaファイルに文法エラー           | Luaエラーをそのまま伝播 |
+| Runtime error    | Luaファイル実行中のエラー         | Luaエラーをそのまま伝播 |
 
 ### Logging
 
@@ -375,28 +392,28 @@ tracing::debug!(module = %module_name, "Loaded module via require");
 
 ### Unit Tests
 
-| テスト項目 | 場所 | 内容 |
-|-----------|------|------|
-| `default_lua_search_paths`にuser_scriptsが含まれる | `config.rs` | 検索パス配列の検証 |
-| `lua_require`正常系 | `runtime/mod.rs` | 存在するモジュールの読み込み |
-| `lua_require`異常系 | `runtime/mod.rs` | 存在しないモジュールのエラー |
-| 検索パス優先順位 | `context.rs` | package.path文字列の検証 |
+| テスト項目                                         | 場所             | 内容                         |
+| -------------------------------------------------- | ---------------- | ---------------------------- |
+| `default_lua_search_paths`にuser_scriptsが含まれる | `config.rs`      | 検索パス配列の検証           |
+| `lua_require`正常系                                | `runtime/mod.rs` | 存在するモジュールの読み込み |
+| `lua_require`異常系                                | `runtime/mod.rs` | 存在しないモジュールのエラー |
+| 検索パス優先順位                                   | `context.rs`     | package.path文字列の検証     |
 
 ### Integration Tests
 
-| テスト項目 | 場所 | 内容 |
-|-----------|------|------|
+| テスト項目               | 場所                         | 内容                                                  |
+| ------------------------ | ---------------------------- | ----------------------------------------------------- |
 | user_scriptsによる上書き | `loader_integration_test.rs` | user_scripts/main.luaがscripts/main.luaより優先される |
-| 初期化順序検証 | `loader_integration_test.rs` | main.lua内でscene_dic前の状態を検証 |
-| デフォルトmain.lua動作 | `loader_integration_test.rs` | user_scriptsなしでもエラーなく起動 |
-| scene_dic require化 | `finalize_scene_test.rs` | pasta.scene_dicがrequireで解決される |
+| 初期化順序検証           | `loader_integration_test.rs` | main.lua内でscene_dic前の状態を検証                   |
+| デフォルトmain.lua動作   | `loader_integration_test.rs` | user_scriptsなしでもエラーなく起動                    |
+| scene_dic require化      | `finalize_scene_test.rs`     | pasta.scene_dicがrequireで解決される                  |
 
 ### E2E Tests
 
-| テスト項目 | 場所 | 内容 |
-|-----------|------|------|
+| テスト項目             | 場所                        | 内容                            |
+| ---------------------- | --------------------------- | ------------------------------- |
 | pasta_sample_ghost生成 | `pasta_sample_ghost/tests/` | setup.bat後のゴーストが正常動作 |
-| 後方互換性 | 既存E2Eテスト | 変更前のゴーストが引き続き動作 |
+| 後方互換性             | 既存E2Eテスト               | 変更前のゴーストが引き続き動作  |
 
 ---
 
@@ -413,6 +430,7 @@ tracing::debug!(module = %module_name, "Loaded module via require");
 1. `from_loader_with_scene_dic()`の初期化順序変更
 2. entry.luaのrequire化
 3. scene_dic.luaのrequire化（生成場所変更含む）
+   - 旧パス（`cache_dir/scene_dic.lua`）の削除処理を含む
 
 ### Phase 3: Sample Ghost Update
 
@@ -454,10 +472,10 @@ tracing::debug!(module = %module_name, "Loaded module via require");
 
 ### 関連ファイル
 
-| ファイル | 変更種別 |
-|----------|----------|
-| [crates/pasta_lua/src/loader/config.rs](crates/pasta_lua/src/loader/config.rs) | 修正 |
-| [crates/pasta_lua/src/loader/cache.rs](crates/pasta_lua/src/loader/cache.rs) | 修正 |
-| [crates/pasta_lua/src/runtime/mod.rs](crates/pasta_lua/src/runtime/mod.rs) | 修正 |
-| [crates/pasta_lua/scripts/main.lua](crates/pasta_lua/scripts/main.lua) | 新規 |
-| [crates/pasta_sample_ghost/templates/pasta.toml.template](crates/pasta_sample_ghost/templates/pasta.toml.template) | 修正 |
+| ファイル                                                                                                           | 変更種別 |
+| ------------------------------------------------------------------------------------------------------------------ | -------- |
+| [crates/pasta_lua/src/loader/config.rs](crates/pasta_lua/src/loader/config.rs)                                     | 修正     |
+| [crates/pasta_lua/src/loader/cache.rs](crates/pasta_lua/src/loader/cache.rs)                                       | 修正     |
+| [crates/pasta_lua/src/runtime/mod.rs](crates/pasta_lua/src/runtime/mod.rs)                                         | 修正     |
+| [crates/pasta_lua/scripts/main.lua](crates/pasta_lua/scripts/main.lua)                                             | 新規     |
+| [crates/pasta_sample_ghost/templates/pasta.toml.template](crates/pasta_sample_ghost/templates/pasta.toml.template) | 修正     |
