@@ -37,11 +37,11 @@ Luaは**末尾呼び出し最適化 (TCO)** をサポートしています。こ
 **Pasta入力**:
 ```pasta
 ＊メイン
-  さくら：「こんにちは」
+  ぱすた：「こんにちは」
   ＞サブ
 
   ・サブ
-    うにゅう：「やあ」
+    ラザニア：「ごきげんよう」
 ```
 
 **Lua出力**:
@@ -50,7 +50,7 @@ function SCENE.__start__(act, ...)
     local args = { ... }
     local save, var = act:init_scene(SCENE)
 
-    act.さくら:talk("「こんにちは」")
+    act.ぱすた:talk("「こんにちは」")
     return act:call(SCENE.__global_name__, "サブ", {}, table.unpack(args))  -- TCO適用
 end
 ```
@@ -62,13 +62,13 @@ Call文の後にアクション行がある場合、TCOは適用されません�
 ```pasta
 ＊メイン
   ＞サブ
-  さくら：「戻ってきました」
+  ぱすた：「戻ってきました」
 ```
 
 出力:
 ```lua
 act:call(SCENE.__global_name__, "サブ", {}, table.unpack(args))  -- return なし
-act.さくら:talk("「戻ってきました」")
+act.ぱすた:talk("「戻ってきました」")
 ```
 
 ---
