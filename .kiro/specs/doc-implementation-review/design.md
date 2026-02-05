@@ -127,13 +127,14 @@ graph TB
 
 ### Summary
 
-| Component           | Domain/Layer | Intent             | Req Coverage | Key Dependencies  | Contracts |
-| ------------------- | ------------ | ------------------ | ------------ | ----------------- | --------- |
-| doc/spec/README.md  | doc/spec     | 仕様書インデックス | 3, 7         | 各章ファイル (P0) | -         |
-| doc/spec/01-12.md   | doc/spec     | 章別仕様書         | 7            | -                 | -         |
-| steering/grammar.md | Level 3      | AI向け完全参照     | 2, 7         | doc/spec/* (P0)   | -         |
-| SOUL.md             | Level 1      | ヒエラルキー定義   | 4            | -                 | -         |
-| TEST_COVERAGE.md    | Level 2      | テスト数更新       | 6            | -                 | -         |
+| Component           | Domain/Layer | Intent                    | Req Coverage | Key Dependencies  | Contracts |
+| ------------------- | ------------ | ------------------------- | ------------ | ----------------- | --------- |
+| doc/spec/README.md  | doc/spec     | 仕様書インデックス        | 3, 7         | 各章ファイル (P0) | -         |
+| doc/spec/01-12.md   | doc/spec     | 章別仕様書                | 7            | -                 | -         |
+| steering/grammar.md | Level 3      | AI向け完全参照            | 2, 7         | doc/spec/* (P0)   | -         |
+| AGENTS.md           | Level 1      | AI Context Loading更新    | 1, 7         | -                 | -         |
+| SOUL.md             | Level 1      | ヒエラルキー定義          | 4            | -                 | -         |
+| TEST_COVERAGE.md    | Level 2      | テスト数更新              | 6            | -                 | -         |
 
 ### doc/spec Layer
 
@@ -213,7 +214,28 @@ doc/spec/
 - 各セクションにdoc/spec/への参照リンク追加
 
 ### Level 1: Constitution Layer
+AGENTS.md
 
+| Field        | Detail                                   |
+| ------------ | ---------------------------------------- |
+| Intent       | AI開発支援・コンテキストロード優先度更新 |
+| Requirements | 1, 7                                     |
+
+**Responsibilities & Constraints**
+- 「AI Context Loading Priority」セクションの更新
+- SPECIFICATION.md参照をdoc/spec/README.mdへ変更
+
+**Dependencies**
+- Outbound: doc/spec/README.md — 新しい仕様書参照 (P0)
+
+**Implementation Notes**
+- AI Context Loading Priorityセクションを以下に更新:
+  ```markdown
+  4. **Specifications**: `doc/spec/README.md`（インデックス）、必要に応じて該当章のみ読み込み
+  5. **Crate READMEs**: `crates/*/README.md`（実装詳細）
+  ```
+
+#### 
 #### SOUL.md
 
 | Field        | Detail                                         |
@@ -274,13 +296,25 @@ doc/spec/
 ### Document Validation
 
 - **リンク検証**: doc/spec/内の相互リンクが有効か確認
+  - 相対パス（`../01-grammar-model.md`等）の妥当性
+  - 章間参照（`See Chapter 2`等）の正確性
 - **内容完全性**: 分割後の全章を結合してSPECIFICATION.mdと差分比較
+  - 検証方法: 
+    1. `cat doc/spec/01-*.md doc/spec/02-*.md ... doc/spec/12-*.md > merged.md`
+    2. `diff SPECIFICATION.md merged.md`（見出し番号を除く）
+    3. 章間リンク変換の正確性確認（`## 2.` → `[Chapter 2](02-markers.md)`）
+  - 欠落・重複がないことを確認
 - **AI参照テスト**: steering/grammar.mdからdoc/spec/への参照が機能するか確認
+  - doc/spec/README.mdのインデックスが正確か
+  - 各章へのリンクが有効か
 
 ### Regression
 
 - 既存のドキュメントリンク（README.md等）が壊れないことを確認
 - SPECIFICATION.mdへの参照をdoc/spec/README.mdへ更新
+  - README.md内の参照
+  - AGENTS.md内の「AI Context Loading Priority」セクション
+  - steering/*.md内の参照
 
 ---
 
