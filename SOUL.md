@@ -8,13 +8,34 @@ _Memories of pasta twine together—now and then a knot, yet always a delight._
 
 pastaプロジェクトのドキュメントは、以下の優先順位と役割を持ちます：
 
-1. **[SOUL.md](SOUL.md)** - プロジェクトの憲法（Why: ビジョン、コアバリュー、あるべき姿）
-2. **[SPECIFICATION.md](SPECIFICATION.md)** - 権威的技術仕様（What/How: 設計の正）
-3. **[GRAMMAR.md](GRAMMAR.md)** - 利用者向けクイックリファレンス（例文豊富な学習用資料）
-4. **[README.md](README.md)** - プロジェクト概要（導入・アーキテクチャ）
-5. **[AGENTS.md](AGENTS.md)** - AI開発支援（Kiro workflow、ステアリング）
+#### Level 0: Entry Point
+- **[README.md](README.md)** - プロジェクト概要（導入・アーキテクチャ）
 
-**ルール**: 仕様の衝突時は SPECIFICATION.md を優先し、GRAMMAR.md・README.md を修正する
+#### Level 1: Constitution
+- **[SOUL.md](SOUL.md)** - プロジェクトの憲法（Why: ビジョン、コアバリュー、あるべき姿）
+- **[GRAMMAR.md](GRAMMAR.md)** - 利用者向けクイックリファレンス（例文豊富な学習用資料）
+- **[AGENTS.md](AGENTS.md)** - AI開発支援（Kiro workflow、ステアリング）
+
+#### Level 2: Implementation Layer
+実装層ドキュメント。技術的詳細と品質管理を担当。
+
+**クレートREADME**:
+- [pasta_core/README.md](crates/pasta_core/README.md) - パーサー・レジストリAPI
+- [pasta_lua/README.md](crates/pasta_lua/README.md) - Luaトランスパイラ・ランタイム
+- [pasta_lua/LUA_API.md](crates/pasta_lua/LUA_API.md) - Lua APIリファレンス
+- [pasta_shiori/README.md](crates/pasta_shiori/README.md) - SHIORI DLLインターフェース
+- [pasta_sample_ghost/README.md](crates/pasta_sample_ghost/README.md) - サンプルゴースト
+
+**品質管理ドキュメント**:
+- [TEST_COVERAGE.md](TEST_COVERAGE.md) - テストカバレッジマップ
+- [OPTIMIZATION.md](OPTIMIZATION.md) - トランスパイラ最適化リファレンス
+- [SCENE_TABLE_REVIEW.md](SCENE_TABLE_REVIEW.md) - シーンテーブル設計レビュー
+
+#### Level 3: Steering (AI向け)
+- [.kiro/steering/](/.kiro/steering/) - AI向けプロジェクトルール（完全性優先）
+- [doc/spec/](doc/spec/) - 言語仕様書（章別分割、AI向け必要な章のみ参照）
+
+**ルール**: 仕様の衝突時は doc/spec/ を優先し、GRAMMAR.md・README.md を修正する
 
 ---
 

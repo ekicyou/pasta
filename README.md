@@ -3,11 +3,11 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 
 ## 関連ドキュメント
 
-| ドキュメント                         | 説明                                               |
-| ------------------------------------ | -------------------------------------------------- |
-| [GRAMMAR.md](GRAMMAR.md)             | Pasta DSL 文法リファレンス（学習用クイックガイド） |
-| [SPECIFICATION.md](SPECIFICATION.md) | Pasta DSL 正式言語仕様書（実装判断の権威的ソース） |
-| [AGENTS.md](AGENTS.md)               | AI開発支援ドキュメント（Kiro仕様駆動開発）         |
+| ドキュメント                 | 説明                                               |
+| ---------------------------- | -------------------------------------------------- |
+| [GRAMMAR.md](GRAMMAR.md)     | Pasta DSL 文法リファレンス（学習用クイックガイド） |
+| [doc/spec/](doc/spec/)       | Pasta DSL 正式言語仕様書（章別分割、実装判断の権威的ソース） |
+| [AGENTS.md](AGENTS.md)       | AI開発支援ドキュメント（Kiro仕様駆動開発）         |
 
 ## アーキテクチャ
 
@@ -68,7 +68,7 @@ use pasta_lua::transpiler::Transpiler;
 
 ### Level 1: Core Docs
 - [GRAMMAR.md](GRAMMAR.md) - Pasta DSL 文法リファレンス
-- [SPECIFICATION.md](SPECIFICATION.md) - 言語仕様書（権威的ソース）
+- [doc/spec/](doc/spec/) - 言語仕様書（章別分割、権威的ソース）
 - [AGENTS.md](AGENTS.md) - AI開発支援ドキュメント
 
 ### Level 2: Crate Docs
@@ -92,7 +92,7 @@ use pasta_lua::transpiler::Transpiler;
 3. [クイックスタート](#クイックスタート) - ビルド・実行方法
 
 ### 開発者向け（推定所要時間: 2-3時間）
-1. [SPECIFICATION.md](SPECIFICATION.md) - 言語仕様の理解
+1. [doc/spec/](doc/spec/) - 言語仕様の理解（必要な章のみ）
 2. [pasta_core/README.md](crates/pasta_core/README.md) - コアアーキテクチャ
 3. [.kiro/steering/structure.md](.kiro/steering/structure.md) - プロジェクト構造
 4. [.kiro/steering/workflow.md](.kiro/steering/workflow.md) - 開発ワークフロー
@@ -100,7 +100,7 @@ use pasta_lua::transpiler::Transpiler;
 ### AI開発支援向け（推定所要時間: 1時間）
 1. [AGENTS.md](AGENTS.md) - AI開発支援概要
 2. [.kiro/steering/](.kiro/steering/) - ステアリングファイル群
-3. [SPECIFICATION.md](SPECIFICATION.md) - 正式仕様
+3. [doc/spec/README.md](doc/spec/README.md) - 正式仕様（章別インデックス）
 
 ---
 

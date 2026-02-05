@@ -44,7 +44,7 @@ When starting new work, load context in this order:
 1. **SOUL.md** - プロジェクトの憲法（ビジョン、コアバリュー、あるべき姿）
 2. **AGENTS.md** - This document (project overview, workflow)
 3. **Steering** - `.kiro/steering/*` (project-wide rules)
-4. **Specifications** - `SPECIFICATION.md`, `GRAMMAR.md` (language specs)
+4. **Specifications** - `doc/spec/README.md`（インデックス）、必要に応じて該当章のみ読み込み
 5. **Crate READMEs** - `crates/*/README.md` (implementation details)
 
 ## Development Rules
@@ -70,9 +70,9 @@ When starting new work, load context in this order:
 
 ### Related Documents
 
-| Document                             | Description                     |
-| ------------------------------------ | ------------------------------- |
-| [SOUL.md](SOUL.md)                   | プロジェクトの憲法（最優先）    |
-| [README.md](README.md)               | Project overview & architecture |
-| [GRAMMAR.md](GRAMMAR.md)             | DSL grammar reference           |
-| [SPECIFICATION.md](SPECIFICATION.md) | Formal language specification   |
+| Document                             | Description                          |
+| ------------------------------------ | ------------------------------------ |
+| [SOUL.md](SOUL.md)                   | プロジェクトの憲法（最優先）         |
+| [README.md](README.md)               | Project overview & architecture      |
+| [GRAMMAR.md](GRAMMAR.md)             | DSL grammar reference（人間向け）    |
+| [doc/spec/](doc/spec/)               | Formal language specification（章別）|

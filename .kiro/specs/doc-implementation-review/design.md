@@ -127,14 +127,14 @@ graph TB
 
 ### Summary
 
-| Component           | Domain/Layer | Intent                    | Req Coverage | Key Dependencies  | Contracts |
-| ------------------- | ------------ | ------------------------- | ------------ | ----------------- | --------- |
-| doc/spec/README.md  | doc/spec     | 仕様書インデックス        | 3, 7         | 各章ファイル (P0) | -         |
-| doc/spec/01-12.md   | doc/spec     | 章別仕様書                | 7            | -                 | -         |
-| steering/grammar.md | Level 3      | AI向け完全参照            | 2, 7         | doc/spec/* (P0)   | -         |
-| AGENTS.md           | Level 1      | AI Context Loading更新    | 1, 7         | -                 | -         |
-| SOUL.md             | Level 1      | ヒエラルキー定義          | 4            | -                 | -         |
-| TEST_COVERAGE.md    | Level 2      | テスト数更新              | 6            | -                 | -         |
+| Component           | Domain/Layer | Intent                 | Req Coverage | Key Dependencies  | Contracts |
+| ------------------- | ------------ | ---------------------- | ------------ | ----------------- | --------- |
+| doc/spec/README.md  | doc/spec     | 仕様書インデックス     | 3, 7         | 各章ファイル (P0) | -         |
+| doc/spec/01-12.md   | doc/spec     | 章別仕様書             | 7            | -                 | -         |
+| steering/grammar.md | Level 3      | AI向け完全参照         | 2, 7         | doc/spec/* (P0)   | -         |
+| AGENTS.md           | Level 1      | AI Context Loading更新 | 1, 7         | -                 | -         |
+| SOUL.md             | Level 1      | ヒエラルキー定義       | 4            | -                 | -         |
+| TEST_COVERAGE.md    | Level 2      | テスト数更新           | 6            | -                 | -         |
 
 ### doc/spec Layer
 

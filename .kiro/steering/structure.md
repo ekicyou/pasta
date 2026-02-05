@@ -130,14 +130,14 @@ pasta_core（再エクスポート）
 
 ## テスト構成
 
-| カテゴリ     | 対象                  | ファイル例                                  |
-| ------------ | --------------------- | ------------------------------------------- |
-| Parser       | 文法パース、エラー    | `span_byte_offset_test.rs`                  |
-| Transpiler   | Lua変換、シーン管理   | `transpiler_integration_test.rs`            |
-| Runtime      | Lua VM、シーン解決    | `runtime_e2e_test.rs`                       |
-| Loader       | スクリプト読み込み    | `loader_integration_test.rs`                |
-| Registry     | 型管理、独立性        | `scene_search_test.rs`                      |
-| Control Flow | Call、最適化          | `transpiler_snapshot_test.rs`               |
+| カテゴリ     | 対象                | ファイル例                       |
+| ------------ | ------------------- | -------------------------------- |
+| Parser       | 文法パース、エラー  | `span_byte_offset_test.rs`       |
+| Transpiler   | Lua変換、シーン管理 | `transpiler_integration_test.rs` |
+| Runtime      | Lua VM、シーン解決  | `runtime_e2e_test.rs`            |
+| Loader       | スクリプト読み込み  | `loader_integration_test.rs`     |
+| Registry     | 型管理、独立性      | `scene_search_test.rs`           |
+| Control Flow | Call、最適化        | `transpiler_snapshot_test.rs`    |
 
 ### テストファイル配置
 - `crates/<crate>/tests/<feature>_test.rs`: 統合テスト
