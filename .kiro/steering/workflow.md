@@ -83,7 +83,7 @@ git push origin <branch>
 実装完了後、以下のドキュメントとの整合性を確認・更新：
 
 1. [ ] SOUL.md - コアバリュー・設計原則との整合性確認
-2. [ ] SPECIFICATION.md - 言語仕様の更新（該当する場合）
+2. [ ] doc/spec/ - 言語仕様の更新（該当する場合）
 3. [ ] GRAMMAR.md - 文法リファレンスの同期（該当する場合）
 4. [ ] TEST_COVERAGE.md - 新規テストのマッピング追加
 5. [ ] クレートREADME - API変更の反映（該当する場合）
@@ -174,8 +174,8 @@ git push origin <branch>
 
 | 変更種別             | 更新対象ドキュメント                                    |
 | -------------------- | ------------------------------------------------------- |
-| コアバリュー影響     | **SOUL.md（最優先）**、SPECIFICATION.md                |
-| 公開API変更          | クレートREADME、SPECIFICATION.md                        |
+| コアバリュー影響     | **SOUL.md（最優先）**、doc/spec/                           |
+| 公開API変更          | クレートREADME、doc/spec/                               |
 | DSL文法変更          | GRAMMAR.md、steering/grammar.md、SOUL.md（設計原則）   |
 | ディレクトリ構造変更 | steering/structure.md、クレートREADME                   |
 | 依存関係変更         | steering/tech.md、クレートREADME                        |
@@ -191,15 +191,15 @@ git push origin <branch>
 | README.md        | プロジェクト概要変更、新クレート追加 |
 | AGENTS.md        | AI開発支援コンテキスト変更           |
 | GRAMMAR.md       | DSL文法変更                          |
-| SPECIFICATION.md | 言語仕様変更（権威的）               |
+| doc/spec/        | 言語仕様変更（権威的）               |
 | TEST_COVERAGE.md | テスト追加・削除・機能変更           |
 | クレートREADME   | クレートAPI/構造変更                 |
 | steering/*       | 対応領域の変更                       |
 
 ### 保守ルール
 
-1. **コアバリュー変更時**: まずSOUL.mdを更新、その後SPECIFICATION.md・GRAMMAR.mdを同期
+1. **コアバリュー変更時**: まずSOUL.mdを更新、その後doc/spec/・GRAMMAR.mdを同期
 2. **API変更時**: 対応するクレートREADMEの「公開API」セクションを更新
-3. **仕様変更時**: まずSPECIFICATION.mdを更新、その後GRAMMAR.mdを同期
+3. **仕様変更時**: まずdoc/spec/を更新、その後GRAMMAR.mdを同期
 4. **テスト追加時**: TEST_COVERAGE.mdのマッピングを更新
 5. **PR時確認**: ドキュメント更新漏れがないかDoDチェックリストで確認

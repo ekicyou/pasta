@@ -48,7 +48,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │   └── ...
 ├── examples/                 # サンプルコード
 │   ├── scripts/              # Pastaスクリプト例
-│   ├── rune_module_test.rs   # Rune統合例
+
 │   └── test_*.rs             # 動作確認例
 ├── benches/                  # ベンチマークコード
 ├── .kiro/                    # Kiro Spec-Driven設定
@@ -61,7 +61,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 ├── .github/                 # GitHub Actions, PR テンプレート
 ├── README.md                # プロジェクト概要
 ├── GRAMMAR.md               # Pasta DSL文法リファレンス
-├── SPECIFICATION.md         # 言語仕様書
+├─ doc/spec/                # 言語仕様書（章別分割）
 ├── LICENSE                  # ライセンス
 └── AGENTS.md                # AI開発支援ドキュメント
 ```
@@ -152,7 +152,7 @@ pasta_core（再エクスポート）
 | ---------------- | ------------------- |
 | README.md        | プロジェクト概要    |
 | GRAMMAR.md       | DSL文法リファレンス |
-| SPECIFICATION.md | 言語仕様書          |
+| doc/spec/        | 言語仕様書（章別） |
 | AGENTS.md        | AI開発支援          |
 
 ### Kiro仕様管理
