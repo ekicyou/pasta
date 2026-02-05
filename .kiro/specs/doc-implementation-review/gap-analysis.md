@@ -426,3 +426,50 @@
 - 実際のコントリビューションパターンが見えてから文書化する方が実用的
 - YAGNI原則（You Aren't Gonna Need It）- 必要になってから作る
 
+---
+
+### 議題4: 文書階層のSOUL.md記載要否
+
+**決定日**: 2026-02-05  
+**ステータス**: ✅ 方針決定
+
+**方針**:
+- **Level 2に品質管理ドキュメントを追加**
+- Level 2を「実装層ドキュメント」として再定義
+  - クレートREADME（実装詳細）
+  - 品質管理ドキュメント（検証・設計判断記録）
+
+**Implementation時の作業内容**:
+1. SOUL.mdのドキュメントヒエラルキーセクションを更新:
+   ```markdown
+   - Level 0: README.md（プロジェクト入口）
+   - Level 1: SOUL.md, SPECIFICATION.md, GRAMMAR.md, AGENTS.md（憲法・仕様）
+   - Level 2: 実装層ドキュメント
+     - クレートREADME: pasta_core, pasta_lua, pasta_shiori, pasta_sample_ghost
+     - 品質管理ドキュメント: TEST_COVERAGE.md, OPTIMIZATION.md, SCENE_TABLE_REVIEW.md
+   - Level 3: steering/*.md（AI向けプロジェクトルール）
+   ```
+
+2. README.mdのドキュメントマップにも反映
+
+**理由**:
+- TEST_COVERAGE.md等はPhase 0 DoD達成の公式証跡
+- AI開発支援に必要な参照情報（過去の判断理由）
+- SOUL.mdのコアバリュー検証を明示的に記載（TEST_COVERAGE.md Section 1）
+- 品質管理文書は「憲法（SOUL.md）の実装状況報告書」
+
+---
+
+## 9. 議題ディスカッション完了サマリー
+
+**全4議題完了**: 2026-02-05
+
+| 議題 | 内容                         | 決定                                       |
+| ---- | ---------------------------- | ------------------------------------------ |
+| #1   | steering/grammar.md役割分離  | AI向け完全参照 vs 人間向けマニュアル       |
+| #2   | CHANGELOG.md作成要否         | Phase 4（外部公開準備時）に初版作成        |
+| #3   | CONTRIBUTING.md作成要否      | 実際のPR発生まで延期（YAGNI原則）          |
+| #4   | 文書階層のSOUL.md記載        | Level 2に品質管理ドキュメント追加          |
+
+**次フェーズ**: Design Phase (`/kiro-spec-design doc-implementation-review`)
+
