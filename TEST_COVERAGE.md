@@ -2,8 +2,8 @@
 
 このドキュメントは、[SOUL.md](SOUL.md) で定義されたコア機能と、それを検証するテストの対応関係を示します。
 
-**最終更新**: 2025-06-24  
-**総テスト数**: 700+テスト（全パス ✅）
+**最終更新**: 2026-02-05  
+**総テスト数**: 736テスト（全パス ✅）
 
 ---
 
@@ -105,7 +105,7 @@
 | SPECIFICATION.md 全マーカー定義完了 | -                                | ✅ ドキュメント                 |
 | 全角/半角対応表の完全性             | -                                | ✅ ドキュメント                 |
 | cargo test pasta_core 100%パス      | 全pasta_coreテスト               | ✅ 91テスト                     |
-| cargo test pasta_lua 100%パス       | 全pasta_luaテスト                | ✅ 257テスト                    |
+| cargo test pasta_lua 100%パス       | 全pasta_luaテスト                | ✅ 230テスト                    |
 | cargo test pasta_shiori 100%パス    | `shiori_lifecycle_test.rs`       | ✅ 全パス                       |
 | comprehensive_control_flow検証      | `transpiler_snapshot_test.rs`    | ✅ 8スナップショット            |
 | スナップショットテスト整備          | insta crate                      | ✅ 実装済み                     |

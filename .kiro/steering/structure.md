@@ -22,31 +22,6 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │   │           ├── scene_table.rs    # SceneTable - シーン検索
 │   │           ├── word_table.rs     # WordTable - 単語検索
 │   │           └── random.rs         # RandomSelector - ランダム選択
-│   ├── pasta_rune/          # Rune言語バックエンド層（公開API）
-│   │   ├── Cargo.toml       # pasta_rune設定（pasta_core依存）
-│   │   ├── src/
-│   │   │   ├── lib.rs       # クレートエントリーポイント、公開API定義
-│   │   │   ├── engine.rs    # PastaEngine - 上位API層
-│   │   │   ├── cache.rs     # ParseCache - パース結果キャッシュ
-│   │   │   ├── loader.rs    # DirectoryLoader - スクリプト読み込み
-│   │   │   ├── error.rs     # PastaError - ランタイムエラー型定義
-│   │   │   ├── ir/          # ScriptEvent - IR出力型
-│   │   │   │   └── mod.rs
-│   │   │   ├── transpiler/  # トランスパイラレイヤー（AST → Rune、2pass）
-│   │   │   │   ├── mod.rs   # Transpiler API
-│   │   │   │   ├── code_generator.rs # Runeコード生成
-│   │   │   │   ├── context.rs # トランスパイルコンテキスト
-│   │   │   │   └── error.rs  # トランスパイルエラー型
-│   │   │   ├── runtime/     # ランタイムレイヤー
-│   │   │   │   ├── mod.rs   # ランタイムAPI
-│   │   │   │   ├── generator.rs # ScriptGenerator - Rune VM実行
-│   │   │   │   └── variables.rs # VariableManager - 変数管理
-│   │   │   └── stdlib/      # Pasta標準ライブラリ（Rune側関数）
-│   │   │       ├── mod.rs   # stdlib API登録
-│   │   │       └── persistence.rs # 永続化API
-│   │   └── tests/           # pasta_rune統合テスト
-│   │       ├── common/      # テスト共通ユーティリティ
-│   │       └── fixtures/    # テスト用Pastaスクリプト
 │   └── pasta_lua/           # Lua言語バックエンド層
 │       ├── Cargo.toml       # pasta_lua設定（pasta_core依存）
 │       ├── src/
@@ -93,7 +68,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 
 **注**: 
 - ルートクレート (`src/`) は削除済み。すべての実装コードは `crates/*/src/` 配下に配置。
-- 各クレートは独自の `tests/` ディレクトリを持つことができる（例: pasta_rune, pasta_lua, pasta_sample_ghost）
+- 各クレートは独自の `tests/` ディレクトリを持つことができる（例: pasta_lua, pasta_sample_ghost）
 - ワークスペースレベルの `tests/` は複数クレートにまたがる統合テスト用
 
 ## ファイル命名規則
@@ -119,7 +94,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 ```
 pasta (workspace)
 ├── pasta_core          # 言語非依存層（パーサー、レジストリ）
-└── pasta_rune          # Runeバックエンド層（pasta_core依存）
+└── pasta_lua           # Luaバックエンド層（pasta_core依存）
 ```
 
 ### レイヤー分離原則
@@ -134,17 +109,13 @@ registry（シーン/単語テーブル）
 error（パースエラー）
 ```
 
-**pasta_rune:**
+**pasta_lua:**
 ```
-engine (上位API)
+loader (スクリプト読み込み)
   ↓
-cache, loader
+transpiler (AST→Lua)
   ↓
-transpiler (2pass)
-  ↓
-runtime
-  ↓
-stdlib, ir
+runtime (Lua VM)
   ↓
 pasta_core（再エクスポート）
 ```
@@ -155,24 +126,18 @@ pasta_core（再エクスポート）
 - **Random**: `RandomSelector`, `DefaultRandomSelector`
 - **Error**: `ParseError`, `SceneTableError`, `WordTableError`
 
-### 公開API (`pasta_rune/lib.rs`)
-- **Engine**: `PastaEngine`（統合API）
-- **Transpiler**: `transpile()`, `TranspileContext`
-- **Runtime**: `ScriptGenerator`, `VariableManager`
-- **IR**: `ScriptEvent`, `ContentPart`
-- **Error**: `PastaError`, `Result`, `Transpiler2Pass`
-- **Core**: `pasta_core`の再エクスポート（`parser`, `core`エイリアス）
+
 
 ## テスト構成
 
 | カテゴリ     | 対象                  | ファイル例                                  |
 | ------------ | --------------------- | ------------------------------------------- |
-| Parser       | 文法パース、エラー    | `parser2_integration_test.rs`               |
-| Transpiler   | 2パス変換、シーン管理 | `pasta_transpiler2_*.rs`                    |
-| Runtime      | Rune VM、シーン解決   | `pasta_engine_rune_*.rs`                    |
-| Engine       | E2E統合、スコープ     | `pasta_engine_*.rs`                         |
-| Registry     | 型管理、独立性        | `pasta_stdlib_call_jump_separation_test.rs` |
-| Control Flow | Call/Jump、並行実行   | `pasta_integration_control_flow_test.rs`    |
+| Parser       | 文法パース、エラー    | `span_byte_offset_test.rs`                  |
+| Transpiler   | Lua変換、シーン管理   | `transpiler_integration_test.rs`            |
+| Runtime      | Lua VM、シーン解決    | `runtime_e2e_test.rs`                       |
+| Loader       | スクリプト読み込み    | `loader_integration_test.rs`                |
+| Registry     | 型管理、独立性        | `scene_search_test.rs`                      |
+| Control Flow | Call、最適化          | `transpiler_snapshot_test.rs`               |
 
 ### テストファイル配置
 - `crates/<crate>/tests/<feature>_test.rs`: 統合テスト

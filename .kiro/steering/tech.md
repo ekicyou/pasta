@@ -4,13 +4,11 @@
 
 ### 言語・ランタイム
 - **Rust 2024 edition**: メインコンパイラ言語
-- **Rune 0.14**: バックエンドスクリプトVM（generator機能を使用）
 - **Lua 5.5 (mlua 0.11)**: Luaバックエンドスクリプト実行
 - **Pest 2.8**: PEGパーサー生成器（`pasta.pest`文法定義）
 
 ### ワークスペース構成
 - **pasta_core**: 言語非依存層（パーサー、レジストリ）
-- **pasta_rune**: Runeバックエンド層（pasta_core依存）
 - **pasta_lua**: Luaバックエンド層（pasta_core依存）
 - **pasta_shiori**: SHIORI DLLインターフェース層
 
@@ -21,15 +19,6 @@
 - **thiserror 2**: エラー型定義
 - **fast_radix_trie 1.1.0**: 前方一致シーン検索
 - **rand 0.9**: ランダム選択（重複シーン、前方一致候補）
-- **tracing 0.1**: ロギング・診断
-
-**pasta_rune:**
-- **pasta_core**: 言語非依存層
-- **rune 0.14**: スクリプトVM
-- **thiserror 2**: エラー型定義
-- **glob 0.3**: ファイルパターンマッチング（スクリプト読み込み）
-- **futures 0.3**: 非同期処理サポート
-- **toml 0.9.8**: 設定ファイル管理
 - **tracing 0.1**: ロギング・診断
 
 **pasta_lua:**
@@ -53,11 +42,6 @@ pasta (workspace)
 ├── pasta_core          # 言語非依存層
 │   ├── Parser          # DSL→AST変換
 │   └── Registry        # シーン/単語テーブル
-├── pasta_rune          # Runeバックエンド層
-│   ├── Engine          # 統合API、キャッシュ
-│   ├── Transpiler      # AST→Runeコード (2pass)
-│   ├── Runtime         # Rune VM実行、yield出力
-│   └── Stdlib          # Pasta標準ライブラリ
 ├── pasta_lua           # Luaバックエンド層
 │   ├── Transpiler      # AST→Luaコード
 │   ├── Runtime         # Lua VM実行
@@ -69,10 +53,6 @@ pasta (workspace)
 | ------------ | ---------- | ------------------------------- |
 | pasta_core   | Parser     | DSL→AST変換                     |
 | pasta_core   | Registry   | シーン/単語テーブル管理         |
-| pasta_rune   | Transpiler | AST→Runeコード、シーン管理      |
-| pasta_rune   | Runtime    | Rune VM実行、yield出力          |
-| pasta_rune   | Engine     | 統合API、キャッシュ             |
-| pasta_rune   | IR         | ScriptEventイベント出力         |
 | pasta_lua    | Transpiler | AST→Luaコード変換               |
 | pasta_lua    | Runtime    | Lua VM実行、コルーチン制御      |
 | pasta_lua    | Loader     | スクリプト読み込み・キャッシュ  |
@@ -112,13 +92,12 @@ pasta (workspace)
 | テスト       | 新機能必須、リグレッション防止 |
 | キャッシュ   | パース結果をメモリ保持         |
 | 検索性能     | シーンO(1)、前方一致Radix Trie |
-| セキュリティ | Rune VMサンドボックス依存      |
+| セキュリティ | Lua VMサンドボックス依存       |
 
 ## 依存関係管理
 
 ### バージョン戦略
 - セマンティックバージョニング準拠
-- Rune 0.14に固定（破壊的変更対応まで）
 - 依存ライブラリ: メジャーバージョン指定
 
 ### ライセンス
@@ -141,9 +120,9 @@ cargo test --release        # リリースビルド
 ### クレート別コマンド
 ```bash
 cargo build -p pasta_core   # pasta_coreビルド
-cargo build -p pasta_rune   # pasta_runeビルド
+cargo build -p pasta_lua    # pasta_luaビルド
 cargo test -p pasta_core    # pasta_coreテスト
-cargo test -p pasta_rune    # pasta_runeテスト
+cargo test -p pasta_lua     # pasta_luaテスト
 ```
 
 ### 将来計画
