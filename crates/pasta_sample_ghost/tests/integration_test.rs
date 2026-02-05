@@ -275,6 +275,13 @@ fn test_ukadoc_files() {
 /// pasta DSL スクリプト検証テスト
 #[test]
 fn test_pasta_scripts() {
+    /// グローバルアクター辞書定義（行頭の`％actor_name`）が含まれているかチェック
+    /// シーン内アクタースコープ（インデント付き`　％actor_name`）は検出しない
+    fn contains_global_actor_dictionary(content: &str, actor_name: &str) -> bool {
+        let pattern = format!("％{}", actor_name);
+        content.starts_with(&pattern) || content.contains(&format!("\n{}", pattern))
+    }
+
     let temp = TempDir::new().unwrap();
     let ghost_root = temp.path().join("hello-pasta");
     let config = GhostConfig::default();
@@ -298,10 +305,11 @@ fn test_pasta_scripts() {
         "OnFirstBoot シーンがありません"
     );
     assert!(boot.contains("＊OnClose"), "OnClose シーンがありません");
-    // アクター辞書が含まれていないことを確認
+    // グローバルアクター辞書定義が含まれていないことを確認
+    // シーン内アクタースコープ指定（インデント付き `　％女の子、男の子`）は許容
     assert!(
-        !boot.contains("％女の子"),
-        "boot.pasta にアクター辞書が含まれています"
+        !contains_global_actor_dictionary(&boot, "女の子"),
+        "boot.pasta にグローバルアクター辞書定義が含まれています"
     );
 
     // talk.pasta
@@ -309,10 +317,10 @@ fn test_pasta_scripts() {
     assert!(talk.contains("＊OnTalk"), "OnTalk シーンがありません");
     assert!(talk.contains("＊OnHour"), "OnHour シーンがありません");
     assert!(talk.contains("＄時"), "時刻変数参照がありません");
-    // アクター辞書が含まれていないことを確認
+    // グローバルアクター辞書定義が含まれていないことを確認
     assert!(
-        !talk.contains("％女の子"),
-        "talk.pasta にアクター辞書が含まれています"
+        !contains_global_actor_dictionary(&talk, "女の子"),
+        "talk.pasta にグローバルアクター辞書定義が含まれています"
     );
 
     // click.pasta
@@ -321,10 +329,10 @@ fn test_pasta_scripts() {
         click.contains("＊OnMouseDoubleClick"),
         "OnMouseDoubleClick シーンがありません"
     );
-    // アクター辞書が含まれていないことを確認
+    // グローバルアクター辞書定義が含まれていないことを確認
     assert!(
-        !click.contains("％女の子"),
-        "click.pasta にアクター辞書が含まれています"
+        !contains_global_actor_dictionary(&click, "女の子"),
+        "click.pasta にグローバルアクター辞書定義が含まれています"
     );
 
     // ダブルクリック反応は7種以上

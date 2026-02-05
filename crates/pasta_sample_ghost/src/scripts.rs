@@ -170,6 +170,15 @@ pub const CLICK_PASTA: &str = r#"＃ click.pasta - ダブルクリック反応�
 mod tests {
     use super::*;
 
+    /// グローバルアクター辞書定義（行頭の`％actor_name`）が含まれているかチェック
+    /// シーン内アクタースコープ（インデント付き`　％actor_name`）は検出しない
+    fn contains_global_actor_dictionary(content: &str, actor_name: &str) -> bool {
+        let pattern = format!("％{}", actor_name);
+        // 文字列先頭での `％actor_name` または改行直後の `％actor_name` を検出
+        // インデント付き（`　％` や ` ％`）は除外される
+        content.starts_with(&pattern) || content.contains(&format!("\n{}", pattern))
+    }
+
     #[test]
     fn test_actors_pasta_contains_all_characters() {
         // アクター辞書に両キャラクターが定義されていることを確認
@@ -210,31 +219,32 @@ mod tests {
     }
 
     #[test]
-    fn test_event_files_do_not_contain_actor_dictionary() {
-        // アクター辞書は actors.pasta のみに定義されることを確認
+    fn test_event_files_do_not_contain_global_actor_dictionary() {
+        // グローバルアクター辞書定義は actors.pasta のみに存在すべき
+        // シーン内アクタースコープ指定（インデント付き `　％女の子、男の子`）は許容
         assert!(
-            !BOOT_PASTA.contains("％女の子"),
-            "boot.pasta にアクター辞書が含まれています"
+            !contains_global_actor_dictionary(BOOT_PASTA, "女の子"),
+            "boot.pasta にグローバルアクター辞書定義が含まれています"
         );
         assert!(
-            !BOOT_PASTA.contains("％男の子"),
-            "boot.pasta にアクター辞書が含まれています"
+            !contains_global_actor_dictionary(BOOT_PASTA, "男の子"),
+            "boot.pasta にグローバルアクター辞書定義が含まれています"
         );
         assert!(
-            !TALK_PASTA.contains("％女の子"),
-            "talk.pasta にアクター辞書が含まれています"
+            !contains_global_actor_dictionary(TALK_PASTA, "女の子"),
+            "talk.pasta にグローバルアクター辞書定義が含まれています"
         );
         assert!(
-            !TALK_PASTA.contains("％男の子"),
-            "talk.pasta にアクター辞書が含まれています"
+            !contains_global_actor_dictionary(TALK_PASTA, "男の子"),
+            "talk.pasta にグローバルアクター辞書定義が含まれています"
         );
         assert!(
-            !CLICK_PASTA.contains("％女の子"),
-            "click.pasta にアクター辞書が含まれています"
+            !contains_global_actor_dictionary(CLICK_PASTA, "女の子"),
+            "click.pasta にグローバルアクター辞書定義が含まれています"
         );
         assert!(
-            !CLICK_PASTA.contains("％男の子"),
-            "click.pasta にアクター辞書が含まれています"
+            !contains_global_actor_dictionary(CLICK_PASTA, "男の子"),
+            "click.pasta にグローバルアクター辞書定義が含まれています"
         );
     }
 }

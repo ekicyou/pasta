@@ -1,22 +1,23 @@
 {
     "feature_name": "fix-actor-marker-test-confusion",
     "created_at": "2026-02-05T12:00:00+09:00",
-    "updated_at": "2026-02-05T12:00:00+09:00",
+    "updated_at": "2026-02-05T15:15:00+09:00",
     "language": "ja",
-    "phase": "requirements",
+    "phase": "implementation-complete",
     "approvals": {
         "requirements": {
             "generated": true,
-            "approved": false
+            "approved": true
         },
         "design": {
             "generated": false,
-            "approved": false
+            "approved": true,
+            "note": "Simple fix - design phase skipped"
         },
         "tasks": {
-            "generated": false,
-            "approved": false
+            "generated": true,
+            "approved": true
         }
     },
-    "ready_for_implementation": false
+    "ready_for_implementation": true
 }

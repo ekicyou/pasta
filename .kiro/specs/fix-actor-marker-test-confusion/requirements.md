@@ -1,11 +1,12 @@
 # Requirements Document
 
-## Project Description (Input)
-Issue 1: pasta_sample_ghost テスト失敗 - `test_event_files_do_not_contain_actor_dictionary` テストが誤ってfailしている問題の修正。テストがアクターマーカー(`％`)の2つの異なる用途を混同している。
+## Introduction
+
+本ドキュメントは、pasta_sample_ghostのテスト `test_event_files_do_not_contain_actor_dictionary` が誤ってfailしている問題を修正するための要件を定義する。テストがアクターマーカー（`％`）の2つの異なる用途を混同していることが根本原因であり、テストロジックを改善して正確な検出を実現する。
 
 ---
 
-## 問題分析結果
+## Background Analysis（背景分析）
 
 ### 問題の背景
 
@@ -33,7 +34,7 @@ pasta DSLにおいて、アクターマーカー `％` は**2つの異なるコ�
 
 ### 失敗しているテスト
 
-**ファイル**: `crates/pasta_sample_ghost/src/scripts.rs:213-240`
+**ファイル**: [scripts.rs](../../../crates/pasta_sample_ghost/src/scripts.rs#L213-L240)
 
 ```rust
 #[test]
@@ -49,13 +50,20 @@ fn test_event_files_do_not_contain_actor_dictionary() {
 
 ### 失敗の根本原因
 
-テストは「`％女の子` という文字列がboot.pastaに含まれていない」ことを確認しているが、**シーン内アクタースコープ指定（`％女の子、男の子`）は設計上正当な使用法**である。
+テストは「`％女の子` という文字列がboot.pastaに含まれていない」ことを確認しているが、**シーン内アクタースコープ指定（`　％女の子、男の子`）は設計上正当な使用法**である。
 
 テストの意図は「アクター**辞書**（単語定義を含むブロック）がactors.pasta以外に存在しないこと」を確認することだが、**単純な文字列検索では2つの用途を区別できない**。
 
+### 構文上の区別
+
+| 用途               | パターン                                            | 例                          |
+| ------------------ | --------------------------------------------------- | --------------------------- |
+| グローバル辞書定義 | 行頭（インデントなし）`％name` + 次行に`　＠word：` | `％女の子\n　＠笑顔：\s[0]` |
+| シーン内スコープ   | インデント付き `　％name`                           | `　％女の子、男の子`        |
+
 ### 影響範囲
 
-- **BOOT_PASTA**: `％女の子、男の子` をシーンアクタースコープとして使用中
+- **BOOT_PASTA**: `　％女の子、男の子` をシーンアクタースコープとして使用中（正当な使用）
 - **TALK_PASTA**: アクタースコープを使用していない（会話行でアクター名直接使用）
 - **CLICK_PASTA**: アクタースコープを使用していない
 
@@ -63,41 +71,49 @@ fn test_event_files_do_not_contain_actor_dictionary() {
 
 ## Requirements
 
-### REQ-1: テストの目的再定義
+### Requirement 1: テストロジックの修正
 
-**要件**: テストの真の目的を明確化し、2つのアクターマーカー用途を区別できるテストに修正する。
+**Objective:** As a 開発者, I want テストが2種類のアクターマーカー用途を区別できるようになる, so that 正当なシーン内アクタースコープ指定がテスト失敗の原因にならない。
 
-**受け入れ基準**:
-- テストが「グローバルアクター辞書定義」と「シーン内アクタースコープ指定」を区別できること
-- テスト名と説明が目的を正確に反映すること
-- テストがpassすること（cargo test -p pasta_sample_ghost）
+#### Acceptance Criteria
 
-### REQ-2: アクター辞書定義の検出方法
+1. When テストが実行される, the Test Suite shall グローバルアクター辞書定義（行頭`％name`＋次行`　＠word：`）のみを検出対象とする
+2. When boot.pastaにシーン内アクタースコープ（`　％女の子、男の子`）が含まれる, the Test Suite shall テストをpassさせる
+3. When boot.pastaに誤ってグローバルアクター辞書定義がコピーされた, the Test Suite shall テストをfailさせる
+4. The Test Suite shall テスト名をその目的を正確に反映したものに変更する（例: `test_event_files_do_not_contain_global_actor_dictionary`）
 
-**要件**: グローバルアクター辞書定義を正確に検出するメカニズムを定義する。
+### Requirement 2: 検出パターンの定義
 
-**受け入れ基準**:
-- グローバルアクター辞書は「行頭（インデントなし）の `％actor_name`」で開始
-- 直後に単語定義行（`　＠word_name：value`）が続く構造を持つ
-- シーン内アクタースコープは「インデント付き `％actor_name` 」で始まり、シーン定義 (`＊`) の配下にある
-- 検出方法がSPECIFICATION.mdの仕様と一致すること
+**Objective:** As a 開発者, I want グローバルアクター辞書定義を正確に検出するパターンを持つ, so that テストが仕様に準拠した検証を行える。
 
-### REQ-3: スクリプトテンプレートの設計整合性
+#### Acceptance Criteria
 
-**要件**: スクリプトテンプレート（BOOT_PASTA等）が pasta DSL の設計哲学に従っていることを確認。
+1. The Test Suite shall グローバルアクター辞書を「行頭（インデントなし）の`％actor_name`」パターンで識別する
+2. The Test Suite shall シーン内アクタースコープを「インデント付きの`　％actor_name`」パターンとして許容する
+3. When 検出パターンを適用する, the Test Suite shall 正規表現または行頭文字列マッチングを使用する（`\n％` または文字列先頭での`％`）
+4. The Test Suite shall SPECIFICATION.mdのアクター定義仕様（§7.2）と整合する検出ロジックを実装する
 
-**受け入れ基準**:
-- 各ファイルの役割分担が明確（actors.pasta = 辞書定義、その他 = シーン定義）
-- シーン内でのアクタースコープ指定は正当な使用法として許容
-- コメント（`＃ ※アクター辞書は actors.pasta で共通定義`）と実装の整合性
+### Requirement 3: スクリプトテンプレートの整合性維持
 
-### REQ-4: テストカバレッジの維持
+**Objective:** As a 開発者, I want スクリプトテンプレートがpasta DSLの設計哲学に従っていることを確認できる, so that ファイルの役割分担が明確に保たれる。
 
-**要件**: 修正後もテストの安全網としての価値を維持する。
+#### Acceptance Criteria
 
-**受け入れ基準**:
-- アクター辞書が actors.pasta 以外に定義されたら検出できること
-- 誤って辞書定義がコピーされた場合にテストがfailすること
+1. The Test Suite shall actors.pastaにグローバルアクター辞書定義が存在することを確認する
+2. The Test Suite shall boot.pasta、talk.pasta、click.pastaにグローバルアクター辞書定義が存在しないことを確認する
+3. While シーン内でアクタースコープ指定（`　％name`）が使用されている, the Test Suite shall これを正当な使用として許容する
+4. The Test Suite shall コメント（`＃ ※アクター辞書は actors.pasta で共通定義`）と実装の整合性を維持する
+
+### Requirement 4: テストの安全網としての価値維持
+
+**Objective:** As a 開発者, I want 修正後もテストが誤った辞書定義の混入を検出できる, so that コードベースの品質が維持される。
+
+#### Acceptance Criteria
+
+1. If グローバルアクター辞書定義（`％name\n　＠word：`パターン）がboot.pastaに追加された, then the Test Suite shall テストをfailさせる
+2. If グローバルアクター辞書定義がtalk.pastaまたはclick.pastaに追加された, then the Test Suite shall テストをfailさせる
+3. When cargo test -p pasta_sample_ghost が実行される, the Test Suite shall 全テストをpassさせる（現在失敗しているテストが修正される）
+4. The Test Suite shall integration_test.rsの同等テストも同じロジックで修正する（DRY原則）
 - false positiveを排除しつつtrue positiveを維持
 
 ---
