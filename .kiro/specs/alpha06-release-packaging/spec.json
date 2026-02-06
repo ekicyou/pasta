@@ -1,9 +1,9 @@
 {
     "feature_name": "alpha06-release-packaging",
     "created_at": "2026-01-30T18:10:00Z",
-    "updated_at": "2026-02-06T12:00:00Z",
+    "updated_at": "2026-02-06T15:00:00Z",
     "language": "ja",
-    "phase": "requirements-generated",
+    "phase": "design-generated",
     "description": "hello-pasta ゴースト（.nar 形式）を GitHub Releases で手動公開するワークフロー。setup.bat による生成 → ZIP → .nar → gh release create。",
     "category": "リリース準備",
     "size_estimate": "S",
@@ -18,10 +18,10 @@
     "approvals": {
         "requirements": {
             "generated": true,
-            "approved": false
+            "approved": true
         },
         "design": {
-            "generated": false,
+            "generated": true,
             "approved": false
         },
         "tasks": {
