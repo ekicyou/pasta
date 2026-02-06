@@ -40,14 +40,15 @@ lua側からロギング出力したい。lua側から、rustのlog出力へリ�
 3. The `@pasta_log` module shall `_VERSION`および`_DESCRIPTION`メタデータフィールドを持つ
 4. The `@pasta_log` module shall 外部設定（`pasta.toml`等）に依存せず、追加設定なしで動作する
 
-### Requirement 4: PastaLoggerとの統合
+### Requirement 4: Rust-side logging infrastructure への統合
 
-**Objective:** ゴーストインスタンスとして、Luaからのログ出力がインスタンス固有のPastaLoggerにも出力されるようにしたい。インスタンスごとのログファイルにLua側のログも含めるため。
+**Objective:** ゴーストインスタンスとして、Luaからのログ出力をRust側の `tracing` インフラに統合し、既存のPastaLogger ルーティング機構を活用して、インスタンスごとのログファイルにLua側のログも含めるようにしたい。
 
 #### Acceptance Criteria
-1. Where PastaLoggerが設定されている場合, the `@pasta_log` module shall Luaからのログ出力をPastaLoggerにも書き込む
-2. Where PastaLoggerが設定されていない場合, the `@pasta_log` module shall `tracing`出力のみを行い、正常に動作する
-3. The `@pasta_log` module shall PastaLoggerへの出力時にログレベルとメッセージを含める
+1. The `@pasta_log` module shall Luaからのログ出力を `tracing` マクロ（`tracing::trace!`, `tracing::debug!` 等）経由でRust側のロギングインフラに転送する
+2. When ログ関数が呼び出された場合, the `@pasta_log` module shall 呼び出し元情報（Lua側のsource, line, function名）を structured fields `lua_source`, `lua_line`, `lua_fn` として `tracing` イベントに埋め込む
+3. The `@pasta_log` module shall トレーシング基盤の既存ルーティング機構（GlobalLoggerRegistry + RoutingWriter）を経由して、インスタンス固有のPastaLoggerに自動的に振り分けられる
+4. Where PastaLoggerが設定されていない場合, the `@pasta_log` module shall `tracing` 出力のみが記録され、正常に動作する（ファイルロギング不要）
 
 ### Requirement 5: 安全性とサンドボックス整合性
 
