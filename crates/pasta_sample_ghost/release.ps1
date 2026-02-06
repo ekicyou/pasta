@@ -1,8 +1,19 @@
-# release.ps1 - hello-pasta .nar Package Generator
-# Validates ghost distribution, creates .nar file, and shows release instructions
+# release.ps1 - hello-pasta Build, Setup & Release Script
+# Builds ghost distribution and creates .nar release package
 #
-# Usage: powershell -ExecutionPolicy Bypass -File release.ps1
-# Prerequisites: Run setup.bat first to generate ghost distribution
+# Usage:
+#   powershell -ExecutionPolicy Bypass -File release.ps1
+#   powershell -ExecutionPolicy Bypass -File release.ps1 -SkipSetup
+#   powershell -ExecutionPolicy Bypass -File release.ps1 -SkipDllBuild
+#
+# Parameters:
+#   -SkipSetup     Skip setup phase (steps 1-4), run release steps only
+#   -SkipDllBuild  Skip DLL build step only (use existing pasta.dll)
+
+param(
+    [switch]$SkipSetup,
+    [switch]$SkipDllBuild
+)
 
 $ErrorActionPreference = 'Stop'
 
@@ -15,17 +26,157 @@ $NarFileName = "hello-pasta.nar"
 $NarFilePath = Join-Path $OutputDir $NarFileName
 
 Write-Host "========================================"
-Write-Host "  hello-pasta Release Packager"
+Write-Host "  hello-pasta Build & Release"
 Write-Host "========================================"
 Write-Host ""
 Write-Host "Workspace: $WorkspaceRoot"
 Write-Host "Ghost Dir: $GhostDir"
+if ($SkipSetup) {
+    Write-Host "Mode:      Release only (setup skipped)"
+}
+elseif ($SkipDllBuild) {
+    Write-Host "Mode:      Setup + Release (DLL build skipped)"
+}
+else {
+    Write-Host "Mode:      Full (setup + release)"
+}
 Write-Host ""
 
 # ============================================================
-# Step 1: Version Check (Task 2.1)
+# Setup Phase (Steps 1-4)
 # ============================================================
-Write-Host "[1/4] Checking version..."
+if ($SkipSetup) {
+    Write-Host "[1/8] Building pasta.dll ................. SKIPPED" -ForegroundColor DarkGray
+    Write-Host "[2/8] Generating ghost distribution ...... SKIPPED" -ForegroundColor DarkGray
+    Write-Host "[3/8] Copying files ...................... SKIPPED" -ForegroundColor DarkGray
+    Write-Host "[4/8] Generating update files ............ SKIPPED" -ForegroundColor DarkGray
+    Write-Host ""
+}
+else {
+    # --- Step 1: Build pasta.dll (32bit) ---
+    if ($SkipDllBuild) {
+        Write-Host "[1/8] Building pasta.dll ................. SKIPPED" -ForegroundColor DarkGray
+    }
+    else {
+        Write-Host "[1/8] Building pasta.dll (32bit release)..."
+        Write-Host "  Target: i686-pc-windows-msvc"
+
+        Push-Location $WorkspaceRoot
+        try {
+            & cargo build --release --target i686-pc-windows-msvc -p pasta_shiori --quiet
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host ""
+                Write-Host "ERROR: pasta_shiori build failed" -ForegroundColor Red
+                Write-Host ""
+                Write-Host "Make sure you have the i686-pc-windows-msvc target installed:"
+                Write-Host "  rustup target add i686-pc-windows-msvc"
+                exit 1
+            }
+        }
+        finally {
+            Pop-Location
+        }
+        Write-Host "  Build completed" -ForegroundColor Green
+    }
+    Write-Host ""
+
+    # --- Step 2: Generate ghost distribution ---
+    Write-Host "[2/8] Generating ghost distribution..."
+
+    Push-Location $WorkspaceRoot
+    try {
+        & cargo run -p pasta_sample_ghost --quiet
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host ""
+            Write-Host "ERROR: Ghost generation failed" -ForegroundColor Red
+            exit 1
+        }
+    }
+    finally {
+        Pop-Location
+    }
+    Write-Host "  Ghost files generated" -ForegroundColor Green
+    Write-Host ""
+
+    # --- Step 3: Copy pasta.dll and scripts/ ---
+    Write-Host "[3/8] Copying files..."
+
+    $MasterDir = Join-Path $GhostDir "ghost\master"
+    if (-not (Test-Path $MasterDir)) {
+        New-Item -ItemType Directory -Path $MasterDir -Force | Out-Null
+    }
+
+    # Copy pasta.dll
+    $DllSrc = Join-Path $WorkspaceRoot "target\i686-pc-windows-msvc\release\pasta.dll"
+    $DllDest = Join-Path $MasterDir "pasta.dll"
+
+    if (-not (Test-Path $DllSrc)) {
+        Write-Host ""
+        Write-Host "ERROR: pasta.dll not found at $DllSrc" -ForegroundColor Red
+        Write-Host "  Run without -SkipDllBuild to build it first."
+        exit 1
+    }
+
+    Copy-Item -Path $DllSrc -Destination $DllDest -Force
+    Write-Host "  Copied pasta.dll"
+
+    # Copy Lua runtime scripts
+    $ScriptsSrc = Join-Path $WorkspaceRoot "crates\pasta_lua\scripts"
+    $ScriptsDest = Join-Path $MasterDir "scripts"
+
+    if (-not (Test-Path $ScriptsSrc)) {
+        Write-Host "  WARNING: Lua scripts not found at $ScriptsSrc" -ForegroundColor Yellow
+        Write-Host "           Skipping scripts copy"
+    }
+    else {
+        if (Test-Path $ScriptsDest) {
+            Remove-Item -Path $ScriptsDest -Recurse -Force
+        }
+        $robocopySetupArgs = @(
+            $ScriptsSrc,
+            $ScriptsDest,
+            "/MIR",
+            "/NJH", "/NJS", "/NDL", "/NC", "/NS", "/NP"
+        )
+        & robocopy @robocopySetupArgs | Out-Null
+        if ($LASTEXITCODE -ge 8) {
+            Write-Host ""
+            Write-Host "ERROR: robocopy failed copying scripts (exit code $LASTEXITCODE)" -ForegroundColor Red
+            exit 1
+        }
+        Write-Host "  Copied scripts/"
+    }
+    Write-Host ""
+
+    # --- Step 4: Finalize (generate updates2.dau and updates.txt) ---
+    Write-Host "[4/8] Generating update files..."
+
+    Push-Location $WorkspaceRoot
+    try {
+        & cargo run -p pasta_sample_ghost --quiet -- --finalize
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host ""
+            Write-Host "ERROR: Finalize failed" -ForegroundColor Red
+            exit 1
+        }
+    }
+    finally {
+        Pop-Location
+    }
+    Write-Host "  Update files generated" -ForegroundColor Green
+
+    # Count files
+    $fileCount = (Get-ChildItem -Path $GhostDir -Recurse -File).Count
+    Write-Host "  Distribution files: $fileCount"
+    Write-Host ""
+}
+
+# ============================================================
+# Release Phase (Steps 5-8)
+# ============================================================
+
+# --- Step 5: Version Check ---
+Write-Host "[5/8] Checking version..."
 
 $CargoToml = Join-Path $WorkspaceRoot "Cargo.toml"
 if (-not (Test-Path $CargoToml)) {
@@ -50,15 +201,13 @@ Write-Host "  Version: $Version"
 Write-Host "  Tag:     $TagName"
 Write-Host ""
 
-# ============================================================
-# Step 2: Validate Ghost Distribution (Task 2.2)
-# ============================================================
-Write-Host "[2/4] Validating ghost distribution..."
+# --- Step 6: Validate Ghost Distribution ---
+Write-Host "[6/8] Validating ghost distribution..."
 
 if (-not (Test-Path $GhostDir)) {
     Write-Host ""
     Write-Host "ERROR: Ghost directory not found at $GhostDir" -ForegroundColor Red
-    Write-Host "  Run setup.bat first to generate the ghost distribution."
+    Write-Host "  Run without -SkipSetup to generate the ghost distribution."
     exit 1
 }
 
@@ -128,17 +277,15 @@ if (Test-Path $DllPath) {
 if ($ValidationFailed) {
     Write-Host ""
     Write-Host "ERROR: Ghost distribution validation failed." -ForegroundColor Red
-    Write-Host "  Run setup.bat first to generate a complete ghost distribution."
+    Write-Host "  Run without -SkipSetup to generate a complete ghost distribution."
     exit 1
 }
 
 Write-Host "  All required files present" -ForegroundColor Green
 Write-Host ""
 
-# ============================================================
-# Step 3: Create .nar File (Task 2.3)
-# ============================================================
-Write-Host "[3/4] Creating $NarFileName..."
+# --- Step 7: Create .nar File ---
+Write-Host "[7/8] Creating $NarFileName..."
 
 $TempDir = Join-Path $ScriptDir "temp_release"
 $TempGhostDir = Join-Path $TempDir "hello-pasta"
@@ -208,10 +355,8 @@ Write-Host "  Created: $NarFilePath"
 Write-Host "  Size:    $narSizeMB MB"
 Write-Host ""
 
-# ============================================================
-# Step 4: Show Release Instructions (Task 2.4)
-# ============================================================
-Write-Host "[4/4] Release instructions"
+# --- Step 8: Show Release Instructions ---
+Write-Host "[8/8] Release instructions"
 Write-Host ""
 Write-Host "========================================"
 Write-Host "  .nar Package Ready!"

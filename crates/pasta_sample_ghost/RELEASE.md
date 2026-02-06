@@ -4,34 +4,27 @@
 
 ## 前提条件
 
-- [x] `setup.bat` を実行してゴースト配布物を生成済み
-- [x] `release.bat` を実行して `hello-pasta.nar` を生成済み
+- [x] `release.bat` を実行してゴースト配布物を生成し `hello-pasta.nar` を作成済み
 - [x] GitHub CLI (`gh`) がインストール・認証済み (`gh auth status` で確認)
 
 ## リリース手順
 
-### Step 1: setup.bat 実行
+### Step 1: release.bat 実行
 
 ```bat
 cd crates\pasta_sample_ghost
-setup.bat
-```
-
-### Step 2: release.bat 実行
-
-```bat
 release.bat
 ```
 
-- `.nar` ファイルが生成され、バージョンとタグ名が表示されます
+- ビルド、ゴースト生成、バリデーション、`.nar` ファイル作成まで一括実行されます
 - 表示されたバージョン番号を確認してください
 
-### Step 3: リリースノート作成
+### Step 2: リリースノート作成
 
 下記テンプレートを元に `release-notes.md` を作成してください。
 AI と相談しながら、変更点を記入するのがおすすめです。
 
-### Step 4: GitHub Release 公開
+### Step 3: GitHub Release 公開
 
 ```bash
 gh release create v{VERSION} "crates/pasta_sample_ghost/hello-pasta.nar" \

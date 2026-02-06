@@ -2,7 +2,7 @@
 //!
 //! このビルドスクリプトは最小限の処理のみを行います。
 //! ゴースト配布物の生成は `cargo run -p pasta_sample_ghost` または
-//! `setup.bat` で行ってください。
+//! `release.bat` で行ってください。
 
 use std::env;
 use std::path::Path;
@@ -36,7 +36,7 @@ fn main() {
         eprintln!("  To generate the ghost distribution, run:");
         eprintln!();
         eprintln!("    cd crates/pasta_sample_ghost");
-        eprintln!("    .\\setup.bat");
+        eprintln!("    .\\release.bat");
         eprintln!();
         eprintln!("  Or manually:");
         eprintln!();

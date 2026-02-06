@@ -44,18 +44,23 @@ crates/pasta_sample_ghost/
 **pasta.dll と Lua ランタイムを配置**
 
 ```powershell
-# crates/pasta_sample_ghost/ フォルダで setup.ps1 をダブルクリック
-# または PowerShell で実行
-.\setup.ps1
+# crates/pasta_sample_ghost/ フォルダで release.bat をダブルクリック
+# または PowerShell で実行（ビルド＋セットアップ＋リリースパッケージ作成）
+.\release.ps1
 
 # DLL ビルドをスキップする場合（既にビルド済みの場合）
-.\setup.ps1 -SkipDllBuild
+.\release.ps1 -SkipDllBuild
+
+# セットアップをスキップしてリリースのみ実行する場合
+.\release.ps1 -SkipSetup
 ```
 
 このスクリプトは以下を実行します：
 1. pasta_shiori.dll (32bit) をビルド
-2. ghosts/hello-pasta/ghost/master/ に pasta.dll として配置
-3. crates/pasta_lua/scripts/ を scripts/ にコピー
+2. ゴーストファイルを生成
+3. ghosts/hello-pasta/ghost/master/ に pasta.dll と scripts/ を配置
+4. updates2.dau / updates.txt を生成
+5. バリデーション＆ .nar パッケージ作成
 
 **注意**: .pasta ファイルと .png ファイルは `build.rs` で自動生成されます（`cargo build` または `cargo test` 時）。
 
