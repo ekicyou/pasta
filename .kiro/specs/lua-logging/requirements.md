@@ -36,7 +36,7 @@ lua側からロギング出力したい。lua側から、rustのlog出力へリ�
 
 #### Acceptance Criteria
 1. The `@pasta_log` module shall `package.loaded["@pasta_log"]`に登録され、`require "@pasta_log"`で取得可能である
-2. The `@pasta_log` module shall ランタイム初期化シーケンス中に他の`@pasta_*`モジュールと同様に登録される
+2. The `@pasta_log` module shall ランタイム初期化シーケンス中に `@pasta_persistence` の直後に登録される（早期登録）。これにより main.lua でのログ出力が可能になる
 3. The `@pasta_log` module shall `_VERSION`および`_DESCRIPTION`メタデータフィールドを持つ
 4. The `@pasta_log` module shall 外部設定（`pasta.toml`等）に依存せず、追加設定なしで動作する
 
