@@ -10,6 +10,7 @@
 
 --- @class Store
 --- @field actors table<string, Actor> アクターキャッシュ（名前→アクター）
+--- @field actor_spots table<string, integer> アクターごとのスポット位置マップ（名前→スポットID）
 --- @field scenes table<string, table> シーンレジストリ（グローバル名→{ローカル名→シーン関数}）
 --- @field counters table<string, number> シーン名カウンタ（ベース名→カウンタ値）
 --- @field global_words table<string, table> グローバル単語レジストリ（key → values[][]）
@@ -21,6 +22,10 @@ local STORE = {}
 --- アクターキャッシュ（名前→アクター）
 --- @type table<string, Actor>
 STORE.actors = {}
+
+--- アクターごとのスポット位置マップ（名前→スポットID）
+--- @type table<string, integer>
+STORE.actor_spots = {}
 
 --- シーンレジストリ（グローバル名→{ローカル名→シーン関数}）
 --- @type table<string, table>
@@ -62,6 +67,7 @@ function STORE.reset()
     end
 
     STORE.actors = {}
+    STORE.actor_spots = {}
     STORE.scenes = {}
     STORE.app_ctx = {}
     STORE.counters = {}
@@ -76,6 +82,14 @@ end
 local ok, CONFIG = pcall(require, "@pasta_config")
 if ok and type(CONFIG.actor) == "table" then
     STORE.actors = CONFIG.actor
+
+    -- CONFIG.actor からのspot値転送（persist-spot-position）
+    -- actor.spot が数値型の場合のみ STORE.actor_spots に転送
+    for name, actor in pairs(CONFIG.actor) do
+        if type(actor) == "table" and type(actor.spot) == "number" then
+            STORE.actor_spots[name] = actor.spot
+        end
+    end
 end
 
 return STORE

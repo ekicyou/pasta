@@ -884,7 +884,10 @@ mod tests {
 
         // 4回目: 循環リセットが発生し、成功すること
         let r4 = table.resolve_scene_id("OnTalk", &HashMap::new());
-        assert!(r4.is_ok(), "4回目の呼び出しが失敗: 循環リセットが動作していない");
+        assert!(
+            r4.is_ok(),
+            "4回目の呼び出しが失敗: 循環リセットが動作していない"
+        );
 
         // 返却されたSceneIdが候補のいずれかであること
         let id = r4.unwrap();
@@ -980,7 +983,10 @@ mod tests {
         assert_eq!(second_cycle.len(), 3);
 
         // 候補セットが同一であること
-        assert_eq!(first_cycle, second_cycle, "リセット後に候補リストが変化している");
+        assert_eq!(
+            first_cycle, second_cycle,
+            "リセット後に候補リストが変化している"
+        );
     }
 
     #[test]
@@ -1005,7 +1011,10 @@ mod tests {
 
         // 3回目: 循環リセットが発生し、成功すること
         let r3 = table.resolve_scene_id_unified("会話_1", "選択肢", &HashMap::new());
-        assert!(r3.is_ok(), "unified版で3回目の呼び出しが失敗: 循環リセットが動作していない");
+        assert!(
+            r3.is_ok(),
+            "unified版で3回目の呼び出しが失敗: 循環リセットが動作していない"
+        );
 
         // 返却されたSceneIdが有効なローカルシーンであること
         let scene = table.get_scene(r3.unwrap()).unwrap();

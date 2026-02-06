@@ -109,7 +109,7 @@ function BUILDER.build(grouped_tokens, config)
         end
     end
 
-    return table.concat(buffer) .. "\\e"
+    return table.concat(buffer) .. "\\e", actor_spots
 end
 
 return BUILDER

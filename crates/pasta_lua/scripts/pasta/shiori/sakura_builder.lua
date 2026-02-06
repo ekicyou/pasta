@@ -41,14 +41,22 @@ end
 --- グループ化されたトークン配列をさくらスクリプト文字列に変換
 --- @param grouped_tokens table[] グループ化されたトークン配列
 --- @param config BuildConfig|nil 設定
---- @return string さくらスクリプト文字列
-function BUILDER.build(grouped_tokens, config)
+--- @param input_actor_spots table<string, integer>|nil アクターごとのスポット位置マップ（nilの場合は{}として扱う）
+--- @return string さくらスクリプト文字列（\e終端）
+--- @return table<string, integer> 更新後のactor_spotsマップ
+function BUILDER.build(grouped_tokens, config, input_actor_spots)
     config = config or {}
     local spot_newlines = config.spot_newlines or 1.5
     local buffer = {}
 
-    -- ビルダー内部状態（build()呼び出しごとにリセット）
+    -- ビルダー内部状態（入力のシャローコピーで初期化）
+    -- 入力テーブルを変更しない（純粋関数性の保証）
     local actor_spots = {} -- {[actor_name]: spot_id} actor位置マップ
+    if input_actor_spots then
+        for name, spot in pairs(input_actor_spots) do
+            actor_spots[name] = spot
+        end
+    end
     local last_actor = nil -- 最後に発言したActor
     local last_spot = nil  -- 最後のスポットID
 
@@ -61,8 +69,10 @@ function BUILDER.build(grouped_tokens, config)
                 actor_spots[token.actor.name] = token.spot
             end
         elseif t == "clear_spot" then
-            -- clear_spotトークン処理: 状態リセット
-            actor_spots = {}
+            -- clear_spotトークン処理: 個別nilクリア（テーブル再割り当てを回避）
+            for name in pairs(actor_spots) do
+                actor_spots[name] = nil
+            end
             last_actor = nil
             last_spot = nil
         elseif t == "actor" then
@@ -109,7 +119,7 @@ function BUILDER.build(grouped_tokens, config)
         end
     end
 
-    return table.concat(buffer) .. "\\e"
+    return table.concat(buffer) .. "\\e", actor_spots
 end
 
 return BUILDER

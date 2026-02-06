@@ -3,7 +3,7 @@
 このドキュメントは、[SOUL.md](SOUL.md) で定義されたコア機能と、それを検証するテストの対応関係を示します。
 
 **最終更新**: 2026-02-06  
-**総テスト数**: 760+テスト（全パス ✅）
+**総テスト数**: 768+テスト（全パス ✅）
 
 ---
 
@@ -90,6 +90,8 @@
 | EVENT.fire チェイントーク統合        | `global_chaintalk_integration_test.lua`| ✅ 完了 | 5テスト（yield-continuation-token）          |
 | @pasta_log ログブリッジ             | `log_module_test.rs`<br>`log_integration_test.rs` | ✅ 完了 | 24+7テスト（lua-logging）        |
 | @pasta_log スタックレベル検証       | `log_stack_level_test.rs`              | ✅ 完了 | 2テスト（lua-logging）                       |
+| スポット位置永続化（STORE連携）      | `persist_spot_position_test.lua`       | ✅ 完了 | 5テスト（persist-spot-position）             |
+| sakura_builder スポット処理          | `sakura_builder_test.lua`              | ✅ 完了 | 3テスト（persist-spot-position追加分）       |
 
 ### 2.5 統合テスト（E2E）
 
@@ -168,9 +170,9 @@
 | クレート     | テスト数 | パス     | 失敗  | カバレッジ評価 |
 | ------------ | -------- | -------- | ----- | -------------- |
 | pasta_core   | 105      | 105      | 0     | ⭐⭐⭐⭐⭐ 優秀     |
-| pasta_lua    | 470      | 470      | 0     | ⭐⭐⭐⭐⭐ 優秀     |
+| pasta_lua    | 478      | 478      | 0     | ⭐⭐⭐⭐⭐ 優秀     |
 | pasta_shiori | 28       | 28       | 0     | ⭐⭐⭐⭐⭐ 優秀     |
-| **合計**     | **714+** | **714+** | **0** | **100%パス率** |
+| **合計**     | **722+** | **722+** | **0** | **100%パス率** |
 
 ---
 

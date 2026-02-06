@@ -52,6 +52,12 @@ script_wait_comma = 500     # 読点ウェイト（デフォルト: 500）
 script_wait_strong = 500    # 強調記号ウェイト（デフォルト: 500）
 script_wait_leader = 200    # リーダーウェイト（デフォルト: 200）
 
+[actor."女の子"]
+spot = 0
+
+[actor."男の子"]
+spot = 1
+
 [persistence]
 # 永続化データディレクトリ
 data_dir = "profile/pasta/save"

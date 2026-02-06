@@ -649,3 +649,204 @@ describe("SAKURA_BUILDER - 統合シナリオ（グループ化トークン構�
         expect(result:find("\\p%[0%]")):toBeTruthy() -- clear後はデフォルト
     end)
 end)
+
+-- ============================================================================
+-- persist-spot-position: build()シグネチャ拡張テスト (Task 5.3, 5.4, 5.5)
+-- ============================================================================
+
+describe("SAKURA_BUILDER - persist-spot-position: 純粋関数性テスト (Task 5.3)", function()
+    test("入力actor_spotsテーブルが変更されないことを確認", function()
+        local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
+
+        local input_spots = { ["さくら"] = 0, ["うにゅう"] = 1 }
+        local tokens = {
+            { type = "spot", actor = actors.sakura, spot = 0 },
+            { type = "spot", actor = actors.kero,   spot = 1 },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk", actor = actors.sakura, text = "Hello" },
+                }
+            },
+        }
+
+        -- build呼び出し前のスナップショット
+        local original_sakura = input_spots["さくら"]
+        local original_kero = input_spots["うにゅう"]
+
+        local _, _ = BUILDER.build(tokens, {}, input_spots)
+
+        -- 入力テーブルが変更されていないことを確認
+        expect(input_spots["さくら"]):toBe(original_sakura)
+        expect(input_spots["うにゅう"]):toBe(original_kero)
+    end)
+
+    test("nil入力時に空テーブルとして扱われることを確認", function()
+        local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
+
+        local tokens = {
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk", actor = actors.sakura, text = "Hello" },
+                }
+            },
+        }
+
+        -- actor_spots = nil で呼び出し
+        local result, updated_spots = BUILDER.build(tokens, {}, nil)
+
+        expect(result:find("\\p%[0%]")):toBeTruthy()
+        expect(type(updated_spots)):toBe("table")
+    end)
+
+    test("第2戻り値としてactor_spotsテーブルが返されることを確認", function()
+        local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
+
+        local tokens = {
+            { type = "spot", actor = actors.sakura, spot = 0 },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk", actor = actors.sakura, text = "Hello" },
+                }
+            },
+        }
+
+        local result, updated_spots = BUILDER.build(tokens, {})
+
+        expect(type(result)):toBe("string")
+        expect(type(updated_spots)):toBe("table")
+        expect(updated_spots["さくら"]):toBe(0)
+    end)
+
+    test("後方互換性: actor_spots省略時も正常動作", function()
+        local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
+
+        local tokens = {
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk", actor = actors.sakura, text = "Hello" },
+                }
+            },
+        }
+
+        -- 第3引数を省略しても動作
+        local result, updated_spots = BUILDER.build(tokens, {})
+
+        expect(result:find("Hello")):toBeTruthy()
+        expect(type(updated_spots)):toBe("table")
+    end)
+end)
+
+describe("SAKURA_BUILDER - persist-spot-position: clear_spotトークン処理 (Task 5.4)", function()
+    test("clear_spotトークンで入力のactor_spotsがリセットされる", function()
+        local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
+
+        local input_spots = { ["さくら"] = 5, ["うにゅう"] = 3 }
+        local tokens = {
+            { type = "clear_spot" },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk", actor = actors.sakura, text = "Reset" },
+                }
+            },
+        }
+
+        local result, updated_spots = BUILDER.build(tokens, {}, input_spots)
+
+        -- clear_spot後はデフォルトspot(0)を使用
+        expect(result:find("\\p%[0%]")):toBeTruthy()
+        -- updated_spotsからエントリがクリアされている
+        expect(updated_spots["さくら"]):toBe(nil)
+        expect(updated_spots["うにゅう"]):toBe(nil)
+    end)
+
+    test("入力テーブルがclear_spotで変更されないことを確認", function()
+        local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
+
+        local input_spots = { ["さくら"] = 5 }
+        local tokens = {
+            { type = "clear_spot" },
+        }
+
+        local _, _ = BUILDER.build(tokens, {}, input_spots)
+
+        -- 入力テーブルは変更されない（純粋関数性）
+        expect(input_spots["さくら"]):toBe(5)
+    end)
+end)
+
+describe("SAKURA_BUILDER - persist-spot-position: spotトークン処理 (Task 5.5)", function()
+    test("spotトークンで入力のactor_spotsが正しく更新される", function()
+        local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
+
+        local input_spots = { ["さくら"] = 0 }
+        local tokens = {
+            { type = "spot", actor = actors.sakura, spot = 0 },
+            { type = "spot", actor = actors.kero,   spot = 1 },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk", actor = actors.sakura, text = "Hi" },
+                }
+            },
+        }
+
+        local _, updated_spots = BUILDER.build(tokens, {}, input_spots)
+
+        expect(updated_spots["さくら"]):toBe(0)
+        expect(updated_spots["うにゅう"]):toBe(1)
+    end)
+
+    test("入力actor_spotsの値を引き継いでスポットタグが出力される", function()
+        local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
+
+        -- 前回のスポット状態を入力として渡す
+        local input_spots = { ["さくら"] = 0, ["うにゅう"] = 1 }
+        local tokens = {
+            -- spotトークンなし（前回の値を引き継ぐ）
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk", actor = actors.sakura, text = "Still here" },
+                }
+            },
+            {
+                type = "actor",
+                actor = actors.kero,
+                tokens = {
+                    { type = "talk", actor = actors.kero, text = "Me too" },
+                }
+            },
+        }
+
+        local result, updated_spots = BUILDER.build(tokens, { spot_newlines = 1.5 }, input_spots)
+
+        -- 前回のスポット値が引き継がれている
+        expect(result:find("\\p%[0%]")):toBeTruthy()
+        expect(result:find("\\p%[1%]")):toBeTruthy()
+        expect(result:find("\\n%[150%]")):toBeTruthy() -- spot変更時の段落改行
+
+        -- updated_spotsも前回の値を保持
+        expect(updated_spots["さくら"]):toBe(0)
+        expect(updated_spots["うにゅう"]):toBe(1)
+    end)
+end)

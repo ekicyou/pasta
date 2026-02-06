@@ -13,6 +13,9 @@ STORE.save = {}
 --- アクターキャッシュ（名前→アクター）
 STORE.actors = {}
 
+--- アクターごとのスポット位置マップ（名前→スポットID）
+STORE.actor_spots = {}
+
 --- シーンレジストリ（グローバル名→{ローカル名→シーン関数}）
 STORE.scenes = {}
 
@@ -32,6 +35,7 @@ STORE.actor_words = {}
 function STORE.reset()
     STORE.save = {}
     STORE.actors = {}
+    STORE.actor_spots = {}
     STORE.scenes = {}
     STORE.counters = {}
     STORE.global_words = {}

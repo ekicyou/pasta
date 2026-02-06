@@ -7,6 +7,7 @@
 local ACT = require("pasta.act")
 local BUILDER = require("pasta.shiori.sakura_builder")
 local CONFIG = require("pasta.config")
+local STORE = require("pasta.store")
 
 --- @class ShioriAct : Act SHIORI専用アクションオブジェクト
 --- @field _spot_newlines number スポット切り替え時の改行数（デフォルト1.5）
@@ -62,10 +63,19 @@ function SHIORI_ACT_IMPL.build(self)
         return nil
     end
 
+    -- STORE.actor_spotsを読み取り、BUILDER.build()に渡す（persist-spot-position）
+    local current_spots = STORE.actor_spots
+
     -- sakura_builderで変換（新プロパティ名spot_newlinesを使用）
-    local script = BUILDER.build(token, {
+    local script, updated_spots = BUILDER.build(token, {
         spot_newlines = self._spot_newlines
-    })
+    }, current_spots)
+
+    -- 更新されたスポット状態をSTOREに書き戻し
+    if updated_spots then
+        STORE.actor_spots = updated_spots
+    end
+
     return script
 end
 

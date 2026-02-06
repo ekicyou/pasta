@@ -26,6 +26,7 @@ local specs = {
     "act_build_early_return_test",       -- ACT:build() / SHIORI_ACT:build() 早期リターンテスト
     "global_chaintalk_call_test",        -- GLOBAL チェイントーク関数登録・L3解決テスト
     "global_chaintalk_integration_test", -- GLOBAL チェイントーク EVENT.fire 統合テスト
+    "persist_spot_position_test",        -- persist-spot-position スポット位置継続保持テスト
     -- 将来のテストスイートをここに追加
     -- "code_generator_test",
     -- "context_test",
