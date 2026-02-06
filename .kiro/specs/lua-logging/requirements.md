@@ -17,7 +17,7 @@ lua側からロギング出力したい。lua側から、rustのlog出力へリ�
 1. The `@pasta_log` module shall `trace(message)`, `debug(message)`, `info(message)`, `warn(message)`, `error(message)` の5つのログレベル関数を提供する
 2. When Luaスクリプトがログ関数を呼び出した場合, the `@pasta_log` module shall Rust側の`tracing`マクロ（`tracing::trace!`, `tracing::debug!`等）へメッセージを転送する
 3. The `@pasta_log` module shall 各ログ関数の引数として文字列メッセージを受け付ける
-4. If ログ関数にnil以外の非文字列値が渡された場合, the `@pasta_log` module shall `tostring()`で文字列に変換してから出力する
+4. If ログ関数に非文字列値が渡された場合, the `@pasta_log` module shall 以下のように変換してから出力する: 数値や真偽値は `tostring()` で変換、テーブル等の複雑型は JSON または YAML のような構造化形式で展開する
 5. If ログ関数にnilまたは引数なしで呼び出された場合, the `@pasta_log` module shall 空文字列として処理し、エラーを発生させない
 
 ### Requirement 2: 呼び出し元情報の自動付与
