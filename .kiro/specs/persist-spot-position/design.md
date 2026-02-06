@@ -233,6 +233,8 @@ BUILDER.build(grouped_tokens, config, actor_spots) → string, table
 
 **Implementation Notes**
 - Integration: ローカル変数 `local actor_spots = {}` を、入力のシャローコピーに置き換え
+  - シャローコピー戦略: 明示的ループコピー（`for name, spot in pairs(input_actor_spots) do local_actor_spots[name] = spot end`）でテーブル参照を分離
+  - clear_spot処理: テーブル再割り当て（`local_actor_spots = {}`）ではなく、個別nilクリア（`for name in pairs(local_actor_spots) do local_actor_spots[name] = nil end`）で副作用リスクを回避
 - Validation: actor_spots が nil の場合は空テーブルとして扱う（後方互換性）
 - Risks: 既存テストの戻り値チェックが単一値を期待している場合に修正が必要
 
@@ -273,6 +275,29 @@ SHIORI_ACT_IMPL.build(self) → string|nil
 4. 戻り値 `(script, updated_spots)` を受け取り
 5. `STORE.actor_spots = updated_spots` で書き戻し
 6. `script` を返却
+
+**疑似コード例**:
+```lua
+function SHIORI_ACT_IMPL:build()
+  -- 1. 親クラスのトークン生成
+  local grouped_tokens = ACT.IMPL.build(self)
+  if not grouped_tokens then return nil end
+  
+  -- 2. STOREからスポット状態を読み取り
+  local current_spots = STORE.actor_spots
+  
+  -- 3. ビルダー呼び出し（入力: current_spots, 出力: script + updated_spots）
+  local script, updated_spots = BUILDER.build(grouped_tokens, self.config, current_spots)
+  
+  -- 4. 更新されたスポット状態をSTOREに書き戻し
+  if updated_spots then
+    STORE.actor_spots = updated_spots
+  end
+  
+  -- 5. さくらスクリプトを返却
+  return script
+end
+```
 
 **Implementation Notes**
 - Integration: `local STORE = require("pasta.store")` を モジュール先頭の require セクションに追加
@@ -372,3 +397,5 @@ pasta.toml [actor."女の子"] spot=0
 ### E2E Tests
 - サンプルゴースト起動: `[actor]`セクション設定の反映確認
 - ランダムトーク: ％行付きシーンでのスポット切り替え正常動作
+- ％行省略シーン連続実行: ％行ありシーン → ％行なしシーン（複数）でスポット位置が引き継がれることの確認（要件2.1/2.2の実証）
+  - テストケース: サンプルゴーストに検証用シーンを追加（最初のシーンで`% 女の子 男の子`、以降2シーン以上でアクター行省略し、生成されるさくらスクリプトの`\p[ID]`が正しく継続することを確認）
