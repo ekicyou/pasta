@@ -6,7 +6,7 @@
 - **Key Findings**:
   - `global.lua` は空テーブルのみで、関数追加は既存パターン完全準拠
   - `ACT_IMPL.call` L3 → `ACT_IMPL.yield` のコールチェーンは既存テスト済み
-  - トランスパイラは `＞チェイン` を `act:call(SCENE.__global_name__, "チェイン", {}, table.unpack(args))` に変換する
+  - トランスパイラは `＞チェイントーク` を `act:call(SCENE.__global_name__, "チェイントーク", {}, table.unpack(args))` に変換する
 
 ## Research Log
 
@@ -17,13 +17,13 @@
   - `global.lua` は `local GLOBAL = {} ... return GLOBAL` の標準モジュール構造
   - lua-coding.md で日本語識別子は内部変数・GLOBAL エントリとして許可されている
   - 関数シグネチャは `function(act, ...)` パターン（`ACT_IMPL.call` が第1引数に `self` を渡す）
-- **Implications**: `GLOBAL.チェイン = function(act) ... end` の形式で追加可能
+- **Implications**: `GLOBAL.チェイントーク = function(act) ... end` の形式で追加可能
 
 ### ACT_IMPL.call の検索フロー
-- **Context**: `＞チェイン` が GLOBAL 関数に正しく解決されることを検証
+- **Context**: `＞チェイントーク` が GLOBAL 関数に正しく解決されることを検証
 - **Sources Consulted**: `scripts/pasta/act.lua` L313-L347, `crates/pasta_lua/src/code_generator.rs` L408-L455
 - **Findings**:
-  - トランスパイラ出力: `act:call(SCENE.__global_name__, "チェイン", {}, table.unpack(args))`
+  - トランスパイラ出力: `act:call(SCENE.__global_name__, "チェイントーク", {}, table.unpack(args))`
   - L1（current_scene）→ L2（SCENE.search）→ L3（GLOBAL[key]）→ L4（SCENE.search fallback）
   - L3 は完全一致: `handler = GLOBAL[key]`
   - ハンドラー実行: `handler(self, ...)` — `self` は act オブジェクト
@@ -63,7 +63,7 @@
   1. Option A — global.lua に直接定義
   2. Option B — 新規 builtins.lua に分離
   3. Option C — Rust 側から登録
-- **Selected Approach**: Option A — `global.lua` に `GLOBAL.チェイン` と `GLOBAL.yield` を直接定義
+- **Selected Approach**: Option A — `global.lua` に `GLOBAL.チェイントーク` と `GLOBAL.yield` を直接定義
 - **Rationale**: 変更量最小（実質3行追加）、既存の「GLOBAL はユーザー拡張可能なテーブル」という設計思想と完全に整合、新ファイル・新モジュール・新バインディング一切不要
 - **Trade-offs**: 将来デフォルト関数が大量に増えた場合の管理性 → 現時点では2関数のみで問題なし
 - **Follow-up**: なし
@@ -77,15 +77,15 @@
   4. Req 2 を Lua BDD、Req 3 を Lua BDD（別テストファイル）
 - **Selected Approach**: Option 4 — 両テストとも Lua BDD で実装、別テストファイルに分離
 - **Rationale**:
-  - Req 2 は `ACT_IMPL.call` → `GLOBAL.チェイン` → `act:yield()` のユニット的な検証。Lua 層で完結
+  - Req 2 は `ACT_IMPL.call` → `GLOBAL.チェイントーク` → `act:yield()` のユニット的な検証。Lua 層で完結
   - Req 3 は `EVENT.fire` → コルーチン分割の統合検証。`integration_coroutine_test.lua` と同じパターン
   - Pasta DSL → トランスパイル経路は `ACT_IMPL.call` のテストで既にカバーされており、Rust E2E の追加価値は薄い
-  - ただし、トランスパイラの `＞チェイン` 出力を検証するスナップショットテストは既存テストでカバー可能
+  - ただし、トランスパイラの `＞チェイントーク` 出力を検証するスナップショットテストは既存テストでカバー可能
 - **Trade-offs**: Rust E2E による DSL→トランスパイル→実行の一気通貫検証は省略 → 既存の ACT_IMPL.call テスト + トランスパイラスナップショットでカバー済み
 - **Follow-up**: 設計で具体的なテストファイル名・構成を決定
 
 ## Risks & Mitigations
-- **Risk 1**: ユーザーが `GLOBAL.チェイン` を意図せず上書きしてしまう — `main.lua` での明示的代入のみなので低リスク。ドキュメントで注意喚起
+- **Risk 1**: ユーザーが `GLOBAL.チェイントーク` を意図せず上書きしてしまう — `main.lua` での明示的代入のみなので低リスク。ドキュメントで注意喚起
 - **Risk 2**: 将来の GLOBAL 関数追加時にファイル肥大化 — 現時点では2関数のみ。増加時は別途モジュール分離を検討
 
 ## References

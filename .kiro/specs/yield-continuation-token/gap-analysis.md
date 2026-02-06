@@ -36,14 +36,14 @@
 
 | 要件 | 既存アセット | ギャップ |
 |------|-------------|---------|
-| Req 1: GLOBAL関数登録・エイリアス・オーバーライド | `global.lua` 空テーブル、`ACT_IMPL.call` L3、`main.lua` 優先ロード | **Missing** — デフォルト関数（チェイン/yield）未定義。Call解決・コルーチン動作・オーバーライドは既存充足 |
+| Req 1: GLOBAL関数登録・エイリアス・オーバーライド | `global.lua` 空テーブル、`ACT_IMPL.call` L3、`main.lua` 優先ロード | **Missing** — デフォルト関数（チェイントーク/yield）未定義。Call解決・コルーチン動作・オーバーライドは既存充足 |
 | Req 2: ランタイム動作試験 | `act_impl_call_test.lua` パターン | **Missing** — Pasta DSL→トランスパイル→実行の試験なし |
-| Req 3: EVENT.fire統合テスト | `integration_coroutine_test.lua` パターン | **Missing** — `＞チェイン` 固有の統合テストなし |
+| Req 3: EVENT.fire統合テスト | `integration_coroutine_test.lua` パターン | **Missing** — `＞チェイントーク` 固有の統合テストなし |
 
 ### 技術的制約
 
 - **Luaモジュール読み込み順序**: `global.lua` は `act.lua` から `require("pasta.global")` で読み込まれる。デフォルト関数を `global.lua` 自体に定義すれば、最初のrequire時点で登録済みとなる
-- **ユーザー上書き**: `main.lua` は `global.lua` より後に実行される。`GLOBAL.チェイン = custom_func` で上書き可能
+- **ユーザー上書き**: `main.lua` は `global.lua` より後に実行される。`GLOBAL.チェイントーク = custom_func` で上書き可能
 - **コルーチンスタック**: `ACT_IMPL.call` は通常の関数呼び出しであり、新しいコルーチンを生成しない。GLOBAL関数内での `act:yield()` は呼び出し元コルーチンの `coroutine.yield()` として正常に動作する
 
 ### 複雑度シグナル
@@ -64,7 +64,7 @@
 ```
 
 **変更内容**:
-- `GLOBAL.チェイン` と `GLOBAL.yield` を定義（`act:yield()` を呼ぶだけ）
+- `GLOBAL.チェイントーク` と `GLOBAL.yield` を定義（`act:yield()` を呼ぶだけ）
 - 既存の空テーブル + return パターンを維持
 
 **互換性**:
@@ -107,7 +107,7 @@
 **既存パターン**: `runtime_e2e_test.rs` + `e2e_helpers.rs`
 
 **実現方法**:
-1. Pasta DSLフィクスチャ作成（`＞チェイン` を含むシーン）
+1. Pasta DSLフィクスチャ作成（`＞チェイントーク` を含むシーン）
 2. `transpile()` → `lua.load()` → `finalize_scene()` → `SCENE.co_exec()` パイプライン
 3. コルーチンresumeでyield前後の出力を検証
 
@@ -155,7 +155,7 @@
 ### 設計フェーズでの決定事項
 
 1. **テスト配置**: Lua BDDテスト（Req 3）とRust E2Eテスト（Req 2）の具体的ファイル名・構成
-2. **Pasta DSLフィクスチャ**: `＞チェイン` を含むテスト用 `.pasta` ファイルの設計
+2. **Pasta DSLフィクスチャ**: `＞チェイントーク` を含むテスト用 `.pasta` ファイルの設計
 3. **ドキュメント更新**: LUA_API.md、GRAMMAR.md への反映範囲
 
 ### Research Needed

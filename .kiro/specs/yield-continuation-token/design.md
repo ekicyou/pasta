@@ -25,9 +25,9 @@
 変更対象は `scripts/pasta/global.lua` の1ファイルのみ。既存アーキテクチャへの影響はない。
 
 **既存の制御フロー**:
-1. トランスパイラが `＞チェイン` → `act:call(SCENE.__global_name__, "チェイン", {}, table.unpack(args))` を生成
+1. トランスパイラが `＞チェイントーク` → `act:call(SCENE.__global_name__, "チェイントーク", {}, table.unpack(args))` を生成
 2. `ACT_IMPL.call` が L1 → L2 → **L3（GLOBAL テーブル）** → L4 の順で検索
-3. `GLOBAL["チェイン"]` が見つかり、`handler(act, ...)` として実行
+3. `GLOBAL["チェイントーク"]` が見つかり、`handler(act, ...)` として実行
 4. ハンドラー内で `act:yield()` → `self:build()` → `coroutine.yield(result)` を実行
 5. `EVENT.fire` の `resume_until_valid` がコルーチン yield を受け取り、中間出力として処理
 
@@ -38,12 +38,12 @@
 ```mermaid
 graph LR
     subgraph Transpiler
-        DSL["Pasta DSL: > chain"]
-        LUA["act:call SCENE name chain"]
+        DSL["Pasta DSL: > chaintalk"]
+        LUA["act:call SCENE name chaintalk"]
     end
     subgraph Runtime
         CALL["ACT_IMPL.call L3"]
-        GLOBAL["GLOBAL.chain function"]
+        GLOBAL["GLOBAL.chaintalk function"]
         YIELD["ACT_IMPL.yield"]
         CO["coroutine.yield"]
     end
@@ -80,10 +80,10 @@ sequenceDiagram
     participant Yield as ACT_IMPL.yield
     participant Event as EVENT.fire
 
-    Scene->>ACT: act:call(name, "chain", {})
+    Scene->>ACT: act:call(name, "chaintalk", {})
     ACT->>ACT: L1: current_scene search - not found
     ACT->>ACT: L2: SCENE.search - not found
-    ACT->>GLOBAL: L3: GLOBAL["chain"] - found
+    ACT->>GLOBAL: L3: GLOBAL["chaintalk"] - found
     GLOBAL->>Yield: act:yield()
     Yield->>Yield: self:build() - collect tokens
     Yield-->>Event: coroutine.yield(result)
@@ -96,11 +96,11 @@ sequenceDiagram
 
 | Requirement | Summary | Components | Interfaces | Flows |
 |-------------|---------|------------|------------|-------|
-| 1.1 | GLOBAL.チェイン / GLOBAL.yield 関数提供 | GlobalModule | GLOBAL テーブルエントリ | — |
+| 1.1 | GLOBAL.チェイントーク / GLOBAL.yield 関数提供 | GlobalModule | GLOBAL テーブルエントリ | — |
 | 1.2 | act:yield() 実行による中間出力 | GlobalModule | ACT_IMPL.yield（既存） | 継続トークフロー |
 | 1.3 | ACT_IMPL.call L3 での解決 | — (既存充足) | ACT_IMPL.call（既存） | 継続トークフロー |
 | 1.4 | ユーザーオーバーライド | — (既存充足) | Lua モジュールキャッシュ（既存） | — |
-| 2.1 | `＞チェイン` → GLOBAL.チェイン 呼び出し検証 | GlobalChainCallTest | — | — |
+| 2.1 | `＞チェイントーク` → GLOBAL.チェイントーク 呼び出し検証 | GlobalChainCallTest | — | — |
 | 2.2 | act:yield() 実行と蓄積トークン出力検証 | GlobalChainCallTest | — | — |
 | 2.3 | テストフロー自動実行 | GlobalChainCallTest | — | — |
 | 2.4 | コルーチン内での yield/resume 検証 | GlobalChainCallTest | — | — |
@@ -114,7 +114,7 @@ sequenceDiagram
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies (P0/P1) | Contracts |
 |-----------|--------------|--------|--------------|--------------------------|-----------|
 | GlobalModule | Runtime/Lua | GLOBAL テーブルへのデフォルト関数登録 | 1.1, 1.2 | ACT_IMPL.yield (P0) | State |
-| GlobalChainCallTest | Test/Lua BDD | GLOBAL.チェイン の call 解決と yield 動作検証 | 2.1, 2.2, 2.3, 2.4 | ACT, GLOBAL, SCENE (P0) | — |
+| GlobalChainCallTest | Test/Lua BDD | GLOBAL.チェイントーク の call 解決と yield 動作検証 | 2.1, 2.2, 2.3, 2.4 | ACT, GLOBAL, SCENE (P0) | — |
 | GlobalChainIntegrationTest | Test/Lua BDD | EVENT.fire 経由のコルーチン分割検証 | 3.1, 3.2, 3.3, 3.4 | EVENT, STORE, GLOBAL (P0) | — |
 
 ### Runtime / Lua
@@ -123,11 +123,11 @@ sequenceDiagram
 
 | Field | Detail |
 |-------|--------|
-| Intent | GLOBAL テーブルにデフォルトの継続トーク関数を登録する |
+| Intent | GLOBAL テーブルにデフォルトのチェイントーク関数を登録する |
 | Requirements | 1.1, 1.2 |
 
 **Responsibilities & Constraints**
-- `GLOBAL.チェイン` と `GLOBAL.yield` の2つの関数を定義
+- `GLOBAL.チェイントーク` と `GLOBAL.yield` の2つの関数を定義
 - 両関数は同一動作: `act:yield()` を呼び出す
 - 関数シグネチャ: `function(act)` — `ACT_IMPL.call` が第1引数に act オブジェクトを渡す
 - 既存の空テーブル + `return GLOBAL` パターンを維持
@@ -139,7 +139,7 @@ sequenceDiagram
 **Contracts**: State [x]
 
 ##### State Management
-- **State model**: `GLOBAL` テーブルに `チェイン` と `yield` キーで関数を保持
+- **State model**: `GLOBAL` テーブルに `チェイントーク` と `yield` キーで関数を保持
 - **Persistence**: なし（モジュールロード時に定義、`require` キャッシュで保持）
 - **Concurrency strategy**: 単一スレッド（Lua VM）
 
@@ -154,14 +154,14 @@ sequenceDiagram
 
 | Field | Detail |
 |-------|--------|
-| Intent | `ACT_IMPL.call` L3 経由で GLOBAL.チェイン が呼ばれ、act:yield() が実行されることを検証 |
+| Intent | `ACT_IMPL.call` L3 経由で GLOBAL.チェイントーク が呼ばれ、act:yield() が実行されることを検証 |
 | Requirements | 2.1, 2.2, 2.3, 2.4 |
 
 **Responsibilities & Constraints**
 - テストファイル: `tests/lua_specs/global_chain_call_test.lua`
 - `init.lua` の specs テーブルに `"global_chain_call_test"` を追加
 - 既存の `act_impl_call_test.lua` の L3 テストパターンを踏襲
-- テスト対象: GLOBAL.チェイン / GLOBAL.yield の関数登録、call 解決、yield 動作
+- テスト対象: GLOBAL.チェイントーク / GLOBAL.yield の関数登録、call 解決、yield 動作
 
 **Dependencies**
 - External: `lua_test.test` — BDD テストフレームワーク (P0)
@@ -172,18 +172,18 @@ sequenceDiagram
 
 | # | テストケース | 検証内容 | Req |
 |---|-------------|---------|-----|
-| 1 | GLOBAL.チェイン が登録されている | `GLOBAL["チェイン"]` が非 nil の関数であること | 2.1 |
+| 1 | GLOBAL.チェイントーク が登録されている | `GLOBAL["チェイントーク"]` が非 nil の関数であること | 2.1 |
 | 2 | GLOBAL.yield が登録されている | `GLOBAL["yield"]` が非 nil の関数であること | 2.1 |
-| 3 | act:call で GLOBAL.チェイン が L3 解決される | current_scene=nil の act で `act:call(nil, "チェイン", {})` → yield 動作 | 2.1 |
+| 3 | act:call で GLOBAL.チェイントーク が L3 解決される | current_scene=nil の act で `act:call(nil, "チェイントーク", {})` → yield 動作 | 2.1 |
 | 4 | act:call で GLOBAL.yield が L3 解決される | 同上、キー "yield" | 2.1 |
 | 5 | コルーチン内で act:yield() が正しく動作する | coroutine.wrap 内で call → yield → resume 後に後続処理が継続 | 2.2, 2.4 |
-| 6 | yield 前のトークンが蓄積出力として返る | act:talk 後に call("チェイン") → build 結果が yield される | 2.2 |
+| 6 | yield 前のトークンが蓄積出力として返る | act:talk 後に call("チェイントーク") → build 結果が yield される | 2.2 |
 
 #### GlobalChainIntegrationTest
 
 | Field | Detail |
 |-------|--------|
-| Intent | EVENT.fire 経由で GLOBAL.チェイン を含むシーンを実行し、コルーチン分割を検証 |
+| Intent | EVENT.fire 経由で GLOBAL.チェイントーク を含むシーンを実行し、コルーチン分割を検証 |
 | Requirements | 3.1, 3.2, 3.3, 3.4 |
 
 **Responsibilities & Constraints**
@@ -209,7 +209,7 @@ sequenceDiagram
 
 **テスト構成方針** (3.4)
 
-EVENT.fire のハンドラーとして、GLOBAL.チェイン を内部的に呼び出すシーン関数を `REG.OnChainTest` に登録する。ハンドラーは `coroutine.create(function(act) ... end)` でコルーチンを返し、その中で `GLOBAL.チェイン(act)` を呼ぶ。`integration_coroutine_test.lua` と同一のテストパターンに従う。
+EVENT.fire のハンドラーとして、GLOBAL.チェイントーク を内部的に呼び出すシーン関数を `REG.OnChainTest` に登録する。ハンドラーは `coroutine.create(function(act) ... end)` でコルーチンを返し、その中で `GLOBAL.チェイントーク(act)` を呼ぶ。`integration_coroutine_test.lua` と同一のテストパターンに従う。
 
 ## Testing Strategy
 
