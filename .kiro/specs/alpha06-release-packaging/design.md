@@ -28,7 +28,9 @@ graph LR
         GhostDir[ghosts/hello-pasta/]
     end
     subgraph New
-        ReleaseScript[release.ps1]
+        ReleaseBat[release.bat]
+        ReleasePs1[release.ps1]
+        ReleaseDoc[RELEASE.md]
     end
     subgraph External
         GhRelease[gh release create]
@@ -36,16 +38,21 @@ graph LR
     end
 
     SetupBat --> GhostDir
-    GhostDir --> ReleaseScript
-    ReleaseScript -->|hello-pasta.nar| GhRelease
+    GhostDir --> ReleaseBat
+    ReleaseBat --> ReleasePs1
+    ReleasePs1 -->|hello-pasta.nar| ReleaseDoc
+    ReleaseDoc -.AI ガイド.-> GhRelease
     GhRelease --> GitHubReleases
 ```
 
 **Architecture Integration**:
-- **Selected pattern**: リニアパイプライン（setup.bat → release.ps1 → gh release create）
-- **Domain boundaries**: ゴースト生成（setup.bat）とリリースパッケージング（release.ps1）を分離
+- **Selected pattern**: リニアパイプライン（setup.bat → release.bat → release.ps1 → AI ガイド付き手動リリース）
+- **Domain boundaries**: ゴースト生成（setup.bat）、パッケージング（release.ps1）、リリース公開（手動）を分離
 - **Existing patterns preserved**: `setup.bat` の 4 ステップワークフローに変更なし
-- **New components rationale**: `release.ps1` のみ追加。ZIP → .nar 変換とリリース公開を担当
+- **New components rationale**: 
+  - `release.bat` — PowerShell スクリプト起動ラッパー（実行の利便性）
+  - `release.ps1` — .nar 生成と検証
+  - `RELEASE.md` — AI ガイド付きリリース手順書
 - **Steering compliance**: 既存のスクリプト配置規約（`crates/pasta_sample_ghost/` 配下）に従う
 
 ### Technology Stack
@@ -65,6 +72,7 @@ graph LR
 sequenceDiagram
     participant Dev as 配布担当者
     participant SetupBat as setup.bat
+    participant ReleaseBat as release.bat
     participant ReleasePs1 as release.ps1
     participant GH as gh CLI
     participant GitHub as GitHub Releases
@@ -73,14 +81,16 @@ sequenceDiagram
     SetupBat->>SetupBat: DLL ビルド + ゴースト生成 + コピー + finalize
     SetupBat-->>Dev: Setup Complete!
 
-    Dev->>ReleasePs1: 2. 実行
+    Dev->>ReleaseBat: 2. ダブルクリック実行
+    ReleaseBat->>ReleasePs1: PowerShell スクリプト起動
     ReleasePs1->>ReleasePs1: バージョン確認（Cargo.toml）
     ReleasePs1->>ReleasePs1: 配布物検証（ファイル存在チェック）
     ReleasePs1->>ReleasePs1: profile/ 除外 → 一時ディレクトリ
     ReleasePs1->>ReleasePs1: ZIP 圧縮 → .nar リネーム
-    ReleasePs1-->>Dev: hello-pasta.nar 生成完了
+    ReleasePs1-->>Dev: hello-pasta.nar 生成完了 + リリース手順表示
 
-    Dev->>GH: 3. gh release create v0.1.1 hello-pasta.nar
+    Note over Dev: 3. AI と相談しながらリリース作業
+    Dev->>GH: gh release create v0.1.1 hello-pasta.nar --notes "..."
     GH->>GitHub: リリース作成 + アセットアップロード
     GitHub-->>Dev: リリース公開完了
 ```
@@ -91,13 +101,13 @@ sequenceDiagram
 |-------------|---------|------------|------------|-------|
 | 1.1 | ZIP 圧縮 → .nar 変換 | release.ps1 | PackageNar | リリースワークフロー Step 2 |
 | 1.2 | .nar 内部構成 | release.ps1（検証） | ValidateGhost | リリースワークフロー Step 2 |
-| 1.3 | setup.bat 後の手動操作 | — | — | リリースワークフロー Step 1→2 |
-| 2.1 | gh release create 実行 | release.ps1 | PublishRelease | リリースワークフロー Step 3 |
-| 2.2 | v\<version\> タグ形式 | release.ps1 | GetVersion | — |
-| 2.3 | Cargo.toml バージョン一致 | release.ps1 | GetVersion | — |
-| 2.4 | .nar アセット添付 | release.ps1 | PublishRelease | リリースワークフロー Step 3 |
-| 2.5 | リリース本文 | リリースノート本文 | — | — |
-| 3.1–3.4 | リリースノート + インストール手順 | リリースノート本文 | — | — |
+| 1.3 | setup.bat 後の手動操作 | release.bat | — | リリースワークフロー Step 1→2 |
+| 2.1 | gh release create 実行 | RELEASE.md（手順書） | — | リリースワークフロー Step 3 |
+| 2.2 | v\<version\> タグ形式 | release.ps1（表示）、RELEASE.md | — | — |
+| 2.3 | Cargo.toml バージョン一致 | release.ps1（表示）、RELEASE.md | — | — |
+| 2.4 | .nar アセット添付 | RELEASE.md（手順書） | — | リリースワークフロー Step 3 |
+| 2.5 | リリース本文 | RELEASE.md（テンプレート） | — | — |
+| 3.1–3.4 | リリースノート + インストール手順 | RELEASE.md（テンプレート） | — | — |
 | 4.1 | ファイル存在チェック | release.ps1 | ValidateGhost | リリースワークフロー Step 2 |
 | 4.2 | 検証失敗時の中断 | release.ps1 | ValidateGhost | — |
 
@@ -105,27 +115,56 @@ sequenceDiagram
 
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies | Contracts |
 |-----------|------------|--------|--------------|-----------------|-----------|
-| release.ps1 | パッケージング | ゴースト検証・ZIP 圧縮・.nar 生成・リリース公開 | 1.1, 1.2, 2.1–2.4, 4.1, 4.2 | setup.bat 生成物 (P0), gh CLI (P0) | Batch |
-| リリースノート本文 | ドキュメント | GitHub Releases 本文テンプレート | 2.5, 3.1–3.4 | — | — |
+| release.bat | ラッパー | release.ps1 起動 | — | release.ps1 (P0) | Batch |
+| release.ps1 | パッケージング | ゴースト検証・.nar 生成 | 1.1, 1.2, 4.1, 4.2 | setup.bat 生成物 (P0) | Batch |
+| RELEASE.md | ドキュメント | リリース手順書（AI ガイド付き） | 2.1–2.5, 3.1–3.4 | — | — |
 
 ### パッケージング
+
+#### release.bat
+
+| Field | Detail |
+|-------|--------|
+| Intent | release.ps1 を起動するラッパースクリプト |
+| Requirements | — |
+
+**Responsibilities & Constraints**
+- PowerShell スクリプト（release.ps1）の起動
+- ダブルクリックで実行可能
+
+**Dependencies**
+- Outbound: `release.ps1` — PowerShell スクリプト (P0)
+
+**Contracts**: Batch [x]
+
+##### Batch / Job Contract
+
+- **Trigger**: 配布担当者がダブルクリック実行
+- **Input / validation**: なし
+- **Output / destination**: release.ps1 を起動
+- **Idempotency & recovery**: 単純なラッパーのため常に冪等
+
+**Implementation Notes**
+- **Integration**: `setup.bat` 実行完了後にダブルクリック実行
+- **Command**: `powershell.exe -ExecutionPolicy Bypass -File "%~dp0release.ps1"`
+
+---
 
 #### release.ps1
 
 | Field | Detail |
 |-------|--------|
-| Intent | setup.bat 生成済みゴーストの検証・.nar 変換・GitHub Releases 公開 |
-| Requirements | 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 2.4, 4.1, 4.2 |
+| Intent | setup.bat 生成済みゴーストの検証・.nar 生成 |
+| Requirements | 1.1, 1.2, 1.3, 4.1, 4.2 |
 
 **Responsibilities & Constraints**
 - `ghosts/hello-pasta/` の検証（必須ファイル存在確認）
 - `profile/` 除外、`*.bak`, `*.tmp` 除外付き ZIP 圧縮 → `.nar` リネーム
 - `Cargo.toml` からバージョン読み取り → タグ名生成
-- `gh release create` の実行（ドライラン対応）
+- リリース手順の表示（次のステップガイド）
 
 **Dependencies**
 - Inbound: `ghosts/hello-pasta/` — setup.bat 生成物 (P0)
-- External: `gh` CLI — リリース公開 (P0)
 - External: `Compress-Archive` — ZIP 圧縮 (P0)
 - External: `robocopy` — profile 除外コピー (P0)
 
@@ -133,44 +172,45 @@ sequenceDiagram
 
 ##### Batch / Job Contract
 
-- **Trigger**: 配布担当者が手動実行（`.\release.ps1`）
+- **Trigger**: release.bat 経由で起動
 - **Input / validation**:
   - `ghosts/hello-pasta/` が存在すること
   - 必須ファイルの存在確認（4.1 のチェックリスト）
   - `Cargo.toml` の `workspace.package.version` が読み取り可能であること
 - **Output / destination**:
   - `hello-pasta.nar` — `crates/pasta_sample_ghost/` に生成
-  - GitHub Releases に公開（`--dry-run` オプションで公開スキップ可能）
+  - リリース手順の表示（バージョン、gh コマンド例、RELEASE.md への誘導）
 - **Idempotency & recovery**:
   - 既存の `hello-pasta.nar` は上書き
   - 一時ディレクトリは処理完了後にクリーンアップ
-  - リリース公開失敗時は `.nar` ファイルが残るため、`gh release create` のみ再実行可能
 
 **Implementation Notes**
-- **Integration**: `setup.bat` 実行完了後に `release.ps1` を実行するリニア手順
+- **Integration**: `setup.bat` 実行完了後に `release.bat` 経由で実行
 - **Validation**: ファイル存在チェック（`Test-Path`）。TOML パースは不要（存在確認のみ）
 - **Exclusion**: `robocopy /MIR /XD profile /XF *.bak *.tmp` で実行時生成物を除外
 - **Risks**: `Compress-Archive` の ZIP 形式が SSP と非互換の可能性（初回検証で確認）
 
+---
+
 ### ドキュメント
 
-#### リリースノート本文
+#### RELEASE.md
 
 | Field | Detail |
 |-------|--------|
-| Intent | GitHub Releases 本文に記載するリリース情報とインストール手順 |
-| Requirements | 2.5, 3.1, 3.2, 3.3, 3.4 |
+| Intent | AI ガイド付きリリース作業手順書 |
+| Requirements | 2.1, 2.2, 2.3, 2.4, 2.5, 3.1, 3.2, 3.3, 3.4 |
 
 **Responsibilities & Constraints**
-- リリースごとにバージョン・概要・コンポーネント情報を記載
-- インストール手順（ドラッグ＆ドロップ / 手動展開）を記載
-- 動作確認方法と問題報告先を記載
-- `gh release create --notes-file` で参照するテキストファイルとして `release.ps1` 内で生成
+- リリース作業の全体手順を記載
+- リリースノート本文のテンプレート（バージョン、概要、コンポーネント、環境、インストール手順、動作確認、問題報告先）
+- `gh release create` コマンドの実行例
+- AI と相談しながら進めるためのガイド文言
 
 **Implementation Notes**
-- `release.ps1` 内でヒアドキュメントとしてリリースノート本文を生成し、一時ファイルに書き出す
-- バージョン番号は `Cargo.toml` から動的に挿入
-- インストール手順・動作確認方法は固定テキスト（毎回同じ内容）
+- `crates/pasta_sample_ghost/RELEASE.md` に配置
+- リリースの度に、開発者が AI と相談しながらリリースノート本文を編集
+- バージョン番号は手動で挿入（または release.ps1 が表示したバージョンをコピー）
 
 ## Data Models
 
