@@ -17,7 +17,7 @@ hello-pasta ゴーストを `.nar` 形式で GitHub Releases に公開するた�
 | `setup.bat` | ✅ 実装済み | DLL ビルド → ゴースト生成 → コピー → finalize の 4 ステップ |
 | `pasta_sample_ghost` クレート | ✅ 実装済み | ゴーストファイル・画像・設定の自動生成 |
 | GitHub CLI (`gh`) | ✅ 認証済み | `gh release create` でリリース公開可能 |
-| CI (`build.yml`) | ✅ 実装済み | x86/x64 マトリックスビルド |
+| CI (`build.yml`) | ✅ 実装済み | x86 ビルド |
 
 ### リリース成果物
 
