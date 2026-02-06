@@ -19,6 +19,8 @@
 mod enc;
 /// Finalize module - Collects Lua-side registries and builds SearchContext.
 pub mod finalize;
+/// Log module - Lua logging bridge to Rust tracing infrastructure.
+pub mod log;
 /// Persistence module - Persistent data storage for Lua scripts.
 pub mod persistence;
 
@@ -374,6 +376,9 @@ impl PastaLuaRuntime {
             mlua_stdlib::yaml::register(&lua, None)?;
         }
 
+        // Register @pasta_log module (always available, independent of RuntimeConfig.libs)
+        Self::register_log_module(&lua)?;
+
         Ok(Self {
             lua,
             logger: None,
@@ -574,6 +579,9 @@ impl PastaLuaRuntime {
         // Register @pasta_persistence module for persistent data storage
         Self::register_persistence_module(&runtime.lua, &runtime.config, &runtime.base_dir)?;
 
+        // Register @pasta_log module for Lua logging bridge
+        Self::register_log_module(&runtime.lua)?;
+
         // Register @pasta_sakura_script module for wait insertion
         Self::register_sakura_script_module(&runtime.lua, &runtime.config)?;
 
@@ -725,6 +733,21 @@ impl PastaLuaRuntime {
         loaded.set("@pasta_sakura_script", sakura_module)?;
 
         tracing::debug!("Registered @pasta_sakura_script module");
+        Ok(())
+    }
+
+    /// Register @pasta_log module for Lua logging bridge.
+    ///
+    /// Provides trace/debug/info/warn/error functions that bridge to Rust tracing.
+    /// Always available, independent of RuntimeConfig.libs.
+    fn register_log_module(lua: &Lua) -> LuaResult<()> {
+        let log_table = log::register(lua)?;
+
+        let package: Table = lua.globals().get("package")?;
+        let loaded: Table = package.get("loaded")?;
+        loaded.set("@pasta_log", log_table)?;
+
+        tracing::debug!("Registered @pasta_log module");
         Ok(())
     }
 

@@ -266,6 +266,7 @@ libs = [
 | `@pasta_search`        | シーン・単語検索 API            | 常に有効                   |
 | `@pasta_config`        | pasta.toml のカスタムフィールド | 常に有効                   |
 | `@pasta_sakura_script` | さくらスクリプト変換 API        | 常に有効                   |
+| `@pasta_log`           | Lua→Rust tracing ログブリッジ   | 常に有効                   |
 | `@enc`                 | エンコーディング変換            | 常に有効                   |
 | `@assertions`          | アサーション関数                | 有効                       |
 | `@testing`             | テストフレームワーク            | 有効                       |
@@ -290,6 +291,13 @@ local SAKURA_SCRIPT = require "@pasta_sakura_script"
 local actor = { talk = { script_wait_default = 50 } }
 local result = SAKURA_SCRIPT.talk_to_script(actor, "こんにちは。")
 -- 結果: "こ\_w[50]ん\_w[50]に\_w[50]ち\_w[50]は\_w[100]。"
+
+-- ログ出力 API
+local log = require "@pasta_log"
+log.info("Hello from Lua!")        -- INFOレベルでログ出力
+log.debug({key = "value"})         -- テーブルはJSON変換される
+log.warn(42)                        -- 数値は文字列変換される
+log.trace(nil)                      -- nilは空文字列、エラーなし
 
 -- JSON 処理
 local JSON = require "@json"

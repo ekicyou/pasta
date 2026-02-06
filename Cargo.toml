@@ -26,6 +26,7 @@ tracing = "0.1"
 # Development dependencies
 tempfile = "3"
 insta = { version = "1.46.3", features = ["glob"] }
+tracing-test = { version = "0.2", features = ["no-env-filter"] }
 
 # pasta_lua dependencies
 lua-src = { version = ">= 550.0.0, < 560.0.0", features = ["ucid"] }
