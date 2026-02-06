@@ -34,7 +34,7 @@ pasta.tomlやboot.pastaなどのファイルは、pasta_sample_ghostクレート
 
 ### Requirement 3: 設定ファイルの外部ファイル化
 
-**Objective:** As a ゴースト開発者, I want 設定ファイル（pasta.toml, descript.txt, install.txt 等）がテンプレート置換なしの最終形として実ファイルで存在すること, so that 配布物の内容を直接確認・編集できる。
+**Objective:** As a ゴースト開発者, I want 設定ファイル（pasta.toml, descript.txt, install.txt）がテンプレート置換なしの最終形として実ファイルで存在すること, so that 配布物の内容を直接確認・編集できる。
 
 #### Acceptance Criteria
 
@@ -42,7 +42,6 @@ pasta.tomlやboot.pastaなどのファイルは、pasta_sample_ghostクレート
 2. The ghost/master/descript.txt shall テンプレート置換済みの完成形として専用ディレクトリに配置される。
 3. The install.txt shall テンプレート置換済みの完成形として専用ディレクトリに配置される。
 4. The shell/master/descript.txt shall テンプレート置換済みの完成形として専用ディレクトリに配置される。
-5. The surfaces.txt shall 専用ディレクトリに完成形として配置される。
 
 ### Requirement 4: release.ps1 の xcopy 統合と実行フロー
 
@@ -66,12 +65,13 @@ pasta.tomlやboot.pastaなどのファイルは、pasta_sample_ghostクレート
 2. The existing tests in `scripts.rs` shall `.pasta` ファイルの内容検証を引き続き実行できる（ファイル読み込み方式の変更に対応）。
 3. The existing tests in `config_templates.rs` and integration tests shall 新しいディレクトリ構造に対応して更新される。
 
-### Requirement 6: 画像ファイルは対象外
+### Requirement 6: 画像ファイルと surfaces.txt の生成
 
-**Objective:** As a 開発者, I want 画像ファイル（surface*.png）の生成方式は変更しないこと, so that 変更範囲を最小限に抑える。
+**Objective:** As a 開発者, I want 画像ファイル（surface*.png）および surfaces.txt の生成方式は変更しないこと, so that 変更範囲を最小限に抑え、画像IDとの整合性を保証する。
 
 #### Acceptance Criteria
 
 1. The `image_generator.rs` module shall 既存のRustコードによる動的画像生成を維持する。
-2. The `cargo run -p pasta_sample_ghost` command shall テキストファイル生成を廃止し、画像生成（surface*.png）のみを実行する。
-3. The surface*.png files shall release.ps1 がテキストをコピーした後、`cargo run` 実行時にRustコードで生成される。
+2. The `config_templates.rs::generate_surfaces_txt()` function shall サーフェスID（0-8, 10-18）を機械的に列挙する既存のロジックを維持する。
+3. The `cargo run -p pasta_sample_ghost` command shall テキストファイル生成を廃止し、画像生成（surface*.png）および surfaces.txt 生成のみを実行する。
+4. The surface*.png and surfaces.txt files shall release.ps1 がテキストをコピーした後、`cargo run` 実行時にRustコードで生成される。
