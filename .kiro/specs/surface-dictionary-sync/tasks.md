@@ -8,20 +8,20 @@
 
 ## 実装タスク
 
-- [ ] 1. スクリプト定数の表情名置換 (P)
-- [ ] 1.1 BOOT_PASTA の表情名置換 (P)
+- [x] 1. スクリプト定数の表情名置換 (P)
+- [x] 1.1 BOOT_PASTA の表情名置換 (P)
   - OnFirstBoot シーンの `男の子：＠元気　ぼくは男の子。ちゃんと使ってよね。` → `＠笑顔` に置換
   - design.md State Management テーブル #1 に従う
   - _Requirements: 1.1, 1.2, 2.1_
 
-- [ ] 1.2 TALK_PASTA の表情名置換（＠元気） (P)
+- [x] 1.2 TALK_PASTA の表情名置換（＠元気） (P)
   - OnTalk シーンの `Lua 側も触ってみなよ。` → `＠笑顔` に置換（#2）
   - OnTalk シーンの `しょうがないなあ。` → `＠照れ` に置換（#3）
   - OnHour シーンの `もう ＄時１２ か、早いね。` → `＠笑顔` に置換（#4）
   - design.md State Management テーブル #2, #3, #4 に従う
   - _Requirements: 1.1, 1.2, 2.1_
 
-- [ ] 1.3 TALK_PASTA の表情名置換（＠考え） (P)
+- [x] 1.3 TALK_PASTA の表情名置換（＠考え） (P)
   - OnTalk シーン 女の子 `今日は何しようかな...` → `＠眠い` に置換（#8）
   - OnTalk シーン 男の子 `さあ、外見てないからわかんないや。` → `＠困惑` に置換（#9）
   - OnHour シーン 女の子 `＄時１２ ...時間が経つのって不思議だね。` → `＠通常` に置換（#10）
@@ -29,15 +29,15 @@
   - design.md State Management テーブル #8, #9, #10, #11 に従う
   - _Requirements: 1.1, 1.2, 2.2_
 
-- [ ] 1.4 CLICK_PASTA の表情名置換 (P)
+- [x] 1.4 CLICK_PASTA の表情名置換 (P)
   - OnMouseDoubleClick シーン `どうしたの？` → `＠笑顔` に置換（#5）
   - OnMouseDoubleClick シーン `照れてるの？` → `＠キラキラ` に置換（#6）
   - OnMouseDoubleClick シーン `ふふん、ぼくのことが気になる？` → `＠キラキラ` に置換（#7）
   - design.md State Management テーブル #5, #6, #7 に従う
   - _Requirements: 1.1, 1.2, 2.1_
 
-- [ ] 2. 表情名整合性検証テストの実装
-- [ ] 2.1 ExpressionConsistencyTest の実装
+- [x] 2. 表情名整合性検証テストの実装
+- [x] 2.1 ExpressionConsistencyTest の実装
   - スクリプト定数（BOOT_PASTA, TALK_PASTA, CLICK_PASTA）から `＠表情名` を抽出する
   - 抽出時にグローバル単語辞書定義（`＠終了挨拶` / `＠雑談` 等）を除外する
   - シーン内（`＊` ブロック内）のアクション行 `アクター名：＠表情名　セリフ` パターンのみを対象とする
@@ -47,15 +47,21 @@
   - テスト名: `test_script_expression_names_defined_in_actors`
   - _Requirements: 1.3, 3.2_
 
-- [ ] 3. リグレッションテストの実行
-- [ ] 3.1 全テストの実行確認
+- [x] 3. リグレッションテストの実行
+- [x] 3.1 全テストの実行確認
   - `cargo test --all` を実行し全テストがパスすることを確認する
   - 既存テスト（`test_actors_pasta_contains_all_characters`, `test_pasta_scripts`, `test_expression_variations` 等）の互換性を維持する
   - E2E テストは独自フィクスチャを使用しておりサンプルゴースト非参照のため影響なしを確認する
   - _Requirements: 4.1, 4.2_
 
-- [ ] 4. ドキュメント整合性の確認と更新
-- [ ] 4.1 プロジェクトドキュメントとの整合性確認
+- [x] 4. サンプルゴースト生成の反映
+- [x] 4.1 setup.bat の実行で生成物を更新
+  - `setup.bat` を実行してサンプルゴースト生成物を更新する
+  - 生成物が更新されることを確認する（ghosts/ 配下のファイル）
+  - _Requirements: 3.1_
+
+- [x] 5. ドキュメント整合性の確認と更新
+- [x] 5.1 プロジェクトドキュメントとの整合性確認
   - SOUL.md - コアバリュー・設計原則との整合性確認（該当なし）
   - doc/spec/ - 言語仕様の更新（該当なし）
   - GRAMMAR.md - 文法リファレンスの同期（該当なし）
@@ -76,7 +82,7 @@
 | 2.1 | 1.1, 1.2, 1.4 |
 | 2.2 | 1.3 |
 | 3.1 | 4.1 |
-| 3.2 | 2.1, 4.1 |
+| 3.2 | 2.1, 5.1 |
 | 4.1 | 3.1 |
 | 4.2 | 3.1 |
 

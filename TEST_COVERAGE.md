@@ -93,6 +93,7 @@
 | Finalize Scene              | `finalize_scene_test.rs`                                            | ✅ 完了 | 14テスト                                            |
 | Virtual Event Dispatcher    | `virtual_event_dispatcher_test.rs`<br>`virtual_dispatcher_spec.lua` | ✅ 完了 | 15+20テスト（onhour-date-var-transfer 5テスト追加） |
 | Sample Ghost Integration    | `shiori_sample_ghost_test.rs`                                       | ✅ 完了 | 2テスト（hello-pasta実ゴースト使用）                |
+| Sample Ghost スクリプト整合性 | `scripts.rs::test_script_expression_names_defined_in_actors`     | ✅ 完了 | 1テスト（表情名↔辞書定義一致検証）                  |
 
 ---
 
