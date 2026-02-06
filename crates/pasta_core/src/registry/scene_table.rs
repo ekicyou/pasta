@@ -42,6 +42,7 @@ pub struct SceneInfo {
 /// Extended to support unified scope search with module context.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct SceneCacheKey {
+    // Clone is required for Phase 3/4 borrow split pattern
     /// Module name (グローバルシーン名)
     module_name: String,
     /// Search key
@@ -227,27 +228,36 @@ impl SceneTable {
         // Phase 3: Get or create cache entry
         // Note: 旧 resolve_scene_id は module_name なしで呼び出されるため、空文字を使用
         let cache_key = SceneCacheKey::new("", search_key, filters);
-        let cached = self.cache.entry(cache_key).or_insert_with(|| {
-            let mut id_values: Vec<usize> = filtered_ids.iter().map(|id| id.0).collect();
-            if self.shuffle_enabled {
-                self.random_selector.shuffle_usize(&mut id_values);
-            }
-            let ids = id_values.into_iter().map(SceneId).collect();
-            CachedSelection {
-                candidates: ids,
-                next_index: 0,
-                history: Vec::new(),
-            }
-        });
-
-        // Phase 4: Sequential selection
-        if cached.next_index >= cached.candidates.len() {
-            return Err(SceneTableError::NoMoreScenes {
-                search_key: search_key.to_string(),
-                filters: filters.clone(),
+        let needs_reset = {
+            let cached = self.cache.entry(cache_key.clone()).or_insert_with(|| {
+                let mut id_values: Vec<usize> = filtered_ids.iter().map(|id| id.0).collect();
+                if self.shuffle_enabled {
+                    self.random_selector.shuffle_usize(&mut id_values);
+                }
+                let ids = id_values.into_iter().map(SceneId).collect();
+                CachedSelection {
+                    candidates: ids,
+                    next_index: 0,
+                    history: Vec::new(),
+                }
             });
+            cached.next_index >= cached.candidates.len()
+        };
+
+        // Phase 4: Reset if needed (借用解放済み)
+        if needs_reset {
+            let cached = self.cache.get_mut(&cache_key).unwrap();
+            cached.next_index = 0;
+            cached.history.clear();
+            if self.shuffle_enabled {
+                let mut id_values: Vec<usize> = cached.candidates.iter().map(|id| id.0).collect();
+                self.random_selector.shuffle_usize(&mut id_values);
+                cached.candidates = id_values.into_iter().map(SceneId).collect();
+            }
         }
 
+        // Phase 5: Sequential selection
+        let cached = self.cache.get_mut(&cache_key).unwrap();
         let selected_id = cached.candidates[cached.next_index];
         cached.next_index += 1;
         cached.history.push(selected_id);
@@ -298,27 +308,36 @@ impl SceneTable {
 
         // Phase 3: Get or create cache entry with module context
         let cache_key = SceneCacheKey::new(module_name, search_key, filters);
-        let cached = self.cache.entry(cache_key).or_insert_with(|| {
-            let mut id_values: Vec<usize> = filtered_ids.iter().map(|id| id.0).collect();
-            if self.shuffle_enabled {
-                self.random_selector.shuffle_usize(&mut id_values);
-            }
-            let ids = id_values.into_iter().map(SceneId).collect();
-            CachedSelection {
-                candidates: ids,
-                next_index: 0,
-                history: Vec::new(),
-            }
-        });
-
-        // Phase 4: Sequential selection
-        if cached.next_index >= cached.candidates.len() {
-            return Err(SceneTableError::NoMoreScenes {
-                search_key: search_key.to_string(),
-                filters: filters.clone(),
+        let needs_reset = {
+            let cached = self.cache.entry(cache_key.clone()).or_insert_with(|| {
+                let mut id_values: Vec<usize> = filtered_ids.iter().map(|id| id.0).collect();
+                if self.shuffle_enabled {
+                    self.random_selector.shuffle_usize(&mut id_values);
+                }
+                let ids = id_values.into_iter().map(SceneId).collect();
+                CachedSelection {
+                    candidates: ids,
+                    next_index: 0,
+                    history: Vec::new(),
+                }
             });
+            cached.next_index >= cached.candidates.len()
+        };
+
+        // Phase 4: Reset if needed (借用解放済み)
+        if needs_reset {
+            let cached = self.cache.get_mut(&cache_key).unwrap();
+            cached.next_index = 0;
+            cached.history.clear();
+            if self.shuffle_enabled {
+                let mut id_values: Vec<usize> = cached.candidates.iter().map(|id| id.0).collect();
+                self.random_selector.shuffle_usize(&mut id_values);
+                cached.candidates = id_values.into_iter().map(SceneId).collect();
+            }
         }
 
+        // Phase 5: Sequential selection
+        let cached = self.cache.get_mut(&cache_key).unwrap();
         let selected_id = cached.candidates[cached.next_index];
         cached.next_index += 1;
         cached.history.push(selected_id);
@@ -823,9 +842,174 @@ mod tests {
         // Should be local scene (has parent)
         assert!(scene.parent.is_some());
 
-        // Call again - should fail because only 1 local candidate (no fallback)
+        // Call again - should succeed due to cycling reset (1 local candidate cycles)
         let result2 = table.resolve_scene_id_unified("会話_1", "挨拶", &HashMap::new());
-        assert!(result2.is_err()); // No more scenes
+        assert!(result2.is_ok()); // Cycling reset returns the same scene
+        let scene_id2 = result2.unwrap();
+        let scene2 = table.get_scene(scene_id2).unwrap();
+        assert!(scene2.parent.is_some()); // Still a local scene
+    }
+
+    // ======================================================================
+    // Tests for cycling reset (Task 3.1〜3.4)
+    // ======================================================================
+
+    #[test]
+    fn test_resolve_scene_id_cycling() {
+        // Task 3.1: 3件のシーンを登録、4回目の呼び出しが成功することを検証
+        let selector = Box::new(MockRandomSelector::new(vec![0]));
+        let mut table = SceneTable {
+            labels: vec![
+                create_test_scene_info(0, "OnTalk1", "OnTalk"),
+                create_test_scene_info(1, "OnTalk2", "OnTalk"),
+                create_test_scene_info(2, "OnTalk3", "OnTalk"),
+            ],
+            prefix_index: {
+                let mut map = RadixMap::new();
+                map.insert(b"OnTalk", vec![SceneId(0), SceneId(1), SceneId(2)]);
+                map
+            },
+            cache: HashMap::new(),
+            random_selector: selector,
+            shuffle_enabled: false,
+        };
+
+        // 1回目〜3回目: 候補を順番に消費
+        let r1 = table.resolve_scene_id("OnTalk", &HashMap::new());
+        assert!(r1.is_ok());
+        let r2 = table.resolve_scene_id("OnTalk", &HashMap::new());
+        assert!(r2.is_ok());
+        let r3 = table.resolve_scene_id("OnTalk", &HashMap::new());
+        assert!(r3.is_ok());
+
+        // 4回目: 循環リセットが発生し、成功すること
+        let r4 = table.resolve_scene_id("OnTalk", &HashMap::new());
+        assert!(r4.is_ok(), "4回目の呼び出しが失敗: 循環リセットが動作していない");
+
+        // 返却されたSceneIdが候補のいずれかであること
+        let id = r4.unwrap();
+        assert!(
+            id == SceneId(0) || id == SceneId(1) || id == SceneId(2),
+            "返却されたSceneId {:?} が候補に含まれていない",
+            id
+        );
+
+        // さらに続行できることも検証（10回以上）
+        for i in 5..=12 {
+            let r = table.resolve_scene_id("OnTalk", &HashMap::new());
+            assert!(r.is_ok(), "{}回目の呼び出しが失敗", i);
+        }
+    }
+
+    #[test]
+    fn test_resolve_scene_id_cycling_reshuffles() {
+        // Task 3.2: シャッフル有効時のリセット後再シャッフル検証
+        // DefaultRandomSelectorを使用して実際のシャッフルが発生することを確認
+        use crate::registry::random::DefaultRandomSelector;
+
+        let selector = Box::new(DefaultRandomSelector::with_seed(42));
+        let mut table = SceneTable {
+            labels: vec![
+                create_test_scene_info(0, "OnTalk1", "OnTalk"),
+                create_test_scene_info(1, "OnTalk2", "OnTalk"),
+                create_test_scene_info(2, "OnTalk3", "OnTalk"),
+            ],
+            prefix_index: {
+                let mut map = RadixMap::new();
+                map.insert(b"OnTalk", vec![SceneId(0), SceneId(1), SceneId(2)]);
+                map
+            },
+            cache: HashMap::new(),
+            random_selector: selector,
+            shuffle_enabled: true,
+        };
+
+        // 1周目の順序を記録
+        let mut first_cycle = Vec::new();
+        for _ in 0..3 {
+            let r = table.resolve_scene_id("OnTalk", &HashMap::new());
+            first_cycle.push(r.unwrap());
+        }
+
+        // 2周目（リセット後）の順序を記録
+        let mut second_cycle = Vec::new();
+        for _ in 0..3 {
+            let r = table.resolve_scene_id("OnTalk", &HashMap::new());
+            assert!(r.is_ok());
+            second_cycle.push(r.unwrap());
+        }
+
+        // 同じ候補セットだが、シャッフルにより順序が異なる可能性がある
+        let first_set: std::collections::HashSet<_> = first_cycle.iter().collect();
+        let second_set: std::collections::HashSet<_> = second_cycle.iter().collect();
+        assert_eq!(first_set, second_set, "候補セットが変化している");
+    }
+
+    #[test]
+    fn test_resolve_scene_id_cycling_preserves_candidates() {
+        // Task 3.3: リセット前後で候補リスト（ID集合）が保持されることを検証
+        let selector = Box::new(MockRandomSelector::new(vec![0]));
+        let mut table = SceneTable {
+            labels: vec![
+                create_test_scene_info(0, "OnTalk1", "OnTalk"),
+                create_test_scene_info(1, "OnTalk2", "OnTalk"),
+                create_test_scene_info(2, "OnTalk3", "OnTalk"),
+            ],
+            prefix_index: {
+                let mut map = RadixMap::new();
+                map.insert(b"OnTalk", vec![SceneId(0), SceneId(1), SceneId(2)]);
+                map
+            },
+            cache: HashMap::new(),
+            random_selector: selector,
+            shuffle_enabled: false,
+        };
+
+        // 1周目: 全候補を収集
+        let mut first_cycle: std::collections::HashSet<SceneId> = std::collections::HashSet::new();
+        for _ in 0..3 {
+            first_cycle.insert(table.resolve_scene_id("OnTalk", &HashMap::new()).unwrap());
+        }
+        assert_eq!(first_cycle.len(), 3);
+
+        // 2周目: リセット後の全候補を収集
+        let mut second_cycle: std::collections::HashSet<SceneId> = std::collections::HashSet::new();
+        for _ in 0..3 {
+            second_cycle.insert(table.resolve_scene_id("OnTalk", &HashMap::new()).unwrap());
+        }
+        assert_eq!(second_cycle.len(), 3);
+
+        // 候補セットが同一であること
+        assert_eq!(first_cycle, second_cycle, "リセット後に候補リストが変化している");
+    }
+
+    #[test]
+    fn test_resolve_scene_id_unified_cycling() {
+        // Task 3.4: unified版での循環リセット動作検証
+        use crate::registry::SceneRegistry;
+
+        let mut registry = SceneRegistry::new();
+        let (_, counter) = registry.register_global("会話", HashMap::new());
+        registry.register_local("選択肢A", "会話", counter, 1, HashMap::new());
+        registry.register_local("選択肢B", "会話", counter, 2, HashMap::new());
+
+        let selector = Box::new(MockRandomSelector::new(vec![0]));
+        let mut table = SceneTable::from_scene_registry(registry, selector).unwrap();
+        table.set_shuffle_enabled(false);
+
+        // 1周目: 2件のローカル候補を消費
+        let r1 = table.resolve_scene_id_unified("会話_1", "選択肢", &HashMap::new());
+        assert!(r1.is_ok());
+        let r2 = table.resolve_scene_id_unified("会話_1", "選択肢", &HashMap::new());
+        assert!(r2.is_ok());
+
+        // 3回目: 循環リセットが発生し、成功すること
+        let r3 = table.resolve_scene_id_unified("会話_1", "選択肢", &HashMap::new());
+        assert!(r3.is_ok(), "unified版で3回目の呼び出しが失敗: 循環リセットが動作していない");
+
+        // 返却されたSceneIdが有効なローカルシーンであること
+        let scene = table.get_scene(r3.unwrap()).unwrap();
+        assert!(scene.parent.is_some(), "返却されたシーンがローカルでない");
     }
 
     #[test]

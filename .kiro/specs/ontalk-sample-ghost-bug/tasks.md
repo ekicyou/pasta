@@ -2,65 +2,65 @@
 
 ## タスク一覧
 
-- [ ] 1. SceneTableの循環リセット機構実装
-- [ ] 1.1 (P) resolve_scene_id メソッドのPhase 3〜5分割リファクタリング
+- [x] 1. SceneTableの循環リセット機構実装
+- [x] 1.1 (P) resolve_scene_id メソッドのPhase 3〜5分割リファクタリング
   - Phase 3で `needs_reset` 判定をスコープ内で完結させる
   - Phase 4でリセット処理（`next_index = 0`, `history.clear()`, 再シャッフル）
   - Phase 5でシーン選択（`get_mut()` による再取得）
   - `cache_key` をPhase 3の外側で定義
   - _Requirements: 1.1, 1.2, 1.3_
 
-- [ ] 1.2 (P) resolve_scene_id_unified メソッドのPhase 3〜5分割リファクタリング
+- [x] 1.2 (P) resolve_scene_id_unified メソッドのPhase 3〜5分割リファクタリング
   - `resolve_scene_id` と同じパターンでPhase分割を適用
   - モジュールコンテキスト（`module_name`）を含む `cache_key` 処理
   - _Requirements: 1.1, 1.2, 1.3_
 
-- [ ] 2. サンプルゴースト設定ファイル更新
-- [ ] 2.1 pasta.toml の発動間隔パラメータ変更
+- [x] 2. サンプルゴースト設定ファイル更新
+- [x] 2.1 pasta.toml の発動間隔パラメータ変更
   - `talk_interval_min` を 180 → 30 に変更
   - `talk_interval_max` を 300 → 60 に変更
   - _Requirements: 2.1, 2.2_
 
-- [ ] 3. 循環リセット検証テストの実装
-- [ ] 3.1 test_resolve_scene_id_cycling テストの追加
+- [x] 3. 循環リセット検証テストの実装
+- [x] 3.1 test_resolve_scene_id_cycling テストの追加
   - 3件のシーン登録
   - 4回目の呼び出しが成功することを検証（循環リセット発生）
   - 返却されたシーンIDが候補のいずれかであることを検証
   - _Requirements: 3.1, 3.2_
 
-- [ ] 3.2 test_resolve_scene_id_cycling_reshuffles テストの追加
+- [x] 3.2 test_resolve_scene_id_cycling_reshuffles テストの追加
   - シャッフル有効状態でリセット後の再シャッフルを検証
   - リセット前後で候補の順序が変化することを確認（決定的シード使用）
   - _Requirements: 1.2, 3.2_
 
-- [ ] 3.3 test_resolve_scene_id_cycling_preserves_candidates テストの追加
+- [x] 3.3 test_resolve_scene_id_cycling_preserves_candidates テストの追加
   - リセット前後で候補リスト（ID集合）が保持されることを検証
   - 候補数が変化しないことを確認
   - _Requirements: 1.3, 3.2_
 
-- [ ] 3.4 test_resolve_scene_id_unified_cycling テストの追加
+- [x] 3.4 test_resolve_scene_id_unified_cycling テストの追加
   - unified版での循環リセット動作を検証
   - ローカル/グローバルスコープ混在環境での循環動作
   - _Requirements: 3.1, 3.2_
 
-- [ ] 3.5 test_resolve_scene_id_unified_local_found テストの修正
+- [x] 3.5 test_resolve_scene_id_unified_local_found テストの修正
   - `assert!(result2.is_err())` → `assert!(result2.is_ok())` に変更
   - 循環リセット後に同一シーンが再返却されることを検証
   - _Requirements: 1.1, 3.2_
 
-- [ ] 4. 統合テストとリグレッション確認
-- [ ] 4.1 既存テストスイート実行と通過確認
+- [x] 4. 統合テストとリグレッション確認
+- [x] 4.1 既存テストスイート実行と通過確認
   - `cargo test -p pasta_core` 実行
   - 全テスト通過を確認（既存テストへの影響なし）
   - _Requirements: 1.1, 1.2, 1.3, 3.1, 3.2_
 
-- [ ] 4.2 サンプルゴースト動作確認
+- [x] 4.2 サンプルゴースト動作確認
   - サンプルゴーストをビルド・実行
   - OnTalkが30〜60秒間隔で発火することを確認
   - 6回以上発火しても継続することを確認（循環リセット動作）
   - _Requirements: 2.1, 2.2, 2.3, 1.1_
 
-- [ ] 5. ドキュメント整合性の確認と更新
+- [x] 5. ドキュメント整合性の確認と更新
   - SOUL.md - コアバリュー・設計原則との整合性確認
   - doc/spec/ - 言語仕様の更新（該当する場合）
   - GRAMMAR.md - 文法リファレンスの同期（該当する場合）

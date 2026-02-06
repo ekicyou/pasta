@@ -40,8 +40,8 @@ level = "debug"
 
 [ghost]
 # ランダムトーク発生間隔（秒）
-talk_interval_min = 180  # 最小トーク間隔（デフォルト: 180）
-talk_interval_max = 300  # 最大トーク間隔（デフォルト: 300）
+talk_interval_min = 30   # 最小トーク間隔（デモ用: 30秒）
+talk_interval_max = 60   # 最大トーク間隔（デモ用: 60秒）
 # hour_margin = 30       # OnHour 誤差許容秒数（デフォルト: 30）
 
 [talk]
