@@ -286,16 +286,69 @@ fn get_caller_info(lua: &Lua) -> LuaCallerInfo;
 
 ## Testing Strategy
 
+### Test Infrastructure
+
+**tracing出力の検証方法**:
+- `tracing-test` クレート（dev-dependency）を使用し、tracing出力をキャプチャ
+- テストコード例:
+  ```rust
+  use tracing_test::traced_test;
+  
+  #[traced_test]
+  fn test_log_info_with_caller_info() {
+      // テスト実行
+      lua.load(r#"
+          local log = require "@pasta_log"
+          log.info("test message")
+      "#).exec().unwrap();
+      
+      // アサーション例
+      assert!(logs_contain("test message"));
+      assert!(logs_contain("lua_source="));
+      assert!(logs_contain("lua_line="));
+  }
+  ```
+
 ### Unit Tests (`crates/pasta_lua/tests/log_module_test.rs`)
-- 各ログレベル関数の基本呼び出し
+
+#### ログレベル関数の基本動作
+- 各ログレベル関数（trace/debug/info/warn/error）の呼び出し成功
 - 文字列引数の正常出力
-- 非文字列値（数値、真偽値、テーブル、nil）の変換確認
-- テーブルの JSON 展開確認
-- 呼び出し元情報（ソース、行番号、関数名）の取得確認
-- nil/引数なし時の空文字列処理
+- **検証**: `logs_contain("test message")` でメッセージ出力確認
+
+#### 値変換の確認
+- **文字列**: そのまま出力されること
+- **数値**: `log.info(123)` → 出力に `"123"` が含まれること
+- **真偽値**: `log.info(true)` → 出力に `"true"` が含まれること
+- **テーブル**: `log.info({key="value"})` → 出力に `"{"key":"value"}"` （JSON形式）が含まれること
+  - **期待フォーマット例**: `{"key":"value"}`, `[1,2,3]`, `{"nested":{"a":1}}`
+- **nil**: `log.info(nil)` または `log.info()` → 空文字列として処理、エラーなし
+
+#### 呼び出し元情報の取得確認
+- **ソースファイル名**: `logs_contain("lua_source=")` で structured field 存在確認
+- **行番号**: `logs_contain("lua_line=")` で行番号フィールド存在確認
+- **関数名**: Lua関数内からの呼び出しで `logs_contain("lua_fn=")` 確認
+  ```lua
+  local function test_func()
+      log.info("from function")
+  end
+  test_func()
+  ```
+  期待: `lua_fn=test_func` がログに含まれる
+
+#### スタックレベル検証テスト
+- **直接呼び出し**: `log.info("direct")` で main chunk のソース・行番号が取得されること
+- **関数経由呼び出し**: `function foo() log.info("in foo") end; foo()` で `foo()` 内の行番号が取得されること
+- **検証**: 各パターンで `lua_line` 値が正しいこと（mlua inspect_stack のレベル値が適切）
 
 ### Integration Tests
+
+#### モジュール登録と利用
 - `require "@pasta_log"` でモジュール取得可能であること
 - `_VERSION` と `_DESCRIPTION` の存在確認
-- 他の `@pasta_*` モジュールとの共存確認
+- 他の `@pasta_*` モジュールとの共存確認（`@pasta_persistence` との順序依存なし）
 - main.lua 内からのログ出力が正常に動作すること
+
+#### PastaLogger統合
+- PastaLogger が設定されている環境で、ログがインスタンス固有ファイルに書き込まれること
+- PastaLogger 未設定時でもエラーなく動作すること（tracing出力のみ）
