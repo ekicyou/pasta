@@ -25,11 +25,11 @@
 
 ### Requirement 2: サンプルゴーストのOnTalk発動間隔調整
 
-**Objective:** As a サンプルゴーストのユーザー, I want OnTalkの発動間隔が60〜90秒であること, so that デモ時に適切な頻度で会話が発生する。
+**Objective:** As a サンプルゴーストのユーザー, I want OnTalkの発動間隔が30〜60秒であること, so that デモ時に素早く確認可能な頻度で会話が発生する。
 
 #### Acceptance Criteria
-1. When サンプルゴーストの設定ファイルが読み込まれた場合, the pasta_lua shall `talk_interval_min` を60（秒）として認識する
-2. When サンプルゴーストの設定ファイルが読み込まれた場合, the pasta_lua shall `talk_interval_max` を90（秒）として認識する
+1. When サンプルゴーストの設定ファイルが読み込まれた場合, the pasta_lua shall `talk_interval_min` を30（秒）として認識する
+2. When サンプルゴーストの設定ファイルが読み込まれた場合, the pasta_lua shall `talk_interval_max` を60（秒）として認識する
 3. The pasta_lua shall デフォルトの `talk_interval_min` / `talk_interval_max` 値はライブラリ側のデフォルト値（180/300）を維持し、サンプルゴースト固有の設定ファイルでのみ上書きする
 
 ### Requirement 3: OnTalk発火の継続性テスト
