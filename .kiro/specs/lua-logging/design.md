@@ -192,13 +192,23 @@ pub fn register(lua: &Lua) -> LuaResult<Table>;
 | Requirements | 1.3, 1.4, 1.5 |
 
 **Responsibilities & Constraints**
-- 型別変換ルール:
+- 型別変換ルール（優先度順）:
   - `String` → そのまま使用
   - `Integer`, `Number`, `Boolean` → `tostring()` 相当の変換
-  - `Table` → `serde_json` で JSON 文字列に変換（`lua.from_value::<serde_json::Value>()` 使用）
+  - `Table` → 以下の階層的変換を試行:
+    1. **サイズチェック**: 要素数が1000を超える場合 → `"<table: N elements>"` 形式で省略表示
+    2. **JSON変換**: `serde_json` でJSON文字列に変換（`lua.from_value::<serde_json::Value>()` 使用）
+       - **ネスト深度制限**: 最大10段階まで（`DeserializeOptions::default().max_depth(10)`）
+       - 深すぎる構造は設計見直しを促す
+    3. **フォールバック**: JSON変換失敗時（循環参照・深度超過等）→ `tostring()` 使用
   - `Nil`, 引数なし → 空文字列 `""`
-  - `Function`, `UserData`, `Thread` 等 → `tostring()` フォールバック
-- JSON 変換失敗時（循環参照等）は `tostring()` にフォールバック
+  - `Function`, `UserData`, `Thread` 等 → `tostring()` 使用
+  - **最終フォールバック**: `tostring()` 失敗時 → `"<unconvertible value>"`
+
+**Boundary Conditions**:
+- **ネスト深度**: 10段階まで（実用上十分、これ以上はデータ構造見直しを推奨）
+- **テーブルサイズ**: 1000要素まで（ログ可読性維持）
+- **省略表示**: `<table: N elements>` 形式（デバッグ時に要素数情報を提供）
 
 **Dependencies**
 - External: serde_json — テーブルの JSON 変換 (P1)
@@ -210,11 +220,17 @@ pub fn register(lua: &Lua) -> LuaResult<Table>;
 ```rust
 /// Lua 値をログ出力用の文字列に変換する。
 /// エラーを返さず、常に何らかの文字列を返す。
+/// 
+/// # 変換ルール
+/// - テーブル: 1000要素以下かつ10段階以下のネストの場合JSON変換
+/// - 制限超過: "<table: N elements>" 形式で省略
+/// - 変換失敗: tostring() フォールバック
+/// - 最終失敗: "<unconvertible value>"
 fn value_to_string(lua: &Lua, value: Value) -> String;
 ```
 - Preconditions: なし
 - Postconditions: 常に有効な String を返す（パニックしない）
-- Invariants: nil → `""`, テーブル → JSON 文字列, 変換失敗 → フォールバック文字列
+- Invariants: nil → `""`, テーブル → JSON 文字列（制限内）, 制限超過 → 省略表示, 変換失敗 → フォールバック文字列
 
 #### CallerInfo
 
@@ -280,9 +296,27 @@ fn get_caller_info(lua: &Lua) -> LuaCallerInfo;
 `@pasta_log` モジュールは**ログ関数からエラーを返さない**方針を採用する。ログ出力はデバッグ補助であり、ログ失敗でアプリケーションが停止するのは望ましくない。
 
 ### Error Categories and Responses
-- **値変換エラー**（テーブルJSON変換失敗）→ `tostring()` フォールバック
-- **スタック情報取得失敗** → デフォルト値（空文字列/0）で補完
-- **tracing 出力エラー** → 発生しない（tracing マクロはエラーを返さない）
+
+#### 値変換エラー
+- **テーブルサイズ超過**（1000要素超）→ `"<table: N elements>"` 形式で省略表示
+- **ネスト深度超過**（10段階超）→ `tostring()` フォールバック
+- **JSON変換失敗**（循環参照等）→ `tostring()` フォールバック
+- **tostring()失敗** → `"<unconvertible value>"` 最終フォールバック
+
+#### スタック情報取得失敗
+- デフォルト値（空文字列/0）で補完、エラーを返さない
+
+#### tracing 出力エラー
+- 発生しない（tracing マクロはエラーを返さない）
+
+### Boundary Condition Handling
+
+| 境界条件 | 検出方法 | 対処 | 出力例 |
+|---------|---------|------|-------|
+| 大量要素テーブル | 要素数カウント > 1000 | 省略表示 | `<table: 10000 elements>` |
+| 深いネスト | serde max_depth=10 超過 | tostring() | `table: 0x...` |
+| 循環参照 | serde_json エラー | tostring() | `table: 0x...` |
+| 変換不可値 | tostring() 失敗 | 固定文字列 | `<unconvertible value>` |
 
 ## Testing Strategy
 
