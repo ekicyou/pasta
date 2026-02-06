@@ -981,7 +981,7 @@ fn test_set_spot_empty_actors() {
 
     // Verify no clear_spot call is generated (Requirement 2.2)
     assert!(
-        !lua_code.contains("PASTA.clear_spot()"),
+        !lua_code.contains("act:clear_spot()"),
         "clear_spot should not be generated when no actors defined. Generated code:\n{lua_code}"
     );
 }
