@@ -47,9 +47,9 @@
 5. When バージョン番号が提供される, the Release Workflow shall semver 形式（例: `1.2.0`）として妥当性を検証する
 6. If バージョン番号が semver 形式でない, the Release Workflow shall エラーを報告し再入力を求める
 7. When リリース作業が開始される, the Release Workflow shall `git status` でワークツリーがクリーンであることを確認する
-5. If 未コミットの変更が存在する, the Release Workflow shall リリース作業を中止し、先にコミットまたはスタッシュするよう開発者に通知する
-6. When リリース作業が開始される, the Release Workflow shall `cargo test --all` を実行し全テストが通過することを確認する
-7. If テストが失敗する, the Release Workflow shall リリース作業を中止し失敗内容を報告する
+8. If 未コミットの変更が存在する, the Release Workflow shall リリース作業を中止し、先にコミットまたはスタッシュするよう開発者に通知する
+9. When リリース作業が開始される, the Release Workflow shall `cargo test --all` を実行し全テストが通過することを確認する
+10. If テストが失敗する, the Release Workflow shall リリース作業を中止し失敗内容を報告する
 
 ### Requirement 2: Cargo.toml バージョン更新
 
