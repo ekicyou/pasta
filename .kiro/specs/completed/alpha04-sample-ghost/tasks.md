@@ -89,38 +89,38 @@ hello-pasta サンプルゴーストの完全実装。SSPにインストール�
 
 ### 4. pasta DSL スクリプト実装
 
-- [ ] 4.0 アクター辞書（actors.pasta）
+- [x] 4.0 アクター辞書（actors.pasta）
   - ％女の子 アクター定義（全9表情：通常、笑顔、照れ、驚き、泣き、困惑、キラキラ、眠い、怒り）
   - ％男の子 アクター定義（全9表情）
   - surface0-8, surface10-18 への対応マッピング
   - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5_
 
-- [ ] 4.1 起動・終了トーク（boot.pasta）
+- [x] 4.1 起動・終了トーク（boot.pasta）
   - 単語定義（＠起動挨拶、＠終了挨拶）
   - OnFirstBoot シーン実装（初回起動メッセージ）
   - OnBoot シーン実装（複数パターン）
   - OnClose シーン実装（複数パターン）
   - _Requirements: 2.1, 2.2, 2.3, 2.4_
 
-- [ ] 4.2 (P) ダブルクリック反応（click.pasta）
+- [x] 4.2 (P) ダブルクリック反応（click.pasta）
   - OnMouseDoubleClick シーン実装（7種以上）
   - ランダム選択による反応多様性
   - シンプルな pasta DSL のみの実装（アクター辞書は actors.pasta に委譲）
   - _Requirements: 3.1, 3.2, 3.3, 3.4_
 
-- [ ] 4.3 (P) ランダムトーク（talk.pasta - OnTalk）
+- [x] 4.3 (P) ランダムトーク（talk.pasta - OnTalk）
   - 単語定義（＠雑談）
   - OnTalk シーン実装（6種以上）
   - sakura と kero の掛け合いトーク（アクター辞書は actors.pasta に委譲）
   - _Requirements: 4.1, 4.2, 4.3_
 
-- [ ] 4.4 (P) 時報（talk.pasta - OnHour）
+- [x] 4.4 (P) 時報（talk.pasta - OnHour）
   - OnHour シーン実装（3種以上）
   - `＄時１２` 変数参照（12時間表記）
   - onhour-date-var-transfer 仕様準拠確認
   - _Requirements: 5.1, 5.2, 5.3_
 
-- [ ] 4.5 スクリプト生成統合
+- [x] 4.5 スクリプト生成統合
   - `generate_scripts()` 関数実装
   - ACTORS_PASTA, BOOT_PASTA, TALK_PASTA, CLICK_PASTA 定数定義
   - dic/ ディレクトリへの一括出力（actors.pasta 含む）
@@ -169,7 +169,7 @@ hello-pasta サンプルゴーストの完全実装。SSPにインストール�
   - shell/master/descript.txt 必須フィールド検証（type, name, balloon offset）
   - _Requirements: 9.1, 9.2, 9.3, 9.4_
 
-- [ ] 6.4 (P) pasta DSL 検証テスト
+- [x] 6.4 (P) pasta DSL 検証テスト
   - `test_pasta_scripts()` 実装
   - actors.pasta アクター辞書存在確認（％女の子、％男の子）
   - OnFirstBoot, OnBoot, OnClose シーン存在確認
