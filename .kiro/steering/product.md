@@ -45,6 +45,9 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 - 🔄 **lua55-manual-consistency** - Lua 5.5 リファレンスマニュアル日本語化整合性
   - マニュアル本体は独立リポジトリに移行: [ekicyou/lua55-manual-ja](https://github.com/ekicyou/lua55-manual-ja)
 
+**完了仕様**:
+- ✅ **yield-continuation-token** - `＞チェイントーク` / `＞yield` 継続トーク機能（GLOBAL テーブル L3 登録）
+
 **保留/評価中仕様**:
 - ⏸️ **pasta-conversation-inline-multi-stage-resolution** - 動的単語参照（Phase 3相当、削除検討中）
 - ⏸️ **ukagaka-desktop-mascot** - メタ仕様（Phase 4相当）

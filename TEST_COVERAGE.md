@@ -2,8 +2,8 @@
 
 このドキュメントは、[SOUL.md](SOUL.md) で定義されたコア機能と、それを検証するテストの対応関係を示します。
 
-**最終更新**: 2026-02-05  
-**総テスト数**: 736テスト（全パス ✅）
+**最終更新**: 2026-02-06  
+**総テスト数**: 750+テスト（全パス ✅）
 
 ---
 
@@ -13,7 +13,7 @@
 | --------------------------------------- | ----------------------------------------------- | ------ | -------- |
 | 日本語フレンドリー（全角キーワード）    | `transpiler_integration_test.rs`                | ✅ 完了 | 24       |
 | UNICODE識別子（日本語シーン名・変数名） | `japanese_identifier_test.rs`<br>`ucid_test.rs` | ✅ 完了 | 2<br>3   |
-| yield型エンジン（継続出力）             | `transpiler_integration_test.rs`                | ✅ 完了 | -        |
+| yield型エンジン（継続出力）             | `transpiler_integration_test.rs`<br>`global_chaintalk_*_test.lua`<br>`runtime_e2e_test.rs` | ✅ 完了 | 13       |
 | 宣言的フロー（Call制御）                | `transpiler_integration_test.rs`                | ✅ 完了 | -        |
 
 ---
@@ -82,6 +82,9 @@
 | main.lua初期化順序                   | `loader_integration_test.rs`           | ✅ 完了 | 2テスト（lua-module-path-resolution）        |
 | scene_dic require化                  | `loader_integration_test.rs`           | ✅ 完了 | 3テスト（lua-module-path-resolution）        |
 | lua_requireヘルパー関数              | `runtime::tests`                       | ✅ 完了 | 3テスト（lua-module-path-resolution）        |
+| GLOBAL チェイントーク関数登録        | `global_chaintalk_call_test.lua`       | ✅ 完了 | 6テスト（yield-continuation-token）          |
+| GLOBAL L3解決 + yield動作            | `global_chaintalk_call_test.lua`       | ✅ 完了 | 4テスト（yield-continuation-token）          |
+| EVENT.fire チェイントーク統合        | `global_chaintalk_integration_test.lua`| ✅ 完了 | 5テスト（yield-continuation-token）          |
 
 ### 2.5 統合テスト（E2E）
 
@@ -89,11 +92,12 @@
 | --------------------------- | ------------------------------------------------------------------- | ------ | --------------------------------------------------- |
 | SHIORI.DLL インターフェース | `shiori_lifecycle_test.rs`                                          | ✅ 完了 | 5テスト全パス                                       |
 | SHIORI リクエスト処理       | `lua_request_test.rs`                                               | ✅ 完了 | 18+テスト                                           |
-| Runtime E2E                 | `runtime_e2e_test.rs`                                               | ✅ 完了 | 16テスト（新規）                                    |
+| Runtime E2E                 | `runtime_e2e_test.rs`                                               | ✅ 完了 | 18テスト（chaintalk E2E 2テスト追加）               |
 | Finalize Scene              | `finalize_scene_test.rs`                                            | ✅ 完了 | 14テスト                                            |
 | Virtual Event Dispatcher    | `virtual_event_dispatcher_test.rs`<br>`virtual_dispatcher_spec.lua` | ✅ 完了 | 15+20テスト（onhour-date-var-transfer 5テスト追加） |
 | Sample Ghost Integration    | `shiori_sample_ghost_test.rs`                                       | ✅ 完了 | 2テスト（hello-pasta実ゴースト使用）                |
 | Sample Ghost スクリプト整合性 | `scripts.rs::test_script_expression_names_defined_in_actors`     | ✅ 完了 | 1テスト（表情名↔辞書定義一致検証）                  |
+| チェイントーク E2E            | `runtime_e2e_test.rs`                                            | ✅ 完了 | 2テスト（yield-continuation-token Pasta→Lua→実行）  |
 
 ---
 

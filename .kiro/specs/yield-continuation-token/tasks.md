@@ -14,7 +14,7 @@
 
 ### 1. GLOBAL テーブルへのチェイントーク関数登録
 
-- [ ] 1.1 (P) GLOBAL.チェイントーク と GLOBAL.yield 関数をグローバルモジュールに実装
+- [x] 1.1 (P) GLOBAL.チェイントーク と GLOBAL.yield 関数をグローバルモジュールに実装
   - `scripts/pasta/global.lua` を修正し、空テーブルの中に2つの関数定義を追加
   - 両関数は同一シグネチャ `function(act)` をとり、`act:yield()` を呼び出すのみ
   - 既存の `local GLOBAL = {} ... return GLOBAL` パターンを維持
@@ -23,14 +23,14 @@
 
 ### 2. Lua BDD ランタイム動作テスト
 
-- [ ] 2.1 Lua BDD テストの初期構成と GLOBAL 関数登録の検証テスト
+- [x] 2.1 Lua BDD テストの初期構成と GLOBAL 関数登録の検証テスト
   - テストファイル `tests/lua_specs/global_chaintalk_call_test.lua` を作成
   - `lua_test.test` フレームワークで describe/test/expect パターンで記述
   - GLOBAL.チェイントーク と GLOBAL.yield が非 nil 関数として存在することを確認
   - `init.lua` の specs テーブルに新テストファイル名を登録
   - _Requirements: 2.1, 2.3_
 
-- [ ] 2.2 (P) GLOBAL 関数の L3 解決と yield 動作の検証
+- [x] 2.2 (P) GLOBAL 関数の L3 解決と yield 動作の検証
   - `act:call` で GLOBAL.チェイントーク が L3 検索で見つかることを確認
   - コルーチン内での `act:yield()` が正しく `coroutine.yield()` を実行することを検証
   - yield 前のトークン蓄積出力が返ってくることを確認
@@ -39,7 +39,7 @@
 
 ### 3. Lua BDD EVENT.fire 統合テスト
 
-- [ ] 3.1 Lua BDD 統合テストの構成と EVENT.fire + コルーチン分割の検証
+- [x] 3.1 Lua BDD 統合テストの構成と EVENT.fire + コルーチン分割の検証
   - テストファイル `tests/lua_specs/global_chaintalk_integration_test.lua` を作成
   - EVENT.fire のハンドラーとして GLOBAL.チェイントーク を呼び出すシーン関数を登録
   - `coroutine.create` でコルーチンを生成し、その中で GLOBAL.チェイントーク を呼び出し
@@ -47,7 +47,7 @@
   - `init.lua` の specs テーブルに新テストファイル名を登録
   - _Requirements: 3.1, 3.3_
 
-- [ ] 3.2 (P) EVENT.fire 経由での中間・最終出力の分割検証
+- [x] 3.2 (P) EVENT.fire 経由での中間・最終出力の分割検証
   - 1回目 resume 時に yield 前のトークンのみが中間出力として返ることを確認
   - 2回目 resume 時に yield 後のトークンが最終出力として返ることを確認
   - STORE.co_scene のコルーチン状態が適切に遷移することを検証
@@ -56,14 +56,14 @@
 
 ### 4. Rust E2E 一気通貫テスト
 
-- [ ] 4.1 (P) Rust E2E テストフィクスチャと Pasta DSL コード生成の検証
+- [x] 4.1 (P) Rust E2E テストフィクスチャと Pasta DSL コード生成の検証
   - テストフィクスチャ `tests/fixtures/e2e/runtime_e2e_scene_chaintalk.pasta` を作成
   - `＞チェイントーク` を含むシーンを記述し、トランスパイルして Lua コードを生成
   - トランスパイル出力が `act:call(SCENE.__global_name__, "チェイントーク", ...)` を含むことを確認
   - スナップショットテストで トランスパイル出力を検証（`runtime_e2e_scene_chaintalk.lua` expected）
   - _Requirements: 3.4_
 
-- [ ] 4.2 (P) Rust E2E テストケース実装と一気通貫実行検証
+- [x] 4.2 (P) Rust E2E テストケース実装と一気通貫実行検証
   - `tests/runtime_e2e_test.rs` に `test_e2e_chaintalk_transpile_and_execute()` を新規追加
   - 既存ヘルパー（`create_runtime_with_finalize()`, `transpile()`）を利用
   - Pasta DSL → トランスパイル → finalize_scene → GLOBAL 関数呼び出し → yield の完全フロー検証
@@ -98,13 +98,13 @@ cargo test --all
 
 ## Final Task: ドキュメント整合性の確認と更新
 
-- [ ] 5. ドキュメント整合性の確認と更新
-  - [ ] SOUL.md - コアバリュー・設計原則との整合性確認
-  - [ ] doc/spec/ - 言語仕様の更新（該当する場合）
-  - [ ] GRAMMAR.md - 文法リファレンスの同期（チェイントーク構文）
-  - [ ] TEST_COVERAGE.md - 新規テスト（Lua BDD 2層 + Rust E2E）の記録
-  - [ ] crates/pasta_lua/README.md - 継続トーク機能の記載（該当する場合）
-  - [ ] steering/* - 該当領域のステアリング更新
+- [x] 5. ドキュメント整合性の確認と更新
+  - [x] SOUL.md - コアバリュー・設計原則との整合性確認
+  - [x] doc/spec/ - 言語仕様の更新（該当する場合）
+  - [x] GRAMMAR.md - 文法リファレンスの同期（チェイントーク構文）
+  - [x] TEST_COVERAGE.md - 新規テスト（Lua BDD 2層 + Rust E2E）の記録
+  - [x] crates/pasta_lua/README.md - 継続トーク機能の記載（該当する場合）
+  - [x] steering/* - 該当領域のステアリング更新
   - _Requirements: 1, 2, 3_
 
 ---

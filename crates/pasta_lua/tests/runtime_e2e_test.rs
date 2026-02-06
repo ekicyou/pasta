@@ -13,6 +13,8 @@
 mod common;
 
 use common::e2e_helpers::{create_runtime_with_finalize, transpile};
+use pasta_lua::loader::TalkConfig;
+use pasta_lua::sakura_script;
 
 // ============================================================================
 // E2E Helper Module Tests
@@ -531,4 +533,126 @@ fn test_error_message_specificity() {
             error_str2
         );
     }
+}
+
+// ============================================================================
+// Task 4: Chaintalk (＞チェイントーク) E2E Tests
+// ============================================================================
+
+/// Test that chaintalk fixture parses and transpiles correctly (Task 4.1)
+///
+/// Verifies:
+/// - ＞チェイントーク is transpiled to act:call with "チェイントーク" label
+/// - The transpiled code contains the expected scene structure
+#[test]
+fn test_fixture_chaintalk_parses() {
+    let source = include_str!("fixtures/e2e/runtime_e2e_scene_chaintalk.pasta");
+    let lua_code = transpile(source);
+
+    // Verify actor definition
+    assert!(
+        lua_code.contains("create_actor(\"さくら\")"),
+        "Should contain さくら actor definition. Generated code:\n{}",
+        lua_code
+    );
+
+    // Verify scene is created
+    assert!(
+        lua_code.contains("チェイントークテスト"),
+        "Should contain チェイントークテスト scene. Generated code:\n{}",
+        lua_code
+    );
+
+    // Verify ＞チェイントーク is transpiled to act:call with "チェイントーク" key
+    assert!(
+        lua_code.contains("\"チェイントーク\""),
+        "Should contain act:call with チェイントーク key. Generated code:\n{}",
+        lua_code
+    );
+}
+
+/// Test chaintalk transpile → finalize → GLOBAL function resolution (Task 4.2)
+///
+/// Verifies the complete E2E flow:
+/// 1. Pasta DSL with ＞チェイントーク transpiles to Lua
+/// 2. Transpiled code loads and finalizes successfully
+/// 3. Scene can be found via search
+/// 4. GLOBAL.チェイントーク is registered and accessible at L3
+/// 5. Scene execution with coroutine produces intermediate output via yield
+#[test]
+fn test_e2e_chaintalk_transpile_and_execute() {
+    let lua = create_runtime_with_finalize().unwrap();
+
+    // Register @pasta_sakura_script (required by SHIORI_ACT → sakura_builder)
+    let config = TalkConfig::default();
+    let module = sakura_script::register(&lua, Some(&config)).unwrap();
+    let package: mlua::Table = lua.globals().get("package").unwrap();
+    let loaded: mlua::Table = package.get("loaded").unwrap();
+    loaded.set("@pasta_sakura_script", module).unwrap();
+
+    let source = include_str!("fixtures/e2e/runtime_e2e_scene_chaintalk.pasta");
+    let lua_code = transpile(source);
+
+    // Load transpiled code
+    lua.load(&lua_code).exec().unwrap();
+
+    // Finalize scenes
+    lua.load("require('pasta').finalize_scene()")
+        .exec()
+        .unwrap();
+
+    // Verify GLOBAL functions are registered
+    let global_ok: bool = lua
+        .load(
+            r#"
+        local GLOBAL = require("pasta.global")
+        return type(GLOBAL["チェイントーク"]) == "function"
+            and type(GLOBAL["yield"]) == "function"
+    "#,
+        )
+        .eval()
+        .unwrap();
+    assert!(
+        global_ok,
+        "GLOBAL.チェイントーク and GLOBAL.yield should be registered"
+    );
+
+    // Execute the scene via EVENT.fire and verify coroutine yield
+    // The fixture scene is: talk → ＞チェイントーク (yield) → talk
+    // Note: STORE.actors["さくら"] is already created by the transpiled code
+    // (PASTA.create_actor("さくら") was called during lua_code execution)
+    // First EVENT.fire should produce the pre-yield output and set co_scene
+    let fire_result: String = lua
+        .load(
+            r#"
+        local STORE = require("pasta.store")
+        local EVENT = require("pasta.shiori.event")
+
+        -- Fire the scene event
+        local req = { id = "チェイントークテスト" }
+        local response = EVENT.fire(req)
+
+        -- Check result and co_scene state
+        local co_state = "none"
+        if STORE.co_scene then
+            co_state = coroutine.status(STORE.co_scene)
+        end
+
+        return string.format("status=%s co=%s", tostring(response ~= nil), co_state)
+    "#,
+        )
+        .eval()
+        .unwrap();
+
+    // After first fire, we expect response and suspended coroutine
+    assert!(
+        fire_result.contains("status=true"),
+        "EVENT.fire should return a response, got: {}",
+        fire_result
+    );
+    assert!(
+        fire_result.contains("co=suspended"),
+        "co_scene should be suspended after yield, got: {}",
+        fire_result
+    );
 }
