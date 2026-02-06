@@ -48,8 +48,7 @@
 ```mermaid
 graph TB
     subgraph Phase0 [Phase 0: 前提条件確認]
-        P0_1[cargo credentials 確認]
-        P0_2[gh auth 確認]
+        P0_1[gh auth 確認]
     end
 
     subgraph Phase1 [Phase 1: 事前検証]
@@ -254,7 +253,7 @@ flowchart TD
 
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies | Contracts |
 |-----------|-------------|--------|--------------|-----------------|-----------|
-| Phase 0: Prerequisites | 検証 | 前提条件の確認 | — | cargo credentials (P0), gh auth (P0) | — |
+| Phase 0: Prerequisites | 検証 | 前提条件の確認 | — | gh auth (P0) | — |
 | Phase 1: Validation | 検証 | バージョン決定と事前検証 | 1.1–1.10 | Cargo.toml (P0), cargo test (P0), git (P0) | — |
 | Phase 2: VersionBump | 実行 | Cargo.toml バージョン更新 | 2.1–2.5 | Cargo.toml (P0), cargo build (P0) | — |
 | Phase 3: Publish | 実行 | crates.io 公開 | 3.1–3.6 | cargo publish (P0), crates.io index (P1) | — |
@@ -268,33 +267,26 @@ flowchart TD
 
 | Field | Detail |
 |-------|--------|
-| Intent | リリース実行に必要な外部ツールの認証状態を確認する |
+| Intent | GitHub CLI の認証状態を確認する |
 | Requirements | — （暗黙的前提条件） |
 
 **Responsibilities & Constraints**
-- `cargo publish` の認証トークン（`~/.cargo/credentials.toml`）の存在確認
 - `gh auth status` による GitHub CLI の認証状態確認
-- 未設定時はガイダンスを提示し、設定完了を待つ
+- 未認証時はガイダンスを提示し、設定完了を待つ
 
 **Dependencies**
-- External: `~/.cargo/credentials.toml` — cargo publish 認証 (P0)
 - External: `gh` CLI 認証 — GitHub Release 作成 (P0)
 
 **実行手順**
 
-1. **cargo credentials 確認**:
-   ```
-   Test-Path "$env:USERPROFILE\.cargo\credentials.toml"
-   ```
-   - `False` の場合: 「`cargo login` を実行して crates.io のAPIトークンを設定してください」とガイダンス
-   - トークン取得先: https://crates.io/settings/tokens
-
-2. **gh auth 確認**:
+1. **gh auth 確認**:
    ```
    gh auth status
    ```
    - 認証済みなら続行
    - 未認証の場合: 「`gh auth login` を実行してください」とガイダンス
+
+**Note**: `cargo publish` の認証は環境変数 `CARGO_REGISTRY_TOKEN` で有効であるため、チェック不要
 
 #### Phase 1: Validation
 
@@ -405,7 +397,7 @@ flowchart TD
 - Inbound: Phase 2 のバージョン更新コミット (P0)
 - External: `cargo publish` — crates.io 公開 (P0)
 - External: crates.io index — インデックス更新待ち (P1)
-- External: `~/.cargo/credentials.toml` — 認証 (P0)
+- External: `CARGO_REGISTRY_TOKEN` 環境変数 — 認証 (P0)
 
 **実行手順**
 
@@ -622,7 +614,7 @@ flowchart TD
 
 | フェーズ | エラー種別 | 対応 | ロールバック |
 |---------|-----------|------|-------------|
-| Phase 0 | 認証未設定 | ガイダンス提示 → 設定待ち | 不要 |
+| Phase 0 | gh 認証未設定 | ガイダンス提示 → 設定待ち | 不要 |
 | Phase 1 | テスト失敗 | エラー報告・中止 | 不要（変更なし） |
 | Phase 2 | ビルド失敗 | `git restore Cargo.toml` | Cargo.toml 復元 |
 | Phase 3 | cargo publish 失敗 | 最大2回リトライ → 中断 | 既公開クレートは残す |
