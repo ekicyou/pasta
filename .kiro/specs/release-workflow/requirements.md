@@ -105,15 +105,17 @@
 
 #### Acceptance Criteria
 
-1. When タグのプッシュが完了する, the Release Workflow shall 前回リリースタグから今回タグまでの Git コミット履歴をチェンジログとして収集する
-2. When チェンジログを生成する, the Release Workflow shall コミットメッセージを種別（feat/fix/refactor/docs/chore等）ごとにグループ化する
-3. When GitHub Release を作成する, the Release Workflow shall `gh release create vX.Y.Z` コマンドを使用する
-4. When GitHub Release を作成する, the Release Workflow shall タイトルを `pasta vX.Y.Z` に設定する
-5. When GitHub Release を作成する, the Release Workflow shall 以下の2ファイルをリリースアセットとして添付する:
+1. When タグのプッシュが完了する, the Release Workflow shall `git log <前回タグ>..HEAD --oneline` コマンドで前回リリースから今回までのコミット履歴を取得する
+2. When コミット履歴が取得される, the Release Workflow shall Conventional Commits 形式（`feat:`, `fix:`, `refactor:`, `docs:`, `chore:`, `test:` 等）に基づいてコミットを種別ごとに分類・グループ化する
+3. When チェンジログを整形する, the Release Workflow shall 各グループを見出し（例: `### Features`, `### Bug Fixes`, `### Documentation`）配下に箇条書きで配置する
+4. When GitHub Release を作成する, the Release Workflow shall `gh release create vX.Y.Z` コマンドを使用する
+5. When GitHub Release を作成する, the Release Workflow shall タイトルを `pasta vX.Y.Z` に設定する
+6. When GitHub Release を作成する, the Release Workflow shall 整形済みチェンジログをリリースノートとして含める
+7. When GitHub Release を作成する, the Release Workflow shall 以下の2ファイルをリリースアセットとして添付する:
    - `target/i686-pc-windows-msvc/release/pasta.dll`
    - `crates/pasta_sample_ghost/hello-pasta.nar`
-6. If `gh` コマンドが失敗する, the Release Workflow shall エラーを報告し手動での Release 作成手順を案内する
-7. If 前回リリースタグが存在しない（初回リリース）, the Release Workflow shall 全コミット履歴をチェンジログとして使用する
+8. If `gh` コマンドが失敗する, the Release Workflow shall エラーを報告し手動での Release 作成手順を案内する
+9. If 前回リリースタグが存在しない（初回リリース）, the Release Workflow shall 全コミット履歴（`git log --oneline`）をチェンジログとして使用する
 
 ### Requirement 7: 繰り返し実行の仕様特性
 
