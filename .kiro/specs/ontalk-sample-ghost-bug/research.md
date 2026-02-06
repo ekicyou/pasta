@@ -17,16 +17,44 @@ if cached.next_index >= cached.candidates.len() {
 }
 ```
 
-### Split Borrow の安全性
+### Split Borrow の安全性（検証済み）
 
-循環リセット時に `self.random_selector.shuffle_usize(&mut cached.candidates)` を呼ぶ必要がある。Rustの借用規則上:
+循環リセット時に `self.random_selector.shuffle_usize(&mut cached.candidates)` を呼ぶ必要がある。
 
-- `cached` は `self.cache.get_mut()` 経由の可変参照
-- `self.random_selector` は `self` の別フィールド
+#### 問題の発見
 
-Rustコンパイラはフィールド単位のsplit borrowを許可するため、`self.cache` と `self.random_selector` の同時可変アクセスは安全。ただし、`self.cache.get_mut()` が返す参照を保持したまま `self.random_selector` にアクセスする形になるため、実装時はコンパイラの挙動に注意。
+Phase 3で `self.cache.entry(key).or_insert_with(...)` が返す `&mut CachedSelection` は、`entry()` API が `&mut self` を借用した結果である。この借用は `cached` 変数が生存している間継続するため、Phase 4で `cached` を保持したまま `self.random_selector` にアクセスすることは**できない**。
 
-**結論**: 既存の `resolve_scene_id` 実装で既に `self.random_selector.shuffle_usize()` をPhase 3で呼んでおり、同パターンの再利用で問題なし。
+Phase 3のクロージャ内部では問題ない（クロージャ実行時、`entry()` の借用は未確定のため `self` の他フィールドにアクセス可能）が、Phase 4は異なる。
+
+#### 解決策: Phaseの分割
+
+Phase 3とPhase 4の間で `cached` の借用を一度解放し、Phase 4でリセット判定後に `self.cache.get_mut()` で再取得する：
+
+```rust
+// Phase 3: Get or create cache entry
+let cache_key = SceneCacheKey::new(module_name, search_key, filters);
+let needs_reset = {
+    let cached = self.cache.entry(cache_key).or_insert_with(|| { ... });
+    cached.next_index >= cached.candidates.len()
+};
+
+// Phase 4: Reset if needed (self の借用は解放済み)
+if needs_reset {
+    let cached = self.cache.get_mut(&cache_key).unwrap();
+    cached.next_index = 0;
+    cached.history.clear();
+    if self.shuffle_enabled {
+        self.random_selector.shuffle_usize(&mut cached.candidates);  // ✅ OK
+    }
+}
+
+// Phase 5: Sequential selection
+let cached = self.cache.get_mut(&cache_key).unwrap();
+// ...
+```
+
+**結論**: 設計上の4行の変更は正しいが、実装時はPhaseを4→5段階に分割する必要がある。
 
 ### NoMoreScenes の呼び出しチェーン
 

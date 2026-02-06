@@ -74,23 +74,44 @@ graph TB
 
 **変更内容**:
 
-`resolve_scene_id` および `resolve_scene_id_unified` の Phase 4 ロジックを以下のように変更する:
+`resolve_scene_id` および `resolve_scene_id_unified` の Phase 3〜4 を Phase 3〜5 に分割する:
 
 ```
-現行:
+現行（Phase 3〜4）:
+  let cached = self.cache.entry(cache_key).or_insert_with(|| { ... });
+  
+  // Phase 4: Sequential selection
   if cached.next_index >= cached.candidates.len() {
       return Err(SceneTableError::NoMoreScenes { ... });
   }
+  let selected_id = cached.candidates[cached.next_index];
+  // ...
 
-改修後:
-  if cached.next_index >= cached.candidates.len() {
-      cached.next_index = 0;
-      cached.history.clear();
+改修後（Phase 3〜5に分割）:
+  // Phase 3: Get or create cache entry
+  let needs_reset = {
+      let cached = self.cache.entry(cache_key).or_insert_with(|| { ... });
+      cached.next_index >= cached.candidates.len()
+  };
+  
+  // Phase 4: Reset if needed (借用解放済み)
+  if needs_reset {
+      let cached = self.cache.get_mut(&cache_key).unwrap();
+   entry()` API は `&mut self` を借用するため、Phase 3とPhase 4の間でスコープを分離する必要がある（Split Borrowは成立しない）
+- `shuffle_usize` は `&mut [usize]` を受け取る。`candidates` は `Vec<SceneId>` であり `SceneId = usize` のため型変換不要
+- `cache_key` はPhase 4で再利用するため、Phase 3の外側で定義する
       if self.shuffle_enabled {
           self.random_selector.shuffle_usize(&mut cached.candidates);
       }
   }
+  
+  // Phase 5: Sequential selection
+  let cached = self.cache.get_mut(&cache_key).unwrap();
+  let selected_id = cached.candidates[cached.next_index];
+  // ...
 ```
+
+**Borrow Checker対応**: Phase 3の `entry()` は `&mut self` を借用するため、`cached` 参照が生存中は `self.random_selector` にアクセスできない。Phase 3とPhase 4の間でスコープを分離し、Phase 4で `get_mut()` による再取得を行う。
 
 **インターフェース変更**: なし
 - 戻り値型 `Result<SceneId, SceneTableError>` は不変
