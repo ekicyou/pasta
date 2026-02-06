@@ -162,7 +162,7 @@ sequenceDiagram
 | scripts.rs | Rust ライブラリ | ハードコード定数を削除、テスト用ファイル読み込みに移行 | 2.2, 5.2 | dist-src (テスト時 P1) | — |
 | main.rs | Rust バイナリ | コンソール出力を画像生成のみに更新 | 6.3 | lib.rs (P0) | — |
 | integration_test.rs | テスト | 新しい生成範囲に合わせたテスト更新 | 5.1, 5.3 | lib.rs (P0), dist-src (P1) | — |
-| templates/ | ファイルシステム | 廃止（dist-src 初期化完了後に削除） | 3.1-3.4 | — | — |
+| templates/ | ファイルシステム | 削除（dist-src 作成と同時に削除） | 3.1-3.4 | — | — |
 
 ### ファイルシステム層
 
@@ -201,13 +201,11 @@ crates/pasta_sample_ghost/dist-src/
 - `shell/master/surfaces.txt` は **含めない**（`cargo run` でコード生成）
 - `shell/master/surface*.png` は **含めない**（`cargo run` で画像生成）
 
-**初期化手順（タスク実装時に決定）**:
-- `dist-src/` の8ファイルは、実装フェーズで以下のいずれかの方法で初期作成する:
-  1. PowerShell スクリプト（`setup-dist-src.ps1`）でテンプレート展開
-  2. Rust ユーティリティコマンド（`cargo run -- --setup-dist-src`）
-  3. 手動作成（各ファイル内容を design.md または別ドキュメントに全文記載）
-- 初期化完了後、`templates/` ディレクトリを削除
-- 初期化正確性の検証: 移行前の `cargo run` 出力と `dist-src/` ファイルの完全一致を確認するテストを追加
+**初期化手順（設計判断により確定）**:
+- `dist-src/` の8ファイルは、実装タスクで `GhostConfig::default()` の固定値を直接埋め込んだ最終形として作成する
+- テンプレート置換の自動化は**不要**（hello-pasta サンプルゴーストの値は固定のため）
+- `templates/` ディレクトリは `dist-src/` 作成と同時に削除（初期化完了を待たない）
+- 移行正確性の検証: 既存の `cargo run` 出力と `dist-src/` ファイルの完全一致を確認するテストを追加（移行前のスナップショット比較）
 
 ### ビルドスクリプト層
 
