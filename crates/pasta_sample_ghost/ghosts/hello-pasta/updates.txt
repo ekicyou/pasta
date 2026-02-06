@@ -1,8 +1,8 @@
 file,ghost/master/descript.txtb17b5e59282bc0574d1f0d7be4f6ac86size=212
 file,ghost/master/dic/actors.pasta0e0258c6e86834913dd915bc6eceb707size=755
 file,ghost/master/dic/boot.pasta262b6b378ac79330ac478bd80f5b94b6size=1277
-file,ghost/master/dic/click.pastaf8f561f86b8d6dc0ed75ff9a2465fc42size=1215
-file,ghost/master/dic/talk.pastaa64e383e5c44a3bfa090036a1d8964besize=1750
+file,ghost/master/dic/click.pasta1d040f765b3e61bf70a754f1e79eabdesize=1411
+file,ghost/master/dic/talk.pastabfe5b1eafb62b391be937c12ff035908size=2002
 file,ghost/master/pasta.dllaf23e08be12739bacfe31530a9969b90size=2719744
 file,ghost/master/pasta.toml0ec9c2f409fcaa7741ee8e126710abd6size=2463
 file,ghost/master/scripts/README.md13b8ec0c7cce76a1c00f09331fbf5fdesize=588
