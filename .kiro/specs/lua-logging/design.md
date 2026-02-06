@@ -240,12 +240,24 @@ fn value_to_string(lua: &Lua, value: Value) -> String;
 | Requirements | 2.1, 2.2, 2.3, 2.4, 5.1 |
 
 **Responsibilities & Constraints**
-- `Lua::inspect_stack(1, ...)` で呼び出し元（Lua側）の情報を取得
+- `Lua::inspect_stack(level, ...)` で呼び出し元（Lua側）の情報を取得
+  - **スタックレベル**: 実装前のプロトタイプ検証で確定（level=1 or 2）
+  - mlua `create_function` クロージャ経由でのスタック構造に依存
 - debug ライブラリを必要としない（Lua C API `lua_getinfo` を直接使用）
 - 情報取得失敗時は全フィールドをデフォルト値で返す
 
 **Dependencies**
 - External: mlua — `Lua::inspect_stack`, `Debug`, `DebugNames`, `DebugSource` (P0)
+
+**Implementation Strategy** (スタックレベル検証戦略):
+1. **最初のタスク**: プロトタイプ検証
+   - 最小限のRustコードで `lua.create_function` + `inspect_stack(1)` / `inspect_stack(2)` を試行
+   - Luaスクリプト `local function test() log.info("x") end; test()` で呼び出し
+   - 各レベルで取得される source/line が期待通りか確認
+2. **検証結果に応じたタスク分岐**:
+   - level=1 が正しい場合 → `get_caller_info` 実装で level=1 使用
+   - level=2 が必要な場合 → `get_caller_info` 実装で level=2 使用
+3. **検証時間見積もり**: 10-15分程度
 
 **Contracts**: Service [x]
 
