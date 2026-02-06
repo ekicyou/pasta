@@ -59,7 +59,7 @@
 
 1. When バージョン番号が確定する, the Release Workflow shall `Cargo.toml`（ワークスペースルート）の `[workspace.package].version` フィールドを新バージョンに更新する
 2. When ワークスペースバージョンが更新される, the Release Workflow shall `[workspace.dependencies]` セクション内の内部クレート参照（`pasta_core`, `pasta_lua`, `pasta_shiori`）の `version` フィールドも同じバージョンに更新する
-3. When Cargo.toml が更新される, the Release Workflow shall `cargo build --workspace` を実行しビルドが成功することを確認する
+3. When Cargo.toml が更新される, the Release Workflow shall `cargo build --workspace` を実行しビルドが成功することを確認する（これにより後続の `cargo publish` 失敗リスクを最小化する）
 4. If ビルドが失敗する, the Release Workflow shall 変更をロールバックしエラーを報告する
 5. When ビルドが成功する, the Release Workflow shall バージョン更新を `chore(release): bump version to vX.Y.Z` メッセージでコミットする
 
@@ -69,11 +69,12 @@
 
 #### Acceptance Criteria
 
-1. When バージョン更新コミットが完了する, the Release Workflow shall クレートを依存関係順（`pasta_core` → `pasta_lua` → `pasta_shiori`）に `cargo publish` する
+1. When バージョン更新コミットが完了する, the Release Workflow shall クレートを依存関係順（`pasta_core` → `pasta_lua` → `pasta_shiori`）に `cargo publish -p <crate>` する
 2. When `cargo publish` を実行する, the Release Workflow shall 各クレートの公開成功を確認してから次のクレートに進む
-3. If `cargo publish` が失敗する, the Release Workflow shall エラーを報告し以降の公開を中断する
-4. While `pasta_sample_ghost` は `publish = false` である, the Release Workflow shall このクレートの公開をスキップする
-5. When 前のクレートを公開した直後, the Release Workflow shall crates.io のインデックス更新を待つため適切な間隔（数秒〜十数秒）を空ける
+3. If `cargo publish` が失敗する, the Release Workflow shall 最大2回までリトライを試みる
+4. If リトライ後も失敗する, the Release Workflow shall エラーを報告し、以降の公開を中断し、既に公開されたクレートはそのまま残す（手動 yank または次回リリースで対処）
+5. While `pasta_sample_ghost` は `publish = false` である, the Release Workflow shall このクレートの公開をスキップする
+6. When 前のクレートを公開した直後, the Release Workflow shall crates.io のインデックス更新を待つため10秒程度の待機時間を設ける
 
 ### Requirement 4: サンプルゴーストビルド
 

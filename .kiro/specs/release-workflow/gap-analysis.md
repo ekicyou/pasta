@@ -108,9 +108,17 @@ gh release create v0.1.2 の構成:
 - LLM が Conventional Commits プレフィックス（`feat:`, `fix:`, `chore:` 等）で種別を判定
 - 種別ごとにグループ化し Markdown 形式のチェンジログを生成
 
-#### Constraint: cargo publish の認証
+#### Constraint: cargo publish の失敗時リカバリ
 
-- `cargo publish` にはcrates.ioのAPIトークンが必要
+**決定事項**: 中断のみ（自動 yank なし）、リトライあり
+
+**戦略**:
+- 各 `cargo publish` で失敗した場合、最大2回までリトライ
+- リトライ後も失敗した場合はエラー報告して作業中断
+- 既に公開されたクレートはそのまま残す（手動 yank または次回リリースで対処）
+- Requirement 2 で事前に `cargo build --workspace` を実施することで、公開失敗のリスクを最小化
+
+#### Constraint: cargo publish の認証
 - ローカル環境に `~/.cargo/credentials.toml` が必要
 - **未確認**: 現在のローカル環境にトークンが設定されているか
 
