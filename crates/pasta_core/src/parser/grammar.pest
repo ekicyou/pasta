@@ -168,7 +168,7 @@ talk      = @{ talk_word+ }
 
 // ################################################# sakura_script
 sakura_script = @{ sakura_marker ~ sakura_id ~ sakura_args? }
-sakura_id     = @{ (('a'..'z') | ('A'..'Z') | ('0'..'9') | "_" | "!" )+ }
+sakura_id     = @{ (('a'..'z') | ('A'..'Z') | ('0'..'9') | "_" | "!" | "-" | "+" | "*" | "?" | "&" )+ }
 sakura_args   =  { sakura_open ~ sakura_body ~ sakura_close }
 sakura_open   = _{ "[" ~ PUSH_LITERAL("]") }
 sakura_body   = @{ ( sakura_str | (!PEEK ~ ANY) )* }

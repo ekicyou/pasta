@@ -505,7 +505,7 @@ Pastaは、さくらスクリプトのエスケープシーケンスを**その�
 
 ```
 sakura_command   ::= "\" ~ sakura_token ~ bracket_content?
-sakura_token     ::= [!_a-zA-Z0-9]+
+sakura_token     ::= [!\-+*?&_a-zA-Z0-9]+
 bracket_content  ::= "[" ~ bracket_chars ~ "]"
 bracket_chars    ::= ( "\\]" | [^\]] )*
 ```

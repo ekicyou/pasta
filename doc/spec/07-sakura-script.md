@@ -19,13 +19,13 @@ Sakura スクリプトは、アクション行内にインラインで埋め込�
 **構文（字句）**:
 ```pest
 sakura_command   ::= "\" ~ sakura_token ~ bracket_content?
-sakura_token     ::= [!_a-zA-Z0-9]+     // 数字開始可、'!' と '_' を含めたASCIIトークン
+sakura_token     ::= [!\-+*?&_a-zA-Z0-9]+     // 数字開始可、'!' と '_' を含めたASCIIトークン + ukadoc記号文字
 bracket_content  ::= "[" ~ bracket_chars ~ "]"
 bracket_chars    ::= ( "\\]" | [^\]] )* // 非エスケープな ']' で閉じる。 '\]' は文字 ']'。
 ```
 
 **説明**:
-- `sakura_token` は ASCII 英数字 + `_` + `!` の連続。先頭が数字でもよい。
+- `sakura_token` は ASCII 英数字 + `_` + `!` + `-` + `+` + `*` + `?` + `&` の連続。先頭が数字でもよい。
 - 角括弧内容は**非ネスト**前提で、最初の「非エスケープな `]`」で閉じます（`\]`は内容文字として扱う）。
 - 角括弧内で `,` や `"` を値に含めるための ukadoc の**引用規則**（第2引数以降の `"..."`、内部 `"` を二重にする）はそのまま透過します。Pasta は中身を構文解析しません。
 
@@ -36,9 +36,20 @@ bracket_chars    ::= ( "\\]" | [^\]] )* // 非エスケープな ']' で閉じ�
 
 ## 7.4 文字種（簡略）
 
-- コマンドトークンは**ASCII**（英数字・`_`・`!`）のみを対象とします。
+- コマンドトークンは**ASCII**（英数字・`_`・`!`・`-`・`+`・`*`・`?`・`&`）を対象とします。
 - 括弧は**半角**の `[` と `]` を対象とします（全角括弧はコマンド括弧として扱わない）。
 - エスケープは**半角**バックスラッシュ `\` のみ（全角不可）。
+
+### 7.4.1 `sakura_token` 文字クラスの同期箇所
+
+`sakura_token` の文字クラスを変更する場合、以下の4箇所を**必ず同時に**更新すること:
+
+| # | ファイル | 場所 | 形式 |
+|---|---------|------|------|
+| 1 | `doc/spec/07-sakura-script.md` | §7.3 sakura_token定義 | EBNF文字クラス |
+| 2 | `GRAMMAR.md` | sakura_token定義 | EBNF文字クラス |
+| 3 | `crates/pasta_core/src/parser/grammar.pest` | sakura_idルール | Pest ordered choice |
+| 4 | `crates/pasta_lua/src/sakura_script/tokenizer.rs` | SAKURA_TAG_PATTERN | Rust regex文字クラス |
 
 ## 7.5 使用例
 

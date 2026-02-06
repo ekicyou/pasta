@@ -109,9 +109,8 @@ pub struct Tokenizer {
 impl Tokenizer {
     /// Sakura script tag pattern.
     /// Matches: \tag or \tag[param]
-    /// Examples: \h, \s[0], \_w[500], \![open,inputbox]
-    const SAKURA_TAG_PATTERN: &'static str = r"\\[0-9a-zA-Z_!]+(?:\[[^\]]*\])?";
-
+    /// Examples: \h, \s[0], \_w[500], \![open,inputbox], \-, \+, \*, \_?, \&[ID]
+    const SAKURA_TAG_PATTERN: &'static str = r"\\[0-9a-zA-Z_!+*?&-]+(?:\[[^\]]*\])?";
     /// Create a new Tokenizer from TalkConfig.
     ///
     /// # Arguments
@@ -313,5 +312,77 @@ mod tests {
         assert_eq!(tokens[4].kind, TokenKind::Strong);
         assert_eq!(tokens[5].kind, TokenKind::Period);
         assert_eq!(tokens[6].kind, TokenKind::Comma);
+    }
+
+    // ====================================================================
+    // 5文字記号タグ（-+*?&）のトークナイズテスト
+    // Requirement: 3.1, 3.2, 3.4, 4.2
+    // ====================================================================
+
+    #[test]
+    fn test_tokenize_symbol_tag_hyphen() {
+        let tokenizer = Tokenizer::new(&default_config()).unwrap();
+        let tokens = tokenizer.tokenize(r"\-");
+
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0].kind, TokenKind::SakuraScript);
+        assert_eq!(tokens[0].text, r"\-");
+    }
+
+    #[test]
+    fn test_tokenize_symbol_tag_plus() {
+        let tokenizer = Tokenizer::new(&default_config()).unwrap();
+        let tokens = tokenizer.tokenize(r"\+");
+
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0].kind, TokenKind::SakuraScript);
+        assert_eq!(tokens[0].text, r"\+");
+    }
+
+    #[test]
+    fn test_tokenize_symbol_tag_asterisk() {
+        let tokenizer = Tokenizer::new(&default_config()).unwrap();
+        let tokens = tokenizer.tokenize(r"\*");
+
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0].kind, TokenKind::SakuraScript);
+        assert_eq!(tokens[0].text, r"\*");
+    }
+
+    #[test]
+    fn test_tokenize_symbol_tag_underscore_question() {
+        let tokenizer = Tokenizer::new(&default_config()).unwrap();
+        let tokens = tokenizer.tokenize(r"\_?");
+
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0].kind, TokenKind::SakuraScript);
+        assert_eq!(tokens[0].text, r"\_?");
+    }
+
+    #[test]
+    fn test_tokenize_symbol_tag_ampersand() {
+        let tokenizer = Tokenizer::new(&default_config()).unwrap();
+        let tokens = tokenizer.tokenize(r"\&[ID]");
+
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0].kind, TokenKind::SakuraScript);
+        assert_eq!(tokens[0].text, r"\&[ID]");
+    }
+
+    #[test]
+    fn test_tokenize_symbol_tag_mixed_text() {
+        let tokenizer = Tokenizer::new(&default_config()).unwrap();
+        let tokens = tokenizer.tokenize(r"こんにちは\-。");
+
+        // こ, ん, に, ち, は, \-, 。 = 7 tokens
+        assert_eq!(tokens.len(), 7);
+        assert_eq!(tokens[0].kind, TokenKind::General); // こ
+        assert_eq!(tokens[1].kind, TokenKind::General); // ん
+        assert_eq!(tokens[2].kind, TokenKind::General); // に
+        assert_eq!(tokens[3].kind, TokenKind::General); // ち
+        assert_eq!(tokens[4].kind, TokenKind::General); // は
+        assert_eq!(tokens[5].kind, TokenKind::SakuraScript); // \-
+        assert_eq!(tokens[5].text, r"\-");
+        assert_eq!(tokens[6].kind, TokenKind::Period); // 。
     }
 }

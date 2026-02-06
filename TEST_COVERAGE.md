@@ -3,7 +3,7 @@
 このドキュメントは、[SOUL.md](SOUL.md) で定義されたコア機能と、それを検証するテストの対応関係を示します。
 
 **最終更新**: 2026-02-06  
-**総テスト数**: 750+テスト（全パス ✅）
+**総テスト数**: 760+テスト（全パス ✅）
 
 ---
 
@@ -35,6 +35,7 @@
 | アクション行（発言）   | `transpiler_integration_test.rs` | ✅ 完了 | キャラクター発言                          |
 | Luaコードブロック      | `actor_code_block_test.rs`       | ✅ 完了 | 関数定義                                  |
 | バイトオフセット       | `span_byte_offset_test.rs`       | ✅ 完了 | エラー位置特定                            |
+| さくらスクリプト記号タグ | `sakura_symbol_tag_test.rs`    | ✅ 完了 | `-+*?&` 5文字タグパース（7テスト）        |
 
 ### 2.2 Registry層テスト（シーン/単語テーブル）
 
@@ -76,6 +77,7 @@
 | RuntimeConfig libs配列               | `runtime::tests`                       | ✅ 完了 | 17テスト（新規）                             |
 | LuaConfig TOML設定                   | `loader::config::tests`                | ✅ 完了 | 6テスト（新規）                              |
 | さくらスクリプトウェイト挿入         | `sakura_script_integration_test.rs`    | ✅ 完了 | 19テスト（sakura-script-wait）               |
+| さくらスクリプト記号タグトークナイズ | `tokenizer.rs` 内テスト                | ✅ 完了 | 6テスト（`-+*?&` タグ認識）                  |
 | EVENT.fire コルーチン対応            | `event_coroutine_test.lua`             | ✅ 完了 | 16テスト（resume_until_valid含む）           |
 | resume_until_valid nil yieldスキップ | `event_coroutine_test.lua`             | ✅ 完了 | 6テスト（coroutine-resume-loop）             |
 | user_scripts検索パス優先順位         | `loader_integration_test.rs`           | ✅ 完了 | 2テスト（lua-module-path-resolution）        |
@@ -162,10 +164,10 @@
 
 | クレート     | テスト数 | パス     | 失敗  | カバレッジ評価 |
 | ------------ | -------- | -------- | ----- | -------------- |
-| pasta_core   | 94       | 94       | 0     | ⭐⭐⭐⭐⭐ 優秀     |
-| pasta_lua    | 464      | 464      | 0     | ⭐⭐⭐⭐⭐ 優秀     |
+| pasta_core   | 101      | 101      | 0     | ⭐⭐⭐⭐⭐ 優秀     |
+| pasta_lua    | 470      | 470      | 0     | ⭐⭐⭐⭐⭐ 優秀     |
 | pasta_shiori | 28       | 28       | 0     | ⭐⭐⭐⭐⭐ 優秀     |
-| **合計**     | **700+** | **700+** | **0** | **100%パス率** |
+| **合計**     | **710+** | **710+** | **0** | **100%パス率** |
 
 ---
 

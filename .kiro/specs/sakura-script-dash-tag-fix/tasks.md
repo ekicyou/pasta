@@ -12,35 +12,35 @@
 
 ## 実装タスク
 
-- [ ] 1 (P). 仕様書の sakura_token 文字クラス定義を5文字追加
-- [ ] 1.1 (P) doc/spec/07-sakura-script.md の sakura_token 定義を更新
+- [x] 1 (P). 仕様書の sakura_token 文字クラス定義を5文字追加
+- [x] 1.1 (P) doc/spec/07-sakura-script.md の sakura_token 定義を更新
   - `sakura_token ::= [!_a-zA-Z0-9]+` → `sakura_token ::= [!\-+*?&_a-zA-Z0-9]+`
   - 説明文を更新: 「ASCII 英数字 + `_` + `!`」→「ASCII 英数字 + `_` + `!` + `-` + `+` + `*` + `?` + `&`」
   - 同期箇所一覧を追記: `sakura_token` 文字クラス変更時に更新すべき4箇所を明記（§7.3の末尾に追加）
   - _Requirements: 1.1, 1.2, 1.3, 4.3_
 
-- [ ] 1.2 (P) GRAMMAR.md の sakura_token 定義を更新
+- [x] 1.2 (P) GRAMMAR.md の sakura_token 定義を更新
   - L508付近の `sakura_token ::= [!_a-zA-Z0-9]+` → `sakura_token ::= [!\-+*?&_a-zA-Z0-9]+`
   - 07-sakura-script.md との一貫性を保つ
   - _Requirements: 1.1, 1.2, 1.3, 4.1_
 
-- [ ] 2 (P). Pest文法定義の sakura_id ルールを5文字追加
-- [ ] 2.1 (P) grammar.pest の sakura_id ルールを更新
+- [x] 2 (P). Pest文法定義の sakura_id ルールを5文字追加
+- [x] 2.1 (P) grammar.pest の sakura_id ルールを更新
   - L171の `sakura_id = @{ (('a'..'z') | ('A'..'Z') | ('0'..'9') | "_" | "!" )+ }` に5文字を追加
   - 変更後: `sakura_id = @{ (('a'..'z') | ('A'..'Z') | ('0'..'9') | "_" | "!" | "-" | "+" | "*" | "?" | "&" )+ }`
   - Pest文法では各文字を `"x"` リテラルで個別に追加（正規表現の文字クラスとは異なる記法）
   - _Requirements: 2.1, 2.2, 2.3, 2.4_
 
-- [ ] 3 (P). ランタイムregexの SAKURA_TAG_PATTERN を5文字追加
-- [ ] 3.1 (P) tokenizer.rs の SAKURA_TAG_PATTERN を更新
+- [x] 3 (P). ランタイムregexの SAKURA_TAG_PATTERN を5文字追加
+- [x] 3.1 (P) tokenizer.rs の SAKURA_TAG_PATTERN を更新
   - L113の `const SAKURA_TAG_PATTERN: &'static str = r"\\[0-9a-zA-Z_!]+(?:\[[^\]]*\])?";` を更新
   - 変更後: `const SAKURA_TAG_PATTERN: &'static str = r"\\[0-9a-zA-Z_!+*?&-]+(?:\[[^\]]*\])?";`
   - `-` を文字クラス末尾に配置（範囲指定と誤解されないため）
   - `+`, `*`, `?` は文字クラス内でリテラル扱いのためエスケープ不要
   - _Requirements: 3.1, 3.2, 3.3, 3.4_
 
-- [ ] 4. pasta_lua ランタイムレイヤーのトークナイズテストを追加
-- [ ] 4.1 tokenizer.rs 内テストに5文字タグのテストケースを追加
+- [x] 4. pasta_lua ランタイムレイヤーのトークナイズテストを追加
+- [x] 4.1 tokenizer.rs 内テストに5文字タグのテストケースを追加
   - `#[cfg(test)] mod tests` に6テスト関数を追加:
     - `test_tokenize_symbol_tag_hyphen`: `\-` → `TokenKind::SakuraScript`, `text == r"\-"`
     - `test_tokenize_symbol_tag_plus`: `\+` → `TokenKind::SakuraScript`, `text == r"\+"`
@@ -51,8 +51,8 @@
   - 既存の `test_tokenize_sakura_script_tag`, `test_tokenize_complex_tag` がリグレッションなく動作することを確認
   - _Requirements: 3.1, 3.2, 3.4, 4.2_
 
-- [ ] 5. pasta_core パーサーレイヤーのパーステストを追加
-- [ ] 5.1 新規ファイル sakura_symbol_tag_test.rs を作成
+- [x] 5. pasta_core パーサーレイヤーのパーステストを追加
+- [x] 5.1 新規ファイル sakura_symbol_tag_test.rs を作成
   - `crates/pasta_core/tests/sakura_symbol_tag_test.rs` を作成
   - ファイル配置理由: 5文字すべての体系的テストケースを1ファイルに集約し、将来の文字クラス拡張時の参照性を高める
   - 7テスト関数を実装:
@@ -66,14 +66,14 @@
   - `parse_str()` APIを使用し、`PastaFile` → `FileItem::GlobalSceneScope` → `Action` の検証パターンに準拠
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 4.2_
 
-- [ ] 6. 全テスト実行と4箇所の一貫性検証
-- [ ] 6.1 ワークスペース全体のテストを実行
+- [x] 6. 全テスト実行と4箇所の一貫性検証
+- [x] 6.1 ワークスペース全体のテストを実行
   - `cargo test --workspace` を実行し、既存テスト340+件すべてがパスすることを確認
   - 新規追加テスト13件（tokenizer内6件 + パーサー7件）がすべてパスすることを確認
   - リグレッションなしを確認（特に `sakura_script_integration_test.rs` の既存644行のテスト群）
   - _Requirements: 2.4, 3.4, 4.1, 4.2_
 
-- [ ] 6.2 4箇所の文字クラス同期を手動検証
+- [x] 6.2 4箇所の文字クラス同期を手動検証
   - `doc/spec/07-sakura-script.md`: `[!\-+*?&_a-zA-Z0-9]+`
   - `GRAMMAR.md` L508: `[!\-+*?&_a-zA-Z0-9]+`
   - `grammar.pest` L171: `"_" | "!" | "-" | "+" | "*" | "?" | "&"` の全文字が含まれる
@@ -81,14 +81,14 @@
   - 4箇所で同一の文字セット（`!`, `_`, `-`, `+`, `*`, `?`, `&`, `a-z`, `A-Z`, `0-9`）を許容することを確認
   - _Requirements: 4.1_
 
-- [ ] 7. ドキュメント整合性の確認と更新
-- [ ] 7.1 SOUL.md との整合性確認
+- [x] 7. ドキュメント整合性の確認と更新
+- [x] 7.1 SOUL.md との整合性確認
   - コアバリュー（日本語フレンドリー、UNICODE識別子、yield型、宣言的フロー）への影響: なし
   - 設計原則（行指向文法、前方一致、UI独立性）への影響: なし
   - 影響なしを確認済みとして記録
   - _Requirements: すべて_
 
-- [ ] 7.2 TEST_COVERAGE.md への新規テストマッピング追加
+- [x] 7.2 TEST_COVERAGE.md への新規テストマッピング追加
   - 新規テストファイル `sakura_symbol_tag_test.rs`（7テスト）を追加
   - `tokenizer.rs` 内テスト（6テスト）を追加
   - テストカバレッジマップを更新

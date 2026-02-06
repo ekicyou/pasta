@@ -10,6 +10,18 @@
 local EVENT = require "pasta.shiori.event"
 local RES = require "pasta.shiori.res"
 
+-- グローバルシーン関数の登録
+local GLOBAL = require "pasta.global"
+
+function GLOBAL.close_ghost(act, ms)
+    if type(ms) == "number" and ms >= 1 then
+        act:wait(ms)
+    end
+    act:raw_script([=[\-]=])
+end
+
+GLOBAL.ゴースト終了 = GLOBAL.close_ghost
+
 -- グローバル SHIORI テーブルを初期化（既存の場合は維持）
 SHIORI = SHIORI or {}
 

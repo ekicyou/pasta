@@ -11,15 +11,8 @@
 ---   end
 
 --- @class Global グローバル関数テーブル
+--- @field [string] fun(act: Act, ...): any
 local GLOBAL = {}
-
---- チェイントーク（継続トーク）関数
---- act:yield() を呼び出し、蓄積トークンを中間出力として返す。
---- Pasta DSL の `＞チェイントーク` で呼び出される。
---- @param act Act ACT オブジェクト
-function GLOBAL.チェイントーク(act)
-    act:yield()
-end
 
 --- yield（継続トーク）関数
 --- チェイントーク と同一動作。
@@ -28,5 +21,9 @@ end
 function GLOBAL.yield(act)
     act:yield()
 end
+
+GLOBAL.チェイントーク = GLOBAL.yield
+
+
 
 return GLOBAL
