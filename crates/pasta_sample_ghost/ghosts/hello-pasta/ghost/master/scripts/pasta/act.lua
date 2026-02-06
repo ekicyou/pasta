@@ -45,7 +45,7 @@ local function group_by_actor(tokens)
             end
             table.insert(current_actor_token.tokens, token)
         else
-            -- アクター行動トークン（surface, wait, newline, clear, sakura_script）
+            -- アクター行動トークン（surface, wait, newline, clear, raw_script）
             -- 現在のアクターグループ内に追加
             if current_actor_token then
                 table.insert(current_actor_token.tokens, token)
@@ -181,12 +181,12 @@ function ACT_IMPL.talk(self, actor, text)
     return self
 end
 
---- sakura_scriptトークン蓄積
+--- raw_scriptトークン蓄積
 --- @param self Act アクションオブジェクト
---- @param text string さくらスクリプト
+--- @param text string 生スクリプト文字列
 --- @return Act self メソッドチェーン用
-function ACT_IMPL.sakura_script(self, text)
-    table.insert(self.token, { type = "sakura_script", text = text })
+function ACT_IMPL.raw_script(self, text)
+    table.insert(self.token, { type = "raw_script", text = text })
     return self
 end
 

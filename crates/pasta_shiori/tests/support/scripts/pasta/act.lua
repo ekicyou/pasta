@@ -67,10 +67,10 @@ function ACT:talk(actor, text)
     table.insert(self.token, { type = "talk", text = text })
 end
 
---- sakura_scriptトークン蓄積
---- @param text string さくらスクリプト
-function ACT:sakura_script(text)
-    table.insert(self.token, { type = "sakura_script", text = text })
+--- raw_scriptトークン蓄積
+--- @param text string 生スクリプト文字列
+function ACT:raw_script(text)
+    table.insert(self.token, { type = "raw_script", text = text })
 end
 
 --- 単語検索（アクター非依存、4レベル検索）

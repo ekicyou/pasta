@@ -204,8 +204,8 @@ describe("SAKURA_BUILDER - clear token", function()
     end)
 end)
 
-describe("SAKURA_BUILDER - sakura_script token", function()
-    test("sakura_scriptトークンをそのまま出力する（エスケープなし）", function()
+describe("SAKURA_BUILDER - raw_script token", function()
+    test("raw_scriptトークンをそのまま出力する（エスケープなし）", function()
         local BUILDER = require("pasta.shiori.sakura_builder")
         local actors = create_mock_actors()
 
@@ -214,8 +214,8 @@ describe("SAKURA_BUILDER - sakura_script token", function()
                 type = "actor",
                 actor = actors.sakura,
                 tokens = {
-                    { type = "talk",          actor = actors.sakura,      text = "" },
-                    { type = "sakura_script", text = "\\![open,calendar]" },
+                    { type = "talk",       actor = actors.sakura,      text = "" },
+                    { type = "raw_script", text = "\\![open,calendar]" },
                 }
             },
         }

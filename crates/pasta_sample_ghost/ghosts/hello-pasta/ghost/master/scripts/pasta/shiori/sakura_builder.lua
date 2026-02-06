@@ -101,7 +101,7 @@ function BUILDER.build(grouped_tokens, config)
                     end
                 elseif inner_type == "clear" then
                     table.insert(buffer, "\\c")
-                elseif inner_type == "sakura_script" then
+                elseif inner_type == "raw_script" then
                     table.insert(buffer, inner.text)
                 end
                 -- yield は無視

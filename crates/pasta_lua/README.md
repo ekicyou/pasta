@@ -484,7 +484,7 @@ local script = BUILDER.build(tokens, config)
 | `wait`          | `ms`              | `\w[ms]`                             |
 | `newline`       | `n`               | `\n` × n回                           |
 | `clear`         | -                 | `\c`                                 |
-| `sakura_script` | `text`            | そのまま出力                         |
+| `raw_script`    | `text`            | そのまま出力                         |
 | `yield`         | -                 | 無視（出力対象外）                   |
 
 ## ファイル検出パターン

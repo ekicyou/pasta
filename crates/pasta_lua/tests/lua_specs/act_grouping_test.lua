@@ -266,20 +266,20 @@ describe("ACT.build() - merge_consecutive_talks()", function()
         expect(result[1].tokens[2].type):toBe("clear")
     end)
 
-    test("アクター行動トークンで分離する（sakura_script）", function()
+    test("アクター行動トークンで分離する（raw_script）", function()
         local ACT = require("pasta.act")
         local actors = create_mock_actors()
         local sakura = actors["さくら"]
         local act = ACT.new(actors)
 
         act:talk(sakura, "スクリプト前")
-        act:sakura_script("\\![open,notepad]")
+        act:raw_script("\\![open,notepad]")
         act:talk(sakura, "スクリプト後")
         local result = act:build()
 
         expect(#result):toBe(1)
         expect(#result[1].tokens):toBe(3)
-        expect(result[1].tokens[2].type):toBe("sakura_script")
+        expect(result[1].tokens[2].type):toBe("raw_script")
         expect(result[1].tokens[2].text):toBe("\\![open,notepad]")
     end)
 

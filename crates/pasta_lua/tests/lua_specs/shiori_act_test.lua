@@ -36,10 +36,10 @@ describe("SHIORI_ACT - inheritance", function()
         local actors = create_mock_actors()
         local act = SHIORI_ACT.new(actors)
 
-        -- sakura_script() is inherited from ACT_IMPL
-        act:sakura_script("\\e")
+        -- raw_script() is inherited from ACT_IMPL
+        act:raw_script("\\e")
         expect(#act.token):toBe(1)
-        expect(act.token[1].type):toBe("sakura_script")
+        expect(act.token[1].type):toBe("raw_script")
     end)
 
     test("has IMPL field for further inheritance", function()
