@@ -31,25 +31,24 @@
 2. The pasta system shall `[actor]`セクションが未定義の場合でもエラーなく動作し、従来どおりの挙動を維持する
 3. When `[actor]`セクションで定義されたアクターが使用される場合, the pasta system shall そのデフォルトspot値をアクターオブジェクトの初期状態として設定する
 
-### 要件 2: スポット位置の継続保持
+### 要件 2: スポット位置の継続保持とトークン出力制御
 
 **目的:** ゴースト制作者として、アクター行（`％`）を省略したシーンでも前回のスポット位置で再生を継続したい。これにより、アクター構成が変わらない連続会話で冗長な`％`行を省略できるようにしたい。
 
-#### 受入基準
-1. While アクターオブジェクトにspot値が設定されている状態で, when 新しいシーンが`％`アクター行なしで開始される場合, the pasta system shall 前回のspot値を保持し再利用する
-2. When `％`アクター行が明示的に記述されたシーンの場合, the pasta system shall そのシーンで指定されたアクター構成でスポット値を更新する
-3. The pasta system shall `act:clear_spot()`を`act:set_spot()`の出力と常にセットで生成し、`act:set_spot()`が1つも出力されない場合は`act:clear_spot()`も出力しない
-
-### 要件 3: トランスパイラのclear_spot出力制御
-
-**目的:** ゴースト制作者として、`％`アクター行がないシーンではスポットのリセットが発生しないようにしたい。これにより、前回スポットが意図せずリセットされる問題を解消したい。
+**設計決定（議題1の結論）:**
+- `STORE.actor_spots = {}` フィールドを追加してセッション全体でスポット状態を保持
+- `store.lua` 初期化時に `CONFIG.actor[name].spot` から初期値を転送
+- `sakura_builder.build()` は純粋関数を維持し、入力として `actor_spots` を受け取り、更新後の値を戻り値で返す
+- `SHIORI_ACT:build()` が STORE との入出力を仲介
 
 #### 受入基準
-1. When `__start__`ローカルシーンにアクター行（`actors`）が存在する場合, the code generator shall `act:clear_spot()`と`act:set_spot()`をセットで出力する
-2. When `__start__`ローカルシーンにアクター行（`actors`）が存在しない場合, the code generator shall `act:clear_spot()`も`act:set_spot()`も出力しない
-3. The code generator shall `act:clear_spot()`を単独で出力することはない（`act:set_spot()`が0件の場合は`act:clear_spot()`もスキップする）
+1. When `store.lua`が初期化される場合, the pasta system shall `CONFIG.actor`の各アクターの`spot`値を`STORE.actor_spots`に転送する
+2. When `sakura_builder.build()`が呼ばれる場合, the builder shall 入力として受け取った`actor_spots`マップを使用してアクターのスポット位置を決定する
+3. When `％`アクター行が明示的に記述されたシーンの場合, the pasta system shall `act:clear_spot()`と`act:set_spot()`をセットで出力し、`STORE.actor_spots`を更新する
+4. When `％`アクター行が省略されたシーンの場合, the pasta system shall `STORE.actor_spots`の前回値を維持したまま`sakura_builder.build()`に渡す
+5. The code generator shall `act:clear_spot()`を`act:set_spot()`と常にセットで生成し、`act:set_spot()`が1つも出力されない場合は`act:clear_spot()`も出力しない（**実装済み**: `code_generator.rs` L292-302で`!actors.is_empty()`ガード済み）
 
-### 要件 4: サンプルゴーストのコンフィグ設定
+### 要件 3: サンプルゴーストのコンフィグ設定
 
 **目的:** ゴースト制作者として、サンプルゴーストでアクターのデフォルトspot設定の実例を確認したい。これにより、自作ゴーストのコンフィグ設定の参考にできるようにしたい。
 
