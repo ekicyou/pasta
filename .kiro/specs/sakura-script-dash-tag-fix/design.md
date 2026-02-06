@@ -282,6 +282,11 @@ const SAKURA_TAG_PATTERN: &'static str = r"\\[0-9a-zA-Z_!+*?&-]+(?:\[[^\]]*\])?"
 
 新規ファイル `crates/pasta_core/tests/sakura_symbol_tag_test.rs` を作成:
 
+**ファイル配置の判断基準**:
+- 5文字すべてに対する体系的テストケース（7テスト関数）を1ファイルに集約
+- 理由: 将来の文字クラス拡張時の参照性を高める、テストカバレッジの確認を容易にする
+- 既存パターン準拠: `span_byte_offset_test.rs`, `actor_code_block_test.rs` と同様の機能別テストファイル構成
+
 | テスト名 | 入力 | 検証内容 | Req |
 |---------|------|---------|-----|
 | `test_parse_sakura_hyphen_tag` | `＊test\nAlice：\-` | `Action::SakuraScript` で `script == r"\-"` | 2.1, 2.2 |
