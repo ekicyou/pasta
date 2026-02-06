@@ -44,5 +44,5 @@
 1. When `＞チェイントーク` を1回含むシーンが `EVENT.fire` 経由で実行されたとき, the runtime shall コルーチンを2回 resume する（yield 前の出力 + yield 後の出力）。
 2. When コルーチンの1回目の resume が完了したとき, the runtime shall yield 前に蓄積されたトークンのみを中間出力として返す。
 3. When コルーチンの2回目の resume が完了したとき, the runtime shall yield 後に蓄積されたトークンを最終出力として返す。
-4. The integration test shall インテグレーションテストの実施方法（テスト用ゴーストの構成、EVENT.fire の呼び出し手順、結果の検証方法）を設計段階で検討・決定する。
+4. The integration test shall Lua BDD テストで EVENT.fire → yield の挙動を確認し、さらに Rust E2E テストで Pasta DSL → トランスパイル → 実行の一気通貫パイプラインを検証する。
 

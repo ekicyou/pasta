@@ -84,6 +84,17 @@
 - **Trade-offs**: Rust E2E による DSL→トランスパイル→実行の一気通貫検証は省略 → 既存の ACT_IMPL.call テスト + トランスパイラスナップショットでカバー済み
 - **Follow-up**: 設計で具体的なテストファイル名・構成を決定
 
+### Rust E2E テスト基盤の調査
+
+- **Context**: Pasta DSL → トランスパイル → 実行 の一気通貫テスト基盤が存在するか調査
+- **Sources Consulted**: `tests/runtime_e2e_test.rs`, `tests/common/e2e_helpers.rs`
+- **Findings**:
+  - **既存基盤**: `e2e_helpers.rs` に `create_runtime_with_finalize()` （Lua ランタイム初期化）、`transpile()` （Pasta → Lua 変換）が整備済み
+  - **既存テスト**: `runtime_e2e_test.rs` に `test_e2e_pipeline_basic()` など基本フローテストが存在
+  - **GLOBAL 関数テスト**: チェイントーク機能に特化した Rust E2E テストはまだ存在しない
+  - **スナップショットテスト**: 既存 E2E テストはトランスパイル出力の検証パターンに対応可能
+- **Implications**: GLOBAL.チェイントーク を含む Pasta シーン用テストフィクスチャ + Rust E2E テストケースを新規作成。既存ヘルパー関数をそのまま利用可能
+
 ## Risks & Mitigations
 - **Risk 1**: ユーザーが `GLOBAL.チェイントーク` を意図せず上書きしてしまう — `main.lua` での明示的代入のみなので低リスク。ドキュメントで注意喚起
 - **Risk 2**: 将来の GLOBAL 関数追加時にファイル肥大化 — 現時点では2関数のみ。増加時は別途モジュール分離を検討
@@ -93,3 +104,5 @@
 - [act.lua](crates/pasta_lua/scripts/pasta/act.lua) — ACT_IMPL.call, ACT_IMPL.yield 実装
 - [global.lua](crates/pasta_lua/scripts/pasta/global.lua) — GLOBAL テーブル（変更対象）
 - [integration_coroutine_test.lua](crates/pasta_lua/tests/lua_specs/integration_coroutine_test.lua) — 既存コルーチン統合テスト
+- [runtime_e2e_test.rs](crates/pasta_lua/tests/runtime_e2e_test.rs) — 既存 Rust E2E テスト（チェイントーク用拡張予定）
+- [e2e_helpers.rs](crates/pasta_lua/tests/common/e2e_helpers.rs) — E2E テスト共通ヘルパー（既存ユーティリティ）

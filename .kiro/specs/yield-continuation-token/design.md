@@ -107,7 +107,7 @@ sequenceDiagram
 | 3.1 | EVENT.fire 経由でコルーチン2回 resume | GlobalChainIntegrationTest | — | 継続トークフロー |
 | 3.2 | 1回目 resume の中間出力検証 | GlobalChainIntegrationTest | — | — |
 | 3.3 | 2回目 resume の最終出力検証 | GlobalChainIntegrationTest | — | — |
-| 3.4 | テスト実施方法の設計 | GlobalChainIntegrationTest | — | — |
+| 3.4 | Pasta DSL → トランスパイル → 実行の一気通貫検証 | RustE2EChainTest | — | — |
 
 ## Components and Interfaces
 
@@ -115,7 +115,8 @@ sequenceDiagram
 |-----------|--------------|--------|--------------|--------------------------|-----------|
 | GlobalModule | Runtime/Lua | GLOBAL テーブルへのデフォルト関数登録 | 1.1, 1.2 | ACT_IMPL.yield (P0) | State |
 | GlobalChainCallTest | Test/Lua BDD | GLOBAL.チェイントーク の call 解決と yield 動作検証 | 2.1, 2.2, 2.3, 2.4 | ACT, GLOBAL, SCENE (P0) | — |
-| GlobalChainIntegrationTest | Test/Lua BDD | EVENT.fire 経由のコルーチン分割検証 | 3.1, 3.2, 3.3, 3.4 | EVENT, STORE, GLOBAL (P0) | — |
+| GlobalChainIntegrationTest | Test/Lua BDD | EVENT.fire 経由のコルーチン分割検証 | 3.1, 3.2, 3.3 | EVENT, STORE, GLOBAL (P0) | — |
+| RustE2EChainTest | Test/Rust E2E | Pasta DSL → トランスパイル → 実行 の一気通貫検証 | 3.4 | transpile(), finalize_scene (P0) | — |
 
 ### Runtime / Lua
 
@@ -184,7 +185,7 @@ sequenceDiagram
 | Field | Detail |
 |-------|--------|
 | Intent | EVENT.fire 経由で GLOBAL.チェイントーク を含むシーンを実行し、コルーチン分割を検証 |
-| Requirements | 3.1, 3.2, 3.3, 3.4 |
+| Requirements | 3.1, 3.2, 3.3 |
 
 **Responsibilities & Constraints**
 - テストファイル: `tests/lua_specs/global_chain_integration_test.lua`
@@ -207,8 +208,7 @@ sequenceDiagram
 | 3 | 2回目 resume の最終出力検証 | yield 後に蓄積されたトークンが返る | 3.3 |
 | 4 | STORE.co_scene のライフサイクル | 1回目後: suspended、2回目後: nil（完了） | 3.1 |
 
-**テスト構成方針** (3.4)
-
+**テスト構成方針**:
 EVENT.fire のハンドラーとして、GLOBAL.チェイントーク を内部的に呼び出すシーン関数を `REG.OnChainTest` に登録する。ハンドラーは `coroutine.create(function(act) ... end)` でコルーチンを返し、その中で `GLOBAL.チェイントーク(act)` を呼ぶ。`integration_coroutine_test.lua` と同一のテストパターンに従う。
 
 ## Testing Strategy
@@ -222,10 +222,27 @@ EVENT.fire のハンドラーとして、GLOBAL.チェイントーク を内部�
 | 3 | yield 動作 | コルーチン内での yield/resume サイクル |
 | 4 | トークン蓄積 | yield 前のトークンが正しく出力 |
 
-### Lua BDD 統合テスト（Req 3）
+### Lua BDD 統合テスト（Req 3 — Lua 層）
 
 | # | テスト対象 | 検証内容 |
 |---|-----------|---------|
 | 1 | EVENT.fire + yield | コルーチン分割（2回 resume） |
 | 2 | 中間/最終出力 | 各 resume の出力内容 |
 | 3 | STORE.co_scene | コルーチン状態のライフサイクル |
+
+### Rust E2E テスト（Req 3 — 一気通貫検証）
+
+チェイントーク機能の Pasta DSL → トランスパイル → 実行 の一気通貫テストを実装。既存の `runtime_e2e_test.rs` に新規テストケースを追加して、以下を検証：
+
+| # | テスト対象 | 検証内容 |
+|---|-----------|---------|
+| 1 | Pasta DSL `＞チェイントーク` の解析・トランスパイル | `＞チェイントーク` が `act:call(...)` に正しく変換される |
+| 2 | トランスパイル後の Lua コード実行 | 変換されたコードが Lua ランタイムで正常に実行される |
+| 3 | GLOBAL テーブル L3 解決 | `act:call` が GLOBAL.チェイントーク を見つけて実行する |
+| 4 | コルーチン yield との統合 | EVENT.fire 経由で1回目・2回目 resume の出力が正しく分割される |
+
+**テスト構成方針**:
+- 新規 Pasta DSL テストフィクスチャ: `runtime_e2e_scene_chaintalk.pasta` （チェイントーク呼び出しを含むシーン）
+- `runtime_e2e_test.rs` に `test_e2e_chaintalk_transpile_and_execute()` を追加
+- 従来の E2E ヘルパー（`create_runtime_with_finalize()`, `transpile()`）を利用
+- スナップショットテスト（`runtime_e2e_scene_chaintalk.lua` expected output）で トランスパイル出力を検証
