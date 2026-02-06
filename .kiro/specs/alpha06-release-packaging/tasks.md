@@ -24,27 +24,27 @@ Use whichever pattern fits the work breakdown:
 
 ## Implementation Tasks
 
-- [ ] 1. release.bat 実装
+- [x] 1. release.bat 実装
   - PowerShell スクリプト起動ラッパースクリプトを作成
   - ダブルクリック実行可能な Windows バッチファイルとして実装
   - `release.ps1` を `-ExecutionPolicy Bypass` フラグ付きで起動
   - エラー時は一時停止してメッセージを表示（`pause`）
   - _Requirements: 1.3_
 
-- [ ] 2. release.ps1 コアロジック実装
-- [ ] 2.1 (P) バージョン確認機能を実装
+- [x] 2. release.ps1 コアロジック実装
+- [x] 2.1 (P) バージョン確認機能を実装
   - ワークスペースルート `Cargo.toml` から `workspace.package.version` を読み取り
   - バージョン文字列を `v<version>` 形式のタグ名に変換（例: `v0.1.1`）
   - バージョン情報を画面に表示（リリース作業のための確認情報）
   - _Requirements: 2.2, 2.3_
 
-- [ ] 2.2 (P) 配布物検証機能を実装
+- [x] 2.2 (P) 配布物検証機能を実装
   - `ghosts/hello-pasta/` 配下の必須ファイルを `Test-Path` でチェック
   - 検証対象: `ghost/master/pasta.dll`, `pasta.toml`, `descript.txt`, `dic/*.pasta`, `scripts/`, `shell/master/`, `install.txt`, `updates.txt`, `updates2.dau`
   - いずれかのファイルが見つからない場合、エラーメッセージを表示して中断
   - _Requirements: 4.1, 4.2_
 
-- [ ] 2.3 .nar 生成機能を実装
+- [x] 2.3 .nar 生成機能を実装
   - 一時ディレクトリ作成（`temp_release/`）
   - `robocopy /MIR /XD profile /XF *.bak *.tmp` で `ghosts/hello-pasta/` を一時ディレクトリにコピー
   - `Compress-Archive` で一時ディレクトリを ZIP 圧縮（`hello-pasta.zip`）
@@ -53,7 +53,7 @@ Use whichever pattern fits the work breakdown:
   - 一時ディレクトリをクリーンアップ（`Remove-Item -Recurse -Force`）
   - _Requirements: 1.1, 1.2_
 
-- [ ] 2.4 リリース手順表示機能を実装
+- [x] 2.4 リリース手順表示機能を実装
   - `.nar` 生成完了メッセージを表示
   - 次のステップガイドを表示:
     - 確認すべきバージョン番号（2.1 で取得した値）
@@ -61,7 +61,7 @@ Use whichever pattern fits the work breakdown:
     - `RELEASE.md` を参照して AI と相談しながらリリースする旨の案内
   - _Requirements: 2.1, 2.4_
 
-- [ ] 3. RELEASE.md 作成 (P)
+- [x] 3. RELEASE.md 作成 (P)
   - AI ガイド付きリリース作業手順書を `crates/pasta_sample_ghost/RELEASE.md` に作成
   - リリースノート本文テンプレートを含める:
     - バージョン番号（プレースホルダー `{VERSION}`）
@@ -75,7 +75,7 @@ Use whichever pattern fits the work breakdown:
   - AI と相談しながらリリースする旨の手順を明記
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 3.1, 3.2, 3.3, 3.4_
 
-- [ ] 4. release.ps1 統合テスト
+- [x] 4. release.ps1 統合テスト
   - `setup.bat` を実行して `ghosts/hello-pasta/` を生成
   - `release.bat` をダブルクリック実行し、`hello-pasta.nar` が正常に生成されることを確認
   - `.nar` ファイルを展開（ZIP として）し、以下を検証:

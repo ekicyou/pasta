@@ -9,6 +9,7 @@
 
 local EVENT = require "pasta.shiori.event"
 local RES = require "pasta.shiori.res"
+local GLOBAL = require "pasta.global"
 
 -- グローバル SHIORI テーブルを初期化（既存の場合は維持）
 SHIORI = SHIORI or {}
