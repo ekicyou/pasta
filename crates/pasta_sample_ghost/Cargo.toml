@@ -1,10 +1,11 @@
 [package]
 name = "pasta_sample_ghost"
-version = "0.1.0"
+version.workspace = true
 description = "Sample ghost implementation for pasta - hello-pasta"
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
+publish = false
 
 # メインバイナリ：ゴースト配布物生成ツール
 [[bin]]

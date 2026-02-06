@@ -6,14 +6,15 @@ members = ["crates/*"]
 resolver = "2"
 
 [workspace.package]
+version = "0.1.0"
 edition = "2024"
 authors = ["Dot-Station Master <dot.station@gmail.com>"]
 license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
 # pasta_core dependencies
-pest = "2.8"
-pest_derive = { version = "2.8", features = ["grammar-extras"] }
+pest = "2.8.6"
+pest_derive = { version = "2.8.6", features = ["grammar-extras"] }
 thiserror = "2"
 fast_radix_trie = "1.1.0"
 rand = "0.9"
@@ -21,27 +22,27 @@ tracing = "0.1"
 
 # Development dependencies
 tempfile = "3"
-insta = { version = "1.42", features = ["glob"] }
+insta = { version = "1.46.3", features = ["glob"] }
 
 # pasta_lua dependencies
 lua-src = { version = ">= 550.0.0, < 560.0.0", features = ["ucid"] }
 mlua = { version = "0.11", features = ["lua55", "vendored", "serialize"] }
 mlua-stdlib = { version = "0.1", features = ["json", "regex", "yaml"] }
-regex = "1"
+regex = "1.12.3"
 toml = "0.9.8"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 glob = "0.3"
-flate2 = "1.1"
+flate2 = "1.1.9"
 
 # Logging dependencies
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-appender = "0.2"
 
 # Internal dependencies
-pasta_core = { path = "crates/pasta_core" }
-pasta_lua = { path = "crates/pasta_lua" }
-pasta_shiori = { path = "crates/pasta_shiori" }
+pasta_core = { path = "crates/pasta_core", version = "0.1.0" }
+pasta_lua = { path = "crates/pasta_lua", version = "0.1.0" }
+pasta_shiori = { path = "crates/pasta_shiori", version = "0.1.0" }
 
 # Release profile optimizations for size reduction
 [profile.release]
