@@ -2,161 +2,168 @@
 
 ## Introduction
 
-本仕様は pasta アルファリリースに向けた **x86 配布パッケージ作成とリリースワークフロー** を定義する。
+本仕様は pasta のサンプルゴースト「hello-pasta」をリリース配布物として提供するワークフローを定義する。
 
 ### 背景
 
 - **親仕様**: alpha-release-planning（アルファリリース計画）
-- **依存**: alpha01〜05 全て（最終パッケージ）
-- **目的**: テスターに配布可能なアルファ版パッケージを作成し、GitHub Releases で公開
-- **既存CI基盤**: `.github/workflows/build.yml`（x86/x64 マトリックスビルド、アーティファクト `pasta-dll-x86` 出力済み）
+- **依存**: alpha01〜05 全て（リリース基盤）
+- **目的**: hello-pasta ゴースト（`.nar` 形式）を GitHub Releases で公開し、テスターが SSP で直接インストール可能な状態を実現
+- **既存基盤**: `setup.bat`（ゴースト配布物生成）、GitHub CLI（リリース公開）
 
 ### リリース成果物
 
-- **pasta.dll** (x86): SHIORI DLL（`pasta_shiori` クレート、`i686-pc-windows-msvc` ターゲット）
-- **サンプルゴースト**: alpha04 で作成した hello-pasta ゴースト（`pasta_sample_ghost` クレート）
-- **ドキュメント**: インストール手順、動作確認方法、リリースノート
+- **hello-pasta.nar**: サンプルゴースト配布ファイル（`.nar` = `.zip` 形式）
+  - pasta.dll (x86)、pasta.toml、pasta DSL スクリプト、Lua ランタイム、シェル画像を含む
+- **GitHub Releases**: リリース本文にドキュメント（インストール手順、動作確認方法）を記載
 
 ---
 
 ## Requirements
 
-### Requirement 1: パッケージ構成
+### Requirement 1: ゴースト配布物（.nar）の構成
 
-**Objective:** As a テスター, I want 展開するだけで動作するパッケージがほしい, so that 簡単に試せる
+**Objective:** As a テスター, I want SSP にそのまま展開できるゴースト配布ファイルがほしい, so that インストール作業を簡略化したい
 
 #### Acceptance Criteria
 
-1. The リリースワークフロー shall 以下のディレクトリ構成で ZIP パッケージを作成する:
+1. The リリースプロセス shall 以下のディレクトリ構成で `.nar` ファイルを生成する:
    ```
-   pasta-v0.1.0-alpha.1-x86/
-   ├── README.md           # インストール手順
-   ├── LICENSE             # MIT OR Apache-2.0 ライセンス
-   ├── ghost/
-   │   └── hello-pasta/    # サンプルゴースト
-   │       ├── ghost/master/
-   │       │   ├── pasta.dll    # SHIORI DLL (x86)
-   │       │   ├── pasta.toml   # 設定ファイル
-   │       │   ├── dic/         # Pasta DSL スクリプト
-   │       │   └── scripts/     # Lua スクリプト
-   │       └── shell/master/    # シェル画像
-   └── docs/
-       └── QUICKSTART.md   # 動作確認手順
+   hello-pasta.nar（内部構成）
+   ├── ghost/master/
+   │   ├── pasta.dll    # SHIORI DLL (x86, i686-pc-windows-msvc)
+   │   ├── pasta.toml   # 設定ファイル
+   │   ├── descript.txt # ゴースト設定（自動生成）
+   │   ├── dic/         # Pasta DSL スクリプト
+   │   │   ├── boot.pasta
+   │   │   ├── talk.pasta
+   │   │   ├── click.pasta
+   │   │   └── actors.pasta
+   │   └── scripts/     # Lua ランタイム（pasta_lua）
+   ├── shell/master/
+   │   ├── descript.txt # シェル設定（自動生成）
+   │   ├── surfaces.txt # サーフェス定義
+   │   └── surface*.png # ピクトグラム画像（18ファイル）
+   ├── install.txt      # インストール情報（自動生成）
+   ├── updates.txt      # 更新情報（自動生成）
+   └── updates2.dau     # 更新情報バイナリ（自動生成）
    ```
-2. The リリースワークフロー shall x86 (32bit, `i686-pc-windows-msvc`) アーキテクチャのみを配布対象とする
-3. The ZIP ファイル名 shall `pasta-v<version>-x86.zip` 形式に従う
+2. The リリースプロセス shall `setup.bat` 実行により自動生成される `ghosts/hello-pasta/` ディレクトリをそのまま ZIP 圧縮し、`.nar` 拡張子に変更する
+3. The `.nar` ファイル名 shall `hello-pasta.nar` とする
 
 ---
 
-### Requirement 2: バージョン体系
+### Requirement 2: バージョン管理
 
-**Objective:** As a 配布担当者, I want 一貫したバージョン番号を使いたい, so that リリース管理ができる
+**Objective:** As a 配布担当者, I want バージョン管理を単純にしたい, so that ビルド・リリース手順が明確である
 
 #### Acceptance Criteria
 
-1. The リリースワークフロー shall セマンティックバージョニング（SemVer）に準拠したバージョン体系を採用する
-2. The アルファ版バージョン shall `0.1.x-alpha.N` 形式とする（N = リリース番号）
-3. The リリースワークフロー shall Git タグ（`v0.1.0-alpha.1` 等）からバージョン文字列を取得する
-4. When タグのバージョンと `Cargo.toml` の `workspace.package.version` が不一致の場合, the リリースワークフロー shall ビルドを失敗させる
+1. The ゴースト shall Cargo.toml の `workspace.package.version` に従うバージョンを使用する
+2. The リリースタグ shall `v<version>` 形式とする（例：`v0.1.1`）
+3. The タグのバージョン shall Cargo.toml の `workspace.package.version` と一致していること（リリース前に確認）
 
 ---
 
-### Requirement 3: GitHub Releases ワークフロー
+### Requirement 3: ゴースト配布物の生成プロセス
 
-**Objective:** As a 配布担当者, I want タグ push でリリースが自動作成されてほしい, so that 手動作業を減らせる
+**Objective:** As a 配布担当者, I want ゴースト配布物を確実に生成したい, so that 品質保証ができる
 
 #### Acceptance Criteria
 
-1. The リリースワークフロー shall `.github/workflows/release.yml` として GitHub Actions ワークフローを定義する
-2. When `v*` パターンに一致するタグが push された場合, the リリースワークフロー shall 自動的にリリースプロセスを開始する
-3. The リリースワークフロー shall 以下のステップを順序通り実行する:
-   - Rust ツールチェーンのセットアップ（`i686-pc-windows-msvc` ターゲット）
+1. The ゴースト生成プロセス shall 以下のステップで構成される:
    - `cargo build --release --target i686-pc-windows-msvc -p pasta_shiori` による x86 DLL ビルド
-   - `pasta_sample_ghost` クレートによるサンプルゴースト成果物の収集
-   - ドキュメント（README.md, LICENSE, QUICKSTART.md）の配置
-   - ZIP パッケージの作成
-   - GitHub Releases へのアップロード（タグに対応するリリースを作成）
-4. The リリースワークフロー shall 既存の `build.yml` と同じ Rust キャッシュ戦略（`Swatinem/rust-cache@v2`）を使用する
-5. The リリースワークフロー shall リリースページに ZIP ファイルをアセットとして添付する
-6. Where タグ名に `alpha` または `beta` が含まれる場合, the リリースワークフロー shall GitHub Releases をプレリリースとしてマークする
+   - `cargo run -p pasta_sample_ghost` によるゴーストファイル生成（dic/, shell/, 設定ファイル）
+   - `cargo run -p pasta_sample_ghost -- --finalize` による更新ファイル生成（updates.txt, updates2.dau）
+   - DLL コピー：`target/i686-pc-windows-msvc/release/pasta.dll` → `ghosts/hello-pasta/ghost/master/pasta.dll`
+   - Lua ランタイムコピー：`crates/pasta_lua/scripts` → `ghosts/hello-pasta/ghost/master/scripts`
+2. The ステップ実行順序 shall `setup.bat` に準拠する
+3. The 生成されたゴースト shall `ghosts/hello-pasta/` ディレクトリに配置される
 
 ---
 
-### Requirement 4: README ドキュメント（パッケージ同梱）
+### Requirement 4: GitHub Releases への公開
 
-**Objective:** As a テスター, I want インストール方法がわかりやすく書かれていてほしい, so that 迷わず試せる
+**Objective:** As a テスター, I want ゴースト配布ファイルを GitHub から入手したい, so that 最新版をダウンロードできる
 
 #### Acceptance Criteria
 
-1. The リリースワークフロー shall パッケージ内 README.md に以下のセクションを含める:
-   - **概要**: pasta とは何か（SHIORI DLL スクリプトエンジン）
-   - **動作環境**: SSP（伺か標準ベースウェア）2.x 以上、Windows x86
-   - **インストール手順**: ZIP 展開 → SSP のゴーストフォルダにコピー
-   - **動作確認方法**: ゴースト切り替え → 起動確認
-   - **ライセンス**: MIT OR Apache-2.0
-   - **問い合わせ先**: GitHub リポジトリ URL
-2. The README shall 日本語で記述する
-3. The README shall パッケージのバージョン番号を明記する
+1. The リリース公開 shall GitHub CLI（`gh release create`）を使用して実行される
+2. The 実行コマンド shall 以下の形式：
+   ```
+   gh release create <tag> hello-pasta.nar --notes-file RELEASE_NOTES.md
+   ```
+3. The GitHub Releases ページ shall `.nar` ファイルをアセットとして添付する
+4. The リリース本文 shall リリースノートテンプレートの内容を含める
 
 ---
 
-### Requirement 5: QUICKSTART ドキュメント
+### Requirement 5: リリースノート
 
-**Objective:** As a 初心者, I want 最短で動作確認したい, so that pasta を評価できる
-
-#### Acceptance Criteria
-
-1. The リリースワークフロー shall `docs/QUICKSTART.md` をパッケージに含める
-2. The QUICKSTART shall 以下のセクションを含める:
-   - **前提条件**: SSP インストール済みであること
-   - **手順**: 3ステップ以内で動作確認できる手順（展開→コピー→起動）
-   - **期待される動作**: サンプルゴーストの起動時の表示内容
-   - **トラブルシューティング**: よくある問題と対処法（DLL 読み込みエラー、文字化け等）
-3. The QUICKSTART shall 日本語で記述する
-
----
-
-### Requirement 6: リリースノート
-
-**Objective:** As a ユーザー, I want 変更点を知りたい, so that 新機能を把握できる
+**Objective:** As a ユーザー, I want リリース内容を理解したい, so that pasta の機能を把握できる
 
 #### Acceptance Criteria
 
-1. The リリースワークフロー shall GitHub Releases のリリース本文にリリースノートを含める
-2. The リリースノート shall 以下のセクションを含める:
+1. The リリースノートテンプレート shall `.kiro/templates/release_notes.md` として管理される
+2. The テンプレート shall 以下のセクションを含める:
+   - **バージョン**: 公開バージョン（例：0.1.1）
+   - **リリース日**: リリース日付
    - **概要**: リリースの一言説明
-   - **新機能一覧**: 実装された機能のリスト
-   - **既知の問題**: 未解決の制限事項
-   - **今後の予定**: 次のリリースで予定している機能
-3. The リリースノート shall テンプレートファイルとして管理する
-4. The リリースノート shall 日本語で記述する
+   - **含まれるコンポーネント**: pasta.dll, hello-pasta ゴースト、各バージョン情報
+   - **必要環境**: SSP 2.x 以上、Windows x86
+   - **インストール方法**: `.nar` ファイルを SSP のゴーストフォルダにコピー
+   - **動作確認方法**: ゴースト切り替え手順
+   - **既知の問題**: 制限事項、推奨環境
+   - **フィードバック**: GitHub Issues への誘導
+3. The テンプレート shall 日本語で記述する
 
 ---
 
-### Requirement 7: 成果物検証
+### Requirement 6: インストール・動作確認ドキュメント
 
-**Objective:** As a 配布担当者, I want パッケージが正しく動作することを確認したい, so that 不具合を防げる
+**Objective:** As a 初心者, I want インストール手順を明確に理解したい, so that スムーズにセットアップできる
 
 #### Acceptance Criteria
 
-1. The リリースワークフロー shall ZIP パッケージ作成後にサニティチェックを実行する
-2. The サニティチェック shall 以下の項目を検証する:
-   - `pasta.dll` が ZIP 内の正しいパスに存在すること
-   - `pasta.toml` が有効な TOML 形式であること
-   - シェル画像ファイル（`shell/master/` 配下）が存在すること
-   - `README.md` および `LICENSE` がパッケージルートに存在すること
-3. If サニティチェックのいずれかが失敗した場合, the リリースワークフロー shall ビルドをエラー終了させ、GitHub Releases へのアップロードを行わない
+1. The インストール手順 shall GitHub Releases の説明欄に含められる
+2. The 手順 shall 以下を記載：
+   - `.nar` ファイルの入手先（GitHub Releases）
+   - SSP のゴーストフォルダパス（`%ProgramFiles%\SSP\ghost\` または `~\SSP\ghost\` 等）
+   - ファイルコピー手順（ドラッグ＆ドロップ、またはコマンドライン）
+3. The 動作確認手順 shall 以下を記載：
+   - SSP の「ゴースト選択」画面で hello-pasta を選択
+   - ゴースト起動・キャラクター表示の確認
+   - トラブルシューティング（DLL 読み込みエラー、文字化け等）
+
+---
+
+### Requirement 7: ゴースト配布物の検証
+
+**Objective:** As a 配布担当者, I want 配布前に品質確認したい, so that ユーザーへの不具合配布を防げる
+
+#### Acceptance Criteria
+
+1. The サニティチェック shall リリース前に `ghosts/hello-pasta/` に対して実行される
+2. The チェック項目 shall 以下を含める:
+   - `ghost/master/pasta.dll` が存在し、ファイルサイズが 0 でないこと
+   - `ghost/master/pasta.toml` が有効な TOML 形式であること
+   - `ghost/master/dic/` 配下に `.pasta` ファイルが 4 ファイル存在すること
+   - `ghost/master/scripts/` 配下に Lua ランタイムファイルが存在すること
+   - `shell/master/` 配下に `surface*.png` ファイルが存在すること
+   - `install.txt`, `updates.txt`, `updates2.dau` が存在すること
+3. If いずれかのチェックが失敗した場合, the リリースプロセス shall 中断し、エラー通知を出す
 
 ---
 
 ## Out of Scope
 
-- x64 配布パッケージ（将来対応）
-- 自動更新機能（ネットワークアップデート）
+- x64 版リリース（将来対応）
+- 自動更新機能（SSP ネイティブの更新チェック）
 - インストーラー（.msi, .exe）
-- 多言語ドキュメント（英語版等）
-- crates.io への公開（別途管理）
-- サイン・署名付きバイナリ
+- 多言語ドキュメント
+- 署名付きバイナリ
+- crates.io への公開（別途仕様）
+- GitHub Actions による完全自動化（手動実行が基本）
 
 ---
 
@@ -164,10 +171,10 @@
 
 | 用語 | 説明 |
 |------|------|
-| GitHub Releases | GitHub のリリース機能（バイナリ配布・リリースノート） |
-| セマンティックバージョニング (SemVer) | `MAJOR.MINOR.PATCH[-prerelease]` 形式のバージョン体系 |
-| SSP | 伺か標準ベースウェア（ukagaka.github.io）。デスクトップマスコットの実行環境 |
-| SHIORI DLL | SSP が読み込む対話エンジン。pasta.dll がこれに該当 |
-| サニティチェック | パッケージの基本的な構成検証テスト |
+| `.nar` ファイル | ZIP ファイルを `.nar` 拡張子に変更したもの。伺か ゴースト配布形式 |
+| GitHub Releases | GitHub のリリース機能。バイナリ配布・変更履歴公開に使用 |
+| GitHub CLI (`gh`) | GitHub をコマンドラインから操作するツール。`gh release create` でリリース公開可能 |
+| SSP | 伺か標準ベースウェア。デスクトップマスコット実行環境 |
+| SHIORI DLL | SSP が読み込む対話エンジン DLL。pasta.dll がこれに該当 |
 | hello-pasta | `pasta_sample_ghost` クレートで生成されるサンプルゴースト |
-| `i686-pc-windows-msvc` | Windows 32bit (x86) 向け Rust ターゲットトリプル |
+| セマンティックバージョニング | `MAJOR.MINOR.PATCH` 形式のバージョン体系 |
