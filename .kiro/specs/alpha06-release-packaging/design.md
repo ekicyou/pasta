@@ -119,7 +119,7 @@ sequenceDiagram
 
 **Responsibilities & Constraints**
 - `ghosts/hello-pasta/` の検証（必須ファイル存在確認）
-- `profile/` 除外付き ZIP 圧縮 → `.nar` リネーム
+- `profile/` 除外、`*.bak`, `*.tmp` 除外付き ZIP 圧縮 → `.nar` リネーム
 - `Cargo.toml` からバージョン読み取り → タグ名生成
 - `gh release create` の実行（ドライラン対応）
 
@@ -149,6 +149,7 @@ sequenceDiagram
 **Implementation Notes**
 - **Integration**: `setup.bat` 実行完了後に `release.ps1` を実行するリニア手順
 - **Validation**: ファイル存在チェック（`Test-Path`）。TOML パースは不要（存在確認のみ）
+- **Exclusion**: `robocopy /MIR /XD profile /XF *.bak *.tmp` で実行時生成物を除外
 - **Risks**: `Compress-Archive` の ZIP 形式が SSP と非互換の可能性（初回検証で確認）
 
 ### ドキュメント

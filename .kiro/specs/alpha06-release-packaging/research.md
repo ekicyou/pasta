@@ -56,8 +56,8 @@
 - **Alternatives Considered**:
   1. `Compress-Archive` + 一時ディレクトリ方式
   2. `robocopy` で除外コピー → ZIP
-- **Selected Approach**: `robocopy /MIR /XD profile` で一時ディレクトリにコピー → `Compress-Archive` → リネーム
-- **Rationale**: `robocopy` の `/XD` オプションで簡潔に除外可能。PowerShell ネイティブで完結。
+- **Selected Approach**: `robocopy /MIR /XD profile /XF *.bak *.tmp` で一時ディレクトリにコピー → `Compress-Archive` → リネーム
+- **Rationale**: `robocopy` の `/XD` オプションでディレクトリ除外、`/XF` でファイルパターン除外が可能。PowerShell ネイティブで完結。
 
 ## Risks & Mitigations
 - `Compress-Archive` の ZIP 形式が SSP と互換性がない可能性 → 初回リリース時に SSP でインストール検証を実施
