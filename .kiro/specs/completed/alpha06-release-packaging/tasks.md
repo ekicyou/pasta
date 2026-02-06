@@ -86,7 +86,7 @@ Use whichever pattern fits the work breakdown:
   - リリース手順表示の内容が正しいこと（バージョン、コマンド例）
   - _Requirements: 1.1, 1.2, 4.1_
 
-- [ ]* 5. SSP インストール検証
+- [x]* 5. SSP インストール検証
   - 生成した `hello-pasta.nar` を SSP にドラッグ＆ドロップ
   - SSP のゴースト一覧に hello-pasta が表示されることを確認（1.2）
   - ゴーストを切り替えて会話が正常に動作することを確認（3.3）
