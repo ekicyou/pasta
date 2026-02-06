@@ -5,6 +5,9 @@ edition.workspace = true
 authors.workspace = true
 license.workspace = true
 description = "SHIORI DLL interface for pasta script engine"
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
 
 [lib]
 name = "pasta"

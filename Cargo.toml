@@ -6,10 +6,13 @@ members = ["crates/*"]
 resolver = "2"
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 authors = ["Dot-Station Master <dot.station@gmail.com>"]
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/ekicyou/pasta"
+homepage = "https://github.com/ekicyou/pasta"
+documentation = "https://github.com/ekicyou/pasta"
 
 [workspace.dependencies]
 # pasta_core dependencies
@@ -40,9 +43,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-appender = "0.2"
 
 # Internal dependencies
-pasta_core = { path = "crates/pasta_core", version = "0.1.0" }
-pasta_lua = { path = "crates/pasta_lua", version = "0.1.0" }
-pasta_shiori = { path = "crates/pasta_shiori", version = "0.1.0" }
+pasta_core = { path = "crates/pasta_core", version = "0.1.1" }
+pasta_lua = { path = "crates/pasta_lua", version = "0.1.1" }
+pasta_shiori = { path = "crates/pasta_shiori", version = "0.1.1" }
 
 # Release profile optimizations for size reduction
 [profile.release]

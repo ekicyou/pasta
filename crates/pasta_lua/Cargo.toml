@@ -6,6 +6,9 @@ authors.workspace = true
 license.workspace = true
 publish = true
 description = "Pasta Lua - Lua integration for Pasta DSL"
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
 
 [dependencies]
 pasta_core.workspace = true

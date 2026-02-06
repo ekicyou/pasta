@@ -6,6 +6,9 @@ edition.workspace = true
 authors.workspace = true
 license.workspace = true
 publish = false
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
 
 # メインバイナリ：ゴースト配布物生成ツール
 [[bin]]

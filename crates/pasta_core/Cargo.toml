@@ -6,6 +6,9 @@ authors.workspace = true
 license.workspace = true
 publish = true
 description = "Pasta Core - Language-independent DSL parsing and registry layer"
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
 
 [dependencies]
 pest.workspace = true
