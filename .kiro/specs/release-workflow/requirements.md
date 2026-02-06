@@ -46,8 +46,8 @@
 4. If 開発者が提案バージョンを承認しない, the Release Workflow shall 開発者に希望するバージョン番号の入力を求める
 5. When バージョン番号が提供される, the Release Workflow shall semver 形式（例: `1.2.0`）として妥当性を検証する
 6. If バージョン番号が semver 形式でない, the Release Workflow shall エラーを報告し再入力を求める
-7. When リリース作業が開始される, the Release Workflow shall `git status` でワークツリーがクリーンであることを確認する
-8. If 未コミットの変更が存在する, the Release Workflow shall リリース作業を中止し、先にコミットまたはスタッシュするよう開発者に通知する
+7. When リリース作業が開始される, the Release Workflow shall `git status` でワークツリーに未コミットの変更があるか確認する
+8. If 未コミットの変更が存在する, the Release Workflow shall すべての変更を `chore(release): prepare release vX.Y.Z` メッセージでコミットする（これにより後続のロールバック操作を安全にする）
 9. When リリース作業が開始される, the Release Workflow shall `cargo test --all` を実行し全テストが通過することを確認する
 10. If テストが失敗する, the Release Workflow shall リリース作業を中止し失敗内容を報告する
 
@@ -60,7 +60,7 @@
 1. When バージョン番号が確定する, the Release Workflow shall `Cargo.toml`（ワークスペースルート）の `[workspace.package].version` フィールドを新バージョンに更新する
 2. When ワークスペースバージョンが更新される, the Release Workflow shall `[workspace.dependencies]` セクション内の内部クレート参照（`pasta_core`, `pasta_lua`, `pasta_shiori`）の `version` フィールドも同じバージョンに更新する
 3. When Cargo.toml が更新される, the Release Workflow shall `cargo build --workspace` を実行しビルドが成功することを確認する（これにより後続の `cargo publish` 失敗リスクを最小化する）
-4. If ビルドが失敗する, the Release Workflow shall 変更をロールバックしエラーを報告する
+4. If ビルドが失敗する, the Release Workflow shall `git restore Cargo.toml` で変更をロールバックし、エラーを報告する
 5. When ビルドが成功する, the Release Workflow shall バージョン更新を `chore(release): bump version to vX.Y.Z` メッセージでコミットする
 
 ### Requirement 3: crates.io 公開
