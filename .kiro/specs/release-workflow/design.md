@@ -130,11 +130,10 @@ sequenceDiagram
     participant GH as GitHub
 
     Note over Dev,GH: Phase 0: 前提条件確認
-    LLM->>Term: Test-Path credentials.toml
-    Term-->>LLM: 結果
-    alt 認証トークン未設定
-        LLM->>Dev: cargo login のガイダンス提示
-        Dev-->>LLM: トークン設定完了
+    LLM->>Term: gh auth status
+    alt gh 認証未設定
+        LLM->>Dev: gh auth login のガイダンス提示
+        Dev-->>LLM: 認証完了
     end
 
     Note over Dev,GH: Phase 1: 事前検証
