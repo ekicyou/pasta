@@ -30,7 +30,7 @@ pasta.tomlやboot.pastaなどのファイルは、pasta_sample_ghostクレート
 #### Acceptance Criteria
 
 1. When release.ps1 がゴースト配布物を構築する際, the release script shall 専用ディレクトリ内の `.pasta` ファイルを `ghosts/hello-pasta/ghost/master/dic/` にコピーする。
-2. The `scripts.rs` module shall `.pasta` ファイルの内容をハードコードした定数として保持せず、`include_str!` マクロで専用ディレクトリの外部ファイルから読み込む方式、またはRustコード生成を廃止して xcopy のみに依存する方式のいずれかを採用する。
+2. The `scripts.rs` module shall `.pasta` ファイルの内容をハードコードした定数として保持せず、テスト実行時は専用ディレクトリの外部ファイルを直接読み込む方式を採用する（`cargo run` はテキストファイル生成を行わない）。
 
 ### Requirement 3: 設定ファイルの外部ファイル化
 
@@ -44,15 +44,17 @@ pasta.tomlやboot.pastaなどのファイルは、pasta_sample_ghostクレート
 4. The shell/master/descript.txt shall テンプレート置換済みの完成形として専用ディレクトリに配置される。
 5. The surfaces.txt shall 専用ディレクトリに完成形として配置される。
 
-### Requirement 4: release.ps1 の xcopy 統合
+### Requirement 4: release.ps1 の xcopy 統合と実行フロー
 
-**Objective:** As a リリース担当者, I want release.ps1 がテキスト系ファイルを専用ディレクトリから xcopy（robocopy）でコピーすること, so that Rustコード実行なしに配布物を構築できる。
+**Objective:** As a リリース担当者, I want release.ps1 がテキスト系ファイルを専用ディレクトリから xcopy（robocopy）でコピーし、その後に画像生成を実行すること, so that 正しい順序で配布物を構築できる。
 
 #### Acceptance Criteria
 
-1. When release.ps1 が実行される際, the release script shall 専用ディレクトリの内容を `ghosts/hello-pasta/` に robocopy（ミラーリングまたはコピー）する。
-2. The release script shall 既存の pasta.dll コピーおよび scripts/ コピーと同じ Step 3 内で、テキストファイルのコピーを実行する。
-3. If 専用ディレクトリが存在しない場合, the release script shall エラーメッセージを表示して処理を中断する。
+1. When release.ps1 が実行される際, the release script shall テキストファイルのコピー → 画像生成 → DLL/scripts コピー → finalize の順序で実行する。
+2. The release script shall 専用ディレクトリの内容を `ghosts/hello-pasta/` に robocopy（ミラーリングまたはコピー）する（pasta.dll ビルド直後、画像生成前に実行）。
+3. The release script shall 画像生成（`cargo run -p pasta_sample_ghost`）をテキストコピー後に実行する。
+4. The release script shall 既存の pasta.dll コピーおよび scripts/ コピーを画像生成後に実行する。
+5. If 専用ディレクトリが存在しない場合, the release script shall エラーメッセージを表示して処理を中断する。
 
 ### Requirement 5: 既存テストの維持
 
@@ -71,4 +73,5 @@ pasta.tomlやboot.pastaなどのファイルは、pasta_sample_ghostクレート
 #### Acceptance Criteria
 
 1. The `image_generator.rs` module shall 既存のRustコードによる動的画像生成を維持する。
-2. The surface*.png files shall 引き続き `cargo run -p pasta_sample_ghost` 実行時にRustコードで生成される。
+2. The `cargo run -p pasta_sample_ghost` command shall テキストファイル生成を廃止し、画像生成（surface*.png）のみを実行する。
+3. The surface*.png files shall release.ps1 がテキストをコピーした後、`cargo run` 実行時にRustコードで生成される。
