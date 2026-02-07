@@ -23,8 +23,8 @@ reqテーブルをact.varに展開してアクセスしやすくしたい。req�
 **Objective:** ゴースト開発者として、イベントIDやその他のリクエストメタ情報にもvar経由で簡便にアクセスしたい。イベント種別に応じた分岐処理をDSL変数で記述できるようにする。
 
 #### Acceptance Criteria
-1. When `act:transfer_req_to_var()` が呼び出された場合, the pasta runtime shall `act.req.id` の値を `act.var.event` に転記する。
-2. When `act:transfer_req_to_var()` が呼び出された場合, the pasta runtime shall `act.req.base_id` の値を `act.var.base_id` に転記する。
+1. When `act:transfer_req_to_var()` が呼び出された場合, the pasta runtime shall `act.req.id` の値を `act.var.req_id` に転記する。
+2. When `act:transfer_req_to_var()` が呼び出された場合, the pasta runtime shall `act.req.base_id` の値を `act.var.req_base_id` に転記する。
 
 ### Requirement 3: 明示的呼び出しパターン
 **Objective:** ゴースト開発者として、パフォーマンスへの悪影響なく必要なタイミングでのみreq展開を実行したい。既存の `transfer_date_to_var()` と一貫した設計パターンを維持する。
