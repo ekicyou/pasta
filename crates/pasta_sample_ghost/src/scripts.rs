@@ -1,244 +1,76 @@
-//! pasta DSL スクリプトテンプレート
+//! pasta DSL スクリプト
 //!
-//! サンプルゴースト用の pasta DSL スクリプトを生成します。
-
-use crate::GhostError;
-use std::fs;
-use std::path::Path;
-
-/// スクリプトファイルを生成
-pub fn generate_scripts(dic_dir: &Path) -> Result<(), GhostError> {
-    fs::create_dir_all(dic_dir)?;
-
-    fs::write(dic_dir.join("actors.pasta"), ACTORS_PASTA)?;
-    fs::write(dic_dir.join("boot.pasta"), BOOT_PASTA)?;
-    fs::write(dic_dir.join("talk.pasta"), TALK_PASTA)?;
-    fs::write(dic_dir.join("click.pasta"), CLICK_PASTA)?;
-
-    Ok(())
-}
-
-/// actors.pasta - アクター辞書（共通定義）
-pub const ACTORS_PASTA: &str = r#"＃ actors.pasta - アクター辞書（共通定義）
-＃ 全ての .pasta ファイルで共有されるアクター定義
-＃ pasta DSL ローダーが dic/*.pasta パターンで自動読み込み
-
-＃ 女の子（sakura）- 赤色ピクトグラム surface0-8
-％女の子
-　＠笑顔：\s[0]
-　＠通常：\s[1]
-　＠照れ：\s[2]
-　＠驚き：\s[3]
-　＠泣き：\s[4]
-　＠困惑：\s[5]
-　＠キラキラ：\s[6]
-　＠眠い：\s[7]
-　＠怒り：\s[8]
-
-＃ 男の子（kero）- 青色ピクトグラム surface10-18
-％男の子
-　＠笑顔：\s[10]
-　＠通常：\s[11]
-　＠照れ：\s[12]
-　＠驚き：\s[13]
-　＠泣き：\s[14]
-　＠困惑：\s[15]
-　＠キラキラ：\s[16]
-　＠眠い：\s[17]
-　＠怒り：\s[18]
-"#;
-
-/// boot.pasta - 起動/終了イベント用スクリプト
-pub const BOOT_PASTA: &str = r#"＃ boot.pasta - 起動/終了イベント用シーン定義
-＃ pasta DSL では「シーン関数フォールバック」機能を利用
-＃ シーン名とSHIORIイベント名を一致させることで、自動ディスパッチされる
-＃ ※アクター辞書は actors.pasta で共通定義
-
-＃ グローバル単語定義（ランダム選択用）
-＠終了挨拶：またね～！、お疲れ様！、ばいばーい！
-
-＃ OnBoot イベント - 決定的動作（テスト安定性のため単一シーン）
-＊OnBoot
-　女の子：＠通常　起動したよ～。
-　男の子：＠通常　さあ、始めようか。
-
-＃ OnFirstBoot イベント - 初回起動時
-＊OnFirstBoot
-　女の子：＠笑顔　初めまして！\nわたしは女の子、よろしくね。
-　男の子：＠笑顔　ぼくは男の子。ちゃんと使ってよね。
-
-＃ OnClose イベント - 終了時
-＊OnClose
-　女の子：＠通常　＠終了挨拶
-　男の子：＠通常　また呼んでよね。
-　＞ゴースト終了（３００）
-
-＃ OnClose イベント - 別パターン
-＊OnClose
-　女の子：＠眠い　おやすみなさい...
-　男の子：＠通常　じゃあね。
-　＞ゴースト終了（３００）
-"#;
-
-/// talk.pasta - ランダムトーク/時報用スクリプト
-pub const TALK_PASTA: &str = r#"＃ talk.pasta - ランダムトーク/時報用シーン定義
-＃ OnSecondChange (毎秒) → 仮想イベントディスパッチャ → ランダムトーク/時報
-＃ ※アクター辞書は actors.pasta で共通定義
-
-＃ ランダムトーク用単語（ランダム選択）
-＠雑談：何か用？、暇だなあ...、ねえねえ、聞いてる？、うーん、眠くなってきた...
-
-＃ ランダムトーク - 仮想イベント OnTalk
-＊OnTalk
-　％女の子、男の子
-　女の子：＠通常　＠雑談
-
-＊OnTalk
-　％女の子、男の子
-　女の子：＠笑顔　Pasta DSL、使ってみてね！
-　男の子：＠笑顔　Lua 側も触ってみなよ。
-
-＊OnTalk
-　％女の子、男の子
-　女の子：＠眠い　今日は何しようかな...
-　男の子：＠通常　宿題やったの？
-
-＊OnTalk
-　％女の子、男の子
-　女の子：＠通常　ねえ、今日の天気どう思う？
-　男の子：＠困惑　さあ、外見てないからわかんないや。
-
-＊OnTalk
-　％女の子、男の子
-　女の子：＠笑顔　一緒にお話しよう！
-　男の子：＠照れ　しょうがないなあ。
-
-＊OnTalk
-　％女の子、男の子
-　女の子：＠眠い　ふわあ...ちょっと眠いかも。
-　男の子：＠通常　寝てていいよ、ぼくが見てるから。
-
-＃ 時報 - 仮想イベント OnHour
-＃ ＄時１２ 変数は onhour-date-var-transfer により自動設定される（12時間表記）
-＊OnHour
-　％女の子、男の子
-　女の子：＠笑顔　＄時１２　だよ！時報だよ～。
-　男の子：＠笑顔　もう　＄時１２　か、早いね。
-
-＊OnHour
-　％女の子、男の子
-　女の子：＠通常　今　＄時１２　だって。
-　男の子：＠通常　へえ、そうなんだ。
-
-＊OnHour
-　％女の子、男の子
-　女の子：＠通常　＄時１２　...時間が経つのって不思議だね。
-　男の子：＠通常　哲学的だね。
-"#;
-
-/// click.pasta - ダブルクリック反応用スクリプト
-///
-/// 仕様準拠: design.md では7種以上のバリエーション
-pub const CLICK_PASTA: &str = r#"＃ click.pasta - ダブルクリック反応用シーン定義
-＃ OnMouseDoubleClick イベントに反応
-＃ ※アクター辞書は actors.pasta で共通定義
-
-＃ ダブルクリック反応（ランダム選択）7種以上
-＊OnMouseDoubleClick
-　％女の子、男の子
-　女の子：＠驚き　わっ、びっくりした！
-　男の子：＠笑顔　どうしたの？
-
-＊OnMouseDoubleClick
-　％女の子、男の子
-　女の子：＠笑顔　なあに？呼んだ？
-　男の子：＠通常　こっちに用があるんじゃない？
-
-＊OnMouseDoubleClick
-　％女の子、男の子
-　女の子：＠照れ　え、なに？
-　男の子：＠キラキラ　照れてるの？
-
-＊OnMouseDoubleClick
-　％女の子、男の子
-　男の子：＠驚き　うわっ！なに！？
-　女の子：＠笑顔　反応してくれたね。
-
-＊OnMouseDoubleClick
-　％女の子、男の子
-　女の子：＠怒り　もう、そんなにクリックしないで！
-　男の子：＠驚き　お、怒った怒った。
-
-＊OnMouseDoubleClick
-　％女の子、男の子
-　女の子：＠笑顔　わ〜い、遊んでくれるの？
-　男の子：＠通常　まあ、暇だしね。
-
-＊OnMouseDoubleClick
-　％女の子、男の子
-　男の子：＠キラキラ　ふふん、ぼくのことが気になる？
-　女の子：＠驚き　えっ？そんなんじゃないよ！
-"#;
+//! サンプルゴースト用の pasta DSL スクリプトは
+//! `dist-src/ghost/master/dic/` に実ファイルとして配置されています。
+//! release.ps1 の robocopy ステップでコピーされます。
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::path::PathBuf;
+
+    /// dist-src ディレクトリのパスを取得
+    fn dist_src_dir() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("dist-src")
+    }
+
+    /// dist-src からスクリプトファイルを読み込む
+    fn read_pasta_script(name: &str) -> String {
+        let path = dist_src_dir().join("ghost/master/dic").join(name);
+        std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("{} の読み込みに失敗: {}", name, e))
+    }
 
     /// グローバルアクター辞書定義（行頭の`％actor_name`）が含まれているかチェック
     /// シーン内アクタースコープ（インデント付き`　％actor_name`）は検出しない
     fn contains_global_actor_dictionary(content: &str, actor_name: &str) -> bool {
         let pattern = format!("％{}", actor_name);
-        // 文字列先頭での `％actor_name` または改行直後の `％actor_name` を検出
-        // インデント付き（`　％` や ` ％`）は除外される
         content.starts_with(&pattern) || content.contains(&format!("\n{}", pattern))
     }
 
     #[test]
     fn test_actors_pasta_contains_all_characters() {
-        // アクター辞書に両キャラクターが定義されていることを確認
+        let actors = read_pasta_script("actors.pasta");
         assert!(
-            ACTORS_PASTA.contains("％女の子"),
+            actors.contains("％女の子"),
             "女の子アクターがありません"
         );
         assert!(
-            ACTORS_PASTA.contains("％男の子"),
+            actors.contains("％男の子"),
             "男の子アクターがありません"
         );
-        // 全9表情が定義されていることを確認
-        assert!(ACTORS_PASTA.contains("＠笑顔"), "笑顔表情がありません");
-        assert!(ACTORS_PASTA.contains("＠通常"), "通常表情がありません");
-        assert!(ACTORS_PASTA.contains("＠怒り"), "怒り表情がありません");
+        assert!(actors.contains("＠笑顔"), "笑顔表情がありません");
+        assert!(actors.contains("＠通常"), "通常表情がありません");
+        assert!(actors.contains("＠怒り"), "怒り表情がありません");
     }
 
     #[test]
     fn test_boot_pasta_contains_events() {
-        assert!(BOOT_PASTA.contains("＊OnBoot"));
-        assert!(BOOT_PASTA.contains("＊OnFirstBoot"));
-        assert!(BOOT_PASTA.contains("＊OnClose"));
+        let boot = read_pasta_script("boot.pasta");
+        assert!(boot.contains("＊OnBoot"));
+        assert!(boot.contains("＊OnFirstBoot"));
+        assert!(boot.contains("＊OnClose"));
     }
 
     #[test]
     fn test_talk_pasta_contains_events() {
-        assert!(TALK_PASTA.contains("＊OnTalk"));
-        assert!(TALK_PASTA.contains("＊OnHour"));
-        assert!(TALK_PASTA.contains("＄時"));
+        let talk = read_pasta_script("talk.pasta");
+        assert!(talk.contains("＊OnTalk"));
+        assert!(talk.contains("＊OnHour"));
+        assert!(talk.contains("＄時"));
     }
 
     #[test]
     fn test_click_pasta_contains_events() {
-        assert!(CLICK_PASTA.contains("＊OnMouseDoubleClick"));
-        // 7種以上のバリエーション確認
-        let count = CLICK_PASTA.matches("＊OnMouseDoubleClick").count();
+        let click = read_pasta_script("click.pasta");
+        assert!(click.contains("＊OnMouseDoubleClick"));
+        let count = click.matches("＊OnMouseDoubleClick").count();
         assert!(count >= 7, "ダブルクリック反応は7種以上必要: {}", count);
     }
 
-    /// スクリプト内の全 ＠表情名 が ACTORS_PASTA に定義済みであることを検証
-    /// シーン内（＊ブロック内）のアクション行 `アクター名：＠表情名　セリフ` パターンのみを対象
-    /// グローバル単語辞書定義（＠終了挨拶 / ＠雑談 等）は除外
     #[test]
     fn test_script_expression_names_defined_in_actors() {
-        /// シーン内アクション行から ＠表情名 を抽出する
-        /// パターン: `アクター名：＠表情名　セリフ` （行頭に全角スペースあり）
+        let actors = read_pasta_script("actors.pasta");
+
         fn extract_expression_names(script: &str) -> Vec<&str> {
             let mut names = Vec::new();
             let mut in_scene = false;
@@ -247,22 +79,13 @@ mod tests {
                     in_scene = true;
                     continue;
                 }
-                // シーン外のグローバル定義行（＠単語名：値）はスキップ
                 if !in_scene {
                     continue;
                 }
-                // 空行やコメント行でシーン外に戻る判定は不要
-                // （pasta DSLでは次の＊までがシーン）
-
-                // アクション行パターン: `　アクター名：＠表情名　セリフ`
-                // 全角スペースでインデントされている行を対象
                 if let Some(rest) = line.strip_prefix('　') {
-                    // `アクター名：＠表情名　セリフ` を解析
                     if let Some(after_colon) = rest.split_once('：').map(|(_, r)| r) {
                         if let Some(name) = after_colon.strip_prefix('＠') {
-                            // 表情名は次の全角スペースまで
                             let expr_name = name.split('　').next().unwrap_or(name);
-                            // 改行のみの行をスキップ
                             if !expr_name.is_empty() {
                                 names.push(expr_name);
                             }
@@ -274,9 +97,9 @@ mod tests {
         }
 
         let scripts = [
-            ("BOOT_PASTA", BOOT_PASTA),
-            ("TALK_PASTA", TALK_PASTA),
-            ("CLICK_PASTA", CLICK_PASTA),
+            ("boot.pasta", read_pasta_script("boot.pasta")),
+            ("talk.pasta", read_pasta_script("talk.pasta")),
+            ("click.pasta", read_pasta_script("click.pasta")),
         ];
 
         for (name, script) in &scripts {
@@ -288,8 +111,8 @@ mod tests {
             );
             for expr_name in &expression_names {
                 assert!(
-                    ACTORS_PASTA.contains(&format!("＠{}：", expr_name)),
-                    "{} 内の表情名「＠{}」が ACTORS_PASTA に定義されていません",
+                    actors.contains(&format!("＠{}：", expr_name)),
+                    "{} 内の表情名「＠{}」が actors.pasta に定義されていません",
                     name,
                     expr_name
                 );
@@ -299,30 +122,32 @@ mod tests {
 
     #[test]
     fn test_event_files_do_not_contain_global_actor_dictionary() {
-        // グローバルアクター辞書定義は actors.pasta のみに存在すべき
-        // シーン内アクタースコープ指定（インデント付き `　％女の子、男の子`）は許容
+        let boot = read_pasta_script("boot.pasta");
+        let talk = read_pasta_script("talk.pasta");
+        let click = read_pasta_script("click.pasta");
+
         assert!(
-            !contains_global_actor_dictionary(BOOT_PASTA, "女の子"),
+            !contains_global_actor_dictionary(&boot, "女の子"),
             "boot.pasta にグローバルアクター辞書定義が含まれています"
         );
         assert!(
-            !contains_global_actor_dictionary(BOOT_PASTA, "男の子"),
+            !contains_global_actor_dictionary(&boot, "男の子"),
             "boot.pasta にグローバルアクター辞書定義が含まれています"
         );
         assert!(
-            !contains_global_actor_dictionary(TALK_PASTA, "女の子"),
+            !contains_global_actor_dictionary(&talk, "女の子"),
             "talk.pasta にグローバルアクター辞書定義が含まれています"
         );
         assert!(
-            !contains_global_actor_dictionary(TALK_PASTA, "男の子"),
+            !contains_global_actor_dictionary(&talk, "男の子"),
             "talk.pasta にグローバルアクター辞書定義が含まれています"
         );
         assert!(
-            !contains_global_actor_dictionary(CLICK_PASTA, "女の子"),
+            !contains_global_actor_dictionary(&click, "女の子"),
             "click.pasta にグローバルアクター辞書定義が含まれています"
         );
         assert!(
-            !contains_global_actor_dictionary(CLICK_PASTA, "男の子"),
+            !contains_global_actor_dictionary(&click, "男の子"),
             "click.pasta にグローバルアクター辞書定義が含まれています"
         );
     }

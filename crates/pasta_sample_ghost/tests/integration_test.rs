@@ -3,54 +3,42 @@
 mod common;
 
 use pasta_sample_ghost::{GhostConfig, generate_ghost};
+use std::path::PathBuf;
 use tempfile::TempDir;
 
-/// ディレクトリ構造生成テスト
+/// dist-src ディレクトリのパスを取得
+fn dist_src_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("dist-src")
+}
+
+/// 画像生成テスト: generate_ghost() 経由で surface*.png 18ファイル＋surfaces.txt が生成されることを確認
 #[test]
-fn test_directory_structure() {
+fn test_generated_images_structure() {
     let temp = TempDir::new().unwrap();
     let ghost_root = temp.path().join("hello-pasta");
     let config = GhostConfig::default();
 
     generate_ghost(&ghost_root, &config).unwrap();
 
-    // 必須ファイル存在確認
+    let shell_dir = ghost_root.join("shell/master");
+
+    // surfaces.txt
     assert!(
-        ghost_root.join("install.txt").exists(),
-        "install.txt が存在しません"
-    );
-    assert!(
-        ghost_root.join("ghost/master/descript.txt").exists(),
-        "ghost descript.txt が存在しません"
-    );
-    assert!(
-        ghost_root.join("ghost/master/pasta.toml").exists(),
-        "pasta.toml が存在しません"
-    );
-    assert!(
-        ghost_root.join("ghost/master/dic/actors.pasta").exists(),
-        "actors.pasta が存在しません"
-    );
-    assert!(
-        ghost_root.join("ghost/master/dic/boot.pasta").exists(),
-        "boot.pasta が存在しません"
-    );
-    assert!(
-        ghost_root.join("ghost/master/dic/talk.pasta").exists(),
-        "talk.pasta が存在しません"
-    );
-    assert!(
-        ghost_root.join("ghost/master/dic/click.pasta").exists(),
-        "click.pasta が存在しません"
-    );
-    assert!(
-        ghost_root.join("shell/master/descript.txt").exists(),
-        "shell descript.txt が存在しません"
-    );
-    assert!(
-        ghost_root.join("shell/master/surfaces.txt").exists(),
+        shell_dir.join("surfaces.txt").exists(),
         "surfaces.txt が存在しません"
     );
+
+    // sakura サーフェス (0-8)
+    for i in 0..=8 {
+        let path = shell_dir.join(format!("surface{}.png", i));
+        assert!(path.exists(), "surface{}.png が存在しません", i);
+    }
+
+    // kero サーフェス (10-18)
+    for i in 10..=18 {
+        let path = shell_dir.join(format!("surface{}.png", i));
+        assert!(path.exists(), "surface{}.png が存在しません", i);
+    }
 }
 
 /// シェル画像生成テスト
@@ -77,18 +65,13 @@ fn test_shell_images() {
     }
 }
 
-/// pasta.toml 内容検証テスト
+/// pasta.toml 内容検証テスト（dist-src 直接読み込み）
 ///
 /// 仕様準拠: requirements.md Requirement 7.1-7.4
 #[test]
 fn test_pasta_toml_content() {
-    let temp = TempDir::new().unwrap();
-    let ghost_root = temp.path().join("hello-pasta");
-    let config = GhostConfig::default();
-
-    generate_ghost(&ghost_root, &config).unwrap();
-
-    let content = std::fs::read_to_string(ghost_root.join("ghost/master/pasta.toml")).unwrap();
+    let content =
+        std::fs::read_to_string(dist_src_dir().join("ghost/master/pasta.toml")).unwrap();
 
     // 必須セクション確認 (Req 7.1)
     assert!(
@@ -175,19 +158,15 @@ fn test_pasta_toml_content() {
     assert!(content.contains("省略可能"), "省略可能の説明がありません");
 }
 
-/// ukadoc 設定ファイル検証テスト
+/// ukadoc 設定ファイル検証テスト（dist-src 直接読み込み）
 ///
 /// 仕様準拠: requirements.md Requirement 9.1-9.4
 #[test]
 fn test_ukadoc_files() {
-    let temp = TempDir::new().unwrap();
-    let ghost_root = temp.path().join("hello-pasta");
-    let config = GhostConfig::default();
-
-    generate_ghost(&ghost_root, &config).unwrap();
+    let dist_src = dist_src_dir();
 
     // install.txt (Req 9.1)
-    let install = std::fs::read_to_string(ghost_root.join("install.txt")).unwrap();
+    let install = std::fs::read_to_string(dist_src.join("install.txt")).unwrap();
     assert!(
         install.contains("type,ghost"),
         "install.txt に type,ghost がありません"
@@ -202,7 +181,8 @@ fn test_ukadoc_files() {
     );
 
     // ghost descript.txt (Req 9.2)
-    let ghost_desc = std::fs::read_to_string(ghost_root.join("ghost/master/descript.txt")).unwrap();
+    let ghost_desc =
+        std::fs::read_to_string(dist_src.join("ghost/master/descript.txt")).unwrap();
     assert!(
         ghost_desc.contains("charset,UTF-8"),
         "ghost descript.txt に charset がありません"
@@ -237,7 +217,8 @@ fn test_ukadoc_files() {
     );
 
     // shell descript.txt (Req 9.3)
-    let shell_desc = std::fs::read_to_string(ghost_root.join("shell/master/descript.txt")).unwrap();
+    let shell_desc =
+        std::fs::read_to_string(dist_src.join("shell/master/descript.txt")).unwrap();
     assert!(
         shell_desc.contains("charset,UTF-8"),
         "shell descript.txt に charset がありません"
@@ -272,7 +253,7 @@ fn test_ukadoc_files() {
     );
 }
 
-/// pasta DSL スクリプト検証テスト
+/// pasta DSL スクリプト検証テスト（dist-src 直接読み込み）
 #[test]
 fn test_pasta_scripts() {
     /// グローバルアクター辞書定義（行頭の`％actor_name`）が含まれているかチェック
@@ -282,13 +263,7 @@ fn test_pasta_scripts() {
         content.starts_with(&pattern) || content.contains(&format!("\n{}", pattern))
     }
 
-    let temp = TempDir::new().unwrap();
-    let ghost_root = temp.path().join("hello-pasta");
-    let config = GhostConfig::default();
-
-    generate_ghost(&ghost_root, &config).unwrap();
-
-    let dic_dir = ghost_root.join("ghost/master/dic");
+    let dic_dir = dist_src_dir().join("ghost/master/dic");
 
     // actors.pasta - アクター辞書
     let actors = std::fs::read_to_string(dic_dir.join("actors.pasta")).unwrap();
@@ -305,8 +280,6 @@ fn test_pasta_scripts() {
         "OnFirstBoot シーンがありません"
     );
     assert!(boot.contains("＊OnClose"), "OnClose シーンがありません");
-    // グローバルアクター辞書定義が含まれていないことを確認
-    // シーン内アクタースコープ指定（インデント付き `　％女の子、男の子`）は許容
     assert!(
         !contains_global_actor_dictionary(&boot, "女の子"),
         "boot.pasta にグローバルアクター辞書定義が含まれています"
@@ -317,7 +290,6 @@ fn test_pasta_scripts() {
     assert!(talk.contains("＊OnTalk"), "OnTalk シーンがありません");
     assert!(talk.contains("＊OnHour"), "OnHour シーンがありません");
     assert!(talk.contains("＄時"), "時刻変数参照がありません");
-    // グローバルアクター辞書定義が含まれていないことを確認
     assert!(
         !contains_global_actor_dictionary(&talk, "女の子"),
         "talk.pasta にグローバルアクター辞書定義が含まれています"
@@ -329,7 +301,6 @@ fn test_pasta_scripts() {
         click.contains("＊OnMouseDoubleClick"),
         "OnMouseDoubleClick シーンがありません"
     );
-    // グローバルアクター辞書定義が含まれていないことを確認
     assert!(
         !contains_global_actor_dictionary(&click, "女の子"),
         "click.pasta にグローバルアクター辞書定義が含まれています"
@@ -344,10 +315,11 @@ fn test_pasta_scripts() {
     );
 }
 
-/// ランダムトークパターン数テスト
+/// ランダムトークパターン数テスト（dist-src 直接読み込み）
 #[test]
 fn test_random_talk_patterns() {
-    let talk = pasta_sample_ghost::scripts::TALK_PASTA;
+    let talk =
+        std::fs::read_to_string(dist_src_dir().join("ghost/master/dic/talk.pasta")).unwrap();
 
     // OnTalk パターン数（5〜10種）
     let talk_count = talk.matches("＊OnTalk").count();
@@ -359,10 +331,11 @@ fn test_random_talk_patterns() {
     );
 }
 
-/// 時報パターンテスト
+/// 時報パターンテスト（dist-src 直接読み込み）
 #[test]
 fn test_hour_chime_patterns() {
-    let talk = pasta_sample_ghost::scripts::TALK_PASTA;
+    let talk =
+        std::fs::read_to_string(dist_src_dir().join("ghost/master/dic/talk.pasta")).unwrap();
 
     // OnHour パターン存在確認
     let hour_count = talk.matches("＊OnHour").count();

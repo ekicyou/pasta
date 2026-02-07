@@ -2,7 +2,7 @@
 
 このドキュメントは、[SOUL.md](SOUL.md) で定義されたコア機能と、それを検証するテストの対応関係を示します。
 
-**最終更新**: 2026-02-06  
+**最終更新**: 2026-07-21  
 **総テスト数**: 768+テスト（全パス ✅）
 
 ---
@@ -104,6 +104,8 @@
 | Virtual Event Dispatcher    | `virtual_event_dispatcher_test.rs`<br>`virtual_dispatcher_spec.lua` | ✅ 完了 | 15+20テスト（onhour-date-var-transfer 5テスト追加） |
 | Sample Ghost Integration    | `shiori_sample_ghost_test.rs`                                       | ✅ 完了 | 2テスト（hello-pasta実ゴースト使用）                |
 | Sample Ghost スクリプト整合性 | `scripts.rs::test_script_expression_names_defined_in_actors`     | ✅ 完了 | 1テスト（表情名↔辞書定義一致検証）                  |
+| Sample Ghost dist-src 検証  | `dist_src_validation_test.rs::test_dist_src_directory_structure`    | ✅ 完了 | 1テスト（dist-src/ 8ファイル存在確認）              |
+| Sample Ghost 画像構造検証   | `integration_test.rs::test_generated_images_structure`              | ✅ 完了 | 1テスト（shell/master/*.png 18枚＋surfaces.txt）    |
 | チェイントーク E2E            | `runtime_e2e_test.rs`                                            | ✅ 完了 | 2テスト（yield-continuation-token Pasta→Lua→実行）  |
 
 ---

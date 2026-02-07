@@ -18,12 +18,12 @@
 //!
 //! # 生成されるファイル
 //!
-//! - install.txt, readme.txt
-//! - ghost/master/descript.txt, pasta.toml
-//! - ghost/master/dic/*.pasta（4ファイル）
-//! - shell/master/descript.txt, surfaces.txt
 //! - shell/master/surface*.png（18ファイル）
+//! - shell/master/surfaces.txt
 //! - updates2.dau, updates.txt（finalize モード時）
+//!
+//! テキスト系ファイル（設定ファイル、pasta スクリプト）は
+//! dist-src/ ディレクトリに配置し、release.ps1 の robocopy でコピーします。
 //!
 //! # 注意
 //!
@@ -65,7 +65,7 @@ fn run_generate_mode(output_dir: &PathBuf) -> Result<(), Box<dyn std::error::Err
     let config = GhostConfig::default();
 
     // ゴースト生成
-    println!("Generating ghost distribution...");
+    println!("Generating surface images and surfaces.txt...");
     generate_ghost(output_dir, &config)?;
 
     // 生成されたファイルをカウント
@@ -74,6 +74,7 @@ fn run_generate_mode(output_dir: &PathBuf) -> Result<(), Box<dyn std::error::Err
     println!();
     println!("========================================");
     println!("  Generation Complete!");
+    println!("  (surface*.png + surfaces.txt only)");
     println!("========================================");
     println!();
     println!("  Location: {}", output_dir.display());

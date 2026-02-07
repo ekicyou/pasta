@@ -1,8 +1,8 @@
 charset,UTF-8
 type,shell
 name,master
-craftman,{{craftman}}
-craftmanw,{{craftman_w}}
+craftman,ekicyou
+craftmanw,どっとステーション駅長
 seriko.use_self_alpha,1
 sakura.balloon.offsetx,64
 sakura.balloon.offsety,0

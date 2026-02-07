@@ -9,6 +9,7 @@ pub mod image_generator;
 pub mod scripts;
 pub mod update_files;
 
+use std::fs;
 use std::path::Path;
 use thiserror::Error;
 
@@ -61,25 +62,30 @@ impl Default for GhostConfig {
     }
 }
 
-/// ゴースト配布物を生成
+/// ゴースト配布物を生成（画像＋surfaces.txt のみ）
+///
+/// テキスト系ファイル（設定ファイル、pasta スクリプト）は
+/// `dist-src/` ディレクトリに配置し、release.ps1 の robocopy でコピーします。
 ///
 /// # Arguments
 /// * `output_dir` - 出力先ディレクトリ（hello-pasta/ が作成される）
-/// * `config` - ゴースト設定
+/// * `_config` - ゴースト設定（API 互換性のため保持）
 ///
 /// # Returns
 /// 成功時は Ok(()), 失敗時は GhostError
-pub fn generate_ghost(output_dir: &Path, config: &GhostConfig) -> Result<(), GhostError> {
-    // ディレクトリ構造を生成
-    config_templates::generate_structure(output_dir, config)?;
+pub fn generate_ghost(output_dir: &Path, _config: &GhostConfig) -> Result<(), GhostError> {
+    // シェルディレクトリ作成（画像生成前に必要）
+    let shell_dir = output_dir.join("shell/master");
+    fs::create_dir_all(&shell_dir)?;
 
     // シェル画像を生成
-    let shell_dir = output_dir.join("shell/master");
     image_generator::generate_surfaces(&shell_dir)?;
 
-    // pasta スクリプトを生成
-    let dic_dir = output_dir.join("ghost/master/dic");
-    scripts::generate_scripts(&dic_dir)?;
+    // surfaces.txt を生成
+    fs::write(
+        shell_dir.join("surfaces.txt"),
+        config_templates::generate_surfaces_txt(),
+    )?;
 
     Ok(())
 }

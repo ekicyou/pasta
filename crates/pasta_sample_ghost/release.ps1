@@ -46,19 +46,20 @@ Write-Host ""
 # Setup Phase (Steps 1-4)
 # ============================================================
 if ($SkipSetup) {
-    Write-Host "[1/8] Building pasta.dll ................. SKIPPED" -ForegroundColor DarkGray
-    Write-Host "[2/8] Generating ghost distribution ...... SKIPPED" -ForegroundColor DarkGray
-    Write-Host "[3/8] Copying files ...................... SKIPPED" -ForegroundColor DarkGray
-    Write-Host "[4/8] Generating update files ............ SKIPPED" -ForegroundColor DarkGray
+    Write-Host "[1/9] Building pasta.dll ................. SKIPPED" -ForegroundColor DarkGray
+    Write-Host "[2/9] Copying text files (robocopy) ...... SKIPPED" -ForegroundColor DarkGray
+    Write-Host "[3/9] Generating images .................. SKIPPED" -ForegroundColor DarkGray
+    Write-Host "[4/9] Copying DLL and scripts ............ SKIPPED" -ForegroundColor DarkGray
+    Write-Host "[5/9] Generating update files ............ SKIPPED" -ForegroundColor DarkGray
     Write-Host ""
 }
 else {
     # --- Step 1: Build pasta.dll (32bit) ---
     if ($SkipDllBuild) {
-        Write-Host "[1/8] Building pasta.dll ................. SKIPPED" -ForegroundColor DarkGray
+        Write-Host "[1/9] Building pasta.dll ................. SKIPPED" -ForegroundColor DarkGray
     }
     else {
-        Write-Host "[1/8] Building pasta.dll (32bit release)..."
+        Write-Host "[1/9] Building pasta.dll (32bit release)..."
         Write-Host "  Target: i686-pc-windows-msvc"
 
         Push-Location $WorkspaceRoot
@@ -80,26 +81,53 @@ else {
     }
     Write-Host ""
 
-    # --- Step 2: Generate ghost distribution ---
-    Write-Host "[2/8] Generating ghost distribution..."
+    # --- Step 2: Copy text files from dist-src (robocopy) ---
+    Write-Host "[2/9] Copying text files from dist-src..."
+
+    $DistSrcDir = Join-Path $ScriptDir "dist-src"
+    if (-not (Test-Path $DistSrcDir)) {
+        Write-Host ""
+        Write-Host "ERROR: dist-src directory not found at $DistSrcDir" -ForegroundColor Red
+        Write-Host "  The dist-src/ directory contains text distribution files."
+        Write-Host "  Please ensure it exists before running release."
+        exit 1
+    }
+
+    $robocopyTextArgs = @(
+        $DistSrcDir,
+        $GhostDir,
+        "/E",
+        "/NJH", "/NJS", "/NDL", "/NC", "/NS", "/NP"
+    )
+    & robocopy @robocopyTextArgs | Out-Null
+    if ($LASTEXITCODE -ge 8) {
+        Write-Host ""
+        Write-Host "ERROR: robocopy failed copying text files (exit code $LASTEXITCODE)" -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "  Text files copied from dist-src" -ForegroundColor Green
+    Write-Host ""
+
+    # --- Step 3: Generate images (surface*.png + surfaces.txt) ---
+    Write-Host "[3/9] Generating images..."
 
     Push-Location $WorkspaceRoot
     try {
         & cargo run -p pasta_sample_ghost --quiet
         if ($LASTEXITCODE -ne 0) {
             Write-Host ""
-            Write-Host "ERROR: Ghost generation failed" -ForegroundColor Red
+            Write-Host "ERROR: Image generation failed" -ForegroundColor Red
             exit 1
         }
     }
     finally {
         Pop-Location
     }
-    Write-Host "  Ghost files generated" -ForegroundColor Green
+    Write-Host "  Images generated" -ForegroundColor Green
     Write-Host ""
 
-    # --- Step 3: Copy pasta.dll and scripts/ ---
-    Write-Host "[3/8] Copying files..."
+    # --- Step 4: Copy pasta.dll and scripts/ ---
+    Write-Host "[4/9] Copying files..."
 
     $MasterDir = Join-Path $GhostDir "ghost\master"
     if (-not (Test-Path $MasterDir)) {
@@ -148,8 +176,8 @@ else {
     }
     Write-Host ""
 
-    # --- Step 4: Finalize (generate updates2.dau and updates.txt) ---
-    Write-Host "[4/8] Generating update files..."
+    # --- Step 5: Finalize (generate updates2.dau and updates.txt) ---
+    Write-Host "[5/9] Generating update files..."
 
     Push-Location $WorkspaceRoot
     try {
@@ -175,8 +203,8 @@ else {
 # Release Phase (Steps 5-8)
 # ============================================================
 
-# --- Step 5: Version Check ---
-Write-Host "[5/8] Checking version..."
+# --- Step 6: Version Check ---
+Write-Host "[6/9] Checking version..."
 
 $CargoToml = Join-Path $WorkspaceRoot "Cargo.toml"
 if (-not (Test-Path $CargoToml)) {
@@ -201,8 +229,8 @@ Write-Host "  Version: $Version"
 Write-Host "  Tag:     $TagName"
 Write-Host ""
 
-# --- Step 6: Validate Ghost Distribution ---
-Write-Host "[6/8] Validating ghost distribution..."
+# --- Step 7: Validate Ghost Distribution ---
+Write-Host "[7/9] Validating ghost distribution..."
 
 if (-not (Test-Path $GhostDir)) {
     Write-Host ""
@@ -284,8 +312,8 @@ if ($ValidationFailed) {
 Write-Host "  All required files present" -ForegroundColor Green
 Write-Host ""
 
-# --- Step 7: Create .nar File ---
-Write-Host "[7/8] Creating $NarFileName..."
+# --- Step 8: Create .nar File ---
+Write-Host "[8/9] Creating $NarFileName..."
 
 $TempDir = Join-Path $ScriptDir "temp_release"
 $TempGhostDir = Join-Path $TempDir "hello-pasta"
@@ -355,8 +383,8 @@ Write-Host "  Created: $NarFilePath"
 Write-Host "  Size:    $narSizeMB MB"
 Write-Host ""
 
-# --- Step 8: Show Release Instructions ---
-Write-Host "[8/8] Release instructions"
+# --- Step 9: Show Release Instructions ---
+Write-Host "[9/9] Release instructions"
 Write-Host ""
 Write-Host "========================================"
 Write-Host "  .nar Package Ready!"

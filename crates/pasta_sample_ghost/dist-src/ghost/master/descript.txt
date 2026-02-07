@@ -1,0 +1,9 @@
+charset,UTF-8
+type,ghost
+name,hello-pasta
+sakura.name,女の子
+kero.name,男の子
+craftman,ekicyou
+craftmanw,どっとステーション駅長
+shiori,pasta.dll
+homeurl,https://github.com/ekicyou/pasta

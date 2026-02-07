@@ -69,6 +69,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 **注**: 
 - ルートクレート (`src/`) は削除済み。すべての実装コードは `crates/*/src/` 配下に配置。
 - 各クレートは独自の `tests/` ディレクトリを持つことができる（例: pasta_lua, pasta_sample_ghost）
+- pasta_sample_ghost は `dist-src/` にテキスト系配布ファイル（設定4種＋DSLスクリプト4種）を保持。`release.ps1` の robocopy ステップで配布先へコピーされる
 - ワークスペースレベルの `tests/` は複数クレートにまたがる統合テスト用
 
 ## ファイル命名規則

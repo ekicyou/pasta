@@ -9,8 +9,8 @@
 # 将来的な pasta_lua の汎用用途（ノベルゲーム、ツール等）では
 # このセクションが必須になる可能性があります。
 [package]
-name = "{{name}}"
-version = "{{version}}"
+name = "hello-pasta"
+version = "1.0.0"
 edition = "2024"
 
 [loader]
