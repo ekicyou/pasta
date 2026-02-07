@@ -29,20 +29,20 @@
 
 ---
 
-- [ ] 1. SHIORI_ACT クラスへの `transfer_req_to_var()` メソッド追加
-- [ ] 1.1 Referenceパラメーター転記ロジックの実装
+- [x] 1. SHIORI_ACT クラスへの `transfer_req_to_var()` メソッド追加
+- [x] 1.1 Referenceパラメーター転記ロジックの実装
   - `act.req.reference[0]`〜`[9]` のループ処理による転記
   - 全角キー（`ｒ０`〜`ｒ９`）と半角キー（`r0`〜`r9`）の両方に同一値を設定
   - `reference[N]` が `nil` の場合はスキップ（varキー未設定）
   - 0-indexed 配列アクセス（SHIORIプロトコル準拠）の正確な実装
   - _Requirements: 1.1, 1.2, 1.3, 4.2, 4.3_
 
-- [ ] 1.2 イベントメタデータ転記ロジックの実装
+- [x] 1.2 イベントメタデータ転記ロジックの実装
   - `act.req.id` → `act.var.req_id` への転記
   - `act.req.base_id` → `act.var.req_base_id` への転記（nil の場合もスキップ）
   - _Requirements: 2.1, 2.2_
 
-- [ ] 1.3 メソッド構造とガード句の実装
+- [x] 1.3 メソッド構造とガード句の実装
   - 関数シグネチャ: `function SHIORI_ACT_IMPL.transfer_req_to_var(self)`
   - 先頭ガード句: `if not self.req then return self end`
   - 戻り値: `return self`（メソッドチェーン対応）
@@ -50,20 +50,20 @@
   - `transfer_date_to_var()` の直後に配置（ファイル内位置）
   - _Requirements: 1.4, 3.1, 3.3, 3.5, 5.3_
 
-- [ ] 2. テストスイートの実装
-- [ ] 2.1 (P) 基本転記テストの実装
+- [x] 2. テストスイートの実装
+- [x] 2.1 (P) 基本転記テストの実装
   - 全角キー（`ｒ０`〜`ｒ９`）への転記検証（reference[0]〜[9] の全10要素）
   - 半角キー（`r0`〜`r9`）への転記検証（同一値の重複設定確認）
   - イベントメタデータ（`req_id`, `req_base_id`）の転記検証
   - _Requirements: 1.1, 1.3, 2.1, 2.2_
 
-- [ ] 2.2 (P) 境界条件・ガード句テストの実装
+- [x] 2.2 (P) 境界条件・ガード句テストの実装
   - `req = nil` の場合のガード句動作検証（クラッシュしない、`self` を返す）
   - 部分欠落 reference（疎配列）での正常動作確認（例: reference[0], [2] のみ存在）
   - メソッドチェーンの検証（戻り値が `self` であること）
   - _Requirements: 1.2, 1.4, 3.5_
 
-- [ ] 2.3 (P) 統合・副作用テストの実装
+- [x] 2.3 (P) 統合・副作用テストの実装
   - 未呼出時の var 未設定検証（`transfer_req_to_var()` を呼ばない場合、req 由来キーが存在しない）
   - `transfer_date_to_var()` との共存検証（両メソッド呼び出し後、全22+16=38キーが衝突なく存在）
   - _Requirements: 3.2, 3.4, 5.1, 5.2_
@@ -115,7 +115,7 @@
 - **キー衝突チェック**: 設計フェーズで検証済み（date 16キー vs req 22キー、衝突なし）
 
 ### Definition of Done
-- [ ] すべての acceptance criteria を満たすテストが全パス
-- [ ] `digit_id_var_test.rs` の既存4テストが引き続き全パス（`＄０` 動作維持）
-- [ ] LDoc コメントが既存スタイルに準拠
-- [ ] コードが `transfer_date_to_var()` と構造的に一貫している
+- [x] すべての acceptance criteria を満たすテストが全パス
+- [x] `digit_id_var_test.rs` の既存4テストが引き続き全パス（`＄０` 動作維持）
+- [x] LDoc コメントが既存スタイルに準拠
+- [x] コードが `transfer_date_to_var()` と構造的に一貫している
