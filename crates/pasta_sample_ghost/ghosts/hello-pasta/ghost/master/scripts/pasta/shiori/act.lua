@@ -146,4 +146,47 @@ function SHIORI_ACT_IMPL.transfer_date_to_var(self)
     return self
 end
 
+-- ============================================================================
+-- リクエスト転記機能 (req-var-expansion)
+-- ============================================================================
+
+--- 全角数字テーブル（0-9 → ０-９）
+local FULLWIDTH_DIGITS = { "０", "１", "２", "３", "４", "５", "６", "７", "８", "９" }
+
+--- リクエストフィールドを req から var へ転記
+--- reference[0]〜[9] を全角キー（ｒ０〜ｒ９）と半角キー（r0〜r9）に転記し、
+--- req.id / req.base_id を req_id / req_base_id に転記する。
+--- @param self ShioriAct アクションオブジェクト
+--- @return ShioriAct self メソッドチェーン用
+function SHIORI_ACT_IMPL.transfer_req_to_var(self)
+    -- req が存在しない場合は何もせず正常終了
+    if not self.req then
+        return self
+    end
+
+    -- Reference パラメーター転記（0-indexed, 0〜9）
+    local ref = self.req.reference
+    if ref then
+        for i = 0, 9 do
+            local val = ref[i]
+            if val ~= nil then
+                -- 全角キー: ｒ＋全角数字（例: ｒ０）
+                self.var["ｒ" .. FULLWIDTH_DIGITS[i + 1]] = val
+                -- 半角キー: r＋半角数字（例: r0）
+                self.var["r" .. i] = val
+            end
+        end
+    end
+
+    -- イベントメタデータ転記
+    if self.req.id then
+        self.var.req_id = self.req.id
+    end
+    if self.req.base_id then
+        self.var.req_base_id = self.req.base_id
+    end
+
+    return self
+end
+
 return SHIORI_ACT
