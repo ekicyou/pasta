@@ -130,8 +130,9 @@ sequenceDiagram
 | 1.1 | `.lua` 検出 | discover_files | discover_files() | Discover Phase |
 | 1.2 | `pasta_patterns` 派生 | PastaLoader | — | Discover Phase |
 | 1.3 | `profile/` 除外 | discover_files | is_in_profile_dir() | Discover Phase |
-| 1.4 | `.pasta` 優先 | PastaLoader | conflict_check | Discover Phase |
-| 1.5 | 衝突警告 | PastaLoader | tracing::warn | Discover Phase |
+| 1.4 | `init.*` 拒否 | PastaLoader | check_invalid_filenames | Discover Phase |
+| 1.5 | `.pasta` 優先（モジュール名ベース） | PastaLoader | conflict_check | Discover Phase |
+| 1.6 | 衝突警告 | PastaLoader | tracing::warn | Discover Phase |
 | 2.1 | パーサー非経由 | PastaLoader | — | Process Phase |
 | 2.2 | キャッシュコピー | CacheManager | save_cache() | Process Phase |
 | 2.3 | ディレクトリ構造・モジュール命名 | CacheManager | source_to_cache_path(), source_to_module_name() | Process Phase |
@@ -157,12 +158,13 @@ sequenceDiagram
 
 | Field | Detail |
 |-------|--------|
-| Intent | `.lua` パススルー分岐と衝突チェックを `load_with_config` に追加 |
-| Requirements | 1.1-1.5, 2.1-2.2, 2.6-2.7 |
+| Intent | `.lua` パススルー分岐、`init.*`拒否、衝突チェックを `load_with_config` に追加 |
+| Requirements | 1.1-1.6, 2.1-2.2, 2.6-2.7 |
 
 **Responsibilities & Constraints**
 - Phase 3 で `.lua` ファイルを追加検出
-- `.pasta` と `.lua` の同名衝突を検出し、`.lua` を除外して警告
+- `init.lua` / `init.pasta` が検出された場合はエラーを返して処理中断
+- `.pasta` と `.lua` のモジュール名衝突を検出し、`.lua` を除外して警告
 - Phase 4 でファイル拡張子に基づく分岐（`.pasta` → トランスパイル / `.lua` → コピー）
 - `.lua` ファイルのモジュール名を `module_names` に追加
 
@@ -217,7 +219,9 @@ struct ProcessStats {
 
 **Implementation Notes**
 - Integration: `load_with_config` の Phase 3/4 を拡張。Phase 5〜7 は変更不要
-- Validation: 衝突チェックは `.pasta` ファイルの stem 名を HashSet に格納し、`.lua` ファイルの stem 名と照合
+- Validation:
+  - `init.lua` / `init.pasta` 検出時は `LoaderError::InvalidFileName` を返して処理中断
+  - 衝突チェックは各ファイルを `CacheManager::source_to_module_name()` でモジュール名に変換し、`.pasta` 由来のモジュール名を HashSet に格納、`.lua` ファイルのモジュール名と照合
 - Risks: 処理順序は `.pasta` 先 → `.lua` 後で固定し、決定的な動作を保証
 
 #### discovery（既存モジュール）
@@ -260,23 +264,26 @@ struct ProcessStats {
 
 | エラー種別 | 発生箇所 | 処理 | Requirement |
 |-----------|---------|------|------------|
+| `init.lua` / `init.pasta` 検出 | `discover_all_files` | エラー（`LoaderError::InvalidFileName`）を返して処理中断 | 1.4 |
 | `.lua` ファイル読み込み失敗 | `process_incremental` | 警告ログ出力、`failed` カウント増加、処理継続 | 2.7 |
 | `.lua` キャッシュ書き込み失敗 | `save_cache` | 警告ログ出力、処理継続（既存パターン） | 2.7 |
-| 同名衝突検出 | `discover_all_files` | 警告ログ出力、`.lua` をリストから除外 | 1.4, 1.5 |
+| モジュール名衝突検出 | `discover_all_files` | 警告ログ出力、`.lua` をリストから除外 | 1.5, 1.6 |
 | glob パターン変換失敗 | `discover_all_files` | `.lua` 検出をスキップ、警告ログ | — |
 
 ## Testing Strategy
 
 ### Unit Tests
 
-1. **衝突チェックロジック**: `.pasta` と `.lua` の同名ファイルが存在する場合に `.lua` が除外されること
-2. **パターン変換**: `dic/*/*.pasta` → `dic/*/*.lua` の変換が正しいこと
-3. **ProcessStats の `copied` カウント**: `.lua` ファイルのコピー時に正しくカウントされること
+1. **`init.*` ファイル拒否**: `init.lua` または `init.pasta` が検出された場合に `LoaderError::InvalidFileName` が返されること
+2. **モジュール名ベース衝突チェック**: 同じモジュール名を生成する `.pasta` と `.lua` が存在する場合に `.lua` が除外されること
+3. **パターン変換**: `dic/*/*.pasta` → `dic/*/*.lua` の変換が正しいこと
+4. **ProcessStats の `copied` カウント**: `.lua` ファイルのコピー時に正しくカウントされること
 
 ### Integration Tests
 
-1. **`.lua` パススルー E2E**: 辞書ディレクトリに `.lua` ファイルを配置し、`PastaLoader::load` で正常にロードされること
-2. **`.pasta` + `.lua` 混在**: 両方のファイルが存在し、scene_dic.lua に両方の require が含まれること
-3. **同名衝突**: `helper.pasta` と `helper.lua` が同じディレクトリにある場合、`.pasta` のみが処理されること
-4. **孤立キャッシュ**: `.lua` ファイルを削除後、対応するキャッシュが孤立として検出されること
-5. **インクリメンタル更新**: `.lua` ファイルの内容変更後、キャッシュが更新されること
+1. **`init.*` ファイル拒否**: `init.lua` または `init.pasta` が辞書ディレクトリに存在する場合、`PastaLoader::load` がエラーを返すこと
+2. **`.lua` パススルー E2E**: 辞書ディレクトリに `.lua` ファイルを配置し、`PastaLoader::load` で正常にロードされること
+3. **`.pasta` + `.lua` 混在**: 両方のファイルが存在し、scene_dic.lua に両方の require が含まれること
+4. **モジュール名衝突**: `foo/bar.pasta` と `foo/bar.lua` が存在する場合、`.pasta` のみが処理されること
+5. **孤立キャッシュ**: `.lua` ファイルを削除後、対応するキャッシュが孤立として検出されること
+6. **インクリメンタル更新**: `.lua` ファイルの内容変更後、キャッシュが更新されること

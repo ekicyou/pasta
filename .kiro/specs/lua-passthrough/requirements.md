@@ -17,8 +17,9 @@
 1. When `.lua` ファイルが辞書ディレクトリ（`dic/*/`）に配置された場合, the Loader shall `.pasta` ファイルと同様にそのファイルを検出する
 2. The Loader shall 既存の `pasta_patterns` 設定に加えて、辞書ディレクトリ内の `.lua` ファイルを検出する
 3. The Loader shall `profile/` ディレクトリ内の `.lua` ファイルを検出対象から除外する
-4. When 同名の `.pasta` ファイルと `.lua` ファイルが同じディレクトリに存在する場合, the Loader shall `.pasta` ファイルを優先し、`.lua` ファイルを無視する
-5. If 同名衝突により `.lua` ファイルが無視された場合, the Loader shall 警告をログに出力する
+4. When ファイル名が `init.lua` または `init.pasta` の場合, the Loader shall エラー（`LoaderError::InvalidFileName`）を返して処理を中断する
+5. When 生成されるモジュール名が衝突する場合（例: `foo/bar.pasta` と `foo/bar.lua`）, the Loader shall `.pasta` ファイルを優先し、`.lua` ファイルを無視する
+6. If モジュール名衝突により `.lua` ファイルが無視された場合, the Loader shall 警告をログに出力する
 
 ### Requirement 2: Luaファイルのパススルー処理
 
