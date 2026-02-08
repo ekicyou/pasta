@@ -43,11 +43,12 @@ use std::fs;
 use std::path::Path;
 use tracing::{debug, info, warn};
 
-/// Transpile statistics for logging.
-struct TranspileStats {
+/// Process statistics for logging.
+struct ProcessStats {
     transpiled: usize,
     skipped: usize,
     failed: usize,
+    copied: usize,
 }
 
 /// Pasta Loader - Unified startup sequence API.
@@ -111,18 +112,20 @@ impl PastaLoader {
         cache_manager.prepare_cache_dir()?;
 
         // Phase 3: Discover files
-        debug!("Phase 3: Discovering pasta files");
-        let files = discovery::discover_files(base_dir, &config.loader.pasta_patterns)?;
-        if files.is_empty() {
-            warn!(path = %base_dir.display(), "No .pasta files found");
+        debug!("Phase 3: Discovering pasta and lua files");
+        let (pasta_files, lua_files) =
+            Self::discover_all_files(base_dir, &config.loader.pasta_patterns)?;
+        let total_files = pasta_files.len() + lua_files.len();
+        if total_files == 0 {
+            warn!(path = %base_dir.display(), "No .pasta or .lua files found");
         } else {
-            info!(count = files.len(), "Found pasta files");
+            info!(pasta = pasta_files.len(), lua = lua_files.len(), "Found files");
         }
 
-        // Phase 4: Incremental transpile
-        debug!("Phase 4: Incremental transpilation");
+        // Phase 4: Incremental process (transpile .pasta, copy .lua)
+        debug!("Phase 4: Incremental processing");
         let (context, module_names, stats) =
-            Self::transpile_incremental(base_dir, &files, &cache_manager)?;
+            Self::process_incremental(base_dir, &pasta_files, &lua_files, &cache_manager)?;
 
         // Log statistics in debug mode
         if config.loader.debug_mode {
@@ -130,12 +133,18 @@ impl PastaLoader {
                 transpiled = stats.transpiled,
                 skipped = stats.skipped,
                 failed = stats.failed,
-                "Transpilation statistics"
+                copied = stats.copied,
+                "Processing statistics"
             );
         }
 
         // Check for orphaned caches
-        let orphans = cache_manager.find_orphaned_caches(&files);
+        let all_source_files: Vec<_> = pasta_files
+            .iter()
+            .chain(lua_files.iter())
+            .cloned()
+            .collect();
+        let orphans = cache_manager.find_orphaned_caches(&all_source_files);
         if !orphans.is_empty() && config.loader.debug_mode {
             for orphan in &orphans {
                 warn!(path = %orphan.display(), "Orphaned cache file detected");
@@ -215,25 +224,128 @@ impl PastaLoader {
         Ok(())
     }
 
-    /// Incremental transpilation - only transpile changed files.
+    /// Discover all files (.pasta and .lua) with conflict checking.
+    ///
+    /// Returns (pasta_files, lua_files) where lua_files has conflicts removed.
+    /// Also checks for invalid filenames (init.lua, init.pasta).
+    fn discover_all_files(
+        base_dir: &Path,
+        pasta_patterns: &[String],
+    ) -> Result<(Vec<std::path::PathBuf>, Vec<std::path::PathBuf>), LoaderError> {
+        // Discover .pasta files
+        let pasta_files = discovery::discover_files(base_dir, pasta_patterns)?;
+
+        // Generate .lua patterns from .pasta patterns
+        let lua_patterns: Vec<String> = pasta_patterns
+            .iter()
+            .filter_map(|p| {
+                if let Some(stem) = p.strip_suffix(".pasta") {
+                    Some(format!("{}.lua", stem))
+                } else {
+                    warn!(pattern = %p, "Cannot convert pattern to .lua, skipping");
+                    None
+                }
+            })
+            .collect();
+
+        // Discover .lua files
+        let lua_files = if lua_patterns.is_empty() {
+            Vec::new()
+        } else {
+            discovery::discover_files(base_dir, &lua_patterns).unwrap_or_else(|e| {
+                warn!(error = %e, "Failed to discover .lua files, skipping");
+                Vec::new()
+            })
+        };
+
+        // Check for invalid filenames (init.lua, init.pasta)
+        for file in pasta_files.iter().chain(lua_files.iter()) {
+            if let Some(file_name) = file.file_name().and_then(|n| n.to_str()) {
+                if file_name == "init.lua" || file_name == "init.pasta" {
+                    return Err(LoaderError::invalid_file_name(file));
+                }
+            }
+        }
+
+        // Build HashSet of .pasta module names for conflict detection
+        let pasta_module_names: std::collections::HashSet<String> = pasta_files
+            .iter()
+            .map(|f| {
+                // Use inline module name computation (same as CacheManager)
+                let relative = f
+                    .strip_prefix(base_dir)
+                    .unwrap_or(f)
+                    .to_string_lossy()
+                    .to_string();
+                let without_prefix = relative
+                    .strip_prefix("dic")
+                    .unwrap_or(&relative)
+                    .trim_start_matches(['/', '\\'])
+                    .to_string();
+                let stem = std::path::Path::new(&without_prefix)
+                    .with_extension("")
+                    .to_string_lossy()
+                    .to_string();
+                stem.replace(['/', '\\'], ".").replace('-', "_")
+            })
+            .collect();
+
+        // Filter out conflicting .lua files
+        let mut filtered_lua_files = Vec::new();
+        for lua_file in &lua_files {
+            let relative = lua_file
+                .strip_prefix(base_dir)
+                .unwrap_or(lua_file)
+                .to_string_lossy()
+                .to_string();
+            let without_prefix = relative
+                .strip_prefix("dic")
+                .unwrap_or(&relative)
+                .trim_start_matches(['/', '\\'])
+                .to_string();
+            let stem = std::path::Path::new(&without_prefix)
+                .with_extension("")
+                .to_string_lossy()
+                .to_string();
+            let module_key = stem.replace(['/', '\\'], ".").replace('-', "_");
+
+            if pasta_module_names.contains(&module_key) {
+                warn!(
+                    lua_file = %lua_file.display(),
+                    module_name = %format!("pasta.scene.{}", module_key),
+                    "Module name conflict: .pasta file takes priority, .lua file ignored"
+                );
+            } else {
+                filtered_lua_files.push(lua_file.clone());
+            }
+        }
+
+        Ok((pasta_files, filtered_lua_files))
+    }
+
+    /// Incremental processing - transpile .pasta files and copy .lua files.
     ///
     /// Uses CacheManager to check timestamps and skip unchanged files.
-    fn transpile_incremental(
+    fn process_incremental(
         _base_dir: &Path,
-        files: &[std::path::PathBuf],
+        pasta_files: &[std::path::PathBuf],
+        lua_files: &[std::path::PathBuf],
         cache_manager: &CacheManager,
-    ) -> Result<(TranspileContext, Vec<String>, TranspileStats), LoaderError> {
+    ) -> Result<(TranspileContext, Vec<String>, ProcessStats), LoaderError> {
         let transpiler = LuaTranspiler::default();
         let mut combined_context = TranspileContext::new();
-        let mut module_names = Vec::with_capacity(files.len());
+        let total_count = pasta_files.len() + lua_files.len();
+        let mut module_names = Vec::with_capacity(total_count);
         let mut failures = Vec::new();
-        let mut stats = TranspileStats {
+        let mut stats = ProcessStats {
             transpiled: 0,
             skipped: 0,
             failed: 0,
+            copied: 0,
         };
 
-        for file_path in files {
+        // Process .pasta files (transpile)
+        for file_path in pasta_files {
             // Check if transpilation is needed
             let needs_transpile = cache_manager.needs_transpile(file_path).unwrap_or(true);
 
@@ -312,14 +424,57 @@ impl PastaLoader {
             debug!(file = %file_path.display(), module = %module_name, "Transpiled");
         }
 
+        // Process .lua files (copy passthrough)
+        for file_path in lua_files {
+            let needs_copy = cache_manager.needs_transpile(file_path).unwrap_or(true);
+
+            // Always collect module name for scene_dic.lua
+            let module_name = cache_manager.source_to_module_name(file_path);
+            module_names.push(module_name.clone());
+
+            if !needs_copy {
+                stats.skipped += 1;
+                debug!(file = %file_path.display(), "Skipped .lua (cache up-to-date)");
+                continue;
+            }
+
+            // Read .lua file content directly (no parse/transpile)
+            let content = match fs::read_to_string(file_path) {
+                Ok(c) => c,
+                Err(e) => {
+                    warn!(
+                        file = %file_path.display(),
+                        error = %e,
+                        "Failed to read .lua file, skipping"
+                    );
+                    stats.failed += 1;
+                    continue;
+                }
+            };
+
+            // Save to cache (direct copy)
+            if let Err(e) = cache_manager.save_cache(file_path, &content) {
+                warn!(
+                    file = %file_path.display(),
+                    error = %e,
+                    "Failed to copy .lua file to cache, skipping"
+                );
+                stats.failed += 1;
+                continue;
+            }
+
+            stats.copied += 1;
+            debug!(file = %file_path.display(), module = %module_name, "Copied .lua");
+        }
+
         // Report failures if any
         if !failures.is_empty() {
-            warn!(failed = stats.failed, "Some files failed to transpile");
+            warn!(failed = stats.failed, "Some files failed to process");
             for failure in &failures {
                 warn!(
                     path = %failure.source_path.display(),
                     error = %failure.error,
-                    "Transpile failure"
+                    "Process failure"
                 );
             }
         }

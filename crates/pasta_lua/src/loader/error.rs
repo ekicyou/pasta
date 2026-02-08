@@ -84,6 +84,10 @@ pub enum LoaderError {
         source: std::io::Error,
     },
 
+    /// Invalid file name error (e.g., init.lua, init.pasta).
+    #[error("無効なファイル名です: '{0}'")]
+    InvalidFileName(PathBuf),
+
     /// scene_dic.lua generation error.
     #[error("scene_dic.lua の生成に失敗しました: {reason}")]
     SceneDicGenerationError {
@@ -151,6 +155,11 @@ impl LoaderError {
     /// Create a directory not found error.
     pub fn directory_not_found(path: impl Into<PathBuf>) -> Self {
         LoaderError::DirectoryNotFound(path.into())
+    }
+
+    /// Create an invalid file name error.
+    pub fn invalid_file_name(path: impl Into<PathBuf>) -> Self {
+        LoaderError::InvalidFileName(path.into())
     }
 
     /// Create a cache directory error.

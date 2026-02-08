@@ -92,6 +92,12 @@
 | @pasta_log スタックレベル検証       | `log_stack_level_test.rs`              | ✅ 完了 | 2テスト（lua-logging）                       |
 | スポット位置永続化（STORE連携）      | `persist_spot_position_test.lua`       | ✅ 完了 | 5テスト（persist-spot-position）             |
 | sakura_builder スポット処理          | `sakura_builder_test.lua`              | ✅ 完了 | 3テスト（persist-spot-position追加分）       |
+| Luaパススルー（init.*拒否）          | `lua_passthrough_test.rs`              | ✅ 完了 | 2テスト（lua-passthrough）                   |
+| Luaパススルー（.lua検出・コピー）    | `lua_passthrough_test.rs`              | ✅ 完了 | 3テスト（lua-passthrough）                   |
+| Luaパススルー（モジュール名衝突）    | `lua_passthrough_test.rs`              | ✅ 完了 | 2テスト（lua-passthrough）                   |
+| Luaパススルー（パススルー処理）      | `lua_passthrough_test.rs`              | ✅ 完了 | 2テスト（lua-passthrough）                   |
+| Luaパススルー（インクリメンタル）    | `lua_passthrough_test.rs`              | ✅ 完了 | 1テスト（lua-passthrough）                   |
+| Luaパススルー（孤立キャッシュ）      | `lua_passthrough_test.rs`              | ✅ 完了 | 2テスト（lua-passthrough）                   |
 
 ### 2.5 統合テスト（E2E）
 
