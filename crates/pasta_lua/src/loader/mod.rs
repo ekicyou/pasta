@@ -30,7 +30,8 @@ mod error;
 
 pub use cache::CacheManager;
 pub use config::{
-    LoaderConfig, LoggingConfig, LuaConfig, PastaConfig, PersistenceConfig, TalkConfig, default_libs,
+    LoaderConfig, LoggingConfig, LuaConfig, PastaConfig, PersistenceConfig, TalkConfig,
+    default_libs,
 };
 pub use context::LoaderContext;
 pub use error::{LoaderError, TranspileFailure};
@@ -119,7 +120,11 @@ impl PastaLoader {
         if total_files == 0 {
             warn!(path = %base_dir.display(), "No .pasta or .lua files found");
         } else {
-            info!(pasta = pasta_files.len(), lua = lua_files.len(), "Found files");
+            info!(
+                pasta = pasta_files.len(),
+                lua = lua_files.len(),
+                "Found files"
+            );
         }
 
         // Phase 4: Incremental process (transpile .pasta, copy .lua)

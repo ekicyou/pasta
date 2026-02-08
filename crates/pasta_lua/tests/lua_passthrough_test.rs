@@ -46,11 +46,7 @@ fn create_test_base() -> TempDir {
     let temp = TempDir::new().unwrap();
     let base_dir = temp.path();
 
-    fs::write(
-        base_dir.join("pasta.toml"),
-        "[loader]\ndebug_mode = true\n",
-    )
-    .unwrap();
+    fs::write(base_dir.join("pasta.toml"), "[loader]\ndebug_mode = true\n").unwrap();
 
     copy_runtime_deps(base_dir);
     temp
@@ -182,11 +178,7 @@ fn test_profile_lua_excluded() {
 
     // Create dic structure with a valid .lua file
     fs::create_dir_all(base_dir.join("dic/test")).unwrap();
-    fs::write(
-        base_dir.join("dic/test/valid.lua"),
-        "return {}\n",
-    )
-    .unwrap();
+    fs::write(base_dir.join("dic/test/valid.lua"), "return {}\n").unwrap();
 
     // Create profile .lua file (should NOT be picked up)
     fs::create_dir_all(base_dir.join("profile/pasta/some")).unwrap();
@@ -398,11 +390,7 @@ fn test_lua_orphan_cache_detected() {
 
     // Create .lua file and load
     fs::create_dir_all(base_dir.join("dic/orphan")).unwrap();
-    fs::write(
-        base_dir.join("dic/orphan/target.lua"),
-        "return {}\n",
-    )
-    .unwrap();
+    fs::write(base_dir.join("dic/orphan/target.lua"), "return {}\n").unwrap();
 
     let _runtime = PastaLoader::load(base_dir).unwrap();
 
