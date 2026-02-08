@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Rounded clip for background and plate only -->
+    <clipPath id="iconClip">
+      <rect width="512" height="512" rx="112" ry="112"/>
+    </clipPath>
+
+    <linearGradient id="bg" x1="0" y1="0" x2="0.1" y2="1">
+      <stop offset="0%" stop-color="#F7E8D5"/>
+      <stop offset="100%" stop-color="#EEDCC2"/>
+    </linearGradient>
+    <radialGradient id="plate" cx="0.44" cy="0.44" r="0.54">
+      <stop offset="0%" stop-color="#FFFEF9"/>
+      <stop offset="70%" stop-color="#F8F2E8"/>
+      <stop offset="100%" stop-color="#E8DCCB"/>
+    </radialGradient>
+    <linearGradient id="thread" x1="0" y1="0" x2="0.5" y2="1">
+      <stop offset="0%" stop-color="#E2AE4E"/>
+      <stop offset="50%" stop-color="#D49A3C"/>
+      <stop offset="100%" stop-color="#C08830"/>
+    </linearGradient>
+    <filter id="plateShadow" x="-10%" y="-5%" width="130%" height="130%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="16" result="blur"/>
+      <feOffset dx="2" dy="10" result="offset"/>
+      <feFlood flood-color="#6B5540" flood-opacity="0.14" result="color"/>
+      <feComposite in="color" in2="offset" operator="in" result="shadow"/>
+      <feMerge>
+        <feMergeNode in="shadow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="threadShadow" x="-10%" y="-10%" width="125%" height="125%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3" result="blur"/>
+      <feOffset dx="1" dy="2.5" result="offset"/>
+      <feFlood flood-color="#6B4420" flood-opacity="0.18" result="color"/>
+      <feComposite in="color" in2="offset" operator="in" result="shadow"/>
+      <feMerge>
+        <feMergeNode in="shadow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background and plate: clipped to rounded icon shape -->
+  <g clip-path="url(#iconClip)">
+    <rect width="512" height="512" fill="url(#bg)"/>
+
+    <g filter="url(#plateShadow)">
+      <ellipse cx="240" cy="250" rx="235" ry="225" fill="url(#plate)"/>
+      <ellipse cx="240" cy="250" rx="235" ry="225" fill="none" stroke="#D8CCBA" stroke-width="2.5" opacity="0.4"/>
+      <ellipse cx="240" cy="250" rx="170" ry="162" fill="none" stroke="#DDD2C2" stroke-width="1" opacity="0.35"/>
+    </g>
+  </g>
+
+  <!-- Pasta strand: NO rounded clip — only clipped by the viewBox itself.
+       The path extends well beyond 512, so it gets cut cleanly at the SVG edge.
+       This gives the feeling that the thread continues beyond the frame. -->
+  <g filter="url(#threadShadow)">
+    <!-- Behind-crossing (knot back) -->
+    <path d="M 210 185
+             C 178 205, 172 248, 204 262"
+          fill="none" stroke="url(#thread)" stroke-width="13" stroke-linecap="round"
+          opacity="0.35"/>
+
+    <!-- Main strand -->
+    <path d="M 168 135
+             C 175 155, 195 168, 210 185
+             C 225 202, 245 206, 252 228
+             C 260 252, 244 272, 222 278
+             C 200 284, 186 262, 204 242
+             C 222 222, 250 228, 256 250
+             C 264 278, 246 304, 228 318
+             C 210 332, 226 354, 250 350
+             C 278 345, 296 324, 315 306
+             C 340 284, 365 275, 390 290
+             C 418 308, 435 340, 448 378
+             C 460 412, 470 448, 478 490
+             C 486 530, 494 570, 502 620"
+          fill="none" stroke="url(#thread)" stroke-width="13" stroke-linecap="round"/>
+
+    <!-- Highlight -->
+    <path d="M 168 135
+             C 175 155, 195 168, 210 185
+             C 225 202, 245 206, 252 228
+             C 260 252, 244 272, 222 278
+             C 200 284, 186 262, 204 242
+             C 222 222, 250 228, 256 250
+             C 264 278, 246 304, 228 318
+             C 210 332, 226 354, 250 350
+             C 278 345, 296 324, 315 306
+             C 340 284, 365 275, 390 290
+             C 418 308, 435 340, 448 378
+             C 460 412, 470 448, 478 490
+             C 486 530, 494 570, 502 620"
+          fill="none" stroke="#F2CC60" stroke-width="4.5" stroke-linecap="round"
+          opacity="0.35"/>
+  </g>
+</svg>
