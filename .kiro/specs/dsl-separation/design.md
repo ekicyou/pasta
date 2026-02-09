@@ -84,12 +84,12 @@ graph TB
 
 ### Technology Stack
 
-| Layer | Choice / Version | Role in Feature | Notes |
-|-------|------------------|-----------------|-------|
-| Parser | Pest 2.8 | PEG文法解析エンジン | grammar.pest を使用してDSLをASTに変換 |
-| Error Handling | thiserror 2 | エラー型生成マクロ | ParseError の derive(Error) に使用 |
-| Workspace | Cargo Workspace | クレート依存管理 | pasta_dsl を新規メンバーとして追加 |
-| Build | pest_derive 2.8 | ビルド時コード生成 | grammar.pest から PastaParser2 を生成 |
+| Layer          | Choice / Version | Role in Feature     | Notes                                 |
+| -------------- | ---------------- | ------------------- | ------------------------------------- |
+| Parser         | Pest 2.8         | PEG文法解析エンジン | grammar.pest を使用してDSLをASTに変換 |
+| Error Handling | thiserror 2      | エラー型生成マクロ  | ParseError の derive(Error) に使用    |
+| Workspace      | Cargo Workspace  | クレート依存管理    | pasta_dsl を新規メンバーとして追加    |
+| Build          | pest_derive 2.8  | ビルド時コード生成  | grammar.pest から PastaParser2 を生成 |
 
 **備考**: tracing 依存は pasta_core に残す（parser で未使用）。pest, pest_derive, thiserror のみが pasta_dsl の依存となる。
 
@@ -99,33 +99,33 @@ graph TB
 
 ## Requirements Traceability
 
-| Requirement | Summary | Components | Interfaces | Flows |
-|-------------|---------|------------|------------|-------|
-| 1.1, 1.2, 1.3, 1.4 | DSLクレート抽出 | pasta_dsl (parser, error) | parse_str(), parse_file(), ParseError | - |
-| 2.1, 2.2, 2.3, 2.4, 2.5 | pasta_core整理と下流移行 | pasta_core (lib.rs変更), pasta_lua (import変更) | - | - |
-| 3.1, 3.2, 3.3, 3.4 | ワークスペース統合 | Cargo.toml (workspace, pasta_dsl) | - | - |
-| 4.1, 4.2, 4.3, 4.4, 4.5, 4.6 | 独立利用性 | pasta_dsl (Cargo.toml, tests移動) | 26テスト移動 | - |
-| 5.1, 5.2, 5.3 | エラー型分離 | pasta_dsl/error.rs, pasta_core/error.rs | ParseError, SceneTableError, WordTableError | - |
-| 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8 | ドキュメント更新 | 8ドキュメントファイル | - | - |
+| Requirement                            | Summary                  | Components                                      | Interfaces                                  | Flows |
+| -------------------------------------- | ------------------------ | ----------------------------------------------- | ------------------------------------------- | ----- |
+| 1.1, 1.2, 1.3, 1.4                     | DSLクレート抽出          | pasta_dsl (parser, error)                       | parse_str(), parse_file(), ParseError       | -     |
+| 2.1, 2.2, 2.3, 2.4, 2.5                | pasta_core整理と下流移行 | pasta_core (lib.rs変更), pasta_lua (import変更) | -                                           | -     |
+| 3.1, 3.2, 3.3, 3.4                     | ワークスペース統合       | Cargo.toml (workspace, pasta_dsl)               | -                                           | -     |
+| 4.1, 4.2, 4.3, 4.4, 4.5, 4.6           | 独立利用性               | pasta_dsl (Cargo.toml, tests移動)               | 26テスト移動                                | -     |
+| 5.1, 5.2, 5.3                          | エラー型分離             | pasta_dsl/error.rs, pasta_core/error.rs         | ParseError, SceneTableError, WordTableError | -     |
+| 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8 | ドキュメント更新         | 8ドキュメントファイル                           | -                                           | -     |
 
 ## Components and Interfaces
 
-| Component | Domain/Layer | Intent | Req Coverage | Key Dependencies (P0/P1) | Contracts |
-|-----------|--------------|--------|--------------|--------------------------|-----------|
-| pasta_dsl | Language-independent | DSLパーサー・AST定義を提供 | 1, 4, 5 | pest (P0), thiserror (P0) | Service, State |
-| pasta_core (更新) | Language-independent | レジストリ層とユーティリティ | 2, 5 | fast_radix_trie (P0), rand (P0) | Service |
-| pasta_lua (更新) | Backend | Luaバックエンド実装 | 2, 5 | pasta_dsl (P0), pasta_core (P0) | - |
-| Workspace Cargo.toml | Infrastructure | クレート依存管理 | 3 | - | - |
-| ドキュメント8ファイル | Documentation | アーキテクチャ図の整合性 | 6 | - | - |
+| Component             | Domain/Layer         | Intent                       | Req Coverage | Key Dependencies (P0/P1)        | Contracts      |
+| --------------------- | -------------------- | ---------------------------- | ------------ | ------------------------------- | -------------- |
+| pasta_dsl             | Language-independent | DSLパーサー・AST定義を提供   | 1, 4, 5      | pest (P0), thiserror (P0)       | Service, State |
+| pasta_core (更新)     | Language-independent | レジストリ層とユーティリティ | 2, 5         | fast_radix_trie (P0), rand (P0) | Service        |
+| pasta_lua (更新)      | Backend              | Luaバックエンド実装          | 2, 5         | pasta_dsl (P0), pasta_core (P0) | -              |
+| Workspace Cargo.toml  | Infrastructure       | クレート依存管理             | 3            | -                               | -              |
+| ドキュメント8ファイル | Documentation        | アーキテクチャ図の整合性     | 6            | -                               | -              |
 
 ### Language-independent Layer
 
 #### pasta_dsl
 
-| Field | Detail |
-|-------|--------|
-| Intent | Pasta DSLのパーサー・AST定義・パースエラー型を独立クレートとして提供 |
-| Requirements | 1.1, 1.2, 1.3, 1.4, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 5.1 |
+| Field        | Detail                                                               |
+| ------------ | -------------------------------------------------------------------- |
+| Intent       | Pasta DSLのパーサー・AST定義・パースエラー型を独立クレートとして提供 |
+| Requirements | 1.1, 1.2, 1.3, 1.4, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 5.1                |
 
 **Responsibilities & Constraints**
 - DSL文法定義（grammar.pest）の所有
@@ -180,10 +180,10 @@ pub struct ParseErrorInfo {
 
 #### pasta_core (更新)
 
-| Field | Detail |
-|-------|--------|
-| Intent | parserモジュールを完全除去し、レジストリ層とユーティリティに特化 |
-| Requirements | 2.1, 2.2, 2.4, 5.2 |
+| Field        | Detail                                                           |
+| ------------ | ---------------------------------------------------------------- |
+| Intent       | parserモジュールを完全除去し、レジストリ層とユーティリティに特化 |
+| Requirements | 2.1, 2.2, 2.4, 5.2                                               |
 
 **Responsibilities & Constraints**
 - parserモジュール・ParseError型の完全除去
@@ -228,10 +228,10 @@ pub use registry::{
 
 #### pasta_lua (更新)
 
-| Field | Detail |
-|-------|--------|
-| Intent | pasta_core::parser への参照を pasta_dsl::parser に変更 |
-| Requirements | 2.3, 5.3 |
+| Field        | Detail                                                 |
+| ------------ | ------------------------------------------------------ |
+| Intent       | pasta_core::parser への参照を pasta_dsl::parser に変更 |
+| Requirements | 2.3, 5.3                                               |
 
 **Responsibilities & Constraints**
 - pasta_dsl を直接依存に追加
@@ -255,10 +255,10 @@ pub use registry::{
 
 #### Workspace Cargo.toml
 
-| Field | Detail |
-|-------|--------|
-| Intent | pasta_dsl をワークスペースメンバーおよび依存として追加 |
-| Requirements | 3.1, 3.2 |
+| Field        | Detail                                                 |
+| ------------ | ------------------------------------------------------ |
+| Intent       | pasta_dsl をワークスペースメンバーおよび依存として追加 |
+| Requirements | 3.1, 3.2                                               |
 
 **Responsibilities & Constraints**
 - `members = ["crates/*"]` に pasta_dsl が自動的に含まれる
@@ -315,16 +315,16 @@ thiserror.workspace = true
 
 #### ドキュメント更新対象（8ファイル）
 
-| ファイル | 更新内容 | 要件 |
-|---------|---------|------|
-| README.md | レイヤー構成図とディレクトリツリーに pasta_dsl を追加 | 6.1 |
-| SOUL.md | Level 2 クレートREADMEリストに pasta_dsl を追加 | 6.2 |
-| .kiro/steering/tech.md | ワークスペースレイヤー構成図とクレート責務テーブルに pasta_dsl を追加 | 6.3 |
-| .kiro/steering/structure.md | ディレクトリ構造ツリー、ワークスペース構成図、レイヤー分離原則に pasta_dsl を追加 | 6.4 |
-| crates/pasta_core/README.md | アーキテクチャ図を更新し、parserモジュール除去を反映 | 6.5 |
-| crates/pasta_lua/README.md | 依存関係セクションに pasta_dsl への直接依存を反映 | 6.6 |
-| crates/pasta_shiori/README.md | 依存関係テーブルに pasta_dsl の位置付けを反映 | 6.7 |
-| TEST_COVERAGE.md | クレート一覧に pasta_dsl を追加、pasta_core のテスト数を更新（130→104） | 6.8 |
+| ファイル                      | 更新内容                                                                          | 要件 |
+| ----------------------------- | --------------------------------------------------------------------------------- | ---- |
+| README.md                     | レイヤー構成図とディレクトリツリーに pasta_dsl を追加                             | 6.1  |
+| SOUL.md                       | Level 2 クレートREADMEリストに pasta_dsl を追加                                   | 6.2  |
+| .kiro/steering/tech.md        | ワークスペースレイヤー構成図とクレート責務テーブルに pasta_dsl を追加             | 6.3  |
+| .kiro/steering/structure.md   | ディレクトリ構造ツリー、ワークスペース構成図、レイヤー分離原則に pasta_dsl を追加 | 6.4  |
+| crates/pasta_core/README.md   | アーキテクチャ図を更新し、parserモジュール除去を反映                              | 6.5  |
+| crates/pasta_lua/README.md    | 依存関係セクションに pasta_dsl への直接依存を反映                                 | 6.6  |
+| crates/pasta_shiori/README.md | 依存関係テーブルに pasta_dsl の位置付けを反映                                     | 6.7  |
+| TEST_COVERAGE.md              | クレート一覧に pasta_dsl を追加、pasta_core のテスト数を更新（130→104）           | 6.8  |
 
 **Implementation Notes**
 - Integration: 各ドキュメントの構成図を手動更新（テキスト編集）
@@ -400,14 +400,16 @@ graph LR
 5. `mod.rs`, `ast.rs`, `grammar.pest` を pasta_core から移動
 6. `src/error.rs` 作成、ParseError/ParseErrorInfo/ParseResult を pasta_core/error.rs から移動
 7. `tests/` ディレクトリ作成、4テストファイルを移動、import パス変更
-8. `cargo test -p pasta_dsl` で26テスト成功を確認
+8. `README.md` 新規作成（独立DSLパーサーとしての説明、使用例、依存関係を記載）
+9. `cargo test -p pasta_dsl` で26テスト成功を確認
 
 **Phase 2: pasta_core整理**
 1. `crates/pasta_core/src/lib.rs` から `pub mod parser;` と `pub use parser::*;` を削除
 2. `crates/pasta_core/src/error.rs` から ParseError/ParseErrorInfo/ParseResult を削除
 3. `crates/pasta_core/tests/` から4テストファイルを削除
-4. `crates/pasta_core/Cargo.toml` から pest, pest_derive を削除（不要になるため）
-5. `cargo test -p pasta_core` で104テスト成功を確認
+4. `crates/pasta_core/src/parser/` ディレクトリを削除（完全除去）
+5. `crates/pasta_core/Cargo.toml` から pest, pest_derive を削除（ステップ1-4完了後に実行、dependency unused 警告回避のため）
+6. `cargo test -p pasta_core` で104テスト成功を確認
 
 **Phase 3: pasta_lua移行**
 1. `crates/pasta_lua/Cargo.toml` に `pasta_dsl.workspace = true` を追加
