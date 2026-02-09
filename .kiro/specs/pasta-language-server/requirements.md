@@ -168,7 +168,11 @@ The pasta_dsl shall 部分パース機能に対する以下のテストを備え
 1. The pasta_lsp shall 開かれた各ドキュメントのテキスト内容をメモリ上に保持する
 2. When エディタから増分テキスト変更通知（`TextDocumentContentChangeEvent`）を受信した時, the pasta_lsp shall ドキュメント内容を正確に更新する
 3. When ドキュメント内容が更新された時, the pasta_lsp shall 再パースを実行しセマンティックトークンとDiagnosticsを更新する
-4. The pasta_lsp shall UNICODEテキスト（日本語識別子・全角マーカー含む）のバイトオフセット計算を正確に行う
+4. The pasta_lsp shall UNICODEテキスト（日本語識別子・全角マーカー・BMP外文字含む）のバイトオフセット計算を正確に行う。以下の文字種で正確なUTF-8→UTF-16位置変換を保証する:
+   - ASCII（1バイト → 1コードユニット）
+   - 日本語BMP内文字（3バイト → 1コードユニット）
+   - BMP外文字（絵文字、CJK拡張B等、4バイト → 2コードユニット/サロゲートペア）
+   - 結合文字シーケンス（可変バイト → code point単位でカウント）
 
 ### Requirement 7: テスト要件
 

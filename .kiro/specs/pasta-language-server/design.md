@@ -73,16 +73,16 @@ graph TB
 
 ### Technology Stack
 
-| レイヤー          | 技術 / バージョン                   | 本機能での役割                             | 備考                                                      |
-| ----------------- | ----------------------------------- | ------------------------------------------ | --------------------------------------------------------- |
+| レイヤー          | 技術 / バージョン                   | 本機能での役割                             | 備考                                                                                                                                                                                                                                                                                                                                                                                |
+| ----------------- | ----------------------------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | LSPフレームワーク | tower-lsp 0.20 (`runtime-agnostic`) | LanguageServer trait、JSON-RPCハンドリング | WASM互換。**リスク受容**: 最終更新から2年以上経過しているが、LSP 3.17機能は安定しており本仕様には十分。Analysis層の分離により、将来のフレームワーク移行時の影響を最小化。問題発生時はコミュニティフォーク（rust-analyzer等の主要プロジェクトで使用実績あり）またはlsp-server移行を検討。LSPプロトコル自体の安定性とセマンティックトークン機能の成熟により、セキュリティリスクは低い |
-| LSP型定義         | lsp-types 0.97                      | SemanticTokens, Diagnostic等の型           | tower-lspが再エクスポート（0.94.1）。必要に応じ直接依存   |
-| パーサー          | pasta_dsl 0.1.x (pest 2.8)          | PEGパース、AST生成                         | `default-features = false`でWASM互換                      |
-| エラー型          | thiserror 2                         | LangServerError定義                        | `no_std`対応でWASM互換                                    |
-| WASMブリッジ      | wasm-bindgen 0.2                    | JS⇔Rustバインディング                      | `cfg(target_arch = "wasm32")`で条件コンパイル             |
-| 非同期            | wasm-bindgen-futures 0.4            | JS Promise⇔Rust Future変換                 | WASM環境専用                                              |
-| シリアライズ      | serde 1 / serde_json 1              | JSON-RPCメッセージ処理                     | WASM互換                                                  |
-| テキスト管理      | 標準ライブラリString                | ドキュメントテキスト保持                   | 初期はString直接管理。パフォーマンス問題時にropey検討     |
+| LSP型定義         | lsp-types 0.97                      | SemanticTokens, Diagnostic等の型           | tower-lspが再エクスポート（0.94.1）。必要に応じ直接依存                                                                                                                                                                                                                                                                                                                             |
+| パーサー          | pasta_dsl 0.1.x (pest 2.8)          | PEGパース、AST生成                         | `default-features = false`でWASM互換                                                                                                                                                                                                                                                                                                                                                |
+| エラー型          | thiserror 2                         | LangServerError定義                        | `no_std`対応でWASM互換                                                                                                                                                                                                                                                                                                                                                              |
+| WASMブリッジ      | wasm-bindgen 0.2                    | JS⇔Rustバインディング                      | `cfg(target_arch = "wasm32")`で条件コンパイル                                                                                                                                                                                                                                                                                                                                       |
+| 非同期            | wasm-bindgen-futures 0.4            | JS Promise⇔Rust Future変換                 | WASM環境専用                                                                                                                                                                                                                                                                                                                                                                        |
+| シリアライズ      | serde 1 / serde_json 1              | JSON-RPCメッセージ処理                     | WASM互換                                                                                                                                                                                                                                                                                                                                                                            |
+| テキスト管理      | 標準ライブラリString                | ドキュメントテキスト保持                   | 初期はString直接管理。パフォーマンス問題時にropey検討                                                                                                                                                                                                                                                                                                                               |
 
 ## System Flows
 
@@ -571,6 +571,25 @@ pub fn utf8_offset_to_utf16(line_text: &str, byte_offset: usize) -> u32 {
 
 **重要**: 日本語文字（CJK）はUTF-8で3バイト、UTF-16で1コードユニット。BMP外の文字はUTF-16で2コードユニット（サロゲートペア）。pasta_dsl `Span`の`start_col`/`end_col`はUTF-8バイトベースのため、直接LSPに渡せない。テキスト行を参照してUTF-16変換が必要。
 
+#### BMP外文字の扱い
+
+Pasta DSLはUNICODE識別子を許可しているため、ユーザーがBMP外文字（絵文字、CJK拡張文字、古代文字等）を変数名・コメント・文字列リテラルに使用する可能性がある。UTF-16変換における境界条件：
+
+| 文字種                     | UTF-8バイト数 | UTF-16コードユニット数 | 例                       |
+| -------------------------- | ------------- | ---------------------- | ------------------------ |
+| ASCII                      | 1             | 1                      | `a`, `*`, `@`            |
+| 日本語（BMP内）            | 3             | 1                      | `あ`, `＊`, `＠`         |
+| 絵文字（BMP外）            | 4             | 2（サロゲートペア）    | `😀` (U+1F600)           |
+| CJK拡張B以降（BMP外）      | 4             | 2（サロゲートペア）    | `𠮷` (U+20BB7)           |
+| 結合文字シーケンス         | 可変          | 可変                   | `é` (e + combining ´)    |
+
+**`encode_utf16().count()`の正確性**:
+- サロゲートペアを2コードユニットとして正しくカウント（`😀`は2、`あ`は1）
+- 結合文字は個別にカウント（grapheme cluster単位ではなくcode point単位）
+- LSPプロトコルはcode point単位を要求するため、結合文字の個別カウントは正しい挙動
+
+**テスト要件**: `utf16_conversion_test.rs`でBMP外文字のテストケースを含める（R6.4, R7.4）
+
 ## Error Handling
 
 ### Error Strategy
@@ -617,7 +636,8 @@ pub enum LangServerError {
 | `semantic_token_test.rs`      | 各14トークンタイプの識別、AST→トークン変換  | R2.2, R2.4, R7.1 |
 | `fullwidth_halfwidth_test.rs` | 全角/半角マーカー両パターンの同等トークン化 | R2.5, R7.3       |
 | `japanese_identifier_test.rs` | 日本語シーン名・変数名・単語名のトークン化  | R6.4, R7.4       |
-| `utf16_conversion_test.rs`    | UTF-8→UTF-16位置変換の正確性                | R6.4             |
+| `utf16_conversion_test.rs`    | UTF-8→UTF-16位置変換の正確性（BMP内文字：日本語、ASCII） | R6.4             |
+| `utf16_conversion_test.rs`    | UTF-8→UTF-16位置変換の境界条件（BMP外文字：絵文字、CJK拡張B、サロゲートペア） | R6.4, R7.4       |
 
 ### Unit Tests (`crates/pasta_dsl/tests/` - 部分パース機能)
 
