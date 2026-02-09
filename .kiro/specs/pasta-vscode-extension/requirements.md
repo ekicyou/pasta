@@ -37,7 +37,12 @@
 1. The pasta-vscode extension shall pasta_lspのビルド成果物を拡張パッケージに含める、またはパスで参照できる構成とする
 2. When 拡張がアクティベートされた時、the pasta-vscode extension shall LSPサーバーを起動する
 3. The pasta-vscode extension shall LSPクライアント（`vscode-languageclient`）を使用してLSPプロトコルを処理する
-4. If LSPサーバーの起動に失敗した場合、the pasta-vscode extension shall ユーザーにエラー通知を表示し、TextMate文法のみのフォールバックモードで動作する
+4. The pasta-vscode extension shall LSP標準のドキュメント同期（`textDocument/didOpen`, `didChange`, `didClose`）をサポートする
+5. When pasta_lspが診断情報を送信した時、the pasta-vscode extension shall エラーをVSCodeの問題パネルに表示する
+6. The pasta-vscode extension shall UTF-16ベースの位置情報を正しく処理する（日本語・全角文字対応）
+7. If LSPサーバーの起動に失敗した場合、the pasta-vscode extension shall ユーザーにエラー通知を表示し、TextMate文法のみのフォールバックモードで動作する
+
+> **Note (LSP標準機能)**: ドキュメント同期、診断情報表示、UTF-16位置変換はLSPクライアント（`vscode-languageclient`）が自動処理する標準機能であり、拡張側での特別な実装は不要である。
 
 ### Requirement 3: セマンティックハイライト
 
@@ -74,29 +79,7 @@
 4. While セマンティックトークンが利用可能である場合、the pasta-vscode extension shall セマンティックハイライトでTextMate文法のハイライトを上書きする
 5. If LSPサーバーが起動に失敗した場合、the pasta-vscode extension shall TextMate文法のみでの基本ハイライトにフォールバックする
 
-### Requirement 5: 診断情報の表示
-
-**Objective:** 開発者として、`*.pasta`ファイルのパースエラーがVSCodeの問題パネルに表示されること。
-
-#### Acceptance Criteria
-
-1. When `*.pasta`ファイルにパースエラーが存在する時、the pasta-vscode extension shall エラーを診断情報としてVSCodeの問題パネルに表示する
-2. The pasta-vscode extension shall エラー位置（行・列）を正確にハイライトする
-3. When パースエラーが修正された時、the pasta-vscode extension shall 対応する診断情報をクリアする
-4. While 部分パースが有効である場合、the pasta-vscode extension shall エラー箇所以外の部分について正常にハイライトを提供する
-
-### Requirement 6: ドキュメント同期
-
-**Objective:** 開発者として、ファイルの開閉・編集がLSPサーバーと正しく同期されること。
-
-#### Acceptance Criteria
-
-1. When `*.pasta`ファイルを開いた時、the pasta-vscode extension shall `textDocument/didOpen`通知をLSPサーバーに送信する
-2. When `*.pasta`ファイルを編集した時、the pasta-vscode extension shall `textDocument/didChange`通知をLSPサーバーに送信する
-3. When `*.pasta`ファイルを閉じた時、the pasta-vscode extension shall `textDocument/didClose`通知をLSPサーバーに送信する
-4. The pasta-vscode extension shall UTF-16ベースの位置情報を正しく処理する（日本語・全角文字対応）
-
-### Requirement 7: プロジェクト配置と構成
+### Requirement 5: プロジェクト配置と構成
 
 **Objective:** メンテナーとして、pasta-vscode拡張がpastaワークスペース内の適切な場所に配置され、ビルド・パッケージングが可能であること。
 
