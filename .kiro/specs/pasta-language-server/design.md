@@ -6,7 +6,7 @@
 
 **ユーザー**: Pasta DSLを使ってゴースト対話スクリプトを記述する開発者が対象。エディタ上でDSL構文の色分け表示を受け、コードの可読性向上と構文エラーの早期発見を行う。
 
-**インパクト**: 既存の`pasta_dsl`クレートのパーサー・AST資産を再利用し、新規の`crates/pasta_lang_server/`クレートとして追加する。既存クレートへの影響は、`pasta_dsl`への部分パースAPI（`parse_str_partial()`）の追加のみ。
+**インパクト**: 既存の`pasta_dsl`クレートのパーサー・AST資産を再利用し、新規の`crates/pasta_lsp/`クレートとして追加する。既存クレートへの影響は、`pasta_dsl`への部分パースAPI（`parse_str_partial()`）の追加のみ。
 
 ### ゴール
 - LSP 3.17準拠のセマンティックトークンプロバイダーとして動作する
@@ -27,7 +27,7 @@
 
 **選択パターン**: **2層分離アーキテクチャ**（research.mdパターンBの簡略化版）
 
-研究段階ではパターンB（`pasta_lsp_core` / `pasta_lsp_server` / `pasta_lsp_wasm`の3クレート分離）を検討したが、scope-evolution.mdの原則「**スコープ外にするのはよほどのことがあるとき**」および「**まずスコープ拡張を優先**」に従い、初期は単一クレート（`pasta_lang_server`）内で論理的にレイヤー分離する。ネイティブサーバー需要が発生した時点で物理的なクレート分割を行う。
+研究段階ではパターンB（`pasta_lsp_core` / `pasta_lsp_server` / `pasta_lsp_wasm`の3クレート分離）を検討したが、scope-evolution.mdの原則「**スコープ外にするのはよほどのことがあるとき**」および「**まずスコープ拡張を優先**」に従い、初期は単一クレート（`pasta_lsp`）内で論理的にレイヤー分離する。ネイティブサーバー需要が発生した時点で物理的なクレート分割を行う。
 
 ```mermaid
 graph TB
@@ -36,7 +36,7 @@ graph TB
         WB[WASM Bridge<br/>postMessage ↔ AsyncRead/Write]
     end
 
-    subgraph "pasta_lang_server (Rust/WASM)"
+    subgraph "pasta_lsp (Rust/WASM)"
         direction TB
         TP[Transport Layer<br/>WASM: wasm-bindgen<br/>Native: stdio]
         LS[LSP Protocol Handler<br/>tower-lsp LanguageServer]
@@ -73,16 +73,16 @@ graph TB
 
 ### Technology Stack
 
-| レイヤー | 技術 / バージョン | 本機能での役割 | 備考 |
-|----------|------------------|---------------|------|
+| レイヤー          | 技術 / バージョン                   | 本機能での役割                             | 備考                                                      |
+| ----------------- | ----------------------------------- | ------------------------------------------ | --------------------------------------------------------- |
 | LSPフレームワーク | tower-lsp 0.20 (`runtime-agnostic`) | LanguageServer trait、JSON-RPCハンドリング | WASM互換。メンテナンス停滞リスクあり→Analysis層分離で緩和 |
-| LSP型定義 | lsp-types 0.97 | SemanticTokens, Diagnostic等の型 | tower-lspが再エクスポート（0.94.1）。必要に応じ直接依存 |
-| パーサー | pasta_dsl 0.1.x (pest 2.8) | PEGパース、AST生成 | `default-features = false`でWASM互換 |
-| エラー型 | thiserror 2 | LangServerError定義 | `no_std`対応でWASM互換 |
-| WASMブリッジ | wasm-bindgen 0.2 | JS⇔Rustバインディング | `cfg(target_arch = "wasm32")`で条件コンパイル |
-| 非同期 | wasm-bindgen-futures 0.4 | JS Promise⇔Rust Future変換 | WASM環境専用 |
-| シリアライズ | serde 1 / serde_json 1 | JSON-RPCメッセージ処理 | WASM互換 |
-| テキスト管理 | 標準ライブラリString | ドキュメントテキスト保持 | 初期はString直接管理。パフォーマンス問題時にropey検討 |
+| LSP型定義         | lsp-types 0.97                      | SemanticTokens, Diagnostic等の型           | tower-lspが再エクスポート（0.94.1）。必要に応じ直接依存   |
+| パーサー          | pasta_dsl 0.1.x (pest 2.8)          | PEGパース、AST生成                         | `default-features = false`でWASM互換                      |
+| エラー型          | thiserror 2                         | LangServerError定義                        | `no_std`対応でWASM互換                                    |
+| WASMブリッジ      | wasm-bindgen 0.2                    | JS⇔Rustバインディング                      | `cfg(target_arch = "wasm32")`で条件コンパイル             |
+| 非同期            | wasm-bindgen-futures 0.4            | JS Promise⇔Rust Future変換                 | WASM環境専用                                              |
+| シリアライズ      | serde 1 / serde_json 1              | JSON-RPCメッセージ処理                     | WASM互換                                                  |
+| テキスト管理      | 標準ライブラリString                | ドキュメントテキスト保持                   | 初期はString直接管理。パフォーマンス問題時にropey検討     |
 
 ## System Flows
 
@@ -142,42 +142,42 @@ flowchart TD
 
 ## Requirements Traceability
 
-| 要件 | 概要 | コンポーネント | インターフェース | フロー |
-|------|------|---------------|-----------------|--------|
-| R1.1-R1.5 | LSPサーバー基盤 | LSP Protocol Handler | LanguageServer trait | フロー1 |
-| R2.1 | semanticTokens/full | SemanticTokenProvider | semantic_tokens_full() | フロー1 |
-| R2.2 | 14トークンタイプ識別 | SemanticTokenProvider | TOKEN_LEGEND | — |
-| R2.3 | 変更時の再計算 | Document Manager, Analysis Engine | analyze() | フロー1 |
-| R2.4 | インライン要素レベル粒度 | SemanticTokenProvider | action_to_tokens() | — |
-| R2.5 | 全角/半角マーカー同等認識 | Analysis Engine (pasta_dsl委譲) | — | — |
-| R2.6 | エラー時の部分トークン | Analysis Engine | partial_analyze() | フロー2 |
-| R3.1 | parse_str()利用 | Analysis Engine | parse_str() | フロー1 |
-| R3.2 | Diagnostics通知 | DiagnosticsProvider | to_lsp_diagnostics() | フロー1 |
-| R3.3 | ASTノードからトークン算出 | SemanticTokenProvider | visit_*() | — |
-| R3.4 | クラッシュ耐性 | LSP Protocol Handler | catch_unwind + log | — |
-| R3.5 | parse_str_partial() | Analysis Engine → pasta_dsl | parse_str_partial() | フロー2 |
-| R4.1-R4.5 | WASMビルド対応 | Transport Layer | cfg(wasm32) | — |
-| R5.1-R5.5 | クレート設計 | 全体 | Cargo.toml | — |
-| R6.1-R6.4 | ドキュメント管理 | Document Manager | open/change/close | フロー1 |
-| R7.1-R7.6 | テスト要件 | 全テストモジュール | — | — |
+| 要件      | 概要                      | コンポーネント                    | インターフェース       | フロー  |
+| --------- | ------------------------- | --------------------------------- | ---------------------- | ------- |
+| R1.1-R1.5 | LSPサーバー基盤           | LSP Protocol Handler              | LanguageServer trait   | フロー1 |
+| R2.1      | semanticTokens/full       | SemanticTokenProvider             | semantic_tokens_full() | フロー1 |
+| R2.2      | 14トークンタイプ識別      | SemanticTokenProvider             | TOKEN_LEGEND           | —       |
+| R2.3      | 変更時の再計算            | Document Manager, Analysis Engine | analyze()              | フロー1 |
+| R2.4      | インライン要素レベル粒度  | SemanticTokenProvider             | action_to_tokens()     | —       |
+| R2.5      | 全角/半角マーカー同等認識 | Analysis Engine (pasta_dsl委譲)   | —                      | —       |
+| R2.6      | エラー時の部分トークン    | Analysis Engine                   | partial_analyze()      | フロー2 |
+| R3.1      | parse_str()利用           | Analysis Engine                   | parse_str()            | フロー1 |
+| R3.2      | Diagnostics通知           | DiagnosticsProvider               | to_lsp_diagnostics()   | フロー1 |
+| R3.3      | ASTノードからトークン算出 | SemanticTokenProvider             | visit_*()              | —       |
+| R3.4      | クラッシュ耐性            | LSP Protocol Handler              | catch_unwind + log     | —       |
+| R3.5      | parse_str_partial()       | Analysis Engine → pasta_dsl       | parse_str_partial()    | フロー2 |
+| R4.1-R4.5 | WASMビルド対応            | Transport Layer                   | cfg(wasm32)            | —       |
+| R5.1-R5.5 | クレート設計              | 全体                              | Cargo.toml             | —       |
+| R6.1-R6.4 | ドキュメント管理          | Document Manager                  | open/change/close      | フロー1 |
+| R7.1-R7.6 | テスト要件                | 全テストモジュール                | —                      | —       |
 
 ## Components and Interfaces
 
-| コンポーネント | レイヤー | 目的 | 要件カバレッジ | 主要依存(P0) | コントラクト |
-|--------------|---------|------|-------------|-------------|-------------|
-| PastaLangServer | Protocol | tower-lsp LanguageServer実装 | R1 | tower-lsp (P0), AnalysisEngine (P0) | Service |
-| AnalysisEngine | Analysis | AST→トークン変換、部分パース | R2, R3 | pasta_dsl (P0), lsp-types (P0) | Service |
-| DocumentManager | Analysis | テキスト保持・同期 | R6 | — | State |
-| TransportBridge | Transport | WASM/Native抽象化 | R4 | wasm-bindgen (P0, WASM時) | Service |
+| コンポーネント  | レイヤー  | 目的                         | 要件カバレッジ | 主要依存(P0)                        | コントラクト |
+| --------------- | --------- | ---------------------------- | -------------- | ----------------------------------- | ------------ |
+| PastaLangServer | Protocol  | tower-lsp LanguageServer実装 | R1             | tower-lsp (P0), AnalysisEngine (P0) | Service      |
+| AnalysisEngine  | Analysis  | AST→トークン変換、部分パース | R2, R3         | pasta_dsl (P0), lsp-types (P0)      | Service      |
+| DocumentManager | Analysis  | テキスト保持・同期           | R6             | —                                   | State        |
+| TransportBridge | Transport | WASM/Native抽象化            | R4             | wasm-bindgen (P0, WASM時)           | Service      |
 
 ### Protocol Layer
 
 #### PastaLangServer
 
-| 項目 | 詳細 |
-|------|------|
+| 項目 | 詳細                                                                                  |
+| ---- | ------------------------------------------------------------------------------------- |
 | 責務 | tower-lsp `LanguageServer` traitの実装。LSPライフサイクル管理、リクエストディスパッチ |
-| 要件 | R1.1, R1.2, R1.3, R1.4, R1.5, R2.1, R2.3, R3.4 |
+| 要件 | R1.1, R1.2, R1.3, R1.4, R1.5, R2.1, R2.3, R3.4                                        |
 
 **責務と制約**
 - LSPプロトコルメッセージのハンドリング（initialize, didOpen, didChange, didClose, semanticTokens/full）
@@ -216,10 +216,10 @@ impl LanguageServer for PastaLangServer {
 
 #### AnalysisEngine
 
-| 項目 | 詳細 |
-|------|------|
+| 項目 | 詳細                                                                |
+| ---- | ------------------------------------------------------------------- |
 | 責務 | pasta_dsl ASTからLSPセマンティックトークンへの変換、Diagnostics生成 |
-| 要件 | R2.1, R2.2, R2.4, R2.5, R2.6, R3.1, R3.2, R3.3, R3.5 |
+| 要件 | R2.1, R2.2, R2.4, R2.5, R2.6, R3.1, R3.2, R3.3, R3.5                |
 
 **責務と制約**
 - `pasta_dsl::parse_str()`によるAST取得とトークン変換
@@ -258,10 +258,10 @@ impl AnalysisEngine {
 
 #### DocumentManager
 
-| 項目 | 詳細 |
-|------|------|
+| 項目 | 詳細                                                             |
+| ---- | ---------------------------------------------------------------- |
 | 責務 | 開かれたドキュメントのテキスト保持、増分更新、解析結果キャッシュ |
-| 要件 | R6.1, R6.2, R6.3, R6.4 |
+| 要件 | R6.1, R6.2, R6.3, R6.4                                           |
 
 **責務と制約**
 - `HashMap<Url, DocumentState>`によるドキュメント状態管理
@@ -308,10 +308,10 @@ impl DocumentManager {
 
 #### TransportBridge
 
-| 項目 | 詳細 |
-|------|------|
+| 項目 | 詳細                                                                    |
+| ---- | ----------------------------------------------------------------------- |
 | 責務 | プラットフォーム固有のトランスポートを抽象化し、tower-lspのServerに接続 |
-| 要件 | R4.1, R4.2, R4.3, R4.4, R4.5 |
+| 要件 | R4.1, R4.2, R4.3, R4.4, R4.5                                            |
 
 **責務と制約**
 - WASM環境: `wasm-bindgen`経由のメッセージパッシング → `AsyncRead`/`AsyncWrite`アダプタ
@@ -389,25 +389,25 @@ pub const TOKEN_MODIFIERS: &[SemanticTokenModifier] = &[
 
 #### AST→トークンマッピング
 
-| AST型 | トークンタイプ | マッピング対象 |
-|--------|---------------|---------------|
-| `FileItem::GlobalSceneScope` の `global_scene_line` | NAMESPACE (1) | マーカー`＊`/`*` + シーン名 |
-| `LocalSceneScope` の `local_scene_line` | scene (2) | マーカー`・`/`-` + シーン名 |
-| `FileItem::FileAttr` / `Attr` | DECORATOR (3) | マーカー`＆`/`&` + key:value |
-| `FileItem::GlobalWord` / `KeyWords` | word (4) | マーカー`＠`/`@` + name:words |
-| `VarSet` / `VarRef` | VARIABLE (5) | `＄`/`$`変数参照・設定 |
-| `CallScene` | call (6) | マーカー`＞`/`>` + シーン名 |
-| `FileItem::ActorScope` の `actor_line` | actor (7) | マーカー`％`/`%` + アクター名 |
-| `ActionLine` の `actor` (id) | actorName (8) | アクション行の`：`前の識別子 |
-| `CodeBlock` | codeBlock (9) | ` ```...``` ` 全体 |
-| `Action::Talk` | STRING (10) | テキスト部分 |
-| `Action::SakuraScript` | sakuraScript (11) | `\s[]`, `\n`等 |
-| `Action::Escape` | escape (12) | `@@`, `$$`, `\\\\` |
-| `Action::WordRef` | word (4) | インライン`@name` |
-| `Action::VarRef` | VARIABLE (5) | インライン`$var` |
-| `Action::FnCall` | word (4) | インライン`@func()` |
-| コロン（`kv_marker`） | OPERATOR (13) | `：`/`:`セパレータ |
-| コメント（`or_comment_eol`内） | COMMENT (0) | `＃`/`#`以降 |
+| AST型                                               | トークンタイプ    | マッピング対象                |
+| --------------------------------------------------- | ----------------- | ----------------------------- |
+| `FileItem::GlobalSceneScope` の `global_scene_line` | NAMESPACE (1)     | マーカー`＊`/`*` + シーン名   |
+| `LocalSceneScope` の `local_scene_line`             | scene (2)         | マーカー`・`/`-` + シーン名   |
+| `FileItem::FileAttr` / `Attr`                       | DECORATOR (3)     | マーカー`＆`/`&` + key:value  |
+| `FileItem::GlobalWord` / `KeyWords`                 | word (4)          | マーカー`＠`/`@` + name:words |
+| `VarSet` / `VarRef`                                 | VARIABLE (5)      | `＄`/`$`変数参照・設定        |
+| `CallScene`                                         | call (6)          | マーカー`＞`/`>` + シーン名   |
+| `FileItem::ActorScope` の `actor_line`              | actor (7)         | マーカー`％`/`%` + アクター名 |
+| `ActionLine` の `actor` (id)                        | actorName (8)     | アクション行の`：`前の識別子  |
+| `CodeBlock`                                         | codeBlock (9)     | ` ```...``` ` 全体            |
+| `Action::Talk`                                      | STRING (10)       | テキスト部分                  |
+| `Action::SakuraScript`                              | sakuraScript (11) | `\s[]`, `\n`等                |
+| `Action::Escape`                                    | escape (12)       | `@@`, `$$`, `\\\\`            |
+| `Action::WordRef`                                   | word (4)          | インライン`@name`             |
+| `Action::VarRef`                                    | VARIABLE (5)      | インライン`$var`              |
+| `Action::FnCall`                                    | word (4)          | インライン`@func()`           |
+| コロン（`kv_marker`）                               | OPERATOR (13)     | `：`/`:`セパレータ            |
+| コメント（`or_comment_eol`内）                      | COMMENT (0)       | `＃`/`#`以降                  |
 
 #### LSPセマンティックトークンのdeltaエンコーディング
 
@@ -472,7 +472,7 @@ pub fn utf8_offset_to_utf16(line_text: &str, byte_offset: usize) -> u32 {
 ### Error Strategy
 
 ```rust
-/// pasta_lang_server固有のエラー型
+/// pasta_lsp固有のエラー型
 #[derive(Debug, thiserror::Error)]
 pub enum LangServerError {
     /// pasta_dslパースエラー（Diagnosticsに変換して続行）
@@ -491,12 +491,12 @@ pub enum LangServerError {
 
 ### Error Categories and Responses
 
-| エラー種別 | 発生源 | 対応 | ユーザーへの影響 |
-|-----------|--------|------|----------------|
-| パースエラー | pasta_dsl::parse_str() | Diagnosticsとして通知。部分パースへフォールバック | エラー行にマーカー表示。他の行はハイライト維持 |
-| パーサーパニック | pest内部エラー等 | catch_unwind → Internal error ログ | 該当ドキュメントのハイライト停止。他ドキュメント影響なし |
-| ドキュメント未管理 | didOpen前のリクエスト | 空のSemanticTokens返却 | ハイライトなし（エディタ側は通常発生しない） |
-| WASM通信エラー | postMessage失敗等 | JS側でエラーハンドリング | 拡張機能の再読み込み案内 |
+| エラー種別         | 発生源                 | 対応                                              | ユーザーへの影響                                         |
+| ------------------ | ---------------------- | ------------------------------------------------- | -------------------------------------------------------- |
+| パースエラー       | pasta_dsl::parse_str() | Diagnosticsとして通知。部分パースへフォールバック | エラー行にマーカー表示。他の行はハイライト維持           |
+| パーサーパニック   | pest内部エラー等       | catch_unwind → Internal error ログ                | 該当ドキュメントのハイライト停止。他ドキュメント影響なし |
+| ドキュメント未管理 | didOpen前のリクエスト  | 空のSemanticTokens返却                            | ハイライトなし（エディタ側は通常発生しない）             |
+| WASM通信エラー     | postMessage失敗等      | JS側でエラーハンドリング                          | 拡張機能の再読み込み案内                                 |
 
 ### Monitoring
 
@@ -506,39 +506,39 @@ pub enum LangServerError {
 
 ## Testing Strategy
 
-### Unit Tests (`crates/pasta_lang_server/tests/`)
+### Unit Tests (`crates/pasta_lsp/tests/`)
 
-| テストファイル | 対象 | 要件 |
-|--------------|------|------|
-| `semantic_token_test.rs` | 各14トークンタイプの識別、AST→トークン変換 | R2.2, R2.4, R7.1 |
-| `fullwidth_halfwidth_test.rs` | 全角/半角マーカー両パターンの同等トークン化 | R2.5, R7.3 |
-| `japanese_identifier_test.rs` | 日本語シーン名・変数名・単語名のトークン化 | R6.4, R7.4 |
-| `utf16_conversion_test.rs` | UTF-8→UTF-16位置変換の正確性 | R6.4 |
-| `partial_parse_test.rs` | エラー時の部分トークン提供、Phase 1→2→3 | R2.6, R3.5 |
+| テストファイル                | 対象                                        | 要件             |
+| ----------------------------- | ------------------------------------------- | ---------------- |
+| `semantic_token_test.rs`      | 各14トークンタイプの識別、AST→トークン変換  | R2.2, R2.4, R7.1 |
+| `fullwidth_halfwidth_test.rs` | 全角/半角マーカー両パターンの同等トークン化 | R2.5, R7.3       |
+| `japanese_identifier_test.rs` | 日本語シーン名・変数名・単語名のトークン化  | R6.4, R7.4       |
+| `utf16_conversion_test.rs`    | UTF-8→UTF-16位置変換の正確性                | R6.4             |
+| `partial_parse_test.rs`       | エラー時の部分トークン提供、Phase 1→2→3     | R2.6, R3.5       |
 
 ### Integration Tests
 
-| テストファイル | 対象 | 要件 |
-|--------------|------|------|
-| `lsp_lifecycle_test.rs` | initialize→didOpen→semanticTokens→didClose | R1, R7.2 |
-| `document_sync_test.rs` | didChange（増分更新）→再解析→トークン更新 | R6.2, R6.3 |
-| `diagnostics_test.rs` | パースエラー→Diagnostics通知 | R3.2 |
-| `crash_recovery_test.rs` | パーサーパニック時のサーバー継続動作 | R3.4 |
+| テストファイル           | 対象                                       | 要件       |
+| ------------------------ | ------------------------------------------ | ---------- |
+| `lsp_lifecycle_test.rs`  | initialize→didOpen→semanticTokens→didClose | R1, R7.2   |
+| `document_sync_test.rs`  | didChange（増分更新）→再解析→トークン更新  | R6.2, R6.3 |
+| `diagnostics_test.rs`    | パースエラー→Diagnostics通知               | R3.2       |
+| `crash_recovery_test.rs` | パーサーパニック時のサーバー継続動作       | R3.4       |
 
 ### CI Tests
 
-| テスト | 対象 | 要件 |
-|--------|------|------|
-| `cargo build --target wasm32-unknown-unknown` | WASMビルド成功検証 | R4.1, R7.5 |
-| `cargo test -p pasta_lang_server` | ユニット+統合テスト | R7 |
+| テスト                                        | 対象                | 要件       |
+| --------------------------------------------- | ------------------- | ---------- |
+| `cargo build --target wasm32-unknown-unknown` | WASMビルド成功検証  | R4.1, R7.5 |
+| `cargo test -p pasta_lsp`             | ユニット+統合テスト | R7         |
 
 ## Performance & Scalability
 
-| 項目 | 目標 | 手段 |
-|------|------|------|
-| semanticTokens/full応答 | < 100ms（1000行ファイル） | パース結果キャッシュ（didChange時に事前計算） |
-| WASMバイナリサイズ | < 2MB（wasm-opt後） | 不要feature削除、LTO有効化 |
-| メモリ使用量 | ドキュメント数 × テキストサイズ + トークンキャッシュ | 閉じたドキュメントの即座解放 |
+| 項目                    | 目標                                                 | 手段                                          |
+| ----------------------- | ---------------------------------------------------- | --------------------------------------------- |
+| semanticTokens/full応答 | < 100ms（1000行ファイル）                            | パース結果キャッシュ（didChange時に事前計算） |
+| WASMバイナリサイズ      | < 2MB（wasm-opt後）                                  | 不要feature削除、LTO有効化                    |
+| メモリ使用量            | ドキュメント数 × テキストサイズ + トークンキャッシュ | 閉じたドキュメントの即座解放                  |
 
 ## Supporting References
 

@@ -2,7 +2,7 @@
 
 ## はじめに
 
-本ドキュメントは、Pasta DSL向けランゲージサーバー（`pasta_lang_server` クレート）の要件を定義する。
+本ドキュメントは、Pasta DSL向けランゲージサーバー（`pasta_lsp` クレート）の要件を定義する。
 
 **目的**: VSCode等のエディタで`*.pasta`ファイルのシンタックスハイライトを提供するLanguage Server Protocol（LSP）サーバーを、WebAssembly（WASM）ビルド可能なRustクレートとして実装する。
 
@@ -25,11 +25,11 @@
 
 #### 受入基準
 
-1. The pasta_lang_server shall LSPプロトコル（Language Server Protocol 3.17+）に準拠したサーバーとして動作する
-2. When エディタがLSPサーバーに接続した時, the pasta_lang_server shall `initialize`リクエストに対してサーバーケーパビリティを返却する
-3. When エディタが`*.pasta`ファイルを開いた時, the pasta_lang_server shall `textDocument/didOpen`通知を受信しドキュメントを管理対象に追加する
-4. When エディタが`*.pasta`ファイルの内容を変更した時, the pasta_lang_server shall `textDocument/didChange`通知を受信しドキュメントの内容を同期する
-5. When エディタが`*.pasta`ファイルを閉じた時, the pasta_lang_server shall `textDocument/didClose`通知を受信しドキュメントを管理対象から除外する
+1. The pasta_lsp shall LSPプロトコル（Language Server Protocol 3.17+）に準拠したサーバーとして動作する
+2. When エディタがLSPサーバーに接続した時, the pasta_lsp shall `initialize`リクエストに対してサーバーケーパビリティを返却する
+3. When エディタが`*.pasta`ファイルを開いた時, the pasta_lsp shall `textDocument/didOpen`通知を受信しドキュメントを管理対象に追加する
+4. When エディタが`*.pasta`ファイルの内容を変更した時, the pasta_lsp shall `textDocument/didChange`通知を受信しドキュメントの内容を同期する
+5. When エディタが`*.pasta`ファイルを閉じた時, the pasta_lsp shall `textDocument/didClose`通知を受信しドキュメントを管理対象から除外する
 
 ### Requirement 2: セマンティックトークンによるシンタックスハイライト
 
@@ -37,8 +37,8 @@
 
 #### 受入基準
 
-1. The pasta_lang_server shall `textDocument/semanticTokens/full`リクエストに対して、ドキュメント全体のセマンティックトークンを返却する
-2. The pasta_lang_server shall 以下のトークンタイプを識別しエディタに通知する:
+1. The pasta_lsp shall `textDocument/semanticTokens/full`リクエストに対して、ドキュメント全体のセマンティックトークンを返却する
+2. The pasta_lsp shall 以下のトークンタイプを識別しエディタに通知する:
    - **コメント**: `＃` / `#` で始まるコメント行
    - **シーンマーカー**: `＊` / `*`（グローバルシーン）, `・` / `-`（ローカルシーン）
    - **属性マーカー**: `＆` / `&` で始まる属性定義行
@@ -53,10 +53,10 @@
    - **エスケープシーケンス**: `@@`, `$$`, `\\\\` 等のエスケープ（`Action::Escape`）
    - **変数代入**: `＄変数名：値` / `＄＊変数名：値` の変数設定行（`VarSet`）
    - **コロン区切り**: `：` / `:` セパレータ
-3. When ドキュメントの内容が変更された時, the pasta_lang_server shall セマンティックトークンを再計算し最新状態を維持する
-4. The pasta_lang_server shall アクション行内の各要素（`Action::Talk`, `Action::WordRef`, `Action::VarRef`, `Action::SakuraScript`, `Action::Escape`）を個別のトークンとして識別し、インライン要素レベルの細粒度色分けを提供する
-5. The pasta_lang_server shall 全角マーカー（`＊`、`・`、`＠`、`＄`、`＞`、`＃`、`＆`、`％`、`：`）と半角マーカー（`*`、`-`、`@`、`$`、`>`、`#`、`&`、`%`、`:`）を同等に認識してトークン化する
-6. When ドキュメント全体のパースが失敗した時, the pasta_lang_server shall 部分的にパース成功した行・スコープのセマンティックトークンを提供し、エラー行はDiagnosticsとして報告する。これにより編集中もマーカー構造が視認可能な状態を保つ
+3. When ドキュメントの内容が変更された時, the pasta_lsp shall セマンティックトークンを再計算し最新状態を維持する
+4. The pasta_lsp shall アクション行内の各要素（`Action::Talk`, `Action::WordRef`, `Action::VarRef`, `Action::SakuraScript`, `Action::Escape`）を個別のトークンとして識別し、インライン要素レベルの細粒度色分けを提供する
+5. The pasta_lsp shall 全角マーカー（`＊`、`・`、`＠`、`＄`、`＞`、`＃`、`＆`、`％`、`：`）と半角マーカー（`*`、`-`、`@`、`$`、`>`、`#`、`&`、`%`、`:`）を同等に認識してトークン化する
+6. When ドキュメント全体のパースが失敗した時, the pasta_lsp shall 部分的にパース成功した行・スコープのセマンティックトークンを提供し、エラー行はDiagnosticsとして報告する。これにより編集中もマーカー構造が視認可能な状態を保つ
 
 ### Requirement 3: pasta_dslパーサー統合
 
@@ -64,11 +64,11 @@
 
 #### 受入基準
 
-1. The pasta_lang_server shall `pasta_dsl`クレートの`parse_str()`関数を利用してDSLソースをASTに変換する
-2. When `pasta_dsl`のパーサーがパースエラーを返却した時, the pasta_lang_server shall エラー情報をLSP Diagnostics（`textDocument/publishDiagnostics`）としてエディタに通知する
-3. The pasta_lang_server shall ASTの各ノード（`GlobalSceneScope`, `FileItem::FileAttr`, `FileItem::GlobalWord`, `FileItem::ActorScope`等）からセマンティックトークンのタイプと範囲を算出する
-4. If `pasta_dsl`のパーサーがクラッシュまたは予期しないエラーを発生させた時, the pasta_lang_server shall サーバー全体を停止せず、該当ドキュメントについてエラーメッセージをログに記録する
-5. The pasta_lang_server shall `pasta_dsl`に部分パースAPI（`parse_str_partial()`または`parse_str_resilient()`）の追加を要求し、パースエラー時も成功した部分のASTとエラー情報リストを取得する。部分パースは行単位またはスコープ単位でpestのRuleを個別適用し、Pasta DSLの行指向文法特性を活用して実装される
+1. The pasta_lsp shall `pasta_dsl`クレートの`parse_str()`関数を利用してDSLソースをASTに変換する
+2. When `pasta_dsl`のパーサーがパースエラーを返却した時, the pasta_lsp shall エラー情報をLSP Diagnostics（`textDocument/publishDiagnostics`）としてエディタに通知する
+3. The pasta_lsp shall ASTの各ノード（`GlobalSceneScope`, `FileItem::FileAttr`, `FileItem::GlobalWord`, `FileItem::ActorScope`等）からセマンティックトークンのタイプと範囲を算出する
+4. If `pasta_dsl`のパーサーがクラッシュまたは予期しないエラーを発生させた時, the pasta_lsp shall サーバー全体を停止せず、該当ドキュメントについてエラーメッセージをログに記録する
+5. The pasta_lsp shall `pasta_dsl`に部分パースAPI（`parse_str_partial()`または`parse_str_resilient()`）の追加を要求し、パースエラー時も成功した部分のASTとエラー情報リストを取得する。部分パースは行単位またはスコープ単位でpestのRuleを個別適用し、Pasta DSLの行指向文法特性を活用して実装される
 
 ### Requirement 4: WebAssembly（WASM）ビルド対応
 
@@ -76,11 +76,14 @@
 
 #### 受入基準
 
-1. The pasta_lang_server shall `cargo build --target wasm32-unknown-unknown` でコンパイルエラーなくビルドできる
-2. The pasta_lang_server shall ファイルシステムI/O・ネットワークI/O・スレッド生成などのWASM非互換APIを直接使用しない
-3. The pasta_lang_server shall 依存クレート（`pasta_dsl`含む）がすべて`wasm32-unknown-unknown`ターゲットでビルド可能であることを保証する
-4. While WASMビルドモードの時, the pasta_lang_server shall LSPトランスポート層をプラットフォーム抽象化し、ネイティブ（stdio）とWASM（メッセージパッシング）の両方に対応する
-5. The pasta_lang_server shall `#[cfg(target_arch = "wasm32")]` による条件コンパイルでWASM固有コードとネイティブ固有コードを分離する
+1. The pasta_lsp shall `cargo build --target wasm32-unknown-unknown --release` でコンパイルエラーなくビルドできる。ビルド成功は以下で検証する:
+   - ビルドコマンドの終了コード0を確認
+   - `target/wasm32-unknown-unknown/release/pasta_lsp.wasm`の生成を確認
+   - wasmバイナリサイズが10MB以下であることを確認（wasm-opt最適化前）
+2. The pasta_lsp shall ファイルシステムI/O・ネットワークI/O・スレッド生成などのWASM非互換APIを直接使用しない
+3. The pasta_lsp shall 依存クレート（`pasta_dsl`含む）がすべて`wasm32-unknown-unknown`ターゲットでビルド可能であることを保証する
+4. While WASMビルドモードの時, the pasta_lsp shall LSPトランスポート層をプラットフォーム抽象化し、ネイティブ（stdio）とWASM（メッセージパッシング）の両方に対応する
+5. The pasta_lsp shall `#[cfg(target_arch = "wasm32")]` による条件コンパイルでWASM固有コードとネイティブ固有コードを分離する
 
 ### Requirement 5: クレート設計とワークスペース統合
 
@@ -88,11 +91,11 @@
 
 #### 受入基準
 
-1. The pasta_lang_server shall 独立したクレートとして`crates/pasta_lang_server/`に配置される
-2. The pasta_lang_server shall `pasta_dsl`クレートにのみ依存し、`pasta_lua`・`pasta_core`・`pasta_shiori`には依存しない
-3. The pasta_lang_server shall ワークスペースの`Cargo.toml`に`members`として登録される
-4. The pasta_lang_server shall 既存のCI/CDパイプライン（GitHub Actions）で`cargo test --workspace`に含まれてテストされる
-5. The pasta_lang_server shall `MIT OR Apache-2.0`デュアルライセンスに従う
+1. The pasta_lsp shall 独立したクレートとして`crates/pasta_lsp/`に配置される
+2. The pasta_lsp shall `pasta_dsl`クレートにのみ依存し、`pasta_lua`・`pasta_core`・`pasta_shiori`には依存しない
+3. The pasta_lsp shall ワークスペースの`Cargo.toml`に`members`として登録される
+4. The pasta_lsp shall 既存のCI/CDパイプライン（GitHub Actions）で`cargo test --workspace`に含まれてテストされる
+5. The pasta_lsp shall `MIT OR Apache-2.0`デュアルライセンスに従う
 
 ### Requirement 6: ドキュメント管理
 
@@ -100,10 +103,10 @@
 
 #### 受入基準
 
-1. The pasta_lang_server shall 開かれた各ドキュメントのテキスト内容をメモリ上に保持する
-2. When エディタから増分テキスト変更通知（`TextDocumentContentChangeEvent`）を受信した時, the pasta_lang_server shall ドキュメント内容を正確に更新する
-3. When ドキュメント内容が更新された時, the pasta_lang_server shall 再パースを実行しセマンティックトークンとDiagnosticsを更新する
-4. The pasta_lang_server shall UNICODEテキスト（日本語識別子・全角マーカー含む）のバイトオフセット計算を正確に行う
+1. The pasta_lsp shall 開かれた各ドキュメントのテキスト内容をメモリ上に保持する
+2. When エディタから増分テキスト変更通知（`TextDocumentContentChangeEvent`）を受信した時, the pasta_lsp shall ドキュメント内容を正確に更新する
+3. When ドキュメント内容が更新された時, the pasta_lsp shall 再パースを実行しセマンティックトークンとDiagnosticsを更新する
+4. The pasta_lsp shall UNICODEテキスト（日本語識別子・全角マーカー含む）のバイトオフセット計算を正確に行う
 
 ### Requirement 7: テスト要件
 
@@ -111,9 +114,12 @@
 
 #### 受入基準
 
-1. The pasta_lang_server shall 各トークンタイプの識別に対するユニットテストを備える
-2. The pasta_lang_server shall LSPリクエスト/レスポンスの統合テストを備える
-3. The pasta_lang_server shall 全角・半角マーカー両方のパターンに対するテストケースを含む
-4. The pasta_lang_server shall 日本語識別子（シーン名・変数名・単語名）を含むテストケースを備える
-5. The pasta_lang_server shall WASMターゲットビルドの成功を検証するCIテストを備える
-6. The pasta_lang_server shall テストファイルを`crates/pasta_lang_server/tests/`配下に`<feature>_test.rs`の命名規則で配置する
+1. The pasta_lsp shall 各トークンタイプの識別に対するユニットテストを備える
+2. The pasta_lsp shall LSPリクエスト/レスポンスの統合テストを備える
+3. The pasta_lsp shall 全角・半角マーカー両方のパターンに対するテストケースを含む
+4. The pasta_lsp shall 日本語識別子（シーン名・変数名・単語名）を含むテストケースを備える
+5. The pasta_lsp shall WASMターゲットビルドの成功を検証するCIテストを備える。CIパイプライン（GitHub Actions）で以下を検証:
+   - `cargo build -p pasta_lsp --target wasm32-unknown-unknown --release` が終了コード0で成功
+   - 生成された`.wasm`ファイルの存在確認
+   - wasmバイナリサイズが閾値（10MB）以下であることの確認
+6. The pasta_lsp shall テストファイルを`crates/pasta_lsp/tests/`配下に`<feature>_test.rs`の命名規則で配置する
