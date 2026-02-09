@@ -54,7 +54,8 @@
    - **変数代入**: `＄変数名：値` / `＄＊変数名：値` の変数設定行（`VarSet`）
    - **コロン区切り**: `：` / `:` セパレータ
 3. When ドキュメントの内容が変更された時, the pasta_lang_server shall セマンティックトークンを再計算し最新状態を維持する
-4. The pasta_lang_server shall 全角マーカー（`＊`、`・`、`＠`、`＄`、`＞`、`＃`、`＆`、`％`、`：`）と半角マーカー（`*`、`-`、`@`、`$`、`>`、`#`、`&`、`%`、`:`）を同等に認識してトークン化する
+4. The pasta_lang_server shall アクション行内の各要素（`Action::Talk`, `Action::WordRef`, `Action::VarRef`, `Action::SakuraScript`, `Action::Escape`）を個別のトークンとして識別し、インライン要素レベルの細粒度色分けを提供する
+5. The pasta_lang_server shall 全角マーカー（`＊`、`・`、`＠`、`＄`、`＞`、`＃`、`＆`、`％`、`：`）と半角マーカー（`*`、`-`、`@`、`$`、`>`、`#`、`&`、`%`、`:`）を同等に認識してトークン化する
 
 ### Requirement 3: pasta_dslパーサー統合
 
