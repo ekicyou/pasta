@@ -56,6 +56,7 @@
 3. When ドキュメントの内容が変更された時, the pasta_lang_server shall セマンティックトークンを再計算し最新状態を維持する
 4. The pasta_lang_server shall アクション行内の各要素（`Action::Talk`, `Action::WordRef`, `Action::VarRef`, `Action::SakuraScript`, `Action::Escape`）を個別のトークンとして識別し、インライン要素レベルの細粒度色分けを提供する
 5. The pasta_lang_server shall 全角マーカー（`＊`、`・`、`＠`、`＄`、`＞`、`＃`、`＆`、`％`、`：`）と半角マーカー（`*`、`-`、`@`、`$`、`>`、`#`、`&`、`%`、`:`）を同等に認識してトークン化する
+6. When ドキュメント全体のパースが失敗した時, the pasta_lang_server shall 部分的にパース成功した行・スコープのセマンティックトークンを提供し、エラー行はDiagnosticsとして報告する。これにより編集中もマーカー構造が視認可能な状態を保つ
 
 ### Requirement 3: pasta_dslパーサー統合
 
@@ -67,6 +68,7 @@
 2. When `pasta_dsl`のパーサーがパースエラーを返却した時, the pasta_lang_server shall エラー情報をLSP Diagnostics（`textDocument/publishDiagnostics`）としてエディタに通知する
 3. The pasta_lang_server shall ASTの各ノード（`GlobalSceneScope`, `FileItem::FileAttr`, `FileItem::GlobalWord`, `FileItem::ActorScope`等）からセマンティックトークンのタイプと範囲を算出する
 4. If `pasta_dsl`のパーサーがクラッシュまたは予期しないエラーを発生させた時, the pasta_lang_server shall サーバー全体を停止せず、該当ドキュメントについてエラーメッセージをログに記録する
+5. The pasta_lang_server shall `pasta_dsl`に部分パースAPI（`parse_str_partial()`または`parse_str_resilient()`）の追加を要求し、パースエラー時も成功した部分のASTとエラー情報リストを取得する。部分パースは行単位またはスコープ単位でpestのRuleを個別適用し、Pasta DSLの行指向文法特性を活用して実装される
 
 ### Requirement 4: WebAssembly（WASM）ビルド対応
 

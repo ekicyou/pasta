@@ -315,3 +315,134 @@ features = ["runtime-agnostic"]
 | pest の WASM バイナリサイズ  | 低   | Unicode テーブルが大きい。必要なものだけ有効化 |
 | 非同期ランタイムの選択       | 中   | WASM では `wasm-bindgen-futures` 一択          |
 | デバッグ困難性               | 高   | WASM 版は `console_log` crate でログ出力       |
+
+---
+
+## 4. 部分パース戦略（議題3調査結果）
+
+### 背景
+
+Pasta DSLの文法は**行指向**であり、各スコープ（`file_scope`, `global_scene_scope`, `actor_scope`）は独立してパース可能。パースエラー時も成功した部分のセマンティックトークンを提供することで、編集中のUX（シンタックスハイライト維持）を向上できる。
+
+### 文法の行指向性
+
+grammarのトップレベル構造:
+```pest
+file = _{ SOI ~ ( file_scope | global_scene_scope | actor_scope )* ~ s ~ EOI }
+```
+
+各スコープの開始マーカー（行頭インデントなし）:
+
+| スコープ | 開始マーカー | 例 |
+|---|---|---|
+| `file_scope` | `&`/`＆` (attr) or `@`/`＠` (word) | `&タイトル：テスト` |
+| `global_scene_scope` | `*`/`＊` (global_marker) | `＊挨拶` |
+| `actor_scope` | `%`/`％` (actor_marker) | `％Alice` |
+
+**重要な性質**: すべての行は `eol` (`NEWLINE`) で終端する。つまり、各行は独立してパース試行可能。
+
+### 部分パース実装戦略
+
+#### Phase 1: 全体パース試行（現行動作）
+```rust
+match PastaParser2::parse(Rule::file, source) {
+    Ok(pairs) => build_full_ast(pairs), // 成功 → 完全AST返却
+    Err(_) => { /* Phase 2へ */ }
+}
+```
+
+#### Phase 2: スコープ境界分割
+行頭マーカーでソースをスコープチャンクに分割:
+- `＊`/`*` → `global_scene_scope`開始
+- `％`/`%` → `actor_scope`開始
+- `＆`/`&` または `＠`/`@` → `file_scope`開始
+
+各チャンクを独立してパース試行:
+```rust
+for chunk in split_by_scope_markers(source) {
+    match PastaParser2::parse(chunk.rule, chunk.text) {
+        Ok(pairs) => partial_items.extend(build_ast(pairs)),
+        Err(e) => {
+            errors.push(e);
+            // Phase 3: 失敗したスコープ内を行単位パース
+            partial_items.extend(parse_line_by_line(chunk));
+        }
+    }
+}
+```
+
+#### Phase 3: 行単位フォールバック
+スコープパースが失敗した場合、各行を個別Ruleで試行:
+```rust
+fn parse_line_by_line(chunk: &ScopeChunk) -> Vec<PartialItem> {
+    let mut items = vec![];
+    for line in chunk.text.lines() {
+        // 各行の先頭パターンから適切なRuleを推論
+        let rule = infer_rule_from_line_prefix(line);
+        if let Ok(pairs) = PastaParser2::parse(rule, line) {
+            items.push(build_partial_item(pairs));
+        }
+        // 失敗した行はスキップ（Diagnosticに報告）
+    }
+    items
+}
+```
+
+#### 行からRuleを推論
+```rust
+fn infer_rule_from_line_prefix(line: &str) -> Rule {
+    let trimmed = line.trim_start();
+    match trimmed.chars().next() {
+        Some('＊')|Some('*') => Rule::global_scene_line,
+        Some('％')|Some('%') => Rule::actor_line,
+        Some('＆')|Some('&') => Rule::file_attr_line,
+        Some('@')|Some('＠') => Rule::file_word_line,
+        _ if trimmed.starts_with("  ") => {
+            // インデントあり → アクション行/変数設定行等
+            if trimmed.contains('：') || trimmed.contains(':') {
+                Rule::action_line
+            } else {
+                Rule::var_set_line
+            }
+        }
+        _ => Rule::blank_line,
+    }
+}
+```
+
+### 技術的課題と対策
+
+| 課題 | 対策 |
+|---|---|
+| **`pad`（インデント）の扱い** | スコープ内行は`pad`（インデント必須）を前提。行単位パース時もインデント付きで試行 |
+| **コンテキスト依存性** | `global_scene_continue_line`（`＊`単体）は前シーン名に依存。部分パースでは無名シーン扱いで十分 |
+| **`code_block`の複数行** | バッククォートフェンスで囲まれたコードブロックは複数行。スコープ分割時に正しく抽出 |
+| **Span整合性** | 行単位パース時、byte offsetはソース全体からの相対位置に補正が必要 |
+
+### pasta_dslへの影響
+
+部分パース機能は**pasta_dslクレート側の新規API**として実装:
+
+```rust
+// pasta_dsl/src/parser/mod.rs
+pub struct PartialParseResult {
+    pub file: PastaFile,        // パース成功した部分のAST
+    pub errors: Vec<ParseError>, // 各行/スコープのエラー
+}
+
+pub fn parse_str_partial(source: &str, filename: &str) -> PartialParseResult {
+    // Phase 1→2→3の実装
+}
+```
+
+### 要件への反映
+
+- **R3-5**: pasta_dslに`parse_str_partial()`を追加
+- **R2-6**: エラー時は成功行のトークンのみ提供し、失敗行はDiagnosticとして報告
+
+### 期待効果
+
+- ✅ 編集中もマーカー構造が視認可能（全トークン消失を回避）
+- ✅ pest文法の単一管理維持（正規表現フォールバックを回避）
+- ✅ 将来的にpest内error recoveryへの移行が容易
+
