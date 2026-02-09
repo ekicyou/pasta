@@ -494,21 +494,65 @@ interface PastaSemanticTokensProvider
 **Contracts**: — （静的ファイル、インターフェースなし）
 
 **Implementation Notes**
-- TextMateスコープマッピング:
+- TextMateスコープマッピング（具体的な JSON パターン例）:
 
 | Pasta要素 | 正規表現パターン | TextMate Scope |
 |-----------|------------------|---------------|
 | コメント | `^[＃#].*$` | `comment.line.pasta` |
-| グローバルシーン | `^[＊*]\s+(.+)$` | `entity.name.section.pasta` |
-| ローカルシーン | `^[・\-]\s+(.+)$` | `entity.name.tag.pasta` |
+| グローバルシーン | `^[＊*]\\s+(.+)$` | `entity.name.section.pasta` |
+| ローカルシーン | `^[・\\-]\\s+(.+)$` | `entity.name.tag.pasta` |
 | 属性定義 | `^[＆&](.+)$` | `entity.other.attribute-name.pasta` |
 | 単語定義 | `^[＠@](.+)$` | `entity.name.function.pasta` |
 | 変数参照 | `^[＄$](.+)$` | `variable.other.pasta` |
 | Call/Jump文 | `^[＞>](.+)$` | `keyword.control.pasta` |
 | アクター定義 | `^[％%](.+)$` | `entity.name.class.pasta` |
-| Luaコードブロック | `` ^```lua `` ... `` ^``` `` | `meta.embedded.block.lua` |
+| Luaコードブロック | `` ^```lua `` ... `` ^``` `` | `meta.embedded.block.lua` + `source.lua` |
 
-- Luaコードブロックは `begin`/`end` パターンで `source.lua` をインクルード
+**TextMate 文法 JSON 実装例**（`syntaxes/pasta.tmLanguage.json`）:
+
+```json
+{
+  "scopeName": "source.pasta",
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#lua-code-block" },
+    { "include": "#global-scene" },
+    { "include": "#local-scene" },
+    { "include": "#attribute" },
+    { "include": "#word" },
+    { "include": "#variable" },
+    { "include": "#call" },
+    { "include": "#actor" }
+  ],
+  "repository": {
+    "comment": {
+      "match": "^[＃#].*$",
+      "name": "comment.line.pasta"
+    },
+    "global-scene": {
+      "match": "^[＊*]\\s+(.+)$",
+      "name": "entity.name.section.pasta",
+      "captures": {
+        "1": { "name": "entity.name.section.pasta" }
+      }
+    },
+    "lua-code-block": {
+      "begin": "^```lua$",
+      "end": "^```$",
+      "name": "meta.embedded.block.lua",
+      "patterns": [
+        { "include": "source.lua" }
+      ]
+    }
+  }
+}
+```
+
+**Unicode トラブルシューティング checklist**:
+- JSON ファイルは UTF-8 (BOM なし) で保存
+- VSCode Grammar Debugger（F1 → "Developer: Inspect Editor Tokens and Scopes"）で全角マーカーの認識を検証
+- 文字クラス `[＃#]` は JSON エスケープ不要（正規表現エンジンが直接処理）
+- バックスラッシュは JSON エスケープ必須: `\\s`, `\\-`
 
 ---
 
@@ -618,7 +662,34 @@ try {
 ### Unit Tests
 - WasmAnalyzeEntry: 各マーカータイプの解析結果検証（Rust側、`#[cfg(test)]`）
 - SemanticTokensProvider: トークンデータからSemanticTokensBuilderへの変換
-- TextMateGrammar: 各正規表現パターンのマッチ検証（vscode-textmate テスト）
+- **TextMateGrammar**: 各正規表現パターンのマッチ検証（`vscode-textmate` ライブラリでテスト）
+  ```typescript
+  import { Registry } from 'vscode-textmate';
+  
+  test('全角コメントマーカーの認識', async () => {
+    const grammar = await registry.loadGrammar('source.pasta');
+    const tokens = grammar.tokenizeLine('＃全角コメント');
+    expect(tokens.tokens.some(t => 
+      t.scopes.includes('comment.line.pasta')
+    )).toBe(true);
+  });
+  
+  test('半角コメントマーカーの認識', async () => {
+    const tokens = grammar.tokenizeLine('#半角コメント');
+    expect(tokens.tokens.some(t => 
+      t.scopes.includes('comment.line.pasta')
+    )).toBe(true);
+  });
+  
+  test('Luaコードブロックのインクルード', async () => {
+    const lines = ['```lua', 'print("hello")', '```'];
+    const tokens1 = grammar.tokenizeLine(lines[0]);
+    const tokens2 = grammar.tokenizeLine(lines[1], tokens1.ruleStack);
+    expect(tokens2.tokens.some(t => 
+      t.scopes.some(s => s.startsWith('source.lua'))
+    )).toBe(true);
+  });
+  ```
 - WasmBridge: WASM初期化・解析呼び出しのモック検証
 
 ### Integration Tests
