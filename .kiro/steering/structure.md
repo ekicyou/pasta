@@ -40,6 +40,16 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       └── tests/           # pasta_lua統合テスト
 │           ├── common/      # テスト共通ユーティリティ
 │           └── fixtures/    # テスト用Pastaスクリプト
+│   ├── pasta_lsp/           # LSP実装層
+│   │   ├── Cargo.toml       # pasta_lsp設定（tower-lsp, pasta_dsl依存）
+│   │   ├── README.md        # クレート概要
+│   │   └── src/
+│   │       ├── lib.rs       # クレートエントリーポイント
+│   │       ├── analysis.rs  # AST→セマンティックトークン変換
+│   │       ├── document.rs  # ドキュメント状態管理
+│   │       ├── error.rs     # LangServerError型定義
+│   │       ├── server.rs    # PastaLangServer (tower-lsp trait実装)
+│   │       └── transport.rs # WASM/Nativeプラットフォーム抽象化
 ├── tests/                    # ワークスペースレベル統合テスト
 │   ├── common/              # テスト共通ユーティリティ
 │   └── fixtures/            # テスト用Pastaスクリプト

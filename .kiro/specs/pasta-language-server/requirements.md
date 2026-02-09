@@ -140,7 +140,7 @@ The pasta_dsl shall 部分パース機能に対する以下のテストを備え
 
 1. The pasta_lsp shall `cargo build --target wasm32-unknown-unknown --release` でコンパイルエラーなくビルドできる。ビルド成功は以下で検証する:
    - ビルドコマンドの終了コード0を確認
-   - `target/wasm32-unknown-unknown/release/pasta_lsp.wasm`の生成を確認
+   - `target/wasm32-unknown-unknown/release/pasta_lsp.wasm`の生成を確認（`crate-type = ["cdylib", "rlib"]` 設定により`.wasm`バイナリを生成）
    - wasmバイナリサイズが10MB以下であることを確認（wasm-opt最適化前）
 2. The pasta_lsp shall ファイルシステムI/O・ネットワークI/O・スレッド生成などのWASM非互換APIを直接使用しない
 3. The pasta_lsp shall 依存クレート（`pasta_dsl`含む）がすべて`wasm32-unknown-unknown`ターゲットでビルド可能であることを保証する

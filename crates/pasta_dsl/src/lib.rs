@@ -26,7 +26,9 @@
 
 pub mod error;
 pub mod parser;
+pub mod partial;
 
 // Convenience re-exports
 pub use error::{ParseError, ParseErrorInfo, ParseResult};
 pub use parser::{FileItem, PastaFile, parse_file, parse_str};
+pub use partial::{PartialParseError, PartialParseResult, parse_str_partial};

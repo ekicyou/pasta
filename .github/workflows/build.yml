@@ -53,3 +53,35 @@ jobs:
           name: pasta-dll-${{ matrix.arch }}
           path: target/${{ matrix.target }}/release/pasta.dll
           retention-days: 7
+
+  wasm:
+    name: wasm-build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: wasm32-unknown-unknown
+
+      - name: Build pasta_lsp for WASM
+        run: cargo build -p pasta_lsp --target wasm32-unknown-unknown --release
+
+      - name: Verify WASM artifact exists
+        run: test -f target/wasm32-unknown-unknown/release/pasta_lsp.wasm
+
+      - name: Check WASM artifact size (< 10MB)
+        run: |
+          size=$(stat -c%s target/wasm32-unknown-unknown/release/pasta_lsp.wasm)
+          echo "WASM binary size: $size bytes ($(echo "scale=2; $size/1048576" | bc) MB)"
+          if [ "$size" -gt 10485760 ]; then
+            echo "ERROR: WASM artifact exceeds 10MB threshold"
+            exit 1
+          fi
