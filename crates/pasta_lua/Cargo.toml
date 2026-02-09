@@ -12,6 +12,7 @@ documentation.workspace = true
 
 [dependencies]
 pasta_core.workspace = true
+pasta_dsl.workspace = true
 tracing.workspace = true
 tracing-appender.workspace = true
 tracing-subscriber.workspace = true

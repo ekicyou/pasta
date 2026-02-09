@@ -4,7 +4,7 @@
 //! Implements Requirement 2: Lua文字列リテラル形式の標準化.
 
 use super::error::TranspileError;
-use pasta_core::parser::Span;
+use pasta_dsl::parser::Span;
 
 /// Maximum number of `=` signs to try before giving up.
 const MAX_EQUALS: usize = 10;

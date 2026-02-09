@@ -4,10 +4,10 @@
 //! パーサーで正しくAction::SakuraScriptとして認識されることを検証。
 //! Requirements: 2.1, 2.2, 2.3, 2.4, 4.2
 
-use pasta_core::parser::{FileItem, parse_str};
+use pasta_dsl::parser::{FileItem, parse_str};
 
 /// テスト用ヘルパー: シーン内の最初のアクション行のアクションリストを取得
-fn parse_actions(source: &str) -> Vec<pasta_core::parser::Action> {
+fn parse_actions(source: &str) -> Vec<pasta_dsl::parser::Action> {
     let ast = parse_str(source, "test.pasta").expect("パース成功すべし");
     let scene = ast
         .items
@@ -33,7 +33,7 @@ fn parse_actions(source: &str) -> Vec<pasta_core::parser::Action> {
         .items
         .into_iter()
         .find_map(|item| {
-            if let pasta_core::parser::LocalSceneItem::ActionLine(al) = item {
+            if let pasta_dsl::parser::LocalSceneItem::ActionLine(al) = item {
                 Some(al)
             } else {
                 None
@@ -53,7 +53,7 @@ fn test_parse_sakura_hyphen_tag() {
     let sakura = actions
         .iter()
         .find_map(|a| {
-            if let pasta_core::parser::Action::SakuraScript { script, .. } = a {
+            if let pasta_dsl::parser::Action::SakuraScript { script, .. } = a {
                 Some(script.as_str())
             } else {
                 None
@@ -73,7 +73,7 @@ fn test_parse_sakura_plus_tag() {
     let sakura = actions
         .iter()
         .find_map(|a| {
-            if let pasta_core::parser::Action::SakuraScript { script, .. } = a {
+            if let pasta_dsl::parser::Action::SakuraScript { script, .. } = a {
                 Some(script.as_str())
             } else {
                 None
@@ -93,7 +93,7 @@ fn test_parse_sakura_asterisk_tag() {
     let sakura = actions
         .iter()
         .find_map(|a| {
-            if let pasta_core::parser::Action::SakuraScript { script, .. } = a {
+            if let pasta_dsl::parser::Action::SakuraScript { script, .. } = a {
                 Some(script.as_str())
             } else {
                 None
@@ -113,7 +113,7 @@ fn test_parse_sakura_underscore_question_tag() {
     let sakura = actions
         .iter()
         .find_map(|a| {
-            if let pasta_core::parser::Action::SakuraScript { script, .. } = a {
+            if let pasta_dsl::parser::Action::SakuraScript { script, .. } = a {
                 Some(script.as_str())
             } else {
                 None
@@ -133,7 +133,7 @@ fn test_parse_sakura_ampersand_tag() {
     let sakura = actions
         .iter()
         .find_map(|a| {
-            if let pasta_core::parser::Action::SakuraScript { script, .. } = a {
+            if let pasta_dsl::parser::Action::SakuraScript { script, .. } = a {
                 Some(script.as_str())
             } else {
                 None
@@ -154,7 +154,7 @@ fn test_parse_sakura_symbol_in_mixed_text() {
 
     // 1. Talk: "こんにちは"
     match &actions[0] {
-        pasta_core::parser::Action::Talk { text, .. } => {
+        pasta_dsl::parser::Action::Talk { text, .. } => {
             assert_eq!(text, "こんにちは");
         }
         other => panic!("最初のアクションはTalkであるべし: {:?}", other),
@@ -162,7 +162,7 @@ fn test_parse_sakura_symbol_in_mixed_text() {
 
     // 2. SakuraScript: "\-"
     match &actions[1] {
-        pasta_core::parser::Action::SakuraScript { script, .. } => {
+        pasta_dsl::parser::Action::SakuraScript { script, .. } => {
             assert_eq!(script, r"\-");
         }
         other => panic!("2番目のアクションはSakuraScriptであるべし: {:?}", other),
@@ -170,7 +170,7 @@ fn test_parse_sakura_symbol_in_mixed_text() {
 
     // 3. Talk: "。"
     match &actions[2] {
-        pasta_core::parser::Action::Talk { text, .. } => {
+        pasta_dsl::parser::Action::Talk { text, .. } => {
             assert_eq!(text, "。");
         }
         other => panic!("3番目のアクションはTalkであるべし: {:?}", other),
@@ -192,7 +192,7 @@ fn test_parse_existing_tags_no_regression() {
     let scripts: Vec<&str> = actions
         .iter()
         .filter_map(|a| {
-            if let pasta_core::parser::Action::SakuraScript { script, .. } = a {
+            if let pasta_dsl::parser::Action::SakuraScript { script, .. } = a {
                 Some(script.as_str())
             } else {
                 None

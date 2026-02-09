@@ -3,7 +3,7 @@
 //! This module generates Lua source code from Pasta AST nodes.
 //! Implements Requirements 1, 3a-3g for Lua code generation.
 
-use pasta_core::parser::{
+use pasta_dsl::parser::{
     Action, ActionLine, ActorScope, Args, AttrValue, CallScene, CodeBlock, ContinueAction, Expr,
     GlobalSceneScope, KeyWords, LocalSceneItem, LocalSceneScope, SceneActorItem, SetValue,
     VarScope, VarSet,
@@ -417,12 +417,12 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             let mut parts = Vec::new();
             for arg in &args.items {
                 match arg {
-                    pasta_core::parser::Arg::Positional(expr) => {
+                    pasta_dsl::parser::Arg::Positional(expr) => {
                         let mut buf = Vec::new();
                         self.generate_expr_to_buffer(expr, &mut buf)?;
                         parts.push(String::from_utf8(buf).unwrap_or_default());
                     }
-                    pasta_core::parser::Arg::Keyword { key: _, value } => {
+                    pasta_dsl::parser::Arg::Keyword { key: _, value } => {
                         let mut buf = Vec::new();
                         self.generate_expr_to_buffer(value, &mut buf)?;
                         parts.push(String::from_utf8(buf).unwrap_or_default());
@@ -526,8 +526,8 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                 // SCENE:関数名(act, 引数...)
                 let args_str = self.generate_args_string(args)?;
                 let prefix = match scope {
-                    pasta_core::parser::FnScope::Local => "SCENE:",
-                    pasta_core::parser::FnScope::Global => "SCENE:", // Same for now
+                    pasta_dsl::parser::FnScope::Local => "SCENE:",
+                    pasta_dsl::parser::FnScope::Global => "SCENE:", // Same for now
                 };
                 self.writeln(&format!(
                     "act.{}:talk(tostring({}{}(act{})))",
@@ -587,8 +587,8 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             Expr::FnCall { name, args, scope } => {
                 let args_str = self.generate_args_string(args)?;
                 let prefix = match scope {
-                    pasta_core::parser::FnScope::Local => "SCENE.",
-                    pasta_core::parser::FnScope::Global => "SCENE.",
+                    pasta_dsl::parser::FnScope::Local => "SCENE.",
+                    pasta_dsl::parser::FnScope::Global => "SCENE.",
                 };
                 write!(
                     self.writer,
@@ -610,11 +610,11 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             Expr::Binary { op, lhs, rhs } => {
                 self.generate_expr(lhs)?;
                 let op_str = match op {
-                    pasta_core::parser::BinOp::Add => " + ",
-                    pasta_core::parser::BinOp::Sub => " - ",
-                    pasta_core::parser::BinOp::Mul => " * ",
-                    pasta_core::parser::BinOp::Div => " / ",
-                    pasta_core::parser::BinOp::Mod => " % ",
+                    pasta_dsl::parser::BinOp::Add => " + ",
+                    pasta_dsl::parser::BinOp::Sub => " - ",
+                    pasta_dsl::parser::BinOp::Mul => " * ",
+                    pasta_dsl::parser::BinOp::Div => " / ",
+                    pasta_dsl::parser::BinOp::Mod => " % ",
                 };
                 write!(self.writer, "{}", op_str)?;
                 self.generate_expr(rhs)?;
@@ -655,8 +655,8 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             Expr::FnCall { name, args, scope } => {
                 let args_str = self.generate_args_string(args)?;
                 let prefix = match scope {
-                    pasta_core::parser::FnScope::Local => "SCENE.",
-                    pasta_core::parser::FnScope::Global => "SCENE.",
+                    pasta_dsl::parser::FnScope::Local => "SCENE.",
+                    pasta_dsl::parser::FnScope::Global => "SCENE.",
                 };
                 write!(
                     buf,
@@ -678,11 +678,11 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             Expr::Binary { op, lhs, rhs } => {
                 self.generate_expr_to_buffer(lhs, buf)?;
                 let op_str = match op {
-                    pasta_core::parser::BinOp::Add => " + ",
-                    pasta_core::parser::BinOp::Sub => " - ",
-                    pasta_core::parser::BinOp::Mul => " * ",
-                    pasta_core::parser::BinOp::Div => " / ",
-                    pasta_core::parser::BinOp::Mod => " % ",
+                    pasta_dsl::parser::BinOp::Add => " + ",
+                    pasta_dsl::parser::BinOp::Sub => " - ",
+                    pasta_dsl::parser::BinOp::Mul => " * ",
+                    pasta_dsl::parser::BinOp::Div => " / ",
+                    pasta_dsl::parser::BinOp::Mod => " % ",
                 };
                 write!(buf, "{}", op_str)?;
                 self.generate_expr_to_buffer(rhs, buf)?;
@@ -697,12 +697,12 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         let mut parts = Vec::new();
         for arg in &args.items {
             match arg {
-                pasta_core::parser::Arg::Positional(expr) => {
+                pasta_dsl::parser::Arg::Positional(expr) => {
                     let mut buf = Vec::new();
                     self.generate_expr_to_buffer(expr, &mut buf)?;
                     parts.push(String::from_utf8(buf).unwrap_or_default());
                 }
-                pasta_core::parser::Arg::Keyword { key: _, value } => {
+                pasta_dsl::parser::Arg::Keyword { key: _, value } => {
                     let mut buf = Vec::new();
                     self.generate_expr_to_buffer(value, &mut buf)?;
                     parts.push(String::from_utf8(buf).unwrap_or_default());
@@ -779,7 +779,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pasta_core::parser::{SetValue, Span, VarSet};
+    use pasta_dsl::parser::{SetValue, Span, VarSet};
 
     #[allow(dead_code)]
     fn create_action_line(actor: &str, actions: Vec<Action>) -> ActionLine {
@@ -979,7 +979,7 @@ mod tests {
 
     #[test]
     fn test_generate_var_set_expr_still_works() {
-        use pasta_core::parser::Expr;
+        use pasta_dsl::parser::Expr;
 
         let mut output = Vec::new();
         let mut codegen = LuaCodeGenerator::new(&mut output);

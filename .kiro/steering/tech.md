@@ -8,21 +8,26 @@
 - **Pest 2.8**: PEGパーサー生成器（`pasta.pest`文法定義）
 
 ### ワークスペース構成
-- **pasta_core**: 言語非依存層（パーサー、レジストリ）
-- **pasta_lua**: Luaバックエンド層（pasta_core依存）
+- **pasta_dsl**: DSLパーサー層（Pest PEG → AST変換）
+- **pasta_core**: 言語非依存層（レジストリ）
+- **pasta_lua**: Luaバックエンド層（pasta_dsl + pasta_core依存）
 - **pasta_shiori**: SHIORI DLLインターフェース層
 
 ### 主要依存関係
 
-**pasta_core:**
+**pasta_dsl:**
 - **pest 2.8, pest_derive 2.8**: PEGパーサー生成器
+- **thiserror 2**: エラー型定義
+
+**pasta_core:**
 - **thiserror 2**: エラー型定義
 - **fast_radix_trie 1.1.0**: 前方一致シーン検索
 - **rand 0.9**: ランダム選択（重複シーン、前方一致候補）
 - **tracing 0.1**: ロギング・診断
 
 **pasta_lua:**
-- **pasta_core**: 言語非依存層
+- **pasta_dsl**: DSLパーサー層
+- **pasta_core**: レジストリ層
 - **mlua 0.11**: Lua VMバインディング（Lua 5.5）
 - **regex 1.x**: 正規表現（さくらスクリプトタグ検出）
 - **thiserror 2**: エラー型定義
@@ -39,8 +44,9 @@
 ### ワークスペースレイヤー構成
 ```
 pasta (workspace)
+├── pasta_dsl           # DSLパーサー層
+│   └── Parser          # DSL→AST変換（Pest PEG）
 ├── pasta_core          # 言語非依存層
-│   ├── Parser          # DSL→AST変換
 │   └── Registry        # シーン/単語テーブル
 ├── pasta_lua           # Luaバックエンド層
 │   ├── Transpiler      # AST→Luaコード
@@ -51,7 +57,7 @@ pasta (workspace)
 
 | クレート     | レイヤー   | 責務                            |
 | ------------ | ---------- | ------------------------------- |
-| pasta_core   | Parser     | DSL→AST変換                     |
+| pasta_dsl    | Parser     | DSL→AST変換                     |
 | pasta_core   | Registry   | シーン/単語テーブル管理         |
 | pasta_lua    | Transpiler | AST→Luaコード変換               |
 | pasta_lua    | Runtime    | Lua VM実行、コルーチン制御      |

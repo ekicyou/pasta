@@ -378,7 +378,7 @@ impl PastaLoader {
             };
 
             let filename = file_path.to_string_lossy().to_string();
-            let pasta_file = match pasta_core::parse_str(&content, &filename) {
+            let pasta_file = match pasta_dsl::parse_str(&content, &filename) {
                 Ok(pf) => pf,
                 Err(e) => {
                     failures.push(TranspileFailure {

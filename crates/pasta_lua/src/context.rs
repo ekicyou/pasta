@@ -2,7 +2,7 @@
 //!
 //! This module provides context management for the transpilation process.
 
-use pasta_core::parser::{Attr, AttrValue, GlobalSceneScope, KeyWords, LocalSceneScope};
+use pasta_dsl::parser::{Attr, AttrValue, GlobalSceneScope, KeyWords, LocalSceneScope};
 use pasta_core::registry::{SceneRegistry, WordDefRegistry};
 use std::collections::HashMap;
 
@@ -137,7 +137,7 @@ impl TranspileContext {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pasta_core::parser::Span;
+    use pasta_dsl::parser::Span;
 
     fn create_test_scene(name: &str) -> GlobalSceneScope {
         GlobalSceneScope {
@@ -236,7 +236,7 @@ mod tests {
     // MAJOR-1: ファイル属性累積・マージ機能のテスト
     // =========================================================================
 
-    use pasta_core::parser::{Attr, AttrValue};
+    use pasta_dsl::parser::{Attr, AttrValue};
 
     fn create_attr(key: &str, value: &str) -> Attr {
         Attr {

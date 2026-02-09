@@ -1,17 +1,16 @@
 [package]
-name = "pasta_core"
+name = "pasta_dsl"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
 publish = true
-description = "Pasta Core - Language-independent DSL parsing and registry layer"
+description = "Pasta DSL - Independent DSL parser and AST definitions"
 repository.workspace = true
 homepage.workspace = true
 documentation.workspace = true
 
 [dependencies]
+pest.workspace = true
+pest_derive.workspace = true
 thiserror.workspace = true
-fast_radix_trie.workspace = true
-rand.workspace = true
-tracing.workspace = true

@@ -1,24 +1,26 @@
 # pasta_core
 
-Pasta DSL のパーサーとレジストリを提供する言語非依存層クレートです。
+Pasta DSL のレジストリとユーティリティを提供する言語非依存層クレートです。
 
 ## 概要
 
-`pasta_core` は Pasta DSL の構文解析とシーン/単語テーブル管理を担当します。
-バックエンド（Lua等）に依存しない純粋なパーサーとデータ構造を提供し、複数のランタイムで再利用可能です。
+`pasta_core` は Pasta DSL のシーン/単語テーブル管理を担当します。
+DSLパーサーは独立クレート `pasta_dsl` に分離されており、
+本クレートはバックエンド（Lua等）に依存しない純粋なデータ構造を提供します。
 
 ## アーキテクチャ
 
 ```
 pasta_core
-├── Parser         # DSL → AST 変換（Pest PEG）
 ├── Registry       # シーン/単語テーブル管理
 │   ├── SceneRegistry   # シーン登録（Pass 1）
 │   ├── WordDefRegistry # 単語定義登録
 │   ├── SceneTable      # シーン検索（Radix Trie）
 │   └── WordTable       # 単語検索
-└── Error          # パースエラー型定義
+└── Error          # テーブルエラー型定義
 ```
+
+> **Note**: DSLパーサーは独立クレート [pasta_dsl](../pasta_dsl/README.md) に分離されています。
 
 ## ディレクトリ構成
 
@@ -27,11 +29,7 @@ pasta_core/
 ├── Cargo.toml
 └── src/
     ├── lib.rs           # クレートエントリーポイント
-    ├── error.rs         # ParseError, SceneTableError, WordTableError
-    ├── parser/          # パーサーレイヤー
-    │   ├── mod.rs       # パーサーAPI（parse_str, parse_file）
-    │   ├── ast.rs       # AST定義（PastaFile, FileItem, Statement等）
-    │   └── grammar.pest # Pest PEG文法定義
+    ├── error.rs         # SceneTableError, WordTableError
     └── registry/        # 型管理レイヤー
         ├── mod.rs       # Registry API
         ├── scene_registry.rs  # SceneRegistry
@@ -41,16 +39,11 @@ pasta_core/
         └── random.rs          # RandomSelector インターフェース
 ```
 
+> **Note**: パーサーモジュール（parser/, grammar.pest）は独立クレート [pasta_dsl](../pasta_dsl/README.md) に移動されました。
+
 ## 公開API
 
-### Parser
-
-| 関数/型                       | 説明                                              |
-| ----------------------------- | ------------------------------------------------- |
-| `parse_str(source, filename)` | 文字列からパース                                  |
-| `parse_file(path)`            | ファイルからパース                                |
-| `PastaFile`                   | パース結果（ASTルート）                           |
-| `FileItem`                    | ファイル直下の項目（GlobalSceneScope, WordDef等） |
+> **パーサーAPI**（`parse_str`, `parse_file`, AST型）は [pasta_dsl](../pasta_dsl/README.md) クレートに移動されました。
 
 ### Registry
 
@@ -76,7 +69,8 @@ pasta_core/
 ### 基本的なパース
 
 ```rust
-use pasta_core::parser::{parse_str, FileItem, PastaFile};
+// DSLパーサーは pasta_dsl クレートを使用してください
+use pasta_dsl::parser::{parse_str, FileItem, PastaFile};
 
 let source = r#"
 ＊挨拶
@@ -132,8 +126,6 @@ if let Some(scene) = table.get_prefix("挨拶", &selector) {
 
 | クレート        | バージョン | 用途                       |
 | --------------- | ---------- | -------------------------- |
-| pest            | 2.8        | PEGパーサー                |
-| pest_derive     | 2.8        | パーサー生成マクロ         |
 | thiserror       | 2          | エラー型定義               |
 | fast_radix_trie | 1.1.0      | 前方一致検索（SceneTable） |
 | rand            | 0.9        | ランダム選択               |
@@ -141,6 +133,7 @@ if let Some(scene) = table.get_prefix("挨拶", &selector) {
 
 ## 関連クレート
 
+- [pasta_dsl](../pasta_dsl/README.md) - DSLパーサー
 - [pasta_lua](../pasta_lua/README.md) - Luaバックエンド
 - [pasta_shiori](../pasta_shiori/README.md) - SHIORI DLL統合
 - [プロジェクト概要](../../README.md) - pasta プロジェクト全体

@@ -9,12 +9,12 @@
 
 ## 1. コアバリューのテストカバレッジ
 
-| コアバリュー                            | 対応テスト                                      | 状態   | テスト数 |
-| --------------------------------------- | ----------------------------------------------- | ------ | -------- |
-| 日本語フレンドリー（全角キーワード）    | `transpiler_integration_test.rs`                | ✅ 完了 | 24       |
-| UNICODE識別子（日本語シーン名・変数名） | `japanese_identifier_test.rs`<br>`ucid_test.rs` | ✅ 完了 | 2<br>3   |
+| コアバリュー                            | 対応テスト                                                                                 | 状態   | テスト数 |
+| --------------------------------------- | ------------------------------------------------------------------------------------------ | ------ | -------- |
+| 日本語フレンドリー（全角キーワード）    | `transpiler_integration_test.rs`                                                           | ✅ 完了 | 24       |
+| UNICODE識別子（日本語シーン名・変数名） | `japanese_identifier_test.rs`<br>`ucid_test.rs`                                            | ✅ 完了 | 2<br>3   |
 | yield型エンジン（継続出力）             | `transpiler_integration_test.rs`<br>`global_chaintalk_*_test.lua`<br>`runtime_e2e_test.rs` | ✅ 完了 | 13       |
-| 宣言的フロー（Call制御）                | `transpiler_integration_test.rs`                | ✅ 完了 | -        |
+| 宣言的フロー（Call制御）                | `transpiler_integration_test.rs`                                                           | ✅ 完了 | -        |
 
 ---
 
@@ -22,32 +22,32 @@
 
 ### 2.1 Parser層テスト（文法解析）
 
-| 機能                   | テストファイル                   | 状態   | 説明                                      |
-| ---------------------- | -------------------------------- | ------ | ----------------------------------------- |
-| グローバルシーン（＊） | `transpiler_integration_test.rs` | ✅ 完了 | シーン定義パース                          |
-| ローカルシーン（・）   | `transpiler_integration_test.rs` | ✅ 完了 | サブシーン定義                            |
-| アクター定義（％）     | `actor_code_block_test.rs`       | ✅ 完了 | アクターコードブロック                    |
-| 属性定義（＆）         | フィクスチャあり                 | 🔶 部分 | `transpiler2/attribute_inheritance.pasta` |
-| 単語定義（＠）         | `actor_word_dictionary_test.rs`  | ✅ 完了 | 単語定義・参照                            |
-| 変数定義（＄）         | フィクスチャあり                 | 🔶 部分 | `transpiler2/variable_scope.pasta`        |
-| Call文（＞）           | `transpiler_integration_test.rs` | ✅ 完了 | 制御フロー                                |
-| コメント行（＃）       | 暗黙的テスト                     | 🔶 部分 | 明示的テストなし                          |
-| アクション行（発言）   | `transpiler_integration_test.rs` | ✅ 完了 | キャラクター発言                          |
-| Luaコードブロック      | `actor_code_block_test.rs`       | ✅ 完了 | 関数定義                                  |
-| バイトオフセット       | `span_byte_offset_test.rs`       | ✅ 完了 | エラー位置特定                            |
-| さくらスクリプト記号タグ | `sakura_symbol_tag_test.rs`    | ✅ 完了 | `-+*?&` 5文字タグパース（7テスト）        |
+| 機能                     | テストファイル                   | 状態   | 説明                                      |
+| ------------------------ | -------------------------------- | ------ | ----------------------------------------- |
+| グローバルシーン（＊）   | `transpiler_integration_test.rs` | ✅ 完了 | シーン定義パース                          |
+| ローカルシーン（・）     | `transpiler_integration_test.rs` | ✅ 完了 | サブシーン定義                            |
+| アクター定義（％）       | `actor_code_block_test.rs`       | ✅ 完了 | アクターコードブロック                    |
+| 属性定義（＆）           | フィクスチャあり                 | 🔶 部分 | `transpiler2/attribute_inheritance.pasta` |
+| 単語定義（＠）           | `actor_word_dictionary_test.rs`  | ✅ 完了 | 単語定義・参照                            |
+| 変数定義（＄）           | フィクスチャあり                 | 🔶 部分 | `transpiler2/variable_scope.pasta`        |
+| Call文（＞）             | `transpiler_integration_test.rs` | ✅ 完了 | 制御フロー                                |
+| コメント行（＃）         | 暗黙的テスト                     | 🔶 部分 | 明示的テストなし                          |
+| アクション行（発言）     | `transpiler_integration_test.rs` | ✅ 完了 | キャラクター発言                          |
+| Luaコードブロック        | `actor_code_block_test.rs`       | ✅ 完了 | 関数定義                                  |
+| バイトオフセット         | `span_byte_offset_test.rs`       | ✅ 完了 | エラー位置特定                            |
+| さくらスクリプト記号タグ | `sakura_symbol_tag_test.rs`      | ✅ 完了 | `-+*?&` 5文字タグパース（7テスト）        |
 
 ### 2.2 Registry層テスト（シーン/単語テーブル）
 
-| 機能               | テストファイル                                                   | 状態   | 説明                  |
-| ------------------ | ---------------------------------------------------------------- | ------ | --------------------- |
-| シーン前方一致検索 | `search_module_test.rs`<br>`fallback_search_integration_test.rs` | ✅ 完了 | 前方一致+ランダム選択 |
-| シーンサイクリングリセット | `scene_table.rs`（インラインテスト） | ✅ 完了 | 循環リセット検証（4テスト） |
-| 単語前方一致検索   | `search_module_test.rs`                                          | ✅ 完了 | 単語辞書検索          |
-| 単語ランダム選択   | `search_module_test.rs`                                          | 🔶 部分 | ランダム性検証        |
-| アクター単語辞書   | `actor_word_dictionary_test.rs`                                  | ✅ 完了 | アクタースコープ単語  |
-| finalize_scene処理 | `finalize_scene_test.rs`                                         | ✅ 完了 | シーン初期化          |
-| SCENE.search() API | `scene_search_test.rs`                                           | ✅ 完了 | 14テスト              |
+| 機能                       | テストファイル                                                   | 状態   | 説明                        |
+| -------------------------- | ---------------------------------------------------------------- | ------ | --------------------------- |
+| シーン前方一致検索         | `search_module_test.rs`<br>`fallback_search_integration_test.rs` | ✅ 完了 | 前方一致+ランダム選択       |
+| シーンサイクリングリセット | `scene_table.rs`（インラインテスト）                             | ✅ 完了 | 循環リセット検証（4テスト） |
+| 単語前方一致検索           | `search_module_test.rs`                                          | ✅ 完了 | 単語辞書検索                |
+| 単語ランダム選択           | `search_module_test.rs`                                          | 🔶 部分 | ランダム性検証              |
+| アクター単語辞書           | `actor_word_dictionary_test.rs`                                  | ✅ 完了 | アクタースコープ単語        |
+| finalize_scene処理         | `finalize_scene_test.rs`                                         | ✅ 完了 | シーン初期化                |
+| SCENE.search() API         | `scene_search_test.rs`                                           | ✅ 完了 | 14テスト                    |
 
 ### 2.3 Transpiler層テスト（Lua変換）
 
@@ -60,59 +60,59 @@
 
 ### 2.4 Runtime層テスト（実行エンジン）
 
-| 機能                                 | テストファイル                         | 状態   | 説明                                         |
-| ------------------------------------ | -------------------------------------- | ------ | -------------------------------------------- |
-| Luaスクリプトローダー                | `loader_integration_test.rs`           | ✅ 完了 | スクリプト読み込み                           |
-| 標準ライブラリモジュール             | `stdlib_modules_test.rs`               | ✅ 完了 | stdlib機能                                   |
-| 正規表現モジュール                   | `stdlib_regex_test.rs`                 | ✅ 完了 | 14テスト                                     |
-| Lua単体テスト実行                    | `lua_unittest_runner.rs`               | ✅ 完了 | Luaテストランナー                            |
-| STORE.save/CTX注入                   | `store_save_test.lua`                  | ✅ 完了 | 永続変数・参照同一性                         |
-| CONFIG.actor→STORE.actors初期化      | `config_actors_initialization_test.rs` | ✅ 完了 | 8テスト（pasta.tomlアクター設定）            |
-| SHIORIレスポンスビルダー             | `shiori_res_test.rs`                   | ✅ 完了 | 14テスト                                     |
-| SHIORIイベントディスパッチ           | `shiori_event_test.rs`                 | ✅ 完了 | 16テスト（新規）                             |
-| SHIORI_ACT さくらスクリプト生成      | `shiori_act_test.lua`                  | ✅ 完了 | 47テスト（transfer_date_to_var 7テスト追加） |
-| SHIORI_ACT 日時転記機能              | `shiori_act_test.lua`                  | ✅ 完了 | 7テスト（onhour-date-var-transfer）          |
-| ACT トークンバッファ（親クラス）     | `act_test.lua`                         | ✅ 完了 | 32テスト（act-token-buffer-refactor）        |
-| ACT トークングループ化               | `act_grouping_test.lua`                | ✅ 完了 | 19テスト（actor-talk-grouping）              |
-| sakura_builder トークン変換          | `sakura_builder_test.lua`              | ✅ 完了 | 24テスト（act-token-buffer-refactor）        |
-| RuntimeConfig libs配列               | `runtime::tests`                       | ✅ 完了 | 17テスト（新規）                             |
-| LuaConfig TOML設定                   | `loader::config::tests`                | ✅ 完了 | 6テスト（新規）                              |
-| さくらスクリプトウェイト挿入         | `sakura_script_integration_test.rs`    | ✅ 完了 | 19テスト（sakura-script-wait）               |
-| さくらスクリプト記号タグトークナイズ | `tokenizer.rs` 内テスト                | ✅ 完了 | 6テスト（`-+*?&` タグ認識）                  |
-| EVENT.fire コルーチン対応            | `event_coroutine_test.lua`             | ✅ 完了 | 16テスト（resume_until_valid含む）           |
-| resume_until_valid nil yieldスキップ | `event_coroutine_test.lua`             | ✅ 完了 | 6テスト（coroutine-resume-loop）             |
-| user_scripts検索パス優先順位         | `loader_integration_test.rs`           | ✅ 完了 | 2テスト（lua-module-path-resolution）        |
-| main.lua初期化順序                   | `loader_integration_test.rs`           | ✅ 完了 | 2テスト（lua-module-path-resolution）        |
-| scene_dic require化                  | `loader_integration_test.rs`           | ✅ 完了 | 3テスト（lua-module-path-resolution）        |
-| lua_requireヘルパー関数              | `runtime::tests`                       | ✅ 完了 | 3テスト（lua-module-path-resolution）        |
-| GLOBAL チェイントーク関数登録        | `global_chaintalk_call_test.lua`       | ✅ 完了 | 6テスト（yield-continuation-token）          |
-| GLOBAL L3解決 + yield動作            | `global_chaintalk_call_test.lua`       | ✅ 完了 | 4テスト（yield-continuation-token）          |
-| EVENT.fire チェイントーク統合        | `global_chaintalk_integration_test.lua`| ✅ 完了 | 5テスト（yield-continuation-token）          |
-| @pasta_log ログブリッジ             | `log_module_test.rs`<br>`log_integration_test.rs` | ✅ 完了 | 24+7テスト（lua-logging）        |
-| @pasta_log スタックレベル検証       | `log_stack_level_test.rs`              | ✅ 完了 | 2テスト（lua-logging）                       |
-| スポット位置永続化（STORE連携）      | `persist_spot_position_test.lua`       | ✅ 完了 | 5テスト（persist-spot-position）             |
-| sakura_builder スポット処理          | `sakura_builder_test.lua`              | ✅ 完了 | 3テスト（persist-spot-position追加分）       |
-| Luaパススルー（init.*拒否）          | `lua_passthrough_test.rs`              | ✅ 完了 | 2テスト（lua-passthrough）                   |
-| Luaパススルー（.lua検出・コピー）    | `lua_passthrough_test.rs`              | ✅ 完了 | 3テスト（lua-passthrough）                   |
-| Luaパススルー（モジュール名衝突）    | `lua_passthrough_test.rs`              | ✅ 完了 | 2テスト（lua-passthrough）                   |
-| Luaパススルー（パススルー処理）      | `lua_passthrough_test.rs`              | ✅ 完了 | 2テスト（lua-passthrough）                   |
-| Luaパススルー（インクリメンタル）    | `lua_passthrough_test.rs`              | ✅ 完了 | 1テスト（lua-passthrough）                   |
-| Luaパススルー（孤立キャッシュ）      | `lua_passthrough_test.rs`              | ✅ 完了 | 2テスト（lua-passthrough）                   |
+| 機能                                 | テストファイル                                    | 状態   | 説明                                         |
+| ------------------------------------ | ------------------------------------------------- | ------ | -------------------------------------------- |
+| Luaスクリプトローダー                | `loader_integration_test.rs`                      | ✅ 完了 | スクリプト読み込み                           |
+| 標準ライブラリモジュール             | `stdlib_modules_test.rs`                          | ✅ 完了 | stdlib機能                                   |
+| 正規表現モジュール                   | `stdlib_regex_test.rs`                            | ✅ 完了 | 14テスト                                     |
+| Lua単体テスト実行                    | `lua_unittest_runner.rs`                          | ✅ 完了 | Luaテストランナー                            |
+| STORE.save/CTX注入                   | `store_save_test.lua`                             | ✅ 完了 | 永続変数・参照同一性                         |
+| CONFIG.actor→STORE.actors初期化      | `config_actors_initialization_test.rs`            | ✅ 完了 | 8テスト（pasta.tomlアクター設定）            |
+| SHIORIレスポンスビルダー             | `shiori_res_test.rs`                              | ✅ 完了 | 14テスト                                     |
+| SHIORIイベントディスパッチ           | `shiori_event_test.rs`                            | ✅ 完了 | 16テスト（新規）                             |
+| SHIORI_ACT さくらスクリプト生成      | `shiori_act_test.lua`                             | ✅ 完了 | 47テスト（transfer_date_to_var 7テスト追加） |
+| SHIORI_ACT 日時転記機能              | `shiori_act_test.lua`                             | ✅ 完了 | 7テスト（onhour-date-var-transfer）          |
+| ACT トークンバッファ（親クラス）     | `act_test.lua`                                    | ✅ 完了 | 32テスト（act-token-buffer-refactor）        |
+| ACT トークングループ化               | `act_grouping_test.lua`                           | ✅ 完了 | 19テスト（actor-talk-grouping）              |
+| sakura_builder トークン変換          | `sakura_builder_test.lua`                         | ✅ 完了 | 24テスト（act-token-buffer-refactor）        |
+| RuntimeConfig libs配列               | `runtime::tests`                                  | ✅ 完了 | 17テスト（新規）                             |
+| LuaConfig TOML設定                   | `loader::config::tests`                           | ✅ 完了 | 6テスト（新規）                              |
+| さくらスクリプトウェイト挿入         | `sakura_script_integration_test.rs`               | ✅ 完了 | 19テスト（sakura-script-wait）               |
+| さくらスクリプト記号タグトークナイズ | `tokenizer.rs` 内テスト                           | ✅ 完了 | 6テスト（`-+*?&` タグ認識）                  |
+| EVENT.fire コルーチン対応            | `event_coroutine_test.lua`                        | ✅ 完了 | 16テスト（resume_until_valid含む）           |
+| resume_until_valid nil yieldスキップ | `event_coroutine_test.lua`                        | ✅ 完了 | 6テスト（coroutine-resume-loop）             |
+| user_scripts検索パス優先順位         | `loader_integration_test.rs`                      | ✅ 完了 | 2テスト（lua-module-path-resolution）        |
+| main.lua初期化順序                   | `loader_integration_test.rs`                      | ✅ 完了 | 2テスト（lua-module-path-resolution）        |
+| scene_dic require化                  | `loader_integration_test.rs`                      | ✅ 完了 | 3テスト（lua-module-path-resolution）        |
+| lua_requireヘルパー関数              | `runtime::tests`                                  | ✅ 完了 | 3テスト（lua-module-path-resolution）        |
+| GLOBAL チェイントーク関数登録        | `global_chaintalk_call_test.lua`                  | ✅ 完了 | 6テスト（yield-continuation-token）          |
+| GLOBAL L3解決 + yield動作            | `global_chaintalk_call_test.lua`                  | ✅ 完了 | 4テスト（yield-continuation-token）          |
+| EVENT.fire チェイントーク統合        | `global_chaintalk_integration_test.lua`           | ✅ 完了 | 5テスト（yield-continuation-token）          |
+| @pasta_log ログブリッジ              | `log_module_test.rs`<br>`log_integration_test.rs` | ✅ 完了 | 24+7テスト（lua-logging）                    |
+| @pasta_log スタックレベル検証        | `log_stack_level_test.rs`                         | ✅ 完了 | 2テスト（lua-logging）                       |
+| スポット位置永続化（STORE連携）      | `persist_spot_position_test.lua`                  | ✅ 完了 | 5テスト（persist-spot-position）             |
+| sakura_builder スポット処理          | `sakura_builder_test.lua`                         | ✅ 完了 | 3テスト（persist-spot-position追加分）       |
+| Luaパススルー（init.*拒否）          | `lua_passthrough_test.rs`                         | ✅ 完了 | 2テスト（lua-passthrough）                   |
+| Luaパススルー（.lua検出・コピー）    | `lua_passthrough_test.rs`                         | ✅ 完了 | 3テスト（lua-passthrough）                   |
+| Luaパススルー（モジュール名衝突）    | `lua_passthrough_test.rs`                         | ✅ 完了 | 2テスト（lua-passthrough）                   |
+| Luaパススルー（パススルー処理）      | `lua_passthrough_test.rs`                         | ✅ 完了 | 2テスト（lua-passthrough）                   |
+| Luaパススルー（インクリメンタル）    | `lua_passthrough_test.rs`                         | ✅ 完了 | 1テスト（lua-passthrough）                   |
+| Luaパススルー（孤立キャッシュ）      | `lua_passthrough_test.rs`                         | ✅ 完了 | 2テスト（lua-passthrough）                   |
 
 ### 2.5 統合テスト（E2E）
 
-| 機能                        | テストファイル                                                      | 状態   | 説明                                                |
-| --------------------------- | ------------------------------------------------------------------- | ------ | --------------------------------------------------- |
-| SHIORI.DLL インターフェース | `shiori_lifecycle_test.rs`                                          | ✅ 完了 | 5テスト全パス                                       |
-| SHIORI リクエスト処理       | `lua_request_test.rs`                                               | ✅ 完了 | 18+テスト                                           |
-| Runtime E2E                 | `runtime_e2e_test.rs`                                               | ✅ 完了 | 18テスト（chaintalk E2E 2テスト追加）               |
-| Finalize Scene              | `finalize_scene_test.rs`                                            | ✅ 完了 | 14テスト                                            |
-| Virtual Event Dispatcher    | `virtual_event_dispatcher_test.rs`<br>`virtual_dispatcher_spec.lua` | ✅ 完了 | 15+20テスト（onhour-date-var-transfer 5テスト追加） |
-| Sample Ghost Integration    | `shiori_sample_ghost_test.rs`                                       | ✅ 完了 | 2テスト（hello-pasta実ゴースト使用）                |
-| Sample Ghost スクリプト整合性 | `scripts.rs::test_script_expression_names_defined_in_actors`     | ✅ 完了 | 1テスト（表情名↔辞書定義一致検証）                  |
-| Sample Ghost dist-src 検証  | `dist_src_validation_test.rs::test_dist_src_directory_structure`    | ✅ 完了 | 1テスト（dist-src/ 8ファイル存在確認）              |
-| Sample Ghost 画像構造検証   | `integration_test.rs::test_generated_images_structure`              | ✅ 完了 | 1テスト（shell/master/*.png 18枚＋surfaces.txt）    |
-| チェイントーク E2E            | `runtime_e2e_test.rs`                                            | ✅ 完了 | 2テスト（yield-continuation-token Pasta→Lua→実行）  |
+| 機能                          | テストファイル                                                      | 状態   | 説明                                                |
+| ----------------------------- | ------------------------------------------------------------------- | ------ | --------------------------------------------------- |
+| SHIORI.DLL インターフェース   | `shiori_lifecycle_test.rs`                                          | ✅ 完了 | 5テスト全パス                                       |
+| SHIORI リクエスト処理         | `lua_request_test.rs`                                               | ✅ 完了 | 18+テスト                                           |
+| Runtime E2E                   | `runtime_e2e_test.rs`                                               | ✅ 完了 | 18テスト（chaintalk E2E 2テスト追加）               |
+| Finalize Scene                | `finalize_scene_test.rs`                                            | ✅ 完了 | 14テスト                                            |
+| Virtual Event Dispatcher      | `virtual_event_dispatcher_test.rs`<br>`virtual_dispatcher_spec.lua` | ✅ 完了 | 15+20テスト（onhour-date-var-transfer 5テスト追加） |
+| Sample Ghost Integration      | `shiori_sample_ghost_test.rs`                                       | ✅ 完了 | 2テスト（hello-pasta実ゴースト使用）                |
+| Sample Ghost スクリプト整合性 | `scripts.rs::test_script_expression_names_defined_in_actors`        | ✅ 完了 | 1テスト（表情名↔辞書定義一致検証）                  |
+| Sample Ghost dist-src 検証    | `dist_src_validation_test.rs::test_dist_src_directory_structure`    | ✅ 完了 | 1テスト（dist-src/ 8ファイル存在確認）              |
+| Sample Ghost 画像構造検証     | `integration_test.rs::test_generated_images_structure`              | ✅ 完了 | 1テスト（shell/master/*.png 18枚＋surfaces.txt）    |
+| チェイントーク E2E            | `runtime_e2e_test.rs`                                               | ✅ 完了 | 2テスト（yield-continuation-token Pasta→Lua→実行）  |
 
 ---
 
@@ -124,7 +124,8 @@
 | ----------------------------------- | -------------------------------- | ------------------------------ |
 | SPECIFICATION.md 全マーカー定義完了 | -                                | ✅ ドキュメント                 |
 | 全角/半角対応表の完全性             | -                                | ✅ ドキュメント                 |
-| cargo test pasta_core 100%パス      | 全pasta_coreテスト               | ✅ 91テスト                     |
+| cargo test pasta_core 100%パス      | 全pasta_coreテスト               | ✅ 67テスト                     |
+| cargo test pasta_dsl 100%パス       | 全pasta_dslテスト                | ✅ 62テスト                     |
 | cargo test pasta_lua 100%パス       | 全pasta_luaテスト                | ✅ 230テスト                    |
 | cargo test pasta_shiori 100%パス    | `shiori_lifecycle_test.rs`       | ✅ 全パス                       |
 | comprehensive_control_flow検証      | `transpiler_snapshot_test.rs`    | ✅ 8スナップショット            |
@@ -177,10 +178,11 @@
 
 | クレート     | テスト数 | パス     | 失敗  | カバレッジ評価 |
 | ------------ | -------- | -------- | ----- | -------------- |
-| pasta_core   | 105      | 105      | 0     | ⭐⭐⭐⭐⭐ 優秀     |
+| pasta_dsl    | 62       | 62       | 0     | ⭐⭐⭐⭐⭐ 優秀     |
+| pasta_core   | 67       | 67       | 0     | ⭐⭐⭐⭐⭐ 優秀     |
 | pasta_lua    | 478      | 478      | 0     | ⭐⭐⭐⭐⭐ 優秀     |
 | pasta_shiori | 28       | 28       | 0     | ⭐⭐⭐⭐⭐ 優秀     |
-| **合計**     | **722+** | **722+** | **0** | **100%パス率** |
+| **合計**     | **746+** | **746+** | **0** | **100%パス率** |
 
 ---
 

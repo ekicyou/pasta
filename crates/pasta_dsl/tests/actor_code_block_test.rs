@@ -2,7 +2,7 @@
 //!
 //! タスク1.3: code_blockを含むactor_scopeが正しくパースされることを検証
 
-use pasta_core::parser::{FileItem, parse_str};
+use pasta_dsl::parser::{FileItem, parse_str};
 
 /// code_blockを含むactor_scopeが正しくパースされることを検証
 #[test]

@@ -2,7 +2,7 @@
 //!
 //! This module defines error types for the Lua code generation process.
 
-use pasta_core::parser::Span;
+use pasta_dsl::parser::Span;
 use std::fmt;
 use thiserror::Error;
 

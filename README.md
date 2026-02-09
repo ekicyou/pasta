@@ -42,7 +42,7 @@ Pastaは、「伺か」などのデスクトップマスコットアプリケー
 ```
 Engine (上位API) → Cache/Loader
     ↓
-Transpiler (2pass) ← Parser (Pest)
+Transpiler (2pass) ← Parser (pasta_dsl, Pest)
     ↓
 Runtime (Lua VM) → IR Output (ScriptEvent)
 ```
@@ -53,20 +53,20 @@ Pastaは現行の `parser` + `transpiler` スタックを使用しています�
 
 | モジュール              | 文法ファイル   | 状態     | 用途                  |
 | ----------------------- | -------------- | -------- | --------------------- |
-| `pasta_core::parser`    | `grammar.pest` | **現行** | engine.rsで使用       |
+| `pasta_dsl::parser`     | `grammar.pest` | **現行** | DSL→AST変換           |
 | `pasta_lua::transpiler` | -              | **現行** | 2-pass トランスパイル |
 
 #### 使用方法
 
 ```rust
 // 現行スタック
-use pasta_core::parser::{parse_str, parse_file};
+use pasta_dsl::parser::{parse_str, parse_file};
 use pasta_lua::transpiler::Transpiler;
 ```
 
 ### parserについて
 
-`parser`モジュールは、`grammar.pest`文法に基づいています。
+`parser`モジュールは、独立クレート `pasta_dsl` として提供され、`grammar.pest`文法に基づいています。
 
 主な特徴：
 - 3層スコープ構造：`FileScope` ⊃ `GlobalSceneScope` ⊃ `LocalSceneScope`
@@ -87,7 +87,8 @@ use pasta_lua::transpiler::Transpiler;
 - [AGENTS.md](AGENTS.md) - AI開発支援ドキュメント
 
 ### Level 2: Crate Docs
-- [pasta_core/README.md](crates/pasta_core/README.md) - パーサー・レジストリ
+- [pasta_dsl/README.md](crates/pasta_dsl/README.md) - DSLパーサー
+- [pasta_core/README.md](crates/pasta_core/README.md) - レジストリ・ユーティリティ
 - [pasta_lua/README.md](crates/pasta_lua/README.md) - Luaトランスパイラ
 - [pasta_shiori/README.md](crates/pasta_shiori/README.md) - SHIORI DLL統合
 
@@ -108,7 +109,8 @@ use pasta_lua::transpiler::Transpiler;
 
 ### 開発者向け（推定所要時間: 2-3時間）
 1. [doc/spec/](doc/spec/) - 言語仕様の理解（必要な章のみ）
-2. [pasta_core/README.md](crates/pasta_core/README.md) - コアアーキテクチャ
+2. [pasta_dsl/README.md](crates/pasta_dsl/README.md) - DSLパーサー
+3. [pasta_core/README.md](crates/pasta_core/README.md) - レジストリ
 3. [.kiro/steering/structure.md](.kiro/steering/structure.md) - プロジェクト構造
 4. [.kiro/steering/workflow.md](.kiro/steering/workflow.md) - 開発ワークフロー
 
@@ -139,7 +141,8 @@ cargo test --workspace
 ```
 pasta/
 ├── crates/
-│   ├── pasta_core/    # パーサー・レジストリ（言語非依存層）
+│   ├── pasta_dsl/     # DSLパーサー（Pest PEG → AST）
+│   ├── pasta_core/    # レジストリ・ユーティリティ（言語非依存層）
 │   ├── pasta_lua/     # Luaトランスパイラ・ランタイム
 │   └── pasta_shiori/  # SHIORI DLL統合
 └── tests/             # 統合テスト・フィクスチャ

@@ -4,10 +4,10 @@
 //! These tests verify the Span byte offset functionality specified in
 //! ast-source-span-mapping requirements.
 
-use pasta_core::parser::{FileItem, GlobalSceneScope, Span, SpanError, parse_str};
+use pasta_dsl::parser::{FileItem, GlobalSceneScope, Span, SpanError, parse_str};
 
 /// Helper to get global scene scopes from PastaFile items
-fn get_global_scene_scopes(file: &pasta_core::parser::PastaFile) -> Vec<&GlobalSceneScope> {
+fn get_global_scene_scopes(file: &pasta_dsl::parser::PastaFile) -> Vec<&GlobalSceneScope> {
     file.items
         .iter()
         .filter_map(|item| {

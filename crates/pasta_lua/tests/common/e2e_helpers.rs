@@ -10,7 +10,7 @@
 //! - Requirement 7.2: Runtime E2E test infrastructure
 
 use mlua::{Lua, StdLib};
-use pasta_core::parser::parse_str;
+use pasta_dsl::parser::parse_str;
 use pasta_lua::LuaTranspiler;
 use pasta_lua::context::TranspileContext;
 use pasta_lua::loader::PersistenceConfig;

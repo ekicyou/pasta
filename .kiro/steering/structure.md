@@ -6,15 +6,20 @@
 pasta/                        # Cargo ワークスペースルート（Pure Virtual Workspace）
 ├── Cargo.toml               # ワークスペース設定のみ（[package] セクションなし）
 ├── crates/                  # クレート群
-│   ├── pasta_core/          # 言語非依存層
+│   ├── pasta_dsl/           # DSLパーサー層
+│   │   ├── Cargo.toml       # pasta_dsl設定
+│   │   └── src/
+│   │       ├── lib.rs       # クレートエントリーポイント
+│   │       ├── error.rs     # ParseError, ParseErrorInfo, ParseResult
+│   │       └── parser/      # パーサーレイヤー（PEG → AST変換）
+│   │           ├── mod.rs   # パーサーAPI公開
+│   │           ├── ast.rs   # AST定義（Statement, Expr, LabelDef等）
+│   │           └── grammar.pest # Pest文法定義
+│   ├── pasta_core/          # 言語非依存層（レジストリ）
 │   │   ├── Cargo.toml       # pasta_core設定
 │   │   └── src/
 │   │       ├── lib.rs       # クレートエントリーポイント
-│   │       ├── error.rs     # ParseError, SceneTableError, WordTableError
-│   │       ├── parser/      # パーサーレイヤー（PEG → AST変換）
-│   │       │   ├── mod.rs   # パーサーAPI公開
-│   │       │   ├── ast.rs   # AST定義（Statement, Expr, LabelDef等）
-│   │       │   └── grammar.pest # Pest文法定義
+│   │       ├── error.rs     # SceneTableError, WordTableError
 │   │       └── registry/    # 型管理レイヤー（独立）
 │   │           ├── mod.rs   # Registry API
 │   │           ├── scene_registry.rs # SceneRegistry - シーン管理
@@ -94,20 +99,26 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 
 ```
 pasta (workspace)
-├── pasta_core          # 言語非依存層（パーサー、レジストリ）
-└── pasta_lua           # Luaバックエンド層（pasta_core依存）
+├── pasta_dsl           # DSLパーサー層（Pest PEG → AST変換）
+├── pasta_core          # 言語非依存層（レジストリ）
+└── pasta_lua           # Luaバックエンド層（pasta_dsl + pasta_core依存）
 ```
 
 ### レイヤー分離原則
 各レイヤーは上位レイヤーのみに依存：
 
-**pasta_core:**
+**pasta_dsl:**
 ```
 parser（AST生成）
   ↓
+error（パースエラー）
+```
+
+**pasta_core:**
+```
 registry（シーン/単語テーブル）
   ↓
-error（パースエラー）
+error（テーブルエラー）
 ```
 
 **pasta_lua:**
@@ -118,14 +129,17 @@ transpiler (AST→Lua)
   ↓
 runtime (Lua VM)
   ↓
-pasta_core（再エクスポート）
+pasta_dsl（パーサー） + pasta_core（レジストリ）
 ```
 
-### 公開API (`pasta_core/lib.rs`)
+### 公開API (`pasta_dsl/lib.rs`)
 - **Parser**: `parse_str()`, `parse_file()`, AST型（PastaFile, Statement, Expr等）
+- **Error**: `ParseError`, `ParseErrorInfo`, `ParseResult`
+
+### 公開API (`pasta_core/lib.rs`)
 - **Registry**: `SceneRegistry`, `WordDefRegistry`, `SceneTable`, `WordTable`
 - **Random**: `RandomSelector`, `DefaultRandomSelector`
-- **Error**: `ParseError`, `SceneTableError`, `WordTableError`
+- **Error**: `SceneTableError`, `WordTableError`
 
 
 

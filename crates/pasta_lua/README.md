@@ -17,9 +17,9 @@ Pasta DSL を Lua にトランスパイルし、Lua VM 上で実行するため�
 PastaLoader (起動シーケンス)
     ↓
 LuaTranspiler (AST → Lua変換)
-    ↓
+    ↓            ← pasta_dsl (DSLパーサー)
 PastaLuaRuntime (Lua VM ホスト)
-    ↓
+    ↓            ← pasta_core (レジストリ)
 SHIORI Integration (プロトコル処理)
 ```
 
@@ -76,7 +76,7 @@ SHIORI Integration (プロトコル処理)
 | -------------------------------- | ------------------------- | ---------------------------------------- |
 | `pasta.toml`                     | 設定ファイル              | 必須。存在しない場合はエラー             |
 | `dic/*/*.pasta`                  | Pasta DSL ソース          | デフォルトの検出パターン                 |
-| `dic/*/*.lua`                    | Lua パススルー        | トランスパイルなしでキャッシュにコピー         |
+| `dic/*/*.lua`                    | Lua パススルー            | トランスパイルなしでキャッシュにコピー   |
 | `scripts/`                       | 自作 Lua スクリプト       | package.path に含まれる                  |
 | `scripts/pasta/`                 | Pasta ランタイム          | トランスパイル済みコードから呼び出される |
 | `scripts/pasta/shiori/entry.lua` | SHIORI エントリーポイント | 存在すれば自動ロード                     |
@@ -535,7 +535,8 @@ Pasta ファイルのパスからモジュール名が自動生成されます�
 
 ## 関連クレート
 
-- [`pasta_core`](../pasta_core/) - パーサー、AST、レジストリ
+- [`pasta_dsl`](../pasta_dsl/) - DSLパーサー、AST
+- [`pasta_core`](../pasta_core/) - レジストリ（シーン/単語テーブル）
 - [`pasta_shiori`](../pasta_shiori/) - SHIORI DLL ラッパー
 - [プロジェクト概要](../../README.md) - pasta プロジェクト全体
 

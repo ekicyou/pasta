@@ -3,7 +3,7 @@
 //! This module provides the main transpiler interface for converting
 //! Pasta AST to Lua code.
 
-use pasta_core::parser::{FileItem, PastaFile};
+use pasta_dsl::parser::{FileItem, PastaFile};
 use pasta_core::registry::SceneRegistry;
 
 use super::code_generator::LuaCodeGenerator;
@@ -150,7 +150,7 @@ impl LuaTranspiler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pasta_core::parser::{ActorScope, GlobalSceneScope, KeyWords, LocalSceneScope, Span};
+    use pasta_dsl::parser::{ActorScope, GlobalSceneScope, KeyWords, LocalSceneScope, Span};
     use std::path::PathBuf;
 
     fn create_simple_actor(name: &str) -> ActorScope {

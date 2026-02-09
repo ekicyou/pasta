@@ -3,10 +3,10 @@
 //! `＄０`〜`＄９` がパーサーで正しく `VarScope::Args(N)` に解決されることを検証。
 //! req-var-expansion ギャップ分析の実証テスト。
 
-use pasta_core::parser::{Action, FileItem, GlobalSceneScope, LocalSceneItem, VarScope, parse_str};
+use pasta_dsl::parser::{Action, FileItem, GlobalSceneScope, LocalSceneItem, VarScope, parse_str};
 
 /// Helper to get global scene scopes from PastaFile items
-fn get_global_scene_scopes(file: &pasta_core::parser::PastaFile) -> Vec<&GlobalSceneScope> {
+fn get_global_scene_scopes(file: &pasta_dsl::parser::PastaFile) -> Vec<&GlobalSceneScope> {
     file.items
         .iter()
         .filter_map(|item| {

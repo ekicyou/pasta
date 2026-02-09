@@ -34,7 +34,7 @@
 //! # Example
 //!
 //! ```no_run
-//! use pasta_core::parser::{parse_str, parse_file, FileItem};
+//! use pasta_dsl::parser::{parse_str, parse_file, FileItem};
 //! use std::path::Path;
 //!
 //! // Parse from string
@@ -89,7 +89,7 @@ pub struct PastaParser2;
 /// # Example
 ///
 /// ```
-/// use pasta_core::parser::{parse_str, FileItem};
+/// use pasta_dsl::parser::{parse_str, FileItem};
 ///
 /// let source = r#"＊挨拶
 ///   Alice：こんにちは
@@ -137,8 +137,8 @@ pub fn parse_str(source: &str, filename: &str) -> Result<PastaFile, ParseError> 
 /// # Example
 ///
 /// ```no_run
-/// use pasta_core::parser::{parse_file, FileItem};
-/// use pasta_core::ParseError;
+/// use pasta_dsl::parser::{parse_file, FileItem};
+/// use pasta_dsl::ParseError;
 /// use std::path::Path;
 ///
 /// let ast = parse_file(Path::new("scripts/main.pasta"))?;

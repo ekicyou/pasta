@@ -2,7 +2,7 @@
 //!
 //! タスク2.4: generate_actorの配列形式出力とcode_blocks展開を検証
 
-use pasta_core::parse_str;
+use pasta_dsl::parse_str;
 use pasta_lua::LuaTranspiler;
 
 /// 複数値が配列形式で正しく出力されることを検証
@@ -31,7 +31,9 @@ fn test_generate_actor_array_format() {
 
     // 対称API形式で出力されること（複数値）
     assert!(
-        output_str.contains(r#"ACTOR:create_word("通常"):entry([=[\s[0]]=], [=[\s[100]]=], [=[\s[200]]=])"#),
+        output_str.contains(
+            r#"ACTOR:create_word("通常"):entry([=[\s[0]]=], [=[\s[100]]=], [=[\s[200]]=])"#
+        ),
         "複数値がACTOR:create_word APIで出力されること: {}",
         output_str
     );

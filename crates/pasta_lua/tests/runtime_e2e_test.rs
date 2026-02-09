@@ -364,7 +364,7 @@ fn test_complete_flow_pasta_to_output() {
 /// - Mixed comments and code parse correctly
 #[test]
 fn test_comment_line_explicit_parse() {
-    use pasta_core::parser::parse_str;
+    use pasta_dsl::parser::parse_str;
 
     let source = r#"
 ＃ これはコメントです
@@ -381,7 +381,7 @@ fn test_comment_line_explicit_parse() {
     let scene_count = file
         .items
         .iter()
-        .filter(|item| matches!(item, pasta_core::parser::ast::FileItem::GlobalSceneScope(_)))
+        .filter(|item| matches!(item, pasta_dsl::parser::ast::FileItem::GlobalSceneScope(_)))
         .count();
 
     assert_eq!(scene_count, 1, "Should have exactly 1 scene");
@@ -501,7 +501,7 @@ fn test_variable_scope_complete() {
 /// - Error message is descriptive
 #[test]
 fn test_error_message_specificity() {
-    use pasta_core::parser::parse_str;
+    use pasta_dsl::parser::parse_str;
 
     // Invalid syntax: scene without name
     let invalid_source = "＊\n";

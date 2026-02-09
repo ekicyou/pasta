@@ -37,7 +37,7 @@ pub enum LoaderError {
         file: PathBuf,
         message: String,
         #[source]
-        source: Option<pasta_core::error::ParseError>,
+        source: Option<pasta_dsl::ParseError>,
     },
 
     /// Transpilation error.
@@ -143,7 +143,7 @@ impl LoaderError {
     pub fn parse_with_source(
         path: impl Into<PathBuf>,
         message: impl Into<String>,
-        source: pasta_core::error::ParseError,
+        source: pasta_dsl::ParseError,
     ) -> Self {
         LoaderError::Parse {
             file: path.into(),

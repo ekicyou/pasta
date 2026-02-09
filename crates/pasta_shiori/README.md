@@ -140,15 +140,15 @@ ghost/
 
 ## 依存関係
 
-| クレート           | バージョン | 用途                 |
-| ------------------ | ---------- | -------------------- |
-| pasta_core         | workspace  | パーサー・レジストリ |
-| pasta_lua          | workspace  | Luaランタイム        |
-| time               | 0.3        | タイムスタンプ処理   |
-| tracing            | 0.1        | ロギング             |
-| tracing-subscriber | workspace  | ログ出力             |
-| tracing-appender   | workspace  | ファイルログ         |
-| thiserror          | 2          | エラー型定義         |
+| クレート           | バージョン | 用途                                              |
+| ------------------ | ---------- | ------------------------------------------------- |
+| pasta_core         | workspace  | レジストリ                                        |
+| pasta_lua          | workspace  | Luaランタイム（pasta_dsl経由でDSLパーサーに依存） |
+| time               | 0.3        | タイムスタンプ処理                                |
+| tracing            | 0.1        | ロギング                                          |
+| tracing-subscriber | workspace  | ログ出力                                          |
+| tracing-appender   | workspace  | ファイルログ                                      |
+| thiserror          | 2          | エラー型定義                                      |
 
 ### Windows 専用
 
@@ -179,7 +179,8 @@ cargo test -p pasta_shiori
 
 ## 関連クレート
 
-- [pasta_core](../pasta_core/README.md) - パーサー・レジストリ
+- [pasta_dsl](../pasta_dsl/README.md) - DSLパーサー
+- [pasta_core](../pasta_core/README.md) - レジストリ
 - [pasta_lua](../pasta_lua/README.md) - Luaバックエンド
 - [プロジェクト概要](../../README.md) - pasta プロジェクト全体
 

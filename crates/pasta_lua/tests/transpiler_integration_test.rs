@@ -2,8 +2,8 @@
 //!
 //! Tests that verify the transpiler generates Lua code matching the reference implementation.
 
-use pasta_core::parse_str;
-use pasta_core::parser::{ActorScope, FileItem, GlobalSceneScope};
+use pasta_dsl::parse_str;
+use pasta_dsl::parser::{ActorScope, FileItem, GlobalSceneScope};
 use pasta_lua::{LuaTranspiler, TranspilerConfig};
 
 /// Normalize line endings to LF (\n) for cross-platform comparison.
@@ -13,7 +13,7 @@ fn normalize_line_endings(s: &str) -> String {
 }
 
 /// Helper to get global scene scopes from PastaFile
-fn get_global_scene_scopes(file: &pasta_core::parser::PastaFile) -> Vec<&GlobalSceneScope> {
+fn get_global_scene_scopes(file: &pasta_dsl::parser::PastaFile) -> Vec<&GlobalSceneScope> {
     file.items
         .iter()
         .filter_map(|item| {
@@ -27,7 +27,7 @@ fn get_global_scene_scopes(file: &pasta_core::parser::PastaFile) -> Vec<&GlobalS
 }
 
 /// Helper to get actor scopes from PastaFile
-fn get_actor_scopes(file: &pasta_core::parser::PastaFile) -> Vec<&ActorScope> {
+fn get_actor_scopes(file: &pasta_dsl::parser::PastaFile) -> Vec<&ActorScope> {
     file.items
         .iter()
         .filter_map(|item| {
@@ -693,7 +693,7 @@ fn test_file_item_order_preserved() {
 /// 同じキーの属性が再出現すると後勝ちで上書きされることを確認
 #[test]
 fn test_file_attr_shadowing() {
-    use pasta_core::parser::{Attr, AttrValue, FileItem, PastaFile, Span};
+    use pasta_dsl::parser::{Attr, AttrValue, FileItem, PastaFile, Span};
     use std::path::PathBuf;
 
     // 手動でPastaFileを構築（FileAttrを含む）
@@ -743,7 +743,7 @@ fn test_file_attr_shadowing() {
 /// MAJOR-4: アクターがファイル属性を継承しないことの検証
 #[test]
 fn test_actor_does_not_inherit_file_attrs() {
-    use pasta_core::parser::{Attr, AttrValue, FileItem, PastaFile, Span};
+    use pasta_dsl::parser::{Attr, AttrValue, FileItem, PastaFile, Span};
     use std::path::PathBuf;
 
     // ファイル属性 → アクター → シーン の順序
@@ -805,7 +805,7 @@ fn test_actor_does_not_inherit_file_attrs() {
 /// MAJOR-4: グローバル単語がFileItem出現順に登録されることの検証
 #[test]
 fn test_global_word_registration_order() {
-    use pasta_core::parser::{FileItem, KeyWords, PastaFile, Span};
+    use pasta_dsl::parser::{FileItem, KeyWords, PastaFile, Span};
     use std::path::PathBuf;
 
     let word1 = FileItem::GlobalWord(KeyWords {

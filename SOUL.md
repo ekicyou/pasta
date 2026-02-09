@@ -20,7 +20,8 @@ pastaプロジェクトのドキュメントは、以下の優先順位と役割
 実装層ドキュメント。技術的詳細と品質管理を担当。
 
 **クレートREADME**:
-- [pasta_core/README.md](crates/pasta_core/README.md) - パーサー・レジストリAPI
+- [pasta_dsl/README.md](crates/pasta_dsl/README.md) - DSLパーサーAPI
+- [pasta_core/README.md](crates/pasta_core/README.md) - レジストリAPI
 - [pasta_lua/README.md](crates/pasta_lua/README.md) - Luaトランスパイラ・ランタイム
 - [pasta_lua/LUA_API.md](crates/pasta_lua/LUA_API.md) - Lua APIリファレンス
 - [pasta_shiori/README.md](crates/pasta_shiori/README.md) - SHIORI DLLインターフェース
