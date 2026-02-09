@@ -69,7 +69,7 @@
 
 ### Requirement 4: WebAssembly（WASM）ビルド対応
 
-**目的:** 開発者として、ランゲージサーバーを`wasm32-unknown-unknown`ターゲットにビルドしたい。将来的に`pasta_vscode` VSCode拡張としてブラウザ環境でも動作させるため。
+**目的:** 開発者として、ランゲージサーバーを`wasm32-unknown-unknown`ターゲットにビルドしたい。VSCode拡張機能に同梱し、追加インストール不要でシンタックスハイライトを提供するため。将来的にvscode.dev（ブラウザ版VSCode）でも動作させる選択肢を残す。
 
 #### 受入基準
 
