@@ -172,13 +172,16 @@ pub use pasta_dsl::parser::*;
 - ✅ 最もシンプルな移行パス
 - ❌ なし（実質的にデメリットがない）
 
-### 推奨: **Option C（薄い wrapper）**
+### 推奨: **Option A（移動ベース・完全分離）** ← 要件レビューで確定
+
+> **要件レビューでの決定**: パターンB（移行措置）が採用され、Option Cの薄いwrapperは不採用。
+> 下流クレートは `pasta_dsl` に直接依存し、`pasta_core::parser` パスは完全に消滅する。
 
 **理由**:
 1. parser と registry が完全に独立しているため、分離自体にリスクがない
-2. `pub use pasta_dsl::parser::*` による薄い wrapper は Rust の標準的な再エクスポートパターン
-3. pasta_core の `parser` モジュールパスを維持できるため、下流の pasta_lua が変更不要
-4. error も同様に `pub use pasta_dsl::error::{ParseError, ParseErrorInfo, ParseResult}` で維持可能
+2. 下流クレートが `pasta_dsl` に直接依存することで、依存関係が明確になる
+3. pasta_core から parser を完全除去し、再エクスポートを行わないことでクリーンな責務分離を実現
+4. pasta_core は将来的に registry 等のユーティリティに特化
 
 ---
 
@@ -187,9 +190,10 @@ pub use pasta_dsl::parser::*;
 ### 工数見積もり: **S（1〜3日）**
 
 **根拠**: 
-- 既存パターン（Cargoワークスペース、pub use 再エクスポート）の適用のみ
+- 既存パターン（Cargoワークスペース）の適用のみ
 - 新規ロジック・外部連携なし
 - parser/registry が完全に独立しており、分離時の意図しない副作用リスクが極めて低い
+- 下流クレートの import パス変更は機械的な作業
 
 ### リスク: **Low**
 
@@ -197,7 +201,7 @@ pub use pasta_dsl::parser::*;
 - 全構造が十分に理解されている（未知の技術なし）
 - parser↔registry 間に相互依存がない（調査で確認済み）
 - `cargo test --all` で即座に回帰検証可能
-- 下流クレート（pasta_lua, pasta_shiori）への影響が再エクスポートで完全に吸収可能
+- 下流クレートの変更は import パスの書き換えのみ
 
 ---
 
@@ -205,21 +209,21 @@ pub use pasta_dsl::parser::*;
 
 ### 推奨アプローチ
 
-**Option C（薄い wrapper）** を採用し、以下の順序で実装：
+**Option A（移動ベース・完全分離）** を採用し、以下の順序で実装：
 
 1. pasta_dsl クレート新規作成（Cargo.toml, src/lib.rs, src/error.rs）
 2. parser ソースファイル移動（mod.rs, ast.rs, grammar.pest）
 3. ParseError 型の移動（error.rs の分割）
-4. pasta_core の parser/error を再エクスポート wrapper に変換
-5. テスト4ファイル（26テスト）の移動と import パス変更
-6. `cargo test --all` で全テスト通過を確認
-7. ドキュメント8ファイルの構成図更新
+4. pasta_core から parser モジュールを完全除去（再エクスポートなし）
+5. 下流クレート（pasta_lua 等）の import パスを `pasta_dsl` に変更
+6. テスト4ファイル（26テスト）の移動と import パス変更
+7. `cargo test --all` で全テスト通過を確認
+8. ドキュメント8ファイルの構成図更新
 
 ### 設計フェーズで決定すべき事項
 
 1. **pasta_dsl の `pub mod` 構成**: `parser` と `error` を別モジュールにするか、フラットにするか
-2. **pasta_core の parser wrapper の実装方法**: `pub mod parser { pub use pasta_dsl::parser::*; }` vs `pub use pasta_dsl::parser;`
-3. **pasta_dsl の Cargo.toml 設定**: `tracing` 依存を含めるか（現在 parser 内で `tracing` を使用しているか要確認）
+2. **pasta_dsl の Cargo.toml 設定**: `tracing` 依存を含めるか（現在 parser 内で `tracing` を使用しているか要確認）
 
 ### Research Needed 項目
 
