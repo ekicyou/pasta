@@ -9,13 +9,13 @@
 
 ### 1.1 既存の再利用可能資産
 
-| 資産 | パス | LSP関連性 |
-|------|------|-----------|
-| **PEGパーサー** | `crates/pasta_dsl/src/parser/grammar.pest` | ✅ シンタックス解析のコア。そのまま利用可能 |
-| **AST型定義** | `crates/pasta_dsl/src/parser/ast.rs` (886行) | ✅ `FileItem`, `GlobalSceneScope`, `Action`等の完全な型定義 |
-| **Span型** | `crates/pasta_dsl/src/parser/ast.rs` | ✅ 行/列(1-based) + バイトオフセット(0-based)。LSPポジション変換に直接利用可能 |
-| **parse_str()** | `crates/pasta_dsl/src/parser/mod.rs:106` | ✅ 文字列からASTへの変換。ドキュメント同期後の再パースに使用 |
-| **ParseError** | `crates/pasta_dsl/src/error.rs` | ✅ ファイル名・行・列・メッセージ。LSP Diagnosticsに変換可能 |
+| 資産            | パス                                         | LSP関連性                                                                     |
+| --------------- | -------------------------------------------- | ----------------------------------------------------------------------------- |
+| **PEGパーサー** | `crates/pasta_dsl/src/parser/grammar.pest`   | ✅ シンタックス解析のコア。そのまま利用可能                                    |
+| **AST型定義**   | `crates/pasta_dsl/src/parser/ast.rs` (886行) | ✅ `FileItem`, `GlobalSceneScope`, `Action`等の完全な型定義                    |
+| **Span型**      | `crates/pasta_dsl/src/parser/ast.rs`         | ✅ 行/列(1-based) + バイトオフセット(0-based)。LSPポジション変換に直接利用可能 |
+| **parse_str()** | `crates/pasta_dsl/src/parser/mod.rs:106`     | ✅ 文字列からASTへの変換。ドキュメント同期後の再パースに使用                   |
+| **ParseError**  | `crates/pasta_dsl/src/error.rs`              | ✅ ファイル名・行・列・メッセージ。LSP Diagnosticsに変換可能                   |
 
 ### 1.2 既存アーキテクチャパターン
 
@@ -27,12 +27,12 @@
 
 ### 1.3 統合サーフェス
 
-| 統合ポイント | 既存API | 備考 |
-|---|---|---|
-| パーサー呼び出し | `pasta_dsl::parse_str(source, filename)` | `&str` 入力、`Result<PastaFile, ParseError>` 返却 |
-| AST走査 | `PastaFile.items: Vec<FileItem>` | 記述順序保持、match式で走査 |
-| ソース位置 | `Span { start_line, start_col, end_line, end_col, start_byte, end_byte }` | 全ノードがSpan持ち |
-| エラー情報 | `ParseError::SyntaxError { file, line, column, message }` | LSP Diagnosticに1:1マッピング可能 |
+| 統合ポイント     | 既存API                                                                   | 備考                                              |
+| ---------------- | ------------------------------------------------------------------------- | ------------------------------------------------- |
+| パーサー呼び出し | `pasta_dsl::parse_str(source, filename)`                                  | `&str` 入力、`Result<PastaFile, ParseError>` 返却 |
+| AST走査          | `PastaFile.items: Vec<FileItem>`                                          | 記述順序保持、match式で走査                       |
+| ソース位置       | `Span { start_line, start_col, end_line, end_col, start_byte, end_byte }` | 全ノードがSpan持ち                                |
+| エラー情報       | `ParseError::SyntaxError { file, line, column, message }`                 | LSP Diagnosticに1:1マッピング可能                 |
 
 ---
 
@@ -40,15 +40,15 @@
 
 ### 要件→資産マッピング
 
-| 要件 | 既存資産 | ギャップ | 状態 |
-|------|---------|---------|------|
-| **R1: LSPサーバー基盤** | なし | LSPフレームワーク選定・実装が必要 | **Missing** |
-| **R2: セマンティックトークン** | `pasta_dsl` AST + Span | AST→SemanticTokenの変換ロジック実装が必要 | **Missing**（部分流用可能） |
-| **R3: pasta_dsl統合** | `parse_str()`, `ParseError` | API完備。変換レイヤーのみ必要 | **低ギャップ** |
-| **R4: WASMビルド** | なし | WASM互換フレームワーク選定、条件コンパイル設計 | **Missing**（要リサーチ） |
-| **R5: クレート設計** | ワークスペースパターン確立済み | 新クレート作成のみ。既存パターンに準拠 | **低ギャップ** |
-| **R6: ドキュメント管理** | なし | テキスト同期・増分更新の実装が必要 | **Missing** |
-| **R7: テスト** | テスト規約確立済み | テストケース実装が必要 | **Missing** |
+| 要件                           | 既存資産                       | ギャップ                                       | 状態                        |
+| ------------------------------ | ------------------------------ | ---------------------------------------------- | --------------------------- |
+| **R1: LSPサーバー基盤**        | なし                           | LSPフレームワーク選定・実装が必要              | **Missing**                 |
+| **R2: セマンティックトークン** | `pasta_dsl` AST + Span         | AST→SemanticTokenの変換ロジック実装が必要      | **Missing**（部分流用可能） |
+| **R3: pasta_dsl統合**          | `parse_str()`, `ParseError`    | API完備。変換レイヤーのみ必要                  | **低ギャップ**              |
+| **R4: WASMビルド**             | なし                           | WASM互換フレームワーク選定、条件コンパイル設計 | **Missing**（要リサーチ）   |
+| **R5: クレート設計**           | ワークスペースパターン確立済み | 新クレート作成のみ。既存パターンに準拠         | **低ギャップ**              |
+| **R6: ドキュメント管理**       | なし                           | テキスト同期・増分更新の実装が必要             | **Missing**                 |
+| **R7: テスト**                 | テスト規約確立済み             | テストケース実装が必要                         | **Missing**                 |
 
 ### 技術的制約と未知数
 
@@ -143,19 +143,19 @@ crates/pasta_lang_server/
 
 ## 4. 工数・リスク評価
 
-| 観点 | 評価 | 根拠 |
-|------|------|------|
-| **工数** | **M（3〜7日）** | LSPフレームワーク統合 + AST→Token変換 + ドキュメント管理。pasta_dsl資産の流用でパーサー実装不要 |
-| **リスク** | **中** | WASM+LSPの組み合わせは実績あるが、tower-lspのWASMモードは比較的新しい。pestのWASM互換性は確認済み |
+| 観点       | 評価            | 根拠                                                                                              |
+| ---------- | --------------- | ------------------------------------------------------------------------------------------------- |
+| **工数**   | **M（3〜7日）** | LSPフレームワーク統合 + AST→Token変換 + ドキュメント管理。pasta_dsl資産の流用でパーサー実装不要   |
+| **リスク** | **中**          | WASM+LSPの組み合わせは実績あるが、tower-lspのWASMモードは比較的新しい。pestのWASM互換性は確認済み |
 
 ### リスク詳細
 
-| リスク | 影響度 | 軽減策 |
-|--------|--------|--------|
-| tower-lsp WASM統合の技術的障壁 | 中 | tower-lsp-web-demo の実績を参考に実装。fallbackとしてOption B |
-| LSP UTF-16ポジション変換の精度 | 低 | Span型に既にバイトオフセット情報あり。UTF-8→UTF-16変換は定型処理 |
-| 増分パース非対応によるパフォーマンス | 低 | pastaファイルは通常小〜中規模。全体再パースでも十分高速 |
-| CI WASMビルド追加の複雑性 | 低 | `wasm32-unknown-unknown` ターゲットをmatrixに追加するだけ |
+| リスク                               | 影響度 | 軽減策                                                           |
+| ------------------------------------ | ------ | ---------------------------------------------------------------- |
+| tower-lsp WASM統合の技術的障壁       | 中     | tower-lsp-web-demo の実績を参考に実装。fallbackとしてOption B    |
+| LSP UTF-16ポジション変換の精度       | 低     | Span型に既にバイトオフセット情報あり。UTF-8→UTF-16変換は定型処理 |
+| 増分パース非対応によるパフォーマンス | 低     | pastaファイルは通常小〜中規模。全体再パースでも十分高速          |
+| CI WASMビルド追加の複雑性            | 低     | `wasm32-unknown-unknown` ターゲットをmatrixに追加するだけ        |
 
 ---
 
@@ -178,8 +178,8 @@ crates/pasta_lang_server/
 
 ### 設計フェーズへの持ち越しリサーチ項目
 
-| 項目 | 理由 |
-|------|------|
-| tower-lsp `runtime-agnostic` の具体的設定 | WASMビルド時のasyncランタイム選択（wasm-bindgen-futures等） |
-| pasta_dsl の `pest` WASM ビルド実機検証 | `default-features = false` の設定確認。`grammar-extras` featureの互換性 |
-| VSCode拡張 (pasta_vscode) との統合インターフェース | WASMバイナリのロード方法、LSPトランスポートの接続方式 |
+| 項目                                               | 理由                                                                    |
+| -------------------------------------------------- | ----------------------------------------------------------------------- |
+| tower-lsp `runtime-agnostic` の具体的設定          | WASMビルド時のasyncランタイム選択（wasm-bindgen-futures等）             |
+| pasta_dsl の `pest` WASM ビルド実機検証            | `default-features = false` の設定確認。`grammar-extras` featureの互換性 |
+| VSCode拡張 (pasta_vscode) との統合インターフェース | WASMバイナリのロード方法、LSPトランスポートの接続方式                   |

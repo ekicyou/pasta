@@ -9,12 +9,12 @@
 
 ### 結論: ✅ **互換性あり（`no_std` + `default-features = false`）**
 
-| 項目 | 詳細 |
-|------|------|
-| バージョン | pest 2.8.x |
-| `no_std` サポート | ✅ 公式サポート（README に明記） |
-| `wasm32-unknown-unknown` | ✅ コンパイル可能 |
-| 条件 | `default-features = false` が必要 |
+| 項目                     | 詳細                              |
+| ------------------------ | --------------------------------- |
+| バージョン               | pest 2.8.x                        |
+| `no_std` サポート        | ✅ 公式サポート（README に明記）   |
+| `wasm32-unknown-unknown` | ✅ コンパイル可能                  |
+| 条件                     | `default-features = false` が必要 |
 
 **設定例:**
 ```toml
@@ -35,12 +35,12 @@ pest_derive = { version = "2.8", default-features = false }
 
 ### 結論: ✅ **互換性あり（`no_std` ネイティブ対応）**
 
-| 項目 | 詳細 |
-|------|------|
-| バージョン | thiserror 2.x |
-| `no_std` サポート | ✅ `#![no_std]` で宣言済み |
-| `wasm32-unknown-unknown` | ✅ コンパイル可能 |
-| カテゴリ | crates.io で「No standard library」カテゴリに登録 |
+| 項目                     | 詳細                                              |
+| ------------------------ | ------------------------------------------------- |
+| バージョン               | thiserror 2.x                                     |
+| `no_std` サポート        | ✅ `#![no_std]` で宣言済み                         |
+| `wasm32-unknown-unknown` | ✅ コンパイル可能                                  |
+| カテゴリ                 | crates.io で「No standard library」カテゴリに登録 |
 
 **根拠:**
 - `thiserror` 2.x の `src/lib.rs` は `#![no_std]` で宣言されている
@@ -62,12 +62,12 @@ thiserror = { version = "2", default-features = false }
 
 ### 結論: ✅ **互換性あり（`runtime-agnostic` feature 使用）**
 
-| 項目 | 詳細 |
-|------|------|
-| バージョン | tower-lsp 0.20.0 |
-| WASM サポート | ✅ 公式に対応（CHANGELOG v0.16.0 で追加） |
-| `runtime-agnostic` feature | ✅ WASM に必須 |
-| 実績 | tower-lsp-web-demo プロジェクトで実証済み |
+| 項目                       | 詳細                                      |
+| -------------------------- | ----------------------------------------- |
+| バージョン                 | tower-lsp 0.20.0                          |
+| WASM サポート              | ✅ 公式に対応（CHANGELOG v0.16.0 で追加）  |
+| `runtime-agnostic` feature | ✅ WASM に必須                             |
+| 実績                       | tower-lsp-web-demo プロジェクトで実証済み |
 
 **CHANGELOG v0.16.0 からの引用:**
 > - Add compatibility with WASM (PR #309).
@@ -106,11 +106,11 @@ features = ["runtime-agnostic"]
 
 ### 結論: ❌ **互換性なし（WASM 非対応）**
 
-| 項目 | 詳細 |
-|------|------|
-| バージョン | lsp-server 0.7.9 |
-| WASM サポート | ❌ 不可能 |
-| 根本的問題 | `crossbeam-channel`、`std::thread`、stdio 依存 |
+| 項目          | 詳細                                           |
+| ------------- | ---------------------------------------------- |
+| バージョン    | lsp-server 0.7.9                               |
+| WASM サポート | ❌ 不可能                                       |
+| 根本的問題    | `crossbeam-channel`、`std::thread`、stdio 依存 |
 
 **非互換の原因:**
 
@@ -207,18 +207,18 @@ fn make_write(mut stream: TcpStream) -> (...) {
 
 ### 5.2 よく使われるクレート構成
 
-| クレート | 用途 | WASM 互換 |
-|---------|------|----------|
-| `lsp-types` | LSP 型定義 | ✅ |
-| `tower-lsp` | LSP サーバーフレームワーク | ✅ (`runtime-agnostic`) |
-| `lsp-server` | LSP サーバースキャフォールド | ❌ |
-| `pest` / `pest_derive` | PEG パーサー | ✅ (`no_std`) |
-| `thiserror` | エラー定義 | ✅ (`no_std`) |
-| `serde` / `serde_json` | シリアライゼーション | ✅ |
-| `wasm-bindgen` | JS ⇔ WASM ブリッジ | ✅（WASM専用） |
-| `wasm-bindgen-futures` | JS Promise ⇔ Rust Future | ✅（WASM専用） |
-| `js-sys` / `web-sys` | Web API バインディング | ✅（WASM専用） |
-| `ropey` | テキストロープ（効率的テキスト操作） | ✅ |
+| クレート               | 用途                                 | WASM 互換              |
+| ---------------------- | ------------------------------------ | ---------------------- |
+| `lsp-types`            | LSP 型定義                           | ✅                      |
+| `tower-lsp`            | LSP サーバーフレームワーク           | ✅ (`runtime-agnostic`) |
+| `lsp-server`           | LSP サーバースキャフォールド         | ❌                      |
+| `pest` / `pest_derive` | PEG パーサー                         | ✅ (`no_std`)           |
+| `thiserror`            | エラー定義                           | ✅ (`no_std`)           |
+| `serde` / `serde_json` | シリアライゼーション                 | ✅                      |
+| `wasm-bindgen`         | JS ⇔ WASM ブリッジ                   | ✅（WASM専用）          |
+| `wasm-bindgen-futures` | JS Promise ⇔ Rust Future             | ✅（WASM専用）          |
+| `js-sys` / `web-sys`   | Web API バインディング               | ✅（WASM専用）          |
+| `ropey`                | テキストロープ（効率的テキスト操作） | ✅                      |
 
 ---
 
@@ -226,11 +226,11 @@ fn make_write(mut stream: TcpStream) -> (...) {
 
 ### 結論: ✅ **互換性あり（問題なし）**
 
-| 項目 | 詳細 |
-|------|------|
-| バージョン | lsp-types 0.97.0 |
-| WASM サポート | ✅ 完全互換 |
-| 依存関係 | `serde`, `serde_json`, `url` のみ |
+| 項目          | 詳細                              |
+| ------------- | --------------------------------- |
+| バージョン    | lsp-types 0.97.0                  |
+| WASM サポート | ✅ 完全互換                        |
+| 依存関係      | `serde`, `serde_json`, `url` のみ |
 
 **根拠:**
 - ほぼ全てが `struct` / `enum` の型定義 + `Serialize`/`Deserialize` derive
@@ -308,10 +308,10 @@ features = ["runtime-agnostic"]
 
 ## リスクと注意事項
 
-| リスク | 影響 | 緩和策 |
-|--------|------|--------|
-| tower-lsp のメンテナンス停滞 | 中 | コアを分離し、tower-lsp への依存を薄く保つ |
-| WASM バイナリサイズ | 中 | `wasm-opt` で最適化、不要機能の削除 |
-| pest の WASM バイナリサイズ | 低 | Unicode テーブルが大きい。必要なものだけ有効化 |
-| 非同期ランタイムの選択 | 中 | WASM では `wasm-bindgen-futures` 一択 |
-| デバッグ困難性 | 高 | WASM 版は `console_log` crate でログ出力 |
+| リスク                       | 影響 | 緩和策                                         |
+| ---------------------------- | ---- | ---------------------------------------------- |
+| tower-lsp のメンテナンス停滞 | 中   | コアを分離し、tower-lsp への依存を薄く保つ     |
+| WASM バイナリサイズ          | 中   | `wasm-opt` で最適化、不要機能の削除            |
+| pest の WASM バイナリサイズ  | 低   | Unicode テーブルが大きい。必要なものだけ有効化 |
+| 非同期ランタイムの選択       | 中   | WASM では `wasm-bindgen-futures` 一択          |
+| デバッグ困難性               | 高   | WASM 版は `console_log` crate でログ出力       |
