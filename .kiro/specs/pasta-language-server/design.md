@@ -142,33 +142,39 @@ flowchart TD
 
 ## Requirements Traceability
 
-| 要件      | 概要                      | コンポーネント                    | インターフェース       | フロー  |
-| --------- | ------------------------- | --------------------------------- | ---------------------- | ------- |
-| R1.1-R1.5 | LSPサーバー基盤           | LSP Protocol Handler              | LanguageServer trait   | フロー1 |
-| R2.1      | semanticTokens/full       | SemanticTokenProvider             | semantic_tokens_full() | フロー1 |
-| R2.2      | 14トークンタイプ識別      | SemanticTokenProvider             | TOKEN_LEGEND           | —       |
-| R2.3      | 変更時の再計算            | Document Manager, Analysis Engine | analyze()              | フロー1 |
-| R2.4      | インライン要素レベル粒度  | SemanticTokenProvider             | action_to_tokens()     | —       |
-| R2.5      | 全角/半角マーカー同等認識 | Analysis Engine (pasta_dsl委譲)   | —                      | —       |
-| R2.6      | エラー時の部分トークン    | Analysis Engine                   | partial_analyze()      | フロー2 |
-| R3.1      | parse_str()利用           | Analysis Engine                   | parse_str()            | フロー1 |
-| R3.2      | Diagnostics通知           | DiagnosticsProvider               | to_lsp_diagnostics()   | フロー1 |
-| R3.3      | ASTノードからトークン算出 | SemanticTokenProvider             | visit_*()              | —       |
-| R3.4      | クラッシュ耐性            | LSP Protocol Handler              | catch_unwind + log     | —       |
-| R3.5      | parse_str_partial()       | Analysis Engine → pasta_dsl       | parse_str_partial()    | フロー2 |
-| R4.1-R4.5 | WASMビルド対応            | Transport Layer                   | cfg(wasm32)            | —       |
-| R5.1-R5.5 | クレート設計              | 全体                              | Cargo.toml             | —       |
-| R6.1-R6.4 | ドキュメント管理          | Document Manager                  | open/change/close      | フロー1 |
-| R7.1-R7.6 | テスト要件                | 全テストモジュール                | —                      | —       |
+| 要件      | 概要                      | コンポーネント                    | インターフェース                      | フロー  |
+| --------- | ------------------------- | --------------------------------- | ------------------------------------- | ------- |
+| R1.1-R1.5 | LSPサーバー基盤           | LSP Protocol Handler              | LanguageServer trait                  | フロー1 |
+| R2.1      | semanticTokens/full       | SemanticTokenProvider             | semantic_tokens_full()                | フロー1 |
+| R2.2      | 14トークンタイプ識別      | SemanticTokenProvider             | TOKEN_LEGEND                          | —       |
+| R2.3      | 変更時の再計算            | Document Manager, Analysis Engine | analyze()                             | フロー1 |
+| R2.4      | インライン要素レベル粒度  | SemanticTokenProvider             | action_to_tokens()                    | —       |
+| R2.5      | 全角/半角マーカー同等認識 | Analysis Engine (pasta_dsl委譲)   | —                                     | —       |
+| R2.6      | エラー時の部分トークン    | Analysis Engine                   | partial_analyze()                     | フロー2 |
+| R3.1      | parse_str()利用           | Analysis Engine                   | parse_str()                           | フロー1 |
+| R3.2      | Diagnostics通知           | DiagnosticsProvider               | to_lsp_diagnostics()                  | フロー1 |
+| R3.3      | ASTノードからトークン算出 | SemanticTokenProvider             | visit_*()                             | —       |
+| R3.4      | クラッシュ耐性            | LSP Protocol Handler              | catch_unwind + log                    | —       |
+| R3.5      | parse_str_partial()       | Analysis Engine → pasta_dsl       | parse_str_partial()                   | フロー2 |
+| R3.5.1    | PartialParseResult型定義  | pasta_dsl Extensions              | PartialParseResult, PartialParseError | —       |
+| R3.5.2    | parse_str_partial() API   | pasta_dsl Extensions              | parse_str_partial()                   | フロー2 |
+| R3.5.3    | Pest Rule個別適用         | pasta_dsl Extensions              | parse_with_rule()                     | —       |
+| R3.5.4    | 行指向文法特性活用        | pasta_dsl Extensions              | infer_rule_from_line()                | —       |
+| R3.5.5    | pasta_dsl部分パーステスト | pasta_dsl Extensions              | tests/partial_parse_test.rs           | —       |
+| R4.1-R4.5 | WASMビルド対応            | Transport Layer                   | cfg(wasm32)                           | —       |
+| R5.1-R5.5 | クレート設計              | 全体                              | Cargo.toml                            | —       |
+| R6.1-R6.4 | ドキュメント管理          | Document Manager                  | open/change/close                     | フロー1 |
+| R7.1-R7.6 | テスト要件                | 全テストモジュール                | —                                     | —       |
 
 ## Components and Interfaces
 
-| コンポーネント  | レイヤー  | 目的                         | 要件カバレッジ | 主要依存(P0)                        | コントラクト |
-| --------------- | --------- | ---------------------------- | -------------- | ----------------------------------- | ------------ |
-| PastaLangServer | Protocol  | tower-lsp LanguageServer実装 | R1             | tower-lsp (P0), AnalysisEngine (P0) | Service      |
-| AnalysisEngine  | Analysis  | AST→トークン変換、部分パース | R2, R3         | pasta_dsl (P0), lsp-types (P0)      | Service      |
-| DocumentManager | Analysis  | テキスト保持・同期           | R6             | —                                   | State        |
-| TransportBridge | Transport | WASM/Native抽象化            | R4             | wasm-bindgen (P0, WASM時)           | Service      |
+| コンポーネント      | レイヤー      | 目的                         | 要件カバレッジ       | 主要依存(P0)                        | コントラクト |
+| ------------------- | ------------- | ---------------------------- | -------------------- | ----------------------------------- | ------------ |
+| PastaLangServer     | Protocol      | tower-lsp LanguageServer実装 | R1                   | tower-lsp (P0), AnalysisEngine (P0) | Service      |
+| AnalysisEngine      | Analysis      | AST→トークン変換、部分パース | R2, R3               | pasta_dsl (P0), lsp-types (P0)      | Service      |
+| DocumentManager     | Analysis      | テキスト保持・同期           | R6                   | —                                   | State        |
+| TransportBridge     | Transport     | WASM/Native抽象化            | R4                   | wasm-bindgen (P0, WASM時)           | Service      |
+| parse_str_partial() | pasta_dsl Ext | 部分パース実装               | R3.5, R3.5.1～R3.5.5 | pest (P0)                           | API          |
 
 ### Protocol Layer
 
@@ -304,6 +310,124 @@ impl DocumentManager {
 - 一貫性: エディタのバージョン番号による楽観的管理
 - 並行性: tower-lspが`&self`でハンドラを呼ぶため、内部で`RwLock`使用（WASM時はシングルスレッドのため`RefCell`代替）
 
+### pasta_dsl Extensions
+
+#### parse_str_partial() Implementation
+
+| 項目 | 詳細                                                                            |
+| ---- | ------------------------------------------------------------------------------- |
+| 責務 | パースエラー時も部分的なASTとエラー情報を返却し、編集中のハイライトUXを維持する |
+| 要件 | R3.5, R3.5.1, R3.5.2, R3.5.3, R3.5.4, R3.5.5                                    |
+
+**責務と制約**
+- 3段階フォールバック戦略（Phase 1: Full Parse → Phase 2: Scope Split → Phase 3: Line-by-Line）
+- 各Phaseで成功した部分のASTを収集し、失敗した部分は次のPhaseへ
+- 最終的に成功したASTとエラー情報を`PartialParseResult`として返却
+- Pasta DSLの行指向文法特性を活用し、行頭パターンからpest Ruleを推論
+
+**依存**
+- Inbound: AnalysisEngine — パース失敗時のフォールバック (P0)
+- Internal: pest parser — Rule個別適用 (P0)
+
+**コントラクト**: API [x] / Service [ ] / Event [ ] / Batch [ ] / State [ ]
+
+##### API Interface
+```rust
+/// 部分パース結果
+pub struct PartialParseResult {
+    /// パース成功した部分のASTアイテム
+    pub items: Vec<FileItem>,
+    /// 各行/スコープのパースエラー
+    pub errors: Vec<PartialParseError>,
+}
+
+/// 部分パースエラー
+pub struct PartialParseError {
+    /// エラーが発生した行番号（1-based）
+    pub line: usize,
+    /// エラーメッセージ
+    pub message: String,
+    /// エラー範囲のSpan（取得できた場合）
+    pub span: Option<Span>,
+}
+
+/// 部分パースAPI
+pub fn parse_str_partial(source: &str) -> PartialParseResult;
+```
+
+**実装アルゴリズム**:
+
+```rust
+pub fn parse_str_partial(source: &str) -> PartialParseResult {
+    // Phase 1: Full Parse試行
+    match parse_str(source) {
+        Ok(pasta_file) => return PartialParseResult {
+            items: pasta_file.items,
+            errors: vec![],
+        },
+        Err(_) => { /* Phase 2へ */ }
+    }
+
+    let mut partial_items = Vec::new();
+    let mut partial_errors = Vec::new();
+
+    // Phase 2: Scope Boundary Split
+    let chunks = split_by_scope_markers(source); // ＊, ％, ＆, ＠で分割
+    for chunk in chunks {
+        let rule = infer_rule_from_marker(&chunk); // 行頭マーカーからRule推論
+        match parse_with_rule(&chunk.text, rule) {
+            Ok(pairs) => {
+                // ASTへ変換して収集
+                partial_items.extend(pairs_to_items(pairs));
+            }
+            Err(_) => {
+                // Phase 3: Line-by-Line Fallback
+                for (line_no, line) in chunk.lines().enumerate() {
+                    let line_rule = infer_rule_from_line(line);
+                    match parse_with_rule(line, line_rule) {
+                        Ok(pairs) => partial_items.extend(pairs_to_items(pairs)),
+                        Err(e) => partial_errors.push(PartialParseError {
+                            line: chunk.start_line + line_no,
+                            message: format!("{}", e),
+                            span: extract_span_from_error(&e),
+                        }),
+                    }
+                }
+            }
+        }
+    }
+
+    PartialParseResult {
+        items: partial_items,
+        errors: partial_errors,
+    }
+}
+```
+
+**行頭パターン→Rule推論テーブル**:
+
+| 行頭パターン | Rule                     | 用途                     |
+| ------------ | ------------------------ | ------------------------ |
+| `＊` / `*`   | `Rule::global_scene`     | グローバルシーン定義     |
+| `・` / `-`   | `Rule::local_scene_line` | ローカルシーン定義       |
+| `＆` / `&`   | `Rule::file_attr`        | ファイル属性             |
+| `＠` / `@`   | `Rule::file_word`        | ファイルスコープ単語定義 |
+| `％` / `%`   | `Rule::actor`            | アクタースコープ         |
+| `＄` / `$`   | `Rule::var_set`          | 変数代入                 |
+| `＞` / `>`   | `Rule::call`             | Call文                   |
+| `＃` / `#`   | `Rule::or_comment_eol`   | コメント                 |
+| `識別子：`   | `Rule::action_line`      | アクション行             |
+| ` ``` `      | `Rule::code_block`       | Luaコードブロック        |
+
+**pest内部API拡張**:
+
+```rust
+/// pest Ruleを個別に適用（内部API）
+fn parse_with_rule(source: &str, rule: Rule) -> Result<Pairs<Rule>, pest::error::Error<Rule>> {
+    PastaParser::parse(rule, source)
+}
+```
+
 ### Transport Layer
 
 #### TransportBridge
@@ -430,27 +554,7 @@ pub fn encode_tokens(raw: &mut [RawToken]) -> Vec<SemanticToken> {
 }
 ```
 
-#### PartialParseResult（pasta_dsl側に追加）
-
-```rust
-/// 部分パース結果
-pub struct PartialParseResult {
-    /// パース成功した部分のASTアイテム
-    pub items: Vec<FileItem>,
-    /// 各行/スコープのパースエラー
-    pub errors: Vec<PartialParseError>,
-}
-
-/// 部分パースエラー
-pub struct PartialParseError {
-    /// エラーが発生した行番号（1-based）
-    pub line: usize,
-    /// エラーメッセージ
-    pub message: String,
-    /// エラー範囲のSpan
-    pub span: Option<Span>,
-}
-```
+**注**: `PartialParseResult`型および`PartialParseError`型の定義は、[pasta_dsl Extensions](#pasta_dsl-extensions)セクションを参照。
 
 ### UTF-8 → UTF-16 位置変換
 
@@ -514,23 +618,33 @@ pub enum LangServerError {
 | `fullwidth_halfwidth_test.rs` | 全角/半角マーカー両パターンの同等トークン化 | R2.5, R7.3       |
 | `japanese_identifier_test.rs` | 日本語シーン名・変数名・単語名のトークン化  | R6.4, R7.4       |
 | `utf16_conversion_test.rs`    | UTF-8→UTF-16位置変換の正確性                | R6.4             |
-| `partial_parse_test.rs`       | エラー時の部分トークン提供、Phase 1→2→3     | R2.6, R3.5       |
 
-### Integration Tests
+### Unit Tests (`crates/pasta_dsl/tests/` - 部分パース機能)
 
-| テストファイル           | 対象                                       | 要件       |
-| ------------------------ | ------------------------------------------ | ---------- |
-| `lsp_lifecycle_test.rs`  | initialize→didOpen→semanticTokens→didClose | R1, R7.2   |
-| `document_sync_test.rs`  | didChange（増分更新）→再解析→トークン更新  | R6.2, R6.3 |
-| `diagnostics_test.rs`    | パースエラー→Diagnostics通知               | R3.2       |
-| `crash_recovery_test.rs` | パーサーパニック時のサーバー継続動作       | R3.4       |
+| テストファイル          | 対象                                         | 要件                   |
+| ----------------------- | -------------------------------------------- | ---------------------- |
+| `partial_parse_test.rs` | Phase 1: Full Parse成功時の完全AST返却       | R3.5.2, R3.5.5         |
+| `partial_parse_test.rs` | Phase 2: スコープ境界分割の正確性            | R3.5.2, R3.5.4, R3.5.5 |
+| `partial_parse_test.rs` | Phase 3: 行単位フォールバックの正確性        | R3.5.2, R3.5.3, R3.5.5 |
+| `partial_parse_test.rs` | 全角/半角マーカー両対応                      | R3.5.4, R3.5.5         |
+| `partial_parse_test.rs` | PartialParseError生成（line, message, span） | R3.5.1, R3.5.5         |
+
+### Integration Tests (`crates/pasta_lsp/tests/`)
+
+| テストファイル           | 対象                                                  | 要件       |
+| ------------------------ | ----------------------------------------------------- | ---------- |
+| `lsp_lifecycle_test.rs`  | initialize→didOpen→semanticTokens→didClose            | R1, R7.2   |
+| `document_sync_test.rs`  | didChange（増分更新）→再解析→トークン更新             | R6.2, R6.3 |
+| `diagnostics_test.rs`    | パースエラー→Diagnostics通知                          | R3.2       |
+| `crash_recovery_test.rs` | パーサーパニック時のサーバー継続動作                  | R3.4       |
+| `partial_token_test.rs`  | エラー時の部分トークン提供（pasta_dsl部分パース統合） | R2.6, R3.5 |
 
 ### CI Tests
 
 | テスト                                        | 対象                | 要件       |
 | --------------------------------------------- | ------------------- | ---------- |
 | `cargo build --target wasm32-unknown-unknown` | WASMビルド成功検証  | R4.1, R7.5 |
-| `cargo test -p pasta_lsp`             | ユニット+統合テスト | R7         |
+| `cargo test -p pasta_lsp`                     | ユニット+統合テスト | R7         |
 
 ## Performance & Scalability
 

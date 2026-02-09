@@ -68,7 +68,69 @@
 2. When `pasta_dsl`のパーサーがパースエラーを返却した時, the pasta_lsp shall エラー情報をLSP Diagnostics（`textDocument/publishDiagnostics`）としてエディタに通知する
 3. The pasta_lsp shall ASTの各ノード（`GlobalSceneScope`, `FileItem::FileAttr`, `FileItem::GlobalWord`, `FileItem::ActorScope`等）からセマンティックトークンのタイプと範囲を算出する
 4. If `pasta_dsl`のパーサーがクラッシュまたは予期しないエラーを発生させた時, the pasta_lsp shall サーバー全体を停止せず、該当ドキュメントについてエラーメッセージをログに記録する
-5. The pasta_lsp shall `pasta_dsl`に部分パースAPI（`parse_str_partial()`または`parse_str_resilient()`）の追加を要求し、パースエラー時も成功した部分のASTとエラー情報リストを取得する。部分パースは行単位またはスコープ単位でpestのRuleを個別適用し、Pasta DSLの行指向文法特性を活用して実装される
+5. The pasta_lsp shall `pasta_dsl`に部分パースAPI（`parse_str_partial()`）を追加し、パースエラー時も成功した部分のASTとエラー情報リストを取得する。以下の詳細要件に従って`pasta_dsl`クレートを拡張する:
+
+#### R3.5.1: PartialParseResult型定義
+
+The pasta_dsl shall 部分パース結果を表現する型を公開する:
+
+```rust
+/// 部分パース結果
+pub struct PartialParseResult {
+    /// パース成功した部分のASTアイテム
+    pub items: Vec<FileItem>,
+    /// 各行/スコープのパースエラー
+    pub errors: Vec<PartialParseError>,
+}
+
+/// 部分パースエラー
+pub struct PartialParseError {
+    /// エラーが発生した行番号（1-based）
+    pub line: usize,
+    /// エラーメッセージ
+    pub message: String,
+    /// エラー範囲のSpan（取得できた場合）
+    pub span: Option<Span>,
+}
+```
+
+#### R3.5.2: parse_str_partial() API
+
+The pasta_dsl shall `parse_str_partial(source: &str) -> PartialParseResult` 関数を公開し、以下の3段階フォールバック戦略でパースを試行する:
+
+- **Phase 1 (Full Parse)**: `parse_str()`による全体パースを試行。成功時は完全なASTを返却し、失敗時はPhase 2へ
+- **Phase 2 (Scope Boundary Split)**: 行頭マーカー（`＊`/`*`, `％`/`%`, `＆`/`&`, `＠`/`@`）でソースをチャンクに分割し、各チャンクを個別にpestのRule（`global_scene`, `actor`, `file_attr`, `file_word`等）でパース。成功したチャンクのASTを収集し、失敗したチャンクはPhase 3へ
+- **Phase 3 (Line-by-Line Fallback)**: 失敗した各行について、行頭パターンから適用すべきpest Ruleを推論し、行単位でパースを試行。成功した行のASTを収集し、失敗した行は`PartialParseError`として記録
+
+#### R3.5.3: Pest Rule個別適用メカニズム
+
+The pasta_dsl shall pestの各Ruleを個別に適用可能な内部API（`parse_with_rule(source: &str, rule: Rule) -> Result<Pairs, ParseError>`）を実装する。Phase 2/3で使用し、`Rule::global_scene`, `Rule::local_scene_line`, `Rule::action_line`等を行/スコープ単位で適用する。
+
+#### R3.5.4: 行指向文法特性の活用
+
+The pasta_dsl shall Pasta DSLの行指向文法特性（各行が独立してパース可能）を活用し、以下のマッピングで行頭パターンからpest Ruleを推論する:
+
+| 行頭パターン | 推論されるRule           | 例                  |
+| ------------ | ------------------------ | ------------------- |
+| `＊` / `*`   | `Rule::global_scene`     | `＊シーン名`        |
+| `・` / `-`   | `Rule::local_scene_line` | `・サブシーン`      |
+| `＆` / `&`   | `Rule::file_attr`        | `＆key：value`      |
+| `＠` / `@`   | `Rule::file_word`        | `＠word：def1 def2` |
+| `％` / `%`   | `Rule::actor`            | `％アクター名`      |
+| `＄` / `$`   | `Rule::var_set`          | `＄var：value`      |
+| `＞` / `>`   | `Rule::call`             | `＞next_scene`      |
+| `＃` / `#`   | `Rule::or_comment_eol`   | `＃コメント`        |
+| 識別子 `:`   | `Rule::action_line`      | `Alice：こんにちは` |
+
+#### R3.5.5: テスト要件
+
+The pasta_dsl shall 部分パース機能に対する以下のテストを備える:
+
+1. Phase 1成功時の完全AST返却テスト
+2. Phase 2スコープ境界分割の正確性テスト（複数グローバルシーン、アクタースコープ混在）
+3. Phase 3行単位フォールバックの正確性テスト（構文エラー行と正常行の混在）
+4. 全角/半角マーカー両対応のテスト
+5. エラー行の`PartialParseError`生成テスト（line番号、message、span精度）
 
 ### Requirement 4: WebAssembly（WASM）ビルド対応
 
