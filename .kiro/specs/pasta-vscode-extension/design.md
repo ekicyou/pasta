@@ -316,6 +316,18 @@ interface WasmBridge {
 - WASMモジュールは `WebAssembly.compile()` → `init()` で初期化
 - `wasm-bindgen --target web` でJSバインディングを生成
 - JSON経由のデシリアライズには `serde-wasm-bindgen` を使用（JSオブジェクトとして直接渡す）
+- `analyzeDocument()` は例外をスロー（TypeScript 標準慣例、try/catch で処理）
+  ```typescript
+  try {
+    const result = wasmBridge.analyzeDocument(text);
+    // tokens と diagnostics を使用
+  } catch (error) {
+    // WASM 呼び出し失敗 → フォールバック + エラー通知
+    console.error(`WASM analysis failed: ${error}`);
+    diagnosticsManager.clear(uri);
+    // TextMateのみでハイライト表示に切り替え
+  }
+  ```
 
 ---
 
@@ -552,13 +564,48 @@ classDiagram
 
 | Error Type | Trigger | Response | Recovery |
 |-----------|---------|----------|----------|
-| WASMロード失敗 | 拡張アクティベート時 | エラー通知 + TextMateフォールバック | 手動リロード |
-| パーサーパニック | 不正入力 | catch_unwindで捕捉、空結果を返す | 自動（次回解析で回復） |
-| WASMクラッシュ | メモリ不足等 | エラー通知 + TextMateフォールバック | 拡張リロード |
-| 不正UTF-8入力 | バイナリファイル等 | 空結果を返す | 自動 |
+| WASMロード失敗 | 拡張アクティベート時 | 例外 throw → ExtensionActivator で catch → エラー通知 + TextMateフォールバック | 手動リロード |
+| analyzeDocument 実行エラー | ドキュメント解析時 | 例外 throw → DocumentSync で catch → 診断クリア + TextMateのみで表示 | 自動（次回解析で回復） |
+| パーサーパニック（Rust側） | 不正入力 | `catch_unwind` で捕捉 → 例外に変換 | 自動（次回解析で回復） |
+| WASMクラッシュ | メモリ不足等 | 例外 throw → ExtensionActivator で catch → エラー通知 + TextMateフォールバック | 拡張リロード |
+| 不正UTF-8入力 | バイナリファイル等 | Rust側で検証 → 空結果を返す（例外なし） | 自動 |
+
+### TypeScript 側例外ハンドリング
+
+**ExtensionActivator.activate() での WASM 初期化例外**:
+```typescript
+try {
+  await wasmBridge.initialize(wasmUri);
+  console.log('WASM bridge initialized');
+} catch (error) {
+  // WASM ロード失敗
+  vscode.window.showErrorMessage(
+    `Pasta WASM initialization failed: ${error}. ` +
+    `Using TextMate grammar fallback.`
+  );
+  activationState.fallbackMode = true;
+  // TextMate grammar のみでアクティベート継続
+}
+```
+
+**DocumentSync での解析呼び出し例外**:
+```typescript
+try {
+  const { tokens, diagnostics } = wasmBridge.analyzeDocument(text);
+  // セマンティックトークンと診断情報を使用
+  semanticTokensProvider.updateTokens(uri, tokens);
+  diagnosticsManager.setDiagnostics(uri, diagnostics);
+} catch (error) {
+  // WASM 解析失敗
+  console.error(`Document analysis failed for ${uri}: ${error}`);
+  diagnosticsManager.clear(uri);
+  // TextMate grammar のハイライトのみに依存
+}
+```
 
 ### Monitoring
 - `console.log` / `console.error` でOutput Channel「Pasta Language」に出力
+- WASM初期化・解析のエラーログを出力（type, message, stack trace）
 - WASMロード時間を計測しログ出力（パフォーマンスベースライン）
 
 ## Testing Strategy
