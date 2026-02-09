@@ -1,0 +1,235 @@
+# Implementation Tasks
+
+## Task List
+
+- [ ] 1. プロジェクトセットアップとCargo設定
+- [ ] 1.1 (P) pasta_lspクレートの初期化
+  - `crates/pasta_lsp/` ディレクトリ作成
+  - `Cargo.toml` 作成（lib crateとして設定）
+  - 依存関係追加: tower-lsp 0.20 (runtime-agnostic), lsp-types 0.97, pasta_dsl, thiserror 2, serde, serde_json
+  - WASM依存関係追加（条件コンパイル）: wasm-bindgen 0.2, wasm-bindgen-futures 0.4
+  - `lib.rs` 作成（エントリポイント）
+  - ワークスペース `Cargo.toml` の `members` に pasta_lsp 追加
+  - MIT OR Apache-2.0 デュアルライセンス設定
+  - _Requirements: 4.3, 5.1, 5.2, 5.3, 5.5_
+- [ ] 1.2 (P) WASMビルド検証環境の構築
+  - `wasm32-unknown-unknown` ターゲット追加（`rustup target add`）
+  - `.cargo/config.toml` でWASMビルド設定追加（オプション）
+  - ビルドスクリプト作成（`cargo build --target wasm32-unknown-unknown --release`）
+  - CI設定更新（GitHub Actions）: WASMビルド成功検証、wasmファイル生成確認、サイズ閾値（10MB）チェック
+  - _Requirements: 4.1, 4.5, 7.5_
+
+- [ ] 2. pasta_dsl部分パースAPI実装（pasta_dslクレート拡張）
+- [ ] 2.1 PartialParseResult型定義
+  - `PartialParseResult` 構造体追加（items: Vec<FileItem>, errors: Vec<PartialParseError>）
+  - `PartialParseError` 構造体追加（line: usize, message: String, span: Option<Span>）
+  - pest::error::Error からPartialParseErrorへの変換実装
+  - _Requirements: 3.5.1_
+- [ ] 2.2 Pest Rule個別適用メカニズム
+  - 内部関数 `parse_with_rule(source: &str, rule: Rule) -> Result<Pairs<Rule>, ParseError>` 実装
+  - PastaParserのRule列挙型を個別適用可能にする
+  - エラーハンドリング（pest::error::Error → PartialParseError変換）
+  - _Requirements: 3.5.3_
+- [ ] 2.3 行頭パターンからRule推論ロジック
+  - `infer_rule_from_line(line: &str) -> Rule` 関数実装
+  - 行頭マーカー検出ロジック（全角/半角両対応）: `＊`/`*` → global_scene、`・`/`-` → local_scene_line、`＆`/`&` → file_attr、`＠`/`@` → file_word、`％`/`%` → actor、`＄`/`$` → var_set、`＞`/`>` → call、`＃`/`#` → or_comment_eol、識別子`:` → action_line
+  - デフォルトRuleフォールバック処理
+  - _Requirements: 3.5.4_
+- [ ] 2.4 parse_str_partial() API実装（Phase 1→2→3フォールバック）
+  - Phase 1: `parse_str()` 全体パース試行、成功時は完全AST返却
+  - Phase 2: スコープ境界分割（`split_by_scope_markers()`）、各チャンクを `parse_with_rule()` でパース
+  - Phase 3: 失敗チャンクの行単位フォールバック、`infer_rule_from_line()` + `parse_with_rule()` 適用
+  - 成功したASTアイテム収集、失敗した行のPartialParseError生成
+  - 最終的に PartialParseResult 返却
+  - _Requirements: 3.5, 3.5.2_
+- [ ] 2.5 部分パース機能のユニットテスト
+  - Phase 1成功時の完全AST返却テスト
+  - Phase 2スコープ境界分割の正確性テスト（複数グローバルシーン、アクタースコープ混在）
+  - Phase 3行単位フォールバックの正確性テスト（構文エラー行と正常行の混在）
+  - 全角/半角マーカー両対応テスト
+  - PartialParseError生成テスト（line番号、message、span精度）
+  - テストファイル: `crates/pasta_dsl/tests/partial_parse_test.rs`
+  - _Requirements: 3.5.5_
+
+- [ ] 3. DocumentManager実装（テキスト管理レイヤー）
+- [ ] 3.1 (P) DocumentState型とDocumentManager構造体
+  - `DocumentState` 構造体定義（text: String, version: i32, analysis: Option<AnalysisResult>）
+  - `DocumentManager` 構造体定義（documents: HashMap<Url, DocumentState>）
+  - WASM時は RefCell、ネイティブ時は RwLock での並行性管理（条件コンパイル）
+  - _Requirements: 6.1_
+- [ ] 3.2 (P) ドキュメント操作API実装
+  - `open(uri, text, version)` メソッド実装
+  - `close(uri)` メソッド実装
+  - `get(uri)` / `get_mut(uri)` アクセサ実装
+  - `change(uri, changes, version)` メソッド実装（full/incremental両対応）
+  - TextDocumentContentChangeEvent処理（増分更新のテキスト適用）
+  - UNICODEバイトオフセット計算（日本語、全角マーカー、BMP外文字対応）
+  - _Requirements: 6.2, 6.3, 6.4_
+
+- [ ] 4. AnalysisEngine実装（AST→トークン変換レイヤー）
+- [ ] 4.1 セマンティックトークンレジェンド定義
+  - TOKEN_TYPES配列定義（14トークンタイプ）: COMMENT, NAMESPACE, scene, DECORATOR, word, VARIABLE, call, actor, actorName, codeBlock, STRING, sakuraScript, escape, OPERATOR
+  - TOKEN_MODIFIERS配列定義（3モディファイア）: DECLARATION, DEFINITION, global
+  - SemanticTokensLegend生成関数
+  - _Requirements: 2.2_
+- [ ] 4.2 UTF-8→UTF-16位置変換ユーティリティ
+  - `utf8_offset_to_utf16(line_text: &str, byte_offset: usize) -> u32` 関数実装
+  - encode_utf16().count()によるサロゲートペア対応
+  - BMP外文字（絵文字、CJK拡張B）の正確な変換
+  - 結合文字のcode point単位カウント
+  - pasta_dsl Span（UTF-8バイト、1-based行列）→ LSP位置（UTF-16、0-based）変換
+  - _Requirements: 6.4_
+- [ ] 4.3 AST→RawToken変換（ASTビジター）
+  - RawToken型定義（line: u32, start_char: u32, length: u32, token_type: u32, modifiers: u32）
+  - ASTノード走査ロジック（GlobalSceneScope, FileItem, Action等）
+  - 各ASTノードから対応トークンタイプへのマッピング（14種類）
+  - インライン要素レベル粒度での個別トークン生成（Action::Talk, WordRef, VarRef, SakuraScript, Escape）
+  - 全角/半角マーカー同等認識
+  - Spanから行/列位置抽出 + UTF-16変換適用
+  - _Requirements: 2.2, 2.4, 2.5, 3.3_
+- [ ] 4.4 RawToken→LSP SemanticTokensエンコーディング
+  - `encode_tokens(raw: &mut [RawToken]) -> Vec<SemanticToken>` 関数実装
+  - ソート（行→列順）
+  - deltaエンコーディング計算（deltaLine, deltaStartChar, length, tokenType, tokenModifiers）
+  - LSP SemanticTokens構造体生成
+  - _Requirements: 2.1_
+- [ ] 4.5 AnalysisEngine::analyze()統合
+  - `analyze(source: &str, uri: &Url) -> AnalysisResult` メソッド実装
+  - pasta_dsl::parse_str() 呼び出し（成功時）→ AST→トークン変換
+  - pasta_dsl::parse_str_partial() 呼び出し（失敗時）→ 部分AST→部分トークン変換
+  - ParseError → LSP Diagnostics変換
+  - PartialParseError → LSP Diagnostics変換
+  - AnalysisResult構造体返却（tokens: Vec<SemanticToken>, diagnostics: Vec<Diagnostic>）
+  - _Requirements: 2.6, 3.1, 3.2, 3.5_
+
+- [ ] 5. PastaLangServer実装（LSPプロトコルレイヤー）
+- [ ] 5.1 PastaLangServer構造体とLanguageServerトレイト骨格
+  - `PastaLangServer` 構造体定義（document_manager: DocumentManager, client: Client）
+  - tower_lsp::LanguageServer trait実装の骨格
+  - 初期化時のドキュメントマネージャー・クライアント保持
+  - _Requirements: 1.1, 1.2_
+- [ ] 5.2 initializeハンドラ実装
+  - ServerCapabilities定義（semanticTokensProvider設定）
+  - TOKEN_TYPES / TOKEN_MODIFIERS をセマンティックトークンレジェンドとして登録
+  - InitializeResult返却
+  - _Requirements: 1.2_
+- [ ] 5.3 ドキュメントライフサイクルハンドラ実装
+  - `did_open()` 実装: DocumentManager::open呼び出し、AnalysisEngine::analyze呼び出し、Diagnostics通知
+  - `did_change()` 実装: DocumentManager::change呼び出し、再解析、Diagnostics更新
+  - `did_close()` 実装: DocumentManager::close呼び出し
+  - _Requirements: 1.3, 1.4, 1.5, 2.3, 6.2, 6.3_
+- [ ] 5.4 semanticTokens/fullハンドラ実装
+  - キャッシュ済みトークン取得（DocumentManager経由）
+  - SemanticTokensResult返却
+  - ドキュメント未管理時の空レスポンス処理
+  - _Requirements: 2.1_
+- [ ] 5.5 パーサークラッシュ保護
+  - std::panic::catch_unwind によるパニックキャッチ
+  - クラッシュ時のエラーログ記録（tower-lsp Client::log_message）
+  - サーバー全体停止回避、該当ドキュメントのみエラー状態維持
+  - _Requirements: 3.4_
+
+- [ ] 6. TransportBridge実装（WASM/Nativeプラットフォーム抽象化）
+- [ ] 6.1 (P) WASMエントリポイント実装
+  - `WasmLspServer` 構造体定義（wasm_bindgen適用）
+  - `new()` コンストラクタ実装
+  - `send()` メソッド実装（JS→Rustメッセージ受信）
+  - `on_message()` メソッド実装（Rust→JSレスポンス送信、コールバック登録）
+  - AsyncRead/AsyncWrite アダプタ実装（ReadableStream/WritableStream ブリッジ）
+  - tower-lsp Server起動ロジック
+  - _Requirements: 4.4_
+- [ ] 6.2 (P) 条件コンパイル設定とネイティブ対応準備
+  - `#[cfg(target_arch = "wasm32")]` によるWASM専用コード分離
+  - `#[cfg(not(target_arch = "wasm32"))]` によるネイティブスタブ（将来拡張用）
+  - _Requirements: 4.2, 4.5_
+
+- [ ] 7. ユニットテスト実装（pasta_lspクレート）
+- [ ] 7.1 (P) セマンティックトークン識別テスト
+  - 14トークンタイプ個別識別テスト（各トークンタイプごと）
+  - AST→トークン変換の正確性テスト
+  - テストファイル: `crates/pasta_lsp/tests/semantic_token_test.rs`
+  - _Requirements: 2.2, 2.4, 7.1_
+- [ ] 7.2 (P) 全角/半角マーカー同等認識テスト
+  - 全角マーカー（`＊`, `・`, `＠`, `＄`, `＞`, `＃`, `＆`, `％`, `：`）のトークン化
+  - 半角マーカー（`*`, `-`, `@`, `$`, `>`, `#`, `&`, `%`, `:`）のトークン化
+  - 両パターンの同等トークン生成検証
+  - テストファイル: `crates/pasta_lsp/tests/fullwidth_halfwidth_test.rs`
+  - _Requirements: 2.5, 7.3_
+- [ ] 7.3 (P) 日本語識別子テスト
+  - 日本語シーン名のトークン化テスト
+  - 日本語変数名のトークン化テスト
+  - 日本語単語名のトークン化テスト
+  - テストファイル: `crates/pasta_lsp/tests/japanese_identifier_test.rs`
+  - _Requirements: 6.4, 7.4_
+- [ ] 7.4 (P) UTF-16位置変換テスト
+  - BMP内文字（ASCII、日本語）の変換正確性テスト
+  - BMP外文字（絵文字、CJK拡張B）の境界条件テスト
+  - サロゲートペア処理の正確性テスト
+  - 結合文字のcode point単位カウント検証
+  - テストファイル: `crates/pasta_lsp/tests/utf16_conversion_test.rs`
+  - _Requirements: 6.4, 7.4_
+
+- [ ] 8. 統合テスト実装（pasta_lspクレート）
+- [ ] 8.1 LSPライフサイクル統合テスト
+  - initialize → didOpen → semanticTokens/full → didClose フロー検証
+  - ServerCapabilitiesの正確性確認
+  - テストファイル: `crates/pasta_lsp/tests/lsp_lifecycle_test.rs`
+  - _Requirements: 1, 7.2_
+- [ ] 8.2 ドキュメント同期統合テスト
+  - didChange（増分更新）→ 再解析 → トークン更新フロー検証
+  - バージョン管理の正確性確認
+  - テストファイル: `crates/pasta_lsp/tests/document_sync_test.rs`
+  - _Requirements: 6.2, 6.3_
+- [ ] 8.3 Diagnostics通知統合テスト
+  - パースエラー → Diagnostics通知フロー検証
+  - PartialParseError → Diagnostics変換の正確性確認
+  - テストファイル: `crates/pasta_lsp/tests/diagnostics_test.rs`
+  - _Requirements: 3.2_
+- [ ] 8.4 パーサークラッシュ回復テスト
+  - パニック発生時のサーバー継続動作検証
+  - エラーログ記録確認
+  - 他ドキュメントへの影響なし確認
+  - テストファイル: `crates/pasta_lsp/tests/crash_recovery_test.rs`
+  - _Requirements: 3.4_
+- [ ] 8.5 部分トークン提供統合テスト
+  - エラー時の部分トークン提供検証（pasta_dsl部分パース統合）
+  - Phase 1→2→3フォールバック動作確認
+  - エラー行Diagnostics + 正常行トークン混在検証
+  - テストファイル: `crates/pasta_lsp/tests/partial_token_test.rs`
+  - _Requirements: 2.6, 3.5_
+
+- [ ] 9. CI/CD統合とドキュメント整合性確認
+- [ ] 9.1 WASMビルドCI検証の実行
+  - `cargo build -p pasta_lsp --target wasm32-unknown-unknown --release` 成功確認
+  - .wasmファイル生成確認
+  - wasmバイナリサイズ閾値（10MB）検証
+  - GitHub Actions既存パイプラインへの統合
+  - _Requirements: 4.1, 7.5_
+- [ ] 9.2 ワークスペーステスト統合確認
+  - `cargo test --workspace` でpasta_lsp含む全テスト実行確認
+  - CI/CDパイプラインでの自動テスト実行確認
+  - _Requirements: 5.4, 7.2_
+- [ ] 9.3 ドキュメント整合性の確認と更新
+  - SOUL.md - コアバリュー・設計原則との整合性確認
+  - doc/spec/ - 言語仕様の更新確認（該当なし）
+  - GRAMMAR.md - 文法リファレンスの同期確認（該当なし）
+  - TEST_COVERAGE.md - 新規テストのマッピング追加
+  - クレートREADME作成 - pasta_lsp/README.md にAPI概要、使用方法、アーキテクチャ概要を記載
+  - steering/* - 該当領域のステアリング更新確認（該当なし）
+  - workflow.md DoD全項目確認
+  - _Requirements: 5.5_
+
+## Task Summary
+
+- **合計**: 9メジャータスク、35サブタスク
+- **並列実行可能**: 9タスク（(P)マーク付き）
+- **要件カバレッジ**: 全7要件（R1～R7）+ サブ要件5件（R3.5.1～R3.5.5）を完全カバー
+- **推定所要時間**: 各サブタスク1-3時間、合計約60-90時間
+
+## Notes
+
+- **pasta_dsl拡張**: タスク2でpasta_dslクレートへの部分パースAPI追加を実施（本仕様のスコープに統合済み）
+- **並列実行**: (P)マーク付きタスクはデータ依存なし、ファイル競合なし、独立テスト可能
+- **WASM優先**: ネイティブサーバー対応は将来拡張（タスク6.2でスタブのみ）
+- **テスト駆動**: ユニットテスト（タスク7）と統合テスト（タスク8）で全機能カバー
+- **DoD準拠**: タスク9.3でworkflow.md Definition of Done全項目確認
