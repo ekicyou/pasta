@@ -75,7 +75,7 @@ graph TB
 
 | レイヤー          | 技術 / バージョン                   | 本機能での役割                             | 備考                                                      |
 | ----------------- | ----------------------------------- | ------------------------------------------ | --------------------------------------------------------- |
-| LSPフレームワーク | tower-lsp 0.20 (`runtime-agnostic`) | LanguageServer trait、JSON-RPCハンドリング | WASM互換。メンテナンス停滞リスクあり→Analysis層分離で緩和 |
+| LSPフレームワーク | tower-lsp 0.20 (`runtime-agnostic`) | LanguageServer trait、JSON-RPCハンドリング | WASM互換。**リスク受容**: 最終更新から2年以上経過しているが、LSP 3.17機能は安定しており本仕様には十分。Analysis層の分離により、将来のフレームワーク移行時の影響を最小化。問題発生時はコミュニティフォーク（rust-analyzer等の主要プロジェクトで使用実績あり）またはlsp-server移行を検討。LSPプロトコル自体の安定性とセマンティックトークン機能の成熟により、セキュリティリスクは低い |
 | LSP型定義         | lsp-types 0.97                      | SemanticTokens, Diagnostic等の型           | tower-lspが再エクスポート（0.94.1）。必要に応じ直接依存   |
 | パーサー          | pasta_dsl 0.1.x (pest 2.8)          | PEGパース、AST生成                         | `default-features = false`でWASM互換                      |
 | エラー型          | thiserror 2                         | LangServerError定義                        | `no_std`対応でWASM互換                                    |
