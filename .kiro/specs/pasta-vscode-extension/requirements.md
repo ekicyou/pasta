@@ -4,7 +4,9 @@
 
 本ドキュメントは、Pasta DSL（`*.pasta`ファイル）のシンタックスハイライトを提供するVSCode拡張「pasta-vscode」の要件を定義する。既存の`pasta_lsp`クレート（14セマンティックトークンタイプ、部分パースフォールバック、クラッシュ保護実装済み、WASMビルド対応）を活用し、TypeScriptベースのVSCode拡張として実装する。
 
-**実装スコープ**：本仕様は **Phase 2（ネイティブLSP統合）** までをゴールとする。Gap分析で推奨された段階的実装アプローチ（Option C）のうち、Phase 1（TextMate文法）と Phase 2（ネイティブLSPサーバー統合）を1サイクルで完遂する。Phase 3（WASM移行）は技術的不確実性が高いため、将来仕様として別サイクルで取り組む。
+**実装スコープ**：本仕様は **Phase 3（WASM インプロセスLSP統合）** を最終ゴールとする。Gap分析で推奨された段階的実装アプローチ（Option C）に従い、Phase 1（TextMate文法）で基本ハイライトを実現し、Phase 3（WASM統合）でLSPセマンティックハイライトを完成させる。
+
+> **Note (Phase 2の位置づけ)**: Phase 2（ネイティブLSP統合）は任意実装とし、WASM transport 実装前のLSP機能検証、またはWASM実装が困難だった場合のフォールバックとして位置づける。設計フェーズで実装の必要性を判断する。
 
 配置場所については、Rustクレートではなくnpmベースのプロジェクトであるため、`crates/`配下ではなくワークスペースルート直下の`editors/vscode/`に配置する（エディタ拡張は`editors/`配下に配置する慣例が広く採用されており、将来的に他エディタ対応も見据えた構造とする）。
 
@@ -26,9 +28,9 @@
 
 **Objective:** 開発者として、pasta_lspが提供するLSP機能（セマンティックトークン、診断情報、ドキュメント同期）がVSCode拡張内で利用できること。
 
-> **Note (Phase 2)**: 本仕様では **ネイティブ実行ファイルとしてのLSPサーバー起動** を実装する。pasta_lspをバイナリとしてビルドし、標準入出力（stdio）経由でVSCode Language Clientと通信する。
+> **Note (Phase 3 - WASM統合)**: 本仕様のゴールは **WASM インプロセスでのLSPサーバー統合** である。pasta_lsp.wasm をVSCode拡張内でロードし、wasm-bindgen 経由でLSPプロトコルを処理する。Gap分析で指摘されたWASM transport実装の技術的リスク（High）については、設計フェーズで具体的な実装アプローチを決定する。
 
-> **Note (Future - Phase 3)**: WASM インプロセス統合は将来仕様として別サイクルで取り組む。transport.rs のWASM実装、wasm-bindgen バインディング設計、VSCode拡張内でのWASMモジュールロードが必要となる。
+> **Note (Phase 2 - 任意実装)**: ネイティブ実行ファイルとしてのLSPサーバー起動（stdio経由）は、WASM実装前のLSP機能検証、またはWASM実装が困難な場合のフォールバックとして任意実装とする。設計フェーズでPhase 2実装の必要性を判断する。
 
 #### Acceptance Criteria
 
@@ -101,7 +103,7 @@
 #### Acceptance Criteria
 
 1. The pasta-vscode extension shall ワークスペースルートの`editors/vscode/`ディレクトリに配置される
-2. The pasta-vscode extension shall LSPサーバーのビルド成果物を取り込む、または参照するビルドスクリプトを持つ
+2. The pasta-vscode extension shall WASMビルド成果物（`pasta_lsp.wasm`+JSバインディング）を拡張パッケージに取り込むビルドスクリプトを持つ
 3. The pasta-vscode extension shall `vsce package`コマンドでVSIXファイルを生成できる
 4. The pasta-vscode extension shall READMEにビルド・インストール手順を記載する
 5. The pasta-vscode extension shall `.kiro/steering/structure.md`にて新規ディレクトリとして登録される
