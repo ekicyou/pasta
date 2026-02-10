@@ -2,7 +2,7 @@
 
 Pasta DSL（`*.pasta` ファイル）のシンタックスハイライトと診断情報を提供する VSCode 拡張です。
 
-![Syntax Highlighting](img/screenshot-syntax-highlight.png)
+![Syntax Highlighting](https://raw.githubusercontent.com/ekicyou/pasta/main/editors/vscode/img/screenshot-syntax-highlight.png)
 
 ## 機能
 
