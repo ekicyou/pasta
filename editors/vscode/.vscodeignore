@@ -3,6 +3,7 @@ src/**
 node_modules/**
 tsconfig.json
 **/*.ts
+!wasm/*.d.ts
 **/*.map
 .gitignore
 scripts/**

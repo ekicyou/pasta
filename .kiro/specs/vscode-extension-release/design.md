@@ -339,6 +339,7 @@ src/**
 node_modules/**
 tsconfig.json
 **/*.ts
+!wasm/*.d.ts
 **/*.map
 .gitignore
 scripts/**
@@ -349,10 +350,10 @@ wasm/package.json
 
 **検証結果（設計時点）**:
 - 7.2 除外対象: `src/` ✅、テストファイル（`**/*.ts` でカバー）✅、`scripts/` ✅、`tsconfig.json` ✅、`package-lock.json` ✅、`wasm/README.md` ✅、`wasm/package.json` ✅
-- 7.3 包含対象: `out/extension.js`（`**/*.ts` 除外、`.js` は含まれる）✅、`syntaxes/` ✅、`wasm/*.wasm` ✅、`wasm/*.js` ✅、`wasm/*.d.ts`（`**/*.ts` で除外される可能性）⚠️、`language-configuration.json` ✅、`README.md` ✅、`CHANGELOG.md` ✅、`LICENSE` ✅、`package.json` ✅
+- 7.3 包含対象: `out/extension.js`（`**/*.ts` 除外、`.js` は含まれる）✅、`syntaxes/` ✅、`wasm/*.wasm` ✅、`wasm/*.js` ✅、`wasm/*.d.ts`（`!wasm/*.d.ts` で明示的に包含）✅、`language-configuration.json` ✅、`README.md` ✅、`CHANGELOG.md` ✅、`LICENSE` ✅、`package.json` ✅
 
 **Implementation Notes**
-- `wasm/*.d.ts` が `**/*.ts` パターンで除外される可能性がある。vsce の実際のパッケージング結果で確認し、必要なら `.vscodeignore` に `!wasm/*.d.ts` を追加する
+- `!wasm/*.d.ts` を事前追加して `**/*.ts` パターンからの除外を回避（Option A: 事前対応採用）
 - 確認方法: `vsce package` 後に `vsce ls` でパッケージ内容をリストアップ
 
 ### リリース統合レイヤー
