@@ -48,11 +48,13 @@
 
 #### Acceptance Criteria
 
-1. When 本仕様が実装される, the Release Workflow shall 現在の `pasta v0.1.5` リリースから `pasta.dll` アセットを `gh release delete-asset` コマンドで削除する
-2. When `pasta.dll` アセットが削除される, the Release Workflow shall `target/i686-pc-windows-msvc/release/pasta.dll` を `pasta.dll.zip` に圧縮する
-3. When `pasta.dll.zip` が生成される, the Release Workflow shall `gh release upload v0.1.5 pasta.dll.zip` コマンドで v0.1.5 リリースに `pasta.dll.zip` をアップロードする
-4. If `gh release delete-asset` または `gh release upload` が失敗する, the Release Workflow shall エラーを報告し手動での対応手順を案内する
-5. When アセット差し替えが完了する, the Release Workflow shall v0.1.5 リリースページに少なくとも `pasta.dll.zip` と `hello-pasta.nar` が存在することを確認する
+1. When 本仕様が実装される, the Release Workflow shall `gh release download v0.1.5 -p pasta.dll -D .` コマンドで v0.1.5 リリースから `pasta.dll` をダウンロードする
+2. When `pasta.dll` のダウンロードが完了する, the Release Workflow shall ダウンロードした `pasta.dll` を `Compress-Archive -Force` で `pasta.dll.zip` に圧縮する
+3. When `pasta.dll.zip` の生成が完了する, the Release Workflow shall `gh release delete-asset v0.1.5 pasta.dll -y` コマンドでリリースから `pasta.dll` アセットを削除する
+4. When `pasta.dll` アセットの削除が完了する, the Release Workflow shall `gh release upload v0.1.5 pasta.dll.zip` コマンドで v0.1.5 リリースに `pasta.dll.zip` をアップロードする
+5. When アセット差し替えが完了する, the Release Workflow shall ダウンロードした一時ファイル（`pasta.dll`, `pasta.dll.zip`）を削除する
+6. If `gh release download`, `gh release delete-asset`, または `gh release upload` が失敗する, the Release Workflow shall エラーを報告し手動での対応手順を案内する
+7. When アセット差し替えが完了する, the Release Workflow shall v0.1.5 リリースページに少なくとも `pasta.dll.zip` と `hello-pasta.nar` が存在することを確認する
 
 ---
 
