@@ -106,6 +106,7 @@ use pasta_lua::transpiler::Transpiler;
 1. [GRAMMAR.md](GRAMMAR.md) - 基本文法を学ぶ
 2. [crates/pasta_lua/tests/fixtures/sample.pasta](crates/pasta_lua/tests/fixtures/sample.pasta) - サンプルスクリプト
 3. [クイックスタート](#クイックスタート) - ビルド・実行方法
+4. [pasta DSL vscode拡張](https://marketplace.visualstudio.com/items?itemName=ekicyou.pasta-vscode) - pasta構文 vscode拡張
 
 ### 開発者向け（推定所要時間: 2-3時間）
 1. [doc/spec/](doc/spec/) - 言語仕様の理解（必要な章のみ）
