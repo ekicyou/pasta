@@ -67,9 +67,10 @@ test('TextMate grammar is registered', () => {
   assert.ok(grammar.path.includes('pasta.tmLanguage.json'));
 });
 
-test('declares all 8 custom semantic token types', () => {
+test('declares all 10 custom semantic token types', () => {
   const customTypes = pkg.contributes.semanticTokenTypes.map((t: any) => t.id);
-  const expected = ['scene', 'word', 'call', 'actor', 'actorName', 'codeBlock', 'sakuraScript', 'escape'];
+  // Custom types declared in package.json (not built-in to VSCode)
+  const expected = ['scene', 'word', 'call', 'actor', 'actorName', 'talk', 'codeBlock', 'sakuraScript', 'escape', 'number'];
   for (const e of expected) {
     assert.ok(customTypes.includes(e), `should declare custom type '${e}'`);
   }
@@ -80,12 +81,13 @@ test('declares global semantic token modifier', () => {
   assert.ok(mods.includes('global'), 'should declare global modifier');
 });
 
-test('has semantic token scopes for all 14 types', () => {
+test('has semantic token scopes for all 15 types', () => {
   const scopes = pkg.contributes.semanticTokenScopes[0].scopes;
+  // Must match PASTA_TOKEN_TYPES in semanticTokensProvider.ts (indices 0-14)
   const expectedKeys = [
     'comment', 'namespace', 'scene', 'decorator', 'word', 'variable',
-    'call', 'actor', 'actorName', 'codeBlock', 'string', 'sakuraScript',
-    'escape', 'operator'
+    'call', 'actor', 'actorName', 'codeBlock', 'talk', 'sakuraScript',
+    'escape', 'operator', 'number'
   ];
   for (const key of expectedKeys) {
     assert.ok(scopes[key], `should have scope mapping for '${key}'`);

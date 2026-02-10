@@ -5,6 +5,13 @@ All notable changes to the "Pasta DSL" extension will be documented in this file
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.5] - 2026-02-10
+
+### Fixed
+
+- セマンティックトークン定義の整合性修正（テスト期待値を実装に合わせて更新）
+- README のセマンティックトークン一覧を実装と同期（14種→15種、`string`→`talk`、`number` 追加）
+
 ## [0.1.4] - 2026-02-10
 
 ### Fixed

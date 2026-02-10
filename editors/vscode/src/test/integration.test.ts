@@ -36,10 +36,11 @@ const TOKEN_TYPES: readonly string[] = [
   'actor',         // 7
   'actorName',     // 8
   'codeBlock',     // 9
-  'string',        // 10
+  'talk',          // 10: Talk文
   'sakuraScript',  // 11
   'escape',        // 12
   'operator',      // 13
+  'number',        // 14: 数値リテラル
 ] as const;
 
 const TOKEN_MODIFIERS: readonly string[] = [
@@ -73,8 +74,8 @@ function test(name: string, fn: () => void) {
 
 console.log('\n[SemanticTokensProvider Tests]');
 
-test('has exactly 14 token types', () => {
-  assert.strictEqual(TOKEN_TYPES.length, 14);
+test('has exactly 15 token types', () => {
+  assert.strictEqual(TOKEN_TYPES.length, 15);
 });
 
 test('has exactly 3 token modifiers', () => {
@@ -93,10 +94,11 @@ test('token types match pasta_lsp analysis.rs order', () => {
   assert.strictEqual(TOKEN_TYPES[7], 'actor');
   assert.strictEqual(TOKEN_TYPES[8], 'actorName');
   assert.strictEqual(TOKEN_TYPES[9], 'codeBlock');
-  assert.strictEqual(TOKEN_TYPES[10], 'string');
+  assert.strictEqual(TOKEN_TYPES[10], 'talk');
   assert.strictEqual(TOKEN_TYPES[11], 'sakuraScript');
   assert.strictEqual(TOKEN_TYPES[12], 'escape');
   assert.strictEqual(TOKEN_TYPES[13], 'operator');
+  assert.strictEqual(TOKEN_TYPES[14], 'number');
 });
 
 test('token modifiers match pasta_lsp analysis.rs order', () => {
@@ -107,7 +109,7 @@ test('token modifiers match pasta_lsp analysis.rs order', () => {
 
 test('custom token types are in correct positions', () => {
   // These are pasta-specific custom types that must stay in sync with Rust
-  const customTypes = ['scene', 'word', 'call', 'actor', 'actorName', 'codeBlock', 'sakuraScript', 'escape'];
+  const customTypes = ['scene', 'word', 'call', 'actor', 'actorName', 'talk', 'codeBlock', 'sakuraScript', 'escape', 'number'];
   for (const ct of customTypes) {
     assert.ok(TOKEN_TYPES.includes(ct), `custom type '${ct}' should be in TOKEN_TYPES`);
   }
