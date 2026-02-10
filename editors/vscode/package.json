@@ -2,7 +2,7 @@
     "name": "pasta-vscode",
     "displayName": "Pasta DSL",
     "description": "Syntax highlighting and diagnostics for Pasta DSL (*.pasta) files",
-    "version": "0.1.0",
+    "version": "0.1.3",
     "publisher": "ekicyou",
     "license": "MIT",
     "repository": {

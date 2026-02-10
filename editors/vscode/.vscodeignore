@@ -6,3 +6,6 @@ tsconfig.json
 **/*.map
 .gitignore
 scripts/**
+package-lock.json
+wasm/README.md
+wasm/package.json

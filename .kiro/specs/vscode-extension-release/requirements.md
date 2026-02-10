@@ -53,15 +53,12 @@ editors/vscode にpasta DSLの言語拡張を作成した。実際にvscodeの�
 #### Acceptance Criteria
 
 1. The package.json shall `publisher` フィールドに有効なパブリッシャーID（`ekicyou`）を設定する
-2. The package.json shall `icon` フィールドにアイコン画像ファイルへのパスを設定する
-3. When アイコンが未作成の場合, the package.json shall 最小限のプレースホルダーアイコン（128x128px 以上の PNG）を `editors/vscode/` 配下に配置する
-4. The package.json shall `categories` フィールドに `"Programming Languages"` を含める
+2. The package.json shall `icon` フィールドに `img/pasta.svg`（プロジェクトルートの既存ロゴ）へのパスを設定する（注: VSCode Marketplace は SVG アイコンに対応している）
+3. The package.json shall `categories` フィールドに `"Programming Languages"` を含める
 5. The package.json shall `keywords` フィールドに検索性を高めるキーワード（例: `"pasta"`, `"dsl"`, `"ukagaka"`, `"ghost"`, `"scripting"`）を設定する
-6. The package.json shall `badges` フィールドにリポジトリの状態を示すバッジ（任意）を設定できるようにする
-7. The package.json shall `repository` フィールドに有効なリポジトリ URL を設定する（現在設定済み）
-8. The package.json shall `homepage` フィールドにプロジェクトのホームページ URL を設定する
-9. The package.json shall `bugs` フィールドに Issue トラッカー URL を設定する
-10. The package.json shall `galleryBanner` フィールドに Marketplace ページの配色を設定する（任意だが推奨）
+6. The package.json shall `repository` フィールドに有効なリポジトリ URL を設定する（現在設定済み）
+7. The package.json shall `homepage` フィールドにプロジェクトのホームページ URL を設定する
+8. The package.json shall `bugs` フィールドに Issue トラッカー URL を設定する
 
 ### Requirement 4: バージョン番号の同期
 
@@ -84,10 +81,8 @@ editors/vscode にpasta DSLの言語拡張を作成した。実際にvscodeの�
 1. The Pasta VSCode Extension shall `npm run package` コマンドで VSIX ファイルを生成できる（現在 `prepackage` スクリプトにより WASM ビルド＋コンパイルも実行される）
 2. When VSIX が生成される, the Extension shall ファイル名に `pasta-vscode-<version>.vsix` 形式を使用する
 3. The Pasta VSCode Extension shall `vsce publish` コマンドによる Marketplace 公開をサポートする
-4. When `vsce publish` を実行する前に, the Extension shall Personal Access Token（PAT）が設定されていることを検証する
-5. If PAT が未設定の場合, the Extension shall PAT の取得手順を案内する
-6. When Marketplace 公開が成功する, the Extension shall 公開された拡張機能の URL を報告する
-7. The Pasta VSCode Extension shall `.vscodeignore` ファイルにより、パッケージに含めないファイル（ソースコード、テスト、ビルドスクリプト等）を指定する
+4. When Marketplace 公開が成功する, the Extension shall 公開された拡張機能の URL を報告する
+5. The Pasta VSCode Extension shall `.vscodeignore` ファイルにより、パッケージに含めないファイル（ソースコード、テスト、ビルドスクリプト等）を指定する
 
 ### Requirement 6: release-workflow との統合
 
@@ -108,13 +103,9 @@ editors/vscode にpasta DSLの言語拡張を作成した。実際にvscodeの�
 
 #### Acceptance Criteria
 
-1. The Pasta VSCode Extension shall `.vscodeignore` ファイルを `editors/vscode/` に配置する
-2. The .vscodeignore shall ソースファイル（`src/`）をパッケージから除外する
-3. The .vscodeignore shall テストファイル（`src/test/`）をパッケージから除外する
-4. The .vscodeignore shall ビルドスクリプト（`scripts/`）をパッケージから除外する
-5. The .vscodeignore shall TypeScript 設定ファイル（`tsconfig.json`）をパッケージから除外する
-6. The .vscodeignore shall Node.js 開発依存（`node_modules/` の不要部分）をパッケージから除外する
-7. The .vscodeignore shall 以下のファイルをパッケージに**含める**：`out/extension.js`、`syntaxes/`、`wasm/`、`language-configuration.json`、`README.md`、`CHANGELOG.md`、`LICENSE`、`package.json`
+1. The Pasta VSCode Extension shall `.vscodeignore` ファイルを `editors/vscode/` に配置する（現在設定済み）
+2. The .vscodeignore shall ソースファイル（`src/`）、テストファイル、ビルドスクリプト（`scripts/`）、TypeScript 設定（`tsconfig.json`）、`package-lock.json`、`wasm/README.md`、`wasm/package.json` をパッケージから除外する
+3. The .vscodeignore shall 以下のファイルをパッケージに**含める**：`out/extension.js`、`syntaxes/`、`wasm/*.wasm`、`wasm/*.js`、`wasm/*.d.ts`、`language-configuration.json`、`README.md`、`CHANGELOG.md`、`LICENSE`、`package.json`
 
 ---
 
@@ -132,6 +123,6 @@ editors/vscode にpasta DSLの言語拡張を作成した。実際にvscodeの�
 
 本仕様はまずドキュメント整備（Req 1〜3, 7）を先行し、その後バージョン同期（Req 4）と release-workflow 統合（Req 5〜6）を実施する。これにより、release-workflow 側の設計変更を最小限に抑えつつ、段階的に統合を進めることができる。
 
-### 現状の package.json バージョン不一致
+### package.json バージョン不一致（解消済み）
 
-現在、`package.json` の version は `0.1.0` だが、`Cargo.toml` の `workspace.package.version` は `0.1.3` である。Requirement 4 の実施時にこの不一致を解消する必要がある。
+`package.json` の version を `0.1.0` から `0.1.3` に更新し、`Cargo.toml` の `workspace.package.version` と同期済み。
