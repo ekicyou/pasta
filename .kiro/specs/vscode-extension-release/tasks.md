@@ -130,20 +130,20 @@
 
 ### Phase 4: バージョン同期機構の検証
 
-- [ ] 13. package.json と Cargo.toml のバージョン不一致検知テスト
+- [x] 13. package.json と Cargo.toml のバージョン不一致検知テスト
   - 意図的に package.json のバージョンを変更（例: 0.1.3 → 0.1.2）
   - release-workflow Phase 1 のタスク 3 で不一致が検知されることを確認
   - 元に戻す（0.1.3）
   - _Requirements: 4.4_
 
-- [ ] 14. release-workflow での package.json バージョン更新テスト
+- [x] 14. release-workflow での package.json バージョン更新テスト
   - release-workflow Phase 2 のタスク 4 で package.json が Cargo.toml と同時に更新されることを確認（ドライラン可能であれば実施、不可能であれば次回 v0.1.4 リリース時に検証）
   - semver 形式が維持されることを確認
   - _Requirements: 4.1, 4.2, 4.5_
 
 ### 最終タスク: ドキュメント整合性の確認と更新
 
-- [ ] 15. ドキュメント整合性の確認と更新
+- [x] 15. ドキュメント整合性の確認と更新
   - 以下のドキュメントとの整合性を確認・更新:
     - ✅ SOUL.md: コアバリュー・設計原則との整合性確認（本仕様は VSCode 拡張リリースのため影響なし）
     - ❌ doc/spec/: 言語仕様の更新不要
