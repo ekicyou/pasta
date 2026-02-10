@@ -32,6 +32,7 @@
 - [ ] 3. ワークツリーの整理とテスト実行
   - `git status --porcelain` で未コミット変更を確認する
   - 未コミット変更がある場合は `git add -A && git commit -m "chore(release): prepare release vX.Y.Z"` で自動コミットする
+  - `editors/vscode/package.json` の `version` と `Cargo.toml` の `workspace.package.version` を比較し、不一致の場合は警告を表示し同期するか開発者に確認
   - `cargo test --all` を実行し全テストの通過を確認する
   - テスト失敗時はエラー内容を報告し、リリース作業を中止する
   - _Requirements: 1.7, 1.8, 1.9, 1.10_
@@ -44,6 +45,7 @@
     - `pasta_core = { path = "crates/pasta_core", version = "<OLD>" }` → `version = "<NEW>"`
     - `pasta_lua = { path = "crates/pasta_lua", version = "<OLD>" }` → `version = "<NEW>"`
     - `pasta_shiori = { path = "crates/pasta_shiori", version = "<OLD>" }` → `version = "<NEW>"`
+  - `editors/vscode/package.json` の `"version": "<OLD>"` → `"version": "<NEW>"` を `replace_string_in_file` で更新する
   - _Requirements: 2.1, 2.2_
 
 - [ ] 5. ビルド検証とコミット
@@ -61,6 +63,20 @@
   - 3回失敗した場合はエラーを報告し、既に公開済みのクレートはそのまま残して以降を中断する
   - 各クレート公開後（最後の `pasta_shiori` を除く）に `Start-Sleep -Seconds 10` で待機する
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6_
+
+### Phase 3.5: VSCode 拡張公開
+
+- [ ] 6.5. VSCode 拡張のビルドと Marketplace 公開
+  - `cd editors/vscode && npm install` を実行する
+    - 失敗時: 警告記録、Phase 4 へ継続
+  - `npm run package` を実行する（prepackage: build:wasm + compile、package: vsce package）
+    - VSIX 生成失敗時: 警告記録、Phase 4 へ継続
+  - `Test-Path "pasta-vscode-X.Y.Z.vsix"` で VSIX 存在確認
+  - 存在する場合: `vsce publish` を実行
+    - 成功: Marketplace URL を記録
+    - 失敗: 警告記録、Phase 4 へ継続
+  - 環境変数 `$env:VSIX_PATH` に VSIX ファイルパスを保持（Phase 6 で使用）
+  - _Requirements: VSX.1–VSX.6_
 
 ### Phase 4: ゴーストビルド
 
@@ -96,17 +112,24 @@
 
 - [ ] 10. GitHub Release の作成とアセット添付
   - 以下のコマンドで GitHub Release を作成する:
-    ```
+    ```powershell
+    $assets = @(
+      "target/i686-pc-windows-msvc/release/pasta.dll",
+      "crates/pasta_sample_ghost/hello-pasta.nar"
+    )
+    if ($env:VSIX_PATH -and (Test-Path $env:VSIX_PATH)) {
+      $assets += $env:VSIX_PATH
+    }
+
     gh release create vX.Y.Z `
-      "target/i686-pc-windows-msvc/release/pasta.dll" `
-      "crates/pasta_sample_ghost/hello-pasta.nar" `
+      $assets `
       --title "pasta vX.Y.Z" `
       --notes-file release-notes-vX.Y.Z.md
     ```
   - `gh` 失敗時はエラー報告と手動手順を案内する
   - 成功時は一時ファイル `release-notes-vX.Y.Z.md` を削除する
-  - リリース完了サマリー（バージョン、公開クレート、Release URL）を開発者に報告する
-  - _Requirements: 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 7.4_
+  - リリース完了サマリー（バージョン、公開クレート、Release URL、Marketplace 公開結果）を開発者に報告する
+  - _Requirements: 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 7.4, VSX.4, VSX.6_
 
 ### 最終タスク: ドキュメント整合性確認
 

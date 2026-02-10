@@ -45,7 +45,7 @@
 
 ### Phase 2: release-workflow 統合設計の反映
 
-- [ ] 4. release-workflow の design.md への Phase 3.5 追加
+- [x] 4. release-workflow の design.md への Phase 3.5 追加
   - `.kiro/specs/release-workflow/design.md` を編集
   - Architecture Pattern & Boundary Map の Mermaid 図に Phase 3.5 ノードを追加（Phase 3 と Phase 4 の間）
   - System Flows のシーケンス図に Phase 3.5 の手順を追加（npm install → package → vsce publish → VSIX パス保持）
@@ -54,7 +54,7 @@
   - Phase 3.5 の詳細セクションを Components レイヤーに追加（VsixPackaging の実行手順を転記）
   - _Requirements: 6.1, 6.2_
 
-- [ ] 5. release-workflow の tasks.md への Phase 3.5 タスク追加
+- [x] 5. release-workflow の tasks.md への Phase 3.5 タスク追加
   - `.kiro/specs/release-workflow/tasks.md` を編集
   - Phase 2 のタスク 4（Cargo.toml バージョン更新）に package.json 更新を追加
   - Phase 1 のタスク 3（ワークツリー整理）に package.json バージョン不一致検知を追加
@@ -68,7 +68,7 @@
   - Phase 6 のタスク 10（GitHub Release 作成）に VSIX アセット条件付き添付を追加
   - _Requirements: 6.1, 6.2, 6.3, 6.5_
 
-- [ ] 6. release-workflow の Phase 6 拡張（VSIX アセット添付）
+- [x] 6. release-workflow の Phase 6 拡張（VSIX アセット添付）
   - `.kiro/specs/release-workflow/tasks.md` のタスク 10 を編集
   - `gh release create` コマンドに VSIX アセット追加の PowerShell コードを追加:
     - `$env:VSIX_PATH` 存在確認

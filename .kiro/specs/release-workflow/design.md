@@ -59,8 +59,9 @@ graph TB
 
     subgraph Phase2 [Phase 2: バージョン更新]
         P2_1[Cargo.toml 4箇所更新]
-        P2_2[cargo build 検証]
-        P2_3[バージョン更新コミット]
+        P2_2[package.json version 更新]
+        P2_3[cargo build 検証]
+        P2_4[バージョン更新コミット]
     end
 
     subgraph Phase3 [Phase 3: crates.io 公開]
@@ -69,6 +70,13 @@ graph TB
         P3_3[pasta_lua publish]
         P3_4[10秒待機]
         P3_5[pasta_shiori publish]
+    end
+
+    subgraph Phase3_5 [Phase 3.5: VSCode Extension]
+        PV1[npm install]
+        PV2[npm run package]
+        PV3[vsce publish]
+        PV4[VSIX ファイル保持]
     end
 
     subgraph Phase4 [Phase 4: ゴーストビルド]
@@ -91,7 +99,8 @@ graph TB
     Phase0 --> Phase1
     Phase1 --> Phase2
     Phase2 --> Phase3
-    Phase3 --> Phase4
+    Phase3 --> Phase3_5
+    Phase3_5 --> Phase4
     Phase4 --> Phase5
     Phase5 --> Phase6
 ```
@@ -170,6 +179,21 @@ sequenceDiagram
     LLM->>Term: release.ps1
     LLM->>Term: git commit
 
+    Note over Dev,GH: Phase 3.5: VSCode Extension
+    LLM->>Term: cd editors/vscode && npm install
+    alt npm install 失敗
+        LLM->>LLM: 警告記録、Phase 4 へ継続
+    end
+    LLM->>Term: npm run package
+    alt VSIX 生成失敗
+        LLM->>LLM: 警告記録、Phase 4 へ継続
+    end
+    LLM->>Term: vsce publish
+    alt vsce publish 失敗
+        LLM->>LLM: 警告記録、Phase 4 へ継続
+    end
+    LLM->>FS: VSIX ファイルパス記録（$env:VSIX_PATH）
+
     Note over Dev,GH: Phase 5: タグとプッシュ
     LLM->>Term: git tag -a vX.Y.Z
     LLM->>Term: git push origin main --tags
@@ -247,6 +271,12 @@ flowchart TD
 | 7.2 | phase を completed にしない | — | 繰り返し実行の仕様特性 |
 | 7.3 | 独立した作業として動作 | — | 繰り返し実行の仕様特性 |
 | 7.4 | 完了サマリー報告 | Phase 6 | メインフロー: 最終報告 |
+| VSX.1 | package.json バージョン更新 | Phase 2 | メインフロー: バージョン更新 |
+| VSX.2 | crates.io 後に VSIX 公開 | Phase 3.5 | メインフロー: VSCode Extension |
+| VSX.3 | vsce publish 失敗時は継続 | Phase 3.5 | エラーフロー: Phase 3.5 |
+| VSX.4 | GitHub Release に VSIX 添付 | Phase 6 | メインフロー: GitHub Release |
+| VSX.5 | npm install の事前実行 | Phase 3.5 | メインフロー: VSCode Extension |
+| VSX.6 | 公開成否をサマリーに含める | Phase 6 | メインフロー: 最終報告 |
 
 ## Components and Interfaces
 
@@ -256,6 +286,7 @@ flowchart TD
 | Phase 1: Validation | 検証 | バージョン決定と事前検証 | 1.1–1.10 | Cargo.toml (P0), cargo test (P0), git (P0) | — |
 | Phase 2: VersionBump | 実行 | Cargo.toml バージョン更新 | 2.1–2.5 | Cargo.toml (P0), cargo build (P0) | — |
 | Phase 3: Publish | 実行 | crates.io 公開 | 3.1–3.6 | cargo publish (P0), crates.io index (P1) | — |
+| Phase 3.5: VsixPublish | 実行 | VSCode 拡張公開 | VSX.1–VSX.6 | npm (P0), vsce (P0), wasm-pack (P0) | — |
 | Phase 4: GhostBuild | 実行 | サンプルゴーストビルド | 4.1–4.5 | release.ps1 (P0), i686-pc-windows-msvc (P0) | — |
 | Phase 5: TagPush | 実行 | Git タグ作成とプッシュ | 5.1–5.5 | git (P0), GitHub remote (P0) | — |
 | Phase 6: Release | 実行 | GitHub Release 作成 | 6.1–6.9, 7.4 | gh CLI (P0), git log (P0) | — |
@@ -426,6 +457,54 @@ flowchart TD
    ```
    - 最後のクレート（`pasta_shiori`）公開後は待機不要
 
+#### Phase 3.5: VsixPublish
+
+| Field | Detail |
+|-------|--------|
+| Intent | VSCode 拡張（VSIX）をビルドし Marketplace に公開する |
+| Requirements | VSX.1, VSX.2, VSX.3, VSX.4, VSX.5, VSX.6 |
+
+**Responsibilities & Constraints**
+- `editors/vscode/` ディレクトリで `npm install` → `npm run package` → `vsce publish` を順次実行
+- 失敗時は警告を記録し後続フェーズに継続（非クリティカル成果物）
+- 生成された VSIX ファイルパスを `$env:VSIX_PATH` に保持（Phase 6 で使用）
+
+**Dependencies**
+- Inbound: Phase 3 の crates.io 公開完了 (P0)
+- External: `vsce` CLI — Marketplace 公開 (P0)
+- External: `wasm-pack` — WASM ビルド (P0)
+- External: `npm` — 依存管理 (P0)
+- External: `VSCE_PAT` 環境変数 — 認証 (P0)
+
+**実行手順**
+
+1. **依存パッケージ更新** (VSX.5):
+   ```
+   cd editors/vscode
+   npm install
+   ```
+   - 失敗: 警告記録、Phase 4 へ継続
+
+2. **VSIX パッケージング** (VSX.2):
+   ```
+   npm run package
+   ```
+   - `prepackage`（build:wasm + compile）→ `vsce package` が実行される
+   - 生成ファイル: `pasta-vscode-X.Y.Z.vsix`
+   - 失敗: 警告記録、Phase 4 へ継続
+
+3. **Marketplace 公開** (VSX.2, VSX.3):
+   ```
+   vsce publish
+   ```
+   - 成功: Marketplace URL を記録
+   - 失敗: 警告記録、Phase 4 へ継続
+
+4. **VSIX パス保持** (VSX.4):
+   ```
+   $env:VSIX_PATH = "editors/vscode/pasta-vscode-X.Y.Z.vsix"
+   ```
+
 #### Phase 4: GhostBuild
 
 | Field | Detail |
@@ -572,11 +651,18 @@ flowchart TD
 3. **リリースノートファイル作成**:
    - チェンジログを一時ファイルに書き出し（`release-notes-vX.Y.Z.md`）
 
-4. **GitHub Release 作成** (6.4, 6.5, 6.6, 6.7):
-   ```
+4. **GitHub Release 作成** (6.4, 6.5, 6.6, 6.7, VSX.4):
+   ```powershell
+   $assets = @(
+     "target/i686-pc-windows-msvc/release/pasta.dll",
+     "crates/pasta_sample_ghost/hello-pasta.nar"
+   )
+   if ($env:VSIX_PATH -and (Test-Path $env:VSIX_PATH)) {
+     $assets += $env:VSIX_PATH
+   }
+
    gh release create vX.Y.Z `
-     "target/i686-pc-windows-msvc/release/pasta.dll" `
-     "crates/pasta_sample_ghost/hello-pasta.nar" `
+     $assets `
      --title "pasta vX.Y.Z" `
      --notes-file release-notes-vX.Y.Z.md
    ```
@@ -598,10 +684,11 @@ flowchart TD
          --notes-file release-notes-vX.Y.Z.md
        ```
 
-7. **完了サマリー** (7.4):
+7. **完了サマリー** (7.4, VSX.6):
    - バージョン: `vX.Y.Z`
    - 公開クレート: `pasta_core`, `pasta_lua`, `pasta_shiori`
    - Release URL: `https://github.com/ekicyou/pasta/releases/tag/vX.Y.Z`
+   - Marketplace: 公開成功 URL or 警告（Phase 3.5 の結果）
 
 ## Error Handling
 
