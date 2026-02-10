@@ -14,7 +14,7 @@
 
 ### Phase 1: ドキュメント・メタデータ整備
 
-- [ ] 1. (P) Marketplace 公開用 README のリライト
+- [x] 1. (P) Marketplace 公開用 README のリライト
   - 現在の `editors/vscode/README.md` を Marketplace 向けユーザー視点に全面リライト
   - 概要を冒頭に配置（1〜2文、package.json の description と整合）
   - 主要機能一覧を箇条書き（TextMate 文法、セマンティックトークン、診断情報、フォールバック）
@@ -26,7 +26,7 @@
   - セマンティックトークン一覧テーブルは維持（現在の README から転記）
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9_
 
-- [ ] 2. (P) CHANGELOG の新規作成
+- [x] 2. (P) CHANGELOG の新規作成
   - `editors/vscode/CHANGELOG.md` を新規作成
   - Keep a Changelog 形式に準拠（ヘッダー、リンク含む）
   - 初回リリース v0.1.3 のエントリを作成
@@ -34,7 +34,7 @@
   - リリース日は実施日に手動更新（YYYY-MM-DD プレースホルダー使用）
   - _Requirements: 2.1, 2.2, 2.3, 2.5_
 
-- [ ] 3. (P) package.json メタデータの拡充
+- [x] 3. (P) package.json メタデータの拡充
   - `editors/vscode/package.json` に以下フィールドを追加:
     - `icon`: `"img/pasta.svg"`（プロジェクトルートの既存ロゴ）
     - `keywords`: `["pasta", "dsl", "ukagaka", "ghost", "scripting"]`
