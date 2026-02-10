@@ -78,14 +78,14 @@
 
 ### Phase 3: 初回リリース実施（v0.1.3）
 
-- [ ] 7. 初回 Marketplace 公開の準備確認
+- [x] 7. 初回 Marketplace 公開の準備確認
   - WASM ビルド環境の確認（wasm-pack インストール確認）
   - Node.js 依存パッケージの更新（`cd editors/vscode && npm install`）
   - vsce の認証状態確認（`vsce login ekicyou` が成功済みであること）
   - PAT 有効期限確認（2027-02-10 まで有効）
   - _Requirements: 5.3, 6.5_
 
-- [ ] 8. VSIX パッケージングとパッケージ内容検証
+- [x] 8. VSIX パッケージングとパッケージ内容検証
   - `npm run package` 実行（prepackage で WASM ビルド + compile、package で vsce package）
   - 生成された VSIX ファイルサイズ確認（2MB 以下が目安）
   - `vsce ls` で VSIX 内容物を確認:
@@ -94,14 +94,14 @@
   - SVG アイコン警告の有無を確認し、research.md に記録
   - _Requirements: 5.1, 5.2, 5.5, 7.1, 7.2, 7.3_
 
-- [ ] 9. Marketplace への公開実行
+- [x] 9. Marketplace への公開実行
   - `vsce publish` 実行
   - Marketplace URL を記録（https://marketplace.visualstudio.com/items?itemName=ekicyou.pasta-vscode）
   - 公開成功メッセージの確認
   - 失敗時はエラー内容を research.md に記録し、手動対処
   - _Requirements: 5.3, 5.4_
 
-- [ ] 10. Marketplace ページの表示確認
+- [x] 10. Marketplace ページの表示確認
   - Marketplace ページにアクセスし、以下を確認:
     - README が正しく表示されていること（スクリーンショット、機能一覧、リンク）
     - アイコン（pasta.svg）が表示されていること
@@ -110,7 +110,7 @@
   - 問題があれば research.md に記録
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.6, 2.1, 3.2, 3.5, 3.7, 3.8_
 
-- [ ] 11. 拡張機能のインストール確認
+- [x] 11. 拡張機能のインストール確認
   - Marketplace から拡張機能をインストール（または VSIX から直接インストール: `code --install-extension pasta-vscode-0.1.3.vsix`）
   - `.pasta` ファイルを開き、以下を確認:
     - TextMate 文法によるシンタックスハイライトが動作すること
@@ -119,7 +119,7 @@
   - 問題があれば research.md に記録
   - _Requirements: 1.3, 1.4_
 
-- [ ] 12. 初回リリース手順の文書化と問題点記録
+- [x] 12. 初回リリース手順の文書化と問題点記録
   - research.md に以下を追記:
     - 初回リリース実施日
     - 発生した問題点（SVG アイコン警告、WASM ビルド時間等）

@@ -311,7 +311,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 | フィールド | 値 | 備考 |
 |-----------|-----|------|
-| `icon` | `"img/pasta.svg"` | プロジェクトルートの SVG ロゴ |
+| `icon` | `"img/pasta.png"` | プロジェクトルートの SVG から変換した PNG ロゴ |
 | `keywords` | `["pasta", "dsl", "ukagaka", "ghost", "scripting"]` | 検索性向上 |
 | `homepage` | `"https://github.com/ekicyou/pasta"` | リポジトリをホームページとして使用 |
 | `bugs` | `{"url": "https://github.com/ekicyou/pasta/issues"}` | Issue トラッカー |

@@ -5,7 +5,7 @@ All notable changes to the "Pasta DSL" extension will be documented in this file
 The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [0.1.3] - YYYY-MM-DD
+## [0.1.3] - 2026-02-10
 
 ### Added
 

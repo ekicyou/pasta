@@ -5,8 +5,14 @@
     "version": "0.1.3",
     "publisher": "ekicyou",
     "license": "MIT",
-    "icon": "img/pasta.svg",
-    "keywords": ["pasta", "dsl", "ukagaka", "ghost", "scripting"],
+    "icon": "img/pasta.png",
+    "keywords": [
+        "pasta",
+        "dsl",
+        "ukagaka",
+        "ghost",
+        "scripting"
+    ],
     "homepage": "https://github.com/ekicyou/pasta",
     "bugs": {
         "url": "https://github.com/ekicyou/pasta/issues"

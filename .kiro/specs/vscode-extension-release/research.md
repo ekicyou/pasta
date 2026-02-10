@@ -93,6 +93,44 @@
 - **vsce PAT 期限切れ**: PAT の有効期限（2027-02-10）が切れるとリリース不可 → リリース前チェックに PAT 有効性確認を含める（ただし vsce login で確認可能）
 - **release-workflow への影響**: 既存リリースフローへの破壊的変更リスク → すべて additive 変更（Phase 2 は拡張、Phase 3.5 は新規、Phase 6 は拡張）とし、環境変数 `$env:SKIP_VSCODE_RELEASE` でスキップ可能な設計により後方互換性を保証
 
+## 初回リリース実施記録
+
+### 実施日
+2026-02-10
+
+### 発生した問題点
+
+1. **SVG アイコン拒否（クリティカル）**
+   - `vsce package` が `ERROR  SVGs can't be used as icons: img/pasta.svg` で失敗
+   - research.md の事前予測では「警告の可能性」としていたが、実際にはハードエラー
+   - **対応**: `@resvg/resvg-js` を使用して SVG → PNG (256x256) に変換、`editors/vscode/img/pasta.png` として配置
+   - **design.md/requirements.md への影響**: icon フィールドは `"img/pasta.png"` に変更。SVG は今後も使用不可
+
+2. **テストファイルの VSIX 混入**
+   - `out/test/*.js` が VSIX に含まれていた（`.vscodeignore` で除外漏れ）
+   - **対応**: `.vscodeignore` に `out/test/**` を追加
+
+3. **Marketplace 接続障害（ECONNRESET）**
+   - `vsce publish` が `ECONNRESET` で繰り返し失敗（約20分間）
+   - `curl` での直接テストでも同様に接続リセット（GitHub は正常接続可能）
+   - PAT 認証は `vsce verify-pat` で正常確認済み
+   - **対応**: 10分間隔でリトライし、復旧後に公開成功
+
+4. **PowerShell 実行ポリシー**
+   - `npm run package` 内部の `powershell -File scripts/build-wasm.ps1` が実行ポリシーエラー
+   - **対応**: `PowerShell -ExecutionPolicy Bypass -File scripts/build-wasm.ps1` で個別実行後、`vsce package` を直接実行
+
+### パッケージング結果
+- **VSIX ファイルサイズ**: 370.47 KB（目安 2MB 以下を大幅に下回る）
+- **WASM バイナリ**: 1.5 MB（dev ビルド）
+- **ビルド時間**: WASM ビルド約 9秒、TypeScript コンパイル約 0.1秒
+- **含まれるファイル**: 15ファイル
+
+### 改善提案
+- `build:wasm` スクリプトを `PowerShell -ExecutionPolicy Bypass` で実行するよう package.json を修正すべき
+- リリースビルドでは WASM を `--release` でビルドすることでサイズ削減が可能
+- Marketplace 接続障害時のリトライは最低5分間隔を推奨
+
 ## References
 - [VSCode Publishing Extensions](https://code.visualstudio.com/api/working-with-extensions/publishing-extension) — 公開手順公式ドキュメント
 - [Keep a Changelog](https://keepachangelog.com/) — CHANGELOG 形式標準
