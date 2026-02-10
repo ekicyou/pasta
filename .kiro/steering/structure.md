@@ -66,6 +66,20 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 
 │   └── test_*.rs             # 動作確認例
 ├── benches/                  # ベンチマークコード
+├── editors/                  # エディタ拡張
+│   └── vscode/              # VSCode拡張（TypeScript + WASM統合）
+│       ├── package.json     # 拡張マニフェスト
+│       ├── tsconfig.json    # TypeScript設定
+│       ├── src/             # TypeScriptソース
+│       │   ├── extension.ts            # アクティベーション・エントリポイント
+│       │   ├── wasmBridge.ts           # WASMモジュールブリッジ
+│       │   ├── semanticTokensProvider.ts # セマンティックトークン提供
+│       │   ├── diagnosticsManager.ts   # 診断情報管理
+│       │   ├── documentSync.ts         # ドキュメント同期（200msデバウンス）
+│       │   └── test/                   # テスト
+│       ├── syntaxes/         # TextMate文法（全角/半角マーカー対応）
+│       ├── scripts/          # ビルドスクリプト（WASM等）
+│       └── wasm/             # pasta_lsp WASMバイナリ（ビルド生成物）
 ├── .kiro/                    # Kiro Spec-Driven設定
 │   ├── steering/            # ステアリング規約
 │   ├── settings/            # テンプレート・ルール

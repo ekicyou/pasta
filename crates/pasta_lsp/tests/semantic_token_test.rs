@@ -2,7 +2,7 @@
 //!
 //! 14トークンタイプ個別識別テスト、AST→トークン変換の正確性テスト
 
-use pasta_lsp::analysis::{token_type, AnalysisEngine};
+use pasta_lsp::analysis::{AnalysisEngine, token_type};
 
 // ============================================================================
 // Global Scene (NAMESPACE)
@@ -59,7 +59,7 @@ fn test_token_actor_name_and_colon() {
 }
 
 // ============================================================================
-// Talk Text (STRING)
+// Talk Text (TALK)
 // ============================================================================
 
 #[test]
@@ -67,11 +67,11 @@ fn test_token_talk_text() {
     let source = "＊挨拶\n  Alice：こんにちは\n";
     let result = AnalysisEngine::analyze(source);
 
-    let has_string = result
+    let has_talk = result
         .tokens
         .iter()
-        .any(|t| t.token_type == token_type::STRING);
-    assert!(has_string, "Talk文字列トークンが含まれる");
+        .any(|t| t.token_type == token_type::TALK);
+    assert!(has_talk, "Talk文字列トークンが含まれる");
 }
 
 // ============================================================================

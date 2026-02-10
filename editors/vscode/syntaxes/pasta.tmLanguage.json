@@ -1,0 +1,203 @@
+{
+    "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+    "name": "Pasta DSL",
+    "scopeName": "source.pasta",
+    "patterns": [
+        {
+            "include": "#comment"
+        },
+        {
+            "include": "#lua-code-block"
+        },
+        {
+            "include": "#global-scene"
+        },
+        {
+            "include": "#local-scene"
+        },
+        {
+            "include": "#attribute"
+        },
+        {
+            "include": "#word"
+        },
+        {
+            "include": "#variable"
+        },
+        {
+            "include": "#call"
+        },
+        {
+            "include": "#actor"
+        },
+        {
+            "include": "#action-line"
+        }
+    ],
+    "repository": {
+        "comment": {
+            "match": "^[\\s\u3000]*[\uff03#].*$",
+            "name": "comment.line.pasta"
+        },
+        "global-scene": {
+            "match": "^([＊*])(.+)?$",
+            "captures": {
+                "1": {
+                    "name": "keyword.other.marker.pasta"
+                },
+                "2": {
+                    "name": "keyword.control.scene.pasta"
+                }
+            },
+            "name": "meta.scene.global.pasta"
+        },
+        "local-scene": {
+            "match": "^(\\s*)([・\\-])(.+)?$",
+            "captures": {
+                "2": {
+                    "name": "keyword.other.marker.pasta"
+                },
+                "3": {
+                    "name": "keyword.control.scene.pasta"
+                }
+            },
+            "name": "meta.scene.local.pasta"
+        },
+        "attribute": {
+            "match": "^(\\s*)([＆&])(.+)$",
+            "captures": {
+                "2": {
+                    "name": "keyword.other.marker.pasta"
+                },
+                "3": {
+                    "name": "entity.other.attribute-name.pasta"
+                }
+            },
+            "name": "meta.attribute.pasta"
+        },
+        "word": {
+            "match": "^(\\s*)([＠@])(.+)$",
+            "captures": {
+                "2": {
+                    "name": "keyword.other.marker.pasta"
+                },
+                "3": {
+                    "name": "string.key.word.pasta"
+                }
+            },
+            "name": "meta.word.pasta"
+        },
+        "variable": {
+            "match": "^(\\s*)([＄$])(.+)$",
+            "captures": {
+                "2": {
+                    "name": "keyword.other.marker.pasta"
+                },
+                "3": {
+                    "name": "variable.other.pasta"
+                }
+            },
+            "name": "meta.variable.pasta"
+        },
+        "call": {
+            "match": "^(\\s*)([＞>])(.+)$",
+            "captures": {
+                "2": {
+                    "name": "keyword.other.marker.pasta"
+                },
+                "3": {
+                    "name": "keyword.control.pasta"
+                }
+            },
+            "name": "meta.call.pasta"
+        },
+        "actor": {
+            "match": "^(\\s*)([％%])(.+)$",
+            "captures": {
+                "2": {
+                    "name": "keyword.other.marker.pasta"
+                },
+                "3": {
+                    "name": "entity.name.class.pasta"
+                }
+            },
+            "name": "meta.actor.pasta"
+        },
+        "lua-code-block": {
+            "begin": "^(\\s*)(```)(lua)?\\s*$",
+            "end": "^(\\s*)(```)\\s*$",
+            "beginCaptures": {
+                "2": {
+                    "name": "punctuation.definition.code.begin.pasta"
+                },
+                "3": {
+                    "name": "entity.name.type.language.pasta"
+                }
+            },
+            "endCaptures": {
+                "2": {
+                    "name": "punctuation.definition.code.end.pasta"
+                }
+            },
+            "name": "meta.embedded.block.lua",
+            "contentName": "meta.embedded.block.lua.content"
+        },
+        "action-line": {
+            "match": "^(\\s+)(\\S+?)\\s*([：:])(.*)$",
+            "captures": {
+                "2": {
+                    "name": "entity.name.type.actor.pasta"
+                },
+                "3": {
+                    "name": "punctuation.separator.pasta"
+                },
+                "4": {
+                    "patterns": [
+                        {
+                            "include": "#inline-word-ref"
+                        },
+                        {
+                            "include": "#inline-var-ref"
+                        },
+                        {
+                            "include": "#inline-fn-call"
+                        },
+                        {
+                            "include": "#inline-sakura-script"
+                        },
+                        {
+                            "include": "#inline-escape"
+                        },
+                        {
+                            "include": "#inline-talk"
+                        }
+                    ]
+                }
+            }
+        },
+        "inline-word-ref": {
+            "match": "[＠@]([^＠@＄$\\\\\\s]+)",
+            "name": "entity.name.function.reference.pasta"
+        },
+        "inline-var-ref": {
+            "match": "[＄$][＊*]?([^＠@＄$\\\\\\s]+)",
+            "name": "variable.other.reference.pasta"
+        },
+        "inline-fn-call": {
+            "match": "[＠@](\\w+)\\([^)]*\\)",
+            "name": "entity.name.function.call.pasta"
+        },
+        "inline-sakura-script": {
+            "match": "\\\\[a-zA-Z_!?](?:\\[[^\\]]*\\]|[^\\\\]*)?",
+            "name": "string.other.sakura-script.pasta"
+        },
+        "inline-escape": {
+            "match": "\\\\[\\\\＠@＄$＞>]",
+            "name": "constant.character.escape.pasta"
+        },
+        "inline-talk": {
+            "match": "[^＠@＄$\\\\]+",
+            "name": "meta.talk.pasta"
+        }
+    }
+}

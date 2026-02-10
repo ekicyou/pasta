@@ -115,6 +115,16 @@
 | 部分パースAPI                        | `partial_parse_test.rs`                           | ✅ 完了 | 28テスト（pasta_dslクレート）                |
 | DocumentManager / AnalysisEngine     | インラインテスト                                  | ✅ 完了 | 12テスト                                     |
 
+### 2.7 VSCode拡張テスト（pasta-vscode-extension）
+
+| 機能                                 | テストファイル                                    | 状態   | 説明                                         |
+| ------------------------------------ | ------------------------------------------------- | ------ | -------------------------------------------- |
+| TextMate文法（全角/半角マーカー）    | `editors/vscode/src/test/tmGrammar.test.ts`       | ✅ 完了 | 20テスト（9構文×全角半角+アクション行2）     |
+| WasmBridgeユニットテスト             | `editors/vscode/src/test/wasmBridge.test.ts`      | ✅ 完了 | 10テスト（初期化・解析・エラー・dispose）    |
+| SemanticTokens/Diagnostics統合       | `editors/vscode/src/test/integration.test.ts`     | ✅ 完了 | 19テスト（トークン定数・キャッシュ・デバウンス） |
+| E2E/ビルド検証                       | `editors/vscode/src/test/e2e.test.ts`             | ✅ 完了 | 30テスト（マニフェスト・文法・ビルド構成・フォールバック） |
+| WASM transport Rustテスト            | `crates/pasta_lsp/src/transport.rs`               | ✅ 完了 | 7テスト（WASM型変換・severity・シリアライズ） |
+
 ### 2.6 統合テスト（E2E）
 
 | 機能                          | テストファイル                                                      | 状態   | 説明                                                |
@@ -197,9 +207,10 @@
 | pasta_dsl    | 90       | 90       | 0     | ⭐⭐⭐⭐⭐ 優秀     |
 | pasta_core   | 67       | 67       | 0     | ⭐⭐⭐⭐⭐ 優秀     |
 | pasta_lua    | 478      | 478      | 0     | ⭐⭐⭐⭐⭐ 優秀     |
-| pasta_lsp    | 72       | 72       | 0     | ⭐⭐⭐⭐⭐ 優秀     |
+| pasta_lsp    | 79       | 79       | 0     | ⭐⭐⭐⭐⭐ 優秀     |
 | pasta_shiori | 28       | 28       | 0     | ⭐⭐⭐⭐⭐ 優秀     |
-| **合計**     | **835+** | **835+** | **0** | **100%パス率** |
+| pasta-vscode | 79       | 79       | 0     | ⭐⭐⭐⭐⭐ 優秀     |
+| **合計**     | **921+** | **921+** | **0** | **100%パス率** |
 
 ---
 

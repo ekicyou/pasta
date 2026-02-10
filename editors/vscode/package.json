@@ -1,0 +1,174 @@
+{
+    "name": "pasta-vscode",
+    "displayName": "Pasta DSL",
+    "description": "Syntax highlighting and diagnostics for Pasta DSL (*.pasta) files",
+    "version": "0.1.0",
+    "publisher": "ekicyou",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/ekicyou/pasta"
+    },
+    "engines": {
+        "vscode": "^1.85.0"
+    },
+    "categories": [
+        "Programming Languages"
+    ],
+    "activationEvents": [
+        "onLanguage:pasta"
+    ],
+    "main": "./out/extension.js",
+    "contributes": {
+        "languages": [
+            {
+                "id": "pasta",
+                "aliases": [
+                    "Pasta DSL",
+                    "pasta"
+                ],
+                "extensions": [
+                    ".pasta"
+                ],
+                "configuration": "./language-configuration.json"
+            }
+        ],
+        "grammars": [
+            {
+                "language": "pasta",
+                "scopeName": "source.pasta",
+                "path": "./syntaxes/pasta.tmLanguage.json"
+            }
+        ],
+        "semanticTokenTypes": [
+            {
+                "id": "scene",
+                "superType": "type",
+                "description": "Local scene marker"
+            },
+            {
+                "id": "word",
+                "superType": "function",
+                "description": "Word definition/reference"
+            },
+            {
+                "id": "call",
+                "superType": "keyword",
+                "description": "Call/Jump statement"
+            },
+            {
+                "id": "actor",
+                "superType": "class",
+                "description": "Actor dictionary marker"
+            },
+            {
+                "id": "actorName",
+                "superType": "type",
+                "description": "Actor name before colon"
+            },
+            {
+                "id": "talk",
+                "description": "Talk text (dialogue)"
+            },
+            {
+                "id": "codeBlock",
+                "superType": "string",
+                "description": "Lua code block"
+            },
+            {
+                "id": "sakuraScript",
+                "superType": "string",
+                "description": "Sakura Script tag"
+            },
+            {
+                "id": "escape",
+                "superType": "string",
+                "description": "Escape sequence"
+            },
+            {
+                "id": "number",
+                "superType": "number",
+                "description": "Numeric literal"
+            }
+        ],
+        "semanticTokenModifiers": [
+            {
+                "id": "global",
+                "description": "Global scope modifier"
+            }
+        ],
+        "semanticTokenScopes": [
+            {
+                "language": "pasta",
+                "scopes": {
+                    "comment": [
+                        "comment.line.pasta"
+                    ],
+                    "namespace": [
+                        "keyword.control.scene.pasta"
+                    ],
+                    "scene": [
+                        "keyword.control.scene.pasta"
+                    ],
+                    "decorator": [
+                        "entity.other.attribute-name.pasta"
+                    ],
+                    "word": [
+                        "string.key.word.pasta"
+                    ],
+                    "variable": [
+                        "variable.other.pasta"
+                    ],
+                    "call": [
+                        "keyword.control.pasta"
+                    ],
+                    "actor": [
+                        "entity.name.class.pasta"
+                    ],
+                    "actorName": [
+                        "entity.name.type.actor.pasta"
+                    ],
+                    "codeBlock": [
+                        "meta.embedded.block.lua"
+                    ],
+                    "talk": [
+                        "meta.talk.pasta"
+                    ],
+                    "sakuraScript": [
+                        "string.other.sakura-script.pasta"
+                    ],
+                    "escape": [
+                        "constant.character.escape.pasta"
+                    ],
+                    "operator": [
+                        "punctuation.separator.pasta"
+                    ],
+                    "number": [
+                        "constant.numeric.pasta"
+                    ]
+                }
+            }
+        ]
+    },
+    "scripts": {
+        "compile": "esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --sourcemap",
+        "watch": "esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --sourcemap --watch",
+        "lint": "eslint src",
+        "test:grammar": "esbuild ./src/test/tmGrammar.test.ts --bundle --outfile=out/test/tmGrammar.test.js --format=cjs --platform=node --sourcemap && node out/test/tmGrammar.test.js",
+        "test:unit": "esbuild ./src/test/wasmBridge.test.ts --bundle --outfile=out/test/wasmBridge.test.js --format=cjs --platform=node --sourcemap && esbuild ./src/test/integration.test.ts --bundle --outfile=out/test/integration.test.js --format=cjs --platform=node --sourcemap && node out/test/wasmBridge.test.js && node out/test/integration.test.js",
+        "test:e2e": "esbuild ./src/test/e2e.test.ts --bundle --outfile=out/test/e2e.test.js --format=cjs --platform=node --sourcemap && node out/test/e2e.test.js",
+        "test": "npm run test:grammar && npm run test:unit && npm run test:e2e",
+        "prepackage": "npm run build:wasm && npm run compile",
+        "package": "vsce package",
+        "build:wasm": "powershell -File scripts/build-wasm.ps1"
+    },
+    "devDependencies": {
+        "@types/node": "^20.0.0",
+        "@types/vscode": "^1.85.0",
+        "@vscode/vsce": "^3.0.0",
+        "esbuild": "^0.24.0",
+        "typescript": "^5.5.0",
+        "vscode-textmate": "^9.0.0",
+        "vscode-oniguruma": "^2.0.0"
+    }
+}

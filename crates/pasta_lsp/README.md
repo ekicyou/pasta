@@ -85,11 +85,13 @@ cargo build -p pasta_lsp --target wasm32-unknown-unknown --release
 
 ## テスト
 
-72 テスト（インラインテスト 12 + 統合テスト 60）:
+79 テスト（インラインテスト 19 + 統合テスト 60）:
 
 | テストファイル                 | テスト数 | 内容                              |
 | ------------------------------ | -------- | --------------------------------- |
-| インラインテスト               | 12       | analysis / document モジュール    |
+| analysis インラインテスト      | 7        | analysis モジュール               |
+| document インラインテスト      | 5        | document モジュール               |
+| transport インラインテスト     | 7        | WASM型変換・エントリポイント      |
 | semantic_token_test.rs         | 9        | 14 トークンタイプ識別             |
 | fullwidth_halfwidth_test.rs    | 5        | 全角/半角マーカー同等認識         |
 | japanese_identifier_test.rs    | 5        | 日本語識別子のトークン化          |
@@ -107,6 +109,7 @@ cargo build -p pasta_lsp --target wasm32-unknown-unknown --release
 - `thiserror 2` - エラー型定義
 - `serde` / `serde_json` - シリアライズ
 - `wasm-bindgen` / `wasm-bindgen-futures` (WASM ターゲット条件コンパイル)
+- `serde-wasm-bindgen 0.6` - Rust→JS型変換（WASMエントリポイント）
 
 ## ライセンス
 
