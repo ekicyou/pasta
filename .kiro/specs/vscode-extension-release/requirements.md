@@ -27,7 +27,7 @@ editors/vscode にpasta DSLの言語拡張を作成した。実際にvscodeの�
 1. The Pasta VSCode Extension shall Marketplace 公開用 README を `editors/vscode/README.md` に配置する
 2. The README shall 拡張機能の概要（1〜2文の説明）をドキュメント冒頭に配置する
 3. The README shall 主要機能一覧（TextMate 文法ハイライト、セマンティックトークン、診断情報、フォールバック動作）を箇条書きで列挙する
-4. The README shall スクリーンショットまたは GIF による視覚的なデモを少なくとも1つ含む
+4. The README shall スクリーンショット `img/screenshot-syntax-highlight.png` を含み、Pasta DSL のシンタックスハイライト機能を視覚的に示す
 5. The README shall 対応する VSCode バージョン要件（`engines.vscode` フィールドと整合）を記載する
 6. The README shall Pasta DSL の簡潔な紹介と公式リポジトリへのリンクを含む
 7. The README shall ライセンス情報（MIT）を記載する
