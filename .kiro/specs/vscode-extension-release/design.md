@@ -15,12 +15,14 @@
 - `release-workflow` の Phase 構造に VSCode 拡張公開ステップを統合する
 - VSIX パッケージングと `vsce publish` を標準化する
 - バージョン番号の Cargo.toml ⇔ package.json 同期を確立する
+- **初回リリース（v0.1.3）を Marketplace に公開し、整備した手順を実地検証する**
 
 ### Non-Goals
 - CI/CD パイプラインでの自動公開（ローカル LLM 実行前提）
 - 拡張機能の新機能実装（公開準備のみ）
 - Marketplace アナリティクスやレビュー管理
 - Pre-release チャネルの構築
+- 初回リリースでの GitHub Release 作成（release-workflow 統合の検証は次回リリース v0.1.4+ で実施）
 
 ## Architecture
 
@@ -508,6 +510,29 @@ VSCode 拡張公開は release-workflow において**非クリティカル**な
 - `vsce package` の成功確認
 - `vsce ls` で VSIX 内容物の確認（7.2 除外対象が含まれていないこと、7.3 包含対象が含まれていること）
 - VSIX ファイルサイズの妥当性確認（WASM バイナリ 1.53MB + JS/JSON を考慮し 2MB 以下が目安）
+
+### 初回リリース検証（v0.1.3）
+本仕様の実装フェーズで以下を実施し、整備した手順の実地検証を行う：
+
+1. **Marketplace 公開**:
+   - `npm install` → `npm run package` → `vsce publish` の一連の手順を実行
+   - Marketplace での公開成功を確認（URL: https://marketplace.visualstudio.com/items?itemName=ekicyou.pasta-vscode）
+
+2. **Marketplace ページ確認**:
+   - README の表示が正しいこと（スクリーンショット、機能一覧、リンク）
+   - アイコン（pasta.svg）が表示されること
+   - メタデータ（keywords, homepage, bugs）が反映されていること
+
+3. **インストール確認**:
+   - Marketplace から拡張機能をインストール
+   - `.pasta` ファイルでシンタックスハイライトが動作すること
+   - セマンティックトークンが機能すること（WASM ロード成功確認）
+
+4. **手順文書化**:
+   - 初回リリース時に発生した問題点や改善点を research.md に記録
+   - SVG アイコン警告などの実際の vsce 出力を記録
+
+**Note**: GitHub Release への VSIX 添付は本仕様では実施せず、次回 release-workflow 実行時（v0.1.4+）に統合検証を行う
 
 ### 統合検証
 - release-workflow の全タスク（1〜11 + 新規タスク）が順次実行可能であること
