@@ -21,4 +21,13 @@ JITビルド可能なスクリプト言語をサポートするためのフレ�
 
 
 ## コパイロットコミットの設定を他の端末にも設定する。
-@id:github.copilot.chat.commitMessageGeneration.instructions
+```json
+{
+  "github.copilot.chat.anthropic.tools.websearch.enabled": true,
+  "github.copilot.chat.localeOverride": "ja",
+  "chat.agent.thinkingStyle": "collapsed",
+  "github.copilot.chat.commitMessageGeneration.instructions": [
+    { "text": "コミットメッセージは必ず以下の形式で生成すること：\n\n形式: <type>(<scope>): <summary>\n\n- type: feat, fix, refactor, docs, test のいずれか\n- scope: 変更対象の領域（例: spec, core, lua）\n- summary: 変更内容を日本語で簡潔に記述\n\n例:\n- feat(parser): UNICODE識別子のサポートを追加\n- fix(core): シーン遷移時のメモリリーク修正\n- docs(spec): テストファイル配置方針を明記" }
+  ]
+}
+```
