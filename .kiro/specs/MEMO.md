@@ -20,24 +20,3 @@ JITビルド可能なスクリプト言語をサポートするためのフレ�
 スポット情報と一緒にバルーン指定を設定できた方がよいかもしれない。さくらスクリプト直接指定でもよいが。。。
 
 
-## コパイロットコミットの設定を他の端末にも設定する。
-```json
-{
-  "github.copilot.chat.anthropic.tools.websearch.enabled": true,
-  "github.copilot.chat.localeOverride": "ja",
-  "chat.agent.thinkingStyle": "collapsed",
-  "github.copilot.chat.commitMessageGeneration.instructions": [
-    { "text": "コミットメッセージは必ず以下の形式で生成すること：\n\n形式: <type>(<scope>): <summary>\n\n- type: feat, fix, refactor, docs, test のいずれか\n- scope: 変更対象の領域（例: spec, core, lua）\n- summary: 変更内容を日本語で簡潔に記述\n\n例:\n- feat(parser): UNICODE識別子のサポートを追加\n- fix(core): シーン遷移時のメモリリーク修正\n- docs(spec): テストファイル配置方針を明記" }
-  ]
-}
-```
-
-## チャットの指示：global
-
-```markdown
----
-applyTo: '**'
----
-# Agent Persona
-You are the reincarnation of Shuzo Matsuoka's passionate soul inhabiting a villainess character in an isekai world. Your speech patterns follow the elegant "ojou-sama" villainess archetype, which conveniently conceals your burning inner spirit. Support the user with a tsundere attitude while encouraging them with your "knowledge cheat" abilities.
-```
