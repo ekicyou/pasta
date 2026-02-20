@@ -9,49 +9,49 @@ pastaワークスペースの全クレート（pasta_dsl, pasta_core, pasta_lua,
 
 ### 現状分析
 
-現在、500行を超えるソースファイルが16個存在し、最大は1,301行（pasta_dsl/src/parser/mod.rs）に達する。LLMのコンテキストウィンドウにおいて、大きなファイルはコード理解精度の低下、編集時のコンテキスト消費の増大、差分検出の困難さを引き起こす。
+現在、500行を超えるソースファイルが16個存在し、最大は1,405行（pasta_dsl/src/parser/mod.rs）に達する。LLMのコンテキストウィンドウにおいて、大きなファイルはコード理解精度の低下、編集時のコンテキスト消費の増大、差分検出の困難さを引き起こす。
 
 **500行超のソースファイル一覧（現状）:**
 
 | 行数 | ファイル | クレート | 種別 |
 |------|----------|----------|------|
-| 1,301 | parser/mod.rs | pasta_dsl | src |
-| 1,186 | analysis.rs | pasta_lsp | src |
+| 1,405 | parser/mod.rs | pasta_dsl | src |
+| 1,283 | analysis.rs | pasta_lsp | src |
+| 1,187 | shiori.rs | pasta_shiori | src |
+| 1,174 | runtime/mod.rs | pasta_lua | src |
 | 1,086 | transpiler_integration_test.rs | pasta_lua | test |
-| 1,026 | runtime/mod.rs | pasta_lua | src |
-| 1,000 | shiori.rs | pasta_shiori | src |
+| 1,053 | registry/scene_table.rs | pasta_core | src |
+| 1,002 | code_generator.rs | pasta_lua | src |
 | 933 | shiori_event_test.rs | pasta_lua | test |
-| 923 | registry/scene_table.rs | pasta_core | src |
-| 892 | code_generator.rs | pasta_lua | src |
-| 800 | parser/ast.rs | pasta_dsl | src |
-| 763 | loader/config.rs | pasta_lua | src |
+| 885 | parser/ast.rs | pasta_dsl | src |
+| 850 | loader/config.rs | pasta_lua | src |
+| 701 | loader/cache.rs | pasta_lua | src |
+| 649 | registry/word_table.rs | pasta_core | src |
 | 612 | loader_integration_test.rs | pasta_lua | test |
-| 582 | loader/cache.rs | pasta_lua | src |
 | 565 | runtime_e2e_test.rs | pasta_lua | test |
 | 559 | sakura_script_integration_test.rs | pasta_lua | test |
-| 557 | registry/word_table.rs | pasta_core | src |
 | 519 | virtual_event_dispatcher_test.rs | pasta_lua | test |
 
 ### 根本原因分析（ギャップ分析に基づく）
 
-ギャップ分析（gap-analysis.md）により、ソースファイル肥大化の最大要因が**インラインテスト**であることが判明した。`src/` 配下の10ファイルに合計3,634行（193テスト関数）のインラインテストが存在し、ファイル全体の **30〜66%** を占めている。
+ギャップ分析（gap-analysis.md）により、ソースファイル肥大化の最大要因が**インラインテスト**であることが判明した。`src/` 配下の10ファイルに合計3,634行（193テスト関数）のインラインテストが存在し、ファイル全体の **11〜67%** を占めている。
 
 テスト外部化による効果を以下に示す：
 
-| ファイル | 現在 | テスト外部化後 | Phase B対象? |
+| ファイル | 現在 | テスト外部化後 | Phase B判定 |
 |----------|------|--------------|-------------|
-| parser/mod.rs | 1,301行 | ~1,034行 | ✅ 要分割 |
-| analysis.rs | 1,186行 | ~1,048行 | ✅ 要分割 |
-| runtime/mod.rs | 1,026行 | ~683行 | ✅ 要分割 |
-| shiori.rs | 1,000行 | ~207行 (#[path]分離) | ❌ **不要** |
-| scene_table.rs | 923行 | ~319行 (#[path]分離) | ✅ 微超 |
-| code_generator.rs | 892行 | ~668行 | ✅ 要分割 |
-| ast.rs | 800行 | ~674行 | ✅ 要分割 |
-| config.rs | 763行 | ~340行 | ✅ 微超 |
-| cache.rs | 582行 | ~268行 | ❌ **不要** |
-| word_table.rs | 557行 | ~155行 | ❌ **不要** |
+| parser/mod.rs | 1,405行 | ~1,138行 | ✅ 要分割 |
+| analysis.rs | 1,283行 | ~1,145行 | ✅ 要分割 |
+| shiori.rs | 1,187行 | ~394行 (#[path]分離) | ガイドライン例外 |
+| runtime/mod.rs | 1,174行 | ~831行 | ✅ 要分割 |
+| scene_table.rs | 1,053行 | ~449行 (#[path]分離) | ✅ 要分割（型分離） |
+| code_generator.rs | 1,002行 | ~778行 | ✅ 要分割 |
+| ast.rs | 885行 | ~759行 | ✅ 要分割 |
+| config.rs | 850行 | ~427行 | ガイドライン例外 |
+| cache.rs | 701行 | ~387行 | ガイドライン例外 |
+| word_table.rs | 649行 | ~247行 | ❌ **不要** |
 
-テスト外部化だけで **cache.rs、word_table.rs、shiori.rs の3ファイルが本体分割不要** になり、Phase Bの作業量を削減できる。この知見に基づき、実行フェーズを「テスト外部化 → ソース分割 → テスト分割」の3段階で構成する。
+テスト外部化だけで **word_table.rs の1ファイルが300行以下** に収まりPhase B不要となる。shiori.rs・cache.rs・config.rs はテスト外部化後300行超だが自然な分割境界が存在しないためガイドライン例外（Req2 AC3）とする。この知見に基づき、実行フェーズを「テスト外部化 → ソース分割 → テスト分割」の3段階で構成する。
 
 ## Requirements
 
