@@ -43,15 +43,15 @@ pastaワークスペースの全クレート（pasta_dsl, pasta_core, pasta_lua,
 | parser/mod.rs | 1,301行 | ~1,034行 | ✅ 要分割 |
 | analysis.rs | 1,186行 | ~1,048行 | ✅ 要分割 |
 | runtime/mod.rs | 1,026行 | ~683行 | ✅ 要分割 |
-| shiori.rs | 1,000行 | 1,000行 (inline維持) | ✅ 要分割 |
-| scene_table.rs | 923行 | 923行 (inline維持) | ✅ 要分割 |
+| shiori.rs | 1,000行 | ~207行 (#[path]分離) | ❌ **不要** |
+| scene_table.rs | 923行 | ~319行 (#[path]分離) | ✅ 微超 |
 | code_generator.rs | 892行 | ~668行 | ✅ 要分割 |
 | ast.rs | 800行 | ~674行 | ✅ 要分割 |
 | config.rs | 763行 | ~340行 | ✅ 微超 |
 | cache.rs | 582行 | ~268行 | ❌ **不要** |
 | word_table.rs | 557行 | ~155行 | ❌ **不要** |
 
-テスト外部化だけで **cache.rs と word_table.rs の2ファイルが本体分割不要** になり、Phase Bの作業量を削減できる。この知見に基づき、実行フェーズを「テスト外部化 → ソース分割 → テスト分割」の3段階で構成する。
+テスト外部化だけで **cache.rs、word_table.rs、shiori.rs の3ファイルが本体分割不要** になり、Phase Bの作業量を削減できる。この知見に基づき、実行フェーズを「テスト外部化 → ソース分割 → テスト分割」の3段階で構成する。
 
 ## Requirements
 
@@ -88,9 +88,9 @@ pastaワークスペースの全クレート（pasta_dsl, pasta_core, pasta_lua,
 2. When ソースファイルがPhase A完了後も300行を超えている場合, the リファクタリング shall 当該ファイルを論理的な責務単位（型定義、トレイト実装、ヘルパー関数等）で複数ファイルに分割する
 3. The リファクタリング shall 分割後の各ファイルが単一の明確な責務を持つようにする
 4. When ファイルを分割する場合, the リファクタリング shall ディレクトリモジュール（`mod.rs` + サブモジュール）パターンで構成し、既存のプロジェクト慣例に従う
-5. The リファクタリング shall 分割後のモジュール構造が既存のクレート公開API（`pub use`）を維持する
-6. When ファイルを分割する場合, the リファクタリング shall 適切な `mod.rs` または親モジュールからの `pub use` re-export により、外部から見たAPIの互換性を保持する
-7. The リファクタリング shall 分割後のファイル名がsteering（structure.md）のファイル命名規則に従う
+5. The リファクタリング shall 分割後のファイル名がsteering（structure.md）のファイル命名規則に従う
+
+※ 分割後のAPI互換性保持（re-export、公開APIの維持）はRequirement 4で規定
 
 ### Requirement 3: テストファイルの分割
 
