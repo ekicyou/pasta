@@ -84,16 +84,16 @@ pastaワークスペースの全クレート（pasta_dsl, pasta_core, pasta_lua,
 5. The リファクタリング shall `cargo build --workspace` がワーニングなしで成功すること
 6. The リファクタリング shall テスト外部化に伴う `pub(crate)` 可視性昇格を「API変更」とはみなさない（`pub(crate)` は同一クレート内限定であり、外部クレートの依存関係・公開シグネチャに影響しないため）
 
-### Requirement 5: 分割戦略の優先順位
+### Requirement 5: 実行フェーズと分割順序
 
-**Objective:** AI開発者として、効果的な順序でリファクタリングを進めたい。最も効果が高いファイルから着手し、段階的にプロジェクト全体の品質を向上させるため。
+**Objective:** AI開発者として、効果的な順序でリファクタリングを進めたい。最もリスクが低く効果が高い作業から段階的に着手し、各フェーズで安定した状態を維持するため。
 
 #### Acceptance Criteria
 
-1. The リファクタリング shall 1,000行超のファイル（Critical: 5ファイル）を最優先で分割する
-2. The リファクタリング shall 次に500〜999行のファイルを分割する
-3. The リファクタリング shall ソースファイル（`src/`）をテストファイル（`tests/`）より先に分割する
-4. The リファクタリング shall 下位レイヤー（pasta_dsl → pasta_core → pasta_lua）の順に分割し、上位レイヤーへの影響を最小化する
+1. The リファクタリング shall まず全対象ファイルのインラインテストを `tests/` へ外部化する（Phase A: テスト外部化）
+2. The リファクタリング shall テスト外部化後に300行を超えるソースファイルを責務単位で分割する（Phase B: ソース分割）
+3. The リファクタリング shall `tests/` 配下で500行を超えるテストファイルを機能単位で分割する（Phase C: テスト分割）
+4. The リファクタリング shall 各フェーズにおいて下位レイヤー（pasta_dsl → pasta_core → pasta_lua）の順に処理し、上位レイヤーへの影響を最小化する
 
 ### Requirement 6: structure.mdステアリングの更新
 
