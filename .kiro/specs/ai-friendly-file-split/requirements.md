@@ -41,7 +41,7 @@ pastaワークスペースの全クレート（pasta_dsl, pasta_core, pasta_lua,
 #### Acceptance Criteria
 
 1. The リファクタリング shall ソースファイル（`src/` 配下の `.rs` ファイル）の目標上限を **300行** と定める
-2. The リファクタリング shall テストファイル（`tests/` 配下の `.rs` ファイル）の目標上限を **500行** と定める
+2. The リファクタリング shall テストファイル（`tests/` 配下の `.rs` ファイル、および `src/` 配下の `#[path]` テスト専用ファイル）の目標上限を **500行** と定める
 3. The リファクタリング shall 300行以下のソースファイルは分割対象外とする
 4. If ファイルが自動生成コードやマクロ展開など構造的に分割不能な場合, the リファクタリング shall 当該ファイルを例外として記録し、分割をスキップする
 5. The リファクタリング shall pest文法定義ファイル（`.pest`）を分割対象外とする
@@ -70,6 +70,7 @@ pastaワークスペースの全クレート（pasta_dsl, pasta_core, pasta_lua,
 2. The リファクタリング shall 分割後のテストファイルが `<feature>_test.rs` の命名規則に従う
 3. When テストファイルが共通ヘルパーを含む場合, the リファクタリング shall 共通部分を `common/` モジュールに抽出する
 4. The リファクタリング shall 分割後のすべてのテストが `cargo test --workspace` で引き続き実行可能であること
+5. The リファクタリング shall `src/` 配下の `#[path]` テスト専用ファイルもテストファイルとして本要件のサイズ基準（500行）を適用する
 
 ### Requirement 4: API互換性の維持
 
