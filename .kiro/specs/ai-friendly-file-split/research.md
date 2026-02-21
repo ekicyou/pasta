@@ -144,6 +144,13 @@
 - **Selected Approach**: pasta_dsl → pasta_core → pasta_lua → pasta_lsp → pasta_shiori の順
 - **Rationale**: 下位レイヤーから分割することで、上位レイヤーのリファクタリング中に下位レイヤーの変更が発生しない。re-exportの安定性を保証
 
+### Decision: Phase Bガイドライン例外の分類なし
+
+- **Context**: 7件のガイドライン例外を「恒久例外」「将来レビュー候補」に分類するか否か
+- **Selected Approach**: 分類なし。例外は例外のまま一律記録
+- **Rationale**: 将来の判断は将来時点で行う。「将来検指」の注記は非拘束のインフォーマルヒントとして残す
+- **Impact**: design.mdの例外テーブルは変更なし
+
 ### Decision: code_generator → code_gen リネーム（re-exportなし）
 
 - **Context**: `code_generator.rs` をディレクトリモジュール化する際のモジュール名選択
