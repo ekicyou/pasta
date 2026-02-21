@@ -6,7 +6,7 @@
 use pasta_dsl::parser::{FileItem, PastaFile};
 use pasta_core::registry::SceneRegistry;
 
-use super::code_generator::LuaCodeGenerator;
+use super::code_gen::LuaCodeGenerator;
 use super::config::TranspilerConfig;
 use super::context::TranspileContext;
 use super::error::TranspileError;

@@ -19,10 +19,11 @@ Pasta DSL の Language Server Protocol (LSP) 実装クレート。
 │  - 増分・全体テキスト更新                       │
 │  - UNICODE バイトオフセット計算                 │
 ├─────────────────────────────────────────────────┤
-│  AnalysisEngine (analysis.rs)                   │
-│  - AST → セマンティックトークン変換             │
-│  - 14 トークンタイプ / 3 モディファイア          │
-│  - UTF-8 → UTF-16 位置変換                      │
+│  AnalysisEngine (analysis/)                     │
+│  - mod.rs: AST → セマンティックトークン変換     │
+│  - token_types.rs: 14 トークンタイプ / 3 モディファイア │
+│  - visitors.rs: AST ビジター                    │
+│  - text_utils.rs: UTF-8 → UTF-16 位置変換       │
 │  - 部分パースフォールバック (parse_str_partial)  │
 │  - ParseError → LSP Diagnostics 変換            │
 ├─────────────────────────────────────────────────┤

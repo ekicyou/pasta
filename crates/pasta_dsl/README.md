@@ -74,15 +74,24 @@ for item in &ast.items {
 ```
 pasta_dsl
 ├── src/
-│   ├── lib.rs          # クレートエントリーポイント
-│   ├── error.rs        # ParseError, ParseErrorInfo, ParseResult
+│   ├── lib.rs               # クレートエントリーポイント
+│   ├── error.rs             # ParseError, ParseErrorInfo, ParseResult
 │   └── parser/
-│       ├── mod.rs      # パーサーAPI（parse_str, parse_file）
-│       ├── ast.rs      # AST型定義
-│       └── grammar.pest # Pest文法定義（権威的仕様）
+│       ├── mod.rs           # パーサーAPI（parse_str, parse_file）
+│       ├── parse_scene.rs   # シーン解析
+│       ├── parse_action.rs  # アクション解析
+│       ├── parse_elements.rs # 要素解析
+│       ├── ast/             # AST型定義（ディレクトリ）
+│       │   ├── mod.rs       # AST公開エントリ
+│       │   ├── span.rs      # Span型定義
+│       │   ├── scene.rs     # シーン関連AST
+│       │   └── action.rs    # アクション関連AST
+│       └── grammar.pest     # Pest文法定義（権威的仕様）
 └── tests/
     ├── actor_code_block_test.rs   # アクターコードブロック解析テスト
+    ├── ast_test.rs                # AST型テスト
     ├── digit_id_var_test.rs       # 全角数字変数テスト
+    ├── parser_test.rs             # パーサー統合テスト
     ├── sakura_symbol_tag_test.rs  # さくらスクリプト記号タグテスト
     └── span_byte_offset_test.rs   # バイトオフセットテスト
 ```

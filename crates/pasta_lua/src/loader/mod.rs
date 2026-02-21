@@ -28,10 +28,10 @@ mod context;
 mod discovery;
 mod error;
 
-pub use cache::CacheManager;
+pub use cache::{CacheManager, CURRENT_VERSION};
 pub use config::{
     LoaderConfig, LoggingConfig, LuaConfig, PastaConfig, PersistenceConfig, TalkConfig,
-    default_libs,
+    default_libs, default_log_file_path, default_lua_search_paths,
 };
 pub use context::LoaderContext;
 pub use error::{LoaderError, TranspileFailure};

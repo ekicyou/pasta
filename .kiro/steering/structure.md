@@ -8,44 +8,68 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 ├── crates/                  # クレート群
 │   ├── pasta_dsl/           # DSLパーサー層
 │   │   ├── Cargo.toml       # pasta_dsl設定
+│   │   ├── tests/           # 外部化テスト（Phase A）
 │   │   └── src/
 │   │       ├── lib.rs       # クレートエントリーポイント
 │   │       ├── error.rs     # ParseError, ParseErrorInfo, ParseResult
 │   │       └── parser/      # パーサーレイヤー（PEG → AST変換）
-│   │           ├── mod.rs   # パーサーAPI公開
-│   │           ├── ast.rs   # AST定義（Statement, Expr, LabelDef等）
+│   │           ├── mod.rs   # パーサーAPI公開・エントリーポイント
+│   │           ├── parse_scene.rs    # シーン解析サブモジュール
+│   │           ├── parse_action.rs   # アクション解析サブモジュール
+│   │           ├── parse_elements.rs # 要素解析サブモジュール
+│   │           ├── ast/              # AST型定義（ディレクトリモジュール）
+│   │           │   ├── mod.rs        # 全型の pub use re-export
+│   │           │   ├── span.rs       # Span型定義
+│   │           │   ├── scene.rs      # シーン関連AST型
+│   │           │   └── action.rs     # アクション関連AST型
 │   │           └── grammar.pest # Pest文法定義
 │   ├── pasta_core/          # 言語非依存層（レジストリ）
 │   │   ├── Cargo.toml       # pasta_core設定
+│   │   ├── tests/           # 外部化テスト（Phase A）
+│   │   │   └── word_table_test.rs # 単語テーブルテスト
 │   │   └── src/
 │   │       ├── lib.rs       # クレートエントリーポイント
 │   │       ├── error.rs     # SceneTableError, WordTableError
 │   │       └── registry/    # 型管理レイヤー（独立）
 │   │           ├── mod.rs   # Registry API
-│   │           ├── scene_registry.rs # SceneRegistry - シーン管理
-│   │           ├── word_registry.rs  # WordDefRegistry - 単語辞書
-│   │           ├── scene_table.rs    # SceneTable - シーン検索
-│   │           ├── word_table.rs     # WordTable - 単語検索
-│   │           └── random.rs         # RandomSelector - ランダム選択
+│   │           ├── scene_registry.rs  # SceneRegistry - シーン管理
+│   │           ├── word_registry.rs   # WordDefRegistry - 単語辞書
+│   │           ├── scene_table.rs     # SceneTable - シーン検索
+│   │           ├── scene_table_tests.rs # シーンテーブルテスト（#[path]パターン）
+│   │           ├── scene_types.rs     # シーンID・スコープ・情報型定義
+│   │           ├── word_table.rs      # WordTable - 単語検索
+│   │           └── random.rs          # RandomSelector - ランダム選択
 │   └── pasta_lua/           # Lua言語バックエンド層
 │       ├── Cargo.toml       # pasta_lua設定（pasta_core依存）
 │       ├── src/
 │       │   ├── lib.rs       # クレートエントリーポイント
 │       │   ├── config.rs    # 設定管理
-│       │   ├── code_generator.rs # Lua コード生成
+│       │   ├── code_gen/    # Luaコード生成（ディレクトリモジュール）
+│       │   │   ├── mod.rs          # コード生成エントリーポイント
+│       │   │   ├── scope_gen.rs    # スコープ生成（分割impl）
+│       │   │   └── element_gen.rs  # 要素生成（分割impl）
 │       │   ├── context.rs   # トランスパイルコンテキスト
 │       │   ├── error.rs     # エラー型
 │       │   ├── runtime/     # ランタイムレイヤー
+│       │   │   ├── mod.rs              # ランタイムコア
+│       │   │   ├── runtime_config.rs   # ランタイム設定構造体
+│       │   │   ├── module_registry.rs  # モジュール登録関数群（分割impl）
+│       │   │   └── ...                # その他ランタイムサブモジュール
 │       │   └── stdlib/      # Lua標準ライブラリ
-│       └── tests/           # pasta_lua統合テスト
+│       └── tests/           # pasta_lua統合テスト（Phase C で機能別に分割済み）
 │           ├── common/      # テスト共通ユーティリティ
 │           └── fixtures/    # テスト用Pastaスクリプト
 │   ├── pasta_lsp/           # LSP実装層
 │   │   ├── Cargo.toml       # pasta_lsp設定（tower-lsp, pasta_dsl依存）
 │   │   ├── README.md        # クレート概要
+│   │   ├── tests/           # 外部化テスト（Phase A）
 │   │   └── src/
 │   │       ├── lib.rs       # クレートエントリーポイント
-│   │       ├── analysis.rs  # AST→セマンティックトークン変換
+│   │       ├── analysis/    # 解析エンジン（ディレクトリモジュール）
+│   │       │   ├── mod.rs          # 解析API・全公開型 re-export
+│   │       │   ├── token_types.rs  # トークン型定義
+│   │       │   ├── visitors.rs     # ASTビジター群
+│   │       │   └── text_utils.rs   # テキストユーティリティ
 │   │       ├── document.rs  # ドキュメント状態管理
 │   │       ├── error.rs     # LangServerError型定義
 │   │       ├── server.rs    # PastaLangServer (tower-lsp trait実装)
@@ -97,7 +121,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 
 **注**: 
 - ルートクレート (`src/`) は削除済み。すべての実装コードは `crates/*/src/` 配下に配置。
-- 各クレートは独自の `tests/` ディレクトリを持つことができる（例: pasta_lua, pasta_sample_ghost）
+- 各クレートは独自の `tests/` ディレクトリを持つことができる（例: pasta_dsl, pasta_core, pasta_lua, pasta_lsp, pasta_sample_ghost）
 - pasta_sample_ghost は `dist-src/` にテキスト系配布ファイル（設定4種＋DSLスクリプト4種）を保持。`release.ps1` の robocopy ステップで配布先へコピーされる
 - ワークスペースレベルの `tests/` は複数クレートにまたがる統合テスト用
 

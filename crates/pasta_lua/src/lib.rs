@@ -29,7 +29,7 @@
 //! runtime.exec(&lua_code)?;
 //! ```
 
-pub mod code_generator;
+pub mod code_gen;
 pub mod config;
 pub mod context;
 pub mod encoding;
@@ -44,7 +44,7 @@ pub mod string_literalizer;
 pub mod transpiler;
 
 // Re-export main types
-pub use code_generator::LuaCodeGenerator;
+pub use code_gen::LuaCodeGenerator;
 pub use config::{LineEnding, TranspilerConfig};
 pub use context::TranspileContext;
 pub use encoding::{Encoder, Encoding};

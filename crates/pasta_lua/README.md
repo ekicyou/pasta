@@ -23,6 +23,28 @@ PastaLuaRuntime (Lua VM ホスト)
 SHIORI Integration (プロトコル処理)
 ```
 
+## ソースモジュール構成
+
+```
+pasta_lua/
+├── Cargo.toml
+└── src/
+    ├── lib.rs              # クレートエントリーポイント
+    ├── transpiler.rs       # LuaTranspiler（トランスパイラエントリ）
+    ├── code_gen/           # コード生成モジュール
+    │   ├── mod.rs          # CodeGenerator インターフェース
+    │   ├── scope_gen.rs    # スコープコード生成
+    │   └── element_gen.rs  # 要素コード生成
+    ├── runtime/            # Lua VM ランタイム
+    │   ├── mod.rs             # PastaLuaRuntime
+    │   ├── runtime_config.rs  # RuntimeConfig（設定型）
+    │   └── module_registry.rs # Lua モジュール登録管理
+    └── loader/             # 起動・設定読み込み
+        └── config.rs       # pasta.toml 読み込み
+```
+
+> **Note**: テストは `tests/common/mod.rs` に共有ヘルパーを集約し、統合テストを複数ファイルに分割しています。
+
 ## ディレクトリ構成
 
 `pasta_lua` が想定する標準的なプロジェクト構造：

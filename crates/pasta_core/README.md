@@ -27,16 +27,21 @@ pasta_core
 ```
 pasta_core/
 ├── Cargo.toml
-└── src/
-    ├── lib.rs           # クレートエントリーポイント
-    ├── error.rs         # SceneTableError, WordTableError
-    └── registry/        # 型管理レイヤー
-        ├── mod.rs       # Registry API
-        ├── scene_registry.rs  # SceneRegistry
-        ├── word_registry.rs   # WordDefRegistry
-        ├── scene_table.rs     # SceneTable（Radix Trie）
-        ├── word_table.rs      # WordTable
-        └── random.rs          # RandomSelector インターフェース
+├── src/
+│   ├── lib.rs           # クレートエントリーポイント
+│   ├── error.rs         # SceneTableError, WordTableError
+│   └── registry/        # 型管理レイヤー
+│       ├── mod.rs              # Registry API
+│       ├── scene_registry.rs   # SceneRegistry
+│       ├── scene_types.rs      # SceneId, SceneScope, SceneInfo（抽出型）
+│       ├── word_registry.rs    # WordDefRegistry
+│       ├── scene_table.rs      # SceneTable（Radix Trie）
+│       ├── scene_table_tests.rs # SceneTable テスト（#[path]属性）
+│       ├── word_table.rs       # WordTable
+│       └── random.rs           # RandomSelector インターフェース
+└── tests/
+    ├── word_table_test.rs   # WordTable 統合テスト
+    └── scene_table_test.rs  # SceneTable 統合テスト
 ```
 
 > **Note**: パーサーモジュール（parser/, grammar.pest）は独立クレート [pasta_dsl](../pasta_dsl/README.md) に移動されました。
