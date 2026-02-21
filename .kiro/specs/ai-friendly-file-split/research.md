@@ -144,6 +144,17 @@
 - **Selected Approach**: pasta_dsl → pasta_core → pasta_lua → pasta_lsp → pasta_shiori の順
 - **Rationale**: 下位レイヤーから分割することで、上位レイヤーのリファクタリング中に下位レイヤーの変更が発生しない。re-exportの安定性を保証
 
+### Decision: code_generator → code_gen リネーム（re-exportなし）
+
+- **Context**: `code_generator.rs` をディレクトリモジュール化する際のモジュール名選択
+- **Alternatives Considered**:
+  1. `code_generator/` 名をそのまま維持（API変更ゼロ）
+  2. `code_gen/` にリネーム + `pub use code_gen as code_generator;` で旧パス互換
+  3. `code_gen/` にリネーム、re-exportなし
+- **Selected Approach**: 案C — `code_gen/` リネーム、re-exportなし
+- **Rationale**: 外部クレートからの `pasta_lua::code_generator::*` 直接参照がゼロ（実測済み）。変更箇所はlib.rs, transpiler.rsのクレート内部2ファイルのみ。不要なエイリアスを残すとかえって認知負荷になる
+- **Trade-offs**: モジュール名変更は "pure refactoring" から少しはみ出すが、ディレクトリ化の機会を活かした命名改善として許容
+
 ## Risks & Mitigations
 
 - **API互換性の破壊** — `pub use` re-exportの徹底検証、各分割後に `cargo test --workspace` を実行

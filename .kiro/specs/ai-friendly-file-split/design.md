@@ -409,7 +409,9 @@ code_gen/
 **実装ノート**:
 - 分割impl: `impl<'a, W: Write> LuaCodeGenerator<'a, W>` を3ファイルで定義
 - `mod scope_gen; mod element_gen;` 宣言（内部モジュール、外部非公開）
-- `lib.rs` のre-export: `code_generator` → `code_gen` へのモジュール名変更。`pub use code_gen::LuaCodeGenerator;` 等を更新
+- `lib.rs` 更新: `pub mod code_generator;` → `pub mod code_gen;`、`pub use code_gen::LuaCodeGenerator;` に変更
+- `transpiler.rs` 更新: `use super::code_generator::` → `use super::code_gen::`
+- **re-export不要**: 外部クレートからの `pasta_lua::code_generator::*` 直接参照はゼロ（実測済み）。Req4 AC3の義務は発生しない
 
 #### pasta_lsp — LspSrcSplitter
 
