@@ -64,7 +64,7 @@ pasta ワークスペース全体のクレート・テストにおける名前�
 #### Acceptance Criteria
 
 1. The namespace-refactoring shall 全テストファイルが `<feature>_test.rs` パターンに準拠していることを検証する
-2. If 命名規則に従わないファイル（例: `lua_unittest_runner.rs`）が存在する場合, the namespace-refactoring shall 規則に準拠したファイル名にリネームする、または例外として承認された理由を文書化する
+2. The namespace-refactoring shall `lua_unittest_runner.rs` を命名規則の例外として承認し、`steering/structure.md` に例外理由を文書化する（テストランナーはテストとは役割が異なり、`_runner.rs` サフィックスでその役割を明示するため）
 
 ### Requirement 6: steering/structure.md の更新
 
