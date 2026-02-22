@@ -2,7 +2,9 @@
 
 ## Introduction
 
-pasta ワークスペース全体のクレート・テストにおける名前空間（モジュール・ディレクトリ構造）を見直し、一貫性と可読性を向上させるリファクタリング仕様。特に `pasta_lua` クレートのテストファイルが 58 ファイル（.rs 36 + .lua 22）にまで肥大化しており、フラットな `tests/` 配置が保守性を損なっている。全クレートを対象に統一的な名前空間方針を策定し、適用する。
+pasta ワークスペース全体のクレート・テストにおける名前空間（モジュール・ディレクトリ構造）を見直し、一貫性と可読性を向上させるリファクタリング仕様。特に `pasta_lua` クレートのテストファイルが 58 ファイル（.rs 36 + .lua 22）にまで肥大化しており、フラットな `tests/` 配置が保守性を損なっている。`pasta_lua` を重点対象に統一的な名前空間方針を策定し、適用する。
+
+**スコープ外**: pasta_lsp（テスト10本、現時点で実害なし。将来テスト増加時に別途対応）。
 
 ## Project Description (Input)
 
@@ -33,16 +35,7 @@ pasta ワークスペース全体のクレート・テストにおける名前�
 4. The namespace-refactoring shall `tests/lua_specs/` および `tests/snapshots/` は既にサブディレクトリ化されているため、位置を維持する
 5. If テスト移動により `mod.rs` の追加や `#[path]` アトリビュートが必要になる場合, the namespace-refactoring shall Rust の統合テストのディレクトリ慣例（各ファイルが独立クレートとなるフラット構成 vs サブモジュール構成）に基づき、最適な方式で構成する
 
-### Requirement 3: pasta_lsp テストの名前空間整理
-
-**Objective:** 開発者として、10 本のテストファイルが `tests/` 直下にフラットに並ぶ `pasta_lsp` クレートのテストを整理したい。これにより、LSP 機能ごとのテスト所在が明確になる。
-
-#### Acceptance Criteria
-
-1. When テストファイル数が 10 を超える場合, the namespace-refactoring shall 機能ドメイン別（例: semantic_tokens系、diagnostics系、document系、lifecycle系）のサブディレクトリ分割を適用する
-2. The namespace-refactoring shall `tests/common/mod.rs` が存在しない場合でも、共通ヘルパー用のディレクトリ構造を準備する
-
-### Requirement 4: src 内テストファイルの配置方針統一
+### Requirement 3: src 内テストファイルの配置方針統一
 
 **Objective:** 開発者として、`src/` 内に配置されたテストファイル（`pasta_core/src/registry/scene_table_tests.rs` および `pasta_shiori/src/shiori_tests.rs`）の取り扱い方針を統一したい。一貫したプロジェクト規約によりテスト配置の迷いを排除する。
 
@@ -54,7 +47,7 @@ pasta ワークスペース全体のクレート・テストにおける名前�
 2. The namespace-refactoring shall 公開 API のみをテストする統合テストは従来通り `tests/` に外部化する方針を維持する
 3. The namespace-refactoring shall 選択された方針を `steering/structure.md` に明記し、今後の開発で一貫性を保つ
 
-### Requirement 5: ソースモジュールの名前空間レビュー
+### Requirement 4: ソースモジュールの名前空間レビュー
 
 **Objective:** 開発者として、各クレートの `src/` モジュール構造が責務に対して適切な粒度と階層を持つことを確認したい。特に `pasta_lua`（30 ファイル）は責務の分離と名前空間の整合性を検証する。
 
@@ -64,7 +57,7 @@ pasta ワークスペース全体のクレート・テストにおける名前�
 2. If モジュールが所属するディレクトリの責務と合致しない場合, the namespace-refactoring shall 適切なディレクトリへ移動し、`mod.rs` の re-export を更新する
 3. The namespace-refactoring shall `string_literalizer.rs` や `normalize.rs` のような `pasta_lua/src/` 直下のユーティリティファイルが適切な名前空間に属しているか検証する
 
-### Requirement 6: テストファイル命名規則の徹底
+### Requirement 5: テストファイル命名規則の徹底
 
 **Objective:** 開発者として、全クレートのテストファイル名が一貫した命名規則に従っていることを確認したい。`steering/tech.md` で定義済みの `<feature>_test.rs` パターンが全体で遵守されているか検証する。
 
@@ -73,7 +66,7 @@ pasta ワークスペース全体のクレート・テストにおける名前�
 1. The namespace-refactoring shall 全テストファイルが `<feature>_test.rs` パターンに準拠していることを検証する
 2. If 命名規則に従わないファイル（例: `lua_unittest_runner.rs`）が存在する場合, the namespace-refactoring shall 規則に準拠したファイル名にリネームする、または例外として承認された理由を文書化する
 
-### Requirement 7: steering/structure.md の更新
+### Requirement 6: steering/structure.md の更新
 
 **Objective:** 開発者として、リファクタリング後のディレクトリ構造を `steering/structure.md` に正確に反映したい。ステアリングが常に実体と一致していることが、AI支援開発の品質基盤となる。
 
