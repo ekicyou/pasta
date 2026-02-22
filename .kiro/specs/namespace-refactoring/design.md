@@ -44,10 +44,10 @@
 graph TB
     subgraph "pasta_lua/tests/ (After)"
         subgraph "サブディレクトリ化対象"
-            TR[transpiler/main.rs<br/>6 files]
+            TR[transpiler/main.rs<br/>7 files]
             LD[loader/main.rs<br/>6 files]
             SH[shiori/main.rs<br/>5 files]
-            RT[runtime/main.rs<br/>4 files]
+            RT[runtime/main.rs<br/>6 files]
             LG[log/main.rs<br/>3 files]
             SS[sakura_script/main.rs<br/>2 files]
             SE[search/main.rs<br/>2 files]
@@ -87,7 +87,7 @@ flowchart TD
     B --> C[3. テストファイルを git mv]
     C --> D[4. プレフィックス除去<br/>transpiler_basic_test.rs → basic_test.rs]
     D --> E{5. mod common; 使用?}
-    E -->|Yes| F[mod common; 削除<br/>main.rs 経由で参照]
+    E -->|Yes| F[mod common; を<br/>use crate::common; に変更]
     E -->|No| G[変更なし]
     F --> H[6. cargo test 実行]
     G --> H
@@ -157,14 +157,14 @@ graph LR
 
 | Field | Detail |
 |-------|--------|
-| Intent | pasta_lua の 36 テストファイルを機能ドメイン別に 7 サブディレクトリ + フラット残留に分類する |
+| Intent | pasta_lua の 36 テストファイルを機能ドメイン別に 7〜8 サブディレクトリ + フラット残留に分類する |
 | Requirements | 1.1, 2.1 |
 
 **テストファイルマッピング**
 
 以下の 7 サブディレクトリを作成し、33 ファイルを移動する。3 ファイルはフラット残留。
 
-**`tests/transpiler/`** (6 files)
+**`tests/transpiler/`** (7 files)
 
 | 移動元 | 移動先（`_test` サフィックスはディレクトリ名で文脈が明確なため維持） |
 |--------|------|
@@ -174,6 +174,7 @@ graph LR
 | transpiler_snapshot_test.rs | transpiler/snapshot_test.rs |
 | actor_word_dictionary_test.rs | transpiler/actor_word_dictionary_test.rs |
 | fallback_search_integration_test.rs | transpiler/fallback_search_integration_test.rs |
+| code_generator_test.rs | transpiler/code_generator_test.rs |
 
 **`tests/loader/`** (6 files)
 
@@ -196,7 +197,7 @@ graph LR
 | virtual_event_config_test.rs | shiori/virtual_event_config_test.rs |
 | virtual_event_dispatch_test.rs | shiori/virtual_event_dispatch_test.rs |
 
-**`tests/runtime/`** (4 files)
+**`tests/runtime/`** (6 files)
 
 | 移動元 | 移動先 |
 |--------|------|
@@ -204,8 +205,11 @@ graph LR
 | runtime_scene_test.rs | runtime/scene_test.rs |
 | runtime_syntax_test.rs | runtime/syntax_test.rs |
 | runtime_test.rs | runtime/unit_test.rs |
+| persistence_integration_test.rs | runtime/persistence_integration_test.rs |
+| pasta_lua_encoding_test.rs | runtime/encoding_test.rs |
 
 > `runtime_test.rs` → `unit_test.rs`: 他の runtime E2E テストと区別するため。Runtime API 単体テスト。
+> `pasta_lua_encoding_test.rs` → `encoding_test.rs`: ディレクトリで文脈が明確なためプレフィックス除去。
 
 **`tests/log/`** (3 files)
 
@@ -241,21 +245,19 @@ graph LR
 
 | 旧ドメイン | 統合先 | 理由 |
 |-----------|--------|------|
-| CodeGen (1 file) | — | `code_generator_test.rs` は後述の補足参照 |
+| CodeGen (1 file) | transpiler/ | コード生成はトランスパイラの一部（AST→Lua コード生成の補助） |
 | Runtime E2E (3 files) + Runtime (1 file) | runtime/ | 同一モジュール群のテスト |
-| Persistence (1 file) | — | 後述の補足参照 |
-| Encoding (1 file) | — | 後述の補足参照 |
-| Stdlib (2 files) | — | 後述の補足参照 |
+| Persistence (1 file) | runtime/ | 永続化はランタイムの責務 |
+| Encoding (1 file) | runtime/ | エンコーディング変換はランタイム系処理 |
+| Stdlib (2 files) | **要確認** | 後述の補足参照 |
 
-> **補足: 小規模ドメインの取り扱い**
+> **補足: stdlib の配置（未確定）**
 >
-> 以下の単独〜2 ファイルドメインについて、最終的な配置は実装フェーズで確定する:
-> - `code_generator_test.rs` → transpiler/ に統合（コード生成はトランスパイラの一部）
-> - `persistence_integration_test.rs` → runtime/ に統合（永続化はランタイムの責務）
-> - `pasta_lua_encoding_test.rs` → runtime/ に統合（エンコーディングはランタイムの責務）
-> - `stdlib_modules_test.rs`, `stdlib_regex_test.rs` → runtime/ に統合、または独立 stdlib/ サブディレクトリ
+> `stdlib_modules_test.rs`, `stdlib_regex_test.rs` については以下の 2 案が存在：
+> - **案 A**: runtime/ に統合 → stdlib は runtime 層の上位機能として扱う
+> - **案 B**: 独立 `stdlib/` サブディレクトリ → stdlib の独立性を明示
 >
-> これにより transpiler/ は 7 files、runtime/ は 6〜8 files となる可能性がある。
+> この設計判断は開発者確認事項として別途クローズする。確定後に本テーブルを修正する。
 
 #### C2: main.rs テンプレート
 
@@ -289,9 +291,18 @@ mod comparison_test;
 4. `common` を使用しないテストモジュール内では `use super::common;` または `use crate::common;` で参照可能
 
 **テストモジュール側の変更**:
-- `mod common;` 宣言を削除（`main.rs` 経由で提供されるため）
-- `common::` への参照はそのまま維持（モジュールパスは変わらない）
-- ファイルスコープのインポートはそのまま維持
+- `mod common;` 宣言を削除し、代わりに `use crate::common;` を追加する
+  ```rust
+  // ビフォー（フラット時）
+  mod common;
+  
+  // アフター（サブモジュール化後）
+  use crate::common;  // main.rs が宣言した mod common を crate:: 経由で参照
+  ```
+- `common::func()` 等の呼び出しはそのまま維持（`use crate::common;` により同名バインディングが保たれるため）
+- ファイルスコープの他のインポートはそのまま維持
+
+> **技術的根拠**: サブモジュール化後、各 `.rs` ファイルは `main.rs` の子モジュールになる。`main.rs` で宣言された `mod common;` は `crate::common` として参照可能だが、子モジュール内では自動的にスコープに入らないため `use crate::common;` が必要。
 
 #### C3: ファイル移動計画
 
@@ -305,7 +316,11 @@ mod comparison_test;
 2. `git mv` でファイルを移動（リネーム検出維持のため）
 3. プレフィックス除去が必要なファイルは `git mv old_name.rs new_name.rs`
 4. 各サブディレクトリに `main.rs` を作成
-5. 移動したテストファイルから `mod common;` 宣言を削除
+5. 移動したファイルで `mod common;` を `use crate::common;` に置換
+   ```rust
+   // 削除: mod common;
+   // 追加: use crate::common;
+   ```
 6. 重複ヘルパー（`copy_dir_recursive` 等）を自前定義から `common::` 参照に切り替え
 
 **ヘルパー重複排除対象**:
@@ -460,7 +475,7 @@ src/ 内テストファイルの配置方針:
 ```mermaid
 flowchart LR
     P1["Phase 1<br/>サブディレクトリ作成<br/>+ main.rs 配置"] --> P2["Phase 2<br/>ファイル移動<br/>(ドメイン別バッチ)"]
-    P2 --> P3["Phase 3<br/>mod common 削除<br/>+ 重複排除"]
+    P2 --> P3["Phase 3<br/>mod common を<br/>use crate::common; に変更<br/>+ 重複排除"]
     P3 --> P4["Phase 4<br/>スナップショット再生成<br/>+ テスト全 Pass 確認"]
     P4 --> P5["Phase 5<br/>steering 更新<br/>+ 命名検証文書化"]
 ```
