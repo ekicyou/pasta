@@ -85,8 +85,16 @@
   - `Test-Path "crates/pasta_sample_ghost/hello-pasta.nar"` で .nar ファイルの生成を確認する
   - `Test-Path "target/i686-pc-windows-msvc/release/pasta.dll"` で DLL の存在を確認する
   - いずれかが存在しない場合はエラー報告し中断する
+  - DLL 存在確認後、zip 圧縮を実行する:
+    ```powershell
+    Compress-Archive -Path "target/i686-pc-windows-msvc/release/pasta.dll" `
+      -DestinationPath "target/i686-pc-windows-msvc/release/pasta.dll.zip" `
+      -Force
+    ```
+  - `Test-Path "target/i686-pc-windows-msvc/release/pasta.dll.zip"` で zip 確認する
+  - zip 圧縮失敗時はエラー報告し中断する
   - 成功時は `git add -A && git commit -m "chore(release): build hello-pasta vX.Y.Z"` でコミットする
-  - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
+  - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8_
 
 ### Phase 5: タグとプッシュ
 
@@ -114,7 +122,7 @@
   - 以下のコマンドで GitHub Release を作成する:
     ```powershell
     $assets = @(
-      "target/i686-pc-windows-msvc/release/pasta.dll",
+      "target/i686-pc-windows-msvc/release/pasta.dll.zip",
       "crates/pasta_sample_ghost/hello-pasta.nar"
     )
     if ($env:VSIX_PATH -and (Test-Path $env:VSIX_PATH)) {
@@ -159,7 +167,7 @@
 | 2.1, 2.2 | 4 |
 | 2.3–2.5 | 5 |
 | 3.1–3.6 | 6 |
-| 4.1–4.5 | 7 |
+| 4.1–4.8 | 7 |
 | 5.1–5.5 | 8 |
 | 6.1–6.3 | 9 |
 | 6.4–6.9, 7.4 | 10 |

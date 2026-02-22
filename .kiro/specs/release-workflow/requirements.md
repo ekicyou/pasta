@@ -86,7 +86,10 @@
 2. When `release.ps1` が成功する, the Release Workflow shall `hello-pasta.nar` が生成されたことを確認する
 3. When `release.ps1` が成功する, the Release Workflow shall 32bit リリースビルドの `pasta.dll` が `target/i686-pc-windows-msvc/release/pasta.dll` に存在することを確認する
 4. If `release.ps1` が失敗する, the Release Workflow shall エラーを報告しリリース作業を中断する
-5. When ゴーストビルドが成功する, the Release Workflow shall 変更を `chore(release): build hello-pasta vX.Y.Z` メッセージでコミットする
+5. When `pasta.dll` の存在が確認される, the Release Workflow shall `Compress-Archive -Path "target/i686-pc-windows-msvc/release/pasta.dll" -DestinationPath "target/i686-pc-windows-msvc/release/pasta.dll.zip" -Force` で zip 圧縮する
+6. When zip 圧縮が完了する, the Release Workflow shall `pasta.dll.zip` の存在を確認する
+7. If zip 圧縮が失敗する, the Release Workflow shall エラーを報告しリリース作業を中断する
+8. When ゴーストビルドが成功する, the Release Workflow shall 変更を `chore(release): build hello-pasta vX.Y.Z` メッセージでコミットする
 
 ### Requirement 5: バージョンタグとプッシュ
 
@@ -113,7 +116,7 @@
 5. When GitHub Release を作成する, the Release Workflow shall タイトルを `pasta vX.Y.Z` に設定する
 6. When GitHub Release を作成する, the Release Workflow shall 整形済みチェンジログをリリースノートとして含める
 7. When GitHub Release を作成する, the Release Workflow shall 以下の2ファイルをリリースアセットとして添付する:
-   - `target/i686-pc-windows-msvc/release/pasta.dll`
+   - `target/i686-pc-windows-msvc/release/pasta.dll.zip`
    - `crates/pasta_sample_ghost/hello-pasta.nar`
 8. If `gh` コマンドが失敗する, the Release Workflow shall エラーを報告し手動での Release 作成手順を案内する
 9. If 前回リリースタグが存在しない（初回リリース）, the Release Workflow shall 全コミット履歴（`git log --oneline`）をチェンジログとして使用する

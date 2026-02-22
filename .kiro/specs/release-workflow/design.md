@@ -82,7 +82,8 @@ graph TB
     subgraph Phase4 [Phase 4: ゴーストビルド]
         P4_1[release.ps1 実行]
         P4_2[成果物確認]
-        P4_3[ビルドコミット]
+        P4_3[pasta.dll を pasta.dll.zip に圧縮]
+        P4_4[ビルドコミット]
     end
 
     subgraph Phase5 [Phase 5: タグとプッシュ]
@@ -252,7 +253,10 @@ flowchart TD
 | 4.2 | hello-pasta.nar 確認 | Phase 4 | メインフロー: ゴーストビルド |
 | 4.3 | pasta.dll 確認 | Phase 4 | メインフロー: ゴーストビルド |
 | 4.4 | release.ps1 失敗時中断 | Phase 4 | エラーフロー: Phase 4 |
-| 4.5 | ゴーストビルドコミット | Phase 4 | メインフロー: ゴーストビルド |
+| 4.5 | pasta.dll を pasta.dll.zip に圧縮 | Phase 4 | メインフロー: ゴーストビルド |
+| 4.6 | pasta.dll.zip の存在確認 | Phase 4 | メインフロー: ゴーストビルド |
+| 4.7 | zip 圧縮失敗時中断 | Phase 4 | エラーフロー: Phase 4 |
+| 4.8 | ゴーストビルドコミット | Phase 4 | メインフロー: ゴーストビルド |
 | 5.1 | アノテーションタグ作成 | Phase 5 | メインフロー: タグとプッシュ |
 | 5.2 | タグメッセージ設定 | Phase 5 | メインフロー: タグとプッシュ |
 | 5.3 | 既存タグ競合時エラー | Phase 5 | エラーフロー: Phase 5-6 |
@@ -264,7 +268,7 @@ flowchart TD
 | 6.4 | gh release create 実行 | Phase 6 | メインフロー: GitHub Release |
 | 6.5 | タイトル設定 | Phase 6 | メインフロー: GitHub Release |
 | 6.6 | チェンジログをリリースノートに含める | Phase 6 | メインフロー: GitHub Release |
-| 6.7 | アセット添付（pasta.dll, hello-pasta.nar） | Phase 6 | メインフロー: GitHub Release |
+| 6.7 | アセット添付（pasta.dll.zip, hello-pasta.nar） | Phase 6 | メインフロー: GitHub Release |
 | 6.8 | gh 失敗時手動手順案内 | Phase 6 | エラーフロー: Phase 5-6 |
 | 6.9 | 初回リリース時の全履歴使用 | Phase 6 | メインフロー: GitHub Release |
 | 7.1 | タスク状態初期化 | — | 繰り返し実行の仕様特性 |
@@ -509,12 +513,13 @@ flowchart TD
 
 | Field | Detail |
 |-------|--------|
-| Intent | x86 リリースビルドの pasta.dll とサンプルゴースト hello-pasta.nar を生成する |
-| Requirements | 4.1, 4.2, 4.3, 4.4, 4.5 |
+| Intent | x86 リリースビルドの pasta.dll とサンプルゴースト hello-pasta.nar を生成し、pasta.dll.zip に圧縮する |
+| Requirements | 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8 |
 
 **Responsibilities & Constraints**
 - `release.ps1` を `crates/pasta_sample_ghost/` ディレクトリで実行
 - 成果物（`hello-pasta.nar`, `pasta.dll`）の存在確認
+- `pasta.dll` を `pasta.dll.zip` に圧縮（`Compress-Archive -Force`）
 - 失敗時はリリース作業中断
 
 **Dependencies**
@@ -538,7 +543,16 @@ flowchart TD
    ```
    - いずれかが `False`: エラー報告し中断 (4.4)
 
-3. **コミット** (4.5):
+3. **DLL zip 圧縮** (4.5, 4.6, 4.7):
+   ```powershell
+   Compress-Archive -Path "target/i686-pc-windows-msvc/release/pasta.dll" `
+     -DestinationPath "target/i686-pc-windows-msvc/release/pasta.dll.zip" `
+     -Force
+   ```
+   - `Test-Path "target/i686-pc-windows-msvc/release/pasta.dll.zip"` で zip 確認
+   - 失敗時はエラー報告し中断 (4.8)
+
+4. **コミット** (4.5):
    ```
    git add -A
    git commit -m "chore(release): build hello-pasta vX.Y.Z"
@@ -654,7 +668,7 @@ flowchart TD
 4. **GitHub Release 作成** (6.4, 6.5, 6.6, 6.7, VSX.4):
    ```powershell
    $assets = @(
-     "target/i686-pc-windows-msvc/release/pasta.dll",
+     "target/i686-pc-windows-msvc/release/pasta.dll.zip",
      "crates/pasta_sample_ghost/hello-pasta.nar"
    )
    if ($env:VSIX_PATH -and (Test-Path $env:VSIX_PATH)) {
@@ -678,7 +692,7 @@ flowchart TD
      - 手動手順を案内:
        ```
        gh release create vX.Y.Z ^
-         "target/i686-pc-windows-msvc/release/pasta.dll" ^
+         "target/i686-pc-windows-msvc/release/pasta.dll.zip" ^
          "crates/pasta_sample_ghost/hello-pasta.nar" ^
          --title "pasta vX.Y.Z" ^
          --notes-file release-notes-vX.Y.Z.md
