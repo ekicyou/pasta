@@ -47,7 +47,7 @@ graph TB
             TR[transpiler/main.rs<br/>7 files]
             LD[loader/main.rs<br/>6 files]
             SH[shiori/main.rs<br/>5 files]
-            RT[runtime/main.rs<br/>6 files]
+            RT[runtime/main.rs<br/>8 files]
             LG[log/main.rs<br/>3 files]
             SS[sakura_script/main.rs<br/>2 files]
             SE[search/main.rs<br/>2 files]
@@ -197,7 +197,7 @@ graph LR
 | virtual_event_config_test.rs | shiori/virtual_event_config_test.rs |
 | virtual_event_dispatch_test.rs | shiori/virtual_event_dispatch_test.rs |
 
-**`tests/runtime/`** (6 files)
+**`tests/runtime/`** (8 files)
 
 | 移動元 | 移動先 |
 |--------|------|
@@ -207,9 +207,12 @@ graph LR
 | runtime_test.rs | runtime/unit_test.rs |
 | persistence_integration_test.rs | runtime/persistence_integration_test.rs |
 | pasta_lua_encoding_test.rs | runtime/encoding_test.rs |
+| stdlib_modules_test.rs | runtime/stdlib_modules_test.rs |
+| stdlib_regex_test.rs | runtime/stdlib_regex_test.rs |
 
 > `runtime_test.rs` → `unit_test.rs`: 他の runtime E2E テストと区別するため。Runtime API 単体テスト。
 > `pasta_lua_encoding_test.rs` → `encoding_test.rs`: ディレクトリで文脈が明確なためプレフィックス除去。
+> `stdlib_*` は src/ に独立 stdlib/ モジュールが存在せず、runtime 初期化時の Lua 標準ライブラリ登録テストとして runtime/ に統合。
 
 **`tests/log/`** (3 files)
 
@@ -249,15 +252,7 @@ graph LR
 | Runtime E2E (3 files) + Runtime (1 file) | runtime/ | 同一モジュール群のテスト |
 | Persistence (1 file) | runtime/ | 永続化はランタイムの責務 |
 | Encoding (1 file) | runtime/ | エンコーディング変換はランタイム系処理 |
-| Stdlib (2 files) | **要確認** | 後述の補足参照 |
-
-> **補足: stdlib の配置（未確定）**
->
-> `stdlib_modules_test.rs`, `stdlib_regex_test.rs` については以下の 2 案が存在：
-> - **案 A**: runtime/ に統合 → stdlib は runtime 層の上位機能として扱う
-> - **案 B**: 独立 `stdlib/` サブディレクトリ → stdlib の独立性を明示
->
-> この設計判断は開発者確認事項として別途クローズする。確定後に本テーブルを修正する。
+| Stdlib (2 files) | runtime/ | src/ に独立 stdlib/ モジュールなし。runtime 初期化時の Lua 標準ライブラリ登録テストとして runtime/ に統合 |
 
 #### C2: main.rs テンプレート
 
