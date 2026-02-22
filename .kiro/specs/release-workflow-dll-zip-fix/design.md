@@ -60,8 +60,8 @@ flowchart TD
 ```mermaid
 flowchart TD
     V1[gh release download v0.1.5 -p pasta.dll] --> V2[Compress-Archive pasta.dll → pasta.dll.zip]
-    V2 --> V3[gh release delete-asset v0.1.5 pasta.dll]
-    V3 --> V4[gh release upload v0.1.5 pasta.dll.zip]
+    V2 --> V3[gh release upload v0.1.5 pasta.dll.zip]
+    V3 --> V4[gh release delete-asset v0.1.5 pasta.dll]
     V4 --> V5[一時ファイル削除]
     V5 --> V6[アセット確認]
 ```
@@ -172,7 +172,7 @@ $assets = @(
 
 **Responsibilities & Constraints**
 - DLL 同一性の担保（リリースからダウンロードした DLL を使用）
-- 操作の順序: download → compress → delete-asset → upload → cleanup → verify
+- 操作の順序: download → compress → upload → delete-asset → cleanup → verify
 - エラー時の手動対応案内
 
 **Dependencies**
@@ -191,14 +191,14 @@ $assets = @(
    Compress-Archive -Path "pasta.dll" -DestinationPath "pasta.dll.zip" -Force
    ```
 
-3. **アセット削除** (3.3):
-   ```powershell
-   gh release delete-asset v0.1.5 pasta.dll -y
-   ```
-
-4. **アセットアップロード** (3.4):
+3. **アセットアップロード** (3.4):
    ```powershell
    gh release upload v0.1.5 pasta.dll.zip
+   ```
+
+4. **アセット削除** (3.3):
+   ```powershell
+   gh release delete-asset v0.1.5 pasta.dll -y
    ```
 
 5. **一時ファイル削除** (3.5):
@@ -227,8 +227,8 @@ $assets = @(
 |------|-----------|------|-------------|
 | Compress-Archive | zip 圧縮失敗 | エラー報告・中断 | 不要（元ファイル未変更） |
 | gh release download | ダウンロード失敗 | エラー報告・手動案内 | 不要 |
-| gh release delete-asset | アセット削除失敗 | エラー報告・手動案内 | 不要（アセット残存） |
-| gh release upload | アップロード失敗 | エラー報告・手動案内 | `pasta.dll` は既に削除済みのため、手動で再アップロード案内 |
+| gh release upload | アップロード失敗 | エラー報告・手動案内 | 不要（`pasta.dll` は残存、zip アップロード再試行可能） |
+| gh release delete-asset | アセット削除失敗 | エラー報告・手動案内 | 不要（`pasta.dll.zip` は既にアップロード済み、手動で `pasta.dll` 削除を案内） |
 
 ## Testing Strategy
 
