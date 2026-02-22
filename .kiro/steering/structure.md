@@ -56,9 +56,63 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       │   │   ├── module_registry.rs  # モジュール登録関数群（分割impl）
 │       │   │   └── ...                # その他ランタイムサブモジュール
 │       │   └── stdlib/      # Lua標準ライブラリ
-│       └── tests/           # pasta_lua統合テスト（Phase C で機能別に分割済み）
-│           ├── common/      # テスト共通ユーティリティ
-│           └── fixtures/    # テスト用Pastaスクリプト
+│       └── tests/           # pasta_lua統合テスト（機能ドメイン別サブディレクトリ化済み）
+│           ├── transpiler/          # トランスパイラ関連テスト（7 files）
+│           │   ├── main.rs          # エントリーポイント（#[path] で common 参照）
+│           │   ├── basic_test.rs
+│           │   ├── comparison_test.rs
+│           │   ├── scene_test.rs
+│           │   ├── snapshot_test.rs
+│           │   ├── actor_word_dictionary_test.rs
+│           │   ├── fallback_search_integration_test.rs
+│           │   ├── code_generator_test.rs
+│           │   └── snapshots/       # insta スナップショット
+│           ├── loader/              # ローダー関連テスト（6 files）
+│           │   ├── main.rs
+│           │   ├── cache_test.rs
+│           │   ├── config_test.rs
+│           │   ├── lifecycle_test.rs
+│           │   ├── startup_test.rs
+│           │   ├── config_actors_initialization_test.rs
+│           │   └── lua_passthrough_test.rs
+│           ├── shiori/              # SHIORI関連テスト（5 files）
+│           │   ├── main.rs
+│           │   ├── event_dispatch_test.rs
+│           │   ├── event_handler_test.rs
+│           │   ├── res_test.rs
+│           │   ├── virtual_event_config_test.rs
+│           │   └── virtual_event_dispatch_test.rs
+│           ├── runtime/             # ランタイム関連テスト（8 files）
+│           │   ├── main.rs
+│           │   ├── finalize_scene_test.rs
+│           │   ├── scene_test.rs
+│           │   ├── syntax_test.rs
+│           │   ├── unit_test.rs
+│           │   ├── persistence_integration_test.rs
+│           │   ├── encoding_test.rs
+│           │   ├── stdlib_modules_test.rs
+│           │   └── stdlib_regex_test.rs
+│           ├── log/                 # ログ関連テスト（3 files）
+│           │   ├── main.rs
+│           │   ├── integration_test.rs
+│           │   ├── module_test.rs
+│           │   └── stack_level_test.rs
+│           ├── sakura_script/       # SakuraScript関連テスト（2 files）
+│           │   ├── main.rs
+│           │   ├── basic_test.rs
+│           │   └── output_test.rs
+│           ├── search/              # 検索関連テスト（2 files）
+│           │   ├── main.rs
+│           │   ├── scene_search_test.rs
+│           │   └── module_test.rs
+│           ├── common/              # テスト共通ユーティリティ
+│           │   ├── mod.rs
+│           │   └── e2e_helpers.rs
+│           ├── fixtures/            # テスト用Pastaスクリプト
+│           ├── lua_specs/           # Lua単体テスト仕様
+│           ├── lua_unittest_runner.rs  # Lua単体テストランナー（命名例外）
+│           ├── japanese_identifier_test.rs  # Lua基盤テスト
+│           └── ucid_test.rs         # Lua基盤テスト
 │   ├── pasta_lsp/           # LSP実装層
 │   │   ├── Cargo.toml       # pasta_lsp設定（tower-lsp, pasta_dsl依存）
 │   │   ├── README.md        # クレート概要
@@ -137,6 +191,27 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 - フィクスチャ: `crates/<crate>/tests/fixtures/<scenario>.pasta`
 - 共通ユーティリティ: `crates/<crate>/tests/common/mod.rs`
 - クレート専用テスト: 各クレート配下の `tests/` に配置可能
+- **命名例外**: `lua_unittest_runner.rs` — テストランナーはテストとは役割が異なり、`_runner.rs` サフィックスでその役割を明示する
+
+### テストサブモジュール化方針
+
+テストファイルが 10 本を超えるクレートについては、機能ドメイン別サブディレクトリに分割する。
+
+**パターン**: `tests/<category>/main.rs` + `#[path = "../common/mod.rs"] mod common;`
+
+- 各サブディレクトリの `main.rs` はエントリーポイント。テスト関数は配置せず、`mod` 宣言のみ記述する
+- `common/` を使用するサブモジュール内では `use crate::common;` で参照する
+- 3 ファイル未満のドメインは類似ドメインに統合するか、フラット残留とする
+
+### src/ 内テスト配置方針
+
+1. private フィールドへの直接アクセスが構造的に必要なテストは、`#[cfg(test)] #[path = "<name>_tests.rs"] mod tests;` パターンで `src/` 内に配置する
+2. 公開 API のみをテストする統合テストは、従来通り `tests/` に外部化する
+3. 判断基準: テスト対象の構造体が `pub(crate)` 以下のフィールドを持ち、それらに直接アクセスしなければテストが成立しない場合に限り `src/` 内に配置する
+
+**既存の適用例**:
+- `pasta_core/src/registry/scene_table_tests.rs`（SceneTable の labels, prefix_index への直接アクセス）
+- `pasta_shiori/src/shiori_tests.rs`（ShioriService の cache への直接アクセス）
 
 ### 文法定義
 - Pest文法: `src/parser/pasta.pest`
