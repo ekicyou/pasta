@@ -12,7 +12,7 @@
 
 use crate::common;
 
-use common::{copy_fixture_to_temp};
+use common::copy_fixture_to_temp;
 use pasta_lua::loader::PastaLoader;
 use std::path::PathBuf;
 
