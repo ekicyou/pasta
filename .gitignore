@@ -24,3 +24,4 @@ Cargo.lock
 #.idea/
 profile
 node_modules
+tmpclaude*
