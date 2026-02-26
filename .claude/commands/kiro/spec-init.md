@@ -1,11 +1,8 @@
 ---
-agent: 'agent'
 description: Initialize a new specification with detailed project description
----
-<meta>
-description: Initialize a new specification with detailed project description
+allowed-tools: Bash, Read, Write, Glob
 argument-hint: <project-description>
-</meta>
+---
 
 # Spec Initialization
 
@@ -52,7 +49,7 @@ Provide output in the language specified in `spec.json` with the following struc
 1. **Generated Feature Name**: `feature-name` format with 1-2 sentence rationale
 2. **Project Summary**: Brief summary (1 sentence)
 3. **Created Files**: Bullet list with full paths
-4. **Next Step**: Command block showing `/kiro-spec-requirements <feature-name>`
+4. **Next Step**: Command block showing `/kiro:spec-requirements <feature-name>`
 5. **Notes**: Explain why only initialization was performed (2-3 sentences on phase separation)
 
 **Format Requirements**:
@@ -66,4 +63,3 @@ Provide output in the language specified in `spec.json` with the following struc
 - **Template Missing**: If template files don't exist in `.kiro/settings/templates/specs/`, report error with specific missing file path and suggest checking repository setup
 - **Directory Conflict**: If feature name already exists, append numeric suffix (e.g., `feature-name-2`) and notify user of automatic conflict resolution
 - **Write Failure**: Report error with specific path and suggest checking permissions or disk space
-
