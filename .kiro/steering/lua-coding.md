@@ -193,7 +193,46 @@ return STORE
 local STORE = require("pasta.store")
 ```
 
-### 3.5 禁止パターン
+### 3.5 継承パターン
+
+サブクラスは親のIMPLを継承チェーンで参照する。親モジュールは`IMPL`フィールドで公開する。
+
+```lua
+-- 親モジュール: IMPL公開
+local ACT = {}
+local ACT_IMPL = {}
+-- ...
+ACT.IMPL = ACT_IMPL  -- 継承のために公開
+return ACT
+
+-- 子モジュール: 継承チェーン設定
+local ACT = require("pasta.act")
+local CHILD_ACT = {}
+local CHILD_ACT_IMPL = {}
+
+-- 継承チェーン: CHILD_ACT_IMPL → ACT.IMPL
+setmetatable(CHILD_ACT_IMPL, { __index = ACT.IMPL })
+
+-- __index オーバーライド: rawget で自クラスを先に検索
+function CHILD_ACT_IMPL.__index(self, key)
+    local method = rawget(CHILD_ACT_IMPL, key)
+    if method then return method end
+    return ACT.IMPL.__index(self, key)  -- 親の__indexに委譲
+end
+
+CHILD_ACT.IMPL = CHILD_ACT_IMPL  -- 更なる継承のために公開
+
+function CHILD_ACT.new(actors)
+    local base = ACT.new(actors)  -- 親コンストラクタを呼ぶ
+    -- 子クラス固有フィールドを追加
+    base._extra = "value"
+    return setmetatable(base, CHILD_ACT_IMPL)
+end
+
+return CHILD_ACT
+```
+
+### 3.6 禁止パターン
 
 ```lua
 -- ❌ 禁止: MODULE.instance() パターン
@@ -300,7 +339,7 @@ function process(data)
     if type(data) ~= "table" then
         return nil
     end
-    
+
     -- メイン処理
     return transform(data)
 end
@@ -348,7 +387,7 @@ end
 ```lua
 local PASTA = require("pasta")
 
--- アクター作成
+-- アクター作成（または取得）
 local actor = PASTA.create_actor("さくら")
 
 -- シーン登録
@@ -358,25 +397,29 @@ local scene = PASTA.create_scene("scene_name")
 PASTA.create_word("キーワード")
     :entry("値1", "値2")
     :entry("値3")
+
+-- シーン辞書最終化（Rustから上書きされるスタブ）
+PASTA.finalize_scene()
 ```
 
-### 6.2 CTXオブジェクト
+### 6.2 saveモジュールと永続化
 
-セッション管理とコルーチン制御を担当する。
+`pasta.save`は`@pasta_persistence`経由でセッション間永続データをロードする。
+ACTオブジェクトが`save`フィールドとして参照する。
 
 ```lua
---- @class CTX
---- @field save table 永続変数
---- @field actors table<string, Actor> 登録アクター
+-- pasta/save.lua（内部実装）
+local persistence = require("@pasta_persistence")
+local save = persistence.load()
+return save
 
--- 作成
-local ctx = CTX.new(save_data, actors)
-
--- アクション開始
-local act = ctx:start_action()
-
--- コルーチンでシーン実行
-local co = ctx:co_action(scene_func, args)
+-- 使用側: ACT経由でアクセス
+function scene(act)
+    local save, var = act:init_scene(SCENE)
+    -- save: セッション間永続（@pasta_persistence管理）
+    -- var:  アクション内一時変数
+    save.count = (save.count or 0) + 1
+end
 ```
 
 ### 6.3 ACTオブジェクト
@@ -385,22 +428,40 @@ local co = ctx:co_action(scene_func, args)
 
 ```lua
 --- @class Act
---- @field ctx CTX 環境オブジェクト
+--- @field actors table<string, Actor> 登録アクター
+--- @field save table 永続変数（pasta.save）
+--- @field app_ctx table アプリケーション実行中の汎用コンテキスト
 --- @field var table アクションローカル変数
 --- @field token table[] 蓄積トークン
---- @field current_scene table|nil 現在のシーン
+--- @field current_scene SceneTable|nil 現在のシーン
+--- @field req ShioriRequest|nil SHIORIリクエスト（ShioriActのみ）
 
 -- シーン関数内での使用
 function scene(act)
     local save, var = act:init_scene(SCENE)
     act:talk(actor, "こんにちは")
-    act:yield()
+    act:yield()  -- トークンをコルーチンyield
 end
+
+-- ACTメソッド一覧
+-- act:init_scene(scene) → save, var
+-- act:talk(actor, text) → self
+-- act:raw_script(text) → self
+-- act:surface(id) → self
+-- act:wait(ms) → self
+-- act:newline(n) → self
+-- act:clear() → self
+-- act:set_spot(name, number) → nil
+-- act:clear_spot() → nil
+-- act:word(name) → string|nil   （4段階検索）
+-- act:call(global, key, attrs, ...) → any
+-- act:build() → table[]|nil     （グループ化トークン）
+-- act:yield() → self            （build()してコルーチンyield）
 ```
 
 ### 6.4 PROXYパターン
 
-アクターへのプロキシオブジェクト。ACTへの逆参照を持つ。
+アクターへのプロキシオブジェクト。ACTへの逆参照を持ち、3段階単語検索を実装。
 
 ```lua
 --- @class ActorProxy
@@ -409,7 +470,7 @@ end
 
 -- 使用例（トランスパイラー出力）
 act.さくら:talk("こんにちは")
-local word = act.さくら:word("名前")
+local word = act.さくら:word("名前")  -- 3段階検索: actor→actor辞書→act:word()
 ```
 
 ### 6.5 STOREパターン
@@ -419,12 +480,64 @@ local word = act.さくら:word("名前")
 ```lua
 -- store.lua
 local STORE = {}
-STORE.actors = {}
-STORE.scenes = {}
-STORE.global_words = {}
-STORE.local_words = {}
-STORE.actor_words = {}
+STORE.actors = {}          -- table<string, Actor>    アクターキャッシュ
+STORE.actor_spots = {}     -- table<string, integer>  スポット位置マップ
+STORE.scenes = {}          -- table<string, table>    シーンレジストリ
+STORE.counters = {}        -- table<string, number>   シーン名カウンタ
+STORE.global_words = {}    -- table<string, table>    グローバル単語レジストリ
+STORE.local_words = {}     -- table<string, table>    ローカル単語レジストリ
+STORE.actor_words = {}     -- table<string, table>    アクター単語レジストリ
+STORE.app_ctx = {}         -- table                   汎用コンテキストデータ
+STORE.co_scene = nil       -- thread|nil              継続コルーチン（OnTalk等）
+
+-- 全データリセット（テスト・再初期化用）
+function STORE.reset()
+    if STORE.co_scene then
+        if coroutine.status(STORE.co_scene) == "suspended" then
+            coroutine.close(STORE.co_scene)
+        end
+        STORE.co_scene = nil
+    end
+    STORE.actors = {}
+    -- 他フィールドも同様にリセット
+end
+
 return STORE
+```
+
+**例外**: Rust組み込みモジュール`@pasta_config`のみpcall経由でrequireする（実行環境の違いに対応）。
+
+```lua
+local ok, CONFIG = pcall(require, "@pasta_config")
+if ok and type(CONFIG.actor) == "table" then
+    STORE.actors = CONFIG.actor
+end
+```
+
+### 6.6 Rustネイティブモジュールパターン
+
+`@pasta_*`プレフィックスのモジュールはRust側で提供されるネイティブモジュール。
+
+| モジュール | アクセス方法 | 用途 |
+|-----------|------------|------|
+| `@pasta_search` | `require` / `pcall(require, ...)` | シーン・単語検索（Radix Trie） |
+| `@pasta_persistence` | `require` | セッション永続化データ |
+| `@pasta_config` | `pcall(require, ...)` | pasta.toml設定読み込み |
+| `@pasta_sakura_script` | `require` | さくらスクリプト処理 |
+
+```lua
+-- 常に利用可能なモジュール: require直接
+local SEARCH = require("@pasta_search")
+local result = SEARCH:search_scene(name, global_scene_name)
+
+-- オプショナルモジュール: pcallで保護（テスト環境等でも動作）
+local ok, SEARCH = pcall(require, "@pasta_search")
+if ok and SEARCH then
+    local word = SEARCH:search_word(name, scene_name)
+end
+
+-- 設定モジュール: 常にpcall（単体テスト環境では存在しない可能性）
+local ok, CONFIG = pcall(require, "@pasta_config")
 ```
 
 ---
@@ -451,13 +564,30 @@ end)
 
 ### 7.2 テストファイル命名
 
-テストファイルは`*_test.lua`パターンを使用する。
+テストファイルは`*_test.lua`または`*_spec.lua`パターンを使用する。
 
 ```
 crates/pasta_lua/tests/lua_specs/
-├── actor_word_test.lua
+├── actor_word_test.lua        # _test.lua: 機能単位テスト
 ├── transpiler_test.lua
-└── init.lua
+├── persistence_spec.lua       # _spec.lua: 仕様ベーステスト
+├── virtual_dispatcher_spec.lua
+└── init.lua                   # エントリーポイント（テストスイート登録）
+```
+
+**init.luaパターン**: テストスイートは`specs`テーブルに登録してpcallで実行。
+
+```lua
+-- tests/lua_specs/init.lua
+local specs = {
+    "module_test",
+    "feature_spec",
+    -- 追加はここに
+}
+for _, spec_name in ipairs(specs) do
+    local ok, err = pcall(function() require(spec_name) end)
+    if not ok then error(spec_name .. " failed: " .. tostring(err)) end
+end
 ```
 
 ### 7.3 テスト構造テンプレート
@@ -480,13 +610,13 @@ describe("Example", function()
             expect(instance):not_:toBe(nil)
         end)
     end)
-    
+
     describe("method", function()
         test("正常系: 期待値を返す", function()
             local instance = Example.new()
             expect(instance:method()):toBe("expected")
         end)
-        
+
         test("異常系: nilを返す", function()
             local instance = Example.new()
             expect(instance:method(nil)):toBe(nil)
@@ -548,6 +678,7 @@ lua scriptlibs/luacheck/bin/luacheck.lua scripts/ --config .luacheckrc
 - [ ] MODULE/MODULE_IMPL分離
 - [ ] メソッド定義はドット構文 + 明示的self
 - [ ] setmetatableパターン使用
+- [ ] 継承が必要な場合は`MODULE.IMPL = MODULE_IMPL`で公開
 
 ### 型注釈
 - [ ] `@module`がファイル先頭にある
@@ -558,3 +689,7 @@ lua scriptlibs/luacheck/bin/luacheck.lua scripts/ --config .luacheckrc
 - [ ] nilチェックが適切
 - [ ] ガードクローズパターン使用
 - [ ] サイレントnil返却がない
+
+### Rustネイティブモジュール
+- [ ] `@pasta_config`等オプショナルモジュールはpcall経由
+- [ ] 常に利用可能なモジュール（`@pasta_search`等）はrequire直接可

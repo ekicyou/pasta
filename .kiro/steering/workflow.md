@@ -2,7 +2,7 @@
 
 Kiro仕様駆動開発における作業フローと完了基準。
 
-> **関連ドキュメント**: [AGENTS.md](../../AGENTS.md) - AI開発支援ドキュメント（ワークフロー概要、コマンド一覧）
+> **関連ドキュメント**: [CLAUDE.md](../../CLAUDE.md) - AI開発支援ドキュメント（プロジェクト指示、コマンド一覧）
 
 ---
 
@@ -179,7 +179,7 @@ git push origin <branch>
 | DSL文法変更          | GRAMMAR.md、steering/grammar.md、SOUL.md（設計原則）    |
 | ディレクトリ構造変更 | steering/structure.md、クレートREADME                   |
 | 依存関係変更         | steering/tech.md、クレートREADME                        |
-| 開発フロー変更       | steering/workflow.md、AGENTS.md                         |
+| 開発フロー変更       | steering/workflow.md、CLAUDE.md                         |
 | 新クレート追加       | README.md（ドキュメントマップ）、クレートREADME新規作成 |
 | テストカバレッジ変更 | TEST_COVERAGE.md                                        |
 
@@ -189,7 +189,7 @@ git push origin <branch>
 | ---------------- | ---------------------------------------- |
 | **SOUL.md**      | **コアバリュー・設計原則変更（最優先）** |
 | README.md        | プロジェクト概要変更、新クレート追加     |
-| AGENTS.md        | AI開発支援コンテキスト変更               |
+| CLAUDE.md        | AI開発支援プロジェクト指示変更               |
 | GRAMMAR.md       | DSL文法変更                              |
 | doc/spec/        | 言語仕様変更（権威的）                   |
 | TEST_COVERAGE.md | テスト追加・削除・機能変更               |
