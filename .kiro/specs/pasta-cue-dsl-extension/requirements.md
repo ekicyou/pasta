@@ -119,7 +119,15 @@ Option C' 設計方針に基づき、pasta_core は**構文解析と構造的 AS
 |----|------|------|
 | D1 | Cue AST 型のファイル配置 | `ast/cue.rs` 新設 vs 既存ファイルへの追加 |
 | D2 | `string_literal` / `json_object` の PEG ルール | choice/custom コマンドの引数パースに必要。既存文法との対応を設計 |
-| D3 | `cue_cmd_line` の配置スコープ | `local_scene_item` のみか、`global_scene_init` にも追加するか |
+
+## 確定済み設計判断
+
+| ID | 項目 | 決定 |
+|----|------|------|
+| D3 | `cue_cmd_line` の配置スコープ | `local_scene_item` のみ。`global_scene_init` には追加しない。アクション行と同じくくり |
+| D4 | `@alias` と `@word_ref` の関係 | 既存 `Action::WordRef` をそのまま利用。ActionFragment / AliasRef の新設不要 |
+| D5 | ActionLine の構造変更 | 不要。既存 `actions: Vec<Action>` を維持 |
+| D6 | 継続行の `\n` 結合 | pasta_core は `ContinueAction` を独立 AST ノードとして維持。結合は dola 側 |
 
 ---
 
