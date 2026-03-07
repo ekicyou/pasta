@@ -488,9 +488,12 @@ LocalSceneItem::CueCommand(_) => {
 ```rust
 LocalSceneItem::CueCommand(cue) => {
     // キューコマンド行のセマンティックトークン生成
-    // 最低限: Span 全体を KEYWORD トークンとして登録
+    // 最低限: Span 全体を既存の適切な token_type で登録
+    // 注: token_type::KEYWORD は存在しない。OPERATOR (13) が最も近いが、
+    // 新しい token_type (e.g. CUE_COMMAND = 15) の追加も検討可。
+    // 実装タスクで確定する。
     if cue.span.is_valid() {
-        Self::add_token_from_span(&cue.span, source, token_type::KEYWORD, 0, tokens);
+        Self::add_token_from_span(&cue.span, source, token_type::OPERATOR, 0, tokens);
     }
 }
 ```
