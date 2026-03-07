@@ -10,6 +10,7 @@ mod actor_word_dictionary_test;
 mod basic_test;
 mod code_generator_test;
 mod comparison_test;
+mod cue_command_passthrough_test;
 mod fallback_search_integration_test;
 mod scene_test;
 mod snapshot_test;

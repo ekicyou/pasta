@@ -53,6 +53,7 @@ pub fn infer_rule_from_line(line: &str) -> Option<Rule> {
         '％' | '%' => Some(Rule::actor_scope),
         '＄' | '$' => Some(Rule::var_set_line),
         '＞' | '>' => Some(Rule::call_scene_line),
+        '!' | '！' => Some(Rule::cue_cmd_line),
         '＃' | '#' => Some(Rule::or_comment_eol),
         '`' if trimmed.starts_with("```") => Some(Rule::code_scope),
         _ => {

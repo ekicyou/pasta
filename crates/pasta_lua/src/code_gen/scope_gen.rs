@@ -279,6 +279,9 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                 LocalSceneItem::ContinueAction(continue_action) => {
                     self.generate_continue_action(continue_action, &last_actor)?;
                 }
+                LocalSceneItem::CueCommand(_) => {
+                    // キューコマンドは Lua コード生成の対象外（dola 側で処理）
+                }
             }
         }
 

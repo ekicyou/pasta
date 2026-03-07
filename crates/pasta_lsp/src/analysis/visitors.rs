@@ -563,6 +563,12 @@ impl super::AnalysisEngine {
             LocalSceneItem::ContinueAction(ca) => {
                 Self::visit_continue_action(ca, source, tokens);
             }
+            LocalSceneItem::CueCommand(cue) => {
+                // キューコマンド行のセマンティックトークン生成
+                if cue.span.is_valid() {
+                    Self::add_token_from_span(&cue.span, source, token_type::OPERATOR, 0, tokens);
+                }
+            }
         }
     }
 

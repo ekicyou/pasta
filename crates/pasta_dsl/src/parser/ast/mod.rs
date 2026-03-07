@@ -12,10 +12,12 @@
 mod span;
 mod scene;
 mod action;
+mod cue;
 
 pub use span::*;
 pub use scene::*;
 pub use action::*;
+pub use cue::*;
 
 use std::path::PathBuf;
 

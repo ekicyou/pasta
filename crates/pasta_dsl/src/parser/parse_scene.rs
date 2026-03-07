@@ -209,6 +209,11 @@ pub(crate) fn parse_local_start_scene_scope(pair: Pair<Rule>) -> Result<LocalSce
                         inner,
                     )?));
             }
+            Rule::cue_cmd_line => {
+                scope
+                    .items
+                    .push(LocalSceneItem::CueCommand(parse_cue_cmd_line(inner)?));
+            }
             Rule::code_block => {
                 scope.code_blocks.push(parse_code_block(inner)?);
             }
@@ -257,6 +262,11 @@ pub(crate) fn parse_local_scene_scope(pair: Pair<Rule>) -> Result<LocalSceneScop
                         inner,
                     )?));
             }
+            Rule::cue_cmd_line => {
+                scope
+                    .items
+                    .push(LocalSceneItem::CueCommand(parse_cue_cmd_line(inner)?));
+            }
             Rule::code_block => {
                 scope.code_blocks.push(parse_code_block(inner)?);
             }
@@ -265,4 +275,128 @@ pub(crate) fn parse_local_scene_scope(pair: Pair<Rule>) -> Result<LocalSceneScop
     }
 
     Ok(scope)
+}
+
+// ============================================================================
+// Cue Command Line Parsing
+// ============================================================================
+
+/// Parse a `cue_cmd_line` pair into a `CueCommandNode`.
+///
+/// grammar.pest:
+/// `cue_cmd_line = { pad ~ cue_cmd_marker ~ cue_cmd_name ~ cue_cmd_scope? ~ cue_cmd_args? ~ or_comment_eol }`
+pub(crate) fn parse_cue_cmd_line(pair: Pair<Rule>) -> Result<CueCommandNode, ParseError> {
+    let span = Span::from(&pair.as_span());
+    let mut command = String::new();
+    let mut scope = None;
+    let mut args = Vec::new();
+
+    for inner in pair.into_inner() {
+        match inner.as_rule() {
+            Rule::cue_cmd_name => {
+                command = inner.as_str().to_string();
+            }
+            Rule::cue_cmd_scope => {
+                scope = Some(parse_cue_cmd_scope(inner)?);
+            }
+            Rule::cue_cmd_args => {
+                args = parse_cue_cmd_args(inner)?;
+            }
+            _ => {}
+        }
+    }
+
+    Ok(CueCommandNode {
+        command,
+        scope,
+        args,
+        span,
+    })
+}
+
+/// Parse a `cue_cmd_scope` pair into a `ScopedName`.
+///
+/// grammar.pest:
+/// `cue_cmd_scope = { at ~ cue_scoped_ident }`
+/// `cue_scoped_ident = @{ cue_ident_part ~ ( colon ~ cue_ident_part )? }`
+///
+/// `cue_scoped_ident` is atomic, so we get the full text and split on `:`.
+fn parse_cue_cmd_scope(pair: Pair<Rule>) -> Result<ScopedName, ParseError> {
+    let span = Span::from(&pair.as_span());
+
+    for inner in pair.into_inner() {
+        if inner.as_rule() == Rule::cue_scoped_ident {
+            let raw = inner.as_str();
+            // Split on ':' or '：' (full-width colon) to separate actor and name
+            if let Some(colon_pos) = raw.find(|c: char| c == ':' || c == '：') {
+                let actor = &raw[..colon_pos];
+                let colon_char = raw[colon_pos..].chars().next().unwrap();
+                let name = &raw[colon_pos + colon_char.len_utf8()..];
+                return Ok(ScopedName {
+                    actor: Some(actor.to_string()),
+                    name: name.to_string(),
+                    span,
+                });
+            } else {
+                return Ok(ScopedName {
+                    actor: None,
+                    name: raw.to_string(),
+                    span,
+                });
+            }
+        }
+    }
+
+    // Fallback (should not be reached due to PEG grammar guarantees)
+    Ok(ScopedName {
+        actor: None,
+        name: String::new(),
+        span,
+    })
+}
+
+/// Parse `cue_cmd_args` into a `Vec<CueArgToken>`.
+///
+/// grammar.pest:
+/// `cue_cmd_args = { lparen ~ s ~ cue_arg_list? ~ s ~ rparen }`
+/// `cue_arg_list = _{ cue_arg ~ ( comma_sep ~ cue_arg )* }`
+/// `cue_arg = _{ cue_arg_at_ref | number_literal | string_literal | cue_arg_id }`
+///
+/// Since `cue_arg_list` and `cue_arg` are silent rules, the inner pairs of
+/// `cue_cmd_args` directly contain the matched argument rules.
+fn parse_cue_cmd_args(pair: Pair<Rule>) -> Result<Vec<CueArgToken>, ParseError> {
+    let mut tokens = Vec::new();
+
+    for inner in pair.into_inner() {
+        match inner.as_rule() {
+            Rule::cue_arg_at_ref => {
+                // cue_arg_at_ref = { at ~ id }
+                for id_pair in inner.into_inner() {
+                    if id_pair.as_rule() == Rule::id {
+                        tokens.push(CueArgToken::AtRef(id_pair.as_str().to_string()));
+                    }
+                }
+            }
+            Rule::number_literal => {
+                let normalized = normalize_number_str(inner.as_str());
+                if normalized.contains('.') {
+                    tokens.push(CueArgToken::Float(normalized.parse().unwrap_or(0.0)));
+                } else {
+                    tokens.push(CueArgToken::Integer(normalized.parse().unwrap_or(0)));
+                }
+            }
+            Rule::string_contents => {
+                tokens.push(CueArgToken::StringLiteral(inner.as_str().to_string()));
+            }
+            Rule::string_blank => {
+                tokens.push(CueArgToken::StringLiteral(String::new()));
+            }
+            Rule::cue_arg_id => {
+                tokens.push(CueArgToken::Ident(inner.as_str().to_string()));
+            }
+            _ => {}
+        }
+    }
+
+    Ok(tokens)
 }

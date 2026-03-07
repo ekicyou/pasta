@@ -367,6 +367,51 @@ end
 
 ---
 
+## 2.11 キューコマンド
+
+### キューコマンドマーカー
+
+```text
+キューコマンドマーカー ::= "！" | "!"
+使用例: !emote@笑顔(smile), ！clear
+```
+
+**セマンティクス**: 演出キュー（表情切替、BGM、ウェイト、選択肢など）をDSLレベルで宣言する。パーサーで `CueCommandNode` としてAST化されるが、Lua変換時にはスキップされる（dola側で処理）。
+
+**構文**:
+```
+cue_cmd_line ::= pad ~ cue_cmd_marker ~ cue_cmd_name ~ cue_cmd_scope? ~ cue_cmd_args? ~ or_comment_eol
+cue_cmd_name ::= 識別子
+cue_cmd_scope ::= at ~ cue_scoped_ident
+cue_scoped_ident ::= 識別子 ~ (":" ~ 識別子)?   // actor:name 形式
+cue_cmd_args ::= open_paren ~ (cue_arg ~ (comma ~ cue_arg)*)? ~ close_paren
+cue_arg ::= cue_arg_number | cue_arg_string | cue_arg_at_ref | cue_arg_id
+```
+
+**引数トークン型**:
+| 型           | 構文例                      | AST                         |
+| ------------ | --------------------------- | --------------------------- |
+| 識別子       | `normal`, `actor:さくら`   | `CueArgToken::Ident`        |
+| 文字列       | `「はい」`                  | `CueArgToken::StringLiteral`|
+| 整数         | `30`, `-5`                  | `CueArgToken::Integer`      |
+| 浮動小数点   | `10.0`, `-5.5`              | `CueArgToken::Float`        |
+| @参照        | `@名前`                     | `CueArgToken::AtRef`        |
+
+**全角/半角対応**: マーカー(`!`/`！`)、括弧(`()`/`（）`)、@(`@`/`＠`)はいずれも全角/半角の両方を許容。
+
+**例**:
+```pasta
+＊起動挨拶
+    !emote@普通(normal)          # コマンド + スコープ + 引数
+    さくら：こんにちは！
+    !wait@さくら(500)            # アクター指定スコープ
+    ！bgm(morning.ogg)           # 全角マーカー
+    !yield(10.0)                 # 数値引数
+    !clear                       # 引数なし
+```
+
+---
+
 **関連章**:
 - [Chapter 1: 文法モデルの基本原則](01-grammar-model.md) - 基本原則
 - [Chapter 3: 行とブロック構造](03-block-structure.md) - ブロック構造

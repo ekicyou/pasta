@@ -185,6 +185,19 @@ sakura_marker     = _{ "\\" }
 eol             = _{ NEWLINE }
 or_comment_eol  = _{ s ~ ( comment_marker ~ (!NEWLINE ~ ANY)* )? ~ eol }
 
+// ################################################# cue command
+cue_cmd_marker   = _{ "!" | "\u{FF01}" }
+cue_cmd_line     =  { pad ~ cue_cmd_marker ~ cue_cmd_name ~ cue_cmd_scope? ~ cue_cmd_args? ~ or_comment_eol }
+cue_cmd_name     = @{ id }
+cue_cmd_scope    =  { at ~ cue_scoped_ident }
+cue_scoped_ident = @{ cue_ident_part ~ ( colon ~ cue_ident_part )? }
+cue_ident_part   = @{ (!(space_chars | "(" | ")" | "\u{FF08}" | "\u{FF09}" | "," | "\u{3001}" | "\u{FF0C}" | ":" | "\u{FF1A}" | "\r" | "\n" | "@" | "\u{FF20}") ~ ANY)+ }
+cue_cmd_args     =  { lparen ~ s ~ cue_arg_list? ~ s ~ rparen }
+cue_arg_list     = _{ cue_arg ~ ( comma_sep ~ cue_arg )* }
+cue_arg          = _{ cue_arg_at_ref | number_literal | string_literal | cue_arg_id }
+cue_arg_at_ref   =  { at ~ id }
+cue_arg_id       = @{ (!(space_chars | "(" | ")" | "\u{FF08}" | "\u{FF09}" | "," | "\u{3001}" | "\u{FF0C}" | "\r" | "\n") ~ ANY)+ }
+
 // ################################################# code_block
 code_block    =  { code_open ~ code_contents ~ code_close }
 code_open     = _{ PUSH("`"{3,}) ~ id? ~ eol }
@@ -227,7 +240,7 @@ local_start_scene_scope = {                     local_scene_item+ ~ code_scope* 
 local_scene_scope       = { local_scene_start ~ local_scene_item+ ~ code_scope* }
 
 local_scene_start =_{ local_scene_line }
-local_scene_item  =_{ var_set_line | call_scene_line | action_line | continue_action_line | blank_line }
+local_scene_item  =_{ var_set_line | call_scene_line | cue_cmd_line | action_line | continue_action_line | blank_line }
 
 code_scope = _{ code_block ~ blank_line* }
 

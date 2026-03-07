@@ -36,6 +36,7 @@
 | Luaコードブロック        | `actor_code_block_test.rs`       | ✅ 完了 | 関数定義                                  |
 | バイトオフセット         | `span_byte_offset_test.rs`       | ✅ 完了 | エラー位置特定                            |
 | さくらスクリプト記号タグ | `sakura_symbol_tag_test.rs`      | ✅ 完了 | `-+*?&` 5文字タグパース（7テスト）        |
+| キューコマンド行（！/!） | `cue_cmd_test.rs`                | ✅ 完了 | 63テスト（AST型・PEG文法・パース・推定）  |
 
 ### 2.2 Registry層テスト（シーン/単語テーブル）
 
@@ -56,6 +57,7 @@
 | 包括的制御フロー    | `transpiler_basic_test.rs`<br>`transpiler_comparison_test.rs`<br>`transpiler_scene_test.rs` | ✅ 完了 | 24テストケース（3ファイルに分割） |
 | 変数スコープ        | フィクスチャあり                 | 🔶 部分 | Local/Global変数 |
 | Call/末尾Call最適化 | `transpiler_scene_test.rs`       | ✅ 完了 | 自動判定         |
+| CueCommandパススルー | `cue_command_passthrough_test.rs` | ✅ 完了 | 5テスト（Lua変換スキップ検証） |
 | エンコーディング    | `pasta_lua_encoding_test.rs`     | ✅ 完了 | 文字エンコード   |
 
 ### 2.4 Runtime層テスト（実行エンジン）
@@ -204,13 +206,13 @@
 
 | クレート     | テスト数 | パス     | 失敗  | カバレッジ評価 |
 | ------------ | -------- | -------- | ----- | -------------- |
-| pasta_dsl    | 90       | 90       | 0     | ⭐⭐⭐⭐⭐ 優秀     |
+| pasta_dsl    | 153      | 153      | 0     | 優秀（cue_cmd 63テスト含む） |
 | pasta_core   | 67       | 67       | 0     | ⭐⭐⭐⭐⭐ 優秀     |
-| pasta_lua    | 478      | 478      | 0     | ⭐⭐⭐⭐⭐ 優秀     |
+| pasta_lua    | 483      | 483      | 0     | 優秀（cue_command_passthrough 5テスト含む） |
 | pasta_lsp    | 79       | 79       | 0     | ⭐⭐⭐⭐⭐ 優秀     |
 | pasta_shiori | 28       | 28       | 0     | ⭐⭐⭐⭐⭐ 優秀     |
 | pasta-vscode | 79       | 79       | 0     | ⭐⭐⭐⭐⭐ 優秀     |
-| **合計**     | **921+** | **921+** | **0** | **100%パス率** |
+| **合計**     | **989+** | **989+** | **0** | **100%パス率** |
 
 ---
 

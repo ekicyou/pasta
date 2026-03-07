@@ -86,6 +86,13 @@ impl GlobalSceneScope {
             span: Span::default(),
         }
     }
+
+    /// いずれかのローカルシーン内にキューコマンド行が存在するかを返す。
+    ///
+    /// dola がキューシートモード判定に使用する。
+    pub fn has_cue_commands(&self) -> bool {
+        self.local_scenes.iter().any(|ls| ls.has_cue_commands())
+    }
 }
 
 // ============================================================================
@@ -132,6 +139,15 @@ impl LocalSceneScope {
             span: Span::default(),
         }
     }
+
+    /// シーン内にキューコマンド行が 1 つ以上存在するかを返す。
+    ///
+    /// dola がキューシートモード判定に使用する。
+    pub fn has_cue_commands(&self) -> bool {
+        self.items
+            .iter()
+            .any(|item| matches!(item, LocalSceneItem::CueCommand(_)))
+    }
 }
 
 // ============================================================================
@@ -151,6 +167,8 @@ pub enum LocalSceneItem {
     ActionLine(ActionLine),
     /// Continuation action line (continue_action_line)
     ContinueAction(ContinueAction),
+    /// Cue command line (cue_cmd_line)
+    CueCommand(CueCommandNode),
 }
 
 // ============================================================================

@@ -21,7 +21,8 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │   │           │   ├── mod.rs        # 全型の pub use re-export
 │   │           │   ├── span.rs       # Span型定義
 │   │           │   ├── scene.rs      # シーン関連AST型
-│   │           │   └── action.rs     # アクション関連AST型
+│   │           │   ├── action.rs     # アクション関連AST型
+│   │           │   └── cue.rs        # キューコマンドAST型（CueCommandNode等）
 │   │           └── grammar.pest # Pest文法定義
 │   ├── pasta_core/          # 言語非依存層（レジストリ）
 │   │   ├── Cargo.toml       # pasta_core設定
@@ -50,14 +51,39 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       │   │   └── element_gen.rs  # 要素生成（分割impl）
 │       │   ├── context.rs   # トランスパイルコンテキスト
 │       │   ├── error.rs     # エラー型
+│       │   ├── encoding/    # エンコーディング処理（プラットフォーム別分割）
+│       │   │   ├── mod.rs           # エンコーディングAPI
+│       │   │   ├── windows.rs       # Windows固有（Shift_JIS等）
+│       │   │   └── unix.rs          # Unix固有
+│       │   ├── loader/      # スクリプトローダー（ディレクトリモジュール）
+│       │   │   ├── mod.rs           # ローダーAPI
+│       │   │   ├── cache.rs         # キャッシュ管理
+│       │   │   ├── config.rs        # ローダー設定
+│       │   │   ├── context.rs       # ローダーコンテキスト
+│       │   │   ├── discovery.rs     # スクリプト検出
+│       │   │   └── error.rs         # ローダーエラー型
+│       │   ├── logging/     # ロギング設定
+│       │   ├── normalize.rs # 正規化ユーティリティ
 │       │   ├── runtime/     # ランタイムレイヤー
 │       │   │   ├── mod.rs              # ランタイムコア
 │       │   │   ├── runtime_config.rs   # ランタイム設定構造体
 │       │   │   ├── module_registry.rs  # モジュール登録関数群（分割impl）
-│       │   │   └── ...                # その他ランタイムサブモジュール
-│       │   └── stdlib/      # Lua標準ライブラリ
+│       │   │   ├── enc.rs              # ランタイムエンコーディング
+│       │   │   ├── persistence.rs      # 永続化
+│       │   │   ├── finalize.rs         # ファイナライズ処理
+│       │   │   └── log.rs              # ランタイムログ
+│       │   ├── sakura_script/ # さくらスクリプト処理
+│       │   │   ├── mod.rs           # さくらスクリプトAPI
+│       │   │   ├── tokenizer.rs     # トークナイザー
+│       │   │   └── wait_inserter.rs # ウェイト挿入
+│       │   ├── search/       # 検索機能（Rust/Lua間バインディング）
+│       │   │   ├── mod.rs           # 検索API
+│       │   │   ├── context.rs       # 検索コンテキスト
+│       │   │   └── error.rs         # 検索エラー型
+│       │   ├── string_literalizer.rs # 文字列リテラル化
+│       │   └── transpiler.rs # トランスパイラーエントリーポイント
 │       └── tests/           # pasta_lua統合テスト（機能ドメイン別サブディレクトリ化済み）
-│           ├── transpiler/          # トランスパイラ関連テスト（7 files）
+│           ├── transpiler/          # トランスパイラ関連テスト（8 files）
 │           │   ├── main.rs          # エントリーポイント（#[path] で common 参照）
 │           │   ├── basic_test.rs
 │           │   ├── comparison_test.rs
@@ -66,6 +92,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │           │   ├── actor_word_dictionary_test.rs
 │           │   ├── fallback_search_integration_test.rs
 │           │   ├── code_generator_test.rs
+│           │   ├── cue_command_passthrough_test.rs
 │           │   └── snapshots/       # insta スナップショット
 │           ├── loader/              # ローダー関連テスト（6 files）
 │           │   ├── main.rs
@@ -128,6 +155,26 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │   │       ├── error.rs     # LangServerError型定義
 │   │       ├── server.rs    # PastaLangServer (tower-lsp trait実装)
 │   │       └── transport.rs # WASM/Nativeプラットフォーム抽象化
+│   └── pasta_sample_ghost/  # サンプルゴースト「hello-pasta」（publish=false）
+│       ├── Cargo.toml       # 画像生成・配布物作成用依存
+│       ├── README.md        # クレート概要
+│       ├── RELEASE.md       # リリース手順
+│       ├── release.ps1      # ビルド＋配布パッケージ生成スクリプト
+│       ├── release.bat      # release.ps1のバッチラッパー
+│       ├── build.rs         # ビルドスクリプト
+│       ├── src/
+│       │   ├── lib.rs              # 公開API（画像＋surfaces.txt生成）
+│       │   ├── main.rs             # 配布物生成CLIエントリーポイント
+│       │   ├── image_generator.rs  # ピクトグラム画像生成
+│       │   ├── config_templates.rs # surfaces.txt生成
+│       │   ├── scripts.rs          # テスト用dist-srcヘルパー
+│       │   └── update_files.rs     # 更新ファイル生成
+│       ├── dist-src/        # テキスト系配布ファイル（Single Source of Truth）
+│       │   ├── install.txt
+│       │   ├── ghost/master/ # descript.txt, pasta.toml, dic/*.pasta
+│       │   └── shell/master/ # descript.txt
+│       ├── ghosts/           # 生成された配布物（hello-pasta/）
+│       └── tests/            # 統合テスト・dist-src検証
 ├── tests/                    # ワークスペースレベル統合テスト
 │   ├── common/              # テスト共通ユーティリティ
 │   └── fixtures/            # テスト用Pastaスクリプト
@@ -170,14 +217,15 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 ├── GRAMMAR.md               # Pasta DSL文法リファレンス
 ├─ doc/spec/                # 言語仕様書（章別分割）
 ├── LICENSE                  # ライセンス
-└── AGENTS.md                # AI開発支援ドキュメント
+└── CLAUDE.md                # AI開発支援ドキュメント（プロジェクト指示）
 ```
 
-**注**: 
+**注**:
 - ルートクレート (`src/`) は削除済み。すべての実装コードは `crates/*/src/` 配下に配置。
 - 各クレートは独自の `tests/` ディレクトリを持つことができる（例: pasta_dsl, pasta_core, pasta_lua, pasta_lsp, pasta_sample_ghost）
 - pasta_sample_ghost は `dist-src/` にテキスト系配布ファイル（設定4種＋DSLスクリプト4種）を保持。`release.ps1` の robocopy ステップで配布先へコピーされる
 - ワークスペースレベルの `tests/` は複数クレートにまたがる統合テスト用
+- `AGENTS.md` は削除済み。AI開発支援指示は `CLAUDE.md` に移行
 
 ## ファイル命名規則
 
@@ -224,7 +272,10 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 pasta (workspace)
 ├── pasta_dsl           # DSLパーサー層（Pest PEG → AST変換）
 ├── pasta_core          # 言語非依存層（レジストリ）
-└── pasta_lua           # Luaバックエンド層（pasta_dsl + pasta_core依存）
+├── pasta_lua           # Luaバックエンド層（pasta_dsl + pasta_core依存）
+├── pasta_shiori        # SHIORI DLLインターフェース層
+├── pasta_lsp           # LSP実装層（WASM/Native対応）
+└── pasta_sample_ghost  # サンプルゴースト「hello-pasta」（publish=false）
 ```
 
 ### レイヤー分離原則
@@ -291,7 +342,7 @@ pasta_dsl（パーサー） + pasta_core（レジストリ）
 | README.md  | プロジェクト概要    |
 | GRAMMAR.md | DSL文法リファレンス |
 | doc/spec/  | 言語仕様書（章別）  |
-| AGENTS.md  | AI開発支援          |
+| CLAUDE.md  | AI開発支援          |
 
 ### Kiro仕様管理
 - `.kiro/steering/`: 規約・原則

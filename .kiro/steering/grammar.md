@@ -26,9 +26,14 @@
 | [02-markers.md](../../doc/spec/02-markers.md)                 | マーカー・演算子定義         |
 | [03-block-structure.md](../../doc/spec/03-block-structure.md) | ブロック構造                 |
 | [04-call-spec.md](../../doc/spec/04-call-spec.md)             | Call仕様・スコープ解決       |
+| [05-literals.md](../../doc/spec/05-literals.md)               | リテラル定義                 |
 | [06-action-line.md](../../doc/spec/06-action-line.md)         | アクション行・インライン要素 |
+| [07-sakura-script.md](../../doc/spec/07-sakura-script.md)     | Sakuraスクリプト仕様         |
+| [08-attributes.md](../../doc/spec/08-attributes.md)           | 属性定義                     |
 | [09-variables.md](../../doc/spec/09-variables.md)             | 変数スコープ                 |
 | [10-words.md](../../doc/spec/10-words.md)                     | 単語定義・参照               |
+| [11-actor-dictionary.md](../../doc/spec/11-actor-dictionary.md) | アクター辞書定義           |
+| [12-future.md](../../doc/spec/12-future.md)                   | 将来の拡張予定               |
 
 パーサー・トランスパイラー・ランタイムの実装判断はすべてこの仕様書に基づく。
 
@@ -47,6 +52,7 @@
 | コメント         | `＃` | `#`  | コメント行                   | [Chapter 2](../../doc/spec/02-markers.md#210-コメント)      |
 | コロン           | `：` | `:`  | 区切り                       | [Chapter 2](../../doc/spec/02-markers.md#コロンcolon)       |
 | アクター辞書     | `％` | `%`  | アクター辞書定義             | [Chapter 11](../../doc/spec/11-actor-dictionary.md)         |
+| キューコマンド   | `！` | `!`  | 演出キュー（dola側で処理）   | [Chapter 2](../../doc/spec/02-markers.md#211-キューコマンド) |
 
 ---
 
