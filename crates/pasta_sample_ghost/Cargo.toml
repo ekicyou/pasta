@@ -1,5 +1,6 @@
 [package]
 name = "pasta_sample_ghost"
+workspace = "../.."
 version.workspace = true
 description = "Sample ghost implementation for pasta - hello-pasta"
 edition.workspace = true

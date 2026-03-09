@@ -1,5 +1,6 @@
 [package]
 name = "pasta_core"
+workspace = "../.."
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
