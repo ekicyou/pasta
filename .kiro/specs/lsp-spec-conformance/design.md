@@ -233,8 +233,7 @@ impl AnalysisEngine {
     /// 1. マーカー（`!` / `！`）→ CUE_MARKER
     /// 2. コマンド名 → CUE_COMMAND
     /// 3. スコープ（存在する場合）:
-    ///    - `@` 記号 → OPERATOR
-    ///    - スコープ名 → WORD
+    ///    - `@name` 全体（`@` を含む）→ WORD（ActionLine の WordRef と同方針）
     /// 4. 引数（存在する場合）:
     ///    - `(` → OPERATOR
     ///    - 各引数（タイプ別）:
@@ -261,8 +260,7 @@ impl AnalysisEngine {
 | ---------------------------------- | -------------- | ------------ | -------------------------------------- |
 | マーカー `!` / `！`                | `cueMarker`    | 15           | D1: テーマ独立制御                     |
 | コマンド名                         | `cueCommand`   | 16           | D2: 意味的差別化                       |
-| `@` 記号                           | `operator`     | 13           | 区切り記号として既存 OPERATOR を再利用 |
-| スコープ名（`@name` の name 部分） | `word`         | 4            | 単語参照と同等のセマンティクス         |
+| スコープ名全体（`@name`、`@` を含む）| `word`        | 4            | ActionLine の WordRef（`@笑顔` = 1 WORD）と同方針。`ScopedName.span` をそのまま使用 |
 | `(` / `)` 括弧                     | `operator`     | 13           | D6: 括弧を OPERATOR として生成         |
 | `,` / `、` カンマ                  | （スキップ）   | —            | カンマはトークン化せずスキャンのみ     |
 | 引数 `Ident`                       | `cueCommand`   | 16           | キューコマンド固有の識別子             |
@@ -278,7 +276,7 @@ impl AnalysisEngine {
 2. span テキスト内でカーソルを進めながら以下を順次検出:
    - **マーカー**: `！`（3 バイト）or `!`（1 バイト）— 全角優先で検索
    - **コマンド名**: `cue.command` 文字列を `span_text[cursor..]` 内で検索
-   - **スコープ**: `cue.scope` が `Some` なら `@` を検出し、`ScopedName` のテキストを検出
+   - **スコープ**: `cue.scope` が `Some` なら `ScopedName.span` をそのまま `WORD` として emit（`@` を含む全体）。テキストスキャン不要
    - **引数**: `cue.args` が非空なら `(` を検出し、各 `CueArgToken` の値を走査で検出、最後に `)` を検出
 3. 各検出位置で `utf8_offset_to_utf16` を使い UTF-16 オフセットに変換して `RawToken` を生成
 
