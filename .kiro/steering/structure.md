@@ -175,21 +175,6 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       │   └── shell/master/ # descript.txt
 │       ├── ghosts/           # 生成された配布物（hello-pasta/）
 │       └── tests/            # 統合テスト・dist-src検証
-├── tests/                    # ワークスペースレベル統合テスト
-│   ├── common/              # テスト共通ユーティリティ
-│   └── fixtures/            # テスト用Pastaスクリプト
-│       ├── simple_hello.pasta
-│       ├── comprehensive_control_flow.pasta
-│       └── ...
-│   ├── parser2_integration_test.rs  # パーサー統合テスト
-│   ├── pasta_transpiler2_*.rs       # トランスパイラーテスト群
-│   ├── pasta_engine_*.rs            # エンジンテスト群
-│   ├── pasta_integration_*.rs       # E2E統合テスト群
-│   └── ...
-├── examples/                 # サンプルコード
-│   ├── scripts/              # Pastaスクリプト例
-
-│   └── test_*.rs             # 動作確認例
 ├── benches/                  # ベンチマークコード
 ├── editors/                  # エディタ拡張
 │   └── vscode/              # VSCode拡張（TypeScript + WASM統合）
@@ -217,15 +202,16 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 ├── GRAMMAR.md               # Pasta DSL文法リファレンス
 ├─ doc/spec/                # 言語仕様書（章別分割）
 ├── LICENSE                  # ライセンス
-└── CLAUDE.md                # AI開発支援ドキュメント（プロジェクト指示）
+├── AGENTS.md                # AI開発支援（エージェント共通指示）
+└── CLAUDE.md                # AI開発支援（Claude Code固有指示）
 ```
 
 **注**:
 - ルートクレート (`src/`) は削除済み。すべての実装コードは `crates/*/src/` 配下に配置。
-- 各クレートは独自の `tests/` ディレクトリを持つことができる（例: pasta_dsl, pasta_core, pasta_lua, pasta_lsp, pasta_sample_ghost）
+- ルートレベルの `tests/` と `examples/` も削除済み（Pure Virtual Workspace移行完了）
+- 各クレートは独自の `tests/` ディレクトリを持つことができる（例: pasta_dsl, pasta_core, pasta_lua, pasta_lsp, pasta_sample_ghost, pasta_shiori）
 - pasta_sample_ghost は `dist-src/` にテキスト系配布ファイル（設定4種＋DSLスクリプト4種）を保持。`release.ps1` の robocopy ステップで配布先へコピーされる
-- ワークスペースレベルの `tests/` は複数クレートにまたがる統合テスト用
-- `AGENTS.md` は削除済み。AI開発支援指示は `CLAUDE.md` に移行
+- `AGENTS.md` と `CLAUDE.md` の両方が存在。`AGENTS.md` はエージェント共通指示、`CLAUDE.md` は Claude Code 固有指示
 
 ## ファイル命名規則
 
@@ -337,12 +323,14 @@ pasta_dsl（パーサー） + pasta_core（レジストリ）
 
 ## ドキュメント構成
 
-| ファイル   | 用途                |
-| ---------- | ------------------- |
-| README.md  | プロジェクト概要    |
-| GRAMMAR.md | DSL文法リファレンス |
-| doc/spec/  | 言語仕様書（章別）  |
-| CLAUDE.md  | AI開発支援          |
+| ファイル   | 用途                                             |
+| ---------- | ------------------------------------------------ |
+| SOUL.md    | プロジェクトの憲法（ビジョン・コアバリュー）     |
+| README.md  | プロジェクト概要                                 |
+| GRAMMAR.md | DSL文法リファレンス（人間向け）                  |
+| doc/spec/  | 言語仕様書（章別）                               |
+| AGENTS.md  | AI開発支援（エージェント共通指示・ワークフロー） |
+| CLAUDE.md  | AI開発支援（Claude Code固有指示）                |
 
 ### Kiro仕様管理
 - `.kiro/steering/`: 規約・原則

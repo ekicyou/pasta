@@ -1,47 +1,32 @@
 ---
-name: validate-gap-agent
+agent: 'agent'
 description: Analyze implementation gap between requirements and existing codebase
-tools: Read, Grep, Glob, WebSearch, WebFetch
-model: inherit
-color: yellow
 ---
+<meta>
+description: Analyze implementation gap between requirements and existing codebase
+argument-hint: <feature-name:$1>
+</meta>
 
-# validate-gap Agent
+# Implementation Gap Validation
 
-## Role
-You are a specialized agent for analyzing the implementation gap between requirements and existing codebase to inform implementation strategy.
-
-## Core Mission
+<background_information>
 - **Mission**: Analyze the gap between requirements and existing codebase to inform implementation strategy
 - **Success Criteria**:
   - Comprehensive understanding of existing codebase patterns and components
   - Clear identification of missing capabilities and integration challenges
   - Multiple viable implementation approaches evaluated
   - Technical research needs identified for design phase
+</background_information>
 
-## Execution Protocol
-
-You will receive task prompts containing:
-- Feature name and spec directory path
-- File path patterns (NOT expanded file lists)
-
-### Step 0: Expand File Patterns (Subagent-specific)
-
-Use Glob tool to expand file patterns, then read all files:
-- Glob(`.kiro/steering/*.md`) to get all steering files
-- Read each file from glob results
-- Read other specified file patterns
-
-### Step 1-4: Core Task (from original instructions)
-
+<instructions>
 ## Core Task
-Analyze implementation gap for feature based on approved requirements and existing codebase.
+Analyze implementation gap for feature **$1** based on approved requirements and existing codebase.
 
 ## Execution Steps
 
 1. **Load Context**:
-   - Read `.kiro/specs/{feature}/spec.json` for language and metadata
-   - Read `.kiro/specs/{feature}/requirements.md` for requirements
+   - Read `.kiro/specs/$1/spec.json` for language and metadata
+   - Read `.kiro/specs/$1/requirements.md` for requirements
    - **Load ALL steering context**: Read entire `.kiro/steering/` directory including:
      - Default files: `structure.md`, `tech.md`, `product.md`
      - All custom steering files (regardless of mode settings)
@@ -67,6 +52,7 @@ Analyze implementation gap for feature based on approved requirements and existi
 - **Multiple Options**: Present viable alternatives when applicable
 - **Thorough Investigation**: Use tools to deeply understand existing codebase
 - **Explicit Gaps**: Clearly flag areas needing research or investigation
+</instructions>
 
 ## Tool Guidance
 - **Read first**: Load all context (spec, steering, rules) before analysis
@@ -89,10 +75,17 @@ Provide output in the language specified in spec.json with:
 ## Safety & Fallback
 
 ### Error Scenarios
-- **Missing Requirements**: If requirements.md doesn't exist, stop with message: "Run `/kiro:spec-requirements {feature}` first to generate requirements"
+- **Missing Requirements**: If requirements.md doesn't exist, stop with message: "Run `/kiro-spec-requirements $1` first to generate requirements"
 - **Requirements Not Approved**: If requirements not approved, warn user but proceed (gap analysis can inform requirement revisions)
 - **Empty Steering Directory**: Warn user that project context is missing and may affect analysis quality
 - **Complex Integration Unclear**: Flag for comprehensive research in design phase rather than blocking
 - **Language Undefined**: Default to English (`en`) if spec.json doesn't specify language
 
-**Note**: You execute tasks autonomously. Return final report only when complete.
+### Next Phase: Design Generation
+
+**If Gap Analysis Complete**:
+- Review gap analysis insights
+- Run `/kiro-spec-design $1` to create technical design document
+- Or `/kiro-spec-design $1 -y` to auto-approve requirements and proceed directly
+
+**Note**: Gap analysis is optional but recommended for brownfield projects to inform design decisions.

@@ -39,7 +39,7 @@
 - **glob 0.3**: ファイルパターンマッチ
 - **flate2 1.x**: gzip圧縮（キャッシュ等）
 - **tracing 0.1 / tracing-appender 0.2 / tracing-subscriber 0.3**: ロギング・診断
-- **windows-sys 0.61**: Windows API（Shift_JISエンコーディング等、cfg(windows)）
+- **windows-sys 0.61.2**: Windows API（Shift_JISエンコーディング等、cfg(windows)）
 - **luacheck v1.2.0**: 静的解析ツール（scriptlibs/）
 - **lua_test**: BDDスタイルテストフレームワーク（scriptlibs/）
 
@@ -66,6 +66,8 @@
 
 ### 開発環境
 - **tempfile 3**: テスト用一時ファイル生成
+- **insta 1.46**: スナップショットテスト（glob機能付き）
+- **tracing-test 0.2**: テスト用ログキャプチャ
 
 ## アーキテクチャ原則
 

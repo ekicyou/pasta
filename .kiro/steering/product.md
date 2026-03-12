@@ -19,7 +19,7 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 - [x] シーンジャンプテーブル設計の修正 → `scene-search-integration` 完了
 - [x] 宣言的制御フロー（Call/Jump文）の再実装 → `act-impl-call` 完了
 
-**完了仕様**: 69件（`.kiro/specs/completed/` に格納）
+**完了仕様**: 70件（`.kiro/specs/completed/` に格納）
 
 **主要成果**:
 - ✅ **act-impl-call** - `ACT_IMPL.call` 4段階優先順位検索実装
@@ -29,7 +29,7 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 - ✅ **pasta_search_module** - Rust/Lua間の辞書検索バインディング
 - ✅ **shiori-entry** - SHIORI APIエントリポイント
 
-**品質指標**: 900+ テスト全パス、リグレッション0件
+**品質指標**: 950+ テスト全パス、リグレッション0件
 
 ### Phase 1: 基盤確立 ✅ 完了
 **現状**: Phase 0の再構築により基盤確立完了
@@ -41,11 +41,12 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 
 ### Phase 2: コア機能拡張（進行中）🔄
 
-**進行中仕様**: 2件
-- 🔄 **release-workflow** - リリースワークフロー整備（タスク生成済み、実装待ち）
-- 🔄 **release-workflow-dll-zip-fix** - リリースワークフローDLL ZIP修正（実装完了、アーカイブ待ち）
+**繰り返し仕様**:
+- 🔁 **release-workflow** - リリース作業手順（`/kiro-spec-impl` 実行のたびにタスクリセット、永続的に未完了）
 
 **完了仕様**:
+- ✅ **pasta-cue-dsl-extension** - キューコマンド行(`!`)のDSLパース機能追加
+- ✅ **release-workflow-dll-zip-fix** - リリースワークフローDLL ZIP修正
 - ✅ **yield-continuation-token** - `＞チェイントーク` / `＞yield` 継続トーク機能（GLOBAL テーブル L3 登録）
 - ✅ **lua55-manual-consistency** - Lua 5.5 リファレンスマニュアル日本語化整合性
   - マニュアル本体は独立リポジトリに移行: [ekicyou/lua55-manual-ja](https://github.com/ekicyou/lua55-manual-ja)

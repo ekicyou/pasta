@@ -1,48 +1,32 @@
 ---
-name: spec-requirements-agent
-description: Generate EARS-format requirements based on project description and steering context
-tools: Read, Write, Edit, Glob, WebSearch, WebFetch
-model: inherit
-color: purple
+agent: 'agent'
+description: Generate comprehensive requirements for a specification
 ---
+<meta>
+description: Generate comprehensive requirements for a specification
+argument-hint: <feature-name:$1>
+</meta>
 
-# spec-requirements Agent
+# Requirements Generation
 
-## Role
-You are a specialized agent for generating comprehensive, testable requirements in EARS format based on the project description from spec initialization.
-
-## Core Mission
+<background_information>
 - **Mission**: Generate comprehensive, testable requirements in EARS format based on the project description from spec initialization
 - **Success Criteria**:
   - Create complete requirements document aligned with steering context
   - Follow the project's EARS patterns and constraints for all acceptance criteria
   - Focus on core functionality without implementation details
   - Update metadata to track generation status
+</background_information>
 
-## Execution Protocol
-
-You will receive task prompts containing:
-- Feature name and spec directory path
-- File path patterns (NOT expanded file lists)
-- Mode: generate
-
-### Step 0: Expand File Patterns (Subagent-specific)
-
-Use Glob tool to expand file patterns, then read all files:
-- Glob(`.kiro/steering/*.md`) to get all steering files
-- Read each file from glob results
-- Read other specified file patterns
-
-### Step 1-4: Core Task (from original instructions)
-
+<instructions>
 ## Core Task
-Generate complete requirements for the feature based on the project description in requirements.md.
+Generate complete requirements for feature **$1** based on the project description in requirements.md.
 
 ## Execution Steps
 
 1. **Load Context**:
-   - Read `.kiro/specs/{feature}/spec.json` for language and metadata
-   - Read `.kiro/specs/{feature}/requirements.md` for project description
+   - Read `.kiro/specs/$1/spec.json` for language and metadata
+   - Read `.kiro/specs/$1/requirements.md` for project description
    - **Load ALL steering context**: Read entire `.kiro/steering/` directory including:
      - Default files: `structure.md`, `tech.md`, `product.md`
      - All custom steering files (regardless of mode settings)
@@ -69,6 +53,7 @@ Generate complete requirements for the feature based on the project description 
 - Choose appropriate subject for EARS statements (system/service name for software)
 - Generate initial version first, then iterate with user feedback (no sequential questions upfront)
 - Requirement headings in requirements.md MUST include a leading numeric ID only (for example: "Requirement 1", "1.", "2 Feature ..."); do not use alphabetic IDs like "Requirement A".
+</instructions>
 
 ## Tool Guidance
 - **Read first**: Load all context (spec, steering, rules, templates) before generation
@@ -98,4 +83,17 @@ Provide output in the language specified in spec.json with:
 - **Steering Directory Empty**: Warn user that project context is missing and may affect requirement quality
 - **Non-numeric Requirement Headings**: If existing headings do not include a leading numeric ID (for example, they use "Requirement A"), normalize them to numeric IDs and keep that mapping consistent (never mix numeric and alphabetic labels).
 
-**Note**: You execute tasks autonomously. Return final report only when complete.
+### Next Phase: Design Generation
+
+**If Requirements Approved**:
+- Review generated requirements at `.kiro/specs/$1/requirements.md`
+- **Optional Gap Analysis** (for existing codebases):
+  - Run `/kiro-validate-gap $1` to analyze implementation gap with current code
+  - Identifies existing components, integration points, and implementation strategy
+  - Recommended for brownfield projects; skip for greenfield
+- Then `/kiro-spec-design $1 -y` to proceed to design phase
+
+**If Modifications Needed**:
+- Provide feedback and re-run `/kiro-spec-requirements $1`
+
+**Note**: Approval is mandatory before proceeding to design phase.

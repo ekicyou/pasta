@@ -1,17 +1,15 @@
 ---
-name: validate-impl-agent
+agent: 'agent'
 description: Validate implementation against requirements, design, and tasks
-tools: Read, Bash, Grep, Glob
-model: inherit
-color: yellow
 ---
+<meta>
+description: Validate implementation against requirements, design, and tasks
+argument-hint: [feature-name:$1] [task-numbers:$2]
+</meta>
 
-# validate-impl Agent
+# Implementation Validation
 
-## Role
-You are a specialized agent for verifying that implementation aligns with approved requirements, design, and tasks.
-
-## Core Mission
+<background_information>
 - **Mission**: Verify that implementation aligns with approved requirements, design, and tasks
 - **Success Criteria**:
   - All specified tasks marked as completed
@@ -19,23 +17,9 @@ You are a specialized agent for verifying that implementation aligns with approv
   - Requirements traceability confirmed (EARS requirements covered)
   - Design structure reflected in implementation
   - No regressions in existing functionality
+</background_information>
 
-## Execution Protocol
-
-You will receive task prompts containing:
-- Feature name and spec directory path (or auto-detection mode)
-- File path patterns (NOT expanded file lists)
-- Target tasks: task numbers or auto-detect from conversation/checkboxes
-
-### Step 0: Expand File Patterns (Subagent-specific)
-
-Use Glob tool to expand file patterns, then read all files:
-- Glob(`.kiro/steering/*.md`) to get all steering files
-- Read each file from glob results
-- Read other specified file patterns
-
-### Step 1-4: Core Task (from original instructions)
-
+<instructions>
 ## Core Task
 Validate implementation for feature(s) and task(s) based on approved specifications.
 
@@ -43,18 +27,18 @@ Validate implementation for feature(s) and task(s) based on approved specificati
 
 ### 1. Detect Validation Target
 
-**If no arguments provided** (auto-detection mode):
-- Parse conversation history for `/kiro:spec-impl <feature> [tasks]` commands
+**If no arguments provided** (`$1` empty):
+- Parse conversation history for `/kiro-spec-impl <feature> [tasks]` commands
 - Extract feature names and task numbers from each execution
 - Aggregate all implemented tasks by feature
 - Report detected implementations (e.g., "user-auth: 1.1, 1.2, 1.3")
 - If no history found, scan `.kiro/specs/` for features with completed tasks `[x]`
 
-**If feature provided** (feature specified, tasks empty):
+**If feature provided** (`$1` present, `$2` empty):
 - Use specified feature
-- Detect all completed tasks `[x]` in `.kiro/specs/{feature}/tasks.md`
+- Detect all completed tasks `[x]` in `.kiro/specs/$1/tasks.md`
 
-**If both feature and tasks provided** (explicit mode):
+**If both feature and tasks provided** (`$1` and `$2` present):
 - Validate specified feature and tasks only (e.g., `user-auth 1.1,1.2`)
 
 ### 2. Load Context
@@ -90,7 +74,7 @@ For each task, verify:
 #### Design Alignment
 - Check if design.md structure is reflected in implementation
 - Verify key interfaces, components, and modules exist
-- Use Grep/Glob to confirm file structure matches design
+- Use Grep/LS to confirm file structure matches design
 - If misalignment found, flag as "Design deviation"
 
 #### Regression Check
@@ -111,13 +95,14 @@ Provide summary in the language specified in spec.json:
 - **Non-blocking warnings**: Design deviations are warnings unless critical
 - **Test-first focus**: Test coverage is mandatory for GO decision
 - **Traceability required**: All requirements must be traceable to implementation
+</instructions>
 
 ## Tool Guidance
-- **Conversation parsing**: Extract `/kiro:spec-impl` patterns from history
+- **Conversation parsing**: Extract `/kiro-spec-impl` patterns from history
 - **Read context**: Load all specs and steering before validation
 - **Bash for tests**: Execute test commands to verify pass status
 - **Grep for traceability**: Search codebase for requirement evidence
-- **Glob for structure**: Verify file structure matches design
+- **LS/Glob for structure**: Verify file structure matches design
 
 ## Output Description
 
@@ -137,9 +122,20 @@ Provide output in the language specified in spec.json with:
 ## Safety & Fallback
 
 ### Error Scenarios
-- **No Implementation Found**: If no `/kiro:spec-impl` in history and no `[x]` tasks, report "No implementations detected"
+- **No Implementation Found**: If no `/kiro-spec-impl` in history and no `[x]` tasks, report "No implementations detected"
 - **Test Command Unknown**: If test framework unclear, warn and skip test validation (manual verification required)
 - **Missing Spec Files**: If spec.json/requirements.md/design.md missing, stop with error
 - **Language Undefined**: Default to English (`en`) if spec.json doesn't specify language
 
-**Note**: You execute tasks autonomously. Return final report only when complete.
+### Next Steps Guidance
+
+**If GO Decision**:
+- Implementation validated and ready
+- Proceed to deployment or next feature
+
+**If NO-GO Decision**:
+- Address critical issues listed
+- Re-run `/kiro-spec-impl <feature> [tasks]` for fixes
+- Re-validate with `/kiro-validate-impl [feature] [tasks]`
+
+**Note**: Validation is recommended after implementation to ensure spec alignment and quality.
