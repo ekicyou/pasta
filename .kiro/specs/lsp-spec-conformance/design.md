@@ -256,17 +256,17 @@ impl AnalysisEngine {
 
 **トークンタイプマッピング表**:
 
-| キューコマンド構成要素             | トークンタイプ | インデックス | 根拠                                   |
-| ---------------------------------- | -------------- | ------------ | -------------------------------------- |
-| マーカー `!` / `！`                | `cueMarker`    | 15           | D1: テーマ独立制御                     |
-| コマンド名                         | `cueCommand`   | 16           | D2: 意味的差別化                       |
-| スコープ名全体（`@name`、`@` を含む）| `word`        | 4            | ActionLine の WordRef（`@笑顔` = 1 WORD）と同方針。`ScopedName.span` をそのまま使用 |
-| `(` / `)` 括弧                     | `operator`     | 13           | D6: 括弧を OPERATOR として生成         |
-| `,` / `、` カンマ                  | （スキップ）   | —            | カンマはトークン化せずスキャンのみ     |
-| 引数 `Ident`                       | `cueCommand`   | 16           | キューコマンド固有の識別子             |
-| 引数 `StringLiteral`               | `talk`         | 10           | 文字列リテラル（R1.4）                 |
-| 引数 `Integer` / `Float`           | `number`       | 14           | 数値リテラル（R1.5）                   |
-| 引数 `AtRef`                       | `word`         | 4            | @参照（R1.6）                          |
+| キューコマンド構成要素                | トークンタイプ | インデックス | 根拠                                                                                |
+| ------------------------------------- | -------------- | ------------ | ----------------------------------------------------------------------------------- |
+| マーカー `!` / `！`                   | `cueMarker`    | 15           | D1: テーマ独立制御                                                                  |
+| コマンド名                            | `cueCommand`   | 16           | D2: 意味的差別化                                                                    |
+| スコープ名全体（`@name`、`@` を含む） | `word`         | 4            | ActionLine の WordRef（`@笑顔` = 1 WORD）と同方針。`ScopedName.span` をそのまま使用 |
+| `(` / `)` 括弧                        | `operator`     | 13           | D6: 括弧を OPERATOR として生成                                                      |
+| `,` / `、` カンマ                     | （スキップ）   | —            | カンマはトークン化せずスキャンのみ                                                  |
+| 引数 `Ident`                          | `cueCommand`   | 16           | キューコマンド固有の識別子                                                          |
+| 引数 `StringLiteral`                  | `talk`         | 10           | 文字列リテラル（R1.4）                                                              |
+| 引数 `Integer` / `Float`              | `number`       | 14           | 数値リテラル（R1.5）                                                                |
+| 引数 `AtRef`                          | `word`         | 4            | @参照（R1.6）                                                                       |
 
 **実装ノート**
 
@@ -277,7 +277,20 @@ impl AnalysisEngine {
    - **マーカー**: `！`（3 バイト）or `!`（1 バイト）— 全角優先で検索
    - **コマンド名**: `cue.command` 文字列を `span_text[cursor..]` 内で検索
    - **スコープ**: `cue.scope` が `Some` なら `ScopedName.span` をそのまま `WORD` として emit（`@` を含む全体）。テキストスキャン不要
-   - **引数**: `cue.args` が非空なら `(` を検出し、各 `CueArgToken` の値を走査で検出、最後に `)` を検出
+   - **引数**: `cue.args` が非空なら以下の手順で処理:
+     1. `(` / `（` を検出 → OPERATOR emit
+     2. 括弧内のテキスト `args_text` を取得（`tokenize_args_text` と同方式）
+     3. `arg_cursor = 0` を初期化し、各 `CueArgToken` を前進スキャン:
+        - カンマ・全角カンマ・空白をスキップして `arg_text_start` を求める
+        - `find_arg_end(args_text[arg_text_start..])` で引数テキスト範囲を確定
+        - 確定した `arg_slice` に絞って、トークンタイプ別に検出:
+          - `Ident(s)` → `arg_slice.find(s)` → CUE_COMMAND
+          - `StringLiteral(s)` → `arg_slice.find(s)` → TALK（括弧 `「」` も含む）
+          - `Integer(_)` / `Float(_)` → `find_number_literal(arg_slice)` → NUMBER
+          - `AtRef(s)` → `arg_slice.find(@ + s)` → WORD
+        - `arg_cursor` を `arg_text_start + arg_end` に進める
+     4. `)` / `）` を検出 → OPERATOR emit
+     - **同値引数の衝突回避**: 各引数のスライスに絞ってから検索するため `!cmd(1, 1, 1)` でも正確に位置特定できる（`tokenize_args_text` と同一方針）
 3. 各検出位置で `utf8_offset_to_utf16` を使い UTF-16 オフセットに変換して `RawToken` を生成
 
 ### VSCode 拡張レイヤー
