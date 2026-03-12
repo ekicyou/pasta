@@ -207,6 +207,8 @@ LocalSceneItem::CueCommand(cue) => {
 | D2  | コマンド名のトークンタイプ | `function` 再利用 vs 新規 `cueCommand`             | 新規 `cueCommand` が意図明確（R2.2）。ただし `function` 再利用でも十分 |
 | D3  | テキストスキャンの実装詳細 | `CueCommandNode.span` の行テキストからカーソル走査 | `visit_var_set` パターン踏襲が自然                                     |
 | D4  | TextMate パターン位置      | `call` の後、`actor` の前                          | `!` / `！` は `action-line` の `\S+?` にマッチしないため衝突なし       |
+| D5  | ScopedName の actor:name 分割粒度 | `@actor:name` 全体で1トークン vs actor/name 分割 | ScopedName.span が全体を持つため1トークンが自然                  |
+| D6  | 括弧・カンマ記号のトークン化 | OPERATOR トークン生成 vs TextMate に委譲          | TextMate 委譲がシンプル。Oniguruma の全角スペース制約（`[\s\u3000]+`）に留意 |
 
 ### Research Needed（設計フェーズで調査）
 

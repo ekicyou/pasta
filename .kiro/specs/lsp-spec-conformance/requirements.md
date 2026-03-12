@@ -1,6 +1,6 @@
 # 要件定義書: lsp-spec-conformance
 
-> **バージョン**: v1（2026-03-12）
+> **バージョン**: v2（2026-03-12）
 > **関連完了仕様**: `pasta-cue-dsl-extension`（Cue コマンド DSL 拡張）
 > **スコープ**: pasta_lsp クレートおよび VSCode 拡張のキューコマンド対応を中心とした仕様追従
 
@@ -53,7 +53,7 @@
 
 #### Acceptance Criteria
 
-1. The pasta_lsp shall キューコマンドのマーカー（`!` / `！`）に対して専用のトークンタイプ（`cueMarker` または既存の適切なタイプ）を割り当てる
+1. The pasta_lsp shall キューコマンドのマーカー（`!` / `！`）に対して専用のトークンタイプを割り当てる（具体的なタイプは設計判断 D1 で決定）
 2. The pasta_lsp shall キューコマンドのコマンド名に対して適切なトークンタイプを割り当てる（具体的なタイプは設計判断 D2 で決定）
 3. The pasta_lsp shall `SemanticTokensLegend` にキューコマンド用トークンタイプを登録する
 4. The pasta_lsp shall VSCode 拡張の `package.json` でキューコマンド用セマンティックトークンタイプのデフォルトカラーマッピングを宣言する（必要な場合）
@@ -68,7 +68,7 @@
 2. The VSCode 拡張 shall キューコマンドマーカー（`!` / `！`）に `keyword.other.marker.pasta` スコープを割り当てる
 3. The VSCode 拡張 shall キューコマンド名に `entity.name.function.cue.pasta` スコープを割り当てる
 4. The VSCode 拡張 shall キューコマンドの `@scope` 部分に参照用スコープを割り当てる
-5. The VSCode 拡張 shall キューコマンドの括弧と引数を適切なスコープで装飾する
+5. The VSCode 拡張 shall キューコマンドの引数を適切なスコープで装飾する（括弧等の区切り記号のスコープ割り当ては設計判断 D6 と整合させる）
 
 ### Requirement 4: テストカバレッジの確保
 
@@ -80,7 +80,7 @@
 2. The pasta_lsp shall 全角マーカー（`！`）のキューコマンド行が半角マーカー（`!`）と同一のトークンタイプを生成することを検証するテストを持つ
 3. The pasta_lsp shall キューコマンド行を含むシーンと含まないシーンが混在するドキュメントの正しいトークン生成を検証するテストを持つ
 4. The pasta_lsp shall キューコマンド行の構文エラー（例: 引数括弧の不一致）が Diagnostics として報告されることを検証するテストを持つ
-5. While 既存テスト（79 テスト）がすべてパスしている場合, the pasta_lsp shall 新規テスト追加後もリグレッションなくパスする
+5. While 既存全テストがすべてパスしている場合, the pasta_lsp shall 新規テスト追加後もリグレッションなくパスする
 
 ### Requirement 5: 後方互換性の維持
 
@@ -97,13 +97,13 @@
 
 ## 設計判断事項（設計フェーズで解決）
 
-| ID  | 項目                                   | 概要                                                                  |
-| --- | -------------------------------------- | --------------------------------------------------------------------- |
-| D1  | キューコマンドマーカーのトークンタイプ | 新規 `cueMarker` 追加 vs 既存 `keyword` 相当の再利用                  |
-| D2  | コマンド名のトークンタイプ             | `function` 相当 vs `method` 相当 vs 新規 `cueCommand`                 |
-| D3  | visit_cue_command の実装方式           | Span ベーステキストスキャン vs CueCommandNode フィールド直接利用      |
-| D4  | TextMate 文法の挿入位置                | `action-line` の前 vs 後、patterns 配列内の順序                       |
-| D5  | ScopedName の actor:name 分割粒度      | `@actor:name` 形式で actor/name を別トークンにするか全体で1トークンか |
+| ID  | 項目                                   | 概要                                                                                |
+| --- | -------------------------------------- | ----------------------------------------------------------------------------------- |
+| D1  | キューコマンドマーカーのトークンタイプ | 新規 `cueMarker` 追加 vs 既存 `keyword` 相当の再利用                                |
+| D2  | コマンド名のトークンタイプ             | `function` 相当 vs `method` 相当 vs 新規 `cueCommand`                               |
+| D3  | visit_cue_command の実装方式           | Span ベーステキストスキャン vs CueCommandNode フィールド直接利用                    |
+| D4  | TextMate 文法の挿入位置                | `action-line` の前 vs 後、patterns 配列内の順序                                     |
+| D5  | ScopedName の actor:name 分割粒度      | `@actor:name` 形式で actor/name を別トークンにするか全体で1トークンか               |
 | D6  | 括弧・カンマ記号のトークン化           | `(` `)` `,` 等の区切り記号を OPERATOR トークンとして生成するか、TextMate に委ねるか |
 
 ---
