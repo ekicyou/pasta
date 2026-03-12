@@ -41,7 +41,7 @@
 
 1. When `!command` 形式のキューコマンド行が解析された場合, the pasta_lsp shall マーカー（`!` / `！`）と コマンド名をそれぞれ独立したセマンティックトークンとして生成する
 2. When `!command@scope` 形式のキューコマンド行が解析された場合, the pasta_lsp shall マーカー・コマンド名・`@` 記号・スコープ識別子をそれぞれ独立したセマンティックトークンとして生成する
-3. When `!command@scope(arg1, arg2)` 形式のキューコマンド行が解析された場合, the pasta_lsp shall マーカー・コマンド名・スコープ・括弧・各引数をそれぞれ独立したセマンティックトークンとして生成する
+3. When `!command@scope(arg1, arg2)` 形式のキューコマンド行が解析された場合, the pasta_lsp shall マーカー・コマンド名・スコープ・各引数をそれぞれ独立したセマンティックトークンとして生成する（括弧・カンマ等の区切り記号のトークン化は設計判断 D6 で決定）
 4. When 引数に文字列リテラル（`"..."` / `「...」`）が含まれる場合, the pasta_lsp shall 文字列リテラル用のトークンタイプで生成する
 5. When 引数に数値リテラルが含まれる場合, the pasta_lsp shall 数値リテラル用のトークンタイプで生成する
 6. When 引数に `@` 参照が含まれる場合, the pasta_lsp shall 単語参照用のトークンタイプで生成する
@@ -64,7 +64,7 @@
 
 #### Acceptance Criteria
 
-1. The VSCode 拡張 shall `pasta.tmLanguage.json` にキューコマンド行パターンを追加し、`!` / `！` で始まる行を認識する
+1. The VSCode 拡張 shall `pasta.tmLanguage.json` にキューコマンド行パターンを追加し、`!` / `！` で始まる行を認識する（インデント部の正規表現は Oniguruma の `\s` が U+3000 全角スペースを含まないため `[\s\u3000]+` を使用すること）
 2. The VSCode 拡張 shall キューコマンドマーカー（`!` / `！`）に `keyword.other.marker.pasta` スコープを割り当てる
 3. The VSCode 拡張 shall キューコマンド名に `entity.name.function.cue.pasta` スコープを割り当てる
 4. The VSCode 拡張 shall キューコマンドの `@scope` 部分に参照用スコープを割り当てる
@@ -104,6 +104,7 @@
 | D3  | visit_cue_command の実装方式           | Span ベーステキストスキャン vs CueCommandNode フィールド直接利用      |
 | D4  | TextMate 文法の挿入位置                | `action-line` の前 vs 後、patterns 配列内の順序                       |
 | D5  | ScopedName の actor:name 分割粒度      | `@actor:name` 形式で actor/name を別トークンにするか全体で1トークンか |
+| D6  | 括弧・カンマ記号のトークン化           | `(` `)` `,` 等の区切り記号を OPERATOR トークンとして生成するか、TextMate に委ねるか |
 
 ---
 
