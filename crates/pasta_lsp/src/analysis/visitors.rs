@@ -564,9 +564,175 @@ impl super::AnalysisEngine {
                 Self::visit_continue_action(ca, source, tokens);
             }
             LocalSceneItem::CueCommand(cue) => {
-                // キューコマンド行のセマンティックトークン生成
+                // キューコマンド行の細粒度セマンティックトークン生成
                 if cue.span.is_valid() {
-                    Self::add_token_from_span(&cue.span, source, token_type::OPERATOR, 0, tokens);
+                    Self::visit_cue_command(cue, source, tokens);
+                }
+            }
+        }
+    }
+
+    fn visit_cue_command(cue: &CueCommandNode, source: &str, tokens: &mut Vec<RawToken>) {
+        let line = cue.span.start_line;
+        let line_text = get_line_text(source, line);
+        let line_start = line_byte_offset(source, line);
+        let span_start_in_line = cue.span.start_byte.saturating_sub(line_start);
+        let span_end_in_line = cue.span.end_byte.saturating_sub(line_start).min(line_text.len());
+        let span_text = &line_text[span_start_in_line..span_end_in_line];
+        let base_offset = span_start_in_line;
+        let line0 = (line - 1) as u32;
+
+        // Skip leading whitespace (pad)
+        let trimmed = span_text.trim_start();
+        let mut cursor = span_text.len() - trimmed.len();
+
+        // 1) マーカー: ！ (3 bytes) or ! (1 byte) — 全角優先
+        let remaining = &span_text[cursor..];
+        let marker = if remaining.starts_with('！') {
+            "！"
+        } else if remaining.starts_with('!') {
+            "!"
+        } else {
+            return; // マーカー検出失敗 — サイレントフォールバック
+        };
+        tokens.push(RawToken {
+            line: line0,
+            start_char: utf8_offset_to_utf16(line_text, base_offset + cursor),
+            length: utf8_len_to_utf16(marker),
+            token_type: token_type::CUE_MARKER,
+            modifiers: 0,
+        });
+        cursor += marker.len();
+
+        // 2) コマンド名
+        if let Some(name_pos) = span_text[cursor..].find(cue.command.as_str()) {
+            let name_start = cursor + name_pos;
+            tokens.push(RawToken {
+                line: line0,
+                start_char: utf8_offset_to_utf16(line_text, base_offset + name_start),
+                length: utf8_len_to_utf16(&cue.command),
+                token_type: token_type::CUE_COMMAND,
+                modifiers: 0,
+            });
+            cursor = name_start + cue.command.len();
+        }
+
+        // 3) スコープ: ScopedName.span (@名前 全体を 1 WORD トークン)
+        if let Some(ref scope) = cue.scope {
+            if scope.span.is_valid() {
+                Self::add_token_from_span(&scope.span, source, token_type::WORD, 0, tokens);
+                // カーソルを scope 後に進める
+                let scope_end = scope.span.end_byte.saturating_sub(line_start);
+                if scope_end > cursor + span_start_in_line {
+                    cursor = scope_end - span_start_in_line;
+                }
+            }
+        }
+
+        // 4) 引数リスト
+        if !cue.args.is_empty() {
+            let remaining = &span_text[cursor..];
+            // 開き括弧検出
+            if let Some(paren_pos) = find_open_paren(remaining) {
+                let abs_paren = cursor + paren_pos;
+                let paren_char = &span_text[abs_paren..abs_paren + char_len_at(span_text, abs_paren)];
+                tokens.push(RawToken {
+                    line: line0,
+                    start_char: utf8_offset_to_utf16(line_text, base_offset + abs_paren),
+                    length: utf8_len_to_utf16(paren_char),
+                    token_type: token_type::OPERATOR,
+                    modifiers: 0,
+                });
+
+                let inner_start = abs_paren + paren_char.len();
+                let close_pos = find_close_paren(span_text, inner_start);
+                let args_text = if let Some(cp) = close_pos {
+                    &span_text[inner_start..cp]
+                } else {
+                    &span_text[inner_start..]
+                };
+
+                // 各引数をスキャン
+                let mut arg_cursor = 0usize;
+                for arg in &cue.args {
+                    let remaining_args = &args_text[arg_cursor..];
+                    // カンマ・空白スキップ
+                    let skip = remaining_args
+                        .find(|c: char| !c.is_whitespace() && c != '、' && c != ',')
+                        .unwrap_or(0);
+                    let arg_text_start = arg_cursor + skip;
+                    let arg_remaining = &args_text[arg_text_start..];
+                    let arg_end = find_arg_end(arg_remaining);
+                    let arg_slice = &args_text[arg_text_start..arg_text_start + arg_end];
+                    let arg_base = base_offset + inner_start + arg_text_start;
+
+                    match arg {
+                        CueArgToken::Ident(s) => {
+                            if let Some(pos) = arg_slice.find(s.as_str()) {
+                                tokens.push(RawToken {
+                                    line: line0,
+                                    start_char: utf8_offset_to_utf16(line_text, arg_base + pos),
+                                    length: utf8_len_to_utf16(s),
+                                    token_type: token_type::CUE_COMMAND,
+                                    modifiers: 0,
+                                });
+                            }
+                        }
+                        CueArgToken::StringLiteral(s) => {
+                            // 文字列リテラルはソース上では括弧付き 「...」 or "..."
+                            // arg_slice に括弧を含む全テキストがあるので、中身を検索
+                            if let Some(pos) = arg_slice.find(s.as_str()) {
+                                tokens.push(RawToken {
+                                    line: line0,
+                                    start_char: utf8_offset_to_utf16(line_text, arg_base + pos),
+                                    length: utf8_len_to_utf16(s),
+                                    token_type: token_type::TALK,
+                                    modifiers: 0,
+                                });
+                            }
+                        }
+                        CueArgToken::Integer(_) | CueArgToken::Float(_) => {
+                            if let Some((start, end)) = find_number_literal(arg_slice) {
+                                let num_text = &arg_slice[start..end];
+                                tokens.push(RawToken {
+                                    line: line0,
+                                    start_char: utf8_offset_to_utf16(line_text, arg_base + start),
+                                    length: utf8_len_to_utf16(num_text),
+                                    token_type: token_type::NUMBER,
+                                    modifiers: 0,
+                                });
+                            }
+                        }
+                        CueArgToken::AtRef(name) => {
+                            // @name — ＠ or @ + name
+                            let patterns = [format!("＠{}", name), format!("@{}", name)];
+                            for pat in &patterns {
+                                if let Some(pos) = arg_slice.find(pat.as_str()) {
+                                    tokens.push(RawToken {
+                                        line: line0,
+                                        start_char: utf8_offset_to_utf16(line_text, arg_base + pos),
+                                        length: utf8_len_to_utf16(pat),
+                                        token_type: token_type::WORD,
+                                        modifiers: 0,
+                                    });
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    arg_cursor = arg_text_start + arg_end;
+                }
+
+                // 閉じ括弧
+                if let Some(cp) = close_pos {
+                    let close_char = &span_text[cp..cp + char_len_at(span_text, cp)];
+                    tokens.push(RawToken {
+                        line: line0,
+                        start_char: utf8_offset_to_utf16(line_text, base_offset + cp),
+                        length: utf8_len_to_utf16(close_char),
+                        token_type: token_type::OPERATOR,
+                        modifiers: 0,
+                    });
                 }
             }
         }

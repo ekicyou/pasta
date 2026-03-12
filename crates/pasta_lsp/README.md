@@ -21,7 +21,7 @@ Pasta DSL の Language Server Protocol (LSP) 実装クレート。
 ├─────────────────────────────────────────────────┤
 │  AnalysisEngine (analysis/)                     │
 │  - mod.rs: AST → セマンティックトークン変換     │
-│  - token_types.rs: 14 トークンタイプ / 3 モディファイア │
+│  - token_types.rs: 17 トークンタイプ / 3 モディファイア │
 │  - visitors.rs: AST ビジター                    │
 │  - text_utils.rs: UTF-8 → UTF-16 位置変換       │
 │  - 部分パースフォールバック (parse_str_partial)  │
@@ -37,22 +37,25 @@ Pasta DSL の Language Server Protocol (LSP) 実装クレート。
 
 ## セマンティックトークンタイプ
 
-| トークンタイプ | 対応する Pasta 構文要素     |
-| -------------- | --------------------------- |
-| comment        | コメント行 (`＃` / `#`)     |
-| namespace      | グローバルシーン (`＊` / `*`) |
-| scene          | ローカルシーン (`・` / `-`)  |
-| decorator      | 属性定義 (`＆` / `&`)       |
-| word           | 単語定義 (`＠` / `@`)       |
-| variable       | 変数参照 (`＄` / `$`)       |
-| call           | Call文 (`＞` / `>`)          |
-| actor          | アクター定義 (`％` / `%`)   |
-| actorName      | アクション行のアクター名    |
-| codeBlock      | Lua コードブロック          |
-| string         | 文字列リテラル / Talk テキスト |
-| sakuraScript   | さくらスクリプトタグ         |
-| escape         | エスケープシーケンス         |
-| operator       | コロン区切り (`：` / `:`)    |
+| トークンタイプ | 対応する Pasta 構文要素             |
+| -------------- | ----------------------------------- |
+| comment        | コメント行 (`＃` / `#`)             |
+| namespace      | グローバルシーン (`＊` / `*`)       |
+| scene          | ローカルシーン (`・` / `-`)         |
+| decorator      | 属性定義 (`＆` / `&`)               |
+| word           | 単語定義 (`＠` / `@`)               |
+| variable       | 変数参照 (`＄` / `$`)               |
+| call           | Call文 (`＞` / `>`)                 |
+| actor          | アクター定義 (`％` / `%`)           |
+| actorName      | アクション行のアクター名            |
+| codeBlock      | Lua コードブロック                  |
+| string         | 文字列リテラル / Talk テキスト      |
+| sakuraScript   | さくらスクリプトタグ                |
+| escape         | エスケープシーケンス                |
+| operator       | コロン区切り (`：` / `:`)           |
+| number         | 数値リテラル                        |
+| cueMarker      | キューコマンドマーカー (`！` / `!`) |
+| cueCommand     | キューコマンド名                    |
 
 ## 公開 API
 
@@ -86,22 +89,23 @@ cargo build -p pasta_lsp --target wasm32-unknown-unknown --release
 
 ## テスト
 
-79 テスト（インラインテスト 19 + 統合テスト 60）:
+88 テスト（インラインテスト 19 + 統合テスト 69）:
 
-| テストファイル                 | テスト数 | 内容                              |
-| ------------------------------ | -------- | --------------------------------- |
-| analysis インラインテスト      | 7        | analysis モジュール               |
-| document インラインテスト      | 5        | document モジュール               |
-| transport インラインテスト     | 7        | WASM型変換・エントリポイント      |
-| semantic_token_test.rs         | 9        | 14 トークンタイプ識別             |
-| fullwidth_halfwidth_test.rs    | 5        | 全角/半角マーカー同等認識         |
-| japanese_identifier_test.rs    | 5        | 日本語識別子のトークン化          |
-| utf16_conversion_test.rs       | 12       | UTF-8→UTF-16 位置変換             |
-| lsp_lifecycle_test.rs          | 4        | LSP ライフサイクル統合            |
-| document_sync_test.rs          | 4        | ドキュメント同期                  |
-| diagnostics_test.rs            | 6        | パースエラー診断                  |
-| crash_recovery_test.rs         | 4        | パニック回復・サーバー継続        |
-| partial_token_test.rs          | 5        | 部分パース→トークン提供           |
+| テストファイル              | テスト数 | 内容                         |
+| --------------------------- | -------- | ---------------------------- |
+| analysis インラインテスト   | 7        | analysis モジュール          |
+| document インラインテスト   | 5        | document モジュール          |
+| transport インラインテスト  | 7        | WASM型変換・エントリポイント |
+| semantic_token_test.rs      | 9        | 17 トークンタイプ識別        |
+| fullwidth_halfwidth_test.rs | 5        | 全角/半角マーカー同等認識    |
+| japanese_identifier_test.rs | 5        | 日本語識別子のトークン化     |
+| utf16_conversion_test.rs    | 12       | UTF-8→UTF-16 位置変換        |
+| lsp_lifecycle_test.rs       | 4        | LSP ライフサイクル統合       |
+| document_sync_test.rs       | 4        | ドキュメント同期             |
+| diagnostics_test.rs         | 6        | パースエラー診断             |
+| crash_recovery_test.rs      | 4        | パニック回復・サーバー継続   |
+| partial_token_test.rs       | 5        | 部分パース→トークン提供      |
+| cue_command_token_test.rs   | 10       | キューコマンドトークン生成   |
 
 ## 依存関係
 

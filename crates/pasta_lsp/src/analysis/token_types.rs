@@ -25,6 +25,8 @@ pub const TOKEN_TYPES: &[SemanticTokenType] = &[
     SemanticTokenType::new("escape"),       // 12: エスケープシーケンス
     SemanticTokenType::OPERATOR,            // 13: コロン区切り
     SemanticTokenType::NUMBER,              // 14: 数値リテラル
+    SemanticTokenType::new("cueMarker"),    // 15: キューコマンドマーカー (!/！)
+    SemanticTokenType::new("cueCommand"),   // 16: キューコマンド名
 ];
 
 /// トークンモディファイア
@@ -51,6 +53,8 @@ pub mod token_type {
     pub const ESCAPE: u32 = 12;
     pub const OPERATOR: u32 = 13;
     pub const NUMBER: u32 = 14;
+    pub const CUE_MARKER: u32 = 15;
+    pub const CUE_COMMAND: u32 = 16;
 }
 
 /// Generate the SemanticTokensLegend for registration with the LSP client.

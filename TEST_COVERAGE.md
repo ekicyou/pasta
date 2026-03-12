@@ -2,8 +2,8 @@
 
 このドキュメントは、[SOUL.md](SOUL.md) で定義されたコア機能と、それを検証するテストの対応関係を示します。
 
-**最終更新**: 2026-02-22（`ai-friendly-file-split` リファクタリング反映）  
-**総テスト数**: 840+テスト（全パス ✅）
+**最終更新**: 2026-03-12（`lsp-spec-conformance` キューコマンドトークン細分化反映）  
+**総テスト数**: 850+テスト（全パス ✅）
 
 ---
 
@@ -105,7 +105,7 @@
 
 | 機能                                 | テストファイル                                    | 状態   | 説明                                         |
 | ------------------------------------ | ------------------------------------------------- | ------ | -------------------------------------------- |
-| セマンティックトークン識別           | `semantic_token_test.rs`                          | ✅ 完了 | 9テスト（14トークンタイプ）                  |
+| セマンティックトークン識別           | `semantic_token_test.rs`                          | ✅ 完了 | 9テスト（17トークンタイプ）                  |
 | 全角/半角マーカー同等認識            | `fullwidth_halfwidth_test.rs`                     | ✅ 完了 | 5テスト                                      |
 | 日本語識別子トークン化               | `japanese_identifier_test.rs`                     | ✅ 完了 | 5テスト                                      |
 | UTF-8→UTF-16位置変換                 | `utf16_conversion_test.rs`                        | ✅ 完了 | 12テスト（サロゲートペア含む）               |
@@ -114,6 +114,7 @@
 | Diagnostics通知                      | `diagnostics_test.rs`                             | ✅ 完了 | 6テスト                                      |
 | パーサークラッシュ回復               | `crash_recovery_test.rs`                          | ✅ 完了 | 4テスト（catch_unwind保護）                  |
 | 部分パーストークン提供               | `partial_token_test.rs`                           | ✅ 完了 | 5テスト（Phase 1→2→3フォールバック）         |
+| キューコマンドトークン生成           | `cue_command_token_test.rs`                       | ✅ 完了 | 10テスト（4形式・全角半角・引数種別・混在・診断） |
 | 部分パースAPI                        | `partial_parse_test.rs`                           | ✅ 完了 | 28テスト（pasta_dslクレート）                |
 | DocumentManager / AnalysisEngine     | `analysis_test.rs`（外部化）                      | ✅ 完了 | 12テスト（外部化済み）                       |
 

@@ -40,7 +40,7 @@ fn test_lifecycle_open_analyze_close() {
 fn test_lifecycle_capabilities_legend() {
     // Verify the legend contains all expected token types
     let legend = pasta_lsp::analysis::semantic_tokens_legend();
-    assert_eq!(legend.token_types.len(), 15, "15トークンタイプ");
+    assert_eq!(legend.token_types.len(), 17, "17トークンタイプ");
     assert_eq!(legend.token_modifiers.len(), 3, "3モディファイア");
 }
 

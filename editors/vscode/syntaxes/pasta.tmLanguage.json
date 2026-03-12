@@ -28,6 +28,9 @@
             "include": "#call"
         },
         {
+            "include": "#cue-command"
+        },
+        {
             "include": "#actor"
         },
         {
@@ -198,6 +201,62 @@
         "inline-talk": {
             "match": "[^＠@＄$\\\\]+",
             "name": "meta.talk.pasta"
+        },
+        "cue-command": {
+            "match": "^([\\s\u3000]*)([!！])([^@＠(（\\s\u3000]+)(?:([＠@])([^(（\\s\u3000]+))?(?:([（(])([^)）]*)?([）)])?)?",
+            "captures": {
+                "2": {
+                    "name": "keyword.other.marker.pasta"
+                },
+                "3": {
+                    "name": "entity.name.function.cue.pasta"
+                },
+                "4": {
+                    "name": "punctuation.separator.pasta"
+                },
+                "5": {
+                    "name": "variable.other.reference.pasta"
+                },
+                "6": {
+                    "name": "punctuation.bracket.begin.pasta"
+                },
+                "7": {
+                    "patterns": [
+                        {
+                            "include": "#cue-arg-string"
+                        },
+                        {
+                            "include": "#cue-arg-number"
+                        },
+                        {
+                            "include": "#cue-arg-at-ref"
+                        },
+                        {
+                            "include": "#cue-arg-ident"
+                        }
+                    ]
+                },
+                "8": {
+                    "name": "punctuation.bracket.end.pasta"
+                }
+            },
+            "name": "meta.cue-command.pasta"
+        },
+        "cue-arg-string": {
+            "match": "「[^」]*」|\"[^\"]*\"",
+            "name": "string.quoted.other.pasta"
+        },
+        "cue-arg-number": {
+            "match": "[0-9０-９]+(?:[.．][0-9０-９]+)?",
+            "name": "constant.numeric.pasta"
+        },
+        "cue-arg-at-ref": {
+            "match": "[＠@][^,、)）\\s\u3000]+",
+            "name": "variable.other.reference.pasta"
+        },
+        "cue-arg-ident": {
+            "match": "[^,、)）\\s\u3000]+",
+            "name": "entity.name.tag.pasta"
         }
     }
 }

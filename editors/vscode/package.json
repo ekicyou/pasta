@@ -101,6 +101,16 @@
                 "id": "number",
                 "superType": "number",
                 "description": "Numeric literal"
+            },
+            {
+                "id": "cueMarker",
+                "superType": "keyword",
+                "description": "Cue command marker (! / ！)"
+            },
+            {
+                "id": "cueCommand",
+                "superType": "function",
+                "description": "Cue command name"
             }
         ],
         "semanticTokenModifiers": [
@@ -157,6 +167,12 @@
                     ],
                     "number": [
                         "constant.numeric.pasta"
+                    ],
+                    "cueMarker": [
+                        "keyword.other.marker.pasta"
+                    ],
+                    "cueCommand": [
+                        "entity.name.function.cue.pasta"
                     ]
                 }
             }
