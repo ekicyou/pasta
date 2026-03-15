@@ -55,10 +55,12 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             // Use symmetric API: ACTOR:create_word(key):entry(...)
             // This pattern matches SCENE:create_word(key):entry(...)
             let entry_args = literals.join(", ");
-            self.writeln(&format!(
-                "ACTOR:create_word(\"{}\"):entry({})",
-                word_def.name(), entry_args
-            ))?;
+            for name in &word_def.names {
+                self.writeln(&format!(
+                    "ACTOR:create_word(\"{}\"):entry({})",
+                    name, entry_args
+                ))?;
+            }
         }
 
         // Generate code blocks (Requirement 4.関数定義)

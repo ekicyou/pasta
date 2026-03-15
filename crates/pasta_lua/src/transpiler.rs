@@ -479,4 +479,91 @@ mod tests {
         assert_eq!(entries[0].key, ":__actor_さくら__:通常");
         assert_eq!(entries[1].key, ":__actor_さくら__:普通");
     }
+
+    #[test]
+    fn test_transpile_multi_key_global_word_lua_output() {
+        let transpiler = LuaTranspiler::default();
+        let global_words = KeyWords {
+            names: vec!["女性".to_string(), "水の妖精".to_string()],
+            words: vec!["水無灯里".to_string(), "アリス・キャロル".to_string()],
+            span: Span::default(),
+        };
+
+        let file = PastaFile {
+            path: PathBuf::from("test.pasta"),
+            items: vec![FileItem::GlobalWord(global_words)],
+            span: Span::default(),
+        };
+        let mut output = Vec::new();
+
+        transpiler.transpile(&file, &mut output).unwrap();
+        let lua_code = String::from_utf8(output).unwrap();
+
+        // 各キーに対して create_word が出力されること
+        assert!(
+            lua_code.contains("PASTA.create_word(\"女性\"):entry(\"水無灯里\", \"アリス・キャロル\")"),
+            "女性キーの create_word が出力されること: {lua_code}"
+        );
+        assert!(
+            lua_code.contains("PASTA.create_word(\"水の妖精\"):entry(\"水無灯里\", \"アリス・キャロル\")"),
+            "水の妖精キーの create_word が出力されること: {lua_code}"
+        );
+    }
+
+    #[test]
+    fn test_transpile_multi_key_actor_word_lua_output() {
+        let transpiler = LuaTranspiler::default();
+        let actor = ActorScope {
+            name: "さくら".to_string(),
+            attrs: vec![],
+            words: vec![KeyWords {
+                names: vec!["通常".to_string(), "普通".to_string()],
+                words: vec!["\\s[0]".to_string()],
+                span: Span::default(),
+            }],
+            var_sets: vec![],
+            code_blocks: vec![],
+            span: Span::default(),
+        };
+        let file = create_pasta_file(vec![actor], vec![]);
+        let mut output = Vec::new();
+
+        transpiler.transpile(&file, &mut output).unwrap();
+        let lua_code = String::from_utf8(output).unwrap();
+
+        assert!(
+            lua_code.contains("ACTOR:create_word(\"通常\"):entry([=[\\s[0]]=])"),
+            "通常キーの create_word: {lua_code}"
+        );
+        assert!(
+            lua_code.contains("ACTOR:create_word(\"普通\"):entry([=[\\s[0]]=])"),
+            "普通キーの create_word: {lua_code}"
+        );
+    }
+
+    #[test]
+    fn test_transpile_single_key_backward_compat_lua_output() {
+        let transpiler = LuaTranspiler::default();
+        let global_words = KeyWords {
+            names: vec!["挨拶".to_string()],
+            words: vec!["こんにちは".to_string()],
+            span: Span::default(),
+        };
+
+        let file = PastaFile {
+            path: PathBuf::from("test.pasta"),
+            items: vec![FileItem::GlobalWord(global_words)],
+            span: Span::default(),
+        };
+        let mut output = Vec::new();
+
+        transpiler.transpile(&file, &mut output).unwrap();
+        let lua_code = String::from_utf8(output).unwrap();
+
+        // 単一キーでも従来と同一の出力
+        assert!(
+            lua_code.contains("PASTA.create_word(\"挨拶\"):entry(\"こんにちは\")"),
+            "単一キーの出力: {lua_code}"
+        );
+    }
 }

@@ -383,12 +383,15 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             .iter()
             .map(|w| StringLiteralizer::literalize(w))
             .collect::<Result<Vec<_>, _>>()?;
+        let entry = values.join(", ");
 
-        self.writeln(&format!(
-            "PASTA.create_word({}):entry({})",
-            StringLiteralizer::literalize(word.name())?,
-            values.join(", ")
-        ))?;
+        for name in &word.names {
+            self.writeln(&format!(
+                "PASTA.create_word({}):entry({})",
+                StringLiteralizer::literalize(name)?,
+                entry
+            ))?;
+        }
 
         Ok(())
     }
@@ -409,12 +412,15 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             .iter()
             .map(|w| StringLiteralizer::literalize(w))
             .collect::<Result<Vec<_>, _>>()?;
+        let entry = values.join(", ");
 
-        self.writeln(&format!(
-            "SCENE:create_word({}):entry({})",
-            StringLiteralizer::literalize(word.name())?,
-            values.join(", ")
-        ))?;
+        for name in &word.names {
+            self.writeln(&format!(
+                "SCENE:create_word({}):entry({})",
+                StringLiteralizer::literalize(name)?,
+                entry
+            ))?;
+        }
 
         Ok(())
     }
