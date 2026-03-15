@@ -30,6 +30,7 @@ pasta.dll用のLuaコード実装を助けるコーディングスキル（VS Co
 4. The SKILL.md shall スキルの目的（自然言語→pasta_lua準拠Luaコード変換サポート）・対象ドメイン・前提条件を冒頭に明記する
 5. The スキルフォルダ shall 別リポジトリにコピーして単体で機能するよう、pastaリポジトリ内の他ファイルへの参照に依存せず、必要な情報をすべてスキルフォルダ内に自己完結的に内包する
 6. The SKILL.md shall 姉妹スキル `pasta-ghost-authoring`（DSL層担当）との役割分離を明記する
+7. The SKILL.md shall Pasta DSLでは手間がかかるケース（大量の単語投入、構造化データからの変換等）について、Luaでの実装が適切である理由と判断基準を示す
 
 ### Requirement 2: Luaコーディング規約の組み込み
 
@@ -83,22 +84,7 @@ pasta.dll用のLuaコード実装を助けるコーディングスキル（VS Co
 4. The スキル shall シーン関数フォールバック（REGテーブル未登録時にSCENE.searchで検索）の動作を説明する
 5. The スキル shall 仮想ディスパッチャ（OnTalk/OnHour自動発行、`pasta.toml` の `talk_interval_min`/`talk_interval_max` 設定）を説明する
 
-### Requirement 6: 外部データソースからの単語辞書一括投入パターン集
-
-**Objective:** LLMとして、開発者がCSV・TSV・JSON等の外部データソースから大量の単語をLuaコードで効率的に投入したい場合に、WORDビルダーAPIの活用パターンと外部データ読み込みパターンがスキルに含まれていること により、Pasta DSLでは手間がかかる大量投入をLuaで簡潔に実現するコードを生成できるようにしたい。
-
-#### Acceptance Criteria
-1. The スキル shall `WORD.create_global(key):entry(...)` パターンによるグローバル単語一括投入の例を提供する
-2. The スキル shall `WORD.create_local(scene, key):entry(...)` パターンによるローカル単語投入の例を提供する
-3. The スキル shall `WORD.create_actor(actor, key):entry(...)` パターンによるアクター単語投入の例を提供する
-4. The スキル shall メソッドチェーンによる複数エントリ投入（`:entry(...):entry(...)`）の例を提供する
-5. The スキル shall 大量データ投入時のループパターン（テーブルデータからの一括登録）の例を提供する
-6. The スキル shall CSVファイルからの単語辞書一括投入パターン（ファイル読み込み→行パース→WORDビルダーによる登録）の例を提供する
-7. The スキル shall TSV・JSON等の別形式データからの投入パターン（`@json`モジュール活用を含む）の例を提供する
-8. The スキル shall 外部データから単語辞書へ変換する際のキーマッピング指針（CSV列→単語キー・値の対応付け）を説明する
-9. The スキル shall Pasta DSLの `＠単語名：値1、値2` 構文では手間がかかるケース（数百件以上の単語、構造化データからの変換等）について、Luaでの投入が適切である理由と判断基準を示す
-
-### Requirement 7: Luaブロック統合パターン集
+### Requirement 6: Luaブロック統合パターン集
 
 **Objective:** LLMとして、Pasta DSLのLuaブロック（` ```lua ``` `）内でのコード記述パターンがスキルに含まれていること により、DSLとLuaの連携コードを正確に生成できるようにしたい。
 
@@ -109,7 +95,7 @@ pasta.dll用のLuaコード実装を助けるコーディングスキル（VS Co
 4. The スキル shall Luaブロック内からのシーンCall（`act:call(global, key, attrs)`）を説明する
 5. The スキル shall GLOBALテーブルへの関数登録パターン（`scripts/main.lua` 等でのカスタム関数定義）を説明する
 
-### Requirement 8: テスト・Lint規約の組み込み
+### Requirement 7: テスト・Lint規約の組み込み
 
 **Objective:** LLMとして、生成したLuaコードのテストコードも併せて生成するために、テストフレームワーク・Lint規約がスキルに含まれていること により、テスト可能なコードを生成できるようにしたい。
 
