@@ -51,8 +51,12 @@ pub(crate) fn parse_key_words(pair: Pair<Rule>) -> Result<KeyWords, ParseError> 
 
     for inner in pair.into_inner() {
         match inner.as_rule() {
-            Rule::id => {
-                names.push(inner.as_str().to_string());
+            Rule::key_list => {
+                for key_inner in inner.into_inner() {
+                    if key_inner.as_rule() == Rule::id {
+                        names.push(key_inner.as_str().to_string());
+                    }
+                }
             }
             Rule::words => {
                 for word_inner in inner.into_inner() {

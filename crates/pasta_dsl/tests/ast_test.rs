@@ -126,3 +126,104 @@ fn test_ast_types_debug() {
     };
     let _ = format!("{:?}", action);
 }
+
+// ============================================================================
+// word-multi-key: 複数キー単語定義のパーステスト
+// ============================================================================
+
+/// 単一キーの従来形式が names.len() == 1 を返す（後方互換性）
+#[test]
+fn test_parse_single_key_word_definition() {
+    let source = "＠女性：水無灯里、アリス・キャロル\n";
+    let file = parse_str(source, "test.pasta").expect("パース成功すべし");
+
+    let word = match &file.items[0] {
+        FileItem::GlobalWord(w) => w,
+        other => panic!("GlobalWord を期待, got: {:?}", other),
+    };
+    assert_eq!(word.names.len(), 1);
+    assert_eq!(word.name(), "女性");
+    assert_eq!(word.words, vec!["水無灯里", "アリス・キャロル"]);
+}
+
+/// 2キー指定のパーステスト
+#[test]
+fn test_parse_two_key_word_definition() {
+    let source = "＠女性、水の妖精：水無灯里、アリス・キャロル\n";
+    let file = parse_str(source, "test.pasta").expect("パース成功すべし");
+
+    let word = match &file.items[0] {
+        FileItem::GlobalWord(w) => w,
+        other => panic!("GlobalWord を期待, got: {:?}", other),
+    };
+    assert_eq!(word.names.len(), 2);
+    assert_eq!(word.names[0], "女性");
+    assert_eq!(word.names[1], "水の妖精");
+    assert_eq!(word.name(), "女性");
+    assert_eq!(word.words, vec!["水無灯里", "アリス・キャロル"]);
+}
+
+/// 3キー以上のパーステスト
+#[test]
+fn test_parse_three_key_word_definition() {
+    let source = "＠人物、女性、水の妖精：水無灯里、アリス・キャロル\n";
+    let file = parse_str(source, "test.pasta").expect("パース成功すべし");
+
+    let word = match &file.items[0] {
+        FileItem::GlobalWord(w) => w,
+        other => panic!("GlobalWord を期待, got: {:?}", other),
+    };
+    assert_eq!(word.names.len(), 3);
+    assert_eq!(word.names[0], "人物");
+    assert_eq!(word.names[1], "女性");
+    assert_eq!(word.names[2], "水の妖精");
+    assert_eq!(word.words, vec!["水無灯里", "アリス・キャロル"]);
+}
+
+/// 半角カンマでのキー区切り
+#[test]
+fn test_parse_multi_key_half_width_comma() {
+    let source = "＠人物,女性：水無灯里\n";
+    let file = parse_str(source, "test.pasta").expect("パース成功すべし");
+
+    let word = match &file.items[0] {
+        FileItem::GlobalWord(w) => w,
+        other => panic!("GlobalWord を期待, got: {:?}", other),
+    };
+    assert_eq!(word.names.len(), 2);
+    assert_eq!(word.names[0], "人物");
+    assert_eq!(word.names[1], "女性");
+}
+
+/// シーンスコープ内での複数キー単語定義
+#[test]
+fn test_parse_multi_key_in_scene_scope() {
+    let source = "＊メイン\n　＠場所、地名：東京、大阪\n　　さくら：テスト。\n";
+    let file = parse_str(source, "test.pasta").expect("パース成功すべし");
+
+    let scene = match &file.items[0] {
+        FileItem::GlobalSceneScope(s) => s,
+        other => panic!("GlobalSceneScope を期待, got: {:?}", other),
+    };
+    assert_eq!(scene.words.len(), 1);
+    assert_eq!(scene.words[0].names.len(), 2);
+    assert_eq!(scene.words[0].names[0], "場所");
+    assert_eq!(scene.words[0].names[1], "地名");
+    assert_eq!(scene.words[0].words, vec!["東京", "大阪"]);
+}
+
+/// アクター辞書内での複数キー単語定義
+#[test]
+fn test_parse_multi_key_in_actor_scope() {
+    let source = "％さくら\n　＠通常、普通：\\s[0]、\\s[1]\n";
+    let file = parse_str(source, "test.pasta").expect("パース成功すべし");
+
+    let actor = match &file.items[0] {
+        FileItem::ActorScope(a) => a,
+        other => panic!("ActorScope を期待, got: {:?}", other),
+    };
+    assert_eq!(actor.words.len(), 1);
+    assert_eq!(actor.words[0].names.len(), 2);
+    assert_eq!(actor.words[0].names[0], "通常");
+    assert_eq!(actor.words[0].names[1], "普通");
+}

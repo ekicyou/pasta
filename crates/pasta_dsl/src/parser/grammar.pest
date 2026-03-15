@@ -130,7 +130,8 @@ digit_id       = @{ digit+ }
 // ################################################# key_value
 key_literal = { id ~ s ~ kv_marker ~ s ~ ( number_literal | string_literal ) }
 key_expr    = { id ~ s ~ kv_marker ~ s ~ expr }
-key_words   = { id ~ s ~ kv_marker ~ s ~ words }
+key_list    = { id ~ ( comma_sep ~ id )* }
+key_words   = { key_list ~ s ~ kv_marker ~ s ~ words }
 
 // ################################################# word_dic
 words         =  { word ~ ( comma_sep ~ word )* ~ comma_sep? }
