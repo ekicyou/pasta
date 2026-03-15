@@ -298,13 +298,13 @@ end
   - シーン関数は必ずこの呼び出しで始まる。`save`（永続変数）と `var`（アクション内一時変数）を取得
   - コード例 2〜3行で示す
 - 主要メソッド一覧テーブル: `talk`, `raw_script`, `surface`, `wait`, `newline`, `clear`, `word`, `call`, `yield`, `build`
-- ACTフィールド: `actors`, `save`, `app_ctx`, `var`, `token`, `current_scene`（`req` は ACT のフィールドではなく REG ハンドラ関数の引数パラメータ）
+- ACTフィールド: `actors`, `save`, `app_ctx`, `var`, `token`, `current_scene`
 
 #### 5.3 SCENE モジュール（~15行）
 - `pasta.scene` — シーン登録・検索
-- `SCENE.create_scene(name)` — グローバルシーン作成
-- `SCENE.search(name, global_scene_name?, attrs?)` — シーン検索（3引数; `ACT.call` 内部から使用）
-- `co_exec` — コルーチン実行
+- `SCENE.create_scene(base_name, local_name?, scene_func?)` — グローバルシーン作成（カウンタ自動採番）
+- `SCENE.search(name, global_scene_name?, attrs?)` — シーン検索（3引数: 名前, グローバルシーン名, 属性）
+- `SCENE.co_exec(name, global_scene_name?, attrs?)` — シーンコルーチン実行
 - DSL→Luaブリッジ: `function SCENE.func(act) ... end` パターン（Req 4 AC8）
 
 #### 5.4 WORD モジュール（~20行）
@@ -347,6 +347,7 @@ end
 #### 6.1 REG テーブル登録（~15行）
 - `local REG = require("pasta.shiori.event.register")`
 - 登録パターン: `REG.EventName = function(req) ... end`
+- `req` パラメータ: SHIORIリクエスト情報（`req.id`, `req.reference[]`, `req.date` 等）
 - 最小使用例（OnBoot登録、3行）
 
 #### 6.2 RES レスポンス生成（~15行）
@@ -364,9 +365,9 @@ end
 - DSLの `＊OnBoot` 等がこの機構で自動的に呼び出される旨の説明
 
 #### 6.5 仮想ディスパッチャ（~10行）
-- モジュール: `require("pasta.shiori.event.virtual_dispatcher")`
-- OnTalk / OnHour の自動発行メカニズム（`dispatcher.dispatch(req)` 経由）
-- pasta.toml `[ghost]` セクション: `talk_interval_min`, `talk_interval_max`
+- `pasta.shiori.event.virtual_dispatcher` モジュール
+- OnTalk / OnHour の自動発行メカニズム
+- pasta.toml `[ghost]` セクション: `talk_interval_min`, `talk_interval_max`, `hour_margin`
 - OnSecondChange をトリガーとして内部的にディスパッチ
 
 **設計判断**:
@@ -415,7 +416,7 @@ end
 ### 行数管理
 
 - 各セクションの目標行数を上記テーブルに記載
-- 合計目標: 555行（±10%で500〜610行）
+- 合計目標: 555行（±10%で490〜610行）
 - 600行超過時は §3, §4 を優先的に圧縮（EmmyLua/エラーハンドリングの例をさらに削減）
 
 ### 整合性管理
