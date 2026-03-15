@@ -2,8 +2,8 @@
 
 このドキュメントは、[SOUL.md](SOUL.md) で定義されたコア機能と、それを検証するテストの対応関係を示します。
 
-**最終更新**: 2026-03-12（`lsp-spec-conformance` キューコマンドトークン細分化反映）  
-**総テスト数**: 850+テスト（全パス ✅）
+**最終更新**: 2026-03-15（`word-multi-key` 複数キー単語定義反映）  
+**総テスト数**: 880+テスト（全パス ✅）
 
 ---
 
@@ -29,6 +29,7 @@
 | アクター定義（％）       | `actor_code_block_test.rs`                     | ✅ 完了 | アクターコードブロック                    |
 | 属性定義（＆）           | フィクスチャあり                               | 🔶 部分 | `transpiler2/attribute_inheritance.pasta` |
 | 単語定義（＠）           | `actor_word_dictionary_test.rs`                | ✅ 完了 | 単語定義・参照                            |
+| 複数キー単語定義（＠k1、k2）| `ast_test.rs`                               | ✅ 完了 | 6テスト（2キー・3キー・半角カンマ・各スコープ）|
 | 変数定義（＄）           | フィクスチャあり                               | 🔶 部分 | `transpiler2/variable_scope.pasta`        |
 | Call文（＞）             | `transpiler_scene_test.rs`                     | ✅ 完了 | 制御フロー                                |
 | コメント行（＃）         | 暗黙的テスト                                   | 🔶 部分 | 明示的テストなし                          |
@@ -58,6 +59,7 @@
 | 変数スコープ         | フィクスチャあり                                                                            | 🔶 部分 | Local/Global変数                  |
 | Call/末尾Call最適化  | `transpiler_scene_test.rs`                                                                  | ✅ 完了 | 自動判定                          |
 | CueCommandパススルー | `cue_command_passthrough_test.rs`                                                           | ✅ 完了 | 5テスト（Lua変換スキップ検証）    |
+| 複数キー単語登録     | `transpiler.rs`（インライン）                                                               | ✅ 完了 | 7テスト（登録・Lua出力・後方互換）        |
 | エンコーディング     | `pasta_lua_encoding_test.rs`                                                                | ✅ 完了 | 文字エンコード                    |
 
 ### 2.4 Runtime層テスト（実行エンジン）
