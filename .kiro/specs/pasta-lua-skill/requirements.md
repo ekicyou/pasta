@@ -31,6 +31,7 @@ pasta.dll用のLuaコード実装を助けるコーディングスキル（VS Co
 5. The スキルフォルダ shall 別リポジトリにコピーして単体で機能するよう、pastaリポジトリ内の他ファイルへの参照に依存せず、必要な情報をすべてスキルフォルダ内に自己完結的に内包する
 6. The SKILL.md shall 姉妹スキル `pasta-ghost-authoring`（DSL層担当）との役割分離を明記する
 7. The SKILL.md shall Pasta DSLでは手間がかかるケース（大量の単語投入、構造化データからの変換等）について、Luaでの実装が適切である理由と判断基準を示す
+8. The SKILL.md shall 独自のLuaスクリプトの配置先（`scripts/` フォルダ）を説明する
 
 ### Requirement 2: Luaコーディング規約の組み込み
 
@@ -72,6 +73,7 @@ pasta.dll用のLuaコード実装を助けるコーディングスキル（VS Co
 5. The スキル shall GLOBALモジュール（`pasta.global` のユーザー定義グローバル関数テーブル）を説明する
 6. The スキル shall SAVEモジュール（`pasta.save` の永続化データアクセス、ACT経由の使用パターン）を説明する
 7. The スキル shall `pasta.finalize_scene()` の呼び出しタイミングと役割を説明する
+8. The スキル shall DSL内Luaブロックから呼ばれる関数の構造規約（`function SCENE.func(act) ... end` パターン）を説明する
 
 ### Requirement 5: SHIORIイベントハンドラの Lua実装パターン
 
@@ -84,18 +86,7 @@ pasta.dll用のLuaコード実装を助けるコーディングスキル（VS Co
 4. The スキル shall シーン関数フォールバック（REGテーブル未登録時にSCENE.searchで検索）の動作を説明する
 5. The スキル shall 仮想ディスパッチャ（OnTalk/OnHour自動発行、`pasta.toml` の `talk_interval_min`/`talk_interval_max` 設定）を説明する
 
-### Requirement 6: Luaブロック統合パターン集
-
-**Objective:** LLMとして、Pasta DSLのLuaブロック（` ```lua ``` `）内でのコード記述パターンがスキルに含まれていること により、DSLとLuaの連携コードを正確に生成できるようにしたい。
-
-#### Acceptance Criteria
-1. The スキル shall Luaブロック内関数定義の基本パターン（`function SCENE.func(act) ... end`）を説明する
-2. The スキル shall `act:init_scene(SCENE)` による save/var 取得パターンを説明する
-3. The スキル shall Luaブロック内からの単語参照（`act:word(name)` 4段階検索）を説明する
-4. The スキル shall Luaブロック内からのシーンCall（`act:call(global, key, attrs)`）を説明する
-5. The スキル shall GLOBALテーブルへの関数登録パターン（`scripts/main.lua` 等でのカスタム関数定義）を説明する
-
-### Requirement 7: テスト・Lint規約の組み込み
+### Requirement 6: テスト・Lint規約の組み込み
 
 **Objective:** LLMとして、生成したLuaコードのテストコードも併せて生成するために、テストフレームワーク・Lint規約がスキルに含まれていること により、テスト可能なコードを生成できるようにしたい。
 

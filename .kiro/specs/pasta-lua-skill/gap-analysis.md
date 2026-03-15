@@ -56,10 +56,9 @@
 | **Req 1: スキルファイル構造** | pasta-ghost-authoring SKILL.md | ✅ 十分 | 姉妹スキルの構造をテンプレートとして再利用可能 |
 | **Req 2: コーディング規約** | lua-coding.md | ✅ 十分 | ~650行の規約から必要部分を抽出・転記。整合性制約含む |
 | **Req 3: ランタイムAPI** | LUA_API.md | ✅ 十分 | ~1200行のリファレンスから必要APIを転記。整合性制約含む |
-| **Req 4: 内部Luaモジュール** | scripts/pasta/*.lua ソース | ✅ 十分 | 全モジュールのソースコードが利用可能 |
+| **Req 4: 内部Luaモジュール** | scripts/pasta/*.lua ソース | ✅ 十分 | 全モジュールのソースコードが利用可能。DSL→Luaブリッジ規約含む |
 | **Req 5: SHIORIハンドラ** | register.lua, virtual_dispatcher.lua, LUA_API.md | ✅ 十分 | REG/RES/仮想ディスパッチャの実装とドキュメント両方あり |
-| **Req 6: Luaブロック統合** | pasta-ghost-authoring SKILL.md §3.8, act.lua | ✅ 十分 | DSL側にLuaブロック記法あり、act.luaにAPI実装あり |
-| **Req 7: テスト・Lint** | lua-coding.md テストセクション | ✅ 十分 | lua_testフレームワーク仕様が記載済み |
+| **Req 6: テスト・Lint** | lua-coding.md テストセクション | ✅ 十分 | lua_testフレームワーク仕様が記載済み |
 
 ### ギャップ・制約の特定
 
@@ -83,7 +82,7 @@
 
 - **構成**:
   - `.agents/skills/pasta-lua-coding/SKILL.md` に全情報を集約
-  - YAML Frontmatter + 7〜9セクション構成
+  - YAML Frontmatter + 6〜7セクション構成
   - 想定行数: 400〜600行
 
 - **互換性**:
@@ -159,7 +158,7 @@
 
 ### 設計フェーズでの重点事項
 
-1. **セクション構成の確定**: 7要件を何セクションに集約するか。姉妹スキルの6セクション構成を参考に、6〜8セクションの目次を設計する
+1. **セクション構成の確定**: 6要件を何セクションに集約するか。姉妹スキルの6セクション構成を参考に、6〜7セクションの目次を設計する
 2. **情報量の圧縮戦略**: LUA_API.md (~1200行) と lua-coding.md (~650行) から、スキルに転記する情報の取捨選択基準を定義する（Gap①対応）
 3. **DSL vs Lua 判断基準の設計**: Req 1.7 の「いつLuaを使うべきか」ガイドラインを設計する
 
