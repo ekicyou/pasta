@@ -116,6 +116,21 @@
 - **Risk 2**: テストコードの構造体リテラル構築（`KeyWords { name: ... }`）のコンパイルエラー — **Mitigation**: `names: vec![...]` への機械的変更。影響箇所は `parse_elements.rs` 1箇所（コンストラクタ）+ `comparison_test.rs` 2箇所 + `transpiler.rs` テスト 5箇所 + `context.rs` テスト 2箇所 = 計10箇所。`actor_code_block_test.rs` の1箇所は `.name` フィールドアクセスであり `.name()` メソッド呼び出しへの変更が必要。
 - **Risk 3**: 将来の仕様拡張（動的単語参照 `＠＄変数`）との整合性 — **Mitigation**: 動的単語参照はキー名の解決方法の問題であり、`KeyWords` AST構造とは独立。影響なし。
 
+### Decision: `register_*_words()` ヘルパー関数の削除
+
+- **Context**: 設計レビューで transpiler.rs の単語登録パスに非対称性を発見。GlobalWord と ActorScope は `context.word_registry` を直接呼び出しているのに対し、LocalWord のみ `context.register_local_words()` ヘルパーを経由していた。`register_global_words()` はプロダクションコードで未使用（テストのみ）。
+- **Alternatives Considered**:
+  1. 設計図のみ修正（コード変更なし）
+  2. ヘルパーを追加して全パスをヘルパー経由に統一
+  3. ヘルパーを削除して全パスを `word_registry` 直接呼び出しに統一
+- **Selected Approach**: 3（ヘルパー削除）
+- **Rationale**:
+  - ヘルパー関数は引数加工を一切行わない純粋なパススルーであり、抽象化の価値がない
+  - 全3パス（GlobalWord, LocalWord, ActorScope）を対称な直接呼び出しに統一することでAPI整合性が向上
+  - word-multi-key 実装時に `names.iter()` ループを各パスに直接記述する方が、既存コードパターンと一貫する
+- **Trade-offs**: transpiler.rs 内のコードが数行増えるが、間接呼び出しの廃止により見通しが向上
+- **Follow-up**: word-multi-key タスクに「ヘルパー削除 + LocalWord パスの直接呼び出し化 + テスト修正」を含める
+
 ## References
 - [doc/spec/10-words.md](../../../doc/spec/10-words.md) — 単語定義・参照の仕様書
 - [doc/spec/11-actor-dictionary.md](../../../doc/spec/11-actor-dictionary.md) — アクター辞書定義の仕様書

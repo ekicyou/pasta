@@ -53,7 +53,6 @@ graph TD
     end
 
     subgraph pasta_lua["pasta_lua（変更対象）"]
-        CTX["context.rs<br/>register_*_words()"]
         TR["transpiler.rs<br/>Pass1 登録ループ"]
         EG["element_gen.rs<br/>generate_*_word()"]
         SG["scope_gen.rs<br/>generate_actor()"]
@@ -70,11 +69,9 @@ graph TD
 
     PEG -->|"Pair<Rule>"| Parser
     Parser -->|"KeyWords AST"| AST
-    AST -->|"names.iter()"| CTX
     AST -->|"names.iter()"| TR
     AST -->|"names.iter()"| EG
     AST -->|"names.iter()"| SG
-    CTX -->|"register_*(key, values)"| WR
     TR -->|"register_*(key, values)"| WR
     WR --> WT
     AST -->|"span のみ"| VIS
@@ -136,7 +133,7 @@ sequenceDiagram
 | 2.6 | 値リスト共有 | `KeyWords.words` | 単一 `Vec<String>` | — |
 | 3.1 | コロンなしエラー | PEG `kv_marker` 要求 | 変更なし | — |
 | 3.2 | 空キーエラー | PEG `id` ルール | 変更なし | — |
-| 4.1 | レジストリ全キー登録 | `context.rs`, `transpiler.rs` | `names.iter()` ループ | 登録フロー |
+| 4.1 | レジストリ全キー登録 | `transpiler.rs` | `names.iter()` ループ（直接 `word_registry` 呼び出し） | 登録フロー |
 | 4.2 | Lua全キー出力 | `element_gen.rs`, `scope_gen.rs` | `names.iter()` ループ | コード生成フロー |
 | 4.3 | 単一キー後方互換 | 全pasta_luaコンポーネント | `names.len() == 1` 時の等価出力 | — |
 | 4.4 | Registry構造変更なし | pasta_core | 変更なし | — |
@@ -148,10 +145,12 @@ sequenceDiagram
 | PEG `key_list` | pasta_dsl/Parser | カンマ区切りキーリストの文法定義 | 1.1–1.5 | `id`, `comma_sep` (P0) | — |
 | `KeyWords` AST | pasta_dsl/AST | 複数キー情報を型安全に表現 | 2.1–2.6 | `Span` (P0) | Service |
 | `parse_key_words()` | pasta_dsl/Parser | PEG結果→AST変換 | 1.1–1.3, 2.1 | `Rule::key_list` (P0) | Service |
-| `register_*_words()` | pasta_lua/Context | 全キーでWordDefRegistry登録 | 4.1, 4.4 | `WordDefRegistry` (P0) | Service |
+| Pass1 登録 (GlobalWord) | pasta_lua/Transpiler | GlobalWord の全キーで WordDefRegistry 登録 | 4.1, 4.4 | `WordDefRegistry` (P0) | — |
+| Pass1 登録 (LocalWord) | pasta_lua/Transpiler | LocalWord の全キーで WordDefRegistry 登録 | 4.1, 4.4 | `WordDefRegistry` (P0) | — |
+| Pass1 登録 (ActorScope) | pasta_lua/Transpiler | ActorScope の全キーで WordDefRegistry 登録 | 4.1, 4.4 | `WordDefRegistry` (P0) | — |
 | `generate_*_word()` | pasta_lua/CodeGen | 全キーでLuaコード出力 | 4.2, 4.3 | `StringLiteralizer` (P0) | Service |
 | `generate_actor()` | pasta_lua/CodeGen | アクター単語の全キー出力 | 4.2 | `StringLiteralizer` (P0) | Service |
-| Pass1 登録 | pasta_lua/Transpiler | ファイル処理ループ内の全キー登録 | 4.1 | `WordDefRegistry` (P0) | — |
+
 
 ### pasta_dsl / Parser
 
@@ -289,47 +288,11 @@ pub(crate) fn parse_key_words(pair: Pair<Rule>) -> Result<KeyWords, ParseError> 
 
 ### pasta_lua / Context
 
-#### `register_*_words()` 関数群
-
-| Field | Detail |
-|-------|--------|
-| Intent | `KeyWords` AST の全キーに対して `WordDefRegistry` への登録を実行 |
-| Requirements | 4.1, 4.3, 4.4 |
-
-**Responsibilities & Constraints**
-- `kw.names.iter()` で全キーをイテレーション
-- 各キーに対して `register_global` / `register_local` を呼び出し
-- `words` は `clone()` で渡す（既存パターン維持）
-
-**Dependencies**
-- Inbound: `transpile()` / コンテキスト構築 — `KeyWords` AST (P0)
-- Outbound: `WordDefRegistry` — 単語登録 (P0)
-
-##### Service Interface
-
-```rust
-pub fn register_global_words(&mut self, words: &[KeyWords]) {
-    for kw in words {
-        for name in &kw.names {
-            self.word_registry
-                .register_global(name, kw.words.clone());
-        }
-    }
-}
-
-pub fn register_local_words(&mut self, words: &[KeyWords], module_name: &str) {
-    for kw in words {
-        for name in &kw.names {
-            self.word_registry
-                .register_local(module_name, name, kw.words.clone());
-        }
-    }
-}
-```
-
-- Preconditions: `kw.names` は1要素以上
-- Postconditions: 各キーが `WordDefRegistry` に登録されている
-- Invariants: `WordDefRegistry` の構造は変更しない
+> **リファクタリング決定**: `register_global_words()` / `register_local_words()` ヘルパー関数は削除する。
+> 現在 transpiler.rs の GlobalWord・ActorScope パスは `context.word_registry` を直接呼び出しており、
+> LocalWord のみヘルパー経由という非対称性がある。ヘルパーは引数加工を一切行わない純粋なパススルーであるため、
+> word-multi-key 実装時に全パスを `word_registry` 直接呼び出し + `names.iter()` ループに統一する。
+> 対応するテスト（`test_register_global_words`, `test_register_local_words`）も `word_registry` 直接呼び出しに変更する。
 
 ### pasta_lua / CodeGen
 
@@ -431,12 +394,13 @@ for word_def in &actor.words {
 
 | Field | Detail |
 |-------|--------|
-| Intent | `FileItem::GlobalWord` / `FileItem::ActorScope` 内の全キーで `WordDefRegistry` 登録 |
+| Intent | `FileItem::GlobalWord` / `FileItem::GlobalSceneScope` / `FileItem::ActorScope` 内の全キーで `WordDefRegistry` 登録 |
 | Requirements | 4.1 |
 
 **Responsibilities & Constraints**
-- `word.names.iter()` でグローバル単語の全キーを登録
-- アクタースコープ内でも `word_def.names.iter()` で全キーを登録
+- 全3パス（GlobalWord, LocalWord, ActorScope）で `word_registry` を直接呼び出し（ヘルパー関数を経由しない）
+- `names.iter()` で全キーをイテレーションし、各キーに対して登録
+- `words` は `clone()` で渡す（既存パターン維持）
 
 ##### Service Interface
 
@@ -444,17 +408,27 @@ for word_def in &actor.words {
 // transpiler.rs 内:
 FileItem::GlobalWord(word) => {
     for name in &word.names {
-        let values: Vec<String> = word.words.clone();
-        context.word_registry.register_global(name, values);
+        context.word_registry.register_global(name, word.words.clone());
     }
     codegen.generate_global_word(word)?;
+}
+
+FileItem::GlobalSceneScope(scene) => {
+    // ... シーン登録 ...
+    let module_name = format!("{}{}", SceneRegistry::sanitize_name(&scene.name), counter);
+    // LocalWord: ヘルパー経由ではなく直接登録
+    for kw in &scene.words {
+        for name in &kw.names {
+            context.word_registry.register_local(&module_name, name, kw.words.clone());
+        }
+    }
+    // ... codegen ...
 }
 
 FileItem::ActorScope(actor) => {
     for word_def in &actor.words {
         for name in &word_def.names {
-            let values: Vec<String> = word_def.words.clone();
-            context.word_registry.register_actor(&actor.name, name, values);
+            context.word_registry.register_actor(&actor.name, name, word_def.words.clone());
         }
     }
     codegen.generate_actor(actor)?;
