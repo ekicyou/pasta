@@ -309,7 +309,12 @@ end
 --- シーン呼び出し（4段階検索）
 ---
 --- トランスパイラ出力から呼び出され、キーに対応するハンドラーを検索して実行する。
---- 4段階の優先順位に従い、最初に見つかった有効な関数を実行する。
+--- 5段階の優先順位に従い、最初に見つかった有効な関数を実行する。
+--- Level 1: シーンローカル検索
+--- Level 2: グローバルシーン名スコープ検索
+--- Level 3: GLOBALテーブル
+--- Level 4: actメソッドフォールバック
+--- Level 5: スコープなし全体検索
 ---
 --- @param self Act アクションオブジェクト
 --- @param global_scene_name string|nil グローバルシーン名
@@ -338,7 +343,15 @@ function ACT_IMPL.call(self, global_scene_name, key, attrs, ...)
         handler = GLOBAL[key]
     end
 
-    -- Level 4: スコープなし全体検索（フォールバック）
+    -- Level 4: actメソッドフォールバック
+    if not handler then
+        local method = self[key]
+        if type(method) == "function" then
+            handler = method
+        end
+    end
+
+    -- Level 5: スコープなし全体検索（フォールバック）
     if not handler then
         local result = SCENE.search(key, nil, attrs)
         if result then

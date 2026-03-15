@@ -71,22 +71,6 @@ impl TranspileContext {
             .register_local(name, parent_name, parent_counter, local_index, attrs)
     }
 
-    /// Register global word definitions from file-level scope (Task 3.2).
-    pub fn register_global_words(&mut self, words: &[KeyWords]) {
-        for kw in words {
-            self.word_registry
-                .register_global(kw.name(), kw.words.clone());
-        }
-    }
-
-    /// Register local word definitions within a scene (Task 3.2).
-    pub fn register_local_words(&mut self, words: &[KeyWords], module_name: &str) {
-        for kw in words {
-            self.word_registry
-                .register_local(module_name, kw.name(), kw.words.clone());
-        }
-    }
-
     // =========================================================================
     // MAJOR-1: ファイル属性累積・マージ機能
     // =========================================================================
@@ -203,13 +187,9 @@ mod tests {
     #[test]
     fn test_register_global_words() {
         let mut ctx = TranspileContext::new();
-        let words = vec![KeyWords {
-            names: vec!["挨拶".to_string()],
-            words: vec!["こんにちは".to_string(), "やあ".to_string()],
-            span: Span::default(),
-        }];
-
-        ctx.register_global_words(&words);
+        // 単一キー: word_registry 直接呼び出し
+        ctx.word_registry
+            .register_global("挨拶", vec!["こんにちは".to_string(), "やあ".to_string()]);
 
         let entries = ctx.word_registry.all_entries();
         assert_eq!(entries.len(), 1);
@@ -217,19 +197,53 @@ mod tests {
     }
 
     #[test]
+    fn test_register_global_words_multi_key() {
+        let mut ctx = TranspileContext::new();
+        // 複数キー: 各キーに対して登録
+        let kw = KeyWords {
+            names: vec!["女性".to_string(), "水の妖精".to_string()],
+            words: vec!["水無灯里".to_string(), "アリス・キャロル".to_string()],
+            span: Span::default(),
+        };
+        for name in &kw.names {
+            ctx.word_registry.register_global(name, kw.words.clone());
+        }
+
+        let entries = ctx.word_registry.all_entries();
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].key, "女性");
+        assert_eq!(entries[1].key, "水の妖精");
+    }
+
+    #[test]
     fn test_register_local_words() {
         let mut ctx = TranspileContext::new();
-        let words = vec![KeyWords {
-            names: vec!["場所".to_string()],
-            words: vec!["東京".to_string(), "大阪".to_string()],
-            span: Span::default(),
-        }];
-
-        ctx.register_local_words(&words, "メイン_1");
+        // 単一キー: word_registry 直接呼び出し
+        ctx.word_registry
+            .register_local("メイン_1", "場所", vec!["東京".to_string(), "大阪".to_string()]);
 
         let entries = ctx.word_registry.all_entries();
         assert_eq!(entries.len(), 1);
         assert!(entries[0].key.contains(":メイン_1:場所"));
+    }
+
+    #[test]
+    fn test_register_local_words_multi_key() {
+        let mut ctx = TranspileContext::new();
+        // 複数キー: 各キーに対して登録
+        let kw = KeyWords {
+            names: vec!["場所".to_string(), "地名".to_string()],
+            words: vec!["東京".to_string(), "大阪".to_string()],
+            span: Span::default(),
+        };
+        for name in &kw.names {
+            ctx.word_registry.register_local("メイン_1", name, kw.words.clone());
+        }
+
+        let entries = ctx.word_registry.all_entries();
+        assert_eq!(entries.len(), 2);
+        assert!(entries[0].key.contains(":メイン_1:場所"));
+        assert!(entries[1].key.contains(":メイン_1:地名"));
     }
 
     // =========================================================================

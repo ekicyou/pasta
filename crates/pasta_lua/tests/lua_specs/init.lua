@@ -28,6 +28,7 @@ local specs = {
     "global_chaintalk_integration_test", -- GLOBAL チェイントーク EVENT.fire 統合テスト
     "persist_spot_position_test",        -- persist-spot-position スポット位置継続保持テスト
     "transfer_req_to_var_test",          -- transfer_req_to_var req→var展開テスト
+    "act_method_fallback_test",          -- ACT_IMPL.call Level 4 actメソッドフォールバックテスト
     -- 将来のテストスイートをここに追加
     -- "code_generator_test",
     -- "context_test",

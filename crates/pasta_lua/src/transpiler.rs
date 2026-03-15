@@ -78,9 +78,9 @@ impl LuaTranspiler {
                 }
                 FileItem::GlobalWord(word) => {
                     // MAJOR-2.2: グローバル単語登録 (Rust側レジストリ + Lua出力)
-                    // Register in Rust-side registry (for backward compatibility)
-                    let values: Vec<String> = word.words.clone();
-                    context.word_registry.register_global(word.name(), values);
+                    for name in &word.names {
+                        context.word_registry.register_global(name, word.words.clone());
+                    }
                     // Generate Lua code for word definition (Requirement 2.1, Task 4.2)
                     codegen.generate_global_word(word)?;
                 }
@@ -92,7 +92,11 @@ impl LuaTranspiler {
                     // Register scene-level word definitions in WordDefRegistry
                     let module_name =
                         format!("{}{}", SceneRegistry::sanitize_name(&scene.name), counter);
-                    context.register_local_words(&scene.words, &module_name);
+                    for kw in &scene.words {
+                        for name in &kw.names {
+                            context.word_registry.register_local(&module_name, name, kw.words.clone());
+                        }
+                    }
 
                     // Merge file attrs with scene attrs (MAJOR-1)
                     let merged_attrs = context.merge_attrs(&scene.attrs);
@@ -120,10 +124,11 @@ impl LuaTranspiler {
                     // MAJOR-2.4: アクター処理（ファイル属性継承なし）
                     // Register actor word definitions in WordDefRegistry (Task 2.3)
                     for word_def in &actor.words {
-                        let values: Vec<String> = word_def.words.clone();
-                        context
-                            .word_registry
-                            .register_actor(&actor.name, word_def.name(), values);
+                        for name in &word_def.names {
+                            context
+                                .word_registry
+                                .register_actor(&actor.name, name, word_def.words.clone());
+                        }
                     }
                     codegen.generate_actor(actor)?;
                 }
@@ -420,5 +425,58 @@ mod tests {
         // Check values
         assert_eq!(entries[0].values, vec!["\\s[0]", "\\s[1]"]);
         assert_eq!(entries[1].values, vec!["\\s[2]"]);
+    }
+
+    // word-multi-key: 複数キーの統合テスト
+    #[test]
+    fn test_transpile_multi_key_global_word_registration() {
+        let transpiler = LuaTranspiler::default();
+        let global_words = KeyWords {
+            names: vec!["女性".to_string(), "水の妖精".to_string()],
+            words: vec!["水無灯里".to_string(), "アリス・キャロル".to_string()],
+            span: Span::default(),
+        };
+
+        let file = PastaFile {
+            path: PathBuf::from("test.pasta"),
+            items: vec![FileItem::GlobalWord(global_words)],
+            span: Span::default(),
+        };
+        let mut output = Vec::new();
+
+        let context = transpiler.transpile(&file, &mut output).unwrap();
+
+        let entries = context.word_registry.all_entries();
+        assert_eq!(entries.len(), 2, "複数キーでそれぞれ登録されること");
+        assert_eq!(entries[0].key, "女性");
+        assert_eq!(entries[1].key, "水の妖精");
+        assert_eq!(entries[0].values, vec!["水無灯里", "アリス・キャロル"]);
+        assert_eq!(entries[1].values, vec!["水無灯里", "アリス・キャロル"]);
+    }
+
+    #[test]
+    fn test_transpile_multi_key_actor_word_registration() {
+        let transpiler = LuaTranspiler::default();
+        let actor = ActorScope {
+            name: "さくら".to_string(),
+            attrs: vec![],
+            words: vec![KeyWords {
+                names: vec!["通常".to_string(), "普通".to_string()],
+                words: vec!["\\s[0]".to_string()],
+                span: Span::default(),
+            }],
+            var_sets: vec![],
+            code_blocks: vec![],
+            span: Span::default(),
+        };
+        let file = create_pasta_file(vec![actor], vec![]);
+        let mut output = Vec::new();
+
+        let context = transpiler.transpile(&file, &mut output).unwrap();
+
+        let entries = context.word_registry.all_entries();
+        assert_eq!(entries.len(), 2, "複数キーでそれぞれ登録されること");
+        assert_eq!(entries[0].key, ":__actor_さくら__:通常");
+        assert_eq!(entries[1].key, ":__actor_さくら__:普通");
     }
 }
