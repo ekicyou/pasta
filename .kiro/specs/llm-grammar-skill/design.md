@@ -105,7 +105,7 @@ graph LR
 | 5.1 | シーン関数フォールバック | §5 Event Mapping | `entry.lua`, `scene.lua` |
 | 5.2 | 主要SHIORIイベント | §5 Event Mapping | `entry.lua` |
 | 5.3 | 仮想イベント | §5 Event Mapping | `virtual_dispatcher.lua` |
-| 5.4 | スコープ指定 | §5 Event Mapping | `doc/spec/11` |
+| 5.4 | スコープ指定 | §3 Syntax — Actor Dictionary | `doc/spec/11` |
 | 6.1 | doc/spec/ 転記 | 全体制約 | — |
 | 6.2 | grammar.md 一致 | 全体制約 | — |
 | 6.3 | 役割分離 | §1 Purpose | — |
@@ -122,7 +122,7 @@ SKILL.md は単一ファイルだが、論理的に7つのセクションで構�
 | §2 Quick Reference | 文法 | マーカー一覧表（最高頻度参照） | 2.1 | `steering/grammar.md` (P0) | 20-30 |
 | §3 DSL Syntax | 文法 | 構文ルール詳細 | 2.2-2.10 | `doc/spec/` (P0) | 80-120 |
 | §4 Project Structure | 構造 | ゴーストプロジェクトの理解 | 3.1-3.4 | サンプルゴースト (P0) | 30-40 |
-| §5 Event Mapping | イベント | SHIORI イベント→シーン名対応 | 5.1-5.4 | `entry.lua` (P0) | 30-40 |
+| §5 Event Mapping | イベント | SHIORI イベント→シーン名対応 | 5.1-5.3 | `entry.lua` (P0) | 25-35 |
 | §6 Authoring Patterns | パターン | 辞書制作の実例集 | 4.1-4.6 | `dic/*.pasta` (P0) | 80-120 |
 
 **合計推定行数**: 260-380行（目標: 400行以内）
@@ -228,7 +228,7 @@ metadata:
 | Words（単語定義） | 2.4 | `doc/spec/10` | `＠単語名：値1、値2` 定義、グローバル/ローカルスコープ、参照方法 |
 | Variables（変数） | 2.5 | `doc/spec/09` | `＄変数名`（ローカル）、`＄＊変数名`（グローバル）、代入と参照 |
 | Call Statements（Call文） | 2.6 | `doc/spec/04` | `＞シーン名` 構文、特殊Call（`＞ゴースト終了（ミリ秒）`）|
-| Actor Dictionary（アクター辞書） | 2.7 | `doc/spec/11` | `％アクター名` 定義、表情単語パターン、スコープ指定 |
+| Actor Dictionary（アクター辞書） | 2.7, 5.4 | `doc/spec/11` | `％アクター名` 定義、表情単語パターン、スコープ指定（`％名前1、名前2`）によるバルーン連動 |
 | Sakura Script（さくらスクリプト） | 2.8 | `doc/spec/07` | `\s[ID]`, `\n`, `\w数字`, `\_w[数字]` の基本タグ |
 | Lua Code Blocks（Luaブロック） | 2.9 | `doc/spec/03` | ` ```lua ``` ` の記述方法と基本制約のみ（3-5行で簡潔に） |
 | Comments & Attributes（コメント・属性） | 2.10 | `doc/spec/02`, `doc/spec/08` | `＃` コメント、`＆属性名：値` |
@@ -236,6 +236,7 @@ metadata:
 **Implementation Notes**
 - Lua ブロック（2.9）は最小限の説明に留める。辞書制作では Pasta DSL 構文のみで十分なケースが大半であり、Lua は高度なユースケース向けのエスケープハッチとして言及する
 - アクター辞書（2.7）は §6 Patterns と重複するが、構文ルールとしての説明をここに、実例パターンを §6 に配置することで役割を分離する
+- スコープ指定（Req 5.4）はアクター辞書の文法構文であるため §3 に配置する。SHIORIゴーストでは OnBoot で一度設定して固定するのが慣習だが、構文自体は汎用（ノベルゲーム用途等でシーンごとに切り替える用途もある）
 
 ### プロジェクト構造層
 
@@ -265,7 +266,7 @@ metadata:
 | Field | Detail |
 |-------|--------|
 | Intent | 開発者の自然言語指示（「起動時の挨拶を作って」等）から正しいSHIORIイベント名への変換を可能にする |
-| Requirements | 5.1, 5.2, 5.3, 5.4 |
+| Requirements | 5.1, 5.2, 5.3 |
 
 **Responsibilities & Constraints**
 - ゴースト作者視点で説明する。内部ディスパッチ機構の実装詳細は含めない
@@ -286,7 +287,6 @@ metadata:
 | ダブルクリック反応 | `＊OnMouseDoubleClick` | 同名複数定義でランダム選択 |
 
 3. **仮想イベント補足**: OnTalk と OnHour は内部タイマーにより自動的にディスパッチされる仮想イベントであること。`pasta.toml` の `[ghost]` セクションでトーク間隔を設定可能
-4. **スコープ指定**: `％アクター名1、アクター名2` によるバルーン連動の説明（1-2行 + コード例）
 
 ### パターン層
 
