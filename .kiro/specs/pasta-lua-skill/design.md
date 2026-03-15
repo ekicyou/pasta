@@ -298,12 +298,12 @@ end
   - シーン関数は必ずこの呼び出しで始まる。`save`（永続変数）と `var`（アクション内一時変数）を取得
   - コード例 2〜3行で示す
 - 主要メソッド一覧テーブル: `talk`, `raw_script`, `surface`, `wait`, `newline`, `clear`, `word`, `call`, `yield`, `build`
-- ACTフィールド: `actors`, `save`, `app_ctx`, `var`, `token`, `current_scene`, `req`
+- ACTフィールド: `actors`, `save`, `app_ctx`, `var`, `token`, `current_scene`（`req` は ACT のフィールドではなく REG ハンドラ関数の引数パラメータ）
 
 #### 5.3 SCENE モジュール（~15行）
 - `pasta.scene` — シーン登録・検索
 - `SCENE.create_scene(name)` — グローバルシーン作成
-- `SCENE.search(name)` — シーン検索
+- `SCENE.search(name, global_scene_name?, attrs?)` — シーン検索（3引数; `ACT.call` 内部から使用）
 - `co_exec` — コルーチン実行
 - DSL→Luaブリッジ: `function SCENE.func(act) ... end` パターン（Req 4 AC8）
 
@@ -364,7 +364,8 @@ end
 - DSLの `＊OnBoot` 等がこの機構で自動的に呼び出される旨の説明
 
 #### 6.5 仮想ディスパッチャ（~10行）
-- OnTalk / OnHour の自動発行メカニズム
+- モジュール: `require("pasta.shiori.event.virtual_dispatcher")`
+- OnTalk / OnHour の自動発行メカニズム（`dispatcher.dispatch(req)` 経由）
 - pasta.toml `[ghost]` セクション: `talk_interval_min`, `talk_interval_max`
 - OnSecondChange をトリガーとして内部的にディスパッチ
 
@@ -414,7 +415,7 @@ end
 ### 行数管理
 
 - 各セクションの目標行数を上記テーブルに記載
-- 合計目標: 545行（±10%で490〜600行）
+- 合計目標: 555行（±10%で500〜610行）
 - 600行超過時は §3, §4 を優先的に圧縮（EmmyLua/エラーハンドリングの例をさらに削減）
 
 ### 整合性管理
