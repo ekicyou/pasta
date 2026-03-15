@@ -75,7 +75,7 @@ impl TranspileContext {
     pub fn register_global_words(&mut self, words: &[KeyWords]) {
         for kw in words {
             self.word_registry
-                .register_global(&kw.name, kw.words.clone());
+                .register_global(kw.name(), kw.words.clone());
         }
     }
 
@@ -83,7 +83,7 @@ impl TranspileContext {
     pub fn register_local_words(&mut self, words: &[KeyWords], module_name: &str) {
         for kw in words {
             self.word_registry
-                .register_local(module_name, &kw.name, kw.words.clone());
+                .register_local(module_name, kw.name(), kw.words.clone());
         }
     }
 
@@ -204,7 +204,7 @@ mod tests {
     fn test_register_global_words() {
         let mut ctx = TranspileContext::new();
         let words = vec![KeyWords {
-            name: "挨拶".to_string(),
+            names: vec!["挨拶".to_string()],
             words: vec!["こんにちは".to_string(), "やあ".to_string()],
             span: Span::default(),
         }];
@@ -220,7 +220,7 @@ mod tests {
     fn test_register_local_words() {
         let mut ctx = TranspileContext::new();
         let words = vec![KeyWords {
-            name: "場所".to_string(),
+            names: vec!["場所".to_string()],
             words: vec!["東京".to_string(), "大阪".to_string()],
             span: Span::default(),
         }];

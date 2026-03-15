@@ -46,13 +46,13 @@ pub(crate) fn parse_attr_number(s: &str) -> AttrValue {
 /// Parse key_words.
 pub(crate) fn parse_key_words(pair: Pair<Rule>) -> Result<KeyWords, ParseError> {
     let span = Span::from(&pair.as_span());
-    let mut name = String::new();
+    let mut names = Vec::new();
     let mut words = Vec::new();
 
     for inner in pair.into_inner() {
         match inner.as_rule() {
             Rule::id => {
-                name = inner.as_str().to_string();
+                names.push(inner.as_str().to_string());
             }
             Rule::words => {
                 for word_inner in inner.into_inner() {
@@ -74,7 +74,7 @@ pub(crate) fn parse_key_words(pair: Pair<Rule>) -> Result<KeyWords, ParseError> 
         }
     }
 
-    Ok(KeyWords { name, words, span })
+    Ok(KeyWords { names, words, span })
 }
 
 /// Parse code block.

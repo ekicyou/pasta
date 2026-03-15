@@ -137,15 +137,24 @@ impl std::fmt::Display for AttrValue {
 
 /// Word definition for random selection.
 ///
-/// Corresponds to the `key_words` rule: `@name：word1、word2、...`
+/// Corresponds to the `key_words` rule: `@key1、key2：word1、word2、...`
 #[derive(Debug, Clone)]
 pub struct KeyWords {
-    /// Word name
-    pub name: String,
+    /// Key name list (at least one element guaranteed)
+    pub names: Vec<String>,
     /// List of word values
     pub words: Vec<String>,
     /// Source location
     pub span: Span,
+}
+
+impl KeyWords {
+    /// Returns the first (primary) key name.
+    ///
+    /// Equivalent to the former `name` field for backward compatibility.
+    pub fn name(&self) -> &str {
+        &self.names[0]
+    }
 }
 
 // ============================================================================

@@ -406,12 +406,12 @@ fn test_global_word_registration_order() {
     use std::path::PathBuf;
 
     let word1 = FileItem::GlobalWord(KeyWords {
-        name: "挨拶1".to_string(),
+        names: vec!["挨拶1".to_string()],
         words: vec!["こんにちは".to_string()],
         span: Span::default(),
     });
     let word2 = FileItem::GlobalWord(KeyWords {
-        name: "挨拶2".to_string(),
+        names: vec!["挨拶2".to_string()],
         words: vec!["やあ".to_string()],
         span: Span::default(),
     });

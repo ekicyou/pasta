@@ -45,7 +45,7 @@
 //! for item in &ast.items {
 //!     match item {
 //!         FileItem::FileAttr(attr) => println!("FileAttr: {}", attr.key),
-//!         FileItem::GlobalWord(word) => println!("GlobalWord: {}", word.name),
+//!         FileItem::GlobalWord(word) => println!("GlobalWord: {}", word.name()),
 //!         FileItem::GlobalSceneScope(scene) => println!("Scene: {}", scene.name),
 //!         FileItem::ActorScope(actor) => println!("Actor: {}", actor.name),
 //!     }

@@ -36,7 +36,7 @@ end
 
     assert_eq!(actor.name, "さくら");
     assert_eq!(actor.words.len(), 1, "単語定義は1つ");
-    assert_eq!(actor.words[0].name, "通常");
+    assert_eq!(actor.words[0].name(), "通常");
 
     // code_blocksが正しく格納されることを検証
     assert_eq!(actor.code_blocks.len(), 1, "code_blockは1つであるべし");

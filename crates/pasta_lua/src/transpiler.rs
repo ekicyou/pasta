@@ -80,7 +80,7 @@ impl LuaTranspiler {
                     // MAJOR-2.2: グローバル単語登録 (Rust側レジストリ + Lua出力)
                     // Register in Rust-side registry (for backward compatibility)
                     let values: Vec<String> = word.words.clone();
-                    context.word_registry.register_global(&word.name, values);
+                    context.word_registry.register_global(word.name(), values);
                     // Generate Lua code for word definition (Requirement 2.1, Task 4.2)
                     codegen.generate_global_word(word)?;
                 }
@@ -123,7 +123,7 @@ impl LuaTranspiler {
                         let values: Vec<String> = word_def.words.clone();
                         context
                             .word_registry
-                            .register_actor(&actor.name, &word_def.name, values);
+                            .register_actor(&actor.name, word_def.name(), values);
                     }
                     codegen.generate_actor(actor)?;
                 }
@@ -158,7 +158,7 @@ mod tests {
             name: name.to_string(),
             attrs: vec![],
             words: vec![KeyWords {
-                name: "通常".to_string(),
+                names: vec!["通常".to_string()],
                 words: vec!["\\s[0]".to_string()],
                 span: Span::default(),
             }],
@@ -191,7 +191,7 @@ mod tests {
             is_continuation: false,
             attrs: vec![],
             words: vec![KeyWords {
-                name: word_name.to_string(),
+                names: vec![word_name.to_string()],
                 words: word_values.iter().map(|s| s.to_string()).collect(),
                 span: Span::default(),
             }],
@@ -359,7 +359,7 @@ mod tests {
     fn test_transpile_with_global_words() {
         let transpiler = LuaTranspiler::default();
         let global_words = KeyWords {
-            name: "挨拶".to_string(),
+            names: vec!["挨拶".to_string()],
             words: vec!["こんにちは".to_string(), "やあ".to_string()],
             span: Span::default(),
         };
@@ -393,12 +393,12 @@ mod tests {
             attrs: vec![],
             words: vec![
                 KeyWords {
-                    name: "通常".to_string(),
+                    names: vec!["通常".to_string()],
                     words: vec!["\\s[0]".to_string(), "\\s[1]".to_string()],
                     span: Span::default(),
                 },
                 KeyWords {
-                    name: "照れ".to_string(),
+                    names: vec!["照れ".to_string()],
                     words: vec!["\\s[2]".to_string()],
                     span: Span::default(),
                 },

@@ -386,7 +386,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
 
         self.writeln(&format!(
             "PASTA.create_word({}):entry({})",
-            StringLiteralizer::literalize(&word.name)?,
+            StringLiteralizer::literalize(word.name())?,
             values.join(", ")
         ))?;
 
@@ -412,7 +412,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
 
         self.writeln(&format!(
             "SCENE:create_word({}):entry({})",
-            StringLiteralizer::literalize(&word.name)?,
+            StringLiteralizer::literalize(word.name())?,
             values.join(", ")
         ))?;
 

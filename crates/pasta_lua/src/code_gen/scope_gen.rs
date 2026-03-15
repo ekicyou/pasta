@@ -57,7 +57,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             let entry_args = literals.join(", ");
             self.writeln(&format!(
                 "ACTOR:create_word(\"{}\"):entry({})",
-                word_def.name, entry_args
+                word_def.name(), entry_args
             ))?;
         }
 
