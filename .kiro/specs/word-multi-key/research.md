@@ -113,7 +113,7 @@
 
 ## Risks & Mitigations
 - **Risk 1**: `kw.name` → `kw.name()` の変更によるpasta_lua側のコンパイルエラー多発 — **Mitigation**: コンパイルエラーは意図的（対応箇所の洗い出し）。7箇所の機械的変更で対応完了。
-- **Risk 2**: テストコードの構造体リテラル構築（`KeyWords { name: ... }`）のコンパイルエラー — **Mitigation**: `names: vec![...]` への機械的変更。影響箇所は `comparison_test.rs` 1箇所 + `actor_code_block_test.rs` 1箇所。
+- **Risk 2**: テストコードの構造体リテラル構築（`KeyWords { name: ... }`）のコンパイルエラー — **Mitigation**: `names: vec![...]` への機械的変更。影響箇所は `parse_elements.rs` 1箇所（コンストラクタ）+ `comparison_test.rs` 2箇所 + `transpiler.rs` テスト 5箇所 + `context.rs` テスト 2箇所 = 計10箇所。`actor_code_block_test.rs` の1箇所は `.name` フィールドアクセスであり `.name()` メソッド呼び出しへの変更が必要。
 - **Risk 3**: 将来の仕様拡張（動的単語参照 `＠＄変数`）との整合性 — **Mitigation**: 動的単語参照はキー名の解決方法の問題であり、`KeyWords` AST構造とは独立。影響なし。
 
 ## References
