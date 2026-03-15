@@ -310,8 +310,9 @@ end
 #### 5.4 WORD モジュール（~20行）
 - `pasta.word` — ビルダーパターンAPI
 - `WORD.create_global(key)` → WordBuilder
-- `WORD.create_local(key)` → WordBuilder
-- `WORD.create_actor(key)` → WordBuilder
+- `WORD.create_local(scene_name, key)` → WordBuilder（シーン名 + 単語キーの2引数）
+- `WORD.create_actor(actor_name, key)` → WordBuilder（アクター名 + 単語キーの2引数）
+- `PASTA.create_word(key)` — `WORD.create_global` のエイリアス（`pasta/init.lua` 経由）
 - `builder:entry(...)` メソッドチェーン
 - 大量投入の使用例（ループパターン、5行）
 
