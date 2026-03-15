@@ -170,8 +170,14 @@ sequenceDiagram
     Note over Dev,GH: Phase 3: crates.io 公開
     loop pasta_core, pasta_lua, pasta_shiori
         LLM->>Term: cargo publish -p crate
-        alt 失敗（最大2回リトライ）
-            LLM->>Dev: エラー報告・中断
+        alt 失敗（段階的リトライ: 1分→2分→...→10分）
+            loop 待機時間を1分ずつ増加（最大10分）
+                LLM->>Term: Start-Sleep N分
+                LLM->>Term: cargo publish -p crate（リトライ）
+            end
+            alt 10分待機でも失敗
+                LLM->>Dev: エラー報告・中断・指示待ち
+            end
         end
         LLM->>Term: Start-Sleep 10
     end
@@ -190,8 +196,14 @@ sequenceDiagram
         LLM->>LLM: 警告記録、Phase 4 へ継続
     end
     LLM->>Term: vsce publish
-    alt vsce publish 失敗
-        LLM->>LLM: 警告記録、Phase 4 へ継続
+    alt vsce publish 失敗（段階的リトライ: 1分→2分→...→10分）
+        loop 待機時間を1分ずつ増加（最大10分）
+            LLM->>Term: Start-Sleep N分
+            LLM->>Term: vsce publish（リトライ）
+        end
+        alt 10分待機でも失敗
+            LLM->>LLM: 警告記録、Phase 4 へ継続
+        end
     end
     LLM->>FS: VSIX ファイルパス記録（$env:VSIX_PATH）
 
@@ -205,6 +217,30 @@ sequenceDiagram
     LLM->>Term: gh release create
     LLM->>Dev: リリース完了サマリー
 ```
+
+### 共通リトライ戦略（段階的バックオフ）
+
+外部サービスとの通信を伴うタスク（`cargo publish`, `vsce publish`, `gh release create`, `git push` 等）では、ネットワーク一時障害に対して以下の**段階的バックオフ**戦略を適用する:
+
+```
+待機時間系列: 1分 → 2分 → 3分 → 4分 → 5分 → 6分 → 7分 → 8分 → 9分 → 10分
+最大試行回数: 初回 + リトライ10回 = 合計11回
+最大累計待機: 55分
+```
+
+**手順**:
+1. コマンドを実行する
+2. 失敗した場合、待機時間 = 1分から開始
+3. `Start-Sleep -Seconds (N * 60)` で待機後にリトライ
+4. 成功すれば次のステップへ進む
+5. 失敗するたびに待機時間を1分ずつ増加（N = 1, 2, 3, ...）
+6. 10分待機（N=10）のリトライでも失敗した場合、**処理を中断し開発者に指示を仰ぐ**
+
+**適用対象フェーズ**:
+- Phase 3: `cargo publish`（クリティカル — 失敗時は以降の公開を中断）
+- Phase 3.5: `vsce publish`（非クリティカル — 失敗時は警告のみで後続へ継続）
+- Phase 5: `git push`（クリティカル — 失敗時は手動対応を案内）
+- Phase 6: `gh release create`（クリティカル — 失敗時は手動手順を案内）
 
 ### エラー時ロールバックフロー
 
@@ -447,13 +483,14 @@ flowchart TD
    cargo publish -p <crate_name>
    ```
 
-2. **リトライ** (3.3, 3.4):
-   - 失敗時: 最大2回リトライ（合計3回試行）
-   - 3回失敗:
+2. **リトライ（段階的バックオフ）** (3.3, 3.4):
+   - 失敗時: 段階的バックオフでリトライ（待機 1分→2分→...→10分、最大10回）
+   - 各リトライ前に `Start-Sleep -Seconds (N * 60)` で待機
+   - 10分待機のリトライでも失敗した場合:
      - エラーを報告
      - 既に公開済みのクレートはそのまま残す
      - 以降の公開を中断
-     - 「手動 yank または次回リリースで対処してください」と案内
+     - 開発者に指示を仰ぐ（「手動 yank または次回リリースで対処してください」と案内）
 
 3. **待機** (3.6):
    ```
@@ -497,12 +534,14 @@ flowchart TD
    - 生成ファイル: `pasta-vscode-X.Y.Z.vsix`
    - 失敗: 警告記録、Phase 4 へ継続
 
-3. **Marketplace 公開** (VSX.2, VSX.3):
+3. **Marketplace 公開（段階的バックオフ）** (VSX.2, VSX.3):
    ```
    vsce publish
    ```
    - 成功: Marketplace URL を記録
-   - 失敗: 警告記録、Phase 4 へ継続
+   - 失敗時: 段階的バックオフでリトライ（待機 1分→2分→...→10分、最大10回）
+   - 各リトライ前に `Start-Sleep -Seconds (N * 60)` で待機
+   - 10分待機のリトライでも失敗した場合: 警告記録、Phase 4 へ継続
 
 4. **VSIX パス保持** (VSX.4):
    ```

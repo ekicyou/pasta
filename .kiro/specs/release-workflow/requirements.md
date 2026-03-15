@@ -71,8 +71,8 @@
 
 1. When バージョン更新コミットが完了する, the Release Workflow shall クレートを依存関係順（`pasta_core` → `pasta_lua` → `pasta_shiori`）に `cargo publish -p <crate>` する
 2. When `cargo publish` を実行する, the Release Workflow shall 各クレートの公開成功を確認してから次のクレートに進む
-3. If `cargo publish` が失敗する, the Release Workflow shall 最大2回までリトライを試みる
-4. If リトライ後も失敗する, the Release Workflow shall エラーを報告し、以降の公開を中断し、既に公開されたクレートはそのまま残す（手動 yank または次回リリースで対処）
+3. If `cargo publish` が失敗する, the Release Workflow shall 段階的バックオフでリトライを試みる（待機時間を1分から1分ずつ増加し最大10分まで、最大10回リトライ）
+4. If 10分待機のリトライ後も失敗する, the Release Workflow shall エラーを報告し、以降の公開を中断し、既に公開されたクレートはそのまま残し、開発者の指示を待つ（手動 yank または次回リリースで対処）
 5. While `pasta_sample_ghost` は `publish = false` である, the Release Workflow shall このクレートの公開をスキップする
 6. When 前のクレートを公開した直後, the Release Workflow shall crates.io のインデックス更新を待つため10秒程度の待機時間を設ける
 

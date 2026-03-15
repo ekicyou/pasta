@@ -59,8 +59,9 @@
 - [ ] 6. 依存関係順での crates.io 公開
   - 以下の順序でクレートを公開する: `pasta_core` → `pasta_lua` → `pasta_shiori`
   - 各クレートに対して `cargo publish -p <crate_name>` を実行する
-  - 失敗時は最大2回リトライ（合計3回試行）する
-  - 3回失敗した場合はエラーを報告し、既に公開済みのクレートはそのまま残して以降を中断する
+  - 失敗時は段階的バックオフでリトライする（待機 1分→2分→...→10分、最大10回）
+  - 各リトライ前に `Start-Sleep -Seconds (N * 60)` で待機する（N=1,2,...,10）
+  - 10分待機のリトライでも失敗した場合はエラーを報告し、既に公開済みのクレートはそのまま残して以降を中断、開発者の指示を待つ
   - 各クレート公開後（最後の `pasta_shiori` を除く）に `Start-Sleep -Seconds 10` で待機する
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6_
 
@@ -74,7 +75,9 @@
   - `Test-Path "pasta-vscode-X.Y.Z.vsix"` で VSIX 存在確認
   - 存在する場合: `vsce publish` を実行
     - 成功: Marketplace URL を記録
-    - 失敗: 警告記録、Phase 4 へ継続
+    - 失敗時: 段階的バックオフでリトライ（待機 1分→2分→...→10分、最大10回）
+    - 各リトライ前に `Start-Sleep -Seconds (N * 60)` で待機する（N=1,2,...,10）
+    - 10分待機のリトライでも失敗した場合: 警告記録、Phase 4 へ継続
   - 環境変数 `$env:VSIX_PATH` に VSIX ファイルパスを保持（Phase 6 で使用）
   - _Requirements: VSX.1–VSX.6_
 
@@ -103,7 +106,7 @@
   - 競合がある場合は開発者に「手動で `git tag -d vX.Y.Z` を実行しますか？」と確認する
   - `git tag -a vX.Y.Z -m "Release vX.Y.Z"` でアノテーションタグを作成する
   - `git push origin main --tags` でコミットとタグをリモートにプッシュする
-  - プッシュ失敗時はエラー報告し「手動で `git push origin main --tags` を再実行してください」と案内する
+  - プッシュ失敗時は段階的バックオフでリトライ（待機 1分→2分→...→10分、最大10回）、それでも失敗の場合は「手動で `git push origin main --tags` を再実行してください」と案内する
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
 
 ### Phase 6: GitHub Release 作成
@@ -134,7 +137,7 @@
       --title "pasta vX.Y.Z" `
       --notes-file release-notes-vX.Y.Z.md
     ```
-  - `gh` 失敗時はエラー報告と手動手順を案内する
+  - `gh` 失敗時は段階的バックオフでリトライ（待機 1分→2分→...→10分、最大10回）、それでも失敗の場合はエラー報告と手動手順を案内する
   - 成功時は一時ファイル `release-notes-vX.Y.Z.md` を削除する
   - リリース完了サマリー（バージョン、公開クレート、Release URL、Marketplace 公開結果）を開発者に報告する
   - _Requirements: 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 7.4, VSX.4, VSX.6_
