@@ -6,13 +6,14 @@
 
 ## スコープ
 
-- **対象クレート**: `pasta_dsl`（PEG文法 + AST変換）
-- **対象外**: `pasta_lua`（トランスパイル・ランタイム解釈）は別仕様で対応
-- **設計方針**: 本仕様のAST出力は`pasta_lua`側が消費する前提で、後続仕様との整合性を考慮する
+- **対象クレート**: `pasta_dsl`（PEG文法 + AST変換）+ `pasta_lua`（トランスパイル・コード生成・レジストリ登録）
+- **対象外**: `pasta_core`（`WordDefRegistry`/`WordTable` — 構造変更不要）、`pasta_lsp`（`span`のみ使用、`name`未参照）
+- **実装制約**: 段階的にコンパイル可能な状態を維持する（各ステップで`cargo test --all`が通ること）
+- **設計方針**: AST変更→文法変更→pasta_lua対応の順でインクリメンタルに進行
 
 ## Introduction
 
-Pasta DSLの単語定義（`＠key：values`）は現在、1つのキーに対して複数の値を紐付ける構文のみをサポートしている。本仕様では、**複数のキーを同一の値リストに紐付ける**構文パターンをPEG文法とAST層に追加する。これにより、ゴースト作者は同一の単語候補群を複数のカテゴリ名で参照できるようになる。
+Pasta DSLの単語定義（`＠key：values`）は現在、1つのキーに対して複数の値を紐付ける構文のみをサポートしている。本仕様では、**複数のキーを同一の値リストに紐付ける**構文パターンをPEG文法・AST層・Luaトランスパイル層にわたって追加する。これにより、ゴースト作者は同一の単語候補群を複数のカテゴリ名で参照できるようになり、エンドツーエンドで動作する。
 
 ## Requirements
 
@@ -50,10 +51,19 @@ Pasta DSLの単語定義（`＠key：values`）は現在、1つのキーに対�
 1. If コロンが存在しない `＠key1、key2` 形式が入力された場合, the pasta_dsl parser shall 既存の動作に従いパースエラーとして処理する（PEG文法が `kv_marker` を要求するため自動的にマッチ失敗する。破壊的変更を起こさない）。
 2. If キー部分に空文字のキーが含まれる場合（`＠、key2：values` や `＠key1、、key2：values`）, the pasta_dsl parser shall PEG文法の `id` ルールにより自動的にマッチ失敗し、パースエラーとなる。
 
-## 備考: pasta_lua側への影響（別仕様スコープ）
+### Requirement 4: pasta_lua トランスパイル・レジストリ登録対応
 
-本仕様によるAST変更を受けて、`pasta_lua`側では以下の対応が必要となる（本仕様のスコープ外だが、設計の整合性のため記録）：
+**Objective:** ゴースト作者として、複数キーで定義した単語をいずれのキー名でも参照したい。それにより、`＠女性`でも`＠水の妖精`でも同じ候補リストから選択される。
 
-- **トランスパイラ（Pass 1）**: `KeyWords`の各キーに対して `WordDefRegistry` へ登録を実行
-- **WordDefRegistry / WordTable**: 構造変更は不要（同一 `values` を複数の `key` で登録すれば既存の仕組みで動作する）
-- **ランタイム検索**: 変更不要（前方一致検索ロジックはキー単位で動作するため影響なし）
+#### Acceptance Criteria
+
+1. When 複数キーの`KeyWords` ASTがトランスパイルされた場合, the pasta_lua transpiler shall 各キーに対して`WordDefRegistry`への登録（`register_global` / `register_local` / `register_actor`）を実行する。
+2. When 複数キーの`KeyWords` ASTからLuaコードが生成された場合, the pasta_lua code generator shall 各キーに対して`PASTA.create_word(key):entry(...)` / `SCENE:create_word(key):entry(...)` / `ACTOR:create_word(key):entry(...)` を出力する。
+3. When 単一キーの従来形式がトランスパイルされた場合, the pasta_lua transpiler shall 既存と同一の出力を生成する（後方互換性）。
+4. The pasta_lua transpiler shall `WordDefRegistry` / `WordTable` の構造変更なしに、同一`values`を複数`key`で登録することで動作する。
+
+## 備考
+
+- **`pasta_core`**: `WordDefRegistry`/`WordTable`は構造変更不要。同一`values`を複数`key`で`register_*`すれば既存の前方一致検索がそのまま動作する。
+- **`pasta_lsp`**: `visit_keywords`は`word.span`のみ使用しており`name`フィールド未参照。本仕様では変更不要。
+- **実装順序制約**: AST拡張→PEG文法変更→pasta_lua対応の順で、各ステップでコンパイルが通る状態を維持する。
