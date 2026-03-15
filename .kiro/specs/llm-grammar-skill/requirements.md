@@ -70,8 +70,8 @@
 
 #### Acceptance Criteria
 1. The スキル shall シーン関数フォールバック（シーン名 = SHIORIイベント名で自動ディスパッチ）の仕組みを説明する
-2. The スキル shall 主要SHIORIイベント（OnBoot, OnFirstBoot, OnClose, OnMouseDoubleClick, OnSecondChange）とそのReference引数の概要を説明する
-3. The スキル shall 仮想イベント（OnTalk, OnHour）のディスパッチ機構（OnSecondChange経由）を説明する
+2. The スキル shall 主要SHIORIイベント（OnBoot, OnFirstBoot, OnClose, OnMouseDoubleClick）とその概要を説明する
+3. The スキル shall 仮想イベント（OnTalk, OnHour）が内部タイマーにより自動ディスパッチされる仕組みを説明する（ゴースト作者は `＊OnTalk` / `＊OnHour` シーンを定義するだけでよい）
 
 ### Requirement 6: 既存ドキュメントとの整合性
 

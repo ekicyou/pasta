@@ -105,7 +105,6 @@ graph LR
 | 5.1 | シーン関数フォールバック | §5 Event Mapping | `entry.lua`, `scene.lua` |
 | 5.2 | 主要SHIORIイベント | §5 Event Mapping | `entry.lua` |
 | 5.3 | 仮想イベント | §5 Event Mapping | `virtual_dispatcher.lua` |
-| 5.4 | スコープ指定 | §3 Syntax — Actor Dictionary | `doc/spec/11` |
 | 6.1 | doc/spec/ 転記 | 全体制約 | — |
 | 6.2 | grammar.md 一致 | 全体制約 | — |
 | 6.3 | 役割分離 | §1 Purpose | — |
@@ -286,7 +285,7 @@ metadata:
 | 時報 | `＊OnHour` | 仮想イベント。`＄時１２` 変数が自動設定される |
 | ダブルクリック反応 | `＊OnMouseDoubleClick` | 同名複数定義でランダム選択 |
 
-3. **仮想イベント補足**: OnTalk と OnHour は内部タイマーにより自動的にディスパッチされる仮想イベントであること。`pasta.toml` の `[ghost]` セクションでトーク間隔を設定可能
+3. **仮想イベント補足**: OnTalk と OnHour は内部タイマーにより自動ディスパッチされる仮想イベント。ゴースト作者は `＊OnTalk` / `＊OnHour` シーンを定義するだけでよい。`pasta.toml` の `[ghost]` セクションでトーク間隔を設定可能
 
 ### パターン層
 
