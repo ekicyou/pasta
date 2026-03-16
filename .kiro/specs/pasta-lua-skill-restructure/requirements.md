@@ -2,7 +2,7 @@
 
 ## Introduction
 
-pasta-lua-codingスキルの構造改善仕様。現在のSKILL.md（588行）を500行未満にコンパクト化し、詳細なAPIリファレンスを `references/` サブディレクトリに分離する。AIエージェントがスキル本体を高速にロードしつつ、必要に応じてリッチなリファレンスを参照できる構成を実現する。
+pasta-lua-codingスキルの構造改善仕様。現在のSKILL.md（588行）を500行未満にコンパクト化し、詳細なAPIリファレンスを `references/` サブディレクトリに分離する。AIエージェントがスキル本体を高速にロードしつつ、必要に応じてリッチなリファレンスを参照できる構成を実現する。また、references/ を新たな権威ドキュメントとし、従来の権威ドキュメント（LUA_API.md、steering/lua-coding.md）を統合・廃止する。
 
 ### 現状分析
 
@@ -10,7 +10,7 @@ pasta-lua-codingスキルの構造改善仕様。現在のSKILL.md（588行）�
 |------|------|
 | SKILL.md | 588行（7セクション構成） |
 | references/ | 未作成 |
-| 情報ソース | steering/lua-coding.md（695行）、LUA_API.md（1160行） |
+| 情報ソース（統合対象） | steering/lua-coding.md（695行）、LUA_API.md（1160行） |
 | SKILL.mdの主要セクション | §1 Purpose（30行）、§2 Quick Ref（50行）、§3 Conventions（95行）、§4 Runtime API（120行）、§5 Internal Modules（115行）、§6 SHIORI Handlers（90行）、§7 Testing（60行） |
 
 ## Requirements
@@ -47,9 +47,9 @@ pasta-lua-codingスキルの構造改善仕様。現在のSKILL.md（588行）�
 4. The references shall include a file for Coding Conventions（命名規約, モジュール構造, クラス設計パターン, 型注釈, エラーハンドリング）
 5. The references shall include a file for Testing & Lint（lua_test, テストファイル規約, 決定論的テスト, luacheck）
 
-### Requirement 4: リファレンス内容のリッチ化
+### Requirement 4: references/ を権威ドキュメントとする
 
-**Objective:** As a ゴースト開発者（AI/人間）, I want 現在のSKILL.mdよりも詳細で実用的なリファレンスを得たい, so that 実装時に情報ソース（LUA_API.md, steering/lua-coding.md）を直接参照する必要がなくなる
+**Objective:** As a ゴースト開発者（AI/人間）, I want references/ を唯一の権威的Lua APIリファレンスとして利用したい, so that 情報の二重管理を排除しつつ、スキルとしての自己完結性を実現できる
 
 #### Acceptance Criteria
 
@@ -57,7 +57,17 @@ pasta-lua-codingスキルの構造改善仕様。現在のSKILL.md（588行）�
 2. The reference files shall include practical usage examples（現行SKILL.mdの例に加え、情報ソースから追加例を含める）
 3. The reference files shall include cross-reference links to related sections in other reference files（例: ACTオブジェクトの説明からSHIORI Handlersへのリンク）
 4. The reference files shall document edge cases and caveats（例: `@pasta_config` のpcall必須理由、`@enc` のプラットフォーム依存性）
-5. The reference files shall note their information source at the bottom of each file for traceability
+
+### Requirement 6: 旧権威ドキュメントの統合・廃止
+
+**Objective:** As a 開発者, I want 情報の二重管理を解消したい, so that ドキュメント更新時の同期コストが発生しない
+
+#### Acceptance Criteria
+
+1. When references/ が完成した後, the `crates/pasta_lua/LUA_API.md` shall be deleted
+2. When references/ が完成した後, the `.kiro/steering/lua-coding.md` shall be replaced with a brief redirect（「Luaコーディング時はpasta-lua-codingスキルを参照」程度の誘導）
+3. The SOUL.md shall update its LUA_API.md link to point to the skill references directory
+4. The GRAMMAR.md shall update its LUA_API.md link to point to the skill references directory
 
 ### Requirement 5: SKILL.md本体の構成
 
