@@ -147,7 +147,35 @@
 ## Risks & Mitigations
 
 - **早期ロガーのパス不一致**: `pasta.toml` でカスタムの `[logging].file_path` を設定している場合、早期ロガーのパスと異なる → load 失敗時のログは デフォルトパスに記録される。影響軽微（デフォルトの `profile/pasta/logs/pasta.log` は既知の場所）
-- **subscriber の一度きり初期化**: tracing subscriber は `try_init()` で1回のみ初期化される。早期初期化後は、`PastaLoader` 成功後に設定変更できない → 影響軽微（フィルターレベルは環境変数 `PASTA_LOG` で上書き可能）
+- **subscriber の一度きり初期化**: tracing subscriber は `try_init()` で1回のみ初期化される。`reload::Layer` によりフィルターは動的更新可能だが、subscriber 構造自体は変更できない → 意図通りの制約
+
+## Deep Dive Investigation（リファインメント追加調査）
+
+### `reload::Layer` のフィルター配置変更
+
+- **Context**: 現行の `init_tracing_with_config()` では `EnvFilter` が `fmt::layer().with_filter(filter)` として per-layer フィルターになっている
+- **Finding**: `reload::Layer` の `reload()` メソッドで差し替えるには、フィルターを subscriber-global レイヤー（`registry().with(filter_layer)`）に昇格させる必要がある
+- **Implication**: `fmt::layer()` はフィルターなしで全イベントを受け取り、フィルタリングは `reload::Layer` が担う。動作上の差異はなし（per-layer filter → global filter の移動のみ）
+
+### Cargo.toml の `reload` feature 追加
+
+- **Context**: `tracing-subscriber` の workspace dependency 確認
+- **Finding**: 現行は `features = ["env-filter"]` のみ。`reload::Layer` を使用するには `"reload"` feature の追加が必須
+- **Change**: `tracing-subscriber = { version = "0.3", features = ["env-filter", "reload"] }`
+
+### `.lua` ファイル失敗の `failures` Vec 未収集問題
+
+- **Context**: `process_incremental()` の `.lua` ファイルループ（loader/mod.rs L437-461）
+- **Finding**: `.pasta` ファイルの失敗は `failures.push(TranspileFailure { ... })` で収集されるが、`.lua` ファイルの読み込み/コピー失敗は `stats.failed++` と `warn!()` のみで `failures` に追加されない
+- **Implication**: `PartialTranspileError` で返す際に `.lua` ファイルの失敗詳細が欠落する。修正として `.lua` 読み込み失敗と `.lua` キャッシュ書き込み失敗を `failures.push()` に追加する
+- **Note**: `TranspileFailure` 型名は `.pasta` トランスパイル固有ではなく汎用的なため、`.lua` 失敗を含めても構造的に問題ない
+
+### `init_tracing_with_config()` の責務移動
+
+- **Context**: `init_tracing_with_config()` は現在 `pasta_shiori/src/shiori.rs` L15-49 に定義されている
+- **Finding**: `init_tracing_with_reload()` と `update_tracing_filter()` は `OnceLock<FilterHandle>` を共有する必要がある。`update_tracing_filter()` は `PastaLoader`（`pasta_lua` クレート内）から呼ばれるため、`OnceLock` は `pasta_lua` に置く必要がある
+- **Decision**: 両関数を `pasta_lua::logging::tracing_init` モジュール（新規）に配置。`pasta_shiori` からは `pasta_lua::init_tracing_with_reload` として呼び出す
+- **Benefit**: 循環参照を回避し、ロギング関連の責務を `pasta_lua::logging` に集約
 - **既存テストへの影響**: `PastaLogger` の `Rotation::DAILY` → `Rotation::NEVER` への変更がテストで不具合を起こす可能性 → テストは `PastaLogger::new()` を直接使っており、Rotation への依存は軽微
 
 ## References
