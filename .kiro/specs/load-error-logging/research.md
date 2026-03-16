@@ -7,6 +7,7 @@
   1. `tracing-appender` 0.2.4 の `Rotation::NEVER` + `filename_prefix` で正確な固定ファイル名が得られる
   2. `init_tracing_with_config()` は `try_init()` ベースのため、早期呼び出し後の再初期化は安全に無視される
   3. `RawShiori<T>::load_impl()` が `load()` の成否に関わらず `*guard = Some(shiori)` を設定する — エラー保持型にするには `request_impl()` のフロー変更が必要
+  4. `PartialTranspileError` の `Display` にファイルパスを含めることで `X-ERROR-REASON` 経由でファイル名が伝搬する（設計レビュー後の議論で確定）
 
 ## Research Log
 

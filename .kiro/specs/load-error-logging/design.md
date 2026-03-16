@@ -217,7 +217,7 @@ flowchart TD
 | 1.1 | load エラーメッセージ内部保持 | PastaShiori | `last_load_error` フィールド | load 失敗フロー |
 | 1.2 | request() で X-ERROR-REASON にエラー含める | PastaShiori | `request()` 分岐 | request エラー応答フロー |
 | 1.3 | 根本原因を含める | LoaderError | `Display` トレイト（既存） | — |
-| 1.4 | 失敗ファイル名含める | LoaderError::PartialTranspileError | `Display` + `failures` | — |
+| 1.4 | 失敗ファイル名含める | LoaderError::PartialTranspileError | `Display` にファイルパス含む | — |
 | 1.5 | 日本語メッセージ | LoaderError | 既存日本語メッセージ（対応不要） | — |
 | 2.1 | load 前のログ初期化 | PastaShiori, logging::tracing_init, PastaLoader | Stage 1 + Stage 1.5 | 2段階初期化フロー |
 | 2.2 | load 失敗時のログ記録 | PastaShiori | `error!()` マクロ | load 失敗フロー |
@@ -753,13 +753,50 @@ Ok((combined_context, module_names, stats))
 
 **Implementation Notes**
 - 既存の `warn!()` を `error!()` に昇格（失敗はロード中止に直結するため）
-- `PartialTranspileError` の `Display` 実装（`"トランスパイル部分失敗: N件成功, M件失敗"`）は既存のまま使用
-- `PartialTranspileError` の `failures` フィールドに各失敗の `source_path` と `error` が含まれ、上位の `MyError::Load(String)` に変換される際に `Display` で要約が伝搬される
+- `PartialTranspileError` の `Display` 実装を変更し、失敗ファイルパスを含める（後述の LoaderError セクション参照）
+- `PartialTranspileError` の `failures` フィールドに各失敗の `source_path` と `error` が含まれ、上位の `MyError::Load(String)` に変換される際に `Display` でファイル名付き要約が伝搬される
 - `.lua` ファイル失敗も `TranspileFailure` に含めるが、`TranspileFailure` は型名として汎用的なので問題ない
 
 ## Data Models
 
 本機能でのデータモデル変更は `PastaShiori` 構造体への `last_load_error: Option<String>` フィールド追加のみ。永続化やストレージへの影響はない。
+
+### LoaderError::PartialTranspileError の Display 変更
+
+`X-ERROR-REASON` へのファイル名伝搬（Req 1.4）のため、`Display` に失敗ファイルパスを含める。
+
+```rust
+// 現行
+#[error("トランスパイル部分失敗: {succeeded}件成功, {failed}件失敗")]
+PartialTranspileError {
+    succeeded: usize,
+    failed: usize,
+    failures: Vec<TranspileFailure>,
+}
+
+// 変更後
+#[error("トランスパイル部分失敗: {succeeded}件成功, {failed}件失敗 [{}]", format_failure_paths(.failures))]
+PartialTranspileError {
+    succeeded: usize,
+    failed: usize,
+    failures: Vec<TranspileFailure>,
+}
+```
+
+ヘルパー関数（同ファイル内に追加）:
+
+```rust
+fn format_failure_paths(failures: &[TranspileFailure]) -> String {
+    failures
+        .iter()
+        .map(|f| f.source_path.display().to_string())
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+```
+
+- **結果例**: `X-ERROR-REASON: load error: トランスパイル部分失敗: 3件成功, 1件失敗 [dic/talk.pasta]`
+- thiserror 2 の `.field` 構文で `failures` を参照し、ヘルパー関数でフォーマットする
 
 ### 削除(廃止)される関数
 
