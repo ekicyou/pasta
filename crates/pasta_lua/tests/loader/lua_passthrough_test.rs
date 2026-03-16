@@ -427,3 +427,84 @@ fn test_cache_manager_orphan_with_lua_source() {
         "Orphan should be the unmatched cache file"
     );
 }
+
+// ============================================================================
+// load-error-logging: Task 6.2 - process_incremental error propagation tests
+// ============================================================================
+
+/// Verify that a broken .pasta file causes PastaLoader::load to return Err.
+#[test]
+fn test_partial_transpile_error_on_broken_pasta() {
+    let temp = create_test_base();
+    let base_dir = temp.path();
+
+    // Create a valid .pasta file
+    fs::create_dir_all(base_dir.join("dic/ok")).unwrap();
+    fs::write(
+        base_dir.join("dic/ok/good.pasta"),
+        "＊テスト\n  ゴースト：「こんにちは」\n",
+    )
+    .unwrap();
+
+    // Create a broken .pasta file (invalid syntax)
+    fs::create_dir_all(base_dir.join("dic/bad")).unwrap();
+    fs::write(
+        base_dir.join("dic/bad/broken.pasta"),
+        "＊壊れた\n  {{{{invalid syntax}}}}\n",
+    )
+    .unwrap();
+
+    let result = PastaLoader::load(base_dir);
+    assert!(result.is_err(), "Should fail with partial transpile error");
+    let err = match result {
+        Err(e) => e,
+        Ok(_) => panic!("Expected error but got Ok"),
+    };
+    let msg = format!("{}", err);
+    assert!(
+        msg.contains("トランスパイル部分失敗"),
+        "Error should mention partial transpile failure: {}",
+        msg
+    );
+    assert!(
+        msg.contains("broken.pasta"),
+        "Error should contain failed filename: {}",
+        msg
+    );
+}
+
+/// Verify that PartialTranspileError Display includes file paths.
+#[test]
+fn test_partial_transpile_error_display_includes_paths() {
+    use pasta_lua::loader::TranspileFailure;
+    use std::path::PathBuf;
+
+    let err = LoaderError::partial_transpile(
+        3,
+        2,
+        vec![
+            TranspileFailure {
+                source_path: PathBuf::from("dic/talk.pasta"),
+                error: "Parse error".to_string(),
+            },
+            TranspileFailure {
+                source_path: PathBuf::from("dic/click.pasta"),
+                error: "Transpile error".to_string(),
+            },
+        ],
+    );
+
+    let msg = format!("{}", err);
+    assert!(msg.contains("3件成功"), "Should show success count: {}", msg);
+    assert!(msg.contains("2件失敗"), "Should show failure count: {}", msg);
+    assert!(
+        msg.contains("dic/talk.pasta"),
+        "Should contain first failure path: {}",
+        msg
+    );
+    assert!(
+        msg.contains("dic/click.pasta"),
+        "Should contain second failure path: {}",
+        msg
+    );
+}

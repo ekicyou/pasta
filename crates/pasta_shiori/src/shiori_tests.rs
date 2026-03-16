@@ -160,6 +160,25 @@ fn test_load_nonexistent_directory_returns_false() {
     assert!(shiori.runtime.is_none());
 }
 
+#[test]
+fn test_request_after_load_failure_returns_load_error() {
+    let temp = TempDir::new().unwrap();
+    // Create an empty directory (no pasta.toml) → PastaLoader::load will fail
+    let mut shiori = PastaShiori::default();
+
+    let loaded = shiori.load(0, temp.path().as_os_str()).unwrap();
+    assert!(!loaded);
+
+    // Request should return Load error with the failure message
+    let err = shiori.request("test").unwrap_err();
+    match err {
+        MyError::Load(msg) => {
+            assert!(!msg.is_empty(), "Load error message should not be empty");
+        }
+        other => panic!("Expected MyError::Load, got {:?}", other),
+    }
+}
+
 // ========================================================================
 // Task 13: 複数インスタンス同時ロードテスト
 // ========================================================================

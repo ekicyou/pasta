@@ -28,7 +28,7 @@ mod context;
 mod discovery;
 mod error;
 
-pub use cache::{CacheManager, CURRENT_VERSION};
+pub use cache::{CURRENT_VERSION, CacheManager};
 pub use config::{
     LoaderConfig, LoggingConfig, LuaConfig, PastaConfig, PersistenceConfig, TalkConfig,
     default_libs, default_log_file_path, default_lua_search_paths,
@@ -42,7 +42,7 @@ use crate::transpiler::LuaTranspiler;
 
 use std::fs;
 use std::path::Path;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 /// Process statistics for logging.
 struct ProcessStats {
@@ -56,6 +56,7 @@ struct ProcessStats {
 ///
 /// Orchestrates the complete startup sequence:
 /// 1. Load configuration from pasta.toml
+/// 1.5. Create logger with config, register, and update tracing filter
 /// 2. Prepare profile directories and cache with version check
 /// 3. Discover .pasta files in dic/*/*.pasta
 /// 4. Incremental transpile (only changed files)
@@ -104,6 +105,10 @@ impl PastaLoader {
         // Phase 1: Load configuration
         debug!("Phase 1: Loading configuration");
         let config = PastaConfig::load(base_dir)?;
+
+        // Stage 1.5: Create logger with config and update tracing filter
+        debug!("Stage 1.5: Applying logging configuration");
+        let logger = Self::create_and_register_logger(base_dir, &config)?;
 
         // Phase 2: Prepare directories and cache (with version check)
         debug!("Phase 2: Preparing directories and cache");
@@ -160,12 +165,8 @@ impl PastaLoader {
         debug!("Phase 5: Generating scene_dic.lua");
         let scene_dic_path = cache_manager.generate_scene_dic(&module_names)?;
 
-        // Phase 6: Create logger
-        debug!("Phase 6: Creating instance logger");
-        let logger = Self::create_logger(base_dir, &config)?;
-
-        // Phase 7: Initialize runtime and load scene_dic
-        debug!("Phase 7: Initializing runtime");
+        // Phase 6: Initialize runtime and load scene_dic
+        debug!("Phase 6: Initializing runtime");
         let loader_context = LoaderContext::from_config(base_dir, &config);
         let runtime = PastaLuaRuntime::from_loader_with_scene_dic(
             context,
@@ -180,11 +181,11 @@ impl PastaLoader {
         Ok(runtime)
     }
 
-    /// Create an instance-specific logger from configuration.
+    /// Create an instance-specific logger, register it with the global registry,
+    /// and update the tracing filter with config from pasta.toml.
     ///
-    /// Returns None if logging directory cannot be created (optional feature).
-    /// Logger is wrapped in Arc for sharing with GlobalLoggerRegistry.
-    fn create_logger(
+    /// Called at Stage 1.5 (after Phase 1 config load).
+    fn create_and_register_logger(
         base_dir: &Path,
         config: &PastaConfig,
     ) -> Result<Option<std::sync::Arc<crate::logging::PastaLogger>>, LoaderError> {
@@ -192,8 +193,19 @@ impl PastaLoader {
 
         match crate::logging::PastaLogger::new(base_dir, logging_config.as_ref()) {
             Ok(logger) => {
+                let logger = std::sync::Arc::new(logger);
                 info!(path = %logger.log_path().display(), "Created instance logger");
-                Ok(Some(std::sync::Arc::new(logger)))
+
+                // Register with global registry (overwrites Stage 1 default writer)
+                crate::logging::GlobalLoggerRegistry::instance()
+                    .register(base_dir.to_path_buf(), logger.clone());
+
+                // Update tracing filter with config
+                if let Some(ref cfg) = logging_config {
+                    crate::logging::update_tracing_filter(cfg);
+                }
+
+                Ok(Some(logger))
             }
             Err(e) => {
                 // Log warning but don't fail startup
@@ -447,11 +459,15 @@ impl PastaLoader {
             let content = match fs::read_to_string(file_path) {
                 Ok(c) => c,
                 Err(e) => {
-                    warn!(
+                    error!(
                         file = %file_path.display(),
                         error = %e,
-                        "Failed to read .lua file, skipping"
+                        "Failed to read .lua file"
                     );
+                    failures.push(TranspileFailure {
+                        source_path: file_path.clone(),
+                        error: format!("Read error: {}", e),
+                    });
                     stats.failed += 1;
                     continue;
                 }
@@ -459,11 +475,15 @@ impl PastaLoader {
 
             // Save to cache (direct copy)
             if let Err(e) = cache_manager.save_cache(file_path, &content) {
-                warn!(
+                error!(
                     file = %file_path.display(),
                     error = %e,
-                    "Failed to copy .lua file to cache, skipping"
+                    "Failed to copy .lua file to cache"
                 );
+                failures.push(TranspileFailure {
+                    source_path: file_path.clone(),
+                    error: format!("Cache write error: {}", e),
+                });
                 stats.failed += 1;
                 continue;
             }
@@ -472,16 +492,21 @@ impl PastaLoader {
             debug!(file = %file_path.display(), module = %module_name, "Copied .lua");
         }
 
-        // Report failures if any
+        // Abort on any failures
         if !failures.is_empty() {
-            warn!(failed = stats.failed, "Some files failed to process");
             for failure in &failures {
-                warn!(
+                error!(
                     path = %failure.source_path.display(),
                     error = %failure.error,
                     "Process failure"
                 );
             }
+            let succeeded = stats.transpiled + stats.skipped + stats.copied;
+            return Err(LoaderError::partial_transpile(
+                succeeded,
+                stats.failed,
+                failures,
+            ));
         }
 
         Ok((combined_context, module_names, stats))

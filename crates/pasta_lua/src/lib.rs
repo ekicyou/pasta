@@ -54,7 +54,8 @@ pub use loader::{
     PastaLoader, TalkConfig, TranspileFailure, TranspileResult, default_libs,
 };
 pub use logging::{
-    GlobalLoggerRegistry, LoadDirGuard, PastaLogger, get_current_load_dir, set_current_load_dir,
+    GlobalLoggerRegistry, LoadDirGuard, PastaLogger, get_current_load_dir,
+    init_tracing_with_reload, set_current_load_dir, update_tracing_filter,
 };
 pub use runtime::{PastaLuaRuntime, RuntimeConfig};
 pub use search::{SearchContext, SearchError};

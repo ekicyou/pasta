@@ -1,0 +1,40 @@
+＃ update.pasta - ネットワーク更新イベント + バルーン切替（emo2-talk-port）
+＃ emo-gs dic/talks/event.lua のネットワーク更新 5 イベント + バルーン切替を忠実移植
+
+＊OnUpdateBegin
+むらさき：＠笑顔 あったらし～い～、更新は？
+エモ：＠通常 きた？
+
+＊OnUpdateReady
+むらさき：＠期待大 きたよぉ～。
+エモ：＠冷笑 期待しない方が‥‥
+
+＊OnUpdateFailure
+むらさき：＠期待外れ 繋がらへん‥‥\w9\w9
+エモ：＠驚き ｲｷﾛｰ｡
+
+＃ OnUpdateComplete は reference[0] で更新成功/更新無しを分岐
+＊OnUpdateComplete
+```lua
+function SCENE.on_update_complete(act)
+    local save, var = act:init_scene(SCENE)
+    act:transfer_req_to_var()
+    local r0 = var.r0
+
+    if r0 == "changed" then
+        return "\\1\\s[通常]"
+            .. "\\0\\s[637]更新したで！"
+            .. "\\n\\1\\s[笑顔]どこが変わったかな？"
+            .. "\\n\\0\\n[150]‥‥\\s[4]アヒルが。。。"
+            .. "\\n\\1\\s[静観]\\n[150]起動トークだけ差し替え？"
+    else
+        return "\\0\\s[570]こえへん‥‥\\w9\\w9"
+            .. "\\n\\1\\s[驚き]ｲｷﾛｰ｡"
+    end
+end
+```
+　＠on_update_complete()
+
+＊OnBalloonChange
+むらさき：＠通常 バルーン切り替えです。\w9\w9
+エモ：＠通常 ばるるるるん？\_w[600]

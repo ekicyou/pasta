@@ -1,50 +1,9 @@
 use crate::error::*;
 use crate::lua_request;
-use pasta_lua::loader::LoggingConfig;
 use pasta_lua::mlua::{Function, Table};
 use pasta_lua::{GlobalLoggerRegistry, LoadDirGuard, PastaLoader, PastaLuaRuntime};
 use std::{ffi::*, path::*};
 use tracing::{debug, error, info, trace, warn};
-
-/// Initialize global tracing subscriber with LoggingConfig.
-///
-/// # Filter Priority
-/// 1. PASTA_LOG environment variable (highest)
-/// 2. pasta.toml [logging].filter
-/// 3. pasta.toml [logging].level
-/// 4. Default: "debug"
-///
-/// # Note
-/// Never fails - falls back to default filter on any error.
-/// Uses try_init() so subsequent calls are safely ignored.
-pub fn init_tracing_with_config(config: &LoggingConfig) {
-    use tracing_subscriber::filter::EnvFilter;
-    use tracing_subscriber::fmt;
-    use tracing_subscriber::prelude::*;
-
-    // Build filter with priority: PASTA_LOG > config.filter > config.level > default
-    let filter = EnvFilter::try_from_env("PASTA_LOG")
-        .or_else(|_| EnvFilter::try_new(config.to_filter_directive()))
-        .unwrap_or_else(|e| {
-            eprintln!(
-                "Warning: Failed to parse log filter '{}', using default: {}",
-                config.to_filter_directive(),
-                e
-            );
-            EnvFilter::new("debug")
-        });
-
-    let _ = tracing_subscriber::registry()
-        .with(
-            fmt::layer()
-                .with_writer(GlobalLoggerRegistry::instance().clone())
-                .with_ansi(false)
-                .with_target(true)
-                .with_level(true)
-                .with_filter(filter),
-        )
-        .try_init();
-}
 
 pub trait Shiori {
     fn load<S: AsRef<OsStr>>(&mut self, hinst: isize, load_dir: S) -> MyResult<bool>;
@@ -69,6 +28,9 @@ pub struct PastaShiori {
 
     /// Pasta Lua runtime instance (contains logger internally)
     runtime: Option<PastaLuaRuntime>,
+
+    /// Error message from last failed load (for X-ERROR-REASON)
+    last_load_error: Option<String>,
 
     /// Cached SHIORI.load function
     load_fn: Option<Function>,
@@ -119,17 +81,25 @@ impl Shiori for PastaShiori {
         // If already loaded, cleanup previous instance
         if self.runtime.is_some() {
             info!("Releasing existing runtime for reload");
-            // Clear cached functions before releasing runtime
             self.clear_cached_lua_functions();
             if let Some(ref old_load_dir) = self.load_dir {
                 GlobalLoggerRegistry::instance().unregister(old_load_dir);
             }
             self.runtime = None;
+            self.last_load_error = None;
         }
 
         // Save hinst and load_dir
         self.hinst = hinst;
         self.load_dir = Some(load_dir_path.clone());
+
+        // Stage 1: Early logger initialization (before PastaLoader::load)
+        // Create a default logger so all load-phase logs are captured to file
+        if let Ok(logger) = pasta_lua::PastaLogger::new(&load_dir_path, None) {
+            let logger = std::sync::Arc::new(logger);
+            GlobalLoggerRegistry::instance().register(load_dir_path.clone(), logger);
+        }
+        pasta_lua::init_tracing_with_reload(&pasta_lua::LoggingConfig::default());
 
         // Set load_dir context for logging
         let _guard = LoadDirGuard::new(load_dir_path.clone());
@@ -140,33 +110,14 @@ impl Shiori for PastaShiori {
             "Starting PastaShiori load"
         );
 
-        // Load runtime via PastaLoader (logger is created inside)
+        // Load runtime via PastaLoader (Stage 1.5 logger update happens inside)
         match PastaLoader::load(&load_dir_path) {
             Ok(runtime) => {
-                // Initialize tracing subscriber with config from pasta.toml (Requirement 6)
-                // Priority: PASTA_LOG env var > filter > level > default ("debug")
-                let logging_config = runtime
-                    .config()
-                    .and_then(|c| c.logging())
-                    .unwrap_or_default();
-                init_tracing_with_config(&logging_config);
-
-                // Immediately log load_dir after tracing initialization (Requirement 7)
-                info!(
-                    load_dir = %load_dir_path.display(),
-                    "Logger initialized for ghost directory"
-                );
-
-                // Register runtime's logger with global registry for log routing
-                if let Some(logger) = runtime.logger() {
-                    GlobalLoggerRegistry::instance().register(load_dir_path.clone(), logger);
-                    debug!(load_dir = %load_dir_path.display(), "Registered logger with GlobalLoggerRegistry");
-                }
-
                 // Cache SHIORI functions (load/request/unload)
                 self.cache_lua_functions(&runtime);
 
                 self.runtime = Some(runtime);
+                self.last_load_error = None;
 
                 // Call SHIORI.load if available (using cached function)
                 if !self.call_lua_load(hinst, &load_dir_path) {
@@ -182,15 +133,20 @@ impl Shiori for PastaShiori {
                     error = %e,
                     "PastaShiori load failed"
                 );
-                // Return false on error (SHIORI convention)
+                self.last_load_error = Some(format!("{}", e));
                 Ok(false)
             }
         }
     }
 
     fn request<S: AsRef<str>>(&mut self, req: S) -> MyResult<String> {
-        // Check if runtime is initialized
-        let _runtime = self.runtime.as_ref().ok_or(MyError::NotInitialized)?;
+        // Check if runtime is initialized, with detailed error on load failure
+        let _runtime = self.runtime.as_ref().ok_or_else(|| {
+            match &self.last_load_error {
+                Some(msg) => MyError::Load(msg.clone()),
+                None => MyError::NotInitialized,
+            }
+        })?;
 
         // Set load_dir context for logging
         let _guard = self.load_dir.as_ref().map(|p| LoadDirGuard::new(p.clone()));

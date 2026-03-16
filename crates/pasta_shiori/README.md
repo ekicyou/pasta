@@ -147,8 +147,6 @@ ghost/
 | pasta_lua          | workspace  | Luaランタイム（pasta_dsl経由でDSLパーサーに依存） |
 | time               | 0.3        | タイムスタンプ処理                                |
 | tracing            | 0.1        | ロギング                                          |
-| tracing-subscriber | workspace  | ログ出力                                          |
-| tracing-appender   | workspace  | ファイルログ                                      |
 | thiserror          | 2          | エラー型定義                                      |
 
 ### Windows 専用

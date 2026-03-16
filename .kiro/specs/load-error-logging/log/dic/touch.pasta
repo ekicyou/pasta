@@ -1,0 +1,43 @@
+＃ touch.pasta - タッチ反応 + ダブルクリック（emo2-talk-port）
+＃ emo-gs dic/talks/event.lua の TOUCH 関数 + ダブルクリック を忠実移植
+＃ OnMouseMove は Lua コードブロックで actor×region ルーティング
+＃ OnMouseDoubleClick は純粋 DSL
+
+＊OnMouseMove
+```lua
+function SCENE.on_mouse_move(act)
+    local save, var = act:init_scene(SCENE)
+    act:transfer_req_to_var()
+    local td = require("touch_detect")
+    local actor = var.r3
+    local region = var.r4
+
+    if actor == nil or region == nil then return nil end
+
+    local fired = td.check(actor, region)
+    if not fired then return nil end
+
+    local key = region .. actor
+    local talks = {
+        Head0 = "\\1\\s[通常]"
+            .. "\\0\\s[5]撫でて伸ばすタイプなんや～。"
+            .. "\\n\\1\\s[冷笑]うそっぽ～い。",
+        Bust0 = "\\1\\s[通常]"
+            .. "\\0\\s[5]えっち、\\n　すけっち、\\n　　わんたっち～♪\\w9"
+            .. "\\n\\1\\s[冷笑]‥‥\\n\\w9昭和の香りがするよ。",
+        Head1 = "\\0\\s[0]"
+            .. "\\1\\s[不安]な、なんだよう。"
+            .. "\\n\\0\\s[5]仕方ないなあ～、\\n%usernameったらもう♪\\w9",
+        Bust1 = "\\0\\s[0]"
+            .. "\\1\\s[照れ怒り]さ、触らないでよ！"
+            .. "\\n\\0\\s[5]もう、%usernameったら、いたずらっ子やねぇ。\\w9",
+    }
+    return talks[key]
+end
+```
+　＠on_mouse_move()
+
+＊OnMouseDoubleClick
+エモ：＠通常 \1\![move,-353,,,0,base,base]
+むらさき：＠通常 ダブルクリックで位置調整なんや。
+エモ：＠通常 ソーシャルディスタンスだね。

@@ -59,11 +59,9 @@ impl PastaLogger {
             .and_then(|s| s.to_str())
             .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "Invalid log filename"))?;
 
-        // Create rolling file appender with daily rotation
-        // max_log_files is based on rotation_days
+        // Create file appender with no rotation (fixed filename)
         let appender = RollingFileAppender::builder()
-            .rotation(Rotation::DAILY)
-            .max_log_files(config.rotation_days)
+            .rotation(Rotation::NEVER)
             .filename_prefix(log_file_name)
             .build(log_dir)
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
@@ -211,5 +209,43 @@ mod tests {
 
         let result = PastaLogger::new(base_dir, Some(&config));
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_log_file_is_fixed_name_no_date_suffix() {
+        let temp_dir = TempDir::new().unwrap();
+        let base_dir = temp_dir.path();
+
+        std::fs::create_dir_all(base_dir.join("profile/pasta/logs")).unwrap();
+
+        let logger = PastaLogger::new(base_dir, None).unwrap();
+
+        // Write something to trigger file creation
+        logger.write(b"test log line\n").unwrap();
+        logger.flush().unwrap();
+
+        // Check that the log file is exactly "pasta.log" with no date suffix
+        let log_dir = base_dir.join("profile/pasta/logs");
+        let entries: Vec<_> = std::fs::read_dir(&log_dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.file_name().to_string_lossy().to_string())
+            .collect();
+
+        assert!(
+            entries.contains(&"pasta.log".to_string()),
+            "Log file should be exactly 'pasta.log', found: {:?}",
+            entries
+        );
+        // No date-suffixed files should exist
+        let date_files: Vec<_> = entries
+            .iter()
+            .filter(|n| n.starts_with("pasta.log.") && n.len() > "pasta.log".len())
+            .collect();
+        assert!(
+            date_files.is_empty(),
+            "No date-suffixed log files should exist, found: {:?}",
+            date_files
+        );
     }
 }

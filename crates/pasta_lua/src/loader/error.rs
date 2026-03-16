@@ -97,12 +97,24 @@ pub enum LoaderError {
     },
 
     /// Partial transpilation failure.
-    #[error("トランスパイル部分失敗: {succeeded}件成功, {failed}件失敗")]
+    #[error(
+        "トランスパイル部分失敗: {succeeded}件成功, {failed}件失敗 [{}]",
+        format_failure_paths(failures)
+    )]
     PartialTranspileError {
         succeeded: usize,
         failed: usize,
         failures: Vec<TranspileFailure>,
     },
+}
+
+/// Format failure file paths into a comma-separated list for Display.
+fn format_failure_paths(failures: &[TranspileFailure]) -> String {
+    failures
+        .iter()
+        .map(|f| f.source_path.display().to_string())
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 /// Details about a single transpile failure.

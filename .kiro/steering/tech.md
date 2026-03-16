@@ -47,7 +47,7 @@
 - **pasta_core, pasta_lua**: 内部依存
 - **pest 2.8.6, pest_derive 2.8.6**: SHIORIプロトコルパーサー
 - **time 0.3**: 時刻処理
-- **tracing 0.1 / tracing-subscriber 0.3 / tracing-appender 0.2**: ロギング
+- **tracing 0.1**: ロギング（subscriber/appenderはpasta_luaに移管）
 - **thiserror 2**: エラー型定義
 - **windows-sys 0.59**: Windows DLL API（cfg(windows)）
 

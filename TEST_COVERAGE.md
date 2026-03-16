@@ -102,6 +102,9 @@
 | Luaパススルー（パススルー処理）      | `lua_passthrough_test.rs`                                         | ✅ 完了 | 2テスト（lua-passthrough）                   |
 | Luaパススルー（インクリメンタル）    | `lua_passthrough_test.rs`                                         | ✅ 完了 | 1テスト（lua-passthrough）                   |
 | Luaパススルー（孤立キャッシュ）      | `lua_passthrough_test.rs`                                         | ✅ 完了 | 2テスト（lua-passthrough）                   |
+| トランスパイル失敗中止               | `lua_passthrough_test.rs`                                         | ✅ 完了 | 2テスト（load-error-logging）                |
+| ログファイル名固定（Rotation::NEVER）| `logger.rs`                                                       | ✅ 完了 | 1テスト（load-error-logging）                |
+| load失敗→requestエラー伝搬           | `shiori_tests.rs`                                                 | ✅ 完了 | 1テスト（load-error-logging）                |
 
 ### 2.5 LSP層テスト（Language Server）
 
