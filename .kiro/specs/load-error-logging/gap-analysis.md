@@ -74,17 +74,18 @@
 
 **注意**: `Rotation::NEVER` の場合でも `RollingFileAppender` は使用可能だが、`filename_prefix` が付くと `pasta.log.` のようなファイル名になる可能性がある。`tracing-appender` 0.2 の `Rotation::NEVER` の挙動を確認する必要あり。 → **Research Needed**
 
-### Requirement 4: トランスパイルエラーの詳細記録
+### Requirement 4: トランスパイルエラーの詳細記録とロード中止
 
 **現状**:
 - `process_incremental()` が失敗ファイルを `Vec<TranspileFailure>` に収集
 - `warn!()` で各失敗を報告（L490-496）
 - しかし `process_incremental()` は `Ok(...)` を返す — 失敗があっても `LoaderError` に変換しない
 - `stats.failed` がカウントされるが、呼び出し元でチェックしていない
+- **構造的欠陥**: トランスパイル成否に関わらず `module_names` に全ファイルを登録（L357-359 `// Always collect module name for scene_dic.lua`）。これにより `scene_dic.lua` が存在しない `.lua` を `require()` → Phase 7 の Lua ランタイム初期化で必ずクラッシュする。現行コードでは「部分成功で起動継続」は事実上不可能。
 
-**ギャップ**: Partial — 情報は収集されているが、呼び出し元への伝搬が不足
+**ギャップ**: Partial → **Fatal** — 部分成功の起動パスが壊れており、失敗情報も伝搬されない
 
-**対応**: `process_incremental()` で `stats.failed > 0` の場合に `Err(LoaderError::PartialTranspileError {...})` を返すか、`Ok` のまま返して呼び出し元で `stats.failed` を確認するか。部分失敗時の起動方針（継続 or 中止）は設計フェーズで決定。
+**決定事項**（ディスカッションにて決定）: トランスパイル部分失敗時は**ロードを中止**する（選択肢A）。`process_incremental()` で `stats.failed > 0` の場合に `Err(LoaderError::PartialTranspileError {...})` を返す。部分成功での起動は実装上の構造的理由からも不可能であり、明示的なエラー中止がユーザー体験として正しい。
 
 ### Requirement 5: ~~エラーメッセージの可読性~~ → Requirement 1 に統合済み
 
@@ -159,7 +160,8 @@ Option Aで十分カバーできるため、ハイブリッドは不要。
 ## 5. Research Needed（設計フェーズで確認）
 
 1. **`tracing-appender` 0.2 の `Rotation::NEVER` のファイル名挙動**: `filename_prefix` / `filename_suffix` が空の場合にどのようなファイル名が生成されるか
-2. **`process_incremental` のエラー伝搬戦略**: 部分失敗時に `Err` で返すか、`Ok` + warning で返すか（既存の設計意図を確認）
+
+> ~~2. **`process_incremental` のエラー伝搬戦略**~~ → **解決済み**: 部分失敗時は `Err(LoaderError::PartialTranspileError)` で即座にロード中止。構造的に部分成功起動は不可能であることを確認済み（scene_dic.lua が全モジュールを require するため）。
 
 ---
 

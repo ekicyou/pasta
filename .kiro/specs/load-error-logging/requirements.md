@@ -45,13 +45,15 @@ SHIORI `load` フェーズでトランスパイルエラー等が発生した際
 
 > **Note**: デフォルトパス `profile/pasta/logs/pasta.log` は既存の `default_log_file_path()` で既に設定済みのため、変更不要。
 
-### Requirement 4: トランスパイルエラーの詳細記録
+### Requirement 4: トランスパイルエラーの詳細記録とロード中止
 
-**Objective:** ゴースト開発者として、どの `.pasta` ファイルのトランスパイルが失敗したかをログから特定したい。
+**Objective:** ゴースト開発者として、どの `.pasta` ファイルのトランスパイルが失敗したかをログから特定したい。また、不完全な状態での起動は原因不明の二次障害を引き起こすため、早期に中止したい。
+
+#### 背景（実運用で確認された障害パターン）
+
+`.pasta` 7件中3件がトランスパイル失敗 → `scene_dic.lua` は7件すべてを `require()` → Luaランタイムが存在しないモジュールをロードしようとしてクラッシュ → ロガーが未初期化（Phase 6）のため記録なし → 原因不明。`process_incremental()` が失敗ファイルの `module_name` も `scene_dic.lua` に含めるため、部分成功での起動は必ず Phase 7 で失敗する構造的問題がある。
 
 #### Acceptance Criteria
 1. When トランスパイル処理で個別ファイルのエラーが発生した場合, pasta_lua shall 失敗したファイルパスとエラーメッセージをログに記録する
 2. When `PartialTranspileError` が発生した場合, pasta_lua shall 全失敗ファイルの一覧をログに記録する
-3. If トランスパイルエラーが発生した場合, pasta_lua shall 失敗情報を呼び出し元に返す（`LoaderError` として伝搬する）
-
-> **設計判断**: 部分失敗時にゴースト起動を継続するか中止するかは設計フェーズで決定する。
+3. If トランスパイルで1件以上の失敗が発生した場合, pasta_lua shall `process_incremental()` から `Err(LoaderError::PartialTranspileError)` を返しロードを中止する
