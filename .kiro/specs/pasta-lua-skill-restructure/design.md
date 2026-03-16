@@ -213,6 +213,18 @@ sequenceDiagram
 > 📖 詳細: [references/ファイル名.md](references/ファイル名.md)
 ```
 
+**§3-§7 各セクションの必須キーワード**:
+
+要約に必ず言及すべきキーワード・API名の基準。エージェントがロード判断できる最低限の情報として機能する。
+
+| セクション | 必須キーワード |
+|-----------|--------------|
+| §3 Coding Conventions | `MODULE/MODULE_IMPL`分離, `STORE`パターン, EmmyLua(`@class`, `@field`, `@param`, `@return`), `pcall`, ガードクローズ |
+| §4 Runtime API | `@pasta_search`, `@pasta_persistence`, `@pasta_config`, `@pasta_sakura_script`, `@enc`, `pcall`必須, フォールバック戦略 |
+| §5 Internal Modules | `STORE`, `ACT`, `SCENE`, `WORD`, `GLOBAL`, `SAVE`, `finalize_scene` |
+| §6 SHIORI Handlers | `REG`, `RES`, `OnTalk`, `OnHour`, 仮想ディスパッチャ, フォールバックチェーン |
+| §7 Testing & Lint | `lua_test`, `describe`, `test`, `expect`, `set_scene_selector`, `set_word_selector`, luacheck |
+
 **Referencesインデックスセクション**:
 
 ```markdown
