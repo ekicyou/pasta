@@ -157,7 +157,7 @@ flowchart TD
 | 1.3 | 根本原因を含める | LoaderError | `Display` トレイト | — |
 | 1.4 | 失敗ファイル名含める | LoaderError::PartialTranspileError | `Display` 書式 | — |
 | 1.5 | 日本語メッセージ | LoaderError | 既存日本語メッセージ | — |
-| 2.1 | load 前のログ初期化 | PastaShiori | `init_early_logger()` | 早期初期化フロー |
+| 2.1 | load 前のログ初期化 | PastaShiori | `load()` 内インライン（PastaLogger + register + init_tracing） | 早期初期化フロー |
 | 2.2 | load 失敗時のログ記録 | PastaShiori | `error!()` マクロ | load 失敗フロー |
 | 2.3 | 二重初期化防止 | init_tracing_with_config | `try_init()` | — |
 | 3.1 | 固定ファイル名 `pasta.log` | PastaLogger | `Rotation::NEVER` | — |
@@ -319,7 +319,7 @@ let appender = RollingFileAppender::builder()
 | Requirements | 4.1, 4.2, 4.3 |
 
 **Responsibilities & Constraints**
-- 個別ファイルのトランスパイル失敗をログに記録する（既存の `warn!()` を維持）
+- 個別ファイルのトランスパイル失敗を `error!()` でログに記録する（ロード中止に直結するため `warn!()` から昇格）
 - 全ファイル処理完了後、`stats.failed > 0` なら `Err(LoaderError::PartialTranspileError)` を返す
 - 既存の `TranspileFailure` 構造体と `PartialTranspileError` バリアントを活用する
 
