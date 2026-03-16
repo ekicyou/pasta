@@ -119,40 +119,37 @@ end)
 
 ランダム選択を含むモジュール（シーン選択・単語選択）のテストでは、セレクターを固定する。
 
+`@pasta_search` の `set_scene_selector` / `set_word_selector` は**整数インデックスのシーケンス（0始まり）**を受け取り、候補選択順序を事前指定する。Rust側で `MockRandomSelector` に変換される。
+
 ### set_scene_selector
 
-`@pasta_search` モジュールのシーン選択ロジックを固定する。
-
 ```lua
-local pasta_search = require("@pasta_search")
+local SEARCH = require("@pasta_search")
 
--- 常に最初のシーンを選択
-pasta_search.set_scene_selector(function(scenes)
-    return scenes[1]
-end)
+-- 常に最初のシーンを選択（0始まりインデックス）
+SEARCH:set_scene_selector(0, 0, 0)
+
+-- 1番目→2番目→1番目の順で選択
+SEARCH:set_scene_selector(0, 1, 0)
 ```
 
 ### set_word_selector
 
-`@pasta_search` モジュールの単語選択ロジックを固定する。
-
 ```lua
-local pasta_search = require("@pasta_search")
+local SEARCH = require("@pasta_search")
 
 -- 常に最初の候補を選択
-pasta_search.set_word_selector(function(candidates)
-    return candidates[1]
-end)
+SEARCH:set_word_selector(0, 0, 0)
 ```
 
 ### リセット
 
-テスト後は `nil` を渡してデフォルト動作に戻す:
+テスト後は**引数なし**で呼び出してデフォルト（ランダム）動作に戻す:
 
 ```lua
--- テスト終了後にリセット
-pasta_search.set_scene_selector(nil)
-pasta_search.set_word_selector(nil)
+-- テスト終了後にリセット（引数なし = デフォルトに戻す）
+SEARCH:set_scene_selector()
+SEARCH:set_word_selector()
 ```
 
 ### 決定論的テストの例
@@ -160,24 +157,23 @@ pasta_search.set_word_selector(nil)
 ```lua
 describe("トーク選択", function()
     test("特定のシーンが選択される", function()
-        local pasta_search = require("@pasta_search")
+        local SEARCH = require("@pasta_search")
 
-        -- 常に2番目のシーンを選択するよう固定
-        pasta_search.set_scene_selector(function(scenes)
-            return scenes[2]
-        end)
+        -- 常に2番目のシーンを選択するよう固定（0始まり）
+        SEARCH:set_scene_selector(1)
 
         local result = SCENE.search("talk")
         expect(result).to_be_truthy()
         -- 特定のシーンが返されることを検証
 
-        -- リセット
-        pasta_search.set_scene_selector(nil)
+        -- リセット（引数なしでデフォルトに復帰）
+        SEARCH:set_scene_selector()
+        SEARCH:set_word_selector()
     end)
 end)
 ```
 
-> 📖 `@pasta_search` モジュールの完全なAPI仕様は [runtime-api.md](runtime-api.md) を参照。
+> 📖 `@pasta_search` モジュールの完全なAPI仕様は [runtime-api.md](runtime-api.md#set_scene_selector--set_word_selector) を参照。
 
 ---
 
@@ -243,3 +239,9 @@ cargo test -p pasta_lua lua_test
 ```
 
 lua_test フレームワークはRust側の `#[test]` 関数から呼び出される。テスト結果はRustのテストランナーを通じて報告される。
+
+---
+
+## 関連リファレンス
+
+- [runtime-api.md](runtime-api.md#set_scene_selector--set_word_selector) — `@pasta_search` の `set_scene_selector` / `set_word_selector` 完全APIシグネチャ
