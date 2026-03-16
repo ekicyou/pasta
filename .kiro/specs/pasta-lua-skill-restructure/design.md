@@ -6,7 +6,7 @@
 
 **Users**: AIエージェント（GitHub Copilot等）およびゴースト開発者が、pasta_luaランタイムのLuaスクリプト開発時に利用する。
 
-**Impact**: 既存のSKILL.md単体構成から、SKILL.md（概要・インデックス）+ references/（詳細リファレンス）の2層構成に変更。LUA_API.mdを削除し、steering/lua-coding.mdをリダイレクトに置換する。
+**Impact**: 既存のSKILL.md単体構成から、SKILL.md（概要・インデックス）+ references/（詳細リファレンス）の2層構成に変更。LUA_API.mdおよびsteering/lua-coding.mdを削除する。
 
 ### Goals
 - SKILL.mdを500行未満に圧縮し、AIエージェントのコンテキスト効率を向上
@@ -55,7 +55,7 @@ graph TB
 
     subgraph Legacy[廃止対象]
         LUA[LUA_API.md<br/>削除]
-        LCS[lua-coding.md<br/>リダイレクト化]
+        LCS[lua-coding.md<br/>削除]
     end
 
     subgraph CrossRef[リンク更新対象]
@@ -73,10 +73,10 @@ graph TB
     RT <-->|相互リファレンス| SH
     IM <-->|相互リファレンス| SH
 
-    LUA -.->|内容統合| RT
-    LUA -.->|内容統合| SH
-    LCS -.->|内容統合| CC
-    LCS -.->|内容統合| IM
+    LUA -.->|内容統合 → 削除| RT
+    LUA -.->|内容統合 → 削除| SH
+    LCS -.->|内容統合 → 削除| CC
+    LCS -.->|内容統合 → 削除| IM
 
     SOUL -->|リンク更新| SKILL
     GRAM -->|リンク更新| SKILL
@@ -143,7 +143,7 @@ sequenceDiagram
 | 5.3 | §3-§7要約 + リファレンスリンク | SKILL.md §3-§7 | ロードフロー |
 | 5.4 | Referencesセクション | SKILL.md §References | ロードフロー |
 | 6.1 | LUA_API.md削除 | LUA_API.md | — |
-| 6.2 | lua-coding.mdリダイレクト化 | lua-coding.md | — |
+| 6.2 | lua-coding.md削除 | lua-coding.md | — |
 | 6.3 | SOUL.mdリンク更新 | SOUL.md | — |
 | 6.4 | GRAMMAR.mdリンク更新 | GRAMMAR.md | — |
 
@@ -158,7 +158,7 @@ sequenceDiagram
 | coding-conventions.md | Conventions | Luaコーディング規約の完全リファレンス | 2.2, 2.4, 3.4, 4.1-4.4 | — | — |
 | testing-lint.md | Quality | テスト・静的解析の完全リファレンス | 2.2, 2.4, 3.5, 4.1-4.4 | runtime-api.md (P2) | — |
 | LUA_API.md (削除) | Legacy | 旧権威APIリファレンスの廃止 | 6.1 | — | — |
-| lua-coding.md (リダイレクト) | Legacy | 旧コーディング規約のリダイレクト化 | 6.2 | — | — |
+| lua-coding.md (削除) | Legacy | 旧コーディング規約の削除 | 6.2 | — | — |
 | SOUL.md (リンク更新) | CrossRef | LUA_API.mdリンクの更新 | 6.3 | — | — |
 | GRAMMAR.md (リンク更新) | CrossRef | LUA_API.mdリンクの更新 | 6.4 | — | — |
 
@@ -519,24 +519,17 @@ sequenceDiagram
 - references/の全5ファイルが完成した後に削除を実行
 - 削除前にreferences/内の各ファイルがLUA_API.mdの全セクション内容をカバーしていることを検証
 
-#### lua-coding.md (リダイレクト化)
+#### lua-coding.md (削除)
 
 | Field | Detail |
 |-------|--------|
-| Intent | steeringファイルをスキルへのリダイレクトに置換 |
+| Intent | steeringファイルを完全削除してオンデマンドロードコストを排除 |
 | Requirements | 6.2 |
 
 **Responsibilities & Constraints**
-- ファイル内容を以下のリダイレクト文に置換:
-
-```markdown
-# Luaコーディング規約
-
-> Luaコーディング時は **pasta-lua-coding** スキルを参照してください。
-> 詳細リファレンス: `.agents/skills/pasta-lua-coding/references/`
-```
-
-- ファイル自体は削除しない（steeringとして存在し続けるため、コンテキストロード時に他の場所を探す手間を排除）
+- references/の全5ファイルが完成した後にファイルを削除
+- スキルのUSE FORキーワード（`lua-coding`, `Luaスクリプト`, `Lua API`等）によりエージェントは`pasta-lua-coding`スキルを直接発見できるため、steeringレベルの常時ロードは不要
+- 削除によりLua非関連タスクでのコンテキスト消費を完全排除し、Goals「常時ロードコスト排除」を達成
 
 ### CrossRef Layer
 

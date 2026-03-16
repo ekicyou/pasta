@@ -76,6 +76,6 @@ pasta-lua-codingスキルの構造改善仕様。現在のSKILL.md（588行）�
 #### Acceptance Criteria
 
 1. When references/ が完成した後, the `crates/pasta_lua/LUA_API.md` shall be deleted
-2. When references/ が完成した後, the `.kiro/steering/lua-coding.md` shall be replaced with a brief redirect（「Luaコーディング時はpasta-lua-codingスキルを参照」程度の誘導）
+2. When references/ が完成した後, the `.kiro/steering/lua-coding.md` shall be deleted（スキルのUSE FORキーワードによりオンデマンドで発見可能なため、steeringとして常時ロードする必要なし）
 3. The SOUL.md shall update its LUA_API.md link to point to the skill references directory
 4. The GRAMMAR.md shall update its LUA_API.md link to point to the skill references directory
