@@ -65,13 +65,19 @@ sequenceDiagram
     SSP->>RawShiori: load(hdir, len)
     RawShiori->>PastaShiori: load(hinst, load_dir)
     
-    Note over PastaShiori: 【新規】早期ロガー初期化
+    Note over PastaShiori: 【Stage 1】早期トレーシング初期化
     PastaShiori->>PastaLogger: new(base_dir, default_config)
     PastaShiori->>GlobalRegistry: register(load_dir, logger)
-    PastaShiori->>PastaShiori: init_tracing_with_config(default)
+    PastaShiori->>PastaShiori: init_tracing_with_reload() → handle を OnceLock に保存
     
     PastaShiori->>PastaLoader: load(base_dir)
-    PastaLoader->>PastaLoader: Phase 1: config
+    PastaLoader->>PastaLoader: Phase 1: pasta.toml 読み込み成功
+    
+    Note over PastaLoader: 【Stage 1.5】ロギング設定反映
+    PastaLoader->>PastaLogger: new(base_dir, config.logging())
+    PastaLoader->>GlobalRegistry: register(load_dir, logger) ← writer 上書き
+    PastaLoader->>PastaLoader: update_tracing_filter(config) ← reload::Handle 経由
+    
     PastaLoader->>PastaLoader: Phase 2-3: directories, discovery
     PastaLoader->>Transpiler: Phase 4: process_incremental()
     
@@ -92,9 +98,9 @@ sequenceDiagram
 
 **Architecture Integration**:
 - 選択パターン: Option A（既存コンポーネント拡張）— 変更最小、API 互換維持
-- ドメイン境界: `pasta_shiori`（エラー保持・ログ初期化タイミング）と `pasta_lua`（エラー伝搬・ファイル名簡素化）で責務分離
+- ドメイン境界: `pasta_shiori`（エラー保持・Stage 1 ログ初期化）と `pasta_lua`（Stage 1.5 設定反映・エラー伝搬・ファイル名簡素化）で責務分離
 - 既存パターン維持: `LoaderError` → `MyError` 変換、`GlobalLoggerRegistry` ルーティング、`try_init()` 安全性
-- 新規コンポーネント: なし（既存構造体へのフィールド追加のみ）
+- 追加要素: `tracing_subscriber::reload::Layer` — `pasta_lua::logging` モジュールに `OnceLock<FilterHandle>` を追加し、Stage 1.5 でフィルター動的更新
 
 ### Technology Stack
 
@@ -102,6 +108,7 @@ sequenceDiagram
 |-------|------------------|-----------------|-------|
 | Backend | Rust 2024 edition | エラーハンドリング・ログ初期化ロジック | 変更なし |
 | Logging | tracing 0.1 / tracing-appender 0.2.4 / tracing-subscriber 0.3 | ファイルログ出力 | `Rotation::NEVER` 動作を確認済み |
+| Filter Reload | tracing-subscriber 0.3 `reload::Layer` | Stage 1.5 でのフィルター動的更新 | `OnceLock<reload::Handle<EnvFilter, _>>` に handle 保管 |
 | Error | thiserror 2 | `LoaderError`, `MyError` 定義 | 変更なし |
 
 ## System Flows
@@ -157,9 +164,9 @@ flowchart TD
 | 1.3 | 根本原因を含める | LoaderError | `Display` トレイト | — |
 | 1.4 | 失敗ファイル名含める | LoaderError::PartialTranspileError | `Display` 書式 | — |
 | 1.5 | 日本語メッセージ | LoaderError | 既存日本語メッセージ | — |
-| 2.1 | load 前のログ初期化 | PastaShiori | `load()` 内インライン（PastaLogger + register + init_tracing） | 早期初期化フロー |
+| 2.1 | load 前のログ初期化 | PastaShiori, PastaLoader | Stage 1: `load()` 内インライン／Stage 1.5: Phase 1 後にロギング設定反映 | 早期初期化フロー |
 | 2.2 | load 失敗時のログ記録 | PastaShiori | `error!()` マクロ | load 失敗フロー |
-| 2.3 | 二重初期化防止 | init_tracing_with_config | `try_init()` | — |
+| 2.3 | 二重初期化防止 | init_tracing_with_reload | `try_init()`、`reload::Layer` | — |
 | 3.1 | 固定ファイル名 `pasta.log` | PastaLogger | `Rotation::NEVER` | — |
 | 3.2 | Rotation::NEVER 使用 | PastaLogger | `RollingFileAppender::builder()` | — |
 | 4.1 | 失敗ファイルのログ記録 | process_incremental | `warn!()` / `error!()` | process_incremental フロー |
@@ -193,7 +200,7 @@ flowchart TD
 - Outbound: `PastaLoader` — ランタイム初期化 (P0)
 - Outbound: `PastaLogger` — 早期ロガー作成 (P0)
 - Outbound: `GlobalLoggerRegistry` — ロガー登録 (P0)
-- Outbound: `init_tracing_with_config` — subscriber 初期化 (P0)
+- Outbound: `init_tracing_with_reload` — subscriber 初期化（reload::Layer 使用） (P0)
 
 **Contracts**: State [x]
 
@@ -237,14 +244,21 @@ PastaShiori {
 
 `load()` メソッドの変更:
 
-1. `PastaLoader::load()` 呼び出し**前**に、早期ロガーを初期化:
+1. 【Stage 1】`PastaLoader::load()` 呼び出し**前**に、早期ロガーを初期化:
    - `PastaLogger::new(base_dir, None)` でデフォルト設定のロガーを作成
    - `GlobalLoggerRegistry::instance().register(load_dir, logger)` で登録
-   - `init_tracing_with_config(&LoggingConfig::default())` で subscriber 初期化
-2. `PastaLoader::load()` の `Err(e)` ブランチ:
+   - `init_tracing_with_reload(&LoggingConfig::default())` で subscriber 初期化
+     - 内部で `reload::Layer::new(default_filter)` を使用し、`OnceLock<FilterHandle>` に handle を保存
+     - この時点から pasta.toml 読み込みエラーなど初期化エラーがファイルログに記録される
+2. 【Stage 1.5】`PastaLoader::load()` 内部の Phase 1（pasta.toml 読み込み）成功後:
+   - `PastaLogger::new(base_dir, Some(&config.logging()))` でカスタム設定のロガーを作成
+   - `GlobalLoggerRegistry::instance().register(load_dir, logger)` で writer を上書き
+   - `update_tracing_filter(&config.logging())` で `OnceLock` の handle 経由でフィルター更新
+   - 以降のログは `pasta.toml` の `[logging].level/filter` 設定が反映される
+3. `PastaLoader::load()` の `Err(e)` ブランチ:
    - `self.last_load_error = Some(format!("{}", e))` でエラー保持
    - `error!()` マクロでログ記録（早期初期化済みのためファイルに書かれる）
-3. reload 時は `self.last_load_error = None` をリセット
+4. reload 時は `self.last_load_error = None` をリセット
 
 `request()` メソッドの変更:
 
