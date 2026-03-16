@@ -40,9 +40,10 @@
 ### Phase 2: バージョン更新
 
 - [ ] 4. Cargo.toml のバージョン一括更新
-  - ルート `Cargo.toml` の以下4箇所を `replace_string_in_file` で更新する:
+  - ルート `Cargo.toml` の以下5箇所を `replace_string_in_file` で更新する:
     - `[workspace.package].version = "<OLD>"` → `version = "<NEW>"`
     - `pasta_core = { path = "crates/pasta_core", version = "<OLD>" }` → `version = "<NEW>"`
+    - `pasta_dsl = { path = "crates/pasta_dsl", version = "<OLD>" }` → `version = "<NEW>"`
     - `pasta_lua = { path = "crates/pasta_lua", version = "<OLD>" }` → `version = "<NEW>"`
     - `pasta_shiori = { path = "crates/pasta_shiori", version = "<OLD>" }` → `version = "<NEW>"`
   - `editors/vscode/package.json` の `"version": "<OLD>"` → `"version": "<NEW>"` を `replace_string_in_file` で更新する
@@ -57,7 +58,7 @@
 ### Phase 3: crates.io 公開
 
 - [ ] 6. 依存関係順での crates.io 公開
-  - 以下の順序でクレートを公開する: `pasta_core` → `pasta_lua` → `pasta_shiori`
+  - 以下の順序でクレートを公開する: `pasta_core` → `pasta_dsl` → `pasta_lua` → `pasta_shiori`
   - 各クレートに対して `cargo publish -p <crate_name>` を実行する
   - 失敗時は段階的バックオフでリトライする（待機 1分→2分→...→10分、最大10回）
   - 各リトライ前に `Start-Sleep -Seconds (N * 60)` で待機する（N=1,2,...,10）

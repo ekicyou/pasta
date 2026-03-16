@@ -58,7 +58,7 @@
 #### Acceptance Criteria
 
 1. When バージョン番号が確定する, the Release Workflow shall `Cargo.toml`（ワークスペースルート）の `[workspace.package].version` フィールドを新バージョンに更新する
-2. When ワークスペースバージョンが更新される, the Release Workflow shall `[workspace.dependencies]` セクション内の内部クレート参照（`pasta_core`, `pasta_lua`, `pasta_shiori`）の `version` フィールドも同じバージョンに更新する
+2. When ワークスペースバージョンが更新される, the Release Workflow shall `[workspace.dependencies]` セクション内の内部クレート参照（`pasta_core`, `pasta_dsl`, `pasta_lua`, `pasta_shiori`）の `version` フィールドも同じバージョンに更新する
 3. When Cargo.toml が更新される, the Release Workflow shall `cargo build --workspace` を実行しビルドが成功することを確認する（これにより後続の `cargo publish` 失敗リスクを最小化する）
 4. If ビルドが失敗する, the Release Workflow shall `git restore Cargo.toml` で変更をロールバックし、エラーを報告する
 5. When ビルドが成功する, the Release Workflow shall バージョン更新を `chore(release): bump version to vX.Y.Z` メッセージでコミットする
@@ -69,7 +69,7 @@
 
 #### Acceptance Criteria
 
-1. When バージョン更新コミットが完了する, the Release Workflow shall クレートを依存関係順（`pasta_core` → `pasta_lua` → `pasta_shiori`）に `cargo publish -p <crate>` する
+1. When バージョン更新コミットが完了する, the Release Workflow shall クレートを依存関係順（`pasta_core` → `pasta_dsl` → `pasta_lua` → `pasta_shiori`）に `cargo publish -p <crate>` する
 2. When `cargo publish` を実行する, the Release Workflow shall 各クレートの公開成功を確認してから次のクレートに進む
 3. If `cargo publish` が失敗する, the Release Workflow shall 段階的バックオフでリトライを試みる（待機時間を1分から1分ずつ増加し最大10分まで、最大10回リトライ）
 4. If 10分待機のリトライ後も失敗する, the Release Workflow shall エラーを報告し、以降の公開を中断し、既に公開されたクレートはそのまま残し、開発者の指示を待つ（手動 yank または次回リリースで対処）
@@ -139,7 +139,7 @@
 ### 追加した要件
 
 1. **事前検証（Req 1）**: ワークツリーのクリーンチェック・テスト実行を追加。汚れた状態からのリリースを防止。
-2. **内部クレート参照の同期（Req 2-2）**: `[workspace.dependencies]` セクション内の `pasta_core`, `pasta_lua`, `pasta_shiori` のバージョンも更新が必要。
+2. **内部クレート参照の同期（Req 2-2）**: `[workspace.dependencies]` セクション内の `pasta_core`, `pasta_dsl`, `pasta_lua`, `pasta_shiori` のバージョンも更新が必要。
 3. **公開順序と待機（Req 3）**: crates.io は依存関係順に公開する必要あり。インデックス更新の待機も必要。
 4. **タグ競合処理（Req 5-3）**: 既存タグとの衝突時に安全に停止。workflow.md の「危険な Git 操作の禁止」ポリシーに準拠。
 5. **繰り返し実行特性（Req 7）**: 本仕様の特殊な運用モデルを明示的に要件化。

@@ -26,23 +26,26 @@
 Cargo.toml (ワークスペースルート)
 ├── [workspace.package].version = "0.1.2"         ← 更新対象①
 ├── [workspace.dependencies].pasta_core.version    ← 更新対象②
-├── [workspace.dependencies].pasta_lua.version     ← 更新対象③
-└── [workspace.dependencies].pasta_shiori.version  ← 更新対象④
+├── [workspace.dependencies].pasta_dsl.version     ← 更新対象③
+├── [workspace.dependencies].pasta_lua.version     ← 更新対象④
+└── [workspace.dependencies].pasta_shiori.version  ← 更新対象⑤
 
 crates/*/Cargo.toml
 └── version.workspace = true                       ← 自動継承（更新不要）
 ```
 
-**重要な発見**: バージョンの更新箇所は **ルート Cargo.toml の4箇所のみ**。個別クレートの `Cargo.toml` は `version.workspace = true` で継承しているため変更不要。
+**重要な発見**: バージョンの更新箇所は **ルート Cargo.toml の5箇所のみ**。個別クレートの `Cargo.toml` は `version.workspace = true` で継承しているため変更不要。
 
 ### 1.3 cargo publish の依存関係順序
 
 ```
-pasta_core (依存なし)          → 最初に公開
+pasta_core (依存なし)                   → 最初に公開
     ↓
-pasta_lua (pasta_core に依存)  → 2番目に公開
+pasta_dsl (pasta_core に依存)   → 2番目に公開
     ↓
-pasta_shiori (pasta_core, pasta_lua に依存) → 3番目に公開
+pasta_lua (pasta_core, pasta_dsl に依存)  → 3番目に公開
+    ↓
+pasta_shiori (pasta_core, pasta_lua に依存) → 4番目に公開
 
 pasta_sample_ghost (publish = false) → スキップ
 ```
@@ -81,7 +84,7 @@ gh release create v0.1.2 の構成:
 | **Req 1-2**: semver 検証 | 正規表現チェック | なし | **LLM判定で十分** |
 | **Req 1-4**: git status チェック | `git status` コマンド | なし | **ターミナル実行で実現** |
 | **Req 1-6**: テスト実行 | `cargo test --all` | CI の `build.yml` | **ターミナル実行で実現** |
-| **Req 2-1/2**: Cargo.toml 更新 | テキスト編集 | `Cargo.toml`（4箇所） | **エディタツールで実現** |
+| **Req 2-1/2**: Cargo.toml 更新 | テキスト編集 | `Cargo.toml`（5箇所） | **エディタツールで実現** |
 | **Req 2-3**: ビルド確認 | `cargo build --workspace` | なし | **ターミナル実行で実現** |
 | **Req 3-1**: cargo publish | `cargo publish -p <crate>` | なし | **ターミナル実行で実現** |
 | **Req 3-5**: インデックス待機 | sleep/待機 | なし | **ターミナルで `Start-Sleep`** |

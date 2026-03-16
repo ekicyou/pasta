@@ -30,7 +30,7 @@
 
 | アセット | 状態 | 本設計での役割 |
 |----------|------|----------------|
-| `Cargo.toml`（ルート） | ✅ ワークスペース集中管理 | バージョン更新対象（4箇所） |
+| `Cargo.toml`（ルート） | ✅ ワークスペース集中管理 | バージョン更新対象（5箇所） |
 | `release.ps1` | ✅ 成熟スクリプト（387行） | ゴーストビルド実行 |
 | `gh` CLI | ✅ 認証済み（ekicyou） | GitHub Release 作成 |
 | `cargo` | ✅ 利用可能 | テスト・ビルド・公開 |
@@ -58,7 +58,7 @@ graph TB
     end
 
     subgraph Phase2 [Phase 2: バージョン更新]
-        P2_1[Cargo.toml 4箇所更新]
+        P2_1[Cargo.toml 5箇所更新]
         P2_2[package.json version 更新]
         P2_3[cargo build 検証]
         P2_4[バージョン更新コミット]
@@ -67,6 +67,8 @@ graph TB
     subgraph Phase3 [Phase 3: crates.io 公開]
         P3_1[pasta_core publish]
         P3_2[10秒待機]
+        P3_2b[pasta_dsl publish]
+        P3_2c[10秒待機]
         P3_3[pasta_lua publish]
         P3_4[10秒待機]
         P3_5[pasta_shiori publish]
@@ -159,7 +161,7 @@ sequenceDiagram
     end
 
     Note over Dev,GH: Phase 2: バージョン更新
-    LLM->>FS: Cargo.toml 4箇所更新
+    LLM->>FS: Cargo.toml 5箇所更新
     LLM->>Term: cargo build --workspace
     alt ビルド失敗
         LLM->>Term: git restore Cargo.toml
@@ -168,7 +170,7 @@ sequenceDiagram
     LLM->>Term: git commit
 
     Note over Dev,GH: Phase 3: crates.io 公開
-    loop pasta_core, pasta_lua, pasta_shiori
+    loop pasta_core, pasta_dsl, pasta_lua, pasta_shiori
         LLM->>Term: cargo publish -p crate
         alt 失敗（段階的リトライ: 1分→2分→...→10分）
             loop 待機時間を1分ずつ増加（最大10分）
@@ -414,7 +416,7 @@ flowchart TD
 | Requirements | 2.1, 2.2, 2.3, 2.4, 2.5 |
 
 **Responsibilities & Constraints**
-- `Cargo.toml` の4箇所を正確に更新
+- `Cargo.toml` の5箇所を正確に更新
 - ビルド検証によるバージョン整合性の確認
 - 失敗時は `git restore Cargo.toml` で安全にロールバック
 
@@ -426,9 +428,10 @@ flowchart TD
 **実行手順**
 
 1. **Cargo.toml 更新** (2.1, 2.2):
-   - `replace_string_in_file` で以下の4箇所を更新:
+   - `replace_string_in_file` で以下の5箇所を更新:
      - `[workspace.package]` セクションの `version = "<OLD>"` → `version = "<NEW>"`
      - `pasta_core = { path = "crates/pasta_core", version = "<OLD>" }` → `version = "<NEW>"`
+     - `pasta_dsl = { path = "crates/pasta_dsl", version = "<OLD>" }` → `version = "<NEW>"`
      - `pasta_lua = { path = "crates/pasta_lua", version = "<OLD>" }` → `version = "<NEW>"`
      - `pasta_shiori = { path = "crates/pasta_shiori", version = "<OLD>" }` → `version = "<NEW>"`
 
@@ -454,11 +457,11 @@ flowchart TD
 
 | Field | Detail |
 |-------|--------|
-| Intent | 依存関係順に3クレートを crates.io に公開する |
+| Intent | 依存関係順に4クレートを crates.io に公開する |
 | Requirements | 3.1, 3.2, 3.3, 3.4, 3.5, 3.6 |
 
 **Responsibilities & Constraints**
-- 依存関係順（`pasta_core` → `pasta_lua` → `pasta_shiori`）を厳守
+- 依存関係順（`pasta_core` → `pasta_dsl` → `pasta_lua` → `pasta_shiori`）を厳守
 - 各クレート公開後に10秒待機（crates.io インデックス更新待ち）
 - 失敗時は最大2回リトライ、それでも失敗なら中断
 - `pasta_sample_ghost`（`publish = false`）はスキップ
@@ -473,8 +476,9 @@ flowchart TD
 
 公開対象クレートリスト（順序固定）:
 1. `pasta_core`
-2. `pasta_lua`
-3. `pasta_shiori`
+2. `pasta_dsl`
+3. `pasta_lua`
+4. `pasta_shiori`
 
 各クレートに対して以下を実行:
 
@@ -739,7 +743,7 @@ flowchart TD
 
 7. **完了サマリー** (7.4, VSX.6):
    - バージョン: `vX.Y.Z`
-   - 公開クレート: `pasta_core`, `pasta_lua`, `pasta_shiori`
+   - 公開クレート: `pasta_core`, `pasta_dsl`, `pasta_lua`, `pasta_shiori`
    - Release URL: `https://github.com/ekicyou/pasta/releases/tag/vX.Y.Z`
    - Marketplace: 公開成功 URL or 警告（Phase 3.5 の結果）
 
