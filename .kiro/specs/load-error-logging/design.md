@@ -670,7 +670,7 @@ fn create_and_register_logger(
 
 `process_incremental()` の変更:
 
-**.lua ファイル処理の変更**（現行: loader/mod.rs L437-461）:
+**.lua ファイル読み込み失敗の変更**（現行: loader/mod.rs L437-461）:
 
 ```rust
 // 現行: warn!() + stats.failed++ のみ
@@ -680,11 +680,36 @@ Err(e) => {
     continue;
 }
 
-// 変更後: failures に収集 + error!()
+// 変更後: failures に収集
 Err(e) => {
     failures.push(TranspileFailure {
         source_path: file_path.clone(),
         error: format!("Read error: {}", e),
+    });
+    stats.failed += 1;
+    continue;
+}
+```
+
+**.lua キャッシュ書き込み失敗の変更**（現行: loader/mod.rs L463-469）:
+
+```rust
+// 現行: warn!() + stats.failed++ のみ
+if let Err(e) = cache_manager.save_cache(file_path, &content) {
+    warn!(
+        file = %file_path.display(),
+        error = %e,
+        "Failed to copy .lua file to cache, skipping"
+    );
+    stats.failed += 1;
+    continue;
+}
+
+// 変更後: failures に収集
+if let Err(e) = cache_manager.save_cache(file_path, &content) {
+    failures.push(TranspileFailure {
+        source_path: file_path.clone(),
+        error: format!("Cache write error: {}", e),
     });
     stats.failed += 1;
     continue;
@@ -728,7 +753,6 @@ Ok((combined_context, module_names, stats))
 
 **Implementation Notes**
 - 既存の `warn!()` を `error!()` に昇格（失敗はロード中止に直結するため）
-- `.lua` ファイルのキャッシュ書き込み失敗（loader/mod.rs L453-459）も同様に `failures` に収集する
 - `PartialTranspileError` の `Display` 実装（`"トランスパイル部分失敗: N件成功, M件失敗"`）は既存のまま使用
 - `PartialTranspileError` の `failures` フィールドに各失敗の `source_path` と `error` が含まれ、上位の `MyError::Load(String)` に変換される際に `Display` で要約が伝搬される
 - `.lua` ファイル失敗も `TranspileFailure` に含めるが、`TranspileFailure` は型名として汎用的なので問題ない
