@@ -79,4 +79,3 @@ pasta-lua-codingスキルの構造改善仕様。現在のSKILL.md（588行）�
 2. The SKILL.md shall retain the §2 Quick Reference section（モジュール一覧テーブル、DSL→Luaブリッジ基本形）
 3. The SKILL.md shall include a condensed summary（各セクション3-5行程度）for §3-§7 with reference links
 4. The SKILL.md shall include a "References" section listing all reference files with file paths and one-line descriptions
-5. If リファレンスファイルが存在しない場合, the SKILL.md shall still function as a standalone reference（degraded but usable）
