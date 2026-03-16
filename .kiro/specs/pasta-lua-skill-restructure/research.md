@@ -57,7 +57,7 @@
   - SOUL.md: `- [pasta_lua/LUA_API.md](crates/pasta_lua/LUA_API.md) - Lua APIリファレンス` → skillリファレンスへのリンクに変更
   - GRAMMAR.md: 同上
   - LUA_API.md: 完全削除（references/が権威文書を引き継ぐ）
-  - lua-coding.md: リダイレクトに置換（「pasta-lua-codingスキルを参照」程度の誘導文）
+  - lua-coding.md: 完全削除（スキルのUSE FORキーワードによりオンデマンド発見可能なため、steering常時ロードは不要）
 - **Implications**: SOUL.md/GRAMMAR.mdのリンク先はスキルディレクトリのReferencesインデックスを指す
 
 ## Architecture Pattern Evaluation
@@ -95,6 +95,21 @@
 - **Rationale**: GFMの自動アンカー生成で十分。日本語見出しもアンカー化される（例: `#act-オブジェクト`）。明示的ID管理は保守コストが高い
 - **Trade-offs**: 見出し変更時にリンク切れリスクあり。ただし同一スキル内の5ファイルなので影響範囲は限定的
 
+### Decision: lua-coding.md の廃止方式
+- **Context**: steering/lua-coding.md（695行）をreferences/統合後にどう扱うか
+- **Alternatives Considered**:
+  1. 3行のリダイレクトに置換 — steeringとして残り、他の場所を探す手間を排除
+  2. 完全削除 — steeringの常時ロードコストを完全排除
+- **Selected Approach**: 2. 完全削除
+- **Rationale**: steeringファイルは全タスクで常時コンテキストにロードされる。3行のリダイレクトでもLua非関連タスクのコンテキストを浪費する。スキルのUSE FORキーワード（`pasta lua`, `Luaスクリプト`, `Lua API`等）によりエージェントはオンデマンドで`pasta-lua-coding`スキルを発見可能なため、steeringレベルの誘導は不要
+- **Trade-offs**: 過去にlua-coding.mdを直接参照していたエージェントは見つけられなくなるが、SKILL.mdのUSE FORキーワードで代替される
+
+### Decision: §3-§7要約の必須キーワード基準
+- **Context**: SKILL.md §3-§7の3-5行要約に「何を含めるべきか」の判断基準
+- **Selected Approach**: 各セクションの必須キーワード一覧をdesign.mdに明記
+- **Rationale**: 「主要キーワードを含める」という抽象的な指示では実装時に判断がブレる。エージェントがロード判断に必要な最低限の情報を事前定義することで、実装品質のばらつきを防止
+- **Trade-offs**: 設計が実装の詳細に踏み込む形になるが、ドキュメント再編成タスクでは実装詳細 ≈ コンテンツ判断のため妥当
+
 ## Risks & Mitigations
 - **リスク1**: リファレンスファイル間のリンク切れ — 見出し変更時に発生しうる。**軽減策**: 実装完了時にリンク検証タスクを追加
 - **リスク2**: SKILL.md要約が不十分でエージェントが適切なリファレンスを選択できない — **軽減策**: 各要約セクションにキーワード（API名、モジュール名）を含める
@@ -103,6 +118,6 @@
 ## References
 - `.agents/skills/pasta-lua-coding/SKILL.md` — 現行スキル定義（588行）
 - `crates/pasta_lua/LUA_API.md` — 現行権威APIリファレンス（1160行、削除予定）
-- `.kiro/steering/lua-coding.md` — 現行コーディング規約（695行、リダイレクト化予定）
+- `.kiro/steering/lua-coding.md` — 現行コーディング規約（695行、削除予定）
 - `.kiro/specs/pasta-lua-skill-restructure/requirements.md` — 要件定義書
 - `.kiro/specs/pasta-lua-skill-restructure/gap-analysis.md` — ギャップ分析レポート

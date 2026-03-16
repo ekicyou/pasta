@@ -12,6 +12,7 @@
 - SKILL.mdを500行未満に圧縮し、AIエージェントのコンテキスト効率を向上
 - references/に権威的かつ自己完結的なリファレンスを配置
 - 情報の二重管理を解消し、ドキュメント更新の同期コストを排除
+- steering/lua-coding.mdを削除し、Lua非関連タスクでの常時ロードコストを完全排除（スキルのUSE FORキーワードによるオンデマンド発見で代替）
 
 ### Non-Goals
 - Pasta DSL文法に関するスキル（pasta-ghost-authoring）の変更
