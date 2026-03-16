@@ -754,7 +754,7 @@ Label not found: 存在しないシーン名
 
 - [doc/spec/](doc/spec/) - 権威的仕様書（章別分割、12章）
 - [サンプルスクリプト](crates/pasta_lua/tests/fixtures/)
-- [pasta_lua/LUA_API.md](crates/pasta_lua/LUA_API.md) - Lua APIリファレンス
+- [pasta-lua-coding skill](.agents/skills/pasta-lua-coding/SKILL.md) - Lua APIリファレンス（references/に詳細）
 
 ---
 

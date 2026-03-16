@@ -23,7 +23,7 @@ pastaプロジェクトのドキュメントは、以下の優先順位と役割
 - [pasta_dsl/README.md](crates/pasta_dsl/README.md) - DSLパーサーAPI
 - [pasta_core/README.md](crates/pasta_core/README.md) - レジストリAPI
 - [pasta_lua/README.md](crates/pasta_lua/README.md) - Luaトランスパイラ・ランタイム
-- [pasta_lua/LUA_API.md](crates/pasta_lua/LUA_API.md) - Lua APIリファレンス
+- [pasta-lua-coding skill](.agents/skills/pasta-lua-coding/SKILL.md) - Lua APIリファレンス（references/に詳細）
 - [pasta_lsp/README.md](crates/pasta_lsp/README.md) - Language Server Protocol実装
 - [pasta_shiori/README.md](crates/pasta_shiori/README.md) - SHIORI DLLインターフェース
 - [pasta_sample_ghost/README.md](crates/pasta_sample_ghost/README.md) - サンプルゴースト

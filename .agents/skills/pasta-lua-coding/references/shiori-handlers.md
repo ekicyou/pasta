@@ -1,0 +1,354 @@
+# SHIORI Handlers リファレンス
+
+SHIORI/3.0プロトコルにおけるイベントハンドリング機構の完全リファレンス。  
+REGテーブルへのハンドラ登録、RESレスポンス生成、主要SHIORIイベント一覧、シーン関数フォールバック、仮想ディスパッチャ（OnTalk/OnHour自動発行）を網羅する。
+
+---
+
+## REG テーブル登録
+
+`pasta.shiori.event.register`（REGテーブル）にイベントハンドラを登録する。
+
+```lua
+local REG = require("pasta.shiori.event.register")
+local RES = require("pasta.shiori.res")
+```
+
+### 登録パターン
+
+```lua
+REG.イベント名 = function(req)
+    -- req: SHIORIリクエスト情報
+    return RES.ok("\\h\\s[0]応答\\e")  -- または RES.no_content()
+end
+```
+
+### req パラメータ
+
+SHIORIリクエスト情報テーブル。
+
+| フィールド | 型 | 説明 |
+|-----------|---|------|
+| `req.id` | string | イベント名（`"OnBoot"` 等） |
+| `req.reference[N]` | string\|nil | Referenceヘッダ（0始まりインデックス）。未送信時は `nil` |
+| `req.date` | table | 日時情報（`req.date.unix` 等） |
+| `req.status` | string\|nil | ステータス（`"talking"` 等） |
+
+**Reference パラメータへのアクセス**:
+
+```lua
+local ref0 = req.reference[0]  -- Reference0 の値
+local ref1 = req.reference[1]  -- Reference1 の値
+-- 存在しない Reference は nil
+if req.reference[5] == nil then
+    print("Reference5 は送信されていません")
+end
+```
+
+---
+
+## RES レスポンス生成
+
+`pasta.shiori.res` — SHIORI/3.0 レスポンス文字列を生成する。
+
+```lua
+local RES = require("pasta.shiori.res")
+```
+
+### API一覧
+
+| 関数 | ステータス | 説明 |
+|------|----------|------|
+| `RES.ok(value)` | 200 OK | 成功レスポンス + Value |
+| `RES.ok_with(headers)` | 200 OK | 成功レスポンス + 複数ヘッダ |
+| `RES.no_content()` | 204 No Content | 空レスポンス |
+| `RES.err(message)` | 500 Internal Server Error | エラーレスポンス |
+
+### 使用例
+
+```lua
+-- 基本的な応答（さくらスクリプト）
+return RES.ok("\\h\\s[0]こんにちは\\e")
+
+-- 空応答（イベントを処理したが表示なし）
+return RES.no_content()
+
+-- エラー応答
+return RES.err("設定ファイルが見つかりません")
+
+-- 複数ヘッダ付き応答
+return RES.ok_with({
+    Value = "\\h\\s[0]こんにちは\\e",
+    Reference0 = "追加情報",
+})
+```
+
+---
+
+## 主要SHIORIイベント一覧
+
+SSP（ベースウェア）から送信される主要イベント。
+
+### 起動・終了系
+
+#### OnFirstBoot — 初回起動
+
+ゴーストが初めて起動されたとき、またはバニッシュから復帰したときに発火。
+
+| Reference | 型 | 説明 |
+|-----------|---|------|
+| `req.reference[0]` | string | バニッシュ復帰フラグ ("0": 初回, "1": 復帰) |
+
+```lua
+REG.OnFirstBoot = function(req)
+    local is_vanish_return = req.reference[0] == "1"
+    if is_vanish_return then
+        return RES.ok("\\h\\s[0]帰ってきたわ。\\e")
+    end
+    return RES.ok("\\h\\s[0]はじめまして。\\e")
+end
+```
+
+#### OnBoot — 通常起動
+
+ゴーストが起動されるたびに発火。
+
+| Reference | 型 | 説明 |
+|-----------|---|------|
+| `req.reference[0]` | string | シェル名 |
+| `req.reference[6]` | string | シェルパス |
+| `req.reference[7]` | string | ゴーストパス |
+
+```lua
+REG.OnBoot = function(req)
+    local shell_name = req.reference[0]
+    return RES.ok("\\h\\s[0]起動しました。シェル: " .. (shell_name or "不明") .. "\\e")
+end
+```
+
+#### OnClose — 終了
+
+ゴーストが終了するときに発火。
+
+| Reference | 型 | 説明 |
+|-----------|---|------|
+| `req.reference[0]` | string | 終了理由 ("user", "shutdown" 等) |
+
+```lua
+REG.OnClose = function(req)
+    local reason = req.reference[0]
+    if reason == "user" then
+        return RES.ok("\\h\\s[0]またね。\\e")
+    end
+    return RES.ok("\\h\\s[0]終了します。\\e")
+end
+```
+
+#### OnGhostChanged — ゴースト切り替え
+
+他のゴーストに切り替わるときに発火。
+
+| Reference | 型 | 説明 |
+|-----------|---|------|
+| `req.reference[0]` | string | 切り替え先ゴースト名 |
+| `req.reference[1]` | string | 切り替え元ゴースト名 |
+
+```lua
+REG.OnGhostChanged = function(req)
+    local to_ghost = req.reference[0]
+    return RES.ok("\\h\\s[0]" .. (to_ghost or "別のゴースト") .. "に交代するわ。\\e")
+end
+```
+
+### マウス操作系
+
+#### OnMouseDoubleClick — ダブルクリック
+
+キャラクターをダブルクリックしたときに発火。
+
+| Reference | 型 | 説明 |
+|-----------|---|------|
+| `req.reference[0]` | string | スコープ ("0": sakura, "1": kero) |
+| `req.reference[4]` | string | 当たり判定 ID |
+
+```lua
+REG.OnMouseDoubleClick = function(req)
+    local scope = req.reference[0]
+    local hit_area = req.reference[4]
+    if scope == "0" then
+        return RES.ok("\\h\\s[0]なあに？\\e")
+    else
+        return RES.ok("\\u\\s[0]呼んだ？\\e")
+    end
+end
+```
+
+### 時間系
+
+#### OnSecondChange — 毎秒
+
+毎秒発火する（高頻度）。仮想ディスパッチャのトリガーとして使用される。
+
+| Reference | 型 | 説明 |
+|-----------|---|------|
+| `req.reference[0]` | string | 現在秒 (0-59) |
+| `req.reference[1]` | string | 累積秒 |
+
+```lua
+REG.OnSecondChange = function(req)
+    return RES.no_content()
+end
+```
+
+#### OnMinuteChange — 毎分
+
+毎分発火する。
+
+| Reference | 型 | 説明 |
+|-----------|---|------|
+| `req.reference[0]` | string | 現在分 (0-59) |
+| `req.reference[1]` | string | 現在時 (0-23) |
+
+```lua
+REG.OnMinuteChange = function(req)
+    local minute = req.reference[0]
+    local hour = req.reference[1]
+    if minute == "0" then
+        return RES.ok("\\h\\s[0]" .. hour .. "時よ。\\e")
+    end
+    return RES.no_content()
+end
+```
+
+---
+
+## シーン関数フォールバック
+
+REGテーブルにハンドラが登録されていない場合、`SCENE.search` でグローバルシーンを検索する。
+
+### フォールバックチェーン
+
+```
+EVENT.fire(req)
+  ↓
+REG[req.id] 存在？
+  ├─ Yes → ハンドラ実行 → レスポンス返却
+  └─ No  → EVENT.no_entry(req)
+              ↓
+           SCENE.search(req.id)
+              ├─ 見つかった → シーン関数実行 → 204 No Content
+              └─ 見つからない → 204 No Content
+```
+
+### DSLシーンとの連携
+
+Pasta DSLで定義したシーンは、イベント名と同じグローバルシーン名で検索される:
+
+```
+＊OnBoot
+こんにちは。
+```
+
+上記シーンは `OnBoot` イベントでREGハンドラがない場合に自動的に呼び出される。
+
+### エラーハンドリング
+
+- REGハンドラ実行時の例外は `xpcall` でキャッチされ、`RES.err()` でエラーレスポンスが生成
+- シーン関数フォールバック時も `pcall` でエラーをキャッチ
+
+```lua
+REG.OnBoot = function(req)
+    error("何かがおかしい")
+    -- → SHIORI/3.0 500 Internal Server Error
+end
+```
+
+---
+
+## 仮想ディスパッチャ
+
+`pasta.shiori.event.virtual_dispatcher` — OnSecondChangeをトリガーとしてOnTalk/OnHour仮想イベントを自動発行する。
+
+```lua
+local dispatcher = require("pasta.shiori.event.virtual_dispatcher")
+```
+
+### dispatch(req)
+
+メインエントリポイント。OnSecondChangeリクエストからOnHour/OnTalkイベントを判定・発行。
+
+```lua
+--- @param req table リクエストテーブル (req.date.unix 必須)
+--- @return string|nil "fired" (発行成功), nil (発行なし)
+local result = dispatcher.dispatch(req)
+```
+
+- OnHourを優先判定し、発火しなければOnTalkを判定
+- `req.date` フィールドがない場合は `nil` を返却
+- `req.status == "talking"` の場合はスキップ
+
+### OnHour — 時報自動発行
+
+#### check_hour(req)
+
+```lua
+--- @param req table リクエストテーブル
+--- @return string|nil "fired" or nil
+local result = dispatcher.check_hour(req)
+```
+
+- 初回呼び出し時は次の正時を計算してスキップ
+- 正時超過時にOnHourシーンを検索・実行
+
+### OnTalk — ランダムトーク自動発行
+
+#### check_talk(req)
+
+```lua
+--- @param req table リクエストテーブル
+--- @return string|nil "fired" or nil
+local result = dispatcher.check_talk(req)
+```
+
+### pasta.toml設定
+
+`[ghost]` セクションで仮想ディスパッチャの動作を設定。
+
+| 設定 | 型 | デフォルト | 説明 |
+|------|---|----------|------|
+| `talk_interval_min` | integer | 180 | 最小トーク間隔（秒） |
+| `talk_interval_max` | integer | 300 | 最大トーク間隔（秒） |
+| `hour_margin` | integer | 30 | 時報前スキップマージン（秒） |
+
+```toml
+[ghost]
+talk_interval_min = 180
+talk_interval_max = 300
+hour_margin = 30
+```
+
+- 時報前マージン内の場合はランダムトークをスキップし、時報を優先
+- **セッション定義**: SHIORI load 〜 unload 間。unload時にLua VMごとドロップされ、モジュールローカル変数は自動リセット
+
+### テスト用関数
+
+```lua
+-- 状態リセット（セッション開始時相当）
+dispatcher._reset()
+
+-- 内部状態取得
+local state = dispatcher._get_internal_state()
+-- { next_hour_unix, next_talk_time, cached_config }
+
+-- シーン実行関数のモック差し替え
+dispatcher._set_scene_executor(function(event_name)
+    return "mocked_result"
+end)
+```
+
+---
+
+## 関連リファレンス
+
+- [internal-modules.md](internal-modules.md) — ACTオブジェクトの全メソッド、SCENE.searchの詳細
+- [runtime-api.md](runtime-api.md) — RESレスポンス生成で使用する `@pasta_sakura_script` の変換仕様
