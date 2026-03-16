@@ -1,0 +1,22 @@
+{
+    "feature_name": "load-error-logging",
+    "created_at": "2026-03-16T19:30:00+09:00",
+    "updated_at": "2026-03-17T00:00:00+09:00",
+    "language": "ja",
+    "phase": "design-generated",
+    "approvals": {
+        "requirements": {
+            "generated": true,
+            "approved": true
+        },
+        "design": {
+            "generated": true,
+            "approved": false
+        },
+        "tasks": {
+            "generated": false,
+            "approved": false
+        }
+    },
+    "ready_for_implementation": false
+}
