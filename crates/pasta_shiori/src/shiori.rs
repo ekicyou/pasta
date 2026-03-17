@@ -141,12 +141,13 @@ impl Shiori for PastaShiori {
 
     fn request<S: AsRef<str>>(&mut self, req: S) -> MyResult<String> {
         // Check if runtime is initialized, with detailed error on load failure
-        let _runtime = self.runtime.as_ref().ok_or_else(|| {
-            match &self.last_load_error {
+        let _runtime = self
+            .runtime
+            .as_ref()
+            .ok_or_else(|| match &self.last_load_error {
                 Some(msg) => MyError::Load(msg.clone()),
                 None => MyError::NotInitialized,
-            }
-        })?;
+            })?;
 
         // Set load_dir context for logging
         let _guard = self.load_dir.as_ref().map(|p| LoadDirGuard::new(p.clone()));
@@ -246,7 +247,7 @@ impl PastaShiori {
         let load_dir_str = load_dir.to_string_lossy().to_string();
         match load_fn.call::<bool>((hinst, load_dir_str)) {
             Ok(true) => {
-                trace!("SHIORI.load returned true");
+                info!("SHIORI.load called successfully");
                 true
             }
             Ok(false) => {
