@@ -27,15 +27,19 @@ Pasta DSL の `％`（アクター宣言）行を持たないシーンが、直�
 ### 根本原因の構造
 
 1. `％` 行あり → トランスパイラが `act:clear_spot()` + `act:set_spot("名前", N)` を生成 → スポットトークンが token stream に入る → `BUILDER.build()` が `actor_spots` を再構築
-2. `％` 行なし → スポットトークン未生成 → `BUILDER.build()` は `STORE.actor_spots`（前回の状態）をそのまま使う → **初回シーン実行時は `STORE.actor_spots` が空のため `actor_spots[name]` が nil → デフォルト 0 にフォールバック**
+2. `％` 行なし → スポットトークン未生成 → `BUILDER.build()` は `STORE.actor_spots`（前回の状態）をそのまま使う → スコープ継承として正しい動作
 
-**問題**: `STORE.actor_spots` が空（初回起動直後、または `clear_spot` 後にリセットされた場合）のとき、`％` なしシーンでは明示的なスポット設定がないため、すべてのアクターがスポット 0 にフォールバックする。これ自体は動作するが、`pasta.toml` で定義したスポット設定が無視される。
+**設計原則**: 全トークは最終的に `BUILDER.build()` を経由してさくらスクリプトに変換される。この関数に適切なスコープ情報（`actor_spots`）を注入し、変更されたスコープ情報を外部で正しく維持する設計は既に機能している。
+
+**真の問題**: CONFIG由来アクター（`STORE.actors["さくら"]` = `{spot=0}`）に `name` フィールドが欠落している。`BUILDER.build()` 内部で `actor_name = actor.name` → `nil` となり、`actor_spots[nil]` で正しいスポット値を参照できない。スコープフロー自体は正常であり、データの整合性（`actor.name` の正規化）を修正すれば解決する。
 
 ## Requirements
 
-### Requirement 1: `％` 省略時のスコープ継承（全シーン共通）
+### Requirement 1: `％` 省略時のスコープ継承と正しいアクター解決（全シーン共通）
 
-**Objective:** ゴースト作者として、`％` 行を省略したシーンでも直前のスコープ状態が自動的に引き継がれてほしい。これにより、全シーンに `％` を記述する冗長性を排除し、直感的な辞書記述を実現する。
+**Objective:** ゴースト作者として、`％` 行を省略したシーンでも直前のスコープ状態が自動的に引き継がれ、イベント経路によらず正しく動作してほしい。これにより、全シーンに `％` を記述する冗長性を排除し、直感的な辞書記述を実現する。
+
+**設計原則**: 全トークは最終的に `BUILDER.build()` を経由してさくらスクリプトに変換される。この関数に適切なスコープ情報（`actor_spots`）を注入し、変更されたスコープ情報を外部で正しく維持することで、スコープ継承を実現する。`BUILDER.build()` 自体は純粋関数を維持する。
 
 #### Acceptance Criteria
 
@@ -43,28 +47,11 @@ Pasta DSL の `％`（アクター宣言）行を持たないシーンが、直�
 2. When SHIORIセッション開始後の最初のシーン実行で `％` 行がないとき, pasta shall `pasta.toml` の `[actor]` セクションで定義された `spot` 値を初期スコープとして適用する
 3. When `％` 行を持つシーンが実行されたとき, pasta shall 従来通り `clear_spot()` + `set_spot()` によるスポット再設定を行い、`STORE.actor_spots` を更新する（既存動作の維持）
 4. The pasta runtime shall イベント経路（直接SHIORI / `co_exec` 経由）に関わらず、同一のスコープ継承ルールを適用する
+5. When シーン関数内で `act.アクター名` を参照したとき, pasta shall `STORE.actors` に当該アクターが存在する限り、`name` フィールドを持つ有効なアクタープロキシを返す
 
-### Requirement 2: 初期スコープの自動設定
+> **統合経緯**: 旧 Req 2（初期スコープの自動設定）は store.lua の既存実装（CONFIG.actor → STORE.actor_spots 転送）で充足済み。旧 Req 3（co_exec/SHIORI直接経由の動作一貫性）は本 Req の AC 4, 5 に統合。全ギャップが同一根本原因（CONFIG由来アクターの `name` フィールド欠落）に帰結するため、1つの要件に集約。
 
-**Objective:** ゴースト作者として、`pasta.toml` の `[actor]` 定義がセッション開始時に自動的にスコープに反映されてほしい。これにより、OnBoot 等の最初のシーンでも `％` 行なしで正しいスポット配置が得られる。
-
-#### Acceptance Criteria
-
-1. When SHIORIセッションが開始された（load完了）とき, pasta shall `pasta.toml` の `[actor]` セクションの `spot` 値を `STORE.actor_spots` に自動設定する
-2. If `pasta.toml` の `[actor]` セクションに `spot` 値が定義されていないアクターが存在する場合, pasta shall そのアクターの初期スポットを `0` とする
-3. While 初期スコープが設定された状態で, pasta shall 最初のシーン実行で `％` 行がなくても正しいスポット位置でさくらスクリプトを生成する
-
-### Requirement 3: co_exec 経由とSHIORI直接経由の動作一貫性
-
-**Objective:** ゴースト作者として、シーンの呼び出し経路によって動作が変わらないことを保証してほしい。直接SHIORIイベント（OnBoot等）でも `co_exec` 経由の仮想イベント（OnTalk/OnHour）でも、同じシーンが同じ結果を返すべき。
-
-#### Acceptance Criteria
-
-1. When `％` 行なしのシーンが `SCENE.co_exec()` 経由で実行されたとき, pasta shall 直接SHIORIイベントで同一シーンを実行した場合と同一のスコープ解決結果を返す
-2. When `virtual_dispatcher` が `SCENE.co_exec("OnTalk", nil, nil)` を呼び出したとき, pasta shall `act` オブジェクトの `actors` テーブルに `STORE.actors` の全アクターが設定された状態でシーン関数を実行する
-3. If `SCENE.co_exec()` 経由で実行されたシーンが `act.アクター名` を参照した場合, pasta shall nil ではなく有効なアクタープロキシを返す（`STORE.actors` に当該アクターが存在する限り）
-
-### Requirement 4: `％` 行欠落時の診断支援
+### Requirement 2: `％` 行欠落時の診断支援
 
 **Objective:** ゴースト作者として、`％` 行の省略が意図的かどうかを判別しやすくしたい。特にデバッグ時に、スコープ継承の状況をログで確認できるべき。
 

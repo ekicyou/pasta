@@ -3,12 +3,10 @@
 ## 分析サマリー
 
 - **スコープ**: `％` アクター宣言なしシーンにおけるスコープ継承・アクター解決の不具合修正（Lua ランタイム側）
-- **主要課題**:
-  - CONFIG由来アクター（`STORE.actors`）に `name` フィールドが欠落しており、`sakura_builder` がスポット解決に失敗する
-  - `ACTOR.get_or_create(name)` は既存エントリを正規化せず、`name` や `ACTOR_IMPL` metatable を追加しない
-  - `scope_gen.rs` は `％` 行がないとき `clear_spot`/`set_spot` コードを生成しないが、これは仕様通り（スコープ継承として扱う）
-  - `％` なしシーンでのスコープ継承ログ・未定義アクター参照警告が存在しない
-- **推奨アプローチ**: **Option A: ACTOR.get_or_create 正規化拡張** — 最小変更で根本原因を解消
+- **設計原則**: 全トークは最終的に `BUILDER.build()` を経由してさくらスクリプトに変換される。この関数に適切なスコープ情報を注入し、変更されたスコープ情報を外部で正しく維持することが本問題の解決の鍵となる。`BUILDER.build()` 自体は純粋関数を維持する。
+- **スコープフローの現状**: `STORE.actor_spots` → `SHIORI_ACT_IMPL.build` → `BUILDER.build(tokens, config, current_spots)` → `updated_spots` 返却 → `STORE.actor_spots` 書き戻し。**このフロー自体は正しく機能している**。
+- **根本原因**: CONFIG由来アクター（`STORE.actors`）に `name` フィールドが欠落しているため、`BUILDER.build()` 内で `actor_spots[actor.name]`（= `actor_spots[nil]`）のルックアップが失敗し、正しいスコープ情報が注入されているにもかかわらず参照できない。
+- **推奨アプローチ**: CONFIG由来アクターの `name` フィールド正規化 — スコープフローを変更せず、データの整合性を修正することで解決
 
 ---
 
@@ -101,8 +99,12 @@ OnSecondChange
 
 ### 1.4 統合ポイント
 
+`BUILDER.build()` は全トークをさくらスクリプトに変換する**唯一の経路**である。スコープ情報（`actor_spots`）はこの関数のパラメータとして注入され、返却値として更新状態が外部に伝搬される。このフロー自体は既に正しく機能しており、変更不要。
+
 | 統合箇所 | 既存インターフェース | 必要な変更 |
 |----------|---------------------|-----------|
+| `BUILDER.build()` | 純粋関数: `input_actor_spots` 受取 → コピー → 更新版返却 | **変更不要** — スコープ注入・抽出フローは正常 |
+| `SHIORI_ACT_IMPL.build()` | `STORE.actor_spots` → `BUILDER.build` → 書き戻し | **変更不要** — フロー正常 |
 | `ACTOR.get_or_create` | 新規のみ正規化 | 既存エントリにも `name`/metatable を設定 |
 | `store.lua` 初期化 | `CONFIG.actor` 直接参照共有 | 変更不要（get_or_create で正規化すれば解決） |
 | `STORE.actor_spots` | CONFIG.actor.spot からの転送 | **既に実装済み** — 問題なし |
@@ -113,44 +115,31 @@ OnSecondChange
 
 ## 2. 要求仕様の実現可能性分析
 
-### Requirement 1: `％` 省略時のスコープ継承
+### Requirement 1: `％` 省略時のスコープ継承と正しいアクター解決
 
 | AC | 技術ニーズ | 既存実装 | ギャップ |
 |---|-----------|---------|---------|
-| 1.1 | `STORE.actor_spots` からスポット引き継ぎ | ✅ `BUILDER.build()` が `input_actor_spots` を受け取る | **actor.name 欠落** — `actor_spots[nil]` でルックアップ失敗 |
+| 1.1 | `STORE.actor_spots` からスポット引き継ぎ | ✅ `BUILDER.build()` がスコープを受け取り返却するフローは正常 | **actor.name 欠落** — `actor_spots[nil]` でルックアップ失敗 |
 | 1.2 | 初回実行時の `pasta.toml` spot 適用 | ✅ `store.lua` で `STORE.actor_spots` に転送済み | **actor.name 欠落** — 同上 |
 | 1.3 | `％` ありシーンの既存動作維持 | ✅ `scope_gen.rs` の生成コードは正常 | **なし** |
 | 1.4 | イベント経路に依存しない一貫性 | ✅ 両経路とも同一 `act` オブジェクトを使用 | **actor.name 欠落** — 同上 |
+| 1.5 | `act.アクター名` が有効プロキシを返す | ✅ `ACT_IMPL.__index` → `ACTOR.create_proxy` は動作 | **プロキシの actor.name が nil** |
 
-**根本原因**: AC 1.1, 1.2, 1.4 の3つのギャップはすべて同一原因 — CONFIG由来アクターの `name` フィールド欠落。
+**根本原因**: AC 1.1, 1.2, 1.4, 1.5 のギャップはすべて同一原因 — CONFIG由来アクターの `name` フィールド欠落。スコープフロー（`STORE.actor_spots` → `BUILDER.build` → 書き戻し）は正しく機能しており、`actor.name` が正規化されれば全ACが自動的に充足される。
 
-### Requirement 2: 初期スコープの自動設定
+> **統合済み旧要件の充足状況**:
+> - 旧 Req 2（初期スコープの自動設定）: AC 2.1（STORE.actor_spots 初期化）は store.lua L88-92 で✅実装済み。AC 2.2（デフォルト 0）は BUILDER.build の `or 0` で✅対応済み。
+> - 旧 Req 3（co_exec/SHIORI一貫性）: AC 3.2（act.actors設定）は✅実装済み。AC 3.1, 3.3 は本 Req の AC 1.4, 1.5 に統合。
 
-| AC | 技術ニーズ | 既存実装 | ギャップ |
-|---|-----------|---------|---------|
-| 2.1 | セッション開始時の `STORE.actor_spots` 設定 | ✅ `store.lua` L88-92 で実装済み | **なし** |
-| 2.2 | spot 未定義アクターのデフォルト 0 | ⚠️ `BUILDER.build` のフォールバック `or 0` で暗黙対応 | **actor.name 欠落で到達しない** |
-| 2.3 | 初回シーンでの正しいスポット出力 | ❌ `actor.name` が nil のため `STORE.actor_spots` 参照不能 | **actor.name 正規化が必要** |
-
-### Requirement 3: co_exec/SHIORI 直接経由の動作一貫性
+### Requirement 2: `％` 行欠落時の診断支援
 
 | AC | 技術ニーズ | 既存実装 | ギャップ |
 |---|-----------|---------|---------|
-| 3.1 | 同一スコープ解決結果 | ⚠️ 両経路とも `actor.name=nil` で同じ不正結果 | **actor.name 欠落** — 「一貫して壊れている」 |
-| 3.2 | `act.actors` に全アクター設定 | ✅ `SHIORI_ACT.new(STORE.actors, req)` で設定 | **なし** |
-| 3.3 | `act.アクター名` が有効プロキシを返す | ✅ `ACT_IMPL.__index` → `ACTOR.create_proxy` は動作 | **プロキシの actor.name が nil** |
+| 2.1 | スコープ継承ログ（debug レベル） | ❌ なし | **Lua 側実装が必要** |
+| 2.2 | 未定義アクター参照警告（warn レベル） | ❌ なし | **Lua 側実装が必要** |
+| 2.3 | `％` 省略をエラーとしない | ✅ パーサーは `％` なしを正常にパース | **なし** |
 
-**注記**: 直接SHIORI経由でも同じ不具合が発生するが、`％` ありシーンが先に実行されることで `name` がトランスパイラ出力の `PASTA.create_actor("さくら")` 経由で設定される場合が多く、顕在化しにくい。
-
-### Requirement 4: `％` 行欠落時の診断支援
-
-| AC | 技術ニーズ | 既存実装 | ギャップ |
-|---|-----------|---------|---------|
-| 4.1 | スコープ継承ログ（debug レベル） | ❌ なし | **Lua 側実装が必要** |
-| 4.2 | 未定義アクター参照警告（warn レベル） | ❌ なし | **Lua 側実装が必要** |
-| 4.3 | `％` 省略をエラーとしない | ✅ パーサーは `％` なしを正常にパース | **なし** |
-
-**注記**: Req 4 のログ出力は Lua 側で `LOGGER` モジュール（既存の `tracing` 連携）を使用する想定。Research Needed: `LOGGER` モジュールの現在の API を確認。
+**注記**: Req 2 のログ出力は Lua 側で `LOGGER` モジュール（既存の `tracing` 連携）を使用する想定。Research Needed: `LOGGER` モジュールの現在の API を確認。
 
 ---
 
@@ -282,18 +271,21 @@ end
 
 ### 推奨アプローチ
 
-**Option A（ACTOR.get_or_create 正規化拡張）** をベースに、`ACT_IMPL.__index` での正規化呼び出しを組み合わせる。
+CONFIG由来アクターの `name` フィールド正規化を行い、既存のスコープフロー（`STORE.actor_spots` → `BUILDER.build` → 書き戻し）を活かす。`BUILDER.build()` の純粋関数性とインターフェースは変更しない。
+
+**正規化の実装場所**: `ACTOR.get_or_create` を拡張し、`ACT_IMPL.__index` から呼び出す。
 
 **理由**:
 1. `get_or_create` は正規化の自然な責務所在
 2. `__index` からの `get_or_create` 呼び出しで、CONFIG 由来アクターの遅延正規化を統一的に処理
 3. 既存テスト（`config_actors_initialization_test.rs`）の想定と完全一致
 4. `store.lua` の循環参照リスクを回避
+5. スコープフロー（`BUILDER.build` への注入・抽出）は変更不要 — データの整合性修正のみで解決
 
 ### 設計フェーズで決定すべき事項
 
 1. **`ACT_IMPL.__index` の正規化戦略**: `self.actors[key]` の直後に `ACTOR.get_or_create(key)` を呼ぶか、インライン正規化か
-2. **Req 4 ログ出力の実装場所**: `ACT_IMPL.__index`（アクター参照時）か `BUILDER.build`（スクリプト生成時）か
+2. **Req 2 ログ出力の実装場所**: `ACT_IMPL.__index`（アクター参照時）か `BUILDER.build`（スクリプト生成時）か
 3. **Research Needed**: Lua 側 `LOGGER` モジュールの API 確認（`tracing` 連携の既存パターン）
 
 ### キャリーフォワード Research Items
