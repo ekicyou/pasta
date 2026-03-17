@@ -26,7 +26,11 @@ metadata:
 
 **前提条件**: ゴーストプロジェクトが既に存在すること（`pasta.toml`、`descript.txt`、`dic/` ディレクトリが揃っている）。
 
-**役割分離**: 本スキルはLLMによるコード生成に特化する。Pasta DSL言語仕様の設計判断やパーサー実装には関与しない。本スキルは自己完結型であり、必要な情報をすべて内包している。
+**役割分離**: 本スキルはLLMによるコード生成に特化する。Pasta DSL言語仕様の設計判断やパーサー実装には関与しない。
+- `references/`（詳細リファレンス）と `SKILL.md`（要約＋パターン集）の2層構成
+- SKILL.md と `references/` の記述に矛盾がある場合、`references/` を正とする
+
+**自己完結性**: 本スキルフォルダは単体で完結しており、外部ファイルへの参照に依存しない。必要な文法ルールはすべて `references/` に内包している。
 
 ---
 
@@ -34,18 +38,19 @@ metadata:
 
 全マーカーは全角・半角の両方を許容する。コード例では全角を使用する。
 
-| マーカー名 | 全角 | 半角 | 用途 | 使用例 |
-|-----------|------|------|------|--------|
-| グローバルシーン | `＊` | `*` | シーン定義 | `＊OnBoot` |
-| ローカルシーン | `・` | `-` | サブシーン定義 | `・選択肢1` |
-| 単語/関数 | `＠` | `@` | 単語定義・参照・関数呼び出し | `＠挨拶：こんにちは、やあ` / `＠女性、妖精：水無灯里、アリス`（複数キー） |
-| 変数 | `＄` | `$` | 変数宣言・参照 | `＄count＝1` |
-| Call | `＞` | `>` | シーン呼び出し | `＞次の会話` |
-| 属性 | `＆` | `&` | メタデータ | `＆author：Alice` |
-| コメント | `＃` | `#` | コメント行 | `＃ メモ` |
-| アクター辞書 | `％` | `%` | アクター辞書定義 | `％さくら` |
-| キューコマンド | `！` | `!` | 演出キュー | `！emote(smile)` |
-| コロン | `：` | `:` | キー・値の区切り | `Alice：こんにちは` |
+| マーカー名 | 全角 | 半角 | 用途 | 使用例 | リファレンス |
+|-----------|------|------|------|--------|-------------|
+| グローバルシーン | `＊` | `*` | シーン定義 | `＊OnBoot` | [grammar-model.md](references/grammar-model.md) |
+| ローカルシーン | `・` | `-` | サブシーン定義 | `・選択肢1` | [grammar-model.md](references/grammar-model.md) |
+| 単語/関数 | `＠` | `@` | 単語定義・参照・関数呼び出し | `＠挨拶：こんにちは、やあ` / `＠女性、妖精：水無灯里、アリス`（複数キー） | [words.md](references/words.md) |
+| 変数 | `＄` | `$` | 変数宣言・参照 | `＄count＝1` | [variables.md](references/variables.md) |
+| Call | `＞` | `>` | シーン呼び出し | `＞次の会話` | [call-spec.md](references/call-spec.md) |
+| 属性 | `＆` | `&` | メタデータ | `＆author：Alice` | [grammar-model.md](references/grammar-model.md) |
+| コメント | `＃` | `#` | コメント行 | `＃ メモ` | [grammar-model.md](references/grammar-model.md) |
+| アクター辞書 | `％` | `%` | アクター辞書定義 | `％さくら` | [actor-dictionary.md](references/actor-dictionary.md) |
+| キューコマンド | `！` | `!` | 演出キュー | `！emote(smile)` | [grammar-model.md](references/grammar-model.md) |
+| コロン | `：` | `:` | キー・値の区切り | `Alice：こんにちは` | [grammar-model.md](references/grammar-model.md) |
+| さくらスクリプト | `\` | `\` | 表情・タイミング制御 | `\s[0]` | [sakura-script.md](references/sakura-script.md) |
 
 ---
 
@@ -65,6 +70,8 @@ metadata:
   女の子：やっほー！
 ```
 
+> 📖 詳細: [references/grammar-model.md](references/grammar-model.md)
+
 ### 3.2 Action Lines（アクション行）
 
 - 構文: `アクター名：発話内容`（インデントあり）
@@ -77,6 +84,33 @@ metadata:
   Alice：こんにちは、＠weather　ですね。\w8
   Bob：＄player_name　さん、元気？
 ```
+
+#### インライン要素の区切り文字
+
+インライン要素（`＠`、`＄`）の識別子はUnicode識別子（XID_START＋XID_CONTINUE*）として**最長一致**で切り出される。日本語文字（平仮名・カタカナ・漢字）はXID_CONTINUEに含まれるため、空白なしでは後続テキストが識別子に吸収される。
+
+1. **空白区切り** — `＠単語名　テキスト` で単語参照と通常テキストを分離。空白はトークン区切りとして消費され出力に含まれない（空白数は無関係）
+2. **最長一致（空白なし）** — `＠天気ですね` は「天気ですね」全体が識別子として吸収される
+3. **＠＠エスケープ** — リテラルの「＠」を出力するには `＠＠` と記述
+
+```
+❌ ＠地名からおらんようなってもた
+✅ ＠地名　からおらんようなってもた
+
+❌ ＄nameさん
+✅ ＄name　さん
+```
+
+#### ⚠️ よくある間違い
+
+| # | パターン | ❌ まちがい | ✅ ただしい | 理由 |
+|---|---------|-----------|-----------|------|
+| a | ＠空白なし | `＠地名からおらんようなってもた` | `＠地名　からおらんようなってもた` | 最長一致で全体が識別子に |
+| b | ＄空白なし | `＄nameさん` | `＄name　さん` | 日本語文字もXID_CONTINUEに含まれる |
+| c | 行継続で行マーカー | 継続行を`＠`で開始 | 継続行はマーカーなしで開始 | マーカーで始まる行は別の行種として解釈 |
+| d | 属性の配置位置 | アクション行→属性行 | シーン定義直後→属性行 | 属性はシーン定義の直後にのみ配置可能 |
+
+> 📖 詳細: [references/action-line.md](references/action-line.md)
 
 ### 3.3 Words（単語定義）
 
@@ -96,6 +130,8 @@ metadata:
   Alice：＠挨拶　今日は＠天気　だね。
 ```
 
+> 📖 詳細: [references/words.md](references/words.md)
+
 ### 3.4 Variables（変数）
 
 - **ローカル変数** `＄変数名`: 一連のシーンが終わるまで有効
@@ -110,6 +146,8 @@ metadata:
   Alice：＄count　回目の会話だよ。
 ```
 
+> 📖 詳細: [references/variables.md](references/variables.md)
+
 ### 3.5 Call Statements（Call文）
 
 - 構文: `＞シーン名` — 指定シーンを呼び出し、実行後に復帰
@@ -123,6 +161,8 @@ metadata:
   女の子：またね！
   ＞ゴースト終了（３００）
 ```
+
+> 📖 詳細: [references/call-spec.md](references/call-spec.md)
 
 ### 3.6 Actor Dictionary（アクター辞書）
 
@@ -144,6 +184,8 @@ metadata:
   さくら：＠笑顔　おはよう！
 ```
 
+> 📖 詳細: [references/actor-dictionary.md](references/actor-dictionary.md)
+
 ### 3.7 Sakura Script（さくらスクリプト）
 
 アクション行内にインラインで埋め込む `\` から始まるコマンド。Pasta は内容を解釈せずそのまま透過する。
@@ -156,6 +198,8 @@ metadata:
 | `\_w[数字]` | ウェイト（ミリ秒指定） | `\_w[1000]` |
 
 さくらスクリプトは必ず半角で記述する（エスケープ文字 `\` は半角バックスラッシュのみ）。
+
+> 📖 詳細: [references/sakura-script.md](references/sakura-script.md)
 
 ### 3.8 Lua Code Blocks（Luaブロック）
 
@@ -176,6 +220,8 @@ end
   Alice：結果は＠calculate()　です。
 ````
 
+> 📖 詳細: [references/grammar-model.md](references/grammar-model.md)
+
 ### 3.9 Comments & Attributes（コメント・属性）
 
 - **コメント**: `＃` または `#` で始まる行。処理されない。インデントあり・なし両方可
@@ -189,6 +235,8 @@ end
   ＆genre：comedy
   Alice：こんにちは！
 ```
+
+> 📖 詳細: [references/grammar-model.md](references/grammar-model.md)
 
 ---
 
