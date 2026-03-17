@@ -87,4 +87,3 @@ pasta-ghost-authoringスキルをpasta-lua-skillと同様にリファレンス�
 1. The SKILL.md shall §1（Purpose）に四者の役割分離を明記する：情報権威フロー `doc/spec/`（権威仕様書）→ `references/`（AI向け転記）→ `SKILL.md`（要約＋パターン集）。`GRAMMAR.md`（人間向け学習用）はこのフローとは独立した文書であり、AI向け情報チェーンには含まれない
 2. The SKILL.md shall 情報更新時のフローを明記する：`doc/spec/`を更新 → `references/`に反映 → 必要に応じてSKILL.mdの要約を更新
 3. The SKILL.md shall GRAMMAR.mdへの参照を含まない（GRAMMAR.mdはAI向けではないため）
-4. The SKILL.md shall `steering/grammar.md`との関係を明記する：steering/grammar.mdはステアリング（コンテキスト注入）、SKILL.mdはスキル（他リポジトリでも使える自己完結型リファレンス）

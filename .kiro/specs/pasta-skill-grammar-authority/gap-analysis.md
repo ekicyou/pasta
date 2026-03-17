@@ -123,7 +123,6 @@
 | 三者の役割定義 | steering/grammar.md に部分的記載 | **Missing**: SKILL.md §1に未記載 |
 | 情報更新フロー | なし | **Missing**: 新規定義が必要 |
 | GRAMMAR.md参照の排除 | 現行SKILL.mdにGRAMMARへの参照なし | ✅ 既に準拠 |
-| steering/grammar.mdとの関係 | steering/grammar.md に役割分離の記載あり | **Missing**: SKILL.md側での相互参照 |
 
 ---
 
