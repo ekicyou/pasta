@@ -83,20 +83,22 @@
 | 正例/誤例ペア | doc/spec/に部分的にあり | **Missing**: ⚠️ペア形式の明示的なピットフォールなし |
 | 変数参照の同ルール | doc/spec/06-action-line.md §6.3に記載（全インライン要素共通ルール） | **Missing**: SKILL.md §3.4に空白要件の記載なし |
 
-### Requirement 3: 権威文書からの文法ルール移植
+### Requirement 3: 権威文書のAI向け再構成
 
 | doc/spec/章 | 行数 | SKILL.md §3対応 | ギャップ |
-|-------------|------|-----------------|---------|
+|-------------|------|-----------------|--------|
 | 06-action-line.md | 111行 | §3.2（4行要約） | **Missing**: インライン判定ルール、行継続構文、改行セマンティクス |
 | 10-words.md | 50行 | §3.3（10行要約） | **Missing**: 動的単語参照、スコープ解決アルゴリズム |
 | 09-variables.md | 62行 | §3.4（7行要約） | **Missing**: 式サポート、代入制約、許可される値の型表 |
 | 04-call-spec.md | 92行 | §3.5（7行要約） | **Missing**: 2段階検索、フィルター、動的ターゲット詳細 |
 | 11-actor-dictionary.md | 86行 | §3.6（12行要約） | **Missing**: シーンスコープ内指定、フォールバック解決ルール |
 | 07-sakura-script.md | 47行 | §3.7（7行要約） | **Missing**: コマンド字句構造、文字クラス |
-| 02-markers.md | 300行 | §2（18行要約） | **Missing**: 識別子定義、演算子、リテラル |
 | 01-grammar-model.md | 54行 | なし | **Missing**: 行指向文法モデル、式サポート概要 |
+| 02-markers.md | 300行 | §2（18行要約） | **Missing**: 識別子定義、演算子、リテラル |
 | 03-block-structure.md | 149行 | §3.8の一部 | **Missing**: ブロック構造の完全定義 |
+| 05-literals.md | 29行 | 記載なし | **Missing**: 型変換ルール |
 | 08-attributes.md | 46行 | §3.9の一部 | **Missing**: 配置ルール詳細 |
+| 12-future.md | 104行 | — | **対象外**: 未確定事項。コード生成には不要 |
 
 ### Requirement 4: 重複排除と構造強化
 
@@ -104,7 +106,7 @@
 |------|---------|---------|
 | §2 マーカー表→references/リンク | §2にマーカー表あり | **Missing**: references/リンクなし |
 | §3→references/導線 | なし | **Missing**: 姉妹スキルのパターンに合わせて追加 |
-| GRAMMAR.mdとの重複排除 | GRAMMAR.md 536行 とSKILL.md §3で内容重複 | **Constraint**: GRAMMAR.mdは人間向け/SKILL.mdはAI向け、重複は許容するが権威方向を明確に |
+| GRAMMAR.mdとの重複排除 | GRAMMAR.md 536行 とSKILL.md §3で内容重複 | **Constraint**: GRAMMAR.mdは人間向け/SKILL.mdはAI向け。同一情報の冗長な重複を避け、権威方向を明確に |
 | §6 Authoring Patterns維持 | §6.1〜§6.10（110行） | 維持（スキル固有知識） |
 
 ### Requirement 5: 危険パターンとピットフォール集

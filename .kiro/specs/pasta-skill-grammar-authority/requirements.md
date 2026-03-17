@@ -10,7 +10,9 @@ pasta-ghost-authoringスキル（`.agents/skills/pasta-ghost-authoring/SKILL.md`
 
 `doc/spec/06-action-line.md` §6.3に明記されている「インライン要素の区切り文字」ルール（＠単語参照の後に空白を置いて通常テキストと区切る）が、スキルのみを参照したAIでは読み取れず、誤ったコードを生成してしまった。権威文書の重要ルールがスキルに十分移植されていないことが根本原因。
 
-**情報ソース明記の原則**: スキルに転記する情報は権威的ドキュメント（`doc/spec/`章別仕様書、`GRAMMAR.md`）を正とし、転記元をスキル内に明記する。
+**情報ソース明記の原則**: スキルに記載する情報は権威的ドキュメント（`doc/spec/`章別仕様書）を正とし、情報源をスキル内に明記する。
+
+**重複回避の原則**: `references/`は`doc/spec/`のコピーではなく、AIによるコード生成に特化した再構成とする。同一情報の冗長な重複を避け、ルール・例・表などAIが参照しやすい形式で再構成する。
 
 **姉妹スキルとの関係**: `pasta-lua-coding`（Luaランタイム層）が完了済み仕様`pasta-lua-skill`により`references/`付きアーキテクチャに構成されている。本仕様は同じアーキテクチャを`pasta-ghost-authoring`に適用し、DSL文法層の権威リファレンスとして再構成する。
 
@@ -42,20 +44,22 @@ pasta-ghost-authoringスキルをpasta-lua-skillと同様にリファレンス�
 3. The SKILL.md shall 最長一致ルール（空白なしの場合、識別子に含まれない文字が現れるまでを識別子として切り出す）を説明し、意図しない吸収の例を含める
 4. The SKILL.md shall 変数参照（`＄変数名　テキスト`）にも同じ空白区切りルールが適用されることを明記する
 5. When AIがアクション行内でインライン要素（＠、＄）の後に通常テキストを配置するコードを生成する場合, the スキル shall 空白区切りの必要性を判断できる十分な情報を提供する
-6. The `references/` shall `doc/spec/06-action-line.md` §6.3で定義されたインライン判定ルール（左から右への走査、マーカー文字列での分岐、最長一致での切り出し）の完全な転記を含む
+6. The `references/` shall `doc/spec/06-action-line.md` §6.3で定義されたインライン判定ルール（左から右への走査、マーカー文字列での分岐、最長一致での切り出し）をAI向けに再構成して収録する
 
 ### Requirement 3: 権威文書からの文法ルール移植
 
-**Objective:** LLMとして、`doc/spec/`に記載されているがスキルに未反映の重要文法ルールをすべて取り込み、スキルのみの参照で正確なPasta DSLコードを生成できるようにしたい。
+**Objective:** LLMとして、`doc/spec/`（01〜11章）に記載されている文法ルールをAI向けに再構成し、スキルのみの参照で正確なPasta DSLコードを生成できるようにしたい。
 
 #### Acceptance Criteria
-1. The `references/` shall `doc/spec/06-action-line.md`のアクション行仕様（基本構文、インライン要素一覧表、行継続、改行セマンティクス）を完全に転記する
-2. The `references/` shall `doc/spec/10-words.md`の単語定義仕様（グローバル/ローカル/複数キー、単語参照、動的単語参照、スコープ解決ルール）を完全に転記する
-3. The `references/` shall `doc/spec/09-variables.md`の変数仕様（スコープ、代入構文、式サポート）を完全に転記する
-4. The `references/` shall `doc/spec/04-call-spec.md`のCall仕様（スコープ解決アルゴリズム、前方一致検索、動的ターゲット）を完全に転記する
-5. The `references/` shall `doc/spec/11-actor-dictionary.md`のアクター辞書仕様（スコープ指定、フォールバック検索、バルーン連動）を完全に転記する
-6. The `references/` shall `doc/spec/07-sakura-script.md`のさくらスクリプト仕様（タグ一覧、透過ルール）を完全に転記する
-7. The `references/` shall 各リファレンスファイルの冒頭に転記元の`doc/spec/`章番号を明記する
+1. The `references/` shall `doc/spec/06-action-line.md`のアクション行仕様（基本構文、インライン要素一覧表、行継続、改行セマンティクス）をAI向けに再構成して収録する
+2. The `references/` shall `doc/spec/10-words.md`の単語定義仕様（グローバル/ローカル/複数キー、単語参照、動的単語参照、スコープ解決ルール）をAI向けに再構成して収録する
+3. The `references/` shall `doc/spec/09-variables.md`の変数仕様（スコープ、代入構文、式サポート）をAI向けに再構成して収録する
+4. The `references/` shall `doc/spec/04-call-spec.md`のCall仕様（スコープ解決アルゴリズム、前方一致検索、動的ターゲット）をAI向けに再構成して収録する
+5. The `references/` shall `doc/spec/11-actor-dictionary.md`のアクター辞書仕様（スコープ指定、フォールバック検索、バルーン連動）をAI向けに再構成して収録する
+6. The `references/` shall `doc/spec/07-sakura-script.md`のさくらスクリプト仕様（タグ一覧、透過ルール）をAI向けに再構成して収録する
+7. The `references/` shall `doc/spec/`の残りの章（01-grammar-model, 02-markers, 03-block-structure, 05-literals, 08-attributes）もコード生成に必要なルールをAI向けに再構成して収録する（ファイルグルーピングは設計フェーズで決定）
+8. The `references/` shall `doc/spec/12-future.md`（未確定事項・検討中仕様）を対象外とする（コード生成には不要）
+9. The `references/` shall 各リファレンスファイルの冒頭に情報源の`doc/spec/`章番号を明記する
 
 ### Requirement 4: SKILL.mdの重複排除と構造強化
 
@@ -64,9 +68,9 @@ pasta-ghost-authoringスキルをpasta-lua-skillと同様にリファレンス�
 #### Acceptance Criteria
 1. The SKILL.md shall 現行の§2（Quick Reference マーカー一覧表）を維持し、各マーカーの対応する`references/`ファイルへのリンクを追加する
 2. The SKILL.md shall §3（DSL Syntax）の各サブセクションに「詳細は `references/xxx.md` を参照」の導線を明記する
-3. The SKILL.md shall GRAMMAR.mdとの重複記述を排除し、情報の権威を`doc/spec/` → `references/`（転記）→ `SKILL.md`（要約）の一方向に整理する
+3. The SKILL.md shall 情報の権威フローを`doc/spec/`（権威仕様）→ `references/`（AI向け再構成）→ `SKILL.md`（要約）の一方向に整理し、同一情報の冗長な重複を避ける
 4. The SKILL.md shall §6（Authoring Patterns）の辞書制作パターン集を維持する（これはスキル固有の知識であり、権威文書には含まれない）
-5. If SKILL.mdと`references/`の記述に矛盾がある場合, the `references/`（権威文書の転記）shall 正とする
+5. If SKILL.mdと`references/`の記述に矛盾がある場合, the `references/`（権威文書のAI向け再構成）shall 正とする
 
 ### Requirement 5: 危険パターンとピットフォール集
 
