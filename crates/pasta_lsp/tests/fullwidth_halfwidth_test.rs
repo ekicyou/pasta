@@ -2,7 +2,7 @@
 //!
 //! 全角マーカーと半角マーカーが同等のトークンを生成することを検証
 
-use pasta_lsp::analysis::{token_type, AnalysisEngine};
+use pasta_lsp::analysis::{AnalysisEngine, token_type};
 
 /// 特定のトークンタイプが含まれるか確認するヘルパー
 fn has_token_type(source: &str, expected_type: u32) -> bool {
@@ -11,7 +11,12 @@ fn has_token_type(source: &str, expected_type: u32) -> bool {
 }
 
 /// 2つのソースから同じトークンタイプが生成されることを確認
-fn assert_equivalent_tokens(fullwidth_source: &str, halfwidth_source: &str, token_type: u32, label: &str) {
+fn assert_equivalent_tokens(
+    fullwidth_source: &str,
+    halfwidth_source: &str,
+    token_type: u32,
+    label: &str,
+) {
     let has_fw = has_token_type(fullwidth_source, token_type);
     let has_hw = has_token_type(halfwidth_source, token_type);
     assert!(has_fw, "{}: 全角マーカーでトークン生成失敗", label);
@@ -35,8 +40,10 @@ fn test_global_scene_fullwidth_halfwidth_equivalence() {
 
 #[test]
 fn test_local_scene_fullwidth_halfwidth_equivalence() {
-    let fw = "＊挨拶\n  Alice：OK\n";
-    let hw = "*greeting\n  Alice：OK\n";
+    // Anonymous local scene (local_start_scene_scope) is required before named scenes.
+    // Use sources with both an anonymous and a named local scene.
+    let fw = "＊挨拶\n  Alice：こんにちは\n  ・ランダム\n    Bob：OK\n";
+    let hw = "*greeting\n  Alice：hello\n  -random\n    Bob：OK\n";
     assert_equivalent_tokens(fw, hw, token_type::SCENE, "ローカルシーン");
 }
 

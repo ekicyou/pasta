@@ -25,6 +25,8 @@ export const PASTA_TOKEN_TYPES: readonly string[] = [
   'escape',        // 12: エスケープ (custom)
   'operator',      // 13
   'number',        // 14: 数値リテラル
+  'cueMarker',     // 15: キューコマンドマーカー (custom)
+  'cueCommand',    // 16: キューコマンド名 (custom)
 ] as const;
 
 /**

@@ -24,14 +24,16 @@ fn test_token_global_scene_marker() {
 
 #[test]
 fn test_token_local_scene_marker() {
-    let source = "＊挨拶\n  Alice：こんにちは\n";
+    // Anonymous local scene (name=None) should NOT emit a SCENE token.
+    // Named local scene (with ・ or - marker) should emit one.
+    let source = "＊挨拶\n  Alice：こんにちは\n  ・ランダム\n    Bob：OK\n";
     let result = AnalysisEngine::analyze(source);
-    // Should contain scene token type (2) for local scene
+    // Should contain scene token type (2) for the named local scene
     let has_scene = result
         .tokens
         .iter()
         .any(|t| t.token_type == token_type::SCENE);
-    assert!(has_scene, "ローカルシーンのトークンが含まれる");
+    assert!(has_scene, "名前付きローカルシーンのトークンが含まれる");
 }
 
 // ============================================================================

@@ -13,11 +13,7 @@ use super::token_types::*;
 // ============================================================================
 
 impl super::AnalysisEngine {
-    pub(super) fn visit_file_items(
-        items: &[FileItem],
-        source: &str,
-        tokens: &mut Vec<RawToken>,
-    ) {
+    pub(super) fn visit_file_items(items: &[FileItem], source: &str, tokens: &mut Vec<RawToken>) {
         for item in items {
             match item {
                 FileItem::FileAttr(attr) => Self::visit_attr(attr, source, tokens),
@@ -65,7 +61,10 @@ impl super::AnalysisEngine {
     }
 
     fn visit_local_scene(scene: &LocalSceneScope, source: &str, tokens: &mut Vec<RawToken>) {
-        if scene.span.is_valid() {
+        // Only emit SCENE token for named local scenes (with explicit marker like ・ランダム).
+        // Anonymous local_start_scene_scope (name=None) has no marker line, and emitting
+        // a SCENE token would overlap with the action line tokens within the scope.
+        if scene.name.is_some() && scene.span.is_valid() {
             let line = scene.span.start_line;
             let line_text = get_line_text(source, line);
             let line_start = line_byte_offset(source, line);
@@ -577,7 +576,11 @@ impl super::AnalysisEngine {
         let line_text = get_line_text(source, line);
         let line_start = line_byte_offset(source, line);
         let span_start_in_line = cue.span.start_byte.saturating_sub(line_start);
-        let span_end_in_line = cue.span.end_byte.saturating_sub(line_start).min(line_text.len());
+        let span_end_in_line = cue
+            .span
+            .end_byte
+            .saturating_sub(line_start)
+            .min(line_text.len());
         let span_text = &line_text[span_start_in_line..span_end_in_line];
         let base_offset = span_start_in_line;
         let line0 = (line - 1) as u32;
@@ -635,7 +638,8 @@ impl super::AnalysisEngine {
             // 開き括弧検出
             if let Some(paren_pos) = find_open_paren(remaining) {
                 let abs_paren = cursor + paren_pos;
-                let paren_char = &span_text[abs_paren..abs_paren + char_len_at(span_text, abs_paren)];
+                let paren_char =
+                    &span_text[abs_paren..abs_paren + char_len_at(span_text, abs_paren)];
                 tokens.push(RawToken {
                     line: line0,
                     start_char: utf8_offset_to_utf16(line_text, base_offset + abs_paren),

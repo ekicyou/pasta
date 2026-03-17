@@ -191,7 +191,7 @@
             "name": "entity.name.function.call.pasta"
         },
         "inline-sakura-script": {
-            "match": "\\\\[a-zA-Z_!?](?:\\[[^\\]]*\\]|[^\\\\]*)?",
+            "match": "\\\\[a-zA-Z0-9_!?+\\-*&]+(?:\\[[^\\]]*\\])?",
             "name": "string.other.sakura-script.pasta"
         },
         "inline-escape": {
