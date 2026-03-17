@@ -216,6 +216,8 @@ Pasta DSL言語仕様の設計判断やパーサー実装には関与しない�
 | 属性 | `＆` | `&` | メタデータ | [grammar-model.md](references/grammar-model.md) |
 | コメント | `＃` | `#` | コメント行 | [grammar-model.md](references/grammar-model.md) |
 | アクター辞書 | `％` | `%` | アクター辞書定義 | [actor-dictionary.md](references/actor-dictionary.md) |
+| キューコマンド | `！` | `!` | 演出キュー | [grammar-model.md](references/grammar-model.md) |
+| コロン | `：` | `:` | キー・値の区切り | [grammar-model.md](references/grammar-model.md) |
 | さくらスクリプト | `\` | `\` | 表情・タイミング制御 | [sakura-script.md](references/sakura-script.md) |
 
 **Implementation Notes**: 現行テーブルの「使用例」列を削除する代わりに「リファレンス」列を追加。使用例は §3 各サブセクションに存在するため冗長。これにより列数を維持（5列→5列）。
