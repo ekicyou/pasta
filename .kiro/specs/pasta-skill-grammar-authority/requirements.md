@@ -85,8 +85,8 @@ pasta-ghost-authoringスキルをpasta-lua-skillと同様にリファレンス�
 
 ### Requirement 6: GRAMMAR.mdとの役割分離の明確化
 
-**Objective:** プロジェクトメンテナーとして、GRAMMAR.md（人間向け学習マニュアル）・doc/spec/（権威仕様書）・SKILL.md（AI向けリファレンス）の三者の役割を明確に定義し、情報の一元管理を実現したい。
+**Objective:** プロジェクトメンテナーとして、スキル内部の情報階層（`references/` → `SKILL.md`）を明確にし、自己完結性を損なわない形で役割分離を実現したい。
 
 #### Acceptance Criteria
-1. The SKILL.md shall §1（Purpose）に四者の役割分離を明記する：情報権威フロー `doc/spec/`（権威仕様書）→ `references/`（AI向け再構成）→ `SKILL.md`（要約＋パターン集）。`GRAMMAR.md`（人間向け学習用）はこのフローとは独立した文書であり、AI向け情報チェーンには含まれない
+1. The SKILL.md shall §1（Purpose）にスキル内部の情報階層を明記する：`references/`（詳細リファレンス）と `SKILL.md`（要約＋パターン集）の2層構成、および `references/` が SKILL.md より権威であることを記述する。外部ファイル（`doc/spec/`、`GRAMMAR.md`）のパスを SKILL.md に記載しない（自己完結性: 1.5）
 2. The SKILL.md shall GRAMMAR.mdへの参照を含まない（GRAMMAR.mdはAI向けではないため）
