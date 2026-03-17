@@ -4,8 +4,8 @@
 //! default_lua_search_paths, default_log_file_path: pub に昇格
 
 use pasta_lua::loader::{
-    LoaderConfig, LoggingConfig, LuaConfig, PastaConfig, PersistenceConfig,
-    default_log_file_path, default_lua_search_paths,
+    LoaderConfig, LoggingConfig, LuaConfig, PastaConfig, PersistenceConfig, default_log_file_path,
+    default_lua_search_paths,
 };
 
 #[test]

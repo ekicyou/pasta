@@ -423,4 +423,3 @@ impl Default for TalkConfig {
         }
     }
 }
-
