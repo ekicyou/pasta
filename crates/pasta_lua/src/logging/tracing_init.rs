@@ -31,7 +31,7 @@ fn build_filter(config: &LoggingConfig) -> EnvFilter {
                 config.to_filter_directive(),
                 e
             );
-            EnvFilter::new("debug")
+            EnvFilter::new("info")
         })
 }
 

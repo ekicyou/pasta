@@ -117,7 +117,7 @@ fn test_logging_config_default() {
     let config = LoggingConfig::default();
     assert_eq!(config.file_path, "profile/pasta/logs/pasta.log");
     assert_eq!(config.rotation_days, 7);
-    assert_eq!(config.level, "debug");
+    assert_eq!(config.level, "info");
     assert!(config.filter.is_none());
 }
 
@@ -147,9 +147,9 @@ fn test_logging_config_to_filter_directive_with_level_only() {
 
 #[test]
 fn test_logging_config_to_filter_directive_default() {
-    // デフォルト: "debug"
+    // デフォルト: "info"
     let config = LoggingConfig::default();
-    assert_eq!(config.to_filter_directive(), "debug");
+    assert_eq!(config.to_filter_directive(), "info");
 }
 
 #[test]
@@ -166,7 +166,7 @@ rotation_days = 14
     let logging = config.logging().expect("logging section should exist");
     assert_eq!(logging.file_path, "profile/custom/logs/my.log");
     assert_eq!(logging.rotation_days, 14);
-    assert_eq!(logging.level, "debug"); // default
+    assert_eq!(logging.level, "info"); // default
     assert!(logging.filter.is_none());
 }
 

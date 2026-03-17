@@ -196,7 +196,7 @@ pub struct LoggingConfig {
     pub rotation_days: usize,
 
     /// Default log level.
-    /// Default: "debug"
+    /// Default: "info"
     /// Valid: "error", "warn", "info", "debug", "trace"
     #[serde(default = "default_log_level")]
     pub level: String,
@@ -240,7 +240,7 @@ fn default_rotation_days() -> usize {
 }
 
 fn default_log_level() -> String {
-    "debug".to_string()
+    "info".to_string()
 }
 
 /// Persistence configuration from [persistence] section in pasta.toml.
