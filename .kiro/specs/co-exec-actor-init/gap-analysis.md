@@ -3,8 +3,8 @@
 ## 分析サマリー
 
 - **スコープ**: `％` アクター宣言なしシーンにおけるスコープ継承・アクター解決の不具合修正（Lua ランタイム側）
-- **設計原則**: 全トークは最終的に `BUILDER.build()` を経由してさくらスクリプトに変換される。この関数に適切なスコープ情報を注入し、変更されたスコープ情報を外部で正しく維持することが本問題の解決の鍵となる。`BUILDER.build()` 自体は純粋関数を維持する。
-- **スコープフローの現状**: `STORE.actor_spots` → `SHIORI_ACT_IMPL.build` → `BUILDER.build(tokens, config, current_spots)` → `updated_spots` 返却 → `STORE.actor_spots` 書き戻し。**このフロー自体は正しく機能している**。
+- **設計原則**: 全トークは最終的に `BUILDER.build()` を経由してさくらスクリプトに変換される。この関数に適切なスコープ情報（`actor_spots`）を注入し、関数内で直接変更することで外部のスコープ状態を更新する。テスト再現性は入力テーブルの制御で担保する。
+- **スコープフロー（合意済み設計変更）**: `STORE.actor_spots` → `SHIORI_ACT_IMPL.build` → `BUILDER.build(tokens, config, actor_spots)` → `actor_spots` を直接変更、スクリプト文字列のみ返却。**コピー＋第2返却値＋書き戻しパターンを廃止し、直接変更方式に移行する**。
 - **根本原因**: CONFIG由来アクター（`STORE.actors`）に `name` フィールドが欠落しているため、`BUILDER.build()` 内で `actor_spots[actor.name]`（= `actor_spots[nil]`）のルックアップが失敗し、正しいスコープ情報が注入されているにもかかわらず参照できない。
 - **推奨アプローチ**: CONFIG由来アクターの `name` フィールド正規化 — スコープフローを変更せず、データの整合性を修正することで解決
 
@@ -103,8 +103,8 @@ OnSecondChange
 
 | 統合箇所 | 既存インターフェース | 必要な変更 |
 |----------|---------------------|-----------|
-| `BUILDER.build()` | 純粋関数: `input_actor_spots` 受取 → コピー → 更新版返却 | **変更不要** — スコープ注入・抽出フローは正常 |
-| `SHIORI_ACT_IMPL.build()` | `STORE.actor_spots` → `BUILDER.build` → 書き戻し | **変更不要** — フロー正常 |
+| `BUILDER.build()` | `actor_spots` を直接変更、スクリプト文字列のみ返却 | **変更あり** — コピーループ廃止、第2返却値廃止 |
+| `SHIORI_ACT_IMPL.build()` | `STORE.actor_spots` → `BUILDER.build` | **変更あり** — 書き戻し不要（直接変更のため） |
 | `ACTOR.get_or_create` | 新規のみ正規化 | 既存エントリにも `name`/metatable を設定 |
 | `store.lua` 初期化 | `CONFIG.actor` 直接参照共有 | 変更不要（get_or_create で正規化すれば解決） |
 | `STORE.actor_spots` | CONFIG.actor.spot からの転送 | **既に実装済み** — 問題なし |
@@ -271,16 +271,23 @@ end
 
 ### 推奨アプローチ
 
-CONFIG由来アクターの `name` フィールド正規化を行い、既存のスコープフロー（`STORE.actor_spots` → `BUILDER.build` → 書き戻し）を活かす。`BUILDER.build()` の純粋関数性とインターフェースは変更しない。
+2つの変更を組み合わせて解決する:
 
-**正規化の実装場所**: `ACTOR.get_or_create` を拡張し、`ACT_IMPL.__index` から呼び出す。
+**1. CONFIG由来アクターの `name` フィールド正規化**
 
-**理由**:
-1. `get_or_create` は正規化の自然な責務所在
-2. `__index` からの `get_or_create` 呼び出しで、CONFIG 由来アクターの遅延正規化を統一的に処理
-3. 既存テスト（`config_actors_initialization_test.rs`）の想定と完全一致
-4. `store.lua` の循環参照リスクを回避
-5. スコープフロー（`BUILDER.build` への注入・抽出）は変更不要 — データの整合性修正のみで解決
+`ACTOR.get_or_create` を拡張し、`ACT_IMPL.__index` から呼び出す。
+
+- `get_or_create` は正規化の自然な責務所在
+- `__index` からの `get_or_create` 呼び出しで、CONFIG 由来アクターの遅延正規化を統一的に処理
+- 既存テスト（`config_actors_initialization_test.rs`）の想定と完全一致
+- `store.lua` の循環参照リスクを回避
+
+**2. `BUILDER.build()` のインターフェース簡素化**（ディスカッションで合意済み）
+
+- `actor_spots` テーブルを直接変更（浅いコピーのループを廃止）
+- 返却値をスクリプト文字列のみに変更（第2返却値 `actor_spots` を廃止）
+- 呼び出し元（`SHIORI_ACT_IMPL.build`）の書き戻し処理を廃止
+- テスト再現性は入力テーブルの制御で担保（既存の「入力テーブルが変更されないことを確認」テストは方針に合わせて更新）
 
 ### 設計フェーズで決定すべき事項
 
