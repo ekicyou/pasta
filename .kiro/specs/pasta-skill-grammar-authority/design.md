@@ -204,23 +204,23 @@ Pasta DSL言語仕様の設計判断やパーサー実装には関与しない�
 | Requirements | 4.1 |
 
 **変更内容**:
-現行のマーカー表にリファレンス列を追加:
+現行のマーカー表に「リファレンス」列を追加（「使用例」列は維持）:
 
-| マーカー名 | 全角 | 半角 | 用途 | リファレンス |
-|-----------|------|------|------|-------------|
-| グローバルシーン | `＊` | `*` | シーン定義 | [grammar-model.md](references/grammar-model.md) |
-| ローカルシーン | `・` | `-` | サブシーン定義 | [grammar-model.md](references/grammar-model.md) |
-| 単語/関数 | `＠` | `@` | 単語定義・参照・関数呼び出し | [words.md](references/words.md) |
-| 変数 | `＄` | `$` | 変数宣言・参照 | [variables.md](references/variables.md) |
-| Call | `＞` | `>` | シーン呼び出し | [call-spec.md](references/call-spec.md) |
-| 属性 | `＆` | `&` | メタデータ | [grammar-model.md](references/grammar-model.md) |
-| コメント | `＃` | `#` | コメント行 | [grammar-model.md](references/grammar-model.md) |
-| アクター辞書 | `％` | `%` | アクター辞書定義 | [actor-dictionary.md](references/actor-dictionary.md) |
-| キューコマンド | `！` | `!` | 演出キュー | [grammar-model.md](references/grammar-model.md) |
-| コロン | `：` | `:` | キー・値の区切り | [grammar-model.md](references/grammar-model.md) |
-| さくらスクリプト | `\` | `\` | 表情・タイミング制御 | [sakura-script.md](references/sakura-script.md) |
+| マーカー名 | 全角 | 半角 | 用途 | 使用例 | リファレンス |
+|-----------|------|------|------|--------|-------------|
+| グローバルシーン | `＊` | `*` | シーン定義 | `＊OnBoot` | [grammar-model.md](references/grammar-model.md) |
+| ローカルシーン | `・` | `-` | サブシーン定義 | `・選択肢1` | [grammar-model.md](references/grammar-model.md) |
+| 単語/関数 | `＠` | `@` | 単語定義・参照・関数呼び出し | `＠挨拶：こんにちは、やあ` / `＠女性、妖精：水無灯里、アリス`（複数キー） | [words.md](references/words.md) |
+| 変数 | `＄` | `$` | 変数宣言・参照 | `＄count＝1` | [variables.md](references/variables.md) |
+| Call | `＞` | `>` | シーン呼び出し | `＞次の会話` | [call-spec.md](references/call-spec.md) |
+| 属性 | `＆` | `&` | メタデータ | `＆author：Alice` | [grammar-model.md](references/grammar-model.md) |
+| コメント | `＃` | `#` | コメント行 | `＃ メモ` | [grammar-model.md](references/grammar-model.md) |
+| アクター辞書 | `％` | `%` | アクター辞書定義 | `％さくら` | [actor-dictionary.md](references/actor-dictionary.md) |
+| キューコマンド | `！` | `!` | 演出キュー | `！emote(smile)` | [grammar-model.md](references/grammar-model.md) |
+| コロン | `：` | `:` | キー・値の区切り | `Alice：こんにちは` | [grammar-model.md](references/grammar-model.md) |
+| さくらスクリプト | `\` | `\` | 表情・タイミング制御 | `\s[0]` | [sakura-script.md](references/sakura-script.md) |
 
-**Implementation Notes**: 現行テーブルの「使用例」列を削除する代わりに「リファレンス」列を追加。使用例は §3 各サブセクションに存在するため冗長。これにより列数を維持（5列→5列）。
+**Implementation Notes**: 現行テーブルの「使用例」列を維持したまま「リファレンス」列を追加（5列→6列）。Quick Reference としての即応性を保ちつつ、references/ への導線を提供する。行数への影響なし。
 
 ---
 
@@ -503,7 +503,7 @@ Pasta DSL言語仕様の設計判断やパーサー実装には関与しない�
 | セクション | 現行行数 | 変更後行数 | 変更内容 |
 |-----------|---------|-----------|---------|
 | §1 Purpose | 8行 | 18行 | スキル内部情報階層＋自己完結性追加 |
-| §2 Quick Reference | 18行 | 20行 | リファレンス列追加（使用例列と入替） |
+| §2 Quick Reference | 18行 | 20行 | リファレンス列追加（使用例列は維持、5列→6列） |
 | §3.1 Scenes | 15行 | 17行 | 📖導線追加 |
 | §3.2 Action Lines | 10行 | 55行 | 区切りルール＋ピットフォール＋📖導線追加 |
 | §3.3 Words | 18行 | 20行 | 📖導線追加 |
