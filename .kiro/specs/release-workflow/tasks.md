@@ -140,6 +140,7 @@
     ```
   - `gh` 失敗時は段階的バックオフでリトライ（待機 1分→2分→...→10分、最大10回）、それでも失敗の場合はエラー報告と手動手順を案内する
   - 成功時は一時ファイル `release-notes-vX.Y.Z.md` を削除する
+  - `Get-ChildItem "editors/vscode" -Filter "*.vsix" | Remove-Item -Force` で VSIX 成果物を全削除する
   - リリース完了サマリー（バージョン、公開クレート、Release URL、Marketplace 公開結果）を開発者に報告する
   - _Requirements: 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 7.4, VSX.4, VSX.6_
 
