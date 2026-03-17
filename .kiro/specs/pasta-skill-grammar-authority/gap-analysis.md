@@ -122,9 +122,9 @@
 
 | 要素 | 既存資産 | ギャップ |
 |------|---------|---------|
-| 三者の役割定義 | steering/grammar.md に部分的記載 | **Missing**: SKILL.md §1に未記載 |
-| 情報更新フロー | なし | **Missing**: 新規定義が必要 |
+| 四者の役割定義 | steering/grammar.md に部分的記載 | **Missing**: SKILL.md §1に未記載 |
 | GRAMMAR.md参照の排除 | 現行SKILL.mdにGRAMMARへの参照なし | ✅ 既に準拠 |
+| 情報更新フロー | — | Kiroステアリング（workflow.md等）の責務。SKILL.mdのスコープ外 |
 
 ---
 
