@@ -321,19 +321,26 @@ elseif inner_type == "sakura_script" then
 | Requirements | 4.1, 4.2 |
 
 **Responsibilities & Constraints**
-- `tests/fixtures/` に新規 `.pasta` ファイル追加（さくらスクリプトタグを含むアクション行）
-- `snapshot_test.rs` にテスト関数追加
-- 既存8スナップショットに影響なし（現行フィクスチャにさくらスクリプト使用例がない）
+- `snapshot_test.rs` にテスト関数を**インライン文字列**で追加（既存7/8件がインライン文字列パターンを採用しており、fixture ファイル方式は使用しない）
+- テスト内容: アクション行にさくらスクリプトタグ（`\n`, `\w9` 等）を含む Pasta DSL のトランスパイル出力を検証
+- 既存8スナップショットに影響なし（現行テストにさくらスクリプト使用例がない）
 
-#### LuaUnitTest (act_grouping_test.lua)
+#### LuaUnitTest
 
 | Field | Detail |
 |-------|--------|
-| Intent | `sakura_script` トークンの `group_by_actor()` テスト追加 |
+| Intent | `sakura_script` トークンのグループ化・ビルド動作テスト追加 |
 | Requirements | 4.2 |
 
-**Responsibilities & Constraints**
+**対象ファイル（既存ファイルへの追記）**:
+- `tests/lua_specs/act_grouping_test.lua` — `group_by_actor()` に関するテスト追記
+- `tests/lua_specs/sakura_builder_test.lua` — `BUILDER.build()` に関するテスト追記
+
+**act_grouping_test.lua 追記内容**:
 - `sakura_script` 単体でのアクターグループ開始テスト
 - `talk` + `sakura_script` 混合配列のグループ化テスト
-- アクター切り替え検出テスト（sakura_script によるアクター変更）
+- アクター切り替え検出テスト（`sakura_script` によるアクター変更）
 - `merge_consecutive_talks()` での分離動作テスト
+
+**sakura_builder_test.lua 追記内容**:
+- `{ type="sakura_script", actor=..., text="\\n" }` トークンを含むグループを `BUILDER.build()` に渡し、さくらスクリプトタグがそのまま出力に含まれることをアサート（R3.1 の直接検証）
