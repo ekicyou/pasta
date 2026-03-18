@@ -131,15 +131,14 @@ OnSecondChange
 > - 旧 Req 2（初期スコープの自動設定）: AC 2.1（STORE.actor_spots 初期化）は store.lua L88-92 で✅実装済み。AC 2.2（デフォルト 0）は BUILDER.build の `or 0` で✅対応済み。
 > - 旧 Req 3（co_exec/SHIORI一貫性）: AC 3.2（act.actors設定）は✅実装済み。AC 3.1, 3.3 は本 Req の AC 1.4, 1.5 に統合。
 
-### Requirement 2: `％` 行欠落時の診断支援
+### Requirement 2: スコープ未設定アクターの診断
 
 | AC | 技術ニーズ | 既存実装 | ギャップ |
-|---|-----------|---------|---------|
-| 2.1 | スコープ継承ログ（debug レベル） | ❌ なし | **Lua 側実装が必要** |
-| 2.2 | 未定義アクター参照警告（warn レベル） | ❌ なし | **Lua 側実装が必要** |
-| 2.3 | `％` 省略をエラーとしない | ✅ パーサーは `％` なしを正常にパース | **なし** |
+|---|-----------|---------|----------|
+| 2.1 | `actor_spots` フォールバック時の warn ログ | ❌ なし | **`sakura_builder.lua` の `BUILDER.build` 内にログ追加が必要** |
+| 2.2 | `％` 省略をエラーとしない | ✅ パーサーは `％` なしを正常にパース | **なし** |
 
-**注記**: Req 2 のログ出力は Lua 側で `LOGGER` モジュール（既存の `tracing` 連携）を使用する想定。Research Needed: `LOGGER` モジュールの現在の API を確認。
+**ログ基盤**: Lua 側で `require "@pasta_log"` により Rust `tracing` へブリッジ可能（`log.warn(msg)` 等）。`sakura_builder.lua` 内で `actor_spots[actor_name]` が `nil` のフォールバック発動時に `log.warn` を呼び出す。
 
 ---
 
