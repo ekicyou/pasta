@@ -77,7 +77,7 @@
 | SHIORI_ACT さくらスクリプト生成      | `shiori_act_test.lua`                                             | ✅ 完了 | 47テスト（transfer_date_to_var 7テスト追加） |
 | SHIORI_ACT 日時転記機能              | `shiori_act_test.lua`                                             | ✅ 完了 | 7テスト（onhour-date-var-transfer）          |
 | ACT トークンバッファ（親クラス）     | `act_test.lua`                                                    | ✅ 完了 | 32テスト（act-token-buffer-refactor）        |
-| ACT トークングループ化               | `act_grouping_test.lua`                                           | ✅ 完了 | 19テスト（actor-talk-grouping）              |
+| ACT トークングループ化               | `act_grouping_test.lua`                                           | ✅ 完了 | 23テスト（actor-talk-grouping、sakura_script grouping追加）  |
 | sakura_builder トークン変換          | `sakura_builder_test.lua`                                         | ✅ 完了 | 24テスト（act-token-buffer-refactor）        |
 | RuntimeConfig libs配列               | `runtime_test.rs`（外部化）                                       | ✅ 完了 | 17テスト（外部化済み）                       |
 | LuaConfig TOML設定                   | `loader_config_test.rs`（外部化）                                 | ✅ 完了 | 6テスト（外部化済み）                        |
@@ -96,6 +96,8 @@
 | @pasta_log スタックレベル検証        | `log_stack_level_test.rs`                                         | ✅ 完了 | 2テスト（lua-logging）                       |
 | スポット位置永続化（STORE連携）      | `persist_spot_position_test.lua`                                  | ✅ 完了 | 5テスト（persist-spot-position）             |
 | sakura_builder スポット処理          | `sakura_builder_test.lua`                                         | ✅ 完了 | 3テスト（persist-spot-position追加分）       |
+| sakura_builder sakura_script処理     | `sakura_builder_test.lua`                                         | ✅ 完了 | 3テスト（act-sakura-script-method追加分）    |
+| Action::SakuraScript アクター紐付け  | `snapshot_test.rs`                                                | ✅ 完了 | 1スナップショット（act-sakura-script-method）|
 | Luaパススルー（init.*拒否）          | `lua_passthrough_test.rs`                                         | ✅ 完了 | 2テスト（lua-passthrough）                   |
 | Luaパススルー（.lua検出・コピー）    | `lua_passthrough_test.rs`                                         | ✅ 完了 | 3テスト（lua-passthrough）                   |
 | Luaパススルー（モジュール名衝突）    | `lua_passthrough_test.rs`                                         | ✅ 完了 | 2テスト（lua-passthrough）                   |
