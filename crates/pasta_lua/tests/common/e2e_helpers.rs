@@ -70,6 +70,10 @@ pub fn create_runtime_with_finalize() -> mlua::Result<Lua> {
             .expect("Failed to create SearchContext");
     loaded.set("@pasta_search", lua.create_userdata(search_context)?)?;
 
+    // Register @pasta_log module (required by pasta.shiori.sakura_builder)
+    let log_table = pasta_lua::runtime::log::register(&lua)?;
+    loaded.set("@pasta_log", log_table)?;
+
     // Register finalize_scene binding
     pasta_lua::runtime::finalize::register_finalize_scene(&lua)?;
 
@@ -123,6 +127,10 @@ pub fn create_runtime_with_search(ctx: TranspileContext) -> mlua::Result<Lua> {
         pasta_lua::search::SearchContext::new(ctx.scene_registry, ctx.word_registry)
             .expect("Failed to create SearchContext");
     loaded.set("@pasta_search", lua.create_userdata(search_context)?)?;
+
+    // Register @pasta_log module (required by pasta.shiori.sakura_builder)
+    let log_table = pasta_lua::runtime::log::register(&lua)?;
+    loaded.set("@pasta_log", log_table)?;
 
     // Register finalize_scene binding
     pasta_lua::runtime::finalize::register_finalize_scene(&lua)?;

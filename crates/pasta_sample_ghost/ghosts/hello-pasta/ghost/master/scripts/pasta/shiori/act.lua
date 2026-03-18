@@ -63,18 +63,10 @@ function SHIORI_ACT_IMPL.build(self)
         return nil
     end
 
-    -- STORE.actor_spotsを読み取り、BUILDER.build()に渡す（persist-spot-position）
-    local current_spots = STORE.actor_spots
-
-    -- sakura_builderで変換（新プロパティ名spot_newlinesを使用）
-    local script, updated_spots = BUILDER.build(token, {
+    -- STORE.actor_spotsを直接BUILDER.build()に渡す（直接変更方式）
+    local script = BUILDER.build(token, {
         spot_newlines = self._spot_newlines
-    }, current_spots)
-
-    -- 更新されたスポット状態をSTOREに書き戻し
-    if updated_spots then
-        STORE.actor_spots = updated_spots
-    end
+    }, STORE.actor_spots)
 
     return script
 end

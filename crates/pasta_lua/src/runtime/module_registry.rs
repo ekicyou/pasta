@@ -3,10 +3,10 @@
 //! This file contains the `impl PastaLuaRuntime` methods that register
 //! various Lua modules (split impl pattern).
 
+use super::PastaLuaRuntime;
 use super::enc;
 use super::log;
 use super::persistence;
-use super::PastaLuaRuntime;
 use crate::loader::{LoaderContext, PastaConfig};
 use mlua::{Lua, Result as LuaResult, Table, Value};
 use std::path::{Path, PathBuf};
@@ -42,17 +42,47 @@ impl PastaLuaRuntime {
     ///
     /// Creates a read-only Lua table from the TOML custom_fields and
     /// registers it as the @pasta_config module.
-    pub(crate) fn register_config_module(
-        lua: &Lua,
-        custom_fields: &toml::Table,
-    ) -> LuaResult<()> {
+    pub(crate) fn register_config_module(lua: &Lua, custom_fields: &toml::Table) -> LuaResult<()> {
         let config_table = Self::toml_to_lua(lua, &toml::Value::Table(custom_fields.clone()))?;
+
+        // [actor] サブテーブルの各エントリに name = キー名 を注入
+        Self::inject_actor_names(lua, &config_table)?;
 
         let package: Table = lua.globals().get("package")?;
         let loaded: Table = package.get("loaded")?;
         loaded.set("@pasta_config", config_table)?;
 
         tracing::debug!("Registered @pasta_config module");
+        Ok(())
+    }
+
+    /// Inject `name` field into each actor sub-table under `config_table["actor"]`.
+    ///
+    /// For each sub-table entry in `config_table["actor"]`, sets `name = key_name`.
+    /// This ensures CONFIG-derived actors have their name field set at the data source,
+    /// so `BUILDER.build()` can resolve `actor.name` correctly for `actor_spots` lookup.
+    ///
+    /// If `config_table["actor"]` does not exist or is not a table, this is a no-op.
+    /// Existing `name` fields are overwritten (TOML key is authoritative).
+    fn inject_actor_names(_lua: &Lua, config_table: &Value) -> LuaResult<()> {
+        let config = match config_table {
+            Value::Table(t) => t,
+            _ => return Ok(()),
+        };
+
+        let actor_section: Value = config.get("actor")?;
+        let actor_table = match actor_section {
+            Value::Table(t) => t,
+            _ => return Ok(()),
+        };
+
+        for pair in actor_table.pairs::<mlua::String, Value>() {
+            let (key, value) = pair?;
+            if let Value::Table(sub_table) = value {
+                sub_table.set("name", key.clone())?;
+            }
+        }
+
         Ok(())
     }
 

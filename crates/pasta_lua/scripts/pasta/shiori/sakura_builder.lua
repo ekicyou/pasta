@@ -1,12 +1,13 @@
 --- @module pasta.shiori.sakura_builder
 --- さくらスクリプトビルダーモジュール
 ---
---- グループ化されたトークン配列をさくらスクリプト文字列に変換する純粋関数モジュール。
+--- グループ化されたトークン配列をさくらスクリプト文字列に変換するモジュール。
 --- pasta.shiori.act の build() から呼び出される。
 
 local BUILDER = {}
 
 local SAKURA_SCRIPT = require "@pasta_sakura_script"
+local log = require "@pasta_log"
 
 --- spotからスポットID番号を決定
 --- @param spot any スポット値
@@ -41,22 +42,15 @@ end
 --- グループ化されたトークン配列をさくらスクリプト文字列に変換
 --- @param grouped_tokens table[] グループ化されたトークン配列
 --- @param config BuildConfig|nil 設定
---- @param input_actor_spots table<string, integer>|nil アクターごとのスポット位置マップ（nilの場合は{}として扱う）
+--- @param input_actor_spots table<string, integer>|nil アクターごとのスポット位置マップ（直接変更される）
 --- @return string さくらスクリプト文字列（\e終端）
---- @return table<string, integer> 更新後のactor_spotsマップ
 function BUILDER.build(grouped_tokens, config, input_actor_spots)
     config = config or {}
     local spot_newlines = config.spot_newlines or 1.5
     local buffer = {}
 
-    -- ビルダー内部状態（入力のシャローコピーで初期化）
-    -- 入力テーブルを変更しない（純粋関数性の保証）
-    local actor_spots = {} -- {[actor_name]: spot_id} actor位置マップ
-    if input_actor_spots then
-        for name, spot in pairs(input_actor_spots) do
-            actor_spots[name] = spot
-        end
-    end
+    -- input_actor_spots を直接変更する（nilの場合は内部で空テーブルを作成）
+    local actor_spots = input_actor_spots or {}
     local last_actor = nil -- 最後に発言したActor
     local last_spot = nil  -- 最後のスポットID
 
@@ -82,7 +76,13 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots)
 
             -- アクター切り替え検出
             if actor and last_actor ~= actor then
-                local spot = actor_spots[actor_name] or 0
+                local spot = actor_spots[actor_name]
+                if spot == nil then
+                    spot = 0
+                    if actor_name then
+                        log.warn(string.format("actor_spots fallback: '%s' -> spot=0", actor_name))
+                    end
+                end
 
                 -- spot変更時に段落区切り改行を出力
                 if last_spot ~= nil and last_spot ~= spot then
@@ -119,7 +119,7 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots)
         end
     end
 
-    return table.concat(buffer) .. "\\e", actor_spots
+    return table.concat(buffer) .. "\\e"
 end
 
 return BUILDER

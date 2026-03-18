@@ -60,6 +60,10 @@ fn run_lua_unit_tests() -> LuaResult<()> {
     let sakura_module = pasta_lua::sakura_script::register(&lua, None)?;
     loaded.set("@pasta_sakura_script", sakura_module)?;
 
+    // Register @pasta_log module (required by pasta.shiori.sakura_builder)
+    let log_table = pasta_lua::runtime::log::register(&lua)?;
+    loaded.set("@pasta_log", log_table)?;
+
     // Lua ユニットテストを実行（エントリーポイント: init.lua）
     let test_file = lua_specs_path.join("init.lua");
     println!("Running Lua tests from: {}", test_file.display());

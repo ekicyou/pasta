@@ -211,6 +211,67 @@ fn test_dynamic_and_config_actors_coexist() {
     );
 }
 
+// ============================================================================
+// co-exec-actor-init: CONFIG由来アクターの name フィールド注入テスト
+// ============================================================================
+
+/// CONFIG由来アクターに name フィールドが正しく注入されていること
+/// (co-exec-actor-init Requirement 1.1, 1.5)
+#[test]
+fn test_config_actors_have_name_field() {
+    let temp = copy_fixture_to_temp("with_actor_config");
+    let runtime = PastaLoader::load(temp.path()).unwrap();
+
+    // さくらアクターの name フィールドを確認
+    let result = runtime
+        .exec(
+            r#"
+        local STORE = require "pasta.store"
+        return STORE.actors["さくら"].name == "さくら"
+    "#,
+        )
+        .unwrap();
+    assert!(
+        result.as_boolean() == Some(true),
+        "CONFIG由来アクターに name = 'さくら' が注入されるべき"
+    );
+
+    // うにゅうアクターの name フィールドを確認
+    let result = runtime
+        .exec(
+            r#"
+        local STORE = require "pasta.store"
+        return STORE.actors["うにゅう"].name == "うにゅう"
+    "#,
+        )
+        .unwrap();
+    assert!(
+        result.as_boolean() == Some(true),
+        "CONFIG由来アクターに name = 'うにゅう' が注入されるべき"
+    );
+}
+
+/// CONFIG.actor 経由でも name が参照できること（参照共有の確認）
+/// (co-exec-actor-init Requirement 1.1)
+#[test]
+fn test_config_actor_name_via_config_module() {
+    let temp = copy_fixture_to_temp("with_actor_config");
+    let runtime = PastaLoader::load(temp.path()).unwrap();
+
+    let result = runtime
+        .exec(
+            r#"
+        local CONFIG = require "@pasta_config"
+        return CONFIG.actor["さくら"].name == "さくら"
+    "#,
+        )
+        .unwrap();
+    assert!(
+        result.as_boolean() == Some(true),
+        "CONFIG.actor 経由でも name が参照できるべき（参照共有）"
+    );
+}
+
 /// 動的追加アクターが CONFIG.actor にも反映されること（参照共有の検証）
 /// (Requirement 4.1)
 #[test]

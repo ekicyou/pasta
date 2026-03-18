@@ -11,9 +11,6 @@
 ## 実装完了処理
 ステアリング（workflow.md）を読み込んだら以下を実施。実装完了を承認します。完了フローを実施。お疲れ様でした！
 
-/kiro:spec-init
-/kiro:spec-requirements
-
 
 ## cranelift / cranelift-jit
 JITビルド可能なスクリプト言語をサポートするためのフレームワークらしい。勉強していつかluaを置き換えよう。
