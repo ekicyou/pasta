@@ -90,6 +90,7 @@ graph TB
 | Backend | Rust 2024 / mlua 0.11 | `register_config_module` でname注入 | `toml_to_lua` は変更しない |
 | Runtime | Lua 5.5 | `BUILDER.build` 簡素化 + warn ログ | `@pasta_log` 既存モジュール利用 |
 | Testing | Rust `#[test]` / insta | 既存テスト更新 + 新規テスト追加 | `config_actors_initialization_test.rs` |
+| Testing | lua_test | `sakura_builder_test.lua` 大規模更新 | 第2返却値検証テスト → 直接変更検証へ書き換え・「純粋関数性」テスト削除（後述）|
 
 ## System Flows
 
@@ -150,6 +151,10 @@ sequenceDiagram
 | module_registry.rs | Rust/Runtime | `[actor]` サブテーブルに `name` 注入 | 1.1, 1.4, 1.5 | mlua (P0) | Service |
 | sakura_builder.lua | Lua/SHIORI | インターフェース簡素化 + warn ログ | 1.1, 2.1 | @pasta_log (P1) | Service |
 | shiori/act.lua | Lua/SHIORI | 書き戻し処理削除 | 1.1 | sakura_builder (P0) | Service |
+| sakura_builder.lua (sample ghost copy) | Lua/SHIORI | `pasta_sample_ghost` 同期更新 | 1.1, 2.1 | — | Sync |
+| shiori/act.lua (sample ghost copy) | Lua/SHIORI | `pasta_sample_ghost` 同期更新 | 1.1 | — | Sync |
+
+> **注**: `crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/scripts/pasta/shiori/` に `sakura_builder.lua` と `act.lua` の独立コピーが存在する。`pasta_lua/scripts/` と同一の変更を適用する必要がある（build.rs はファイルを自動コピーしない）。
 
 ### Rust 層
 
@@ -181,7 +186,7 @@ fn inject_actor_names(lua: &Lua, config_table: &Table) -> LuaResult<()>;
 ```
 
 - **Preconditions**: `config_table` は `toml_to_lua` で正常に生成されたテーブル
-- **Postconditions**: `config_table["actor"]` 配下の各サブテーブルに `name` フィールドが設定される。既存フィールドは保持される
+- **Postconditions**: `config_table["actor"]` 配下の各サブテーブルに `name` フィールドが設定される。既存の `name` フィールドがあっても **キー名で上書きする**（TOML キーが正規のアクター名として権威的）。`name` 以外の既存フィールドは保持される
 - **Invariants**: `config_table["actor"]` が存在しない場合、またはテーブルでない場合は何もしない
 
 ### Lua 層
@@ -257,6 +262,40 @@ end
 - **Preconditions**: `self` は有効な SHIORI_ACT オブジェクト
 - **Postconditions**: `STORE.actor_spots` は `BUILDER.build` 内で直接更新される
 - **Invariants**: `token` が `nil` の場合は `nil` を返す（既存動作維持）
+
+## テスト更新計画
+
+### `sakura_builder_test.lua` — 変更の影響と対応
+
+`BUILDER.build` のインターフェース変更（直接変更方式、第2返却値削除）により、テストの大規模更新が必要。
+
+#### 削除するテスト
+
+| テスト名 | 削除理由 |
+|---------|----------|
+| `入力テーブルがclear_spotで変更されないことを確認` | 「純粋関数性」を明示検証するテスト。直接変更方式への移行により動作が逆転するため削除 |
+
+#### 書き換えるテスト（`updated_spots` → `input_spots` 直接参照）
+
+以下のテストは `local result, updated_spots = BUILDER.build(...)` パターンで第2返却値を検証している。
+直接変更方式では第2返却値が存在しないため、`updated_spots` の参照を `input_spots`（渡したテーブル自体）に変更する。
+
+| テスト名 | 変更点 |
+|---------|--------|
+| `第2戻り値としてactor_spotsテーブルが返されることを確認` | `updated_spots["さくら"]` → `input_spots["さくら"]`、第2返却値の型チェック削除 |
+| `後方互換性: actor_spots省略時も正常動作` | `type(updated_spots)` チェック削除。`nil` 入力時は内部で空テーブル生成（外部から検証不可）→ result の内容のみ検証 |
+| `clear_spotトークンで入力のactor_spotsがリセットされる` | `updated_spots` → `input_spots` に変更。クリア後 `input_spots["さくら"] == nil` を検証 |
+| `spotトークンで入力のactor_spotsが正しく更新される` | `updated_spots` → `input_spots` |
+| `入力actor_spotsの値を引き継いでスポットタグが出力される` | `updated_spots` → `input_spots` |
+| `nilを渡した場合のactor_spots動作確認` | `type(updated_spots):toBe("table")` 削除。result の `\p[0]` 含有のみ検証 |
+
+#### 追加するテスト
+
+| テスト名 | 目的 |
+|---------|------|
+| `直接変更: clear_spotで入力テーブルのエントリがクリアされる` | 直接変更方式の確認（旧「純粋関数性」テストの逆） |
+
+---
 
 ## Data Models
 
