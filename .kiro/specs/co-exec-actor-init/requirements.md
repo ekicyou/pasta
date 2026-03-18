@@ -31,7 +31,7 @@ Pasta DSL の `％`（アクター宣言）行を持たないシーンが、直�
 
 **設計原則**: 全トークは最終的に `BUILDER.build()` を経由してさくらスクリプトに変換される。この関数に適切なスコープ情報（`actor_spots`）を注入し、変更されたスコープ情報を外部で正しく維持する設計は既に機能している。
 
-**真の問題**: CONFIG由来アクター（`STORE.actors["さくら"]` = `{spot=0}`）に `name` フィールドが欠落している。`BUILDER.build()` 内部で `actor_name = actor.name` → `nil` となり、`actor_spots[nil]` で正しいスポット値を参照できない。スコープフロー自体は正常であり、データの整合性（`actor.name` の正規化）を修正すれば解決する。
+**真の問題**: Rust 側の `register_config_module`（`module_registry.rs`）が `[actor]` セクション配下のサブテーブルを TOML → Lua 変換する際、テーブルのキー名（アクター名）を値テーブル内の `name` フィールドとして注入していない。そのため CONFIG由来アクター（`STORE.actors["さくら"]` = `{spot=0}`）に `name` フィールドが欠落し、`BUILDER.build()` 内部で `actor_name = actor.name` → `nil` となって、`actor_spots[nil]` で正しいスポット値を参照できない。データ提供側（Rust）で修正する（ディスカッションで合意済み）。
 
 ## Requirements
 
