@@ -879,9 +879,9 @@ describe("SAKURA_BUILDER - sakura_scriptトークン処理", function()
                 type = "actor",
                 actor = actors.sakura,
                 tokens = {
-                    { type = "talk", actor = actors.sakura, text = "Hello" },
+                    { type = "talk",          actor = actors.sakura, text = "Hello" },
                     { type = "sakura_script", actor = actors.sakura, text = "\\w9" },
-                    { type = "talk", actor = actors.sakura, text = "World" },
+                    { type = "talk",          actor = actors.sakura, text = "World" },
                 }
             },
         }
