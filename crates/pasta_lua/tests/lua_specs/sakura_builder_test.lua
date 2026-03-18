@@ -844,3 +844,69 @@ describe("SAKURA_BUILDER - persist-spot-position: spotトークン処理 (Task 5
         expect(input_spots["うにゅう"]):toBe(1)
     end)
 end)
+
+-- ============================================================================
+-- act-sakura-script-method: sakura_scriptトークン処理 (Task 4.3)
+-- ============================================================================
+
+describe("SAKURA_BUILDER - sakura_scriptトークン処理", function()
+    test("sakura_scriptトークンがtalk_to_scriptで変換される", function()
+        local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
+
+        local tokens = {
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "sakura_script", actor = actors.sakura, text = "\\n" },
+                }
+            },
+        }
+        local result = BUILDER.build(tokens, {})
+
+        -- さくらスクリプトタグがそのまま出力に含まれる
+        expect(result:find("\\n")):toBeTruthy()
+        expect(result:sub(-2)):toBe("\\e")
+    end)
+
+    test("talk + sakura_script混合がそれぞれ処理される", function()
+        local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
+
+        local tokens = {
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk", actor = actors.sakura, text = "Hello" },
+                    { type = "sakura_script", actor = actors.sakura, text = "\\w9" },
+                    { type = "talk", actor = actors.sakura, text = "World" },
+                }
+            },
+        }
+        local result = BUILDER.build(tokens, {})
+
+        expect(result:find("Hello")):toBeTruthy()
+        expect(result:find("\\w9")):toBeTruthy()
+        expect(result:find("World")):toBeTruthy()
+    end)
+
+    test("raw_scriptトークンの既存動作が変化していない", function()
+        local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
+
+        local tokens = {
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "raw_script", text = "\\![open,notepad]" },
+                }
+            },
+        }
+        local result = BUILDER.build(tokens, {})
+
+        expect(result:find("\\!%[open,notepad%]")):toBeTruthy()
+    end)
+end)

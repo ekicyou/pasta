@@ -186,9 +186,9 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                 ))?;
             }
             Action::SakuraScript { script, .. } => {
-                // SakuraScript is output as act:sakura_script()
+                // SakuraScript is output as act.{actor}:sakura_script()
                 let literal = StringLiteralizer::literalize(script)?;
-                self.writeln(&format!("act:sakura_script({})", literal))?;
+                self.writeln(&format!("act.{}:sakura_script({})", actor, literal))?;
             }
             Action::Escape {
                 sequence: escape, ..

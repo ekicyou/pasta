@@ -369,3 +369,89 @@ describe("ACT.build() - 複合シナリオ", function()
         expect(result2):toBe(nil)
     end)
 end)
+
+-- ============================================================================
+-- sakura_script グループ化テスト (act-sakura-script-method)
+-- ============================================================================
+
+describe("ACT.build() - sakura_script grouping", function()
+    test("sakura_script単体でアクターグループを開始する", function()
+        local ACT = require("pasta.act")
+        local actors = create_mock_actors()
+        local sakura = actors["さくら"]
+        local act = ACT.new(actors)
+
+        act:sakura_script(sakura, "\\n")
+        local result = act:build()
+
+        expect(#result):toBe(1)
+        expect(result[1].type):toBe("actor")
+        expect(result[1].actor):toBe(sakura)
+        expect(#result[1].tokens):toBe(1)
+        expect(result[1].tokens[1].type):toBe("sakura_script")
+        expect(result[1].tokens[1].text):toBe("\\n")
+    end)
+
+    test("talk + sakura_script混合配列が正しくグループ化される", function()
+        local ACT = require("pasta.act")
+        local actors = create_mock_actors()
+        local sakura = actors["さくら"]
+        local act = ACT.new(actors)
+
+        act:talk(sakura, "こんにちは")
+        act:sakura_script(sakura, "\\n")
+        act:talk(sakura, "お元気ですか")
+        local result = act:build()
+
+        expect(#result):toBe(1)
+        expect(result[1].type):toBe("actor")
+        expect(result[1].actor):toBe(sakura)
+        -- talk + sakura_script + talk = 3トークン（sakura_scriptがtalkの統合を分断）
+        expect(#result[1].tokens):toBe(3)
+        expect(result[1].tokens[1].type):toBe("talk")
+        expect(result[1].tokens[1].text):toBe("こんにちは")
+        expect(result[1].tokens[2].type):toBe("sakura_script")
+        expect(result[1].tokens[2].text):toBe("\\n")
+        expect(result[1].tokens[3].type):toBe("talk")
+        expect(result[1].tokens[3].text):toBe("お元気ですか")
+    end)
+
+    test("sakura_scriptによるアクター切り替えが検出される", function()
+        local ACT = require("pasta.act")
+        local actors = create_mock_actors()
+        local sakura = actors["さくら"]
+        local kero = actors["うにゅう"]
+        local act = ACT.new(actors)
+
+        act:talk(sakura, "さくらの話")
+        act:sakura_script(kero, "\\w9")
+        local result = act:build()
+
+        expect(#result):toBe(2)
+        expect(result[1].type):toBe("actor")
+        expect(result[1].actor):toBe(sakura)
+        expect(result[2].type):toBe("actor")
+        expect(result[2].actor):toBe(kero)
+        expect(result[2].tokens[1].type):toBe("sakura_script")
+    end)
+
+    test("merge_consecutive_talksでsakura_scriptはtalkと統合されない", function()
+        local ACT = require("pasta.act")
+        local actors = create_mock_actors()
+        local sakura = actors["さくら"]
+        local act = ACT.new(actors)
+
+        act:talk(sakura, "前半")
+        act:sakura_script(sakura, "\\n")
+        act:talk(sakura, "後半")
+        local result = act:build()
+
+        -- sakura_scriptは非talkなので統合されず分離トークンとして扱われる
+        expect(#result[1].tokens):toBe(3)
+        expect(result[1].tokens[1].type):toBe("talk")
+        expect(result[1].tokens[1].text):toBe("前半")
+        expect(result[1].tokens[2].type):toBe("sakura_script")
+        expect(result[1].tokens[3].type):toBe("talk")
+        expect(result[1].tokens[3].text):toBe("後半")
+    end)
+end)

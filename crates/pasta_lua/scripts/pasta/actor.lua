@@ -109,6 +109,14 @@ function PROXY_IMPL.talk(self, text)
     self.act:talk(self.actor, text)
 end
 
+--- sakura_script（act経由でトークン蓄積）
+--- @param self ActorProxy プロキシオブジェクト
+--- @param text string さくらスクリプトタグ文字列
+--- @return nil
+function PROXY_IMPL.sakura_script(self, text)
+    self.act:sakura_script(self.actor, text)
+end
+
 -------------------------------------------
 -- PROXY_IMPL:word 3レベルフォールバック検索
 -------------------------------------------

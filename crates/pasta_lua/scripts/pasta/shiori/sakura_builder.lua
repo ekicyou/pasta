@@ -101,6 +101,8 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots)
 
                 if inner_type == "talk" then
                     table.insert(buffer, SAKURA_SCRIPT.talk_to_script(actor, inner.text))
+                elseif inner_type == "sakura_script" then
+                    table.insert(buffer, SAKURA_SCRIPT.talk_to_script(actor, inner.text))
                 elseif inner_type == "surface" then
                     table.insert(buffer, string.format("\\s[%s]", tostring(inner.id)))
                 elseif inner_type == "wait" then

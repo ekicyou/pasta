@@ -154,3 +154,19 @@ fn test_tail_call_optimization_snapshot() {
     let lua_code = transpile(&source);
     assert_snapshot!("tail_call_optimization", lua_code);
 }
+
+// ============================================================================
+// SakuraScript Action Snapshots
+// ============================================================================
+
+/// SakuraScript action with actor binding snapshot
+#[test]
+fn test_sakura_script_action_snapshot() {
+    let source = r#"
+＊メイン
+  さくら：「こんにちは」\n「お元気ですか」
+"#;
+
+    let lua_code = transpile(source);
+    assert_snapshot!("sakura_script_action", lua_code);
+}

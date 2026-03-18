@@ -30,7 +30,7 @@ local function group_by_actor(tokens)
         -- アクター属性設定トークン: 独立して出力
         if t == "spot" or t == "clear_spot" then
             table.insert(result, token)
-        elseif t == "talk" then
+        elseif t == "talk" or t == "sakura_script" then
             local talk_actor = token.actor
             -- アクター変更検出（最初のtalkまたはアクター変更時）
             if current_actor_token == nil or talk_actor ~= current_actor then
@@ -178,6 +178,16 @@ end
 --- @return Act self メソッドチェーン用
 function ACT_IMPL.talk(self, actor, text)
     table.insert(self.token, { type = "talk", actor = actor, text = text })
+    return self
+end
+
+--- sakura_scriptトークン蓄積
+--- @param self Act アクションオブジェクト
+--- @param actor Actor アクターオブジェクト
+--- @param text string さくらスクリプトタグ文字列
+--- @return Act self メソッドチェーン用
+function ACT_IMPL.sakura_script(self, actor, text)
+    table.insert(self.token, { type = "sakura_script", actor = actor, text = text })
     return self
 end
 
