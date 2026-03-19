@@ -109,7 +109,9 @@ fn parse_fn_name(fn_name: &str) -> (String, String) {
 | Req 1-3: `parse_fn_name` 修正 | `__` 再ラッピングの削除 | **条件分岐修正** |
 | Req 2: ローカルシーン検索正常化 | 上記修正で自動的に解決 | なし |
 | Req 3: 互換性 | 既存テスト + スナップショット更新 | スナップショット更新が必要 |
-| Req 4: 統合テスト | finalize経路テスト追加 | **新規テスト作成** |
+| Req 4-1: E2Eインテグレーションテスト | DSL→トランスパイル→Lua実行→call解決の一気通貫テスト | **新規テスト作成** |
+| Req 4-2: finalize経路テスト | `register_global_raw` 経由の検索テスト | **新規テスト作成** |
+| Req 4-3: ラウンドトリップテスト | `collect_scenes` → `build_scene_registry` → `SceneTable` | **新規テスト作成** |
 
 ## 3. 実装アプローチ
 

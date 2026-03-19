@@ -65,11 +65,12 @@ Pasta DSLの `・`（ローカルシーン）記法で定義されたシーン�
 3. The pasta.dll shall `act:call` の Level 3〜4（`GLOBAL` テーブル参照、actメソッドフォールバック）の既存動作を変更しない。
 4. The pasta.dll shall 名前付きLuaシーン関数（`function SCENE.xxx(act)` 形式）の解決動作を変更しない。
 
-### Requirement 4: finalize経路の統合テスト
+### Requirement 4: ローカルシーンcallの統合テスト
 
-**Objective:** 今回の根本原因であるテストギャップ（finalize経路のテスト欠落）を埋め、再発を防止したい。
+**Objective:** 今回の根本原因であるテストギャップ（ローカルシーンcallのエンドツーエンドテスト欠落）を埋め、再発を防止したい。ローカルコールのインテグレーションテストが無かったからこそ本件を見過ごした。
 
 #### Acceptance Criteria
 
-1. The テストスイート shall `register_global_raw` 経由で登録されたローカルシーンの前方一致検索が正しく動作することを検証するテストを含む。
-2. The テストスイート shall finalize経路（`collect_scenes` → `build_scene_registry` → `SceneTable`）のラウンドトリップを検証するテストを含む。
+1. The テストスイート shall DSLで定義したローカルシーンをトランスパイルし、生成されたLuaコードを実行して `act:call` でローカルシーンが正しく解決・実行されることを検証するエンドツーエンドのインテグレーションテストを含む。
+2. The テストスイート shall `register_global_raw` 経由で登録されたローカルシーンの前方一致検索が正しく動作することを検証するテストを含む。
+3. The テストスイート shall finalize経路（`collect_scenes` → `build_scene_registry` → `SceneTable`）のラウンドトリップを検証するテストを含む。
