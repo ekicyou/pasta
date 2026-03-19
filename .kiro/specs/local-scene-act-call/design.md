@@ -196,6 +196,9 @@ sequenceDiagram
 
 **Implementation Notes**
 - 変更箇所: else節の `format!("__{}__", local_part)` → `local_part.to_string()`
+- インラインコメント更新: `// Convert "選択肢_1" to "__選択肢_1__"` を削除または `// Return local_part as-is (already in Lua function name format)` に変更
+- docstring更新（`parse_fn_name` の Returns） : `("メイン_1", "__選択肢_1__")` → `("メイン_1", "選択肢_1")`
+- docstring更新（`search_scene` の Note）: `"__選択肢_1__" or "__start__"` → `"選択肢_1" or "__start__"`
 
 ### Test Layer
 
