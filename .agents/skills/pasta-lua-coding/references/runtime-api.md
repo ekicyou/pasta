@@ -401,6 +401,125 @@ end
 
 ---
 
+## @pasta_log
+
+Luaからのログ出力をRust tracingインフラにブリッジするモジュール。呼び出し元のLuaファイル名・行番号・関数名を自動キャプチャして構造化ログイベントとして出力する。
+
+```lua
+local log = require "@pasta_log"
+```
+
+**モジュールメタデータ**: `_VERSION = "0.1.0"`, `_DESCRIPTION = "Lua logging bridge to Rust tracing"`
+
+> **常時利用可能**: `RuntimeConfig.libs` の設定に関わらず、常にロードされる。
+
+### trace(value)
+
+TRACEレベルでログを出力する。
+
+```lua
+log.trace(value) -> nil
+```
+
+| パラメータ | 型 | 必須 | 説明 |
+|-----------|---|------|------|
+| `value` | any | ❌ | ログメッセージ（省略時・nil時は空文字列） |
+
+### debug(value)
+
+DEBUGレベルでログを出力する。
+
+```lua
+log.debug(value) -> nil
+```
+
+| パラメータ | 型 | 必須 | 説明 |
+|-----------|---|------|------|
+| `value` | any | ❌ | ログメッセージ |
+
+### info(value)
+
+INFOレベルでログを出力する。
+
+```lua
+log.info(value) -> nil
+```
+
+| パラメータ | 型 | 必須 | 説明 |
+|-----------|---|------|------|
+| `value` | any | ❌ | ログメッセージ |
+
+### warn(value)
+
+WARNレベルでログを出力する。
+
+```lua
+log.warn(value) -> nil
+```
+
+| パラメータ | 型 | 必須 | 説明 |
+|-----------|---|------|------|
+| `value` | any | ❌ | ログメッセージ |
+
+### error(value)
+
+ERRORレベルでログを出力する。
+
+```lua
+log.error(value) -> nil
+```
+
+| パラメータ | 型 | 必須 | 説明 |
+|-----------|---|------|------|
+| `value` | any | ❌ | ログメッセージ |
+
+### 値の変換規則
+
+各関数は任意のLua値を受け取り、以下の優先順で文字列に変換する：
+
+| Lua型 | 変換方法 |
+|-------|---------|
+| `string` | そのまま出力 |
+| `integer`, `number`, `boolean` | `tostring()` 相当 |
+| `table` | JSON変換（要素数≤1000、ネスト深さ≤10の場合）。制限超過時は `tostring()` フォールバック |
+| `nil`（または引数なし） | 空文字列 `""` |
+| `function`, `userdata`, `thread` 等 | `tostring()` フォールバック |
+
+変換失敗時は `"<unconvertible value>"` を出力する。**エラーやpanicは発生しない**。
+
+### 構造化ログフィールド
+
+各ログイベントには以下の構造化フィールドが自動付与される：
+
+| フィールド | 説明 | 例 |
+|-----------|------|-----|
+| `lua_source` | 呼び出し元ソースファイル | `"@main.lua"`, `"@scripts/touch_detect.lua"` |
+| `lua_line` | 呼び出し元行番号 | `42` |
+| `lua_fn` | 呼び出し元関数名 | `"on_boot"`, `""` (トップレベル時) |
+
+### 使用例
+
+```lua
+local log = require "@pasta_log"
+
+-- 基本的なログ出力
+log.info("ゴースト起動完了")
+log.debug("変数の値を確認: " .. tostring(some_var))
+log.warn("非推奨APIが使用されています")
+log.error("設定ファイルの読み込みに失敗")
+
+-- 任意の型をそのままログ出力可能
+log.info({player = "ユーザー", score = 100})  -- JSON: {"player":"ユーザー","score":100}
+log.debug(42)                                  -- "42"
+log.trace(nil)                                 -- "" (空文字列)
+log.warn(true)                                 -- "true"
+
+-- Lua callstack情報は自動キャプチャされる
+-- 出力例: INFO pasta_lua::runtime::log: ゴースト起動完了 lua_source="@main.lua" lua_line=15 lua_fn="on_boot"
+```
+
+---
+
 ## mlua-stdlib 統合モジュール
 
 pasta_luaは [mlua-stdlib](https://github.com/khvzak/mlua-stdlib) を統合しており、追加のユーティリティモジュールが利用可能。

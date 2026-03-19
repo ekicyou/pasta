@@ -100,31 +100,6 @@ function SCENE.func_name(act)
 end
 ```
 
-### ロギング基本形
-
-```lua
--- @pasta_log: Luaからロギングを出力（Rust tracing基盤にブリッジ）
-local log = require "@pasta_log"
-
-log.trace("デバッグ用の詳細トレース")
-log.debug("開発時デバッグ情報")
-log.info("通常の情報ログ")
-log.warn("警告メッセージ")
-log.error("エラー発生")
-
--- 任意のLua値をロギング可能
-log.info({key = "value", count = 42})  -- テーブルはJSON変換
-log.debug(save.score)                   -- 数値
-log.warn(nil)                           -- 空文字列として出力
-
--- 呼び出し元情報（ファイル名、行番号、関数名）は自動キャプチャされる
-```
-
-**注意**：
-- テーブルは要素数≤1000、ネスト深さ≤10の範囲でJSON変換される
-- 制限を超える場合や変換不可能なテーブルは`tostring()`でフォールバック
-- Function/UserData/Threadなども`tostring()`で自動変換される
-
 ---
 
 ## §3 Coding Conventions
@@ -137,7 +112,7 @@ log.warn(nil)                           -- 空文字列として出力
 
 ## §4 Runtime API
 
-Rust組み込みモジュールの完全APIリファレンス。`@pasta_search`（シーン・単語検索、フォールバック戦略）、`@pasta_persistence`（セーブデータ永続化）、`@pasta_config`（`pcall`必須）、`@pasta_sakura_script`（ウェイトタグ変換）、`@enc`（UTF-8⇔ANSI）。mlua-stdlib（`@json`, `@yaml`, `@regex`等）も含む。
+Rust組み込みモジュールの完全APIリファレンス。`@pasta_search`（シーン・単語検索、フォールバック戦略）、`@pasta_persistence`（セーブデータ永続化）、`@pasta_config`（`pcall`必須）、`@pasta_sakura_script`（ウェイトタグ変換）、`@enc`（UTF-8⇔ANSI）、`@pasta_log`（ロギング、trace/debug/info/warn/error）。mlua-stdlib（`@json`, `@yaml`, `@regex`等）も含む。
 
 > 📖 詳細: [references/runtime-api.md](references/runtime-api.md)
 
