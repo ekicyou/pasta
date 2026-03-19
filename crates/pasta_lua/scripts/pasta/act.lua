@@ -7,6 +7,7 @@
 local ACTOR = require("pasta.actor")
 local SCENE = require("pasta.scene")
 local GLOBAL = require("pasta.global")
+local log = require "@pasta_log"
 
 -- ============================================================================
 -- グループ化ローカル関数（actor-talk-grouping feature）
@@ -374,7 +375,8 @@ function ACT_IMPL.call(self, global_scene_name, key, attrs, ...)
         return handler(self, ...)
     end
 
-    -- TODO: ハンドラー未発見時のログ出力（将来実装）
+    log.error(string.format("act:call - handler not found: key='%s', scene='%s'",
+        tostring(key), tostring(global_scene_name)))
     return nil
 end
 
