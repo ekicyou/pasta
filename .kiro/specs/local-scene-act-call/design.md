@@ -224,7 +224,9 @@ sequenceDiagram
   1. 単純なローカルシーンcall（`＞SubScene` → `SubScene_1` 関数実行）
   2. 同名重複ローカルシーン（ランダム選択の動作確認）
   3. 前方一致ローカルシーン検索（`"Head"` で `Head0_1`、`Head1_1` をマッチ）
-- テスト配置: `crates/pasta_lua/tests/runtime/` に追加（finalize_scene_test.rs の拡張、または新規ファイル）
+- テスト配置: **新規 `crates/pasta_lua/tests/runtime/local_scene_call_test.rs`** として作成する
+  - `finalize_scene_test.rs` は既に464行・13KBあるため、E2E責務は別ファイルに分離する
+  - `main.rs` に `mod local_scene_call_test;` を追加すること
 - 検証方法: `act:call` の戻り値またはLuaグローバル変数への副作用で関数実行を確認
 
 #### FinalizeTest（finalize経路統合テスト）
