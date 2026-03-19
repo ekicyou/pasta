@@ -7,7 +7,8 @@ description: >-
   USE FOR: pasta lua, pasta_lua, Lua API, Luaスクリプト, scripts/,
   単語辞書一括投入, WORD.create, イベントハンドラ, REG, RES,
   永続化, @pasta_persistence, save, @pasta_search,
-  @pasta_config, @pasta_sakura_script, @enc,
+  @pasta_config, @pasta_sakura_script, @enc, @pasta_log,
+  ロギング, logging, log, trace, debug, info, warn, error,
   ACT, SCENE, STORE, GLOBAL, SAVE, lua_test, luacheck,
   pasta lua coding, pasta runtime API.
   DO NOT USE FOR: Pasta DSL文法, .pastaファイル編集,
@@ -62,6 +63,7 @@ metadata:
 | `@pasta_sakura_script` | さくらスクリプト変換 | `require` 直接 |
 | `@enc` | UTF-8 ⇔ ANSI変換 | `require` 直接 |
 | `@pasta_config` | pasta.toml設定読み取り | `pcall(require, ...)` 保護必須 |
+| `@pasta_log` | ロギング（trace/debug/info/warn/error） | `require` 直接 |
 
 ### 内部Luaモジュール（pasta.*名前空間）
 
@@ -97,6 +99,31 @@ function SCENE.func_name(act)
     act:yield()                               -- トークンをyield
 end
 ```
+
+### ロギング基本形
+
+```lua
+-- @pasta_log: Luaからロギングを出力（Rust tracing基盤にブリッジ）
+local log = require "@pasta_log"
+
+log.trace("デバッグ用の詳細トレース")
+log.debug("開発時デバッグ情報")
+log.info("通常の情報ログ")
+log.warn("警告メッセージ")
+log.error("エラー発生")
+
+-- 任意のLua値をロギング可能
+log.info({key = "value", count = 42})  -- テーブルはJSON変換
+log.debug(save.score)                   -- 数値
+log.warn(nil)                           -- 空文字列として出力
+
+-- 呼び出し元情報（ファイル名、行番号、関数名）は自動キャプチャされる
+```
+
+**注意**：
+- テーブルは要素数≤1000、ネスト深さ≤10の範囲でJSON変換される
+- 制限を超える場合や変換不可能なテーブルは`tostring()`でフォールバック
+- Function/UserData/Threadなども`tostring()`で自動変換される
 
 ---
 
