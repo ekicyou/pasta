@@ -2,9 +2,9 @@
 
 ## 分析サマリー
 
-- **スコープ**: `act:call()` を「名前解決フェーズ」と「実行フェーズ」に分解し、`SCENE.co_exec()` が名前解決フェーズ（`act:resolve()`）を共有するリファクタリング
-- **影響範囲**: `act.lua`（resolve抽出）+ `scene.lua`（co_execの解決ロジック変更）+ `pasta/shiori/event/` 配下 Lua 3ファイル
-- **主要課題**: → **解決済み**: `act:call()` = resolve + 即時実行、`SCENE.co_exec()` = resolve + コルーチン化という2フェーズ分解により、インターフェース差異の問題を解消
+- **スコープ**: `act:call()` を「名前解決フェーズ」と「実行フェーズ」に分解し、`SCENE.co_exec()` が名前解決フェーズ（`act:find_scene()`）を共有するリファクタリング
+- **影響範囲**: `act.lua`（find_scene抽出）+ `scene.lua`（co_execの解決ロジック変更）+ `pasta/shiori/event/` 配下 Lua 3ファイル
+- **主要課題**: → **解決済み**: `act:call()` = `act:find_scene()` + 即時実行、`SCENE.co_exec()` = `act:find_scene()` + コルーチン化という2フェーズ分解により、インターフェース差異の問題を解消
 - **工数見積り**: **S（1〜3日）** — 変更対象ファイル数が少なく、既存パターンの再構成
 - **リスク**: **Medium** — コルーチン管理との統合に注意が必要だが、既存テストカバレッジが厚い（130+テスト）
 
@@ -56,7 +56,7 @@ end
 | L4 | `self[key]` (act メソッド) | ❌ 存在しない |
 | L5 | `SCENE.search(key, nil)` (スコープなし検索) | ❌ 存在しない |
 
-**注**: EVENT dispatch のコンテキスト（L1 シーンローカルなし、L4 act メソッド意味なし）を考慮すると、実効的に必要なのは L2, L3, L5 のフォールバック。ただし `act:resolve()` として名前解決ロジックを抽出し共有する設計原則により、Level 選択の判断は不要。
+**注**: EVENT dispatch のコンテキスト（L1 シーンローカルなし、L4 act メソッド意味なし）を考慮すると、実効的に必要なのは L2, L3, L5 のフォールバック。ただし `act:find_scene()` として名前解決ロジックを抽出し共有する設計原則により、Level 選択の判断は不要。
 
 ---
 
@@ -71,7 +71,7 @@ end
 | **resume_until_valid** | 関係なし | EVENT.fire() が返却コルーチンを resume |
 | **STORE.co_scene** | 関係なし | チェイントーク継続管理 |
 
-**設計上の核心課題 → 解決済み**: `act:call()` は resolve + 即時実行、`SCENE.co_exec()` は resolve + コルーチン化とい2フェーズに分解することで、名前解決ロジック（`act:resolve()`）を共有しつつ実行方式の差異を吸収する。
+**設計上の核心課題 → 解決済み**: `act:call()` は `act:find_scene()` + 即時実行、`SCENE.co_exec()` は `act:find_scene()` + コルーチン化とい2フェーズに分解することで、名前解決ロジックを共有しつつ実行方式の差異を吸収する。
 
 ### transfer_date_to_var の特殊処理
 
@@ -108,20 +108,20 @@ OnHour 発火前に日時情報を act.var に転記する処理。`act:call()` 
 
 ## 5. 実装アプローチ選択肢
 
-### Option A: act:call() を2フェーズに分解（resolve + execute）— 採用決定
+### Option A: act:call() を2フェーズに分解（find_scene + execute）— 採用決定
 
-**概要**: `act:call()` から名前解決ロジックを `act:resolve()` として抽出する。`act:call()` は `act:resolve()` + 即時実行、`SCENE.co_exec()` は `act:resolve()` + コルーチン化という構成になる。
+**概要**: `act:call()` から名前解決ロジックを `act:find_scene()` として抽出する。`act:call()` は `act:find_scene()` + 即時実行、`SCENE.co_exec()` は `act:find_scene()` + コルーチン化という構成になる。
 
 **変更対象**:
-- `act.lua`: `ACT_IMPL.resolve()` 新規抽出（既存 call() の5段フォールバック部分）、`ACT_IMPL.call()` を resolve + execute に再構成
-- `scene.lua`: `SCENE.co_exec()` が `SCENE.search()` の代わりに `act:resolve()` を使用
+- `act.lua`: `ACT_IMPL.find_scene()` 新規抽出（既存 call() の5段フォールバック部分）、`ACT_IMPL.call()` を find_scene + execute に再構成
+- `scene.lua`: `SCENE.co_exec()` が `SCENE.search()` の代わりに `act:find_scene()` を使用
 - `event/init.lua`, `event/virtual_dispatcher.lua`, `event/boot.lua`: 変更不要（SCENE.co_exec 経由で自動的に恩恵を受ける）
 
 **トレードオフ**:
 - ✅ 名前解決コードパスの完全な1本化
 - ✅ `act:call()` の既存インターフェースを変更しない（内部分解のみ）
-- ✅ EVENT dispatch 側の3ファイルは変更不要（SCENE.co_exec が内部で resolve を使うだけ）
-- ✅ コルーチン化の橋渡し問題が消滅（resolve は関数を返すだけで実行しない）
+- ✅ EVENT dispatch 側の3ファイルは変更不要（SCENE.co_exec が内部で find_scene を使うだけ）
+- ✅ コルーチン化の橋渡し問題が消滅（find_scene は関数を返すだけで実行しない）
 
 ### Option B（不採用）: EVENT.no_entry 内で act:call() を呼び、結果をコルーチン化
 
@@ -156,18 +156,18 @@ OnHour 発火前に日時情報を act.var に転記する処理。`act:call()` 
 
 **理由**:
 1. 「名前解決コードパスは1つだけ」の原則に完全適合
-2. コルーチン化の橋渡し問題が消滅（resolve は関数を返すだけで実行しない）
+2. コルーチン化の橋渡し問題が消滅（find_scene は関数を返すだけで実行しない）
 3. 既存の act:call() の外部インターフェースを変更しない（内部分解のみ）
-4. EVENT dispatch 側の3ファイルは変更不要（SCENE.co_exec が内部で resolve を使う）
+4. EVENT dispatch 側の3ファイルは変更不要（SCENE.co_exec が内部で find_scene を使う）
 5. 既存テスト（130+）への影響が最小
 
 ### 設計フェーズへの持ち越し事項
 
-1. **~~act:call() 即時実行 → コルーチン化の橋渡し方法~~** — ✅ 2フェーズ分解により解決済み。resolve は関数を返すだけなのでコルーチン化の問題は発生しない
-2. **act:resolve() のコンテキスト設定** — EVENT dispatch では `global_scene_name` / `key` の振り分けをどうするか
-3. **transfer_date_to_var の呼び出しタイミング** — resolve 前に実行する現行の前処理フローの維持
-4. **チェイントーク (yield) との統合** — SCENE.co_exec() が resolve 結果をコルーチン化するので、既存 yield 動作は維持されるはず（要検証）
-5. **~~REG.OnBoot のデフォルト実装~~** — ✅ 2フェーズ分解により解決済み。REG.OnBoot は SCENE.co_exec() を使うが、その co_exec が act:resolve() を使うためGLOBAL含む全解決空間が自動的にカバーされる
+1. **~~act:call() 即時実行 → コルーチン化の橋渡し方法~~** — ✅ 2フェーズ分解により解決済み。find_scene は関数を返すだけなのでコルーチン化の問題は発生しない
+2. **`act:find_scene()` のコンテキスト設定** — EVENT dispatch では `global_scene_name` / `key` の振り分けをどうするか
+3. **transfer_date_to_var の呼び出しタイミング** — find_scene 前に実行する現行の前処理フローの維持
+4. **チェイントーク (yield) との統合** — SCENE.co_exec() が find_scene 結果をコルーチン化するので、既存 yield 動作は維持されるはず（要検証）
+5. **~~REG.OnBoot のデフォルト実装~~** — ✅ 2フェーズ分解により解決済み。REG.OnBoot は SCENE.co_exec() を使うが、その co_exec が `act:find_scene()` を使うためGLOBAL含む全解決空間が自動的にカバーされる
 
 ---
 
