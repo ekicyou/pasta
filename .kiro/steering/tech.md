@@ -179,3 +179,51 @@ cargo test -p pasta_lua     # pasta_luaテスト
   - **WASMビルド**: `pasta_lsp` を `wasm32-unknown-unknown` ターゲットでビルド（10MBサイズ上限チェック付き）
   - Rust キャッシュ: `Swatinem/rust-cache@v2`
   - アーティファクト: `pasta-dll-x86`, `pasta-dll-x64`（7日間保持）
+
+## Luaランタイムパターン
+
+### scripts/ 優先順位
+- `scripts/`（ゴーストカスタム）> `pasta_scripts/`（エンジン同梱）
+- `scripts/main.lua` がエントリーポイント。同名ファイルでエンジン動作を上書き可能
+
+### DSL vs Lua 判断基準
+
+| ケース | 推奨 |
+|--------|------|
+| 数個の単語定義 | DSL（`＠単語：値1、値2`） |
+| 数十〜数百件の単語一括投入 | Lua（`WORD.create_*`）|
+| 基本的なシーン定義 | DSL（`＊シーン名`） |
+| 条件分岐を含む複雑なロジック | Lua（シーン関数） |
+| カスタムSHIORIイベント処理 | Lua（REGテーブル） |
+
+### Rust組み込みモジュール
+
+| モジュール | 用途 | 注意 |
+|-----------|------|------|
+| `@pasta_search` | シーン・単語検索 | |
+| `@pasta_persistence` | セーブデータ永続化 | |
+| `@pasta_config` | pasta.toml設定読み取り | **`pcall` 必須** |
+| `@pasta_sakura_script` | さくらスクリプト変換 | |
+| `@enc` | UTF-8⇔ANSI変換 | |
+| `@pasta_log` | ロギング（trace/debug/info/warn/error） | |
+| `@env` | 環境変数アクセス | **無効**（セキュリティ上） |
+
+### シーン関数定型パターン
+
+```lua
+function SCENE.func_name(act)
+    local save, var = act:init_scene(SCENE)  -- 必須
+    act:talk(act.アクター名.actor, "セリフ")
+    act:yield()
+end
+```
+
+### SHIORIハンドラ登録パターン
+
+```lua
+REG.OnBoot = function(req)
+    return RES.ok("value0")
+end
+```
+
+詳細: `.agents/skills/pasta-lua-coding/SKILL.md`
