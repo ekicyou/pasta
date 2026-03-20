@@ -174,6 +174,26 @@ else {
         }
         Write-Host "  Copied pasta_scripts/"
     }
+
+    # Copy user scripts directory (README.md only)
+    $UserScriptsSrc = Join-Path $WorkspaceRoot "crates\pasta_lua\scripts"
+    $UserScriptsDest = Join-Path $MasterDir "scripts"
+
+    if (Test-Path $UserScriptsSrc) {
+        $robocopyScriptsArgs = @(
+            $UserScriptsSrc,
+            $UserScriptsDest,
+            "/MIR",
+            "/NJH", "/NJS", "/NDL", "/NC", "/NS", "/NP"
+        )
+        & robocopy @robocopyScriptsArgs | Out-Null
+        if ($LASTEXITCODE -ge 8) {
+            Write-Host ""
+            Write-Host "ERROR: robocopy failed copying scripts (exit code $LASTEXITCODE)" -ForegroundColor Red
+            exit 1
+        }
+        Write-Host "  Synced scripts/ (user layer)"
+    }
     Write-Host ""
 
     # --- Step 5: Finalize (generate updates2.dau and updates.txt) ---

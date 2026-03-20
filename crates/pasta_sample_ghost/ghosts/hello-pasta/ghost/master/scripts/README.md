@@ -1,23 +1,8 @@
-# scripts/ - pasta_lua Lua Scripts Layer
+# User Scripts
 
-自作Luaコード・スクリプト実装層
+ゴースト開発者が自由に配置できるカスタム Lua スクリプト用のフォルダーです。
 
-## 構成
+ここに置いたファイルは `pasta_scripts/`（標準ランタイム）より優先して読み込まれます。
+同名ファイルを配置することで、標準ランタイムの動作を上書きできます。
 
-- **root**: メインスクリプト（hello.lua, init.lua等）
-- **helpers/**: ヘルパー関数ユーティリティ
-- **examples/**: 使用例・サンプルスクリプト
-
-## package.path設定
-
-```lua
-package.path = "crates/pasta_lua/scripts/?.lua;" .. package.path
-package.path = "crates/pasta_lua/scripts/?/init.lua;" .. package.path
-```
-
-## Lua require
-
-```lua
-local helpers = require("helpers.string_utils")
-local transpiler = require("transpiler")
-```
+例: `scripts/main.lua` を作成すると `pasta_scripts/main.lua` の代わりに実行されます。
