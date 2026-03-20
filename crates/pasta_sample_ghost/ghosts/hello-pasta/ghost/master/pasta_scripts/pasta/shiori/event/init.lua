@@ -142,7 +142,7 @@ end
 function EVENT.no_entry(act)
     -- シーン関数をイベント名で検索（遅延ロードで循環参照回避）
     local SCENE = require("pasta.scene")
-    return SCENE.co_exec(act.req.id, nil, nil)
+    return SCENE.co_exec(act, act.req.id, nil, nil)
 end
 
 --- イベント振り分け

@@ -72,7 +72,7 @@ local function create_scene_thread(event_name, act)
     end
 
     local SCENE = require("pasta.scene")
-    return SCENE.co_exec(event_name, nil, nil)
+    return SCENE.co_exec(act, event_name, nil, nil)
 end
 
 -- 5. 公開関数

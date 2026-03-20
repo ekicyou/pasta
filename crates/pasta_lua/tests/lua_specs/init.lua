@@ -28,6 +28,8 @@ local specs = {
     "persist_spot_position_test",        -- persist-spot-position スポット位置継続保持テスト
     "transfer_req_to_var_test",          -- transfer_req_to_var req→var展開テスト
     "act_method_fallback_test",          -- ACT_IMPL.call Level 4 actメソッドフォールバックテスト
+    "act_find_scene_test",               -- ACT_IMPL.find_scene 5段階フォールバック検索テスト
+    "global_fallback_integration_test",  -- GLOBAL フォールバック統合テスト & DSL+GLOBAL 優先順位テスト
     -- 将来のテストスイートをここに追加
     -- "code_generator_test",
     -- "context_test",

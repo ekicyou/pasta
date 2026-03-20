@@ -97,7 +97,10 @@ fn probe_ontalk_via_lua_state() {
         .load(
             r#"
         local SCENE = require("pasta.scene")
-        local thread = SCENE.co_exec("OnTalk", nil, nil)
+        local STORE = require("pasta.store")
+        local ACT = require("pasta.shiori.act")
+        local act = ACT.new(STORE.actors, { id = "OnTalk" })
+        local thread = SCENE.co_exec(act, "OnTalk", nil, nil)
         if thread then
             return string.format("THREAD: type=%s, status=%s", type(thread), coroutine.status(thread))
         else

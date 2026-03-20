@@ -89,7 +89,8 @@ fn test_event_no_entry_returns_nil_when_scene_not_found() {
     let result = runtime.exec(
         r#"
         local EVENT = require "pasta.shiori.event"
-        local act = { req = { id = "UnknownEvent", method = "get", version = 30 } }
+        local SHIORI_ACT = require "pasta.shiori.act"
+        local act = SHIORI_ACT.new({}, { id = "UnknownEvent", method = "get", version = 30 })
         local response = EVENT.no_entry(act)
         -- EVENT.no_entry now returns thread|nil, not SHIORI response
         -- When no scene is found, it returns nil

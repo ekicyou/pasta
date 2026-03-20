@@ -23,6 +23,7 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 
 **主要成果**:
 - ✅ **act-impl-call** - `ACT_IMPL.call` 4段階優先順位検索実装
+- ✅ **event-handler-call-equivalence** - `act:find_scene()` 統合名前解決（イベント/call 経路1本化）
 - ✅ **scene-search-integration** - `SCENE.search()` 動的シーン検索機能
 - ✅ **pasta-transpiler-variable-expansion** - 変数スコープ管理（Local/Global）
 - ✅ **remove-root-crate** - Pure Virtual Workspace化

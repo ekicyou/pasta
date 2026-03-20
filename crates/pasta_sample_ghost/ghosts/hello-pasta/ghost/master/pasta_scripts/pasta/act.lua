@@ -317,23 +317,22 @@ function ACT_IMPL.yield(self)
     return self
 end
 
---- シーン呼び出し（4段階検索）
+--- シーン名前解決（5段階フォールバック検索）
 ---
---- トランスパイラ出力から呼び出され、キーに対応するハンドラーを検索して実行する。
---- 5段階の優先順位に従い、最初に見つかった有効な関数を実行する。
---- Level 1: シーンローカル検索
---- Level 2: グローバルシーン名スコープ検索
---- Level 3: GLOBALテーブル
---- Level 4: actメソッドフォールバック
---- Level 5: スコープなし全体検索
+--- キーに対応するハンドラー関数を検索して返す（実行しない）。
+--- 5段階の優先順位に従い、最初に見つかった有効な関数を返す。
+--- Level 1: シーンローカル検索 (current_scene[key])
+--- Level 2: グローバルシーン名スコープ検索 (SCENE.search(key, scope))
+--- Level 3: GLOBALテーブル (GLOBAL[key])
+--- Level 4: actメソッドフォールバック (self[key])
+--- Level 5: スコープなし全体検索 (SCENE.search(key, nil))
 ---
 --- @param self Act アクションオブジェクト
---- @param global_scene_name string|nil グローバルシーン名
---- @param key string 検索キー
+--- @param key string 検索キー（シーン名/関数名）
+--- @param global_scene_name string|nil グローバルシーンスコープ（省略時 nil）
 --- @param attrs table|nil 属性テーブル（将来拡張用、現在は未使用）
---- @param ... any 可変長引数（ハンドラーに渡す）
---- @return any ハンドラーの戻り値、またはnil
-function ACT_IMPL.call(self, global_scene_name, key, attrs, ...)
+--- @return function|nil 見つかったハンドラ関数、またはnil
+function ACT_IMPL.find_scene(self, key, global_scene_name, attrs)
     local handler = nil
 
     -- Level 1: シーンローカル検索
@@ -369,6 +368,28 @@ function ACT_IMPL.call(self, global_scene_name, key, attrs, ...)
             handler = result.func
         end
     end
+
+    return handler
+end
+
+--- シーン呼び出し（5段階検索）
+---
+--- トランスパイラ出力から呼び出され、キーに対応するハンドラーを検索して実行する。
+--- 5段階の優先順位に従い、最初に見つかった有効な関数を実行する。
+--- Level 1: シーンローカル検索
+--- Level 2: グローバルシーン名スコープ検索
+--- Level 3: GLOBALテーブル
+--- Level 4: actメソッドフォールバック
+--- Level 5: スコープなし全体検索
+---
+--- @param self Act アクションオブジェクト
+--- @param global_scene_name string|nil グローバルシーン名
+--- @param key string 検索キー
+--- @param attrs table|nil 属性テーブル（将来拡張用、現在は未使用）
+--- @param ... any 可変長引数（ハンドラーに渡す）
+--- @return any ハンドラーの戻り値、またはnil
+function ACT_IMPL.call(self, global_scene_name, key, attrs, ...)
+    local handler = self:find_scene(key, global_scene_name, attrs)
 
     -- ハンドラー実行
     if handler then

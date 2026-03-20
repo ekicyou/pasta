@@ -14,10 +14,11 @@ describe("EVENT.no_entry thread return", function()
     local original_search
 
     local function setup()
-        -- Reset modules
+        -- Reset modules (pasta.act も含める: find_scene が SCENE を参照するため)
         package.loaded["pasta.shiori.event"] = nil
         package.loaded["pasta.scene"] = nil
         package.loaded["pasta.shiori.act"] = nil
+        package.loaded["pasta.act"] = nil
 
         EVENT = require("pasta.shiori.event")
         SCENE = require("pasta.scene")

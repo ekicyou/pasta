@@ -16,7 +16,7 @@ local SCENE = require "pasta.scene"
 ---@return thread|nil シーンコルーチン、またはnil
 REG.OnBoot = function(act)
     -- Try to find a Pasta DSL scene for OnBoot
-    return SCENE.co_exec(act.req.id, nil, nil)
+    return SCENE.co_exec(act, act.req.id, nil, nil)
 end
 
 return REG

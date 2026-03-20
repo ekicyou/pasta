@@ -197,9 +197,30 @@ function ACT_IMPL.word(self, name) end
 
 検索順序: アクター単語 → ローカル単語 → グローバル単語 → `@pasta_search`
 
+#### find_scene(key, scope?, attrs?)
+
+シーン名前解決（5段階フォールバック検索）。ハンドラー関数を検索して返す（実行しない）。
+
+```lua
+--- @param key string 検索キー
+--- @param scope? string グローバルシーンスコープ
+--- @param attrs? table 属性テーブル
+--- @return function|nil 見つかったハンドラ関数
+function ACT_IMPL.find_scene(self, key, scope, attrs) end
+```
+
+**検索順序**:
+1. **L1**: `current_scene[key]` — シーンローカル検索
+2. **L2**: `SCENE.search(key, scope)` — スコープ付き前方一致検索
+3. **L3**: `GLOBAL[key]` — GLOBALテーブル
+4. **L4**: `self[key]` — actメソッドフォールバック（type=="function" のみ）
+5. **L5**: `SCENE.search(key, nil)` — スコープなし全体検索
+
+> `act:call()` と `SCENE.co_exec()` の両方がこのメソッドを使用して名前解決を行う。
+
 #### call(global, key, attrs, ...)
 
-シーンまたは関数を呼び出す。
+シーンまたは関数を呼び出す。内部で `find_scene()` を使用して名前解決し、見つかったハンドラを即時実行する。
 
 ```lua
 --- @param global string グローバルシーン名
@@ -282,17 +303,20 @@ local scene = SCENE.create_scene("メイン")
 function SCENE.search(name, global_scene_name, attrs) end
 ```
 
-### co_exec(name, global_scene_name?, attrs?)
+### co_exec(act, name, global_scene_name?, attrs?)
 
-検索したシーンをコルーチンとして実行する。
+`act:find_scene()` を使用してシーンを検索し、コルーチンとして実行する。
 
 ```lua
+--- @param act Act アクションオブジェクト（find_scene による名前解決に使用）
 --- @param name string シーン名
 --- @param global_scene_name? string 親シーン名
 --- @param attrs? table 属性テーブル
---- @return any 実行結果
-function SCENE.co_exec(name, global_scene_name, attrs) end
+--- @return thread|nil シーンコルーチン、またはnil
+function SCENE.co_exec(act, name, global_scene_name, attrs) end
 ```
+
+> **Breaking Change**: 第1引数に `act` が追加された。イベントディスパッチ層からの呼び出しは `SCENE.co_exec(act, event_name, nil, nil)` とすること。
 
 ### DSL→Luaブリッジ
 
