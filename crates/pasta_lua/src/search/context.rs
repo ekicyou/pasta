@@ -165,10 +165,7 @@ impl SearchContext {
             None => Box::new(DefaultRandomSelector::new()),
         };
 
-        // Recreate scene table with new selector
-        // Note: This is a workaround since SceneTable doesn't have replace_selector
-        // In a production implementation, we'd add that method to SceneTable
-        self.scene_table = SceneTable::new(selector);
+        self.scene_table.replace_selector(selector);
         Ok(())
     }
 
@@ -182,8 +179,7 @@ impl SearchContext {
             None => Box::new(DefaultRandomSelector::new()),
         };
 
-        // Recreate word table with new selector
-        self.word_table = WordTable::new(selector);
+        self.word_table.replace_selector(selector);
         Ok(())
     }
 }

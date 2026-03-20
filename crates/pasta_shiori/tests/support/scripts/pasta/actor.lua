@@ -33,16 +33,8 @@ ActorWordBuilder.__index = ActorWordBuilder
 function ActorWordBuilder:entry(...)
     local values = { ... }
     if #values > 0 then
-        -- word.lua辞書に登録（L2前方一致用）
+        -- Rust WordTableにのみ登録（シャッフル＆順次消費はWordTableが担当）
         self._word_builder:entry(...)
-
-        -- ACTORプロパティに値を追加（L1完全一致用）
-        if not self._actor[self._key] then
-            self._actor[self._key] = {}
-        end
-        for _, v in ipairs(values) do
-            table.insert(self._actor[self._key], v)
-        end
     end
     return self
 end

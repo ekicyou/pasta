@@ -416,6 +416,14 @@ impl SceneTable {
             })?;
         Ok(scene.fn_name.clone())
     }
+
+    /// Replace the random selector and clear cached selections.
+    ///
+    /// Keeps labels and prefix_index intact — only the selector and cache are reset.
+    pub fn replace_selector(&mut self, selector: Box<dyn RandomSelector>) {
+        self.random_selector = selector;
+        self.cache.clear();
+    }
 }
 
 

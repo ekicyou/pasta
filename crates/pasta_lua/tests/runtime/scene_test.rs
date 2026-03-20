@@ -349,3 +349,156 @@ fn test_complete_flow_pasta_to_output() {
 
     assert!(prefix_found, "Should find scene with prefix '挨拶'");
 }
+
+// ============================================================================
+// Actor Word Shuffle Tests (actor-dict-word-shuffle spec)
+// ============================================================================
+
+/// Task 2.1: アクタースコープ単語のシャッフル＆順次消費をプロキシ経由で検証
+///
+/// PROXY_IMPL.word() → Level 2 (SEARCH:search_word) → WordTable のシャッフルパスが
+/// 正しく動作し、3値すべてが順次消費されることを確認する。
+/// set_word_selector() でモックセレクタを注入して決定論的に検証する。
+///
+/// Requirements: 1.1, 1.2, 1.3, 2.1, 3.1
+#[test]
+fn test_actor_word_shuffle_via_proxy() {
+    let lua = create_runtime_with_finalize().unwrap();
+
+    let source = include_str!("../fixtures/e2e/runtime_e2e_actor_word.pasta");
+    let lua_code = transpile(source);
+
+    lua.load(&lua_code).exec().unwrap();
+    lua.load("require('pasta').finalize_scene()")
+        .exec()
+        .unwrap();
+
+    // set_word_selector(0, 1, 2) で決定論的順序を注入
+    // アクター「さくら」の「通常」は 3 値: \s[0], \s[100], \s[200]
+    let results: Vec<String> = lua
+        .load(
+            r#"
+        local SEARCH = require "@pasta_search"
+        local ACTOR = require "pasta.actor"
+        local ACT = require "pasta.act"
+
+        -- モックセレクタ注入: 0番目, 1番目, 2番目の順で返す
+        SEARCH:set_word_selector(0, 1, 2)
+
+        -- ACTオブジェクトとプロキシを構築
+        local act = ACT.new()
+        local sakura = ACTOR.get_or_create("さくら")
+        local proxy = ACTOR.create_proxy(sakura, act)
+
+        local results = {}
+        for i = 1, 3 do
+            local val = proxy:word("通常")
+            results[#results + 1] = val or "NIL"
+        end
+
+        -- リセット
+        SEARCH:set_word_selector()
+        return results
+    "#,
+        )
+        .eval()
+        .unwrap();
+
+    // 3 値すべてが順次消費されることを検証
+    assert_eq!(results.len(), 3, "Should get 3 results");
+    assert_eq!(results[0], "\\s[0]", "First should be \\s[0]");
+    assert_eq!(results[1], "\\s[100]", "Second should be \\s[100]");
+    assert_eq!(results[2], "\\s[200]", "Third should be \\s[200]");
+}
+
+/// Task 2.2: アクタースコープからグローバルへのフォールバック検証
+///
+/// アクター辞書に存在しない単語がグローバル単語にフォールバックすることを確認する。
+///
+/// Requirements: 3.2
+#[test]
+fn test_actor_word_fallback_to_global() {
+    let lua = create_runtime_with_finalize().unwrap();
+
+    let source = include_str!("../fixtures/e2e/runtime_e2e_actor_word.pasta");
+    let lua_code = transpile(source);
+
+    lua.load(&lua_code).exec().unwrap();
+    lua.load("require('pasta').finalize_scene()")
+        .exec()
+        .unwrap();
+
+    // まゆらには「一人称」が定義されていないので、グローバルの「私」にフォールバック
+    let result: Option<String> = lua
+        .load(
+            r#"
+        local ACTOR = require "pasta.actor"
+        local ACT = require "pasta.act"
+
+        local act = ACT.new()
+        local mayura = ACTOR.get_or_create("まゆら")
+        local proxy = ACTOR.create_proxy(mayura, act)
+
+        return proxy:word("一人称")
+    "#,
+        )
+        .eval()
+        .unwrap();
+
+    assert_eq!(
+        result,
+        Some("私".to_string()),
+        "まゆらの一人称はグローバルの「私」にフォールバックすべき"
+    );
+}
+
+/// Task 2.3: 単一値アクター単語の後方互換性
+///
+/// アクター辞書に単一値定義された単語が常に同じ値を返すことを確認する。
+///
+/// Requirements: 1.4, 3.3
+#[test]
+fn test_actor_word_single_value_backward_compat() {
+    let lua = create_runtime_with_finalize().unwrap();
+
+    let source = include_str!("../fixtures/e2e/runtime_e2e_actor_word.pasta");
+    let lua_code = transpile(source);
+
+    lua.load(&lua_code).exec().unwrap();
+    lua.load("require('pasta').finalize_scene()")
+        .exec()
+        .unwrap();
+
+    // さくらの「照れ」は単一値 \s[1]
+    let results: Vec<String> = lua
+        .load(
+            r#"
+        local ACTOR = require "pasta.actor"
+        local ACT = require "pasta.act"
+
+        local act = ACT.new()
+        local sakura = ACTOR.get_or_create("さくら")
+        local proxy = ACTOR.create_proxy(sakura, act)
+
+        local results = {}
+        for i = 1, 3 do
+            local val = proxy:word("照れ")
+            results[#results + 1] = val or "NIL"
+        end
+        return results
+    "#,
+        )
+        .eval()
+        .unwrap();
+
+    // 3回とも同じ値
+    assert_eq!(results.len(), 3, "Should get 3 results");
+    for (i, val) in results.iter().enumerate() {
+        assert_eq!(
+            val, "\\s[1]",
+            "Call {} should return \\s[1], got {}",
+            i + 1,
+            val
+        );
+    }
+}

@@ -243,4 +243,12 @@ impl WordTable {
     pub fn clear_cache(&mut self) {
         self.cached_selections.clear();
     }
+
+    /// Replace the random selector and clear cached selections.
+    ///
+    /// Keeps entries and prefix_index intact — only the selector and cache are reset.
+    pub fn replace_selector(&mut self, selector: Box<dyn RandomSelector>) {
+        self.random_selector = selector;
+        self.cached_selections.clear();
+    }
 }
