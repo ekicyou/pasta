@@ -2,9 +2,9 @@
 
 ## 分析サマリー
 
-- **スコープ**: イベントディスパッチ経路で `SCENE.co_exec()` を直接呼び出している **3箇所** を `act:call()` に委譲するリファクタリング
-- **影響範囲**: `pasta_scripts/pasta/shiori/event/` 配下の Lua ファイル3つ + 仮想ディスパッチャ1つ
-- **主要課題**: `act:call()` は関数を即時実行して戻り値を返すが、EVENT dispatch はコルーチン (`thread`) を返す必要がある — このインターフェース差異の橋渡しが設計の核心
+- **スコープ**: `act:call()` を「名前解決フェーズ」と「実行フェーズ」に分解し、`SCENE.co_exec()` が名前解決フェーズ（`act:resolve()`）を共有するリファクタリング
+- **影響範囲**: `act.lua`（resolve抽出）+ `scene.lua`（co_execの解決ロジック変更）+ `pasta/shiori/event/` 配下 Lua 3ファイル
+- **主要課題**: → **解決済み**: `act:call()` = resolve + 即時実行、`SCENE.co_exec()` = resolve + コルーチン化という2フェーズ分解により、インターフェース差異の問題を解消
 - **工数見積り**: **S（1〜3日）** — 変更対象ファイル数が少なく、既存パターンの再構成
 - **リスク**: **Medium** — コルーチン管理との統合に注意が必要だが、既存テストカバレッジが厚い（130+テスト）
 
@@ -56,7 +56,7 @@ end
 | L4 | `self[key]` (act メソッド) | ❌ 存在しない |
 | L5 | `SCENE.search(key, nil)` (スコープなし検索) | ❌ 存在しない |
 
-**注**: EVENT dispatch のコンテキスト（L1 シーンローカルなし、L4 act メソッド意味なし）を考慮すると、実効的に必要なのは L2, L3, L5 のフォールバック。ただし `act:call()` そのものに委譲する設計原則により、Level 選択の判断は不要。
+**注**: EVENT dispatch のコンテキスト（L1 シーンローカルなし、L4 act メソッド意味なし）を考慮すると、実効的に必要なのは L2, L3, L5 のフォールバック。ただし `act:resolve()` として名前解決ロジックを抽出し共有する設計原則により、Level 選択の判断は不要。
 
 ---
 
@@ -71,7 +71,7 @@ end
 | **resume_until_valid** | 関係なし | EVENT.fire() が返却コルーチンを resume |
 | **STORE.co_scene** | 関係なし | チェイントーク継続管理 |
 
-**設計上の核心課題**: `act:call()` は関数を見つけて即時実行するが、`EVENT.fire()` はコルーチンを期待する。`act:call()` に委譲した結果をどうコルーチン化するかが設計フェーズの主要判断。
+**設計上の核心課題 → 解決済み**: `act:call()` は resolve + 即時実行、`SCENE.co_exec()` は resolve + コルーチン化とい2フェーズに分解することで、名前解決ロジック（`act:resolve()`）を共有しつつ実行方式の差異を吸収する。
 
 ### transfer_date_to_var の特殊処理
 
@@ -108,68 +108,66 @@ OnHour 発火前に日時情報を act.var に転記する処理。`act:call()` 
 
 ## 5. 実装アプローチ選択肢
 
-### Option A: EVENT.no_entry 内で act:call() を呼び、結果をコルーチン化（推奨）
+### Option A: act:call() を2フェーズに分解（resolve + execute）— 採用決定
 
-**概要**: `EVENT.no_entry(act)` と `create_scene_thread()` で `act:call()` を呼び出し、その結果（関数実行後の文字列）をコルーチンでラップして返す。
-
-**変更対象**:
-- `event/init.lua`: `EVENT.no_entry()` — `SCENE.co_exec()` → `act:call()` + コルーチン化
-- `event/virtual_dispatcher.lua`: `create_scene_thread()` — 同上
-- `event/boot.lua`: `REG.OnBoot` — 同上（または no_entry と同じパス）
-
-**課題**:
-- `act:call()` は即時実行して結果を返す。コルーチン化が必要
-- `act:call()` 内で handler(self, ...) を実行済み。wrapped_fn + act:build() のパターンとの統合
-- チェイントーク (yield) がact:call() 経由でも正しく動作するか確認要
-
-**トレードオフ**:
-- ✅ コードパス1本化の原則に完全適合
-- ✅ 変更箇所が3ファイル・3関数のみ
-- ❌ act:call() の戻り値（即時実行結果）とコルーチン化の橋渡し設計が必要
-
-### Option B: act:call() にコルーチン対応の新メソッドを追加
-
-**概要**: `act:call_co()` のようなコルーチン返却版を追加し、EVENT dispatch から呼び出す。
+**概要**: `act:call()` から名前解決ロジックを `act:resolve()` として抽出する。`act:call()` は `act:resolve()` + 即時実行、`SCENE.co_exec()` は `act:resolve()` + コルーチン化という構成になる。
 
 **変更対象**:
-- `act.lua`: `ACT_IMPL.call_co()` 新規追加
-- `event/init.lua`, `event/virtual_dispatcher.lua`, `event/boot.lua`: 呼び出し先変更
+- `act.lua`: `ACT_IMPL.resolve()` 新規抽出（既存 call() の5段フォールバック部分）、`ACT_IMPL.call()` を resolve + execute に再構成
+- `scene.lua`: `SCENE.co_exec()` が `SCENE.search()` の代わりに `act:resolve()` を使用
+- `event/init.lua`, `event/virtual_dispatcher.lua`, `event/boot.lua`: 変更不要（SCENE.co_exec 経由で自動的に恩恵を受ける）
 
 **トレードオフ**:
-- ✅ act:call() の既存インターフェースを変更しない
-- ✅ コルーチン化ロジックを1箇所に集約
-- ❌ 「コードパス1本化」の原則に対して、call と call_co の2パスが生まれる懸念
-- ❌ 解決ロジック自体は共有されるが、実行方法が分岐する
+- ✅ 名前解決コードパスの完全な1本化
+- ✅ `act:call()` の既存インターフェースを変更しない（内部分解のみ）
+- ✅ EVENT dispatch 側の3ファイルは変更不要（SCENE.co_exec が内部で resolve を使うだけ）
+- ✅ コルーチン化の橋渡し問題が消滅（resolve は関数を返すだけで実行しない）
 
-### Option C: act:call() 自体をコルーチン対応にリファクタリング
+### Option B（不採用）: EVENT.no_entry 内で act:call() を呼び、結果をコルーチン化
+
+**概要**: `EVENT.no_entry(act)` と `create_scene_thread()` で `act:call()` を呼び出し、その結果をコルーチンでラップ。
+
+**トレードオフ**:
+- ✅ 変更箇所が少ない
+- ❌ `act:call()` の即時実行とコルーチン化の橋渡し問題が残る
+- ❌ yield/チェイントークとの統合が複雑
+
+### Option C（不採用）: act:call() にコルーチン対応の新メソッドを追加
+
+**概要**: `act:call_co()` のようなコルーチン返却版を追加。
+
+**トレードオフ**:
+- ❌ call と call_co の2パスが生まれる
+- ❌ 解決ロジックは共有されるが、実行方法が分岐
+
+### Option D（不採用）: act:call() 自体をコルーチン対応にリファクタリング
 
 **概要**: `act:call()` がオプションでコルーチンを返すモードを持つ。
 
 **トレードオフ**:
-- ✅ 完全な1本化
 - ❌ 既存の act:call() 呼び出し元すべてに影響
-- ❌ DSL トランスパイル出力の変更が必要になる可能性
 - ❌ 影響範囲が大きすぎる
 
 ---
 
 ## 6. 推奨事項
 
-### 推奨アプローチ: **Option A**（act:call() 呼び出し + 結果のコルーチン化）
+### 推奨アプローチ: **Option A**（act:call() を2フェーズに分解）
 
 **理由**:
-1. 「コードパスは1つだけ」の原則に最も適合
-2. 変更対象が最小（3ファイル・3関数）
-3. 既存の act:call() インターフェースを変更しない
-4. 既存テスト（130+）への影響が最小
+1. 「名前解決コードパスは1つだけ」の原則に完全適合
+2. コルーチン化の橋渡し問題が消滅（resolve は関数を返すだけで実行しない）
+3. 既存の act:call() の外部インターフェースを変更しない（内部分解のみ）
+4. EVENT dispatch 側の3ファイルは変更不要（SCENE.co_exec が内部で resolve を使う）
+5. 既存テスト（130+）への影響が最小
 
 ### 設計フェーズへの持ち越し事項
 
-1. **act:call() 即時実行 → コルーチン化の橋渡し方法** — act:call() は handler を見つけて即時実行する（戻り値は実行結果）。EVENT dispatch はコルーチンを期待する。この変換をどこでどう行うかの設計が必要
-2. **act:call() のコンテキスト設定** — EVENT dispatch では `global_scene_name` (第1引数) と `key` (第2引数) の振り分けをどうするか
-3. **transfer_date_to_var の呼び出しタイミング** — act:call() 委譲前に実行する現行の前処理フローの維持
-4. **チェイントーク (yield) との統合** — act:call() 経由でシーン関数を実行した場合、yield が正しくコルーチン分割を引き起こすか
-5. **REG.OnBoot のデフォルト実装** — REG 登録済みハンドラだが内部で SCENE.co_exec() を使用。act:call() に統一するか、REG ハンドラ内は自由とするか
+1. **~~act:call() 即時実行 → コルーチン化の橋渡し方法~~** — ✅ 2フェーズ分解により解決済み。resolve は関数を返すだけなのでコルーチン化の問題は発生しない
+2. **act:resolve() のコンテキスト設定** — EVENT dispatch では `global_scene_name` / `key` の振り分けをどうするか
+3. **transfer_date_to_var の呼び出しタイミング** — resolve 前に実行する現行の前処理フローの維持
+4. **チェイントーク (yield) との統合** — SCENE.co_exec() が resolve 結果をコルーチン化するので、既存 yield 動作は維持されるはず（要検証）
+5. **~~REG.OnBoot のデフォルト実装~~** — ✅ 2フェーズ分解により解決済み。REG.OnBoot は SCENE.co_exec() を使うが、その co_exec が act:resolve() を使うためGLOBAL含む全解決空間が自動的にカバーされる
 
 ---
 

@@ -12,29 +12,29 @@
 
 この非対称性は、`＊OnHour` をDSLラベルで定義した場合とGLOBALテーブルに登録した場合で挙動が異なるという一貫性の欠如を生んでいる。
 
-すべての `*.pasta` ファイルは**シーン辞書**であり、GLOBALテーブルもまた `act:call()` の解決空間に含まれる「シーン内」の存在である。シーンへの遷移は、その起点がイベントディスパッチであれシーン内コールであれ、すべて `act:call()` という**唯一の経路**を通るべきである。
+すべての `*.pasta` ファイルは**シーン辞書**であり、GLOBALテーブルもまた `act:call()` の解決空間に含まれる「シーン内」の存在である。シーンの名前解決は、その起点がイベントディスパッチであれシーン内コールであれ、すべて**同一の解決ロジック**を通るべきである。
 
-本仕様では、**イベントハンドラからのシーン解決を `act:call()` そのものに委譲するリファクタリング**を行う。「同等のロジックを別経路で再実装する」のではなく、解決ロジックのコードパスを1本化し、経路の複製によるバグを根絶する。
+本仕様では、**`act:call()` を「名前解決フェーズ」と「実行フェーズ」に分解**し、名前解決ロジックを唯一の共有経路とするリファクタリングを行う。`act:call()` は resolve + 即時実行、`SCENE.co_exec()` は resolve + コルーチン化という構成になる。「同等のロジックを別経路で再実装する」のではなく、解決ロジックのコードパスを1本化し、経路の複製によるバグを根絶する。
 
 ## Requirements
 
 ### Requirement 1: イベントハンドラのシーン解決を act:call() に委譲する
 **Objective:** ゴースト作者として、イベントハンドラ（OnHour, OnTalk等）からのシーン呼び出しが `act:call()` と同じ解決ルールに従うようにしたい。これにより、どの経路からコールされても一貫した名前解決が行われる。
 
-**設計原則:** 解決ロジックのコードパスは1つだけとする。`EVENT.no_entry` は `act:call()` そのものを呼び出すことでシーン解決を行い、同等ロジックの複製を禁止する。
+**設計原則:** 解決ロジックのコードパスは1つだけとする。`act:call()` の名前解決フェーズ（`act:resolve()`）を抽出し、`EVENT.no_entry` → `SCENE.co_exec()` と `act:call()` の両方がこの共有ロジックを使用する。同等ロジックの複製を禁止する。
 
 #### Acceptance Criteria
-1. When `EVENT.no_entry` がイベント名でシーンを解決するとき, the pasta runtime shall `act:call()` を直接呼び出す（同等ロジックの再実装ではなく、同一コードパスを使用する）
-2. When `act:call()` の解決結果が `nil` であるとき, the pasta runtime shall `RES.no_content()` (204) レスポンスとなる
-3. The pasta runtime shall イベントディスパッチとシーン内コールで同一の `act:call()` 実装を共有する
+1. When `EVENT.no_entry` がイベント名でシーンを解決するとき, the pasta runtime shall `act:call()` と同一の名前解決ロジック（`act:resolve()`）を使用する（同等ロジックの再実装ではなく、同一コードパスを使用する）
+2. When 名前解決の結果が `nil` であるとき, the pasta runtime shall `RES.no_content()` (204) レスポンスとなる
+3. The pasta runtime shall イベントディスパッチ（`SCENE.co_exec()`）とシーン内コール（`act:call()`）で同一の名前解決ロジック（`act:resolve()`）を共有する
 4. The pasta runtime shall 解決優先順位のドキュメントをスキルファイルまたは仕様書に記載する
 
 ### Requirement 2: 仮想イベント（OnHour, OnTalk）の解決経路統一
 **Objective:** ゴースト作者として、`OnSecondChange` から発火する仮想イベント（OnHour, OnTalk）も `act:call()` 経由でシーン解決するようにしたい。これにより、DSLラベル `＊OnHour` だけでなく `GLOBAL.OnHour` としての登録も正しく解決される。
 
 #### Acceptance Criteria
-1. When `OnSecondChange` ハンドラが正時を検出して `OnHour` を発火するとき, the pasta runtime shall `act:call()` 経由でシーンまたはGLOBALハンドラを検索する
-2. When `OnSecondChange` ハンドラがトークタイマー到達を検出して `OnTalk` を発火するとき, the pasta runtime shall `act:call()` 経由でシーンまたはGLOBALハンドラを検索する
+1. When `OnSecondChange` ハンドラが正時を検出して `OnHour` を発火するとき, the pasta runtime shall 共有名前解決ロジック（`act:resolve()`）経由でシーンまたはGLOBALハンドラを検索する
+2. When `OnSecondChange` ハンドラがトークタイマー到達を検出して `OnTalk` を発火するとき, the pasta runtime shall 共有名前解決ロジック（`act:resolve()`）経由でシーンまたはGLOBALハンドラを検索する
 3. When `GLOBAL.OnHour` に関数が登録されているとき, the pasta runtime shall DSLラベル `＊OnHour` が未定義であっても `act:call()` のフォールバックによりその関数を呼び出す
 4. When DSLラベル `＊OnHour` と `GLOBAL.OnHour` の両方が存在するとき, the pasta runtime shall `act:call()` の既存優先順位に従いシーン検索（DSLラベル）をGLOBALより優先する
 
@@ -50,9 +50,9 @@
 **Objective:** ランタイム開発者として、`act:call()` 委譲によるリファクタリング後もコルーチンベースの出力管理（yield、チェイントーク）が正しく動作することを保証したい。
 
 #### Acceptance Criteria
-1. When `act:call()` がシーン関数またはGLOBAL関数を実行したとき, the pasta runtime shall その結果をコルーチンとしてラップし、既存の `resume_until_valid` による実行フローを維持する
+1. When 名前解決（`act:resolve()`）がシーン関数またはGLOBAL関数を返したとき, the pasta runtime shall `SCENE.co_exec()` においてその結果をコルーチンとしてラップし、既存の `resume_until_valid` による実行フローを維持する
 2. While チェイントーク（`STORE.co_scene` に中断コルーチンが存在する状態）が進行中であるとき, the pasta runtime shall 新規イベントのシーン解決をスキップし、既存コルーチンを継続する
-3. The pasta runtime shall `act:build()` によるさくらスクリプト最終構築が `act:call()` 経由でも正しく呼び出される
+3. The pasta runtime shall `act:build()` によるさくらスクリプト最終構築が `act:call()` 経由でも `SCENE.co_exec()` 経由でも正しく呼び出される
 
 ### Requirement 5: 後方互換性の維持
 **Objective:** 既存ゴースト作者として、本変更によって既存のゴースト辞書やスクリプトが壊れないことを保証したい。
