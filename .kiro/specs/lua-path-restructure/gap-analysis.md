@@ -96,7 +96,10 @@ scripts/
 | `scripts/main.lua` 内の `user_scripts` 参照 | コメント文修正 | `user_scripts`→`scripts`への案内に変更 |
 | `scripts/README.md` | 新規作成（旧READMEは削除） | `pasta_scripts/` 用のREADME（編集禁止の案内）に差し替え |
 | `scripts/` (ユーザー用) | 新規 README.md 配置 | ユーザーカスタム用フォルダーの説明 |
-| `scripts/hello.lua` | テストフィクスチャに移動 | ランタイム不要、`transpiler_test.lua` が参照。`launch.json` のパスも更新 |
+| `scripts/hello.lua` | 削除 | ランタイム不要のサンプルファイル |
+| `tests/lua_specs/transpiler_test.lua` | 削除 | `require("hello")` のみを検証。hello.lua 削除に伴い不要 |
+| `tests/lua_specs/init.lua` | `"transpiler_test"` エントリ削除 | 上記テスト削除に伴う整合 |
+| `.vscode/launch.json` | `"Lua (pasta_lua scripts)"` エントリ削除 | `hello.lua` を `program` とするデバッグ設定。hello.lua 削除に伴い不要 |
 
 ### Req 3: hello-pasta サンプルゴースト
 

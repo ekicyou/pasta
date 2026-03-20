@@ -65,7 +65,7 @@ Luaスクリプト検索パスを再構成し、pasta標準ランタイムスク
 3. When ビルド実行時, the pasta_lua shall `pasta_scripts/` ディレクトリのスクリプトを正しく発見・ロードする
 4. The `pasta_scripts/` ディレクトリに README.md を配置し、ゴースト開発者がこのフォルダーを編集すべきでないことを明記する
 5. The `scripts/` ディレクトリに README.md を配置し、ユーザーカスタムスクリプト用フォルダーであること・`pasta_scripts/` より優先される旨を明記する
-6. The `hello.lua`（サンプルスクリプト）をテストフィクスチャに移動し、`pasta_scripts/` には含めない（ランタイム不要、テスト専用のため）
+6. The `hello.lua`（サンプルスクリプト）を削除し、それを参照するテスト（`transpiler_test.lua`）および VSCode デバッグ設定（`launch.json` の該当エントリ）も削除する（ランタイム不要、テスト用途としても残す価値なし）
 
 ### Requirement 3: hello-pasta サンプルゴーストの設定更新
 

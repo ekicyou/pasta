@@ -1,0 +1,22 @@
+{
+    "feature_name": "lua-path-restructure",
+    "created_at": "2026-03-20T10:25:02.4943819+09:00",
+    "updated_at": "2026-03-21T12:00:00+09:00",
+    "language": "ja",
+    "phase": "design-generated",
+    "approvals": {
+        "requirements": {
+            "generated": true,
+            "approved": true
+        },
+        "design": {
+            "generated": true,
+            "approved": false
+        },
+        "tasks": {
+            "generated": false,
+            "approved": false
+        }
+    },
+    "ready_for_implementation": false
+}

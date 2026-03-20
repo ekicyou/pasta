@@ -186,20 +186,18 @@ pasta.dll に同梱される標準ランタイムスクリプトです。
 
 | Field | Detail |
 |-------|--------|
-| Intent | `hello.lua` を標準ランタイムからテストフィクスチャに移動する |
+| Intent | `hello.lua` およびそれを参照するテスト・デバッグ設定を削除する |
 | Requirements | 2.6 |
 
 **Responsibilities & Constraints**
-- `crates/pasta_lua/pasta_scripts/hello.lua` → `crates/pasta_lua/tests/fixtures/hello.lua` に移動（DirRename 後に実施）
-- `crates/pasta_lua/tests/lua_unittest_runner.rs` の `package.path` 構築を以下のとおり更新:
-  - `scripts_path` 変数名を `pasta_scripts_path` に変更し、パスを `crates/pasta_lua/pasta_scripts` に変更
-  - `fixtures_path = workspace_root.join("crates/pasta_lua/tests/fixtures")` を追加
-  - `package_path` 文字列に `{fixtures_path}/?.lua` を追加（`require("hello")` の解決先）
-- `.vscode/launch.json` のデバッグ設定中 `scripts/hello.lua` への参照を更新（方針は DirReadme 後に確定）
+- `crates/pasta_lua/pasta_scripts/hello.lua` を削除（ランタイムとは無関係なサンプルファイル）
+- `crates/pasta_lua/tests/lua_specs/transpiler_test.lua` を削除（`require("hello")` のみを検証するテスト。hello.lua 削除に伴い意味を失う）
+- `crates/pasta_lua/tests/lua_specs/init.lua` の `"transpiler_test"` エントリを削除
+- `.vscode/launch.json` の `"Lua (pasta_lua scripts)"` エントリ（`hello.lua` をデバッグ対象とする設定）を削除
 - 配布物（updates2.dau, updates.txt）から hello.lua を除去（HelloPastaBuild の配布物再生成で自動解決）
 
 **Dependencies**
-- Inbound: DirRename — リネーム後に移動 (P0)
+- Inbound: DirRename — リネーム後に削除 (P0)
 
 ### SampleGhost / Config
 
