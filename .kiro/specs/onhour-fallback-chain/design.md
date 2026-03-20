@@ -184,29 +184,24 @@ sequenceDiagram
 | 3 | `時報その他` | `時報その他` | 固定文字列 |
 | 4 | `OnHourOther` | `OnHourOther` | 固定文字列 |
 
-**テストモック対応**:
-
-```lua
---- scene_executor が設定されている場合のフォールバック動作
----
---- scene_executor(candidate_name, act) を候補名ごとに呼び出す。
---- scene_executor が非nilの thread を返した時点で早期リターン。
---- 全候補で nil の場合は nil を返す。
----
---- テスト側では scene_executor に以下のようなハンドラを設定:
----   dispatcher._set_scene_executor(function(event_name, act)
----       if event_name == "OnHourOther" then
----           return coroutine.create(function(act) return "result" end)
----       end
----       return nil
----   end)
-```
-
 **実装上の注意**
-- `act:find_scene()` で見つかった関数は `SCENE.co_exec()` と同様に `coroutine.create()` でラップし、`act:build()` を末尾で呼ぶ wrapped_fn パターンを踏襲する
-- `scene_executor` 使用時は `act:find_scene()` を呼ばない（既存の分岐を維持）
+- `create_scene_thread(name, act)` を候補名ごとに呼ぶ。`create_scene_thread()` が `scene_executor` 分岐と `SCENE.co_exec()` 分岐を内包しているため、`check_hour()` では意識不要
 - `string.format("%02d", hour)` は `check_hour()` 内で1回だけ計算する
 - `act.req.date.hour` は `check_hour()` 進入時点で利用可能（`transfer_date_to_var()` より前に取得可能）
+
+**`check_hour()` 末尾の実装（擬似コード）**:
+
+```lua
+local hh = string.format("%02d", act.req.date.hour)
+local candidates = {"時報" .. hh, "OnHour" .. hh, "時報その他", "OnHourOther"}
+for _, name in ipairs(candidates) do
+    local t = create_scene_thread(name, act)
+    if t then return t end
+end
+return nil
+```
+
+`create_scene_thread()` は変更しない。テスト時は `scene_executor(name, act)` が呼ばれ、本番時は `SCENE.co_exec(act, name)` が呼ばれる。
 
 ### サンプルゴースト辞書
 
