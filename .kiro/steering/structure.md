@@ -42,6 +42,8 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │   │           └── random.rs          # RandomSelector - ランダム選択
 │   └── pasta_lua/           # Lua言語バックエンド層
 │       ├── Cargo.toml       # pasta_lua設定（pasta_core依存）
+│       ├── scripts/         # ユーザーカスタムLuaスクリプト（pasta_scripts/より優先）
+│       ├── pasta_scripts/   # 標準ランタイムLuaスクリプト（main.lua, pasta/等）
 │       ├── src/
 │       │   ├── lib.rs       # クレートエントリーポイント
 │       │   ├── config.rs    # 設定管理

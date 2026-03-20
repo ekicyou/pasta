@@ -22,7 +22,7 @@ pub fn create_empty_context() -> TranspileContext {
 /// Helper to get the scripts directory path as a Lua-compatible string.
 pub fn get_scripts_dir() -> String {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("scripts")
+        .join("pasta_scripts")
         .to_string_lossy()
         .replace('\\', "/")
 }
@@ -116,8 +116,8 @@ pub fn copy_fixture_to_temp(name: &str) -> tempfile::TempDir {
 
     // Also copy scripts directory from crate root for pasta runtime modules
     let crate_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let scripts_src = crate_root.join("scripts");
-    let scripts_dst = temp.path().join("scripts");
+    let scripts_src = crate_root.join("pasta_scripts");
+    let scripts_dst = temp.path().join("pasta_scripts");
     if scripts_src.exists() {
         std::fs::create_dir_all(&scripts_dst).unwrap();
         copy_dir_recursive(&scripts_src, &scripts_dst).unwrap();
@@ -146,10 +146,10 @@ pub fn create_temp_with_pasta(pasta_content: &str) -> tempfile::TempDir {
     // Create minimal pasta.toml
     std::fs::write(base_dir.join("pasta.toml"), "[loader]\ndebug_mode = true\n").unwrap();
 
-    // Copy scripts directory from crate root for pasta runtime modules
+    // Copy pasta_scripts directory from crate root for pasta runtime modules
     let crate_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let scripts_src = crate_root.join("scripts");
-    let scripts_dst = base_dir.join("scripts");
+    let scripts_src = crate_root.join("pasta_scripts");
+    let scripts_dst = base_dir.join("pasta_scripts");
     if scripts_src.exists() {
         std::fs::create_dir_all(&scripts_dst).unwrap();
         copy_dir_recursive(&scripts_src, &scripts_dst).unwrap();

@@ -165,8 +165,8 @@ fn default_pasta_patterns() -> Vec<String> {
 pub fn default_lua_search_paths() -> Vec<String> {
     vec![
         "profile/pasta/save/lua".to_string(),
-        "user_scripts".to_string(),
         "scripts".to_string(),
+        "pasta_scripts".to_string(),
         "profile/pasta/cache/lua".to_string(),
         "scriptlibs".to_string(),
     ]

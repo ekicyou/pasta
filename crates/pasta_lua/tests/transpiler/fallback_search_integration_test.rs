@@ -193,7 +193,7 @@ fn setup_runtime() -> mlua::Lua {
 
     // Configure package.path to include pasta scripts directory
     let scripts_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("scripts")
+        .join("pasta_scripts")
         .to_string_lossy()
         .replace('\\', "/");
 

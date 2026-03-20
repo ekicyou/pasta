@@ -4,7 +4,7 @@ description: >-
   pasta.dll Luaランタイム APIリファレンスとコーディング規約。
   ゴーストの scripts/ 配下のカスタムLuaスクリプトや、
   Pasta DSL内のLuaブロック実装を支援する。
-  USE FOR: pasta lua, pasta_lua, Lua API, Luaスクリプト, scripts/,
+  USE FOR: pasta lua, pasta_lua, Lua API, Luaスクリプト, scripts/, pasta_scripts/,
   単語辞書一括投入, WORD.create, イベントハンドラ, REG, RES,
   永続化, @pasta_persistence, save, @pasta_search,
   @pasta_config, @pasta_sakura_script, @enc, @pasta_log,
@@ -26,14 +26,15 @@ metadata:
 **目的**: 自然言語の指示からpasta_luaランタイムに準拠したLuaコードを正確に生成するサポートを提供する。
 
 **対象ドメイン**:
-- `scripts/` 配下のカスタムLuaスクリプト（`main.lua` がエントリーポイント）
+- `scripts/` 配下のカスタムLuaスクリプト（`main.lua` がエントリーポイント、`pasta_scripts/` より優先）
+- `pasta_scripts/` 配下の標準ランタイムスクリプト（エンジン同梱）
 - Pasta DSL内の ` ```lua ``` ` ブロックで記述するシーン関数
 
-**前提条件**: ゴーストプロジェクトが既に存在すること（`pasta.toml`、`dic/`、`scripts/` が揃っている）。
+**前提条件**: ゴーストプロジェクトが既に存在すること（`pasta.toml`、`dic/`、`pasta_scripts/` が揃っている）。
 
-**役割分離**: 姉妹スキル `pasta-ghost-authoring` がPasta DSL文法（`.pasta`ファイルの記述）を担当し、本スキルはその下位層であるLuaランタイム層を担当する。DSLの ` ```lua ``` ` ブロック内のコード記述や、`scripts/` 配下の独自スクリプト開発を支援する。
+**役割分離**: 姉妹スキル `pasta-ghost-authoring` がPasta DSL文法（`.pasta`ファイルの記述）を担当し、本スキルはその下位層であるLuaランタイム層を担当する。DSLの ` ```lua ``` ` ブロック内のコード記述や、`scripts/` 配下のカスタムスクリプト・`pasta_scripts/` 配下のランタイムスクリプト開発を支援する。
 
-**scripts/ フォルダ**: ゴーストディレクトリ直下の `scripts/` に独自Luaスクリプトを配置する。`main.lua` がエントリーポイントとしてpastaランタイムに読み込まれ、シーン関数・単語定義・イベントハンドラ等をセットアップする。
+**scripts/ フォルダ**: ゴーストディレクトリ直下の `scripts/` にユーザーカスタムLuaスクリプトを配置する。`main.lua` がエントリーポイントとしてpastaランタイムに読み込まれ、シーン関数・単語定義・イベントハンドラ等をセットアップする。`scripts/` は `pasta_scripts/` より優先されるため、同名ファイルでランタイムの動作を上書きできる。
 
 ### DSL vs Lua 判断基準
 

@@ -217,13 +217,13 @@ files["tests/**"] = {
 
 ```bash
 # 全ファイルチェック
-luacheck scripts/
+luacheck pasta_scripts/
 
 # 特定ファイルのみ
-luacheck scripts/pasta/word.lua
+luacheck pasta_scripts/pasta/word.lua
 
 # エラー詳細表示
-luacheck scripts/ --codes
+luacheck pasta_scripts/ --codes
 ```
 
 ### Rustテスト統合

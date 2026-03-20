@@ -27,7 +27,7 @@
 //!
 //! # 注意
 //!
-//! pasta.dll と scripts/ は release.ps1 で別途コピーされます。
+//! pasta.dll と pasta_scripts/ は release.ps1 で別途コピーされます。
 //! 更新ファイル（updates2.dau, updates.txt）は --finalize オプションで生成します。
 
 use pasta_sample_ghost::{GhostConfig, finalize_ghost, generate_ghost};
@@ -81,7 +81,7 @@ fn run_generate_mode(output_dir: &PathBuf) -> Result<(), Box<dyn std::error::Err
     println!("  Files:    {}", file_count);
     println!();
     println!("Next steps:");
-    println!("  1. Run release.ps1 to copy pasta.dll, scripts/, and create .nar");
+    println!("  1. Run release.ps1 to copy pasta.dll, pasta_scripts/, and create .nar");
     println!("  2. Or run: release.ps1 -SkipDllBuild (if DLL already built)");
     println!();
 

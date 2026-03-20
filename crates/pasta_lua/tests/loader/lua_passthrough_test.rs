@@ -15,7 +15,7 @@ use tempfile::TempDir;
 fn copy_runtime_deps(base_dir: &std::path::Path) {
     let crate_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 
-    for dir_name in &["scripts", "scriptlibs"] {
+    for dir_name in &["pasta_scripts", "scriptlibs"] {
         let src = crate_root.join(dir_name);
         let dst = base_dir.join(dir_name);
         if src.exists() {

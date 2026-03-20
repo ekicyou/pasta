@@ -66,82 +66,82 @@ fn test_cache_incremental_update() {
 // ============================================================================
 
 #[test]
-fn test_user_scripts_priority_over_scripts() {
-    // Task 7.1: user_scripts/main.lua が scripts/main.lua より優先されることを検証
+fn test_scripts_priority_over_pasta_scripts() {
+    // Task 7.1: scripts/main.lua が pasta_scripts/main.lua より優先されることを検証
     let temp = create_temp_with_pasta("＊テスト\n  ゴースト：「こんにちは」\n");
     let base_dir = temp.path();
 
-    // Create user_scripts directory with a custom main.lua
-    let user_scripts_dir = base_dir.join("user_scripts");
-    std::fs::create_dir_all(&user_scripts_dir).unwrap();
-    std::fs::write(
-        user_scripts_dir.join("main.lua"),
-        r#"
--- User's custom main.lua
-_G.MAIN_SOURCE = "user_scripts"
-return { source = "user_scripts" }
-"#,
-    )
-    .unwrap();
-
-    // scripts/main.lua exists from copy_dir_recursive, but let's ensure it has different content
+    // Create scripts directory with a custom main.lua
     let scripts_dir = base_dir.join("scripts");
+    std::fs::create_dir_all(&scripts_dir).unwrap();
     std::fs::write(
         scripts_dir.join("main.lua"),
         r#"
--- Default scripts/main.lua (should be overridden)
+-- User's custom main.lua
 _G.MAIN_SOURCE = "scripts"
 return { source = "scripts" }
 "#,
     )
     .unwrap();
 
+    // pasta_scripts/main.lua exists from copy_dir_recursive, but let's ensure it has different content
+    let pasta_scripts_dir = base_dir.join("pasta_scripts");
+    std::fs::write(
+        pasta_scripts_dir.join("main.lua"),
+        r#"
+-- Default pasta_scripts/main.lua (should be overridden)
+_G.MAIN_SOURCE = "pasta_scripts"
+return { source = "pasta_scripts" }
+"#,
+    )
+    .unwrap();
+
     // Load the runtime
     let runtime = PastaLoader::load(base_dir).unwrap();
 
-    // Verify user_scripts/main.lua was loaded (has priority)
+    // Verify scripts/main.lua was loaded (has priority)
     let result = runtime.exec("return _G.MAIN_SOURCE").unwrap();
     assert_eq!(
         value_as_str(&result).as_deref(),
-        Some("user_scripts"),
-        "user_scripts/main.lua should have priority over scripts/main.lua"
+        Some("scripts"),
+        "scripts/main.lua should have priority over pasta_scripts/main.lua"
     );
 }
 
 #[test]
-fn test_user_scripts_module_priority() {
-    // Task 7.1: user_scripts内のモジュールがscriptsより優先されることを検証
+fn test_scripts_module_priority() {
+    // Task 7.1: scripts内のモジュールがpasta_scriptsより優先されることを検証
     let temp = create_temp_with_pasta("＊テスト\n  ゴースト：「こんにちは」\n");
     let base_dir = temp.path();
 
-    // Create user_scripts directory with a custom module
-    let user_scripts_dir = base_dir.join("user_scripts");
-    std::fs::create_dir_all(&user_scripts_dir).unwrap();
+    // Create scripts directory with a custom module
+    let scripts_dir = base_dir.join("scripts");
+    std::fs::create_dir_all(&scripts_dir).unwrap();
     std::fs::write(
-        user_scripts_dir.join("test_module.lua"),
-        r#"return { source = "user_scripts", value = 42 }"#,
+        scripts_dir.join("test_module.lua"),
+        r#"return { source = "scripts", value = 42 }"#,
     )
     .unwrap();
 
-    // Create same module in scripts (lower priority)
-    let scripts_dir = base_dir.join("scripts");
+    // Create same module in pasta_scripts (lower priority)
+    let pasta_scripts_dir = base_dir.join("pasta_scripts");
     std::fs::write(
-        scripts_dir.join("test_module.lua"),
-        r#"return { source = "scripts", value = 0 }"#,
+        pasta_scripts_dir.join("test_module.lua"),
+        r#"return { source = "pasta_scripts", value = 0 }"#,
     )
     .unwrap();
 
     // Load the runtime
     let runtime = PastaLoader::load(base_dir).unwrap();
 
-    // Require the module - should get user_scripts version
+    // Require the module - should get scripts version
     let result = runtime
         .exec(r#"return require("test_module").source"#)
         .unwrap();
     assert_eq!(
         value_as_str(&result).as_deref(),
-        Some("user_scripts"),
-        "user_scripts module should have priority"
+        Some("scripts"),
+        "scripts module should have priority"
     );
 
     let result = runtime
@@ -156,12 +156,12 @@ fn test_user_scripts_module_priority() {
 
 #[test]
 fn test_default_main_lua_fallback() {
-    // Task 7.3: user_scriptsにmain.luaを配置しない状態でエラーなく初期化完了を検証
+    // Task 7.3: scriptsにmain.luaを配置しない状態でエラーなく初期化完了を検証
     let temp = create_temp_with_pasta("＊テスト\n  ゴースト：「こんにちは」\n");
     let base_dir = temp.path();
 
-    // Don't create user_scripts/main.lua - should fall back to scripts/main.lua
-    // The default scripts/main.lua should be copied by copy_dir_recursive
+    // Don't create scripts/main.lua - should fall back to pasta_scripts/main.lua
+    // The default pasta_scripts/main.lua should be copied by copy_dir_recursive
 
     // Load the runtime - should succeed without error
     let runtime = PastaLoader::load(base_dir).unwrap();
@@ -181,11 +181,11 @@ fn test_main_lua_executed_before_scene_dic() {
     let temp = create_temp_with_pasta("＊テスト\n  ゴースト：「こんにちは」\n");
     let base_dir = temp.path();
 
-    // Create user_scripts with a main.lua that records initialization state
-    let user_scripts_dir = base_dir.join("user_scripts");
-    std::fs::create_dir_all(&user_scripts_dir).unwrap();
+    // Create scripts with a main.lua that records initialization state
+    let scripts_dir = base_dir.join("scripts");
+    std::fs::create_dir_all(&scripts_dir).unwrap();
     std::fs::write(
-        user_scripts_dir.join("main.lua"),
+        scripts_dir.join("main.lua"),
         r#"
 -- main.lua executed during initialization
 -- Record that we were called (and finalize_scene hasn't been called yet)
@@ -226,11 +226,11 @@ fn test_dictionary_registration_in_main_lua() {
     let temp = create_temp_with_pasta("＊テスト\n  ゴースト：「こんにちは」\n");
     let base_dir = temp.path();
 
-    // Create user_scripts with a main.lua that registers a custom dictionary
-    let user_scripts_dir = base_dir.join("user_scripts");
-    std::fs::create_dir_all(&user_scripts_dir).unwrap();
+    // Create scripts with a main.lua that registers a custom dictionary
+    let scripts_dir = base_dir.join("scripts");
+    std::fs::create_dir_all(&scripts_dir).unwrap();
     std::fs::write(
-        user_scripts_dir.join("main.lua"),
+        scripts_dir.join("main.lua"),
         r#"
 -- Register a word dictionary via pasta.word API
 local WORD = require("pasta.word")

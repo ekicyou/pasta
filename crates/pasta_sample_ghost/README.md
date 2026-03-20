@@ -72,7 +72,7 @@ crates/pasta_sample_ghost/
 1. pasta_shiori.dll (32bit) をビルド
 2. dist-src/ のテキストファイルを robocopy でコピー
 3. ゴースト画像を生成（surface*.png + surfaces.txt）
-4. ghosts/hello-pasta/ghost/master/ に pasta.dll と scripts/ を配置
+4. ghosts/hello-pasta/ghost/master/ に pasta.dll と pasta_scripts/ を配置
 5. updates2.dau / updates.txt を生成
 6. バリデーション＆ .nar パッケージ作成
 
@@ -96,7 +96,7 @@ crates/pasta_sample_ghost/ghosts/hello-pasta/
 2. `dist-src/` テキストファイルの robocopy コピー
 3. 画像生成（`cargo run`）
 4. `pasta.dll` の配置
-5. Lua ランタイム (`scripts/`) のコピー
+5. Lua ランタイム (`pasta_scripts/`) のコピー
 
 ### 手動ビルド手順
 

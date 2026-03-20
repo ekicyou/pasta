@@ -16,8 +16,8 @@ fn test_default_config() {
         config.loader.lua_search_paths,
         vec![
             "profile/pasta/save/lua",
-            "user_scripts",
             "scripts",
+            "pasta_scripts",
             "profile/pasta/cache/lua",
             "scriptlibs"
         ]
@@ -375,15 +375,15 @@ debug_mode = true
 
 #[test]
 fn test_default_lua_search_paths_contains_user_scripts() {
-    // Requirement 1.2: user_scripts should be at priority 2 (second position)
+    // Requirement 1.2: scripts should be at priority 2 (second position)
     let paths = default_lua_search_paths();
     assert_eq!(paths.len(), 5, "Should have 5 search paths");
     assert_eq!(
         paths,
         vec![
             "profile/pasta/save/lua",
-            "user_scripts",
             "scripts",
+            "pasta_scripts",
             "profile/pasta/cache/lua",
             "scriptlibs",
         ],
@@ -393,18 +393,18 @@ fn test_default_lua_search_paths_contains_user_scripts() {
 
 #[test]
 fn test_default_lua_search_paths_user_scripts_priority() {
-    // Requirement 1.3: user_scripts (index 1) should come before scripts (index 2)
+    // Requirement 1.3: scripts (index 1) should come before pasta_scripts (index 2)
     let paths = default_lua_search_paths();
-    let user_scripts_pos = paths.iter().position(|p| p == "user_scripts");
     let scripts_pos = paths.iter().position(|p| p == "scripts");
-    assert!(
-        user_scripts_pos.is_some(),
-        "user_scripts should be in search paths"
-    );
+    let pasta_scripts_pos = paths.iter().position(|p| p == "pasta_scripts");
     assert!(scripts_pos.is_some(), "scripts should be in search paths");
     assert!(
-        user_scripts_pos.unwrap() < scripts_pos.unwrap(),
-        "user_scripts should come before scripts for override functionality"
+        pasta_scripts_pos.is_some(),
+        "pasta_scripts should be in search paths"
+    );
+    assert!(
+        scripts_pos.unwrap() < pasta_scripts_pos.unwrap(),
+        "scripts should come before pasta_scripts for override functionality"
     );
 }
 
@@ -413,9 +413,13 @@ fn test_loader_config_default_includes_user_scripts() {
     // Verify LoaderConfig::default() uses the new search paths
     let config = LoaderConfig::default();
     assert!(
+        config.lua_search_paths.contains(&"scripts".to_string()),
+        "Default LoaderConfig should include scripts"
+    );
+    assert!(
         config
             .lua_search_paths
-            .contains(&"user_scripts".to_string()),
-        "Default LoaderConfig should include user_scripts"
+            .contains(&"pasta_scripts".to_string()),
+        "Default LoaderConfig should include pasta_scripts"
     );
 }

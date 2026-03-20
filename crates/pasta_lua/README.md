@@ -61,7 +61,10 @@ pasta_lua/
 │       ├── greeting.pasta
 │       └── talk.pasta
 │
-├── scripts/                         # 自作 Lua スクリプト
+├── scripts/                         # ユーザーカスタム Lua スクリプト（pasta_scripts/ より優先）
+│   └── (your_modules)/              # ユーザー定義モジュール
+│
+├── pasta_scripts/                   # Pasta 標準ランタイムスクリプト
 │   ├── pasta/                       # Pasta ランタイムライブラリ
 │   │   ├── init.lua                 # PASTA モジュール
 │   │   ├── ctx.lua                  # コンテキスト管理
@@ -69,7 +72,7 @@ pasta_lua/
 │   │   ├── scene.lua                # シーン管理
 │   │   └── shiori/
 │   │       └── entry.lua            # SHIORI エントリーポイント
-│   └── (your_modules)/              # ユーザー定義モジュール
+│   └── main.lua                     # エントリーポイント（scripts/main.lua で上書き可）
 │
 ├── scriptlibs/                      # 外部 Lua ライブラリ
 │   └── (external_libs)/             # サードパーティライブラリ
@@ -99,9 +102,10 @@ pasta_lua/
 | `pasta.toml`                     | 設定ファイル              | 必須。存在しない場合はエラー             |
 | `dic/*/*.pasta`                  | Pasta DSL ソース          | デフォルトの検出パターン                 |
 | `dic/*/*.lua`                    | Lua パススルー            | トランスパイルなしでキャッシュにコピー   |
-| `scripts/`                       | 自作 Lua スクリプト       | package.path に含まれる                  |
-| `scripts/pasta/`                 | Pasta ランタイム          | トランスパイル済みコードから呼び出される |
-| `scripts/pasta/shiori/entry.lua` | SHIORI エントリーポイント | 存在すれば自動ロード                     |
+| `scripts/`                       | ユーザーカスタム Lua | `pasta_scripts/` より優先される             |
+| `pasta_scripts/`                 | 標準ランタイム        | エンジン同梱スクリプト                 |
+| `pasta_scripts/pasta/`           | Pasta ランタイム          | トランスパイル済みコードから呼び出される |
+| `pasta_scripts/pasta/shiori/entry.lua` | SHIORI エントリーポイント | 存在すれば自動ロード                     |
 | `scriptlibs/`                    | 外部ライブラリ            | package.path の最後に追加                |
 | `profile/pasta/save/lua/`        | 永続化モジュール          | 最優先で検索される                       |
 | `profile/pasta/cache/lua/`       | Lua キャッシュ            | debug_mode 時に出力                      |
@@ -119,9 +123,10 @@ pasta_patterns = ["dic/*/*.pasta"]
 # デフォルト: 下記参照
 lua_search_paths = [
     "profile/pasta/save/lua",  # 1. 永続化モジュール（最優先）
-    "scripts",                 # 2. 自作スクリプト
-    "profile/pasta/cache/lua", # 3. トランスパイル済みキャッシュ
-    "scriptlibs",              # 4. 外部ライブラリ
+    "scripts",                 # 2. ユーザーカスタムスクリプト
+    "pasta_scripts",           # 3. 標準ランタイムスクリプト
+    "profile/pasta/cache/lua", # 4. トランスパイル済みキャッシュ
+    "scriptlibs",              # 5. 外部ライブラリ
 ]
 
 # トランスパイル出力ディレクトリ

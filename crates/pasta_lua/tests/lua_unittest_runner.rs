@@ -15,7 +15,7 @@ fn run_lua_unit_tests() -> LuaResult<()> {
         .unwrap()
         .to_path_buf();
 
-    let scripts_path = workspace_root.join("crates/pasta_lua/scripts");
+    let scripts_path = workspace_root.join("crates/pasta_lua/pasta_scripts");
     let scriptlibs_path = workspace_root.join("crates/pasta_lua/scriptlibs");
     let lua_specs_path = workspace_root.join("crates/pasta_lua/tests/lua_specs");
 

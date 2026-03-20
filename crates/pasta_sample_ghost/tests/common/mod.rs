@@ -46,7 +46,7 @@ pub fn copy_pasta_shiori_dll(dest_dir: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// pasta_lua ランタイム（scripts/）をコピー
+/// pasta_lua ランタイム（pasta_scripts/）をコピー
 ///
 /// # Arguments
 /// * `dest_dir` - コピー先ディレクトリ（ghost/master/）
@@ -59,18 +59,18 @@ pub fn copy_pasta_lua_runtime(dest_dir: &Path) -> Result<(), String> {
     let scripts_src = workspace
         .join("crates")
         .join("pasta_lua")
-        .join("scripts");
+        .join("pasta_scripts");
 
     if !scripts_src.exists() {
         return Err(format!(
-            "pasta_lua scripts が見つかりません: {}",
+            "pasta_lua pasta_scripts が見つかりません: {}",
             scripts_src.display()
         ));
     }
 
-    let scripts_dest = dest_dir.join("scripts");
+    let scripts_dest = dest_dir.join("pasta_scripts");
     copy_dir_recursive(&scripts_src, &scripts_dest)
-        .map_err(|e| format!("scripts コピー失敗: {}", e))?;
+        .map_err(|e| format!("pasta_scripts コピー失敗: {}", e))?;
 
     Ok(())
 }

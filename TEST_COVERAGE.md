@@ -85,7 +85,7 @@
 | さくらスクリプト記号タグトークナイズ | `tokenizer.rs` 内テスト                                           | ✅ 完了 | 6テスト（`-+*?&` タグ認識）                  |
 | EVENT.fire コルーチン対応            | `event_coroutine_test.lua`                                        | ✅ 完了 | 16テスト（resume_until_valid含む）           |
 | resume_until_valid nil yieldスキップ | `event_coroutine_test.lua`                                        | ✅ 完了 | 6テスト（coroutine-resume-loop）             |
-| user_scripts検索パス優先順位         | `loader_startup_test.rs`                                          | ✅ 完了 | 2テスト（lua-module-path-resolution）        |
+| scripts検索パス優先順位              | `loader_startup_test.rs`                                          | ✅ 完了 | 2テスト（lua-module-path-resolution）        |
 | main.lua初期化順序                   | `loader_lifecycle_test.rs`                                        | ✅ 完了 | 2テスト（lua-module-path-resolution）        |
 | scene_dic require化                  | `loader_lifecycle_test.rs`                                        | ✅ 完了 | 3テスト（lua-module-path-resolution）        |
 | lua_requireヘルパー関数              | `runtime_test.rs`（外部化）                                       | ✅ 完了 | 3テスト（lua-module-path-resolution）        |
@@ -206,7 +206,7 @@
 - ✅ `test_shiori_lifecycle_lua_execution_verified`
 
 **修正内容**: 
-- `pasta_lua/scripts/pasta/`から完全なLuaモジュールセットを`pasta_shiori/tests/support/scripts/pasta/`にコピー
+- `pasta_lua/pasta_scripts/pasta/`から完全なLuaモジュールセットを`pasta_shiori/tests/support/scripts/pasta/`にコピー
 - `copy_fixture_to_temp()`のコピー順序を修正（サポートファイル→フィクスチャの順）
 
 ---

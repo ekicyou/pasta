@@ -479,7 +479,7 @@ fn test_search_unavailable_before_finalize() {
 
     // Configure package.path
     let scripts_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("scripts")
+        .join("pasta_scripts")
         .to_string_lossy()
         .replace('\\', "/");
 

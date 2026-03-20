@@ -223,10 +223,10 @@ fn test_load_empty_dic() {
     // Create minimal pasta.toml
     std::fs::write(base_dir.join("pasta.toml"), "[loader]\ndebug_mode = true\n").unwrap();
 
-    // Copy scripts directory for pasta module
+    // Copy pasta_scripts directory for pasta module
     let crate_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let scripts_src = crate_root.join("scripts");
-    let scripts_dst = base_dir.join("scripts");
+    let scripts_src = crate_root.join("pasta_scripts");
+    let scripts_dst = base_dir.join("pasta_scripts");
     if scripts_src.exists() {
         std::fs::create_dir_all(&scripts_dst).unwrap();
         copy_dir_recursive(&scripts_src, &scripts_dst).unwrap();

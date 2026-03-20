@@ -12,13 +12,13 @@ fn copy_fixture_to_temp(fixture_name: &str) -> TempDir {
     let temp = TempDir::new().unwrap();
     copy_dir_recursive(&src, temp.path()).unwrap();
 
-    // Copy scripts directory
+    // Copy pasta_scripts directory (standard runtime)
     let crate_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
         .join("pasta_lua");
-    let scripts_src = crate_root.join("scripts");
-    let scripts_dst = temp.path().join("scripts");
+    let scripts_src = crate_root.join("pasta_scripts");
+    let scripts_dst = temp.path().join("pasta_scripts");
     if scripts_src.exists() {
         std::fs::create_dir_all(&scripts_dst).unwrap();
         copy_dir_recursive(&scripts_src, &scripts_dst).unwrap();
@@ -248,7 +248,7 @@ fn test_load_sets_shiori_flags_when_entry_lua_exists() {
     let mut shiori = PastaShiori::default();
     assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
 
-    // entry.lua is present in scripts/, so cached functions should be Some
+    // entry.lua is present in pasta_scripts/, so cached functions should be Some
     assert!(shiori.load_fn.is_some(), "load_fn should be cached");
     assert!(shiori.request_fn.is_some(), "request_fn should be cached");
 }
@@ -258,7 +258,7 @@ fn test_load_flags_false_without_entry_lua() {
     let temp = copy_fixture_to_temp("minimal");
 
     // Remove the entry.lua file to simulate missing SHIORI functions
-    let entry_lua_path = temp.path().join("scripts/pasta/shiori/entry.lua");
+    let entry_lua_path = temp.path().join("pasta_scripts/pasta/shiori/entry.lua");
     if entry_lua_path.exists() {
         std::fs::remove_file(&entry_lua_path).unwrap();
     }
@@ -304,7 +304,7 @@ fn test_request_returns_default_204_without_main_lua() {
     let temp = copy_fixture_to_temp("minimal");
 
     // Remove entry.lua to test fallback behavior
-    let entry_lua_path = temp.path().join("scripts/pasta/shiori/entry.lua");
+    let entry_lua_path = temp.path().join("pasta_scripts/pasta/shiori/entry.lua");
     if entry_lua_path.exists() {
         std::fs::remove_file(&entry_lua_path).unwrap();
     }
@@ -341,7 +341,7 @@ fn test_unload_called_on_drop() {
     let temp = copy_fixture_to_temp("minimal");
 
     // Create a Lua script that defines SHIORI.unload and sets a global flag
-    let entry_lua_path = temp.path().join("scripts/pasta/shiori/entry.lua");
+    let entry_lua_path = temp.path().join("pasta_scripts/pasta/shiori/entry.lua");
     std::fs::write(
         &entry_lua_path,
         r#"
@@ -406,7 +406,7 @@ fn test_unload_error_does_not_panic() {
     let temp = copy_fixture_to_temp("minimal");
 
     // Create a Lua script with an unload function that always errors
-    let entry_lua_path = temp.path().join("scripts/pasta/shiori/entry.lua");
+    let entry_lua_path = temp.path().join("pasta_scripts/pasta/shiori/entry.lua");
     std::fs::write(
         &entry_lua_path,
         r#"
@@ -450,7 +450,7 @@ fn test_cached_functions_cleared_on_reload() {
     let temp2 = copy_fixture_to_temp("minimal");
 
     // Modify temp2's entry.lua to remove SHIORI.load but keep request
-    let entry_lua_path2 = temp2.path().join("scripts/pasta/shiori/entry.lua");
+    let entry_lua_path2 = temp2.path().join("pasta_scripts/pasta/shiori/entry.lua");
     std::fs::write(
         &entry_lua_path2,
         r#"
@@ -500,7 +500,7 @@ fn test_multiple_instances_independent_caches() {
     let temp2 = copy_fixture_to_temp("minimal");
 
     // Modify temp1's entry.lua to define all three SHIORI functions
-    let entry_lua_path1 = temp1.path().join("scripts/pasta/shiori/entry.lua");
+    let entry_lua_path1 = temp1.path().join("pasta_scripts/pasta/shiori/entry.lua");
     std::fs::write(
         &entry_lua_path1,
         r#"
@@ -522,7 +522,7 @@ end
     .unwrap();
 
     // Modify temp2's entry.lua to only define request (no load/unload)
-    let entry_lua_path2 = temp2.path().join("scripts/pasta/shiori/entry.lua");
+    let entry_lua_path2 = temp2.path().join("pasta_scripts/pasta/shiori/entry.lua");
     std::fs::write(
         &entry_lua_path2,
         r#"
@@ -778,15 +778,14 @@ fn copy_shiori_lifecycle_fixture() -> TempDir {
     let temp = TempDir::new().unwrap();
     copy_dir_recursive(&src, temp.path()).unwrap();
 
-    // Copy scripts directory from pasta_lua
+    // Copy pasta_scripts directory from pasta_lua (standard runtime)
     let crate_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
         .join("pasta_lua");
-    let scripts_src = crate_root.join("scripts");
-    let scripts_dst = temp.path().join("scripts");
+    let scripts_src = crate_root.join("pasta_scripts");
+    let scripts_dst = temp.path().join("pasta_scripts");
     if scripts_src.exists() {
-        // Merge: copy pasta_lua scripts first, then overlay fixture scripts
         std::fs::create_dir_all(&scripts_dst).unwrap();
         copy_dir_recursive(&scripts_src, &scripts_dst).unwrap();
     }
@@ -799,10 +798,12 @@ fn copy_shiori_lifecycle_fixture() -> TempDir {
         copy_dir_recursive(&scriptlibs_src, &scriptlibs_dst).unwrap();
     }
 
-    // Copy fixture's scripts on top (overwrite)
+    // Copy fixture's scripts/ as user override (searched before pasta_scripts/)
     let fixture_scripts = src.join("scripts");
+    let user_scripts_dst = temp.path().join("scripts");
     if fixture_scripts.exists() {
-        copy_dir_recursive(&fixture_scripts, &scripts_dst).unwrap();
+        std::fs::create_dir_all(&user_scripts_dst).unwrap();
+        copy_dir_recursive(&fixture_scripts, &user_scripts_dst).unwrap();
     }
 
     temp

@@ -5,12 +5,12 @@
 --- scene_dic のファイナライズより先に実行されるため、
 --- ユーザー定義の辞書登録や初期設定をここで行えます。
 ---
---- カスタマイズするには、user_scripts/main.lua を作成してください。
---- user_scripts/ は scripts/ より優先されます。
+--- カスタマイズするには、scripts/main.lua を作成してください。
+--- scripts/ は pasta_scripts/ より優先されます。
 ---
 --- 使用例:
 --- ```lua
---- -- user_scripts/main.lua
+--- -- scripts/main.lua
 ---
 --- -- ユーザー定義のアクター辞書を登録
 --- local WORD = require("pasta.word")

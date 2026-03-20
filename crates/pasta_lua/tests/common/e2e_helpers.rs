@@ -43,7 +43,7 @@ pub fn create_runtime_with_finalize() -> mlua::Result<Lua> {
 
     // Configure package.path to include pasta scripts directory
     let scripts_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("scripts")
+        .join("pasta_scripts")
         .to_string_lossy()
         .replace('\\', "/");
 
@@ -102,7 +102,7 @@ pub fn create_runtime_with_search(ctx: TranspileContext) -> mlua::Result<Lua> {
 
     // Configure package.path to include pasta scripts directory
     let scripts_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("scripts")
+        .join("pasta_scripts")
         .to_string_lossy()
         .replace('\\', "/");
 

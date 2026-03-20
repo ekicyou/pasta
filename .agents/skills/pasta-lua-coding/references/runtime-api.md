@@ -1,7 +1,7 @@
 # Runtime API リファレンス
 
 pasta_luaクレートがRust側からLua VMに公開しているモジュール群の完全APIリファレンス。  
-本ドキュメントは `scripts/` 配下のLuaスクリプトや Pasta DSL内の ` ```lua ``` ` ブロックで使用するランタイムモジュールを網羅する。
+本ドキュメントは `scripts/` 配下のカスタムLuaスクリプトや `pasta_scripts/` 配下のランタイムスクリプト、および Pasta DSL内の ` ```lua ``` ` ブロックで使用するランタイムモジュールを網羅する。
 
 ---
 

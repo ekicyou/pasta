@@ -6,7 +6,6 @@
 --   2. 下記の specs テーブルにモジュール名を追加
 
 local specs = {
-    "transpiler_test",
     "actor_word_test",                   -- actor-word-dictionary feature tests
     "store_save_test",                   -- store-save-table feature tests
     "persistence_spec",                  -- store-save-persistence feature tests

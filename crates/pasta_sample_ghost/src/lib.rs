@@ -92,7 +92,7 @@ pub fn generate_ghost(output_dir: &Path, _config: &GhostConfig) -> Result<(), Gh
 
 /// 更新ファイルのみを生成（finalize モード）
 ///
-/// pasta.dll や scripts/ がコピーされた後に呼び出すことで、
+/// pasta.dll や pasta_scripts/ がコピーされた後に呼び出すことで、
 /// 完全なファイルリストを含む updates2.dau / updates.txt を生成します。
 ///
 /// # Arguments
