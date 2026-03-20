@@ -14,6 +14,7 @@ local SCENE = {}
 --- シーンテーブル実装メタテーブル（create_word メソッドを提供）
 --- @class SceneTable
 --- @field __global_name__ string グローバルシーン名
+--- @field [string] function 任意のシーン関数メソッド（__start__ 等）
 local SCENE_TABLE_IMPL = {}
 
 --- ローカル単語ビルダーを作成（scene:create_word("key") 形式）
