@@ -1,20 +1,20 @@
 {
     "feature_name": "event-handler-call-equivalence",
     "created_at": "2026-03-20T16:28:33.7867736+09:00",
-    "updated_at": "2026-03-20T16:34:42.0009174+09:00",
+    "updated_at": "2026-03-20T18:01:05.1761203+09:00",
     "language": "ja",
-    "phase": "requirements-generated",
+    "phase": "tasks-generated",
     "approvals": {
         "requirements": {
             "generated": true,
-            "approved": false
+            "approved": true
         },
         "design": {
-            "generated": false,
-            "approved": false
+            "generated": true,
+            "approved": true
         },
         "tasks": {
-            "generated": false,
+            "generated": true,
             "approved": false
         }
     },
