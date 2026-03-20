@@ -27,6 +27,7 @@
 1. When `EVENT.no_entry` がイベント名でシーンを解決するとき, the pasta runtime shall `act:call()` を直接呼び出す（同等ロジックの再実装ではなく、同一コードパスを使用する）
 2. When `act:call()` の解決結果が `nil` であるとき, the pasta runtime shall `RES.no_content()` (204) レスポンスとなる
 3. The pasta runtime shall イベントディスパッチとシーン内コールで同一の `act:call()` 実装を共有する
+4. The pasta runtime shall 解決優先順位のドキュメントをスキルファイルまたは仕様書に記載する
 
 ### Requirement 2: 仮想イベント（OnHour, OnTalk）の解決経路統一
 **Objective:** ゴースト作者として、`OnSecondChange` から発火する仮想イベント（OnHour, OnTalk）も `act:call()` 経由でシーン解決するようにしたい。これにより、DSLラベル `＊OnHour` だけでなく `GLOBAL.OnHour` としての登録も正しく解決される。
@@ -53,15 +54,7 @@
 2. While チェイントーク（`STORE.co_scene` に中断コルーチンが存在する状態）が進行中であるとき, the pasta runtime shall 新規イベントのシーン解決をスキップし、既存コルーチンを継続する
 3. The pasta runtime shall `act:build()` によるさくらスクリプト最終構築が `act:call()` 経由でも正しく呼び出される
 
-### Requirement 5: 解決優先順位の明確化
-**Objective:** ゴースト作者として、イベントディスパッチにおける名前解決の優先順位を明確に理解し、予測可能な動作が得られるようにしたい。
-
-#### Acceptance Criteria
-1. The pasta runtime shall イベントディスパッチの名前解決において、以下の優先順位を適用する: (1) `REG[id]` 明示登録 → (2) `act:call()` によるフォールバック解決
-2. The pasta runtime shall `act:call()` の既存優先順位をそのまま適用する（解決ロジックが1本化されているため、別途の優先順位定義は不要）
-3. The pasta runtime shall 解決優先順位のドキュメントをスキルファイルまたは仕様書に記載する
-
-### Requirement 6: 後方互換性の維持
+### Requirement 5: 後方互換性の維持
 **Objective:** 既存ゴースト作者として、本変更によって既存のゴースト辞書やスクリプトが壊れないことを保証したい。
 
 #### Acceptance Criteria
