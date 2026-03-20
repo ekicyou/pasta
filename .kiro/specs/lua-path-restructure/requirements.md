@@ -63,6 +63,9 @@ Luaスクリプト検索パスを再構成し、pasta標準ランタイムスク
 1. The pasta_lua crate shall 開発ディレクトリ内の標準ランタイムスクリプトを `scripts/` ではなく `pasta_scripts/` に格納する
 2. The pasta_lua shall `pasta_scripts/` 配下の全Luaファイルのコードロジックを変更なく保持する（ファイル名の同一性。案内コメント内のパス参照は新構成に合わせて更新する）
 3. When ビルド実行時, the pasta_lua shall `pasta_scripts/` ディレクトリのスクリプトを正しく発見・ロードする
+4. The `pasta_scripts/` ディレクトリに README.md を配置し、ゴースト開発者がこのフォルダーを編集すべきでないことを明記する
+5. The `scripts/` ディレクトリに README.md を配置し、ユーザーカスタムスクリプト用フォルダーであること・`pasta_scripts/` より優先される旨を明記する
+6. The `hello.lua`（サンプルスクリプト）をテストフィクスチャに移動し、`pasta_scripts/` には含めない（ランタイム不要、テスト専用のため）
 
 ### Requirement 3: hello-pasta サンプルゴーストの設定更新
 
