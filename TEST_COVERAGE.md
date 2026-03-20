@@ -91,6 +91,8 @@
 | lua_requireヘルパー関数              | `runtime_test.rs`（外部化）                                       | ✅ 完了 | 3テスト（lua-module-path-resolution）        |
 | GLOBAL チェイントーク関数登録        | `global_chaintalk_call_test.lua`                                  | ✅ 完了 | 6テスト（yield-continuation-token）          |
 | GLOBAL L3解決 + yield動作            | `global_chaintalk_call_test.lua`                                  | ✅ 完了 | 4テスト（yield-continuation-token）          |
+| act:find_scene 5段階フォールバック   | `act_find_scene_test.lua`                                         | ✅ 完了 | 13テスト（event-handler-call-equivalence）   |
+| GLOBAL フォールバック統合            | `global_fallback_integration_test.lua`                            | ✅ 完了 | 7テスト（event-handler-call-equivalence）    |
 | EVENT.fire チェイントーク統合        | `global_chaintalk_integration_test.lua`                           | ✅ 完了 | 5テスト（yield-continuation-token）          |
 | @pasta_log ログブリッジ              | `log_module_test.rs`<br>`log_integration_test.rs`                 | ✅ 完了 | 24+7テスト（lua-logging）                    |
 | @pasta_log スタックレベル検証        | `log_stack_level_test.rs`                                         | ✅ 完了 | 2テスト（lua-logging）                       |
