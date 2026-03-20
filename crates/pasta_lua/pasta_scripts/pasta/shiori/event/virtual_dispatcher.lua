@@ -108,8 +108,14 @@ function M.check_hour(act)
         act:transfer_date_to_var()
     end
 
-    -- threadを返す（実行しない）
-    return create_scene_thread("OnHour", act)
+    -- 4段階フォールバックチェーンでシーンを解決
+    local hh = string.format("%02d", act.req.date.hour)
+    local candidates = {"時報" .. hh, "OnHour" .. hh, "時報その他", "OnHourOther"}
+    for _, name in ipairs(candidates) do
+        local t = create_scene_thread(name, act)
+        if t then return t end
+    end
+    return nil
 end
 
 --- OnTalk 判定・発行（thread返却形式、チェイントーク対応）

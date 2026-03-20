@@ -41,7 +41,7 @@ describe("virtual_dispatcher - thread返却", function()
         local act = create_mock_act({
             id = "OnSecondChange",
             status = "idle",
-            date = { unix = 1702648800 }
+            date = { unix = 1702648800, hour = 14 }
         })
 
         -- Initialize
@@ -49,6 +49,7 @@ describe("virtual_dispatcher - thread返却", function()
 
         -- Fire at next hour
         act.req.date.unix = 1702652400
+        act.req.date.hour = 15
         local result = dispatcher.check_hour(act)
 
         expect(type(result)):toBe("thread")
@@ -226,7 +227,7 @@ describe("virtual_dispatcher - チェイントーク継続", function()
         local act = create_mock_act({
             id = "OnSecondChange",
             status = "idle",
-            date = { unix = 0 }
+            date = { unix = 0, hour = 14 }
         })
 
         -- Initialize
@@ -234,6 +235,7 @@ describe("virtual_dispatcher - チェイントーク継続", function()
 
         -- Fire
         act.req.date.unix = 3600
+        act.req.date.hour = 15
 
         local result = dispatcher.check_hour(act)
 

@@ -44,12 +44,33 @@ git add -A; git commit -m "<type>(<scope>): <summary>"
 ```
 タイプ: `feat`, `fix`, `refactor`, `docs`, `test`
 
-### 2. リモート同期
+### 2. スキルドキュメント更新検討
+
+実装内容が以下に該当する場合、対応するスキルの SKILL.md および references/ を読み込み、実装との乖離がないか検証・更新する。
+
+| 変更領域 | 対象スキル | 確認ポイント |
+|----------|-----------|-------------|
+| DSL文法・マーカー・シーン構造 | `pasta-ghost-authoring` | references/ の文法記述、§2マーカー一覧表、パターン集の整合性 |
+| Lua API・ランタイム動作・モジュール追加 | `pasta-lua-coding` | references/ のAPI記述、モジュール一覧、コーディング規約の整合性 |
+| 両方に影響する変更 | 両スキル | 役割分離（DSL層 vs Lua層）の境界が正しいか |
+
+**手順**:
+1. SKILL.md を読み込み、実装で変更・追加した機能が反映されているか確認
+2. references/ 配下の該当ファイルを読み込み、記述の正確性を検証
+3. 乖離があれば更新し、SKILL.md の metadata.version をバンプ
+4. 更新があった場合はコミット:
+   ```powershell
+   git add .agents/skills/; git commit -m "docs(skill): <スキル名> を実装に同期"
+   ```
+
+**スキップ条件**: テストのみの変更、ドキュメントのみの変更、スキル対象外クレート（pasta_lsp等）のみの変更は対象外。
+
+### 3. リモート同期
 ```powershell
 git push origin <branch>
 ```
 
-### 3. 仕様アーカイブ
+### 4. 仕様アーカイブ
 
 **重要**: spec.json更新は仕様移動の**直後**に実行（移動前に更新するとVSCode仕様でファイルが復活する場合がある）
 
@@ -90,6 +111,8 @@ git push origin <branch>
 4. [ ] TEST_COVERAGE.md - 新規テストのマッピング追加
 5. [ ] クレートREADME - API変更の反映（該当する場合）
 6. [ ] steering/* - 該当領域のステアリング更新
+7. [ ] .agents/skills/pasta-ghost-authoring/ - DSL文法変更時にスキル同期（該当する場合）
+8. [ ] .agents/skills/pasta-lua-coding/ - Lua API変更時にスキル同期（該当する場合）
 
 特に、以下の場合は**SOUL.md更新が必須**：
 - コアバリュー（日本語フレンドリー、UNICODE識別子、yield型、宣言的フロー）に影響
@@ -182,6 +205,8 @@ git push origin <branch>
 | ディレクトリ構造変更 | steering/structure.md、クレートREADME                   |
 | 依存関係変更         | steering/tech.md、クレートREADME                        |
 | 開発フロー変更       | steering/workflow.md、CLAUDE.md                         |
+| DSL文法変更          | .agents/skills/pasta-ghost-authoring/ (SKILL.md + references/) |
+| Lua API変更          | .agents/skills/pasta-lua-coding/ (SKILL.md + references/)     |
 | 新クレート追加       | README.md（ドキュメントマップ）、クレートREADME新規作成 |
 | テストカバレッジ変更 | TEST_COVERAGE.md                                        |
 

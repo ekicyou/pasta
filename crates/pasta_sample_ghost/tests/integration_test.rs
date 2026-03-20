@@ -288,7 +288,8 @@ fn test_pasta_scripts() {
     // talk.pasta
     let talk = std::fs::read_to_string(dic_dir.join("talk.pasta")).unwrap();
     assert!(talk.contains("＊OnTalk"), "OnTalk シーンがありません");
-    assert!(talk.contains("＊OnHour"), "OnHour シーンがありません");
+    assert!(talk.contains("＊時報その他"), "時報その他 シーンがありません");
+    assert!(talk.contains("＊時報12"), "時報12 シーンがありません");
     assert!(talk.contains("＄時"), "時刻変数参照がありません");
     assert!(
         !contains_global_actor_dictionary(&talk, "女の子"),
@@ -337,9 +338,12 @@ fn test_hour_chime_patterns() {
     let talk =
         std::fs::read_to_string(dist_src_dir().join("ghost/master/dic/talk.pasta")).unwrap();
 
-    // OnHour パターン存在確認
-    let hour_count = talk.matches("＊OnHour").count();
-    assert!(hour_count >= 1, "OnHour パターンがありません");
+    // 時報その他パターン存在確認
+    let hour_count = talk.matches("＊時報その他").count();
+    assert!(hour_count >= 1, "時報その他 パターンがありません");
+
+    // 時刻別時報確認
+    assert!(talk.contains("＊時報12"), "時報12 パターンがありません");
 
     // 時刻変数参照確認
     assert!(talk.contains("＄時"), "＄時 変数参照がありません");

@@ -41,23 +41,23 @@ describe("Integration - GLOBAL fallback via EVENT.fire", function()
         STORE.co_scene = nil
     end
 
-    test("GLOBAL.OnHour が EVENT.fire 経由で呼ばれる（DSL ラベルなし）", function()
+    test("GLOBAL.OnHourOther が EVENT.fire 経由で呼ばれる（DSL ラベルなし）", function()
         setup()
 
         local global_called = false
-        GLOBAL.OnHour = function(act)
+        GLOBAL.OnHourOther = function(act)
             global_called = true
             act:talk(act.actors.sakura, "正午です")
         end
 
-        local response = EVENT.fire({ id = "OnHour", method = "get", version = 30 })
+        local response = EVENT.fire({ id = "OnHourOther", method = "get", version = 30 })
 
         expect(global_called):toBe(true)
         -- RES.ok が返されている（204 ではない）
         expect(response:find("SHIORI/3.0 200 OK")).not_:toBe(nil)
         expect(response:find("正午です")).not_:toBe(nil)
 
-        GLOBAL.OnHour = nil
+        GLOBAL.OnHourOther = nil
     end)
 
     test("GLOBAL に未登録のイベントは 204 No Content を返す", function()

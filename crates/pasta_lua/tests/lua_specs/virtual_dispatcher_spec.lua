@@ -84,7 +84,7 @@ describe("check_hour function", function()
         dispatcher = require("pasta.shiori.event.virtual_dispatcher")
         dispatcher._reset()
         dispatcher._set_scene_executor(function(event_name)
-            if event_name == "OnHour" then
+            if event_name == "OnHourOther" then
                 return coroutine.create(function() return "hour_result" end)
             end
             return nil
@@ -112,7 +112,7 @@ describe("check_hour function", function()
         dispatcher.check_hour(act1)
 
         -- At next hour
-        local act2 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = 1702652400 } })
+        local act2 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = 1702652400, hour = 15 } })
         local result = dispatcher.check_hour(act2)
 
         expect(type(result)):toBe("thread")
@@ -231,7 +231,7 @@ describe("priority and integration", function()
         dispatcher.dispatch(act1)
 
         -- At next hour (OnHour should fire, OnTalk should not)
-        local act2 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = 1702652400 } })
+        local act2 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = 1702652400, hour = 15 } })
         local result = dispatcher.dispatch(act2)
 
         -- Should return thread from check_hour
@@ -364,7 +364,7 @@ describe("execute_scene - act parameter passing", function()
         act.req.date.unix = 3600
         dispatcher.check_hour(act)
 
-        expect(received_event_name):toBe("OnHour")
+        expect(received_event_name):toBe("時報14")
         expect(received_act):toBe(act)
     end)
 end)
@@ -446,5 +446,212 @@ describe("check_talk - no transfer_date_to_var", function()
         if type(result) == "thread" then
             expect(received_act):toBe(act)
         end
+    end)
+end)
+
+-- ============================================================================
+-- Task 3.1: フォールバック順序テスト
+-- Requirements: 1.1
+-- ============================================================================
+
+describe("check_hour - fallback chain order", function()
+    local dispatcher
+
+    local function setup()
+        dispatcher = require("pasta.shiori.event.virtual_dispatcher")
+        dispatcher._reset()
+    end
+
+    test("searches candidates in order: 時報{HH} → OnHour{HH} → 時報その他 → OnHourOther", function()
+        setup()
+        local called_names = {}
+
+        -- すべての候補で nil を返し、呼び出し順序を記録
+        dispatcher._set_scene_executor(function(event_name, act)
+            table.insert(called_names, event_name)
+            return nil
+        end)
+
+        local act = { req = { id = "OnSecondChange", status = "idle", date = { unix = 0, hour = 12 } } }
+        -- Initialize
+        dispatcher.check_hour(act)
+        -- Fire
+        act.req.date.unix = 3600
+        dispatcher.check_hour(act)
+
+        expect(#called_names):toBe(4)
+        expect(called_names[1]):toBe("時報12")
+        expect(called_names[2]):toBe("OnHour12")
+        expect(called_names[3]):toBe("時報その他")
+        expect(called_names[4]):toBe("OnHourOther")
+    end)
+end)
+
+-- ============================================================================
+-- Task 3.2: 早期打ち切りテスト
+-- Requirements: 1.3
+-- ============================================================================
+
+describe("check_hour - early termination", function()
+    local dispatcher
+
+    local function setup()
+        dispatcher = require("pasta.shiori.event.virtual_dispatcher")
+        dispatcher._reset()
+    end
+
+    test("stops at first matching candidate (candidate 1)", function()
+        setup()
+        local call_count = 0
+
+        dispatcher._set_scene_executor(function(event_name, act)
+            call_count = call_count + 1
+            -- 候補1（時報12）でヒット
+            return coroutine.create(function() return "scene_result" end)
+        end)
+
+        local act = { req = { id = "OnSecondChange", status = "idle", date = { unix = 0, hour = 12 } } }
+        dispatcher.check_hour(act)
+        act.req.date.unix = 3600
+
+        local result = dispatcher.check_hour(act)
+
+        expect(type(result)):toBe("thread")
+        expect(call_count):toBe(1)
+    end)
+
+    test("stops at candidate 3 when candidates 1-2 miss", function()
+        setup()
+        local called_names = {}
+
+        dispatcher._set_scene_executor(function(event_name, act)
+            table.insert(called_names, event_name)
+            if event_name == "時報その他" then
+                return coroutine.create(function() return "scene_result" end)
+            end
+            return nil
+        end)
+
+        local act = { req = { id = "OnSecondChange", status = "idle", date = { unix = 0, hour = 9 } } }
+        dispatcher.check_hour(act)
+        act.req.date.unix = 3600
+
+        local result = dispatcher.check_hour(act)
+
+        expect(type(result)):toBe("thread")
+        expect(#called_names):toBe(3)
+        expect(called_names[3]):toBe("時報その他")
+    end)
+end)
+
+-- ============================================================================
+-- Task 3.3: 全候補未発見テスト
+-- Requirements: 1.2
+-- ============================================================================
+
+describe("check_hour - all candidates miss", function()
+    local dispatcher
+
+    local function setup()
+        dispatcher = require("pasta.shiori.event.virtual_dispatcher")
+        dispatcher._reset()
+    end
+
+    test("returns nil when no candidate matches", function()
+        setup()
+
+        dispatcher._set_scene_executor(function(event_name, act)
+            return nil
+        end)
+
+        local act = { req = { id = "OnSecondChange", status = "idle", date = { unix = 0, hour = 12 } } }
+        dispatcher.check_hour(act)
+        act.req.date.unix = 3600
+
+        local result = dispatcher.check_hour(act)
+
+        expect(result):toBe(nil)
+    end)
+end)
+
+-- ============================================================================
+-- Task 3.4: HH フォーマットテスト
+-- Requirements: 2.1, 2.2
+-- ============================================================================
+
+describe("check_hour - HH format", function()
+    local dispatcher
+
+    local function setup()
+        dispatcher = require("pasta.shiori.event.virtual_dispatcher")
+        dispatcher._reset()
+    end
+
+    test("hour=0 generates candidate 時報00", function()
+        setup()
+        local first_name = nil
+
+        dispatcher._set_scene_executor(function(event_name, act)
+            if not first_name then first_name = event_name end
+            return coroutine.create(function() return "result" end)
+        end)
+
+        local act = { req = { id = "OnSecondChange", status = "idle", date = { unix = 0, hour = 0 } } }
+        dispatcher.check_hour(act)
+        act.req.date.unix = 3600
+        dispatcher.check_hour(act)
+
+        expect(first_name):toBe("時報00")
+    end)
+
+    test("hour=9 generates candidate 時報09", function()
+        setup()
+        local first_name = nil
+
+        dispatcher._set_scene_executor(function(event_name, act)
+            if not first_name then first_name = event_name end
+            return coroutine.create(function() return "result" end)
+        end)
+
+        local act = { req = { id = "OnSecondChange", status = "idle", date = { unix = 0, hour = 9 } } }
+        dispatcher.check_hour(act)
+        act.req.date.unix = 3600
+        dispatcher.check_hour(act)
+
+        expect(first_name):toBe("時報09")
+    end)
+
+    test("hour=12 generates candidate 時報12", function()
+        setup()
+        local first_name = nil
+
+        dispatcher._set_scene_executor(function(event_name, act)
+            if not first_name then first_name = event_name end
+            return coroutine.create(function() return "result" end)
+        end)
+
+        local act = { req = { id = "OnSecondChange", status = "idle", date = { unix = 0, hour = 12 } } }
+        dispatcher.check_hour(act)
+        act.req.date.unix = 3600
+        dispatcher.check_hour(act)
+
+        expect(first_name):toBe("時報12")
+    end)
+
+    test("hour=23 generates candidate 時報23", function()
+        setup()
+        local first_name = nil
+
+        dispatcher._set_scene_executor(function(event_name, act)
+            if not first_name then first_name = event_name end
+            return coroutine.create(function() return "result" end)
+        end)
+
+        local act = { req = { id = "OnSecondChange", status = "idle", date = { unix = 0, hour = 23 } } }
+        dispatcher.check_hour(act)
+        act.req.date.unix = 3600
+        dispatcher.check_hour(act)
+
+        expect(first_name):toBe("時報23")
     end)
 end)

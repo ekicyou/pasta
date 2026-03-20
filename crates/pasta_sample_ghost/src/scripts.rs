@@ -55,7 +55,8 @@ mod tests {
     fn test_talk_pasta_contains_events() {
         let talk = read_pasta_script("talk.pasta");
         assert!(talk.contains("＊OnTalk"));
-        assert!(talk.contains("＊OnHour"));
+        assert!(talk.contains("＊時報その他"));
+        assert!(talk.contains("＊時報12"));
         assert!(talk.contains("＄時"));
     }
 

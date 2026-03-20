@@ -129,7 +129,7 @@ fn test_onhour_fires_at_hour() {
         -- Set up mock scene executor that returns a thread directly
         -- (since scene_executor bypass returns its result as-is)
         local scene_threads = {
-            OnHour = coroutine.create(function() return "hour_result" end),
+            OnHourOther = coroutine.create(function() return "hour_result" end),
             OnTalk = coroutine.create(function() return "talk_result" end)
         }
         dispatcher._set_scene_executor(function(event_name)
@@ -140,7 +140,7 @@ fn test_onhour_fires_at_hour() {
         local act1 = { req = {
             id = "OnSecondChange",
             status = "idle",
-            date = { unix = 1702648800 }  -- 14:00:00
+            date = { unix = 1702648800, hour = 14 }  -- 14:00:00
         } }
         dispatcher.check_hour(act1)
         
@@ -148,7 +148,7 @@ fn test_onhour_fires_at_hour() {
         local act2 = { req = {
             id = "OnSecondChange",
             status = "idle",
-            date = { unix = 1702652400 }  -- 15:00:00 (next hour)
+            date = { unix = 1702652400, hour = 15 }  -- 15:00:00 (next hour)
         } }
         local result = dispatcher.check_hour(act2)
         
@@ -176,7 +176,7 @@ fn test_onhour_priority_over_ontalk() {
         
         -- Set up mock scene executor that returns threads directly
         local scene_threads = {
-            OnHour = coroutine.create(function() return "hour" end),
+            OnHourOther = coroutine.create(function() return "hour" end),
             OnTalk = coroutine.create(function() return "talk" end)
         }
         dispatcher._set_scene_executor(function(event_name)
@@ -187,7 +187,7 @@ fn test_onhour_priority_over_ontalk() {
         local act1 = { req = {
             id = "OnSecondChange",
             status = "idle",
-            date = { unix = 1702648800 }
+            date = { unix = 1702648800, hour = 14 }
         } }
         dispatcher.dispatch(act1)
         
@@ -195,7 +195,7 @@ fn test_onhour_priority_over_ontalk() {
         local act2 = { req = {
             id = "OnSecondChange",
             status = "idle",
-            date = { unix = 1702652400 }  -- Next hour
+            date = { unix = 1702652400, hour = 15 }  -- Next hour
         } }
         local result = dispatcher.dispatch(act2)
         
