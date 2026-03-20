@@ -495,7 +495,8 @@ fn test_actor_word_single_value_backward_compat() {
     assert_eq!(results.len(), 3, "Should get 3 results");
     for (i, val) in results.iter().enumerate() {
         assert_eq!(
-            val, "\\s[1]",
+            val,
+            "\\s[1]",
             "Call {} should return \\s[1], got {}",
             i + 1,
             val
