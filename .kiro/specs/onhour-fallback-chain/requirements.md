@@ -42,13 +42,16 @@ OnHourを呼ぶ代わりに、`act:find_scene()`候補として
 #### Acceptance Criteria
 1. When OnHourフォールバックチェーンが実行される前に, the virtual_dispatcher shall `act:transfer_date_to_var()` を呼び出し、`＄時１２` などの日時変数を設定済みにする。
 
-### Requirement 4: 既存 `＊OnHour` シーンの後方互換性
+### Requirement 4: 既存 `＊OnHour` シーンの移行方針
 
-**Objective:** 既存のゴースト辞書作者として、現在の `＊OnHour` シーン定義が引き続き動作することを期待する。それにより、フォールバック導入による辞書の書き換えが不要になる。
+**Objective:** 既存の `＊OnHour` シーン定義を持つゴースト辞書作者に対して、新しいフォールバック仕様への移行方針を明確にする。それにより、辞書作者が更新作業を迷わず実施できる。
+
+#### Background
+`OnHour` をフォールバック候補5として追加する案（5段階化）も検討されたが、候補2 `OnHour{HH}`（例: `OnHour12`）と候補名が前方一致するためシーン解決に誤動作が生じる可能性がある。このため `OnHour` はフォールバック候補に含めない設計とした。
 
 #### Acceptance Criteria
-1. When 辞書に `＊OnHour` のみ定義されている（時刻別シーンなし）場合, the virtual_dispatcher shall フォールバック候補4（`＊OnHourOther`）として既存の `＊OnHour` シーンを検索する。
-2. If 既存の辞書が `＊OnHour` のシーン名で定義されている場合, then the virtual_dispatcher shall フォールバック候補4の名前を `OnHourOther` とするため、既存辞書のシーン名を `＊OnHourOther` に変更する必要があることを明示する。
+1. The virtual_dispatcher shall `OnHour` というシーン名をフォールバック候補として使用しない。
+2. If 既存の辞書に `＊OnHour` シーンが定義されている場合, then 辞書作者は当該シーンを `＊OnHourOther`（フォールバック候補4）または時刻別シーン（`＊時報{HH}` / `＊OnHour{HH}` など）に移行する必要がある。
 
 ### Requirement 5: サンプルゴースト辞書の更新
 
