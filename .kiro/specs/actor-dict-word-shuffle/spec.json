@@ -1,22 +1,22 @@
 {
-  "feature_name": "actor-dict-word-shuffle",
-  "created_at": "2026-03-20T00:00:00Z",
-  "updated_at": "2026-03-20T00:00:00Z",
-  "language": "ja",
-  "phase": "design-generated",
-  "approvals": {
-    "requirements": {
-      "generated": true,
-      "approved": true
+    "feature_name": "actor-dict-word-shuffle",
+    "created_at": "2026-03-20T00:00:00Z",
+    "updated_at": "2026-03-20T06:00:00Z",
+    "language": "ja",
+    "phase": "tasks-generated",
+    "approvals": {
+        "requirements": {
+            "generated": true,
+            "approved": true
+        },
+        "design": {
+            "generated": true,
+            "approved": true
+        },
+        "tasks": {
+            "generated": true,
+            "approved": false
+        }
     },
-    "design": {
-      "generated": true,
-      "approved": false
-    },
-    "tasks": {
-      "generated": false,
-      "approved": false
-    }
-  },
-  "ready_for_implementation": false
+    "ready_for_implementation": false
 }
