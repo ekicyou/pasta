@@ -103,9 +103,9 @@ do
     end
 
     -- 　・グローバル単語呼び出し
-    -- 意図: 第1階層ローカルシーンは __ローカルシーン名_N__ 形式で常にカウンター付与（Requirement 3c）
+    -- 意図: 第1階層ローカルシーンは ローカルシーン名_N 形式で常にカウンター付与（Requirement 3c）
     --       N=1,2,3... で各ローカルシーン定義順に採番。Rune実装と同一パターン
-    function SCENE.__グローバル単語呼び出し_1__(ctx, ...)
+    function SCENE.グローバル単語呼び出し_1(ctx, ...)
         local args = { ... }
         local act, save, var = PASTA.create_session(SCENE, ctx)
 
@@ -122,7 +122,7 @@ do
     end
 
     -- 　・ローカル単語呼び出し
-    function SCENE.__ローカル単語呼び出し_1__(ctx, ...)
+    function SCENE.ローカル単語呼び出し_1(ctx, ...)
         local args = { ... }
         local act, save, var = PASTA.create_session(SCENE, ctx)
 
@@ -139,7 +139,7 @@ do
 
     -- 　・会話分岐
     -- 意図: ローカルシーン定義順に採番。最初の「会話分岐」は_1（Requirement 3c、Rune実装と同一）
-    function SCENE.__会話分岐_1__(ctx, ...)
+    function SCENE.会話分岐_1(ctx, ...)
         local args = { ... }
         local act, save, var = PASTA.create_session(SCENE, ctx)
 
@@ -152,7 +152,7 @@ do
 
     -- 　・会話分岐
     -- 意図: ローカルシーン定義順に採番。重複「会話分岐」は_2
-    function SCENE.__会話分岐_2__(ctx, ...)
+    function SCENE.会話分岐_2(ctx, ...)
         local args = { ... }
         local act, save, var = PASTA.create_session(SCENE, ctx)
 
@@ -169,7 +169,7 @@ do
     end
 
     -- 　・変数代入
-    function SCENE.__変数代入_1__(ctx, ...)
+    function SCENE.変数代入_1(ctx, ...)
         local args = { ... }
         local act, save, var = PASTA.create_session(SCENE, ctx)
 
@@ -195,7 +195,7 @@ do
     end
 
     -- 　・引数付き呼び出し
-    function SCENE.__引数付き呼び出し_1__(ctx, ...)
+    function SCENE.引数付き呼び出し_1(ctx, ...)
         local args = { ... }
         local act, save, var = PASTA.create_session(SCENE, ctx)
 

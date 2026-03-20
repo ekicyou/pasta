@@ -143,6 +143,7 @@
 | SHIORI リクエスト処理         | `lua_request_test.rs`                                                                               | ✅ 完了 | 18+テスト                                          |
 | Runtime E2E                   | `runtime_scene_test.rs`<br>`runtime_syntax_test.rs`                                                 | ✅ 完了 | 16テスト（2ファイルに分割）                        |
 | Finalize Scene                | `finalize_scene_test.rs`                                                                            | ✅ 完了 | 14テスト                                           |
+| ローカルシーン call E2E       | `local_scene_call_test.rs`                                                                          | ✅ 完了 | 3テスト（finalize経路・重複・前方一致）            |
 | Virtual Event Dispatcher      | `virtual_event_dispatch_test.rs`<br>`virtual_event_config_test.rs`<br>`virtual_dispatcher_spec.lua` | ✅ 完了 | 15+20テスト（2ファイルに分割）                     |
 | Sample Ghost Integration      | `shiori_sample_ghost_test.rs`                                                                       | ✅ 完了 | 2テスト（hello-pasta実ゴースト使用）               |
 | Sample Ghost スクリプト整合性 | `scripts.rs::test_script_expression_names_defined_in_actors`                                        | ✅ 完了 | 1テスト（表情名↔辞書定義一致検証）                 |
@@ -162,7 +163,7 @@
 | 全角/半角対応表の完全性             | -                             | ✅ ドキュメント                 |
 | cargo test pasta_core 100%パス      | 全pasta_coreテスト            | ✅ 67テスト                     |
 | cargo test pasta_dsl 100%パス       | 全pasta_dslテスト             | ✅ 62テスト                     |
-| cargo test pasta_lua 100%パス       | 全pasta_luaテスト             | ✅ 230テスト                    |
+| cargo test pasta_lua 100%パス       | 全pasta_luaテスト             | ✅ 233テスト                    |
 | cargo test pasta_shiori 100%パス    | `shiori_lifecycle_test.rs`    | ✅ 全パス                       |
 | comprehensive_control_flow検証      | `transpiler_snapshot_test.rs` | ✅ 8スナップショット            |
 | スナップショットテスト整備          | insta crate                   | ✅ 実装済み                     |

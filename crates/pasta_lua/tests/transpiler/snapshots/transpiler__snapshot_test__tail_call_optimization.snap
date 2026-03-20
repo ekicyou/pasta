@@ -27,14 +27,14 @@ do
         return act:call(SCENE.__global_name__, "呼び出しなし", {}, table.unpack(args))
     end
 
-    function SCENE.__単一呼び出し_1__(act, ...)
+    function SCENE.単一呼び出し_1(act, ...)
         local args = { ... }
         local save, var = act:init_scene(SCENE)
 
         return act:call(SCENE.__global_name__, "シーン2", {}, table.unpack(args))
     end
 
-    function SCENE.__複数呼び出し_1__(act, ...)
+    function SCENE.複数呼び出し_1(act, ...)
         local args = { ... }
         local save, var = act:init_scene(SCENE)
 
@@ -43,7 +43,7 @@ do
         return act:call(SCENE.__global_name__, "シーン3", {}, table.unpack(args))
     end
 
-    function SCENE.__呼び出し後にアクション_1__(act, ...)
+    function SCENE.呼び出し後にアクション_1(act, ...)
         local args = { ... }
         local save, var = act:init_scene(SCENE)
 
@@ -51,7 +51,7 @@ do
         act.さくら:talk("こんにちは")
     end
 
-    function SCENE.__呼び出しなし_1__(act, ...)
+    function SCENE.呼び出しなし_1(act, ...)
         local args = { ... }
         local save, var = act:init_scene(SCENE)
 
@@ -59,21 +59,21 @@ do
         act.うにゅう:talk("やふぅ")
     end
 
-    function SCENE.__シーン1_1__(act, ...)
+    function SCENE.シーン1_1(act, ...)
         local args = { ... }
         local save, var = act:init_scene(SCENE)
 
         act.さくら:talk("シーン1です")
     end
 
-    function SCENE.__シーン2_1__(act, ...)
+    function SCENE.シーン2_1(act, ...)
         local args = { ... }
         local save, var = act:init_scene(SCENE)
 
         act.うにゅう:talk("シーン2やで")
     end
 
-    function SCENE.__シーン3_1__(act, ...)
+    function SCENE.シーン3_1(act, ...)
         local args = { ... }
         local save, var = act:init_scene(SCENE)
 

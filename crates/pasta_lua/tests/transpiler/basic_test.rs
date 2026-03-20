@@ -147,7 +147,7 @@ fn test_transpile_sample_pasta_scenes() {
 
     // Verify local scene function (Requirement 3c)
     assert!(
-        lua_code.contains("function SCENE.__自己紹介_"),
+        lua_code.contains("function SCENE.自己紹介_"),
         "Missing 自己紹介 local scene function"
     );
 }

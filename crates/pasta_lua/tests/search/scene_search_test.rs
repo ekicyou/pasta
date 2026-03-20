@@ -131,7 +131,7 @@ fn test_scene_search_local_search() {
 
         -- Register scenes
         SCENE.register("メイン_1", "__start__", function() return "start" end)
-        SCENE.register("メイン_1", "__選択肢_1__", function() return "choice" end)
+        SCENE.register("メイン_1", "選択肢_1", function() return "choice" end)
 
         -- Local search (within メイン_1)
         local result = SCENE.search("選択肢", "メイン_1")

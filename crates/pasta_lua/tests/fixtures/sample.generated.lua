@@ -36,7 +36,7 @@ do
         return act:call(SCENE.__global_name__, "引数付き呼び出し", {}, var.カウンタ, save.グローバル, table.unpack(args))
     end
 
-    function SCENE.__グローバル単語呼び出し_1__(act, ...)
+    function SCENE.グローバル単語呼び出し_1(act, ...)
         local args = { ... }
         local save, var = act:init_scene(SCENE)
 
@@ -47,7 +47,7 @@ do
         act.うにゅう:talk("やふぅ。")
     end
 
-    function SCENE.__ローカル単語呼び出し_1__(act, ...)
+    function SCENE.ローカル単語呼び出し_1(act, ...)
         local args = { ... }
         local save, var = act:init_scene(SCENE)
 
@@ -58,7 +58,7 @@ do
         act.うにゅう:talk("らしいで。")
     end
 
-    function SCENE.__会話分岐_1__(act, ...)
+    function SCENE.会話分岐_1(act, ...)
         local args = { ... }
         local save, var = act:init_scene(SCENE)
 
@@ -66,7 +66,7 @@ do
         act.うにゅう:talk("ちっぽけやね。")
     end
 
-    function SCENE.__会話分岐_2__(act, ...)
+    function SCENE.会話分岐_2(act, ...)
         local args = { ... }
         local save, var = act:init_scene(SCENE)
 
@@ -76,7 +76,7 @@ do
         act.さくら:talk("なんでだよ。")
     end
 
-    function SCENE.__変数代入_1__(act, ...)
+    function SCENE.変数代入_1(act, ...)
         local args = { ... }
         local save, var = act:init_scene(SCENE)
 
@@ -88,7 +88,7 @@ do
         var.場所 = act:word("場所")
     end
 
-    function SCENE.__引数付き呼び出し_1__(act, ...)
+    function SCENE.引数付き呼び出し_1(act, ...)
         local args = { ... }
         local save, var = act:init_scene(SCENE)
 

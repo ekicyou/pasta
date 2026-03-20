@@ -123,6 +123,90 @@ fn test_scene_collection_local_scenes() {
     assert!(search_exists, "@pasta_search module should be available");
 }
 
+/// Test: Local scene search via finalize path (Req 4.2, 4.3)
+///
+/// Verifies that after transpile → execute → finalize_scene(),
+/// local scenes can be resolved via search_scene with a parent scope.
+#[test]
+fn test_scene_collection_local_scene_search() {
+    let lua = create_runtime_with_finalize().unwrap();
+
+    let pasta_source = include_str!("../fixtures/sample.pasta");
+    let lua_code = transpile(pasta_source);
+
+    lua.load(&lua_code).exec().unwrap();
+    lua.load("require('pasta').finalize_scene()")
+        .exec()
+        .unwrap();
+
+    // Search for local scene "グローバル単語呼び出し" within parent "メイン"
+    // Note: PASTA.create_scene("メイン") generates global_name "メイン1"
+    let result: (String, String) = lua
+        .load(
+            r#"
+        local SEARCH = require "@pasta_search"
+        local SCENE = require "pasta.scene"
+        local gn = SCENE.get_global_table("メイン1").__global_name__
+        return SEARCH:search_scene("グローバル単語呼び出し", gn)
+    "#,
+        )
+        .eval()
+        .unwrap();
+
+    assert!(
+        result.0.contains("メイン"),
+        "Global name should contain 'メイン', got: {}",
+        result.0
+    );
+    assert!(
+        result.1.contains("グローバル単語呼び出し"),
+        "Local name should contain 'グローバル単語呼び出し', got: {}",
+        result.1
+    );
+}
+
+/// Test: Local scene prefix search via finalize path (Req 4.2)
+///
+/// Verifies that register_global_raw → SceneTable prefix matching
+/// correctly resolves local scenes with a shared prefix.
+#[test]
+fn test_scene_collection_local_scene_prefix_search() {
+    let lua = create_runtime_with_finalize().unwrap();
+
+    let pasta_source = include_str!("../fixtures/sample.pasta");
+    let lua_code = transpile(pasta_source);
+
+    lua.load(&lua_code).exec().unwrap();
+    lua.load("require('pasta').finalize_scene()")
+        .exec()
+        .unwrap();
+
+    // Prefix search "会話分岐" should find one of the local scenes (会話分岐_1 or 会話分岐_2)
+    // Note: PASTA.create_scene("メイン") generates global_name "メイン1"
+    let result: (String, String) = lua
+        .load(
+            r#"
+        local SEARCH = require "@pasta_search"
+        local SCENE = require "pasta.scene"
+        local gn = SCENE.get_global_table("メイン1").__global_name__
+        return SEARCH:search_scene("会話分岐", gn)
+    "#,
+        )
+        .eval()
+        .unwrap();
+
+    assert!(
+        result.0.contains("メイン"),
+        "Global name should contain 'メイン', got: {}",
+        result.0
+    );
+    assert!(
+        result.1.contains("会話分岐"),
+        "Local name should contain '会話分岐', got: {}",
+        result.1
+    );
+}
+
 // ============================================================================
 // Task 8.2: Word Dictionary Collection E2E Tests
 // ============================================================================

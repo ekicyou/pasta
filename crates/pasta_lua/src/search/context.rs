@@ -60,7 +60,7 @@ impl SearchContext {
     ///
     /// The returned names match the transpiler output format:
     /// - `global_name`: e.g., "メイン1" (from fn_name before "::")
-    /// - `local_name`: e.g., "__選択肢_1__" or "__start__" (Lua function name format)
+    /// - `local_name`: e.g., "選択肢_1" or "__start__" (Lua function name format)
     pub fn search_scene(
         &mut self,
         name: &str,
@@ -116,14 +116,14 @@ impl SearchContext {
     /// * `fn_name` - e.g., "メイン_1::選択肢_1" or "メイン_1::__start__"
     ///
     /// # Returns
-    /// * `(global_name, local_name)` - e.g., ("メイン_1", "__選択肢_1__") or ("メイン_1", "__start__")
+    /// * `(global_name, local_name)` - e.g., ("メイン_1", "選択肢_1") or ("メイン_1", "__start__")
     fn parse_fn_name(fn_name: &str) -> (String, String) {
         if let Some((global_part, local_part)) = fn_name.split_once("::") {
             let local_name = if local_part == "__start__" {
                 "__start__".to_string()
             } else {
-                // Convert "選択肢_1" to "__選択肢_1__"
-                format!("__{}__", local_part)
+                // Return local_part as-is (already in Lua function name format)
+                local_part.to_string()
             };
             (global_part.to_string(), local_name)
         } else {

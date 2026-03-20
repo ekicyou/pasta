@@ -15,7 +15,7 @@ do
         return act:call(SCENE.__global_name__, "サブ", {}, table.unpack(args))
     end
 
-    function SCENE.__サブ_1__(act, ...)
+    function SCENE.サブ_1(act, ...)
         local args = { ... }
         local save, var = act:init_scene(SCENE)
 

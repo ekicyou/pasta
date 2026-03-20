@@ -8,6 +8,7 @@ mod common;
 
 mod encoding_test;
 mod finalize_scene_test;
+mod local_scene_call_test;
 mod persistence_integration_test;
 mod scene_test;
 mod stdlib_modules_test;

@@ -197,7 +197,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     ) -> Result<(), TranspileError> {
         let fn_name = if let Some(ref name) = scene.name {
             let sanitized = SceneRegistry::sanitize_name(name);
-            format!("__{}_{}__", sanitized, counter)
+            format!("{}_{}", sanitized, counter)
         } else {
             "__start__".to_string()
         };

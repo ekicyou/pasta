@@ -360,7 +360,7 @@ fn test_tail_call_optimization_fixture() {
     // Pattern 2: 複数呼び出し - 最後の呼び出しのみ return
     // シーン1, シーン2 には return なし
     let multiple_call_section = lua_code
-        .find("__複数呼び出し")
+        .find("SCENE.複数呼び出し_")
         .expect("複数呼び出し function not found");
     let next_function = lua_code[multiple_call_section..]
         .find("\n    function SCENE.")
@@ -385,7 +385,7 @@ fn test_tail_call_optimization_fixture() {
 
     // Pattern 3: 呼び出し後にアクション - return なし
     let action_after_call_section = lua_code
-        .find("__呼び出し後にアクション")
+        .find("SCENE.呼び出し後にアクション_")
         .expect("呼び出し後にアクション function not found");
     let next_function2 = lua_code[action_after_call_section..]
         .find("\n    function SCENE.")
@@ -401,7 +401,7 @@ fn test_tail_call_optimization_fixture() {
 
     // Pattern 4: 呼び出しなし - return act:call なし
     let no_call_section = lua_code
-        .find("__呼び出しなし")
+        .find("SCENE.呼び出しなし_")
         .expect("呼び出しなし function not found");
     let next_function3 = lua_code[no_call_section..]
         .find("\n    function SCENE.")

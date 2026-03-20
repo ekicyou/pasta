@@ -307,13 +307,13 @@ fn test_search_scene_local_returns_transpiler_format() {
     let runtime = PastaLuaRuntime::new(ctx).unwrap();
 
     // Test local scene search returns names matching transpiler output format
-    // Local scene: global_name = "メイン_1", local_name = "__選択肢_1__"
+    // Local scene: global_name = "メイン_1", local_name = "選択肢_1"
     let result = runtime.exec(
         r#"
         local SEARCH = require "@pasta_search"
         local global_name, local_name = SEARCH:search_scene("選択肢", "メイン_1")
-        -- Verify format: global_name should be "メイン_1", local_name should be "__選択肢_1__"
-        return global_name == "メイン_1" and local_name == "__選択肢_1__"
+        -- Verify format: global_name should be "メイン_1", local_name should be "選択肢_1"
+        return global_name == "メイン_1" and local_name == "選択肢_1"
     "#,
     );
 
@@ -321,6 +321,6 @@ fn test_search_scene_local_returns_transpiler_format() {
     let value = result.unwrap();
     assert!(
         value.as_boolean().unwrap_or(false),
-        "Expected global_name='メイン_1' and local_name='__選択肢_1__'"
+        "Expected global_name='メイン_1' and local_name='選択肢_1'"
     );
 }
