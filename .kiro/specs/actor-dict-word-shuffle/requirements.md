@@ -58,5 +58,5 @@
 
 #### Acceptance Criteria
 
-1. The doc/spec/11-actor-dictionary.md shall アクタースコープ単語が複数値定義時にシャッフル＆順次消費方式で選択されることを明記する
-2. The doc/spec/11-actor-dictionary.md shall 単語選択方式が Chapter 10（単語定義）と同一であることへの相互参照を含む
+1. The doc/spec/11-actor-dictionary.md shall アクタースコープ単語が複数値定義時にシャッフル＆順次消費方式で選択されることを明記する（「アクター単語はシャッフルされる」が仕様上の契約である）
+2. The doc/spec/11-actor-dictionary.md shall 単語選択のシャッフル動作が [4.1.4 スコープ解決アルゴリズム](04-call-spec.md#414-スコープ解決アルゴリズム) と同一であることへの相互参照を含む
