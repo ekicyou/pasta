@@ -273,41 +273,49 @@ end
 local dispatcher = require("pasta.shiori.event.virtual_dispatcher")
 ```
 
-### dispatch(req)
+### dispatch(act)
 
 メインエントリポイント。OnSecondChangeリクエストからOnHour/OnTalkイベントを判定・発行。
 
 ```lua
---- @param req table リクエストテーブル (req.date.unix 必須)
---- @return string|nil "fired" (発行成功), nil (発行なし)
-local result = dispatcher.dispatch(req)
+--- @param act ShioriAct actオブジェクト
+--- @return thread|nil コルーチンまたはnil
+local result = dispatcher.dispatch(act)
 ```
 
 - OnHourを優先判定し、発火しなければOnTalkを判定
-- `req.date` フィールドがない場合は `nil` を返却
-- `req.status == "talking"` の場合はスキップ
+- `act.req.date` フィールドがない場合は `nil` を返却
+- `act.req.status == "talking"` の場合はスキップ
 
-### OnHour — 時報自動発行
+### OnHour — 時報自動発行（4段階フォールバックチェーン）
 
-#### check_hour(req)
+#### check_hour(act)
 
 ```lua
---- @param req table リクエストテーブル
---- @return string|nil "fired" or nil
-local result = dispatcher.check_hour(req)
+--- @param act ShioriAct actオブジェクト
+--- @return thread|nil コルーチンまたはnil
+local result = dispatcher.check_hour(act)
 ```
 
 - 初回呼び出し時は次の正時を計算してスキップ
-- 正時超過時にOnHourシーンを検索・実行
+- 正時超過時に4段階フォールバックチェーンでシーンを解決:
+  1. `時報{HH}` — 時刻別シーン（例: `時報12` で正午専用）
+  2. `OnHour{HH}` — 時刻別英語シーン（例: `OnHour12`）
+  3. `時報その他` — 汎用時報シーン
+  4. `OnHourOther` — 汎用英語時報シーン
+- `{HH}` は `act.req.date.hour` の0埋め2桁（00〜23）
+- 最初にハンドラが見つかった候補で即リターン（早期打ち切り）
+- 全候補未発見の場合は `nil` を返す
+- **注意**: 旧シーン名 `OnHour` はフォールバック候補に含まれない（前方一致バグ回避）
 
 ### OnTalk — ランダムトーク自動発行
 
-#### check_talk(req)
+#### check_talk(act)
 
 ```lua
---- @param req table リクエストテーブル
---- @return string|nil "fired" or nil
-local result = dispatcher.check_talk(req)
+--- @param act ShioriAct actオブジェクト
+--- @return thread|nil コルーチンまたはnil
+local result = dispatcher.check_talk(act)
 ```
 
 ### pasta.toml設定
