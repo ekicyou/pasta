@@ -51,7 +51,7 @@
 
 ```mermaid
 graph TD
-    A[".pasta ファイル"] --> B["grammar.pest<br/>call_scene = call_marker ~ (id | expr) ~ s ~ args?"]
+    A[".pasta ファイル"] --> B["grammar.pest<br/>call_target_expr = { expr }<br/>call_scene = call_marker ~ (id | call_target_expr) ~ s ~ args?"]
     B --> C{"Pest ordered choice"}
     C -->|"XID_START 先頭"| D["Rule::id → CallTarget::Static(String)"]
     C -->|"＄/＠/（/数字/「 先頭"| E["Rule::expr → CallTarget::Dynamic(Expr)"]
@@ -138,7 +138,7 @@ sequenceDiagram
 
 | コンポーネント | ドメイン/レイヤー | 意図 | 要件カバレッジ | 主要依存 (P0/P1) | コントラクト |
 |--------------|-----------------|------|--------------|-----------------|-------------|
-| grammar.pest | パーサー | `call_scene` ルール拡張 | 1.1, 1.2, 4.1 | — | — |
+| grammar.pest | パーサー | `call_target_expr` ラッパー + `call_scene` ルール拡張 | 1.1, 1.2, 4.1 | — | — |
 | CallTarget | AST | 静的/動的ターゲットの型表現 | 1.1, 1.3 | Expr (P0) | 型定義 |
 | parse_call_scene() | パーサー | call_scene の AST 構築 | 1.1, 1.2 | try_parse_expr (P0) | Service |
 | generate_call_scene() | コード生成 | call_scene の Lua 出力 | 2.1, 2.2, 4.2 | generate_expr (P0) | Service |
@@ -154,9 +154,10 @@ sequenceDiagram
 | 要件 | 1.1, 1.2, 4.1 |
 
 **責務 & 制約**
-- `call_scene` ルールを `call_marker ~ (id | expr) ~ s ~ args?` に変更
+- `call_scene` ルールを `call_marker ~ (id | call_target_expr) ~ s ~ args?` に変更
 - `id` を先に ordered choice で試行（静的コール高速パス）
 - `id ∩ expr = ∅` の先頭文字素集合性によりバックトラック最小
+- `expr` は silent rule なので `call_target_expr = { expr }` 非 silent ラッパーで wrap して単一 Pair として捕捉
 
 **変更内容**:
 ```pest
@@ -164,13 +165,14 @@ sequenceDiagram
 call_scene = { call_marker ~ id ~ s ~ args? }
 
 # After
-call_scene = { call_marker ~ (id | expr) ~ s ~ args? }
+call_target_expr = { expr }  \u2190 非 silent ラッパールール (1行追加)
+call_scene = { call_marker ~ (id | call_target_expr) ~ s ~ args? }
 ```
 
 **実装メモ**
-- `expr` は silent rule（`=_{ term ~ s ~ bin* }`）のため、内側の `term` 子ルール（`var_ref_local`, `var_ref_global`, `fn_call_local`, `fn_call_global`, `paren_expr`, `number_literal`, `string_literal`）が直接展開される
-- `bin` も silent rule のため、`bin_op`（`add_op`, `sub_op` 等）が直接展開される
-- `parse_call_scene()` では `Rule::id` 以外の inner pair を `parse_expr_from_parts()` に委譲
+- `expr` は `=_{}` silent rule のため、単体の `Pair` として捕捉できない。`call_target_expr = { expr }` は非 silent ラッパーであり、その inner pairs に `expr` の展開内容（`var_ref_local`, `add_op` 等）が格納される
+- `call_target_expr` を `parse_expr_from_parts(call_target_expr_pair)` にそのまま渡せるため、既存関数を完全再利用できる
+- LSP `visit_call_scene` は `cs.span` のみ参照するため、この文法変更の影響はない
 
 ---
 
@@ -240,21 +242,19 @@ pub(crate) fn parse_call_scene(pair: Pair<Rule>) -> Result<CallScene, ParseError
 **事前条件**: `pair.as_rule() == Rule::call_scene`
 **事後条件**:
 - `pair` の inner に `Rule::id` が含まれる場合 → `CallTarget::Static(String)`
-- `pair` の inner に `expr` 由来のルール（`Rule::var_ref_local`, `Rule::add_op` 等）が含まれる場合 → `CallTarget::Dynamic(Expr)`
+- `pair` の inner に `Rule::call_target_expr` が含まれる場合 → `parse_expr_from_parts(call_target_expr_pair)` → `CallTarget::Dynamic(Expr)`
 - `args` の解析は既存ロジック不変
 
 **ロジック概要**:
-1. inner pairs をイテレート
+1. `pair.into_inner()` をイテレート（`call_marker`・`s` は silent なので現れない）
 2. `Rule::id` を検出 → `CallTarget::Static(id.as_str().to_string())`
-3. `Rule::id` 非検出 → 全 inner pairs を `parse_expr_from_parts()` に委譲して `Expr` 構築 → `CallTarget::Dynamic(expr)`
+3. `Rule::call_target_expr` を検出 → `parse_expr_from_parts(inner)` で `Expr` 構築 → `CallTarget::Dynamic(expr)`
 4. `Rule::args` → 既存の `parse_args()` で処理（不変）
 
 **実装メモ**
-- `call_marker` は `=_{}` silent rule のため、`pair.into_inner()` の返却するペアには**含まれない**（スキップ不要）
-- `s`（空白）も `=_{}` silent rule のため同様に含まれない
-- `expr` は `=_{}` silent rule のため、その内部ルール（`var_ref_local`, `var_ref_global`, `fn_call_local`, `add_op` 等）が call_scene の inner pairs に直接展開される
-- 既存の `try_parse_expr()` の match arm を全て活用可能（追加のルールハンドリング不要）
-- **設計未確定**: `parse_expr_from_parts()` は `Pair<Rule>` を受け取り `pair.into_inner()` を使う構造上、フラット展開された expr 由来ペアを直接渡せない。grammar に `call_target_expr = { expr }` ラッパーを追加するか、新たな `parse_expr_from_iter` ヘルパーを追加するかの設計選択が必要（→ 未解決）
+- `call_marker`・`s` は `=_{}` silent rule のため `pair.into_inner()` に**含まれない**
+- `call_target_expr = { expr }` は**非 silent** ラッパー。`expr` 内ルール（`var_ref_local`, `add_op` 等）は `call_target_expr_pair.into_inner()` として展開され、`parse_expr_from_parts()` がそのまま再利用できる
+- 案A（grammar ラッパー）採用: 案B（新ヘルパー `parse_expr_from_iter`）よりロジック重複がなく最小変更
 
 ---
 
