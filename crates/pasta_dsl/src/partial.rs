@@ -95,9 +95,11 @@ fn split_by_scope_markers(source: &str) -> Vec<SourceChunk> {
         };
 
         if is_scope_boundary && !current_lines.is_empty() {
-            // Flush current chunk
+            // Flush current chunk (append trailing \n so every line has eol)
+            let mut text = current_lines.join("\n");
+            text.push('\n');
             chunks.push(SourceChunk {
-                text: current_lines.join("\n"),
+                text,
                 start_line: current_start_line,
             });
             current_lines.clear();
@@ -110,10 +112,12 @@ fn split_by_scope_markers(source: &str) -> Vec<SourceChunk> {
         current_lines.push(line);
     }
 
-    // Flush remaining
+    // Flush remaining (append trailing \n so every line has eol)
     if !current_lines.is_empty() {
+        let mut text = current_lines.join("\n");
+        text.push('\n');
         chunks.push(SourceChunk {
-            text: current_lines.join("\n"),
+            text,
             start_line: current_start_line,
         });
     }

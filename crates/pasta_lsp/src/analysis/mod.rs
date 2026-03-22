@@ -32,6 +32,15 @@ pub struct AnalysisEngine;
 impl AnalysisEngine {
     /// ドキュメント全体を解析し、トークンとDiagnosticsを生成する
     pub fn analyze(source: &str) -> AnalysisResult {
+        // Ensure source ends with newline — the grammar requires every line
+        // to terminate with eol (NEWLINE). Editors like VSCode may omit it.
+        let source = if source.ends_with('\n') {
+            std::borrow::Cow::Borrowed(source)
+        } else {
+            std::borrow::Cow::Owned(format!("{}\n", source))
+        };
+        let source: &str = &source;
+
         // Phase 0: Scan source lines for comment lines (AST does not preserve comments)
         let mut raw_tokens = Self::scan_comment_lines(source);
 
