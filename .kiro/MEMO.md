@@ -17,3 +17,34 @@ JITビルド可能なスクリプト言語をサポートするためのフレ�
 
 ## バルーン指定
 スポット情報と一緒にバルーン指定を設定できた方がよいかもしれない。さくらスクリプト直接指定でもよいが。。。
+
+
+## アクション行がないローカルシーン分岐が書きたい
+以下の行が成立するように、pest定義からluaトランスパイル、最終コード実行までの確認を行う。
+
+```pasta
+＊サンプル
+　ぱすた：分岐するよ！
+　　＞分岐
+
+　　・分岐会話無し
+　　・分岐会話アリ
+　ぱすた：分岐したよ！
+```
+
+上記のようなコードをトランスパイルから実行まで行うインテグレーションテストを追加し、このシナリオが成立するように全体を修正せよ
+
+
+具体的には以下のコード修正で行けるはず。
+
+修正前：
+```pest
+local_start_scene_scope = {                     local_scene_item+ ~ code_scope* }
+local_scene_scope       = { local_scene_start ~ local_scene_item+ ~ code_scope* }
+```
+
+修正後：
+```pest
+local_start_scene_scope = {                     local_scene_item* ~ code_scope* }
+local_scene_scope       = { local_scene_start ~ local_scene_item* ~ code_scope* }
+```
