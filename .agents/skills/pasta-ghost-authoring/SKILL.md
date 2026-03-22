@@ -14,7 +14,7 @@ description: >-
   SHIORIプロトコル実装, Luaランタイム開発, pasta言語仕様の設計変更.
 metadata:
   author: ekicyou
-  version: "1.2.0"
+  version: "1.3.0"
 ---
 
 # Pasta Ghost Authoring Skill
@@ -152,7 +152,7 @@ metadata:
 ### 3.5 Call Statements（Call文）
 
 - 構文: `＞シーン名` — 指定シーンを呼び出し、実行後に復帰
-- 動的ターゲット: `＞＄変数名` — 変数値をシーン名として解決
+- 動的ターゲット: `＞expr` — 式の評価結果をシーン名として解決（`＞＄変数名` は `var_ref` としての代表ケース）
 - 前方一致で候補が複数ある場合はランダム選択
 - 特殊Call: `＞ゴースト終了（ミリ秒）` — ゴーストを終了させる
 - 特殊Call: `＞チェイントーク` / `＞yield` — シーン出力を分割し、次回 OnTalk トリガーで後半を出力する（§6.7 参照）

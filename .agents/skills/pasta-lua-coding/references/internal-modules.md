@@ -224,12 +224,14 @@ function ACT_IMPL.find_scene(self, key, scope, attrs) end
 
 ```lua
 --- @param global string グローバルシーン名
---- @param key string ローカルキー
+--- @param key string|nil ローカルキー（nilの場合は警告ログ出力＋即時リターン）
 --- @param attrs table|nil 属性テーブル
 --- @param ... any 追加引数
 --- @return any 呼び出し結果
 function ACT_IMPL.call(self, global, key, attrs, ...) end
 ```
+
+> **nilガード**: `key == nil` の場合（未定義変数参照等）、`find_scene` は呼ばれず `log.warn` を出力して `nil` を返す。動的コール `＞expr` で式評価結果が nil になった場合に適用される。
 
 ### yield()
 

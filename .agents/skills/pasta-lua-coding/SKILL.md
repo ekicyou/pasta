@@ -16,7 +16,7 @@ description: >-
   汎用Luaプログラミング, SHIORIプロトコル実装.
 metadata:
   author: ekicyou
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Pasta Lua Coding Skill
