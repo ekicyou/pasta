@@ -54,8 +54,6 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         call_scene: &CallScene,
         is_tail_call: bool,
     ) -> Result<(), TranspileError> {
-        let target = &call_scene.target;
-
         // Generate argument list
         let args_str = if let Some(ref args) = call_scene.args {
             let mut parts = Vec::new();
@@ -82,12 +80,24 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             "table.unpack(args)".to_string()
         };
 
-        // Use SCENE.__global_name__ instead of hardcoded module name
-        // This allows Lua runtime to determine the actual global scene name
-        let call_stmt = format!(
-            "act:call(SCENE.__global_name__, \"{}\", {{}}, {})",
-            target, args_str
-        );
+        // Generate call statement based on target type
+        let call_stmt = match &call_scene.target {
+            pasta_dsl::parser::CallTarget::Static(name) => {
+                format!(
+                    "act:call(SCENE.__global_name__, \"{}\", {{}}, {})",
+                    name, args_str
+                )
+            }
+            pasta_dsl::parser::CallTarget::Dynamic(expr) => {
+                let mut buf = Vec::new();
+                self.generate_expr_to_buffer(expr, &mut buf)?;
+                let expr_str = String::from_utf8(buf).unwrap_or_default();
+                format!(
+                    "act:call(SCENE.__global_name__, tostring({}), {{}}, {})",
+                    expr_str, args_str
+                )
+            }
+        };
 
         // Tail call optimization: prepend 'return' for the last callable item
         if is_tail_call {

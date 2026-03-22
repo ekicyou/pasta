@@ -150,7 +150,8 @@ attr_value = _{ number_literal | string_literal | attr_string }
 attr_string = @ { ( !( kv_marker | attr_marker | comment_marker ) ~ no_ws )+ }
 
 // ################################################# call
-call_scene = { call_marker ~ id ~ s ~ args? }
+call_target_expr = { expr }
+call_scene = { call_marker ~ (id | call_target_expr) ~ s ~ args? }
 
 // ################################################# scene
 scene = _{ id ~ s ~ attrs? }

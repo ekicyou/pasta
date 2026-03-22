@@ -77,13 +77,22 @@ pub struct VarSet {
 // CallScene - Scene Call
 // ============================================================================
 
+/// コールターゲット: 静的（リテラルシーン名）または動的（式評価結果）
+#[derive(Debug, Clone, PartialEq)]
+pub enum CallTarget {
+    /// 静的コール: リテラルのシーン名（従来の ＞シーン名）
+    Static(String),
+    /// 動的コール: 式の評価結果をシーン名として使用（＞expr）
+    Dynamic(Expr),
+}
+
 /// Scene call.
 ///
 /// Corresponds to the `call_scene` rule: `>scene_name args?`
 #[derive(Debug, Clone)]
 pub struct CallScene {
-    /// Target scene name
-    pub target: String,
+    /// Target: static scene name or dynamic expression
+    pub target: CallTarget,
     /// Optional arguments
     pub args: Option<Args>,
     /// Source location

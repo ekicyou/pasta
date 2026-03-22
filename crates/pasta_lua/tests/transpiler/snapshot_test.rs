@@ -170,3 +170,56 @@ fn test_sakura_script_action_snapshot() {
     let lua_code = transpile(source);
     assert_snapshot!("sakura_script_action", lua_code);
 }
+
+// ============================================================================
+// Dynamic Call Snapshots
+// ============================================================================
+
+/// Dynamic call with local variable reference
+#[test]
+fn test_dynamic_call_local_var_snapshot() {
+    let source = r#"
+＊メイン
+  ＄target＝「挨拶」
+  ＞＄target
+"#;
+
+    let lua_code = transpile(source);
+    assert_snapshot!("dynamic_call_local_var", lua_code);
+}
+
+/// Dynamic call with global variable reference
+#[test]
+fn test_dynamic_call_global_var_snapshot() {
+    let source = r#"
+＊メイン
+  ＞＄＊target
+"#;
+
+    let lua_code = transpile(source);
+    assert_snapshot!("dynamic_call_global_var", lua_code);
+}
+
+/// Dynamic call with function call expression
+#[test]
+fn test_dynamic_call_fn_call_snapshot() {
+    let source = r#"
+＊メイン
+  ＞＠func（）
+"#;
+
+    let lua_code = transpile(source);
+    assert_snapshot!("dynamic_call_fn_call", lua_code);
+}
+
+/// Dynamic call with binary expression
+#[test]
+fn test_dynamic_call_binary_expr_snapshot() {
+    let source = r#"
+＊メイン
+  ＞＄a＋＄b
+"#;
+
+    let lua_code = transpile(source);
+    assert_snapshot!("dynamic_call_binary_expr", lua_code);
+}

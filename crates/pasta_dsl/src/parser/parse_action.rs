@@ -5,13 +5,18 @@ use super::*;
 /// Parse call_scene.
 pub(crate) fn parse_call_scene(pair: Pair<Rule>) -> Result<CallScene, ParseError> {
     let span = Span::from(&pair.as_span());
-    let mut target = String::new();
+    let mut target = None;
     let mut args = None;
 
     for inner in pair.into_inner() {
         match inner.as_rule() {
             Rule::id => {
-                target = inner.as_str().to_string();
+                target = Some(CallTarget::Static(inner.as_str().to_string()));
+            }
+            Rule::call_target_expr => {
+                if let Some(expr) = parse_expr_from_parts(inner) {
+                    target = Some(CallTarget::Dynamic(expr));
+                }
             }
             Rule::args => {
                 args = Some(parse_args(inner)?);
@@ -20,7 +25,11 @@ pub(crate) fn parse_call_scene(pair: Pair<Rule>) -> Result<CallScene, ParseError
         }
     }
 
-    Ok(CallScene { target, args, span })
+    Ok(CallScene {
+        target: target.unwrap_or(CallTarget::Static(String::new())),
+        args,
+        span,
+    })
 }
 
 /// Parse action_line.
