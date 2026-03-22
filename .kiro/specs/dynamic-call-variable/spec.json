@@ -1,16 +1,16 @@
 {
     "feature_name": "dynamic-call-variable",
     "created_at": "2026-03-22T00:00:00+09:00",
-    "updated_at": "2026-03-22T12:00:00+09:00",
+    "updated_at": "2026-03-23T00:00:00+09:00",
     "language": "ja",
-    "phase": "requirements-generated",
+    "phase": "design-generated",
     "approvals": {
         "requirements": {
             "generated": true,
-            "approved": false
+            "approved": true
         },
         "design": {
-            "generated": false,
+            "generated": true,
             "approved": false
         },
         "tasks": {
