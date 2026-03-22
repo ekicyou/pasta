@@ -503,3 +503,80 @@ fn test_actor_word_single_value_backward_compat() {
         );
     }
 }
+
+// ============================================================================
+// 空ローカルシーン E2E Tests (optional-action-local-scene)
+// ============================================================================
+
+/// 名前付き空ローカルシーンのE2Eテスト (Req 4.1)
+///
+/// `・分岐会話無し` の直後に `・分岐会話アリ` が続く構文をパース→トランスパイル→実行する。
+/// アクション行なし分岐と通常分岐の混在を検証する。
+#[test]
+fn test_e2e_empty_local_scene() {
+    let lua = create_runtime_with_finalize().unwrap();
+
+    let source = "＊サンプル\n\u{3000}ぱすた：分岐するよ！\n\u{3000}\u{3000}＞分岐\n\n\u{3000}\u{3000}・分岐会話無し\n\u{3000}\u{3000}・分岐会話アリ\n\u{3000}ぱすた：分岐したよ！\n";
+    let lua_code = transpile(source);
+
+    // Execute transpiled code
+    lua.load(&lua_code).exec().unwrap();
+
+    // Call finalize_scene
+    lua.load("require('pasta').finalize_scene()")
+        .exec()
+        .unwrap();
+
+    // Verify scene can be searched
+    let result: (String, String) = lua
+        .load(
+            r#"
+        local SEARCH = require "@pasta_search"
+        return SEARCH:search_scene("サンプル", nil)
+    "#,
+        )
+        .eval()
+        .unwrap();
+
+    assert!(
+        result.0.contains("サンプル"),
+        "Global name should contain 'サンプル', got: {}",
+        result.0
+    );
+}
+
+/// 空スタートスコープのE2Eテスト (Req 4.2)
+///
+/// `local_start_scene_scope` がアクション行0個で直接ローカルシーンに分かれるケースを検証する。
+#[test]
+fn test_e2e_empty_start_scope_local_scene() {
+    let lua = create_runtime_with_finalize().unwrap();
+
+    let source = "＊空スタート\n\u{3000}\u{3000}・分岐A\n\u{3000}ぱすた：Aルート！\n";
+    let lua_code = transpile(source);
+
+    // Execute transpiled code
+    lua.load(&lua_code).exec().unwrap();
+
+    // Call finalize_scene
+    lua.load("require('pasta').finalize_scene()")
+        .exec()
+        .unwrap();
+
+    // Verify scene can be searched
+    let result: (String, String) = lua
+        .load(
+            r#"
+        local SEARCH = require "@pasta_search"
+        return SEARCH:search_scene("空スタート", nil)
+    "#,
+        )
+        .eval()
+        .unwrap();
+
+    assert!(
+        result.0.contains("空スタート"),
+        "Global name should contain '空スタート', got: {}",
+        result.0
+    );
+}

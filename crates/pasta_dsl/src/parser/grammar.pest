@@ -237,8 +237,8 @@ global_scene_scope = { global_scene_start ~ global_scene_init* ~ code_scope* ~ l
 global_scene_start = { global_scene_line | global_scene_continue_line }
 global_scene_init  =_{ global_scene_attr_line | global_scene_word_line | scene_actors_line | blank_line }
 
-local_start_scene_scope = {                     local_scene_item+ ~ code_scope* }
-local_scene_scope       = { local_scene_start ~ local_scene_item+ ~ code_scope* }
+local_start_scene_scope = {                     local_scene_item* ~ code_scope* }
+local_scene_scope       = { local_scene_start ~ local_scene_item* ~ code_scope* }
 
 local_scene_start =_{ local_scene_line }
 local_scene_item  =_{ var_set_line | call_scene_line | cue_cmd_line | action_line | continue_action_line | blank_line }
