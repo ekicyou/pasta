@@ -250,9 +250,11 @@ pub(crate) fn parse_call_scene(pair: Pair<Rule>) -> Result<CallScene, ParseError
 4. `Rule::args` → 既存の `parse_args()` で処理（不変）
 
 **実装メモ**
-- `expr` は silent rule のため、`pair.into_inner()` で直接 `var_ref_local` 等が出現する
+- `call_marker` は `=_{}` silent rule のため、`pair.into_inner()` の返却するペアには**含まれない**（スキップ不要）
+- `s`（空白）も `=_{}` silent rule のため同様に含まれない
+- `expr` は `=_{}` silent rule のため、その内部ルール（`var_ref_local`, `var_ref_global`, `fn_call_local`, `add_op` 等）が call_scene の inner pairs に直接展開される
 - 既存の `try_parse_expr()` の match arm を全て活用可能（追加のルールハンドリング不要）
-- **重要**: `parse_expr_from_parts()` は `pair.into_inner()` の全子要素を処理するため、`Rule::args` を先に分離してから残りを expr パースに渡す必要がある
+- **設計未確定**: `parse_expr_from_parts()` は `Pair<Rule>` を受け取り `pair.into_inner()` を使う構造上、フラット展開された expr 由来ペアを直接渡せない。grammar に `call_target_expr = { expr }` ラッパーを追加するか、新たな `parse_expr_from_iter` ヘルパーを追加するかの設計選択が必要（→ 未解決）
 
 ---
 
@@ -299,6 +301,7 @@ pub(super) fn generate_call_scene(
 
 **実装メモ**
 - `generate_expr_to_buffer()` で式を一旦バッファに出力し、`tostring(...)` でラップする方式
+- `generate_expr_to_buffer` のシグネチャ（element_gen.rs:272 確認済み）: `fn generate_expr_to_buffer(&self, expr: &Expr, buf: &mut Vec<u8>) -> Result<(), TranspileError>`
 - 引数生成ロジック（`args_str` 構築）は Static/Dynamic 共通（既存不変）
 - `is_tail_call` フラグ処理も共通（既存不変）
 
