@@ -389,6 +389,12 @@ end
 --- @param ... any 可変長引数（ハンドラーに渡す）
 --- @return any ハンドラーの戻り値、またはnil
 function ACT_IMPL.call(self, global_scene_name, key, attrs, ...)
+    -- nil ガード: 式評価結果が nil の場合（未定義変数等）
+    if key == nil then
+        log.warn("act:call - nil key (undefined variable?), skipping scene search")
+        return nil
+    end
+
     local handler = self:find_scene(key, global_scene_name, attrs)
 
     -- ハンドラー実行
