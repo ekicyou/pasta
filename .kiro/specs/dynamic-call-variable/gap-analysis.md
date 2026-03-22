@@ -5,10 +5,14 @@
 **仕様書参照**: doc/spec/04-call-spec.md §4.1 パターン2（動的ターゲット）
 
 ```text
-call_target ::= call_marker ~ var_ref
-例: ＞＄target_label
-   >$dynamic_choice
+call_target ::= call_marker ~ (id | expr)
+例: ＞＄target_label          (変数参照 = expr の var_ref)
+   >＄＊dynamic_choice   (グローバル変数 = expr の var_ref_global)
+   >（＠func（））          (括弧式 = expr の paren_expr + fn_call)
+   >＄a ＋ ＄b           (二項演算 = expr の Binary)
 ```
+
+**技術的前提**: `id`（XID_START / `_` 先頭）と `expr`（`＄`/`＠`/`（`/数字/`「`/`"` 先頭）の先頭文字集合は完全に素集合→ PEG の `(id | expr)` は曖昧性なし
 
 ## 1. 現状調査
 
@@ -24,22 +28,24 @@ call_target ::= call_marker ~ var_ref
 
 ### 既存パターンの活用
 
-**変数参照の既存 AST パターン**（`Action::VarRef`）:
+**`Expr` AST 型**（`ast/action.rs`）―完全実装済み:
 ```rust
-VarRef { name: String, scope: VarScope, span: Span }
+pub enum Expr {
+    Integer(i64), Float(f64), String(String), BlankString,
+    VarRef { name: String, scope: VarScope },
+    FnCall { name: String, args: Vec<Expr> },
+    Paren(Box<Expr>),
+    Binary { op: BinOp, lhs: Box<Expr>, rhs: Box<Expr> },
+}
 ```
 
-**変数参照の既存 Pest ルール**:
-```pest
-var_ref        =_{ var_ref_global | var_ref_local }
-var_id         = { id | digit_id }
-var_ref_local  = { var_marker ~ var_id ~ s }
-var_ref_global = { var_marker ~ global_marker ~ id ~ s }
-```
+**`generate_expr()` 関数**（`element_gen.rs`）―完全実装済み:
+- 全 `Expr` バリアントに対応した Lua 式を生成する
+- 動的コールのターゲット生成は `tostring(generate_expr(expr))` の形でそのまま再利用可能
 
-**変数参照の既存 Lua コード生成パターン**（`element_gen.rs`）:
-- `Action::VarRef` → `tostring(var["name"])` または `tostring(var_g["name"])` を生成
-- この既存パターンを動的コールのターゲット解決にも適用可能
+**`try_parse_expr()` / `parse_expr_from_parts()` 関数**（`parse_action.rs`）―完全実装済み:
+- Pest パースソースランを受け取り `Expr` AST を構築する
+- この関数を `parse_call_scene()` で再利用することで新規ロジックが不要
 
 **`ACT_IMPL.call` の既存シグネチャ**:
 ```lua
@@ -78,15 +84,16 @@ function ACT_IMPL.call(self, global_scene_name, key, attrs, ...)
    call_scene = { call_marker ~ id ~ s ~ args? }
    
    # After
-   call_scene = { call_marker ~ (var_ref | id) ~ s ~ args? }
+   call_scene = { call_marker ~ (id | expr) ~ s ~ args? }
    ```
-   - `var_ref` は `=_{}` （silent rule）なので、内側の `var_ref_local` / `var_ref_global` が直接展開される
+   - `id` と `expr` の先頭文字集合は完全に素集合 → PEG の選択で曖昧性なし
+   - `＞＄変数`・`＞＄＊変数`・`＞（＠func（））` 等はすべて `expr` ブランチで解決される
 
 2. **ast/action.rs** — `CallScene` 型拡張
    ```rust
    pub enum CallTarget {
        Static(String),
-       Dynamic { name: String, scope: VarScope },
+       Dynamic(Expr),   // 全 Expr バリアントを許容
    }
    
    pub struct CallScene {
@@ -97,18 +104,21 @@ function ACT_IMPL.call(self, global_scene_name, key, attrs, ...)
    ```
 
 3. **parse_action.rs** — `parse_call_scene()` 拡張
-   - `Rule::var_ref_local` と `Rule::var_ref_global` のハンドリング追加
-   - 既存の `parse_actions()` での `var_ref` 処理パターンを流用
+   - `id` ブランチ: 既存の文字列取得 → `CallTarget::Static(String)`
+   - `expr` ブランチ: 既存の `try_parse_expr()` を再利用 → `CallTarget::Dynamic(Expr)`
 
 4. **element_gen.rs** — `generate_call_scene()` 拡張
    ```rust
-   // 動的ターゲット: act:call(SCENE.__global_name__, tostring(var["name"]), {}, ...)
-   // 静的ターゲット: act:call(SCENE.__global_name__, "name", {}, ...)（既存そのまま）
+   // Dynamic(expr): tostring(をラップして generate_expr(expr) を出力
+   // act:call(SCENE.__global_name__, tostring(<expr>), {}, ...)
+   // Static(name): 既存そのまま
+   // act:call(SCENE.__global_name__, "name", {}, ...)
    ```
+   - `generate_expr()` は全 Expr バリアント実装済みのため、新規ロジックは `tostring()` ラップのみ
 
 **トレードオフ**:
 - ✅ 最小変更（5ファイル、各数行の変更）
-- ✅ 既存パターン（`var_ref` 解析・コード生成）を完全流用
+- ✅ 既存の `Expr` AST・`generate_expr()`・`try_parse_expr()` を完全再利用（新規ロジックなし）
 - ✅ Lua ランタイムは key=nil ガードの追加のみ（構造的変更なし）
 - ✅ 末尾呼び出し最適化（TCO）は既存の `is_tail_call` フラグで自動対応
 - ❌ `CallScene.target` 型変更により既存参照箇所の修正が必要（コンパイラが検出）
