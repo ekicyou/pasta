@@ -26,7 +26,7 @@
 **Objective:** As a エンジン開発者, I want さくらスクリプトタグを改行計算から除外しつつ最終出力に保持する, so that テキスト幅の計算が正確でありながらさくらスクリプトの機能が損なわれない
 
 #### Acceptance Criteria
-1. When さくらスクリプトタグ（例: `\w1`, `\_q`, `\s[0]` 等）を含む文字列が入力された場合, the budoux-line-breaker shall さくらスクリプトタグを改行位置計算の対象から除外する
+1. When さくらスクリプトタグ（例: `\_w[50]`, `\_q`, `\s[0]`, `\n` 等、`Tokenizer::SAKURA_TAG_PATTERN` にマッチするすべてのタグ）を含む文字列が入力された場合, the budoux-line-breaker shall さくらスクリプトタグを改行位置計算の対象から除外する
 2. When さくらスクリプトタグを含む文字列を処理した場合, the budoux-line-breaker shall 最終出力にすべてのさくらスクリプトタグを元の位置関係を保って含める
 3. When `こ\_w[50]れ\_w[50]は\_w[50]テ\_w[50]ス\_w[50]ト` を幅 `[6]` で処理した場合, the budoux-line-breaker shall `こ\_w[50]れ\_w[50]は\_w[50]\nテ\_w[50]ス\_w[50]ト` のように、タグを幅計算から除外しつつ適切な位置にさくらスクリプト改行を挿入する（タグなしテキスト `これはテスト` のCJK幅合計12、閾値6で3文字/行）
 4. The budoux-line-breaker shall さくらスクリプトタグの除去と再合成を単一パスまたは線形時間の処理で実現する
@@ -95,7 +95,6 @@
 1. When Lua 側でトーク出力を処理する際, the pasta runtime shall `wait_inserter` の処理完了後に budoux 改行処理を実行する
 2. When 処理中のアクターオブジェクトに `budoux` フィールドが存在する場合, the Lua layer shall budoux 改行処理を呼び出す
 3. When 処理中のアクターオブジェクトに `budoux` フィールドが存在しない場合, the Lua layer shall budoux 改行処理をスキップする
-4. The budoux-line-breaker shall `wait_inserter` が挿入した `\_w[N]` タグを改行計算から正しく除外する
 
 ---
 
