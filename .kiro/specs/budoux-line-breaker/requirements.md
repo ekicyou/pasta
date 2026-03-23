@@ -83,7 +83,7 @@
 1. The `@pasta_sakura_script` module shall budoux 改行処理関数を Lua から呼び出し可能な関数として公開する
 2. When Lua から呼び出された場合, the budoux-line-breaker function shall 処理対象の文字列と幅閾値配列を引数に受け取る
 3. When Lua から呼び出された場合, the budoux-line-breaker function shall 改行挿入済みの文字列を返す
-4. The budoux-line-breaker function shall `wait_inserter.rs` と同一ディレクトリ（`sakura_script/`）内に独立したファイル・関数として実装する
+4. The budoux-line-breaker function shall `sakura_script` モジュール内に独立した実装単位として提供する（ファイル名は設計フェーズで決定）
 
 ---
 
