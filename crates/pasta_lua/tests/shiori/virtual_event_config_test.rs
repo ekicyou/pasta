@@ -112,12 +112,10 @@ fn test_module_state_reset() {
         dispatcher._reset()
 
         local state_after = dispatcher._get_internal_state()
-        -- cached_config フィールドは廃止されたため存在しないことを確認
         -- リセット後は _get_config() がデフォルト値を返すことを検証
         local cfg_after_reset = dispatcher._get_config()
         local is_reset = state_after.next_hour_unix == 0
                      and state_after.next_talk_time == 0
-                     and state_after.cached_config == nil  -- フィールドが存在しないことを確認
                      and cfg_after_reset.talk_interval_min == 180
                      and cfg_after_reset.talk_interval_max == 300
 
@@ -140,11 +138,9 @@ fn test_internal_state_getter() {
         
         local state = dispatcher._get_internal_state()
 
-        -- cached_config フィールドは廃止されたため存在しないことを確認
         return type(state) == "table"
            and state.next_hour_unix == 0
            and state.next_talk_time == 0
-           and state.cached_config == nil  -- フィールド自体が存在しない
     "#,
     );
 
@@ -208,17 +204,28 @@ fn test_onsecondchange_handler_registered() {
 fn test_save_priority_over_toml_and_default() {
     let runtime = create_runtime_with_pasta_path();
 
+    // tomlモックを設定（SAVE値とは異なる値）
+    runtime
+        .exec(
+            r#"
+        package.loaded["@pasta_config"] = {
+            ghost = { talk_interval_min = 90, talk_interval_max = 150 }
+        }
+    "#,
+        )
+        .expect("Failed to set inline mock for @pasta_config");
+
     let result = runtime.exec(
         r#"
         local dispatcher = require "pasta.shiori.event.virtual_dispatcher"
         dispatcher._reset()
 
-        -- SAVEテーブルに値を設定
+        -- SAVEテーブルに値を設定（tomlとは異なる値）
         local save = require "pasta.save"
         save.pasta_talk_interval_min = 60
         save.pasta_talk_interval_max = 120
 
-        -- _get_config() がSAVE値を返すことを検証
+        -- _get_config() がSAVE値（toml値ではなく）を返すことを検証
         local cfg = dispatcher._get_config()
         return cfg.talk_interval_min == 60
            and cfg.talk_interval_max == 120
@@ -300,6 +307,34 @@ fn test_partial_save_configuration() {
     assert!(
         result.is_ok(),
         "Partial save config: min from SAVE, max from default: {:?}",
+        result
+    );
+    assert!(result.unwrap().as_boolean().unwrap_or(false));
+}
+
+#[test]
+fn test_partial_save_configuration_max_only() {
+    let runtime = create_runtime_with_pasta_path();
+
+    let result = runtime.exec(
+        r#"
+        local dispatcher = require "pasta.shiori.event.virtual_dispatcher"
+        dispatcher._reset()
+
+        -- maxのみSAVEに設定、minは未設定
+        local save = require "pasta.save"
+        save.pasta_talk_interval_max = 600
+
+        local cfg = dispatcher._get_config()
+        -- min はデフォルト(180)、max はSAVE値
+        return cfg.talk_interval_min == 180
+           and cfg.talk_interval_max == 600
+    "#,
+    );
+
+    assert!(
+        result.is_ok(),
+        "Partial save config: max from SAVE, min from default: {:?}",
         result
     );
     assert!(result.unwrap().as_boolean().unwrap_or(false));
