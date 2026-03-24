@@ -26,12 +26,34 @@
 ### Phase 1: 事前検証
 
 - [ ] 2. バージョン番号の決定と承認
-  - 開発者からバージョン指定がある場合はそれを使用する
-  - 指定がない場合は `Cargo.toml` の `[workspace.package].version` を読み取り、PATCH を +1 して提案する
-  - 提案形式「vX.Y.Z から vX.Y.(Z+1) に更新します。よろしいですか？」で開発者に確認
-  - 拒否された場合は希望バージョンの入力を求める
-  - semver 形式（`^[0-9]+\.[0-9]+\.[0-9]+$`）として妥当性を検証する
-  - 形式エラー時は再入力を求める
+  - **2-A: 全バージョンソースの並行調査**（サブエージェントを使って以下を同時に収集する）
+    - Git タグ: `git tag --sort=-version:refname | Select-Object -First 1` → 最新タグ
+    - Cargo.toml: `Select-String -Path "Cargo.toml" -Pattern '^\s*version\s*='` → ワークスペースバージョン
+    - package.json: `(Get-Content "editors/vscode/package.json" | ConvertFrom-Json).version`
+    - GitHub Releases: `gh release list --repo ekicyou/pasta --limit 1 --json tagName | ConvertFrom-Json | ForEach-Object { $_.tagName }` → 最新リリースタグ
+    - crates.io (pasta_core): `(Invoke-RestMethod https://crates.io/api/v1/crates/pasta_core).crate.max_version`
+    - crates.io (pasta_dsl): `(Invoke-RestMethod https://crates.io/api/v1/crates/pasta_dsl).crate.max_version`
+    - crates.io (pasta_lua): `(Invoke-RestMethod https://crates.io/api/v1/crates/pasta_lua).crate.max_version`
+    - crates.io (pasta_shiori): `(Invoke-RestMethod https://crates.io/api/v1/crates/pasta_shiori).crate.max_version`
+    - VSCode Marketplace: `npx @vscode/vsce show ekicyou.pasta-vscode 2>&1 | Select-String 'Version:' | ForEach-Object { $_ -replace '.*Version:\s*', '' }`
+  - **2-B: 最大バージョンの算出**
+    - 上記全ソースから取得した全バージョン文字列（`v` プレフィックス除去後）を比較し、semver ルールで最大値を決定する
+    - これを `$CURRENT_VERSION` とする
+    - 取得に失敗したソースは「取得失敗（スキップ）」と記録し、残りのソースで最大値を算出する
+    - 全ソースの取得結果と `$CURRENT_VERSION` を表形式で開発者に報告する
+  - **2-C: 次バージョンの決定**
+    - 開発者からバージョン指定がある場合はそれを使用する
+    - 指定がない場合は `$CURRENT_VERSION` の PATCH を +1 した値を `$NEXT_VERSION` として提案する
+    - 提案形式「全ソース調査の結果、現在の最大バージョンは vX.Y.Z です。vX.Y.(Z+1) に更新します。よろしいですか？」で開発者に確認
+    - 拒否された場合は希望バージョンの入力を求める
+  - **2-D: 重複チェック**
+    - `$NEXT_VERSION` が2-Aで収集したいずれかのソースに**既に存在する場合は作業を即座に中止**する
+    - エラーメッセージ例:「vX.Y.Z は既に [ソース名] に存在します。別のバージョン番号を指定してください。」
+    - 開発者が別のバージョンを指定した場合は 2-D を再実行する
+  - **2-E: 最終確認**
+    - `$NEXT_VERSION` が semver 形式（`^[0-9]+\.[0-9]+\.[0-9]+$`）として妥当か検証する
+    - 形式エラー時は再入力を求める
+    - 確定したバージョンを `$NEW_VERSION` に保存し、以降のタスクで使用する
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6_
 
 - [ ] 3. ワークツリーの整理とテスト実行
