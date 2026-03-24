@@ -2,8 +2,8 @@
 
 このドキュメントは、[SOUL.md](SOUL.md) で定義されたコア機能と、それを検証するテストの対応関係を示します。
 
-**最終更新**: 2026-03-15（`word-multi-key` 複数キー単語定義反映）  
-**総テスト数**: 880+テスト（全パス ✅）
+**最終更新**: 2026-03-24（`talk-frequency-persistence` おしゃべり頻度SAVE永続化反映）  
+**総テスト数**: 890+テスト（全パス ✅）
 
 ---
 
@@ -146,7 +146,7 @@
 | Runtime E2E                   | `runtime_scene_test.rs`<br>`runtime_syntax_test.rs`                                                 | ✅ 完了 | 16テスト（2ファイルに分割）                        |
 | Finalize Scene                | `finalize_scene_test.rs`                                                                            | ✅ 完了 | 14テスト                                           |
 | ローカルシーン call E2E       | `local_scene_call_test.rs`                                                                          | ✅ 完了 | 3テスト（finalize経路・重複・前方一致）            |
-| Virtual Event Dispatcher      | `virtual_event_dispatch_test.rs`<br>`virtual_event_config_test.rs`<br>`virtual_dispatcher_spec.lua` | ✅ 完了 | 15+20テスト（2ファイルに分割）                     |
+| Virtual Event Dispatcher      | `virtual_event_dispatch_test.rs`<br>`virtual_event_config_test.rs`<br>`virtual_dispatcher_spec.lua` | ✅ 完了 | 16+15テスト（2ファイルに分割）<br>おしゃべり頻度SAVE永続化（SAVE>toml>default, floor/clamp/Inf guard）含む |
 | Sample Ghost Integration      | `shiori_sample_ghost_test.rs`                                                                       | ✅ 完了 | 2テスト（hello-pasta実ゴースト使用）               |
 | Sample Ghost スクリプト整合性 | `scripts.rs::test_script_expression_names_defined_in_actors`                                        | ✅ 完了 | 1テスト（表情名↔辞書定義一致検証）                 |
 | Sample Ghost dist-src 検証    | `dist_src_validation_test.rs::test_dist_src_directory_structure`                                    | ✅ 完了 | 1テスト（dist-src/ 8ファイル存在確認）             |
