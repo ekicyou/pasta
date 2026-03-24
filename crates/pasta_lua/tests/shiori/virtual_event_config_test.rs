@@ -462,3 +462,63 @@ fn test_min_greater_than_max_correction() {
     );
     assert!(result.unwrap().as_boolean().unwrap_or(false));
 }
+
+// ============================================================================
+// 検証レポート P1: 値バリデーション強化テスト
+// ============================================================================
+
+#[test]
+fn test_values_below_minimum_clamped_to_10() {
+    let runtime = create_runtime_with_pasta_path();
+
+    let result = runtime.exec(
+        r#"
+        local dispatcher = require "pasta.shiori.event.virtual_dispatcher"
+        dispatcher._reset()
+
+        local save = require "pasta.save"
+        save.pasta_talk_interval_min = 3
+        save.pasta_talk_interval_max = 5
+
+        local cfg = dispatcher._get_config()
+        -- 10未満の値は10にクランプされる
+        return cfg.talk_interval_min == 10
+           and cfg.talk_interval_max == 10
+    "#,
+    );
+
+    assert!(
+        result.is_ok(),
+        "Values below 10 should be clamped to 10: {:?}",
+        result
+    );
+    assert!(result.unwrap().as_boolean().unwrap_or(false));
+}
+
+#[test]
+fn test_float_values_are_floored() {
+    let runtime = create_runtime_with_pasta_path();
+
+    let result = runtime.exec(
+        r#"
+        local dispatcher = require "pasta.shiori.event.virtual_dispatcher"
+        dispatcher._reset()
+
+        local save = require "pasta.save"
+        save.pasta_talk_interval_min = 45.7
+        save.pasta_talk_interval_max = 120.9
+
+        local cfg = dispatcher._get_config()
+        -- 小数値はfloorで切り捨て
+        return cfg.talk_interval_min == 45
+           and cfg.talk_interval_max == 120
+    "#,
+    );
+
+    assert!(
+        result.is_ok(),
+        "Float values should be floored: {:?}",
+        result
+    );
+    assert!(result.unwrap().as_boolean().unwrap_or(false));
+}

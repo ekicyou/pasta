@@ -37,15 +37,22 @@ local function get_config()
     local ghost = config.ghost or {}
 
     --- SAVE > toml > default の優先順位で単一キーを解決
+    --- 数値以外・NaN・Inf は無視してフォールバック。小数は floor、10未満は10にクランプ。
     ---@param save_key string SAVEテーブルのキー名（pasta_ プレフィックス付き）
     ---@param toml_key string pasta.toml [ghost] セクションのキー名
     ---@param default number ハードコードデフォルト値
     ---@return number
     local function resolve(save_key, toml_key, default)
         local sv = save[save_key]
-        if type(sv) == "number" then return sv end
+        if type(sv) == "number" then
+            sv = math.floor(sv)
+            if sv < math.huge then return math.max(10, sv) end
+        end
         local tv = ghost[toml_key]
-        if type(tv) == "number" then return tv end
+        if type(tv) == "number" then
+            tv = math.floor(tv)
+            if tv < math.huge then return math.max(10, tv) end
+        end
         return default
     end
 
@@ -126,7 +133,7 @@ function M.check_hour(act)
 
     -- 4段階フォールバックチェーンでシーンを解決
     local hh = string.format("%02d", act.req.date.hour)
-    local candidates = {"時報" .. hh, "OnHour" .. hh, "時報その他", "OnHourOther"}
+    local candidates = { "時報" .. hh, "OnHour" .. hh, "時報その他", "OnHourOther" }
     for _, name in ipairs(candidates) do
         local t = create_scene_thread(name, act)
         if t then return t end
