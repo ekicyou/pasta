@@ -41,6 +41,12 @@ flate2 = "1.1.9"
 budoux = "0.1.1"
 unicode-width = "0.2.2"
 
+# Time dependencies
+time = { version = "0.3", features = ["local-offset"] }
+
+# Windows API dependencies
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Memory", "Win32_Globalization"] }
+
 # Logging dependencies
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-appender = "0.2"

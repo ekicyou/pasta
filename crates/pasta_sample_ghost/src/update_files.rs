@@ -146,7 +146,7 @@ fn calculate_md5(path: &Path) -> std::io::Result<String> {
         context.consume(&buffer[..bytes_read]);
     }
 
-    let digest = context.compute();
+    let digest = context.finalize();
     Ok(format!("{:032x}", digest))
 }
 

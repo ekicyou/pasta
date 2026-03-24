@@ -19,10 +19,10 @@ path = "src/main.rs"
 [dependencies]
 # 画像生成
 image = "0.25"
-imageproc = "0.25"
+imageproc = "0.26"
 
 # MD5ハッシュ計算
-md5 = "0.7"
+md5 = "0.8"
 
 # Shift_JISエンコーディング
 encoding_rs = "0.8"

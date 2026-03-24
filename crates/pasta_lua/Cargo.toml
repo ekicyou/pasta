@@ -30,7 +30,7 @@ budoux.workspace = true
 unicode-width.workspace = true
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61.2", features = ["Win32_Globalization"] }
+windows-sys.workspace = true
 
 [build-dependencies]
 lua-src.workspace = true
