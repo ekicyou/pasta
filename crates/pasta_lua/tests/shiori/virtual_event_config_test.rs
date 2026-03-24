@@ -18,18 +18,10 @@ fn test_config_default_values() {
         r#"
         local dispatcher = require "pasta.shiori.event.virtual_dispatcher"
         dispatcher._reset()
-        
-        -- Trigger config load by calling dispatch
-        local act = { req = {
-            id = "OnSecondChange",
-            status = "idle",
-            date = { unix = 1702648800 }
-        } }
-        dispatcher.dispatch(act)
-        
-        local state = dispatcher._get_internal_state()
-        local cfg = state.cached_config
-        
+
+        -- _get_config() を直接呼び出してデフォルト値を検証
+        local cfg = dispatcher._get_config()
+
         -- Default values: min=180, max=300, margin=30
         return cfg ~= nil
            and cfg.talk_interval_min == 180
@@ -115,15 +107,20 @@ fn test_module_state_reset() {
         
         local state_before = dispatcher._get_internal_state()
         local had_state = state_before.next_hour_unix > 0
-        
+
         -- Reset
         dispatcher._reset()
-        
+
         local state_after = dispatcher._get_internal_state()
+        -- cached_config フィールドは廃止されたため存在しないことを確認
+        -- リセット後は _get_config() がデフォルト値を返すことを検証
+        local cfg_after_reset = dispatcher._get_config()
         local is_reset = state_after.next_hour_unix == 0
                      and state_after.next_talk_time == 0
-                     and state_after.cached_config == nil
-        
+                     and state_after.cached_config == nil  -- フィールドが存在しないことを確認
+                     and cfg_after_reset.talk_interval_min == 180
+                     and cfg_after_reset.talk_interval_max == 300
+
         return had_state and is_reset
     "#,
     );
@@ -142,11 +139,12 @@ fn test_internal_state_getter() {
         dispatcher._reset()
         
         local state = dispatcher._get_internal_state()
-        
+
+        -- cached_config フィールドは廃止されたため存在しないことを確認
         return type(state) == "table"
            and state.next_hour_unix == 0
            and state.next_talk_time == 0
-           and state.cached_config == nil
+           and state.cached_config == nil  -- フィールド自体が存在しない
     "#,
     );
 
@@ -197,6 +195,234 @@ fn test_onsecondchange_handler_registered() {
     assert!(
         result.is_ok(),
         "OnSecondChange handler should be registered: {:?}",
+        result
+    );
+    assert!(result.unwrap().as_boolean().unwrap_or(false));
+}
+
+// ============================================================================
+// Task 3.1: SAVE優先・実行時変更・部分設定テスト
+// ============================================================================
+
+#[test]
+fn test_save_priority_over_toml_and_default() {
+    let runtime = create_runtime_with_pasta_path();
+
+    let result = runtime.exec(
+        r#"
+        local dispatcher = require "pasta.shiori.event.virtual_dispatcher"
+        dispatcher._reset()
+
+        -- SAVEテーブルに値を設定
+        local save = require "pasta.save"
+        save.pasta_talk_interval_min = 60
+        save.pasta_talk_interval_max = 120
+
+        -- _get_config() がSAVE値を返すことを検証
+        local cfg = dispatcher._get_config()
+        return cfg.talk_interval_min == 60
+           and cfg.talk_interval_max == 120
+    "#,
+    );
+
+    assert!(
+        result.is_ok(),
+        "SAVE values should take priority over toml and default: {:?}",
+        result
+    );
+    assert!(result.unwrap().as_boolean().unwrap_or(false));
+}
+
+#[test]
+fn test_runtime_change_reflected_immediately() {
+    let runtime = create_runtime_with_pasta_path();
+
+    let result = runtime.exec(
+        r#"
+        local dispatcher = require "pasta.shiori.event.virtual_dispatcher"
+        dispatcher._reset()
+
+        local save = require "pasta.save"
+        local act = { req = {
+            id = "OnSecondChange",
+            status = "idle",
+            date = { unix = 1702648800 }
+        } }
+
+        -- 初回dispatch（next_talk_time設定）
+        dispatcher.dispatch(act)
+
+        -- SAVE値を初期設定
+        save.pasta_talk_interval_min = 60
+        save.pasta_talk_interval_max = 120
+        local cfg1 = dispatcher._get_config()
+
+        -- SAVE値を変更
+        save.pasta_talk_interval_min = 30
+        save.pasta_talk_interval_max = 60
+        local cfg2 = dispatcher._get_config()
+
+        -- キャッシュ廃止により変更が即時反映されること
+        return cfg1.talk_interval_min == 60
+           and cfg2.talk_interval_min == 30
+           and cfg2.talk_interval_max == 60
+    "#,
+    );
+
+    assert!(
+        result.is_ok(),
+        "Runtime changes should be reflected immediately: {:?}",
+        result
+    );
+    assert!(result.unwrap().as_boolean().unwrap_or(false));
+}
+
+#[test]
+fn test_partial_save_configuration() {
+    let runtime = create_runtime_with_pasta_path();
+
+    let result = runtime.exec(
+        r#"
+        local dispatcher = require "pasta.shiori.event.virtual_dispatcher"
+        dispatcher._reset()
+
+        -- minのみSAVEに設定、maxは未設定
+        local save = require "pasta.save"
+        save.pasta_talk_interval_min = 50
+
+        local cfg = dispatcher._get_config()
+        -- min はSAVE値、max はデフォルト(300)
+        return cfg.talk_interval_min == 50
+           and cfg.talk_interval_max == 300
+    "#,
+    );
+
+    assert!(
+        result.is_ok(),
+        "Partial save config: min from SAVE, max from default: {:?}",
+        result
+    );
+    assert!(result.unwrap().as_boolean().unwrap_or(false));
+}
+
+// ============================================================================
+// Task 3.2: tomlフォールバック・ハードコードデフォルトテスト
+// ============================================================================
+
+#[test]
+fn test_toml_fallback_values() {
+    let runtime = create_runtime_with_pasta_path();
+
+    // 案B: インラインモックで @pasta_config を差し込む
+    runtime
+        .exec(
+            r#"
+        package.loaded["@pasta_config"] = {
+            ghost = { talk_interval_min = 60, talk_interval_max = 90 }
+        }
+    "#,
+        )
+        .expect("Failed to set inline mock for @pasta_config");
+
+    let result = runtime.exec(
+        r#"
+        local dispatcher = require "pasta.shiori.event.virtual_dispatcher"
+        dispatcher._reset()
+
+        -- SAVE未設定、tomlモック有り → toml値が使用される
+        local cfg = dispatcher._get_config()
+        return cfg.talk_interval_min == 60
+           and cfg.talk_interval_max == 90
+    "#,
+    );
+
+    assert!(
+        result.is_ok(),
+        "toml values should be used as fallback when SAVE is empty: {:?}",
+        result
+    );
+    assert!(result.unwrap().as_boolean().unwrap_or(false));
+}
+
+#[test]
+fn test_hardcoded_default_values() {
+    let runtime = create_runtime_with_pasta_path();
+
+    let result = runtime.exec(
+        r#"
+        local dispatcher = require "pasta.shiori.event.virtual_dispatcher"
+        dispatcher._reset()
+
+        -- SAVE・tomlともに未設定 → ハードコードデフォルト(180/300)
+        local cfg = dispatcher._get_config()
+        return cfg.talk_interval_min == 180
+           and cfg.talk_interval_max == 300
+    "#,
+    );
+
+    assert!(
+        result.is_ok(),
+        "Hardcoded defaults should be used when SAVE and toml are both unset: {:?}",
+        result
+    );
+    assert!(result.unwrap().as_boolean().unwrap_or(false));
+}
+
+// ============================================================================
+// Task 3.3: バリデーション（非数値・min>max補正）テスト
+// ============================================================================
+
+#[test]
+fn test_non_numeric_save_values_fallback() {
+    let runtime = create_runtime_with_pasta_path();
+
+    let result = runtime.exec(
+        r#"
+        local dispatcher = require "pasta.shiori.event.virtual_dispatcher"
+        dispatcher._reset()
+
+        -- SAVEに文字列値を設定 → 無視されてデフォルト値にフォールバック
+        local save = require "pasta.save"
+        save.pasta_talk_interval_min = "fast"
+        save.pasta_talk_interval_max = "slow"
+
+        local cfg = dispatcher._get_config()
+        return cfg.talk_interval_min == 180
+           and cfg.talk_interval_max == 300
+    "#,
+    );
+
+    assert!(
+        result.is_ok(),
+        "Non-numeric SAVE values should be ignored and fall back to defaults: {:?}",
+        result
+    );
+    assert!(result.unwrap().as_boolean().unwrap_or(false));
+}
+
+#[test]
+fn test_min_greater_than_max_correction() {
+    let runtime = create_runtime_with_pasta_path();
+
+    let result = runtime.exec(
+        r#"
+        local dispatcher = require "pasta.shiori.event.virtual_dispatcher"
+        dispatcher._reset()
+
+        -- min > max のケース → max = min に補正
+        local save = require "pasta.save"
+        save.pasta_talk_interval_min = 500
+        save.pasta_talk_interval_max = 100
+
+        local cfg = dispatcher._get_config()
+        return cfg.talk_interval_min == 500
+           and cfg.talk_interval_max == 500
+    "#,
+    );
+
+    assert!(
+        result.is_ok(),
+        "When min > max, max should be corrected to equal min: {:?}",
         result
     );
     assert!(result.unwrap().as_boolean().unwrap_or(false));

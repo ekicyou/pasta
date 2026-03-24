@@ -16,7 +16,7 @@ description: >-
   汎用Luaプログラミング, SHIORIプロトコル実装.
 metadata:
   author: ekicyou
-  version: "1.2.0"
+  version: "1.3.0"
 ---
 
 # Pasta Lua Coding Skill
@@ -108,6 +108,17 @@ end
 命名規約（snake_case/UPPER_CASE/`_IMPL`サフィックス）、`MODULE/MODULE_IMPL`分離によるクラス設計、`STORE`パターンによる循環参照回避、EmmyLua型注釈（`@class`, `@field`, `@param`, `@return`）、エラーハンドリング（ガードクローズ, `pcall`, nilチェック）の規約。
 
 > 📖 詳細: [references/coding-conventions.md](references/coding-conventions.md)
+
+### SAVE キー命名規約
+
+`pasta.save` テーブルのキーは以下の2種類に分類される：
+
+| 種類 | 命名規則 | 例 | 備考 |
+|------|---------|-----|------|
+| **エンジン予約キー** | `pasta_` プレフィックス付き | `pasta_talk_interval_min`, `pasta_talk_interval_max` | pasta エンジン内部で参照・制御されるキー |
+| **ゴースト固有キー** | 任意命名（`pasta_` プレフィックス禁止） | `my_flag`, `talk_count` | ゴースト作者が自由に使用可能 |
+
+**重要**: `pasta_` プレフィックスはエンジン予約領域。ゴースト固有キーに `pasta_` を使用すると、エンジン動作に意図しない影響を与える可能性がある。
 
 ---
 
