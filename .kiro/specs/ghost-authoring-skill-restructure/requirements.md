@@ -48,7 +48,7 @@
 #### Acceptance Criteria
 
 1. The pasta-ghost-authoring スキル shall `references/` 配下に pasta.toml の全セクション・全キーを網羅するリファレンスファイルを新設する。
-2. The リファレンスファイル shall 以下のセクションを含む: `[loader]`、`[ghost]`、`[talk]`、`[actor."名前"]`、`[persistence]`、`[logging]`。
+2. The リファレンスファイル shall 以下のセクションを含む: `[package]`、`[loader]`、`[logging]`、`[lua]`、`[ghost]`、`[talk]`、`[actor."名前"]`、`[persistence]`（`[lua]` と `[package]` の記載深度は設計フェーズで決定: DJ-3）。
 3. The リファレンスファイル shall 各キーについて、キー名・型・既定値・説明・使用例を記載する。
 4. Where `[actor."名前"]` セクションに `budoux` キーが定義されている場合, the リファレンス shall BudouX 自動改行機能の設定方法（配列形式 `[行1幅, 行2+幅]`）と動作説明を含める。
 5. The pasta-ghost-authoring スキル shall `SKILL.md` §4 Project Structure の pasta.toml セクションを新設リファレンスへの参照に置き換え、SKILL.md 上には要約のみを残す。
@@ -60,7 +60,7 @@
 #### Acceptance Criteria
 
 1. The pasta-ghost-authoring スキル shall SKILL.md の各セクションが「要約 + リファレンスリンク」の形式を一貫して維持する。
-2. The pasta-ghost-authoring スキル shall §4 Project Structure 内の pasta.toml 記述を新設の pasta.toml リファレンスへの参照に圧縮する。
+2. （Req 3 AC5 に統合）§4 の pasta.toml 記述の圧縮は Req 3 AC5 に従う。
 3. While SKILL.md のセクション構造を変更する場合, the pasta-ghost-authoring スキル shall 既存の §1〜§6 のセクション番号体系を維持する（外部からの参照リンクを壊さない）。
 4. The pasta-ghost-authoring スキル shall SKILL.md と references/ の間に記述の矛盾がないことを保証する（矛盾がある場合は references/ を正として SKILL.md を更新する）。
 
