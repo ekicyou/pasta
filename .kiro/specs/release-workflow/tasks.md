@@ -52,6 +52,11 @@
     - `pasta_lua = { path = "crates/pasta_lua", version = "<OLD>" }` → `version = "<NEW>"`
     - `pasta_shiori = { path = "crates/pasta_shiori", version = "<OLD>" }` → `version = "<NEW>"`
   - `editors/vscode/package.json` の `"version": "<OLD>"` → `"version": "<NEW>"` を `replace_string_in_file` で更新する
+  - 更新後、以下のコマンドで実際に書き換えられたことを検証する:
+    - `Select-String -Path "Cargo.toml" -Pattern 'version = "<NEW>"'` で `[workspace.package]` のバージョンを確認
+    - `Select-String -Path "Cargo.toml" -Pattern '"pasta_core".*version = "<NEW>"'` 等でワークスペース依存バージョンを確認（4クレート分）
+    - `Select-String -Path "editors/vscode/package.json" -Pattern '"version": "<NEW>"'` でVSCode拡張バージョンを確認
+  - 検証で `<NEW>` が見つからない箇所があれば、エラーを報告して中止する
   - _Requirements: 2.1, 2.2_
 
 - [ ] 5. ビルド検証とコミット
