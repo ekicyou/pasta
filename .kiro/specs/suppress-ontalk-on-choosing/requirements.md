@@ -38,28 +38,23 @@ Statusに「choosing」が出ている間、OnTalk発動を抑制すること。
 1. While SHIORI リクエストの `Status` ヘッダーに `choosing` が含まれている, the virtual_dispatcher shall OnHour の発動をスキップする（`nil` を返す）。
 2. While `choosing` 状態で OnHour がスキップされた場合, the virtual_dispatcher shall 次の正時タイムスタンプを更新しない（正時到達後に choosing が解除されれば発火可能とする）。
 
-### Requirement 3: Status ヘッダーのカンマ区切り対応
+### Requirement 3: Status ヘッダーのカンマ区切り対応（choosing・talking 共通）
 
-**Objective:** ゴースト開発者として、`Status` ヘッダーが `talking,choosing,balloon(0=2)` のようにカンマ区切りで複合された場合でも正しく状態を検出したい。誤判定によるトーク割り込みを防ぐためである。
+**Objective:** ゴースト開発者として、`Status` ヘッダーが `talking,choosing,balloon(0=2)` のようにカンマ区切りで複合された場合でも正しく状態を検出したい。既存の完全一致（`==`）判定を「含む」（部分一致）判定に統一し、choosing 新規対応と既存 talking 判定の CSV 不具合を同時に解消するためである。
+
+> **決定事項（ディスカッション #1）**: 既存 talking 判定の CSV 不具合修正（旧 Req 4）を本 spec に含めることを承認。  
+> **理由**: 変更対象が同一ファイル・同一ガード節であり、検出方式を「含む」パターンに統一することで choosing・talking を一貫して扱える。  
 
 #### Acceptance Criteria
 
 1. When `Status` ヘッダーが `choosing` 単独の場合, the virtual_dispatcher shall choosing 状態として検出する。
 2. When `Status` ヘッダーが `talking,choosing,balloon(0=2)` のようにカンマ区切りで複合されている場合, the virtual_dispatcher shall choosing 状態として検出する。
-3. When `Status` ヘッダーが `talking` のみの場合, the virtual_dispatcher shall choosing 状態として検出しない（既存の talking 抑制のみ適用）。
+3. When `Status` ヘッダーが `talking` のみの場合, the virtual_dispatcher shall choosing 状態として検出しない（talking 抑制のみ適用）。
+4. When `Status` ヘッダーが `talking,balloon(0=0)` のようにカンマ区切りで複合されている場合, the virtual_dispatcher shall talking 状態として検出し OnTalk / OnHour をスキップする。
 
-### Requirement 4: 既存 talking 抑制とのカンマ区切り整合
+### Requirement 4: テストカバレッジ
 
-**Objective:** ゴースト開発者として、本仕様の `choosing` 対応に合わせて既存の `talking` 抑制もカンマ区切り対応したい。`Status: talking,balloon(0=0)` のような実際のSSP送出値でも talking 抑制が正しく機能するためである。
-
-#### Acceptance Criteria
-
-1. When `Status` ヘッダーが `talking,balloon(0=0)` のようにカンマ区切りで複合されている場合, the virtual_dispatcher shall talking 状態として検出し OnTalk をスキップする。
-2. When `Status` ヘッダーが `talking,balloon(0=0)` のようにカンマ区切りで複合されている場合, the virtual_dispatcher shall talking 状態として検出し OnHour をスキップする。
-
-### Requirement 5: テストカバレッジ
-
-**Objective:** 開発者として、choosing 抑制の挙動を自動テストで保証したい。リグレッションを防止するためである。
+**Objective:** 開発者として、choosing 抑制および CSV 対応 talking 抑制の挙動を自動テストで保証したい。リグレッションを防止するためである。
 
 #### Acceptance Criteria
 
