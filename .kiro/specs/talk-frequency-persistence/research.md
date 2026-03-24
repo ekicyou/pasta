@@ -87,6 +87,7 @@
 ## Risks & Mitigations
 - **低リスク**: 毎秒の SAVE テーブル参照パフォーマンス → `require` キャッシュにより実質 O(1)、計測不要
 - **低リスク**: 既存テストの破壊 → `cached_config` フィールドは `_get_internal_state()` から除去するが、テスト側も同時更新
+- **低リスク**: toml フォールバックのテスト実現性 → `@pasta_config` は共通ヘルパーでモックされないため、該当テスト（`test_toml_fallback_values`）冒頭でインラインモックを挿入（案B）。共通ヘルパーは変更せず既存テストへの影響ゼロ
 
 ## References
 - [gap-analysis.md](gap-analysis.md) — 完全なギャップ分析レポート

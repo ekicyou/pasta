@@ -276,18 +276,23 @@ local function resolve(save_key, toml_key, default) end
 7. **部分設定テスト**: min のみ SAVE に設定 → min は SAVE 値、max は toml/デフォルト
 
 **テストパターン**:
-```lua
--- SAVE テーブルへの事前書き込み
-local save = require("pasta.save")
-save.pasta_talk_interval_min = 60
-save.pasta_talk_interval_max = 120
 
--- get_config() の検証
-local dispatcher = require "pasta.shiori.event.virtual_dispatcher"
-dispatcher._reset()
-local cfg = dispatcher._get_config()
--- cfg.talk_interval_min == 60, cfg.talk_interval_max == 120
+SAVE 優先テスト・バリデーションテスト（テスト 1, 4, 5, 6, 7）はそのまま `require("pasta.save")` に書き込むだけで検証可能。
+
+toml フォールバックテスト（テスト 2）は `create_runtime_with_pasta_path()` では `@pasta_config` がモックされないため、各テスト冒頭でインラインモックを挿入する（案B）:
+
+```rust
+// test_toml_fallback_values 冒頭のみ
+runtime.exec(r#"
+    package.loaded["@pasta_config"] = {
+        ghost = { talk_interval_min = 60, talk_interval_max = 90 }
+    }
+"#).unwrap();
 ```
+
+- 既存の `create_runtime_with_pasta_path()` は**変更しない**
+- mokkはそのテスト関数のスコープ内のみ有効（Lua の `require` キャッシュはランタイムインスタンス単位）
+- 各テストは独立したランタイムインスタンスを使用するため副作用なし
 
 ### 既存テストへの影響
 
