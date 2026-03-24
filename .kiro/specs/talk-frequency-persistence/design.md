@@ -89,9 +89,9 @@ flowchart TB
 flowchart TD
     START["get_config() 呼び出し"] --> LOAD_SAVE["save = require('pasta.save')"]
     LOAD_SAVE --> LOAD_TOML["config = pcall(require, '@pasta_config')"]
-    LOAD_TOML --> RESOLVE_MIN["resolve('pasta_talk_interval_min', 180)"]
+    LOAD_TOML --> RESOLVE_MIN["resolve('pasta_talk_interval_min', 'talk_interval_min', 180)"]
 
-    RESOLVE_MIN --> CHECK_SAVE_MIN{"save[key] が数値?"}
+    RESOLVE_MIN --> CHECK_SAVE_MIN{"save[save_key] が数値?"}
     CHECK_SAVE_MIN -->|Yes| USE_SAVE_MIN["SAVE 値を使用"]
     CHECK_SAVE_MIN -->|No| CHECK_TOML_MIN{"ghost[toml_key] が数値?"}
     CHECK_TOML_MIN -->|Yes| USE_TOML_MIN["toml 値を使用"]
@@ -194,16 +194,15 @@ local function get_config() end
 
 ```lua
 --- SAVE キーの値 → toml キーの値 → デフォルト値の優先順位で解決
---- @param save table SAVE テーブル
---- @param ghost table @pasta_config.ghost テーブル
+--- （save と ghost は get_config() のアップバリューとして捕捉）
 --- @param save_key string SAVE テーブルのキー名（pasta_ プレフィックス付き）
---- @param toml_key string toml テーブルのキー名
+--- @param toml_key string pasta.toml [ghost] セクションのキー名（プレフィックスなし）
 --- @param default number ハードコードデフォルト値
 --- @return number 解決された値
-local function resolve(save, ghost, save_key, toml_key, default) end
+local function resolve(save_key, toml_key, default) end
 ```
 
-- Preconditions: `save`, `ghost` は table（nil 不可、空テーブル可）
+- Preconditions: `save`, `ghost` は get_config() スコープで初期化済み（アップバリュー）
 - Postconditions: 返却値は必ず number 型
 - Invariants: `type(返却値) == "number"`
 

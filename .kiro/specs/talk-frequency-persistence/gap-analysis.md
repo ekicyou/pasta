@@ -84,16 +84,18 @@ local function get_config()
     local ghost = config.ghost or {}
 
     -- SAVE > toml > hardcoded default
-    local function resolve(key, default)
-        local sv = save[key]
+    -- save_key: SAVE テーブルのキー（pasta_ プレフィックス付き）
+    -- toml_key: pasta.toml [ghost] セクションのキー（プレフィックスなし）
+    local function resolve(save_key, toml_key, default)
+        local sv = save[save_key]
         if type(sv) == "number" then return sv end
-        local tv = ghost[key]
+        local tv = ghost[toml_key]
         if type(tv) == "number" then return tv end
         return default
     end
 
-    local min = resolve("pasta_talk_interval_min", 180)
-    local max = resolve("pasta_talk_interval_max", 300)
+    local min = resolve("pasta_talk_interval_min", "talk_interval_min", 180)
+    local max = resolve("pasta_talk_interval_max", "talk_interval_max", 300)
     if min > max then max = min end
 
     return {
