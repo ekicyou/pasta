@@ -26,7 +26,7 @@ file,ghost/master/pasta_scripts/pasta/shiori/event/boot.lua8903e94847e96ac90920c
 file,ghost/master/pasta_scripts/pasta/shiori/event/init.luaac42e6ee1300e9a075466caef65dfa01size=6797
 file,ghost/master/pasta_scripts/pasta/shiori/event/register.lua59b52c7092fbe720fb72c4dc274aa647size=1408
 file,ghost/master/pasta_scripts/pasta/shiori/event/second_change.lua04862e4afb8e057dbd2dc86182d8c1ecsize=981
-file,ghost/master/pasta_scripts/pasta/shiori/event/virtual_dispatcher.lua275e15e6b2c01e9bd0a11da0f0f17309size=7251
+file,ghost/master/pasta_scripts/pasta/shiori/event/virtual_dispatcher.lua93b838c190f3e1e77d2b6a8af6681b93size=9106
 file,ghost/master/pasta_scripts/pasta/shiori/init.lua5b3dcb2cd4f38c5626dd0cd6eceb8c7dsize=538
 file,ghost/master/pasta_scripts/pasta/shiori/res.lua608e3e2828104cdd2ed8ecc3e3d491d6size=4659
 file,ghost/master/pasta_scripts/pasta/shiori/sakura_builder.lua8630913a7f19578e03534cb9b91f4ee2size=5163

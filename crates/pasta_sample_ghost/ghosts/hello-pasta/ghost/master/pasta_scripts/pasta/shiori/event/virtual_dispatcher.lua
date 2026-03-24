@@ -18,7 +18,6 @@
 -- 2. モジュールローカル変数（SHIORIセッション中のみ有効）
 local next_hour_unix = 0   -- 次の正時タイムスタンプ
 local next_talk_time = 0   -- 次回トーク発行予定時刻
-local cached_config = nil  -- 設定キャッシュ
 local scene_executor = nil -- テスト用: シーン実行関数のオーバーライド
 
 -- 3. モジュールテーブル宣言
@@ -27,21 +26,45 @@ local M = {}
 
 -- 4. 内部関数
 
---- 設定を読み込み・キャッシュ
+--- 設定を読み込む（SAVE > toml > hardcoded の3段フォールバック）
+--- キャッシュなし：毎回 SAVE テーブルを読み直すことで実行時変更を即時反映
 ---@return table 設定テーブル
 local function get_config()
-    if cached_config then return cached_config end
+    local save = require("pasta.save")
 
     local ok, config = pcall(require, "@pasta_config")
     if not ok then config = {} end
-
     local ghost = config.ghost or {}
-    cached_config = {
-        talk_interval_min = ghost.talk_interval_min or 180,
-        talk_interval_max = ghost.talk_interval_max or 300,
+
+    --- SAVE > toml > default の優先順位で単一キーを解決
+    --- 数値以外・NaN・Inf は無視してフォールバック。小数は floor、10未満は10にクランプ。
+    ---@param save_key string SAVEテーブルのキー名（pasta_ プレフィックス付き）
+    ---@param toml_key string pasta.toml [ghost] セクションのキー名
+    ---@param default number ハードコードデフォルト値
+    ---@return number
+    local function resolve(save_key, toml_key, default)
+        local sv = save[save_key]
+        if type(sv) == "number" then
+            sv = math.floor(sv)
+            if sv < math.huge then return math.max(10, sv) end
+        end
+        local tv = ghost[toml_key]
+        if type(tv) == "number" then
+            tv = math.floor(tv)
+            if tv < math.huge then return math.max(10, tv) end
+        end
+        return default
+    end
+
+    local min = resolve("pasta_talk_interval_min", "talk_interval_min", 180)
+    local max = resolve("pasta_talk_interval_max", "talk_interval_max", 300)
+    if min > max then max = min end
+
+    return {
+        talk_interval_min = min,
+        talk_interval_max = max,
         hour_margin = ghost.hour_margin or 30,
     }
-    return cached_config
 end
 
 --- 次の正時タイムスタンプを計算
@@ -122,7 +145,7 @@ function M.check_hour(act)
 
     -- 4段階フォールバックチェーンでシーンを解決
     local hh = string.format("%02d", act.req.date.hour)
-    local candidates = {"時報" .. hh, "OnHour" .. hh, "時報その他", "OnHourOther"}
+    local candidates = { "時報" .. hh, "OnHour" .. hh, "時報その他", "OnHourOther" }
     for _, name in ipairs(candidates) do
         local t = create_scene_thread(name, act)
         if t then return t end
@@ -201,7 +224,6 @@ end
 function M._reset()
     next_hour_unix = 0
     next_talk_time = 0
-    cached_config = nil
     scene_executor = nil
 end
 
@@ -211,7 +233,6 @@ function M._get_internal_state()
     return {
         next_hour_unix = next_hour_unix,
         next_talk_time = next_talk_time,
-        cached_config = cached_config,
     }
 end
 
@@ -220,5 +241,9 @@ end
 function M._set_scene_executor(executor)
     scene_executor = executor
 end
+
+--- テスト用: 設定解決結果を直接取得（get_config の公開参照）
+---@return table 設定テーブル
+M._get_config = get_config
 
 return M
