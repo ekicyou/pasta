@@ -61,6 +61,15 @@ local function calculate_next_talk_time(current_unix)
     return current_unix + interval
 end
 
+--- Status 文字列にキーワードが含まれるかを判定する
+---@param status string|nil Status ヘッダー値（カンマ区切り複合文字列）
+---@param keyword string 検索キーワード（例: "talking", "choosing"）
+---@return boolean キーワードが含まれていれば true
+local function has_status(status, keyword)
+    if not status then return false end
+    return status:find(keyword, 1, true) ~= nil
+end
+
 --- シーン関数からthreadを生成（実行しない）
 ---@param event_name string イベント名 ("OnTalk" or "OnHour")
 ---@param act ShioriAct actオブジェクト（未使用、将来拡張用）
@@ -94,8 +103,11 @@ function M.check_hour(act)
         return nil
     end
 
-    -- トーク中はスキップ（SSPからの状態情報を使用）
-    if act.req.status == "talking" then
+    -- トーク中・選択中はスキップ（SSPからの状態情報を使用）
+    if has_status(act.req.status, "talking") then
+        return nil
+    end
+    if has_status(act.req.status, "choosing") then
         return nil
     end
 
@@ -125,8 +137,11 @@ function M.check_talk(act)
     local current_unix = act.req.date.unix
     local cfg = get_config()
 
-    -- トーク中はスキップ（SSPからの状態情報を使用）
-    if act.req.status == "talking" then
+    -- トーク中・選択中はスキップ（SSPからの状態情報を使用）
+    if has_status(act.req.status, "talking") then
+        return nil
+    end
+    if has_status(act.req.status, "choosing") then
         return nil
     end
 

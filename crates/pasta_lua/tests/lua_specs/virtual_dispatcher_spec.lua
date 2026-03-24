@@ -655,3 +655,185 @@ describe("check_hour - HH format", function()
         expect(first_name):toBe("時報23")
     end)
 end)
+
+-- ============================================================================
+-- Task 4.1: choosing 状態での OnTalk スキップ・CSV 対応
+-- Requirements: 4.1, 4.3, 4.4
+-- ============================================================================
+
+describe("check_talk - choosing/CSV status guard", function()
+    local dispatcher
+
+    local function setup()
+        dispatcher = require("pasta.shiori.event.virtual_dispatcher")
+        dispatcher._reset()
+        dispatcher._set_scene_executor(function(event_name)
+            if event_name == "OnTalk" then
+                return coroutine.create(function() return "talk_result" end)
+            end
+            return nil
+        end)
+    end
+
+    test("skips when status is 'choosing' (T1)", function()
+        setup()
+        -- Initialize
+        local act1 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } })
+        dispatcher.dispatch(act1)
+
+        local state = dispatcher._get_internal_state()
+
+        -- After interval but choosing
+        local act2 = create_mock_act({ id = "OnSecondChange", status = "choosing", date = { unix = state.next_talk_time + 1 } })
+        local result = dispatcher.check_talk(act2)
+
+        expect(result):toBe(nil)
+    end)
+
+    test("skips when status is CSV 'talking,choosing,balloon(0=2)' (T3)", function()
+        setup()
+        local act1 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } })
+        dispatcher.dispatch(act1)
+
+        local state = dispatcher._get_internal_state()
+
+        local act2 = create_mock_act({ id = "OnSecondChange", status = "talking,choosing,balloon(0=2)", date = { unix = state.next_talk_time + 1 } })
+        local result = dispatcher.check_talk(act2)
+
+        expect(result):toBe(nil)
+    end)
+
+    test("skips when status is CSV 'talking,balloon(0=0)' (T5)", function()
+        setup()
+        local act1 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } })
+        dispatcher.dispatch(act1)
+
+        local state = dispatcher._get_internal_state()
+
+        local act2 = create_mock_act({ id = "OnSecondChange", status = "talking,balloon(0=0)", date = { unix = state.next_talk_time + 1 } })
+        local result = dispatcher.check_talk(act2)
+
+        expect(result):toBe(nil)
+    end)
+
+    test("does NOT skip when status is 'idle' (T7)", function()
+        setup()
+        local act1 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } })
+        dispatcher.dispatch(act1)
+
+        local state = dispatcher._get_internal_state()
+
+        local act2 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = state.next_talk_time + 1 } })
+        local result = dispatcher.check_talk(act2)
+
+        expect(type(result)):toBe("thread")
+    end)
+end)
+
+-- ============================================================================
+-- Task 4.2: choosing 状態での OnHour スキップ
+-- Requirements: 4.2, 4.3, 4.4
+-- ============================================================================
+
+describe("check_hour - choosing/CSV status guard", function()
+    local dispatcher
+
+    local function setup()
+        dispatcher = require("pasta.shiori.event.virtual_dispatcher")
+        dispatcher._reset()
+        dispatcher._set_scene_executor(function(event_name)
+            if event_name == "OnHourOther" then
+                return coroutine.create(function() return "hour_result" end)
+            end
+            return nil
+        end)
+    end
+
+    test("skips when status is 'choosing' (T2)", function()
+        setup()
+        -- Initialize
+        local act1 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } })
+        dispatcher.check_hour(act1)
+
+        -- At next hour but choosing
+        local act2 = create_mock_act({ id = "OnSecondChange", status = "choosing", date = { unix = 1702652400, hour = 15 } })
+        local result = dispatcher.check_hour(act2)
+
+        expect(result):toBe(nil)
+    end)
+
+    test("skips when status is CSV 'talking,choosing,balloon(0=2)' (T4)", function()
+        setup()
+        local act1 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } })
+        dispatcher.check_hour(act1)
+
+        local act2 = create_mock_act({ id = "OnSecondChange", status = "talking,choosing,balloon(0=2)", date = { unix = 1702652400, hour = 15 } })
+        local result = dispatcher.check_hour(act2)
+
+        expect(result):toBe(nil)
+    end)
+
+    test("skips when status is CSV 'talking,balloon(0=0)' (T6)", function()
+        setup()
+        local act1 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } })
+        dispatcher.check_hour(act1)
+
+        local act2 = create_mock_act({ id = "OnSecondChange", status = "talking,balloon(0=0)", date = { unix = 1702652400, hour = 15 } })
+        local result = dispatcher.check_hour(act2)
+
+        expect(result):toBe(nil)
+    end)
+end)
+
+-- ============================================================================
+-- Task 4.3: タイマー非消費の検証
+-- Requirements: 1.2, 2.2
+-- ============================================================================
+
+describe("choosing status - timer non-consumption", function()
+    local dispatcher
+
+    local function setup()
+        dispatcher = require("pasta.shiori.event.virtual_dispatcher")
+        dispatcher._reset()
+        dispatcher._set_scene_executor(function(event_name)
+            return coroutine.create(function() return event_name .. "_result" end)
+        end)
+    end
+
+    test("check_talk does not consume next_talk_time when choosing (T8)", function()
+        setup()
+        -- Initialize
+        local act1 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } })
+        dispatcher.dispatch(act1)
+
+        local state_before = dispatcher._get_internal_state()
+        local saved_talk_time = state_before.next_talk_time
+
+        -- Call with choosing status after interval
+        local act2 = create_mock_act({ id = "OnSecondChange", status = "choosing", date = { unix = saved_talk_time + 1 } })
+        dispatcher.check_talk(act2)
+
+        local state_after = dispatcher._get_internal_state()
+
+        expect(state_after.next_talk_time):toBe(saved_talk_time)
+    end)
+
+    test("check_hour does not consume next_hour_unix when choosing (T9)", function()
+        setup()
+        -- Initialize
+        local act1 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } })
+        dispatcher.check_hour(act1)
+
+        local state_before = dispatcher._get_internal_state()
+        local saved_hour_unix = state_before.next_hour_unix
+
+        -- Call with choosing status at next hour
+        local act2 = create_mock_act({ id = "OnSecondChange", status = "choosing", date = { unix = saved_hour_unix + 1, hour = 15 } })
+        dispatcher.check_hour(act2)
+
+        local state_after = dispatcher._get_internal_state()
+
+        expect(state_after.next_hour_unix):toBe(saved_hour_unix)
+    end)
+end)
