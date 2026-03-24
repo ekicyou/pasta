@@ -13,7 +13,7 @@
 ### Goals
 - SAVE テーブルからのおしゃべり頻度読み出しと 3 段フォールバック（SAVE > toml > hardcoded）
 - 実行時変更の即時反映（キャッシュ廃止による暗黙的実現）
-- 不正値に対するバリデーション（型チェック、min > max 補正）
+- 不正値に対するバリデーション（型チェック、floor丸め、最小10秒クランプ、Inf/NaN拒否、min > max 補正）
 - `pasta-lua-coding` スキルへの SAVE キー命名規約追記
 
 ### Non-Goals
@@ -92,9 +92,15 @@ flowchart TD
     LOAD_TOML --> RESOLVE_MIN["resolve('pasta_talk_interval_min', 'talk_interval_min', 180)"]
 
     RESOLVE_MIN --> CHECK_SAVE_MIN{"save[save_key] が数値?"}
-    CHECK_SAVE_MIN -->|Yes| USE_SAVE_MIN["SAVE 値を使用"]
+    CHECK_SAVE_MIN -->|Yes| FLOOR_SAVE["math.floor → max(10, v)"]
+    FLOOR_SAVE --> INF_CHECK_SAVE{"< Inf?"}
+    INF_CHECK_SAVE -->|Yes| USE_SAVE_MIN["SAVE 値を使用"]
+    INF_CHECK_SAVE -->|No| CHECK_TOML_MIN
     CHECK_SAVE_MIN -->|No| CHECK_TOML_MIN{"ghost[toml_key] が数値?"}
-    CHECK_TOML_MIN -->|Yes| USE_TOML_MIN["toml 値を使用"]
+    CHECK_TOML_MIN -->|Yes| FLOOR_TOML["math.floor → max(10, v)"]
+    FLOOR_TOML --> INF_CHECK_TOML{"< Inf?"}
+    INF_CHECK_TOML -->|Yes| USE_TOML_MIN["toml 値を使用"]
+    INF_CHECK_TOML -->|No| USE_DEFAULT_MIN
     CHECK_TOML_MIN -->|No| USE_DEFAULT_MIN["ハードコードデフォルト使用"]
 
     USE_SAVE_MIN --> RESOLVE_MAX["resolve('pasta_talk_interval_max', 300)"]
@@ -166,6 +172,8 @@ sequenceDiagram
 - `pcall(require, "@pasta_config")` で toml 設定を取得（既存パターン維持）
 - ローカル関数 `resolve()` で各キーの3段フォールバック解決
 - `type(sv) == "number"` ガードで非数値値を無視
+- `math.floor()` で小数を切り捨て、`math.max(10, v)` で最小10秒にクランプ
+- Inf/NaN は `v < math.huge` チェックで拒否しフォールバック
 - `min > max` の場合 `max = min` に補正
 - `hour_margin` は従来通り toml のみ参照（永続化対象外）
 - `cached_config` モジュールローカル変数を廃止
@@ -194,17 +202,18 @@ local function get_config() end
 
 ```lua
 --- SAVE キーの値 → toml キーの値 → デフォルト値の優先順位で解決
+--- 数値以外・NaN・Inf は無視してフォールバック。小数は floor、10未満は10にクランプ。
 --- （save と ghost は get_config() のアップバリューとして捕捉）
 --- @param save_key string SAVE テーブルのキー名（pasta_ プレフィックス付き）
 --- @param toml_key string pasta.toml [ghost] セクションのキー名（プレフィックスなし）
 --- @param default number ハードコードデフォルト値
---- @return number 解決された値
+--- @return number 解決された値（≥10 の整数）
 local function resolve(save_key, toml_key, default) end
 ```
 
 - Preconditions: `save`, `ghost` は get_config() スコープで初期化済み（アップバリュー）
-- Postconditions: 返却値は必ず number 型
-- Invariants: `type(返却値) == "number"`
+- Postconditions: 返却値は必ず number 型、≥10 の整数
+- Invariants: `type(返却値) == "number"` かつ `返却値 >= 10`
 
 **Implementation Notes**
 - `cached_config` 変数と早期リターンを除去
