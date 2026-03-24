@@ -50,3 +50,12 @@
 1. If SAVE テーブルの `pasta_talk_interval_min` が数値でない場合, the virtual_dispatcher shall その値を無視し、次の優先順位の値にフォールバックする。
 2. If SAVE テーブルの `pasta_talk_interval_max` が数値でない場合, the virtual_dispatcher shall その値を無視し、次の優先順位の値にフォールバックする。
 3. If `talk_interval_min` が `talk_interval_max` より大きい場合, the virtual_dispatcher shall 両方の値を `talk_interval_min` と同じ値として扱う。
+
+### Requirement 4: スキルへの命名規約の反映
+
+**Objective:** ゴースト作者として、SAVE テーブルのキー命名規則をスキルドキュメントで参照できるようにしたい。他の永続化変数を実装する際に一貫した命名を維持するため。
+
+#### Acceptance Criteria
+
+1. When `pasta-lua-coding` スキルを更新する場合, the スキルドキュメント shall `pasta.save` の §5 Internal Modules または §3 Coding Conventions セクションに、pasta エンジン固有の SAVE キーには `pasta_` プレフィックスを付けることを規約として記載する。
+2. When `pasta-lua-coding` スキルを更新する場合, the スキルドキュメント shall ゴースト作者向けの SAVE キー命名指針として、エンジン予約キー（`pasta_` プレフィックス付き）とゴースト固有キー（任意命名）の区別を明示する。
