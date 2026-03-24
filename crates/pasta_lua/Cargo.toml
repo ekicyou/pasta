@@ -26,6 +26,8 @@ serde_json.workspace = true
 glob.workspace = true
 flate2.workspace = true
 regex.workspace = true
+budoux.workspace = true
+unicode-width.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61.2", features = ["Win32_Globalization"] }

@@ -110,7 +110,7 @@ impl Tokenizer {
     /// Sakura script tag pattern.
     /// Matches: \tag or \tag[param]
     /// Examples: \h, \s[0], \_w[500], \![open,inputbox], \-, \+, \*, \_?, \&[ID]
-    const SAKURA_TAG_PATTERN: &'static str = r"\\[0-9a-zA-Z_!+*?&-]+(?:\[[^\]]*\])?";
+    pub const SAKURA_TAG_PATTERN: &'static str = r"\\[0-9a-zA-Z_!+*?&-]+(?:\[[^\]]*\])?";
     /// Create a new Tokenizer from TalkConfig.
     ///
     /// # Arguments
@@ -127,6 +127,11 @@ impl Tokenizer {
             sakura_tag_regex,
             char_sets,
         })
+    }
+
+    /// Get a reference to the sakura tag regex.
+    pub fn tag_regex(&self) -> &Regex {
+        &self.sakura_tag_regex
     }
 
     /// Tokenize input text.

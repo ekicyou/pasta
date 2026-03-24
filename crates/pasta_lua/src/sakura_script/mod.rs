@@ -18,6 +18,7 @@
 
 pub mod tokenizer;
 pub mod wait_inserter;
+pub mod line_breaker;
 
 use crate::loader::TalkConfig;
 use mlua::{Lua, Result as LuaResult, Table, Value};
@@ -35,6 +36,7 @@ const DESCRIPTION: &str = "Sakura Script wait insertion module for natural conve
 struct SakuraScriptState {
     tokenizer: Tokenizer,
     default_wait_values: WaitValues,
+    budoux_model: budoux::Model,
 }
 
 /// Register the `@pasta_sakura_script` module to Lua.
@@ -59,6 +61,7 @@ pub fn register(lua: &Lua, config: Option<&TalkConfig>) -> LuaResult<Table> {
     let state = Arc::new(SakuraScriptState {
         tokenizer,
         default_wait_values,
+        budoux_model: budoux::models::default_japanese_model().clone(),
     });
 
     // Create module table
@@ -76,6 +79,15 @@ pub fn register(lua: &Lua, config: Option<&TalkConfig>) -> LuaResult<Table> {
         })?;
 
     module.set("talk_to_script", talk_to_script)?;
+
+    // Create break_lines function
+    let state_clone = Arc::clone(&state);
+    let break_lines =
+        lua.create_function(move |_lua, (text, widths): (Option<String>, Value)| {
+            break_lines_lua_impl(&state_clone, text, widths)
+        })?;
+
+    module.set("break_lines", break_lines)?;
 
     Ok(module)
 }
@@ -99,10 +111,48 @@ fn talk_to_script_impl(
     // Tokenize the input
     let tokens = state.tokenizer.tokenize(&talk);
 
-    // Insert waits and return result
+    // Insert waits
     let result = wait_inserter::insert_waits(&tokens, &wait_values);
 
+    // Apply budoux line breaking if actor has budoux config
+    let result = apply_budoux_if_configured(&actor, state, result)?;
+
     Ok(result)
+}
+
+/// Apply budoux line breaking if the actor table has a `budoux` field.
+fn apply_budoux_if_configured(
+    actor: &Value,
+    state: &SakuraScriptState,
+    text: String,
+) -> LuaResult<String> {
+    let actor_table = match actor {
+        Value::Table(t) => t,
+        _ => return Ok(text),
+    };
+
+    let widths: Vec<usize> = match actor_table.get::<Value>("budoux")? {
+        Value::Table(t) => {
+            let mut v = Vec::new();
+            for i in 1..=t.raw_len() {
+                let w: i64 = t.get(i)?;
+                v.push(w as usize);
+            }
+            v
+        }
+        _ => return Ok(text),
+    };
+
+    if widths.is_empty() {
+        return Ok(text);
+    }
+
+    Ok(line_breaker::break_lines_impl(
+        &text,
+        &widths,
+        state.tokenizer.tag_regex(),
+        &state.budoux_model,
+    ))
 }
 
 /// Resolve wait values from actor table with fallback to defaults.
@@ -128,6 +178,44 @@ fn resolve_wait_values(_lua: &Lua, actor: &Value, defaults: &WaitValues) -> LuaR
     })
 }
 
+/// Implementation of break_lines Lua function.
+fn break_lines_lua_impl(
+    state: &SakuraScriptState,
+    text: Option<String>,
+    widths: Value,
+) -> LuaResult<String> {
+    let text = match text {
+        Some(s) if !s.is_empty() => s,
+        _ => return Ok(String::new()),
+    };
+
+    // Convert Lua table to Vec<usize>
+    let widths_vec: Vec<usize> = match widths {
+        Value::Table(t) => {
+            let mut v = Vec::new();
+            for i in 1..=t.raw_len() {
+                let w: i64 = t.get(i)?;
+                v.push(w as usize);
+            }
+            v
+        }
+        _ => return Ok(text),
+    };
+
+    if widths_vec.is_empty() {
+        return Ok(text);
+    }
+
+    let result = line_breaker::break_lines_impl(
+        &text,
+        &widths_vec,
+        state.tokenizer.tag_regex(),
+        &state.budoux_model,
+    );
+
+    Ok(result)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -141,6 +229,7 @@ mod tests {
         assert!(module.contains_key("_VERSION").unwrap());
         assert!(module.contains_key("_DESCRIPTION").unwrap());
         assert!(module.contains_key("talk_to_script").unwrap());
+        assert!(module.contains_key("break_lines").unwrap());
     }
 
     #[test]

@@ -7,4 +7,5 @@
 mod common;
 
 mod basic_test;
+mod budoux_test;
 mod output_test;

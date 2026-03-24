@@ -2,7 +2,7 @@
     "name": "pasta-vscode",
     "displayName": "Pasta DSL",
     "description": "Syntax highlighting and diagnostics for Pasta DSL (*.pasta) files",
-    "version": "0.1.17",
+    "version": "0.1.16",
     "publisher": "ekicyou",
     "license": "MIT",
     "icon": "img/pasta.png",
@@ -188,7 +188,7 @@
         "test": "npm run test:grammar && npm run test:unit && npm run test:e2e",
         "prepackage": "npm run build:wasm && npm run compile",
         "package": "vsce package",
-        "build:wasm": "powershell -ExecutionPolicy Bypass -File scripts/build-wasm.ps1"
+        "build:wasm": "powershell -File scripts/build-wasm.ps1"
     },
     "devDependencies": {
         "@types/node": "^20.0.0",
