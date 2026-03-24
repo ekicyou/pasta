@@ -97,7 +97,7 @@
 2. pasta.toml `[ghost].talk_interval_min` — 次優先
 3. ハードコード既定値 (180秒) — 最終フォールバック
 
-**注意**: `pasta_talk_interval_min/max` は SAVE テーブルのキーであり、Pasta DSL の `＄＊` 変数ではない。辞書制作者が Lua ブロック内で `act:init_scene(SCENE)` → `save.pasta_talk_interval_min` でアクセスする形態。これを variables.md に記載するか、別の適切な場所に記載するかは**設計判断**。
+**確定事実（C-1 調査で判明）**: `＄＊XXX` DSL グローバル変数は Lua トランスパイル時に `save.XXX` に変換される。つまり SAVE テーブルキーと DSL グローバル変数は**同一のもの**。辞書制作者は `.pasta` ファイル内で `＄＊pasta_talk_interval_min = 60` と書くことで直接エンジン予約キーを変更できる。これは辞書制作者向けドキュメント（variables.md）に記載すべき内容であることが確定。
 
 ### Req 3: pasta.toml リファレンス新設
 
@@ -191,17 +191,11 @@ pasta.toml [actor."名前"] → @pasta_config.actor["名前"] → STORE.actors["
 
 ## 4. 設計判断が必要な項目
 
-### DJ-1: SAVE エンジン予約キーの記載場所
+### DJ-1: SAVE エンジン予約キーの記載場所 — **✅ 確定: (a)**
 
-**選択肢:**
-- **(a)** `references/variables.md` に「永続化と SAVE テーブル」セクションを追加
-  - 理由: 変数スコープとの関連性が強い（`＄＊` → SAVE）
-- **(b)** `references/pasta-toml.md` の `[persistence]` セクション内に記載
-  - 理由: SAVE キーは設定と同じレイヤーの概念
-- **(c)** 両方に記載（references/variables.md に要約 + pasta-toml.md に詳細）
-  - 理由: 辞書制作者のアクセス経路に合わせた二重参照
+**確定根拠**: `＄＊グローバル変数` = `save.キー名`（同一）であることが確認された（C-1 クローズ）。DSL 辞書制作者が `＄＊pasta_talk_interval_min = 60` と書けばエンジン動作を変更できるため、variables.md（変数スコープの文書）に記載するのが自然かつ唯一の適切な場所。
 
-**推奨**: **(a)** — 辞書制作者は「変数」の文脈で永続化を調べる可能性が最も高い。
+**確定**: `references/variables.md` に「永続化と SAVE テーブル」セクションを追加。`pasta-toml.md` への記載は不要（重複を避ける）。
 
 ### DJ-2: BudouX の記載カテゴリ
 

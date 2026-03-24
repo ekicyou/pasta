@@ -27,19 +27,19 @@
 
 #### Acceptance Criteria
 
-1. When ゴースト辞書制作者が `references/variables.md` を参照した場合, the pasta-ghost-authoring スキル shall グローバル変数がセッション間で JSON ファイルに永続化されることを明記する。
+1. When ゴースト辞書制作者が `references/variables.md` を参照した場合, the pasta-ghost-authoring スキル shall `＄＊変数名` DSL 構文によるグローバル変数が内部的に Lua の SAVE テーブルに展開され、セッション間で JSON ファイルに永続化されることを明記する。
 2. The pasta-ghost-authoring スキル shall `SKILL.md` §3.4 Variables セクションの「永続的に有効」の記述を、SAVE テーブル経由のファイル永続化であることが分かる表現に更新する。
 3. The pasta-ghost-authoring スキル shall 永続化の詳細な実装メカニズム（`@pasta_persistence` モジュール、gzip 圧縮等）については `pasta-lua-coding` スキルへのクロスリファレンスを記載する（重複記述を避ける）。
 
 ### Requirement 2: SAVE テーブルのエンジン予約キー記載
 
-**Objective:** ゴースト辞書制作者として、エンジンが SAVE テーブルに使用する予約キー（`pasta_` プレフィックス）とその影響を把握したい。これにより、キー名の衝突を回避し、エンジン動作を意図的に制御できるようになる。
+**Objective:** ゴースト辞書制作者として、`＄＊変数名` 構文でアクセスできる SAVE テーブルのエンジン予約キー（`pasta_` プレフィックス）とその影響を把握したい。これにより、キー名の衝突を回避し、エンジン動作（トーク間隔など）を意図的に `＄＊変数名` 構文で制御できるようになる。
 
 #### Acceptance Criteria
 
 1. The pasta-ghost-authoring スキル shall `references/variables.md` に SAVE テーブルのキー命名規約（`pasta_` プレフィックスはエンジン予約）を記載する。
 2. The pasta-ghost-authoring スキル shall 現在存在するエンジン予約キー `pasta_talk_interval_min` および `pasta_talk_interval_max` の用途・既定値・影響を記載する。
-3. When ゴースト辞書制作者が SAVE キーに `pasta_` プレフィックスを使用しようとした場合, the ドキュメント shall エンジン動作に影響する可能性があることを警告する。
+3. When ゴースト辞書制作者が SAVE キーに `pasta_` プレフィックスを使用しようとした場合（DSL 内で `＄＊pasta_XXX = ...` と書く場合を含む）, the ドキュメント shall エンジン動作に影響する可能性があることを警告する。
 
 ### Requirement 3: pasta.toml リファレンス新設
 
