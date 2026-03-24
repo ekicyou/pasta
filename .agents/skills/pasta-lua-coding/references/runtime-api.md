@@ -334,6 +334,66 @@ script_wait_period = 100
 script_wait_comma = 75
 ```
 
+### break_lines(text, widths)
+
+budoux 日本語分割モデルを用いて、テキストの自然な区切り位置にさくらスクリプト改行タグ（`\n`）を挿入する。
+さくらスクリプトタグ（`\_w[ms]` 等）は幅計算から除外されつつ元の位置関係を保持して出力される。
+
+```lua
+SAKURA_SCRIPT.break_lines(text, widths) -> string
+```
+
+| パラメータ | 型 | 必須 | 説明 |
+|-----------|---|------|------|
+| `text` | string \| nil | ✅ | 処理対象テキスト。`nil` の場合は空文字列を返す |
+| `widths` | table \| nil | ✅ | 行ごとの幅閾値（CJK文字幅）の配列。空テーブル・`nil` の場合は入力をそのまま返す |
+
+**widths の仕様**:
+- `widths[1]` = 1行目の幅上限
+- `widths[2]` = 2行目の幅上限
+- 配列末尾の値が3行目以降に繰り返し適用される（例: `{10, 12}` → 3行目以降は幅12）
+- 例: `{10, 12}` なら1行目≤10、2行目以降≤12
+
+**通常 `talk_to_script` と組み合わせて使う必要はない**: `actor.budoux` フィールドが設定されていれば `talk_to_script` が自動的に `break_lines` を後段処理として呼び出す。`break_lines` を直接呼ぶのはカスタムパイプラインを構築する場合のみ。
+
+### pasta.toml での budoux 設定
+
+アクターへ `budoux` フィールドを追加することで、`talk_to_script` が自動的に改行を挿入するようになる。
+
+```toml
+[actor."女の子"]
+spot = 0
+budoux = [10, 12]
+# 1行目≤10文字幅、2行目以降≤12文字幅で自動改行
+```
+
+### 使用例（直接呼び出し）
+
+```lua
+local SAKURA_SCRIPT = require "@pasta_sakura_script"
+
+-- 直接呼び出し（カスタムパイプライン用）
+local result = SAKURA_SCRIPT.break_lines("今日はいい天気ですね", {6})
+-- 結果例: "今日は\nいい天気ですね"（budoux分割位置に依存）
+
+-- さくらスクリプトタグは幅計算から除外され出力に保持される
+local with_tags = SAKURA_SCRIPT.break_lines(
+    "こ\\_w[50]れ\\_w[50]は\\_w[50]テ\\_w[50]ス\\_w[50]ト",
+    {6}
+)
+-- 結果例: "こ\\_w[50]れ\\_w[50]は\\_w[50]\nテ\\_w[50]ス\\_w[50]ト"
+
+-- nil / 空テーブルは安全
+local r1 = SAKURA_SCRIPT.break_lines(nil, {10})   -- ""
+local r2 = SAKURA_SCRIPT.break_lines("テスト", {}) -- "テスト"（変更なし）
+local r3 = SAKURA_SCRIPT.break_lines("テスト", nil) -- "テスト"（変更なし）
+
+-- talk_to_script 経由の自動適用（pasta.toml に budoux = [10, 12] が設定済み）
+local actor = CONFIG.actor["女の子"]  -- actor.budoux = {10, 12} が含まれる
+local script = SAKURA_SCRIPT.talk_to_script(actor, "今日はいい天気ですね")
+-- ウェイト挿入後に自動的に break_lines が適用される
+```
+
 ---
 
 ## @enc
