@@ -55,30 +55,46 @@ flowchart LR
 
 ## System Flows
 
-### Status 判定フロー（変更後）
+### dispatch() 全体フロー
 
 ```mermaid
 flowchart TD
-    Entry["OnSecondChange 受信"]
+    Entry["dispatch(act)<br/>OnSecondChange 受信"]
     HasDate{"act.req.date<br/>exists?"}
-    CheckHour["check_hour(act)"]
-    CheckTalk["check_talk(act)"]
+    CallHour["check_hour(act)<br/>（OnHour 優先判定）"]
+    HourResult{"非 nil を返した?"}
+    CallTalk["check_talk(act)<br/>（OnTalk 判定）"]
+    ReturnNil["return nil"]
+    ReturnHour["return hour thread"]
+    ReturnTalk["return talk_thread or nil"]
+
+    Entry --> HasDate
+    HasDate -->|No| ReturnNil
+    HasDate -->|Yes| CallHour
+    CallHour --> HourResult
+    HourResult -->|Yes| ReturnHour
+    HourResult -->|No| CallTalk
+    CallTalk --> ReturnTalk
+```
+
+### Status ガード節パターン（check_hour / check_talk 共通）
+
+```mermaid
+flowchart TD
+    FuncEntry["ガード節エントリ"]
     HasTalking{"has_status<br/>('talking')?"}
     HasChoosing{"has_status<br/>('choosing')?"}
     Skip["return nil<br/>（タイマー非消費）"]
     Proceed["タイマー判定へ進む"]
 
-    Entry --> HasDate
-    HasDate -->|No| Skip
-    HasDate -->|Yes| CheckHour
-    CheckHour --> HasTalking
+    FuncEntry --> HasTalking
     HasTalking -->|Yes| Skip
     HasTalking -->|No| HasChoosing
     HasChoosing -->|Yes| Skip
     HasChoosing -->|No| Proceed
 ```
 
-> `check_talk()` も同一パターン。talking → choosing の順序でガード判定し、いずれかに該当すれば `nil` を返す。talking/choosing ガードの位置はタイマー更新前に配置し、タイマーを消費しない。
+> **ガード位置の差異**: `check_talk` では関数冒頭（全タイマー判定前）に配置。`check_hour` では正時到達チェック後・`next_hour_unix` 更新前に配置。いずれも「ガード後にタイマー更新ロジックが来る」構造を維持し、タイマーを消費しない。
 
 ## Requirements Traceability
 
@@ -228,3 +244,17 @@ end
 | T7 | check_talk | `"idle"` | 通常動作 | 3.3（逆テスト） |
 | T8 | check_talk タイマー | `"choosing"` | `next_talk_time` 不変 | 1.2 |
 | T9 | check_hour タイマー | `"choosing"` | `next_hour_unix` 不変 | 2.2 |
+
+**T8/T9 の検証方法**: `M._get_internal_state()` で内部状態を直接取得して検証する。
+
+```lua
+-- T8 パターン例（T9 は check_hour / next_hour_unix で同様）
+local state_before = dispatcher._get_internal_state()
+local result = dispatcher.check_talk(create_mock_act({
+    status = "choosing",
+    date = { unix = state_before.next_talk_time + 1 }
+}))
+local state_after = dispatcher._get_internal_state()
+expect(result):toBe(nil)
+expect(state_after.next_talk_time):toBe(state_before.next_talk_time)  -- タイマー未更新
+```
