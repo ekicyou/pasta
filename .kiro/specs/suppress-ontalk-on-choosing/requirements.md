@@ -1,0 +1,69 @@
+# Requirements Document
+
+## Introduction
+
+SSP（SHIORI Server Protocol）は、SHIORI リクエストの `Status` ヘッダーでゴーストの現在状態を通知する。ユーザーが選択肢（`\q[]` タグ）を提示されている間、`Status` ヘッダーには `choosing` が含まれる。この状態中にランダムトーク（OnTalk）や時報（OnHour）が発動すると、選択肢UIが消失しユーザー体験を損なう。本仕様は `choosing` 状態を検出し、仮想イベント発動を抑制する機能を定義する。
+
+### 背景情報
+
+- SSP の `Status` ヘッダーはカンマ区切りで複数状態を同時送出する（例: `talking,choosing,balloon(0=2)`）
+- 既存実装では `talking` 状態での抑制は完全一致（`==`）で行われているが、`Status` ヘッダーの実際の値は `talking,balloon(0=0)` のようにカンマ区切りで複合される場合がある
+- `choosing` は常に `talking` と併記される傾向にあるが、仕様上は単独出現の可能性もある
+
+### 参考
+
+- SSP SHIORI/3.0 仕様: https://ssp.shillest.net/ukadoc/manual/spec_shiori3.html
+
+## Project Description (Input)
+
+Statusに「choosing」が出ている間、OnTalk発動を抑制すること。
+
+## Requirements
+
+### Requirement 1: choosing 状態での OnTalk 抑制
+
+**Objective:** ゴースト開発者として、ユーザーが選択肢を選んでいる最中にランダムトークが割り込まないようにしたい。選択肢が意図せず消えてしまうことを防ぐためである。
+
+#### Acceptance Criteria
+
+1. While SHIORI リクエストの `Status` ヘッダーに `choosing` が含まれている, the virtual_dispatcher shall OnTalk の発動をスキップする（`nil` を返す）。
+2. While SHIORI リクエストの `Status` ヘッダーに `choosing` が含まれている, the virtual_dispatcher shall 次回トーク時刻の再計算を行わない（タイマーを消費しない）。
+
+### Requirement 2: choosing 状態での OnHour 抑制
+
+**Objective:** ゴースト開発者として、ユーザーが選択肢を選んでいる最中に時報が割り込まないようにしたい。OnTalk と同じ理由で選択肢消失を防ぐためである。
+
+#### Acceptance Criteria
+
+1. While SHIORI リクエストの `Status` ヘッダーに `choosing` が含まれている, the virtual_dispatcher shall OnHour の発動をスキップする（`nil` を返す）。
+2. While `choosing` 状態で OnHour がスキップされた場合, the virtual_dispatcher shall 次の正時タイムスタンプを更新しない（正時到達後に choosing が解除されれば発火可能とする）。
+
+### Requirement 3: Status ヘッダーのカンマ区切り対応
+
+**Objective:** ゴースト開発者として、`Status` ヘッダーが `talking,choosing,balloon(0=2)` のようにカンマ区切りで複合された場合でも正しく状態を検出したい。誤判定によるトーク割り込みを防ぐためである。
+
+#### Acceptance Criteria
+
+1. When `Status` ヘッダーが `choosing` 単独の場合, the virtual_dispatcher shall choosing 状態として検出する。
+2. When `Status` ヘッダーが `talking,choosing,balloon(0=2)` のようにカンマ区切りで複合されている場合, the virtual_dispatcher shall choosing 状態として検出する。
+3. When `Status` ヘッダーが `talking` のみの場合, the virtual_dispatcher shall choosing 状態として検出しない（既存の talking 抑制のみ適用）。
+
+### Requirement 4: 既存 talking 抑制とのカンマ区切り整合
+
+**Objective:** ゴースト開発者として、本仕様の `choosing` 対応に合わせて既存の `talking` 抑制もカンマ区切り対応したい。`Status: talking,balloon(0=0)` のような実際のSSP送出値でも talking 抑制が正しく機能するためである。
+
+#### Acceptance Criteria
+
+1. When `Status` ヘッダーが `talking,balloon(0=0)` のようにカンマ区切りで複合されている場合, the virtual_dispatcher shall talking 状態として検出し OnTalk をスキップする。
+2. When `Status` ヘッダーが `talking,balloon(0=0)` のようにカンマ区切りで複合されている場合, the virtual_dispatcher shall talking 状態として検出し OnHour をスキップする。
+
+### Requirement 5: テストカバレッジ
+
+**Objective:** 開発者として、choosing 抑制の挙動を自動テストで保証したい。リグレッションを防止するためである。
+
+#### Acceptance Criteria
+
+1. The Lua テストスイート shall choosing 状態での OnTalk スキップを検証するテストケースを含む。
+2. The Lua テストスイート shall choosing 状態での OnHour スキップを検証するテストケースを含む。
+3. The Lua テストスイート shall カンマ区切り Status（例: `talking,choosing,balloon(0=2)`）での choosing 正常検出を検証するテストケースを含む。
+4. The Lua テストスイート shall カンマ区切り Status（例: `talking,balloon(0=0)`）での talking 正常検出を検証するテストケースを含む。
