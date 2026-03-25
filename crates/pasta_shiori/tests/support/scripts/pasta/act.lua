@@ -67,10 +67,53 @@ function ACT:talk(actor, text)
     table.insert(self.token, { type = "talk", text = text })
 end
 
+--- さくらスクリプトトークン蓄積
+--- @param actor Actor アクターオブジェクト
+--- @param text string さくらスクリプトタグ文字列
+--- @return Act self メソッドチェーン用
+function ACT:sakura_script(actor, text)
+    table.insert(self.token, { type = "sakura_script", actor = actor, text = text })
+    return self
+end
+
 --- raw_scriptトークン蓄積
 --- @param text string 生スクリプト文字列
+--- @return Act self メソッドチェーン用
 function ACT:raw_script(text)
     table.insert(self.token, { type = "raw_script", text = text })
+    return self
+end
+
+--- surfaceトークン蓄積
+--- @param id number|string サーフェスID
+--- @return Act self メソッドチェーン用
+function ACT:surface(id)
+    table.insert(self.token, { type = "surface", id = id })
+    return self
+end
+
+--- waitトークン蓄積
+--- @param ms number 待機時間（ミリ秒）
+--- @return Act self メソッドチェーン用
+function ACT:wait(ms)
+    ms = math.max(0, math.floor(ms or 0))
+    table.insert(self.token, { type = "wait", ms = ms })
+    return self
+end
+
+--- newlineトークン蓄積
+--- @param n number|nil 改行回数（デフォルト1）
+--- @return Act self メソッドチェーン用
+function ACT:newline(n)
+    table.insert(self.token, { type = "newline", n = n or 1 })
+    return self
+end
+
+--- clearトークン蓄積
+--- @return Act self メソッドチェーン用
+function ACT:clear()
+    table.insert(self.token, { type = "clear" })
+    return self
 end
 
 --- 単語検索（アクター非依存、4レベル検索）
