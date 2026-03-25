@@ -14,7 +14,7 @@ description: >-
   SHIORIプロトコル実装, Luaランタイム開発, pasta言語仕様の設計変更.
 metadata:
   author: ekicyou
-  version: "1.3.0"
+  version: "1.4.0"
 ---
 
 # Pasta Ghost Authoring Skill
@@ -138,12 +138,16 @@ metadata:
 - **ローカル変数** `＄変数名`: 一連のシーンが終わるまで有効
 - **グローバル変数** `＄＊変数名`: 永続的に有効
 - 代入: `＄変数名＝値` または `＄変数名：値`（リテラル値・単語参照・変数参照・式・関数呼び出しが使用可能）
+- **グローバル関数代入**: `＄result＝＠＊func()` → `GLOBAL.func(act)` の戻り値を代入
+- **式文（副作用のみ）**: `＄＝expr` — 戻り値を使わず式を実行するだけ
 - 参照: アクション行内で `＄変数名` と記述
 
 ```pasta
 ＊会話
   ＄count＝1
   ＄＊total＝＄＊total ＋ 1
+  ＄result＝＠＊globalFunc()     ＃ グローバル関数の戻り値を代入
+  ＄＝＠＊logEvent（「起動」）   ＃ 戻り値不要の式文
   Alice：＄count　回目の会話だよ。
 ```
 

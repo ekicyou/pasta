@@ -38,8 +38,26 @@ Bob：値は ＄＊グローバル変数 です
 | 単語参照 | `＄value＝＠word_name` |
 | 変数参照 | `＄new_var＝＄old_var` |
 | 式 | `＄result＝＄a + ＄b * 2` |
-| 関数呼び出し | `＄result＝＠calculate()` |
+| ローカル関数呼び出し | `＄result＝＠calculate()` |
+| グローバル関数呼び出し | `＄result＝＠＊calculate()` |
 | 関数呼び出し（引数付き） | `＄sum：＠add（x：10　y：20）` |
+
+> **`＠` と `＠＊` の違い**: `＠calculate()` はシーン内の `SCENE.calculate(act)` を呼び出す。`＠＊calculate()` は `pasta.global` に登録されたグローバル関数 `GLOBAL.calculate(act)` を呼び出す。
+
+---
+
+## 式文構文（var_set_none）
+
+変数名を省略して式だけを実行できる。関数の副作用（外部状態更新、ログ出力等）が目的で戻り値を使わない場合に使用する。
+
+```
+＄＝式        ← 変数名なし・式を評価して結果を捨てる
+```
+
+```pasta
+＄＝＠notify（「保存完了」）       ← ローカル関数を副作用目的で呼び出す
+＄＝＠＊log_event（「起動」）      ← グローバル関数を副作用目的で呼び出す
+```
 
 ---
 
