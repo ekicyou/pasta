@@ -46,12 +46,12 @@ Pasta DSL の `＠` 関数呼び出し構文に2つの改善を行う。
 5. When `＝＠＊fn()` が記述された場合, the pasta_lua transpiler shall `GLOBAL.fn(act)` を式文として生成する（Requirement 1 との組み合わせ）
 6. The pasta_dsl parser shall `＝expr` 行を `local_scene_item` として認識する（`var_set_line`, `call_scene_line`, `action_line` と同じレベル）
 
-#### 設計検討メモ: PEG文法リファクタリング案
+#### 設計決定メモ: PEG文法リファクタリング案（議題2クローズ済み）
 
-`＝expr` を独立した `expr_stmt_line` として追加するのではなく、`var_set` 自体をリファクタリングして統合する案を設計フェーズで検討すること。
+`＝expr` は `var_set_none` として既存の `var_set_line` に統合する方針で確定。
 
 ```pest
-# 案: var_set を3形式に拡張し、＝expr を var_set_none として統合
+# 確定案: var_set を3形式に拡張し、＝expr を var_set_none として統合
 var_set        =_{ var_set_global | var_set_local | var_set_none }
 var_set_local  = { var_marker                 ~ id ~ s ~ set }
 var_set_global = { var_marker ~ global_marker ~ id ~ s ~ set }
@@ -59,7 +59,12 @@ var_set_none   = { set }
 set            =_{ set_marker ~ s ~ ( expr | word_ref ) }
 ```
 
-この案では `＝expr` が `var_set_none` として既存の `var_set_line` に統合され、新規ルール `expr_stmt_line` の追加や `local_scene_item` への変更が不要になる可能性がある。設計フェーズで既存の `set` ルールとの構造変更（`id` の位置移動）による後方互換性への影響を精査すること。
+**議題2の結論**: `＝＠単語名`（`word_ref` を含む `var_set_none`）はパーサーレベルで禁止しない。
+意味論は「式の結果を捨てる」であり、`word_ref` を含んでも無害（書く人はいない）。
+`set` ルールを完全共用できシンプルさが保たれる（パターンB採用）。
+
+設計フェーズでは既存の `set` ルールの構造変更（`id` の位置移動：`set` 内 → 親ルール内）による
+パーサー・AST の後方互換性への影響を精査すること。
 
 ### Requirement 3: 仕様ドキュメントの更新
 
