@@ -86,11 +86,11 @@
 
 ## Architecture Pattern Evaluation
 
-| Option | Description | Strengths | Risks / Limitations |
-|--------|-------------|-----------|---------------------|
-| A: `VarSet.name` を `Option<String>` に変更 | 既存 `VarSet` 構造体の `name` フィールドを `Option` 化 | 最小変更、`LocalSceneItem` 不変、全層で `name.is_none()` チェックのみ | `name` 使用箇所の全探索が必要 |
-| B: 新 `VarSetNone` 構造体 + `LocalSceneItem` 新バリアント | 専用の構造体とバリアントを追加 | 型安全、不正な組み合わせ不可 | `LocalSceneItem` 変更（R2-AC6 に反する）、match arm 追加が全層に波及 |
-| C: `VarSet.name` を空文字列のまま使用 | `name: ""` の場合を expr stmt として扱う | コード変更最小 | 暗黙的な規約、型レベルでの保証なし、空文字列変数名との区別不可 |
+| Option                                                    | Description                                            | Strengths                                                             | Risks / Limitations                                                  |
+| --------------------------------------------------------- | ------------------------------------------------------ | --------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| A: `VarSet.name` を `Option<String>` に変更               | 既存 `VarSet` 構造体の `name` フィールドを `Option` 化 | 最小変更、`LocalSceneItem` 不変、全層で `name.is_none()` チェックのみ | `name` 使用箇所の全探索が必要                                        |
+| B: 新 `VarSetNone` 構造体 + `LocalSceneItem` 新バリアント | 専用の構造体とバリアントを追加                         | 型安全、不正な組み合わせ不可                                          | `LocalSceneItem` 変更（R2-AC6 に反する）、match arm 追加が全層に波及 |
+| C: `VarSet.name` を空文字列のまま使用                     | `name: ""` の場合を expr stmt として扱う               | コード変更最小                                                        | 暗黙的な規約、型レベルでの保証なし、空文字列変数名との区別不可       |
 
 ## Design Decisions
 
