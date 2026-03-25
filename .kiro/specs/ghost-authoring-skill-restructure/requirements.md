@@ -53,16 +53,18 @@
 4. Where `[actor."名前"]` セクションに `budoux` キーが定義されている場合, the リファレンス shall BudouX 自動改行機能の設定方法（配列形式 `[行1幅, 行2+幅]`）と動作説明を含める。
 5. The pasta-ghost-authoring スキル shall `SKILL.md` §4 Project Structure の pasta.toml セクションを新設リファレンスへの参照に置き換え、SKILL.md 上には要約のみを残す。
 
-### Requirement 4: SKILL.md のセクション構造最適化
+### Requirement 4: SKILL.md のセクション構造最適化（大規模整理）
 
-**Objective:** LLM によるスキル読み込み効率を高めるために、SKILL.md 本体の情報密度を適正化し、詳細は references/ に委譲する構成にしたい。
+**Objective:** LLM によるスキル読み込み効率を高めるために、SKILL.md 本体の情報密度を大幅に適正化する。§4 の pasta.toml 記述に加え、§6 のオーサリングパターン集（約204行）も `references/` に分離し、SKILL.md を 300行台まで削減する。
 
 #### Acceptance Criteria
 
 1. The pasta-ghost-authoring スキル shall SKILL.md の各セクションが「要約 + リファレンスリンク」の形式を一貫して維持する。
 2. （Req 3 AC5 に統合）§4 の pasta.toml 記述の圧縮は Req 3 AC5 に従う。
 3. While SKILL.md のセクション構造を変更する場合, the pasta-ghost-authoring スキル shall 既存の §1〜§6 のセクション番号体系を維持する（外部からの参照リンクを壊さない）。
-4. The pasta-ghost-authoring スキル shall SKILL.md と references/ の間に記述の矛盾がないことを保証する（矛盾がある場合は references/ を正として SKILL.md を更新する）。
+4. The pasta-ghost-authoring スキル shall §6 Authoring Patterns の詳細パターン集（約204行）を `references/authoring-patterns.md` として分離し、SKILL.md §6 は「要約 + 📖 リファレンスリンク」形式に圧縮する。
+5. The pasta-ghost-authoring スキル shall 実装後の SKILL.md の総行数が 350行以内に収まることを目標とする。
+6. The pasta-ghost-authoring スキル shall SKILL.md と references/ の間に記述の矛盾がないことを保証する（矛盾がある場合は references/ を正として SKILL.md を更新する）。
 
 ### Requirement 5: metadata.version のバンプ
 

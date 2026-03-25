@@ -129,16 +129,16 @@ pasta.toml [actor."名前"] → @pasta_config.actor["名前"] → STORE.actors["
 - サンプルゴーストには未設定（利用可能だが未使用）
 - テストコードでは `{ budoux = {6} }` や `{ budoux = {10, 12} }` が使用されている
 
-### Req 4: SKILL.md のセクション構造最適化
+### Req 4: SKILL.md のセクション構造最適化（大規模整理）
 
 | 項目 | 現状 | ギャップ |
-|------|------|---------|
+|------|------|------|
 | §4 pasta.toml | インラインで詳細記述 | references/pasta-toml.md への委譲が必要 |
-| §1-§3, §5-§6 | 既に「要約 + 📖 リンク」形式 (§3) | §4 のみ未対応 |
+| §6 Authoring Patterns | 204行のパターン集 | **分離対象**: references/authoring-patterns.md へ移動 |
 | セクション番号体系 | §1-§6 存在 | 維持必須（外部参照の破壊防止） |
-| SKILL.md 行数 | ~620行 | pasta.toml 圧縮で若干減少見込み（-10行程度） |
+| SKILL.md 行数 | ~620行 | **目標: 350行以内**（-43%） |
 
-**注意**: SKILL.md の肥大化について、§3 (289行) と §6 (204行) が大半を占める。しかし §3 は各サブセクションに references/ リンクがあり既に適正な要約レベル、§6 はパターン集であり本質的に必要な内容。今回のスコープで大幅削減は困難であり、pasta.toml の references/ 圧縮（§4 のみ）が実質的な最適化となる。
+**C-2 クローズ**: Option B（大規模リファクタ）を選択。§6 パターン集を `references/authoring-patterns.md` へ分離する。
 
 ### Req 5: metadata.version バンプ
 
@@ -165,17 +165,22 @@ pasta.toml [actor."名前"] → @pasta_config.actor["名前"] → STORE.actors["
 - ✅ 既に §3 で確立された「要約 + 📖 リンク」パターンに倣う
 - ❌ SKILL.md 全体の行数は大きく減少しない
 
-### Option B: 大規模リファクタ（Restructure SKILL.md）
+### Option B: 大規模リファクタ（Restructure SKILL.md）— **✅ 選択済み（C-2 クローズ）**
 
-**追加変更:**
-- §6 パターン集を references/ に分離
-- §5 イベントマッピングを references/ に分離
+**変更内容（Option A + 追加）:**
+1. `SKILL.md` §3.4 — 「永続的に有効」の表現修正 + クロスリファレンス追加
+2. `SKILL.md` §4 — pasta.toml 記述を圧縮して references/ 参照に
+3. `SKILL.md` §6 — **パターン集（204行）を `references/authoring-patterns.md` へ分離**
+4. `references/variables.md` — SAVE 永続化メカニズム + エンジン予約キーの追記
+5. `references/pasta-toml.md` — **新設**（全セクション・全キーの体系的リファレンス）
+6. `references/authoring-patterns.md` — **新設**（§6 分離）
+7. `SKILL.md` YAML ヘッダー — version バンプ
 
 **トレードオフ:**
-- ✅ SKILL.md を大幅圧縮（~300行まで削減可能）
-- ❌ 外部参照リンクの破壊リスク
-- ❌ references/ ファイル数が増加（7→10+）
-- ❌ スコープ逸脱（要件外の作業）
+- ✅ SKILL.md を大幅圧縮（620行 → 350行以内， -43%）
+- ✅ 要件定義の肨化目標を完全に満たす
+- ⚠️ references/ ファイル数が増加（7→8→新設 2ファイル）
+- ⚠️ §6 内の外部参照リンクは分離後に更新必要
 
 ### Option C: ハイブリッド（推奨）
 
@@ -237,25 +242,27 @@ pasta.toml [actor."名前"] → @pasta_config.actor["名前"] → STORE.actors["
 
 | 項目 | 評価 | 根拠 |
 |------|------|------|
-| **工数** | **S（1-3日）** | ドキュメント変更のみ、コード変更なし、既存パターン踏襲 |
-| **リスク** | **Low** | 破壊的変更なし、既存テスト影響なし、ロールバック容易 |
+| **工数** | **M（1週間程度）** | §6分離作業が追加（Option B 選択） |
+| **リスク** | **Low-Medium** | §6 内の外部参照確認と新ファイル設計が必要 |
 
 ---
 
 ## 6. 設計フェーズに持ち越す項目
 
-1. **DJ-1〜DJ-4** の設計判断の確定
+1. **DJ-2〜DJ-4** の設計判断の確定
 2. `references/pasta-toml.md` の具体的なセクション構成と記述粒度
 3. `references/variables.md` への追記内容の具体的なテキスト
-4. SKILL.md §4 の圧縮後の最終構成
+4. `references/authoring-patterns.md` の構成と内容
+5. SKILL.md §4・§6 圧縮後の最終構成
 
 ---
 
 ## 7. 推奨
 
-**Option A（最小変更）を推奨**。要件を過不足なく満たし、工数 S / リスク Low で実行可能。
+**Option B（大規模リファクタ）を採用**（C-2 クローズ済み）。
 
 変更対象ファイル:
-1. `SKILL.md` — §3.4 + §4 + YAML ヘッダー（3箇所編集）
+1. `SKILL.md` — §3.4 + §4 + §6圧縮 + YAML ヘッダー
 2. `references/variables.md` — SAVE 永続化セクション追記
 3. `references/pasta-toml.md` — **新設**（全セクション・全キーリファレンス）
+4. `references/authoring-patterns.md` — **新設**（§6 分離）
