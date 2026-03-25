@@ -29,6 +29,12 @@ JITビルド可能なスクリプト言語をサポートするためのフレ�
 | ワード取得　　　|`ACT_IMPL.word()`       |`PROXY_IMPL.word()`       |
 | expr関数呼び出し|`ACT_IMPL.expr_fn()`    |`PROXY_IMPL.expr_fn()`    |
 
+### expr関数呼び出し
+「expr関数呼び出し」は今回新規に作成してもらう。
+ローカル関数呼び出しのトランスパイルを変更。
+「さくら：＠XX（...）」⇒「actor:expr_fn("XX", ...)」
+「$x=＠XX（...）」⇒「var.x = act:expr_fn("XX", ...)」
+
 ### 共通ハンドラー検索処理（ハンドラー`XX`を解決するルール）
 ハンドラー解決は、共通関数`find_handler()`を用意し、モードにより判定を調整する。
 
@@ -78,9 +84,18 @@ function ACT_IMPL.find_act_handler(act, scene, mode, key)
 
 #### 4. いずれもマッチしなければnil
 
+### ワード辞書：ハンドラー`h`取得後の処理
++ nil ⇒ keyが見つからないエラーログだけ出力し、なにもせずreturn
++ function ⇒ `return h(actor or act)`。
++ その他 ⇒ `return tostring(h)`
 
-###
+### シーン辞書：ハンドラー`h`取得後の処理
++ function ⇒ コルーチン化
++ その他 ⇒ keyが見つからないエラーログだけ出力し、なにもせずreturn
 
+### expr_fn：ハンドラー`h`取得後の処理
++ function ⇒ `return h(actor or act, ...)`。
++ その他 ⇒ keyが見つからないエラーログだけ出力し、なにもせずreturn
 
 
 ## 共有プロパティシステムへのアクセス
