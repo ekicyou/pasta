@@ -26,5 +26,8 @@ JITビルド可能なスクリプト言語をサポートするためのフレ�
 ```
 
 ## 共有プロパティシステムへのアクセス
+参考：https://ssp.shillest.net/ukadoc/manual/list_propertysystem.html
+プロパティシステムへのアクセスAPIをLuaで構築せよ。
+
 
 
