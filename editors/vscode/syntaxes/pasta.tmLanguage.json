@@ -85,7 +85,7 @@
                     "name": "keyword.other.marker.pasta"
                 },
                 "3": {
-                    "name": "string.key.word.pasta"
+                    "name": "markup.inline.raw.string.pasta"
                 }
             },
             "name": "meta.word.pasta"
@@ -180,7 +180,7 @@
         },
         "inline-word-ref": {
             "match": "[＠@]([^＠@＄$\\\\\\s]+)",
-            "name": "entity.name.function.reference.pasta"
+            "name": "markup.inline.raw.string.pasta"
         },
         "inline-var-ref": {
             "match": "[＄$][＊*]?([^＠@＄$\\\\\\s]+)",
