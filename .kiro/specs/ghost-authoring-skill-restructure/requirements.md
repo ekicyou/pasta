@@ -62,7 +62,7 @@
 1. The pasta-ghost-authoring スキル shall SKILL.md の各セクションが「要約 + リファレンスリンク」の形式を一貫して維持する。
 2. （Req 3 AC5 に統合）§4 の pasta.toml 記述の圧縮は Req 3 AC5 に従う。
 3. While SKILL.md のセクション構造を変更する場合, the pasta-ghost-authoring スキル shall 既存の §1〜§6 のセクション番号体系を維持する（外部からの参照リンクを壊さない）。
-4. The pasta-ghost-authoring スキル shall §6 Authoring Patterns の詳細パターン集（約204行）を `references/authoring-patterns.md` として分離し、SKILL.md §6 は「要約 + 📖 リファレンスリンク」形式に圧縮する。
+4. The pasta-ghost-authoring スキル shall §6 Authoring Patterns の詳細パターン集（約305行）を `references/authoring-patterns.md` として分離し、SKILL.md §6 は「要約 + 📖 リファレンスリンク」形式に圧縮する。
 5. The pasta-ghost-authoring スキル shall 実装後の SKILL.md の総行数が 350行以内に収まることを目標とする。
 6. The pasta-ghost-authoring スキル shall SKILL.md と references/ の間に記述の矛盾がないことを保証する（矛盾がある場合は references/ を正として SKILL.md を更新する）。
 
@@ -72,5 +72,5 @@
 
 #### Acceptance Criteria
 
-1. When 上記要件 1〜4 の変更が完了した場合, the pasta-ghost-authoring スキル shall SKILL.md フロントマター（YAML ヘッダー）の `metadata.version` を現行 `1.3.0` からマイナーバージョンアップする。
+1. When 上記要件 1〜4 の変更が完了した場合, the pasta-ghost-authoring スキル shall SKILL.md フロントマター（YAML ヘッダー）の `metadata.version` を現行 `1.4.0` からマイナーバージョンアップする。
 2. The バージョン番号 shall 破壊的変更（セクション削除・移動）がなければパッチ、新規リファレンス追加を含むためマイナーバンプとする。
