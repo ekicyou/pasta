@@ -82,12 +82,12 @@ graph LR
 
 ### Technology Stack
 
-| Layer | Choice / Version | Role in Feature | Notes |
-|-------|------------------|-----------------|-------|
-| Parser | pest 2.8.6 | PEG 文法定義、`var_set` ルール拡張 | サイレントルールの子ノード昇格を活用 |
-| AST | Rust 2024 edition | `VarSet` 型の `name` フィールド `Option` 化 | 型チェッカが未対応箇所を自動検出 |
-| Transpiler | mlua 0.11 (Lua 5.5) | `GLOBAL.` プレフィックス生成、ヘッダー追加 | `require` 結果はキャッシュされるため常時出力でも無影響 |
-| Test | insta 1.46 | スナップショット一括更新 | `cargo insta review` で GLOBAL ヘッダー差分を自動承認 |
+| Layer      | Choice / Version    | Role in Feature                             | Notes                                                  |
+| ---------- | ------------------- | ------------------------------------------- | ------------------------------------------------------ |
+| Parser     | pest 2.8.6          | PEG 文法定義、`var_set` ルール拡張          | サイレントルールの子ノード昇格を活用                   |
+| AST        | Rust 2024 edition   | `VarSet` 型の `name` フィールド `Option` 化 | 型チェッカが未対応箇所を自動検出                       |
+| Transpiler | mlua 0.11 (Lua 5.5) | `GLOBAL.` プレフィックス生成、ヘッダー追加  | `require` 結果はキャッシュされるため常時出力でも無影響 |
+| Test       | insta 1.46          | スナップショット一括更新                    | `cargo insta review` で GLOBAL ヘッダー差分を自動承認  |
 
 ## System Flows
 
@@ -128,48 +128,48 @@ sequenceDiagram
 
 ## Requirements Traceability
 
-| Requirement | Summary | Components | Interfaces | Flows |
-|-------------|---------|------------|------------|-------|
-| 1.1 | `＠＊XX()` アクション行展開 | element_gen.rs | `generate_action()` | GLOBAL 関数呼び出し |
-| 1.2 | 名前付き引数展開 | element_gen.rs | `generate_args_string()` | GLOBAL 関数呼び出し |
-| 1.3 | 変数代入右辺の `＠＊XX()` | element_gen.rs | `generate_expr()`, `generate_expr_to_buffer()` | GLOBAL 関数呼び出し |
-| 1.4 | `FnScope::Global` AST 維持 | — | — | — |
-| 1.5 | `＠XX()` ローカル展開維持 | element_gen.rs | — | — |
-| 1.6 | GLOBAL ヘッダー出力 | mod.rs | `write_header()` | — |
-| 2.1 | `＄＝＠fn()` パース | grammar.pest, parse_elements.rs | `parse_var_set()` | 式文 |
-| 2.2 | 引数付き `＄＝＠fn(x:10)` | grammar.pest, parse_elements.rs | `parse_var_set()` | 式文 |
-| 2.3 | 全角半角混在 | grammar.pest | `var_marker`, `set_marker` | — |
-| 2.4 | 式文コード生成 | element_gen.rs | `generate_var_set()` | 式文 |
-| 2.5 | `＄＝＠＊fn()` の GLOBAL 展開 | element_gen.rs | `generate_var_set()` + `generate_expr()` | 式文 + GLOBAL |
-| 2.6 | `var_set_line` の一部として認識 | grammar.pest | — | — |
-| 3.1 | `doc/spec/09-variables.md` 更新 | — | — | — |
-| 3.2 | `doc/spec/01-grammar-model.md` 更新 | — | — | — |
-| 3.3 | PEG ルール名の仕様記載 | — | — | — |
-| 4.1 | `＠XX()` 互換性 | — | — | — |
-| 4.2 | `＄XX＝＠fn()` 互換性 | — | — | — |
-| 4.3 | 全テスト通過 | — | — | — |
+| Requirement | Summary                             | Components                      | Interfaces                                     | Flows               |
+| ----------- | ----------------------------------- | ------------------------------- | ---------------------------------------------- | ------------------- |
+| 1.1         | `＠＊XX()` アクション行展開         | element_gen.rs                  | `generate_action()`                            | GLOBAL 関数呼び出し |
+| 1.2         | 名前付き引数展開                    | element_gen.rs                  | `generate_args_string()`                       | GLOBAL 関数呼び出し |
+| 1.3         | 変数代入右辺の `＠＊XX()`           | element_gen.rs                  | `generate_expr()`, `generate_expr_to_buffer()` | GLOBAL 関数呼び出し |
+| 1.4         | `FnScope::Global` AST 維持          | —                               | —                                              | —                   |
+| 1.5         | `＠XX()` ローカル展開維持           | element_gen.rs                  | —                                              | —                   |
+| 1.6         | GLOBAL ヘッダー出力                 | mod.rs                          | `write_header()`                               | —                   |
+| 2.1         | `＄＝＠fn()` パース                 | grammar.pest, parse_elements.rs | `parse_var_set()`                              | 式文                |
+| 2.2         | 引数付き `＄＝＠fn(x:10)`           | grammar.pest, parse_elements.rs | `parse_var_set()`                              | 式文                |
+| 2.3         | 全角半角混在                        | grammar.pest                    | `var_marker`, `set_marker`                     | —                   |
+| 2.4         | 式文コード生成                      | element_gen.rs                  | `generate_var_set()`                           | 式文                |
+| 2.5         | `＄＝＠＊fn()` の GLOBAL 展開       | element_gen.rs                  | `generate_var_set()` + `generate_expr()`       | 式文 + GLOBAL       |
+| 2.6         | `var_set_line` の一部として認識     | grammar.pest                    | —                                              | —                   |
+| 3.1         | `doc/spec/09-variables.md` 更新     | —                               | —                                              | —                   |
+| 3.2         | `doc/spec/01-grammar-model.md` 更新 | —                               | —                                              | —                   |
+| 3.3         | PEG ルール名の仕様記載              | —                               | —                                              | —                   |
+| 4.1         | `＠XX()` 互換性                     | —                               | —                                              | —                   |
+| 4.2         | `＄XX＝＠fn()` 互換性               | —                               | —                                              | —                   |
+| 4.3         | 全テスト通過                        | —                               | —                                              | —                   |
 
 ## Components and Interfaces
 
-| Component | Domain/Layer | Intent | Req Coverage | Key Dependencies | Contracts |
-|-----------|--------------|--------|--------------|------------------|-----------|
-| grammar.pest | Parser | `var_set` 3形式定義、`set` ルール簡素化 | 2.1, 2.2, 2.3, 2.6 | — | — |
-| parse_elements.rs | Parser | `var_set_none` の AST 変換 | 2.1, 2.2 | grammar.pest | Service |
-| parse_scene.rs | Parser | `Rule::var_set_none` のルーティング | 2.1, 2.6 | parse_elements.rs | — |
-| ast/action.rs | Parser/AST | `VarSet.name` の `Option` 化 | 2.1, 2.4 | — | State |
-| element_gen.rs | Transpiler | `FnScope::Global` → `GLOBAL.` + 式文生成 | 1.1–1.5, 2.4, 2.5 | AST | Service |
-| mod.rs | Transpiler | GLOBAL ヘッダー出力 | 1.6 | — | — |
-| visitors.rs | LSP | `name: None` 時のトークン化 | — | AST | — |
-| doc/spec/*.md | Documentation | 仕様反映 | 3.1, 3.2, 3.3 | — | — |
+| Component         | Domain/Layer  | Intent                                   | Req Coverage       | Key Dependencies  | Contracts |
+| ----------------- | ------------- | ---------------------------------------- | ------------------ | ----------------- | --------- |
+| grammar.pest      | Parser        | `var_set` 3形式定義、`set` ルール簡素化  | 2.1, 2.2, 2.3, 2.6 | —                 | —         |
+| parse_elements.rs | Parser        | `var_set_none` の AST 変換               | 2.1, 2.2           | grammar.pest      | Service   |
+| parse_scene.rs    | Parser        | `Rule::var_set_none` のルーティング      | 2.1, 2.6           | parse_elements.rs | —         |
+| ast/action.rs     | Parser/AST    | `VarSet.name` の `Option` 化             | 2.1, 2.4           | —                 | State     |
+| element_gen.rs    | Transpiler    | `FnScope::Global` → `GLOBAL.` + 式文生成 | 1.1–1.5, 2.4, 2.5  | AST               | Service   |
+| mod.rs            | Transpiler    | GLOBAL ヘッダー出力                      | 1.6                | —                 | —         |
+| visitors.rs       | LSP           | `name: None` 時のトークン化              | —                  | AST               | —         |
+| doc/spec/*.md     | Documentation | 仕様反映                                 | 3.1, 3.2, 3.3      | —                 | —         |
 
 ### Parser Layer
 
 #### grammar.pest
 
-| Field | Detail |
-|-------|--------|
-| Intent | `var_set` ルールを3形式に拡張し、`＄＝expr` を `var_set_none` として統合 |
-| Requirements | 2.1, 2.2, 2.3, 2.6 |
+| Field        | Detail                                                                   |
+| ------------ | ------------------------------------------------------------------------ |
+| Intent       | `var_set` ルールを3形式に拡張し、`＄＝expr` を `var_set_none` として統合 |
+| Requirements | 2.1, 2.2, 2.3, 2.6                                                       |
 
 **Responsibilities & Constraints**
 - `var_set` を `var_set_global | var_set_local | var_set_none` の3択に拡張
@@ -198,14 +198,15 @@ set            =_{ set_marker ~ s ~ ( expr | word_ref ) }
 **Implementation Notes**
 - `var_set` の選択肢順序: `var_set_global`（longest match）→ `var_set_local` → `var_set_none`（fallback）
 - pest の PEG ordered choice により、`＄XX＝expr` は `var_set_local` にマッチし `var_set_none` には到達しない
+- **順序安全性の根拠**: `id = @{ !(reserved_id) ~ identifier }` の `identifier = _{ id1 ~ idn* }` は XID_START（Unicode 識別子開始文字）を先頭文字として必須とする。`＝`/`=`（set_marker）は XID_START ではないため、`var_set_local` の `id` ルールが `＝` を識別子として吸収することはない → `＄＝expr` は `var_set_local` にマッチせず `var_set_none` に正しく到達する
 - `set` はサイレントルール（`=_{ }`）のため、子ノードは親に昇格 → `parse_var_set()` への影響なし
 
 #### ast/action.rs — VarSet 構造体
 
-| Field | Detail |
-|-------|--------|
-| Intent | `name` フィールドを `Option<String>` に変更し、式文（`var_set_none`）を型レベルで表現 |
-| Requirements | 2.1, 2.4 |
+| Field        | Detail                                                                                |
+| ------------ | ------------------------------------------------------------------------------------- |
+| Intent       | `name` フィールドを `Option<String>` に変更し、式文（`var_set_none`）を型レベルで表現 |
+| Requirements | 2.1, 2.4                                                                              |
 
 **変更前後**:
 
@@ -235,10 +236,10 @@ pub struct VarSet {
 
 #### parse_elements.rs — parse_var_set()
 
-| Field | Detail |
-|-------|--------|
-| Intent | `Rule::var_set_none` のハンドリング追加、`name` を `Option` で返却 |
-| Requirements | 2.1, 2.2 |
+| Field        | Detail                                                             |
+| ------------ | ------------------------------------------------------------------ |
+| Intent       | `Rule::var_set_none` のハンドリング追加、`name` を `Option` で返却 |
+| Requirements | 2.1, 2.2                                                           |
 
 **Dependencies**
 - Inbound: parse_scene.rs — `Rule::var_set_none` ペアの受け渡し (P0)
@@ -273,10 +274,10 @@ Ok(VarSet { name, scope, value, span })
 
 #### parse_scene.rs — Rule::var_set_none ルーティング
 
-| Field | Detail |
-|-------|--------|
-| Intent | `Rule::var_set_none` を `LocalSceneItem::VarSet` として登録 |
-| Requirements | 2.1, 2.6 |
+| Field        | Detail                                                      |
+| ------------ | ----------------------------------------------------------- |
+| Intent       | `Rule::var_set_none` を `LocalSceneItem::VarSet` として登録 |
+| Requirements | 2.1, 2.6                                                    |
 
 **変更内容**: `parse_local_start_scene_scope()` と `parse_local_scene_scope()` の match arm に追加
 
@@ -296,29 +297,30 @@ Rule::var_set_local | Rule::var_set_global | Rule::var_set_none => {
 
 #### element_gen.rs — FnScope::Global 展開修正
 
-| Field | Detail |
-|-------|--------|
-| Intent | `FnScope::Global` のコード生成先を `SCENE.` から `GLOBAL.` に変更 |
-| Requirements | 1.1, 1.2, 1.3, 1.5 |
+| Field        | Detail                                                            |
+| ------------ | ----------------------------------------------------------------- |
+| Intent       | `FnScope::Global` のコード生成先を `SCENE.` から `GLOBAL.` に変更 |
+| Requirements | 1.1, 1.2, 1.3, 1.5                                                |
 
 **変更箇所（3箇所）**:
 
-| Location | Function | Line | Before | After |
-|----------|----------|------|--------|-------|
-| Action::FnCall | `generate_action()` | ~L184 | `FnScope::Global => "SCENE."` | `FnScope::Global => "GLOBAL."` |
-| Expr::FnCall | `generate_expr()` | ~L245 | `FnScope::Global => "SCENE."` | `FnScope::Global => "GLOBAL."` |
-| Expr::FnCall | `generate_expr_to_buffer()` | ~L313 | `FnScope::Global => "SCENE."` | `FnScope::Global => "GLOBAL."` |
+| Location       | Function                    | Line  | Before                        | After                          |
+| -------------- | --------------------------- | ----- | ----------------------------- | ------------------------------ |
+| Action::FnCall | `generate_action()`         | ~L184 | `FnScope::Global => "SCENE."` | `FnScope::Global => "GLOBAL."` |
+| Expr::FnCall   | `generate_expr()`           | ~L245 | `FnScope::Global => "SCENE."` | `FnScope::Global => "GLOBAL."` |
+| Expr::FnCall   | `generate_expr_to_buffer()` | ~L313 | `FnScope::Global => "SCENE."` | `FnScope::Global => "GLOBAL."` |
 
 **Constraints**:
 - `FnScope::Local => "SCENE."` は変更なし（1.5）
 - 3箇所すべてで同一の変更パターン
+- アクション行 (`Action::FnCall`) の生成形式は `act.{actor}:talk(tostring({prefix}{name}(act{args})))` — `tostring()` ラッパーは element_gen.rs L187 の既存フォーマット文字列が保証しており、`prefix` を `"GLOBAL."` に変更しても形式は維持される（要件 1.1 受入基準の `act.{actor}:talk(tostring(GLOBAL.XX(act)))` と一致）
 
 #### element_gen.rs — generate_var_set() 式文対応
 
-| Field | Detail |
-|-------|--------|
-| Intent | `name: None` の場合に代入なしの式文を生成 |
-| Requirements | 2.4, 2.5 |
+| Field        | Detail                                    |
+| ------------ | ----------------------------------------- |
+| Intent       | `name: None` の場合に代入なしの式文を生成 |
+| Requirements | 2.4, 2.5                                  |
 
 **変更内容**:
 
@@ -375,10 +377,10 @@ pub fn generate_var_set(&mut self, var_set: &VarSet) -> Result<(), TranspileErro
 
 #### mod.rs — write_header()
 
-| Field | Detail |
-|-------|--------|
-| Intent | `local GLOBAL = require "pasta.global"` をヘッダーに追加 |
-| Requirements | 1.6 |
+| Field        | Detail                                                   |
+| ------------ | -------------------------------------------------------- |
+| Intent       | `local GLOBAL = require "pasta.global"` をヘッダーに追加 |
+| Requirements | 1.6                                                      |
 
 **変更内容**:
 
@@ -400,10 +402,10 @@ pub fn write_header(&mut self) -> Result<(), TranspileError> {
 
 #### visitors.rs — var_set_none トークン化
 
-| Field | Detail |
-|-------|--------|
-| Intent | `name: None` の場合に変数名トークンをスキップ |
-| Requirements | — (LSP は要件外だが影響箇所として設計) |
+| Field        | Detail                                        |
+| ------------ | --------------------------------------------- |
+| Intent       | `name: None` の場合に変数名トークンをスキップ |
+| Requirements | — (LSP は要件外だが影響箇所として設計)        |
 
 **変更内容**: `tokenize_var_set_text()` 内の変数名トークン出力部を条件分岐
 
@@ -418,6 +420,8 @@ if let Some(name) = &vs.name {
 
 **Implementation Notes**:
 - マーカートークン（`＄`）は常に出力
+- **カーソル挙動 (`name: None` の場合)**: step 2（変数名走査）が `if let Some(name) = &vs.name { ... }` の分岐でスキップされ、`cursor` は marker 終端を指したまま step 3 の `=` 探索に進む。例: `＄＝＠fn()` では `cursor = len("＄") = 3`、`remaining = "＝＠fn()"` となり step 3 で `＝` が正しく検出される
+- **コンパイル安全性**: `vs.name: String` → `Option<String>` 変更後、現行コードの `span_text[cursor..].find(name.as_str())` は `Option<String>` に対してコンパイルエラーになる。Rust の型チェッカが `visitors.rs` の未対応箇所を自動的に検出する
 - 代入演算子トークン（`＝`）は名前有無に関わらず `set_marker` として出力
 - 値トークン（式/単語参照）は共通処理
 
@@ -425,10 +429,10 @@ if let Some(name) = &vs.name {
 
 #### doc/spec/09-variables.md
 
-| Field | Detail |
-|-------|--------|
-| Intent | `＠＊` のグローバル展開先を明記 |
-| Requirements | 3.1 |
+| Field        | Detail                          |
+| ------------ | ------------------------------- |
+| Intent       | `＠＊` のグローバル展開先を明記 |
+| Requirements | 3.1                             |
 
 **変更内容**:
 - 関数呼び出し代入例のセクションに `＠＊func()` → `GLOBAL.func(act)` の展開先を追記
@@ -436,10 +440,10 @@ if let Some(name) = &vs.name {
 
 #### doc/spec/01-grammar-model.md
 
-| Field | Detail |
-|-------|--------|
-| Intent | `＄＝expr` 式文の構文と用途を追加 |
-| Requirements | 3.2, 3.3 |
+| Field        | Detail                            |
+| ------------ | --------------------------------- |
+| Intent       | `＄＝expr` 式文の構文と用途を追加 |
+| Requirements | 3.2, 3.3                          |
 
 **変更内容**:
 - 式サポートセクション（§1.3）に `＄＝expr` の構文定義を追加
