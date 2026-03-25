@@ -177,11 +177,11 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             Action::FnCall {
                 name, args, scope, ..
             } => {
-                // SCENE:関数名(act, 引数...)
+                // SCENE.関数名(act, 引数...)
                 let args_str = self.generate_args_string(args)?;
                 let prefix = match scope {
-                    pasta_dsl::parser::FnScope::Local => "SCENE:",
-                    pasta_dsl::parser::FnScope::Global => "SCENE:", // Same for now
+                    pasta_dsl::parser::FnScope::Local => "SCENE.",
+                    pasta_dsl::parser::FnScope::Global => "SCENE.", // Same for now
                 };
                 self.writeln(&format!(
                     "act.{}:talk(tostring({}{}(act{})))",
