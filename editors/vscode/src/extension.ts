@@ -8,6 +8,7 @@ import { WasmBridge } from './wasmBridge';
 import { DocumentSync } from './documentSync';
 import { SemanticTokensProvider, PASTA_TOKENS_LEGEND } from './semanticTokensProvider';
 import { DiagnosticsManager } from './diagnosticsManager';
+import { activateWordRefDecorator } from './wordRefDecorator';
 
 /** Activation state of the extension */
 export interface ActivationState {
@@ -29,6 +30,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   outputChannel = vscode.window.createOutputChannel('Pasta Language');
   context.subscriptions.push(outputChannel);
   outputChannel.appendLine('Pasta DSL extension activating...');
+
+  // Initialize word-ref box decorations
+  activateWordRefDecorator(context);
 
   // Initialize diagnostics manager
   diagnosticsManager = new DiagnosticsManager();

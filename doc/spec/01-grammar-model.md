@@ -48,7 +48,28 @@ Pasta DSL では**式（Expression）を記述できます**。式は変数代�
 ＄result＝＄a * ＄b       # 変数を含む式
 ＠func（＄x + 1）         # 関数引数での式
 ＄nested＝（＄a + ＄b）* 2  # 括弧による優先順位制御
+＄＝＠副作用関数（）       # 式文: 結果を代入せず式を評価のみ
 ```
+
+### 式文（ExprStmt）
+
+`＄＝expr` 形式で、代入を伴わない式の評価（式文）を記述できます。
+
+| 要素 | pasta2.pest規則                         | 説明                           |
+| ---- | --------------------------------------- | ------------------------------ |
+| 式文 | `var_set_none = { var_marker ~ set }`   | 変数名を省略し結果を捨てる式文 |
+
+`var_set` は以下の3形式があります：
+
+```pest
+var_set        =_{ var_set_global | var_set_local | var_set_none }
+var_set_local  = { var_marker ~                 id ~ s ~ set }
+var_set_global = { var_marker ~ global_marker ~ id ~ s ~ set }
+var_set_none   = { var_marker ~                            set }
+set            =_{ set_marker ~ s ~ ( expr | word_ref ) }
+```
+
+全バリアントが `＄`（`var_marker`）で始まり、LSP/TextMate で変数操作のシグナルとして一貫して認識できます。
 
 ### 複雑な演算
 

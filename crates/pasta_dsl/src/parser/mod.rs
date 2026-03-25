@@ -264,7 +264,7 @@ fn parse_actor_scope(pair: Pair<Rule>) -> Result<ActorScope, ParseError> {
                     }
                 }
             }
-            Rule::var_set_local | Rule::var_set_global => {
+            Rule::var_set_local | Rule::var_set_global | Rule::var_set_none => {
                 var_sets.push(parse_var_set(inner)?);
             }
             Rule::code_block => {

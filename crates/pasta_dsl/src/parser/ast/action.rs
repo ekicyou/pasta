@@ -58,13 +58,13 @@ pub struct CodeBlock {
 // VarSet - Variable Assignment
 // ============================================================================
 
-/// Variable assignment.
+/// Variable assignment or expression statement.
 ///
-/// Corresponds to the `var_set` rule: `$var = expr` or `$*var = expr`
+/// Corresponds to the `var_set` rule: `$var = expr`, `$*var = expr`, or `$= expr`
 #[derive(Debug, Clone)]
 pub struct VarSet {
-    /// Variable name
-    pub name: String,
+    /// Variable name. `None` for expression statements (`var_set_none`).
+    pub name: Option<String>,
     /// Variable scope
     pub scope: VarScope,
     /// Value (expression or word reference)

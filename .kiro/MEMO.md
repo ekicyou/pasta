@@ -18,13 +18,89 @@ JITビルド可能なスクリプト言語をサポートするためのフレ�
 ## バルーン指定
 スポット情報と一緒にバルーン指定を設定できた方がよいかもしれない。さくらスクリプト直接指定でもよいが。。。
 
-## 下記要件は必要か？
-現在、`＞＊コール`構文は存在してるか？確か、「ローカル呼び出し」⇒「グローバル呼び出し」のフォールバックがあるから不要になってないか？現行の仕様を調査して判断せよ。
 
-```markdown
-3. When `＞＄＊グローバル変数` 構文（グローバル変数の動的コール）が記述された場合, the pasta_dsl パーサー shall グローバル変数参照の動的コールとして正しく AST ノードを生成する。
+## ハンドラー解決フォールバックの統一
+以下のハンドラー解決ロジックを経路別に整理し、主関数の経路を統一せよ。
+
+### 入口対象
+| 種別            |act:XX()                |actor / proxy:XX()        |
+|:================|:=======================|:=========================|
+| シーン解決　　　|`ACT_IMPL.find_scene()` |                          |
+| ワード取得　　　|`ACT_IMPL.word()`       |`PROXY_IMPL.word()`       |
+| expr関数呼び出し|`ACT_IMPL.expr_fn()`    |`PROXY_IMPL.expr_fn()`    |
+
+### expr関数呼び出し
+「expr関数呼び出し」は今回新規に作成してもらう。
+ローカル関数呼び出しのトランスパイルを変更。
+「さくら：＠XX（...）」⇒「actor:expr_fn("XX", ...)」
+「$x=＠XX（...）」⇒「var.x = act:expr_fn("XX", ...)」
+
+### 共通ハンドラー検索処理（ハンドラー`XX`を解決するルール）
+ハンドラー解決は、共通関数`find_handler()`を用意し、モードにより判定を調整する。
+
+#### 検索関数宣言（要件案）
+ここで、mode = "scene" or "word" or "expr"
+
+```lua
+function ACTOR_IMPL.find_handler(actor, mode, key)
+    do
+        local h = actor:find_actor_handler(mode, key)
+        if h then return h end
+    end
+    return act:find_act_handler(mode, key)
+end
+
+function ACT_IMPL.find_handler(act, mode, key)
+    return act:find_act_handler(mode, key)
+end
 ```
 
-## さくらスクリプトの除去＆復旧案
+#### コア検索関数の宣言
+```lua
+function ACTOR_IMPL.find_actor_handler(actor, mode, key)
 
-1.
+function ACT_IMPL.find_act_handler(act, scene, mode, key)
+
+
+```
+
+### `key = 'XX'`が与えられたときのフォールバック戦略
+
+以下のフォールバックを順番に検索し、最初にマッチした要素で確定する。
+
+#### 1. （アクター、アクタープロキシなら）
+1. `actor.XX`があれば確定
+2. `mode= 'word'`なら、アクター単語辞書でXXがマッチすれば確定
+
+#### 2. ローカルシーン
+1. `scene.XX`があれば確定
+2. `mode= 'word'`なら、ローカル単語辞書でXXがマッチすれば確定
+3. `mode= 'scene' or 'expr'`なら、ローカルシーン辞書でXXがマッチすれば確定
+
+#### 3. グローバルシーン
+1. `GLOBAL.XX`があれば確定
+2. `mode= 'word'`なら、グローバル単語辞書でXXがマッチすれば確定
+3. `mode= 'scene' or 'expr'`なら、ローカルシーン辞書でXXがマッチすれば確定
+
+#### 4. いずれもマッチしなければnil
+
+### ワード辞書：ハンドラー`h`取得後の処理
++ nil ⇒ keyが見つからないエラーログだけ出力し、なにもせずreturn
++ function ⇒ `return h(actor or act)`。
++ その他 ⇒ `return tostring(h)`
+
+### シーン辞書：ハンドラー`h`取得後の処理
++ function ⇒ コルーチン化
++ その他 ⇒ keyが見つからないエラーログだけ出力し、なにもせずreturn
+
+### expr_fn：ハンドラー`h`取得後の処理
++ function ⇒ `return h(actor or act, ...)`。
++ その他 ⇒ keyが見つからないエラーログだけ出力し、なにもせずreturn
+
+
+## 共有プロパティシステムへのアクセス
+参考：https://ssp.shillest.net/ukadoc/manual/list_propertysystem.html
+プロパティシステムへのアクセスAPIをLuaで構築せよ。
+
+
+

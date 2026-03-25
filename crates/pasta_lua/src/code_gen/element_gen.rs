@@ -15,29 +15,47 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// Local: `var.変数名 = 値`
     /// Global: `save.変数名 = 値`
     pub fn generate_var_set(&mut self, var_set: &VarSet) -> Result<(), TranspileError> {
-        let var_path = match var_set.scope {
-            VarScope::Local => format!("var.{}", var_set.name),
-            VarScope::Global => format!("save.{}", var_set.name),
-            VarScope::Args(_) => {
-                // Cannot assign to scene arguments
-                return Err(TranspileError::invalid_ast(
-                    &var_set.span,
-                    "Cannot assign to scene argument",
-                ));
-            }
-        };
+        match &var_set.name {
+            Some(name) => {
+                let var_path = match var_set.scope {
+                    VarScope::Local => format!("var.{}", name),
+                    VarScope::Global => format!("save.{}", name),
+                    VarScope::Args(_) => {
+                        // Cannot assign to scene arguments
+                        return Err(TranspileError::invalid_ast(
+                            &var_set.span,
+                            "Cannot assign to scene argument",
+                        ));
+                    }
+                };
 
-        match &var_set.value {
-            SetValue::Expr(expr) => {
-                self.write_indent()?;
-                self.write_raw(&format!("{} = ", var_path))?;
-                self.generate_expr(expr)?;
-                writeln!(self.writer)?;
+                match &var_set.value {
+                    SetValue::Expr(expr) => {
+                        self.write_indent()?;
+                        self.write_raw(&format!("{} = ", var_path))?;
+                        self.generate_expr(expr)?;
+                        writeln!(self.writer)?;
+                    }
+                    SetValue::WordRef { name } => {
+                        // Generate: var.変数名 = act:word("単語名") or save.変数名 = act:word("単語名")
+                        let word_literal = StringLiteralizer::literalize(name)?;
+                        self.writeln(&format!("{} = act:word({})", var_path, word_literal))?;
+                    }
+                }
             }
-            SetValue::WordRef { name } => {
-                // Generate: var.変数名 = act:word("単語名") or save.変数名 = act:word("単語名")
-                let word_literal = StringLiteralizer::literalize(name)?;
-                self.writeln(&format!("{} = act:word({})", var_path, word_literal))?;
+            None => {
+                // Expression statement: evaluate expression without assignment
+                match &var_set.value {
+                    SetValue::Expr(expr) => {
+                        self.write_indent()?;
+                        self.generate_expr(expr)?;
+                        writeln!(self.writer)?;
+                    }
+                    SetValue::WordRef { name } => {
+                        let word_literal = StringLiteralizer::literalize(name)?;
+                        self.writeln(&format!("act:word({})", word_literal))?;
+                    }
+                }
             }
         }
 
@@ -177,11 +195,11 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             Action::FnCall {
                 name, args, scope, ..
             } => {
-                // SCENE:関数名(act, 引数...)
+                // SCENE.関数名(act, 引数...)
                 let args_str = self.generate_args_string(args)?;
                 let prefix = match scope {
-                    pasta_dsl::parser::FnScope::Local => "SCENE:",
-                    pasta_dsl::parser::FnScope::Global => "SCENE:", // Same for now
+                    pasta_dsl::parser::FnScope::Local => "SCENE.",
+                    pasta_dsl::parser::FnScope::Global => "GLOBAL.",
                 };
                 self.writeln(&format!(
                     "act.{}:talk(tostring({}{}(act{})))",
@@ -242,7 +260,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                 let args_str = self.generate_args_string(args)?;
                 let prefix = match scope {
                     pasta_dsl::parser::FnScope::Local => "SCENE.",
-                    pasta_dsl::parser::FnScope::Global => "SCENE.",
+                    pasta_dsl::parser::FnScope::Global => "GLOBAL.",
                 };
                 write!(
                     self.writer,
@@ -310,7 +328,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                 let args_str = self.generate_args_string(args)?;
                 let prefix = match scope {
                     pasta_dsl::parser::FnScope::Local => "SCENE.",
-                    pasta_dsl::parser::FnScope::Global => "SCENE.",
+                    pasta_dsl::parser::FnScope::Global => "GLOBAL.",
                 };
                 write!(
                     buf,

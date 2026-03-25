@@ -1,4 +1,5 @@
 local PASTA = require "pasta"
+local GLOBAL = require "pasta.global"
 
 do
     local ACTOR = PASTA.create_actor("さくら")
@@ -33,7 +34,8 @@ do
         act:call(SCENE.__global_name__, "ローカル単語呼び出し", {}, table.unpack(args))
         act:call(SCENE.__global_name__, "会話分岐", {}, table.unpack(args))
         act:call(SCENE.__global_name__, "変数代入", {}, table.unpack(args))
-        return act:call(SCENE.__global_name__, "引数付き呼び出し", {}, var.カウンタ, save.グローバル, table.unpack(args))
+        act:call(SCENE.__global_name__, "引数付き呼び出し", {}, var.カウンタ, save.グローバル, table.unpack(args))
+        return act:call(SCENE.__global_name__, "グローバル関数呼び出し", {}, table.unpack(args))
     end
 
     function SCENE.グローバル単語呼び出し_1(act, ...)
@@ -98,6 +100,19 @@ do
         act.うにゅう:talk("第２引数は")
         act.うにゅう:talk(tostring(args[2]))
         act.うにゅう:talk("やね。")
+    end
+
+    function SCENE.グローバル関数呼び出し_1(act, ...)
+        local args = { ... }
+        local save, var = act:init_scene(SCENE)
+
+        act.さくら:talk(tostring(GLOBAL.グローバル関数(act, "グローバル")))
+        act.さくら:talk("を呼んだよ。")
+        var.結果 = GLOBAL.グローバル関数(act, "代入テスト")
+        GLOBAL.グローバル関数(act, "式文テスト")
+        SCENE.関数(act, 42)
+        act.うにゅう:talk("ローカルもいけるで")
+        act.うにゅう:talk(tostring(SCENE.関数(act, 1)))
     end
 
     function SCENE.関数(act, value, ...)
