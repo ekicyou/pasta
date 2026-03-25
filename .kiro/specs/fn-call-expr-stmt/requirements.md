@@ -75,10 +75,14 @@ set            =_{ set_marker ~ s ~ ( expr | word_ref ) }
 
 **Objective:** 既存ゴースト作者として、既存の `.pasta` ファイルが変更なしで動作し続けることを期待する。
 
+> **設計決定（議題1クローズ）**: Lua中間コードの後方互換性維持は不要。
+> `pasta_lua` にはキャッシュバージョン管理機構（`.cache_version` / `CacheManager`）があり、
+> `CARGO_PKG_VERSION` 変更時にキャッシュが全クリア・再トランスパイルされる。
+> したがって R1-AC6 の `local GLOBAL` ヘッダー出力は常時出力（方針A）とし、
+> 旧 R4-AC4「生成コードに一切の変化を生じさせない」は削除。
+
 #### Acceptance Criteria
 
 1. The pasta_dsl parser shall 既存の `＠XX()` ローカル関数呼び出し構文を変更なしでパースし続ける
 2. The pasta_dsl parser shall 既存の `＄XX＝＠fn()` 変数代入構文を変更なしでパースし続ける
-3. The pasta_lua transpiler shall `＠XX()` （ローカルスコープ）の生成コードを変更しない
-4. While 既存の `.pasta` ファイルに `＠＊` を使用していない場合, the pasta_lua transpiler shall 生成コードに一切の変化を生じさせない
-5. The pasta_dsl parser and pasta_lua transpiler shall 既存テスト（950+件）をすべてパスし続ける
+3. The pasta_dsl parser and pasta_lua transpiler shall 既存テスト（950+件）をすべてパスし続ける（スナップショットの期待値更新は許容）
