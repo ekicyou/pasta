@@ -83,6 +83,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// Write the Lua header (require statement).
     pub fn write_header(&mut self) -> Result<(), TranspileError> {
         self.writeln("local PASTA = require \"pasta\"")?;
+        self.writeln("local GLOBAL = require \"pasta.global\"")?;
         self.write_blank_line()?;
         Ok(())
     }

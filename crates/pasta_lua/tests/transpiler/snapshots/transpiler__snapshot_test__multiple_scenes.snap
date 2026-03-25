@@ -3,6 +3,7 @@ source: crates/pasta_lua/tests/transpiler/snapshot_test.rs
 expression: lua_code
 ---
 local PASTA = require "pasta"
+local GLOBAL = require "pasta.global"
 
 do
     local SCENE = PASTA.create_scene("挨拶")

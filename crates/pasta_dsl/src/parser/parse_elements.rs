@@ -111,10 +111,10 @@ pub(crate) fn parse_var_set(pair: Pair<Rule>) -> Result<VarSet, ParseError> {
     let span = Span::from(&pair.as_span());
     let scope = match pair.as_rule() {
         Rule::var_set_global => VarScope::Global,
-        _ => VarScope::Local,
+        _ => VarScope::Local, // var_set_local, var_set_none
     };
 
-    let mut name = String::new();
+    let mut name: Option<String> = None;
     let mut terms: Vec<Expr> = Vec::new();
     let mut operators: Vec<BinOp> = Vec::new();
     let mut word_ref_name: Option<String> = None;
@@ -123,8 +123,8 @@ pub(crate) fn parse_var_set(pair: Pair<Rule>) -> Result<VarSet, ParseError> {
         match inner.as_rule() {
             Rule::id => {
                 // The first id is the variable name
-                if name.is_empty() {
-                    name = inner.as_str().to_string();
+                if name.is_none() {
+                    name = Some(inner.as_str().to_string());
                 }
             }
             Rule::word_ref => {

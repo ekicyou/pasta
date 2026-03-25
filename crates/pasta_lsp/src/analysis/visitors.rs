@@ -206,24 +206,25 @@ impl super::AnalysisEngine {
         });
         cursor += marker.len();
 
-        // 2) Variable name
-        let name = &vs.name;
-        if let Some(name_pos) = span_text[cursor..].find(name.as_str()) {
-            let name_start = cursor + name_pos;
-            let name_offset = base_offset + name_start;
-            let global_mod = if vs.scope == VarScope::Global {
-                1 << 2
-            } else {
-                0
-            };
-            tokens.push(RawToken {
-                line: line0,
-                start_char: utf8_offset_to_utf16(line_text, name_offset),
-                length: utf8_len_to_utf16(name),
-                token_type: token_type::VARIABLE,
-                modifiers: (1 << 1) | global_mod, // definition + optional global
-            });
-            cursor = name_start + name.len();
+        // 2) Variable name (skip for var_set_none where name is None)
+        if let Some(name) = &vs.name {
+            if let Some(name_pos) = span_text[cursor..].find(name.as_str()) {
+                let name_start = cursor + name_pos;
+                let name_offset = base_offset + name_start;
+                let global_mod = if vs.scope == VarScope::Global {
+                    1 << 2
+                } else {
+                    0
+                };
+                tokens.push(RawToken {
+                    line: line0,
+                    start_char: utf8_offset_to_utf16(line_text, name_offset),
+                    length: utf8_len_to_utf16(name),
+                    token_type: token_type::VARIABLE,
+                    modifiers: (1 << 1) | global_mod, // definition + optional global
+                });
+                cursor = name_start + name.len();
+            }
         }
 
         // 3) Assignment operator ＝ or =
