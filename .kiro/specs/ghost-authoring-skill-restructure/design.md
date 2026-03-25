@@ -248,14 +248,17 @@ graph TB
 
 **§6 相互参照の更新マップ**:
 
+全角文字を含む Markdown ヘッダーのアンカーは GitHub / VS Code / LLM で挙動が異なる。
+`references/authoring-patterns.md` の各セクション先頭に `<a id="s6-X"></a>` 形式の **明示的 HTML アンカー**を付与し、リンクはそのIDを使用する。
+
 | 現在の参照（SKILL.md 内） | 更新後 |
 |--------------------------|--------|
-| `§6.6 参照`（§3.1 内） | `[authoring-patterns.md §6.6](references/authoring-patterns.md#66-単語ランダム選択シャッフル順次消費方式)` |
-| `§6.10 参照`（§3.3 内） | `[authoring-patterns.md §6.10](references/authoring-patterns.md#610-複数キー単語定義マルチキー)` |
-| `§6.6 参照`（§3.3 内） | `[authoring-patterns.md §6.6](references/authoring-patterns.md#66-単語ランダム選択シャッフル順次消費方式)` |
-| `§6.7 参照`（§3.5 内） | `[authoring-patterns.md §6.7](references/authoring-patterns.md#67-継続トークチェイントーク)` |
-| `§6.7`（§5 内） | `[authoring-patterns.md §6.7](references/authoring-patterns.md#67-継続トークチェイントーク)` |
-| `§6.4 参照`（§5 内） | `[authoring-patterns.md §6.4](references/authoring-patterns.md#64-時報hourpasta--talkpasta)` |
+| `§6.6 参照`（§3.1 内） | `[authoring-patterns.md §6.6](references/authoring-patterns.md#s6-6)` |
+| `§6.10 参照`（§3.3 内） | `[authoring-patterns.md §6.10](references/authoring-patterns.md#s6-10)` |
+| `§6.6 参照`（§3.3 内） | `[authoring-patterns.md §6.6](references/authoring-patterns.md#s6-6)` |
+| `§6.7 参照`（§3.5 内） | `[authoring-patterns.md §6.7](references/authoring-patterns.md#s6-7)` |
+| `§6.7`（§5 内） | `[authoring-patterns.md §6.7](references/authoring-patterns.md#s6-7)` |
+| `§6.4 参照`（§5 内） | `[authoring-patterns.md §6.4](references/authoring-patterns.md#s6-4)` |
 
 ##### 行数見積もり
 
@@ -472,33 +475,43 @@ SAVE テーブルのキー名のうち、`pasta_` で始まるキーはエンジ
 
 ---
 
+<a id="s6-1"></a>
 ## 6.1 アクター辞書定義（actors.pasta）
 （現 SKILL.md §6.1 の内容をそのまま移動）
 
+<a id="s6-2"></a>
 ## 6.2 イベントハンドラ（boot.pasta）
 （現 SKILL.md §6.2）
 
+<a id="s6-3"></a>
 ## 6.3 ランダムトーク（talk.pasta）
 （現 SKILL.md §6.3）
 
+<a id="s6-4"></a>
 ## 6.4 時報（hour.pasta / talk.pasta）
 （現 SKILL.md §6.4 — 最大セクション、日時変数テーブル含む）
 
+<a id="s6-5"></a>
 ## 6.5 クリック反応（click.pasta）
 （現 SKILL.md §6.5）
 
+<a id="s6-6"></a>
 ## 6.6 単語ランダム選択（シャッフル＆順次消費方式）
 （現 SKILL.md §6.6）
 
+<a id="s6-7"></a>
 ## 6.7 継続トーク（チェイントーク）
 （現 SKILL.md §6.7）
 
+<a id="s6-8"></a>
 ## 6.8 ファイル分割ガイド
 （現 SKILL.md §6.8）
 
+<a id="s6-9"></a>
 ## 6.9 自然言語→シーン変換指針
 （現 SKILL.md §6.9）
 
+<a id="s6-10"></a>
 ## 6.10 複数キー単語定義（マルチキー）
 （現 SKILL.md §6.10）
 ```
@@ -508,7 +521,8 @@ SAVE テーブルのキー名のうち、`pasta_` で始まるキーはエンジ
 **Implementation Notes**
 - §6.4 の日時変数テーブルは variables.md にも記載があるが、ここでは「辞書制作パターン」としてのコンテキスト（使用例付き）を維持する。variables.md が「リファレンス」、authoring-patterns.md が「パターン集（ハウツー）」という役割分離
 - 移動時はコンテンツをそのままコピーし、変更しない（矛盾防止: 4.6）
-- Markdown ヘッダーのアンカーは GitHub 互換の自動生成方式（小文字化、スペース→ハイフン）を想定
+- 各セクション先頭に `<a id="s6-X"></a>` 形式の **明示的 HTML アンカー**を付与（D-1 クローズ: GitHub / VS Code / LLM いずれでも同一アンカーで到達できることを保証）
+- 自動生成アンカー（全角文字依存）は **使用しない**
 
 ---
 
