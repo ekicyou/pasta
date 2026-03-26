@@ -218,9 +218,15 @@ function M.is_blocked(status) end
 dispatch(act):
   1. act.req.date 存在チェック → nil
   2. M.is_blocked(act.req.status) → nil  ← NEW
-  3. check_hour(act) → thread|nil
-  4. check_talk(act) → thread|nil
+  3. M.check_hour(act) → thread|nil
+  4. M.check_talk(act) → thread|nil
 ```
+
+**Note on visibility**: `M.check_hour` / `M.check_talk` は **公開関数として維持**する。
+既存の Rust テスト（`virtual_event_dispatch_test.rs`, `virtual_event_config_test.rs`）が
+`dispatcher.check_hour(act)` / `dispatcher.check_talk(act)` を直接呼び出しており、local化すると
+これらのテストが破壊される。check_* を直接呼び出した場合は `M.is_blocked()` をバイパスするが、
+これは既知のトレードオフとして受け入れる（dispatch() 経由が推奨される正規パス）。
 
 #### check_hour() — 個別チェック削除
 
