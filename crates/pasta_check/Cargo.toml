@@ -1,0 +1,35 @@
+[package]
+name = "pasta_check"
+workspace = "../.."
+version.workspace = true
+description = "CLI tool for ghost release packaging - generates update files and NAR archives"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+
+[[bin]]
+name = "pasta_check"
+path = "src/main.rs"
+
+[dependencies]
+# CLI パーサー
+lexopt = "0.3"
+
+# 更新ファイル生成
+md5 = "0.8"
+
+# NAR (ZIP) 作成
+zip = { version = "8.4", default-features = false, features = ["deflate"] }
+
+# エラー処理
+thiserror.workspace = true
+
+# 将来拡張（Lua 単体試験サポート基盤）
+pasta_lua = { path = "../pasta_lua", version = "0.1" }
+
+[dev-dependencies]
+tempfile.workspace = true

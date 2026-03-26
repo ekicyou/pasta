@@ -2,8 +2,8 @@
 //!
 //! This module provides context management for the transpilation process.
 
-use pasta_dsl::parser::{Attr, AttrValue, GlobalSceneScope, KeyWords, LocalSceneScope};
 use pasta_core::registry::{SceneRegistry, WordDefRegistry};
+use pasta_dsl::parser::{Attr, AttrValue, GlobalSceneScope, LocalSceneScope};
 use std::collections::HashMap;
 
 /// Transpile context for sharing state during transpilation.
@@ -121,7 +121,7 @@ impl TranspileContext {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pasta_dsl::parser::Span;
+    use pasta_dsl::parser::{KeyWords, Span};
 
     fn create_test_scene(name: &str) -> GlobalSceneScope {
         GlobalSceneScope {
@@ -219,8 +219,11 @@ mod tests {
     fn test_register_local_words() {
         let mut ctx = TranspileContext::new();
         // 単一キー: word_registry 直接呼び出し
-        ctx.word_registry
-            .register_local("メイン_1", "場所", vec!["東京".to_string(), "大阪".to_string()]);
+        ctx.word_registry.register_local(
+            "メイン_1",
+            "場所",
+            vec!["東京".to_string(), "大阪".to_string()],
+        );
 
         let entries = ctx.word_registry.all_entries();
         assert_eq!(entries.len(), 1);
@@ -237,7 +240,8 @@ mod tests {
             span: Span::default(),
         };
         for name in &kw.names {
-            ctx.word_registry.register_local("メイン_1", name, kw.words.clone());
+            ctx.word_registry
+                .register_local("メイン_1", name, kw.words.clone());
         }
 
         let entries = ctx.word_registry.all_entries();

@@ -6,8 +6,7 @@ use crate::error::TranspileError;
 use crate::string_literalizer::StringLiteralizer;
 use pasta_core::registry::SceneRegistry;
 use pasta_dsl::parser::{
-    ActorScope, AttrValue, CallScene, CodeBlock, GlobalSceneScope, KeyWords, LocalSceneItem,
-    LocalSceneScope, SceneActorItem,
+    ActorScope, AttrValue, GlobalSceneScope, LocalSceneItem, LocalSceneScope, SceneActorItem,
 };
 use std::collections::HashMap;
 use std::io::Write;

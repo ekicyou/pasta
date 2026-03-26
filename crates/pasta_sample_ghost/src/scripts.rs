@@ -1,21 +1,20 @@
 //! pasta DSL スクリプト
 //!
 //! サンプルゴースト用の pasta DSL スクリプトは
-//! `dist-src/ghost/master/dic/` に実ファイルとして配置されています。
-//! release.ps1 の robocopy ステップでコピーされます。
+//! `ghosts/hello-pasta/ghost/master/dic/` に実ファイルとして配置されています。
 
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
 
-    /// dist-src ディレクトリのパスを取得
-    fn dist_src_dir() -> PathBuf {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("dist-src")
+    /// ghosts/hello-pasta ディレクトリのパスを取得
+    fn ghost_dir() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("ghosts/hello-pasta")
     }
 
-    /// dist-src からスクリプトファイルを読み込む
+    /// ghosts/hello-pasta からスクリプトファイルを読み込む
     fn read_pasta_script(name: &str) -> String {
-        let path = dist_src_dir().join("ghost/master/dic").join(name);
+        let path = ghost_dir().join("ghost/master/dic").join(name);
         std::fs::read_to_string(&path)
             .unwrap_or_else(|e| panic!("{} の読み込みに失敗: {}", name, e))
     }

@@ -6,9 +6,9 @@ use pasta_sample_ghost::{GhostConfig, generate_ghost};
 use std::path::PathBuf;
 use tempfile::TempDir;
 
-/// dist-src ディレクトリのパスを取得
-fn dist_src_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("dist-src")
+/// ghosts/hello-pasta ディレクトリのパスを取得
+fn ghost_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("ghosts/hello-pasta")
 }
 
 /// 画像生成テスト: generate_ghost() 経由で surface*.png 18ファイル＋surfaces.txt が生成されることを確認
@@ -65,13 +65,13 @@ fn test_shell_images() {
     }
 }
 
-/// pasta.toml 内容検証テスト（dist-src 直接読み込み）
+/// pasta.toml 内容検証テスト（ghosts/hello-pasta 直接読み込み）
 ///
 /// 仕様準拠: requirements.md Requirement 7.1-7.4
 #[test]
 fn test_pasta_toml_content() {
     let content =
-        std::fs::read_to_string(dist_src_dir().join("ghost/master/pasta.toml")).unwrap();
+        std::fs::read_to_string(ghost_dir().join("ghost/master/pasta.toml")).unwrap();
 
     // 必須セクション確認 (Req 7.1)
     assert!(
@@ -158,15 +158,15 @@ fn test_pasta_toml_content() {
     assert!(content.contains("省略可能"), "省略可能の説明がありません");
 }
 
-/// ukadoc 設定ファイル検証テスト（dist-src 直接読み込み）
+/// ukadoc 設定ファイル検証テスト（ghosts/hello-pasta 直接読み込み）
 ///
 /// 仕様準拠: requirements.md Requirement 9.1-9.4
 #[test]
 fn test_ukadoc_files() {
-    let dist_src = dist_src_dir();
+    let ghost_dir = ghost_dir();
 
     // install.txt (Req 9.1)
-    let install = std::fs::read_to_string(dist_src.join("install.txt")).unwrap();
+    let install = std::fs::read_to_string(ghost_dir.join("install.txt")).unwrap();
     assert!(
         install.contains("type,ghost"),
         "install.txt に type,ghost がありません"
@@ -182,7 +182,7 @@ fn test_ukadoc_files() {
 
     // ghost descript.txt (Req 9.2)
     let ghost_desc =
-        std::fs::read_to_string(dist_src.join("ghost/master/descript.txt")).unwrap();
+        std::fs::read_to_string(ghost_dir.join("ghost/master/descript.txt")).unwrap();
     assert!(
         ghost_desc.contains("charset,UTF-8"),
         "ghost descript.txt に charset がありません"
@@ -218,7 +218,7 @@ fn test_ukadoc_files() {
 
     // shell descript.txt (Req 9.3)
     let shell_desc =
-        std::fs::read_to_string(dist_src.join("shell/master/descript.txt")).unwrap();
+        std::fs::read_to_string(ghost_dir.join("shell/master/descript.txt")).unwrap();
     assert!(
         shell_desc.contains("charset,UTF-8"),
         "shell descript.txt に charset がありません"
@@ -253,7 +253,7 @@ fn test_ukadoc_files() {
     );
 }
 
-/// pasta DSL スクリプト検証テスト（dist-src 直接読み込み）
+/// pasta DSL スクリプト検証テスト（ghosts/hello-pasta 直接読み込み）
 #[test]
 fn test_pasta_scripts() {
     /// グローバルアクター辞書定義（行頭の`％actor_name`）が含まれているかチェック
@@ -263,7 +263,7 @@ fn test_pasta_scripts() {
         content.starts_with(&pattern) || content.contains(&format!("\n{}", pattern))
     }
 
-    let dic_dir = dist_src_dir().join("ghost/master/dic");
+    let dic_dir = ghost_dir().join("ghost/master/dic");
 
     // actors.pasta - アクター辞書
     let actors = std::fs::read_to_string(dic_dir.join("actors.pasta")).unwrap();
@@ -316,11 +316,11 @@ fn test_pasta_scripts() {
     );
 }
 
-/// ランダムトークパターン数テスト（dist-src 直接読み込み）
+/// ランダムトークパターン数テスト（ghosts/hello-pasta 直接読み込み）
 #[test]
 fn test_random_talk_patterns() {
     let talk =
-        std::fs::read_to_string(dist_src_dir().join("ghost/master/dic/talk.pasta")).unwrap();
+        std::fs::read_to_string(ghost_dir().join("ghost/master/dic/talk.pasta")).unwrap();
 
     // OnTalk パターン数（5〜10種）
     let talk_count = talk.matches("＊OnTalk").count();
@@ -332,11 +332,11 @@ fn test_random_talk_patterns() {
     );
 }
 
-/// 時報パターンテスト（dist-src 直接読み込み）
+/// 時報パターンテスト（ghosts/hello-pasta 直接読み込み）
 #[test]
 fn test_hour_chime_patterns() {
     let talk =
-        std::fs::read_to_string(dist_src_dir().join("ghost/master/dic/talk.pasta")).unwrap();
+        std::fs::read_to_string(ghost_dir().join("ghost/master/dic/talk.pasta")).unwrap();
 
     // 時報その他パターン存在確認
     let hour_count = talk.matches("＊時報その他").count();

@@ -7,7 +7,6 @@
 pub mod config_templates;
 pub mod image_generator;
 pub mod scripts;
-pub mod update_files;
 
 use std::fs;
 use std::path::Path;
@@ -64,8 +63,7 @@ impl Default for GhostConfig {
 
 /// ゴースト配布物を生成（画像＋surfaces.txt のみ）
 ///
-/// テキスト系ファイル（設定ファイル、pasta スクリプト）は
-/// `dist-src/` ディレクトリに配置し、release.ps1 の robocopy でコピーします。
+/// テキスト系ファイル（辞書・設定ファイル）は `ghosts/hello-pasta/` に直接配置されています。
 ///
 /// # Arguments
 /// * `output_dir` - 出力先ディレクトリ（hello-pasta/ が作成される）
@@ -90,20 +88,7 @@ pub fn generate_ghost(output_dir: &Path, _config: &GhostConfig) -> Result<(), Gh
     Ok(())
 }
 
-/// 更新ファイルのみを生成（finalize モード）
-///
-/// pasta.dll や pasta_scripts/ がコピーされた後に呼び出すことで、
-/// 完全なファイルリストを含む updates2.dau / updates.txt を生成します。
-///
-/// # Arguments
-/// * `output_dir` - ゴーストルートディレクトリ
-///
-/// # Returns
-/// 生成したファイル数
-pub fn finalize_ghost(output_dir: &Path) -> Result<usize, GhostError> {
-    let count = update_files::generate_update_files(output_dir)?;
-    Ok(count)
-}
+
 
 #[cfg(test)]
 mod tests {

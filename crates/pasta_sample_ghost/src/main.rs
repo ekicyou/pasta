@@ -1,6 +1,6 @@
 //! pasta_sample_ghost - サンプルゴースト配布物生成ツール
 //!
-//! hello-pasta ゴーストの配布物一式を生成します。
+//! hello-pasta ゴーストのシェル画像を生成します。
 //!
 //! # 使い方
 //!
@@ -10,45 +10,24 @@
 //!
 //! # カスタム出力先
 //! cargo run -p pasta_sample_ghost -- /path/to/output
-//!
-//! # finalize モード（更新ファイルのみ生成）
-//! cargo run -p pasta_sample_ghost -- --finalize
-//! cargo run -p pasta_sample_ghost -- --finalize /path/to/output
 //! ```
 //!
 //! # 生成されるファイル
 //!
 //! - shell/master/surface*.png（18ファイル）
 //! - shell/master/surfaces.txt
-//! - updates2.dau, updates.txt（finalize モード時）
 //!
-//! テキスト系ファイル（設定ファイル、pasta スクリプト）は
-//! dist-src/ ディレクトリに配置し、release.ps1 の robocopy でコピーします。
-//!
-//! # 注意
-//!
-//! pasta.dll と pasta_scripts/ は release.ps1 で別途コピーされます。
-//! 更新ファイル（updates2.dau, updates.txt）は --finalize オプションで生成します。
+//! 辞書・設定ファイルは `ghosts/hello-pasta/` に直接 git 管理されています。
+//! 更新ファイルと NAR は `pasta_check release` コマンドで生成します。
 
-use pasta_sample_ghost::{GhostConfig, finalize_ghost, generate_ghost};
+use pasta_sample_ghost::{GhostConfig, generate_ghost};
 use std::env;
 use std::path::PathBuf;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
-
-    // --finalize オプションをチェック
-    let finalize_mode = args.iter().any(|arg| arg == "--finalize");
-
-    // 出力先を決定（--finalize 以外の引数を探す）
     let output_dir = get_output_dir(&args);
-
-    if finalize_mode {
-        run_finalize_mode(&output_dir)?;
-    } else {
-        run_generate_mode(&output_dir)?;
-    }
-
+    run_generate_mode(&output_dir)?;
     Ok(())
 }
 
@@ -88,47 +67,10 @@ fn run_generate_mode(output_dir: &PathBuf) -> Result<(), Box<dyn std::error::Err
     Ok(())
 }
 
-/// finalize モード：更新ファイルのみ生成
-fn run_finalize_mode(output_dir: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
-    println!("========================================");
-    println!("  pasta_sample_ghost Finalize");
-    println!("========================================");
-    println!();
-    println!("Target: {}", output_dir.display());
-    println!();
-
-    // 出力ディレクトリが存在するか確認
-    if !output_dir.exists() {
-        eprintln!("ERROR: Directory does not exist: {}", output_dir.display());
-        eprintln!("       Run without --finalize first to generate the ghost.");
-        std::process::exit(1);
-    }
-
-    // 更新ファイルを生成
-    println!("Generating update files...");
-    let entry_count = finalize_ghost(output_dir)?;
-
-    println!();
-    println!("========================================");
-    println!("  Finalize Complete!");
-    println!("========================================");
-    println!();
-    println!("  Location: {}", output_dir.display());
-    println!("  Entries:  {} files indexed", entry_count);
-    println!();
-    println!("Generated files:");
-    println!("  - updates2.dau (SSP binary format)");
-    println!("  - updates.txt  (SSP text format)");
-    println!();
-
-    Ok(())
-}
-
 /// 出力先ディレクトリを決定する
 fn get_output_dir(args: &[String]) -> PathBuf {
-    // --finalize 以外の引数を探す
     for arg in args.iter().skip(1) {
-        if arg != "--finalize" && !arg.starts_with('-') {
+        if !arg.starts_with('-') {
             return PathBuf::from(arg);
         }
     }

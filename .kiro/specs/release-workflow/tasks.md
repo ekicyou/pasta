@@ -35,6 +35,7 @@
     - crates.io (pasta_dsl): `(Invoke-RestMethod https://crates.io/api/v1/crates/pasta_dsl).crate.max_version`
     - crates.io (pasta_lua): `(Invoke-RestMethod https://crates.io/api/v1/crates/pasta_lua).crate.max_version`
     - crates.io (pasta_shiori): `(Invoke-RestMethod https://crates.io/api/v1/crates/pasta_shiori).crate.max_version`
+    - crates.io (pasta_check): `(Invoke-RestMethod https://crates.io/api/v1/crates/pasta_check).crate.max_version`
     - VSCode Marketplace: `npx @vscode/vsce show ekicyou.pasta-vscode 2>&1 | Select-String 'Version:' | ForEach-Object { $_ -replace '.*Version:\s*', '' }`
   - **2-B: 最大バージョンの算出**
     - 上記全ソースから取得した全バージョン文字列（`v` プレフィックス除去後）を比較し、semver ルールで最大値を決定する
@@ -103,7 +104,7 @@
 ### Phase 3: crates.io 公開
 
 - [ ] 6. 依存関係順での crates.io 公開
-  - 以下の順序でクレートを公開する: `pasta_core` → `pasta_dsl` → `pasta_lua` → `pasta_shiori`
+  - 以下の順序でクレートを公開する: `pasta_core` → `pasta_dsl` → `pasta_lua` → `pasta_check` → `pasta_shiori`
   - 各クレートに対して `cargo publish -p <crate_name>` を実行する
   - 失敗時は段階的バックオフでリトライする（待機 1分→2分→...→10分、最大10回）
   - 各リトライ前に `Start-Sleep -Seconds (N * 60)` で待機する（N=1,2,...,10）
@@ -130,8 +131,8 @@
 ### Phase 4: ゴーストビルド
 
 - [ ] 7. サンプルゴーストのビルドと成果物確認
-  - `crates/pasta_sample_ghost/` ディレクトリで `PowerShell -ExecutionPolicy Bypass -File release.ps1` を実行する
-  - `Test-Path "crates/pasta_sample_ghost/hello-pasta.nar"` で .nar ファイルの生成を確認する
+  - ワークスペースルートで `PowerShell -ExecutionPolicy Bypass -File crates\pasta_sample_ghost\release.ps1` を実行する
+  - `Test-Path "release/hello-pasta.nar"` で .nar ファイルの生成を確認する
   - `Test-Path "target/i686-pc-windows-msvc/release/pasta.dll"` で DLL の存在を確認する
   - いずれかが存在しない場合はエラー報告し中断する
   - DLL 存在確認後、zip 圧縮を実行する:
@@ -172,7 +173,7 @@
     ```powershell
     $assets = @(
       "target/i686-pc-windows-msvc/release/pasta.dll.zip",
-      "crates/pasta_sample_ghost/hello-pasta.nar"
+      "release/hello-pasta.nar"
     )
     if ($env:VSIX_PATH -and (Test-Path $env:VSIX_PATH)) {
       $assets += $env:VSIX_PATH

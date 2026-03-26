@@ -7,7 +7,7 @@
 #   powershell -ExecutionPolicy Bypass -File release.ps1 -SkipDllBuild
 #
 # Parameters:
-#   -SkipSetup     Skip setup phase (steps 1-4), run release steps only
+#   -SkipSetup     Skip setup phase (steps 1-3), run release steps only
 #   -SkipDllBuild  Skip DLL build step only (use existing pasta.dll)
 
 param(
@@ -21,45 +21,44 @@ $ErrorActionPreference = 'Stop'
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $WorkspaceRoot = Resolve-Path (Join-Path $ScriptDir "..\..") | Select-Object -ExpandProperty Path
 $GhostDir = Join-Path $ScriptDir "ghosts\hello-pasta"
-$OutputDir = $ScriptDir
-$NarFileName = "hello-pasta.nar"
-$NarFilePath = Join-Path $OutputDir $NarFileName
+$ReleaseDir = Join-Path $WorkspaceRoot "release\hello-pasta"
+$NarFilePath = Join-Path $WorkspaceRoot "release\hello-pasta.nar"
 
 Write-Host "========================================"
 Write-Host "  hello-pasta Build & Release"
 Write-Host "========================================"
 Write-Host ""
-Write-Host "Workspace: $WorkspaceRoot"
-Write-Host "Ghost Dir: $GhostDir"
+Write-Host "Workspace:   $WorkspaceRoot"
+Write-Host "Ghost Dir:   $GhostDir"
+Write-Host "Release Dir: $ReleaseDir"
+Write-Host "NAR File:    $NarFilePath"
 if ($SkipSetup) {
-    Write-Host "Mode:      Release only (setup skipped)"
+    Write-Host "Mode:        Release only (setup skipped)"
 }
 elseif ($SkipDllBuild) {
-    Write-Host "Mode:      Setup + Release (DLL build skipped)"
+    Write-Host "Mode:        Setup + Release (DLL build skipped)"
 }
 else {
-    Write-Host "Mode:      Full (setup + release)"
+    Write-Host "Mode:        Full (setup + release)"
 }
 Write-Host ""
 
 # ============================================================
-# Setup Phase (Steps 1-4)
+# Setup Phase (Steps 1-3)
 # ============================================================
 if ($SkipSetup) {
-    Write-Host "[1/9] Building pasta.dll ................. SKIPPED" -ForegroundColor DarkGray
-    Write-Host "[2/9] Copying text files (robocopy) ...... SKIPPED" -ForegroundColor DarkGray
-    Write-Host "[3/9] Generating images .................. SKIPPED" -ForegroundColor DarkGray
-    Write-Host "[4/9] Copying DLL and scripts ............ SKIPPED" -ForegroundColor DarkGray
-    Write-Host "[5/9] Generating update files ............ SKIPPED" -ForegroundColor DarkGray
+    Write-Host "[1/6] Building pasta.dll ................. SKIPPED" -ForegroundColor DarkGray
+    Write-Host "[2/6] Generating images .................. SKIPPED" -ForegroundColor DarkGray
+    Write-Host "[3/6] Copying DLL and scripts ............ SKIPPED" -ForegroundColor DarkGray
     Write-Host ""
 }
 else {
     # --- Step 1: Build pasta.dll (32bit) ---
     if ($SkipDllBuild) {
-        Write-Host "[1/9] Building pasta.dll ................. SKIPPED" -ForegroundColor DarkGray
+        Write-Host "[1/6] Building pasta.dll ................. SKIPPED" -ForegroundColor DarkGray
     }
     else {
-        Write-Host "[1/9] Building pasta.dll (32bit release)..."
+        Write-Host "[1/6] Building pasta.dll (32bit release)..."
         Write-Host "  Target: i686-pc-windows-msvc"
 
         Push-Location $WorkspaceRoot
@@ -81,35 +80,8 @@ else {
     }
     Write-Host ""
 
-    # --- Step 2: Copy text files from dist-src (robocopy) ---
-    Write-Host "[2/9] Copying text files from dist-src..."
-
-    $DistSrcDir = Join-Path $ScriptDir "dist-src"
-    if (-not (Test-Path $DistSrcDir)) {
-        Write-Host ""
-        Write-Host "ERROR: dist-src directory not found at $DistSrcDir" -ForegroundColor Red
-        Write-Host "  The dist-src/ directory contains text distribution files."
-        Write-Host "  Please ensure it exists before running release."
-        exit 1
-    }
-
-    $robocopyTextArgs = @(
-        $DistSrcDir,
-        $GhostDir,
-        "/E",
-        "/NJH", "/NJS", "/NDL", "/NC", "/NS", "/NP"
-    )
-    & robocopy @robocopyTextArgs | Out-Null
-    if ($LASTEXITCODE -ge 8) {
-        Write-Host ""
-        Write-Host "ERROR: robocopy failed copying text files (exit code $LASTEXITCODE)" -ForegroundColor Red
-        exit 1
-    }
-    Write-Host "  Text files copied from dist-src" -ForegroundColor Green
-    Write-Host ""
-
-    # --- Step 3: Generate images (surface*.png + surfaces.txt) ---
-    Write-Host "[3/9] Generating images..."
+    # --- Step 2: Generate images (surface*.png + surfaces.txt) ---
+    Write-Host "[2/6] Generating images..."
 
     Push-Location $WorkspaceRoot
     try {
@@ -126,8 +98,8 @@ else {
     Write-Host "  Images generated" -ForegroundColor Green
     Write-Host ""
 
-    # --- Step 4: Copy pasta.dll and scripts/ ---
-    Write-Host "[4/9] Copying files..."
+    # --- Step 3: Copy pasta.dll and scripts/ ---
+    Write-Host "[3/6] Copying files..."
 
     $MasterDir = Join-Path $GhostDir "ghost\master"
     if (-not (Test-Path $MasterDir)) {
@@ -194,24 +166,6 @@ else {
         }
         Write-Host "  Synced scripts/ (user layer)"
     }
-    Write-Host ""
-
-    # --- Step 5: Finalize (generate updates2.dau and updates.txt) ---
-    Write-Host "[5/9] Generating update files..."
-
-    Push-Location $WorkspaceRoot
-    try {
-        & cargo run -p pasta_sample_ghost --quiet -- --finalize
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host ""
-            Write-Host "ERROR: Finalize failed" -ForegroundColor Red
-            exit 1
-        }
-    }
-    finally {
-        Pop-Location
-    }
-    Write-Host "  Update files generated" -ForegroundColor Green
 
     # Count files
     $fileCount = (Get-ChildItem -Path $GhostDir -Recurse -File).Count
@@ -220,11 +174,29 @@ else {
 }
 
 # ============================================================
-# Release Phase (Steps 5-8)
+# Release Phase (Steps 4-6)
 # ============================================================
 
-# --- Step 6: Version Check ---
-Write-Host "[6/9] Checking version..."
+# --- Step 4: Run pasta_check release ---
+Write-Host "[4/6] Running pasta_check release..."
+
+Push-Location $WorkspaceRoot
+try {
+    & cargo run -p pasta_check --quiet -- release --target $GhostDir --release $ReleaseDir --nar $NarFilePath
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host ""
+        Write-Host "ERROR: pasta_check release failed" -ForegroundColor Red
+        exit 1
+    }
+}
+finally {
+    Pop-Location
+}
+Write-Host "  Release package created" -ForegroundColor Green
+Write-Host ""
+
+# --- Step 5: Version Check ---
+Write-Host "[5/6] Checking version..."
 
 $CargoToml = Join-Path $WorkspaceRoot "Cargo.toml"
 if (-not (Test-Path $CargoToml)) {
@@ -249,162 +221,11 @@ Write-Host "  Version: $Version"
 Write-Host "  Tag:     $TagName"
 Write-Host ""
 
-# --- Step 7: Validate Ghost Distribution ---
-Write-Host "[7/9] Validating ghost distribution..."
-
-if (-not (Test-Path $GhostDir)) {
-    Write-Host ""
-    Write-Host "ERROR: Ghost directory not found at $GhostDir" -ForegroundColor Red
-    Write-Host "  Run without -SkipSetup to generate the ghost distribution."
-    exit 1
-}
-
-$RequiredFiles = @(
-    "ghost\master\pasta.dll",
-    "ghost\master\pasta.toml",
-    "ghost\master\descript.txt",
-    "install.txt",
-    "updates.txt",
-    "updates2.dau"
-)
-
-$RequiredDirs = @(
-    "ghost\master\dic",
-    "ghost\master\scripts",
-    "shell\master"
-)
-
-$ValidationFailed = $false
-
-foreach ($file in $RequiredFiles) {
-    $fullPath = Join-Path $GhostDir $file
-    if (-not (Test-Path $fullPath)) {
-        Write-Host "  MISSING: $file" -ForegroundColor Red
-        $ValidationFailed = $true
-    }
-}
-
-foreach ($dir in $RequiredDirs) {
-    $fullPath = Join-Path $GhostDir $dir
-    if (-not (Test-Path $fullPath)) {
-        Write-Host "  MISSING DIR: $dir" -ForegroundColor Red
-        $ValidationFailed = $true
-    }
-}
-
-# Check dic/ has .pasta files
-$DicDir = Join-Path $GhostDir "ghost\master\dic"
-if (Test-Path $DicDir) {
-    $pastaFiles = Get-ChildItem -Path $DicDir -Filter "*.pasta" -ErrorAction SilentlyContinue
-    if ($null -eq $pastaFiles -or $pastaFiles.Count -eq 0) {
-        Write-Host "  MISSING: No .pasta files in ghost\master\dic\" -ForegroundColor Red
-        $ValidationFailed = $true
-    }
-}
-
-# Check shell/master/ has image files
-$ShellDir = Join-Path $GhostDir "shell\master"
-if (Test-Path $ShellDir) {
-    $imageFiles = Get-ChildItem -Path $ShellDir -Filter "surface*.png" -ErrorAction SilentlyContinue
-    if ($null -eq $imageFiles -or $imageFiles.Count -eq 0) {
-        Write-Host "  MISSING: No surface*.png files in shell\master\" -ForegroundColor Red
-        $ValidationFailed = $true
-    }
-}
-
-# Check pasta.dll is not empty
-$DllPath = Join-Path $GhostDir "ghost\master\pasta.dll"
-if (Test-Path $DllPath) {
-    $dllSize = (Get-Item $DllPath).Length
-    if ($dllSize -eq 0) {
-        Write-Host "  ERROR: pasta.dll is empty (0 bytes)" -ForegroundColor Red
-        $ValidationFailed = $true
-    }
-}
-
-if ($ValidationFailed) {
-    Write-Host ""
-    Write-Host "ERROR: Ghost distribution validation failed." -ForegroundColor Red
-    Write-Host "  Run without -SkipSetup to generate a complete ghost distribution."
-    exit 1
-}
-
-Write-Host "  All required files present" -ForegroundColor Green
-Write-Host ""
-
-# --- Step 8: Create .nar File ---
-Write-Host "[8/9] Creating $NarFileName..."
-
-$TempDir = Join-Path $ScriptDir "temp_release"
-$TempGhostDir = Join-Path $TempDir "hello-pasta"
-$ZipPath = Join-Path $ScriptDir "hello-pasta.zip"
-
-# Clean up any previous temp directory
-if (Test-Path $TempDir) {
-    Remove-Item -Path $TempDir -Recurse -Force
-}
-
-# Clean up any previous output
-if (Test-Path $ZipPath) {
-    Remove-Item -Path $ZipPath -Force
-}
-if (Test-Path $NarFilePath) {
-    Remove-Item -Path $NarFilePath -Force
-}
-
-# Create temp directory
-New-Item -ItemType Directory -Path $TempGhostDir -Force | Out-Null
-
-# Copy with robocopy, excluding profile/ directory and temp files
-$robocopyArgs = @(
-    $GhostDir,
-    $TempGhostDir,
-    "/MIR",
-    "/XD", "profile",
-    "/XF", "*.bak", "*.tmp",
-    "/NJH", "/NJS", "/NDL", "/NC", "/NS", "/NP"
-)
-& robocopy @robocopyArgs | Out-Null
-# robocopy returns 0-7 for success, 8+ for error
-if ($LASTEXITCODE -ge 8) {
-    Write-Host ""
-    Write-Host "ERROR: robocopy failed with exit code $LASTEXITCODE" -ForegroundColor Red
-    if (Test-Path $TempDir) { Remove-Item -Path $TempDir -Recurse -Force }
-    exit 1
-}
-
-# ZIP compress
-Compress-Archive -Path (Join-Path $TempGhostDir "*") -DestinationPath $ZipPath -Force
-
-if (-not (Test-Path $ZipPath)) {
-    Write-Host ""
-    Write-Host "ERROR: ZIP compression failed" -ForegroundColor Red
-    if (Test-Path $TempDir) { Remove-Item -Path $TempDir -Recurse -Force }
-    exit 1
-}
-
-# Rename .zip to .nar
-Rename-Item -Path $ZipPath -NewName $NarFileName
-
-if (-not (Test-Path $NarFilePath)) {
-    Write-Host ""
-    Write-Host "ERROR: .nar rename failed" -ForegroundColor Red
-    if (Test-Path $TempDir) { Remove-Item -Path $TempDir -Recurse -Force }
-    exit 1
-}
-
-# Clean up temp directory
-Remove-Item -Path $TempDir -Recurse -Force
-
+# --- Step 6: Show Release Instructions ---
 $narSize = (Get-Item $NarFilePath).Length
 $narSizeMB = [math]::Round($narSize / 1MB, 2)
 
-Write-Host "  Created: $NarFilePath"
-Write-Host "  Size:    $narSizeMB MB"
-Write-Host ""
-
-# --- Step 9: Show Release Instructions ---
-Write-Host "[9/9] Release instructions"
+Write-Host "[6/6] Release instructions"
 Write-Host ""
 Write-Host "========================================"
 Write-Host "  .nar Package Ready!"
