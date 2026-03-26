@@ -1,7 +1,7 @@
 ---
-name: pasta-ghost-release
-description: 'pasta_check CLIを使ったゴーストリリースビルド手順。release.ps1/release.batの実行、pasta_checkの各ステップ、NARパッケージ作成、GitHub Releaseの公開までをガイドする。USE FOR: ghost release, ゴーストリリース, NAR作成, release.bat, release.ps1, pasta_check release, .nar, hello-pasta.nar, リリースビルド, ゴースト配布, updates.txt, updates2.dau, build ghost, deploy ghost, publish ghost, リリース手順. DO NOT USE FOR: pasta DSL文法（pasta-ghost-authoringを使用）, Lua API（pasta-lua-codingを使用）, crates.ioパブリッシュ（release-workflow specを参照）.'
-argument-hint: 'リリース対象のゴースト名や特別なオプションを指定'
+name: pasta-check
+description: 'pasta_check CLIツールのリファレンス。ゴーストリリースビルド（release サブコマンド）、将来的なテスト・検証コマンドを含む。USE FOR: pasta_check, pasta check, ghost release, ゴーストリリース, NAR作成, release.bat, release.ps1, pasta_check release, .nar, リリースビルド, ゴースト配布, updates.txt, updates2.dau, build ghost, deploy ghost, publish ghost, リリース手順, pasta_check test, ゴースト検証. DO NOT USE FOR: pasta DSL文法（pasta-ghost-authoringを使用）, Lua API（pasta-lua-codingを使用）, crates.ioパブリッシュ（release-workflow specを参照）.'
+argument-hint: 'サブコマンド名（release等）やゴースト名、オプションを指定'
 ---
 
 # pasta_check — ゴーストリリースツール
