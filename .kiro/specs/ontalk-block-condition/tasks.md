@@ -1,0 +1,48 @@
+# Implementation Plan
+
+- [ ] 1. ブロック判定ロジックを仮想ディスパッチャに実装する
+- [ ] 1.1 BLOCKED_STATUSES テーブルと M.is_blocked() 公開関数を追加する
+  - `local BLOCKED_STATUSES` 配列に SSP Status 9キーワード（talking, choosing, online, opening, passive, induction, timecritical, nouserbreak, minimizing）を列挙する
+  - `M.is_blocked(status)` 公開関数を実装する。BLOCKED_STATUSES を `ipairs` でループし `has_status()` で評価、1つでも一致すれば `true`、いずれも一致しなければ `false` を返す
+  - `status` が `nil` または空文字列の場合は常に `false` を返すこと（`has_status()` 内で処理済み）
+  - `---@param status string|nil` および `---@return boolean` のアノテーションを付与する
+  - _Requirements: 1, 2, 5_
+- [ ] 1.2 dispatch() の先頭に M.is_blocked() ブロックガードを追加する
+  - `act.req.date` チェックの直後、`M.check_hour()` 呼び出し前に `if M.is_blocked(act.req.status) then return nil end` を挿入する
+  - これにより 9キーワードすべてが `dispatch()` 入口で一括ブロックされる
+  - _Requirements: 1, 2, 5_
+- [ ] 1.3 (P) pasta_scripts 版の check_hour() と check_talk() から talking/choosing 個別チェックを削除する
+  - `M.check_hour()` 内の `if has_status(..., "talking") then return nil end` および `if has_status(..., "choosing") then return nil end` の2行を削除する
+  - `M.check_talk()` 内の同様の2行を削除する
+  - 残りのロジック（初回初期化、正時判定、interval 判定、時報マージン等）は変更しない
+  - 1.2 の実装完了後に実施すること（Dispatchガードがないままcheckのブロックだけをなくすとブロック漏れが発生する）
+  - _Requirements: 2_
+- [ ] 1.4 (P) hello-pasta サンプルゴーストの virtual_dispatcher コピーに同じ変更を適用する
+  - `crates/pasta_sample_ghost` 内の virtual_dispatcher.lua に 1.1〜1.3 と同じ変更（BLOCKED_STATUSES, M.is_blocked(), dispatch()ガード挿入, check_*削除）を加える
+  - 1.2 の実装完了後に実施すること（1.3 と並行実施可）
+  - _Requirements: 1, 2, 5_
+
+- [ ] 2. テストスイートを更新する
+- [ ] 2.1 (P) 旧 talking/choosing ブロック検証テストを dispatch() 経由に書き直す
+  - `virtual_event_config_test.rs` 内の `test_skip_when_talking`、`test_skip_when_choosing`、`test_skip_when_csv_talking_choosing` の3テストを修正する
+  - 各テストで `dispatcher.check_hour(act2)` / `dispatcher.check_talk(act2)` の直接呼び出しを `dispatcher.dispatch(act2)` に置き換える
+  - 検証内容は「`dispatch()` が `nil` を返す」ことに変更する
+  - `virtual_event_dispatch_test.rs` の `test_virtual_dispatcher_exports_required_functions` に `is_blocked` の公開確認（`type(dispatcher.is_blocked) == "function"`）を追加する
+  - _Requirements: 3_
+- [ ] 2.2 (P) dispatch() 経由のブロック条件テスト18件を Lua spec に追加する
+  - `virtual_dispatcher_spec.lua` に新しい `describe` ブロック「status block conditions」を追加する
+  - ブロック対象 Status 9件（各キーワード単体）: dispatch() が `nil` を返すことを検証する
+  - 複合 Status 2件（例: `"choosing,balloon(0=0)"`、`"online,balloon(1=2)"`）: dispatch() が `nil` を返すことを検証する
+  - 非ブロック Status 4件（`nil`、空文字列、`"idle"`、`"balloon(0=0)"`）: dispatch() が `nil` 以外を返すことを検証する
+  - `M.is_blocked()` 直接呼び出し 3件（`"talking"` → `true`、`"idle"` → `false`、`nil` → `false`）: 戻り値を直接検証する
+  - dispatch() 経由のテストでは `setup()` 後に初回スキップ用の `dispatch(act1)` を実行してから `dispatch(act2)` でブロック動作を検証する
+  - 既存の `create_mock_act()` ヘルパーと `_set_scene_executor()` モックを活用する
+  - _Requirements: 3_
+
+- [ ] 3. (P) スキルリファレンスを実装内容に合わせて更新する
+  - `shiori-handlers.md` の `dispatch(act)` セクションに「Statusブロックガードは `dispatch()` 入口で一括判定される」旨を追記する
+  - ブロック対象 Status 9キーワードを表形式（キーワード・意味・対応SSP状態）で追記する
+  - `M.is_blocked(status)` 公開関数のシグネチャと、他イベントハンドラ（撫で反応等）からの利用例コードを追記する
+  - 旧記述「`act.req.status == "talking"` の場合はスキップ」を新しいブロックガード説明に置き換える
+  - Task 1 の実装完了後に実施すること（Task 2 と並行実施可）
+  - _Requirements: 4_
