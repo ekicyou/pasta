@@ -108,7 +108,7 @@ sequenceDiagram
 | 1.1 | dispatch入口の集約ブロックガード（9キーワード） | BLOCKED_STATUSES, dispatch() | M.is_blocked() | ブロック判定フロー |
 | 2.1 | check_hour/check_talk 個別チェック庁止 | check_hour(), check_talk() | — | — |
 | 2.2 | BLOCKED_STATUSES 一元管理テーブル | BLOCKED_STATUSES | — | — |
-| 3.1 | 兩12キーワードのブロックテスト | テスト追加 | create_mock_act() | — |
+| 3.1 | 9キーワードのブロックテスト | テスト追加 | create_mock_act() | — |
 | 3.2 | 複合Status（カンマ區切り）テスト | テスト追加 | create_mock_act() | — |
 | 3.3 | nil/空文字列の非ブロックテスト | テスト追加 | create_mock_act() | — |
 | 3.4 | M.is_blocked() 直接呼び出しテスト | テスト追加 | M.is_blocked() | — |
