@@ -30,10 +30,12 @@
 |------|-----------|--------|
 | 更新ファイル生成 | `pasta_sample_ghost/src/update_files.rs` (Rust) | `pasta_check` |
 | NAR パッケージング | `release.ps1` Step 8 (PowerShell) | `pasta_check` |
-| リリースフォルダー構築 | `release.ps1` Step 2, 4 (robocopy) | `pasta_check` |
+| リリースフォルダー構築 | `release.ps1` Step 4 (robocopy → GhostDir) | `pasta_check` (`--release` フォルダーへコピー) |
+| dist-src robocopy | `release.ps1` Step 2 (robocopy) | **廃止**（辞書を `ghosts/hello-pasta` に直接配置） |
 | DLL ビルド | `release.ps1` Step 1 (cargo build) | `release.ps1` (維持) |
-| 画像生成 | `release.ps1` Step 3 (cargo run) | `release.ps1` (維持) |
-| バージョンチェック | `release.ps1` Step 6 | `release.ps1` (維持) |
+| DLL/scripts コピー | `release.ps1` Step 4 (copy → GhostDir) | `release.ps1` (維持、Step 3 に繰り上げ) |
+| 画像生成 | `release.ps1` Step 3 (cargo run) | `release.ps1` (維持、Step 2 に繰り上げ) |
+| バージョンチェック | `release.ps1` Step 6 | `release.ps1` (維持、Step 5 に繰り上げ) |
 
 `pasta_check` は新規独立クレートとして追加され、既存クレートの依存グラフに影響を与えない。
 
@@ -43,10 +45,11 @@
 graph TD
     subgraph "release.ps1 (簡素化後)"
         S1["Step 1: DLL ビルド<br/>cargo build --release"]
-        S3["Step 3: 画像生成<br/>cargo run -p pasta_sample_ghost"]
-        S_PC["Step 2-5: pasta_check release<br/>フォルダー構築 + 更新ファイル + NAR"]
-        S6["Step 6: バージョンチェック"]
-        S9["Step 9: リリース手順表示"]
+        S2["Step 2: 画像生成<br/>cargo run -p pasta_sample_ghost"]
+        S3["Step 3: DLL/scripts コピー<br/>→ GhostDir/ghost/master/"]
+        S_PC["Step 4: pasta_check release<br/>--target GhostDir<br/>更新ファイル + NAR"]
+        S5["Step 5: バージョンチェック"]
+        S6["Step 6: リリース手順表示"]
     end
 
     subgraph "pasta_check クレート"
@@ -57,10 +60,11 @@ graph TD
         NAR["NAR 作成<br/>zip クレート"]
     end
 
-    S1 --> S3
+    S1 --> S2
+    S2 --> S3
     S3 --> S_PC
-    S_PC --> S6
-    S6 --> S9
+    S_PC --> S5
+    S5 --> S6
 
     S_PC -.->|"呼び出し"| CLI
     CLI --> REL
@@ -71,7 +75,7 @@ graph TD
 
 **Architecture Integration**:
 - **Selected pattern**: CLI バイナリクレート（単一サブコマンド・パイプライン実行）
-- **Domain boundaries**: `pasta_check` はリリース処理のみ。画像生成は `pasta_sample_ghost`。DLL ビルドは `release.ps1`
+- **Domain boundaries**: `pasta_check` はリリース処理のみ。画像生成は `pasta_sample_ghost`。DLL ビルド・DLL/scripts の開発フォルダーへのコピーは `release.ps1`
 - **Existing patterns preserved**: ワークスペースレイヤー構成、`version.workspace = true` パターン、`publish = true` 公開パターン
 - **New components rationale**: CLI 層（`lexopt`）と NAR 生成層（`zip`）は新規外部依存だが、いずれも最小構成で採用
 - **Steering compliance**: `tech.md` のワークスペース構成原則に準拠。新クレートは独立レイヤーとして追加
@@ -443,6 +447,12 @@ crates/pasta_check/
 - `crates/pasta_sample_ghost/src/main.rs` — `--finalize` オプション分岐、`run_finalize_mode()` 関数
 - `crates/pasta_sample_ghost/Cargo.toml` — `md5` 依存、`encoding_rs` 依存
 - `crates/pasta_sample_ghost/hello-pasta.nar` — 既存 NAR ファイル
+- `crates/pasta_sample_ghost/dist-src/` — 廃止。内容は `crates/pasta_sample_ghost/ghosts/hello-pasta/` に統合
+
+**再配置（dist-src 廃止）**:
+- `dist-src/ghost/` → `ghosts/hello-pasta/ghost/`（辞書・設定テキストを直接 git 管理）
+- `dist-src/shell/` → `ghosts/hello-pasta/shell/`（シェル設定テキストを直接 git 管理）
+- `dist-src/install.txt` → `ghosts/hello-pasta/install.txt`
 
 **影響なし**:
 - `integration_test.rs` — 10 テストはすべて画像生成系。finalize/update_files を参照しない
@@ -450,7 +460,7 @@ crates/pasta_check/
 
 ---
 
-### Integration: release.ps1 簡素化 (7.1–7.4)
+### Integration: release.ps1 簡素化 (7.1–7.5)
 
 **変更前（概念）**:
 ```
@@ -468,20 +478,22 @@ Step 9: リリース手順表示
 **変更後（概念）**:
 ```
 Step 1: DLL ビルド
-Step 2: 画像生成 (cargo run -p pasta_sample_ghost)
-Step 3: pasta_check release --target GhostDir --release ReleaseDir --nar NarPath --copy DistSrc --copy DllScriptsDir
-Step 4: バージョンチェック
-Step 5: リリース手順表示
+Step 2: 画像生成 (cargo run -p pasta_sample_ghost → GhostDir/shell/master/)
+Step 3: DLL/scripts コピー (→ GhostDir/ghost/master/)
+Step 4: pasta_check release --target GhostDir --release ReleaseDir --nar NarPath
+Step 5: バージョンチェック
+Step 6: リリース手順表示
 ```
 
 **主な変更点**:
-- 旧 Step 2 (dist-src robocopy) → `--copy` の最初の値として `pasta_check` に委譲
-- 旧 Step 4 (DLL/scripts コピー) → `--copy` の2番目の値として `pasta_check` に委譲。ただし DLL/scripts を一時フォルダーに集約する前処理が必要（`release.ps1` 側で実施）
+- 旧 Step 2 (dist-src robocopy) → **廃止**。辞書・設定テキストは `ghosts/hello-pasta/` に直接配置されるため不要
+- 旧 Step 4 (DLL/scripts コピー) → Step 3 として維持（`GhostDir` への直接コピー）
 - 旧 Step 5 (finalize) → `pasta_check release` 内で自動実行
 - 旧 Step 7 (バリデーション) → 廃止（`pasta_check` の正常終了で保証）
 - 旧 Step 8 (NAR 作成) → `pasta_check release` 内で自動実行
-- ステップ番号は 9 段階 → 5 段階に簡素化
-- パス変数: `$GhostDir` は `--target`、新規 `$ReleaseDir`（例: `release/hello-pasta`）は `--release`、`$NarFilePath`（例: `release/hello-pasta.nar`）は `--nar`
+- ステップ数: 9 段階 → 6 段階に簡素化。`--copy` は使用しない
+- パス変数: `$GhostDir = ghosts/hello-pasta`（`--target`）、新規 `$ReleaseDir`（例: `release/hello-pasta`、`--release`）、`$NarFilePath`（例: `release/hello-pasta.nar`、`--nar`）
+- **Existing Architecture Analysis** 更新: `dist-src/ robocopy` は「廃止」となる
 
 ---
 

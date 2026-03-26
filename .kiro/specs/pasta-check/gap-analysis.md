@@ -13,6 +13,8 @@
 | `release.bat` | `crates/pasta_sample_ghost/release.bat` | `release.ps1` のバッチラッパー |
 | NAR 作成処理 | `release.ps1` Step 8 | PowerShell `Compress-Archive` + `.zip` → `.nar` リネーム |
 | robocopy 処理 | `release.ps1` Step 2-4 | `dist-src/` コピー、DLL/scripts コピー |
+| `dist-src/` | `crates/pasta_sample_ghost/dist-src/` | **廃止対象**。辞書・設定テキスト・`install.txt` を一時格納。内容は `ghosts/hello-pasta/` に統合 |
+| `ghosts/hello-pasta/` | `crates/pasta_sample_ghost/ghosts/hello-pasta/` | ゴースト開発フォルダー（`--target` の指定先）。`dist-src/` 統合後はすべての辞書・テキストを git 管理 |
 
 ### 1.2 既存パターンと慣例
 
@@ -27,6 +29,8 @@
 ### 1.3 統合ポイント
 
 - **release.ps1**: Step 5 で `cargo run -p pasta_sample_ghost -- --finalize` を呼び出し。Step 8 で PowerShell NAR 作成。これらが `pasta_check` に置き換わる。
+- **dist-src/ 廃止**: `release.ps1` の Step 2（dist-src robocopy）は廃止。辞書・設定テキスト・`install.txt` は `ghosts/hello-pasta/` に直接配置し git 管理。DLL/scripts コピー（旧 Step 4）は `release.ps1` Step 3 として維持。
+- **ghosts/hello-pasta/ = 永続開発フォルダー**: `--target` 引数の指定先。`dist-src/` 統合後はすべてのゴーストファイル（辞書・テキスト）を git 管理。DLL・生成画像はビルド成果物として git 管理外。
 - **release-workflow 仕様**: タスク一覧の Step 2-A で `cargo publish` 対象を列挙。`pasta_check` を追加する必要あり。
 - **Cargo.toml ワークスペース**: `[workspace.dependencies]` に `pasta_check` 内部依存の追加が必要（md5, encoding_rs 等がワークスペース共通化されていないため、個別指定か新規追加）。
 - **リリース出力先**: 開発フォルダー（`ghosts/hello-pasta`）とは別に `release/hello-pasta/` および `release/hello-pasta.nar` にリリース成果物を出力する構成に変更。既存の `hello-pasta.nar`（クレートルート直下）は削除対象。
@@ -43,7 +47,7 @@
 | **Req 4**: 更新ファイル生成 | `update_files.rs`（完全な実装+テスト） | **移植可能**: 既存コードをほぼそのまま移植可能。依存: `md5 0.8`, `encoding_rs 0.8` |
 | **Req 5**: NAR 作成 | `release.ps1` Step 8（PowerShell） | **Missing**: Rust の ZIP ライブラリ（`zip` クレート）による NAR 作成が必要。`flate2` は gzip のみで ZIP アーカイブ非対応 |
 | **Req 6**: pasta_sample_ghost 分離 | `update_files.rs`, `lib.rs` finalize, `main.rs` --finalize, `hello-pasta.nar` | **削除対象**: `update_files.rs` モジュール全体、`finalize_ghost()` 関数、`--finalize` CLI 処理、`md5`/`encoding_rs` 依存、`hello-pasta.nar` |
-| **Req 7**: release.ps1 簡素化 | `release.ps1` Step 2, 4, 5, 7, 8 | **変更**: Step 2, 4（ファイルコピー）、Step 5（finalize）、Step 8（NAR作成）を `pasta_check release` に置換。Step 7（バリデーション）は不要（pasta_check の正常終了で保証） |
+| **Req 7**: release.ps1 簡素化 | `release.ps1` Step 2, 4, 5, 7, 8 | **変更**: Step 2（dist-src robocopy）は廃止（`ghosts/hello-pasta/` に直接統合）。Step 5（finalize）、Step 8（NAR作成）を `pasta_check release` に置換。旧 Step 4（DLL/scripts コピー）は `release.ps1` の新 Step 3 として維持（`GhostDir` へ直接コピー）。Step 7（バリデーション）は不要（`pasta_check` の正常終了で保証）。`--copy` 引数は hello-pasta フローでは使用しない。9ステップ→6ステップに簡素化 |
 | **Req 8**: release.bat 移動 | `crates/pasta_sample_ghost/release.bat` | **変更**: リポジトリルートに移動、パス解決を調整 |
 | **Req 9**: crates.io 公開 | publish パターン確立済み | **Missing**: `Cargo.toml` で `publish = true` + `description`。`release-workflow` タスクリストへの追加 |
 

@@ -40,7 +40,9 @@
 
 これらを `pasta_check` クレートに統合することで、`release.ps1` からの Rust ランタイム呼び出しを簡素化し、将来的な Lua 単体試験サポートの基盤を確保する。
 
-リリース成果物は開発フォルダー（`ghosts/hello-pasta`）とは分離された `release/` ディレクトリに出力される（例: `release/hello-pasta/`, `release/hello-pasta.nar`）。開発フォルダーの内容は変更されない。`pasta_check` は将来的に `release.ps1` のリリース関連処理を全面的に吸収する方向とする。
+リリース成果物は開発フォルダーとは分離された `release/` ディレクトリに出力される（例: `release/hello-pasta/`, `release/hello-pasta.nar`）。開発フォルダーの内容は変更されない。`pasta_check` は将来的に `release.ps1` のリリース関連処理を全面的に吸収する方向とする。
+
+`ghosts/hello-pasta/` はゴーストが実際にテスト動作する完全な開発フォルダーであり、辞書・設定テキストを git で直接管理する。現在 `dist-src/` に分離されているテキストファイル（辞書・設定ファイル・`install.txt` 等）はすべて `ghosts/hello-pasta/` に統合し、`dist-src/` ディレクトリは廃止する。DLL（`pasta.dll`）と生成画像（`surface*.png`）はビルドステップにより `ghosts/hello-pasta/` に配置されるビルド成果物であり、git 管理外とする。
 
 ---
 
@@ -131,10 +133,11 @@
 
 #### Acceptance Criteria
 
-1. When リリースフローが実行される, the `release.ps1` shall ファイルコピー（旧 Step 2, 4）、更新ファイル生成（旧 Step 5）、NAR 作成（旧 Step 8）を `pasta_check release` コマンドに委譲する
+1. When リリースフローが実行される, the `release.ps1` shall 更新ファイル生成（旧 Step 5）、NAR 作成（旧 Step 8）を `pasta_check release` コマンドに委譲する
 2. The `release.ps1` shall `pasta_check release` コマンドの正常終了をもってリリース成果物の整合性を保証し、別途バリデーションステップ（旧 Step 7）は設けない
-3. The `release.ps1` shall DLL ビルド（Step 1）および画像生成（Step 3）の実行後に `pasta_check release` を呼び出す構成とする
+3. The `release.ps1` shall DLL ビルド（Step 1）、画像生成（Step 2）、DLL/scripts の `ghosts/hello-pasta/` へのコピー（Step 3）の実行後に `pasta_check release` を呼び出す構成とする
 4. The `release.ps1` shall 現在の配置場所（`crates/pasta_sample_ghost/release.ps1`）に留まる
+5. When `pasta_check` が完成する, the Release Workflow shall `dist-src/` ディレクトリを削除し、その内容（辞書・設定テキスト・`install.txt`）を `ghosts/hello-pasta/` に直接統合する
 
 ### Requirement 8: release.bat のリポジトリルート移動
 
