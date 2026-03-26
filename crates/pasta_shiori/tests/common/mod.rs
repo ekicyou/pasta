@@ -1,5 +1,7 @@
 //! Common test utilities for pasta_shiori integration tests.
 
+#![allow(dead_code)]
+
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 

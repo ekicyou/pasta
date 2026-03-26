@@ -29,7 +29,7 @@ pub fn execute_release(args: &ReleaseArgs) -> io::Result<()> {
     // Step 4: 更新ファイル生成
     println!("[4/5] Generating update files...");
     let entries = generate_update_files(&args.release)?;
-    println!("  Generated updates2.dau and updates.txt ({entries} entries)");
+    println!("  Generated updates.txt ({entries} entries)");
 
     // Step 5: NAR 作成
     println!("[5/5] Creating NAR archive...");
@@ -72,14 +72,17 @@ mod tests {
         execute_release(&args).unwrap();
 
         // リリースフォルダーに更新ファイルが生成されている
-        assert!(release.join("updates2.dau").exists());
+        assert!(!release.join("updates2.dau").exists());
         assert!(release.join("updates.txt").exists());
         // NAR が作成されている
         assert!(nar.exists());
         assert!(nar.metadata().unwrap().len() > 0);
         // target フォルダーは変更されていない
         assert!(!target.join("updates2.dau").exists());
-        assert_eq!(fs::read_to_string(target.join("install.txt")).unwrap(), "install");
+        assert_eq!(
+            fs::read_to_string(target.join("install.txt")).unwrap(),
+            "install"
+        );
     }
 
     #[test]
@@ -107,9 +110,18 @@ mod tests {
 
         execute_release(&args).unwrap();
 
-        assert_eq!(fs::read_to_string(release.join("a.txt")).unwrap(), "overwritten");
-        assert_eq!(fs::read_to_string(release.join("b.txt")).unwrap(), "new file");
+        assert_eq!(
+            fs::read_to_string(release.join("a.txt")).unwrap(),
+            "overwritten"
+        );
+        assert_eq!(
+            fs::read_to_string(release.join("b.txt")).unwrap(),
+            "new file"
+        );
         // target は変更されていない
-        assert_eq!(fs::read_to_string(target.join("a.txt")).unwrap(), "original");
+        assert_eq!(
+            fs::read_to_string(target.join("a.txt")).unwrap(),
+            "original"
+        );
     }
 }

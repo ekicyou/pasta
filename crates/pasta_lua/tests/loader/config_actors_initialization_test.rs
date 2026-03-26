@@ -14,7 +14,6 @@ use crate::common;
 
 use common::copy_fixture_to_temp;
 use pasta_lua::loader::PastaLoader;
-use std::path::PathBuf;
 
 // ============================================================================
 // Task 2.1: pasta.store 初期化ロジックの単体テスト

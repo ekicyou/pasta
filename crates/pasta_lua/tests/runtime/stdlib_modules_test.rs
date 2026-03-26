@@ -5,7 +5,7 @@
 
 use crate::common;
 
-use pasta_lua::{PastaLuaRuntime, RuntimeConfig, TranspileContext};
+use pasta_lua::{PastaLuaRuntime, RuntimeConfig};
 
 use common::create_empty_context;
 

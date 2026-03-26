@@ -113,9 +113,9 @@ fn probe_ontalk_via_lua_state() {
     println!("=== co_exec Result ===");
     println!("{}", co_exec_check);
 
-    // Drop the runtime/lua borrows before mutable borrow
-    drop(lua);
-    drop(runtime);
+    // lua/runtime borrows end here (NLL)
+    let _ = lua;
+    let _ = runtime;
 
     // Now test the full dispatch chain via Lua directly (no mutable borrow needed)
     // Re-acquire runtime after mutable operations

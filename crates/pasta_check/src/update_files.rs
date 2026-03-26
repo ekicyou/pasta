@@ -1,6 +1,6 @@
 //! SSP ネットワーク更新ファイル生成モジュール
 //!
-//! `updates2.dau` および `updates.txt` を SSP 仕様に準拠して生成します。
+//! `updates.txt` を SSP 仕様に準拠して生成します（`updates2.dau` は将来用に保持）。
 
 use std::fs::{self, File};
 use std::io::{self, Read, Write};
@@ -36,7 +36,7 @@ fn format_datetime(time: SystemTime) -> String {
     let sec = secs % 60;
     let min = (secs / 60) % 60;
     let hour = (secs / 3600) % 24;
-    let mut days = secs / 86400;
+    let days = secs / 86400;
 
     // 1970-01-01 からの日数をグレゴリオ暦に変換
     let (year, month, day) = days_to_ymd(days as u32);
@@ -95,7 +95,6 @@ pub fn generate_update_files(root_dir: &Path) -> io::Result<usize> {
         return Ok(0);
     }
 
-    generate_updates2_dau(root_dir, &entries)?;
     generate_updates_txt(root_dir, &entries)?;
 
     Ok(count)
@@ -177,6 +176,7 @@ fn calculate_md5(path: &Path) -> io::Result<String> {
 
 /// updates2.dau を生成
 /// フォーマット: `<filepath><SOH><md5><SOH>size=<bytes><SOH><CRLF>`
+#[allow(dead_code)]
 fn generate_updates2_dau(root_dir: &Path, entries: &[FileEntry]) -> io::Result<()> {
     let output_path = root_dir.join("updates2.dau");
     let mut file = File::create(&output_path)?;
@@ -263,7 +263,7 @@ mod tests {
         let count = generate_update_files(temp.path()).unwrap();
         assert_eq!(count, 2);
 
-        assert!(temp.path().join("updates2.dau").exists());
+        assert!(!temp.path().join("updates2.dau").exists());
         assert!(temp.path().join("updates.txt").exists());
 
         let content = fs::read_to_string(temp.path().join("updates.txt")).unwrap();

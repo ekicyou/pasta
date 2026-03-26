@@ -6,8 +6,7 @@
 use crate::common;
 
 use common::{create_empty_context, value_as_str};
-use mlua::Value;
-use pasta_lua::{PastaLuaRuntime, TranspileContext};
+use pasta_lua::PastaLuaRuntime;
 
 #[test]
 fn test_regex_module_available() {

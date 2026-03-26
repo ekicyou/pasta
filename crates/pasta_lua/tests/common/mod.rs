@@ -3,6 +3,8 @@
 //! This module provides shared helper functions for E2E testing of the
 //! Pasta DSL to Lua transpilation and runtime execution pipeline.
 
+#![allow(dead_code)]
+
 pub mod e2e_helpers;
 
 use pasta_lua::{PastaLuaRuntime, TranspileContext};
