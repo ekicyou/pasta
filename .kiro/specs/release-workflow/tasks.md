@@ -35,7 +35,6 @@
     - crates.io (pasta_dsl): `(Invoke-RestMethod https://crates.io/api/v1/crates/pasta_dsl).crate.max_version`
     - crates.io (pasta_lua): `(Invoke-RestMethod https://crates.io/api/v1/crates/pasta_lua).crate.max_version`
     - crates.io (pasta_shiori): `(Invoke-RestMethod https://crates.io/api/v1/crates/pasta_shiori).crate.max_version`
-    - crates.io (pasta_check): `(Invoke-RestMethod https://crates.io/api/v1/crates/pasta_check).crate.max_version`
     - VSCode Marketplace: `npx @vscode/vsce show ekicyou.pasta-vscode 2>&1 | Select-String 'Version:' | ForEach-Object { $_ -replace '.*Version:\s*', '' }`
   - **2-B: 最大バージョンの算出**
     - 上記全ソースから取得した全バージョン文字列（`v` プレフィックス除去後）を比較し、semver ルールで最大値を決定する
@@ -58,29 +57,16 @@
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6_
 
 - [ ] 3. ワークツリーの整理とテスト実行
-  - **3-A: バージョンファイルの整合性検証**（自動コミット前に必ず実行）
-    - `git diff HEAD -- Cargo.toml editors/vscode/package.json` で HEAD との差分を確認する
-    - バージョンファイルに HEAD との差分がある場合:
-      - 作業ツリーのバージョンと HEAD のバージョンをそれぞれ表示する
-      - 作業ツリーのバージョンが HEAD より古い場合は **巻き戻し警告** を表示し、`git checkout HEAD -- Cargo.toml editors/vscode/package.json` で HEAD の状態に復元するか開発者に確認する
-      - 開発者が復元を選択した場合は `git checkout HEAD --` で復元する
-      - 開発者が作業ツリーの値を維持する場合はその旨を記録して続行する
-  - **3-B: バージョン一致チェック**
-    - `editors/vscode/package.json` の `version` と `Cargo.toml` の `workspace.package.version` を比較する
-    - さらに、両者が Task 2 で算出した `$CURRENT_VERSION` と一致するか検証する
-    - 不一致の場合は全バージョン値を表示して開発者に確認し、同期方法の指示を仰ぐ
-  - **3-C: 未コミット変更の処理**
-    - `git status --porcelain` で未コミット変更を確認する
-    - 未コミット変更がある場合は `git add -A && git commit -m "chore(release): prepare release vX.Y.Z"` で自動コミットする
-  - **3-D: テスト実行**
-    - `cargo test --all` を実行し全テストの通過を確認する
-    - テスト失敗時はエラー内容を報告し、リリース作業を中止する
+  - `git status --porcelain` で未コミット変更を確認する
+  - 未コミット変更がある場合は `git add -A && git commit -m "chore(release): prepare release vX.Y.Z"` で自動コミットする
+  - `editors/vscode/package.json` の `version` と `Cargo.toml` の `workspace.package.version` を比較し、不一致の場合は警告を表示し同期するか開発者に確認
+  - `cargo test --all` を実行し全テストの通過を確認する
+  - テスト失敗時はエラー内容を報告し、リリース作業を中止する
   - _Requirements: 1.7, 1.8, 1.9, 1.10_
 
 ### Phase 2: バージョン更新
 
 - [ ] 4. Cargo.toml のバージョン一括更新
-  - **`<OLD>` の定義**: `<OLD>` は Task 3 完了後のファイルから実際に読み取ったバージョン文字列（= `$CURRENT_VERSION`）を指す。Task 3-B で `$CURRENT_VERSION` との一致が検証済みのため、この値を使用する
   - ルート `Cargo.toml` の以下5箇所を `replace_string_in_file` で更新する:
     - `[workspace.package].version = "<OLD>"` → `version = "<NEW>"`
     - `pasta_core = { path = "crates/pasta_core", version = "<OLD>" }` → `version = "<NEW>"`
@@ -97,14 +83,14 @@
 
 - [ ] 5. ビルド検証とコミット
   - `cargo build --workspace` を実行してビルド成功を確認する
-  - ビルド失敗時は `git restore Cargo.toml editors/vscode/package.json` でロールバックし、エラーを報告して中止する
-  - ビルド成功時は `git add Cargo.toml editors/vscode/package.json && git commit -m "chore(release): bump version to vX.Y.Z"` でコミットする
+  - ビルド失敗時は `git restore Cargo.toml` でロールバックし、エラーを報告して中止する
+  - ビルド成功時は `git add Cargo.toml && git commit -m "chore(release): bump version to vX.Y.Z"` でコミットする
   - _Requirements: 2.3, 2.4, 2.5_
 
 ### Phase 3: crates.io 公開
 
 - [ ] 6. 依存関係順での crates.io 公開
-  - 以下の順序でクレートを公開する: `pasta_core` → `pasta_dsl` → `pasta_lua` → `pasta_check` → `pasta_shiori`
+  - 以下の順序でクレートを公開する: `pasta_core` → `pasta_dsl` → `pasta_lua` → `pasta_shiori`
   - 各クレートに対して `cargo publish -p <crate_name>` を実行する
   - 失敗時は段階的バックオフでリトライする（待機 1分→2分→...→10分、最大10回）
   - 各リトライ前に `Start-Sleep -Seconds (N * 60)` で待機する（N=1,2,...,10）
@@ -131,8 +117,8 @@
 ### Phase 4: ゴーストビルド
 
 - [ ] 7. サンプルゴーストのビルドと成果物確認
-  - ワークスペースルートで `PowerShell -ExecutionPolicy Bypass -File crates\pasta_sample_ghost\release.ps1` を実行する
-  - `Test-Path "release/hello-pasta.nar"` で .nar ファイルの生成を確認する
+  - `crates/pasta_sample_ghost/` ディレクトリで `PowerShell -ExecutionPolicy Bypass -File release.ps1` を実行する
+  - `Test-Path "crates/pasta_sample_ghost/hello-pasta.nar"` で .nar ファイルの生成を確認する
   - `Test-Path "target/i686-pc-windows-msvc/release/pasta.dll"` で DLL の存在を確認する
   - いずれかが存在しない場合はエラー報告し中断する
   - DLL 存在確認後、zip 圧縮を実行する:
@@ -173,7 +159,7 @@
     ```powershell
     $assets = @(
       "target/i686-pc-windows-msvc/release/pasta.dll.zip",
-      "release/hello-pasta.nar"
+      "crates/pasta_sample_ghost/hello-pasta.nar"
     )
     if ($env:VSIX_PATH -and (Test-Path $env:VSIX_PATH)) {
       $assets += $env:VSIX_PATH
