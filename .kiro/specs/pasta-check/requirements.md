@@ -13,10 +13,10 @@
 
 #### 共通コマンドラインオプション
 
-- `--target XXX`：処理対象のパス。ゴーストが配置されているフォルダー。
+- `--target XXX`：処理対象のパス。すべてのゴーストファイル（DLL・スクリプト・辞書・シェル画像）が揃ったゴースト開発フォルダー。
 - `--release XXX`：リリースファイルパス。ゴーストフォルダーをコピーする。
 - `--nar XXX`：NAR パス。指定パス名で NAR ファイルを作成する。
-- `--copy XXX`：コピーファイルパス。release フォルダーに上書きするファイルのフォルダー。
+- `--copy XXX`：コピーファイルパス。release フォルダーに上書きするファイルのフォルダー。複数回指定可能。
 
 #### コマンドラインコマンド: release
 
@@ -67,10 +67,10 @@
 #### Acceptance Criteria
 
 1. The `pasta_check` shall `release` サブコマンドを提供する
-2. When `release` サブコマンドが実行される, the `pasta_check` shall `--target` オプションで処理対象のゴーストフォルダーパスを受け取る
+2. When `release` サブコマンドが実行される, the `pasta_check` shall `--target` オプションで、すべてのゴーストファイル（DLL・スクリプト・辞書・シェル画像）が揃った開発フォルダーパスを受け取る
 3. When `release` サブコマンドが実行される, the `pasta_check` shall `--release` オプションでリリースフォルダーの出力先パスを受け取る
 4. When `release` サブコマンドが実行される, the `pasta_check` shall `--nar` オプションで生成する NAR ファイルのパスを受け取る
-5. Where `--copy` オプションが指定される, the `pasta_check` shall 指定フォルダーの内容をリリースフォルダーに上書きコピーする
+5. The `pasta_check` shall `--copy` オプションを 0 回以上の複数指定可能とし、指定された順序で各フォルダーの内容をリリースフォルダーに上書きコピーする
 6. If 必須オプション（`--target`, `--release`, `--nar`）のいずれかが未指定, the `pasta_check` shall エラーメッセージと使用方法を表示して終了する
 
 ### Requirement 3: release サブコマンドの実行フロー
@@ -81,7 +81,7 @@
 
 1. When `release` サブコマンドが実行される, the `pasta_check` shall まず `--release` フォルダーが存在すれば削除し、空ディレクトリとして再作成する
 2. When リリースフォルダーが準備される, the `pasta_check` shall `--target` フォルダーの内容を `--release` フォルダーに再帰的にコピーする
-3. Where `--copy` オプションが指定される, the `pasta_check` shall `--copy` フォルダーの内容を `--release` フォルダーに上書きコピーする
+3. Where `--copy` オプションが 1 回以上指定される, the `pasta_check` shall 指定された順序で各 `--copy` フォルダーの内容を `--release` フォルダーに上書きコピーする
 4. When ファイルコピーが完了する, the `pasta_check` shall `--release` フォルダー内に `updates2.dau` および `updates.txt` を SSP 仕様に準拠して生成する
 5. When 更新ファイルの生成が完了する, the `pasta_check` shall `--release` フォルダーの内容から `--nar` で指定されたパスに NAR ファイルを作成する
 6. When 各ステップが実行される, the `pasta_check` shall 進捗メッセージを標準出力に表示する

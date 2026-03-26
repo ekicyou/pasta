@@ -18,7 +18,7 @@
 
 | 項目 | 現状 |
 |------|------|
-| CLI パーサー | プロジェクト内に `clap` 等の CLI フレームワークは使用されていない。`pasta_sample_ghost` は `std::env::args()` で手動解析 |
+| CLI パーサー | プロジェクト内に `clap` 等の CLI フレームワークは使用されていない。`pasta_sample_ghost` は `std::env::args()` で手動解析。`--copy` は複数回指定可能なため array 対応が必要 |
 | ZIP 圧縮 | Rust 側にはない。`flate2` は `pasta_lua` でキャッシュ用 gzip に使用されているが、ZIP アーカイブではない |
 | 依存グラフ | `pasta_shiori` → `pasta_lua` → `pasta_dsl` + `pasta_core`。`pasta_sample_ghost` は `publish=false` で `pasta_shiori` と `pasta_lua` を `[dev-dependencies]` に持つ |
 | ワークスペース版番 | `0.1.21`（`version.workspace = true` で全クレート共通）|
