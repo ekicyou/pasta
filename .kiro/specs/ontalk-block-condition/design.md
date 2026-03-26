@@ -295,7 +295,7 @@ dispatch(act):
 **Implementation Notes**
 - `dispatch()` 経由でテスト（入口ガードの動作確認）
 - 既存の `create_mock_act()` ヘルパーと `_set_scene_executor()` モックを活用
-- 既存の talking/choosing テスト（check_hour/check_talk 直接呼び出し）は削除または dispatch() 経由に移行
+- 既存の talking/choosing テスト（check_hour/check_talk 直接呼び出し）は**削除する**。check_hour/check_talk はブロック判定を持たなくなるため、これらのテストは「存在しない機能のテスト」になる。ブロック動作の検証は dispatch() 経由の新テストケース（上記18件）で行う。
 
 ### Documentation Layer
 
