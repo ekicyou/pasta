@@ -22,6 +22,7 @@ OnSecondChange経由で自動発行されるOnTalk/OnHourの仮想ディスパ�
 - `induction` — インダクションモード中
 - `timecritical` — タイムクリティカルセクション中
 - `nouserbreak` — ユーザーブレイク禁止中
+- `minimizing` — 最小化中（バルーン非表示）
 
 ## Requirements
 
@@ -31,7 +32,7 @@ OnSecondChange経由で自動発行されるOnTalk/OnHourの仮想ディスパ�
 
 #### Acceptance Criteria
 
-1. When `dispatch(act)` が呼ばれた時, the virtual_dispatcher shall `act.req.status` に以下のいずれかのキーワードが含まれる場合 `nil` を返して発行をブロックする: `talking`, `choosing`, `online`, `opening`, `passive`, `induction`, `timecritical`, `nouserbreak`
+1. When `dispatch(act)` が呼ばれた時, the virtual_dispatcher shall `act.req.status` に以下のいずれかのキーワードが含まれる場合 `nil` を返して発行をブロックする: `talking`, `choosing`, `online`, `opening`, `passive`, `induction`, `timecritical`, `nouserbreak`, `minimizing`
 
 ### Requirement 2: check_hour / check_talk 個別チェックの廃止
 
@@ -42,15 +43,7 @@ OnSecondChange経由で自動発行されるOnTalk/OnHourの仮想ディスパ�
 1. The virtual_dispatcher shall dispatch関数の入口で一括ブロック判定を行い、`check_hour()` および `check_talk()` 内の個別Status判定（talking/choosing）を除去する
 2. The virtual_dispatcher shall ブロック判定のStatus一覧をモジュールローカルのテーブル（`local BLOCKED_STATUSES`）として一元管理する
 
-### Requirement 3: minimizingの扱い
-
-**Objective:** ゴースト開発者として、最小化中はバルーンが見えないため、トークを発行しても無意味にならないようにしたい。
-
-#### Acceptance Criteria
-
-1. When `act.req.status` に `minimizing` が含まれる場合, the virtual_dispatcher shall `nil` を返して発行をブロックする
-
-### Requirement 4: テストカバレッジ
+### Requirement 3: テストカバレッジ
 
 **Objective:** 開発者として、全ブロック条件が正しく機能することをテストで保証したい。
 
@@ -60,7 +53,7 @@ OnSecondChange経由で自動発行されるOnTalk/OnHourの仮想ディスパ�
 2. When 複数Statusがカンマ区切りで設定された場合（例: `"choosing,balloon(0=0)"`）, the テスト shall ブロック対象が含まれていれば `nil` を返すことを検証する
 3. When `act.req.status` が `nil` または空文字列の場合, the テスト shall ブロックされないことを検証する
 
-### Requirement 5: スキルドキュメント更新
+### Requirement 4: スキルドキュメント更新
 
 **Objective:** LLMエージェントとして、ブロック条件の仕様変更をスキルリファレンスに反映し、将来の辞書制作やコード生成で正しい情報を参照できるようにしたい。
 
