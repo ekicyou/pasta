@@ -35,7 +35,6 @@ pasta_check の `generate_update_files()` が自動生成する。
 | ファイル | 理由 |
 |---------|------|
 | `updates.txt` | 自分自身 |
-| `updates2.dau` | 更新メタファイル |
 | `developer_options.txt` | 開発用オプション |
 
 ## 出力例
@@ -46,14 +45,6 @@ file,ghost/master/descript.txt\x01a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4\x01size=1234\
 file,ghost/master/dic/talk.pasta\x01b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5\x01size=5678\x01date=2026-03-26T12:00:00\x01
 file,shell/master/surface0.png\x01d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2\x01size=90123\x01date=2026-03-26T12:00:00\x01
 file,install.txt\x01e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3\x01size=456\x01date=2026-03-26T12:00:00\x01
-```
-
-## updates2.dau
-
-メタデータファイル。SOH 区切り形式:
-
-```
-<path>\x01<md5>\x01size=<bytes>\x01
 ```
 
 ## 実装箇所

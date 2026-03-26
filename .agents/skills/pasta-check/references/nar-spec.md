@@ -36,7 +36,6 @@ shell/master/descript.txt
 shell/master/surface0.png
 shell/master/surfaces.txt
 updates.txt
-updates2.dau
 ```
 
 ## インストール動作

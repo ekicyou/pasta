@@ -1,6 +1,6 @@
 ---
 name: pasta-check
-description: 'pasta_check CLIツールのリファレンス。ゴーストリリースビルド（release サブコマンド）、将来的なテスト・検証コマンドを含む。USE FOR: pasta_check, pasta check, ghost release, ゴーストリリース, NAR作成, release.bat, release.ps1, pasta_check release, .nar, リリースビルド, ゴースト配布, updates.txt, updates2.dau, build ghost, deploy ghost, publish ghost, リリース手順, pasta_check test, ゴースト検証. DO NOT USE FOR: pasta DSL文法（pasta-ghost-authoringを使用）, Lua API（pasta-lua-codingを使用）, crates.ioパブリッシュ（release-workflow specを参照）.'
+description: 'pasta_check CLIツールのリファレンス。ゴーストリリースビルド（release サブコマンド）、将来的なテスト・検証コマンドを含む。USE FOR: pasta_check, pasta check, ghost release, ゴーストリリース, NAR作成, release.bat, release.ps1, pasta_check release, .nar, リリースビルド, ゴースト配布, updates.txt, build ghost, deploy ghost, publish ghost, リリース手順, pasta_check test, ゴースト検証. DO NOT USE FOR: pasta DSL文法（pasta-ghost-authoringを使用）, Lua API（pasta-lua-codingを使用）, crates.ioパブリッシュ（release-workflow specを参照）.'
 argument-hint: 'サブコマンド名（release等）やゴースト名、オプションを指定'
 ---
 
@@ -50,7 +50,7 @@ pasta_check release --target <path> --release <path> --nar <path> [--copy <path>
 [1/5] Preparing release folder   ← --release を削除して新規作成
 [2/5] Copying target files       ← --target → --release に再帰コピー
 [3/5] Applying overlay copies    ← --copy（指定があれば）上書きコピー
-[4/5] Generating update files    ← updates.txt / updates2.dau を自動生成
+[4/5] Generating update files    ← updates.txt を自動生成
 [5/5] Creating NAR archive       ← --release を ZIP 圧縮して --nar に出力
 ```
 
@@ -98,8 +98,7 @@ workspace/
 │   │   ├── ghost/master/                # ゴースト本体
 │   │   ├── shell/master/                # シェル（画像等）
 │   │   ├── install.txt
-│   │   ├── updates.txt                  # 自動生成
-│   │   └── updates2.dau                 # 自動生成
+│   │   └── updates.txt                  # 自動生成
 │   └── {ghost-name}.nar                 # --nar 出力
 └── crates/pasta_sample_ghost/
     ├── release.ps1                      # Setup + Release を統合したスクリプト
