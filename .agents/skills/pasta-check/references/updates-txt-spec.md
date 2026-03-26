@@ -3,15 +3,19 @@
 SSP（伺かベースウェア）のネットワーク更新ファイル仕様。
 pasta_check の `generate_update_files()` が自動生成する。
 
-## フォーマット
+## フォーマット (Version 3)
 
 | 項目 | 値 |
 |------|-----|
-| エンコーディング | Shift_JIS |
+| エンコーディング | UTF-8 |
 | 改行コード | CRLF (`\r\n`) |
-| 行フォーマット | `relative/path/to/file,md5hash` |
+| 1行目 | `charset,UTF-8` |
+| 以降の行フォーマット | `file,<path>\x01<md5>\x01size=<bytes>\x01date=<ISO8601>\x01` |
 | MD5 | 32文字小文字16進数 |
 | パス区切り | スラッシュ (`/`) |
+| フィールド区切り | SOH (`\x01`) |
+
+> SSP は Version 3 (charset ヘッダー付き) を認識し、UTF-8 として処理する。
 
 ## 除外ルール
 
@@ -37,21 +41,24 @@ pasta_check の `generate_update_files()` が自動生成する。
 ## 出力例
 
 ```
-ghost/master/descript.txt,a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
-ghost/master/dic/talk.pasta,b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5
-ghost/master/pasta.toml,c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1
-shell/master/surface0.png,d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2
-install.txt,e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3
+charset,UTF-8
+file,ghost/master/descript.txt\x01a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4\x01size=1234\x01date=2026-03-26T12:00:00\x01
+file,ghost/master/dic/talk.pasta\x01b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5\x01size=5678\x01date=2026-03-26T12:00:00\x01
+file,shell/master/surface0.png\x01d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2\x01size=90123\x01date=2026-03-26T12:00:00\x01
+file,install.txt\x01e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3\x01size=456\x01date=2026-03-26T12:00:00\x01
 ```
 
 ## updates2.dau
 
-将来用のメタデータファイル。現在は空ファイルとして生成される。
+メタデータファイル。SOH 区切り形式:
+
+```
+<path>\x01<md5>\x01size=<bytes>\x01
+```
 
 ## 実装箇所
 
 - ソース: `crates/pasta_check/src/update_files.rs`
-- エンコーディング変換: `encoding_rs` クレート (UTF-8 → Shift_JIS)
 - MD5 計算: `md5` クレート
 
 ## SSP 参考仕様

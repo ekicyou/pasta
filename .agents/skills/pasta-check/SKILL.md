@@ -9,6 +9,16 @@ argument-hint: 'サブコマンド名（release等）やゴースト名、オプ
 pasta_check はゴーストの配布パッケージ（.nar）を作成する CLI ツール。
 ゴースト名やパスに依存しない汎用ツールであり、任意のゴーストに対して使える。
 
+## インストール
+
+crates.io から `cargo install` でインストールする。
+
+```bash
+cargo install pasta_check
+```
+
+インストール後は `pasta_check` コマンドとして使える（`~/.cargo/bin` にパスが通っている前提）。
+
 ## pasta_check CLI
 
 ### 基本構文
@@ -48,13 +58,13 @@ pasta_check release --target <path> --release <path> --nar <path> [--copy <path>
 
 ```powershell
 # 最小構成
-cargo run -p pasta_check -- release `
+pasta_check release `
   --target path/to/ghost `
   --release release/my-ghost `
   --nar release/my-ghost.nar
 
 # オーバーレイ付き（ビルド成果物を上書き）
-cargo run -p pasta_check -- release `
+pasta_check release `
   --target path/to/ghost `
   --release release/my-ghost `
   --nar release/my-ghost.nar `
