@@ -52,6 +52,7 @@ OnSecondChange経由で自動発行されるOnTalk/OnHourの仮想ディスパ�
 1. When 各ブロック対象Status（talking, choosing, online, opening, passive, induction, timecritical, nouserbreak, minimizing）が `act.req.status` に設定された場合, the テスト shall `dispatch()` が `nil` を返すことを検証する
 2. When 複数Statusがカンマ区切りで設定された場合（例: `"choosing,balloon(0=0)"`）, the テスト shall ブロック対象が含まれていれば `nil` を返すことを検証する
 3. When `act.req.status` が `nil` または空文字列の場合, the テスト shall ブロックされないことを検証する
+4. When `M.is_blocked(status)` を直接呼び出した場合, the テスト shall 各ブロック対象Statusで `true` を返し、非ブロック対象で `false` を返すことを検証する
 
 ### Requirement 4: スキルドキュメント更新
 
@@ -61,3 +62,14 @@ OnSecondChange経由で自動発行されるOnTalk/OnHourの仮想ディスパ�
 
 1. The shiori-handlers.md shall virtual_dispatcherセクションの記述を更新し、ブロック対象Status一覧を記載する
 2. The shiori-handlers.md shall `dispatch()` の記述に「Statusブロックガードは `dispatch()` 入口で一括判定される」旨を追記する
+3. The shiori-handlers.md shall `M.is_blocked(status)` の使用例（他イベントアルゴリズムへの応用例）を記載する
+
+### Requirement 5: ブロック判定の汎用公開API化
+
+**Objective:** ゴースト開発者（Luaスクリプト作者）として、SSP Statusブロック判定を他のイベントアルゴリズム（例: 撫で反応、OnMouseDoubleClick等）でも再利用できるようにしたい。
+
+#### Acceptance Criteria
+
+1. The virtual_dispatcher shall `M.is_blocked(status)` を公開関数として提供し、他モジュールから `require` して呼び出せるようにする
+2. The virtual_dispatcher shall `dispatch()` 内のブロック判定を `M.is_blocked(act.req.status)` に委譲する
+3. When `M.is_blocked(status)` が呼ばれた時, the function shall `BLOCKED_STATUSES` の全キーワードを評価し、1つでも一致すれば `true`、いずれも一致しなければ `false` を返す
