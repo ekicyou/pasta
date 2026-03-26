@@ -417,6 +417,10 @@ zip = { version = "8.4", default-features = false, features = ["deflate"] }
 thiserror.workspace = true
 
 # 将来拡張（Lua 単体試験サポート基盤）
+# [dev-dependencies] でなく [dependencies] に置く理由:
+# pasta_check は将来 pasta_lua に依存する予定であり、
+# crates.io への publish 順序（pasta_lua → pasta_check）を
+# 最初から明示的に確定させるため。
 pasta_lua = { path = "../pasta_lua", version = "0.1" }
 
 [dev-dependencies]
