@@ -97,6 +97,15 @@ pub fn generate_update_files(root_dir: &Path) -> io::Result<usize> {
 
     generate_updates_txt(root_dir, &entries)?;
 
+    // ghost/master が存在する場合、updates.txt をそこにもコピー
+    let ghost_master = root_dir.join("ghost/master");
+    if ghost_master.is_dir() {
+        fs::copy(
+            root_dir.join("updates.txt"),
+            ghost_master.join("updates.txt"),
+        )?;
+    }
+
     Ok(count)
 }
 
@@ -193,9 +202,9 @@ fn generate_updates2_dau(root_dir: &Path, entries: &[FileEntry]) -> io::Result<(
 }
 
 /// updates.txt を生成
-/// フォーマット:
+/// フォーマット (Version 3):
 ///   1行目: `charset,UTF-8`
-///   以降: `file,<filepath><md5>size=<bytes>date=<YYYY-MM-DDTHH:MM:SS><CRLF>`
+///   以降: `file,<filepath>\x01<md5>\x01size=<bytes>\x01date=<YYYY-MM-DDTHH:MM:SS>\x01<CRLF>`
 fn generate_updates_txt(root_dir: &Path, entries: &[FileEntry]) -> io::Result<()> {
     let output_path = root_dir.join("updates.txt");
     let mut file = File::create(&output_path)?;
@@ -206,7 +215,7 @@ fn generate_updates_txt(root_dir: &Path, entries: &[FileEntry]) -> io::Result<()
     for entry in entries {
         let date = format_datetime(entry.modified);
         let record = format!(
-            "file,{}{}size={}date={}\r\n",
+            "file,{}\x01{}\x01size={}\x01date={}\x01\r\n",
             entry.path, entry.md5, entry.size, date
         );
         file.write_all(record.as_bytes())?;
@@ -282,5 +291,80 @@ mod tests {
         // 2024-01-01T00:00:00 UTC = 1704067200
         let t = UNIX_EPOCH + std::time::Duration::from_secs(1704067200);
         assert_eq!(format_datetime(t), "2024-01-01T00:00:00");
+    }
+
+    /// updates.txt の file 行は SOH (\x01) でフィールド区切りされること
+    #[test]
+    fn test_updates_txt_soh_delimiters() {
+        let temp = TempDir::new().unwrap();
+        fs::write(temp.path().join("test.txt"), "hello").unwrap();
+
+        generate_update_files(temp.path()).unwrap();
+        let bytes = fs::read(temp.path().join("updates.txt")).unwrap();
+        let content = String::from_utf8(bytes).unwrap();
+
+        // charset 行は SOH なし
+        assert!(content.starts_with("charset,UTF-8\r\n"));
+
+        // file 行は SOH 区切り: file,<path>\x01<md5>\x01size=...\x01date=...\x01\r\n
+        let file_line = content.lines().find(|l| l.starts_with("file,")).unwrap();
+        let soh_count = file_line.bytes().filter(|&b| b == 0x01).count();
+        assert!(
+            soh_count >= 3,
+            "file line should have at least 3 SOH delimiters, got {soh_count}: {file_line:?}"
+        );
+    }
+
+    /// ghost/master が存在する場合、updates.txt がそこにもコピーされること
+    #[test]
+    fn test_updates_txt_copied_to_ghost_master() {
+        let temp = TempDir::new().unwrap();
+
+        let ghost_dir = temp.path().join("ghost/master");
+        fs::create_dir_all(&ghost_dir).unwrap();
+        fs::write(ghost_dir.join("descript.txt"), "desc").unwrap();
+
+        generate_update_files(temp.path()).unwrap();
+
+        // ルートに生成
+        assert!(temp.path().join("updates.txt").exists());
+        // ghost/master にもコピー
+        assert!(
+            ghost_dir.join("updates.txt").exists(),
+            "updates.txt should be copied to ghost/master/"
+        );
+
+        // 内容が同一であること
+        let root_content = fs::read_to_string(temp.path().join("updates.txt")).unwrap();
+        let copy_content = fs::read_to_string(ghost_dir.join("updates.txt")).unwrap();
+        assert_eq!(root_content, copy_content);
+    }
+
+    /// サブディレクトリの updates.txt / updates2.dau もファイル一覧から除外されること
+    #[test]
+    fn test_collect_files_excludes_updates_in_subdirs() {
+        let temp = TempDir::new().unwrap();
+
+        let sub = temp.path().join("ghost/master");
+        fs::create_dir_all(&sub).unwrap();
+        fs::write(sub.join("descript.txt"), "desc").unwrap();
+        fs::write(sub.join("updates.txt"), "should be excluded").unwrap();
+        fs::write(sub.join("updates2.dau"), "should be excluded").unwrap();
+
+        let entries = collect_files(temp.path()).unwrap();
+
+        let paths: Vec<&str> = entries.iter().map(|e| e.path.as_str()).collect();
+        assert!(
+            paths.contains(&"ghost/master/descript.txt"),
+            "descript.txt should be included"
+        );
+        assert!(
+            !paths.iter().any(|p| p.contains("updates.txt")),
+            "updates.txt should be excluded from listing"
+        );
+        assert!(
+            !paths.iter().any(|p| p.contains("updates2.dau")),
+            "updates2.dau should be excluded from listing"
+        );
     }
 }
