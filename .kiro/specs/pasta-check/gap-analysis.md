@@ -29,6 +29,7 @@
 - **release.ps1**: Step 5 で `cargo run -p pasta_sample_ghost -- --finalize` を呼び出し。Step 8 で PowerShell NAR 作成。これらが `pasta_check` に置き換わる。
 - **release-workflow 仕様**: タスク一覧の Step 2-A で `cargo publish` 対象を列挙。`pasta_check` を追加する必要あり。
 - **Cargo.toml ワークスペース**: `[workspace.dependencies]` に `pasta_check` 内部依存の追加が必要（md5, encoding_rs 等がワークスペース共通化されていないため、個別指定か新規追加）。
+- **リリース出力先**: 開発フォルダー（`ghosts/hello-pasta`）とは別に `release/hello-pasta/` および `release/hello-pasta.nar` にリリース成果物を出力する構成に変更。既存の `hello-pasta.nar`（クレートルート直下）は削除対象。
 
 ---
 
@@ -41,8 +42,8 @@
 | **Req 3**: release 実行フロー | `release.ps1` Step 2-5, 8（PowerShell） | **Missing**: フォルダー削除→再帰コピー→上書きコピーのロジックを Rust で実装 |
 | **Req 4**: 更新ファイル生成 | `update_files.rs`（完全な実装+テスト） | **移植可能**: 既存コードをほぼそのまま移植可能。依存: `md5 0.8`, `encoding_rs 0.8` |
 | **Req 5**: NAR 作成 | `release.ps1` Step 8（PowerShell） | **Missing**: Rust の ZIP ライブラリ（`zip` クレート）による NAR 作成が必要。`flate2` は gzip のみで ZIP アーカイブ非対応 |
-| **Req 6**: pasta_sample_ghost 分離 | `update_files.rs`, `lib.rs` finalize, `main.rs` --finalize | **削除対象**: `update_files.rs` モジュール全体、`finalize_ghost()` 関数、`--finalize` CLI 処理。`md5`/`encoding_rs` 依存も削除 |
-| **Req 7**: release.ps1 更新 | `release.ps1` Step 5, 8 | **変更**: Step 5（finalize呼び出し）と Step 8（NAR作成）を `pasta_check release` に置換。**注意**: Step 7（バリデーション）は `$GhostDir` 内の `updates.txt`/`updates2.dau` の存在を検証しているが、`pasta_check` 導入後はこれらが `--release` フォルダーに生成されるため影響あり |
+| **Req 6**: pasta_sample_ghost 分離 | `update_files.rs`, `lib.rs` finalize, `main.rs` --finalize, `hello-pasta.nar` | **削除対象**: `update_files.rs` モジュール全体、`finalize_ghost()` 関数、`--finalize` CLI 処理、`md5`/`encoding_rs` 依存、`hello-pasta.nar` |
+| **Req 7**: release.ps1 簡素化 | `release.ps1` Step 2, 4, 5, 7, 8 | **変更**: Step 2, 4（ファイルコピー）、Step 5（finalize）、Step 8（NAR作成）を `pasta_check release` に置換。Step 7（バリデーション）は不要（pasta_check の正常終了で保証） |
 | **Req 8**: release.bat 移動 | `crates/pasta_sample_ghost/release.bat` | **変更**: リポジトリルートに移動、パス解決を調整 |
 | **Req 9**: crates.io 公開 | publish パターン確立済み | **Missing**: `Cargo.toml` で `publish = true` + `description`。`release-workflow` タスクリストへの追加 |
 
