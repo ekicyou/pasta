@@ -35,6 +35,7 @@
     - crates.io (pasta_dsl): `(Invoke-RestMethod https://crates.io/api/v1/crates/pasta_dsl).crate.max_version`
     - crates.io (pasta_lua): `(Invoke-RestMethod https://crates.io/api/v1/crates/pasta_lua).crate.max_version`
     - crates.io (pasta_shiori): `(Invoke-RestMethod https://crates.io/api/v1/crates/pasta_shiori).crate.max_version`
+    - crates.io (pasta_check): `(Invoke-RestMethod https://crates.io/api/v1/crates/pasta_check).crate.max_version`
     - VSCode Marketplace: `npx @vscode/vsce show ekicyou.pasta-vscode 2>&1 | Select-String 'Version:' | ForEach-Object { $_ -replace '.*Version:\s*', '' }`
   - **2-B: 最大バージョンの算出**
     - 上記全ソースから取得した全バージョン文字列（`v` プレフィックス除去後）を比較し、semver ルールで最大値を決定する
@@ -67,16 +68,17 @@
 ### Phase 2: バージョン更新
 
 - [ ] 4. Cargo.toml のバージョン一括更新
-  - ルート `Cargo.toml` の以下5箇所を `replace_string_in_file` で更新する:
+  - ルート `Cargo.toml` の以下6箇所を `replace_string_in_file` で更新する:
     - `[workspace.package].version = "<OLD>"` → `version = "<NEW>"`
     - `pasta_core = { path = "crates/pasta_core", version = "<OLD>" }` → `version = "<NEW>"`
     - `pasta_dsl = { path = "crates/pasta_dsl", version = "<OLD>" }` → `version = "<NEW>"`
     - `pasta_lua = { path = "crates/pasta_lua", version = "<OLD>" }` → `version = "<NEW>"`
     - `pasta_shiori = { path = "crates/pasta_shiori", version = "<OLD>" }` → `version = "<NEW>"`
+    - `pasta_check = { path = "crates/pasta_check", version = "<OLD>" }` → `version = "<NEW>"`
   - `editors/vscode/package.json` の `"version": "<OLD>"` → `"version": "<NEW>"` を `replace_string_in_file` で更新する
   - 更新後、以下のコマンドで実際に書き換えられたことを検証する:
     - `Select-String -Path "Cargo.toml" -Pattern 'version = "<NEW>"'` で `[workspace.package]` のバージョンを確認
-    - `Select-String -Path "Cargo.toml" -Pattern '"pasta_core".*version = "<NEW>"'` 等でワークスペース依存バージョンを確認（4クレート分）
+    - `Select-String -Path "Cargo.toml" -Pattern '"pasta_core".*version = "<NEW>"'` 等でワークスペース依存バージョンを確認（5クレート分: pasta_core, pasta_dsl, pasta_lua, pasta_shiori, pasta_check）
     - `Select-String -Path "editors/vscode/package.json" -Pattern '"version": "<NEW>"'` でVSCode拡張バージョンを確認
   - 検証で `<NEW>` が見つからない箇所があれば、エラーを報告して中止する
   - _Requirements: 2.1, 2.2_
@@ -90,13 +92,14 @@
 ### Phase 3: crates.io 公開
 
 - [ ] 6. 依存関係順での crates.io 公開
-  - 以下の順序でクレートを公開する: `pasta_core` → `pasta_dsl` → `pasta_lua` → `pasta_shiori`
+  - 以下の順序でクレートを公開する: `pasta_core` → `pasta_dsl` → `pasta_lua` → `pasta_shiori` → `pasta_check`
+  - `pasta_check` は他の pasta_* クレートに依存しないバイナリクレートのため、ライブラリクレートの後に公開する
   - 各クレートに対して `cargo publish -p <crate_name>` を実行する
   - 失敗時は段階的バックオフでリトライする（待機 1分→2分→...→10分、最大10回）
   - 各リトライ前に `Start-Sleep -Seconds (N * 60)` で待機する（N=1,2,...,10）
   - 10分待機のリトライでも失敗した場合はエラーを報告し、既に公開済みのクレートはそのまま残して以降を中断、開発者の指示を待つ
-  - 各クレート公開後（最後の `pasta_shiori` を除く）に `Start-Sleep -Seconds 10` で待機する
-  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6_
+  - 各クレート公開後（最後の `pasta_check` を除く）に `Start-Sleep -Seconds 10` で待機する
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7_
 
 ### Phase 3.5: VSCode 拡張公開
 

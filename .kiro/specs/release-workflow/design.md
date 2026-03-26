@@ -72,6 +72,8 @@ graph TB
         P3_3[pasta_lua publish]
         P3_4[10秒待機]
         P3_5[pasta_shiori publish]
+        P3_6[10秒待機]
+        P3_7[pasta_check publish]
     end
 
     subgraph Phase3_5 [Phase 3.5: VSCode Extension]
@@ -170,7 +172,7 @@ sequenceDiagram
     LLM->>Term: git commit
 
     Note over Dev,GH: Phase 3: crates.io 公開
-    loop pasta_core, pasta_dsl, pasta_lua, pasta_shiori
+    loop pasta_core, pasta_dsl, pasta_lua, pasta_shiori, pasta_check
         LLM->>Term: cargo publish -p crate
         alt 失敗（段階的リトライ: 1分→2分→...→10分）
             loop 待機時間を1分ずつ増加（最大10分）
@@ -183,6 +185,7 @@ sequenceDiagram
         end
         LLM->>Term: Start-Sleep 10
     end
+    Note right of LLM: pasta_checkは他のpasta_*クレートに依存しないバイナリ。一番最後に公開
 
     Note over Dev,GH: Phase 4: ゴーストビルド
     LLM->>Term: release.ps1
@@ -287,6 +290,7 @@ flowchart TD
 | 3.4 | リトライ後失敗時中断 | Phase 3 | エラーフロー: Phase 3 |
 | 3.5 | pasta_sample_ghost スキップ | Phase 3 | メインフロー: crates.io 公開 |
 | 3.6 | 公開間10秒待機 | Phase 3 | メインフロー: crates.io 公開 |
+| 3.7 | pasta_check 公開（最後に実行） | Phase 3 | メインフロー: crates.io 公開 |
 | 4.1 | release.ps1 実行 | Phase 4 | メインフロー: ゴーストビルド |
 | 4.2 | hello-pasta.nar 確認 | Phase 4 | メインフロー: ゴーストビルド |
 | 4.3 | pasta.dll 確認 | Phase 4 | メインフロー: ゴーストビルド |

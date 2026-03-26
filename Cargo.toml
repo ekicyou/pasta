@@ -56,6 +56,7 @@ pasta_core = { path = "crates/pasta_core", version = "0.1.21" }
 pasta_dsl = { path = "crates/pasta_dsl", version = "0.1.21" }
 pasta_lua = { path = "crates/pasta_lua", version = "0.1.21" }
 pasta_shiori = { path = "crates/pasta_shiori", version = "0.1.21" }
+pasta_check = { path = "crates/pasta_check", version = "0.1.21" }
 
 # Release profile optimizations for size reduction
 [profile.release]

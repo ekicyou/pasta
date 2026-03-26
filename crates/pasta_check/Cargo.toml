@@ -29,7 +29,7 @@ zip = { version = "8.4", default-features = false, features = ["deflate"] }
 thiserror.workspace = true
 
 # 将来拡張（Lua 単体試験サポート基盤）
-pasta_lua = { path = "../pasta_lua", version = "0.1" }
+pasta_lua.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
