@@ -47,13 +47,8 @@ fn test_skip_when_talking() {
         local dispatcher = require "pasta.shiori.event.virtual_dispatcher"
         dispatcher._reset()
         
-        -- Set up mock scene executor (should never be called when "talking")
-        local scene_results = {
-            OnHour = "hour",
-            OnTalk = "talk"
-        }
         dispatcher._set_scene_executor(function(event_name)
-            return scene_results[event_name]
+            return coroutine.create(function() return event_name end)
         end)
         
         -- Initialize
@@ -64,16 +59,15 @@ fn test_skip_when_talking() {
         } }
         dispatcher.dispatch(act1)
         
-        -- Call at next hour with "talking" status - should skip
+        -- Call at next hour with "talking" status - dispatch() should block
         local act2 = { req = {
             id = "OnSecondChange",
-            status = "talking",  -- Currently talking
-            date = { unix = 1702652400 }  -- Next hour
+            status = "talking",
+            date = { unix = 1702652400, hour = 15 }
         } }
-        local hour_result = dispatcher.check_hour(act2)
-        local talk_result = dispatcher.check_talk(act2)
+        local result = dispatcher.dispatch(act2)
         
-        return hour_result == nil and talk_result == nil
+        return result == nil
     "#,
     );
 
@@ -549,16 +543,15 @@ fn test_skip_when_choosing() {
         } }
         dispatcher.dispatch(act1)
 
-        -- Call at next hour with "choosing" status - should skip both
+        -- Call at next hour with "choosing" status - dispatch() should block
         local act2 = { req = {
             id = "OnSecondChange",
             status = "choosing",
             date = { unix = 1702652400, hour = 15 }
         } }
-        local hour_result = dispatcher.check_hour(act2)
-        local talk_result = dispatcher.check_talk(act2)
+        local result = dispatcher.dispatch(act2)
 
-        return hour_result == nil and talk_result == nil
+        return result == nil
     "#,
     );
 
@@ -591,16 +584,15 @@ fn test_skip_when_csv_talking_choosing() {
         } }
         dispatcher.dispatch(act1)
 
-        -- Call with CSV status containing both talking and choosing
+        -- Call with CSV status containing both talking and choosing - dispatch() should block
         local act2 = { req = {
             id = "OnSecondChange",
             status = "talking,choosing,balloon(0=2)",
             date = { unix = 1702652400, hour = 15 }
         } }
-        local hour_result = dispatcher.check_hour(act2)
-        local talk_result = dispatcher.check_talk(act2)
+        local result = dispatcher.dispatch(act2)
 
-        return hour_result == nil and talk_result == nil
+        return result == nil
     "#,
     );
 

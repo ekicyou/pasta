@@ -283,9 +283,49 @@ local dispatcher = require("pasta.shiori.event.virtual_dispatcher")
 local result = dispatcher.dispatch(act)
 ```
 
+- Statusブロックガードは `dispatch()` 入口で一括判定される。`M.is_blocked(act.req.status)` が `true` を返した場合、即座に `nil` を返して発行をブロックする
 - OnHourを優先判定し、発火しなければOnTalkを判定
 - `act.req.date` フィールドがない場合は `nil` を返却
-- `act.req.status == "talking"` の場合はスキップ
+
+#### ブロック対象 Status キーワード
+
+以下のSSP Statusキーワードが `act.req.status` に含まれている場合、`dispatch()` はイベント発行をブロックする:
+
+| キーワード | 意味 | 対応SSP状態 |
+|-----------|------|------------|
+| `talking` | トーク中 | さくらスクリプト実行中 |
+| `choosing` | 選択肢表示中 | `\q` 選択肢待ち |
+| `online` | ネットワーク通信中 | 更新チェック等 |
+| `opening` | 入力ボックス等が開いている | `opening(communicate)` 等 |
+| `passive` | パッシブモード中 | 他ゴーストから制御中 |
+| `induction` | インダクションモード中 | 他ゴーストを呼び出し中 |
+| `timecritical` | タイムクリティカルセクション中 | `\![set,timecritical]` |
+| `nouserbreak` | ユーザーブレイク禁止中 | `\![set,nouserbreak]` |
+| `minimizing` | 最小化中 | バルーン非表示 |
+
+### is_blocked(status)
+
+SSP Status文字列にブロック対象キーワードが含まれるか判定する汎用公開関数。`dispatch()` で内部使用されるほか、他イベントハンドラからも再利用可能。
+
+```lua
+--- @param status string|nil act.req.status値
+--- @return boolean true=発行ブロック, false=発行許可
+local blocked = dispatcher.is_blocked(status)
+```
+
+**使用例**（他イベントハンドラからの利用）:
+
+```lua
+-- 撫で反応イベントハンドラの例
+local dispatcher = require("pasta.shiori.event.virtual_dispatcher")
+
+---@param act ShioriAct
+---@return thread|nil
+local function handle_touch(act)
+    if dispatcher.is_blocked(act.req.status) then return nil end
+    -- ... 撫で反応処理
+end
+```
 
 ### OnHour — 時報自動発行（4段階フォールバックチェーン）
 
@@ -346,7 +386,7 @@ dispatcher._reset()
 
 -- 内部状態取得
 local state = dispatcher._get_internal_state()
--- { next_hour_unix, next_talk_time, cached_config }
+-- { next_hour_unix, next_talk_time }
 
 -- シーン実行関数のモック差し替え
 dispatcher._set_scene_executor(function(event_name)

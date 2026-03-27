@@ -40,6 +40,7 @@ fn test_virtual_dispatcher_exports_required_functions() {
         return type(dispatcher.dispatch) == "function"
            and type(dispatcher.check_hour) == "function"
            and type(dispatcher.check_talk) == "function"
+           and type(dispatcher.is_blocked) == "function"
            and type(dispatcher._reset) == "function"
            and type(dispatcher._get_internal_state) == "function"
     "#,

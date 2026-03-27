@@ -118,19 +118,6 @@ describe("check_hour function", function()
         expect(type(result)):toBe("thread")
     end)
 
-    test("skips when status is talking", function()
-        setup()
-        -- Initialize
-        local act1 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } })
-        dispatcher.check_hour(act1)
-
-        -- At next hour but talking
-        local act2 = create_mock_act({ id = "OnSecondChange", status = "talking", date = { unix = 1702652400 } })
-        local result = dispatcher.check_hour(act2)
-
-        expect(result):toBe(nil)
-    end)
-
     test("returns nil before hour boundary", function()
         setup()
         -- Initialize
@@ -182,21 +169,6 @@ describe("check_talk function", function()
         local result = dispatcher.check_talk(act2)
 
         expect(type(result)):toBe("thread")
-    end)
-
-    test("skips when status is talking", function()
-        setup()
-        -- Initialize
-        local act1 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } })
-        dispatcher.dispatch(act1)
-
-        local state = dispatcher._get_internal_state()
-
-        -- After interval but talking
-        local act2 = create_mock_act({ id = "OnSecondChange", status = "talking", date = { unix = state.next_talk_time + 1 } })
-        local result = dispatcher.check_talk(act2)
-
-        expect(result):toBe(nil)
     end)
 
     test("skips before interval", function()
@@ -657,140 +629,11 @@ describe("check_hour - HH format", function()
 end)
 
 -- ============================================================================
--- Task 4.1: choosing 状態での OnTalk スキップ・CSV 対応
--- Requirements: 4.1, 4.3, 4.4
+-- ontalk-block-condition: dispatch() 経由のブロック条件テスト
+-- Requirements: 3.1, 3.2, 3.3, 3.4
 -- ============================================================================
 
-describe("check_talk - choosing/CSV status guard", function()
-    local dispatcher
-
-    local function setup()
-        dispatcher = require("pasta.shiori.event.virtual_dispatcher")
-        dispatcher._reset()
-        dispatcher._set_scene_executor(function(event_name)
-            if event_name == "OnTalk" then
-                return coroutine.create(function() return "talk_result" end)
-            end
-            return nil
-        end)
-    end
-
-    test("skips when status is 'choosing' (T1)", function()
-        setup()
-        -- Initialize
-        local act1 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } })
-        dispatcher.dispatch(act1)
-
-        local state = dispatcher._get_internal_state()
-
-        -- After interval but choosing
-        local act2 = create_mock_act({ id = "OnSecondChange", status = "choosing", date = { unix = state.next_talk_time + 1 } })
-        local result = dispatcher.check_talk(act2)
-
-        expect(result):toBe(nil)
-    end)
-
-    test("skips when status is CSV 'talking,choosing,balloon(0=2)' (T3)", function()
-        setup()
-        local act1 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } })
-        dispatcher.dispatch(act1)
-
-        local state = dispatcher._get_internal_state()
-
-        local act2 = create_mock_act({ id = "OnSecondChange", status = "talking,choosing,balloon(0=2)", date = { unix = state.next_talk_time + 1 } })
-        local result = dispatcher.check_talk(act2)
-
-        expect(result):toBe(nil)
-    end)
-
-    test("skips when status is CSV 'talking,balloon(0=0)' (T5)", function()
-        setup()
-        local act1 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } })
-        dispatcher.dispatch(act1)
-
-        local state = dispatcher._get_internal_state()
-
-        local act2 = create_mock_act({ id = "OnSecondChange", status = "talking,balloon(0=0)", date = { unix = state.next_talk_time + 1 } })
-        local result = dispatcher.check_talk(act2)
-
-        expect(result):toBe(nil)
-    end)
-
-    test("does NOT skip when status is 'idle' (T7)", function()
-        setup()
-        local act1 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } })
-        dispatcher.dispatch(act1)
-
-        local state = dispatcher._get_internal_state()
-
-        local act2 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = state.next_talk_time + 1 } })
-        local result = dispatcher.check_talk(act2)
-
-        expect(type(result)):toBe("thread")
-    end)
-end)
-
--- ============================================================================
--- Task 4.2: choosing 状態での OnHour スキップ
--- Requirements: 4.2, 4.3, 4.4
--- ============================================================================
-
-describe("check_hour - choosing/CSV status guard", function()
-    local dispatcher
-
-    local function setup()
-        dispatcher = require("pasta.shiori.event.virtual_dispatcher")
-        dispatcher._reset()
-        dispatcher._set_scene_executor(function(event_name)
-            if event_name == "OnHourOther" then
-                return coroutine.create(function() return "hour_result" end)
-            end
-            return nil
-        end)
-    end
-
-    test("skips when status is 'choosing' (T2)", function()
-        setup()
-        -- Initialize
-        local act1 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } })
-        dispatcher.check_hour(act1)
-
-        -- At next hour but choosing
-        local act2 = create_mock_act({ id = "OnSecondChange", status = "choosing", date = { unix = 1702652400, hour = 15 } })
-        local result = dispatcher.check_hour(act2)
-
-        expect(result):toBe(nil)
-    end)
-
-    test("skips when status is CSV 'talking,choosing,balloon(0=2)' (T4)", function()
-        setup()
-        local act1 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } })
-        dispatcher.check_hour(act1)
-
-        local act2 = create_mock_act({ id = "OnSecondChange", status = "talking,choosing,balloon(0=2)", date = { unix = 1702652400, hour = 15 } })
-        local result = dispatcher.check_hour(act2)
-
-        expect(result):toBe(nil)
-    end)
-
-    test("skips when status is CSV 'talking,balloon(0=0)' (T6)", function()
-        setup()
-        local act1 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } })
-        dispatcher.check_hour(act1)
-
-        local act2 = create_mock_act({ id = "OnSecondChange", status = "talking,balloon(0=0)", date = { unix = 1702652400, hour = 15 } })
-        local result = dispatcher.check_hour(act2)
-
-        expect(result):toBe(nil)
-    end)
-end)
-
--- ============================================================================
--- Task 4.3: タイマー非消費の検証
--- Requirements: 1.2, 2.2
--- ============================================================================
-
-describe("choosing status - timer non-consumption", function()
+describe("dispatch - status block conditions", function()
     local dispatcher
 
     local function setup()
@@ -801,39 +644,165 @@ describe("choosing status - timer non-consumption", function()
         end)
     end
 
-    test("check_talk does not consume next_talk_time when choosing (T8)", function()
+    -- ブロック対象 Status 9件（各キーワード単体）: dispatch() が nil を返す
+    -- Requirements: 3.1
+
+    test("blocks when status is 'talking'", function()
         setup()
-        -- Initialize
         local act1 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } })
         dispatcher.dispatch(act1)
-
-        local state_before = dispatcher._get_internal_state()
-        local saved_talk_time = state_before.next_talk_time
-
-        -- Call with choosing status after interval
-        local act2 = create_mock_act({ id = "OnSecondChange", status = "choosing", date = { unix = saved_talk_time + 1 } })
-        dispatcher.check_talk(act2)
-
-        local state_after = dispatcher._get_internal_state()
-
-        expect(state_after.next_talk_time):toBe(saved_talk_time)
+        local act2 = create_mock_act({ id = "OnSecondChange", status = "talking", date = { unix = 1702652400, hour = 15 } })
+        local result = dispatcher.dispatch(act2)
+        expect(result):toBe(nil)
     end)
 
-    test("check_hour does not consume next_hour_unix when choosing (T9)", function()
+    test("blocks when status is 'choosing'", function()
         setup()
-        -- Initialize
         local act1 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } })
-        dispatcher.check_hour(act1)
+        dispatcher.dispatch(act1)
+        local act2 = create_mock_act({ id = "OnSecondChange", status = "choosing", date = { unix = 1702652400, hour = 15 } })
+        local result = dispatcher.dispatch(act2)
+        expect(result):toBe(nil)
+    end)
 
-        local state_before = dispatcher._get_internal_state()
-        local saved_hour_unix = state_before.next_hour_unix
+    test("blocks when status is 'online'", function()
+        setup()
+        local act1 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } })
+        dispatcher.dispatch(act1)
+        local act2 = create_mock_act({ id = "OnSecondChange", status = "online", date = { unix = 1702652400, hour = 15 } })
+        local result = dispatcher.dispatch(act2)
+        expect(result):toBe(nil)
+    end)
 
-        -- Call with choosing status at next hour
-        local act2 = create_mock_act({ id = "OnSecondChange", status = "choosing", date = { unix = saved_hour_unix + 1, hour = 15 } })
-        dispatcher.check_hour(act2)
+    test("blocks when status is 'opening(communicate)'", function()
+        setup()
+        local act1 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } })
+        dispatcher.dispatch(act1)
+        local act2 = create_mock_act({ id = "OnSecondChange", status = "opening(communicate)", date = { unix = 1702652400, hour = 15 } })
+        local result = dispatcher.dispatch(act2)
+        expect(result):toBe(nil)
+    end)
 
-        local state_after = dispatcher._get_internal_state()
+    test("blocks when status is 'passive'", function()
+        setup()
+        local act1 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } })
+        dispatcher.dispatch(act1)
+        local act2 = create_mock_act({ id = "OnSecondChange", status = "passive", date = { unix = 1702652400, hour = 15 } })
+        local result = dispatcher.dispatch(act2)
+        expect(result):toBe(nil)
+    end)
 
-        expect(state_after.next_hour_unix):toBe(saved_hour_unix)
+    test("blocks when status is 'induction'", function()
+        setup()
+        local act1 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } })
+        dispatcher.dispatch(act1)
+        local act2 = create_mock_act({ id = "OnSecondChange", status = "induction", date = { unix = 1702652400, hour = 15 } })
+        local result = dispatcher.dispatch(act2)
+        expect(result):toBe(nil)
+    end)
+
+    test("blocks when status is 'timecritical'", function()
+        setup()
+        local act1 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } })
+        dispatcher.dispatch(act1)
+        local act2 = create_mock_act({ id = "OnSecondChange", status = "timecritical", date = { unix = 1702652400, hour = 15 } })
+        local result = dispatcher.dispatch(act2)
+        expect(result):toBe(nil)
+    end)
+
+    test("blocks when status is 'nouserbreak'", function()
+        setup()
+        local act1 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } })
+        dispatcher.dispatch(act1)
+        local act2 = create_mock_act({ id = "OnSecondChange", status = "nouserbreak", date = { unix = 1702652400, hour = 15 } })
+        local result = dispatcher.dispatch(act2)
+        expect(result):toBe(nil)
+    end)
+
+    test("blocks when status is 'minimizing'", function()
+        setup()
+        local act1 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } })
+        dispatcher.dispatch(act1)
+        local act2 = create_mock_act({ id = "OnSecondChange", status = "minimizing", date = { unix = 1702652400, hour = 15 } })
+        local result = dispatcher.dispatch(act2)
+        expect(result):toBe(nil)
+    end)
+
+    -- 複合 Status 2件: dispatch() が nil を返す
+    -- Requirements: 3.2
+
+    test("blocks when compound status contains 'choosing'", function()
+        setup()
+        local act1 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } })
+        dispatcher.dispatch(act1)
+        local act2 = create_mock_act({ id = "OnSecondChange", status = "choosing,balloon(0=0)", date = { unix = 1702652400, hour = 15 } })
+        local result = dispatcher.dispatch(act2)
+        expect(result):toBe(nil)
+    end)
+
+    test("blocks when compound status contains 'online'", function()
+        setup()
+        local act1 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } })
+        dispatcher.dispatch(act1)
+        local act2 = create_mock_act({ id = "OnSecondChange", status = "online,balloon(1=2)", date = { unix = 1702652400, hour = 15 } })
+        local result = dispatcher.dispatch(act2)
+        expect(result):toBe(nil)
+    end)
+
+    -- 非ブロック Status 4件: dispatch() が nil 以外を返す
+    -- Requirements: 3.3
+
+    test("does not block when status is nil", function()
+        setup()
+        local act1 = create_mock_act({ id = "OnSecondChange", status = nil, date = { unix = 1702648800 } })
+        dispatcher.dispatch(act1)
+        local act2 = create_mock_act({ id = "OnSecondChange", status = nil, date = { unix = 1702652400, hour = 15 } })
+        local result = dispatcher.dispatch(act2)
+        expect(result ~= nil):toBe(true)
+    end)
+
+    test("does not block when status is empty string", function()
+        setup()
+        local act1 = create_mock_act({ id = "OnSecondChange", status = "", date = { unix = 1702648800 } })
+        dispatcher.dispatch(act1)
+        local act2 = create_mock_act({ id = "OnSecondChange", status = "", date = { unix = 1702652400, hour = 15 } })
+        local result = dispatcher.dispatch(act2)
+        expect(result ~= nil):toBe(true)
+    end)
+
+    test("does not block when status is 'idle'", function()
+        setup()
+        local act1 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = 1702648800 } })
+        dispatcher.dispatch(act1)
+        local act2 = create_mock_act({ id = "OnSecondChange", status = "idle", date = { unix = 1702652400, hour = 15 } })
+        local result = dispatcher.dispatch(act2)
+        expect(result ~= nil):toBe(true)
+    end)
+
+    test("does not block when status is 'balloon(0=0)'", function()
+        setup()
+        local act1 = create_mock_act({ id = "OnSecondChange", status = "balloon(0=0)", date = { unix = 1702648800 } })
+        dispatcher.dispatch(act1)
+        local act2 = create_mock_act({ id = "OnSecondChange", status = "balloon(0=0)", date = { unix = 1702652400, hour = 15 } })
+        local result = dispatcher.dispatch(act2)
+        expect(result ~= nil):toBe(true)
+    end)
+
+    -- M.is_blocked() 直接呼び出し 3件
+    -- Requirements: 3.4
+
+    test("is_blocked returns true for 'talking'", function()
+        setup()
+        expect(dispatcher.is_blocked("talking")):toBe(true)
+    end)
+
+    test("is_blocked returns false for 'idle'", function()
+        setup()
+        expect(dispatcher.is_blocked("idle")):toBe(false)
+    end)
+
+    test("is_blocked returns false for nil", function()
+        setup()
+        expect(dispatcher.is_blocked(nil)):toBe(false)
     end)
 end)

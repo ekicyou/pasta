@@ -26,6 +26,19 @@ local M = {}
 
 -- 4. 内部関数
 
+-- ブロック対象SSP Statusキーワード一覧
+local BLOCKED_STATUSES = {
+    "talking",
+    "choosing",
+    "online",
+    "opening",
+    "passive",
+    "induction",
+    "timecritical",
+    "nouserbreak",
+    "minimizing",
+}
+
 --- 設定を読み込む（SAVE > toml > hardcoded の3段フォールバック）
 --- キャッシュなし：毎回 SAVE テーブルを読み直すことで実行時変更を即時反映
 ---@return table 設定テーブル
@@ -109,6 +122,18 @@ end
 
 -- 5. 公開関数
 
+--- Status文字列にブロック対象キーワードが含まれるか判定
+---@param status string|nil act.req.status値
+---@return boolean true=発行ブロック, false=発行許可
+function M.is_blocked(status)
+    for _, keyword in ipairs(BLOCKED_STATUSES) do
+        if has_status(status, keyword) then
+            return true
+        end
+    end
+    return false
+end
+
 --- OnHour 判定・発行（thread返却形式）
 ---@param act ShioriAct actオブジェクト（act.req でリクエスト情報にアクセス）
 ---@return thread|nil コルーチンまたはnil
@@ -123,14 +148,6 @@ function M.check_hour(act)
 
     -- 正時未到達
     if current_unix < next_hour_unix then
-        return nil
-    end
-
-    -- トーク中・選択中はスキップ（SSPからの状態情報を使用）
-    if has_status(act.req.status, "talking") then
-        return nil
-    end
-    if has_status(act.req.status, "choosing") then
         return nil
     end
 
@@ -159,14 +176,6 @@ end
 function M.check_talk(act)
     local current_unix = act.req.date.unix
     local cfg = get_config()
-
-    -- トーク中・選択中はスキップ（SSPからの状態情報を使用）
-    if has_status(act.req.status, "talking") then
-        return nil
-    end
-    if has_status(act.req.status, "choosing") then
-        return nil
-    end
 
     -- 初回または次回トーク時刻未設定
     if next_talk_time == 0 then
@@ -205,6 +214,11 @@ end
 function M.dispatch(act)
     -- act.req.date 存在チェック
     if not act.req or not act.req.date then
+        return nil
+    end
+
+    -- Statusブロックガード（dispatch入口で一括判定）
+    if M.is_blocked(act.req.status) then
         return nil
     end
 
