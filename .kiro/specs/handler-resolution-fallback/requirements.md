@@ -42,12 +42,12 @@
 1. When `PROXY_IMPL.find_handler()` がアクタープロキシ経由で呼び出された場合, the pasta runtime shall 最初にアクターレベル検索（`find_actor_handler`）を実行し、マッチすれば即座に確定する
 2. While `mode` が `"word"` であるとき, the pasta runtime shall アクターレベル検索において、`proxy.actor.XX` の完全一致を最優先で検索する（アクター解決はアクション行のword解決にのみ影響するため、word モード限定）
 3. While `mode` が `"word"` であるとき, the pasta runtime shall アクターレベル検索において、アクター単語辞書（前方一致）も検索対象に含める
-4. The pasta runtime shall `scene.XX` の完全一致をすべてのモードで最優先で検索する
-5. The pasta runtime shall `GLOBAL.XX` の完全一致をすべてのモードで `scene.XX` の次に検索する（完全一致をまとめて先に解決することで、GLOBAL定義が辞書よりも常に優先されるという直感的な挙動をゴースト開発者に保証するため）
-6. While `mode` が `"word"` であるとき, the pasta runtime shall ローカル単語辞書（前方一致）を検索する
-7. While `mode` が `"scene"` または `"expr"` であるとき, the pasta runtime shall ローカルシーン辞書（前方一致）を検索する
-8. While `mode` が `"word"` であるとき, the pasta runtime shall グローバル単語辞書（前方一致）を検索する
-9. While `mode` が `"scene"` または `"expr"` であるとき, the pasta runtime shall グローバルシーン辞書（前方一致）を検索する
+4. The pasta runtime shall `scene.XX` の完全一致をすべてのモードで最優先で検索する（ローカルスコープ・完全一致）
+5. While `mode` が `"word"` であるとき, the pasta runtime shall ローカル単語辞書（前方一致）を検索する（ローカルスコープ・前方一致）
+6. While `mode` が `"scene"` または `"expr"` であるとき, the pasta runtime shall ローカルシーン辞書（前方一致）を検索する（ローカルスコープ・前方一致）
+7. The pasta runtime shall `GLOBAL.XX` の完全一致をすべてのモードでローカルスコープ解決の次に検索する（グローバルスコープ・完全一致）
+8. While `mode` が `"word"` であるとき, the pasta runtime shall グローバル単語辞書（前方一致）を検索する（グローバルスコープ・前方一致）
+9. While `mode` が `"scene"` または `"expr"` であるとき, the pasta runtime shall グローバルシーン辞書（前方一致）を検索する（グローバルスコープ・前方一致）
 10. The pasta runtime shall すべての辞書検索でマッチしなかった場合、`act.XX`（`find_act_handler` の自身メソッド）の完全一致を `function` 型に限り、すべてのモードで検索する（`SHIORI_ACT_IMPL.transfer_req_to_var` 等のサブクラスメソッドへのフォールバックを保証するため）
 11. If いずれの検索でもマッチしない場合, the pasta runtime shall `nil` を返却する
 
