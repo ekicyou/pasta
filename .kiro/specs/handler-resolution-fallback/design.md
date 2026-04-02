@@ -39,10 +39,11 @@ PROXY_IMPL.word(name)       ─── 3段階+act:word()委譲
 
 **維持する既存パターン**:
 - `@pasta_search` の pcall 保護パターン
-- `WORD.resolve_value()` による関数/値の型判定
 - `SCENE.co_exec()` によるコルーチン化
 - `ACT_IMPL.__index` のメタテーブル経由アクタープロキシ生成
 - `SHIORI_ACT_IMPL` → `ACT_IMPL` の継承チェーン
+
+> **注**: `WORD.resolve_value()` は本フィーチャーで廃止。ポストプロセス（word モード: function/その他 の2分岐）はインライン実装に移行する。table→先頭要素ロジックは `SEARCH:search_word()` の Rust 側で完結しているためポストプロセス層では不要。
 
 ### Architecture Pattern & Boundary Map
 
@@ -275,6 +276,7 @@ function ACT_IMPL.find_act_handler(self, mode, key)
 - `self.current_scene[key]` の nil チェック（current_scene が nil の場合をガード）
 - `self[key]`（act.XX）は `type(method) == "function"` チェック付き。メタテーブル経由で SHIORI_ACT_IMPL のメソッドも検索される
 - `@pasta_search` 未実装時、前方一致レベル（2, 5）はすべてスキップ
+- **SCENE.search スコープ**: `SCENE.search(key, scope, nil)` の `scope` には `SCENE.__global_name__` を使用する。トランスパイラ（`element_gen.rs` L.105, L.114）は `act:call()` の第1引数を**常に `SCENE.__global_name__`** として生成するため、`find_act_handler` がこれをパラメータとして受け取る必要はない。ローカル前方一致（Level 2）は `SCENE.__global_name__`、グローバル前方一致（Level 5）は `nil` としてそれぞれ渡す。
 
 ---
 
