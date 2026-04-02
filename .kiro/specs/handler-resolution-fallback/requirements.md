@@ -45,10 +45,10 @@
 4. The pasta runtime shall `scene.XX` の完全一致をすべてのモードで最優先で検索する（ローカルスコープ・完全一致）
 5. While `mode` が `"word"` であるとき, the pasta runtime shall ローカル単語辞書（前方一致）を検索する（ローカルスコープ・前方一致）
 6. While `mode` が `"scene"` または `"expr"` であるとき, the pasta runtime shall ローカルシーン辞書（前方一致）を検索する（ローカルスコープ・前方一致）
-7. The pasta runtime shall `GLOBAL.XX` の完全一致をすべてのモードでローカルスコープ解決の次に検索する（グローバルスコープ・完全一致）
-8. While `mode` が `"word"` であるとき, the pasta runtime shall グローバル単語辞書（前方一致）を検索する（グローバルスコープ・前方一致）
-9. While `mode` が `"scene"` または `"expr"` であるとき, the pasta runtime shall グローバルシーン辞書（前方一致）を検索する（グローバルスコープ・前方一致）
-10. The pasta runtime shall すべての辞書検索でマッチしなかった場合、`act.XX`（`find_act_handler` の自身メソッド）の完全一致を `function` 型に限り、すべてのモードで検索する（`SHIORI_ACT_IMPL.transfer_req_to_var` 等のサブクラスメソッドへのフォールバックを保証するため）
+7. The pasta runtime shall `act.XX`（`find_act_handler` の自身メソッド）の完全一致を `function` 型に限り、ローカルスコープ解決の次・グローバルスコープより前に、すべてのモードで検索する（`transfer_req_to_var` 等のランタイム内部メソッドはゴースト開発者による上書きを想定しないため、GLOBAL より保護された位置に置く）
+8. The pasta runtime shall `GLOBAL.XX` の完全一致をすべてのモードで検索する（グローバルスコープ・完全一致）
+9. While `mode` が `"word"` であるとき, the pasta runtime shall グローバル単語辞書（前方一致）を検索する（グローバルスコープ・前方一致）
+10. While `mode` が `"scene"` または `"expr"` であるとき, the pasta runtime shall グローバルシーン辞書（前方一致）を検索する（グローバルスコープ・前方一致）
 11. If いずれの検索でもマッチしない場合, the pasta runtime shall `nil` を返却する
 
 ### Requirement 3: モード別ポストプロセス（ハンドラー取得後の処理）
