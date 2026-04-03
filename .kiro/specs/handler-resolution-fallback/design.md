@@ -367,6 +367,7 @@ end
 
 **Responsibilities & Constraints**
 - ポストプロセスは各公開メソッド（`word()` / `call()` / `expr_fn()`）内でインラインに実装。独立関数ではない
+- **共有不可の理由**: ① word は `tostring(h)` 分岐を持つが expr/scene は持たない ② word の caller は `self.act`（PROXY経由）だが expr は `self`（proxy自身） ③ expr_fn と call は構造が同じだがファイルが分かれている（act.lua vs actor.lua）。よって `local function` では共有できない
 - 各モードの型判定ルール:
 
 | モード | handler型 | 処理 |
