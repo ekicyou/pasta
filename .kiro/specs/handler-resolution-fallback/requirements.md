@@ -63,7 +63,7 @@
 3. When ハンドラー `h` がその他の型の場合, the pasta runtime shall `tostring(h)` を返す
 
 ##### シーンモード (`"scene"`)
-4. When ハンドラー `h` が `function` 型の場合, the pasta runtime shall コルーチン化して実行する
+4. When ハンドラー `h` が `function` 型の場合, the pasta runtime shall `call()` 内で `handler(self, ...)` を直接呼び出して戻り値を返す（`act:call()` はすでに `SCENE.co_exec()` によるコルーチン内で呼ばれるため、ここで再度コルーチン化しない）
 5. If ハンドラー `h` が `function` 型でない場合, the pasta runtime shall key が見つからないエラーログを出力し、何もせず return する
 
 ##### Exprモード (`"expr"`)
@@ -98,7 +98,7 @@
 
 1. The pasta runtime shall `ACT_IMPL.word()` を `find_handler(act, "word", key)` + ワードモードポストプロセスで再実装する
 2. The pasta runtime shall `PROXY_IMPL.word()` を `find_handler(proxy, "word", key)` + ワードモードポストプロセスで再実装する
-3. The pasta runtime shall `ACT_IMPL.find_scene()` を `find_handler(act, "scene", key)` + シーンモードポストプロセスで再実装する
+3. The pasta runtime shall `ACT_IMPL.find_scene()` を `find_handler(act, "scene", key)` の thin wrapper として再実装する（ハンドラーを返すのみ。コルーチン化は呼び出し元 `SCENE.co_exec()` の責務であり `find_scene()` 内では行わない）
 4. The pasta runtime shall 既存の全テスト（950+件）がリファクタリング後も通過する
 
 ### Requirement 7: エラーハンドリングとログ出力

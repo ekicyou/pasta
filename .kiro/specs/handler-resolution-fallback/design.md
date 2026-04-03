@@ -483,8 +483,8 @@ end
 |--------------|--------|-------|
 | `ACT_IMPL.word(name)` | 4段階独自検索 + WORD.resolve_value | `find_handler("word", name)` + word ポストプロセス |
 | `PROXY_IMPL.word(name)` | 3段階 + act:word() 委譲 | `find_handler("word", name)` + word ポストプロセス |
-| `ACT_IMPL.find_scene(key, ...)` | 5段階独自検索 | `find_handler("scene", key)` の結果を返却 |
-| `ACT_IMPL.call(key, ...)` | find_scene + handler 実行 | `find_handler("scene", key)` + scene ポストプロセス |
+| `ACT_IMPL.find_scene(key, ...)` | 5段階独自検索 | `find_handler("scene", key)` の thin wrapper（ハンドラーを返すのみ） |
+| `ACT_IMPL.call(key, ...)` | find_scene + handler 実行 | `find_handler("scene", key)` → ハンドラーを `handler(self, ...)` で直接実行（`call()` はすでに `SCENE.co_exec()` によるコルーチン内で呼ばれるため再度コルーチン化しない） |
 
 - `ACT_IMPL.find_scene()` は `find_handler("scene", key)` のラッパーとして残す（`call()` からの呼び出し互換性のため）
 - `PROXY_IMPL.word()` の `act:word()` 委譲は不要になる（`find_handler` がアクターレベル → actレベルを一貫して検索）
