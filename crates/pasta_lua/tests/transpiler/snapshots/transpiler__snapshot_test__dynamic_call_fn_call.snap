@@ -12,6 +12,6 @@ do
         local args = { ... }
         local save, var = act:init_scene(SCENE)
 
-        return act:call(SCENE.__global_name__, tostring(SCENE.func(act)), {}, table.unpack(args))
+        return act:call(SCENE.__global_name__, tostring(act:expr_fn("func")), {}, table.unpack(args))
     end
 end

@@ -91,6 +91,10 @@ describe("Integration - DSL scene priority over GLOBAL", function()
         package.loaded["pasta.global"] = nil
         package.loaded["pasta.scene"] = nil
 
+        -- @pasta_search スタブ: find_act_handler の SEARCH ガードを通過させる
+        -- SCENE.search はテスト内でモックするため実際には呼ばれない
+        package.loaded["@pasta_search"] = { search_scene = function() end, search_word = function() return nil end }
+
         STORE = require("pasta.store")
         EVENT = require("pasta.shiori.event")
         SCENE = require("pasta.scene")
@@ -100,17 +104,17 @@ describe("Integration - DSL scene priority over GLOBAL", function()
         STORE.co_scene = nil
     end
 
-    test("DSL ラベルと GLOBAL の両方がある場合、DSL が優先される", function()
+    test("GLOBAL (L4) はグローバル辞書 (L5) より優先される", function()
         setup()
 
-        -- L3: GLOBAL に登録
+        -- L4: GLOBAL に登録（current_scene=nil のため L2 はスキップ、L4 が先に当たる）
         local global_called = false
         GLOBAL.OnPriorityTest = function(act)
             global_called = true
             act:talk(act.actors.sakura, "GLOBAL版")
         end
 
-        -- L2: SCENE.search をモックして DSL シーンを返す
+        -- L5: SCENE.search をモック（グローバル辞書前方一致）
         local dsl_called = false
         local dsl_scene_fn = function(act)
             dsl_called = true
@@ -130,10 +134,10 @@ describe("Integration - DSL scene priority over GLOBAL", function()
 
         local response = EVENT.fire({ id = "OnPriorityTest", method = "get", version = 30 })
 
-        -- DSL が呼ばれ、GLOBAL は呼ばれない
-        expect(dsl_called):toBe(true)
-        expect(global_called):toBe(false)
-        expect(response:find("DSL版")).not_:toBe(nil)
+        -- GLOBAL (L4) が先に当たる。グローバル辞書 (L5) は呼ばれない
+        expect(global_called):toBe(true)
+        expect(dsl_called):toBe(false)
+        expect(response:find("GLOBAL版")).not_:toBe(nil)
 
         SCENE.search = original_search
         GLOBAL.OnPriorityTest = nil

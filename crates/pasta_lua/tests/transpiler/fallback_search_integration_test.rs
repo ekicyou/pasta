@@ -200,6 +200,16 @@ fn setup_runtime() -> mlua::Lua {
     lua.load(&format!(
         r#"
         package.path = "{scripts_dir}/?.lua;{scripts_dir}/?/init.lua;" .. package.path
+        -- @pasta_log スタブ（テスト環境用）
+        package.preload["@pasta_log"] = function()
+            local log = {{}}
+            function log.trace(msg) end
+            function log.debug(msg) end
+            function log.info(msg) end
+            function log.warn(msg) end
+            function log.error(msg) end
+            return log
+        end
         "#
     ))
     .exec()

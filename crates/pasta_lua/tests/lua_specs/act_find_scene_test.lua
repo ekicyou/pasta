@@ -52,9 +52,9 @@ describe("act:find_scene - Level 2 (SCENE.search scoped)", function()
         end
 
         local act = ACT.new({})
-        act.current_scene = {} -- L1 miss
+        act.current_scene = { __global_name__ = "my_scope" } -- L1 miss, scope from __global_name__
 
-        local result = act:find_scene("target", "my_scope")
+        local result = act:find_scene("target")
         expect(result):toBe(handler)
 
         SCENE.search = original_search
@@ -67,7 +67,7 @@ describe("act:find_scene - Level 2 (SCENE.search scoped)", function()
         local act = ACT.new({})
         act.current_scene = {}
 
-        local result = act:find_scene("target", "scope")
+        local result = act:find_scene("target")
         expect(result):toBe(nil)
 
         SCENE.search = original_search
@@ -131,11 +131,11 @@ describe("act:find_scene - Level 5 (SCENE.search scopeless)", function()
         end
 
         local act = ACT.new({})
-        act.current_scene = {} -- L1 miss
+        act.current_scene = { __global_name__ = "some_scope" } -- L1 miss, scope from __global_name__
         -- L3: GLOBAL に未登録
         -- L4: act メソッドなし
 
-        local result = act:find_scene("fallback_key", "some_scope")
+        local result = act:find_scene("fallback_key")
         expect(result):toBe(handler)
 
         -- L2 と L5 の 2 回呼ばれていることを確認
@@ -158,7 +158,7 @@ describe("act:find_scene - all levels miss", function()
         local act = ACT.new({})
         act.current_scene = {}
 
-        local result = act:find_scene("nonexistent_key_xyz", "scope")
+        local result = act:find_scene("nonexistent_key_xyz")
         expect(result):toBe(nil)
 
         SCENE.search = original_search

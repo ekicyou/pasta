@@ -237,12 +237,88 @@ function ACT_IMPL.clear(self)
     return self
 end
 
---- 単語検索（アクター非依存、4レベル検索）
---- 検索順序:
---- 1. シーンテーブル完全一致 (current_scene[name])
---- 2. GLOBAL完全一致 (GLOBAL[name])
---- 3. シーンローカル辞書前方一致 (SEARCH:search_word(name, scene_name))
---- 4. グローバル辞書前方一致 (SEARCH:search_word(name, nil))
+--- ハンドラーフォールバック検索コア（6段階）
+---
+--- 検索レベル:
+--- L1: current_scene[key] 完全一致（全モード共通）
+--- L2: ローカル辞書前方一致（word: search_word(key, scene_name)、scene/expr: SCENE.search(key, scene_name)）
+--- L3: ACT_IMPL[key] function型のみ（act.XX フォールバック。全モード共通）
+--- L4: GLOBAL[key] 完全一致（全モード共通）
+--- L5: グローバル辞書前方一致（word: search_word(key, nil)、scene/expr: SCENE.search(key, nil)）
+--- word モードの @pasta_search 未利用時はL2・L5 word 前方一致をスキップ
+--- scene/expr モードは SCENE.search を直接呼び出す（@pasta_search 可用性チェックは package.loaded 参照）
+---
+--- @param self Act アクションオブジェクト
+--- @param mode string "word" | "scene" | "expr"
+--- @param key string 検索キー
+--- @return any|nil 見つかったハンドラー（関数または値）、またはnil
+function ACT_IMPL.find_act_handler(self, mode, key)
+    -- @pasta_search 可用性チェック（オプショナルモジュールのため pcall による1回チェック・値保持）
+    local ok, SEARCH = pcall(require, "@pasta_search")
+    if not ok then SEARCH = nil end
+
+    -- L1: current_scene[key] 完全一致
+    if self.current_scene and self.current_scene[key] ~= nil then
+        return self.current_scene[key]
+    end
+
+    -- L2: ローカル辞書前方一致
+    local scene_name = self.current_scene and self.current_scene.__global_name__
+    if mode == "word" then
+        -- word モード: @pasta_search.search_word が必須（未利用時はスキップ）
+        if SEARCH and scene_name then
+            local result = SEARCH:search_word(key, scene_name)
+            if result ~= nil then return result end
+        end
+    else
+        -- scene / expr モード: @pasta_search 利用可能かつ scene_name あり時のみ
+        if SEARCH and scene_name then
+            local result = SCENE.search(key, scene_name)
+            if result then return result.func end
+        end
+    end
+
+    -- L3: self[key] function型のみ（act.XX / SHIORI_ACT_IMPL 継承チェーンを含む）
+    local method = self[key]
+    if type(method) == "function" then
+        return method
+    end
+
+    -- L4: GLOBAL[key] 完全一致（全モード共通）
+    if GLOBAL[key] ~= nil then
+        return GLOBAL[key]
+    end
+
+    -- L5: グローバル辞書前方一致（word: search_word(key, nil)、scene/expr: SCENE.search(key, nil)）
+    if mode == "word" then
+        -- word モード: @pasta_search.search_word が必須
+        if SEARCH then
+            local result = SEARCH:search_word(key, nil)
+            if result ~= nil then return result end
+        end
+    else
+        -- scene / expr モード: @pasta_search 利用可能時のみ
+        if SEARCH then
+            local result = SCENE.search(key, nil)
+            if result then return result.func end
+        end
+    end
+
+    return nil
+end
+
+--- find_act_handler への thin wrapper（ACT_IMPL.find_handler）
+--- @param self Act アクションオブジェクト
+--- @param mode string "word" | "scene" | "expr"
+--- @param key string 検索キー
+--- @return any|nil
+function ACT_IMPL.find_handler(self, mode, key)
+    return self:find_act_handler(mode, key)
+end
+
+--- 単語取得（find_handler + word ポストプロセス）
+--- 検索順序は find_act_handler の6段階フォールバック（word モード）
+--- ポストプロセス: handler=nil → warn+nil、function → h(self)、その他 → tostring(h)
 --- @param self Act アクションオブジェクト
 --- @param name string 単語名
 --- @return string|nil 見つかった単語、またはnil
@@ -251,39 +327,32 @@ function ACT_IMPL.word(self, name)
         return nil
     end
 
-    local WORD = require("pasta.word")
-
-    -- 1. シーンテーブル完全一致
-    if self.current_scene and self.current_scene[name] ~= nil then
-        local value = self.current_scene[name]
-        return WORD.resolve_value(value, self)
+    local handler = self:find_handler("word", name)
+    if handler == nil then
+        log.warn(string.format("act:word - handler not found: key='%s', mode='word', via=act",
+            tostring(name)))
+        return nil
     end
-
-    -- 2. GLOBAL完全一致
-    if GLOBAL[name] ~= nil then
-        local value = GLOBAL[name]
-        return WORD.resolve_value(value, self)
+    if type(handler) == "function" then
+        return handler(self)
     end
+    return tostring(handler)
+end
 
-    -- 3 & 4. SEARCH API を使用した前方一致検索（利用可能な場合のみ）
-    local ok, SEARCH = pcall(require, "@pasta_search")
-    if ok and SEARCH then
-        -- 3. シーンローカル辞書（前方一致）
-        local scene_name = self.current_scene and self.current_scene.__global_name__
-        if scene_name then
-            local result = SEARCH:search_word(name, scene_name)
-            if result then
-                return result -- SEARCH APIは既に文字列を返す
-            end
-        end
-
-        -- 4. グローバル辞書（前方一致）
-        local result = SEARCH:search_word(name, nil)
-        if result then
-            return result -- SEARCH APIは既に文字列を返す
-        end
+--- expr関数呼び出し（find_handler + expr ポストプロセス）
+--- find_handler("expr", key) でハンドラーを取得してポストプロセスを実行する。
+--- ポストプロセス: function → h(self, ...) 可変引数を伝搬、非function → warn+nil
+--- @param self Act アクションオブジェクト
+--- @param key string 関数名
+--- @param ... any 可変引数（ハンドラーに伝搬）
+--- @return any ハンドラーの戻り値、またはnil
+function ACT_IMPL.expr_fn(self, key, ...)
+    local handler = self:find_handler("expr", key)
+    if type(handler) == "function" then
+        return handler(self, ...)
     end
-
+    log.warn(string.format("act:expr_fn - handler not found: key='%s', mode='expr', via=act",
+        tostring(key)))
     return nil
 end
 
@@ -317,75 +386,30 @@ function ACT_IMPL.yield(self)
     return self
 end
 
---- シーン名前解決（5段階フォールバック検索）
+--- シーン名前解決（find_handler への thin wrapper）
 ---
 --- キーに対応するハンドラー関数を検索して返す（実行しない）。
---- 5段階の優先順位に従い、最初に見つかった有効な関数を返す。
---- Level 1: シーンローカル検索 (current_scene[key])
---- Level 2: グローバルシーン名スコープ検索 (SCENE.search(key, scope))
---- Level 3: GLOBALテーブル (GLOBAL[key])
---- Level 4: actメソッドフォールバック (self[key])
---- Level 5: スコープなし全体検索 (SCENE.search(key, nil))
+--- find_handler("scene", key) に委譲する。
+--- コルーチン化は呼び出し元 SCENE.co_exec の責務。
 ---
 --- @param self Act アクションオブジェクト
 --- @param key string 検索キー（シーン名/関数名）
---- @param global_scene_name string|nil グローバルシーンスコープ（省略時 nil）
---- @param attrs table|nil 属性テーブル（将来拡張用、現在は未使用）
+--- @param global_scene_name string|nil 互換性のため残す（未使用）
+--- @param attrs table|nil 属性テーブル（互換性のため残す・未使用）
 --- @return function|nil 見つかったハンドラ関数、またはnil
 function ACT_IMPL.find_scene(self, key, global_scene_name, attrs)
-    local handler = nil
-
-    -- Level 1: シーンローカル検索
-    if self.current_scene then
-        handler = self.current_scene[key]
-    end
-
-    -- Level 2: グローバルシーン名スコープ検索
-    if not handler then
-        local result = SCENE.search(key, global_scene_name, attrs)
-        if result then
-            handler = result.func
-        end
-    end
-
-    -- Level 3: グローバル関数モジュール
-    if not handler then
-        handler = GLOBAL[key]
-    end
-
-    -- Level 4: actメソッドフォールバック
-    if not handler then
-        local method = self[key]
-        if type(method) == "function" then
-            handler = method
-        end
-    end
-
-    -- Level 5: スコープなし全体検索（フォールバック）
-    if not handler then
-        local result = SCENE.search(key, nil, attrs)
-        if result then
-            handler = result.func
-        end
-    end
-
-    return handler
+    return self:find_handler("scene", key)
 end
 
---- シーン呼び出し（5段階検索）
+--- シーン呼び出し（find_handler 委譲 + scene ポストプロセス）
 ---
 --- トランスパイラ出力から呼び出され、キーに対応するハンドラーを検索して実行する。
---- 5段階の優先順位に従い、最初に見つかった有効な関数を実行する。
---- Level 1: シーンローカル検索
---- Level 2: グローバルシーン名スコープ検索
---- Level 3: GLOBALテーブル
---- Level 4: actメソッドフォールバック
---- Level 5: スコープなし全体検索
+--- find_handler("scene", key) でハンドラーを取得し、function なら直接呼ぶ。
 ---
 --- @param self Act アクションオブジェクト
---- @param global_scene_name string|nil グローバルシーン名
+--- @param global_scene_name string|nil グローバルシーン名（互換性のため残す・未使用）
 --- @param key string 検索キー
---- @param attrs table|nil 属性テーブル（将来拡張用、現在は未使用）
+--- @param attrs table|nil 属性テーブル（互換性のため残す・未使用）
 --- @param ... any 可変長引数（ハンドラーに渡す）
 --- @return any ハンドラーの戻り値、またはnil
 function ACT_IMPL.call(self, global_scene_name, key, attrs, ...)
@@ -395,15 +419,15 @@ function ACT_IMPL.call(self, global_scene_name, key, attrs, ...)
         return nil
     end
 
-    local handler = self:find_scene(key, global_scene_name, attrs)
+    local handler = self:find_handler("scene", key)
 
-    -- ハンドラー実行
-    if handler then
+    -- scene ポストプロセス
+    if type(handler) == "function" then
         return handler(self, ...)
     end
 
-    log.error(string.format("act:call - handler not found: key='%s', scene='%s'",
-        tostring(key), tostring(global_scene_name)))
+    log.warn(string.format("act:call - handler not found: key='%s', mode='scene', via=act",
+        tostring(key)))
     return nil
 end
 

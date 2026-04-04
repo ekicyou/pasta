@@ -86,7 +86,7 @@ do
         act.さくら:talk("変数を代入。")
         act.うにゅう:talk("中身は内緒や。")
         var.カウンタ = 10
-        save.グローバル = SCENE.関数(act, 2 + 1)
+        save.グローバル = act:expr_fn("関数", 2 + 1)
         var.場所 = act:word("場所")
     end
 
@@ -107,12 +107,12 @@ do
         local save, var = act:init_scene(SCENE)
 
         act.さくら:talk(tostring(GLOBAL.グローバル関数(act, "グローバル")))
-        act.さくら:talk("を呼んだよ。")
+        act.さくら:talk("　を呼んだよ。")
         var.結果 = GLOBAL.グローバル関数(act, "代入テスト")
         GLOBAL.グローバル関数(act, "式文テスト")
-        SCENE.関数(act, 42)
+        act:expr_fn("関数", 42)
         act.うにゅう:talk("ローカルもいけるで")
-        act.うにゅう:talk(tostring(SCENE.関数(act, 1)))
+        act.うにゅう:talk(tostring(act.うにゅう:expr_fn("関数", 1)))
     end
 
     function SCENE.関数(act, value, ...)

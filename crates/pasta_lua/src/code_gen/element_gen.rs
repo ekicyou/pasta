@@ -195,23 +195,37 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             Action::FnCall {
                 name, args, scope, ..
             } => {
-                // SCENE.関数名(act, 引数...)
                 let args_str = self.generate_args_string(args)?;
-                let prefix = match scope {
-                    pasta_dsl::parser::FnScope::Local => "SCENE.",
-                    pasta_dsl::parser::FnScope::Global => "GLOBAL.",
-                };
-                self.writeln(&format!(
-                    "act.{}:talk(tostring({}{}(act{})))",
-                    actor,
-                    prefix,
-                    name,
-                    if args_str.is_empty() {
-                        String::new()
-                    } else {
-                        format!(", {}", args_str)
+                match scope {
+                    pasta_dsl::parser::FnScope::Local => {
+                        // act.アクター:expr_fn("関数名", 引数...)
+                        let name_literal = StringLiteralizer::literalize(name)?;
+                        self.writeln(&format!(
+                            "act.{}:talk(tostring(act.{}:expr_fn({}{})))",
+                            actor,
+                            actor,
+                            name_literal,
+                            if args_str.is_empty() {
+                                String::new()
+                            } else {
+                                format!(", {}", args_str)
+                            }
+                        ))?;
                     }
-                ))?;
+                    pasta_dsl::parser::FnScope::Global => {
+                        // GLOBAL.関数名(act, 引数...)
+                        self.writeln(&format!(
+                            "act.{}:talk(tostring(GLOBAL.{}(act{})))",
+                            actor,
+                            name,
+                            if args_str.is_empty() {
+                                String::new()
+                            } else {
+                                format!(", {}", args_str)
+                            }
+                        ))?;
+                    }
+                }
             }
             Action::SakuraScript { script, .. } => {
                 // SakuraScript is output as act.{actor}:sakura_script()
@@ -258,21 +272,35 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             }
             Expr::FnCall { name, args, scope } => {
                 let args_str = self.generate_args_string(args)?;
-                let prefix = match scope {
-                    pasta_dsl::parser::FnScope::Local => "SCENE.",
-                    pasta_dsl::parser::FnScope::Global => "GLOBAL.",
-                };
-                write!(
-                    self.writer,
-                    "{}{}(act{})",
-                    prefix,
-                    name,
-                    if args_str.is_empty() {
-                        String::new()
-                    } else {
-                        format!(", {}", args_str)
+                match scope {
+                    pasta_dsl::parser::FnScope::Local => {
+                        // act:expr_fn("関数名", 引数...)
+                        let name_literal = StringLiteralizer::literalize(name)?;
+                        write!(
+                            self.writer,
+                            "act:expr_fn({}{})",
+                            name_literal,
+                            if args_str.is_empty() {
+                                String::new()
+                            } else {
+                                format!(", {}", args_str)
+                            }
+                        )?;
                     }
-                )?;
+                    pasta_dsl::parser::FnScope::Global => {
+                        // GLOBAL.関数名(act, 引数...)
+                        write!(
+                            self.writer,
+                            "GLOBAL.{}(act{})",
+                            name,
+                            if args_str.is_empty() {
+                                String::new()
+                            } else {
+                                format!(", {}", args_str)
+                            }
+                        )?;
+                    }
+                }
             }
             Expr::Paren(inner) => {
                 write!(self.writer, "(")?;
@@ -326,21 +354,35 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             }
             Expr::FnCall { name, args, scope } => {
                 let args_str = self.generate_args_string(args)?;
-                let prefix = match scope {
-                    pasta_dsl::parser::FnScope::Local => "SCENE.",
-                    pasta_dsl::parser::FnScope::Global => "GLOBAL.",
-                };
-                write!(
-                    buf,
-                    "{}{}(act{})",
-                    prefix,
-                    name,
-                    if args_str.is_empty() {
-                        String::new()
-                    } else {
-                        format!(", {}", args_str)
+                match scope {
+                    pasta_dsl::parser::FnScope::Local => {
+                        // act:expr_fn("関数名", 引数...)
+                        let name_literal = StringLiteralizer::literalize(name)?;
+                        write!(
+                            buf,
+                            "act:expr_fn({}{})",
+                            name_literal,
+                            if args_str.is_empty() {
+                                String::new()
+                            } else {
+                                format!(", {}", args_str)
+                            }
+                        )?;
                     }
-                )?;
+                    pasta_dsl::parser::FnScope::Global => {
+                        // GLOBAL.関数名(act, 引数...)
+                        write!(
+                            buf,
+                            "GLOBAL.{}(act{})",
+                            name,
+                            if args_str.is_empty() {
+                                String::new()
+                            } else {
+                                format!(", {}", args_str)
+                            }
+                        )?;
+                    }
+                }
             }
             Expr::Paren(inner) => {
                 write!(buf, "(")?;

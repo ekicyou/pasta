@@ -255,8 +255,8 @@ fn test_generate_local_fn_call_action_still_scene() {
 
     let result = String::from_utf8(output).unwrap();
     assert!(
-        result.contains("SCENE.func(act)"),
-        "Expected SCENE.func(act) for local scope, got: {}",
+        result.contains("act.さくら:expr_fn(\"func\")"),
+        "Expected act.さくら:expr_fn(\"func\") for local scope, got: {}",
         result
     );
 }
@@ -309,8 +309,8 @@ fn test_generate_var_set_none_expr_stmt() {
 
     let result = String::from_utf8(output).unwrap();
     assert!(
-        result.contains("SCENE.fn(act)"),
-        "Expected expression statement 'SCENE.fn(act)' but got: {}",
+        result.contains("act:expr_fn(\"fn\")"),
+        "Expected expression statement 'act:expr_fn(\"fn\")' but got: {}",
         result
     );
     assert!(
