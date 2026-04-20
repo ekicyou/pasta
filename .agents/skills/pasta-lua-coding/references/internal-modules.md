@@ -187,51 +187,100 @@ function ACT_IMPL.clear_spot(self) end
 
 #### word(name)
 
-4段階単語検索を実行する。
+単語取得（`find_handler` + word ポストプロセス）。内部で `find_act_handler` の6段階フォールバックを使用する。
 
 ```lua
 --- @param name string 単語キー
---- @return string|nil 単語の値、または見つからない場合nil
+--- @return string|nil 単語の値、またはnil（未発見時はwarnログ出力）
 function ACT_IMPL.word(self, name) end
 ```
 
-検索順序: アクター単語 → ローカル単語 → グローバル単語 → `@pasta_search`
+**フォールバック順序**（`find_act_handler` word モード）:
+1. **L1**: `current_scene[key]` — シーンローカル完全一致
+2. **L2**: `SEARCH:search_word(key, scene_name)` — ローカル単語辞書前方一致（`@pasta_search` 必須）
+3. **L3**: `self[key]` — act.XX メソッドフォールバック（`function` 型のみ）
+4. **L4**: `GLOBAL[key]` — GLOBAL テーブル完全一致
+5. **L5**: `SEARCH:search_word(key, nil)` — グローバル単語辞書前方一致（`@pasta_search` 必須）
+6. ⇒ nil（warnログ出力）
 
-#### find_scene(key, scope?, attrs?)
+**ポストプロセス**: handler が function → `h(self)` の戻り値を返す。その他の型 → `tostring(h)` を返す。
 
-シーン名前解決（5段階フォールバック検索）。ハンドラー関数を検索して返す（実行しない）。
+#### find_handler(mode, key)
+
+統一ハンドラー検索エントリ（`find_act_handler` への thin wrapper）。
 
 ```lua
+--- @param mode string "word" | "scene" | "expr"
 --- @param key string 検索キー
---- @param scope? string グローバルシーンスコープ
---- @param attrs? table 属性テーブル
---- @return function|nil 見つかったハンドラ関数
-function ACT_IMPL.find_scene(self, key, scope, attrs) end
+--- @return any|nil
+function ACT_IMPL.find_handler(self, mode, key) end
 ```
 
-**検索順序**:
-1. **L1**: `current_scene[key]` — シーンローカル検索
-2. **L2**: `SCENE.search(key, scope)` — スコープ付き前方一致検索
-3. **L3**: `GLOBAL[key]` — GLOBALテーブル
-4. **L4**: `self[key]` — actメソッドフォールバック（type=="function" のみ）
-5. **L5**: `SCENE.search(key, nil)` — スコープなし全体検索
+#### find_act_handler(mode, key)
 
-> `act:call()` と `SCENE.co_exec()` の両方がこのメソッドを使用して名前解決を行う。
-
-#### call(global, key, attrs, ...)
-
-シーンまたは関数を呼び出す。内部で `find_scene()` を使用して名前解決し、見つかったハンドラを即時実行する。
+act スコープの6段階フォールバック検索コア。`mode` に応じて辞書種を切り替える。
 
 ```lua
---- @param global string グローバルシーン名
---- @param key string|nil ローカルキー（nilの場合は警告ログ出力＋即時リターン）
---- @param attrs table|nil 属性テーブル
---- @param ... any 追加引数
---- @return any 呼び出し結果
-function ACT_IMPL.call(self, global, key, attrs, ...) end
+--- @param mode string "word" | "scene" | "expr"
+--- @param key string 検索キー
+--- @return any|nil マッチしたハンドラー（function / string / その他）、またはnil
+function ACT_IMPL.find_act_handler(self, mode, key) end
 ```
 
-> **nilガード**: `key == nil` の場合（未定義変数参照等）、`find_scene` は呼ばれず `log.warn` を出力して `nil` を返す。動的コール `＞expr` で式評価結果が nil になった場合に適用される。
+**フォールバック順序**:
+1. **L1**: `current_scene[key]` — 完全一致（全モード共通）
+2. **L2**: ローカル辞書前方一致（word: `SEARCH:search_word(key, scene_name)`、scene/expr: `SCENE.search(key, scene_name)`）
+3. **L3**: `self[key]` — act.XX フォールバック（`function` 型のみ・全モード共通）
+4. **L4**: `GLOBAL[key]` — GLOBAL テーブル完全一致（全モード共通）
+5. **L5**: グローバル辞書前方一致（word: `SEARCH:search_word(key, nil)`、scene/expr: `SCENE.search(key, nil)`）
+6. ⇒ nil
+
+`@pasta_search` 未利用時はL2・L5の前方一致検索をスキップする。
+
+#### expr_fn(key, ...)
+
+expr 関数呼び出し（`find_handler` + expr ポストプロセス）。DSL の `＠func(args)` ローカル関数呼び出し構文がトランスパイルされる先。
+
+```lua
+--- @param key string 関数名
+--- @param ... any 可変引数（ハンドラーに伝搬）
+--- @return any ハンドラーの戻り値、またはnil（未発見時はwarnログ出力）
+function ACT_IMPL.expr_fn(self, key, ...) end
+```
+
+**ポストプロセス**: handler が function → `h(self, ...)` を呼び出して戻り値を返す。非 function → warnログ出力 + nil。
+
+#### find_scene(key)
+
+シーン名前解決（`find_handler` への thin wrapper）。ハンドラー関数を検索して返す（実行しない）。
+
+```lua
+--- @param key string 検索キー（シーン名/関数名）
+--- @param global_scene_name? string 互換性のため残す（未使用）
+--- @param attrs? table 互換性のため残す（未使用）
+--- @return function|nil 見つかったハンドラ関数、またはnil
+function ACT_IMPL.find_scene(self, key, global_scene_name, attrs) end
+```
+
+内部で `find_handler("scene", key)` に委譲する。`global_scene_name` / `attrs` は後方互換のために引数として残るが無視される。検索順序は `find_act_handler` の scene モード（L1→L5）に従う。
+
+> `SCENE.co_exec()` がこのメソッドを使用して名前解決を行う。
+
+#### call(global_scene_name, key, attrs, ...)
+
+シーンまたは関数を呼び出す。`find_handler("scene", key)` で名前解決し、見つかったハンドラを直接呼び出す（コルーチン化しない）。
+
+```lua
+--- @param global_scene_name string|nil 互換性のため残す（未使用）
+--- @param key string|nil 検索キー（nilの場合は警告ログ出力＋即時リターン）
+--- @param attrs table|nil 互換性のため残す（未使用）
+--- @param ... any 追加引数（ハンドラーに伝搬）
+--- @return any 呼び出し結果
+function ACT_IMPL.call(self, global_scene_name, key, attrs, ...) end
+```
+
+> **nilガード**: `key == nil` の場合（未定義変数参照等）、検索は行わず `log.warn` を出力して `nil` を返す。
+> **コルーチン不使用**: `call()` は `SCENE.co_exec()` によるコルーチン内から呼ばれるため、ここで再度コルーチン化しない。
 
 ### yield()
 
@@ -254,7 +303,7 @@ end
 
 ### PROXYパターン
 
-アクターへのプロキシオブジェクト。ACTへの逆参照を持ち、3段階単語検索を実装する。
+アクターへのプロキシオブジェクト。ACTへの逆参照を持ち、統一ハンドラー検索（`find_handler`）を実装する。
 
 ```lua
 --- @class ActorProxy
@@ -263,8 +312,51 @@ end
 
 -- トランスパイラー出力で使用
 act.さくら:talk("こんにちは")
-local word = act.さくら:word("名前")  -- 3段階: actor→actor辞書→act:word()
+local word = act.さくら:word("名前")  -- A1+A2+L1〜L5 フルチェーン
+act.さくら:expr_fn("func", arg1)       -- expr関数呼び出し
 ```
+
+#### PROXY.find_actor_handler(mode, key)
+
+アクタースコープのみの検索（word モード限定）。
+
+```lua
+--- @param mode string "word" | "scene" | "expr"（word以外はnil即返し）
+--- @param key string 検索キー
+--- @return any|nil
+function PROXY_IMPL.find_actor_handler(self, mode, key) end
+```
+
+**検索順序**（word モードのみ）:
+1. **A1**: `proxy.actor[key]` — アクターフィールド完全一致
+2. **A2**: `SEARCH:search_word(key, "__actor_{name}__")` — アクター単語辞書前方一致（`@pasta_search` 必須）
+
+#### PROXY.find_handler(mode, key)
+
+統一ハンドラー検索エントリ（PROXY経由）。アクターレベル検索を先に実行し、マッチしなければ `act:find_act_handler` に委譲する。
+
+```lua
+--- @param mode string "word" | "scene" | "expr"
+--- @param key string 検索キー
+--- @return any|nil
+function PROXY_IMPL.find_handler(self, mode, key) end
+```
+
+**完全なフォールバックチェーン**（word モード例）:
+A1 → A2 → L1 → L2 → L3 → L4 → L5 → nil
+
+#### PROXY.expr_fn(key, ...)
+
+expr 関数呼び出し（`find_handler` + expr ポストプロセス）。DSL の `さくら：＠func(args)` アクター修飾付き呼び出しがトランスパイルされる先。
+
+```lua
+--- @param key string 関数名
+--- @param ... any 可変引数（ハンドラーに伝搬）
+--- @return any|nil
+function PROXY_IMPL.expr_fn(self, key, ...) end
+```
+
+**ポストプロセス**: handler が function → `h(self, ...)` を呼び出して戻り値を返す（`self` は proxy）。非 function → warnログ出力 + nil。
 
 ---
 
