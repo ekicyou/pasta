@@ -13,6 +13,7 @@
 - **pasta_lua**: Luaバックエンド層（pasta_dsl + pasta_core依存）
 - **pasta_shiori**: SHIORI DLLインターフェース層
 - **pasta_lsp**: LSP実装層（tower-lsp, WASM/Native対応）
+- **pasta_check**: リリースCLIツール（ゴーストパッケージング・NAR生成）
 - **pasta_sample_ghost**: サンプルゴースト「hello-pasta」（publish=false, 画像生成・配布物作成）
 
 ### 主要依存関係
@@ -38,8 +39,10 @@
 - **serde 1 / serde_json 1**: シリアライゼーション
 - **glob 0.3**: ファイルパターンマッチ
 - **flate2 1.x**: gzip圧縮（キャッシュ等）
+- **budoux 0.1.1**: 日本語改行位置推定（BudouX）
+- **unicode-width 0.2.2**: Unicode文字幅計算
 - **tracing 0.1 / tracing-appender 0.2 / tracing-subscriber 0.3**: ロギング・診断
-- **windows-sys 0.61.2**: Windows API（Shift_JISエンコーディング等、cfg(windows)）
+- **windows-sys 0.61**: Windows API（Shift_JISエンコーディング等、cfg(windows)）
 - **luacheck v1.2.0**: 静的解析ツール（scriptlibs/）
 - **lua_test**: BDDスタイルテストフレームワーク（scriptlibs/）
 
@@ -49,7 +52,7 @@
 - **time 0.3**: 時刻処理
 - **tracing 0.1**: ロギング（subscriber/appenderはpasta_luaに移管）
 - **thiserror 2**: エラー型定義
-- **windows-sys 0.59**: Windows DLL API（cfg(windows)）
+- **windows-sys 0.61**: Windows DLL API（cfg(windows)）
 
 **pasta_lsp:**
 - **pasta_dsl**: DSLパーサー層
@@ -58,10 +61,15 @@
 - **thiserror 2**: エラー型定義
 - **wasm-bindgen, js-sys**: WASM対応（cfg(wasm32)）
 
+**pasta_check:**
+- **lexopt 0.3**: CLIパーサー
+- **md5 0.8**: ハッシュ計算（更新ファイル生成）
+- **zip 8.4**: NAR（ZIP）アーカイブ作成
+- **pasta_lua**: 将来のLua単体試験サポート基盤
+- **thiserror 2**: エラー型定義
+
 **pasta_sample_ghost:**
-- **image 0.25 / imageproc 0.25**: ピクトグラム画像生成
-- **md5 0.7**: ハッシュ計算（更新検出）
-- **encoding_rs 0.8**: Shift_JISエンコーディング
+- **image 0.25 / imageproc 0.26**: ピクトグラム画像生成
 - **thiserror 2**: エラー型定義
 
 ### 開発環境
@@ -87,6 +95,7 @@ pasta (workspace)
 │   └── Encoding        # プラットフォーム別エンコーディング
 ├── pasta_shiori        # SHIORI DLLインターフェース
 ├── pasta_lsp           # LSP実装（WASM/Native）
+├── pasta_check         # リリースCLI（NAR生成・更新ファイル）
 └── pasta_sample_ghost  # サンプルゴースト生成ツール
 ```
 
@@ -99,6 +108,7 @@ pasta (workspace)
 | pasta_lua          | Loader       | スクリプト読み込み・キャッシュ  |
 | pasta_shiori       | SHIORI       | DLLエクスポート、リクエスト処理 |
 | pasta_lsp          | LSP          | 構文ハイライト、診断、WASM対応  |
+| pasta_check        | CLI          | リリースパッケージング・NAR生成 |
 | pasta_sample_ghost | Distribution | サンプルゴースト画像生成・配布  |
 
 ### 設計哲学

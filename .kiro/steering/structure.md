@@ -157,6 +157,14 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │   │       ├── error.rs     # LangServerError型定義
 │   │       ├── server.rs    # PastaLangServer (tower-lsp trait実装)
 │   │       └── transport.rs # WASM/Nativeプラットフォーム抽象化
+│   ├── pasta_check/         # リリースCLIツール
+│   │   ├── Cargo.toml       # pasta_check設定（lexopt, md5, zip, pasta_lua依存）
+│   │   └── src/
+│   │       ├── main.rs          # CLIエントリーポイント
+│   │       ├── release.rs       # リリースビルドオーケストレーション
+│   │       ├── update_files.rs  # 更新ファイル（updates.txt）生成
+│   │       ├── nar.rs           # NAR（ZIP）アーカイブ作成
+│   │       └── copy.rs          # ファイルコピーユーティリティ
 │   └── pasta_sample_ghost/  # サンプルゴースト「hello-pasta」（publish=false）
 │       ├── Cargo.toml       # 画像生成・配布物作成用依存
 │       ├── README.md        # クレート概要
@@ -169,8 +177,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       │   ├── main.rs             # 配布物生成CLIエントリーポイント
 │       │   ├── image_generator.rs  # ピクトグラム画像生成
 │       │   ├── config_templates.rs # surfaces.txt生成
-│       │   ├── scripts.rs          # テスト用dist-srcヘルパー
-│       │   └── update_files.rs     # 更新ファイル生成
+│       │   └── scripts.rs          # テスト用dist-srcヘルパー
 │       ├── dist-src/        # テキスト系配布ファイル（Single Source of Truth）
 │       │   ├── install.txt
 │       │   ├── ghost/master/ # descript.txt, pasta.toml, dic/*.pasta

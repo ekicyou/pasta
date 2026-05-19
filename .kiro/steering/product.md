@@ -51,6 +51,9 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 - ✅ **yield-continuation-token** - `＞チェイントーク` / `＞yield` 継続トーク機能（GLOBAL テーブル L3 登録）
 - ✅ **lua55-manual-consistency** - Lua 5.5 リファレンスマニュアル日本語化整合性
   - マニュアル本体は独立リポジトリに移行: [ekicyou/lua55-manual-ja](https://github.com/ekicyou/lua55-manual-ja)
+- ✅ **budoux-line-breaker** - BudouX日本語改行位置推定の統合
+- ✅ **pasta-check** - `pasta_check` CLIツール（NAR生成・更新ファイル管理）
+- ✅ **luajit-migration** - Lua 5.5からLuaJIT 2.1への移行
 
 **保留/評価中仕様**:
 - ⏸️ **pasta-conversation-inline-multi-stage-resolution** - 動的単語参照（Phase 3相当、削除検討中）
