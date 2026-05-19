@@ -167,7 +167,7 @@ impl PastaLuaRuntime {
     fn toml_to_lua(lua: &Lua, value: &toml::Value) -> LuaResult<Value> {
         match value {
             toml::Value::String(s) => Ok(Value::String(lua.create_string(s)?)),
-            toml::Value::Integer(i) => Ok(Value::Integer(*i)),
+            toml::Value::Integer(i) => Ok(Value::Number(*i as f64)),
             toml::Value::Float(f) => Ok(Value::Number(*f)),
             toml::Value::Boolean(b) => Ok(Value::Boolean(*b)),
             toml::Value::Datetime(dt) => Ok(Value::String(lua.create_string(dt.to_string())?)),
