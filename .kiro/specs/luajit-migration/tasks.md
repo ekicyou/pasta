@@ -33,8 +33,8 @@
   - _Requirements: 3.1, 3.2, 4.1, 4.2, 5.1, 5.2, 5.3_
   - _Boundary: crates/pasta_lua/pasta_scripts/pasta/shiori/event/init.lua, crates/pasta_lua/pasta_scripts/pasta/store.lua, crates/pasta_lua/scriptlibs/lua_test/test.lua, crates/pasta_lua/tests/loader/startup_test.rs, crates/pasta_lua/tests/log/stack_level_test.rs, crates/pasta_lua/tests/lua_specs/event_coroutine_test.lua, crates/pasta_lua/tests/lua_specs/integration_coroutine_test.lua, crates/pasta_lua/tests/lua_specs/store_coroutine_test.lua, crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/pasta_scripts/pasta/shiori/event/init.lua, crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/pasta_scripts/pasta/store.lua_
 
-- [ ] 2. テスト検証
-- [ ] 2.1 テストスイート全パス確認
+- [x] 2. テスト検証
+- [x] 2.1 テストスイート全パス確認
   - `cargo test --workspace` を実行し全テストがパスすることを確認する
   - 特に以下を重点確認: ucid_test.rs（UTF-8識別子）、runtime/unit_test.rs（StdLib設定）、lua_specs/（Luaスクリプトテスト）
   - mlua-stdlib互換性確認: json/regex/yaml機能を使用するテスト（lua_specs/内のdkjson使用テスト等）がLuaJITバックエンドで動作すること
@@ -43,8 +43,8 @@
   - _Requirements: 3.1, 3.2, 4.1, 4.2, 4.3, 5.1, 5.2, 5.3, 6.1, 6.2, 6.3_
   - _Depends on: 1.2_
 
-- [ ] 3. ステアリングドキュメント更新
-- [ ] 3.1 (P) tech.mdのLuaランタイム記載更新
+- [x] 3. ステアリングドキュメント更新
+- [x] 3.1 (P) tech.mdのLuaランタイム記載更新
   - `.kiro/steering/tech.md` のLuaランタイム記載を「Lua 5.5 (mlua 0.11)」から「LuaJIT 2.1 (mlua 0.11)」に変更する
   - `lua-src` への言及を除去または「luajit-src（mlua vendored内部使用）」に更新する
   - `lua55` feature への言及を `luajit52` に更新する
