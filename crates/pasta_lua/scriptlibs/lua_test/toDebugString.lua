@@ -86,8 +86,12 @@ toDebugString = function(value)
         local mapPart = mapPartToStrings(value)
 
         local items = {}
-        table.move(arrayPart, 1, #arrayPart, #items + 1, items)
-        table.move(mapPart, 1, #mapPart, #items + 1, items)
+        for i = 1, #arrayPart do
+            items[#items + 1] = arrayPart[i]
+        end
+        for i = 1, #mapPart do
+            items[#items + 1] = mapPart[i]
+        end
 
         if #items == 0 then
             return "{}"

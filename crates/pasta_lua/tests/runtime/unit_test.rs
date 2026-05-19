@@ -76,6 +76,39 @@ fn test_to_stdlib_individual_libs() {
 }
 
 #[test]
+fn test_to_stdlib_luajit_specific_libs() {
+    let config = RuntimeConfig::from_libs(vec![
+        "std_jit".into(),
+        "std_ffi".into(),
+        "std_bit".into(),
+    ]);
+    let stdlib = config.to_stdlib().unwrap();
+    assert_eq!(stdlib, StdLib::JIT | StdLib::FFI | StdLib::BIT);
+}
+
+#[test]
+fn test_to_stdlib_rejects_removed_std_utf8() {
+    let config = RuntimeConfig::from_libs(vec!["std_utf8".into()]);
+    let result = config.to_stdlib();
+
+    match result {
+        Err(ConfigError::UnknownLibrary(name)) => {
+            assert_eq!(name, "std_utf8");
+            let message = ConfigError::UnknownLibrary(name).to_string();
+            let valid_libraries = message
+                .split_once("Valid libraries: ")
+                .map(|(_, libraries)| libraries)
+                .expect("UnknownLibrary message should list valid libraries");
+            assert!(!valid_libraries.contains("std_utf8"));
+            assert!(valid_libraries.contains("std_jit"));
+            assert!(valid_libraries.contains("std_ffi"));
+            assert!(valid_libraries.contains("std_bit"));
+        }
+        Ok(_) => panic!("Expected error for removed std_utf8 library"),
+    }
+}
+
+#[test]
 fn test_to_stdlib_subtraction() {
     let config = RuntimeConfig::from_libs(vec!["std_all".into(), "-std_io".into()]);
     let stdlib = config.to_stdlib().unwrap();

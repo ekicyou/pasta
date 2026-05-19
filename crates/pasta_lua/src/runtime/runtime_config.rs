@@ -43,7 +43,7 @@ pub struct RuntimeConfig {
     /// - `std_all` - All safe libraries (StdLib::ALL_SAFE, excludes std_debug)
     /// - `std_all_unsafe` - All libraries including debug (StdLib::ALL)
     /// - `std_coroutine`, `std_table`, `std_io`, `std_os`, `std_string`
-    /// - `std_utf8`, `std_math`, `std_package`, `std_debug`
+    /// - `std_math`, `std_package`, `std_debug`, `std_jit`, `std_ffi`, `std_bit`
     ///
     /// Valid mlua-stdlib modules:
     /// - `assertions`, `testing`, `env`, `regex`, `json`, `yaml`
@@ -151,15 +151,17 @@ impl RuntimeConfig {
         match name {
             "std_all" => Ok(StdLib::ALL_SAFE),
             "std_all_unsafe" => Ok(StdLib::ALL),
-            "std_coroutine" => Ok(StdLib::COROUTINE),
+            "std_coroutine" => Ok(StdLib::NONE),
             "std_table" => Ok(StdLib::TABLE),
             "std_io" => Ok(StdLib::IO),
             "std_os" => Ok(StdLib::OS),
             "std_string" => Ok(StdLib::STRING),
-            "std_utf8" => Ok(StdLib::UTF8),
             "std_math" => Ok(StdLib::MATH),
             "std_package" => Ok(StdLib::PACKAGE),
             "std_debug" => Ok(StdLib::DEBUG),
+            "std_jit" => Ok(StdLib::JIT),
+            "std_ffi" => Ok(StdLib::FFI),
+            "std_bit" => Ok(StdLib::BIT),
             _ => Err(ConfigError::UnknownLibrary(name.to_string())),
         }
     }

@@ -117,7 +117,7 @@ impl fmt::Display for SpanDisplay {
 pub enum ConfigError {
     /// Unknown library name in libs array.
     #[error(
-        "Unknown library: {0}. Valid libraries: std_all, std_all_unsafe, std_coroutine, std_table, std_io, std_os, std_string, std_utf8, std_math, std_package, std_debug, assertions, testing, env, regex, json, yaml"
+        "Unknown library: {0}. Valid libraries: std_all, std_all_unsafe, std_coroutine, std_table, std_io, std_os, std_string, std_math, std_package, std_debug, std_jit, std_ffi, std_bit, assertions, testing, env, regex, json, yaml"
     )]
     UnknownLibrary(String),
 }

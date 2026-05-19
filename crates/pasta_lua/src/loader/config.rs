@@ -322,7 +322,7 @@ pub struct LuaConfig {
     /// - `std_all` - All safe libraries (StdLib::ALL_SAFE)
     /// - `std_all_unsafe` - All libraries including debug (StdLib::ALL)
     /// - `std_coroutine`, `std_table`, `std_io`, `std_os`, `std_string`
-    /// - `std_utf8`, `std_math`, `std_package`, `std_debug`
+    /// - `std_math`, `std_package`, `std_debug`, `std_jit`, `std_ffi`, `std_bit`
     ///
     /// Valid mlua-stdlib modules:
     /// - `assertions`, `testing`, `env`, `regex`, `json`, `yaml`
