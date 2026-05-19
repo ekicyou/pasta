@@ -114,7 +114,10 @@ fn test_pasta_config_ghost_section() {
         )
         .unwrap();
     // with_ghost_config/pasta.toml has spot_newlines = 2.0
-    assert_eq!(result.as_f64(), Some(2.0));
+    let numeric_result = result
+        .as_f64()
+        .or_else(|| result.as_i64().map(|v| v as f64));
+    assert_eq!(numeric_result, Some(2.0));
 }
 
 #[test]

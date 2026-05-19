@@ -298,8 +298,13 @@ describe("EVENT.fire - 既存コルーチン置換", function()
         local req = { id = "TestEvent" }
         EVENT.fire(req)
 
-        -- 旧コルーチンはcloseされてdead状態
-        expect(coroutine.status(old_co)):toBe("dead")
+        if coroutine.close then
+            -- 旧コルーチンはcloseされてdead状態
+            expect(coroutine.status(old_co)):toBe("dead")
+        else
+            -- LuaJIT/Lua 5.1 does not provide coroutine.close().
+            expect(coroutine.status(old_co)):toBe("suspended")
+        end
         -- 新しいコルーチンがSTORE.co_sceneに設定されている
         expect(type(STORE.co_scene)):toBe("thread")
         expect(STORE.co_scene ~= old_co):toBe(true)

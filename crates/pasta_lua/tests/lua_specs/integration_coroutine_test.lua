@@ -239,8 +239,13 @@ describe("Integration - error handling", function()
         -- Fire second - should close the old coroutine
         EVENT.fire({ id = "OnSecond" })
 
-        -- Old coroutine should be dead (closed)
-        expect(coroutine.status(old_co)):toBe("dead")
+        if coroutine.close then
+            -- Old coroutine should be dead (closed)
+            expect(coroutine.status(old_co)):toBe("dead")
+        else
+            -- LuaJIT/Lua 5.1 does not provide coroutine.close().
+            expect(coroutine.status(old_co)):toBe("suspended")
+        end
 
         -- STORE.co_scene should be nil (new coroutine completed)
         expect(STORE.co_scene):toBe(nil)
@@ -267,6 +272,11 @@ describe("Integration - error handling", function()
         STORE.reset()
 
         expect(STORE.co_scene):toBe(nil)
-        expect(coroutine.status(co)):toBe("dead")
+        if coroutine.close then
+            expect(coroutine.status(co)):toBe("dead")
+        else
+            -- LuaJIT/Lua 5.1 does not provide coroutine.close().
+            expect(coroutine.status(co)):toBe("suspended")
+        end
     end)
 end)

@@ -60,7 +60,7 @@ STORE.co_scene = nil
 function STORE.reset()
     -- co_sceneのクリーンアップ（suspendedコルーチンをclose）
     if STORE.co_scene then
-        if coroutine.status(STORE.co_scene) == "suspended" then
+        if coroutine.close and coroutine.status(STORE.co_scene) == "suspended" then
             coroutine.close(STORE.co_scene)
         end
         STORE.co_scene = nil

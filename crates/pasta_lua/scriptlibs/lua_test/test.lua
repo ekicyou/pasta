@@ -1,4 +1,5 @@
 local expect = require("lua_test.expect")
+local ENV = _ENV or _G
 
 ---@class Test
 ---@field name string
@@ -15,7 +16,7 @@ local expect = require("lua_test.expect")
 
 ---Global context to detect current test context when `describe` and `test` are called.
 ---@type TestContext | nil
-_ENV.__testContext = nil
+ENV.__testContext = nil
 
 
 ---Colorize text with green.
@@ -177,31 +178,31 @@ local function describe(name, func)
         result = nil,
     }
 
-    if _ENV.__testContext ~= nil then
+    if ENV.__testContext ~= nil then
         -- Set up parent-child relationship
-        table.insert(_ENV.__testContext.children, ctx)
-        ctx.parent = _ENV.__testContext
+        table.insert(ENV.__testContext.children, ctx)
+        ctx.parent = ENV.__testContext
     end
 
     -- Set current test context
-    _ENV.__testContext = ctx
+    ENV.__testContext = ctx
 
     func()
 
-    if _ENV.__testContext.parent == nil then
+    if ENV.__testContext.parent == nil then
         --dumpTest(_ENV.__testContext, 0)
-        local succeeded = performTest(_ENV.__testContext, 0)
-        printTestResult(_ENV.__testContext, 0, {})
+        local succeeded = performTest(ENV.__testContext, 0)
+        printTestResult(ENV.__testContext, 0, {})
 
         -- Reset global context after top-level describe completes
-        _ENV.__testContext = nil
+        ENV.__testContext = nil
 
         if not succeeded then
             os.exit(1)
         end
     else
         -- Restore parent context
-        _ENV.__testContext = _ENV.__testContext.parent
+        ENV.__testContext = ENV.__testContext.parent
     end
 end
 
@@ -209,9 +210,9 @@ end
 ---@param name string
 ---@param func fun()
 local function test(name, func)
-    if _ENV.__testContext == nil then
+    if ENV.__testContext == nil then
         -- Define anonymous test context
-        _ENV.__testContext = {
+        ENV.__testContext = {
             parent = nil,
             name = "(anonymous)",
             children = {},
@@ -219,7 +220,7 @@ local function test(name, func)
         }
     end
 
-    table.insert(_ENV.__testContext.children, {
+    table.insert(ENV.__testContext.children, {
         name = name,
         func = func,
         result = nil,

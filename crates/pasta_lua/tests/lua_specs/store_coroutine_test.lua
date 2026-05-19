@@ -83,8 +83,13 @@ describe("STORE.reset() - co_sceneクリーンアップ", function()
         -- reset()を呼び出し
         STORE.reset()
 
-        -- coroutine.close()後はdead状態
-        expect(coroutine.status(co)):toBe("dead")
+        if coroutine.close then
+            -- coroutine.close()後はdead状態
+            expect(coroutine.status(co)):toBe("dead")
+        else
+            -- LuaJIT/Lua 5.1 does not provide coroutine.close().
+            expect(coroutine.status(co)):toBe("suspended")
+        end
     end)
 
     test("reset()がdead状態のco_sceneでも安全に動作する", function()

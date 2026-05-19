@@ -83,7 +83,9 @@ end
 local function set_co_scene(co)
     -- 1. 引数検証（suspended以外はclose）
     if co and coroutine.status(co) ~= "suspended" then
-        coroutine.close(co)
+        if coroutine.close then
+            coroutine.close(co)
+        end
         co = nil
     end
 
@@ -94,7 +96,9 @@ local function set_co_scene(co)
 
     -- 3. 旧コルーチンをclose（存在すれば無条件）
     if STORE.co_scene then
-        coroutine.close(STORE.co_scene)
+        if coroutine.close then
+            coroutine.close(STORE.co_scene)
+        end
     end
 
     -- 4. 上書き（coはsuspendedまたはnil確定）
