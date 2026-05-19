@@ -2,8 +2,8 @@
 //!
 //! 全テストが公開 API のみ使用しているため可視性変更不要
 
-use mlua::prelude::*;
 use mlua::StdLib;
+use mlua::prelude::*;
 use pasta_lua::loader::LuaConfig;
 use pasta_lua::runtime::lua_require;
 use pasta_lua::{ConfigError, RuntimeConfig};
@@ -77,11 +77,8 @@ fn test_to_stdlib_individual_libs() {
 
 #[test]
 fn test_to_stdlib_luajit_specific_libs() {
-    let config = RuntimeConfig::from_libs(vec![
-        "std_jit".into(),
-        "std_ffi".into(),
-        "std_bit".into(),
-    ]);
+    let config =
+        RuntimeConfig::from_libs(vec!["std_jit".into(), "std_ffi".into(), "std_bit".into()]);
     let stdlib = config.to_stdlib().unwrap();
     assert_eq!(stdlib, StdLib::JIT | StdLib::FFI | StdLib::BIT);
 }
