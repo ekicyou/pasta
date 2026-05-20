@@ -1,216 +1,167 @@
-# Implementation Plan: release-workflow
+# Implementation Plan
 
-## タスク概要
+<!-- 本仕様は繰り返し実行型オペレーション仕様です。
+     /kiro-impl release-workflow を実行するたびに全タスクが初期化され、
+     新たなリリース作業として実行されます。仕様は completed になりません。(Req 8.1-8.3) -->
 
-本仕様は**オペレーション仕様**であり、コードの新規作成・変更を伴わない。LLM エージェントが `/kiro-spec-impl release-workflow` を実行するたびに、以下のタスクを順次実行してリリース作業を遂行する。
+## Task 1: 事前確認フェーズ
 
-**タスクの特殊性**:
-- タスク完了 = リリース1回の実行完了
-- 各実行ごとにタスク状態はリセットされる（繰り返し実行型）
-- 実装フェーズ = 実際のリリース作業の実行
+- [ ] 1. 事前確認フェーズ
+- [ ] 1.1 GitHub CLI の認証状態を確認する
+  - `gh auth status` を実行し、ekicyou アカウントで認証済みであることを確認する
+  - 未認証の場合: `gh auth login` の実行を開発者に案内し、認証完了を待つ
+  - 完了条件: `gh auth status` が認証済みアカウントを表示する（Phase 0 暗黙的前提条件）
+- [ ] 1.2 リリースバージョン番号を決定する
+  - 開発者からバージョン指定がある場合はそのバージョンを使用する
+  - 指定がない場合: Cargo.toml、package.json、git タグ、crates.io、GitHub Releases、VSCode Marketplace の全ソースを調査し最大バージョンを確認する
+  - 最大バージョンの PATCH を +1 した値を提案バージョンとして開発者に承認を求める
+  - 拒否された場合は希望バージョンの入力を求め、semver 形式（X.Y.Z）を検証する
+  - 確定バージョンが全ソースに対して重複していないことを確認する
+  - 完了条件: リリース対象バージョン `vX.Y.Z` が開発者に承認され、全ソースで重複がないことが確認された
+  - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7_
+- [ ] 1.3 ワークツリーを整理する
+  - `git status --porcelain` を実行し未コミット変更の有無を確認する
+  - 変更がある場合: `git add -A && git commit -m "chore(release): prepare release vX.Y.Z"` を実行する
+  - 完了条件: `git status --porcelain` が空出力（ワークツリーがクリーン）
+  - _Requirements: 1.8, 1.9_
+- [ ] 1.4 全テストを実行してリリース前の健全性を確認する
+  - `cargo test --all` を実行する
+  - テスト失敗時: エラー内容を報告してリリース作業を中止する
+  - 完了条件: `cargo test --all` がゼロ終了コードで完了する
+  - _Requirements: 1.10, 1.11_
 
-**全タスク共通の実行条件**:
-- 各タスクで発生した失敗がリカバリー不可能（リトライ上限到達・手動介入が必要・前提条件の不整合など）と判断された場合、その時点で**即座にリリース作業を失敗終了**する
-- 失敗終了時は「どのタスクで・何が失敗したか・現在のリリース状態（何が完了済みで何が未実行か）」を明示し、開発者に手動対応の指示を行う
-- **「既に完了済みのように見える」状態を理由に後続タスクをスキップしてはならない**。前回の部分的な実行が残存している可能性があるため、各タスクは必ず実行する（冪等性を持って実行する）
+## Task 2: バージョン更新とビルド検証
 
-## タスク一覧
-
-### Phase 0: 前提条件確認
-
-- [ ] 1. GitHub CLI 認証確認
-  - `gh auth status` を実行し、認証状態を確認する
-  - 未認証の場合は `gh auth login` のガイダンスを開発者に提示し、認証完了を待つ
-  - _Requirements: Phase 0 暗黙的前提_
-
-### Phase 1: 事前検証
-
-- [ ] 2. バージョン番号の決定と承認
-  - **2-A: 全バージョンソースの並行調査**（サブエージェントを使って以下を同時に収集する）
-    - Git タグ: `git tag --sort=-version:refname | Select-Object -First 1` → 最新タグ
-    - Cargo.toml: `Select-String -Path "Cargo.toml" -Pattern '^\s*version\s*='` → ワークスペースバージョン
-    - package.json: `(Get-Content "editors/vscode/package.json" | ConvertFrom-Json).version`
-    - GitHub Releases: `gh release list --repo ekicyou/pasta --limit 1 --json tagName | ConvertFrom-Json | ForEach-Object { $_.tagName }` → 最新リリースタグ
-    - crates.io (pasta_core): `(Invoke-RestMethod https://crates.io/api/v1/crates/pasta_core).crate.max_version`
-    - crates.io (pasta_dsl): `(Invoke-RestMethod https://crates.io/api/v1/crates/pasta_dsl).crate.max_version`
-    - crates.io (pasta_lua): `(Invoke-RestMethod https://crates.io/api/v1/crates/pasta_lua).crate.max_version`
-    - crates.io (pasta_shiori): `(Invoke-RestMethod https://crates.io/api/v1/crates/pasta_shiori).crate.max_version`
-    - crates.io (pasta_check): `(Invoke-RestMethod https://crates.io/api/v1/crates/pasta_check).crate.max_version`
-    - VSCode Marketplace: `npx @vscode/vsce show ekicyou.pasta-vscode 2>&1 | Select-String 'Version:' | ForEach-Object { $_ -replace '.*Version:\s*', '' }`
-  - **2-B: 最大バージョンの算出**
-    - 上記全ソースから取得した全バージョン文字列（`v` プレフィックス除去後）を比較し、semver ルールで最大値を決定する
-    - これを `$CURRENT_VERSION` とする
-    - 取得に失敗したソースは「取得失敗（スキップ）」と記録し、残りのソースで最大値を算出する
-    - 全ソースの取得結果と `$CURRENT_VERSION` を表形式で開発者に報告する
-  - **2-C: 次バージョンの決定**
-    - 開発者からバージョン指定がある場合はそれを使用する
-    - 指定がない場合は `$CURRENT_VERSION` の PATCH を +1 した値を `$NEXT_VERSION` として提案する
-    - 提案形式「全ソース調査の結果、現在の最大バージョンは vX.Y.Z です。vX.Y.(Z+1) に更新します。よろしいですか？」で開発者に確認
-    - 拒否された場合は希望バージョンの入力を求める
-  - **2-D: 重複チェック**
-    - `$NEXT_VERSION` が2-Aで収集したいずれかのソースに**既に存在する場合は作業を即座に中止**する
-    - エラーメッセージ例:「vX.Y.Z は既に [ソース名] に存在します。別のバージョン番号を指定してください。」
-    - 開発者が別のバージョンを指定した場合は 2-D を再実行する
-  - **2-E: 最終確認**
-    - `$NEXT_VERSION` が semver 形式（`^[0-9]+\.[0-9]+\.[0-9]+$`）として妥当か検証する
-    - 形式エラー時は再入力を求める
-    - 確定したバージョンを `$NEW_VERSION` に保存し、以降のタスクで使用する
-  - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6_
-
-- [ ] 3. ワークツリーの整理とテスト実行
-  - `git status --porcelain` で未コミット変更を確認する
-  - 未コミット変更がある場合は `git add -A && git commit -m "chore(release): prepare release vX.Y.Z"` で自動コミットする
-  - `editors/vscode/package.json` の `version` と `Cargo.toml` の `workspace.package.version` を比較し、不一致の場合は警告を表示し同期するか開発者に確認
-  - `cargo test --all` を実行し全テストの通過を確認する
-  - テスト失敗時はエラー内容を報告し、リリース作業を中止する
-  - _Requirements: 1.7, 1.8, 1.9, 1.10_
-
-### Phase 2: バージョン更新
-
-- [ ] 4. Cargo.toml のバージョン一括更新
-  - ルート `Cargo.toml` の以下6箇所を `replace_string_in_file` で更新する:
-    - `[workspace.package].version = "<OLD>"` → `version = "<NEW>"`
-    - `pasta_core = { path = "crates/pasta_core", version = "<OLD>" }` → `version = "<NEW>"`
-    - `pasta_dsl = { path = "crates/pasta_dsl", version = "<OLD>" }` → `version = "<NEW>"`
-    - `pasta_lua = { path = "crates/pasta_lua", version = "<OLD>" }` → `version = "<NEW>"`
-    - `pasta_shiori = { path = "crates/pasta_shiori", version = "<OLD>" }` → `version = "<NEW>"`
-    - `pasta_check = { path = "crates/pasta_check", version = "<OLD>" }` → `version = "<NEW>"`
-  - `editors/vscode/package.json` の `"version": "<OLD>"` → `"version": "<NEW>"` を `replace_string_in_file` で更新する
-  - 更新後、以下のコマンドで実際に書き換えられたことを検証する:
-    - `Select-String -Path "Cargo.toml" -Pattern 'version = "<NEW>"'` で `[workspace.package]` のバージョンを確認
-    - `Select-String -Path "Cargo.toml" -Pattern '"pasta_core".*version = "<NEW>"'` 等でワークスペース依存バージョンを確認（5クレート分: pasta_core, pasta_dsl, pasta_lua, pasta_shiori, pasta_check）
-    - `Select-String -Path "editors/vscode/package.json" -Pattern '"version": "<NEW>"'` でVSCode拡張バージョンを確認
-  - 検証で `<NEW>` が見つからない箇所があれば、エラーを報告して中止する
+- [ ] 2. バージョン更新とビルド検証
+- [ ] 2.1 Cargo.toml のバージョンを新バージョンに更新する
+  - `replace_string_in_file` を使い `[workspace.package].version` を新バージョンに更新する
+  - `[workspace.dependencies]` セクションの5クレート（pasta_core, pasta_dsl, pasta_lua, pasta_shiori, pasta_check）の `version` フィールドを更新する
+  - 完了条件: Cargo.toml の6箇所すべてに新バージョンが反映されている
   - _Requirements: 2.1, 2.2_
-
-- [ ] 5. ビルド検証とコミット
+- [ ] 2.2 package.json のバージョンを新バージョンに同期する
+  - `replace_string_in_file` を使い `editors/vscode/package.json` の `version` フィールドを新バージョンに更新する
+  - 完了条件: `editors/vscode/package.json` の `"version"` が新バージョンを示している
+  - _Requirements: 2.3_
+- [ ] 2.3 ビルド検証を行い、バージョン更新をコミットする
   - `cargo build --workspace` を実行してビルド成功を確認する
-  - ビルド失敗時は `git restore Cargo.toml` でロールバックし、エラーを報告して中止する
-  - ビルド成功時は `git add Cargo.toml && git commit -m "chore(release): bump version to vX.Y.Z"` でコミットする
-  - _Requirements: 2.3, 2.4, 2.5_
+  - ビルド失敗時: `git restore Cargo.toml editors/vscode/package.json` でロールバックしエラーを報告する
+  - ビルド成功時: `git add Cargo.toml editors/vscode/package.json && git commit -m "chore(release): bump version to vX.Y.Z"` を実行する
+  - 完了条件: `cargo build --workspace` が成功し、バージョン更新コミットが git ログに記録されている
+  - _Requirements: 2.4, 2.5, 2.6_
 
-### Phase 3: crates.io 公開
+## Task 3: crates.io へのクレート公開
 
-- [ ] 6. 依存関係順での crates.io 公開
-  - 以下の順序でクレートを公開する: `pasta_core` → `pasta_dsl` → `pasta_lua` → `pasta_shiori` → `pasta_check`
-  - `pasta_check` は他の pasta_* クレートに依存しないバイナリクレートのため、ライブラリクレートの後に公開する
-  - 各クレートに対して `cargo publish -p <crate_name>` を実行する
-  - 失敗時は段階的バックオフでリトライする（待機 1分→2分→...→10分、最大10回）
-  - 各リトライ前に `Start-Sleep -Seconds (N * 60)` で待機する（N=1,2,...,10）
-  - 10分待機のリトライでも失敗した場合はエラーを報告し、既に公開済みのクレートはそのまま残して以降を中断、開発者の指示を待つ
-  - 各クレート公開後（最後の `pasta_check` を除く）に `Start-Sleep -Seconds 10` で待機する
-  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7_
+- [ ] 3. crates.io へのクレート公開
+- [ ] 3.1 pasta_core を crates.io に公開する
+  - `cargo publish -p pasta_core` を実行する
+  - 失敗時: 段階的バックオフ（1分→2分→…→10分、最大10回）でリトライする
+  - リトライ全失敗時: エラーを報告し以降の公開を中断して開発者の指示を待つ
+  - 成功後: `Start-Sleep -Seconds 10` で待機する
+  - 完了条件: `cargo publish -p pasta_core` が成功し、crates.io に新バージョンが登録された
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.6_
+- [ ] 3.2 pasta_dsl を crates.io に公開する
+  - `cargo publish -p pasta_dsl` を実行する
+  - 失敗時: 段階的バックオフでリトライする
+  - 成功後: `Start-Sleep -Seconds 10` で待機する
+  - 完了条件: `cargo publish -p pasta_dsl` が成功する
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.6_
+- [ ] 3.3 pasta_lua を crates.io に公開する
+  - `cargo publish -p pasta_lua` を実行する
+  - 失敗時: 段階的バックオフでリトライする
+  - 成功後: `Start-Sleep -Seconds 10` で待機する
+  - 完了条件: `cargo publish -p pasta_lua` が成功する
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.6_
+- [ ] 3.4 pasta_shiori を crates.io に公開する
+  - `cargo publish -p pasta_shiori` を実行する
+  - 失敗時: 段階的バックオフでリトライする
+  - 成功後: `Start-Sleep -Seconds 10` で待機する
+  - 完了条件: `cargo publish -p pasta_shiori` が成功する
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.6_
+- [ ] 3.5 pasta_check を crates.io に公開する（最終クレート）
+  - `cargo publish -p pasta_check` を実行する（他の pasta_* クレートに依存しないバイナリ、最後に公開）
+  - `pasta_sample_ghost` は `publish = false` のためスキップ
+  - 失敗時: 段階的バックオフでリトライする
+  - 完了条件: `cargo publish -p pasta_check` が成功し、5クレートすべての公開が完了した
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-### Phase 3.5: VSCode 拡張公開
+## Task 4: VSCode 拡張の Marketplace 公開（非クリティカル）
 
-- [ ] 6.5. VSCode 拡張のビルドと Marketplace 公開
+- [ ] 4. VSCode 拡張の Marketplace 公開（非クリティカル）
+- [ ] 4.1 VSCode 拡張をビルドしてパッケージングする
   - `cd editors/vscode && npm install` を実行する
-    - 失敗時: 警告記録、Phase 4 へ継続
-  - `npm run package` を実行する（prepackage: build:wasm + compile、package: vsce package）
-    - VSIX 生成失敗時: 警告記録、Phase 4 へ継続
-  - `Test-Path "pasta-vscode-X.Y.Z.vsix"` で VSIX 存在確認
-  - 存在する場合: `vsce publish` を実行
-    - 成功: Marketplace URL を記録
-    - 失敗時: 段階的バックオフでリトライ（待機 1分→2分→...→10分、最大10回）
-    - 各リトライ前に `Start-Sleep -Seconds (N * 60)` で待機する（N=1,2,...,10）
-    - 10分待機のリトライでも失敗した場合: 警告記録、Phase 4 へ継続
-  - 環境変数 `$env:VSIX_PATH` に VSIX ファイルパスを保持（Phase 6 で使用）
-  - _Requirements: VSX.1–VSX.6_
+  - 失敗時: 警告を記録し Task 5 へ継続する
+  - `npm run package` を実行して VSIX ファイルを生成する
+  - 失敗時: 警告を記録し Task 5 へ継続する
+  - 生成された VSIX ファイルパスを記録する（`$env:VSIX_PATH`）
+  - 完了条件: VSIX ファイル（`pasta-vscode-X.Y.Z.vsix`）が生成されているか、警告を記録して次フェーズへ継続
+  - _Requirements: 4.1, 4.2, 4.6_
+- [ ] 4.2 VSIX を VSCode Marketplace に公開する
+  - `vsce publish` を実行する
+  - 失敗時: 段階的バックオフ（1分→2分→…→10分、最大10回）でリトライする
+  - リトライ全失敗時: 警告を記録し Task 5 へ継続する（非クリティカル）
+  - 成功時: Marketplace URL を記録する
+  - 完了条件: `vsce publish` が成功して Marketplace URL が記録されているか、警告を記録して次フェーズへ継続
+  - _Requirements: 4.3, 4.4, 4.5, 4.7_
 
-### Phase 4: ゴーストビルド
+## Task 5: サンプルゴーストのビルドと成果物確認
 
-- [ ] 7. サンプルゴーストのビルドと成果物確認
-  - `crates/pasta_sample_ghost/` ディレクトリで `PowerShell -ExecutionPolicy Bypass -File release.ps1` を実行する
-  - `Test-Path "crates/pasta_sample_ghost/hello-pasta.nar"` で .nar ファイルの生成を確認する
+- [ ] 5. サンプルゴーストのビルドと成果物確認
+- [ ] 5.1 release.ps1 を実行して成果物を確認する
+  - `Push-Location crates/pasta_sample_ghost; PowerShell -ExecutionPolicy Bypass -File release.ps1; Pop-Location` を実行する
+  - 失敗時: エラーを報告してリリース作業を中断する
+  - `Test-Path "crates/pasta_sample_ghost/hello-pasta.nar"` で .nar ファイルの存在を確認する
   - `Test-Path "target/i686-pc-windows-msvc/release/pasta.dll"` で DLL の存在を確認する
-  - いずれかが存在しない場合はエラー報告し中断する
-  - DLL 存在確認後、zip 圧縮を実行する:
-    ```powershell
-    Compress-Archive -Path "target/i686-pc-windows-msvc/release/pasta.dll" `
-      -DestinationPath "target/i686-pc-windows-msvc/release/pasta.dll.zip" `
-      -Force
-    ```
-  - `Test-Path "target/i686-pc-windows-msvc/release/pasta.dll.zip"` で zip 確認する
-  - zip 圧縮失敗時はエラー報告し中断する
-  - 成功時は `git add -A && git commit -m "chore(release): build hello-pasta vX.Y.Z"` でコミットする
-  - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8_
+  - いずれかが存在しない場合: エラーを報告してリリース作業を中断する
+  - 完了条件: hello-pasta.nar と pasta.dll の両方が存在する
+  - _Requirements: 5.1, 5.2, 5.3, 5.4_
+- [ ] 5.2 DLL を zip 圧縮してビルドコミットを作成する
+  - `Compress-Archive -Path "target/i686-pc-windows-msvc/release/pasta.dll" -DestinationPath "target/i686-pc-windows-msvc/release/pasta.dll.zip" -Force` を実行する
+  - `Test-Path "target/i686-pc-windows-msvc/release/pasta.dll.zip"` で zip ファイルの存在を確認する
+  - 確認失敗時: エラーを報告してリリース作業を中断する
+  - `git add -A && git commit -m "chore(release): build hello-pasta vX.Y.Z"` を実行する
+  - 完了条件: pasta.dll.zip が存在し、ビルドコミットが git ログに記録されている
+  - _Requirements: 5.5, 5.6, 5.7, 5.8_
 
-### Phase 5: タグとプッシュ
+## Task 6: リリースタグとリモートプッシュ
 
-- [ ] 8. Git タグの作成とリモートプッシュ
+- [ ] 6. リリースタグとリモートプッシュ
+- [ ] 6.1 Git アノテーションタグを作成する
   - `git tag -l "vX.Y.Z"` で既存タグの競合を確認する
-  - 競合がある場合は開発者に「手動で `git tag -d vX.Y.Z` を実行しますか？」と確認する
-  - `git tag -a vX.Y.Z -m "Release vX.Y.Z"` でアノテーションタグを作成する
-  - `git push origin main --tags` でコミットとタグをリモートにプッシュする
-  - プッシュ失敗時は段階的バックオフでリトライ（待機 1分→2分→...→10分、最大10回）、それでも失敗の場合は「手動で `git push origin main --tags` を再実行してください」と案内する
-  - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
-
-### Phase 6: GitHub Release 作成
-
-- [ ] 9. チェンジログの生成
-  - `git tag -l "v*" --sort=-version:refname` で前回リリースタグを取得する
-  - 前回タグがある場合は `git log <前回タグ>..vX.Y.Z --oneline --no-merges` でコミット履歴を取得する
-  - 前回タグがない場合（初回リリース）は `git log --oneline --no-merges` で全履歴を取得する
-  - Conventional Commits 形式（`feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`）でコミットを分類する
-  - スコープが `spec` のコミット（`chore(spec):`, `docs(spec):` 等）は除外する
-  - 各カテゴリを見出し（`### ✨ Features`, `### 🐛 Bug Fixes` 等）配下に箇条書きで整形する
-  - チェンジログを一時ファイル `release-notes-vX.Y.Z.md` に書き出す
+  - 既存タグがある場合: 開発者に対応方法を確認する（自動削除はしない）
+  - `git tag -a vX.Y.Z -m "Release vX.Y.Z"` を実行する
+  - 完了条件: `git tag -l "vX.Y.Z"` でタグが確認できる
   - _Requirements: 6.1, 6.2, 6.3_
+- [ ] 6.2 コミットとタグをリモートにプッシュする
+  - `git push origin main --tags` を実行する
+  - 失敗時: 段階的バックオフでリトライし、それでも失敗なら手動実行手順を案内する
+  - 完了条件: `git push origin main --tags` が成功し、GitHub のリモートブランチとタグが更新されている
+  - _Requirements: 6.4, 6.5_
 
-- [ ] 10. GitHub Release の作成とアセット添付
-  - 以下のコマンドで GitHub Release を作成する:
-    ```powershell
-    $assets = @(
-      "target/i686-pc-windows-msvc/release/pasta.dll.zip",
-      "crates/pasta_sample_ghost/hello-pasta.nar"
-    )
-    if ($env:VSIX_PATH -and (Test-Path $env:VSIX_PATH)) {
-      $assets += $env:VSIX_PATH
-    }
+## Task 7: GitHub Release 作成と完了報告
 
-    gh release create vX.Y.Z `
-      $assets `
-      --title "pasta vX.Y.Z" `
-      --notes-file release-notes-vX.Y.Z.md
-    ```
-  - `gh` 失敗時は段階的バックオフでリトライ（待機 1分→2分→...→10分、最大10回）、それでも失敗の場合はエラー報告と手動手順を案内する
-  - 成功時は一時ファイル `release-notes-vX.Y.Z.md` を削除する
-  - `Get-ChildItem "editors/vscode" -Filter "*.vsix" | Remove-Item -Force` で VSIX 成果物を全削除する
-  - リリース完了サマリー（バージョン、公開クレート、Release URL、Marketplace 公開結果）を開発者に報告する
-  - _Requirements: 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 7.4, VSX.4, VSX.6_
-
-### 最終タスク: ドキュメント整合性確認
-
-- [ ]* 11. ドキュメント整合性の確認と更新
-  - 本仕様はオペレーション仕様であり、コード変更を伴わないため、以下の確認は**該当しない**
-  - ドキュメント更新が不要であることを確認:
-    - SOUL.md: コアバリュー・設計原則に影響なし
-    - doc/spec/: 言語仕様変更なし
-    - GRAMMAR.md: 文法リファレンス変更なし
-    - TEST_COVERAGE.md: 新規テストなし
-    - クレートREADME: API変更なし
-    - steering/*: ステアリング更新なし
-  - _Requirements: 7.1, 7.2, 7.3_
-
-## 繰り返し実行の注意事項
-
-- 各 `/kiro-spec-impl release-workflow` 実行時に全タスク（1〜11）を順次実行する
-- タスク完了後、タスク状態はリセットされる（spec.json の `phase` は `ready_for_implementation` を維持）
-- 各実行は独立したリリース作業として動作する
-
-## 要件カバレッジ検証
-
-| Requirement | タスク |
-|-------------|--------|
-| 1.1–1.6 | 2 |
-| 1.7–1.10 | 3 |
-| 2.1, 2.2 | 4 |
-| 2.3–2.5 | 5 |
-| 3.1–3.6 | 6 |
-| 4.1–4.8 | 7 |
-| 5.1–5.5 | 8 |
-| 6.1–6.3 | 9 |
-| 6.4–6.9, 7.4 | 10 |
-| 7.1–7.3 | 11 |
-
-全47個の Acceptance Criteria がカバーされています。
+- [ ] 7. GitHub Release 作成と完了報告
+- [ ] 7.1 コミット履歴からチェンジログを生成する
+  - `git tag -l "v*" --sort=-version:refname` で前回タグを特定する
+  - 前回タグがある場合: `git log <前回タグ>..vX.Y.Z --oneline --no-merges` でコミット履歴を取得する
+  - 前回タグがない場合（初回）: `git log --oneline --no-merges` で全履歴を取得する
+  - 取得したコミットを Conventional Commits 形式で分類・グループ化する
+  - スコープが `spec` のコミットはチェンジログから除外する
+  - グループ別（Features/Bug Fixes/Refactoring/etc.）に見出し配下へ箇条書きで整形する
+  - チェンジログを一時ファイル `release-notes-vX.Y.Z.md` に書き出す
+  - 完了条件: `release-notes-vX.Y.Z.md` が作成され、整形済みチェンジログが含まれている
+  - _Requirements: 7.1, 7.2, 7.3, 7.9_
+- [ ] 7.2 GitHub Release を作成しアセットを添付する
+  - VSIX ファイルが存在する場合（`$env:VSIX_PATH`）: アセットリストに追加する
+  - `gh release create vX.Y.Z "target/i686-pc-windows-msvc/release/pasta.dll.zip" "crates/pasta_sample_ghost/hello-pasta.nar" [<VSIX>] --title "pasta vX.Y.Z" --notes-file release-notes-vX.Y.Z.md` を実行する
+  - 失敗時: 段階的バックオフでリトライし、それでも失敗なら手動実行手順を案内する
+  - `Remove-Item release-notes-vX.Y.Z.md` で一時ファイルを削除する
+  - 完了条件: GitHub の `ekicyou/pasta` リポジトリにリリースページが作成され、アセットが添付されている
+  - _Requirements: 7.4, 7.5, 7.6, 7.7, 7.8_
+- [ ] 7.3 リリース完了サマリーを報告する
+  - 以下の内容を含む完了サマリーを開発者に報告する：
+    - リリースバージョン: `vX.Y.Z`
+    - 公開クレート: pasta_core, pasta_dsl, pasta_lua, pasta_shiori, pasta_check
+    - GitHub Release URL: `https://github.com/ekicyou/pasta/releases/tag/vX.Y.Z`
+    - VSCode Marketplace: 公開成功 URL または警告メッセージ（Task 4 の結果を反映）
+  - 完了条件: 上記情報を含む完了報告が開発者に提示されている
+  - _Requirements: 8.1, 8.2, 8.3, 8.4_

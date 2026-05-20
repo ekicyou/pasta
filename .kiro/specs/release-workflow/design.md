@@ -2,15 +2,16 @@
 
 ## Overview
 
-**Purpose**: 本設計は、pasta プロジェクトの crates.io 公開・GitHub Release 作成を含むリリース作業を、LLM エージェントが繰り返し実行するためのオペレーション設計を定義する。
+**Purpose**: 本設計は、pasta プロジェクトのリリース作業（crates.io 公開、VSCode Marketplace 公開、GitHub Release 作成）を、LLM エージェントが繰り返し実行するためのオペレーション設計を定義する。
 
-**Users**: 開発者（ekicyou）が `/kiro-spec-impl release-workflow` を実行するたびに、LLM エージェントが本設計に従ってリリース作業を遂行する。
+**Users**: 開発者（ekicyou）が `/kiro-impl release-workflow` を実行するたびに、LLM エージェントが本設計に従ってリリース作業を遂行する。
 
-**Impact**: 手動リリース手順（`RELEASE.md`）を体系化し、バージョン管理から GitHub Release 作成までの全工程を一貫した品質で繰り返し実行可能にする。
+**Impact**: 手動リリース手順を体系化し、バージョン管理から GitHub Release 作成までの全工程を一貫した品質で繰り返し実行可能にする。
 
 ### Goals
-- Cargo.toml のバージョン更新から GitHub Release 作成までの全工程を LLM が逐次実行する
+- Cargo.toml / package.json のバージョン更新から GitHub Release 作成までの全工程を LLM が逐次実行する
 - 各ステップでエラー検出・ロールバック・開発者確認を適切に行う
+- VSCode 拡張の Marketplace 公開を非クリティカルフェーズとして統合する
 - Conventional Commits に基づく整形済みチェンジログを自動生成する
 - 繰り返し実行可能な設計を維持する（仕様は `completed` に遷移しない）
 
@@ -18,7 +19,42 @@
 - リリース自動化スクリプトの新規作成（LLM による対話的実行で代替）
 - CI/CD パイプラインへの統合（ローカル実行前提）
 - クロスプラットフォーム対応（Windows + PowerShell 環境限定）
-- `cargo publish` 認証トークンの自動設定（セキュリティ上、手動設定を前提とする）
+- `cargo publish` / `vsce` 認証トークンの自動設定（セキュリティ上、手動設定を前提とする）
+- pasta_lsp の独立リリース管理
+
+## Boundary Commitments
+
+### This Spec Owns
+- バージョン番号の決定・検証・全ソース調査
+- Cargo.toml（6箇所）および package.json のバージョン更新
+- crates.io への依存関係順公開（5クレート）
+- VSCode 拡張の Marketplace 公開（非クリティカル）
+- サンプルゴースト（hello-pasta）のビルドと成果物確認
+- Git タグ作成・リモートプッシュ
+- GitHub Release 作成（チェンジログ生成・アセット添付）
+- リリース作業全体のエラーハンドリングとロールバック
+
+### Out of Boundary
+- pasta_lsp の crates.io 公開（`publish = true` だが本ワークフロー対象外）
+- CI/CD パイプラインとの統合
+- 認証トークンの設定・管理
+- release.ps1 スクリプト自体の修正
+- crates.io に公開済みクレートの yank 操作
+
+### Allowed Dependencies
+- External: `cargo` CLI — ビルド・テスト・公開 (P0)
+- External: `git` CLI — バージョン管理・タグ・プッシュ (P0)
+- External: `gh` CLI — GitHub Release 作成 (P0)
+- External: `npm` / `vsce` — VSCode 拡張ビルド・公開 (P0)
+- Script: `release.ps1` — サンプルゴーストビルド (P0)
+- Infra: crates.io registry — インデックス更新待機 (P1)
+- Infra: VSCode Marketplace — 拡張公開 (P1)
+
+### Revalidation Triggers
+- Cargo.toml の workspace 構造変更（クレート追加・削除）
+- release.ps1 のインターフェース変更（パラメータ・出力パス変更）
+- VSCode 拡張のビルドパイプライン変更（scripts セクション変更）
+- 新しい公開対象（例: pasta_lsp）の追加
 
 ## Architecture
 
@@ -28,13 +64,15 @@
 
 **既存アセット**:
 
-| アセット | 状態 | 本設計での役割 |
-|----------|------|----------------|
-| `Cargo.toml`（ルート） | ✅ ワークスペース集中管理 | バージョン更新対象（5箇所） |
-| `release.ps1` | ✅ 成熟スクリプト（387行） | ゴーストビルド実行 |
-| `gh` CLI | ✅ 認証済み（ekicyou） | GitHub Release 作成 |
-| `cargo` | ✅ 利用可能 | テスト・ビルド・公開 |
-| `git` | ✅ 利用可能 | バージョン管理・タグ・プッシュ |
+| アセット                      | 状態                     | 本設計での役割                 |
+| ----------------------------- | ------------------------ | ------------------------------ |
+| `Cargo.toml`（ルート）        | ✅ ワークスペース集中管理 | バージョン更新対象（6箇所）    |
+| `editors/vscode/package.json` | ✅ バージョン同期対象     | バージョン更新対象（1箇所）    |
+| `release.ps1`                 | ✅ 成熟スクリプト         | ゴーストビルド実行             |
+| `gh` CLI                      | ✅ 認証済み（ekicyou）    | GitHub Release 作成            |
+| `cargo`                       | ✅ 利用可能               | テスト・ビルド・公開           |
+| `git`                         | ✅ 利用可能               | バージョン管理・タグ・プッシュ |
+| `npm` / `vsce`                | ✅ 利用可能               | VSCode 拡張ビルド・公開        |
 
 **保持すべきパターン**:
 - ワークスペースルート `Cargo.toml` による集中バージョン管理
@@ -58,7 +96,7 @@ graph TB
     end
 
     subgraph Phase2 [Phase 2: バージョン更新]
-        P2_1[Cargo.toml 5箇所更新]
+        P2_1[Cargo.toml 6箇所更新]
         P2_2[package.json version 更新]
         P2_3[cargo build 検証]
         P2_4[バージョン更新コミット]
@@ -76,44 +114,45 @@ graph TB
         P3_7[pasta_check publish]
     end
 
-    subgraph Phase3_5 [Phase 3.5: VSCode Extension]
+    subgraph Phase4 [Phase 4: VSCode Extension]
         PV1[npm install]
         PV2[npm run package]
         PV3[vsce publish]
         PV4[VSIX ファイル保持]
     end
 
-    subgraph Phase4 [Phase 4: ゴーストビルド]
-        P4_1[release.ps1 実行]
-        P4_2[成果物確認]
-        P4_3[pasta.dll を pasta.dll.zip に圧縮]
-        P4_4[ビルドコミット]
+    subgraph Phase5 [Phase 5: ゴーストビルド]
+        P5_1[release.ps1 実行]
+        P5_2[成果物確認]
+        P5_3[pasta.dll を pasta.dll.zip に圧縮]
+        P5_4[ビルドコミット]
     end
 
-    subgraph Phase5 [Phase 5: タグとプッシュ]
-        P5_1[git tag 作成]
-        P5_2[git push --tags]
+    subgraph Phase6 [Phase 6: タグとプッシュ]
+        P6_1[git tag 作成]
+        P6_2[git push --tags]
     end
 
-    subgraph Phase6 [Phase 6: GitHub Release]
-        P6_1[git log でコミット履歴取得]
-        P6_2[LLM チェンジログ整形]
-        P6_3[gh release create]
+    subgraph Phase7 [Phase 7: GitHub Release]
+        P7_1[git log でコミット履歴取得]
+        P7_2[LLM チェンジログ整形]
+        P7_3[gh release create]
     end
 
     Phase0 --> Phase1
     Phase1 --> Phase2
     Phase2 --> Phase3
-    Phase3 --> Phase3_5
-    Phase3_5 --> Phase4
+    Phase3 --> Phase4
     Phase4 --> Phase5
     Phase5 --> Phase6
+    Phase6 --> Phase7
 ```
 
 **ドメイン境界**:
 - 各フェーズは独立したゲートを持ち、失敗時はそのフェーズで停止
 - Phase 0〜1 は検証フェーズ（ロールバック不要）
-- Phase 2〜6 は実行フェーズ（エラー時のロールバック戦略が定義済み）
+- Phase 2〜7 は実行フェーズ（エラー時のロールバック戦略が定義済み）
+- Phase 4（VSCode）は非クリティカル——失敗しても後続フェーズへ継続
 
 **Steering 準拠**:
 - workflow.md の「危険な Git 操作の禁止」ポリシーに準拠（`git reset --hard` 等は使用しない）
@@ -122,14 +161,30 @@ graph TB
 
 ### Technology Stack
 
-| Layer | Choice / Version | Role in Feature | Notes |
-|-------|------------------|-----------------|-------|
-| CLI | `cargo` (Rust toolchain) | テスト・ビルド・crates.io 公開 | `cargo publish -p <crate>` |
-| CLI | `git` | バージョン管理・タグ・プッシュ | アノテーションタグ使用 |
-| CLI | `gh` (GitHub CLI) | GitHub Release 作成・アセット添付 | 認証済み（ekicyou） |
-| Script | `release.ps1` (PowerShell) | x86 DLL ビルド + .nar 生成 | 既存成熟スクリプト |
-| Editor | LLM エディタツール | `Cargo.toml` バージョン編集 | `replace_string_in_file` |
-| Runtime | Windows + PowerShell | 実行環境 | `i686-pc-windows-msvc` ターゲット必須 |
+| Layer   | Choice / Version           | Role in Feature                          | Notes                                 |
+| ------- | -------------------------- | ---------------------------------------- | ------------------------------------- |
+| CLI     | `cargo` (Rust toolchain)   | テスト・ビルド・crates.io 公開           | `cargo publish -p <crate>`            |
+| CLI     | `git`                      | バージョン管理・タグ・プッシュ           | アノテーションタグ使用                |
+| CLI     | `gh` (GitHub CLI)          | GitHub Release 作成・アセット添付        | 認証済み（ekicyou）                   |
+| CLI     | `npm` / `vsce`             | VSCode 拡張ビルド・公開                  | `@vscode/vsce ^3.0.0`                 |
+| Script  | `release.ps1` (PowerShell) | x86 DLL ビルド + .nar 生成               | 既存成熟スクリプト                    |
+| Editor  | LLM エディタツール         | Cargo.toml / package.json バージョン編集 | `replace_string_in_file`              |
+| Runtime | Windows + PowerShell       | 実行環境                                 | `i686-pc-windows-msvc` ターゲット必須 |
+
+## File Structure Plan
+
+本仕様はオペレーション仕様であり、コードの新規作成を伴わない。以下はリリース作業中に変更されるファイル一覧である。
+
+### 変更対象ファイル
+
+| ファイル                                            | 変更内容                                                                        | Phase   |
+| --------------------------------------------------- | ------------------------------------------------------------------------------- | ------- |
+| `Cargo.toml`                                        | `[workspace.package].version` + 5クレートの `version` フィールド更新（計6箇所） | Phase 2 |
+| `editors/vscode/package.json`                       | `version` フィールド更新                                                        | Phase 2 |
+| `crates/pasta_sample_ghost/hello-pasta.nar`         | release.ps1 による再生成                                                        | Phase 5 |
+| `target/i686-pc-windows-msvc/release/pasta.dll`     | release.ps1 によるビルド                                                        | Phase 5 |
+| `target/i686-pc-windows-msvc/release/pasta.dll.zip` | DLL の zip 圧縮                                                                 | Phase 5 |
+| `release-notes-vX.Y.Z.md`                           | 一時ファイル（Phase 7 完了後削除）                                              | Phase 7 |
 
 ## System Flows
 
@@ -163,7 +218,7 @@ sequenceDiagram
     end
 
     Note over Dev,GH: Phase 2: バージョン更新
-    LLM->>FS: Cargo.toml 5箇所更新
+    LLM->>FS: Cargo.toml 6箇所更新
     LLM->>Term: cargo build --workspace
     alt ビルド失敗
         LLM->>Term: git restore Cargo.toml
@@ -187,18 +242,14 @@ sequenceDiagram
     end
     Note right of LLM: pasta_checkは他のpasta_*クレートに依存しないバイナリ。一番最後に公開
 
-    Note over Dev,GH: Phase 4: ゴーストビルド
-    LLM->>Term: release.ps1
-    LLM->>Term: git commit
-
-    Note over Dev,GH: Phase 3.5: VSCode Extension
+    Note over Dev,GH: Phase 4: VSCode Extension
     LLM->>Term: cd editors/vscode && npm install
     alt npm install 失敗
-        LLM->>LLM: 警告記録、Phase 4 へ継続
+        LLM->>LLM: 警告記録、Phase 5 へ継続
     end
     LLM->>Term: npm run package
     alt VSIX 生成失敗
-        LLM->>LLM: 警告記録、Phase 4 へ継続
+        LLM->>LLM: 警告記録、Phase 5 へ継続
     end
     LLM->>Term: vsce publish
     alt vsce publish 失敗（段階的リトライ: 1分→2分→...→10分）
@@ -207,16 +258,20 @@ sequenceDiagram
             LLM->>Term: vsce publish（リトライ）
         end
         alt 10分待機でも失敗
-            LLM->>LLM: 警告記録、Phase 4 へ継続
+            LLM->>LLM: 警告記録、Phase 5 へ継続
         end
     end
     LLM->>FS: VSIX ファイルパス記録（$env:VSIX_PATH）
 
-    Note over Dev,GH: Phase 5: タグとプッシュ
+    Note over Dev,GH: Phase 5: ゴーストビルド
+    LLM->>Term: release.ps1
+    LLM->>Term: git commit
+
+    Note over Dev,GH: Phase 6: タグとプッシュ
     LLM->>Term: git tag -a vX.Y.Z
     LLM->>Term: git push origin main --tags
 
-    Note over Dev,GH: Phase 6: GitHub Release
+    Note over Dev,GH: Phase 7: GitHub Release
     LLM->>Term: git log 前回タグ..HEAD
     LLM->>LLM: チェンジログ整形
     LLM->>Term: gh release create
@@ -243,9 +298,9 @@ sequenceDiagram
 
 **適用対象フェーズ**:
 - Phase 3: `cargo publish`（クリティカル — 失敗時は以降の公開を中断）
-- Phase 3.5: `vsce publish`（非クリティカル — 失敗時は警告のみで後続へ継続）
-- Phase 5: `git push`（クリティカル — 失敗時は手動対応を案内）
-- Phase 6: `gh release create`（クリティカル — 失敗時は手動手順を案内）
+- Phase 4: `vsce publish`（非クリティカル — 失敗時は警告のみで後続へ継続）
+- Phase 6: `git push`（クリティカル — 失敗時は手動対応を案内）
+- Phase 7: `gh release create`（クリティカル — 失敗時は手動手順を案内）
 
 ### エラー時ロールバックフロー
 
@@ -255,96 +310,100 @@ flowchart TD
     A --> C{Phase 2}
     A --> D{Phase 3}
     A --> E{Phase 4}
-    A --> F{Phase 5-6}
+    A --> F{Phase 5}
+    A --> G{Phase 6-7}
 
     B --> B1[作業不要 - 変更なし]
-    C --> C1[git restore Cargo.toml]
+    C --> C1[git restore Cargo.toml package.json]
     D --> D1[中断のみ - 既公開クレートは残す]
     D1 --> D2[次回リリースで対処]
-    E --> E1[エラー報告 - 手動対応]
+    E --> E1[警告記録のみ - 後続へ継続]
     F --> F1[エラー報告 - 手動対応]
+    G --> G1[エラー報告 - 手動対応]
 ```
 
 ## Requirements Traceability
 
-| Requirement | Summary | Components | Flows |
-|-------------|---------|------------|-------|
-| 1.1 | バージョン番号指定時に使用 | Phase 1 | メインフロー: バージョン確認 |
-| 1.2 | PATCH 自動インクリメント | Phase 1 | メインフロー: バージョン確認 |
-| 1.3 | 提案バージョン承認確認 | Phase 1 | メインフロー: バージョン確認 |
-| 1.4 | 承認拒否時の再入力 | Phase 1 | メインフロー: バージョン確認 |
-| 1.5 | semver 妥当性検証 | Phase 1 | メインフロー: バージョン確認 |
-| 1.6 | semver 形式エラー報告 | Phase 1 | メインフロー: バージョン確認 |
-| 1.7 | git status 確認 | Phase 1 | メインフロー: 事前検証 |
-| 1.8 | 未コミット変更の自動コミット | Phase 1 | メインフロー: 事前検証 |
-| 1.9 | cargo test 実行 | Phase 1 | メインフロー: 事前検証 |
-| 1.10 | テスト失敗時中止 | Phase 1 | エラーフロー: Phase 0-1 |
-| 2.1 | workspace.package.version 更新 | Phase 2 | メインフロー: バージョン更新 |
-| 2.2 | workspace.dependencies 内部クレート参照更新 | Phase 2 | メインフロー: バージョン更新 |
-| 2.3 | cargo build 検証 | Phase 2 | メインフロー: バージョン更新 |
-| 2.4 | ビルド失敗時ロールバック | Phase 2 | エラーフロー: Phase 2 |
-| 2.5 | バージョン更新コミット | Phase 2 | メインフロー: バージョン更新 |
-| 3.1 | 依存関係順 cargo publish | Phase 3 | メインフロー: crates.io 公開 |
-| 3.2 | 公開成功確認後に次クレート | Phase 3 | メインフロー: crates.io 公開 |
-| 3.3 | 最大2回リトライ | Phase 3 | メインフロー: crates.io 公開 |
-| 3.4 | リトライ後失敗時中断 | Phase 3 | エラーフロー: Phase 3 |
-| 3.5 | pasta_sample_ghost スキップ | Phase 3 | メインフロー: crates.io 公開 |
-| 3.6 | 公開間10秒待機 | Phase 3 | メインフロー: crates.io 公開 |
-| 3.7 | pasta_check 公開（最後に実行） | Phase 3 | メインフロー: crates.io 公開 |
-| 4.1 | release.ps1 実行 | Phase 4 | メインフロー: ゴーストビルド |
-| 4.2 | hello-pasta.nar 確認 | Phase 4 | メインフロー: ゴーストビルド |
-| 4.3 | pasta.dll 確認 | Phase 4 | メインフロー: ゴーストビルド |
-| 4.4 | release.ps1 失敗時中断 | Phase 4 | エラーフロー: Phase 4 |
-| 4.5 | pasta.dll を pasta.dll.zip に圧縮 | Phase 4 | メインフロー: ゴーストビルド |
-| 4.6 | pasta.dll.zip の存在確認 | Phase 4 | メインフロー: ゴーストビルド |
-| 4.7 | zip 圧縮失敗時中断 | Phase 4 | エラーフロー: Phase 4 |
-| 4.8 | ゴーストビルドコミット | Phase 4 | メインフロー: ゴーストビルド |
-| 5.1 | アノテーションタグ作成 | Phase 5 | メインフロー: タグとプッシュ |
-| 5.2 | タグメッセージ設定 | Phase 5 | メインフロー: タグとプッシュ |
-| 5.3 | 既存タグ競合時エラー | Phase 5 | エラーフロー: Phase 5-6 |
-| 5.4 | git push origin main --tags | Phase 5 | メインフロー: タグとプッシュ |
-| 5.5 | プッシュ失敗時報告 | Phase 5 | エラーフロー: Phase 5-6 |
-| 6.1 | git log で履歴取得 | Phase 6 | メインフロー: GitHub Release |
-| 6.2 | Conventional Commits 分類 | Phase 6 | メインフロー: GitHub Release |
-| 6.3 | グループ別チェンジログ整形 | Phase 6 | メインフロー: GitHub Release |
-| 6.4 | gh release create 実行 | Phase 6 | メインフロー: GitHub Release |
-| 6.5 | タイトル設定 | Phase 6 | メインフロー: GitHub Release |
-| 6.6 | チェンジログをリリースノートに含める | Phase 6 | メインフロー: GitHub Release |
-| 6.7 | アセット添付（pasta.dll.zip, hello-pasta.nar） | Phase 6 | メインフロー: GitHub Release |
-| 6.8 | gh 失敗時手動手順案内 | Phase 6 | エラーフロー: Phase 5-6 |
-| 6.9 | 初回リリース時の全履歴使用 | Phase 6 | メインフロー: GitHub Release |
-| 7.1 | タスク状態初期化 | — | 繰り返し実行の仕様特性 |
-| 7.2 | phase を completed にしない | — | 繰り返し実行の仕様特性 |
-| 7.3 | 独立した作業として動作 | — | 繰り返し実行の仕様特性 |
-| 7.4 | 完了サマリー報告 | Phase 6 | メインフロー: 最終報告 |
-| VSX.1 | package.json バージョン更新 | Phase 2 | メインフロー: バージョン更新 |
-| VSX.2 | crates.io 後に VSIX 公開 | Phase 3.5 | メインフロー: VSCode Extension |
-| VSX.3 | vsce publish 失敗時は継続 | Phase 3.5 | エラーフロー: Phase 3.5 |
-| VSX.4 | GitHub Release に VSIX 添付 | Phase 6 | メインフロー: GitHub Release |
-| VSX.5 | npm install の事前実行 | Phase 3.5 | メインフロー: VSCode Extension |
-| VSX.6 | 公開成否をサマリーに含める | Phase 6 | メインフロー: 最終報告 |
+| Requirement | Summary                                      | Components | Flows                                   |
+| ----------- | -------------------------------------------- | ---------- | --------------------------------------- |
+| 1.1         | バージョン番号指定時に使用                   | Phase 1    | メインフロー: バージョン確認            |
+| 1.2         | 全ソース調査→PATCH 自動提案                  | Phase 1    | メインフロー: バージョン確認            |
+| 1.3         | 提案バージョン承認確認                       | Phase 1    | メインフロー: バージョン確認            |
+| 1.4         | 承認拒否時の再入力                           | Phase 1    | メインフロー: バージョン確認            |
+| 1.5         | semver 妥当性検証                            | Phase 1    | メインフロー: バージョン確認            |
+| 1.6         | semver 形式エラー報告                        | Phase 1    | メインフロー: バージョン確認            |
+| 1.7         | 重複バージョン検出                           | Phase 1    | メインフロー: バージョン確認            |
+| 1.8         | git status 確認                              | Phase 1    | メインフロー: 事前検証                  |
+| 1.9         | 未コミット変更の自動コミット                 | Phase 1    | メインフロー: 事前検証                  |
+| 1.10        | cargo test 実行                              | Phase 1    | メインフロー: 事前検証                  |
+| 1.11        | テスト失敗時中止                             | Phase 1    | エラーフロー: Phase 0-1                 |
+| 2.1         | workspace.package.version 更新               | Phase 2    | メインフロー: バージョン更新            |
+| 2.2         | workspace.dependencies 内部クレート参照更新  | Phase 2    | メインフロー: バージョン更新            |
+| 2.3         | package.json version 同期                    | Phase 2    | メインフロー: バージョン更新            |
+| 2.4         | cargo build 検証                             | Phase 2    | メインフロー: バージョン更新            |
+| 2.5         | ビルド失敗時ロールバック                     | Phase 2    | エラーフロー: Phase 2                   |
+| 2.6         | バージョン更新コミット                       | Phase 2    | メインフロー: バージョン更新            |
+| 3.1         | 依存関係順 cargo publish（pasta_check 最後） | Phase 3    | メインフロー: crates.io 公開            |
+| 3.2         | 公開成功確認後に次クレート                   | Phase 3    | メインフロー: crates.io 公開            |
+| 3.3         | 段階的リトライ（共通戦略）                   | Phase 3    | 共通リトライ戦略                        |
+| 3.4         | リトライ後失敗時中断                         | Phase 3    | エラーフロー: Phase 3                   |
+| 3.5         | pasta_sample_ghost スキップ                  | Phase 3    | メインフロー: crates.io 公開            |
+| 3.6         | 公開間待機                                   | Phase 3    | メインフロー: crates.io 公開            |
+| 4.1         | VSCode 拡張ビルド実行                        | Phase 4    | メインフロー: VSCode Extension          |
+| 4.2         | VSIX ファイル生成確認                        | Phase 4    | メインフロー: VSCode Extension          |
+| 4.3         | Marketplace 公開実行                         | Phase 4    | メインフロー: VSCode Extension          |
+| 4.4         | Marketplace 失敗時リトライ                   | Phase 4    | 共通リトライ戦略                        |
+| 4.5         | 最大リトライ後失敗→警告・継続                | Phase 4    | エラーフロー: Phase 4（非クリティカル） |
+| 4.6         | ビルド失敗→警告・継続                        | Phase 4    | エラーフロー: Phase 4（非クリティカル） |
+| 4.7         | Marketplace 成功時 URL 記録                  | Phase 4    | メインフロー: VSCode Extension          |
+| 5.1         | release.ps1 実行                             | Phase 5    | メインフロー: ゴーストビルド            |
+| 5.2         | hello-pasta.nar 確認                         | Phase 5    | メインフロー: ゴーストビルド            |
+| 5.3         | pasta.dll 確認                               | Phase 5    | メインフロー: ゴーストビルド            |
+| 5.4         | release.ps1 失敗時中断                       | Phase 5    | エラーフロー: Phase 5                   |
+| 5.5         | pasta.dll を pasta.dll.zip に圧縮            | Phase 5    | メインフロー: ゴーストビルド            |
+| 5.6         | pasta.dll.zip の存在確認                     | Phase 5    | メインフロー: ゴーストビルド            |
+| 5.7         | zip 圧縮失敗時中断                           | Phase 5    | エラーフロー: Phase 5                   |
+| 5.8         | ゴーストビルドコミット                       | Phase 5    | メインフロー: ゴーストビルド            |
+| 6.1         | アノテーションタグ作成                       | Phase 6    | メインフロー: タグとプッシュ            |
+| 6.2         | タグメッセージ設定                           | Phase 6    | メインフロー: タグとプッシュ            |
+| 6.3         | 既存タグ競合時エラー                         | Phase 6    | エラーフロー: Phase 6-7                 |
+| 6.4         | git push origin main --tags                  | Phase 6    | メインフロー: タグとプッシュ            |
+| 6.5         | プッシュ失敗時報告                           | Phase 6    | エラーフロー: Phase 6-7                 |
+| 7.1         | git log で履歴取得                           | Phase 7    | メインフロー: GitHub Release            |
+| 7.2         | Conventional Commits 分類                    | Phase 7    | メインフロー: GitHub Release            |
+| 7.3         | グループ別チェンジログ整形                   | Phase 7    | メインフロー: GitHub Release            |
+| 7.4         | タイトル `pasta vX.Y.Z` 設定                 | Phase 7    | メインフロー: GitHub Release            |
+| 7.5         | チェンジログをリリースノートに含める         | Phase 7    | メインフロー: GitHub Release            |
+| 7.6         | DLL zip + .nar アセット添付                  | Phase 7    | メインフロー: GitHub Release            |
+| 7.7         | VSIX アセット添付（存在時）                  | Phase 7    | メインフロー: GitHub Release            |
+| 7.8         | gh 失敗時手動手順案内                        | Phase 7    | エラーフロー: Phase 6-7                 |
+| 7.9         | 初回リリース時の全履歴使用                   | Phase 7    | メインフロー: GitHub Release            |
+| 8.1         | タスク状態初期化                             | —          | 繰り返し実行の仕様特性                  |
+| 8.2         | phase を completed にしない                  | —          | 繰り返し実行の仕様特性                  |
+| 8.3         | 独立した作業として動作                       | —          | 繰り返し実行の仕様特性                  |
+| 8.4         | 完了サマリー報告                             | Phase 7    | メインフロー: 最終報告                  |
 
 ## Components and Interfaces
 
-| Component | Domain/Layer | Intent | Req Coverage | Key Dependencies | Contracts |
-|-----------|-------------|--------|--------------|-----------------|-----------|
-| Phase 0: Prerequisites | 検証 | 前提条件の確認 | — | gh auth (P0) | — |
-| Phase 1: Validation | 検証 | バージョン決定と事前検証 | 1.1–1.10 | Cargo.toml (P0), cargo test (P0), git (P0) | — |
-| Phase 2: VersionBump | 実行 | Cargo.toml バージョン更新 | 2.1–2.5 | Cargo.toml (P0), cargo build (P0) | — |
-| Phase 3: Publish | 実行 | crates.io 公開 | 3.1–3.6 | cargo publish (P0), crates.io index (P1) | — |
-| Phase 3.5: VsixPublish | 実行 | VSCode 拡張公開 | VSX.1–VSX.6 | npm (P0), vsce (P0), wasm-pack (P0) | — |
-| Phase 4: GhostBuild | 実行 | サンプルゴーストビルド | 4.1–4.5 | release.ps1 (P0), i686-pc-windows-msvc (P0) | — |
-| Phase 5: TagPush | 実行 | Git タグ作成とプッシュ | 5.1–5.5 | git (P0), GitHub remote (P0) | — |
-| Phase 6: Release | 実行 | GitHub Release 作成 | 6.1–6.9, 7.4 | gh CLI (P0), git log (P0) | — |
+| Component              | Domain/Layer           | Intent                                   | Req Coverage    | Key Dependencies                                     | Contracts |
+| ---------------------- | ---------------------- | ---------------------------------------- | --------------- | ---------------------------------------------------- | --------- |
+| Phase 0: Prerequisites | 検証                   | 前提条件の確認                           | —（暗黙的前提） | gh auth (P0)                                         | —         |
+| Phase 1: Validation    | 検証                   | バージョン決定と事前検証                 | 1.1–1.11        | Cargo.toml (P0), cargo test (P0), git (P0)           | —         |
+| Phase 2: VersionBump   | 実行                   | Cargo.toml + package.json バージョン更新 | 2.1–2.6         | Cargo.toml (P0), package.json (P0), cargo build (P0) | —         |
+| Phase 3: Publish       | 実行                   | crates.io 公開                           | 3.1–3.6         | cargo publish (P0), crates.io index (P1)             | —         |
+| Phase 4: VsixPublish   | 実行（非クリティカル） | VSCode 拡張公開                          | 4.1–4.7         | npm (P0), vsce (P0)                                  | —         |
+| Phase 5: GhostBuild    | 実行                   | サンプルゴーストビルド                   | 5.1–5.8         | release.ps1 (P0), i686-pc-windows-msvc (P0)          | —         |
+| Phase 6: TagPush       | 実行                   | Git タグ作成とプッシュ                   | 6.1–6.5         | git (P0), GitHub remote (P0)                         | —         |
+| Phase 7: Release       | 実行                   | GitHub Release 作成                      | 7.1–7.9, 8.4    | gh CLI (P0), git log (P0)                            | —         |
 
 ### 検証レイヤー
 
 #### Phase 0: Prerequisites
 
-| Field | Detail |
-|-------|--------|
-| Intent | GitHub CLI の認証状態を確認する |
-| Requirements | — （暗黙的前提条件） |
+| Field        | Detail                          |
+| ------------ | ------------------------------- |
+| Intent       | GitHub CLI の認証状態を確認する |
+| Requirements | — （暗黙的前提条件）            |
 
 **Responsibilities & Constraints**
 - `gh auth status` による GitHub CLI の認証状態確認
@@ -366,33 +425,43 @@ flowchart TD
 
 #### Phase 1: Validation
 
-| Field | Detail |
-|-------|--------|
-| Intent | リリースバージョンを決定し、ワークツリーとテストの健全性を検証する |
-| Requirements | 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10 |
+| Field        | Detail                                                             |
+| ------------ | ------------------------------------------------------------------ |
+| Intent       | リリースバージョンを決定し、ワークツリーとテストの健全性を検証する |
+| Requirements | 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11            |
 
 **Responsibilities & Constraints**
 - バージョン番号の決定（指定 or PATCH+1 自動提案）
+- 全バージョンソースの調査と最大値の特定
 - semver 形式の妥当性検証
+- 重複バージョンの検出（crates.io, GitHub Releases, Git タグ, Marketplace）
 - 未コミット変更の自動コミット（安全なロールバック基盤の確立）
 - 全テストの通過確認
 
 **Dependencies**
 - Inbound: Phase 0 の前提条件充足 (P0)
 - External: `Cargo.toml` — 現在バージョンの読み取り (P0)
+- External: `editors/vscode/package.json` — 現在バージョンの読み取り (P0)
 - External: `cargo test` — テスト実行 (P0)
-- External: `git` — ワークツリー状態確認 (P0)
+- External: `git` — ワークツリー状態確認・タグ一覧取得 (P0)
 
 **実行手順**
 
-1. **バージョン決定** (1.1–1.6):
+1. **バージョン決定** (1.1–1.7):
    - 開発者からバージョン指定がある場合 → そのまま使用 (1.1)
-   - 指定がない場合 → `Cargo.toml` の `[workspace.package].version` を読み取り、PATCH を +1 (1.2)
-   - 提案形式: 「v0.1.2 から v0.1.3 に更新します。よろしいですか？」 (1.3)
-   - 拒否された場合 → 希望バージョンの入力を求める (1.4)
-   - semver 形式チェック: `X.Y.Z` の数値3組（`^[0-9]+\.[0-9]+\.[0-9]+$`） (1.5, 1.6)
+   - 指定がない場合 → 全バージョンソースを調査し最大値を特定 (1.3):
+     - `Cargo.toml` の `[workspace.package].version`
+     - `editors/vscode/package.json` の `version`
+     - `git tag -l "v*"` の最新タグ
+     - crates.io の公開バージョン（参考）
+     - GitHub Releases の最新リリース（参考）
+   - 最大バージョンの PATCH を +1 して提案 (1.2)
+   - 提案形式: 「v0.1.22 から v0.1.23 に更新します。よろしいですか？」 (1.4)
+   - 拒否された場合 → 希望バージョンの入力を求める (1.5)
+   - semver 形式チェック: `X.Y.Z` の数値３組（`^[0-9]+\.[0-9]+\.[0-9]+$`） (1.6)
+   - 重複チェック: 決定バージョンが既に crates.io / GitHub Releases / Git タグ / Marketplace に存在する場合はエラー (1.7)
 
-2. **ワークツリー整理** (1.7, 1.8):
+2. **ワークツリー整理** (1.8, 1.9):
    ```
    git status --porcelain
    ```
@@ -403,7 +472,7 @@ flowchart TD
      ```
    - 出力が空の場合: スキップ
 
-3. **テスト実行** (1.9, 1.10):
+3. **テスト実行** (1.10, 1.11):
    ```
    cargo test --all
    ```
@@ -414,61 +483,68 @@ flowchart TD
 
 #### Phase 2: VersionBump
 
-| Field | Detail |
-|-------|--------|
-| Intent | ワークスペース全体のバージョンを新バージョンに一括更新し、ビルド検証する |
-| Requirements | 2.1, 2.2, 2.3, 2.4, 2.5 |
+| Field        | Detail                                                                   |
+| ------------ | ------------------------------------------------------------------------ |
+| Intent       | ワークスペース全体のバージョンを新バージョンに一括更新し、ビルド検証する |
+| Requirements | 2.1, 2.2, 2.3, 2.4, 2.5, 2.6                                             |
 
 **Responsibilities & Constraints**
-- `Cargo.toml` の5箇所を正確に更新
+- `Cargo.toml` の6箇所を正確に更新
+- `editors/vscode/package.json` の `version` フィールドを同期
 - ビルド検証によるバージョン整合性の確認
-- 失敗時は `git restore Cargo.toml` で安全にロールバック
+- 失敗時は `git restore Cargo.toml editors/vscode/package.json` で安全にロールバック
 
 **Dependencies**
 - Inbound: Phase 1 のバージョン確定 (P0)
 - External: `Cargo.toml`（ルート） — 編集対象 (P0)
+- External: `editors/vscode/package.json` — 編集対象 (P0)
 - External: `cargo build` — ビルド検証 (P0)
 
 **実行手順**
 
 1. **Cargo.toml 更新** (2.1, 2.2):
-   - `replace_string_in_file` で以下の5箇所を更新:
+   - `replace_string_in_file` で以下の6箇所を更新:
      - `[workspace.package]` セクションの `version = "<OLD>"` → `version = "<NEW>"`
      - `pasta_core = { path = "crates/pasta_core", version = "<OLD>" }` → `version = "<NEW>"`
      - `pasta_dsl = { path = "crates/pasta_dsl", version = "<OLD>" }` → `version = "<NEW>"`
      - `pasta_lua = { path = "crates/pasta_lua", version = "<OLD>" }` → `version = "<NEW>"`
      - `pasta_shiori = { path = "crates/pasta_shiori", version = "<OLD>" }` → `version = "<NEW>"`
+     - `pasta_check = { path = "crates/pasta_check", version = "<OLD>" }` → `version = "<NEW>"`
 
-2. **ビルド検証** (2.3):
+2. **package.json 更新** (2.3):
+   - `replace_string_in_file` で `editors/vscode/package.json` の `"version": "<OLD>"` → `"version": "<NEW>"`
+
+3. **ビルド検証** (2.4):
    ```
    cargo build --workspace
    ```
 
-3. **エラーハンドリング** (2.4):
+4. **エラーハンドリング** (2.5):
    - ビルド失敗時:
      ```
-     git restore Cargo.toml
+     git restore Cargo.toml editors/vscode/package.json
      ```
    - エラー内容を報告し中止
 
-4. **コミット** (2.5):
+5. **コミット** (2.6):
    ```
-   git add Cargo.toml
+   git add Cargo.toml editors/vscode/package.json
    git commit -m "chore(release): bump version to vX.Y.Z"
    ```
 
 #### Phase 3: Publish
 
-| Field | Detail |
-|-------|--------|
-| Intent | 依存関係順に4クレートを crates.io に公開する |
-| Requirements | 3.1, 3.2, 3.3, 3.4, 3.5, 3.6 |
+| Field        | Detail                                       |
+| ------------ | -------------------------------------------- |
+| Intent       | 依存関係順に5クレートを crates.io に公開する |
+| Requirements | 3.1, 3.2, 3.3, 3.4, 3.5, 3.6                 |
 
 **Responsibilities & Constraints**
-- 依存関係順（`pasta_core` → `pasta_dsl` → `pasta_lua` → `pasta_shiori`）を厳守
+- 依存関係順（`pasta_core` → `pasta_dsl` → `pasta_lua` → `pasta_shiori` → `pasta_check`）を厳守
 - 各クレート公開後に10秒待機（crates.io インデックス更新待ち）
-- 失敗時は最大2回リトライ、それでも失敗なら中断
+- 失敗時は段階的バックオフでリトライ、それでも失敗なら中断
 - `pasta_sample_ghost`（`publish = false`）はスキップ
+- `pasta_check` は最後に公開（他の pasta_* クレートに依存しないバイナリ）
 
 **Dependencies**
 - Inbound: Phase 2 のバージョン更新コミット (P0)
@@ -483,6 +559,7 @@ flowchart TD
 2. `pasta_dsl`
 3. `pasta_lua`
 4. `pasta_shiori`
+5. `pasta_check`（最後 — 3.7）
 
 各クレートに対して以下を実行:
 
@@ -504,64 +581,64 @@ flowchart TD
    ```
    Start-Sleep -Seconds 10
    ```
-   - 最後のクレート（`pasta_shiori`）公開後は待機不要
+   - 最後のクレート（`pasta_check`）公開後は待機不要
 
-#### Phase 3.5: VsixPublish
+#### Phase 4: VsixPublish
 
-| Field | Detail |
-|-------|--------|
-| Intent | VSCode 拡張（VSIX）をビルドし Marketplace に公開する |
-| Requirements | VSX.1, VSX.2, VSX.3, VSX.4, VSX.5, VSX.6 |
+| Field        | Detail                                               |
+| ------------ | ---------------------------------------------------- |
+| Intent       | VSCode 拡張（VSIX）をビルドし Marketplace に公開する |
+| Requirements | 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7                    |
 
 **Responsibilities & Constraints**
 - `editors/vscode/` ディレクトリで `npm install` → `npm run package` → `vsce publish` を順次実行
 - 失敗時は警告を記録し後続フェーズに継続（非クリティカル成果物）
-- 生成された VSIX ファイルパスを `$env:VSIX_PATH` に保持（Phase 6 で使用）
+- 生成された VSIX ファイルパスを `$env:VSIX_PATH` に保持（Phase 7 で使用）
+- Marketplace 公開成功時は URL を記録
 
 **Dependencies**
 - Inbound: Phase 3 の crates.io 公開完了 (P0)
 - External: `vsce` CLI — Marketplace 公開 (P0)
-- External: `wasm-pack` — WASM ビルド (P0)
 - External: `npm` — 依存管理 (P0)
 - External: `VSCE_PAT` 環境変数 — 認証 (P0)
 
 **実行手順**
 
-1. **依存パッケージ更新** (VSX.5):
+1. **依存パッケージ更新** (4.1):
    ```
    cd editors/vscode
    npm install
    ```
-   - 失敗: 警告記録、Phase 4 へ継続
+   - 失敗: 警告記録、Phase 5 へ継続
 
-2. **VSIX パッケージング** (VSX.2):
+2. **VSIX パッケージング** (4.1):
    ```
    npm run package
    ```
    - `prepackage`（build:wasm + compile）→ `vsce package` が実行される
    - 生成ファイル: `pasta-vscode-X.Y.Z.vsix`
-   - 失敗: 警告記録、Phase 4 へ継続
+   - 失敗: 警告記録、Phase 5 へ継続
 
-3. **Marketplace 公開（段階的バックオフ）** (VSX.2, VSX.3):
+3. **Marketplace 公開（段階的バックオフ）** (4.2, 4.3):
    ```
    vsce publish
    ```
    - 成功: Marketplace URL を記録
    - 失敗時: 段階的バックオフでリトライ（待機 1分→2分→...→10分、最大10回）
    - 各リトライ前に `Start-Sleep -Seconds (N * 60)` で待機
-   - 10分待機のリトライでも失敗した場合: 警告記録、Phase 4 へ継続
+   - 10分待機のリトライでも失敗した場合: 警告記録、Phase 5 へ継続
 
-4. **VSIX パス保持** (VSX.4):
+4. **VSIX パス保持** (4.4):
    ```
    $env:VSIX_PATH = "editors/vscode/pasta-vscode-X.Y.Z.vsix"
    ```
 
-#### Phase 4: GhostBuild
+#### Phase 5: GhostBuild
 
-| Field | Detail |
-|-------|--------|
-| Intent | x86 リリースビルドの pasta.dll とサンプルゴースト hello-pasta.nar を生成し、pasta.dll.zip に圧縮する |
-| Requirements | 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8 |
+| Field        | Detail                                                                                               |
+| ------------ | ---------------------------------------------------------------------------------------------------- |
+| Intent       | x86 リリースビルドの pasta.dll とサンプルゴースト hello-pasta.nar を生成し、pasta.dll.zip に圧縮する |
+| Requirements | 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8                                                               |
 
 **Responsibilities & Constraints**
 - `release.ps1` を `crates/pasta_sample_ghost/` ディレクトリで実行
@@ -576,41 +653,41 @@ flowchart TD
 
 **実行手順**
 
-1. **ビルド実行** (4.1):
+1. **ビルド実行** (5.1):
    ```
    Push-Location crates/pasta_sample_ghost
    PowerShell -ExecutionPolicy Bypass -File release.ps1
    Pop-Location
    ```
 
-2. **成果物確認** (4.2, 4.3):
+2. **成果物確認** (5.2, 5.3):
    ```
    Test-Path "crates/pasta_sample_ghost/hello-pasta.nar"
    Test-Path "target/i686-pc-windows-msvc/release/pasta.dll"
    ```
-   - いずれかが `False`: エラー報告し中断 (4.4)
+   - いずれかが `False`: エラー報告し中断 (5.4)
 
-3. **DLL zip 圧縮** (4.5, 4.6, 4.7):
+3. **DLL zip 圧縮** (5.5, 5.6, 5.7):
    ```powershell
    Compress-Archive -Path "target/i686-pc-windows-msvc/release/pasta.dll" `
      -DestinationPath "target/i686-pc-windows-msvc/release/pasta.dll.zip" `
      -Force
    ```
    - `Test-Path "target/i686-pc-windows-msvc/release/pasta.dll.zip"` で zip 確認
-   - 失敗時はエラー報告し中断 (4.8)
+   - 失敗時はエラー報告し中断 (5.7)
 
-4. **コミット** (4.5):
+4. **コミット** (5.8):
    ```
    git add -A
    git commit -m "chore(release): build hello-pasta vX.Y.Z"
    ```
 
-#### Phase 5: TagPush
+#### Phase 6: TagPush
 
-| Field | Detail |
-|-------|--------|
-| Intent | リリースポイントを Git タグで記録し、リモートに反映する |
-| Requirements | 5.1, 5.2, 5.3, 5.4, 5.5 |
+| Field        | Detail                                                  |
+| ------------ | ------------------------------------------------------- |
+| Intent       | リリースポイントを Git タグで記録し、リモートに反映する |
+| Requirements | 6.1, 6.2, 6.3, 6.4, 6.5                                 |
 
 **Responsibilities & Constraints**
 - アノテーションタグ（`-a`）を使用
@@ -618,49 +695,49 @@ flowchart TD
 - プッシュ失敗時は手動対応を案内
 
 **Dependencies**
-- Inbound: Phase 4 のゴーストビルドコミット (P0)
+- Inbound: Phase 5 のゴーストビルドコミット (P0)
 - External: `git` — タグ・プッシュ (P0)
 - External: GitHub remote — プッシュ先 (P0)
 
 **実行手順**
 
-1. **既存タグ確認** (5.3):
+1. **既存タグ確認** (6.3):
    ```
    git tag -l "vX.Y.Z"
    ```
    - 出力がある場合: 「タグ vX.Y.Z は既に存在します。既存タグの削除が必要です。手動で `git tag -d vX.Y.Z` を実行しますか？」と確認
 
-2. **タグ作成** (5.1, 5.2):
+2. **タグ作成** (6.1, 6.2):
    ```
    git tag -a vX.Y.Z -m "Release vX.Y.Z"
    ```
 
-3. **プッシュ** (5.4, 5.5):
+3. **プッシュ** (6.4, 6.5):
    ```
    git push origin main --tags
    ```
    - 失敗時: エラー報告し「手動で `git push origin main --tags` を再実行してください」と案内
 
-#### Phase 6: Release
+#### Phase 7: Release
 
-| Field | Detail |
-|-------|--------|
-| Intent | チェンジログ付きの GitHub Release を作成し、ビルド成果物を添付する |
-| Requirements | 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 7.4 |
+| Field        | Detail                                                             |
+| ------------ | ------------------------------------------------------------------ |
+| Intent       | チェンジログ付きの GitHub Release を作成し、ビルド成果物を添付する |
+| Requirements | 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 8.4                   |
 
 **Responsibilities & Constraints**
 - `git log` からコミット履歴を取得し、LLM が Conventional Commits 形式で分類・整形
 - 仕様管理コミット（`chore(spec):`, `docs(spec):` 等）はチェンジログから除外
-- GitHub Release にリリースノートとアセット（2ファイル）を添付
+- GitHub Release にリリースノートとアセット（3ファイル）を添付
 
 **Dependencies**
-- Inbound: Phase 5 のタグプッシュ完了 (P0)
+- Inbound: Phase 6 のタグプッシュ完了 (P0)
 - External: `git log` — コミット履歴取得 (P0)
 - External: `gh` CLI — GitHub Release 作成 (P0)
 
 **実行手順**
 
-1. **コミット履歴取得** (6.1, 6.9):
+1. **コミット履歴取得** (7.1, 7.9):
    ```
    git tag -l "v*" --sort=-version:refname
    ```
@@ -673,19 +750,19 @@ flowchart TD
      git log --oneline --no-merges
      ```
 
-2. **チェンジログ整形** (6.2, 6.3):
+2. **チェンジログ整形** (7.2, 7.3):
    LLM が以下のルールでコミットを分類:
 
    **分類マッピング**:
 
-   | Conventional Prefix | チェンジログ見出し |
-   |--------------------|--------------------|
-   | `feat:` / `feat(*)` | ✨ Features |
-   | `fix:` / `fix(*)` | 🐛 Bug Fixes |
-   | `refactor:` / `refactor(*)` | ♻️ Refactoring |
-   | `docs:` / `docs(*)` | 📝 Documentation |
-   | `test:` / `test(*)` | 🧪 Tests |
-   | `chore:` / `chore(*)` | 🔧 Maintenance |
+   | Conventional Prefix         | チェンジログ見出し |
+   | --------------------------- | ------------------ |
+   | `feat:` / `feat(*)`         | ✨ Features         |
+   | `fix:` / `fix(*)`           | 🐛 Bug Fixes        |
+   | `refactor:` / `refactor(*)` | ♻️ Refactoring      |
+   | `docs:` / `docs(*)`         | 📝 Documentation    |
+   | `test:` / `test(*)`         | 🧪 Tests            |
+   | `chore:` / `chore(*)`       | 🔧 Maintenance      |
 
    **除外ルール**:
    - スコープが `spec` のコミット（`chore(spec):`, `docs(spec):` 等）は除外
@@ -712,7 +789,7 @@ flowchart TD
 3. **リリースノートファイル作成**:
    - チェンジログを一時ファイルに書き出し（`release-notes-vX.Y.Z.md`）
 
-4. **GitHub Release 作成** (6.4, 6.5, 6.6, 6.7, VSX.4):
+4. **GitHub Release 作成** (7.4, 7.5, 7.6, 7.7):
    ```powershell
    $assets = @(
      "target/i686-pc-windows-msvc/release/pasta.dll.zip",
@@ -733,7 +810,7 @@ flowchart TD
    Remove-Item release-notes-vX.Y.Z.md
    ```
 
-6. **エラーハンドリング** (6.8):
+6. **エラーハンドリング** (7.8):
    - `gh` 失敗時:
      - エラー報告
      - 手動手順を案内:
@@ -745,11 +822,11 @@ flowchart TD
          --notes-file release-notes-vX.Y.Z.md
        ```
 
-7. **完了サマリー** (7.4, VSX.6):
+7. **完了サマリー** (8.4):
    - バージョン: `vX.Y.Z`
-   - 公開クレート: `pasta_core`, `pasta_dsl`, `pasta_lua`, `pasta_shiori`
+   - 公開クレート: `pasta_core`, `pasta_dsl`, `pasta_lua`, `pasta_shiori`, `pasta_check`
    - Release URL: `https://github.com/ekicyou/pasta/releases/tag/vX.Y.Z`
-   - Marketplace: 公開成功 URL or 警告（Phase 3.5 の結果）
+   - Marketplace: 公開成功 URL or 警告（Phase 4 の結果）
 
 ## Error Handling
 
@@ -759,16 +836,17 @@ flowchart TD
 
 ### Error Categories and Responses
 
-| フェーズ | エラー種別 | 対応 | ロールバック |
-|---------|-----------|------|-------------|
-| Phase 0 | gh 認証未設定 | ガイダンス提示 → 設定待ち | 不要 |
-| Phase 1 | テスト失敗 | エラー報告・中止 | 不要（変更なし） |
-| Phase 2 | ビルド失敗 | `git restore Cargo.toml` | Cargo.toml 復元 |
-| Phase 3 | cargo publish 失敗 | 最大2回リトライ → 中断 | 既公開クレートは残す |
-| Phase 4 | release.ps1 失敗 | エラー報告・中断 | 手動対応 |
-| Phase 5 | タグ競合 | 開発者に確認 | 手動対応 |
-| Phase 5 | プッシュ失敗 | エラー報告 | 手動リトライ |
-| Phase 6 | gh 失敗 | 手動手順案内 | 手動実行 |
+| フェーズ | エラー種別         | 対応                                                 | ロールバック                   |
+| -------- | ------------------ | ---------------------------------------------------- | ------------------------------ |
+| Phase 0  | gh 認証未設定      | ガイダンス提示 → 設定待ち                            | 不要                           |
+| Phase 1  | テスト失敗         | エラー報告・中止                                     | 不要（変更なし）               |
+| Phase 2  | ビルド失敗         | `git restore Cargo.toml editors/vscode/package.json` | Cargo.toml + package.json 復元 |
+| Phase 3  | cargo publish 失敗 | 段階的バックオフリトライ → 中断                      | 既公開クレートは残す           |
+| Phase 4  | vsce publish 失敗  | 警告記録・継続                                       | 不要（非クリティカル）         |
+| Phase 5  | release.ps1 失敗   | エラー報告・中断                                     | 手動対応                       |
+| Phase 6  | タグ競合           | 開発者に確認                                         | 手動対応                       |
+| Phase 6  | プッシュ失敗       | エラー報告                                           | 手動リトライ                   |
+| Phase 7  | gh 失敗            | 手動手順案内                                         | 手動実行                       |
 
 ### セッション中断からの復旧
 
@@ -778,7 +856,7 @@ LLM セッションが途中で切断された場合の復旧手順:
 2. コミットメッセージから進捗を判断:
    - `chore(release): prepare release vX.Y.Z` → Phase 1 完了
    - `chore(release): bump version to vX.Y.Z` → Phase 2 完了
-   - `chore(release): build hello-pasta vX.Y.Z` → Phase 4 完了
+   - `chore(release): build hello-pasta vX.Y.Z` → Phase 5 完了
 3. 完了済みフェーズをスキップして再開
 
 ## Testing Strategy
@@ -787,22 +865,23 @@ LLM セッションが途中で切断された場合の復旧手順:
 
 - **Phase 1**: `cargo test --all` による全テスト通過の確認
 - **Phase 2**: `cargo build --workspace` によるビルド検証
-- **Phase 4**: `release.ps1` による成果物生成と存在確認
-- **Phase 6**: GitHub Release の作成成功確認
+- **Phase 5**: `release.ps1` による成果物生成と存在確認
+- **Phase 7**: GitHub Release の作成成功確認
 
 ### 手動検証項目
 
-| 確認項目 | 確認方法 | タイミング |
-|----------|---------|-----------|
-| crates.io にクレートが公開されたか | https://crates.io/crates/pasta_core を確認 | Phase 3 完了後 |
-| GitHub Release にアセットが添付されたか | Release ページで確認 | Phase 6 完了後 |
-| .nar ファイルが正常か | arekaで読み込みテスト | リリース後（任意） |
+| 確認項目                                | 確認方法                                   | タイミング         |
+| --------------------------------------- | ------------------------------------------ | ------------------ |
+| crates.io にクレートが公開されたか      | https://crates.io/crates/pasta_core を確認 | Phase 3 完了後     |
+| Marketplace に拡張が公開されたか        | Marketplace ページで確認                   | Phase 4 完了後     |
+| GitHub Release にアセットが添付されたか | Release ページで確認                       | Phase 7 完了後     |
+| .nar ファイルが正常か                   | arekaで読み込みテスト                      | リリース後（任意） |
 
 ## 繰り返し実行の仕様特性
 
-本仕様は Requirements 7 に基づき、以下の特殊な運用モデルを持つ:
+本仕様は Requirements 8 に基づき、以下の特殊な運用モデルを持つ:
 
-- `/kiro-spec-impl release-workflow` が実行されるたびに、全タスクの状態は初期化される (7.1)
-- `spec.json` の `phase` は `completed` に遷移せず、`ready_for_implementation` を維持する (7.2)
-- 各実行は前回の実行状態に依存しない独立した作業として動作する (7.3)
-- 実行完了時にサマリーを報告する (7.4)
+- `/kiro-impl release-workflow` が実行されるたびに、全タスクの状態は初期化される (8.1)
+- `spec.json` の `phase` は `completed` に遷移せず、`ready_for_implementation` を維持する (8.2)
+- 各実行は前回の実行状態に依存しない独立した作業として動作する (8.3)
+- 実行完了時にサマリーを報告する (8.4)
