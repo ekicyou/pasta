@@ -118,6 +118,8 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots)
                 end
                 -- yield は無視
             end
+        elseif t == "raw_script" then
+            table.insert(buffer, token.text)
         end
     end
 

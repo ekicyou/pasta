@@ -1,0 +1,1580 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.62s
+     Running unittests src\lib.rs (target\debug\deps\pasta_lua-ee4ed59085842d7e.exe)
+
+running 169 tests
+test config::tests::test_default_config ... ok
+test config::tests::test_line_ending ... ok
+test config::tests::test_with_line_ending ... ok
+test config::tests::test_without_comments ... ok
+test context::tests::test_context_new ... ok
+test context::tests::test_accumulate_file_attr_shadowing ... ok
+test context::tests::test_accumulate_file_attr_basic ... ok
+test context::tests::test_context_set_module ... ok
+test context::tests::test_merge_attrs_file_only ... ok
+test context::tests::test_merge_attrs_scene_adds_new_key ... ok
+test context::tests::test_merge_attrs_scene_overrides_file ... ok
+test context::tests::test_register_global_scene ... ok
+test context::tests::test_register_global_words ... ok
+test context::tests::test_register_local_words_multi_key ... ok
+test context::tests::test_register_local_scene ... ok
+test context::tests::test_register_local_words ... ok
+test context::tests::test_register_global_words_multi_key ... ok
+test encoding::tests::test_to_ansi_bytes_empty ... ok
+test encoding::tests::test_encoding_enum ... ok
+test encoding::tests::test_to_ansi_bytes_ascii ... ok
+test encoding::tests::test_to_ansi_bytes_japanese ... ok
+test encoding::tests::test_to_ansi_bytes_roundtrip ... ok
+test encoding::windows::tests::test_ansi_to_bytes ... ok
+test encoding::windows::tests::test_ansi_to_string ... ok
+test encoding::windows::tests::test_empty_string ... ok
+test encoding::windows::tests::test_multi_byte_to_wide_char_utf8 ... ok
+test encoding::windows::tests::test_oem_to_bytes ... ok
+test encoding::windows::tests::test_oem_to_string ... ok
+test encoding::windows::tests::test_wide_char_to_multi_byte_ascii ... ok
+test error::tests::test_span_display_format ... ok
+test error::tests::test_span_display_multiline ... ok
+test error::tests::test_transpile_error_invalid_ast ... ok
+test error::tests::test_transpile_error_invalid_continuation ... ok
+test error::tests::test_transpile_error_io ... ok
+test loader::context::tests::test_absolute_search_paths ... ok
+test loader::context::tests::test_from_config ... ok
+test loader::context::tests::test_from_config_with_custom_fields ... ok
+test loader::context::tests::test_generate_package_path ... ok
+test loader::context::tests::test_generate_package_path_bytes_ascii ... ok
+test loader::context::tests::test_generate_package_path_bytes_japanese ... ok
+test loader::context::tests::test_generate_package_path_bytes_not_empty ... ok
+test loader::context::tests::test_new ... ok
+test loader::error::tests::test_directory_not_found_display ... ok
+test loader::error::tests::test_error_source_chain ... ok
+test loader::error::tests::test_io_error_display ... ok
+test loader::error::tests::test_parse_error_display ... ok
+test logging::registry::tests::test_load_dir_context ... ok
+test logging::registry::tests::test_load_dir_guard ... ok
+test logging::registry::tests::test_registry_singleton ... ok
+test normalize::tests::test_normalize_blank_line_before_end ... ok
+test normalize::tests::test_normalize_blank_line_before_indented_end ... ok
+test normalize::tests::test_normalize_crlf_input ... ok
+test normalize::tests::test_normalize_empty_input ... ok
+test normalize::tests::test_normalize_existing_single_newline ... ok
+test normalize::tests::test_normalize_lua_do_block ... ok
+test normalize::tests::test_normalize_mixed_line_endings ... ok
+test normalize::tests::test_normalize_multi_line_content ... ok
+test normalize::tests::test_normalize_multiple_blank_lines_before_end ... ok
+test normalize::tests::test_normalize_multiple_extra_blank_lines ... ok
+test normalize::tests::test_normalize_nested_end_blocks ... ok
+test normalize::tests::test_normalize_no_trailing_newline ... ok
+test normalize::tests::test_normalize_preserves_intermediate_blank_lines ... ok
+test normalize::tests::test_normalize_single_extra_blank_line ... ok
+test loader::discovery::tests::test_discover_nonexistent_directory ... ok
+test normalize::tests::test_normalize_trailing_whitespace_only ... ok
+test logging::logger::tests::test_path_validation_rejects_non_profile ... ok
+test logging::logger::tests::test_path_validation_rejects_traversal ... ok
+test runtime::enc::tests::test_register_creates_table ... ok
+test runtime::enc::tests::test_to_utf8_ascii ... ok
+test runtime::enc::tests::test_to_ansi_type_error ... ok
+test runtime::enc::tests::test_to_ansi_ascii ... ok
+test runtime::enc::tests::test_to_utf8_type_error ... ok
+test loader::discovery::tests::test_discover_empty_directory ... ok
+test runtime::enc::tests::test_roundtrip_japanese ... ok
+test runtime::persistence::tests::test_load_nonexistent_returns_error ... ok
+test runtime::persistence::tests::test_empty_file_returns_empty_object ... ok
+test runtime::persistence::tests::test_lua_module_load ... ok
+test loader::discovery::tests::test_discover_multiple_patterns ... ok
+test runtime::persistence::tests::test_lua_module_save_and_load ... ok
+test runtime::persistence::tests::test_nested_table_serialization ... ok
+test runtime::persistence::tests::test_atomic_write_creates_directory ... ok
+test runtime::persistence::tests::test_save_load_json ... ok
+test logging::logger::tests::test_logger_creation ... ok
+test sakura_script::line_breaker::tests::test_empty_input_returns_empty ... ok
+test sakura_script::line_breaker::tests::test_empty_widths_returns_input_unchanged ... ok
+test sakura_script::line_breaker::tests::test_leading_tags_preserved ... ok
+test sakura_script::line_breaker::tests::test_existing_newline_tag_preserved ... ok
+test loader::discovery::tests::test_discover_excludes_root_dic ... ok
+test logging::logger::tests::test_log_file_is_fixed_name_no_date_suffix ... ok
+test sakura_script::line_breaker::tests::test_multiple_width_thresholds ... ok
+test loader::discovery::tests::test_discover_default_pattern ... ok
+test sakura_script::line_breaker::tests::test_last_width_repeats_for_subsequent_lines ... ok
+test sakura_script::line_breaker::tests::test_oversized_word_then_normal ... ok
+test runtime::persistence::tests::test_load_corrupted_returns_error ... ok
+test runtime::persistence::tests::test_save_load_obfuscated ... ok
+test runtime::persistence::tests::test_auto_detect_format ... ok
+test sakura_script::line_breaker::tests::test_single_oversized_word_no_forced_break ... ok
+test sakura_script::line_breaker::tests::test_tokenize_plain_only ... ok
+test sakura_script::line_breaker::tests::test_tags_excluded_from_width_and_preserved ... ok
+test sakura_script::line_breaker::tests::test_plain_text_no_break_when_fits ... ok
+test sakura_script::line_breaker::tests::test_tokenize_tags_only ... ok
+test sakura_script::line_breaker::tests::test_tokenize_with_tags ... ok
+test loader::discovery::tests::test_discover_excludes_profile ... ok
+test sakura_script::line_breaker::tests::test_wider_last_width_produces_fewer_breaks ... ok
+test sakura_script::tests::test_register_creates_module_table ... ok
+test sakura_script::tokenizer::tests::test_tokenize_consecutive_punctuation ... ok
+test sakura_script::tokenizer::tests::test_tokenize_comma ... ok
+test sakura_script::tokenizer::tests::test_tokenize_complex_tag ... ok
+test sakura_script::tests::test_version_and_description ... ok
+test sakura_script::tokenizer::tests::test_tokenize_empty_string ... ok
+test sakura_script::line_breaker::tests::test_plain_japanese_text_breaks_at_word_boundary ... ok
+test sakura_script::wait_inserter::tests::test_consecutive_punctuation_max_wait ... ok
+test sakura_script::wait_inserter::tests::test_empty_tokens ... ok
+test sakura_script::tokenizer::tests::test_tokenize_period ... ok
+test sakura_script::tokenizer::tests::test_tokenize_general_text ... ok
+test sakura_script::tokenizer::tests::test_tokenize_strong ... ok
+test sakura_script::wait_inserter::tests::test_leader_per_char_wait ... ok
+test sakura_script::wait_inserter::tests::test_general_text_wait ... ok
+test sakura_script::tokenizer::tests::test_tokenize_leader ... ok
+test sakura_script::tokenizer::tests::test_tokenize_sakura_script_tag ... ok
+test sakura_script::tokenizer::tests::test_tokenize_line_prohibited ... ok
+test sakura_script::wait_inserter::tests::test_requirement_7_1_example ... ok
+test sakura_script::wait_inserter::tests::test_requirement_7_2_example ... ok
+test sakura_script::wait_inserter::tests::test_requirement_7_3_example ... ok
+test sakura_script::tokenizer::tests::test_tokenize_symbol_tag_ampersand ... ok
+test sakura_script::wait_inserter::tests::test_period_wait ... ok
+test sakura_script::wait_inserter::tests::test_negative_wait_skip ... ok
+test sakura_script::wait_inserter::tests::test_sakura_script_no_wait ... ok
+test sakura_script::tokenizer::tests::test_tokenize_symbol_tag_asterisk ... ok
+test string_literalizer::tests::test_long_string_n1_pattern ... ok
+test string_literalizer::tests::test_long_string_with_backslash_and_bracket ... ok
+test string_literalizer::tests::test_danger_pattern_n1 ... ok
+test string_literalizer::tests::test_long_string_with_backslash ... ok
+test string_literalizer::tests::test_long_string_n2_pattern ... ok
+test sakura_script::wait_inserter::tests::test_line_end_prohibited_no_wait ... ok
+test sakura_script::wait_inserter::tests::test_zero_wait_skip ... ok
+test string_literalizer::tests::test_danger_pattern_n0 ... ok
+test sakura_script::wait_inserter::tests::test_mixed_text ... ok
+test string_literalizer::tests::test_danger_pattern_n2 ... ok
+test sakura_script::tokenizer::tests::test_tokenize_symbol_tag_hyphen ... ok
+test string_literalizer::tests::test_long_string_with_bracket ... ok
+test sakura_script::tokenizer::tests::test_tokenize_mixed ... ok
+test string_literalizer::tests::test_long_string_with_quote ... ok
+test string_literalizer::tests::test_needs_long_string_plain_text ... ok
+test string_literalizer::tests::test_needs_long_string_with_backslash ... ok
+test string_literalizer::tests::test_needs_long_string_with_quote ... ok
+test string_literalizer::tests::test_sakura_script_s0 ... ok
+test string_literalizer::tests::test_sakura_script_s10 ... ok
+test string_literalizer::tests::test_simple_string_japanese ... ok
+test string_literalizer::tests::test_simple_string_no_special_chars ... ok
+test transpiler::tests::test_transpile_empty ... ok
+test transpiler::tests::test_transpile_actor ... ok
+test sakura_script::tokenizer::tests::test_tokenize_unicode_preservation ... ok
+test transpiler::tests::test_transpile_multi_key_actor_word_lua_output ... ok
+test transpiler::tests::test_transpile_multi_key_actor_word_registration ... ok
+test transpiler::tests::test_transpile_multi_key_global_word_lua_output ... ok
+test transpiler::tests::test_transpile_multi_key_global_word_registration ... ok
+test transpiler::tests::test_transpile_multiple_scenes ... ok
+test transpiler::tests::test_transpile_registers_actor_words ... ok
+test transpiler::tests::test_transpile_registers_global_scene ... ok
+test transpiler::tests::test_transpile_registers_local_scene ... ok
+test sakura_script::tokenizer::tests::test_tokenize_symbol_tag_plus ... ok
+test transpiler::tests::test_transpile_registers_local_words ... ok
+test sakura_script::tokenizer::tests::test_tokenize_symbol_tag_underscore_question ... ok
+test transpiler::tests::test_transpile_scene ... ok
+test sakura_script::tokenizer::tests::test_tokenize_symbol_tag_mixed_text ... ok
+test transpiler::tests::test_transpile_single_key_backward_compat_lua_output ... ok
+test transpiler::tests::test_transpile_with_global_words ... ok
+test transpiler::tests::test_transpiler_default ... ok
+
+test result: ok. 169 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+
+     Running tests\japanese_identifier_test.rs (target\debug\deps\japanese_identifier_test-85b47184d849aa15.exe)
+
+running 2 tests
+test test_japanese_function_names ... ok
+test test_japanese_identifier_support ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests\loader\main.rs (target\debug\deps\loader-cb34de931eb60bbb.exe)
+
+running 96 tests
+test cache_test::test_source_to_cache_path_nested ... ok
+test cache_test::test_source_to_module_name_japanese ... ok
+test cache_test::test_source_to_cache_path_simple ... ok
+test cache_test::test_source_to_module_name_nested ... ok
+test cache_test::test_source_to_module_name_deep_nested ... ok
+test common::e2e_helpers::tests::test_transpile_basic_scene ... ok
+test cache_test::test_source_to_module_name_simple ... ok
+test cache_test::test_source_to_module_name_with_hyphen ... ok
+test common::e2e_helpers::tests::test_create_runtime_with_finalize_succeeds ... ok
+test cache_test::test_find_orphaned_caches ... ok
+test cache_test::test_needs_transpile_no_cache ... ok
+test cache_test::test_save_cache_creates_file ... ok
+test cache_test::test_prepare_cache_dir_preserves_cache_on_version_match ... ok
+test cache_test::test_prepare_cache_dir_creates_version_file ... ok
+test cache_test::test_save_cache_creates_nested_dirs ... ok
+test config_test::test_default_config ... ok
+test config_test::test_default_lua_search_paths_contains_user_scripts ... ok
+test config_test::test_default_lua_search_paths_user_scripts_priority ... ok
+test config_test::test_deserialize_full_config ... ok
+test config_test::test_deserialize_minimal_config ... ok
+test cache_test::test_generate_scene_dic_empty ... ok
+test config_test::test_deserialize_with_custom_fields ... ok
+test cache_test::test_generate_scene_dic ... ok
+test config_test::test_deserialize_without_loader_section ... ok
+test config_test::test_logging_config_default ... ok
+test config_test::test_loader_config_default_includes_user_scripts ... ok
+test config_test::test_logging_config_defaults_when_partial ... ok
+test config_test::test_logging_config_from_toml_with_filter ... ok
+test config_test::test_logging_config_from_toml ... ok
+test config_test::test_logging_config_from_toml_with_level ... ok
+test config_test::test_logging_config_none_when_missing ... ok
+test config_test::test_logging_config_to_filter_directive_default ... ok
+test config_test::test_lua_config_default ... ok
+test config_test::test_lua_config_defaults_when_libs_omitted ... ok
+test config_test::test_logging_config_to_filter_directive_with_filter ... ok
+test cache_test::test_prepare_cache_dir_clears_on_version_mismatch ... ok
+test config_test::test_logging_config_to_filter_directive_with_level_only ... ok
+test config_test::test_lua_config_empty_array ... ok
+test config_test::test_lua_config_from_toml ... ok
+test config_test::test_lua_config_none_when_section_missing ... ok
+test config_test::test_lua_config_with_subtraction ... ok
+test config_test::test_persistence_config_default ... ok
+test config_test::test_persistence_config_from_toml ... ok
+test config_test::test_persistence_config_defaults_when_partial ... ok
+test config_test::test_persistence_config_none_when_missing ... ok
+test config_test::test_persistence_effective_file_path ... ok
+test cache_test::test_needs_transpile_cache_newer ... ok
+test cache_test::test_needs_transpile_cache_older ... ok
+test config_actors_initialization_test::test_config_actors_have_name_field ... ok
+test config_actors_initialization_test::test_dynamic_actor_reflects_in_config ... ok
+test config_actors_initialization_test::test_dynamic_and_config_actors_coexist ... ok
+test config_actors_initialization_test::test_get_or_create_preserves_config_properties ... ok
+test config_actors_initialization_test::test_config_actors_have_metatable ... ok
+test lifecycle_test::test_scene_dic_new_path ... ok
+test lifecycle_test::test_cache_incremental_update ... ok
+test config_actors_initialization_test::test_config_actors_can_use_metatable_methods ... ok
+test config_actors_initialization_test::test_store_actors_is_config_actor_reference ... ok
+test lua_passthrough_test::test_cache_manager_orphan_with_lua_source ... ok
+test lifecycle_test::test_directories_created ... ok
+test config_actors_initialization_test::test_store_actors_has_config_values ... ok
+test config_actors_initialization_test::test_config_actor_name_via_config_module ... ok
+test lifecycle_test::test_main_lua_executed_before_scene_dic ... ok
+test lua_passthrough_test::test_partial_transpile_error_display_includes_paths ... ok
+test config_actors_initialization_test::test_store_actors_empty_when_no_config_actor ... ok
+test lifecycle_test::test_default_main_lua_fallback ... ok
+test lifecycle_test::test_dictionary_registration_in_main_lua ... ok
+test lifecycle_test::test_scene_dic_old_path_cleanup ... ok
+test startup_test::test_config_load_not_found ... ok
+test startup_test::test_config_load_with_file ... ok
+test lifecycle_test::test_scene_dic_require_resolution ... ok
+test lua_passthrough_test::test_init_lua_rejected ... ok
+test startup_test::test_load_nonexistent_directory ... ok
+test lifecycle_test::test_scripts_module_priority ... ok
+test lua_passthrough_test::test_init_pasta_rejected ... ok
+test lua_passthrough_test::test_lua_file_in_scene_dic ... ok
+test lua_passthrough_test::test_lua_file_detected_and_cached ... ok
+test lifecycle_test::test_scripts_priority_over_pasta_scripts ... ok
+test lua_passthrough_test::test_partial_transpile_error_on_broken_pasta ... ok
+test lua_passthrough_test::test_lua_not_transpiled ... ok
+test lua_passthrough_test::test_lua_incremental_update ... ok
+test lua_passthrough_test::test_profile_lua_excluded ... ok
+test lua_passthrough_test::test_pasta_and_lua_mixed ... ok
+test lua_passthrough_test::test_pasta_takes_priority_over_lua_on_conflict ... ok
+test lua_passthrough_test::test_no_conflict_different_dirs ... ok
+test lua_passthrough_test::test_lua_orphan_cache_detected ... ok
+test startup_test::test_load_minimal ... ok
+test startup_test::test_load_with_config ... ok
+test startup_test::test_load_empty_dic ... ok
+test startup_test::test_package_path_set ... ok
+test startup_test::test_load_with_custom_config ... ok
+test startup_test::test_shiori_act_uses_config_spot_newlines ... ok
+test startup_test::test_pasta_config_nested_table ... ok
+test startup_test::test_pasta_config_deeply_nested ... ok
+test startup_test::test_pasta_config_returns_default_for_missing_section ... ok
+test startup_test::test_pasta_config_ghost_section ... ok
+test startup_test::test_pasta_config_excludes_loader ... ok
+
+test result: ok. 96 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.44s
+
+     Running tests\log\main.rs (target\debug\deps\log-89a009e520c7c99a.exe)
+
+running 33 tests
+test module_test::test_log_debug_outputs_message ... ok
+test module_test::test_log_contains_caller_fn ... ok
+test module_test::test_log_error_outputs_message ... ok
+test module_test::test_log_boolean_true ... ok
+test module_test::test_log_circular_reference_no_error ... ok
+test module_test::test_log_contains_caller_source ... ok
+test module_test::test_log_boolean_false ... ok
+test module_test::test_log_contains_caller_line ... ok
+test module_test::test_log_array_table_as_json ... ok
+test module_test::test_log_info_outputs_message ... ok
+test module_test::test_log_integer_value ... ok
+test module_test::test_log_no_argument ... ok
+test module_test::test_log_number_value ... ok
+test module_test::test_log_large_table_abbreviated ... ok
+test module_test::test_log_table_as_json ... ok
+test module_test::test_log_string_value ... ok
+test module_test::test_log_nested_table_json ... ok
+test module_test::test_log_trace_outputs_message ... ok
+test module_test::test_log_nil_value ... ok
+test module_test::test_module_accessible_via_require ... ok
+test module_test::test_log_warn_outputs_message ... ok
+test module_test::test_module_has_version ... ok
+test module_test::test_module_has_description ... ok
+test module_test::test_module_has_all_functions ... ok
+test stack_level_test::test_inspect_stack_level_verification ... ok
+test stack_level_test::test_stack_level_gives_lua_caller ... ok
+test integration_test::test_pasta_log_works_with_minimal_config ... ok
+test integration_test::test_pasta_log_metadata_via_runtime ... ok
+test integration_test::test_pasta_log_output_via_runtime ... ok
+test integration_test::test_pasta_log_coexists_with_other_modules ... ok
+test integration_test::test_pasta_log_all_functions_via_runtime ... ok
+test integration_test::test_pasta_log_without_pasta_logger ... ok
+test integration_test::test_pasta_log_registered_via_with_config ... ok
+
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests\lua_unittest_runner.rs (target\debug\deps\lua_unittest_runner-25ccef6b25cb0c3d.exe)
+
+running 1 test
+Lua package.path configured:
+C:\home\maz\git\pasta\crates/pasta_lua/pasta_scripts/?.lua;C:\home\maz\git\pasta\crates/pasta_lua/pasta_scripts/?/init.lua;C:\home\maz\git\pasta\crates/pasta_lua/scriptlibs/?.lua;C:\home\maz\git\pasta\crates/pasta_lua/scriptlibs/?/init.lua;C:\home\maz\git\pasta\crates/pasta_lua/tests/lua_specs/?.lua;;.\?.lua;C:\home\maz\git\pasta\target\debug\deps\lua\?.lua;C:\home\maz\git\pasta\target\debug\deps\lua\?\init.lua;
+=====================================
+Running Lua test suites...
+=====================================
+
+[SUITE] actor_word_test
+word module - actor registry (5/5)[92m笨・[0m
+  create_actor returns word builder [92m笨・[0m
+  create_actor registers actor in registry [92m笨・[0m
+  get_actor_words returns nil for unknown actor [92m笨・[0m
+  get_global_words returns GLOBAL table [92m笨・[0m
+  get_local_words returns nil for unknown scene [92m笨・[0m
+word module - actor registry (5/5)[92m笨・[0m
+[92mAll tests passed.[0m
+  笨・actor_word_test loaded successfully
+
+[SUITE] store_save_test
+pasta.save - persistence module (2/2)[92m笨・[0m
+  pasta.save returns a table [92m笨・[0m
+  pasta.save can store and retrieve values [92m笨・[0m
+pasta.save - persistence module (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+pasta.store - save field removed (2/2)[92m笨・[0m
+  STORE.save is nil (deprecated) [92m笨・[0m
+  STORE.reset() works without save field [92m笨・[0m
+pasta.store - save field removed (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+pasta.act - save from pasta.save (3/3)[92m笨・[0m
+  ACT.new() returns act with save from pasta.save [92m笨・[0m
+  ACT.new(actors) sets actors correctly while save references pasta.save [92m笨・[0m
+  ACT.new() with nil actors sets empty actors table [92m笨・[0m
+pasta.act - save from pasta.save (3/3)[92m笨・[0m
+[92mAll tests passed.[0m
+pasta.save and act.save - reference identity (3/3)[92m笨・[0m
+  act.save changes reflect in pasta.save [92m笨・[0m
+  pasta.save changes reflect in act.save [92m笨・[0m
+  multiple ACT instances share the same pasta.save [92m笨・[0m
+pasta.save and act.save - reference identity (3/3)[92m笨・[0m
+[92mAll tests passed.[0m
+  笨・store_save_test loaded successfully
+
+[SUITE] persistence_spec
+@pasta_persistence module (4/4)[92m笨・[0m
+  module is loadable [92m笨・[0m
+  load returns a table [92m笨・[0m
+  save accepts a table and returns success [92m笨・[0m
+  save and load preserve data [92m笨・[0m
+@pasta_persistence module (4/4)[92m笨・[0m
+[92mAll tests passed.[0m
+pasta.save module (via @pasta_persistence) (4/4)[92m笨・[0m
+  pasta.save is loadable [92m笨・[0m
+  pasta.save persists data across requires [92m笨・[0m
+  pasta.save supports nested tables [92m笨・[0m
+  pasta.save supports arrays [92m笨・[0m
+pasta.save module (via @pasta_persistence) (4/4)[92m笨・[0m
+[92mAll tests passed.[0m
+act.save integration with persistence (3/3)[92m笨・[0m
+  act.save references pasta.save [92m笨・[0m
+  changes in act.save reflect in pasta.save [92m笨・[0m
+  changes in pasta.save reflect in act.save [92m笨・[0m
+act.save integration with persistence (3/3)[92m笨・[0m
+[92mAll tests passed.[0m
+STORE.save deprecation (1/1)[92m笨・[0m
+  STORE.save is nil (removed) [92m笨・[0m
+STORE.save deprecation (1/1)[92m笨・[0m
+[92mAll tests passed.[0m
+  笨・persistence_spec loaded successfully
+
+[SUITE] act_impl_call_test
+ACT_IMPL.call - Level 1 (current_scene) (3/3)[92m笨・[0m
+  current_scene[key]縺九ｉ豁｣縺励￥繝上Φ繝峨Λ繝ｼ繧貞叙蠕励〒縺阪ｋ [92m笨・[0m
+  current_scene == nil 縺ｮ蝣ｴ蜷医´evel 2縺ｸ繧ｹ繧ｭ繝・・・・il螳牙・諤ｧ・・[92m笨・[0m
+  current_scene[key] == nil 縺ｮ蝣ｴ蜷医´evel 2縺ｸ騾ｲ繧 [92m笨・[0m
+ACT_IMPL.call - Level 1 (current_scene) (3/3)[92m笨・[0m
+[92mAll tests passed.[0m
+ACT_IMPL.call - Level 3 (pasta.global) (2/2)[92m笨・[0m
+  pasta.global[key]縺九ｉ豁｣縺励￥繝上Φ繝峨Λ繝ｼ繧貞叙蠕励〒縺阪ｋ [92m笨・[0m
+  Level 1, 2縺系il縺ｮ蝣ｴ蜷医↓Level 3縺悟他縺ｰ繧後ｋ [92m笨・[0m
+ACT_IMPL.call - Level 3 (pasta.global) (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+ACT_IMPL.call - Priority (2/2)[92m笨・[0m
+  隍・焚繝ｬ繝吶Ν縺ｫ蜷後§繧ｭ繝ｼ縺悟ｭ伜惠縺吶ｋ蝣ｴ蜷医´evel 1縺悟━蜈医＆繧後ｋ [92m笨・[0m
+  Level 1縺系il縺ｧLevel 3縺悟ｭ伜惠縺吶ｋ蝣ｴ蜷医´evel 3縺御ｽｿ繧上ｌ繧・[92m笨・[0m
+ACT_IMPL.call - Priority (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+ACT_IMPL.call - Handler Not Found (2/2)[92m笨・[0m
+  縺吶∋縺ｦ縺ｮ繝ｬ繝吶Ν縺ｧnil縺ｮ蝣ｴ蜷医］il繧定ｿ泌唆縺吶ｋ [92m笨・[0m
+  繧ｨ繝ｩ繝ｼ縺檎匱逕溘＠縺ｪ縺・ｼ医し繧､繝ｬ繝ｳ繝亥虚菴懶ｼ・[92m笨・[0m
+ACT_IMPL.call - Handler Not Found (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+ACT_IMPL.call - Handler Execution (3/3)[92m笨・[0m
+  蜿ｯ螟蛾聞蠑墓焚縺梧ｭ｣縺励￥繝上Φ繝峨Λ繝ｼ縺ｫ貂｡縺輔ｌ繧・[92m笨・[0m
+  繝上Φ繝峨Λ繝ｼ縺ｮ謌ｻ繧雁､縺梧ｭ｣縺励￥霑泌唆縺輔ｌ繧・[92m笨・[0m
+  繝上Φ繝峨Λ繝ｼ縺系il繧定ｿ斐＠縺溷ｴ蜷医］il縺梧ｭ｣縺励￥霑泌唆縺輔ｌ繧・[92m笨・[0m
+ACT_IMPL.call - Handler Execution (3/3)[92m笨・[0m
+[92mAll tests passed.[0m
+  笨・ACT_IMPL.call tests defined
+  笨・act_impl_call_test loaded successfully
+
+[SUITE] act_test
+ACT - surface() (3/3)[92m笨・[0m
+  闢・ｩ阪ヨ繝ｼ繧ｯ繝ｳ縺ｫ { type = 'surface', id = id } 繧定ｿｽ蜉縺吶ｋ [92m笨・[0m
+  譁・ｭ怜・ID繧偵し繝昴・繝医☆繧・[92m笨・[0m
+  繝｡繧ｽ繝・ラ繝√ぉ繝ｼ繝ｳ逕ｨ縺ｫself繧定ｿ斐☆ [92m笨・[0m
+ACT - surface() (3/3)[92m笨・[0m
+[92mAll tests passed.[0m
+ACT - wait() (5/5)[92m笨・[0m
+  闢・ｩ阪ヨ繝ｼ繧ｯ繝ｳ縺ｫ { type = 'wait', ms = ms } 繧定ｿｽ蜉縺吶ｋ [92m笨・[0m
+  雋縺ｮ蛟､縺ｯ0縺ｫ螟画鋤縺吶ｋ [92m笨・[0m
+  蟆乗焚轤ｹ莉･荳九ｒ蛻・ｊ謐ｨ縺ｦ繧・[92m笨・[0m
+  nil縺ｯ0縺ｨ縺励※謇ｱ縺・[92m笨・[0m
+  繝｡繧ｽ繝・ラ繝√ぉ繝ｼ繝ｳ逕ｨ縺ｫself繧定ｿ斐☆ [92m笨・[0m
+ACT - wait() (5/5)[92m笨・[0m
+[92mAll tests passed.[0m
+ACT - newline() (3/3)[92m笨・[0m
+  闢・ｩ阪ヨ繝ｼ繧ｯ繝ｳ縺ｫ { type = 'newline', n = n } 繧定ｿｽ蜉縺吶ｋ [92m笨・[0m
+  蠑墓焚縺ｪ縺励・蝣ｴ蜷医・n=1繧偵ョ繝輔か繝ｫ繝医→縺吶ｋ [92m笨・[0m
+  繝｡繧ｽ繝・ラ繝√ぉ繝ｼ繝ｳ逕ｨ縺ｫself繧定ｿ斐☆ [92m笨・[0m
+ACT - newline() (3/3)[92m笨・[0m
+[92mAll tests passed.[0m
+ACT - clear() (2/2)[92m笨・[0m
+  闢・ｩ阪ヨ繝ｼ繧ｯ繝ｳ縺ｫ { type = 'clear' } 繧定ｿｽ蜉縺吶ｋ [92m笨・[0m
+  繝｡繧ｽ繝・ラ繝√ぉ繝ｼ繝ｳ逕ｨ縺ｫself繧定ｿ斐☆ [92m笨・[0m
+ACT - clear() (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+ACT - set_spot() 繝医・繧ｯ繝ｳ蛹・(3/3)[92m笨・[0m
+  set_spot()縺梧ｭ｣縺励＞繝医・繧ｯ繝ｳ讒矩{type='spot', actor=Actor, spot=N}繧堤函謌舌☆繧・[92m笨・[0m
+  set_spot()蜻ｼ縺ｳ蜃ｺ縺怜ｾ後ｂactor.spot縺悟､画峩縺輔ｌ縺ｦ縺・↑縺・ｼ育憾諷九Ξ繧ｹ蛹厄ｼ・[92m笨・[0m
+  set_spot()縺ｧspot繝医・繧ｯ繝ｳ繧堤函謌仙ｾ後∥ctor縺ｮspot螻樊ｧ縺ｯ荳榊､・[92m笨・[0m
+ACT - set_spot() 繝医・繧ｯ繝ｳ蛹・(3/3)[92m笨・[0m
+[92mAll tests passed.[0m
+ACT - clear_spot() 繝医・繧ｯ繝ｳ蛹・(2/2)[92m笨・[0m
+  clear_spot()縺梧ｭ｣縺励＞繝医・繧ｯ繝ｳ讒矩{type='clear_spot'}繧堤函謌舌☆繧・[92m笨・[0m
+  clear_spot()蜻ｼ縺ｳ蜃ｺ縺怜ｾ後ｂactor繧ｪ繝悶ず繧ｧ繧ｯ繝医′螟画峩縺輔ｌ縺ｦ縺・↑縺・[92m笨・[0m
+ACT - clear_spot() 繝医・繧ｯ繝ｳ蛹・(2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+ACT - talk() actor諠・ｱ莉倥″繝医・繧ｯ繝ｳ逕滓・ (3/3)[92m笨・[0m
+  talk()縺鶏type='talk', actor=Actor, text=text}繝医・繧ｯ繝ｳ繧堤函謌舌☆繧・[92m笨・[0m
+  talk()縺径ctor繝医・繧ｯ繝ｳ繧堤函謌舌＠縺ｪ縺・ｼ育憾諷九Ξ繧ｹ蛹厄ｼ・[92m笨・[0m
+  talk()縺茎pot_switch繝医・繧ｯ繝ｳ繧堤函謌舌＠縺ｪ縺・ｼ育憾諷九Ξ繧ｹ蛹厄ｼ・[92m笨・[0m
+ACT - talk() actor諠・ｱ莉倥″繝医・繧ｯ繝ｳ逕滓・ (3/3)[92m笨・[0m
+[92mAll tests passed.[0m
+ACT - 迥ｶ諷九ヵ繧｣繝ｼ繝ｫ繝牙炎髯､ (3/3)[92m笨・[0m
+  ACT.new()縺ｧnow_actor繝輔ぅ繝ｼ繝ｫ繝峨′蟄伜惠縺励↑縺・[92m笨・[0m
+  ACT.new()縺ｧ_current_spot繝輔ぅ繝ｼ繝ｫ繝峨′蟄伜惠縺励↑縺・[92m笨・[0m
+  talk()蜻ｼ縺ｳ蜃ｺ縺怜ｾ後ｂnow_actor縺瑚ｨｭ螳壹＆繧後↑縺・[92m笨・[0m
+ACT - 迥ｶ諷九ヵ繧｣繝ｼ繝ｫ繝牙炎髯､ (3/3)[92m笨・[0m
+[92mAll tests passed.[0m
+ACT - 繧｢繧ｯ繧ｿ繝ｼ繝励Ο繧ｭ繧ｷ縺ｮ迢ｬ遶区ｧ (2/2)[92m笨・[0m
+  set_spot()蜻ｼ縺ｳ蜃ｺ縺励↑縺励〒act.縺輔￥繧・talk()縺悟虚菴懊☆繧・[92m笨・[0m
+  繝励Ο繧ｭ繧ｷ邨檎罰縺ｮtalk()縺梧ｭ｣縺励＞繝医・繧ｯ繝ｳ・・ctor莉倥″・峨ｒ逕滓・縺吶ｋ [92m笨・[0m
+ACT - 繧｢繧ｯ繧ｿ繝ｼ繝励Ο繧ｭ繧ｷ縺ｮ迢ｬ遶区ｧ (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+ACT - talk()蝗ｺ螳壽隼陦碁勁蜴ｻ (1/1)[92m笨・[0m
+  talk()蠕後↓newline繝医・繧ｯ繝ｳ繧定・蜍墓諺蜈･縺励↑縺・[92m笨・[0m
+ACT - talk()蝗ｺ螳壽隼陦碁勁蜴ｻ (1/1)[92m笨・[0m
+[92mAll tests passed.[0m
+ACT - build() (3/3)[92m笨・[0m
+  繝医・繧ｯ繝ｳ驟榊・繧定ｿ泌唆縺吶ｋ [92m笨・[0m
+  build()蠕後↓self.token繧堤ｩｺ驟榊・縺ｫ繝ｪ繧ｻ繝・ヨ縺吶ｋ [92m笨・[0m
+  繝医・繧ｯ繝ｳ0莉ｶ譎ゅ・nil繧定ｿ斐☆ (act-build-early-return) [92m笨・[0m
+ACT - build() (3/3)[92m笨・[0m
+[92mAll tests passed.[0m
+ACT - yield() (3/3)[92m笨・[0m
+  yield()縺ｯself:build()繧貞他縺ｳ蜃ｺ縺・[92m笨・[0m
+  yield()蠕後↓繝医・繧ｯ繝ｳ縺後Μ繧ｻ繝・ヨ縺輔ｌ繧・[92m笨・[0m
+  yield()縺ｯ繝｡繧ｽ繝・ラ繝√ぉ繝ｼ繝ｳ逕ｨ縺ｫself繧定ｿ斐☆ [92m笨・[0m
+ACT - yield() (3/3)[92m笨・[0m
+[92mAll tests passed.[0m
+ACT - end_action()蜑企勁 (1/1)[92m笨・[0m
+  end_action()繝｡繧ｽ繝・ラ縺悟ｭ伜惠縺励↑縺・[92m笨・[0m
+ACT - end_action()蜑企勁 (1/1)[92m笨・[0m
+[92mAll tests passed.[0m
+ACT - 繝｡繧ｽ繝・ラ繝√ぉ繝ｼ繝ｳ (2/2)[92m笨・[0m
+  隍・焚繝｡繧ｽ繝・ラ繧帝｣邯壼他縺ｳ蜃ｺ縺怜庄閭ｽ [92m笨・[0m
+  talk()繧ゅΓ繧ｽ繝・ラ繝√ぉ繝ｼ繝ｳ縺ｫ蟇ｾ蠢・[92m笨・[0m
+ACT - 繝｡繧ｽ繝・ラ繝√ぉ繝ｼ繝ｳ (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+  笨・act_test loaded successfully
+
+[SUITE] act_grouping_test
+ACT.build() - group_by_actor() (8/8)[92m笨・[0m
+  繝医・繧ｯ繝ｳ0莉ｶ縺ｧnil繧定ｿ斐☆ (act-build-early-return) [92m笨・[0m
+  蜊倅ｸtalk縺ｧ蜊倅ｸtype=actor繝医・繧ｯ繝ｳ繧堤函謌舌☆繧・[92m笨・[0m
+  spot繝医・繧ｯ繝ｳ縺ｯ迢ｬ遶九ヨ繝ｼ繧ｯ繝ｳ縺ｨ縺励※蜃ｺ蜉帙☆繧・[92m笨・[0m
+  clear_spot繝医・繧ｯ繝ｳ縺ｯ迢ｬ遶九ヨ繝ｼ繧ｯ繝ｳ縺ｨ縺励※蜃ｺ蜉帙☆繧・[92m笨・[0m
+  蜷御ｸactor縺ｮ騾｣邯嗾alk縺ｯ蜷御ｸtype=actor繝医・繧ｯ繝ｳ蜀・↓譬ｼ邏阪☆繧・[92m笨・[0m
+  actor縺悟､牙喧縺励◆繧画眠縺励＞type=actor繝医・繧ｯ繝ｳ繧帝幕蟋九☆繧・[92m笨・[0m
+  譁ｭ邯夂噪縺ｫ蜷後§actor縺瑚ｩｱ縺励※繧ょ挨繧ｰ繝ｫ繝ｼ繝励↓縺ｪ繧・[92m笨・[0m
+  繝医・繧ｯ繝ｳ鬆・ｺ上ｒ菫晄戟縺吶ｋ [92m笨・[0m
+ACT.build() - group_by_actor() (8/8)[92m笨・[0m
+[92mAll tests passed.[0m
+ACT.build() - merge_consecutive_talks() (9/9)[92m笨・[0m
+  騾｣邯壹＠縺殳alk繝医・繧ｯ繝ｳ繧貞腰荳talk縺ｫ邨ｱ蜷医☆繧・[92m笨・[0m
+  遨ｺ譁・ｭ怜・縺ｮtalk繧よｭ｣縺励￥邨仙粋縺吶ｋ [92m笨・[0m
+  繧｢繧ｯ繧ｿ繝ｼ陦悟虚繝医・繧ｯ繝ｳ縺ｧ蛻・屬縺吶ｋ・・urface・・[92m笨・[0m
+  繧｢繧ｯ繧ｿ繝ｼ陦悟虚繝医・繧ｯ繝ｳ縺ｧ蛻・屬縺吶ｋ・・ait・・[92m笨・[0m
+  繧｢繧ｯ繧ｿ繝ｼ陦悟虚繝医・繧ｯ繝ｳ縺ｧ蛻・屬縺吶ｋ・・ewline・・[92m笨・[0m
+  繧｢繧ｯ繧ｿ繝ｼ陦悟虚繝医・繧ｯ繝ｳ縺ｧ蛻・屬縺吶ｋ・・lear・・[92m笨・[0m
+  繧｢繧ｯ繧ｿ繝ｼ陦悟虚繝医・繧ｯ繝ｳ縺ｧ蛻・屬縺吶ｋ・・aw_script・・[92m笨・[0m
+  譛蛻昴・talk縺ｮactor諠・ｱ繧剃ｿ晄戟縺吶ｋ [92m笨・[0m
+  spot/clear_spot繝医・繧ｯ繝ｳ縺ｯ縺昴・縺ｾ縺ｾ蜃ｺ蜉帙☆繧・[92m笨・[0m
+ACT.build() - merge_consecutive_talks() (9/9)[92m笨・[0m
+[92mAll tests passed.[0m
+ACT.build() - 隍・粋繧ｷ繝翫Μ繧ｪ (2/2)[92m笨・[0m
+  螳滄圀縺ｮ莨夊ｩｱ繧ｷ繝翫Μ繧ｪ繧呈ｭ｣縺励￥繧ｰ繝ｫ繝ｼ繝怜喧縺吶ｋ [92m笨・[0m
+  build蠕後↓token縺後Μ繧ｻ繝・ヨ縺輔ｌnil繧定ｿ斐☆ (act-build-early-return) [92m笨・[0m
+ACT.build() - 隍・粋繧ｷ繝翫Μ繧ｪ (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+ACT.build() - sakura_script grouping (4/4)[92m笨・[0m
+  sakura_script蜊倅ｽ薙〒繧｢繧ｯ繧ｿ繝ｼ繧ｰ繝ｫ繝ｼ繝励ｒ髢句ｧ九☆繧・[92m笨・[0m
+  talk + sakura_script豺ｷ蜷磯・蛻励′豁｣縺励￥繧ｰ繝ｫ繝ｼ繝怜喧縺輔ｌ繧・[92m笨・[0m
+  sakura_script縺ｫ繧医ｋ繧｢繧ｯ繧ｿ繝ｼ蛻・ｊ譖ｿ縺医′讀懷・縺輔ｌ繧・[92m笨・[0m
+  merge_consecutive_talks縺ｧsakura_script縺ｯtalk縺ｨ邨ｱ蜷医＆繧後↑縺・[92m笨・[0m
+ACT.build() - sakura_script grouping (4/4)[92m笨・[0m
+[92mAll tests passed.[0m
+  笨・act_grouping_test loaded successfully
+
+[SUITE] sakura_builder_test
+SAKURA_BUILDER - talk token (3/3)[92m笨・[0m
+  talk繝医・繧ｯ繝ｳ縺荊alk_to_script縺ｧ螟画鋤縺輔ｌ繧・[92m笨・[0m
+  蜿･轤ｹ縺ｫ縺ｯ繧ｦ繧ｧ繧､繝医ち繧ｰ縺梧諺蜈･縺輔ｌ繧・[92m笨・[0m
+  隱ｭ轤ｹ縺ｫ縺ｯ繧ｦ繧ｧ繧､繝医ち繧ｰ縺梧諺蜈･縺輔ｌ繧・[92m笨・[0m
+SAKURA_BUILDER - talk token (3/3)[92m笨・[0m
+[92mAll tests passed.[0m
+SAKURA_BUILDER - surface token (2/2)[92m笨・[0m
+  surface繝医・繧ｯ繝ｳ繧・\s[id] 縺ｫ螟画鋤縺吶ｋ [92m笨・[0m
+  譁・ｭ怜・ID繧偵し繝昴・繝医☆繧・[92m笨・[0m
+SAKURA_BUILDER - surface token (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+SAKURA_BUILDER - wait token (1/1)[92m笨・[0m
+  wait繝医・繧ｯ繝ｳ繧・\w[ms] 縺ｫ螟画鋤縺吶ｋ [92m笨・[0m
+SAKURA_BUILDER - wait token (1/1)[92m笨・[0m
+[92mAll tests passed.[0m
+SAKURA_BUILDER - newline token (2/2)[92m笨・[0m
+  newline繝医・繧ｯ繝ｳ繧・\n 縺ｫ螟画鋤縺吶ｋ・・=1・・[92m笨・[0m
+  隍・焚謾ｹ陦後ｒ騾｣邯壼・蜉帙☆繧具ｼ・=3・・[92m笨・[0m
+SAKURA_BUILDER - newline token (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+SAKURA_BUILDER - clear token (1/1)[92m笨・[0m
+  clear繝医・繧ｯ繝ｳ繧・\c 縺ｫ螟画鋤縺吶ｋ [92m笨・[0m
+SAKURA_BUILDER - clear token (1/1)[92m笨・[0m
+[92mAll tests passed.[0m
+SAKURA_BUILDER - raw_script token (1/1)[92m笨・[0m
+  raw_script繝医・繧ｯ繝ｳ繧偵◎縺ｮ縺ｾ縺ｾ蜃ｺ蜉帙☆繧具ｼ医お繧ｹ繧ｱ繝ｼ繝励↑縺暦ｼ・[92m笨・[0m
+SAKURA_BUILDER - raw_script token (1/1)[92m笨・[0m
+[92mAll tests passed.[0m
+SAKURA_BUILDER - yield token (1/1)[92m笨・[0m
+  yield繝医・繧ｯ繝ｳ縺ｯ辟｡隕悶＆繧後ｋ [92m笨・[0m
+SAKURA_BUILDER - yield token (1/1)[92m笨・[0m
+[92mAll tests passed.[0m
+SAKURA_BUILDER - \e邨らｫｯ (2/2)[92m笨・[0m
+  蜃ｺ蜉帶忰蟆ｾ縺ｫ \e 繧剃ｻ倅ｸ弱☆繧・[92m笨・[0m
+  遨ｺ繝医・繧ｯ繝ｳ驟榊・縺ｧ繧・\e 繧剃ｻ倅ｸ弱☆繧・[92m笨・[0m
+SAKURA_BUILDER - \e邨らｫｯ (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+SAKURA_BUILDER - 隍・粋繧ｷ繝翫Μ繧ｪ (1/1)[92m笨・[0m
+  隍・焚繝医・繧ｯ繝ｳ繧呈ｭ｣縺励￥騾｣邨舌☆繧・[92m笨・[0m
+SAKURA_BUILDER - 隍・粋繧ｷ繝翫Μ繧ｪ (1/1)[92m笨・[0m
+[92mAll tests passed.[0m
+SAKURA_BUILDER - talk_to_script螟画鋤 (1/1)[92m笨・[0m
+  繝・く繧ｹ繝医′talk_to_script縺ｧ螟画鋤縺輔ｌ繧・[92m笨・[0m
+SAKURA_BUILDER - talk_to_script螟画鋤 (1/1)[92m笨・[0m
+[92mAll tests passed.[0m
+SAKURA_BUILDER - spot繝医・繧ｯ繝ｳ蜃ｦ逅・(2/2)[92m笨・[0m
+  spot繝医・繧ｯ繝ｳ蜃ｦ逅・〒actor_spots[actor.name]縺梧ｭ｣縺励￥譖ｴ譁ｰ縺輔ｌ繧・[92m笨・[0m
+  隍・焚actor縺ｮspot迢ｬ遶狗ｮ｡逅・ｒ遒ｺ隱・[92m笨・[0m
+SAKURA_BUILDER - spot繝医・繧ｯ繝ｳ蜃ｦ逅・(2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+SAKURA_BUILDER - clear_spot繝医・繧ｯ繝ｳ蜃ｦ逅・(2/2)[92m笨・[0m
+  clear_spot繝医・繧ｯ繝ｳ蜃ｦ逅・〒actor_spots={}縺ｫ繝ｪ繧ｻ繝・ヨ縺輔ｌ繧・[92m笨・[0m
+  clear_spot繝医・繧ｯ繝ｳ蜃ｦ逅・〒last_actor=nil縺ｫ繝ｪ繧ｻ繝・ヨ縺輔ｌ繧・[92m笨・[0m
+SAKURA_BUILDER - clear_spot繝医・繧ｯ繝ｳ蜃ｦ逅・(2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+SAKURA_BUILDER - actor繝医・繧ｯ繝ｳ縺ｮactor蛻・ｊ譖ｿ縺域､懷・ (4/4)[92m笨・[0m
+  actor_spots譛ｪ險ｭ螳壽凾縺ｫ繝・ヵ繧ｩ繝ｫ繝亥､0繧剃ｽｿ逕ｨ縺吶ｋ [92m笨・[0m
+  last_actor != token.actor譎ゅ↓\p[spot]繧貞・蜉帙☆繧・[92m笨・[0m
+  spot螟画峩譎ゅ↓\n[N]繧貞・蜉帙☆繧具ｼ・縺ｯconfig.spot_newlines * 100・・[92m笨・[0m
+  蜷後§actor縺ｮ騾｣邯啾ctor繝医・繧ｯ繝ｳ縺ｧ縺ｯ繧ｹ繝昴ャ繝医ち繧ｰ繧貞・蜉帙＠縺ｪ縺・[92m笨・[0m
+SAKURA_BUILDER - actor繝医・繧ｯ繝ｳ縺ｮactor蛻・ｊ譖ｿ縺域､懷・ (4/4)[92m笨・[0m
+[92mAll tests passed.[0m
+SAKURA_BUILDER - 邨ｱ蜷医す繝翫Μ繧ｪ・医げ繝ｫ繝ｼ繝怜喧繝医・繧ｯ繝ｳ讒矩・・(3/3)[92m笨・[0m
+  set_spot()縺ｪ縺励〒縺ｮtalk() 竊・繝・ヵ繧ｩ繝ｫ繝・pot(0)菴ｿ逕ｨ繧堤｢ｺ隱・[92m笨・[0m
+  set_spot() 竊・talk() 竊・spot蛻・ｊ譖ｿ縺医→繧ｹ繝昴ャ繝医ち繧ｰ蜃ｺ蜉帙ｒ遒ｺ隱・[92m笨・[0m
+  clear_spot() 竊・talk() 竊・繝・ヵ繧ｩ繝ｫ繝・pot(0)縺ｸ縺ｮ蠕ｩ蟶ｰ繧堤｢ｺ隱・[92m笨・[0m
+SAKURA_BUILDER - 邨ｱ蜷医す繝翫Μ繧ｪ・医げ繝ｫ繝ｼ繝怜喧繝医・繧ｯ繝ｳ讒矩・・(3/3)[92m笨・[0m
+[92mAll tests passed.[0m
+SAKURA_BUILDER - persist-spot-position: 邏皮ｲ矩未謨ｰ諤ｧ繝・せ繝・(Task 5.3) (4/4)[92m笨・[0m
+  蜈･蜉帙ユ繝ｼ繝悶Ν縺茎pot繝医・繧ｯ繝ｳ縺ｧ逶ｴ謗･螟画峩縺輔ｌ繧九％縺ｨ繧堤｢ｺ隱・[92m笨・[0m
+  nil蜈･蜉帶凾縺ｫ遨ｺ繝・・繝悶Ν縺ｨ縺励※謇ｱ繧上ｌ繧九％縺ｨ繧堤｢ｺ隱・[92m笨・[0m
+  spot繝医・繧ｯ繝ｳ縺ｧinput_spots縺檎峩謗･螟画峩縺輔ｌ繧・[92m笨・[0m
+  蠕梧婿莠呈鋤諤ｧ: actor_spots逵∫払譎ゅｂ豁｣蟶ｸ蜍穂ｽ・[92m笨・[0m
+SAKURA_BUILDER - persist-spot-position: 邏皮ｲ矩未謨ｰ諤ｧ繝・せ繝・(Task 5.3) (4/4)[92m笨・[0m
+[92mAll tests passed.[0m
+SAKURA_BUILDER - persist-spot-position: clear_spot繝医・繧ｯ繝ｳ蜃ｦ逅・(Task 5.4) (2/2)[92m笨・[0m
+  clear_spot繝医・繧ｯ繝ｳ縺ｧ蜈･蜉帙・actor_spots縺後Μ繧ｻ繝・ヨ縺輔ｌ繧・[92m笨・[0m
+  逶ｴ謗･螟画峩: clear_spot縺ｧ蜈･蜉帙ユ繝ｼ繝悶Ν縺ｮ繧ｨ繝ｳ繝医Μ縺後け繝ｪ繧｢縺輔ｌ繧・[92m笨・[0m
+SAKURA_BUILDER - persist-spot-position: clear_spot繝医・繧ｯ繝ｳ蜃ｦ逅・(Task 5.4) (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+SAKURA_BUILDER - persist-spot-position: spot繝医・繧ｯ繝ｳ蜃ｦ逅・(Task 5.5) (2/2)[92m笨・[0m
+  spot繝医・繧ｯ繝ｳ縺ｧ蜈･蜉帙・actor_spots縺梧ｭ｣縺励￥譖ｴ譁ｰ縺輔ｌ繧・[92m笨・[0m
+  蜈･蜉嫗ctor_spots縺ｮ蛟､繧貞ｼ輔″邯吶＞縺ｧ繧ｹ繝昴ャ繝医ち繧ｰ縺悟・蜉帙＆繧後ｋ [92m笨・[0m
+SAKURA_BUILDER - persist-spot-position: spot繝医・繧ｯ繝ｳ蜃ｦ逅・(Task 5.5) (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+SAKURA_BUILDER - sakura_script繝医・繧ｯ繝ｳ蜃ｦ逅・(3/3)[92m笨・[0m
+  sakura_script繝医・繧ｯ繝ｳ縺荊alk_to_script縺ｧ螟画鋤縺輔ｌ繧・[92m笨・[0m
+  talk + sakura_script豺ｷ蜷医′縺昴ｌ縺槭ｌ蜃ｦ逅・＆繧後ｋ [92m笨・[0m
+  raw_script繝医・繧ｯ繝ｳ縺ｮ譌｢蟄伜虚菴懊′螟牙喧縺励※縺・↑縺・[92m笨・[0m
+SAKURA_BUILDER - sakura_script繝医・繧ｯ繝ｳ蜃ｦ逅・(3/3)[92m笨・[0m
+[92mAll tests passed.[0m
+  笨・sakura_builder_test loaded successfully
+
+[SUITE] shiori_act_test
+SHIORI_ACT - inheritance (5/5)[92m笨・[0m
+  inherits ACT.IMPL methods [92m笨・[0m
+  has IMPL field for further inheritance [92m笨・[0m
+  inherits word() method [92m笨・[0m
+  supports actor proxy (act.sakura:talk) [92m笨・[0m
+  actor proxy supports method chaining [92m笨・[0m
+SHIORI_ACT - inheritance (5/5)[92m笨・[0m
+[92mAll tests passed.[0m
+SHIORI_ACT - talk() (7/7)[92m笨・[0m
+  appends scope tag on first actor [92m笨・[0m
+  appends scope tag on actor switch [92m笨・[0m
+  does not append scope tag on same actor [92m笨・[0m
+  uses \p[N] for char2+ actors [92m笨・[0m
+  adds newline after spot switch [92m笨・[0m
+  supports method chaining [92m笨・[0m
+  also updates token buffer (parent behavior) [92m笨・[0m
+SHIORI_ACT - talk() (7/7)[92m笨・[0m
+[92mAll tests passed.[0m
+SHIORI_ACT - surface() (3/3)[92m笨・[0m
+  appends surface tag with number [92m笨・[0m
+  appends surface tag with alias string [92m笨・[0m
+  supports method chaining [92m笨・[0m
+SHIORI_ACT - surface() (3/3)[92m笨・[0m
+[92mAll tests passed.[0m
+SHIORI_ACT - wait() (4/4)[92m笨・[0m
+  appends wait tag [92m笨・[0m
+  handles negative values as 0 [92m笨・[0m
+  truncates float to integer [92m笨・[0m
+  supports method chaining [92m笨・[0m
+SHIORI_ACT - wait() (4/4)[92m笨・[0m
+[92mAll tests passed.[0m
+SHIORI_ACT - newline() (4/4)[92m笨・[0m
+  appends single newline by default [92m笨・[0m
+  appends multiple newlines [92m笨・[0m
+  does nothing for n < 1 [92m笨・[0m
+  supports method chaining [92m笨・[0m
+SHIORI_ACT - newline() (4/4)[92m笨・[0m
+[92mAll tests passed.[0m
+SHIORI_ACT - clear() (2/2)[92m笨・[0m
+  appends clear tag [92m笨・[0m
+  supports method chaining [92m笨・[0m
+SHIORI_ACT - clear() (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+SHIORI_ACT - build() (3/3)[92m笨・[0m
+  returns nil for empty buffer (act-build-early-return) [92m笨・[0m
+  appends \e to end [92m笨・[0m
+  auto-resets after build [92m笨・[0m
+SHIORI_ACT - build() (3/3)[92m笨・[0m
+[92mAll tests passed.[0m
+SHIORI_ACT - talk_to_script螟画鋤 (3/3)[92m笨・[0m
+  騾壼ｸｸ繝・く繧ｹ繝医′縺昴・縺ｾ縺ｾ蜃ｺ蜉帙＆繧後ｋ・医ョ繝輔か繝ｫ繝郁ｨｭ螳夲ｼ・[92m笨・[0m
+  蜿･轤ｹ縺ｫ縺ｯ繧ｦ繧ｧ繧､繝医ち繧ｰ縺梧諺蜈･縺輔ｌ繧・[92m笨・[0m
+  隱ｭ轤ｹ縺ｫ縺ｯ繧ｦ繧ｧ繧､繝医ち繧ｰ縺梧諺蜈･縺輔ｌ繧・[92m笨・[0m
+SHIORI_ACT - talk_to_script螟画鋤 (3/3)[92m笨・[0m
+[92mAll tests passed.[0m
+SHIORI_ACT - E2E scenario (2/2)[92m笨・[0m
+  complex script generation [92m笨・[0m
+  multiple rounds (build auto-resets) [92m笨・[0m
+SHIORI_ACT - E2E scenario (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+SHIORI_ACT - req field (3/3)[92m笨・[0m
+  stores req parameter in act.req [92m笨・[0m
+  req reference is same object (not a copy) [92m笨・[0m
+  act.req.date contains date info when provided [92m笨・[0m
+SHIORI_ACT - req field (3/3)[92m笨・[0m
+[92mAll tests passed.[0m
+SHIORI_ACT - transfer_date_to_var() (7/7)[92m笨・[0m
+  transfers all date fields from req.date to var [92m笨・[0m
+  returns self safely when req is nil [92m笨・[0m
+  returns self safely when req.date is nil [92m笨・[0m
+  maps Japanese variable names with formatted strings [92m笨・[0m
+  converts wday to Japanese and English weekday names [92m笨・[0m
+  converts hour to 12-hour format with 豺ｱ螟・譎・豁｣蜊・special cases [92m笨・[0m
+  returns self for method chaining [92m笨・[0m
+SHIORI_ACT - transfer_date_to_var() (7/7)[92m笨・[0m
+[92mAll tests passed.[0m
+  笨・shiori_act_test loaded successfully
+
+[SUITE] virtual_dispatcher_spec
+pasta.shiori.event.virtual_dispatcher (3/3)[92m笨・[0m
+  module is loadable [92m笨・[0m
+  exports required functions [92m笨・[0m
+  initial state is zeroed [92m笨・[0m
+pasta.shiori.event.virtual_dispatcher (3/3)[92m笨・[0m
+[92mAll tests passed.[0m
+dispatch function (2/2)[92m笨・[0m
+  returns nil when req.date is missing [92m笨・[0m
+  returns nil when req.date is nil [92m笨・[0m
+dispatch function (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+check_hour function (3/3)[92m笨・[0m
+  first call initializes next_hour_unix and returns nil [92m笨・[0m
+  fires at hour boundary [92m笨・[0m
+  returns nil before hour boundary [92m笨・[0m
+check_hour function (3/3)[92m笨・[0m
+[92mAll tests passed.[0m
+check_talk function (3/3)[92m笨・[0m
+  first call initializes next_talk_time and returns nil [92m笨・[0m
+  fires after interval [92m笨・[0m
+  skips before interval [92m笨・[0m
+check_talk function (3/3)[92m笨・[0m
+[92mAll tests passed.[0m
+priority and integration (2/2)[92m笨・[0m
+  OnHour has priority over OnTalk [92m笨・[0m
+  _reset clears all state [92m笨・[0m
+priority and integration (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+check_hour - transfer_date_to_var integration (2/2)[92m笨・[0m
+  calls transfer_date_to_var when OnHour fires [92m笨・[0m
+  sets Japanese date variables on OnHour fire [92m笨・[0m
+check_hour - transfer_date_to_var integration (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+execute_scene - act parameter passing (1/1)[92m笨・[0m
+  scene_executor receives act parameter [92m笨・[0m
+execute_scene - act parameter passing (1/1)[92m笨・[0m
+[92mAll tests passed.[0m
+check_talk - no transfer_date_to_var (2/2)[92m笨・[0m
+  does not call transfer_date_to_var on OnTalk [92m笨・[0m
+  passes act to scene_executor for OnTalk [92m笨・[0m
+check_talk - no transfer_date_to_var (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+check_hour - fallback chain order (1/1)[92m笨・[0m
+  searches candidates in order: 譎ょｱ{HH} 竊・OnHour{HH} 竊・譎ょｱ縺昴・莉・竊・OnHourOther [92m笨・[0m
+check_hour - fallback chain order (1/1)[92m笨・[0m
+[92mAll tests passed.[0m
+check_hour - early termination (2/2)[92m笨・[0m
+  stops at first matching candidate (candidate 1) [92m笨・[0m
+  stops at candidate 3 when candidates 1-2 miss [92m笨・[0m
+check_hour - early termination (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+check_hour - all candidates miss (1/1)[92m笨・[0m
+  returns nil when no candidate matches [92m笨・[0m
+check_hour - all candidates miss (1/1)[92m笨・[0m
+[92mAll tests passed.[0m
+check_hour - HH format (4/4)[92m笨・[0m
+  hour=0 generates candidate 譎ょｱ00 [92m笨・[0m
+  hour=9 generates candidate 譎ょｱ09 [92m笨・[0m
+  hour=12 generates candidate 譎ょｱ12 [92m笨・[0m
+  hour=23 generates candidate 譎ょｱ23 [92m笨・[0m
+check_hour - HH format (4/4)[92m笨・[0m
+[92mAll tests passed.[0m
+dispatch - status block conditions (18/18)[92m笨・[0m
+  blocks when status is 'talking' [92m笨・[0m
+  blocks when status is 'choosing' [92m笨・[0m
+  blocks when status is 'online' [92m笨・[0m
+  blocks when status is 'opening(communicate)' [92m笨・[0m
+  blocks when status is 'passive' [92m笨・[0m
+  blocks when status is 'induction' [92m笨・[0m
+  blocks when status is 'timecritical' [92m笨・[0m
+  blocks when status is 'nouserbreak' [92m笨・[0m
+  blocks when status is 'minimizing' [92m笨・[0m
+  blocks when compound status contains 'choosing' [92m笨・[0m
+  blocks when compound status contains 'online' [92m笨・[0m
+  does not block when status is nil [92m笨・[0m
+  does not block when status is empty string [92m笨・[0m
+  does not block when status is 'idle' [92m笨・[0m
+  does not block when status is 'balloon(0=0)' [92m笨・[0m
+  is_blocked returns true for 'talking' [92m笨・[0m
+  is_blocked returns false for 'idle' [92m笨・[0m
+  is_blocked returns false for nil [92m笨・[0m
+dispatch - status block conditions (18/18)[92m笨・[0m
+[92mAll tests passed.[0m
+  笨・virtual_dispatcher_spec loaded successfully
+
+[SUITE] store_coroutine_test
+STORE.co_scene - 繝輔ぅ繝ｼ繝ｫ繝牙ｮ夂ｾｩ (2/2)[92m笨・[0m
+  co_scene 繝輔ぅ繝ｼ繝ｫ繝峨′蟄伜惠縺吶ｋ [92m笨・[0m
+  co_scene 縺ｯthread縺ｾ縺溘・nil繧剃ｿ晄戟縺ｧ縺阪ｋ [92m笨・[0m
+STORE.co_scene - 繝輔ぅ繝ｼ繝ｫ繝牙ｮ夂ｾｩ (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+STORE.reset() - co_scene繧ｯ繝ｪ繝ｼ繝ｳ繧｢繝・・ (5/5)[92m笨・[0m
+  reset()蠕後↓co_scene縺系il縺ｫ縺ｪ繧・[92m笨・[0m
+  reset()縺茎uspended繧ｳ繝ｫ繝ｼ繝√Φ繧団lose()縺吶ｋ [92m笨・[0m
+  reset()縺慧ead迥ｶ諷九・co_scene縺ｧ繧ょｮ牙・縺ｫ蜍穂ｽ懊☆繧・[92m笨・[0m
+  reset()縺系il縺ｮco_scene縺ｧ繧ょｮ牙・縺ｫ蜍穂ｽ懊☆繧・[92m笨・[0m
+  reset()縺御ｻ悶・繝輔ぅ繝ｼ繝ｫ繝峨ｂ豁｣蟶ｸ縺ｫ繝ｪ繧ｻ繝・ヨ縺吶ｋ [92m笨・[0m
+STORE.reset() - co_scene繧ｯ繝ｪ繝ｼ繝ｳ繧｢繝・・ (5/5)[92m笨・[0m
+[92mAll tests passed.[0m
+  笨・store_coroutine_test loaded successfully
+
+[SUITE] event_coroutine_test
+EVENT.fire - 繧ｳ繝ｫ繝ｼ繝√Φ蟇ｾ蠢・(7/7)[92m笨・[0m
+  handler 縺・thread 繧定ｿ斐＠縺溷ｴ蜷・resume 縺悟ｮ溯｡後＆繧後ｋ [92m笨・[0m
+  thread縺軽ield縺励◆蝣ｴ蜷・STORE.co_scene 縺瑚ｨｭ螳壹＆繧後ｋ [92m笨・[0m
+  thread縺梧ｭ｣蟶ｸ邨ゆｺ・＠縺溷ｴ蜷・STORE.co_scene 縺・nil 縺ｫ繧ｯ繝ｪ繧｢縺輔ｌ繧・[92m笨・[0m
+  handler 縺・string 繧定ｿ斐＠縺溷ｴ蜷・縺昴・縺ｾ縺ｾ RES.ok() 縺ｧ霑斐☆ [92m笨・[0m
+  handler 縺・nil 繧定ｿ斐＠縺溷ｴ蜷・RES.no_content() 縺瑚ｿ斐ｋ [92m笨・[0m
+  yield蛟､縺・RES.ok() 縺ｧ霑斐＆繧後ｋ [92m笨・[0m
+  coroutine.resume() 繧ｨ繝ｩ繝ｼ譎ゅ↓ STORE.co_scene 縺後け繝ｪ繧｢縺輔ｌ繧・[92m笨・[0m
+EVENT.fire - 繧ｳ繝ｫ繝ｼ繝√Φ蟇ｾ蠢・(7/7)[92m笨・[0m
+[92mAll tests passed.[0m
+resume_until_valid - nil yield繧ｹ繧ｭ繝・・繝ｫ繝ｼ繝・(6/6)[92m笨・[0m
+  nil yield縺励※suspended縺ｮ繧ｳ繝ｫ繝ｼ繝√Φ縺悟・resume縺輔ｌ繧・(1.1) [92m笨・[0m
+  譛牙柑蛟､・・il莉･螟厄ｼ峨ｒ霑斐＠縺溘ｉ繝ｫ繝ｼ繝礼ｵゆｺ・(1.2) [92m笨・[0m
+  dead迥ｶ諷九〒nil繧定ｿ斐＠縺溘ｉ繝ｫ繝ｼ繝礼ｵゆｺ・ｼ育ｩｺ繧ｷ繝ｼ繝ｳ・・(1.2) [92m笨・[0m
+  繧ｨ繝ｩ繝ｼ逋ｺ逕滓凾縺ｫok=false縲√お繝ｩ繝ｼ繝｡繝・そ繝ｼ繧ｸ繧定ｿ斐☆ (1.3) [92m笨・[0m
+  蛻晏屓resume蠑墓焚縺後さ繝ｫ繝ｼ繝√Φ縺ｫ貂｡縺輔ｌ繧・[92m笨・[0m
+  2蝗樒岼莉･髯阪・resume縺ｯ蠑墓焚縺ｪ縺励〒蜻ｼ縺ｰ繧後ｋ [92m笨・[0m
+resume_until_valid - nil yield繧ｹ繧ｭ繝・・繝ｫ繝ｼ繝・(6/6)[92m笨・[0m
+[92mAll tests passed.[0m
+EVENT.fire - 譌｢蟄倥さ繝ｫ繝ｼ繝√Φ鄂ｮ謠・(2/2)[92m笨・[0m
+  譁ｰ縺励＞繧ｳ繝ｫ繝ｼ繝√Φ縺瑚ｨｭ螳壹＆繧後ｋ縺ｨ譌｢蟄倥・繧ｳ繝ｫ繝ｼ繝√Φ縺慶lose縺輔ｌ繧・[92m笨・[0m
+  蜷後§繧ｳ繝ｫ繝ｼ繝√Φ繧貞・險ｭ螳壹＠繧医≧縺ｨ縺励※繧Ｄlose縺励↑縺・[92m笨・[0m
+EVENT.fire - 譌｢蟄倥さ繝ｫ繝ｼ繝√Φ鄂ｮ謠・(2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+EVENT.fire - nil yield繧ｹ繧ｭ繝・・邨ｱ蜷・(5/5)[92m笨・[0m
+  nil yield縺吶ｋthread縺罫esume_until_valid縺ｧ蜃ｦ逅・＆繧後ｋ (2.1) [92m笨・[0m
+  譛牙柑蛟､繧定ｿ斐☆thread繝上Φ繝峨Λ縺梧ｭ｣蟶ｸ蜍穂ｽ・(2.1) [92m笨・[0m
+  繧ｨ繝ｩ繝ｼ逋ｺ逕滓凾縺ｫset_co_scene縺ｧclose縺輔ｌ繧・(3.1, 3.2) [92m笨・[0m
+  繝ｫ繝ｼ繝礼ｵゆｺ・ｾ後↓suspended縺ｪ繧鋭et_co_scene縺ｧ菫晏ｭ・(2.4) [92m笨・[0m
+  遨ｺ繧ｷ繝ｼ繝ｳ・・ead + nil・峨′204 No Content縺ｫ螟画鋤 (2.3) [92m笨・[0m
+EVENT.fire - nil yield繧ｹ繧ｭ繝・・邨ｱ蜷・(5/5)[92m笨・[0m
+[92mAll tests passed.[0m
+EVENT.fire - 蠕梧婿莠呈鋤諤ｧ (2/2)[92m笨・[0m
+  譌｢蟄倥・譁・ｭ怜・繝上Φ繝峨Λ縺梧ｭ｣蟶ｸ蜍穂ｽ・(2.2) [92m笨・[0m
+  譌｢蟄倥・nil謌ｻ繧雁､縺・04 No Content縺ｫ螟画鋤 (2.3) [92m笨・[0m
+EVENT.fire - 蠕梧婿莠呈鋤諤ｧ (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+  笨・event_coroutine_test loaded successfully
+
+[SUITE] virtual_dispatcher_thread_test
+virtual_dispatcher - thread霑泌唆 (4/4)[92m笨・[0m
+  check_hour() 縺・thread 繧定ｿ斐☆ [92m笨・[0m
+  check_talk() 縺・thread 繧定ｿ斐☆ [92m笨・[0m
+  dispatch() 縺・thread 繧定ｿ斐☆ [92m笨・[0m
+  繧ｷ繝ｼ繝ｳ縺瑚ｦ九▽縺九ｉ縺ｪ縺・ｴ蜷・nil 繧定ｿ斐☆ [92m笨・[0m
+virtual_dispatcher - thread霑泌唆 (4/4)[92m笨・[0m
+[92mAll tests passed.[0m
+virtual_dispatcher - 繝√ぉ繧､繝ｳ繝医・繧ｯ邯咏ｶ・(3/3)[92m笨・[0m
+  STORE.co_scene 縺悟ｭ伜惠縺吶ｋ蝣ｴ蜷・check_talk() 縺ｯ邯咏ｶ夂畑 thread 繧定ｿ斐☆ [92m笨・[0m
+  STORE.co_scene 縺・nil 縺ｮ蝣ｴ蜷・譁ｰ隕上す繝ｼ繝ｳ繧呈､懃ｴ｢ [92m笨・[0m
+  OnHour 縺ｯ STORE.co_scene 繧堤┌隕悶＠縺ｦ蟶ｸ縺ｫ譁ｰ隕・thread 繧定ｿ斐☆ [92m笨・[0m
+virtual_dispatcher - 繝√ぉ繧､繝ｳ繝医・繧ｯ邯咏ｶ・(3/3)[92m笨・[0m
+[92mAll tests passed.[0m
+  笨・virtual_dispatcher_thread_test loaded successfully
+
+[SUITE] event_no_entry_test
+EVENT.no_entry thread return (5/5)[92m笨・[0m
+  returns thread when scene function is found [92m笨・[0m
+  returns nil when scene function is not found [92m笨・[0m
+  passes event_name to SCENE.search [92m笨・[0m
+  returned thread produces scene result when resumed [92m笨・[0m
+  returned thread can be resumed with act parameter [92m笨・[0m
+EVENT.no_entry thread return (5/5)[92m笨・[0m
+[92mAll tests passed.[0m
+  笨・event_no_entry_test loaded successfully
+
+[SUITE] second_change_thread_test
+OnSecondChange handler - thread passthrough (3/3)[92m笨・[0m
+  returns thread when dispatcher returns thread [92m笨・[0m
+  returns nil when dispatcher returns nil [92m笨・[0m
+  passthrough preserves thread from dispatcher [92m笨・[0m
+OnSecondChange handler - thread passthrough (3/3)[92m笨・[0m
+[92mAll tests passed.[0m
+  笨・second_change_thread_test loaded successfully
+
+[SUITE] res_ok_test
+RES.ok - nil and empty string handling (7/7)[92m笨・[0m
+  returns no_content when value is nil [92m笨・[0m
+  returns no_content when value is empty string [92m笨・[0m
+  returns 200 OK with Value header when value is valid string [92m笨・[0m
+  preserves additional headers when returning no_content for nil [92m笨・[0m
+  preserves additional headers when returning no_content for empty string [92m笨・[0m
+  returns 200 OK with additional headers for valid string [92m笨・[0m
+  whitespace-only string is treated as valid (not empty) [92m笨・[0m
+RES.ok - nil and empty string handling (7/7)[92m笨・[0m
+[92mAll tests passed.[0m
+  笨・res_ok_test loaded successfully
+
+[SUITE] integration_coroutine_test
+Integration - act:yield() and chain talk (4/4)[92m笨・[0m
+  yield() returns value and sets STORE.co_scene [92m笨・[0m
+  chain talk continues suspended coroutine [92m笨・[0m
+  completed coroutine clears STORE.co_scene [92m笨・[0m
+  multiple yields work correctly [92m笨・[0m
+Integration - act:yield() and chain talk (4/4)[92m笨・[0m
+[92mAll tests passed.[0m
+Integration - error handling (3/3)[92m笨・[0m
+  coroutine error clears STORE.co_scene [92m笨・[0m
+  new coroutine closes existing suspended coroutine [92m笨・[0m
+  STORE.reset() closes suspended coroutine [92m笨・[0m
+Integration - error handling (3/3)[92m笨・[0m
+[92mAll tests passed.[0m
+  笨・integration_coroutine_test loaded successfully
+
+[SUITE] act_build_early_return_test
+ACT:build() - 譌ｩ譛溘Μ繧ｿ繝ｼ繝ｳ・医ヨ繝ｼ繧ｯ繝ｳ0莉ｶ譎ゑｼ・(5/5)[92m笨・[0m
+  繝医・繧ｯ繝ｳ0莉ｶ譎ゅ↓nil繧定ｿ斐☆ [92m笨・[0m
+  nil繝ｪ繧ｿ繝ｼ繝ｳ蠕後ｂself.token縺檎ｩｺ繝・・繝悶Ν縺ｫ繝ｪ繧ｻ繝・ヨ縺輔ｌ縺ｦ縺・ｋ [92m笨・[0m
+  繝医・繧ｯ繝ｳ1莉ｶ莉･荳翫・蝣ｴ蜷医・驟榊・繧定ｿ斐☆・域里蟄伜虚菴懃ｶ咏ｶ夂｢ｺ隱搾ｼ・[92m笨・[0m
+  2蝗樣｣邯喘uild()縺ｧ荳｡譁ｹnil繧定ｿ斐☆ [92m笨・[0m
+  繝医・繧ｯ繝ｳ霑ｽ蜉竊鍛uild()竊偵ヨ繝ｼ繧ｯ繝ｳ縺ｪ縺冷・build()縺ｮ豬√ｌ縺ｧ2蝗樒岼縺ｯnil [92m笨・[0m
+ACT:build() - 譌ｩ譛溘Μ繧ｿ繝ｼ繝ｳ・医ヨ繝ｼ繧ｯ繝ｳ0莉ｶ譎ゑｼ・(5/5)[92m笨・[0m
+[92mAll tests passed.[0m
+SHIORI_ACT:build() - 譌ｩ譛溘Μ繧ｿ繝ｼ繝ｳ・医ヨ繝ｼ繧ｯ繝ｳ0莉ｶ譎ゑｼ・(4/4)[92m笨・[0m
+  繝医・繧ｯ繝ｳ0莉ｶ譎ゅ↓nil繧定ｿ斐☆ [92m笨・[0m
+  繝医・繧ｯ繝ｳ1莉ｶ莉･荳翫・蝣ｴ蜷医・縺輔￥繧峨せ繧ｯ繝ｪ繝励ヨ譁・ｭ怜・繧定ｿ斐☆・域里蟄伜虚菴懃ｶ咏ｶ夂｢ｺ隱搾ｼ・[92m笨・[0m
+  2蝗樣｣邯喘uild()縺ｧ荳｡譁ｹnil繧定ｿ斐☆ [92m笨・[0m
+  繝医・繧ｯ繝ｳ霑ｽ蜉竊鍛uild()竊偵ヨ繝ｼ繧ｯ繝ｳ縺ｪ縺冷・build()縺ｮ豬√ｌ縺ｧ2蝗樒岼縺ｯnil [92m笨・[0m
+SHIORI_ACT:build() - 譌ｩ譛溘Μ繧ｿ繝ｼ繝ｳ・医ヨ繝ｼ繧ｯ繝ｳ0莉ｶ譎ゑｼ・(4/4)[92m笨・[0m
+[92mAll tests passed.[0m
+  笨・act_build_early_return_test loaded successfully
+
+[SUITE] global_chaintalk_call_test
+GLOBAL chaintalk function registration (2/2)[92m笨・[0m
+  GLOBAL.繝√ぉ繧､繝ｳ繝医・繧ｯ 縺碁撼 nil 縺ｮ髢｢謨ｰ縺ｨ縺励※逋ｻ骭ｲ縺輔ｌ縺ｦ縺・ｋ [92m笨・[0m
+  GLOBAL.yield 縺碁撼 nil 縺ｮ髢｢謨ｰ縺ｨ縺励※逋ｻ骭ｲ縺輔ｌ縺ｦ縺・ｋ [92m笨・[0m
+GLOBAL chaintalk function registration (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+GLOBAL chaintalk L3 resolution and yield (4/4)[92m笨・[0m
+  act:call 縺ｧ GLOBAL.繝√ぉ繧､繝ｳ繝医・繧ｯ 縺・L3 隗｣豎ｺ縺輔ｌ繧・[92m笨・[0m
+  act:call 縺ｧ GLOBAL.yield 縺・L3 隗｣豎ｺ縺輔ｌ繧・[92m笨・[0m
+  繧ｳ繝ｫ繝ｼ繝√Φ蜀・〒 act:yield() 縺梧ｭ｣縺励￥蜍穂ｽ懊☆繧具ｼ・ield/resume 繧ｵ繧､繧ｯ繝ｫ・・[92m笨・[0m
+  yield 蜑阪・繝医・繧ｯ繝ｳ縺瑚塘遨榊・蜉帙→縺励※霑斐ｋ [92m笨・[0m
+GLOBAL chaintalk L3 resolution and yield (4/4)[92m笨・[0m
+[92mAll tests passed.[0m
+  笨・global_chaintalk_call_test loaded successfully
+
+[SUITE] global_chaintalk_integration_test
+Integration - GLOBAL chaintalk via EVENT.fire (5/5)[92m笨・[0m
+  chaintalk yield splits coroutine into 2 resumes via EVENT.fire [92m笨・[0m
+  first resume returns only pre-yield tokens as intermediate output [92m笨・[0m
+  second resume returns post-yield tokens as final output [92m笨・[0m
+  STORE.co_scene lifecycle: suspended after 1st resume, nil after 2nd [92m笨・[0m
+  GLOBAL.yield also splits coroutine correctly via EVENT.fire [92m笨・[0m
+Integration - GLOBAL chaintalk via EVENT.fire (5/5)[92m笨・[0m
+[92mAll tests passed.[0m
+  笨・global_chaintalk_integration_test loaded successfully
+
+[SUITE] persist_spot_position_test
+STORE.actor_spots - 蛻晄悄蛹・(Task 5.1) (2/2)[92m笨・[0m
+  STORE.actor_spots繝輔ぅ繝ｼ繝ｫ繝峨′蟄伜惠縺吶ｋ [92m笨・[0m
+  CONFIG.actor譛ｪ螳夂ｾｩ譎ゅ↓actor_spots縺檎ｩｺ繝・・繝悶Ν [92m笨・[0m
+STORE.actor_spots - 蛻晄悄蛹・(Task 5.1) (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+STORE.actor_spots - reset() (Task 5.2) (2/2)[92m笨・[0m
+  STORE.reset()縺径ctor_spots繧堤ｩｺ繝・・繝悶Ν縺ｫ繧ｯ繝ｪ繧｢縺吶ｋ [92m笨・[0m
+  reset()蠕後ｂactor_spots縺ｸ縺ｮ譖ｸ縺崎ｾｼ縺ｿ縺悟庄閭ｽ [92m笨・[0m
+STORE.actor_spots - reset() (Task 5.2) (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+SHIORI_ACT.build() - STORE.actor_spots騾｣謳ｺ (Task 6.1) (2/2)[92m笨・[0m
+  build()蠕後↓STORE.actor_spots縺梧峩譁ｰ縺輔ｌ繧・[92m笨・[0m
+  繝医・繧ｯ繝ｳ0莉ｶ譎ゑｼ・il霑泌唆・峨〒STORE譖ｴ譁ｰ縺後せ繧ｭ繝・・縺輔ｌ繧・[92m笨・[0m
+SHIORI_ACT.build() - STORE.actor_spots騾｣謳ｺ (Task 6.1) (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+SHIORI_ACT.build() - 繧ｷ繝ｼ繝ｳ騾｣邯壼ｮ溯｡後〒繧ｹ繝昴ャ繝亥､蠑輔″邯吶℃ (Task 6.2) (1/1)[92m笨・[0m
+  ・・｡後≠繧翫す繝ｼ繝ｳ 竊・・・｡後↑縺励す繝ｼ繝ｳ縺ｧ繧ｹ繝昴ャ繝亥､縺悟ｼ輔″邯吶′繧後ｋ [92m笨・[0m
+SHIORI_ACT.build() - 繧ｷ繝ｼ繝ｳ騾｣邯壼ｮ溯｡後〒繧ｹ繝昴ャ繝亥､蠑輔″邯吶℃ (Task 6.2) (1/1)[92m笨・[0m
+[92mAll tests passed.[0m
+SHIORI_ACT.build() - CONFIG譛ｪ險ｭ螳壽凾縺ｮ繝・ヵ繧ｩ繝ｫ繝亥虚菴・(Task 6.3) (1/1)[92m笨・[0m
+  CONFIG.actor譛ｪ螳夂ｾｩ譎ゅ↓actor_spots縺檎ｩｺ繝・・繝悶Ν縺ｧ蜍穂ｽ懊☆繧・[92m笨・[0m
+SHIORI_ACT.build() - CONFIG譛ｪ險ｭ螳壽凾縺ｮ繝・ヵ繧ｩ繝ｫ繝亥虚菴・(Task 6.3) (1/1)[92m笨・[0m
+[92mAll tests passed.[0m
+  笨・persist_spot_position_test loaded successfully
+
+[SUITE] transfer_req_to_var_test
+SHIORI_ACT - transfer_req_to_var() 蝓ｺ譛ｬ霆｢險・(3/3)[92m笨・[0m
+  transfers reference[0]-[9] to fullwidth keys ・抵ｼ・・抵ｼ・[92m笨・[0m
+  transfers reference[0]-[9] to halfwidth keys r0-r9 [92m笨・[0m
+  transfers req.id to var.req_id and req.base_id to var.req_base_id [92m笨・[0m
+SHIORI_ACT - transfer_req_to_var() 蝓ｺ譛ｬ霆｢險・(3/3)[92m笨・[0m
+[92mAll tests passed.[0m
+SHIORI_ACT - transfer_req_to_var() 蠅・阜譚｡莉ｶ (3/3)[92m笨・[0m
+  returns self safely when req is nil [92m笨・[0m
+  handles sparse reference array correctly (only [0] and [2] exist) [92m笨・[0m
+  returns self for method chaining [92m笨・[0m
+SHIORI_ACT - transfer_req_to_var() 蠅・阜譚｡莉ｶ (3/3)[92m笨・[0m
+[92mAll tests passed.[0m
+SHIORI_ACT - transfer_req_to_var() 邨ｱ蜷医ユ繧ｹ繝・(2/2)[92m笨・[0m
+  does not set req-derived keys in var when not called [92m笨・[0m
+  coexists with transfer_date_to_var() without key conflicts [92m笨・[0m
+SHIORI_ACT - transfer_req_to_var() 邨ｱ蜷医ユ繧ｹ繝・(2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+  笨・transfer_req_to_var_test loaded successfully
+
+[SUITE] act_method_fallback_test
+ACT_IMPL.call - Level 4 (act method fallback) (3/3)[92m笨・[0m
+  act繝｡繧ｽ繝・ラ縺慶all邨檎罰縺ｧ蜻ｼ縺ｳ蜃ｺ縺帙ｋ [92m笨・[0m
+  蠑墓焚縺径ct繝｡繧ｽ繝・ラ縺ｫ豁｣縺励￥貂｡縺輔ｌ繧・[92m笨・[0m
+  non-function蛟､・医ユ繝ｼ繝悶Ν遲会ｼ峨・繝輔か繝ｼ繝ｫ繝舌ャ繧ｯ蟇ｾ雎｡螟・[92m笨・[0m
+ACT_IMPL.call - Level 4 (act method fallback) (3/3)[92m笨・[0m
+[92mAll tests passed.[0m
+ACT_IMPL.call - current_scene蜆ｪ蜈・over act繝｡繧ｽ繝・ラ (2/2)[92m笨・[0m
+  current_scene縺ｨact繝｡繧ｽ繝・ラ荳｡譁ｹ縺ｫ蜷悟錐縺悟ｭ伜惠縺吶ｋ蝣ｴ蜷医…urrent_scene縺悟━蜈・[92m笨・[0m
+  current_scene縺ｫ縺ｪ縺・ｴ蜷医・act繝｡繧ｽ繝・ラ縺ｫ繝輔か繝ｼ繝ｫ繝舌ャ繧ｯ [92m笨・[0m
+ACT_IMPL.call - current_scene蜆ｪ蜈・over act繝｡繧ｽ繝・ラ (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+ACT_IMPL.call - SHIORI_ACT method fallback (1/1)[92m笨・[0m
+  SHIORI_ACT_IMPL縺ｮ繝｡繧ｽ繝・ラ縺慶all邨檎罰縺ｧ蜻ｼ縺ｳ蜃ｺ縺帙ｋ [92m笨・[0m
+ACT_IMPL.call - SHIORI_ACT method fallback (1/1)[92m笨・[0m
+[92mAll tests passed.[0m
+  笨・act_method_fallback tests defined
+  笨・act_method_fallback_test loaded successfully
+
+[SUITE] act_find_scene_test
+act:find_scene - Level 1 (current_scene) (3/3)[92m笨・[0m
+  current_scene[key] 縺九ｉ髢｢謨ｰ繧貞叙蠕励〒縺阪ｋ [92m笨・[0m
+  current_scene 縺・nil 縺ｮ縺ｨ縺・L1 繧偵せ繧ｭ繝・・縺吶ｋ [92m笨・[0m
+  current_scene[key] 縺・nil 縺ｮ縺ｨ縺肴ｬ｡繝ｬ繝吶Ν縺ｸ騾ｲ繧 [92m笨・[0m
+act:find_scene - Level 1 (current_scene) (3/3)[92m笨・[0m
+[92mAll tests passed.[0m
+act:find_scene - Level 2 (SCENE.search scoped) (2/2)[92m笨・[0m
+  SCENE.search(key, scope) 縺ｧ隕九▽縺九▲縺滄未謨ｰ繧定ｿ斐☆ [92m笨・[0m
+  SCENE.search 縺・nil 繧定ｿ斐＠縺溘→縺肴ｬ｡繝ｬ繝吶Ν縺ｸ騾ｲ繧 [92m笨・[0m
+act:find_scene - Level 2 (SCENE.search scoped) (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+act:find_scene - Level 3 (GLOBAL) (2/2)[92m笨・[0m
+  GLOBAL[key] 縺九ｉ髢｢謨ｰ繧貞叙蠕励〒縺阪ｋ [92m笨・[0m
+  L1繝ｻL2 縺・nil 縺ｧ GLOBAL 縺ｫ髢｢謨ｰ縺後≠繧九→縺・L3 縺瑚ｿ斐ｋ [92m笨・[0m
+act:find_scene - Level 3 (GLOBAL) (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+act:find_scene - Level 5 (SCENE.search scopeless) (1/1)[92m笨・[0m
+  L1縲廰4 蜈ｨ繝溘せ縺ｧ SCENE.search(key, nil) 縺悟他縺ｰ繧後ｋ [92m笨・[0m
+act:find_scene - Level 5 (SCENE.search scopeless) (1/1)[92m笨・[0m
+[92mAll tests passed.[0m
+act:find_scene - all levels miss (2/2)[92m笨・[0m
+  縺吶∋縺ｦ縺ｮ繝ｬ繝吶Ν縺ｧ譛ｪ逋ｺ隕九・縺ｨ縺・nil 繧定ｿ斐☆ [92m笨・[0m
+  繧ｨ繝ｩ繝ｼ縺檎匱逕溘＠縺ｪ縺・[92m笨・[0m
+act:find_scene - all levels miss (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+act:find_scene - returns function without executing (1/1)[92m笨・[0m
+  繝上Φ繝峨Λ繝ｼ縺悟ｮ溯｡後＆繧後※縺・↑縺・％縺ｨ繧堤｢ｺ隱阪☆繧・[92m笨・[0m
+act:find_scene - returns function without executing (1/1)[92m笨・[0m
+[92mAll tests passed.[0m
+act:find_scene - Priority (2/2)[92m笨・[0m
+  L1 縺ｨ L3 縺ｮ荳｡譁ｹ縺ｫ蜷後§繧ｭ繝ｼ縺後≠繧句ｴ蜷・L1 縺悟━蜈・[92m笨・[0m
+  L1 縺・nil 縺ｧ L3 縺後≠繧句ｴ蜷・L3 縺御ｽｿ繧上ｌ繧・[92m笨・[0m
+act:find_scene - Priority (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+  笨・act_find_scene_test loaded successfully
+
+[SUITE] global_fallback_integration_test
+Integration - GLOBAL fallback via EVENT.fire (2/2)[92m笨・[0m
+  GLOBAL.OnHourOther 縺・EVENT.fire 邨檎罰縺ｧ蜻ｼ縺ｰ繧後ｋ・・SL 繝ｩ繝吶Ν縺ｪ縺暦ｼ・[92m笨・[0m
+  GLOBAL 縺ｫ譛ｪ逋ｻ骭ｲ縺ｮ繧､繝吶Φ繝医・ 204 No Content 繧定ｿ斐☆ [92m笨・[0m
+Integration - GLOBAL fallback via EVENT.fire (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+Integration - DSL scene priority over GLOBAL (2/2)[92m笨・[0m
+  GLOBAL (L4) 縺ｯ繧ｰ繝ｭ繝ｼ繝舌Ν霎樊嶌 (L5) 繧医ｊ蜆ｪ蜈医＆繧後ｋ [92m笨・[0m
+  DSL 縺・nil 縺ｧ GLOBAL 縺後≠繧句ｴ蜷医；LOBAL 縺ｫ繝輔か繝ｼ繝ｫ繝舌ャ繧ｯ縺吶ｋ [92m笨・[0m
+Integration - DSL scene priority over GLOBAL (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+Integration - GLOBAL fallback for OnTalk (Req 2.2) (1/1)[92m笨・[0m
+  GLOBAL.OnTalk 縺・EVENT.fire 邨檎罰縺ｧ蜻ｼ縺ｰ繧後ｋ・・SL 繝ｩ繝吶Ν縺ｪ縺暦ｼ・[92m笨・[0m
+Integration - GLOBAL fallback for OnTalk (Req 2.2) (1/1)[92m笨・[0m
+[92mAll tests passed.[0m
+Integration - act:build() works via both call and co_exec (Req 4.3) (2/2)[92m笨・[0m
+  EVENT.fire 邨檎罰・・o_exec・峨〒 act:build() 縺後＆縺上ｉ繧ｹ繧ｯ繝ｪ繝励ヨ繧呈ｧ狗ｯ峨☆繧・[92m笨・[0m
+  act:call() 邨檎罰縺ｧ act:build() 縺後＆縺上ｉ繧ｹ繧ｯ繝ｪ繝励ヨ繧呈ｧ狗ｯ峨☆繧・[92m笨・[0m
+Integration - act:build() works via both call and co_exec (Req 4.3) (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+  笨・global_fallback_integration_test loaded successfully
+
+[SUITE] act_find_act_handler_test
+find_act_handler - L1 (current_scene 螳悟・荳閾ｴ) (6/6)[92m笨・[0m
+  scene[key] 縺ｫ髢｢謨ｰ縺瑚ｨｭ螳壹＆繧後※縺・ｌ縺ｰ霑斐☆・・cene 繝｢繝ｼ繝会ｼ・[92m笨・[0m
+  scene[key] 縺ｫ髢｢謨ｰ縺瑚ｨｭ螳壹＆繧後※縺・ｌ縺ｰ霑斐☆・・ord 繝｢繝ｼ繝会ｼ・[92m笨・[0m
+  scene[key] 縺ｫ髢｢謨ｰ縺瑚ｨｭ螳壹＆繧後※縺・ｌ縺ｰ霑斐☆・・xpr 繝｢繝ｼ繝会ｼ・[92m笨・[0m
+  scene[key] 縺ｫ譁・ｭ怜・蛟､縺瑚ｨｭ螳壹＆繧後※縺・ｌ縺ｰ霑斐☆ [92m笨・[0m
+  current_scene 縺・nil 縺ｮ縺ｨ縺阪せ繧ｭ繝・・縺励※ nil 繧定ｿ斐☆ [92m笨・[0m
+  current_scene[key] 縺・nil 縺ｮ縺ｨ縺肴ｬ｡繝ｬ繝吶Ν縺ｸ騾ｲ繧 [92m笨・[0m
+find_act_handler - L1 (current_scene 螳悟・荳閾ｴ) (6/6)[92m笨・[0m
+[92mAll tests passed.[0m
+find_act_handler - L2 word 繝｢繝ｼ繝・(繝ｭ繝ｼ繧ｫ繝ｫ蜊倩ｪ櫁ｾ樊嶌蜑肴婿荳閾ｴ) (3/3)[92m笨・[0m
+  @pasta_search 縺後≠繧後・ search_word(key, scene_name) 縺ｮ邨先棡繧定ｿ斐☆ [92m笨・[0m
+  @pasta_search 縺後↑縺代ｌ縺ｰ L2 繧偵せ繧ｭ繝・・縺励※ nil 繧定ｿ斐☆ [92m笨・[0m
+  current_scene.__global_name__ 縺後↑縺代ｌ縺ｰ L2 繧偵せ繧ｭ繝・・縺吶ｋ・・5繧ｰ繝ｭ繝ｼ繝舌Ν繧りｿ斐ｉ縺ｪ縺・ｼ・[92m笨・[0m
+find_act_handler - L2 word 繝｢繝ｼ繝・(繝ｭ繝ｼ繧ｫ繝ｫ蜊倩ｪ櫁ｾ樊嶌蜑肴婿荳閾ｴ) (3/3)[92m笨・[0m
+[92mAll tests passed.[0m
+find_act_handler - L2 scene 繝｢繝ｼ繝・(繝ｭ繝ｼ繧ｫ繝ｫ繧ｷ繝ｼ繝ｳ霎樊嶌蜑肴婿荳閾ｴ) (2/2)[92m笨・[0m
+  @pasta_search 縺後≠繧・SCENE.search 縺後・繝・メ縺吶ｌ縺ｰ func 繧定ｿ斐☆ [92m笨・[0m
+  expr 繝｢繝ｼ繝峨〒繧・L2 縺ｯ繧ｷ繝ｼ繝ｳ霎樊嶌蜑肴婿荳閾ｴ繧剃ｽｿ縺・[92m笨・[0m
+find_act_handler - L2 scene 繝｢繝ｼ繝・(繝ｭ繝ｼ繧ｫ繝ｫ繧ｷ繝ｼ繝ｳ霎樊嶌蜑肴婿荳閾ｴ) (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+find_act_handler - L3 (act.XX 繝｡繧ｽ繝・ラ繝輔か繝ｼ繝ｫ繝舌ャ繧ｯ) (3/3)[92m笨・[0m
+  ACT.IMPL 縺ｫ縺ゅｋ function 縺瑚ｿ斐ｋ [92m笨・[0m
+  髱・function 蛟､・医ユ繝ｼ繝悶Ν遲会ｼ峨・ L3 蟇ｾ雎｡螟・[92m笨・[0m
+  word 繝｢繝ｼ繝峨〒繧・L3 縺ｯ function 蝙九ｒ霑斐☆ [92m笨・[0m
+find_act_handler - L3 (act.XX 繝｡繧ｽ繝・ラ繝輔か繝ｼ繝ｫ繝舌ャ繧ｯ) (3/3)[92m笨・[0m
+[92mAll tests passed.[0m
+find_act_handler - L4 (GLOBAL 螳悟・荳閾ｴ) (2/2)[92m笨・[0m
+  GLOBAL[key] 縺ｫ髢｢謨ｰ縺瑚ｨｭ螳壹＆繧後※縺・ｌ縺ｰ霑斐☆ [92m笨・[0m
+  word 繝｢繝ｼ繝峨〒繧・L4 縺ｯ GLOBAL 螳悟・荳閾ｴ繧呈､懃ｴ｢縺吶ｋ [92m笨・[0m
+find_act_handler - L4 (GLOBAL 螳悟・荳閾ｴ) (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+find_act_handler - L5 word 繝｢繝ｼ繝・(繧ｰ繝ｭ繝ｼ繝舌Ν蜊倩ｪ櫁ｾ樊嶌蜑肴婿荳閾ｴ) (1/1)[92m笨・[0m
+  @pasta_search 縺後≠繧後・ search_word(key, nil) 縺ｮ邨先棡繧定ｿ斐☆ [92m笨・[0m
+find_act_handler - L5 word 繝｢繝ｼ繝・(繧ｰ繝ｭ繝ｼ繝舌Ν蜊倩ｪ櫁ｾ樊嶌蜑肴婿荳閾ｴ) (1/1)[92m笨・[0m
+[92mAll tests passed.[0m
+find_act_handler - L5 scene 繝｢繝ｼ繝・(繧ｰ繝ｭ繝ｼ繝舌Ν繧ｷ繝ｼ繝ｳ霎樊嶌蜑肴婿荳閾ｴ) (1/1)[92m笨・[0m
+  @pasta_search 縺後≠繧・SCENE.search(key, nil) 縺後・繝・メ縺吶ｌ縺ｰ func 繧定ｿ斐☆ [92m笨・[0m
+find_act_handler - L5 scene 繝｢繝ｼ繝・(繧ｰ繝ｭ繝ｼ繝舌Ν繧ｷ繝ｼ繝ｳ霎樊嶌蜑肴婿荳閾ｴ) (1/1)[92m笨・[0m
+[92mAll tests passed.[0m
+find_act_handler - nil return (2/2)[92m笨・[0m
+  蜈ｨ繝ｬ繝吶Ν縺後Α繧ｹ縺励◆縺ｨ縺・nil 繧定ｿ斐☆ [92m笨・[0m
+  word 繝｢繝ｼ繝峨〒繧ょ・繝溘せ縺ｮ縺ｨ縺・nil 繧定ｿ斐☆ [92m笨・[0m
+find_act_handler - nil return (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+ACT_IMPL.find_handler (thin wrapper) (2/2)[92m笨・[0m
+  find_handler('scene', key) 縺・find_act_handler('scene', key) 縺ｨ蜷後§邨先棡繧定ｿ斐☆ [92m笨・[0m
+  find_handler('word', key) 縺・find_act_handler('word', key) 縺ｨ蜷後§邨先棡繧定ｿ斐☆ [92m笨・[0m
+ACT_IMPL.find_handler (thin wrapper) (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+find_act_handler - 繝輔か繝ｼ繝ｫ繝舌ャ繧ｯ蜆ｪ蜈磯・ｽ・(2/2)[92m笨・[0m
+  L1・・cene・峨・ L3・・ct.XX・峨ｈ繧雁━蜈医＆繧後ｋ [92m笨・[0m
+  L3・・ct.XX・峨・ L4・・LOBAL・峨ｈ繧雁━蜈医＆繧後ｋ [92m笨・[0m
+find_act_handler - 繝輔か繝ｼ繝ｫ繝舌ャ繧ｯ蜆ｪ蜈磯・ｽ・(2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+  笨・act_find_act_handler_test loaded successfully
+
+[SUITE] proxy_find_handler_test
+PROXY_IMPL.find_actor_handler - word 莉･蚯est run_lua_unit_tests ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+
+､悶・ nil (2/2)[92m笨・[0m
+  mode 縺・'scene' 縺ｮ縺ｨ縺・nil 繧定ｿ斐☆ [92m笨・[0m
+  mode 縺・'expr' 縺ｮ縺ｨ縺・nil 繧定ｿ斐☆ [92m笨・[0m
+PROXY_IMPL.find_actor_handler - word 莉･螟悶・ nil (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+PROXY_IMPL.find_actor_handler - A1 (proxy.actor[key] 螳悟・荳閾ｴ) (3/3)[92m笨・[0m
+  proxy.actor[key] 縺ｫ蛟､縺後≠繧後・霑斐☆ [92m笨・[0m
+  proxy.actor[key] 縺ｫ髢｢謨ｰ縺後≠繧後・霑斐☆ [92m笨・[0m
+  proxy.actor[key] 縺・nil 縺ｮ縺ｨ縺肴ｬ｡繝ｬ繝吶Ν縺ｸ騾ｲ繧・・pasta_search 縺ｪ縺・竊・nil・・[92m笨・[0m
+PROXY_IMPL.find_actor_handler - A1 (proxy.actor[key] 螳悟・荳閾ｴ) (3/3)[92m笨・[0m
+[92mAll tests passed.[0m
+PROXY_IMPL.find_actor_handler - A2 (繧｢繧ｯ繧ｿ繝ｼ霎樊嶌蜑肴婿荳閾ｴ) (2/2)[92m笨・[0m
+  @pasta_search 縺後≠繧後・ __actor_{name}__ 繧ｹ繧ｳ繝ｼ繝励〒 search_word 繧貞他縺ｶ [92m笨・[0m
+  @pasta_search 縺後↑縺代ｌ縺ｰ A2 繧偵せ繧ｭ繝・・縺励※ nil 繧定ｿ斐☆ [92m笨・[0m
+PROXY_IMPL.find_actor_handler - A2 (繧｢繧ｯ繧ｿ繝ｼ霎樊嶌蜑肴婿荳閾ｴ) (2/2)[92m笨・[0m
+[92mAll tests passed.[0m
+PROXY_IMPL.find_handler - 繧｢繧ｯ繧ｿ繝ｼ繝ｬ繝吶Ν蜈郁｡・竊・act蟋碑ｭｲ (5/5)[92m笨・[0m
+  word 繝｢繝ｼ繝・ actor[key] 縺後・繝・メ縺吶ｌ縺ｰ蜊ｳ霑斐☆・・ct 縺ｫ蟋碑ｭｲ縺励↑縺・ｼ・[92m笨・[0m
+  word 繝｢繝ｼ繝・ actor 縺後Α繧ｹ縺励◆縺ｨ縺・act:find_act_handler 縺ｫ蟋碑ｭｲ縺吶ｋ [92m笨・[0m
+  scene 繝｢繝ｼ繝・ actor讀懃ｴ｢繧偵せ繧ｭ繝・・縺励※ act:find_act_handler 縺ｫ蟋碑ｭｲ縺吶ｋ [92m笨・[0m
+  expr 繝｢繝ｼ繝・ actor讀懃ｴ｢繧偵せ繧ｭ繝・・縺励※ act:find_act_handler 縺ｫ蟋碑ｭｲ縺吶ｋ [92m笨・[0m
+  蜈ｨ繝溘せ縺ｮ縺ｨ縺・nil 繧定ｿ斐☆ [92m笨・[0m
+PROXY_IMPL.find_handler - 繧｢繧ｯ繧ｿ繝ｼ繝ｬ繝吶Ν蜈郁｡・竊・act蟋碑ｭｲ (5/5)[92m笨・[0m
+[92mAll tests passed.[0m
+  笨・proxy_find_handler_test loaded successfully
+
+=====================================
+Test suites: 26 passed, 0 failed
+=====================================
+     Running tests\runtime\main.rs (target\debug\deps\runtime-0ef527a0254b670d.exe)
+
+running 119 tests
+test common::e2e_helpers::tests::test_transpile_basic_scene ... ok
+test encoding_test::test_runtime_with_config_api_unchanged ... ok
+test encoding_test::test_runtime_new_api_unchanged ... ok
+test encoding_test::test_enc_ansi_bytes_differ_from_utf8 ... ok
+test encoding_test::test_package_path_with_japanese_base ... ok
+test encoding_test::test_enc_to_ansi_ascii ... ok
+test encoding_test::test_package_path_set_correctly ... ok
+test encoding_test::test_enc_to_utf8_ascii ... ok
+test encoding_test::test_enc_nil_handling ... ok
+test encoding_test::test_enc_roundtrip_japanese ... ok
+test encoding_test::test_pasta_config_module_still_works ... ok
+test encoding_test::test_enc_type_error_handling ... ok
+test encoding_test::test_enc_module_require ... ok
+test finalize_scene_test::test_search_unavailable_before_finalize ... ok
+test finalize_scene_test::test_empty_registry_finalize ... ok
+test common::e2e_helpers::tests::test_create_runtime_with_finalize_succeeds ... ok
+test finalize_scene_test::test_multiple_finalize_calls ... ok
+test finalize_scene_test::test_word_builder_pattern ... ok
+test finalize_scene_test::test_word_not_found ... ok
+test local_scene_call_test::test_local_scene_call_duplicate_random_selection ... ok
+test local_scene_call_test::test_local_scene_call_prefix_match ... ok
+test local_scene_call_test::test_local_scene_call_simple ... ok
+test finalize_scene_test::test_full_e2e_flow ... ok
+test finalize_scene_test::test_scene_collection_basic ... ok
+test persistence_integration_test::test_persistence_config_effective_path ... ok
+test finalize_scene_test::test_scene_collection_local_scene_prefix_search ... ok
+test finalize_scene_test::test_scene_collection_local_scenes ... ok
+test finalize_scene_test::test_word_collection_global ... ok
+test finalize_scene_test::test_scene_not_found ... ok
+test persistence_integration_test::test_persistence_json_roundtrip ... ok
+test finalize_scene_test::test_scene_collection_local_scene_search ... ok
+test finalize_scene_test::test_scene_collection_multiple_global_scenes ... ok
+test persistence_integration_test::test_lua_persistence_module ... ok
+test persistence_integration_test::test_pasta_save_ctx_integration ... ok
+test persistence_integration_test::test_persistence_creates_directories ... ok
+test scene_test::test_fixture_word_parses ... ok
+test scene_test::test_fixture_actor_word_parses ... ok
+test scene_test::test_fixture_scene_parses ... ok
+test persistence_integration_test::test_persistence_obfuscated_roundtrip ... ok
+test persistence_integration_test::test_store_save_deprecated ... ok
+test scene_test::test_transpile_basic_scene ... ok
+test finalize_scene_test::test_word_collection_local ... ok
+test scene_test::test_actor_word_scope_resolution ... ok
+test scene_test::test_create_runtime_with_finalize_succeeds ... ok
+test stdlib_modules_test::test_assertions_fail_on_false ... ok
+test stdlib_modules_test::test_assertions_assert_eq ... ok
+test scene_test::test_e2e_empty_start_scope_local_scene ... ok
+test stdlib_modules_test::test_assertions_assert_same ... ok
+test stdlib_modules_test::test_assertions_assert_ne ... ok
+test scene_test::test_complete_flow_pasta_to_output ... ok
+test stdlib_modules_test::test_assertions_module_available ... ok
+test scene_test::test_e2e_empty_local_scene ... ok
+test scene_test::test_actor_word_fallback_to_global ... ok
+test scene_test::test_scene_prefix_search_and_random_selection ... ok
+test stdlib_modules_test::test_assertions_string_equality ... ok
+test stdlib_modules_test::test_runtime_config_minimal ... ok
+test stdlib_modules_test::test_env_module_disabled_by_default ... ok
+test stdlib_modules_test::test_testing_module_available ... ok
+test stdlib_modules_test::test_testing_create_instance ... ok
+test stdlib_modules_test::test_env_os_constant ... ok
+test stdlib_modules_test::test_runtime_config_full ... ok
+test scene_test::test_e2e_pipeline_basic ... ok
+test stdlib_modules_test::test_env_arch_constant ... ok
+test stdlib_modules_test::test_testing_register_test ... ok
+test stdlib_regex_test::test_regex_escape ... ok
+test scene_test::test_actor_word_shuffle_via_proxy ... ok
+test stdlib_modules_test::test_env_module_available_when_enabled ... ok
+test scene_test::test_actor_word_single_value_backward_compat ... ok
+test scene_test::test_word_random_selection_and_replacement ... ok
+test stdlib_regex_test::test_regex_invalid_pattern ... ok
+test stdlib_regex_test::test_regex_is_match_false ... ok
+test stdlib_regex_test::test_regex_is_match ... ok
+test stdlib_regex_test::test_regex_module_available ... ok
+test stdlib_regex_test::test_regex_shortcut_is_match ... ok
+test stdlib_regex_test::test_regex_new ... ok
+test syntax_test::test_comment_line_explicit_parse ... ok
+test syntax_test::test_error_message_specificity ... ok
+test stdlib_regex_test::test_regex_split ... ok
+test unit_test::test_from_lua_config ... ok
+test unit_test::test_default_equals_new ... ok
+test syntax_test::test_fixture_chaintalk_parses ... ok
+test unit_test::test_lua_require_existing_module ... ok
+test unit_test::test_runtime_config_from_libs ... ok
+test unit_test::test_lua_require_dotted_module_name ... ok
+test stdlib_regex_test::test_regex_japanese_text ... ok
+test unit_test::test_runtime_config_full_includes_unsafe ... ok
+test unit_test::test_runtime_config_minimal_is_std_all_only ... ok
+test unit_test::test_lua_require_nonexistent_module ... ok
+test unit_test::test_runtime_config_new_returns_default_libs ... ok
+test unit_test::test_should_enable_module_positive ... ok
+test unit_test::test_should_enable_module_subtraction_without_positive ... ok
+test unit_test::test_to_stdlib_empty_libs ... ok
+test unit_test::test_to_stdlib_order_independent ... ok
+test unit_test::test_should_enable_module_with_subtraction ... ok
+test unit_test::test_to_stdlib_ignores_mlua_stdlib_modules ... ok
+test unit_test::test_to_stdlib_luajit_specific_libs ... ok
+test unit_test::test_to_stdlib_individual_libs ... ok
+test unit_test::test_to_stdlib_rejects_removed_std_utf8 ... ok
+test unit_test::test_to_stdlib_std_all ... ok
+test unit_test::test_to_stdlib_std_all_unsafe ... ok
+test unit_test::test_to_stdlib_subtraction ... ok
+test unit_test::test_to_stdlib_unknown_library_error ... ok
+test unit_test::test_validate_and_warn_detects_std_all_unsafe ... ok
+test unit_test::test_validate_and_warn_detects_std_debug ... ok
+test unit_test::test_validate_and_warn_detects_env_module ... ok
+test unit_test::test_validate_and_warn_empty_libs ... ok
+test unit_test::test_validate_and_warn_respects_env_subtraction ... ok
+test unit_test::test_validate_and_warn_minimal ... ok
+test unit_test::test_validate_and_warn_respects_debug_subtraction ... ok
+test unit_test::test_validate_and_warn_safe_config ... ok
+test stdlib_regex_test::test_regex_replace ... ok
+test unit_test::test_validate_and_warn_unsafe_config ... ok
+test stdlib_regex_test::test_regex_match_captures ... ok
+test stdlib_regex_test::test_regex_unicode_word_boundary ... ok
+test stdlib_regex_test::test_regex_named_captures ... ok
+test syntax_test::test_attribute_inheritance ... ok
+test syntax_test::test_variable_scope_complete ... ok
+test syntax_test::test_e2e_chaintalk_transpile_and_execute ... ok
+test stdlib_regex_test::test_regex_shortcut_match ... ok
+
+test result: ok. 119 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests\sakura_script\main.rs (target\debug\deps\sakura_script-964bd956148036aa.exe)
+
+running 38 tests
+test basic_test::test_actor_wait_override ... ok
+test basic_test::test_empty_talk_returns_empty ... ok
+test budoux_test::test_break_lines_empty_table_returns_input ... ok
+test basic_test::test_actor_partial_override ... ok
+test basic_test::test_talk_to_script_with_custom_normal_wait ... ok
+test basic_test::test_nil_talk_returns_empty ... ok
+test basic_test::test_require_pasta_sakura_script ... ok
+test basic_test::test_line_end_prohibited_no_wait ... ok
+test basic_test::test_leader_per_char_wait ... ok
+test basic_test::test_talk_to_script_basic ... ok
+test basic_test::test_consecutive_punctuation_max_wait ... ok
+test basic_test::test_actor_non_numeric_fallback ... ok
+test basic_test::test_sakura_script_tag_preserved ... ok
+test budoux_test::test_break_lines_multiple_widths ... ok
+test budoux_test::test_break_lines_basic_japanese ... ok
+test budoux_test::test_break_lines_nil_text_returns_empty ... ok
+test basic_test::test_complex_sakura_tag ... ok
+test budoux_test::test_break_lines_no_break_when_fits ... ok
+test budoux_test::test_talk_to_script_budoux_vs_no_budoux_same_input ... ok
+test common::e2e_helpers::tests::test_transpile_basic_scene ... ok
+test budoux_test::test_talk_to_script_nil_actor_no_line_breaks ... ok
+test budoux_test::test_break_lines_nil_widths_returns_input ... ok
+test output_test::test_talk_config_default ... ok
+test budoux_test::test_talk_to_script_with_budoux_actor_inserts_line_breaks ... ok
+test budoux_test::test_break_lines_with_wait_tags ... ok
+test output_test::test_talk_config_from_toml_full ... ok
+test budoux_test::test_talk_to_script_budoux_preserves_wait_tags ... ok
+test budoux_test::test_talk_to_script_budoux_multi_width_array ... ok
+test output_test::test_talk_config_partial_override ... ok
+test output_test::test_consecutive_mixed_punctuation_max_selection ... ok
+test budoux_test::test_talk_to_script_budoux_last_value_repeats ... ok
+test budoux_test::test_talk_to_script_without_budoux_actor_no_line_breaks ... ok
+test output_test::test_requirement_7_1_consecutive_punctuation ... ok
+test common::e2e_helpers::tests::test_create_runtime_with_finalize_succeeds ... ok
+test output_test::test_individual_punctuation_wait_values ... ok
+test output_test::test_requirement_7_3_sakura_script_preserved ... ok
+test output_test::test_requirement_7_2_general_text ... ok
+test output_test::test_all_wait_types_comprehensive ... ok
+
+test result: ok. 38 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests\search\main.rs (target\debug\deps\search-b0b4490fea3e7fa7.exe)
+
+running 29 tests
+test common::e2e_helpers::tests::test_transpile_basic_scene ... ok
+test module_test::test_search_scene_global ... ok
+test module_test::test_search_word_local_fallback ... ok
+test module_test::test_set_selector_invalid_argument ... ok
+test module_test::test_require_returns_same_instance ... ok
+test module_test::test_runtime_creation ... ok
+test module_test::test_require_pasta_search ... ok
+test module_test::test_set_word_selector ... ok
+test module_test::test_search_word_global ... ok
+test module_test::test_search_scene_local_returns_transpiler_format ... ok
+test module_test::test_search_word_not_found ... ok
+test module_test::test_search_scene_returns_transpiler_format ... ok
+test common::e2e_helpers::tests::test_create_runtime_with_finalize_succeeds ... ok
+test module_test::test_search_scene_not_found ... ok
+test module_test::test_set_scene_selector ... ok
+test module_test::test_set_selector_reset ... ok
+test module_test::test_multiple_runtime_instances ... ok
+test scene_search_test::test_existing_scene_api_still_works ... ok
+test scene_search_test::test_scene_search_from_event_handler_pattern ... ok
+test scene_search_test::test_scene_search_not_found_returns_nil ... ok
+test scene_search_test::test_scene_search_global_returns_start_scene ... ok
+test scene_search_test::test_scene_search_local_search ... ok
+test scene_search_test::test_scene_search_nil_name_returns_nil ... ok
+test scene_search_test::test_scene_search_non_string_name_returns_nil ... ok
+test scene_search_test::test_scene_search_result_func_field_is_callable ... ok
+test scene_search_test::test_scene_search_result_is_callable ... ok
+test scene_search_test::test_scene_search_scene_not_registered_in_lua_returns_nil ... ok
+test scene_search_test::test_scene_search_returns_result_with_metadata ... ok
+test scene_search_test::test_scene_search_result_metadata_access ... ok
+
+test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests\shiori\main.rs (target\debug\deps\shiori-a3fcffc054bcaef0.exe)
+
+running 70 tests
+test common::e2e_helpers::tests::test_transpile_basic_scene ... ok
+test event_dispatch_test::test_reg_allows_handler_registration ... ok
+test common::e2e_helpers::tests::test_create_runtime_with_finalize_succeeds ... ok
+test event_dispatch_test::test_reg_module_exports_empty_table ... ok
+test event_dispatch_test::test_reg_module_loads ... ok
+test event_dispatch_test::test_event_module_with_res_module ... ok
+test event_dispatch_test::test_custom_onboot_overrides_default ... ok
+test event_dispatch_test::test_event_fire_dispatches_registered_handler ... ok
+test event_dispatch_test::test_event_fire_handles_nil_id ... ok
+test event_dispatch_test::test_nil_reference_access ... ok
+test event_dispatch_test::test_handler_registration_and_dispatch ... ok
+test event_dispatch_test::test_event_fire_handles_empty_error_message ... ok
+test event_dispatch_test::test_event_no_entry_returns_nil_when_scene_not_found ... ok
+test event_dispatch_test::test_default_onboot_returns_204 ... ok
+test event_dispatch_test::test_default_onboot_handler_registered ... ok
+test event_handler_test::test_no_entry_attempts_scene_fallback ... ok
+test event_dispatch_test::test_event_fire_catches_handler_error ... ok
+test event_dispatch_test::test_error_message_no_newline ... ok
+test event_dispatch_test::test_event_fire_returns_no_content_for_unregistered ... ok
+test event_dispatch_test::test_event_module_loads ... ok
+test event_handler_test::test_onboot_handler_with_references ... ok
+test res_test::test_defensive_nil_handling ... ok
+test res_test::test_res_bad_request_generates_400_response ... ok
+test res_test::test_res_env_modification_reflected ... ok
+test res_test::test_res_env_defaults ... ok
+test res_test::test_res_err_generates_500_response ... ok
+test res_test::test_res_advice_generates_312_response ... ok
+test res_test::test_res_warn_generates_204_with_warning ... ok
+test res_test::test_res_module_loads ... ok
+test res_test::test_res_ok_generates_200_response ... ok
+test res_test::test_res_not_enough_generates_311_response ... ok
+test res_test::test_res_no_content_generates_204_response ... ok
+test res_test::test_standard_headers_order ... ok
+test res_test::test_res_no_content_with_custom_header ... ok
+test event_handler_test::test_onghostchanged_handler_with_references ... ok
+test event_handler_test::test_onclose_handler_with_reference ... ok
+test res_test::test_response_terminates_with_double_crlf ... ok
+test event_handler_test::test_onfirstboot_handler_with_reference ... ok
+test event_handler_test::test_onminutechange_handler_with_references ... ok
+test event_handler_test::test_onmousedoubleclick_handler_with_references ... ok
+test virtual_event_config_test::test_non_numeric_save_values_fallback ... ok
+test event_handler_test::test_onsecondchange_handler_with_references ... ok
+test virtual_event_config_test::test_internal_state_getter ... ok
+test virtual_event_config_test::test_min_greater_than_max_correction ... ok
+test virtual_event_config_test::test_hardcoded_default_values ... ok
+test virtual_event_config_test::test_float_values_are_floored ... ok
+test virtual_event_config_test::test_config_default_values ... ok
+test virtual_event_config_test::test_runtime_change_reflected_immediately ... ok
+test virtual_event_config_test::test_module_state_reset ... ok
+test virtual_event_config_test::test_onsecondchange_handler_registered ... ok
+test event_handler_test::test_scene_fallback_returns_204_when_not_found ... ok
+test virtual_event_dispatch_test::test_dispatch_without_req_date_returns_nil ... ok
+test virtual_event_config_test::test_skip_when_choosing ... ok
+test virtual_event_config_test::test_save_priority_over_toml_and_default ... ok
+test virtual_event_config_test::test_partial_save_configuration_max_only ... ok
+test virtual_event_config_test::test_partial_save_configuration ... ok
+test virtual_event_dispatch_test::test_ontalk_hour_margin_skip ... ok
+test virtual_event_dispatch_test::test_ontalk_fires_after_interval ... ok
+test virtual_event_dispatch_test::test_virtual_dispatcher_exports_required_functions ... ok
+test virtual_event_dispatch_test::test_virtual_dispatcher_module_loads ... ok
+test virtual_event_config_test::test_values_below_minimum_clamped_to_10 ... ok
+test virtual_event_config_test::test_skip_when_talking ... ok
+test virtual_event_dispatch_test::test_onhour_first_run_skip ... ok
+test virtual_event_config_test::test_skip_when_csv_talking_choosing ... ok
+test virtual_event_dispatch_test::test_onhour_fires_at_hour ... ok
+test virtual_event_config_test::test_toml_fallback_values ... ok
+test virtual_event_dispatch_test::test_onhour_priority_over_ontalk ... ok
+test virtual_event_config_test::test_second_change_module_loads ... ok
+test virtual_event_dispatch_test::test_ontalk_interval_check ... ok
+test event_handler_test::test_scene_fallback_catches_errors ... ok
+
+test result: ok. 70 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+
+     Running tests\transpiler\main.rs (target\debug\deps\transpiler-d9205da8b3d22f9b.exe)
+
+running 80 tests
+test actor_word_dictionary_test::test_generate_actor_single_value_backward_compatible ... ok
+test basic_test::test_string_literalizer_in_transpile ... ok
+test actor_word_dictionary_test::test_generate_actor_code_blocks ... ok
+test actor_word_dictionary_test::test_generate_actor_ignores_non_lua_code_blocks ... ok
+test actor_word_dictionary_test::test_generate_actor_array_format ... ok
+test basic_test::test_transpile_do_end_scope_separation ... ok
+test basic_test::test_transpile_config_no_comments ... ok
+test code_generator_test::test_generate_escape_action ... ok
+test basic_test::test_transpile_sample_pasta_actors ... ok
+test code_generator_test::test_generate_global_fn_call_action ... ok
+test basic_test::test_transpile_sample_pasta_actions ... ok
+test code_generator_test::test_generate_global_fn_call_in_var_set_rhs ... ok
+test basic_test::test_transpile_sample_pasta_scenes ... ok
+test code_generator_test::test_generate_var_ref_args ... ok
+test code_generator_test::test_generate_talk_action ... ok
+test code_generator_test::test_generate_var_ref_global ... ok
+test basic_test::test_transpile_sample_pasta_header ... ok
+test code_generator_test::test_generate_header ... ok
+test code_generator_test::test_generate_local_fn_call_action_still_scene ... ok
+test code_generator_test::test_generate_var_ref_local ... ok
+test code_generator_test::test_generate_var_set_expr_still_works ... ok
+test code_generator_test::test_generate_var_set_none_expr_stmt ... ok
+test code_generator_test::test_generate_var_set_none_global_expr_stmt ... ok
+test code_generator_test::test_generate_var_set_wordref_args_error ... ok
+test code_generator_test::test_generate_var_set_wordref_global ... ok
+test code_generator_test::test_generate_var_set_wordref_local ... ok
+test code_generator_test::test_generate_word_ref_action ... ok
+test common::e2e_helpers::tests::test_transpile_basic_scene ... ok
+test comparison_test::test_file_attr_shadowing ... ok
+test comparison_test::test_actor_does_not_inherit_file_attrs ... ok
+test comparison_test::test_global_word_registration_order ... ok
+test cue_command_passthrough_test::test_transpile_fullwidth_cue_marker_passthrough ... ok
+test comparison_test::test_file_item_order_preserved ... ok
+test cue_command_passthrough_test::test_cue_commands_not_emitted_in_lua_output ... ok
+test dynamic_call_test::test_dynamic_call_code_gen_output ... ok
+test cue_command_passthrough_test::test_transpile_requirements_sample_scene ... ok
+test cue_command_passthrough_test::test_non_cue_items_emitted_correctly_alongside_cue ... ok
+test cue_command_passthrough_test::test_transpile_scene_with_cue_commands_succeeds ... ok
+test dynamic_call_test::test_dynamic_call_global_var_code_gen ... ok
+test dynamic_call_test::test_static_call_lua_output_unchanged ... ok
+test fallback_search_integration_test::test_actor_code_blocks_parsed ... ok
+test basic_test::test_debug_dump_generated_lua ... ok
+test fallback_search_integration_test::test_actor_code_blocks_are_expanded ... ok
+test fallback_search_integration_test::test_comprehensive_fallback_parses ... ok
+test basic_test::test_transpile_reference_sample_structure ... ok
+test fallback_search_integration_test::test_transpiler_actor_array_format ... ok
+test fallback_search_integration_test::test_transpiler_actor_word_format ... ok
+test basic_test::test_transpile_reference_code_patterns ... ok
+test scene_test::test_call_scene_followed_by_action_no_return ... ok
+test fallback_search_integration_test::test_generated_lua_actor_structure ... ok
+test fallback_search_integration_test::test_transpiler_expands_code_blocks ... ok
+test scene_test::test_set_spot_single_actor ... ok
+test scene_test::test_no_call_scene_no_return ... ok
+test scene_test::test_set_spot_with_explicit_number ... ok
+test scene_test::test_set_spot_empty_actors ... ok
+test scene_test::test_multiple_call_scenes_only_last_gets_return ... ok
+test scene_test::test_set_spot_multiple_actors ... ok
+test scene_test::test_single_call_scene_gets_return ... ok
+test fallback_search_integration_test::test_t1_actor_function_exact_match ... ok
+test fallback_search_integration_test::test_t15_empty_key_returns_nil ... ok
+test scene_test::test_tail_call_optimization_fixture ... ok
+test fallback_search_integration_test::test_t12_function_priority_over_dict ... ok
+test common::e2e_helpers::tests::test_create_runtime_with_finalize_succeeds ... ok
+test dynamic_call_test::test_dynamic_call_resolves_scene ... ok
+test comparison_test::test_transpile_sample_pasta_line_comparison ... ok
+test dynamic_call_test::test_nil_guard_in_act_call ... ok
+test dynamic_call_test::test_dynamic_call_no_match_returns_nil ... ok
+test snapshot_test::test_dynamic_call_binary_expr_snapshot ... ok
+test snapshot_test::test_dynamic_call_local_var_snapshot ... ok
+test snapshot_test::test_minimal_scene_snapshot ... ok
+test snapshot_test::test_dynamic_call_fn_call_snapshot ... ok
+test snapshot_test::test_sakura_script_action_snapshot ... ok
+test snapshot_test::test_actor_word_definition_snapshot ... ok
+test snapshot_test::test_multiple_scenes_snapshot ... ok
+test snapshot_test::test_dynamic_call_global_var_snapshot ... ok
+test snapshot_test::test_scene_with_variables_snapshot ... ok
+test snapshot_test::test_scene_with_call_snapshot ... ok
+test snapshot_test::test_scene_with_attributes_snapshot ... ok
+test snapshot_test::test_scene_with_word_snapshot ... ok
+test snapshot_test::test_tail_call_optimization_snapshot ... ok
+
+test result: ok. 80 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+
+     Running tests\ucid_test.rs (target\debug\deps\ucid_test-9c45068e8359fefd.exe)
+
+running 3 tests
+test test_japanese_function_name ... ok
+test test_japanese_table_field ... ok
+test test_japanese_variable_name ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests pasta_lua
+
+running 12 tests
+test crates\pasta_lua\src\code_gen\scope_gen.rs - code_gen::scope_gen::LuaCodeGenerator<'a,W>::is_callable_item (line 245) ... ignored
+test crates\pasta_lua\src\encoding\mod.rs - encoding::to_ansi_bytes (line 60) ... ignored
+test crates\pasta_lua\src\lib.rs - (line 18) ... ignored
+test crates\pasta_lua\src\loader\context.rs - loader::context::LoaderContext::generate_package_path_bytes (line 128) ... ignored
+test crates\pasta_lua\src\loader\mod.rs - loader (line 15) ... ignored
+test crates\pasta_lua\src\logging\registry.rs - logging::registry (line 11) ... ignored
+test crates\pasta_lua\src\runtime\mod.rs - runtime (line 8) ... ignored
+test crates\pasta_lua\src\runtime\runtime_config.rs - runtime::runtime_config::lua_require (line 256) ... ignored
+test crates\pasta_lua\src\search\mod.rs - search (line 10) ... ignored
+test crates\pasta_lua\src\normalize.rs - normalize::normalize_output (line 22) ... ok
+test crates\pasta_lua\src\runtime\runtime_config.rs - runtime::runtime_config::RuntimeConfig::to_stdlib (line 109) ... ok
+test crates\pasta_lua\src\runtime\runtime_config.rs - runtime::runtime_config::RuntimeConfig (line 16) ... ok
+
+test result: ok. 3 passed; 0 failed; 9 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+all doctests ran in 1.32s; merged doctests compilation took 1.15s

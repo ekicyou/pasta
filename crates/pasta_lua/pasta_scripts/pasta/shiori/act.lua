@@ -181,4 +181,47 @@ function SHIORI_ACT_IMPL.transfer_req_to_var(self)
     return self
 end
 
+-- ============================================================================
+-- SSPプロパティ書き込み (property-write-helpers feature)
+-- ============================================================================
+
+--- SSPタグ引数をエスケープする（SHIORI専用）
+--- Step 1: \, %, ] をバックスラッシュでエスケープ
+--- Step 2: , または " を含む場合は "" で全体をクォートし、内部の " を "" に二重化
+--- @param s string エスケープ対象の文字列
+--- @return string エスケープ済み文字列
+local function escape_tag_arg(s)
+    -- Step 1: 文字エスケープ（この順番で適用）
+    s = s:gsub("\\", "\\\\")
+    s = s:gsub("%%", "\\%%")
+    s = s:gsub("]", "\\]")
+    -- Step 2: クォーティング（, または " を含む場合）
+    if s:find('[,"]') then
+        s = s:gsub('"', '""')
+        s = '"' .. s .. '"'
+    end
+    return s
+end
+
+--- SSPプロパティ書き込みタグ（\![set,property,name,value]）を蓄積
+--- @param self ShioriAct アクションオブジェクト
+--- @param name string プロパティ名（nil・空文字列は不可）
+--- @param value any プロパティ値（nil の場合は "" として扱う）
+--- @return ShioriAct self メソッドチェーン用
+function SHIORI_ACT_IMPL.set_property(self, name, value)
+    if name == nil or name == "" then
+        error("set_property: name must not be nil or empty")
+    end
+    if value == nil then
+        value = ""
+    else
+        value = tostring(value)
+    end
+    local escaped_name = escape_tag_arg(name)
+    local escaped_value = escape_tag_arg(value)
+    local tag = "\\![set,property," .. escaped_name .. "," .. escaped_value .. "]"
+    table.insert(self.token, { type = "raw_script", text = tag })
+    return self
+end
+
 return SHIORI_ACT

@@ -32,6 +32,7 @@ local specs = {
     "global_fallback_integration_test",  -- GLOBAL フォールバック統合テスト & DSL+GLOBAL 優先順位テスト
     "act_find_act_handler_test",         -- ACT_IMPL.find_act_handler / find_handler フォールバック検索テスト
     "proxy_find_handler_test",           -- PROXY_IMPL.find_actor_handler / find_handler 検索テスト
+    "set_property_test",                 -- ACT_IMPL.set_property / escape_tag_arg テスト (property-write-helpers)
     -- 将来のテストスイートをここに追加
     -- "code_generator_test",
     -- "context_test",

@@ -148,6 +148,38 @@ function ACT_IMPL.raw_script(self, text) end
 act:raw_script("\\h\\s[5]\\e")
 ```
 
+### SHIORI固有メソッド（ShioriActのみ）
+
+> **注意**: 以下のメソッドは `pasta.shiori.act` モジュールが提供する `SHIORI_ACT_IMPL` に定義されている。
+> `SHIORI_ACT.new()` で生成した `ShioriAct` インスタンスでのみ使用可能。
+> 汎用 `ACT.new()` インスタンスには存在しない。
+
+#### set_property(name, value)
+
+SSPプロパティ書き込みタグ（`\![set,property,name,value]`）をトークンとして蓄積する。
+
+- `name` が `nil` または空文字列の場合は `error()` を発生させる
+- `value` が `nil` の場合は空文字列として扱い、それ以外は `tostring()` を適用する
+- 引数はSSPタグエスケープ規則で自動エスケープされる（`\`→`\\`、`%`→`\%`、`]`→`\]`、`,`/`"` を含む場合は `""` でクォート）
+
+```lua
+--- @param name string プロパティ名（nil・空文字列は不可）
+--- @param value any プロパティ値（nilは""として扱う）
+--- @return ShioriAct self
+function SHIORI_ACT_IMPL.set_property(self, name, value) end
+```
+
+```lua
+-- 単純なプロパティ書き込み
+act:set_property("sakura.name", "Alice")
+
+-- 数値（tostring自動適用）
+act:set_property("score", 100)
+
+-- メソッドチェーン
+act:set_property("flag", "on"):talk(act.さくら.actor, "設定しました")
+```
+
 ### 表示制御メソッド
 
 | メソッド | シグネチャ | 説明 |

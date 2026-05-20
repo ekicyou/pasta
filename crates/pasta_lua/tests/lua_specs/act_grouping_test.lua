@@ -455,3 +455,45 @@ describe("ACT.build() - sakura_script grouping", function()
         expect(result[1].tokens[3].text):toBe("後半")
     end)
 end)
+
+-- ============================================================================
+-- raw_script ハイブリッド分類テスト (group_by_actor バグ修正検証)
+-- アクターグループ不在時に独立トークンとして出力されることを検証する
+-- ============================================================================
+
+describe("ACT.build() - raw_script ハイブリッド分類", function()
+    -- シナリオ1: raw_script 単独（アクターグループなし） → 独立トークンとして出力
+    test("raw_script単独でアクターグループ不在時に独立トークンとして出力する", function()
+        local ACT = require("pasta.act")
+        local actors = create_mock_actors()
+        local act = ACT.new(actors)
+
+        act:raw_script("\\![play,sound,chime.wav]")
+        local result = act:build()
+
+        expect(#result):toBe(1)
+        expect(result[1].type):toBe("raw_script")
+        expect(result[1].text):toBe("\\![play,sound,chime.wav]")
+    end)
+
+    -- シナリオ3: raw_script → talk（raw_script先行、アクターグループなし）
+    -- raw_scriptは独立トークン、後続talkは新規アクターグループとして出力
+    test("raw_scriptが先行しtalkが後続する場合、raw_scriptは独立でtalkはactorグループになる", function()
+        local ACT = require("pasta.act")
+        local actors = create_mock_actors()
+        local sakura = actors["さくら"]
+        local act = ACT.new(actors)
+
+        act:raw_script("\\![set,otherghosttalk,ghostname,talk]")
+        act:talk(sakura, "こんにちは")
+        local result = act:build()
+
+        expect(#result):toBe(2)
+        expect(result[1].type):toBe("raw_script")
+        expect(result[1].text):toBe("\\![set,otherghosttalk,ghostname,talk]")
+        expect(result[2].type):toBe("actor")
+        expect(result[2].actor):toBe(sakura)
+        expect(#result[2].tokens):toBe(1)
+        expect(result[2].tokens[1].text):toBe("こんにちは")
+    end)
+end)

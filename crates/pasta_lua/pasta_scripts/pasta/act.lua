@@ -45,8 +45,16 @@ local function group_by_actor(tokens)
                 current_actor = talk_actor
             end
             table.insert(current_actor_token.tokens, token)
+        elseif t == "raw_script" then
+            -- raw_script: ハイブリッド分類
+            -- アクターグループ存在時はグループ内に追加、不在時はresultに直接追加
+            if current_actor_token then
+                table.insert(current_actor_token.tokens, token)
+            else
+                table.insert(result, token)
+            end
         else
-            -- アクター行動トークン（surface, wait, newline, clear, raw_script）
+            -- アクター行動トークン（surface, wait, newline, clear）
             -- 現在のアクターグループ内に追加
             if current_actor_token then
                 table.insert(current_actor_token.tokens, token)
