@@ -1,22 +1,22 @@
 {
-  "feature_name": "shiori-event-test-framework",
-  "created_at": "2026-05-20T10:00:00Z",
-  "updated_at": "2026-05-20T10:00:00Z",
-  "language": "ja",
-  "phase": "initialized",
-  "approvals": {
-    "requirements": {
-      "generated": false,
-      "approved": false
+    "feature_name": "shiori-event-test-framework",
+    "created_at": "2026-05-20T10:00:00Z",
+    "updated_at": "2026-05-20T10:00:00Z",
+    "language": "ja",
+    "phase": "initialized",
+    "approvals": {
+        "requirements": {
+            "generated": false,
+            "approved": false
+        },
+        "design": {
+            "generated": false,
+            "approved": false
+        },
+        "tasks": {
+            "generated": false,
+            "approved": false
+        }
     },
-    "design": {
-      "generated": false,
-      "approved": false
-    },
-    "tasks": {
-      "generated": false,
-      "approved": false
-    }
-  },
-  "ready_for_implementation": false
+    "ready_for_implementation": false
 }
