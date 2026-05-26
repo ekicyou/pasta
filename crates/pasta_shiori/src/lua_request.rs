@@ -1,10 +1,11 @@
 #![allow(clippy::trivially_copy_pass_by_ref)]
-use crate::error::MyResult;
+use crate::error::{MyError, MyResult};
 use crate::util::parsers::req::{Parser, Rule};
 use pasta_lua::mlua::{Lua, Table};
 use pest::Parser as _;
 use pest::iterators::FlatPairs;
 use time::OffsetDateTime;
+use time::format_description::well_known::Rfc3339;
 
 /// 指定時刻でdateテーブルを作成します。
 /// テスト時に固定時刻を渡せるようにするための基盤関数です。
@@ -54,6 +55,24 @@ pub fn parse_request(lua: &Lua, text: &str) -> MyResult<Table> {
     t.set("date", lua_date(lua)?)?;
     let it = Parser::parse(Rule::req, text)?.flatten();
     parse1(&t, it)?;
+
+    // X-Pasta-Time ヘッダーによる日時上書き
+    let dic: Table = t.get("dic")?;
+    if let Some(value) = dic.get::<Option<String>>("X-Pasta-Time")? {
+        match OffsetDateTime::parse(&value, &Rfc3339) {
+            Ok(dt) => {
+                t.set("date", lua_date_from(lua, dt)?)?;
+            }
+            Err(e) => {
+                tracing::error!(value = %value, error = %e, "Invalid X-Pasta-Time header");
+                return Err(MyError::InvalidPastaTime {
+                    value: value.into(),
+                    reason: e.to_string(),
+                });
+            }
+        }
+    }
+
     Ok(t)
 }
 
