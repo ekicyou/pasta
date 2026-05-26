@@ -106,5 +106,3 @@ function ACT_IMPL.find_act_handler(act, scene, mode, key)
 参考：https://ssp.shillest.net/ukadoc/manual/list_propertysystem.html
 プロパティシステムへのアクセスAPIをLuaで構築せよ。
 
-
-

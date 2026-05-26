@@ -632,13 +632,13 @@ _staged = { event_id, timeout_at, on_timeout }  -- or nil
 
 ### Error Categories and Responses
 
-| Category           | Trigger                               | Response                                                  |
-| ------------------ | ------------------------------------- | --------------------------------------------------------- |
-| User Error (4xx)   | `get_property` 引数バリデーション失敗 | コルーチン内 `error()` → 500（`xpcall` 経由）             |
-| User Error (4xx)   | コルーチン外呼び出し                  | 同上                                                      |
+| Category           | Trigger                               | Response                                                                                             |
+| ------------------ | ------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| User Error (4xx)   | `get_property` 引数バリデーション失敗 | コルーチン内 `error()` → 500（`xpcall` 経由）                                                        |
+| User Error (4xx)   | コルーチン外呼び出し                  | 同上                                                                                                 |
 | System Error (5xx) | タイムアウト（`on_timeout` 文字列）   | sweep がコルーチンを error で resume → 500 + `X-ERROR-REASON`。`OnSecondChange` レスポンスとして返却 |
-| Silent             | タイムアウト（`on_timeout` nil）      | コルーチン内全戻り値 nil、エラー出力なし                  |
-| Programming Error  | 多重ステージング                      | コルーチン内 `error()` → 500                              |
+| Silent             | タイムアウト（`on_timeout` nil）      | コルーチン内全戻り値 nil、エラー出力なし                                                             |
+| Programming Error  | 多重ステージング                      | コルーチン内 `error()` → 500                                                                         |
 
 ### Monitoring
 - タイムアウト sweep 時に `@pasta_log.warn(event_id, on_timeout)` でログ出力（`on_timeout` 文字列指定時のみ）
