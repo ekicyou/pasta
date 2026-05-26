@@ -71,8 +71,23 @@ impl ShioriTestEnv {
     }
 
     /// Send a SHIORI request and return a structured response.
+    ///
+    /// The request text is normalized for convenience:
+    /// - Leading/trailing newlines are trimmed
+    /// - Line endings are normalized to `\r\n`
+    /// - `\r\n\r\n` is appended as the SHIORI request terminator
+    ///
+    /// This allows writing requests as raw strings:
+    /// ```ignore
+    /// env.request(r#"
+    /// GET SHIORI/3.0
+    /// ID: OnBoot
+    /// X-Pasta-Time: 2025-07-15T12:00:00Z
+    /// "#)
+    /// ```
     pub fn request(&mut self, text: &str) -> Result<ShioriResponse, ShioriRequestError> {
-        let raw = self.shiori.request(text)?;
+        let normalized = normalize_request(text);
+        let raw = self.shiori.request(&normalized)?;
         let response = ShioriResponse::parse(&raw)?;
         Ok(response)
     }
@@ -86,4 +101,16 @@ impl ShioriTestEnv {
     pub fn path(&self) -> &Path {
         self._temp_dir.path()
     }
+}
+
+/// Normalize a SHIORI request string for test convenience.
+///
+/// - Trims leading/trailing newlines
+/// - Normalizes line endings to `\r\n`
+/// - Appends `\r\n\r\n` terminator
+fn normalize_request(text: &str) -> String {
+    let trimmed = text.trim_matches(|c| c == '\r' || c == '\n');
+    let mut result = trimmed.replace("\r\n", "\n").replace('\r', "\n").replace('\n', "\r\n");
+    result.push_str("\r\n\r\n");
+    result
 }

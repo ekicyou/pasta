@@ -15,12 +15,11 @@ use common::test_env::ShioriTestEnv;
 fn test_env_load_and_request() {
     let mut env = ShioriTestEnv::new("shiori_lifecycle");
 
-    let request = "GET SHIORI/3.0\r\n\
-                   Charset: UTF-8\r\n\
-                   ID: OnBoot\r\n\
-                   \r\n";
-
-    let resp = env.request(request).expect("request should succeed");
+    let resp = env.request(r#"
+GET SHIORI/3.0
+Charset: UTF-8
+ID: OnBoot
+"#).expect("request should succeed");
     assert!(resp.status_code == 200 || resp.status_code == 500,
         "Expected 200 or 500, got: {}", resp.status_code);
 }
@@ -34,7 +33,11 @@ fn test_env_multiple_requests_maintain_state() {
     let mut env = ShioriTestEnv::new("shiori_lifecycle");
 
     // First request
-    let req = "GET SHIORI/3.0\r\nCharset: UTF-8\r\nID: OnBoot\r\n\r\n";
+    let req = r#"
+GET SHIORI/3.0
+Charset: UTF-8
+ID: OnBoot
+"#;
     let _ = env.request(req).expect("first request should succeed");
 
     // Check request count via runtime
@@ -77,13 +80,12 @@ fn test_env_runtime_access() {
 fn test_env_x_pasta_time_fixed_time() {
     let mut env = ShioriTestEnv::new("shiori_lifecycle");
 
-    let request = "GET SHIORI/3.0\r\n\
-                   Charset: UTF-8\r\n\
-                   ID: OnBoot\r\n\
-                   X-Pasta-Time: 2025-07-15T10:30:00Z\r\n\
-                   \r\n";
-
-    let resp = env.request(request).expect("request with X-Pasta-Time should succeed");
+    let resp = env.request(r#"
+GET SHIORI/3.0
+Charset: UTF-8
+ID: OnBoot
+X-Pasta-Time: 2025-07-15T10:30:00Z
+"#).expect("request with X-Pasta-Time should succeed");
     // The request should process successfully (not 400)
     assert_ne!(resp.status_code, 400,
         "Valid X-Pasta-Time should not produce 400: {:?}", resp);
@@ -97,13 +99,12 @@ fn test_env_x_pasta_time_fixed_time() {
 fn test_env_invalid_x_pasta_time_returns_400() {
     let mut env = ShioriTestEnv::new("shiori_lifecycle");
 
-    let request = "GET SHIORI/3.0\r\n\
-                   Charset: UTF-8\r\n\
-                   ID: OnBoot\r\n\
-                   X-Pasta-Time: not-a-valid-date\r\n\
-                   \r\n";
-
-    let resp = env.request(request).expect("request should return parsed response");
+    let resp = env.request(r#"
+GET SHIORI/3.0
+Charset: UTF-8
+ID: OnBoot
+X-Pasta-Time: not-a-valid-date
+"#).expect("request should return parsed response");
     assert_eq!(resp.status_code, 400, "Invalid X-Pasta-Time should produce 400");
     let reason = resp.header("X-ERROR-REASON");
     assert!(reason.is_some(), "400 response should have X-ERROR-REASON header");
