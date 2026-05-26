@@ -70,7 +70,7 @@ impl ShioriTestEnv {
         }
     }
 
-    /// Send a SHIORI request and return a structured response.
+    /// Send a SHIORI request with normalized text and return a structured response.
     ///
     /// The request text is normalized for convenience:
     /// - Leading/trailing newlines are trimmed
@@ -87,7 +87,12 @@ impl ShioriTestEnv {
     /// ```
     pub fn request(&mut self, text: &str) -> Result<ShioriResponse, ShioriRequestError> {
         let normalized = normalize_request(text);
-        let raw = self.shiori.request(&normalized)?;
+        self.raw_request(&normalized)
+    }
+
+    /// Send a pre-formatted SHIORI request without normalization.
+    pub fn raw_request(&mut self, text: &str) -> Result<ShioriResponse, ShioriRequestError> {
+        let raw = self.shiori.request(text)?;
         let response = ShioriResponse::parse(&raw)?;
         Ok(response)
     }
