@@ -242,6 +242,66 @@ lua_test フレームワークはRust側の `#[test]` 関数から呼び出さ�
 
 ---
 
+## モックライブラリ (lua_test.mocks)
+
+`crates/pasta_lua/scriptlibs/lua_test/mocks.lua` は、Rustバックエンドモジュール5つのデフォルトスタブを一括で `package.loaded` に注入するライブラリ。テストごとの手動 `package.loaded` 設定ボイラープレートを排除する。
+
+### API
+
+| 関数 | 説明 |
+|------|------|
+| `mocks.install(opts?)` | 全5モジュールのスタブを `package.loaded` に登録。`opts` でモジュール単位のカスタムスタブを上書き可能 |
+| `mocks.reset()` | 全5モジュールの `package.loaded` エントリを `nil` に戻す |
+
+### 基本利用パターン
+
+```lua
+local mocks = require("lua_test.mocks")
+
+describe("イベントハンドラ", function()
+    test("OnBootが正常に動作する", function()
+        mocks.install()   -- 全5モジュールを一括スタブ化
+
+        local event = require("pasta.shiori.event")
+        -- ... テストロジック ...
+
+        mocks.reset()     -- クリーンアップ
+    end)
+end)
+```
+
+### カスタムスタブの指定
+
+`opts` テーブルで特定モジュールのみ置き換え可能。指定しないモジュールはデフォルトスタブが使われる。
+
+```lua
+mocks.install({
+    persistence = {
+        load = function() return { talk_count = 5 } end,
+        save = function(_data) return true end,
+    },
+    log = {
+        trace = function() end,
+        debug = function() end,
+        info  = function(msg) print("[INFO] " .. msg) end,
+        warn  = function() end,
+        error = function() end,
+    },
+})
+```
+
+### 対象モジュールとデフォルトスタブ
+
+| キー名 | モジュール名 | デフォルトスタブの動作 |
+|--------|-------------|----------------------|
+| `persistence` | `@pasta_persistence` | `load` → `{}`、`save` → `true` |
+| `search` | `@pasta_search` | メタテーブルキャッチオール（任意メソッド呼び出しで `nil` を返す関数） |
+| `sakura_script` | `@pasta_sakura_script` | `talk_to_script` → テキスト返却、`break_lines` → テキスト返却 |
+| `config` | `@pasta_config` | 空テーブル `{}` |
+| `log` | `@pasta_log` | `trace`/`debug`/`info`/`warn`/`error` → noop |
+
+---
+
 ## 関連リファレンス
 
 - [runtime-api.md](runtime-api.md#set_scene_selector--set_word_selector) — `@pasta_search` の `set_scene_selector` / `set_word_selector` 完全APIシグネチャ

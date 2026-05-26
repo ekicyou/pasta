@@ -2,8 +2,8 @@
 
 このドキュメントは、[SOUL.md](SOUL.md) で定義されたコア機能と、それを検証するテストの対応関係を示します。
 
-**最終更新**: 2026-03-24（`talk-frequency-persistence` おしゃべり頻度SAVE永続化反映）  
-**総テスト数**: 890+テスト（全パス ✅）
+**最終更新**: 2026-05-26（`shiori-event-test-framework` SHIORIイベントフロー試験基盤）  
+**総テスト数**: 1019+テスト（全パス ✅）
 
 ---
 
@@ -142,7 +142,8 @@
 | 機能                          | テストファイル                                                                                      | 状態   | 説明                                               |
 | ----------------------------- | --------------------------------------------------------------------------------------------------- | ------ | -------------------------------------------------- |
 | SHIORI.DLL インターフェース   | `shiori_lifecycle_test.rs`                                                                          | ✅ 完了 | 5テスト全パス                                      |
-| SHIORI リクエスト処理         | `lua_request_test.rs`                                                                               | ✅ 完了 | 18+テスト                                          |
+| SHIORI リクエスト処理         | `lua_request_test.rs`                                                                               | ✅ 完了 | 23+テスト（X-Pasta-Time時刻注入 5テスト追加）       |
+| ShioriTestEnv統合テスト       | `shiori_test_env_test.rs`<br>`common/response.rs`                                                   | ✅ 完了 | 5+9テスト（ShioriTestEnv E2E・ShioriResponseパーサー）|
 | Runtime E2E                   | `runtime_scene_test.rs`<br>`runtime_syntax_test.rs`                                                 | ✅ 完了 | 16テスト（2ファイルに分割）                        |
 | Finalize Scene                | `finalize_scene_test.rs`                                                                            | ✅ 完了 | 14テスト                                           |
 | ローカルシーン call E2E       | `local_scene_call_test.rs`                                                                          | ✅ 完了 | 3テスト（finalize経路・重複・前方一致）            |
@@ -219,11 +220,11 @@
 | ------------ | -------- | -------- | ----- | ------------------------------------------- |
 | pasta_dsl    | 153      | 153      | 0     | 優秀（cue_cmd 63テスト含む）                |
 | pasta_core   | 67       | 67       | 0     | ⭐⭐⭐⭐⭐ 優秀                                  |
-| pasta_lua    | 483      | 483      | 0     | 優秀（cue_command_passthrough 5テスト含む） |
+| pasta_lua    | 491      | 491      | 0     | 優秀（cue_command_passthrough 5テスト・mocks 8テスト含む） |
 | pasta_lsp    | 79       | 79       | 0     | ⭐⭐⭐⭐⭐ 優秀                                  |
-| pasta_shiori | 28       | 28       | 0     | ⭐⭐⭐⭐⭐ 優秀                                  |
+| pasta_shiori | 47       | 47       | 0     | ⭐⭐⭐⭐⭐ 優秀（ShioriTestEnv・X-Pasta-Time追加）  |
 | pasta-vscode | 79       | 79       | 0     | ⭐⭐⭐⭐⭐ 優秀                                  |
-| **合計**     | **989+** | **989+** | **0** | **100%パス率**                              |
+| **合計**     | **1019+** | **1019+** | **0** | **100%パス率**                              |
 
 ---
 

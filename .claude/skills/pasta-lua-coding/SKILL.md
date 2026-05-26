@@ -10,6 +10,7 @@ description: >-
   @pasta_config, @pasta_sakura_script, @enc, @pasta_log,
   ロギング, logging, log, trace, debug, info, warn, error,
   ACT, SCENE, STORE, GLOBAL, SAVE, lua_test, luacheck,
+  mocks, lua_test.mocks, モックライブラリ, mock install, mock reset,
   pasta lua coding, pasta runtime API.
   DO NOT USE FOR: Pasta DSL文法, .pastaファイル編集,
   pasta_dsl crate, pasta_core crate, Rustクレート実装,
