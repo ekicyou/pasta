@@ -420,7 +420,7 @@ local pending = {}                  -- event_id → {co, act, timeout_at, on_tim
     - **緩和**: `get_property` は `stage_pending` → `table.insert(self.token, ...)` → `coroutine.yield(self:build())` を例外を介在させない順序で実行。バリデーションは `stage_pending` より前で完了
   - **(R2) sweep 中の resume が新たな yield を発生**: タイムアウトで resume したコルーチンが内部で `get_property` を再度呼ぶ可能性。
     - **緩和**: タイムアウトで resume されたコルーチンが再度 `stage_pending` → yield しても、新しい pending エントリとして登録される（既存設計で対応可）。sweep 自体は単純イテレーションなので再入問題なし
-  - **(R3) 500 レスポンス能動送信不可**: SHIORI プロトコルは要求応答型のため、タイムアウト時に SSP へ能動的に 500 を送信する手段がない。Req 5.2 の「500 + X-ERROR-REASON」は、sweep が登録を削除した後に**遅延してコールバックイベントが到着した場合**に `try_route` が 500 を生成して返す経路として実装
+  - **(R3) OnSecondChange レスポンス消費**: sweep がタイムアウト検出時に 500 を返すと `OnSecondChange` の正常ディスパッチがスキップされる。ただし `OnSecondChange` は毎秒発火するため1回の 500 は実害なし。また、sweep 後に「遅延コールバック」が到着した場合も `try_route` が 500 を生成する（2経路の 500 機構）
 
 #### `EVENT.fire` (modified, `pasta/shiori/event/init.lua`)
 
@@ -473,11 +473,14 @@ end
 
 **Responsibilities & Constraints**:
 - sweep を起動してから既存ディスパッチャに委譲
-- sweep の副作用（コルーチン resume）は本ハンドラの戻り値に影響しない
+- sweep がタイムアウトを検出した場合は 500 レスポンスを返し、ディスパッチをスキップ（OnSecondChange は毎秒発火するため実害なし）
 
 ```lua
 REG.OnSecondChange = function(act)
-    CALLBACK.sweep(os.time())
+    local timeout_response = CALLBACK.sweep(os.time())
+    if timeout_response then
+        return timeout_response
+    end
     return dispatcher.dispatch(act)
 end
 ```
@@ -624,7 +627,7 @@ _staged = { event_id, timeout_at, on_timeout }  -- or nil
 
 ### Error Strategy
 - **入力バリデーション**: `get_property` で `error()` 即時発生。`xpcall` 経由で SHIORI 500 レスポンスに変換（既存仕組み）
-- **タイムアウト**: sweep で待機コルーチンを resume。`on_timeout` 文字列指定時はコルーチン内で `error(on_timeout)` を発生させ、`xpcall` で 500 + X-ERROR-REASON 変換。nil 指定時は全戻り値 nil で正常返却
+- **タイムアウト**: sweep で待機コルーチンを resume。`on_timeout` 文字列指定時はコルーチン内で `error(on_timeout)` を発生させ、`xpcall` で 500 + X-ERROR-REASON 変換。この 500 は `OnSecondChange` レスポンスとして返却される。nil 指定時は全戻り値 nil で正常返却
 - **多重ステージング**: バグ検出として即時 `error()`
 
 ### Error Categories and Responses
@@ -633,7 +636,7 @@ _staged = { event_id, timeout_at, on_timeout }  -- or nil
 | ------------------ | ------------------------------------- | --------------------------------------------------------- |
 | User Error (4xx)   | `get_property` 引数バリデーション失敗 | コルーチン内 `error()` → 500（`xpcall` 経由）             |
 | User Error (4xx)   | コルーチン外呼び出し                  | 同上                                                      |
-| System Error (5xx) | タイムアウト（`on_timeout` 文字列）   | コルーチン内 `error(on_timeout)` → 500 + `X-ERROR-REASON` |
+| System Error (5xx) | タイムアウト（`on_timeout` 文字列）   | sweep がコルーチンを error で resume → 500 + `X-ERROR-REASON`。`OnSecondChange` レスポンスとして返却 |
 | Silent             | タイムアウト（`on_timeout` nil）      | コルーチン内全戻り値 nil、エラー出力なし                  |
 | Programming Error  | 多重ステージング                      | コルーチン内 `error()` → 500                              |
 
@@ -649,8 +652,8 @@ _staged = { event_id, timeout_at, on_timeout }  -- or nil
 - 多重 `stage_pending`（consume 前）が error を発生
 - `try_route` が一致時にコルーチンを resume し pending エントリを削除
 - `try_route` が不一致時に nil を返し pending エントリを保持
-- `sweep` が `on_timeout` 文字列エントリでコルーチンを error 値で resume し pending を削除、ログ出力を確認
-- `sweep` が `on_timeout` nil エントリでコルーチンを nil で resume し、ログ出力なし
+- `sweep` が `on_timeout` 文字列エントリでコルーチンを error 値で resume し pending を削除、500 + X-ERROR-REASON レスポンスを返す。ログ出力を確認
+- `sweep` が `on_timeout` nil エントリでコルーチンを nil で resume し、ログ出力なし、nil を返す（500 なし）
 
 ### Unit Tests (`tests/get_property_test.lua`)
 - 引数なしで error
