@@ -23,7 +23,7 @@ lexopt = "0.3"
 md5 = "0.8"
 
 # NAR (ZIP) 作成
-zip = { version = "8.4", default-features = false, features = ["deflate"] }
+zip = { version = "8.6", default-features = false, features = ["deflate"] }
 
 # エラー処理
 thiserror.workspace = true

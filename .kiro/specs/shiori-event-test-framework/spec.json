@@ -1,22 +1,22 @@
 {
     "feature_name": "shiori-event-test-framework",
     "created_at": "2026-05-20T10:00:00Z",
-    "updated_at": "2026-05-20T10:00:00Z",
+    "updated_at": "2026-05-26T12:00:00Z",
     "language": "ja",
-    "phase": "initialized",
+    "phase": "tasks-generated",
     "approvals": {
         "requirements": {
-            "generated": false,
-            "approved": false
+            "generated": true,
+            "approved": true
         },
         "design": {
-            "generated": false,
-            "approved": false
+            "generated": true,
+            "approved": true
         },
         "tasks": {
-            "generated": false,
-            "approved": false
+            "generated": true,
+            "approved": true
         }
     },
-    "ready_for_implementation": false
+    "ready_for_implementation": true
 }

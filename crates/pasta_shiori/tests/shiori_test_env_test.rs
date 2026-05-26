@@ -15,13 +15,20 @@ use common::test_env::ShioriTestEnv;
 fn test_env_load_and_request() {
     let mut env = ShioriTestEnv::new("shiori_lifecycle");
 
-    let resp = env.request(r#"
+    let resp = env
+        .request(
+            r#"
 GET SHIORI/3.0
 Charset: UTF-8
 ID: OnBoot
-"#).expect("request should succeed");
-    assert!(resp.status_code == 200 || resp.status_code == 500,
-        "Expected 200 or 500, got: {}", resp.status_code);
+"#,
+        )
+        .expect("request should succeed");
+    assert!(
+        resp.status_code == 200 || resp.status_code == 500,
+        "Expected 200 or 500, got: {}",
+        resp.status_code
+    );
 }
 
 // ============================================================================
@@ -69,7 +76,10 @@ fn test_env_runtime_access() {
     let globals = lua.globals();
     let shiori_table: pasta_lua::mlua::Table = globals.get("SHIORI").unwrap();
     let loaded_hinst: i64 = shiori_table.get("loaded_hinst").unwrap();
-    assert_eq!(loaded_hinst, 0, "hinst should be 0 (default from ShioriTestEnv)");
+    assert_eq!(
+        loaded_hinst, 0,
+        "hinst should be 0 (default from ShioriTestEnv)"
+    );
 }
 
 // ============================================================================
@@ -80,15 +90,22 @@ fn test_env_runtime_access() {
 fn test_env_x_pasta_time_fixed_time() {
     let mut env = ShioriTestEnv::new("shiori_lifecycle");
 
-    let resp = env.request(r#"
+    let resp = env
+        .request(
+            r#"
 GET SHIORI/3.0
 Charset: UTF-8
 ID: OnBoot
 X-Pasta-Time: 2025-07-15T10:30:00Z
-"#).expect("request with X-Pasta-Time should succeed");
+"#,
+        )
+        .expect("request with X-Pasta-Time should succeed");
     // The request should process successfully (not 400)
-    assert_ne!(resp.status_code, 400,
-        "Valid X-Pasta-Time should not produce 400: {:?}", resp);
+    assert_ne!(
+        resp.status_code, 400,
+        "Valid X-Pasta-Time should not produce 400: {:?}",
+        resp
+    );
 }
 
 // ============================================================================
@@ -99,15 +116,28 @@ X-Pasta-Time: 2025-07-15T10:30:00Z
 fn test_env_invalid_x_pasta_time_returns_400() {
     let mut env = ShioriTestEnv::new("shiori_lifecycle");
 
-    let resp = env.request(r#"
+    let resp = env
+        .request(
+            r#"
 GET SHIORI/3.0
 Charset: UTF-8
 ID: OnBoot
 X-Pasta-Time: not-a-valid-date
-"#).expect("request should return parsed response");
-    assert_eq!(resp.status_code, 400, "Invalid X-Pasta-Time should produce 400");
+"#,
+        )
+        .expect("request should return parsed response");
+    assert_eq!(
+        resp.status_code, 400,
+        "Invalid X-Pasta-Time should produce 400"
+    );
     let reason = resp.header("X-ERROR-REASON");
-    assert!(reason.is_some(), "400 response should have X-ERROR-REASON header");
-    assert!(reason.unwrap().contains("X-Pasta-Time"),
-        "X-ERROR-REASON should mention X-Pasta-Time: {}", reason.unwrap());
+    assert!(
+        reason.is_some(),
+        "400 response should have X-ERROR-REASON header"
+    );
+    assert!(
+        reason.unwrap().contains("X-Pasta-Time"),
+        "X-ERROR-REASON should mention X-Pasta-Time: {}",
+        reason.unwrap()
+    );
 }
