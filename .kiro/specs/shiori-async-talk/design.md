@@ -492,7 +492,7 @@ end
 | Requirements | 2.1, 2.2, 2.3, 3.1, 3.2, 4.1, 4.2, 4.3, 5.4          |
 
 **Responsibilities & Constraints**:
-- 引数: 1 つ以上の文字列プロパティ名（最後の引数が table の場合は options として扱う）
+- 引数: `(name_or_names, timeout, timeout_message)` の 3 引数形式。第 1 引数が string なら単一プロパティ、table なら複数プロパティ
 - 戻り値: プロパティ名と同じ個数の多値（nil 含む）
 - バリデーションは `set_property` のパターンを踏襲
 
@@ -507,35 +507,38 @@ end
 
 ```lua
 --- SSP プロパティを取得（同期 API として動作）
---- 引数のうち最後が table の場合は options として扱う
+--- 第 1 引数が string なら単一プロパティ、table なら複数プロパティ
 --- @param self ShioriAct
---- @param ... string プロパティ名（1 個以上）、最後に table { timeout=number, on_timeout=string|nil } 可
+--- @param name_or_names string|string[] プロパティ名（単一）またはプロパティ名配列（複数）
+--- @param timeout number|nil タイムアウト秒数（デフォルト 5）
+--- @param timeout_message string|nil タイムアウト時エラー理由（デフォルト "callback timeout: get_property"）
 --- @return ... プロパティ値（文字列または nil）
-function SHIORI_ACT_IMPL.get_property(self, ...)
+function SHIORI_ACT_IMPL.get_property(self, name_or_names, timeout, timeout_message)
 ```
 
 **Preconditions**:
 - コルーチン実行コンテキスト内で呼ばれること（`coroutine.running()` がメインスレッドではない thread を返す）
-- 少なくとも 1 つのプロパティ名引数があること
+- `name_or_names` が string または空でない string 配列であること
 - 各プロパティ名は nil でも空文字列でもないこと
 
 **Postconditions**:
 - コールバック到着時、引数順に対応する Reference 値（または nil）を多値で返す
-- タイムアウト時、`on_timeout` が文字列なら `error()` 経由でコルーチンエラー、nil なら全戻り値 nil
+- タイムアウト時、`timeout_message` が文字列なら `error()` 経由でコルーチンエラー、nil なら全戻り値 nil
 
 **Internal Algorithm**:
 
 ```lua
-function SHIORI_ACT_IMPL.get_property(self, ...)
-    local args = {...}
-    local n = select("#", ...)
-
-    -- options 抽出
-    local options = nil
-    if n > 0 and type(args[n]) == "table" then
-        options = args[n]
-        n = n - 1
+function SHIORI_ACT_IMPL.get_property(self, name_or_names, timeout, timeout_message)
+    -- 引数正規化: string → 配列化
+    local names
+    if type(name_or_names) == "string" then
+        names = { name_or_names }
+    elseif type(name_or_names) == "table" then
+        names = name_or_names
+    else
+        error("get_property: first argument must be a property name (string) or array of names (table)")
     end
+    local n = #names
 
     -- バリデーション
     if n == 0 then error("get_property: at least one property name required") end
@@ -544,30 +547,26 @@ function SHIORI_ACT_IMPL.get_property(self, ...)
         error("get_property: must be called inside a scene coroutine")
     end
     for i = 1, n do
-        local name = args[i]
+        local name = names[i]
         if name == nil or name == "" then
             error("get_property: name must not be nil or empty")
         end
     end
 
-    -- options デフォルト適用
-    local timeout = (options and options.timeout) or 5
-    local on_timeout = (options and options.on_timeout)
-    if on_timeout == nil and options == nil then
-        -- ユーザー未指定: デフォルト reason 適用
-        on_timeout = "callback timeout: get_property"
+    -- デフォルト適用（Lua の引数省略 = nil を活用）
+    timeout = timeout or 5
+    if timeout_message == nil then
+        timeout_message = "callback timeout: get_property"
     end
-    -- options.on_timeout が明示的に false や nil 文字列でない nil の場合のみデフォルト適用
-    -- options を渡したが on_timeout 未指定なら nil（静かに消える）モード
 
     -- イベント ID 生成 + ステージング
     local event_id = CALLBACK.next_event_id()
-    CALLBACK.stage_pending(event_id, os.time() + timeout, on_timeout)
+    CALLBACK.stage_pending(event_id, os.time() + timeout, timeout_message)
 
     -- タグ蓄積
     local parts = { "\\![get,property," .. event_id }
     for i = 1, n do
-        parts[#parts+1] = escape_tag_arg(args[i])
+        parts[#parts+1] = escape_tag_arg(names[i])
     end
     local tag = table.concat(parts, ",") .. "]"
     table.insert(self.token, { type = "raw_script", text = tag })
@@ -575,11 +574,11 @@ function SHIORI_ACT_IMPL.get_property(self, ...)
     -- yield して resume 値（reference array + reason）を受け取り、多値で返す
     local refs, reason = coroutine.yield(self:build())
     if reason then
-        -- タイムアウト（on_timeout=string 経路）: エラー発生 → xpcall 経由で 500 + X-ERROR-REASON
+        -- タイムアウト（timeout_message=string 経路）: エラー発生 → xpcall 経由で 500 + X-ERROR-REASON
         error(reason)
     end
     if refs == nil then
-        -- タイムアウト（on_timeout=nil 経路）または異常: 全 nil
+        -- タイムアウト（timeout_message=nil 経路）または異常: 全 nil
         local nils = {}
         for i = 1, n do nils[i] = nil end
         return table.unpack(nils, 1, n)
@@ -598,8 +597,7 @@ end
 - **Integration**: 既存の `set_property` と対称的なバリデーション・エスケープパターン
 - **Validation**: バリデーション → ID 生成 → ステージング → タグ蓄積 → yield の順序を厳守。バリデーション失敗時にステージングが残らない
 - **Risks**:
-  - **(R5) options 形状の曖昧性**: 最後の引数が table の場合のみ options 扱いとする。プロパティ名は文字列のみ受けるという前提に依存
-  - **(R6) `coroutine.running()` のメインスレッド判定**: LuaJIT 2.1 では `(co, true)` を返す。`is_main == true` または `co == nil` でメインスレッド判定
+  - **(R5) `coroutine.running()` のメインスレッド判定**: LuaJIT 2.1 では `(co, true)` を返す。`is_main == true` または `co == nil` でメインスレッド判定
 
 ## Data Models
 
@@ -657,11 +655,13 @@ _staged = { event_id, timeout_at, on_timeout }  -- or nil
 ### Unit Tests (`tests/get_property_test.lua`)
 - 引数なしで error
 - nil/空文字列引数で error
+- 第 1 引数が数値や boolean など不正型で error
 - メインスレッド呼び出しで error
-- 単一引数で `\![get,property,OnPastaCallBack{N},name]` タグが蓄積され、ステージングが発生
-- 複数引数で `\![get,property,OnPastaCallBack{N},n1,n2]` タグが蓄積される
+- 単一 string 引数で `\![get,property,OnPastaCallBack{N},name]` タグが蓄積され、ステージングが発生
+- table 引数 `{"n1","n2"}` で `\![get,property,OnPastaCallBack{N},n1,n2]` タグが蓄積される
 - カンマ・引用符を含むプロパティ名がエスケープされる
-- options table を最後に渡した場合、`timeout` / `on_timeout` がステージングに反映される
+- 第 2 引数 timeout 、第 3 引数 timeout_message がステージングに反映される
+- timeout のみ指定時もデフォルト timeout_message が適用される
 
 ### Integration Tests (`pasta_shiori/tests/async_callback_integration_test.rs`)
 - **Scenario 1**: 単純なプロパティ取得 — 2 ラウンドで `baseware.version: 2.6.77\e` を取得
