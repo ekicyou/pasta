@@ -19,20 +19,20 @@ documentation = "https://github.com/ekicyou/pasta"
 pest = "2.8.6"
 pest_derive = { version = "2.8.6", features = ["grammar-extras"] }
 thiserror = "2"
-fast_radix_trie = "1.1.0"
-rand = "0.9"
+fast_radix_trie = "1.2.0"
+rand = "0.10"
 tracing = "0.1"
 
 # Development dependencies
 tempfile = "3"
-insta = { version = "1.46.3", features = ["glob"] }
+insta = { version = "1.47.2", features = ["glob"] }
 tracing-test = { version = "0.2", features = ["no-env-filter"] }
 
 # pasta_lua dependencies
 mlua = { version = "0.11", features = ["luajit52", "vendored", "serialize"] }
 mlua-stdlib = { version = "0.1", features = ["json", "regex", "yaml"] }
 regex = "1.12.3"
-toml = "0.9.8"
+toml = "1.1.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 glob = "0.3"
@@ -41,7 +41,7 @@ budoux = "0.1.1"
 unicode-width = "0.2.2"
 
 # Time dependencies
-time = { version = "0.3", features = ["local-offset"] }
+time = { version = "0.3", features = ["local-offset", "parsing"] }
 
 # Windows API dependencies
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Memory", "Win32_Globalization"] }
