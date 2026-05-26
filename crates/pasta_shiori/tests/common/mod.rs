@@ -3,6 +3,7 @@
 #![allow(dead_code)]
 
 pub mod response;
+pub mod test_env;
 
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
