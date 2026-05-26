@@ -2,6 +2,8 @@
 
 #![allow(dead_code)]
 
+pub mod response;
+
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
