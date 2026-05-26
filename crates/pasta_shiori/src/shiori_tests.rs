@@ -575,13 +575,18 @@ end
 // ========================================================================
 
 #[test]
-fn test_default_400_response_format() {
-    let response = PastaShiori::default_400_response();
+fn test_400_response_via_my_error() {
+    let err = MyError::InvalidPastaTime {
+        value: "bad-value".to_string(),
+        reason: "parse failed".to_string(),
+    };
+    let response = err.to_shiori_400_response();
 
     // SHIORI/3.0プロトコル準拠を検証
     assert!(response.starts_with("SHIORI/3.0 400 Bad Request\r\n"));
     assert!(response.contains("Charset: UTF-8\r\n"));
-    assert!(response.contains("Sender: Pasta\r\n"));
+    assert!(response.contains("X-ERROR-REASON:"));
+    assert!(!response.contains("Sender:"));
     assert!(response.ends_with("\r\n\r\n"));
 }
 

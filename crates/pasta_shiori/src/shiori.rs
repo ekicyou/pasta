@@ -284,7 +284,7 @@ impl PastaShiori {
             Ok(table) => table,
             Err(e) => {
                 error!(error = %e, "SHIORI request parsing failed");
-                return Ok(Self::default_400_response());
+                return Ok(e.to_shiori_400_response());
             }
         };
 
@@ -338,15 +338,6 @@ impl PastaShiori {
             .to_string()
     }
 
-    /// Generate default 400 Bad Request response.
-    /// Used when SHIORI request parsing fails.
-    fn default_400_response() -> String {
-        "SHIORI/3.0 400 Bad Request\r\n\
-         Charset: UTF-8\r\n\
-         Sender: Pasta\r\n\
-         \r\n"
-            .to_string()
-    }
 }
 
 #[cfg(test)]
