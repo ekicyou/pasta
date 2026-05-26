@@ -442,3 +442,132 @@ mod edge_case_tests {
         assert_eq!(ref1, "さようなら");
     }
 }
+
+// ============================================================================
+// Task 3.2: X-Pasta-Time header injection tests
+// ============================================================================
+
+mod x_pasta_time_tests {
+    use super::*;
+    use pasta::lua_request::parse_request;
+
+    /// Valid UTC time: X-Pasta-Time ヘッダーで req.date が上書きされることを確認
+    #[test]
+    fn test_valid_utc_time_overrides_date() {
+        let lua = create_test_lua();
+        let request = "GET SHIORI/3.0\r\n\
+            Charset: UTF-8\r\n\
+            ID: OnBoot\r\n\
+            X-Pasta-Time: 2025-07-15T10:30:00Z\r\n\
+            \r\n";
+
+        let table = parse_request(&lua, request).expect("parse_request should succeed");
+        let date: pasta_lua::mlua::Table = table.get("date").expect("date table should exist");
+
+        let year: i32 = date.get("year").unwrap();
+        let month: u8 = date.get("month").unwrap();
+        let day: u8 = date.get("day").unwrap();
+        let hour: u8 = date.get("hour").unwrap();
+        let min: u8 = date.get("min").unwrap();
+        let sec: u8 = date.get("sec").unwrap();
+
+        assert_eq!(year, 2025);
+        assert_eq!(month, 7);
+        assert_eq!(day, 15);
+        assert_eq!(hour, 10);
+        assert_eq!(min, 30);
+        assert_eq!(sec, 0);
+    }
+
+    /// Valid offset time: タイムゾーンオフセット付き値のフィールドが正確なこと
+    #[test]
+    fn test_valid_offset_time_overrides_date() {
+        let lua = create_test_lua();
+        let request = "GET SHIORI/3.0\r\n\
+            Charset: UTF-8\r\n\
+            ID: OnBoot\r\n\
+            X-Pasta-Time: 2025-01-02T15:30:45+09:00\r\n\
+            \r\n";
+
+        let table = parse_request(&lua, request).expect("parse_request should succeed");
+        let date: pasta_lua::mlua::Table = table.get("date").expect("date table should exist");
+
+        let year: i32 = date.get("year").unwrap();
+        let month: u8 = date.get("month").unwrap();
+        let day: u8 = date.get("day").unwrap();
+        let hour: u8 = date.get("hour").unwrap();
+        let min: u8 = date.get("min").unwrap();
+        let sec: u8 = date.get("sec").unwrap();
+
+        assert_eq!(year, 2025);
+        assert_eq!(month, 1);
+        assert_eq!(day, 2);
+        assert_eq!(hour, 15);
+        assert_eq!(min, 30);
+        assert_eq!(sec, 45);
+    }
+
+    /// Timezone offset affects wday/yday: 2025-01-02 (木曜日, yday=2) を確認
+    #[test]
+    fn test_offset_time_wday_yday_correct() {
+        let lua = create_test_lua();
+        let request = "GET SHIORI/3.0\r\n\
+            Charset: UTF-8\r\n\
+            ID: OnBoot\r\n\
+            X-Pasta-Time: 2025-01-02T15:30:45+09:00\r\n\
+            \r\n";
+
+        let table = parse_request(&lua, request).expect("parse_request should succeed");
+        let date: pasta_lua::mlua::Table = table.get("date").expect("date table should exist");
+
+        // 2025-01-02 is Thursday (wday=4) and the 2nd day of the year (yday=2)
+        let wday: u8 = date.get("wday").unwrap();
+        let yday: u16 = date.get("yday").unwrap();
+
+        assert_eq!(wday, 4, "2025-01-02 should be Thursday (wday=4)");
+        assert_eq!(yday, 2, "2025-01-02 should be yday=2");
+    }
+
+    /// No header: X-Pasta-Time 無しでも正常に date が取得できること
+    #[test]
+    fn test_no_header_uses_system_time() {
+        let lua = create_test_lua();
+        let request = "GET SHIORI/3.0\r\n\
+            Charset: UTF-8\r\n\
+            ID: OnBoot\r\n\
+            \r\n";
+
+        let table = parse_request(&lua, request).expect("parse_request should succeed");
+        let date: pasta_lua::mlua::Table = table.get("date").expect("date table should exist");
+
+        // date fields exist and have sane values
+        let year: i32 = date.get("year").unwrap();
+        let month: u8 = date.get("month").unwrap();
+        let day: u8 = date.get("day").unwrap();
+
+        assert!(year >= 2020 && year <= 2100, "year should be reasonable: {}", year);
+        assert!(month >= 1 && month <= 12, "month should be 1-12: {}", month);
+        assert!(day >= 1 && day <= 31, "day should be 1-31: {}", day);
+    }
+
+    /// Invalid value: 不正な X-Pasta-Time → エラーが返ること
+    #[test]
+    fn test_invalid_value_returns_error() {
+        let lua = create_test_lua();
+        let request = "GET SHIORI/3.0\r\n\
+            Charset: UTF-8\r\n\
+            ID: OnBoot\r\n\
+            X-Pasta-Time: not-a-date\r\n\
+            \r\n";
+
+        let result = parse_request(&lua, request);
+        assert!(result.is_err(), "Invalid X-Pasta-Time should return error");
+
+        let err_msg = format!("{}", result.unwrap_err());
+        assert!(
+            err_msg.contains("X-Pasta-Time") || err_msg.contains("not-a-date"),
+            "Error message should mention the invalid value: {}",
+            err_msg
+        );
+    }
+}
