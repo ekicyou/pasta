@@ -43,10 +43,10 @@
 - `pasta.shiori.event.init` → `pasta.shiori.event.callback`（ルーター⇄基盤）
 - `pasta.shiori.event.second_change` → `pasta.shiori.event.callback`（sweep 呼び出し）
 - `pasta.shiori.event.callback` → `@pasta_log`（ログ出力）、`pasta.shiori.res`（500 エラーレスポンス生成）
+- `pasta.shiori.event.callback` → `pasta.store`（`STORE.co_callback` マーカー設定。コールバック登録済みコルーチンを `set_co_scene` に伝達する通信用マーカー）
 
 **禁止される依存**:
 - `pasta.shiori.event.callback` は `pasta.shiori.act` を require しない（循環参照回避、依存は逆方向のみ）
-- `pasta.shiori.event.callback` は `pasta.store` を require しない（責務分離）
 
 ### Revalidation Triggers
 - 以下の変更は依存 spec の再検証を要する:
@@ -343,6 +343,7 @@ sequenceDiagram
 **Dependencies**:
 - Inbound: `SHIORI_ACT.get_property` (P0), `EVENT.fire` (P0), `REG.OnSecondChange` (P0)
 - Outbound: `@pasta_log` (P0) — タイムアウト警告ログ
+- Outbound: `pasta.store` (P0) — `STORE.co_callback` マーカー設定（コールバック登録済みコルーチンを `set_co_scene` に伝達）
 - Outbound: `pasta.shiori.res` (P1) — 500 エラーレスポンス生成（sweep 内で使用しない場合は依存不要、設計判断は Implementation Notes 参照）
 
 **Contracts**: Service [x] / API [ ] / Event [ ] / Batch [ ] / State [x]
@@ -389,12 +390,13 @@ function CALLBACK.reset()
 
 **Postconditions**:
 - `stage_pending`: 直前にステージングがあれば（消費されずに残っている場合）エラー（プログラミングミス検出）
-- `consume_staged` が true を返した場合: ステージングが消費され、co が `CALLBACK.pending[event_id]` に登録されている
+- `consume_staged` が true を返した場合: ステージングが消費され、co が `CALLBACK.pending[event_id]` に登録され、`STORE.co_callback = co` が設定されている
 - `try_route` が非 nil を返した場合: 該当 pending エントリは削除済み
 
 **Invariants**:
 - `CALLBACK.pending` の各エントリは `{co, act, timeout_at, on_timeout}` の構造を持つ
 - ステージングは単一スロット、消費されるまで次の `stage_pending` は失敗
+- `consume_staged` が true を返した場合、`STORE.co_callback` に co が設定されている（`set_co_scene` が消費）
 
 ##### State Management
 
@@ -405,7 +407,8 @@ local _staged = nil                 -- ステージング: {event_id, timeout_at
 local pending = {}                  -- event_id → {co, act, timeout_at, on_timeout}
 ```
 
-- **State model**: in-memory モジュール局所
+- **STORE 通信マーカー**: `STORE.co_callback`（`consume_staged` が設定、`set_co_scene` が消費）
+- **State model**: in-memory モジュール局所（pending, _staged, _next_id）+ STORE マーカー（co_callback）
 - **Persistence**: なし（プロセスライフタイム内のみ）
 - **Concurrency**: 単一スレッド前提、ロック不要
 
@@ -446,12 +449,11 @@ function EVENT.fire(req)
             set_co_scene(result)
             error(yielded)
         end
-        -- (新規) ステージング消費判定
-        if CALLBACK.consume_staged(result, act) then
-            set_co_scene(nil)  -- コールバック待ちはチェーントーク扱いしない
-        else
-            set_co_scene(result)  -- 既存: チェーントーク用に保持
-        end
+        -- (新規) ステージング消費（内部で STORE.co_callback が設定される）
+        CALLBACK.consume_staged(result, act)
+        -- set_co_scene は常に呼ぶ。STORE.co_callback が設定済みなら
+        -- co_scene に登録せずデタッチのみ行う
+        set_co_scene(result)
         return RES.ok(yielded)
     elseif type(result) == "string" then
         return RES.ok(result)
@@ -462,7 +464,8 @@ end
 ```
 
 **Implementation Notes**:
-- **Integration**: ステージング消費の戻り値だけで分岐するため、既存の `resume_until_valid` / `set_co_scene` のロジックは変更不要
+- **Integration**: `consume_staged` が `STORE.co_callback` マーカーを設定し、`set_co_scene` がマーカーを消費して分岐する。EVENT.fire 側は常に `set_co_scene(result)` を呼ぶだけで、コールバック登録済みコルーチンの制御は `set_co_scene` 内部で完結する
+- **set_co_scene 修正**: コールバック登録済みコルーチン（`STORE.co_callback == co`）を検出した場合、close せずに `STORE.co_scene` からデタッチのみ行う。旧 `STORE.co_scene` が同一オブジェクト（チェーントーク→コールバック遷移）なら close スキップ、別オブジェクトなら旧 co を通常通り close
 - **Risks**:
   - **(R4) `try_route` が pending と一致したが内部 resume が yield を返した（callback chaining）**: コールバック後に同じコルーチンが再度 `get_property` を呼んだ場合、`CALLBACK.try_route` 内で再度 `stage_pending` → yield → `consume_staged` の流れが必要。callback module 内で完結させる
 
