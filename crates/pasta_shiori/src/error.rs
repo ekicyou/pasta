@@ -30,6 +30,9 @@ pub enum MyError {
 
     #[error("script error: {}", message)]
     Script { message: String },
+
+    #[error("Invalid X-Pasta-Time header value '{value}': {reason}")]
+    InvalidPastaTime { value: String, reason: String },
 }
 
 impl From<parsers::req::ParseError> for MyError {
@@ -94,5 +97,72 @@ impl MyError {
              \r\n",
             self
         )
+    }
+
+    /// Generate SHIORI 3.0 bad request response
+    pub fn to_shiori_400_response(&self) -> String {
+        format!(
+            "SHIORI/3.0 400 Bad Request\r\n\
+             Charset: UTF-8\r\n\
+             X-ERROR-REASON: {}\r\n\
+             \r\n",
+            self
+        )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn invalid_pasta_time_error_message() {
+        let err = MyError::InvalidPastaTime {
+            value: "bad-value".to_string(),
+            reason: "parse failed".to_string(),
+        };
+        assert_eq!(
+            err.to_string(),
+            "Invalid X-Pasta-Time header value 'bad-value': parse failed"
+        );
+    }
+
+    #[test]
+    fn to_shiori_400_response_format() {
+        let err = MyError::InvalidPastaTime {
+            value: "bad-value".to_string(),
+            reason: "parse failed".to_string(),
+        };
+        let response = err.to_shiori_400_response();
+        assert_eq!(
+            response,
+            "SHIORI/3.0 400 Bad Request\r\n\
+             Charset: UTF-8\r\n\
+             X-ERROR-REASON: Invalid X-Pasta-Time header value 'bad-value': parse failed\r\n\
+             \r\n"
+        );
+    }
+
+    #[test]
+    fn to_shiori_400_response_does_not_contain_sender() {
+        let err = MyError::InvalidPastaTime {
+            value: "x".to_string(),
+            reason: "y".to_string(),
+        };
+        let response = err.to_shiori_400_response();
+        assert!(!response.contains("Sender:"));
+    }
+
+    #[test]
+    fn existing_to_shiori_response_unchanged() {
+        let err = MyError::Others;
+        let response = err.to_shiori_response();
+        assert_eq!(
+            response,
+            "SHIORI/3.0 500 Internal Server Error\r\n\
+             Charset: UTF-8\r\n\
+             X-ERROR-REASON: others error\r\n\
+             \r\n"
+        );
     }
 }
