@@ -32,7 +32,7 @@
   - _Requirements: 2.2, 6.1, 6.2, 6.3_
   - _Boundary: EVENT.fire, set_co_scene (event/init.lua)_
 
-- [ ] 2.2 (P) OnSecondChangeラッパーへのsweep呼び出し追加
+- [x] 2.2 (P) OnSecondChangeラッパーへのsweep呼び出し追加
   - `second_change.lua` の `REG.OnSecondChange` を修正: `CALLBACK.sweep(os.time())` を先に呼び出し、非 nil（タイムアウト 500 レスポンス）が返ったら即 return し、nil なら既存の `dispatcher.dispatch(act)` に委譲する
   - **完了確認**: タイムアウト超過エントリが pending にある状態で `OnSecondChange` を発火すると 500 レスポンスが返る。エントリがない場合は通常のディスパッチ結果が返る
   - _Requirements: 5.2, 5.3_

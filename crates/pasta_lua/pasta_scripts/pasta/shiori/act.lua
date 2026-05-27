@@ -6,6 +6,7 @@
 
 local ACT = require("pasta.act")
 local BUILDER = require("pasta.shiori.sakura_builder")
+local CALLBACK = require("pasta.shiori.event.callback")
 local CONFIG = require("pasta.config")
 local STORE = require("pasta.store")
 
@@ -222,6 +223,73 @@ function SHIORI_ACT_IMPL.set_property(self, name, value)
     local tag = "\\![set,property," .. escaped_name .. "," .. escaped_value .. "]"
     table.insert(self.token, { type = "raw_script", text = tag })
     return self
+end
+
+--- SSPプロパティ読み取りタグ（\![get,property,{id},{names...}]）を蓄積し、yield で値を受け取る
+--- @param self ShioriAct アクションオブジェクト
+--- @param name_or_names string|string[] プロパティ名または名前の配列
+--- @param timeout number|nil タイムアウト秒数（デフォルト 5）
+--- @param timeout_message string|nil タイムアウト時のエラーメッセージ
+--- @return any ... プロパティ値（多値返却）
+function SHIORI_ACT_IMPL.get_property(self, name_or_names, timeout, timeout_message)
+    -- 引数正規化: string → 配列化
+    local names
+    if type(name_or_names) == "string" then
+        names = { name_or_names }
+    elseif type(name_or_names) == "table" then
+        names = name_or_names
+    else
+        error("get_property: first argument must be a property name (string) or array of names (table)")
+    end
+    local n = #names
+
+    -- バリデーション
+    if n == 0 then error("get_property: at least one property name required") end
+    local co, is_main = coroutine.running()
+    if is_main or co == nil then
+        error("get_property: must be called inside a scene coroutine")
+    end
+    for i = 1, n do
+        local name = names[i]
+        if name == nil or name == "" then
+            error("get_property: name must not be nil or empty")
+        end
+    end
+
+    -- デフォルト適用
+    timeout = timeout or 5
+    if timeout_message == nil then
+        timeout_message = "callback timeout: get_property"
+    end
+
+    -- イベント ID 生成 + ステージング
+    local event_id = CALLBACK.next_event_id()
+    CALLBACK.stage_pending(event_id, os.time() + timeout, timeout_message)
+
+    -- タグ蓄積
+    local parts = { "\\![get,property," .. event_id }
+    for i = 1, n do
+        parts[#parts+1] = escape_tag_arg(names[i])
+    end
+    local tag = table.concat(parts, ",") .. "]"
+    table.insert(self.token, { type = "raw_script", text = tag })
+
+    -- yield して resume 値を受け取り、多値で返す
+    local refs, reason = coroutine.yield(self:build())
+    if reason then
+        error(reason)
+    end
+    if refs == nil then
+        local nils = {}
+        for i = 1, n do nils[i] = nil end
+        return table.unpack(nils, 1, n)
+    end
+    local out = {}
+    for i = 1, n do
+        local v = refs[i]
+        out[i] = (v == nil or v == "") and nil or v
+    end
+    return table.unpack(out, 1, n)
 end
 
 return SHIORI_ACT
