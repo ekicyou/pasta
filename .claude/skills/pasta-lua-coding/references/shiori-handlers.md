@@ -27,12 +27,12 @@ end
 
 SHIORIリクエスト情報テーブル。
 
-| フィールド | 型 | 説明 |
-|-----------|---|------|
-| `req.id` | string | イベント名（`"OnBoot"` 等） |
+| フィールド         | 型          | 説明                                                     |
+| ------------------ | ----------- | -------------------------------------------------------- |
+| `req.id`           | string      | イベント名（`"OnBoot"` 等）                              |
 | `req.reference[N]` | string\|nil | Referenceヘッダ（0始まりインデックス）。未送信時は `nil` |
-| `req.date` | table | 日時情報（`req.date.unix` 等） |
-| `req.status` | string\|nil | ステータス（`"talking"` 等） |
+| `req.date`         | table       | 日時情報（`req.date.unix` 等）                           |
+| `req.status`       | string\|nil | ステータス（`"talking"` 等）                             |
 
 **Reference パラメータへのアクセス**:
 
@@ -57,12 +57,12 @@ local RES = require("pasta.shiori.res")
 
 ### API一覧
 
-| 関数 | ステータス | 説明 |
-|------|----------|------|
-| `RES.ok(value)` | 200 OK | 成功レスポンス + Value |
-| `RES.ok_with(headers)` | 200 OK | 成功レスポンス + 複数ヘッダ |
-| `RES.no_content()` | 204 No Content | 空レスポンス |
-| `RES.err(message)` | 500 Internal Server Error | エラーレスポンス |
+| 関数                   | ステータス                | 説明                        |
+| ---------------------- | ------------------------- | --------------------------- |
+| `RES.ok(value)`        | 200 OK                    | 成功レスポンス + Value      |
+| `RES.ok_with(headers)` | 200 OK                    | 成功レスポンス + 複数ヘッダ |
+| `RES.no_content()`     | 204 No Content            | 空レスポンス                |
+| `RES.err(message)`     | 500 Internal Server Error | エラーレスポンス            |
 
 ### 使用例
 
@@ -95,8 +95,8 @@ SSP（ベースウェア）から送信される主要イベント。
 
 ゴーストが初めて起動されたとき、またはバニッシュから復帰したときに発火。
 
-| Reference | 型 | 説明 |
-|-----------|---|------|
+| Reference          | 型     | 説明                                        |
+| ------------------ | ------ | ------------------------------------------- |
 | `req.reference[0]` | string | バニッシュ復帰フラグ ("0": 初回, "1": 復帰) |
 
 ```lua
@@ -113,10 +113,10 @@ end
 
 ゴーストが起動されるたびに発火。
 
-| Reference | 型 | 説明 |
-|-----------|---|------|
-| `req.reference[0]` | string | シェル名 |
-| `req.reference[6]` | string | シェルパス |
+| Reference          | 型     | 説明         |
+| ------------------ | ------ | ------------ |
+| `req.reference[0]` | string | シェル名     |
+| `req.reference[6]` | string | シェルパス   |
 | `req.reference[7]` | string | ゴーストパス |
 
 ```lua
@@ -130,8 +130,8 @@ end
 
 ゴーストが終了するときに発火。
 
-| Reference | 型 | 説明 |
-|-----------|---|------|
+| Reference          | 型     | 説明                             |
+| ------------------ | ------ | -------------------------------- |
 | `req.reference[0]` | string | 終了理由 ("user", "shutdown" 等) |
 
 ```lua
@@ -148,8 +148,8 @@ end
 
 他のゴーストに切り替わるときに発火。
 
-| Reference | 型 | 説明 |
-|-----------|---|------|
+| Reference          | 型     | 説明                 |
+| ------------------ | ------ | -------------------- |
 | `req.reference[0]` | string | 切り替え先ゴースト名 |
 | `req.reference[1]` | string | 切り替え元ゴースト名 |
 
@@ -166,10 +166,10 @@ end
 
 キャラクターをダブルクリックしたときに発火。
 
-| Reference | 型 | 説明 |
-|-----------|---|------|
+| Reference          | 型     | 説明                              |
+| ------------------ | ------ | --------------------------------- |
 | `req.reference[0]` | string | スコープ ("0": sakura, "1": kero) |
-| `req.reference[4]` | string | 当たり判定 ID |
+| `req.reference[4]` | string | 当たり判定 ID                     |
 
 ```lua
 REG.OnMouseDoubleClick = function(req)
@@ -190,10 +190,10 @@ end
 毎秒発火する（高頻度）。仮想ディスパッチャのトリガーとして使用される。  
 **非同期コールバック保留中のコルーチン再開もこのイベントで行われる**（`CALLBACK.resume_pending()`）。
 
-| Reference | 型 | 説明 |
-|-----------|---|------|
+| Reference          | 型     | 説明          |
+| ------------------ | ------ | ------------- |
 | `req.reference[0]` | string | 現在秒 (0-59) |
-| `req.reference[1]` | string | 累積秒 |
+| `req.reference[1]` | string | 累積秒        |
 
 ```lua
 REG.OnSecondChange = function(req)
@@ -206,9 +206,9 @@ end
 SSP からのコールバック応答（`get_property` 等の結果）を受信するイベント。  
 ゴースト作者が直接ハンドラを登録する必要はなく、フレームワーク内部の `pasta.shiori.callback` モジュールが自動処理する。
 
-| Reference | 型 | 説明 |
-|-----------|---|------|
-| `req.reference[0]` | string | コールバック ID |
+| Reference          | 型     | 説明                     |
+| ------------------ | ------ | ------------------------ |
+| `req.reference[0]` | string | コールバック ID          |
 | `req.reference[1]` | string | 結果値（プロパティ値等） |
 
 > **注意**: このイベントのハンドラは `pasta.shiori.event.init` で自動登録される。  
@@ -218,8 +218,8 @@ SSP からのコールバック応答（`get_property` 等の結果）を受信�
 
 毎分発火する。
 
-| Reference | 型 | 説明 |
-|-----------|---|------|
+| Reference          | 型     | 説明          |
+| ------------------ | ------ | ------------- |
 | `req.reference[0]` | string | 現在分 (0-59) |
 | `req.reference[1]` | string | 現在時 (0-23) |
 
@@ -305,17 +305,17 @@ local result = dispatcher.dispatch(act)
 
 以下のSSP Statusキーワードが `act.req.status` に含まれている場合、`dispatch()` はイベント発行をブロックする:
 
-| キーワード | 意味 | 対応SSP状態 |
-|-----------|------|------------|
-| `talking` | トーク中 | さくらスクリプト実行中 |
-| `choosing` | 選択肢表示中 | `\q` 選択肢待ち |
-| `online` | ネットワーク通信中 | 更新チェック等 |
-| `opening` | 入力ボックス等が開いている | `opening(communicate)` 等 |
-| `passive` | パッシブモード中 | 他ゴーストから制御中 |
-| `induction` | インダクションモード中 | 他ゴーストを呼び出し中 |
-| `timecritical` | タイムクリティカルセクション中 | `\![set,timecritical]` |
-| `nouserbreak` | ユーザーブレイク禁止中 | `\![set,nouserbreak]` |
-| `minimizing` | 最小化中 | バルーン非表示 |
+| キーワード     | 意味                           | 対応SSP状態               |
+| -------------- | ------------------------------ | ------------------------- |
+| `talking`      | トーク中                       | さくらスクリプト実行中    |
+| `choosing`     | 選択肢表示中                   | `\q` 選択肢待ち           |
+| `online`       | ネットワーク通信中             | 更新チェック等            |
+| `opening`      | 入力ボックス等が開いている     | `opening(communicate)` 等 |
+| `passive`      | パッシブモード中               | 他ゴーストから制御中      |
+| `induction`    | インダクションモード中         | 他ゴーストを呼び出し中    |
+| `timecritical` | タイムクリティカルセクション中 | `\![set,timecritical]`    |
+| `nouserbreak`  | ユーザーブレイク禁止中         | `\![set,nouserbreak]`     |
+| `minimizing`   | 最小化中                       | バルーン非表示            |
 
 ### is_blocked(status)
 
@@ -376,11 +376,11 @@ local result = dispatcher.check_talk(act)
 
 `[ghost]` セクションで仮想ディスパッチャの動作を設定。
 
-| 設定 | 型 | デフォルト | 説明 |
-|------|---|----------|------|
-| `talk_interval_min` | integer | 180 | 最小トーク間隔（秒） |
-| `talk_interval_max` | integer | 300 | 最大トーク間隔（秒） |
-| `hour_margin` | integer | 30 | 時報前スキップマージン（秒） |
+| 設定                | 型      | デフォルト | 説明                         |
+| ------------------- | ------- | ---------- | ---------------------------- |
+| `talk_interval_min` | integer | 180        | 最小トーク間隔（秒）         |
+| `talk_interval_max` | integer | 300        | 最大トーク間隔（秒）         |
+| `hour_margin`       | integer | 30         | 時報前スキップマージン（秒） |
 
 ```toml
 [ghost]

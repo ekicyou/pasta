@@ -39,14 +39,14 @@ metadata:
 
 ### DSL vs Lua 判断基準
 
-| ケース | 推奨 | 理由 |
-|--------|------|------|
-| 数個の単語定義 | DSL (`＠単語：値1、値2`) | 宣言的で簡潔 |
-| 数十〜数百件の単語一括投入 | Lua (`WORD.create_*`) | ループ/外部データ読み込みが必要 |
-| 基本的なシーン定義 | DSL (`＊シーン名`) | 可読性が高い |
-| 条件分岐を含む複雑なロジック | Lua (シーン関数) | DSLの制御構文は限定的 |
-| カスタムSHIORIイベント処理 | Lua (REGテーブル) | DSLではイベントハンドラを直接定義不可 |
-| 外部データ（JSON/YAML）の読み込み | Lua (`@json`/`@yaml`) | DSLには外部ファイル操作機能なし |
+| ケース                            | 推奨                     | 理由                                  |
+| --------------------------------- | ------------------------ | ------------------------------------- |
+| 数個の単語定義                    | DSL (`＠単語：値1、値2`) | 宣言的で簡潔                          |
+| 数十〜数百件の単語一括投入        | Lua (`WORD.create_*`)    | ループ/外部データ読み込みが必要       |
+| 基本的なシーン定義                | DSL (`＊シーン名`)       | 可読性が高い                          |
+| 条件分岐を含む複雑なロジック      | Lua (シーン関数)         | DSLの制御構文は限定的                 |
+| カスタムSHIORIイベント処理        | Lua (REGテーブル)        | DSLではイベントハンドラを直接定義不可 |
+| 外部データ（JSON/YAML）の読み込み | Lua (`@json`/`@yaml`)    | DSLには外部ファイル操作機能なし       |
 
 **自己完結性**: 本スキルは別リポジトリにコピーして単体で機能する。pastaリポジトリ内の他ファイルへの参照に依存しない。
 
@@ -58,38 +58,38 @@ metadata:
 
 ### Rust組み込みモジュール
 
-| モジュール | 用途 | require方法 |
-|-----------|------|------------|
-| `@pasta_search` | シーン・単語検索 | `require` 直接 |
-| `@pasta_persistence` | セーブデータ永続化 | `require` 直接 |
-| `@pasta_sakura_script` | さくらスクリプト変換 | `require` 直接 |
-| `@enc` | UTF-8 ⇔ ANSI変換 | `require` 直接 |
-| `@pasta_config` | pasta.toml設定読み取り | `pcall(require, ...)` 保護必須 |
-| `@pasta_log` | ロギング（trace/debug/info/warn/error） | `require` 直接 |
+| モジュール             | 用途                                    | require方法                    |
+| ---------------------- | --------------------------------------- | ------------------------------ |
+| `@pasta_search`        | シーン・単語検索                        | `require` 直接                 |
+| `@pasta_persistence`   | セーブデータ永続化                      | `require` 直接                 |
+| `@pasta_sakura_script` | さくらスクリプト変換                    | `require` 直接                 |
+| `@enc`                 | UTF-8 ⇔ ANSI変換                        | `require` 直接                 |
+| `@pasta_config`        | pasta.toml設定読み取り                  | `pcall(require, ...)` 保護必須 |
+| `@pasta_log`           | ロギング（trace/debug/info/warn/error） | `require` 直接                 |
 
 ### 内部Luaモジュール（pasta.*名前空間）
 
-| モジュール | 用途 | 主要API |
-|-----------|------|--------|
-| `pasta.store` | 一元データ管理 | `STORE.actors`, `STORE.scenes`, `STORE.reset()` |
-| `pasta.scene` | シーン登録・検索 | `SCENE.create_scene()`, `SCENE.search()` |
-| `pasta.word` | 単語ビルダー | `WORD.create_global()`, `WORD.create_local()`, `WORD.create_actor()` |
-| `pasta.global` | ユーザー定義関数 | `GLOBAL.関数名 = function(act) ... end` |
-| `pasta.save` | 永続化データ | `require("pasta.save")` |
-| `pasta.act` | シーン実行コンテキスト | `act:init_scene()`, `act:talk()`, `act:yield()` |
-| `pasta.shiori.event.register` | イベントハンドラ登録 | `REG.EventName = function(req) ... end` |
-| `pasta.shiori.res` | SHIORIレスポンス | `RES.ok()`, `RES.no_content()` |
+| モジュール                    | 用途                   | 主要API                                                              |
+| ----------------------------- | ---------------------- | -------------------------------------------------------------------- |
+| `pasta.store`                 | 一元データ管理         | `STORE.actors`, `STORE.scenes`, `STORE.reset()`                      |
+| `pasta.scene`                 | シーン登録・検索       | `SCENE.create_scene()`, `SCENE.search()`                             |
+| `pasta.word`                  | 単語ビルダー           | `WORD.create_global()`, `WORD.create_local()`, `WORD.create_actor()` |
+| `pasta.global`                | ユーザー定義関数       | `GLOBAL.関数名 = function(act) ... end`                              |
+| `pasta.save`                  | 永続化データ           | `require("pasta.save")`                                              |
+| `pasta.act`                   | シーン実行コンテキスト | `act:init_scene()`, `act:talk()`, `act:yield()`                      |
+| `pasta.shiori.event.register` | イベントハンドラ登録   | `REG.EventName = function(req) ... end`                              |
+| `pasta.shiori.res`            | SHIORIレスポンス       | `RES.ok()`, `RES.no_content()`                                       |
 
 ### mlua-stdlib統合モジュール
 
-| モジュール | 用途 | デフォルト |
-|-----------|------|----------|
-| `@json` | JSON encode/decode | ✅ 有効 |
-| `@yaml` | YAML encode/decode | ✅ 有効 |
-| `@regex` | 正規表現 | ✅ 有効 |
-| `@assertions` | アサーション | ✅ 有効 |
-| `@testing` | テストフレームワーク | ✅ 有効 |
-| `@env` | 環境変数・パスアクセス | ❌ 無効（セキュリティ上） |
+| モジュール    | 用途                   | デフォルト               |
+| ------------- | ---------------------- | ------------------------ |
+| `@json`       | JSON encode/decode     | ✅ 有効                   |
+| `@yaml`       | YAML encode/decode     | ✅ 有効                   |
+| `@regex`      | 正規表現               | ✅ 有効                   |
+| `@assertions` | アサーション           | ✅ 有効                   |
+| `@testing`    | テストフレームワーク   | ✅ 有効                   |
+| `@env`        | 環境変数・パスアクセス | ❌ 無効（セキュリティ上） |
 
 ### DSL→Luaブリッジ基本形
 
@@ -114,10 +114,10 @@ end
 
 `pasta.save` テーブルのキーは以下の2種類に分類される：
 
-| 種類 | 命名規則 | 例 | 備考 |
-|------|---------|-----|------|
-| **エンジン予約キー** | `pasta_` プレフィックス付き | `pasta_talk_interval_min`, `pasta_talk_interval_max` | pasta エンジン内部で参照・制御されるキー |
-| **ゴースト固有キー** | 任意命名（`pasta_` プレフィックス禁止） | `my_flag`, `talk_count` | ゴースト作者が自由に使用可能 |
+| 種類                 | 命名規則                                | 例                                                   | 備考                                     |
+| -------------------- | --------------------------------------- | ---------------------------------------------------- | ---------------------------------------- |
+| **エンジン予約キー** | `pasta_` プレフィックス付き             | `pasta_talk_interval_min`, `pasta_talk_interval_max` | pasta エンジン内部で参照・制御されるキー |
+| **ゴースト固有キー** | 任意命名（`pasta_` プレフィックス禁止） | `my_flag`, `talk_count`                              | ゴースト作者が自由に使用可能             |
 
 **重要**: `pasta_` プレフィックスはエンジン予約領域。ゴースト固有キーに `pasta_` を使用すると、エンジン動作に意図しない影響を与える可能性がある。
 
@@ -159,10 +159,10 @@ BDD風テストフレームワーク `lua_test`（`describe`/`test`/`expect`マ�
 
 本スキルの詳細リファレンス。必要に応じて `read_file` でロードすること。
 
-| ファイル | 概要 |
-|---------|------|
-| [references/runtime-api.md](references/runtime-api.md) | Rust組み込みモジュール（@pasta_search, @pasta_persistence等）の完全API |
-| [references/internal-modules.md](references/internal-modules.md) | pasta.*名前空間（STORE, ACT, SCENE, WORD等）の完全リファレンス |
-| [references/shiori-handlers.md](references/shiori-handlers.md) | SHIORIイベントハンドラ（REG, RES, イベント一覧, 仮想ディスパッチャ） |
-| [references/coding-conventions.md](references/coding-conventions.md) | 命名規約、モジュール構造、クラス設計、型注釈、エラーハンドリング |
-| [references/testing-lint.md](references/testing-lint.md) | lua_test, テストファイル規約, 決定論的テスト, luacheck |
+| ファイル                                                             | 概要                                                                   |
+| -------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| [references/runtime-api.md](references/runtime-api.md)               | Rust組み込みモジュール（@pasta_search, @pasta_persistence等）の完全API |
+| [references/internal-modules.md](references/internal-modules.md)     | pasta.*名前空間（STORE, ACT, SCENE, WORD等）の完全リファレンス         |
+| [references/shiori-handlers.md](references/shiori-handlers.md)       | SHIORIイベントハンドラ（REG, RES, イベント一覧, 仮想ディスパッチャ）   |
+| [references/coding-conventions.md](references/coding-conventions.md) | 命名規約、モジュール構造、クラス設計、型注釈、エラーハンドリング       |
+| [references/testing-lint.md](references/testing-lint.md)             | lua_test, テストファイル規約, 決定論的テスト, luacheck                 |
