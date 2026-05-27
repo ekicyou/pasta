@@ -6,7 +6,7 @@
   - 追加後にコンパイルすると element_gen.rs（4箇所）と visitors.rs（2箇所）で match 網羅性エラーが発生すること（後続タスクで解消）
   - _Requirements: 1.1, 2.1, 3.1, 4.1_
 
-- [ ] 2. Pestグラマー: プロパティ構文ルール追加
+- [x] 2. Pestグラマー: プロパティ構文ルール追加
   - `property_marker`（`dollar ~ modulo`）、`property_id`（ASCII英字始まり）、`var_ref_property`、`var_set_property` の4ルールを `grammar.pest` に追加する
   - `var_ref` の選択順を `var_ref_property | var_ref_global | var_ref_local` に更新する
   - `var_set` の選択順を `var_set_property | var_set_global | var_set_local | var_set_none` に更新する
