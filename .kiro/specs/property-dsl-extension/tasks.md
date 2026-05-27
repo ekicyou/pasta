@@ -22,7 +22,7 @@
   - _Requirements: 2.1, 3.1, 3.2_
   - _Boundary: ParseVarSet, ParseScene_
 
-- [ ] 3.2 (P) アクション行パーサー拡張（parse_action.rs）
+- [x] 3.2 (P) アクション行パーサー拡張（parse_action.rs）
   - `parse_actions()` の match に `Rule::var_ref_property` arm を追加する
   - inner から `Rule::property_id` を抽出して `Action::VarRef { scope: Property, name }` を生成する
   - アクション行内の `＄％prop` が `Action::VarRef { scope: Property }` にパースされること

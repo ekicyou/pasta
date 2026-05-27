@@ -134,6 +134,17 @@ pub(crate) fn parse_actions(pair: Pair<Rule>) -> Result<Vec<Action>, ParseError>
                     }
                 }
             }
+            Rule::var_ref_property => {
+                for id_inner in inner.into_inner() {
+                    if id_inner.as_rule() == Rule::property_id {
+                        actions.push(Action::VarRef {
+                            name: id_inner.as_str().to_string(),
+                            scope: VarScope::Property,
+                            span: action_span,
+                        });
+                    }
+                }
+            }
             Rule::fn_call_local => {
                 let (name, args) = parse_fn_call_inner(inner)?;
                 actions.push(Action::FnCall {
@@ -355,6 +366,17 @@ pub(crate) fn try_parse_expr(pair: Pair<Rule>) -> Option<Expr> {
                     return Some(Expr::VarRef {
                         name: inner.as_str().to_string(),
                         scope: VarScope::Global,
+                    });
+                }
+            }
+            None
+        }
+        Rule::var_ref_property => {
+            for inner in pair.into_inner() {
+                if inner.as_rule() == Rule::property_id {
+                    return Some(Expr::VarRef {
+                        name: inner.as_str().to_string(),
+                        scope: VarScope::Property,
                     });
                 }
             }
