@@ -61,7 +61,7 @@
   - _Requirements: 3.5, 4.4_
   - _Boundary: GetPropertyLua_
 
-- [ ] 6. (P) LSP シンタックスハイライト対応
+- [x] 6. (P) LSP シンタックスハイライト対応
   - `visitors.rs` の `Expr::VarRef` と `Action::VarRef` の `match scope` 2箇所に `VarScope::Property` arm を追加する
   - パターン: `["＄％{name}", "$%{name}"]` で `token_type::VARIABLE` を付与する
   - `cargo check -p pasta_lsp` がエラーなく通ること

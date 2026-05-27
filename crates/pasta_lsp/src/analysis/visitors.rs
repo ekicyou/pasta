@@ -338,6 +338,7 @@ impl super::AnalysisEngine {
                     VarScope::Global => vec![format!("＄＊{}", name), format!("$*{}", name)],
                     VarScope::Args(_) => vec![format!("＄{}", name), format!("${}", name)],
                     VarScope::Local => vec![format!("＄{}", name), format!("${}", name)],
+                    VarScope::Property => vec![format!("＄％{}", name), format!("$%{}", name)],
                 };
                 for pat in &patterns {
                     if let Some(pos) = text.find(pat.as_str()) {
