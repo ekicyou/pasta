@@ -35,6 +35,7 @@ local specs = {
     "set_property_test",                 -- ACT_IMPL.set_property / escape_tag_arg テスト (property-write-helpers)
     "mocks_test",                        -- lua_test.mocks install/reset/custom stub テスト
     "callback_module_test",              -- CALLBACK.try_route / sweep テスト (shiori-async-talk)
+    "get_property_test",                 -- get_property バリデーション・タグ発行テスト (shiori-async-talk)
     -- 将来のテストスイートをここに追加
     -- "code_generator_test",
     -- "context_test",

@@ -51,7 +51,7 @@
   - _Boundary: SHIORI_ACT.get_property (act.lua)_
 
 - [ ] 3. テスト実装
-- [ ] 3.1 (P) CALLBACKモジュール単体テスト
+- [x] 3.1 (P) CALLBACKモジュール単体テスト
   - `crates/pasta_lua/tests/callback_module_test.lua` を新規作成し、既存の Lua テストパターンと `CALLBACK.reset()` を使って各関数を検証する
   - `next_event_id` の連番確認（OnPastaCallBack1, OnPastaCallBack2, ...）
   - `stage_pending` → `consume_staged` のラウンドトリップで `CALLBACK.pending` にエントリが登録されることを確認
