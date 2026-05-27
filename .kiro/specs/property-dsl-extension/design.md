@@ -180,11 +180,11 @@ flowchart LR
     E[actor: ＄％prop<br/>インライン] --> F[parse_actions<br/>→ Action::VarRef Property]
 
     B --> G[generate_var_set<br/>Property arm]
-    D --> H[generate_var_set<br/>+ generate_expr<br/>Property arm]
+    D --> H[generate_var_set<br/>Property直接代入パス]
     F --> I[generate_action<br/>Property arm]
 
     G --> J[act:set_property name, val]
-    H --> K[local __tmp = act:get_property name<br/>var.x = __tmp]
+    H --> K[var.x = act:get_property name]
     I --> L[act.actor:talk tostring act:get_property name]
 ```
 
@@ -199,7 +199,7 @@ flowchart LR
 | 1.5         | 許容外文字で終端                                  | PestGrammar                                   | `property_id`                                    | —                  |
 | 1.6         | 全角・半角同等                                    | PestGrammar                                   | `property_marker`                                | —                  |
 | 2.1〜2.6    | SET各種値タイプ                                   | ParseVarSet, GenerateVarSet                   | `parse_var_set`, `generate_var_set` Property arm | SET経路            |
-| 3.1〜3.4    | GET代入・nil                                      | ParseVarSet, GenerateVarSet+Expr, GetProperty | `generate_expr` Property arm                     | GET代入経路        |
+| 3.1〜3.4    | GET代入・nil                                      | ParseVarSet, GenerateVarSet, GetProperty      | `generate_var_set` Property直接代入パス          | GET代入経路        |
 | 3.5         | get_property トークン非汚染                       | GetPropertyLua                                | `SHIORI_ACT_IMPL.get_property`                   | トークン保全フロー |
 | 4.1〜4.4    | インラインGET展開・分断なし                       | ParseActions, GenerateAction, GetPropertyLua  | `generate_action` Property arm                   | インラインフロー   |
 | 4.5         | nilインライン → `"nil"` 文字列                    | GenerateAction                                | `tostring()` ラップ                              | —                  |
@@ -374,37 +374,38 @@ Rule::var_set_local | Rule::var_set_global | Rule::var_set_none | Rule::var_set_
 
 **Responsibilities & Constraints**
 - SET (`＄％prop＝value`): `act:set_property("prop", value_expr)` を出力。値が `SetValue::WordRef` の場合は `act:set_property("prop", act:word("word"))` を出力
-- GET代入 (`＄var＝＄％prop`): 右辺の `Expr::VarRef { scope: Property }` を検出し、`local __pasta_prop_<counter> = act:get_property("prop")` を先行出力 → `var.name = __pasta_prop_<counter>` に置換
-- ローカル変数命名規則: `__pasta_prop_<連番>` 形式（衝突回避のため `__pasta_` プレフィックス）
-- 右辺が単一 `Expr::VarRef { Property }` 以外（Binary含む式中Property）の場合: `TranspileError::property_in_expression` を返す（要件3スコープ外）
+- GET代入 (`＄var＝＄％prop`): scope match で `var_path` 確定後、value match の前に右辺 `Expr::VarRef { scope: Property }` を検出し、`var.name = act:get_property("prop")` を直接生成（`generate_expr` を通さない）
+- 右辺が単一 `Expr::VarRef { Property }` 以外（Binary含む式中Property）の場合: 通常の value match → `generate_expr()` → `TranspileError::property_in_expression` でガード（要件3スコープ外）
 
 **Contracts**: Service
 
 ##### Service Interface
 ```rust
 // generate_var_set() 内分岐:
-match var_set.scope {
+
+// Step 1: scope match で var_path 確定または SET 早期リターン
+let var_path = match var_set.scope {
     VarScope::Local => format!("var.{}", name),
     VarScope::Global => format!("save.{}", name),
     VarScope::Property => {
         // SET: act:set_property("name", expr) を出力
-        // ※ var_path = expr 形式ではなく専用パスに分岐
         return self.generate_property_set(name, &var_set.value);
     }
     VarScope::Args(_) => return Err(...),
 };
 
-// generate_var_set() で右辺がProperty参照かを事前検出:
-fn detect_property_get_assign(value: &SetValue) -> Option<&str> {
-    if let SetValue::Expr(Expr::VarRef { name, scope: VarScope::Property }) = value {
-        Some(name)
-    } else {
-        None
-    }
+// Step 2: 右辺が単一Property参照なら直接代入を生成（generate_expr をバイパス）
+if let SetValue::Expr(Expr::VarRef { name: prop_name, scope: VarScope::Property }) = &var_set.value {
+    self.writeln(&format!("{} = act:get_property({})",
+        var_path, StringLiteralizer::literalize(prop_name)?))?;
+    return Ok(());
 }
+
+// Step 3: 通常の value match へフォールスルー
+// → generate_expr() で VarScope::Property が出現した場合はエラー
 ```
-- Preconditions: `var_set.scope == VarScope::Property` または右辺Property検出時
-- Postconditions: Property SET は `act:set_property("name", expr)`、GET代入は `local __pasta_prop_N = act:get_property("name")` + `var/save.name = __pasta_prop_N` を出力
+- Preconditions: `var_set.scope == VarScope::Property`（SET）または `var_set.value` が `Expr::VarRef { Property }`（GET代入）
+- Postconditions: SET は `act:set_property("name", expr)`、GET代入は `var.name = act:get_property("name")` を直接出力
 - Invariants: Local/Global の既存出力パスは変更なし
 
 #### GenerateAction
@@ -564,8 +565,8 @@ VarScope::Property => vec![format!("＄％{}", name), format!("$%{}", name)],
 ### Unit Tests (Transpiler)
 - `property_scope_codegen_test.rs`:
   - SET各種値タイプ: リテラル/変数/単語/式（要件2.1〜2.6）→ `act:set_property("name", value)`
-  - GET代入: `＄var＝＄％p` → `local __pasta_prop_1 = act:get_property("p")` + `var.name = __pasta_prop_1`（要件3.1）
-  - グローバル代入: `＄＊var＝＄％p` → `save.name = __pasta_prop_1`（要件3.2）
+  - GET代入: `＄var＝＄％p` → `var.name = act:get_property("p")`（直接代入、要件3.1）
+  - グローバル代入: `＄＊var＝＄％p` → `save.name = act:get_property("p")`（要件3.2）
   - インライン: `さくら：＄％p` → `act.さくら:talk(tostring(act:get_property("p")))`（要件4.1）
   - 式中Property: `＄var＝＄％a＋1` → `TranspileError::property_in_expression`
 
