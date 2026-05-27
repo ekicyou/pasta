@@ -15,7 +15,7 @@
   - _Requirements: 1.1, 1.2_
   - _Boundary: CALLBACK module (callback.lua)_
 
-- [ ] 1.2 コールバックルーティングとタイムアウトsweepの実装
+- [x] 1.2 コールバックルーティングとタイムアウトsweepの実装
   - `CALLBACK.try_route(req)` を実装: `req.id` が `CALLBACK.pending` のキーと一致するとき、`req.reference[0..N]` を 1-based 配列に詰め替えて `coroutine.resume(entry.co, refs)` を呼び出す。コールバック後に同一コルーチンが再度 `get_property` を呼ぶ（コールバックチェーン R4）場合は `consume_staged` が発火するため、`try_route` 内で一致エントリの削除後に `consume_staged` の追加戻り値を処理してネストした pending 登録に対応する。不一致時は nil を返す
   - `CALLBACK.sweep(now)` を実装: `now > entry.timeout_at` のエントリを走査し、`on_timeout` が文字列の場合は `coroutine.resume(co, nil, on_timeout)` + `@pasta_log.warn(event_id, on_timeout)` + `pasta.shiori.res` で 500 + `X-ERROR-REASON: <on_timeout>` レスポンス文字列を生成して返す。`on_timeout` が nil の場合は `coroutine.resume(co, nil)` のみで nil を返す。いずれの場合もエントリを削除する
   - sweep が複数エントリ走査時は文字列 `on_timeout` の最初のタイムアウトエントリを 500 として返し、他はサイレントに削除する（OnSecondChange は毎秒発火するため次回以降に処理可能）

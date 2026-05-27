@@ -60,6 +60,7 @@ local REG = require("pasta.shiori.event.register")
 local RES = require("pasta.shiori.res")
 local SHIORI_ACT = require("pasta.shiori.act")
 local STORE = require("pasta.store")
+local CALLBACK = require("pasta.shiori.event.callback")
 
 -- 1.5. デフォルトイベントハンドラをロード
 require("pasta.shiori.event.boot")
@@ -87,6 +88,19 @@ local function set_co_scene(co)
             coroutine.close(co)
         end
         co = nil
+    end
+
+    -- NEW: コールバック登録済みコルーチン検出
+    if STORE.co_callback and co == STORE.co_callback then
+        -- コールバック待ちコルーチンは CALLBACK.pending で管理される
+        -- co_scene には登録しない、旧 co_scene と同一なら close もしない
+        if STORE.co_scene and STORE.co_scene ~= co then
+            -- 別の旧コルーチンがある場合は通常通り close
+            if coroutine.close then coroutine.close(STORE.co_scene) end
+        end
+        STORE.co_scene = nil
+        STORE.co_callback = nil
+        return
     end
 
     -- 2. 同一オブジェクトチェック
@@ -154,6 +168,12 @@ end
 --- @param req table リクエストテーブル（req.id にイベント名）
 --- @return string SHIORI レスポンス
 function EVENT.fire(req)
+    -- (新規) コールバックルーティング
+    local cb_response = CALLBACK.try_route(req)
+    if cb_response then
+        return cb_response
+    end
+
     -- act オブジェクトを作成
     local act = create_act(req)
 
@@ -171,6 +191,8 @@ function EVENT.fire(req)
             set_co_scene(result)
             error(yielded_value)
         end
+        -- (新規) ステージング消費
+        CALLBACK.consume_staged(result, act)
         -- 状態保存（set_co_scene内部でstatus判断）
         set_co_scene(result)
         return RES.ok(yielded_value)
