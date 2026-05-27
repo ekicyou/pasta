@@ -4,8 +4,8 @@
 本仕様は、Pasta DSLに `＄％`（プロパティスコープ修飾子）を導入し、SSPプロパティシステムへの読み書きをDSL内から直接記述可能にする。既存の変数スコープ修飾パターン（`＄` = ローカル、`＄＊` = グローバル）の自然な拡張として、`＄％` を「共有プロパティスコープ」に割り当てる。プロパティ書き込み（SET）は同期的に処理され、読み取り（GET）はフレームワーク内部の非同期通信で透過的に処理される。
 
 ## Boundary Context
-- **In scope**: `＄％prop.path＝value` による書き込み、`＄var＝＄％prop.path` による読み取り、アクション行内のインライン展開 `＄％prop.path`、プロパティ名の文字クラス定義、パーサー文法拡張、コンパイラのコード生成
-- **Out of scope**: 式中でのプロパティ参照（`＄var＝＄％a ＋ ＄％b`）、新規Lua APIの追加（既存の `set_property`/`get_property` APIにコンパイル）、プロパティ値の型変換（文字列として返す）、`%property[name]` 環境変数展開、LSP対応（補完・バリデーション等）、プロパティ名の存在検証（SSP側の責任）
+- **In scope**: `＄％prop.path＝value` による書き込み、`＄var＝＄％prop.path` による読み取り、アクション行内のインライン展開 `＄％prop.path`、プロパティ名の文字クラス定義、パーサー文法拡張、コンパイラのコード生成、`get_property()` のトークンバッファ保全改修（yield前後のトークン退避・復元）
+- **Out of scope**: 式中でのプロパティ参照（`＄var＝＄％a ＋ ＄％b`）、新規Lua APIの追加、プロパティ値の型変換（文字列として返す）、`%property[name]` 環境変数展開、LSP対応（補完・バリデーション等）、プロパティ名の存在検証（SSP側の責任）
 - **Adjacent expectations**: 既存の `act:set_property()` および `act:get_property()` Lua APIが正常に動作すること。既存のyield/resume非同期通信基盤（`shiori-async-talk` spec）がプロパティGETのコールバック処理を正しくルーティングすること
 
 ## Requirements
@@ -47,6 +47,7 @@
 2. When ゴースト作者が `＄＊var＝＄％prop.path` を記述した場合, the pasta framework shall 実行時にSSPプロパティ値を取得し、指定グローバル変数に文字列として代入する
 3. When プロパティGETの結果が変数に代入された後, the pasta framework shall 同一シーン内で後続のトーク生成や追加のプロパティ操作を正常に継続する
 4. When 指定プロパティがSSPに存在しない場合, the pasta framework shall nilを変数に代入する
+5. When `get_property()` が呼び出された時点でトークンバッファに未配信のトークンが存在する場合, the pasta framework shall 既存トークンを退避し、getタグのみでyieldし、resume後に退避トークンを復元する（トークンバッファ非汚染）
 
 #### GET構文の想定例
 ```pasta

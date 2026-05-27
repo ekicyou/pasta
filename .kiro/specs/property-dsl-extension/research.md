@@ -295,20 +295,38 @@ act.さくら:talk(tostring(__prop_2))
 
 `＄var＝＄％a ＋ ＄％b` は要件R3のスコープ外（R3は`＄var＝＄％prop`のみ）。`generate_expr()`内で`VarScope::Property`が出現した場合のエラー処理は設計フェーズで決定。
 
-### 4.6 `get_property()`のact消費とトークン配信
+### 4.6 `get_property()`のトークンバッファ保全（解決済み）
 
-`get_property()`は内部で`self:build()`を呼び、**蓄積済みトークンをSSPに送信**してからyieldする。これはアクション行の途中でGETすると、GETより前のtalkトークンがその時点で配信されることを意味する。
+`get_property()`は内部で`self:build()`を呼び、**蓄積済みトークンをSSPに送信**してからyieldする。これはアクション行の途中でGETすると、GETより前のtalkトークンがその時点で配信される（「トークン汚染」）ことを意味する。
 
-**バッチ最適化の副作用**: プリフェッチをアクション行の先頭で行う場合、その時点ではトークンバッファは空（前の行で配信済み）のため、問題なし。ただし`generate_var_set()`内でGETする場合、直前のSETトークンが先行配信される可能性がある。
+**決定**: `get_property()`内部でトークンバッファを退避・復元する方式を採用。
+
+```lua
+function SHIORI_ACT_IMPL.get_property(self, name_or_names, ...)
+    -- 1. 既存トークンを退避
+    local saved_tokens = self.token
+    -- 2. 空のトークンバッファを作成し、getタグのみ登録
+    self.token = {}
+    table.insert(self.token, { type = "raw_script", text = tag })
+    -- 3. getタグのみでyield
+    local refs, reason = coroutine.yield(self:build())
+    -- 4. 退避トークンを復元
+    self.token = saved_tokens
+    -- ...
+end
+```
+
+**効果**: トランスパイラは呼び出し位置を意識せず素直に`act:get_property()`を生成できる。バッチ最適化はR4-AC4の「一度に配信」保証に引き続き有効（yield回数削減）。
 
 ## 5. 複雑度とリスク
 
 **工数**: **M (3-7日)**
 - パーサー拡張: S（既存パターンの機械的複製）
 - SET トランスパイル: S（同期的、シンプル）
-- GET代入 トランスパイル: M（プリフェッチ生成が必要）
-- GETインライン + バッチ最適化: M-L（アクション行の前処理パス追加）
-- テスト: S-M（パーサー + トランスパイラ）
+- GET代入 トランスパイル: S-M（トークン保全改修により素直に呼べる）
+- GETインライン + バッチ最適化: M（アクション行の前処理パス追加）
+- get_propertyトークン保全: S（Lua内部改修のみ）
+- テスト: S-M（パーサー + トランスパイラ + トークン保全）
 
 **リスク**: **Medium**
 - パーサー拡張は前例豊富（`Args`、cue-dsl-extension等）で低リスク
@@ -324,8 +342,7 @@ act.さくら:talk(tostring(__prop_2))
 ### 設計フェーズでの決定事項
 1. `property_id` Pestルールの全角/半角対応方針
 2. SET `generate_var_set()`内の分岐 vs 別関数ディスパッチ
-3. GET代入のプリフェッチコード生成パターン（ローカル変数命名規則）
+3. GET代入のコード生成パターン（ローカル変数命名規則）
 4. バッチ最適化の実装位置（`generate_action_line()`内 vs 前処理パス）
 5. `generate_continue_action()`へのバッチ最適化適用方法
 6. 式中`VarScope::Property`のエラーメッセージ（TranspileError拡張）
-7. LSPへの影響確認（スコープ外だが回帰テスト必要性の判断）
