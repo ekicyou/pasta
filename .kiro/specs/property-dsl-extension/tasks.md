@@ -94,11 +94,11 @@
   - `cargo test -p pasta_lua property_scope_codegen` が全件グリーンであること
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 3.1, 3.2, 3.3, 3.4, 4.1, 4.5_
 
-- [ ] 8.2 既存トランスパイラテスト回帰確認
+- [x] 8.2 既存トランスパイラテスト回帰確認
   - `cargo test -p pasta_lua` を全件実行し、既存テストがすべてグリーンであること
   - _Requirements: 5.1, 5.2, 5.3, 5.4_
 
-- [ ] 9. Lua API トークン保全テスト
+- [x] 9. Lua API トークン保全テスト
   - `crates/pasta_lua/tests/property_token_preservation_test.rs` を作成する（既存 shiori-event-test-framework を活用）
   - `act:talk("A"); act:get_property("p"); act:talk("B")` を実行し、最初の SSP 送信スクリプトに "A" が含まれないことを検証する
   - resume 後の最終出力に "A" と "B" が両方含まれることを検証する
