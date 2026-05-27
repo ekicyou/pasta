@@ -269,7 +269,7 @@ function SHIORI_ACT_IMPL.get_property(self, name_or_names, timeout, timeout_mess
     -- タグ蓄積
     local parts = { "\\![get,property," .. event_id }
     for i = 1, n do
-        parts[#parts+1] = escape_tag_arg(names[i])
+        parts[#parts + 1] = escape_tag_arg(names[i])
     end
     local tag = table.concat(parts, ",") .. "]"
     table.insert(self.token, { type = "raw_script", text = tag })

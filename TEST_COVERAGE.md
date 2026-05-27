@@ -85,6 +85,8 @@
 | さくらスクリプト記号タグトークナイズ | `tokenizer.rs` 内テスト                                           | ✅ 完了 | 6テスト（`-+*?&` タグ認識）                  |
 | EVENT.fire コルーチン対応            | `event_coroutine_test.lua`                                        | ✅ 完了 | 16テスト（resume_until_valid含む）           |
 | resume_until_valid nil yieldスキップ | `event_coroutine_test.lua`                                        | ✅ 完了 | 6テスト（coroutine-resume-loop）             |
+| CALLBACK モジュール（非同期通信基盤）| `callback_module_test.lua`                                        | ✅ 完了 | 18テスト（shiori-async-talk）                |
+| get_property バリデーション・タグ発行| `get_property_test.lua`                                           | ✅ 完了 | 18テスト（shiori-async-talk）                |
 | scripts検索パス優先順位              | `loader_startup_test.rs`                                          | ✅ 完了 | 2テスト（lua-module-path-resolution）        |
 | main.lua初期化順序                   | `loader_lifecycle_test.rs`                                        | ✅ 完了 | 2テスト（lua-module-path-resolution）        |
 | scene_dic require化                  | `loader_lifecycle_test.rs`                                        | ✅ 完了 | 3テスト（lua-module-path-resolution）        |
@@ -109,6 +111,7 @@
 | トランスパイル失敗中止               | `lua_passthrough_test.rs`                                         | ✅ 完了 | 2テスト（load-error-logging）                |
 | ログファイル名固定（Rotation::NEVER）| `logger.rs`                                                       | ✅ 完了 | 1テスト（load-error-logging）                |
 | load失敗→requestエラー伝搬           | `shiori_tests.rs`                                                 | ✅ 完了 | 1テスト（load-error-logging）                |
+| 非同期コールバック統合（SHIORI層）   | `async_callback_integration_test.rs`                              | ✅ 完了 | 10テスト（shiori-async-talk）                |
 
 ### 2.5 LSP層テスト（Language Server）
 

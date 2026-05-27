@@ -236,4 +236,17 @@ REG.OnBoot = function(req)
 end
 ```
 
+### 非同期コールバック（SHIORI通信基盤）
+
+トーク合成中にSSPプロパティを非同期取得するパターン。コルーチン内でのみ使用可能。
+
+```lua
+-- act:get_property() はyieldして結果を待つ
+local value = act:get_property("baseware.version")
+```
+
+- `pasta.shiori.callback` モジュールがID管理・タイムアウト・コルーチンresume を担当
+- OnSecondChange で `CALLBACK.resume_pending()` が保留コルーチンを再開
+- OnNotifyCallbackResponse でSSPからの応答を受信・格納
+
 詳細: `.agents/skills/pasta-lua-coding/SKILL.md`

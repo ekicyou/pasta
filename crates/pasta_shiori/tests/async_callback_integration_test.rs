@@ -40,8 +40,7 @@ impl AsyncCallbackEnv {
             .join("pasta_scripts");
         let pasta_scripts_dst = temp_dir.path().join("pasta_scripts");
         std::fs::create_dir_all(&pasta_scripts_dst).expect("create pasta_scripts dir");
-        copy_dir_recursive(&pasta_scripts_src, &pasta_scripts_dst)
-            .expect("copy pasta_scripts");
+        copy_dir_recursive(&pasta_scripts_src, &pasta_scripts_dst).expect("copy pasta_scripts");
 
         // 2. Copy fixture files (entry.lua override + pasta.toml)
         //    These go into scripts/ which takes priority over pasta_scripts/
@@ -116,11 +115,13 @@ fn test_scenario1_simple_property_get() {
     let mut env = AsyncCallbackEnv::new();
 
     // Round 1: OnTestSimple を送信
-    let resp1 = env.request(r#"
+    let resp1 = env.request(
+        r#"
 GET SHIORI/3.0
 Charset: UTF-8
 ID: OnTestSimple
-"#);
+"#,
+    );
 
     assert_eq!(resp1.status_code, 200, "Round 1 should return 200 OK");
 
@@ -142,12 +143,14 @@ ID: OnTestSimple
     );
 
     // Round 2: コールバックを送信（Reference0 にプロパティ値を設定）
-    let resp2 = env.request(r#"
+    let resp2 = env.request(
+        r#"
 GET SHIORI/3.0
 Charset: UTF-8
 ID: OnPastaCallBack1
 Reference0: 2.6.77
-"#);
+"#,
+    );
 
     assert_eq!(resp2.status_code, 200, "Round 2 should return 200 OK");
 
@@ -177,11 +180,13 @@ fn test_scenario2_talk_accumulation_with_property_get() {
     let mut env = AsyncCallbackEnv::new();
 
     // Round 1: OnTestAccumulate を送信
-    let resp1 = env.request(r#"
+    let resp1 = env.request(
+        r#"
 GET SHIORI/3.0
 Charset: UTF-8
 ID: OnTestAccumulate
-"#);
+"#,
+    );
 
     assert_eq!(resp1.status_code, 200, "Round 1 should return 200 OK");
 
@@ -197,12 +202,14 @@ ID: OnTestAccumulate
     );
 
     // Round 2: コールバック
-    let resp2 = env.request(r#"
+    let resp2 = env.request(
+        r#"
 GET SHIORI/3.0
 Charset: UTF-8
 ID: OnPastaCallBack1
 Reference0: 3.14
-"#);
+"#,
+    );
 
     assert_eq!(resp2.status_code, 200, "Round 2 should return 200 OK");
 
@@ -231,11 +238,13 @@ fn test_scenario4_unrelated_event_during_callback_wait() {
     let mut env = AsyncCallbackEnv::new();
 
     // Round 1: OnTestWait を送信 → コールバック待ちに入る
-    let resp1 = env.request(r#"
+    let resp1 = env.request(
+        r#"
 GET SHIORI/3.0
 Charset: UTF-8
 ID: OnTestWait
-"#);
+"#,
+    );
 
     assert_eq!(resp1.status_code, 200, "Round 1 should return 200 OK");
 
@@ -246,11 +255,13 @@ ID: OnTestWait
     );
 
     // Round 2: 無関係イベントを送信（ハンドラ未登録 → 204）
-    let resp2 = env.request(r#"
+    let resp2 = env.request(
+        r#"
 NOTIFY SHIORI/3.0
 Charset: UTF-8
 ID: OnUnrelatedEvent
-"#);
+"#,
+    );
 
     // Req 3.1: 無関係イベントは正常に処理される（204 No Content）
     assert_eq!(
@@ -260,12 +271,14 @@ ID: OnUnrelatedEvent
     );
 
     // Round 3: コールバックを送信 → ペンディング状態が維持されている
-    let resp3 = env.request(r#"
+    let resp3 = env.request(
+        r#"
 GET SHIORI/3.0
 Charset: UTF-8
 ID: OnPastaCallBack1
 Reference0: 9.99
-"#);
+"#,
+    );
 
     // Req 3.2: コールバックが正常に処理される
     assert_eq!(resp3.status_code, 200, "Round 3 should return 200 OK");
@@ -292,11 +305,13 @@ fn test_callback_id_uniqueness() {
     let mut env = AsyncCallbackEnv::new();
 
     // 1つ目のget_property
-    let resp1 = env.request(r#"
+    let resp1 = env.request(
+        r#"
 GET SHIORI/3.0
 Charset: UTF-8
 ID: OnTestSimple
-"#);
+"#,
+    );
 
     let value1 = resp1.value.as_ref().expect("should have Value");
     assert!(
@@ -305,19 +320,23 @@ ID: OnTestSimple
     );
 
     // コールバックを完了させる
-    let _ = env.request(r#"
+    let _ = env.request(
+        r#"
 GET SHIORI/3.0
 Charset: UTF-8
 ID: OnPastaCallBack1
 Reference0: v1
-"#);
+"#,
+    );
 
     // 2つ目のget_property（新しいコールバックID）
-    let resp3 = env.request(r#"
+    let resp3 = env.request(
+        r#"
 GET SHIORI/3.0
 Charset: UTF-8
 ID: OnTestSimple
-"#);
+"#,
+    );
 
     let value3 = resp3.value.as_ref().expect("should have Value");
     // Req 2.2: 2つ目は異なるIDになる
@@ -338,12 +357,14 @@ fn test_invalid_callback_id_not_routed() {
     let mut env = AsyncCallbackEnv::new();
 
     // 存在しないコールバックID → REGにハンドラなし → 204
-    let resp = env.request(r#"
+    let resp = env.request(
+        r#"
 GET SHIORI/3.0
 Charset: UTF-8
 ID: OnPastaCallBack999
 Reference0: bogus
-"#);
+"#,
+    );
 
     assert_eq!(
         resp.status_code, 204,
@@ -363,11 +384,13 @@ fn test_callback_response_protocol_compliance() {
     let mut env = AsyncCallbackEnv::new();
 
     // Round 1: get_property
-    let resp1 = env.request(r#"
+    let resp1 = env.request(
+        r#"
 GET SHIORI/3.0
 Charset: UTF-8
 ID: OnTestSimple
-"#);
+"#,
+    );
 
     // プロトコルヘッダー検証（Round 1）
     assert_eq!(resp1.status_code, 200);
@@ -381,12 +404,14 @@ ID: OnTestSimple
     );
 
     // Round 2: コールバック
-    let resp2 = env.request(r#"
+    let resp2 = env.request(
+        r#"
 GET SHIORI/3.0
 Charset: UTF-8
 ID: OnPastaCallBack1
 Reference0: test_value
-"#);
+"#,
+    );
 
     // プロトコルヘッダー検証（Round 2 - コールバックレスポンス）
     assert_eq!(resp2.status_code, 200);
@@ -612,7 +637,10 @@ Reference0: 1
     );
     // sweep は 500 文字列を返すが、EVENT.fire が RES.ok() でラップするため 200 になる
     // （二重ラップは既知の設計上の挙動）
-    assert_eq!(resp2.status_code, 200, "R2 sweep response should be 200 (double-wrapped)");
+    assert_eq!(
+        resp2.status_code, 200,
+        "R2 sweep response should be 200 (double-wrapped)"
+    );
 
     // Round 3: Late callback → 既に sweep で削除済み → 204
     let resp3 = env.request(&format!(

@@ -87,7 +87,7 @@
   - **完了確認**: `cargo test async_callback_integration` で全シナリオが通過する
   - _Requirements: 2.1, 2.2, 2.3, 3.1, 3.2, 5.2, 6.1, 6.2, 6.3_
 
-- [ ] 3.4 既存テストのリグレッション確認
+- [x] 3.4 既存テストのリグレッション確認
   - `cargo test` で `event_coroutine_test` と `integration_coroutine_test` が変更なしで通過することを確認する
   - **完了確認**: 既存の全テストスイートが green のまま維持され、本機能導入による既存フローへの影響がないことが確認される
   - _Requirements: 6.1, 6.2_

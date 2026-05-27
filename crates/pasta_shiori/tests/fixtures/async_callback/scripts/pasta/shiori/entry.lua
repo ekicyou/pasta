@@ -92,7 +92,7 @@ end
 REG.OnTestChain = function(act)
     return coroutine.create(function(act)
         act:raw_script("起動しました\\e")
-        coroutine.yield(act:build())  -- yield chain talk, STORE.co_scene set
+        coroutine.yield(act:build()) -- yield chain talk, STORE.co_scene set
         -- Resumed by OnResumeChain
         local ver = act:get_property("baseware.version")
         act:raw_script("ver=" .. tostring(ver) .. "\\e")
@@ -104,14 +104,14 @@ end
 --- STORE.co_scene に保存されたコルーチンを返して resume させる
 REG.OnResumeChain = function(act)
     local STORE = require("pasta.store")
-    return STORE.co_scene  -- returns the stored coroutine to resume it
+    return STORE.co_scene -- returns the stored coroutine to resume it
 end
 
 --- 複数プロパティ取得
 --- get_property にテーブルを渡して複数値を一度に取得
 REG.OnTestMultiProp = function(act)
     return coroutine.create(function(act)
-        local w, h = act:get_property({"width", "height"})
+        local w, h = act:get_property({ "width", "height" })
         act:raw_script("w=" .. tostring(w) .. ",h=" .. tostring(h) .. "\\e")
         coroutine.yield(act:build())
     end)

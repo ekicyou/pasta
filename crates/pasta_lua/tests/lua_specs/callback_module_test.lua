@@ -140,11 +140,11 @@ describe("CALLBACK.try_route", function()
         -- Actually: the coroutine should first yield to be in suspended state,
         -- then try_route resumes it with refs
         local co2 = coroutine.create(function()
-            local refs = coroutine.yield() -- first yield to become suspended
+            local refs = coroutine.yield()    -- first yield to become suspended
             received_refs = refs
             coroutine.yield("hello world\\e") -- yield response
         end)
-        coroutine.resume(co2) -- initial resume to reach first yield
+        coroutine.resume(co2)                 -- initial resume to reach first yield
 
         local act = { name = "test_act" }
         CALLBACK.pending["OnPastaCallBack1"] = {

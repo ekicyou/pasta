@@ -180,6 +180,40 @@ act:set_property("score", 100)
 act:set_property("flag", "on"):talk(act.さくら.actor, "設定しました")
 ```
 
+#### get_property(name_or_names [, timeout [, timeout_message]])
+
+SSPプロパティ読み取りタグ（`\![get,property,{callback_id},{names...}]`）を発行し、コールバック到着まで待機する。
+**コルーチン実行コンテキスト内でのみ使用可能**（メインスレッドで呼ぶと `error()`）。
+
+- `name_or_names`: string（単一）または string の配列（複数）
+  - `nil`、空文字列、空テーブルは `error()` を発生させる
+- `timeout`: 秒数（デフォルト: 5）。`os.time()` + timeout でタイムアウト判定
+- `timeout_message`: タイムアウト時のエラー理由（デフォルト: `"callback timeout: get_property"`）
+- 戻り値: string（単一の場合）、多値 string... （配列の場合）。不在プロパティは `nil`
+- 引数はSSPタグエスケープ規則で自動エスケープされる
+
+```lua
+--- @param name_or_names string|string[] プロパティ名（単一文字列 or 配列）
+--- @param timeout? number タイムアウト秒数（デフォルト5）
+--- @param timeout_message? string タイムアウト時エラー理由
+--- @return string ... プロパティ値（配列引数時は多値返却）
+function SHIORI_ACT_IMPL.get_property(self, name_or_names, timeout, timeout_message) end
+```
+
+```lua
+-- 単一プロパティ取得
+local version = act:get_property("baseware.version")
+
+-- 複数プロパティ一括取得（多値返却）
+local w, h = act:get_property({
+    "currentghost.balloon.scope(0).validwidth.initial",
+    "currentghost.balloon.scope(0).validheight.initial",
+})
+
+-- カスタムタイムアウト
+local name = act:get_property("sakura.name", 10, "name取得タイムアウト")
+```
+
 ### 表示制御メソッド
 
 | メソッド | シグネチャ | 説明 |

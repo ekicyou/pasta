@@ -187,7 +187,8 @@ end
 
 #### OnSecondChange — 毎秒
 
-毎秒発火する（高頻度）。仮想ディスパッチャのトリガーとして使用される。
+毎秒発火する（高頻度）。仮想ディスパッチャのトリガーとして使用される。  
+**非同期コールバック保留中のコルーチン再開もこのイベントで行われる**（`CALLBACK.resume_pending()`）。
 
 | Reference | 型 | 説明 |
 |-----------|---|------|
@@ -199,6 +200,19 @@ REG.OnSecondChange = function(req)
     return RES.no_content()
 end
 ```
+
+#### OnNotifyCallbackResponse — SSPコールバック応答
+
+SSP からのコールバック応答（`get_property` 等の結果）を受信するイベント。  
+ゴースト作者が直接ハンドラを登録する必要はなく、フレームワーク内部の `pasta.shiori.callback` モジュールが自動処理する。
+
+| Reference | 型 | 説明 |
+|-----------|---|------|
+| `req.reference[0]` | string | コールバック ID |
+| `req.reference[1]` | string | 結果値（プロパティ値等） |
+
+> **注意**: このイベントのハンドラは `pasta.shiori.event.init` で自動登録される。  
+> ゴースト作者が REG に独自ハンドラを登録した場合、コールバック機構が動作しなくなる。
 
 #### OnMinuteChange — 毎分
 
