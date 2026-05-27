@@ -63,6 +63,7 @@
 2. When アクション行内に複数の `＄％` 参照が存在する場合, the pasta framework shall 全プロパティ値を正しく取得し、テキスト内の出現位置に対応する値をそれぞれ展開する
 3. When アクション行内に `＄％` 参照と通常テキスト・変数参照 `＄var`・単語参照 `＠word` が混在する場合, the pasta framework shall すべての要素を記述順に正しくトーク出力に展開する
 4. When アクション行内に `＄％` 参照が存在する場合, the pasta framework shall プロパティ値取得の前後で蓄積済みトークンを分断せずに保全する（R3-AC5のトークンバッファ非汚染保証による）
+5. When インライン展開で取得したプロパティ値がnilの場合, the pasta framework shall `"nil"` 文字列としてトーク出力に展開する（`tostring(nil)` の結果）
 
 #### インラインGET構文の想定例
 ```pasta
