@@ -42,6 +42,10 @@ pub enum TranspileError {
     /// Unsupported feature.
     #[error("Unsupported feature: {feature} at {span}")]
     Unsupported { feature: String, span: SpanDisplay },
+
+    /// Property reference used in expression context (not allowed).
+    #[error("Property reference cannot be used in expressions; use variable assignment first")]
+    PropertyInExpression,
 }
 
 impl TranspileError {
@@ -74,6 +78,11 @@ impl TranspileError {
             span: SpanDisplay::from(*span),
             feature: feature.to_string(),
         }
+    }
+
+    /// Create a PropertyInExpression error (span-less).
+    pub fn property_in_expression() -> Self {
+        TranspileError::PropertyInExpression
     }
 }
 

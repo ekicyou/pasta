@@ -20,6 +20,9 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                 let var_path = match var_set.scope {
                     VarScope::Local => format!("var.{}", name),
                     VarScope::Global => format!("save.{}", name),
+                    VarScope::Property => {
+                        return self.generate_property_set(name, &var_set.value);
+                    }
                     VarScope::Args(_) => {
                         // Cannot assign to scene arguments
                         return Err(TranspileError::invalid_ast(
@@ -28,6 +31,20 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                         ));
                     }
                 };
+
+                // GET代入: 右辺が単一Property参照なら直接代入
+                if let SetValue::Expr(Expr::VarRef {
+                    name: ref prop_name,
+                    scope: VarScope::Property,
+                }) = var_set.value
+                {
+                    let prop_literal = StringLiteralizer::literalize(prop_name)?;
+                    self.writeln(&format!(
+                        "{} = act:get_property({})",
+                        var_path, prop_literal
+                    ))?;
+                    return Ok(());
+                }
 
                 match &var_set.value {
                     SetValue::Expr(expr) => {
@@ -59,6 +76,34 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             }
         }
 
+        Ok(())
+    }
+
+    /// Generate property SET assignment.
+    ///
+    /// `SetValue::Expr` → `act:set_property("name", expr)`
+    /// `SetValue::WordRef` → `act:set_property("name", act:word("word"))`
+    fn generate_property_set(
+        &mut self,
+        name: &str,
+        value: &SetValue,
+    ) -> Result<(), TranspileError> {
+        let name_literal = StringLiteralizer::literalize(name)?;
+        match value {
+            SetValue::Expr(expr) => {
+                let mut buf = Vec::new();
+                self.generate_expr_to_buffer(expr, &mut buf)?;
+                let expr_str = String::from_utf8(buf).unwrap_or_default();
+                self.writeln(&format!("act:set_property({}, {})", name_literal, expr_str))?;
+            }
+            SetValue::WordRef { name: word_name } => {
+                let word_literal = StringLiteralizer::literalize(word_name)?;
+                self.writeln(&format!(
+                    "act:set_property({}, act:word({}))",
+                    name_literal, word_literal
+                ))?;
+            }
+        }
         Ok(())
     }
 
@@ -185,12 +230,24 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             }
             Action::VarRef { name, scope, .. } => {
                 // Variable interpolation: generate talk with concatenation
-                let var_path = match scope {
-                    VarScope::Local => format!("var.{}", name),
-                    VarScope::Global => format!("save.{}", name),
-                    VarScope::Args(index) => format!("args[{}]", index + 1), // 0-indexed to 1-indexed
-                };
-                self.writeln(&format!("act.{}:talk(tostring({}))", actor, var_path))?;
+                match scope {
+                    VarScope::Property => {
+                        let prop_literal = StringLiteralizer::literalize(name)?;
+                        self.writeln(&format!(
+                            "act.{}:talk(tostring(act:get_property({})))",
+                            actor, prop_literal
+                        ))?;
+                    }
+                    _ => {
+                        let var_path = match scope {
+                            VarScope::Local => format!("var.{}", name),
+                            VarScope::Global => format!("save.{}", name),
+                            VarScope::Args(index) => format!("args[{}]", index + 1),
+                            VarScope::Property => unreachable!(),
+                        };
+                        self.writeln(&format!("act.{}:talk(tostring({}))", actor, var_path))?;
+                    }
+                }
             }
             Action::FnCall {
                 name, args, scope, ..
@@ -267,6 +324,9 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                     VarScope::Local => format!("var.{}", name),
                     VarScope::Global => format!("save.{}", name),
                     VarScope::Args(index) => format!("args[{}]", index + 1),
+                    VarScope::Property => {
+                        return Err(TranspileError::property_in_expression());
+                    }
                 };
                 write!(self.writer, "{}", var_path)?;
             }
@@ -349,6 +409,9 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                     VarScope::Local => format!("var.{}", name),
                     VarScope::Global => format!("save.{}", name),
                     VarScope::Args(index) => format!("args[{}]", index + 1),
+                    VarScope::Property => {
+                        return Err(TranspileError::property_in_expression());
+                    }
                 };
                 write!(buf, "{}", var_path)?;
             }

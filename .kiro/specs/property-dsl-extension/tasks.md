@@ -30,7 +30,7 @@
   - _Boundary: ParseAction_
 
 - [ ] 4. トランスパイラ拡張: Luaコード生成（element_gen.rs）
-- [ ] 4.1 generate_var_set: Property SET / GET代入分岐
+- [x] 4.1 generate_var_set: Property SET / GET代入分岐
   - scope match に `VarScope::Property` arm を追加し、SET は `generate_property_set()` ヘルパーに委譲する
   - `generate_property_set()` は `SetValue::Expr` → `act:set_property("name", expr)`、`SetValue::WordRef` → `act:set_property("name", act:word("word"))` を出力する
   - value match の前に `Expr::VarRef { scope: Property }` を検出し、`var.name = act:get_property("prop")` または `save.name = act:get_property("prop")` を直接出力する（中間変数なし）
@@ -38,14 +38,14 @@
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 3.1, 3.2, 3.3, 3.4_
   - _Boundary: GenerateVarSet_
 
-- [ ] 4.2 generate_action: VarRef Property インラインGET
+- [x] 4.2 generate_action: VarRef Property インラインGET
   - `Action::VarRef` の scope match に `VarScope::Property` arm を追加する
   - `act.{actor}:talk(tostring(act:get_property("name")))` を出力する（nil → `"nil"` 文字列保証）
   - `さくら：＄％p` → `act.さくら:talk(tostring(act:get_property("p")))` が生成されること
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
   - _Boundary: GenerateAction_
 
-- [ ] 4.3 generate_expr: Property エラーガード + TranspileError 拡張
+- [x] 4.3 generate_expr: Property エラーガード + TranspileError 拡張
   - `TranspileError` に `property_in_expression()` バリアント（spanなし）を追加する
   - `generate_expr()` と `generate_expr_to_buffer()` の `Expr::VarRef` match に `VarScope::Property => TranspileError::property_in_expression()` arm を追加する
   - `＄var＝＄％a＋1` のような式中 Property で `TranspileError::property_in_expression()` が返ること
