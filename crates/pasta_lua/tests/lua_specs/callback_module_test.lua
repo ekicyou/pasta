@@ -1,6 +1,7 @@
 -- ============================================================================
 -- Task 1.2: CALLBACK.try_route / CALLBACK.sweep テスト
--- Requirements: 1.1, 5.1, 5.2, 5.3, R4 (callback chaining)
+-- Task 3.1: CALLBACK ID generation and staging テスト
+-- Requirements: 1.1, 1.2, 5.1, 5.2, 5.3, R4 (callback chaining)
 -- ============================================================================
 
 local describe = require("lua_test.test").describe
@@ -8,6 +9,102 @@ local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect
 local mocks = require("lua_test.mocks")
 
+-- ============================================================================
+-- Task 3.1: ID generation and staging tests
+-- ============================================================================
+describe("CALLBACK - ID generation and staging", function()
+    local CALLBACK, STORE
+
+    local function setup()
+        mocks.reset()
+        mocks.install()
+        package.loaded["pasta.shiori.event.callback"] = nil
+        package.loaded["pasta.store"] = nil
+        STORE = require("pasta.store")
+        CALLBACK = require("pasta.shiori.event.callback")
+        CALLBACK.reset()
+    end
+
+    test("next_event_id generates sequential IDs", function()
+        setup()
+        expect(CALLBACK.next_event_id()):toBe("OnPastaCallBack1")
+        expect(CALLBACK.next_event_id()):toBe("OnPastaCallBack2")
+        expect(CALLBACK.next_event_id()):toBe("OnPastaCallBack3")
+    end)
+
+    test("reset clears ID counter", function()
+        setup()
+        CALLBACK.next_event_id() -- 1
+        CALLBACK.next_event_id() -- 2
+        CALLBACK.reset()
+        expect(CALLBACK.next_event_id()):toBe("OnPastaCallBack1")
+    end)
+
+    test("stage_pending → consume_staged registers entry in pending", function()
+        setup()
+        CALLBACK.stage_pending("OnPastaCallBack1", 1000, "test timeout")
+
+        local co = coroutine.create(function() coroutine.yield() end)
+        coroutine.resume(co)
+        local act = { name = "test" }
+
+        local consumed = CALLBACK.consume_staged(co, act)
+        expect(consumed):toBe(true)
+        expect(CALLBACK.pending["OnPastaCallBack1"]).not_:toBe(nil)
+        expect(CALLBACK.pending["OnPastaCallBack1"].co):toBe(co)
+        expect(CALLBACK.pending["OnPastaCallBack1"].act):toBe(act)
+        expect(CALLBACK.pending["OnPastaCallBack1"].timeout_at):toBe(1000)
+        expect(CALLBACK.pending["OnPastaCallBack1"].on_timeout):toBe("test timeout")
+    end)
+
+    test("consume_staged sets STORE.co_callback", function()
+        setup()
+        CALLBACK.stage_pending("OnPastaCallBack1", 1000, nil)
+
+        local co = coroutine.create(function() coroutine.yield() end)
+        coroutine.resume(co)
+
+        CALLBACK.consume_staged(co, {})
+        expect(STORE.co_callback):toBe(co)
+    end)
+
+    test("consume_staged returns false when nothing staged", function()
+        setup()
+        local co = coroutine.create(function() coroutine.yield() end)
+        coroutine.resume(co)
+
+        local consumed = CALLBACK.consume_staged(co, {})
+        expect(consumed):toBe(false)
+    end)
+
+    test("multiple stage_pending without consume raises error", function()
+        setup()
+        CALLBACK.stage_pending("OnPastaCallBack1", 1000, nil)
+
+        local ok, err = pcall(function()
+            CALLBACK.stage_pending("OnPastaCallBack2", 2000, "second")
+        end)
+        expect(ok):toBe(false)
+        expect(tostring(err):find("multiple staging detected")).not_:toBe(nil)
+    end)
+
+    test("reset clears pending, staged, and STORE.co_callback", function()
+        setup()
+        CALLBACK.stage_pending("OnPastaCallBack1", 1000, nil)
+        local co = coroutine.create(function() coroutine.yield() end)
+        coroutine.resume(co)
+        CALLBACK.consume_staged(co, {})
+
+        expect(STORE.co_callback):toBe(co)
+        CALLBACK.reset()
+        expect(STORE.co_callback):toBe(nil)
+        expect(next(CALLBACK.pending)):toBe(nil)
+    end)
+end)
+
+-- ============================================================================
+-- Task 1.2: try_route / sweep tests
+-- ============================================================================
 describe("CALLBACK.try_route", function()
     local CALLBACK
 

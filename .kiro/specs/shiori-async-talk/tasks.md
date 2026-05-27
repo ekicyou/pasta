@@ -38,7 +38,7 @@
   - _Requirements: 5.2, 5.3_
   - _Boundary: REG.OnSecondChange (second_change.lua)_
 
-- [ ] 2.3 (P) get_propertyメソッドの実装
+- [x] 2.3 (P) get_propertyメソッドの実装
   - `act.lua` の `SHIORI_ACT_IMPL` に `get_property(self, name_or_names, timeout, timeout_message)` メソッドを追加する
   - 引数正規化: `name_or_names` が string なら 1 要素配列、table ならそのまま利用し、それ以外の型ではエラーを発生させる
   - バリデーション（`stage_pending` より前に完了させること）: 配列長 0 のエラー・各要素の nil または空文字列エラー・`coroutine.running()` で `is_main == true` または `co == nil` のコルーチン外呼び出しエラー
