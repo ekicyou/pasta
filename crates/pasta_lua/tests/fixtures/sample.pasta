@@ -28,8 +28,7 @@
 　　　＞変数代入
 　　　＞引数付き呼び出し（＄カウンタ、＄＊グローバル）
 　　　＞グローバル関数呼び出し
-
-
+　　　＞共有プロパティ操作
 　・グローバル単語呼び出し
 　　　さくら　：＠笑顔　＠挨拶！
 　　　うにゅう：＠通常　やふぅ。
@@ -65,11 +64,12 @@
 　　　＄＝＠関数（４２）
 　　　うにゅう：ローカルもいけるで＠関数（１）
 
-```lua
-function SCENE.関数(act, value, ...)
-    return value * value
-end
-```
+　・共有プロパティ操作
+　　　＄％system.name＝「テストゴースト」
+　　　＄ゴースト名＝＄％currentghost.name
+　　　＄＊幅＝＄％currentghost.balloon.scope(0).validwidth.initial
+　　　さくら　：＠通常　名前は＄％currentghost.name　です。
+　　　うにゅう：幅は＄ゴースト名　だって。
 
 ＊会話分岐
 　　さくら　：グローバルの分岐に飛んできた。

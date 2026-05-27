@@ -127,4 +127,36 @@ REG.OnTestTimeout = function(act)
     end)
 end
 
+--- Scenario: talk()チェーン内 get_property 干渉テスト
+--- トランスパイル後パターンの再現:
+---   act.さくら:talk("名前は")
+---   act.さくら:talk(tostring(act:get_property("currentghost.name")))
+---   act.さくら:talk("です。")
+--- get_property のトークン退避・復元が act.さくら:talk() チェーンに
+--- 干渉しないことを検証する。
+REG.OnTestTalkChainProperty = function(act)
+    return coroutine.create(function(act)
+        -- トランスパイル後コードと同一パターン
+        act.さくら:talk("名前は")
+        act.さくら:talk(tostring(act:get_property("currentghost.name")))
+        act.さくら:talk("です。")
+        coroutine.yield(act:build())
+    end)
+end
+
+--- Scenario: 複数アクター talk()チェーン + get_property 干渉テスト
+--- さくら→get_property→うにゅう の切り替えパターン:
+---   act.さくら:talk("確認中...")
+---   local name = act:get_property("currentghost.name")
+---   act.うにゅう:talk("名前は" .. tostring(name) .. "だよ。")
+--- get_property 前後でアクター切り替えが正しく動作することを検証。
+REG.OnTestMultiActorProperty = function(act)
+    return coroutine.create(function(act)
+        act.さくら:talk("確認中...")
+        local name = act:get_property("currentghost.name")
+        act.うにゅう:talk("名前は" .. tostring(name) .. "だよ。")
+        coroutine.yield(act:build())
+    end)
+end
+
 return SHIORI

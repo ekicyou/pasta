@@ -33,5 +33,5 @@ SSPのプロパティシステムへのアクセスをpastaゴーストから可
 - [x] shiori-event-test-framework -- SHIORIイベントフロー試験基盤（Luaモックライブラリ + X-Pasta-Time時刻注入 + ShioriResponse検証）。Dependencies: none
 - [x] shiori-async-talk -- トーク合成中のSHIORI非同期通信基盤 + `act:get_property(name)`。Dependencies: property-write-helpers, shiori-event-test-framework
 
-## 将来フェーズ
-- [ ] property-dsl-extension -- Pasta DSL文法にプロパティアクセス構文を追加（Spec 1+2のLua APIにトランスパイル）。Dependencies: property-write-helpers, shiori-async-talk
+## Phase 2: DSL統合
+- [ ] property-dsl-extension -- `＄％` スコープ修飾子によるプロパティアクセスDSL構文（＄％prop.path＝value / ＄var＝＄％prop.path）。既存Lua APIにトランスパイル。Dependencies: property-write-helpers, shiori-async-talk

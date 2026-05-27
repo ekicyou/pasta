@@ -100,6 +100,13 @@ do
         -- 　　　＞引数付き呼び出し（＄カウンタ、＄＊グローバル）
         -- 意図: 引数付きCall文では変数展開後、残りの引数を ... で継承（Requirement 3d）
         act:call("メイン1", "引数付き呼び出し", {}, var.カウンタ, save.グローバル, table.unpack(args))
+
+        -- 　　　＞グローバル関数呼び出し
+        act:call("メイン1", "グローバル関数呼び出し", {}, table.unpack(args))
+
+        -- 　　　＞共有プロパティ操作
+        -- 意図: プロパティ操作シーンを呼び出し（return で終端）
+        act:call("メイン1", "共有プロパティ操作", {}, table.unpack(args))
     end
 
     -- 　・グローバル単語呼び出し
@@ -220,6 +227,38 @@ do
     -- 意図: コードブロック（``` で識別、言語識別子は無視）内のコードをそのまま出力（Requirement 3f）
     function SCENE.関数(ctx, value, ...)
         return value * value
+    end
+
+    -- 　・共有プロパティ操作
+    -- 意図: ＄％ プロパティスコープによるSSPプロパティ読み書き
+    function SCENE.共有プロパティ操作_1(ctx, ...)
+        local args = { ... }
+        local act, save, var = PASTA.create_session(SCENE, ctx)
+
+        -- 　　　＄％system.name＝「テストゴースト」
+        -- 意図: プロパティSETは act:set_property("name", value) に展開
+        act:set_property("system.name", "テストゴースト")
+
+        -- 　　　＄ゴースト名＝＄％currentghost.name
+        -- 意図: プロパティGET代入は var.name = act:get_property("prop") に直接展開（中間変数なし）
+        var.ゴースト名 = act:get_property("currentghost.name")
+
+        -- 　　　＄＊幅＝＄％currentghost.balloon.scope(0).validwidth.initial
+        -- 意図: グローバル変数へのGET代入は save.name = act:get_property("prop") に展開
+        save.幅 = act:get_property("currentghost.balloon.scope(0).validwidth.initial")
+
+        -- 　　　さくら　：＠通常　名前は＄％currentghost.name　です。
+        -- 意図: インラインGETは act.X:talk(tostring(act:get_property("prop"))) に展開
+        act.さくら:word("通常")
+        act.さくら:talk("名前は")
+        act.さくら:talk(tostring(act:get_property("currentghost.name")))
+        act.さくら:talk("です。")
+
+        -- 　　　うにゅう：幅は＄ゴースト名　だって。
+        -- 意図: 通常のローカル変数参照は tostring(var.name) に展開
+        act.うにゅう:talk("幅は")
+        act.うにゅう:talk(tostring(var.ゴースト名))
+        act.うにゅう:talk("だって。")
     end
 end
 

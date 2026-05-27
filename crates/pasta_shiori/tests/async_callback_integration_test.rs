@@ -657,3 +657,161 @@ Reference0: 1
         resp3.status_code
     );
 }
+
+// ============================================================================
+// Scenario: talk()チェーン内 get_property のトーク生成干渉回避
+// トランスパイル後パターン（act.さくら:talk() + get_property）において
+// トークン退避・復元が正しく動作し、最終出力が期待通りに連結されること。
+// ============================================================================
+
+/// act.さくら:talk() チェーン内で get_property を呼び出した場合、
+/// 退避・復元によりプレフィックストークが失われず、
+/// プロパティ値と後続テキストが正しく連結されること。
+///
+/// Round 1: GET OnTestTalkChainProperty → get タグのみ（トークン退避済み）
+/// Round 2: コールバック → "名前は{value}です。" がさくらスクリプトとして出力
+#[test]
+fn test_talk_chain_property_no_interference() {
+    let mut env = AsyncCallbackEnv::new();
+
+    // Round 1: act.さくら:talk("名前は") + get_property → トークン退避
+    let resp1 = env.request(
+        r#"
+GET SHIORI/3.0
+Charset: UTF-8
+ID: OnTestTalkChainProperty
+"#,
+    );
+
+    assert_eq!(resp1.status_code, 200, "R1 should return 200 OK");
+    let v1 = resp1.value.as_ref().expect("R1 should have Value");
+
+    // トークン退避により get タグのみ（"名前は" は含まれない）
+    assert!(
+        v1.contains("\\![get,property,OnPastaCallBack"),
+        "R1 should contain get property tag, got: {v1}"
+    );
+    assert!(
+        !v1.contains("名前は"),
+        "R1 should NOT contain prefix talk (tokens saved), got: {v1}"
+    );
+
+    // Round 2: コールバック送信 → トークン復元 + 最終出力
+    let cb_id = extract_callback_id(v1);
+    let resp2 = env.request(&format!(
+        "GET SHIORI/3.0\r\nCharset: UTF-8\r\nID: {cb_id}\r\nReference0: テストゴースト\r\n\r\n"
+    ));
+
+    assert_eq!(resp2.status_code, 200, "R2 should return 200 OK");
+    let v2 = resp2.value.as_ref().expect("R2 should have Value");
+
+    // トークン復元により全トークが出力に含まれる
+    assert!(
+        v2.contains("名前は"),
+        "R2 should contain restored prefix talk, got: {v2}"
+    );
+    assert!(
+        v2.contains("テストゴースト"),
+        "R2 should contain property value, got: {v2}"
+    );
+    assert!(
+        v2.contains("です。"),
+        "R2 should contain suffix talk, got: {v2}"
+    );
+    assert!(
+        v2.contains("\\e"),
+        "R2 should contain \\e (final), got: {v2}"
+    );
+
+    // さくらスクリプト出力順序の検証: "名前は" → "テストゴースト" → "です。"
+    let pos_prefix = v2.find("名前は").expect("should find prefix");
+    let pos_value = v2.find("テストゴースト").expect("should find value");
+    let pos_suffix = v2.find("です。").expect("should find suffix");
+    assert!(
+        pos_prefix < pos_value && pos_value < pos_suffix,
+        "Output order should be: prefix → value → suffix, got: {v2}"
+    );
+
+    // スポットタグ \p[0] が出力に含まれる（さくらアクター）
+    assert!(
+        v2.contains("\\p[0]"),
+        "R2 should contain spot tag \\p[0] for さくら actor, got: {v2}"
+    );
+}
+
+/// 複数アクター間での talk() + get_property の干渉回避テスト。
+/// さくら → get_property → うにゅう の切り替えパターンで
+/// スポットタグとトーク内容が正しく生成されること。
+///
+/// Round 1: GET OnTestMultiActorProperty → get タグのみ
+/// Round 2: コールバック → さくら:talk + うにゅう:talk が正しいスポットで出力
+#[test]
+fn test_multi_actor_talk_chain_property_no_interference() {
+    let mut env = AsyncCallbackEnv::new();
+
+    // Round 1: act.さくら:talk("確認中...") + get_property → トークン退避
+    let resp1 = env.request(
+        r#"
+GET SHIORI/3.0
+Charset: UTF-8
+ID: OnTestMultiActorProperty
+"#,
+    );
+
+    assert_eq!(resp1.status_code, 200, "R1 should return 200 OK");
+    let v1 = resp1.value.as_ref().expect("R1 should have Value");
+
+    assert!(
+        v1.contains("\\![get,property,OnPastaCallBack"),
+        "R1 should contain get property tag, got: {v1}"
+    );
+    assert!(
+        !v1.contains("確認中"),
+        "R1 should NOT contain prefix talk (tokens saved), got: {v1}"
+    );
+
+    // Round 2: コールバック送信
+    let cb_id = extract_callback_id(v1);
+    let resp2 = env.request(&format!(
+        "GET SHIORI/3.0\r\nCharset: UTF-8\r\nID: {cb_id}\r\nReference0: マイゴースト\r\n\r\n"
+    ));
+
+    assert_eq!(resp2.status_code, 200, "R2 should return 200 OK");
+    let v2 = resp2.value.as_ref().expect("R2 should have Value");
+
+    // さくらのトーク（プレフィックス）が復元されている
+    assert!(
+        v2.contains("確認中..."),
+        "R2 should contain さくら's prefix talk, got: {v2}"
+    );
+    // うにゅうのトーク（プロパティ値含む）が出力されている
+    assert!(
+        v2.contains("名前はマイゴーストだよ。"),
+        "R2 should contain うにゅう's talk with property value, got: {v2}"
+    );
+
+    // さくらスポット(\p[0]) と うにゅうスポット(\p[1]) の両方が含まれる
+    assert!(
+        v2.contains("\\p[0]"),
+        "R2 should contain \\p[0] for さくら, got: {v2}"
+    );
+    assert!(
+        v2.contains("\\p[1]"),
+        "R2 should contain \\p[1] for うにゅう, got: {v2}"
+    );
+
+    // 出力順序: さくらのトーク → うにゅうのトーク
+    let pos_sakura = v2.find("確認中...").expect("should find さくら talk");
+    let pos_kero = v2
+        .find("名前はマイゴーストだよ。")
+        .expect("should find うにゅう talk");
+    assert!(
+        pos_sakura < pos_kero,
+        "さくら's talk should appear before うにゅう's talk, got: {v2}"
+    );
+
+    assert!(
+        v2.contains("\\e"),
+        "R2 should contain \\e (final), got: {v2}"
+    );
+}

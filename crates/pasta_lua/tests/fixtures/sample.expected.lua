@@ -35,7 +35,8 @@ do
         act:call(SCENE.__global_name__, "会話分岐", {}, table.unpack(args))
         act:call(SCENE.__global_name__, "変数代入", {}, table.unpack(args))
         act:call(SCENE.__global_name__, "引数付き呼び出し", {}, var.カウンタ, save.グローバル, table.unpack(args))
-        return act:call(SCENE.__global_name__, "グローバル関数呼び出し", {}, table.unpack(args))
+        act:call(SCENE.__global_name__, "グローバル関数呼び出し", {}, table.unpack(args))
+        return act:call(SCENE.__global_name__, "共有プロパティ操作", {}, table.unpack(args))
     end
 
     function SCENE.グローバル単語呼び出し_1(act, ...)
@@ -115,8 +116,20 @@ do
         act.うにゅう:talk(tostring(act.うにゅう:expr_fn("関数", 1)))
     end
 
-    function SCENE.関数(act, value, ...)
-        return value * value
+    function SCENE.共有プロパティ操作_1(act, ...)
+        local args = { ... }
+        local save, var = act:init_scene(SCENE)
+
+        act:set_property("system.name", "テストゴースト")
+        var.ゴースト名 = act:get_property("currentghost.name")
+        save.幅 = act:get_property("currentghost.balloon.scope(0).validwidth.initial")
+        act.さくら:talk(act.さくら:word("通常"))
+        act.さくら:talk("名前は")
+        act.さくら:talk(tostring(act:get_property("currentghost.name")))
+        act.さくら:talk("です。")
+        act.うにゅう:talk("幅は")
+        act.うにゅう:talk(tostring(var.ゴースト名))
+        act.うにゅう:talk("だって。")
     end
 end
 

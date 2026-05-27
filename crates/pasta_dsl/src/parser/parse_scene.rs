@@ -180,14 +180,19 @@ pub(crate) fn parse_actors_item(
 }
 
 /// Parse local start scene scope (no name).
-pub(crate) fn parse_local_start_scene_scope(pair: Pair<Rule>) -> Result<LocalSceneScope, ParseError> {
+pub(crate) fn parse_local_start_scene_scope(
+    pair: Pair<Rule>,
+) -> Result<LocalSceneScope, ParseError> {
     let span = Span::from(&pair.as_span());
     let mut scope = LocalSceneScope::start();
     scope.span = span;
 
     for inner in pair.into_inner() {
         match inner.as_rule() {
-            Rule::var_set_local | Rule::var_set_global | Rule::var_set_none | Rule::var_set_property => {
+            Rule::var_set_local
+            | Rule::var_set_global
+            | Rule::var_set_none
+            | Rule::var_set_property => {
                 scope
                     .items
                     .push(LocalSceneItem::VarSet(parse_var_set(inner)?));
@@ -240,7 +245,10 @@ pub(crate) fn parse_local_scene_scope(pair: Pair<Rule>) -> Result<LocalSceneScop
                     }
                 }
             }
-            Rule::var_set_local | Rule::var_set_global | Rule::var_set_none | Rule::var_set_property => {
+            Rule::var_set_local
+            | Rule::var_set_global
+            | Rule::var_set_none
+            | Rule::var_set_property => {
                 scope
                     .items
                     .push(LocalSceneItem::VarSet(parse_var_set(inner)?));

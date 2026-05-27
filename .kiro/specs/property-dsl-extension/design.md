@@ -190,21 +190,21 @@ flowchart LR
 
 ## Requirements Traceability
 
-| Requirement | Summary                                           | Components                                    | Interfaces                                       | Flows              |
-| ----------- | ------------------------------------------------- | --------------------------------------------- | ------------------------------------------------ | ------------------ |
-| 1.1         | `＄％` をスコープ修飾子として認識                 | PestGrammar, ParseAction                      | `property_marker`, `var_ref_property`            | —                  |
-| 1.2         | プロパティ名文字クラス `[a-zA-Z][_().a-zA-Z0-9]*` | PestGrammar                                   | `property_id`                                    | —                  |
-| 1.3         | プロパティ名にドットを含む                        | PestGrammar                                   | `property_id`                                    | —                  |
-| 1.4         | プロパティ名に括弧と数字を含む                    | PestGrammar                                   | `property_id`                                    | —                  |
-| 1.5         | 許容外文字で終端                                  | PestGrammar                                   | `property_id`                                    | —                  |
-| 1.6         | 全角・半角同等                                    | PestGrammar                                   | `property_marker`                                | —                  |
-| 2.1〜2.6    | SET各種値タイプ                                   | ParseVarSet, GenerateVarSet                   | `parse_var_set`, `generate_var_set` Property arm | SET経路            |
-| 3.1〜3.4    | GET代入・nil                                      | ParseVarSet, GenerateVarSet, GetProperty      | `generate_var_set` Property直接代入パス          | GET代入経路        |
-| 3.5         | get_property トークン非汚染                       | GetPropertyLua                                | `SHIORI_ACT_IMPL.get_property`                   | トークン保全フロー |
-| 4.1〜4.4    | インラインGET展開・分断なし                       | ParseActions, GenerateAction, GetPropertyLua  | `generate_action` Property arm                   | インラインフロー   |
-| 4.5         | nilインライン → `"nil"` 文字列                    | GenerateAction                                | `tostring()` ラップ                              | —                  |
-| 5.1〜5.4    | 既存構文互換                                      | PestGrammar (rule order)                      | 全 var_ref / var_set ルール                      | —                  |
-| 6.1〜6.2    | 構文エラー                                        | PestGrammar                                   | Pest自動エラー報告                               | —                  |
+| Requirement | Summary                                           | Components                                   | Interfaces                                       | Flows              |
+| ----------- | ------------------------------------------------- | -------------------------------------------- | ------------------------------------------------ | ------------------ |
+| 1.1         | `＄％` をスコープ修飾子として認識                 | PestGrammar, ParseAction                     | `property_marker`, `var_ref_property`            | —                  |
+| 1.2         | プロパティ名文字クラス `[a-zA-Z][_().a-zA-Z0-9]*` | PestGrammar                                  | `property_id`                                    | —                  |
+| 1.3         | プロパティ名にドットを含む                        | PestGrammar                                  | `property_id`                                    | —                  |
+| 1.4         | プロパティ名に括弧と数字を含む                    | PestGrammar                                  | `property_id`                                    | —                  |
+| 1.5         | 許容外文字で終端                                  | PestGrammar                                  | `property_id`                                    | —                  |
+| 1.6         | 全角・半角同等                                    | PestGrammar                                  | `property_marker`                                | —                  |
+| 2.1〜2.6    | SET各種値タイプ                                   | ParseVarSet, GenerateVarSet                  | `parse_var_set`, `generate_var_set` Property arm | SET経路            |
+| 3.1〜3.4    | GET代入・nil                                      | ParseVarSet, GenerateVarSet, GetProperty     | `generate_var_set` Property直接代入パス          | GET代入経路        |
+| 3.5         | get_property トークン非汚染                       | GetPropertyLua                               | `SHIORI_ACT_IMPL.get_property`                   | トークン保全フロー |
+| 4.1〜4.4    | インラインGET展開・分断なし                       | ParseActions, GenerateAction, GetPropertyLua | `generate_action` Property arm                   | インラインフロー   |
+| 4.5         | nilインライン → `"nil"` 文字列                    | GenerateAction                               | `tostring()` ラップ                              | —                  |
+| 5.1〜5.4    | 既存構文互換                                      | PestGrammar (rule order)                     | 全 var_ref / var_set ルール                      | —                  |
+| 6.1〜6.2    | 構文エラー                                        | PestGrammar                                  | Pest自動エラー報告                               | —                  |
 
 ## Components and Interfaces
 

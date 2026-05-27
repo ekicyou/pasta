@@ -1,2 +1,11 @@
 [loader]
 debug_mode = true
+
+# テスト用アクター定義（talk()チェーン + get_property 干渉テスト用）
+[actor."さくら"]
+spot = 0
+default_surface = 0
+
+[actor."うにゅう"]
+spot = 1
+default_surface = 10
