@@ -24,7 +24,7 @@
   - _Boundary: CALLBACK module (callback.lua)_
 
 - [ ] 2. イベントディスパッチャへの統合
-- [ ] 2.1 (P) EVENT.fireへのコールバックルーティング分岐とset_co_scene修正
+- [x] 2.1 (P) EVENT.fireへのコールバックルーティング分岐とset_co_scene修正
   - `event/init.lua` の `EVENT.fire(req)` 冒頭に `CALLBACK.try_route(req)` 呼び出しを追加し、非 nil なら即 return するルーティング分岐を実装する（`create_act` より前）
   - `resume_until_valid` 後に `CALLBACK.consume_staged(result, act)` を呼び出す分岐を追加する（戻り値 true/false は `set_co_scene` の挙動制御に使う）
   - `set_co_scene(co)` を修正: `co == STORE.co_callback` の場合は旧 `STORE.co_scene` を close せずにデタッチのみ行い（コールバック待ちコルーチンの誤 close を防ぐ）、`STORE.co_callback` をクリアする。旧 `STORE.co_scene` が `co` と別オブジェクトであれば通常通り close する
