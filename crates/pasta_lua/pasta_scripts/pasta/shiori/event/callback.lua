@@ -8,6 +8,8 @@
 --- 循環参照回避: このモジュールは pasta.shiori.act を require しない。
 
 local STORE = require("pasta.store")
+local log = require("@pasta_log")
+local RES = require("pasta.shiori.res")
 
 local CALLBACK = {}
 
@@ -61,6 +63,68 @@ function CALLBACK.consume_staged(co, act)
     }
     STORE.co_callback = co
     return true
+end
+
+--- 到着イベントが pending と一致するなら該当コルーチンを resume してレスポンスを返す
+--- @param req table SHIORI リクエスト
+--- @return string|nil response 一致時は SHIORI レスポンス文字列、不一致は nil
+function CALLBACK.try_route(req)
+    local entry = CALLBACK.pending[req.id]
+    if entry == nil then
+        return nil
+    end
+
+    -- Delete entry before resume (coroutine may re-stage)
+    CALLBACK.pending[req.id] = nil
+
+    -- Convert 0-indexed reference to 1-based array
+    local refs = {}
+    local i = 0
+    while req.reference[i] ~= nil do
+        refs[i + 1] = req.reference[i]
+        i = i + 1
+    end
+
+    -- Resume coroutine with references
+    local ok, yielded = coroutine.resume(entry.co, refs)
+    if not ok then
+        error(yielded)
+    end
+
+    -- R4: callback chaining — coroutine may have called stage_pending again
+    if coroutine.status(entry.co) == "suspended" then
+        CALLBACK.consume_staged(entry.co, entry.act)
+    end
+
+    return RES.ok(yielded)
+end
+
+--- タイムアウト時刻超過エントリを掃引
+--- @param now number 現在時刻（os.time() 戻り値）
+--- @return string|nil response 最初の on_timeout=string エントリの 500 レスポンス、なければ nil
+function CALLBACK.sweep(now)
+    local timeout_response = nil
+    local to_remove = {}
+    for event_id, entry in pairs(CALLBACK.pending) do
+        if now > entry.timeout_at then
+            to_remove[#to_remove + 1] = event_id
+            if type(entry.on_timeout) == "string" then
+                coroutine.resume(entry.co, nil, entry.on_timeout)
+                log.warn(event_id .. ": " .. entry.on_timeout)
+                if timeout_response == nil then
+                    timeout_response = RES.build("500 Internal Server Error", {
+                        ["X-ERROR-REASON"] = entry.on_timeout,
+                    })
+                end
+            else
+                coroutine.resume(entry.co, nil)
+            end
+        end
+    end
+    for _, event_id in ipairs(to_remove) do
+        CALLBACK.pending[event_id] = nil
+    end
+    return timeout_response
 end
 
 --- 全状態リセット（テスト用）

@@ -5,7 +5,7 @@
 ---
 
 - [ ] 1. CALLBACKモジュール基盤の構築
-- [ ] 1.1 IDカウンターとステージング・pending登録機構の実装
+- [x] 1.1 IDカウンターとステージング・pending登録機構の実装
   - `pasta/shiori/event/callback.lua` を新規作成し、モジュール局所状態（`_next_id`, `_staged`, `pending`）を定義する
   - `CALLBACK.next_event_id()` を実装: 毎回インクリメントして `"OnPastaCallBack{N}"` 形式の文字列を返す
   - `CALLBACK.stage_pending(event_id, timeout_at, on_timeout)` を実装: 単一スロット（`_staged`）への記録と、`_staged` が非 nil の場合の多重ステージング検出エラーを含む

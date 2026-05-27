@@ -34,6 +34,7 @@ local specs = {
     "proxy_find_handler_test",           -- PROXY_IMPL.find_actor_handler / find_handler 検索テスト
     "set_property_test",                 -- ACT_IMPL.set_property / escape_tag_arg テスト (property-write-helpers)
     "mocks_test",                        -- lua_test.mocks install/reset/custom stub テスト
+    "callback_module_test",              -- CALLBACK.try_route / sweep テスト (shiori-async-talk)
     -- 将来のテストスイートをここに追加
     -- "code_generator_test",
     -- "context_test",
