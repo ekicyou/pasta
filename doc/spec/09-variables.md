@@ -6,10 +6,10 @@
 
 グローバル変数は永続的に有効な変数です。
 
-| 構文 | pasta2.pest規則                                                     | 説明             |
-| ---- | -------------------------------------------------------------------- | ---------------- |
-| 参照 | `var_ref_global = { var_marker ~ global_marker ~ id ~ s }`          | `＄＊変数名`     |
-| 代入 | `var_set_global = { var_marker ~ global_marker ~ id ~ s ~ set }`    | `＄＊変数名＝値` |
+| 構文 | pasta2.pest規則                                                  | 説明             |
+| ---- | ---------------------------------------------------------------- | ---------------- |
+| 参照 | `var_ref_global = { var_marker ~ global_marker ~ id ~ s }`       | `＄＊変数名`     |
+| 代入 | `var_set_global = { var_marker ~ global_marker ~ id ~ s ~ set }` | `＄＊変数名＝値` |
 
 ```pasta
 宣言: ＄＊var_name＝value
@@ -22,10 +22,10 @@
 
 ローカル変数は一連のシーンが終わるまで有効な変数です。
 
-| 構文 | pasta2.pest規則                                  | 説明           |
-| ---- | ------------------------------------------------ | -------------- |
-| 参照 | `var_ref_local = { var_marker ~ id ~ s }`        | `＄変数名`     |
-| 代入 | `var_set_local = { var_marker ~ id ~ s ~ set }`  | `＄変数名＝値` |
+| 構文 | pasta2.pest規則                                 | 説明           |
+| ---- | ----------------------------------------------- | -------------- |
+| 参照 | `var_ref_local = { var_marker ~ id ~ s }`       | `＄変数名`     |
+| 代入 | `var_set_local = { var_marker ~ id ~ s ~ set }` | `＄変数名＝値` |
 
 ```pasta
 宣言: ＄var_name＝value
@@ -38,10 +38,10 @@
 
 プロパティ変数はSSP共有プロパティの読み書きを行う変数です。
 
-| 構文 | pasta2.pest規則                                                              | 説明                  |
-| ---- | ----------------------------------------------------------------------------- | --------------------- |
-| 参照 | `var_ref_property = { var_marker ~ property_marker ~ property_id ~ s }`       | `＄％prop.path`       |
-| 代入 | `var_set_property = { var_marker ~ property_marker ~ property_id ~ s ~ set }` | `＄％prop.path＝値`  |
+| 構文 | pasta2.pest規則                                                               | 説明                |
+| ---- | ----------------------------------------------------------------------------- | ------------------- |
+| 参照 | `var_ref_property = { var_marker ~ property_marker ~ property_id ~ s }`       | `＄％prop.path`     |
+| 代入 | `var_set_property = { var_marker ~ property_marker ~ property_id ~ s ~ set }` | `＄％prop.path＝値` |
 
 ```pasta
 SET: ＄％sakura.name＝Alice       → act:set_property("sakura.name", "Alice")
@@ -68,22 +68,22 @@ Bob：値は ＄＊グローバル変数 です
 
 ### 許可される値の型
 
-| 値の種類                 | 構文例                           | 説明                   |
-| ------------------------ | -------------------------------- | ---------------------- |
-| リテラル値               | `＄score＝100`                   | 数値、文字列リテラル   |
-| 単語参照                       | `＄value＝＠word_name`           | 登録済み単語の参照                       |
-| 変数参照                       | `＄new_var＝＄old_var`           | 他の変数の値をコピー                     |
-| 式                             | `＄result＝＄a + ＄b * 2`        | 算術式                                   |
-| ローカル関数呼び出し           | `＄result＝＠calculate()`        | `SCENE.calculate(act)` の戻り値          |
-| グローバル関数呼び出し         | `＄result＝＠＊calculate()`      | `GLOBAL.calculate(act)` の戻り値         |
-| 関数呼び出し（引数付き）       | `＄sum＝＠add（x：10　y：20）`   | 名前付き引数で呼び出し                   |
+| 値の種類                 | 構文例                         | 説明                             |
+| ------------------------ | ------------------------------ | -------------------------------- |
+| リテラル値               | `＄score＝100`                 | 数値、文字列リテラル             |
+| 単語参照                 | `＄value＝＠word_name`         | 登録済み単語の参照               |
+| 変数参照                 | `＄new_var＝＄old_var`         | 他の変数の値をコピー             |
+| 式                       | `＄result＝＄a + ＄b * 2`      | 算術式                           |
+| ローカル関数呼び出し     | `＄result＝＠calculate()`      | `SCENE.calculate(act)` の戻り値  |
+| グローバル関数呼び出し   | `＄result＝＠＊calculate()`    | `GLOBAL.calculate(act)` の戻り値 |
+| 関数呼び出し（引数付き） | `＄sum＝＠add（x：10　y：20）` | 名前付き引数で呼び出し           |
 
 ### 関数スコープの展開先
 
-| DSL 構文         | Lua 展開先          | 説明                           |
-| ---------------- | ------------------- | ------------------------------ |
-| `＠func()`       | `SCENE.func(act)`   | ローカルスコープ（シーン内）   |
-| `＠＊func()`     | `GLOBAL.func(act)`  | グローバルスコープ（永続領域） |
+| DSL 構文     | Lua 展開先         | 説明                           |
+| ------------ | ------------------ | ------------------------------ |
+| `＠func()`   | `SCENE.func(act)`  | ローカルスコープ（シーン内）   |
+| `＠＊func()` | `GLOBAL.func(act)` | グローバルスコープ（永続領域） |
 
 `＠＊` のグローバルスコープは変数 `＄＊` → `save.` との対称構造です。
 
@@ -91,9 +91,9 @@ Bob：値は ＄＊グローバル変数 です
 
 代入を伴わない関数呼び出し（副作用専用）を `＄＝expr` で記述できます。
 
-| 構文 | pasta2.pest規則                     | 説明               |
-| ---- | ----------------------------------- | ------------------ |
-| 式文 | `var_set_none = { var_marker ~ set }` | `＄＝＠func()`     |
+| 構文 | pasta2.pest規則                       | 説明           |
+| ---- | ------------------------------------- | -------------- |
+| 式文 | `var_set_none = { var_marker ~ set }` | `＄＝＠func()` |
 
 ```pasta
 ＄＝＠副作用関数（）           # ローカル: SCENE.副作用関数(act)

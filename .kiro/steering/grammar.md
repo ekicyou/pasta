@@ -20,20 +20,20 @@
 
 **開発時は必ず参照**: `doc/spec/` ディレクトリ（章別分割）
 
-| 章番号                                                        | 参照用途                     |
-| ------------------------------------------------------------- | ---------------------------- |
-| [01-grammar-model.md](../../doc/spec/01-grammar-model.md)     | 行指向文法・式サポート       |
-| [02-markers.md](../../doc/spec/02-markers.md)                 | マーカー・演算子定義         |
-| [03-block-structure.md](../../doc/spec/03-block-structure.md) | ブロック構造                 |
-| [04-call-spec.md](../../doc/spec/04-call-spec.md)             | Call仕様・スコープ解決       |
-| [05-literals.md](../../doc/spec/05-literals.md)               | リテラル定義                 |
-| [06-action-line.md](../../doc/spec/06-action-line.md)         | アクション行・インライン要素 |
-| [07-sakura-script.md](../../doc/spec/07-sakura-script.md)     | Sakuraスクリプト仕様         |
-| [08-attributes.md](../../doc/spec/08-attributes.md)           | 属性定義                     |
-| [09-variables.md](../../doc/spec/09-variables.md)             | 変数スコープ                 |
-| [10-words.md](../../doc/spec/10-words.md)                     | 単語定義・参照               |
-| [11-actor-dictionary.md](../../doc/spec/11-actor-dictionary.md) | アクター辞書定義           |
-| [12-future.md](../../doc/spec/12-future.md)                   | 将来の拡張予定               |
+| 章番号                                                          | 参照用途                     |
+| --------------------------------------------------------------- | ---------------------------- |
+| [01-grammar-model.md](../../doc/spec/01-grammar-model.md)       | 行指向文法・式サポート       |
+| [02-markers.md](../../doc/spec/02-markers.md)                   | マーカー・演算子定義         |
+| [03-block-structure.md](../../doc/spec/03-block-structure.md)   | ブロック構造                 |
+| [04-call-spec.md](../../doc/spec/04-call-spec.md)               | Call仕様・スコープ解決       |
+| [05-literals.md](../../doc/spec/05-literals.md)                 | リテラル定義                 |
+| [06-action-line.md](../../doc/spec/06-action-line.md)           | アクション行・インライン要素 |
+| [07-sakura-script.md](../../doc/spec/07-sakura-script.md)       | Sakuraスクリプト仕様         |
+| [08-attributes.md](../../doc/spec/08-attributes.md)             | 属性定義                     |
+| [09-variables.md](../../doc/spec/09-variables.md)               | 変数スコープ                 |
+| [10-words.md](../../doc/spec/10-words.md)                       | 単語定義・参照               |
+| [11-actor-dictionary.md](../../doc/spec/11-actor-dictionary.md) | アクター辞書定義             |
+| [12-future.md](../../doc/spec/12-future.md)                     | 将来の拡張予定               |
 
 パーサー・トランスパイラー・ランタイムの実装判断はすべてこの仕様書に基づく。
 
@@ -41,17 +41,17 @@
 
 ## マーカー一覧（全角/半角両対応）
 
-| マーカー         | 全角 | 半角 | 用途                         | 参照                                                        |
-| ---------------- | ---- | ---- | ---------------------------- | ----------------------------------------------------------- |
-| グローバルシーン | `＊` | `*`  | シーン定義                   | [Chapter 2](../../doc/spec/02-markers.md#22-シーンマーカー) |
-| ローカルシーン   | `・` | `-`  | サブシーン定義               | [Chapter 2](../../doc/spec/02-markers.md#22-シーンマーカー) |
-| 属性             | `＆` | `&`  | メタデータ                   | [Chapter 8](../../doc/spec/08-attributes.md)                |
-| 単語/関数        | `＠` | `@`  | 単語定義・参照・関数呼び出し | [Chapter 10](../../doc/spec/10-words.md)                    |
-| 変数             | `＄` | `$`  | 変数宣言・参照               | [Chapter 9](../../doc/spec/09-variables.md)                 |
-| Call             | `＞` | `>`  | シーン呼び出し               | [Chapter 4](../../doc/spec/04-call-spec.md)                 |
-| コメント         | `＃` | `#`  | コメント行                   | [Chapter 2](../../doc/spec/02-markers.md#210-コメント)      |
-| コロン           | `：` | `:`  | 区切り                       | [Chapter 2](../../doc/spec/02-markers.md#コロンcolon)       |
-| アクター辞書     | `％` | `%`  | アクター辞書定義             | [Chapter 11](../../doc/spec/11-actor-dictionary.md)         |
+| マーカー         | 全角 | 半角 | 用途                         | 参照                                                         |
+| ---------------- | ---- | ---- | ---------------------------- | ------------------------------------------------------------ |
+| グローバルシーン | `＊` | `*`  | シーン定義                   | [Chapter 2](../../doc/spec/02-markers.md#22-シーンマーカー)  |
+| ローカルシーン   | `・` | `-`  | サブシーン定義               | [Chapter 2](../../doc/spec/02-markers.md#22-シーンマーカー)  |
+| 属性             | `＆` | `&`  | メタデータ                   | [Chapter 8](../../doc/spec/08-attributes.md)                 |
+| 単語/関数        | `＠` | `@`  | 単語定義・参照・関数呼び出し | [Chapter 10](../../doc/spec/10-words.md)                     |
+| 変数             | `＄` | `$`  | 変数宣言・参照               | [Chapter 9](../../doc/spec/09-variables.md)                  |
+| Call             | `＞` | `>`  | シーン呼び出し               | [Chapter 4](../../doc/spec/04-call-spec.md)                  |
+| コメント         | `＃` | `#`  | コメント行                   | [Chapter 2](../../doc/spec/02-markers.md#210-コメント)       |
+| コロン           | `：` | `:`  | 区切り                       | [Chapter 2](../../doc/spec/02-markers.md#コロンcolon)        |
+| アクター辞書     | `％` | `%`  | アクター辞書定義             | [Chapter 11](../../doc/spec/11-actor-dictionary.md)          |
 | キューコマンド   | `！` | `!`  | 演出キュー（dola側で処理）   | [Chapter 2](../../doc/spec/02-markers.md#211-キューコマンド) |
 
 ---
@@ -126,12 +126,12 @@ end
 
 ## よくある間違いパターン
 
-| # | パターン | ❌ まちがい | ✅ ただしい | 理由 |
-|---|---------|-----------|-----------|------|
-| a | ＠空白なし | `＠地名からおらんようなってもた` | `＠地名　からおらんようなってもた` | 最長一致で全体が識別子に |
-| b | ＄空白なし | `＄nameさん` | `＄name　さん` | 日本語文字もXID_CONTINUEに含まれる |
-| c | 属性の配置位置 | アクション行→属性行 | シーン定義直後→属性行 | 属性はシーン定義の直後にのみ配置可能 |
-| d | 継続トークの用途 | OnBoot等一度きりイベントで使用 | OnTalkのような繰り返しイベントで使用 | OnBoot等では後半が発火されない |
+| #   | パターン         | ❌ まちがい                       | ✅ ただしい                           | 理由                                 |
+| --- | ---------------- | -------------------------------- | ------------------------------------ | ------------------------------------ |
+| a   | ＠空白なし       | `＠地名からおらんようなってもた` | `＠地名　からおらんようなってもた`   | 最長一致で全体が識別子に             |
+| b   | ＄空白なし       | `＄nameさん`                     | `＄name　さん`                       | 日本語文字もXID_CONTINUEに含まれる   |
+| c   | 属性の配置位置   | アクション行→属性行              | シーン定義直後→属性行                | 属性はシーン定義の直後にのみ配置可能 |
+| d   | 継続トークの用途 | OnBoot等一度きりイベントで使用   | OnTalkのような繰り返しイベントで使用 | OnBoot等では後半が発火されない       |
 
 ---
 

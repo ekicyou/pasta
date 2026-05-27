@@ -165,6 +165,8 @@ git commit -m "chore({feature-name}): spec完了・アーカイブ"
 
 ### ステップ8: リモート同期
 
+確認不要。以下のコマンドを直接実行する。
+
 ```powershell
 git push origin main
 ```
