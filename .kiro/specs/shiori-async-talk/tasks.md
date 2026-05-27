@@ -75,7 +75,7 @@
   - _Requirements: 2.1, 3.1, 4.1, 4.2, 4.3, 5.4_
   - _Boundary: SHIORI_ACT tests (pasta_lua/tests/)_
 
-- [ ] 3.3 SHIORIプロトコルレベル統合テスト
+- [x] 3.3 SHIORIプロトコルレベル統合テスト
   - `crates/pasta_shiori/tests/async_callback_integration_test.rs` を新規作成する（既存統合テストのモックパターンを参考にする）
   - **Scenario 1**: 2 ラウンドで `baseware.version: 2.6.77\e` が取得できることを確認（Round 1 の Value に `\e` なし）
   - **Scenario 2**: Round 1 の Value に蓄積済みトークンと get タグが同一 Value に含まれることを確認
