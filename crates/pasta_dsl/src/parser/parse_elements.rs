@@ -111,6 +111,7 @@ pub(crate) fn parse_var_set(pair: Pair<Rule>) -> Result<VarSet, ParseError> {
     let span = Span::from(&pair.as_span());
     let scope = match pair.as_rule() {
         Rule::var_set_global => VarScope::Global,
+        Rule::var_set_property => VarScope::Property,
         _ => VarScope::Local, // var_set_local, var_set_none
     };
 
@@ -121,7 +122,7 @@ pub(crate) fn parse_var_set(pair: Pair<Rule>) -> Result<VarSet, ParseError> {
 
     for inner in pair.into_inner() {
         match inner.as_rule() {
-            Rule::id => {
+            Rule::id | Rule::property_id => {
                 // The first id is the variable name
                 if name.is_none() {
                     name = Some(inner.as_str().to_string());

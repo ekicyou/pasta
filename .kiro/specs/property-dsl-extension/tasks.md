@@ -14,7 +14,7 @@
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 5.1, 5.2, 5.3, 5.4, 6.1, 6.2_
 
 - [ ] 3. パーサーモジュール拡張
-- [ ] 3.1 変数代入パーサー拡張（parse_elements.rs / parse_scene.rs）
+- [x] 3.1 変数代入パーサー拡張（parse_elements.rs / parse_scene.rs）
   - `parse_var_set()` の scope match に `Rule::var_set_property => VarScope::Property` を追加する
   - name 抽出ループで `Rule::property_id` を `Rule::id` と同様に受理するよう拡張する
   - `parse_scene.rs` の2箇所の match パターンに `Rule::var_set_property` を追加する

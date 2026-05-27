@@ -187,7 +187,7 @@ pub(crate) fn parse_local_start_scene_scope(pair: Pair<Rule>) -> Result<LocalSce
 
     for inner in pair.into_inner() {
         match inner.as_rule() {
-            Rule::var_set_local | Rule::var_set_global | Rule::var_set_none => {
+            Rule::var_set_local | Rule::var_set_global | Rule::var_set_none | Rule::var_set_property => {
                 scope
                     .items
                     .push(LocalSceneItem::VarSet(parse_var_set(inner)?));
@@ -240,7 +240,7 @@ pub(crate) fn parse_local_scene_scope(pair: Pair<Rule>) -> Result<LocalSceneScop
                     }
                 }
             }
-            Rule::var_set_local | Rule::var_set_global | Rule::var_set_none => {
+            Rule::var_set_local | Rule::var_set_global | Rule::var_set_none | Rule::var_set_property => {
                 scope
                     .items
                     .push(LocalSceneItem::VarSet(parse_var_set(inner)?));
