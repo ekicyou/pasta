@@ -38,6 +38,7 @@
 | バイトオフセット             | `span_byte_offset_test.rs`                     | ✅ 完了 | エラー位置特定                                  |
 | さくらスクリプト記号タグ     | `sakura_symbol_tag_test.rs`                    | ✅ 完了 | `-+*?&` 5文字タグパース（7テスト）              |
 | キューコマンド行（！/!）     | `cue_cmd_test.rs`                              | ✅ 完了 | 63テスト（AST型・PEG文法・パース・推定）        |
+| プロパティスコープ（＄％）    | `property_scope_test.rs`                       | ✅ 完了 | 16テスト（property-dsl-extension）              |
 
 ### 2.2 Registry層テスト（シーン/単語テーブル）
 
@@ -61,6 +62,8 @@
 | CueCommandパススルー | `cue_command_passthrough_test.rs`                                                           | ✅ 完了 | 5テスト（Lua変換スキップ検証）     |
 | 複数キー単語登録     | `transpiler.rs`（インライン）                                                               | ✅ 完了 | 7テスト（登録・Lua出力・後方互換） |
 | エンコーディング     | `pasta_lua_encoding_test.rs`                                                                | ✅ 完了 | 文字エンコード                     |
+| プロパティLua変換   | `property_scope_codegen_test.rs`                                                            | ✅ 完了 | 10テスト（property-dsl-extension）         |
+| プロパティトークン保全 | `property_token_preservation_test.rs`                                                       | ✅ 完了 | 3テスト（property-dsl-extension）          |
 
 ### 2.4 Runtime層テスト（実行エンジン）
 
@@ -111,7 +114,7 @@
 | トランスパイル失敗中止                | `lua_passthrough_test.rs`                                         | ✅ 完了 | 2テスト（load-error-logging）                               |
 | ログファイル名固定（Rotation::NEVER） | `logger.rs`                                                       | ✅ 完了 | 1テスト（load-error-logging）                               |
 | load失敗→requestエラー伝搬            | `shiori_tests.rs`                                                 | ✅ 完了 | 1テスト（load-error-logging）                               |
-| 非同期コールバック統合（SHIORI層）    | `async_callback_integration_test.rs`                              | ✅ 完了 | 10テスト（shiori-async-talk）                               |
+| 非同期コールバック統合（SHIORI層）    | `async_callback_integration_test.rs`                              | ✅ 完了 | 12テスト（shiori-async-talk、property-dsl-extension追加2テスト） |
 
 ### 2.5 LSP層テスト（Language Server）
 

@@ -34,6 +34,25 @@
 
 **スコープ**: 一連のシーンが終わるまで
 
+### プロパティ変数
+
+プロパティ変数はSSP共有プロパティの読み書きを行う変数です。
+
+| 構文 | pasta2.pest規則                                                              | 説明                  |
+| ---- | ----------------------------------------------------------------------------- | --------------------- |
+| 参照 | `var_ref_property = { var_marker ~ property_marker ~ property_id ~ s }`       | `＄％prop.path`       |
+| 代入 | `var_set_property = { var_marker ~ property_marker ~ property_id ~ s ~ set }` | `＄％prop.path＝値`  |
+
+```pasta
+SET: ＄％sakura.name＝Alice       → act:set_property("sakura.name", "Alice")
+GET: ＄name＝＄％sakura.name      → var.name = act:get_property("sakura.name")
+インライン: さくら：＄％sakura.name  → act.さくら:talk(tostring(act:get_property("sakura.name")))
+```
+
+**スコープ**: SSP共有プロパティ（ベースウェア管理）
+
+**プロパティIDの識別子規則**: `property_id` は通常の `id` と異なり、ドット（`.`）を含むことができる。これにより `sakura.name` や `baseware.version` などのSSPプロパティ名をそのまま記述できる。
+
 ### 使用例
 
 ```pasta

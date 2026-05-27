@@ -44,7 +44,7 @@ metadata:
 | グローバルシーン | `＊` | `*` | シーン定義 | `＊OnBoot` | [grammar-model.md](references/grammar-model.md) |
 | ローカルシーン | `・` | `-` | サブシーン定義 | `・選択肢1` | [grammar-model.md](references/grammar-model.md) |
 | 単語/関数 | `＠` | `@` | 単語定義・参照・関数呼び出し | `＠挨拶：こんにちは、やあ` / `＠女性、妖精：水無灯里、アリス`（複数キー） | [words.md](references/words.md) |
-| 変数 | `＄` | `$` | 変数宣言・参照 | `＄count＝1` | [variables.md](references/variables.md) |
+| 変数 | `＄` | `$` | 変数宣言・参照 | `＄count＝1` / `＄％prop＝v` | [variables.md](references/variables.md) |
 | Call | `＞` | `>` | シーン呼び出し | `＞次の会話` | [call-spec.md](references/call-spec.md) |
 | 属性 | `＆` | `&` | メタデータ | `＆author：Alice` | [grammar-model.md](references/grammar-model.md) |
 | コメント | `＃` | `#` | コメント行 | `＃ メモ` | [grammar-model.md](references/grammar-model.md) |
@@ -137,6 +137,7 @@ metadata:
 
 - **ローカル変数** `＄変数名`: 一連のシーンが終わるまで有効
 - **グローバル変数** `＄＊変数名`: SAVE テーブル経由でセッション間にわたりファイルに永続化される（JSON 保存）
+- **プロパティ変数** `＄％prop.path`: SSP共有プロパティの読み書き。SET（`＄％prop＝value`）、GET代入（`＄var＝＄％prop`）、インラインGET（`アクター：＄％prop`）が可能
 - 代入: `＄変数名＝値` または `＄変数名：値`（リテラル値・単語参照・変数参照・式・関数呼び出しが使用可能）
 - **グローバル関数代入**: `＄result＝＠＊func()` → `GLOBAL.func(act)` の戻り値を代入
 - **式文（副作用のみ）**: `＄＝expr` — 戻り値を使わず式を実行するだけ
@@ -148,7 +149,10 @@ metadata:
   ＄＊total＝＄＊total ＋ 1
   ＄result＝＠＊globalFunc()     ＃ グローバル関数の戻り値を代入
   ＄＝＠＊logEvent（「起動」）   ＃ 戻り値不要の式文
+  ＄％sakura.name＝Alice         ＃ SSP共有プロパティに書き込み
+  ＄name＝＄％sakura.name        ＃ SSP共有プロパティを変数に代入
   Alice：＄count　回目の会話だよ。
+  Alice：名前は ＄％sakura.name　です。  ＃ インラインでプロパティ参照
 ```
 
 > 📖 詳細: [references/variables.md](references/variables.md)
