@@ -266,7 +266,11 @@ function SHIORI_ACT_IMPL.get_property(self, name_or_names, timeout, timeout_mess
     local event_id = CALLBACK.next_event_id()
     CALLBACK.stage_pending(event_id, os.time() + timeout, timeout_message)
 
-    -- タグ蓄積
+    -- トークンバッファ退避
+    local saved_tokens = self.token
+    self.token = {}
+
+    -- get タグのみを新バッファに登録
     local parts = { "\\![get,property," .. event_id }
     for i = 1, n do
         parts[#parts + 1] = escape_tag_arg(names[i])
@@ -274,8 +278,12 @@ function SHIORI_ACT_IMPL.get_property(self, name_or_names, timeout, timeout_mess
     local tag = table.concat(parts, ",") .. "]"
     table.insert(self.token, { type = "raw_script", text = tag })
 
-    -- yield して resume 値を受け取り、多値で返す
+    -- yield（get タグのみのスクリプトを送信）
     local refs, reason = coroutine.yield(self:build())
+
+    -- トークンバッファ復元（成功・失敗いずれの経路でも）
+    self.token = saved_tokens
+
     if reason then
         error(reason)
     end

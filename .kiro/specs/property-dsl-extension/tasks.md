@@ -52,7 +52,7 @@
   - _Requirements: 3.1, 3.2_
   - _Boundary: GenerateExpr_
 
-- [ ] 5. (P) Lua API: get_property トークンバッファ保全
+- [x] 5. (P) Lua API: get_property トークンバッファ保全
   - `SHIORI_ACT_IMPL.get_property()` のバリデーション完了直後に `local saved_tokens = self.token` で退避し、`self.token = {}` で空にする
   - get タグのみを新バッファに登録し `coroutine.yield(self:build())` を呼ぶ
   - `coroutine.yield` の直後（成功・エラー両経路）で `self.token = saved_tokens` を実行する
