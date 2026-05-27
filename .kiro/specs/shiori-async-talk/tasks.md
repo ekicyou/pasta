@@ -63,7 +63,7 @@
   - _Requirements: 1.1, 1.2, 5.1, 5.2, 5.3_
   - _Boundary: CALLBACK module tests (pasta_lua/tests/)_
 
-- [ ] 3.2 (P) get_propertyバリデーション・タグ発行・多値返却テスト
+- [x] 3.2 (P) get_propertyバリデーション・タグ発行・多値返却テスト
   - `crates/pasta_lua/tests/get_property_test.lua` を新規作成する
   - 引数なし・nil・空文字列・不正型（数値、boolean）で明確なエラーが発生することを確認
   - メインスレッド呼び出しでエラーが発生することを確認
