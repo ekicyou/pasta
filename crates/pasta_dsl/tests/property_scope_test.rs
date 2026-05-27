@@ -292,3 +292,34 @@ fn test_property_scope_regression_global() {
     assert_eq!(var_sets[0].scope, VarScope::Global);
     assert_eq!(var_sets[0].name.as_deref(), Some("var"));
 }
+
+// Req 5.3: ＄＝expr 式文が不変
+#[test]
+fn test_property_scope_regression_expr_statement() {
+    let input = "＊テスト\n　＄＝1＋2\n";
+    let result = parse_str(input, "test.pasta");
+    assert!(result.is_ok(), "＄＝expr should still parse after property-dsl-extension: {:?}", result);
+}
+
+// Req 5.4: 行頭 ％ がアクター辞書マーカーとして不変
+#[test]
+fn test_property_scope_regression_actor_marker() {
+    let input = "＊テスト\n　％さくら、うにゅう\n　さくら：テスト\n";
+    let result = parse_str(input, "test.pasta");
+    assert!(result.is_ok(), "Line-initial ％ should still parse as actor dictionary: {:?}", result);
+}
+
+// Req 4.2: 複数 ＄％ 参照を含むアクション行
+#[test]
+fn test_property_scope_multiple_inline_refs() {
+    let input = "＊テスト\n　さくら：＄％a.name　と＄％b.name\n";
+    let file = parse_str(input, "test.pasta").unwrap();
+    let scenes = get_global_scene_scopes(&file);
+    let actions = find_actions_in_scene(scenes[0]);
+    // Should parse into multiple actions: VarRef(a.name) + Talk + VarRef(b.name)
+    let var_refs: Vec<_> = actions
+        .iter()
+        .filter(|a| matches!(a, Action::VarRef { scope: VarScope::Property, .. }))
+        .collect();
+    assert_eq!(var_refs.len(), 2, "Should find 2 property VarRefs, got: {:?}", actions);
+}
