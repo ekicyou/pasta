@@ -106,7 +106,7 @@
   - `cargo test -p pasta_lua property_token_preservation` が全件グリーンであること
   - _Requirements: 3.5, 4.4_
 
-- [ ] 10. 統合テスト: 全体回帰確認
+- [x] 10. 統合テスト: 全体回帰確認
   - `pasta_sample_ghost` の任意のシーンに `＄ゴースト名＝＄％currentghost.name` + 後続トークを追加する
   - `cargo test --workspace` を全件実行し、すべてグリーンであること
   - 既存の 950+ テストを含めてリグレッション 0 件であること

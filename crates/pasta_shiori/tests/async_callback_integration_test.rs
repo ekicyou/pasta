@@ -169,12 +169,12 @@ Reference0: 2.6.77
 
 // ============================================================================
 // Scenario 2: トーク蓄積 + プロパティ取得
-// Req 5.2: get_property呼び出し前のトークンがレスポンスに含まれる
-// Req 6.3: 蓄積されたトークンとgetタグが同じレスポンスに含まれる
+// get_property のトークン退避・復元により、get タグのみが先行 yield され、
+// 蓄積トークンはコールバック後の最終出力に含まれる。
 // ============================================================================
 
-/// Round 1: GET OnTestAccumulate → プレフィックストーク + get タグ
-/// Round 2: コールバック → 最終トーク
+/// Round 1: GET OnTestAccumulate → get タグのみ（トークンは退避済み）
+/// Round 2: コールバック → 蓄積トーク + 最終トーク
 #[test]
 fn test_scenario2_talk_accumulation_with_property_get() {
     let mut env = AsyncCallbackEnv::new();
@@ -191,10 +191,10 @@ ID: OnTestAccumulate
     assert_eq!(resp1.status_code, 200, "Round 1 should return 200 OK");
 
     let value1 = resp1.value.as_ref().expect("Round 1 should have Value");
-    // Req 5.2 / 6.3: プレフィックストークとgetタグが同じレスポンスに含まれる
+    // トークン退避により、get タグのみがyieldされる（プレフィックストークは含まれない）
     assert!(
-        value1.contains("\\p[0]checking..."),
-        "Round 1 should contain prefix talk, got: {value1}"
+        !value1.contains("\\p[0]checking..."),
+        "Round 1 should NOT contain prefix talk (tokens saved), got: {value1}"
     );
     assert!(
         value1.contains("\\![get,property,OnPastaCallBack"),
@@ -214,6 +214,11 @@ Reference0: 3.14
     assert_eq!(resp2.status_code, 200, "Round 2 should return 200 OK");
 
     let value2 = resp2.value.as_ref().expect("Round 2 should have Value");
+    // トークン復元により、プレフィックストーク + 最終トークが同じレスポンスに含まれる
+    assert!(
+        value2.contains("checking..."),
+        "Round 2 should contain restored prefix talk, got: {value2}"
+    );
     assert!(
         value2.contains("result=3.14"),
         "Round 2 should contain property value result, got: {value2}"
