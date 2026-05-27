@@ -267,29 +267,22 @@ var.name = __prop_1
 
 `generate_var_set()`でProperty式を検出し、プリフェッチコードを先行出力する必要あり。
 
-### 4.4 インラインGET バッチ最適化 (最重要課題)
+### 4.4 ~~インラインGET バッチ最適化~~ （スコープ外に決定）
 
-`さくら：名前は＄％currentghost.name、作者は＄％currentghost.craftman`のようなアクション行で、2回のyieldを1回に最適化。
+トークンバッファ保全改修（4.6）により、`get_property()`を逐次呼び出してもテキスト分断は発生しない。バッチ最適化（複数プロパティの一括取得によるyield回数削減）は**パフォーマンス最適化**に過ぎず、正確性には影響しない。
 
-**現状**: `generate_action_line()`はアクションを逐次処理。
+**決定**: 本specではバッチ最適化を実装しない。トランスパイラは各`＄％`参照に対して個別に`act:get_property()`を生成する。後方互換を壊さず後付け可能なため、将来の最適化specで対応する。
 
-**必要な変更**:
-1. アクション行内の全`Action::VarRef { scope: Property }`を収集
-2. 一括`get_property({names})`呼び出しを先行出力
-3. 結果をローカル変数にバインド
-4. 各アクションの生成時にローカル変数を参照
-
-**生成コード例**:
+**生成コード例（逐次方式）**:
 ```lua
 -- さくら：名前は＄％currentghost.name、作者は＄％currentghost.craftman
-local __prop_1, __prop_2 = act:get_property({"currentghost.name", "currentghost.craftman"})
 act.さくら:talk("名前は")
+local __prop_1 = act:get_property("currentghost.name")
 act.さくら:talk(tostring(__prop_1))
 act.さくら:talk("、作者は")
+local __prop_2 = act:get_property("currentghost.craftman")
 act.さくら:talk(tostring(__prop_2))
 ```
-
-**影響範囲**: `generate_action_line()`と`generate_continue_action()`の両方に適用が必要。
 
 ### 4.5 式中のプロパティ参照 (スコープ外だが考慮必要)
 
@@ -324,7 +317,7 @@ end
 - パーサー拡張: S（既存パターンの機械的複製）
 - SET トランスパイル: S（同期的、シンプル）
 - GET代入 トランスパイル: S-M（トークン保全改修により素直に呼べる）
-- GETインライン + バッチ最適化: M（アクション行の前処理パス追加）
+- GETインライン: S（トークン保全により逐次呼び出しで十分、バッチ最適化不要）
 - get_propertyトークン保全: S（Lua内部改修のみ）
 - テスト: S-M（パーサー + トランスパイラ + トークン保全）
 
@@ -343,6 +336,4 @@ end
 1. `property_id` Pestルールの全角/半角対応方針
 2. SET `generate_var_set()`内の分岐 vs 別関数ディスパッチ
 3. GET代入のコード生成パターン（ローカル変数命名規則）
-4. バッチ最適化の実装位置（`generate_action_line()`内 vs 前処理パス）
-5. `generate_continue_action()`へのバッチ最適化適用方法
-6. 式中`VarScope::Property`のエラーメッセージ（TranspileError拡張）
+4. 式中`VarScope::Property`のエラーメッセージ（TranspileError拡張）
