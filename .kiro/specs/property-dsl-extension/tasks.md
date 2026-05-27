@@ -79,13 +79,13 @@
   - `cargo test -p pasta_dsl property_scope` が全件グリーンであること
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 6.1, 6.2_
 
-- [ ] 7.2 既存パーサーテスト回帰確認
+- [x] 7.2 既存パーサーテスト回帰確認
   - `cargo test -p pasta_dsl` を実行し、既存テストがすべてグリーンであること
   - `＄var`・`＄＊var`・`＄＝expr`・`＄０`〜`＄９` の各テストが pass すること
   - _Requirements: 5.1, 5.2, 5.3, 5.4_
 
 - [ ] 8. トランスパイラテスト
-- [ ] 8.1 プロパティコード生成テスト新規作成
+- [x] 8.1 プロパティコード生成テスト新規作成
   - `crates/pasta_lua/tests/property_scope_codegen_test.rs` を作成する
   - SET（リテラル・変数・単語・式）→ `act:set_property(...)` の Lua 出力を検証する
   - GET代入（ローカル・グローバル）→ `var.name = act:get_property(...)` / `save.name = ...` の出力を検証する
