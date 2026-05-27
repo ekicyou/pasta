@@ -71,7 +71,7 @@
   - _Depends: 1_
 
 - [ ] 7. パーサーテスト
-- [ ] 7.1 プロパティ構文パーサーテスト新規作成
+- [x] 7.1 プロパティ構文パーサーテスト新規作成
   - `crates/pasta_dsl/tests/property_scope_test.rs` を作成する
   - `＄％simple`・`＄％system.name`・`＄％scope(0).validwidth.initial` が `VarScope::Property` にパースされることを検証する
   - `$%half` と `＄％full` が同一 AST 構造に解決されることを検証する
