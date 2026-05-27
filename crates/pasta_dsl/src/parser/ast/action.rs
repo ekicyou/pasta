@@ -264,6 +264,8 @@ pub enum VarScope {
     Global,
     /// Scene argument reference ($0, $1, ...)
     Args(u8),
+    /// Property variable ($%prop)
+    Property,
 }
 
 /// Function scope.

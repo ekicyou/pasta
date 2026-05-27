@@ -1,6 +1,6 @@
 # Implementation Plan
 
-- [ ] 1. Foundation: VarScope::Property enum 拡張
+- [x] 1. Foundation: VarScope::Property enum 拡張
   - `VarScope` enum に `Property` バリアントを追加する（`crates/pasta_dsl/src/parser/ast/action.rs`）
   - 既存の `Copy + PartialEq + Eq + Debug + Clone` derive を維持する
   - 追加後にコンパイルすると element_gen.rs（4箇所）と visitors.rs（2箇所）で match 網羅性エラーが発生すること（後続タスクで解消）
