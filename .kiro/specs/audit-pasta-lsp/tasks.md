@@ -45,7 +45,7 @@
   - _Requirements: 4.3, 4.4_
   - _Boundary: error.rs_
 
-- [ ] 4.2 (P) 未使用インポート・アイテムの除去
+- [x] 4.2 (P) 未使用インポート・アイテムの除去
   - `cargo clippy -p pasta_lsp` で未使用の `use` 文・アイテムを検出
   - 検出された警告を修正
   - `cargo test -p pasta_lsp` で全テストパスを確認
