@@ -17,7 +17,7 @@ pub enum SceneTableError {
     SceneNotFound { scene: String },
 
     /// No matching scene with filters.
-    #[error("No matching scene for '{scene}' with filters {filters:?}")]
+    #[error("No matching scene: '{scene}' with filters {filters:?}")]
     NoMatchingScene {
         scene: String,
         filters: HashMap<String, String>,
@@ -40,7 +40,7 @@ pub enum SceneTableError {
     DuplicateScenePath { fn_name: String },
 
     /// No more scenes available.
-    #[error("No more scenes for '{search_key}' with filters {filters:?}")]
+    #[error("No more scenes: '{search_key}' with filters {filters:?}")]
     NoMoreScenes {
         search_key: String,
         filters: HashMap<String, String>,

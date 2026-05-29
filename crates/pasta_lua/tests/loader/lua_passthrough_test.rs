@@ -462,8 +462,8 @@ fn test_partial_transpile_error_on_broken_pasta() {
     };
     let msg = format!("{}", err);
     assert!(
-        msg.contains("トランスパイル部分失敗"),
-        "Error should mention partial transpile failure: {}",
+        msg.contains("Partial transpilation failure"),
+        "Error should mention partial transpilation failure: {}",
         msg
     );
     assert!(
@@ -495,8 +495,8 @@ fn test_partial_transpile_error_display_includes_paths() {
     );
 
     let msg = format!("{}", err);
-    assert!(msg.contains("3件成功"), "Should show success count: {}", msg);
-    assert!(msg.contains("2件失敗"), "Should show failure count: {}", msg);
+    assert!(msg.contains("3 succeeded"), "Should show success count: {}", msg);
+    assert!(msg.contains("2 failed"), "Should show failure count: {}", msg);
     assert!(
         msg.contains("dic/talk.pasta"),
         "Should contain first failure path: {}",

@@ -13,7 +13,7 @@ pub type ParseResult<T> = std::result::Result<T, ParseError>;
 #[derive(Error, Debug, Clone)]
 pub enum ParseError {
     /// Syntax error at a specific location.
-    #[error("Parse error at {file}:{line}:{column}: {message}")]
+    #[error("Parse error: {file}:{line}:{column}: {message}")]
     SyntaxError {
         file: String,
         line: usize,
@@ -30,7 +30,7 @@ pub enum ParseError {
     IoError(String),
 
     /// Multiple parse errors accumulated.
-    #[error("Multiple parse errors ({} errors)", .errors.len())]
+    #[error("Multiple parse errors: {} errors", .errors.len())]
     MultipleErrors { errors: Vec<ParseErrorInfo> },
 }
 

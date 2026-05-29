@@ -7,16 +7,16 @@ pub type MyResult<T> = Result<T, MyError>;
 
 #[derive(Clone, Eq, PartialEq, Debug, Error)]
 pub enum MyError {
-    #[error("load error: {0}")]
+    #[error("Load error: {0}")]
     Load(String),
 
-    #[error("not initialized error")]
+    #[error("Not initialized error")]
     NotInitialized,
 
     #[error("Poison error")]
     Poison,
 
-    #[error("Shiori request parse error for '{0}'")]
+    #[error("Shiori request parse error: '{0}'")]
     ParseRequest(Box<parsers::req::ParseError>),
 
     #[error("ANSI encoding error")]
@@ -24,10 +24,10 @@ pub enum MyError {
     #[error("UTF8 encoding error")]
     EncodeUtf8(#[from] Utf8Error),
 
-    #[error("script error: {}", message)]
+    #[error("Script error: {message}")]
     Script { message: String },
 
-    #[error("Invalid X-Pasta-Time header value '{value}': {reason}")]
+    #[error("Invalid X-Pasta-Time header value: '{value}', reason: {reason}")]
     InvalidPastaTime { value: String, reason: String },
 }
 
@@ -109,7 +109,7 @@ mod tests {
         };
         assert_eq!(
             err.to_string(),
-            "Invalid X-Pasta-Time header value 'bad-value': parse failed"
+            "Invalid X-Pasta-Time header value: 'bad-value', reason: parse failed"
         );
     }
 
@@ -124,7 +124,7 @@ mod tests {
             response,
             "SHIORI/3.0 400 Bad Request\r\n\
              Charset: UTF-8\r\n\
-             X-ERROR-REASON: Invalid X-Pasta-Time header value 'bad-value': parse failed\r\n\
+             X-ERROR-REASON: Invalid X-Pasta-Time header value: 'bad-value', reason: parse failed\r\n\
              \r\n"
         );
     }
@@ -147,7 +147,7 @@ mod tests {
             response,
             "SHIORI/3.0 500 Internal Server Error\r\n\
              Charset: UTF-8\r\n\
-             X-ERROR-REASON: not initialized error\r\n\
+             X-ERROR-REASON: Not initialized error\r\n\
              \r\n"
         );
     }

@@ -14,24 +14,24 @@ pub enum TranspileError {
     IoError(#[from] std::io::Error),
 
     /// Invalid AST structure.
-    #[error("Invalid AST structure at {span}: {message}")]
+    #[error("Invalid AST structure: {span}: {message}")]
     InvalidAst { span: SpanDisplay, message: String },
 
     /// Undefined scene reference.
-    #[error("Undefined scene '{name}' at {span}")]
+    #[error("Undefined scene: '{name}' at {span}")]
     UndefinedScene { name: String, span: SpanDisplay },
 
     /// Undefined word reference.
-    #[error("Undefined word '{name}' at {span}")]
+    #[error("Undefined word: '{name}' at {span}")]
     UndefinedWord { name: String, span: SpanDisplay },
 
     /// Continuation action without actor.
-    #[error("Continuation action without actor at {span}")]
+    #[error("Continuation action without actor: {span}")]
     InvalidContinuation { span: SpanDisplay },
 
     /// String literal cannot be converted.
     #[error(
-        "String literal cannot be converted at {span}: dangerous pattern detected in all formats"
+        "String literal cannot be converted: {span}: dangerous pattern detected in all formats"
     )]
     StringLiteralError { text: String, span: SpanDisplay },
 

@@ -20,19 +20,19 @@ use crate::TranspileError;
 #[derive(Debug, Error)]
 pub enum LoaderError {
     /// File IO error.
-    #[error("ファイル '{0}' の読み込みに失敗しました: {1}")]
+    #[error("Failed to read file: '{0}': {1}")]
     Io(PathBuf, #[source] std::io::Error),
 
     /// Configuration file parsing error.
-    #[error("設定ファイル '{0}' の解析に失敗しました: {1}")]
+    #[error("Failed to parse configuration file: '{0}': {1}")]
     Config(PathBuf, #[source] toml::de::Error),
 
     /// Configuration file not found error.
-    #[error("設定ファイル '{0}' が見つかりません")]
+    #[error("Configuration file not found: '{0}'")]
     ConfigNotFound(PathBuf),
 
     /// Pasta file parsing error.
-    #[error("Pastaファイル '{file}' のパースに失敗しました: {message}")]
+    #[error("Failed to parse Pasta file: '{file}': {message}")]
     Parse {
         file: PathBuf,
         message: String,
@@ -41,27 +41,27 @@ pub enum LoaderError {
     },
 
     /// Transpilation error.
-    #[error("トランスパイルに失敗しました")]
+    #[error("Transpilation failed: {0}")]
     Transpile(#[from] TranspileError),
 
     /// Lua runtime initialization error.
-    #[error("Luaランタイムの初期化に失敗しました: {0}")]
+    #[error("Failed to initialize Lua runtime: {0}")]
     Runtime(#[from] mlua::Error),
 
     /// Directory not found error.
-    #[error("起動ディレクトリ '{0}' が存在しません")]
+    #[error("Startup directory not found: '{0}'")]
     DirectoryNotFound(PathBuf),
 
     /// Glob pattern error.
-    #[error("ファイル探索パターンが不正です: {0}")]
+    #[error("Invalid file discovery pattern: {0}")]
     GlobPattern(#[from] glob::PatternError),
 
     /// Glob traversal error.
-    #[error("ファイル探索中にエラーが発生しました: {0}")]
+    #[error("Error during file discovery: {0}")]
     GlobTraversal(#[from] glob::GlobError),
 
     /// Cache directory operation error.
-    #[error("キャッシュディレクトリの操作に失敗しました: {path}")]
+    #[error("Failed to prepare cache directory: {path}")]
     CacheDirectoryError {
         path: PathBuf,
         #[source]
@@ -69,7 +69,7 @@ pub enum LoaderError {
     },
 
     /// File metadata retrieval error.
-    #[error("ファイルメタデータの取得に失敗しました: {path}")]
+    #[error("Failed to get file metadata: {path}")]
     MetadataError {
         path: PathBuf,
         #[source]
@@ -77,7 +77,7 @@ pub enum LoaderError {
     },
 
     /// Cache file write error.
-    #[error("キャッシュファイルの書き込みに失敗しました: {path}")]
+    #[error("Failed to write cache file: {path}")]
     CacheWriteError {
         path: PathBuf,
         #[source]
@@ -85,11 +85,11 @@ pub enum LoaderError {
     },
 
     /// Invalid file name error (e.g., init.lua, init.pasta).
-    #[error("無効なファイル名です: '{0}'")]
+    #[error("Invalid file name: '{0}'")]
     InvalidFileName(PathBuf),
 
     /// scene_dic.lua generation error.
-    #[error("scene_dic.lua の生成に失敗しました: {reason}")]
+    #[error("Failed to generate scene_dic.lua: {reason}")]
     SceneDicGenerationError {
         reason: String,
         #[source]
@@ -98,7 +98,7 @@ pub enum LoaderError {
 
     /// Partial transpilation failure.
     #[error(
-        "トランスパイル部分失敗: {succeeded}件成功, {failed}件失敗 [{}]",
+        "Partial transpilation failure: {succeeded} succeeded, {failed} failed [{}]",
         format_failure_paths(failures)
     )]
     PartialTranspileError {
@@ -232,7 +232,7 @@ mod tests {
             io::Error::new(io::ErrorKind::NotFound, "file not found"),
         );
         let msg = format!("{}", err);
-        assert!(msg.contains("ファイル"));
+        assert!(msg.contains("Failed to read file"));
         assert!(msg.contains("/path/to/file.pasta"));
     }
 
@@ -240,7 +240,7 @@ mod tests {
     fn test_directory_not_found_display() {
         let err = LoaderError::directory_not_found("/ghost/master");
         let msg = format!("{}", err);
-        assert!(msg.contains("起動ディレクトリ"));
+        assert!(msg.contains("Startup directory not found"));
         assert!(msg.contains("/ghost/master"));
     }
 
@@ -248,7 +248,7 @@ mod tests {
     fn test_parse_error_display() {
         let err = LoaderError::parse("/path/to/test.pasta", "unexpected token");
         let msg = format!("{}", err);
-        assert!(msg.contains("Pastaファイル"));
+        assert!(msg.contains("Failed to parse Pasta file"));
         assert!(msg.contains("/path/to/test.pasta"));
         assert!(msg.contains("unexpected token"));
     }

@@ -15,13 +15,13 @@ use thiserror::Error;
 /// ゴースト生成時のエラー
 #[derive(Debug, Error)]
 pub enum GhostError {
-    #[error("画像生成エラー: {0}")]
+    #[error("Image generation error: {0}")]
     ImageError(#[from] image::ImageError),
 
-    #[error("IOエラー: {0}")]
+    #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
 
-    #[error("設定エラー: {0}")]
+    #[error("Configuration error: {0}")]
     ConfigError(String),
 }
 

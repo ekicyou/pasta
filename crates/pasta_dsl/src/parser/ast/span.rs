@@ -8,17 +8,17 @@
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum SpanError {
     /// Byte offset is out of bounds for the source text.
-    #[error("byte offset out of bounds: {start}..{end} (source length: {source_len})")]
+    #[error("Byte offset out of bounds: {start}..{end} (source length: {source_len})")]
     OutOfBounds {
         start: usize,
         end: usize,
         source_len: usize,
     },
     /// Byte offset does not fall on a valid UTF-8 character boundary.
-    #[error("invalid UTF-8 boundary at byte {byte}")]
+    #[error("Invalid UTF-8 boundary: byte {byte}")]
     InvalidUtf8Boundary { byte: usize },
     /// Span is invalid (default/uninitialized).
-    #[error("invalid span (uninitialized or default)")]
+    #[error("Invalid span: uninitialized or default")]
     InvalidSpan,
 }
 
