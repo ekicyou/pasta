@@ -36,6 +36,7 @@ local specs = {
     "mocks_test",                        -- lua_test.mocks install/reset/custom stub テスト
     "callback_module_test",              -- CALLBACK.try_route / sweep テスト (shiori-async-talk)
     "get_property_test",                 -- get_property バリデーション・タグ発行テスト (shiori-async-talk)
+    "store_last_global_scene_test",      -- STORE.last_global_scene フィールドテスト (choice-definition-dsl)
     -- 将来のテストスイートをここに追加
     -- "code_generator_test",
     -- "context_test",
