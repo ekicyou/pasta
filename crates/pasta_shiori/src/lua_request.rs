@@ -31,7 +31,6 @@ pub fn lua_date_from(lua: &Lua, dt: OffsetDateTime) -> MyResult<Table> {
 }
 
 /// 現在時刻でdateテーブルを作成します。
-#[allow(dead_code)]
 pub fn lua_date(lua: &Lua) -> MyResult<Table> {
     let now = OffsetDateTime::now_local()?;
     lua_date_from(lua, now)
@@ -66,7 +65,7 @@ pub fn parse_request(lua: &Lua, text: &str) -> MyResult<Table> {
             Err(e) => {
                 tracing::error!(value = %value, error = %e, "Invalid X-Pasta-Time header");
                 return Err(MyError::InvalidPastaTime {
-                    value: value.into(),
+                    value,
                     reason: e.to_string(),
                 });
             }
@@ -90,7 +89,11 @@ fn parse1(table: &Table, mut it: FlatPairs<'_, Rule>) -> MyResult<()> {
         Rule::shiori2_id => table.set("id", pair.as_str())?,
         Rule::shiori2_ver => {
             let version = {
-                let nums: i32 = pair.as_str().parse().unwrap();
+                let nums: i32 = pair.as_str().parse().map_err(|_| {
+                    MyError::Script {
+                        message: format!("Invalid SHIORI2 version number: '{}'", pair.as_str()),
+                    }
+                })?;
                 if nums < 0 {
                     20
                 } else if nums > 9 {
@@ -107,7 +110,9 @@ fn parse1(table: &Table, mut it: FlatPairs<'_, Rule>) -> MyResult<()> {
 }
 
 fn parse_key_value(table: &Table, it: &mut FlatPairs<'_, Rule>) -> MyResult<()> {
-    let pair = it.next().unwrap();
+    let pair = it.next().ok_or_else(|| MyError::Script {
+        message: "Expected key in SHIORI request key-value pair".into(),
+    })?;
     let rule = pair.as_rule();
     let key = pair.as_str();
     let reference: Table = table.get("reference")?;
@@ -115,13 +120,24 @@ fn parse_key_value(table: &Table, it: &mut FlatPairs<'_, Rule>) -> MyResult<()> 
 
     let value = match rule {
         Rule::key_ref => {
-            let nums: i32 = it.next().unwrap().as_str().parse().unwrap();
-            let value = it.next().unwrap().as_str();
+            let num_pair = it.next().ok_or_else(|| MyError::Script {
+                message: format!("Expected reference number after key '{}'", key),
+            })?;
+            let nums: i32 = num_pair.as_str().parse().map_err(|_| MyError::Script {
+                message: format!("Invalid reference number: '{}'", num_pair.as_str()),
+            })?;
+            let val_pair = it.next().ok_or_else(|| MyError::Script {
+                message: format!("Expected value after reference number for key '{}'", key),
+            })?;
+            let value = val_pair.as_str();
             reference.set(nums, value)?;
             value
         }
         _ => {
-            let value = it.next().unwrap().as_str();
+            let val_pair = it.next().ok_or_else(|| MyError::Script {
+                message: format!("Expected value for key '{}'", key),
+            })?;
+            let value = val_pair.as_str();
             match rule {
                 Rule::key_charset => table.set("charset", value)?,
                 Rule::key_id => table.set("id", value)?,
@@ -130,7 +146,11 @@ fn parse_key_value(table: &Table, it: &mut FlatPairs<'_, Rule>) -> MyResult<()> 
                 Rule::key_security_level => table.set("security_level", value)?,
                 Rule::key_sender => table.set("sender", value)?,
                 Rule::key_other => (),
-                _ => panic!(),
+                _ => {
+                    return Err(MyError::Script {
+                        message: format!("Unexpected rule {:?} in key-value pair", rule),
+                    });
+                }
             };
             value
         }

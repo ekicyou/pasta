@@ -17,7 +17,6 @@
 //! UTF-8 used as 8-bit codepage for non-Windows system.
 //!
 //! original: https://github.com/bozaro/local-encoding-rs/blob/master/src/lib.rs
-#![allow(dead_code)]
 
 use super::windows_api;
 use std::io::Result;
@@ -29,14 +28,17 @@ pub trait Encoder {
     fn to_string(&self, data: &[u8]) -> Result<String>;
 
     /// Convert from string to bytes.
+    #[cfg(test)]
     fn to_bytes(&self, data: &str) -> Result<Vec<u8>>;
 }
 
 /// Text convertation encoding.
+#[allow(clippy::upper_case_acronyms)]
 pub enum Encoding {
     /// Use CP_ACP codepage on Windows and UTF-8 on other systems.
     ANSI,
     /// Use CP_OEM codepage on Windows and UTF-8 on other systems.
+    #[cfg(test)]
     OEM,
 }
 
@@ -48,6 +50,7 @@ impl CodePage for Encoding {
     fn codepage(&self) -> u32 {
         match *self {
             Encoding::ANSI => CP_ACP,
+            #[cfg(test)]
             Encoding::OEM => CP_OEMCP,
         }
     }
@@ -59,6 +62,7 @@ impl Encoder for Encoding {
         windows_api::EncoderCodePage(self.codepage()).to_string(data)
     }
     /// Convert from bytes to string.
+    #[cfg(test)]
     fn to_bytes(&self, data: &str) -> Result<Vec<u8>> {
         windows_api::EncoderCodePage(self.codepage()).to_bytes(data)
     }

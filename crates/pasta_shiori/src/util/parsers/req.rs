@@ -1,122 +1,116 @@
-use crate::error::*;
-use pest;
-use pest::Parser as PestParser;
-use pest::iterators::FlatPairs;
-use std::collections::HashMap;
-
 pub use super::req_parser::Rule;
 pub use super::req_parser::ShioriRequestParser as Parser;
 
 pub type ParseError = pest::error::Error<Rule>;
 
-/// SHIORI3リクエストの解析結果を格納します。
-#[derive(PartialEq, Eq, Debug)]
-pub struct ShioriRequest<'a> {
-    pub text: &'a str,
-    pub version: i32,
-    pub method: Rule,
-    pub id: Option<&'a str>,
-    pub sender: Option<&'a str>,
-    pub security_level: Option<&'a str>,
-    pub charset: Option<&'a str>,
-    pub status: Option<&'a str>,
-    pub base_id: Option<&'a str>,
-    pub reference: Vec<(i32, &'a str)>,
-    pub dic: HashMap<String, &'a str>,
-    pub key_values: Vec<(Rule, &'a str, &'a str)>,
-}
-
-impl<'a> ShioriRequest<'a> {
-    #[allow(dead_code)]
-    pub fn parse(text: &'a str) -> MyResult<ShioriRequest<'a>> {
-        let rc = ShioriRequest::new(text);
-        let it = Parser::parse(Rule::req, text)?.flatten();
-        rc.parse1(it)
-    }
-
-    #[allow(dead_code)]
-    fn new(text: &'a str) -> ShioriRequest<'a> {
-        ShioriRequest {
-            text,
-            version: 0,
-            method: Rule::req,
-            id: None,
-            sender: None,
-            security_level: None,
-            charset: None,
-            status: None,
-            base_id: None,
-            dic: HashMap::new(),
-            key_values: Vec::new(),
-            reference: Vec::new(),
-        }
-    }
-
-    #[allow(dead_code)]
-    fn parse1(mut self, mut it: FlatPairs<'a, Rule>) -> MyResult<ShioriRequest<'a>> {
-        let pair = match it.next() {
-            Some(a) => a,
-            None => return Ok(self),
-        };
-        let rule = pair.as_rule();
-        match rule {
-            Rule::key_value => self.parse_key_value(&mut it)?,
-            Rule::get => self.method = rule,
-            Rule::notify => self.method = rule,
-            Rule::header3 => self.version = 30,
-            Rule::shiori2_id => self.id = Some(pair.as_str()),
-            Rule::shiori2_ver => {
-                self.version = {
-                    let nums: i32 = pair.as_str().parse().unwrap();
-                    if nums < 0 {
-                        20
-                    } else if nums > 9 {
-                        29
-                    } else {
-                        nums + 20
-                    }
-                };
-            }
-            _ => (),
-        };
-        self.parse1(it)
-    }
-
-    #[allow(dead_code)]
-    fn parse_key_value(&mut self, it: &mut FlatPairs<'a, Rule>) -> MyResult<()> {
-        let pair = it.next().unwrap();
-        let rule = pair.as_rule();
-        let key = pair.as_str();
-        let value = match rule {
-            Rule::key_ref => {
-                let nums = it.next().unwrap().as_str().parse().unwrap();
-                let value = it.next().unwrap().as_str();
-                self.reference.push((nums, value));
-                value
-            }
-            _ => {
-                let value = it.next().unwrap().as_str();
-                match rule {
-                    Rule::key_charset => self.charset = Some(value),
-                    Rule::key_id => self.id = Some(value),
-                    Rule::key_base_id => self.base_id = Some(value),
-                    Rule::key_status => self.status = Some(value),
-                    Rule::key_security_level => self.security_level = Some(value),
-                    Rule::key_sender => self.sender = Some(value),
-                    Rule::key_other => (),
-                    _ => panic!(),
-                };
-                value
-            }
-        };
-        self.dic.entry(key.into()).or_insert(value);
-        Ok(())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::*;
+    use pest::iterators::FlatPairs;
+    use pest::Parser as PestParser;
+    use std::collections::HashMap;
+
+    /// SHIORI3リクエストの解析結果を格納します（テスト専用）。
+    #[derive(PartialEq, Eq, Debug)]
+    pub struct ShioriRequest<'a> {
+        pub text: &'a str,
+        pub version: i32,
+        pub method: Rule,
+        pub id: Option<&'a str>,
+        pub sender: Option<&'a str>,
+        pub security_level: Option<&'a str>,
+        pub charset: Option<&'a str>,
+        pub status: Option<&'a str>,
+        pub base_id: Option<&'a str>,
+        pub reference: Vec<(i32, &'a str)>,
+        pub dic: HashMap<String, &'a str>,
+        pub key_values: Vec<(Rule, &'a str, &'a str)>,
+    }
+
+    impl<'a> ShioriRequest<'a> {
+        pub fn parse(text: &'a str) -> MyResult<ShioriRequest<'a>> {
+            let rc = ShioriRequest::new(text);
+            let it = Parser::parse(Rule::req, text)?.flatten();
+            rc.parse1(it)
+        }
+
+        fn new(text: &'a str) -> ShioriRequest<'a> {
+            ShioriRequest {
+                text,
+                version: 0,
+                method: Rule::req,
+                id: None,
+                sender: None,
+                security_level: None,
+                charset: None,
+                status: None,
+                base_id: None,
+                dic: HashMap::new(),
+                key_values: Vec::new(),
+                reference: Vec::new(),
+            }
+        }
+
+        fn parse1(mut self, mut it: FlatPairs<'a, Rule>) -> MyResult<ShioriRequest<'a>> {
+            let pair = match it.next() {
+                Some(a) => a,
+                None => return Ok(self),
+            };
+            let rule = pair.as_rule();
+            match rule {
+                Rule::key_value => self.parse_key_value(&mut it)?,
+                Rule::get => self.method = rule,
+                Rule::notify => self.method = rule,
+                Rule::header3 => self.version = 30,
+                Rule::shiori2_id => self.id = Some(pair.as_str()),
+                Rule::shiori2_ver => {
+                    self.version = {
+                        let nums: i32 = pair.as_str().parse().unwrap();
+                        if nums < 0 {
+                            20
+                        } else if nums > 9 {
+                            29
+                        } else {
+                            nums + 20
+                        }
+                    };
+                }
+                _ => (),
+            };
+            self.parse1(it)
+        }
+
+        fn parse_key_value(&mut self, it: &mut FlatPairs<'a, Rule>) -> MyResult<()> {
+            let pair = it.next().unwrap();
+            let rule = pair.as_rule();
+            let key = pair.as_str();
+            let value = match rule {
+                Rule::key_ref => {
+                    let nums = it.next().unwrap().as_str().parse().unwrap();
+                    let value = it.next().unwrap().as_str();
+                    self.reference.push((nums, value));
+                    value
+                }
+                _ => {
+                    let value = it.next().unwrap().as_str();
+                    match rule {
+                        Rule::key_charset => self.charset = Some(value),
+                        Rule::key_id => self.id = Some(value),
+                        Rule::key_base_id => self.base_id = Some(value),
+                        Rule::key_status => self.status = Some(value),
+                        Rule::key_security_level => self.security_level = Some(value),
+                        Rule::key_sender => self.sender = Some(value),
+                        Rule::key_other => (),
+                        _ => panic!(),
+                    };
+                    value
+                }
+            };
+            self.dic.entry(key.into()).or_insert(value);
+            Ok(())
+        }
+    }
 
     #[test]
     fn req_1() {

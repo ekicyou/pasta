@@ -16,7 +16,12 @@ static SHIORI: OnceLock<RawShiori<PastaShiori>> = OnceLock::new();
 /// Initializes SHIORI at DLL load/unload time.
 ///
 /// # Safety
-/// This is called by Windows loader.
+/// This function is called by the Windows loader. The caller must ensure:
+/// - `hinst` is a valid module handle provided by the OS
+/// - `call_reason` is a valid DLL notification code
+/// - `_reserved` may be null or a valid pointer depending on `call_reason`
+///
+/// `#[unsafe(no_mangle)]` is required for the Windows loader to find this symbol.
 #[unsafe(no_mangle)]
 extern "system" fn DllMain(
     hinst: isize,
@@ -45,9 +50,20 @@ extern "system" fn DllMain(
 /// Called after DLL initialization (DllMain has already run).
 ///
 /// # Safety
-/// This function is called from external C code.
+/// This function is called from external C code (SHIORI host such as SSP).
+/// The caller must ensure:
+/// - `hdir` is a valid HGLOBAL containing the ghost directory path encoded in
+///   the system's ANSI codepage (e.g., Shift_JIS on Japanese Windows)
+/// - `len` is the exact byte length of the data in `hdir`
+/// - The HGLOBAL will be freed by the callee (ownership transfer)
+///
+/// `#[unsafe(no_mangle)]` is required for the SHIORI host to find this symbol.
 #[unsafe(no_mangle)]
 pub extern "C" fn load(hdir: HGLOBAL, len: usize) -> bool {
+    if hdir.is_null() || len == 0 {
+        warn!("load called with null HGLOBAL or zero length");
+        return false;
+    }
     // SHIORI is already initialized in DllMain
     match SHIORI.get() {
         Some(raw) => raw.load(hdir, len),
@@ -58,7 +74,10 @@ pub extern "C" fn load(hdir: HGLOBAL, len: usize) -> bool {
 /// SHIORI unload entry point
 ///
 /// # Safety
-/// This function is called from external C code.
+/// This function is called from external C code (SHIORI host).
+/// No pointer parameters; safe to call at any time after DllMain.
+///
+/// `#[unsafe(no_mangle)]` is required for the SHIORI host to find this symbol.
 #[unsafe(no_mangle)]
 pub extern "C" fn unload() -> bool {
     match SHIORI.get() {
@@ -71,9 +90,23 @@ pub extern "C" fn unload() -> bool {
 /// Handles SHIORI requests using the initialized instance.
 ///
 /// # Safety
-/// This function is called from external C code.
+/// This function is called from external C code (SHIORI host such as SSP).
+/// The caller must ensure:
+/// - `req` is a valid HGLOBAL containing a UTF-8 encoded SHIORI request,
+///   or null (in which case this function returns null with `*len = 0`)
+/// - `len` is a valid mutable reference; on entry it holds the byte length
+///   of `req`, on return it is set to the byte length of the response
+/// - The returned HGLOBAL is owned by the caller (must be freed by caller)
+/// - The input HGLOBAL `req` will be freed by the callee (ownership transfer)
+///
+/// `#[unsafe(no_mangle)]` is required for the SHIORI host to find this symbol.
 #[unsafe(no_mangle)]
 pub extern "C" fn request(req: HGLOBAL, len: &mut usize) -> HGLOBAL {
+    if req.is_null() {
+        warn!("request called with null HGLOBAL");
+        *len = 0;
+        return ptr::null_mut();
+    }
     match SHIORI.get() {
         Some(raw) => raw.request(req, len),
         None => {
@@ -98,7 +131,6 @@ impl<T: Shiori + Default + Sized> RawShiori<T> {
             Ok(_) => (),
             Err(e) => {
                 error!("[pasta_shiori::unload] {e}");
-                ()
             }
         };
         true
@@ -152,7 +184,7 @@ impl<T: Shiori + Default + Sized> RawShiori<T> {
     fn request_impl(&self, hreq: HGLOBAL, len: usize) -> MyResult<(HGLOBAL, usize)> {
         let mut guard = self.1.lock()?;
         match *guard {
-            None => return Err(MyError::NotInitialized),
+            None => Err(MyError::NotInitialized),
             Some(ref mut shiori) => {
                 let hreq = ShioriString::capture(hreq, len);
                 let req = hreq.to_utf8_str()?;

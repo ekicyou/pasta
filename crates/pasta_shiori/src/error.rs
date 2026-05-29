@@ -7,10 +7,6 @@ pub type MyResult<T> = Result<T, MyError>;
 
 #[derive(Clone, Eq, PartialEq, Debug, Error)]
 pub enum MyError {
-    #[error("others error")]
-    #[allow(dead_code)]
-    Others,
-
     #[error("load error: {0}")]
     Load(String),
 
@@ -26,7 +22,7 @@ pub enum MyError {
     #[error("ANSI encoding error")]
     EncodeAnsi,
     #[error("UTF8 encoding error")]
-    EncodeUtf8(Utf8Error),
+    EncodeUtf8(#[from] Utf8Error),
 
     #[error("script error: {}", message)]
     Script { message: String },
@@ -44,11 +40,6 @@ impl From<parsers::req::ParseError> for MyError {
 impl<G> From<PoisonError<G>> for MyError {
     fn from(_error: PoisonError<G>) -> MyError {
         MyError::Poison
-    }
-}
-impl From<Utf8Error> for MyError {
-    fn from(error: Utf8Error) -> MyError {
-        MyError::EncodeUtf8(error)
     }
 }
 
@@ -75,11 +66,6 @@ impl From<time::error::IndeterminateOffset> for MyError {
 }
 
 impl MyError {
-    #[allow(dead_code)]
-    pub fn script_error(message: String) -> MyError {
-        MyError::Script { message }
-    }
-
     /// Generate SHIORI 3.0 error response
     ///
     /// Format:
@@ -155,13 +141,13 @@ mod tests {
 
     #[test]
     fn existing_to_shiori_response_unchanged() {
-        let err = MyError::Others;
+        let err = MyError::NotInitialized;
         let response = err.to_shiori_response();
         assert_eq!(
             response,
             "SHIORI/3.0 500 Internal Server Error\r\n\
              Charset: UTF-8\r\n\
-             X-ERROR-REASON: others error\r\n\
+             X-ERROR-REASON: not initialized error\r\n\
              \r\n"
         );
     }

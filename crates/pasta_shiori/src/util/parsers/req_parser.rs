@@ -3,6 +3,8 @@ const _GRAMMAR: &str = include_str!("req_parser.pest");
 
 use pest_derive::*;
 
+// pest_derive generates Rule variants for all grammar rules.
+// Some variants are used only internally by the parser, not directly referenced in code.
 #[allow(dead_code)]
 #[derive(Parser)]
 #[grammar = "util/parsers/req_parser.pest"]

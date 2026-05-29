@@ -1,39 +1,27 @@
 //! 8-bit string converters for Windows systems.
 //! original: https://github.com/bozaro/local-encoding-rs/blob/master/src/windows.rs
 
-#![allow(dead_code)]
-
 use super::enc::Encoder;
+#[cfg(test)]
 use std::ffi::OsStr;
 use std::io::{Error, ErrorKind, Result};
+#[cfg(test)]
 use std::os::windows::ffi::OsStrExt;
 use std::ptr;
 use windows_sys::Win32::Globalization::*;
 
-/// Always use precomposed characters, that is, characters having a single character value for
-/// a base or nonspacing character combination.
-pub const MB_PRECOMPOSED: u32 = 0x0000_0001;
-/// Always use decomposed characters, that is, characters in which a base character and one or more
-/// nonspacing characters each have distinct code point values.
-pub const MB_COMPOSITE: u32 = 0x0000_0002;
-/// Use glyph characters instead of control characters.
-pub const MB_USEGLYPHCHARS: u32 = 0x0000_0004;
 /// Fail if an invalid input character is encountered.
 pub const MB_ERR_INVALID_CHARS: u32 = 0x0000_0008;
 /// Convert composite characters, consisting of a base character and a nonspacing character,
 /// each with different character values.
+#[cfg(test)]
 pub const WC_COMPOSITECHECK: u32 = 0x0000_0200;
-/// Discard nonspacing characters during conversion.
-pub const WC_DISCARDNS: u32 = 0x0000_0010;
-/// Default. Generate separate characters during conversion.
-pub const WC_SEPCHARS: u32 = 0x0000_0020;
 /// Replace exceptions with the default character during conversion.
+#[cfg(test)]
 pub const WC_DEFAULTCHAR: u32 = 0x0000_0040;
 /// Fail if an invalid input character is encountered.
+#[cfg(test)]
 pub const WC_ERR_INVALID_CHARS: u32 = 0x0000_0080;
-/// Translate any Unicode characters that do not translate directly to multibyte equivalents to
-/// the default character specified by lpDefaultChar.
-pub const WC_NO_BEST_FIT_CHARS: u32 = 0x0000_0400;
 
 /// Encoding for use WinAPI calls: MultiByteToWideChar and WideCharToMultiByte.
 pub struct EncoderCodePage(pub u32);
@@ -45,6 +33,7 @@ impl Encoder for EncoderCodePage {
     }
 
     /// Convert from string to bytes.
+    #[cfg(test)]
     fn to_bytes(&self, data: &str) -> Result<Vec<u8>> {
         string_to_multibyte(self.0, data, None)
     }
@@ -60,6 +49,7 @@ impl Encoder for EncoderCodePage {
 ///   in the specified code page.
 ///
 /// Returns `Err` if an invalid input character is encountered and `default_char` is `None`.
+#[cfg(test)]
 pub fn string_to_multibyte(codepage: u32, data: &str, default_char: Option<u8>) -> Result<Vec<u8>> {
     let wstr: Vec<u16> = OsStr::new(data).encode_wide().collect();
     wide_char_to_multi_byte(
@@ -90,8 +80,13 @@ pub fn multi_byte_to_wide_char(codepage: u32, flags: u32, multi_byte_str: &[u8])
     if multi_byte_str.is_empty() {
         return Ok(String::new());
     }
+    // SAFETY: MultiByteToWideChar is called with valid inputs:
+    // - codepage and flags are caller-provided API parameters
+    // - multi_byte_str.as_ptr() is valid for multi_byte_str.len() bytes (Rust slice guarantee)
+    // - Empty input is handled above before entering the unsafe block
+    // First call with null output gets required buffer length;
+    // second call fills the pre-allocated Vec.
     unsafe {
-        // Get length of UTF-16 string
         let len = MultiByteToWideChar(
             codepage,
             flags,
@@ -102,7 +97,8 @@ pub fn multi_byte_to_wide_char(codepage: u32, flags: u32, multi_byte_str: &[u8])
         );
         if len > 0 {
             // Convert to UTF-16
-            // SAFETY: MultiByteToWideChar will fully initialize the buffer up to `len` elements.
+            // SAFETY: set_len is safe here because MultiByteToWideChar with a non-null
+            // output buffer will fully initialize exactly `len` u16 elements.
             #[allow(clippy::uninit_vec)]
             let mut wstr: Vec<u16> = {
                 let mut v = Vec::with_capacity(len as usize);
@@ -130,6 +126,7 @@ pub fn multi_byte_to_wide_char(codepage: u32, flags: u32, multi_byte_str: &[u8])
 ///
 /// See https://msdn.microsoft.com/ru-ru/library/windows/desktop/dd374130(v=vs.85).aspx
 /// for more details.
+#[cfg(test)]
 pub fn wide_char_to_multi_byte(
     codepage: u32,
     flags: u32,
@@ -141,6 +138,12 @@ pub fn wide_char_to_multi_byte(
     if wide_char_str.is_empty() {
         return Ok((Vec::new(), false));
     }
+    // SAFETY: WideCharToMultiByte is called with valid inputs:
+    // - codepage and flags are caller-provided API parameters
+    // - wide_char_str.as_ptr() is valid for wide_char_str.len() u16 elements (Rust slice guarantee)
+    // - Empty input is handled above before entering the unsafe block
+    // First call with null output gets required buffer length;
+    // second call fills the pre-allocated Vec.
     unsafe {
         // Get length of multibyte string
         let len = WideCharToMultiByte(
@@ -156,7 +159,8 @@ pub fn wide_char_to_multi_byte(
 
         if len > 0 {
             // Convert from UTF-16 to multibyte
-            // SAFETY: WideCharToMultiByte will fully initialize the buffer up to `len` elements.
+            // SAFETY: set_len is safe here because WideCharToMultiByte with a non-null
+            // output buffer will fully initialize up to `len` bytes.
             #[allow(clippy::uninit_vec)]
             let mut astr: Vec<u8> = {
                 let mut v = Vec::with_capacity(len as usize);
