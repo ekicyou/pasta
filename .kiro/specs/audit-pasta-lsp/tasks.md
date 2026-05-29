@@ -68,7 +68,7 @@
   - _Requirements: 5.1, 5.4, 5.5_
   - _Boundary: PastaLangServer_
 
-- [ ] 5.3 (P) transport.rs の WASM 型変換簡素化
+- [x] 5.3 (P) transport.rs の WASM 型変換簡素化
   - `WasmSemanticToken`、`WasmDiagnostic` への変換を `From` トレイト実装に置き換え
   - `from_analysis()` メソッドを `From` トレイト呼び出しに簡素化
   - JSON シリアライズ出力が変更前と同一であることを確認

@@ -4,7 +4,9 @@
 //! WASM entry point exposes `wasm_analyze()` which wraps `AnalysisEngine::analyze()`
 //! and returns results as JS objects via `serde-wasm-bindgen`.
 
+use crate::analysis::AnalysisResult;
 use serde::Serialize;
+use tower_lsp::lsp_types::{Diagnostic, DiagnosticSeverity, SemanticToken};
 
 /// WASM-friendly semantic token data (mirrors tower-lsp SemanticToken fields)
 #[derive(Debug, Clone, Serialize)]
@@ -46,54 +48,58 @@ pub struct WasmAnalysisResult {
     pub diagnostics: Vec<WasmDiagnostic>,
 }
 
+impl From<&SemanticToken> for WasmSemanticToken {
+    fn from(token: &SemanticToken) -> Self {
+        Self {
+            delta_line: token.delta_line,
+            delta_start_character: token.delta_start,
+            length: token.length,
+            token_type: token.token_type,
+            token_modifiers: token.token_modifiers_bitset,
+        }
+    }
+}
+
+impl From<&Diagnostic> for WasmDiagnostic {
+    fn from(diagnostic: &Diagnostic) -> Self {
+        let severity = match diagnostic.severity {
+            Some(DiagnosticSeverity::ERROR) => 1,
+            Some(DiagnosticSeverity::WARNING) => 2,
+            Some(DiagnosticSeverity::INFORMATION) => 3,
+            Some(DiagnosticSeverity::HINT) => 4,
+            _ => 1, // Default to Error
+        };
+
+        Self {
+            range: WasmRange {
+                start: WasmPosition {
+                    line: diagnostic.range.start.line,
+                    character: diagnostic.range.start.character,
+                },
+                end: WasmPosition {
+                    line: diagnostic.range.end.line,
+                    character: diagnostic.range.end.character,
+                },
+            },
+            message: diagnostic.message.clone(),
+            severity,
+        }
+    }
+}
+
+impl From<&AnalysisResult> for WasmAnalysisResult {
+    fn from(result: &AnalysisResult) -> Self {
+        Self {
+            tokens: result.tokens.iter().map(WasmSemanticToken::from).collect(),
+            diagnostics: result.diagnostics.iter().map(WasmDiagnostic::from).collect(),
+        }
+    }
+}
+
 impl WasmAnalysisResult {
     /// Convert from AnalysisEngine result (tower-lsp types) to WASM-friendly types
-    pub fn from_analysis(result: &crate::analysis::AnalysisResult) -> Self {
-        let tokens = result
-            .tokens
-            .iter()
-            .map(|t| WasmSemanticToken {
-                delta_line: t.delta_line,
-                delta_start_character: t.delta_start,
-                length: t.length,
-                token_type: t.token_type,
-                token_modifiers: t.token_modifiers_bitset,
-            })
-            .collect();
-
-        let diagnostics = result
-            .diagnostics
-            .iter()
-            .map(|d| {
-                use tower_lsp::lsp_types::DiagnosticSeverity;
-                let severity = match d.severity {
-                    Some(DiagnosticSeverity::ERROR) => 1,
-                    Some(DiagnosticSeverity::WARNING) => 2,
-                    Some(DiagnosticSeverity::INFORMATION) => 3,
-                    Some(DiagnosticSeverity::HINT) => 4,
-                    _ => 1, // Default to Error
-                };
-                WasmDiagnostic {
-                    range: WasmRange {
-                        start: WasmPosition {
-                            line: d.range.start.line,
-                            character: d.range.start.character,
-                        },
-                        end: WasmPosition {
-                            line: d.range.end.line,
-                            character: d.range.end.character,
-                        },
-                    },
-                    message: d.message.clone(),
-                    severity,
-                }
-            })
-            .collect();
-
-        WasmAnalysisResult {
-            tokens,
-            diagnostics,
-        }
+    pub fn from_analysis(result: &AnalysisResult) -> Self {
+        Self::from(result)
     }
 }
 
@@ -125,7 +131,7 @@ pub mod wasm {
         let result = std::panic::catch_unwind(|| AnalysisEngine::analyze(source));
 
         let analysis_result = match result {
-            Ok(r) => WasmAnalysisResult::from_analysis(&r),
+            Ok(r) => WasmAnalysisResult::from(&r),
             Err(_) => WasmAnalysisResult {
                 tokens: vec![],
                 diagnostics: vec![],
@@ -278,6 +284,46 @@ mod tests {
         assert!(
             json.contains("diagnostics"),
             "JSON should contain diagnostics field"
+        );
+    }
+
+    #[test]
+    fn test_wasm_analysis_result_json_shape_stable() {
+        use tower_lsp::lsp_types::{
+            Diagnostic, DiagnosticSeverity, Position, Range, SemanticToken,
+        };
+
+        let analysis_result = AnalysisResult {
+            tokens: vec![SemanticToken {
+                delta_line: 0,
+                delta_start: 1,
+                length: 2,
+                token_type: 3,
+                token_modifiers_bitset: 4,
+            }],
+            diagnostics: vec![Diagnostic {
+                range: Range {
+                    start: Position {
+                        line: 0,
+                        character: 0,
+                    },
+                    end: Position {
+                        line: 0,
+                        character: 5,
+                    },
+                },
+                severity: Some(DiagnosticSeverity::WARNING),
+                message: "test warning".to_string(),
+                ..Default::default()
+            }],
+        };
+
+        let wasm_result = WasmAnalysisResult::from(&analysis_result);
+        let json = serde_json::to_string(&wasm_result).expect("should serialize to JSON");
+
+        assert_eq!(
+            json,
+            r#"{"tokens":[{"deltaLine":0,"deltaStartCharacter":1,"length":2,"tokenType":3,"tokenModifiers":4}],"diagnostics":[{"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":5}},"message":"test warning","severity":2}]}"#
         );
     }
 }
