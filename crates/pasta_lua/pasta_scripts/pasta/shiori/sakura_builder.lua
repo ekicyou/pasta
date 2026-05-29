@@ -9,6 +9,16 @@ local BUILDER = {}
 local SAKURA_SCRIPT = require "@pasta_sakura_script"
 local log = require "@pasta_log"
 
+--- \q[display,target] 内のデリミタ文字をエスケープ
+--- @param s string エスケープ対象の文字列
+--- @return string エスケープ済み文字列
+local function escape_choice(s)
+    s = s:gsub("\\", "\\\\")
+    s = s:gsub("%]", "\\]")
+    s = s:gsub(",", "\\,")
+    return s
+end
+
 --- spotからスポットID番号を決定
 --- @param spot any スポット値
 --- @return number スポットID番号
@@ -115,6 +125,13 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots)
                     table.insert(buffer, "\\c")
                 elseif inner_type == "raw_script" then
                     table.insert(buffer, inner.text)
+                elseif inner_type == "choice" then
+                    local d = escape_choice(inner.display)
+                    local t = escape_choice(inner.target)
+                    table.insert(buffer, "\\![*]\\q[" .. d .. "," .. t .. "]")
+                elseif inner_type == "choice_timeout" then
+                    local ms = inner.seconds and math.floor(inner.seconds * 1000) or 0
+                    table.insert(buffer, "\\![set,choicetimeout," .. ms .. "]")
                 end
                 -- yield は無視
             end

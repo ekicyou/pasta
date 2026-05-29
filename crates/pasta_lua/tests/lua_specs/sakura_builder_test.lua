@@ -910,3 +910,203 @@ describe("SAKURA_BUILDER - sakura_scriptトークン処理", function()
         expect(result:find("\\!%[open,notepad%]")):toBeTruthy()
     end)
 end)
+
+-- ============================================================================
+-- choice-definition-dsl: choice/choice_timeoutトークン処理 (Task 4.1)
+-- ============================================================================
+
+describe("SAKURA_BUILDER - choiceトークン処理", function()
+    test("choiceトークンを \\![*]\\q[display,target] に変換する", function()
+        local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
+
+        local tokens = {
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "choice", display = "こんにちは", target = "挨拶" },
+                }
+            },
+        }
+        local result = BUILDER.build(tokens, {})
+
+        expect(result:find("\\!%[%*%]\\q%[こんにちは,挨拶%]")):toBeTruthy()
+        expect(result:sub(-2)):toBe("\\e")
+    end)
+
+    test("displayテキスト内の ] をエスケープする", function()
+        local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
+
+        local tokens = {
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "choice", display = "yes]no", target = "分岐" },
+                }
+            },
+        }
+        local result = BUILDER.build(tokens, {})
+
+        expect(result:find("\\!%[%*%]\\q%[yes\\]no,分岐%]")):toBeTruthy()
+    end)
+
+    test("displayテキスト内の , をエスケープする", function()
+        local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
+
+        local tokens = {
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "choice", display = "A,B", target = "分岐" },
+                }
+            },
+        }
+        local result = BUILDER.build(tokens, {})
+
+        expect(result:find("\\!%[%*%]\\q%[A\\,B,分岐%]")):toBeTruthy()
+    end)
+
+    test("displayテキスト内の \\ をエスケープする", function()
+        local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
+
+        local tokens = {
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "choice", display = "a\\b", target = "分岐" },
+                }
+            },
+        }
+        local result = BUILDER.build(tokens, {})
+
+        expect(result:find("\\!%[%*%]\\q%[a\\\\b,分岐%]")):toBeTruthy()
+    end)
+
+    test("displayテキスト内の複合デリミタをエスケープする（], ,, \\）", function()
+        local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
+
+        local tokens = {
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "choice", display = "yes]or,no\\maybe", target = "挨拶" },
+                }
+            },
+        }
+        local result = BUILDER.build(tokens, {})
+
+        -- \ → \\, ] → \], , → \,
+        expect(result:find("\\!%[%*%]\\q%[yes\\]or\\,no\\\\maybe,挨拶%]")):toBeTruthy()
+    end)
+
+    test("targetテキスト内のデリミタもエスケープされる", function()
+        local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
+
+        local tokens = {
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "choice", display = "はい", target = "a],b\\c" },
+                }
+            },
+        }
+        local result = BUILDER.build(tokens, {})
+
+        expect(result:find("\\!%[%*%]\\q%[はい,a\\]\\,b\\\\c%]")):toBeTruthy()
+    end)
+end)
+
+describe("SAKURA_BUILDER - choice_timeoutトークン処理", function()
+    test("choice_timeoutトークンを \\![set,choicetimeout,<ms>] に変換する", function()
+        local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
+
+        local tokens = {
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "choice_timeout", seconds = 5 },
+                }
+            },
+        }
+        local result = BUILDER.build(tokens, {})
+
+        expect(result:find("\\!%[set,choicetimeout,5000%]")):toBeTruthy()
+        expect(result:sub(-2)):toBe("\\e")
+    end)
+
+    test("choice_timeout seconds=nil の場合は 0 を出力する", function()
+        local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
+
+        local tokens = {
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "choice_timeout", seconds = nil },
+                }
+            },
+        }
+        local result = BUILDER.build(tokens, {})
+
+        expect(result:find("\\!%[set,choicetimeout,0%]")):toBeTruthy()
+    end)
+
+    test("choice_timeout 小数秒をミリ秒に変換し floor する", function()
+        local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
+
+        local tokens = {
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "choice_timeout", seconds = 2.5 },
+                }
+            },
+        }
+        local result = BUILDER.build(tokens, {})
+
+        expect(result:find("\\!%[set,choicetimeout,2500%]")):toBeTruthy()
+    end)
+end)
+
+describe("SAKURA_BUILDER - choice統合シナリオ", function()
+    test("talk + choice_timeout + choice の複合トークンが正しく連結される", function()
+        local BUILDER = require("pasta.shiori.sakura_builder")
+        local actors = create_mock_actors()
+
+        local tokens = {
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk",           actor = actors.sakura, text = "選んでね" },
+                    { type = "choice_timeout", seconds = 10 },
+                    { type = "choice",         display = "はい",  target = "yes_route" },
+                    { type = "choice",         display = "いいえ", target = "no_route" },
+                }
+            },
+        }
+        local result = BUILDER.build(tokens, {})
+
+        expect(result:find("選んでね")):toBeTruthy()
+        expect(result:find("\\!%[set,choicetimeout,10000%]")):toBeTruthy()
+        expect(result:find("\\!%[%*%]\\q%[はい,yes_route%]")):toBeTruthy()
+        expect(result:find("\\!%[%*%]\\q%[いいえ,no_route%]")):toBeTruthy()
+        expect(result:sub(-2)):toBe("\\e")
+    end)
+end)
