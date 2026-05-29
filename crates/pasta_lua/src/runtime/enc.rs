@@ -143,6 +143,10 @@ mod tests {
     use mlua::StdLib;
 
     fn create_test_lua() -> Lua {
+        // SAFETY: `Lua::unsafe_new_with` is required because mlua's safe `new` does not
+        // accept custom StdLib flags. `StdLib::ALL_SAFE` excludes the debug library, so
+        // no unsafe Lua introspection is available. Default LuaOptions are used, and the
+        // handle is confined to this test thread.
         unsafe { Lua::unsafe_new_with(StdLib::ALL_SAFE, mlua::LuaOptions::default()) }
     }
 

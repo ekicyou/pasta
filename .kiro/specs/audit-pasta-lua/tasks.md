@@ -27,7 +27,7 @@
   - _Boundary: code_gen_
 
 - [ ] 3. ランタイムモジュールの監査（セキュリティ）
-- [ ] 3.1 unsafe ブロックのSAFETYコメント付与と安全性検証
+- [x] 3.1 unsafe ブロックのSAFETYコメント付与と安全性検証
   - `runtime/mod.rs:101` の `Lua::unsafe_new_with` に `// SAFETY:` コメント付与（StdLibパラメータの妥当性、メモリ安全性の前提条件を記述）
   - `runtime/enc.rs:146` の `Lua::unsafe_new_with` に `// SAFETY:` コメント付与
   - `encoding/windows.rs:112, 168` の Windows FFI呼び出しに `// SAFETY:` コメント付与（バッファサイズ検証、ヌルポインタチェック、戻り値検証の前提条件を記述）
