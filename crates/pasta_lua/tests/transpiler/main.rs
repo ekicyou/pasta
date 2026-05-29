@@ -9,6 +9,7 @@ mod common;
 mod actor_word_dictionary_test;
 mod basic_test;
 mod choice_transpile_test;
+mod choice_timeout_transpile_test;
 mod code_generator_test;
 mod comparison_test;
 mod cue_command_passthrough_test;

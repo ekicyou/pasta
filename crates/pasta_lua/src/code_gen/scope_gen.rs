@@ -280,8 +280,11 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                 LocalSceneItem::ContinueAction(continue_action) => {
                     self.generate_continue_action(continue_action, &last_actor)?;
                 }
-                LocalSceneItem::CueCommand(_) => {
-                    // キューコマンドは Lua コード生成の対象外（dola 側で処理）
+                LocalSceneItem::CueCommand(cmd) => {
+                    if cmd.command == "select" {
+                        self.generate_choice_timeout(cmd)?;
+                    }
+                    // 他のキューコマンドは Lua コード生成の対象外（dola 側で処理）
                 }
                 LocalSceneItem::Choice(choice) => {
                     self.generate_choice(choice)?;
@@ -301,6 +304,28 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         let target_lit = StringLiteralizer::literalize_with_span(&choice.target, &choice.span)?;
         let display_lit = StringLiteralizer::literalize_with_span(display, &choice.span)?;
         self.writeln(&format!("act:choice({}, {})", target_lit, display_lit))?;
+        Ok(())
+    }
+
+    /// Generate `act:choice_timeout(seconds)` or `act:choice_timeout(nil)` for `!select` cue command.
+    fn generate_choice_timeout(
+        &mut self,
+        cmd: &pasta_dsl::parser::CueCommandNode,
+    ) -> Result<(), TranspileError> {
+        use pasta_dsl::parser::CueArgToken;
+        let arg = match cmd.args.first() {
+            Some(CueArgToken::Integer(n)) => n.to_string(),
+            Some(CueArgToken::Float(f)) => {
+                // Emit as integer if the value has no fractional part
+                if f.fract() == 0.0 {
+                    (*f as i64).to_string()
+                } else {
+                    f.to_string()
+                }
+            }
+            _ => "nil".to_string(),
+        };
+        self.writeln(&format!("act:choice_timeout({})", arg))?;
         Ok(())
     }
 }
