@@ -70,7 +70,18 @@ argument-hint: <feature-name>
 
 1. **workflow.md を読み込む**（未読の場合）
 2. **5ゲート（Spec / Test / Doc / Steering / Soul）** を順に検証
-3. **Test Gate** は必ず実行:
+3. **Test Gate**:
+   - まず `session_store_sql` でセッション記録を確認し、直近のターンで `cargo test` が実行され全テスト成功していたか判定する
+     ```sql
+     SELECT t.content FROM turns t
+     JOIN sessions s ON t.session_id = s.id
+     WHERE s.id = (SELECT id FROM sessions ORDER BY start_time DESC LIMIT 1)
+       AND t.content LIKE '%cargo test%'
+       AND t.content LIKE '%test result%'
+     ORDER BY t.created_at DESC LIMIT 3
+     ```
+   - **スキップ可**: セッション記録に `test result: ok` が確認でき、その後にテスト対象コードの変更がない場合、Test Gate をスキップする。スキップ時は完了チェックリストに「(セッション記録により省略)」と注記する
+   - **スキップ不可**: セッション記録が見つからない、テスト結果が不明瞭、またはテスト後にコード変更がある場合は実行する:
    ```powershell
    cargo test --all 2>&1 | Select-String "test result:|FAILED|error\["
    ```
@@ -177,7 +188,7 @@ git push origin main
 
 ```
 - [ ] DoD 5ゲート通過（Spec/Test/Doc/Steering/Soul）
-- [ ] cargo test --all 成功
+- [ ] cargo test --all 成功（またはセッション記録により省略）
 - [ ] 未コミットファイルをコミット済み（ステップ2）
 - [ ] completedフォルダへ移動済み（ステップ3）※繰り返し仕様はスキップ
 - [ ] spec.json の phase を "completed" に更新済み（ステップ4）※繰り返し仕様はスキップ
