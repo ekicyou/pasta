@@ -25,3 +25,4 @@ Cargo.lock
 profile
 node_modules
 tmpclaude*
+target_test
