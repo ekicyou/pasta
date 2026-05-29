@@ -257,6 +257,9 @@ impl From<LuaConfig> for RuntimeConfig {
 /// let result = lua_require(&lua, "main")?;
 /// let result = lua_require(&lua, "pasta.shiori.entry")?;
 /// ```
+// SAFETY(injection): All call sites pass compile-time string literals as `module_name`
+// ("main", "pasta.shiori.entry", "pasta.scene_dic"). No external user input reaches
+// this function. Errors are propagated via `LuaResult`.
 pub fn lua_require(lua: &Lua, module_name: &str) -> LuaResult<Value> {
     let require: Function = lua.globals().get("require")?;
     require.call(module_name)

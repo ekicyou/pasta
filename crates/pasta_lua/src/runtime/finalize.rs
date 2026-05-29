@@ -43,6 +43,8 @@ pub struct WordCollectionEntry {
 /// * `Err(e)` - Collection error
 pub fn collect_scenes(lua: &Lua) -> LuaResult<Vec<(String, String)>> {
     // Get pasta.scene module
+    // SAFETY(injection): Module name is a compile-time string literal, not derived from
+    // external input. No injection vector exists. Error is propagated via `?`.
     let scene_module: Table = lua.load("return require('pasta.scene')").eval()?;
 
     // Call get_all_scenes()
@@ -86,6 +88,8 @@ pub fn collect_scenes(lua: &Lua) -> LuaResult<Vec<(String, String)>> {
 /// * `Err(e)` - Collection error
 pub fn collect_words(lua: &Lua) -> LuaResult<Vec<WordCollectionEntry>> {
     // Get pasta.word module
+    // SAFETY(injection): Module name is a compile-time string literal, not derived from
+    // external input. No injection vector exists. Error is propagated via `?`.
     let word_module: Table = lua.load("return require('pasta.word')").eval()?;
 
     // Call get_all_words()
@@ -286,6 +290,8 @@ pub fn register_finalize_scene(lua: &Lua) -> LuaResult<()> {
     let loaded: Table = package.get("loaded")?;
 
     // Get or require pasta module
+    // SAFETY(injection): Module name is a compile-time string literal ("pasta"),
+    // not derived from external input. No injection vector exists.
     let pasta_module: Table = if let Ok(module) = loaded.get::<Table>("pasta") {
         module
     } else {
