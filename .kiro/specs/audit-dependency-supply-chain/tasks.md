@@ -3,7 +3,7 @@
 ## タスク一覧
 
 - [ ] 1. 監査環境セットアップ・脆弱性チェック
-- [ ] 1.1 cargo-auditのインストールとRustSec Advisory DBに基づく全依存の脆弱性スキャンを実行する
+- [x] 1.1 cargo-auditのインストールとRustSec Advisory DBに基づく全依存の脆弱性スキャンを実行する
   - `cargo install cargo-audit` でツールを導入し、`cargo audit` をワークスペースルートで実行する
   - 検出されたadvisoryがあれば、ID・深刻度・影響範囲・推奨対処をresearch.mdに記録する
   - advisoryが0件の場合はクリーンステータスをresearch.mdに記録する

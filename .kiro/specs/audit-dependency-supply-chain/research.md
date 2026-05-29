@@ -96,3 +96,32 @@
 - [cargo-audit](https://github.com/rustsec/rustsec/tree/main/cargo-audit) — 脆弱性スキャナ
 - [cargo-deny](https://github.com/EmbarkStudios/cargo-deny) — ライセンス・ban・重複チェック
 - [SPDX License List](https://spdx.org/licenses/) — ライセンス識別子一覧
+
+## Vulnerability Scan Results
+
+### 2026-05-30 cargo-audit実行結果
+- **対応要件**: 1.1, 1.2, 1.3, 1.4, 6.1, 6.2
+- **実行日時**: 2026-05-30T08:11:33.1324607+09:00
+- **使用ツール**: `cargo-audit-audit 0.22.1`
+- **データソース**: RustSec Advisory DB (`last-updated`: `2026-05-29T20:55:26+02:00`, `last-commit`: `eaf48e749baa3d5e27d304107d8abf175fd756bb`, `advisory-count`: 1099)
+- **監査対象範囲**: ワークスペースルート `C:\home\maz\git\pasta` の `Cargo.lock` を対象に監査を実行。全7クレートの直接依存（Cargo.toml）および間接依存（Cargo.lock経由）を含む351依存を走査
+- **実行コマンド**: `cargo audit --json`
+- **終了コード**: `0`
+
+#### 脆弱性（Requirement 1）
+- **結果**: クリーン。`vulnerabilities.found = false`、既知脆弱性 advisory は **0件**
+- **記録対象**: Requirement 1.3 に基づき、脆弱性未検出のためクリーンステータスを明示
+
+#### Informational Warnings（参考）
+- **件数**: 1件
+- **ID**: `RUSTSEC-2024-0436`
+- **深刻度**: informational / unmaintained
+- **影響パッケージ**: `paste 1.0.15`
+- **影響範囲**: `pasta_sample_ghost` の間接依存チェーン（`pasta_sample_ghost` → `imageproc`/`image` → `ravif`/`nalgebra` → `paste`）
+- **内容**: `paste` クレートはメンテナンス終了としてRustSecに登録されている
+- **推奨対処**: 直ちに脆弱性対応は不要だが、`image` / `imageproc` 系の更新時に `paste` 依存の解消有無を確認し、必要に応じて upstream 側の更新または代替（例: `pastey`）を追跡する
+
+#### 総括
+- Requirement 1.1 / 1.4 を満たす形で、Cargo.lockベースの全直接・間接依存監査を実行済み
+- Requirement 1.2 は「既知脆弱性が検出された場合」に備える記録項目だが、今回は脆弱性0件のため該当なし
+- Requirement 6.1 / 6.2 を満たす形で、実行日時・ツールバージョン・監査範囲・構造化結果を本書に記録済み
