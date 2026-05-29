@@ -10,7 +10,7 @@
   - 実行完了後、脆弱性チェック結果がresearch.mdに構造化されて記録されている
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 6.1, 6.2_
 
-- [ ] 1.2 cargo-denyのインストールとdeny.toml設定ファイルを作成する
+- [x] 1.2 cargo-denyのインストールとdeny.toml設定ファイルを作成する
   - `cargo install cargo-deny` でツールを導入する
   - ワークスペースルートにdeny.tomlを作成し、ライセンス許可リスト（MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, Unicode-3.0, Zlib, BSL-1.0）を設定する
   - advisoriesセクションでvulnerability=deny, unmaintained=warn, yanked=warnを設定する
