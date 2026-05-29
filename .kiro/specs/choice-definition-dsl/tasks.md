@@ -74,7 +74,7 @@
   - _Boundary: pasta_lua/shiori_runtime_
   - _Depends: 3.2_
 
-- [ ] 4.2 (P) OnChoiceSelectEx 自動ルーティングハンドラを実装する
+- [x] 4.2 (P) OnChoiceSelectEx 自動ルーティングハンドラを実装する
   - `OnChoiceSelectEx` 受信時に選択IDでシーンを前方一致検索して自動実行するハンドラを新規ファイルで実装する
   - 選択 Reference インデックスはハンドラ内で定数化して後から変更しやすくする
   - 明示的な OnChoiceSelectEx シーンが存在する場合は自動ルーティングより優先する

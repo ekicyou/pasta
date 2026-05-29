@@ -64,6 +64,7 @@ local CALLBACK = require("pasta.shiori.event.callback")
 
 -- 1.5. デフォルトイベントハンドラをロード
 require("pasta.shiori.event.boot")
+require("pasta.shiori.event.choice_select")
 require("pasta.shiori.event.second_change")
 
 -- 2. モジュールテーブル宣言

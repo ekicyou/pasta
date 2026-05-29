@@ -491,3 +491,87 @@ fn test_nil_reference_access() {
     );
     assert!(result.unwrap().as_boolean().unwrap_or(false));
 }
+
+// ============================================================================
+// Default Event Handlers: choice_select.lua (Task 4.3)
+// ============================================================================
+
+/// Tests that default OnChoiceSelectEx handler is registered via choice_select.lua
+#[test]
+fn test_default_onchoiceselectex_handler_registered() {
+    let runtime = create_runtime_with_pasta_path();
+
+    let result = runtime.exec(
+        r#"
+        local EVENT = require "pasta.shiori.event"
+        local REG = require "pasta.shiori.event.register"
+        
+        -- OnChoiceSelectEx should be registered after loading EVENT module
+        return type(REG.OnChoiceSelectEx) == "function"
+    "#,
+    );
+
+    assert!(
+        result.is_ok(),
+        "Default OnChoiceSelectEx handler should be registered: {:?}",
+        result
+    );
+    assert!(result.unwrap().as_boolean().unwrap_or(false));
+}
+
+/// Tests that default OnChoiceSelectEx returns 204 when no matching scene exists
+#[test]
+fn test_default_onchoiceselectex_returns_204_no_match() {
+    let runtime = create_runtime_with_pasta_path();
+
+    let result = runtime.exec(
+        r#"
+        local EVENT = require "pasta.shiori.event"
+        
+        local req = {
+            id = "OnChoiceSelectEx",
+            method = "get",
+            version = 30,
+            reference = { [0] = "nonexistent_choice_id" }
+        }
+        local response = EVENT.fire(req)
+        
+        return response:find("204 No Content") ~= nil
+    "#,
+    );
+
+    assert!(
+        result.is_ok(),
+        "Default OnChoiceSelectEx should return 204 when no scene matches: {:?}",
+        result
+    );
+    assert!(result.unwrap().as_boolean().unwrap_or(false));
+}
+
+/// Tests that OnChoiceSelectEx returns 204 when reference is missing
+#[test]
+fn test_default_onchoiceselectex_returns_204_no_reference() {
+    let runtime = create_runtime_with_pasta_path();
+
+    let result = runtime.exec(
+        r#"
+        local EVENT = require "pasta.shiori.event"
+        
+        local req = {
+            id = "OnChoiceSelectEx",
+            method = "get",
+            version = 30,
+        }
+        local response = EVENT.fire(req)
+        
+        return response:find("204 No Content") ~= nil
+    "#,
+    );
+
+    assert!(
+        result.is_ok(),
+        "Default OnChoiceSelectEx should return 204 when no reference: {:?}",
+        result
+    );
+    assert!(result.unwrap().as_boolean().unwrap_or(false));
+}
