@@ -1,6 +1,6 @@
 # 実装計画
 
-- [ ] 1. 画像処理の安全性検証と冗長コード削減
+- [x] 1. 画像処理の安全性検証と冗長コード削減
 - [x] 1.1 image_generator.rsのピクセル座標境界チェック確認 (P)
   - 全ての `put_pixel` 呼び出しに `if x < WIDTH && y < HEIGHT` ガードが存在することを確認
   - `draw_filled_circle_mut` がimageproc内部で境界チェック済みであることを確認
@@ -17,7 +17,7 @@
   - _Requirements: 1.4, 3.1, 3.3_
   - _Boundary: image_generator_
 
-- [ ] 2. main.rsのRustイディオム改善とデッドコード除去
+- [x] 2. main.rsのRustイディオム改善とデッドコード除去
 - [x] 2.1 main.rsの関数シグネチャ改善とデッドコード除去 (P)
   - `walkdir(path: &PathBuf)` → `walkdir(path: &Path)` にシグネチャ変更
   - `count_files(dir: &PathBuf)` → `count_files(dir: &Path)` にシグネチャ変更
@@ -26,7 +26,7 @@
   - _Requirements: 3.1, 3.2, 5.1, 5.2, 5.3_
   - _Boundary: main.rs_
 
-- [ ] 3. lib.rsとbuild.rsの安全性検証
+- [x] 3. lib.rsとbuild.rsの安全性検証
 - [x] 3.1 lib.rsのデッドコード確認とAPI安全性検証 (P)
   - `generate_ghost` の `_config` パラメータの使用状況を確認（API互換性のため保持が妥当か判断）
   - 未使用の型定義・関数がないことを確認
@@ -43,8 +43,8 @@
   - _Requirements: 2.1, 2.2, 2.3, 2.4_
   - _Boundary: build.rs_
 
-- [ ] 4. 最終検証
-- [ ] 4.1 全テストパスと警告ゼロの最終確認
+- [x] 4. 最終検証
+- [x] 4.1 全テストパスと警告ゼロの最終確認
   - `cargo test -p pasta_sample_ghost` が全テストにパスすること
   - `cargo clippy -p pasta_sample_ghost` が警告0件であること
   - `cargo run -p pasta_sample_ghost` が正常にサーフェス画像を生成すること
