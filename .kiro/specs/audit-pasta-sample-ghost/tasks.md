@@ -34,7 +34,7 @@
   - `cargo test -p pasta_sample_ghost` で `test_default_config` がパスすること
   - _Requirements: 3.1, 4.3_
   - _Boundary: lib.rs_
-- [ ] 3.2 build.rsのファイルI/O安全性検証 (P)
+- [x] 3.2 build.rsのファイルI/O安全性検証 (P)
   - `CARGO_MANIFEST_DIR` 未設定時の `expect()` パニックメッセージが原因を明示していることを確認
   - `parent()` → `and_then` → `expect()` チェーンが適切なエラーメッセージを持つことを確認
   - 外部入力に基づくパス構築がないことを確認（パストラバーサルリスクなし）
