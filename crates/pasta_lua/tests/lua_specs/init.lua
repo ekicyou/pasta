@@ -39,6 +39,7 @@ local specs = {
     "store_last_global_scene_test",      -- STORE.last_global_scene フィールドテスト (choice-definition-dsl)
     "act_choice_test",                   -- act:choice / act:choice_timeout トークン蓄積テスト (choice-definition-dsl)
     "act_init_scene_global_record_test",  -- init_scene グローバルシーン名記録テスト (choice-definition-dsl)
+    "choice_select_test",                 -- OnChoiceSelectEx 自動ルーティングハンドラテスト (choice-definition-dsl)
     -- 将来のテストスイートをここに追加
     -- "code_generator_test",
     -- "context_test",
