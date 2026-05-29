@@ -59,7 +59,7 @@
   - _Requirements: 4.2, 4.4_
   - _Boundary: runtime/persistence_
 
-- [ ] 4.3 (P) module_registry.rs の重複パターン共通化
+- [x] 4.3 (P) module_registry.rs の重複パターン共通化
   - モジュール登録関数間の重複するボイラープレートを特定
   - 共通パターンをヘルパー関数またはマクロに抽出
   - 変更後にランタイムテストが全パスする状態

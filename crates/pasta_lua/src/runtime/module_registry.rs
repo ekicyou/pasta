@@ -8,9 +8,22 @@ use super::enc;
 use super::log;
 use super::persistence;
 use crate::loader::{LoaderContext, PastaConfig};
-use mlua::{Lua, Result as LuaResult, Table, Value};
+use mlua::{IntoLua, Lua, Result as LuaResult, Table, Value};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+
+/// Register a module into `package.loaded` under the given name.
+///
+/// This is the shared helper that eliminates the repeated
+/// `package` → `loaded` → `set` → `tracing::debug!` boilerplate
+/// found in every `register_*_module` function.
+fn set_loaded_module(lua: &Lua, name: &str, module: impl IntoLua) -> LuaResult<()> {
+    let package: Table = lua.globals().get("package")?;
+    let loaded: Table = package.get("loaded")?;
+    loaded.set(name, module)?;
+    tracing::debug!("Registered {name} module");
+    Ok(())
+}
 
 impl PastaLuaRuntime {
     /// Setup package.path for Lua module resolution.
@@ -48,12 +61,7 @@ impl PastaLuaRuntime {
         // [actor] サブテーブルの各エントリに name = キー名 を注入
         Self::inject_actor_names(lua, &config_table)?;
 
-        let package: Table = lua.globals().get("package")?;
-        let loaded: Table = package.get("loaded")?;
-        loaded.set("@pasta_config", config_table)?;
-
-        tracing::debug!("Registered @pasta_config module");
-        Ok(())
+        set_loaded_module(lua, "@pasta_config", config_table)
     }
 
     /// Inject `name` field into each actor sub-table under `config_table["actor"]`.
@@ -91,13 +99,7 @@ impl PastaLuaRuntime {
     /// Provides UTF-8 <-> ANSI conversion functions for Lua scripts.
     pub(crate) fn register_enc_module(lua: &Lua) -> LuaResult<()> {
         let enc_table = enc::register(lua)?;
-
-        let package: Table = lua.globals().get("package")?;
-        let loaded: Table = package.get("loaded")?;
-        loaded.set("@enc", enc_table)?;
-
-        tracing::debug!("Registered @enc module");
-        Ok(())
+        set_loaded_module(lua, "@enc", enc_table)
     }
 
     /// Register @pasta_persistence module for persistent data storage.
@@ -117,13 +119,7 @@ impl PastaLuaRuntime {
         let base = base_dir.as_deref().unwrap_or(Path::new("."));
 
         let persistence_table = persistence::register(lua, &persistence_config, base)?;
-
-        let package: Table = lua.globals().get("package")?;
-        let loaded: Table = package.get("loaded")?;
-        loaded.set("@pasta_persistence", persistence_table)?;
-
-        tracing::debug!("Registered @pasta_persistence module");
-        Ok(())
+        set_loaded_module(lua, "@pasta_persistence", persistence_table)
     }
 
     /// Register @pasta_sakura_script module for wait insertion.
@@ -137,13 +133,7 @@ impl PastaLuaRuntime {
         let talk_config = config.as_ref().and_then(|c| c.talk());
 
         let sakura_module = crate::sakura_script::register(lua, talk_config.as_ref())?;
-
-        let package: Table = lua.globals().get("package")?;
-        let loaded: Table = package.get("loaded")?;
-        loaded.set("@pasta_sakura_script", sakura_module)?;
-
-        tracing::debug!("Registered @pasta_sakura_script module");
-        Ok(())
+        set_loaded_module(lua, "@pasta_sakura_script", sakura_module)
     }
 
     /// Register @pasta_log module for Lua logging bridge.
@@ -152,13 +142,7 @@ impl PastaLuaRuntime {
     /// Always available, independent of RuntimeConfig.libs.
     pub(crate) fn register_log_module(lua: &Lua) -> LuaResult<()> {
         let log_table = log::register(lua)?;
-
-        let package: Table = lua.globals().get("package")?;
-        let loaded: Table = package.get("loaded")?;
-        loaded.set("@pasta_log", log_table)?;
-
-        tracing::debug!("Registered @pasta_log module");
-        Ok(())
+        set_loaded_module(lua, "@pasta_log", log_table)
     }
 
     /// Convert toml::Value to mlua::Value.
