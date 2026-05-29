@@ -102,7 +102,9 @@ impl LanguageServer for PastaLangServer {
         let version = params.text_document.version;
 
         {
-            let mut docs = self.documents.write().unwrap();
+            let Ok(mut docs) = self.documents.write() else {
+                return;
+            };
             docs.open(uri.to_string(), text.clone(), version);
         }
 
@@ -128,7 +130,9 @@ impl LanguageServer for PastaLangServer {
             .collect();
 
         let text = {
-            let mut docs = self.documents.write().unwrap();
+            let Ok(mut docs) = self.documents.write() else {
+                return;
+            };
             docs.change(uri.as_str(), &changes, version);
             docs.get(uri.as_str())
                 .map(|d| d.text.clone())
@@ -141,7 +145,9 @@ impl LanguageServer for PastaLangServer {
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
         let uri = params.text_document.uri;
         {
-            let mut docs = self.documents.write().unwrap();
+            let Ok(mut docs) = self.documents.write() else {
+                return;
+            };
             docs.close(uri.as_str());
         }
         // Clear diagnostics
@@ -155,7 +161,12 @@ impl LanguageServer for PastaLangServer {
         let uri = params.text_document.uri;
 
         let tokens = {
-            let docs = self.documents.read().unwrap();
+            let Ok(docs) = self.documents.read() else {
+                return Ok(Some(SemanticTokensResult::Tokens(SemanticTokens {
+                    result_id: None,
+                    data: vec![],
+                })));
+            };
             docs.get(uri.as_str())
                 .and_then(|d| d.analysis.as_ref())
                 .map(|a| a.tokens.clone())

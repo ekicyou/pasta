@@ -1,7 +1,7 @@
 # 実装計画
 
 - [ ] 1. JSON-RPC 入力処理の安全性強化
-- [ ] 1.1 (P) server.rs の RwLock パニックリスク解消
+- [x] 1.1 (P) server.rs の RwLock パニックリスク解消
   - `did_open` ハンドラの `self.documents.write().unwrap()` を `let Ok(mut docs) = self.documents.write() else { return; }` に置換
   - `did_change` ハンドラの `self.documents.write().unwrap()` を同様に置換
   - `did_close` ハンドラの `self.documents.write().unwrap()` を同様に置換
