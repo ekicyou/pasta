@@ -101,7 +101,7 @@
   - _Boundary: logging, utilities_
 
 - [ ] 7. Luaスクリプト群の安全性調査
-- [ ] 7.1 pasta_scripts/ の安全性検証
+- [x] 7.1 pasta_scripts/ の安全性検証
   - 全.luaファイルでグローバル変数の意図しない汚染がないことを検証（`local` 宣言の網羅性確認）
   - `os.execute`, `io.popen`, `loadstring`, `dofile` 等の危険関数の使用がないことをgrepで確認
   - スクリプト間の依存関係（`require` 呼び出し）を追跡し循環参照がないことを確認
