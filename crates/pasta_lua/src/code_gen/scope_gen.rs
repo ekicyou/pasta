@@ -67,16 +67,11 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             // Only expand Lua code blocks
             if code_block.language.as_deref() == Some("lua") {
                 self.write_blank_line()?;
-                // Write code content line by line, preserving indentation
-                for line in code_block.content.lines() {
-                    self.writeln(line)?;
-                }
+                self.generate_code_block(code_block)?;
             }
         }
 
-        self.dedent();
-        self.writeln("end")?;
-        self.write_blank_line()?;
+        self.end_block()?;
 
         Ok(())
     }
@@ -165,9 +160,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             }
         }
 
-        self.dedent();
-        self.writeln("end")?;
-        self.write_blank_line()?;
+        self.end_block()?;
 
         Ok(())
     }
@@ -230,9 +223,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         // Code blocks are NOT generated here - they are generated at global scene level
         // This ensures code blocks appear after all local scene function definitions
 
-        self.dedent();
-        self.writeln("end")?;
-        self.write_blank_line()?;
+        self.end_block()?;
 
         Ok(())
     }

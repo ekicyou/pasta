@@ -19,7 +19,7 @@
   - _Requirements: 3.1, 3.2, 3.4_
   - _Boundary: code_gen_
 
-- [ ] 2.2 (P) scope_gen.rs の重複パターン共通化
+- [x] 2.2 (P) scope_gen.rs の重複パターン共通化
   - シーン・アクターレベルのスコープ生成で重複するコード構造を特定
   - 共通化可能なパターンをヘルパーに抽出
   - 変更後に `cargo test -p pasta_lua` が全パスし、instaスナップショットが一致する状態

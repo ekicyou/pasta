@@ -422,17 +422,23 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         Ok(())
     }
 
-    /// Generate global word definition (Requirement 2.1, Task 4.2).
+    /// Shared word definition generator parameterized by prefix.
     ///
-    /// Generates: `PASTA.create_word("key"):entry("value1", "value2", ...)`
+    /// Generates: `{prefix}:entry("value1", "value2", ...)`
     ///
-    /// Called at file level, outside of any do block.
-    pub fn generate_global_word(&mut self, word: &KeyWords) -> Result<(), TranspileError> {
+    /// The `prefix` includes the full method call syntax, e.g.:
+    /// - `PASTA.create_word("key")` for global words (dot syntax)
+    /// - `SCENE:create_word("key")` for scene-local words (colon syntax)
+    fn generate_word_definition(
+        &mut self,
+        word: &KeyWords,
+        receiver: &str,
+        separator: &str,
+    ) -> Result<(), TranspileError> {
         if word.words.is_empty() {
             return Ok(());
         }
 
-        // Generate entry values as string literals
         let values: Vec<String> = word
             .words
             .iter()
@@ -442,7 +448,9 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
 
         for name in &word.names {
             self.writeln(&format!(
-                "PASTA.create_word({}):entry({})",
+                "{}{}create_word({}):entry({})",
+                receiver,
+                separator,
                 StringLiteralizer::literalize(name)?,
                 entry
             ))?;
@@ -451,32 +459,21 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         Ok(())
     }
 
+    /// Generate global word definition (Requirement 2.1, Task 4.2).
+    ///
+    /// Generates: `PASTA.create_word("key"):entry("value1", "value2", ...)`
+    ///
+    /// Called at file level, outside of any do block.
+    pub fn generate_global_word(&mut self, word: &KeyWords) -> Result<(), TranspileError> {
+        self.generate_word_definition(word, "PASTA", ".")
+    }
+
     /// Generate local word definition for a scene (Requirement 2.2, Task 4.3).
     ///
     /// Generates: `SCENE:create_word("key"):entry("value1", "value2", ...)`
     ///
     /// Called inside a local scene function, after init_scene.
     pub fn generate_local_word(&mut self, word: &KeyWords) -> Result<(), TranspileError> {
-        if word.words.is_empty() {
-            return Ok(());
-        }
-
-        // Generate entry values as string literals
-        let values: Vec<String> = word
-            .words
-            .iter()
-            .map(|w| StringLiteralizer::literalize(w))
-            .collect::<Result<Vec<_>, _>>()?;
-        let entry = values.join(", ");
-
-        for name in &word.names {
-            self.writeln(&format!(
-                "SCENE:create_word({}):entry({})",
-                StringLiteralizer::literalize(name)?,
-                entry
-            ))?;
-        }
-
-        Ok(())
+        self.generate_word_definition(word, "SCENE", ":")
     }
 }
