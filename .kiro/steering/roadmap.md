@@ -35,3 +35,21 @@ SSPのプロパティシステムへのアクセスをpastaゴーストから可
 
 ## Phase 2: DSL統合
 - [x] property-dsl-extension -- `＄％` スコープ修飾子によるプロパティアクセスDSL構文（＄％prop.path＝value / ＄var＝＄％prop.path）。既存Lua APIにトランスパイル。Dependencies: property-write-helpers, shiori-async-talk
+
+## Phase 3: 脆弱性監査・コード簡素化
+
+全クレートを対象に、同一仕様（外部振る舞い不変）のまま、脆弱性回避とコード量削減を実施する。
+調査対象: メモリ安全性、入力検証、FFI境界、依存クレートサプライチェーン、デッドコード除去、冗長表現削減、アルゴリズム改善。
+
+### Wave 1（全並行・クレート内完結）
+- [ ] audit-pasta-core -- レジストリ層の脆弱性監査・コード簡素化（~600行）。Dependencies: none
+- [ ] audit-pasta-dsl -- DSLパーサー層の脆弱性監査・コード簡素化（~2500行）。Dependencies: none
+- [ ] audit-pasta-lua -- Luaトランスパイラ/ランタイムの脆弱性監査・コード簡素化（~8000行、最大規模）。Dependencies: none
+- [ ] audit-pasta-shiori -- SHIORI/FFI層の脆弱性監査・unsafe安全性検証（~1500行）。Dependencies: none
+- [ ] audit-pasta-check -- CLIツールの脆弱性監査・コード簡素化（~500行）。Dependencies: none
+- [ ] audit-pasta-lsp -- LSPラッパーの脆弱性監査・コード簡素化（~400行）。Dependencies: none
+- [ ] audit-pasta-sample-ghost -- サンプルゴーストの脆弱性監査・コード簡素化（~300行）。Dependencies: none
+
+### Wave 2（横断的・Wave 1完了後）
+- [ ] audit-dependency-supply-chain -- 外部依存クレートのセキュリティ・ライセンス・バージョン監査。Dependencies: Wave 1全spec
+- [ ] audit-workspace-patterns -- クレート横断エラーハンドリング統一・共通パターン抽出。Dependencies: Wave 1全spec

@@ -1,0 +1,53 @@
+# 実装計画
+
+- [ ] 1. 画像処理の安全性検証と冗長コード削減
+- [ ] 1.1 image_generator.rsのピクセル座標境界チェック確認 (P)
+  - 全ての `put_pixel` 呼び出しに `if x < WIDTH && y < HEIGHT` ガードが存在することを確認
+  - `draw_filled_circle_mut` がimageproc内部で境界チェック済みであることを確認
+  - 定数（WIDTH=128, HEIGHT=256, HEAD_RADIUS=42等）による計算が整数オーバーフローを起こさないことを確認
+  - `i32` → `u32` キャストが負値の場合に境界チェックで保護されていることを確認
+  - 確認結果: 全ピクセル操作が安全であり、パニックリスクがないことがコードレビューで検証済み
+  - _Requirements: 1.1, 1.2, 1.3_
+  - _Boundary: image_generator_
+- [ ] 1.2 image_generator.rsの冗長描画コード削減 (P)
+  - 描画ヘルパー関数群の冗長パターンを特定し、安全に簡素化可能な箇所を改善
+  - 各描画関数の境界チェックパターンが統一されていることを確認
+  - 変更後に `cargo test -p pasta_sample_ghost` が全パスすること
+  - 生成画像の幾何学的性質（sakura=△上広がり、kero=▽下広がり）が不変であること
+  - _Requirements: 1.4, 3.1, 3.3_
+  - _Boundary: image_generator_
+
+- [ ] 2. main.rsのRustイディオム改善とデッドコード除去
+- [ ] 2.1 main.rsの関数シグネチャ改善とデッドコード除去 (P)
+  - `walkdir(path: &PathBuf)` → `walkdir(path: &Path)` にシグネチャ変更
+  - `count_files(dir: &PathBuf)` → `count_files(dir: &Path)` にシグネチャ変更
+  - 未使用のimport文がないことを `cargo clippy` で確認
+  - `cargo clippy -p pasta_sample_ghost` が警告0件であること
+  - _Requirements: 3.1, 3.2, 5.1, 5.2, 5.3_
+  - _Boundary: main.rs_
+
+- [ ] 3. lib.rsとbuild.rsの安全性検証
+- [ ] 3.1 lib.rsのデッドコード確認とAPI安全性検証 (P)
+  - `generate_ghost` の `_config` パラメータの使用状況を確認（API互換性のため保持が妥当か判断）
+  - 未使用の型定義・関数がないことを確認
+  - 公開API（`generate_ghost`, `GhostConfig`, `GhostError`）のシグネチャが変更されていないことを確認
+  - `cargo test -p pasta_sample_ghost` で `test_default_config` がパスすること
+  - _Requirements: 3.1, 4.3_
+  - _Boundary: lib.rs_
+- [ ] 3.2 build.rsのファイルI/O安全性検証 (P)
+  - `CARGO_MANIFEST_DIR` 未設定時の `expect()` パニックメッセージが原因を明示していることを確認
+  - `parent()` → `and_then` → `expect()` チェーンが適切なエラーメッセージを持つことを確認
+  - 外部入力に基づくパス構築がないことを確認（パストラバーサルリスクなし）
+  - `ghosts_dir` 不在時にビルド失敗ではなく警告のみ出力することを確認
+  - 確認結果: build.rsが全安全性基準を満たしていることがコードレビューで検証済み
+  - _Requirements: 2.1, 2.2, 2.3, 2.4_
+  - _Boundary: build.rs_
+
+- [ ] 4. 最終検証
+- [ ] 4.1 全テストパスと警告ゼロの最終確認
+  - `cargo test -p pasta_sample_ghost` が全テストにパスすること
+  - `cargo clippy -p pasta_sample_ghost` が警告0件であること
+  - `cargo run -p pasta_sample_ghost` が正常にサーフェス画像を生成すること
+  - surfaces.txt の内容が変更前と同一であること
+  - dead_code警告が0件であること
+  - _Requirements: 3.3, 3.4, 4.1, 4.2, 4.4_
