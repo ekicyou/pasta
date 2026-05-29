@@ -60,7 +60,7 @@
   - _Requirements: 5.2, 5.4, 5.5_
   - _Boundary: DocumentManager_
 
-- [ ] 5.2 (P) server.rs の不要 clone 除去
+- [x] 5.2 (P) server.rs の不要 clone 除去
   - `did_open` の `params.text_document.uri.clone()` と `params.text_document.text.clone()` の必要性を調査
   - 所有権の移動で代替可能な clone を除去
   - `did_change` の `params.content_changes.iter().map(|c| ...)` での `c.text.clone()` の必要性を調査

@@ -97,9 +97,8 @@ impl LanguageServer for PastaLangServer {
     }
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
-        let uri = params.text_document.uri.clone();
-        let text = params.text_document.text.clone();
-        let version = params.text_document.version;
+        let DidOpenTextDocumentParams { text_document } = params;
+        let TextDocumentItem { uri, text, version, .. } = text_document;
 
         {
             let Ok(mut docs) = self.documents.write() else {
@@ -112,12 +111,14 @@ impl LanguageServer for PastaLangServer {
     }
 
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
-        let uri = params.text_document.uri.clone();
-        let version = params.text_document.version;
+        let DidChangeTextDocumentParams {
+            text_document,
+            content_changes,
+        } = params;
+        let VersionedTextDocumentIdentifier { uri, version } = text_document;
 
-        let changes: Vec<ContentChange> = params
-            .content_changes
-            .iter()
+        let changes: Vec<ContentChange> = content_changes
+            .into_iter()
             .map(|c| ContentChange {
                 range: c.range.map(|r| TextRange {
                     start_line: r.start.line,
@@ -125,7 +126,7 @@ impl LanguageServer for PastaLangServer {
                     end_line: r.end.line,
                     end_col: r.end.character,
                 }),
-                text: c.text.clone(),
+                text: c.text,
             })
             .collect();
 
