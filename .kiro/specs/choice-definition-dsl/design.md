@@ -18,6 +18,7 @@
 ### Non-Goals
 - 条件付き選択肢（`＠？target if 条件`）、入れ子選択肢、コロン形式（`＠？target：text`）
 - 選択肢専用シーンマーカー（`＊？`）— 通常シーン（`＊`/`・`）をコールバック先とする
+- アクター非依存の選択肢DSL構文（`＠？` をトーク行外に配置する文法）— Luaランタイムはハイブリッド対応するが、DSL文法は現行スコープ外
 - LSP補完・ジャンプ先候補表示、選択肢のスタイリング
 
 ## Boundary Commitments
@@ -254,7 +255,7 @@ pub struct ChoiceNode {
 - `LocalSceneItem::Choice(node)`: `display = node.label.unwrap_or(node.target)` として `act:choice("<target>", "<display>")` を1呼び出し生成（2.1/2.2）。複数行は各々個別生成（2.3）
 - `LocalSceneItem::CueCommand(cmd)`: `cmd.name == "select"` のとき `act:choice_timeout(<秒>)` を生成（4.1/4.2）。引数なしは `act:choice_timeout(nil)`。それ以外の cue は従来どおり無視（dola委譲）
 - Preconditions: `target`/`display` 文字列は Lua 文字列リテラルとして安全にエスケープ（`\`/`"` 等）
-- Invariants: 選択肢は他の行種別と独立。アクター文脈に依存しない（B1解決）
+- Invariants: 選択肢は他の行種別と独立。DSLレベルではトーク行内に記述されるため自然にアクターに紐づくが、Luaトークン自体はアクター非依存（B1解決）
 
 > **設計判断 B1（アクター問題解決）**: 選択肢は行レベル要素でありアクター文脈に属さない。`choice` トークンはアクター非依存の構造化データとして蓄積する。
 
@@ -275,10 +276,10 @@ function ACT_IMPL.choice_timeout(self, seconds)
 end
 ```
 - `act.lua` はさくらスクリプトタグを組み立てない。構造化データ（`target`/`display`/`seconds`）をトークンとして蓄積するのみ
-- `choice` トークンはアクター非依存（`actor` フィールドなし）。`group_by_actor` では `raw_script` と同様にハイブリッド分類（アクターグループ内 or トップレベル）
+- `choice` トークンはアクター非依存（`actor` フィールドなし）。`group_by_actor` では `raw_script` と同様にハイブリッド分類（アクターグループ内 or トップレベル）。DSLレベルではトーク行内に記述するため自然にアクターグループに属するが、Luaランタイムとしてはトップレベル配置も許容する（SHIORI以外の用途、例: ノベルゲームではアクターに紐づかない選択肢がありうる）
 - `seconds` は生の数値（変換は SHIORI 層に委譲）。`nil` = 引数なし（4.3）
 
-> **設計判断 B1（アクター問題解決）**: 選択肢は行レベル要素でありアクター文脈に属さない。`choice` トークンはアクター非依存の構造化データとして蓄積する。
+> **設計判断 B1（アクター問題解決）**: Luaランタイムでは `choice` トークンをアクター非依存の構造化データとして蓄積し、`group_by_actor` ではハイブリッド分類（アクターグループ内 or トップレベル）とする。DSLレベルではトーク行内に記述するため自然にアクター紐づきとなる。SHIORI層（sakura_builder）ではアクター紐づき前提で処理してよい。アクター非依存のDSL構文は現行スコープ外とする。
 
 > **設計判断 B2（`!select` 委譲規約）**: `!select` は cue コマンド構文を再利用するが、タイムアウト設定は出力に反映する必要があるため、トランスパイラで特例的に `act:choice_timeout` へ変換する（research.md 案 B2-A）。他の cue コマンドの dola 委譲ポリシーは変更しない。
 

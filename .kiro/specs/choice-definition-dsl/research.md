@@ -193,8 +193,8 @@ PEG/AST/トランスパイラはOption Aで拡張し、Luaルーティングの�
 
 設計フェーズで以下を確定した。詳細は `design.md` 参照。
 
-### B1: アクター問題 → アクター非依存の構造化トークンで解決
-選択肢は行レベル要素でありアクター文脈に属さない。`act:choice(target, display)` が構造化トークン `{ type = "choice", target, display }` を生成し（コアランタイム層、SHIORI非依存）、`sakura_builder`（SHIORI層）が `\![*]\q[display,target]` へ変換する。`％`アクター指定・直前アクター継承は不要。
+### B1: アクター問題 → Luaハイブリッド＋DSLはアクター紐づき
+選択肢はLuaランタイムレベルではアクター非依存の構造化トークン `{ type = "choice", target, display }` として蓄積する。`group_by_actor` ではハイブリッド分類（アクターグループ内 or トップレベル）。DSLレベルではトーク行内に記述するため自然にアクターに紐づく。SHIORI層（sakura_builder）ではアクター紐づき前提で処理してよい。アクター非依存のDSL構文は現行スコープ外（Luaランタイムは対応済み）。`％`アクター指定・直前アクター継承は不要。
 
 ### B2: `!select` 委譲規約 → トランスパイラ特殊ケース（案A採用）
 `choicetimeout` さくらスクリプトタグは出力に含める必要があるため、`scope_gen.rs` の `LocalSceneItem::CueCommand` 分岐で cue 名 `select` を特例処理し `act:choice_timeout(秒)` を生成する。他の cue コマンドの dola 委譲ポリシーは不変。
