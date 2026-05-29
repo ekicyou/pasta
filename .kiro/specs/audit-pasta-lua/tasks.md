@@ -26,7 +26,7 @@
   - _Requirements: 3.3, 3.4_
   - _Boundary: code_gen_
 
-- [ ] 3. ランタイムモジュールの監査（セキュリティ）
+- [x] 3. ランタイムモジュールの監査（セキュリティ）
 - [x] 3.1 unsafe ブロックのSAFETYコメント付与と安全性検証
   - `runtime/mod.rs:101` の `Lua::unsafe_new_with` に `// SAFETY:` コメント付与（StdLibパラメータの妥当性、メモリ安全性の前提条件を記述）
   - `runtime/enc.rs:146` の `Lua::unsafe_new_with` に `// SAFETY:` コメント付与
@@ -43,7 +43,7 @@
   - _Requirements: 2.1, 2.2, 2.4_
   - _Boundary: runtime_
 
-- [ ] 4. ランタイムモジュールの監査（簡素化）
+- [x] 4. ランタイムモジュールの監査（簡素化）
 - [x] 4.1 (P) finalize.rs のレジストリ収集ロジック簡素化
   - ネストテーブル走査の冗長パターンを特定し削減
   - シーン収集とワード収集で重複するテーブル操作を共通化
@@ -66,7 +66,7 @@
   - _Requirements: 4.3, 4.4_
   - _Boundary: runtime/module_registry_
 
-- [ ] 5. トランスパイラモジュールの監査
+- [x] 5. トランスパイラモジュールの監査
 - [x] 5.1 transpiler.rs のフェーズ責務分離と冗長コード削減
   - マルチフェーズトランスパイルの各フェーズの責務を明確化
   - 冗長な中間状態・デッドコードを除去
@@ -75,7 +75,7 @@
   - _Requirements: 5.1, 5.2, 5.3_
   - _Boundary: transpiler_
 
-- [ ] 6. ローダー・ユーティリティモジュールの監査
+- [x] 6. ローダー・ユーティリティモジュールの監査
 - [x] 6.1 (P) loader/ モジュールのセキュリティ検証と簡素化
   - ファイルパス操作がディレクトリトラバーサルに対して安全であることを検証（`..` や絶対パスの処理確認）
   - discovery.rs のファイル検出パスが意図したディレクトリ外にアクセスしないことを確認
@@ -100,7 +100,7 @@
   - _Requirements: 6.3, 6.4_
   - _Boundary: logging, utilities_
 
-- [ ] 7. Luaスクリプト群の安全性調査
+- [x] 7. Luaスクリプト群の安全性調査
 - [x] 7.1 pasta_scripts/ の安全性検証
   - 全.luaファイルでグローバル変数の意図しない汚染がないことを検証（`local` 宣言の網羅性確認）
   - `os.execute`, `io.popen`, `loadstring`, `dofile` 等の危険関数の使用がないことをgrepで確認
@@ -115,8 +115,8 @@
   - _Requirements: 7.2, 7.4_
   - _Boundary: lua_scripts_
 
-- [ ] 8. 統合検証と最終確認
-- [ ] 8.1 全体回帰テストと行数比較
+- [x] 8. 統合検証と最終確認
+- [x] 8.1 全体回帰テストと行数比較
   - `cargo test -p pasta_lua` が全パスすることを確認
   - `cargo test --workspace` が全パスすることを確認（pasta_shiori等の下流クレート含む）
   - 監査前後の行数を比較し総行数が削減されていることを確認
