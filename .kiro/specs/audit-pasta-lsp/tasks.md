@@ -11,7 +11,7 @@
   - _Requirements: 1.5, 1.6_
   - _Boundary: PastaLangServer_
 
-- [ ] 1.2 (P) 入力検証の安全性確認
+- [x] 1.2 (P) 入力検証の安全性確認
   - `did_open` で空文字列テキストを受信した場合の動作を既存テストで確認（`AnalysisEngine::analyze("")` が安全に動作すること）
   - `did_change` で未登録ドキュメントへの変更リクエストの動作を確認（`HashMap::get_mut` が `None` を返して安全にスキップ）
   - `line_col_to_offset` が範囲外の行番号・列番号に対して `None` を返すことを確認

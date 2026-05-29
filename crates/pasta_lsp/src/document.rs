@@ -169,11 +169,47 @@ mod tests {
     }
 
     #[test]
+    fn test_change_unregistered_document_is_noop() {
+        let mut dm = DocumentManager::new();
+        dm.change(
+            "file:///missing.pasta",
+            &[ContentChange {
+                range: None,
+                text: "world".to_string(),
+            }],
+            2,
+        );
+        assert!(dm.get("file:///missing.pasta").is_none());
+    }
+
+    #[test]
     fn test_close() {
         let mut dm = DocumentManager::new();
         dm.open("file:///test.pasta".to_string(), "hello".to_string(), 1);
         dm.close("file:///test.pasta");
         assert!(dm.get("file:///test.pasta").is_none());
+    }
+
+    #[test]
+    fn test_incremental_change_out_of_range_is_noop() {
+        let mut dm = DocumentManager::new();
+        dm.open("file:///test.pasta".to_string(), "hello\nworld\n".to_string(), 1);
+        dm.change(
+            "file:///test.pasta",
+            &[ContentChange {
+                range: Some(TextRange {
+                    start_line: 10,
+                    start_col: 0,
+                    end_line: 10,
+                    end_col: 1,
+                }),
+                text: "ignored".to_string(),
+            }],
+            2,
+        );
+        let doc = dm.get("file:///test.pasta").unwrap();
+        assert_eq!(doc.text, "hello\nworld\n");
+        assert_eq!(doc.version, 2);
     }
 
     #[test]
@@ -194,5 +230,14 @@ mod tests {
         assert_eq!(line_col_to_offset(text, 0, 3), Some(9)); // End of line
         // Line 1: "Alice：こんにちは"
         assert_eq!(line_col_to_offset(text, 1, 0), Some(10)); // Start of line 1
+    }
+
+    #[test]
+    fn test_line_col_to_offset_out_of_range_returns_none() {
+        let text = "hello\nworld\n";
+        assert_eq!(line_col_to_offset(text, 2, 0), Some(12));
+        assert_eq!(line_col_to_offset(text, 3, 0), None);
+        assert_eq!(line_col_to_offset(text, 0, 6), None);
+        assert_eq!(line_col_to_offset(text, 1, 6), None);
     }
 }
