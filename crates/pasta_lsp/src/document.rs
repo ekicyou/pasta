@@ -49,22 +49,16 @@ impl DocumentManager {
     /// Apply changes to an opened document.
     ///
     /// Supports both full content replacement and incremental updates.
-    pub fn change(
-        &mut self,
-        uri: &str,
-        content_changes: &[ContentChange],
-        version: i32,
-    ) {
+    pub fn change(&mut self, uri: &str, content_changes: &[ContentChange], version: i32) {
         if let Some(doc) = self.documents.get_mut(uri) {
             for change in content_changes {
-                if change.range.is_some() {
+                if let Some(range) = &change.range {
                     // Incremental update
-                    if let Some(range) = &change.range {
-                        let start_offset = line_col_to_offset(&doc.text, range.start_line, range.start_col);
-                        let end_offset = line_col_to_offset(&doc.text, range.end_line, range.end_col);
-                        if let (Some(start), Some(end)) = (start_offset, end_offset) {
-                            doc.text.replace_range(start..end, &change.text);
-                        }
+                    let start_offset =
+                        line_col_to_offset(&doc.text, range.start_line, range.start_col);
+                    let end_offset = line_col_to_offset(&doc.text, range.end_line, range.end_col);
+                    if let (Some(start), Some(end)) = (start_offset, end_offset) {
+                        doc.text.replace_range(start..end, &change.text);
                     }
                 } else {
                     // Full content replacement
@@ -112,11 +106,10 @@ pub struct TextRange {
 
 /// Convert 0-based line and UTF-16 column to byte offset.
 fn line_col_to_offset(text: &str, line: u32, col: u32) -> Option<usize> {
-    let mut current_line = 0u32;
     let mut byte_offset = 0usize;
 
-    for text_line in text.split('\n') {
-        if current_line == line {
+    for (current_line, text_line) in text.split('\n').enumerate() {
+        if current_line as u32 == line {
             // Convert UTF-16 column to byte offset within line
             let mut utf16_col = 0u32;
             for (byte_idx, ch) in text_line.char_indices() {
@@ -132,7 +125,6 @@ fn line_col_to_offset(text: &str, line: u32, col: u32) -> Option<usize> {
             return None;
         }
         byte_offset += text_line.len() + 1; // +1 for '\n'
-        current_line += 1;
     }
 
     None
@@ -193,7 +185,11 @@ mod tests {
     #[test]
     fn test_incremental_change_out_of_range_is_noop() {
         let mut dm = DocumentManager::new();
-        dm.open("file:///test.pasta".to_string(), "hello\nworld\n".to_string(), 1);
+        dm.open(
+            "file:///test.pasta".to_string(),
+            "hello\nworld\n".to_string(),
+            1,
+        );
         dm.change(
             "file:///test.pasta",
             &[ContentChange {

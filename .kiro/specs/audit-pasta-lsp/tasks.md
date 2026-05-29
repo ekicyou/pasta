@@ -53,7 +53,7 @@
   - _Boundary: 全ファイル_
 
 - [ ] 5. 冗長表現の削減
-- [ ] 5.1 (P) document.rs の冗長パターン簡素化
+- [x] 5.1 (P) document.rs の冗長パターン簡素化
   - `change()` メソッドの `if change.range.is_some() { if let Some(range) = &change.range {` を `if let Some(range) = &change.range { ... } else { ... }` に簡素化
   - 他に冗長なパターンがあれば同様に簡素化
   - `cargo test -p pasta_lsp` で全テストパスを確認
