@@ -109,10 +109,19 @@ pub mod wasm {
     /// This is the primary WASM entry point called from the VSCode extension.
     /// Results are returned as a JS object via serde-wasm-bindgen.
     ///
+    /// `wasm-bindgen` converts JavaScript strings into Rust `&str`.
+    /// JavaScript strings are UTF-16; unpaired surrogates are replaced with
+    /// U+FFFD during conversion, so the Rust side always receives valid UTF-8.
+    /// Invalid byte sequences cannot reach `AnalysisEngine::analyze()`.
+    ///
     /// # Panics
     /// Protected by `catch_unwind` — returns an empty result on parser panic.
     #[wasm_bindgen]
     pub fn wasm_analyze(source: &str) -> JsValue {
+        // `AnalysisEngine::analyze("")` is already expected to return an empty,
+        // non-panicking result, so an empty JS string safely maps to the same path.
+        // `catch_unwind` keeps any upstream parser panic from unwinding across the
+        // WASM ABI boundary and crashing the embedding JavaScript host.
         let result = std::panic::catch_unwind(|| AnalysisEngine::analyze(source));
 
         let analysis_result = match result {
@@ -123,6 +132,10 @@ pub mod wasm {
             },
         };
 
+        // `WasmAnalysisResult` and all nested types derive `Serialize`, so
+        // `serde-wasm-bindgen` converts a statically defined Rust shape into a
+        // `JsValue`. If serialization still fails unexpectedly, return `null`
+        // instead of panicking across the WASM boundary.
         serde_wasm_bindgen::to_value(&analysis_result).unwrap_or(JsValue::NULL)
     }
 }

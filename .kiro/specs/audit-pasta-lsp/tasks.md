@@ -20,7 +20,7 @@
   - _Boundary: DocumentManager_
 
 - [ ] 2. WASM 境界の安全性確認
-- [ ] 2.1 WASM エントリポイントの入力検証確認
+- [x] 2.1 WASM エントリポイントの入力検証確認
   - `transport.rs` 末尾の `wasm_analyze()` 関数（`cfg(wasm32)` 条件コンパイル）を確認
   - 空文字列入力時に `AnalysisEngine::analyze("")` が空の解析結果を返すパスを確認
   - `serde-wasm-bindgen` によるシリアライズが型安全であること（`WasmAnalysisResult` → `JsValue` 変換）を確認
