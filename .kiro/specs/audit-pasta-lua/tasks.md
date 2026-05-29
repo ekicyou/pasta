@@ -51,7 +51,7 @@
   - _Requirements: 4.1, 4.4_
   - _Boundary: runtime/finalize_
 
-- [ ] 4.2 (P) persistence.rs のファイルI/Oエラーハンドリング検証
+- [x] 4.2 (P) persistence.rs のファイルI/Oエラーハンドリング検証
   - ファイル読み書き操作のエラーパスを全て追跡
   - `.unwrap()` が使用されている箇所を `?` 演算子または適切なエラー型に置換
   - ファイルパスの検証が適切であることを確認
@@ -123,3 +123,6 @@
   - 全unsafeブロックにSAFETYコメントが存在することを最終確認
   - 全要件の受け入れ基準を充足していることを確認できる状態
   - _Requirements: 8.1, 8.2, 8.3, 8.4_
+
+## Implementation Notes
+- 4.2: `runtime/mod.rs` の `save_persistence_data()` でも `effective_file_path()` を `base_dir.join()` しているが、`register()` で既にバリデーション済みのパスしか到達しないフロー。念のため6.1（loader/セキュリティ検証）で横断確認すること。
