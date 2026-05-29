@@ -6,7 +6,7 @@
 //! - Phase 3: Line-by-line fallback with rule inference
 
 use crate::parser::ast::{FileItem, Span};
-use crate::parser::{Rule, parse_str};
+use crate::parser::{parse_str, Rule};
 
 /// 部分パース結果
 #[derive(Debug, Clone)]

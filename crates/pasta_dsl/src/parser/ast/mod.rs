@@ -9,15 +9,15 @@
 //! - `ContinueAction`: Continuation lines now explicitly start with `：` or `:`
 //!   (pasta2.pest specification change from pasta.pest)
 
-mod span;
-mod scene;
 mod action;
 mod cue;
+mod scene;
+mod span;
 
-pub use span::*;
-pub use scene::*;
 pub use action::*;
 pub use cue::*;
+pub use scene::*;
+pub use span::*;
 
 use std::path::PathBuf;
 
@@ -139,8 +139,6 @@ pub struct ActorScope {
     /// ソース位置
     pub span: Span,
 }
-
-
 
 // ============================================================================
 // FileScope - File-Level Scope
