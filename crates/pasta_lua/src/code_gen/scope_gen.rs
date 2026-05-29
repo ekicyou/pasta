@@ -283,12 +283,24 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                 LocalSceneItem::CueCommand(_) => {
                     // キューコマンドは Lua コード生成の対象外（dola 側で処理）
                 }
-                LocalSceneItem::Choice(_) => {
-                    // 選択肢行は Lua コード生成の対象外（dola 側で処理）
+                LocalSceneItem::Choice(choice) => {
+                    self.generate_choice(choice)?;
                 }
             }
         }
 
+        Ok(())
+    }
+
+    /// Generate `act:choice("target", "display")` Lua call for a choice node.
+    fn generate_choice(
+        &mut self,
+        choice: &pasta_dsl::parser::ChoiceNode,
+    ) -> Result<(), TranspileError> {
+        let display = choice.label.as_deref().unwrap_or(&choice.target);
+        let target_lit = StringLiteralizer::literalize_with_span(&choice.target, &choice.span)?;
+        let display_lit = StringLiteralizer::literalize_with_span(display, &choice.span)?;
+        self.writeln(&format!("act:choice({}, {})", target_lit, display_lit))?;
         Ok(())
     }
 }
