@@ -86,7 +86,7 @@
   - _Boundary: pasta_lua/shiori_event_
   - _Depends: 3.1, 3.3_
 
-- [ ] 4.3 OnChoiceSelectEx ハンドラをイベントシステムに登録する
+- [x] 4.3 OnChoiceSelectEx ハンドラをイベントシステムに登録する
   - 4.2 で実装したルータを既定の OnChoiceSelectEx ハンドラとして登録する
   - 既存のイベント登録パターン（boot.lua 準拠）に従って登録する
   - 既存イベント登録処理との副作用がないことを確認する
