@@ -85,7 +85,7 @@
   - _Requirements: 6.1, 6.4_
   - _Boundary: loader_
 
-- [ ] 6.2 (P) sakura_script/ モジュールのセキュリティ検証と簡素化
+- [x] 6.2 (P) sakura_script/ モジュールのセキュリティ検証と簡素化
   - tokenizer.rs の正規表現パターンにReDoS脆弱性がないことを検証（バックトラッキングの爆発的増加がない正規表現構造を確認）
   - wait_inserter.rs の `unreachable!()` マクロの到達不能性を検証
   - line_breaker.rs の冗長パターンを確認し削減
