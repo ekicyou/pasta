@@ -27,7 +27,7 @@
   - _Boundary: main.rs_
 
 - [ ] 3. lib.rsとbuild.rsの安全性検証
-- [ ] 3.1 lib.rsのデッドコード確認とAPI安全性検証 (P)
+- [x] 3.1 lib.rsのデッドコード確認とAPI安全性検証 (P)
   - `generate_ghost` の `_config` パラメータの使用状況を確認（API互換性のため保持が妥当か判断）
   - 未使用の型定義・関数がないことを確認
   - 公開API（`generate_ghost`, `GhostConfig`, `GhostError`）のシグネチャが変更されていないことを確認
