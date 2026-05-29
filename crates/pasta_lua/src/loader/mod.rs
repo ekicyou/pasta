@@ -512,15 +512,6 @@ impl PastaLoader {
         Ok((combined_context, module_names, stats))
     }
 
-    /// Convert file path to module name (legacy - for backward compatibility).
-    ///
-    /// Example: `dic/baseware/system.pasta` → `dic_baseware_system`
-    #[allow(dead_code)]
-    fn path_to_module_name(path: &Path) -> String {
-        let stem = path.with_extension("");
-        let s = stem.to_string_lossy();
-        s.replace(['/', '\\'], "_")
-    }
 }
 
 /// Result of transpiling a single pasta file.

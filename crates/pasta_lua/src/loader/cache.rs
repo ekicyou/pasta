@@ -6,7 +6,7 @@
 
 use super::LoaderError;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::time::SystemTime;
 use tracing::{debug, info, warn};
 
@@ -63,27 +63,24 @@ impl CacheManager {
             let cached_version = fs::read_to_string(&version_file)
                 .map_err(|e| LoaderError::cache_directory(&version_file, e))?;
 
-            if cached_version.trim() != CURRENT_VERSION {
-                // Version mismatch → clear all cache
-                info!(
-                    old_version = %cached_version.trim(),
-                    new_version = %CURRENT_VERSION,
-                    "Cache version mismatch, clearing all cache"
-                );
-
-                if self.cache_dir.exists() {
-                    fs::remove_dir_all(&self.cache_dir)
-                        .map_err(|e| LoaderError::cache_directory(&self.cache_dir, e))?;
-                }
-            } else {
+            if cached_version.trim() == CURRENT_VERSION {
                 debug!(version = %CURRENT_VERSION, "Cache version matches, preserving cache");
-                // Ensure scene directory exists
+                // Ensure scene directory exists (idempotent)
                 let scene_dir = self.cache_dir.join("pasta/scene");
-                if !scene_dir.exists() {
-                    fs::create_dir_all(&scene_dir)
-                        .map_err(|e| LoaderError::cache_directory(&scene_dir, e))?;
-                }
+                fs::create_dir_all(&scene_dir)
+                    .map_err(|e| LoaderError::cache_directory(&scene_dir, e))?;
                 return Ok(());
+            }
+
+            // Version mismatch → clear all cache
+            info!(
+                old_version = %cached_version.trim(),
+                new_version = %CURRENT_VERSION,
+                "Cache version mismatch, clearing all cache"
+            );
+            if self.cache_dir.exists() {
+                fs::remove_dir_all(&self.cache_dir)
+                    .map_err(|e| LoaderError::cache_directory(&self.cache_dir, e))?;
             }
         }
 
@@ -167,11 +164,23 @@ impl CacheManager {
         let cache_path = self.source_to_cache_path(source_path);
         let module_name = self.source_to_module_name(source_path);
 
-        // Create parent directories if needed
+        // Validate cache path stays within cache directory (prevent directory traversal)
+        if !cache_path.starts_with(&self.cache_dir) {
+            return Err(LoaderError::cache_write(
+                &cache_path,
+                std::io::Error::new(
+                    std::io::ErrorKind::PermissionDenied,
+                    format!(
+                        "Cache path escapes cache directory (directory traversal detected): {}",
+                        cache_path.display()
+                    ),
+                ),
+            ));
+        }
+
+        // Create parent directories if needed (idempotent)
         if let Some(parent) = cache_path.parent() {
-            if !parent.exists() {
-                fs::create_dir_all(parent).map_err(|e| LoaderError::cache_write(&cache_path, e))?;
-            }
+            fs::create_dir_all(parent).map_err(|e| LoaderError::cache_write(&cache_path, e))?;
         }
 
         // Write UTF-8 encoded Lua code
@@ -232,12 +241,29 @@ impl CacheManager {
     }
 
     /// Get relative path from base_dir.
+    ///
+    /// Returns the path relative to base_dir. If the source path contains
+    /// directory traversal components (`..`), they are preserved in the
+    /// relative path string (caught later by `save_cache` boundary check).
     fn get_relative_path(&self, source_path: &Path) -> String {
-        source_path
+        let relative = source_path
             .strip_prefix(&self.base_dir)
-            .unwrap_or(source_path)
-            .to_string_lossy()
-            .to_string()
+            .unwrap_or(source_path);
+
+        // Warn if relative path contains traversal components
+        if relative.components().any(|c| {
+            matches!(
+                c,
+                Component::ParentDir | Component::RootDir | Component::Prefix(_)
+            )
+        }) {
+            warn!(
+                path = %source_path.display(),
+                "Source path contains directory traversal components"
+            );
+        }
+
+        relative.to_string_lossy().to_string()
     }
 
     /// Generate scene_dic.lua from module names.

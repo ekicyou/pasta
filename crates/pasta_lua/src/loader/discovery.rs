@@ -3,13 +3,28 @@
 //! This module provides file discovery functionality using glob patterns.
 
 use glob::glob;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 use super::LoaderError;
+
+/// Check if a pattern contains directory traversal components.
+///
+/// Rejects patterns containing `..`, absolute paths, or Windows drive prefixes
+/// to prevent file discovery outside the intended base directory.
+fn contains_traversal(pattern: &str) -> bool {
+    let path = Path::new(pattern);
+    path.components().any(|c| {
+        matches!(
+            c,
+            Component::ParentDir | Component::RootDir | Component::Prefix(_)
+        )
+    })
+}
 
 /// Discover pasta files matching the given patterns.
 ///
 /// Files in `profile/` directory are excluded from discovery.
+/// Patterns containing directory traversal (`..`, absolute paths) are rejected.
 ///
 /// # Arguments
 /// * `base_dir` - Base directory to search from
@@ -31,6 +46,15 @@ pub fn discover_files(base_dir: &Path, patterns: &[String]) -> Result<Vec<PathBu
     let mut files = Vec::new();
 
     for pattern in patterns {
+        // Reject patterns with directory traversal components
+        if contains_traversal(pattern) {
+            tracing::warn!(
+                pattern = %pattern,
+                "Rejecting pattern with directory traversal"
+            );
+            continue;
+        }
+
         let full_pattern = base_dir.join(pattern);
         let pattern_str = full_pattern.to_string_lossy();
 
@@ -190,5 +214,39 @@ mod tests {
         let files = discover_files(base_dir, &patterns).unwrap();
 
         assert_eq!(files.len(), 2);
+    }
+
+    #[test]
+    fn test_discover_rejects_parent_dir_traversal() {
+        let temp = TempDir::new().unwrap();
+        let base_dir = create_test_structure(&temp);
+
+        // Pattern with ".." should be silently skipped
+        let patterns = vec!["../../../etc/*.pasta".to_string()];
+        let files = discover_files(&base_dir, &patterns).unwrap();
+        assert!(files.is_empty());
+    }
+
+    #[test]
+    fn test_discover_rejects_traversal_preserves_valid() {
+        let temp = TempDir::new().unwrap();
+        let base_dir = create_test_structure(&temp);
+
+        // Mix of valid and traversal patterns — valid should still work
+        let patterns = vec![
+            "../secret/*.pasta".to_string(),
+            "dic/*/*.pasta".to_string(),
+        ];
+        let files = discover_files(&base_dir, &patterns).unwrap();
+        assert_eq!(files.len(), 3);
+    }
+
+    #[test]
+    fn test_contains_traversal() {
+        assert!(contains_traversal("../foo/*.pasta"));
+        assert!(contains_traversal("foo/../../bar/*.pasta"));
+        assert!(!contains_traversal("dic/*/*.pasta"));
+        assert!(!contains_traversal("**/*.pasta"));
+        assert!(!contains_traversal("extra/*.pasta"));
     }
 }
