@@ -1,6 +1,6 @@
 //! SSP ネットワーク更新ファイル生成モジュール
 //!
-//! `updates.txt` を SSP 仕様に準拠して生成します（`updates2.dau` は将来用に保持）。
+//! `updates.txt` を SSP 仕様に準拠して生成します。
 
 use std::fs::{self, File};
 use std::io::{self, Read, Write};
@@ -129,35 +129,39 @@ fn collect_files_recursive(
     };
 
     for entry in read_dir.flatten() {
-        let path = entry.path();
-        let file_name = entry.file_name().to_string_lossy().to_string();
+        let file_type = entry.file_type()?;
 
-        if path.is_dir() {
-            if EXCLUDED_DIRS.contains(&file_name.as_str()) {
+        // シンボリックリンクはスキップ（リンク先を追跡しない）
+        if file_type.is_symlink() {
+            continue;
+        }
+
+        let path = entry.path();
+        let name = entry.file_name();
+
+        if file_type.is_dir() {
+            if EXCLUDED_DIRS.iter().any(|&d| d == name) {
                 continue;
             }
             collect_files_recursive(root_dir, &path, entries)?;
-        } else if path.is_file() {
-            if EXCLUDED_FILES.contains(&file_name.as_str()) {
+        } else if file_type.is_file() {
+            if EXCLUDED_FILES.iter().any(|&f| f == name) {
                 continue;
             }
 
             let relative_path = path
                 .strip_prefix(root_dir)
-                .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?
+                .map_err(|e| io::Error::other(e.to_string()))?
                 .to_string_lossy()
                 .replace('\\', "/");
 
-            let md5 = calculate_md5(&path)?;
             let metadata = fs::metadata(&path)?;
-            let size = metadata.len();
-            let modified = metadata.modified().unwrap_or(SystemTime::UNIX_EPOCH);
 
             entries.push(FileEntry {
                 path: relative_path,
-                md5,
-                size,
-                modified,
+                md5: calculate_md5(&path)?,
+                size: metadata.len(),
+                modified: metadata.modified().unwrap_or(SystemTime::UNIX_EPOCH),
             });
         }
     }
@@ -166,6 +170,8 @@ fn collect_files_recursive(
 }
 
 /// ファイルの MD5 ハッシュを計算
+///
+/// SSP 仕様準拠の非暗号学的ファイル変更検出用途。認証・署名には使用しない。
 fn calculate_md5(path: &Path) -> io::Result<String> {
     let mut file = File::open(path)?;
     let mut context = md5::Context::new();
@@ -181,24 +187,6 @@ fn calculate_md5(path: &Path) -> io::Result<String> {
 
     let digest = context.finalize();
     Ok(format!("{:032x}", digest))
-}
-
-/// updates2.dau を生成
-/// フォーマット: `<filepath><SOH><md5><SOH>size=<bytes><SOH><CRLF>`
-#[allow(dead_code)]
-fn generate_updates2_dau(root_dir: &Path, entries: &[FileEntry]) -> io::Result<()> {
-    let output_path = root_dir.join("updates2.dau");
-    let mut file = File::create(&output_path)?;
-
-    for entry in entries {
-        let record = format!(
-            "{}\x01{}\x01size={}\x01\r\n",
-            entry.path, entry.md5, entry.size
-        );
-        file.write_all(record.as_bytes())?;
-    }
-
-    Ok(())
 }
 
 /// updates.txt を生成
