@@ -157,21 +157,10 @@ pub(crate) fn parse_var_set(pair: Pair<Rule>) -> Result<VarSet, ParseError> {
         // word_ref was detected
         SetValue::WordRef { name: ref_name }
     } else {
-        // Build left-associative binary expression
         let expr = if terms.is_empty() {
             Expr::BlankString
         } else {
-            let mut result = terms.remove(0);
-            for (i, op) in operators.into_iter().enumerate() {
-                if i < terms.len() {
-                    result = Expr::Binary {
-                        op,
-                        lhs: Box::new(result),
-                        rhs: Box::new(terms[i].clone()),
-                    };
-                }
-            }
-            result
+            build_left_assoc_expr(terms, operators)
         };
         SetValue::Expr(expr)
     };

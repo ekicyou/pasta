@@ -95,32 +95,12 @@ pub(crate) fn parse_actions(pair: Pair<Rule>) -> Result<Vec<Action>, ParseError>
                 }
             }
             Rule::var_ref_local => {
-                for var_id_pair in inner.into_inner() {
-                    if var_id_pair.as_rule() == Rule::var_id {
-                        // var_idの内部構造を確認（idまたはdigit_id）
-                        for id_inner in var_id_pair.into_inner() {
-                            match id_inner.as_rule() {
-                                Rule::id => {
-                                    actions.push(Action::VarRef {
-                                        name: id_inner.as_str().to_string(),
-                                        scope: VarScope::Local,
-                                        span: action_span,
-                                    });
-                                }
-                                Rule::digit_id => {
-                                    let index = normalize_number_str(id_inner.as_str())
-                                        .parse::<u8>()
-                                        .unwrap_or(0);
-                                    actions.push(Action::VarRef {
-                                        name: id_inner.as_str().to_string(),
-                                        scope: VarScope::Args(index),
-                                        span: action_span,
-                                    });
-                                }
-                                _ => {}
-                            }
-                        }
-                    }
+                if let Some((name, scope)) = parse_var_ref_local_inner(inner) {
+                    actions.push(Action::VarRef {
+                        name,
+                        scope,
+                        span: action_span,
+                    });
                 }
             }
             Rule::var_ref_global => {
@@ -253,19 +233,7 @@ pub(crate) fn parse_expr_from_parts(pair: Pair<Rule>) -> Option<Expr> {
         return None;
     }
 
-    // Build left-associative binary expression
-    let mut result = terms.remove(0);
-    for (i, op) in operators.into_iter().enumerate() {
-        if i < terms.len() {
-            result = Expr::Binary {
-                op,
-                lhs: Box::new(result),
-                rhs: Box::new(terms[i].clone()),
-            };
-        }
-    }
-
-    Some(result)
+    Some(build_left_assoc_expr(terms, operators))
 }
 
 /// Parse key_arg.
@@ -299,24 +267,28 @@ pub(crate) fn parse_key_arg(pair: Pair<Rule>) -> Result<(String, Expr), ParseErr
         }
     }
 
-    // Build left-associative binary expression
     let value = if terms.is_empty() {
         Expr::BlankString
     } else {
-        let mut result = terms.remove(0);
-        for (i, op) in operators.into_iter().enumerate() {
-            if i < terms.len() {
-                result = Expr::Binary {
-                    op,
-                    lhs: Box::new(result),
-                    rhs: Box::new(terms[i].clone()),
-                };
-            }
-        }
-        result
+        build_left_assoc_expr(terms, operators)
     };
 
     Ok((key, value))
+}
+
+/// Build a left-associative binary expression from terms and operators.
+pub(crate) fn build_left_assoc_expr(mut terms: Vec<Expr>, operators: Vec<BinOp>) -> Expr {
+    let mut result = terms.remove(0);
+    for (i, op) in operators.into_iter().enumerate() {
+        if i < terms.len() {
+            result = Expr::Binary {
+                op,
+                lhs: Box::new(result),
+                rhs: Box::new(terms[i].clone()),
+            };
+        }
+    }
+    result
 }
 
 /// Try to parse an expression from a pair.
@@ -333,32 +305,7 @@ pub(crate) fn try_parse_expr(pair: Pair<Rule>) -> Option<Expr> {
         Rule::string_contents => Some(Expr::String(pair.as_str().to_string())),
         Rule::string_blank => Some(Expr::BlankString),
         Rule::var_ref_local => {
-            for var_id_pair in pair.into_inner() {
-                if var_id_pair.as_rule() == Rule::var_id {
-                    // var_idの内部構造を確認（idまたはdigit_id）
-                    for id_inner in var_id_pair.into_inner() {
-                        match id_inner.as_rule() {
-                            Rule::id => {
-                                return Some(Expr::VarRef {
-                                    name: id_inner.as_str().to_string(),
-                                    scope: VarScope::Local,
-                                });
-                            }
-                            Rule::digit_id => {
-                                let index = normalize_number_str(id_inner.as_str())
-                                    .parse::<u8>()
-                                    .unwrap_or(0);
-                                return Some(Expr::VarRef {
-                                    name: id_inner.as_str().to_string(),
-                                    scope: VarScope::Args(index),
-                                });
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-            }
-            None
+            parse_var_ref_local_inner(pair).map(|(name, scope)| Expr::VarRef { name, scope })
         }
         Rule::var_ref_global => {
             for inner in pair.into_inner() {
@@ -420,4 +367,29 @@ pub(crate) fn try_parse_expr(pair: Pair<Rule>) -> Option<Expr> {
             None
         }
     }
+}
+
+/// Extract variable name and scope from a `var_ref_local` pair.
+///
+/// Handles both named variables (`$var` → Local) and positional args (`$0` → Args(0)).
+fn parse_var_ref_local_inner(pair: Pair<Rule>) -> Option<(String, VarScope)> {
+    for var_id_pair in pair.into_inner() {
+        if var_id_pair.as_rule() == Rule::var_id {
+            for id_inner in var_id_pair.into_inner() {
+                match id_inner.as_rule() {
+                    Rule::id => {
+                        return Some((id_inner.as_str().to_string(), VarScope::Local));
+                    }
+                    Rule::digit_id => {
+                        let index = normalize_number_str(id_inner.as_str())
+                            .parse::<u8>()
+                            .unwrap_or(0);
+                        return Some((id_inner.as_str().to_string(), VarScope::Args(index)));
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+    None
 }

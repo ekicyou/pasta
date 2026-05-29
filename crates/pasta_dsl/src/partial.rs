@@ -6,8 +6,7 @@
 //! - Phase 3: Line-by-line fallback with rule inference
 
 use crate::parser::ast::{FileItem, Span};
-use crate::parser::{PastaParser2, Rule, parse_str};
-use pest::Parser as PestParser;
+use crate::parser::{Rule, parse_str};
 
 /// 部分パース結果
 #[derive(Debug, Clone)]
@@ -27,14 +26,6 @@ pub struct PartialParseError {
     pub message: String,
     /// エラー範囲のSpan（取得できた場合）
     pub span: Option<Span>,
-}
-
-/// pest Ruleを個別に適用
-pub fn parse_with_rule(
-    source: &str,
-    rule: Rule,
-) -> Result<pest::iterators::Pairs<'_, Rule>, pest::error::Error<Rule>> {
-    PastaParser2::parse(rule, source)
 }
 
 /// 行頭パターンからpest Ruleを推論する
@@ -171,7 +162,7 @@ pub fn parse_str_partial(source: &str) -> PartialParseResult {
                                 Err(e) => {
                                     partial_errors.push(PartialParseError {
                                         line: line_num,
-                                        message: format!("{}", e),
+                                        message: e.to_string(),
                                         span: None,
                                     });
                                 }

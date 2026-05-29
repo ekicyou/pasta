@@ -188,47 +188,7 @@ pub(crate) fn parse_local_start_scene_scope(
     scope.span = span;
 
     for inner in pair.into_inner() {
-        match inner.as_rule() {
-            Rule::var_set_local
-            | Rule::var_set_global
-            | Rule::var_set_none
-            | Rule::var_set_property => {
-                scope
-                    .items
-                    .push(LocalSceneItem::VarSet(parse_var_set(inner)?));
-            }
-            Rule::call_scene => {
-                scope
-                    .items
-                    .push(LocalSceneItem::CallScene(parse_call_scene(inner)?));
-            }
-            Rule::action_line => {
-                scope
-                    .items
-                    .push(LocalSceneItem::ActionLine(parse_action_line(inner)?));
-            }
-            Rule::continue_action_line => {
-                scope
-                    .items
-                    .push(LocalSceneItem::ContinueAction(parse_continue_action_line(
-                        inner,
-                    )?));
-            }
-            Rule::cue_cmd_line => {
-                scope
-                    .items
-                    .push(LocalSceneItem::CueCommand(parse_cue_cmd_line(inner)?));
-            }
-            Rule::choice_line => {
-                scope
-                    .items
-                    .push(LocalSceneItem::Choice(parse_choice_line(inner)?));
-            }
-            Rule::code_block => {
-                scope.code_blocks.push(parse_code_block(inner)?);
-            }
-            _ => {}
-        }
+        parse_local_scene_item(inner, &mut scope)?;
     }
 
     Ok(scope)
@@ -241,58 +201,68 @@ pub(crate) fn parse_local_scene_scope(pair: Pair<Rule>) -> Result<LocalSceneScop
     scope.span = span;
 
     for inner in pair.into_inner() {
-        match inner.as_rule() {
-            Rule::local_scene_line => {
-                for scene_inner in inner.into_inner() {
-                    if scene_inner.as_rule() == Rule::id {
-                        scope.name = Some(scene_inner.as_str().to_string());
-                        break;
-                    }
+        if inner.as_rule() == Rule::local_scene_line {
+            for scene_inner in inner.into_inner() {
+                if scene_inner.as_rule() == Rule::id {
+                    scope.name = Some(scene_inner.as_str().to_string());
+                    break;
                 }
             }
-            Rule::var_set_local
-            | Rule::var_set_global
-            | Rule::var_set_none
-            | Rule::var_set_property => {
-                scope
-                    .items
-                    .push(LocalSceneItem::VarSet(parse_var_set(inner)?));
-            }
-            Rule::call_scene => {
-                scope
-                    .items
-                    .push(LocalSceneItem::CallScene(parse_call_scene(inner)?));
-            }
-            Rule::action_line => {
-                scope
-                    .items
-                    .push(LocalSceneItem::ActionLine(parse_action_line(inner)?));
-            }
-            Rule::continue_action_line => {
-                scope
-                    .items
-                    .push(LocalSceneItem::ContinueAction(parse_continue_action_line(
-                        inner,
-                    )?));
-            }
-            Rule::cue_cmd_line => {
-                scope
-                    .items
-                    .push(LocalSceneItem::CueCommand(parse_cue_cmd_line(inner)?));
-            }
-            Rule::choice_line => {
-                scope
-                    .items
-                    .push(LocalSceneItem::Choice(parse_choice_line(inner)?));
-            }
-            Rule::code_block => {
-                scope.code_blocks.push(parse_code_block(inner)?);
-            }
-            _ => {}
+        } else {
+            parse_local_scene_item(inner, &mut scope)?;
         }
     }
 
     Ok(scope)
+}
+
+/// Parse a single local scene item and push it into the scope.
+fn parse_local_scene_item(
+    inner: Pair<Rule>,
+    scope: &mut LocalSceneScope,
+) -> Result<(), ParseError> {
+    match inner.as_rule() {
+        Rule::var_set_local
+        | Rule::var_set_global
+        | Rule::var_set_none
+        | Rule::var_set_property => {
+            scope
+                .items
+                .push(LocalSceneItem::VarSet(parse_var_set(inner)?));
+        }
+        Rule::call_scene => {
+            scope
+                .items
+                .push(LocalSceneItem::CallScene(parse_call_scene(inner)?));
+        }
+        Rule::action_line => {
+            scope
+                .items
+                .push(LocalSceneItem::ActionLine(parse_action_line(inner)?));
+        }
+        Rule::continue_action_line => {
+            scope
+                .items
+                .push(LocalSceneItem::ContinueAction(parse_continue_action_line(
+                    inner,
+                )?));
+        }
+        Rule::cue_cmd_line => {
+            scope
+                .items
+                .push(LocalSceneItem::CueCommand(parse_cue_cmd_line(inner)?));
+        }
+        Rule::choice_line => {
+            scope
+                .items
+                .push(LocalSceneItem::Choice(parse_choice_line(inner)?));
+        }
+        Rule::code_block => {
+            scope.code_blocks.push(parse_code_block(inner)?);
+        }
+        _ => {}
+    }
+    Ok(())
 }
 
 // ============================================================================
@@ -383,15 +353,18 @@ fn parse_cue_cmd_scope(pair: Pair<Rule>) -> Result<ScopedName, ParseError> {
         if inner.as_rule() == Rule::cue_scoped_ident {
             let raw = inner.as_str();
             // Split on ':' or '：' (full-width colon) to separate actor and name
-            if let Some(colon_pos) = raw.find(|c: char| c == ':' || c == '：') {
+            if let Some(colon_pos) = raw.find([':', '：']) {
                 let actor = &raw[..colon_pos];
-                let colon_char = raw[colon_pos..].chars().next().unwrap();
-                let name = &raw[colon_pos + colon_char.len_utf8()..];
-                return Ok(ScopedName {
-                    actor: Some(actor.to_string()),
-                    name: name.to_string(),
-                    span,
-                });
+                // colon_pos comes from find(), so the character is guaranteed to exist,
+                // but we use if-let for defensive safety.
+                if let Some(colon_char) = raw[colon_pos..].chars().next() {
+                    let name = &raw[colon_pos + colon_char.len_utf8()..];
+                    return Ok(ScopedName {
+                        actor: Some(actor.to_string()),
+                        name: name.to_string(),
+                        span,
+                    });
+                }
             } else {
                 return Ok(ScopedName {
                     actor: None,

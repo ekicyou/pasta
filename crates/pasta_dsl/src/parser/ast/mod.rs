@@ -140,19 +140,7 @@ pub struct ActorScope {
     pub span: Span,
 }
 
-impl ActorScope {
-    /// Create a new actor scope with the given name.
-    pub fn new(name: String) -> Self {
-        Self {
-            name,
-            attrs: Vec::new(),
-            words: Vec::new(),
-            var_sets: Vec::new(),
-            code_blocks: Vec::new(),
-            span: Span::default(),
-        }
-    }
-}
+
 
 // ============================================================================
 // FileScope - File-Level Scope
