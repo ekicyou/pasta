@@ -29,7 +29,7 @@
   - _Boundary: transport.rs_
 
 - [ ] 3. パーサーパニック耐性の確認と文書化
-- [ ] 3.1 catch_unwind の安全性コメント追加
+- [x] 3.1 catch_unwind の安全性コメント追加
   - `analysis/mod.rs` の `analyze()` 内の `catch_unwind(AssertUnwindSafe(|| ...))` に安全性の根拠を説明するコメントを追加
   - `AssertUnwindSafe` の使用が安全である理由（`AnalysisEngine::analyze` は副作用のない純粋関数であり、パニック後に不整合状態が残らない）を文書化
   - パニック発生時に `client.log_message` でエラーログが出力されることを確認

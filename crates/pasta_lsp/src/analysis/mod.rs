@@ -30,7 +30,14 @@ pub struct AnalysisResult {
 pub struct AnalysisEngine;
 
 impl AnalysisEngine {
-    /// ドキュメント全体を解析し、トークンとDiagnosticsを生成する
+    /// ドキュメント全体を解析し、トークンとDiagnosticsを生成する。
+    ///
+    /// 呼び出し側（`server.rs` / `transport.rs`）は、この関数を
+    /// `catch_unwind` で包んで `pasta_dsl::parse_str` 由来のパニックを捕捉する。
+    /// ネイティブ側で `AssertUnwindSafe` を使っているのは、`analyze` が `source`
+    /// から新しい `AnalysisResult` を組み立てるだけの副作用のない純粋関数であり、
+    /// 共有可変状態を変更しないためである。途中でパニックしても不整合な状態を
+    /// 残さず、呼び出し側はエラーログを出して他ドキュメントの処理を継続できる。
     pub fn analyze(source: &str) -> AnalysisResult {
         // Ensure source ends with newline — the grammar requires every line
         // to terminate with eol (NEWLINE). Editors like VSCode may omit it.
