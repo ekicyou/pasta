@@ -1,7 +1,7 @@
 # 実装計画
 
 - [ ] 1. 画像処理の安全性検証と冗長コード削減
-- [ ] 1.1 image_generator.rsのピクセル座標境界チェック確認 (P)
+- [x] 1.1 image_generator.rsのピクセル座標境界チェック確認 (P)
   - 全ての `put_pixel` 呼び出しに `if x < WIDTH && y < HEIGHT` ガードが存在することを確認
   - `draw_filled_circle_mut` がimageproc内部で境界チェック済みであることを確認
   - 定数（WIDTH=128, HEIGHT=256, HEAD_RADIUS=42等）による計算が整数オーバーフローを起こさないことを確認

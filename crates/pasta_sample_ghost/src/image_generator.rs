@@ -158,7 +158,9 @@ fn draw_body(img: &mut RgbaImage, character: Character, color: Rgba<u8>) {
                 let right = (center_x as f32 + half_width).min(WIDTH as f32) as u32;
 
                 for x in left..right {
-                    img.put_pixel(x, y as u32, color);
+                    if x < WIDTH && (y as u32) < HEIGHT {
+                        img.put_pixel(x, y as u32, color);
+                    }
                 }
             }
         }
@@ -174,7 +176,9 @@ fn draw_body(img: &mut RgbaImage, character: Character, color: Rgba<u8>) {
                 let right = (center_x as f32 + half_width).min(WIDTH as f32) as u32;
 
                 for x in left..right {
-                    img.put_pixel(x, y as u32, color);
+                    if x < WIDTH && (y as u32) < HEIGHT {
+                        img.put_pixel(x, y as u32, color);
+                    }
                 }
             }
         }
