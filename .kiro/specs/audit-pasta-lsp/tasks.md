@@ -1,6 +1,6 @@
 # 実装計画
 
-- [ ] 1. JSON-RPC 入力処理の安全性強化
+- [x] 1. JSON-RPC 入力処理の安全性強化
 - [x] 1.1 (P) server.rs の RwLock パニックリスク解消
   - `did_open` ハンドラの `self.documents.write().unwrap()` を `let Ok(mut docs) = self.documents.write() else { return; }` に置換
   - `did_change` ハンドラの `self.documents.write().unwrap()` を同様に置換
@@ -19,7 +19,7 @@
   - _Requirements: 1.1, 1.2, 1.3, 1.4_
   - _Boundary: DocumentManager_
 
-- [ ] 2. WASM 境界の安全性確認
+- [x] 2. WASM 境界の安全性確認
 - [x] 2.1 WASM エントリポイントの入力検証確認
   - `transport.rs` 末尾の `wasm_analyze()` 関数（`cfg(wasm32)` 条件コンパイル）を確認
   - 空文字列入力時に `AnalysisEngine::analyze("")` が空の解析結果を返すパスを確認
@@ -28,7 +28,7 @@
   - _Requirements: 2.1, 2.2, 2.3, 2.4_
   - _Boundary: transport.rs_
 
-- [ ] 3. パーサーパニック耐性の確認と文書化
+- [x] 3. パーサーパニック耐性の確認と文書化
 - [x] 3.1 catch_unwind の安全性コメント追加
   - `analysis/mod.rs` の `analyze()` 内の `catch_unwind(AssertUnwindSafe(|| ...))` に安全性の根拠を説明するコメントを追加
   - `AssertUnwindSafe` の使用が安全である理由（`AnalysisEngine::analyze` は副作用のない純粋関数であり、パニック後に不整合状態が残らない）を文書化
@@ -36,7 +36,7 @@
   - _Requirements: 3.1, 3.2, 3.3_
   - _Boundary: AnalysisEngine_
 
-- [ ] 4. デッドコード除去
+- [x] 4. デッドコード除去
 - [x] 4.1 (P) LangServerError 使用状況調査と対応
   - `LangServerError` の3バリアント（`Parse`, `DocumentNotFound`, `Internal`）がクレート内外で使用されているか `grep` で調査
   - `lib.rs` で `pub use error::LangServerError` として公開されていることを確認
@@ -52,7 +52,7 @@
   - _Requirements: 4.1, 4.2, 4.4_
   - _Boundary: 全ファイル_
 
-- [ ] 5. 冗長表現の削減
+- [x] 5. 冗長表現の削減
 - [x] 5.1 (P) document.rs の冗長パターン簡素化
   - `change()` メソッドの `if change.range.is_some() { if let Some(range) = &change.range {` を `if let Some(range) = &change.range { ... } else { ... }` に簡素化
   - 他に冗長なパターンがあれば同様に簡素化
@@ -75,8 +75,8 @@
   - _Requirements: 5.3, 5.4_
   - _Boundary: transport.rs_
 
-- [ ] 6. 最終検証
-- [ ] 6.1 リグレッションテスト実行
+- [x] 6. 最終検証
+- [x] 6.1 リグレッションテスト実行
   - `cargo test -p pasta_lsp` で全11テストファイルがパスすることを確認
   - `cargo clippy -p pasta_lsp` で新たな警告がないことを確認
   - `cargo build -p pasta_lsp` でネイティブビルドが成功することを確認
