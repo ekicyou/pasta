@@ -7,6 +7,7 @@
 local ACTOR = require("pasta.actor")
 local SCENE = require("pasta.scene")
 local GLOBAL = require("pasta.global")
+local STORE = require("pasta.store")
 local log = require "@pasta_log"
 
 -- ============================================================================
@@ -176,6 +177,9 @@ end
 --- @return table save 永続変数テーブル
 --- @return table var アクションローカル変数テーブル
 function ACT_IMPL.init_scene(self, scene)
+    if scene.__global_name__ then
+        STORE.last_global_scene = scene.__global_name__
+    end
     self.current_scene = scene
     return self.save, self.var
 end

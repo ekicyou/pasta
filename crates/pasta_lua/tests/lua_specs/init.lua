@@ -38,6 +38,7 @@ local specs = {
     "get_property_test",                 -- get_property バリデーション・タグ発行テスト (shiori-async-talk)
     "store_last_global_scene_test",      -- STORE.last_global_scene フィールドテスト (choice-definition-dsl)
     "act_choice_test",                   -- act:choice / act:choice_timeout トークン蓄積テスト (choice-definition-dsl)
+    "act_init_scene_global_record_test",  -- init_scene グローバルシーン名記録テスト (choice-definition-dsl)
     -- 将来のテストスイートをここに追加
     -- "code_generator_test",
     -- "context_test",
