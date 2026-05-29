@@ -22,7 +22,7 @@
 
 use pasta_sample_ghost::{GhostConfig, generate_ghost};
 use std::env;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// 通常モード：ゴースト配布物を生成
-fn run_generate_mode(output_dir: &PathBuf) -> Result<(), Box<dyn std::error::Error>> {
+fn run_generate_mode(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
     println!("========================================");
     println!("  pasta_sample_ghost Generator");
     println!("========================================");
@@ -83,12 +83,12 @@ fn get_output_dir(args: &[String]) -> PathBuf {
 }
 
 /// ディレクトリ内のファイル数をカウント
-fn count_files(dir: &PathBuf) -> usize {
+fn count_files(dir: &Path) -> usize {
     walkdir(dir)
 }
 
 /// 再帰的にファイル数をカウント
-fn walkdir(path: &PathBuf) -> usize {
+fn walkdir(path: &Path) -> usize {
     let mut count = 0;
     if let Ok(entries) = std::fs::read_dir(path) {
         for entry in entries.flatten() {

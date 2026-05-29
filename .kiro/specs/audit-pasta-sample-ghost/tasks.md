@@ -18,7 +18,7 @@
   - _Boundary: image_generator_
 
 - [ ] 2. main.rsのRustイディオム改善とデッドコード除去
-- [ ] 2.1 main.rsの関数シグネチャ改善とデッドコード除去 (P)
+- [x] 2.1 main.rsの関数シグネチャ改善とデッドコード除去 (P)
   - `walkdir(path: &PathBuf)` → `walkdir(path: &Path)` にシグネチャ変更
   - `count_files(dir: &PathBuf)` → `count_files(dir: &Path)` にシグネチャ変更
   - 未使用のimport文がないことを `cargo clippy` で確認
