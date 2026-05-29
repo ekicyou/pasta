@@ -219,6 +219,11 @@ pub(crate) fn parse_local_start_scene_scope(
                     .items
                     .push(LocalSceneItem::CueCommand(parse_cue_cmd_line(inner)?));
             }
+            Rule::choice_line => {
+                scope
+                    .items
+                    .push(LocalSceneItem::Choice(parse_choice_line(inner)?));
+            }
             Rule::code_block => {
                 scope.code_blocks.push(parse_code_block(inner)?);
             }
@@ -275,6 +280,11 @@ pub(crate) fn parse_local_scene_scope(pair: Pair<Rule>) -> Result<LocalSceneScop
                     .items
                     .push(LocalSceneItem::CueCommand(parse_cue_cmd_line(inner)?));
             }
+            Rule::choice_line => {
+                scope
+                    .items
+                    .push(LocalSceneItem::Choice(parse_choice_line(inner)?));
+            }
             Rule::code_block => {
                 scope.code_blocks.push(parse_code_block(inner)?);
             }
@@ -283,6 +293,43 @@ pub(crate) fn parse_local_scene_scope(pair: Pair<Rule>) -> Result<LocalSceneScop
     }
 
     Ok(scope)
+}
+
+// ============================================================================
+// Choice Line Parsing
+// ============================================================================
+
+/// Parse a `choice_line` pair into a `ChoiceNode`.
+///
+/// grammar.pest:
+/// `choice_line = { pad ~ word_marker ~ question_marker ~ id ~ choice_label? ~ or_comment_eol }`
+/// `choice_label = { slfence_ja1 ~ string_contents ~ strclose }`
+pub(crate) fn parse_choice_line(pair: Pair<Rule>) -> Result<ChoiceNode, ParseError> {
+    let span = Span::from(&pair.as_span());
+    let mut target = String::new();
+    let mut label = None;
+
+    for inner in pair.into_inner() {
+        match inner.as_rule() {
+            Rule::id => {
+                target = inner.as_str().to_string();
+            }
+            Rule::choice_label => {
+                for label_inner in inner.into_inner() {
+                    if label_inner.as_rule() == Rule::string_contents {
+                        label = Some(label_inner.as_str().to_string());
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    Ok(ChoiceNode {
+        target,
+        label,
+        span,
+    })
 }
 
 // ============================================================================

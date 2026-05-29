@@ -169,6 +169,36 @@ pub enum LocalSceneItem {
     ContinueAction(ContinueAction),
     /// Cue command line (cue_cmd_line)
     CueCommand(CueCommandNode),
+    /// Choice line (choice_line)
+    Choice(ChoiceNode),
+}
+
+// ============================================================================
+// ChoiceNode - Choice Line AST Node
+// ============================================================================
+
+/// 選択肢行の AST ノード。
+///
+/// `＠？target「表示テキスト」` 形式の選択肢定義を構造的に保持する。
+///
+/// # grammar.pest 対応
+///
+/// `choice_line = { pad ~ word_marker ~ question_marker ~ id ~ choice_label? ~ or_comment_eol }`
+///
+/// # 例
+///
+/// | DSL 記法 | target | label |
+/// |---------|--------|-------|
+/// | `＠？挨拶` | `"挨拶"` | `None` |
+/// | `＠？挨拶「こんにちはを選ぶ」` | `"挨拶"` | `Some("こんにちはを選ぶ")` |
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChoiceNode {
+    /// ジャンプ先のシーン名（`id`）
+    pub target: String,
+    /// 任意の表示テキスト（`「」` 内文字列）。省略時 `None`
+    pub label: Option<String>,
+    /// ソース位置
+    pub span: Span,
 }
 
 // ============================================================================

@@ -1,6 +1,7 @@
 //! 選択肢行（＠？行）の PEG 文法ルールテスト
 //!
 //! Task 1.1: choice_line 文法規則のパーステスト
+//! Task 1.2: AST 構築テスト（ChoiceNode / parse_choice_line）
 
 use pasta_dsl::parser::*;
 use pest::Parser as PestParser;
@@ -97,6 +98,133 @@ fn test_choice_line_in_scene_context() {
 ";
     let result = PastaParser2::parse(Rule::file, source);
     assert!(result.is_ok(), "シーン内の選択肢行がパースできること: {:?}", result.err());
+}
+
+// ============================================================================
+// Task 1.2: AST-level parse tests (ChoiceNode / parse_choice_line)
+// ============================================================================
+
+/// Parse source and extract ChoiceNodes from the first global scene's local scenes.
+fn parse_and_extract_choices(source: &str) -> Vec<ChoiceNode> {
+    let file = parse_str(source, "test.pasta").expect("Parse should succeed");
+    let mut choices = Vec::new();
+    for item in &file.items {
+        if let FileItem::GlobalSceneScope(scene) = item {
+            for local in &scene.local_scenes {
+                for li in &local.items {
+                    if let LocalSceneItem::Choice(node) = li {
+                        choices.push(node.clone());
+                    }
+                }
+            }
+        }
+    }
+    choices
+}
+
+#[test]
+fn test_ast_choice_node_shorthand() {
+    let source = "\
+＊メニュー
+  ＠？挨拶
+";
+    let choices = parse_and_extract_choices(source);
+    assert_eq!(choices.len(), 1);
+    assert_eq!(choices[0].target, "挨拶");
+    assert_eq!(choices[0].label, None);
+}
+
+#[test]
+fn test_ast_choice_node_with_label() {
+    let source = "\
+＊メニュー
+  ＠？挨拶「こんにちはを選ぶ」
+";
+    let choices = parse_and_extract_choices(source);
+    assert_eq!(choices.len(), 1);
+    assert_eq!(choices[0].target, "挨拶");
+    assert_eq!(choices[0].label, Some("こんにちはを選ぶ".to_string()));
+}
+
+#[test]
+fn test_ast_choice_node_halfwidth() {
+    let source = "\
+＊メニュー
+  @?greeting
+";
+    let choices = parse_and_extract_choices(source);
+    assert_eq!(choices.len(), 1);
+    assert_eq!(choices[0].target, "greeting");
+    assert_eq!(choices[0].label, None);
+}
+
+#[test]
+fn test_ast_choice_node_halfwidth_with_label() {
+    let source = "\
+＊メニュー
+  @?greeting「say hello」
+";
+    let choices = parse_and_extract_choices(source);
+    assert_eq!(choices.len(), 1);
+    assert_eq!(choices[0].target, "greeting");
+    assert_eq!(choices[0].label, Some("say hello".to_string()));
+}
+
+#[test]
+fn test_ast_multiple_choices_in_scene() {
+    let source = "\
+＊メニュー
+  さくら：選んでね。
+  ＠？挨拶
+  ＠？雑談「雑談する」
+  ＠？終了
+";
+    let choices = parse_and_extract_choices(source);
+    assert_eq!(choices.len(), 3);
+    assert_eq!(choices[0].target, "挨拶");
+    assert_eq!(choices[0].label, None);
+    assert_eq!(choices[1].target, "雑談");
+    assert_eq!(choices[1].label, Some("雑談する".to_string()));
+    assert_eq!(choices[2].target, "終了");
+    assert_eq!(choices[2].label, None);
+}
+
+#[test]
+fn test_ast_choice_in_local_scene() {
+    let source = concat!(
+        "＊メニュー\n",
+        "    さくら：こんにちは\n",
+        "    ・サブメニュー\n",
+        "    ＠？戻る\n",
+        "    ＠？進む「次へ進む」\n",
+    );
+    let file = parse_str(source, "test.pasta").expect("Parse should succeed");
+    let scene = match &file.items[0] {
+        FileItem::GlobalSceneScope(s) => s,
+        _ => panic!("Expected GlobalSceneScope"),
+    };
+
+    // local_scenes[0] = start scene, local_scenes[1] = named local scene
+    assert_eq!(scene.local_scenes.len(), 2);
+    let named_local = &scene.local_scenes[1];
+    assert_eq!(named_local.name, Some("サブメニュー".to_string()));
+
+    let choices: Vec<_> = named_local
+        .items
+        .iter()
+        .filter_map(|item| {
+            if let LocalSceneItem::Choice(node) = item {
+                Some(node)
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert_eq!(choices.len(), 2);
+    assert_eq!(choices[0].target, "戻る");
+    assert_eq!(choices[0].label, None);
+    assert_eq!(choices[1].target, "進む");
+    assert_eq!(choices[1].label, Some("次へ進む".to_string()));
 }
 
 #[test]

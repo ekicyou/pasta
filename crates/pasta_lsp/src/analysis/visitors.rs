@@ -570,6 +570,9 @@ impl super::AnalysisEngine {
                     Self::visit_cue_command(cue, source, tokens);
                 }
             }
+            LocalSceneItem::Choice(_) => {
+                // 選択肢行のセマンティックトークン生成（将来実装）
+            }
         }
     }
 

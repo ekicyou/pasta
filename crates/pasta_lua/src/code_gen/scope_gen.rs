@@ -283,6 +283,9 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                 LocalSceneItem::CueCommand(_) => {
                     // キューコマンドは Lua コード生成の対象外（dola 側で処理）
                 }
+                LocalSceneItem::Choice(_) => {
+                    // 選択肢行は Lua コード生成の対象外（dola 側で処理）
+                }
             }
         }
 
