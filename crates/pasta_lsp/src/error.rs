@@ -1,6 +1,9 @@
 //! Error types for the Pasta Language Server.
 
 /// pasta_lsp固有のエラー型
+// `LangServerError` は `lib.rs` から再公開される公開 API であり、
+// 現状クレート内で未使用でも downstream から各バリアントを参照・構築される可能性があるため残す。
+#[allow(dead_code)]
 #[derive(Debug, thiserror::Error)]
 pub enum LangServerError {
     /// pasta_dslパースエラー（Diagnosticsに変換して続行）

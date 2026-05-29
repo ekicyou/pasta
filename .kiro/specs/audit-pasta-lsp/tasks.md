@@ -37,7 +37,7 @@
   - _Boundary: AnalysisEngine_
 
 - [ ] 4. デッドコード除去
-- [ ] 4.1 (P) LangServerError 使用状況調査と対応
+- [x] 4.1 (P) LangServerError 使用状況調査と対応
   - `LangServerError` の3バリアント（`Parse`, `DocumentNotFound`, `Internal`）がクレート内外で使用されているか `grep` で調査
   - `lib.rs` で `pub use error::LangServerError` として公開されていることを確認
   - 未使用バリアントがあり、かつ外部から参照されていなければ除去
