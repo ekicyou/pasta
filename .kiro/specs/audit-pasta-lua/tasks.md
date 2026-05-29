@@ -93,7 +93,7 @@
   - _Requirements: 6.2, 6.4_
   - _Boundary: sakura_script_
 
-- [ ] 6.3 (P) logging/ およびその他ユーティリティの監査
+- [x] 6.3 (P) logging/ およびその他ユーティリティの監査
   - logging/ でユーザーデータや機密情報がログ出力に含まれないことを検証
   - context.rs, normalize.rs, string_literalizer.rs のデッドコードと冗長パターンを確認し削減
   - 変更後に関連テストが全パスする状態

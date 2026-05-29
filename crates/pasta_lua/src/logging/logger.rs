@@ -81,27 +81,7 @@ impl PastaLogger {
     /// Prevents path traversal attacks by ensuring the log path
     /// stays within the profile/pasta/ directory.
     fn validate_path(base_dir: &Path, log_path: &Path) -> io::Result<()> {
-        // Canonicalize paths for comparison
-        // Note: log_path may not exist yet, so we canonicalize its parent
-        let base_canonical = base_dir
-            .canonicalize()
-            .unwrap_or_else(|_| base_dir.to_path_buf());
-
-        // Check that the log path starts with base_dir
-        let log_canonical = if let Some(parent) = log_path.parent() {
-            if parent.exists() {
-                let parent_canonical = parent.canonicalize()?;
-                parent_canonical.join(log_path.file_name().unwrap_or_default())
-            } else {
-                // Parent doesn't exist yet, just normalize the path
-                log_path.to_path_buf()
-            }
-        } else {
-            log_path.to_path_buf()
-        };
-
         // The log path should be within profile/ directory
-        // Allow paths that contain "profile" in them
         let relative = log_path.strip_prefix(base_dir).map_err(|_| {
             io::Error::new(
                 io::ErrorKind::PermissionDenied,
@@ -110,7 +90,7 @@ impl PastaLogger {
         })?;
 
         let relative_str = relative.to_string_lossy();
-        if !relative_str.starts_with("profile") && !relative_str.starts_with("profile/") {
+        if !relative_str.starts_with("profile") {
             return Err(io::Error::new(
                 io::ErrorKind::PermissionDenied,
                 format!("Log path must be within profile/ directory: {:?}", log_path),
@@ -125,7 +105,6 @@ impl PastaLogger {
             ));
         }
 
-        let _ = (base_canonical, log_canonical); // silence unused warning
         Ok(())
     }
 
@@ -135,12 +114,20 @@ impl PastaLogger {
     }
 
     /// Write bytes to the log file.
+    ///
+    /// # Panics
+    /// Panics if the internal Mutex is poisoned (another thread panicked while holding the lock).
+    /// This is intentional: a poisoned mutex indicates unrecoverable state corruption.
     pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
         let mut writer = self.writer.lock().unwrap();
         writer.write(buf)
     }
 
     /// Flush the log buffer.
+    ///
+    /// # Panics
+    /// Panics if the internal Mutex is poisoned (another thread panicked while holding the lock).
+    /// This is intentional: a poisoned mutex indicates unrecoverable state corruption.
     pub fn flush(&self) -> io::Result<()> {
         let mut writer = self.writer.lock().unwrap();
         writer.flush()
