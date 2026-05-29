@@ -245,6 +245,25 @@ function ACT_IMPL.clear(self)
     return self
 end
 
+--- 選択肢トークン蓄積（構造化データのみ、さくらスクリプト非依存）
+--- @param self Act アクションオブジェクト
+--- @param target string 選択肢のジャンプ先
+--- @param display string|nil 表示テキスト（nilの場合targetを使用）
+--- @return Act self メソッドチェーン用
+function ACT_IMPL.choice(self, target, display)
+    table.insert(self.token, { type = "choice", target = target, display = display or target })
+    return self
+end
+
+--- 選択肢タイムアウトトークン蓄積（構造化データのみ、さくらスクリプト非依存）
+--- @param self Act アクションオブジェクト
+--- @param seconds number|nil タイムアウト秒数（nilの場合は引数なし）
+--- @return Act self メソッドチェーン用
+function ACT_IMPL.choice_timeout(self, seconds)
+    table.insert(self.token, { type = "choice_timeout", seconds = seconds })
+    return self
+end
+
 --- ハンドラーフォールバック検索コア（6段階）
 ---
 --- 検索レベル:
