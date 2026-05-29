@@ -160,6 +160,32 @@ REG.OnGhostChanged = function(req)
 end
 ```
 
+### 選択肢系
+
+#### OnChoiceSelectEx — 選択肢選択
+
+ユーザーが `\q[表示,ID]` 選択肢をクリックしたときにSSPが発火する。
+デフォルトハンドラが `pasta.shiori.event.choice_select` で自動登録されるため、通常はゴースト作者の明示的な登録は不要。
+
+| Reference          | 型     | 説明                   |
+| ------------------ | ------ | ---------------------- |
+| `req.reference[0]` | string | 選択ID（`\q` の第2引数）|
+| `req.reference[1]` | string | 表示テキスト           |
+
+**デフォルト動作**（自動登録ハンドラ）:
+1. `＊OnChoiceSelectEx` 明示シーンが存在すれば優先実行
+2. `STORE.last_global_scene` をスコープとして `SCENE.search(選択ID)` で前方一致検索
+3. マッチするシーンが見つかればコルーチンとして実行
+4. 見つからなければ `nil`（204 No Content）
+
+**カスタマイズ**:
+```lua
+REG.OnChoiceSelectEx = function(act)
+    local choice_id = act.req.reference[0]
+    -- カスタム処理
+end
+```
+
 ### マウス操作系
 
 #### OnMouseDoubleClick — ダブルクリック

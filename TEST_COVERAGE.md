@@ -2,8 +2,8 @@
 
 このドキュメントは、[SOUL.md](SOUL.md) で定義されたコア機能と、それを検証するテストの対応関係を示します。
 
-**最終更新**: 2026-05-26（`shiori-event-test-framework` SHIORIイベントフロー試験基盤）  
-**総テスト数**: 1019+テスト（全パス ✅）
+**最終更新**: 2026-05-29（`choice-definition-dsl` 選択肢定義DSL）  
+**総テスト数**: 1050+テスト（全パス ✅）
 
 ---
 
@@ -39,6 +39,7 @@
 | さくらスクリプト記号タグ     | `sakura_symbol_tag_test.rs`                    | ✅ 完了 | `-+*?&` 5文字タグパース（7テスト）              |
 | キューコマンド行（！/!）     | `cue_cmd_test.rs`                              | ✅ 完了 | 63テスト（AST型・PEG文法・パース・推定）        |
 | プロパティスコープ（＄％）   | `property_scope_test.rs`                       | ✅ 完了 | 16テスト（property-dsl-extension）              |
+| 選択肢行（＠？）             | `choice_line_test.rs`                          | ✅ 完了 | 選択肢行パース（省略形・括弧形・半角対応）      |
 
 ### 2.2 Registry層テスト（シーン/単語テーブル）
 
@@ -64,6 +65,8 @@
 | エンコーディング       | `pasta_lua_encoding_test.rs`                                                                | ✅ 完了 | 文字エンコード                     |
 | プロパティLua変換      | `property_scope_codegen_test.rs`                                                            | ✅ 完了 | 10テスト（property-dsl-extension） |
 | プロパティトークン保全 | `property_token_preservation_test.rs`                                                       | ✅ 完了 | 3テスト（property-dsl-extension）  |
+| 選択肢Lua変換          | `scope_gen.rs`                                                                              | ✅ 完了 | 選択肢行→act:choice()変換          |
+| 選択肢タイムアウトLua変換 | `scope_gen.rs`                                                                           | ✅ 完了 | !select→act:choice_timeout()変換   |
 
 ### 2.4 Runtime層テスト（実行エンジン）
 
@@ -104,6 +107,7 @@
 | スポット位置永続化（STORE連携）       | `persist_spot_position_test.lua`                                  | ✅ 完了 | 5テスト（persist-spot-position）                                 |
 | sakura_builder スポット処理           | `sakura_builder_test.lua`                                         | ✅ 完了 | 3テスト（persist-spot-position追加分）                           |
 | sakura_builder sakura_script処理      | `sakura_builder_test.lua`                                         | ✅ 完了 | 3テスト（act-sakura-script-method追加分）                        |
+| 選択肢さくらスクリプト変換            | `sakura_builder_test.lua`                                         | ✅ 完了 | choice/choice_timeoutトークン→\q[],\![set,choicetimeout]変換    |
 | Action::SakuraScript アクター紐付け   | `snapshot_test.rs`                                                | ✅ 完了 | 1スナップショット（act-sakura-script-method）                    |
 | Luaパススルー（init.*拒否）           | `lua_passthrough_test.rs`                                         | ✅ 完了 | 2テスト（lua-passthrough）                                       |
 | Luaパススルー（.lua検出・コピー）     | `lua_passthrough_test.rs`                                         | ✅ 完了 | 3テスト（lua-passthrough）                                       |
@@ -115,6 +119,7 @@
 | ログファイル名固定（Rotation::NEVER） | `logger.rs`                                                       | ✅ 完了 | 1テスト（load-error-logging）                                    |
 | load失敗→requestエラー伝搬            | `shiori_tests.rs`                                                 | ✅ 完了 | 1テスト（load-error-logging）                                    |
 | 非同期コールバック統合（SHIORI層）    | `async_callback_integration_test.rs`                              | ✅ 完了 | 12テスト（shiori-async-talk、property-dsl-extension追加2テスト） |
+| OnChoiceSelectEx 自動ルーティング     | `choice_select_test.lua`（Luaテストスイート）                     | ✅ 完了 | 選択肢コールバック→シーン自動解決                                |
 
 ### 2.5 LSP層テスト（Language Server）
 
@@ -226,11 +231,11 @@
 | ------------ | --------- | --------- | ----- | ---------------------------------------------------------- |
 | pasta_dsl    | 153       | 153       | 0     | 優秀（cue_cmd 63テスト含む）                               |
 | pasta_core   | 67        | 67        | 0     | ⭐⭐⭐⭐⭐ 優秀                                                 |
-| pasta_lua    | 491       | 491       | 0     | 優秀（cue_command_passthrough 5テスト・mocks 8テスト含む） |
+| pasta_lua    | 522       | 522       | 0     | 優秀（cue_command_passthrough 5テスト・mocks 8テスト含む） |
 | pasta_lsp    | 79        | 79        | 0     | ⭐⭐⭐⭐⭐ 優秀                                                 |
 | pasta_shiori | 47        | 47        | 0     | ⭐⭐⭐⭐⭐ 優秀（ShioriTestEnv・X-Pasta-Time追加）              |
 | pasta-vscode | 79        | 79        | 0     | ⭐⭐⭐⭐⭐ 優秀                                                 |
-| **合計**     | **1019+** | **1019+** | **0** | **100%パス率**                                             |
+| **合計**     | **1050+** | **1050+** | **0** | **100%パス率**                                             |
 
 ---
 

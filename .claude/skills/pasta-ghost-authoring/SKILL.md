@@ -44,6 +44,7 @@ metadata:
 | グローバルシーン | `＊` | `*`  | シーン定義                   | `＊OnBoot`                                                                | [grammar-model.md](references/grammar-model.md)       |
 | ローカルシーン   | `・` | `-`  | サブシーン定義               | `・選択肢1`                                                               | [grammar-model.md](references/grammar-model.md)       |
 | 単語/関数        | `＠` | `@`  | 単語定義・参照・関数呼び出し | `＠挨拶：こんにちは、やあ` / `＠女性、妖精：水無灯里、アリス`（複数キー） | [words.md](references/words.md)                       |
+| 選択肢           | `＠？` | `@?` | 選択肢定義                   | `＠？挨拶「挨拶する」`                                                    | [grammar-model.md](references/grammar-model.md)       |
 | 変数             | `＄` | `$`  | 変数宣言・参照               | `＄count＝1` / `＄％prop＝v`                                              | [variables.md](references/variables.md)               |
 | Call             | `＞` | `>`  | シーン呼び出し               | `＞次の会話`                                                              | [call-spec.md](references/call-spec.md)               |
 | 属性             | `＆` | `&`  | メタデータ                   | `＆author：Alice`                                                         | [grammar-model.md](references/grammar-model.md)       |
@@ -249,6 +250,49 @@ end
 
 > 📖 詳細: [references/grammar-model.md](references/grammar-model.md)
 
+### 3.10 Choice Lines（選択肢行）
+
+選択肢行は `＠？` マーカーで開始し、プレイヤーに提示する選択肢を宣言的に定義する。
+
+#### 省略形
+```pasta
+＠？挨拶
+```
+ターゲット名がそのまま表示テキストになる。
+
+#### 括弧形
+```pasta
+＠？挨拶「挨拶する」
+```
+「」内が表示テキスト。ターゲット名と異なるラベルを指定できる。
+
+#### 選択肢タイムアウト
+```pasta
+!select(30)
+```
+`!select(秒数)` キューコマンドで選択の制限時間を設定する。
+
+#### 自動ルーティング
+選択後は `OnChoiceSelectEx` イベントハンドラが選択IDでシーンを前方一致検索し自動実行する。ローカルシーン → グローバルシーンの順で検索。
+
+#### 使用例
+```pasta
+＊OnMouseDoubleClick
+　％女の子、男の子
+　女の子：＠通常　何をしますか？
+　＠？挨拶「挨拶する」
+　＠？自己紹介
+　!select(30)
+
+　・挨拶
+　　女の子：＠笑顔　こんにちは！
+
+　・自己紹介
+　　女の子：＠通常　私は女の子だよ。
+```
+
+> 📖 詳細: [references/grammar-model.md](references/grammar-model.md)
+
 ---
 
 ## §4 Project Structure（プロジェクト構造）
@@ -335,6 +379,7 @@ end
 | §6.8 ファイル分割ガイド   | 責務別ファイル構成             | —              |
 | §6.9 自然言語→シーン変換  | LLM 向け変換ワークフロー       | —              |
 | §6.10 複数キー単語定義    | `＠キー1、キー2：値` 構文      | —              |
+| §6.11 選択肢メニュー      | `＠？` 選択肢定義              | —              |
 
 ### 代表パターン: ランダムトーク
 

@@ -412,6 +412,46 @@ cue_arg ::= cue_arg_number | cue_arg_string | cue_arg_at_ref | cue_arg_id
 
 ---
 
+## 2.12 選択肢マーカー
+
+### 選択肢行（Choice Line Marker）
+
+```text
+選択肢マーカー ::= word_marker ~ question_marker
+word_marker     ::= "＠" | "@"
+question_marker ::= "？" | "?"
+使用例: ＠？挨拶「挨拶する」  or  @?greeting
+```
+
+**セマンティクス**: プレイヤーに提示する選択肢を宣言的に定義する。ジャンプ先シーン名（`target`）と任意の表示テキスト（`choice_label`）を指定する。
+
+**構文**:
+```
+choice_line   ::= pad ~ word_marker ~ question_marker ~ id ~ choice_label? ~ or_comment_eol
+choice_label  ::= slfence_ja1 ~ string_contents ~ strclose
+```
+
+**フィールド**:
+| フィールド | 型             | 説明                                     |
+|-----------|----------------|------------------------------------------|
+| target    | 識別子          | ジャンプ先シーン名（OnChoiceSelectExで使用）|
+| label     | 文字列（任意）  | 表示テキスト（省略時はtargetと同一）       |
+
+**全角/半角対応**: `＠？` / `@?` は等価。括弧 `「」` のみ全角。
+
+**Lua変換**: `act:choice(target, display)` メソッド呼び出しに変換。最終的に `\![*]\q[display,target]` さくらスクリプトを生成。
+
+**例**:
+```pasta
+＠？挨拶              # target="挨拶", label=nil → 表示="挨拶"
+＠？挨拶「こんにちは」 # target="挨拶", label="こんにちは"
+@?greeting             # 半角でも可
+```
+
+**関連**: 選択肢タイムアウトは `!select(秒数)` キューコマンド（§2.11）で設定する。
+
+---
+
 **関連章**:
 - [Chapter 1: 文法モデルの基本原則](01-grammar-model.md) - 基本原則
 - [Chapter 3: 行とブロック構造](03-block-structure.md) - ブロック構造

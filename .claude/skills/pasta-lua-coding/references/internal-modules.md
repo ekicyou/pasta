@@ -25,6 +25,7 @@ STORE.local_words = {}     -- table<string, table>    ローカル単語レジ�
 STORE.actor_words = {}     -- table<string, table>    アクター単語レジストリ
 STORE.app_ctx = {}         -- table                   汎用コンテキストデータ
 STORE.co_scene = nil       -- thread|nil              継続コルーチン（OnTalk等）
+STORE.last_global_scene = nil -- string|nil           最後にinit_scene()されたグローバルシーン名
 ```
 
 ### reset()
@@ -116,6 +117,8 @@ function SCENE.my_scene(act)
     var.temp = "一時データ"                   -- アクション内のみ有効
 end
 ```
+
+**副作用**: グローバルシーンの場合、`STORE.last_global_scene` に `scene.__global_name__` を記録する。この値は `OnChoiceSelectEx` ハンドラがスコープ付きシーン検索に使用する。
 
 ### トーク系メソッド
 
@@ -367,6 +370,37 @@ function SCENE.my_scene(act)
     act:talk(act.さくら.actor, "次のセリフ")
     act:yield()  -- 2回目の送出
 end
+```
+
+### choice(target, display)
+
+選択肢トークンを蓄積する。`sakura_builder` で `\![*]\q[display,target]` さくらスクリプトに変換される。
+
+```lua
+--- @param target string ジャンプ先シーン名
+--- @param display string|nil 表示テキスト（nilの場合targetを使用）
+--- @return Act self メソッドチェーン用
+function ACT_IMPL.choice(self, target, display) end
+```
+
+```lua
+act:choice("挨拶", "挨拶する")
+act:choice("自己紹介")  -- displayはtargetと同一
+```
+
+### choice_timeout(seconds)
+
+選択肢タイムアウトトークンを蓄積する。`sakura_builder` で `\![set,choicetimeout,ミリ秒]` さくらスクリプトに変換される。
+
+```lua
+--- @param seconds number|nil タイムアウト秒数（nilの場合は0＝タイムアウトなし）
+--- @return Act self メソッドチェーン用
+function ACT_IMPL.choice_timeout(self, seconds) end
+```
+
+```lua
+act:choice_timeout(30)  -- 30秒でタイムアウト
+act:choice_timeout()    -- タイムアウトなし
 ```
 
 ### PROXYパターン

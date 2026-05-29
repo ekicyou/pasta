@@ -76,7 +76,7 @@ metadata:
 | `pasta.word`                  | 単語ビルダー           | `WORD.create_global()`, `WORD.create_local()`, `WORD.create_actor()` |
 | `pasta.global`                | ユーザー定義関数       | `GLOBAL.関数名 = function(act) ... end`                              |
 | `pasta.save`                  | 永続化データ           | `require("pasta.save")`                                              |
-| `pasta.act`                   | シーン実行コンテキスト | `act:init_scene()`, `act:talk()`, `act:yield()`                      |
+| `pasta.act`                   | シーン実行コンテキスト | `act:init_scene()`, `act:talk()`, `act:yield()`, `act:choice()`, `act:choice_timeout()` |
 | `pasta.shiori.event.register` | イベントハンドラ登録   | `REG.EventName = function(req) ... end`                              |
 | `pasta.shiori.res`            | SHIORIレスポンス       | `RES.ok()`, `RES.no_content()`                                       |
 
@@ -141,7 +141,7 @@ pasta.*名前空間の内部Luaモジュール。`STORE`（一元データ管理
 
 ## §6 SHIORI Handlers
 
-SHIORIイベントハンドラの登録と応答。`REG`テーブルにイベントハンドラを登録し、`RES.ok()`/`RES.no_content()`等でレスポンスを返す。主要イベント（OnBoot, OnClose, OnMouseDoubleClick等）のreference[N]仕様。`OnTalk`/`OnHour`を自動発行する仮想ディスパッチャ。REG未登録時のシーン検索フォールバックチェーン。
+SHIORIイベントハンドラの登録と応答。`REG`テーブルにイベントハンドラを登録し、`RES.ok()`/`RES.no_content()`等でレスポンスを返す。主要イベント（OnBoot, OnClose, OnMouseDoubleClick, OnChoiceSelectEx等）のreference[N]仕様。`OnTalk`/`OnHour`を自動発行する仮想ディスパッチャ。`OnChoiceSelectEx`選択肢自動ルーティング。REG未登録時のシーン検索フォールバックチェーン。
 
 > 📖 詳細: [references/shiori-handlers.md](references/shiori-handlers.md)
 
