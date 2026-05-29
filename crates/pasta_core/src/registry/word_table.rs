@@ -115,7 +115,7 @@ impl WordTable {
             let mut global_entry_ids: Vec<usize> = Vec::new();
             for (matched_key, ids) in self.prefix_index.iter_prefix(key.as_bytes()) {
                 // Skip local keys (start with ':')
-                if !matched_key.starts_with(&[b':']) {
+                if !matched_key.starts_with(b":") {
                     global_entry_ids.extend(ids.iter().copied());
                 }
             }
@@ -195,12 +195,11 @@ impl WordTable {
         let cache_key = WordCacheKey::new(module_name, key);
 
         // Check if cache exists and has remaining words
-        if let Some(cached) = self.cached_selections.get_mut(&cache_key) {
-            if cached.next_index < cached.words.len() {
-                let word = cached.words[cached.next_index].clone();
-                cached.next_index += 1;
-                return Ok(word);
-            }
+        if let Some(cached) = self.cached_selections.get_mut(&cache_key)
+            && let Some(word) = cached.words.get(cached.next_index).cloned()
+        {
+            cached.next_index += 1;
+            return Ok(word);
         }
 
         // Collect all word candidates
@@ -213,11 +212,16 @@ impl WordTable {
         }
         let shuffled_words: Vec<String> = word_indices
             .into_iter()
-            .map(|i| all_words[i].clone())
+            .filter_map(|i| all_words.get(i).cloned())
             .collect();
 
         // Step 5: Return first word and cache the rest
-        let result = shuffled_words[0].clone();
+        let result = shuffled_words
+            .first()
+            .cloned()
+            .ok_or_else(|| WordTableError::WordNotFound {
+                key: key.to_string(),
+            })?;
         self.cached_selections.insert(
             cache_key,
             CachedWordSelection {
