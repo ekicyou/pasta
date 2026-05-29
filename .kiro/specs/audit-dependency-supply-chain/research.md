@@ -125,3 +125,54 @@
 - Requirement 1.1 / 1.4 を満たす形で、Cargo.lockベースの全直接・間接依存監査を実行済み
 - Requirement 1.2 は「既知脆弱性が検出された場合」に備える記録項目だが、今回は脆弱性0件のため該当なし
 - Requirement 6.1 / 6.2 を満たす形で、実行日時・ツールバージョン・監査範囲・構造化結果を本書に記録済み
+
+## License Audit Results
+
+### 2026-05-30 cargo-deny実行結果
+- **対応要件**: 2.1, 2.2, 2.3, 2.4, 6.2
+- **実行日時**: 2026-05-30T08:39:33.6233350+09:00
+- **使用ツール**: `cargo-deny 0.19.8`
+- **監査対象範囲**: `C:\home\maz\git\pasta` の `Cargo.lock` を対象にライセンス監査を実行。`cargo deny list -f json -l crate` で確認できた外部依存は 291 クレートで、workspace の path 依存 7 クレートは下記在庫から除外した。
+- **実行コマンド**:
+  - `cargo deny check licenses` → 終了コード `0`
+  - `cargo deny check licenses --format json` → 終了コード `2`（`cargo-deny 0.19.8` では `--format` が未対応だったため、代替として `cargo deny -f json check licenses` を使用）
+  - `cargo deny -f json check licenses` → 終了コード `0`
+  - `cargo deny list -f json -l crate` → 終了コード `0`
+- **JSON要約**: errors=`0`, warnings=`1`, notes=`0`, helps=`298`
+
+#### ライセンス監査結果（Requirement 2）
+- **互換性判定**: **PASS**。`cargo deny check licenses` は終了コード 0 で完了し、deny.toml ポリシーに対する非互換ライセンスのエラーは検出されなかった。
+- **非互換ライセンス記録**: 該当なし。クレート名とライセンス種別の記録が必要な拒否項目は 0 件。
+- **警告**: `license-not-encountered`（warning）。deny.toml の `ISC` 許可設定が今回の依存グラフでは未使用であることを示す設定警告であり、依存クレート自体の不整合ではない。
+- **補足**: `LGPL-2.1-or-later` と `0BSD` は SPDX 識別子として観測されたが、実際には `r-efi 5.3.0/6.0.0 = MIT OR Apache-2.0 OR LGPL-2.1-or-later`、`adler2 2.0.1 = 0BSD OR MIT OR Apache-2.0` のような複数選択肢ライセンスの一部として現れており、cargo-deny は許可済みの `MIT` / `Apache-2.0` 選択肢を含むためエラーにしていない。
+
+#### Vendored ソース確認（Requirement 2.4）
+- ルート `Cargo.toml` では `mlua = { version = "0.11", features = ["luajit52", "vendored", "serialize"] }` を確認し、`mlua` が vendored LuaJIT を使う構成であることを確認した。
+- `Cargo.lock` では `mlua 0.11.6` が `mlua-sys 0.10.0` に依存し、`mlua-sys 0.10.0` が `luajit-src 210.6.6+707c12b` を build dependency に含むことを確認した。
+- `C:\Users\maz\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\mlua-sys-0.10.0\Cargo.toml` では `license = "MIT"` と `vendored = ["lua-src", "luajit-src"]` を確認した。
+- `C:\Users\maz\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\luajit-src-210.6.6+707c12b\Cargo.toml` では `license = "MIT"`、同梱 `luajit2\COPYRIGHT` では `[ MIT license: https://www.opensource.org/licenses/mit-license.php ]` を確認した。
+- **vendored 判定**: `mlua` が同梱する LuaJIT ソースは **MIT License** であり、プロジェクトライセンス（MIT OR Apache-2.0）と互換であることを明示確認した。
+
+#### ライセンス在庫（外部依存のみ）
+- 集計方法: `cargo deny list -f json -l crate` の結果を SPDX 識別子ごとに再集計した。複数ライセンスのクレートは各識別子に重複して現れるため、下記件数の合計は外部依存クレート数 291 を上回る。
+- **観測された SPDX 識別子**: `0BSD`, `Apache-2.0`, `Apache-2.0 WITH LLVM-exception`, `BSD-2-Clause`, `BSD-3-Clause`, `BSL-1.0`, `CC0-1.0`, `LGPL-2.1-or-later`, `MIT`, `NCSA`, `Unicode-3.0`, `Unlicense`, `Zlib`
+- **識別子別件数**:
+  - `0BSD`: 1 crate
+  - `Apache-2.0`: 202 crates
+  - `Apache-2.0 WITH LLVM-exception`: 5 crates
+  - `BSD-2-Clause`: 5 crates
+  - `BSD-3-Clause`: 6 crates
+  - `BSL-1.0`: 1 crate
+  - `CC0-1.0`: 1 crate
+  - `LGPL-2.1-or-later`: 2 crates
+  - `MIT`: 253 crates
+  - `NCSA`: 1 crate
+  - `Unicode-3.0`: 19 crates
+  - `Unlicense`: 3 crates
+  - `Zlib`: 8 crates
+
+#### 総括
+- Requirement 2.1 / 2.3 を満たす形で、cargo-deny によるライセンス監査を実行し、依存グラフ上で使用中のライセンス識別子を research.md に記録した。
+- Requirement 2.2 については、非互換ライセンス検出時に記録すべき対象は今回は 0 件であり、その旨を明示した。
+- Requirement 2.4 を満たす形で、`mlua` の vendored LuaJIT ソースが MIT License であることを crate metadata と同梱 `COPYRIGHT` の両方で確認した。
+- Requirement 6.2 を満たす形で、実行コマンド、結果、警告、ライセンス在庫、互換性 verdict を本書に追記した。

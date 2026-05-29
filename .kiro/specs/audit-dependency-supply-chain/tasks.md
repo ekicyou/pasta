@@ -19,7 +19,7 @@
   - _Requirements: 2.1, 2.2, 2.3, 6.1_
 
 - [ ] 2. ライセンス互換性監査
-- [ ] 2.1 cargo-denyによるライセンス監査を実行し結果を記録する
+- [x] 2.1 cargo-denyによるライセンス監査を実行し結果を記録する
   - `cargo deny check licenses` を実行し、全依存のライセンスを検査する
   - vendoredソース（mlua/LuaJIT — MIT License）のライセンスも確認する
   - 非互換ライセンスが検出された場合は該当クレート名とライセンス種別をresearch.mdに記録する
