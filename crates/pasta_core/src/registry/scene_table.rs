@@ -196,44 +196,9 @@ impl SceneTable {
             });
         }
 
-        // Phase 3: Get or create cache entry
-        // Note: 旧 resolve_scene_id は module_name なしで呼び出されるため、空文字を使用
+        // Phase 3-5: Cache-based sequential selection
         let cache_key = SceneCacheKey::new("", search_key, filters);
-        let needs_reset = {
-            let cached = self.cache.entry(cache_key.clone()).or_insert_with(|| {
-                let mut id_values: Vec<usize> = filtered_ids.iter().map(|id| id.0).collect();
-                if self.shuffle_enabled {
-                    self.random_selector.shuffle_usize(&mut id_values);
-                }
-                let ids = id_values.into_iter().map(SceneId).collect();
-                CachedSelection {
-                    candidates: ids,
-                    next_index: 0,
-                    history: Vec::new(),
-                }
-            });
-            cached.next_index >= cached.candidates.len()
-        };
-
-        // Phase 4: Reset if needed (借用解放済み)
-        if needs_reset {
-            let cached = self.cache.get_mut(&cache_key).unwrap();
-            cached.next_index = 0;
-            cached.history.clear();
-            if self.shuffle_enabled {
-                let mut id_values: Vec<usize> = cached.candidates.iter().map(|id| id.0).collect();
-                self.random_selector.shuffle_usize(&mut id_values);
-                cached.candidates = id_values.into_iter().map(SceneId).collect();
-            }
-        }
-
-        // Phase 5: Sequential selection
-        let cached = self.cache.get_mut(&cache_key).unwrap();
-        let selected_id = cached.candidates[cached.next_index];
-        cached.next_index += 1;
-        cached.history.push(selected_id);
-
-        Ok(selected_id)
+        self.select_from_cache(cache_key, filtered_ids)
     }
 
     /// Resolve scene ID with unified scope search (local + global).
@@ -277,8 +242,23 @@ impl SceneTable {
             });
         }
 
-        // Phase 3: Get or create cache entry with module context
+        // Phase 3-5: Cache-based sequential selection
         let cache_key = SceneCacheKey::new(module_name, search_key, filters);
+        self.select_from_cache(cache_key, filtered_ids)
+    }
+
+    /// Common helper for cache-based sequential scene selection (Phase 3-5).
+    ///
+    /// # Algorithm
+    /// - Phase 3: Get or create cache entry with shuffled candidates
+    /// - Phase 4: Reset cache when all candidates have been consumed
+    /// - Phase 5: Return next candidate from cache
+    fn select_from_cache(
+        &mut self,
+        cache_key: SceneCacheKey,
+        filtered_ids: Vec<SceneId>,
+    ) -> Result<SceneId, SceneTableError> {
+        // Phase 3: Get or create cache entry
         let needs_reset = {
             let cached = self.cache.entry(cache_key.clone()).or_insert_with(|| {
                 let mut id_values: Vec<usize> = filtered_ids.iter().map(|id| id.0).collect();
@@ -295,21 +275,30 @@ impl SceneTable {
             cached.next_index >= cached.candidates.len()
         };
 
-        // Phase 4: Reset if needed (借用解放済み)
-        if needs_reset {
-            let cached = self.cache.get_mut(&cache_key).unwrap();
+        // Phase 4: Reset if needed (borrowing released above)
+        if needs_reset
+            && let Some(cached) = self.cache.get_mut(&cache_key)
+        {
             cached.next_index = 0;
             cached.history.clear();
             if self.shuffle_enabled {
-                let mut id_values: Vec<usize> = cached.candidates.iter().map(|id| id.0).collect();
+                let mut id_values: Vec<usize> =
+                    cached.candidates.iter().map(|id| id.0).collect();
                 self.random_selector.shuffle_usize(&mut id_values);
                 cached.candidates = id_values.into_iter().map(SceneId).collect();
             }
         }
 
         // Phase 5: Sequential selection
-        let cached = self.cache.get_mut(&cache_key).unwrap();
-        let selected_id = cached.candidates[cached.next_index];
+        let cached = self
+            .cache
+            .get_mut(&cache_key)
+            .ok_or(SceneTableError::RandomSelectionFailed)?;
+        let selected_id = cached
+            .candidates
+            .get(cached.next_index)
+            .copied()
+            .ok_or(SceneTableError::RandomSelectionFailed)?;
         cached.next_index += 1;
         cached.history.push(selected_id);
 
@@ -368,7 +357,7 @@ impl SceneTable {
             let mut global_candidates = Vec::new();
             for (key, ids) in self.prefix_index.iter_prefix(prefix.as_bytes()) {
                 // Skip local keys (start with ':')
-                if !key.starts_with(&[b':']) {
+                if !key.starts_with(b":") {
                     global_candidates.extend(ids.iter().copied());
                 }
             }

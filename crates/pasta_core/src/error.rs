@@ -54,6 +54,6 @@ pub type WordTableResult<T> = std::result::Result<T, WordTableError>;
 #[derive(Error, Debug, Clone)]
 pub enum WordTableError {
     /// Word not found.
-    #[error("単語定義 @{key} が見つかりません")]
+    #[error("Word not found: @{key}")]
     WordNotFound { key: String },
 }

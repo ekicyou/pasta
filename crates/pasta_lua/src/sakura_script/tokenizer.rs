@@ -110,6 +110,15 @@ impl Tokenizer {
     /// Sakura script tag pattern.
     /// Matches: \tag or \tag[param]
     /// Examples: \h, \s[0], \_w[500], \![open,inputbox], \-, \+, \*, \_?, \&[ID]
+    ///
+    /// # ReDoS Safety
+    /// This pattern is safe from ReDoS (Regular expression Denial of Service):
+    /// - The Rust `regex` crate uses a Thompson NFA engine that guarantees
+    ///   linear-time matching — backtracking never occurs.
+    /// - Structurally, both quantifiers (`+` on a character class, `*` on a
+    ///   negated character class) operate on atomic character classes with no
+    ///   overlap, so even a backtracking engine would not exhibit exponential
+    ///   behavior.
     pub const SAKURA_TAG_PATTERN: &'static str = r"\\[0-9a-zA-Z_!+*?&-]+(?:\[[^\]]*\])?";
     /// Create a new Tokenizer from TalkConfig.
     ///

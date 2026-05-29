@@ -77,48 +77,34 @@ impl PastaConfig {
         })
     }
 
-    /// Get logging configuration from [logging] section.
+    /// Get a custom configuration section by key.
     ///
-    /// # Returns
-    /// * `Some(LoggingConfig)` - If [logging] section exists and is valid
-    /// * `None` - If [logging] section is missing or invalid
-    pub fn logging(&self) -> Option<LoggingConfig> {
+    /// Deserializes a TOML section into the target type.
+    /// Returns `None` if the section is missing or cannot be deserialized.
+    fn get_custom_config<T: serde::de::DeserializeOwned>(&self, key: &str) -> Option<T> {
         self.custom_fields
-            .get("logging")
+            .get(key)
             .and_then(|v| v.clone().try_into().ok())
+    }
+
+    /// Get logging configuration from [logging] section.
+    pub fn logging(&self) -> Option<LoggingConfig> {
+        self.get_custom_config("logging")
     }
 
     /// Get persistence configuration from [persistence] section.
-    ///
-    /// # Returns
-    /// * `Some(PersistenceConfig)` - If [persistence] section exists and is valid
-    /// * `None` - If [persistence] section is missing or invalid
     pub fn persistence(&self) -> Option<PersistenceConfig> {
-        self.custom_fields
-            .get("persistence")
-            .and_then(|v| v.clone().try_into().ok())
+        self.get_custom_config("persistence")
     }
 
     /// Get Lua library configuration from [lua] section.
-    ///
-    /// # Returns
-    /// * `Some(LuaConfig)` - If [lua] section exists and is valid
-    /// * `None` - If [lua] section is missing or invalid
     pub fn lua(&self) -> Option<LuaConfig> {
-        self.custom_fields
-            .get("lua")
-            .and_then(|v| v.clone().try_into().ok())
+        self.get_custom_config("lua")
     }
 
     /// Get talk configuration from [talk] section.
-    ///
-    /// # Returns
-    /// * `Some(TalkConfig)` - If [talk] section exists and is valid
-    /// * `None` - If [talk] section is missing or invalid
     pub fn talk(&self) -> Option<TalkConfig> {
-        self.custom_fields
-            .get("talk")
-            .and_then(|v| v.clone().try_into().ok())
+        self.get_custom_config("talk")
     }
 
     /// Create from TOML string.

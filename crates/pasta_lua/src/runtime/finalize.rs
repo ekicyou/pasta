@@ -43,6 +43,8 @@ pub struct WordCollectionEntry {
 /// * `Err(e)` - Collection error
 pub fn collect_scenes(lua: &Lua) -> LuaResult<Vec<(String, String)>> {
     // Get pasta.scene module
+    // SAFETY(injection): Module name is a compile-time string literal, not derived from
+    // external input. No injection vector exists. Error is propagated via `?`.
     let scene_module: Table = lua.load("return require('pasta.scene')").eval()?;
 
     // Call get_all_scenes()
@@ -76,6 +78,36 @@ pub fn collect_scenes(lua: &Lua) -> LuaResult<Vec<(String, String)>> {
     Ok(scenes)
 }
 
+/// Collect word entries from a `{key: [[values]]}` Lua table into the output vec.
+///
+/// This is the shared traversal logic used by global, local, and actor word collection.
+fn collect_word_entries(
+    word_map: &Table,
+    is_local: bool,
+    scene_name: Option<String>,
+    actor_name: Option<String>,
+    out: &mut Vec<WordCollectionEntry>,
+) -> LuaResult<()> {
+    for key_pair in word_map.pairs::<String, Table>() {
+        let (key, values_list) = key_pair?;
+        for values_pair in values_list.pairs::<i64, Table>() {
+            let (_idx, values_table) = values_pair?;
+            let values: Vec<String> = values_table
+                .pairs::<i64, String>()
+                .map(|r| r.map(|(_, v)| v))
+                .collect::<LuaResult<_>>()?;
+            out.push(WordCollectionEntry {
+                key: key.clone(),
+                values,
+                is_local,
+                scene_name: scene_name.clone(),
+                actor_name: actor_name.clone(),
+            });
+        }
+    }
+    Ok(())
+}
+
 /// Collect all words from Lua `pasta.word` registry (Requirement 2.6).
 ///
 /// # Arguments
@@ -86,6 +118,8 @@ pub fn collect_scenes(lua: &Lua) -> LuaResult<Vec<(String, String)>> {
 /// * `Err(e)` - Collection error
 pub fn collect_words(lua: &Lua) -> LuaResult<Vec<WordCollectionEntry>> {
     // Get pasta.word module
+    // SAFETY(injection): Module name is a compile-time string literal, not derived from
+    // external input. No injection vector exists. Error is propagated via `?`.
     let word_module: Table = lua.load("return require('pasta.word')").eval()?;
 
     // Call get_all_words()
@@ -96,56 +130,14 @@ pub fn collect_words(lua: &Lua) -> LuaResult<Vec<WordCollectionEntry>> {
 
     // Process global words: {key: [[values]]}
     if let Ok(global_words) = all_words.get::<Table>("global") {
-        for pair in global_words.pairs::<String, Table>() {
-            let (key, values_list) = pair?;
-
-            // Each key has multiple value arrays
-            for values_pair in values_list.pairs::<i64, Table>() {
-                let (_idx, values_table) = values_pair?;
-
-                let mut values = Vec::new();
-                for val_pair in values_table.pairs::<i64, String>() {
-                    let (_i, val) = val_pair?;
-                    values.push(val);
-                }
-
-                entries.push(WordCollectionEntry {
-                    key: key.clone(),
-                    values,
-                    is_local: false,
-                    scene_name: None,
-                    actor_name: None,
-                });
-            }
-        }
+        collect_word_entries(&global_words, false, None, None, &mut entries)?;
     }
 
     // Process local words: {scene_name: {key: [[values]]}}
     if let Ok(local_words) = all_words.get::<Table>("local") {
         for scene_pair in local_words.pairs::<String, Table>() {
             let (scene_name, scene_words) = scene_pair?;
-
-            for key_pair in scene_words.pairs::<String, Table>() {
-                let (key, values_list) = key_pair?;
-
-                for values_pair in values_list.pairs::<i64, Table>() {
-                    let (_idx, values_table) = values_pair?;
-
-                    let mut values = Vec::new();
-                    for val_pair in values_table.pairs::<i64, String>() {
-                        let (_i, val) = val_pair?;
-                        values.push(val);
-                    }
-
-                    entries.push(WordCollectionEntry {
-                        key: key.clone(),
-                        values,
-                        is_local: true,
-                        scene_name: Some(scene_name.clone()),
-                        actor_name: None,
-                    });
-                }
-            }
+            collect_word_entries(&scene_words, true, Some(scene_name), None, &mut entries)?;
         }
     }
 
@@ -153,28 +145,7 @@ pub fn collect_words(lua: &Lua) -> LuaResult<Vec<WordCollectionEntry>> {
     if let Ok(actor_words) = all_words.get::<Table>("actor") {
         for actor_pair in actor_words.pairs::<String, Table>() {
             let (actor_name, actor_word_map) = actor_pair?;
-
-            for key_pair in actor_word_map.pairs::<String, Table>() {
-                let (key, values_list) = key_pair?;
-
-                for values_pair in values_list.pairs::<i64, Table>() {
-                    let (_idx, values_table) = values_pair?;
-
-                    let mut values = Vec::new();
-                    for val_pair in values_table.pairs::<i64, String>() {
-                        let (_i, val) = val_pair?;
-                        values.push(val);
-                    }
-
-                    entries.push(WordCollectionEntry {
-                        key: key.clone(),
-                        values,
-                        is_local: false, // Actor words are not scene-local
-                        scene_name: None,
-                        actor_name: Some(actor_name.clone()),
-                    });
-                }
-            }
+            collect_word_entries(&actor_word_map, false, None, Some(actor_name), &mut entries)?;
         }
     }
 
@@ -286,6 +257,8 @@ pub fn register_finalize_scene(lua: &Lua) -> LuaResult<()> {
     let loaded: Table = package.get("loaded")?;
 
     // Get or require pasta module
+    // SAFETY(injection): Module name is a compile-time string literal ("pasta"),
+    // not derived from external input. No injection vector exists.
     let pasta_module: Table = if let Ok(module) = loaded.get::<Table>("pasta") {
         module
     } else {

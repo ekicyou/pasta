@@ -107,6 +107,10 @@ pub fn insert_waits(tokens: &[Token], wait_values: &WaitValues) -> String {
                         // LineStartProhibited doesn't add its own wait, but extends the pending run
                         pending_max_wait.unwrap_or(0)
                     }
+                    // SAFETY: The outer match arm constrains token.kind to exactly
+                    // Period | Comma | Strong | LineStartProhibited. All four
+                    // variants are exhaustively handled above, so this branch
+                    // is provably unreachable.
                     _ => unreachable!(),
                 };
 

@@ -80,6 +80,16 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         }
     }
 
+    /// Close a block: dedent, write `end`, and add a blank line.
+    ///
+    /// Common pattern used by actor, global scene, and local scene generators.
+    fn end_block(&mut self) -> Result<(), TranspileError> {
+        self.dedent();
+        self.writeln("end")?;
+        self.write_blank_line()?;
+        Ok(())
+    }
+
     /// Write the Lua header (require statement).
     pub fn write_header(&mut self) -> Result<(), TranspileError> {
         self.writeln("local PASTA = require \"pasta\"")?;

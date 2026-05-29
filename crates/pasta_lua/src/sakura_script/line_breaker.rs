@@ -69,8 +69,6 @@ fn tokenize_plain_chars<'a>(input: &'a str, tag_regex: &Regex) -> Tokens<'a> {
                 trailing: &input[char_end..trailing_end],
             });
 
-
-
             pos = trailing_end;
         } else {
             break;

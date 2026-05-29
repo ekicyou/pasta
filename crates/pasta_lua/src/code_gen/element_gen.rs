@@ -9,7 +9,29 @@ use pasta_dsl::parser::{
 };
 use std::io::Write;
 
+/// Format optional arguments suffix: empty when no args, otherwise ", arg1, arg2, ..."
+fn format_args_suffix(args_str: &str) -> String {
+    if args_str.is_empty() {
+        String::new()
+    } else {
+        format!(", {}", args_str)
+    }
+}
+
 impl<'a, W: Write> LuaCodeGenerator<'a, W> {
+    /// Resolve a VarScope to its Lua variable path (e.g., `var.x`, `save.x`, `args[1]`).
+    ///
+    /// Returns an error for `VarScope::Property`, which must be handled separately
+    /// by callers before reaching this function.
+    fn resolve_var_path(name: &str, scope: &VarScope) -> Result<String, TranspileError> {
+        match scope {
+            VarScope::Local => Ok(format!("var.{}", name)),
+            VarScope::Global => Ok(format!("save.{}", name)),
+            VarScope::Args(index) => Ok(format!("args[{}]", index + 1)),
+            VarScope::Property => Err(TranspileError::property_in_expression()),
+        }
+    }
+
     /// Generate variable assignment (Requirement 3d).
     ///
     /// Local: `var.変数名 = 値`
@@ -239,12 +261,9 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                         ))?;
                     }
                     _ => {
-                        let var_path = match scope {
-                            VarScope::Local => format!("var.{}", name),
-                            VarScope::Global => format!("save.{}", name),
-                            VarScope::Args(index) => format!("args[{}]", index + 1),
-                            VarScope::Property => unreachable!(),
-                        };
+                        // SAFETY: VarScope::Property is handled in the arm above;
+                        // resolve_var_path returns Err for Property as a defensive guard.
+                        let var_path = Self::resolve_var_path(name, scope)?;
                         self.writeln(&format!("act.{}:talk(tostring({}))", actor, var_path))?;
                     }
                 }
@@ -262,11 +281,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                             actor,
                             actor,
                             name_literal,
-                            if args_str.is_empty() {
-                                String::new()
-                            } else {
-                                format!(", {}", args_str)
-                            }
+                            format_args_suffix(&args_str)
                         ))?;
                     }
                     pasta_dsl::parser::FnScope::Global => {
@@ -275,11 +290,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                             "act.{}:talk(tostring(GLOBAL.{}(act{})))",
                             actor,
                             name,
-                            if args_str.is_empty() {
-                                String::new()
-                            } else {
-                                format!(", {}", args_str)
-                            }
+                            format_args_suffix(&args_str)
                         ))?;
                     }
                 }
@@ -303,84 +314,11 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         Ok(())
     }
 
-    /// Generate an expression.
+    /// Generate an expression (delegates to `generate_expr_to_buffer`).
     fn generate_expr(&mut self, expr: &Expr) -> Result<(), TranspileError> {
-        match expr {
-            Expr::Integer(n) => {
-                write!(self.writer, "{}", n)?;
-            }
-            Expr::Float(f) => {
-                write!(self.writer, "{}", f)?;
-            }
-            Expr::String(s) => {
-                let literal = StringLiteralizer::literalize(s)?;
-                write!(self.writer, "{}", literal)?;
-            }
-            Expr::BlankString => {
-                write!(self.writer, "\"\"")?;
-            }
-            Expr::VarRef { name, scope } => {
-                let var_path = match scope {
-                    VarScope::Local => format!("var.{}", name),
-                    VarScope::Global => format!("save.{}", name),
-                    VarScope::Args(index) => format!("args[{}]", index + 1),
-                    VarScope::Property => {
-                        return Err(TranspileError::property_in_expression());
-                    }
-                };
-                write!(self.writer, "{}", var_path)?;
-            }
-            Expr::FnCall { name, args, scope } => {
-                let args_str = self.generate_args_string(args)?;
-                match scope {
-                    pasta_dsl::parser::FnScope::Local => {
-                        // act:expr_fn("関数名", 引数...)
-                        let name_literal = StringLiteralizer::literalize(name)?;
-                        write!(
-                            self.writer,
-                            "act:expr_fn({}{})",
-                            name_literal,
-                            if args_str.is_empty() {
-                                String::new()
-                            } else {
-                                format!(", {}", args_str)
-                            }
-                        )?;
-                    }
-                    pasta_dsl::parser::FnScope::Global => {
-                        // GLOBAL.関数名(act, 引数...)
-                        write!(
-                            self.writer,
-                            "GLOBAL.{}(act{})",
-                            name,
-                            if args_str.is_empty() {
-                                String::new()
-                            } else {
-                                format!(", {}", args_str)
-                            }
-                        )?;
-                    }
-                }
-            }
-            Expr::Paren(inner) => {
-                write!(self.writer, "(")?;
-                self.generate_expr(inner)?;
-                write!(self.writer, ")")?;
-            }
-            Expr::Binary { op, lhs, rhs } => {
-                self.generate_expr(lhs)?;
-                let op_str = match op {
-                    pasta_dsl::parser::BinOp::Add => " + ",
-                    pasta_dsl::parser::BinOp::Sub => " - ",
-                    pasta_dsl::parser::BinOp::Mul => " * ",
-                    pasta_dsl::parser::BinOp::Div => " / ",
-                    pasta_dsl::parser::BinOp::Mod => " % ",
-                };
-                write!(self.writer, "{}", op_str)?;
-                self.generate_expr(rhs)?;
-            }
-        }
-
+        let mut buf = Vec::new();
+        self.generate_expr_to_buffer(expr, &mut buf)?;
+        self.writer.write_all(&buf)?;
         Ok(())
     }
 
@@ -405,15 +343,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                 write!(buf, "\"\"")?;
             }
             Expr::VarRef { name, scope } => {
-                let var_path = match scope {
-                    VarScope::Local => format!("var.{}", name),
-                    VarScope::Global => format!("save.{}", name),
-                    VarScope::Args(index) => format!("args[{}]", index + 1),
-                    VarScope::Property => {
-                        return Err(TranspileError::property_in_expression());
-                    }
-                };
-                write!(buf, "{}", var_path)?;
+                write!(buf, "{}", Self::resolve_var_path(name, scope)?)?;
             }
             Expr::FnCall { name, args, scope } => {
                 let args_str = self.generate_args_string(args)?;
@@ -425,11 +355,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                             buf,
                             "act:expr_fn({}{})",
                             name_literal,
-                            if args_str.is_empty() {
-                                String::new()
-                            } else {
-                                format!(", {}", args_str)
-                            }
+                            format_args_suffix(&args_str)
                         )?;
                     }
                     pasta_dsl::parser::FnScope::Global => {
@@ -438,11 +364,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                             buf,
                             "GLOBAL.{}(act{})",
                             name,
-                            if args_str.is_empty() {
-                                String::new()
-                            } else {
-                                format!(", {}", args_str)
-                            }
+                            format_args_suffix(&args_str)
                         )?;
                     }
                 }
@@ -500,17 +422,23 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         Ok(())
     }
 
-    /// Generate global word definition (Requirement 2.1, Task 4.2).
+    /// Shared word definition generator parameterized by prefix.
     ///
-    /// Generates: `PASTA.create_word("key"):entry("value1", "value2", ...)`
+    /// Generates: `{prefix}:entry("value1", "value2", ...)`
     ///
-    /// Called at file level, outside of any do block.
-    pub fn generate_global_word(&mut self, word: &KeyWords) -> Result<(), TranspileError> {
+    /// The `prefix` includes the full method call syntax, e.g.:
+    /// - `PASTA.create_word("key")` for global words (dot syntax)
+    /// - `SCENE:create_word("key")` for scene-local words (colon syntax)
+    fn generate_word_definition(
+        &mut self,
+        word: &KeyWords,
+        receiver: &str,
+        separator: &str,
+    ) -> Result<(), TranspileError> {
         if word.words.is_empty() {
             return Ok(());
         }
 
-        // Generate entry values as string literals
         let values: Vec<String> = word
             .words
             .iter()
@@ -520,7 +448,9 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
 
         for name in &word.names {
             self.writeln(&format!(
-                "PASTA.create_word({}):entry({})",
+                "{}{}create_word({}):entry({})",
+                receiver,
+                separator,
                 StringLiteralizer::literalize(name)?,
                 entry
             ))?;
@@ -529,32 +459,21 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         Ok(())
     }
 
+    /// Generate global word definition (Requirement 2.1, Task 4.2).
+    ///
+    /// Generates: `PASTA.create_word("key"):entry("value1", "value2", ...)`
+    ///
+    /// Called at file level, outside of any do block.
+    pub fn generate_global_word(&mut self, word: &KeyWords) -> Result<(), TranspileError> {
+        self.generate_word_definition(word, "PASTA", ".")
+    }
+
     /// Generate local word definition for a scene (Requirement 2.2, Task 4.3).
     ///
     /// Generates: `SCENE:create_word("key"):entry("value1", "value2", ...)`
     ///
     /// Called inside a local scene function, after init_scene.
     pub fn generate_local_word(&mut self, word: &KeyWords) -> Result<(), TranspileError> {
-        if word.words.is_empty() {
-            return Ok(());
-        }
-
-        // Generate entry values as string literals
-        let values: Vec<String> = word
-            .words
-            .iter()
-            .map(|w| StringLiteralizer::literalize(w))
-            .collect::<Result<Vec<_>, _>>()?;
-        let entry = values.join(", ");
-
-        for name in &word.names {
-            self.writeln(&format!(
-                "SCENE:create_word({}):entry({})",
-                StringLiteralizer::literalize(name)?,
-                entry
-            ))?;
-        }
-
-        Ok(())
+        self.generate_word_definition(word, "SCENE", ":")
     }
 }

@@ -42,9 +42,9 @@ SSPのプロパティシステムへのアクセスをpastaゴーストから可
 調査対象: メモリ安全性、入力検証、FFI境界、依存クレートサプライチェーン、デッドコード除去、冗長表現削減、アルゴリズム改善。
 
 ### Wave 1（全並行・クレート内完結）
-- [ ] audit-pasta-core -- レジストリ層の脆弱性監査・コード簡素化（~600行）。Dependencies: none
+- [x] audit-pasta-core -- レジストリ層の脆弱性監査・コード簡素化（~600行）。Dependencies: none
 - [x] audit-pasta-dsl -- DSLパーサー層の脆弱性監査・コード簡素化（~2500行）。Dependencies: none
-- [ ] audit-pasta-lua -- Luaトランスパイラ/ランタイムの脆弱性監査・コード簡素化（~8000行、最大規模）。Dependencies: none
+- [x] audit-pasta-lua -- Luaトランスパイラ/ランタイムの脆弱性監査・コード簡素化（~8000行、最大規模）。Dependencies: none
 - [x] audit-pasta-shiori -- SHIORI/FFI層の脆弱性監査・unsafe安全性検証（~1500行）。Dependencies: none
 - [x] audit-pasta-check -- CLIツールの脆弱性監査・コード簡素化（~500行）。Dependencies: none
 - [ ] audit-pasta-lsp -- LSPラッパーの脆弱性監査・コード簡素化（~400行）。Dependencies: none

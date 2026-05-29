@@ -3,7 +3,7 @@
 //! This module provides the main transpiler interface for converting
 //! Pasta AST to Lua code.
 
-use pasta_dsl::parser::{FileItem, PastaFile};
+use pasta_dsl::parser::{ActorScope, FileItem, GlobalSceneScope, KeyWords, PastaFile};
 use pasta_core::registry::SceneRegistry;
 
 use super::code_gen::LuaCodeGenerator;
@@ -72,65 +72,15 @@ impl LuaTranspiler {
         // Process FileItems in document order (MAJOR-2)
         for item in &file.items {
             match item {
-                FileItem::FileAttr(attr) => {
-                    // MAJOR-2.1: FileAttr累積（コード生成なし）
-                    context.accumulate_file_attr(attr);
-                }
+                FileItem::FileAttr(attr) => context.accumulate_file_attr(attr),
                 FileItem::GlobalWord(word) => {
-                    // MAJOR-2.2: グローバル単語登録 (Rust側レジストリ + Lua出力)
-                    for name in &word.names {
-                        context.word_registry.register_global(name, word.words.clone());
-                    }
-                    // Generate Lua code for word definition (Requirement 2.1, Task 4.2)
-                    codegen.generate_global_word(word)?;
+                    Self::process_global_word(&mut context, &mut codegen, word)?;
                 }
                 FileItem::GlobalSceneScope(scene) => {
-                    // MAJOR-2.3: シーン処理
-                    // Register global scene in SceneRegistry
-                    let (scene_id, counter) = context.register_global_scene(scene);
-
-                    // Register scene-level word definitions in WordDefRegistry
-                    let module_name =
-                        format!("{}{}", SceneRegistry::sanitize_name(&scene.name), counter);
-                    for kw in &scene.words {
-                        for name in &kw.names {
-                            context.word_registry.register_local(&module_name, name, kw.words.clone());
-                        }
-                    }
-
-                    // Merge file attrs with scene attrs (MAJOR-1)
-                    let merged_attrs = context.merge_attrs(&scene.attrs);
-
-                    // Generate Lua code for the scene (MAJOR-3: file_attrs引数追加)
-                    codegen.generate_global_scene(scene, counter, &context, &merged_attrs)?;
-
-                    // Register local scenes
-                    for (local_idx, local_scene) in scene.local_scenes.iter().enumerate() {
-                        // Skip start scene (name is None) - already registered as part of global
-                        if local_scene.name.is_some() {
-                            context.register_local_scene(
-                                local_scene,
-                                &scene.name,
-                                counter,
-                                local_idx + 1, // 1-based index for named local scenes
-                            );
-                        }
-                    }
-
-                    // Store scene ID for potential future use
-                    let _ = scene_id;
+                    Self::process_global_scene(&mut context, &mut codegen, scene)?;
                 }
                 FileItem::ActorScope(actor) => {
-                    // MAJOR-2.4: アクター処理（ファイル属性継承なし）
-                    // Register actor word definitions in WordDefRegistry (Task 2.3)
-                    for word_def in &actor.words {
-                        for name in &word_def.names {
-                            context
-                                .word_registry
-                                .register_actor(&actor.name, name, word_def.words.clone());
-                        }
-                    }
-                    codegen.generate_actor(actor)?;
+                    Self::process_actor(&mut context, &mut codegen, actor)?;
                 }
             }
         }
@@ -144,6 +94,73 @@ impl LuaTranspiler {
         writer.write_all(normalized_output.as_bytes())?;
 
         Ok(context)
+    }
+
+    /// Process GlobalWord: register in WordDefRegistry and generate Lua code.
+    fn process_global_word<W: Write>(
+        context: &mut TranspileContext,
+        codegen: &mut LuaCodeGenerator<W>,
+        word: &KeyWords,
+    ) -> Result<(), TranspileError> {
+        for name in &word.names {
+            context.word_registry.register_global(name, word.words.clone());
+        }
+        codegen.generate_global_word(word)?;
+        Ok(())
+    }
+
+    /// Process GlobalSceneScope: register scene/words, merge attrs, generate code, register locals.
+    fn process_global_scene<W: Write>(
+        context: &mut TranspileContext,
+        codegen: &mut LuaCodeGenerator<W>,
+        scene: &GlobalSceneScope,
+    ) -> Result<(), TranspileError> {
+        let (_, counter) = context.register_global_scene(scene);
+
+        // Register scene-level word definitions in WordDefRegistry
+        let module_name = format!("{}{}", SceneRegistry::sanitize_name(&scene.name), counter);
+        for kw in &scene.words {
+            for name in &kw.names {
+                context
+                    .word_registry
+                    .register_local(&module_name, name, kw.words.clone());
+            }
+        }
+
+        // Merge file attrs with scene attrs, generate Lua code
+        let merged_attrs = context.merge_attrs(&scene.attrs);
+        codegen.generate_global_scene(scene, counter, context, &merged_attrs)?;
+
+        // Register named local scenes (start scene is part of global)
+        for (local_idx, local_scene) in scene.local_scenes.iter().enumerate() {
+            if local_scene.name.is_some() {
+                context.register_local_scene(
+                    local_scene,
+                    &scene.name,
+                    counter,
+                    local_idx + 1,
+                );
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Process ActorScope: register actor words and generate Lua code.
+    fn process_actor<W: Write>(
+        context: &mut TranspileContext,
+        codegen: &mut LuaCodeGenerator<W>,
+        actor: &ActorScope,
+    ) -> Result<(), TranspileError> {
+        for word_def in &actor.words {
+            for name in &word_def.names {
+                context
+                    .word_registry
+                    .register_actor(&actor.name, name, word_def.words.clone());
+            }
+        }
+        codegen.generate_actor(actor)?;
+        Ok(())
     }
 
     /// Get the transpiler configuration.

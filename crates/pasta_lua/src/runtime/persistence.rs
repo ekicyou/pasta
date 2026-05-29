@@ -28,7 +28,7 @@ use flate2::write::GzEncoder;
 use mlua::{Lua, LuaSerdeExt, Result as LuaResult, Table, Value};
 use std::fs::{self, File};
 use std::io::{Read, Write};
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use thiserror::Error;
 
 /// Module version.
@@ -109,8 +109,25 @@ pub fn register(lua: &Lua, config: &PersistenceConfig, base_dir: &Path) -> LuaRe
     module.set("_VERSION", VERSION)?;
     module.set("_DESCRIPTION", DESCRIPTION)?;
 
+    // Validate file path to prevent directory traversal
+    let effective_path = config.effective_file_path();
+    let relative = Path::new(&effective_path);
+    if relative.is_absolute()
+        || relative.components().any(|c| {
+            matches!(
+                c,
+                Component::ParentDir | Component::RootDir | Component::Prefix(_)
+            )
+        })
+    {
+        return Err(mlua::Error::RuntimeError(format!(
+            "Invalid persistence file path (directory traversal detected): {}",
+            effective_path
+        )));
+    }
+
     // Create state for closures
-    let file_path = base_dir.join(config.effective_file_path());
+    let file_path = base_dir.join(&effective_path);
     let state = PersistenceState {
         file_path: file_path.clone(),
         obfuscate: config.obfuscate,
@@ -502,5 +519,50 @@ mod tests {
         let count: i32 = result.get("count").unwrap();
         assert_eq!(name, "Test");
         assert_eq!(count, 42);
+    }
+
+    #[test]
+    fn test_register_rejects_directory_traversal() {
+        let temp_dir = TempDir::new().unwrap();
+        let base_dir = temp_dir.path().to_path_buf();
+
+        let config = PersistenceConfig {
+            obfuscate: false,
+            file_path: "../../etc/malicious.json".to_string(),
+            debug_mode: false,
+        };
+
+        let lua = Lua::new();
+        let result = register(&lua, &config, &base_dir);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("directory traversal"),
+            "Expected traversal error, got: {}",
+            err_msg
+        );
+    }
+
+    #[test]
+    fn test_register_rejects_rooted_path() {
+        let temp_dir = TempDir::new().unwrap();
+        let base_dir = temp_dir.path().to_path_buf();
+
+        // "/" prefix has RootDir component on all platforms
+        let config = PersistenceConfig {
+            obfuscate: false,
+            file_path: "/etc/passwd".to_string(),
+            debug_mode: false,
+        };
+
+        let lua = Lua::new();
+        let result = register(&lua, &config, &base_dir);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("directory traversal"),
+            "Expected traversal error, got: {}",
+            err_msg
+        );
     }
 }

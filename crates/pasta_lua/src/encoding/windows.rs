@@ -109,6 +109,16 @@ fn multi_byte_to_wide_char(codepage: u32, flags: u32, multi_byte_str: &[u8]) -> 
         return Ok(String::new());
     }
 
+    // SAFETY: Calls to `MultiByteToWideChar` are safe under these conditions:
+    //  1. `multi_byte_str` is a valid borrowed slice; its pointer and length are valid
+    //     for the duration of each FFI call.
+    //  2. The first call (output buffer = null, length = 0) only queries the required
+    //     buffer size — no memory is written.
+    //  3. The second call writes into `wstr`, which is allocated to exactly `len`
+    //     elements as returned by the first call.  `set_len(len)` is sound because
+    //     `MultiByteToWideChar` fully initializes all `len` elements on success.
+    //  4. Return values are checked: if either call returns 0, we fall through to
+    //     `Error::last_os_error()` instead of reading uninitialized memory.
     unsafe {
         // Get length of UTF-16 string
         let len = MultiByteToWideChar(
@@ -165,6 +175,18 @@ fn wide_char_to_multi_byte(
         return Ok((Vec::new(), false));
     }
 
+    // SAFETY: Calls to `WideCharToMultiByte` are safe under these conditions:
+    //  1. `wide_char_str` is a valid borrowed slice; its pointer and length are valid
+    //     for the duration of each FFI call.
+    //  2. The first call (output buffer = null, length = 0) only queries the required
+    //     buffer size — no memory is written.
+    //  3. The second call writes into `astr`, which is allocated to exactly `len`
+    //     elements as returned by the first call.  `set_len(len)` is sound because
+    //     `WideCharToMultiByte` fully initializes all `len` elements on success.
+    //  4. `default_char_ref` and `use_char_ref` are stack-local arrays whose lifetimes
+    //     span the entire FFI call; null is passed when not needed.
+    //  5. Return values are checked: if either call returns 0, we fall through to
+    //     `Error::last_os_error()` instead of reading uninitialized memory.
     unsafe {
         // Get length of multibyte string
         let len = WideCharToMultiByte(

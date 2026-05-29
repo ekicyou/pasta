@@ -15,6 +15,7 @@ globals = {
     "STORE",     -- データストア
     "GLOBAL",    -- グローバル関数テーブル
     "PROXY",     -- アクタープロキシ
+    "SHIORI",    -- SHIORI/3.0 プロトコルテーブル (pasta/shiori/entry.lua)
 }
 
 -- 読み取り専用グローバル
@@ -32,6 +33,7 @@ read_globals = {
     "string",
     "math",
     "coroutine",
+    "os",
     "pcall",
     "xpcall",
     "error",
@@ -88,8 +90,16 @@ files = {
 
 -- 除外パターン
 exclude_files = {
-    "scriptlibs/**",   -- 外部ライブラリは除外
+    "scriptlibs/**",          -- 外部ライブラリは除外
     ".luacheckrc",
+    -- pasta_scripts/ 内のサードパーティライブラリ
+    "pasta_scripts/dkjson.lua",          -- David Kolf's JSON module
+    "pasta_scripts/vscode-debuggee.lua", -- VS Code debugger adapter
+    "pasta_scripts/ltn12.lua",           -- LuaSocket LTN12
+    "pasta_scripts/socket.lua",          -- LuaSocket
+    "pasta_scripts/socket/**",           -- LuaSocket submodules
+    "pasta_scripts/mime.lua",            -- LuaSocket MIME
+    "pasta_scripts/mime/**",             -- LuaSocket MIME submodules
 }
 
 -- コード品質設定
