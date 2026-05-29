@@ -158,9 +158,7 @@ fn draw_body(img: &mut RgbaImage, character: Character, color: Rgba<u8>) {
                 let right = (center_x as f32 + half_width).min(WIDTH as f32) as u32;
 
                 for x in left..right {
-                    if x < WIDTH && (y as u32) < HEIGHT {
-                        img.put_pixel(x, y as u32, color);
-                    }
+                    put_pixel_checked(img, x as i32, y, color);
                 }
             }
         }
@@ -176,9 +174,7 @@ fn draw_body(img: &mut RgbaImage, character: Character, color: Rgba<u8>) {
                 let right = (center_x as f32 + half_width).min(WIDTH as f32) as u32;
 
                 for x in left..right {
-                    if x < WIDTH && (y as u32) < HEIGHT {
-                        img.put_pixel(x, y as u32, color);
-                    }
+                    put_pixel_checked(img, x as i32, y, color);
                 }
             }
         }
@@ -247,6 +243,16 @@ fn draw_expression(img: &mut RgbaImage, expression: Expression, character: Chara
     }
 }
 
+fn put_pixel_checked(img: &mut RgbaImage, x: i32, y: i32, color: Rgba<u8>) {
+    let (Ok(x), Ok(y)) = (u32::try_from(x), u32::try_from(y)) else {
+        return;
+    };
+
+    if x < WIDTH && y < HEIGHT {
+        img.put_pixel(x, y, color);
+    }
+}
+
 // === 表情用ヘルパー関数 ===
 
 /// 太い横線を描画
@@ -261,11 +267,7 @@ fn draw_thick_horizontal_line(
     let half_thick = thickness / 2;
     for dy in -half_thick..=half_thick {
         for dx in -half_len..=half_len {
-            let x = (cx + dx) as u32;
-            let y = (cy + dy) as u32;
-            if x < WIDTH && y < HEIGHT {
-                img.put_pixel(x, y, color);
-            }
+            put_pixel_checked(img, cx + dx, cy + dy, color);
         }
     }
 }
@@ -282,11 +284,7 @@ fn draw_thick_vertical_line(
     let half_thick = thickness / 2;
     for dx in -half_thick..=half_thick {
         for dy in -half_len..=half_len {
-            let x = (cx + dx) as u32;
-            let y = (cy + dy) as u32;
-            if x < WIDTH && y < HEIGHT {
-                img.put_pixel(x, y, color);
-            }
+            put_pixel_checked(img, cx + dx, cy + dy, color);
         }
     }
 }
@@ -302,11 +300,7 @@ fn draw_caret(img: &mut RgbaImage, cx: i32, cy: i32, color: Rgba<u8>) {
         let base_y = cy + size / 2 - i;
         // 太さを出すために周囲も塗る
         for t in 0..thickness {
-            let x = (base_x + t - thickness / 2) as u32;
-            let y = base_y as u32;
-            if x < WIDTH && y < HEIGHT {
-                img.put_pixel(x, y, color);
-            }
+            put_pixel_checked(img, base_x + t - thickness / 2, base_y, color);
         }
     }
     // 右斜線 (中央上から右下へ)
@@ -314,11 +308,7 @@ fn draw_caret(img: &mut RgbaImage, cx: i32, cy: i32, color: Rgba<u8>) {
         let base_x = cx + i;
         let base_y = cy - size / 2 + i;
         for t in 0..thickness {
-            let x = (base_x + t - thickness / 2) as u32;
-            let y = base_y as u32;
-            if x < WIDTH && y < HEIGHT {
-                img.put_pixel(x, y, color);
-            }
+            put_pixel_checked(img, base_x + t - thickness / 2, base_y, color);
         }
     }
 }
@@ -333,11 +323,7 @@ fn draw_greater_than(img: &mut RgbaImage, cx: i32, cy: i32, color: Rgba<u8>) {
         let base_x = cx - size / 2 + i;
         let base_y = cy - size + i;
         for t in 0..thickness {
-            let x = base_x as u32;
-            let y = (base_y + t - thickness / 2) as u32;
-            if x < WIDTH && y < HEIGHT {
-                img.put_pixel(x, y, color);
-            }
+            put_pixel_checked(img, base_x, base_y + t - thickness / 2, color);
         }
     }
     // 下半分 (中央から左下へ)
@@ -345,11 +331,7 @@ fn draw_greater_than(img: &mut RgbaImage, cx: i32, cy: i32, color: Rgba<u8>) {
         let base_x = cx + size / 2 - i;
         let base_y = cy + i;
         for t in 0..thickness {
-            let x = base_x as u32;
-            let y = (base_y + t - thickness / 2) as u32;
-            if x < WIDTH && y < HEIGHT {
-                img.put_pixel(x, y, color);
-            }
+            put_pixel_checked(img, base_x, base_y + t - thickness / 2, color);
         }
     }
 }
@@ -364,11 +346,7 @@ fn draw_less_than(img: &mut RgbaImage, cx: i32, cy: i32, color: Rgba<u8>) {
         let base_x = cx + size / 2 - i;
         let base_y = cy - size + i;
         for t in 0..thickness {
-            let x = base_x as u32;
-            let y = (base_y + t - thickness / 2) as u32;
-            if x < WIDTH && y < HEIGHT {
-                img.put_pixel(x, y, color);
-            }
+            put_pixel_checked(img, base_x, base_y + t - thickness / 2, color);
         }
     }
     // 下半分 (中央から右下へ)
@@ -376,11 +354,7 @@ fn draw_less_than(img: &mut RgbaImage, cx: i32, cy: i32, color: Rgba<u8>) {
         let base_x = cx - size / 2 + i;
         let base_y = cy + i;
         for t in 0..thickness {
-            let x = base_x as u32;
-            let y = (base_y + t - thickness / 2) as u32;
-            if x < WIDTH && y < HEIGHT {
-                img.put_pixel(x, y, color);
-            }
+            put_pixel_checked(img, base_x, base_y + t - thickness / 2, color);
         }
     }
 }
@@ -394,11 +368,7 @@ fn draw_semicolon(img: &mut RgbaImage, cx: i32, cy: i32, color: Rgba<u8>) {
     // 涙のしずく（太く）
     for i in 0..8 {
         for t in -2..=2 {
-            let x = (cx + t) as u32;
-            let y = (cy + 8 + i) as u32;
-            if x < WIDTH && y < HEIGHT {
-                img.put_pixel(x, y, color);
-            }
+            put_pixel_checked(img, cx + t, cy + 8 + i, color);
         }
     }
 }
@@ -426,17 +396,9 @@ fn draw_star(img: &mut RgbaImage, cx: i32, cy: i32, color: Rgba<u8>) {
     for i in -size..=size {
         for t in -1..=1 {
             // 右下がり
-            let x1 = (cx + i) as u32;
-            let y1 = (cy + i + t) as u32;
-            if x1 < WIDTH && y1 < HEIGHT {
-                img.put_pixel(x1, y1, color);
-            }
+            put_pixel_checked(img, cx + i, cy + i + t, color);
             // 右上がり
-            let x2 = (cx + i) as u32;
-            let y2 = (cy - i + t) as u32;
-            if x2 < WIDTH && y2 < HEIGHT {
-                img.put_pixel(x2, y2, color);
-            }
+            put_pixel_checked(img, cx + i, cy - i + t, color);
         }
     }
 }

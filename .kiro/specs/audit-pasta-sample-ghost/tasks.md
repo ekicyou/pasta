@@ -9,7 +9,7 @@
   - 確認結果: 全ピクセル操作が安全であり、パニックリスクがないことがコードレビューで検証済み
   - _Requirements: 1.1, 1.2, 1.3_
   - _Boundary: image_generator_
-- [ ] 1.2 image_generator.rsの冗長描画コード削減 (P)
+- [x] 1.2 image_generator.rsの冗長描画コード削減 (P)
   - 描画ヘルパー関数群の冗長パターンを特定し、安全に簡素化可能な箇所を改善
   - 各描画関数の境界チェックパターンが統一されていることを確認
   - 変更後に `cargo test -p pasta_sample_ghost` が全パスすること
