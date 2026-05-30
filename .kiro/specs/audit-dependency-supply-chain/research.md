@@ -354,3 +354,43 @@
 - `pasta_sample_ghost` の 2 件は build-order 用の暫定依存の可能性を考慮して最後に検証したが、workspace 全体の `cargo build` / `cargo test` はどちらも成功したため、Task 3.2 の回帰条件下では未使用依存として除去可能と判断した。
 - 今回の除去では `Cargo.lock` の追加更新は発生しなかった。
 - Task 3.2 では候補 9 件すべてが回帰なしで除去でき、個別の revert は不要だった.
+
+## Dependency Update Results
+
+### 2026-05-30 Task 4.2 実施結果
+- **対応要件**: 4.3, 4.4, 6.2, 7.1, 7.2
+- **実行日時**: 2026-05-30T10:36:35.3507210+09:00
+- **実行コマンド**:
+  - 事前確認: `cargo build --workspace`, `cargo test --workspace`
+  - 更新候補確認: `cargo update --dry-run`
+  - 適用: `cargo update`
+  - 回帰確認: `cargo build --workspace`, `cargo test --workspace`
+- **dry-run 結果**:
+  - `typenum` `1.20.0 -> 1.20.1`
+  - `zerocopy` `0.8.49 -> 0.8.50`
+  - `zerocopy-derive` `0.8.49 -> 0.8.50`
+  - Cargo は「latest まで未到達の依存が 3 件ある」と補足したが、いずれも今回の version requirement 外であり、Task 4.2 の更新対象ではない
+
+#### 変更履歴確認
+- `typenum 1.20.1` の upstream `CHANGELOG.md` では、変更点は `tarr` import resolution の修正 1 件のみだった。公開 API の追加・削除や major/minor bump はなく、パッチ更新として安全と判断した。
+- `zerocopy 0.8.50` のパッケージ同梱 `CHANGELOG.md` は GitHub Releases 参照のみだったため、公開 crate の VCS commit (`5fc5d5b -> f70e422`) を比較した。差分は 1 commit のみで、内容は ``[pointer] `Ptr::iter` takes `self` by value`` による soundness fix（`Release 0.8.50`）だった。
+- 上記 zerocopy の修正は commit message 上で unstable pointer API の semver check 除外が明示されており、workspace からは `zerocopy` / `zerocopy-derive` を直接利用していない（`mlua-stdlib` / `image` / `imageproc` 系の間接依存のみ）ため、実運用上の破壊的変更リスクは低いと判断した。
+- `zerocopy-derive 0.8.50` は `zerocopy` と同一リリースで同期更新されており、別個の破壊的変更記録は確認されなかった。
+
+#### 適用した更新一覧
+| 依存 | 更新前 | 更新後 | 導入経路の要約 | 判定 |
+|---|---|---|---|---|
+| `typenum` | `1.20.0` | `1.20.1` | `pest_derive -> pest_generator -> pest_meta -> sha2` の build 依存、および `imageproc -> nalgebra` 経由 | 適用 |
+| `zerocopy` | `0.8.49` | `0.8.50` | `mlua-stdlib -> quick_cache -> ahash` と `image` / `imageproc` 系の間接依存 | 適用 |
+| `zerocopy-derive` | `0.8.49` | `0.8.50` | `zerocopy` の proc-macro 依存 | 適用 |
+
+#### 回帰確認結果
+- 事前確認の `cargo build --workspace` は終了コード `0`
+- 事前確認の `cargo test --workspace` は終了コード `0`
+- 更新後の `cargo build --workspace` は終了コード `0`
+- 更新後の `cargo test --workspace` は終了コード `0`
+- 更新後ビルドでは `typenum 1.20.1`, `zerocopy 0.8.50`, `zerocopy-derive 0.8.50` の再コンパイルを確認し、workspace 全体が正常に完了した
+
+#### 補足
+- ルート `.gitignore` に `Cargo.lock` が含まれるため Git の `status` には表示されないが、実ファイル `Cargo.lock` には上記バージョン更新が反映されている。
+- 既存の作業ツリー変更として `crates/pasta_lua/tests/fixtures/sample.generated.lua` が事前から変更済みだったため、本タスクでは触れていない。
