@@ -42,7 +42,7 @@
   - _Requirements: 3.2, 3.3, 3.4, 7.1, 7.2_
 
 - [ ] 4. バージョン固定戦略の改善
-- [ ] 4.1 workspace管理外の依存をworkspace.dependenciesに統合する (P)
+- [x] 4.1 workspace管理外の依存をworkspace.dependenciesに統合する (P)
   - ルートCargo.tomlのworkspace.dependenciesに以下を追加: lexopt, md5, zip, tower-lsp, image, imageproc, wasm-bindgen, wasm-bindgen-futures, js-sys, serde-wasm-bindgen, tokio
   - 各クレートのCargo.tomlを`.workspace = true`参照に変更する
   - features指定がある依存（zip, tower-lsp）はworkspace定義でfeaturesを含める

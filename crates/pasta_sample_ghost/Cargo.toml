@@ -18,8 +18,8 @@ path = "src/main.rs"
 
 [dependencies]
 # 画像生成
-image = "0.25"
-imageproc = "0.26"
+image.workspace = true
+imageproc.workspace = true
 
 # エラー処理
 thiserror.workspace = true

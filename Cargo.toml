@@ -40,6 +40,20 @@ flate2 = "1.1.9"
 budoux = "0.1.1"
 unicode-width = "0.2.2"
 
+# pasta_check dependencies
+lexopt = "0.3"
+md5 = "0.8"
+zip = { version = "8.6", default-features = false, features = ["deflate"] }
+
+# pasta_lsp dependencies
+tower-lsp = { version = "0.20", default-features = false, features = ["runtime-agnostic"] }
+wasm-bindgen = "0.2"
+serde-wasm-bindgen = "0.6"
+
+# pasta_sample_ghost dependencies
+image = "0.25"
+imageproc = "0.26"
+
 # Time dependencies
 time = { version = "0.3", features = ["local-offset", "parsing"] }
 
