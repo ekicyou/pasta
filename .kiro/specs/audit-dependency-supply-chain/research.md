@@ -445,3 +445,57 @@
 - Requirement 5.2: SSP 仕様準拠の非暗号学的ファイル変更検出用途であることを、実装・テスト・Wave 1 記録の3点から再確認した。
 - Requirement 5.3: 暗号学的利用は検出されず、移行不要と判断した。
 - Requirement 6.4: Wave 1 `audit-pasta-check` の依存関連知見を本 spec の research.md に統合した。
+
+## Final Consolidated Audit Report
+
+### 監査サマリー
+- **総合判定**: **概ね良好 / 継続監視あり**。既知脆弱性は 0 件、ライセンス非互換は 0 件で、依存サプライチェーンに即時の停止要因は確認されなかった。
+- **是正完了事項**: 未使用依存 9 件を除去し、workspace 依存管理を `lexopt`, `md5`, `zip`, `tower-lsp`, `wasm-bindgen`, `serde-wasm-bindgen`, `image`, `imageproc` まで拡張した。さらに `typenum`, `zerocopy`, `zerocopy-derive` のパッチ更新を適用し、`cargo build --workspace` / `cargo test --workspace` の回帰確認を通過した。
+- **Wave 1 との整合**: `audit-pasta-check` の MD5 用途評価、`audit-pasta-lua` の vendored LuaJIT 前提、`audit-pasta-lsp` の依存面積、`audit-pasta-sample-ghost` の `image` / `imageproc` 依存という Wave 1 の前提と、本 spec の監査結果に矛盾はなかった。
+- **残存論点**: `pasta_sample_ghost -> image/imageproc -> ravif/nalgebra -> paste` 系に RustSec informational warning（`RUSTSEC-2024-0436`, unmaintained）が残る。脆弱性ではないが、次回更新時の監視対象とする。
+
+### 監査メタデータ
+| 項目 | 内容 |
+|---|---|
+| 最終統合日時 | `2026-05-30T10:51:25.0652438+09:00` |
+| 個別監査実行日時 | `cargo audit`: `2026-05-30T08:11:33.1324607+09:00` / `cargo deny`: `2026-05-30T08:39:33.6233350+09:00` / `cargo tree`: `2026-05-30T09:05:14.9239147+09:00` / Task 3.2: `2026-05-30T09:38:39.4233519+09:00` / Task 4.2: `2026-05-30T10:36:35.3507210+09:00` |
+| 使用ツール | `cargo-audit-audit 0.22.1`, `cargo-deny 0.19.8`, `cargo tree`（`cargo 1.96.0 (30a34c682 2026-05-25)` 組み込み）, `rustc 1.96.0 (ac68faa20 2026-05-25)` |
+| 監査対象範囲 | ワークスペース `C:\home\maz\git\pasta` 配下の全 7 クレート、ルート `Cargo.toml`, `Cargo.lock`, `deny.toml`, 各 crate の `Cargo.toml`, `src/**/*.rs`, `tests/**/*.rs`, `build.rs` |
+| 依存スコープ要約 | `Cargo.lock` ベース監査 351 依存、ライセンス在庫 291 外部クレート、直接/target/dev 依存宣言 58 件 |
+| Wave 1 参照元 | `completed/audit-pasta-core/research.md`, `audit-pasta-dsl/research.md`, `audit-pasta-lua/research.md`, `audit-pasta-shiori/research.md`, `audit-pasta-check/research.md`, `audit-pasta-lsp/research.md`。`audit-pasta-sample-ghost` は completed 配下に `research.md` が存在しなかったため、同 spec の `brief.md` / `requirements.md` と本 spec の依存分析結果で補完した。 |
+
+### 監査カテゴリ統合結果
+| 監査カテゴリ | 判定 | 主要結果 | 是正アクション / フォローアップ |
+|---|---|---|---|
+| 脆弱性チェック | **PASS** | RustSec advisory の既知脆弱性は 0 件 | `paste 1.0.15` の unmaintained warning は継続監視 |
+| ライセンス監査 | **PASS** | deny ポリシー違反 0 件。vendored LuaJIT を含め MIT OR Apache-2.0 と互換 | `deny.toml` を基準として再監査可能な状態を維持 |
+| 不要依存分析 | **FIXED** | 未使用候補 9 件を特定し、全件を回帰なしで除去 | `cargo build --workspace`, `cargo test --workspace`, `cargo test --workspace -- --list`（1224 件）で確認 |
+| バージョン戦略 | **IMPROVED** | workspace.dependencies の一元管理を拡張し、パッチ更新 3 件を適用 | 新規依存追加時は workspace 直下で管理、`cargo update --dry-run` を定期実行 |
+| MD5 用途評価 | **ACCEPTED** | `md5` は `pasta_check` の `updates.txt` 生成専用で、SSP 仕様準拠の非暗号学的用途 | 暗号学的用途が将来発生した場合のみ SHA-256/BLAKE3 等へ移行検討 |
+
+### Wave 1知見統合
+| Wave 1 spec | 依存関連の統合知見 | 本レポートとの整合 |
+|---|---|---|
+| `audit-pasta-core` | completed 側 research では外部依存自体のリスクは主要論点ではなかった。依存面では `fast_radix_trie` / `rand` / `thiserror` が機能に直結し、`tracing` は本 spec の未使用依存分析で不要と判定された。 | `tracing` 除去後も workspace ビルド・テストは通過し、Wave 1 の内部安全性評価と矛盾しない。 |
+| `audit-pasta-dsl` | `pasta_lua`, `pasta_lsp` が parser API に依存するため、`pest` / `pest_derive` / `thiserror` 系は保守的に扱う必要がある。 | 本 spec は major/minor 更新を避け、`pest` 系に破壊的変更を加えていない。 |
+| `audit-pasta-lua` | `mlua` + vendored LuaJIT が前提であり、unsafe 利用の一部は外部依存 API 制約に由来する。 | ライセンス監査で vendored LuaJIT の MIT 互換を確認し、`zerocopy` 系のパッチ更新も `mlua-stdlib` 側の間接依存として安全に適用した。 |
+| `audit-pasta-shiori` | FFI / `windows-sys` 境界の安全性が主要論点で、依存更新は強い回帰検証と併走すべき領域。 | 本 spec では `pasta_shiori` の未使用 `pasta_core` 依存のみを除去し、FFI 依存そのものには非破壊で対応した。 |
+| `audit-pasta-check` | `md5` は SSP 更新仕様由来の非暗号学的用途、ZIP/I/O は新規依存追加なしで改善すべきと整理されていた。 | MD5 の用途・ライセンスを再確認しつつ、未使用 `thiserror` / `pasta_lua` 依存を除去して依存面積を削減した。 |
+| `audit-pasta-lsp` | `tower-lsp` と WASM 依存群がクレートの依存面積を規定する。 | `tower-lsp` と `serde-wasm-bindgen` は維持しつつ、`wasm-bindgen-futures`, `js-sys`, `tokio` の未使用依存を除去した。duplicate の主因が upstream 由来である点も一致した。 |
+| `audit-pasta-sample-ghost` | completed 配下に `research.md` は見当たらなかったが、spec 自体は `image 0.25` / `imageproc 0.26` の安全使用を主題としていた。 | 本 spec では `image` / `imageproc` を workspace 管理へ統合し、不要な `pasta_shiori` / `pasta_lua` dev-dependencies を除去した。併せて `paste` の informational warning を同クレート由来の継続監視事項として記録した。 |
+
+### 是正アクション実施結果
+| 区分 | 実施内容 | 結果 |
+|---|---|---|
+| 未使用依存除去 | `pasta_core: tracing`, `pasta_check: thiserror, pasta_lua`, `pasta_lsp: wasm-bindgen-futures, js-sys, tokio`, `pasta_shiori: pasta_core`, `pasta_sample_ghost: pasta_shiori, pasta_lua` | 全 9 件を除去し、workspace ビルド/テスト成功 |
+| workspace 依存統合 | ルート `Cargo.toml` の `workspace.dependencies` に `lexopt`, `md5`, `zip`, `tower-lsp`, `wasm-bindgen`, `serde-wasm-bindgen`, `image`, `imageproc` を集約 | 依存バージョン管理の一元性を改善 |
+| 依存更新 | `typenum 1.20.0 -> 1.20.1`, `zerocopy 0.8.49 -> 0.8.50`, `zerocopy-derive 0.8.49 -> 0.8.50` | パッチ更新後も `cargo build --workspace` / `cargo test --workspace` は終了コード 0 |
+| ライセンスポリシー | `deny.toml` で許可ライセンス・unknown source 方針・advisory 方針を明文化 | 将来の再監査手順を標準化 |
+| MD5 文書化 | `pasta_check` の MD5 利用を SSP 仕様準拠の非暗号学的用途として再確認 | 追加の是正不要、用途逸脱時のみ再評価 |
+
+### 残存リスク・推奨事項
+1. **`paste 1.0.15` の unmaintained warning**: 現時点では informational だが、`image` / `imageproc` 更新時に dependency tree を再確認し、上流で解消されたら追従する。
+2. **vendored LuaJIT の追跡性**: `mlua-sys` / `luajit-src` はライセンス互換だが、同梱ソースの更新差分を release ごとに確認する。
+3. **transitive duplicate の残存**: `rand 0.9/0.10`, `thiserror 1/2`, `bitflags`, `hashbrown` などは upstream 由来で残るため、直ちに修正しない代わりに major/minor 更新時の確認項目にする。
+4. **Wave 1 文書完全性**: `audit-pasta-sample-ghost` completed spec に `research.md` が存在しないため、将来の監査追跡性向上のためには当該 spec 側にも依存関連メモを補完することが望ましい。
+5. **再監査トリガー**: 新規依存追加、RustSec Advisory DB 更新、`deny.toml` 変更、`image` / `imageproc` / `mlua` / `tower-lsp` の更新時は、`cargo audit`, `cargo deny check licenses`, `cargo tree --workspace --duplicates` を再実行する。
