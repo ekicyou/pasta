@@ -394,3 +394,54 @@
 #### 補足
 - ルート `.gitignore` に `Cargo.lock` が含まれるため Git の `status` には表示されないが、実ファイル `Cargo.lock` には上記バージョン更新が反映されている。
 - 既存の作業ツリー変更として `crates/pasta_lua/tests/fixtures/sample.generated.lua` が事前から変更済みだったため、本タスクでは触れていない。
+
+## MD5 Usage Assessment
+
+### 2026-05-30 MD5クレート用途の統合監査
+- **対応要件**: 5.1, 5.2, 5.3, 6.4
+- **設計参照**: `design.md` Security Considerations > MD5用途の安全性
+- **監査対象範囲**: ワークスペース全体の `Cargo.toml`, `crates/**/Cargo.toml`, `crates/**/*.rs`, `deny.toml`, Wave 1 `completed/audit-pasta-check/research.md`
+- **調査方法**:
+  - `grep -Rni "md5"` 相当でワークスペース内の宣言・実装・テスト参照を抽出
+  - `crates/pasta_check/src/update_files.rs` の実装を確認し、`updates.txt` 生成フローにおける MD5 利用箇所を追跡
+  - `cargo metadata --format-version 1 --locked` で `md5 0.8.0` のライセンスが `Apache-2.0/MIT` であることを確認
+  - `deny.toml` の `[licenses].allow` に `MIT` / `Apache-2.0` が含まれることを確認
+  - Wave 1 `audit-pasta-check` の既存評価と照合
+- **要約 verdict**: **適切**。MD5 の実装使用は `pasta_check` の `updates.txt` 生成に限定され、SSP 仕様準拠のファイル変更検出用途のみである。暗号学的用途は確認されず、移行は不要。
+
+#### 使用箇所一覧
+| ファイル | 行 | 区分 | 内容 | 評価 |
+|---|---|---|---|---|
+| `Cargo.toml` | `45` | workspace依存宣言 | `md5 = "0.8"` を workspace 管理 | 宣言のみ |
+| `crates/pasta_check/Cargo.toml` | `23` | crate依存宣言 | `md5.workspace = true` | 宣言のみ |
+| `crates/pasta_check/src/update_files.rs` | `21-22` | データ保持 | `FileEntry.md5` に `updates.txt` 出力用ハッシュを保持 | 非暗号学的 |
+| `crates/pasta_check/src/update_files.rs` | `160-163` | 呼び出し | `collect_files_recursive` が各ファイルに対して `calculate_md5(&path)` を実行 | 非暗号学的 |
+| `crates/pasta_check/src/update_files.rs` | `172-189` | 実装本体 | `md5::Context::new()` でファイル内容の MD5 を計算。コメントでも「SSP 仕様準拠の非暗号学的ファイル変更検出用途」と明記 | 非暗号学的 |
+| `crates/pasta_check/src/update_files.rs` | `205-208` | 出力 | `file,<path>\x01<md5>\x01size=...` 形式で `updates.txt` に MD5 を書き出し | SSP仕様準拠 |
+| `crates/pasta_check/src/update_files.rs` | `221-227` | 単体テスト | `test_calculate_md5` が既知文字列の MD5 値を検証 | 実装確認 |
+| `crates/pasta_check/src/update_files.rs` | `297-303` | 形式テスト | `updates.txt` の `file` 行に MD5 スロットが含まれることを確認 | SSP仕様準拠 |
+
+#### 用途評価
+- `update_files.rs` 冒頭コメント（`1-3`行目）はこのモジュールの責務を「`updates.txt` を SSP 仕様に準拠して生成」と定義している。
+- `generate_update_files` → `collect_files_recursive` → `calculate_md5` → `generate_updates_txt` の呼び出し連鎖を確認した結果、MD5 は各配布対象ファイルの内容ハッシュを `updates.txt` レコードへ埋め込むためだけに使われている。
+- 生成されるレコードは `file,<filepath>\x01<md5>\x01size=<bytes>\x01date=<...>` 形式で、認証・署名・鍵導出・パスワード保存・改ざん耐性保証などの暗号学的処理には接続していない。
+- `crates/**/*.rs` の検索では、MD5 の実装参照は `crates/pasta_check/src/update_files.rs` のみであり、他クレートでの暗号学的利用は確認されなかった。
+
+#### deny.toml との整合
+- `deny.toml:2-13` の `[licenses].allow` には `MIT` と `Apache-2.0` が含まれている。
+- `cargo metadata --format-version 1 --locked` で、依存クレート `md5 0.8.0` のライセンスは `Apache-2.0/MIT` と確認できた。
+- したがって `md5` クレートは deny ポリシー上すでに許可対象であり、追加の例外設定は不要である。MD5 の用途妥当性は本節で明示記録した。
+
+#### Wave 1 audit-pasta-check との整合
+- `completed/audit-pasta-check/research.md:30-37` では、`update_files.rs` の `calculate_md5` が「ファイル変更検出」「SSPネットワーク更新仕様」「暗号学的用途ではない」と評価されていた。
+- 今回のワークスペース横断監査でも同じ結論を再確認した。Wave 1 の文書化内容と矛盾はない。
+
+#### Requirement 5.3 判定
+- **暗号学的用途の検出結果**: 該当なし。
+- **移行推奨**: 現時点では不要。将来もし認証・署名・改ざん検知などの暗号学的用途が発生する場合は、MD5 継続利用ではなく SHA-256 / BLAKE3 等への移行を推奨する。
+
+#### 総括
+- Requirement 5.1: 使用箇所・用途をワークスペース横断で列挙し、`pasta_check` の `updates.txt` 生成に限定されることを記録した。
+- Requirement 5.2: SSP 仕様準拠の非暗号学的ファイル変更検出用途であることを、実装・テスト・Wave 1 記録の3点から再確認した。
+- Requirement 5.3: 暗号学的利用は検出されず、移行不要と判断した。
+- Requirement 6.4: Wave 1 `audit-pasta-check` の依存関連知見を本 spec の research.md に統合した。
