@@ -15,4 +15,3 @@ documentation.workspace = true
 thiserror.workspace = true
 fast_radix_trie.workspace = true
 rand.workspace = true
-tracing.workspace = true

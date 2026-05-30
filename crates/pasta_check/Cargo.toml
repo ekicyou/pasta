@@ -25,11 +25,5 @@ md5 = "0.8"
 # NAR (ZIP) 作成
 zip = { version = "8.6", default-features = false, features = ["deflate"] }
 
-# エラー処理
-thiserror.workspace = true
-
-# 将来拡張（Lua 単体試験サポート基盤）
-pasta_lua.workspace = true
-
 [dev-dependencies]
 tempfile.workspace = true

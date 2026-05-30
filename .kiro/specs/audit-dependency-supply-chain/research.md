@@ -319,3 +319,38 @@
 - Requirement 3.1 を満たす形で、`cargo tree` と `cargo tree --duplicates` を実行し、依存木と duplicate を可視化した。
 - Requirement 3.2 の前段として、各クレートの直接依存・target 依存・dev-dependency をコード実参照と突き合わせ、**9 件の未使用候補**を抽出した。
 - Requirement 6.2 を満たす形で、依存ツリー要約、duplicate 一覧、依存ごとの使用/未使用判定、Task 3.2 向け推奨アクションを research.md に構造化して記録した。
+
+### 2026-05-30 Task 3.2 実施結果
+- **対応要件**: 3.2, 3.3, 3.4, 6.2, 7.1, 7.2
+- **実行日時**: 2026-05-30T09:38:39.4233519+09:00
+- **実行コマンド**:
+  - 事前確認: `cargo build --workspace`, `cargo test --workspace`
+  - Phase 1: 安全候補 6 件を除去後に `cargo build --workspace`, `cargo test --workspace`
+  - Phase 2: `pasta_shiori` の `pasta_core` を除去後に `cargo build --workspace`, `cargo test --workspace`
+  - Phase 3: `pasta_sample_ghost` の `pasta_shiori`, `pasta_lua` dev-dependencies を除去後に `cargo build --workspace`, `cargo test --workspace`
+  - 補助確認: `cargo test --workspace -- --list`
+- **回帰結果**:
+  - 事前確認の `cargo build --workspace` は終了コード `0`
+  - 事前確認の `cargo test --workspace` は終了コード `0`
+  - 最終状態の `cargo build --workspace` は終了コード `0`（workspace 全クレートのコンパイル成功）
+  - 最終状態の `cargo test --workspace` は終了コード `0`（失敗 0 件）
+  - `cargo test --workspace -- --list` で **1224 件**のテストを列挙し、Requirement 3.4 / 7.2 の「950+件」期待値を上回ることを確認
+  - テスト実行中に既存の `mlua::Value::as_str` 非推奨警告は継続して出力されたが、新規 failure は発生しなかった
+
+#### 除去した依存一覧
+| クレート | 宣言場所 | 除去した依存 | 判定 |
+|---|---|---|---|
+| `pasta_core` | `crates/pasta_core/Cargo.toml` `[dependencies]` | `tracing` | 除去完了 |
+| `pasta_check` | `crates/pasta_check/Cargo.toml` `[dependencies]` | `thiserror` | 除去完了 |
+| `pasta_check` | `crates/pasta_check/Cargo.toml` `[dependencies]` | `pasta_lua` | 除去完了 |
+| `pasta_lsp` | `crates/pasta_lsp/Cargo.toml` `[target.'cfg(target_arch = "wasm32")'.dependencies]` | `wasm-bindgen-futures` | 除去完了 |
+| `pasta_lsp` | `crates/pasta_lsp/Cargo.toml` `[target.'cfg(target_arch = "wasm32")'.dependencies]` | `js-sys` | 除去完了 |
+| `pasta_lsp` | `crates/pasta_lsp/Cargo.toml` `[dev-dependencies]` | `tokio` | 除去完了 |
+| `pasta_shiori` | `crates/pasta_shiori/Cargo.toml` `[dependencies]` | `pasta_core` | 除去完了 |
+| `pasta_sample_ghost` | `crates/pasta_sample_ghost/Cargo.toml` `[dev-dependencies]` | `pasta_shiori` | 除去完了 |
+| `pasta_sample_ghost` | `crates/pasta_sample_ghost/Cargo.toml` `[dev-dependencies]` | `pasta_lua` | 除去完了 |
+
+#### 補足
+- `pasta_sample_ghost` の 2 件は build-order 用の暫定依存の可能性を考慮して最後に検証したが、workspace 全体の `cargo build` / `cargo test` はどちらも成功したため、Task 3.2 の回帰条件下では未使用依存として除去可能と判断した。
+- 今回の除去では `Cargo.lock` の追加更新は発生しなかった。
+- Task 3.2 では候補 9 件すべてが回帰なしで除去でき、個別の revert は不要だった.

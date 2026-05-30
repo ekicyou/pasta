@@ -15,7 +15,6 @@ name = "pasta"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-pasta_core.workspace = true
 pasta_lua.workspace = true
 time.workspace = true
 tracing.workspace = true
