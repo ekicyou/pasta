@@ -283,8 +283,9 @@ impl CacheManager {
     pub fn generate_scene_dic(&self, module_names: &[String]) -> Result<PathBuf, LoaderError> {
         // Create pasta subdirectory in cache (lua-module-path-resolution spec)
         let pasta_dir = self.cache_dir.join("pasta");
-        fs::create_dir_all(&pasta_dir)
-            .map_err(|e| LoaderError::scene_dic_generation("Failed to create pasta directory", Some(e)))?;
+        fs::create_dir_all(&pasta_dir).map_err(|e| {
+            LoaderError::scene_dic_generation("Failed to create pasta directory", Some(e))
+        })?;
 
         // Clean up old scene_dic.lua location (backward compatibility)
         // Old location: cache_dir/scene_dic.lua (without pasta/ prefix)
@@ -389,12 +390,20 @@ impl CacheManager {
     ) {
         if let Ok(entries) = fs::read_dir(dir) {
             for entry in entries.flatten() {
+                let Ok(file_type) = entry.file_type() else {
+                    continue;
+                };
+
+                if file_type.is_symlink() {
+                    continue;
+                }
+
                 let path = entry.path();
-                if path.is_dir() {
+                if file_type.is_dir() {
                     Self::walk_lua_files(&path, expected, orphans);
-                } else if path.extension().map_or(false, |e| e == "lua") {
+                } else if file_type.is_file() && path.extension().is_some_and(|e| e == "lua") {
                     // Skip scene_dic.lua
-                    if path.file_name().map_or(false, |n| n == "scene_dic.lua") {
+                    if path.file_name().is_some_and(|n| n == "scene_dic.lua") {
                         continue;
                     }
                     if !expected.contains(&path) {
@@ -411,3 +420,47 @@ impl CacheManager {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    #[cfg(unix)]
+    use super::CacheManager;
+    #[cfg(unix)]
+    use std::collections::HashSet;
+    #[cfg(unix)]
+    use std::fs;
+    #[cfg(unix)]
+    use tempfile::TempDir;
+
+    #[cfg(unix)]
+    #[test]
+    fn walk_lua_files_skips_symlinks() {
+        use std::os::unix::fs as unix_fs;
+
+        let temp = TempDir::new().unwrap();
+        let root = temp.path().join("scene");
+        let external = temp.path().join("external");
+        fs::create_dir_all(root.join("nested")).unwrap();
+        fs::create_dir_all(&external).unwrap();
+        let real = root.join("real.lua");
+        let nested = root.join("nested").join("nested.lua");
+        let scene_dic = root.join("scene_dic.lua");
+        let secret = external.join("secret.lua");
+        fs::write(&real, "print('real')").unwrap();
+        fs::write(&nested, "print('nested')").unwrap();
+        fs::write(&scene_dic, "return {}").unwrap();
+        fs::write(&secret, "print('secret')").unwrap();
+        unix_fs::symlink(&real, root.join("link.lua")).unwrap();
+        unix_fs::symlink(&external, root.join("linked_dir")).unwrap();
+
+        let expected = HashSet::new();
+        let mut orphans = Vec::new();
+        CacheManager::walk_lua_files(&root, &expected, &mut orphans);
+
+        assert_eq!(orphans.len(), 2);
+        assert!(orphans.contains(&real));
+        assert!(orphans.contains(&nested));
+        assert!(!orphans.contains(&scene_dic));
+        assert!(!orphans.iter().any(|path| path.ends_with("link.lua")));
+        assert!(!orphans.iter().any(|path| path.ends_with("secret.lua")));
+    }
+}

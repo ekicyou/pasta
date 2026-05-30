@@ -28,7 +28,7 @@
   - _Boundary: pasta_shiori/windows.rs_
 
 - [ ] 4. ファイルI/Oエラーハンドリングパターンの一貫性確認
-- [ ] 4.1 横断的ファイルI/Oパターンの一貫性チェック
+- [x] 4.1 横断的ファイルI/Oパターンの一貫性チェック
   - `pasta_check` (copy.rs, nar.rs, update_files.rs) のパストラバーサル防御・シンボリックリンクスキップの実装パターンを確認
   - `pasta_lua/src/loader/` のファイル検出パスの安全性パターンを確認
   - `pasta_sample_ghost` のファイルI/Oパターンを確認

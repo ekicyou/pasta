@@ -3,6 +3,7 @@
 //! This module provides file discovery functionality using glob patterns.
 
 use glob::glob;
+use std::fs;
 use std::path::{Component, Path, PathBuf};
 
 use super::LoaderError;
@@ -19,6 +20,26 @@ fn contains_traversal(pattern: &str) -> bool {
             Component::ParentDir | Component::RootDir | Component::Prefix(_)
         )
     })
+}
+
+fn is_within_base_dir(base_dir: &Path, path: &Path) -> bool {
+    path.strip_prefix(base_dir).is_ok()
+}
+
+fn has_symlink_component(base_dir: &Path, path: &Path) -> std::io::Result<bool> {
+    let Ok(relative) = path.strip_prefix(base_dir) else {
+        return Ok(false);
+    };
+
+    let mut current = base_dir.to_path_buf();
+    for component in relative.components() {
+        current.push(component.as_os_str());
+        if fs::symlink_metadata(&current)?.file_type().is_symlink() {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
 }
 
 /// Discover pasta files matching the given patterns.
@@ -62,6 +83,31 @@ pub fn discover_files(base_dir: &Path, patterns: &[String]) -> Result<Vec<PathBu
 
         for entry in glob(&pattern_str)? {
             let path = entry?;
+
+            if !is_within_base_dir(base_dir, &path) {
+                tracing::warn!(
+                    path = %path.display(),
+                    base_dir = %base_dir.display(),
+                    "Skipping match outside base directory"
+                );
+                continue;
+            }
+
+            match has_symlink_component(base_dir, &path) {
+                Ok(true) => {
+                    tracing::debug!(path = %path.display(), "Skipping symlinked path");
+                    continue;
+                }
+                Err(error) => {
+                    tracing::warn!(
+                        path = %path.display(),
+                        error = %error,
+                        "Skipping path with unreadable metadata"
+                    );
+                    continue;
+                }
+                Ok(false) => {}
+            }
 
             // Skip files in profile/ directory
             if is_in_profile_dir(base_dir, &path) {
@@ -233,10 +279,7 @@ mod tests {
         let base_dir = create_test_structure(&temp);
 
         // Mix of valid and traversal patterns — valid should still work
-        let patterns = vec![
-            "../secret/*.pasta".to_string(),
-            "dic/*/*.pasta".to_string(),
-        ];
+        let patterns = vec!["../secret/*.pasta".to_string(), "dic/*/*.pasta".to_string()];
         let files = discover_files(&base_dir, &patterns).unwrap();
         assert_eq!(files.len(), 3);
     }
@@ -248,5 +291,61 @@ mod tests {
         assert!(!contains_traversal("dic/*/*.pasta"));
         assert!(!contains_traversal("**/*.pasta"));
         assert!(!contains_traversal("extra/*.pasta"));
+    }
+
+    #[test]
+    fn test_is_within_base_dir() {
+        let temp = TempDir::new().unwrap();
+        let base_dir = temp.path().join("base");
+        let child = base_dir.join("dic/test.pasta");
+        let outside = temp.path().join("outside/test.pasta");
+
+        assert!(is_within_base_dir(&base_dir, &child));
+        assert!(!is_within_base_dir(&base_dir, &outside));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_discover_skips_symlinked_file() {
+        use std::os::unix::fs as unix_fs;
+
+        let temp = TempDir::new().unwrap();
+        let base_dir = create_test_structure(&temp);
+        let external = temp.path().join("external.pasta");
+        fs::write(&external, "# external").unwrap();
+        unix_fs::symlink(&external, base_dir.join("dic/greeting/link.pasta")).unwrap();
+
+        let patterns = vec!["dic/*/*.pasta".to_string()];
+        let files = discover_files(&base_dir, &patterns).unwrap();
+        let file_names: Vec<_> = files
+            .iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+
+        assert_eq!(files.len(), 3);
+        assert!(!file_names.contains(&"link.pasta".to_string()));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_discover_skips_symlinked_directory() {
+        use std::os::unix::fs as unix_fs;
+
+        let temp = TempDir::new().unwrap();
+        let base_dir = create_test_structure(&temp);
+        let external_dir = temp.path().join("external");
+        fs::create_dir_all(&external_dir).unwrap();
+        fs::write(external_dir.join("secret.pasta"), "# secret").unwrap();
+        unix_fs::symlink(&external_dir, base_dir.join("dic/linked")).unwrap();
+
+        let patterns = vec!["dic/*/*.pasta".to_string()];
+        let files = discover_files(&base_dir, &patterns).unwrap();
+        let file_names: Vec<_> = files
+            .iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+
+        assert_eq!(files.len(), 3);
+        assert!(!file_names.contains(&"secret.pasta".to_string()));
     }
 }

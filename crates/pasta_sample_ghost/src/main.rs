@@ -92,13 +92,50 @@ fn walkdir(path: &Path) -> usize {
     let mut count = 0;
     if let Ok(entries) = std::fs::read_dir(path) {
         for entry in entries.flatten() {
+            let Ok(file_type) = entry.file_type() else {
+                continue;
+            };
+
+            if file_type.is_symlink() {
+                continue;
+            }
+
             let path = entry.path();
-            if path.is_file() {
+            if file_type.is_file() {
                 count += 1;
-            } else if path.is_dir() {
+            } else if file_type.is_dir() {
                 count += walkdir(&path);
             }
         }
     }
     count
+}
+
+#[cfg(test)]
+mod tests {
+    #[cfg(unix)]
+    use super::walkdir;
+    #[cfg(unix)]
+    use std::fs;
+    #[cfg(unix)]
+    use tempfile::TempDir;
+
+    #[cfg(unix)]
+    #[test]
+    fn walkdir_skips_symlinks() {
+        use std::os::unix::fs as unix_fs;
+
+        let temp = TempDir::new().unwrap();
+        let root = temp.path().join("root");
+        let external = temp.path().join("external");
+        fs::create_dir_all(root.join("nested")).unwrap();
+        fs::create_dir_all(&external).unwrap();
+        fs::write(root.join("real.txt"), "real").unwrap();
+        fs::write(root.join("nested").join("nested.txt"), "nested").unwrap();
+        fs::write(external.join("secret.txt"), "secret").unwrap();
+        unix_fs::symlink(root.join("real.txt"), root.join("link.txt")).unwrap();
+        unix_fs::symlink(&external, root.join("linked_dir")).unwrap();
+
+        assert_eq!(walkdir(&root), 2);
+    }
 }
