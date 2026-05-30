@@ -3,7 +3,7 @@ use std::io;
 use std::path::Path;
 
 /// release フォルダーを削除して空ディレクトリとして再作成
-pub fn prepare_release_dir(release_dir: &Path) -> io::Result<()> {
+pub(crate) fn prepare_release_dir(release_dir: &Path) -> io::Result<()> {
     if release_dir.exists() {
         fs::remove_dir_all(release_dir)?;
     }
@@ -27,7 +27,7 @@ fn ensure_within(child: &Path, parent: &Path) -> io::Result<()> {
 }
 
 /// src の内容を dst に再帰コピー。戻り値はコピーしたファイル数。
-pub fn copy_dir_recursive(src: &Path, dst: &Path) -> io::Result<u64> {
+pub(crate) fn copy_dir_recursive(src: &Path, dst: &Path) -> io::Result<u64> {
     let mut count = 0u64;
     copy_dir_inner(src, dst, &mut count)?;
     Ok(count)

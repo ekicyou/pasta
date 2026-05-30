@@ -1,6 +1,6 @@
 //! Utility modules for pasta_shiori
 
-pub mod parsers;
+pub(crate) mod parsers;
 
 #[cfg(windows)]
-pub mod hglobal;
+pub(crate) mod hglobal;

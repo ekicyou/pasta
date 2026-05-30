@@ -1,5 +1,5 @@
 #![cfg(windows)]
-pub mod enc;
+pub(crate) mod enc;
 mod windows_api;
 
 use self::enc::{Encoder, Encoding};
@@ -14,7 +14,7 @@ const GMEM_FIXED: u32 = 0;
 
 /// HGLOBALを文字列にキャプチャーします。
 #[derive(Debug, PartialEq)]
-pub struct ShioriString {
+pub(crate) struct ShioriString {
     h: HGLOBAL,
     len: usize,
     has_free: bool,
@@ -46,7 +46,7 @@ impl ShioriString {
     /// HGLOBALをShioriStringにキャプチャーします。
     /// drop時にHGLOBALを開放します。
     /// shiori::load/requestのHGLOBAL受け入れに利用してください。
-    pub fn capture(h: HGLOBAL, len: usize) -> ShioriString {
+    pub(crate) fn capture(h: HGLOBAL, len: usize) -> ShioriString {
         ShioriString {
             h,
             len,
@@ -90,14 +90,14 @@ impl ShioriString {
 
     /// HGLOBALを新たに作成し、textをShioriStringにクローンします。
     /// drop時にHGLOBALを開放しません。
-    pub fn clone_from_str_nofree<S: AsRef<str>>(text: S) -> ShioriString {
+    pub(crate) fn clone_from_str_nofree<S: AsRef<str>>(text: S) -> ShioriString {
         let s = text.as_ref();
         let bytes = s.as_bytes();
         ShioriString::clone_from_slice_impl(bytes, false)
     }
 
     /// 要素を&[u8]として参照します。
-    pub fn as_bytes(&self) -> &[u8] {
+    pub(crate) fn as_bytes(&self) -> &[u8] {
         // SAFETY: self.h and self.len were set together at construction time
         // (either via capture or clone_from_slice_impl), so the pointer is valid
         // for `self.len` bytes. The borrow lifetime is tied to &self.
@@ -127,14 +127,14 @@ impl ShioriString {
     }
 
     /// (HGLOBAL,len)を取得します。
-    pub fn value(&self) -> (HGLOBAL, usize) {
+    pub(crate) fn value(&self) -> (HGLOBAL, usize) {
         (self.h, self.len)
     }
 
     /// 格納データを「ANSI STRING(JP環境ではSJIS)」とみなして、OsStrに変換します。
     /// MultiByteToWideChar()を利用する。
     /// SHIORI::load()文字列の取り出しに利用する。
-    pub fn to_ansi_str(&self) -> MyResult<OsString> {
+    pub(crate) fn to_ansi_str(&self) -> MyResult<OsString> {
         let bytes = self.as_bytes();
         let s = Encoding::ANSI
             .to_string(bytes)
@@ -145,7 +145,7 @@ impl ShioriString {
 
     /// 格納データを「UTF-8」とみなして、strに変換する。
     /// SHIORI::request()文字列の取り出しに利用する。
-    pub fn to_utf8_str(&self) -> MyResult<&str> {
+    pub(crate) fn to_utf8_str(&self) -> MyResult<&str> {
         let bytes = self.as_bytes();
         Ok(str::from_utf8(bytes)?)
     }

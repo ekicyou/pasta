@@ -23,7 +23,7 @@ use std::io::Result;
 use windows_sys::Win32::Globalization::*;
 
 /// Converter between string and multibyte encoding.
-pub trait Encoder {
+pub(crate) trait Encoder {
     /// Convert from bytes to string.
     fn to_string(&self, data: &[u8]) -> Result<String>;
 
@@ -34,7 +34,7 @@ pub trait Encoder {
 
 /// Text convertation encoding.
 #[allow(clippy::upper_case_acronyms)]
-pub enum Encoding {
+pub(crate) enum Encoding {
     /// Use CP_ACP codepage on Windows and UTF-8 on other systems.
     ANSI,
     /// Use CP_OEM codepage on Windows and UTF-8 on other systems.

@@ -11,7 +11,7 @@ use std::ptr;
 use windows_sys::Win32::Globalization::*;
 
 /// Fail if an invalid input character is encountered.
-pub const MB_ERR_INVALID_CHARS: u32 = 0x0000_0008;
+pub(crate) const MB_ERR_INVALID_CHARS: u32 = 0x0000_0008;
 /// Convert composite characters, consisting of a base character and a nonspacing character,
 /// each with different character values.
 #[cfg(test)]
@@ -24,7 +24,7 @@ pub const WC_DEFAULTCHAR: u32 = 0x0000_0040;
 pub const WC_ERR_INVALID_CHARS: u32 = 0x0000_0080;
 
 /// Encoding for use WinAPI calls: MultiByteToWideChar and WideCharToMultiByte.
-pub struct EncoderCodePage(pub u32);
+pub(crate) struct EncoderCodePage(pub u32);
 
 impl Encoder for EncoderCodePage {
     ///     Convert from bytes to string.
@@ -75,7 +75,7 @@ pub fn string_to_multibyte(codepage: u32, data: &str, default_char: Option<u8>) 
 ///
 /// See https://msdn.microsoft.com/en-us/library/windows/desktop/dd319072(v=vs.85).aspx
 /// for more details.
-pub fn multi_byte_to_wide_char(codepage: u32, flags: u32, multi_byte_str: &[u8]) -> Result<String> {
+pub(crate) fn multi_byte_to_wide_char(codepage: u32, flags: u32, multi_byte_str: &[u8]) -> Result<String> {
     // Empty string
     if multi_byte_str.is_empty() {
         return Ok(String::new());

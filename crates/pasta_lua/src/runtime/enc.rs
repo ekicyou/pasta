@@ -43,7 +43,7 @@ const DESCRIPTION: &str = "Encoding conversion (UTF-8 <-> ANSI)";
 /// # Returns
 /// * `Ok(Table)` - The module table
 /// * `Err(e)` - Registration failed
-pub fn register(lua: &Lua) -> LuaResult<Table> {
+pub(crate) fn register(lua: &Lua) -> LuaResult<Table> {
     let enc = lua.create_table()?;
 
     // Set module metadata

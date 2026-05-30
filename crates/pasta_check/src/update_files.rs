@@ -87,7 +87,7 @@ fn days_to_ymd(mut days: u32) -> (u32, u32, u32) {
 }
 
 /// 更新ファイルを生成。戻り値は登録したファイルエントリ数。
-pub fn generate_update_files(root_dir: &Path) -> io::Result<usize> {
+pub(crate) fn generate_update_files(root_dir: &Path) -> io::Result<usize> {
     let entries = collect_files(root_dir)?;
     let count = entries.len();
 

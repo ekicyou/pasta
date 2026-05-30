@@ -13,14 +13,14 @@ mod windows;
 
 #[cfg(windows)]
 #[allow(unused_imports)]
-pub use self::windows::*;
+pub(crate) use self::windows::*;
 
 #[cfg(not(windows))]
 mod unix;
 
 #[cfg(not(windows))]
 #[allow(unused_imports)]
-pub use self::unix::*;
+pub(crate) use self::unix::*;
 
 use std::io::Result;
 

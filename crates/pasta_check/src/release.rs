@@ -5,7 +5,7 @@ use crate::update_files::generate_update_files;
 use std::io;
 
 /// release サブコマンドを実行
-pub fn execute_release(args: &ReleaseArgs) -> io::Result<()> {
+pub(crate) fn execute_release(args: &ReleaseArgs) -> io::Result<()> {
     // Step 1: リリースフォルダー初期化
     println!("[1/5] Preparing release folder...");
     prepare_release_dir(&args.release)?;

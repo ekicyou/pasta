@@ -8,7 +8,7 @@ use pest_derive::*;
 #[allow(dead_code)]
 #[derive(Parser)]
 #[grammar = "util/parsers/req_parser.pest"]
-pub struct ShioriRequestParser;
+pub(crate) struct ShioriRequestParser;
 
 #[cfg(test)]
 mod tests {
