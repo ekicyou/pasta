@@ -176,3 +176,146 @@
 - Requirement 2.2 については、非互換ライセンス検出時に記録すべき対象は今回は 0 件であり、その旨を明示した。
 - Requirement 2.4 を満たす形で、`mlua` の vendored LuaJIT ソースが MIT License であることを crate metadata と同梱 `COPYRIGHT` の両方で確認した。
 - Requirement 6.2 を満たす形で、実行コマンド、結果、警告、ライセンス在庫、互換性 verdict を本書に追記した。
+
+## Dependency Tree & Unused Dependency Analysis
+
+### 2026-05-30 cargo-tree 実行結果
+- **対応要件**: 3.1, 3.2, 6.2
+- **実行日時**: 2026-05-30T09:05:14.9239147+09:00
+- **使用ツール**: `cargo 1.96.0 (30a34c682 2026-05-25)` の組み込み `cargo tree`
+- **監査対象範囲**: ワークスペース `C:\home\maz\git\pasta` の全 7 クレート（`pasta_core`, `pasta_dsl`, `pasta_lua`, `pasta_shiori`, `pasta_check`, `pasta_lsp`, `pasta_sample_ghost`）。`Cargo.toml` の `[dependencies]`, `[dev-dependencies]`, `[target.*.dependencies]` を対象に、`src/**/*.rs`, `tests/**/*.rs`, `build.rs` を照合した。
+- **実行コマンド**:
+  - `cargo tree --workspace`
+  - `cargo tree --workspace --duplicates`
+- **照合方法**:
+  - 通常依存は `use <crate>`, `<crate>::`, `extern crate <crate>` を検索
+  - proc-macro / derive 系は `#[derive(...)]` も確認（`pest_derive`, `thiserror`, `serde`）
+  - target 条件付き依存は `cfg(windows)` / `cfg(target_arch = "wasm32")` 配下のコードまで確認
+  - dev-dependencies は `tests/**/*.rs` に加えて `#[cfg(test)]` を含む `src/**/*.rs` も確認
+
+#### 依存ツリー要約
+- `cargo tree --workspace` は全 7 クレートの依存木を正常に可視化した。主要な深いサブツリーは、`pasta_check -> pasta_lua -> mlua/mlua-stdlib/tracing-*`、`pasta_lsp -> tower-lsp -> lsp-types`、`pasta_sample_ghost -> image/imageproc -> ravif/rand 0.9` だった。
+- 直接依存・target 依存・dev-dependency の宣言は合計 **58 件**。このうち **49 件**は現行コードから使用を確認し、**9 件**はコード参照が見つからない未使用候補だった。
+- `cargo tree` 出力では Git 依存や独自レジストリ依存は観測されず、外部依存は crates.io 系と workspace path 依存で構成されていた。
+
+#### 重複依存 (`cargo tree --workspace --duplicates`)
+- 重複エントリは **17 エントリ / 8 ファミリ** を確認した。
+
+| ファミリ | 観測バージョン | 主な導入元 | 所見 |
+|---|---|---|---|
+| `bitflags` | `1.3.2`, `2.11.1` | `tower-lsp -> lsp-types`, `image -> png` | `pasta_lsp` 系と `pasta_sample_ghost` 系で別系統。直接依存の重複指定ではない |
+| `cpufeatures` | `0.2.17`, `0.3.0` | `pest_derive -> pest_meta -> sha2`, `rand 0.10` | proc-macro build dependency と `rand` 系で分離 |
+| `getrandom` | `0.3.4`, `0.4.2` | `quick_cache`, `rand 0.9`, `rand 0.10`, `tempfile` | `imageproc` 側の `rand 0.9` と workspace 側 `rand 0.10` の差異が原因 |
+| `hashbrown` | `0.14.5`, `0.16.1`, `0.17.1` | `dashmap`, `quick_cache`, `indexmap` | `tower-lsp`, `mlua-stdlib`, `zip`/`serde_yaml` 系の transitive duplicate |
+| `rand` | `0.9.4`, `0.10.1` | `imageproc`, `pasta_core` | `pasta_core` の直接依存は `0.10`、`imageproc` 側が `0.9` を維持 |
+| `rand_core` | `0.9.5`, `0.10.1` | `rand 0.9`, `rand 0.10` | `rand` の二系統に追随 |
+| `thiserror` | `1.0.69`, `2.0.18` | `tower-lsp -> async-codec-lite`, workspace 直接依存群 | workspace 側は `2.x` に統一済みだが upstream が `1.x` を保持 |
+| `thiserror-impl` | `1.0.69`, `2.0.18` | `thiserror 1.x`, `thiserror 2.x` | `thiserror` の二系統に付随 |
+
+- **総評**: duplicate は主に upstream 由来の transitive dependency であり、workspace 自身の直接依存指定ミスによるものは確認できなかった。特に `tower-lsp` 系と `image/imageproc` 系が duplicate の主因だった。
+
+#### 直接依存・dev-dependency 照合結果
+
+##### `pasta_core`
+| 宣言セクション | 依存 | 判定 | 根拠 |
+|---|---|---|---|
+| `dependencies` | `thiserror` | 使用中 | `src/error.rs:7` で `use thiserror::Error;` |
+| `dependencies` | `fast_radix_trie` | 使用中 | `src/registry/scene_table.rs:9` で `use fast_radix_trie::RadixMap;` |
+| `dependencies` | `rand` | 使用中 | `src/registry/random.rs:6` で `use rand::prelude::*;` |
+| `dependencies` | `tracing` | **未使用候補** | `crates/pasta_core` 配下の `src/**/*.rs`, `tests/**/*.rs`, `build.rs` を走査したが `tracing::`, `use tracing`, `debug!` などの参照なし |
+
+##### `pasta_dsl`
+| 宣言セクション | 依存 | 判定 | 根拠 |
+|---|---|---|---|
+| `dependencies` | `pest` | 使用中 | `src/parser/mod.rs:59` で `use pest::Parser as PestParser;` |
+| `dependencies` | `pest_derive` | 使用中 | `src/parser/mod.rs:61` で `use pest_derive::Parser;`、`src/parser/mod.rs:70` で `#[derive(Parser)]` |
+| `dependencies` | `thiserror` | 使用中 | `src/error.rs:7` で `use thiserror::Error;` |
+
+##### `pasta_lua`
+| 宣言セクション | 依存 | 判定 | 根拠 |
+|---|---|---|---|
+| `dependencies` | `pasta_core` | 使用中 | `src/context.rs:5` で `use pasta_core::registry::{SceneRegistry, WordDefRegistry};` |
+| `dependencies` | `pasta_dsl` | 使用中 | `src/context.rs:6` で `use pasta_dsl::parser::{...};` |
+| `dependencies` | `tracing` | 使用中 | `src/loader/cache.rs:11` で `use tracing::{debug, info, warn};` |
+| `dependencies` | `tracing-appender` | 使用中 | `src/logging/logger.rs:8` で `use tracing_appender::non_blocking::{...};` |
+| `dependencies` | `tracing-subscriber` | 使用中 | `src/logging/tracing_init.rs:8` で `use tracing_subscriber::filter::EnvFilter;` |
+| `dependencies` | `thiserror` | 使用中 | `src/error.rs:7` で `use thiserror::Error;` |
+| `dependencies` | `mlua` | 使用中 | `src/lib.rs:65` で `pub use mlua;`、`src/loader/error.rs:49` で `mlua::Error` |
+| `dependencies` | `mlua-stdlib` | 使用中 | `src/runtime/mod.rs:119` で `mlua_stdlib::assertions::register(...)` |
+| `dependencies` | `toml` | 使用中 | `src/loader/config.rs:22` で `toml::Table` |
+| `dependencies` | `serde` | 使用中 | `src/loader/config.rs:6` で `use serde::Deserialize;` |
+| `dependencies` | `serde_json` | 使用中 | `src/runtime/log.rs:120` で `serde_json::Value` |
+| `dependencies` | `glob` | 使用中 | `src/loader/discovery.rs:5` で `use glob::glob;` |
+| `dependencies` | `flate2` | 使用中 | `src/runtime/persistence.rs:25` で `use flate2::Compression;` |
+| `dependencies` | `regex` | 使用中 | `src/sakura_script/line_breaker.rs:6` で `use regex::Regex;` |
+| `dependencies` | `budoux` | 使用中 | `src/sakura_script/line_breaker.rs:105` で `budoux::Model` |
+| `dependencies` | `unicode-width` | 使用中 | `src/sakura_script/line_breaker.rs:7` で `use unicode_width::UnicodeWidthStr;` |
+| `target.'cfg(windows)'.dependencies` | `windows-sys` | 使用中 | `src/encoding/windows.rs:13` で `use windows_sys::Win32::Globalization::*;` |
+| `dev-dependencies` | `tempfile` | 使用中 | `src/loader/discovery.rs:97` のテストで `use tempfile::TempDir;` |
+| `dev-dependencies` | `insta` | 使用中 | `tests/transpiler/snapshot_test.rs:9` で `use insta::assert_snapshot;` |
+| `dev-dependencies` | `tracing-test` | 使用中 | `tests/log/integration_test.rs:8` で `use tracing_test::traced_test;` |
+
+##### `pasta_shiori`
+| 宣言セクション | 依存 | 判定 | 根拠 |
+|---|---|---|---|
+| `dependencies` | `pasta_core` | **未使用候補** | `crates/pasta_shiori` 配下の `src/**/*.rs`, `tests/**/*.rs`, `build.rs` を走査したが `pasta_core::` 参照なし |
+| `dependencies` | `pasta_lua` | 使用中 | `src/error.rs:46` で `impl From<pasta_lua::LoaderError> for MyError` |
+| `dependencies` | `time` | 使用中 | `src/lua_request.rs:7` で `use time::OffsetDateTime;` |
+| `dependencies` | `tracing` | 使用中 | `src/shiori.rs:6` で `use tracing::{debug, error, info, trace, warn};` |
+| `dependencies` | `thiserror` | 使用中 | `src/error.rs:4` で `use thiserror::Error;` |
+| `dependencies` | `pest` | 使用中 | `src/lua_request.rs:5` で `use pest::Parser as _;` |
+| `dependencies` | `pest_derive` | 使用中 | `src/util/parsers/req_parser.rs:9` で `#[derive(Parser)]` |
+| `target.'cfg(windows)'.dependencies` | `windows-sys` | 使用中 | `src/windows.rs:11` で `use windows_sys::Win32::Foundation::*;` |
+| `dev-dependencies` | `tempfile` | 使用中 | `src/shiori_tests.rs:3` で `use tempfile::TempDir;` |
+
+##### `pasta_check`
+| 宣言セクション | 依存 | 判定 | 根拠 |
+|---|---|---|---|
+| `dependencies` | `lexopt` | 使用中 | `src/main.rs:34` で `lexopt::Parser::from_env()` |
+| `dependencies` | `md5` | 使用中 | `src/update_files.rs:177` で `md5::Context::new()` |
+| `dependencies` | `zip` | 使用中 | `src/nar.rs:4` で `use zip::write::SimpleFileOptions;` |
+| `dependencies` | `thiserror` | **未使用候補** | `crates/pasta_check` 配下に `thiserror::Error` / `#[derive(Error)]` の参照なし。実装上のエラー処理は `io::Result` と `lexopt::Error` で完結 |
+| `dependencies` | `pasta_lua` | **未使用候補** | `crates/pasta_check` 配下の `src/**/*.rs`, `tests/**/*.rs`, `build.rs` を走査したが `pasta_lua::` 参照なし。`Cargo.toml` コメントどおり「将来拡張」用の先行宣言に留まる |
+| `dev-dependencies` | `tempfile` | 使用中 | `src/copy.rs:67` のテストで `use tempfile::TempDir;` |
+
+##### `pasta_lsp`
+| 宣言セクション | 依存 | 判定 | 根拠 |
+|---|---|---|---|
+| `dependencies` | `pasta_dsl` | 使用中 | `src/analysis/mod.rs:55` で `pasta_dsl::parse_str(source, "<lsp>")` |
+| `dependencies` | `thiserror` | 使用中 | `src/error.rs:7` で `#[derive(Debug, thiserror::Error)]` |
+| `dependencies` | `serde` | 使用中 | `src/transport.rs:8` で `use serde::Serialize;` |
+| `dependencies` | `serde_json` | 使用中 | `src/transport.rs:282` で `serde_json::to_string(&wasm_result)` |
+| `dependencies` | `tower-lsp` | 使用中 | `src/server.rs:8` で `use tower_lsp::jsonrpc::Result;` |
+| `target.'cfg(target_arch = "wasm32")'.dependencies` | `wasm-bindgen` | 使用中 | `src/transport.rs:111` で `use wasm_bindgen::prelude::*;`、`src/transport.rs:125` で `#[wasm_bindgen]` |
+| `target.'cfg(target_arch = "wasm32")'.dependencies` | `wasm-bindgen-futures` | **未使用候補** | `src/transport.rs` の wasm モジュールは `wasm_bindgen` と `serde_wasm_bindgen` のみ使用。workspace 走査で `wasm_bindgen_futures::` / `future_to_promise` 参照なし |
+| `target.'cfg(target_arch = "wasm32")'.dependencies` | `js-sys` | **未使用候補** | `src/transport.rs` の wasm モジュールに `js_sys::` 参照なし |
+| `target.'cfg(target_arch = "wasm32")'.dependencies` | `serde-wasm-bindgen` | 使用中 | `src/transport.rs:145` で `serde_wasm_bindgen::to_value(&analysis_result)` |
+| `dev-dependencies` | `tokio` | **未使用候補** | `crates/pasta_lsp` 配下の `src/**/*.rs`, `tests/**/*.rs`, `build.rs` を走査したが `tokio::` / `#[tokio::test]` 参照なし |
+
+##### `pasta_sample_ghost`
+| 宣言セクション | 依存 | 判定 | 根拠 |
+|---|---|---|---|
+| `dependencies` | `image` | 使用中 | `src/image_generator.rs:7` で `use image::{Rgba, RgbaImage};` |
+| `dependencies` | `imageproc` | 使用中 | `src/image_generator.rs:8` で `use imageproc::drawing::draw_filled_circle_mut;` |
+| `dependencies` | `thiserror` | 使用中 | `src/lib.rs:13` で `use thiserror::Error;` |
+| `dev-dependencies` | `pasta_shiori` | **未使用候補（要意図確認）** | Rust コード上の `pasta_shiori::` 参照は見つからない。`build.rs:16-25` は `crates/pasta_shiori/src` を監視するだけで、`tests/common/mod.rs:23-35` も `target/.../pasta_shiori.dll` をファイルパスでコピーしている |
+| `dev-dependencies` | `pasta_lua` | **未使用候補（要意図確認）** | Rust コード上の `pasta_lua::` 参照は見つからない。`tests/common/mod.rs:57-73` は `crates/pasta_lua/pasta_scripts` をファイルパスでコピーしているだけ |
+| `dev-dependencies` | `tempfile` | 使用中 | `tests/integration_test.rs:7` で `use tempfile::TempDir;` |
+
+#### 未使用依存候補一覧（Task 3.2 向け）
+| クレート | 宣言場所 | 依存 | 判定根拠 | 推奨 |
+|---|---|---|---|---|
+| `pasta_core` | `crates/pasta_core/Cargo.toml` `[dependencies]` | `tracing` | ソース・テスト・build script に `tracing` 系参照なし | Task 3.2 で除去候補 |
+| `pasta_shiori` | `crates/pasta_shiori/Cargo.toml` `[dependencies]` | `pasta_core` | `pasta_core::` 参照なし。`pasta_lua` 経由で必要型を取得しているわけでもない | Task 3.2 で除去候補 |
+| `pasta_check` | `crates/pasta_check/Cargo.toml` `[dependencies]` | `thiserror` | `thiserror::Error` / `#[derive(Error)]` 不使用。既存コードは `io::Result` / `lexopt::Error` のみ | Task 3.2 で除去候補 |
+| `pasta_check` | `crates/pasta_check/Cargo.toml` `[dependencies]` | `pasta_lua` | `pasta_lua::` 参照なし。`Cargo.toml` コメントどおり将来拡張の先行宣言 | Task 3.2 で除去候補 |
+| `pasta_lsp` | `crates/pasta_lsp/Cargo.toml` `[target.'cfg(target_arch = "wasm32")'.dependencies]` | `wasm-bindgen-futures` | wasm モジュールで `future_to_promise` / `wasm_bindgen_futures::` 不使用 | Task 3.2 で除去候補 |
+| `pasta_lsp` | `crates/pasta_lsp/Cargo.toml` `[target.'cfg(target_arch = "wasm32")'.dependencies]` | `js-sys` | wasm モジュールで `js_sys::` 不使用 | Task 3.2 で除去候補 |
+| `pasta_lsp` | `crates/pasta_lsp/Cargo.toml` `[dev-dependencies]` | `tokio` | `tokio::` / `#[tokio::test]` 参照なし | Task 3.2 で除去候補 |
+| `pasta_sample_ghost` | `crates/pasta_sample_ghost/Cargo.toml` `[dev-dependencies]` | `pasta_shiori` | crate API 参照なし。テストはビルド済み DLL をファイルパスで扱うのみ | **意図確認後** に Task 3.2 で除去候補 |
+| `pasta_sample_ghost` | `crates/pasta_sample_ghost/Cargo.toml` `[dev-dependencies]` | `pasta_lua` | crate API 参照なし。テストは `pasta_scripts/` をファイルパスでコピーするのみ | **意図確認後** に Task 3.2 で除去候補 |
+
+#### 総括
+- Requirement 3.1 を満たす形で、`cargo tree` と `cargo tree --duplicates` を実行し、依存木と duplicate を可視化した。
+- Requirement 3.2 の前段として、各クレートの直接依存・target 依存・dev-dependency をコード実参照と突き合わせ、**9 件の未使用候補**を抽出した。
+- Requirement 6.2 を満たす形で、依存ツリー要約、duplicate 一覧、依存ごとの使用/未使用判定、Task 3.2 向け推奨アクションを research.md に構造化して記録した。
