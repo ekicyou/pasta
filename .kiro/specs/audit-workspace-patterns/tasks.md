@@ -37,7 +37,7 @@
   - _Requirements: 3.1, 3.2, 3.3_
 
 - [ ] 5. `unwrap()`/`expect()` の横断的最終検証
-- [ ] 5.1 全クレートのプロダクションコードにおける `unwrap()`/`expect()` 検証
+- [x] 5.1 全クレートのプロダクションコードにおける `unwrap()`/`expect()` 検証
   - `grep -rn '\.unwrap()' crates/*/src/ --include='*.rs'` で全 `unwrap()` 使用箇所を検出
   - テストコード（`#[cfg(test)]`, `tests/`）を除外した上でプロダクションコードの `unwrap()` をリストアップ
   - 発見された `unwrap()` が安全に使用されている（論理的にパニックしない）ケースかを判定
@@ -63,3 +63,7 @@
   - CLIツール（pasta_check）の出力が改善前と同一であることを確認
   - 全公開APIシグネチャが変更されていないことを確認
   - _Requirements: 7.1, 7.2, 7.3, 8.1, 8.2, 8.3, 8.4_
+
+## Implementation Notes
+- Task 4.1: サブエージェントが境界外のファイルに CRLF/改行変更を加える傾向あり。レビュー前に `git diff --name-only` で境界外変更を revert すること。
+- Task 4.1: `cargo clippy --workspace` には pasta_lua/pasta_lsp/pasta_check に既存警告が残存。Task 7.1 で対応予定。

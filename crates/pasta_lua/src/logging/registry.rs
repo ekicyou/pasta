@@ -61,32 +61,29 @@ impl GlobalLoggerRegistry {
     /// Register a logger for the given load_dir.
     ///
     /// If a logger already exists for the load_dir, it is replaced.
-    ///
-    /// # Panics
-    /// Panics if the internal Mutex is poisoned (another thread panicked while holding the lock).
-    /// This is intentional: a poisoned mutex indicates unrecoverable state corruption.
     pub fn register(&self, load_dir: PathBuf, logger: Arc<PastaLogger>) {
-        let mut loggers = self.loggers.lock().unwrap();
+        let mut loggers = self
+            .loggers
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         loggers.insert(load_dir, logger);
     }
 
     /// Unregister the logger for the given load_dir.
-    ///
-    /// # Panics
-    /// Panics if the internal Mutex is poisoned (another thread panicked while holding the lock).
-    /// This is intentional: a poisoned mutex indicates unrecoverable state corruption.
     pub fn unregister(&self, load_dir: &Path) {
-        let mut loggers = self.loggers.lock().unwrap();
+        let mut loggers = self
+            .loggers
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         loggers.remove(load_dir);
     }
 
     /// Get the logger for the given load_dir.
-    ///
-    /// # Panics
-    /// Panics if the internal Mutex is poisoned (another thread panicked while holding the lock).
-    /// This is intentional: a poisoned mutex indicates unrecoverable state corruption.
     pub fn get(&self, load_dir: &Path) -> Option<Arc<PastaLogger>> {
-        let loggers = self.loggers.lock().unwrap();
+        let loggers = self
+            .loggers
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         loggers.get(load_dir).cloned()
     }
 

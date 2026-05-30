@@ -114,22 +114,20 @@ impl PastaLogger {
     }
 
     /// Write bytes to the log file.
-    ///
-    /// # Panics
-    /// Panics if the internal Mutex is poisoned (another thread panicked while holding the lock).
-    /// This is intentional: a poisoned mutex indicates unrecoverable state corruption.
     pub fn write(&self, buf: &[u8]) -> io::Result<usize> {
-        let mut writer = self.writer.lock().unwrap();
+        let mut writer = self
+            .writer
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         writer.write(buf)
     }
 
     /// Flush the log buffer.
-    ///
-    /// # Panics
-    /// Panics if the internal Mutex is poisoned (another thread panicked while holding the lock).
-    /// This is intentional: a poisoned mutex indicates unrecoverable state corruption.
     pub fn flush(&self) -> io::Result<()> {
-        let mut writer = self.writer.lock().unwrap();
+        let mut writer = self
+            .writer
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         writer.flush()
     }
 
