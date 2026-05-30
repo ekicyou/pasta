@@ -7,7 +7,7 @@ use crate::shiori::*;
 use crate::util::hglobal::*;
 use std::ptr;
 use std::sync::*;
-use tracing::*;
+use tracing::{error, warn};
 use windows_sys::Win32::Foundation::*;
 
 static SHIORI: OnceLock<RawShiori<PastaShiori>> = OnceLock::new();

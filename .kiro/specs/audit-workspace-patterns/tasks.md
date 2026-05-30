@@ -19,7 +19,7 @@
   - _Requirements: 2.1, 2.2, 2.3, 2.4_
 
 - [ ] 3. tracing インポートパターンの統一
-- [ ] 3.1 ワイルドカードインポートの明示的インポートへの変換
+- [x] 3.1 ワイルドカードインポートの明示的インポートへの変換
   - `crates/pasta_shiori/src/windows.rs` の `use tracing::*` を、実際に使用されているマクロのみの明示的インポートに変換
   - 変換前に該当ファイルで使用されている tracing マクロを特定（`debug!`, `error!`, `info!`, `trace!`, `warn!` 等）
   - 全クレートで `use tracing::*` が存在しないことを `grep` で最終確認
