@@ -8,10 +8,10 @@ use zip::ZipWriter;
 /// NAR ファイルを作成。戻り値は NAR ファイルのサイズ（バイト）。
 pub(crate) fn create_nar(release_dir: &Path, nar_path: &Path) -> io::Result<u64> {
     // 親ディレクトリを必要に応じて作成
-    if let Some(parent) = nar_path.parent() {
-        if !parent.exists() {
-            fs::create_dir_all(parent)?;
-        }
+    if let Some(parent) = nar_path.parent()
+        && !parent.exists()
+    {
+        fs::create_dir_all(parent)?;
     }
 
     let file = File::create(nar_path)?;

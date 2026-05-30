@@ -29,7 +29,7 @@ const MAX_TABLE_ELEMENTS: usize = 1000;
 const MAX_NESTING_DEPTH: usize = 10;
 
 /// Lua caller information extracted from the call stack.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 struct LuaCallerInfo {
     /// Source file name (e.g., "@main.lua", "=stdin")
     source: String,
@@ -37,16 +37,6 @@ struct LuaCallerInfo {
     line: usize,
     /// Function name (empty string if unavailable)
     fn_name: String,
-}
-
-impl Default for LuaCallerInfo {
-    fn default() -> Self {
-        Self {
-            source: String::new(),
-            line: 0,
-            fn_name: String::new(),
-        }
-    }
 }
 
 /// Get caller information from the Lua call stack.

@@ -83,8 +83,6 @@ pub(super) fn find_number_literal(text: &str) -> Option<(usize, usize)> {
             started = true;
             end = trimmed_start + i + c.len_utf8();
             chars.next();
-        } else if !started {
-            break;
         } else {
             break;
         }

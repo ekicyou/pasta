@@ -56,7 +56,7 @@ struct ProcessStats {
 ///
 /// Orchestrates the complete startup sequence:
 /// 1. Load configuration from pasta.toml
-/// 1.5. Create logger with config, register, and update tracing filter
+///    1.5. Create logger with config, register, and update tracing filter
 /// 2. Prepare profile directories and cache with version check
 /// 3. Discover .pasta files in dic/*/*.pasta
 /// 4. Incremental transpile (only changed files)
@@ -277,10 +277,10 @@ impl PastaLoader {
 
         // Check for invalid filenames (init.lua, init.pasta)
         for file in pasta_files.iter().chain(lua_files.iter()) {
-            if let Some(file_name) = file.file_name().and_then(|n| n.to_str()) {
-                if file_name == "init.lua" || file_name == "init.pasta" {
-                    return Err(LoaderError::invalid_file_name(file));
-                }
+            if let Some(file_name) = file.file_name().and_then(|n| n.to_str())
+                && (file_name == "init.lua" || file_name == "init.pasta")
+            {
+                return Err(LoaderError::invalid_file_name(file));
             }
         }
 

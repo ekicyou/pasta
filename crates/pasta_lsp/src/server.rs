@@ -38,10 +38,10 @@ impl PastaLangServer {
         match result {
             Ok(analysis_result) => {
                 // Cache the analysis result
-                if let Ok(mut docs) = self.documents.write() {
-                    if let Some(doc) = docs.get_mut(uri.as_str()) {
-                        doc.analysis = Some(analysis_result.clone());
-                    }
+                if let Ok(mut docs) = self.documents.write()
+                    && let Some(doc) = docs.get_mut(uri.as_str())
+                {
+                    doc.analysis = Some(analysis_result.clone());
                 }
 
                 // Publish diagnostics

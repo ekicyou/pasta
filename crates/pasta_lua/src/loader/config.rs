@@ -108,6 +108,10 @@ impl PastaConfig {
     }
 
     /// Create from TOML string.
+    #[allow(
+        clippy::should_implement_trait,
+        reason = "Public API stability: keep the existing inherent from_str constructor name without renaming"
+    )]
     pub fn from_str(s: &str) -> Result<Self, toml::de::Error> {
         Self::parse(s)
     }

@@ -160,15 +160,14 @@ impl Tokenizer {
 
         while pos < input.len() {
             // Check for sakura script tag (starts with \)
-            if bytes[pos] == b'\\' {
-                if let Some(mat) = self.sakura_tag_regex.find(&input[pos..]) {
-                    if mat.start() == 0 {
-                        // Found sakura script tag at current position
-                        tokens.push(Token::new(TokenKind::SakuraScript, mat.as_str()));
-                        pos += mat.len();
-                        continue;
-                    }
-                }
+            if bytes[pos] == b'\\'
+                && let Some(mat) = self.sakura_tag_regex.find(&input[pos..])
+                && mat.start() == 0
+            {
+                // Found sakura script tag at current position
+                tokens.push(Token::new(TokenKind::SakuraScript, mat.as_str()));
+                pos += mat.len();
+                continue;
             }
 
             // Process single character

@@ -79,7 +79,7 @@ pub fn normalize_output(input: &str) -> String {
     let processed = result_lines.join("\n");
 
     // Trim trailing whitespace (spaces, tabs, carriage returns, newlines)
-    let trimmed = processed.trim_end_matches(|c| c == ' ' || c == '\t' || c == '\r' || c == '\n');
+    let trimmed = processed.trim_end_matches([' ', '\t', '\r', '\n']);
 
     // Return with exactly one newline at end
     format!("{}\n", trimmed)

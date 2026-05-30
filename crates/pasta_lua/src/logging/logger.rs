@@ -64,7 +64,7 @@ impl PastaLogger {
             .rotation(Rotation::NEVER)
             .filename_prefix(log_file_name)
             .build(log_dir)
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+            .map_err(io::Error::other)?;
 
         // Create non-blocking writer
         let (writer, guard) = tracing_appender::non_blocking(appender);

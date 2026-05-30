@@ -207,24 +207,24 @@ impl super::AnalysisEngine {
         cursor += marker.len();
 
         // 2) Variable name (skip for var_set_none where name is None)
-        if let Some(name) = &vs.name {
-            if let Some(name_pos) = span_text[cursor..].find(name.as_str()) {
-                let name_start = cursor + name_pos;
-                let name_offset = base_offset + name_start;
-                let global_mod = if vs.scope == VarScope::Global {
-                    1 << 2
-                } else {
-                    0
-                };
-                tokens.push(RawToken {
-                    line: line0,
-                    start_char: utf8_offset_to_utf16(line_text, name_offset),
-                    length: utf8_len_to_utf16(name),
-                    token_type: token_type::VARIABLE,
-                    modifiers: (1 << 1) | global_mod, // definition + optional global
-                });
-                cursor = name_start + name.len();
-            }
+        if let Some(name) = &vs.name
+            && let Some(name_pos) = span_text[cursor..].find(name.as_str())
+        {
+            let name_start = cursor + name_pos;
+            let name_offset = base_offset + name_start;
+            let global_mod = if vs.scope == VarScope::Global {
+                1 << 2
+            } else {
+                0
+            };
+            tokens.push(RawToken {
+                line: line0,
+                start_char: utf8_offset_to_utf16(line_text, name_offset),
+                length: utf8_len_to_utf16(name),
+                token_type: token_type::VARIABLE,
+                modifiers: (1 << 1) | global_mod, // definition + optional global
+            });
+            cursor = name_start + name.len();
         }
 
         // 3) Assignment operator ＝ or =
@@ -626,14 +626,14 @@ impl super::AnalysisEngine {
         }
 
         // 3) スコープ: ScopedName.span (@名前 全体を 1 WORD トークン)
-        if let Some(ref scope) = cue.scope {
-            if scope.span.is_valid() {
-                Self::add_token_from_span(&scope.span, source, token_type::WORD, 0, tokens);
-                // カーソルを scope 後に進める
-                let scope_end = scope.span.end_byte.saturating_sub(line_start);
-                if scope_end > cursor + span_start_in_line {
-                    cursor = scope_end - span_start_in_line;
-                }
+        if let Some(ref scope) = cue.scope
+            && scope.span.is_valid()
+        {
+            Self::add_token_from_span(&scope.span, source, token_type::WORD, 0, tokens);
+            // カーソルを scope 後に進める
+            let scope_end = scope.span.end_byte.saturating_sub(line_start);
+            if scope_end > cursor + span_start_in_line {
+                cursor = scope_end - span_start_in_line;
             }
         }
 
@@ -789,18 +789,18 @@ impl super::AnalysisEngine {
             let colon_actual_offset = colon_byte_offset + ws_bytes;
             if colon_actual_offset < line_text.len() {
                 let colon_char = line_text[colon_actual_offset..].chars().next();
-                if let Some(ch) = colon_char {
-                    if ch == '：' || ch == ':' {
-                        let colon_start = utf8_offset_to_utf16(line_text, colon_actual_offset);
-                        let colon_len = ch.len_utf16() as u32;
-                        tokens.push(RawToken {
-                            line: (line - 1) as u32,
-                            start_char: colon_start,
-                            length: colon_len,
-                            token_type: token_type::OPERATOR,
-                            modifiers: 0,
-                        });
-                    }
+                if let Some(ch) = colon_char
+                    && (ch == '：' || ch == ':')
+                {
+                    let colon_start = utf8_offset_to_utf16(line_text, colon_actual_offset);
+                    let colon_len = ch.len_utf16() as u32;
+                    tokens.push(RawToken {
+                        line: (line - 1) as u32,
+                        start_char: colon_start,
+                        length: colon_len,
+                        token_type: token_type::OPERATOR,
+                        modifiers: 0,
+                    });
                 }
             }
         }

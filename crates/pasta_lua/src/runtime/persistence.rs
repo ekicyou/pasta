@@ -279,11 +279,11 @@ pub fn save_to_file(
     obfuscate: bool,
 ) -> Result<(), PersistenceError> {
     // Ensure parent directory exists
-    if let Some(parent) = path.parent() {
-        if !parent.exists() {
-            fs::create_dir_all(parent)?;
-            tracing::debug!(path = %parent.display(), "Created persistence directory");
-        }
+    if let Some(parent) = path.parent()
+        && !parent.exists()
+    {
+        fs::create_dir_all(parent)?;
+        tracing::debug!(path = %parent.display(), "Created persistence directory");
     }
 
     // Serialize data
