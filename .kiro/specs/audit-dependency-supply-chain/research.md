@@ -499,3 +499,26 @@
 3. **transitive duplicate の残存**: `rand 0.9/0.10`, `thiserror 1/2`, `bitflags`, `hashbrown` などは upstream 由来で残るため、直ちに修正しない代わりに major/minor 更新時の確認項目にする。
 4. **Wave 1 文書完全性**: `audit-pasta-sample-ghost` completed spec に `research.md` が存在しないため、将来の監査追跡性向上のためには当該 spec 側にも依存関連メモを補完することが望ましい。
 5. **再監査トリガー**: 新規依存追加、RustSec Advisory DB 更新、`deny.toml` 変更、`image` / `imageproc` / `mlua` / `tower-lsp` の更新時は、`cargo audit`, `cargo deny check licenses`, `cargo tree --workspace --duplicates` を再実行する。
+
+## 最終回帰検証結果
+
+### 2026-05-30 Task 6.2 実施結果
+
+| Command | Exit code | Result | Summary |
+|---|---|---|---|
+| `cargo build --workspace` | 0 | PASS | ワークスペース全クレートのビルド成功（13.662s） |
+| `cargo test --workspace` | 0 | PASS | 1213 passed / 0 failed / 11 ignored、running total 1224（950+件要件を充足、186.846s） |
+| `cargo build --target i686-pc-windows-msvc` | 0 | PASS | i686 クロスコンパイル成功（343.094s） |
+| `cargo deny check` | 0 | PASS | `advisories ok, bans ok, licenses ok, sources ok`、error 0件 |
+| `cargo audit` | 0 | PASS | 既知脆弱性 0件。`paste 1.0.15` の `RUSTSEC-2024-0436` は unmaintained の allowed warning のみ |
+
+#### 非ブロッキング警告
+- `cargo test --workspace`: `crates\pasta_lua\tests\property_token_preservation_test.rs` で `mlua::Value::as_str` の非推奨警告 3件。テスト結果は全件成功。
+- `cargo deny check`: `license-not-encountered` 1件（`ISC` 未遭遇）と duplicate 警告 10件（`bitflags`, `cpufeatures`, `getrandom`, `hashbrown`, `r-efi`, `rand`, `rand_core`, `thiserror`, `thiserror-impl`, `wit-bindgen`）。終了コード 0、error 0件。
+- `cargo audit`: `paste 1.0.15` に対する `RUSTSEC-2024-0436`（unmaintained）の allowed warning 1件。既知脆弱性は 0件。
+
+#### 判定
+- **Final verdict**: **ALL PASS**
+- **検証対象要件**: Requirement 7.1 / 7.2 / 7.3 / 7.4
+- **実行期間**: `2026-05-30T11:01:28.9431257+09:00` ～ `2026-05-30T11:11:40.7376521+09:00`
+- **記録時刻**: `2026-05-30T11:11:40.7376521+09:00`
