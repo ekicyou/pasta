@@ -24,9 +24,8 @@
 
 **pasta_core:**
 - **thiserror 2**: エラー型定義
-- **fast_radix_trie 1.1.0**: 前方一致シーン検索
-- **rand 0.9**: ランダム選択（重複シーン、前方一致候補）
-- **tracing 0.1**: ロギング・診断
+- **fast_radix_trie 1.2.0**: 前方一致シーン検索
+- **rand 0.10**: ランダム選択（重複シーン、前方一致候補）
 
 **pasta_lua:**
 - **pasta_dsl**: DSLパーサー層
@@ -47,7 +46,7 @@
 - **lua_test**: BDDスタイルテストフレームワーク（scriptlibs/）
 
 **pasta_shiori:**
-- **pasta_core, pasta_lua**: 内部依存
+- **pasta_lua**: 内部依存
 - **pest 2.8.6, pest_derive 2.8.6**: SHIORIプロトコルパーサー
 - **time 0.3**: 時刻処理
 - **tracing 0.1**: ロギング（subscriber/appenderはpasta_luaに移管）
@@ -59,23 +58,24 @@
 - **tower-lsp 0.20**: LSPサーバーフレームワーク
 - **serde 1 / serde_json 1**: シリアライゼーション
 - **thiserror 2**: エラー型定義
-- **wasm-bindgen, js-sys**: WASM対応（cfg(wasm32)）
+- **wasm-bindgen**: WASM対応（cfg(wasm32)）
 
 **pasta_check:**
 - **lexopt 0.3**: CLIパーサー
 - **md5 0.8**: ハッシュ計算（更新ファイル生成）
 - **zip 8.4**: NAR（ZIP）アーカイブ作成
-- **pasta_lua**: 将来のLua単体試験サポート基盤
-- **thiserror 2**: エラー型定義
 
 **pasta_sample_ghost:**
 - **image 0.25 / imageproc 0.26**: ピクトグラム画像生成
-- **thiserror 2**: エラー型定義
 
 ### 開発環境
 - **tempfile 3**: テスト用一時ファイル生成
 - **insta 1.46**: スナップショットテスト（glob機能付き）
 - **tracing-test 0.2**: テスト用ログキャプチャ
+
+### サプライチェーン監査
+- **cargo-audit**: 脆弱性スキャン（RustSec Advisory Database）
+- **cargo-deny 0.19**: ライセンス・脆弱性・ソース監査（deny.toml で定義）
 
 ## アーキテクチャ原則
 
