@@ -52,4 +52,4 @@ SSPのプロパティシステムへのアクセスをpastaゴーストから可
 
 ### Wave 2（横断的・Wave 1完了後）
 - [ ] audit-dependency-supply-chain -- 外部依存クレートのセキュリティ・ライセンス・バージョン監査。Dependencies: Wave 1全spec
-- [ ] audit-workspace-patterns -- クレート横断エラーハンドリング統一・共通パターン抽出。Dependencies: Wave 1全spec
+- [x] audit-workspace-patterns -- クレート横断エラーハンドリング統一・共通パターン抽出。Dependencies: Wave 1全spec
