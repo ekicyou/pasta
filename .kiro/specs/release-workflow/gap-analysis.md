@@ -56,7 +56,7 @@ pasta_sample_ghost (publish = false) → スキップ
 1. **Setup Phase (1-4)**: DLLビルド → ゴースト生成 → ファイルコピー → 更新ファイル生成
 2. **Release Phase (5-8)**: バージョンチェック → バリデーション → .nar作成 → 手順表示
 
-**出力ファイル**: `crates/pasta_sample_ghost/hello-pasta.nar`
+**出力ファイル**: `release/hello-pasta.nar`（release.ps1 は WorkspaceRoot の release/ に出力）
 **DLLパス**: `target/i686-pc-windows-msvc/release/pasta.dll`
 
 スクリプトは `PowerShell -ExecutionPolicy Bypass -File release.ps1` で実行。

@@ -181,7 +181,7 @@ graph TB
 | --------------------------------------------------- | ------------------------------------------------------------------------------- | ------- |
 | `Cargo.toml`                                        | `[workspace.package].version` + 5クレートの `version` フィールド更新（計6箇所） | Phase 2 |
 | `editors/vscode/package.json`                       | `version` フィールド更新                                                        | Phase 2 |
-| `crates/pasta_sample_ghost/hello-pasta.nar`         | release.ps1 による再生成                                                        | Phase 5 |
+| `release/hello-pasta.nar`                           | release.ps1 による再生成                                                        | Phase 5 |
 | `target/i686-pc-windows-msvc/release/pasta.dll`     | release.ps1 によるビルド                                                        | Phase 5 |
 | `target/i686-pc-windows-msvc/release/pasta.dll.zip` | DLL の zip 圧縮                                                                 | Phase 5 |
 | `release-notes-vX.Y.Z.md`                           | 一時ファイル（Phase 7 完了後削除）                                              | Phase 7 |
@@ -662,7 +662,7 @@ flowchart TD
 
 2. **成果物確認** (5.2, 5.3):
    ```
-   Test-Path "crates/pasta_sample_ghost/hello-pasta.nar"
+   Test-Path "release/hello-pasta.nar"
    Test-Path "target/i686-pc-windows-msvc/release/pasta.dll"
    ```
    - いずれかが `False`: エラー報告し中断 (5.4)
@@ -793,7 +793,7 @@ flowchart TD
    ```powershell
    $assets = @(
      "target/i686-pc-windows-msvc/release/pasta.dll.zip",
-     "crates/pasta_sample_ghost/hello-pasta.nar"
+     "release/hello-pasta.nar"
    )
    if ($env:VSIX_PATH -and (Test-Path $env:VSIX_PATH)) {
      $assets += $env:VSIX_PATH
@@ -817,7 +817,7 @@ flowchart TD
        ```
        gh release create vX.Y.Z ^
          "target/i686-pc-windows-msvc/release/pasta.dll.zip" ^
-         "crates/pasta_sample_ghost/hello-pasta.nar" ^
+         "release/hello-pasta.nar" ^
          --title "pasta vX.Y.Z" ^
          --notes-file release-notes-vX.Y.Z.md
        ```

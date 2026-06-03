@@ -37,7 +37,7 @@
   - タイトル形式: `pasta vX.Y.Z`
   - アセット: `pasta.dll` (2.59 MiB), `hello-pasta.nar` (1.29 MiB)
   - DLL パス: `target/i686-pc-windows-msvc/release/pasta.dll`
-  - NAR パス: `crates/pasta_sample_ghost/hello-pasta.nar`
+  - NAR パス: `release/hello-pasta.nar`（release.ps1 が WorkspaceRoot の release/hello-pasta.nar に出力）
 - **Implications**: `gh release create` のコマンド構築時にこれらのパスとタイトル形式を使用
 
 ### チェンジログ生成パターン

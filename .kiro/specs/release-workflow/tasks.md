@@ -109,7 +109,7 @@
 - [ ] 5.1 release.ps1 を実行して成果物を確認する
   - `Push-Location crates/pasta_sample_ghost; PowerShell -ExecutionPolicy Bypass -File release.ps1; Pop-Location` を実行する
   - 失敗時: エラーを報告してリリース作業を中断する
-  - `Test-Path "crates/pasta_sample_ghost/hello-pasta.nar"` で .nar ファイルの存在を確認する
+  - `Test-Path "release/hello-pasta.nar"` で .nar ファイルの存在を確認する
   - `Test-Path "target/i686-pc-windows-msvc/release/pasta.dll"` で DLL の存在を確認する
   - いずれかが存在しない場合: エラーを報告してリリース作業を中断する
   - 完了条件: hello-pasta.nar と pasta.dll の両方が存在する
@@ -152,7 +152,7 @@
   - _Requirements: 7.1, 7.2, 7.3, 7.9_
 - [ ] 7.2 GitHub Release を作成しアセットを添付する
   - VSIX ファイルが存在する場合（`$env:VSIX_PATH`）: アセットリストに追加する
-  - `gh release create vX.Y.Z "target/i686-pc-windows-msvc/release/pasta.dll.zip" "crates/pasta_sample_ghost/hello-pasta.nar" [<VSIX>] --title "pasta vX.Y.Z" --notes-file release-notes-vX.Y.Z.md` を実行する
+  - `gh release create vX.Y.Z "target/i686-pc-windows-msvc/release/pasta.dll.zip" "release/hello-pasta.nar" [<VSIX>] --title "pasta vX.Y.Z" --notes-file release-notes-vX.Y.Z.md` を実行する
   - 失敗時: 段階的バックオフでリトライし、それでも失敗なら手動実行手順を案内する
   - `Remove-Item release-notes-vX.Y.Z.md` で一時ファイルを削除する
   - 完了条件: GitHub の `ekicyou/pasta` リポジトリにリリースページが作成され、アセットが添付されている
