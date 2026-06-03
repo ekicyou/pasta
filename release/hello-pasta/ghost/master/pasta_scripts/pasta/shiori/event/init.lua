@@ -60,9 +60,11 @@ local REG = require("pasta.shiori.event.register")
 local RES = require("pasta.shiori.res")
 local SHIORI_ACT = require("pasta.shiori.act")
 local STORE = require("pasta.store")
+local CALLBACK = require("pasta.shiori.event.callback")
 
 -- 1.5. デフォルトイベントハンドラをロード
 require("pasta.shiori.event.boot")
+require("pasta.shiori.event.choice_select")
 require("pasta.shiori.event.second_change")
 
 -- 2. モジュールテーブル宣言
@@ -83,8 +85,23 @@ end
 local function set_co_scene(co)
     -- 1. 引数検証（suspended以外はclose）
     if co and coroutine.status(co) ~= "suspended" then
-        coroutine.close(co)
+        if coroutine.close then
+            coroutine.close(co)
+        end
         co = nil
+    end
+
+    -- NEW: コールバック登録済みコルーチン検出
+    if STORE.co_callback and co == STORE.co_callback then
+        -- コールバック待ちコルーチンは CALLBACK.pending で管理される
+        -- co_scene には登録しない、旧 co_scene と同一なら close もしない
+        if STORE.co_scene and STORE.co_scene ~= co then
+            -- 別の旧コルーチンがある場合は通常通り close
+            if coroutine.close then coroutine.close(STORE.co_scene) end
+        end
+        STORE.co_scene = nil
+        STORE.co_callback = nil
+        return
     end
 
     -- 2. 同一オブジェクトチェック
@@ -94,7 +111,9 @@ local function set_co_scene(co)
 
     -- 3. 旧コルーチンをclose（存在すれば無条件）
     if STORE.co_scene then
-        coroutine.close(STORE.co_scene)
+        if coroutine.close then
+            coroutine.close(STORE.co_scene)
+        end
     end
 
     -- 4. 上書き（coはsuspendedまたはnil確定）
@@ -150,6 +169,12 @@ end
 --- @param req table リクエストテーブル（req.id にイベント名）
 --- @return string SHIORI レスポンス
 function EVENT.fire(req)
+    -- (新規) コールバックルーティング
+    local cb_response = CALLBACK.try_route(req)
+    if cb_response then
+        return cb_response
+    end
+
     -- act オブジェクトを作成
     local act = create_act(req)
 
@@ -167,6 +192,8 @@ function EVENT.fire(req)
             set_co_scene(result)
             error(yielded_value)
         end
+        -- (新規) ステージング消費
+        CALLBACK.consume_staged(result, act)
         -- 状態保存（set_co_scene内部でstatus判断）
         set_co_scene(result)
         return RES.ok(yielded_value)

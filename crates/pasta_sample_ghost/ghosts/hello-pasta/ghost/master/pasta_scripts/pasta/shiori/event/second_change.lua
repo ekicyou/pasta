@@ -7,11 +7,17 @@
 
 local REG = require("pasta.shiori.event.register")
 local dispatcher = require("pasta.shiori.event.virtual_dispatcher")
+local CALLBACK = require("pasta.shiori.event.callback")
 
 ---OnSecondChange デフォルトハンドラ
 ---@param act ShioriAct actオブジェクト（act.req でリクエスト情報にアクセス可能）
----@return thread|nil シーンコルーチン、またはnil
+---@return string|thread|nil タイムアウト時は500レスポンス文字列、それ以外はシーンコルーチンまたはnil
 REG.OnSecondChange = function(act)
+    -- コールバックのタイムアウトsweepを先に実行
+    local timeout_response = CALLBACK.sweep(os.time())
+    if timeout_response then
+        return timeout_response
+    end
     -- dispatcher.dispatch()からthread|nilを受け取り、そのまま返す
     -- EVENT.fireがresumeとレスポンス生成を担当
     return dispatcher.dispatch(act)

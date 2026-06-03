@@ -6,6 +6,7 @@
 
 local ACT = require("pasta.act")
 local BUILDER = require("pasta.shiori.sakura_builder")
+local CALLBACK = require("pasta.shiori.event.callback")
 local CONFIG = require("pasta.config")
 local STORE = require("pasta.store")
 
@@ -179,6 +180,124 @@ function SHIORI_ACT_IMPL.transfer_req_to_var(self)
     end
 
     return self
+end
+
+-- ============================================================================
+-- SSPプロパティ書き込み (property-write-helpers feature)
+-- ============================================================================
+
+--- SSPタグ引数をエスケープする（SHIORI専用）
+--- Step 1: \, %, ] をバックスラッシュでエスケープ
+--- Step 2: , または " を含む場合は "" で全体をクォートし、内部の " を "" に二重化
+--- @param s string エスケープ対象の文字列
+--- @return string エスケープ済み文字列
+local function escape_tag_arg(s)
+    -- Step 1: 文字エスケープ（この順番で適用）
+    s = s:gsub("\\", "\\\\")
+    s = s:gsub("%%", "\\%%")
+    s = s:gsub("]", "\\]")
+    -- Step 2: クォーティング（, または " を含む場合）
+    if s:find('[,"]') then
+        s = s:gsub('"', '""')
+        s = '"' .. s .. '"'
+    end
+    return s
+end
+
+--- SSPプロパティ書き込みタグ（\![set,property,name,value]）を蓄積
+--- @param self ShioriAct アクションオブジェクト
+--- @param name string プロパティ名（nil・空文字列は不可）
+--- @param value any プロパティ値（nil の場合は "" として扱う）
+--- @return ShioriAct self メソッドチェーン用
+function SHIORI_ACT_IMPL.set_property(self, name, value)
+    if name == nil or name == "" then
+        error("set_property: name must not be nil or empty")
+    end
+    if value == nil then
+        value = ""
+    else
+        value = tostring(value)
+    end
+    local escaped_name = escape_tag_arg(name)
+    local escaped_value = escape_tag_arg(value)
+    local tag = "\\![set,property," .. escaped_name .. "," .. escaped_value .. "]"
+    table.insert(self.token, { type = "raw_script", text = tag })
+    return self
+end
+
+--- SSPプロパティ読み取りタグ（\![get,property,{id},{names...}]）を蓄積し、yield で値を受け取る
+--- @param self ShioriAct アクションオブジェクト
+--- @param name_or_names string|string[] プロパティ名または名前の配列
+--- @param timeout number|nil タイムアウト秒数（デフォルト 5）
+--- @param timeout_message string|nil タイムアウト時のエラーメッセージ
+--- @return any ... プロパティ値（多値返却）
+function SHIORI_ACT_IMPL.get_property(self, name_or_names, timeout, timeout_message)
+    -- 引数正規化: string → 配列化
+    local names
+    if type(name_or_names) == "string" then
+        names = { name_or_names }
+    elseif type(name_or_names) == "table" then
+        names = name_or_names
+    else
+        error("get_property: first argument must be a property name (string) or array of names (table)")
+    end
+    local n = #names
+
+    -- バリデーション
+    if n == 0 then error("get_property: at least one property name required") end
+    local co, is_main = coroutine.running()
+    if is_main or co == nil then
+        error("get_property: must be called inside a scene coroutine")
+    end
+    for i = 1, n do
+        local name = names[i]
+        if name == nil or name == "" then
+            error("get_property: name must not be nil or empty")
+        end
+    end
+
+    -- デフォルト適用
+    timeout = timeout or 5
+    if timeout_message == nil then
+        timeout_message = "callback timeout: get_property"
+    end
+
+    -- イベント ID 生成 + ステージング
+    local event_id = CALLBACK.next_event_id()
+    CALLBACK.stage_pending(event_id, os.time() + timeout, timeout_message)
+
+    -- トークンバッファ退避
+    local saved_tokens = self.token
+    self.token = {}
+
+    -- get タグのみを新バッファに登録
+    local parts = { "\\![get,property," .. event_id }
+    for i = 1, n do
+        parts[#parts + 1] = escape_tag_arg(names[i])
+    end
+    local tag = table.concat(parts, ",") .. "]"
+    table.insert(self.token, { type = "raw_script", text = tag })
+
+    -- yield（get タグのみのスクリプトを送信）
+    local refs, reason = coroutine.yield(self:build())
+
+    -- トークンバッファ復元（成功・失敗いずれの経路でも）
+    self.token = saved_tokens
+
+    if reason then
+        error(reason)
+    end
+    if refs == nil then
+        local nils = {}
+        for i = 1, n do nils[i] = nil end
+        return table.unpack(nils, 1, n)
+    end
+    local out = {}
+    for i = 1, n do
+        local v = refs[i]
+        out[i] = (v == nil or v == "") and nil or v
+    end
+    return table.unpack(out, 1, n)
 end
 
 return SHIORI_ACT

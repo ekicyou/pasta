@@ -55,6 +55,10 @@ STORE.app_ctx = {}
 --- @type thread|nil
 STORE.co_scene = nil
 
+--- 最後に実行したグローバルシーン名（選択肢コールバックルーティング用）
+--- @type string|nil
+STORE.last_global_scene = nil
+
 --- 全データをリセット
 --- @return nil
 function STORE.reset()
@@ -74,6 +78,7 @@ function STORE.reset()
     STORE.global_words = {}
     STORE.local_words = {}
     STORE.actor_words = {}
+    STORE.last_global_scene = nil
 end
 
 -- CONFIG.actor からの初期化
