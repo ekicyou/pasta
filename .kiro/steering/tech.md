@@ -34,7 +34,7 @@
 - **mlua-stdlib 0.1**: Lua標準拡張ライブラリ（json, regex, yaml）
 - **regex 1.x**: 正規表現（さくらスクリプトタグ検出）
 - **thiserror 2**: エラー型定義
-- **toml 0.9.8**: 設定ファイル管理
+- **toml 1.1.2**: 設定ファイル管理
 - **serde 1 / serde_json 1**: シリアライゼーション
 - **glob 0.3**: ファイルパターンマッチ
 - **flate2 1.x**: gzip圧縮（キャッシュ等）
@@ -63,14 +63,14 @@
 **pasta_check:**
 - **lexopt 0.3**: CLIパーサー
 - **md5 0.8**: ハッシュ計算（更新ファイル生成）
-- **zip 8.4**: NAR（ZIP）アーカイブ作成
+- **zip 8.6**: NAR（ZIP）アーカイブ作成
 
 **pasta_sample_ghost:**
 - **image 0.25 / imageproc 0.26**: ピクトグラム画像生成
 
 ### 開発環境
 - **tempfile 3**: テスト用一時ファイル生成
-- **insta 1.46**: スナップショットテスト（glob機能付き）
+- **insta 1.47.2**: スナップショットテスト（glob機能付き）
 - **tracing-test 0.2**: テスト用ログキャプチャ
 
 ### サプライチェーン監査

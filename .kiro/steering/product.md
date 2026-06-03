@@ -19,7 +19,7 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 - [x] シーンジャンプテーブル設計の修正 → `scene-search-integration` 完了
 - [x] 宣言的制御フロー（Call/Jump文）の再実装 → `act-impl-call` 完了
 
-**完了仕様**: 70件（`.kiro/specs/completed/` に格納）
+**完了仕様**: 110件（`.kiro/specs/completed/` に格納）
 
 **主要成果**:
 - ✅ **act-impl-call** - `ACT_IMPL.call` 4段階優先順位検索実装
@@ -41,6 +41,7 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 - [x] SHIORI インターフェース（pasta_shiori）- DLL エクスポート
 
 ### Phase 2: コア機能拡張（進行中）🔄
+**最終更新**: 2026-06-03（現行バージョン v0.1.23）
 
 **繰り返し仕様**:
 - 🔁 **release-workflow** - リリース作業手順（`/kiro-spec-impl` 実行のたびにタスクリセット、永続的に未完了）
@@ -54,6 +55,21 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 - ✅ **budoux-line-breaker** - BudouX日本語改行位置推定の統合
 - ✅ **pasta-check** - `pasta_check` CLIツール（NAR生成・更新ファイル管理）
 - ✅ **luajit-migration** - Lua 5.5からLuaJIT 2.1への移行
+
+**SSPプロパティアクセス機能群**（トーク合成中の同期/非同期 SHIORI 通信基盤）:
+- ✅ **property-write-helpers** - `act:set_property(name, value)` プロパティ書き込み
+- ✅ **shiori-event-test-framework** - SHIORIイベントフロー試験基盤（Luaモック + 時刻注入 + 応答検証）
+- ✅ **shiori-async-talk** - トーク中SHIORI非同期通信基盤 + `act:get_property(name)`
+- ✅ **property-dsl-extension** - `＄％prop.path` スコープ修飾子によるプロパティアクセスDSL構文
+
+**DSL/ランタイム拡張**:
+- ✅ **choice-definition-dsl** - 選択肢定義DSL
+- ✅ **handler-resolution-fallback** - ハンドラ名前解決フォールバック
+- ✅ **ontalk-block-condition** - OnTalkブロック条件
+
+**Phase 3（監査）: 脆弱性監査・コード簡素化 ✅ 完了**（全クレート対象、外部振る舞い不変）:
+- ✅ **Wave 1**: `audit-pasta-core` / `audit-pasta-dsl` / `audit-pasta-lua` / `audit-pasta-shiori` / `audit-pasta-check` / `audit-pasta-lsp` / `audit-pasta-sample-ghost`
+- ✅ **Wave 2**: `audit-dependency-supply-chain`（依存サプライチェーン監査・cargo-deny導入） / `audit-workspace-patterns`（クレート横断パターン統一）
 
 **保留/評価中仕様**:
 - ⏸️ **pasta-conversation-inline-multi-stage-resolution** - 動的単語参照（Phase 3相当、削除検討中）
