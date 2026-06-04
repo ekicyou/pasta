@@ -60,6 +60,38 @@
   - 前提: `i686-pc-windows-msvc` ターゲットがインストール済み（✅確認済み）
 - **Implications**: ステップ4で `Push-Location` + `release.ps1` 実行 + `Pop-Location` の流れ
 
+## 並行作業性の分析（cc-sdd 3.0 書き直しで追加）
+
+### Context
+旧設計は全工程を単一の Sequential Pipeline として直列実行していた。本書き直しでは、各処理が要求する共有リソースを実コードから確認し、安全に並行化できる箇所と偽の依存関係を特定した。
+
+### Sources Consulted
+- `crates/pasta_sample_ghost/release.ps1`（Step 1: `cargo build --release --target i686-pc-windows-msvc -p pasta_shiori`）
+- `editors/vscode/package.json`（`prepackage` = `build:wasm` → `compile`、`build:wasm` = `powershell -File scripts/build-wasm.ps1`）
+- `Cargo.toml`（workspace 構造、6箇所のバージョン参照）
+- `cargo publish` の挙動（既定で検証ビルド + クリーンワークツリー要求）
+
+### Findings — 共有リソースモデル
+| リソース | 種別 | 保持する処理 |
+| --- | --- | --- |
+| R1: cargo ターゲットロック | 排他 | `cargo build/test/run/publish`、VSCode `build:wasm` |
+| R2: git ワークツリー＋index | 排他 | ファイル生成、`git add/commit/restore/tag`、`release.ps1` |
+| R3: ネットワーク | 非排他 | `cargo publish` upload/index待機、`vsce publish`、`gh release create` |
+
+### Findings — 偽の依存関係
+- 旧設計は「crates.io 公開（Phase 3）→ ゴーストビルド（Phase 5）」と直列化していたが、`release.ps1` は **ローカルソースから** pasta.dll をビルドしており crates.io 公開済みクレートに依存しない。よってゴーストビルドは crates.io 公開に**非依存**であり、バージョン更新コミットにのみ依存する。
+
+### Implications — スケジューリング決定
+- R1・R2 を共有する全ローカルビルドは真の並行ができないため、1つの直列ステージ（Stage A）に集約し、ワークツリーをクリーン化してから crates.io 公開を開始する。
+- crates.io 公開（Track X）・Marketplace 公開（Track Y）・チェンジログ生成（Track Z）は R2 を変更せず互いに独立するため Stage B として**並行実行可能**。特に非クリティカルな `vsce publish`（R3 のみ）を Track X の長いインデックス待機に重ねることで wall-clock を短縮する。
+- 不可逆な crates.io 公開（Track X）の成功を Stage C（タグ・プッシュ）の前提とし、安全順序を保証する。
+- VSCode は `build:wasm`（R1）を要するため**ビルドは Stage A**、Marketplace への **upload（R3 のみ）は Stage B Track Y** に分離する。
+
+### Decision: Resource-Aware Staged Concurrency（採用）
+- **Selected Approach**: Stage A（ローカル直列）→ Stage B（並行3トラック X∥Y∥Z）→ Stage C（タグ・プッシュ）→ Stage D（GitHub Release）
+- **Rationale**: 排他リソース制約を尊重しつつ、独立したネットワークトラックを並行化して所要時間を短縮し、非クリティカル失敗を隔離する。
+- **Trade-offs**: 並行トラックの完了個別検証が必要（Req 8.7）。逐次環境ではインターリーブ近似となる。
+
 ## Architecture Pattern Evaluation
 
 | Option | Description | Strengths | Risks / Limitations | Notes |

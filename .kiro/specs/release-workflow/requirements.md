@@ -2,20 +2,22 @@
 
 ## Project Description (Input)
 
-### リリース仕様
+### リリース仕様（cc-sdd 3.0 書き直し版）
 
 本仕様は、リリースのための手順を設計し、「実装」（`/kiro-impl release-workflow`）を実行するたびにリリース作業を行う、**繰り返しタスク**の仕様です。本仕様は実装完了しません。新たに「実装」が指示されるたび、タスクの実行状況は初期化され、新たな「リリース作業」を繰り返し行います。
+
+本書き直しの主眼は **並行作業性（concurrency）の見直し** です。旧仕様は全工程を単一の Sequential Pipeline として直列実行していましたが、各処理が要求する**共有リソース**（cargo ターゲットロック、git ワークツリー、ネットワーク）を分析した結果、いくつかの処理は安全に並行実行でき、また旧仕様には**偽の依存関係**（crates.io 公開 → サンプルゴーストビルド）が存在することが判明しました。本仕様ではこれらを是正します。
 
 **リリース対象**:
 
 | 対象                                                        | 公開先             | 備考                               |
 | ----------------------------------------------------------- | ------------------ | ---------------------------------- |
-| pasta_core, pasta_dsl, pasta_lua, pasta_shiori, pasta_check | crates.io          | 依存関係順に公開                   |
+| pasta_core, pasta_dsl, pasta_lua, pasta_shiori, pasta_check | crates.io          | 依存関係順に公開（クリティカル）   |
 | pasta-vscode (VSCode 拡張)                                  | VSCode Marketplace | 非クリティカル（失敗時も後続継続） |
 | hello-pasta.nar, pasta.dll.zip                              | GitHub Release     | リリースアセット                   |
 | VSIX ファイル                                               | GitHub Release     | 存在する場合のみ添付               |
 
-**開発者提供の手順概要（更新版）**:
+**開発者提供の手順概要**:
 
 1. バージョン（1.2.0など）を開発者に確認する
 2. Cargo.toml のバージョン表記および editors/vscode/package.json を更新し、build が通ることを確認してコミット
@@ -32,6 +34,8 @@
 
 本ドキュメントは pasta プロジェクトのリリースワークフローに関する要件を定義する。このワークフローは LLM エージェントが開発者の指示のもとで繰り返し実行するリリース作業手順であり、crates.io への公開、VSCode 拡張の Marketplace 公開、サンプルゴーストのビルド、GitHub Release の作成までを一貫して行う。
 
+本仕様では、上記の各処理を「**何を**達成するか」（本要件書）と「**どの順序・どの並行度で**実行するか」（design.md の実行モデル）に分離して扱う。並行作業性に関する振る舞い（並行実行可否、失敗隔離、順序保証）は Requirement 8 に集約する。
+
 ### 仕様の特殊性
 
 本仕様は通常の機能仕様と異なり、以下の特性を持つ：
@@ -39,12 +43,13 @@
 - **繰り返し実行型**: `/kiro-impl release-workflow` が実行されるたびにタスク状態はリセットされ、新たなリリース作業として実行される
 - **永続的未完了**: 本仕様は `completed` に移行しない。常に `ready_for_implementation` 状態を維持する
 - **パラメータ依存**: 各実行時にバージョン番号が開発者から提供される
+- **オペレーション仕様**: コードの新規作成・変更を伴わず、既存ツール群（cargo / git / gh / npm / release.ps1）の組み合わせで実現する
 
 ## Boundary Context
 
-- **In scope**: Cargo.toml / package.json のバージョン更新、crates.io 公開（5クレート）、VSCode Marketplace 公開、サンプルゴーストビルド、Git タグ・プッシュ、GitHub Release 作成
-- **Out of scope**: CI/CD パイプライン統合、クロスプラットフォーム対応、認証トークンの自動設定、pasta_lsp の独立リリース管理
-- **Adjacent expectations**: `release.ps1` は既存の成熟スクリプトとしてそのまま利用する。`gh` CLI および `cargo` の認証は事前に設定済みであることを前提とする
+- **In scope**: Cargo.toml / package.json のバージョン更新、crates.io 公開（5クレート）、VSCode Marketplace 公開、サンプルゴーストビルド、Git タグ・プッシュ、GitHub Release 作成、およびこれらの**実行順序と並行スケジューリング**
+- **Out of scope**: CI/CD パイプライン統合、クロスプラットフォーム対応、認証トークンの自動設定、pasta_lsp の独立リリース管理、release.ps1 スクリプト自体の修正
+- **Adjacent expectations**: `release.ps1` は既存の成熟スクリプトとしてそのまま利用する。`gh` CLI および `cargo` / `vsce` の認証は事前に設定済みであることを前提とする
 
 ---
 
@@ -87,7 +92,7 @@
 
 #### Acceptance Criteria
 
-1. When バージョン更新コミットが完了する, the Release Workflow shall クレートを依存関係順（`pasta_core` → `pasta_dsl` → `pasta_lua` → `pasta_shiori` → `pasta_check`）に公開する
+1. When ローカルビルドステージが完了しワークツリーがクリーンである, the Release Workflow shall クレートを依存関係順（`pasta_core` → `pasta_dsl` → `pasta_lua` → `pasta_shiori` → `pasta_check`）に公開する
 2. When クレートを公開する, the Release Workflow shall 各クレートの公開成功を確認してから次のクレートに進む
 3. If クレートの公開が失敗する, the Release Workflow shall 段階的バックオフでリトライを試みる（待機時間を1分から1分ずつ増加し最大10分まで、最大10回リトライ）
 4. If 最大リトライ後も失敗する, the Release Workflow shall エラーを報告し、以降の公開を中断し、既に公開されたクレートはそのまま残し、開発者の指示を待つ
@@ -100,12 +105,12 @@
 
 #### Acceptance Criteria
 
-1. When crates.io 公開が完了する, the Release Workflow shall VSCode 拡張のビルド（パッケージング）を実行する
-2. When パッケージングが成功する, the Release Workflow shall VSIX ファイルが生成されたことを確認する
+1. When ローカルビルドステージが実行される, the Release Workflow shall VSCode 拡張のビルド（パッケージング）を実行する
+2. When パッケージングが成功する, the Release Workflow shall VSIX ファイルが生成されたことを確認しパスを記録する
 3. When VSIX ファイルが存在する, the Release Workflow shall VSCode Marketplace への公開を実行する
 4. If Marketplace 公開が失敗する, the Release Workflow shall 段階的バックオフでリトライを試みる
 5. If 最大リトライ後も公開が失敗する, the Release Workflow shall 警告を記録し後続のフェーズへ継続する（非クリティカル）
-6. If VSCode 拡張のビルドが失敗する, the Release Workflow shall 警告を記録し後続のフェーズへ継続する（非クリティカル）
+6. If VSCode 拡張のビルドが失敗する, the Release Workflow shall 警告を記録し後続のフェーズへ継続する（非クリティカル）。この場合 VSIX アセットは GitHub Release に添付されない
 7. When Marketplace 公開が成功する, the Release Workflow shall 公開結果（Marketplace URL）を記録する
 
 ### Requirement 5: サンプルゴーストビルド
@@ -114,7 +119,7 @@
 
 #### Acceptance Criteria
 
-1. When VSCode 拡張公開フェーズが完了する（成功・失敗問わず）, the Release Workflow shall サンプルゴーストのビルドスクリプトを実行する
+1. When バージョン更新コミットが完了する, the Release Workflow shall サンプルゴーストのビルドスクリプトを実行する
 2. When ビルドスクリプトが成功する, the Release Workflow shall .nar ファイルが生成されたことを確認する
 3. When ビルドスクリプトが成功する, the Release Workflow shall 32bit リリースビルドの DLL が存在することを確認する
 4. If ビルドスクリプトが失敗する, the Release Workflow shall エラーを報告しリリース作業を中断する
@@ -122,6 +127,7 @@
 6. When zip 圧縮が完了する, the Release Workflow shall zip ファイルの存在を確認する
 7. If zip 圧縮が失敗する, the Release Workflow shall エラーを報告しリリース作業を中断する
 8. When ゴーストビルドが成功する, the Release Workflow shall 変更をコミットする
+9. While サンプルゴーストビルドはローカルソースから pasta.dll をビルドする, the Release Workflow shall このビルドを crates.io 公開（Requirement 3）の完了に依存させない
 
 ### Requirement 6: バージョンタグとプッシュ
 
@@ -129,7 +135,7 @@
 
 #### Acceptance Criteria
 
-1. When ゴーストビルドのコミットが完了する, the Release Workflow shall `vX.Y.Z` 形式のアノテーションタグを作成する
+1. When crates.io 公開が成功し全ローカルコミットが完了する, the Release Workflow shall `vX.Y.Z` 形式のアノテーションタグを作成する
 2. When タグが作成される, the Release Workflow shall タグメッセージに `Release vX.Y.Z` を設定する
 3. If 同名のタグが既に存在する, the Release Workflow shall エラーを報告し開発者に対応方法を確認する（既存タグの削除は自動実行しない）
 4. When タグが作成される, the Release Workflow shall コミットとタグの両方をリモートにプッシュする
@@ -151,7 +157,23 @@
 8. If GitHub Release の作成が失敗する, the Release Workflow shall エラーを報告し手動での Release 作成手順を案内する
 9. If 前回リリースタグが存在しない（初回リリース）, the Release Workflow shall 全コミット履歴をチェンジログとして使用する
 
-### Requirement 8: 繰り返し実行の仕様特性
+### Requirement 8: 実行モデルと並行作業性
+
+**Objective:** As a 開発者, I want リリース作業が共有リソースの制約を尊重しつつ、安全に並行化されて実行されたい, so that リリース全体の所要時間が短縮され、非クリティカルな失敗が全体を止めず、不可逆な処理の順序安全性が保たれる
+
+> **背景**: 各処理は 3 種の共有リソースを要求する — **R1: cargo ターゲットロック**（`cargo build/publish/run`、VSCode の `build:wasm` が保持）、**R2: git ワークツリー＋index**（ファイル生成・add/commit/restore/tag が保持）、**R3: ネットワーク**（crates.io / Marketplace / GitHub、実質無制限の並行可能）。R1・R2 は単一保持の排他リソースであり、これを共有する処理は真の並行実行ができない。
+
+#### Acceptance Criteria
+
+1. When リリース作業をスケジュールする, the Release Workflow shall 各処理を要求リソース（R1 cargo ロック / R2 ワークツリー / R3 ネットワーク）で分類し、排他リソースを共有する処理を直列化する
+2. While ワークツリーを変更するローカルビルド（バージョン更新ビルド、サンプルゴーストビルド、VSCode 拡張パッケージング）が R1・R2 を共有する, the Release Workflow shall これら全ローカルビルドとコミットを完了しワークツリーをクリーン化してから crates.io 公開（R3 を要し R2 のクリーン状態を前提とする）を開始する
+3. Where crates.io 公開・Marketplace 公開・チェンジログ生成は互いに独立しワークツリーを変更しない, the Release Workflow shall これらを並行（concurrent）に実行してよい
+4. If 非クリティカルな処理（Marketplace 公開）が失敗する, the Release Workflow shall クリティカルな処理（crates.io 公開、タグ・プッシュ、GitHub Release）の進行を妨げず継続する（失敗隔離）
+5. While crates.io 公開は不可逆である, the Release Workflow shall crates.io 公開をタグ・プッシュおよび GitHub Release より前に完了させる。If crates.io 公開が中断する, the Release Workflow shall タグ・プッシュおよび GitHub Release を実行しない（安全順序保証）
+6. The Release Workflow shall 独立した処理を不要に直列化しない（偽の依存関係の排除）。特にサンプルゴーストビルドを crates.io 公開の後段に配置しない
+7. When 並行実行する処理のいずれかがバックグラウンドで進行する, the Release Workflow shall 各並行トラックの完了・失敗を個別に検証し、結果をサマリーに反映する
+
+### Requirement 9: 繰り返し実行の仕様特性
 
 **Objective:** As a 開発者, I want この仕様を何度でも再実行してリリース作業を行いたい, so that 毎回のリリースで同じ品質の手順が保証される
 
@@ -160,17 +182,16 @@
 1. The Release Workflow shall `/kiro-impl release-workflow` が実行されるたびにタスク状態を初期化（全タスクを未完了に戻す）する
 2. The Release Workflow shall spec.json の `phase` を `completed` に変更しない（常に `ready_for_implementation` を維持する）
 3. The Release Workflow shall 各実行が前回の実行状態に依存しない独立した作業として動作する
-4. When リリース作業が完了する, the Release Workflow shall 実行結果のサマリー（バージョン、公開クレート、Release URL、Marketplace 公開結果）を開発者に報告する
+4. When リリース作業が完了する, the Release Workflow shall 実行結果のサマリー（バージョン、公開クレート、Release URL、Marketplace 公開結果、各並行トラックの成否）を開発者に報告する
 
 ---
 
-## 旧仕様からの変更点
+## 旧仕様（直列 Pipeline 版）からの変更点
 
-1. **VSCode 拡張公開（Req 4）**: design.md / tasks.md で VSX.1–VSX.6 として参照されていたが、requirements.md に正式な要件として未定義だった。本更新で Requirement 4 として正式化
-2. **package.json バージョン更新（Req 2.3）**: Cargo.toml と同期して editors/vscode/package.json のバージョンも更新する要件を追加
-3. **全バージョンソース調査（Req 1.2, 1.7）**: 単一ソースではなく全バージョンソースを調査し重複を防止する要件を明確化
-4. **コマンド参照**: `/kiro-spec-impl` → `/kiro-impl` に更新
-5. **番号体系**: 旧 Req 4（サンプルゴースト）→ Req 5、旧 Req 5（タグ）→ Req 6、旧 Req 6（GitHub Release）→ Req 7、旧 Req 7（繰り返し）→ Req 8 に繰り下げ
-6. **実装詳細の除去**: 具体的なコマンド文字列・ファイルパス・コミットメッセージ形式を要件から除去し、設計フェーズに委譲
-7. **Boundary Context 追加**: In scope / Out of scope / Adjacent expectations を明示
-8. **EARS 準拠の強化**: 重複番号（旧 Req 3 の「6」が2つ）、旧 Req 3.7 の循環参照を解消
+1. **実行モデルの再設計（Req 8 新設）**: 全工程を Sequential Pipeline として直列実行していた旧設計を、共有リソース（R1 cargo ロック / R2 ワークツリー / R3 ネットワーク）に基づく **リソース認識型ステージ並行モデル** へ書き直し。並行実行可否・失敗隔離・順序安全性を要件として明文化
+2. **偽の依存関係の排除（Req 5.9, Req 8.6）**: 旧設計はサンプルゴーストビルドを crates.io 公開の後段（Phase 3 → Phase 5）に置いていたが、`release.ps1` はローカルソースから pasta.dll をビルドしており crates.io 公開に依存しない。この偽の依存を排除し、ゴーストビルドをバージョン更新直後のローカルビルドステージへ移動
+3. **公開トラックの並行化（Req 8.3）**: crates.io 公開・Marketplace 公開・チェンジログ生成は互いに独立しワークツリーを変更しないため、並行実行を許可。特に非クリティカルな Marketplace 公開を crates.io 公開のネットワーク待機に重ねることで wall-clock を短縮
+4. **VSCode ビルドと公開の分離（Req 4.1–4.2 vs 4.3–4.7）**: `build:wasm` は cargo（R1）を要するためローカルビルドステージで実施し、Marketplace への upload（R3 のみ）は並行公開ステージへ分離
+5. **安全順序保証の明文化（Req 8.5）**: 不可逆な crates.io 公開をタグ・プッシュ／GitHub Release より前に完了させ、crates.io 公開中断時はタグ・プッシュを行わないことを要件化
+6. **cc-sdd 3.0 タスク注釈の採用**: tasks.md に `(P)` 並行マーカー、`_Depends:_`、`_Boundary:_` を導入し、並行実行可能なタスクと依存関係を明示
+7. **番号体系**: 旧 Req 8（繰り返し実行）→ Req 9 に繰り下げ（Req 8 を実行モデルに割当）
