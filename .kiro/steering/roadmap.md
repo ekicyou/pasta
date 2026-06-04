@@ -53,3 +53,15 @@ SSPのプロパティシステムへのアクセスをpastaゴーストから可
 ### Wave 2（横断的・Wave 1完了後）
 - [x] audit-dependency-supply-chain -- 外部依存クレートのセキュリティ・ライセンス・バージョン監査。Dependencies: Wave 1全spec
 - [x] audit-workspace-patterns -- クレート横断エラーハンドリング統一・共通パターン抽出。Dependencies: Wave 1全spec
+
+## Phase 4: 利用者マニュアルサイト
+
+pasta ゴースト作者向けの利用者マニュアルを、mdBook で**サーバー不要の静的 HTML+JS サイト**として構築する。
+既存の `doc/spec/` Markdown 資産を流用し、文法・Lua API・入門チュートリアルを検索可能な単一サイトに統合する。
+
+### アプローチ決定（Phase 4）
+- **採用**: mdBook（Rust 製・cargo bin に導入済み・追加エコシステム依存ゼロ）。`mdbook build` が静的 HTML+JS（クライアント側 elasticlunr 全文検索・`.nojekyll` 同梱）を出力 → GitHub Pages 等にサーバー不要で公開可能（実機検証済み: mdbook v0.5.3）
+- **却下**: Sphinx（Python 依存・reST/MyST 設定が重くオーバースペック）／ VitePress・Docusaurus（node_modules ツリー・2 つ目のエコシステム持ち込み）
+
+### Specs (dependency order)
+- [ ] pasta-user-manual -- mdBook ベースの利用者マニュアルサイト（Pasta DSL 文法 + Lua API/コーディング + 入門チュートリアル）。Dependencies: none
