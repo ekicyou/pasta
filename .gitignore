@@ -26,3 +26,6 @@ profile
 node_modules
 tmpclaude*
 target_test
+
+# Claude Code ランタイムのロックファイル（スケジューラ等の一時状態）
+.claude/scheduled_tasks.lock
