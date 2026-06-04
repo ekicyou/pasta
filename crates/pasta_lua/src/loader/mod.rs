@@ -27,6 +27,7 @@ mod config;
 mod context;
 mod discovery;
 mod error;
+mod extract;
 
 pub use cache::{CURRENT_VERSION, CacheManager};
 pub use config::{
@@ -116,6 +117,24 @@ impl PastaLoader {
         let cache_manager =
             CacheManager::new(base_dir.to_path_buf(), &config.loader.transpiled_output_dir);
         cache_manager.prepare_cache_dir()?;
+
+        // Phase 2.5: Self-deploy framework scripts (non-fatal)
+        // base_dir is finalized by Phase 2; sync the embedded canonical pasta_scripts
+        // to disk BEFORE Phase 3 / package.path construction (Req 6.1). Failure must
+        // NOT abort startup (Req 3.2): log ERROR and continue with existing scripts.
+        debug!("Phase 2.5: Self-deploying framework scripts");
+        match extract::sync_pasta_scripts(base_dir) {
+            Ok(_outcome) => {
+                // Outcome already logged inside (DEBUG on skip / INFO on deploy).
+            }
+            Err(e) => {
+                error!(
+                    path = %base_dir.join("profile/pasta/pasta_scripts").display(),
+                    error = %e,
+                    "Self-deploy failed; continuing startup with existing scripts (version drift unresolved)"
+                );
+            }
+        }
 
         // Phase 3: Discover files
         debug!("Phase 3: Discovering pasta and lua files");

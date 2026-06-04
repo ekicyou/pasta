@@ -28,6 +28,11 @@ flate2.workspace = true
 regex.workspace = true
 budoux.workspace = true
 unicode-width.workspace = true
+zip.workspace = true
+
+[build-dependencies]
+zip.workspace = true
+md5.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 windows-sys.workspace = true
@@ -36,3 +41,4 @@ windows-sys.workspace = true
 tempfile.workspace = true
 insta.workspace = true
 tracing-test.workspace = true
+md5.workspace = true

@@ -328,6 +328,59 @@ mod tests {
         assert_eq!(root_content, copy_content);
     }
 
+    /// 回帰テスト（Req 5.2）: 自己展開先 `ghost/master/profile/pasta/pasta_scripts/`
+    /// 配下のフレームワークスクリプト・`.md5` マーカーが `updates.txt` の対象外であること。
+    ///
+    /// `EXCLUDED_DIRS` から `"profile"` が外れると、この test は
+    /// `main.lua` / `.md5` を含むエントリが生成され FAIL する。
+    #[test]
+    fn test_updates_txt_excludes_self_deploy_dir() {
+        let temp = TempDir::new().unwrap();
+
+        // 通常ファイル（同梱対象 = 含まれるべき）
+        let ghost_master = temp.path().join("ghost/master");
+        fs::create_dir_all(&ghost_master).unwrap();
+        fs::write(ghost_master.join("descript.txt"), "desc").unwrap();
+        fs::create_dir_all(ghost_master.join("dic")).unwrap();
+        fs::write(ghost_master.join("dic/foo.pasta"), "foo").unwrap();
+
+        // 自己展開先（profile/ 配下 = 除外領域）
+        let self_deploy = ghost_master.join("profile/pasta/pasta_scripts");
+        fs::create_dir_all(&self_deploy).unwrap();
+        fs::write(self_deploy.join("main.lua"), "-- framework script").unwrap();
+        fs::write(self_deploy.join(".md5"), "deadbeef").unwrap();
+
+        let count = generate_update_files(temp.path()).unwrap();
+        let content = fs::read_to_string(temp.path().join("updates.txt")).unwrap();
+
+        // 通常ファイルは含まれる
+        assert!(
+            content.contains("file,ghost/master/descript.txt"),
+            "descript.txt should be listed: {content:?}"
+        );
+        assert!(
+            content.contains("file,ghost/master/dic/foo.pasta"),
+            "dic/foo.pasta should be listed: {content:?}"
+        );
+
+        // 自己展開先（profile/ 配下）は一切含まれない
+        assert!(
+            !content.contains("profile"),
+            "no profile/ path must appear in updates.txt: {content:?}"
+        );
+        assert!(
+            !content.contains("main.lua"),
+            "self-deploy script must not be listed: {content:?}"
+        );
+        assert!(
+            !content.contains(".md5"),
+            ".md5 marker must not be listed: {content:?}"
+        );
+
+        // エントリ数は通常ファイル 2 件のみ（自己展開先 2 件は除外）
+        assert_eq!(count, 2, "only the 2 normal files should be counted");
+    }
+
     /// サブディレクトリの updates.txt / updates2.dau もファイル一覧から除外されること
     #[test]
     fn test_collect_files_excludes_updates_in_subdirs() {

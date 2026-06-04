@@ -123,6 +123,63 @@ mod tests {
         assert!(names.contains(&"install.txt".to_string()));
     }
 
+    /// 回帰テスト（Req 5.3）: 自己展開先 `ghost/master/profile/pasta/pasta_scripts/`
+    /// 配下のフレームワークスクリプト・`.md5` マーカーが `.nar`（ZIP）封入対象外であること。
+    ///
+    /// `profile` の除外条件が外れると、この test は ZIP に
+    /// `main.lua` / `.md5` エントリが現れ FAIL する。
+    #[test]
+    fn test_create_nar_excludes_self_deploy_dir() {
+        let temp = TempDir::new().unwrap();
+        let release = temp.path().join("release");
+
+        // 通常ファイル（封入対象 = 含まれるべき）
+        let ghost_master = release.join("ghost/master");
+        fs::create_dir_all(&ghost_master).unwrap();
+        fs::write(ghost_master.join("descript.txt"), "desc").unwrap();
+        fs::create_dir_all(ghost_master.join("dic")).unwrap();
+        fs::write(ghost_master.join("dic/foo.pasta"), "foo").unwrap();
+
+        // 自己展開先（profile/ 配下 = 除外領域）
+        let self_deploy = ghost_master.join("profile/pasta/pasta_scripts");
+        fs::create_dir_all(&self_deploy).unwrap();
+        fs::write(self_deploy.join("main.lua"), "-- framework script").unwrap();
+        fs::write(self_deploy.join(".md5"), "deadbeef").unwrap();
+
+        let nar_path = temp.path().join("out.nar");
+        create_nar(&release, &nar_path).unwrap();
+
+        let file = File::open(&nar_path).unwrap();
+        let mut archive = zip::ZipArchive::new(file).unwrap();
+        let names: Vec<String> = (0..archive.len())
+            .map(|i| archive.by_index(i).unwrap().name().to_string())
+            .collect();
+
+        // 通常ファイルは封入される
+        assert!(
+            names.contains(&"ghost/master/descript.txt".to_string()),
+            "descript.txt must be archived: {names:?}"
+        );
+        assert!(
+            names.contains(&"ghost/master/dic/foo.pasta".to_string()),
+            "dic/foo.pasta must be archived: {names:?}"
+        );
+
+        // 自己展開先（profile/ 配下）は一切封入されない
+        assert!(
+            !names.iter().any(|n| n.contains("profile")),
+            "no profile/ entry must be archived: {names:?}"
+        );
+        assert!(
+            !names.iter().any(|n| n.contains("main.lua")),
+            "self-deploy script must not be archived: {names:?}"
+        );
+        assert!(
+            !names.iter().any(|n| n.ends_with(".md5")),
+            ".md5 marker must not be archived: {names:?}"
+        );
+    }
+
     #[test]
     fn test_create_nar_creates_parent_dir() {
         let temp = TempDir::new().unwrap();

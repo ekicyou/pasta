@@ -120,32 +120,9 @@ else {
     Copy-Item -Path $DllSrc -Destination $DllDest -Force
     Write-Host "  Copied pasta.dll"
 
-    # Copy Lua runtime scripts
-    $ScriptsSrc = Join-Path $WorkspaceRoot "crates\pasta_lua\pasta_scripts"
-    $ScriptsDest = Join-Path $MasterDir "pasta_scripts"
-
-    if (-not (Test-Path $ScriptsSrc)) {
-        Write-Host "  WARNING: Lua scripts not found at $ScriptsSrc" -ForegroundColor Yellow
-        Write-Host "           Skipping pasta_scripts copy"
-    }
-    else {
-        if (Test-Path $ScriptsDest) {
-            Remove-Item -Path $ScriptsDest -Recurse -Force
-        }
-        $robocopySetupArgs = @(
-            $ScriptsSrc,
-            $ScriptsDest,
-            "/MIR",
-            "/NJH", "/NJS", "/NDL", "/NC", "/NS", "/NP"
-        )
-        & robocopy @robocopySetupArgs | Out-Null
-        if ($LASTEXITCODE -ge 8) {
-            Write-Host ""
-            Write-Host "ERROR: robocopy failed copying pasta_scripts (exit code $LASTEXITCODE)" -ForegroundColor Red
-            exit 1
-        }
-        Write-Host "  Copied pasta_scripts/"
-    }
+    # Note: pasta_scripts is no longer bundled into master. The Lua framework
+    # runtime is embedded in pasta.dll and self-deployed at runtime
+    # (Phase 2.5 self-deploy -> profile/pasta/pasta_scripts).
 
     # Copy user scripts directory (README.md only)
     $UserScriptsSrc = Join-Path $WorkspaceRoot "crates\pasta_lua\scripts"

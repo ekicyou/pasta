@@ -65,10 +65,64 @@ git add -A; git commit -m "<type>(<scope>): <summary>"
 
 **スキップ条件**: テストのみの変更、ドキュメントのみの変更、スキル対象外クレート（pasta_lsp等）のみの変更は対象外。
 
-### 3. リモート同期
+### 3. リモート同期（ブランチ戦略）
+
+現在のブランチに応じて同期方法を分岐する。
+
+> **注（直接 push）**: 完了フローは main へ**直接 push** する（PR は経由しない）。これは本プロジェクトの意図された運用であり、auto-mode で実行する場合は main への push 権限が必要。main 以外のブランチでは squash ブランチ経由で ff マージ後に main へ直接 push する。
+
+**main ブランチの場合**: そのまま push する。
 ```powershell
-git push origin <branch>
+git push origin main
 ```
+
+**main 以外のブランチ（= ブランチA）の場合**: ブランチAの「mainからの分岐点以降の差分」を1コミットに集約した squash ブランチ（`squash/<A>` = ブランチB）を作り、main へ fast-forward マージしてから push する。マージ・同期がすべて成功したら、ブランチ A/B をローカル・リモート両方から削除する。
+
+```powershell
+$branchA = git rev-parse --abbrev-ref HEAD
+$branchB = "squash/$branchA"
+
+# 1. リモート最新を取得（push reject 予防）
+git fetch origin
+
+# 2. origin/main を起点に squash ブランチBを作成し、Aの全差分を1コミットへ集約
+git switch -c $branchB origin/main
+git merge --squash $branchA
+#   コンフリクト時: 内容を精査して解決する（spec完了文脈ではA側の変更が原則正）。
+#   解決できたら継続。判断不能・意味的に危険な場合は中断し開発者へ報告。
+
+#   squash コミットメッセージは、分岐点以降の履歴を要約して生成する（下記「方針」参照）
+git log --no-merges --pretty=format:"%h %s%n%b" origin/main..$branchA
+git commit -F <生成した要約メッセージ>   # 履歴要約から作成（-m 複数指定でも可）
+
+# 3. main を squash ブランチへ fast-forward（Bはmain先端+1コミットなので構造上必ずff可能）
+git switch main
+git merge --ff-only $branchB
+
+# 4. push（reject時はリモートmainが先行＝特殊ケース。中断して報告）
+git push origin main
+
+# 5. すべて成功したらブランチ A/B をローカル削除
+git branch -D $branchA
+git branch -D $branchB
+
+# 6. リモートに存在すれば削除
+if (git ls-remote --heads origin $branchA) { git push origin --delete $branchA }
+if (git ls-remote --heads origin $branchB) { git push origin --delete $branchB }
+```
+
+**中断条件**: コンフリクト解決不能 / `--ff-only` マージ失敗 / push reject のいずれかが発生した場合は、**ブランチ A/B を削除せず**処理を中断し開発者へ報告する（復旧可能性を確保するため）。
+
+#### squash コミットメッセージの生成方針
+
+ブランチBのコミットメッセージは、**分岐点以降のコミット履歴を要約**して作成する（固定文言にしない）。
+
+1. **履歴を収集**: `git log --no-merges --pretty=format:"%h %s%n%b" origin/main..$branchA` で分岐点以降の全コミットを取得する。
+2. **意図を補強**: 対象 spec の `requirements.md` / `design.md` のタイトル・概要も参照し、機能の目的を正確に反映する。
+3. **要約してメッセージ化**:
+   - **subject**: `<type>(<scope>): <機能全体を1文で表す要約>`
+   - **body**: 主な開発仕様・変更内容を箇条書き（3〜7項目目安）。関連コミットは1項目へ統合し、`fixup` / typo修正 / WIP などの些末な履歴は集約・省略する。
+   - 個々のコミットを羅列するのではなく、**「何を・なぜ作ったか」の開発単位**で再構成する。
 
 ### 4. 仕様アーカイブ
 
@@ -83,9 +137,8 @@ Move-Item .kiro/specs/<spec-name> .kiro/specs/completed/
 # 2. spec.jsonのphaseを"completed"に更新
 # （エディタまたはjqコマンドで .kiro/specs/completed/<spec-name>/spec.json を編集）
 
-# 3. コミット＆プッシュ
+# 3. コミット（プッシュは §3 リモート同期（ブランチ戦略）に従う）
 git add -A; git commit -m "chore(spec): <spec-name>をcompletedへ移動"
-git push origin <branch>
 ```
 
 ---

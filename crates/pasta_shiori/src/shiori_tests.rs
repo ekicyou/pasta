@@ -257,16 +257,22 @@ fn test_load_sets_shiori_flags_when_entry_lua_exists() {
 fn test_load_flags_false_without_entry_lua() {
     let temp = copy_fixture_to_temp("minimal");
 
-    // Remove the entry.lua file to simulate missing SHIORI functions
-    let entry_lua_path = temp.path().join("pasta_scripts/pasta/shiori/entry.lua");
-    if entry_lua_path.exists() {
-        std::fs::remove_file(&entry_lua_path).unwrap();
-    }
+    // The framework entry.lua is always provided by self-deploy. To simulate
+    // missing SHIORI functions, write a user-override entry.lua (in scripts/,
+    // which has higher search priority than the self-deployed pasta_scripts/)
+    // that defines NO SHIORI functions, suppressing the framework defaults.
+    let entry_lua_path = temp.path().join("scripts/pasta/shiori/entry.lua");
+    std::fs::create_dir_all(entry_lua_path.parent().unwrap()).unwrap();
+    std::fs::write(
+        &entry_lua_path,
+        "-- intentionally defines no SHIORI functions\n",
+    )
+    .unwrap();
 
     let mut shiori = PastaShiori::default();
     assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
 
-    // entry.lua doesn't exist, so cached functions should be None
+    // override defines no SHIORI functions, so cached functions should be None
     assert!(
         shiori.load_fn.is_none(),
         "load_fn should be None without entry.lua"
@@ -303,11 +309,15 @@ fn test_request_returns_204_from_lua() {
 fn test_request_returns_default_204_without_main_lua() {
     let temp = copy_fixture_to_temp("minimal");
 
-    // Remove entry.lua to test fallback behavior
-    let entry_lua_path = temp.path().join("pasta_scripts/pasta/shiori/entry.lua");
-    if entry_lua_path.exists() {
-        std::fs::remove_file(&entry_lua_path).unwrap();
-    }
+    // Suppress the framework SHIORI functions via a no-function user override
+    // (scripts/ has higher search priority than the self-deployed pasta_scripts/).
+    let entry_lua_path = temp.path().join("scripts/pasta/shiori/entry.lua");
+    std::fs::create_dir_all(entry_lua_path.parent().unwrap()).unwrap();
+    std::fs::write(
+        &entry_lua_path,
+        "-- intentionally defines no SHIORI functions\n",
+    )
+    .unwrap();
 
     let mut shiori = PastaShiori::default();
     assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
@@ -340,8 +350,10 @@ fn test_request_not_initialized_error() {
 fn test_unload_called_on_drop() {
     let temp = copy_fixture_to_temp("minimal");
 
-    // Create a Lua script that defines SHIORI.unload and sets a global flag
-    let entry_lua_path = temp.path().join("pasta_scripts/pasta/shiori/entry.lua");
+    // Create a user-override Lua script (in scripts/, higher search priority
+    // than the self-deployed pasta_scripts/) that defines SHIORI.unload.
+    let entry_lua_path = temp.path().join("scripts/pasta/shiori/entry.lua");
+    std::fs::create_dir_all(entry_lua_path.parent().unwrap()).unwrap();
     std::fs::write(
         &entry_lua_path,
         r#"
@@ -405,8 +417,10 @@ end
 fn test_unload_error_does_not_panic() {
     let temp = copy_fixture_to_temp("minimal");
 
-    // Create a Lua script with an unload function that always errors
-    let entry_lua_path = temp.path().join("pasta_scripts/pasta/shiori/entry.lua");
+    // Create a user-override Lua script (in scripts/, higher search priority
+    // than the self-deployed pasta_scripts/) whose unload always errors.
+    let entry_lua_path = temp.path().join("scripts/pasta/shiori/entry.lua");
+    std::fs::create_dir_all(entry_lua_path.parent().unwrap()).unwrap();
     std::fs::write(
         &entry_lua_path,
         r#"
@@ -449,8 +463,10 @@ fn test_cached_functions_cleared_on_reload() {
     let temp1 = copy_fixture_to_temp("minimal");
     let temp2 = copy_fixture_to_temp("minimal");
 
-    // Modify temp2's entry.lua to remove SHIORI.load but keep request
-    let entry_lua_path2 = temp2.path().join("pasta_scripts/pasta/shiori/entry.lua");
+    // Override temp2's entry.lua (in scripts/, higher search priority than the
+    // self-deployed pasta_scripts/) to remove SHIORI.load but keep request.
+    let entry_lua_path2 = temp2.path().join("scripts/pasta/shiori/entry.lua");
+    std::fs::create_dir_all(entry_lua_path2.parent().unwrap()).unwrap();
     std::fs::write(
         &entry_lua_path2,
         r#"
@@ -499,8 +515,10 @@ fn test_multiple_instances_independent_caches() {
     let temp1 = copy_fixture_to_temp("minimal");
     let temp2 = copy_fixture_to_temp("minimal");
 
-    // Modify temp1's entry.lua to define all three SHIORI functions
-    let entry_lua_path1 = temp1.path().join("pasta_scripts/pasta/shiori/entry.lua");
+    // Override temp1's entry.lua (in scripts/, higher search priority than the
+    // self-deployed pasta_scripts/) to define all three SHIORI functions.
+    let entry_lua_path1 = temp1.path().join("scripts/pasta/shiori/entry.lua");
+    std::fs::create_dir_all(entry_lua_path1.parent().unwrap()).unwrap();
     std::fs::write(
         &entry_lua_path1,
         r#"
@@ -521,8 +539,10 @@ end
     )
     .unwrap();
 
-    // Modify temp2's entry.lua to only define request (no load/unload)
-    let entry_lua_path2 = temp2.path().join("pasta_scripts/pasta/shiori/entry.lua");
+    // Override temp2's entry.lua (in scripts/, higher search priority than the
+    // self-deployed pasta_scripts/) to only define request (no load/unload).
+    let entry_lua_path2 = temp2.path().join("scripts/pasta/shiori/entry.lua");
+    std::fs::create_dir_all(entry_lua_path2.parent().unwrap()).unwrap();
     std::fs::write(
         &entry_lua_path2,
         r#"

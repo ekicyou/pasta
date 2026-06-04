@@ -20,7 +20,7 @@ pasta_patterns = ["dic/*.pasta"]
 lua_search_paths = [
     "profile/pasta/save/lua",   # ユーザー保存スクリプト
     "scripts",                   # ユーザー作成スクリプト（カスタマイズ用）
-    "pasta_scripts",             # pasta 標準ランタイム
+    "profile/pasta/pasta_scripts", # pasta 標準ランタイム
     "profile/pasta/cache/lua",   # トランスパイル済みキャッシュ
     "scriptlibs",                # 追加ライブラリ
 ]

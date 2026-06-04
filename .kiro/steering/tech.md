@@ -38,6 +38,8 @@
 - **serde 1 / serde_json 1**: シリアライゼーション
 - **glob 0.3**: ファイルパターンマッチ
 - **flate2 1.x**: gzip圧縮（キャッシュ等）
+- **zip 8.6 (deflate)**: pasta_scripts 自己展開（起動時 zip 解凍）・ビルド時の決定論 zip 生成
+- **md5 0.8**: ビルド時の基準ダイジェスト算出（pasta_scripts 自己展開のドリフト検知、build/dev-dependency。ランタイムはマーカー文字列比較のみで md5 不使用）
 - **budoux 0.1.1**: 日本語改行位置推定（BudouX）
 - **unicode-width 0.2.2**: Unicode文字幅計算
 - **tracing 0.1 / tracing-appender 0.2 / tracing-subscriber 0.3**: ロギング・診断
@@ -193,8 +195,9 @@ cargo test -p pasta_lua     # pasta_luaテスト
 ## Luaランタイムパターン
 
 ### scripts/ 優先順位
-- `scripts/`（ゴーストカスタム）> `pasta_scripts/`（エンジン同梱）
-- `scripts/main.lua` がエントリーポイント。同名ファイルでエンジン動作を上書き可能
+- `scripts/`（ゴーストカスタム）> `profile/pasta/pasta_scripts/`（エンジン標準ランタイム、pasta.dll が起動時に自己展開）
+- フレームワークスクリプトは pasta.dll 内蔵 zip から起動時に `profile/pasta/pasta_scripts/` へ自己展開される（`ghost/master/pasta_scripts/` 同梱は廃止）。`.md5` マーカーで版を比較し不一致時のみ準アトミックに再展開。`profile/` 配下のためネットワーク更新（`updates.txt`/`.nar`）の対象外
+- `scripts/main.lua` がエントリーポイント。同名ファイルでエンジン動作を上書き可能（検索パスで `scripts` が `profile/pasta/pasta_scripts` より上位）
 
 ### DSL vs Lua 判断基準
 

@@ -17,7 +17,7 @@ fn test_default_config() {
         vec![
             "profile/pasta/save/lua",
             "scripts",
-            "pasta_scripts",
+            "profile/pasta/pasta_scripts",
             "profile/pasta/cache/lua",
             "scriptlibs"
         ]
@@ -383,7 +383,7 @@ fn test_default_lua_search_paths_contains_user_scripts() {
         vec![
             "profile/pasta/save/lua",
             "scripts",
-            "pasta_scripts",
+            "profile/pasta/pasta_scripts",
             "profile/pasta/cache/lua",
             "scriptlibs",
         ],
@@ -393,18 +393,18 @@ fn test_default_lua_search_paths_contains_user_scripts() {
 
 #[test]
 fn test_default_lua_search_paths_user_scripts_priority() {
-    // Requirement 1.3: scripts (index 1) should come before pasta_scripts (index 2)
+    // Requirement 1.3: scripts (index 1) should come before profile/pasta/pasta_scripts (index 2)
     let paths = default_lua_search_paths();
     let scripts_pos = paths.iter().position(|p| p == "scripts");
-    let pasta_scripts_pos = paths.iter().position(|p| p == "pasta_scripts");
+    let pasta_scripts_pos = paths.iter().position(|p| p == "profile/pasta/pasta_scripts");
     assert!(scripts_pos.is_some(), "scripts should be in search paths");
     assert!(
         pasta_scripts_pos.is_some(),
-        "pasta_scripts should be in search paths"
+        "profile/pasta/pasta_scripts should be in search paths"
     );
     assert!(
         scripts_pos.unwrap() < pasta_scripts_pos.unwrap(),
-        "scripts should come before pasta_scripts for override functionality"
+        "scripts should come before profile/pasta/pasta_scripts for override functionality"
     );
 }
 
@@ -419,7 +419,7 @@ fn test_loader_config_default_includes_user_scripts() {
     assert!(
         config
             .lua_search_paths
-            .contains(&"pasta_scripts".to_string()),
-        "Default LoaderConfig should include pasta_scripts"
+            .contains(&"profile/pasta/pasta_scripts".to_string()),
+        "Default LoaderConfig should include profile/pasta/pasta_scripts"
     );
 }

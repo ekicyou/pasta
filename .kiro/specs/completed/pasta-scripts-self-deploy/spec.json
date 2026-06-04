@@ -1,0 +1,23 @@
+{
+  "feature_name": "pasta-scripts-self-deploy",
+  "created_at": "2026-06-04T08:32:12+09:00",
+  "updated_at": "2026-06-04T03:55:53Z",
+  "completed_at": "2026-06-04T03:55:53Z",
+  "language": "ja",
+  "phase": "completed",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true
+}

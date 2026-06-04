@@ -96,6 +96,19 @@ pub enum LoaderError {
         source: Option<std::io::Error>,
     },
 
+    /// Self-deploy (framework script self-extraction) failure.
+    ///
+    /// Raised when synchronizing the on-disk self-deploy target with the
+    /// dll-embedded canonical scripts fails (e.g. read-only directory or file
+    /// lock). The message conveys the fact of the failure, the target path, and
+    /// that the version drift remains unresolved (Req 3.3).
+    #[error("Self-deploy failed (version drift unresolved): '{path}': {source}")]
+    SelfDeploy {
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+
     /// Partial transpilation failure.
     #[error(
         "Partial transpilation failure: {succeeded} succeeded, {failed} failed [{}]",
@@ -206,6 +219,14 @@ impl LoaderError {
         }
     }
 
+    /// Create a self-deploy error with target path.
+    pub fn self_deploy(path: impl Into<PathBuf>, err: std::io::Error) -> Self {
+        LoaderError::SelfDeploy {
+            path: path.into(),
+            source: err,
+        }
+    }
+
     /// Create a partial transpile error.
     pub fn partial_transpile(
         succeeded: usize,
@@ -251,6 +272,22 @@ mod tests {
         assert!(msg.contains("Failed to parse Pasta file"));
         assert!(msg.contains("/path/to/test.pasta"));
         assert!(msg.contains("unexpected token"));
+    }
+
+    #[test]
+    fn test_self_deploy_error_display() {
+        let err = LoaderError::self_deploy(
+            "/ghost/master/profile/pasta/pasta_scripts",
+            io::Error::new(io::ErrorKind::PermissionDenied, "access denied"),
+        );
+        let msg = format!("{}", err);
+        // Fact of self-deploy failure + drift unresolved (Req 3.3).
+        assert!(msg.contains("Self-deploy failed"));
+        assert!(msg.contains("version drift unresolved"));
+        // Target path (Req 3.3).
+        assert!(msg.contains("/ghost/master/profile/pasta/pasta_scripts"));
+        // Cause is carried in the source chain.
+        assert!(std::error::Error::source(&err).is_some());
     }
 
     #[test]

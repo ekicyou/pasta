@@ -57,7 +57,7 @@ argument-hint: <feature-name>
 繰り返し仕様の場合:
 1. ステップ1（DoD検証）とステップ2（コミット）のみ実行
 2. ステップ3〜5（移動・パス更新・ロードマップ）をスキップ
-3. ステップ6（リモート同期）を実行
+3. ステップ8（リモート同期＝ブランチ戦略）を実行
 4. tasks.md のチェックボックスをリセット（全 `[x]` → `[ ]`）
 
 ---
@@ -174,13 +174,73 @@ git add -A
 git commit -m "chore({feature-name}): spec完了・アーカイブ"
 ```
 
-### ステップ8: リモート同期
+### ステップ8: リモート同期（ブランチ戦略）
 
-確認不要。以下のコマンドを直接実行する。
+> **権威的ソース**: workflow.md「実装完了時アクション > 3. リモート同期（ブランチ戦略）」に従う。
+
+確認不要。現在のブランチを判定し、以下を中断なく実行する。
+
+```powershell
+$branchA = git rev-parse --abbrev-ref HEAD
+```
+
+#### ケース1: 現在のブランチが main
+
+そのまま同期する。
 
 ```powershell
 git push origin main
 ```
+
+#### ケース2: 現在のブランチが main 以外（= ブランチA）
+
+ブランチAの「mainからの分岐点以降の差分」を1コミットに集約した squash ブランチ `squash/$branchA`（= ブランチB）を作り、main へ fast-forward マージしてから push する。すべて成功したらブランチ A/B をローカル・リモート両方から削除する。
+
+```powershell
+$branchB = "squash/$branchA"
+
+# 1. リモート最新を取得（push reject 予防）
+git fetch origin
+
+# 2. origin/main を起点にブランチBを作成し、Aの全差分を1コミットへ集約
+git switch -c $branchB origin/main
+git merge --squash $branchA
+
+# 2-1. squash コミットメッセージは分岐点以降の履歴を要約して生成する（下記「メッセージ生成」参照）
+git log --no-merges --pretty=format:"%h %s%n%b" origin/main..$branchA
+git commit -F <生成した要約メッセージ>   # 履歴要約から作成
+
+# 3. main を fast-forward マージ（Bはmain先端+1コミットなので構造上必ずff可能）
+git switch main
+git merge --ff-only $branchB
+
+# 4. push
+git push origin main
+
+# 5. すべて成功したらブランチ A/B をローカル削除
+git branch -D $branchA
+git branch -D $branchB
+
+# 6. リモートに存在すれば削除
+if (git ls-remote --heads origin $branchA) { git push origin --delete $branchA }
+if (git ls-remote --heads origin $branchB) { git push origin --delete $branchB }
+```
+
+**メッセージ生成**（ステップ2-1 の squash コミット）:
+- 固定文言にせず、**分岐点以降のコミット履歴を要約**して作成する。
+- 手順:
+  1. `git log --no-merges --pretty=format:"%h %s%n%b" origin/main..$branchA` で全コミットを取得
+  2. 対象 spec の `requirements.md` / `design.md` のタイトル・概要も参照し意図を補強
+  3. 以下の形へ再構成:
+     - **subject**: `<type>({feature-name}): <機能全体を1文で表す要約>`
+     - **body**: 主な開発仕様・変更内容を箇条書き（3〜7項目目安）。関連コミットは統合し、`fixup`/typo/WIP 等の些末な履歴は集約・省略。個々のコミット羅列ではなく「何を・なぜ作ったか」の開発単位で再構成する。
+
+**コンフリクト時の対応**（ステップ2の `git merge --squash` で発生し得る）:
+- 内容を精査して解決する。spec完了文脈では**ブランチA側の変更が原則正**。
+- 解決できたら `git add -A; git commit` で継続する。
+- 意味的に危険・判断不能な場合は**中断し開発者へ報告**（ブランチ A/B は削除しない）。
+
+**中断条件**: コンフリクト解決不能 / `--ff-only` マージ失敗 / push reject のいずれかが発生した場合は、**ブランチ A/B を削除せず**処理を中断して報告する（復旧可能性を確保するため）。
 
 ---
 
@@ -196,7 +256,9 @@ git push origin main
 - [ ] ロードマップ更新済み（スコープ内の場合）
 - [ ] スキルドキュメント同期済み（該当する場合）
 - [ ] 完了コミット済み（ステップ7）
-- [ ] リモートにプッシュ済み（ステップ8）
+- [ ] リモート同期完了（ステップ8）
+      - main: `git push origin main` のみ
+      - main以外: squashブランチB作成（コミットメッセージは分岐点以降の履歴を要約）→mainへff-onlyマージ→push→A/B削除（ローカル＋リモート）
 ```
 
 ---
@@ -218,3 +280,23 @@ git push origin main
 ### テスト失敗時
 - **症状**: `cargo test --all` が失敗
 - **対策**: ワークフローを中断し開発者に報告。テスト修正後に再実行
+
+### ブランチ戦略関連（ステップ8 ケース2）
+
+#### ff不可（fast-forward 不可）
+- **症状**: `git merge --ff-only $branchB` が失敗
+- **理由**: 構造上ほぼ発生しない。ブランチBは `origin/main` 先端から作るため、main は必ず祖先になる。発生するのはローカル main に未push の独自コミットがある異常時のみ
+- **対策**: 中断して開発者へ報告（ローカル main の状態を確認）
+
+#### push reject
+- **症状**: `git push origin main` が non-fast-forward で拒否される
+- **理由**: リモート main がローカルより先行（他者または別マシンが間に push）。特殊ケース
+- **対策**: 事前の `git fetch origin` で大半は予防。発生時は中断して報告
+
+#### squash マージのコンフリクト
+- **症状**: `git merge --squash $branchA` がコンフリクトで停止
+- **対策**: 内容を精査して解決（A側が原則正）。解決後コミットして継続。判断不能なら中断、**ブランチ A/B は残す**
+
+#### ブランチ削除のタイミング
+- **原則**: ブランチ A/B の削除は**マージ・push がすべて成功した後のみ**実行する
+- **理由**: 途中失敗時に A/B を残すことで、いつでも元の状態へ復旧できる

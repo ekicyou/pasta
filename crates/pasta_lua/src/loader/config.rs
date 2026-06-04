@@ -156,7 +156,7 @@ pub fn default_lua_search_paths() -> Vec<String> {
     vec![
         "profile/pasta/save/lua".to_string(),
         "scripts".to_string(),
-        "pasta_scripts".to_string(),
+        "profile/pasta/pasta_scripts".to_string(),
         "profile/pasta/cache/lua".to_string(),
         "scriptlibs".to_string(),
     ]

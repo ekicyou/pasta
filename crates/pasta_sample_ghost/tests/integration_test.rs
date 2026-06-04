@@ -118,11 +118,19 @@ fn test_pasta_toml_content() {
         content.contains(r#""profile/pasta/save/lua""#),
         "lua_search_paths の順序1がありません"
     );
-    // Task 7.5: pasta_scripts が検索パスに含まれることを確認
+    // Req 6.4: フレームワーク標準ランタイムの検索パスが自己展開先を指すことを確認
+    // （旧 ghost/master 直下の同梱 pasta_scripts は廃止し、dll 自己展開先
+    //   profile/pasta/pasta_scripts へ一本化）
     assert!(
-        content.contains(r#""pasta_scripts""#),
-        "lua_search_paths に pasta_scripts がありません"
+        content.contains(r#""profile/pasta/pasta_scripts""#),
+        "lua_search_paths に自己展開先 profile/pasta/pasta_scripts がありません"
     );
+    // 旧方式（ghost/master 直下の同梱）の検索パスエントリが残っていないことを確認
+    assert!(
+        !content.contains(r#""pasta_scripts","#) && !content.contains(r#""pasta_scripts"]"#),
+        "lua_search_paths に旧 pasta_scripts エントリが残っています"
+    );
+    // ユーザーカスタム層 scripts が依然として優先層として存在することを確認
     assert!(
         content.contains(r#""scripts""#),
         "lua_search_paths に scripts がありません"

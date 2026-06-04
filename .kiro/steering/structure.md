@@ -42,8 +42,10 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │   │           └── random.rs          # RandomSelector - ランダム選択
 │   └── pasta_lua/           # Lua言語バックエンド層
 │       ├── Cargo.toml       # pasta_lua設定（pasta_core依存）
-│       ├── scripts/         # ユーザーカスタムLuaスクリプト（pasta_scripts/より優先）
-│       ├── pasta_scripts/   # 標準ランタイムLuaスクリプト（main.lua, pasta/等）
+│       ├── build.rs         # pasta_scriptsを決定論zip化→OUT_DIR、MD5をcargo:rustc-envで公開
+│       ├── build_zip.rs     # build.rsとテスト共有の決定論zipパッカー（純粋関数）
+│       ├── scripts/         # ユーザーカスタムLuaスクリプト（profile/pasta/pasta_scriptsより優先）
+│       ├── pasta_scripts/   # 標準ランタイムLuaスクリプト（埋め込みzipのソース正本。main.lua, pasta/等）
 │       ├── src/
 │       │   ├── lib.rs       # クレートエントリーポイント
 │       │   ├── config.rs    # 設定管理
@@ -63,6 +65,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       │   │   ├── config.rs        # ローダー設定
 │       │   │   ├── context.rs       # ローダーコンテキスト
 │       │   │   ├── discovery.rs     # スクリプト検出
+│       │   │   ├── extract.rs       # 起動時自己展開（内蔵zip解凍・MD5マーカー比較・準アトミック展開）
 │       │   │   └── error.rs         # ローダーエラー型
 │       │   ├── logging/     # ロギング設定
 │       │   ├── normalize.rs # 正規化ユーティリティ
