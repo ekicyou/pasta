@@ -33,6 +33,21 @@ requirements → design → tasks → implementation → implementation-complete
 3. **Doc Gate**: 仕様差分を反映
 4. **Steering Gate**: 既存ステアリングと整合
 5. **Soul Gate**: [SOUL.md](../../SOUL.md) との整合性確認（タスク生成時に自動追加）
+6. **Manual Sync Gate（条件付き）**: マニュアル（`book/`）と権威仕様（`doc/spec/`）の整合確認
+
+#### 6. Manual Sync Gate（条件付き）
+
+**ルール本体はこのゲートに置く**（権威）。`kiro-spec-complete` はこのゲートを発火・オーケストレーションするのみで、判定ルールを複製しない。
+
+- **発火条件**: 当該 spec の変更が `doc/spec/` または `book/` に**触れる場合のみ**発火する。
+- **スキップ**: 当該 spec の変更が `doc/spec/` にも `book/` にも触れない場合は、このゲートを**スキップ**する（無関係な spec の完了承認を重くしない）。Gate 1〜5 のみで完了可とする。
+- **判定**: 発火時は `node book/tools/drift-check.mjs` を実行し、以下が無いことを確認する。
+  - **ドリフト**: `book/manual-sources.toml` の記録ハッシュ（版マーカー）と `doc/spec/` の現値ハッシュの不一致（＝参照元が変わったのにマニュアル章が追従していない）。
+  - **未マップ / リンク切れ**: `doc/spec/` に存在するがマッピングに無い章・節、マニュアル→`doc/spec/` および外部参照リンクの切れ。
+- **中断**: `drift-check.mjs` が**非ゼロ終了**した場合は、**未解決ドリフトとして完了を中断**する。
+- **ドリフト解消フロー**: 該当マニュアル章を `doc/spec/` の現状に追従更新したうえで、`book/manual-sources.toml` の版マーカーを現値に更新する（＝レビュー済みであることの明示）。これでゲートを再実行し通過させる。
+
+> 既存 Gate 1〜5 の意味・順序は変更しない。本ゲートは条件付きの**追加**である。
 
 ---
 

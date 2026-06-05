@@ -1,0 +1,21 @@
+[book]
+title = "pasta 利用者マニュアル"
+description = "pasta ゴースト作者向けの Pasta DSL 文法・Lua API・入門チュートリアル統合マニュアル"
+authors = ["pasta project"]
+language = "ja"
+src = "src"
+
+[output.html]
+default-theme = "light"
+preferred-dark-theme = "navy"
+# サブパス公開（GitHub Pages: https://<user>.github.io/pasta/）。
+# 相対リンク出力は mdBook 既定のまま維持し、file:// オフライン閲覧と両立させる。
+site-url = "/pasta/"
+git-repository-url = "https://github.com/ekicyou/pasta"
+
+[output.html.search]
+enable = true
+
+[output.html.fold]
+enable = true
+level = 1

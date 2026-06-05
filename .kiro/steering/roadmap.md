@@ -64,4 +64,8 @@ pasta ゴースト作者向けの利用者マニュアルを、mdBook で**サ�
 - **却下**: Sphinx（Python 依存・reST/MyST 設定が重くオーバースペック）／ VitePress・Docusaurus（node_modules ツリー・2 つ目のエコシステム持ち込み）
 
 ### Specs (dependency order)
-- [ ] pasta-user-manual -- mdBook ベースの利用者マニュアルサイト（Pasta DSL 文法 + Lua API/コーディング + 入門チュートリアル）。Dependencies: none
+- [x] pasta-user-manual -- mdBook ベースの利用者マニュアルサイト（Pasta DSL 文法 + Lua API/コーディング + 入門チュートリアル）。Dependencies: none
+
+### 将来仕様（Phase 4 派生・未着手）
+- [ ] pasta-runtime-internals-doc -- pasta Lua ランタイムの内部設計・アーキテクチャ解説（2パストランスパイル / yield-resume コルーチン / シーン検索 / ローダ自己展開 / SHIORI 非同期基盤）。読者＝コントリビュータ・実装理解者（利用者マニュアルとは読者層が異なる別境界）。Dependencies: pasta-user-manual
+  - 由来: pasta-user-manual の設計ディスカッションで「ランタイム内部設計は本仕様外・将来仕様」と決定（R5 は API 使用法に限定）

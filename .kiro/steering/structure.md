@@ -202,6 +202,13 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       ├── syntaxes/         # TextMate文法（全角/半角マーカー対応）
 │       ├── scripts/          # ビルドスクリプト（WASM等）
 │       └── wasm/             # pasta_lsp WASMバイナリ（ビルド生成物）
+├── book/                     # 利用者マニュアル（mdBook・GitHub Pages 公開）
+│   ├── book.toml            # mdBook 設定（language=ja, 検索有効, site-url）
+│   ├── src/                 # 章ソース（grammar/lua/getting-started/reference）
+│   ├── theme/head.hbs       # 日本語 bigram 検索のクエリ tokenizer override
+│   ├── tools/               # build-time Node（bigram 索引再生成・drift-check 等）
+│   ├── manual-sources.toml  # ドリフト検出マッピング（doc/spec 由来追跡）
+│   └── book/                # mdbook build 生成物（.gitignore 済み・CI で再生成）
 ├── .kiro/                    # Kiro Spec-Driven設定
 │   ├── steering/            # ステアリング規約
 │   ├── settings/            # テンプレート・ルール

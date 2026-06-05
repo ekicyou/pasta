@@ -1,0 +1,83 @@
+# manual-sources.toml — ドリフト追跡マッピングの正準ファイル
+#
+# 役割（Requirement 10.1 / Design「Drift Detection & Gate」）:
+#   各マニュアル文法章（book/src/grammar/*.md）が「どの doc/spec 章・節に由来するか」
+#   の対応関係と、参照時点のコンテンツハッシュ（版マーカー）を機械可読な形で記録する
+#   正準ファイル。drift-check（タスク 4.1, book/tools/drift-check.mjs）がこの記録を
+#   読み込み、各エントリの `hash`（記録値）と `source` 現状ファイルのハッシュを比較する。
+#
+# 検出の仕組み（マーカー方式・git 非依存）:
+#   - 記録ハッシュ == doc/spec 現値ハッシュ  → 由来は不変。章は追従済みとみなす。
+#   - 記録ハッシュ != doc/spec 現値ハッシュ  → 由来が変わったのに章が未追従＝ドリフト。
+#     drift-check は警告または失敗（完了ゲート文脈では非ゼロ終了で完了中断）を返す。
+#   git の分岐点・diff base に依存せず、CI でも完了ゲートでも同一に動作する。
+#
+# ハッシュ方式:
+#   algorithm = "sha256"。対象は doc/spec ファイルの **生バイト列全体**（正規化なし）。
+#   再現方法（どちらも下記の値と一致する）:
+#     sha256sum doc/spec/<file>.md
+#     node -e "const f=require('fs'),c=require('crypto');console.log(c.createHash('sha256').update(f.readFileSync('doc/spec/<file>.md')).digest('hex'))"
+#
+# 運用注記（版マーカーの更新規律）:
+#   この `hash` 値は「該当 doc/spec 章を参照してマニュアル章を追従させた時点の版」を表す。
+#   doc/spec が更新されてドリフトが検出されたら、開発者はまずマニュアル章を追従更新し、
+#   **そのうえで** ここの `hash` を doc/spec の現値へ更新する。
+#   ＝ hash の更新は「マニュアル章をレビュー済みで整合した」という明示的な承認マーカーで
+#   あり、doc/spec 変更時に機械的・無条件に書き換えてはならない。これによりゲートを通過する。
+#
+# 網羅範囲:
+#   doc/spec の実装済み章（ch01–07, 09–11）に対応する全文法章を登録する。
+#   ch08（属性=未実装）・ch12（future=将来仕様）は網羅対象外ゆえマッピングに含めない
+#   （Requirement 4.6 / Design）。
+
+algorithm = "sha256"
+
+[[mapping]]
+chapter = "book/src/grammar/index.md"
+source  = "doc/spec/01-grammar-model.md"
+hash    = "c9512e155f7b696a42f6c017eed4e8b1c8388321ba24c80992d1a6becab7bdc9"
+
+[[mapping]]
+chapter = "book/src/grammar/markers.md"
+source  = "doc/spec/02-markers.md"
+hash    = "3dfbd69c44f27245cbed5c912a58cb27008ebd9f2b00c22598ad7de8e0f0d541"
+
+[[mapping]]
+chapter = "book/src/grammar/block-structure.md"
+source  = "doc/spec/03-block-structure.md"
+hash    = "0a2187041bbb15c301c20a865a12e42e2bf72b687351f525885a89961a458baa"
+
+[[mapping]]
+chapter = "book/src/grammar/call-jump.md"
+source  = "doc/spec/04-call-spec.md"
+hash    = "6289c9a6ed81b15d08095fbf3c5f12d6f0d45412b5c8a9d47453c515021386ab"
+
+[[mapping]]
+chapter = "book/src/grammar/literals.md"
+source  = "doc/spec/05-literals.md"
+hash    = "e6e482ff2b8c063c072dfd031f9d83921fdcec4e90bc881cc87020c78bc31e45"
+
+[[mapping]]
+chapter = "book/src/grammar/action-line.md"
+source  = "doc/spec/06-action-line.md"
+hash    = "5332fb41d7c5740ce9cb657d48816f10696f73b3db02794ee0a4ed176fcbc024"
+
+[[mapping]]
+chapter = "book/src/grammar/sakura-script.md"
+source  = "doc/spec/07-sakura-script.md"
+hash    = "2cbf56fd7798905a2e171dbab06916c8eea353f74442bf8a9f894722654e8fd5"
+
+[[mapping]]
+chapter = "book/src/grammar/variables.md"
+source  = "doc/spec/09-variables.md"
+hash    = "c9b6da0fd95f1220175a1244128f364dda2bb6d58b6bbb6e7dabc97e52d15532"
+
+[[mapping]]
+chapter = "book/src/grammar/words.md"
+source  = "doc/spec/10-words.md"
+hash    = "e46c1ad43c12f849f599dc23419e256188a039c52d8a5b450b7d24697b8a040d"
+
+[[mapping]]
+chapter = "book/src/grammar/actor-dictionary.md"
+source  = "doc/spec/11-actor-dictionary.md"
+hash    = "1ae94da436cfc02da6d9bf260563f65cc3c90f48f5763718b7207cc01e48c31e"

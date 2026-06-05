@@ -29,3 +29,6 @@ target_test
 
 # Claude Code ランタイムのロックファイル（スケジューラ等の一時状態）
 .claude/scheduled_tasks.lock
+
+# mdBook ビルド成果物（利用者マニュアル）
+book/book/

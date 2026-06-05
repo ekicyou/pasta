@@ -66,10 +66,10 @@ argument-hint: <feature-name>
 
 ### ステップ1: DoD（完了基準）ゲート検証
 
-`.kiro/steering/workflow.md` の「完了基準（DoD）」セクションを読み込み、5ゲートをすべて検証する。
+`.kiro/steering/workflow.md` の「完了基準（DoD）」セクションを読み込み、**workflow.md が定義する全ゲートを順に検証**する。判定ルールの本体は workflow.md（権威）にあり、このスキルは発火・オーケストレーションのみを行いルールを複製しない。
 
 1. **workflow.md を読み込む**（未読の場合）
-2. **5ゲート（Spec / Test / Doc / Steering / Soul）** を順に検証
+2. **workflow.md の DoD に列挙された全ゲート**（現状: Spec / Test / Doc / Steering / Soul、および条件付きの **Manual Sync Gate**）を順に検証する。ゲートの構成は workflow.md を正とし、ここで個数や内訳を固定しない。
 3. **Test Gate**:
    - まず `session_store_sql` でセッション記録を確認し、直近のターンで `cargo test` が実行され全テスト成功していたか判定する
      ```sql
@@ -85,7 +85,14 @@ argument-hint: <feature-name>
    ```powershell
    cargo test --all 2>&1 | Select-String "test result:|FAILED|error\["
    ```
-4. **いずれかのゲートが失敗した場合**: ワークフローを中断し、開発者に報告
+4. **Manual Sync Gate（条件付き）**: 判定ルールの本体は workflow.md「完了基準（DoD）> 6. Manual Sync Gate（条件付き）」にある（権威）。ここではその発火だけを行う。
+   - **発火条件**: 当該 spec の変更が `doc/spec/` または `book/` に**触れる場合のみ**、`drift-check` を実行する。
+     ```powershell
+     node book/tools/drift-check.mjs
+     ```
+   - **中断**: `drift-check.mjs` が**非ゼロ終了**（未解決ドリフト / 未マップ / リンク切れ）した場合は、未解決ドリフトとして**ワークフローを中断し開発者に報告**する（下記5の「いずれかのゲート失敗時は中断」と整合）。ドリフト解消フローは workflow.md を参照。
+   - **スキップ**: 当該 spec の変更が `doc/spec/` にも `book/` にも触れない場合は、このゲートを**スキップ**する（Gate 1〜5 のみで完了可）。スキップ時は完了チェックリストに「(無関係変更によりスキップ)」と注記する。
+5. **いずれかのゲートが失敗した場合**: ワークフローを中断し、開発者に報告
 
 ### ステップ2: 未コミットファイルのコミット
 
@@ -247,8 +254,9 @@ if (git ls-remote --heads origin $branchB) { git push origin --delete $branchB }
 ## 完了チェックリスト
 
 ```
-- [ ] DoD 5ゲート通過（Spec/Test/Doc/Steering/Soul）
+- [ ] DoD 全ゲート通過（workflow.md 準拠: Spec/Test/Doc/Steering/Soul）
 - [ ] cargo test --all 成功（またはセッション記録により省略）
+- [ ] Manual Sync Gate: 条件付き発火（doc/spec/ または book/ に触れる spec のみ drift-check 実行・非ゼロで中断／無関係変更はスキップ）
 - [ ] 未コミットファイルをコミット済み（ステップ2）
 - [ ] completedフォルダへ移動済み（ステップ3）※繰り返し仕様はスキップ
 - [ ] spec.json の phase を "completed" に更新済み（ステップ4）※繰り返し仕様はスキップ

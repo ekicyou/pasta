@@ -1,0 +1,145 @@
+{{!--
+  ============================================================================
+  pasta-user-manual タスク 3.2: 検索クエリの bigram override
+  （Requirements 2.1, 2.3, 2.4, 2.5 / design.md「Bigram Search」）
+
+  目的:
+    索引側（3.1 build-index.mjs）は本文を 2-gram で再生成し、検索時に
+    elasticlunr が用いる pipeline を reset 済みにしている。検索の整合には
+    「クエリ側も索引と同一規則（2-gram）で分割」する必要がある（不一致は検索破綻）。
+
+  実装方式（v0.5.3 の制約に基づく選択）:
+    当初設計は `theme/searcher.js` を置いて mdBook 既定 searcher を差し替える前提
+    だったが、mdBook v0.5.3 は検索ランタイム（searcher-<hash>.js）をテーマ
+    オーバーライド対象に含めず、`theme/searcher.js` を置いても無視して既定を出力する
+    （空テーマで実測確認済み）。一方 `theme/head.hbs` は全ページ <head> に確実に
+    取り込まれる正規のオーバーライド対象である。
+
+    そこで本ファイルは、elasticlunr が読み込まれる前（<head> 段階）に
+    `window.elasticlunr` へアクセサ（defineProperty）を仕掛け、elasticlunr の UMD が
+    グローバルへ自身を代入した瞬間に `elasticlunr.tokenizer` を 2-gram tokenize へ
+    差し替える。elasticlunr の `Index.search` はクエリを
+    `pipeline.run(elasticlunr.tokenizer(query))` で分割するため、これで索引・クエリの
+    規則が一致し、語中2文字（連続2文字以上の日本語）がその語を含むページにヒットする。
+    既定 searcher は無改変・サーバ通信なしのまま動作する。
+
+  規則の単一ソース性（design Invariant）:
+    下記 tokenize は `book/tools/bigram-index/tokenize.mjs`（正準・単一ソース）と
+    「同一規則」でなければならない。ブラウザは ESM import 不可ゆえ同ロジックを
+    インライン同梱している。tokenize.mjs を変更した場合は本ファイルの該当ブロックも
+    必ず同期すること（関数本体は tokenize.mjs から `export` を除いた逐語コピー）。
+  ============================================================================
+--}}
+<script>
+(function () {
+    'use strict';
+
+    // --- BEGIN canonical bigram tokenize (mirror of book/tools/bigram-index/tokenize.mjs) ---
+    // 正規化: 小文字化 + 全角英数を半角へ（NFKC は CJK 互換まで畳むため使わず、英数記号のみ畳む）。
+    function normalize(text) {
+        return text
+            .toLowerCase()
+            // 全角英数字 → 半角
+            .replace(/[Ａ-Ｚａ-ｚ０-９]/g, function (c) {
+                return String.fromCharCode(c.charCodeAt(0) - 0xfee0);
+            });
+    }
+
+    // 1 文字が「CJK 等の語中連結対象（bigram 化する文字）」かどうか。
+    function isCjk(ch) {
+        var cp = ch.codePointAt(0);
+        return (
+            (cp >= 0x3040 && cp <= 0x30ff) || // ひらがな・カタカナ
+            (cp >= 0x3400 && cp <= 0x4dbf) || // CJK 拡張A
+            (cp >= 0x4e00 && cp <= 0x9fff) || // CJK 統合漢字
+            (cp >= 0xf900 && cp <= 0xfaff) || // CJK 互換漢字
+            (cp >= 0xff66 && cp <= 0xff9f) || // 半角カタカナ
+            cp === 0x30fc || // 長音記号 ー
+            (cp >= 0x20000 && cp <= 0x2ffff) // CJK 拡張B以降
+        );
+    }
+
+    // 入力文字列をトークン列へ（連続 CJK は隣接 2-gram、ASCII は空白・ハイフン区切り）。
+    function tokenize(input) {
+        if (input === null || input === undefined) {
+            return [];
+        }
+        var text = normalize(String(input));
+        var tokens = [];
+
+        var i = 0;
+        var n = text.length;
+        while (i < n) {
+            var ch = text[i];
+            if (isCjk(ch)) {
+                // CJK ランを収集
+                var j = i;
+                var run = [];
+                while (j < n && isCjk(text[j])) {
+                    run.push(text[j]);
+                    j++;
+                }
+                if (run.length === 1) {
+                    tokens.push(run[0]);
+                } else {
+                    for (var k = 0; k + 1 < run.length; k++) {
+                        tokens.push(run[k] + run[k + 1]);
+                    }
+                }
+                i = j;
+            } else if (/\s/.test(ch) || ch === '-') {
+                i++;
+            } else {
+                // 非 CJK・非区切り（ASCII 英数記号など）のラン
+                var j2 = i;
+                var run2 = [];
+                while (j2 < n && !isCjk(text[j2]) && !/\s/.test(text[j2]) && text[j2] !== '-') {
+                    run2.push(text[j2]);
+                    j2++;
+                }
+                tokens.push(run2.join(''));
+                i = j2;
+            }
+        }
+        return tokens.filter(function (t) { return t.length > 0; });
+    }
+    // --- END canonical bigram tokenize ---
+
+    // クエリ側 tokenizer を bigram tokenize へ差し替える。
+    function applyBigramTokenizer(el) {
+        if (el && typeof el === 'function' && el.tokenizer !== tokenize) {
+            el.tokenizer = tokenize;
+        }
+    }
+
+    // elasticlunr-<hash>.min.js は <head> 後（body 末尾）で読み込まれ、UMD が
+    // `window.elasticlunr = factory()` を実行する。そのタイミングを捕捉して
+    // tokenizer を確実に差し替えるため、代入を監視するアクセサを先に仕込む。
+    if (Object.prototype.hasOwnProperty.call(window, 'elasticlunr') && window.elasticlunr) {
+        // 既に読み込まれていれば即適用（読み込み順が変わっても安全側に倒す）。
+        applyBigramTokenizer(window.elasticlunr);
+    } else {
+        try {
+            var holder;
+            Object.defineProperty(window, 'elasticlunr', {
+                configurable: true,
+                enumerable: true,
+                get: function () { return holder; },
+                set: function (v) {
+                    holder = v;
+                    applyBigramTokenizer(v);
+                },
+            });
+        } catch (e) {
+            // defineProperty 不可な環境ではポーリングでフォールバック。
+            var tries = 0;
+            var timer = setInterval(function () {
+                if (window.elasticlunr || tries++ > 200) {
+                    clearInterval(timer);
+                    applyBigramTokenizer(window.elasticlunr);
+                }
+            }, 25);
+        }
+    }
+})();
+</script>

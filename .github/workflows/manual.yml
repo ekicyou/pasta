@@ -1,0 +1,103 @@
+# .github/workflows/manual.yml
+# 利用者マニュアル（mdBook）を GitHub Pages へ公開する。
+# build.yml（Rust/WASM CI）とは独立。book/** 変更時のみ起動する。
+#
+# パイプライン（design「Publish Pipeline」/ 要件 1.3, 1.4, 10.2, 10.4）:
+#   mdbook build book
+#     -> node book/tools/bigram-index/build-index.mjs（日本語 bigram 索引を再生成）
+#     -> node book/tools/drift-check.mjs（ドリフト/リンク切れで中断）
+#     -> Pages artifact（./book/book）をアップロード -> deploy-pages で公開。
+name: Manual
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'book/**'
+      - '.github/workflows/manual.yml'
+  workflow_dispatch:  # 手動実行
+
+# Pages の同時デプロイを直列化（実行中のデプロイはキャンセルしない）。
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    name: build-manual
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup mdBook
+        uses: peaceiris/actions-mdbook@v2
+        with:
+          mdbook-version: '0.5.3'
+
+      - name: Build manual (mdBook)
+        run: mdbook build book
+
+      # mdbook build の後段で検索インデックスを日本語 bigram へ再生成する（要件 1.4）。
+      # 失敗時 exit 1 でビルド中断。出力先は book/book（mdBook 既定）。
+      - name: Rebuild bigram search index
+        run: node book/tools/bigram-index/build-index.mjs book/book
+
+      # ドリフト/リンク切れがあれば公開前に中断する（要件 10.2, 10.4）。
+      # スクリプトはリポジトリルートを自己解決するため引数不要。
+      - name: Drift / broken-link check
+        run: node book/tools/drift-check.mjs
+
+      # チュートリアル成果物ガード その1（要件 6.2 / design「Content: Getting Started」）。
+      # book/src/getting-started/first-ghost.md の ```pasta 成果物ブロックが、
+      # 起動可能な最小セット一式 hello-pasta（SSOT: crates/pasta_sample_ghost/ghosts/
+      # hello-pasta/ghost/master/dic/*.pasta）と逐語一致するかを検証する。崩れていれば
+      # exit 1 で公開中断。スクリプトはリポジトリルートを自己解決するため引数不要。
+      - name: Tutorial artifact match check
+        run: node book/tools/tutorial-check.mjs
+
+      # Rust ツールチェーン（その2の構文検証＝cargo test 用）。
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
+
+      # チュートリアル成果物ガード その2（要件 6.2 / design「Testing/コンテンツ整合」）。
+      # pasta_check CLI に .pasta 構文検証サブコマンドは無い（release のみ）ため、
+      # hello-pasta 実ファイルを本物の PastaLoader::load で読み込み・トランスパイルして
+      # 検証する既存テスト（self_deploy_integration_test.rs 等）を構文検証手段として採用。
+      # その1で「チュートリアル == 実ファイル」を保証済みのため、チュートリアル成果物の
+      # 構文妥当性が transitively 担保される（フル SSP 実行なしの機械的ガード）。
+      - name: Tutorial syntax validation (hello-pasta real files)
+        run: cargo test -p pasta_sample_ghost
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./book/book
+
+  deploy:
+    name: deploy-manual
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

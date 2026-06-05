@@ -1,0 +1,9 @@
+# PoC 専用の最小 mdBook。本番 book/src/ を汚さず bigram 検索を実証するためのフィクスチャ。
+# 本番 book.toml と同等の検索設定（elasticlunr 索引出力）を有効化する。
+[book]
+title = "bigram PoC"
+language = "ja"
+src = "src"
+
+[output.html.search]
+enable = true
