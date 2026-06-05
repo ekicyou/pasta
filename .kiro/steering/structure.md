@@ -221,8 +221,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 ├── GRAMMAR.md               # Pasta DSL文法リファレンス
 ├─ doc/spec/                # 言語仕様書（章別分割）
 ├── LICENSE                  # ライセンス
-├── AGENTS.md                # AI開発支援（エージェント共通指示）
-└── CLAUDE.md                # AI開発支援（Claude Code固有指示）
+└── CLAUDE.md                # AI開発支援（プロジェクト指示・Kiro ワークフロー・コマンド一覧）
 ```
 
 **注**:
@@ -230,7 +229,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 - ルートレベルの `tests/` と `examples/` も削除済み（Pure Virtual Workspace移行完了）
 - 各クレートは独自の `tests/` ディレクトリを持つことができる（例: pasta_dsl, pasta_core, pasta_lua, pasta_lsp, pasta_sample_ghost, pasta_shiori）
 - pasta_sample_ghost は `dist-src/` にテキスト系配布ファイル（設定4種＋DSLスクリプト4種）を保持。`release.ps1` の robocopy ステップで配布先へコピーされる
-- `AGENTS.md` と `CLAUDE.md` の両方が存在。`AGENTS.md` はエージェント共通指示、`CLAUDE.md` は Claude Code 固有指示
+- `CLAUDE.md` が AI 開発支援の指示（プロジェクト指示・Kiro 仕様駆動ワークフロー・コマンド一覧）を担う
 
 ## ファイル命名規則
 
@@ -348,8 +347,7 @@ pasta_dsl（パーサー） + pasta_core（レジストリ）
 | README.md  | プロジェクト概要                                 |
 | GRAMMAR.md | DSL文法リファレンス（人間向け）                  |
 | doc/spec/  | 言語仕様書（章別）                               |
-| AGENTS.md  | AI開発支援（エージェント共通指示・ワークフロー） |
-| CLAUDE.md  | AI開発支援（Claude Code固有指示）                |
+| CLAUDE.md  | AI開発支援（プロジェクト指示・Kiro ワークフロー・コマンド一覧） |
 
 ### Kiro仕様管理
 - `.kiro/steering/`: 規約・原則

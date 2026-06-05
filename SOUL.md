@@ -14,7 +14,7 @@ pastaプロジェクトのドキュメントは、以下の優先順位と役割
 #### Level 1: Constitution
 - **[SOUL.md](SOUL.md)** - プロジェクトの憲法（Why: ビジョン、コアバリュー、あるべき姿）
 - **[GRAMMAR.md](GRAMMAR.md)** - 利用者向けクイックリファレンス（例文豊富な学習用資料）
-- **[AGENTS.md](AGENTS.md)** - AI開発支援（Kiro workflow、ステアリング）
+- **[CLAUDE.md](CLAUDE.md)** - AI開発支援（Kiro workflow、ステアリング）
 
 #### Level 2: Implementation Layer
 実装層ドキュメント。技術的詳細と品質管理を担当。
