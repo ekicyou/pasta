@@ -37,11 +37,11 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 
 - [x] パーサー（pasta_core）- Pasta DSL解析
 - [x] トランスパイラ（pasta_lua）- Lua コード生成
-- [x] ランタイム（pasta_lua）- Lua 5.5 実行環境
+- [x] ランタイム（pasta_lua）- LuaJIT 2.1 実行環境（旧 Lua 5.5 から `luajit-migration` で移行済み）
 - [x] SHIORI インターフェース（pasta_shiori）- DLL エクスポート
 
 ### Phase 2: コア機能拡張（進行中）🔄
-**最終更新**: 2026-06-03（現行バージョン v0.1.23）
+**最終更新**: 2026-06-05（現行バージョン v0.2.0）
 
 **繰り返し仕様**:
 - 🔁 **release-workflow** - リリース作業手順（`/kiro-spec-impl` 実行のたびにタスクリセット、永続的に未完了）
@@ -66,6 +66,9 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 - ✅ **choice-definition-dsl** - 選択肢定義DSL
 - ✅ **handler-resolution-fallback** - ハンドラ名前解決フォールバック
 - ✅ **ontalk-block-condition** - OnTalkブロック条件
+
+**ドキュメント整備**:
+- ✅ **pasta-user-manual** - 利用者（ゴースト作者）向けマニュアル。Pasta DSL 文法・Lua API/コーディング・入門チュートリアルを mdBook 製の静的サイトへ統合し、GitHub Pages で公開（[https://ekicyou.github.io/pasta/](https://ekicyou.github.io/pasta/)）。日本語 bigram 検索・doc/spec ドリフト検出ゲートを含む
 
 **Phase 3（監査）: 脆弱性監査・コード簡素化 ✅ 完了**（全クレート対象、外部振る舞い不変）:
 - ✅ **Wave 1**: `audit-pasta-core` / `audit-pasta-dsl` / `audit-pasta-lua` / `audit-pasta-shiori` / `audit-pasta-check` / `audit-pasta-lsp` / `audit-pasta-sample-ghost`

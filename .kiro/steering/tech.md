@@ -185,12 +185,24 @@ cargo test -p pasta_lua     # pasta_luaテスト
 - areka統合: 動的リンク、MCP Server
 
 ### CI/CD
-- **GitHub Actions**: `.github/workflows/build.yml`
+- **GitHub Actions**: `.github/workflows/build.yml`（Rust/WASM）
   - push/PR/手動実行トリガー
   - **DLLビルド**: マトリックスビルド: x86 (`i686-pc-windows-msvc`) + x64 (`x86_64-pc-windows-msvc`)
   - **WASMビルド**: `pasta_lsp` を `wasm32-unknown-unknown` ターゲットでビルド（10MBサイズ上限チェック付き）
   - Rust キャッシュ: `Swatinem/rust-cache@v2`
   - アーティファクト: `pasta-dll-x86`, `pasta-dll-x64`（7日間保持）
+- **GitHub Actions**: `.github/workflows/manual.yml`（利用者マニュアル公開・build.yml と独立）
+  - `book/**` 変更時に起動。mdbook build → bigram 索引再生成 → drift-check → tutorial-check → cargo test 構文ガード → GitHub Pages デプロイ
+  - permissions: `pages: write` / `id-token: write` / `contents: read`。Pages 初回は repo Settings で手動有効化が必要
+
+## 利用者マニュアル（ドキュメントサイト `book/`）
+
+ゴースト作者向けマニュアルは、コードとは独立した **mdBook 静的サイト**として `book/` に構築し GitHub Pages へ公開する（[https://ekicyou.github.io/pasta/](https://ekicyou.github.io/pasta/)）。サーバー不要・`file://` オフライン閲覧両立。
+
+- **mdBook v0.5.3**: Markdown → 静的 HTML/CSS/JS。生成物 `book/book/` は `.gitignore` 済み（CI で再生成）
+- **日本語 bigram 検索**: build-time Node スクリプト（`book/tools/bigram-index/`）が mdBook 同梱 elasticlunr 索引を 2-gram で再生成。索引ビルダとクエリ側（`theme/head.hbs`）が単一 `tokenize.mjs` を共有（不一致は検索破綻）
+- **ドリフト検出ゲート**: `book/tools/drift-check.mjs` が `book/manual-sources.toml` の版マーカー（**改行 LF 正規化 sha256**・git 非依存）で文法章と `doc/spec/` の乖離を検出。`workflow.md` DoD の条件付き「Manual Sync Gate」と結線し、未解決ドリフトで完了を中断
+- **正の分離**: 利用者向け知識はマニュアルが正、`doc/spec/` は文法の権威ソース、README は開発者向けの入口
 
 ## Luaランタイムパターン
 
