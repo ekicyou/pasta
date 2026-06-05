@@ -65,6 +65,7 @@ pasta ゴースト作者向けの利用者マニュアルを、mdBook で**サ�
 
 ### Specs (dependency order)
 - [x] pasta-user-manual -- mdBook ベースの利用者マニュアルサイト（Pasta DSL 文法 + Lua API/コーディング + 入門チュートリアル）。Dependencies: none
+- [ ] pasta-manual-syntax-highlight -- マニュアルの *.pasta コードブロックへ VSCode 同等のシンタックスハイライトを追加。VSCode TextMate 文法（SSOT）を build-time 再利用し hljs 互換クラスへ写像、出力は純静的。Dependencies: pasta-user-manual
 
 ### 将来仕様（Phase 4 派生・未着手）
 - [ ] pasta-runtime-internals-doc -- pasta Lua ランタイムの内部設計・アーキテクチャ解説（2パストランスパイル / yield-resume コルーチン / シーン検索 / ローダ自己展開 / SHIORI 非同期基盤）。読者＝コントリビュータ・実装理解者（利用者マニュアルとは読者層が異なる別境界）。Dependencies: pasta-user-manual
