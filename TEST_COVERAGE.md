@@ -161,7 +161,7 @@
 | Virtual Event Dispatcher      | `virtual_event_dispatch_test.rs`<br>`virtual_event_config_test.rs`<br>`virtual_dispatcher_spec.lua` | ✅ 完了 | 16+15テスト（2ファイルに分割）<br>おしゃべり頻度SAVE永続化（SAVE>toml>default, floor/clamp/Inf guard）含む |
 | Sample Ghost Integration      | `shiori_sample_ghost_test.rs`                                                                       | ✅ 完了 | 2テスト（hello-pasta実ゴースト使用）                                                                       |
 | Sample Ghost スクリプト整合性 | `scripts.rs::test_script_expression_names_defined_in_actors`                                        | ✅ 完了 | 1テスト（表情名↔辞書定義一致検証）                                                                         |
-| Sample Ghost dist-src 検証    | `dist_src_validation_test.rs::test_dist_src_directory_structure`                                    | ✅ 完了 | 1テスト（dist-src/ 8ファイル存在確認）                                                                     |
+| Sample Ghost 構成検証         | `dist_src_validation_test.rs::test_ghost_directory_structure`                                       | ✅ 完了 | 1テスト（ghosts/hello-pasta/ 8ファイル存在確認）※テストファイル名は旧称                                    |
 | Sample Ghost 画像構造検証     | `integration_test.rs::test_generated_images_structure`                                              | ✅ 完了 | 1テスト（shell/master/*.png 18枚＋surfaces.txt）                                                           |
 | チェイントーク E2E            | `runtime_scene_test.rs`                                                                             | ✅ 完了 | 2テスト（yield-continuation-token Pasta→Lua→実行）                                                         |
 

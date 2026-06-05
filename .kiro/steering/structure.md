@@ -180,13 +180,10 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       │   ├── main.rs             # 配布物生成CLIエントリーポイント
 │       │   ├── image_generator.rs  # ピクトグラム画像生成
 │       │   ├── config_templates.rs # surfaces.txt生成
-│       │   └── scripts.rs          # テスト用dist-srcヘルパー
-│       ├── dist-src/        # テキスト系配布ファイル（Single Source of Truth）
-│       │   ├── install.txt
-│       │   ├── ghost/master/ # descript.txt, pasta.toml, dic/*.pasta
-│       │   └── shell/master/ # descript.txt
-│       ├── ghosts/           # 生成された配布物（hello-pasta/）
-│       └── tests/            # 統合テスト・dist-src検証
+│       │   └── scripts.rs          # ghosts/hello-pasta 辞書(.pasta)の検証テスト
+│       ├── ghosts/           # サンプルゴースト本体（SSOT・配布物一式）
+│       │   └── hello-pasta/  # 手書きSSOT(descript/pasta.toml/dic/install)＋生成物(dll/画像)
+│       └── tests/            # 統合テスト・配布ファイル構成検証
 ├── benches/                  # ベンチマークコード
 ├── editors/                  # エディタ拡張
 │   └── vscode/              # VSCode拡張（TypeScript + WASM統合）
@@ -228,7 +225,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 - ルートクレート (`src/`) は削除済み。すべての実装コードは `crates/*/src/` 配下に配置。
 - ルートレベルの `tests/` と `examples/` も削除済み（Pure Virtual Workspace移行完了）
 - 各クレートは独自の `tests/` ディレクトリを持つことができる（例: pasta_dsl, pasta_core, pasta_lua, pasta_lsp, pasta_sample_ghost, pasta_shiori）
-- pasta_sample_ghost は `dist-src/` にテキスト系配布ファイル（設定4種＋DSLスクリプト4種）を保持。`release.ps1` の robocopy ステップで配布先へコピーされる
+- pasta_sample_ghost のサンプルゴースト hello-pasta は `ghosts/hello-pasta/` に完全な一式として直接配置（SSOT）。テキスト系（descript/pasta.toml/dic/install）は手書き正本、画像・DLL は生成物。`release.ps1` は生成物の配置と `.nar` パッケージングを担う（旧 dist-src/robocopy 方式は廃止）
 - `CLAUDE.md` が AI 開発支援の指示（プロジェクト指示・Kiro 仕様駆動ワークフロー・コマンド一覧）を担う
 
 ## ファイル命名規則

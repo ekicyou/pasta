@@ -23,38 +23,35 @@ SHIORI/3.0 プロトコルで動作するミニマルなゴーストとして、
 
 ## ディレクトリ構成
 
+サンプルゴーストの実体は `ghosts/hello-pasta/` に**完全なゴースト一式として直接配置**されており、これが配布物の Single Source of Truth（SSOT）です。テキスト系ファイル（`descript.txt` / `pasta.toml` / `dic/*.pasta` / `install.txt`）は手書きの正本、画像・DLL は生成物で、いずれも同じツリー内に置かれます。
+
 ```
 crates/pasta_sample_ghost/
 ├── src/
 │   ├── lib.rs              # 公開API（画像＋surfaces.txt 生成）
 │   ├── image_generator.rs  # ピクトグラム画像生成
 │   ├── config_templates.rs # surfaces.txt 生成
-│   └── scripts.rs          # テスト用 dist-src ヘルパー
-├── dist-src/               # テキスト系配布ファイル（Single Source of Truth）
-│   ├── install.txt
-│   ├── ghost/master/
-│   │   ├── descript.txt
-│   │   ├── pasta.toml
-│   │   └── dic/
-│   │       ├── actors.pasta
-│   │       ├── boot.pasta
-│   │       ├── talk.pasta
-│   │       └── click.pasta
-│   └── shell/master/
-│       └── descript.txt
-├── tests/
-│   ├── common/mod.rs            # テストヘルパー
-│   ├── dist_src_validation_test.rs # dist-src ディレクトリ検証
-│   └── integration_test.rs      # 統合テスト
-└── ghosts/                  # 生成された配布物
-    └── hello-pasta/         # ゴーストID
+│   └── scripts.rs          # ghosts/hello-pasta の辞書(.pasta)を読む検証テスト
+├── ghosts/                 # サンプルゴースト本体（SSOT・配布物）
+│   └── hello-pasta/        # ゴーストID
+│       ├── install.txt
+│       ├── ghost/master/   # descript.txt, pasta.toml, dic/*.pasta（手書きSSOT）＋ pasta.dll, scripts/（生成物）
+│       └── shell/master/   # descript.txt（手書き）＋ surfaces.txt, surface*.png（生成物）
+├── release.ps1             # ビルド＋セットアップ＋.nar パッケージ作成
+├── release.bat             # release.ps1 のバッチラッパー
+├── build.rs                # ビルドスクリプト
+└── tests/
+    ├── common/mod.rs                 # テストヘルパー
+    ├── dist_src_validation_test.rs   # 配布ファイル構成の検証 ※ファイル名は旧称（dist-src 廃止済み）
+    ├── integration_test.rs           # 統合テスト
+    └── self_deploy_integration_test.rs # 実 .pasta を PastaLoader で parse/transpile 検証
 ```
+
+> **注**: かつてテキスト配布ファイルは `dist-src/` に分離し `release.ps1` の robocopy で配布先へコピーする方式でしたが、現在は廃止済みです。テキストファイルは `ghosts/hello-pasta/` に直接置く SSOT 方式に統一されています。
 
 ## 使用方法
 
-### セットアップ（初回のみ）
-
-**pasta.dll と Lua ランタイムを配置**
+### セットアップ／リリース（`release.ps1`）
 
 ```powershell
 # crates/pasta_sample_ghost/ フォルダで release.bat をダブルクリック
@@ -68,35 +65,26 @@ crates/pasta_sample_ghost/
 .\release.ps1 -SkipSetup
 ```
 
-このスクリプトは以下を実行します：
-1. pasta_shiori.dll (32bit) をビルド
-2. dist-src/ のテキストファイルを robocopy でコピー
-3. ゴースト画像を生成（surface*.png + surfaces.txt）
-4. ghosts/hello-pasta/ghost/master/ に pasta.dll と pasta_scripts/ を配置
-5. updates2.dau / updates.txt を生成
-6. バリデーション＆ .nar パッケージ作成
+このスクリプトは以下の 6 ステップを実行します:
 
-**注意**: `cargo run` は画像ファイル（surface*.png）と surfaces.txt のみ生成します。テキスト系配布ファイルは `dist-src/` に配置済みで、`release.ps1` の robocopy ステップでコピーされます。
+1. `pasta_shiori` DLL（32bit Windows）をビルド
+2. ゴースト画像を生成（`cargo run` → surface*.png + surfaces.txt）
+3. `pasta.dll` と Lua ランタイム（`scripts/`）を `ghosts/hello-pasta/ghost/master/` に配置
+4. `pasta_check release` を実行（updates.txt / `.nar` パッケージ作成）
+5. バージョン整合チェック
+6. リリース手順の表示
+
+**注**: テキスト系配布ファイル（`descript.txt` / `pasta.toml` / `dic/*.pasta` / `install.txt`）は `ghosts/hello-pasta/` に手書きで配置済みのため、コピー工程はありません。`release.ps1` は生成物（画像・DLL・ランタイム）の配置とパッケージングのみを担います。
 
 ### 配布物の確認
 
 ```powershell
-# テストを実行（.pasta と .png が自動生成される）
+# テストを実行（辞書検証・画像生成等）
 cargo test -p pasta_sample_ghost
 
-# 配布物の場所
+# 配布物の場所（このフォルダをそのまま SSP にインストール可能）
 crates/pasta_sample_ghost/ghosts/hello-pasta/
 ```
-
-この `ghosts/hello-pasta/` フォルダをそのまま SSP にインストール可能です。
-```
-
-スクリプトは以下を自動実行します:
-1. `pasta_shiori.dll` のビルド（32bit Windows）
-2. `dist-src/` テキストファイルの robocopy コピー
-3. 画像生成（`cargo run`）
-4. `pasta.dll` の配置
-5. Lua ランタイム (`pasta_scripts/`) のコピー
 
 ### 手動ビルド手順
 
@@ -104,7 +92,7 @@ crates/pasta_sample_ghost/ghosts/hello-pasta/
 # 1. pasta_shiori DLL をビルド
 cargo build --release --target i686-pc-windows-msvc -p pasta_shiori
 
-# 2. 配布ディレクトリを作成
+# 2. ゴースト一式をコピー
 $dist = "dist/hello-pasta"
 Copy-Item -Recurse "crates/pasta_sample_ghost/ghosts/hello-pasta" $dist
 
@@ -117,8 +105,8 @@ Copy-Item -Recurse "crates/pasta_lua/scripts" "$dist/ghost/master/scripts"
 
 ### ゴースト生成API
 
-`generate_ghost()` は画像ファイル（surface*.png）と surfaces.txt のみを生成します。
-テキスト系配布ファイルは `dist-src/` に配置済みで、`release.ps1` の robocopy でコピーされます。
+`generate_ghost()` は画像ファイル（surface*.png）と surfaces.txt **のみ**を生成します。
+テキスト系配布ファイルは `ghosts/hello-pasta/` に手書き配置済みのため、本 API は生成しません。
 
 ```rust
 use pasta_sample_ghost::{generate_ghost, GhostConfig};
@@ -135,27 +123,28 @@ cargo test -p pasta_sample_ghost
 
 ## 配布物の構成
 
-`release.ps1` 完了後の `ghosts/hello-pasta/` の構成:
+`ghosts/hello-pasta/` の構成（凡例: **[SSOT]** = 手書き正本 / **[gen]** = 生成物）:
 
 ```
 hello-pasta/
-├── install.txt                 # ← dist-src/ (robocopy)
+├── install.txt                 # [SSOT]
 ├── ghost/
 │   └── master/
-│       ├── pasta.dll           # SHIORI DLL (cargo build)
-│       ├── pasta.toml          # ← dist-src/ (robocopy)
-│       ├── descript.txt        # ← dist-src/ (robocopy)
-│       ├── dic/                # pasta DSL スクリプト
-│       │   ├── actors.pasta    # ← dist-src/ (robocopy)
-│       │   ├── boot.pasta      # ← dist-src/ (robocopy)
-│       │   ├── talk.pasta      # ← dist-src/ (robocopy)
-│       │   └── click.pasta     # ← dist-src/ (robocopy)
-│       └── scripts/            # Lua ランタイム（pasta_lua/scripts/）
+│       ├── descript.txt        # [SSOT]
+│       ├── pasta.toml          # [SSOT]
+│       ├── dic/                # pasta DSL 辞書 [SSOT]
+│       │   ├── actors.pasta
+│       │   ├── boot.pasta
+│       │   ├── choice.pasta
+│       │   ├── click.pasta
+│       │   └── talk.pasta
+│       ├── pasta.dll           # [gen] SHIORI DLL（cargo build）
+│       └── scripts/            # [gen] Lua ランタイム（pasta_lua/scripts/）
 └── shell/
     └── master/
-        ├── descript.txt        # ← dist-src/ (robocopy)
-        ├── surfaces.txt        # ← cargo run (generate_ghost)
-        └── surface*.png        # ← cargo run (generate_ghost)
+        ├── descript.txt        # [SSOT]
+        ├── surfaces.txt        # [gen] cargo run（generate_ghost）
+        └── surface*.png        # [gen] cargo run（generate_ghost）
 ```
 
 ## ライセンス
