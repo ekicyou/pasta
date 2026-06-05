@@ -82,8 +82,12 @@ jobs:
       - name: Tutorial syntax validation (hello-pasta real files)
         run: cargo test -p pasta_sample_ghost
 
+      # enablement: true — リポジトリで Pages が未設定でも API 経由で
+      # 自動有効化を試みる（Source=GitHub Actions）。初回公開を手動設定なしで通す。
       - name: Setup Pages
         uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
