@@ -13,10 +13,14 @@
 #   git の分岐点・diff base に依存せず、CI でも完了ゲートでも同一に動作する。
 #
 # ハッシュ方式:
-#   algorithm = "sha256"。対象は doc/spec ファイルの **生バイト列全体**（正規化なし）。
-#   再現方法（どちらも下記の値と一致する）:
-#     sha256sum doc/spec/<file>.md
-#     node -e "const f=require('fs'),c=require('crypto');console.log(c.createHash('sha256').update(f.readFileSync('doc/spec/<file>.md')).digest('hex'))"
+#   algorithm = "sha256"。対象は doc/spec ファイルの内容を **改行 LF 正規化（CRLF→LF）
+#   した UTF-8 テキスト**。改行コード差（CRLF↔LF）はドリフト＝内容変化ではないため
+#   正規化する。これにより core.autocrlf=true の Windows 作業コピー（CRLF）でも、
+#   git 格納・CI チェックアウト（LF）でも同一ハッシュとなり、改行差による誤検出
+#   （ローカル成功・CI 失敗）を防ぐ。
+#   再現方法（いずれも下記の値と一致する）:
+#     git show HEAD:doc/spec/<file>.md | sha256sum        # git 格納は LF
+#     node -e "const f=require('fs'),c=require('crypto');console.log(c.createHash('sha256').update(f.readFileSync('doc/spec/<file>.md','utf8').replace(/\r\n?/g,'\n'),'utf8').digest('hex'))"
 #
 # 運用注記（版マーカーの更新規律）:
 #   この `hash` 値は「該当 doc/spec 章を参照してマニュアル章を追従させた時点の版」を表す。
@@ -35,49 +39,49 @@ algorithm = "sha256"
 [[mapping]]
 chapter = "book/src/grammar/index.md"
 source  = "doc/spec/01-grammar-model.md"
-hash    = "c9512e155f7b696a42f6c017eed4e8b1c8388321ba24c80992d1a6becab7bdc9"
+hash    = "f30231cf5ec5cde4318490736a810243edaf6aa94cd4e242dc65a47d93b08908"
 
 [[mapping]]
 chapter = "book/src/grammar/markers.md"
 source  = "doc/spec/02-markers.md"
-hash    = "3dfbd69c44f27245cbed5c912a58cb27008ebd9f2b00c22598ad7de8e0f0d541"
+hash    = "6d9ce206211bc5d3920d46518c244ca193f7a6cf8be64cfff6b39d8c4ce6c19a"
 
 [[mapping]]
 chapter = "book/src/grammar/block-structure.md"
 source  = "doc/spec/03-block-structure.md"
-hash    = "0a2187041bbb15c301c20a865a12e42e2bf72b687351f525885a89961a458baa"
+hash    = "8f473ef443ab946919da925f3d5662cff482518f40a217cfdf40a873294c28fc"
 
 [[mapping]]
 chapter = "book/src/grammar/call-jump.md"
 source  = "doc/spec/04-call-spec.md"
-hash    = "6289c9a6ed81b15d08095fbf3c5f12d6f0d45412b5c8a9d47453c515021386ab"
+hash    = "14c3c1c24ce88c0c59b7e8046c26a521fb9124a285f66a23a928a53b2a3d1144"
 
 [[mapping]]
 chapter = "book/src/grammar/literals.md"
 source  = "doc/spec/05-literals.md"
-hash    = "e6e482ff2b8c063c072dfd031f9d83921fdcec4e90bc881cc87020c78bc31e45"
+hash    = "62a0b20635e26dbaa0453ac462feb2bb2d53a318644cc47bd4a616a54b49bc72"
 
 [[mapping]]
 chapter = "book/src/grammar/action-line.md"
 source  = "doc/spec/06-action-line.md"
-hash    = "5332fb41d7c5740ce9cb657d48816f10696f73b3db02794ee0a4ed176fcbc024"
+hash    = "a049a810279ea49343aad8532719526d4b48421c7f1f09ee7dd8cf4f24acdf4c"
 
 [[mapping]]
 chapter = "book/src/grammar/sakura-script.md"
 source  = "doc/spec/07-sakura-script.md"
-hash    = "2cbf56fd7798905a2e171dbab06916c8eea353f74442bf8a9f894722654e8fd5"
+hash    = "406b714c74b2d05fd4c289dcb4c37c85d28477aba902d79d0bb7732522532cb5"
 
 [[mapping]]
 chapter = "book/src/grammar/variables.md"
 source  = "doc/spec/09-variables.md"
-hash    = "c9b6da0fd95f1220175a1244128f364dda2bb6d58b6bbb6e7dabc97e52d15532"
+hash    = "9ee5e8c5542c414f423d49c571d382f49f96da3dfb89e3d7daae9b39b8aeff83"
 
 [[mapping]]
 chapter = "book/src/grammar/words.md"
 source  = "doc/spec/10-words.md"
-hash    = "e46c1ad43c12f849f599dc23419e256188a039c52d8a5b450b7d24697b8a040d"
+hash    = "7be60cad5313affdcea8e9b1422a1a4f6a2b1a63364a74589fca9a6e252bff05"
 
 [[mapping]]
 chapter = "book/src/grammar/actor-dictionary.md"
 source  = "doc/spec/11-actor-dictionary.md"
-hash    = "1ae94da436cfc02da6d9bf260563f65cc3c90f48f5763718b7207cc01e48c31e"
+hash    = "2acf356720803204f68ac56417ba23b70bd66b7b67bc91095b181e4a883e15a1"

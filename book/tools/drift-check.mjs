@@ -53,10 +53,14 @@ export const UNMAPPED_EXCLUDE = new Set([
   'README.md',
 ]);
 
-// ---- sha256（生バイト列全体・正規化なし。manual-sources.toml の方式に一致） ----
+// ---- sha256（改行正規化後の内容ハッシュ。manual-sources.toml の方式に一致） ----
+// doc/spec は UTF-8 テキスト。CRLF↔LF の改行差はドリフト（内容変化）ではないため、
+// ハッシュ前に改行を LF へ正規化する。これにより core.autocrlf=true の Windows
+// 作業コピー（CRLF）でも、git 格納・CI チェックアウト（LF）でも同一ハッシュになり、
+// 改行コード差による誤検出（ローカル成功・CI 失敗の乖離）を防ぐ。
 export function sha256File(absPath) {
-  const buf = fs.readFileSync(absPath);
-  return crypto.createHash('sha256').update(buf).digest('hex');
+  const text = fs.readFileSync(absPath, 'utf8').replace(/\r\n?/g, '\n');
+  return crypto.createHash('sha256').update(text, 'utf8').digest('hex');
 }
 
 // ---- manual-sources.toml の最小パーサ ----
