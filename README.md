@@ -3,11 +3,10 @@
 # pasta
 Memories of pasta twine together—now and then a knot, yet always a delight.
 
-
-
 <br clear="both">
 
-## Pasta DSL サンプル
+**pasta** は「伺か」などのデスクトップマスコット、あるいはノベルゲーム向けの対話スクリプトエンジン／SHIORI.DLL です。
+日本語フレンドリーな全角マーカー、前方一致によるランダム選択、Lua ランタイムによる拡張性を特徴とします。
 
 ```pasta
 ＊OnBoot
@@ -19,135 +18,65 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 　　　　　：ようこそ！一緒に楽しもうね。
 ```
 
-> **Pasta** は里々/Ren'Pyにインスパイアされた対話スクリプト言語/SHIORI.DLLです。
-> 日本語フレンドリーな全角マーカー、前方一致によるランダム選択、Luaランタイムによる拡張性を特徴とします。
-> 上のサンプルのように、シンプルな記述で自然な対話を実現できます。
+---
+
+## 📖 ゴーストを作りたい方へ — 利用者マニュアル
+
+### 👉 **[pasta 利用者マニュアル](https://ekicyou.github.io/pasta/)**
+
+Pasta DSL の文法、Lua API/コーディング、ゼロからの入門チュートリアルを、**日本語で検索可能な単一サイト**にまとめています。
+ゴースト作者の方は、まずこちらからどうぞ。
+
+> 以前 `GRAMMAR.md` や `doc/spec/` に分散していた利用者向けの知識は、上記マニュアルへ集約しました。
+> この README は、pasta **本体の開発**に関わる方のための入口です。
 
 ---
 
-## 関連ドキュメント
+## 🛠️ 開発者・コントリビュータの方へ
 
-| ドキュメント             | 説明                                                         |
-| ------------------------ | ------------------------------------------------------------ |
-| [GRAMMAR.md](GRAMMAR.md) | Pasta DSL 文法リファレンス（学習用クイックガイド）           |
-| [doc/spec/](doc/spec/)   | Pasta DSL 正式言語仕様書（章別分割、実装判断の権威的ソース） |
-| [AGENTS.md](AGENTS.md)   | AI開発支援ドキュメント（Kiro仕様駆動開発）                   |
+pasta 本体（パーサ・トランスパイラ・ランタイム）の開発に関わる方向けの入口です。
 
-## アーキテクチャ
+### ドキュメント
 
-Pastaは、「伺か」などのデスクトップマスコットアプリケーション、あるいはノベルゲーム用途に向いたスクリプトエンジンです。
+| ドキュメント | 説明 |
+| ------------ | ---- |
+| [doc/spec/](doc/spec/) | Pasta DSL 正式言語仕様（章別分割・実装判断の**権威的ソース**） |
+| [GRAMMAR.md](GRAMMAR.md) | 文法クイックリファレンス（開発時の手元参照用） |
+| [CLAUDE.md](CLAUDE.md) | AI 開発支援・Kiro 仕様駆動開発の概要（プロジェクト指示・コマンド一覧） |
+| [SOUL.md](SOUL.md) | コアバリュー・設計原則 |
+| [.kiro/steering/](.kiro/steering/) | プロジェクト構造・技術スタック・開発ワークフローのステアリング |
 
-### レイヤー構成
+### クレート構成
+
+| クレート | 役割 |
+| -------- | ---- |
+| [pasta_dsl](crates/pasta_dsl/README.md) | DSL パーサー（Pest PEG → AST） |
+| [pasta_core](crates/pasta_core/README.md) | レジストリ・ユーティリティ（言語非依存層） |
+| [pasta_lua](crates/pasta_lua/README.md) | Lua トランスパイラ・ランタイム（2-pass） |
+| [pasta_shiori](crates/pasta_shiori/README.md) | SHIORI DLL 統合 |
+
+レイヤー構成:
 
 ```
 Engine (上位API) → Cache/Loader
     ↓
 Transpiler (2pass) ← Parser (pasta_dsl, Pest)
     ↓
-Runtime (Lua VM) → IR Output (ScriptEvent)
+Runtime (LuaJIT VM) → IR Output (ScriptEvent)
 ```
 
-### パーサー/トランスパイラーアーキテクチャ
+### クイックスタート
 
-Pastaは現行の `parser` + `transpiler` スタックを使用しています：
-
-| モジュール              | 文法ファイル   | 状態     | 用途                  |
-| ----------------------- | -------------- | -------- | --------------------- |
-| `pasta_dsl::parser`     | `grammar.pest` | **現行** | DSL→AST変換           |
-| `pasta_lua::transpiler` | -              | **現行** | 2-pass トランスパイル |
-
-#### 使用方法
-
-```rust
-// 現行スタック
-use pasta_dsl::parser::{parse_str, parse_file};
-use pasta_lua::transpiler::Transpiler;
-```
-
-### parserについて
-
-`parser`モジュールは、独立クレート `pasta_dsl` として提供され、`grammar.pest`文法に基づいています。
-
-主な特徴：
-- 3層スコープ構造：`FileScope` ⊃ `GlobalSceneScope` ⊃ `LocalSceneScope`
-- 未名グローバルシーンの自動名前継承
-- 全角/半角数字の自動正規化
-- 継続行アクション（`：`で始まる行）のサポート
-
----
-
-## ドキュメントマップ
-
-### Level 0: Entry Point
-- [README.md](README.md) - プロジェクト概要（このドキュメント）
-
-### Level 1: Core Docs
-- [GRAMMAR.md](GRAMMAR.md) - Pasta DSL 文法リファレンス
-- [doc/spec/](doc/spec/) - 言語仕様書（章別分割、権威的ソース）
-- [AGENTS.md](AGENTS.md) - AI開発支援ドキュメント
-
-### Level 2: Crate Docs
-- [pasta_dsl/README.md](crates/pasta_dsl/README.md) - DSLパーサー
-- [pasta_core/README.md](crates/pasta_core/README.md) - レジストリ・ユーティリティ
-- [pasta_lua/README.md](crates/pasta_lua/README.md) - Luaトランスパイラ
-- [pasta_shiori/README.md](crates/pasta_shiori/README.md) - SHIORI DLL統合
-
-### Level 3: Steering
-- [.kiro/steering/](.kiro/steering/) - AI/仕様駆動開発コンテキスト
-
-### 開発者向けリソース
-- [crates/pasta_lua/tests/fixtures/](crates/pasta_lua/tests/fixtures/) - テストフィクスチャ
-
----
-
-## オンボーディングパス
-
-### DSLユーザー向け（推定所要時間: 30分）
-1. [GRAMMAR.md](GRAMMAR.md) - 基本文法を学ぶ
-2. [crates/pasta_lua/tests/fixtures/sample.pasta](crates/pasta_lua/tests/fixtures/sample.pasta) - サンプルスクリプト
-3. [クイックスタート](#クイックスタート) - ビルド・実行方法
-4. [pasta DSL vscode拡張](https://marketplace.visualstudio.com/items?itemName=ekicyou.pasta-vscode) - pasta構文 vscode拡張
-
-### 開発者向け（推定所要時間: 2-3時間）
-1. [doc/spec/](doc/spec/) - 言語仕様の理解（必要な章のみ）
-2. [pasta_dsl/README.md](crates/pasta_dsl/README.md) - DSLパーサー
-3. [pasta_core/README.md](crates/pasta_core/README.md) - レジストリ
-3. [.kiro/steering/structure.md](.kiro/steering/structure.md) - プロジェクト構造
-4. [.kiro/steering/workflow.md](.kiro/steering/workflow.md) - 開発ワークフロー
-
-### AI開発支援向け（推定所要時間: 1時間）
-1. [AGENTS.md](AGENTS.md) - AI開発支援概要
-2. [.kiro/steering/](.kiro/steering/) - ステアリングファイル群
-3. [doc/spec/README.md](doc/spec/README.md) - 正式仕様（章別インデックス）
-
----
-
-## クイックスタート
-
-### 前提条件
-- Rust 2024 edition
-- cargo
-
-### ビルド
 ```bash
-cargo build --workspace
+cargo build --workspace   # ビルド
+cargo test --workspace    # テスト
 ```
 
-### テスト
-```bash
-cargo test --workspace
-```
+前提: Rust 2024 edition / cargo。詳しいプロジェクト構造は [.kiro/steering/structure.md](.kiro/steering/structure.md) を参照してください。
 
-### プロジェクト構造
-```
-pasta/
-├── crates/
-│   ├── pasta_dsl/     # DSLパーサー（Pest PEG → AST）
-│   ├── pasta_core/    # レジストリ・ユーティリティ（言語非依存層）
-│   ├── pasta_lua/     # Luaトランスパイラ・ランタイム
-│   └── pasta_shiori/  # SHIORI DLL統合
-└── tests/             # 統合テスト・フィクスチャ
-```
+### エディタ拡張
+
+- [Pasta DSL VSCode 拡張](https://marketplace.visualstudio.com/items?itemName=ekicyou.pasta-vscode) — 構文ハイライト・LSP 連携
 
 ---
 

@@ -52,6 +52,11 @@ LuaJIT 独自の拡張（`goto`/ラベルや一部の 5.2 互換機能など）�
 なお、Pasta DSL の厳密な文法仕様は本リポジトリの `doc/spec/` が権威的ソースである。
 本マニュアルは利用者向けにかみ砕いた説明と例を提供し、厳密な定義の所在は各文法章からのリンクで示す。
 
+> **リポジトリ・開発者向け情報**
+> pasta 本体のソースコード・ビルド方法・正式言語仕様などの開発者向け情報は、GitHub リポジトリ
+> [ekicyou/pasta](https://github.com/ekicyou/pasta) にまとまっている。あわせて
+> [README](https://github.com/ekicyou/pasta/blob/main/README.md) も参照されたい。
+
 ---
 
 準備はよろしくて？ どこから読み始めても構いませんけれど、ゴーストづくりが初めてなら、
