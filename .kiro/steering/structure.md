@@ -201,9 +201,10 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       └── wasm/             # pasta_lsp WASMバイナリ（ビルド生成物）
 ├── book/                     # 利用者マニュアル（mdBook・GitHub Pages 公開）
 │   ├── book.toml            # mdBook 設定（language=ja, 検索有効, site-url）
+│   ├── package.json         # book ツールの npm 依存（vscode-textmate/oniguruma/jsdom・lockfile コミット・node_modules 非コミット）
 │   ├── src/                 # 章ソース（grammar/lua/getting-started/reference）
-│   ├── theme/head.hbs       # 日本語 bigram 検索のクエリ tokenizer override
-│   ├── tools/               # build-time Node（bigram 索引再生成・drift-check 等）
+│   ├── theme/head.hbs       # 日本語 bigram 検索 tokenizer ＋ pasta ハイライト中和の override
+│   ├── tools/               # build-time Node（bigram 索引再生成・drift-check・pasta 構文ハイライト 等）
 │   ├── manual-sources.toml  # ドリフト検出マッピング（doc/spec 由来追跡）
 │   └── book/                # mdbook build 生成物（.gitignore 済み・CI で再生成）
 ├── .kiro/                    # Kiro Spec-Driven設定

@@ -192,7 +192,7 @@ cargo test -p pasta_lua     # pasta_luaテスト
   - Rust キャッシュ: `Swatinem/rust-cache@v2`
   - アーティファクト: `pasta-dll-x86`, `pasta-dll-x64`（7日間保持）
 - **GitHub Actions**: `.github/workflows/manual.yml`（利用者マニュアル公開・build.yml と独立）
-  - `book/**` 変更時に起動。mdbook build → bigram 索引再生成 → drift-check → tutorial-check → cargo test 構文ガード → GitHub Pages デプロイ
+  - `book/**` 変更時に起動。npm ci(book) → mdbook build → pasta 構文ハイライト → bigram 索引再生成 → drift-check → tutorial-check → cargo test 構文ガード → GitHub Pages デプロイ
   - permissions: `pages: write` / `id-token: write` / `contents: read`。Pages 初回は repo Settings で手動有効化が必要
 
 ## 利用者マニュアル（ドキュメントサイト `book/`）
@@ -202,6 +202,7 @@ cargo test -p pasta_lua     # pasta_luaテスト
 - **mdBook v0.5.3**: Markdown → 静的 HTML/CSS/JS。生成物 `book/book/` は `.gitignore` 済み（CI で再生成）
 - **日本語 bigram 検索**: build-time Node スクリプト（`book/tools/bigram-index/`）が mdBook 同梱 elasticlunr 索引を 2-gram で再生成。索引ビルダとクエリ側（`theme/head.hbs`）が単一 `tokenize.mjs` を共有（不一致は検索破綻）
 - **ドリフト検出ゲート**: `book/tools/drift-check.mjs` が `book/manual-sources.toml` の版マーカー（**改行 LF 正規化 sha256**・git 非依存）で文法章と `doc/spec/` の乖離を検出。`workflow.md` DoD の条件付き「Manual Sync Gate」と結線し、未解決ドリフトで完了を中断
+- **pasta 構文ハイライト**: build-time Node スクリプト（`book/tools/highlight/`）が VSCode TextMate 文法（`editors/vscode` の SSOT・読み取り再利用）で `language-pasta` ブロックをトークナイズし highlight.js 互換クラスの span を静的 HTML へ焼き込む（決定論・冪等・入れ子 lua は vendor 文法で二段トークナイズ）。`theme/head.hbs` が book.js の無条件再ハイライトを中和し事前 span を保持（正準 `neutralizer.mjs` の逐語ミラー）。`book/` 初の npm devDependency（`vscode-textmate`/`vscode-oniguruma`/`jsdom`・`package-lock.json` コミット・`node_modules` 非コミット・CI は `npm ci`）。WASM は build-time のみで公開成果物にランタイム依存を持ち込まない
 - **正の分離**: 利用者向け知識はマニュアルが正、`doc/spec/` は文法の権威ソース、README は開発者向けの入口
 
 ## Luaランタイムパターン
