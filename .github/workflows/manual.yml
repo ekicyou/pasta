@@ -40,6 +40,12 @@ jobs:
         with:
           node-version: '20'
 
+      # build-time devDependency（vscode-textmate 等）を lockfile から厳密インストール。
+      # npm ci＝決定論的インストール（要件 6.4）。working-directory は book（book/package.json）。
+      - name: Install book build deps (npm ci)
+        working-directory: book
+        run: npm ci
+
       - name: Setup mdBook
         uses: peaceiris/actions-mdbook@v2
         with:
@@ -47,6 +53,13 @@ jobs:
 
       - name: Build manual (mdBook)
         run: mdbook build book
+
+      # mdbook build の直後に pasta コードブロックを TextMate 文法で着色する（要件 7.1）。
+      # language-pasta ブロックに hljs 互換 span を焼き込む。bigram 索引（searchindex-*.js）
+      # とはファイル非競合だが可読性のため bigram の前段に配置（要件 7.2）。
+      # 失敗時 exit 1 でビルド中断＝公開前に止まる。出力先は book/book（mdBook 既定）。
+      - name: Highlight pasta code blocks
+        run: node book/tools/highlight/highlight-html.mjs book/book
 
       # mdbook build の後段で検索インデックスを日本語 bigram へ再生成する（要件 1.4）。
       # 失敗時 exit 1 でビルド中断。出力先は book/book（mdBook 既定）。

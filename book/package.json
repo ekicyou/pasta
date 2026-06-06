@@ -1,0 +1,12 @@
+{
+    "name": "pasta-manual-build",
+    "version": "0.0.0",
+    "private": true,
+    "description": "Build-time tooling for the pasta user manual (mdBook): TextMate-based syntax highlighting for *.pasta code blocks.",
+    "license": "MIT",
+    "devDependencies": {
+        "jsdom": "^25.0.0",
+        "vscode-oniguruma": "^2.0.0",
+        "vscode-textmate": "^9.0.0"
+    }
+}

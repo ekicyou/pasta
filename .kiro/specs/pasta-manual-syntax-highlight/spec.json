@@ -1,0 +1,22 @@
+{
+  "feature_name": "pasta-manual-syntax-highlight",
+  "created_at": "2026-06-05T11:58:51Z",
+  "updated_at": "2026-06-05T13:00:00Z",
+  "language": "ja",
+  "phase": "tasks-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true
+}
