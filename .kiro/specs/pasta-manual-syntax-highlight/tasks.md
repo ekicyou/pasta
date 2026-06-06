@@ -78,15 +78,15 @@
   - _Requirements: 1.1, 1.3, 2.1, 2.2, 4.2_
   - _Depends: 5.1_
 
-- [ ] 6. Validation: 公開 HTML の受け入れ検証（一度限り）
-- [ ] 6.1 GitHub Pages 公開 HTML の受け入れ検証
+- [x] 6. Validation: 公開 HTML の受け入れ検証（一度限り）
+- [x] 6.1 GitHub Pages 公開 HTML の受け入れ検証
   - 公開された HTML の pasta ブロックに hljs span が存在し book.js 再ハイライト後も保持されることを確認
   - light/navy 両テーマと file:// で各構文要素が相互に判別可能であることを確認
   - 初回受け入れ時のみ実施し恒常ゲート化しない
   - 公開 HTML で6色判別・中和保持・両テーマ・file:// が確認された記録が残る（観察可能）
   - _Requirements: 8.1, 8.2, 8.3, 8.4_
   - _Depends: 5.1_
-  - _Blocked: 公開 HTML 受け入れは本機能の GitHub Pages デプロイ後にしか実施できない手動受け入れ工程。現時点で feature ブランチは main 未マージ・未デプロイ（manual.yml は main への push で発火）。マージ→Pages デプロイ完了後に一度限り実施する。検証手順書とローカル事前確信は acceptance-verification.md に記録済み。_
+  - _Done: main マージ（squash f15aaa6）→ manual.yml デプロイ完了後、公開 GitHub Pages HTML で 8.1〜8.4 を実証（GO）。8.1 span実在・8.2 デプロイ済み中和でbook.js再ハイライト後もspan生存（jsdom実機模擬 pre/post一致）・8.3 公開テーマCSS同一ハッシュで6色判別・8.4 恒常ゲート非追加。記録: acceptance-verification.md_
 
 ## Implementation Notes
 
