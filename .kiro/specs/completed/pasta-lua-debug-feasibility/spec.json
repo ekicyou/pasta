@@ -1,0 +1,37 @@
+{
+  "feature_name": "pasta-lua-debug-feasibility",
+  "created_at": "2026-06-07T00:00:00Z",
+  "updated_at": "2026-06-07T09:00:00Z",
+  "completed_at": "2026-06-07T09:00:00Z",
+  "language": "ja",
+  "phase": "completed",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    },
+    "implementation": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true,
+  "implementation": {
+    "completed": true,
+    "tasks_total": 11,
+    "tasks_completed": 11,
+    "validation": "GO",
+    "verdict_tier": "GoPlus",
+    "approved_by_user": true,
+    "merged_to_main": true,
+    "notes": "全11サブタスク完了・全独立レビュー通過・/kiro-validate-impl=GO・cargo test --all 緑。PoC段階的判定=GO+（R1〜R4全成立）。検証結果はresearch.md「PoC検証結果」節。検証コード(feature lua-debug-poc)はpasta-vscode-lua-debugの本番移行完了時に除去予定(同brief.md完了条件)。kiro-spec-completeでcompletedへアーカイブ・squash経由でmainへ同期。"
+  }
+}

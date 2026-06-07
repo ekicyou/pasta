@@ -70,3 +70,24 @@ pasta ゴースト作者向けの利用者マニュアルを、mdBook で**サ�
 ### 将来仕様（Phase 4 派生・未着手）
 - [ ] pasta-runtime-internals-doc -- pasta Lua ランタイムの内部設計・アーキテクチャ解説（2パストランスパイル / yield-resume コルーチン / シーン検索 / ローダ自己展開 / SHIORI 非同期基盤）。読者＝コントリビュータ・実装理解者（利用者マニュアルとは読者層が異なる別境界）。Dependencies: pasta-user-manual
   - 由来: pasta-user-manual の設計ディスカッションで「ランタイム内部設計は本仕様外・将来仕様」と決定（R5 は API 使用法に限定）
+
+## Phase 5: VSCode Lua デバッグ連携
+
+VSCode から pasta（最終的に .pasta ソースレベル）をステップ実行・ブレーク・変数監視できるデバッグ環境を構築する。
+組込 LuaJIT（mlua vendored 静的リンク）に対し、**依存を最小化しトランスポート（ソケット）を Rust 側で提供する「プレーン実装」**を採る（luasocket 等の C モジュール .dll に依存しない）。デバッグ基盤は pasta_lua に内蔵し、SHIORI 以外の pasta ホストでも再利用可能にする。
+
+### アプローチ決定（Phase 5）
+- **採用**: Rust ホスト型 DAP バックエンド（LRDB 型）。`std::net::TcpListener` でトランスポート、`serde_json`（既存依存）で DAP 最小サブセットを手書き、`mlua::Lua::set_global_hook` ＋ `jit.off(true,true)` でフック。別スレッド I/O ↔ VM スレッドフックのチャネル分離。
+- **理由**: 静的リンク LuaJIT は外部 C モジュール（luasocket/emmy_core/remotedebug）を `require` できない構造的制約があるため、トランスポートを Rust が握ることでこの問題を根本回避。依存最小・サンドボックス（`std_debug` 非露出）維持・将来の非 SHIORI ホスト再利用が同時に成立。構造が一致する実在前例（satoren/LRDB、actboy168/lua-debug の LuaJIT 対応）あり。
+- **却下**: 
+  - devCAT vscode-lua-debug 完成路線（同梱 vscode-debuggee.lua + luasocket）— C .dll ロード可否が静的リンクで不透明・依存が増える
+  - lua-debug(actboy168) / EmmyLua への載せ替え — remotedebug.dll/emmy_core.dll の C モジュール依存が同じ壁
+  - MobDebug + ZeroBrane — DAP 非準拠・luasocket 依存
+
+### ゲート方針
+- **実装仕様は検証仕様の GO 判定を前提とする**。「実装前に可否判断を完結」のため、検証仕様で唯一の本丸（jit.off ＋ set_global_hook が LuaJIT の動的生成シーンコルーチンでラインフックを撃つか／フック内ブロッキング停止・再開／フック内変数 inspect）を最小 PoC で実証してから実装へ進む。
+- 検証仕様は開始時に専用ブランチを切り、検証コードは使い捨て/feature-gate とする。
+
+### Specs (dependency order)
+- [x] pasta-lua-debug-feasibility -- Rust ホスト型デバッグ方式の go/no-go を最小 PoC で確定（jit.off + set_global_hook の LuaJIT 実発火・フック内ブロッキング停止/再開・フック内変数 inspect）。**判定 = GO+（R1〜R4 全成立・2026-06-07）**。検証コードは feature `lua-debug-poc`（使い捨て・default 無効）。Dependencies: none
+- [ ] pasta-vscode-lua-debug -- Rust ホスト型 DAP デバッグバックエンド（std::net + serde_json）＋ .pasta ソースマップ（code_gen）＋ VSCode 拡張統合＋旧 luasocket 資産撤去。Dependencies: pasta-lua-debug-feasibility（**= GO+ 達成済み**・着手可）
