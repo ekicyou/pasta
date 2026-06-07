@@ -12,6 +12,8 @@ local specs = {
     "act_impl_call_test",                -- ACT_IMPL.call 4段階検索テスト
     "act_test",                          -- pasta.act トークンバッファリファクタリング tests
     "act_grouping_test",                 -- pasta.act グループ化機能 tests (actor-talk-grouping)
+    "buf_test",                          -- pasta.buf バッファ抽象（new/new_fallback/backend）テスト (sakura-builder-string-buffer)
+    "lua_version_test",                  -- pasta.lua_version ランタイム版整数取得テスト (sakura-builder-string-buffer)
     "sakura_builder_test",               -- pasta.shiori.sakura_builder トークン変換テスト
     "shiori_act_test",                   -- pasta.shiori.act さくらスクリプトビルダーテスト
     "virtual_dispatcher_spec",           -- OnTalk/OnHour virtual event dispatcher tests

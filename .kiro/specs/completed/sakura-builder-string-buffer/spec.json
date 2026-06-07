@@ -1,0 +1,23 @@
+{
+  "feature_name": "sakura-builder-string-buffer",
+  "created_at": "2026-06-07T04:39:05Z",
+  "updated_at": "2026-06-07T07:45:32Z",
+  "completed_at": "2026-06-07T07:45:32Z",
+  "language": "ja",
+  "phase": "completed",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true
+}

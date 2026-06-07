@@ -8,6 +8,7 @@ local BUILDER = {}
 
 local SAKURA_SCRIPT = require "@pasta_sakura_script"
 local log = require "@pasta_log"
+local buf = require("pasta.buf")
 
 --- \q[display,target] 内のデリミタ文字をエスケープ
 --- @param s string エスケープ対象の文字列
@@ -57,7 +58,7 @@ end
 function BUILDER.build(grouped_tokens, config, input_actor_spots)
     config = config or {}
     local spot_newlines = config.spot_newlines or 1.5
-    local buffer = {}
+    local buffer = (config.buffer_factory or buf.new)()
 
     -- input_actor_spots を直接変更する（nilの場合は内部で空テーブルを作成）
     local actor_spots = input_actor_spots or {}
@@ -97,10 +98,10 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots)
                 -- spot変更時に段落区切り改行を出力
                 if last_spot ~= nil and last_spot ~= spot then
                     local percent = math.floor(spot_newlines * 100)
-                    table.insert(buffer, string.format("\\n[%d]", percent))
+                    buffer:put(string.format("\\n[%d]", percent))
                 end
 
-                table.insert(buffer, spot_to_tag(spot))
+                buffer:put(spot_to_tag(spot))
                 last_actor = actor
                 last_spot = spot
             end
@@ -110,37 +111,38 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots)
                 local inner_type = inner.type
 
                 if inner_type == "talk" then
-                    table.insert(buffer, SAKURA_SCRIPT.talk_to_script(actor, inner.text))
+                    buffer:put(SAKURA_SCRIPT.talk_to_script(actor, inner.text))
                 elseif inner_type == "sakura_script" then
-                    table.insert(buffer, SAKURA_SCRIPT.talk_to_script(actor, inner.text))
+                    buffer:put(SAKURA_SCRIPT.talk_to_script(actor, inner.text))
                 elseif inner_type == "surface" then
-                    table.insert(buffer, string.format("\\s[%s]", tostring(inner.id)))
+                    buffer:put(string.format("\\s[%s]", tostring(inner.id)))
                 elseif inner_type == "wait" then
-                    table.insert(buffer, string.format("\\w[%d]", inner.ms))
+                    buffer:put(string.format("\\w[%d]", inner.ms))
                 elseif inner_type == "newline" then
                     for _ = 1, inner.n do
-                        table.insert(buffer, "\\n")
+                        buffer:put("\\n")
                     end
                 elseif inner_type == "clear" then
-                    table.insert(buffer, "\\c")
+                    buffer:put("\\c")
                 elseif inner_type == "raw_script" then
-                    table.insert(buffer, inner.text)
+                    buffer:put(inner.text)
                 elseif inner_type == "choice" then
                     local d = escape_choice(inner.display)
                     local t = escape_choice(inner.target)
-                    table.insert(buffer, "\\![*]\\q[" .. d .. "," .. t .. "]")
+                    buffer:put("\\![*]\\q[" .. d .. "," .. t .. "]")
                 elseif inner_type == "choice_timeout" then
                     local ms = inner.seconds and math.floor(inner.seconds * 1000) or 0
-                    table.insert(buffer, "\\![set,choicetimeout," .. ms .. "]")
+                    buffer:put("\\![set,choicetimeout," .. ms .. "]")
                 end
                 -- yield は無視
             end
         elseif t == "raw_script" then
-            table.insert(buffer, token.text)
+            buffer:put(token.text)
         end
     end
 
-    return table.concat(buffer) .. "\\e"
+    buffer:put("\\e")
+    return buffer:tostring()
 end
 
 return BUILDER

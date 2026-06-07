@@ -733,6 +733,61 @@ pasta.word レジストリ  → collect_words()  → WordDefRegistry ┘
 
 ---
 
+## ユーティリティモジュール
+
+### pasta.buf
+
+`pasta.buf` — 文字列連結用バッファ抽象。LuaJIT String Buffer Library（`string.buffer`）を採用し、不在環境では最小実装へフォールバックする。`sakura_builder` 等での高速な文字列組み立てに使用する。
+
+```lua
+local buf = require("pasta.buf")
+```
+
+| API                  | 説明                                                                       |
+| -------------------- | -------------------------------------------------------------------------- |
+| `buf.new()`          | バッファ生成。LuaJIT 利用時はネイティブ `string.buffer`、不在時は最小実装   |
+| `buf.backend`        | 採用バックエンド種別（`"luajit"` / `"fallback"`）                          |
+| `buf.new_fallback()` | 最小実装バッファを明示生成（環境非依存のテスト用 seam）                     |
+
+バッファオブジェクトのメソッド:
+
+| メソッド             | 説明                                            |
+| -------------------- | ----------------------------------------------- |
+| `buffer:put(s)`      | 文字列を追記し `self` を返す（メソッドチェーン可） |
+| `buffer:tostring()`  | 追記順に連結した文字列を返す（非破壊）          |
+
+```lua
+local b = buf.new()
+b:put("Hello"):put(", "):put("World")
+local s = b:tostring()  -- "Hello, World"
+```
+
+> **採用方針**: ネイティブ object をラップせず生成関数を直束縛するため、LuaJIT 利用時の間接オーバーヘッドはゼロ。`backend == "luajit"` なら高速パス採用。`pcall(require, "string.buffer")` で安全に検出し、不在時も例外を送出しない。
+
+### pasta.lua_version
+
+`pasta.lua_version` — 実行中ランタイム（標準Lua / LuaJIT）の種別とバージョンを単一整数で返す。`_VERSION`（LuaJIT でも `"Lua 5.1"` を返すため判別不能）に依存せず、`rawget(_G, "jit")` の有無で LuaJIT を判定する。
+
+```lua
+local lua_version = require("pasta.lua_version")
+local v = lua_version.get()
+```
+
+| 戻り値 | 意味                                                       |
+| ------ | ---------------------------------------------------------- |
+| `1xy`  | 標準 Lua x.y（例: `154` = Lua 5.4、`155` = Lua 5.5）        |
+| `2xy`  | LuaJIT x.y（例: `220` = LuaJIT 2.0、`221` = LuaJIT 2.1）    |
+
+`>= 200` なら LuaJIT。例外を送出せず常に整数を返す。
+
+```lua
+if lua_version.get() >= 200 then
+    -- LuaJIT 固有機能（string.buffer 等）が利用可能
+end
+```
+
+---
+
 ## 関連リファレンス
 
 - [runtime-api.md](runtime-api.md) — `@pasta_search` の完全APIシグネチャ、`@pasta_persistence` の設定詳細

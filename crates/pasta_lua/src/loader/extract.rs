@@ -28,7 +28,7 @@
 //! ファイルには一切触れない（Req 2.5）。展開物は解凍済みの生テキストとして配置する（Req 2.6）。
 
 use std::io::{Cursor, Read};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -233,6 +233,7 @@ fn zip_io_error(e: zip::result::ZipError) -> std::io::Error {
 mod tests {
     use super::*;
     use std::collections::BTreeMap;
+    use std::path::PathBuf;
     use std::time::SystemTime;
 
     /// 指定ディレクトリ配下の全ファイルの (相対パス, 内容バイト, mtime) スナップショットを取る。
