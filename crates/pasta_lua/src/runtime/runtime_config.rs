@@ -3,6 +3,7 @@
 //! RuntimeConfig controls which Lua standard libraries and mlua-stdlib modules
 //! are enabled in the PastaLuaRuntime.
 
+use crate::debug::{DebugConfig, DebugFileConfig};
 use crate::error::ConfigError;
 use crate::loader::{LuaConfig, default_libs};
 use mlua::{Function, Lua, Result as LuaResult, StdLib, Value};
@@ -48,6 +49,17 @@ pub struct RuntimeConfig {
     /// Valid mlua-stdlib modules:
     /// - `assertions`, `testing`, `env`, `regex`, `json`, `yaml`
     pub libs: Vec<String>,
+
+    /// Resolved debug backend configuration (task 4.2 — single enable choke point).
+    ///
+    /// This is the ONE place the runtime VM init reads to decide whether to call
+    /// [`crate::debug::enable`]. It defaults to **disabled** (`enabled = false`,
+    /// `listen = None`), so every existing `RuntimeConfig` constructor
+    /// (`new`/`minimal`/`full`/`from_libs`/`From<LuaConfig>`) is zero-cost: no
+    /// hook, no port, no `std_debug` exposure (R5.2 / R5.3 / R5.5). The loader
+    /// path overrides this via [`with_debug`](Self::with_debug) after resolving
+    /// pasta.toml `[debug]` + the `PASTA_DEBUG`/`PASTA_DEBUG_PORT` environment.
+    pub debug: DebugConfig,
 }
 
 impl RuntimeConfig {
@@ -59,6 +71,7 @@ impl RuntimeConfig {
     pub fn new() -> Self {
         Self {
             libs: default_libs(),
+            debug: DebugConfig::default(),
         }
     }
 
@@ -76,6 +89,7 @@ impl RuntimeConfig {
                 "json".into(),
                 "yaml".into(),
             ],
+            debug: DebugConfig::default(),
         }
     }
 
@@ -87,12 +101,40 @@ impl RuntimeConfig {
     pub fn minimal() -> Self {
         Self {
             libs: vec!["std_all".into()],
+            debug: DebugConfig::default(),
         }
     }
 
     /// Create a configuration from a custom libs array.
     pub fn from_libs(libs: Vec<String>) -> Self {
-        Self { libs }
+        Self {
+            libs,
+            debug: DebugConfig::default(),
+        }
+    }
+
+    /// Attach a resolved [`DebugConfig`] to this configuration (builder).
+    ///
+    /// Used by the loader path (`PastaLuaRuntime::from_loader_with_scene_dic`) to
+    /// set the debug gate from pasta.toml `[debug]` + the environment, and by
+    /// tests to enable the backend. When `debug.enabled` is `false` this is a
+    /// no-op relative to the zero-cost default. Returns `self` for chaining.
+    pub fn with_debug(mut self, debug: DebugConfig) -> Self {
+        self.debug = debug;
+        self
+    }
+
+    /// Resolve and attach the debug gate from a pasta.toml `[debug]` section plus
+    /// the process environment (`PASTA_DEBUG` / `PASTA_DEBUG_PORT`).
+    ///
+    /// This is the loader-side bridge the design calls `DebugConfig::from_runtime`
+    /// (design "DebugConfig & Gate"): it funnels the file `[debug]` config and the
+    /// environment through the single pure [`DebugConfig::resolve`] choke point and
+    /// stores the result on `self.debug`. Precedence (env overrides file overrides
+    /// defaults) and the `listen = None` when disabled invariant are owned by
+    /// `resolve`. Returns `self` for chaining.
+    pub fn with_debug_from_file_and_env(self, file: Option<&DebugFileConfig>) -> Self {
+        self.with_debug(DebugConfig::from_env(file))
     }
 
     /// Convert libs array to mlua::StdLib flags.
@@ -235,7 +277,10 @@ impl Default for RuntimeConfig {
 
 impl From<LuaConfig> for RuntimeConfig {
     fn from(config: LuaConfig) -> Self {
-        Self { libs: config.libs }
+        Self {
+            libs: config.libs,
+            debug: DebugConfig::default(),
+        }
     }
 }
 

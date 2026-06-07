@@ -31,8 +31,8 @@ mod extract;
 
 pub use cache::{CURRENT_VERSION, CacheManager};
 pub use config::{
-    LoaderConfig, LoggingConfig, LuaConfig, PastaConfig, PersistenceConfig, TalkConfig,
-    default_libs, default_log_file_path, default_lua_search_paths,
+    DebugFileConfig, LoaderConfig, LoggingConfig, LuaConfig, PastaConfig, PersistenceConfig,
+    TalkConfig, default_debug_port, default_libs, default_log_file_path, default_lua_search_paths,
 };
 pub use context::LoaderContext;
 pub use error::{LoaderError, TranspileFailure};

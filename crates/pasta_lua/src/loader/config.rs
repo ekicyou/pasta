@@ -107,6 +107,14 @@ impl PastaConfig {
         self.get_custom_config("talk")
     }
 
+    /// Get debug configuration from [debug] section.
+    ///
+    /// Returns `None` if the `[debug]` section is absent. When present, missing
+    /// fields fall back to their serde defaults (`enabled = false`, `port = 9276`).
+    pub fn debug(&self) -> Option<DebugFileConfig> {
+        self.get_custom_config("debug")
+    }
+
     /// Create from TOML string.
     #[allow(
         clippy::should_implement_trait,
@@ -412,4 +420,44 @@ impl Default for TalkConfig {
             chars_line_end_prohibited: "（［｛「『([{｢".into(),
         }
     }
+}
+
+/// Debug configuration from `[debug]` section in pasta.toml.
+///
+/// Controls the Rust-hosted DAP debug backend embedded in pasta_lua.
+/// Both fields default conservatively so that omitting the section (or the
+/// whole file) keeps debugging OFF and the production path zero-cost.
+///
+/// Runtime resolution combines this file config with the `PASTA_DEBUG` /
+/// `PASTA_DEBUG_PORT` environment variables — see [`crate::debug::DebugConfig`].
+///
+/// # Examples
+///
+/// ```toml
+/// [debug]
+/// enabled = true   # default: false
+/// port = 9276      # default: 9276
+/// ```
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct DebugFileConfig {
+    /// Enable the debug backend. Default: `false`.
+    pub enabled: bool,
+
+    /// TCP port the DAP listener binds to when enabled. Default: `9276`.
+    pub port: u16,
+}
+
+impl Default for DebugFileConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            port: default_debug_port(),
+        }
+    }
+}
+
+/// Default debug listener port.
+pub const fn default_debug_port() -> u16 {
+    9276
 }

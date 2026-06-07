@@ -1,0 +1,1070 @@
+//! `DapAdapter`: the hand-written DAP minimal-subset translation layer (design
+//! "Transport & DapAdapter", requirements 3.2 / 3.3 / 3.4 / 3.5).
+//!
+//! # Role in the backend
+//!
+//! [`DapAdapter`] is the protocol layer that sits between the [`Transport`] wire
+//! boundary (raw [`serde_json::Value`] frames) and the protocol-independent
+//! [`DebugSession`]. It is PURE translation: it maps inbound DAP request JSON to
+//! [`SessionCommand`]s (plus any immediate DAP response), and maps
+//! [`SessionEvent`]s coming back from the session to the matching DAP
+//! response/event JSON. It owns NO Lua state, opens NO sockets, and never
+//! touches `mlua` — that separation is the whole point of the channel seam.
+//!
+//! [`Transport`]: crate::debug::transport
+//! [`DebugSession`]: crate::debug::session
+//!
+//! # Hand-written, dependency-minimal (design "依存最小")
+//!
+//! DAP messages are built and parsed by hand with the already-present
+//! `serde_json`. The `dap` crate (and any other heavy DAP dependency) is
+//! deliberately NOT used, keeping the supply chain and distribution size small.
+//!
+//! # DAP message envelopes
+//!
+//! - **Request** (inbound): `{"seq":N,"type":"request","command":"<cmd>","arguments":{…}}`.
+//! - **Response** (outbound): `{"seq":<out>,"type":"response","request_seq":<req
+//!   seq>,"success":true,"command":"<cmd>","body":{…}}` (the `body` is omitted
+//!   for bare acks).
+//! - **Event** (outbound, unsolicited): `{"seq":<out>,"type":"event","event":"<name>","body":{…}}`.
+//!
+//! The outgoing `seq` is a monotonic counter ([`DapAdapter::next_seq`]) shared by
+//! every response and event the adapter emits.
+//!
+//! # Deferred responses & `request_seq` correlation
+//!
+//! Several requests cannot be answered until the session replies with the
+//! corresponding [`SessionEvent`] (e.g. a `stackTrace` request becomes a
+//! [`SessionCommand::StackTrace`], and only later does
+//! [`SessionEvent::Stack`] arrive). The adapter records the originating request
+//! `seq` in a small FIFO [`PendingTable`], keyed by the event KIND the request
+//! will produce, so the deferred response carries the correct `request_seq`. The
+//! transport is a single ordered TCP stream, so a per-kind FIFO is sufficient to
+//! pair each event back to its request.
+//!
+//! # `frame_id` / `variablesReference` numbering (design "Implementation Notes")
+//!
+//! The adapter assigns these ids itself and maps them back; table deep-expansion
+//! is OUT OF SCOPE (all leaf variables report `variablesReference: 0`):
+//!
+//! - **`frame_id` = stack index** (0-based) as ordered in [`SessionEvent::Stack`].
+//!   A `scopes` request carries that `frameId` straight through into
+//!   [`SessionCommand::Scopes`].
+//! - **`variablesReference` = `frame_id + 1`** for the single synthetic `Locals`
+//!   scope of a frame. The `+ 1` keeps it non-zero (DAP reserves `0` for "no
+//!   children"), and it is trivially decoded back to the frame (`var_ref - 1`)
+//!   when a subsequent `variables` request arrives. A `variables` request passes
+//!   its `variablesReference` straight through into
+//!   [`SessionCommand::Variables`]; the session side owns the `var_ref -> frame`
+//!   decode. Note: this adapter emits the `Locals` scope itself from the frame
+//!   list rather than relying on the session's [`Scope`] handles, so the scheme
+//!   is self-contained and deterministic.
+//!
+//! # Error mapping (design "Event Contract": `output` optional)
+//!
+//! [`SessionEvent::Error`] is mapped to a DAP `output` event on the `stderr`
+//! category. This is a sane, non-fatal surfacing: the IDE shows the message in
+//! the debug console without aborting the session (a failed *response* would
+//! need a request to correlate to, which an asynchronous VM/FFI error does not
+//! have).
+
+#![allow(dead_code)]
+
+use std::collections::VecDeque;
+
+use serde_json::{Value, json};
+
+use crate::debug::types::{
+    ResolvedBreakpoint, Scope, SessionCommand, SessionEvent, SourceRef, StopReason, ThreadInfo,
+    Variable,
+};
+
+/// The DAP `source` presentation for one frame: the `source` JSON object and
+/// the (possibly remapped) line to report (design "SourceMapSeam", R4.3).
+///
+/// A [`SourceResolver`] returns this for a frame's `(lua_source, lua_line)`. The
+/// [default resolver](default_source_resolver) returns the generated `.lua`
+/// unchanged (`{ "path": <lua source> }`, `line = lua_line`); a future
+/// `pasta-source-map` resolver returns a `.pasta` path and the mapped `.pasta`
+/// line instead.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResolvedSource {
+    /// The DAP `source` object to embed in the stack frame (e.g.
+    /// `{ "path": "@scene.lua" }` or `{ "path": "scene.pasta" }`).
+    pub source: Value,
+    /// The line to report for the frame, after any source mapping.
+    pub line: u32,
+}
+
+/// The DAP-presentation source seam (design "SourceMapSeam", R4.3).
+///
+/// Maps a frame's generated `(lua_source, lua_line)` to the DAP [`ResolvedSource`]
+/// to present. Installed on a [`DapAdapter`] via
+/// [`set_source_resolver`](DapAdapter::set_source_resolver); the default is
+/// [`default_source_resolver`] (presents the generated `.lua` unchanged, R4.3
+/// "既定の提示は生成 .lua").
+///
+/// This is the DAP-PRESENTATION seam and is deliberately independent of the
+/// code_gen producer seam (`SourceMapSink`). The future `pasta-source-map` spec
+/// connects the two: it builds a `LineMap` via the producer seam (task 5.3 /
+/// downstream) and installs a resolver here that consults that map to present
+/// `.pasta` paths/lines. No `.pasta` mapping is implemented in this layer — only
+/// the swappable口.
+pub type SourceResolver = Box<dyn Fn(&str, u32) -> ResolvedSource + Send>;
+
+/// The default [`SourceResolver`]: present the generated `.lua` unchanged.
+///
+/// Returns `{ "path": <lua_source> }` with `line = lua_line`, byte-equivalent to
+/// task 3.2's hard-coded behavior (R4.3 "本仕様の既定提示は生成 .lua").
+pub fn default_source_resolver() -> SourceResolver {
+    Box::new(|lua_source: &str, lua_line: u32| ResolvedSource {
+        source: json!({ "path": lua_source }),
+        line: lua_line,
+    })
+}
+
+/// The kind of deferred [`SessionEvent`] a pending request is waiting for.
+///
+/// Used as the FIFO key in [`PendingTable`] so each deferred response is paired
+/// back to the `request_seq` of the request that triggered it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum PendingKind {
+    /// Awaiting [`SessionEvent::Breakpoints`] for a `setBreakpoints` request.
+    SetBreakpoints,
+    /// Awaiting [`SessionEvent::Threads`] for a `threads` request.
+    Threads,
+    /// Awaiting [`SessionEvent::Stack`] for a `stackTrace` request.
+    StackTrace,
+    /// Awaiting [`SessionEvent::Variables`] for a `variables` request.
+    Variables,
+}
+
+/// FIFO store of pending request seqs keyed by the [`PendingKind`] they await.
+///
+/// The transport delivers events in TCP order, so the oldest outstanding request
+/// of a given kind is the one a freshly-arrived matching event answers.
+#[derive(Debug, Default)]
+struct PendingTable {
+    set_breakpoints: VecDeque<u64>,
+    threads: VecDeque<u64>,
+    stack_trace: VecDeque<u64>,
+    variables: VecDeque<u64>,
+}
+
+impl PendingTable {
+    /// Record `request_seq` as awaiting the given event `kind`.
+    fn push(&mut self, kind: PendingKind, request_seq: u64) {
+        match kind {
+            PendingKind::SetBreakpoints => self.set_breakpoints.push_back(request_seq),
+            PendingKind::Threads => self.threads.push_back(request_seq),
+            PendingKind::StackTrace => self.stack_trace.push_back(request_seq),
+            PendingKind::Variables => self.variables.push_back(request_seq),
+        }
+    }
+
+    /// Pop the oldest pending `request_seq` for `kind`, if any.
+    fn pop(&mut self, kind: PendingKind) -> Option<u64> {
+        match kind {
+            PendingKind::SetBreakpoints => self.set_breakpoints.pop_front(),
+            PendingKind::Threads => self.threads.pop_front(),
+            PendingKind::StackTrace => self.stack_trace.pop_front(),
+            PendingKind::Variables => self.variables.pop_front(),
+        }
+    }
+}
+
+/// The outcome of decoding one inbound DAP request.
+///
+/// A request can produce a [`SessionCommand`] to forward to the session, an
+/// immediate DAP response to send straight back, or BOTH (e.g. `continue`
+/// forwards the command AND immediately acks). `initialize` additionally needs a
+/// follow-up `initialized` event, carried in `events`.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct Decoded {
+    /// Command to forward to the session, if the request maps to one.
+    pub command: Option<SessionCommand>,
+    /// An immediate DAP response to send back now (acks and `initialize`).
+    pub response: Option<Value>,
+    /// Any immediate unsolicited events to emit after the response (the
+    /// `initialized` event of the `initialize` handshake).
+    pub events: Vec<Value>,
+}
+
+/// Hand-written DAP minimal-subset adapter (design "Transport & DapAdapter").
+///
+/// Translates inbound DAP request [`Value`]s into [`SessionCommand`]s (+ optional
+/// immediate response) and outbound [`SessionEvent`]s into DAP response/event
+/// [`Value`]s, correlating deferred responses to their originating request `seq`.
+/// Stateful only in the small bookkeeping it must own: the monotonic outgoing
+/// `seq` counter and the [`PendingTable`].
+pub struct DapAdapter {
+    /// Monotonic outgoing sequence counter for every response/event emitted.
+    out_seq: u64,
+    /// Pending request seqs awaiting their deferred [`SessionEvent`].
+    pending: PendingTable,
+    /// The DAP-presentation source seam consulted per stack frame (R4.3).
+    ///
+    /// Defaults to [`default_source_resolver`] (generated `.lua` unchanged); a
+    /// future `.pasta` resolver is installed via
+    /// [`set_source_resolver`](DapAdapter::set_source_resolver).
+    source_resolver: SourceResolver,
+}
+
+impl std::fmt::Debug for DapAdapter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // `source_resolver` is a boxed closure (no Debug); summarise it instead.
+        f.debug_struct("DapAdapter")
+            .field("out_seq", &self.out_seq)
+            .field("pending", &self.pending)
+            .field("source_resolver", &"<SourceResolver>")
+            .finish()
+    }
+}
+
+impl Default for DapAdapter {
+    fn default() -> Self {
+        Self {
+            out_seq: 0,
+            pending: PendingTable::default(),
+            source_resolver: default_source_resolver(),
+        }
+    }
+}
+
+impl DapAdapter {
+    /// Construct a fresh adapter with an empty pending table, `seq` at 0, and the
+    /// default `.lua` source resolver (R4.3).
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Install an alternate [`SourceResolver`] for stack-frame `source`
+    /// presentation, replacing the default generated-`.lua` resolver (R4.3).
+    ///
+    /// This is the swappable口 the downstream `pasta-source-map` spec uses to
+    /// present `.pasta` paths/lines instead of the generated `.lua`, without
+    /// changing the response shape. The resolver is consulted per frame by
+    /// [`encode_frames`]; only this DAP-presentation layer is affected, leaving
+    /// the code_gen producer seam (`SourceMapSink`) independent.
+    pub fn set_source_resolver(&mut self, resolver: SourceResolver) {
+        self.source_resolver = resolver;
+    }
+
+    /// Allocate the next monotonic outgoing `seq` (1, 2, 3, …).
+    fn next_seq(&mut self) -> u64 {
+        self.out_seq += 1;
+        self.out_seq
+    }
+
+    /// Build a DAP response envelope for `command`/`request_seq` with `body`.
+    ///
+    /// `body` may be [`Value::Null`] for a bare ack, in which case the `body`
+    /// field is omitted entirely (an empty ack response).
+    fn response(&mut self, request_seq: u64, command: &str, body: Value) -> Value {
+        let seq = self.next_seq();
+        let mut msg = json!({
+            "seq": seq,
+            "type": "response",
+            "request_seq": request_seq,
+            "success": true,
+            "command": command,
+        });
+        if !body.is_null() {
+            msg["body"] = body;
+        }
+        msg
+    }
+
+    /// Build a DAP event envelope named `event` with `body`.
+    fn event(&mut self, event: &str, body: Value) -> Value {
+        let seq = self.next_seq();
+        json!({
+            "seq": seq,
+            "type": "event",
+            "event": event,
+            "body": body,
+        })
+    }
+
+    /// Decode one inbound DAP request [`Value`] into a [`Decoded`] outcome.
+    ///
+    /// Recognises exactly the minimal subset (design "API Contract"). An
+    /// unknown command yields an empty [`Decoded`] (no command, no response) so
+    /// the caller can choose to ignore it; malformed-but-known requests fall
+    /// back to sane defaults (e.g. missing breakpoint lines → empty set).
+    pub fn decode_request(&mut self, req: &Value) -> Decoded {
+        let request_seq = req.get("seq").and_then(Value::as_u64).unwrap_or(0);
+        let command = req.get("command").and_then(Value::as_str).unwrap_or("");
+        let args = req.get("arguments");
+
+        match command {
+            "initialize" => {
+                let response = self.response(
+                    request_seq,
+                    "initialize",
+                    json!({
+                        "supportsConfigurationDoneRequest": true,
+                    }),
+                );
+                // Standard DAP handshake: an `initialized` event follows the
+                // initialize response (configurationDone then follows from the
+                // client).
+                let initialized = self.event("initialized", json!({}));
+                Decoded {
+                    command: None,
+                    response: Some(response),
+                    events: vec![initialized],
+                }
+            }
+            "setBreakpoints" => {
+                let (source, lines) = parse_set_breakpoints(args);
+                // Deferred: the verified breakpoints come back as
+                // SessionEvent::Breakpoints; remember this request's seq.
+                self.pending.push(PendingKind::SetBreakpoints, request_seq);
+                Decoded {
+                    command: Some(SessionCommand::SetBreakpoints { source, lines }),
+                    response: None,
+                    events: Vec::new(),
+                }
+            }
+            "configurationDone" => {
+                let response = self.response(request_seq, "configurationDone", Value::Null);
+                Decoded {
+                    command: None,
+                    response: Some(response),
+                    events: Vec::new(),
+                }
+            }
+            "threads" => {
+                self.pending.push(PendingKind::Threads, request_seq);
+                Decoded {
+                    command: Some(SessionCommand::Threads),
+                    response: None,
+                    events: Vec::new(),
+                }
+            }
+            "stackTrace" => {
+                self.pending.push(PendingKind::StackTrace, request_seq);
+                Decoded {
+                    command: Some(SessionCommand::StackTrace),
+                    response: None,
+                    events: Vec::new(),
+                }
+            }
+            "scopes" => {
+                // `scopes` is answered immediately from the frame id alone: one
+                // synthetic `Locals` scope whose variablesReference = frameId+1
+                // (non-zero, decodable back to the frame). We still forward the
+                // Scopes command so the session can prepare frame state, but the
+                // response does not wait on SessionEvent::Scopes.
+                let frame_id = args
+                    .and_then(|a| a.get("frameId"))
+                    .and_then(Value::as_u64)
+                    .unwrap_or(0) as u32;
+                let var_ref = frame_id + 1;
+                let response = self.response(
+                    request_seq,
+                    "scopes",
+                    json!({
+                        "scopes": [{
+                            "name": "Locals",
+                            "variablesReference": var_ref,
+                            "expensive": false,
+                        }],
+                    }),
+                );
+                Decoded {
+                    command: Some(SessionCommand::Scopes { frame_id }),
+                    response: Some(response),
+                    events: Vec::new(),
+                }
+            }
+            "variables" => {
+                let var_ref = args
+                    .and_then(|a| a.get("variablesReference"))
+                    .and_then(Value::as_u64)
+                    .unwrap_or(0) as u32;
+                self.pending.push(PendingKind::Variables, request_seq);
+                Decoded {
+                    command: Some(SessionCommand::Variables { var_ref }),
+                    response: None,
+                    events: Vec::new(),
+                }
+            }
+            "continue" => {
+                let response = self.response(
+                    request_seq,
+                    "continue",
+                    json!({ "allThreadsContinued": true }),
+                );
+                Decoded {
+                    command: Some(SessionCommand::Continue),
+                    response: Some(response),
+                    events: Vec::new(),
+                }
+            }
+            "next" => self.step_ack(request_seq, "next", SessionCommand::Next),
+            "stepIn" => self.step_ack(request_seq, "stepIn", SessionCommand::StepIn),
+            "stepOut" => self.step_ack(request_seq, "stepOut", SessionCommand::StepOut),
+            "disconnect" => {
+                let response = self.response(request_seq, "disconnect", Value::Null);
+                Decoded {
+                    command: Some(SessionCommand::Disconnect),
+                    response: Some(response),
+                    events: Vec::new(),
+                }
+            }
+            _ => Decoded::default(),
+        }
+    }
+
+    /// Shared shape for `next`/`stepIn`/`stepOut`: ack immediately and forward
+    /// the step command; the later `stopped` event reports the new position.
+    fn step_ack(&mut self, request_seq: u64, command: &str, cmd: SessionCommand) -> Decoded {
+        let response = self.response(request_seq, command, Value::Null);
+        Decoded {
+            command: Some(cmd),
+            response: Some(response),
+            events: Vec::new(),
+        }
+    }
+
+    /// Encode one outbound [`SessionEvent`] into DAP response/event [`Value`]s.
+    ///
+    /// Deferred responses ([`SessionEvent::Breakpoints`] / `Threads` / `Stack` /
+    /// `Variables`) are correlated back to their originating request `seq` via
+    /// the [`PendingTable`]; if no pending request is found (e.g. a spurious or
+    /// out-of-band event) the correlation falls back to `request_seq = 0`.
+    /// Unsolicited events ([`SessionEvent::Stopped`] / `Terminated` / `Error`)
+    /// become DAP events. Each call returns zero or more frames to write to the
+    /// transport.
+    pub fn encode_event(&mut self, event: SessionEvent) -> Vec<Value> {
+        match event {
+            SessionEvent::Stopped { reason, thread_id } => {
+                let body = json!({
+                    "reason": stop_reason_str(reason),
+                    "threadId": thread_id,
+                    "allThreadsStopped": true,
+                });
+                vec![self.event("stopped", body)]
+            }
+            SessionEvent::Terminated => vec![self.event("terminated", json!({}))],
+            SessionEvent::Breakpoints(bps) => {
+                let request_seq = self.pending.pop(PendingKind::SetBreakpoints).unwrap_or(0);
+                let body = json!({ "breakpoints": encode_breakpoints(&bps) });
+                vec![self.response(request_seq, "setBreakpoints", body)]
+            }
+            SessionEvent::Threads(threads) => {
+                let request_seq = self.pending.pop(PendingKind::Threads).unwrap_or(0);
+                let body = json!({ "threads": encode_threads(&threads) });
+                vec![self.response(request_seq, "threads", body)]
+            }
+            SessionEvent::Stack(frames) => {
+                let request_seq = self.pending.pop(PendingKind::StackTrace).unwrap_or(0);
+                let total = frames.len();
+                let body = json!({
+                    "stackFrames": encode_frames(&frames, self.source_resolver.as_ref()),
+                    "totalFrames": total,
+                });
+                vec![self.response(request_seq, "stackTrace", body)]
+            }
+            SessionEvent::Scopes(scopes) => {
+                // `scopes` is answered immediately at decode time (from the frame
+                // id), so a SessionEvent::Scopes carries no request to correlate.
+                // It is intentionally a no-op on the wire. The synthetic scope is
+                // documented on DapAdapter; see decode_request("scopes").
+                let _ = scopes;
+                Vec::new()
+            }
+            SessionEvent::Variables(vars) => {
+                let request_seq = self.pending.pop(PendingKind::Variables).unwrap_or(0);
+                let body = json!({ "variables": encode_variables(&vars) });
+                vec![self.response(request_seq, "variables", body)]
+            }
+            SessionEvent::Error(msg) => {
+                // Surface asynchronous VM/FFI errors as a non-fatal `output`
+                // event on stderr (design "Event Contract": output optional).
+                let body = json!({
+                    "category": "stderr",
+                    "output": format!("{msg}\n"),
+                });
+                vec![self.event("output", body)]
+            }
+        }
+    }
+}
+
+/// Map a [`StopReason`] to its DAP `stopped` `reason` string.
+fn stop_reason_str(reason: StopReason) -> &'static str {
+    match reason {
+        StopReason::Breakpoint => "breakpoint",
+        StopReason::Step => "step",
+        StopReason::Entry => "entry",
+        StopReason::Pause => "pause",
+    }
+}
+
+/// Parse a `setBreakpoints` request's `arguments` into `(SourceRef, lines)`.
+///
+/// DAP shape: `{"source":{"path":".."},"breakpoints":[{"line":N},..]}`. Missing
+/// pieces degrade gracefully: no source path → empty path; no breakpoints →
+/// empty line set (which clears the source's breakpoints, per DAP semantics).
+fn parse_set_breakpoints(args: Option<&Value>) -> (SourceRef, Vec<u32>) {
+    let path = args
+        .and_then(|a| a.get("source"))
+        .and_then(|s| s.get("path"))
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .to_string();
+
+    let lines = args
+        .and_then(|a| a.get("breakpoints"))
+        .and_then(Value::as_array)
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|bp| bp.get("line").and_then(Value::as_u64).map(|l| l as u32))
+                .collect()
+        })
+        .unwrap_or_default();
+
+    (SourceRef { path }, lines)
+}
+
+/// Encode resolved breakpoints into the `setBreakpoints` response `body`.
+fn encode_breakpoints(bps: &[ResolvedBreakpoint]) -> Vec<Value> {
+    bps.iter()
+        .map(|bp| {
+            json!({
+                "verified": bp.verified,
+                "line": bp.line,
+            })
+        })
+        .collect()
+}
+
+/// Encode threads into the `threads` response `body`.
+fn encode_threads(threads: &[ThreadInfo]) -> Vec<Value> {
+    threads
+        .iter()
+        .map(|t| json!({ "id": t.id, "name": t.name }))
+        .collect()
+}
+
+/// Encode stack frames into the `stackTrace` response `body`.
+///
+/// `frame id = stack index` (0-based), per the documented numbering. The frame's
+/// `source`/`line` are produced by `resolver` rather than hard-coded, so the
+/// DAP-presentation seam is swappable (R4.3): the default resolver presents the
+/// generated `.lua` (`{ "path": <source> }`, `line = FrameInfo.line`)
+/// byte-equivalently to task 3.2, while a future `pasta-source-map` resolver can
+/// substitute a `.pasta` path and the mapped `.pasta` line without changing the
+/// frame shape.
+fn encode_frames(
+    frames: &[crate::debug::types::FrameInfo],
+    resolver: &(dyn Fn(&str, u32) -> ResolvedSource + Send),
+) -> Vec<Value> {
+    frames
+        .iter()
+        .enumerate()
+        .map(|(idx, f)| {
+            let resolved = resolver(&f.source, f.line);
+            json!({
+                "id": idx as u32,
+                "name": f.func_name.clone().unwrap_or_else(|| "?".to_string()),
+                "source": resolved.source,
+                "line": resolved.line,
+                "column": 1,
+            })
+        })
+        .collect()
+}
+
+/// Encode variables into the `variables` response `body`.
+///
+/// Maps [`Variable::repr`] → DAP `value` and [`Variable::type_name`] → DAP
+/// `type`. Leaf variables report `variablesReference: 0` (no deep table
+/// expansion — out of scope for this task).
+fn encode_variables(vars: &[Variable]) -> Vec<Value> {
+    vars.iter()
+        .map(|v| {
+            json!({
+                "name": v.name,
+                "value": v.repr,
+                "type": v.type_name,
+                "variablesReference": 0,
+            })
+        })
+        .collect()
+}
+
+/// Encode a session [`Scope`] (unused on the immediate-scopes path; retained for
+/// completeness so a future richer scopes flow can reuse it).
+fn encode_scope(scope: &Scope) -> Value {
+    json!({
+        "name": scope.name,
+        "variablesReference": scope.variables_reference,
+        "expensive": false,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::debug::types::FrameInfo;
+
+    /// Build a minimal DAP request value.
+    fn request(seq: u64, command: &str, arguments: Value) -> Value {
+        json!({
+            "seq": seq,
+            "type": "request",
+            "command": command,
+            "arguments": arguments,
+        })
+    }
+
+    // --- initialize (R3.2) -------------------------------------------------
+
+    #[test]
+    fn initialize_advertises_capabilities_and_emits_initialized() {
+        let mut dap = DapAdapter::new();
+        let decoded = dap.decode_request(&request(1, "initialize", json!({ "adapterID": "pasta" })));
+
+        // No session command for initialize.
+        assert_eq!(decoded.command, None);
+
+        let resp = decoded.response.expect("initialize must produce a response");
+        assert_eq!(resp["type"], "response");
+        assert_eq!(resp["command"], "initialize");
+        assert_eq!(resp["request_seq"], 1);
+        assert_eq!(resp["success"], true);
+        assert_eq!(
+            resp["body"]["supportsConfigurationDoneRequest"], true,
+            "R3.2: initialize must advertise supportsConfigurationDoneRequest"
+        );
+
+        // The standard handshake emits an `initialized` event after the response.
+        assert_eq!(decoded.events.len(), 1, "initialize emits one event");
+        let ev = &decoded.events[0];
+        assert_eq!(ev["type"], "event");
+        assert_eq!(ev["event"], "initialized");
+
+        // Outgoing seq is monotonic: response seq=1, event seq=2.
+        assert_eq!(resp["seq"], 1);
+        assert_eq!(ev["seq"], 2);
+    }
+
+    // --- setBreakpoints (R3.3) ---------------------------------------------
+
+    #[test]
+    fn set_breakpoints_decodes_command_and_correlates_response() {
+        let mut dap = DapAdapter::new();
+        let decoded = dap.decode_request(&request(
+            5,
+            "setBreakpoints",
+            json!({
+                "source": { "path": "@scene.lua" },
+                "breakpoints": [{ "line": 3 }, { "line": 7 }],
+            }),
+        ));
+
+        assert_eq!(
+            decoded.command,
+            Some(SessionCommand::SetBreakpoints {
+                source: SourceRef::new("@scene.lua"),
+                lines: vec![3, 7],
+            }),
+            "R3.3: setBreakpoints → SetBreakpoints{{source,lines}}"
+        );
+        // setBreakpoints is deferred — no immediate response.
+        assert!(decoded.response.is_none());
+
+        // The corresponding SessionEvent::Breakpoints produces the response,
+        // correlated to request_seq=5.
+        let out = dap.encode_event(SessionEvent::Breakpoints(vec![
+            ResolvedBreakpoint {
+                source: SourceRef::new("@scene.lua"),
+                line: 3,
+                verified: true,
+            },
+            ResolvedBreakpoint {
+                source: SourceRef::new("@scene.lua"),
+                line: 7,
+                verified: false,
+            },
+        ]));
+        assert_eq!(out.len(), 1);
+        let resp = &out[0];
+        assert_eq!(resp["type"], "response");
+        assert_eq!(resp["command"], "setBreakpoints");
+        assert_eq!(resp["request_seq"], 5, "deferred response carries originating seq");
+        assert_eq!(resp["success"], true);
+        let bps = resp["body"]["breakpoints"].as_array().expect("breakpoints array");
+        assert_eq!(bps.len(), 2);
+        assert_eq!(bps[0]["verified"], true);
+        assert_eq!(bps[0]["line"], 3);
+        assert_eq!(bps[1]["verified"], false);
+        assert_eq!(bps[1]["line"], 7);
+    }
+
+    // --- configurationDone (R3.3) ------------------------------------------
+
+    #[test]
+    fn configuration_done_acks_without_command() {
+        let mut dap = DapAdapter::new();
+        let decoded = dap.decode_request(&request(2, "configurationDone", json!({})));
+        assert_eq!(decoded.command, None);
+        let resp = decoded.response.expect("ack response");
+        assert_eq!(resp["type"], "response");
+        assert_eq!(resp["command"], "configurationDone");
+        assert_eq!(resp["request_seq"], 2);
+        assert_eq!(resp["success"], true);
+        assert!(resp.get("body").is_none(), "ack has no body");
+    }
+
+    // --- threads (R3.3) ----------------------------------------------------
+
+    #[test]
+    fn threads_decodes_command_and_correlates_response() {
+        let mut dap = DapAdapter::new();
+        let decoded = dap.decode_request(&request(8, "threads", json!({})));
+        assert_eq!(decoded.command, Some(SessionCommand::Threads));
+        assert!(decoded.response.is_none());
+
+        let out = dap.encode_event(SessionEvent::Threads(vec![ThreadInfo {
+            id: 1,
+            name: "main".to_string(),
+        }]));
+        assert_eq!(out.len(), 1);
+        let resp = &out[0];
+        assert_eq!(resp["command"], "threads");
+        assert_eq!(resp["request_seq"], 8);
+        let threads = resp["body"]["threads"].as_array().expect("threads array");
+        assert_eq!(threads.len(), 1);
+        assert_eq!(threads[0]["id"], 1);
+        assert_eq!(threads[0]["name"], "main");
+    }
+
+    // --- stackTrace (R3.3) -------------------------------------------------
+
+    #[test]
+    fn stack_trace_decodes_command_and_correlates_response() {
+        let mut dap = DapAdapter::new();
+        let decoded = dap.decode_request(&request(11, "stackTrace", json!({ "threadId": 1 })));
+        assert_eq!(decoded.command, Some(SessionCommand::StackTrace));
+        assert!(decoded.response.is_none());
+
+        let out = dap.encode_event(SessionEvent::Stack(vec![
+            FrameInfo {
+                source: "@scene.lua".to_string(),
+                line: 7,
+                func_name: Some("talk".to_string()),
+            },
+            FrameInfo {
+                source: "@scene.lua".to_string(),
+                line: 2,
+                func_name: None,
+            },
+        ]));
+        assert_eq!(out.len(), 1);
+        let resp = &out[0];
+        assert_eq!(resp["command"], "stackTrace");
+        assert_eq!(resp["request_seq"], 11);
+        assert_eq!(resp["body"]["totalFrames"], 2);
+        let frames = resp["body"]["stackFrames"].as_array().expect("stackFrames array");
+        assert_eq!(frames.len(), 2);
+        assert_eq!(frames[0]["id"], 0, "frame id = stack index");
+        assert_eq!(frames[0]["name"], "talk");
+        assert_eq!(frames[0]["source"]["path"], "@scene.lua");
+        assert_eq!(frames[0]["line"], 7);
+        assert_eq!(frames[0]["column"], 1);
+        assert_eq!(frames[1]["id"], 1);
+        assert_eq!(frames[1]["name"], "?", "missing func name → placeholder");
+    }
+
+    // --- scopes (R3.3) -----------------------------------------------------
+
+    #[test]
+    fn scopes_immediately_returns_locals_scope_with_decodable_ref() {
+        let mut dap = DapAdapter::new();
+        let decoded = dap.decode_request(&request(13, "scopes", json!({ "frameId": 2 })));
+        assert_eq!(
+            decoded.command,
+            Some(SessionCommand::Scopes { frame_id: 2 }),
+            "scopes → Scopes{{frame_id}}"
+        );
+        let resp = decoded.response.expect("scopes answered immediately");
+        assert_eq!(resp["command"], "scopes");
+        assert_eq!(resp["request_seq"], 13);
+        let scopes = resp["body"]["scopes"].as_array().expect("scopes array");
+        assert_eq!(scopes.len(), 1);
+        assert_eq!(scopes[0]["name"], "Locals");
+        // variablesReference = frameId + 1 (non-zero, decodable back to frame 2).
+        assert_eq!(scopes[0]["variablesReference"], 3);
+    }
+
+    // --- variables (R3.3) --------------------------------------------------
+
+    #[test]
+    fn variables_decodes_command_and_maps_fields() {
+        let mut dap = DapAdapter::new();
+        // A scopes for frame 2 yields variablesReference 3; the client passes it
+        // back in a variables request.
+        let decoded = dap.decode_request(&request(15, "variables", json!({ "variablesReference": 3 })));
+        assert_eq!(
+            decoded.command,
+            Some(SessionCommand::Variables { var_ref: 3 }),
+            "variables → Variables{{var_ref}}"
+        );
+        assert!(decoded.response.is_none());
+
+        let out = dap.encode_event(SessionEvent::Variables(vec![
+            Variable {
+                name: "x".to_string(),
+                type_name: "number".to_string(),
+                repr: "42".to_string(),
+            },
+            Variable {
+                name: "s".to_string(),
+                type_name: "string".to_string(),
+                repr: "\"hi\"".to_string(),
+            },
+        ]));
+        assert_eq!(out.len(), 1);
+        let resp = &out[0];
+        assert_eq!(resp["command"], "variables");
+        assert_eq!(resp["request_seq"], 15);
+        let vars = resp["body"]["variables"].as_array().expect("variables array");
+        assert_eq!(vars.len(), 2);
+        // repr → value, type_name → type, leaf ref = 0.
+        assert_eq!(vars[0]["name"], "x");
+        assert_eq!(vars[0]["value"], "42");
+        assert_eq!(vars[0]["type"], "number");
+        assert_eq!(vars[0]["variablesReference"], 0);
+        assert_eq!(vars[1]["name"], "s");
+        assert_eq!(vars[1]["value"], "\"hi\"");
+        assert_eq!(vars[1]["type"], "string");
+    }
+
+    // --- continue / next / stepIn / stepOut (R3.3) -------------------------
+
+    #[test]
+    fn continue_acks_and_forwards_command() {
+        let mut dap = DapAdapter::new();
+        let decoded = dap.decode_request(&request(20, "continue", json!({ "threadId": 1 })));
+        assert_eq!(decoded.command, Some(SessionCommand::Continue));
+        let resp = decoded.response.expect("continue acks");
+        assert_eq!(resp["command"], "continue");
+        assert_eq!(resp["request_seq"], 20);
+        assert_eq!(resp["body"]["allThreadsContinued"], true);
+    }
+
+    #[test]
+    fn step_commands_ack_and_forward() {
+        for (command, expected) in [
+            ("next", SessionCommand::Next),
+            ("stepIn", SessionCommand::StepIn),
+            ("stepOut", SessionCommand::StepOut),
+        ] {
+            let mut dap = DapAdapter::new();
+            let decoded = dap.decode_request(&request(30, command, json!({ "threadId": 1 })));
+            assert_eq!(decoded.command, Some(expected), "{command} → step command");
+            let resp = decoded.response.expect("step acks");
+            assert_eq!(resp["command"], command);
+            assert_eq!(resp["request_seq"], 30);
+            assert_eq!(resp["success"], true);
+            assert!(resp.get("body").is_none(), "step ack has no body");
+        }
+    }
+
+    // --- disconnect (R3.3 / R3.5) ------------------------------------------
+
+    #[test]
+    fn disconnect_acks_forwards_and_later_terminates() {
+        let mut dap = DapAdapter::new();
+        let decoded = dap.decode_request(&request(40, "disconnect", json!({})));
+        assert_eq!(decoded.command, Some(SessionCommand::Disconnect));
+        let resp = decoded.response.expect("disconnect acks");
+        assert_eq!(resp["command"], "disconnect");
+        assert_eq!(resp["request_seq"], 40);
+
+        // The later Terminated event maps to a `terminated` DAP event (R3.5).
+        let out = dap.encode_event(SessionEvent::Terminated);
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0]["type"], "event");
+        assert_eq!(out[0]["event"], "terminated");
+    }
+
+    // --- stopped event (R3.4) ----------------------------------------------
+
+    #[test]
+    fn stopped_event_maps_each_reason_and_thread() {
+        for (reason, expected) in [
+            (StopReason::Breakpoint, "breakpoint"),
+            (StopReason::Step, "step"),
+            (StopReason::Entry, "entry"),
+            (StopReason::Pause, "pause"),
+        ] {
+            let mut dap = DapAdapter::new();
+            let out = dap.encode_event(SessionEvent::Stopped {
+                reason,
+                thread_id: 1,
+            });
+            assert_eq!(out.len(), 1);
+            let ev = &out[0];
+            assert_eq!(ev["type"], "event");
+            assert_eq!(ev["event"], "stopped");
+            assert_eq!(ev["body"]["reason"], expected, "R3.4: reason mapping");
+            assert_eq!(ev["body"]["threadId"], 1);
+        }
+    }
+
+    // --- terminated event (R3.5) -------------------------------------------
+
+    #[test]
+    fn terminated_event_encoded() {
+        let mut dap = DapAdapter::new();
+        let out = dap.encode_event(SessionEvent::Terminated);
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0]["type"], "event");
+        assert_eq!(out[0]["event"], "terminated");
+    }
+
+    // --- error event -------------------------------------------------------
+
+    #[test]
+    fn error_maps_to_output_event() {
+        let mut dap = DapAdapter::new();
+        let out = dap.encode_event(SessionEvent::Error("lua boom".to_string()));
+        assert_eq!(out.len(), 1);
+        let ev = &out[0];
+        assert_eq!(ev["type"], "event");
+        assert_eq!(ev["event"], "output");
+        assert_eq!(ev["body"]["category"], "stderr");
+        assert!(
+            ev["body"]["output"].as_str().unwrap().contains("lua boom"),
+            "error message surfaced in output event"
+        );
+    }
+
+    // --- envelope / seq invariants -----------------------------------------
+
+    #[test]
+    fn outgoing_seq_is_monotonic_across_responses_and_events() {
+        let mut dap = DapAdapter::new();
+        // initialize → response (seq 1) + initialized event (seq 2).
+        let init = dap.decode_request(&request(1, "initialize", json!({})));
+        assert_eq!(init.response.unwrap()["seq"], 1);
+        assert_eq!(init.events[0]["seq"], 2);
+        // A stopped event (seq 3).
+        let stopped = dap.encode_event(SessionEvent::Stopped {
+            reason: StopReason::Breakpoint,
+            thread_id: 1,
+        });
+        assert_eq!(stopped[0]["seq"], 3);
+        // configurationDone response (seq 4).
+        let cfg = dap.decode_request(&request(2, "configurationDone", json!({})));
+        assert_eq!(cfg.response.unwrap()["seq"], 4);
+    }
+
+    #[test]
+    fn deferred_responses_correlate_in_fifo_order_per_kind() {
+        let mut dap = DapAdapter::new();
+        // Two stackTrace requests in flight; FIFO pairs each Stack event back.
+        dap.decode_request(&request(100, "stackTrace", json!({})));
+        dap.decode_request(&request(101, "stackTrace", json!({})));
+
+        let first = dap.encode_event(SessionEvent::Stack(vec![]));
+        assert_eq!(first[0]["request_seq"], 100, "first event pairs to first request");
+        let second = dap.encode_event(SessionEvent::Stack(vec![]));
+        assert_eq!(second[0]["request_seq"], 101, "second event pairs to second request");
+    }
+
+    #[test]
+    fn unknown_request_is_ignored() {
+        let mut dap = DapAdapter::new();
+        let decoded = dap.decode_request(&request(99, "evaluate", json!({})));
+        assert_eq!(decoded, Decoded::default(), "unknown command yields empty decode");
+    }
+
+    // --- source resolver seam (R4.3) ---------------------------------------
+
+    /// DEFAULT resolver: a `stackTrace` response presents each frame's `source`
+    /// as the generated `.lua` (path = `FrameInfo.source`, line = `FrameInfo.line`),
+    /// byte-equivalent to task 3.2 — R4.3 "既定の提示は生成 .lua".
+    #[test]
+    fn stack_trace_default_resolver_presents_generated_lua() {
+        let mut dap = DapAdapter::new();
+        dap.decode_request(&request(11, "stackTrace", json!({ "threadId": 1 })));
+
+        let out = dap.encode_event(SessionEvent::Stack(vec![
+            FrameInfo {
+                source: "@scene.lua".to_string(),
+                line: 7,
+                func_name: Some("talk".to_string()),
+            },
+            FrameInfo {
+                source: "@scene.lua".to_string(),
+                line: 2,
+                func_name: None,
+            },
+        ]));
+        let resp = &out[0];
+        let frames = resp["body"]["stackFrames"].as_array().expect("stackFrames array");
+        // Default presentation is the generated .lua, unchanged from 3.2.
+        assert_eq!(frames[0]["source"], json!({ "path": "@scene.lua" }));
+        assert_eq!(frames[0]["line"], 7);
+        assert_eq!(frames[1]["source"], json!({ "path": "@scene.lua" }));
+        assert_eq!(frames[1]["line"], 2);
+    }
+
+    /// SWAPPABLE: install an alternate resolver that maps any `.lua` source to a
+    /// `.pasta`-style source (and remaps the line); the same `SessionEvent::Stack`
+    /// now presents the `.pasta` source/line — proving the口 is genuinely
+    /// swappable (R4.3 "将来 .pasta パスを提示できる構造"). This stub stands in for
+    /// the future `pasta-source-map` resolver (wired via task 5.3 / downstream).
+    #[test]
+    fn stack_trace_alternate_resolver_presents_pasta() {
+        let mut dap = DapAdapter::new();
+        // A test stub resolver: every frame becomes foo.pasta with line+100.
+        dap.set_source_resolver(Box::new(|_lua_source: &str, lua_line: u32| {
+            ResolvedSource {
+                source: json!({ "path": "foo.pasta" }),
+                line: lua_line + 100,
+            }
+        }));
+
+        dap.decode_request(&request(11, "stackTrace", json!({ "threadId": 1 })));
+        let out = dap.encode_event(SessionEvent::Stack(vec![FrameInfo {
+            source: "@scene.lua".to_string(),
+            line: 7,
+            func_name: Some("talk".to_string()),
+        }]));
+        let resp = &out[0];
+        let frames = resp["body"]["stackFrames"].as_array().expect("stackFrames array");
+        // The seam is swapped: presentation is now the .pasta source + mapped line.
+        assert_eq!(frames[0]["source"], json!({ "path": "foo.pasta" }));
+        assert_eq!(frames[0]["line"], 107);
+        // Other frame fields (id / name) are unaffected by the source seam.
+        assert_eq!(frames[0]["id"], 0);
+        assert_eq!(frames[0]["name"], "talk");
+    }
+
+    #[test]
+    fn set_breakpoints_with_no_breakpoints_clears_lines() {
+        let mut dap = DapAdapter::new();
+        let decoded = dap.decode_request(&request(
+            7,
+            "setBreakpoints",
+            json!({ "source": { "path": "@s.lua" } }),
+        ));
+        assert_eq!(
+            decoded.command,
+            Some(SessionCommand::SetBreakpoints {
+                source: SourceRef::new("@s.lua"),
+                lines: vec![],
+            }),
+            "missing breakpoints array → empty (clears) line set"
+        );
+    }
+}

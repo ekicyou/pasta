@@ -5,7 +5,7 @@ use crate::error::TranspileError;
 use crate::string_literalizer::StringLiteralizer;
 use pasta_dsl::parser::{
     Action, ActionLine, Args, CallScene, CodeBlock, ContinueAction, Expr, KeyWords, SetValue,
-    VarScope, VarSet,
+    Span, VarScope, VarSet,
 };
 use std::io::Write;
 
@@ -15,6 +15,22 @@ fn format_args_suffix(args_str: &str) -> String {
         String::new()
     } else {
         format!(", {}", args_str)
+    }
+}
+
+/// Extract the `.pasta` [`Span`] carried by every [`Action`] variant.
+///
+/// Source-map seam helper (R4): used to thread the originating `.pasta` location to
+/// the output-line recording point. Defined here (not on the `pasta_dsl` AST) to keep
+/// the change within the `code_gen` boundary.
+fn action_span(action: &Action) -> Span {
+    match action {
+        Action::Talk { span, .. }
+        | Action::WordRef { span, .. }
+        | Action::VarRef { span, .. }
+        | Action::FnCall { span, .. }
+        | Action::SakuraScript { span, .. }
+        | Action::Escape { span, .. } => *span,
     }
 }
 
@@ -73,7 +89,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                         self.write_indent()?;
                         self.write_raw(&format!("{} = ", var_path))?;
                         self.generate_expr(expr)?;
-                        writeln!(self.writer)?;
+                        self.write_line_terminator()?;
                     }
                     SetValue::WordRef { name } => {
                         // Generate: var.変数名 = act:word("単語名") or save.変数名 = act:word("単語名")
@@ -88,7 +104,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                     SetValue::Expr(expr) => {
                         self.write_indent()?;
                         self.generate_expr(expr)?;
-                        writeln!(self.writer)?;
+                        self.write_line_terminator()?;
                     }
                     SetValue::WordRef { name } => {
                         let word_literal = StringLiteralizer::literalize(name)?;
@@ -233,7 +249,17 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     }
 
     /// Generate a single action (Requirement 3d, 3e).
+    ///
+    /// Source-map seam (R4): this is the representative span-bearing path. The
+    /// action's `.pasta` [`Span`](pasta_dsl::parser::Span) is recorded against the
+    /// generated Lua line via [`record_span`](Self::record_span) when a sink is
+    /// attached (otherwise inert / byte-identical). Every variant emits exactly one
+    /// line except the rare empty-escape case, so we detect actual emission by the
+    /// `out_line` delta before recording, ensuring the span maps to the line that was
+    /// actually written.
     pub fn generate_action(&mut self, action: &Action, actor: &str) -> Result<(), TranspileError> {
+        let span = action_span(action);
+        let out_line_before = self.out_line();
         match action {
             Action::Talk { text, .. } => {
                 // act.アクター:talk("文字列")
@@ -309,6 +335,14 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                     self.writeln(&format!("act.{}:talk({})", actor, literal))?;
                 }
             }
+        }
+
+        // Record the (out_line -> span) correspondence for the line(s) just emitted.
+        // Skipped automatically when no line was emitted (empty escape) or no sink is
+        // attached. `record_span` uses the current `out_line`, which now points at the
+        // last line written by this action.
+        if self.out_line() > out_line_before {
+            self.record_span(span);
         }
 
         Ok(())

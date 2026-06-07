@@ -652,13 +652,24 @@ end)
 
 環境変数とファイルシステムパスへのアクセス。**セキュリティ上の理由からデフォルト無効**。
 
-有効化にはRust側の `RuntimeConfig` 設定が必要:
+有効化にはRust側の `RuntimeConfig` 設定が必要。`libs` 配列に `"env"` エントリを追加します:
 
 ```rust
-let config = RuntimeConfig {
-    enable_env: true,
-    ..RuntimeConfig::new()
-};
+use pasta_lua::RuntimeConfig;
+
+// デフォルト構成に @env を追加（libs 配列で制御）
+let config = RuntimeConfig::from_libs(vec![
+    "std_all".into(),
+    "assertions".into(),
+    "testing".into(),
+    "env".into(),
+    "regex".into(),
+    "json".into(),
+    "yaml".into(),
+]);
+
+// または、すべて有効化（@env を含む）
+let config = RuntimeConfig::full();
 ```
 
 ```lua
@@ -669,26 +680,27 @@ local home = env.var("HOME")
 
 ### RuntimeConfig によるモジュール制御
 
-Rust側で各モジュールの有効/無効を制御:
+Rust側では `libs` 配列で各モジュールの有効/無効を制御します。
+プリセットのコンストラクタを使うか、`from_libs` でカスタム配列を渡します:
 
 ```rust
 use pasta_lua::RuntimeConfig;
 
-RuntimeConfig::new()      // デフォルト（@env以外すべて有効）
-RuntimeConfig::full()     // すべて有効（@env含む）
-RuntimeConfig::minimal()  // pastaモジュールのみ
+RuntimeConfig::new()      // デフォルト（std_all + assertions/testing/regex/json/yaml、@env は無効）
+RuntimeConfig::full()     // すべて有効（std_all_unsafe + @env を含む）
+RuntimeConfig::minimal()  // std_all のみ（mlua-stdlib モジュールなし）
 
-// カスタム設定
-RuntimeConfig {
-    enable_std_libs: true,
-    enable_assertions: true,
-    enable_testing: false,
-    enable_env: false,
-    enable_regex: true,
-    enable_json: true,
-    enable_yaml: false,
-};
+// カスタム設定: libs 配列のエントリで有効化、`-` プレフィックスで無効化
+let config = RuntimeConfig::from_libs(vec![
+    "std_all".into(),    // 安全な Lua 標準ライブラリすべて
+    "assertions".into(), // @assertions を有効化
+    "regex".into(),      // @regex を有効化
+    "json".into(),       // @json を有効化
+    "-std_debug".into(), // std_debug を除外
+]);
 ```
+
+> モジュールの有効/無効は `libs` 配列のエントリ（例: `"env"` で有効化、`"-env"` で無効化）で表現します。`enable_*` のような boolean フィールドは存在しません。
 
 ---
 

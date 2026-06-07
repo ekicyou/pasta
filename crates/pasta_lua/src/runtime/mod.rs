@@ -52,6 +52,20 @@ pub struct PastaLuaRuntime {
     config: Option<PastaConfig>,
     /// Base directory for resolving relative paths (persistence file, etc.).
     base_dir: Option<PathBuf>,
+    /// Runtime-scope debug backend handle (task 4.2).
+    ///
+    /// `Some` only when debugging was enabled at VM init (`config.debug.enabled`);
+    /// the hook is installed exactly ONCE there and this handle owns the bridge
+    /// threads + transport + the runtime-scope `DebugSession`/`BreakpointSet`. It
+    /// is `None` on the disabled (default) zero-cost path — no hook, no port, no
+    /// `std_debug` (R5.2 / R5.3 / R5.5).
+    ///
+    /// Held at RUNTIME scope so breakpoint/session state set in one request
+    /// PERSISTS across subsequent requests (design "セッションライフサイクル"). Its
+    /// `Drop` (run after this struct's explicit `Drop` saves persistence) signals
+    /// `terminated` to any connected client and tears the transport/threads down
+    /// non-blockingly.
+    debug_handle: Option<crate::debug::DebugHandle>,
 }
 
 impl PastaLuaRuntime {
@@ -137,11 +151,24 @@ impl PastaLuaRuntime {
         // Register @pasta_log module (always available, independent of RuntimeConfig.libs)
         Self::register_log_module(&lua)?;
 
+        // Debug backend gate (task 4.2): the SINGLE enable choke point. After the
+        // VM is constructed and all modules are registered, install the debug hook
+        // exactly ONCE iff `config.debug.enabled`. When disabled (the default),
+        // `enable` returns `Ok(None)`: no hook, no port, no thread, no `std_debug`
+        // exposure, no `jit.off()` — true zero cost (R5.2 / R5.3 / R5.5). The
+        // returned handle lives at runtime scope so the `DebugSession` /
+        // `BreakpointSet` / transport persist across requests (design
+        // "セッションライフサイクル"). `DebugError` (`!Send`-safe, stringified) is
+        // mapped to `mlua::Error` at this boundary.
+        let debug_handle = crate::debug::enable(&lua, &config.debug)
+            .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+
         Ok(Self {
             lua,
             logger: None,
             config: None,
             base_dir: None,
+            debug_handle,
         })
     }
 
@@ -162,6 +189,38 @@ impl PastaLuaRuntime {
     ///   Errors are propagated via `LuaResult`, not unwrapped.
     pub fn exec(&self, script: &str) -> LuaResult<Value> {
         self.lua.load(script).eval()
+    }
+
+    /// Execute a Lua script string under an explicit chunk name (the `source`
+    /// reported to the debugger).
+    ///
+    /// Identical to [`exec`](Self::exec) but sets the chunk name so a debugger
+    /// breakpoint keyed on that source (the generated `.lua` name) matches. The
+    /// transpiled-module load path already names its chunks; this is the analogous
+    /// entry point for ad-hoc / per-request script execution under a known source.
+    ///
+    /// # Safety (input source analysis)
+    /// Same as [`exec`](Self::exec): callers pass transpiled Lua or Rust string
+    /// literals; no external user input reaches this method. Errors propagate via
+    /// `LuaResult`.
+    pub fn exec_named(&self, script: &str, name: &str) -> LuaResult<Value> {
+        self.lua.load(script).set_name(name).eval()
+    }
+
+    /// The bound DAP listen address when the debug backend is active, else `None`.
+    ///
+    /// `Some(addr)` only when this runtime was built with `config.debug.enabled`
+    /// and the transport bound a port (the OS-assigned concrete port is readable
+    /// here even when port 0 was requested — R3.1). On the disabled default path
+    /// this is always `None` (no port is ever opened — R5.5), which doubles as the
+    /// zero-cost assertion hook for tests.
+    pub fn debug_local_addr(&self) -> Option<std::net::SocketAddr> {
+        self.debug_handle.as_ref().and_then(|h| h.local_addr())
+    }
+
+    /// Whether the debug backend is active for this runtime (a handle is held).
+    pub fn debug_enabled(&self) -> bool {
+        self.debug_handle.is_some()
     }
 
     /// Execute a Lua script from a file.
@@ -332,7 +391,17 @@ impl PastaLuaRuntime {
         logger: Option<Arc<PastaLogger>>,
         _scene_dic_path: &Path,
     ) -> LuaResult<Self> {
-        // Create base runtime
+        // Derive the debug gate BEFORE building the VM (task 4.2): funnel the
+        // pasta.toml `[debug]` section (`PastaConfig::debug()`) plus the
+        // `PASTA_DEBUG`/`PASTA_DEBUG_PORT` environment through the single pure
+        // `DebugConfig::resolve` choke point and attach it to `runtime_config`.
+        // `with_config` then performs the SINGLE `debug::enable` at VM init. When
+        // there is no `[debug]` section (and no env override) this resolves to the
+        // disabled, zero-cost default (R5.2 / R5.5).
+        let debug_file = pasta_config.as_ref().and_then(|c| c.debug());
+        let runtime_config = runtime_config.with_debug_from_file_and_env(debug_file.as_ref());
+
+        // Create base runtime (installs the debug hook exactly once iff enabled).
         let mut runtime = Self::with_config(context, runtime_config)?;
 
         // Set logger if provided

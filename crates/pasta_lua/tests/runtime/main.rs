@@ -6,10 +6,9 @@
 #[path = "../common/mod.rs"]
 mod common;
 
+mod debug_integration_test;
 mod encoding_test;
 mod finalize_scene_test;
-#[cfg(feature = "lua-debug-poc")]
-mod lua_debug_poc_test;
 mod local_scene_call_test;
 mod persistence_integration_test;
 mod scene_test;

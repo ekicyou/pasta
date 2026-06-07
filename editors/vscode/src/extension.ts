@@ -9,6 +9,7 @@ import { DocumentSync } from './documentSync';
 import { SemanticTokensProvider, PASTA_TOKENS_LEGEND } from './semanticTokensProvider';
 import { DiagnosticsManager } from './diagnosticsManager';
 import { activateWordRefDecorator } from './wordRefDecorator';
+import { PastaDebugAdapterFactory } from './debugAdapterFactory';
 
 /** Activation state of the extension */
 export interface ActivationState {
@@ -33,6 +34,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   // Initialize word-ref box decorations
   activateWordRefDecorator(context);
+
+  // Register the Pasta debug adapter factory (attach to the Rust DAP backend).
+  // Independent of WASM readiness — debugging targets a running pasta_lua VM.
+  context.subscriptions.push(
+    vscode.debug.registerDebugAdapterDescriptorFactory('pasta', new PastaDebugAdapterFactory())
+  );
 
   // Initialize diagnostics manager
   diagnosticsManager = new DiagnosticsManager();

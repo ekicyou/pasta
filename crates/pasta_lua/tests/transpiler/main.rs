@@ -17,3 +17,4 @@ mod dynamic_call_test;
 mod fallback_search_integration_test;
 mod scene_test;
 mod snapshot_test;
+mod source_map_seam_test;

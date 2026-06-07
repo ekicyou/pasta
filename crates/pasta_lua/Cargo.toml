@@ -12,10 +12,11 @@ homepage.workspace = true
 documentation.workspace = true
 
 [features]
-# lua-debug-poc: VSCode Lua デバッグ実現可能性の検証ハーネス（テスト専用）。
-# default には含めず、`cargo test --features lua-debug-poc` でのみ有効化する。
-# 既定（リリース）ビルド・既存テストには一切影響しない（Requirement 5.1）。
-lua-debug-poc = []
+# pasta-source-map-slice: `.pasta`↔生成 `.lua` 行対応の薄い実証スライス（R4.4/R4.5）。
+# default には含めず、`cargo test --features pasta-source-map-slice` でのみ有効化する。
+# 無効時（既定）はスライスのコード・テスト経路を一切コンパイル/露出せず、本番動作へ
+# ゼロコスト（R4.6）。本番品質のソースマップ実装は別仕様 `pasta-source-map` の担当。
+pasta-source-map-slice = []
 
 [dependencies]
 pasta_core.workspace = true

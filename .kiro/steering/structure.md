@@ -52,7 +52,19 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       │   ├── code_gen/    # Luaコード生成（ディレクトリモジュール）
 │       │   │   ├── mod.rs          # コード生成エントリーポイント
 │       │   │   ├── scope_gen.rs    # スコープ生成（分割impl）
-│       │   │   └── element_gen.rs  # 要素生成（分割impl）
+│       │   │   ├── element_gen.rs  # 要素生成（分割impl）
+│       │   │   └── source_map.rs   # .pastaソースマップ記録シーム（SourceMapSink/PastaPos）
+│       │   ├── debug/      # VSCode Luaデバッグバックエンド（DAP・既定無効/ゼロコスト・SHIORI非依存）
+│       │   │   ├── mod.rs          # DebugConfig/enable()/DebugHandle/DebugError・有効化ゲート
+│       │   │   ├── types.rs        # 共有DTO（SessionCommand/Event・FrameInfo・ThreadId等）
+│       │   │   ├── breakpoints.rs  # BreakpointSet（Arc<Mutex>共有）
+│       │   │   ├── hook.rs         # set_global_hook＋jit.off・LineHookシーム
+│       │   │   ├── session.rs      # 停止状態機械・StepController（over/in/out）
+│       │   │   ├── inspect.rs      # FrameInspector（mlua::ffi・コルーチンstate走査）
+│       │   │   ├── transport.rs    # TCP＋Content-Lengthフレーミング（I/O専用）
+│       │   │   ├── dap.rs          # DAP最小サブセット（serde_json手書き）
+│       │   │   ├── wiring.rs       # transport↔dap↔session↔hook結線（ブリッジスレッド）
+│       │   │   └── source_map.rs   # .pasta実証スライス（feature gate・LineMap/resolve）
 │       │   ├── context.rs   # トランスパイルコンテキスト
 │       │   ├── error.rs     # エラー型
 │       │   ├── encoding/    # エンコーディング処理（プラットフォーム別分割）

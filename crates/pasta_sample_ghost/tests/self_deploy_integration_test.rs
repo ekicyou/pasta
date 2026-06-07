@@ -120,26 +120,28 @@ fn fresh_first_boot_self_deploys_and_require_resolves() {
         "package.path must include the self-deploy dir, got: {pkg_path}"
     );
 
-    // フレームワークの実在モジュール（dkjson: 純粋なテーブル返却モジュール）が
+    // フレームワークのコアモジュール（pasta: pasta/init.lua）が
     // 自己展開先から require で解決できること（Req 6.3 / 5.5）。
+    // 注: 旧 probe の `dkjson` は luasocket デバッグ資産撤去（pasta-vscode-lua-debug R8）で
+    // 内蔵 zip から除去されたため、常設のフレームワークコア `pasta` を probe に用いる。
     let resolved = runtime
-        .exec("return (require('dkjson') ~= nil)")
-        .expect("exec require dkjson");
+        .exec("return (require('pasta') ~= nil)")
+        .expect("exec require pasta");
     assert_eq!(
         resolved.as_boolean(),
         Some(true),
-        "framework module 'dkjson' must resolve via require after self-deploy"
+        "framework module 'pasta' must resolve via require after self-deploy"
     );
 
     // searchpath が確かに自己展開先を指していること（解決位置の裏取り）。
     let where_resolved = runtime
-        .exec("return package.searchpath('dkjson', package.path)")
-        .expect("exec searchpath dkjson");
+        .exec("return package.searchpath('pasta', package.path)")
+        .expect("exec searchpath pasta");
     let where_resolved = value_as_str(&where_resolved).expect("searchpath result to string");
     assert!(
         where_resolved.contains("profile/pasta/pasta_scripts")
             || where_resolved.contains("profile\\pasta\\pasta_scripts"),
-        "dkjson must resolve under the self-deploy dir, got: {where_resolved}"
+        "pasta must resolve under the self-deploy dir, got: {where_resolved}"
     );
 }
 
@@ -224,7 +226,7 @@ fn write_failure_logs_error_and_continues() {
     {
         let runtime = PastaLoader::load(base).expect("initial fresh load to establish live scripts");
         // 既存版が機能していること（フレームワークが解決する）を軽く確認。
-        let ok = runtime.exec("return (require('dkjson') ~= nil)").expect("exec require");
+        let ok = runtime.exec("return (require('pasta') ~= nil)").expect("exec require");
         assert_eq!(ok.as_boolean(), Some(true), "framework must resolve from initial deploy");
     }
     assert!(
@@ -254,7 +256,7 @@ fn write_failure_logs_error_and_continues() {
     let ok = runtime.exec("return 1+1").expect("exec after continue");
     assert_eq!(ok.as_i64(), Some(2), "runtime must be usable after non-fatal self-deploy failure");
     let resolved = runtime
-        .exec("return (require('dkjson') ~= nil)")
+        .exec("return (require('pasta') ~= nil)")
         .expect("exec require after continue");
     assert_eq!(
         resolved.as_boolean(),

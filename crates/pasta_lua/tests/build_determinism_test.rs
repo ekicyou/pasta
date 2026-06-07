@@ -111,6 +111,43 @@ fn md5_changes_when_a_single_file_changes() {
     );
 }
 
+/// 生成 zip 内の全エントリ名（forward-slash 相対パス）を列挙する。
+fn zip_entry_names(zip_bytes: &[u8]) -> Vec<String> {
+    let reader = std::io::Cursor::new(zip_bytes.to_vec());
+    let mut archive = zip::ZipArchive::new(reader).expect("open generated zip");
+    let mut names = Vec::with_capacity(archive.len());
+    for i in 0..archive.len() {
+        let entry = archive.by_index(i).expect("read zip entry");
+        names.push(entry.name().to_string());
+    }
+    names
+}
+
+/// R8.1: 旧 luasocket デバッグ資産（撤去対象の4ファイル）が埋め込み zip に同梱されないこと。
+/// build.rs と同一のパッカーで生成した zip のエントリ一覧を直接検査する
+/// （= 実際に dll へ埋め込まれるバイト列の内容を検証する）。
+#[test]
+fn legacy_luasocket_debug_assets_absent_from_zip() {
+    let zip = build_zip::build_deterministic_zip(&scripts_root());
+    let names = zip_entry_names(&zip);
+
+    // requirements 8.1 / design "Removed Files (R8)" が名指しする厳密な4資産。
+    let removed = [
+        "vscode-debuggee.lua",
+        "socket/core.dll",
+        "mime/core.dll",
+        "dkjson.lua",
+    ];
+
+    for asset in removed {
+        assert!(
+            !names.contains(&asset.to_string()),
+            "removed legacy luasocket debug asset still present in embedded zip: {asset}\n\
+             zip entries: {names:?}"
+        );
+    }
+}
+
 /// ツリー内で最初に見つかったファイルを（決定的な順序で）返す。
 fn find_first_file(dir: &Path, out: &mut Option<PathBuf>) {
     if out.is_some() {

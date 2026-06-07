@@ -92,14 +92,6 @@ files = {
 exclude_files = {
     "scriptlibs/**",          -- 外部ライブラリは除外
     ".luacheckrc",
-    -- pasta_scripts/ 内のサードパーティライブラリ
-    "pasta_scripts/dkjson.lua",          -- David Kolf's JSON module
-    "pasta_scripts/vscode-debuggee.lua", -- VS Code debugger adapter
-    "pasta_scripts/ltn12.lua",           -- LuaSocket LTN12
-    "pasta_scripts/socket.lua",          -- LuaSocket
-    "pasta_scripts/socket/**",           -- LuaSocket submodules
-    "pasta_scripts/mime.lua",            -- LuaSocket MIME
-    "pasta_scripts/mime/**",             -- LuaSocket MIME submodules
 }
 
 -- コード品質設定

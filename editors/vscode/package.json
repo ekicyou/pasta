@@ -28,7 +28,8 @@
         "Programming Languages"
     ],
     "activationEvents": [
-        "onLanguage:pasta"
+        "onLanguage:pasta",
+        "onDebug:pasta"
     ],
     "main": "./out/extension.js",
     "contributes": {
@@ -176,6 +177,58 @@
                     ]
                 }
             }
+        ],
+        "breakpoints": [
+            {
+                "language": "pasta"
+            },
+            {
+                "language": "lua"
+            }
+        ],
+        "debuggers": [
+            {
+                "type": "pasta",
+                "label": "Pasta Debug",
+                "configurationAttributes": {
+                    "attach": {
+                        "properties": {
+                            "host": {
+                                "type": "string",
+                                "description": "Host the Pasta debug backend is listening on.",
+                                "default": "127.0.0.1"
+                            },
+                            "port": {
+                                "type": "number",
+                                "description": "TCP port the Pasta debug backend is listening on.",
+                                "default": 9276
+                            }
+                        }
+                    }
+                },
+                "initialConfigurations": [
+                    {
+                        "type": "pasta",
+                        "request": "attach",
+                        "name": "Attach to Pasta Debug Backend",
+                        "host": "127.0.0.1",
+                        "port": 9276
+                    }
+                ],
+                "configurationSnippets": [
+                    {
+                        "label": "Pasta: Attach",
+                        "description": "Attach to a running Pasta debug backend.",
+                        "body": {
+                            "type": "pasta",
+                            "request": "attach",
+                            "name": "Attach to Pasta Debug Backend",
+                            "host": "127.0.0.1",
+                            "port": 9276
+                        }
+                    }
+                ]
+            }
         ]
     },
     "scripts": {
@@ -183,7 +236,7 @@
         "watch": "esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --sourcemap --watch",
         "lint": "eslint src",
         "test:grammar": "esbuild ./src/test/tmGrammar.test.ts --bundle --outfile=out/test/tmGrammar.test.js --format=cjs --platform=node --sourcemap && node out/test/tmGrammar.test.js",
-        "test:unit": "esbuild ./src/test/wasmBridge.test.ts --bundle --outfile=out/test/wasmBridge.test.js --format=cjs --platform=node --sourcemap && esbuild ./src/test/integration.test.ts --bundle --outfile=out/test/integration.test.js --format=cjs --platform=node --sourcemap && node out/test/wasmBridge.test.js && node out/test/integration.test.js",
+        "test:unit": "esbuild ./src/test/wasmBridge.test.ts --bundle --outfile=out/test/wasmBridge.test.js --format=cjs --platform=node --sourcemap && esbuild ./src/test/integration.test.ts --bundle --outfile=out/test/integration.test.js --format=cjs --platform=node --sourcemap && esbuild ./src/test/debugAdapterFactory.test.ts --bundle --outfile=out/test/debugAdapterFactory.test.js --format=cjs --platform=node --sourcemap && node out/test/wasmBridge.test.js && node out/test/integration.test.js && node out/test/debugAdapterFactory.test.js",
         "test:e2e": "esbuild ./src/test/e2e.test.ts --bundle --outfile=out/test/e2e.test.js --format=cjs --platform=node --sourcemap && node out/test/e2e.test.js",
         "test": "npm run test:grammar && npm run test:unit && npm run test:e2e",
         "prepackage": "npm run build:wasm && npm run compile",

@@ -32,6 +32,7 @@
 pub mod code_gen;
 pub mod config;
 pub mod context;
+pub mod debug;
 pub mod encoding;
 pub mod error;
 pub mod loader;
@@ -47,11 +48,13 @@ pub mod transpiler;
 pub use code_gen::LuaCodeGenerator;
 pub use config::{LineEnding, TranspilerConfig};
 pub use context::TranspileContext;
+pub use debug::{DebugConfig, DebugError, DebugHandle, enable as enable_debug};
 pub use encoding::{Encoder, Encoding};
 pub use error::{ConfigError, TranspileError};
 pub use loader::{
-    CacheManager, LoaderConfig, LoaderContext, LoaderError, LoggingConfig, LuaConfig, PastaConfig,
-    PastaLoader, TalkConfig, TranspileFailure, TranspileResult, default_libs,
+    CacheManager, DebugFileConfig, LoaderConfig, LoaderContext, LoaderError, LoggingConfig,
+    LuaConfig, PastaConfig, PastaLoader, TalkConfig, TranspileFailure, TranspileResult,
+    default_debug_port, default_libs,
 };
 pub use logging::{
     GlobalLoggerRegistry, LoadDirGuard, PastaLogger, get_current_load_dir,
