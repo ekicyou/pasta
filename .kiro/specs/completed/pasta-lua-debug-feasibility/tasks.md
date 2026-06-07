@@ -1,0 +1,101 @@
+# Implementation Plan: pasta-lua-debug-feasibility
+
+> 検証（PoC）仕様。成果物は再現可能な feature-gated 検証ハーネスと、段階的 GO 判定（NO-GO / 条件付き GO / GO / GO+）の文書。production コードは無改変（Cargo.toml `[features]` 追加とテスト側 gated `mod` 行のみ）。
+
+- [ ] 1. Foundation: feature ゲートとハーネス土台
+- [x] 1.1 feature `lua-debug-poc` とビルド構成
+  - `crates/pasta_lua/Cargo.toml` に `[features]` を新設し `lua-debug-poc`（default 無効）を追加
+  - `tests/runtime/main.rs` に gated な検証ハーネスのモジュール宣言を追加し、ハーネス本体にサブモジュール宣言の骨組み（空でコンパイル可）を置く
+  - 観測: `cargo test --features lua-debug-poc` がコンパイル成功し、feature 無効の既定ビルド・既存テストは不変
+  - _Requirements: 5.1_
+- [x] 1.2 ハーネス共有型と jit 無効化 VM ヘルパ
+  - 共有型（行イベント / 変数 / フレーム情報 / コマンド / イベント / ブレークポイント / 項目結果 / 段階）を定義
+  - 既存の生 VM ヘルパで ALL_SAFE の VM を構築し、**グローバル `jit.off()`（無引数）** で JIT エンジンを無効化するヘルパを用意（`std_debug` 非露出を確認。`jit.off(true,true)` は関数単位制御で不十分——Implementation Notes 参照）
+  - 観測: 型がコンパイルし、ヘルパが返す VM で jit が無効化されている（`jit.status()` 第一返値 == false で確認）
+  - _Requirements: 1.4, 5.3_
+
+- [ ] 2. Core: 観測・制御コンポーネント
+- [x] 2.1 (P) HookProbe: フック発火とコルーチン横断検証
+  - jit.off 後に全行トリガのグローバルフックを設置し、行イベント（ソース・行・コルーチン識別）を記録
+  - シーン実行（シーン=コルーチンの動的生成と駆動ループ）を忠実に模したシナリオを構築
+  - 単一チャンクで各行発火（期待行系列一致）、複数コルーチンで全コルーチン発火を assert
+  - グローバルフックが Lua 側コルーチン生成に効かない場合のフォールバック（Rust 製コルーチン生成差し替えでスレッド毎にフック付与）を試行し、採用したフック方式を記録
+  - 観測: 発火検証テストが緑になり、採用フック方式が出力される
+  - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
+  - _Boundary: HookProbe_
+  - _Depends: 1.2_
+- [x] 2.2 (P) PauseGate: ブレークポイント判定と停止/再開機構
+  - ブレークポイント集合と標的判定（ソース・行の包含）を実装
+  - フック内ブロッキング待機と再開（コマンド受信で復帰、yield 不使用・常に Continue を返す）を実装
+  - 観測: 標的判定の論理ユニットテストが緑、再開コマンドでブロックが解けることをテストで確認
+  - _Requirements: 2.3_
+  - _Boundary: PauseGate_
+  - _Depends: 1.2_
+- [x] 2.3 (P) FrameInspector: フレーム情報と FFI 変数取得
+  - 安全 API でソース・行・関数名を取得
+  - 生 state を取得して現フレームのアクティベーションレコードを再取得し、ローカル・upvalue を名前と値で取得（基本型 number/string/boolean/table を判別、スタックを必ず復元）
+  - `std_debug` 非露出のまま成立させることを第一目標とし、取得不可・制限される種別は範囲と回避策を記録
+  - 観測: フックで止めた地点（inspect 後に継続でも可）で number/string/boolean/table を取得・型判別するテストが緑
+  - _Requirements: 3.1, 3.2, 3.3, 3.4_
+  - _Boundary: FrameInspector_
+  - _Depends: 1.2_
+- [x] 2.4 (P) VerdictRecorder: 段階判定ロジック
+  - 項目結果の収集と段階算出（最低ライン未達→NO-GO、R1+R2→条件付き GO、+R3→GO、+R4→GO+）
+  - 判定の妥当性前提として隔離条件（feature-gate / cargo test 実行 / サンドボックス維持）の注記を含む結果出力
+  - 観測: 各入力に対し段階が正しく算出されるユニットテストが緑（最低ライン未達で NO-GO を返す）
+  - _Requirements: 6.1, 6.2, 6.3, 6.4_
+  - _Boundary: VerdictRecorder_
+  - _Depends: 1.2_
+
+- [ ] 3. Integration: セッション駆動とトランスポート
+- [x] 3.1 デバッグセッション駆動と R2 停止・再開検証
+  - VM をホスト役スレッドで起動し、ブレークポイント判定＋停止を行うフックを設置、コマンド/イベントチャネルを公開する共有ドライバを実装（トランスポート非依存・スレッドモデル①〜③）
+  - コントローラスレッドで「標的行で停止継続（共有フラグが非進行）→再開→進行」を検証
+  - 観測: R2 の停止→再開テストが緑になり、停止中は進行フラグが変化しない
+  - _Requirements: 2.1, 2.2_
+  - _Boundary: session, PauseGate, HookProbe_
+  - _Depends: 2.1, 2.2_
+- [x] 3.2 TransportLoop と R4 トランスポート往復検証
+  - OS 割当ポート（127.0.0.1:0）の TcpListener を長命 1 スレッドで待受し、socket とセッションのチャネルを橋渡し（最小行プロトコル: 停止通知 / 変数 / 継続）
+  - client スレッドで「停止→変数取得→継続」の往復を完了させ、socket=I/O・VM 操作=フック内の分離（!Send 遵守）を維持、`std::net` のみ使用
+  - 往復が成立しない場合はブロッカー（スレッド分離・!Send・ブロッキング起因）を記録し、到達段階を GO 以下に据置
+  - 観測: R4 往復テストが往復完了で成功し、追加クレートなしで成立
+  - _Requirements: 4.1, 4.2, 4.3, 4.4_
+  - _Boundary: TransportLoop_
+  - _Depends: 3.1, 2.3_
+
+- [ ] 4. Validation: 異常系・判定集約・隔離
+- [x] 4.1 異常検出（パニック・デッドロック・inspect 不可）
+  - フック内パニックを捕捉して項目結果へ記録、コントローラ側 timeout で未達/デッドロックを検出（テスト専用 watchdog・停止コアには組み込まない）
+  - inspect 不可種別を範囲外として記録
+  - 観測: 異常注入テストが失敗を項目結果として記録し、ハングせずに終了する
+  - _Requirements: 2.4, 3.4_
+  - _Depends: 3.1, 2.3_
+- [x] 4.2 段階判定の集約と検証結果の文書化
+  - 全チャレンジ項目（R1〜R4）の結果を集約して段階を算出し、cargo test 出力に各項目結果と段階を表示
+  - `research.md` に「PoC 検証結果」節を追記（到達段階・採用フック方式・変数 inspect 方式・既知制約・SSP 応答ブロッキングの扱い・後続実装仕様 `pasta-vscode-lua-debug` への引き継ぎ結論）
+  - SSP ロード実機での確認が可能なら補足記録（任意）
+  - 観測: `cargo test --features lua-debug-poc` 実行で段階と各項目結果が出力され、`research.md` に検証結果節が存在する
+  - _Requirements: 5.2, 5.4, 6.2, 6.5_
+  - _Depends: 2.1, 2.4, 3.1, 3.2, 4.1_
+- [x] 4.3 隔離の最終確認
+  - feature 無効で既定ビルド・既存テストが不変であり、ハーネスが非コンパイルであることを確認
+  - 観測: `cargo test`（feature 無効）が従来どおり緑で、ハーネスコードがビルドに含まれない
+  - _Requirements: 5.1, 5.5_
+  - _Depends: 4.2_
+
+## Implementation Notes
+
+- **ビルド前提（全タスク共通）**: cargo の build/test 前に同一 PowerShell 呼び出し内で `Remove-Item Env:\NoDefaultCurrentDirectoryInExePath -ErrorAction SilentlyContinue` を実行する（未実行だと mlua-sys/LuaJIT ビルドが exit 101 で失敗）。
+- **jit.off セマンティクス（タスク 1.2 知見・タスク 2.1 に影響）**: LuaJIT の `jit.off(true,true)` は「呼び出し元関数＋下位関数」の**関数単位**制御で `jit.status()` のグローバルエンジン状態を変えない。VM 全体の JIT 無効化（ラインフック取りこぼし防止 R1.4）には**無引数 `jit.off()`** が必要。設計が当初 mandate していた `jit.off(true,true)` を無引数 `jit.off()` に訂正済み（design.md「jit.off セマンティクス注」・requirements.md R1.1・research.md「実装フェーズ知見」）。タスク 2.1 の HookProbe は無引数 `jit.off()` 済み VM 前提で実装すること。
+- **R1 = GO（タスク 2.1 実証）**: 無引数 `jit.off()` 済み LuaJIT 2.1 VM 上で `mlua::Lua::set_global_hook`（`HookTriggers::EVERY_LINE`）が Lua 側 `coroutine.create` 由来の動的コルーチン群すべてに line フックを撃つ（`HookStrategy::GlobalHook` 採用・D1 フォールバック不要・LuaJIT #666 のグローバル sethook 挙動を確認）。フックコールバックは常に `VmState::Continue` を返す（LuaJIT は `Yield` 不可）。注意: フックコールバック内の `&Lua` は常にメインステートで、走行中コルーチンの `lua_State*` は渡されない（`thread_ptr` はベストエフォート）。コルーチン横断の識別は記録した source/line 内容で行う。後続 3.1/4.x も同じグローバルフック方式を踏襲。
+- **mlua::VmState は PartialEq/Debug 未実装（タスク 2.2 知見）**: テストでは `assert_eq!` 不可。`matches!(state, mlua::VmState::Continue)` で判定すること（3.x/4.x も同様）。
+- **R3 = GO 方向（タスク 2.3 実証）**: `Lua::exec_raw` ＋ `mlua::ffi`（`lua_getstack`/`lua_getlocal`/`lua_getupvalue`/`lua_getinfo`）で**ローカル・upvalue を名前＋値で取得でき、number/string/boolean/table を `lua_type` 判別**。`std_debug` 非露出のまま成立（`debug==nil` 維持・R5.3）。スタックは entry/exit で `lua_gettop` 一致を保証。
+  - **exec_raw レベルオフセット知見**: `exec_raw` はクロージャを内部 `lua_pcall`（`do_call` C フレーム）下で実行するため `lua_getstack(L,0)` は C フレームを指す。`what` が "Lua"/"main" の最初のフレームを走査して選ぶ（`find_first_lua_frame`）必要がある。
+  - **R3.4 既知制約（後続実装仕様 pasta-vscode-lua-debug へ重要引き継ぎ）**: フックコールバックの `&Lua`＝メインステート、`exec_raw` もメインステートで動くため、**走行中コルーチン本体のフレームは別 `lua_State` 上にあり、このメインステート FFI 経路からは到達不可**。本 PoC は**メインスレッド（トップレベル）Lua フレームの変数取得を実証**。pasta のシーンはコルーチンで走るため、コルーチン内ローカルの inspect は実装仕様でコルーチン自身の state を辿る等の追加対応が必要（回避策: デバッグ時限定 `std_debug`）。タスク 4.2/VerdictRecorder で ItemOutcome として記録すること。
+- **ItemOutcome.id 規約（タスク 2.4 知見・タスク 4.2 必須）**: `compute_tier` は `ItemOutcome.id` を `"R1"`/`"R2"`/`"R3"`/`"R4"` の文字列で照合する（欠落 id は not-passed 扱い・単調積み上げ）。タスク 4.2 で各チャレンジ項目を集約する際は **この exact な id 文字列**を設定すること。`report` は全項目＋算出 Tier＋R5 隔離前提（feature-gate / cargo test / サンドボックス）を出力する。
+- **R2 = GO 方向（タスク 3.1 実証）**: VM をテスト spawn のホスト役スレッドで起動（Lua はスレッド内生成・非 move、チャネル端点と `Arc<Atomic*>` のみ seam を渡る）。フック内 `should_pause`→`block_until_command` で標的行に停止継続（進行フラグ凍結）、`Continue` で再開・進行を実証。停止コアは無期限 `recv()`、timeout はテスト専用 watchdog。
+  - **!Send エラー境界知見（タスク 3.1・3.2/4.x/実装仕様へ重要）**: `mlua::Error` は `Arc<dyn Error>`（`!Send`）を保持するため `JoinHandle<mlua::Result<()>>` は `T: Send` を満たさない。VM スレッド境界では mlua エラーを `String` 等 Send 安全な値へ変換して渡すこと（thread model ③ 準拠）。
+- **R4 = GO+ 到達（タスク 3.2 実証）**: 別スレッドの `std::net` TcpListener を介した最小行プロトコル（`stopped`/`vars`/`continue`）で「停止→変数取得→再開」の往復を完全成立。`vars` payload は実 FFI inspect 値（`answer=number:42`）を搬送（空往復でないことを専用テストで非空＋値一致 assert）。3スレッド分離（client / listener=socket I/O のみ / VM ホスト=フック内に Lua・FFI）、`!Send` 遵守、`std` のみ・追加クレートなし（Cargo.toml 無改変）。in-hook 停止ループは Inspect→`inspect_locals`→`Vars`、Continue→復帰（transport_loop.rs 側に新設・pause_gate.rs 未改変、targeting は `should_pause` をダミーチャネル gate で再利用）。
+- **チャレンジ項目総括（タスク 4.2 集約用）**: R1=GO（HookStrategy::GlobalHook）／R2=成立（停止・再開）／R3=成立（FFI 変数取得・メインフレーム制約 R3.4 付き）／R4=成立（トランスポート往復）。`compute_tier` 入力で **R1〜R4 すべて passed=true → Tier = GoPlus（GO+）** 見込み。
+- **異常検出知見（タスク 4.1 実証）**: (1) フック内パニックは mlua 0.11.6 が `callback_error_ext` で `catch_unwind`→`WrappedFailure::Panic`→Rust 呼出境界で `resume_unwind` 再送する。`exec()` を `catch_unwind(AssertUnwindSafe)` で囲めば**同一スレッドで捕捉でき VM スレッドは異常終了しない**。ただし**MSVC/LuaJIT の C-unwind 境界で panic ペイロードが失われ**（`&str`/`String` への downcast 不可・不透明 TypeId）、原因記録には**フック内で Send 安全なサイドチャネルへ事前格納**が必要（後続実装仕様 pasta-vscode-lua-debug へ引き継ぎ）。(2) デッドロックはテスト専用 `recv_timeout`＋bounded-join で検出し、停止コアは無期限 `recv()` のまま（VM スレッドは検出後 detach）。(3) inspect 非対応種別（function/nil/userdata/thread/cdata）は `lua_typename` で `<unsupported ...>` として記録し、クラッシュせずスタックも維持（基本型は取得継続・R3.4）。
