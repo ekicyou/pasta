@@ -343,6 +343,71 @@ const LUA_MODULES = [
 }
 
 // ============================================================
+// G. デバッグ章（R7.1 導入/締めボイス / R7.3 コード内に口調なし / R8.4 存在・本文・ボイス検査可能）
+// ============================================================
+// デバッグ章は doc/spec 由来を持たないため A の権威リンク検査は対象外。
+// 既存の isSubstantive / hasVoice / stripCodeFences / extractCodeFences / NARRATION_MARKERS を再利用し、
+// 文法章ループ（GRAMMAR_CHAPTERS）と同型のイディオムでアサートする。
+const DEBUG_CHAPTERS = ['index', 'vscode-setup', 'source-level', 'constraints', 'troubleshooting'];
+
+for (const ch of DEBUG_CHAPTERS) {
+  const rel = `${SRC}/debug/${ch}.md`;
+  // G-exist: 各ページが存在する。
+  if (!exists(rel)) {
+    fail(`G-exist:${ch}`, `デバッグ章が存在しない: ${rel}`);
+    continue;
+  }
+  ok(`G-exist:${ch}`, `デバッグ章 ${ch}.md が存在する`);
+  const md = read(rel);
+  // G-body: 本文実体を持つ（プレースホルダでない）。
+  assert(
+    `G-body:${ch}`,
+    isSubstantive(md, 800),
+    `デバッグ章 ${ch}.md が本文を持つ`,
+    `デバッグ章 ${ch}.md が本文不足/プレースホルダ`,
+  );
+  // G-voice: 散文部（コードフェンス除去後）に導入/締めのキャラ口調がある（R7.1）。
+  const prose = stripCodeFences(md);
+  assert(
+    `G-voice:${ch}`,
+    hasVoice(prose),
+    `デバッグ章 ${ch}.md の散文部にキャラ口調（導入/締め）がある`,
+    `デバッグ章 ${ch}.md の散文部にキャラ口調が見当たらない`,
+  );
+  // G-codevoice: コードフェンス内に解説ナレーションが混入していない（R7.3）。
+  const fences = extractCodeFences(md);
+  const leaked = [];
+  for (const body of fences) {
+    for (const mk of NARRATION_MARKERS) {
+      if (body.includes(mk)) leaked.push(mk);
+    }
+  }
+  assert(
+    `G-codevoice:${ch}`,
+    leaked.length === 0,
+    `デバッグ章 ${ch}.md のコードフェンス内にナレーション混入なし`,
+    `デバッグ章 ${ch}.md のコードフェンス内に解説ナレーションが混入: ${leaked.join(', ')}`,
+  );
+}
+
+// G-fact: 主要事実が章全体のどこかに登場する（取りこぼし防止・R8.1 の最低限）。
+{
+  const allDebug = DEBUG_CHAPTERS
+    .map((ch) => `${SRC}/debug/${ch}.md`)
+    .filter((rel) => exists(rel))
+    .map((rel) => read(rel))
+    .join('\n');
+  const FACTS = ['9276', 'PASTA_DEBUG', 'attach', '.pasta', 'sourcePresentation'];
+  const missing = FACTS.filter((kw) => !allDebug.includes(kw));
+  assert(
+    'G-fact',
+    missing.length === 0,
+    `デバッグ章に主要事実が登場する (${FACTS.join(', ')})`,
+    `デバッグ章に未登場の主要事実: ${missing.join(', ')}`,
+  );
+}
+
+// ============================================================
 // レポート
 // ============================================================
 const passed = checks.filter((c) => c.pass);

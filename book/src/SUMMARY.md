@@ -29,6 +29,14 @@
   - [scripts/ の記述パターン](lua/patterns.md)
   - [DSL と Lua の使い分け](lua/dsl-vs-lua.md)
 
+# デバッグ
+
+- [デバッグ概要](debug/index.md)
+  - [VSCode 接続と拡張導入](debug/vscode-setup.md)
+  - [.pasta ソースレベルのデバッグ操作](debug/source-level.md)
+  - [構造的制約と緩和策](debug/constraints.md)
+  - [接続できないとき（トラブルシューティング）](debug/troubleshooting.md)
+
 # リファレンス
 
 - [外部リンク集](reference/external-links.md)

@@ -81,3 +81,37 @@ SUMMARY.md には載せず、mdBook のビルド対象（公開サイト）に�
 ### 重複回避メモ
 
 本レビューは 7.4 の責務（コンテンツの網羅・整合・ボイス）に限定する。静的出力・オフライン閲覧（7.1）、日本語検索（7.2）、ドリフト検出・完了ゲート（7.3）は各専用タスク・スクリプトが担い、本ファイル／`verify-content.mjs` では重複検証しない。
+
+---
+
+## G. デバッグ章（pasta-manual-debugging）
+
+> 対応要件: Requirement 6（6.2, 6.3, 6.4）, 7（7.2, 7.4）, 8（8.1, 8.3）。
+> 関連設計: `pasta-manual-debugging/design.md`「Testing Strategy / 人手確認（CONTENT-REVIEW.md 追補）」。
+> 確定事実の典拠: `pasta-manual-debugging/research.md` §1.3 / §7。
+> 観測可能な完了条件: 下記 5 項目すべてが「確認済」根拠付きで記録されている。
+
+デバッグ章（`book/src/debug/` の 4 ページ）は別仕様 `pasta-manual-debugging` で追加された。機械検証は 5.1 で全 PASS 済み（後述「機械検証の補完参照」）であり、本セクションはそれを補完する人手確認（記載値の事実一致・文体・本番記述・二重管理回避・実装非変更）を記録する。各項目は実ファイルを読んで照合した。
+
+| # | 確認項目 | 状況 | 根拠 |
+| - | -------- | ---- | ---- |
+| G-1 | **記載値の正確性（8.1）**: デバッグ 4 ページの設定値・既定値・識別子が research.md §1.3/§7 の確定事実と一致 | 確認済 | 4 ページ（`debug/{index,vscode-setup,source-level,constraints}.md`）を実読して research.md §1.3/§7 と逐一照合。一致を確認した主要値: `enabled` 既定 `false`（index.md）／`port` 既定 `9276`（index/vscode-setup）／`PASTA_DEBUG` truthy = `1/true/yes/on`・大小無視・trim 後（index.md L54）／優先順位 `環境変数 > pasta.toml [debug] > 既定値`（index.md L66）／`launch.json` の `type:"pasta"`・`request:"attach"`・`host:"127.0.0.1"`・`port:9276`・`sourcePresentation`（enum `pasta`/`lua`・任意）（vscode-setup.md L54-74）／接続先 `127.0.0.1:9276`・TCP・loopback 限定・attach のみ（vscode-setup.md L46,80）／提示モード優先順位 `sourcePresentation > PASTA_DEBUG_SOURCE_MODE > present_as > 既定 .pasta`（source-level.md L49）／サイドカー出力先 `<lua_path>.map`（例 `.../scene/sys.lua` → `.../scene/sys.lua.map`）・JSON・既定無効（source-level.md L99-115）／ブレークポイント言語 `pasta`+`lua` 両登録（source-level.md L16, vscode-setup.md L12）。研究確定値との齟齬は検出されず。 |
+| G-2 | **本体の文体（7.2/7.4）**: 説明本体が普通文体で、キャラ口調により技術的内容が不正確・読みにくくなっていないこと | 確認済 | 4 ページとも、章の導入（冒頭 2 段落）と締め（末尾 2 行）にのみ Claudia 令嬢ボイスが置かれ、有効化・接続・操作・制約の説明本体（見出し配下の段落・表・コードフェンス）は淡々とした普通文体で記述されている。設定値・優先順位・launch.json 例・制約の仕組み（`Arc<Mutex>` 直列化）は表とプレーン文で提示され、口調による誤読の余地なし。コードフェンス・表セル内に地の文ナレーションの混入なし（機械検査 `[G-codevoice:*]` とも整合）。R7.4（正確さ優先）違反は検出されず。 |
+| G-3 | **`.pasta` 本番記述（6.2）**: `.pasta` ソースレベルが本番提供機能として記述され「実験的」「将来」表現が無いこと | 確認済 | `source-level.md` L10 が「すべて**本番提供の機能**である。実験的な試みでも将来の予定でもなく、出荷済みの実装として今すぐ利用できる」と明記。`index.md` L14 も「これは本番提供の機能であり」と記述。4 ページ全体を読み、`.pasta` ソースレベルを実験的・将来仕様と位置づける記述は存在しないことを確認（陳腐化した旧 `DEBUGGING.md` の「実験的・将来」表現は撤去済み・G-4 参照）。 |
+| G-4 | **二重管理なし（6.3/6.4）**: ルート `DEBUGGING.md` がリダイレクトスタブのみで重複本文を残さず、README ドキュメント表もマニュアルを権威として指す | 確認済 | ルート `DEBUGGING.md` を実読。本文は撤去され「デバッグの説明は…マニュアルのデバッグ章に移設しました」「内容の二重管理を避けるため、ここでは個別の手順や設定値を再掲しません」と明記し、公開サイト URL（`https://ekicyou.github.io/pasta/`）＋ `book/src/debug/` 各ページへの数行の誘導のみで構成。具体的設定値・手順の重複本文なし。`README.md` のドキュメント表（L45）も「マニュアル デバッグ章」を**権威的ソース**と記し、`DEBUGGING.md` を「本章へのリダイレクトスタブ」と説明しており、読者を最新（マニュアル）へ導く構成。並行管理は検出されず。 |
+| G-5 | **デバッグ実装未変更（8.3）**: 本仕様でデバッグ機能（`crates/pasta_lua/src/debug/*`・`editors/vscode/*`）のコードを変更していないこと | 確認済 | `git diff --name-only 5f66618~1 HEAD`（本仕様 `pasta-manual-debugging` のコミット範囲）で変更ファイルを確認。対象は `.kiro/specs/pasta-manual-debugging/*`・`DEBUGGING.md`・`README.md`・`book/src/SUMMARY.md`・`book/src/debug/*.md`（4 ページ）・`book/tools/verify-content.mjs` に限られる。`crates/pasta_lua/src/debug/*` および `editors/vscode/*` のコードは本範囲に**一切含まれない**（フィルタ結果: NONE）。デバッグ実装は読み取り専用の典拠としてのみ参照し、変更していないことを確認。 |
+
+### 機械検証の補完参照（5.1 実施済み）
+
+本セクションは人手確認が主眼であり、機械検証は補完関係として参照する。タスク 5.1 で次が全 PASS 済み（5.1 の検証記録に基づく）:
+
+- `node book/tools/verify-content.mjs` — デバッグ章カテゴリ `G`（存在・本文 800 字以上・ボイス・コードフェンス内ナレーション非混入・主要事実の登場）および既存 A〜F が非回帰で PASS。
+- `node book/tools/verify-static.mjs` — デバッグ全ページの HTML 生成・`file://` 解決・SUMMARY リンク健全。
+- `node book/tools/verify-search.mjs` — デバッグ章本文が日本語検索でヒット。
+- `node book/tools/drift-check.mjs` — 未マップ警告ゼロ・章内リンク切れゼロ。
+- `mdbook build book` — エラーなく静的サイト生成。
+
+### 総括（デバッグ章）
+
+- 人手確認 G-1〜G-5: いずれも実ファイル照合に基づき「確認済」。記載値は research.md §1.3/§7 の確定事実と一致、本体は普通文体、`.pasta` は本番機能として記述、`DEBUGGING.md`/`README.md` は二重管理なくマニュアルを権威として誘導、デバッグ実装コードは本仕様で未変更。
+- 結論: 要件 **6.2 / 6.3 / 6.4 / 7.2 / 7.4 / 8.1 / 8.3** のコンテンツ受入基準を人手確認の範囲で満たす（機械確認は 5.1 が補完）。

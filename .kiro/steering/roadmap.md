@@ -70,6 +70,17 @@ pasta ゴースト作者向けの利用者マニュアルを、mdBook で**サ�
 ### 将来仕様（Phase 4 派生・未着手）
 - [ ] pasta-runtime-internals-doc -- pasta Lua ランタイムの内部設計・アーキテクチャ解説（2パストランスパイル / yield-resume コルーチン / シーン検索 / ローダ自己展開 / SHIORI 非同期基盤）。読者＝コントリビュータ・実装理解者（利用者マニュアルとは読者層が異なる別境界）。Dependencies: pasta-user-manual
   - 由来: pasta-user-manual の設計ディスカッションで「ランタイム内部設計は本仕様外・将来仕様」と決定（R5 は API 使用法に限定）
+- [ ] manual-ssot-authority -- マニュアル全体の SSOT/権威化の再編。「mdBook に書く項目は mdBook を権威にする」方針を確立し、文法・Lua 含めた `doc/spec` との並行管理（drift-check 方式）を見直す。Dependencies: pasta-user-manual
+  - 由来: pasta-manual-debugging の discovery（2026-06-08）でユーザーが「mdbook に書いてる項目は mdbook を権威にしたい／別仕様で権威化の整理をすべき」と指摘。本仕様外・別仕様として申し送り
+
+### Phase 4 派生（デバッグ利用者ガイド）
+- [x] pasta-manual-debugging -- VSCode Lua デバッグ（`.pasta` ソースレベルまで完全網羅）の利用者向けデバッグ章を mdBook マニュアルに追加。有効化／`launch.json`／attach／BP・ステップ・変数 inspect・提示モード切替／構造的制約と緩和策。ルート `DEBUGGING.md` をマニュアルへ統合・最新化しリダイレクト化（mdBook を権威）。Dependencies: pasta-vscode-lua-debug, pasta-source-map, pasta-user-manual
+  - discovery 決定（2026-06-08）: DEBUGGING.md = マニュアルに一本化（推奨案）、スコープ = `.pasta` ソースレベルまで完全網羅。brief.md 作成済み（`.kiro/specs/completed/pasta-manual-debugging/brief.md`）。マニュアル全体の権威化再編は manual-ssot-authority へ分離
+  - 実装完了 2026-06-08（全8タスク・各独立レビュー APPROVED・機能レベルバリデーション GO・mdbook build/verify-content(G+A〜F)/verify-static/verify-search/drift-check 全緑）。spec 完了フロー未実施
+
+### Phase 5 派生（デバッグ観測性）
+- [ ] debug-startup-logging -- pasta_lua デバッグバックエンドの `enable()` に「デバッグ有効化・DAP 待ち受け開始（実バインドアドレス `host:port`）」の `info!` 起動ログを追加し、`pasta.log` で起動確認できるようにする。無効時は無言・ゼロコスト維持。Dependencies: pasta-vscode-lua-debug
+  - 由来: pasta-manual-debugging 実装後のユーザー検証（2026-06-08）で「pasta.log でデバッグ起動を確認したいが、現状ログが出ない」と判明。デバッグ実装側の観測性ギャップ（pasta-manual-debugging は文書のみ・R8.3 で実装非変更のため境界外）。brief.md 作成済み（`.kiro/specs/debug-startup-logging/brief.md`）。完了後、pasta-manual-debugging のデバッグ章へ「ログ＋ポート確認」手順を小追補可能
 
 ## Phase 5: VSCode Lua デバッグ連携
 
