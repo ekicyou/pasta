@@ -1,0 +1,59 @@
+---
+source: crates/pasta_lua/tests/transpiler/zero_cost_regression_test.rs
+expression: lua_code
+---
+local PASTA = require "pasta"
+local GLOBAL = require "pasta.global"
+
+PASTA.create_word("挨拶"):entry("おはよう", "こんにちは", "こんばんは")
+do
+    local ACTOR = PASTA.create_actor("さくら")
+    ACTOR:create_word("一人称"):entry("私", "わたし", "あたし")
+
+    function ACTOR.時刻(act)
+        return "朝"
+    end
+end
+
+do
+    local ACTOR = PASTA.create_actor("うにゅう")
+    ACTOR:create_word("一人称"):entry("僕", "ぼく")
+end
+
+do
+    local SCENE = PASTA.create_scene("メイン")
+
+    SCENE:create_word("場所"):entry("東京", "大阪")
+
+    function SCENE.__start__(act, ...)
+        local args = { ... }
+        local save, var = act:init_scene(SCENE)
+
+        var.カウンタ = "10"
+        save.グローバル = "永続値"
+        act:set_property("mood", "happy")
+        act.さくら:talk("「")
+        act.さくら:talk(act.さくら:word("挨拶"))
+        act.さくら:talk("！")
+        act.さくら:talk(act.さくら:word("一人称は元気です"))
+        act.さくら:talk("」")
+        act.うにゅう:talk("「")
+        act.うにゅう:talk(act.うにゅう:word("場所にいるよ"))
+        act.うにゅう:talk("」")
+        return act:call(SCENE.__global_name__, "サブ会話", {}, table.unpack(args))
+    end
+
+    function SCENE.サブ会話_1(act, ...)
+        local args = { ... }
+        local save, var = act:init_scene(SCENE)
+
+        act.さくら:talk("「カウンタは")
+        act.さくら:talk(tostring(var.カウンタ))
+        act.さくら:talk("、グローバルは")
+        act.さくら:talk(tostring(save.グローバル))
+        act.さくら:talk("」")
+    end
+
+    local total = 1 + 2
+    return total
+end

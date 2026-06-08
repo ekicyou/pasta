@@ -58,13 +58,16 @@
 
 #![allow(dead_code)]
 
+use std::sync::Arc;
 use std::sync::mpsc::{Receiver, Sender};
 
 use mlua::{Debug, Lua, VmState};
 
+use crate::debug::SourceMode;
 use crate::debug::breakpoints::BreakpointSet;
 use crate::debug::hook::LineHook;
 use crate::debug::inspect::{capture_stack, capture_variables};
+use crate::debug::source_map::{PastaPos, SourceMap};
 use crate::debug::types::{
     Scope, SessionCommand, SessionEvent, StopReason, ThreadId, ThreadInfo,
 };
@@ -89,14 +92,26 @@ pub(crate) enum StepKind {
     Out,
 }
 
-/// The session's run mode (design "DebugSession 状態機械").
+/// The session's run mode (design "DebugSession 状態機械" + "PastaStepper").
 ///
 /// `Stepping` keeps the coroutine identity (`thread`) and the captured stack
 /// depth (`base_depth`) so the StepController can decide over/into/out by
 /// comparing the current thread+depth against these (task 2.5). It also records
 /// the `start_line` so step-over can detect "line changed in the same frame"
 /// (a same-frame statement that spans the call's own line must not re-trigger).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+///
+/// For `.pasta`-granular stepping (task 5.4 / requirements 9.1–9.5) it ALSO
+/// records `origin_pasta`: the resolved `.pasta` position the step began on
+/// (`Some` only in [`SourceMode::Pasta`] with a map AND when the start `.lua`
+/// line itself maps to a `.pasta` position; `None` otherwise). Together with
+/// `(thread, base_depth)` this forms the frame identity `(thread, base_depth,
+/// .pasta-file, .pasta-line)` used to consume all `.lua` lines mapping to the
+/// SAME `.pasta` line and stop at the next DIFFERENT one (design 549–556).
+///
+/// Because `origin_pasta` holds a [`PastaPos`] (which owns a `String` file
+/// path), `RunMode` is NOT `Copy`/`Eq`; it is stored behind a `RefCell` and
+/// read via `clone()`.
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) enum RunMode {
     /// Run until a breakpoint is hit (or termination).
     Running,
@@ -119,6 +134,16 @@ pub(crate) enum RunMode {
         /// Source line the step began on, for step-over "line changed"
         /// detection within the same frame (`depth == base_depth`).
         start_line: u32,
+        /// The resolved `.pasta` position the step began on (design 544:
+        /// `origin_pasta: Option<(ChunkName, u32)>`). Stored as the resolved
+        /// [`PastaPos`] `{file, line}` — which IS the design's `(.pasta-source,
+        /// line)` identity — so the "same `.pasta` line" test (stop decision
+        /// step 3, design 552 「同 chunk・同行」) is a direct `PastaPos` equality
+        /// of FILE + LINE, not a chunk-name comparison. `Some` only in
+        /// [`SourceMode::Pasta`] with a map AND when the start `.lua` line maps;
+        /// `None` for `.lua` mode / no map / unmapped start line (in which case
+        /// the existing `.lua`-granularity decision is used unchanged — 9.5).
+        origin_pasta: Option<PastaPos>,
     },
 }
 
@@ -142,9 +167,35 @@ pub(crate) struct DebugSession {
     cmd_rx: Receiver<SessionCommand>,
     /// Session → controller event end (e.g. `Stopped` / `Terminated` / `Error`).
     event_tx: Sender<SessionEvent>,
-    /// Current run mode. `Cell` because the line hook calls `&self`; the session
-    /// is single-threaded (VM thread), so interior mutability is race-free here.
-    mode: std::cell::Cell<RunMode>,
+    /// Current run mode. `RefCell` (not `Cell`) because [`RunMode::Stepping`]
+    /// now carries a non-`Copy` `origin_pasta: Option<PastaPos>` (task 5.4); the
+    /// line hook calls `&self` and the session is single-threaded (VM thread),
+    /// so interior mutability is race-free here.
+    mode: std::cell::RefCell<RunMode>,
+    /// Immutable shared source map for `.pasta`↔`.lua` resolution, threaded in by
+    /// [`enable`](crate::debug::enable) (task 4.2 plumbing). `Some` only when a
+    /// map was supplied AND the present mode is [`SourceMode::Pasta`]; `None`
+    /// otherwise (no map, or `SourceMode::Lua`) so the stepper keeps its existing
+    /// `.lua` granularity (requirements 6.1 / 6.2). The `.pasta`-granular stepping
+    /// CONSUMER of this field lands in task 5.4; this task only carries it here so
+    /// it REACHES the stepper. `Arc` is the immutable shared form (design
+    /// "Architecture": `Arc<SourceMap>` 不変共有).
+    source_map: Option<Arc<SourceMap>>,
+    /// The resolved present mode for this session (requirements 6.1 default
+    /// `.pasta`, 6.2 `.lua`). Carried alongside `source_map` so the stepper (5.4)
+    /// can branch its granularity; default [`SourceMode::Pasta`] keeps parity with
+    /// [`DebugConfig`] when unset. This is the `enable`-time resolved fallback —
+    /// the EFFECTIVE mode is `shared_mode` when present (task 5.5).
+    source_mode: SourceMode,
+    /// The SHARED, interior-mutable EFFECTIVE present mode (task 5.5 /
+    /// requirement 6.3). `Some` when [`enable`](crate::debug::enable) threaded a
+    /// shared cell whose value the socket bridge can flip on a DAP `attach`
+    /// `sourcePresentation` (highest precedence, design 581). When present the
+    /// stepper reads THIS (so an `attach` switches `.pasta`↔`.lua` step
+    /// granularity for the current session); when `None` it falls back to the
+    /// baked `source_mode`. Held as a cheap `Arc` clone shared with the
+    /// socket-bridge thread, mirroring [`BreakpointSet`].
+    shared_mode: Option<crate::debug::SharedSourceMode>,
 }
 
 impl DebugSession {
@@ -163,13 +214,82 @@ impl DebugSession {
             breakpoints,
             cmd_rx,
             event_tx,
-            mode: std::cell::Cell::new(RunMode::Running),
+            mode: std::cell::RefCell::new(RunMode::Running),
+            // Default `.lua` granularity: no map, present mode `Pasta` but with no
+            // map the stepper still behaves exactly as today (task 4.2 plumbing;
+            // `.pasta` stepping is task 5.4). `enable` overrides these via
+            // [`with_source_map`](Self::with_source_map) when a map is supplied in
+            // `SourceMode::Pasta` (requirements 6.1 / 6.2).
+            source_map: None,
+            source_mode: SourceMode::default(),
+            shared_mode: None,
+        }
+    }
+
+    /// Thread the (optional) shared source map and present mode into the session
+    /// (task 4.2 injection point: `enable → wiring → DebugSession`, design 548).
+    ///
+    /// This is the SKELETON plumbing only: it STORES the map+mode so the
+    /// `.pasta`-granular stepper (task 5.4) can read them; no stepping behavior
+    /// changes here. The gating decision lives in [`enable`](crate::debug::enable):
+    /// it passes `Some(map)` only when a map exists AND the present mode is
+    /// [`SourceMode::Pasta`] (requirements 6.1); for `None`/`SourceMode::Lua` the
+    /// session keeps its existing `.lua` behavior (requirements 6.2, 7.2).
+    pub(crate) fn with_source_map(
+        mut self,
+        source_map: Option<Arc<SourceMap>>,
+        source_mode: SourceMode,
+    ) -> Self {
+        self.source_map = source_map;
+        self.source_mode = source_mode;
+        self
+    }
+
+    /// Thread the SHARED, interior-mutable EFFECTIVE present mode into the session
+    /// (task 5.5 / requirement 6.3: `enable → wiring → DebugSession`).
+    ///
+    /// When set, the stepper reads this shared cell instead of the baked
+    /// `source_mode`, so a DAP `attach` `sourcePresentation` (flipped on the
+    /// socket-bridge thread, highest precedence per design 581) switches this
+    /// session's `.pasta`↔`.lua` STEP granularity. The cell is initialised at
+    /// `enable` to the resolved env > file > 既定 mode, so with no `attach`
+    /// override the behavior is identical to the baked `source_mode` (task 5.4).
+    pub(crate) fn with_shared_mode(
+        mut self,
+        shared_mode: Option<crate::debug::SharedSourceMode>,
+    ) -> Self {
+        self.shared_mode = shared_mode;
+        self
+    }
+
+    /// The EFFECTIVE present mode for this session: the shared cell when threaded
+    /// (so a DAP `attach` flip is observed, task 5.5), else the baked resolved
+    /// `source_mode` (task 5.4). This is the single read the stepper consults.
+    fn effective_mode(&self) -> SourceMode {
+        match &self.shared_mode {
+            Some(shared) => shared.get(),
+            None => self.source_mode,
         }
     }
 
     /// The current run mode (controller-side / test observation helper).
     pub(crate) fn mode(&self) -> RunMode {
-        self.mode.get()
+        self.mode.borrow().clone()
+    }
+
+    /// The threaded shared source map, if any (task 4.2 plumbing observation /
+    /// task 5.4 stepper consumer). `Some` only when `enable` was given a map in
+    /// [`SourceMode::Pasta`]; `None` for the default `.lua` behavior.
+    pub(crate) fn source_map(&self) -> Option<&Arc<SourceMap>> {
+        self.source_map.as_ref()
+    }
+
+    /// The EFFECTIVE present mode (requirements 6.1 / 6.2 / 6.3). Reads the shared
+    /// cell when threaded (so a DAP `attach` flip is reflected, task 5.5), else
+    /// the baked resolved mode. Default [`SourceMode::Pasta`] until `enable`
+    /// threads the resolved mode.
+    pub(crate) fn source_mode(&self) -> SourceMode {
+        self.effective_mode()
     }
 
     /// Extract `(source, line)` from a hook [`mlua::Debug`] frame.
@@ -202,6 +322,31 @@ impl DebugSession {
         let tid = ThreadId::from_state(thread.state());
         let depth = capture_stack(lua, &thread).len() as u32;
         (tid, depth)
+    }
+
+    /// Resolve the current `(source, line)` to a `.pasta` position FOR STEPPING,
+    /// gated on `.pasta` granularity being active (task 5.4 / requirements 9.5).
+    ///
+    /// Returns `Some(PastaPos)` ONLY when this session is in
+    /// [`SourceMode::Pasta`] AND a [`SourceMap`] is present AND the current
+    /// `.lua` line maps to a `.pasta` position. Otherwise `None`:
+    /// - `SourceMode::Lua` or no map → `.pasta` stepping is disabled, the stepper
+    ///   keeps its existing `.lua` granularity (9.5).
+    /// - mapped chunk/line miss → the line is `.pasta`-unmapped (passed through;
+    ///   9.4).
+    ///
+    /// The RAW hook `source` is passed straight through to
+    /// [`SourceMap::resolve_lua_to_pasta`], which canonicalizes the chunk
+    /// internally (task 3.4); the caller must NOT pre-canonicalize.
+    fn resolve_current_pasta(&self, source: &str, line: u32) -> Option<PastaPos> {
+        // Read the EFFECTIVE mode (shared cell when threaded) so a DAP `attach`
+        // `sourcePresentation` flip switches `.pasta` stepping for this session
+        // (task 5.5 / requirement 6.3).
+        if self.effective_mode() != SourceMode::Pasta {
+            return None;
+        }
+        let map = self.source_map.as_ref()?;
+        map.resolve_lua_to_pasta(source, line).cloned()
     }
 
     /// The step-stop decision for [`RunMode::Stepping`] (design
@@ -247,6 +392,69 @@ impl DebugSession {
         }
     }
 
+    /// The `.pasta`-granular stop refinement layered on top of
+    /// [`step_should_stop`](Self::step_should_stop) for [`SourceMode::Pasta`]
+    /// (task 5.4 / requirements 9.1–9.5; design "PastaStepper" 549–556, Flow 4).
+    ///
+    /// This is ONLY consulted AFTER the existing `.lua`-granularity
+    /// `step_should_stop` has already returned `true` for the current line — it
+    /// can therefore only DEMOTE a `.lua` stop to "keep going", never invent a
+    /// stop the `.lua` machinery would not have produced. The decision (design
+    /// 549–556, reconciling branch 1 「異フレームは `.lua` 判定」 with 554/555
+    /// 「step into/out は最初の `.pasta` 対応行で停止」 and 9.4 「未対応行は通過」):
+    ///
+    /// 1. **Current `.lua` line is `.pasta`-unmapped** (`cur_pasta == None`):
+    ///    CONTINUE (`false`) — pass through unmapped lines, in ANY frame. This
+    ///    realizes 9.4/E6 for the origin frame AND the "stop at the first
+    ///    *mapped* `.pasta` line" of step into (9.2/E3 — skip unmapped callee
+    ///    lines) and step out (9.3/E4 — skip unmapped caller lines). Sub-call /
+    ///    recursion lines that reach here would only be in the origin frame,
+    ///    because `step_should_stop` already excluded DEEPER frames for
+    ///    `Over`/`Out` (E2/E5 are handled structurally by depth before this
+    ///    function is consulted).
+    /// 2. **Same frame as the step origin** (`cur_thread == thread` AND
+    ///    `depth == base_depth`) **AND current `.pasta` == origin** (same FILE +
+    ///    LINE): CONTINUE (`false`) — consume all `.lua` lines of the SAME
+    ///    `.pasta` line in the origin frame (9.1/E1). The same-frame guard makes
+    ///    step into "discard" the origin (design 554): a callee line is a
+    ///    DIFFERENT frame, so even if it coincidentally maps to the origin's
+    ///    `.pasta` line it is NOT consumed — it stops (step 3).
+    /// 3. **Otherwise** — a mapped line that is either a DIFFERENT `.pasta` line
+    ///    in the origin frame (9.1 next line) OR any mapped line in a different
+    ///    frame (step into callee / step out caller — 9.2/9.3): STOP (`true`).
+    ///
+    /// `cur_thread`/`depth` come from
+    /// [`current_thread_and_depth`](Self::current_thread_and_depth). `cur_pasta`
+    /// is `resolve_lua_to_pasta(RAW source, line)` for the current line (the map
+    /// canonicalizes the chunk internally — task 3.4 — so the RAW hook source is
+    /// passed straight through). `origin_pasta` is the position captured when the
+    /// step began (`None` if the start line was itself unmapped, in which case a
+    /// mapped current line is a genuine `.pasta` transition and stops — step 3).
+    fn pasta_step_should_stop(
+        thread: ThreadId,
+        base_depth: u32,
+        origin_pasta: Option<&PastaPos>,
+        cur_thread: ThreadId,
+        depth: u32,
+        cur_pasta: Option<&PastaPos>,
+    ) -> bool {
+        // (1) 現 `.lua` 行が `.pasta` 未対応 → 通過（継続・9.4/E6）。フレームに依らず
+        //     未対応行は飛ばし、step into/out は最初の「対応行」で止める（9.2/9.3）。
+        let Some(cur) = cur_pasta else {
+            return false;
+        };
+        // (2) 同一起点フレーム かつ 現 `.pasta` 位置が起点と同一（同 file・同 line）→
+        //     同一 `.pasta` 行を消化（継続・9.1/E1）。同フレーム条件により step into は
+        //     起点 `.pasta` を破棄（呼び出し先は別フレームなので消化対象にしない）。
+        let same_frame = cur_thread == thread && depth == base_depth;
+        if same_frame && origin_pasta == Some(cur) {
+            return false;
+        }
+        // (3) それ以外（同フレームで異なる `.pasta` 対応行、または別フレームの対応行）
+        //     → 停止（9.1 次行 / 9.2 step into / 9.3 step out）。
+        true
+    }
+
     /// The STOP LOOP: emit `Stopped(reason, thread_id)` then block until the
     /// controller resumes / steps / disconnects.
     ///
@@ -290,7 +498,7 @@ impl DebugSession {
             match self.cmd_rx.recv() {
                 // Resume (R1.6): leave stepping mode entirely.
                 Ok(SessionCommand::Continue) => {
-                    self.mode.set(RunMode::Running);
+                    *self.mode.borrow_mut() = RunMode::Running;
                     return Ok(VmState::Continue);
                 }
 
@@ -303,13 +511,23 @@ impl DebugSession {
                         _ => StepKind::Out,
                     };
                     let (thread, base_depth) = Self::current_thread_and_depth(lua);
-                    let (_source, start_line) = Self::source_and_line(debug);
-                    self.mode.set(RunMode::Stepping {
+                    let (source, start_line) = Self::source_and_line(debug);
+                    // `.pasta`-granular origin (task 5.4 / 9.1): in `SourceMode::Pasta`
+                    // with a map, resolve the START line's `.pasta` position so the
+                    // stepper can consume all `.lua` lines of the SAME `.pasta` line
+                    // and stop at the next DIFFERENT one. `None` for `.lua` mode / no
+                    // map (9.5: unchanged `.lua` granularity) or an unmapped start
+                    // line. The RAW hook source is passed straight through — the map
+                    // canonicalizes the chunk internally (task 3.4); do NOT
+                    // double-canonicalize.
+                    let origin_pasta = self.resolve_current_pasta(&source, start_line);
+                    *self.mode.borrow_mut() = RunMode::Stepping {
                         kind,
                         thread,
                         base_depth,
                         start_line,
-                    });
+                        origin_pasta,
+                    };
                     return Ok(VmState::Continue);
                 }
 
@@ -396,7 +614,16 @@ impl DebugSession {
     /// even while stepping — stepping never masks a breakpoint. Otherwise, in
     /// [`RunMode::Stepping`], the StepController decision
     /// ([`step_should_stop`](Self::step_should_stop)) decides whether this line
-    /// is the step's completion point (reason [`StopReason::Step`]).
+    /// is the step's completion point at `.lua` granularity (reason
+    /// [`StopReason::Step`]).
+    ///
+    /// In [`SourceMode::Pasta`] with a map, that `.lua`-granularity stop is then
+    /// REFINED to `.pasta` granularity by
+    /// [`pasta_step_should_stop`](Self::pasta_step_should_stop) (task 5.4 /
+    /// requirements 9.1–9.5): same-`.pasta`-line and unmapped `.lua` lines in the
+    /// origin frame are consumed (continue), and the step completes only at the
+    /// next DIFFERENT `.pasta` line (same frame) or in a different frame (step
+    /// into/out). In `.lua` mode / no map the stop is taken as-is (9.5).
     ///
     /// Always returns `Ok(VmState::Continue)` (LuaJIT cannot Yield from a hook);
     /// non-target lines fall through immediately.
@@ -414,18 +641,47 @@ impl DebugSession {
         }
 
         // Otherwise, while stepping, evaluate the StepController completion.
+        // Clone the mode out of the RefCell first so the borrow is released
+        // before `stop_loop` (which re-borrows `mode`); `origin_pasta` is a
+        // small owned `Option<PastaPos>`.
+        let current_mode = self.mode.borrow().clone();
         if let RunMode::Stepping {
             kind,
             thread,
             base_depth,
             start_line,
-        } = self.mode.get()
+            origin_pasta,
+        } = current_mode
         {
             let (cur_thread, depth) = Self::current_thread_and_depth(lua);
+            // (a) Existing `.lua`-granularity decision (9.5 unchanged).
             if Self::step_should_stop(
                 kind, thread, base_depth, start_line, cur_thread, depth, line,
             ) {
-                return self.stop_loop(lua, debug, StopReason::Step, MAIN_THREAD_ID);
+                // (b) In `.pasta` mode (a map is present), REFINE the `.lua` stop
+                //     to `.pasta` granularity (9.1–9.4). The RAW source is passed
+                //     through; the map canonicalizes the chunk internally (3.4).
+                //     `resolve_current_pasta` is `None` for `.lua` mode / no map,
+                //     so the refinement is skipped and the `.lua` stop is taken
+                //     as-is (9.5).
+                let take_stop = if self.effective_mode() == SourceMode::Pasta
+                    && self.source_map.is_some()
+                {
+                    let cur_pasta = self.resolve_current_pasta(&source, line);
+                    Self::pasta_step_should_stop(
+                        thread,
+                        base_depth,
+                        origin_pasta.as_ref(),
+                        cur_thread,
+                        depth,
+                        cur_pasta.as_ref(),
+                    )
+                } else {
+                    true
+                };
+                if take_stop {
+                    return self.stop_loop(lua, debug, StopReason::Step, MAIN_THREAD_ID);
+                }
             }
         }
 
@@ -466,6 +722,64 @@ mod tests {
 
     use crate::debug::breakpoints::BreakpointSet;
     use crate::debug::types::{SourceRef, StopReason};
+
+    // =======================================================================
+    // Task 4.2 — source map injection plumbing (enable → wiring → DebugSession).
+    //
+    // The session is the STEPPER consumer (task 5.4). These tests prove the
+    // SKELETON: the gated `Arc<SourceMap>` + present mode REACH the session in
+    // `.pasta` mode, and are absent (default `.lua` behavior) for `None`/`Lua`
+    // (requirements 6.1 / 6.2 / 7.2). No stepping behavior is implemented here.
+    // =======================================================================
+
+    /// 6.1 / design 548: a `Some(map)` threaded in `SourceMode::Pasta` REACHES the
+    /// session (the stepper-holding struct), observable via `source_map()` /
+    /// `source_mode()`. This is the injection-path "arrival" assertion.
+    #[test]
+    fn with_source_map_pasta_threads_map_into_session() {
+        let (_cmd_tx, cmd_rx) = mpsc::channel::<SessionCommand>();
+        let (event_tx, _event_rx) = mpsc::channel::<SessionEvent>();
+        let map = Arc::new(SourceMap::new());
+
+        let session = DebugSession::new(BreakpointSet::new(), cmd_rx, event_tx)
+            .with_source_map(Some(Arc::clone(&map)), SourceMode::Pasta);
+
+        // The map reaches the session (Some) and the present mode is Pasta (6.1).
+        assert!(
+            session.source_map().is_some(),
+            "Some(map) in Pasta mode must REACH the session (design 548)"
+        );
+        assert_eq!(session.source_mode(), SourceMode::Pasta);
+        // It is the SAME shared Arc (immutable shared, design Architecture).
+        assert!(Arc::ptr_eq(session.source_map().unwrap(), &map));
+    }
+
+    /// 6.2 / 7.2: a `None` map (every existing call site post-4.2) leaves the
+    /// session with NO map — the default `.lua` behavior, unchanged from today.
+    #[test]
+    fn none_map_leaves_session_default_lua_behavior() {
+        let (_cmd_tx, cmd_rx) = mpsc::channel::<SessionCommand>();
+        let (event_tx, _event_rx) = mpsc::channel::<SessionEvent>();
+
+        // Default constructor: no map, default mode.
+        let default_session =
+            DebugSession::new(BreakpointSet::new(), cmd_rx, event_tx);
+        assert!(
+            default_session.source_map().is_none(),
+            "default session must hold NO map (default `.lua` behavior, 7.2)"
+        );
+
+        // Explicit None threading is likewise map-less.
+        let (_c2, cmd_rx2) = mpsc::channel::<SessionCommand>();
+        let (ev2, _e2) = mpsc::channel::<SessionEvent>();
+        let lua_session = DebugSession::new(BreakpointSet::new(), cmd_rx2, ev2)
+            .with_source_map(None, SourceMode::Lua);
+        assert!(
+            lua_session.source_map().is_none(),
+            "None in `.lua` mode must leave the session map-less (6.2 / 7.2)"
+        );
+        assert_eq!(lua_session.source_mode(), SourceMode::Lua);
+    }
 
     /// Controller-side watchdog (TEST-ONLY). The stop core stays UNBOUNDED;
     /// this only keeps CI from hanging on a regression.
@@ -1143,6 +1457,578 @@ end
             reason,
             StopReason::Breakpoint,
             "a breakpoint hit while Stepping must report reason Breakpoint, not Step"
+        );
+
+        host.cont(SessionCommand::Continue);
+        host.join();
+    }
+
+    // =======================================================================
+    // Task 5.4 — `.pasta`-granular stepping (requirements 9.1–9.5).
+    //
+    // In `SourceMode::Pasta` with a `SourceMap`, stepping is `.pasta`-line
+    // granular: step over consumes all `.lua` lines mapping to the SAME `.pasta`
+    // line in the origin frame and stops at the next DIFFERENT `.pasta` line
+    // (9.1); unmapped `.lua` lines are passed through (9.4); step into stops at
+    // the callee's first MAPPED `.pasta` line (9.2); step out stops at the first
+    // MAPPED `.pasta` line in the caller (9.3). `SourceMode::Lua` (or no map)
+    // keeps the existing `.lua` granularity unchanged (9.5).
+    //
+    // The pure stop-decision core `pasta_step_should_stop` (design 549–556) is
+    // unit-tested directly; the end-to-end host-thread tests drive a real VM
+    // with a controlled `SourceMap` injected via `with_source_map`.
+    // =======================================================================
+
+    // `PastaPos` / `SourceMap` are already in scope via `use super::*`; only the
+    // builder type `ChunkSourceMap` and `BTreeMap` need importing here.
+    use crate::debug::source_map::ChunkSourceMap;
+    use std::collections::BTreeMap;
+
+    /// Build a `PastaPos` in a fixed `.pasta` file for these tests.
+    fn ppos(line: u32) -> PastaPos {
+        PastaPos {
+            file: "scene.pasta".to_string(),
+            line,
+        }
+    }
+
+    // ----------------------------------------------------------------------
+    // Unit tests for the pure `.pasta` stop-decision core (design 549–556).
+    // These synthesize (thread, depth, origin_pasta, cur_pasta) inputs and need
+    // no VM — they pin the 4 behaviours the host-thread tests exercise E2E.
+    // ----------------------------------------------------------------------
+
+    /// 9.1/E1: same origin frame, current `.lua` line maps to the SAME `.pasta`
+    /// line as the origin → CONTINUE (consume the `.pasta` line's `.lua` lines).
+    #[test]
+    fn pasta_decision_same_pasta_line_same_frame_continues() {
+        let t = ThreadId(0xAB);
+        let origin = ppos(10);
+        let cur = ppos(10);
+        assert!(
+            !DebugSession::pasta_step_should_stop(
+                t, 3, Some(&origin), t, 3, Some(&cur)
+            ),
+            "same `.pasta` line in the origin frame must be consumed (continue, 9.1)"
+        );
+    }
+
+    /// 9.1: same origin frame, current `.lua` line maps to a DIFFERENT `.pasta`
+    /// line → STOP (the next `.pasta` line is reached).
+    #[test]
+    fn pasta_decision_different_pasta_line_same_frame_stops() {
+        let t = ThreadId(0xAB);
+        let origin = ppos(10);
+        let cur = ppos(11);
+        assert!(
+            DebugSession::pasta_step_should_stop(
+                t, 3, Some(&origin), t, 3, Some(&cur)
+            ),
+            "a DIFFERENT `.pasta` line in the same frame must STOP (9.1)"
+        );
+    }
+
+    /// 9.4/E6: current `.lua` line is `.pasta`-unmapped → CONTINUE (pass through),
+    /// regardless of frame.
+    #[test]
+    fn pasta_decision_unmapped_line_passes_through() {
+        let t = ThreadId(0xAB);
+        let origin = ppos(10);
+        // Same frame, unmapped current line.
+        assert!(
+            !DebugSession::pasta_step_should_stop(t, 3, Some(&origin), t, 3, None),
+            "an unmapped `.lua` line must be passed through (continue, 9.4)"
+        );
+        // Different frame (deeper), unmapped current line — also passes (skip
+        // unmapped callee lines for step into, 9.2/9.4).
+        assert!(
+            !DebugSession::pasta_step_should_stop(t, 3, Some(&origin), t, 4, None),
+            "an unmapped line in a deeper frame must also be passed through (9.2/9.4)"
+        );
+    }
+
+    /// 9.2/E3: step into — a mapped line in a DEEPER frame (callee) stops, and the
+    /// origin `.pasta` is discarded (a callee line mapping to the SAME `.pasta`
+    /// line as the origin still STOPS, because it is a different frame).
+    #[test]
+    fn pasta_decision_deeper_frame_mapped_line_stops_discarding_origin() {
+        let t = ThreadId(0xAB);
+        let origin = ppos(10);
+        // Callee mapped line with a DIFFERENT `.pasta` line → stop.
+        let cur_diff = ppos(20);
+        assert!(
+            DebugSession::pasta_step_should_stop(
+                t, 3, Some(&origin), t, 4, Some(&cur_diff)
+            ),
+            "a mapped line in the callee frame must STOP (step into, 9.2)"
+        );
+        // Callee mapped line coincidentally equal to the origin `.pasta` line →
+        // still STOP (different frame discards the origin; design 554).
+        let cur_same = ppos(10);
+        assert!(
+            DebugSession::pasta_step_should_stop(
+                t, 3, Some(&origin), t, 4, Some(&cur_same)
+            ),
+            "a callee line equal to the origin `.pasta` line still STOPS (origin \
+             discarded across frames, 9.2)"
+        );
+    }
+
+    /// 9.3/E4: step out — a mapped line in a SHALLOWER frame (caller) stops.
+    #[test]
+    fn pasta_decision_shallower_frame_mapped_line_stops() {
+        let t = ThreadId(0xAB);
+        let origin = ppos(20); // origin captured inside the callee
+        let cur = ppos(12); // a mapped caller line after return
+        assert!(
+            DebugSession::pasta_step_should_stop(
+                t, 4, Some(&origin), t, 3, Some(&cur)
+            ),
+            "a mapped line in the caller frame after return must STOP (step out, 9.3)"
+        );
+    }
+
+    /// A different THREAD (host loop / another coroutine) with a mapped line:
+    /// branch (3) STOPs (different frame). The thread-mismatch SKIP that protects
+    /// against mis-stopping on other threads is enforced earlier by
+    /// `step_should_stop` (which returns false for `cur_thread != thread`), so by
+    /// the time this refinement runs the line is already on a relevant frame.
+    #[test]
+    fn pasta_decision_origin_none_mapped_line_stops() {
+        let t = ThreadId(0xAB);
+        // Unmapped start line (origin None): the first mapped line is a genuine
+        // `.pasta` transition → STOP (9.1/9.4 combined).
+        let cur = ppos(11);
+        assert!(
+            DebugSession::pasta_step_should_stop(t, 3, None, t, 3, Some(&cur)),
+            "with no origin `.pasta` (unmapped start), the first mapped line STOPS"
+        );
+    }
+
+    // ----------------------------------------------------------------------
+    // End-to-end host-thread tests with an injected `SourceMap`.
+    // ----------------------------------------------------------------------
+
+    // `.pasta`-stepping scenario chunk. Lines (1-origin), source PASTA_SOURCE:
+    //   1: local function helper(x)
+    //   2:     local y = x + 1      <- callee: UNMAPPED (passed through on step in)
+    //   3:     local z = y + 1      <- callee: .pasta 20 (step-in stop target)
+    //   4:     return z
+    //   5: end
+    //   6: local a = 1              <- .pasta 10  (BREAKPOINT / step origin)
+    //   7: local b = a + 1          <- .pasta 10  (SAME .pasta as 6 -> consumed)
+    //   8: local c = b + 1          <- UNMAPPED   (passed through)
+    //   9: local d = helper(c)      <- .pasta 11  (DIFFERENT .pasta -> step-over stop)
+    //  10: return d                 <- .pasta 12  (step-out stop target)
+    const PASTA_SOURCE: &str = "@pasta_step_scenario";
+    const PASTA_CHUNK: &str = "\
+local function helper(x)
+    local y = x + 1
+    local z = y + 1
+    return z
+end
+local a = 1
+local b = a + 1
+local c = b + 1
+local d = helper(c)
+return d
+";
+    const PASTA_BP_LINE: u32 = 6;
+
+    /// Build the `SourceMap` for `PASTA_CHUNK` (keyed by the hook source name,
+    /// which the map canonicalizes internally — task 3.4).
+    fn pasta_scenario_map() -> Arc<SourceMap> {
+        let mut forward: BTreeMap<u32, PastaPos> = BTreeMap::new();
+        // caller frame
+        forward.insert(6, ppos(10));
+        forward.insert(7, ppos(10)); // same .pasta line as 6
+        // line 8 intentionally unmapped
+        forward.insert(9, ppos(11));
+        forward.insert(10, ppos(12));
+        // callee frame
+        // line 2 intentionally unmapped
+        forward.insert(3, ppos(20));
+        forward.insert(4, ppos(21));
+
+        let mut sm = SourceMap::new();
+        sm.insert_chunk(
+            PASTA_SOURCE.to_string(),
+            "scene.pasta".to_string(),
+            ChunkSourceMap::from_forward(forward),
+        );
+        Arc::new(sm)
+    }
+
+    /// Start a `StepHost` like [`start_step_host`] but inject a `SourceMap` +
+    /// `SourceMode` into the `DebugSession` (task 4.2 `with_source_map`), so the
+    /// stepper runs at `.pasta` granularity (5.4).
+    fn start_step_host_with_map(
+        breakpoints: BreakpointSet,
+        chunk: &'static str,
+        source: &'static str,
+        source_map: Option<Arc<SourceMap>>,
+        source_mode: SourceMode,
+    ) -> StepHost {
+        let (cmd_tx, cmd_rx) = mpsc::channel::<SessionCommand>();
+        let (event_tx, event_rx) = mpsc::channel::<SessionEvent>();
+
+        let last_line = Arc::new(std::sync::atomic::AtomicU32::new(0));
+        let hook_last_line = Arc::clone(&last_line);
+
+        let handle = std::thread::spawn(move || -> Result<(), String> {
+            let lua = build_all_safe_vm();
+            let session = DebugSession::new(breakpoints, cmd_rx, event_tx)
+                .with_source_map(source_map, source_mode);
+
+            let handler = move |lua: &Lua, debug: &Debug| {
+                let line = debug.current_line().unwrap_or(0) as u32;
+                hook_last_line.store(line, Ordering::SeqCst);
+                session.on_line(lua, debug)
+            };
+
+            crate::debug::hook::install(&lua, handler).map_err(|e| e.to_string())?;
+            lua.load(chunk)
+                .set_name(source)
+                .exec()
+                .map_err(|e| e.to_string())?;
+            lua.remove_global_hook();
+            Ok(())
+        });
+
+        StepHost {
+            cmd_tx,
+            event_rx,
+            last_line,
+            handle: Some(handle),
+        }
+    }
+
+    /// Start a `StepHost` like [`start_step_host_with_map`] but thread a SHARED
+    /// effective mode ([`SharedSourceMode`]) into the session via
+    /// [`with_shared_mode`](DebugSession::with_shared_mode) (task 5.5). The map is
+    /// ALWAYS threaded; the EFFECTIVE mode is the shared cell, so a test (standing
+    /// in for the socket bridge applying a DAP `attach` `sourcePresentation`) can
+    /// flip the returned [`SharedSourceMode`] to switch `.pasta`↔`.lua` step
+    /// granularity for the running session. Returns `(host, shared_mode)`.
+    fn start_step_host_with_shared_mode(
+        breakpoints: BreakpointSet,
+        chunk: &'static str,
+        source: &'static str,
+        source_map: Option<Arc<SourceMap>>,
+        initial_mode: SourceMode,
+    ) -> (StepHost, crate::debug::SharedSourceMode) {
+        let (cmd_tx, cmd_rx) = mpsc::channel::<SessionCommand>();
+        let (event_tx, event_rx) = mpsc::channel::<SessionEvent>();
+
+        let shared_mode = crate::debug::SharedSourceMode::new(initial_mode);
+        let session_shared = shared_mode.clone();
+
+        let last_line = Arc::new(std::sync::atomic::AtomicU32::new(0));
+        let hook_last_line = Arc::clone(&last_line);
+
+        let handle = std::thread::spawn(move || -> Result<(), String> {
+            let lua = build_all_safe_vm();
+            // `source_mode` (baked) is set to the initial mode too; the EFFECTIVE
+            // mode read by the stepper is the shared cell (so an attach flip wins).
+            let session = DebugSession::new(breakpoints, cmd_rx, event_tx)
+                .with_source_map(source_map, initial_mode)
+                .with_shared_mode(Some(session_shared));
+
+            let handler = move |lua: &Lua, debug: &Debug| {
+                let line = debug.current_line().unwrap_or(0) as u32;
+                hook_last_line.store(line, Ordering::SeqCst);
+                session.on_line(lua, debug)
+            };
+
+            crate::debug::hook::install(&lua, handler).map_err(|e| e.to_string())?;
+            lua.load(chunk)
+                .set_name(source)
+                .exec()
+                .map_err(|e| e.to_string())?;
+            lua.remove_global_hook();
+            Ok(())
+        });
+
+        (
+            StepHost {
+                cmd_tx,
+                event_rx,
+                last_line,
+                handle: Some(handle),
+            },
+            shared_mode,
+        )
+    }
+
+    /// 5.5 / 6.3 (attach forces `.pasta`): the resolved/baked mode starts at `Lua`,
+    /// but a DAP `attach sourcePresentation="pasta"` flips the SHARED mode to
+    /// `Pasta` BEFORE the VM runs. The stepper must then run at `.pasta`
+    /// granularity: step over from line 6 (`.pasta` 10) consumes line 7 (same
+    /// `.pasta` 10) + passes line 8 (unmapped), stopping at line 9 (`.pasta` 11) —
+    /// NOT at line 7 (which `.lua` granularity would target).
+    #[test]
+    fn attach_pasta_switches_session_to_pasta_step_granularity() {
+        let breakpoints = BreakpointSet::new();
+        breakpoints.set_breakpoints(&SourceRef::new(PASTA_SOURCE), &[PASTA_BP_LINE]);
+        // Server default/file mode is Lua; the map IS present (always threaded).
+        let (mut host, shared_mode) = start_step_host_with_shared_mode(
+            breakpoints,
+            PASTA_CHUNK,
+            PASTA_SOURCE,
+            Some(pasta_scenario_map()),
+            SourceMode::Lua,
+        );
+
+        // attach sourcePresentation="pasta" applied (socket bridge writes shared).
+        shared_mode.set(SourceMode::Pasta);
+
+        let (reason, line) = host.recv_stop();
+        assert_eq!(reason, StopReason::Breakpoint);
+        assert_eq!(line, PASTA_BP_LINE, "must stop at the breakpoint line (6)");
+
+        host.cont(SessionCommand::Next);
+        let (reason, line) = host.recv_stop();
+        assert_eq!(reason, StopReason::Step);
+        assert_eq!(
+            line, 9,
+            "attach `pasta` must switch this session to `.pasta` step granularity: \
+             consume line 7 (same `.pasta` 10), pass line 8 (unmapped), stop at \
+             line 9 (`.pasta` 11) — NOT line 7 (5.5/6.3)"
+        );
+
+        host.cont(SessionCommand::Continue);
+        host.join();
+    }
+
+    /// 5.5 / 6.3 (attach forces `.lua`): the resolved/baked mode starts at `Pasta`,
+    /// but a DAP `attach sourcePresentation="lua"` flips the SHARED mode to `Lua`
+    /// BEFORE the VM runs. The stepper must then run at `.lua` granularity: step
+    /// over from line 6 stops at line 7 (the next `.lua` line) — NOT line 9 (which
+    /// `.pasta` granularity would target). attach > env/file precedence.
+    #[test]
+    fn attach_lua_switches_session_to_lua_step_granularity() {
+        let breakpoints = BreakpointSet::new();
+        breakpoints.set_breakpoints(&SourceRef::new(PASTA_SOURCE), &[PASTA_BP_LINE]);
+        // Server default/file mode is Pasta (map present) → would be `.pasta`-granular.
+        let (mut host, shared_mode) = start_step_host_with_shared_mode(
+            breakpoints,
+            PASTA_CHUNK,
+            PASTA_SOURCE,
+            Some(pasta_scenario_map()),
+            SourceMode::Pasta,
+        );
+
+        // attach sourcePresentation="lua" applied → flip to Lua.
+        shared_mode.set(SourceMode::Lua);
+
+        let (_reason, line) = host.recv_stop();
+        assert_eq!(line, PASTA_BP_LINE, "must stop at the breakpoint line (6)");
+
+        host.cont(SessionCommand::Next);
+        let (reason, line) = host.recv_stop();
+        assert_eq!(reason, StopReason::Step);
+        assert_eq!(
+            line, 7,
+            "attach `lua` must force `.lua` step granularity (stop at line 7), NOT \
+             consume to the next `.pasta` line at 9 (5.5/6.3 — attach > env/file)"
+        );
+
+        host.cont(SessionCommand::Continue);
+        host.join();
+    }
+
+    /// 5.5 / design 581 (no attach override): with NO attach flip the session keeps
+    /// the resolved env > file > 既定 mode. Baked `Pasta` + map → `.pasta`-granular
+    /// stepping (stop at line 9), exactly as without any shared-mode plumbing.
+    #[test]
+    fn no_attach_keeps_resolved_pasta_step_granularity() {
+        let breakpoints = BreakpointSet::new();
+        breakpoints.set_breakpoints(&SourceRef::new(PASTA_SOURCE), &[PASTA_BP_LINE]);
+        let (mut host, _shared_mode) = start_step_host_with_shared_mode(
+            breakpoints,
+            PASTA_CHUNK,
+            PASTA_SOURCE,
+            Some(pasta_scenario_map()),
+            SourceMode::Pasta,
+        );
+        // No flip: the env > file > 既定 resolved mode (Pasta) stands (design 581).
+
+        let (_reason, line) = host.recv_stop();
+        assert_eq!(line, PASTA_BP_LINE, "must stop at the breakpoint line (6)");
+
+        host.cont(SessionCommand::Next);
+        let (reason, line) = host.recv_stop();
+        assert_eq!(reason, StopReason::Step);
+        assert_eq!(
+            line, 9,
+            "no attach override → resolved Pasta `.pasta` granularity (stop at 9)"
+        );
+
+        host.cont(SessionCommand::Continue);
+        host.join();
+    }
+
+    /// 9.1/E1 + 9.4/E6 (step over): stopped at `local a = 1` (line 6, `.pasta`
+    /// 10), `Next` must CONSUME line 7 (also `.pasta` 10) and PASS line 8
+    /// (unmapped), stopping at line 9 (`.pasta` 11) — the next DIFFERENT `.pasta`
+    /// line — NOT at line 7 or 8.
+    #[test]
+    fn pasta_step_over_consumes_same_pasta_line_and_passes_unmapped() {
+        let breakpoints = BreakpointSet::new();
+        breakpoints.set_breakpoints(&SourceRef::new(PASTA_SOURCE), &[PASTA_BP_LINE]);
+        let mut host = start_step_host_with_map(
+            breakpoints,
+            PASTA_CHUNK,
+            PASTA_SOURCE,
+            Some(pasta_scenario_map()),
+            SourceMode::Pasta,
+        );
+
+        let (reason, line) = host.recv_stop();
+        assert_eq!(reason, StopReason::Breakpoint);
+        assert_eq!(line, PASTA_BP_LINE, "must stop at the breakpoint line (6)");
+
+        host.cont(SessionCommand::Next);
+        let (reason, line) = host.recv_stop();
+        assert_eq!(reason, StopReason::Step, "step over must stop with reason Step");
+        assert_eq!(
+            line, 9,
+            "step over from `.pasta` 10 must consume line 7 (same `.pasta` 10) and \
+             pass line 8 (unmapped), stopping at line 9 (`.pasta` 11) — the next \
+             DIFFERENT `.pasta` line (9.1/9.4)"
+        );
+
+        host.cont(SessionCommand::Continue);
+        host.join();
+    }
+
+    /// 9.2/E3 + 9.4 (step into): stopped at `local d = helper(c)` (line 9),
+    /// `StepIn` must enter `helper`, PASS the unmapped callee line 2, and stop at
+    /// line 3 (`.pasta` 20) — the callee's first MAPPED `.pasta` line.
+    #[test]
+    fn pasta_step_into_stops_at_first_mapped_callee_line() {
+        let breakpoints = BreakpointSet::new();
+        // Breakpoint at the call line so we can step from there.
+        breakpoints.set_breakpoints(&SourceRef::new(PASTA_SOURCE), &[9]);
+        let mut host = start_step_host_with_map(
+            breakpoints,
+            PASTA_CHUNK,
+            PASTA_SOURCE,
+            Some(pasta_scenario_map()),
+            SourceMode::Pasta,
+        );
+
+        let (_reason, line) = host.recv_stop();
+        assert_eq!(line, 9, "must stop at the call line (9)");
+
+        host.cont(SessionCommand::StepIn);
+        let (reason, line) = host.recv_stop();
+        assert_eq!(reason, StopReason::Step, "step into must stop with reason Step");
+        assert_eq!(
+            line, 3,
+            "step into must PASS the unmapped callee line 2 and stop at line 3 \
+             (`.pasta` 20) — the callee's first MAPPED `.pasta` line (9.2/9.4)"
+        );
+
+        host.cont(SessionCommand::Continue);
+        host.join();
+    }
+
+    /// 9.3/E4 (step out): step INTO `helper` (stop at line 3), then `StepOut` must
+    /// return to the caller and stop at line 10 (`.pasta` 12) — the first MAPPED
+    /// `.pasta` line in the caller after `helper` returns.
+    #[test]
+    fn pasta_step_out_stops_at_first_mapped_caller_line() {
+        let breakpoints = BreakpointSet::new();
+        breakpoints.set_breakpoints(&SourceRef::new(PASTA_SOURCE), &[9]);
+        let mut host = start_step_host_with_map(
+            breakpoints,
+            PASTA_CHUNK,
+            PASTA_SOURCE,
+            Some(pasta_scenario_map()),
+            SourceMode::Pasta,
+        );
+
+        let (_reason, line) = host.recv_stop();
+        assert_eq!(line, 9, "must stop at the call line (9)");
+
+        // Step into helper (stop at line 3, the first mapped callee line).
+        host.cont(SessionCommand::StepIn);
+        let (_reason, line) = host.recv_stop();
+        assert_eq!(line, 3, "precondition: stepped into helper at line 3");
+
+        // Step out: return to the caller, stop at the first mapped line (10).
+        host.cont(SessionCommand::StepOut);
+        let (reason, line) = host.recv_stop();
+        assert_eq!(reason, StopReason::Step, "step out must stop with reason Step");
+        assert_eq!(
+            line, 10,
+            "step out must return to the caller and stop at line 10 (`.pasta` 12) — \
+             the first MAPPED `.pasta` line after `helper` returns (9.3)"
+        );
+
+        host.cont(SessionCommand::Continue);
+        host.join();
+    }
+
+    /// E2/E5 (sub-call NOT entered on step over): a `helper` sub-call on the
+    /// step-over line lives in a DEEPER frame; step over must not stop inside it.
+    /// Stepping over line 9 (`.pasta` 11, which CALLS helper) lands at line 10
+    /// (`.pasta` 12) in the SAME frame — NOT inside helper (lines 2/3/4).
+    #[test]
+    fn pasta_step_over_does_not_enter_sub_call() {
+        let breakpoints = BreakpointSet::new();
+        breakpoints.set_breakpoints(&SourceRef::new(PASTA_SOURCE), &[9]);
+        let mut host = start_step_host_with_map(
+            breakpoints,
+            PASTA_CHUNK,
+            PASTA_SOURCE,
+            Some(pasta_scenario_map()),
+            SourceMode::Pasta,
+        );
+
+        let (_reason, line) = host.recv_stop();
+        assert_eq!(line, 9, "must stop at the call line (9)");
+
+        host.cont(SessionCommand::Next);
+        let (reason, line) = host.recv_stop();
+        assert_eq!(reason, StopReason::Step);
+        assert_eq!(
+            line, 10,
+            "step over the call line (9) must stop at line 10 in the SAME frame \
+             (`.pasta` 12), NOT inside helper (E2 — sub-call not entered)"
+        );
+
+        host.cont(SessionCommand::Continue);
+        host.join();
+    }
+
+    /// 9.5 (`.lua` mode unchanged): with `SourceMode::Lua` AND a map present, the
+    /// stepper must keep `.lua`-line granularity. Step over from line 6 stops at
+    /// line 7 (the next `.lua` line) — NOT line 9 (which `.pasta` granularity
+    /// would target). This guards that `.pasta` refinement is gated on the mode.
+    #[test]
+    fn lua_mode_keeps_lua_granularity_even_with_map() {
+        let breakpoints = BreakpointSet::new();
+        breakpoints.set_breakpoints(&SourceRef::new(PASTA_SOURCE), &[PASTA_BP_LINE]);
+        let mut host = start_step_host_with_map(
+            breakpoints,
+            PASTA_CHUNK,
+            PASTA_SOURCE,
+            Some(pasta_scenario_map()),
+            SourceMode::Lua,
+        );
+
+        let (_reason, line) = host.recv_stop();
+        assert_eq!(line, PASTA_BP_LINE, "must stop at the breakpoint line (6)");
+
+        host.cont(SessionCommand::Next);
+        let (reason, line) = host.recv_stop();
+        assert_eq!(reason, StopReason::Step);
+        assert_eq!(
+            line, 7,
+            "`.lua` mode must step at `.lua` granularity (stop at line 7), NOT \
+             consume to the next `.pasta` line (9.5)"
         );
 
         host.cont(SessionCommand::Continue);

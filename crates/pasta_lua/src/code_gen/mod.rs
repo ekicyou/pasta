@@ -114,6 +114,28 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         }
     }
 
+    /// Record `(out_line -> pasta_line)` directly if a sink is attached.
+    ///
+    /// Inert (no-op, zero-cost) when no sink is attached — the production default.
+    /// Unlike [`record_span`](Self::record_span), this maps the most recently
+    /// emitted output line to an explicit 1-based `.pasta` line rather than a span's
+    /// `start_line`. It is the per-line mapping primitive used by multi-line elements
+    /// whose output lines correspond 1:1 to distinct `.pasta` source lines — chiefly
+    /// code blocks, where in-block breakpoint precision (Requirement 1.3) requires
+    /// each generated `.lua` line to resolve to its own originating `.pasta` line.
+    ///
+    /// `pasta_line` must be 1-based. Callers compute it as
+    /// `block.span.start_line + offset` (see `generate_code_block`). A `0` value is
+    /// treated as invalid and skipped, mirroring the `span.is_valid()` guard in
+    /// `record_span` (the default/uninitialized line is not recorded).
+    fn record_block_line(&mut self, pasta_line: u32) {
+        if let Some(sink) = self.source_map.as_deref_mut() {
+            if pasta_line > 0 {
+                sink.record_line(self.out_line, pasta_line);
+            }
+        }
+    }
+
     /// Write indentation at current level.
     fn write_indent(&mut self) -> Result<(), TranspileError> {
         let indent = "    ".repeat(self.indent_level);

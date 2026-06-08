@@ -22,6 +22,8 @@
 //! These are pure DTOs. Behavioural state machines (`RunMode`, `StepKind`,
 //! `StepController`) live in `session.rs`, not here.
 
+use crate::debug::source_map::ChunkName;
+
 /// A single inspected variable (locals / upvalues), captured by the
 /// FrameInspector.
 ///
@@ -84,12 +86,68 @@ impl SourceRef {
     }
 }
 
-/// A breakpoint target: `(source, line)`.
+/// A registered breakpoint as a **two-tier key** (design "BpTranslator 二段キー"
+/// 516-528): the *present* source path the IDE knows it by, and the *resolved
+/// execution coordinate* `(chunk, lua_line)` the runtime hook stops on.
 ///
-/// Promoted from the PoC, where breakpoints were stored in a
-/// `HashSet<Breakpoint>`; kept as a tuple alias so it remains `Hash`/`Eq` for
-/// set membership in `breakpoints.rs`.
-pub type Breakpoint = (String, u32);
+/// # Why two tiers
+///
+/// VSCode's `setBreakpoints` is authoritative **per presented source**: one
+/// request replaces every breakpoint for that source. But the runtime hook only
+/// sees the executing `.lua` chunk + line. A single presented `.pasta` line can
+/// resolve to MANY `.lua` lines (requirement 8.2), and a `.pasta`-origin BP and
+/// a `.lua`-origin BP can resolve into the SAME chunk. Storing only the
+/// execution coordinate would let a `setBreakpoints` for one presented source
+/// evict another presented source's BP that happens to share a chunk. Splitting
+/// the key fixes this:
+///
+/// - [`present_source`](Self::present_source) is the **retain / replace key**:
+///   `set_breakpoints` drops and re-inserts only the entries whose
+///   `present_source` matches the request's source (the DAP per-source
+///   authoritative model). BPs presented under a *different* source survive even
+///   if they resolve into the same chunk (requirement 4.4 — registered BPs
+///   persist; requirement 8.2 — no cross-source eviction).
+/// - `(chunk, lua_line)` is the **stop-decision key**: the hook reports the
+///   executing chunk source + line, and [`should_pause`] matches against these
+///   two fields. The presented space (`present_source`) is irrelevant to the
+///   stop decision, so `.pasta`-presented and `.lua`-presented BPs in the same
+///   chunk both fire independently.
+///
+/// For the existing `.lua` path these collapse to the same identity: the IDE
+/// presents a `.lua` source path, `present_source` is that path, and `chunk`
+/// is that same path (the chunk name set via `set_name`), so behaviour is
+/// byte-for-byte the prior single-key behaviour. The `.pasta`→`.lua` resolution
+/// that fills `present_source = .pasta` with a different `chunk`/`lua_line` is
+/// task 5.3.
+///
+/// `Hash`/`Eq` over all three fields so it remains a `HashSet` member in
+/// `breakpoints.rs`.
+///
+/// [`should_pause`]: crate::debug::breakpoints::BreakpointSet::should_pause
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Breakpoint {
+    /// The source path the IDE presented this breakpoint under (`.pasta` or
+    /// `.lua`). The **retain / replace key** for `set_breakpoints`.
+    pub present_source: String,
+    /// The resolved execution chunk (a [`ChunkName`]: the runtime hook's
+    /// reported `.lua` chunk source). Half of the **stop-decision key**.
+    pub chunk: ChunkName,
+    /// The resolved execution line within `chunk`. Half of the
+    /// **stop-decision key**.
+    pub lua_line: u32,
+}
+
+impl Breakpoint {
+    /// Construct a two-tier breakpoint from its present source and resolved
+    /// execution coordinate.
+    pub fn new(present_source: impl Into<String>, chunk: impl Into<ChunkName>, lua_line: u32) -> Self {
+        Self {
+            present_source: present_source.into(),
+            chunk: chunk.into(),
+            lua_line,
+        }
+    }
+}
 
 /// A breakpoint after resolution against the loaded source.
 ///
@@ -304,12 +362,27 @@ mod tests {
     }
 
     #[test]
-    fn breakpoint_tuple_is_hashable() {
+    fn breakpoint_two_tier_is_hashable_and_keyed_by_all_fields() {
         use std::collections::HashSet;
-        let bp: Breakpoint = ("@scene.lua".to_string(), 3);
+        // The two-tier key is Hash/Eq over (present_source, chunk, lua_line).
+        let bp = Breakpoint::new("x.pasta", "@scene.lua", 3);
         let mut set: HashSet<Breakpoint> = HashSet::new();
         set.insert(bp.clone());
         assert!(set.contains(&bp));
+
+        // Same execution coord but a DIFFERENT present source is a DISTINCT
+        // entry (so two presented sources can both target one chunk line —
+        // requirement 8.2 / 4.4 no cross-source collision).
+        let other_present = Breakpoint::new("scene.lua", "@scene.lua", 3);
+        assert_ne!(bp, other_present, "present_source participates in identity");
+        set.insert(other_present.clone());
+        assert_eq!(set.len(), 2, "distinct present sources are distinct entries");
+        assert!(set.contains(&other_present));
+
+        // Field accessors hold the two-tier shape from design 519-524.
+        assert_eq!(bp.present_source, "x.pasta");
+        assert_eq!(bp.chunk, "@scene.lua");
+        assert_eq!(bp.lua_line, 3);
     }
 
     #[test]

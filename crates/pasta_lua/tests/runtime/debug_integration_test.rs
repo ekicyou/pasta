@@ -145,7 +145,7 @@ fn enabled_runtime_persists_breakpoint_across_requests() {
         let debug_cfg = DebugConfig {
             enabled: true,
             listen: Some("127.0.0.1:0".parse().unwrap()),
-            source_map_slice: false,
+            ..Default::default()
         };
         let config = RuntimeConfig::minimal().with_debug(debug_cfg);
         let runtime = PastaLuaRuntime::with_config(TranspileContext::new(), config)
@@ -262,7 +262,7 @@ fn runtime_teardown_emits_terminated_to_connected_client() {
         let debug_cfg = DebugConfig {
             enabled: true,
             listen: Some("127.0.0.1:0".parse().unwrap()),
-            source_map_slice: false,
+            ..Default::default()
         };
         let config = RuntimeConfig::minimal().with_debug(debug_cfg);
         let runtime = PastaLuaRuntime::with_config(TranspileContext::new(), config)
@@ -513,7 +513,7 @@ return jit ~= nil and jit.status() == true",
         let debug_cfg = DebugConfig {
             enabled: true,
             listen: Some("127.0.0.1:0".parse().unwrap()),
-            source_map_slice: false,
+            ..Default::default()
         };
         let config = RuntimeConfig::minimal().with_debug(debug_cfg);
         let runtime = PastaLuaRuntime::with_config(TranspileContext::new(), config)

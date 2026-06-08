@@ -53,10 +53,8 @@ pub(crate) mod transport;
 pub(crate) mod wiring;
 pub mod types;
 
-// R4 薄い実証スライス（feature `pasta-source-map-slice`・default 無効）。
-// 無効時（既定）はこのモジュールを一切コンパイル/露出しない（R4.6 ゼロコスト）。
-// 本番品質のソースマップは別仕様 `pasta-source-map` の担当。
-#[cfg(feature = "pasta-source-map-slice")]
+// `.pasta`↔生成 `.lua` ソースマップの consumer 側モジュール。
+// 本仕様 `pasta-source-map` で本番化（常時コンパイル）した（7.3）。
 pub mod source_map;
 pub use types::{
     Breakpoint, FrameInfo, LineEvent, ResolvedBreakpoint, Scope, SessionCommand, SessionEvent,
@@ -67,6 +65,110 @@ pub use types::{
 ///
 /// Debugging is local-only by design; the address is never externally routable.
 const LOOPBACK: Ipv4Addr = Ipv4Addr::LOCALHOST;
+
+/// Source presentation mode for the debug session.
+///
+/// Selects whether stop positions, call stacks and breakpoints are presented in
+/// `.pasta` coordinates (via the source map) or in the raw generated `.lua`
+/// coordinates. The default is [`SourceMode::Pasta`] (requirements 6.1). This
+/// field replaces the dead `source_map_slice: bool` reserve removed in task 3.1
+/// (requirements 7.3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SourceMode {
+    /// Present in `.pasta` coordinates via the source map. Default (6.1).
+    #[default]
+    Pasta,
+    /// Present in the raw generated `.lua` coordinates (6.2).
+    Lua,
+}
+
+impl SourceMode {
+    /// Parse a case-insensitive string (`"pasta"` / `"lua"`, surrounding
+    /// whitespace ignored) into a [`SourceMode`].
+    ///
+    /// Any other value falls back to the default [`SourceMode::Pasta`] and emits
+    /// a warning (design "Error Categories": 不正な `sourcePresentation` 値 →
+    /// 既定 `pasta` へフォールバック＋警告). This keeps an invalid env / file /
+    /// attach value from breaking the session.
+    pub fn parse(raw: &str) -> Self {
+        match raw.trim().to_ascii_lowercase().as_str() {
+            "pasta" => SourceMode::Pasta,
+            "lua" => SourceMode::Lua,
+            other => {
+                tracing::warn!(
+                    value = other,
+                    "invalid source presentation mode; falling back to default `pasta`"
+                );
+                SourceMode::default()
+            }
+        }
+    }
+
+    /// Encode a [`SourceMode`] as a `u8` for an [`AtomicU8`]-backed shared cell.
+    fn as_u8(self) -> u8 {
+        match self {
+            SourceMode::Pasta => 0,
+            SourceMode::Lua => 1,
+        }
+    }
+
+    /// Decode a `u8` produced by [`as_u8`](Self::as_u8) back to a [`SourceMode`].
+    /// Any unexpected value defaults to [`SourceMode::Pasta`] (6.1).
+    fn from_u8(v: u8) -> Self {
+        match v {
+            1 => SourceMode::Lua,
+            _ => SourceMode::Pasta,
+        }
+    }
+}
+
+/// A shared, interior-mutable EFFECTIVE present mode for one debug session
+/// (task 5.5 / requirements 6.3).
+///
+/// The resolved [`DebugConfig::source_mode`] (env > file > 既定) is baked at
+/// [`enable`] time, BEFORE the DAP `attach` request arrives. When that `attach`
+/// request carries an explicit `sourcePresentation` argument (the HIGHEST
+/// precedence, design 581: `attach > env > file > 既定`), the server must apply
+/// it to the CURRENT session — switching BOTH the `.pasta` source RESOLVER
+/// presentation (task 5.2) AND the `.pasta`-granular STEP granularity
+/// (task 5.4). Those two consumers live on DIFFERENT threads — the resolver on
+/// the socket-bridge thread (it owns the [`DapAdapter`]) and the stepper on the
+/// VM thread (inside the line hook) — so the effective mode is shared here.
+///
+/// Mirrors the established [`BreakpointSet`](crate::debug::breakpoints::BreakpointSet)
+/// pattern (a cheap `Arc` clone of settable-while-running shared state): the
+/// socket-bridge thread WRITES the new mode when the `attach` arg is received,
+/// and the VM-thread stepper READS it per line. An [`AtomicU8`] is sufficient
+/// (the value is `Copy`, a single scalar, with no compound invariant) and needs
+/// no lock on the hot per-line read path.
+///
+/// When the `attach` request carries NO `sourcePresentation`, the cell is left
+/// at the [`enable`]-time resolved mode, so the env > file > default decision
+/// stands (design 581: a client default must NOT override env/file).
+#[derive(Clone, Debug)]
+pub(crate) struct SharedSourceMode {
+    inner: Arc<std::sync::atomic::AtomicU8>,
+}
+
+impl SharedSourceMode {
+    /// Construct a shared cell initialised to `mode` (the [`enable`]-time
+    /// resolved mode).
+    pub(crate) fn new(mode: SourceMode) -> Self {
+        Self {
+            inner: Arc::new(std::sync::atomic::AtomicU8::new(mode.as_u8())),
+        }
+    }
+
+    /// Read the current effective present mode (VM-thread stepper / resolver).
+    pub(crate) fn get(&self) -> SourceMode {
+        SourceMode::from_u8(self.inner.load(Ordering::SeqCst))
+    }
+
+    /// Write a new effective present mode (socket bridge, on `attach`).
+    pub(crate) fn set(&self, mode: SourceMode) {
+        self.inner.store(mode.as_u8(), Ordering::SeqCst);
+    }
+}
 
 /// Runtime-resolved debug configuration and zero-cost gate.
 ///
@@ -81,25 +183,34 @@ pub struct DebugConfig {
     /// Listen address for the DAP transport. `None` when disabled (R5.5).
     pub listen: Option<SocketAddr>,
 
-    /// Whether the `.pasta` source-map proof-of-concept slice is active.
+    /// Source presentation mode. Default [`SourceMode::Pasta`] (6.1).
     ///
-    /// This is ANDed with the `pasta-source-map-slice` build feature downstream
-    /// (R4). It defaults to `false` and is never enabled by this foundation task.
-    pub source_map_slice: bool,
+    /// Composed in [`resolve`](Self::resolve) with precedence
+    /// `DAP attach 引数 > env > pasta.toml [debug] > 既定 Pasta`.
+    pub source_mode: SourceMode,
+
+    /// Whether to additionally write the on-disk `.lua.map` sidecar (3.2).
+    /// Default `false`; the in-memory source map is always the primary path.
+    ///
+    /// Composed in [`resolve`](Self::resolve) with precedence `env > file >
+    /// default` (same convention as `enabled`/`port`).
+    pub source_map_sidecar: bool,
 }
 
 impl Default for DebugConfig {
     /// The disabled, zero-cost configuration (R5.2 / R5.5).
     ///
-    /// Equivalent to `DebugConfig::resolve(None, None, None)`: `enabled = false`,
-    /// `listen = None` (no port is ever opened), `source_map_slice = false`. This
-    /// lets every existing `RuntimeConfig` constructor stay zero-cost by deriving
+    /// Equivalent to `DebugConfig::resolve(None, None, None, None, None, None,
+    /// None, None)`: `enabled = false`, `listen = None` (no port is ever opened),
+    /// `source_mode = Pasta` (6.1), `source_map_sidecar = false` (3.2). This lets
+    /// every existing `RuntimeConfig` constructor stay zero-cost by deriving
     /// `RuntimeConfig::debug` from this default.
     fn default() -> Self {
         Self {
             enabled: false,
             listen: None,
-            source_map_slice: false,
+            source_mode: SourceMode::Pasta,
+            source_map_sidecar: false,
         }
     }
 }
@@ -115,14 +226,38 @@ impl DebugConfig {
     /// * `file` - parsed `[debug]` section, if present in pasta.toml.
     /// * `env_enabled` - `PASTA_DEBUG` parsed to a bool, if the var was set.
     /// * `env_port` - `PASTA_DEBUG_PORT` parsed to a port, if the var was set.
+    /// * `env_source_mode` - `PASTA_DEBUG_SOURCE_MODE` parsed to a [`SourceMode`],
+    ///   if the var was set.
+    /// * `env_sidecar` - `PASTA_DEBUG_SOURCE_MAP_SIDECAR` parsed to a bool, if the
+    ///   var was set.
+    /// * `file_source_mode` - the `[debug]` source-presentation mode, if present.
+    /// * `file_sidecar` - the `[debug]` sidecar flag, if present.
+    ///   The two `file_*` mode/sidecar values are supplied separately (not via
+    ///   [`DebugFileConfig`]) because the pasta.toml loading of these fields lands
+    ///   in task 4.4 (`loader/config.rs`); `resolve` only needs to ACCEPT them.
+    /// * `attach_source_mode` - the DAP `attach` `sourcePresentation` override,
+    ///   set ONLY when the client explicitly specifies it (task 5.5 plumbing).
+    ///   A client default is NOT passed here, so it never overrides env/file.
     ///
     /// # Precedence
-    /// `env_enabled`/`env_port` (when `Some`) override the file values, which in
-    /// turn override the defaults (`enabled = false`, `port = 9276`).
+    /// - `enabled` / `port`: `env` (when `Some`) beats `file` beats default
+    ///   (`enabled = false`, `port = 9276`). (unchanged)
+    /// - `source_mode`: `attach_source_mode` beats `env_source_mode` beats
+    ///   `file_source_mode` beats 既定 [`SourceMode::Pasta`] (6.1). The DAP attach
+    ///   引数 wins, then env, then the pasta.toml `[debug]` value, consistent with
+    ///   the env>file convention above.
+    /// - `source_map_sidecar`: `env_sidecar` beats `file_sidecar` beats default
+    ///   `false` (3.2; same env>file convention).
+    #[allow(clippy::too_many_arguments)]
     pub fn resolve(
         file: Option<&DebugFileConfig>,
         env_enabled: Option<bool>,
         env_port: Option<u16>,
+        env_source_mode: Option<SourceMode>,
+        env_sidecar: Option<bool>,
+        file_source_mode: Option<SourceMode>,
+        file_sidecar: Option<bool>,
+        attach_source_mode: Option<SourceMode>,
     ) -> Self {
         let file_enabled = file.map(|f| f.enabled).unwrap_or(false);
         let file_port = file.map(|f| f.port).unwrap_or_else(default_debug_port);
@@ -137,17 +272,35 @@ impl DebugConfig {
             None
         };
 
+        // 6.1: source presentation mode. Precedence attach > env > file > Pasta.
+        let source_mode = attach_source_mode
+            .or(env_source_mode)
+            .or(file_source_mode)
+            .unwrap_or_default();
+
+        // 3.2: disk sidecar output. Precedence env > file > false (A1 convention).
+        let source_map_sidecar = env_sidecar.or(file_sidecar).unwrap_or(false);
+
         Self {
             enabled,
             listen,
-            source_map_slice: false,
+            source_mode,
+            source_map_sidecar,
         }
     }
 
     /// Resolve from a file config plus the process environment.
     ///
-    /// Reads `PASTA_DEBUG` / `PASTA_DEBUG_PORT` via [`std::env`]. Prefer
+    /// Reads `PASTA_DEBUG` / `PASTA_DEBUG_PORT` / `PASTA_DEBUG_SOURCE_MODE` /
+    /// `PASTA_DEBUG_SOURCE_MAP_SIDECAR` via [`std::env`]. Prefer
     /// [`resolve`](Self::resolve) in tests to avoid global-env races.
+    ///
+    /// The pasta.toml `[debug]` source-mode (`present_as`) / sidecar
+    /// (`source_map_sidecar`) values are loaded by `loader/config.rs` (task 4.4)
+    /// and SUPPLIED here from `file`: they are fed to [`resolve`](Self::resolve)
+    /// as the `file_*` inputs so the precedence becomes `env > file > 既定`
+    /// (requirements 6.3 / 3.2). No DAP attach override is available at this
+    /// layer (task 5.5).
     pub fn from_env(file: Option<&DebugFileConfig>) -> Self {
         let env_enabled = std::env::var("PASTA_DEBUG")
             .ok()
@@ -155,15 +308,57 @@ impl DebugConfig {
         let env_port = std::env::var("PASTA_DEBUG_PORT")
             .ok()
             .and_then(|v| v.trim().parse::<u16>().ok());
-        Self::resolve(file, env_enabled, env_port)
+        let env_source_mode = std::env::var("PASTA_DEBUG_SOURCE_MODE")
+            .ok()
+            .map(|v| SourceMode::parse(&v));
+        let env_sidecar = std::env::var("PASTA_DEBUG_SOURCE_MAP_SIDECAR")
+            .ok()
+            .and_then(|v| parse_env_bool(&v));
+        Self::resolve(
+            file,
+            env_enabled,
+            env_port,
+            env_source_mode,
+            env_sidecar,
+            file_source_mode(file), // pasta.toml [debug] present_as (task 4.4)
+            file_sidecar(file),     // pasta.toml [debug] source_map_sidecar (task 4.4)
+            None,                   // no DAP attach override at this layer (task 5.5)
+        )
     }
 
     /// Resolve from a file config only, ignoring the environment.
     ///
-    /// Convenience wrapper equivalent to `resolve(file, None, None)`.
+    /// Equivalent to feeding [`resolve`](Self::resolve) the file's
+    /// `present_as`→[`SourceMode`] and `source_map_sidecar` as the `file_*`
+    /// inputs with no env / attach override (precedence `file > 既定`).
     pub fn from_file(file: Option<&DebugFileConfig>) -> Self {
-        Self::resolve(file, None, None)
+        Self::resolve(
+            file,
+            None,
+            None,
+            None,
+            None,
+            file_source_mode(file),
+            file_sidecar(file),
+            None,
+        )
     }
+}
+
+/// Map a pasta.toml `[debug]` `present_as` string to a [`SourceMode`], if the
+/// key was present. `None` (key omitted) lets env/default decide; an invalid
+/// value is tolerated and parsed back to the default `.pasta` via
+/// [`SourceMode::parse`] (requirements 6.1 / 6.3).
+fn file_source_mode(file: Option<&DebugFileConfig>) -> Option<SourceMode> {
+    file.and_then(|f| f.present_as.as_deref())
+        .map(SourceMode::parse)
+}
+
+/// The pasta.toml `[debug]` `source_map_sidecar` flag, supplied to `resolve`
+/// only when a file config is present (3.2). When no file config is present this
+/// is `None` so the env/default decides.
+fn file_sidecar(file: Option<&DebugFileConfig>) -> Option<bool> {
+    file.map(|f| f.source_map_sidecar)
 }
 
 /// Parse an environment variable value into a boolean.
@@ -349,16 +544,58 @@ impl Drop for DebugHandle {
 /// # Preconditions
 /// `lua` must already be constructed on the VM thread.
 ///
+/// # Source map injection (task 4.2 — `pasta-source-map`)
+///
+/// `source_map` is the OPTIONAL immutable shared `.pasta`↔`.lua` map (design
+/// "Architecture": `Arc<SourceMap>` 不変共有). Together with `cfg.source_mode`
+/// (task 4.1) it is threaded to the three `.pasta` CONSUMERS — the DAP source
+/// resolver (task 5.2), the breakpoint translator (task 5.3) and the stepper
+/// (task 5.4) — via this injection path: `enable → wiring → DebugSession`
+/// (design 548). The map+mode REACH those points only when BOTH a map is
+/// supplied AND `cfg.source_mode == SourceMode::Pasta` (design 582, requirements
+/// 6.1); for `None` or [`SourceMode::Lua`] every consumer keeps its existing
+/// default `.lua` behavior byte-for-byte (requirements 6.2 / 7.2). This task
+/// wires the SKELETON only — the consumer LOGIC is tasks 5.x.
+///
 /// # Errors
 /// [`DebugError::Bind`] if the DAP listener fails to bind; [`DebugError::Vm`] if
 /// the hook install fails (`mlua::Error` is stringified at the boundary, it is
 /// `!Send`). The disabled path never errors.
-pub fn enable(lua: &mlua::Lua, cfg: &DebugConfig) -> Result<Option<DebugHandle>, DebugError> {
+pub fn enable(
+    lua: &mlua::Lua,
+    cfg: &DebugConfig,
+    source_map: Option<Arc<source_map::SourceMap>>,
+) -> Result<Option<DebugHandle>, DebugError> {
     if !cfg.enabled {
         // Zero-cost disabled path (R5.2 / R5.3 / R5.5): no hook, no port, no
-        // thread, no std_debug exposure. Leave `lua` untouched.
+        // thread, no std_debug exposure. Leave `lua` untouched. The `source_map`
+        // (if any) is simply dropped here — the disabled gate never consumes it.
         return Ok(None);
     }
+
+    // Effective present-mode cell (task 5.5 / requirement 6.3): initialise the
+    // SHARED, interior-mutable mode from the resolved `cfg.source_mode` (env >
+    // file > 既定). The socket bridge flips it when a DAP `attach`
+    // `sourcePresentation` arrives (highest precedence, design 581); the resolver
+    // (task 5.2) and the VM-thread stepper (task 5.4) both read it, so an `attach`
+    // switches BOTH for this session. One clone goes to the wiring, one to the
+    // session.
+    let shared_mode = SharedSourceMode::new(cfg.source_mode);
+
+    // Gating (design 582, requirements 6.1 / 6.2 / 6.3): the `.pasta` consumers
+    // (resolver / BP translator / stepper) are reached only when a map is supplied
+    // AND the EFFECTIVE mode is `SourceMode::Pasta`. The mode part is now decided
+    // at CONSUMPTION time (`pasta_active()` reads the shared cell) rather than
+    // frozen here, because a DAP `attach` `sourcePresentation` can flip the mode
+    // AFTER `enable` (it arrives later) — including Lua→Pasta, which needs the map
+    // available. So the map is ALWAYS threaded when supplied; the per-consumption
+    // `pasta_active()` gate (map present AND effective mode Pasta) keeps `None`/
+    // `Lua`/no-attach paths byte-for-byte (7.2). Cloning the `Arc` is a refcount
+    // bump (immutable shared map).
+    let source_map_wiring = wiring::SourceMapWiring {
+        source_map: source_map.clone(),
+        source_mode: shared_mode.clone(),
+    };
 
     // (1) Shared breakpoint store: one clone goes to the VM-thread hook (reads),
     // one clone to the handle / socket bridge (writes — settable while running).
@@ -381,7 +618,17 @@ pub fn enable(lua: &mlua::Lua, cfg: &DebugConfig) -> Result<Option<DebugHandle>,
     // into the line hook. install() applies engine-wide jit.off() and registers
     // the coroutine-crossing EVERY_LINE hook (R1.7 / R5.2). The session is moved
     // INTO the hook closure and thereafter lives on this VM thread inside `lua`.
-    let session = DebugSession::new(breakpoints.clone(), cmd_rx, event_tx);
+    // The session is the STEPPER consumer (task 5.4 / 5.5): thread the map plus
+    // the SHARED effective mode into it. The map is threaded whenever supplied
+    // (the `effective_mode == Pasta` gate is applied per line via
+    // `resolve_current_pasta`), so a DAP `attach` Lua→Pasta flip can activate
+    // `.pasta` stepping; `with_shared_mode` lets the socket-bridge `attach` flip
+    // be observed here. With no map / `Lua` effective mode the session keeps its
+    // default `.lua` granularity (7.2). The baked `source_mode` is the `attach`-
+    // absent fallback (matches the env > file > 既定 resolution).
+    let session = DebugSession::new(breakpoints.clone(), cmd_rx, event_tx)
+        .with_source_map(source_map.clone(), cfg.source_mode)
+        .with_shared_mode(Some(shared_mode.clone()));
     crate::debug::hook::install(lua, session).map_err(|e| DebugError::Vm(e.to_string()))?;
 
     // (4) I/O side: bind the transport (None → no port; Some → bind + accept one
@@ -409,8 +656,20 @@ pub fn enable(lua: &mlua::Lua, cfg: &DebugConfig) -> Result<Option<DebugHandle>,
         let adapter = Arc::clone(&adapter);
         let breakpoints = breakpoints.clone();
         let shutdown = Arc::clone(&shutdown);
+        // The socket bridge owns the DapAdapter (source RESOLVER attach point,
+        // task 5.2) and applies setBreakpoints (BP TRANSLATION attach point, task
+        // 5.3): deliver the gated map+mode there too (task 4.2 plumbing).
+        let source_map_wiring = source_map_wiring.clone();
         std::thread::spawn(move || {
-            wiring::run_socket_bridge(transport, adapter, breakpoints, cmd_tx, out_rx, shutdown);
+            wiring::run_socket_bridge(
+                transport,
+                adapter,
+                breakpoints,
+                cmd_tx,
+                out_rx,
+                shutdown,
+                source_map_wiring,
+            );
         })
     };
 
@@ -440,10 +699,9 @@ mod tests {
 
     #[test]
     fn disabled_by_default_no_inputs() {
-        let cfg = DebugConfig::resolve(None, None, None);
+        let cfg = DebugConfig::resolve(None, None, None, None, None, None, None, None);
         assert!(!cfg.enabled, "default must be disabled");
         assert!(cfg.listen.is_none(), "disabled => no listen address (R5.5)");
-        assert!(!cfg.source_map_slice);
     }
 
     #[test]
@@ -451,8 +709,9 @@ mod tests {
         let file = DebugFileConfig {
             enabled: false,
             port: 9276,
+            ..Default::default()
         };
-        let cfg = DebugConfig::resolve(Some(&file), None, None);
+        let cfg = DebugConfig::resolve(Some(&file), None, None, None, None, None, None, None);
         assert!(!cfg.enabled);
         assert!(cfg.listen.is_none());
     }
@@ -462,8 +721,9 @@ mod tests {
         let file = DebugFileConfig {
             enabled: true,
             port: 9276,
+            ..Default::default()
         };
-        let cfg = DebugConfig::resolve(Some(&file), None, None);
+        let cfg = DebugConfig::resolve(Some(&file), None, None, None, None, None, None, None);
         assert!(cfg.enabled);
         assert_eq!(
             cfg.listen,
@@ -474,7 +734,7 @@ mod tests {
 
     #[test]
     fn enabled_via_env_when_no_file() {
-        let cfg = DebugConfig::resolve(None, Some(true), None);
+        let cfg = DebugConfig::resolve(None, Some(true), None, None, None, None, None, None);
         assert!(cfg.enabled);
         assert_eq!(cfg.listen, Some("127.0.0.1:9276".parse().unwrap()));
     }
@@ -484,8 +744,9 @@ mod tests {
         let file = DebugFileConfig {
             enabled: true,
             port: 5000,
+            ..Default::default()
         };
-        let cfg = DebugConfig::resolve(Some(&file), None, None);
+        let cfg = DebugConfig::resolve(Some(&file), None, None, None, None, None, None, None);
         assert_eq!(cfg.listen, Some("127.0.0.1:5000".parse().unwrap()));
     }
 
@@ -494,8 +755,9 @@ mod tests {
         let file = DebugFileConfig {
             enabled: true,
             port: 5000,
+            ..Default::default()
         };
-        let cfg = DebugConfig::resolve(Some(&file), None, Some(7000));
+        let cfg = DebugConfig::resolve(Some(&file), None, Some(7000), None, None, None, None, None);
         assert_eq!(
             cfg.listen,
             Some("127.0.0.1:7000".parse().unwrap()),
@@ -508,8 +770,9 @@ mod tests {
         let file = DebugFileConfig {
             enabled: false,
             port: 9276,
+            ..Default::default()
         };
-        let cfg = DebugConfig::resolve(Some(&file), Some(true), None);
+        let cfg = DebugConfig::resolve(Some(&file), Some(true), None, None, None, None, None, None);
         assert!(cfg.enabled, "PASTA_DEBUG truthy overrides [debug] enabled=false");
         assert_eq!(cfg.listen, Some("127.0.0.1:9276".parse().unwrap()));
     }
@@ -519,8 +782,9 @@ mod tests {
         let file = DebugFileConfig {
             enabled: true,
             port: 9276,
+            ..Default::default()
         };
-        let cfg = DebugConfig::resolve(Some(&file), Some(false), None);
+        let cfg = DebugConfig::resolve(Some(&file), Some(false), None, None, None, None, None, None);
         assert!(!cfg.enabled, "explicit PASTA_DEBUG=false overrides [debug] enabled=true");
         assert!(cfg.listen.is_none());
     }
@@ -528,7 +792,7 @@ mod tests {
     #[test]
     fn env_port_only_without_enable_stays_disabled() {
         // Setting a port but never enabling must NOT open anything.
-        let cfg = DebugConfig::resolve(None, None, Some(7000));
+        let cfg = DebugConfig::resolve(None, None, Some(7000), None, None, None, None, None);
         assert!(!cfg.enabled);
         assert!(cfg.listen.is_none());
     }
@@ -549,8 +813,8 @@ mod tests {
     #[test]
     fn enable_disabled_returns_none_and_no_trace() {
         let lua = mlua::Lua::new();
-        let cfg = DebugConfig::resolve(None, None, None);
-        let handle = enable(&lua, &cfg).expect("enable must not error when disabled");
+        let cfg = DebugConfig::resolve(None, None, None, None, None, None, None, None);
+        let handle = enable(&lua, &cfg, None).expect("enable must not error when disabled");
         assert!(handle.is_none(), "disabled enable() returns Ok(None) (R5.2)");
 
         // No std_debug exposure as a side effect of the disabled gate (R5.3).
@@ -572,9 +836,9 @@ mod tests {
         let cfg = DebugConfig {
             enabled: true,
             listen: Some("127.0.0.1:0".parse().unwrap()),
-            source_map_slice: false,
+            ..Default::default()
         };
-        let handle = enable(&lua, &cfg).expect("enable must succeed when enabled");
+        let handle = enable(&lua, &cfg, None).expect("enable must succeed when enabled");
         let handle = handle.expect("enabled enable() returns Ok(Some(DebugHandle))");
 
         // The handle echoes the config it was built from.
@@ -632,5 +896,131 @@ mod tests {
         assert!(format!("{vm}").contains("lua boom"));
         let disc = DebugError::Disconnected;
         assert!(!format!("{disc}").is_empty());
+    }
+
+    // --- SourceMode: default + string parse (6.1, design Error line 615) ---
+
+    #[test]
+    fn source_mode_default_is_pasta() {
+        // 6.1: 既定の提示モードは `.pasta`。
+        assert_eq!(SourceMode::default(), SourceMode::Pasta);
+    }
+
+    #[test]
+    fn source_mode_parse_case_insensitive() {
+        assert_eq!(SourceMode::parse("pasta"), SourceMode::Pasta);
+        assert_eq!(SourceMode::parse("lua"), SourceMode::Lua);
+        assert_eq!(SourceMode::parse("PASTA"), SourceMode::Pasta);
+        assert_eq!(SourceMode::parse("Lua"), SourceMode::Lua);
+        assert_eq!(SourceMode::parse("  pasta  "), SourceMode::Pasta);
+    }
+
+    #[test]
+    fn source_mode_parse_invalid_falls_back_to_pasta() {
+        // design Error line 615: 不正な値 → 既定 `pasta` へフォールバック。
+        assert_eq!(SourceMode::parse("garbage"), SourceMode::Pasta);
+        assert_eq!(SourceMode::parse(""), SourceMode::Pasta);
+    }
+
+    // --- DebugConfig: new field defaults (6.1, 3.2) ---
+    //
+    // resolve signature:
+    //   resolve(file, env_enabled, env_port,
+    //           env_source_mode, env_sidecar,
+    //           file_source_mode, file_sidecar, attach_source_mode)
+
+    #[test]
+    fn default_source_mode_is_pasta_and_sidecar_false() {
+        // 6.1: 既定 source_mode == Pasta; 3.2: 既定 sidecar == false.
+        let cfg = DebugConfig::resolve(None, None, None, None, None, None, None, None);
+        assert_eq!(cfg.source_mode, SourceMode::Pasta, "6.1: default present mode is .pasta");
+        assert!(!cfg.source_map_sidecar, "3.2: sidecar disabled by default");
+
+        // The struct Default mirrors the no-input resolve (zero-cost config).
+        let d = DebugConfig::default();
+        assert_eq!(d.source_mode, SourceMode::Pasta);
+        assert!(!d.source_map_sidecar);
+    }
+
+    // --- DebugConfig::resolve: source_mode precedence attach > env > file > default ---
+
+    #[test]
+    fn source_mode_file_overrides_default() {
+        // file Lua, no env, no attach => Lua (file beats default Pasta).
+        let cfg = DebugConfig::resolve(
+            None,
+            None,
+            None,
+            None,                  // env source_mode
+            None,                  // env sidecar
+            Some(SourceMode::Lua), // file source_mode
+            None,                  // file sidecar
+            None,                  // attach source_mode
+        );
+        assert_eq!(cfg.source_mode, SourceMode::Lua, "file overrides default");
+    }
+
+    #[test]
+    fn source_mode_env_overrides_file() {
+        // file Pasta, env Lua => Lua (env beats file), matching enabled/port env>file.
+        let cfg = DebugConfig::resolve(
+            None,
+            None,
+            None,
+            Some(SourceMode::Lua),   // env source_mode
+            None,                    // env sidecar
+            Some(SourceMode::Pasta), // file source_mode
+            None,                    // file sidecar
+            None,                    // attach
+        );
+        assert_eq!(cfg.source_mode, SourceMode::Lua, "env overrides file");
+    }
+
+    #[test]
+    fn source_mode_attach_overrides_env() {
+        // attach Lua beats env Pasta beats file Pasta (DAP attach 引数 > env > file).
+        let cfg = DebugConfig::resolve(
+            None,
+            None,
+            None,
+            Some(SourceMode::Pasta), // env
+            None,                    // env sidecar
+            Some(SourceMode::Pasta), // file
+            None,                    // file sidecar
+            Some(SourceMode::Lua),   // attach
+        );
+        assert_eq!(cfg.source_mode, SourceMode::Lua, "attach overrides env");
+    }
+
+    // --- DebugConfig::resolve: source_map_sidecar precedence env > file > default ---
+
+    #[test]
+    fn sidecar_file_overrides_default() {
+        // file_sidecar=true, no env => true (file beats default false).
+        let cfg = DebugConfig::resolve(None, None, None, None, None, None, Some(true), None);
+        assert!(cfg.source_map_sidecar, "file sidecar=true overrides default false");
+    }
+
+    #[test]
+    fn sidecar_env_overrides_file() {
+        // env false beats file true; and env true beats file false.
+        // env false, file none:
+        let off = DebugConfig::resolve(None, None, None, None, Some(false), None, None, None)
+            .source_map_sidecar;
+        // file true alone:
+        let file_on = DebugConfig::resolve(None, None, None, None, None, None, Some(true), None)
+            .source_map_sidecar;
+        // env false over file true:
+        let env_off_over_file_on =
+            DebugConfig::resolve(None, None, None, None, Some(false), None, Some(true), None)
+                .source_map_sidecar;
+        // env true over file false:
+        let env_on_over_file_off =
+            DebugConfig::resolve(None, None, None, None, Some(true), None, Some(false), None)
+                .source_map_sidecar;
+        assert!(!off);
+        assert!(file_on);
+        assert!(!env_off_over_file_on, "PASTA_DEBUG_SOURCE_MAP_SIDECAR=false overrides file true");
+        assert!(env_on_over_file_off, "PASTA_DEBUG_SOURCE_MAP_SIDECAR=true overrides file false");
     }
 }

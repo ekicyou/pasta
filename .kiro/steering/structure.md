@@ -64,7 +64,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       │   │   ├── transport.rs    # TCP＋Content-Lengthフレーミング（I/O専用）
 │       │   │   ├── dap.rs          # DAP最小サブセット（serde_json手書き）
 │       │   │   ├── wiring.rs       # transport↔dap↔session↔hook結線（ブリッジスレッド）
-│       │   │   └── source_map.rs   # .pasta実証スライス（feature gate・LineMap/resolve）
+│       │   │   └── source_map.rs   # .pasta本番ソースマップ（ChunkSourceMap/MapBuilderSink/SourceMap・正規化キー・任意サイドカー）
 │       │   ├── context.rs   # トランスパイルコンテキスト
 │       │   ├── error.rs     # エラー型
 │       │   ├── encoding/    # エンコーディング処理（プラットフォーム別分割）

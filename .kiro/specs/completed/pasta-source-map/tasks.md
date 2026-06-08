@@ -1,0 +1,175 @@
+# Implementation Plan
+
+- [ ] 1. Foundation: 実機検証とゼロコスト回帰基盤
+- [x] 1.1 チャンク名の実機検証とチャンク命名戦略の確定（Validation Hook）
+  - デバッグ有効で実トランスパイル済みチャンクをロードし、ラインフックが報告する source 文字列（`@<絶対 .lua パス>` 想定）を実機で取得する
+  - ローダのキャッシュパス構築由来のキーと、正規化（`@` 除去・区切り統一・Windows 大小無視）後に一致するかを検証する
+  - 完了状態: 実フックの source 文字列とローダ由来キーの**一致**、または `set_name` 明示命名の要否を確定する（命名戦略の確定が成果物）。Windows での区切り・エンコーディング差を実測し、判断として残す
+  - 注: `set_name` 明示命名が必要と判明した場合、その改修は 4.3 のローダ構築タスクに含める
+  - _Requirements: 4.2, 5.1_
+- [x] 1.2 (P) ゼロコスト回帰テスト基盤
+  - デバッグ無効（sink 未装着）で生成 `.lua` が現行と**バイト一致**することを検証するスナップショット回帰を整備する
+  - 代表的な複数構文（トーク・スコープ定義・コードブロック・単語定義・変数代入）を含むフィクスチャで現行出力を基準として固定する
+  - 完了状態: デバッグ無効時の生成 `.lua` がバイト不変であることを示す回帰テストが通る
+  - _Requirements: 7.1_
+  - _Boundary: Transpiler_
+
+- [ ] 2. Producer: span 記録の全経路網羅と行ズレ補正
+- [x] 2.1 (P) トランスパイル API へのソースマップ受け渡し口追加
+  - トランスパイルがオプショナルな記録シンクを受け取り、本番ローダから装着できるようにする
+  - 既存トランスパイル呼び出しはシンクなしの薄いラッパとして互換維持する
+  - 完了状態: シンクなし呼び出しは従来どおり動作し、シンクあり呼び出しで記録が収集される
+  - _Requirements: 1.1, 3.1, 7.1_
+  - _Boundary: TranspileSinkPort_
+- [x] 2.2 (P) 正規化の行ズレ削除写像
+  - 出力正規化が「削除された行の写像（旧行→最終行、削除行は無写像）」を返せるようにする
+  - 既存の正規化関数は新関数の薄いラッパとして出力バイト一致を維持する
+  - 完了状態: `end` 直前空行・末尾空白の削除で旧行→最終行写像が正しいことを示す単体テストが通る
+  - _Requirements: 2.1_
+  - _Boundary: LineShift_
+- [x] 2.3 (P) 記録シンクへの行直接対応 API 追加
+  - 記録シンクに「出力 `.lua` 行を `.pasta` 行へ直接対応づける」操作を追加し、既存の span ベース記録をその糖衣にする
+  - 完了状態: 行直接対応 API と span ベース糖衣の双方が同一の対応づけ結果を返す単体テストが通る
+  - _Requirements: 1.1, 1.3_
+  - _Boundary: SourceMapSink_
+- [x] 2.4 要素生成の全 record 配線
+  - 変数代入・シーン呼び出し・単語定義の各要素生成で、出力 `.lua` 行に由来 `.pasta` span を記録する
+  - コードブロックは各出力行を対応 `.pasta` 行（ブロック開始＋行オフセット）へ個別記録する（1:1 行対応を確認、非 1:1 なら定数補正）
+  - 完了状態: 各要素種別および コードブロック内行について、出力 `.lua` 行→期待 `.pasta` 行の対応が単体テストで一致する
+  - _Requirements: 1.1, 1.3, 1.4_
+  - _Depends: 2.3_
+  - _Boundary: RecordWiring (element_gen)_
+- [x] 2.5 (P) スコープ定義ヘッダの record 配線
+  - アクター定義・グローバル/ローカルシーン定義のヘッダ `.lua` 出力行に、既存の scope span（start_line ＝定義ヘッダ行）を記録する
+  - 完了状態: シーン/アクター定義ヘッダの `.lua` 行が `.pasta` 定義ヘッダ行に対応し、その行をブレークポイント対象にできることを単体テストで確認する
+  - _Requirements: 1.1, 1.4, 1.5_
+  - _Boundary: RecordWiring (scope_gen)_
+
+- [ ] 3. Map: 本番ソースマップ表現と feature gate 撤去
+- [x] 3.1 スライス feature gate 撤去と本番モジュール化
+  - ソースマップ消費モジュールの feature gate を撤去し常時コンパイル化、使い捨て feature 定義とデッド予約フィールドを除去する
+  - 完了状態: feature 削除後もワークスペースがビルド・テスト通過し、暫定ハーネスが残存しない
+  - _Requirements: 7.3_
+- [x] 3.2 チャンク単位の双方向行写像
+  - 1 チャンクの「最終 `.lua` 行→`.pasta` 位置」写像と、対応あり/なしの区別、`.pasta` 行→`.lua` 行群（昇順・安定順序）の逆引きを提供する
+  - 完了状態: 対応なし行が「対応なし」を返し、1 `.pasta` 行→複数 `.lua` 行が昇順かつ決定的順序で返ることを単体テストで確認する
+  - _Requirements: 1.2, 2.2, 2.3, 8.1, 8.2, 8.3_
+  - _Depends: 3.1_
+- [x] 3.3 マップ構築シンク（行ごと記録→補正適用）
+  - 記録シンク実装として、行ごと記録を受け、正規化の削除写像で最終 `.lua` 行へ補正したチャンク写像を確定する
+  - `.pasta` 行は span の行番号を直接採用し、同一行は決定的な last-write-wins とする
+  - 完了状態: 記録→補正でチャンク写像が最終 `.lua` 行に整合し、集約行が決定的な単一 `.pasta` 位置になる単体テストが通る
+  - _Requirements: 2.1, 8.1_
+  - _Depends: 2.2, 2.3, 3.2_
+- [x] 3.4 マルチチャンク集約と双方向解決（正規化キー）
+  - チャンク名キーの集約マップと逆引き索引を構築し、`.lua`→`.pasta`／`.pasta`→`.lua`／最近接対応行の解決を提供する
+  - 照合は正規化キー（`@` 除去・区切り統一・Windows 大小無視）で行う
+  - 完了状態: 双方向解決と最近接対応行解決が正規化キーで成立する単体テストが通る
+  - _Requirements: 2.2, 3.3_
+  - _Depends: 1.1, 3.2_
+
+- [ ] 4. Orchestration: 構築・保持・enable 注入・設定
+- [x] 4.1 (P) デバッグ設定の拡張（提示モード・サイドカー）
+  - 提示モード（既定 `.pasta`）とサイドカー有効化フラグを設定に追加し、デッド予約フィールドを置換する
+  - 設定合成の優先順位を attach 引数 > env > ファイル > 既定とする（既存 env>file 規約に整合）
+  - 完了状態: 優先順位と既定値（提示モード `.pasta`）が単体テストで確認できる
+  - _Requirements: 6.1, 7.3_
+  - _Boundary: DebugConfig_
+- [x] 4.2 enable へのソースマップ注入口追加（スレッド受け渡し）
+  - デバッグ有効化がオプショナルなソースマップ（共有参照）と提示モードを受け取り、dap・wiring・session へ受け渡す配線骨格を確立する（各 consumer の装着中身は 5.x が実装）
+  - 完了状態: ソースマップ有り＋`.pasta` モードで各 consumer へマップが到達し、無し/`.lua` モードで既定挙動になる
+  - _Requirements: 6.1, 6.2_
+  - _Depends: 3.4, 4.1_
+  - _Boundary: enable (debug::mod)_
+- [x] 4.3 (P) ローダのマップ構築・集約（統合）
+  - デバッグ有効時のみ各 `.pasta` のトランスパイルに記録シンクを装着し、正規化補正を適用したチャンク写像をチャンク名キーで集約、共有参照として保持する
+  - チャンク名キーは 1.1 で確定した命名戦略に従う（必要なら `set_name` 明示命名を含む）
+  - デバッグ無効時はシンクを装着せず出力バイト不変を保つ
+  - 完了状態: 複数 `.pasta` から複数チャンクのマップが構築・集約され、無効時はマップ非構築でバイト不変になる
+  - _Requirements: 1.1, 3.1_
+  - _Depends: 1.1, 2.1, 3.3, 3.4_
+  - _Boundary: SourceMapBuilder (loader)_
+- [x] 4.4 ランタイムへの受け渡しと設定供給（統合）
+  - ランタイムが集約ソースマップを保持し、有効化へ受け渡す。提示モード・サイドカー設定をファイル/env から供給する
+  - 完了状態: トランスパイル→有効化の順でマップが到達し、ファイル/env の提示モード設定が反映される
+  - _Requirements: 3.1, 6.3_
+  - _Depends: 4.2, 4.3_
+
+- [ ] 5. Consumer: .pasta 提示・ブレークポイント・ステップ
+- [x] 5.1 ブレークポイントの二段キー構造体改修
+  - ブレークポイントを「提示 source path（置換キー）」と「解決済み実行座標（チャンク・`.lua` 行＝突合キー）」の二段で保持する構造へ作り変え、停止判定・登録/置換・呼び出し側を更新する
+  - 完了状態: 停止判定が実行座標で突合し、`.pasta` 由来 BP と `.lua` 由来 BP が同一チャンクに混在しても相互に消えないことを単体テストで確認する
+  - _Requirements: 4.4, 8.2_
+  - _Depends: 3.2_
+  - _Boundary: BreakpointSet (breakpoints, types, wiring caller)_
+- [x] 5.2 (P) .pasta ソース提示リゾルバ
+  - 停止位置・コールスタック各フレームを `.lua`→`.pasta` で提示し、対応なしフレームは `.lua` へフォールバックする。提示モードに応じて装着する
+  - 完了状態: `.pasta` モードで各フレームが `.pasta` 提示になり、対応なしは `.lua` 提示になる
+  - _Requirements: 5.1, 5.2, 5.3, 6.2, 3.3_
+  - _Depends: 3.4, 4.2_
+  - _Boundary: PastaSourceResolver (dap)_
+- [x] 5.3 (P) .pasta ブレークポイント翻訳と最近接調整
+  - `.pasta` ソースのブレークポイントを `.lua` 行群へ翻訳して登録し、対応行なしは後続最近接へ調整して有効位置を返す
+  - 完了状態: `.pasta` 行 BP が対応 `.lua` 行群で登録・停止し、対応なしは最近接へ調整して有効位置（verified＋行）を返す
+  - _Requirements: 4.1, 4.2, 4.3, 8.2_
+  - _Depends: 3.4, 4.2, 5.1_
+  - _Boundary: BpTranslator (wiring)_
+- [x] 5.4 (P) .pasta 粒度ステップ
+  - 提示モード `.pasta` で、現 `.pasta` 行に対応する `.lua` 行群を消化し次の異なる `.pasta` 対応行で停止する。frame identity（スレッド・深度・チャンク・行）でサブ呼び出し/再帰を別扱いし、未対応行は通過、step into/out を `.pasta` 対応行で停止する
+  - `.lua` モードは従来どおり `.lua` 行単位とする
+  - 完了状態: step over が同一 `.pasta` 行の `.lua` 行群を消化し次の対応行で停止、step into/out が対応行で停止、未対応行を通過することを単体/コンポーネントテストで確認する
+  - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5_
+  - _Depends: 3.4, 4.2_
+  - _Boundary: PastaStepper (session)_
+- [x] 5.5 提示モードの attach 引数適用（統合）
+  - デバッグ構成（attach 引数）の提示モードを受領し、当該セッションのリゾルバ装着とステップ粒度に適用する（dap と session を跨ぐ統合）
+  - 完了状態: attach 引数の提示モードが当該セッションに適用され、リゾルバ提示とステップ粒度が切り替わる
+  - _Requirements: 6.3_
+  - _Depends: 4.1, 5.2, 5.4_
+  - _Boundary: dap, session_
+
+- [ ] 6. サイドカー出力と VSCode 設定
+- [x] 6.1 (P) ディスクサイドカー出力
+  - サイドカー有効時に、各生成 `.lua` の隣に行ペア列のサイドカー（serde_json）を出力する。失敗は非致命でメモリ既定経路を維持する
+  - 完了状態: サイドカー有効時に出力ファイルが生成され、再読込でメモリ写像と一致する。無効時・出力失敗時もメモリ経路が継続する
+  - _Requirements: 3.2_
+  - _Depends: 3.4, 4.1_
+  - _Boundary: SidecarWriter (source_map)_
+- [x] 6.2 (P) VSCode 提示モード設定の素通し
+  - VSCode 拡張のデバッグ構成に提示モード設定項目を追加し、attach 引数としてサーバへ素通しする（`.pasta`↔`.lua` 変換ロジックは持たない）
+  - 完了状態: launch.json の提示モード指定が attach 引数に載りサーバへ渡る
+  - _Requirements: 6.3_
+  - _Boundary: VscodeAttach (editors/vscode)_
+
+- [ ] 7. Validation: E2E・エッジケース・後方互換
+- [x] 7.1 (P) .pasta ブレークポイント E2E
+  - 実トランスパイル→実デバッグセッションで、`.pasta` 行 BP が当該 `.pasta` 行で停止し、コールスタック・現在行が `.pasta` 提示されることを検証する。停止中の変数/コルーチン inspect が利用可能であることも確認する
+  - 対応なし `.pasta` 行 BP の最近接調整（有効位置の提示）も検証する
+  - 完了状態: `.pasta` BP ヒット・`.pasta` 提示・inspect 継続・最近接調整が E2E で通る
+  - _Requirements: 4.1, 4.2, 4.3, 5.1, 5.2, 5.4_
+  - _Depends: 4.4, 5.2, 5.3_
+- [x] 7.2 (P) .pasta 粒度ステップ E2E（E1–E8）
+  - E1 複数 `.lua` 行消化→次 `.pasta` 行／E2 サブ呼び出し内包行で呼び出し先に入らない／E3 step into で呼び出し先最初の対応行／E4 step out で呼出元の次対応行／E5 再帰で別フレーム同一行に誤停止しない／E6 対応なし行連続を通過／E7 コルーチン跨ぎ／E8 `.lua` モード回帰 を検証する
+  - 完了状態: E1–E8 各シナリオで停止位置が期待どおりになる E2E が通る
+  - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5_
+  - _Depends: 4.4, 5.4_
+- [x] 7.3 (P) 提示モード切替とエッジケース E2E
+  - `.lua` 提示モードで BP・停止・コールスタック・ステップが `.lua` 座標になる回帰、集約行の確定的単一提示・展開行の同一 `.pasta` 提示・提示順安定を検証する
+  - 完了状態: `.lua` モード提示と多対多エッジケースの確定挙動が E2E で通る
+  - _Requirements: 6.2, 8.1, 8.2, 8.3_
+  - _Depends: 5.3, 5.5_
+- [x] 7.4 後方互換・ゼロコスト最終回帰
+  - デバッグ無効時の生成 `.lua` バイト不変を最終確認し、既存 Lua レベルデバッグ（`.lua` BP・ステップ・変数/コルーチン inspect・VSCode attach）の全テストが継続パスすることを確認する
+  - 完了状態: ゼロコスト回帰と既存デバッグ全テストがパスし、暫定 feature 撤去後もワークスペースが通る
+  - _Requirements: 7.1, 7.2_
+  - _Depends: 4.4, 5.2, 5.3, 5.4, 6.1, 6.2_
+
+## Implementation Notes
+
+- **1.1 チャンク命名戦略（実機確定）**: Windows 実機で本番 require 経路のフック source は `@`付き＋区切り混在（例 `@C:/…/cache/lua/pasta\scene\…\system.lua`）、ローダ由来キー（`CacheManager::source_to_cache_path`）も区切り混在。生バイトは不一致だが「`@`除去＋`\`→`/`統一＋Windows小文字化」の正規化後に完全一致。**命名戦略＝「構築時一致＋正規化」で確定、`set_name` 明示命名は不要**（task 4.3 で set_name 改修は不要）。正規化ヘルパ `debug::source_map::canonicalize_chunk_name` を新設済み（gate 撤去後も同位置で常時コンパイル化想定）。**task 3.4 の正規化キー集約/逆引きはこのヘルパを採用すること**。区切り統一は双方を `/` へ寄せる必要あり（片側だけでは不十分）。`canonicalize_chunk_name` は FS `canonicalize`（実在問い合わせ）を行わず文字列正規化に専念（決定論性のため）・絶対化は呼び出し側が絶対パスを渡す前提。
+- **環境**: cargo build/test 前に毎回 `Remove-Item Env:\NoDefaultCurrentDirectoryInExePath -ErrorAction SilentlyContinue` を同一 PowerShell 呼び出しで実行（vendored LuaJIT ビルドが exit 101 で死ぬため）。
+- **3.1 スライスデモ撤去**: 使い捨て slice デモ（`SliceHost`/`transpile_slice`/`SLICE_PASTA`/`load_stub_preamble`/slice_* テスト5件）は要件 7.3「暫定ハーネス残置不可」に従い**丸ごと撤去**。本番シード（`LineMap`/`SliceSink`/`resolve_lua_to_pasta`/`canonicalize_chunk_name`/`PastaPos`）は常時コンパイル化して 3.2-3.4 が一般化する想定だった。スライス E2E の本番昇格は Phase 7（7.1）で新規作成。`build_all_safe_vm` は slice とは無関係の既存テストヘルパ（残置）。
+- **【7.3 完全達成・最終クリーンアップ】**: 3.2-3.4 は `LineMap`/`SliceSink` を in-place 一般化せず**並行する新型**（`ChunkSourceMap`/`MapBuilderSink`/`SourceMap`）を新設したため、種であった `LineMap`/`SliceSink`/自由関数 `resolve_lua_to_pasta(&LineMap,...)` が消費されず孤立デッドコード化。kiro-validate-impl の境界監査で検出し、**機能レベル GO 後に一掃**（本番 `SourceMap::resolve_lua_to_pasta` メソッドは別物・温存）。陳腐化ドキュメントも修正。`canonicalize_chunk_name` は孤立対象外（本番で常時使用）。これで 7.3「暫定ハーネス残置なし」を真に完遂。`cargo test --all` 緑・バイト不変維持。残: `.kiro/steering/structure.md:67` の `LineMap` 言及は steering 同期の別件（コード外）。
+- **3.2-3.4 向け写像精度の注意**: スライスデモの `SliceSink`(byte-scan) では `.lua` 行7(`function SCENE.__start__`)が `.pasta` 行2へ帰属していた。本番 `MapBuilderSink`(3.3) は **span.start_line を直接採用**（byte 走査廃止・research D-3）するため、`__start__`/scope ヘッダの写像は 2.5 で配線した `scope.span`（定義ヘッダ行）で決まる。3.3/E2E(7.x) で実マッピングの妥当性（定義ヘッダ行に止まれるか）を確認すること。
+- **既存 clippy エラー（本仕様外）**: `debug/session.rs:868`・`debug/transport.rs:639` に `this loop never actually loops` が**先行存在**（本 spec 着手前から）。CI は `cargo test --all` で clippy 非使用のため非ブロッキングだが、別途対処候補。
+- **5.1→5.3 チャンク正規化の決定的申し送り（必読）**: 既存 `.lua` BP ヒット経路（`should_pause`）は**正規化なしの生フック source 厳密一致**（`session.rs source_and_line` が `debug.source().source` を verbatim 返却、`set_breakpoints` が `source.path` を verbatim 格納、`bp.chunk == chunk` 生比較）。一方 `SourceMap`（3.4）の `resolve_*` は **`canonicalize_chunk_name` 正規化済みチャンク**を返す。よって **5.3 が `.pasta` BP を `resolve_pasta_to_lua` の結果（正規化チャンク）で `register()` すると、生フック form の `should_pause` と一致せず BP が発火しない**。対策（推奨）: `should_pause` の突合で**両辺を `canonicalize_chunk_name` 正規化**する（task 1.1 実測でフック form ↔ ローダ form は正規化後一致）。変更後は**既存 `.lua` E2E（`full_dap_session_over_tcp_*`）の継続を必ず確認**（テストの `@scene.lua` は正規化後も一致するため安全）。代替: 生フック form でチャンク格納（ただしリゾルバは正規化形のみ提供のため非推奨）。5.2 のリゾルバ（`resolve_lua_to_pasta`）も同様に**フック source を `canonicalize_chunk_name` してから引く**こと（3.4 は照合時に正規化するが、引数として生 source を渡せばよい）。**【5.3 で解決済み】** `should_pause` が両辺を `canonicalize_chunk_name` 正規化する形で実装・RED 独立再現で load-bearing 確認・`.lua` E2E 無回帰を確認。5.2 リゾルバは生 source を渡し 3.4 内部正規化に委譲済み。

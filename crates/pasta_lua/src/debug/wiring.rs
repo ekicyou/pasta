@@ -85,10 +85,61 @@ use std::time::Duration;
 
 use serde_json::Value;
 
+use crate::debug::{SharedSourceMode, SourceMode};
 use crate::debug::breakpoints::BreakpointSet;
-use crate::debug::dap::DapAdapter;
+use crate::debug::dap::{DapAdapter, pasta_source_resolver};
+use crate::debug::source_map::SourceMap;
 use crate::debug::transport::Transport;
-use crate::debug::types::{SessionCommand, SessionEvent};
+use crate::debug::types::{
+    Breakpoint, ResolvedBreakpoint, SessionCommand, SessionEvent, SourceRef,
+};
+
+/// The (optional) shared source map + present mode threaded from
+/// [`enable`](crate::debug::enable) to the I/O-side consumers (task 4.2 plumbing).
+///
+/// Carries the immutable `Arc<SourceMap>` and the resolved [`SourceMode`] to the
+/// socket-bridge thread, which owns the [`DapAdapter`] where the `.pasta` source
+/// RESOLVER attaches (task 5.2) and applies `setBreakpoints` where the `.pasta`
+/// BP TRANSLATION attaches (task 5.3). This task only DELIVERS the map+mode to
+/// those attachment points; the resolver/translation LOGIC is 5.x.
+///
+/// `source_map` is `Some` only when `enable` was given a map AND the present mode
+/// is [`SourceMode::Pasta`] (the gating decision lives in `enable`, design 582);
+/// for `None`/[`SourceMode::Lua`] the bridge keeps its existing default `.lua`
+/// behavior byte-for-byte (requirements 6.1 / 6.2 / 7.2).
+#[derive(Clone)]
+pub(crate) struct SourceMapWiring {
+    /// Immutable shared map, or `None` for default `.lua` behavior.
+    pub(crate) source_map: Option<Arc<SourceMap>>,
+    /// The EFFECTIVE present mode for this session (requirements 6.1 default
+    /// `.pasta`, 6.2 `.lua`). Shared and interior-mutable so the DAP `attach`
+    /// `sourcePresentation` argument (highest precedence, design 581) can flip it
+    /// at request time and have BOTH the resolver (task 5.2) and the VM-thread
+    /// stepper (task 5.4) observe the same value (task 5.5 / requirement 6.3).
+    /// Initialised at [`enable`](crate::debug::enable) time from the resolved
+    /// `DebugConfig::source_mode` (env > file > 既定).
+    pub(crate) source_mode: SharedSourceMode,
+}
+
+impl SourceMapWiring {
+    /// The default (disabled) wiring: no map, effective mode default `.pasta` —
+    /// but with no map the consumers behave exactly as today's `.lua` path (7.2).
+    pub(crate) fn disabled() -> Self {
+        Self {
+            source_map: None,
+            source_mode: SharedSourceMode::new(SourceMode::default()),
+        }
+    }
+
+    /// Whether the `.pasta` consumers (resolver / BP translation / stepper) should
+    /// be active: a map is present AND the EFFECTIVE mode is
+    /// [`SourceMode::Pasta`] (design 582). Otherwise every consumer keeps its
+    /// default `.lua` behavior. Reads the shared mode each call so an `attach`
+    /// flip is observed immediately (task 5.5).
+    pub(crate) fn pasta_active(&self) -> bool {
+        self.source_map.is_some() && self.source_mode.get() == SourceMode::Pasta
+    }
+}
 
 /// Inbound poll interval for the socket bridge. `std::sync::mpsc` has no
 /// `select` and [`Transport`] is `!Sync`, so the single Transport-owner thread
@@ -100,6 +151,49 @@ const POLL_INTERVAL: Duration = Duration::from_millis(5);
 /// Shared DAP adapter (seq counter + per-kind FIFO `request_seq` correlation),
 /// mutated by BOTH the socket bridge and the event encoder thread.
 pub(crate) type SharedAdapter = Arc<Mutex<DapAdapter>>;
+
+/// Install the `.pasta` source RESOLVER on the shared [`DapAdapter`] when the
+/// `.pasta` consumers should be active (task 5.2・design 509/582).
+///
+/// When `source_map.pasta_active()` (a map present AND
+/// [`SourceMode::Pasta`](crate::debug::SourceMode), requirements 6.1), the
+/// adapter's source seam is swapped to
+/// [`pasta_source_resolver`](crate::debug::dap::pasta_source_resolver) so every
+/// stack frame is presented in `.pasta` coordinates (R5.1/R5.2), with unmapped
+/// frames falling back to the generated `.lua` (R5.3). Otherwise
+/// (`SourceMode::Lua` or no map) the adapter keeps its default `.lua` resolver
+/// untouched — byte-for-byte the existing behavior (requirements 6.2 / 7.2).
+///
+/// Called ONCE by [`run_socket_bridge`] before the inbound/outbound loop, so the
+/// resolver is in place before any `stackTrace` is encoded. A poisoned adapter
+/// lock is treated as "do not attach" (the bridge never panics); the default
+/// `.lua` resolver then remains, which is the safe fallback.
+///
+/// It is also RE-RUN when a DAP `attach` `sourcePresentation` flips the effective
+/// mode (task 5.5): because [`SourceMapWiring::pasta_active`] reads the SHARED
+/// effective mode, this re-installs the `.pasta` resolver on a Lua→Pasta flip AND
+/// resets to the default `.lua` resolver on a Pasta→Lua flip (so the resolver
+/// presentation always matches the FINAL effective mode, requirement 6.3).
+fn attach_pasta_resolver(adapter: &SharedAdapter, source_map: &SourceMapWiring) {
+    if !source_map.pasta_active() {
+        // Lua mode / no map → ensure the default `.lua` resolver (6.2/7.2). This
+        // RESETS a previously-installed `.pasta` resolver on a Pasta→Lua `attach`
+        // flip (task 5.5); on the first call (default adapter) it is a harmless
+        // re-assert of the already-default resolver.
+        if let Ok(mut dap) = adapter.lock() {
+            dap.set_source_resolver(crate::debug::dap::default_source_resolver());
+        }
+        return;
+    }
+    // `pasta_active()` guarantees the map is `Some`.
+    let map = match &source_map.source_map {
+        Some(map) => Arc::clone(map),
+        None => return,
+    };
+    if let Ok(mut dap) = adapter.lock() {
+        dap.set_source_resolver(pasta_source_resolver(map)); // 5.1, 5.2, 5.3
+    }
+}
 
 /// Socket bridge body: the SOLE owner of the [`Transport`]. Multiplexes inbound
 /// socket frames (poll) and outbound encoded frames (`out_rx`) on one thread,
@@ -123,7 +217,18 @@ pub(crate) fn run_socket_bridge(
     cmd_tx: Sender<SessionCommand>,
     out_rx: Receiver<Value>,
     shutdown: Arc<AtomicBool>,
+    // The (optional) shared map + present mode delivered to the `.pasta` resolver
+    // (5.2, attached just below) and BP-translation (5.3) attachment points on
+    // this thread. `disabled()`/`Lua`/`None` → existing `.lua` behavior
+    // (6.1/6.2/7.2).
+    source_map: SourceMapWiring,
 ) {
+    // Task 5.2: install the `.pasta` source resolver on the shared adapter when
+    // `pasta_active()` (map present AND `SourceMode::Pasta`, design 509/582). For
+    // `Lua`/no-map this is a no-op and the default `.lua` resolver stays (6.2/7.2).
+    // Done ONCE before the loop so it is in place before any `stackTrace` encode.
+    attach_pasta_resolver(&adapter, &source_map);
+
     loop {
         if shutdown.load(Ordering::SeqCst) {
             return;
@@ -132,7 +237,7 @@ pub(crate) fn run_socket_bridge(
         // (1) Inbound: poll one frame (bounded so we can also service outbound).
         match transport.inbound().recv_timeout(POLL_INTERVAL) {
             Ok(req) => {
-                if !handle_inbound(&transport, &adapter, &breakpoints, &cmd_tx, &req) {
+                if !handle_inbound(&transport, &adapter, &breakpoints, &cmd_tx, &req, &source_map) {
                     return; // peer gone while replying → done
                 }
             }
@@ -161,6 +266,11 @@ fn handle_inbound(
     breakpoints: &BreakpointSet,
     cmd_tx: &Sender<SessionCommand>,
     req: &Value,
+    // Task 4.2 plumbing: reaches the `setBreakpoints` branch below, where the
+    // `.pasta` BP TRANSLATION (task 5.3) will consult `source_map` when
+    // `pasta_active()`. This task only DELIVERS it here; no translation yet, so
+    // the `.lua` path is unchanged (requirements 6.2 / 7.2).
+    source_map: &SourceMapWiring,
 ) -> bool {
     // Decode under the shared adapter lock (seq counter / pending table).
     let decoded = {
@@ -170,6 +280,20 @@ fn handle_inbound(
         };
         dap.decode_request(req)
     };
+
+    // Task 5.5 (requirement 6.3 / design 581/586): an `attach` request carrying an
+    // explicit `sourcePresentation` is the HIGHEST-precedence present-mode source.
+    // Apply it to THIS session BEFORE replying so the resolver/stepper switch is
+    // already in effect: (1) write the SHARED effective mode (read by the VM-thread
+    // stepper per line, task 5.4), and (2) RE-RUN `attach_pasta_resolver` so the
+    // DAP source resolver presentation matches the FINAL effective mode (attach
+    // `.pasta` resolver on Pasta+map, reset to default `.lua` otherwise — task
+    // 5.2). When the `attach` arg is ABSENT (`None`) this is skipped, so the
+    // resolved env > file > 既定 mode stays in effect (no client-default override).
+    if let Some(mode) = decoded.attach_source_mode {
+        source_map.source_mode.set(mode);
+        attach_pasta_resolver(adapter, source_map);
+    }
 
     // (a) Immediate response (acks / initialize / scopes self-answer).
     if let Some(response) = decoded.response {
@@ -191,7 +315,22 @@ fn handle_inbound(
         // adapter (correlated to the originating request seq). It is NOT
         // forwarded to the session (that would block off a stop).
         Some(SessionCommand::SetBreakpoints { source, lines }) => {
-            let resolved = breakpoints.set_breakpoints(&source, &lines);
+            // Task 5.3: when `pasta_active()` (a map present AND `SourceMode::
+            // Pasta`, design 582) the source is treated as a `.pasta` file and
+            // each requested `.pasta` line is TRANSLATED to its `.lua` execution
+            // coords via `resolve_pasta_to_lua`, registering ALL of them (4.1 /
+            // 8.2) and adjusting no-correspondence lines to the nearest
+            // SUBSEQUENT mapped `.pasta` line (4.3). Otherwise (`Lua` mode / no
+            // map) the existing `.lua` direct path is used byte-for-byte
+            // (requirements 6.2 / 7.2).
+            let resolved = if source_map.pasta_active() && is_pasta_source(&source.path) {
+                translate_pasta_breakpoints(breakpoints, source_map, &source, &lines)
+            } else {
+                // `Lua` mode / no map, OR a `.lua` source presented in Pasta mode
+                // (design "BpTranslator" 514: `.lua` source → direct register):
+                // existing path, byte-for-byte (requirements 6.2 / 7.2).
+                breakpoints.set_breakpoints(&source, &lines)
+            };
             let frames = {
                 let mut dap = match adapter.lock() {
                     Ok(g) => g,
@@ -215,6 +354,112 @@ fn handle_inbound(
         None => {}
     }
     true
+}
+
+/// Whether a DAP `setBreakpoints` source path names a `.pasta` file (design
+/// "BpTranslator" 514: `.pasta` source → translate; `.lua` source → direct
+/// register). Case-insensitive on the extension so `.PASTA` is also recognised.
+///
+/// In Pasta mode VSCode presents `.pasta` paths, but a `.lua` source can still be
+/// set (e.g. the author opened a generated `.lua`); routing only `.pasta` sources
+/// through the translator keeps the `.lua` direct path intact (6.2 / 7.2) and
+/// avoids treating a `.lua` path as an (unmapped) `.pasta` file.
+fn is_pasta_source(path: &str) -> bool {
+    std::path::Path::new(path)
+        .extension()
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("pasta"))
+}
+
+/// Translate a `.pasta`-source `setBreakpoints` into `.lua` execution-coordinate
+/// registrations and build the DAP `setBreakpoints` response (task 5.3・design
+/// "BpTranslator" 511-528・Flow 2 215-236・requirements 4.1 / 4.2 / 4.3 / 8.2).
+///
+/// Only called when [`SourceMapWiring::pasta_active`] (a map present AND
+/// [`SourceMode::Pasta`](crate::debug::SourceMode)); the `.lua`/`Lua`/no-map path
+/// keeps the existing direct [`BreakpointSet::set_breakpoints`] (requirements 6.2
+/// / 7.2). For each requested `.pasta` `line`:
+///
+/// 1. `resolve_pasta_to_lua(pasta_path, line)` → all `(chunk, lua_line)` exec
+///    coords. If non-empty, every coord is registered (4.1; one `.pasta` line may
+///    expand to MANY `.lua` lines, 8.2) and the BP is reported `verified` at the
+///    ORIGINAL `line`.
+/// 2. No correspondence → `nearest_pasta_line_with_mapping(pasta_path, line)`
+///    finds the nearest SUBSEQUENT mapped `.pasta` line; THAT line's `.lua` coords
+///    are registered and the BP is reported `verified` at the ADJUSTED line (so
+///    VSCode shows it moved, 4.3). NEVER mismaps.
+/// 3. No nearest mapping at all → `verified: false` at the original line (4.3:
+///    only adjust to a real subsequent line; otherwise leave unverified).
+///
+/// ALL execution coords across ALL requested lines are accumulated into a SINGLE
+/// [`BreakpointSet::register`] call tagged with the `.pasta` present source, so
+/// they replace this presented source's prior set atomically (per-present-source
+/// authoritative; a `.pasta`-origin and a `.lua`-origin BP in the same chunk
+/// never evict each other — requirements 4.4 / 8.2). The hook reports the RAW
+/// `@<.lua path>` source; [`BreakpointSet::should_pause`] canonicalizes both the
+/// hook source and these stored canonical chunks, so the registered `.pasta` BP
+/// fires for the runtime coord (4.2).
+fn translate_pasta_breakpoints(
+    breakpoints: &BreakpointSet,
+    source_map: &SourceMapWiring,
+    source: &SourceRef,
+    lines: &[u32],
+) -> Vec<ResolvedBreakpoint> {
+    // `pasta_active()` guarantees the map is `Some`; degrade safely to the `.lua`
+    // path if it is somehow absent (never panic in the bridge).
+    let map = match &source_map.source_map {
+        Some(map) => map,
+        None => return breakpoints.set_breakpoints(source, lines),
+    };
+    let pasta_path = source.path.as_str();
+
+    // Accumulate ALL execution coords for ALL requested lines into one register
+    // call (replacing this present source's set atomically). One requested line
+    // may yield many `(chunk, lua_line)` (8.2); a no-correspondence line is
+    // adjusted to the nearest subsequent mapped `.pasta` line (4.3).
+    let mut entries: Vec<Breakpoint> = Vec::new();
+    let resolved: Vec<ResolvedBreakpoint> = lines
+        .iter()
+        .map(|&line| {
+            // (1) Direct correspondence: register all `.lua` coords, verified at
+            // the original line (4.1 / 8.2).
+            let direct = map.resolve_pasta_to_lua(pasta_path, line);
+            if !direct.is_empty() {
+                for (chunk, lua_line) in direct {
+                    entries.push(Breakpoint::new(pasta_path, chunk, lua_line));
+                }
+                return ResolvedBreakpoint {
+                    source: source.clone(),
+                    line,
+                    verified: true,
+                };
+            }
+            // (2) No correspondence: adjust to the nearest SUBSEQUENT mapped
+            // `.pasta` line and register THAT line's coords, verified at the
+            // adjusted line (4.3).
+            if let Some(adjusted) = map.nearest_pasta_line_with_mapping(pasta_path, line) {
+                for (chunk, lua_line) in map.resolve_pasta_to_lua(pasta_path, adjusted) {
+                    entries.push(Breakpoint::new(pasta_path, chunk, lua_line));
+                }
+                return ResolvedBreakpoint {
+                    source: source.clone(),
+                    line: adjusted,
+                    verified: true,
+                };
+            }
+            // (3) No nearest mapping at all → unverified at the original line
+            // (4.3: never mismap; only adjust to a real subsequent line).
+            ResolvedBreakpoint {
+                source: source.clone(),
+                line,
+                verified: false,
+            }
+        })
+        .collect();
+
+    // Replace this `.pasta` present source's prior set with the accumulated exec
+    // coords (per-present-source authoritative; other sources preserved).
+    breakpoints.register(pasta_path, entries);
+    resolved
 }
 
 /// Drain all currently-available outbound frames from `out_rx` and write them.
@@ -410,9 +655,9 @@ end
                 enabled: true,
                 // Port 0 → OS-assigned free loopback port (no fixed-port clash).
                 listen: Some("127.0.0.1:0".parse().unwrap()),
-                source_map_slice: false,
+                ..Default::default()
             };
-            let handle = enable(&lua, &cfg)
+            let handle = enable(&lua, &cfg, None)
                 .map_err(|e| format!("enable failed: {e}"))?
                 .ok_or_else(|| "enable returned None for an enabled config".to_string())?;
 
@@ -687,9 +932,9 @@ end
             let cfg = DebugConfig {
                 enabled: true,
                 listen: Some("127.0.0.1:0".parse().unwrap()),
-                source_map_slice: false,
+                ..Default::default()
             };
-            let handle = enable(&lua, &cfg)
+            let handle = enable(&lua, &cfg, None)
                 .map_err(|e| format!("enable failed: {e}"))?
                 .ok_or_else(|| "enable returned None for an enabled config".to_string())?;
 
@@ -953,5 +1198,2647 @@ end
             .expect("stackFrames array");
         assert!(!frames.is_empty(), "stack must have the stopped frame");
         frames[0]["line"].as_u64().expect("top frame line") as u32
+    }
+}
+
+#[cfg(test)]
+mod source_map_wiring_tests {
+    //! Task 4.2 — the gating that decides whether the I/O-side `.pasta` consumers
+    //! (resolver 5.2 / BP translation 5.3) are reached. `pasta_active()` is the
+    //! single gate: a map present AND `SourceMode::Pasta` (design 582). Otherwise
+    //! the bridge keeps its default `.lua` behavior (requirements 6.1/6.2/7.2).
+
+    use std::sync::Arc;
+
+    use crate::debug::{SharedSourceMode, SourceMode};
+    use crate::debug::source_map::SourceMap;
+
+    use super::SourceMapWiring;
+
+    /// 6.1 / design 582: a map present in `SourceMode::Pasta` activates the
+    /// `.pasta` consumers (`pasta_active() == true`).
+    #[test]
+    fn pasta_active_when_map_present_and_mode_pasta() {
+        let wiring = SourceMapWiring {
+            source_map: Some(Arc::new(SourceMap::new())),
+            source_mode: SharedSourceMode::new(SourceMode::Pasta),
+        };
+        assert!(
+            wiring.pasta_active(),
+            "Some(map) + Pasta must activate the `.pasta` consumers (6.1)"
+        );
+    }
+
+    /// 6.2 / 7.2: `SourceMode::Lua` keeps the default `.lua` behavior even if a map
+    /// were present (the gate is false).
+    #[test]
+    fn not_active_in_lua_mode_even_with_map() {
+        let wiring = SourceMapWiring {
+            source_map: Some(Arc::new(SourceMap::new())),
+            source_mode: SharedSourceMode::new(SourceMode::Lua),
+        };
+        assert!(
+            !wiring.pasta_active(),
+            "`.lua` mode must NOT activate `.pasta` consumers (6.2)"
+        );
+    }
+
+    /// 7.2: with no map the gate is false regardless of mode — the existing call
+    /// sites (all pass `None`) behave exactly as today.
+    #[test]
+    fn not_active_without_map() {
+        assert!(!SourceMapWiring::disabled().pasta_active());
+        let pasta_no_map = SourceMapWiring {
+            source_map: None,
+            source_mode: SharedSourceMode::new(SourceMode::Pasta),
+        };
+        assert!(
+            !pasta_no_map.pasta_active(),
+            "no map → default `.lua` behavior even in Pasta mode (7.2)"
+        );
+    }
+}
+
+#[cfg(test)]
+mod resolver_attach_tests {
+    //! Task 5.2 — the `.pasta` source RESOLVER attachment on the socket-bridge's
+    //! shared [`DapAdapter`]. [`attach_pasta_resolver`] installs
+    //! [`pasta_source_resolver`](crate::debug::dap::pasta_source_resolver) IFF
+    //! `pasta_active()` (a map present AND `SourceMode::Pasta`, design 509/582);
+    //! otherwise the adapter keeps its default `.lua` resolver (R6.2 / 7.2).
+
+    use std::collections::BTreeMap;
+    use std::sync::{Arc, Mutex};
+
+    use serde_json::json;
+
+    use crate::debug::{SharedSourceMode, SourceMode};
+    use crate::debug::dap::DapAdapter;
+    use crate::debug::source_map::{ChunkSourceMap, PastaPos, SourceMap};
+    use crate::debug::types::{FrameInfo, SessionEvent};
+
+    use super::{SourceMapWiring, attach_pasta_resolver};
+
+    /// 既知 `chunk(.lua line) → .pasta` 対応を 1 件持つ集約 `SourceMap`。
+    fn map_with(chunk: &str, lua_line: u32, file: &str, pasta_line: u32) -> SourceMap {
+        let mut forward = BTreeMap::new();
+        forward.insert(
+            lua_line,
+            PastaPos {
+                file: file.to_string(),
+                line: pasta_line,
+            },
+        );
+        let mut sm = SourceMap::new();
+        sm.insert_chunk(
+            chunk.to_string(),
+            file.to_string(),
+            ChunkSourceMap::from_forward(forward),
+        );
+        sm
+    }
+
+    /// `stackTrace` を 1 回エンコードし、top フレームの `source` / `line` を返す
+    /// 小ヘルパ（装着結果の提示を観測する）。
+    fn top_frame(adapter: &Arc<Mutex<DapAdapter>>, source: &str, line: u32) -> (serde_json::Value, u32) {
+        let mut dap = adapter.lock().unwrap();
+        dap.decode_request(&json!({
+            "seq": 1, "type": "request", "command": "stackTrace",
+            "arguments": { "threadId": 1 },
+        }));
+        let out = dap.encode_event(SessionEvent::Stack(vec![FrameInfo {
+            source: source.to_string(),
+            line,
+            func_name: Some("f".to_string()),
+        }]));
+        let frame = &out[0]["body"]["stackFrames"][0];
+        (frame["source"].clone(), frame["line"].as_u64().unwrap() as u32)
+    }
+
+    /// R5.1/R5.2/6.1: map present + `SourceMode::Pasta` → resolver 装着。対応あり
+    /// フレームが `.pasta` 提示になる。
+    #[test]
+    fn attaches_pasta_resolver_when_active() {
+        let adapter = Arc::new(Mutex::new(DapAdapter::new()));
+        let wiring = SourceMapWiring {
+            source_map: Some(Arc::new(map_with(
+                "C:/proj/cache/scene.lua",
+                7,
+                "C:/proj/scene.pasta",
+                3,
+            ))),
+            source_mode: SharedSourceMode::new(SourceMode::Pasta),
+        };
+        attach_pasta_resolver(&adapter, &wiring);
+
+        let (source, line) = top_frame(&adapter, r"@C:\proj\cache\scene.lua", 7);
+        assert_eq!(
+            source,
+            json!({ "path": "C:/proj/scene.pasta" }),
+            "active → 対応ありフレームは `.pasta` 提示 (R5.1/R5.2)"
+        );
+        assert_eq!(line, 3);
+    }
+
+    /// R5.3: 装着済みでも対応の無いフレームは `.lua` フォールバック（判別可能）。
+    #[test]
+    fn attached_resolver_falls_back_to_lua_for_unmapped() {
+        let adapter = Arc::new(Mutex::new(DapAdapter::new()));
+        let wiring = SourceMapWiring {
+            source_map: Some(Arc::new(map_with(
+                "C:/proj/cache/scene.lua",
+                7,
+                "C:/proj/scene.pasta",
+                3,
+            ))),
+            source_mode: SharedSourceMode::new(SourceMode::Pasta),
+        };
+        attach_pasta_resolver(&adapter, &wiring);
+
+        // `.lua` 行 2 は未対応 → 生成 `.lua` 提示のまま。
+        let (source, line) = top_frame(&adapter, r"@C:\proj\cache\scene.lua", 2);
+        assert_eq!(source, json!({ "path": r"@C:\proj\cache\scene.lua" }));
+        assert_eq!(line, 2);
+    }
+
+    /// R6.2 / 7.2: `SourceMode::Lua`（map あり）→ 非装着。既定 `.lua` resolver の
+    /// まま、生成 `.lua` 提示（バイト不変）。
+    #[test]
+    fn does_not_attach_in_lua_mode() {
+        let adapter = Arc::new(Mutex::new(DapAdapter::new()));
+        let wiring = SourceMapWiring {
+            source_map: Some(Arc::new(map_with(
+                "C:/proj/cache/scene.lua",
+                7,
+                "C:/proj/scene.pasta",
+                3,
+            ))),
+            source_mode: SharedSourceMode::new(SourceMode::Lua),
+        };
+        attach_pasta_resolver(&adapter, &wiring);
+
+        // Lua モードでは対応があっても `.pasta` 化されない（既定 `.lua` のまま）。
+        let (source, line) = top_frame(&adapter, r"@C:\proj\cache\scene.lua", 7);
+        assert_eq!(
+            source,
+            json!({ "path": r"@C:\proj\cache\scene.lua" }),
+            "R6.2: Lua モードは既定 `.lua` resolver のまま（非装着）"
+        );
+        assert_eq!(line, 7);
+    }
+
+    /// 7.2: map なし → 非装着（既存呼び出し全てが `None` を渡す経路と同一の挙動）。
+    #[test]
+    fn does_not_attach_without_map() {
+        let adapter = Arc::new(Mutex::new(DapAdapter::new()));
+        attach_pasta_resolver(&adapter, &SourceMapWiring::disabled());
+
+        let (source, line) = top_frame(&adapter, "@scene.lua", 7);
+        assert_eq!(source, json!({ "path": "@scene.lua" }), "no map → 既定 `.lua`");
+        assert_eq!(line, 7);
+    }
+}
+
+#[cfg(test)]
+mod attach_source_presentation_tests {
+    //! Task 5.5 — the DAP `attach` `sourcePresentation` applied to the SESSION's
+    //! resolver presentation (task 5.2) via the shared effective mode
+    //! ([`SharedSourceMode`]). `handle_inbound`, on an `attach` whose `Decoded`
+    //! carries `attach_source_mode`, WRITES the shared mode and RE-RUNS
+    //! [`attach_pasta_resolver`] so the DAP source resolver matches the FINAL
+    //! effective mode (requirement 6.3 / design 581/586). A missing arg leaves the
+    //! resolved env > file > 既定 mode untouched.
+    //!
+    //! These tests drive the resolver-attachment + shared-mode decision DIRECTLY
+    //! (the unit-testable core of the integration); the VM-thread step granularity
+    //! half is covered in `session.rs` (`attach_*` tests via [`SharedSourceMode`]).
+
+    use std::collections::BTreeMap;
+    use std::sync::{Arc, Mutex};
+
+    use serde_json::json;
+
+    use crate::debug::dap::DapAdapter;
+    use crate::debug::source_map::{ChunkSourceMap, PastaPos, SourceMap};
+    use crate::debug::types::{FrameInfo, SessionEvent};
+    use crate::debug::{SharedSourceMode, SourceMode};
+
+    use super::{SourceMapWiring, attach_pasta_resolver};
+
+    fn map_with(chunk: &str, lua_line: u32, file: &str, pasta_line: u32) -> SourceMap {
+        let mut forward = BTreeMap::new();
+        forward.insert(
+            lua_line,
+            PastaPos {
+                file: file.to_string(),
+                line: pasta_line,
+            },
+        );
+        let mut sm = SourceMap::new();
+        sm.insert_chunk(
+            chunk.to_string(),
+            file.to_string(),
+            ChunkSourceMap::from_forward(forward),
+        );
+        sm
+    }
+
+    /// Top frame `source`/`line` after encoding ONE `stackTrace` (observes which
+    /// resolver is installed).
+    fn top_frame(adapter: &Arc<Mutex<DapAdapter>>, source: &str, line: u32) -> (serde_json::Value, u32) {
+        let mut dap = adapter.lock().unwrap();
+        dap.decode_request(&json!({
+            "seq": 1, "type": "request", "command": "stackTrace",
+            "arguments": { "threadId": 1 },
+        }));
+        let out = dap.encode_event(SessionEvent::Stack(vec![FrameInfo {
+            source: source.to_string(),
+            line,
+            func_name: Some("f".to_string()),
+        }]));
+        let frame = &out[0]["body"]["stackFrames"][0];
+        (frame["source"].clone(), frame["line"].as_u64().unwrap() as u32)
+    }
+
+    /// Pasta-capable wiring (map present) whose EFFECTIVE mode starts at `start`.
+    fn wiring_with(map: SourceMap, start: SourceMode) -> SourceMapWiring {
+        SourceMapWiring {
+            source_map: Some(Arc::new(map)),
+            source_mode: SharedSourceMode::new(start),
+        }
+    }
+
+    /// Simulate the `handle_inbound` attach-apply step: write the shared mode and
+    /// re-run the resolver attachment (the exact two operations `handle_inbound`
+    /// performs when `Decoded.attach_source_mode` is `Some`).
+    fn apply_attach(adapter: &Arc<Mutex<DapAdapter>>, wiring: &SourceMapWiring, mode: SourceMode) {
+        wiring.source_mode.set(mode);
+        attach_pasta_resolver(adapter, wiring);
+    }
+
+    /// R6.3 / precedence attach > env > file: `attach sourcePresentation="lua"`
+    /// FORCES `.lua` presentation even when the server default/file is `.pasta`.
+    /// After the flip, the resolver is the default `.lua` (NOT `.pasta`).
+    #[test]
+    fn attach_lua_forces_lua_resolver_over_pasta_default() {
+        let adapter = Arc::new(Mutex::new(DapAdapter::new()));
+        // Server default is Pasta (map present): the `.pasta` resolver is attached.
+        let wiring = wiring_with(
+            map_with("C:/proj/cache/scene.lua", 7, "C:/proj/scene.pasta", 3),
+            SourceMode::Pasta,
+        );
+        attach_pasta_resolver(&adapter, &wiring);
+        // Precondition: Pasta default presents `.pasta`.
+        let (src, line) = top_frame(&adapter, r"@C:\proj\cache\scene.lua", 7);
+        assert_eq!(src, json!({ "path": "C:/proj/scene.pasta" }));
+        assert_eq!(line, 3);
+
+        // attach sourcePresentation="lua" → flip to Lua.
+        apply_attach(&adapter, &wiring, SourceMode::Lua);
+
+        // Now the SAME frame is presented as the generated `.lua` (NOT `.pasta`).
+        let (src, line) = top_frame(&adapter, r"@C:\proj\cache\scene.lua", 7);
+        assert_eq!(
+            src,
+            json!({ "path": r"@C:\proj\cache\scene.lua" }),
+            "attach `lua` must force `.lua` presentation over the Pasta default (R6.3)"
+        );
+        assert_eq!(line, 7);
+        assert_eq!(wiring.source_mode.get(), SourceMode::Lua);
+        assert!(!wiring.pasta_active(), "Lua effective mode → consumers inactive");
+    }
+
+    /// R6.3: `attach sourcePresentation="pasta"` FORCES `.pasta` presentation even
+    /// when the server default/file is `.lua` (a map IS present). The `.pasta`
+    /// resolver is attached after the flip.
+    #[test]
+    fn attach_pasta_forces_pasta_resolver_over_lua_default() {
+        let adapter = Arc::new(Mutex::new(DapAdapter::new()));
+        // Server default is Lua (map present but gated off): default `.lua`.
+        let wiring = wiring_with(
+            map_with("C:/proj/cache/scene.lua", 7, "C:/proj/scene.pasta", 3),
+            SourceMode::Lua,
+        );
+        attach_pasta_resolver(&adapter, &wiring);
+        // Precondition: Lua default presents the generated `.lua`.
+        let (src, _line) = top_frame(&adapter, r"@C:\proj\cache\scene.lua", 7);
+        assert_eq!(src, json!({ "path": r"@C:\proj\cache\scene.lua" }));
+
+        // attach sourcePresentation="pasta" → flip to Pasta (map present).
+        apply_attach(&adapter, &wiring, SourceMode::Pasta);
+
+        let (src, line) = top_frame(&adapter, r"@C:\proj\cache\scene.lua", 7);
+        assert_eq!(
+            src,
+            json!({ "path": "C:/proj/scene.pasta" }),
+            "attach `pasta` must force `.pasta` presentation over the Lua default (R6.3)"
+        );
+        assert_eq!(line, 3);
+        assert!(wiring.pasta_active(), "Pasta effective mode + map → consumers active");
+    }
+
+    /// design 581 (no client-default override): with NO attach `sourcePresentation`
+    /// the resolved env > file > 既定 mode stays in effect — the resolver is NOT
+    /// touched by the (absent) attach arg.
+    #[test]
+    fn no_attach_arg_keeps_resolved_mode() {
+        let adapter = Arc::new(Mutex::new(DapAdapter::new()));
+        let wiring = wiring_with(
+            map_with("C:/proj/cache/scene.lua", 7, "C:/proj/scene.pasta", 3),
+            SourceMode::Pasta,
+        );
+        attach_pasta_resolver(&adapter, &wiring);
+        // No apply_attach call (Decoded.attach_source_mode == None → skipped).
+        let (src, line) = top_frame(&adapter, r"@C:\proj\cache\scene.lua", 7);
+        assert_eq!(
+            src,
+            json!({ "path": "C:/proj/scene.pasta" }),
+            "absent attach arg keeps the resolved Pasta mode (design 581)"
+        );
+        assert_eq!(line, 3);
+        assert_eq!(wiring.source_mode.get(), SourceMode::Pasta);
+    }
+}
+
+#[cfg(test)]
+mod bp_translator_tests {
+    //! Task 5.3 — `.pasta` ブレークポイント翻訳と最近接調整
+    //! ([`translate_pasta_breakpoints`]・design "BpTranslator" 511-528・Flow 2
+    //! 215-236・requirements 4.1 / 4.2 / 4.3 / 8.2).
+    //!
+    //! `.pasta` 行 BP を `resolve_pasta_to_lua` で `.lua` 実行座標群へ翻訳して登録
+    //! （4.1・複数 `.lua` 行は全登録 8.2）、対応なしは
+    //! `nearest_pasta_line_with_mapping` で後続最近接へ調整して `verified`＋調整後
+    //! 行を返す（4.3）。登録した `.pasta` BP が **生フック座標**で `should_pause`
+    //! を発火することも end-to-end で検証する（5.1 review のキー再整合・4.2）。
+
+    use std::collections::BTreeMap;
+    use std::sync::Arc;
+
+    use crate::debug::{SharedSourceMode, SourceMode};
+    use crate::debug::breakpoints::BreakpointSet;
+    use crate::debug::source_map::{ChunkSourceMap, PastaPos, SourceMap};
+    use crate::debug::types::SourceRef;
+
+    use super::{SourceMapWiring, is_pasta_source, translate_pasta_breakpoints};
+
+    /// design "BpTranslator" 514: `.pasta` source は翻訳経路、`.lua` source は直接
+    /// 登録経路。拡張子で判別する（大小無視）。
+    #[test]
+    fn is_pasta_source_detects_pasta_extension() {
+        assert!(is_pasta_source("C:/proj/scene.pasta"));
+        assert!(is_pasta_source(r"C:\proj\scene.PASTA"), "拡張子は大小無視");
+        assert!(is_pasta_source("scene.pasta"));
+        // `.lua` source（フック源 `@` 付きを含む）は翻訳しない → 直接登録経路。
+        assert!(!is_pasta_source("@e2e_scenario"));
+        assert!(!is_pasta_source("C:/proj/cache/scene.lua"));
+        assert!(!is_pasta_source(r"@C:\proj\cache\scene.lua"));
+    }
+
+    /// 集約 `SourceMap` を、`.pasta` ファイル → [(chunk, lua_line, pasta_line)] の
+    /// 列から構築する小ヘルパ。各 (chunk, lua_line) を `pasta_line` へ対応づける。
+    fn map_from(file: &str, entries: &[(&str, u32, u32)]) -> SourceMap {
+        let mut per_chunk: BTreeMap<String, BTreeMap<u32, PastaPos>> = BTreeMap::new();
+        for &(chunk, lua_line, pasta_line) in entries {
+            per_chunk.entry(chunk.to_string()).or_default().insert(
+                lua_line,
+                PastaPos {
+                    file: file.to_string(),
+                    line: pasta_line,
+                },
+            );
+        }
+        let mut sm = SourceMap::new();
+        for (chunk, forward) in per_chunk {
+            sm.insert_chunk(chunk, file.to_string(), ChunkSourceMap::from_forward(forward));
+        }
+        sm
+    }
+
+    /// Pasta-active な wiring を構築する。
+    fn pasta_wiring(map: SourceMap) -> SourceMapWiring {
+        SourceMapWiring {
+            source_map: Some(Arc::new(map)),
+            source_mode: SharedSourceMode::new(SourceMode::Pasta),
+        }
+    }
+
+    /// 4.1 / 8.2 / 4.2: `.pasta` 行 → 対応 `.lua` 行群を全登録し、`verified`＋元行を
+    /// 返す。さらに登録された各 `.lua` 実行座標が **生フック source**（`@`・`\`）で
+    /// `should_pause` を発火する（canonicalize 再整合の end-to-end 証明・4.2）。
+    #[test]
+    fn pasta_line_registers_all_lua_lines_and_fires_should_pause() {
+        // `.pasta` 行 7 → `.lua` 12, 13（同一 chunk・1→多展開・8.2）。
+        let file = "C:/proj/scene.pasta";
+        let map = map_from(
+            file,
+            &[
+                ("C:/proj/cache/scene.lua", 12, 7),
+                ("C:/proj/cache/scene.lua", 13, 7),
+            ],
+        );
+        let wiring = pasta_wiring(map);
+        let set = BreakpointSet::new();
+
+        let resolved =
+            translate_pasta_breakpoints(&set, &wiring, &SourceRef::new(file), &[7]);
+
+        // 応答: 1 件・verified・元の `.pasta` 行 7（4.1）。
+        assert_eq!(resolved.len(), 1);
+        assert!(resolved[0].verified, "対応ありは verified (4.1)");
+        assert_eq!(resolved[0].line, 7, "verified 行は元の `.pasta` 行");
+        assert_eq!(resolved[0].source, SourceRef::new(file));
+
+        // 4.2 end-to-end: 生フック座標（`@`・`\`・大小違い）で両 `.lua` 行が発火する。
+        // 登録 chunk は `resolve_pasta_to_lua` の正規化済み chunk だが、
+        // `should_pause` が両側を canonicalize するため一致する。
+        assert!(
+            set.should_pause(r"@C:\proj\cache\scene.lua", 12),
+            "`.pasta` 行 7 の `.lua` 行 12 が生フック座標で発火する (4.2/8.2)"
+        );
+        assert!(
+            set.should_pause(r"@C:\proj\cache\scene.lua", 13),
+            "`.pasta` 行 7 の `.lua` 行 13 が生フック座標で発火する (4.2/8.2)"
+        );
+        // 未登録 `.lua` 行は発火しない。
+        assert!(!set.should_pause(r"@C:\proj\cache\scene.lua", 11));
+    }
+
+    /// 4.3 最近接調整: 対応の無い `.pasta` 行は後続最近接の対応行へ調整され、その
+    /// `.lua` 座標で登録、応答は `verified`＋**調整後**行。
+    #[test]
+    fn unmapped_pasta_line_adjusts_to_nearest_subsequent() {
+        // 対応 `.pasta` 行 = {3, 7}。`.pasta` 行 4（対応なし）→ 最近接 7 へ調整。
+        let file = "C:/proj/scene.pasta";
+        let map = map_from(
+            file,
+            &[
+                ("C:/proj/cache/scene.lua", 10, 3),
+                ("C:/proj/cache/scene.lua", 20, 7),
+            ],
+        );
+        let wiring = pasta_wiring(map);
+        let set = BreakpointSet::new();
+
+        let resolved =
+            translate_pasta_breakpoints(&set, &wiring, &SourceRef::new(file), &[4]);
+
+        assert_eq!(resolved.len(), 1);
+        assert!(resolved[0].verified, "調整後は verified (4.3)");
+        assert_eq!(
+            resolved[0].line, 7,
+            "対応なし行 4 は後続最近接の対応行 7 へ調整される (4.3)"
+        );
+        // 調整先 `.pasta` 行 7 の `.lua` 行 20 が登録・発火する。
+        assert!(
+            set.should_pause(r"@C:\proj\cache\scene.lua", 20),
+            "調整後の `.pasta` 行 7 の `.lua` 座標で停止する (4.3)"
+        );
+        // 元の対応行 3 の `.lua` 10 は（行 4 のリクエストでは）登録されない。
+        assert!(!set.should_pause(r"@C:\proj\cache\scene.lua", 10));
+    }
+
+    /// 4.3: 後続に対応行が一切無い `.pasta` 行は **誤マッピングせず** unverified を
+    /// 返す（最近接が存在しない場合のみ）。
+    #[test]
+    fn no_subsequent_mapping_returns_unverified() {
+        let file = "C:/proj/scene.pasta";
+        // 対応 `.pasta` 行 = {3}。行 5 以降に対応なし。
+        let map = map_from(file, &[("C:/proj/cache/scene.lua", 10, 3)]);
+        let wiring = pasta_wiring(map);
+        let set = BreakpointSet::new();
+
+        let resolved =
+            translate_pasta_breakpoints(&set, &wiring, &SourceRef::new(file), &[5]);
+
+        assert_eq!(resolved.len(), 1);
+        assert!(
+            !resolved[0].verified,
+            "後続最近接が無い場合は unverified（誤マッピング禁止・4.3）"
+        );
+        assert_eq!(resolved[0].line, 5, "unverified は元の行を保持");
+        // 何も登録されない。
+        assert!(!set.should_pause(r"@C:\proj\cache\scene.lua", 10));
+    }
+
+    /// 4.1 / 8.2: 複数 `.pasta` 行を 1 回の setBreakpoints で要求した場合、全行分の
+    /// `.lua` 実行座標が **同一 present source** で蓄積登録され、行ごとに後勝ち
+    /// eviction しない（1 register 呼び出しに集約）。
+    #[test]
+    fn multiple_pasta_lines_all_register_without_mutual_eviction() {
+        let file = "C:/proj/scene.pasta";
+        // `.pasta` 3 → `.lua` 10、`.pasta` 7 → `.lua` 20, 21。
+        let map = map_from(
+            file,
+            &[
+                ("C:/proj/cache/scene.lua", 10, 3),
+                ("C:/proj/cache/scene.lua", 20, 7),
+                ("C:/proj/cache/scene.lua", 21, 7),
+            ],
+        );
+        let wiring = pasta_wiring(map);
+        let set = BreakpointSet::new();
+
+        let resolved =
+            translate_pasta_breakpoints(&set, &wiring, &SourceRef::new(file), &[3, 7]);
+
+        assert_eq!(resolved.len(), 2);
+        assert!(resolved.iter().all(|r| r.verified));
+        assert_eq!(resolved[0].line, 3);
+        assert_eq!(resolved[1].line, 7);
+
+        // 全 `.lua` 座標が同時に登録されている（行ごとの register で互いを評価
+        // 退避していない）。
+        assert!(set.should_pause(r"@C:\proj\cache\scene.lua", 10), "行 3 の座標");
+        assert!(set.should_pause(r"@C:\proj\cache\scene.lua", 20), "行 7 の座標 1");
+        assert!(set.should_pause(r"@C:\proj\cache\scene.lua", 21), "行 7 の座標 2");
+    }
+
+    /// 4.1 / 多チャンク: 同一 `.pasta` 行が複数チャンクへ展開される場合も全チャンクの
+    /// `.lua` 座標を登録する（design 215-236 のクロスチャンク・8.2）。
+    #[test]
+    fn pasta_line_spanning_multiple_chunks_registers_all() {
+        let file = "C:/proj/scene.pasta";
+        // `.pasta` 行 7 → chunk a の `.lua` 12, chunk b の `.lua` 5。
+        let map = map_from(
+            file,
+            &[
+                ("C:/proj/cache/a.lua", 12, 7),
+                ("C:/proj/cache/b.lua", 5, 7),
+            ],
+        );
+        let wiring = pasta_wiring(map);
+        let set = BreakpointSet::new();
+
+        let resolved =
+            translate_pasta_breakpoints(&set, &wiring, &SourceRef::new(file), &[7]);
+
+        assert_eq!(resolved.len(), 1);
+        assert!(resolved[0].verified);
+        assert!(set.should_pause(r"@C:\proj\cache\a.lua", 12), "chunk a の座標");
+        assert!(set.should_pause(r"@C:\proj\cache\b.lua", 5), "chunk b の座標");
+    }
+
+    /// `.pasta` present source は retain/置換キー: 同 `.pasta` の再 setBreakpoints は
+    /// 旧座標を置換しつつ、別 present source（別 `.pasta`/`.lua`）の BP を保持する。
+    /// requirements 4.4 / 8.2（present source 単位の権威的置換）。
+    #[test]
+    fn re_setting_pasta_source_replaces_only_its_own_coords() {
+        let file = "C:/proj/scene.pasta";
+        let map = map_from(
+            file,
+            &[
+                ("C:/proj/cache/scene.lua", 10, 3),
+                ("C:/proj/cache/scene.lua", 20, 7),
+            ],
+        );
+        let wiring = pasta_wiring(map);
+        let set = BreakpointSet::new();
+
+        // 行 3（→ `.lua` 10）を登録。
+        translate_pasta_breakpoints(&set, &wiring, &SourceRef::new(file), &[3]);
+        assert!(set.should_pause(r"@C:\proj\cache\scene.lua", 10));
+
+        // 同 `.pasta` を行 7（→ `.lua` 20）で再設定。旧座標 10 は置換される。
+        translate_pasta_breakpoints(&set, &wiring, &SourceRef::new(file), &[7]);
+        assert!(
+            !set.should_pause(r"@C:\proj\cache\scene.lua", 10),
+            "同一 present source の旧座標は権威的に置換される"
+        );
+        assert!(set.should_pause(r"@C:\proj\cache\scene.lua", 20), "新座標が登録される");
+    }
+}
+
+#[cfg(test)]
+mod pasta_bp_e2e {
+    //! Task 7.1 — `.pasta` ブレークポイント **E2E**（実トランスパイル → 実マップ構築
+    //! → 実デバッグセッション）。
+    //!
+    //! 既存の `.lua` E2E（[`super::tests::full_dap_session_over_tcp_*`] / 4.1）を
+    //! **本番化**し、`.pasta` 座標経路を end-to-end で駆動する（design 637-639「既存
+    //! スライス E2E を本番化」）。同じ DAP-over-TCP ハーネス（[`super::tests`] と同型の
+    //! `DapClient`）で、ローダの本番マップ構築経路（task 4.3
+    //! [`PastaLoader::build_source_map`]）が産んだ集約 `Arc<SourceMap>` を
+    //! [`enable`](crate::debug::enable)（task 4.2）へ `SourceMode::Pasta` で渡し、実際の
+    //! 生成 `.lua` を当該キャッシュ `.lua` パスをチャンク名（`@<path>`）として VM 上で
+    //! 走らせる。
+    //!
+    //! 観測する「done」（task 7.1 完了状態）:
+    //! 1. **`.pasta` 行 BP ヒット（4.1/4.2）**: `.pasta` のマップ済み行へ BP を張ると
+    //!    `verified`＝true で登録され、対応する `.lua` 行に到達して停止する。
+    //! 2. **`.pasta` 提示（5.1/5.2）**: 停止フレームの `stackTrace` が **`.pasta`** の
+    //!    ファイル・行を提示する（生成 `.lua` 座標**ではない**）。これがテストの「歯」:
+    //!    resolver/翻訳が無効なら `.lua` 座標が出てこのアサートが落ちる。
+    //! 3. **停止中 inspect 継続（5.4）**: `.pasta` 提示中も `scopes`/`variables` が
+    //!    機能する（提示モードは inspect に影響しない）。
+    //! 4. **最近接調整（4.3）**: マップの無い `.pasta` 行（先頭コメント行）へ BP を張ると
+    //!    後続最近接のマップ済み `.pasta` 行へ調整され、`verified`＋調整後 `line` が返る。
+    //!
+    //! `mlua::Lua`（`!Send`）は VM ホストスレッドにのみ生存し、バウンド `SocketAddr`
+    //! （`Copy`）と go/done チャネルだけが越境する。全クライアント待機は TEST-ONLY
+    //! watchdog でバウンドし CI がハングしないようにする（停止コアは無期限）。
+
+    use std::io::BufReader;
+    use std::net::{SocketAddr, TcpStream};
+    use std::sync::Arc;
+    use std::sync::mpsc::{self, RecvTimeoutError};
+    use std::time::Duration;
+
+    use serde_json::{Value, json};
+
+    use crate::debug::source_map::{MapBuilderSink, SourceMap};
+    use crate::debug::transport::{read_frame, write_frame};
+    use crate::debug::{DebugConfig, SourceMode, enable};
+    use crate::loader::CacheManager;
+    use crate::transpiler::LuaTranspiler;
+
+    /// TEST-ONLY watchdog so CI cannot hang. The stop core is unbounded.
+    const WATCHDOG: Duration = Duration::from_secs(15);
+
+    /// 最小 `.pasta` フィクスチャ（グローバル単語定義 3 本）。先頭行はコメント（マップ
+    /// 無し → 4.3 最近接調整の対象）。各単語定義行はマップ済みで、生成 `.lua` の
+    /// トップレベル文（`PASTA.create_word(...):entry(...)`）として **実行**されるため、
+    /// その行に張った `.pasta` BP が実フックで発火する。
+    ///
+    /// `.pasta` 行（1-origin）:
+    ///   1: ＃グローバル単語          <- コメント（マップ無し → 4.3 で行2へ調整）
+    ///   2: ＠あいさつ：こんにちは、やあ   <- マップ済み（→ 生成 `.lua` のある行）
+    ///   3: ＠べつ：A、B、C            <- マップ済み（BP 対象）
+    ///   4: ＠みっつ：x、y             <- マップ済み
+    const PASTA_FIXTURE: &str = "\
+＃グローバル単語
+＠あいさつ：こんにちは、やあ
+＠べつ：A、B、C
+＠みっつ：x、y
+";
+
+    /// `require "pasta"` / `require "pasta.global"` を満たす最小 Lua シム。
+    /// `PASTA.create_word(name)` は `entry(...)` を持つオブジェクトを返すので、生成
+    /// `.lua` のトップレベル単語定義文が **副作用付きで実行**でき、各行で実フックが
+    /// 発火する（BP ヒット観測に必要）。`.pasta`↔`.lua` 変換とは無関係の純粋な実行
+    /// 足場であり、提示は resolver/翻訳（5.2/5.3）が担う。
+    const PASTA_SHIM: &str = "\
+local word = {}
+word.__index = word
+function word:entry(...) self.entries = { ... } return self end
+local PASTA = {}
+function PASTA.create_word(name) return setmetatable({ name = name }, word) end
+package.loaded['pasta'] = PASTA
+package.loaded['pasta.global'] = {}
+";
+
+    /// 実 TCP ソケット越しの最小 DAP クライアント（Content-Length フレーミング）。
+    /// [`super::tests::DapClient`] と同型（モジュール独立のため自前に持つ）。
+    struct DapClient {
+        reader: BufReader<TcpStream>,
+        writer: TcpStream,
+    }
+
+    impl DapClient {
+        fn connect(addr: SocketAddr) -> Self {
+            let stream = TcpStream::connect(addr).expect("client must connect to the bound port");
+            stream
+                .set_read_timeout(Some(WATCHDOG))
+                .expect("TEST-ONLY read timeout");
+            let writer = stream.try_clone().expect("clone socket for writing");
+            Self {
+                reader: BufReader::new(stream),
+                writer,
+            }
+        }
+
+        fn send_request(&mut self, seq: u64, command: &str, arguments: Value) {
+            let req = json!({
+                "seq": seq,
+                "type": "request",
+                "command": command,
+                "arguments": arguments,
+            });
+            write_frame(&mut self.writer, &req).expect("client write must succeed");
+        }
+
+        fn recv(&mut self) -> Value {
+            read_frame(&mut self.reader)
+                .expect("client read must succeed (TEST-ONLY timeout)")
+                .expect("a frame must be present (peer did not close)")
+        }
+
+        fn recv_until(&mut self, mut pred: impl FnMut(&Value) -> bool) -> Value {
+            loop {
+                let msg = self.recv();
+                if pred(&msg) {
+                    return msg;
+                }
+            }
+        }
+    }
+
+    fn is_event(msg: &Value, name: &str) -> bool {
+        msg["type"] == "event" && msg["event"] == name
+    }
+
+    fn is_response(msg: &Value, command: &str) -> bool {
+        msg["type"] == "response" && msg["command"] == command
+    }
+
+    /// 実トランスパイルの成果物（E2E が必要とする実座標を **マップから導出**）。
+    struct Fixture {
+        /// ローダの本番経路が産んだ集約マップ（`enable` へ渡す）。
+        map: Arc<SourceMap>,
+        /// 実行する生成 `.lua` 本文（map が構築されたのと同一バイト）。
+        lua_source: String,
+        /// VM チャンク名（`@<キャッシュ .lua 絶対パス>`）= ローダ由来チャンク名。
+        chunk_name: String,
+        /// `.pasta` ファイルパス（`PastaPos.file` / VSCode source.path と一致）。
+        pasta_path: String,
+        /// BP を張るマップ済み `.pasta` 行（map から導出）。
+        mapped_pasta_line: u32,
+        /// `mapped_pasta_line` に対応する `.lua` 実行行（停止位置の根拠）。
+        mapped_lua_line: u32,
+        /// マップの無い `.pasta` 行（4.3 最近接調整の入力）。
+        unmapped_pasta_line: u32,
+        /// `unmapped_pasta_line` の後続最近接マップ済み `.pasta` 行（調整後の期待値）。
+        nearest_adjusted_line: u32,
+    }
+
+    /// 実 `.pasta` をディスクへ書き、(a) 本番ローダ経路でマップを構築し
+    /// （[`PastaLoader::build_source_map`]・task 4.3）、(b) 同一 `.pasta` を同一
+    /// `transpile_with_source_map` で再トランスパイルして **実行する生成 `.lua` 本文**を
+    /// 取得する。map のチャンク名キー（ローダ由来 `source_to_cache_path`）を VM の
+    /// `set_name` に用いるため、停止座標とマップが一致する。
+    ///
+    /// BP 対象/調整対象の `.pasta` 行は **マップから導出**してハードコードを避ける
+    /// （map の決定的順序に依存しない・回帰耐性）。
+    fn build_fixture() -> Fixture {
+        let temp = tempfile::TempDir::new().expect("temp dir");
+        let base_dir = temp.path().to_path_buf();
+        let pasta_file = base_dir.join("dic/baseware/words.pasta");
+        std::fs::create_dir_all(pasta_file.parent().unwrap()).expect("mkdir dic");
+        std::fs::write(&pasta_file, PASTA_FIXTURE).expect("write .pasta");
+
+        let cache_manager = CacheManager::new(base_dir.clone(), "profile/pasta/cache/lua");
+
+        // (a) 本番ローダ経路の集約マップ（sidecar=false: メモリ既定）。
+        let map = crate::loader::PastaLoader::build_source_map(
+            std::slice::from_ref(&pasta_file),
+            &cache_manager,
+            false,
+        );
+
+        // チャンク名キー = ローダ由来 `source_to_cache_path`（map のキーと同一）。
+        let chunk_name = cache_manager
+            .source_to_cache_path(&pasta_file)
+            .to_string_lossy()
+            .to_string();
+        // `.pasta` ファイルキー = `build_source_map_inner` が `parse_str` / `PastaPos.file`
+        // に用いる `file_path.to_string_lossy()`（VSCode source.path と一致させる側）。
+        let pasta_path = pasta_file.to_string_lossy().to_string();
+
+        // (b) 同一入力で再トランスパイルし、実行する生成 `.lua` 本文を得る（map が
+        // 構築されたのと同一の決定的バイト）。
+        let content = std::fs::read_to_string(&pasta_file).expect("read .pasta");
+        let parsed = pasta_dsl::parse_str(&content, &pasta_path).expect("parse .pasta");
+        let transpiler = LuaTranspiler::default();
+        let mut sink = MapBuilderSink::new(pasta_path.clone(), chunk_name.clone());
+        let mut out = Vec::new();
+        transpiler
+            .transpile_with_source_map(&parsed, &mut out, Some(&mut sink))
+            .expect("transpile .pasta");
+        let lua_source = String::from_utf8(out).expect("utf8 .lua");
+
+        // --- 実座標をマップから導出 ---
+        // マップ済み `.pasta` 行（と対応 `.lua` 行）を、`.lua`→`.pasta` 前方解決の
+        // 昇順走査から収集する。
+        let mut mapped: Vec<(u32, u32)> = Vec::new(); // (pasta_line, lua_line)
+        for lua_line in 1u32..=200 {
+            if let Some(pos) = map.resolve_lua_to_pasta(&chunk_name, lua_line) {
+                mapped.push((pos.line, lua_line));
+            }
+        }
+        mapped.sort();
+        assert!(
+            mapped.len() >= 2,
+            "フィクスチャは少なくとも 2 つのマップ済み `.pasta` 行を持つこと: {mapped:?}"
+        );
+
+        // BP 対象: 2 番目のマップ済み `.pasta` 行（先頭以外で安定して実行される行）。
+        let (mapped_pasta_line, mapped_lua_line) = mapped[1];
+
+        // マップの無い `.pasta` 行: 最小マップ済み行の手前の行（先頭コメント行など）。
+        // その後続最近接マップ済み行は最小マップ済み行になる。
+        let min_mapped = mapped[0].0;
+        assert!(
+            min_mapped >= 2,
+            "最小マップ済み `.pasta` 行の手前にマップ無し行が必要（4.3 入力）: min={min_mapped}"
+        );
+        let unmapped_pasta_line = min_mapped - 1; // 先頭コメント行（マップ無し）。
+        // 期待される調整先 = `from_line` 以上で最初にマップを持つ `.pasta` 行。
+        let nearest_adjusted_line = map
+            .nearest_pasta_line_with_mapping(&pasta_path, unmapped_pasta_line)
+            .expect("マップ無し行には後続最近接のマップ済み行が存在すること");
+        assert_eq!(
+            nearest_adjusted_line, min_mapped,
+            "未マップ行の後続最近接は最小マップ済み行（4.3）"
+        );
+        // 未マップ行自身が本当にマップを持たないことを表明（テストの前提）。
+        assert!(
+            map.resolve_pasta_to_lua(&pasta_path, unmapped_pasta_line)
+                .is_empty(),
+            "選んだ未マップ `.pasta` 行 {unmapped_pasta_line} は対応 `.lua` を持たないこと"
+        );
+
+        // TempDir をリークさせて寿命を伸ばす（map / lua_source は既に取得済みで
+        // ディスクは不要だが、念のため明示）。drop で削除されても map は in-memory。
+        drop(temp);
+
+        Fixture {
+            map,
+            lua_source,
+            chunk_name,
+            pasta_path,
+            mapped_pasta_line,
+            mapped_lua_line,
+            unmapped_pasta_line,
+            nearest_adjusted_line,
+        }
+    }
+
+    /// task 7.1 の本体: `.pasta` 行 BP ヒット・`.pasta` 提示・停止中 inspect・最近接調整を
+    /// 1 本の実 DAP-over-TCP セッションで end-to-end 検証する。
+    ///
+    /// requirements: **4.1**（`.pasta` 行 BP → 対応 `.lua` 行群登録）/ **4.2**（対応
+    /// `.lua` 行到達で停止）/ **4.3**（対応なし → 後続最近接へ調整・有効位置提示）/
+    /// **5.1**（停止位置 `.pasta` 提示）/ **5.2**（コールスタック各フレーム `.pasta`
+    /// 提示）/ **5.4**（`.pasta` 提示中も変数/コルーチン inspect 利用可能）。
+    #[test]
+    fn pasta_breakpoint_hits_presents_pasta_inspects_and_nearest_adjusts_over_tcp() {
+        let fx = build_fixture();
+
+        // host へ渡す値（`!Send` を越境させない）。
+        let lua_source = fx.lua_source.clone();
+        let chunk_name = fx.chunk_name.clone();
+        let map = Arc::clone(&fx.map);
+
+        let (addr_tx, addr_rx) = mpsc::channel::<SocketAddr>();
+        let (go_tx, go_rx) = mpsc::channel::<()>();
+
+        // VM HOST スレッド: `mlua::Lua`（!Send）を専有。実マップを Pasta モードで
+        // `enable` へ渡し、実生成 `.lua` をローダ由来チャンク名で走らせる。
+        let host = std::thread::spawn(move || -> Result<(), String> {
+            let lua = unsafe {
+                mlua::Lua::unsafe_new_with(mlua::StdLib::ALL_SAFE, mlua::LuaOptions::default())
+            };
+            // `require "pasta"` を満たすシムを先に読み込む（フック未装着の準備実行）。
+            lua.load(PASTA_SHIM)
+                .set_name("@pasta_shim")
+                .exec()
+                .map_err(|e| format!("shim exec failed: {e}"))?;
+
+            let cfg = DebugConfig {
+                enabled: true,
+                listen: Some("127.0.0.1:0".parse().unwrap()),
+                source_mode: SourceMode::Pasta, // 既定だが明示（6.1）。
+                ..Default::default()
+            };
+            // 実マップを `Some` で渡す（task 4.2・design 582: map+Pasta で `.pasta`
+            // resolver/BP 翻訳/stepper が装着される）。
+            let handle = enable(&lua, &cfg, Some(map))
+                .map_err(|e| format!("enable failed: {e}"))?
+                .ok_or_else(|| "enable returned None for an enabled config".to_string())?;
+
+            let addr = handle
+                .local_addr()
+                .ok_or_else(|| "enabled handle must expose a bound addr".to_string())?;
+            addr_tx.send(addr).map_err(|_| "addr send failed".to_string())?;
+
+            // クライアントが setBreakpoints/configurationDone を終えるまで待つ。
+            go_rx
+                .recv_timeout(WATCHDOG)
+                .map_err(|_| "did not receive go signal before running the VM".to_string())?;
+
+            // 実生成 `.lua` を **ローダ由来チャンク名**（`@<キャッシュ .lua パス>`）で
+            // 走らせる。フックはこの source を報告し、`should_pause` が正規化突合する
+            // ので `.pasta` BP（→ `.lua` 行登録）が発火する（4.2）。
+            lua.load(&lua_source)
+                .set_name(&format!("@{chunk_name}"))
+                .exec()
+                .map_err(|e| format!("scenario exec failed: {e}"))?;
+            lua.remove_global_hook();
+            drop(handle);
+            Ok(())
+        });
+
+        // CLIENT（このスレッド）。
+        let addr = addr_rx
+            .recv_timeout(WATCHDOG)
+            .expect("host must publish the bound addr before the watchdog");
+        let mut client = DapClient::connect(addr);
+
+        // --- initialize → capabilities + `initialized` ---
+        client.send_request(1, "initialize", json!({ "adapterID": "pasta" }));
+        let init_resp = client.recv_until(|m| is_response(m, "initialize"));
+        assert_eq!(init_resp["success"], true, "initialize must succeed");
+        let _initialized = client.recv_until(|m| is_event(m, "initialized"));
+
+        // --- (4.3) 最近接調整: マップ無し `.pasta` 行へ BP → verified＋調整後 line ---
+        // 先に最近接調整を表明する（設定リクエストの応答だけで判定でき、VM 実行に
+        // 依存しない）。同一 `.pasta` source なので後段のヒット用 BP で置換される。
+        client.send_request(
+            2,
+            "setBreakpoints",
+            json!({
+                "source": { "path": fx.pasta_path },
+                "breakpoints": [{ "line": fx.unmapped_pasta_line }],
+            }),
+        );
+        let adj_resp = client.recv_until(|m| is_response(m, "setBreakpoints"));
+        let adj_bps = adj_resp["body"]["breakpoints"]
+            .as_array()
+            .expect("breakpoints array");
+        assert_eq!(adj_bps.len(), 1, "1 つの BP 応答");
+        assert_eq!(
+            adj_bps[0]["verified"], true,
+            "4.3: マップ無し行 BP は後続最近接へ調整され verified になる"
+        );
+        assert_eq!(
+            adj_bps[0]["line"].as_u64().expect("adjusted line") as u32,
+            fx.nearest_adjusted_line,
+            "4.3: 調整後の有効位置（後続最近接のマップ済み `.pasta` 行）が提示される"
+        );
+
+        // --- (4.1) `.pasta` のマップ済み行へ BP → verified（元の行で確定）---
+        client.send_request(
+            3,
+            "setBreakpoints",
+            json!({
+                "source": { "path": fx.pasta_path },
+                "breakpoints": [{ "line": fx.mapped_pasta_line }],
+            }),
+        );
+        let bp_resp = client.recv_until(|m| is_response(m, "setBreakpoints"));
+        let bps = bp_resp["body"]["breakpoints"]
+            .as_array()
+            .expect("breakpoints array");
+        assert_eq!(bps.len(), 1);
+        assert_eq!(
+            bps[0]["verified"], true,
+            "4.1: マップ済み `.pasta` 行 BP は verified で登録される"
+        );
+        assert_eq!(
+            bps[0]["line"].as_u64().expect("bp line") as u32,
+            fx.mapped_pasta_line,
+            "4.1: マップ済み行は調整されず元の `.pasta` 行のまま"
+        );
+
+        // --- configurationDone → VM 実行開始 ---
+        client.send_request(4, "configurationDone", json!({}));
+        let cfg_resp = client.recv_until(|m| is_response(m, "configurationDone"));
+        assert_eq!(cfg_resp["success"], true);
+        go_tx.send(()).expect("send go signal");
+
+        // --- (4.2) `.pasta` 行に対応する `.lua` 行へ到達 → stopped(breakpoint) ---
+        let stopped = client.recv_until(|m| is_event(m, "stopped"));
+        assert_eq!(
+            stopped["body"]["reason"], "breakpoint",
+            "4.2: `.pasta` 行 BP に対応する `.lua` 行で停止する"
+        );
+        let thread_id = stopped["body"]["threadId"].as_u64().expect("threadId");
+
+        // --- (5.1/5.2) stackTrace は **`.pasta`** 座標を提示する（`.lua` ではない）---
+        client.send_request(10, "stackTrace", json!({ "threadId": thread_id }));
+        let stack = client.recv_until(|m| is_response(m, "stackTrace"));
+        let frames = stack["body"]["stackFrames"]
+            .as_array()
+            .expect("stackFrames array");
+        assert!(!frames.is_empty(), "停止フレームが存在する（5.2）");
+
+        // === テストの「歯」: top フレームの source.path が `.pasta`・line が `.pasta`
+        // 行であること。resolver/翻訳（5.2/5.3）が無効なら、ここに生成 `.lua` の
+        // チャンク名（`@<...lua>`）と `.lua` 行が出てこのアサートが落ちる。===
+        let top_src = frames[0]["source"]["path"]
+            .as_str()
+            .expect("top frame source path");
+        assert!(
+            top_src.ends_with(".pasta"),
+            "5.1/5.2: 停止フレームは `.pasta` を提示すること（`.lua` ではない）。actual={top_src:?}"
+        );
+        // 正規化突合（区切り/大小）で `.pasta` パスと一致する。
+        assert_eq!(
+            crate::debug::source_map::canonicalize_chunk_name(top_src),
+            crate::debug::source_map::canonicalize_chunk_name(&fx.pasta_path),
+            "5.1: 提示 `.pasta` パスは元 `.pasta` ファイルと一致する"
+        );
+        assert_eq!(
+            frames[0]["line"].as_u64().expect("top frame line") as u32,
+            fx.mapped_pasta_line,
+            "5.1: 提示行は **`.pasta` 行**（{}）。`.lua` 行（{}）であってはならない",
+            fx.mapped_pasta_line,
+            fx.mapped_lua_line
+        );
+        // `.pasta` 行と `.lua` 行が異なることを前提として確認（歯の有効性の裏付け）:
+        // もし提示が `.lua` のままなら line==mapped_lua_line になり、上の assert が
+        // 落ちる。両者が異なるフィクスチャを選んでいる。
+        assert_ne!(
+            fx.mapped_pasta_line, fx.mapped_lua_line,
+            "フィクスチャは `.pasta` 行 ≠ `.lua` 行（提示差が観測可能）"
+        );
+
+        // --- (5.4) `.pasta` 提示中でも inspect（scopes/variables）が機能する ---
+        let frame_id = frames[0]["id"].as_u64().expect("frame id");
+        client.send_request(11, "scopes", json!({ "frameId": frame_id }));
+        let scopes = client.recv_until(|m| is_response(m, "scopes"));
+        assert_eq!(scopes["success"], true, "5.4: `.pasta` 提示中も scopes が成功する");
+        let scope_arr = scopes["body"]["scopes"]
+            .as_array()
+            .expect("scopes array");
+        assert!(
+            !scope_arr.is_empty(),
+            "5.4: 停止フレームの scope が利用可能（提示モードは inspect に影響しない）"
+        );
+        let var_ref = scope_arr[0]["variablesReference"]
+            .as_u64()
+            .expect("variablesReference");
+        // variables 要求も成功する（中身の有無に依らず、提示モードで壊れないこと）。
+        client.send_request(12, "variables", json!({ "variablesReference": var_ref }));
+        let vars = client.recv_until(|m| is_response(m, "variables"));
+        assert_eq!(
+            vars["success"], true,
+            "5.4: `.pasta` 提示中でも variables 要求が成功する（inspect 継続）"
+        );
+        assert!(
+            vars["body"]["variables"].is_array(),
+            "5.4: variables 応答は配列を返す（inspect 経路が機能している）"
+        );
+
+        // --- continue → 実行完走 → host スレッド終了（terminated 観測）---
+        //
+        // 注意: マップ済み行（単語定義）は生成 `.lua` 上で `create_word():entry()` の
+        // **複数呼び出しを含む 1 行**であり、Lua のラインフックは同一ソース行で複数回
+        // 発火し得る（呼び出しから戻る際に同じ行へ再入する）。よって 1 つの `.pasta`
+        // 行 BP がその行で複数回停止し得る。これは行 BP の正当な挙動なので、`continue`
+        // を繰り返して流し切り、chunk 完走 → `drop(handle)` が出す `terminated`（host が
+        // 完了した決定的シグナル）を観測するまでループする。各 `continue` 後に来る
+        // フレームは `stopped`（再停止 → もう一度 continue）か `terminated`（完了 →
+        // 終了）のいずれか。ループ回数は BP 行の再入数で有限（CI 無限ループ防止に上限）。
+        let mut terminated = false;
+        for continue_seq in 30u64..60u64 {
+            client.send_request(continue_seq, "continue", json!({ "threadId": thread_id }));
+            // continue ack の後に来る次の制御フレーム（stopped/terminated）を待つ。
+            let next = client.recv_until(|m| {
+                is_event(m, "stopped") || is_event(m, "terminated")
+            });
+            if is_event(&next, "terminated") {
+                terminated = true;
+                break;
+            }
+            // それ以外は同一 BP 行への再停止 → もう一度 continue（reason は breakpoint）。
+            assert_eq!(
+                next["body"]["reason"], "breakpoint",
+                "再停止は同一 `.pasta` 行 BP のはず（多重呼び出し行の再入）"
+            );
+        }
+        assert!(
+            terminated,
+            "chunk 完走 → `terminated` が来るまで continue で流し切れること"
+        );
+
+        // host VM スレッドが watchdog 内で完了することを確認（ハング無し）。
+        let (done_tx, done_rx) = mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = done_tx.send(host.join());
+        });
+        match done_rx.recv_timeout(WATCHDOG) {
+            Ok(joined) => {
+                joined
+                    .expect("host VM thread must not panic")
+                    .expect("scenario must run to completion after continue");
+            }
+            Err(RecvTimeoutError::Timeout) => {
+                panic!("host VM thread did not finish within the watchdog (hang?)");
+            }
+            Err(RecvTimeoutError::Disconnected) => panic!("join watcher disconnected"),
+        }
+    }
+}
+
+#[cfg(test)]
+mod pasta_step_e2e {
+    //! Task 7.2 — `.pasta` 粒度ステップ **E2E**（E1–E8）。実デバッグセッションを
+    //! 実 DAP-over-TCP トランスポート越しに駆動し、`.pasta` 行単位のステップ実行
+    //! （step over/into/out）が design 640 の 8 シナリオすべてで **期待どおりの
+    //! `.pasta` 停止位置**へ到達することを end-to-end で検証する（requirements
+    //! **9.1**/**9.2**/**9.3**/**9.4**/**9.5**）。
+    //!
+    //! # ハーネス（task 7.1 [`super::pasta_bp_e2e`] / `.lua` ステップ E2E
+    //! [`super::tests::full_lua_debug_session_all_steps_all_var_types_coroutine_body`]
+    //! の踏襲）
+    //!
+    //! - 実マップ＋`SourceMode::Pasta` を [`enable`](crate::debug::enable) へ渡し
+    //!   （task 4.2／design 582: map+Pasta で `.pasta` resolver/BP 翻訳/stepper が装着）、
+    //!   生成 `.lua`（ここでは決定的に制御するため**素の Lua チャンク**）を VM 上で走らせる。
+    //! - クライアントは実 TCP ソケット越しに `next`/`stepIn`/`stepOut` を送り、各停止の
+    //!   **`.pasta` 行**を `stackTrace` の top フレーム `line` で読む（DAP は停止位置を
+    //!   `stopped` body ではなく `stackTrace` で報告する・task 7.1 と同型の [`top_pasta_line`]）。
+    //!   resolver（task 5.2）が装着済みなので、`stackTrace` の `line` は `.pasta` 座標
+    //!   （E1–E7）。
+    //!
+    //! # マップは「素の Lua チャンク」へ手組みする（task 5.4 unit test 流儀）
+    //!
+    //! `.pasta` トランスパイラの出力に依存せず E1–E8 の行構造（複数 `.lua`→同一
+    //! `.pasta`、サブ呼び出し、再帰、未対応行、コルーチン）を **決定的に**作るため、
+    //! [`super::super::session`] の task 5.4 unit test と同じく `ChunkSourceMap::
+    //! from_forward` で `lua_line → PastaPos` を手組みした集約 [`SourceMap`] を注入する。
+    //! これは task 5.4 が stop-decision ロジックで検証した**同じ振る舞い**を、本物の
+    //! セッション（transport→dap→session→hook）で合成して end-to-end に証明する 7.2 の
+    //! 役割そのもの。**期待停止 `.pasta` 行は map から導出**してハードコードを避ける
+    //! （[`derive`](Expected::derive)・回帰耐性）。
+    //!
+    //! # 「歯」（teeth）
+    //!
+    //! 中核シナリオ（E1/E3/E6）について、`SourceMode::Lua` へ切り替えると `.pasta`
+    //! 粒度が無効化されて `.lua` 行で停止する（`.pasta` 行ではない）ことを別テスト
+    //! [`teeth_lua_mode_stops_at_lua_line_not_pasta`] で示し、アサートが**本物**
+    //! （恒真でない）ことを裏づける。E8（9.5）はその `.lua` 粒度回帰そのもの。
+    //!
+    //! `mlua::Lua`（`!Send`）は VM ホストスレッドにのみ生存し、バウンド `SocketAddr`
+    //! （`Copy`）と go/done チャネルだけが越境する。全クライアント待機は TEST-ONLY
+    //! watchdog でバウンドし CI がハングしないようにする（停止コアは無期限）。
+
+    use std::collections::BTreeMap;
+    use std::io::BufReader;
+    use std::net::{SocketAddr, TcpStream};
+    use std::sync::Arc;
+    use std::sync::mpsc::{self, RecvTimeoutError};
+    use std::time::Duration;
+
+    use serde_json::{Value, json};
+
+    use crate::debug::source_map::{ChunkSourceMap, PastaPos, SourceMap};
+    use crate::debug::transport::{read_frame, write_frame};
+    use crate::debug::{DebugConfig, SourceMode, enable};
+
+    /// TEST-ONLY watchdog so CI cannot hang. The stop core is unbounded.
+    const WATCHDOG: Duration = Duration::from_secs(15);
+
+    /// 生成 `.lua` チャンク名（フック source = `set_name` 値）。map のキーと一致させる。
+    const STEP_SOURCE: &str = "@pasta_step_e2e_scenario";
+
+    /// `.pasta` ファイルパス（`PastaPos.file` / VSCode source.path と一致させる側）。
+    /// `.pasta` 拡張子を持たせて [`super::is_pasta_source`] の BP 翻訳経路を通す。
+    const STEP_PASTA_FILE: &str = "scene_step.pasta";
+
+    /// E1–E8 を 1 本で覆う**素の Lua チャンク**。`.pasta` 行は手組みマップ
+    /// （[`step_scenario_map`]）が与える。行番号（1-origin）と各行の役割:
+    ///
+    /// ```text
+    ///   1: local function helper(x)
+    ///   2:     local hy = x + 1     -- callee: 未対応（step into で通過・E3/9.4）
+    ///   3:     local hz = hy + 1    -- callee: .pasta 30（step into 停止先・E3 / step out 起点）
+    ///   4:     return hz
+    ///   5: end
+    ///   6: local function recur(n)
+    ///   7:     if n > 0 then        -- .pasta 40（再帰: 別フレームで同一 .pasta 行・E5）
+    ///   8:         return recur(n-1)-- .pasta 41（再帰呼び出し）
+    ///   9:     end
+    ///  10:     return 0
+    ///  11: end
+    ///  12: local body = function()
+    ///  13:     local p = 1          -- .pasta 50（コルーチン本体・E7 step 起点）
+    ///  14:     coroutine.yield()    -- .pasta 51（E7: step over で yield を跨ぐ）
+    ///  15:     local q = p + 1      -- .pasta 52（E7: resume 後の停止先）
+    ///  16:     return q
+    ///  17: end
+    ///  18: local a = 1              -- .pasta 10（BP / step over 起点・単一 .lua 行）
+    ///  19: local b = a + 1          -- .pasta 11（E1: 複数 .lua 行へ展開された .pasta 行の 1 本目）
+    ///  20: local c = b + 1          -- .pasta 11（E1: 同一 .pasta 11 の 2 本目 → 消化・9.1）
+    ///  21: local g = c + 1          -- 未対応（通過・E6/9.4）
+    ///  22: local d = helper(c)      -- .pasta 12（E1 step over 停止先 / E2 サブ呼び出し / E3 step into 起点）
+    ///  23: local e = recur(2)       -- .pasta 13（E5 再帰呼び出し / E2 step over 停止先）
+    ///  24: local f = e + 1          -- .pasta 14（E4 step out 停止先 / E5 step over 停止先）
+    ///  25: local co = coroutine.create(body)
+    ///  26: while coroutine.status(co) ~= 'dead' do  -- 駆動ループ（別スレッド・E7 で skip）
+    ///  27:     coroutine.resume(co)
+    ///  28: end
+    ///  29: return f
+    /// ```
+    ///
+    /// E1 の「複数 `.lua` 行を生む `.pasta` 行」は**起点ではなく**行19/20（`.pasta` 11）に
+    /// 置く（起点 `.pasta` 10 は単一 `.lua` 行18）。これにより `.pasta` 行 BP が起点 1 本
+    /// だけを登録し、step over 中に同一 BP 行へ再入して `breakpoint` で再停止する事故を
+    /// 避けつつ、step over が `.pasta` 11 の 2 本（行19/20）を消化することを観測できる。
+    const STEP_CHUNK: &str = "\
+local function helper(x)
+    local hy = x + 1
+    local hz = hy + 1
+    return hz
+end
+local function recur(n)
+    if n > 0 then
+        return recur(n - 1)
+    end
+    return 0
+end
+local body = function()
+    local p = 1
+    coroutine.yield()
+    local q = p + 1
+    return q
+end
+local a = 1
+local b = a + 1
+local c = b + 1
+local g = c + 1
+local d = helper(c)
+local e = recur(2)
+local f = e + 1
+local co = coroutine.create(body)
+while coroutine.status(co) ~= 'dead' do
+    coroutine.resume(co)
+end
+return f
+";
+
+    /// `STEP_CHUNK` の手組み `SourceMap`（task 5.4 unit test と同流儀・
+    /// `ChunkSourceMap::from_forward`）。フック source 名でキーし、map が内部で
+    /// 正規化する（task 3.4）。各 `(lua_line → .pasta line)` は上記コメントの対応表。
+    fn step_scenario_map() -> Arc<SourceMap> {
+        let pp = |line: u32| PastaPos {
+            file: STEP_PASTA_FILE.to_string(),
+            line,
+        };
+        let mut forward: BTreeMap<u32, PastaPos> = BTreeMap::new();
+        // helper 本体（callee）
+        // 行2 は意図的に未対応（step into で通過・E3/9.4）
+        forward.insert(3, pp(30)); // step into 停止先 / step out 起点
+        forward.insert(4, pp(31));
+        // recur 本体（再帰: 別フレームで同一 .pasta 行を踏む・E5）
+        forward.insert(7, pp(40));
+        forward.insert(8, pp(41));
+        forward.insert(10, pp(42));
+        // body（コルーチン本体・E7）
+        forward.insert(13, pp(50));
+        forward.insert(14, pp(51));
+        forward.insert(15, pp(52));
+        forward.insert(16, pp(53));
+        // トップレベル（caller フレーム）
+        forward.insert(18, pp(10)); // BP / step over 起点（単一 .lua 行）
+        forward.insert(19, pp(11)); // E1: .pasta 11 の 1 本目（複数 .lua 行展開）
+        forward.insert(20, pp(11)); // E1: .pasta 11 の 2 本目 → 消化（9.1）
+        // 行21 は意図的に未対応（通過・E6/9.4）
+        forward.insert(22, pp(12)); // E1 停止先 / E2 サブ呼び出し / E3 step into 起点
+        forward.insert(23, pp(13)); // E5 再帰呼び出し / E2 step over 停止先
+        forward.insert(24, pp(14)); // E4 step out 停止先 / E5 step over 停止先
+        forward.insert(29, pp(15));
+
+        let mut sm = SourceMap::new();
+        sm.insert_chunk(
+            STEP_SOURCE.to_string(),
+            STEP_PASTA_FILE.to_string(),
+            ChunkSourceMap::from_forward(forward),
+        );
+        Arc::new(sm)
+    }
+
+    /// E1–E8 の期待座標を **map から導出**した束（ハードコード回避）。`.lua` 行を起点に
+    /// `resolve_lua_to_pasta` で `.pasta` 行を引き、シナリオが要求する関係（同一/異なる/
+    /// 未対応）を build 時に表明する。各テストはこの導出値に対してアサートする。
+    struct Expected {
+        /// BP/step over 起点の `.lua` 行（単一 `.lua` 行）と対応 `.pasta` 行。
+        origin_lua: u32,
+        origin_pasta: u32,
+        /// E1: 複数 `.lua` 行へ展開された `.pasta` 行（行19/20 = 同一 `.pasta`）と、その
+        /// `.lua` 行（1 本目/2 本目）。1 回目 step over の停止先（= 起点の次の異なる
+        /// `.pasta` 行）でもある。
+        multi_pasta: u32,
+        multi_lua_first: u32,
+        multi_lua_second: u32,
+        /// E6: step over がまたぐ未対応 `.lua` 行（停止しない）。
+        unmapped_lua: u32,
+        /// E1 の 2 回目 step over 停止先（`.pasta` 11 を消化＋未対応行通過の次の `.pasta` 行）
+        /// = helper 呼び出し行（E2 サブ呼び出し / E3 step into 起点）と対応 `.pasta` 行。
+        call_helper_lua: u32,
+        call_helper_pasta: u32,
+        /// E3: helper 内の未対応 `.lua` 行（step into で通過）。
+        callee_unmapped_lua: u32,
+        /// E3: helper 内の最初の対応 `.lua` 行（step into 停止先）と `.pasta` 行。
+        callee_first_lua: u32,
+        callee_first_pasta: u32,
+        /// E2/E5: helper / recur 呼び出し行から step over した停止先（呼出元フレームの
+        /// 次の `.pasta` 行 = 再帰呼び出し行）と `.pasta` 行。
+        next_caller_lua: u32,
+        next_caller_pasta: u32,
+        /// E4: step out が呼出元で停止する `.lua` 行と `.pasta` 行（呼出行の次の対応行）。
+        step_out_lua: u32,
+        step_out_pasta: u32,
+        /// E5: 再帰呼び出し行（step over 起点）と `.pasta` 行。
+        recur_call_lua: u32,
+        recur_call_pasta: u32,
+        /// E5: 再帰呼び出し行から step over した停止先（呼出元フレームの次の `.pasta`
+        /// 行 = 行24）と `.pasta` 行。recur 内の同一 `.pasta` 行（40/41）ではない。
+        after_recur_lua: u32,
+        after_recur_pasta: u32,
+        /// E7: コルーチン本体 step 起点（`.pasta` 行）。
+        co_origin_pasta: u32,
+        /// E7: yield 行の `.pasta` 行（first step over の停止先）。
+        co_yield_pasta: u32,
+        /// E7: resume 後の `.pasta` 行（yield をまたぐ step over の停止先）。
+        co_post_yield_pasta: u32,
+    }
+
+    impl Expected {
+        /// map から導出し、シナリオ前提（同一/異なる/未対応）を build 時に表明する。
+        /// `.lua` 行番号は [`STEP_CHUNK`] のコメント対応表に由来する固定アンカーだが、
+        /// `.pasta` 行は全て map から引き、行同士の関係（同一/異なる/未対応）を表明する
+        /// ことで「ハードコードした `.pasta` 行で恒真になる」ことを防ぐ。
+        fn derive(map: &SourceMap) -> Self {
+            let lp = |lua: u32| map.resolve_lua_to_pasta(STEP_SOURCE, lua).map(|p| p.line);
+
+            // 起点（行18）→ 単一 `.lua` 行の `.pasta` 行。
+            let origin_lua = 18;
+            let origin_pasta = lp(origin_lua).expect("起点 `.lua` 18 は対応 `.pasta` を持つ");
+
+            // E1: 行19/20 が同一 `.pasta` 行（複数 `.lua` 行展開）。
+            let multi_lua_first = 19;
+            let multi_lua_second = 20;
+            let multi_pasta = lp(multi_lua_first).expect("行19 は対応 `.pasta` を持つ");
+            assert_eq!(
+                lp(multi_lua_second),
+                Some(multi_pasta),
+                "E1: 行19/20 は同一 `.pasta` 行（複数 `.lua` 行展開・消化対象）"
+            );
+            assert_ne!(
+                multi_pasta, origin_pasta,
+                "E1: 複数 `.lua` の `.pasta` 行は起点の `.pasta` 行と異なる（1 回目 step over の停止先）"
+            );
+
+            // E6: 行21 は未対応（通過対象）。
+            let unmapped_lua = 21;
+            assert_eq!(lp(unmapped_lua), None, "E6: 行21 は未対応（通過する）");
+
+            // E1 の 2 回目 step over 停止先 / E2 サブ呼び出し / E3 step into 起点:
+            // 行22（helper 呼び出し）。`.pasta` は `multi_pasta` と異なる次の行。
+            let call_helper_lua = 22;
+            let call_helper_pasta = lp(call_helper_lua).expect("行22 は helper 呼び出しの対応 `.pasta`");
+            assert_ne!(
+                call_helper_pasta, multi_pasta,
+                "E1: 2 回目 step over 停止先は `.pasta` 11 と異なる次の `.pasta` 行"
+            );
+
+            // E3 step into: helper（行2 未対応 → 行3 対応）。
+            let callee_unmapped_lua = 2;
+            assert_eq!(
+                lp(callee_unmapped_lua),
+                None,
+                "E3: helper 内 行2 は未対応（step into で通過）"
+            );
+            let callee_first_lua = 3;
+            let callee_first_pasta =
+                lp(callee_first_lua).expect("helper 内 行3 は最初の対応 `.pasta`（step into 停止先）");
+
+            // E5 再帰: 呼び出し行23（recur）。recur 内（行7/8）は別フレームで同一 `.pasta`
+            // 行を踏むが、step over は depth で別扱い → 呼出元フレームの次行へ。
+            let recur_call_lua = 23;
+            let recur_call_pasta = lp(recur_call_lua).expect("行23 は再帰呼び出しの対応 `.pasta`");
+            assert_ne!(
+                recur_call_pasta, call_helper_pasta,
+                "E2/E5: 再帰呼び出し行は helper 呼び出し行と異なる `.pasta` 行"
+            );
+            // E5 step over 停止先: 行24（recur 呼び出しの直後の対応行）。
+            let after_recur_lua = 24;
+            let after_recur_pasta = lp(after_recur_lua).expect("行24 は recur 呼び出し直後の対応 `.pasta`");
+            assert_ne!(
+                after_recur_pasta, recur_call_pasta,
+                "E5: 再帰 step over 停止先は recur 呼び出し行と異なる次の `.pasta` 行"
+            );
+            // recur 内の同一 `.pasta` 行（40/41）が誤停止の罠であることを表明（前提）。
+            assert!(
+                lp(7).is_some() && lp(8).is_some(),
+                "E5: recur 本体（行7/8）は対応 `.pasta` 行を持つ（深いフレームの誤停止候補）"
+            );
+
+            // E2: helper 呼び出し行（行22）から step over → 呼出元フレームの次の `.pasta`
+            // 行 = 行23（recur 呼び出し・`.pasta` 13）。helper の `.pasta`（30/31）ではない。
+            let next_caller_lua = recur_call_lua;
+            let next_caller_pasta = recur_call_pasta;
+
+            // E4 step out: helper から戻り、呼出元の次の対応行 = 行23（recur 呼び出し）。
+            // helper 呼び出し行（行22）の直後の対応行であり、呼出行の `.pasta` とは異なる。
+            let step_out_lua = recur_call_lua;
+            let step_out_pasta = recur_call_pasta;
+            assert_ne!(
+                step_out_pasta, call_helper_pasta,
+                "E4: step out 停止先は呼出行の `.pasta` 行と異なる（次の対応行）"
+            );
+
+            // E7 コルーチン: 本体 行13 起点 → 行14 yield → 行15 resume 後。
+            let co_origin_pasta = lp(13).expect("コルーチン本体 行13 の対応 `.pasta`");
+            let co_yield_pasta = lp(14).expect("yield 行14 の対応 `.pasta`");
+            let co_post_yield_pasta = lp(15).expect("resume 後 行15 の対応 `.pasta`");
+            assert!(
+                co_origin_pasta != co_yield_pasta && co_yield_pasta != co_post_yield_pasta,
+                "E7: コルーチンの 3 停止位置は相異なる `.pasta` 行"
+            );
+
+            Expected {
+                origin_lua,
+                origin_pasta,
+                multi_pasta,
+                multi_lua_first,
+                multi_lua_second,
+                unmapped_lua,
+                call_helper_lua,
+                call_helper_pasta,
+                callee_unmapped_lua,
+                callee_first_lua,
+                callee_first_pasta,
+                next_caller_lua,
+                next_caller_pasta,
+                step_out_lua,
+                step_out_pasta,
+                recur_call_lua,
+                recur_call_pasta,
+                after_recur_lua,
+                after_recur_pasta,
+                co_origin_pasta,
+                co_yield_pasta,
+                co_post_yield_pasta,
+            }
+        }
+    }
+
+    /// 実 TCP ソケット越しの最小 DAP クライアント（[`super::tests::DapClient`] と同型）。
+    struct DapClient {
+        reader: BufReader<TcpStream>,
+        writer: TcpStream,
+    }
+
+    impl DapClient {
+        fn connect(addr: SocketAddr) -> Self {
+            let stream = TcpStream::connect(addr).expect("client must connect to the bound port");
+            stream
+                .set_read_timeout(Some(WATCHDOG))
+                .expect("TEST-ONLY read timeout");
+            let writer = stream.try_clone().expect("clone socket for writing");
+            Self {
+                reader: BufReader::new(stream),
+                writer,
+            }
+        }
+
+        fn send_request(&mut self, seq: u64, command: &str, arguments: Value) {
+            let req = json!({
+                "seq": seq,
+                "type": "request",
+                "command": command,
+                "arguments": arguments,
+            });
+            write_frame(&mut self.writer, &req).expect("client write must succeed");
+        }
+
+        fn recv(&mut self) -> Value {
+            read_frame(&mut self.reader)
+                .expect("client read must succeed (TEST-ONLY timeout)")
+                .expect("a frame must be present (peer did not close)")
+        }
+
+        fn recv_until(&mut self, mut pred: impl FnMut(&Value) -> bool) -> Value {
+            loop {
+                let msg = self.recv();
+                if pred(&msg) {
+                    return msg;
+                }
+            }
+        }
+    }
+
+    fn is_event(msg: &Value, name: &str) -> bool {
+        msg["type"] == "event" && msg["event"] == name
+    }
+
+    fn is_response(msg: &Value, command: &str) -> bool {
+        msg["type"] == "response" && msg["command"] == command
+    }
+
+    /// `stackTrace` の top フレーム `line` を返す（task 7.1 [`super::tests::top_frame_line`]
+    /// と同型）。`SourceMode::Pasta` では resolver（task 5.2）が装着済みなので、これは
+    /// **`.pasta` 行**を返す（E1–E7 はこれで `.pasta` 停止位置を観測する）。`Lua` モード
+    /// では `.lua` 行を返す（E8/teeth）。`seq` は stackTrace 要求の相関 seq。
+    fn top_frame_line(client: &mut DapClient, thread_id: u64, seq: u64) -> u32 {
+        client.send_request(seq, "stackTrace", json!({ "threadId": thread_id }));
+        let stack = client.recv_until(|m| is_response(m, "stackTrace"));
+        let frames = stack["body"]["stackFrames"]
+            .as_array()
+            .expect("stackFrames array");
+        assert!(!frames.is_empty(), "stack must have the stopped frame");
+        frames[0]["line"].as_u64().expect("top frame line") as u32
+    }
+
+    /// stackTrace の top フレーム `source.path` が `.pasta` を提示することを表明し、その
+    /// `line`（= `.pasta` 行）を返す。`.pasta` 提示の「歯」を各停止で効かせる
+    /// （resolver/翻訳が無効なら `.lua` チャンク名が出てこのアサートが落ちる）。
+    fn top_pasta_line(client: &mut DapClient, thread_id: u64, seq: u64) -> u32 {
+        client.send_request(seq, "stackTrace", json!({ "threadId": thread_id }));
+        let stack = client.recv_until(|m| is_response(m, "stackTrace"));
+        let frames = stack["body"]["stackFrames"]
+            .as_array()
+            .expect("stackFrames array");
+        assert!(!frames.is_empty(), "stack must have the stopped frame");
+        let top_src = frames[0]["source"]["path"]
+            .as_str()
+            .expect("top frame source path");
+        assert!(
+            top_src.ends_with(".pasta"),
+            "`.pasta` 提示中は top フレームが `.pasta` を提示すること（`.lua` ではない）: {top_src:?}"
+        );
+        frames[0]["line"].as_u64().expect("top frame line") as u32
+    }
+
+    /// VM ホストスレッドの結果を watchdog 内で確認する（ハング無し）。
+    fn join_host(host: std::thread::JoinHandle<Result<(), String>>) {
+        let (done_tx, done_rx) = mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = done_tx.send(host.join());
+        });
+        match done_rx.recv_timeout(WATCHDOG) {
+            Ok(joined) => {
+                joined
+                    .expect("host VM thread must not panic")
+                    .expect("scenario must run to completion");
+            }
+            Err(RecvTimeoutError::Timeout) => {
+                panic!("host VM thread did not finish within the watchdog (hang?)");
+            }
+            Err(RecvTimeoutError::Disconnected) => panic!("join watcher disconnected"),
+        }
+    }
+
+    /// 実 DAP セッションを起動する共通ヘルパ。`STEP_CHUNK` を `STEP_SOURCE` で走らせ、
+    /// `map`＋`mode` で `enable` する。`(host, client, thread_id)` を返す。`bp_pasta_line`
+    /// は最初に張る `.pasta` 行 BP（`pasta_path` が `.pasta` なら BP 翻訳経路を通る）。
+    /// `mode == Lua` のときは `.lua` 行 BP を直接張る（`lua_bp_line` を使う）。
+    ///
+    /// クライアントは initialize→setBreakpoints→configurationDone を済ませ、最初の停止
+    /// （reason breakpoint）まで進めて `thread_id` を確定して返す。
+    #[allow(clippy::too_many_arguments)]
+    fn start_session(
+        map: Arc<SourceMap>,
+        mode: SourceMode,
+        bp_source_path: &str,
+        bp_line: u32,
+    ) -> (std::thread::JoinHandle<Result<(), String>>, DapClient, u64) {
+        let map_for_host = Arc::clone(&map);
+
+        let (addr_tx, addr_rx) = mpsc::channel::<SocketAddr>();
+        let (go_tx, go_rx) = mpsc::channel::<()>();
+
+        let host = std::thread::spawn(move || -> Result<(), String> {
+            let lua = unsafe {
+                mlua::Lua::unsafe_new_with(mlua::StdLib::ALL_SAFE, mlua::LuaOptions::default())
+            };
+
+            let cfg = DebugConfig {
+                enabled: true,
+                listen: Some("127.0.0.1:0".parse().unwrap()),
+                source_mode: mode,
+                ..Default::default()
+            };
+            let handle = enable(&lua, &cfg, Some(map_for_host))
+                .map_err(|e| format!("enable failed: {e}"))?
+                .ok_or_else(|| "enable returned None for an enabled config".to_string())?;
+
+            let addr = handle
+                .local_addr()
+                .ok_or_else(|| "enabled handle must expose a bound addr".to_string())?;
+            addr_tx.send(addr).map_err(|_| "addr send failed".to_string())?;
+
+            go_rx
+                .recv_timeout(WATCHDOG)
+                .map_err(|_| "did not receive go signal before running the VM".to_string())?;
+
+            lua.load(STEP_CHUNK)
+                .set_name(STEP_SOURCE)
+                .exec()
+                .map_err(|e| format!("scenario exec failed: {e}"))?;
+            lua.remove_global_hook();
+            drop(handle);
+            Ok(())
+        });
+
+        let addr = addr_rx
+            .recv_timeout(WATCHDOG)
+            .expect("host must publish the bound addr before the watchdog");
+        let mut client = DapClient::connect(addr);
+
+        // initialize
+        client.send_request(1, "initialize", json!({ "adapterID": "pasta" }));
+        let _ = client.recv_until(|m| is_response(m, "initialize"));
+        let _ = client.recv_until(|m| is_event(m, "initialized"));
+
+        // setBreakpoints: `.pasta` 行 BP は翻訳経路（map+Pasta）で `.lua` へ展開され
+        // verified になる。`.lua` 源（Lua モード）は直接登録。
+        client.send_request(
+            2,
+            "setBreakpoints",
+            json!({
+                "source": { "path": bp_source_path },
+                "breakpoints": [{ "line": bp_line }],
+            }),
+        );
+        let bp_resp = client.recv_until(|m| is_response(m, "setBreakpoints"));
+        let bps = bp_resp["body"]["breakpoints"]
+            .as_array()
+            .expect("breakpoints array");
+        assert_eq!(bps.len(), 1);
+        assert_eq!(bps[0]["verified"], true, "BP は verified で登録される");
+
+        // configurationDone → VM 実行開始
+        client.send_request(3, "configurationDone", json!({}));
+        let _ = client.recv_until(|m| is_response(m, "configurationDone"));
+        go_tx.send(()).expect("send go signal");
+
+        // 最初の停止（reason breakpoint）
+        let stopped = client.recv_until(|m| is_event(m, "stopped"));
+        assert_eq!(
+            stopped["body"]["reason"], "breakpoint",
+            "最初の停止は BP（step 起点）"
+        );
+        let thread_id = stopped["body"]["threadId"].as_u64().expect("threadId");
+
+        (host, client, thread_id)
+    }
+
+    /// `continue` を投げて完走させ、host を join する（停止が再発する行 BP の再入は無いので
+    /// 1 回で `terminated`／完走）。
+    fn continue_to_end(
+        host: std::thread::JoinHandle<Result<(), String>>,
+        client: &mut DapClient,
+        thread_id: u64,
+        seq: u64,
+    ) {
+        client.send_request(seq, "continue", json!({ "threadId": thread_id }));
+        let _ = client.recv_until(|m| is_response(m, "continue"));
+        join_host(host);
+    }
+
+    // =======================================================================
+    // E1（9.1）+ E6（9.4）+ E2（9.1）: step over が、複数 `.lua` 行へ展開された同一
+    // `.pasta` 行を消化し、未対応行を通過し、次の異なる `.pasta` 行で停止する。さらに
+    // サブ呼び出しを含む行（`helper(c)`）からの step over はサブ呼び出しに入らない（E2）。
+    // =======================================================================
+    /// E1（9.1）/ E6（9.4）/ E2（9.1）を 1 セッションで検証する。
+    ///
+    /// - **1 回目 step over**（起点 `.pasta` 10・行18 = 単一 `.lua` 行）→ 次の異なる
+    ///   `.pasta` 行 = `.pasta` 11（行19・複数 `.lua` 行展開の 1 本目）で停止。
+    /// - **E1/E6（2 回目 step over）**: `.pasta` 11（行19）から step over → 行20（**同一
+    ///   `.pasta` 11**・複数 `.lua` 行の 2 本目）を**消化**し、行21（未対応・E6/9.4）を
+    ///   **通過**し、`.pasta` 12（行22）で停止する（**`.pasta` 12**・`.lua` 20/21 ではない）。
+    /// - **E2（3 回目 step over）**: `.pasta` 12（`helper(c)` を**含む**行22）から step over
+    ///   → サブ呼び出し helper（行2/3/4・`.pasta` 30/31）に入らず、呼出元フレームの次の
+    ///   `.pasta` 行 `.pasta` 13（行23）で停止する。
+    #[test]
+    fn e1_e6_e2_step_over_consumes_pasta_line_passes_unmapped_and_skips_sub_call() {
+        let map = step_scenario_map();
+        let exp = Expected::derive(&map);
+
+        let (host, mut client, thread_id) =
+            start_session(Arc::clone(&map), SourceMode::Pasta, STEP_PASTA_FILE, exp.origin_pasta);
+
+        // BP 停止位置は `.pasta` 起点行を提示する（5.1）。
+        assert_eq!(
+            top_pasta_line(&mut client, thread_id, 10),
+            exp.origin_pasta,
+            "BP 停止は `.pasta` 起点行（{}）を提示する",
+            exp.origin_pasta
+        );
+
+        // 1 回目 step over（起点 = 単一 `.lua` 行）→ 複数 `.lua` 行展開の `.pasta` 行（行19）。
+        client.send_request(20, "next", json!({ "threadId": thread_id }));
+        let _ = client.recv_until(|m| is_response(m, "next"));
+        let stopped = client.recv_until(|m| is_event(m, "stopped"));
+        assert_eq!(stopped["body"]["reason"], "step", "1 回目 step over は reason step");
+        assert_eq!(
+            top_pasta_line(&mut client, thread_id, 21),
+            exp.multi_pasta,
+            "1 回目 step over は次の異なる `.pasta` 行 {}（複数 `.lua` 行展開・行{}）で停止する",
+            exp.multi_pasta,
+            exp.multi_lua_first
+        );
+
+        // E1/E6: 2 回目 step over（`.pasta` 11・行19 起点）→ 行20（同一 `.pasta` 11）を消化＋
+        // 行21（未対応）を通過 → 次の異なる `.pasta` 行（`.pasta` 12・行22）で停止。
+        client.send_request(22, "next", json!({ "threadId": thread_id }));
+        let _ = client.recv_until(|m| is_response(m, "next"));
+        let stopped = client.recv_until(|m| is_event(m, "stopped"));
+        assert_eq!(stopped["body"]["reason"], "step", "E1: step over は reason step");
+        assert_eq!(
+            top_pasta_line(&mut client, thread_id, 23),
+            exp.call_helper_pasta,
+            "E1/E6/9.1/9.4: step over は同一 `.pasta` 行の 2 本目（.lua {}）を消化し、未対応行 \
+             （.lua {}）を通過、次の異なる `.pasta` 行 {} で停止する（`.lua` 行ではない）",
+            exp.multi_lua_second,
+            exp.unmapped_lua,
+            exp.call_helper_pasta
+        );
+
+        // E2: 3 回目 step over（`.pasta` 12・helper(c) を含む行22）→ サブ呼び出しに入らず、
+        // 呼出元フレームの次の `.pasta` 行（`.pasta` 13・行23）で停止。
+        client.send_request(24, "next", json!({ "threadId": thread_id }));
+        let _ = client.recv_until(|m| is_response(m, "next"));
+        let _ = client.recv_until(|m| is_event(m, "stopped"));
+        let after_sub = top_pasta_line(&mut client, thread_id, 25);
+        assert_eq!(
+            after_sub, exp.next_caller_pasta,
+            "E2/9.1: サブ呼び出しを含む行から step over は呼び出し先 helper（`.pasta` \
+             30/31）に入らず、次の `.pasta` 行 {}（呼出元フレーム）で停止する",
+            exp.next_caller_pasta
+        );
+        assert_ne!(
+            after_sub, exp.callee_first_pasta,
+            "E2: helper 内の `.pasta` 行（{}）で停止してはならない",
+            exp.callee_first_pasta
+        );
+
+        continue_to_end(host, &mut client, thread_id, 30);
+    }
+
+    // =======================================================================
+    // E3（9.2）+ E4（9.3）: step into で呼び出し先の最初の対応 `.pasta` 行へ、
+    // step out で呼出元の次の対応 `.pasta` 行へ。
+    // =======================================================================
+    /// E3（9.2）/ E4（9.3）を 1 セッションで検証する。
+    ///
+    /// - **E3**: 行22（`helper(c)`・`.pasta` 12）で停止 → step into は helper に入り、
+    ///   未対応の行2 を通過して、helper の最初の対応 `.pasta` 行（行3 = `.pasta` 30）で
+    ///   停止する。
+    /// - **E4**: helper 内（行3）から step out → 呼出元へ戻り、呼出行の `.pasta` 行とは
+    ///   異なる**次の対応 `.pasta` 行**（行23 = `.pasta` 13）で停止する。
+    #[test]
+    fn e3_e4_step_into_first_callee_pasta_line_and_step_out_next_caller_pasta_line() {
+        let map = step_scenario_map();
+        let exp = Expected::derive(&map);
+
+        // 呼び出し行（`.pasta` 12）に BP を張ってそこから step する。
+        let (host, mut client, thread_id) = start_session(
+            Arc::clone(&map),
+            SourceMode::Pasta,
+            STEP_PASTA_FILE,
+            exp.call_helper_pasta,
+        );
+        assert_eq!(
+            top_pasta_line(&mut client, thread_id, 10),
+            exp.call_helper_pasta,
+            "BP 停止は呼び出し行の `.pasta`（{}）",
+            exp.call_helper_pasta
+        );
+
+        // E3: step into（stepIn）→ helper の最初の対応 `.pasta` 行（行3 = `.pasta` 30）。
+        client.send_request(20, "stepIn", json!({ "threadId": thread_id }));
+        let _ = client.recv_until(|m| is_response(m, "stepIn"));
+        let stopped = client.recv_until(|m| is_event(m, "stopped"));
+        assert_eq!(stopped["body"]["reason"], "step", "E3: step into は reason step");
+        assert_eq!(
+            top_pasta_line(&mut client, thread_id, 21),
+            exp.callee_first_pasta,
+            "E3/9.2/9.4: step into は未対応の callee 行（.lua {}）を通過し、helper の最初の \
+             対応 `.pasta` 行 {} で停止する",
+            exp.callee_unmapped_lua,
+            exp.callee_first_pasta
+        );
+
+        // E4: step out（stepOut）→ 呼出元へ戻り、呼出行と異なる次の対応 `.pasta` 行
+        // （行23 = `.pasta` 13）で停止する。
+        client.send_request(30, "stepOut", json!({ "threadId": thread_id }));
+        let _ = client.recv_until(|m| is_response(m, "stepOut"));
+        let stopped = client.recv_until(|m| is_event(m, "stopped"));
+        assert_eq!(stopped["body"]["reason"], "step", "E4: step out は reason step");
+        let out_line = top_pasta_line(&mut client, thread_id, 31);
+        assert_eq!(
+            out_line, exp.step_out_pasta,
+            "E4/9.3: step out は呼出元へ戻り、次の対応 `.pasta` 行 {} で停止する",
+            exp.step_out_pasta
+        );
+        assert_ne!(
+            out_line, exp.call_helper_pasta,
+            "E4: 呼出行の `.pasta` 行（{}）で再停止してはならない（次の対応行へ）",
+            exp.call_helper_pasta
+        );
+
+        continue_to_end(host, &mut client, thread_id, 40);
+    }
+
+    // =======================================================================
+    // E5: 再帰で別フレームの同一 `.pasta` 行に誤停止しない（depth による frame identity）。
+    // =======================================================================
+    /// E5 を検証する。`recur(2)`（行23・`.pasta` 13）から step over すると、recur は
+    /// 自身を再帰呼び出し（行7/8 = `.pasta` 40/41 を**異なる深さのフレームで複数回**踏む）
+    /// するが、step over は base フレームより深いフレームを depth で除外するため、それらの
+    /// 同一 `.pasta` 行に誤停止せず、呼出元フレームの次の `.pasta` 行（行24 = `.pasta` 14）で
+    /// 停止する。
+    #[test]
+    fn e5_recursion_does_not_mis_stop_at_same_pasta_line_in_other_frames() {
+        let map = step_scenario_map();
+        let exp = Expected::derive(&map);
+
+        // 再帰呼び出し行（`.pasta` 13）に BP を張る。
+        let (host, mut client, thread_id) = start_session(
+            Arc::clone(&map),
+            SourceMode::Pasta,
+            STEP_PASTA_FILE,
+            exp.recur_call_pasta,
+        );
+        assert_eq!(
+            top_pasta_line(&mut client, thread_id, 10),
+            exp.recur_call_pasta,
+            "BP 停止は再帰呼び出し行の `.pasta`（{}）",
+            exp.recur_call_pasta
+        );
+
+        // E5: step over → recur の深いフレーム（`.pasta` 40/41 を複数回踏む）に誤停止せず、
+        // 呼出元フレームの次の `.pasta` 行（行24 = `.pasta` 14）で停止する。
+        client.send_request(20, "next", json!({ "threadId": thread_id }));
+        let _ = client.recv_until(|m| is_response(m, "next"));
+        let stopped = client.recv_until(|m| is_event(m, "stopped"));
+        assert_eq!(stopped["body"]["reason"], "step", "E5: step over は reason step");
+        assert_eq!(
+            top_pasta_line(&mut client, thread_id, 21),
+            exp.after_recur_pasta,
+            "E5: 再帰の別フレームで同一 `.pasta` 行（40/41）を踏んでも誤停止せず、呼出元 \
+             フレームの次の `.pasta` 行 {} で停止する（depth による frame identity）",
+            exp.after_recur_pasta
+        );
+
+        continue_to_end(host, &mut client, thread_id, 30);
+    }
+
+    // =======================================================================
+    // E7: コルーチン跨ぎ（yield/resume）の `.pasta` ステップ。
+    // =======================================================================
+    /// E7 を検証する。コルーチン本体内（行13・`.pasta` 50）で停止し、step over は yield 行
+    /// （行14・`.pasta` 51）に到達。さらに step over で `coroutine.yield()` をまたぐと、
+    /// コルーチンは中断し駆動ループ（別スレッド・行25/26）が再 resume するが、それらは
+    /// thread 不一致で skip され、同一コルーチンの resume 後の `.pasta` 行（行15・
+    /// `.pasta` 52）で停止する（step 鍵が yield/resume をまたいで生存・採択B）。
+    #[test]
+    fn e7_pasta_step_over_crosses_coroutine_yield_resume() {
+        let map = step_scenario_map();
+        let exp = Expected::derive(&map);
+
+        // コルーチン本体の起点行（`.pasta` 50）に BP を張る。
+        let (host, mut client, thread_id) = start_session(
+            Arc::clone(&map),
+            SourceMode::Pasta,
+            STEP_PASTA_FILE,
+            exp.co_origin_pasta,
+        );
+        assert_eq!(
+            top_pasta_line(&mut client, thread_id, 10),
+            exp.co_origin_pasta,
+            "BP 停止はコルーチン本体の `.pasta` 起点行（{}）",
+            exp.co_origin_pasta
+        );
+
+        // 1 回目 step over: 同一フレーム次行 = yield 行（`.pasta` 51）。
+        client.send_request(20, "next", json!({ "threadId": thread_id }));
+        let _ = client.recv_until(|m| is_response(m, "next"));
+        let _ = client.recv_until(|m| is_event(m, "stopped"));
+        assert_eq!(
+            top_pasta_line(&mut client, thread_id, 21),
+            exp.co_yield_pasta,
+            "E7: 1 回目 step over は yield 行の `.pasta`（{}）に停止する",
+            exp.co_yield_pasta
+        );
+
+        // 2 回目 step over: `coroutine.yield()` をまたぐ。駆動ループ（別スレッド）を
+        // skip し、resume 後の `.pasta` 行（`.pasta` 52）で停止する（採択B 生存）。
+        client.send_request(30, "next", json!({ "threadId": thread_id }));
+        let _ = client.recv_until(|m| is_response(m, "next"));
+        let stopped = client.recv_until(|m| is_event(m, "stopped"));
+        assert_eq!(stopped["body"]["reason"], "step", "E7: step over は reason step");
+        assert_eq!(
+            top_pasta_line(&mut client, thread_id, 31),
+            exp.co_post_yield_pasta,
+            "E7: yield をまたぐ step over は駆動ループ（別スレッド）を skip し、resume 後の \
+             `.pasta` 行 {} で停止する（step 鍵が yield/resume をまたいで生存）",
+            exp.co_post_yield_pasta
+        );
+
+        continue_to_end(host, &mut client, thread_id, 40);
+    }
+
+    // =======================================================================
+    // E8（9.5）: `.lua` モード回帰 — ステップは `.lua` 行単位（`.pasta` 消化しない）。
+    // =======================================================================
+    /// E8（9.5）を検証する。`SourceMode::Lua`（map は存在するが提示モードが `.lua`）の
+    /// とき、step over は**`.lua` 行単位**で進む。複数 `.lua` 行へ展開された `.pasta` 行の
+    /// 1 本目（行19）で停止 → step over は次の `.lua` 行20（**同一 `.pasta` 11 の 2 本目**）で
+    /// 停止する。`.pasta` 粒度なら行20 を消化して行22（`.pasta` 12）まで進むが、`.lua`
+    /// モードではそうならない。停止位置も `.lua` 座標で提示される。
+    #[test]
+    fn e8_lua_mode_steps_at_lua_granularity_regression() {
+        let map = step_scenario_map();
+        let exp = Expected::derive(&map);
+
+        // Lua モード: 複数 `.lua` 展開行の 1 本目（行19）へ `.lua` 直接 BP を張る（`.pasta`
+        // 翻訳経路は通さない）。`.lua`/`.pasta` 粒度が分岐する行を起点に選ぶ。
+        let lua_source_path = STEP_SOURCE; // `@...`（`.pasta` 拡張子ではない）。
+        let (host, mut client, thread_id) = start_session(
+            Arc::clone(&map),
+            SourceMode::Lua,
+            lua_source_path,
+            exp.multi_lua_first,
+        );
+
+        // `.lua` モードでは stackTrace は `.lua` 座標（`.pasta` ではない）を提示する。
+        assert_eq!(
+            top_frame_line(&mut client, thread_id, 10),
+            exp.multi_lua_first,
+            "E8/9.5: `.lua` モードの停止は `.lua` 行（{}）を提示する",
+            exp.multi_lua_first
+        );
+
+        // E8: step over → 次の `.lua` 行（行20 = 同一 `.pasta` 11 の 2 本目）。`.pasta` 粒度の
+        // ように行20 を消化して行22 まで進んではならない。
+        client.send_request(20, "next", json!({ "threadId": thread_id }));
+        let _ = client.recv_until(|m| is_response(m, "next"));
+        let stopped = client.recv_until(|m| is_event(m, "stopped"));
+        assert_eq!(stopped["body"]["reason"], "step", "E8: step over は reason step");
+        let lua_step_line = top_frame_line(&mut client, thread_id, 21);
+        assert_eq!(
+            lua_step_line, exp.multi_lua_second,
+            "E8/9.5: `.lua` モードは `.lua` 行単位（次行 {} で停止）。`.pasta` 粒度のように \
+             同一 `.pasta` 行（{}）を消化して次の `.pasta` 行まで進んではならない",
+            exp.multi_lua_second, exp.multi_pasta
+        );
+        assert_ne!(
+            lua_step_line, exp.call_helper_lua,
+            "E8: `.pasta` 粒度の停止先（.lua {}）に進んではならない（`.lua` 粒度回帰）",
+            exp.call_helper_lua
+        );
+
+        continue_to_end(host, &mut client, thread_id, 30);
+    }
+
+    // =======================================================================
+    // 「歯」（teeth）: 中核シナリオ（E1）で `.pasta` 粒度を無効化（`SourceMode::Lua`）
+    // すると、停止が `.lua` 行になり `.pasta` 行**ではない**ことを示す。E1 の核心アサート
+    // （`.pasta` 11 の複数 `.lua` 行を消化して `.pasta` 12 で停止）が `.pasta` 粒度に
+    // **真に依存**していることの証左。
+    // =======================================================================
+    /// teeth: E1 の核心と同一の起点（複数 `.lua` 行展開の `.pasta` 11・行19）・操作でも、
+    /// `SourceMode::Lua` では step over の停止が `.lua` 行20（同一 `.pasta` 11 の 2 本目）に
+    /// なり、E1 が期待する `.pasta` 停止位置（`.pasta` 12 = `.lua` 22）には**到達しない**。
+    /// `.pasta` ステップが無効なら E1 のアサートが落ちることの実証。
+    #[test]
+    fn teeth_lua_mode_stops_at_lua_line_not_pasta() {
+        let map = step_scenario_map();
+        let exp = Expected::derive(&map);
+
+        let (host, mut client, thread_id) =
+            start_session(Arc::clone(&map), SourceMode::Lua, STEP_SOURCE, exp.multi_lua_first);
+
+        // E1 と同じ起点（`.pasta` 11・行19）で同じ step over を `.lua` モードで行う。
+        client.send_request(20, "next", json!({ "threadId": thread_id }));
+        let _ = client.recv_until(|m| is_response(m, "next"));
+        let _ = client.recv_until(|m| is_event(m, "stopped"));
+        let lua_step_line = top_frame_line(&mut client, thread_id, 21);
+
+        // teeth: `.lua` 粒度では同一 `.pasta` 行の 2 本目（行20）で止まる（E1 の `.pasta`
+        // 停止 = `.lua` 22 ではない）。つまり E1 の核心アサート（`.pasta` 12）は `.pasta`
+        // 粒度が ON のときだけ通る。
+        assert_eq!(
+            lua_step_line, exp.multi_lua_second,
+            "teeth: `.pasta` 粒度を無効化（Lua モード）すると step over は `.lua` 行 {} で \
+             停止する（E1 の `.pasta` 消化後の停止位置 .lua {} ではない）",
+            exp.multi_lua_second, exp.call_helper_lua
+        );
+        assert_ne!(
+            lua_step_line, exp.call_helper_lua,
+            "teeth: `.pasta` 粒度が OFF なら E1 の停止位置（.lua {}）には到達しない \
+             → E1 のアサートは `.pasta` 粒度に真に依存（恒真ではない）",
+            exp.call_helper_lua
+        );
+
+        continue_to_end(host, &mut client, thread_id, 30);
+    }
+}
+
+#[cfg(test)]
+mod pasta_mode_edge_e2e {
+    //! Task 7.3 — **提示モード切替**（`.lua` モード回帰・requirements **6.2**/**9.5**）と
+    //! **多対多マッピングのエッジケース確定挙動**（requirements **8.1**/**8.2**/**8.3**）の
+    //! **E2E**。
+    //!
+    //! task 7.1 [`super::pasta_bp_e2e`] / 7.2 [`super::pasta_step_e2e`] と同型の
+    //! DAP-over-TCP ハーネス（実 `Arc<SourceMap>`・実 [`enable`](crate::debug::enable)
+    //! セッション）を用い、**手組みの集約 [`SourceMap`]**（`ChunkSourceMap::from_forward`・
+    //! task 5.4 unit test / 7.2 流儀）に **集約行**（複数 `.pasta` 行 → 単一 `.lua` 行・8.1）と
+    //! **展開行**（単一 `.pasta` 行 → 複数 `.lua` 行・8.2）の双方を仕込む。
+    //!
+    //! # 観測する「done」（task 7.3 完了状態）
+    //!
+    //! 1. **`.lua` 提示モード回帰（6.2/9.5）**: 実 DAP `attach sourcePresentation="lua"`
+    //!    （VSCode 等価クライアント経路）で提示モードを `.lua` へ切替えると、BP・停止位置・
+    //!    コールスタックが **`.lua` 座標**（`.pasta` ではない）で提示され、ステップも
+    //!    **`.lua` 行単位**になる（[`mode_switch_lua_presents_lua_coords_and_lua_step_granularity_over_tcp`]）。
+    //!    **歯**: 同一マップ・同一 `.lua` 行を `.pasta` モードで提示すると **`.pasta` 座標**が
+    //!    出ることを併せて表明し、`.lua` モードのアサートが本物（恒真でない）ことを裏づける。
+    //! 2. **8.1 集約 → 確定的単一 `.pasta`**: 複数 `.pasta` 行が集約された単一 `.lua` 行で
+    //!    停止すると、確定的に **単一の** `.pasta` 位置を提示する（last-write-wins・task 3.3）。
+    //!    セッション提示＋マップ直接（`pasta_for_lua` 反復一致）で確定性を表明
+    //!    （[`edge_8_1_aggregated_lua_line_presents_deterministic_single_pasta`]）。
+    //! 3. **8.2 展開 → 同一 `.pasta`**: 単一 `.pasta` 行が展開された複数 `.lua` 行の **いずれ**で
+    //!    停止しても **同一の** `.pasta` 行を提示する
+    //!    （[`edge_8_2_expanded_pasta_line_same_pasta_at_every_lua_line`]）。
+    //! 4. **8.3 提示順安定**: 同一 `.pasta` 位置に対するマッピング（`lua_lines_for_pasta` /
+    //!    `resolve_pasta_to_lua`）の提示順が反復・複数回構築をまたいで **安定（決定的）**
+    //!    （[`edge_8_3_presentation_order_is_stable_deterministic`]）。
+    //!
+    //! `mlua::Lua`（`!Send`）は VM ホストスレッドにのみ生存し、バウンド `SocketAddr`
+    //! （`Copy`）と go/done チャネルだけが越境する。全クライアント待機は TEST-ONLY
+    //! watchdog でバウンドし CI がハングしないようにする（停止コアは無期限）。
+
+    use std::collections::BTreeMap;
+    use std::io::BufReader;
+    use std::net::{SocketAddr, TcpStream};
+    use std::sync::Arc;
+    use std::sync::mpsc::{self, RecvTimeoutError};
+    use std::time::Duration;
+
+    use serde_json::{Value, json};
+
+    use crate::debug::source_map::{ChunkSourceMap, PastaPos, SourceMap};
+    use crate::debug::transport::{read_frame, write_frame};
+    use crate::debug::{DebugConfig, SourceMode, enable};
+
+    /// TEST-ONLY watchdog so CI cannot hang. The stop core is unbounded.
+    const WATCHDOG: Duration = Duration::from_secs(15);
+
+    /// 生成 `.lua` チャンク名（フック source = `set_name` 値）。map のキーと一致させる。
+    const EDGE_SOURCE: &str = "@pasta_mode_edge_e2e_scenario";
+
+    /// `.pasta` ファイルパス（`PastaPos.file` / VSCode source.path と一致させる側）。
+    /// `.pasta` 拡張子で [`super::is_pasta_source`] の BP 翻訳経路を通す。
+    const EDGE_PASTA_FILE: &str = "scene_edge.pasta";
+
+    /// エッジケースを 1 本で覆う **素の Lua チャンク**。`.pasta` 行は手組みマップ
+    /// （[`edge_scenario_map`]）が与える。行番号（1-origin）と各行の役割:
+    ///
+    /// ```text
+    ///   1: local a = 1            -- .pasta 20（集約 `.lua` 行・8.1 / `.lua` モード回帰起点）
+    ///   2: local b = a + 1        -- .pasta 30（展開 `.pasta` 30 の 1 本目・8.2）
+    ///   3: local c = b + 1        -- .pasta 30（展開 `.pasta` 30 の 2 本目・8.2）
+    ///   4: local d = c + 1        -- .pasta 30（展開 `.pasta` 30 の 3 本目・8.2）
+    ///   5: local e = d + 1        -- .pasta 40（展開行の後・異なる `.pasta`）
+    ///   6: return e
+    /// ```
+    ///
+    /// - 行1（`.pasta` 20）は **集約行**: マップ上は単一の `PastaPos`（`.pasta` 20）だが、
+    ///   トランスパイル時に複数の `.pasta` 行（例 19/20）が同一 `.lua` 行へ集約された結果を
+    ///   模す。確定挙動（8.1）は「単一の `.pasta` を確定的に提示」であり、`from_forward` の
+    ///   `BTreeMap<lua_line, PastaPos>` が 1 `.lua` 行 → 高々 1 `.pasta` 位置を構造的に担保する。
+    /// - 行2/3/4（同一 `.pasta` 30）は **展開行**: 単一 `.pasta` 行が複数 `.lua` 行へ展開された
+    ///   ケース（8.2）。いずれの行で停止しても同一 `.pasta` 30 を提示する。
+    const EDGE_CHUNK: &str = "\
+local a = 1
+local b = a + 1
+local c = b + 1
+local d = c + 1
+local e = d + 1
+return e
+";
+
+    /// `EDGE_CHUNK` の手組み `SourceMap`（task 5.4 / 7.2 流儀・`ChunkSourceMap::from_forward`）。
+    /// フック source 名でキーし、map が内部で正規化する（task 3.4）。
+    ///
+    /// - 集約行（8.1）: `.lua` 行1 → `.pasta` 20（単一・確定的）。
+    /// - 展開行（8.2）: `.lua` 行2/3/4 → 同一 `.pasta` 30。
+    /// - 行5 → `.pasta` 40（展開とは異なる `.pasta`・ステップ観測の終端）。
+    fn edge_scenario_map() -> Arc<SourceMap> {
+        let pp = |line: u32| PastaPos {
+            file: EDGE_PASTA_FILE.to_string(),
+            line,
+        };
+        let mut forward: BTreeMap<u32, PastaPos> = BTreeMap::new();
+        forward.insert(1, pp(20)); // 集約 `.lua` 行（8.1）: 単一 `.pasta` 20。
+        forward.insert(2, pp(30)); // 展開（8.2）: `.pasta` 30 の 1 本目。
+        forward.insert(3, pp(30)); // 展開（8.2）: `.pasta` 30 の 2 本目。
+        forward.insert(4, pp(30)); // 展開（8.2）: `.pasta` 30 の 3 本目。
+        forward.insert(5, pp(40)); // 展開後の異なる `.pasta` 行。
+
+        let mut sm = SourceMap::new();
+        sm.insert_chunk(
+            EDGE_SOURCE.to_string(),
+            EDGE_PASTA_FILE.to_string(),
+            ChunkSourceMap::from_forward(forward),
+        );
+        Arc::new(sm)
+    }
+
+    /// 実 TCP ソケット越しの最小 DAP クライアント（[`super::tests::DapClient`] と同型）。
+    struct DapClient {
+        reader: BufReader<TcpStream>,
+        writer: TcpStream,
+    }
+
+    impl DapClient {
+        fn connect(addr: SocketAddr) -> Self {
+            let stream = TcpStream::connect(addr).expect("client must connect to the bound port");
+            stream
+                .set_read_timeout(Some(WATCHDOG))
+                .expect("TEST-ONLY read timeout");
+            let writer = stream.try_clone().expect("clone socket for writing");
+            Self {
+                reader: BufReader::new(stream),
+                writer,
+            }
+        }
+
+        fn send_request(&mut self, seq: u64, command: &str, arguments: Value) {
+            let req = json!({
+                "seq": seq,
+                "type": "request",
+                "command": command,
+                "arguments": arguments,
+            });
+            write_frame(&mut self.writer, &req).expect("client write must succeed");
+        }
+
+        fn recv(&mut self) -> Value {
+            read_frame(&mut self.reader)
+                .expect("client read must succeed (TEST-ONLY timeout)")
+                .expect("a frame must be present (peer did not close)")
+        }
+
+        fn recv_until(&mut self, mut pred: impl FnMut(&Value) -> bool) -> Value {
+            loop {
+                let msg = self.recv();
+                if pred(&msg) {
+                    return msg;
+                }
+            }
+        }
+    }
+
+    fn is_event(msg: &Value, name: &str) -> bool {
+        msg["type"] == "event" && msg["event"] == name
+    }
+
+    fn is_response(msg: &Value, command: &str) -> bool {
+        msg["type"] == "response" && msg["command"] == command
+    }
+
+    /// `stackTrace` の top フレーム `(source.path, line)` を返す（task 7.1/7.2 同型）。
+    /// `.pasta` モードでは resolver（task 5.2）が装着済みなので `.pasta` 座標、`.lua`
+    /// モードでは `.lua` 座標（チャンク名 + `.lua` 行）を返す。
+    fn top_frame(client: &mut DapClient, thread_id: u64, seq: u64) -> (String, u32) {
+        client.send_request(seq, "stackTrace", json!({ "threadId": thread_id }));
+        let stack = client.recv_until(|m| is_response(m, "stackTrace"));
+        let frames = stack["body"]["stackFrames"]
+            .as_array()
+            .expect("stackFrames array");
+        assert!(!frames.is_empty(), "stack must have the stopped frame");
+        let path = frames[0]["source"]["path"]
+            .as_str()
+            .expect("top frame source path")
+            .to_string();
+        let line = frames[0]["line"].as_u64().expect("top frame line") as u32;
+        (path, line)
+    }
+
+    /// VM ホストスレッドの結果を watchdog 内で確認する（ハング無し）。
+    fn join_host(host: std::thread::JoinHandle<Result<(), String>>) {
+        let (done_tx, done_rx) = mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = done_tx.send(host.join());
+        });
+        match done_rx.recv_timeout(WATCHDOG) {
+            Ok(joined) => {
+                joined
+                    .expect("host VM thread must not panic")
+                    .expect("scenario must run to completion");
+            }
+            Err(RecvTimeoutError::Timeout) => {
+                panic!("host VM thread did not finish within the watchdog (hang?)");
+            }
+            Err(RecvTimeoutError::Disconnected) => panic!("join watcher disconnected"),
+        }
+    }
+
+    /// 実 DAP セッションを起動する共通ヘルパ。`EDGE_CHUNK` を `EDGE_SOURCE` で走らせ、
+    /// `map`＋サーバ既定 `mode` で `enable` する。
+    ///
+    /// `attach_mode` が `Some(m)` のとき、initialize 後に実 DAP `attach` リクエスト
+    /// （`sourcePresentation` 付き）を送って提示モードを **クライアント経路で切替える**
+    /// （task 5.5・requirement 6.3）。`None` のときは attach を送らず、サーバ既定 `mode` の
+    /// まま（resolved env > file > 既定）。
+    ///
+    /// その後 setBreakpoints（`bp_source_path` の `bp_line`）→ configurationDone を済ませ、
+    /// 最初の停止（reason breakpoint）まで進めて `thread_id` を確定して返す。
+    fn start_session(
+        map: Arc<SourceMap>,
+        server_mode: SourceMode,
+        attach_mode: Option<SourceMode>,
+        bp_source_path: &str,
+        bp_line: u32,
+    ) -> (std::thread::JoinHandle<Result<(), String>>, DapClient, u64) {
+        let map_for_host = Arc::clone(&map);
+
+        let (addr_tx, addr_rx) = mpsc::channel::<SocketAddr>();
+        let (go_tx, go_rx) = mpsc::channel::<()>();
+
+        let host = std::thread::spawn(move || -> Result<(), String> {
+            let lua = unsafe {
+                mlua::Lua::unsafe_new_with(mlua::StdLib::ALL_SAFE, mlua::LuaOptions::default())
+            };
+
+            let cfg = DebugConfig {
+                enabled: true,
+                listen: Some("127.0.0.1:0".parse().unwrap()),
+                source_mode: server_mode,
+                ..Default::default()
+            };
+            let handle = enable(&lua, &cfg, Some(map_for_host))
+                .map_err(|e| format!("enable failed: {e}"))?
+                .ok_or_else(|| "enable returned None for an enabled config".to_string())?;
+
+            let addr = handle
+                .local_addr()
+                .ok_or_else(|| "enabled handle must expose a bound addr".to_string())?;
+            addr_tx.send(addr).map_err(|_| "addr send failed".to_string())?;
+
+            go_rx
+                .recv_timeout(WATCHDOG)
+                .map_err(|_| "did not receive go signal before running the VM".to_string())?;
+
+            lua.load(EDGE_CHUNK)
+                .set_name(EDGE_SOURCE)
+                .exec()
+                .map_err(|e| format!("scenario exec failed: {e}"))?;
+            lua.remove_global_hook();
+            drop(handle);
+            Ok(())
+        });
+
+        let addr = addr_rx
+            .recv_timeout(WATCHDOG)
+            .expect("host must publish the bound addr before the watchdog");
+        let mut client = DapClient::connect(addr);
+
+        // initialize
+        client.send_request(1, "initialize", json!({ "adapterID": "pasta" }));
+        let _ = client.recv_until(|m| is_response(m, "initialize"));
+        let _ = client.recv_until(|m| is_event(m, "initialized"));
+
+        // attach（任意）: 実クライアント経路で `sourcePresentation` を渡し提示モードを
+        // 切替える（task 5.5 / R6.3）。`attach` 応答が来たら適用済み。
+        if let Some(m) = attach_mode {
+            let presentation = match m {
+                SourceMode::Pasta => "pasta",
+                SourceMode::Lua => "lua",
+            };
+            client.send_request(
+                4,
+                "attach",
+                json!({ "sourcePresentation": presentation }),
+            );
+            let _ = client.recv_until(|m| is_response(m, "attach"));
+        }
+
+        // setBreakpoints: `.pasta` 行 BP は翻訳経路（map+Pasta）で `.lua` へ展開され
+        // verified になる。`.lua` 源（Lua モード）は直接登録。
+        client.send_request(
+            2,
+            "setBreakpoints",
+            json!({
+                "source": { "path": bp_source_path },
+                "breakpoints": [{ "line": bp_line }],
+            }),
+        );
+        let bp_resp = client.recv_until(|m| is_response(m, "setBreakpoints"));
+        let bps = bp_resp["body"]["breakpoints"]
+            .as_array()
+            .expect("breakpoints array");
+        assert_eq!(bps.len(), 1);
+        assert_eq!(bps[0]["verified"], true, "BP は verified で登録される");
+
+        // configurationDone → VM 実行開始
+        client.send_request(3, "configurationDone", json!({}));
+        let _ = client.recv_until(|m| is_response(m, "configurationDone"));
+        go_tx.send(()).expect("send go signal");
+
+        // 最初の停止（reason breakpoint）
+        let stopped = client.recv_until(|m| is_event(m, "stopped"));
+        assert_eq!(
+            stopped["body"]["reason"], "breakpoint",
+            "最初の停止は BP（観測起点）"
+        );
+        let thread_id = stopped["body"]["threadId"].as_u64().expect("threadId");
+
+        (host, client, thread_id)
+    }
+
+    /// `continue` を投げて完走させ、host を join する。
+    ///
+    /// 展開 `.pasta` 行 BP（8.2）は複数 `.lua` 行を登録するため、`continue` 後に同一
+    /// `.pasta` 行 BP の別 `.lua` 行で **再停止**し得る（task 7.1 と同じ多重ヒット挙動）。
+    /// よって `stopped`（再停止 → もう一度 `continue`）／host 完了（`terminated` 相当の
+    /// 決定的シグナル）のいずれかを観測するまでループする。`continue` を送ったら、その
+    /// 後に来る次の制御フレーム（`stopped`／`terminated`）を待つ。再入数で有限（CI 無限
+    /// ループ防止に上限）。
+    fn continue_to_end(
+        host: std::thread::JoinHandle<Result<(), String>>,
+        client: &mut DapClient,
+        thread_id: u64,
+        mut seq: u64,
+    ) {
+        for _ in 0..30u64 {
+            client.send_request(seq, "continue", json!({ "threadId": thread_id }));
+            seq += 1;
+            let next =
+                client.recv_until(|m| is_event(m, "stopped") || is_event(m, "terminated"));
+            if is_event(&next, "terminated") {
+                break;
+            }
+            // それ以外は同一 BP 行（別 `.lua` 行）への再停止 → もう一度 continue。
+        }
+        join_host(host);
+    }
+
+    // =======================================================================
+    // 6.2 / 9.5 — `.lua` 提示モード回帰（実 DAP `attach sourcePresentation="lua"`）。
+    // BP・停止・コールスタックが `.lua` 座標、ステップが `.lua` 行単位。
+    // 「歯」: 同一 `.lua` 行を `.pasta` モードで提示すると `.pasta` 座標になることを
+    // 併せて表明し、`.lua` モードのアサートが本物（恒真でない）ことを裏づける。
+    // =======================================================================
+    /// requirement **6.2**（`.lua` モードで BP・停止位置・コールスタックを `.lua` 座標で
+    /// 提示）/ **9.5**（`.lua` モードのステップは `.lua` 行単位）を、実 DAP-over-TCP
+    /// `attach sourcePresentation="lua"`（VSCode 等価クライアント経路・task 5.5/R6.3）で
+    /// 提示モードを切替えて end-to-end 検証する。
+    ///
+    /// サーバ既定は `.pasta`（map present・6.1）だが、`attach` が `.lua` を **強制**する。
+    /// `.lua` 源（`@...`）への BP を行2（展開 `.pasta` 30 の 1 本目）に張り、停止・
+    /// コールスタックが `.lua` 行2（チャンク名提示）であること、step over が次の `.lua`
+    /// 行3（**同一 `.pasta` 30 の 2 本目**）で止まる（`.pasta` 粒度なら同一 `.pasta` を
+    /// 消化して行5 まで進むがそうならない）ことを表明する。
+    #[test]
+    fn mode_switch_lua_presents_lua_coords_and_lua_step_granularity_over_tcp() {
+        let map = edge_scenario_map();
+
+        // サーバ既定は Pasta（6.1）。attach で `.lua` を強制（R6.3）。BP は `.lua` 源・
+        // 行2（展開 `.pasta` 30 の 1 本目）。`.lua`/`.pasta` 粒度が分岐する行を起点に選ぶ。
+        let lua_bp_line = 2u32;
+        let (host, mut client, thread_id) = start_session(
+            Arc::clone(&map),
+            SourceMode::Pasta,            // サーバ既定（6.1）。
+            Some(SourceMode::Lua),        // attach で `.lua` へ切替（6.2/6.3）。
+            EDGE_SOURCE,                  // `.lua` 源（`@...`・`.pasta` 拡張子ではない）。
+            lua_bp_line,
+        );
+
+        // 6.2: `.lua` モードの停止・コールスタックは `.lua` 座標を提示する（`.pasta`
+        // ではない）。top フレーム source.path はチャンク名（`@...`・`.pasta` で終わらない）、
+        // line は `.lua` 行。
+        let (lua_src, lua_line) = top_frame(&mut client, thread_id, 10);
+        assert!(
+            !lua_src.ends_with(".pasta"),
+            "6.2: `.lua` モードのコールスタックは `.lua` 座標（チャンク名）を提示すること \
+             （`.pasta` ではない）。actual={lua_src:?}"
+        );
+        assert_eq!(
+            crate::debug::source_map::canonicalize_chunk_name(&lua_src),
+            crate::debug::source_map::canonicalize_chunk_name(EDGE_SOURCE),
+            "6.2: `.lua` モードの提示 source は生成 `.lua` チャンク（{EDGE_SOURCE}）"
+        );
+        assert_eq!(
+            lua_line, lua_bp_line,
+            "6.2: `.lua` モードの停止行は `.lua` 行（{lua_bp_line}）。`.pasta` 行（30）ではない"
+        );
+
+        // 9.5: `.lua` モードの step over は `.lua` 行単位。行2 → 行3（同一 `.pasta` 30 の
+        // 2 本目）で停止する。`.pasta` 粒度なら行3/4 を消化して行5（`.pasta` 40）まで
+        // 進むが、`.lua` モードではそうならない。
+        client.send_request(20, "next", json!({ "threadId": thread_id }));
+        let _ = client.recv_until(|m| is_response(m, "next"));
+        let stopped = client.recv_until(|m| is_event(m, "stopped"));
+        assert_eq!(stopped["body"]["reason"], "step", "9.5: step over は reason step");
+        let (step_src, step_line) = top_frame(&mut client, thread_id, 21);
+        assert!(
+            !step_src.ends_with(".pasta"),
+            "9.5: `.lua` モードのステップ後も `.lua` 座標提示。actual={step_src:?}"
+        );
+        assert_eq!(
+            step_line, 3,
+            "9.5: `.lua` モードの step over は次の `.lua` 行（3 = 同一 `.pasta` 30 の 2 本目）で \
+             停止する。`.pasta` 粒度のように同一 `.pasta` 行を消化して `.pasta` 40（.lua 5）まで \
+             進んではならない"
+        );
+        assert_ne!(
+            step_line, 5,
+            "9.5: `.pasta` 粒度の停止先（.lua 5 = `.pasta` 40）に進んではならない（`.lua` 粒度回帰）"
+        );
+
+        continue_to_end(host, &mut client, thread_id, 30);
+    }
+
+    /// 「歯」（6.2 の teeth）: `.lua` モード回帰の核心アサート（`.lua` 座標・`.lua` 粒度）が
+    /// **本物**であることを、同一 map・同一 `.lua` 行2 を **`.pasta` モード**で提示すると
+    /// **`.pasta` 30**（`.lua` 行ではない）が出ることで裏づける。提示モード切替が効いて
+    /// いなければ、`.lua` モードのテストも `.pasta` を提示して落ちるはず。
+    #[test]
+    fn teeth_same_lua_line_in_pasta_mode_presents_pasta_not_lua() {
+        let map = edge_scenario_map();
+
+        // `.pasta` モード（既定・attach なし）。`.pasta` 30（展開行）に BP を張り、最初の
+        // 対応 `.lua` 行（行2）で停止する。
+        let (host, mut client, thread_id) = start_session(
+            Arc::clone(&map),
+            SourceMode::Pasta,
+            None,
+            EDGE_PASTA_FILE,
+            30,
+        );
+
+        // 歯: 同一 `.lua` 行2 が、`.pasta` モードでは `.pasta` 30 を提示する（`.lua` 行
+        // ではない）。`.lua` モードのテストはここが `.lua` 座標に変わることを表明している。
+        let (pasta_src, pasta_line) = top_frame(&mut client, thread_id, 10);
+        assert!(
+            pasta_src.ends_with(".pasta"),
+            "歯: `.pasta` モードは `.pasta` を提示する（`.lua` モードのテストの差分が観測可能）。\
+             actual={pasta_src:?}"
+        );
+        assert_eq!(
+            pasta_line, 30,
+            "歯: `.pasta` モードの提示行は `.pasta` 30（`.lua` 行2 ではない）。`.lua` モードの \
+             テストの `.lua` 座標アサートは恒真でない"
+        );
+
+        continue_to_end(host, &mut client, thread_id, 30);
+    }
+
+    // =======================================================================
+    // 8.1 — 集約行に確定的単一 `.pasta` 提示。複数 `.pasta` 行が集約された単一 `.lua`
+    // 行で停止すると、確定的に単一の `.pasta` 位置を提示する（last-write-wins・3.3）。
+    // =======================================================================
+    /// requirement **8.1**: 複数 `.pasta` 行が同一 `.lua` 行へ集約された場合、当該 `.lua`
+    /// 行の停止について **確定的な単一の `.pasta` 位置**を提示する。
+    ///
+    /// (a) マップ直接: 集約行 `.lua` 行1 の `resolve_lua_to_pasta` は **単一**の `.pasta`
+    ///     位置（20）を返し、反復しても同一（決定的）。`from_forward` の
+    ///     `BTreeMap<lua_line, PastaPos>` が 1 `.lua` 行 → 高々 1 `.pasta` 位置を構造的に
+    ///     担保する（design 286 last-write-wins）。
+    /// (b) セッション提示: 集約 `.lua` 行で停止すると stackTrace の top フレームが その
+    ///     単一 `.pasta` 20 を提示する。
+    #[test]
+    fn edge_8_1_aggregated_lua_line_presents_deterministic_single_pasta() {
+        let map = edge_scenario_map();
+
+        // (a) マップ直接: 集約 `.lua` 行1 → 単一 `.pasta` 20。反復一致（確定的）。
+        let first = map
+            .resolve_lua_to_pasta(EDGE_SOURCE, 1)
+            .expect("集約 `.lua` 行1 は対応 `.pasta` を持つ")
+            .clone();
+        assert_eq!(
+            first.line, 20,
+            "8.1: 集約 `.lua` 行1 の `.pasta` 位置は確定的単一（20・last-write-wins）"
+        );
+        // 反復して同一位置を返す（確定性・8.1）。
+        for _ in 0..8 {
+            let again = map
+                .resolve_lua_to_pasta(EDGE_SOURCE, 1)
+                .expect("集約行は反復しても対応 `.pasta` を持つ");
+            assert_eq!(
+                (&again.file, again.line),
+                (&first.file, first.line),
+                "8.1: 集約行の `.pasta` 位置は反復しても確定的に同一の単一位置"
+            );
+        }
+
+        // (b) セッション提示: `.pasta` 20 に BP を張り、集約 `.lua` 行1 で停止 → top
+        // フレームは単一 `.pasta` 20 を提示する。
+        let (host, mut client, thread_id) = start_session(
+            Arc::clone(&map),
+            SourceMode::Pasta,
+            None,
+            EDGE_PASTA_FILE,
+            20,
+        );
+        let (src, line) = top_frame(&mut client, thread_id, 10);
+        assert!(
+            src.ends_with(".pasta"),
+            "8.1: 集約行の停止は `.pasta` を提示する。actual={src:?}"
+        );
+        assert_eq!(
+            line, 20,
+            "8.1: 集約 `.lua` 行1 の停止は確定的単一の `.pasta` 20 を提示する"
+        );
+
+        continue_to_end(host, &mut client, thread_id, 30);
+    }
+
+    // =======================================================================
+    // 8.2 — 展開行は同一 `.pasta` 提示。単一 `.pasta` 行が複数 `.lua` 行へ展開された
+    // 場合、それら `.lua` 行のいずれで停止しても同一の `.pasta` 行を提示する。
+    // =======================================================================
+    /// requirement **8.2**: 単一 `.pasta` 行（30）が複数 `.lua` 行（2/3/4）へ展開された
+    /// とき、**いずれの `.lua` 行で停止しても**同一の `.pasta` 30 を提示する。
+    ///
+    /// (a) マップ直接: `resolve_lua_to_pasta` が 行2/3/4 すべてで同一 `.pasta` 30 を返す。
+    /// (b) セッション提示: 各展開 `.lua` 行に **`.lua` 直接 BP**（`.lua` 源）を張り、それぞれ
+    ///     `.pasta` モードで停止させて、top フレームが毎回同一 `.pasta` 30 を提示すること
+    ///     を end-to-end で確認する（`.lua` 源 BP でも `.pasta` 提示は resolver が担う）。
+    #[test]
+    fn edge_8_2_expanded_pasta_line_same_pasta_at_every_lua_line() {
+        let map = edge_scenario_map();
+
+        // (a) マップ直接: 展開 `.lua` 行2/3/4 はすべて同一 `.pasta` 30。
+        for lua_line in [2u32, 3, 4] {
+            let pos = map
+                .resolve_lua_to_pasta(EDGE_SOURCE, lua_line)
+                .unwrap_or_else(|| panic!("展開 `.lua` 行{lua_line} は対応 `.pasta` を持つ"));
+            assert_eq!(
+                pos.line, 30,
+                "8.2: 展開 `.lua` 行{lua_line} は単一 `.pasta` 30 へ写像する"
+            );
+        }
+
+        // (b) セッション提示: 各展開 `.lua` 行で停止 → 毎回同一 `.pasta` 30 を提示する。
+        // `.lua` 直接 BP（`.lua` 源）を使い、停止を当該 `.lua` 行に確定させつつ、提示は
+        // `.pasta` モードの resolver（task 5.2）で `.pasta` 30 になることを確認する。
+        for lua_line in [2u32, 3, 4] {
+            let (host, mut client, thread_id) = start_session(
+                Arc::clone(&map),
+                SourceMode::Pasta, // 提示は `.pasta`（resolver 装着）。
+                None,
+                EDGE_SOURCE,       // `.lua` 直接 BP（停止行を当該 `.lua` 行に確定）。
+                lua_line,
+            );
+            let (src, presented) = top_frame(&mut client, thread_id, 10);
+            assert!(
+                src.ends_with(".pasta"),
+                "8.2: 展開 `.lua` 行{lua_line} の停止は `.pasta` を提示する。actual={src:?}"
+            );
+            assert_eq!(
+                presented, 30,
+                "8.2: 展開 `.lua` 行{lua_line} のいずれで停止しても同一 `.pasta` 30 を提示する"
+            );
+            continue_to_end(host, &mut client, thread_id, 30);
+        }
+    }
+
+    // =======================================================================
+    // 8.3 — 提示順安定（決定的）。同一 `.pasta` 位置に対するマッピングの提示順が
+    // 反復・複数回構築をまたいで安定（決定的）。
+    // =======================================================================
+    /// requirement **8.3**: 同一 `.pasta` 位置に対するマッピングの提示順序を安定
+    /// （決定的）に保つ。
+    ///
+    /// (a) `ChunkSourceMap::lua_lines_for_pasta` が展開 `.pasta` 30 に対し `.lua` 行の
+    ///     **昇順**（[2, 3, 4]）を返し、反復しても同一順（決定的）。
+    /// (b) 集約 `SourceMap::resolve_pasta_to_lua` が `.pasta` 30 に対し
+    ///     `(chunk, lua_line)` の決定的順序（チャンク名昇順 → `.lua` 行昇順）を返し、
+    ///     反復しても同一。
+    /// (c) マップを **複数回構築**（`edge_scenario_map` を再呼び出し）しても同一順序
+    ///     （ビルド非依存の決定論）。
+    #[test]
+    fn edge_8_3_presentation_order_is_stable_deterministic() {
+        let map = edge_scenario_map();
+
+        // (a) チャンクレベルの逆引きは `.lua` 行昇順で決定的。反復一致。
+        // チャンクへ直接アクセスはできない（private）ため、集約 `SourceMap` 経由の
+        // 逆引きで順序の安定を確認する（resolve_pasta_to_lua は同一決定的順序を返す）。
+        let baseline: Vec<u32> = map
+            .resolve_pasta_to_lua(EDGE_PASTA_FILE, 30)
+            .into_iter()
+            .map(|(_chunk, lua_line)| lua_line)
+            .collect();
+        assert_eq!(
+            baseline,
+            vec![2, 3, 4],
+            "8.3: 展開 `.pasta` 30 の逆引きは `.lua` 行昇順 [2, 3, 4]（決定的）"
+        );
+
+        // (b) 反復しても完全一致（`(chunk, lua_line)` 列ごと）。
+        let baseline_full = map.resolve_pasta_to_lua(EDGE_PASTA_FILE, 30);
+        for _ in 0..16 {
+            let again = map.resolve_pasta_to_lua(EDGE_PASTA_FILE, 30);
+            assert_eq!(
+                again, baseline_full,
+                "8.3: 同一 `.pasta` 位置の提示順は反復しても安定（決定的）"
+            );
+        }
+
+        // (c) マップを複数回構築しても同一順序（ビルド非依存の決定論）。
+        for _ in 0..4 {
+            let rebuilt = edge_scenario_map();
+            let order: Vec<u32> = rebuilt
+                .resolve_pasta_to_lua(EDGE_PASTA_FILE, 30)
+                .into_iter()
+                .map(|(_chunk, lua_line)| lua_line)
+                .collect();
+            assert_eq!(
+                order, baseline,
+                "8.3: 複数回構築しても提示順は安定（決定的・BTreeMap 由来）"
+            );
+        }
     }
 }

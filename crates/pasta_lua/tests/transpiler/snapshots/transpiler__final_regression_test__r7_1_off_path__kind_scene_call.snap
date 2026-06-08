@@ -1,0 +1,25 @@
+---
+source: crates/pasta_lua/tests/transpiler/final_regression_test.rs
+expression: lua
+---
+local PASTA = require "pasta"
+local GLOBAL = require "pasta.global"
+
+do
+    local SCENE = PASTA.create_scene("メイン")
+
+    function SCENE.__start__(act, ...)
+        local args = { ... }
+        local save, var = act:init_scene(SCENE)
+
+        act.さくら:talk("「サブルーチンを呼びます」")
+        return act:call(SCENE.__global_name__, "サブ", {}, table.unpack(args))
+    end
+
+    function SCENE.サブ_1(act, ...)
+        local args = { ... }
+        local save, var = act:init_scene(SCENE)
+
+        act.うにゅう:talk("「サブルーチンです」")
+    end
+end

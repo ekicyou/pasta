@@ -1,0 +1,26 @@
+---
+source: crates/pasta_lua/tests/transpiler/final_regression_test.rs
+expression: lua
+---
+local PASTA = require "pasta"
+local GLOBAL = require "pasta.global"
+
+do
+    local ACTOR = PASTA.create_actor("さくら")
+    ACTOR:create_word("一人称"):entry("私")
+
+    function ACTOR.時刻(act)
+        return "朝"
+    end
+end
+
+do
+    local SCENE = PASTA.create_scene("メイン")
+
+    function SCENE.__start__(act, ...)
+        local args = { ... }
+        local save, var = act:init_scene(SCENE)
+
+        act.さくら:talk("「テスト」")
+    end
+end

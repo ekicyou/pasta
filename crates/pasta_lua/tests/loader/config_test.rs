@@ -8,6 +8,107 @@ use pasta_lua::loader::{
     default_lua_search_paths,
 };
 
+// ============================================================================
+// Task 4.4 — pasta.toml [debug] 提示モード/サイドカー供給 (requirements 6.3 / 3.2)
+//
+// 設計参照: design.md "SourceMode / DebugConfig"（提示モード合成 precedence
+// attach > env > pasta.toml [debug] > 既定 Pasta）、"SidecarWriter Trigger"
+// （source_map_sidecar を pasta.toml [debug] + env で合成、env>file>既定）。
+//
+// このタスクは pasta.toml `[debug]` の `present_as` / `source_map_sidecar` を
+// パースし、`DebugConfig::resolve` の **ファイル由来値** として供給する配線を
+// 担う（task 4.1 はそれらを None で受けていた）。
+// ============================================================================
+
+use pasta_lua::debug::{DebugConfig, SourceMode};
+use pasta_lua::loader::DebugFileConfig;
+
+/// 6.3: pasta.toml `[debug]` の `present_as = "lua"` がパースされ、env/attach 上書きが
+/// 無い時に `DebugConfig::from_env` 経由で `source_mode == Lua` を解決する。
+#[test]
+fn debug_file_present_as_lua_resolves_to_lua_source_mode() {
+    // 環境変数の汚染を避けるため、ここでは env を読まない経路（from_file）も併用する。
+    let toml_str = r#"
+[debug]
+enabled = true
+present_as = "lua"
+"#;
+    let config = PastaConfig::from_str(toml_str).unwrap();
+    let file: DebugFileConfig = config.debug().expect("[debug] section should parse");
+
+    // ファイル由来の提示モードが resolve に供給され、Lua になる（env/attach 無し）。
+    let resolved = DebugConfig::from_file(Some(&file));
+    assert_eq!(
+        resolved.source_mode,
+        SourceMode::Lua,
+        "6.3: pasta.toml [debug] present_as=\"lua\" must yield source_mode == Lua"
+    );
+}
+
+/// 6.3: `present_as` 省略時（[debug] はあるが present_as 無し）は既定 `.pasta`。
+#[test]
+fn debug_file_present_as_default_is_pasta() {
+    let toml_str = r#"
+[debug]
+enabled = true
+"#;
+    let config = PastaConfig::from_str(toml_str).unwrap();
+    let file: DebugFileConfig = config.debug().expect("[debug] section should parse");
+
+    let resolved = DebugConfig::from_file(Some(&file));
+    assert_eq!(
+        resolved.source_mode,
+        SourceMode::Pasta,
+        "6.1/6.3: omitted present_as must default to .pasta"
+    );
+}
+
+/// 3.2: pasta.toml `[debug]` の `source_map_sidecar = true` がパースされ、resolve で
+/// `source_map_sidecar == true` になる（env 無し）。既定は false。
+#[test]
+fn debug_file_source_map_sidecar_flag_resolves() {
+    let on = PastaConfig::from_str(
+        r#"
+[debug]
+enabled = true
+source_map_sidecar = true
+"#,
+    )
+    .unwrap();
+    let file_on: DebugFileConfig = on.debug().expect("[debug] parse");
+    assert!(
+        DebugConfig::from_file(Some(&file_on)).source_map_sidecar,
+        "3.2: source_map_sidecar=true must yield true"
+    );
+
+    let off = PastaConfig::from_str(
+        r#"
+[debug]
+enabled = true
+"#,
+    )
+    .unwrap();
+    let file_off: DebugFileConfig = off.debug().expect("[debug] parse");
+    assert!(
+        !DebugConfig::from_file(Some(&file_off)).source_map_sidecar,
+        "3.2: omitted source_map_sidecar must default to false"
+    );
+}
+
+/// `DebugFileConfig` の serde 既定: present_as 省略 → None 相当（既定 Pasta へ）、
+/// source_map_sidecar 省略 → false。既存 enabled/port の既定も維持。
+#[test]
+fn debug_file_config_serde_defaults_for_new_fields() {
+    // 空 [debug]（全フィールド既定）。
+    let parsed: DebugFileConfig = toml::from_str("").unwrap();
+    assert!(!parsed.enabled);
+    assert_eq!(parsed.port, 9276);
+    // 新フィールドの既定: from_file 経由で Pasta / sidecar=false に解決される。
+    let resolved = DebugConfig::from_file(Some(&parsed));
+    assert_eq!(resolved.source_mode, SourceMode::Pasta);
+    assert!(!resolved.source_map_sidecar);
+}
+
 #[test]
 fn test_default_config() {
     let config = PastaConfig::default();

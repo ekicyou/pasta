@@ -92,6 +92,7 @@ VSCode から pasta（最終的に .pasta ソースレベル）をステップ�
 - [x] pasta-lua-debug-feasibility -- Rust ホスト型デバッグ方式の go/no-go を最小 PoC で確定（jit.off + set_global_hook の LuaJIT 実発火・フック内ブロッキング停止/再開・フック内変数 inspect）。**判定 = GO+（R1〜R4 全成立・2026-06-07）**。検証コードは feature `lua-debug-poc`（使い捨て・default 無効）。Dependencies: none
 - [x] pasta-vscode-lua-debug -- Rust ホスト型 DAP デバッグバックエンド（std::net + serde_json）で **Lua レベルのデバッグ**（生成 .lua 上で BP/ステップ/変数 inspect・コルーチン inspect・VSCode attach）を本番化＋旧 luasocket 資産撤去＋PoC ハーネス除去（完了条件）。**`.pasta` ソースマップは実現可能性確定（調査＋薄い実証スライス＋設計シーム）まで**を担い、本番化は派生別仕様 pasta-source-map へ分割。Dependencies: pasta-lua-debug-feasibility（**= GO+ 達成済み**・着手可）。**完了 2026-06-08（全8タスク・DoD GO）。`.pasta` ソースマップ実現可能性 = 確定、本番化は pasta-source-map へ申し送り済み**
 
-### 将来仕様（Phase 5 派生・未着手）
-- [ ] pasta-source-map（仮称）-- `.pasta`↔生成 .lua ソースマップの**本番実装**（全 generate_* 網羅・本番マップ出力）と、**`.pasta` 座標でのブレークポイント／コールスタックの常時提示**。pasta-vscode-lua-debug が確定した実現可能性ノート・薄い実証スライス・設計シーム（code_gen 接合点／マップ受け渡し IF／DAP source 取り扱い口）を入力として消費し、`.pasta` ソースレベルのデバッグ体験（Phase 5 の最終目標）を完成させる。Dependencies: pasta-vscode-lua-debug
+### Phase 5 派生
+- [x] pasta-source-map -- `.pasta`↔生成 .lua ソースマップの**本番実装**（全 generate_* 網羅・本番マップ出力）と、**`.pasta` 座標でのブレークポイント／コールスタックの常時提示**。pasta-vscode-lua-debug が確定した実現可能性ノート・薄い実証スライス・設計シーム（code_gen 接合点／マップ受け渡し IF／DAP source 取り扱い口）を入力として消費し、`.pasta` ソースレベルのデバッグ体験（Phase 5 の最終目標）を完成させる。Dependencies: pasta-vscode-lua-debug（**= 完了済み**）。**完了 2026-06-08（全26サブタスク・各独立レビュー APPROVED・機能レベルバリデーション GO・cargo test --all 緑）。`.pasta` 行 BP／`.pasta` 座標停止・コールスタック／`.pasta` 粒度ステップ（コルーチン跨ぎ含む）／提示モード切替／任意サイドカー出力を実 DAP-over-TCP E2E で実証。OFF 経路バイト不変・既存 Lua デバッグ無回帰**
   - 由来: pasta-vscode-lua-debug のギャップ分析で「.pasta ソースマップ本番化は独立した最大級の塊（code_gen 全 generate_* 波及・双方向変換の正確性）」と判断。ユーザー決定（2026-06-07）により分割し、本仕様は Lua レベルのデバッグを出荷コア、.pasta ソースマップは実現可能性確定までを担うと確定
+  - discovery 決定（2026-06-08）: 保持方式 = **メモリ既定＋任意ディスクサイドカー出力**、提示モード = **`.pasta` 既定＋`.pasta`/`.lua` 切替可能**。brief.md 作成済み（`.kiro/specs/pasta-source-map/brief.md`）

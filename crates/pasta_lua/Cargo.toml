@@ -11,13 +11,6 @@ repository.workspace = true
 homepage.workspace = true
 documentation.workspace = true
 
-[features]
-# pasta-source-map-slice: `.pasta`↔生成 `.lua` 行対応の薄い実証スライス（R4.4/R4.5）。
-# default には含めず、`cargo test --features pasta-source-map-slice` でのみ有効化する。
-# 無効時（既定）はスライスのコード・テスト経路を一切コンパイル/露出せず、本番動作へ
-# ゼロコスト（R4.6）。本番品質のソースマップ実装は別仕様 `pasta-source-map` の担当。
-pasta-source-map-slice = []
-
 [dependencies]
 pasta_core.workspace = true
 pasta_dsl.workspace = true

@@ -1,0 +1,17 @@
+---
+source: crates/pasta_lua/tests/transpiler/final_regression_test.rs
+expression: lua
+---
+local PASTA = require "pasta"
+local GLOBAL = require "pasta.global"
+
+do
+    local SCENE = PASTA.create_scene("選択シーン")
+
+    function SCENE.__start__(act, ...)
+        local args = { ... }
+        local save, var = act:init_scene(SCENE)
+
+        act:choice("挨拶", "あいさつする")
+    end
+end

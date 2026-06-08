@@ -202,6 +202,19 @@
                                 "type": "number",
                                 "description": "TCP port the Pasta debug backend is listening on.",
                                 "default": 9276
+                            },
+                            "sourcePresentation": {
+                                "type": "string",
+                                "enum": [
+                                    "pasta",
+                                    "lua"
+                                ],
+                                "enumDescriptions": [
+                                    "Present breakpoints, stops and call stacks in .pasta source coordinates (default).",
+                                    "Present them in the generated .lua coordinates."
+                                ],
+                                "description": "Source presentation mode for this debug session. 'pasta' shows your .pasta lines; 'lua' shows the generated .lua. Forwarded as-is to the backend; omit to use the backend's own setting (env > pasta.toml > default).",
+                                "default": "pasta"
                             }
                         }
                     }

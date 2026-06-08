@@ -71,9 +71,12 @@
 #![allow(dead_code)]
 
 use std::collections::VecDeque;
+use std::sync::Arc;
 
 use serde_json::{Value, json};
 
+use crate::debug::SourceMode;
+use crate::debug::source_map::SourceMap;
 use crate::debug::types::{
     ResolvedBreakpoint, Scope, SessionCommand, SessionEvent, SourceRef, StopReason, ThreadInfo,
     Variable,
@@ -105,11 +108,12 @@ pub struct ResolvedSource {
 /// "既定の提示は生成 .lua").
 ///
 /// This is the DAP-PRESENTATION seam and is deliberately independent of the
-/// code_gen producer seam (`SourceMapSink`). The future `pasta-source-map` spec
-/// connects the two: it builds a `LineMap` via the producer seam (task 5.3 /
-/// downstream) and installs a resolver here that consults that map to present
-/// `.pasta` paths/lines. No `.pasta` mapping is implemented in this layer — only
-/// the swappable口.
+/// code_gen producer seam (`SourceMapSink`). The `pasta-source-map` spec connects
+/// the two: it builds a [`SourceMap`](crate::debug::source_map::SourceMap) via the
+/// producer seam and installs a resolver here (see
+/// [`pasta_source_resolver`]) that consults that map to present `.pasta`
+/// paths/lines. No `.pasta` mapping is implemented in this layer — only the
+/// swappable口.
 pub type SourceResolver = Box<dyn Fn(&str, u32) -> ResolvedSource + Send>;
 
 /// The default [`SourceResolver`]: present the generated `.lua` unchanged.
@@ -120,6 +124,44 @@ pub fn default_source_resolver() -> SourceResolver {
     Box::new(|lua_source: &str, lua_line: u32| ResolvedSource {
         source: json!({ "path": lua_source }),
         line: lua_line,
+    })
+}
+
+/// `.pasta` 提示用の [`SourceResolver`]（task 5.2・R5.1/R5.2/R5.3/R6.2/R3.3）。
+///
+/// 各フレームの生成 `(lua_source, lua_line)` を、集約 [`SourceMap`] の
+/// [`resolve_lua_to_pasta`](SourceMap::resolve_lua_to_pasta) で `.pasta` 位置へ
+/// 写像する（R3.3 双方向変換はマップ経由）:
+///
+/// - `Some(pos)`: `.pasta` `{ path: pos.file, line: pos.line }` を提示する
+///   （停止位置・各コールスタックフレーム＝R5.1/R5.2）。
+/// - `None`: 既定 `.lua` resolver（[`default_source_resolver`]）へ委譲し、生成
+///   `.lua` を **判別可能**に提示する（対応なしフォールバック＝R5.3）。誤った
+///   `.pasta` 対応づけ（mismap）は決して行わない（design "Error Handling"
+///   610/617・整合性エラーも `.lua` フォールバック）。
+///
+/// `lua_source` は **フック報告の生 chunk 名**（`@<絶対 .lua パス>` 想定）であり、
+/// [`SourceMap::resolve_lua_to_pasta`] が内部で
+/// [`canonicalize_chunk_name`](crate::debug::source_map) による正規化を行う
+/// （task 3.4）。したがって本 resolver は `lua_source` を **そのまま**渡す
+/// （二重正規化しない）。
+///
+/// この resolver は提示モード `Pasta`（既定）時に
+/// [`DapAdapter::set_source_resolver`] で装着する。`Lua` 時やマップ未提供時は
+/// 既定 `.lua` resolver のままにする（R6.2・7.2 ゼロ劣化）— 装着判断は wiring 側
+/// の `pasta_active()` ゲートが担う。
+pub fn pasta_source_resolver(map: Arc<SourceMap>) -> SourceResolver {
+    Box::new(move |lua_source: &str, lua_line: u32| {
+        match map.resolve_lua_to_pasta(lua_source, lua_line) {
+            // R5.1 / R5.2: 対応ありフレームは `.pasta` `{path, line}` を提示。
+            Some(pos) => ResolvedSource {
+                source: json!({ "path": pos.file }),
+                line: pos.line,
+            },
+            // R5.3: 対応なし（行ミス／chunk ミス）は既定 `.lua` resolver と同一の
+            // 提示へフォールバック（判別可能・誤マッピング禁止）。
+            None => default_source_resolver()(lua_source, lua_line),
+        }
     })
 }
 
@@ -188,6 +230,13 @@ pub struct Decoded {
     /// Any immediate unsolicited events to emit after the response (the
     /// `initialized` event of the `initialize` handshake).
     pub events: Vec<Value>,
+    /// The `attach` request's explicit `sourcePresentation` override, parsed to a
+    /// [`SourceMode`] — `Some` ONLY when the `attach` arguments carried the key
+    /// (task 5.5 / requirement 6.3 / design 581/586). The socket bridge applies
+    /// it to the current session (resolver + step granularity), overriding the
+    /// `enable`-time resolved env > file > 既定 mode. When the key is ABSENT this
+    /// stays `None` so the resolved mode is kept (NO client-default override).
+    pub attach_source_mode: Option<SourceMode>,
 }
 
 /// Hand-written DAP minimal-subset adapter (design "Transport & DapAdapter").
@@ -314,6 +363,7 @@ impl DapAdapter {
                     command: None,
                     response: Some(response),
                     events: vec![initialized],
+                    attach_source_mode: None,
                 }
             }
             "setBreakpoints" => {
@@ -325,6 +375,7 @@ impl DapAdapter {
                     command: Some(SessionCommand::SetBreakpoints { source, lines }),
                     response: None,
                     events: Vec::new(),
+                    attach_source_mode: None,
                 }
             }
             "configurationDone" => {
@@ -333,6 +384,7 @@ impl DapAdapter {
                     command: None,
                     response: Some(response),
                     events: Vec::new(),
+                    attach_source_mode: None,
                 }
             }
             "threads" => {
@@ -341,6 +393,7 @@ impl DapAdapter {
                     command: Some(SessionCommand::Threads),
                     response: None,
                     events: Vec::new(),
+                    attach_source_mode: None,
                 }
             }
             "stackTrace" => {
@@ -349,6 +402,7 @@ impl DapAdapter {
                     command: Some(SessionCommand::StackTrace),
                     response: None,
                     events: Vec::new(),
+                    attach_source_mode: None,
                 }
             }
             "scopes" => {
@@ -377,6 +431,7 @@ impl DapAdapter {
                     command: Some(SessionCommand::Scopes { frame_id }),
                     response: Some(response),
                     events: Vec::new(),
+                    attach_source_mode: None,
                 }
             }
             "variables" => {
@@ -389,6 +444,7 @@ impl DapAdapter {
                     command: Some(SessionCommand::Variables { var_ref }),
                     response: None,
                     events: Vec::new(),
+                    attach_source_mode: None,
                 }
             }
             "continue" => {
@@ -401,17 +457,42 @@ impl DapAdapter {
                     command: Some(SessionCommand::Continue),
                     response: Some(response),
                     events: Vec::new(),
+                    attach_source_mode: None,
                 }
             }
             "next" => self.step_ack(request_seq, "next", SessionCommand::Next),
             "stepIn" => self.step_ack(request_seq, "stepIn", SessionCommand::StepIn),
             "stepOut" => self.step_ack(request_seq, "stepOut", SessionCommand::StepOut),
+            "attach" => {
+                // The server SIDE of `sourcePresentation` (task 5.5 / requirement
+                // 6.3 / design 581/586): when the client put an explicit
+                // `sourcePresentation` ("pasta"/"lua") on the `attach` arguments,
+                // parse it (highest precedence) so the socket bridge can apply it
+                // to THIS session — switching the `.pasta` resolver presentation
+                // (task 5.2) AND the step granularity (task 5.4). An invalid value
+                // falls back to the default `pasta` with a warning (design 615),
+                // via [`SourceMode::parse`]. When the key is ABSENT, leave the
+                // resolved env > file > 既定 mode in effect (NO client-default
+                // override, design 581) — so `attach_source_mode` stays `None`.
+                let attach_source_mode = args
+                    .and_then(|a| a.get("sourcePresentation"))
+                    .and_then(Value::as_str)
+                    .map(SourceMode::parse);
+                let response = self.response(request_seq, "attach", Value::Null);
+                Decoded {
+                    command: None,
+                    response: Some(response),
+                    events: Vec::new(),
+                    attach_source_mode,
+                }
+            }
             "disconnect" => {
                 let response = self.response(request_seq, "disconnect", Value::Null);
                 Decoded {
                     command: Some(SessionCommand::Disconnect),
                     response: Some(response),
                     events: Vec::new(),
+                    attach_source_mode: None,
                 }
             }
             _ => Decoded::default(),
@@ -426,6 +507,7 @@ impl DapAdapter {
             command: Some(cmd),
             response: Some(response),
             events: Vec::new(),
+            attach_source_mode: None,
         }
     }
 
@@ -987,6 +1069,69 @@ mod tests {
         assert_eq!(decoded, Decoded::default(), "unknown command yields empty decode");
     }
 
+    // --- attach `sourcePresentation` parsing (task 5.5 — R6.3 / design 581/586) ---
+
+    /// R6.3 / design 586: an `attach` request carrying an explicit
+    /// `sourcePresentation` ("lua"/"pasta") is parsed into
+    /// `Decoded.attach_source_mode` (highest precedence) and acked. The server
+    /// applies it to the session (resolver + step granularity) in the wiring.
+    #[test]
+    fn attach_parses_explicit_source_presentation() {
+        for (raw, expected) in [("lua", SourceMode::Lua), ("pasta", SourceMode::Pasta)] {
+            let mut dap = DapAdapter::new();
+            let decoded = dap.decode_request(&request(
+                3,
+                "attach",
+                json!({ "sourcePresentation": raw }),
+            ));
+            assert_eq!(
+                decoded.attach_source_mode,
+                Some(expected),
+                "explicit sourcePresentation={raw:?} must parse to {expected:?} (R6.3)"
+            );
+            // attach is acked immediately (no session command).
+            assert_eq!(decoded.command, None);
+            let resp = decoded.response.expect("attach must ack");
+            assert_eq!(resp["command"], "attach");
+            assert_eq!(resp["request_seq"], 3);
+            assert_eq!(resp["success"], true);
+        }
+    }
+
+    /// design 581: an invalid `sourcePresentation` value still PARSES (the key is
+    /// present) but falls back to the default `pasta` (design 615) — it is NOT
+    /// `None` (the author DID specify presentation, just wrongly).
+    #[test]
+    fn attach_invalid_source_presentation_falls_back_to_pasta() {
+        let mut dap = DapAdapter::new();
+        let decoded = dap.decode_request(&request(
+            3,
+            "attach",
+            json!({ "sourcePresentation": "garbage" }),
+        ));
+        assert_eq!(
+            decoded.attach_source_mode,
+            Some(SourceMode::Pasta),
+            "invalid sourcePresentation → default pasta (design 615)"
+        );
+    }
+
+    /// design 581 (NO client-default override): an `attach` WITHOUT
+    /// `sourcePresentation` leaves `attach_source_mode` `None`, so the server
+    /// keeps the resolved env > file > 既定 mode (a missing arg must NOT override).
+    #[test]
+    fn attach_without_source_presentation_is_none() {
+        let mut dap = DapAdapter::new();
+        let decoded = dap.decode_request(&request(3, "attach", json!({ "host": "127.0.0.1" })));
+        assert_eq!(
+            decoded.attach_source_mode, None,
+            "absent sourcePresentation must NOT override the resolved mode (design 581)"
+        );
+        // Still acked so the client handshake proceeds.
+        let resp = decoded.response.expect("attach must ack even without the arg");
+        assert_eq!(resp["command"], "attach");
+    }
+
     // --- source resolver seam (R4.3) ---------------------------------------
 
     /// DEFAULT resolver: a `stackTrace` response presents each frame's `source`
@@ -1066,5 +1211,124 @@ mod tests {
             }),
             "missing breakpoints array → empty (clears) line set"
         );
+    }
+
+    // --- pasta source resolver (task 5.2 — R5.1 / R5.2 / R5.3 / R6.2 / R3.3) ---
+
+    use std::sync::Arc;
+
+    use crate::debug::source_map::{ChunkSourceMap, PastaPos, SourceMap};
+
+    /// 既知の `chunk → .pasta` 対応を 1 件持つ集約 `SourceMap` を構築する小ヘルパ。
+    ///
+    /// `chunk_name`（生フック源相当）へ、最終 `.lua` 行 `lua_line` → `.pasta`
+    /// `{file, pasta_line}` の 1 対応を登録する。`resolve_lua_to_pasta` は chunk
+    /// 引数を内部で正規化する（task 3.4）ため、テストは生フック source 文字列を
+    /// そのまま渡す。
+    fn map_with(chunk_name: &str, lua_line: u32, file: &str, pasta_line: u32) -> SourceMap {
+        let mut forward = std::collections::BTreeMap::new();
+        forward.insert(
+            lua_line,
+            PastaPos {
+                file: file.to_string(),
+                line: pasta_line,
+            },
+        );
+        let mut sm = SourceMap::new();
+        sm.insert_chunk(
+            chunk_name.to_string(),
+            file.to_string(),
+            ChunkSourceMap::from_forward(forward),
+        );
+        sm
+    }
+
+    /// R5.1 / R5.2 / R3.3: 対応のあるフレームは `.pasta` `{path, line}` を提示する。
+    /// resolver は **生フック source**（`@` 付き・区切り混在）をそのまま
+    /// `resolve_lua_to_pasta` へ渡し、内部正規化（task 3.4）で突合される。
+    #[test]
+    fn pasta_resolver_maps_frame_to_pasta_source_and_line() {
+        // 格納時とは異なる等価形（`@` 付き・大小違い）の生フック source で引く。
+        let raw_hook_source = r"@C:\proj\cache\scene.lua";
+        let map = map_with("C:/proj/cache/scene.lua", 12, "C:/proj/scene.pasta", 7);
+        let resolver = pasta_source_resolver(Arc::new(map));
+
+        let resolved = resolver(raw_hook_source, 12);
+        // 提示は `.pasta` ファイル・行（pos.file / pos.line）。
+        assert_eq!(
+            resolved.source,
+            json!({ "path": "C:/proj/scene.pasta" }),
+            "R5.1/R5.2: 対応ありフレームは `.pasta` パスを提示する"
+        );
+        assert_eq!(resolved.line, 7, "R5.1/R5.2: 提示行は `.pasta` 行 (pos.line)");
+    }
+
+    /// R5.3: 対応の無い `(source, line)` は既定 `.lua` resolver と **完全に同一**の
+    /// 提示（生成 `.lua` の `{path, line}`）へフォールバックし、誤った `.pasta`
+    /// 対応づけ（mismap）を行わない。判別可能（`.pasta` ではなく `.lua`）。
+    #[test]
+    fn pasta_resolver_falls_back_to_lua_for_unmapped() {
+        // chunk は一致するが `.lua` 行 99 は未対応 → フォールバック。
+        let map = map_with("C:/proj/cache/scene.lua", 12, "C:/proj/scene.pasta", 7);
+        let resolver = pasta_source_resolver(Arc::new(map));
+
+        let resolved = resolver(r"@C:\proj\cache\scene.lua", 99);
+        let expected = default_source_resolver()(r"@C:\proj\cache\scene.lua", 99);
+        assert_eq!(
+            resolved, expected,
+            "R5.3: 未対応行は既定 `.lua` resolver と同一の提示へフォールバックする"
+        );
+        // 念のため：誤った `.pasta` ではなく生成 `.lua` source を保持している。
+        assert_eq!(resolved.source, json!({ "path": r"@C:\proj\cache\scene.lua" }));
+        assert_eq!(resolved.line, 99);
+    }
+
+    /// R5.3（整合性エラー・design 610/617）: chunk 名がマップに無い場合も `.lua`
+    /// フォールバック（誤マッピング禁止）。
+    #[test]
+    fn pasta_resolver_falls_back_to_lua_for_unknown_chunk() {
+        let map = map_with("C:/proj/cache/scene.lua", 12, "C:/proj/scene.pasta", 7);
+        let resolver = pasta_source_resolver(Arc::new(map));
+
+        let resolved = resolver("@C:/proj/cache/other.lua", 12);
+        let expected = default_source_resolver()("@C:/proj/cache/other.lua", 12);
+        assert_eq!(
+            resolved, expected,
+            "R5.3: 未知 chunk は `.lua` フォールバック（誤マッピング禁止）"
+        );
+    }
+
+    /// R5.2: `pasta_source_resolver` を装着した `DapAdapter` で `stackTrace` を
+    /// エンコードすると、各フレームが個別に `.pasta`／`.lua` で提示される
+    /// （対応ありは `.pasta`、対応なしは `.lua` フォールバック）。
+    #[test]
+    fn stack_trace_with_pasta_resolver_presents_each_frame() {
+        let map = map_with("C:/proj/cache/scene.lua", 7, "C:/proj/scene.pasta", 3);
+        let mut dap = DapAdapter::new();
+        dap.set_source_resolver(pasta_source_resolver(Arc::new(map)));
+
+        dap.decode_request(&request(11, "stackTrace", json!({ "threadId": 1 })));
+        let out = dap.encode_event(SessionEvent::Stack(vec![
+            // 対応あり（`.lua` 7 → `.pasta` 3）。
+            FrameInfo {
+                source: r"@C:\proj\cache\scene.lua".to_string(),
+                line: 7,
+                func_name: Some("talk".to_string()),
+            },
+            // 対応なし（`.lua` 2 は未登録）→ `.lua` フォールバック。
+            FrameInfo {
+                source: r"@C:\proj\cache\scene.lua".to_string(),
+                line: 2,
+                func_name: None,
+            },
+        ]));
+        let resp = &out[0];
+        let frames = resp["body"]["stackFrames"].as_array().expect("stackFrames array");
+        // フレーム 0: `.pasta` 提示（R5.2）。
+        assert_eq!(frames[0]["source"], json!({ "path": "C:/proj/scene.pasta" }));
+        assert_eq!(frames[0]["line"], 3);
+        // フレーム 1: 対応なし → 生成 `.lua` 提示（R5.3 判別可能フォールバック）。
+        assert_eq!(frames[1]["source"], json!({ "path": r"@C:\proj\cache\scene.lua" }));
+        assert_eq!(frames[1]["line"], 2);
     }
 }

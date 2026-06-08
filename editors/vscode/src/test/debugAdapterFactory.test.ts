@@ -7,7 +7,7 @@
 // (which lives in `debugAdapterFactory.ts`) so it stays node-testable.
 
 import * as assert from 'assert';
-import { resolveAttachTarget, DEFAULT_DEBUG_PORT } from '../debugAttachTarget';
+import { resolveAttachTarget, DEFAULT_DEBUG_PORT, resolveSourcePresentation } from '../debugAttachTarget';
 
 let passed = 0;
 let failed = 0;
@@ -58,6 +58,43 @@ test('resolveAttachTarget coerces a non-string host to a string', () => {
   const target = resolveAttachTarget({ host: 127 as unknown as string, port: 9276 });
   assert.strictEqual(target.host, '127');
   assert.strictEqual(typeof target.host, 'string');
+});
+
+// ---------------------------------------------------------------------------
+// sourcePresentation passthrough (Task 6.2 / requirement 6.3 / design 581/586)
+//
+// CLIENT-side PURE passthrough: the resolver only forwards an EXPLICIT,
+// valid `sourcePresentation` value; it never injects a client default and
+// performs NO `.pasta`<->`.lua` conversion (that is 100% server-side).
+// The forwarded key must match the server's case-sensitive `sourcePresentation`
+// attach-arg key read in `crates/pasta_lua/src/debug/dap.rs`.
+// ---------------------------------------------------------------------------
+
+test('resolveSourcePresentation forwards an explicit "lua" value', () => {
+  assert.strictEqual(resolveSourcePresentation({ sourcePresentation: 'lua' }), 'lua');
+});
+
+test('resolveSourcePresentation forwards an explicit "pasta" value', () => {
+  assert.strictEqual(resolveSourcePresentation({ sourcePresentation: 'pasta' }), 'pasta');
+});
+
+test('resolveSourcePresentation returns undefined when the key is ABSENT (no client default)', () => {
+  // Only-when-explicit (design 581): an unset value must NOT be forced to a
+  // client default so the server falls back to env > file > 既定.
+  assert.strictEqual(resolveSourcePresentation({ host: '1.2.3.4', port: 9276 }), undefined);
+  assert.strictEqual(resolveSourcePresentation({}), undefined);
+});
+
+test('resolveSourcePresentation is case-insensitive on the value (mirrors server SourceMode::parse)', () => {
+  assert.strictEqual(resolveSourcePresentation({ sourcePresentation: 'LUA' }), 'lua');
+  assert.strictEqual(resolveSourcePresentation({ sourcePresentation: 'Pasta' }), 'pasta');
+});
+
+test('resolveSourcePresentation ignores an invalid value (server falls back to default)', () => {
+  // No client conversion: an unrecognised value is dropped so the server's
+  // own fallback (default `pasta` + warning, design 615) decides.
+  assert.strictEqual(resolveSourcePresentation({ sourcePresentation: 'banana' }), undefined);
+  assert.strictEqual(resolveSourcePresentation({ sourcePresentation: 42 as unknown as string }), undefined);
 });
 
 console.log(`\nDebugAdapterFactory: ${passed} passed, ${failed} failed\n`);

@@ -21,6 +21,16 @@ struct CapturingSink {
 }
 
 impl SourceMapSink for CapturingSink {
+    // Core (required) method: capture the direct line mapping. These seam tests
+    // exercise the span-based `record` path (which carries the full span), so
+    // `record_line` synthesizes a line-only span to satisfy the trait contract.
+    fn record_line(&mut self, lua_line: u32, pasta_line: u32) {
+        self.records
+            .push((lua_line, Span::new(pasta_line as usize, 0, pasta_line as usize, 0, 0, 0)));
+    }
+
+    // Override the default sugar to capture the FULL originating span (these tests
+    // assert on the exact span, not just its start line).
     fn record(&mut self, lua_line: u32, span: Span) {
         self.records.push((lua_line, span));
     }

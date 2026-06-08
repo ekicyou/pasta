@@ -52,14 +52,26 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     ///
     /// Local: `var.変数名 = 値`
     /// Global: `save.変数名 = 値`
+    ///
+    /// Source-map wiring (Requirements 1.1, 1.3): records the assignment's `.pasta`
+    /// [`Span`] against the output line(s) it emits, following `generate_action`'s
+    /// `out_line` delta-detection pattern. Every branch emits exactly one line, but
+    /// the delta check makes recording robust to non-emitting paths (e.g. the error
+    /// branch). The `Property` branch delegates to `generate_property_set`, which is
+    /// covered by the same surrounding delta.
     pub fn generate_var_set(&mut self, var_set: &VarSet) -> Result<(), TranspileError> {
+        let out_line_before = self.out_line();
         match &var_set.name {
             Some(name) => {
                 let var_path = match var_set.scope {
                     VarScope::Local => format!("var.{}", name),
                     VarScope::Global => format!("save.{}", name),
                     VarScope::Property => {
-                        return self.generate_property_set(name, &var_set.value);
+                        self.generate_property_set(name, &var_set.value)?;
+                        if self.out_line() > out_line_before {
+                            self.record_span(var_set.span);
+                        }
+                        return Ok(());
                     }
                     VarScope::Args(_) => {
                         // Cannot assign to scene arguments
@@ -81,6 +93,9 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                         "{} = act:get_property({})",
                         var_path, prop_literal
                     ))?;
+                    if self.out_line() > out_line_before {
+                        self.record_span(var_set.span);
+                    }
                     return Ok(());
                 }
 
@@ -112,6 +127,12 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                     }
                 }
             }
+        }
+
+        // Record the (out_line -> span) correspondence for the line just emitted
+        // (Requirement 1.1). Skipped when no line was emitted or no sink is attached.
+        if self.out_line() > out_line_before {
+            self.record_span(var_set.span);
         }
 
         Ok(())
@@ -150,11 +171,16 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// Generates: `act:call("モジュール名", "ラベル名", {}, table.unpack(args))`
     ///
     /// When `is_tail_call` is true, prepends `return` to enable Lua TCO.
+    ///
+    /// Source-map wiring (Requirement 1.1): records the call's `.pasta` [`Span`]
+    /// against the single output line it emits, following `generate_action`'s
+    /// `out_line` delta-detection pattern.
     pub(super) fn generate_call_scene(
         &mut self,
         call_scene: &CallScene,
         is_tail_call: bool,
     ) -> Result<(), TranspileError> {
+        let out_line_before = self.out_line();
         // Generate argument list
         let args_str = if let Some(ref args) = call_scene.args {
             let mut parts = Vec::new();
@@ -205,6 +231,12 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             self.writeln(&format!("return {}", call_stmt))?;
         } else {
             self.writeln(&call_stmt)?;
+        }
+
+        // Record the (out_line -> span) correspondence for the line just emitted
+        // (Requirement 1.1).
+        if self.out_line() > out_line_before {
+            self.record_span(call_scene.span);
         }
 
         Ok(())
@@ -448,10 +480,38 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// Generate code block (Requirement 3f).
     ///
     /// Outputs the code block content directly without transformation.
+    ///
+    /// Source-map wiring (Requirements 1.1, 1.3): the block is emitted one `.lua`
+    /// line per `.pasta` content line (1:1 line correspondence — `content.lines()`
+    /// is each emitted via exactly one `writeln`). Each output line is mapped
+    /// INDIVIDUALLY to its originating `.pasta` line so in-block breakpoints resolve
+    /// precisely, instead of collapsing the whole block onto a single span line.
+    ///
+    /// # Line offset
+    ///
+    /// `block.span.start_line` is the `.pasta` line of the OPENING fence
+    /// (` ```lang `, the `code_open` grammar rule). The block `content`
+    /// (`code_contents`) begins on the line immediately AFTER the fence. Therefore
+    /// content line `offset` (0-based) originates from
+    /// `block.span.start_line + 1 + offset` — a constant `+1` correction for the
+    /// fence line. The closing fence is not part of `content`, so no trailing
+    /// adjustment is needed.
     pub fn generate_code_block(&mut self, block: &CodeBlock) -> Result<(), TranspileError> {
+        // The opening fence occupies `span.start_line`; content starts on the next
+        // line. `+ 1` skips the fence; `+ offset` walks each content line. Only map
+        // when the span is valid, mirroring `record_span`'s guard so default/
+        // synthetic spans (start_line == 0) do not pollute the map.
+        let content_start_line = if block.span.is_valid() {
+            block.span.start_line as u32 + 1
+        } else {
+            0 // sentinel: record_block_line skips pasta_line == 0 (and subsequent)
+        };
         // Output code content with proper indentation
-        for line in block.content.lines() {
+        for (offset, line) in block.content.lines().enumerate() {
             self.writeln(line)?;
+            if content_start_line > 0 {
+                self.record_block_line(content_start_line + offset as u32);
+            }
         }
         Ok(())
     }
@@ -463,6 +523,12 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// The `prefix` includes the full method call syntax, e.g.:
     /// - `PASTA.create_word("key")` for global words (dot syntax)
     /// - `SCENE:create_word("key")` for scene-local words (colon syntax)
+    ///
+    /// Source-map wiring (Requirements 1.1, 1.3): one `.pasta` word definition with
+    /// multiple key names emits one `.lua` line per name; ALL of those output lines
+    /// map to the same definition `.pasta` [`Span`]. Recording happens per emitted
+    /// line (following `generate_action`'s per-line delta pattern), so every line is
+    /// covered, not just the last.
     fn generate_word_definition(
         &mut self,
         word: &KeyWords,
@@ -481,6 +547,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         let entry = values.join(", ");
 
         for name in &word.names {
+            let out_line_before = self.out_line();
             self.writeln(&format!(
                 "{}{}create_word({}):entry({})",
                 receiver,
@@ -488,6 +555,11 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                 StringLiteralizer::literalize(name)?,
                 entry
             ))?;
+            // Map this output line to the word definition's `.pasta` span. Every name
+            // line maps to the same span (Requirement 1.3).
+            if self.out_line() > out_line_before {
+                self.record_span(word.span);
+            }
         }
 
         Ok(())

@@ -425,18 +425,25 @@ impl Default for TalkConfig {
 /// Debug configuration from `[debug]` section in pasta.toml.
 ///
 /// Controls the Rust-hosted DAP debug backend embedded in pasta_lua.
-/// Both fields default conservatively so that omitting the section (or the
+/// All fields default conservatively so that omitting the section (or the
 /// whole file) keeps debugging OFF and the production path zero-cost.
 ///
 /// Runtime resolution combines this file config with the `PASTA_DEBUG` /
-/// `PASTA_DEBUG_PORT` environment variables — see [`crate::debug::DebugConfig`].
+/// `PASTA_DEBUG_PORT` / `PASTA_DEBUG_SOURCE_MODE` /
+/// `PASTA_DEBUG_SOURCE_MAP_SIDECAR` environment variables — see
+/// [`crate::debug::DebugConfig`]. The precedence for the source-presentation
+/// mode is `DAP attach 引数 > env > pasta.toml [debug] > 既定 .pasta`; for the
+/// sidecar flag it is `env > pasta.toml [debug] > 既定 false`
+/// (requirements 6.3 / 3.2).
 ///
 /// # Examples
 ///
 /// ```toml
 /// [debug]
-/// enabled = true   # default: false
-/// port = 9276      # default: 9276
+/// enabled = true            # default: false
+/// port = 9276               # default: 9276
+/// present_as = "lua"        # default: .pasta ("pasta" / "lua", case-insensitive)
+/// source_map_sidecar = true # default: false
 /// ```
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default)]
@@ -446,6 +453,19 @@ pub struct DebugFileConfig {
 
     /// TCP port the DAP listener binds to when enabled. Default: `9276`.
     pub port: u16,
+
+    /// Source presentation mode for the debug session (`"pasta"` / `"lua"`,
+    /// case-insensitive). `None` (the default, when the key is omitted) means
+    /// "not specified by the file" so the env/default decides; an invalid value
+    /// is tolerated by the resolver and falls back to the default `.pasta`
+    /// (requirements 6.1 / 6.3). The string→[`crate::debug::SourceMode`] parse
+    /// happens at resolution time (in `crate::debug`) to avoid a `loader`→`debug`
+    /// dependency cycle here.
+    pub present_as: Option<String>,
+
+    /// Whether to additionally write the on-disk `.lua.map` sidecar (3.2).
+    /// Default: `false`. The in-memory source map is always the primary path.
+    pub source_map_sidecar: bool,
 }
 
 impl Default for DebugFileConfig {
@@ -453,6 +473,8 @@ impl Default for DebugFileConfig {
         Self {
             enabled: false,
             port: default_debug_port(),
+            present_as: None,
+            source_map_sidecar: false,
         }
     }
 }

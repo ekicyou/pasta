@@ -48,7 +48,7 @@ pub mod transpiler;
 pub use code_gen::LuaCodeGenerator;
 pub use config::{LineEnding, TranspilerConfig};
 pub use context::TranspileContext;
-pub use debug::{DebugConfig, DebugError, DebugHandle, enable as enable_debug};
+pub use debug::{DebugConfig, DebugError, DebugHandle, SourceMode, enable as enable_debug};
 pub use encoding::{Encoder, Encoding};
 pub use error::{ConfigError, TranspileError};
 pub use loader::{

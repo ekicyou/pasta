@@ -30,6 +30,8 @@ pub use runtime_config::lua_require;
 pub use runtime_config::RuntimeConfig;
 
 use crate::context::TranspileContext;
+use crate::debug::SourceMode;
+use crate::debug::source_map::SourceMap;
 use crate::loader::{LoaderContext, PastaConfig, TranspileResult};
 use crate::logging::PastaLogger;
 pub(crate) use finalize::register_finalize_scene;
@@ -66,6 +68,17 @@ pub struct PastaLuaRuntime {
     /// `terminated` to any connected client and tears the transport/threads down
     /// non-blockingly.
     debug_handle: Option<crate::debug::DebugHandle>,
+    /// Aggregated `.pasta`↔`.lua` source map held at runtime scope (task 4.4).
+    ///
+    /// `Some` only when debugging was ENABLED at VM init AND the loader built the
+    /// map (after transpile) and handed it to [`with_config`]→[`crate::debug::enable`]
+    /// (requirements 3.1: メモリ内保持 ＋ enable へ到達). The same `Arc` was cloned
+    /// into the debug backend's wiring/session by `enable`; this field keeps a
+    /// runtime-scope clone so the map outlives a single request and is observable
+    /// (e.g. for diagnostics / sidecar). On the disabled (default) zero-cost path
+    /// it is `None` — the loader does not build a map and nothing is held
+    /// (requirements 7.1, byte-invariant).
+    source_map: Option<Arc<SourceMap>>,
 }
 
 impl PastaLuaRuntime {
@@ -102,6 +115,33 @@ impl PastaLuaRuntime {
     /// * `Ok(Self)` - Runtime initialized successfully
     /// * `Err(e)` - Lua VM or module registration failed
     pub fn with_config(context: TranspileContext, config: RuntimeConfig) -> LuaResult<Self> {
+        // No source map on the bare `with_config` entry point: callers that build
+        // the aggregated map (the loader, task 4.4) go through
+        // `with_config_and_source_map`. Passing `None` keeps the existing default
+        // `.lua` behavior (requirements 6.2 / 7.2) for ad-hoc / test runtimes.
+        Self::with_config_and_source_map(context, config, None)
+    }
+
+    /// Like [`with_config`](Self::with_config) but additionally HANDS the
+    /// aggregated `.pasta`↔`.lua` source map to the debug enable choke point
+    /// (task 4.4).
+    ///
+    /// This is the runtime side of the design "runtime/mod.rs 168" handoff: the
+    /// loader builds the aggregated `Arc<SourceMap>` AFTER transpile (only when
+    /// debugging is enabled — task 4.3) and passes it here; this function holds it
+    /// at runtime scope and forwards it to [`crate::debug::enable`] together with
+    /// `config.debug` (which carries the resolved `source_mode`). The order is
+    /// therefore transpile/load → build map → enable-with-map (requirement 3.1).
+    ///
+    /// When `source_map` is `None` (debug disabled, or an ad-hoc runtime), this is
+    /// byte-for-byte the previous behavior: `enable` receives `None`, builds no
+    /// map wiring, and the disabled gate stays zero-cost (requirements 6.2 / 7.1 /
+    /// 7.2).
+    pub(crate) fn with_config_and_source_map(
+        context: TranspileContext,
+        config: RuntimeConfig,
+        source_map: Option<Arc<SourceMap>>,
+    ) -> LuaResult<Self> {
         // Validate configuration and emit warnings
         config.validate_and_warn();
 
@@ -160,8 +200,23 @@ impl PastaLuaRuntime {
         // `BreakpointSet` / transport persist across requests (design
         // "セッションライフサイクル"). `DebugError` (`!Send`-safe, stringified) is
         // mapped to `mlua::Error` at this boundary.
-        let debug_handle = crate::debug::enable(&lua, &config.debug)
+        // Task 4.4: HAND the aggregated `.pasta` source map (built by the loader
+        // AFTER transpile, only when debugging is enabled) to the enable choke
+        // point. `enable` clones the `Arc` into the backend wiring/session when
+        // `config.debug.source_mode == Pasta`; the disabled gate / `Lua` mode /
+        // `None` map keeps the default `.lua` behavior (requirements 6.1 / 6.2 /
+        // 7.2). We keep a runtime-scope clone in `self.source_map` so the held map
+        // outlives a single request (requirement 3.1).
+        let debug_handle = crate::debug::enable(&lua, &config.debug, source_map.clone())
             .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+
+        // Only hold the map when the backend is actually active (debug enabled).
+        // On the disabled zero-cost path nothing is built nor held (7.1).
+        let source_map = if debug_handle.is_some() {
+            source_map
+        } else {
+            None
+        };
 
         Ok(Self {
             lua,
@@ -169,6 +224,7 @@ impl PastaLuaRuntime {
             config: None,
             base_dir: None,
             debug_handle,
+            source_map,
         })
     }
 
@@ -221,6 +277,30 @@ impl PastaLuaRuntime {
     /// Whether the debug backend is active for this runtime (a handle is held).
     pub fn debug_enabled(&self) -> bool {
         self.debug_handle.is_some()
+    }
+
+    /// The aggregated `.pasta`↔`.lua` source map held at runtime scope, or `None`.
+    ///
+    /// `Some` only when debugging was ENABLED at VM init and the loader built and
+    /// handed the map to the enable path (task 4.4 / requirement 3.1). On the
+    /// disabled (default) zero-cost path this is always `None` — no map is built
+    /// (requirement 7.1). The returned `Arc` is a cheap refcount clone of the same
+    /// immutable map the debug backend wiring consumes.
+    pub fn debug_source_map(&self) -> Option<Arc<SourceMap>> {
+        self.source_map.clone()
+    }
+
+    /// The resolved source-presentation mode for the active debug session, or
+    /// `None` when debugging is disabled.
+    ///
+    /// Reflects the precedence `DAP attach 引数 > env > pasta.toml [debug]
+    /// present_as > 既定 .pasta` resolved into `config.debug.source_mode`
+    /// (requirements 6.1 / 6.3). Reads from the held [`crate::debug::DebugHandle`]
+    /// so it mirrors exactly what `enable` was configured with.
+    pub fn debug_source_mode(&self) -> Option<SourceMode> {
+        self.debug_handle
+            .as_ref()
+            .map(|h| h.config().source_mode)
     }
 
     /// Execute a Lua script from a file.
@@ -379,6 +459,10 @@ impl PastaLuaRuntime {
     /// * `pasta_config` - Pasta configuration from pasta.toml
     /// * `logger` - Optional instance-specific logger (Arc-wrapped for sharing)
     /// * `scene_dic_path` - Path to the generated scene_dic.lua (used for backward compatibility check)
+    /// * `source_map` - Optional aggregated `.pasta`↔`.lua` source map built by the
+    ///   loader AFTER transpile, ONLY when debugging is enabled (task 4.3/4.4).
+    ///   `None` on the disabled (default) zero-cost path, where nothing is built or
+    ///   held (requirements 3.1 / 7.1).
     ///
     /// # Returns
     /// * `Ok(Self)` - Runtime initialized and scene_dic loaded
@@ -390,19 +474,24 @@ impl PastaLuaRuntime {
         pasta_config: Option<PastaConfig>,
         logger: Option<Arc<PastaLogger>>,
         _scene_dic_path: &Path,
+        source_map: Option<Arc<SourceMap>>,
     ) -> LuaResult<Self> {
-        // Derive the debug gate BEFORE building the VM (task 4.2): funnel the
-        // pasta.toml `[debug]` section (`PastaConfig::debug()`) plus the
-        // `PASTA_DEBUG`/`PASTA_DEBUG_PORT` environment through the single pure
-        // `DebugConfig::resolve` choke point and attach it to `runtime_config`.
-        // `with_config` then performs the SINGLE `debug::enable` at VM init. When
-        // there is no `[debug]` section (and no env override) this resolves to the
-        // disabled, zero-cost default (R5.2 / R5.5).
+        // Derive the debug gate BEFORE building the VM (task 4.2/4.4): funnel the
+        // pasta.toml `[debug]` section (`PastaConfig::debug()` — now carrying
+        // `present_as`/`source_map_sidecar`, task 4.4) plus the `PASTA_DEBUG*`
+        // environment through the single pure `DebugConfig::resolve` choke point and
+        // attach it to `runtime_config`. `with_config_and_source_map` then performs
+        // the SINGLE `debug::enable` at VM init, HANDING the aggregated source map
+        // (built by the loader after transpile) to it (requirement 3.1 ordering:
+        // transpile → build map → enable-with-map). When there is no `[debug]`
+        // section (and no env override) this resolves to the disabled, zero-cost
+        // default and `source_map` is `None` (R5.2 / R5.5 / 7.1).
         let debug_file = pasta_config.as_ref().and_then(|c| c.debug());
         let runtime_config = runtime_config.with_debug_from_file_and_env(debug_file.as_ref());
 
-        // Create base runtime (installs the debug hook exactly once iff enabled).
-        let mut runtime = Self::with_config(context, runtime_config)?;
+        // Create base runtime (installs the debug hook exactly once iff enabled,
+        // and holds + forwards the source map to enable when present).
+        let mut runtime = Self::with_config_and_source_map(context, runtime_config, source_map)?;
 
         // Set logger if provided
         runtime.logger = logger;
