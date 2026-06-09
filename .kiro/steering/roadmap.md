@@ -107,3 +107,16 @@ VSCode から pasta（最終的に .pasta ソースレベル）をステップ�
 - [x] pasta-source-map -- `.pasta`↔生成 .lua ソースマップの**本番実装**（全 generate_* 網羅・本番マップ出力）と、**`.pasta` 座標でのブレークポイント／コールスタックの常時提示**。pasta-vscode-lua-debug が確定した実現可能性ノート・薄い実証スライス・設計シーム（code_gen 接合点／マップ受け渡し IF／DAP source 取り扱い口）を入力として消費し、`.pasta` ソースレベルのデバッグ体験（Phase 5 の最終目標）を完成させる。Dependencies: pasta-vscode-lua-debug（**= 完了済み**）。**完了 2026-06-08（全26サブタスク・各独立レビュー APPROVED・機能レベルバリデーション GO・cargo test --all 緑）。`.pasta` 行 BP／`.pasta` 座標停止・コールスタック／`.pasta` 粒度ステップ（コルーチン跨ぎ含む）／提示モード切替／任意サイドカー出力を実 DAP-over-TCP E2E で実証。OFF 経路バイト不変・既存 Lua デバッグ無回帰**
   - 由来: pasta-vscode-lua-debug のギャップ分析で「.pasta ソースマップ本番化は独立した最大級の塊（code_gen 全 generate_* 波及・双方向変換の正確性）」と判断。ユーザー決定（2026-06-07）により分割し、本仕様は Lua レベルのデバッグを出荷コア、.pasta ソースマップは実現可能性確定までを担うと確定
   - discovery 決定（2026-06-08）: 保持方式 = **メモリ既定＋任意ディスクサイドカー出力**、提示モード = **`.pasta` 既定＋`.pasta`/`.lua` 切替可能**。brief.md 作成済み（`.kiro/specs/pasta-source-map/brief.md`）
+
+### Phase 5 派生（デバッグ UX 修正・2026-06-08）
+
+pasta-source-map 完成後のユーザー実機検証（2026-06-08）で判明した、`.pasta` ソースレベルデバッグの2つの体験ギャップを解消する。両者は責務の縫い目が独立（#1 = ブレーク制御フロー／#2 = 提示レゾルバ＋VSCode UX）で依存関係なし。並行実装可能。
+
+#### 境界戦略（Phase 5 派生 UX）
+- **分割理由**: #1 は session/breakpoints の停止制御フローの正しさ（回帰テスト駆動・外部 UI 変更なし）、#2 は提示レゾルバの実行時トグル＋DAP カスタムリクエスト＋VSCode 拡張 UI（UX 駆動）。停止する場所と検証方法が根本的に異なる
+- **共有接点**: 両者とも `crates/pasta_lua/src/debug/` を触るが、#1 = `session.rs`/`breakpoints.rs`、#2 = `dap.rs`/`wiring.rs`/`mod.rs`(SourceMode)＋`editors/vscode/` と接触面が分離。`SourceMode::Lua` 時はステップ粒度が `.lua` になり #1 のバグは発生しない（モード直交）
+
+#### Specs (dependency order)
+- [x] pasta-debug-break-coalesce -- F5（Continue）で同一 `.pasta` 行から抜け出せず再ブレークする不具合の修正。1つの `.pasta` 行が複数 `.lua` 行へ展開され、対応する全 `.lua` 行へ BP が登録されるため、Continue 後に同 `.pasta` 行を指す次の `.lua` 行で `should_pause()` が即再ヒットする。`.pasta` 行 BP は「`.pasta` 行訪問ごとに1回だけ」発火し、Continue は次の `.pasta` 行まで残りの `.lua` 行を消化（再ブレーク抑制）するよう停止制御へロジック追加。Dependencies: pasta-source-map（完了済み）
+- [ ] pasta-debug-lua-view-toggle -- `.pasta` 行にブレークを張ったまま、停止時に `.lua` 側コードを提示する「lua 表示モード」を**デバッグ中に実行時トグル**できるようにする。内部の提示モード切替基盤（`SourceMode {Pasta, Lua}`／`pasta_source_resolver`／attach 引数 `sourcePresentation`）は既存。DAP カスタムリクエスト＋VSCode 拡張コマンド/ボタンで `.pasta`⇔`.lua` 提示をセッション中に即切替し、スタックトレース/source 応答へ反映。Dependencies: pasta-source-map（完了済み）
+  - discovery 決定（2026-06-08）: 仕様分割 = **2仕様**、問題2の操作性 = **デバッグ中の実行時トグル**（attach 時固定ではなく、DAP カスタムリクエスト＋VSCode UI による即切替）。brief.md 作成済み（`.kiro/specs/completed/pasta-debug-break-coalesce/brief.md`, `.kiro/specs/pasta-debug-lua-view-toggle/brief.md`）

@@ -6,6 +6,7 @@
 #[path = "../common/mod.rs"]
 mod common;
 
+mod debug_break_coalesce_fixture_test;
 mod debug_integration_test;
 mod encoding_test;
 mod finalize_scene_test;
