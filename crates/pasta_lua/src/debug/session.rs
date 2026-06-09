@@ -196,6 +196,18 @@ pub(crate) struct DebugSession {
     /// baked `source_mode`. Held as a cheap `Arc` clone shared with the
     /// socket-bridge thread, mirroring [`BreakpointSet`].
     shared_mode: Option<crate::debug::SharedSourceMode>,
+    /// The `.pasta` line of the MOST RECENT stop, used to coalesce the breakpoint
+    /// re-hits a single `.pasta` line produces across its many mapped `.lua` lines
+    /// (design "State Management"; requirements 1.1 / 2.1 / 2.2 / 2.4). `None` =
+    /// no anchor (no recent stop / left the anchored line); `Some(p)` = stopped on
+    /// (or resuming from, not yet left) `.pasta` position `p`.
+    ///
+    /// Interior-mutable via `RefCell` with the SAME thread discipline as `mode`:
+    /// the line hook calls `&self` and the session is single-threaded (VM thread),
+    /// so this is race-free without a lock. Maintained / referenced ONLY in
+    /// [`SourceMode::Pasta`] with a `source_map` (task 2 integration); the
+    /// `with_source_map` / `with_shared_mode` injection helpers do NOT touch it.
+    pasta_break_anchor: std::cell::RefCell<Option<PastaPos>>,
 }
 
 impl DebugSession {
@@ -223,6 +235,8 @@ impl DebugSession {
             source_map: None,
             source_mode: SourceMode::default(),
             shared_mode: None,
+            // No anchor at construction (design "State Management": 初期値 = None).
+            pasta_break_anchor: std::cell::RefCell::new(None),
         }
     }
 
@@ -347,6 +361,46 @@ impl DebugSession {
         }
         let map = self.source_map.as_ref()?;
         map.resolve_lua_to_pasta(source, line).cloned()
+    }
+
+    /// Advance the `.pasta` break ANCHOR by one line and report whether the
+    /// current line is suppression-eligible (design "State Management" 175-178,
+    /// "System Flows → アンカーのライフサイクル" 114-122; requirements 1.1 / 2.1 /
+    /// 2.2 / 2.3).
+    ///
+    /// The return value is **suppression-eligibility**: `true` IFF the current
+    /// line sits on the SAME `.pasta` line the session last stopped on (the
+    /// anchor), so a breakpoint hit here should be CONSUMED rather than re-stop
+    /// (this is the `anchor == cur` test — same invariant as
+    /// [`pasta_step_should_stop`](Self::pasta_step_should_stop)'s `origin_pasta ==
+    /// Some(cur)`). Transitions over `(anchor, cur)`:
+    ///
+    /// - `(Some(a), Some(a))` — same `.pasta` line → `true`, anchor UNCHANGED.
+    /// - `(Some(a), Some(b))`, `b != a` — moved to a DIFFERENT mapped `.pasta`
+    ///   line → CLEAR the anchor to `None`, `false` (2.2: leaving the line; the
+    ///   next re-visit re-stops because the anchor is gone).
+    /// - `(_, None)` — the current `.lua` line is `.pasta`-unmapped → `false`,
+    ///   anchor UNCHANGED (2.1: an unmapped line within the SAME `.pasta` line's
+    ///   expansion must NOT falsely clear the anchor).
+    /// - `(None, _)` — no anchor → `false`, anchor UNCHANGED.
+    ///
+    /// The ONLY side effect is clearing on a move to a different `.pasta` line.
+    /// ESTABLISHING the anchor (`*anchor = Some(cur)`) is the CALLER's job at stop
+    /// time (design 178), NOT done here.
+    fn update_break_anchor(&self, cur: Option<&PastaPos>) -> bool {
+        let mut anchor = self.pasta_break_anchor.borrow_mut();
+        match (anchor.as_ref(), cur) {
+            // Same `.pasta` line as the anchor: suppression-eligible, anchor kept.
+            (Some(a), Some(c)) if a == c => true,
+            // Moved to a DIFFERENT mapped `.pasta` line: clear (left the line).
+            (Some(_), Some(_)) => {
+                *anchor = None;
+                false
+            }
+            // Unmapped line (`cur == None`): keep the anchor, not eligible (2.1).
+            // No anchor (`anchor == None`): nothing to suppress.
+            _ => false,
+        }
     }
 
     /// The step-stop decision for [`RunMode::Stepping`] (design
@@ -634,9 +688,43 @@ impl DebugSession {
     fn on_line_impl(&self, lua: &Lua, debug: &Debug) -> mlua::Result<VmState> {
         let (source, line) = Self::source_and_line(debug);
 
+        // `.pasta` break-anchor processing (task 2 / design §State Management
+        // 183-191). ONLY active in `SourceMode::Pasta` WITH a `source_map` — the
+        // single gate that keeps `.lua` mode / no-map / OFF byte-identical to
+        // before (4.1, 4.2, 4.3). Computed ONCE per line so `update_break_anchor`
+        // runs EVERY pasta+map line (this is what guarantees the anchor is CLEARED
+        // when execution leaves the anchored `.pasta` line). `should_pause` is
+        // evaluated only once below — `cur`/`suppress` are computed first.
+        let pasta = self.effective_mode() == SourceMode::Pasta && self.source_map.is_some();
+        let cur = if pasta {
+            self.resolve_current_pasta(&source, line)
+        } else {
+            None
+        };
+        let suppress = if pasta {
+            self.update_break_anchor(cur.as_ref())
+        } else {
+            false
+        };
+
         // Breakpoint-first: a breakpoint ALWAYS stops (reason Breakpoint), even
         // while Stepping — stepping must not mask breakpoints.
         if self.breakpoints.should_pause(&source, line) {
+            // Suppression-eligible (the current line is on the SAME `.pasta` line
+            // the session last stopped on): CONSUME the re-hit — no additional
+            // Stopped event (1.1, 3.2). Returning here escapes the breakpoint-first
+            // branch exactly as a non-matching line would.
+            if suppress {
+                return Ok(VmState::Continue);
+            }
+            // Otherwise this is a genuine stop on a NEW `.pasta` line: ESTABLISH
+            // the anchor at the stop point (the caller's job per design 178) so the
+            // remaining `.lua` lines of THIS `.pasta` line are consumed on the next
+            // Continue. In `.lua` mode / no map (`cur == None`) the anchor is NOT
+            // set → `.lua`-granularity stop (design §State Management 179).
+            if let Some(p) = cur {
+                *self.pasta_break_anchor.borrow_mut() = Some(p);
+            }
             return self.stop_loop(lua, debug, StopReason::Breakpoint, MAIN_THREAD_ID);
         }
 
@@ -2029,6 +2117,382 @@ return d
             line, 7,
             "`.lua` mode must step at `.lua` granularity (stop at line 7), NOT \
              consume to the next `.pasta` line (9.5)"
+        );
+
+        host.cont(SessionCommand::Continue);
+        host.join();
+    }
+
+    // =======================================================================
+    // Task 1 — `.pasta` 行ブレークアンカーの状態機械（フィールド＋遷移ヘルパー）。
+    //
+    // These are PURE unit tests of `update_break_anchor` (no VM): they pin the 4
+    // transitions of the anchor state machine (design §State Management 173-191,
+    // §System Flows アンカーのライフサイクル 114-122) and the equality invariant
+    // that two DIFFERENT `.lua` lines mapping to the SAME `.pasta` line resolve to
+    // an EQUAL `PastaPos` (the precondition for the `anchor == cur` suppression
+    // check; same invariant as `pasta_step_should_stop`'s `origin_pasta ==
+    // Some(cur)`). Requirements 1.1, 2.1, 2.2, 2.3.
+    //
+    // The transition helper may be dead code until Task 2 (on_line_impl
+    // integration); these tests verify it in isolation.
+    // =======================================================================
+
+    /// Build a bare session (no VM, dangling channel ends) for pure anchor-helper
+    /// unit tests. Channels are created and the senders/receivers held by the
+    /// session; the test does not drive them.
+    fn anchor_test_session() -> DebugSession {
+        // The helper under test (`update_break_anchor`) never touches the
+        // channels, so the test-side ends may be dropped immediately.
+        let (_cmd_tx, cmd_rx) = mpsc::channel::<SessionCommand>();
+        let (event_tx, _event_rx) = mpsc::channel::<SessionEvent>();
+        DebugSession::new(BreakpointSet::new(), cmd_rx, event_tx)
+    }
+
+    /// Read the current anchor (test observation of the private state field).
+    fn anchor_of(session: &DebugSession) -> Option<PastaPos> {
+        session.pasta_break_anchor.borrow().clone()
+    }
+
+    /// 初期状態: `new` はアンカー無し（`None`）で開始する。
+    #[test]
+    fn update_break_anchor_initial_is_none() {
+        let session = anchor_test_session();
+        assert_eq!(
+            anchor_of(&session),
+            None,
+            "a fresh session must start with NO anchor (design §State Management)"
+        );
+    }
+
+    /// 遷移1（design 177: `(Some(a), Some(a))` → `true`・不変）:
+    /// アンカー == 現在の `.pasta` 行 → 抑制適格 true、アンカー不変（2.1）。
+    #[test]
+    fn update_break_anchor_same_pasta_line_returns_true_unchanged() {
+        let session = anchor_test_session();
+        *session.pasta_break_anchor.borrow_mut() = Some(ppos(10));
+
+        let cur = ppos(10);
+        let suppress = session.update_break_anchor(Some(&cur));
+
+        assert!(
+            suppress,
+            "same `.pasta` line as the anchor must be suppression-eligible (true)"
+        );
+        assert_eq!(
+            anchor_of(&session),
+            Some(ppos(10)),
+            "the anchor must remain UNCHANGED on the same `.pasta` line"
+        );
+    }
+
+    /// 遷移2（design 177: `(Some(a), Some(b!=a))` → `anchor=None`, `false`）:
+    /// 別の対応 `.pasta` 行へ移動 → 非抑制 false、アンカー解除（2.2）。
+    #[test]
+    fn update_break_anchor_different_pasta_line_clears_returns_false() {
+        let session = anchor_test_session();
+        *session.pasta_break_anchor.borrow_mut() = Some(ppos(10));
+
+        let cur = ppos(11);
+        let suppress = session.update_break_anchor(Some(&cur));
+
+        assert!(
+            !suppress,
+            "a DIFFERENT `.pasta` line must NOT be suppression-eligible (false)"
+        );
+        assert_eq!(
+            anchor_of(&session),
+            None,
+            "moving to a different `.pasta` line must CLEAR the anchor to None (2.2)"
+        );
+    }
+
+    /// 遷移3（design 178: `(_, None)` → `false`・不変）:
+    /// 未対応行（`cur==None`）→ 非抑制 false、アンカー不変（同一展開内の未対応行で
+    /// 誤解除しない・2.1）。
+    #[test]
+    fn update_break_anchor_unmapped_line_returns_false_unchanged() {
+        let session = anchor_test_session();
+        *session.pasta_break_anchor.borrow_mut() = Some(ppos(10));
+
+        let suppress = session.update_break_anchor(None);
+
+        assert!(
+            !suppress,
+            "an unmapped (`None`) line must NOT be suppression-eligible (false)"
+        );
+        assert_eq!(
+            anchor_of(&session),
+            Some(ppos(10)),
+            "an unmapped line must keep the anchor UNCHANGED (no false clear, 2.1)"
+        );
+    }
+
+    /// 遷移4（design 178: `(None, Some)` → `false`・不変）:
+    /// アンカー無し起点 → 非抑制 false、アンカー不変（確立は呼び出し側の責務）。
+    #[test]
+    fn update_break_anchor_no_anchor_returns_false_unchanged() {
+        let session = anchor_test_session();
+        assert_eq!(anchor_of(&session), None, "precondition: no anchor");
+
+        let cur = ppos(10);
+        let suppress = session.update_break_anchor(Some(&cur));
+
+        assert!(
+            !suppress,
+            "with NO anchor the line must NOT be suppression-eligible (false)"
+        );
+        assert_eq!(
+            anchor_of(&session),
+            None,
+            "the helper must NOT establish the anchor — that is the CALLER's job \
+             at stop time (design 178)"
+        );
+    }
+
+    /// 等価不変条件（design Testing Strategy §Unit Tests, line 207 / 1.1, 2.1）:
+    /// 同一 `.pasta` 行へマップする2つの DIFFERENT `.lua` 行に対し
+    /// `resolve_current_pasta` が EQUAL な `PastaPos`（同一 file・同一 line）を返す。
+    /// これがアンカー抑制 `anchor == cur` の前提（既存 `pasta_step_should_stop` の
+    /// `origin_pasta == Some(cur)` と同一不変条件）。
+    #[test]
+    fn two_lua_lines_for_same_pasta_line_resolve_equal_pastapos() {
+        // Build a map where two DIFFERENT `.lua` lines (20, 21) both map to the
+        // SAME `.pasta` line (10) — the multi-to-one expansion (8.2).
+        let mut forward: BTreeMap<u32, PastaPos> = BTreeMap::new();
+        forward.insert(20, ppos(10));
+        forward.insert(21, ppos(10));
+        let mut sm = SourceMap::new();
+        sm.insert_chunk(
+            PASTA_SOURCE.to_string(),
+            "scene.pasta".to_string(),
+            ChunkSourceMap::from_forward(forward),
+        );
+        let map = Arc::new(sm);
+
+        let (_cmd_tx, cmd_rx) = mpsc::channel::<SessionCommand>();
+        let (event_tx, _event_rx) = mpsc::channel::<SessionEvent>();
+        let session = DebugSession::new(BreakpointSet::new(), cmd_rx, event_tx)
+            .with_source_map(Some(map), SourceMode::Pasta);
+
+        let a = session
+            .resolve_current_pasta(PASTA_SOURCE, 20)
+            .expect("lua line 20 must map to a `.pasta` position");
+        let b = session
+            .resolve_current_pasta(PASTA_SOURCE, 21)
+            .expect("lua line 21 must map to a `.pasta` position");
+
+        assert_eq!(
+            a, b,
+            "two DIFFERENT `.lua` lines mapping to the SAME `.pasta` line must \
+             resolve to EQUAL `PastaPos` (file + line) — the `anchor == cur` \
+             suppression precondition (1.1, 2.1)"
+        );
+        assert_eq!(a, ppos(10), "both must resolve to the shared `.pasta` line 10");
+    }
+
+    /// `with_source_map` / `with_shared_mode` MUST NOT touch the anchor state
+    /// (design File Structure Plan line 90: 「`with_source_map`/`with_shared_mode`
+    /// は不変」). The anchor stays `None` through both injections.
+    #[test]
+    fn injection_helpers_do_not_touch_anchor() {
+        let (_cmd_tx, cmd_rx) = mpsc::channel::<SessionCommand>();
+        let (event_tx, _event_rx) = mpsc::channel::<SessionEvent>();
+        let session = DebugSession::new(BreakpointSet::new(), cmd_rx, event_tx)
+            .with_source_map(Some(Arc::new(SourceMap::new())), SourceMode::Pasta)
+            .with_shared_mode(None);
+
+        assert_eq!(
+            anchor_of(&session),
+            None,
+            "with_source_map / with_shared_mode must leave the anchor as None \
+             (design File Structure Plan: 「不変」)"
+        );
+    }
+
+    // =======================================================================
+    // Task 2 — 行フック判定への統合（再ブレーク消化の本体）。
+    //
+    // Session-level (host-thread) aggregates over `on_line_impl`:
+    //   - the BUG fix: a `.pasta`-line breakpoint registered on MULTIPLE mapped
+    //     `.lua` lines stops ONCE; one Continue does NOT re-stop on the SAME
+    //     `.pasta` line but advances to the next mapped stop point (1.1–1.3,
+    //     2.4, 3.1, 3.2, 5.2);
+    //   - loop re-visit re-stops (2.2);
+    //   - the gating invariant: `.lua` mode + no source map keep the existing
+    //     `.lua`-granularity behavior unchanged (4.1, 4.2).
+    // =======================================================================
+
+    /// 1.1 / 1.2 / 2.4 / 3.2 / 5.2 (the bug fix): `.pasta` line 10 maps to BOTH
+    /// `.lua` lines 6 AND 7 (`pasta_scenario_map`). With a breakpoint on BOTH (and
+    /// on line 9 = `.pasta` 11, a DIFFERENT line), the session must stop ONCE on
+    /// `.pasta` 10 (at line 6), and a single Continue must NOT re-stop on line 7
+    /// (same `.pasta` 10 — consumed) but advance to line 9 (`.pasta` 11).
+    ///
+    /// BEFORE the integration this FAILS: line 7's breakpoint re-stops on the same
+    /// `.pasta` line 10 (the user cannot escape the line with one Continue).
+    #[test]
+    fn continue_escapes_pasta_line_with_breakpoints_on_multiple_mapped_lua_lines() {
+        let breakpoints = BreakpointSet::new();
+        // BP on BOTH `.lua` lines mapping to `.pasta` 10 (lines 6, 7) AND on
+        // line 9 (`.pasta` 11, the next DIFFERENT `.pasta` line).
+        breakpoints.set_breakpoints(&SourceRef::new(PASTA_SOURCE), &[6, 7, 9]);
+        let mut host = start_step_host_with_map(
+            breakpoints,
+            PASTA_CHUNK,
+            PASTA_SOURCE,
+            Some(pasta_scenario_map()),
+            SourceMode::Pasta,
+        );
+
+        // First (and only) stop on `.pasta` 10: at line 6, reason Breakpoint (2.4,
+        // 3.1).
+        let (reason, line) = host.recv_stop();
+        assert_eq!(reason, StopReason::Breakpoint);
+        assert_eq!(line, 6, "must stop once on `.pasta` 10 at line 6 (2.4)");
+
+        // One Continue must ESCAPE `.pasta` 10: line 7 (same `.pasta` 10) is
+        // consumed (no extra Stopped event — 3.2), line 8 (unmapped) is passed,
+        // and the next stop is line 9 (`.pasta` 11) — NOT line 7 (1.1, 1.2, 5.2).
+        host.cont(SessionCommand::Continue);
+        let (reason, line) = host.recv_stop();
+        assert_eq!(
+            reason,
+            StopReason::Breakpoint,
+            "the next stop after escaping `.pasta` 10 is a Breakpoint (3.1)"
+        );
+        assert_eq!(
+            line, 9,
+            "one Continue must escape `.pasta` 10: line 7 (same `.pasta` 10) is \
+             consumed and the next stop is line 9 (`.pasta` 11) — NOT a re-stop on \
+             line 7 (1.1, 1.2, 5.2)"
+        );
+
+        host.cont(SessionCommand::Continue);
+        host.join();
+    }
+
+    /// 2.2 (loop re-visit re-stops): a `.pasta` line visited again via a loop must
+    /// re-stop on the new visit. The loop body line maps to one `.pasta` line; a
+    /// DIFFERENT `.pasta` line inside the loop clears the anchor each turn, so the
+    /// breakpoint fires once PER visit.
+    #[test]
+    fn loop_revisit_restops_on_same_pasta_line() {
+        // Chunk: a 3-iteration loop. Lines (1-origin):
+        //   1: local s = 0
+        //   2: for i = 1, 3 do        <- loop header
+        //   3:     s = s + i          <- `.pasta` 50 (BREAKPOINT — once per visit)
+        //   4:     s = s + 0          <- `.pasta` 51 (DIFFERENT — clears the anchor)
+        //   5: end
+        //   6: return s
+        const LOOP_SOURCE: &str = "@pasta_loop_scenario";
+        const LOOP_CHUNK: &str = "\
+local s = 0
+for i = 1, 3 do
+    s = s + i
+    s = s + 0
+end
+return s
+";
+        let mut forward: BTreeMap<u32, PastaPos> = BTreeMap::new();
+        forward.insert(3, PastaPos { file: "loop.pasta".to_string(), line: 50 });
+        forward.insert(4, PastaPos { file: "loop.pasta".to_string(), line: 51 });
+        let mut sm = SourceMap::new();
+        sm.insert_chunk(
+            LOOP_SOURCE.to_string(),
+            "loop.pasta".to_string(),
+            ChunkSourceMap::from_forward(forward),
+        );
+
+        let breakpoints = BreakpointSet::new();
+        breakpoints.set_breakpoints(&SourceRef::new(LOOP_SOURCE), &[3]);
+        let mut host = start_step_host_with_map(
+            breakpoints,
+            LOOP_CHUNK,
+            LOOP_SOURCE,
+            Some(Arc::new(sm)),
+            SourceMode::Pasta,
+        );
+
+        // The breakpoint on `.pasta` 50 (line 3) must fire ONCE PER loop iteration
+        // (3 visits) — the anchor is cleared by line 4 (`.pasta` 51) each turn (2.2).
+        for visit in 1..=3 {
+            let (reason, line) = host.recv_stop();
+            assert_eq!(reason, StopReason::Breakpoint);
+            assert_eq!(
+                line, 3,
+                "loop visit {visit} must re-stop on `.pasta` 50 (line 3) (2.2)"
+            );
+            host.cont(SessionCommand::Continue);
+        }
+
+        host.join();
+    }
+
+    /// 4.1 (`.lua` mode unchanged): with `SourceMode::Lua` AND a map present, the
+    /// breakpoint-first path keeps `.lua` granularity — NO `.pasta` aggregation.
+    /// A breakpoint on BOTH `.lua` lines 6 and 7 (which map to the SAME `.pasta`
+    /// line 10) stops on EACH (line 6, then on Continue line 7) — the anchor is
+    /// never touched in `.lua` mode.
+    #[test]
+    fn lua_mode_does_not_coalesce_breakpoints_even_with_map() {
+        let breakpoints = BreakpointSet::new();
+        breakpoints.set_breakpoints(&SourceRef::new(PASTA_SOURCE), &[6, 7]);
+        let mut host = start_step_host_with_map(
+            breakpoints,
+            PASTA_CHUNK,
+            PASTA_SOURCE,
+            Some(pasta_scenario_map()),
+            SourceMode::Lua,
+        );
+
+        let (reason, line) = host.recv_stop();
+        assert_eq!(reason, StopReason::Breakpoint);
+        assert_eq!(line, 6, "first stop at line 6");
+
+        // In `.lua` mode the SAME-`.pasta`-line line 7 is NOT coalesced: it
+        // re-stops at `.lua` granularity (4.1 — aggregation does not apply).
+        host.cont(SessionCommand::Continue);
+        let (reason, line) = host.recv_stop();
+        assert_eq!(reason, StopReason::Breakpoint);
+        assert_eq!(
+            line, 7,
+            "`.lua` mode must stop at EACH `.lua` line (7), NOT coalesce by \
+             `.pasta` line (4.1)"
+        );
+
+        host.cont(SessionCommand::Continue);
+        host.join();
+    }
+
+    /// 4.2 (no source map → existing behavior unchanged): with `SourceMode::Pasta`
+    /// but NO map, the anchor path is inert (`source_map.is_some()` is false) — the
+    /// breakpoint-first path is byte-identical to before. A breakpoint on lines 6
+    /// and 7 stops on EACH, exactly as the pre-spec `.lua`-granularity behavior.
+    #[test]
+    fn no_source_map_keeps_existing_breakpoint_behavior() {
+        let breakpoints = BreakpointSet::new();
+        breakpoints.set_breakpoints(&SourceRef::new(PASTA_SOURCE), &[6, 7]);
+        // Pasta mode but NO map → gating disables the anchor (4.2).
+        let mut host = start_step_host_with_map(
+            breakpoints,
+            PASTA_CHUNK,
+            PASTA_SOURCE,
+            None,
+            SourceMode::Pasta,
+        );
+
+        let (reason, line) = host.recv_stop();
+        assert_eq!(reason, StopReason::Breakpoint);
+        assert_eq!(line, 6, "first stop at line 6");
+
+        host.cont(SessionCommand::Continue);
+        let (reason, line) = host.recv_stop();
+        assert_eq!(reason, StopReason::Breakpoint);
+        assert_eq!(
+            line, 7,
+            "with no source map the breakpoint path is unchanged: stop on EACH \
+             `.lua` line (4.2)"
         );
 
         host.cont(SessionCommand::Continue);

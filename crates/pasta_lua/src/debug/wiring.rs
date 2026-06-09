@@ -3842,3 +3842,728 @@ return e
         }
     }
 }
+
+#[cfg(test)]
+mod pasta_break_coalesce_e2e {
+    //! Task 3.2 — 多対1 Continue の実 DAP-over-TCP E2E
+    //! (spec: `pasta-debug-break-coalesce`, requirements **1.1** / **1.2** / **3.2** / **6.2(a)**).
+    //!
+    //! # 観測する「done」
+    //!
+    //! 1つの `.pasta` 行が複数の `.lua` 行へ展開される（多対1）構成で、その `.pasta` 行へ
+    //! BP を張って停止させ、**1回だけ** `continue` を送ると、実行は **次の `.pasta` 行**
+    //! （次の停止点）へ進み、**同一 `.pasta` 行に対する 2 回目の `stopped` は来ない**こと
+    //! を実ソケットで証明する。これが design "System Flows" / "Testing Strategy →
+    //! Integration / E2E（multi-to-one Continue）" のシナリオであり、fix（`session.rs`
+    //! `on_line_impl` の break-anchor coalescing）が無ければ、同じ `.pasta` 行へマップする
+    //! 次の `.lua` 行で再停止してこのテストが落ちる。
+    //!
+    //! # フィクスチャ（Task 3.1 で committed）
+    //!
+    //! `tests/fixtures/debug_break_coalesce.pasta` のトーク行
+    //! `合計は＠加算ループ()　です。`（`.pasta` 行 21）は、生成 `.lua` の
+    //! `SCENE.__start__` 本体で **3 本の `talk(...)`/`expr_fn(...)` 文**（`.lua` 行 11/12/13）
+    //! へ展開される（多対1）。次行 `「おはよう」「げんき」`（`.pasta` 行 22）は `.lua` 行 14
+    //! へ対応し、これが「1 回の continue で到達すべき次の停止点」。実 `.pasta`/`.lua` 行は
+    //! **ローダの本番マップ構築経路**（[`PastaLoader::build_source_map`]・Task 4.3）から
+    //! 導出してハードコードを避ける（[`build_fixture`] と同流儀）。
+    //!
+    //! # ハーネス（task 7.1 [`super::pasta_bp_e2e`] の踏襲）
+    //!
+    //! 実マップを `SourceMode::Pasta` で [`enable`](crate::debug::enable) へ渡し、生成
+    //! `.lua` を **ローダ由来チャンク名**（`@<キャッシュ .lua パス>`）で VM 上に走らせる。
+    //! 関数定義は BP 設定前に行い（チャンク本文実行で `SCENE.__start__` 等を定義）、その後
+    //! クライアントが `.pasta` 行 21 へ BP を張ってから `SCENE.__start__(act)` を呼ぶ。
+    //! こうすると BP 有効下で実行されるのは `__start__` 本体（`.lua` 行 11→12→13→14）だけ
+    //! になり、多対1 行の **連続実行**中の coalescing を決定的に観測できる（関数定義行
+    //! `.lua` 7 もまた `.pasta` 21 へマップするが、それは定義時＝BP 設定前に実行済み）。
+    //!
+    //! `mlua::Lua`（`!Send`）は VM ホストスレッドにのみ生存し、バウンド `SocketAddr`
+    //! （`Copy`）と go/done チャネルだけが越境する。全クライアント待機は TEST-ONLY
+    //! watchdog でバウンドし CI がハングしないようにする（停止コアは無期限）。
+
+    use std::io::BufReader;
+    use std::net::{SocketAddr, TcpStream};
+    use std::sync::Arc;
+    use std::sync::mpsc::{self, RecvTimeoutError};
+    use std::time::Duration;
+
+    use serde_json::{Value, json};
+
+    use crate::debug::source_map::{MapBuilderSink, SourceMap};
+    use crate::debug::transport::{read_frame, write_frame};
+    use crate::debug::{DebugConfig, SourceMode, enable};
+    use crate::loader::CacheManager;
+    use crate::transpiler::LuaTranspiler;
+
+    /// TEST-ONLY watchdog so CI cannot hang. The stop core is unbounded.
+    const WATCHDOG: Duration = Duration::from_secs(15);
+
+    /// 多対1＋ループ再訪を含む committed フィクスチャ（Task 3.1）。3.2/3.3 が同一ファイルを
+    /// ロードする。`include_str!` で取り込み、移動時はコンパイルエラーで検知する。
+    const FIXTURE: &str = include_str!("../../tests/fixtures/debug_break_coalesce.pasta");
+
+    /// 多対1 トーク行（`合計は＠加算ループ()　です。`）の `.pasta` 行（1-origin）を
+    /// FIXTURE から一意に求める（[`debug_break_coalesce_fixture_test`] の同名マーカー）。
+    const MULTI_TO_ONE_MARKER: &str = "合計は＠加算ループ()";
+
+    /// ループ本体行（`SCENE.加算ループ` 内 `total = total + i`）の `.pasta` 行を FIXTURE から
+    /// 一意に求める（[`debug_break_coalesce_fixture_test`] の同名マーカー / Task 3.3 用）。
+    /// ループは `GLOBAL.ループ回数 or 3` 回まわるため、この `.pasta` 行は実行時に再訪される。
+    const LOOP_BODY_MARKER: &str = "total = total + i";
+
+    /// フィクスチャのループ反復回数（`GLOBAL.ループ回数` 未設定時の既定 = ループ本体行の再訪回数）。
+    /// shim は `package.loaded['pasta.global'] = {}`（= `GLOBAL.ループ回数` が nil）を与えるため、
+    /// `加算ループ` は `for i = 1, 3 do ... end` を回し、ループ本体 `.pasta` 行を N 回再訪する。
+    const LOOP_VISITS: usize = 3;
+
+    /// `require "pasta"` / `require "pasta.global"` を満たし、`SCENE.__start__` を実行可能に
+    /// する最小シム。`create_scene` は素のテーブルを返し、`act` スタブは `init_scene` /
+    /// `expr_fn` / `さくら:talk` を no-op で提供する（`.pasta`↔`.lua` 変換とは無関係の純粋な
+    /// 実行足場であり、BP/coalescing は実セッションが担う）。
+    const PASTA_SHIM: &str = "\
+local PASTA = {}
+function PASTA.create_scene(name)
+    local s = { name = name }
+    PASTA.__last_scene = s   -- 生成 scene を捕捉（chunk の do...end ローカルを橋渡し）
+    return s
+end
+package.loaded['pasta'] = PASTA
+package.loaded['pasta.global'] = {}
+local actor = {}
+actor.__index = actor
+function actor:talk(_s) return self end
+function actor:expr_fn(_name) return 0 end
+ACT = setmetatable({}, {
+    __index = function(_t, _k)
+        return setmetatable({}, actor)
+    end,
+})
+function ACT.init_scene(_self, _scene) return {}, {} end
+";
+
+    /// 実 TCP ソケット越しの最小 DAP クライアント（[`super::tests::DapClient`] と同型）。
+    struct DapClient {
+        reader: BufReader<TcpStream>,
+        writer: TcpStream,
+    }
+
+    impl DapClient {
+        fn connect(addr: SocketAddr) -> Self {
+            let stream = TcpStream::connect(addr).expect("client must connect to the bound port");
+            stream
+                .set_read_timeout(Some(WATCHDOG))
+                .expect("TEST-ONLY read timeout");
+            let writer = stream.try_clone().expect("clone socket for writing");
+            Self {
+                reader: BufReader::new(stream),
+                writer,
+            }
+        }
+
+        fn send_request(&mut self, seq: u64, command: &str, arguments: Value) {
+            let req = json!({
+                "seq": seq,
+                "type": "request",
+                "command": command,
+                "arguments": arguments,
+            });
+            write_frame(&mut self.writer, &req).expect("client write must succeed");
+        }
+
+        fn recv(&mut self) -> Value {
+            read_frame(&mut self.reader)
+                .expect("client read must succeed (TEST-ONLY timeout)")
+                .expect("a frame must be present (peer did not close)")
+        }
+
+        fn recv_until(&mut self, mut pred: impl FnMut(&Value) -> bool) -> Value {
+            loop {
+                let msg = self.recv();
+                if pred(&msg) {
+                    return msg;
+                }
+            }
+        }
+    }
+
+    fn is_event(msg: &Value, name: &str) -> bool {
+        msg["type"] == "event" && msg["event"] == name
+    }
+
+    fn is_response(msg: &Value, command: &str) -> bool {
+        msg["type"] == "response" && msg["command"] == command
+    }
+
+    /// FIXTURE 内で `needle` を含む唯一の **非コメント** 行の 1-origin 行番号を返す。
+    /// コメント行（`＃`/`#`）は除外する（マーカー文字列を解説で含み得るため）。
+    fn unique_pasta_line(needle: &str) -> u32 {
+        let hits: Vec<u32> = FIXTURE
+            .lines()
+            .enumerate()
+            .filter(|(_, l)| {
+                let t = l.trim_start();
+                !t.starts_with('＃') && !t.starts_with('#') && l.contains(needle)
+            })
+            .map(|(i, _)| i as u32 + 1)
+            .collect();
+        assert_eq!(
+            hits.len(),
+            1,
+            "fixture invariant: marker {needle:?} must appear on exactly one line, got {hits:?}"
+        );
+        hits[0]
+    }
+
+    /// 実トランスパイル成果物（実座標を **マップから導出**）。
+    struct Fixture {
+        /// ローダ本番経路の集約マップ（`enable` へ渡す）。
+        map: Arc<SourceMap>,
+        /// 実行する生成 `.lua` 本文（map 構築と同一バイト）。
+        lua_source: String,
+        /// VM チャンク名（`@<キャッシュ .lua 絶対パス>`）= ローダ由来チャンク名。
+        chunk_name: String,
+        /// `.pasta` ファイルパス（`PastaPos.file` / VSCode source.path と一致）。
+        pasta_path: String,
+        /// 多対1 トーク行の `.pasta` 行（BP 対象）。
+        multi_pasta_line: u32,
+        /// `multi_pasta_line` が展開される `.lua` 行群（≥2 で多対1 を裏づける）。
+        multi_lua_lines: Vec<u32>,
+        /// 多対1 行の **次に到達すべき** `.pasta` 行（continue 後の停止点・歯）。
+        next_pasta_line: u32,
+    }
+
+    /// committed `.pasta` をディスクへ書き、(a) 本番ローダ経路でマップを構築し、(b) 同一入力を
+    /// 同一マップ構築経路で再トランスパイルして実行用 `.lua` 本文を得る（バイト一致）。BP 対象・
+    /// 次行・`.lua` 展開はすべて map から導出する。
+    fn build_fixture() -> Fixture {
+        let temp = tempfile::TempDir::new().expect("temp dir");
+        let base_dir = temp.path().to_path_buf();
+        let pasta_file = base_dir.join("dic/test/debug_break_coalesce.pasta");
+        std::fs::create_dir_all(pasta_file.parent().unwrap()).expect("mkdir dic");
+        std::fs::write(&pasta_file, FIXTURE).expect("write .pasta");
+
+        let cache_manager = CacheManager::new(base_dir.clone(), "profile/pasta/cache/lua");
+
+        // (a) 本番ローダ経路の集約マップ（sidecar=false: メモリ既定）。
+        let map = crate::loader::PastaLoader::build_source_map(
+            std::slice::from_ref(&pasta_file),
+            &cache_manager,
+            false,
+        );
+
+        // チャンク名キー = ローダ由来 `source_to_cache_path`（map のキーと同一）。
+        let chunk_name = cache_manager
+            .source_to_cache_path(&pasta_file)
+            .to_string_lossy()
+            .to_string();
+        // `.pasta` ファイルキー = `parse_str` / `PastaPos.file`（VSCode source.path 側）。
+        let pasta_path = pasta_file.to_string_lossy().to_string();
+
+        // (b) `build_source_map` は生成 `.lua` を破棄するため、同一入力・同一マップ構築経路で
+        //     再トランスパイルして **実行する `.lua` 本文**を得る（map と同一の決定的バイト）。
+        let content = std::fs::read_to_string(&pasta_file).expect("read .pasta");
+        let parsed = pasta_dsl::parse_str(&content, &pasta_path).expect("parse .pasta");
+        let transpiler = LuaTranspiler::default();
+        let mut sink = MapBuilderSink::new(pasta_path.clone(), chunk_name.clone());
+        let mut out = Vec::new();
+        transpiler
+            .transpile_with_source_map(&parsed, &mut out, Some(&mut sink))
+            .expect("transpile .pasta");
+        let lua_source = String::from_utf8(out).expect("utf8 .lua");
+
+        // 多対1 行（BP 対象）の `.pasta` 行と、その `.lua` 展開（≥2）。
+        let multi_pasta_line = unique_pasta_line(MULTI_TO_ONE_MARKER);
+        let mut multi_lua_lines: Vec<u32> = map
+            .resolve_pasta_to_lua(&pasta_path, multi_pasta_line)
+            .into_iter()
+            .map(|(_chunk, lua_line)| lua_line)
+            .collect();
+        multi_lua_lines.sort_unstable();
+        assert!(
+            multi_lua_lines.len() >= 2,
+            "6.2(a): 多対1 行 {multi_pasta_line} は ≥2 の `.lua` 行へ展開されること（前提）: \
+             {multi_lua_lines:?}"
+        );
+
+        // continue 後に到達すべき **次の** `.pasta` 行 = 多対1 行の `.lua` 展開の **最大** 行の
+        // 直後で初めて現れる、`multi_pasta_line` と異なる `.pasta` 行を map から導出する。
+        let last_multi_lua = *multi_lua_lines.last().unwrap();
+        let next_pasta_line = (last_multi_lua + 1..=last_multi_lua + 200)
+            .find_map(|lua_line| {
+                map.resolve_lua_to_pasta(&chunk_name, lua_line)
+                    .filter(|pos| pos.line != multi_pasta_line)
+                    .map(|pos| pos.line)
+            })
+            .expect("多対1 行の後に別の `.pasta` 行が存在すること（next stop point）");
+        assert_ne!(
+            next_pasta_line, multi_pasta_line,
+            "次の停止点は多対1 行とは異なる `.pasta` 行であること（歯の有効性）"
+        );
+
+        drop(temp); // map / lua_source は取得済み。ディスクは不要。
+
+        Fixture {
+            map,
+            lua_source,
+            chunk_name,
+            pasta_path,
+            multi_pasta_line,
+            multi_lua_lines,
+            next_pasta_line,
+        }
+    }
+
+    /// 多対1 Continue: `.pasta` 行（→ 複数 `.lua` 行）に BP を張り、停止後 **1 回だけ**
+    /// `continue` すると、(1) 同一 `.pasta` 行に対する 2 回目の `stopped` は来ず、(2) 実行は
+    /// 次の `.pasta` 行（次の停止点）へ進む — を実 DAP-over-TCP で証明する
+    /// （requirements 1.1 / 1.2 / 3.2 / 6.2(a)）。
+    #[test]
+    fn one_continue_escapes_multi_to_one_pasta_line_over_tcp() {
+        let fx = build_fixture();
+
+        // 前提の自己点検: 多対1 行が ≥2 の `.lua` 行へ展開される（テストが非空虚である土台）。
+        assert!(
+            fx.multi_lua_lines.len() >= 2,
+            "多対1 前提: `.pasta` 行 {} → `.lua` 行 {:?}",
+            fx.multi_pasta_line,
+            fx.multi_lua_lines
+        );
+
+        let lua_source = fx.lua_source.clone();
+        let chunk_name = fx.chunk_name.clone();
+        let map = Arc::clone(&fx.map);
+
+        let (addr_tx, addr_rx) = mpsc::channel::<SocketAddr>();
+        let (loaded_tx, loaded_rx) = mpsc::channel::<()>();
+        let (go_tx, go_rx) = mpsc::channel::<()>();
+
+        // VM HOST スレッド。
+        let host = std::thread::spawn(move || -> Result<(), String> {
+            let lua = unsafe {
+                mlua::Lua::unsafe_new_with(mlua::StdLib::ALL_SAFE, mlua::LuaOptions::default())
+            };
+
+            let cfg = DebugConfig {
+                enabled: true,
+                listen: Some("127.0.0.1:0".parse().unwrap()),
+                source_mode: SourceMode::Pasta, // 既定だが明示（6.1）。
+                ..Default::default()
+            };
+            let handle = enable(&lua, &cfg, Some(map))
+                .map_err(|e| format!("enable failed: {e}"))?
+                .ok_or_else(|| "enable returned None for an enabled config".to_string())?;
+
+            let addr = handle
+                .local_addr()
+                .ok_or_else(|| "enabled handle must expose a bound addr".to_string())?;
+            addr_tx.send(addr).map_err(|_| "addr send failed".to_string())?;
+
+            // `require "pasta"` を満たすシムを先に読み込む（BP 設定前・関数定義準備）。
+            lua.load(PASTA_SHIM)
+                .set_name("@pasta_shim")
+                .exec()
+                .map_err(|e| format!("shim exec failed: {e}"))?;
+
+            // 生成 `.lua` 本文を **ローダ由来チャンク名**で実行し、`SCENE.__start__` 等を
+            // 定義する。多対1 行 BP はまだ張られていないので、定義時に `.lua` 行 7（→ `.pasta`
+            // 21）を通過しても停止しない（BP 設定前）。
+            lua.load(&lua_source)
+                .set_name(&format!("@{chunk_name}"))
+                .exec()
+                .map_err(|e| format!("chunk (definitions) exec failed: {e}"))?;
+
+            // 定義完了をクライアントへ通知し、BP+configurationDone 完了の go を待つ。
+            loaded_tx
+                .send(())
+                .map_err(|_| "loaded signal send failed".to_string())?;
+            go_rx
+                .recv_timeout(WATCHDOG)
+                .map_err(|_| "did not receive go signal before calling __start__".to_string())?;
+
+            // ここで初めて多対1 行が **連続実行**される: 捕捉した SCENE の `__start__(ACT)` を
+            // 呼ぶと `.lua` 行 11→12→13（すべて `.pasta` 21）→ 14（`.pasta` 22）が走る。
+            // SCENE は chunk の `do ... end` ローカルなので、shim が捕捉した `__last_scene`
+            // 経由で取得する。
+            lua.load("local s = package.loaded['pasta'].__last_scene; return s.__start__(ACT)")
+                .set_name("@invoke_start")
+                .exec()
+                .map_err(|e| format!("__start__ call failed: {e}"))?;
+
+            lua.remove_global_hook();
+            drop(handle);
+            Ok(())
+        });
+
+        // CLIENT（このスレッド）。
+        let addr = addr_rx
+            .recv_timeout(WATCHDOG)
+            .expect("host must publish the bound addr before the watchdog");
+        let mut client = DapClient::connect(addr);
+
+        // initialize ハンドシェイク。
+        client.send_request(1, "initialize", json!({ "adapterID": "pasta" }));
+        let _ = client.recv_until(|m| is_response(m, "initialize"));
+        let _ = client.recv_until(|m| is_event(m, "initialized"));
+
+        // 関数定義（チャンク本文実行）が終わるのを待ってから BP を張る — こうすると BP 有効
+        // 下で実行されるのは `__start__` 本体だけになり、多対1 行の連続実行を観測できる。
+        loaded_rx
+            .recv_timeout(WATCHDOG)
+            .expect("host must finish definitions before the watchdog");
+
+        // 多対1 `.pasta` 行（翻訳経路 map+Pasta で複数 `.lua` 行へ展開）と、その **次行**の
+        // 両方へ BP を張る。次行 BP は「1 回の continue が次の停止点まで進む」ことを観測する
+        // ための停止点であると同時に、coalescing が無ければ continue が **次行へ着く前に**
+        // 同一 `.pasta` 行 21 の別 `.lua` 行で再停止することを暴く（テストの歯）。
+        client.send_request(
+            2,
+            "setBreakpoints",
+            json!({
+                "source": { "path": fx.pasta_path },
+                "breakpoints": [
+                    { "line": fx.multi_pasta_line },
+                    { "line": fx.next_pasta_line },
+                ],
+            }),
+        );
+        let bp_resp = client.recv_until(|m| is_response(m, "setBreakpoints"));
+        let bps = bp_resp["body"]["breakpoints"]
+            .as_array()
+            .expect("breakpoints array");
+        assert_eq!(bps.len(), 2, "2 つの BP 応答（多対1 行＋次行）");
+        assert!(
+            bps.iter().all(|b| b["verified"] == true),
+            "両 `.pasta` 行 BP は verified で登録される: {bps:?}"
+        );
+
+        client.send_request(3, "configurationDone", json!({}));
+        let _ = client.recv_until(|m| is_response(m, "configurationDone"));
+        go_tx.send(()).expect("send go signal");
+
+        // (1) 最初の停止: 多対1 `.pasta` 行で stop（reason breakpoint）。
+        let stopped1 = client.recv_until(|m| is_event(m, "stopped"));
+        assert_eq!(
+            stopped1["body"]["reason"], "breakpoint",
+            "1.2/3.2: 多対1 `.pasta` 行 BP に対応する `.lua` 行で停止する"
+        );
+        let thread_id = stopped1["body"]["threadId"].as_u64().expect("threadId");
+        // 停止位置は多対1 `.pasta` 行（resolver 装着で `.pasta` 座標を提示する）。
+        let stop1_line = top_pasta_line(&mut client, thread_id, 10);
+        assert_eq!(
+            stop1_line, fx.multi_pasta_line,
+            "最初の停止は多対1 `.pasta` 行 {} であること",
+            fx.multi_pasta_line
+        );
+
+        // === 「歯」: ここで **1 回だけ** continue を送る。fix（break-anchor coalescing）が
+        // あれば、同じ `.pasta` 行へマップする残りの `.lua` 行は消化され、次の `stopped` は
+        // **別の** `.pasta` 行（次の停止点）になる。fix が無ければ、同一 `.pasta` 行 {} の
+        // 次の `.lua` 行で再停止し（reason breakpoint・同じ提示行）、下のアサートが落ちる。===
+        client.send_request(20, "continue", json!({ "threadId": thread_id }));
+        let _ = client.recv_until(|m| is_response(m, "continue"));
+
+        // 1 回の continue 後に来る次の制御フレーム（stopped か terminated）。
+        let next = client.recv_until(|m| is_event(m, "stopped") || is_event(m, "terminated"));
+
+        if is_event(&next, "stopped") {
+            // 次の停止が **同一 `.pasta` 行** であってはならない（2 回目の同一行 stop の禁止 =
+            // requirement 1.1 / 3.2）。停止しているなら次の `.pasta` 停止点であること。
+            let next_tid = next["body"]["threadId"].as_u64().unwrap_or(thread_id);
+            let stop2_line = top_pasta_line(&mut client, next_tid, 21);
+            assert_ne!(
+                stop2_line, fx.multi_pasta_line,
+                "1.1/3.2: 1 回の continue が同一 `.pasta` 行 {} で **再停止してはならない** \
+                 （coalescing）。actual={stop2_line}",
+                fx.multi_pasta_line
+            );
+            assert_eq!(
+                stop2_line, fx.next_pasta_line,
+                "1.2: 1 回の continue は **次の** `.pasta` 行 {} へ進むこと。actual={stop2_line}",
+                fx.next_pasta_line
+            );
+            // 後片付け: 残りを流し切って host を完走させる（CI 無限ループ防止に上限）。
+            let mut done = false;
+            for seq in 30u64..60u64 {
+                client.send_request(seq, "continue", json!({ "threadId": next_tid }));
+                let m =
+                    client.recv_until(|m| is_event(m, "stopped") || is_event(m, "terminated"));
+                if is_event(&m, "terminated") {
+                    done = true;
+                    break;
+                }
+            }
+            assert!(done, "残りを continue で流し切れること");
+        } else {
+            // 次行（`.pasta` {next_pasta_line}）には BP を張ってあるので、正常時はここで停止する
+            // はず。stopped 無しで terminated したのは、1 回の continue が次の停止点へ到達できて
+            // いない（早期完走）ことを意味するので失敗扱いとする。
+            panic!(
+                "1.2: 1 回の continue は次の `.pasta` 行 {} で停止すべきだが、stopped 無しで \
+                 terminated した（次の停止点へ到達できていない）",
+                fx.next_pasta_line
+            );
+        }
+
+        // host VM スレッドが watchdog 内で完了することを確認（ハング無し）。
+        let (done_tx, done_rx) = mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = done_tx.send(host.join());
+        });
+        match done_rx.recv_timeout(WATCHDOG) {
+            Ok(joined) => {
+                joined
+                    .expect("host VM thread must not panic")
+                    .expect("scenario must run to completion after continue");
+            }
+            Err(RecvTimeoutError::Timeout) => {
+                panic!("host VM thread did not finish within the watchdog (hang?)");
+            }
+            Err(RecvTimeoutError::Disconnected) => panic!("join watcher disconnected"),
+        }
+    }
+
+    /// Task 3.3 — ループ再訪の実 DAP-over-TCP E2E
+    /// （spec: `pasta-debug-break-coalesce`, requirements **2.2** / **6.2(b)**）。
+    ///
+    /// # 観測する「done」
+    ///
+    /// 同一 `.pasta` 行（`SCENE.加算ループ` 本体の `total = total + i`）をループで N 回
+    /// 再訪する構成で、その `.pasta` 行へ BP を張る。停止のたびに `continue` を送ると、ループ
+    /// 反復ごとに **同一 `.pasta` 行で再び停止** し、合計 **ちょうど N 回**（= `LOOP_VISITS`）の
+    /// `stopped`（reason breakpoint・同一提示行）を観測できることを実ソケットで証明する。
+    ///
+    /// アンカー coalescing（fix）は **同一 `.pasta` 行に連続して留まる間**だけ再停止を抑止する。
+    /// ループは反復ごとに `for ... do`（条件/増分 = 本体とは別の `.pasta` 行）を経由するため、
+    /// 本体行へ再入するたびにアンカーがクリアされ、再び停止する。したがって観測される停止数は
+    ///   - over-suppression（coalescing がループをまたいで効いてしまう）なら **< N**、
+    ///   - 壊れた coalescing（同一行内で複数停止）なら **> N**、
+    /// となり、**ちょうど N** を要求することで両誤りを弁別する（テストの「歯」）。
+    ///
+    /// # ハーネス
+    ///
+    /// [`build_fixture`] と同一の本番ローダ経路でマップ＋生成 `.lua` を得るが、本テストは
+    /// **ループ本体 `.pasta` 行**（[`LOOP_BODY_MARKER`]）へ BP を張り、`SCENE.加算ループ(ACT)`
+    /// を呼んでループ本体を N 回実行させる（多対1 行ではなくループ行が観測対象）。
+    #[test]
+    fn loop_revisit_yields_one_stop_per_iteration_over_tcp() {
+        // --- フィクスチャ（本番ローダ経路）を build_fixture と同流儀で構築し、ループ本体行を導出 ---
+        let temp = tempfile::TempDir::new().expect("temp dir");
+        let base_dir = temp.path().to_path_buf();
+        let pasta_file = base_dir.join("dic/test/debug_break_coalesce.pasta");
+        std::fs::create_dir_all(pasta_file.parent().unwrap()).expect("mkdir dic");
+        std::fs::write(&pasta_file, FIXTURE).expect("write .pasta");
+
+        let cache_manager = CacheManager::new(base_dir.clone(), "profile/pasta/cache/lua");
+        let map = crate::loader::PastaLoader::build_source_map(
+            std::slice::from_ref(&pasta_file),
+            &cache_manager,
+            false,
+        );
+        let chunk_name = cache_manager
+            .source_to_cache_path(&pasta_file)
+            .to_string_lossy()
+            .to_string();
+        let pasta_path = pasta_file.to_string_lossy().to_string();
+
+        // 生成 `.lua` 本文（map 構築とバイト一致）。
+        let content = std::fs::read_to_string(&pasta_file).expect("read .pasta");
+        let parsed = pasta_dsl::parse_str(&content, &pasta_path).expect("parse .pasta");
+        let transpiler = LuaTranspiler::default();
+        let mut sink = MapBuilderSink::new(pasta_path.clone(), chunk_name.clone());
+        let mut out = Vec::new();
+        transpiler
+            .transpile_with_source_map(&parsed, &mut out, Some(&mut sink))
+            .expect("transpile .pasta");
+        let lua_source = String::from_utf8(out).expect("utf8 .lua");
+
+        // ループ本体 `.pasta` 行は単一の `.lua` 実行座標へ対応する（前提＝再訪は同一行）。
+        let loop_pasta_line = unique_pasta_line(LOOP_BODY_MARKER);
+        let loop_lua_lines: Vec<u32> = map
+            .resolve_pasta_to_lua(&pasta_path, loop_pasta_line)
+            .into_iter()
+            .map(|(_chunk, lua_line)| lua_line)
+            .collect();
+        assert_eq!(
+            loop_lua_lines.len(),
+            1,
+            "6.2(b) 前提: ループ本体 `.pasta` 行 {loop_pasta_line} は単一 `.lua` 座標を持つ: \
+             {loop_lua_lines:?}"
+        );
+
+        drop(temp);
+
+        let (addr_tx, addr_rx) = mpsc::channel::<SocketAddr>();
+        let (loaded_tx, loaded_rx) = mpsc::channel::<()>();
+        let (go_tx, go_rx) = mpsc::channel::<()>();
+
+        let map_host = Arc::clone(&map);
+
+        // VM HOST スレッド。
+        let host = std::thread::spawn(move || -> Result<(), String> {
+            let lua = unsafe {
+                mlua::Lua::unsafe_new_with(mlua::StdLib::ALL_SAFE, mlua::LuaOptions::default())
+            };
+
+            let cfg = DebugConfig {
+                enabled: true,
+                listen: Some("127.0.0.1:0".parse().unwrap()),
+                source_mode: SourceMode::Pasta,
+                ..Default::default()
+            };
+            let handle = enable(&lua, &cfg, Some(map_host))
+                .map_err(|e| format!("enable failed: {e}"))?
+                .ok_or_else(|| "enable returned None for an enabled config".to_string())?;
+
+            let addr = handle
+                .local_addr()
+                .ok_or_else(|| "enabled handle must expose a bound addr".to_string())?;
+            addr_tx.send(addr).map_err(|_| "addr send failed".to_string())?;
+
+            // require シム（BP 設定前）。
+            lua.load(PASTA_SHIM)
+                .set_name("@pasta_shim")
+                .exec()
+                .map_err(|e| format!("shim exec failed: {e}"))?;
+
+            // 生成 `.lua` 本文をローダ由来チャンク名で実行し、`SCENE.加算ループ` 等を定義する。
+            // BP 未設定なので定義時の通過では停止しない。
+            lua.load(&lua_source)
+                .set_name(&format!("@{chunk_name}"))
+                .exec()
+                .map_err(|e| format!("chunk (definitions) exec failed: {e}"))?;
+
+            loaded_tx
+                .send(())
+                .map_err(|_| "loaded signal send failed".to_string())?;
+            go_rx
+                .recv_timeout(WATCHDOG)
+                .map_err(|_| "did not receive go signal before calling 加算ループ".to_string())?;
+
+            // ここで初めてループ本体行が **反復実行**される: 捕捉した SCENE の `加算ループ(ACT)`
+            // を呼ぶと `for i = 1, 3 do total = total + i end` がループ本体行を N 回再訪する。
+            lua.load("local s = package.loaded['pasta'].__last_scene; return s['加算ループ'](ACT)")
+                .set_name("@invoke_loop")
+                .exec()
+                .map_err(|e| format!("加算ループ call failed: {e}"))?;
+
+            lua.remove_global_hook();
+            drop(handle);
+            Ok(())
+        });
+
+        // CLIENT。
+        let addr = addr_rx
+            .recv_timeout(WATCHDOG)
+            .expect("host must publish the bound addr before the watchdog");
+        let mut client = DapClient::connect(addr);
+
+        client.send_request(1, "initialize", json!({ "adapterID": "pasta" }));
+        let _ = client.recv_until(|m| is_response(m, "initialize"));
+        let _ = client.recv_until(|m| is_event(m, "initialized"));
+
+        loaded_rx
+            .recv_timeout(WATCHDOG)
+            .expect("host must finish definitions before the watchdog");
+
+        // ループ本体 `.pasta` 行のみへ BP を張る。
+        client.send_request(
+            2,
+            "setBreakpoints",
+            json!({
+                "source": { "path": pasta_path },
+                "breakpoints": [ { "line": loop_pasta_line } ],
+            }),
+        );
+        let bp_resp = client.recv_until(|m| is_response(m, "setBreakpoints"));
+        let bps = bp_resp["body"]["breakpoints"]
+            .as_array()
+            .expect("breakpoints array");
+        assert_eq!(bps.len(), 1, "1 つの BP 応答（ループ本体行）");
+        assert!(
+            bps.iter().all(|b| b["verified"] == true),
+            "ループ本体 `.pasta` 行 BP は verified で登録される: {bps:?}"
+        );
+
+        client.send_request(3, "configurationDone", json!({}));
+        let _ = client.recv_until(|m| is_response(m, "configurationDone"));
+        go_tx.send(()).expect("send go signal");
+
+        // === 「歯」: 停止のたびに continue。ループは N 回まわるので、同一 `.pasta` 行で
+        // ちょうど N 回 stop する。< N なら coalescing がループをまたいで効きすぎ、> N なら
+        // 同一行内で過剰停止（coalescing 不全）。両者を「ちょうど N」で弁別する。===
+        let mut stop_count = 0usize;
+        let mut seq = 10u64;
+        loop {
+            let ev = client.recv_until(|m| is_event(m, "stopped") || is_event(m, "terminated"));
+            if is_event(&ev, "terminated") {
+                break;
+            }
+            // stopped: ループ本体 `.pasta` 行であることを検証して数える。
+            assert_eq!(
+                ev["body"]["reason"], "breakpoint",
+                "2.2: ループ本体行 BP に対応する `.lua` 行で停止する"
+            );
+            let tid = ev["body"]["threadId"].as_u64().expect("threadId");
+            let stop_line = top_pasta_line(&mut client, tid, seq);
+            seq += 1;
+            assert_eq!(
+                stop_line, loop_pasta_line,
+                "2.2/6.2(b): 各停止はループ本体 `.pasta` 行 {loop_pasta_line} であること。actual={stop_line}"
+            );
+            stop_count += 1;
+            assert!(
+                stop_count <= LOOP_VISITS,
+                "2.2: 停止数がループ反復回数 {LOOP_VISITS} を超えた（coalescing 不全 / 同一行で過剰停止）: \
+                 既に {stop_count} 回停止"
+            );
+            // 次の反復へ。
+            client.send_request(seq, "continue", json!({ "threadId": tid }));
+            let _ = client.recv_until(|m| is_response(m, "continue"));
+            seq += 1;
+        }
+
+        // ちょうど N 回停止（再訪ごとに 1 回、再訪ごとにアンカーがクリアされ再停止する）。
+        assert_eq!(
+            stop_count, LOOP_VISITS,
+            "2.2/6.2(b): ループ本体 `.pasta` 行はループ反復回数 {LOOP_VISITS} と同数だけ停止すること \
+             （N 訪問 → N 停止）。actual={stop_count}"
+        );
+
+        // host VM スレッドが watchdog 内で完了することを確認（ハング無し）。
+        let (done_tx, done_rx) = mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = done_tx.send(host.join());
+        });
+        match done_rx.recv_timeout(WATCHDOG) {
+            Ok(joined) => {
+                joined
+                    .expect("host VM thread must not panic")
+                    .expect("loop scenario must run to completion");
+            }
+            Err(RecvTimeoutError::Timeout) => {
+                panic!("host VM thread did not finish within the watchdog (hang?)");
+            }
+            Err(RecvTimeoutError::Disconnected) => panic!("join watcher disconnected"),
+        }
+    }
+
+    /// stackTrace の top フレーム `line`（`.pasta` 提示中は `.pasta` 行）を返し、`.pasta`
+    /// 提示の「歯」を効かせる（[`super::pasta_step_e2e::top_pasta_line`] と同型）。
+    fn top_pasta_line(client: &mut DapClient, thread_id: u64, seq: u64) -> u32 {
+        client.send_request(seq, "stackTrace", json!({ "threadId": thread_id }));
+        let stack = client.recv_until(|m| is_response(m, "stackTrace"));
+        let frames = stack["body"]["stackFrames"]
+            .as_array()
+            .expect("stackFrames array");
+        assert!(!frames.is_empty(), "stack must have the stopped frame");
+        let top_src = frames[0]["source"]["path"]
+            .as_str()
+            .expect("top frame source path");
+        assert!(
+            top_src.ends_with(".pasta"),
+            "`.pasta` 提示中は top フレームが `.pasta` を提示すること: {top_src:?}"
+        );
+        frames[0]["line"].as_u64().expect("top frame line") as u32
+    }
+}

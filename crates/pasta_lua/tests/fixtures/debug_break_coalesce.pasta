@@ -1,0 +1,22 @@
+＃ E2E フィクスチャ（spec: pasta-debug-break-coalesce / Requirement 6.2）
+＃ 実 DAP-over-TCP E2E（Tasks 3.2 多対1 Continue / 3.3 ループ再訪）が依存する最小辞書。
+＃
+＃ 二つの観測対象を 1 ファイルに含める:
+＃ (a) 多対1展開:  1つの `.pasta` 行 → 複数の `.lua` 行。
+＃      → 対象は下の「合計は＠加算ループ()　です。」のトーク行（複数 .lua 行へ展開）。
+＃ (b) ループ再訪:  同一 `.pasta` 行を実行時に複数回通過するループ。
+＃      → 対象は SCENE.加算ループ 内の `total = total + i`（ループ本体）行。
+＃        ループは ＄＊ループ回数（既定 3）回まわり、毎回同じ `.pasta` 行を再訪する。
+＊ループ検証
+```lua
+function SCENE.加算ループ(act)
+    local count = tonumber(GLOBAL.ループ回数 or 3)
+    local total = 0
+    for i = 1, count do
+        total = total + i
+    end
+    return total
+end
+```
+　さくら：合計は＠加算ループ()　です。
+　さくら：「おはよう」「げんき」
