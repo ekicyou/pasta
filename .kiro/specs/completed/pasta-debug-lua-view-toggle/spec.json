@@ -1,0 +1,23 @@
+{
+  "feature_name": "pasta-debug-lua-view-toggle",
+  "created_at": "2026-06-09T09:22:58Z",
+  "updated_at": "2026-06-09T22:37:06Z",
+  "completed_at": "2026-06-09T22:37:06Z",
+  "language": "ja",
+  "phase": "completed",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true
+}

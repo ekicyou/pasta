@@ -654,6 +654,20 @@ impl DebugSession {
                     continue;
                 }
 
+                // RefreshPresentation (requirement 3.3): a `pasta/sourcePresentation`
+                // toggle arrived while paused. RE-SEND the CURRENT stop reusing the
+                // in-scope `reason`/`thread_id` — NO new snapshot state — so the
+                // client re-fetches the stack and re-renders under the (already
+                // swapped) present resolver. KEEP BLOCKING: this does NOT resume and
+                // does NOT change `RunMode`, so step granularity continues to follow
+                // `effective_mode()` per line (requirement 5.3, satisfied by the
+                // existing per-line read; no extra logic here). Only ever drained
+                // here in `stop_loop`, so "ignore while running" is automatic.
+                Ok(SessionCommand::RefreshPresentation) => {
+                    let _ = self.event_tx.send(SessionEvent::Stopped { reason, thread_id });
+                    continue;
+                }
+
                 // Controller gone: never hang the VM — resume.
                 Err(_) => return Ok(VmState::Continue),
             }
@@ -1164,6 +1178,75 @@ return e
         assert!(
             host.progress() > at_stop,
             "progress must advance after Continue following a non-resuming command"
+        );
+    }
+
+    /// 3.3 (停止中の即時再描画): `RefreshPresentation` while stopped RE-SENDS the
+    /// CURRENT stop (`Stopped` with the SAME `reason`/`thread_id`) so the client
+    /// re-fetches the stack and re-renders under the swapped resolver — WITHOUT
+    /// resuming. Mirrors `non_resuming_command_keeps_blocking_until_continue`:
+    /// the second `Stopped` arrives, the session stays paused (a later `Continue`
+    /// drives normal completion).
+    #[test]
+    fn refresh_presentation_resends_current_stop_and_keeps_paused() {
+        let breakpoints = BreakpointSet::new();
+        breakpoints.set_breakpoints(&SourceRef::new(SCENARIO_SOURCE), &[BREAKPOINT_LINE]);
+
+        let mut host = start_session(breakpoints);
+
+        // (1) Reach the breakpoint and capture the FIRST Stopped (R3.4).
+        let first = host
+            .event_rx
+            .recv_timeout(WATCHDOG)
+            .expect("must reach the breakpoint and emit the first Stopped");
+        assert_eq!(
+            first,
+            SessionEvent::Stopped {
+                reason: StopReason::Breakpoint,
+                thread_id: MAIN_THREAD_ID,
+            },
+            "the first Stopped must report Breakpoint on the main thread id"
+        );
+
+        let at_stop = host.progress();
+
+        // (2) Send RefreshPresentation while stopped (3.3): the session must
+        // RE-SEND the SAME stop, reusing the in-scope reason/thread_id.
+        host.cmd_tx
+            .send(SessionCommand::RefreshPresentation)
+            .expect("sending RefreshPresentation must succeed");
+
+        let second = host
+            .event_rx
+            .recv_timeout(WATCHDOG)
+            .expect("RefreshPresentation must RE-SEND a Stopped event (3.3)");
+        assert_eq!(
+            second, first,
+            "the re-sent Stopped must carry the SAME reason and thread_id as the \
+             original stop (3.3 — no new snapshot state, in-scope values reused)"
+        );
+
+        // (3) The session is STILL paused: it did NOT resume (progress frozen).
+        std::thread::sleep(Duration::from_millis(150));
+        assert_eq!(
+            host.progress(),
+            at_stop,
+            "RefreshPresentation must NOT resume execution — the session stays paused"
+        );
+
+        // (4) Continue still drives normal completion (the re-send did not break
+        // the resume path).
+        host.cmd_tx
+            .send(SessionCommand::Continue)
+            .expect("sending Continue must succeed");
+        let joined = join_with_watchdog(&mut host, WATCHDOG)
+            .expect("host thread must finish after Continue following RefreshPresentation");
+        joined
+            .expect("host thread must not panic")
+            .expect("scenario must complete after Continue");
+        assert!(
+            host.progress() > at_stop,
+            "progress must advance after Continue following RefreshPresentation"
         );
     }
 

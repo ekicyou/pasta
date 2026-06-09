@@ -1,0 +1,6 @@
+＃ E2E フィクスチャ（spec: pasta-debug-lua-view-toggle / Requirement 7）
+＃ 実 DAP-over-TCP の往復 E2E（runtime_toggle_e2e_test.rs）が依存する最小辞書。
+＃ 単一の `.pasta` トーク行に BP を張り、`.pasta` ⇔ `.lua` 提示の切替を検証する。
+＊あいさつ
+　さくら：「おはよう」
+　さくら：「げんき」

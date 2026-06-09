@@ -257,6 +257,14 @@ pub enum SessionCommand {
     },
     /// Request the list of debuggable threads (coroutines).
     Threads,
+    /// Re-render the current stop under the (just-swapped) present resolver
+    /// while paused (requirement 3.3). Carries NO payload: it is only ever
+    /// drained inside `stop_loop` (the sole place the VM is paused), where the
+    /// session re-emits the CURRENT [`SessionEvent::Stopped`] reusing the
+    /// in-scope `reason`/`thread_id` — no new snapshot state is introduced. Sent
+    /// by the controller after a `pasta/sourcePresentation` toggle so the client
+    /// re-fetches the stack and re-renders in the new mode WITHOUT resuming.
+    RefreshPresentation,
     /// Disconnect and tear down the session.
     Disconnect,
 }

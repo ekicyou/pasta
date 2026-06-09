@@ -237,6 +237,22 @@ pub struct Decoded {
     /// `enable`-time resolved env > file > 既定 mode. When the key is ABSENT this
     /// stays `None` so the resolved mode is kept (NO client-default override).
     pub attach_source_mode: Option<SourceMode>,
+    /// The runtime presentation-toggle mode requested by a
+    /// `pasta/sourcePresentation` custom request (requirement 1.1 / 1.2), parsed
+    /// STRICTLY: `Some` ONLY for the exact valid tokens `"pasta"`/`"lua"`
+    /// (case-insensitive); ANY other value — an unrecognized string, a missing
+    /// key, or a non-string — yields `None`.
+    ///
+    /// This is DELIBERATELY separate from [`attach_source_mode`]: the two have
+    /// different semantics. `attach` uses [`SourceMode::parse`], whose invalid
+    /// fallback is the default `Pasta`; the runtime toggle must NOT fall back,
+    /// because requirement 1.4 mandates that an unrecognized mode value cause NO
+    /// mode change (a `Pasta` fallback would silently CHANGE the mode and violate
+    /// 1.4). `None` therefore means "keep the current mode"; the wiring (task 3.1)
+    /// keeps the current mode and echoes it.
+    ///
+    /// [`attach_source_mode`]: Decoded::attach_source_mode
+    pub requested_source_mode: Option<SourceMode>,
 }
 
 /// Hand-written DAP minimal-subset adapter (design "Transport & DapAdapter").
@@ -364,6 +380,7 @@ impl DapAdapter {
                     response: Some(response),
                     events: vec![initialized],
                     attach_source_mode: None,
+                    requested_source_mode: None,
                 }
             }
             "setBreakpoints" => {
@@ -376,6 +393,7 @@ impl DapAdapter {
                     response: None,
                     events: Vec::new(),
                     attach_source_mode: None,
+                    requested_source_mode: None,
                 }
             }
             "configurationDone" => {
@@ -385,6 +403,7 @@ impl DapAdapter {
                     response: Some(response),
                     events: Vec::new(),
                     attach_source_mode: None,
+                    requested_source_mode: None,
                 }
             }
             "threads" => {
@@ -394,6 +413,7 @@ impl DapAdapter {
                     response: None,
                     events: Vec::new(),
                     attach_source_mode: None,
+                    requested_source_mode: None,
                 }
             }
             "stackTrace" => {
@@ -403,6 +423,7 @@ impl DapAdapter {
                     response: None,
                     events: Vec::new(),
                     attach_source_mode: None,
+                    requested_source_mode: None,
                 }
             }
             "scopes" => {
@@ -432,6 +453,7 @@ impl DapAdapter {
                     response: Some(response),
                     events: Vec::new(),
                     attach_source_mode: None,
+                    requested_source_mode: None,
                 }
             }
             "variables" => {
@@ -445,6 +467,7 @@ impl DapAdapter {
                     response: None,
                     events: Vec::new(),
                     attach_source_mode: None,
+                    requested_source_mode: None,
                 }
             }
             "continue" => {
@@ -458,6 +481,7 @@ impl DapAdapter {
                     response: Some(response),
                     events: Vec::new(),
                     attach_source_mode: None,
+                    requested_source_mode: None,
                 }
             }
             "next" => self.step_ack(request_seq, "next", SessionCommand::Next),
@@ -484,6 +508,38 @@ impl DapAdapter {
                     response: Some(response),
                     events: Vec::new(),
                     attach_source_mode,
+                    requested_source_mode: None,
+                }
+            }
+            "pasta/sourcePresentation" => {
+                // The decode SIDE of the runtime presentation toggle (requirement
+                // 1.1 / 1.2 / 1.4). Parse the `mode` argument STRICTLY into
+                // `requested_source_mode`: ONLY the exact tokens "pasta"/"lua"
+                // (case-insensitive, mirroring `SourceMode::parse`'s convention)
+                // yield `Some`; ANY other value — an unrecognized string, a
+                // missing key, or a non-string — yields `None`.
+                //
+                // We DELIBERATELY do NOT use `SourceMode::parse` here: its invalid
+                // fallback is the default `Pasta`, which would silently CHANGE the
+                // mode and violate requirement 1.4 ("認識できない提示モード値" →
+                // 現在の提示モードを変更せず). `None` means "no change"; the wiring
+                // (task 3.1) keeps the current mode and echoes it in the response.
+                //
+                // No immediate response/command is produced here: the wiring owns
+                // mode application, the acceptance response (built via
+                // `source_presentation_response`), the `RefreshPresentation`
+                // forwarding, and the `pasta/sourcePresentation` event (built via
+                // `source_presentation_event`).
+                let requested_source_mode = args
+                    .and_then(|a| a.get("mode"))
+                    .and_then(Value::as_str)
+                    .and_then(parse_source_mode_strict);
+                Decoded {
+                    command: None,
+                    response: None,
+                    events: Vec::new(),
+                    attach_source_mode: None,
+                    requested_source_mode,
                 }
             }
             "disconnect" => {
@@ -493,6 +549,7 @@ impl DapAdapter {
                     response: Some(response),
                     events: Vec::new(),
                     attach_source_mode: None,
+                    requested_source_mode: None,
                 }
             }
             _ => Decoded::default(),
@@ -508,7 +565,39 @@ impl DapAdapter {
             response: Some(response),
             events: Vec::new(),
             attach_source_mode: None,
+            requested_source_mode: None,
         }
+    }
+
+    /// Build the `pasta/sourcePresentation` custom EVENT [`Value`] for `mode`
+    /// (body `{ "mode": "pasta"|"lua" }`), reusing the existing [`event`](Self::event)
+    /// envelope.
+    ///
+    /// This is the current-mode push notification (requirement 2.5 / 2.6): the
+    /// wiring (task 3.1) emits it on attach-complete (resolved initial mode) and
+    /// after a runtime toggle changes the mode, so the VSCode extension can keep
+    /// its status-bar display in sync without polling.
+    pub(crate) fn source_presentation_event(&mut self, mode: SourceMode) -> Value {
+        self.event(
+            "pasta/sourcePresentation",
+            json!({ "mode": source_mode_str(mode) }),
+        )
+    }
+
+    /// Build the `pasta/sourcePresentation` acceptance RESPONSE [`Value`] echoing
+    /// the resolved `mode` (body `{ "mode": ... }`), correlated to `request_seq`,
+    /// reusing the existing [`response`](Self::response) envelope.
+    ///
+    /// This is the acceptance confirmation (requirement 1.3): the wiring (task
+    /// 3.1) passes the RESOLVED current mode — the newly applied mode on a valid
+    /// request, or the UNCHANGED current mode when the request carried an
+    /// unrecognized value (requirement 1.4) — and this helper echoes it back.
+    pub(crate) fn source_presentation_response(&mut self, request_seq: u64, mode: SourceMode) -> Value {
+        self.response(
+            request_seq,
+            "pasta/sourcePresentation",
+            json!({ "mode": source_mode_str(mode) }),
+        )
     }
 
     /// Encode one outbound [`SessionEvent`] into DAP response/event [`Value`]s.
@@ -573,6 +662,38 @@ impl DapAdapter {
                 vec![self.event("output", body)]
             }
         }
+    }
+}
+
+/// Strictly parse a `pasta/sourcePresentation` `mode` token into a
+/// [`SourceMode`], for the runtime presentation toggle (requirement 1.1 / 1.2 /
+/// 1.4).
+///
+/// ONLY the exact tokens `"pasta"` / `"lua"` (case-insensitive, surrounding
+/// whitespace ignored — mirroring [`SourceMode::parse`]'s tokenizing convention)
+/// yield `Some`; ANY other value yields `None`.
+///
+/// Unlike [`SourceMode::parse`], there is NO invalid-value fallback to the
+/// default `Pasta`. That fallback is correct for `attach` (the author DID specify
+/// a presentation, just wrongly) but WRONG for the runtime toggle: requirement
+/// 1.4 mandates that an unrecognized mode value cause NO mode change, so an
+/// invalid token must map to `None` ("keep current mode"), never silently to
+/// `Pasta`.
+fn parse_source_mode_strict(raw: &str) -> Option<SourceMode> {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "pasta" => Some(SourceMode::Pasta),
+        "lua" => Some(SourceMode::Lua),
+        _ => None,
+    }
+}
+
+/// Map a [`SourceMode`] to its `pasta/sourcePresentation` wire token
+/// (`"pasta"` / `"lua"`), used in both the acceptance response and the custom
+/// event body (requirement 1.3 / 2.5 / 2.6).
+fn source_mode_str(mode: SourceMode) -> &'static str {
+    match mode {
+        SourceMode::Pasta => "pasta",
+        SourceMode::Lua => "lua",
     }
 }
 
@@ -1001,6 +1122,68 @@ mod tests {
         }
     }
 
+    /// Spike (Task 1.1, pasta-debug-lua-view-toggle): adapter-layer proof that a
+    /// SECOND `stopped` event can be emitted MID-PAUSE on the same adapter and a
+    /// subsequent `stackTrace` request is still served — i.e. the
+    /// transport/adapter has NO single-shot guard on `stopped` and does NOT
+    /// require a resume between two stops. This underpins the R3.3 redraw design
+    /// (停止中の `stopped` 再送 → クライアントが stackTrace を再フェッチ): the
+    /// session-side `RefreshPresentation` handler will resend `Stopped { reason,
+    /// thread_id }` and the adapter encodes it identically every time.
+    ///
+    /// This is the adapter-level slice of the spike; the VM-thread-gated
+    /// "停止中のみ再送" judgement lives in `session.rs` (unbuilt here, see
+    /// research.md). The DAP-client refetch semantics themselves are confirmed by
+    /// the official DAP overview / VSCode docs (research.md "Spike 結果").
+    #[test]
+    fn stopped_can_be_resent_midpause_and_stacktrace_still_served() {
+        let mut dap = DapAdapter::new();
+
+        // First stop (e.g. breakpoint hit) — a normal `stopped` event.
+        let first = dap.encode_event(SessionEvent::Stopped {
+            reason: StopReason::Breakpoint,
+            thread_id: 1,
+        });
+        assert_eq!(first.len(), 1);
+        assert_eq!(first[0]["event"], "stopped");
+        assert_eq!(first[0]["body"]["reason"], "breakpoint");
+
+        // No `continue`/resume happens here. A client `stackTrace` arrives and is
+        // accepted (deferred until the session replies with Stack).
+        let st1 = dap.decode_request(&request(50, "stackTrace", json!({ "threadId": 1 })));
+        assert_eq!(st1.command, Some(SessionCommand::StackTrace));
+        let stack1 = dap.encode_event(SessionEvent::Stack(vec![]));
+        assert_eq!(stack1[0]["command"], "stackTrace");
+        assert_eq!(stack1[0]["request_seq"], 50, "first stackTrace correlates");
+
+        // RE-SEND `stopped` WHILE STILL PAUSED (the redraw trigger). The adapter
+        // emits it again with no error and no single-shot guard. This is exactly
+        // what the session-side RefreshPresentation will drive.
+        let resent = dap.encode_event(SessionEvent::Stopped {
+            reason: StopReason::Breakpoint,
+            thread_id: 1,
+        });
+        assert_eq!(resent.len(), 1, "a re-sent stopped is emitted again");
+        assert_eq!(resent[0]["event"], "stopped");
+        assert_eq!(resent[0]["body"]["reason"], "breakpoint");
+        assert_eq!(resent[0]["body"]["threadId"], 1);
+        assert_eq!(resent[0]["body"]["allThreadsStopped"], true);
+        // The re-sent event is a fresh, monotonically-sequenced frame (not a
+        // replay of the first) — the client treats it as a new stop and refetches.
+        assert!(
+            resent[0]["seq"].as_u64().unwrap() > first[0]["seq"].as_u64().unwrap(),
+            "re-sent stopped carries a new monotonic seq"
+        );
+
+        // After the re-send the client refetches the stack; the adapter serves it
+        // again identically (proving the refetch loop the design relies on).
+        let st2 = dap.decode_request(&request(51, "stackTrace", json!({ "threadId": 1 })));
+        assert_eq!(st2.command, Some(SessionCommand::StackTrace));
+        let stack2 = dap.encode_event(SessionEvent::Stack(vec![]));
+        assert_eq!(stack2[0]["command"], "stackTrace");
+        assert_eq!(stack2[0]["request_seq"], 51, "second stackTrace correlates");
+    }
+
     // --- terminated event (R3.5) -------------------------------------------
 
     #[test]
@@ -1130,6 +1313,153 @@ mod tests {
         // Still acked so the client handshake proceeds.
         let resp = decoded.response.expect("attach must ack even without the arg");
         assert_eq!(resp["command"], "attach");
+    }
+
+    // --- pasta/sourcePresentation custom request (R1.1–R1.4) ---------------
+
+    /// R1.1: a `pasta/sourcePresentation` request with `mode: "lua"` decodes to a
+    /// `Decoded` carrying `Some(SourceMode::Lua)` as the requested runtime mode,
+    /// SEPARATE from `attach_source_mode` (which stays `None`). The request is
+    /// acked immediately so the client observes acceptance (R1.3).
+    #[test]
+    fn source_presentation_request_lua_decodes_runtime_mode() {
+        let mut dap = DapAdapter::new();
+        let decoded = dap.decode_request(&request(
+            60,
+            "pasta/sourcePresentation",
+            json!({ "mode": "lua" }),
+        ));
+        assert_eq!(
+            decoded.requested_source_mode,
+            Some(SourceMode::Lua),
+            "R1.1: mode=lua → Some(Lua) requested runtime mode"
+        );
+        // Runtime toggle does NOT populate the attach field (separate semantics).
+        assert_eq!(
+            decoded.attach_source_mode, None,
+            "runtime toggle must not overload attach_source_mode"
+        );
+        // No session command is produced at decode time (wiring owns application).
+        assert_eq!(decoded.command, None);
+    }
+
+    /// R1.2: a `pasta/sourcePresentation` request with `mode: "pasta"` decodes to
+    /// `Some(SourceMode::Pasta)`.
+    #[test]
+    fn source_presentation_request_pasta_decodes_runtime_mode() {
+        let mut dap = DapAdapter::new();
+        let decoded = dap.decode_request(&request(
+            61,
+            "pasta/sourcePresentation",
+            json!({ "mode": "pasta" }),
+        ));
+        assert_eq!(
+            decoded.requested_source_mode,
+            Some(SourceMode::Pasta),
+            "R1.2: mode=pasta → Some(Pasta) requested runtime mode"
+        );
+        assert_eq!(decoded.attach_source_mode, None);
+    }
+
+    /// R1.4: an UNRECOGNIZED `mode` value must yield `None` (NO change). Unlike
+    /// `attach` (which falls back to `Pasta` on garbage via `SourceMode::parse`),
+    /// the runtime toggle parses STRICTLY: an invalid token must NOT silently
+    /// switch the mode to `Pasta` — `None` means "keep current mode".
+    #[test]
+    fn source_presentation_request_invalid_mode_is_none() {
+        let mut dap = DapAdapter::new();
+        let decoded = dap.decode_request(&request(
+            62,
+            "pasta/sourcePresentation",
+            json!({ "mode": "xml" }),
+        ));
+        assert_eq!(
+            decoded.requested_source_mode, None,
+            "R1.4: unrecognized mode → None (no change), NOT a Pasta fallback"
+        );
+    }
+
+    /// R1.4: a MISSING (or non-string) `mode` likewise yields `None` (no change).
+    #[test]
+    fn source_presentation_request_missing_mode_is_none() {
+        let mut dap = DapAdapter::new();
+        let decoded =
+            dap.decode_request(&request(63, "pasta/sourcePresentation", json!({})));
+        assert_eq!(
+            decoded.requested_source_mode, None,
+            "R1.4: absent mode → None (no change)"
+        );
+
+        // A non-string mode is also rejected strictly.
+        let mut dap2 = DapAdapter::new();
+        let decoded2 = dap2.decode_request(&request(
+            64,
+            "pasta/sourcePresentation",
+            json!({ "mode": 1 }),
+        ));
+        assert_eq!(
+            decoded2.requested_source_mode, None,
+            "R1.4: non-string mode → None (no change)"
+        );
+    }
+
+    /// The valid tokens are matched case-insensitively, mirroring the existing
+    /// `SourceMode::parse` convention, but WITHOUT its invalid-value fallback.
+    #[test]
+    fn source_presentation_request_mode_is_case_insensitive() {
+        for (raw, expected) in [
+            ("LUA", SourceMode::Lua),
+            ("Pasta", SourceMode::Pasta),
+            ("  lua  ", SourceMode::Lua),
+        ] {
+            let mut dap = DapAdapter::new();
+            let decoded = dap.decode_request(&request(
+                65,
+                "pasta/sourcePresentation",
+                json!({ "mode": raw }),
+            ));
+            assert_eq!(
+                decoded.requested_source_mode,
+                Some(expected),
+                "mode={raw:?} must parse case-insensitively to {expected:?}"
+            );
+        }
+    }
+
+    /// Event-builder: `source_presentation_event` produces the custom event
+    /// `pasta/sourcePresentation` with body `{ "mode": "lua"|"pasta" }`, reusing
+    /// the existing `event(...)` envelope (R2.5/R2.6 push notification body).
+    #[test]
+    fn source_presentation_event_builds_custom_event() {
+        let mut dap = DapAdapter::new();
+        let ev = dap.source_presentation_event(SourceMode::Lua);
+        assert_eq!(ev["type"], "event");
+        assert_eq!(ev["event"], "pasta/sourcePresentation");
+        assert_eq!(ev["body"]["mode"], "lua");
+        // Reuses the monotonic seq counter from event().
+        assert_eq!(ev["seq"], 1);
+
+        let ev2 = dap.source_presentation_event(SourceMode::Pasta);
+        assert_eq!(ev2["body"]["mode"], "pasta");
+        assert_eq!(ev2["seq"], 2, "event() seq is monotonic");
+    }
+
+    /// Response-builder: `source_presentation_response` echoes the given resolved
+    /// mode in body `{ "mode": ... }` and correlates to the request seq (R1.3
+    /// acceptance response), reusing the existing `response(...)` envelope.
+    #[test]
+    fn source_presentation_response_echoes_resolved_mode() {
+        let mut dap = DapAdapter::new();
+        let resp = dap.source_presentation_response(70, SourceMode::Lua);
+        assert_eq!(resp["type"], "response");
+        assert_eq!(resp["command"], "pasta/sourcePresentation");
+        assert_eq!(resp["request_seq"], 70);
+        assert_eq!(resp["success"], true);
+        assert_eq!(resp["body"]["mode"], "lua", "R1.3: echo resolved mode");
+
+        let resp2 = dap.source_presentation_response(71, SourceMode::Pasta);
+        assert_eq!(resp2["body"]["mode"], "pasta");
+        assert_eq!(resp2["request_seq"], 71);
     }
 
     // --- source resolver seam (R4.3) ---------------------------------------
