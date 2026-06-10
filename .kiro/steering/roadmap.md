@@ -120,3 +120,18 @@ pasta-source-map 完成後のユーザー実機検証（2026-06-08）で判明�
 - [x] pasta-debug-break-coalesce -- F5（Continue）で同一 `.pasta` 行から抜け出せず再ブレークする不具合の修正。1つの `.pasta` 行が複数 `.lua` 行へ展開され、対応する全 `.lua` 行へ BP が登録されるため、Continue 後に同 `.pasta` 行を指す次の `.lua` 行で `should_pause()` が即再ヒットする。`.pasta` 行 BP は「`.pasta` 行訪問ごとに1回だけ」発火し、Continue は次の `.pasta` 行まで残りの `.lua` 行を消化（再ブレーク抑制）するよう停止制御へロジック追加。Dependencies: pasta-source-map（完了済み）
 - [x] pasta-debug-lua-view-toggle -- `.pasta` 行にブレークを張ったまま、停止時に `.lua` 側コードを提示する「lua 表示モード」を**デバッグ中に実行時トグル**できるようにする。内部の提示モード切替基盤（`SourceMode {Pasta, Lua}`／`pasta_source_resolver`／attach 引数 `sourcePresentation`）は既存。DAP カスタムリクエスト＋VSCode 拡張コマンド/ボタンで `.pasta`⇔`.lua` 提示をセッション中に即切替し、スタックトレース/source 応答へ反映。Dependencies: pasta-source-map（完了済み）
   - discovery 決定（2026-06-08）: 仕様分割 = **2仕様**、問題2の操作性 = **デバッグ中の実行時トグル**（attach 時固定ではなく、DAP カスタムリクエスト＋VSCode UI による即切替）。brief.md 作成済み（`.kiro/specs/completed/pasta-debug-break-coalesce/brief.md`, `.kiro/specs/completed/pasta-debug-lua-view-toggle/brief.md`）
+
+## Phase 6: コード総合レビュー＆改善ループ（移植可能・再実行型）
+
+リポジトリ全域を、**外部観測挙動を変えずに**継続改善する「自己発見ループ型」の再実行可能プロセス仕様。`レビュー領域 × レビュー内容` のマトリクスを実装時にギャップ分析で動的生成し、各セルをサブエージェントへ委譲してループ実行する。別プロジェクトへコピー＋再実行で領域を自動再発見し同等効果を狙う。
+
+### アプローチ決定（Phase 6・2026-06-10 discovery）
+- **採用**: 自己発見ループ型（design.md=普遍手順、tasks.md 冒頭にギャップ分析タスク、release-workflow 同様の再実行型 spec・`completed/` へ移動しない）
+- **挙動保存**: 正常系厳密保存・攻撃面ハードニングのみ挙動変化許容（境界はテストで明示）
+- **レビュー内容 7 次元**: ①テスト網羅性 ②karpathy 簡素化 ③脆弱性対策 ④clippy/lint 徹底 ⑤デッドコード/未使用除去 ⑥パニック経路削減 ⑦ドキュメント/依存整合
+- **委譲**: ギャップ分析・各セル改善・自己レビュー・レポート集約をサブエージェントへ。メインはオーケストレーション（ワークリスト・コミット・巻き戻し）に徹する
+- **完走保証**: サイクル毎コミット／デバッグ不能セルは直前コミットへ巻き戻して次へ／途中中断・部分出荷禁止／全完走後に改善レポート生成
+- **却下**: スキル抽出＋spec ラッパ（2層化）、pasta 具体特化（移植時 tasks 再生成が必要）
+
+### Specs (dependency order)
+- [ ] review-improvement-loop -- 移植可能・再実行型のコード総合レビュー＆改善ループ（領域自己発見 × 7 次元マトリクス・サブエージェント委譲・破壊検知＋巻き戻し・改善レポート）。Dependencies: none。brief.md 作成済み（`.kiro/specs/review-improvement-loop/brief.md`）
