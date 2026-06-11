@@ -56,7 +56,7 @@ fn test_get_property_does_not_contaminate_yielded_script() {
         )
         .unwrap();
 
-    let s = result.as_str().unwrap();
+    let s = result.as_string().unwrap().to_string_lossy();
     // has_before should be false, has_get_tag should be true
     assert_eq!(s, "false|true", "yield script must NOT contain prior talk tokens, but MUST contain get tag");
 }
@@ -106,7 +106,7 @@ fn test_get_property_restores_tokens_after_resume() {
         )
         .unwrap();
 
-    let s = result.as_str().unwrap();
+    let s = result.as_string().unwrap().to_string_lossy();
     assert_eq!(s, "true|true", "final build must contain BOTH pre- and post-get_property talk tokens");
 }
 
@@ -151,6 +151,6 @@ fn test_get_property_returns_value_to_caller() {
         )
         .unwrap();
 
-    let s = result.as_str().unwrap();
+    let s = result.as_string().unwrap().to_string_lossy();
     assert_eq!(s, "テストゴースト", "get_property must return the value provided on resume");
 }

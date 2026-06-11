@@ -4,6 +4,33 @@ local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect
 
+-- 共通セットアップ: 関連モジュールを package.loaded から一括リロードする（スイート分離規約）。
+-- 戻り値は EVENT, REG, STORE。reset_res=false の場合のみ pasta.shiori.res をリロードしない
+-- （「既存コルーチン置換」describe の従来挙動を保存）。register/res は依存なしの純モジュールで、
+-- pasta.shiori.event のリロード時に内部 require で追従するため、明示 require の省略は等価。
+local function reload_event_modules(reset_res)
+    package.loaded["pasta.shiori.event"] = nil
+    package.loaded["pasta.shiori.event.register"] = nil
+    package.loaded["pasta.store"] = nil
+    if reset_res ~= false then
+        package.loaded["pasta.shiori.res"] = nil
+    end
+    package.loaded["pasta.shiori.event.boot"] = nil
+    package.loaded["pasta.shiori.event.second_change"] = nil
+
+    local REG = require("pasta.shiori.event.register")
+    local STORE = require("pasta.store")
+    STORE.reset()
+
+    -- 登録をクリア
+    for k in pairs(REG) do
+        REG[k] = nil
+    end
+
+    local EVENT = require("pasta.shiori.event")
+    return EVENT, REG, STORE
+end
+
 -- ============================================================================
 -- Task 2.1: set_co_scene() ローカル関数のテスト
 -- Task 2.2: EVENT.fire thread判定とresume処理
@@ -12,35 +39,17 @@ local expect = require("lua_test.test").expect
 -- ============================================================================
 
 describe("EVENT.fire - コルーチン対応", function()
-    local EVENT, REG, STORE, RES
+    local EVENT, REG, STORE
 
     local function setup()
-        -- パッケージキャッシュをクリア
-        package.loaded["pasta.shiori.event"] = nil
-        package.loaded["pasta.shiori.event.register"] = nil
-        package.loaded["pasta.store"] = nil
-        package.loaded["pasta.shiori.res"] = nil
-        package.loaded["pasta.shiori.event.boot"] = nil
-        package.loaded["pasta.shiori.event.second_change"] = nil
-
-        REG = require("pasta.shiori.event.register")
-        STORE = require("pasta.store")
-        RES = require("pasta.shiori.res")
-        STORE.reset()
-
-        -- 登録をクリア
-        for k in pairs(REG) do
-            REG[k] = nil
-        end
-
-        EVENT = require("pasta.shiori.event")
+        EVENT, REG, STORE = reload_event_modules()
     end
 
     test("handler が thread を返した場合 resume が実行される", function()
         setup()
         local resumed = false
         REG.TestEvent = function(act)
-            return coroutine.create(function(act)
+            return coroutine.create(function()
                 resumed = true
                 return "test_result"
             end)
@@ -55,7 +64,7 @@ describe("EVENT.fire - コルーチン対応", function()
     test("threadがyieldした場合 STORE.co_scene が設定される", function()
         setup()
         REG.TestEvent = function(act)
-            return coroutine.create(function(act)
+            return coroutine.create(function()
                 coroutine.yield("first_yield")
                 return "final"
             end)
@@ -71,7 +80,7 @@ describe("EVENT.fire - コルーチン対応", function()
     test("threadが正常終了した場合 STORE.co_scene が nil にクリアされる", function()
         setup()
         REG.TestEvent = function(act)
-            return coroutine.create(function(act)
+            return coroutine.create(function()
                 return "completed"
             end)
         end
@@ -109,7 +118,7 @@ describe("EVENT.fire - コルーチン対応", function()
     test("yield値が RES.ok() で返される", function()
         setup()
         REG.TestEvent = function(act)
-            return coroutine.create(function(act)
+            return coroutine.create(function()
                 coroutine.yield("yielded_value")
             end)
         end
@@ -123,7 +132,7 @@ describe("EVENT.fire - コルーチン対応", function()
     test("coroutine.resume() エラー時に STORE.co_scene がクリアされる", function()
         setup()
         REG.TestEvent = function(act)
-            return coroutine.create(function(act)
+            return coroutine.create(function()
                 error("intentional_error")
             end)
         end
@@ -145,20 +154,10 @@ end)
 -- ============================================================================
 
 describe("resume_until_valid - nil yieldスキップループ", function()
-    local EVENT, STORE
+    local EVENT
 
     local function setup()
-        package.loaded["pasta.shiori.event"] = nil
-        package.loaded["pasta.shiori.event.register"] = nil
-        package.loaded["pasta.store"] = nil
-        package.loaded["pasta.shiori.res"] = nil
-        package.loaded["pasta.shiori.event.boot"] = nil
-        package.loaded["pasta.shiori.event.second_change"] = nil
-
-        STORE = require("pasta.store")
-        STORE.reset()
-
-        EVENT = require("pasta.shiori.event")
+        EVENT = reload_event_modules()
     end
 
     test("nil yieldしてsuspendedのコルーチンが再resumeされる (1.1)", function()
@@ -261,21 +260,8 @@ describe("EVENT.fire - 既存コルーチン置換", function()
     local EVENT, REG, STORE
 
     local function setup()
-        package.loaded["pasta.shiori.event"] = nil
-        package.loaded["pasta.shiori.event.register"] = nil
-        package.loaded["pasta.store"] = nil
-        package.loaded["pasta.shiori.event.boot"] = nil
-        package.loaded["pasta.shiori.event.second_change"] = nil
-
-        REG = require("pasta.shiori.event.register")
-        STORE = require("pasta.store")
-        STORE.reset()
-
-        for k in pairs(REG) do
-            REG[k] = nil
-        end
-
-        EVENT = require("pasta.shiori.event")
+        -- pasta.shiori.res は従来からリロード対象外（reset_res=false）
+        EVENT, REG, STORE = reload_event_modules(false)
     end
 
     test("新しいコルーチンが設定されると既存のコルーチンがcloseされる", function()
@@ -290,7 +276,7 @@ describe("EVENT.fire - 既存コルーチン置換", function()
 
         -- 新しいthreadを返すハンドラ
         REG.TestEvent = function(act)
-            return coroutine.create(function(act)
+            return coroutine.create(function()
                 coroutine.yield("new")
             end)
         end
@@ -313,11 +299,10 @@ describe("EVENT.fire - 既存コルーチン置換", function()
     test("同じコルーチンを再設定しようとしてもcloseしない", function()
         setup()
 
-        local call_count = 0
         local the_co
 
         REG.TestEvent = function(act)
-            the_co = coroutine.create(function(act)
+            the_co = coroutine.create(function()
                 coroutine.yield("first")
                 coroutine.yield("second")
             end)
@@ -340,33 +325,17 @@ end)
 -- ============================================================================
 
 describe("EVENT.fire - nil yieldスキップ統合", function()
-    local EVENT, REG, STORE, RES
+    local EVENT, REG, STORE
 
     local function setup()
-        package.loaded["pasta.shiori.event"] = nil
-        package.loaded["pasta.shiori.event.register"] = nil
-        package.loaded["pasta.store"] = nil
-        package.loaded["pasta.shiori.res"] = nil
-        package.loaded["pasta.shiori.event.boot"] = nil
-        package.loaded["pasta.shiori.event.second_change"] = nil
-
-        REG = require("pasta.shiori.event.register")
-        STORE = require("pasta.store")
-        RES = require("pasta.shiori.res")
-        STORE.reset()
-
-        for k in pairs(REG) do
-            REG[k] = nil
-        end
-
-        EVENT = require("pasta.shiori.event")
+        EVENT, REG, STORE = reload_event_modules()
     end
 
     test("nil yieldするthreadがresume_until_validで処理される (2.1)", function()
         setup()
         local resume_count = 0
         REG.TestEvent = function(act)
-            return coroutine.create(function(act)
+            return coroutine.create(function()
                 resume_count = resume_count + 1
                 coroutine.yield(nil)            -- スキップされる
                 resume_count = resume_count + 1
@@ -384,7 +353,7 @@ describe("EVENT.fire - nil yieldスキップ統合", function()
     test("有効値を返すthreadハンドラが正常動作 (2.1)", function()
         setup()
         REG.TestEvent = function(act)
-            return coroutine.create(function(act)
+            return coroutine.create(function()
                 return "immediate_result"
             end)
         end
@@ -398,7 +367,7 @@ describe("EVENT.fire - nil yieldスキップ統合", function()
     test("エラー発生時にset_co_sceneでcloseされる (3.1, 3.2)", function()
         setup()
         REG.TestEvent = function(act)
-            return coroutine.create(function(act)
+            return coroutine.create(function()
                 error("test_error")
             end)
         end
@@ -416,7 +385,7 @@ describe("EVENT.fire - nil yieldスキップ統合", function()
     test("ループ終了後にsuspendedならset_co_sceneで保存 (2.4)", function()
         setup()
         REG.TestEvent = function(act)
-            return coroutine.create(function(act)
+            return coroutine.create(function()
                 coroutine.yield(nil)     -- スキップ
                 coroutine.yield("valid") -- 有効値
                 -- まだ終了していない
@@ -434,7 +403,7 @@ describe("EVENT.fire - nil yieldスキップ統合", function()
     test("空シーン（dead + nil）が204 No Contentに変換 (2.3)", function()
         setup()
         REG.TestEvent = function(act)
-            return coroutine.create(function(act)
+            return coroutine.create(function()
                 -- 何もyieldせず終了（空シーン）
                 return nil
             end)
@@ -453,25 +422,10 @@ end)
 -- ============================================================================
 
 describe("EVENT.fire - 後方互換性", function()
-    local EVENT, REG, STORE
+    local EVENT, REG
 
     local function setup()
-        package.loaded["pasta.shiori.event"] = nil
-        package.loaded["pasta.shiori.event.register"] = nil
-        package.loaded["pasta.store"] = nil
-        package.loaded["pasta.shiori.res"] = nil
-        package.loaded["pasta.shiori.event.boot"] = nil
-        package.loaded["pasta.shiori.event.second_change"] = nil
-
-        REG = require("pasta.shiori.event.register")
-        STORE = require("pasta.store")
-        STORE.reset()
-
-        for k in pairs(REG) do
-            REG[k] = nil
-        end
-
-        EVENT = require("pasta.shiori.event")
+        EVENT, REG = reload_event_modules()
     end
 
     test("既存の文字列ハンドラが正常動作 (2.2)", function()

@@ -77,8 +77,8 @@ impl Span {
             return Err(SpanError::InvalidSpan);
         }
 
-        // Check bounds
-        if self.end_byte > source.len() {
+        // Check bounds (reversed ranges would panic on slicing below)
+        if self.start_byte > self.end_byte || self.end_byte > source.len() {
             return Err(SpanError::OutOfBounds {
                 start: self.start_byte,
                 end: self.end_byte,

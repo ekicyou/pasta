@@ -8,7 +8,10 @@ use pasta_lsp::analysis::AnalysisEngine;
 fn test_japanese_scene_name_tokenized() {
     let source = "＊挨拶シーン\n  Alice：こんにちは\n";
     let result = AnalysisEngine::analyze(source);
-    assert!(!result.tokens.is_empty(), "日本語シーン名がトークン化される");
+    assert!(
+        !result.tokens.is_empty(),
+        "日本語シーン名がトークン化される"
+    );
     assert!(result.diagnostics.is_empty(), "パースエラーなし");
 }
 
@@ -16,7 +19,10 @@ fn test_japanese_scene_name_tokenized() {
 fn test_japanese_actor_name_tokenized() {
     let source = "＊テスト\n  太郎：こんにちは\n";
     let result = AnalysisEngine::analyze(source);
-    assert!(!result.tokens.is_empty(), "日本語アクター名がトークン化される");
+    assert!(
+        !result.tokens.is_empty(),
+        "日本語アクター名がトークン化される"
+    );
     assert!(result.diagnostics.is_empty(), "パースエラーなし");
 }
 
@@ -24,7 +30,10 @@ fn test_japanese_actor_name_tokenized() {
 fn test_japanese_global_scene_name() {
     let source = "＊日本語シーン名テスト\n  Alice：テスト\n";
     let result = AnalysisEngine::analyze(source);
-    assert!(result.diagnostics.is_empty(), "日本語グローバルシーン名でエラーなし");
+    assert!(
+        result.diagnostics.is_empty(),
+        "日本語グローバルシーン名でエラーなし"
+    );
     assert!(!result.tokens.is_empty());
 }
 

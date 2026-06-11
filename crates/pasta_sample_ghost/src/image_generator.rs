@@ -97,18 +97,13 @@ fn character_color(character: Character) -> Rgba<u8> {
 pub fn generate_surfaces(output_dir: &Path) -> Result<(), GhostError> {
     std::fs::create_dir_all(output_dir)?;
 
-    // sakura サーフェス (0-8)
-    for expr in Expression::all() {
-        let img = generate_surface(Character::Sakura, expr);
-        let path = output_dir.join(format!("surface{}.png", expr.surface_offset()));
-        img.save(&path)?;
-    }
-
-    // kero サーフェス (10-18)
-    for expr in Expression::all() {
-        let img = generate_surface(Character::Kero, expr);
-        let path = output_dir.join(format!("surface{}.png", 10 + expr.surface_offset()));
-        img.save(&path)?;
+    // sakura サーフェス (0-8) / kero サーフェス (10-18)
+    for (character, base) in [(Character::Sakura, 0), (Character::Kero, 10)] {
+        for expr in Expression::all() {
+            let img = generate_surface(character, expr);
+            let path = output_dir.join(format!("surface{}.png", base + expr.surface_offset()));
+            img.save(&path)?;
+        }
     }
 
     Ok(())
@@ -144,39 +139,22 @@ pub fn generate_surface(character: Character, expression: Expression) -> RgbaIma
 fn draw_body(img: &mut RgbaImage, character: Character, color: Rgba<u8>) {
     let center_x = WIDTH as i32 / 2;
     let body_bottom_y = (BODY_TOP_Y + BODY_HEIGHT).min(HEIGHT as i32 - 1);
+    let max_half_width = 55.0_f32; // 三角形の最大半幅（△は底辺、▽は上辺）
 
-    match character {
-        Character::Sakura => {
-            // △ 上向き三角形（スカート）: 頂点が上、底辺が下
-            // 頂点から始まり、下に向かって広がる
-            let bottom_half_width = 55; // 底辺の半幅
+    for y in BODY_TOP_Y..body_bottom_y {
+        let ratio = (y - BODY_TOP_Y) as f32 / BODY_HEIGHT as f32;
+        // 女の子: △（スカート）= 下に向かって広がる
+        // 男の子: ▽（ズボン）= 下に向かって狭まる
+        let half_width = max_half_width
+            * match character {
+                Character::Sakura => ratio,
+                Character::Kero => 1.0 - ratio,
+            };
+        let left = (center_x as f32 - half_width).max(0.0) as u32;
+        let right = (center_x as f32 + half_width).min(WIDTH as f32) as u32;
 
-            for y in BODY_TOP_Y..body_bottom_y {
-                let ratio = (y - BODY_TOP_Y) as f32 / BODY_HEIGHT as f32;
-                let half_width = bottom_half_width as f32 * ratio;
-                let left = (center_x as f32 - half_width).max(0.0) as u32;
-                let right = (center_x as f32 + half_width).min(WIDTH as f32) as u32;
-
-                for x in left..right {
-                    put_pixel_checked(img, x as i32, y, color);
-                }
-            }
-        }
-        Character::Kero => {
-            // ▽ 下向き三角形（ズボン）: 底辺が上、頂点が下
-            // 上から始まり、下に向かって狭まる
-            let top_half_width = 55; // 上辺の半幅
-
-            for y in BODY_TOP_Y..body_bottom_y {
-                let ratio = (y - BODY_TOP_Y) as f32 / BODY_HEIGHT as f32;
-                let half_width = top_half_width as f32 * (1.0 - ratio);
-                let left = (center_x as f32 - half_width).max(0.0) as u32;
-                let right = (center_x as f32 + half_width).min(WIDTH as f32) as u32;
-
-                for x in left..right {
-                    put_pixel_checked(img, x as i32, y, color);
-                }
-            }
+        for x in left..right {
+            put_pixel_checked(img, x as i32, y, color);
         }
     }
 }
@@ -453,6 +431,101 @@ mod tests {
     fn test_all_expressions() {
         let expressions = Expression::all();
         assert_eq!(expressions.len(), 9);
+    }
+
+    #[test]
+    fn expression_offsets_are_bijective_over_0_to_8() {
+        // 重複オフセットがあるとサーフェス画像が相互上書きされるため、
+        // all() のオフセット集合が 0..=8 と完全一致することを固定する
+        let mut offsets: Vec<u32> = Expression::all()
+            .iter()
+            .map(|e| e.surface_offset())
+            .collect();
+        offsets.sort_unstable();
+        assert_eq!(offsets, (0..=8).collect::<Vec<u32>>());
+    }
+
+    #[test]
+    fn each_expression_renders_distinct_image() {
+        // 9 表情すべてが異なるピクセルパターンを描画すること
+        // （draw_expression の match 腕が潰れる退行を検知する）
+        let expressions = Expression::all();
+        let images: Vec<RgbaImage> = expressions
+            .iter()
+            .map(|&e| generate_surface(Character::Sakura, e))
+            .collect();
+        for i in 0..images.len() {
+            for j in (i + 1)..images.len() {
+                assert_ne!(
+                    images[i].as_raw(),
+                    images[j].as_raw(),
+                    "表情 {:?} と {:?} が同一の描画になっています",
+                    expressions[i],
+                    expressions[j]
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn surface_background_is_transparent_and_head_uses_character_color() {
+        let img = generate_surface(Character::Sakura, Expression::Normal);
+
+        // 四隅は透明（背景は塗らない）
+        assert_eq!(img.get_pixel(0, 0)[3], 0, "左上が透明ではありません");
+        assert_eq!(
+            img.get_pixel(WIDTH - 1, 0)[3],
+            0,
+            "右上が透明ではありません"
+        );
+        assert_eq!(
+            img.get_pixel(0, HEIGHT - 1)[3],
+            0,
+            "左下が透明ではありません"
+        );
+        assert_eq!(
+            img.get_pixel(WIDTH - 1, HEIGHT - 1)[3],
+            0,
+            "右下が透明ではありません"
+        );
+
+        // 頭部（円の内側・表情描画域の外）はキャラクター色
+        let head_pixel = *img.get_pixel(WIDTH / 2, (HEAD_CENTER_Y + 26) as u32);
+        assert_eq!(
+            head_pixel,
+            character_color(Character::Sakura),
+            "頭部がキャラクター色（sakura 赤）ではありません"
+        );
+
+        let kero = generate_surface(Character::Kero, Expression::Normal);
+        let kero_head = *kero.get_pixel(WIDTH / 2, (HEAD_CENTER_Y + 26) as u32);
+        assert_eq!(
+            kero_head,
+            character_color(Character::Kero),
+            "頭部がキャラクター色（kero 青）ではありません"
+        );
+    }
+
+    #[test]
+    fn generate_surfaces_writes_18_decodable_pngs() {
+        let temp = tempfile::TempDir::new().unwrap();
+        generate_surfaces(temp.path()).unwrap();
+
+        // sakura 0-8 / kero 10-18 の 18 ファイルが PNG としてデコード可能で、
+        // 寸法が 128x256 であること（統合テストの存在チェックより踏み込む）
+        for id in (0..=8).chain(10..=18) {
+            let path = temp.path().join(format!("surface{id}.png"));
+            let img = image::open(&path)
+                .unwrap_or_else(|e| panic!("surface{id}.png をデコードできません: {e}"));
+            assert_eq!(img.width(), WIDTH, "surface{id}.png の幅が不正です");
+            assert_eq!(img.height(), HEIGHT, "surface{id}.png の高さが不正です");
+        }
+
+        // 欠番 surface9.png が生成されていないこと
+        assert!(
+            !temp.path().join("surface9.png").exists(),
+            "欠番 surface9.png が生成されています"
+        );
     }
 
     #[test]

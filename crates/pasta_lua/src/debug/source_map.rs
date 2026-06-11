@@ -39,8 +39,8 @@ use crate::normalize::LineShift;
 ///
 /// ランタイムのラインフックが報告する `lua_Debug.source`（`@<絶対 .lua パス>` 想定）
 /// に **正規化キー**で一致させる（design "Source Identity" 437-440・
-/// [`canonicalize_chunk_name`]）。マルチチャンク集約 `SourceMap` のキー型として
-/// 後続タスク（3.4）が用いる。本タスク（3.2）では型エイリアスのみ提供する。
+/// [`canonicalize_chunk_name`]）。マルチチャンク集約 [`SourceMap`] のキー型として
+/// 用いる。
 pub type ChunkName = String;
 
 /// 1 チャンクの **双方向**行写像（design "ChunkSourceMap" 450-456）。
@@ -62,8 +62,9 @@ pub type ChunkName = String;
 /// （キー昇順）を持つため、逆引きの提示順序の安定性（8.3）も自然に満たす。
 ///
 /// トランスパイル完了後は不変（design 434）。生成（producer → `ChunkSourceMap` の
-/// ビルドパイプライン・`finish(shift)` rebase）は後続タスク（3.3）の担当であり、
-/// 本タスクでは [`from_forward`](Self::from_forward) による構築のみを提供する。
+/// ビルドパイプライン・`finish(shift)` rebase）は同モジュールの
+/// [`MapBuilderSink::finish`] が担い、[`from_forward`](Self::from_forward) は既知
+/// forward からの直接構築（`finish` 内部・テスト）に供する。
 #[derive(Debug, Clone, Default)]
 pub struct ChunkSourceMap {
     /// 最終 `.lua` 行（1 始まり）→ 対応する `.pasta` 位置。
@@ -84,8 +85,8 @@ impl ChunkSourceMap {
     ///
     /// `BTreeMap` のキー一意性により 1 `.lua` 行 → 高々 1 `.pasta` 位置の不変条件
     /// （requirements 8.1）が担保される。producer からの本番ビルドパイプラインは
-    /// 後続タスク（3.3）の担当であり、本コンストラクタは主にテスト・3.3 の
-    /// `finish` から `forward` を直接渡す用途に供する。
+    /// [`MapBuilderSink::finish`] が担い、本コンストラクタは `finish` から `forward`
+    /// を直接渡す内部用途とテストに供する。
     pub fn from_forward(forward: BTreeMap<u32, PastaPos>) -> Self {
         Self { forward }
     }
@@ -163,10 +164,10 @@ pub struct MapBuilderSink {
     pasta_file: String,
     /// このチャンク（生成 `.lua` ファイル）を識別するキー（design "Source Identity"）。
     ///
-    /// 本タスク（3.3）では per-chunk マップの確定までを担い、マルチチャンク集約
-    /// `SourceMap` への登録（task 3.4）でこのキーを用いる。`finish` の戻り値
-    /// [`ChunkSourceMap`] 自体はチャンク名を保持しないため、本フィールドは集約側が
-    /// 参照する識別子として保持する。
+    /// マルチチャンク集約 [`SourceMap`] への登録
+    /// （[`SourceMap::insert_chunk`]・loader の `build_source_map`）でこのキーを
+    /// 用いる。`finish` の戻り値 [`ChunkSourceMap`] 自体はチャンク名を保持しないため、
+    /// 本フィールドは集約側が参照する識別子として保持する。
     chunk_name: ChunkName,
     /// pre-normalize の `lua_line`（1 始まり・`out_line`）→ `.pasta` 位置。
     ///
@@ -297,8 +298,8 @@ fn canonicalize_pasta_file(raw: &str) -> String {
 /// 複数チャンク（各生成 `.lua` ファイル）の [`ChunkSourceMap`] を **正規化チャンク名**
 /// で集約し、`.lua`→`.pasta` の前方解決と `.pasta`→`.lua` の逆引き解決を提供する。
 /// トランスパイル完了後は不変で、`Arc<SourceMap>` として consumer（resolver/BP 翻訳/
-/// stepper）へ読み取り専用共有される（design 434・`Arc` 化は後続タスク 4.x の担当で
-/// 本タスクは型・構築・解決のみを提供する）。
+/// stepper）へ読み取り専用共有される（design 434・`Arc` 化は loader の
+/// `build_source_map` が行い、本モジュールは型・構築・解決を提供する）。
 ///
 /// # キー正規化（design "Source Identity" 437-440）
 ///
@@ -339,8 +340,8 @@ impl SourceMap {
         Self::default()
     }
 
-    /// 1 チャンクを集約へ登録する（loader（task 4.3）が per-`.pasta` の `finish` 結果を
-    /// 投入する想定の builder API）。
+    /// 1 チャンクを集約へ登録する（loader の `build_source_map` が per-`.pasta` の
+    /// `finish` 結果を投入する builder API）。
     ///
     /// `chunk_name`（生フック源／ローダ由来パス）を [`canonicalize_chunk_name`] で
     /// 正規化して [`chunks`](Self::chunks) のキーとし、`pasta_file` を
@@ -350,16 +351,35 @@ impl SourceMap {
     ///
     /// 逆引き各 `.pasta` 行の `Vec` は、追記後に **チャンク名昇順 → `.lua` 行昇順**で
     /// 安定ソートし、提示順序を決定的にする（design 435・requirements 8.3）。
+    ///
+    /// # 再投入は置換セマンティクス（防御的ハードニング）
+    ///
+    /// 同一チャンク名（正規化後）を再投入した場合、前方写像（`HashMap` 上書き）と
+    /// 整合するよう **逆引き索引からも旧チャンクのエントリを除去**してから登録する。
+    /// 本番経路（loader）は 1 チャンク 1 回投入のため正常系では no-op だが、公開 API
+    /// として再投入時に stale な `(chunk, lua_line)` を残さない。
     pub fn insert_chunk(&mut self, chunk_name: ChunkName, pasta_file: String, map: ChunkSourceMap) {
         let chunk_key = canonicalize_chunk_name(&chunk_name);
         let file_key = canonicalize_pasta_file(&pasta_file);
+
+        // 再投入（同一正規化チャンク名）なら、旧チャンク由来の逆引きエントリを全
+        // ファイルキーから除去する（forward の HashMap 上書きと整合・stale 残留防止）。
+        // 旧投入時の `.pasta` ファイルが今回と異なる可能性があるため全キーを掃く。
+        if self.chunks.contains_key(&chunk_key) {
+            self.reverse.retain(|_, per_file| {
+                per_file.retain(|_, entries| {
+                    entries.retain(|(ck, _)| *ck != chunk_key);
+                    !entries.is_empty()
+                });
+                !per_file.is_empty()
+            });
+        }
 
         // 逆引き索引を、このチャンクの前方写像（`.lua` 行昇順の `BTreeMap`）から構築。
         let per_file = self.reverse.entry(file_key).or_default();
         // `forward` の反復は `.lua` 行昇順（BTreeMap）。各 `.pasta` 行へ
         // (chunk_key, lua_line) を追記する。
-        for lua_line in map_forward_iter(&map) {
-            let (lua_line, pasta_line) = lua_line;
+        for (lua_line, pasta_line) in map_forward_iter(&map) {
             per_file
                 .entry(pasta_line)
                 .or_default()
@@ -742,7 +762,7 @@ mod tests {
         assert_eq!(map.pasta_for_lua(4), Some(&pos(20)));
         // 削除行（pre 4）の記録は除外され、最終 .lua には現れない。
         assert!(
-            !map.pasta_for_lua(5).is_some(),
+            map.pasta_for_lua(5).is_none(),
             "削除行に紐づく記録は最終写像に残ってはならない（2.1）"
         );
         // 削除によって生じる旧位置（pre 5 のままの行 5）は存在しない。
@@ -841,9 +861,9 @@ mod tests {
     /// を構築する。
     ///
     /// - chunk "a"（`.pasta` ファイル `C:/proj/scene/a.pasta`）:
-    ///     最終 `.lua` 10→`.pasta` 3, 12→`.pasta` 7, 13→`.pasta` 7, 20→`.pasta` 9
+    ///   最終 `.lua` 10→`.pasta` 3, 12→`.pasta` 7, 13→`.pasta` 7, 20→`.pasta` 9
     /// - chunk "b"（`.pasta` ファイル `C:/proj/scene/b.pasta`）:
-    ///     最終 `.lua` 5→`.pasta` 7（chunk a と同じ `.pasta` 行番号だが別ファイル）
+    ///   最終 `.lua` 5→`.pasta` 7（chunk a と同じ `.pasta` 行番号だが別ファイル）
     ///
     /// さらに、**同一 `.pasta` ファイルが複数チャンクへ写像される**ケース（4.1 クロス
     /// チャンク）を表現するため chunk "c" も同じ `C:/proj/scene/a.pasta` を使い、
@@ -1117,5 +1137,338 @@ mod tests {
         assert_eq!(map.pasta_for_lua(20), Some(&pos(9)));
         // サイドカーファイルは生成されていない。
         assert!(!sidecar_path_for_lua(&bad_lua).exists());
+    }
+
+    // =======================================================================
+    // 追補テスト（review-improvement-loop cell 3.30・G1 テスト網羅）
+    // =======================================================================
+
+    /// 空の `ChunkSourceMap`（`new`/`Default`）は件数 0・空判定 true で、前方/逆引き
+    /// とも「対応なし」を返す（2.3: 誤対応づけをしない最小ケース）。
+    #[test]
+    fn chunk_source_map_empty_has_no_mappings() {
+        let empty = ChunkSourceMap::new();
+        assert_eq!(empty.len(), 0);
+        assert!(empty.is_empty());
+        assert_eq!(empty.pasta_for_lua(1), None);
+        assert_eq!(empty.lua_lines_for_pasta(1), Vec::<u32>::new());
+
+        // `Default` 構築も `new` と同一挙動。
+        let defaulted = ChunkSourceMap::default();
+        assert!(defaulted.is_empty());
+        assert_eq!(defaulted.pasta_for_lua(1), None);
+
+        // 非空マップでは len/is_empty が件数を反映する（対になる正例）。
+        let map = sample_map();
+        assert_eq!(map.len(), 5);
+        assert!(!map.is_empty());
+    }
+
+    /// 記録ゼロ件の `MapBuilderSink::finish` は空の `ChunkSourceMap` を返す
+    /// （producer が一行も record しなかったチャンクでも安全に確定できる）。
+    #[test]
+    fn map_builder_sink_finish_with_no_records_yields_empty_map() {
+        let (_out, shift) = normalize_output_with_shift("a\nb\n");
+        let sink = MapBuilderSink::new("dict.pasta".to_string(), "chunk".to_string());
+        let map = sink.finish(&shift);
+        assert!(map.is_empty());
+        assert_eq!(map.pasta_for_lua(1), None);
+    }
+
+    /// `canonicalize_chunk_name` は (1) `@` の無い入力では strip を素通りし、
+    /// (2) 正規形入力に対して **冪等**（再適用しても不変）であり、(3) `@` は
+    /// **先頭 1 個のみ**除去する（`strip_prefix`・途中の `@` は保持）。
+    /// STORE と QUERY が同一 canonicalizer を多段に通っても安全であることの根拠。
+    #[test]
+    fn canonicalize_chunk_name_is_idempotent_and_strips_only_leading_at() {
+        // `@` 無し入力: 区切り・大小規則のみが効く。
+        let plain = canonicalize_chunk_name(r"C:\proj\cache\sys.lua");
+        assert!(!plain.contains('\\'));
+        #[cfg(windows)]
+        assert_eq!(plain, "c:/proj/cache/sys.lua");
+        #[cfg(not(windows))]
+        assert_eq!(plain, "C:/proj/cache/sys.lua");
+
+        // 冪等性: 正規形を再正規化しても不変。
+        assert_eq!(canonicalize_chunk_name(&plain), plain);
+        let hook = canonicalize_chunk_name(r"@C:\proj\cache\sys.lua");
+        assert_eq!(canonicalize_chunk_name(&hook), hook);
+
+        // 先頭 `@` のみ除去（`@@x` → `@x`・途中の `@` は保持）。
+        assert_eq!(canonicalize_chunk_name("@@x.lua"), "@x.lua");
+        assert_eq!(canonicalize_chunk_name("a@b.lua"), "a@b.lua");
+
+        // 空文字列・`@` 単独も panic せず決定的に処理する。
+        assert_eq!(canonicalize_chunk_name(""), "");
+        assert_eq!(canonicalize_chunk_name("@"), "");
+    }
+
+    /// 空の `SourceMap`（チャンク未登録）は全 `resolve_*` で「対応なし」を返す
+    /// （2.3: 登録前の query で誤対応づけ・panic をしない）。
+    #[test]
+    fn source_map_empty_resolves_to_nothing() {
+        let sm = SourceMap::new();
+        assert_eq!(sm.resolve_lua_to_pasta("any.lua", 1), None);
+        assert!(sm.resolve_pasta_to_lua("any.pasta", 1).is_empty());
+        assert_eq!(sm.nearest_pasta_line_with_mapping("any.pasta", 1), None);
+    }
+
+    /// 空の `ChunkSourceMap` を `insert_chunk` しても、解決は全て「対応なし」のまま
+    /// （ファイルキーだけが登録され、写像ゼロ件でも `range` 系が安全に動く）。
+    #[test]
+    fn source_map_insert_empty_chunk_yields_no_resolutions() {
+        let mut sm = SourceMap::new();
+        sm.insert_chunk(
+            "@C:/proj/cache/empty.lua".to_string(),
+            "C:/proj/scene/empty.pasta".to_string(),
+            ChunkSourceMap::new(),
+        );
+        // 登録済みチャンクだが対応行ゼロ → None。
+        assert_eq!(sm.resolve_lua_to_pasta("C:/proj/cache/empty.lua", 1), None);
+        // 逆引き・最近接も「対応なし」。
+        assert!(sm.resolve_pasta_to_lua("C:/proj/scene/empty.pasta", 1).is_empty());
+        assert_eq!(
+            sm.nearest_pasta_line_with_mapping("C:/proj/scene/empty.pasta", 1),
+            None
+        );
+    }
+
+    /// STORE 側 `.pasta` ファイルキーの正規化: `insert_chunk` に **非正規形**（`\`
+    /// 区切り）の `pasta_file` を渡しても、正規形（`/` 区切り）の query で逆引き・
+    /// 最近接が一致する（design Validation Hook 475・STORE/QUERY 同一規則）。
+    /// 一方、前方解決が返す `PastaPos::file` は **格納時の生文字列**を保持する
+    /// （正規化はキー照合のみで、producer が記録したパス表現は不変）。
+    #[test]
+    fn source_map_canonicalizes_pasta_file_key_on_store_side() {
+        let raw_file = r"C:\proj\scene\raw.pasta"; // 非正規形（backslash）
+        let mut fwd = BTreeMap::new();
+        fwd.insert(10u32, pos_in(raw_file, 3));
+
+        let mut sm = SourceMap::new();
+        sm.insert_chunk(
+            "@C:/proj/cache/raw.lua".to_string(),
+            raw_file.to_string(),
+            ChunkSourceMap::from_forward(fwd),
+        );
+
+        // 正規形（`/` 区切り）query が STORE 時の非正規形キーへ一致する。
+        // チャンク名の正規形は Windows では小文字・非 Windows は大小保持。
+        #[cfg(windows)]
+        let expected_chunk = "c:/proj/cache/raw.lua".to_string();
+        #[cfg(not(windows))]
+        let expected_chunk = "C:/proj/cache/raw.lua".to_string();
+        assert_eq!(
+            sm.resolve_pasta_to_lua("C:/proj/scene/raw.pasta", 3),
+            vec![(expected_chunk, 10u32)]
+        );
+        assert_eq!(
+            sm.nearest_pasta_line_with_mapping("C:/proj/scene/raw.pasta", 1),
+            Some(3)
+        );
+        // 前方解決の返す PastaPos::file は格納時の生文字列（backslash のまま）。
+        assert_eq!(
+            sm.resolve_lua_to_pasta("C:/proj/cache/raw.lua", 10),
+            Some(&pos_in(raw_file, 3))
+        );
+    }
+
+    /// `read_sidecar` のエラー経路: サイドカーが存在しない → `NotFound` の `Err`、
+    /// JSON 不正 → `InvalidData` の `Err`。いずれも panic せず非致命（3.1/611 の
+    /// 「warn して継続」を呼び出し側が選べる単一の `Result` 経路）。
+    #[test]
+    fn read_sidecar_missing_or_corrupt_returns_err_without_panic() {
+        let dir = TempDir::new().unwrap();
+        let lua_path = dir.path().join("sys.lua");
+
+        // (1) サイドカー不存在 → NotFound。
+        let missing = read_sidecar(&lua_path);
+        assert_eq!(
+            missing.expect_err("不存在は Err").kind(),
+            std::io::ErrorKind::NotFound
+        );
+
+        // (2) JSON 不正（壊れたサイドカー）→ InvalidData。
+        std::fs::write(sidecar_path_for_lua(&lua_path), b"{ not valid json !!").unwrap();
+        let corrupt = read_sidecar(&lua_path);
+        assert_eq!(
+            corrupt.expect_err("JSON 不正は Err").kind(),
+            std::io::ErrorKind::InvalidData
+        );
+    }
+
+    /// `SidecarFile::to_chunk` は同一 `lua_line` の重複ペアを **last-write-wins** で
+    /// 復元する（`forward` の `BTreeMap` キー一意性 = 8.1 の不変条件が読込側でも保たれ、
+    /// 手書き・破損気味のサイドカーでも 1 `.lua` 行 → 高々 1 `.pasta` 位置に確定する）。
+    #[test]
+    fn sidecar_to_chunk_duplicate_lua_line_is_last_write_wins() {
+        let sidecar = SidecarFile {
+            version: SIDECAR_VERSION,
+            pasta_file: "dict.pasta".to_string(),
+            pairs: vec![[5, 1], [5, 9], [7, 2]],
+        };
+        let map = sidecar.to_chunk();
+        // 重複キー 5 は後勝ち（.pasta 9）で一意に確定。
+        assert_eq!(map.pasta_for_lua(5), Some(&pos(9)));
+        assert_eq!(map.lua_lines_for_pasta(1), Vec::<u32>::new());
+        assert_eq!(map.lua_lines_for_pasta(9), vec![5]);
+        assert_eq!(map.len(), 2);
+    }
+
+    /// 文書化テスト（現行挙動の固定）: `read_sidecar` は `version` フィールドを
+    /// **検証しない**（未知バージョンでも行ペアを復元する・前方互換読み）。スキーマ
+    /// 変更時に読み手が判別できるよう `version` を **持つ**（602）が、現行 reader は
+    /// 値を選別しない。将来 version ゲートを導入する場合は本テストを更新すること。
+    #[test]
+    fn read_sidecar_currently_accepts_unknown_version() {
+        let dir = TempDir::new().unwrap();
+        let lua_path = dir.path().join("sys.lua");
+        let future = SidecarFile {
+            version: SIDECAR_VERSION + 999,
+            pasta_file: "dict.pasta".to_string(),
+            pairs: vec![[10, 3]],
+        };
+        std::fs::write(
+            sidecar_path_for_lua(&lua_path),
+            serde_json::to_vec(&future).unwrap(),
+        )
+        .unwrap();
+
+        let reread = read_sidecar(&lua_path).expect("未知 version でも現行は読める");
+        assert_eq!(reread.pasta_for_lua(10), Some(&pos(3)));
+    }
+
+    /// `write_sidecar` は親ディレクトリ不在でも idempotent に作成して書き込む
+    /// （呼び出し順に依存しない堅牢性・`save_cache` 前でも成功する）。あわせて
+    /// 写像ゼロ件のサイドカーも往復同一（空 `pairs` → 空マップ復元）。
+    #[test]
+    fn write_sidecar_creates_parents_and_round_trips_empty_map() {
+        let dir = TempDir::new().unwrap();
+        // 親 `nested/deep` は未作成。
+        let lua_path = dir.path().join("nested").join("deep").join("x.lua");
+        let empty = ChunkSourceMap::new();
+
+        write_sidecar(&lua_path, "dict.pasta", &empty)
+            .expect("親ディレクトリを作成して書き込めること");
+        assert!(sidecar_path_for_lua(&lua_path).exists());
+
+        // 空マップの往復同一性。
+        let reread = read_sidecar(&lua_path).expect("read_sidecar");
+        assert!(reread.is_empty());
+        let parsed: SidecarFile =
+            serde_json::from_slice(&std::fs::read(sidecar_path_for_lua(&lua_path)).unwrap())
+                .unwrap();
+        assert_eq!(parsed.pairs, Vec::<[u32; 2]>::new());
+        assert_eq!(parsed.version, SIDECAR_VERSION);
+    }
+
+    /// `sidecar_path_for_lua` は拡張子を **付加**する（置換しない）: `.lua` 以外・
+    /// 拡張子なしのパスでも一様に `<path>.map` を導出する（決定的なファイル名規則）。
+    #[test]
+    fn sidecar_path_appends_for_any_extension() {
+        assert_eq!(
+            sidecar_path_for_lua(Path::new("/cache/noext")),
+            PathBuf::from("/cache/noext.map")
+        );
+        assert_eq!(
+            sidecar_path_for_lua(Path::new("/cache/a.tar.lua")),
+            PathBuf::from("/cache/a.tar.lua.map")
+        );
+    }
+
+    // =======================================================================
+    // 防御的ハードニング回帰（review-improvement-loop cell 3.31・G3）
+    // =======================================================================
+
+    /// 同一チャンク名の **再投入は置換セマンティクス**: forward（`HashMap` 上書き）
+    /// だけでなく **逆引き索引からも旧チャンクのエントリが除去**され、stale な
+    /// `(chunk, lua_line)` が残留しない（3.30 申し送りの防御的ハードニング）。
+    /// 本番経路（loader）は 1 チャンク 1 回投入のため正常系の挙動は不変だが、
+    /// `insert_chunk` は公開 API であり外部呼び出しでの再投入に備える。
+    #[test]
+    fn source_map_reinsert_same_chunk_replaces_reverse_entries() {
+        let file_a = "C:/proj/scene/a.pasta";
+        let file_b = "C:/proj/scene/b.pasta";
+
+        // 掃除の精密性確認用: 別チャンク "other" も file_a へ写像を持つ。
+        let mut fwd_other = BTreeMap::new();
+        fwd_other.insert(50u32, pos_in(file_a, 3));
+
+        let mut fwd_v1 = BTreeMap::new();
+        fwd_v1.insert(10u32, pos_in(file_a, 3));
+        fwd_v1.insert(12u32, pos_in(file_a, 7));
+
+        let mut sm = SourceMap::new();
+        sm.insert_chunk(
+            "@C:/proj/cache/other.lua".to_string(),
+            file_a.to_string(),
+            ChunkSourceMap::from_forward(fwd_other),
+        );
+        sm.insert_chunk(
+            "@C:/proj/cache/x.lua".to_string(),
+            file_a.to_string(),
+            ChunkSourceMap::from_forward(fwd_v1),
+        );
+
+        // 再トランスパイル相当の v2: 同一チャンク名・同一 .pasta だが対応行が移動。
+        let mut fwd_v2 = BTreeMap::new();
+        fwd_v2.insert(20u32, pos_in(file_a, 5));
+        sm.insert_chunk(
+            "@C:/proj/cache/x.lua".to_string(),
+            file_a.to_string(),
+            ChunkSourceMap::from_forward(fwd_v2),
+        );
+
+        // 正規化キー（Windows は小文字・非 Windows は大小保持）。
+        #[cfg(windows)]
+        let (x_key, other_key) = (
+            "c:/proj/cache/x.lua".to_string(),
+            "c:/proj/cache/other.lua".to_string(),
+        );
+        #[cfg(not(windows))]
+        let (x_key, other_key) = (
+            "C:/proj/cache/x.lua".to_string(),
+            "C:/proj/cache/other.lua".to_string(),
+        );
+
+        // forward は v2 のみ（HashMap insert 上書き — 従来から正しい）。
+        assert_eq!(sm.resolve_lua_to_pasta("C:/proj/cache/x.lua", 10), None);
+        assert_eq!(
+            sm.resolve_lua_to_pasta("C:/proj/cache/x.lua", 20),
+            Some(&pos_in(file_a, 5))
+        );
+        // 逆引きも v2 のみ: v1 の旧エントリ（行 3 の (x,10)・行 7 の (x,12)）が
+        // 残留しない。別チャンク "other" の行 3 エントリは温存される（掃除の精密性）。
+        assert_eq!(
+            sm.resolve_pasta_to_lua(file_a, 3),
+            vec![(other_key.clone(), 50u32)],
+            "再投入チャンクの旧エントリのみ除去・他チャンクは温存"
+        );
+        assert!(
+            sm.resolve_pasta_to_lua(file_a, 7).is_empty(),
+            "旧 v1 だけが持っていた .pasta 行 7 は対応なしへ戻る"
+        );
+        assert_eq!(
+            sm.resolve_pasta_to_lua(file_a, 5),
+            vec![(x_key.clone(), 20u32)]
+        );
+        // 最近接調整も stale 行 7 を返さない（{3, 5} のみが対応行）。
+        assert_eq!(sm.nearest_pasta_line_with_mapping(file_a, 4), Some(5));
+        assert_eq!(sm.nearest_pasta_line_with_mapping(file_a, 6), None);
+
+        // 再投入で .pasta ファイルが移った場合: 旧ファイルキー側の residue も掃除。
+        let mut fwd_v3 = BTreeMap::new();
+        fwd_v3.insert(30u32, pos_in(file_b, 9));
+        sm.insert_chunk(
+            "@C:/proj/cache/x.lua".to_string(),
+            file_b.to_string(),
+            ChunkSourceMap::from_forward(fwd_v3),
+        );
+        assert!(
+            sm.resolve_pasta_to_lua(file_a, 5).is_empty(),
+            "旧ファイル a.pasta 側の v2 エントリも除去される"
+        );
+        assert_eq!(sm.resolve_pasta_to_lua(file_b, 9), vec![(x_key, 30u32)]);
+        // 他チャンクの a.pasta エントリは引き続き温存。
+        assert_eq!(sm.resolve_pasta_to_lua(file_a, 3), vec![(other_key, 50u32)]);
     }
 }

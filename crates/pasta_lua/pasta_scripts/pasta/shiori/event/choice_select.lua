@@ -18,9 +18,8 @@ local CHOICE_ID_REF_INDEX = 0
 --- SCENE.co_exec と同等のコルーチン作成（スコープ付き SCENE.search 用）
 --- co_exec/find_scene は global_scene_name を透過しないため、
 --- SCENE.search を直接呼んでコルーチン化する。
---- @param act ShioriAct actオブジェクト
 --- @param search_result SceneSearchResult SCENE.search の戻り値
---- @return thread シーンコルーチン
+--- @return thread シーンコルーチン（act は EVENT.fire の初回 resume 時に渡される）
 local function create_scene_coroutine(search_result)
     local fn = search_result.func
     local function wrapped_fn(act, ...)

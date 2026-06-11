@@ -40,8 +40,7 @@ pasta_core/
 │       ├── word_table.rs       # WordTable
 │       └── random.rs           # RandomSelector インターフェース
 └── tests/
-    ├── word_table_test.rs   # WordTable 統合テスト
-    └── scene_table_test.rs  # SceneTable 統合テスト
+    └── word_table_test.rs   # WordTable 統合テスト
 ```
 
 > **Note**: パーサーモジュール（parser/, grammar.pest）は独立クレート [pasta_dsl](../pasta_dsl/README.md) に移動されました。
@@ -71,60 +70,45 @@ pasta_core/
 
 ## 使用例
 
-### 基本的なパース
+> **Note**: DSLのパースは [pasta_dsl](../pasta_dsl/README.md) クレートを使用してください。
+
+### シーンテーブルの構築と検索
 
 ```rust
-// DSLパーサーは pasta_dsl クレートを使用してください
-use pasta_dsl::parser::{parse_str, FileItem, PastaFile};
+use std::collections::HashMap;
+use pasta_core::registry::{SceneRegistry, SceneTable, DefaultRandomSelector};
 
-let source = r#"
-＊挨拶
-    Alice：こんにちは
-    Bob：やあ！
-"#;
+// Pass 1: トランスパイル時にシーンを登録
+let mut registry = SceneRegistry::new();
+registry.register_global("挨拶", HashMap::new());
 
-let ast = parse_str(source, "example.pasta").unwrap();
+// Runtime: SceneTable へ変換して前方一致検索
+let mut table = SceneTable::from_scene_registry(
+    registry,
+    Box::new(DefaultRandomSelector::new()),
+).unwrap();
 
-// グローバルシーン数をカウント
-let scene_count = ast.items.iter()
-    .filter(|i| matches!(i, FileItem::GlobalSceneScope(_)))
-    .count();
-println!("Parsed {} global scenes", scene_count);
+let scene_id = table.resolve_scene_id("挨拶", &HashMap::new()).unwrap();
+let scene = table.get_scene(scene_id).unwrap();
+println!("Selected: {}", scene.fn_name);
 ```
 
-### シーンテーブルの構築
+### 単語テーブルの構築と検索
 
 ```rust
-use pasta_core::registry::{SceneTable, SceneEntry, SceneId, SceneScope, DefaultRandomSelector};
+use pasta_core::registry::{WordDefRegistry, WordTable, DefaultRandomSelector};
 
-let mut table = SceneTable::new();
+// Pass 1: 単語定義を登録
+let mut registry = WordDefRegistry::new();
+registry.register_global("挨拶", vec!["こんにちは".to_string(), "おはよう".to_string()]);
 
-// シーンを登録
-let entry = SceneEntry {
-    id: SceneId(0),
-    name: "挨拶".to_string(),
-    scope: SceneScope::Global,
-    file_path: "example.pasta".to_string(),
-};
-table.insert(entry);
-
-// 完全一致検索
-let selector = DefaultRandomSelector::new();
-if let Some(scene) = table.get_exact("挨拶", &selector) {
-    println!("Found scene: {:?}", scene);
-}
-```
-
-### 前方一致検索
-
-```rust
-use pasta_core::registry::{SceneTable, DefaultRandomSelector};
-
-let selector = DefaultRandomSelector::new();
-// "挨拶" で始まるすべてのシーンからランダムに1つ選択
-if let Some(scene) = table.get_prefix("挨拶", &selector) {
-    println!("Selected: {:?}", scene);
-}
+// Runtime: WordTable へ変換してランダム選択（同一キーは循環消費）
+let mut table = WordTable::from_word_def_registry(
+    registry,
+    Box::new(DefaultRandomSelector::new()),
+);
+let word = table.search_word("", "挨拶", &[]).unwrap();
+println!("Selected: {}", word);
 ```
 
 ## 依存関係
@@ -132,9 +116,8 @@ if let Some(scene) = table.get_prefix("挨拶", &selector) {
 | クレート        | バージョン | 用途                       |
 | --------------- | ---------- | -------------------------- |
 | thiserror       | 2          | エラー型定義               |
-| fast_radix_trie | 1.1.0      | 前方一致検索（SceneTable） |
-| rand            | 0.9        | ランダム選択               |
-| tracing         | 0.1        | ロギング・診断             |
+| fast_radix_trie | 1.2.0      | 前方一致検索（SceneTable） |
+| rand            | 0.10       | ランダム選択               |
 
 ## 関連クレート
 

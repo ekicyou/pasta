@@ -115,7 +115,10 @@ impl ShioriTestEnv {
 /// - Appends `\r\n\r\n` terminator
 fn normalize_request(text: &str) -> String {
     let trimmed = text.trim_matches(|c| c == '\r' || c == '\n');
-    let mut result = trimmed.replace("\r\n", "\n").replace('\r', "\n").replace('\n', "\r\n");
+    let mut result = trimmed
+        .replace("\r\n", "\n")
+        .replace('\r', "\n")
+        .replace('\n', "\r\n");
     result.push_str("\r\n\r\n");
     result
 }

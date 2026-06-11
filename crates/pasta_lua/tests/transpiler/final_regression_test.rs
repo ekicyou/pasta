@@ -3,13 +3,13 @@
 //! 仕様参照（`.kiro/specs/pasta-source-map/`）:
 //! - requirements.md **7.1**:
 //!   「While ソースマップ生成が無効である, the ソースマップ生成器 shall 生成 `.lua` の
-//!    出力内容を従来と完全に一致させる（バイト不変）」
+//!   出力内容を従来と完全に一致させる（バイト不変）」
 //! - requirements.md **7.2**:
 //!   「The デバッグ基盤 shall 先行仕様で出荷済みの Lua レベルデバッグ（生成 `.lua` 上の
-//!    BP・ステップ・変数 inspect・コルーチン inspect・VSCode attach）を引き続き動作させる」
+//!   BP・ステップ・変数 inspect・コルーチン inspect・VSCode attach）を引き続き動作させる」
 //! - requirements.md **7.3**:
 //!   「When 本機能を本番化する, the プロジェクト shall 実証用の使い捨て feature gate
-//!    （`pasta-source-map-slice` 等）を本番経路へ統合または除去し、暫定ハーネスを残置しない」
+//!   （`pasta-source-map-slice` 等）を本番経路へ統合または除去し、暫定ハーネスを残置しない」
 //! - design.md "Performance / Backward Compatibility"（643-649 行）: 二相のゼロコスト。OFF 経路は
 //!   sink 非装着で `record_*` が no-op ＝出力バイト不変・ラインフック未装着・`SourceMap` 非構築。
 //! - design.md "Migration Strategy" → Rollback triggers（668 行）: ゼロコスト回帰失敗（7.1）／

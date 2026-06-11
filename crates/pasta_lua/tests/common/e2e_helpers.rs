@@ -47,7 +47,7 @@ pub fn create_runtime_with_finalize() -> mlua::Result<Lua> {
         .to_string_lossy()
         .replace('\\', "/");
 
-    lua.load(&format!(
+    lua.load(format!(
         r#"
         package.path = "{scripts_dir}/?.lua;{scripts_dir}/?/init.lua;" .. package.path
         "#
@@ -106,7 +106,7 @@ pub fn create_runtime_with_search(ctx: TranspileContext) -> mlua::Result<Lua> {
         .to_string_lossy()
         .replace('\\', "/");
 
-    lua.load(&format!(
+    lua.load(format!(
         r#"
         package.path = "{scripts_dir}/?.lua;{scripts_dir}/?/init.lua;" .. package.path
         "#

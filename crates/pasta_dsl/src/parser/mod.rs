@@ -1,27 +1,16 @@
-//! Parser2 module for Pasta DSL using pasta2.pest grammar.
+//! Parser module for Pasta DSL using the grammar.pest grammar.
 //!
 //! grammar.pest `file = ( file_scope | global_scene_scope )*` 仕様に完全準拠。
 //! 複数の file_scope と global_scene_scope を任意順序・任意回数で正確に処理します。
 //!
 //! This module provides parsing functionality based on the authoritative
-//! pasta2.pest grammar specification (now located at `grammar.pest`).
-//! The grammar file is immutable and represents the canonical definition
-//! of Pasta DSL syntax.
-//!
-//! # Migration Purpose
-//!
-//! This module exists to enable a gradual migration from the legacy `parser`
-//! module to a new implementation based on the verified `pasta2.pest` grammar.
-//! Both modules coexist during the transition period:
-//!
-//! - `pasta::parser` - Legacy parser (to be deprecated)
-//! - `pasta::parser2` - New parser based on pasta2.pest (this module)
+//! `grammar.pest` grammar specification.
 //!
 //! # Grammar Authority
 //!
 //! The `grammar.pest` file in this module is the authoritative specification
-//! for Pasta DSL syntax. It was moved from `pasta2.pest` without any content
-//! changes and must never be manually edited.
+//! for Pasta DSL syntax (originally migrated from `pasta2.pest` without any
+//! content changes) and must never be manually edited.
 //!
 //! # AST Structure (parser2-filescope-bug-fix)
 //!

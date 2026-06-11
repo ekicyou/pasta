@@ -233,4 +233,68 @@ mod tests {
             date_files
         );
     }
+
+    #[test]
+    fn test_logger_custom_file_path_under_profile() {
+        // A custom file_path under profile/ is accepted and the directory
+        // tree is created automatically.
+        let temp_dir = TempDir::new().unwrap();
+        let base_dir = temp_dir.path();
+
+        let config = LoggingConfig {
+            file_path: "profile/custom/app.log".to_string(),
+            rotation_days: 7,
+            level: "info".to_string(),
+            filter: None,
+        };
+
+        let logger = PastaLogger::new(base_dir, Some(&config)).unwrap();
+        assert_eq!(logger.log_path(), base_dir.join("profile/custom/app.log"));
+        assert!(base_dir.join("profile/custom").is_dir());
+    }
+
+    #[test]
+    fn test_path_validation_rejects_traversal_within_profile() {
+        // Even when the path starts with "profile", a ".." component must
+        // be rejected (path traversal branch of validate_path).
+        let temp_dir = TempDir::new().unwrap();
+        let base_dir = temp_dir.path();
+
+        let config = LoggingConfig {
+            file_path: "profile/../escape.log".to_string(),
+            rotation_days: 7,
+            level: "info".to_string(),
+            filter: None,
+        };
+
+        let result = PastaLogger::new(base_dir, Some(&config));
+        match result {
+            Err(err) => assert_eq!(err.kind(), io::ErrorKind::PermissionDenied),
+            Ok(_) => panic!("traversal inside profile/ should be rejected"),
+        }
+    }
+
+    #[test]
+    fn test_logger_write_content_persisted_after_drop() {
+        // Bytes written through the non-blocking writer must reach the log
+        // file once the logger (and its worker guard) is dropped.
+        let temp_dir = TempDir::new().unwrap();
+        let base_dir = temp_dir.path();
+
+        let logger = PastaLogger::new(base_dir, None).unwrap();
+        let log_path = logger.log_path().to_path_buf();
+
+        let written = logger.write(b"persisted log line\n").unwrap();
+        assert_eq!(written, b"persisted log line\n".len());
+
+        // Dropping flushes and joins the worker thread.
+        drop(logger);
+
+        let content = std::fs::read_to_string(&log_path).unwrap();
+        assert!(
+            content.contains("persisted log line"),
+            "log file should contain the written line, got: {:?}",
+            content
+        );
+    }
 }

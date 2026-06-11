@@ -244,4 +244,75 @@ mod tests {
         let result = parse(&["unknown"]);
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_help_short_flag() {
+        let args = parse(&["-h"]).unwrap();
+        assert!(matches!(args.command, Command::Help));
+    }
+
+    #[test]
+    fn test_version_short_flag() {
+        let args = parse(&["-V"]).unwrap();
+        assert!(matches!(args.command, Command::Version));
+    }
+
+    /// `release` サブコマンド指定中でも `--help` が優先される（早期 return）
+    #[test]
+    fn test_help_wins_over_release_subcommand() {
+        let args = parse(&["release", "--target", "t", "--help"]).unwrap();
+        assert!(matches!(args.command, Command::Help));
+    }
+
+    /// 2 つ目の位置引数は `arg.unexpected()` で拒否される
+    #[test]
+    fn test_release_extra_positional_rejected() {
+        let result = parse(&[
+            "release",
+            "extra",
+            "--target",
+            "t",
+            "--release",
+            "r",
+            "--nar",
+            "n",
+        ]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_unknown_option_rejected() {
+        let result = parse(&[
+            "release",
+            "--target",
+            "t",
+            "--release",
+            "r",
+            "--nar",
+            "n",
+            "--bogus",
+        ]);
+        assert!(result.is_err());
+    }
+
+    /// オプションの値欠落（`--target` の直後に値がない）はエラー
+    #[test]
+    fn test_release_option_missing_value() {
+        let result = parse(&["release", "--target"]);
+        assert!(result.is_err());
+    }
+
+    /// オプションはサブコマンドより前に置いてもよい（パーサは位置に依存しない）
+    #[test]
+    fn test_options_before_subcommand_accepted() {
+        let args = parse(&["--target", "t", "release", "--release", "r", "--nar", "n"]).unwrap();
+        match args.command {
+            Command::Release(r) => {
+                assert_eq!(r.target, PathBuf::from("t"));
+                assert_eq!(r.release, PathBuf::from("r"));
+                assert_eq!(r.nar, PathBuf::from("n"));
+            }
+            _ => panic!("Expected Release command"),
+        }
+    }
 }

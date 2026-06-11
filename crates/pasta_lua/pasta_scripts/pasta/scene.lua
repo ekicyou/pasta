@@ -201,9 +201,10 @@ function SCENE.co_exec(act, name, global_scene_name, attrs)
     end
 
     -- 必ず最後にbuildを呼び出す関数
-    local function wrapped_fn(act, ...)
-        fn(act, ...)
-        local result = act:build()
+    -- 引数名は外側の act（名前解決用）と区別する（coroutine.resume 経由で渡される act を受ける）
+    local function wrapped_fn(resumed_act, ...)
+        fn(resumed_act, ...)
+        local result = resumed_act:build()
         if result ~= nil then
             return result
         end

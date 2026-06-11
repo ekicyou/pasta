@@ -24,13 +24,7 @@ fn test_catch_unwind_with_malformed_input() {
     // Even with unusual input, analyze should not panic
     let large_a = "a".repeat(10000);
     let large_star = "＊".repeat(100);
-    let sources: Vec<&str> = vec![
-        "",
-        "\0",
-        "\n\n\n",
-        &large_a,
-        &large_star,
-    ];
+    let sources: Vec<&str> = vec!["", "\0", "\n\n\n", &large_a, &large_star];
 
     for source in &sources {
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -65,7 +59,10 @@ fn test_other_documents_unaffected_after_error() {
 
     // Good document's analysis should be unaffected
     let cached = dm.get(uri1).unwrap().analysis.as_ref().unwrap();
-    assert!(!cached.tokens.is_empty(), "良好なドキュメントの解析結果は影響なし");
+    assert!(
+        !cached.tokens.is_empty(),
+        "良好なドキュメントの解析結果は影響なし"
+    );
 }
 
 #[test]

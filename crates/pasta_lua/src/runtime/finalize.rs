@@ -273,6 +273,6 @@ pub fn register_finalize_scene(lua: &Lua) -> LuaResult<()> {
     Ok(())
 }
 
-// Future extension point (Requirement 7.1, 7.2, 7.3)
-// TODO: Add collect_actors() for actor dictionary support
-// pub fn collect_actors(lua: &Lua) -> LuaResult<Vec<ActorCollectionEntry>> { ... }
+// Future extension point (Requirement 7.1, 7.2, 7.3):
+// a `collect_actors()` for actor dictionary support can be added here, e.g.
+// `pub fn collect_actors(lua: &Lua) -> LuaResult<Vec<ActorCollectionEntry>>`.

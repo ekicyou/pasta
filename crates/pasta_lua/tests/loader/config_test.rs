@@ -4,8 +4,8 @@
 //! default_lua_search_paths, default_log_file_path: pub に昇格
 
 use pasta_lua::loader::{
-    LoaderConfig, LoggingConfig, LuaConfig, PastaConfig, PersistenceConfig, default_log_file_path,
-    default_lua_search_paths,
+    LoaderConfig, LoaderError, LoggingConfig, LuaConfig, PastaConfig, PersistenceConfig, TalkConfig,
+    default_log_file_path, default_lua_search_paths,
 };
 
 // ============================================================================
@@ -474,6 +474,158 @@ debug_mode = true
 // Lua Search Path tests (lua-module-path-resolution spec)
 // ========================================
 
+// ============================================================================
+// G1 (review-improvement-loop cell 3.14): untested public behavior
+// ============================================================================
+
+// ----- PastaConfig::load (ファイルベース読み込み) -----
+//
+// NOTE: load の成功経路は tests/loader/startup_test.rs::test_config_load_with_file、
+// ファイル欠落→ConfigNotFound は同 test_config_load_not_found（バリアント＋パス検証）と
+// src/loader/error.rs::test_config_not_found_display（Display メッセージ検証）で既カバー。
+// 本セルで真に新規なのは「不正 TOML → LoaderError::Config」経路のみ。
+
+/// 壊れた TOML は Config（パースエラー）になること。
+/// （load の3経路中、唯一の未カバー経路。成功/NotFound は startup_test.rs で既カバー）
+#[test]
+fn test_load_invalid_toml_returns_config_error() {
+    let temp = tempfile::TempDir::new().unwrap();
+    std::fs::write(temp.path().join("pasta.toml"), "= broken toml =").unwrap();
+
+    let err = PastaConfig::load(temp.path()).unwrap_err();
+    assert!(
+        matches!(err, LoaderError::Config(_, _)),
+        "invalid TOML must yield Config error, got: {err:?}"
+    );
+}
+
+// ----- パースエラー・型不一致の許容挙動 -----
+
+/// [loader] セクションのフィールド型が不正な場合、from_str はエラーを返すこと
+/// （loader セクションは厳格パース）。
+#[test]
+fn test_invalid_loader_field_type_fails_parse() {
+    let toml_str = r#"
+[loader]
+pasta_patterns = "not-an-array"
+"#;
+    assert!(PastaConfig::from_str(toml_str).is_err());
+}
+
+/// [loader] 内の未知キーは無視されること（前方互換）。
+#[test]
+fn test_unknown_loader_keys_are_ignored() {
+    let toml_str = r#"
+[loader]
+debug_mode = false
+future_option = "tolerated"
+"#;
+    let config = PastaConfig::from_str(toml_str).unwrap();
+    assert!(!config.loader.debug_mode);
+}
+
+/// カスタムセクションの型不一致は panic せず None になること
+/// （get_custom_config の .ok() フォールバック）。
+#[test]
+fn test_custom_section_type_mismatch_returns_none() {
+    let toml_str = r#"
+[logging]
+rotation_days = "fourteen"
+"#;
+    let config = PastaConfig::from_str(toml_str).unwrap();
+    assert!(
+        config.logging().is_none(),
+        "wrongly-typed [logging] must deserialize to None, not panic"
+    );
+    // セクション自体は custom_fields には残っている
+    assert!(config.custom_fields.contains_key("logging"));
+}
+
+// ----- TalkConfig -----
+//
+// NOTE: TalkConfig の既定値（禁則文字2フィールドを除く）・直接デシリアライズ・部分上書きは
+// tests/sakura_script/output_test.rs の test_talk_config_default /
+// test_talk_config_from_toml_full / test_talk_config_partial_override で既カバー。
+// 本セルの増分は (1) 禁則文字2フィールドの既定値、(2) PastaConfig::talk() アクセサ経路。
+
+/// 禁則文字2フィールドの既定値固定。
+/// （output_test.rs の test_talk_config_default は chars_line_start_prohibited /
+/// chars_line_end_prohibited を検証していないため、その差分のみをここで固定する）
+#[test]
+fn test_talk_config_default_kinsoku_fields() {
+    let config = TalkConfig::default();
+    assert_eq!(config.chars_line_start_prohibited, "゛゜ヽヾゝゞ々ー）］｝」』):;]}｣､･ｰﾞﾟ");
+    assert_eq!(config.chars_line_end_prohibited, "（［｛「『([{｢");
+}
+
+/// [talk] 部分指定: 指定フィールドのみ上書きされ、残りは既定値になること。
+/// （増分は PastaConfig::talk() アクセサ経由のセクション抽出経路。
+/// TalkConfig 単体の部分上書きは output_test.rs::test_talk_config_partial_override で既カバー）
+#[test]
+fn test_talk_config_from_toml_partial() {
+    let toml_str = r#"
+[talk]
+script_wait_period = 1500
+chars_period = "."
+"#;
+    let config = PastaConfig::from_str(toml_str).unwrap();
+    let talk = config.talk().expect("talk section should exist");
+    assert_eq!(talk.script_wait_period, 1500);
+    assert_eq!(talk.chars_period, ".");
+    // 未指定フィールドは既定値
+    assert_eq!(talk.script_wait_normal, 50);
+    assert_eq!(talk.chars_comma, "、，,");
+}
+
+#[test]
+fn test_talk_config_none_when_missing() {
+    let config = PastaConfig::from_str("").unwrap();
+    assert!(config.talk().is_none());
+}
+
+// ----- DebugFileConfig セクション供給 -----
+
+/// [debug] セクションが無い場合 debug() は None（既定 OFF パス）。
+#[test]
+fn test_debug_config_none_when_missing() {
+    let toml_str = r#"
+[loader]
+debug_mode = true
+"#;
+    let config = PastaConfig::from_str(toml_str).unwrap();
+    assert!(config.debug().is_none());
+}
+
+/// [debug] の port 指定が反映されること（既定 9276 の上書き）。
+#[test]
+fn test_debug_config_custom_port_from_toml() {
+    let toml_str = r#"
+[debug]
+enabled = true
+port = 12345
+"#;
+    let config = PastaConfig::from_str(toml_str).unwrap();
+    let debug = config.debug().expect("[debug] section should parse");
+    assert!(debug.enabled);
+    assert_eq!(debug.port, 12345);
+}
+
+// ----- PersistenceConfig::effective_file_path 第3分岐 -----
+
+/// obfuscate=true かつ .json でも .dat でもない拡張子は ".dat" が付加されること。
+#[test]
+fn test_persistence_effective_file_path_appends_dat_for_other_ext() {
+    let config = PersistenceConfig {
+        obfuscate: true,
+        file_path: "profile/pasta/save/data.bin".to_string(),
+        debug_mode: false,
+    };
+    assert_eq!(
+        config.effective_file_path(),
+        "profile/pasta/save/data.bin.dat"
+    );
+}
+
 #[test]
 fn test_default_lua_search_paths_contains_user_scripts() {
     // Requirement 1.2: scripts should be at priority 2 (second position)
@@ -497,7 +649,9 @@ fn test_default_lua_search_paths_user_scripts_priority() {
     // Requirement 1.3: scripts (index 1) should come before profile/pasta/pasta_scripts (index 2)
     let paths = default_lua_search_paths();
     let scripts_pos = paths.iter().position(|p| p == "scripts");
-    let pasta_scripts_pos = paths.iter().position(|p| p == "profile/pasta/pasta_scripts");
+    let pasta_scripts_pos = paths
+        .iter()
+        .position(|p| p == "profile/pasta/pasta_scripts");
     assert!(scripts_pos.is_some(), "scripts should be in search paths");
     assert!(
         pasta_scripts_pos.is_some(),

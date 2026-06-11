@@ -77,10 +77,23 @@ export interface AttachTarget {
  * Pure and `vscode`-free so it is node-testable:
  * - missing `host` falls back to `127.0.0.1`; any value is coerced to a string.
  * - missing `port` falls back to {@link DEFAULT_DEBUG_PORT}; a string port
- *   (e.g. from a JSON launch config) is coerced to a number.
+ *   (e.g. from a JSON launch config) is coerced to a number. Any INVALID port
+ *   (non-number/non-string type, NaN, non-integer, outside 1–65535) also falls
+ *   back to {@link DEFAULT_DEBUG_PORT} instead of producing a broken
+ *   `DebugAdapterServer` descriptor (cell 3.56 / G3 hardening — valid input
+ *   behaviour is unchanged).
  */
 export function resolveAttachTarget(config: AttachConfig): AttachTarget {
   const host = String(config.host ?? DEFAULT_DEBUG_HOST);
-  const port = Number(config.port ?? DEFAULT_DEBUG_PORT);
-  return { host, port };
+  return { host, port: resolvePort(config.port) };
+}
+
+/** Coerce + validate a raw `port` config value; fall back to the default. */
+function resolvePort(raw: unknown): number {
+  if (raw === undefined || raw === null) {
+    return DEFAULT_DEBUG_PORT;
+  }
+  const port =
+    typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw) : Number.NaN;
+  return Number.isInteger(port) && port >= 1 && port <= 65535 ? port : DEFAULT_DEBUG_PORT;
 }

@@ -147,9 +147,8 @@ fn test_out_line_counter_matches_emitted_line_count() {
         .unwrap();
     assert_eq!(codegen.out_line(), 4);
 
-    drop(codegen);
-
     // Cross-check: counter equals the actual number of LF-terminated lines.
+    // (The borrow of `output` through `codegen` ends at its last use above.)
     let s = String::from_utf8(output).unwrap();
     let emitted = s.matches('\n').count() as u32;
     assert_eq!(emitted, 4, "actual emitted lines should match out_line");

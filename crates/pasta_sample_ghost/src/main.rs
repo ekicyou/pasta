@@ -20,7 +20,7 @@
 //! 辞書・設定ファイルは `ghosts/hello-pasta/` に直接 git 管理されています。
 //! 更新ファイルと NAR は `pasta_check release` コマンドで生成します。
 
-use pasta_sample_ghost::{GhostConfig, generate_ghost};
+use pasta_sample_ghost::generate_ghost;
 use std::env;
 use std::path::{Path, PathBuf};
 
@@ -40,15 +40,12 @@ fn run_generate_mode(output_dir: &Path) -> Result<(), Box<dyn std::error::Error>
     println!("Output: {}", output_dir.display());
     println!();
 
-    // 設定
-    let config = GhostConfig::default();
-
     // ゴースト生成
     println!("Generating surface images and surfaces.txt...");
-    generate_ghost(output_dir, &config)?;
+    generate_ghost(output_dir)?;
 
     // 生成されたファイルをカウント
-    let file_count = count_files(output_dir);
+    let file_count = walkdir(output_dir);
 
     println!();
     println!("========================================");
@@ -82,11 +79,6 @@ fn get_output_dir(args: &[String]) -> PathBuf {
         .join("hello-pasta")
 }
 
-/// ディレクトリ内のファイル数をカウント
-fn count_files(dir: &Path) -> usize {
-    walkdir(dir)
-}
-
 /// 再帰的にファイル数をカウント
 fn walkdir(path: &Path) -> usize {
     let mut count = 0;
@@ -113,12 +105,55 @@ fn walkdir(path: &Path) -> usize {
 
 #[cfg(test)]
 mod tests {
-    #[cfg(unix)]
-    use super::walkdir;
-    #[cfg(unix)]
+    use super::{get_output_dir, walkdir};
     use std::fs;
-    #[cfg(unix)]
+    use std::path::{Path, PathBuf};
     use tempfile::TempDir;
+
+    #[test]
+    fn get_output_dir_uses_first_non_flag_argument() {
+        let args = vec![
+            "pasta_sample_ghost".to_string(),
+            "--some-flag".to_string(),
+            "custom/output".to_string(),
+            "ignored".to_string(),
+        ];
+        assert_eq!(get_output_dir(&args), PathBuf::from("custom/output"));
+    }
+
+    #[test]
+    fn get_output_dir_defaults_to_ghosts_hello_pasta() {
+        // フラグのみ（位置引数なし）の場合は CARGO_MANIFEST_DIR/ghosts/hello-pasta
+        let args = vec!["pasta_sample_ghost".to_string(), "--flag-only".to_string()];
+        let dir = get_output_dir(&args);
+        assert!(
+            dir.ends_with(Path::new("ghosts").join("hello-pasta")),
+            "デフォルト出力先が ghosts/hello-pasta ではありません: {}",
+            dir.display()
+        );
+        // 引数なし（プログラム名のみ）でも同じデフォルト
+        let args = vec!["pasta_sample_ghost".to_string()];
+        assert_eq!(get_output_dir(&args), dir);
+    }
+
+    #[test]
+    fn walkdir_counts_nested_files() {
+        let temp = TempDir::new().unwrap();
+        fs::create_dir_all(temp.path().join("a/b")).unwrap();
+        fs::write(temp.path().join("f1.txt"), "1").unwrap();
+        fs::write(temp.path().join("a").join("f2.txt"), "2").unwrap();
+        fs::write(temp.path().join("a/b").join("f3.txt"), "3").unwrap();
+
+        // ディレクトリは数えず、ネストしたファイルのみ 3 件
+        assert_eq!(walkdir(temp.path()), 3);
+    }
+
+    #[test]
+    fn walkdir_returns_zero_for_missing_or_empty_dir() {
+        let temp = TempDir::new().unwrap();
+        assert_eq!(walkdir(&temp.path().join("does_not_exist")), 0);
+        assert_eq!(walkdir(temp.path()), 0);
+    }
 
     #[cfg(unix)]
     #[test]

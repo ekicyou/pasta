@@ -85,6 +85,107 @@ mod tests {
         );
     }
 
+    /// 複数 --copy 指定時は後勝ち（後のオーバーレイが前のオーバーレイを上書きする）
+    #[test]
+    fn test_execute_release_overlay_precedence_last_wins() {
+        let temp = TempDir::new().unwrap();
+
+        let target = temp.path().join("target_ghost");
+        fs::create_dir_all(&target).unwrap();
+        fs::write(target.join("a.txt"), "original").unwrap();
+
+        let overlay1 = temp.path().join("overlay1");
+        fs::create_dir_all(&overlay1).unwrap();
+        fs::write(overlay1.join("a.txt"), "first").unwrap();
+        fs::write(overlay1.join("only1.txt"), "one").unwrap();
+
+        let overlay2 = temp.path().join("overlay2");
+        fs::create_dir_all(&overlay2).unwrap();
+        fs::write(overlay2.join("a.txt"), "second").unwrap();
+
+        let release = temp.path().join("release_out");
+        let args = ReleaseArgs {
+            target,
+            release: release.clone(),
+            nar: temp.path().join("out.nar"),
+            copy_dirs: vec![overlay1, overlay2],
+        };
+
+        execute_release(&args).unwrap();
+
+        assert_eq!(fs::read_to_string(release.join("a.txt")).unwrap(), "second");
+        // 上書きされなかったオーバーレイ 1 固有のファイルは残る
+        assert_eq!(
+            fs::read_to_string(release.join("only1.txt")).unwrap(),
+            "one"
+        );
+    }
+
+    /// 既存の release フォルダーは初期化され、stale ファイルが残らない
+    #[test]
+    fn test_execute_release_cleans_stale_release_dir() {
+        let temp = TempDir::new().unwrap();
+
+        let target = temp.path().join("target_ghost");
+        fs::create_dir_all(&target).unwrap();
+        fs::write(target.join("a.txt"), "fresh").unwrap();
+
+        let release = temp.path().join("release_out");
+        fs::create_dir_all(&release).unwrap();
+        fs::write(release.join("stale.txt"), "stale").unwrap();
+
+        let args = ReleaseArgs {
+            target,
+            release: release.clone(),
+            nar: temp.path().join("out.nar"),
+            copy_dirs: vec![],
+        };
+
+        execute_release(&args).unwrap();
+
+        assert!(!release.join("stale.txt").exists());
+        assert_eq!(fs::read_to_string(release.join("a.txt")).unwrap(), "fresh");
+    }
+
+    /// NAR には生成済みの updates.txt が封入される
+    /// （updates.txt 生成 → NAR 作成の実行順序契約。順序が逆転すると fail する）
+    #[test]
+    fn test_execute_release_nar_contains_updates_txt() {
+        let temp = TempDir::new().unwrap();
+
+        let target = temp.path().join("target_ghost");
+        fs::create_dir_all(target.join("ghost/master")).unwrap();
+        fs::write(target.join("ghost/master/descript.txt"), "desc").unwrap();
+
+        let nar = temp.path().join("out.nar");
+        let args = ReleaseArgs {
+            target,
+            release: temp.path().join("release_out"),
+            nar: nar.clone(),
+            copy_dirs: vec![],
+        };
+
+        execute_release(&args).unwrap();
+
+        let file = fs::File::open(&nar).unwrap();
+        let mut archive = zip::ZipArchive::new(file).unwrap();
+        assert!(archive.by_name("updates.txt").is_ok());
+        assert!(archive.by_name("ghost/master/updates.txt").is_ok());
+    }
+
+    /// target が存在しない場合はエラーが伝播する
+    #[test]
+    fn test_execute_release_missing_target_errors() {
+        let temp = TempDir::new().unwrap();
+        let args = ReleaseArgs {
+            target: temp.path().join("no_such_target"),
+            release: temp.path().join("release_out"),
+            nar: temp.path().join("out.nar"),
+            copy_dirs: vec![],
+        };
+        assert!(execute_release(&args).is_err());
+    }
+
     #[test]
     fn test_execute_release_with_copy() {
         let temp = TempDir::new().unwrap();

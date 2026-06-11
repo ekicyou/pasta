@@ -46,6 +46,8 @@ fn has_symlink_component(base_dir: &Path, path: &Path) -> std::io::Result<bool> 
 ///
 /// Files in `profile/` directory are excluded from discovery.
 /// Patterns containing directory traversal (`..`, absolute paths) are rejected.
+/// Matches outside `base_dir` and paths containing a symlinked component
+/// (including Windows junctions) are skipped.
 ///
 /// # Arguments
 /// * `base_dir` - Base directory to search from
@@ -54,7 +56,10 @@ fn has_symlink_component(base_dir: &Path, path: &Path) -> std::io::Result<bool> 
 /// # Returns
 /// * `Ok(Vec<PathBuf>)` - List of discovered files (may be empty)
 /// * `Err(LoaderError)` - Directory not found or pattern error
-pub(crate) fn discover_files(base_dir: &Path, patterns: &[String]) -> Result<Vec<PathBuf>, LoaderError> {
+pub(crate) fn discover_files(
+    base_dir: &Path,
+    patterns: &[String],
+) -> Result<Vec<PathBuf>, LoaderError> {
     // Verify base directory exists
     if !base_dir.exists() {
         return Err(LoaderError::directory_not_found(base_dir));
@@ -294,6 +299,78 @@ mod tests {
     }
 
     #[test]
+    fn test_contains_traversal_absolute_paths() {
+        // RootDir component (absolute path) must be rejected
+        assert!(contains_traversal("/etc/*.pasta"));
+        // Windows drive prefix must be rejected (Prefix component on Windows)
+        #[cfg(windows)]
+        assert!(contains_traversal(r"C:\secret\*.pasta"));
+    }
+
+    #[test]
+    fn test_discover_base_dir_is_file() {
+        // base_dir exists but is a regular file -> DirectoryNotFound
+        let temp = TempDir::new().unwrap();
+        let file_path = temp.path().join("not_a_dir");
+        fs::write(&file_path, "plain file").unwrap();
+
+        let patterns = vec!["dic/*/*.pasta".to_string()];
+        let result = discover_files(&file_path, &patterns);
+
+        match result {
+            Err(LoaderError::DirectoryNotFound(path)) => {
+                assert_eq!(path, file_path);
+            }
+            other => panic!("Expected DirectoryNotFound, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_discover_invalid_glob_pattern() {
+        // Unclosed character class is an invalid glob pattern -> GlobPattern error
+        let temp = TempDir::new().unwrap();
+        let base_dir = create_test_structure(&temp);
+
+        let patterns = vec!["dic/[/*.pasta".to_string()];
+        let result = discover_files(&base_dir, &patterns);
+
+        assert!(matches!(result, Err(LoaderError::GlobPattern(_))));
+    }
+
+    #[test]
+    fn test_discover_rejects_absolute_pattern() {
+        // Absolute patterns are silently skipped (traversal guard), result is empty
+        let temp = TempDir::new().unwrap();
+        let base_dir = create_test_structure(&temp);
+
+        let patterns = vec!["/etc/*.pasta".to_string()];
+        let files = discover_files(&base_dir, &patterns).unwrap();
+        assert!(files.is_empty());
+    }
+
+    #[test]
+    fn test_discover_profile_prefix_dir_not_excluded() {
+        // Only the exact "profile" directory is excluded. A sibling directory
+        // whose name merely starts with "profile" (e.g. "profile2") must NOT
+        // be excluded — exclusion works on path components, not string prefix.
+        let temp = TempDir::new().unwrap();
+        let base_dir = create_test_structure(&temp);
+        fs::create_dir_all(base_dir.join("profile2/inner")).unwrap();
+        fs::write(base_dir.join("profile2/inner/kept.pasta"), "# kept").unwrap();
+
+        let patterns = vec!["**/*.pasta".to_string()];
+        let files = discover_files(&base_dir, &patterns).unwrap();
+        let file_names: Vec<_> = files
+            .iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+
+        assert!(file_names.contains(&"kept.pasta".to_string()));
+        // The real profile/ file stays excluded
+        assert!(!file_names.contains(&"cached.pasta".to_string()));
+    }
+
+    #[test]
     fn test_is_within_base_dir() {
         let temp = TempDir::new().unwrap();
         let base_dir = temp.path().join("base");
@@ -324,6 +401,42 @@ mod tests {
 
         assert_eq!(files.len(), 3);
         assert!(!file_names.contains(&"link.pasta".to_string()));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_discover_skips_junction_directory() {
+        // Windows junctions (mount-point reparse points) can redirect discovery
+        // outside base_dir exactly like symlinks. Rust std reports them via
+        // `FileType::is_symlink()` (name-surrogate reparse tag), so
+        // `has_symlink_component` must skip them — this test pins that behavior.
+        let temp = TempDir::new().unwrap();
+        let base_dir = create_test_structure(&temp);
+        let external_dir = temp.path().join("external");
+        fs::create_dir_all(&external_dir).unwrap();
+        fs::write(external_dir.join("secret.pasta"), "# secret").unwrap();
+
+        // Create junction without elevation: cmd /C mklink /J <link> <target>
+        let junction = base_dir.join("dic").join("linked");
+        let status = std::process::Command::new("cmd")
+            .arg("/C")
+            .arg("mklink")
+            .arg("/J")
+            .arg(&junction)
+            .arg(&external_dir)
+            .status()
+            .expect("failed to spawn cmd for mklink");
+        assert!(status.success(), "mklink /J failed");
+
+        let patterns = vec!["dic/*/*.pasta".to_string()];
+        let files = discover_files(&base_dir, &patterns).unwrap();
+        let file_names: Vec<_> = files
+            .iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+
+        assert_eq!(files.len(), 3);
+        assert!(!file_names.contains(&"secret.pasta".to_string()));
     }
 
     #[cfg(unix)]

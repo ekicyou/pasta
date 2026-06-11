@@ -184,6 +184,36 @@ fn test_parse_scene_actors_fullwidth_number() {
 }
 
 #[test]
+fn test_parse_scene_actors_u32_max_explicit_number_no_panic() {
+    // ハードニング回帰テスト: 明示番号 u32::MAX（4294967295）で next_number 計算
+    // （n + 1）が整数オーバーフローで panic しない境界を固定する（飽和加算）
+    let source = "＊挨拶\n　％さくら＝4294967295\n  さくら：こんにちは\n";
+    let result = parse_str(source, "test.pasta");
+    assert!(result.is_ok());
+    let file = result.unwrap();
+    let scenes = get_global_scene_scopes(&file);
+    assert_eq!(scenes.len(), 1);
+    assert_eq!(scenes[0].actors.len(), 1);
+    assert_eq!(scenes[0].actors[0].number, u32::MAX);
+}
+
+#[test]
+fn test_parse_scene_actors_u32_max_then_implicit_no_panic() {
+    // ハードニング回帰テスト: u32::MAX 指定後の暗黙採番（next_number += 1）が
+    // panic せず u32::MAX で飽和する境界を固定する
+    let source = "＊挨拶\n　％さくら＝4294967295、うにゅう\n  さくら：こんにちは\n";
+    let result = parse_str(source, "test.pasta");
+    assert!(result.is_ok());
+    let file = result.unwrap();
+    let scenes = get_global_scene_scopes(&file);
+    assert_eq!(scenes.len(), 1);
+    assert_eq!(scenes[0].actors.len(), 2);
+    assert_eq!(scenes[0].actors[0].number, u32::MAX);
+    // 飽和後の暗黙採番も u32::MAX に張り付く
+    assert_eq!(scenes[0].actors[1].number, u32::MAX);
+}
+
+#[test]
 fn test_parse_scene_actors_multiple_lines() {
     // 複数行のアクター宣言で番号が行をまたいで引き継がれることを確認
     // 1行目: さくら=0

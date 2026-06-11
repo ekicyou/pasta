@@ -56,8 +56,6 @@
 //! Lua-level lines are accepted as-is in this spec; verification refinement
 //! (binding to an executable location) is out of scope here.
 
-#![allow(dead_code)]
-
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
@@ -511,5 +509,83 @@ mod tests {
             "a clone on another thread must observe an update made via the \
              original handle (Arc<Mutex> sharing)"
         );
+    }
+
+    /// Documented poisoned-lock degradation: after the inner mutex is poisoned,
+    /// `should_pause` fails SAFE to `false` (never panics inside the VM-thread
+    /// hook) and `register` / `set_breakpoints` become non-panicking no-ops on
+    /// the store (the resolved return value is still produced, since it does
+    /// not depend on the lock).
+    #[test]
+    fn poisoned_lock_degrades_without_panicking() {
+        let set = BreakpointSet::new();
+        set.set_breakpoints(&src("@s"), &[7]);
+        assert!(set.should_pause("@s", 7), "pre-poison: the BP fires");
+
+        // Poison the inner mutex: a thread panics while holding the guard.
+        let clone = set.clone();
+        let _ = std::thread::spawn(move || {
+            let _guard = clone.inner.lock().unwrap();
+            panic!("poison the breakpoint store");
+        })
+        .join();
+        assert!(set.inner.lock().is_err(), "the inner mutex must be poisoned");
+
+        // should_pause: fail safe (false), even for the previously-firing coord.
+        assert!(
+            !set.should_pause("@s", 7),
+            "poisoned lock → should_pause degrades to false (do not pause)"
+        );
+
+        // register: a silent no-op, never a panic across the shared store.
+        set.register("@t", vec![Breakpoint::new("@t", "@t", 1)]);
+
+        // set_breakpoints: still returns the resolved (verified) entries —
+        // the return value is computed independently of the poisoned store.
+        let resolved = set.set_breakpoints(&src("@u"), &[3]);
+        assert_eq!(
+            resolved,
+            vec![ResolvedBreakpoint {
+                source: src("@u"),
+                line: 3,
+                verified: true,
+            }],
+            "set_breakpoints still resolves the requested lines after poisoning"
+        );
+    }
+
+    /// `set_breakpoints` with DUPLICATE requested lines: the resolved `Vec`
+    /// mirrors the request order INCLUDING duplicates (DAP echoes one resolved
+    /// entry per requested breakpoint), while the store itself dedups (a
+    /// `HashSet`) and the coordinate fires.
+    #[test]
+    fn set_breakpoints_duplicate_lines_mirror_request_order() {
+        let set = BreakpointSet::new();
+        let resolved = set.set_breakpoints(&src("@s"), &[5, 5, 2]);
+
+        assert_eq!(
+            resolved,
+            vec![
+                ResolvedBreakpoint {
+                    source: src("@s"),
+                    line: 5,
+                    verified: true
+                },
+                ResolvedBreakpoint {
+                    source: src("@s"),
+                    line: 5,
+                    verified: true
+                },
+                ResolvedBreakpoint {
+                    source: src("@s"),
+                    line: 2,
+                    verified: true
+                },
+            ],
+            "resolved entries mirror the requested lines order, duplicates kept"
+        );
+        assert!(set.should_pause("@s", 5), "the duplicated coordinate fires");
+        assert!(set.should_pause("@s", 2));
+        assert!(!set.should_pause("@s", 4));
     }
 }

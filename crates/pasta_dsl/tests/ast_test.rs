@@ -94,8 +94,9 @@ fn test_bin_op_equality() {
 #[test]
 fn test_ast_types_clone() {
     // Test that all AST types implement Clone
+    // Span は Copy（Copy: Clone なので Clone 実装も保証される）
     let span = Span::new(1, 1, 1, 1, 0, 1);
-    let _span2 = span.clone();
+    let _span2 = span;
 
     let file = PastaFile::new(PathBuf::from("test.pasta"));
     let _file2 = file.clone();

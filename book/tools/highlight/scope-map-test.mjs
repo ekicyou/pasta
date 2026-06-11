@@ -223,5 +223,49 @@ log('--- 純粋性・決定論 ---');
 }
 log('');
 
+// =========================================================================
+// 8. 不正入力ガード（非配列・非文字列要素・空文字列要素 — 例外を出さず null/スキップ）
+// =========================================================================
+log('--- 不正入力ガード ---');
+{
+  // (a) 非配列入力は null（Array.isArray ガード）。
+  const NON_ARRAYS = [
+    ['null', null],
+    ['undefined', undefined],
+    ['文字列', 'comment.line.pasta'],
+    ['オブジェクト', { 0: 'comment.line.pasta', length: 1 }],
+    ['数値', 42],
+  ];
+  for (const [desc, input] of NON_ARRAYS) {
+    let got;
+    let threw = false;
+    try {
+      got = scopesToClass(input);
+    } catch (e) {
+      threw = true;
+    }
+    check(`guard: 非配列（${desc}）→ null（例外なし）`, !threw && got === null,
+      threw ? 'threw' : `got=${JSON.stringify(got)}`);
+  }
+
+  // (b) 配列内の非文字列・空文字列要素は安全にスキップされ、全て未マッチなら null。
+  let got;
+  let threw = false;
+  try {
+    got = scopesToClass([123, '', null, undefined]);
+  } catch (e) {
+    threw = true;
+  }
+  check('guard: 非文字列/空文字列のみの配列 → null（例外なし）', !threw && got === null,
+    threw ? 'threw' : `got=${JSON.stringify(got)}`);
+
+  // (c) 非文字列要素が混在しても、走査は継続し有効スコープでヒットする。
+  // 末尾の 123 は classForScope ガードで null → 手前の comment.line.pasta を採用。
+  check('guard: 非文字列要素を飛ばして手前の有効スコープを採用',
+    scopesToClass(['comment.line.pasta', 123]) === 'hljs-comment',
+    `got=${JSON.stringify(scopesToClass(['comment.line.pasta', 123]))}`);
+}
+log('');
+
 log(`RESULT: ${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

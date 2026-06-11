@@ -107,10 +107,10 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// node's `span` to its emit point and call `record_span(span)` immediately
     /// before the corresponding `writeln`.
     fn record_span(&mut self, span: Span) {
-        if let Some(sink) = self.source_map.as_deref_mut() {
-            if span.is_valid() {
-                sink.record(self.out_line, span);
-            }
+        if let Some(sink) = self.source_map.as_deref_mut()
+            && span.is_valid()
+        {
+            sink.record(self.out_line, span);
         }
     }
 
@@ -129,10 +129,10 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     /// treated as invalid and skipped, mirroring the `span.is_valid()` guard in
     /// `record_span` (the default/uninitialized line is not recorded).
     fn record_block_line(&mut self, pasta_line: u32) {
-        if let Some(sink) = self.source_map.as_deref_mut() {
-            if pasta_line > 0 {
-                sink.record_line(self.out_line, pasta_line);
-            }
+        if let Some(sink) = self.source_map.as_deref_mut()
+            && pasta_line > 0
+        {
+            sink.record_line(self.out_line, pasta_line);
         }
     }
 
@@ -214,5 +214,178 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         self.writeln("local GLOBAL = require \"pasta.global\"")?;
         self.write_blank_line()?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Test sink capturing each `(lua_line, pasta_line)` record.
+    #[derive(Default)]
+    struct CapturingSink {
+        records: Vec<(u32, u32)>,
+    }
+
+    impl SourceMapSink for CapturingSink {
+        fn record_line(&mut self, lua_line: u32, pasta_line: u32) {
+            self.records.push((lua_line, pasta_line));
+        }
+    }
+
+    /// `out_line` accounting contract: starts at 0; `writeln` and
+    /// `write_blank_line` advance by exactly 1; `write_raw` advances by the
+    /// number of embedded `\n` (0 for plain fragments); `write_line_terminator`
+    /// advances by 1. The emitted bytes must match the counter exactly.
+    #[test]
+    fn out_line_advances_per_choke_point_and_matches_bytes() {
+        let mut output = Vec::new();
+        {
+            let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+            assert_eq!(cg.out_line(), 0, "no line emitted yet");
+
+            cg.writeln("a").unwrap();
+            assert_eq!(cg.out_line(), 1, "writeln advances by 1");
+
+            cg.write_blank_line().unwrap();
+            assert_eq!(cg.out_line(), 2, "write_blank_line advances by 1");
+
+            cg.write_raw("frag").unwrap();
+            assert_eq!(cg.out_line(), 2, "write_raw without newline does not advance");
+
+            cg.write_raw("x\ny\nz").unwrap();
+            assert_eq!(cg.out_line(), 4, "write_raw advances per embedded newline");
+
+            cg.write_line_terminator().unwrap();
+            assert_eq!(cg.out_line(), 5, "write_line_terminator advances by 1");
+        }
+        let text = String::from_utf8(output).unwrap();
+        assert_eq!(text, "a\n\nfragx\ny\nz\n");
+        assert_eq!(
+            text.matches('\n').count(),
+            5,
+            "byte-level line count must equal final out_line"
+        );
+    }
+
+    /// `writeln` indents 4 spaces per level; `dedent` decreases one level and
+    /// saturates at 0 (extra dedents must not underflow or panic).
+    #[test]
+    fn indent_dedent_levels_and_saturation_at_zero() {
+        let mut output = Vec::new();
+        {
+            let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+            cg.dedent(); // saturates: still level 0
+            cg.writeln("zero").unwrap();
+            cg.indent();
+            cg.indent();
+            cg.writeln("two").unwrap();
+            cg.dedent();
+            cg.writeln("one").unwrap();
+            cg.dedent();
+            cg.dedent(); // extra dedent below 0 saturates
+            cg.writeln("zero2").unwrap();
+        }
+        let text = String::from_utf8(output).unwrap();
+        assert_eq!(text, "zero\n        two\n    one\nzero2\n");
+    }
+
+    /// `end_block` closes a block: dedents one level, writes `end` at the new
+    /// level, then a blank line.
+    #[test]
+    fn end_block_dedents_then_writes_end_and_blank_line() {
+        let mut output = Vec::new();
+        {
+            let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+            cg.writeln("do").unwrap();
+            cg.indent();
+            cg.writeln("body").unwrap();
+            cg.end_block().unwrap();
+        }
+        let text = String::from_utf8(output).unwrap();
+        assert_eq!(text, "do\n    body\nend\n\n");
+    }
+
+    /// CRLF line ending is honored by both `writeln` and `write_blank_line`,
+    /// and each terminator still advances `out_line` by exactly 1.
+    #[test]
+    fn with_line_ending_crlf_emits_crlf_terminators() {
+        let mut output = Vec::new();
+        let final_out_line;
+        {
+            let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::CrLf);
+            cg.writeln("a").unwrap();
+            cg.write_blank_line().unwrap();
+            final_out_line = cg.out_line();
+        }
+        assert_eq!(String::from_utf8(output).unwrap(), "a\r\n\r\n");
+        assert_eq!(final_out_line, 2);
+    }
+
+    /// `write_header` emits the exact two require lines plus a trailing blank
+    /// line (byte-exact with LF endings).
+    #[test]
+    fn write_header_emits_exact_require_lines() {
+        let mut output = Vec::new();
+        {
+            let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+            cg.write_header().unwrap();
+        }
+        assert_eq!(
+            String::from_utf8(output).unwrap(),
+            "local PASTA = require \"pasta\"\nlocal GLOBAL = require \"pasta.global\"\n\n"
+        );
+    }
+
+    /// `record_span` guard: with a sink attached, an invalid span
+    /// (`end_byte == 0`, e.g. `Span::default()`) is skipped; a valid span is
+    /// recorded against the current `out_line` using its `start_line`.
+    #[test]
+    fn record_span_skips_invalid_span_and_records_valid_span() {
+        let mut sink = CapturingSink::default();
+        let mut output = Vec::new();
+        {
+            let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+            cg.set_source_map(&mut sink);
+            cg.writeln("line1").unwrap();
+            cg.record_span(Span::default()); // invalid: end_byte == 0 -> skipped
+            cg.writeln("line2").unwrap();
+            cg.record_span(Span::new(7, 1, 7, 5, 10, 20)); // valid
+        }
+        assert_eq!(
+            sink.records,
+            vec![(2, 7)],
+            "only the valid span is recorded, mapped to out_line 2 -> pasta line 7"
+        );
+    }
+
+    /// `record_block_line` guard: `pasta_line == 0` is skipped; a positive
+    /// line is recorded against the current `out_line`.
+    #[test]
+    fn record_block_line_skips_zero_and_records_positive_line() {
+        let mut sink = CapturingSink::default();
+        let mut output = Vec::new();
+        {
+            let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+            cg.set_source_map(&mut sink);
+            cg.writeln("line1").unwrap();
+            cg.record_block_line(0); // invalid sentinel -> skipped
+            cg.record_block_line(9);
+        }
+        assert_eq!(sink.records, vec![(1, 9)]);
+    }
+
+    /// Without a sink attached, `record_span` / `record_block_line` are inert:
+    /// no panic, and the emitted bytes are unaffected.
+    #[test]
+    fn recording_without_sink_is_inert() {
+        let mut output = Vec::new();
+        {
+            let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+            cg.writeln("a").unwrap();
+            cg.record_span(Span::new(1, 1, 1, 2, 0, 5));
+            cg.record_block_line(3);
+        }
+        assert_eq!(String::from_utf8(output).unwrap(), "a\n");
     }
 }

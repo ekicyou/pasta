@@ -160,14 +160,28 @@ async function runTests(): Promise<void> {
   });
 
   // --- Word Tests ---
+  // NOTE: commit 0ccf429 (word-ref box decoration) intentionally changed the
+  // word definition/reference scope from string.key.word.pasta /
+  // entity.name.function.reference.pasta to markup.inline.raw.string.pasta.
+  // These expectations follow the grammar's current committed behaviour.
   test('全角単語マーカーの認識', () => {
     const result = tokenizeLine('  ＠greeting：こんにちは おはよう');
-    expect(hasScope(result.tokens, 'string.key.word.pasta'), 'should have string.key.word scope');
+    expect(hasScope(result.tokens, 'markup.inline.raw.string.pasta'), 'should have markup.inline.raw.string scope');
+    expect(hasScope(result.tokens, 'keyword.other.marker.pasta'), 'marker should have keyword.other.marker.pasta scope');
   });
 
   test('半角単語マーカーの認識', () => {
     const result = tokenizeLine('  @greeting:hello hi');
-    expect(hasScope(result.tokens, 'string.key.word.pasta'), 'should have string.key.word scope');
+    expect(hasScope(result.tokens, 'markup.inline.raw.string.pasta'), 'should have markup.inline.raw.string scope');
+    expect(hasScope(result.tokens, 'keyword.other.marker.pasta'), 'marker should have keyword.other.marker.pasta scope');
+  });
+
+  test('アクション行内の単語参照の認識（inline-word-ref）', () => {
+    const result = tokenizeLine('　さくら：＠笑顔　こんにちは');
+    expect(
+      hasScope(result.tokens, 'markup.inline.raw.string.pasta'),
+      'inline word reference should have markup.inline.raw.string scope'
+    );
   });
 
   // --- Variable Tests ---

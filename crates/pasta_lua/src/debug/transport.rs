@@ -45,8 +45,6 @@
 //! TEST-ONLY `set_read_timeout` and bounded joins so CI cannot hang; the
 //! production path has no timeout baked in.
 
-#![allow(dead_code)]
-
 use std::io::{self, BufRead, BufReader, Write};
 use std::net::{SocketAddr, TcpListener};
 use std::sync::mpsc::{Receiver, Sender};
@@ -58,6 +56,15 @@ use crate::debug::DebugError;
 
 /// The DAP header that carries the body byte length.
 const CONTENT_LENGTH: &str = "Content-Length";
+
+/// Upper bound for an inbound frame body accepted by [`read_frame`].
+///
+/// The `Content-Length` value is **attacker-controlled** (the TCP debugger
+/// client is a trust boundary): without a cap, a single malicious header could
+/// drive an arbitrarily large body allocation before any byte of the body is
+/// read (memory-exhaustion DoS). Real DAP messages are tiny; 16 MiB is far
+/// above any legitimate frame while keeping the worst-case allocation bounded.
+const MAX_CONTENT_LENGTH: usize = 16 * 1024 * 1024;
 
 // ---------------------------------------------------------------------------
 // Frame codec (Content-Length framing) — pure, Lua-free, unit-testable
@@ -126,16 +133,16 @@ pub(crate) fn read_frame<R: BufRead>(reader: &mut R) -> io::Result<Option<Value>
 
         // Parse `Header-Name: value`; only Content-Length matters. Robust to
         // ordering and to additional headers (which are ignored).
-        if let Some((name, value)) = trimmed.split_once(':') {
-            if name.trim().eq_ignore_ascii_case(CONTENT_LENGTH) {
-                let parsed = value.trim().parse::<usize>().map_err(|_| {
-                    io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!("invalid Content-Length value: {value:?}"),
-                    )
-                })?;
-                content_length = Some(parsed);
-            }
+        if let Some((name, value)) = trimmed.split_once(':')
+            && name.trim().eq_ignore_ascii_case(CONTENT_LENGTH)
+        {
+            let parsed = value.trim().parse::<usize>().map_err(|_| {
+                io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("invalid Content-Length value: {value:?}"),
+                )
+            })?;
+            content_length = Some(parsed);
         }
     }
 
@@ -145,6 +152,15 @@ pub(crate) fn read_frame<R: BufRead>(reader: &mut R) -> io::Result<Option<Value>
             "frame header block missing Content-Length",
         )
     })?;
+
+    // DoS guard: the length is attacker-controlled, so reject absurd values
+    // BEFORE allocating the body buffer (see [`MAX_CONTENT_LENGTH`]).
+    if len > MAX_CONTENT_LENGTH {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("Content-Length {len} exceeds the maximum {MAX_CONTENT_LENGTH}"),
+        ));
+    }
 
     // (2) Read EXACTLY `len` body bytes (no over/under-read).
     let mut body = vec![0u8; len];
@@ -268,6 +284,10 @@ impl Transport {
     /// Signal shutdown: drop the outbound sender so the writer side unblocks and
     /// the listener thread can wind down. Idempotent; the reader side completes
     /// on the next socket EOF / error.
+    ///
+    /// Production teardown goes through [`Drop`] (same effect); this explicit
+    /// form is exercised by the `#[cfg(test)]` teardown paths.
+    #[allow(dead_code)] // test-facing; production uses Drop (kept per design seam)
     pub(crate) fn shutdown(&mut self) {
         // Dropping the outbound Sender closes the channel; the writer loop sees a
         // disconnect and returns. The reader loop returns on socket EOF/error.
@@ -276,6 +296,7 @@ impl Transport {
 
     /// Join the listener thread (used by tests / orderly teardown). No-op when
     /// disabled (no thread was spawned).
+    #[allow(dead_code)] // test-facing bounded-teardown helper (used by #[cfg(test)])
     pub(crate) fn join(&mut self) {
         if let Some(handle) = self.handle.take() {
             let _ = handle.join();
@@ -505,6 +526,121 @@ mod tests {
         assert_eq!(err.kind(), io::ErrorKind::UnexpectedEof);
     }
 
+    /// A non-numeric `Content-Length` value is a framing error (`InvalidData`),
+    /// not a silent skip — a malformed client cannot smuggle an unframed body.
+    #[test]
+    fn read_frame_non_numeric_content_length_is_error() {
+        let mut frame: Vec<u8> = Vec::new();
+        frame.extend_from_slice(b"Content-Length: abc\r\n\r\n");
+        frame.extend_from_slice(br#"{"x":1}"#);
+        let mut reader = Cursor::new(frame);
+        let err = read_frame(&mut reader).expect_err("non-numeric Content-Length must error");
+        assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+        assert!(
+            err.to_string().contains("invalid Content-Length"),
+            "error should name the bad header, got: {err}"
+        );
+    }
+
+    /// EOF in the MIDDLE of a header block (some header bytes seen, no blank
+    /// line yet) is `UnexpectedEof` — distinct from the clean `Ok(None)` EOF
+    /// BETWEEN frames. This is the truncated-header half of the EOF contract.
+    #[test]
+    fn read_frame_eof_mid_header_is_unexpected_eof() {
+        // A header line was read, but the stream ends before the blank line.
+        let frame: Vec<u8> = b"Content-Length: 7\r\n".to_vec();
+        let mut reader = Cursor::new(frame);
+        let err = read_frame(&mut reader).expect_err("EOF mid-header must error");
+        assert_eq!(err.kind(), io::ErrorKind::UnexpectedEof);
+        assert!(
+            err.to_string().contains("header"),
+            "error should mention the header block, got: {err}"
+        );
+    }
+
+    /// A body that is not valid UTF-8 is `InvalidData` (the DAP body is JSON,
+    /// which is UTF-8 by definition), not a panic or a lossy decode.
+    #[test]
+    fn read_frame_non_utf8_body_is_error() {
+        let body: &[u8] = &[0xFF, 0xFE, 0xFD, 0xFC]; // invalid UTF-8
+        let mut frame: Vec<u8> = Vec::new();
+        frame.extend_from_slice(format!("Content-Length: {}\r\n\r\n", body.len()).as_bytes());
+        frame.extend_from_slice(body);
+        let mut reader = Cursor::new(frame);
+        let err = read_frame(&mut reader).expect_err("non-UTF-8 body must error");
+        assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+    }
+
+    /// A body that is valid UTF-8 but not valid JSON is `InvalidData`. Also
+    /// pins `Content-Length: 0` (an empty body is NOT valid JSON, so a zero
+    /// length frame is rejected rather than yielding a phantom value).
+    #[test]
+    fn read_frame_invalid_json_body_is_error() {
+        // Valid UTF-8, invalid JSON.
+        let body = b"not json at all";
+        let mut frame: Vec<u8> = Vec::new();
+        frame.extend_from_slice(format!("Content-Length: {}\r\n\r\n", body.len()).as_bytes());
+        frame.extend_from_slice(body);
+        let mut reader = Cursor::new(frame);
+        let err = read_frame(&mut reader).expect_err("invalid JSON body must error");
+        assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+
+        // Content-Length: 0 → empty body → invalid JSON → InvalidData.
+        let mut zero: Vec<u8> = b"Content-Length: 0\r\n\r\n".to_vec();
+        // Append a following frame to prove the zero-length read consumed nothing.
+        write_frame(&mut zero, &json!({"after": true})).unwrap();
+        let mut reader = Cursor::new(zero);
+        let err = read_frame(&mut reader).expect_err("zero-length body must error");
+        assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+    }
+
+    /// G3 hardening regression: an attacker-controlled oversized
+    /// `Content-Length` is rejected as `InvalidData` BEFORE the body buffer is
+    /// allocated, so a malicious client cannot drive an unbounded allocation
+    /// (memory-exhaustion DoS) with a single cheap header. At the limit itself
+    /// the frame is still read normally (the guard is exclusive-above), which
+    /// here surfaces as `UnexpectedEof` because no body bytes follow.
+    #[test]
+    fn read_frame_rejects_oversized_content_length_before_allocating() {
+        // One byte over the cap → rejected up front (InvalidData, names the cap).
+        let mut over: Vec<u8> = Vec::new();
+        over.extend_from_slice(
+            format!("Content-Length: {}\r\n\r\n", MAX_CONTENT_LENGTH + 1).as_bytes(),
+        );
+        let mut reader = Cursor::new(over);
+        let err = read_frame(&mut reader).expect_err("oversized Content-Length must error");
+        assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+        assert!(
+            err.to_string().contains("exceeds"),
+            "error should name the exceeded cap, got: {err}"
+        );
+
+        // Exactly AT the cap the guard does not fire: the read proceeds and
+        // fails only because the body is absent (UnexpectedEof, not InvalidData).
+        let mut at: Vec<u8> = Vec::new();
+        at.extend_from_slice(format!("Content-Length: {MAX_CONTENT_LENGTH}\r\n\r\n").as_bytes());
+        let mut reader = Cursor::new(at);
+        let err = read_frame(&mut reader).expect_err("missing body must error");
+        assert_eq!(err.kind(), io::ErrorKind::UnexpectedEof, "at-limit passes the guard");
+    }
+
+    /// Header lines terminated by bare `\n` (no `\r`) are tolerated: the
+    /// terminator trim accepts both `\r\n` and `\n`, so a lenient client still
+    /// frames correctly.
+    #[test]
+    fn read_frame_tolerates_bare_lf_header_endings() {
+        let body = br#"{"lf":true}"#;
+        let mut frame: Vec<u8> = Vec::new();
+        frame.extend_from_slice(format!("Content-Length: {}\n", body.len()).as_bytes());
+        frame.extend_from_slice(b"\n");
+        frame.extend_from_slice(body);
+        let mut reader = Cursor::new(frame);
+        let read = read_frame(&mut reader)
+            .expect("bare-LF headers must parse")
+            .expect("a frame must be present");
+        assert_eq!(read, json!({ "lf": true }));
+    }
+
     // -----------------------------------------------------------------------
     // Disabled path: listen == None opens NO port (R5.5)
     // -----------------------------------------------------------------------
@@ -534,6 +670,41 @@ mod tests {
             matches!(transport.send(json!({"x":1})), Err(DebugError::Disconnected)),
             "disabled send must report Disconnected (no socket)"
         );
+    }
+
+    /// `join` on a disabled transport is a no-op (no thread was ever spawned)
+    /// and `shutdown` stays idempotent — neither hangs nor panics.
+    #[test]
+    fn disabled_join_and_shutdown_are_noops() {
+        let mut transport = Transport::start(None).expect("disabled start must succeed");
+        transport.join(); // no thread → returns immediately
+        transport.shutdown();
+        transport.shutdown(); // idempotent
+        transport.join(); // still a no-op after shutdown
+        assert!(transport.local_addr().is_none());
+    }
+
+    /// After `shutdown` the outbound sender is gone: `send` on an ENABLED
+    /// transport reports `Disconnected` (the owner's clean stop signal), and
+    /// `shutdown` is idempotent.
+    #[test]
+    fn send_after_shutdown_reports_disconnected() {
+        let mut transport =
+            Transport::start(Some("127.0.0.1:0".parse().unwrap())).expect("bind must succeed");
+        assert!(transport.local_addr().is_some(), "enabled transport binds");
+
+        transport.shutdown();
+        assert!(
+            matches!(transport.send(json!({"x":1})), Err(DebugError::Disconnected)),
+            "send after shutdown must report Disconnected"
+        );
+        transport.shutdown(); // idempotent
+
+        // Unblock the listener (it is parked in accept()) so the bounded join
+        // can complete: connect-and-drop makes accept return, the reader sees
+        // EOF, and the writer sees the already-closed outbound channel.
+        let _ = connect_client(transport.local_addr().unwrap());
+        join_transport_with_watchdog(transport, WATCHDOG);
     }
 
     // -----------------------------------------------------------------------
@@ -636,14 +807,12 @@ mod tests {
 
         // The inbound channel must close (reader returned on EOF) within the
         // watchdog — proving no hang.
-        loop {
-            match transport.inbound().recv_timeout(WATCHDOG) {
-                Err(RecvTimeoutError::Disconnected) => break, // reader done
-                Err(RecvTimeoutError::Timeout) => {
-                    panic!("inbound did not close after client disconnect (hang?)")
-                }
-                Ok(v) => panic!("unexpected inbound frame after disconnect: {v:?}"),
+        match transport.inbound().recv_timeout(WATCHDOG) {
+            Err(RecvTimeoutError::Disconnected) => {} // reader done
+            Err(RecvTimeoutError::Timeout) => {
+                panic!("inbound did not close after client disconnect (hang?)")
             }
+            Ok(v) => panic!("unexpected inbound frame after disconnect: {v:?}"),
         }
 
         let mut transport = transport;

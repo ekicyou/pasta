@@ -335,7 +335,7 @@ fn test_search_word_merge_duplicate_entries_all_words_reachable() {
     let r4 = table.search_word("", "挨拶", &[]).unwrap();
 
     // Collect results
-    let results = vec![r1, r2, r3, r4];
+    let results = [r1, r2, r3, r4];
 
     // All 4 words should be represented
     assert!(results.contains(&"おはよう".to_string()));
@@ -370,6 +370,113 @@ fn test_search_word_merge_duplicate_local_entries() {
         "Unexpected word: {}",
         word
     );
+}
+
+#[test]
+fn test_new_word_table_is_empty() {
+    let selector = Box::new(MockRandomSelector::new(vec![0]));
+    let mut table = WordTable::new(selector);
+
+    assert!(table.entries().is_empty());
+    // Any search on an empty table is WordNotFound
+    let result = table.search_word("", "anything", &[]);
+    assert!(matches!(result, Err(WordTableError::WordNotFound { .. })));
+}
+
+#[test]
+fn test_clear_cache_restarts_sequence() {
+    let mut registry = WordDefRegistry::new();
+    registry.register_global(
+        "test",
+        vec!["a".to_string(), "b".to_string(), "c".to_string()],
+    );
+
+    let selector = Box::new(MockRandomSelector::new(vec![0]));
+    let mut table = WordTable::from_word_def_registry(registry, selector);
+    table.set_shuffle_enabled(false);
+
+    // Consume part of the sequence
+    assert_eq!(table.search_word("", "test", &[]).unwrap(), "a");
+    assert_eq!(table.search_word("", "test", &[]).unwrap(), "b");
+
+    // clear_cache discards consumption state — sequence restarts
+    table.clear_cache();
+    assert_eq!(table.search_word("", "test", &[]).unwrap(), "a");
+}
+
+#[test]
+fn test_replace_selector_clears_cache_keeps_entries() {
+    let mut registry = WordDefRegistry::new();
+    registry.register_global("test", vec!["a".to_string(), "b".to_string()]);
+
+    let selector = Box::new(MockRandomSelector::new(vec![0]));
+    let mut table = WordTable::from_word_def_registry(registry, selector);
+    table.set_shuffle_enabled(false);
+
+    // Consume part of the sequence
+    assert_eq!(table.search_word("", "test", &[]).unwrap(), "a");
+
+    // Replace the selector — cache must be cleared, entries preserved
+    table.replace_selector(Box::new(MockRandomSelector::new(vec![0])));
+    assert_eq!(table.entries().len(), 1);
+    assert_eq!(
+        table.search_word("", "test", &[]).unwrap(),
+        "a",
+        "cache was not cleared by replace_selector"
+    );
+}
+
+#[test]
+fn test_search_word_empty_key_matches_all_global() {
+    // Empty key is a prefix of every key: global search merges all global words
+    let mut registry = WordDefRegistry::new();
+    registry.register_global("alpha", vec!["a".to_string()]);
+    registry.register_global("beta", vec!["b".to_string()]);
+    registry.register_local("mod", "gamma", vec!["c".to_string()]);
+
+    let selector = Box::new(MockRandomSelector::new(vec![0]));
+    let table = WordTable::from_word_def_registry(registry, selector);
+
+    // Documents current behavior: empty key matches all GLOBAL entries,
+    // local entries (':' prefix) are excluded
+    let candidates = table.collect_word_candidates("", "").unwrap();
+    assert_eq!(candidates.len(), 2);
+    assert!(candidates.contains(&"a".to_string()));
+    assert!(candidates.contains(&"b".to_string()));
+    assert!(!candidates.contains(&"c".to_string()));
+}
+
+#[test]
+fn test_collect_word_candidates_entry_with_empty_values() {
+    // An entry that exists but has zero values must yield WordNotFound,
+    // not an empty list (collect_word_candidates' second guard)
+    let mut registry = WordDefRegistry::new();
+    registry.register_global("empty", vec![]);
+
+    let selector = Box::new(MockRandomSelector::new(vec![0]));
+    let table = WordTable::from_word_def_registry(registry, selector);
+
+    let result = table.collect_word_candidates("", "empty");
+    match result {
+        Err(WordTableError::WordNotFound { key }) => assert_eq!(key, "empty"),
+        other => panic!("Expected WordNotFound, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_collect_word_candidates_local_entry_with_empty_values() {
+    // Same guard on the local search path
+    let mut registry = WordDefRegistry::new();
+    registry.register_local("mod", "empty", vec![]);
+
+    let selector = Box::new(MockRandomSelector::new(vec![0]));
+    let table = WordTable::from_word_def_registry(registry, selector);
+
+    let result = table.collect_word_candidates("mod", "empty");
+    match result {
+        Err(WordTableError::WordNotFound { key }) => assert_eq!(key, "empty"),
+        other => panic!("Expected WordNotFound, got {:?}", other),
+    }
 }
 
 #[test]

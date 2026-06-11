@@ -29,14 +29,8 @@ mod tests {
     #[test]
     fn test_actors_pasta_contains_all_characters() {
         let actors = read_pasta_script("actors.pasta");
-        assert!(
-            actors.contains("％女の子"),
-            "女の子アクターがありません"
-        );
-        assert!(
-            actors.contains("％男の子"),
-            "男の子アクターがありません"
-        );
+        assert!(actors.contains("％女の子"), "女の子アクターがありません");
+        assert!(actors.contains("％男の子"), "男の子アクターがありません");
         assert!(actors.contains("＠笑顔"), "笑顔表情がありません");
         assert!(actors.contains("＠通常"), "通常表情がありません");
         assert!(actors.contains("＠怒り"), "怒り表情がありません");
@@ -82,14 +76,13 @@ mod tests {
                 if !in_scene {
                     continue;
                 }
-                if let Some(rest) = line.strip_prefix('　') {
-                    if let Some(after_colon) = rest.split_once('：').map(|(_, r)| r) {
-                        if let Some(name) = after_colon.strip_prefix('＠') {
-                            let expr_name = name.split('　').next().unwrap_or(name);
-                            if !expr_name.is_empty() {
-                                names.push(expr_name);
-                            }
-                        }
+                if let Some(rest) = line.strip_prefix('　')
+                    && let Some(after_colon) = rest.split_once('：').map(|(_, r)| r)
+                    && let Some(name) = after_colon.strip_prefix('＠')
+                {
+                    let expr_name = name.split('　').next().unwrap_or(name);
+                    if !expr_name.is_empty() {
+                        names.push(expr_name);
                     }
                 }
             }

@@ -445,7 +445,7 @@ fn extract_callback_id(value: &str) -> String {
         .expect("Value should contain OnPastaCallBack");
     let rest = &value[start..];
     let end = rest
-        .find(|c: char| c == ',' || c == ']')
+        .find([',', ']'])
         .expect("OnPastaCallBack should be followed by ',' or ']'");
     rest[..end].to_string()
 }

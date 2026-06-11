@@ -3,7 +3,7 @@
 //! 仕様参照:
 //! - requirements.md **7.1**:
 //!   「While ソースマップ生成が無効である, the ソースマップ生成器 shall 生成 `.lua` の
-//!    出力内容を従来と完全に一致させる（バイト不変）」
+//!   出力内容を従来と完全に一致させる（バイト不変）」
 //! - design.md "Testing Strategy" → "Integration Tests" → **ゼロコスト回帰**（633 行）:
 //!   「debug 無効（sink=None）で生成 `.lua` がバイト不変（既存スナップショットと一致）」
 //! - design.md "Performance / Backward Compatibility" → 二相のゼロコスト（643-649 行）:

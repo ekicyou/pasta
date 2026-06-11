@@ -8,6 +8,26 @@ local expect = require("lua_test.test").expect
 local ACT = require("pasta.act")
 local SCENE = require("pasta.scene")
 
+-- pasta.act を再読込して新鮮なモジュールテーブルを返す
+-- （act.lua が参照する GLOBAL / @pasta_search との同一性を保つための再読込規約）
+local function reload_fresh_act()
+    package.loaded["pasta.act"] = nil
+    return require("pasta.act")
+end
+
+-- @pasta_search を mock（nil 指定で不在固定）へ差し替えたうえで pasta.act を再読込する
+-- （package.loaded への差し替えは pasta.act 再読込より先に行う必要がある）
+local function reload_act_with_search(mock_search)
+    package.loaded["@pasta_search"] = mock_search
+    return reload_fresh_act()
+end
+
+-- SCENE.search 側をモックする scene/expr モードテスト用の @pasta_search ダミー
+-- （pcall require を成功させるためだけに存在し、検索自体は SCENE.search モックが担う）
+local function dummy_search_module()
+    return { search_scene = function() end, search_word = function() return nil end }
+end
+
 -- ============================================================================
 -- L1: current_scene[key] 完全一致（全モード共通）
 -- ============================================================================
@@ -78,10 +98,7 @@ describe("find_act_handler - L2 word モード (ローカル単語辞書前方�
                 return nil
             end
         }
-        package.loaded["@pasta_search"] = mock_search
-
-        package.loaded["pasta.act"] = nil
-        local fresh_ACT = require("pasta.act")
+        local fresh_ACT = reload_act_with_search(mock_search)
 
         local act = fresh_ACT.new({})
         act.current_scene = { __global_name__ = "テストシーン_1" }
@@ -94,9 +111,7 @@ describe("find_act_handler - L2 word モード (ローカル単語辞書前方�
     end)
 
     test("@pasta_search がなければ L2 をスキップして nil を返す", function()
-        package.loaded["@pasta_search"] = nil
-        package.loaded["pasta.act"] = nil
-        local fresh_ACT = require("pasta.act")
+        local fresh_ACT = reload_act_with_search(nil)
 
         local act = fresh_ACT.new({})
         act.current_scene = { __global_name__ = "テストシーン_1" }
@@ -120,9 +135,7 @@ describe("find_act_handler - L2 word モード (ローカル単語辞書前方�
                 return nil -- L5 グローバルも nil → 最終 nil を確認
             end
         }
-        package.loaded["@pasta_search"] = mock_search
-        package.loaded["pasta.act"] = nil
-        local fresh_ACT = require("pasta.act")
+        local fresh_ACT = reload_act_with_search(mock_search)
 
         local act = fresh_ACT.new({})
         act.current_scene = {} -- __global_name__ なし
@@ -142,12 +155,9 @@ describe("find_act_handler - L2 scene モード (ローカルシーン辞書前�
     local original_search
 
     test("@pasta_search があり SCENE.search がマッチすれば func を返す", function()
-        -- @pasta_search をモック（SCENE.search内部のrequireを通すためダミーを設定）
-        local mock_search_called_with = {}
         original_search = SCENE.search
         local handler = function() return "L2-scene" end
         SCENE.search = function(key, scope, attrs)
-            table.insert(mock_search_called_with, { key = key, scope = scope })
             if key == "target" and scope == "テストシーン_1" then
                 return { func = handler }
             end
@@ -155,9 +165,7 @@ describe("find_act_handler - L2 scene モード (ローカルシーン辞書前�
         end
 
         -- @pasta_search モックをpackage.loadedに設定することでpcall成功させる
-        package.loaded["@pasta_search"] = { search_scene = function() end, search_word = function() return nil end }
-        package.loaded["pasta.act"] = nil
-        local fresh_ACT = require("pasta.act")
+        local fresh_ACT = reload_act_with_search(dummy_search_module())
 
         local act = fresh_ACT.new({})
         act.current_scene = { __global_name__ = "テストシーン_1" } -- L1 miss (no "target" key)
@@ -179,9 +187,7 @@ describe("find_act_handler - L2 scene モード (ローカルシーン辞書前�
             end
             return nil
         end
-        package.loaded["@pasta_search"] = { search_scene = function() end, search_word = function() return nil end }
-        package.loaded["pasta.act"] = nil
-        local fresh_ACT = require("pasta.act")
+        local fresh_ACT = reload_act_with_search(dummy_search_module())
 
         local act = fresh_ACT.new({})
         act.current_scene = { __global_name__ = "テストシーン_1" }
@@ -244,8 +250,7 @@ end)
 describe("find_act_handler - L4 (GLOBAL 完全一致)", function()
     test("GLOBAL[key] に関数が設定されていれば返す", function()
         -- モジュール同期: 同一GLOBALテーブルを参照
-        package.loaded["pasta.act"] = nil
-        local fresh_ACT = require("pasta.act")
+        local fresh_ACT = reload_fresh_act()
         local fresh_GLOBAL = require("pasta.global")
 
         local handler = function() return "L4" end
@@ -262,8 +267,7 @@ describe("find_act_handler - L4 (GLOBAL 完全一致)", function()
     end)
 
     test("word モードでも L4 は GLOBAL 完全一致を検索する", function()
-        package.loaded["pasta.act"] = nil
-        local fresh_ACT = require("pasta.act")
+        local fresh_ACT = reload_fresh_act()
         local fresh_GLOBAL = require("pasta.global")
 
         fresh_GLOBAL._test_l4_word_val = "L4val"
@@ -292,9 +296,7 @@ describe("find_act_handler - L5 word モード (グローバル単語辞書前�
                 return nil
             end
         }
-        package.loaded["@pasta_search"] = mock_search
-        package.loaded["pasta.act"] = nil
-        local fresh_ACT = require("pasta.act")
+        local fresh_ACT = reload_act_with_search(mock_search)
 
         local act = fresh_ACT.new({})
         act.current_scene = {} -- L1 miss、__global_name__なしでL2スキップ
@@ -322,9 +324,7 @@ describe("find_act_handler - L5 scene モード (グローバルシーン辞書�
             end
             return nil
         end
-        package.loaded["@pasta_search"] = { search_scene = function() end, search_word = function() return nil end }
-        package.loaded["pasta.act"] = nil
-        local fresh_ACT = require("pasta.act")
+        local fresh_ACT = reload_act_with_search(dummy_search_module())
 
         local act = fresh_ACT.new({})
         act.current_scene = {} -- L1 miss、L2はL3-4もスキップ想定
@@ -405,8 +405,7 @@ describe("find_act_handler - フォールバック優先順位", function()
     end)
 
     test("L3（act.XX）は L4（GLOBAL）より優先される", function()
-        package.loaded["pasta.act"] = nil
-        local fresh_ACT = require("pasta.act")
+        local fresh_ACT = reload_fresh_act()
         local fresh_GLOBAL = require("pasta.global")
 
         local global_handler = function() return "L4_loser" end

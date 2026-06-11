@@ -797,6 +797,175 @@ end
     );
 }
 
+// ========================================================================
+// G1 (3.35): call_lua_load failure branches (previously unreached)
+// ========================================================================
+
+/// SHIORI.load returning false must surface as load() == Ok(false).
+/// Characterization: the runtime stays initialized (load() returns early
+/// AFTER self.runtime was set), so subsequent requests still reach Lua.
+#[test]
+fn test_load_returns_false_when_lua_load_returns_false() {
+    let temp = copy_fixture_to_temp("minimal");
+
+    let entry_lua_path = temp.path().join("scripts/pasta/shiori/entry.lua");
+    std::fs::create_dir_all(entry_lua_path.parent().unwrap()).unwrap();
+    std::fs::write(
+        &entry_lua_path,
+        r#"
+SHIORI = {}
+
+function SHIORI.load(hinst, load_dir)
+    return false
+end
+
+function SHIORI.request(request)
+    return "SHIORI/3.0 204 No Content\r\nCharset: UTF-8\r\nSender: Pasta\r\n\r\n"
+end
+"#,
+    )
+    .unwrap();
+
+    let mut shiori = PastaShiori::default();
+    let result = shiori.load(0, temp.path().as_os_str());
+    assert!(result.is_ok(), "Lua-level load failure is not a Rust error");
+    assert!(
+        !result.unwrap(),
+        "SHIORI.load false must propagate as false"
+    );
+
+    // Characterize current semantics: runtime kept despite reported failure.
+    assert!(shiori.runtime.is_some());
+    let response = shiori
+        .request("GET SHIORI/3.0\r\nCharset: UTF-8\r\n\r\n")
+        .unwrap();
+    assert!(response.contains("SHIORI/3.0 204 No Content"));
+}
+
+/// SHIORI.load raising a Lua error must also surface as Ok(false).
+#[test]
+fn test_load_returns_false_when_lua_load_errors() {
+    let temp = copy_fixture_to_temp("minimal");
+
+    let entry_lua_path = temp.path().join("scripts/pasta/shiori/entry.lua");
+    std::fs::create_dir_all(entry_lua_path.parent().unwrap()).unwrap();
+    std::fs::write(
+        &entry_lua_path,
+        r#"
+SHIORI = {}
+
+function SHIORI.load(hinst, load_dir)
+    error("intentional load failure")
+end
+
+function SHIORI.request(request)
+    return "SHIORI/3.0 204 No Content\r\nCharset: UTF-8\r\nSender: Pasta\r\n\r\n"
+end
+"#,
+    )
+    .unwrap();
+
+    let mut shiori = PastaShiori::default();
+    let result = shiori.load(0, temp.path().as_os_str());
+    assert!(result.is_ok());
+    assert!(
+        !result.unwrap(),
+        "SHIORI.load error must propagate as false"
+    );
+}
+
+// ========================================================================
+// G1 (3.35): call_lua_request error branches (previously unreached)
+// ========================================================================
+
+/// SHIORI.request raising a Lua error must surface as Err(MyError::Script)
+/// — this is the path windows.rs turns into a SHIORI 500 response.
+#[test]
+fn test_request_lua_error_returns_script_error() {
+    let temp = copy_fixture_to_temp("minimal");
+
+    let entry_lua_path = temp.path().join("scripts/pasta/shiori/entry.lua");
+    std::fs::create_dir_all(entry_lua_path.parent().unwrap()).unwrap();
+    std::fs::write(
+        &entry_lua_path,
+        r#"
+SHIORI = {}
+
+function SHIORI.load(hinst, load_dir)
+    return true
+end
+
+function SHIORI.request(request)
+    error("intentional request failure")
+end
+"#,
+    )
+    .unwrap();
+
+    let mut shiori = PastaShiori::default();
+    assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
+
+    let err = shiori
+        .request("GET SHIORI/3.0\r\nCharset: UTF-8\r\n\r\n")
+        .unwrap_err();
+    match err {
+        MyError::Script { ref message } => {
+            assert!(
+                message.contains("intentional request failure"),
+                "Script message should carry the Lua error: {message}"
+            );
+        }
+        other => panic!("Expected MyError::Script, got {:?}", other),
+    }
+}
+
+/// SHIORI.request returning a non-string (nil) fails the mlua String
+/// conversion and must also surface as Err(MyError::Script).
+#[test]
+fn test_request_non_string_return_is_script_error() {
+    let temp = copy_fixture_to_temp("minimal");
+
+    let entry_lua_path = temp.path().join("scripts/pasta/shiori/entry.lua");
+    std::fs::create_dir_all(entry_lua_path.parent().unwrap()).unwrap();
+    std::fs::write(
+        &entry_lua_path,
+        r#"
+SHIORI = {}
+
+function SHIORI.load(hinst, load_dir)
+    return true
+end
+
+function SHIORI.request(request)
+    return nil
+end
+"#,
+    )
+    .unwrap();
+
+    let mut shiori = PastaShiori::default();
+    assert!(shiori.load(0, temp.path().as_os_str()).unwrap());
+
+    let err = shiori
+        .request("GET SHIORI/3.0\r\nCharset: UTF-8\r\n\r\n")
+        .unwrap_err();
+    assert!(
+        matches!(err, MyError::Script { .. }),
+        "nil return must become a Script error, got {:?}",
+        err
+    );
+}
+
+// ========================================================================
+// G1 (3.35): runtime() accessor None branch
+// ========================================================================
+
+#[test]
+fn test_runtime_accessor_none_before_load() {
+    let shiori = PastaShiori::default();
+    assert!(shiori.runtime().is_none());
+}
+
 /// Copy shiori_lifecycle fixture to a temporary directory.
 fn copy_shiori_lifecycle_fixture() -> TempDir {
     let src = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/shiori_lifecycle");

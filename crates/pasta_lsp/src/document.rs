@@ -57,7 +57,13 @@ impl DocumentManager {
                     let start_offset =
                         line_col_to_offset(&doc.text, range.start_line, range.start_col);
                     let end_offset = line_col_to_offset(&doc.text, range.end_line, range.end_col);
-                    if let (Some(start), Some(end)) = (start_offset, end_offset) {
+                    // `start <= end` guard: LSP contracts require start <= end, but a
+                    // buggy/malicious client can send an inverted range, which would
+                    // panic in `replace_range`. Treat it as a no-op, consistent with
+                    // the existing out-of-range behavior.
+                    if let (Some(start), Some(end)) = (start_offset, end_offset)
+                        && start <= end
+                    {
                         doc.text.replace_range(start..end, &change.text);
                     }
                 } else {
@@ -209,6 +215,35 @@ mod tests {
     }
 
     #[test]
+    fn test_incremental_change_inverted_range_is_noop() {
+        // 境界回帰テスト（R3.3/R3.6）: LSP 契約上 range は start <= end だが、
+        // 不正クライアントが逆転 range を送ると replace_range がパニックしていた
+        // （slice index starts at 9 but ends at 2）。ハードニング後は no-op。
+        let mut dm = DocumentManager::new();
+        dm.open(
+            "file:///test.pasta".to_string(),
+            "hello\nworld\n".to_string(),
+            1,
+        );
+        dm.change(
+            "file:///test.pasta",
+            &[ContentChange {
+                range: Some(TextRange {
+                    start_line: 1,
+                    start_col: 3,
+                    end_line: 0,
+                    end_col: 2,
+                }),
+                text: "x".to_string(),
+            }],
+            2,
+        );
+        let doc = dm.get("file:///test.pasta").unwrap();
+        assert_eq!(doc.text, "hello\nworld\n", "テキストは変更されない");
+        assert_eq!(doc.version, 2, "バージョンは更新される");
+    }
+
+    #[test]
     fn test_line_col_to_offset_ascii() {
         let text = "hello\nworld\n";
         assert_eq!(line_col_to_offset(text, 0, 0), Some(0));
@@ -226,6 +261,59 @@ mod tests {
         assert_eq!(line_col_to_offset(text, 0, 3), Some(9)); // End of line
         // Line 1: "Alice：こんにちは"
         assert_eq!(line_col_to_offset(text, 1, 0), Some(10)); // Start of line 1
+    }
+
+    #[test]
+    fn test_multiple_content_changes_applied_sequentially() {
+        // LSP didChange は複数 contentChanges を順次適用する。
+        // 2 番目の change の range は 1 番目適用後のテキストに対して解釈される。
+        let mut dm = DocumentManager::new();
+        dm.open(
+            "file:///test.pasta".to_string(),
+            "hello\nworld\n".to_string(),
+            1,
+        );
+        dm.change(
+            "file:///test.pasta",
+            &[
+                // 1st: "hello" → "hey" (5 → 3 chars)
+                ContentChange {
+                    range: Some(TextRange {
+                        start_line: 0,
+                        start_col: 0,
+                        end_line: 0,
+                        end_col: 5,
+                    }),
+                    text: "hey".to_string(),
+                },
+                // 2nd: 適用後テキスト "hey" 全体 (col0..3) → "yo"
+                // 元テキスト基準なら col0..3 = "hel" となり結果が異なる
+                ContentChange {
+                    range: Some(TextRange {
+                        start_line: 0,
+                        start_col: 0,
+                        end_line: 0,
+                        end_col: 3,
+                    }),
+                    text: "yo".to_string(),
+                },
+            ],
+            2,
+        );
+        let doc = dm.get("file:///test.pasta").unwrap();
+        assert_eq!(doc.text, "yo\nworld\n");
+        assert_eq!(doc.version, 2);
+    }
+
+    #[test]
+    fn test_line_col_to_offset_inside_surrogate_pair_returns_none() {
+        // UTF-16 col がサロゲートペアの内部（😀 は 2 ユニット）を指す場合は
+        // 文字境界に一致しないため None（補間や丸めをしない）
+        let text = "😀x\n";
+        assert_eq!(line_col_to_offset(text, 0, 0), Some(0));
+        assert_eq!(line_col_to_offset(text, 0, 1), None, "ペア内部は None");
+        assert_eq!(line_col_to_offset(text, 0, 2), Some(4), "😀 = 4 bytes");
+        assert_eq!(line_col_to_offset(text, 0, 3), Some(5));
     }
 
     #[test]

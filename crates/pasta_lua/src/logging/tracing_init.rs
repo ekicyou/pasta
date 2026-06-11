@@ -75,3 +75,45 @@ pub fn update_tracing_filter(config: &LoggingConfig) {
         let _ = handle.reload(new_filter);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Exercise the full two-stage lifecycle in a single test so the call
+    /// order is deterministic (the subscriber and FILTER_HANDLE are
+    /// process-global).
+    ///
+    /// Contract under test:
+    /// - `update_tracing_filter` never panics, with or without prior init
+    /// - `init_tracing_with_reload` is idempotent (second call is ignored)
+    /// - reloading with a valid or an unparsable filter never panics
+    ///   (unparsable input falls back to the "info" filter)
+    #[test]
+    fn test_init_and_update_lifecycle_no_panic() {
+        let config = LoggingConfig::default();
+
+        // Update before (or regardless of) init: must not panic.
+        update_tracing_filter(&config);
+
+        // Stage 1: install subscriber + reload handle.
+        init_tracing_with_reload(&config);
+
+        // Second init must be safely ignored (try_init contract).
+        init_tracing_with_reload(&config);
+
+        // Stage 1.5: reload with a valid custom directive.
+        let custom = LoggingConfig {
+            filter: Some("warn,pasta_lua=debug".to_string()),
+            ..LoggingConfig::default()
+        };
+        update_tracing_filter(&custom);
+
+        // Reload with an unparsable directive: falls back without panicking.
+        let invalid = LoggingConfig {
+            filter: Some("===not a directive===".to_string()),
+            ..LoggingConfig::default()
+        };
+        update_tracing_filter(&invalid);
+    }
+}

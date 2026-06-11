@@ -156,7 +156,7 @@ impl PastaLoader {
         // Phase 4: Incremental process (transpile .pasta, copy .lua)
         debug!("Phase 4: Incremental processing");
         let (context, module_names, stats) =
-            Self::process_incremental(base_dir, &pasta_files, &lua_files, &cache_manager)?;
+            Self::process_incremental(&pasta_files, &lua_files, &cache_manager)?;
 
         // Log statistics in debug mode
         if config.loader.debug_mode {
@@ -338,44 +338,13 @@ impl PastaLoader {
         // Build HashSet of .pasta module names for conflict detection
         let pasta_module_names: std::collections::HashSet<String> = pasta_files
             .iter()
-            .map(|f| {
-                // Use inline module name computation (same as CacheManager)
-                let relative = f
-                    .strip_prefix(base_dir)
-                    .unwrap_or(f)
-                    .to_string_lossy()
-                    .to_string();
-                let without_prefix = relative
-                    .strip_prefix("dic")
-                    .unwrap_or(&relative)
-                    .trim_start_matches(['/', '\\'])
-                    .to_string();
-                let stem = std::path::Path::new(&without_prefix)
-                    .with_extension("")
-                    .to_string_lossy()
-                    .to_string();
-                stem.replace(['/', '\\'], ".").replace('-', "_")
-            })
+            .map(|f| module_key(base_dir, f))
             .collect();
 
         // Filter out conflicting .lua files
         let mut filtered_lua_files = Vec::new();
         for lua_file in &lua_files {
-            let relative = lua_file
-                .strip_prefix(base_dir)
-                .unwrap_or(lua_file)
-                .to_string_lossy()
-                .to_string();
-            let without_prefix = relative
-                .strip_prefix("dic")
-                .unwrap_or(&relative)
-                .trim_start_matches(['/', '\\'])
-                .to_string();
-            let stem = std::path::Path::new(&without_prefix)
-                .with_extension("")
-                .to_string_lossy()
-                .to_string();
-            let module_key = stem.replace(['/', '\\'], ".").replace('-', "_");
+            let module_key = module_key(base_dir, lua_file);
 
             if pasta_module_names.contains(&module_key) {
                 warn!(
@@ -395,7 +364,6 @@ impl PastaLoader {
     ///
     /// Uses CacheManager to check timestamps and skip unchanged files.
     fn process_incremental(
-        _base_dir: &Path,
         pasta_files: &[std::path::PathBuf],
         lua_files: &[std::path::PathBuf],
         cache_manager: &CacheManager,
@@ -620,13 +588,36 @@ impl PastaLoader {
     ) -> Arc<SourceMap> {
         Arc::new(build_source_map_inner(pasta_files, cache_manager, sidecar))
     }
-
 }
 
-/// Core multi-chunk source-map build (testable without `Arc`).
+/// Compute the bare scene module key for a source file under `base_dir`.
 ///
-/// See [`PastaLoader::build_source_map`] for the contract. Kept as a free function
-/// so integration tests can assert on the built [`SourceMap`] directly.
+/// Same derivation as `CacheManager::source_to_module_name`, without the
+/// `pasta.scene.` prefix: strip `base_dir` and the leading `dic` component,
+/// drop the extension, then map path separators to `.` and `-` to `_`.
+fn module_key(base_dir: &Path, file: &Path) -> String {
+    let relative = file
+        .strip_prefix(base_dir)
+        .unwrap_or(file)
+        .to_string_lossy()
+        .to_string();
+    let without_prefix = relative
+        .strip_prefix("dic")
+        .unwrap_or(&relative)
+        .trim_start_matches(['/', '\\'])
+        .to_string();
+    let stem = std::path::Path::new(&without_prefix)
+        .with_extension("")
+        .to_string_lossy()
+        .to_string();
+    stem.replace(['/', '\\'], ".").replace('-', "_")
+}
+
+/// Core multi-chunk source-map build.
+///
+/// See [`PastaLoader::build_source_map`] for the contract. Kept as a private free
+/// function so the build logic stays separate from the `Arc` wrapping; tests
+/// exercise it through [`PastaLoader::build_source_map`].
 fn build_source_map_inner(
     pasta_files: &[std::path::PathBuf],
     cache_manager: &CacheManager,

@@ -190,7 +190,7 @@ mod tests {
         // "今日はいい天気ですね" — budoux should find natural boundaries.
         // We use a narrow width to force at least one break.
         let input = "今日はいい天気ですね";
-        let result = break_lines_impl(input, &[6], &re, &m);
+        let result = break_lines_impl(input, &[6], &re, m);
         // Should contain at least one \n and preserve all original chars
         assert!(result.contains("\\n"), "Expected line break in: {}", result);
         let plain: String = re.replace_all(&result, "").into_owned();
@@ -202,7 +202,7 @@ mod tests {
         let re = tag_regex();
         let m = model();
         let input = "短い";
-        let result = break_lines_impl(input, &[20], &re, &m);
+        let result = break_lines_impl(input, &[20], &re, m);
         assert_eq!(result, "短い");
     }
 
@@ -215,7 +215,7 @@ mod tests {
         // Example from requirements: こ\_w[50]れ\_w[50]は\_w[50]テ\_w[50]ス\_w[50]ト
         // Plain text: これはテスト (6 CJK chars = width 12), threshold 6 → break after ~3 chars
         let input = r"こ\_w[50]れ\_w[50]は\_w[50]テ\_w[50]ス\_w[50]ト";
-        let result = break_lines_impl(input, &[6], &re, &m);
+        let result = break_lines_impl(input, &[6], &re, m);
         // Should have a \n somewhere, and all \_w[50] tags should remain
         assert!(result.contains("\\n"), "Expected line break in: {}", result);
         assert_eq!(result.matches(r"\_w[50]").count(), 5, "All 5 wait tags must be preserved");
@@ -226,7 +226,7 @@ mod tests {
         let re = tag_regex();
         let m = model();
         let input = r"\h\s[0]こんにちは世界";
-        let result = break_lines_impl(input, &[6], &re, &m);
+        let result = break_lines_impl(input, &[6], &re, m);
         assert!(result.starts_with(r"\h\s[0]"), "Leading tags should be preserved: {}", result);
     }
 
@@ -239,7 +239,7 @@ mod tests {
         // Build a long string that forces multiple lines
         // Use simple characters to be predictable
         let input = "あいうえおかきくけこさしすせそたちつてと";
-        let result = break_lines_impl(input, &[4, 6], &re, &m);
+        let result = break_lines_impl(input, &[4, 6], &re, m);
         // Should contain line breaks
         assert!(result.contains("\\n"), "Expected line breaks: {}", result);
         // Plain text should be preserved
@@ -253,7 +253,7 @@ mod tests {
     fn test_empty_input_returns_empty() {
         let re = tag_regex();
         let m = model();
-        let result = break_lines_impl("", &[10], &re, &m);
+        let result = break_lines_impl("", &[10], &re, m);
         assert_eq!(result, "");
     }
 
@@ -262,7 +262,7 @@ mod tests {
         let re = tag_regex();
         let m = model();
         let input = "テスト文字列";
-        let result = break_lines_impl(input, &[], &re, &m);
+        let result = break_lines_impl(input, &[], &re, m);
         assert_eq!(result, input);
     }
 
@@ -274,7 +274,7 @@ mod tests {
         let m = model();
         // A word larger than threshold → should not be force-split
         let input = "超長い一語";
-        let result = break_lines_impl(input, &[2], &re, &m);
+        let result = break_lines_impl(input, &[2], &re, m);
         // Plain text should be fully preserved
         let plain: String = re.replace_all(&result, "").into_owned();
         assert_eq!(plain, input);
@@ -286,7 +286,7 @@ mod tests {
         let m = model();
         // "超超超超超超超超短い" — budoux should split, oversized first part then normal
         let input = "あいうえおかきくけこさしすせそ短い文";
-        let result = break_lines_impl(input, &[4], &re, &m);
+        let result = break_lines_impl(input, &[4], &re, m);
         let plain: String = re.replace_all(&result, "").into_owned();
         assert_eq!(plain, input, "Plain text must be preserved");
     }
@@ -298,7 +298,7 @@ mod tests {
         let re = tag_regex();
         let m = model();
         let input = r"あいう\nえおか";
-        let result = break_lines_impl(input, &[20], &re, &m);
+        let result = break_lines_impl(input, &[20], &re, m);
         // With wide threshold, no extra breaks needed; existing \n should remain
         assert!(result.contains(r"\n"), "Existing \\n should be preserved: {}", result);
         let plain: String = re.replace_all(&result, "").into_owned();
@@ -314,8 +314,8 @@ mod tests {
         let input = "あいうえおかきくけこさしすせそたちつてと";
         // [4, 4] と [4, 4, 4] は最後の値が同じ (4) なので同一結果になること
         // widths[line_idx.min(widths.len()-1)] の実装を直接検証する
-        let result_len2 = break_lines_impl(input, &[4, 4], &re, &m);
-        let result_len3 = break_lines_impl(input, &[4, 4, 4], &re, &m);
+        let result_len2 = break_lines_impl(input, &[4, 4], &re, m);
+        let result_len3 = break_lines_impl(input, &[4, 4, 4], &re, m);
         assert_eq!(
             result_len2, result_len3,
             "[4,4] と [4,4,4] は等価であること（最後の値繰り返し）:\n{}\nvs\n{}",
@@ -329,9 +329,9 @@ mod tests {
         let m = model();
         let input = "あいうえおかきくけこさしすせそたちつてと";
         // [4, 4]: 全行 width=4 → 改行数多め
-        let result_narrow = break_lines_impl(input, &[4, 4], &re, &m);
+        let result_narrow = break_lines_impl(input, &[4, 4], &re, m);
         // [4, 20]: 1行目 width=4、2行目以降 width=20 (繰り返し) → 改行数少なめ
-        let result_wide = break_lines_impl(input, &[4, 20], &re, &m);
+        let result_wide = break_lines_impl(input, &[4, 20], &re, m);
         let breaks_narrow = result_narrow.matches("\\n").count();
         let breaks_wide = result_wide.matches("\\n").count();
         assert!(

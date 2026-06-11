@@ -83,7 +83,9 @@ function tokenizeLinesRaw(grammar, lines) {
 
 // 生トークンを行境界 [0, line.length] にクランプし、隙間なく被覆する TokenSpan 列へ整える。
 // textmate の仮想改行由来の超過終端を吸収し、Post 条件（各行被覆・行内オフセット）を満たす。
-function clampToLine(tokens, line) {
+// fallbackScope は末尾埋めプレーン区間のスコープ（pasta 行は 'source.pasta'、
+// lua 行ローカル座標では 'source.lua'）。
+function clampSpansToLine(tokens, line, fallbackScope) {
   const spans = [];
   let cursor = 0;
   for (const t of tokens) {
@@ -96,7 +98,7 @@ function clampToLine(tokens, line) {
   }
   // 末尾が行長に満たない場合（理論上ほぼ起きないが）プレーン区間で埋めて被覆を保証。
   if (cursor < line.length) {
-    spans.push({ startIndex: cursor, endIndex: line.length, scopes: ['source.pasta'] });
+    spans.push({ startIndex: cursor, endIndex: line.length, scopes: [fallbackScope] });
   }
   // 空行（line.length === 0）は空配列を返す（coversLine と整合）。
   return spans;
@@ -146,7 +148,7 @@ export function createPastaTokenizer() {
     ensureLoaded();
     const lines = text.split('\n');
     const rawLines = tokenizeLinesRaw(pastaGrammar, lines);
-    return rawLines.map((rl, i) => clampToLine(rl.tokens, lines[i]));
+    return rawLines.map((rl, i) => clampSpansToLine(rl.tokens, lines[i], 'source.pasta'));
   }
 
   function ensureLoaded() {
@@ -193,8 +195,9 @@ export function createPastaTokenizer() {
       const luaRaw = tokenizeLinesRaw(luaGrammar, luaLineTexts);
       for (let j = 0; j < block.length; j++) {
         const { lineIndex, text: luaLine, start } = block[j];
-        // lua トークンを lua 行内でクランプし、元行オフセット start を加算して正規化。
-        const clamped = clampLuaToLine(luaRaw[j].tokens, luaLine);
+        // lua トークンを lua 行内でクランプし、元行オフセット start を加算して正規化
+        // （lua 行ローカル座標・末尾埋めは source.lua）。
+        const clamped = clampSpansToLine(luaRaw[j].tokens, luaLine, 'source.lua');
         luaTokensByLine[lineIndex] = clamped.map((s) => ({
           startIndex: s.startIndex + start,
           endIndex: s.endIndex + start,
@@ -224,7 +227,7 @@ export function createPastaTokenizer() {
       const line = lines[i];
       const region = luaRegions[i];
       if (!region || !luaTokensByLine[i]) {
-        result.push(clampToLine(pastaRaw[i].tokens, line));
+        result.push(clampSpansToLine(pastaRaw[i].tokens, line, 'source.pasta'));
         continue;
       }
       result.push(mergeLuaIntoLine(pastaRaw[i].tokens, line, region, luaTokensByLine[i]));
@@ -233,24 +236,6 @@ export function createPastaTokenizer() {
   }
 
   return { load, tokenizeText, tokenizeTextSinglePass };
-}
-
-// lua 行トークンを [0, luaLine.length] にクランプし隙間なく被覆（lua 行ローカル座標）。
-function clampLuaToLine(tokens, luaLine) {
-  const spans = [];
-  let cursor = 0;
-  for (const t of tokens) {
-    const start = Math.max(0, Math.min(t.startIndex, luaLine.length));
-    const end = Math.max(start, Math.min(t.endIndex, luaLine.length));
-    if (end <= cursor) continue;
-    const s = Math.max(start, cursor);
-    spans.push({ startIndex: s, endIndex: end, scopes: t.scopes.slice() });
-    cursor = end;
-  }
-  if (cursor < luaLine.length) {
-    spans.push({ startIndex: cursor, endIndex: luaLine.length, scopes: ['source.lua'] });
-  }
-  return spans;
 }
 
 // pasta 行のトークンのうち lua content 区間 [region.start, region.end) を

@@ -117,5 +117,3 @@ export function installHljsNeutralizer(win) {
     }
   }
 }
-
-export default installHljsNeutralizer;

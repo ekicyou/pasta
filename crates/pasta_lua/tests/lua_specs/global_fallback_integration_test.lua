@@ -11,6 +11,19 @@ local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect
 
+-- 全モジュールリセットの共通ヘルパー（GLOBAL 同期のため pasta.act も含む）
+-- 各 describe の setup はこの直後に必要なモジュールを require して束縛する
+local function reset_modules()
+    package.loaded["pasta.store"] = nil
+    package.loaded["pasta.shiori.event"] = nil
+    package.loaded["pasta.shiori.event.register"] = nil
+    package.loaded["pasta.shiori.res"] = nil
+    package.loaded["pasta.shiori.act"] = nil
+    package.loaded["pasta.act"] = nil
+    package.loaded["pasta.global"] = nil
+    package.loaded["pasta.scene"] = nil
+end
+
 -- ============================================================================
 -- Task 5.1: GLOBAL フォールバック統合テスト
 -- DSL ラベル未定義の状態で GLOBAL 関数が EVENT.fire 経由で呼ばれることを確認
@@ -22,15 +35,7 @@ describe("Integration - GLOBAL fallback via EVENT.fire", function()
     local GLOBAL
 
     local function setup()
-        -- 全モジュールリセット（GLOBAL 同期のため pasta.act も含む）
-        package.loaded["pasta.store"] = nil
-        package.loaded["pasta.shiori.event"] = nil
-        package.loaded["pasta.shiori.event.register"] = nil
-        package.loaded["pasta.shiori.res"] = nil
-        package.loaded["pasta.shiori.act"] = nil
-        package.loaded["pasta.act"] = nil
-        package.loaded["pasta.global"] = nil
-        package.loaded["pasta.scene"] = nil
+        reset_modules()
 
         STORE = require("pasta.store")
         EVENT = require("pasta.shiori.event")
@@ -82,14 +87,7 @@ describe("Integration - DSL scene priority over GLOBAL", function()
     local GLOBAL
 
     local function setup()
-        package.loaded["pasta.store"] = nil
-        package.loaded["pasta.shiori.event"] = nil
-        package.loaded["pasta.shiori.event.register"] = nil
-        package.loaded["pasta.shiori.res"] = nil
-        package.loaded["pasta.shiori.act"] = nil
-        package.loaded["pasta.act"] = nil
-        package.loaded["pasta.global"] = nil
-        package.loaded["pasta.scene"] = nil
+        reset_modules()
 
         -- @pasta_search スタブ: find_act_handler の SEARCH ガードを通過させる
         -- SCENE.search はテスト内でモックするため実際には呼ばれない
@@ -178,14 +176,7 @@ describe("Integration - GLOBAL fallback for OnTalk (Req 2.2)", function()
     local GLOBAL
 
     local function setup()
-        package.loaded["pasta.store"] = nil
-        package.loaded["pasta.shiori.event"] = nil
-        package.loaded["pasta.shiori.event.register"] = nil
-        package.loaded["pasta.shiori.res"] = nil
-        package.loaded["pasta.shiori.act"] = nil
-        package.loaded["pasta.act"] = nil
-        package.loaded["pasta.global"] = nil
-        package.loaded["pasta.scene"] = nil
+        reset_modules()
 
         STORE = require("pasta.store")
         EVENT = require("pasta.shiori.event")
@@ -227,14 +218,7 @@ describe("Integration - act:build() works via both call and co_exec (Req 4.3)", 
     local SHIORI_ACT
 
     local function setup()
-        package.loaded["pasta.store"] = nil
-        package.loaded["pasta.shiori.event"] = nil
-        package.loaded["pasta.shiori.event.register"] = nil
-        package.loaded["pasta.shiori.res"] = nil
-        package.loaded["pasta.shiori.act"] = nil
-        package.loaded["pasta.act"] = nil
-        package.loaded["pasta.global"] = nil
-        package.loaded["pasta.scene"] = nil
+        reset_modules()
 
         STORE = require("pasta.store")
         EVENT = require("pasta.shiori.event")

@@ -13,6 +13,13 @@ local function create_mock_actors()
     }
 end
 
+-- 新規 act を生成する共通ヘルパー
+-- require はテスト実行時に都度行い、先行スイートの package.loaded リセットに追従する
+local function new_act(req)
+    local SHIORI_ACT = require("pasta.shiori.act")
+    return SHIORI_ACT.new(create_mock_actors(), req)
+end
+
 -- ============================================================================
 -- Task 2.1: 基本転記テスト
 -- Requirements: 1.1, 1.3, 2.1, 2.2
@@ -21,8 +28,6 @@ end
 describe("SHIORI_ACT - transfer_req_to_var() 基本転記", function()
     -- 全角キー（ｒ０〜ｒ９）への転記検証
     test("transfers reference[0]-[9] to fullwidth keys ｒ０-ｒ９", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
         local req = {
             id = "OnMouseClick",
             base_id = "OnMouseClick",
@@ -40,7 +45,7 @@ describe("SHIORI_ACT - transfer_req_to_var() 基本転記", function()
             },
         }
 
-        local act = SHIORI_ACT.new(actors, req)
+        local act = new_act(req)
         act:transfer_req_to_var()
 
         -- 全角キー確認（ｒ０〜ｒ９）
@@ -58,8 +63,6 @@ describe("SHIORI_ACT - transfer_req_to_var() 基本転記", function()
 
     -- 半角キー（r0〜r9）への転記検証
     test("transfers reference[0]-[9] to halfwidth keys r0-r9", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
         local req = {
             id = "OnMouseClick",
             base_id = "OnMouseClick",
@@ -70,7 +73,7 @@ describe("SHIORI_ACT - transfer_req_to_var() 基本転記", function()
             },
         }
 
-        local act = SHIORI_ACT.new(actors, req)
+        local act = new_act(req)
         act:transfer_req_to_var()
 
         -- 半角キー確認（r0〜r9）
@@ -81,15 +84,13 @@ describe("SHIORI_ACT - transfer_req_to_var() 基本転記", function()
 
     -- イベントメタデータ（req_id, req_base_id）の転記検証
     test("transfers req.id to var.req_id and req.base_id to var.req_base_id", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
         local req = {
             id = "OnMouseDoubleClick",
             base_id = "OnMouseClick",
             reference = { [0] = "0" },
         }
 
-        local act = SHIORI_ACT.new(actors, req)
+        local act = new_act(req)
         act:transfer_req_to_var()
 
         expect(act.var.req_id):toBe("OnMouseDoubleClick")
@@ -105,10 +106,7 @@ end)
 describe("SHIORI_ACT - transfer_req_to_var() 境界条件", function()
     -- req = nil の場合のガード句動作検証
     test("returns self safely when req is nil", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-
-        local act = SHIORI_ACT.new(actors, nil)
+        local act = new_act(nil)
         local result = act:transfer_req_to_var()
 
         -- クラッシュしない、self を返す
@@ -117,8 +115,6 @@ describe("SHIORI_ACT - transfer_req_to_var() 境界条件", function()
 
     -- 部分欠落 reference（疎配列）での正常動作確認
     test("handles sparse reference array correctly (only [0] and [2] exist)", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
         local req = {
             id = "OnMouseClick",
             reference = {
@@ -129,7 +125,7 @@ describe("SHIORI_ACT - transfer_req_to_var() 境界条件", function()
             },
         }
 
-        local act = SHIORI_ACT.new(actors, req)
+        local act = new_act(req)
         act:transfer_req_to_var()
 
         -- 存在するキーのみ転記される
@@ -145,14 +141,12 @@ describe("SHIORI_ACT - transfer_req_to_var() 境界条件", function()
 
     -- メソッドチェーンの検証（戻り値が self であること）
     test("returns self for method chaining", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
         local req = {
             id = "OnBoot",
             reference = { [0] = "test" },
         }
 
-        local act = SHIORI_ACT.new(actors, req)
+        local act = new_act(req)
         local result = act:transfer_req_to_var()
 
         expect(result):toBe(act)
@@ -167,14 +161,12 @@ end)
 describe("SHIORI_ACT - transfer_req_to_var() 統合テスト", function()
     -- 未呼出時の var 未設定検証
     test("does not set req-derived keys in var when not called", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
         local req = {
             id = "OnMouseClick",
             reference = { [0] = "head", [1] = "button1" },
         }
 
-        local act = SHIORI_ACT.new(actors, req)
+        local act = new_act(req)
         -- transfer_req_to_var() を呼ばない
 
         -- req 由来キーが var に存在しない
@@ -188,8 +180,6 @@ describe("SHIORI_ACT - transfer_req_to_var() 統合テスト", function()
 
     -- transfer_date_to_var() との共存検証
     test("coexists with transfer_date_to_var() without key conflicts", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
         local req = {
             id = "OnSecondChange",
             base_id = "OnSecondChange",
@@ -208,7 +198,7 @@ describe("SHIORI_ACT - transfer_req_to_var() 統合テスト", function()
             },
         }
 
-        local act = SHIORI_ACT.new(actors, req)
+        local act = new_act(req)
         -- 両メソッドを順に呼び出し
         act:transfer_date_to_var()
         act:transfer_req_to_var()

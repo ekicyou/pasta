@@ -139,8 +139,7 @@ impl SceneTable {
     fn fn_name_to_search_key(fn_name: &str, is_local: bool) -> String {
         if is_local {
             // Local scene: "会話_1::選択肢_1" → ":会話_1:選択肢_1"
-            let parts: Vec<&str> = fn_name.split("::").collect();
-            format!(":{}", parts.join(":"))
+            format!(":{}", fn_name.replace("::", ":"))
         } else {
             // Global scene: "会話_1::__start__" → "会話_1"
             fn_name.split("::").next().unwrap_or(fn_name).to_string()
@@ -179,22 +178,7 @@ impl SceneTable {
         }
 
         // Phase 2: Filter by attributes
-        let filtered_ids: Vec<SceneId> = candidate_ids
-            .into_iter()
-            .filter(|&id| {
-                let scene = &self.labels[id.0];
-                filters
-                    .iter()
-                    .all(|(key, value)| scene.attributes.get(key) == Some(value))
-            })
-            .collect();
-
-        if filtered_ids.is_empty() {
-            return Err(SceneTableError::NoMatchingScene {
-                scene: search_key.to_string(),
-                filters: filters.clone(),
-            });
-        }
+        let filtered_ids = self.filter_by_attributes(candidate_ids, search_key, filters)?;
 
         // Phase 3-5: Cache-based sequential selection
         let cache_key = SceneCacheKey::new("", search_key, filters);
@@ -225,6 +209,22 @@ impl SceneTable {
         let candidate_ids = self.collect_scene_candidates(module_name, search_key)?;
 
         // Phase 2: Filter by attributes
+        let filtered_ids = self.filter_by_attributes(candidate_ids, search_key, filters)?;
+
+        // Phase 3-5: Cache-based sequential selection
+        let cache_key = SceneCacheKey::new(module_name, search_key, filters);
+        self.select_from_cache(cache_key, filtered_ids)
+    }
+
+    /// Filter candidate IDs by attribute filters (Phase 2 of scene resolution).
+    ///
+    /// Returns NoMatchingScene if no candidate satisfies all filters.
+    fn filter_by_attributes(
+        &self,
+        candidate_ids: Vec<SceneId>,
+        search_key: &str,
+        filters: &HashMap<String, String>,
+    ) -> Result<Vec<SceneId>, SceneTableError> {
         let filtered_ids: Vec<SceneId> = candidate_ids
             .into_iter()
             .filter(|&id| {
@@ -242,9 +242,7 @@ impl SceneTable {
             });
         }
 
-        // Phase 3-5: Cache-based sequential selection
-        let cache_key = SceneCacheKey::new(module_name, search_key, filters);
-        self.select_from_cache(cache_key, filtered_ids)
+        Ok(filtered_ids)
     }
 
     /// Common helper for cache-based sequential scene selection (Phase 3-5).

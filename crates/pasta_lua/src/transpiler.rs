@@ -642,6 +642,103 @@ mod tests {
     }
 
     #[test]
+    fn test_with_defaults_matches_default() {
+        let transpiler = LuaTranspiler::with_defaults();
+        let default = TranspilerConfig::default();
+        assert_eq!(transpiler.config().comment_mode, default.comment_mode);
+        assert_eq!(transpiler.config().line_ending, default.line_ending);
+    }
+
+    #[test]
+    fn test_transpile_accumulates_file_attrs() {
+        use pasta_dsl::parser::{Attr, AttrValue};
+
+        let transpiler = LuaTranspiler::default();
+        let file = PastaFile {
+            path: PathBuf::from("test.pasta"),
+            items: vec![
+                FileItem::FileAttr(Attr {
+                    key: "author".to_string(),
+                    value: AttrValue::AttrString("Alice".to_string()),
+                    span: Span::default(),
+                }),
+                // Same key later in document order overwrites (shadowing).
+                FileItem::FileAttr(Attr {
+                    key: "author".to_string(),
+                    value: AttrValue::AttrString("Bob".to_string()),
+                    span: Span::default(),
+                }),
+                FileItem::GlobalSceneScope(create_simple_scene("メイン")),
+            ],
+            span: Span::default(),
+        };
+        let mut output = Vec::new();
+
+        let context = transpiler.transpile(&file, &mut output).unwrap();
+
+        let attrs = context.file_attrs();
+        assert_eq!(attrs.len(), 1);
+        assert_eq!(
+            attrs.get("author"),
+            Some(&AttrValue::AttrString("Bob".to_string())),
+            "later FileAttr must shadow the earlier one"
+        );
+    }
+
+    /// A writer that always fails, to exercise the IoError conversion path.
+    struct FailingWriter;
+
+    impl Write for FailingWriter {
+        fn write(&mut self, _buf: &[u8]) -> std::io::Result<usize> {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::BrokenPipe,
+                "simulated write failure",
+            ))
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn test_transpile_writer_failure_yields_io_error() {
+        let transpiler = LuaTranspiler::default();
+        let file = create_pasta_file(vec![], vec![create_simple_scene("メイン")]);
+
+        match transpiler.transpile(&file, &mut FailingWriter) {
+            Err(TranspileError::IoError(e)) => {
+                assert_eq!(e.kind(), std::io::ErrorKind::BrokenPipe);
+            }
+            Err(other) => panic!("expected IoError, got: {:?}", other),
+            Ok(_) => panic!("expected IoError, but transpile succeeded"),
+        }
+    }
+
+    /// Documents current behavior: output normalization converts all line endings
+    /// to LF, so the final transpiled bytes are LF-only even when the transpiler
+    /// is configured with CRLF line endings (CRLF applies to the intermediate
+    /// code-generation buffer only).
+    #[test]
+    fn test_transpile_output_is_lf_only_even_with_crlf_config() {
+        use crate::config::LineEnding;
+
+        let config = TranspilerConfig::new().with_line_ending(LineEnding::CrLf);
+        let transpiler = LuaTranspiler::new(config);
+        let file = create_pasta_file(vec![], vec![create_simple_scene("メイン")]);
+        let mut output = Vec::new();
+
+        transpiler.transpile(&file, &mut output).unwrap();
+        let lua_code = String::from_utf8(output).unwrap();
+
+        assert!(
+            !lua_code.contains('\r'),
+            "normalized output must not contain CR"
+        );
+        assert!(lua_code.ends_with('\n'));
+        assert!(!lua_code.ends_with("\n\n"), "exactly one trailing newline");
+    }
+
+    #[test]
     fn test_transpile_single_key_backward_compat_lua_output() {
         let transpiler = LuaTranspiler::default();
         let global_words = KeyWords {

@@ -2,7 +2,7 @@
 //!
 //! このビルドスクリプトは最小限の処理のみを行います。
 //! ゴースト配布物の生成は `cargo run -p pasta_sample_ghost` または
-//! `release.bat` で行ってください。
+//! `release.ps1` で行ってください。
 
 use std::env;
 use std::path::Path;
@@ -11,7 +11,6 @@ fn main() {
     // ビルドスクリプト再実行トリガー
     println!("cargo::rerun-if-changed=build.rs");
     println!("cargo::rerun-if-changed=src/");
-    println!("cargo::rerun-if-changed=templates/");
 
     // pasta_shiori のソース変更を監視
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
@@ -36,7 +35,7 @@ fn main() {
         eprintln!("  To generate the ghost distribution, run:");
         eprintln!();
         eprintln!("    cd crates/pasta_sample_ghost");
-        eprintln!("    .\\release.bat");
+        eprintln!("    .\\release.ps1");
         eprintln!();
         eprintln!("  Or manually:");
         eprintln!();

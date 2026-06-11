@@ -481,6 +481,176 @@ async function run() {
   }
   log('');
 
+  // -----------------------------------------------------------------------
+  // load 前呼び出しガード: highlightHtmlString / highlightHtmlFiles は load 前に例外。
+  // -----------------------------------------------------------------------
+  {
+    const fresh = createHtmlHighlighter();
+    let threw1 = false;
+    try {
+      fresh.highlightHtmlString('<p>x</p>');
+    } catch (e) {
+      threw1 = true;
+    }
+    check('ガード: load 前の highlightHtmlString が例外', threw1);
+    let threw2 = false;
+    try {
+      fresh.highlightHtmlFiles(here);
+    } catch (e) {
+      threw2 = true;
+    }
+    check('ガード: load 前の highlightHtmlFiles が例外', threw2);
+  }
+  log('');
+
+  // -----------------------------------------------------------------------
+  // 入力検証: highlightHtmlFiles にディレクトリでなくファイルを渡すと例外
+  // （existsSync は真でも isDirectory が偽の分岐）。
+  // -----------------------------------------------------------------------
+  {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hl-file-'));
+    const file = path.join(tmp, 'not-a-dir.html');
+    fs.writeFileSync(file, FIXTURE_HTML, 'utf8');
+    let threw = false;
+    let msg = '';
+    try {
+      hl.highlightHtmlFiles(file);
+    } catch (e) {
+      threw = true;
+      msg = String(e && e.message ? e.message : e);
+    }
+    check('入力検証: ファイルパスを渡すと例外（not a directory 分岐）',
+      threw && msg.includes('not a directory'), msg);
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+  log('');
+
+  // -----------------------------------------------------------------------
+  // write:false オプション: 変換は走るがファイルへ書き込まない（dry-run）。
+  // -----------------------------------------------------------------------
+  {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hl-dry-'));
+    const f = path.join(tmp, 'index.html');
+    fs.writeFileSync(f, FIXTURE_HTML, 'utf8');
+
+    const summary = hl.highlightHtmlFiles(tmp, { write: false });
+    const after = fs.readFileSync(f, 'utf8');
+    check('write:false: ファイルがバイト不変（書き込まれない）',
+      bytesEqual(after, FIXTURE_HTML));
+    check('write:false: 集計（filesProcessed/blocksColored）は通常どおり報告',
+      summary.filesProcessed === 1 && summary.blocksColored >= 2,
+      `files=${summary.filesProcessed} blocks=${summary.blocksColored}`);
+
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+  log('');
+
+  // -----------------------------------------------------------------------
+  // モジュール直 export のワンショット関数（load 込み非同期版）: factory 経由と
+  // 同一バイトの出力を返し、ファイル版も write:false で動作する。
+  // -----------------------------------------------------------------------
+  {
+    const viaFactory = hl.highlightHtmlString(FIXTURE_HTML);
+    const viaOneShot = await highlightHtmlString(FIXTURE_HTML);
+    check('ワンショット: highlightHtmlString(html) が factory 経由と同一バイト',
+      bytesEqual(viaFactory, viaOneShot),
+      `md5=${md5(viaFactory)} vs ${md5(viaOneShot)}`);
+
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hl-once-'));
+    const f = path.join(tmp, 'index.html');
+    fs.writeFileSync(f, FIXTURE_HTML, 'utf8');
+    const summary = await highlightHtmlFiles(tmp, { write: false });
+    check('ワンショット: highlightHtmlFiles(dir, {write:false}) が動作・ファイル不変',
+      summary.filesProcessed === 1 && bytesEqual(fs.readFileSync(f, 'utf8'), FIXTURE_HTML),
+      `files=${summary.filesProcessed}`);
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+  log('');
+
+  // -----------------------------------------------------------------------
+  // 非マッチ境界: pasta ブロック無し HTML はバイト不変。language-pastafoo の
+  // ような部分一致クラスは \b 境界で弾かれて不変。空 pasta ブロックも安全。
+  // -----------------------------------------------------------------------
+  {
+    const noPasta = '<html><body><pre><code class="language-rust">fn f() {}\n</code></pre></body></html>';
+    check('非マッチ: pasta ブロック無し HTML がバイト不変',
+      bytesEqual(hl.highlightHtmlString(noPasta), noPasta));
+
+    const partial = '<pre><code class="language-pastafoo">＊シーン\n</code></pre>';
+    check('非マッチ: language-pastafoo（部分一致クラス）は処理されず不変',
+      bytesEqual(hl.highlightHtmlString(partial), partial),
+      hl.highlightHtmlString(partial));
+
+    const emptyBlock = '<pre><code class="language-pasta"></code></pre>';
+    let threw = false;
+    let emptyOut = '';
+    try {
+      emptyOut = hl.highlightHtmlString(emptyBlock);
+    } catch (e) {
+      threw = true;
+    }
+    check('境界: 空の pasta ブロックで例外を出さずテキスト等価を保つ',
+      !threw && decodeEntities(stripSpans(emptyOut)) === decodeEntities(stripSpans(emptyBlock)),
+      threw ? 'threw' : emptyOut);
+  }
+  log('');
+
+  // -----------------------------------------------------------------------
+  // 挙動固定: 抽出は <code> クラス基準で外側 <pre> を要求しない（ヘッダ文書の規約）。
+  //   mdBook 実出力では language-pasta は <pre> 内のみだが、インライン
+  //   <code class="language-pasta"> が現れた場合も着色対象となることを固定する。
+  // -----------------------------------------------------------------------
+  {
+    const inline = '<p>インライン <code class="language-pasta">＊挨拶</code> も対象。</p>';
+    const out = hl.highlightHtmlString(inline);
+    check('挙動固定: インライン <code class="language-pasta">（<pre> なし）も着色される',
+      out !== inline && /<span class="hljs-/.test(out),
+      out);
+    check('挙動固定: インライン着色でもテキスト等価（span を剥がすと元に戻る）',
+      decodeEntities(stripSpans(out)) === decodeEntities(inline),
+      out);
+  }
+  log('');
+
+  // -----------------------------------------------------------------------
+  // 境界固定（G3）: highlightHtmlFiles の走査はディレクトリシンボリックリンク/
+  //   ジャンクションを辿らない（Dirent は lstat 準拠で isDirectory()=false）。
+  //   リンク先（出力ディレクトリ外）の HTML へ到達・書き換えしないこと、および
+  //   自己ループのリンクで無限再帰しないことを固定する。
+  //   （symlink 作成不可な環境ではスキップ。Windows は 'junction' で権限不要。）
+  // -----------------------------------------------------------------------
+  {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'pasta-hl-symlink-'));
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'pasta-hl-outside-'));
+    const victim = path.join(outside, 'victim.html');
+    const victimHtml = '<pre><code class="language-pasta">＊挨拶\n</code></pre>';
+    fs.writeFileSync(victim, victimHtml, 'utf8');
+    fs.writeFileSync(path.join(tmp, 'normal.html'), FIXTURE_HTML, 'utf8');
+    let linked = false;
+    try {
+      // 'junction' は Windows では権限不要のジャンクション、他 OS では通常の symlink。
+      fs.symlinkSync(outside, path.join(tmp, 'link'), 'junction');
+      fs.symlinkSync(tmp, path.join(tmp, 'loop'), 'junction'); // 自己ループ
+      linked = true;
+    } catch (e) {
+      log('  INFO  symlink/junction を作成できない環境のため走査境界テストをスキップ');
+    }
+    if (linked) {
+      const summary = hl.highlightHtmlFiles(tmp); // write=true（既定）でも外へ書かない
+      check('境界固定: ディレクトリリンクを辿らず自己ループでも完走する',
+        summary.filesProcessed === 1 &&
+          summary.files.length === 1 &&
+          path.basename(summary.files[0]) === 'normal.html',
+        JSON.stringify(summary.files));
+      check('境界固定: リンク先（出力ディレクトリ外）の HTML が列挙も書き換えもされない',
+        bytesEqual(fs.readFileSync(victim, 'utf8'), victimHtml),
+        fs.readFileSync(victim, 'utf8'));
+    }
+    fs.rmSync(tmp, { recursive: true, force: true });
+    fs.rmSync(outside, { recursive: true, force: true });
+  }
+  log('');
+
   log(`RESULT: ${passed} passed, ${failed} failed`);
   // oniguruma WASM の async ハンドル close 中の libuv assertion を避けるため exitCode 方式。
   process.exitCode = failed === 0 ? 0 : 1;
@@ -490,7 +660,3 @@ run().catch((e) => {
   console.error('UNEXPECTED ERROR:', e && e.stack ? e.stack : e);
   process.exitCode = 1;
 });
-
-// 未使用 import の lint 回避（CLI 直接 export 群の参照を明示）。
-void highlightHtmlString;
-void highlightHtmlFiles;

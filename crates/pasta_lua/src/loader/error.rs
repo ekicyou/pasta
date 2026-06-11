@@ -297,4 +297,162 @@ mod tests {
         // Check that source() works
         assert!(std::error::Error::source(&err).is_some());
     }
+
+    #[test]
+    fn test_config_not_found_display() {
+        let err = LoaderError::config_not_found("/ghost/master/pasta.toml");
+        let msg = format!("{}", err);
+        assert!(msg.contains("Configuration file not found"));
+        assert!(msg.contains("/ghost/master/pasta.toml"));
+    }
+
+    #[test]
+    fn test_config_error_display_and_source() {
+        // Produce a real toml::de::Error from invalid TOML
+        let toml_err = toml::from_str::<toml::Table>("= invalid").unwrap_err();
+        let err = LoaderError::config("/ghost/master/pasta.toml", toml_err);
+        let msg = format!("{}", err);
+        assert!(msg.contains("Failed to parse configuration file"));
+        assert!(msg.contains("/ghost/master/pasta.toml"));
+        assert!(std::error::Error::source(&err).is_some());
+    }
+
+    #[test]
+    fn test_invalid_file_name_display() {
+        let err = LoaderError::invalid_file_name("/ghost/master/dic/test/init.lua");
+        let msg = format!("{}", err);
+        assert!(msg.contains("Invalid file name"));
+        assert!(msg.contains("init.lua"));
+    }
+
+    #[test]
+    fn test_cache_directory_error_display_and_source() {
+        let err = LoaderError::cache_directory(
+            "/ghost/master/profile/pasta/cache/lua",
+            io::Error::new(io::ErrorKind::PermissionDenied, "denied"),
+        );
+        let msg = format!("{}", err);
+        assert!(msg.contains("Failed to prepare cache directory"));
+        assert!(msg.contains("cache"));
+        assert!(std::error::Error::source(&err).is_some());
+    }
+
+    #[test]
+    fn test_metadata_error_display_and_source() {
+        let err = LoaderError::metadata(
+            "/ghost/master/dic/test/hello.pasta",
+            io::Error::new(io::ErrorKind::NotFound, "gone"),
+        );
+        let msg = format!("{}", err);
+        assert!(msg.contains("Failed to get file metadata"));
+        assert!(msg.contains("hello.pasta"));
+        assert!(std::error::Error::source(&err).is_some());
+    }
+
+    #[test]
+    fn test_cache_write_error_display_and_source() {
+        let err = LoaderError::cache_write(
+            "/ghost/master/profile/pasta/cache/lua/pasta/scene/test.lua",
+            io::Error::new(io::ErrorKind::WriteZero, "disk full"),
+        );
+        let msg = format!("{}", err);
+        assert!(msg.contains("Failed to write cache file"));
+        assert!(msg.contains("test.lua"));
+        assert!(std::error::Error::source(&err).is_some());
+    }
+
+    #[test]
+    fn test_scene_dic_generation_display_with_source() {
+        let err = LoaderError::scene_dic_generation(
+            "write failed",
+            Some(io::Error::new(io::ErrorKind::WriteZero, "disk full")),
+        );
+        let msg = format!("{}", err);
+        assert!(msg.contains("Failed to generate scene_dic.lua"));
+        assert!(msg.contains("write failed"));
+        assert!(std::error::Error::source(&err).is_some());
+    }
+
+    #[test]
+    fn test_scene_dic_generation_without_source() {
+        let err = LoaderError::scene_dic_generation("no modules", None);
+        let msg = format!("{}", err);
+        assert!(msg.contains("Failed to generate scene_dic.lua"));
+        assert!(msg.contains("no modules"));
+        // Option<io::Error> = None -> no source in the chain
+        assert!(std::error::Error::source(&err).is_none());
+    }
+
+    #[test]
+    fn test_parse_error_source_none_vs_some() {
+        // parse() without source error -> source() is None
+        let err = LoaderError::parse("/path/test.pasta", "bad token");
+        assert!(std::error::Error::source(&err).is_none());
+
+        // parse_with_source() -> source() carries the ParseError
+        let parse_err =
+            pasta_dsl::parse_str("＊壊れた\n  {{{{invalid syntax}}}}\n", "test.pasta").unwrap_err();
+        let err = LoaderError::parse_with_source("/path/test.pasta", "bad token", parse_err);
+        assert!(std::error::Error::source(&err).is_some());
+        let msg = format!("{}", err);
+        assert!(msg.contains("Failed to parse Pasta file"));
+        assert!(msg.contains("bad token"));
+    }
+
+    #[test]
+    fn test_glob_pattern_error_from_conversion() {
+        let pattern_err = glob::Pattern::new("[").unwrap_err();
+        let err: LoaderError = pattern_err.into();
+        assert!(matches!(err, LoaderError::GlobPattern(_)));
+        let msg = format!("{}", err);
+        assert!(msg.contains("Invalid file discovery pattern"));
+    }
+
+    #[test]
+    fn test_runtime_error_from_conversion() {
+        let lua_err = mlua::Error::RuntimeError("boom".to_string());
+        let err: LoaderError = lua_err.into();
+        assert!(matches!(err, LoaderError::Runtime(_)));
+        let msg = format!("{}", err);
+        assert!(msg.contains("Failed to initialize Lua runtime"));
+        assert!(msg.contains("boom"));
+    }
+
+    #[test]
+    fn test_transpile_error_from_conversion() {
+        let transpile_err =
+            crate::TranspileError::IoError(io::Error::new(io::ErrorKind::WriteZero, "out"));
+        let err: LoaderError = transpile_err.into();
+        assert!(matches!(err, LoaderError::Transpile(_)));
+        let msg = format!("{}", err);
+        assert!(msg.contains("Transpilation failed"));
+    }
+
+    #[test]
+    fn test_partial_transpile_display_empty_failures() {
+        // format_failure_paths must handle an empty failure list gracefully
+        let err = LoaderError::partial_transpile(5, 0, Vec::new());
+        let msg = format!("{}", err);
+        assert!(msg.contains("5 succeeded"));
+        assert!(msg.contains("0 failed"));
+        assert!(msg.contains("[]"));
+    }
+
+    #[test]
+    fn test_partial_transpile_display_joins_paths_with_comma() {
+        let failures = vec![
+            TranspileFailure {
+                source_path: PathBuf::from("dic/a.pasta"),
+                error: "x".to_string(),
+            },
+            TranspileFailure {
+                source_path: PathBuf::from("dic/b.pasta"),
+                error: "y".to_string(),
+            },
+        ];
+        let err = LoaderError::partial_transpile(1, 2, failures);
+        let msg = format!("{}", err);
+        // Paths joined with ", " inside brackets
+        assert!(msg.contains("dic/a.pasta, dic/b.pasta"));
+    }
 }

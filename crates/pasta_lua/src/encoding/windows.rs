@@ -66,6 +66,21 @@ impl Encoder for Encoding {
 // Windows API wrappers
 // ============================================================================
 
+/// Convert a buffer length to the `i32` expected by the Win32 conversion APIs.
+///
+/// Lengths above `i32::MAX` are rejected: a plain `as` cast would wrap
+/// (e.g. `u32::MAX as i32 == -1`, which `MultiByteToWideChar` /
+/// `WideCharToMultiByte` interpret as "null-terminated input", reading
+/// past the end of the borrowed slice).
+fn buffer_len_to_i32(len: usize) -> Result<i32> {
+    i32::try_from(len).map_err(|_| {
+        Error::new(
+            ErrorKind::InvalidInput,
+            "Input too large for Windows code page conversion (must be < 2 GiB)",
+        )
+    })
+}
+
 /// Convert String to multibyte string.
 ///
 /// # Arguments
@@ -109,6 +124,9 @@ fn multi_byte_to_wide_char(codepage: u32, flags: u32, multi_byte_str: &[u8]) -> 
         return Ok(String::new());
     }
 
+    // Reject lengths the Win32 API cannot represent (prevents `as` cast wrap).
+    let in_len = buffer_len_to_i32(multi_byte_str.len())?;
+
     // SAFETY: Calls to `MultiByteToWideChar` are safe under these conditions:
     //  1. `multi_byte_str` is a valid borrowed slice; its pointer and length are valid
     //     for the duration of each FFI call.
@@ -125,7 +143,7 @@ fn multi_byte_to_wide_char(codepage: u32, flags: u32, multi_byte_str: &[u8]) -> 
             codepage,
             flags,
             multi_byte_str.as_ptr() as _,
-            multi_byte_str.len() as _,
+            in_len,
             ptr::null_mut(),
             0,
         );
@@ -144,7 +162,7 @@ fn multi_byte_to_wide_char(codepage: u32, flags: u32, multi_byte_str: &[u8]) -> 
                 codepage,
                 flags,
                 multi_byte_str.as_ptr() as _,
-                multi_byte_str.len() as _,
+                in_len,
                 wstr.as_mut_ptr(),
                 len,
             );
@@ -175,6 +193,9 @@ fn wide_char_to_multi_byte(
         return Ok((Vec::new(), false));
     }
 
+    // Reject lengths the Win32 API cannot represent (prevents `as` cast wrap).
+    let in_len = buffer_len_to_i32(wide_char_str.len())?;
+
     // SAFETY: Calls to `WideCharToMultiByte` are safe under these conditions:
     //  1. `wide_char_str` is a valid borrowed slice; its pointer and length are valid
     //     for the duration of each FFI call.
@@ -193,7 +214,7 @@ fn wide_char_to_multi_byte(
             codepage,
             flags,
             wide_char_str.as_ptr(),
-            wide_char_str.len() as _,
+            in_len,
             ptr::null_mut(),
             0,
             ptr::null(),
@@ -220,7 +241,7 @@ fn wide_char_to_multi_byte(
                 codepage,
                 flags,
                 wide_char_str.as_ptr(),
-                wide_char_str.len() as _,
+                in_len,
                 astr.as_mut_ptr() as _,
                 len,
                 match default_char {
@@ -299,5 +320,108 @@ mod tests {
             wide_char_to_multi_byte(CP_ACP_VALUE, WC_COMPOSITECHECK_FLAG, &wide, None, true)
                 .unwrap();
         assert_eq!(result, b"Test");
+    }
+
+    // ------------------------------------------------------------------
+    // Locale-independent tests using explicit code pages (CP932 / CP_UTF8).
+    // CP932 (Shift-JIS) conversion tables ship with every Windows install,
+    // so these are deterministic regardless of the system ANSI code page.
+    // ------------------------------------------------------------------
+
+    /// CP932 code page identifier (Shift-JIS).
+    const CP932: u32 = 932;
+
+    #[test]
+    fn test_multi_byte_to_wide_char_cp932_decodes_shift_jis() {
+        // "日本" in Shift-JIS: 日 = 0x93 0xFA, 本 = 0x96 0x7B
+        let sjis = [0x93u8, 0xFA, 0x96, 0x7B];
+        let result = multi_byte_to_wide_char(CP932, MB_ERR_INVALID_CHARS_FLAG, &sjis).unwrap();
+        assert_eq!(result, "日本");
+    }
+
+    #[test]
+    fn test_multi_byte_to_wide_char_cp932_truncated_lead_byte_errors() {
+        // 0x93 is a Shift-JIS lead byte with no trail byte: invalid sequence
+        // must be rejected because MB_ERR_INVALID_CHARS is set.
+        let truncated = [0x93u8];
+        let result = multi_byte_to_wide_char(CP932, MB_ERR_INVALID_CHARS_FLAG, &truncated);
+        assert!(result.is_err(), "truncated SJIS lead byte should fail");
+    }
+
+    #[test]
+    fn test_multi_byte_to_wide_char_utf8_invalid_bytes_error() {
+        // 0xFF 0xFE is never valid UTF-8.
+        let invalid = [0xFFu8, 0xFE];
+        let result = multi_byte_to_wide_char(CP_UTF8, MB_ERR_INVALID_CHARS_FLAG, &invalid);
+        assert!(result.is_err(), "invalid UTF-8 bytes should fail");
+    }
+
+    #[test]
+    fn test_string_to_multibyte_cp932_encodes_shift_jis() {
+        // "日本語" in Shift-JIS: 日 = 0x93FA, 本 = 0x967B, 語 = 0x8CEA
+        let result = string_to_multibyte(CP932, "日本語", None).unwrap();
+        assert_eq!(result, [0x93u8, 0xFA, 0x96, 0x7B, 0x8C, 0xEA]);
+    }
+
+    #[test]
+    fn test_string_to_multibyte_cp932_roundtrip() {
+        let original = "パス/テスト_01";
+        let bytes = string_to_multibyte(CP932, original, None).unwrap();
+        let restored =
+            multi_byte_to_wide_char(CP932, MB_ERR_INVALID_CHARS_FLAG, &bytes).unwrap();
+        assert_eq!(restored, original);
+    }
+
+    #[test]
+    fn test_string_to_multibyte_unmappable_errors_without_default_char() {
+        // U+20AC (€) has no mapping in CP932; with no default char the
+        // conversion must report InvalidInput instead of silently degrading.
+        let result = string_to_multibyte(CP932, "€", None);
+        let err = result.expect_err("unmappable char should fail without default_char");
+        assert_eq!(err.kind(), ErrorKind::InvalidInput);
+    }
+
+    #[test]
+    fn test_string_to_multibyte_unmappable_uses_default_char() {
+        // With a default char supplied, unmappable input is substituted
+        // instead of failing.
+        let result = string_to_multibyte(CP932, "€", Some(b'?')).unwrap();
+        assert_eq!(result, b"?");
+    }
+
+    #[test]
+    fn test_buffer_len_to_i32_accepts_representable_lengths() {
+        // Boundary regression for the FFI length guard (hardening):
+        // representable lengths pass through unchanged.
+        assert_eq!(buffer_len_to_i32(0).unwrap(), 0);
+        assert_eq!(buffer_len_to_i32(1).unwrap(), 1);
+        assert_eq!(
+            buffer_len_to_i32(i32::MAX as usize).unwrap(),
+            i32::MAX,
+            "i32::MAX is the largest representable Win32 buffer length"
+        );
+    }
+
+    #[test]
+    fn test_buffer_len_to_i32_rejects_overlong_lengths() {
+        // Boundary regression for the FFI length guard (hardening):
+        // lengths above i32::MAX previously wrapped via `as` cast.
+        // u32::MAX is the most dangerous value — it wraps to -1, which the
+        // Win32 APIs treat as "null-terminated input" (out-of-bounds read).
+        let just_over = i32::MAX as usize + 1;
+        let err = buffer_len_to_i32(just_over).expect_err("i32::MAX+1 must be rejected");
+        assert_eq!(err.kind(), ErrorKind::InvalidInput);
+
+        let wraps_to_minus_one = u32::MAX as usize;
+        let err = buffer_len_to_i32(wraps_to_minus_one).expect_err("u32::MAX must be rejected");
+        assert_eq!(err.kind(), ErrorKind::InvalidInput);
+    }
+
+    #[test]
+    fn test_wide_char_to_multi_byte_empty_input() {
+        let (bytes, used_default) =
+            wide_char_to_multi_byte(CP932, WC_COMPOSITECHECK_FLAG, &[], None, true).unwrap();
+        assert!(bytes.is_empty());
+        assert!(!used_default);
     }
 }

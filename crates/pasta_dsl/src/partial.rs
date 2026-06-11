@@ -140,9 +140,9 @@ pub fn parse_str_partial(source: &str) -> PartialParseResult {
         let first_line = chunk.text.lines().next().unwrap_or("");
         let rule = infer_rule_from_line(first_line);
 
-        if let Some(rule) = rule {
+        if rule.is_some() {
             // Try parsing with a file-level wrapper for scope rules
-            let parse_result = try_parse_chunk(&chunk.text, rule);
+            let parse_result = try_parse_chunk(&chunk.text);
             match parse_result {
                 Ok(items) => {
                     partial_items.extend(items);
@@ -155,9 +155,8 @@ pub fn parse_str_partial(source: &str) -> PartialParseResult {
                         if line.trim().is_empty() {
                             continue;
                         }
-                        let line_rule = infer_rule_from_line(line);
-                        if let Some(lr) = line_rule {
-                            match try_parse_chunk(line, lr) {
+                        if infer_rule_from_line(line).is_some() {
+                            match try_parse_chunk(line) {
                                 Ok(items) => partial_items.extend(items),
                                 Err(e) => {
                                     partial_errors.push(PartialParseError {
@@ -200,7 +199,7 @@ pub fn parse_str_partial(source: &str) -> PartialParseResult {
 }
 
 /// チャンクをファイルとしてパースしてFileItemsを抽出
-fn try_parse_chunk(text: &str, _rule: Rule) -> Result<Vec<FileItem>, String> {
+fn try_parse_chunk(text: &str) -> Result<Vec<FileItem>, String> {
     // Try wrapping in a full file parse, as individual rules may require
     // the file context (EOI etc.)
     match parse_str(text, "<partial>") {

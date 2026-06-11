@@ -44,7 +44,11 @@ impl Default for LineEnding {
 pub struct TranspilerConfig {
     /// Enable comment mode (include Pasta source line references)
     pub comment_mode: bool,
-    /// Line ending style for generated code
+    /// Line ending style for the intermediate code-generation buffer.
+    ///
+    /// Note: output normalization converts all line endings to LF as a final
+    /// step, so the transpiled bytes are always LF-only regardless of this
+    /// setting. See `LuaTranspiler::transpile` post-processing.
     pub line_ending: LineEnding,
 }
 
@@ -71,7 +75,11 @@ impl TranspilerConfig {
         }
     }
 
-    /// Set line ending style.
+    /// Set line ending style for the intermediate code-generation buffer.
+    ///
+    /// Note: the final transpiled output is always LF-only because output
+    /// normalization converts CRLF to LF; this setting has no observable
+    /// effect on the bytes written by `LuaTranspiler::transpile`.
     pub fn with_line_ending(mut self, line_ending: LineEnding) -> Self {
         self.line_ending = line_ending;
         self
@@ -104,5 +112,32 @@ mod tests {
     fn test_with_line_ending() {
         let config = TranspilerConfig::new().with_line_ending(LineEnding::Lf);
         assert_eq!(config.line_ending, LineEnding::Lf);
+    }
+
+    #[test]
+    fn test_line_ending_native_matches_platform() {
+        #[cfg(windows)]
+        assert_eq!(LineEnding::native(), LineEnding::CrLf);
+        #[cfg(not(windows))]
+        assert_eq!(LineEnding::native(), LineEnding::Lf);
+    }
+
+    #[test]
+    fn test_line_ending_default_is_native() {
+        assert_eq!(LineEnding::default(), LineEnding::native());
+    }
+
+    #[test]
+    fn test_new_equals_default() {
+        let a = TranspilerConfig::new();
+        let b = TranspilerConfig::default();
+        assert_eq!(a.comment_mode, b.comment_mode);
+        assert_eq!(a.line_ending, b.line_ending);
+    }
+
+    #[test]
+    fn test_without_comments_keeps_default_line_ending() {
+        let config = TranspilerConfig::without_comments();
+        assert_eq!(config.line_ending, LineEnding::default());
     }
 }

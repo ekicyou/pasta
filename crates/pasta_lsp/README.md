@@ -27,8 +27,9 @@ Pasta DSL の Language Server Protocol (LSP) 実装クレート。
 │  - 部分パースフォールバック (parse_str_partial)  │
 │  - ParseError → LSP Diagnostics 変換            │
 ├─────────────────────────────────────────────────┤
-│  TransportBridge (transport.rs)                  │
-│  - WASM: wasm-bindgen エントリポイント           │
+│  Transport (transport.rs)                        │
+│  - WASM 型変換 (WasmAnalysisResult ほか)         │
+│  - WASM: wasm_analyze エントリポイント           │
 │  - Native: スタブ（将来拡張用）                  │
 └─────────────────────────────────────────────────┘
          ↓ 依存
@@ -49,10 +50,10 @@ Pasta DSL の Language Server Protocol (LSP) 実装クレート。
 | actor          | アクター定義 (`％` / `%`)           |
 | actorName      | アクション行のアクター名            |
 | codeBlock      | Lua コードブロック                  |
-| string         | 文字列リテラル / Talk テキスト      |
+| talk           | 文字列リテラル / Talk テキスト      |
 | sakuraScript   | さくらスクリプトタグ                |
 | escape         | エスケープシーケンス                |
-| operator       | コロン区切り (`：` / `:`)           |
+| operator       | コロン区切り (`：` / `:`)・代入 (`＝` / `=`)・括弧・二項演算子 |
 | number         | 数値リテラル                        |
 | cueMarker      | キューコマンドマーカー (`！` / `!`) |
 | cueCommand     | キューコマンド名                    |
@@ -89,32 +90,38 @@ cargo build -p pasta_lsp --target wasm32-unknown-unknown --release
 
 ## テスト
 
-88 テスト（インラインテスト 19 + 統合テスト 69）:
+112 テスト（インラインテスト 22 + 統合テスト 90）:
 
-| テストファイル              | テスト数 | 内容                         |
-| --------------------------- | -------- | ---------------------------- |
-| analysis インラインテスト   | 7        | analysis モジュール          |
-| document インラインテスト   | 5        | document モジュール          |
-| transport インラインテスト  | 7        | WASM型変換・エントリポイント |
-| semantic_token_test.rs      | 9        | 17 トークンタイプ識別        |
-| fullwidth_halfwidth_test.rs | 5        | 全角/半角マーカー同等認識    |
-| japanese_identifier_test.rs | 5        | 日本語識別子のトークン化     |
-| utf16_conversion_test.rs    | 12       | UTF-8→UTF-16 位置変換        |
-| lsp_lifecycle_test.rs       | 4        | LSP ライフサイクル統合       |
-| document_sync_test.rs       | 4        | ドキュメント同期             |
-| diagnostics_test.rs         | 6        | パースエラー診断             |
-| crash_recovery_test.rs      | 4        | パニック回復・サーバー継続   |
-| partial_token_test.rs       | 5        | 部分パース→トークン提供      |
-| cue_command_token_test.rs   | 10       | キューコマンドトークン生成   |
+| テストファイル              | テスト数 | 内容                                   |
+| --------------------------- | -------- | -------------------------------------- |
+| document インラインテスト   | 11       | document モジュール・位置変換境界      |
+| transport インラインテスト  | 9        | WASM型変換・severity・シリアライズ     |
+| error インラインテスト      | 2        | エラー型 Display 契約                  |
+| semantic_token_test.rs      | 9        | 17 トークンタイプ識別                  |
+| fullwidth_halfwidth_test.rs | 5        | 全角/半角マーカー同等認識              |
+| japanese_identifier_test.rs | 5        | 日本語識別子のトークン化               |
+| utf16_conversion_test.rs    | 12       | UTF-8→UTF-16 位置変換                  |
+| lsp_lifecycle_test.rs       | 4        | LSP ライフサイクル統合                 |
+| document_sync_test.rs       | 4        | ドキュメント同期                       |
+| diagnostics_test.rs         | 6        | パースエラー診断                       |
+| crash_recovery_test.rs      | 4        | パニック回復・サーバー継続             |
+| partial_token_test.rs       | 5        | 部分パース→トークン提供                |
+| cue_command_token_test.rs   | 10       | キューコマンドトークン生成             |
+| var_set_token_test.rs       | 10       | 変数代入行のトークン生成               |
+| analysis_test.rs            | 15       | コメント走査・改行正規化・解析結果     |
+| analyze_robustness_test.rs  | 1        | 敵対的入力コーパスの no-panic 境界     |
 
 ## 依存関係
 
 - `tower-lsp 0.20` - LSP フレームワーク（runtime-agnostic、lsp-types 0.94.1 再エクスポート）
 - `pasta_dsl` - Pasta DSL パーサー（PEG ベース、部分パース API）
 - `thiserror 2` - エラー型定義
-- `serde` / `serde_json` - シリアライズ
-- `wasm-bindgen` / `wasm-bindgen-futures` (WASM ターゲット条件コンパイル)
+- `serde 1` - WASM 型のシリアライズ定義
+- `wasm-bindgen 0.2` (WASM ターゲット条件コンパイル)
 - `serde-wasm-bindgen 0.6` - Rust→JS型変換（WASMエントリポイント）
+- dev: `serde_json 1` - JSON 形状検証（テスト専用）
+
+バージョンは workspace で一元管理。
 
 ## ライセンス
 

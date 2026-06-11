@@ -4,16 +4,16 @@
 
 ## 前提条件
 
-- [x] `release.bat` を実行してゴースト配布物を生成し `hello-pasta.nar` を作成済み
+- [x] `release.ps1` を実行してゴースト配布物を生成し `hello-pasta.nar` を作成済み
 - [x] GitHub CLI (`gh`) がインストール・認証済み (`gh auth status` で確認)
 
 ## リリース手順
 
-### Step 1: release.bat 実行
+### Step 1: release.ps1 実行
 
-```bat
+```powershell
 cd crates\pasta_sample_ghost
-release.bat
+.\release.ps1
 ```
 
 - ビルド、ゴースト生成、バリデーション、`.nar` ファイル作成まで一括実行されます
@@ -27,7 +27,7 @@ AI と相談しながら、変更点を記入するのがおすすめです。
 ### Step 3: GitHub Release 公開
 
 ```bash
-gh release create v{VERSION} "crates/pasta_sample_ghost/hello-pasta.nar" \
+gh release create v{VERSION} "release/hello-pasta.nar" \
   --title "hello-pasta v{VERSION}" \
   --notes-file release-notes.md
 ```

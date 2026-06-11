@@ -91,12 +91,6 @@
 //! they are infallible and graceful (R2.5) — on any FFI shortfall they return
 //! partial/empty results and never panic, error, or corrupt the VM stack.
 
-// The `pub(crate)` capture API is consumed by the session/wiring tasks (2.4 /
-// 4.1), so it is dead from non-test code in this foundation task. The sibling
-// debug modules (hook.rs / session.rs / breakpoints.rs) use the same allow for
-// the same staged-wiring reason.
-#![allow(dead_code)]
-
 use std::ffi::{CStr, CString};
 use std::os::raw::c_int;
 
@@ -144,10 +138,10 @@ pub(crate) fn capture_stack(lua: &Lua, thread: &mlua::Thread) -> Vec<FrameInfo> 
             if mlua::ffi::lua_getstack(l, level, &mut ar as *mut _) == 0 {
                 break; // no further frames
             }
-            if mlua::ffi::lua_getinfo(l, what.as_ptr(), &mut ar as *mut _) != 0 {
-                if let Some(frame) = frame_info_from_ar(&ar) {
-                    out.push(frame);
-                }
+            if mlua::ffi::lua_getinfo(l, what.as_ptr(), &mut ar as *mut _) != 0
+                && let Some(frame) = frame_info_from_ar(&ar)
+            {
+                out.push(frame);
             }
             level += 1;
         }
@@ -211,10 +205,10 @@ unsafe fn frame_info_from_ar(ar: &mlua::ffi::lua_Debug) -> Option<FrameInfo> {
 /// (R2.5) — NEVER crashing, erroring, or corrupting the VM stack.
 ///
 /// `frame_level` is the logical call-stack level on `thread.state()` where the
-/// frame is found (0 = the stopped/top frame). For THIS task the caller passes
-/// `0` (the main frame stopped at a top-level chunk); task 2.4 passes a
-/// coroutine `Thread` whose own `state()` likewise has its body frame at the
-/// requested level.
+/// frame is found (0 = the stopped/top frame). The session passes the level
+/// requested by the DAP client; for a running coroutine it passes that
+/// coroutine's `Thread`, whose own `state()` likewise has its body frame at
+/// the requested level.
 ///
 /// Infallible by contract (R2.5): on any FFI shortfall it returns partial /
 /// empty results. Stack discipline (design "Error Handling"): `lua_gettop` at
@@ -246,12 +240,16 @@ pub(crate) fn capture_variables(
         }
 
         // Restore the stack to its entry depth no matter what (VM 破壊回避).
+        // Restore BEFORE asserting: if the symmetry invariant were ever
+        // violated, the debug-build panic must not unwind past a still-dirty
+        // VM stack (the hook machinery keeps the VM running after a captured
+        // panic, so the stack has to be balanced first).
         let top_at_exit = mlua::ffi::lua_gettop(l);
+        mlua::ffi::lua_settop(l, top_at_entry);
         debug_assert_eq!(
             top_at_entry, top_at_exit,
             "capture_variables must keep the VM stack balanced (push/pop symmetric)"
         );
-        mlua::ffi::lua_settop(l, top_at_entry);
     }
     out
 }
@@ -454,10 +452,10 @@ mod tests {
                 // Direct FFI on the running thread's state (level 0 = stopped frame).
                 let thread = hook_lua.current_thread();
                 let vars = capture_variables(hook_lua, &thread, 0);
-                if let Ok(mut g) = captured_hook.lock() {
-                    if g.is_empty() {
-                        *g = vars;
-                    }
+                if let Ok(mut g) = captured_hook.lock()
+                    && g.is_empty()
+                {
+                    *g = vars;
                 }
             }
             Ok(VmState::Continue)
@@ -530,16 +528,15 @@ return marker
 
         lua.set_global_hook(HookTriggers::EVERY_LINE, move |hook_lua, debug| {
             let (source, _line) = source_and_line(debug);
-            if source == "@upvalue_closure" {
-                if let Ok(mut g) = captured_hook.lock() {
-                    if g.is_empty() {
-                        let thread = hook_lua.current_thread();
-                        let vars = capture_variables(hook_lua, &thread, 0);
-                        // Keep only the first frame that actually exposes the upvalue.
-                        if vars.iter().any(|v| v.name == "captured_num") {
-                            *g = vars;
-                        }
-                    }
+            if source == "@upvalue_closure"
+                && let Ok(mut g) = captured_hook.lock()
+                && g.is_empty()
+            {
+                let thread = hook_lua.current_thread();
+                let vars = capture_variables(hook_lua, &thread, 0);
+                // Keep only the first frame that actually exposes the upvalue.
+                if vars.iter().any(|v| v.name == "captured_num") {
+                    *g = vars;
                 }
             }
             Ok(VmState::Continue)
@@ -597,10 +594,10 @@ end
             if source == "@unsupported_chunk" && line == target_line {
                 let thread = hook_lua.current_thread();
                 let vars = capture_variables(hook_lua, &thread, 0);
-                if let Ok(mut g) = captured_hook.lock() {
-                    if g.is_empty() {
-                        *g = vars;
-                    }
+                if let Ok(mut g) = captured_hook.lock()
+                    && g.is_empty()
+                {
+                    *g = vars;
                 }
             }
             Ok(VmState::Continue)
@@ -686,10 +683,10 @@ return marker
             if source == "@stack_chunk" && line == target_line {
                 let thread = hook_lua.current_thread();
                 let frames = capture_stack(hook_lua, &thread);
-                if let Ok(mut g) = captured_hook.lock() {
-                    if g.is_empty() {
-                        *g = frames;
-                    }
+                if let Ok(mut g) = captured_hook.lock()
+                    && g.is_empty()
+                {
+                    *g = frames;
                 }
             }
             Ok(VmState::Continue)
@@ -802,14 +799,17 @@ return b
     /// The coroutine is created with Lua-side `coroutine.create` and driven by a
     /// resume loop (exactly the pasta scene execution model), so this proves the
     /// real production path, not a Rust-created `lua.create_thread`.
+    /// Everything captured at the stop line by [`run_coroutine_and_capture_at`]:
+    /// body-frame variables, the running coroutine's `ThreadId`, and the stack.
+    type CoroutineCapture = (Vec<Variable>, ThreadId, Vec<FrameInfo>);
+
     fn run_coroutine_and_capture_at(
         lua: &Lua,
         body: &str,
         body_name: &str,
         target_line: u32,
     ) -> (Vec<Variable>, Option<ThreadId>, Vec<FrameInfo>) {
-        let captured: Arc<Mutex<Option<(Vec<Variable>, ThreadId, Vec<FrameInfo>)>>> =
-            Arc::new(Mutex::new(None));
+        let captured: Arc<Mutex<Option<CoroutineCapture>>> = Arc::new(Mutex::new(None));
         let captured_hook = Arc::clone(&captured);
         let want_source = body_name.to_string();
 
@@ -821,10 +821,10 @@ return b
                 let tid = ThreadId::from_state(thread.state());
                 let vars = capture_variables(hook_lua, &thread, 0);
                 let stack = capture_stack(hook_lua, &thread);
-                if let Ok(mut g) = captured_hook.lock() {
-                    if g.is_none() {
-                        *g = Some((vars, tid, stack));
-                    }
+                if let Ok(mut g) = captured_hook.lock()
+                    && g.is_none()
+                {
+                    *g = Some((vars, tid, stack));
                 }
             }
             Ok(VmState::Continue)
@@ -1095,6 +1095,274 @@ end
         );
     }
 
+    // =======================================================================
+    // Cell 3.25 (G1) additions — previously-unasserted public behaviour:
+    // multi-frame stack walk + func_name resolution, caller-frame variable
+    // capture (frame_level > 0), out-of-range frame_level, and the
+    // non-integer / negative number repr branches of read_value_at_top.
+    // =======================================================================
+
+    /// R2.1: stopped INSIDE a named local function, `capture_stack` must walk
+    /// MULTIPLE Lua frames in callee→caller order, resolve the callee's
+    /// `func_name` ("inner"), and report the top-level chunk frame (whose
+    /// `func_name` is unresolvable → None) at the call line.
+    #[test]
+    fn capture_stack_walks_nested_frames_and_resolves_func_name() {
+        let lua = build_jit_off_vm();
+        let captured: Arc<Mutex<Vec<FrameInfo>>> = Arc::new(Mutex::new(Vec::new()));
+        let captured_hook = Arc::clone(&captured);
+        // Line 4 = `return inner_var` (inside inner); line 6 = the call site.
+        let target_line: u32 = 4;
+
+        lua.set_global_hook(HookTriggers::EVERY_LINE, move |hook_lua, debug| {
+            let (source, line) = source_and_line(debug);
+            if source == "@nested_stack_chunk" && line == target_line {
+                let thread = hook_lua.current_thread();
+                let frames = capture_stack(hook_lua, &thread);
+                if let Ok(mut g) = captured_hook.lock()
+                    && g.is_empty()
+                {
+                    *g = frames;
+                }
+            }
+            Ok(VmState::Continue)
+        })
+        .expect("set_global_hook should succeed");
+
+        let chunk = "\
+local outer_var = 99
+local function inner()
+    local inner_var = 7
+    return inner_var
+end
+local result = inner()
+return result
+";
+        lua.load(chunk)
+            .set_name("@nested_stack_chunk")
+            .exec()
+            .expect("chunk should execute");
+        lua.remove_global_hook();
+
+        let frames = captured.lock().unwrap();
+        assert!(
+            frames.len() >= 2,
+            "stopped inside inner(), capture_stack must walk BOTH Lua frames \
+             (callee + caller chunk) (R2.1). got: {:?}",
+            *frames
+        );
+
+        // Frame 0 (callee): inner's stop line, func_name resolved as "inner".
+        let callee = &frames[0];
+        assert_eq!(callee.source, "@nested_stack_chunk");
+        assert_eq!(
+            callee.line, target_line,
+            "top frame must be the stopped line inside inner. got: {:?}",
+            *frames
+        );
+        assert_eq!(
+            callee.func_name.as_deref(),
+            Some("inner"),
+            "the callee frame's func_name must be resolved as 'inner' (R2.1). got: {:?}",
+            *frames
+        );
+
+        // Frame 1 (caller = top-level chunk): the call-site line; a main chunk
+        // has no resolvable function name.
+        let caller = &frames[1];
+        assert_eq!(caller.source, "@nested_stack_chunk");
+        assert_eq!(
+            caller.line, 6,
+            "the caller frame must sit on the call-site line. got: {:?}",
+            *frames
+        );
+        assert_eq!(
+            caller.func_name, None,
+            "a top-level chunk frame has no resolvable func_name. got: {:?}",
+            *frames
+        );
+    }
+
+    /// R2.2 (frame_level seam): `frame_level = 1` must capture the CALLER
+    /// frame's locals (not the stopped callee's): the caller's `outer_var` is
+    /// present and the callee's `inner_var` is NOT.
+    #[test]
+    fn capture_variables_at_caller_frame_level() {
+        let lua = build_jit_off_vm();
+        let captured: Arc<Mutex<Vec<Variable>>> = Arc::new(Mutex::new(Vec::new()));
+        let captured_hook = Arc::clone(&captured);
+        let target_line: u32 = 4; // `return inner_var` inside inner
+
+        lua.set_global_hook(HookTriggers::EVERY_LINE, move |hook_lua, debug| {
+            let (source, line) = source_and_line(debug);
+            if source == "@caller_frame_chunk" && line == target_line {
+                let thread = hook_lua.current_thread();
+                // Level 1 = the CALLER of the stopped frame.
+                let vars = capture_variables(hook_lua, &thread, 1);
+                if let Ok(mut g) = captured_hook.lock()
+                    && g.is_empty()
+                {
+                    *g = vars;
+                }
+            }
+            Ok(VmState::Continue)
+        })
+        .expect("set_global_hook should succeed");
+
+        let chunk = "\
+local outer_var = 99
+local function inner()
+    local inner_var = 7
+    return inner_var
+end
+local result = inner()
+return result
+";
+        lua.load(chunk)
+            .set_name("@caller_frame_chunk")
+            .exec()
+            .expect("chunk should execute");
+        lua.remove_global_hook();
+
+        let vars = captured.lock().unwrap();
+        assert!(
+            !vars.is_empty(),
+            "frame_level=1 must capture the caller frame's variables (R2.2). got empty"
+        );
+
+        let outer = find_var(&vars, "outer_var").unwrap_or_else(|| {
+            panic!(
+                "caller local 'outer_var' must be visible at frame_level=1. got: {:?}",
+                *vars
+            )
+        });
+        assert_eq!(outer.type_name, "number");
+        assert_eq!(outer.repr, "99", "caller local must carry the caller's value");
+
+        assert!(
+            find_var(&vars, "inner_var").is_none(),
+            "the CALLEE's local 'inner_var' must NOT appear at frame_level=1 \
+             (proves the caller frame, not the stopped frame, was read). got: {:?}",
+            *vars
+        );
+    }
+
+    /// R2.5 (graceful): a `frame_level` beyond the call stack has no activation
+    /// record (`lua_getstack` returns 0) — the capture must return EMPTY, not
+    /// crash, and the VM must remain usable (stack balanced).
+    #[test]
+    fn capture_variables_out_of_range_level_returns_empty() {
+        let lua = build_jit_off_vm();
+        let captured: Arc<Mutex<Option<Vec<Variable>>>> = Arc::new(Mutex::new(None));
+        let captured_hook = Arc::clone(&captured);
+
+        lua.set_global_hook(HookTriggers::EVERY_LINE, move |hook_lua, debug| {
+            let (source, _line) = source_and_line(debug);
+            if source == "@oor_level_chunk" {
+                let thread = hook_lua.current_thread();
+                let vars = capture_variables(hook_lua, &thread, 200);
+                if let Ok(mut g) = captured_hook.lock()
+                    && g.is_none()
+                {
+                    *g = Some(vars);
+                }
+            }
+            Ok(VmState::Continue)
+        })
+        .expect("set_global_hook should succeed");
+
+        lua.load("local a = 1\nreturn a\n")
+            .set_name("@oor_level_chunk")
+            .exec()
+            .expect("chunk should execute despite an out-of-range capture level (R2.5)");
+        lua.remove_global_hook();
+
+        let vars = captured
+            .lock()
+            .unwrap()
+            .clone()
+            .expect("the hook must have attempted the out-of-range capture");
+        assert!(
+            vars.is_empty(),
+            "an out-of-range frame_level must yield an EMPTY capture (graceful, R2.5). \
+             got: {vars:?}"
+        );
+
+        // VM remains usable: the failed lookup must not unbalance the stack.
+        let sane: i64 = lua
+            .load("return 1 + 2")
+            .eval()
+            .expect("VM must remain usable after an out-of-range capture (R2.5)");
+        assert_eq!(sane, 3);
+    }
+
+    /// R2.3 (number repr branches): non-integer numbers keep their fraction
+    /// ("2.5"), negative integers print without a decimal point ("-3"), and
+    /// non-finite numbers take the non-integer formatting path ("inf") —
+    /// pinning both arms of read_value_at_top's integer/fraction split.
+    #[test]
+    fn capture_variables_number_repr_fractional_negative_and_nonfinite() {
+        let lua = build_jit_off_vm();
+        let captured: Arc<Mutex<Vec<Variable>>> = Arc::new(Mutex::new(Vec::new()));
+        let captured_hook = Arc::clone(&captured);
+        let target_line: u32 = 4; // all three locals visible by `marker`
+
+        lua.set_global_hook(HookTriggers::EVERY_LINE, move |hook_lua, debug| {
+            let (source, line) = source_and_line(debug);
+            if source == "@number_repr_chunk" && line == target_line {
+                let thread = hook_lua.current_thread();
+                let vars = capture_variables(hook_lua, &thread, 0);
+                if let Ok(mut g) = captured_hook.lock()
+                    && g.is_empty()
+                {
+                    *g = vars;
+                }
+            }
+            Ok(VmState::Continue)
+        })
+        .expect("set_global_hook should succeed");
+
+        let chunk = "\
+local frac = 2.5
+local neg = -3
+local huge = math.huge
+local marker = frac
+return marker
+";
+        lua.load(chunk)
+            .set_name("@number_repr_chunk")
+            .exec()
+            .expect("chunk should execute");
+        lua.remove_global_hook();
+
+        let vars = captured.lock().unwrap();
+
+        let frac = find_var(&vars, "frac").unwrap_or_else(|| {
+            panic!("local 'frac' must be retrieved by name. got: {:?}", *vars)
+        });
+        assert_eq!(frac.type_name, "number");
+        assert_eq!(
+            frac.repr, "2.5",
+            "a fractional number must keep its fraction in repr (R2.3)"
+        );
+
+        let neg = find_var(&vars, "neg")
+            .unwrap_or_else(|| panic!("local 'neg' must be retrieved by name. got: {:?}", *vars));
+        assert_eq!(neg.type_name, "number");
+        assert_eq!(
+            neg.repr, "-3",
+            "a negative integer-valued number must print without a decimal point"
+        );
+
+        let huge = find_var(&vars, "huge")
+            .unwrap_or_else(|| panic!("local 'huge' must be retrieved by name. got: {:?}", *vars));
+        assert_eq!(huge.type_name, "number");
+        assert_eq!(
+            huge.repr, "inf",
+            "math.huge is non-finite and must take the non-integer formatting path"
+        );
+    }
+
     /// StepController underpinning: DISTINCT coroutines have DISTINCT
     /// `ThreadId`s, so the step machine can tell scene coroutines apart and
     /// skip lines belonging to a different thread.
@@ -1108,10 +1376,10 @@ end
             let (source, line) = source_and_line(debug);
             if (source == "@co_distinct_0" || source == "@co_distinct_1") && line == 1 {
                 let tid = ThreadId::from_state(hook_lua.current_thread().state());
-                if let Ok(mut g) = seen_hook.lock() {
-                    if !g.iter().any(|(s, _)| s == &source) {
-                        g.push((source, tid));
-                    }
+                if let Ok(mut g) = seen_hook.lock()
+                    && !g.iter().any(|(s, _)| s == &source)
+                {
+                    g.push((source, tid));
                 }
             }
             Ok(VmState::Continue)

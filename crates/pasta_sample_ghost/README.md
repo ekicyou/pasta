@@ -29,6 +29,7 @@ SHIORI/3.0 プロトコルで動作するミニマルなゴーストとして、
 crates/pasta_sample_ghost/
 ├── src/
 │   ├── lib.rs              # 公開API（画像＋surfaces.txt 生成）
+│   ├── main.rs             # 配布物生成 CLI（cargo run -p pasta_sample_ghost）
 │   ├── image_generator.rs  # ピクトグラム画像生成
 │   ├── config_templates.rs # surfaces.txt 生成
 │   └── scripts.rs          # ghosts/hello-pasta の辞書(.pasta)を読む検証テスト
@@ -38,7 +39,6 @@ crates/pasta_sample_ghost/
 │       ├── ghost/master/   # descript.txt, pasta.toml, dic/*.pasta（手書きSSOT）＋ pasta.dll, scripts/（生成物）
 │       └── shell/master/   # descript.txt（手書き）＋ surfaces.txt, surface*.png（生成物）
 ├── release.ps1             # ビルド＋セットアップ＋.nar パッケージ作成
-├── release.bat             # release.ps1 のバッチラッパー
 ├── build.rs                # ビルドスクリプト
 └── tests/
     ├── common/mod.rs                 # テストヘルパー
@@ -54,8 +54,8 @@ crates/pasta_sample_ghost/
 ### セットアップ／リリース（`release.ps1`）
 
 ```powershell
-# crates/pasta_sample_ghost/ フォルダで release.bat をダブルクリック
-# または PowerShell で実行（ビルド＋セットアップ＋リリースパッケージ作成）
+# crates/pasta_sample_ghost/ フォルダで PowerShell から実行
+# （ビルド＋セットアップ＋リリースパッケージ作成）
 .\release.ps1
 
 # DLL ビルドをスキップする場合（既にビルド済みの場合）
@@ -109,10 +109,9 @@ Copy-Item -Recurse "crates/pasta_lua/scripts" "$dist/ghost/master/scripts"
 テキスト系配布ファイルは `ghosts/hello-pasta/` に手書き配置済みのため、本 API は生成しません。
 
 ```rust
-use pasta_sample_ghost::{generate_ghost, GhostConfig};
+use pasta_sample_ghost::generate_ghost;
 
-let config = GhostConfig::default();
-generate_ghost(Path::new("./output"), &config)?;
+generate_ghost(Path::new("./output"))?;
 ```
 
 ### テスト実行

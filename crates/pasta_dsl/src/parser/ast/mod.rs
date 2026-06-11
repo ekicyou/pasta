@@ -1,4 +1,4 @@
-//! AST type definitions for parser2 based on pasta2.pest grammar.
+//! AST type definitions for the parser module based on the grammar.pest grammar.
 //!
 //! This module defines all AST types corresponding to the grammar rules
 //! defined in grammar.pest. The types follow a 3-layer scope hierarchy:

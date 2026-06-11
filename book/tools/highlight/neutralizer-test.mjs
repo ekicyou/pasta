@@ -135,7 +135,12 @@ function pick(doc) {
   };
 }
 
-function run() {
+// ポーリングフォールバック検証用の待機ヘルパ（ケース J）。
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function run() {
   log('ClientNeutralizer (neutralizer.mjs) jsdom unit test');
   log('');
 
@@ -325,10 +330,241 @@ function run() {
   }
   log('');
 
+  // =========================================================================
+  // ケース E: install 前に window.hljs が既に存在する（読み込み順逆転）。
+  //   neutralizer.mjs L91-93 の即時 neutralize 分岐。highlight-*.js が先に
+  //   読み込まれても安全側に倒れることを検証する。
+  // =========================================================================
+  {
+    const dom = buildDom();
+    const { window } = dom;
+    const doc = window.document;
+    const el = pick(doc);
+
+    // 先に hljs を代入してから install する（既存テストと逆順）。
+    const fake = makeFakeHljs();
+    window.hljs = fake;
+    installHljsNeutralizer(window);
+
+    runCodeSnippets(doc, window, false);
+
+    check(
+      'E(既存hljs): install 前に hljs が存在しても pasta 事前 span が残存する',
+      el.pasta.querySelectorAll('span.hljs-keyword, span.hljs-title').length === 2,
+      el.pasta.innerHTML,
+    );
+    check(
+      'E(既存hljs): rust 要素は原処理へ委譲される',
+      fake.spy.block.some((cls) => /\blanguage-rust\b/.test(cls)),
+      `spy.block=${JSON.stringify(fake.spy.block)}`,
+    );
+
+    dom.window.close();
+  }
+  log('');
+
+  // =========================================================================
+  // ケース F: win が null/undefined でも例外を出さない（早期 return）。
+  // =========================================================================
+  {
+    let threw = false;
+    try {
+      installHljsNeutralizer(null);
+      installHljsNeutralizer(undefined);
+    } catch (e) {
+      threw = true;
+    }
+    check('F(nullガード): win=null/undefined で例外を出さない', !threw);
+  }
+  log('');
+
+  // =========================================================================
+  // ケース G: classList の無い環境（プレーンオブジェクト win + className 文字列
+  //   fallback）。neutralizer.mjs は DOM API 非依存（classList/className 参照のみ）
+  //   を謳うため、jsdom なしで検証する。
+  // =========================================================================
+  {
+    const win = {};
+    installHljsNeutralizer(win);
+    const fake = makeFakeHljs();
+    win.hljs = fake;
+
+    // className 文字列のみを持つ偽要素（classList なし）。
+    const pastaEl = { className: 'language-pasta hljs', textContent: 'x', innerHTML: 'x' };
+    const rustEl = { className: 'language-rust', textContent: 'y', innerHTML: 'y' };
+    const noClassEl = { textContent: 'z', innerHTML: 'z' }; // className も classList も無い
+
+    win.hljs.highlightBlock(pastaEl);
+    win.hljs.highlightBlock(rustEl);
+    win.hljs.highlightBlock(noClassEl);
+
+    check(
+      'G(className fallback): language-pasta（className 文字列判定）はスキップされる',
+      fake.spy.block.every((cls) => !/\blanguage-pasta\b/.test(cls)),
+      `spy.block=${JSON.stringify(fake.spy.block)}`,
+    );
+    check(
+      'G(className fallback): 非 pasta（rust/クラス無し）は委譲される',
+      fake.spy.block.length === 2,
+      `spy.block=${JSON.stringify(fake.spy.block)}`,
+    );
+    // 部分一致の誤判定がない: language-pastafoo はスキップされない。
+    const fake2 = makeFakeHljs();
+    win.hljs = fake2; // setter 再発火 → 新オブジェクトも neutralize される
+    win.hljs.highlightBlock({ className: 'language-pastafoo', textContent: 'w', innerHTML: 'w' });
+    check(
+      'G(className fallback): language-pastafoo（部分一致）はスキップされず委譲される',
+      fake2.spy.block.length === 1,
+      `spy.block=${JSON.stringify(fake2.spy.block)}`,
+    );
+    check(
+      'G(再代入): win.hljs 再代入でも setter が新オブジェクトを neutralize する',
+      fake2.highlightBlock.__pastaNeutralized === true,
+    );
+  }
+  log('');
+
+  // =========================================================================
+  // ケース H: API が片方しか無い hljs（highlightBlock のみ / highlightElement のみ /
+  //   どちらも無い / null）でも例外を出さず、存在する側だけラップする。
+  // =========================================================================
+  {
+    const win = {};
+    installHljsNeutralizer(win);
+
+    let threw = false;
+    try {
+      win.hljs = null; // neutralize(!hljs) ガード
+      win.hljs = {}; // メソッド無し
+    } catch (e) {
+      threw = true;
+    }
+    check('H(部分API): hljs=null/メソッド無しオブジェクトでも例外を出さない', !threw);
+
+    // highlightBlock のみ。
+    const win2 = {};
+    installHljsNeutralizer(win2);
+    const onlyBlock = {
+      calls: 0,
+      highlightBlock(el) {
+        this.calls++;
+      },
+    };
+    win2.hljs = onlyBlock;
+    win2.hljs.highlightBlock({ className: 'language-pasta' });
+    win2.hljs.highlightBlock({ className: 'language-rust' });
+    check(
+      'H(部分API): highlightBlock のみの hljs でも pasta スキップ・非 pasta 委譲が機能する',
+      onlyBlock.calls === 1 && typeof win2.hljs.highlightElement === 'undefined',
+      `calls=${onlyBlock.calls}`,
+    );
+
+    // highlightElement のみ。
+    const win3 = {};
+    installHljsNeutralizer(win3);
+    const onlyElement = {
+      calls: 0,
+      highlightElement(el) {
+        this.calls++;
+      },
+    };
+    win3.hljs = onlyElement;
+    win3.hljs.highlightElement({ className: 'language-pasta' });
+    win3.hljs.highlightElement({ className: 'language-rust' });
+    check(
+      'H(部分API): highlightElement のみの hljs でも pasta スキップ・非 pasta 委譲が機能する',
+      onlyElement.calls === 1,
+      `calls=${onlyElement.calls}`,
+    );
+  }
+  log('');
+
+  // =========================================================================
+  // ケース I: 拡張不可（preventExtensions）の hljs — マーカー __pastaNeutralized を
+  //   置けなくても try/catch で吸収し、ラップ自体は機能する（L82-86）。
+  // =========================================================================
+  {
+    const win = {};
+    installHljsNeutralizer(win);
+    const spy = { calls: [] };
+    const rigid = {
+      highlightBlock(el) {
+        spy.calls.push(el.className);
+      },
+    };
+    Object.preventExtensions(rigid); // 既存プロパティは書換可・新規追加は不可
+
+    let threw = false;
+    try {
+      win.hljs = rigid; // neutralize 中のマーカー追加が strict mode で TypeError → catch
+    } catch (e) {
+      threw = true;
+    }
+    check('I(拡張不可): preventExtensions された hljs でも例外を出さない', !threw);
+    win.hljs.highlightBlock({ className: 'language-pasta' });
+    win.hljs.highlightBlock({ className: 'language-rust' });
+    check(
+      'I(拡張不可): マーカー無しでもラップは機能する（pasta スキップ・rust 委譲）',
+      spy.calls.length === 1 && /\blanguage-rust\b/.test(spy.calls[0]),
+      `calls=${JSON.stringify(spy.calls)}`,
+    );
+  }
+  log('');
+
+  // =========================================================================
+  // ケース J: defineProperty 不可な win → ポーリングフォールバック（L108-117）。
+  //   'hljs' を非 configurable な書込可データプロパティとして事前定義すると、
+  //   アクセサへの再定義が TypeError となり setInterval ポーリングへ落ちる。
+  //   その後 hljs を代入し、25ms 周期のポーリングが検出・neutralize することを待つ。
+  // =========================================================================
+  {
+    const win = {};
+    Object.defineProperty(win, 'hljs', {
+      configurable: false, // defineProperty(アクセサ化)を不可にする
+      writable: true,
+      enumerable: true,
+      value: undefined,
+    });
+
+    let threw = false;
+    try {
+      installHljsNeutralizer(win); // defineProperty が TypeError → ポーリング開始
+    } catch (e) {
+      threw = true;
+    }
+    check('J(ポーリング): defineProperty 不可でも install が例外を出さない', !threw);
+
+    const fake = makeFakeHljs();
+    win.hljs = fake; // データプロパティへの素の代入（setter なし）
+
+    // ポーリング周期 25ms を確実に跨ぐまで待機（余裕を持って最大 ~500ms リトライ）。
+    let wrapped = false;
+    for (let i = 0; i < 20; i++) {
+      await sleep(25);
+      if (win.hljs.highlightBlock && win.hljs.highlightBlock.__pastaNeutralized) {
+        wrapped = true;
+        break;
+      }
+    }
+    check('J(ポーリング): ポーリングが hljs 出現を検出してラップする', wrapped);
+
+    win.hljs.highlightBlock({ className: 'language-pasta' });
+    win.hljs.highlightBlock({ className: 'language-rust' });
+    check(
+      'J(ポーリング): ラップ後は pasta スキップ・非 pasta 委譲が機能する',
+      fake.spy.block.length === 1 && /\blanguage-rust\b/.test(fake.spy.block[0]),
+      `spy.block=${JSON.stringify(fake.spy.block)}`,
+    );
+  }
+  log('');
+
   log(`RESULT: ${passed} passed, ${failed} failed`);
   // tokenizer-test.mjs と同様、jsdom の async ハンドル close 中の libuv assertion を避けるため
   // process.exit() を即時に呼ばず exitCode を設定してイベントループを自然に drain させる。
   process.exitCode = failed === 0 ? 0 : 1;
 }
 
-run();
+run().catch((e) => {
+  console.error('UNEXPECTED ERROR:', e && e.stack ? e.stack : e);
+  process.exitCode = 1;
+});

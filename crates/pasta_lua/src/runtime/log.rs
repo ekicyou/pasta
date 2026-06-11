@@ -105,19 +105,26 @@ fn table_to_string(lua: &Lua, table: &Table, original_value: &Value) -> String {
         return format!("<table: {} elements>", element_count);
     }
 
-    // Try JSON conversion with depth limit
+    // Depth gate BEFORE the serde conversion (cell 3.17 / G3 hardening).
+    // `from_value_with` walks nested tables with Rust recursion, so a deeply
+    // nested table built in Lua (cheap: `for _ = 1, N do t = { t } end`) could
+    // overflow the host stack — an abort reachable across the SHIORI boundary
+    // (R3.7). The old post-conversion `json_depth` check ran too late to
+    // prevent that. This iterative pre-check bails out to the same observable
+    // tostring() fallback the post-check produced, and also fires on cyclic
+    // tables (their traversal depth is unbounded), matching the previous
+    // `deny_recursive_tables` fallback behavior.
+    if table_depth_exceeds(table, MAX_NESTING_DEPTH) {
+        return lua_tostring(lua, original_value);
+    }
+
+    // Try JSON conversion (depth already bounded above)
     let deserialize_options = mlua::DeserializeOptions::default().deny_recursive_tables(true);
     match lua.from_value_with::<serde_json::Value>(original_value.clone(), deserialize_options) {
-        Ok(json_value) => {
-            // Check nesting depth
-            if json_depth(&json_value) > MAX_NESTING_DEPTH {
-                return lua_tostring(lua, original_value);
-            }
-            match serde_json::to_string(&json_value) {
-                Ok(s) => s,
-                Err(_) => lua_tostring(lua, original_value),
-            }
-        }
+        Ok(json_value) => match serde_json::to_string(&json_value) {
+            Ok(s) => s,
+            Err(_) => lua_tostring(lua, original_value),
+        },
         Err(_) => lua_tostring(lua, original_value),
     }
 }
@@ -127,13 +134,33 @@ fn count_table_elements(table: &Table) -> usize {
     table.pairs::<Value, Value>().count()
 }
 
-/// Calculate the nesting depth of a JSON value.
-fn json_depth(value: &serde_json::Value) -> usize {
-    match value {
-        serde_json::Value::Array(arr) => 1 + arr.iter().map(json_depth).max().unwrap_or(0),
-        serde_json::Value::Object(obj) => 1 + obj.values().map(json_depth).max().unwrap_or(0),
-        _ => 0,
+/// Whether `table` nests deeper than `limit` levels (the table itself is depth 1).
+///
+/// Uses an explicit work stack instead of Rust recursion so that arbitrarily
+/// deep Lua input can NEVER overflow the host stack (never panics/aborts).
+/// Traversal stops descending as soon as `limit` is exceeded, which bounds the
+/// cost for adversarial inputs and guarantees termination even for cyclic
+/// tables (a cycle keeps increasing the path depth until it trips the limit).
+/// Table-typed keys are inspected too: they reach the serde conversion as well.
+fn table_depth_exceeds(table: &Table, limit: usize) -> bool {
+    let mut stack: Vec<(Table, usize)> = vec![(table.clone(), 1)];
+    while let Some((t, depth)) = stack.pop() {
+        if depth > limit {
+            return true;
+        }
+        for pair in t.pairs::<Value, Value>() {
+            // Iteration errors are ignored here; the conversion itself will
+            // surface them and fall back to tostring().
+            let Ok((key, value)) = pair else { continue };
+            if let Value::Table(kt) = key {
+                stack.push((kt, depth + 1));
+            }
+            if let Value::Table(vt) = value {
+                stack.push((vt, depth + 1));
+            }
+        }
     }
+    false
 }
 
 /// Convert any Lua value to string using Lua's tostring().
@@ -184,72 +211,31 @@ pub fn register(lua: &Lua) -> LuaResult<Table> {
     Ok(module)
 }
 
-/// Log at TRACE level.
-fn log_trace(lua: &Lua, value: Value) -> LuaResult<()> {
-    let msg = value_to_string(lua, value);
-    let caller = get_caller_info(lua);
-    tracing::trace!(
-        lua_source = %caller.source,
-        lua_line = caller.line,
-        lua_fn = %caller.fn_name,
-        "{}",
-        msg
-    );
-    Ok(())
+/// Generate one Lua-callable log function for a tracing level.
+///
+/// The five level functions are identical except for the `tracing` macro they
+/// dispatch to (the level must be known at compile time), so they are stamped
+/// out by this macro to keep them in sync.
+macro_rules! log_fn {
+    ($fn_name:ident => $level:ident) => {
+        #[doc = concat!("Log at `", stringify!($level), "` level.")]
+        fn $fn_name(lua: &Lua, value: Value) -> LuaResult<()> {
+            let msg = value_to_string(lua, value);
+            let caller = get_caller_info(lua);
+            tracing::$level!(
+                lua_source = %caller.source,
+                lua_line = caller.line,
+                lua_fn = %caller.fn_name,
+                "{}",
+                msg
+            );
+            Ok(())
+        }
+    };
 }
 
-/// Log at DEBUG level.
-fn log_debug(lua: &Lua, value: Value) -> LuaResult<()> {
-    let msg = value_to_string(lua, value);
-    let caller = get_caller_info(lua);
-    tracing::debug!(
-        lua_source = %caller.source,
-        lua_line = caller.line,
-        lua_fn = %caller.fn_name,
-        "{}",
-        msg
-    );
-    Ok(())
-}
-
-/// Log at INFO level.
-fn log_info(lua: &Lua, value: Value) -> LuaResult<()> {
-    let msg = value_to_string(lua, value);
-    let caller = get_caller_info(lua);
-    tracing::info!(
-        lua_source = %caller.source,
-        lua_line = caller.line,
-        lua_fn = %caller.fn_name,
-        "{}",
-        msg
-    );
-    Ok(())
-}
-
-/// Log at WARN level.
-fn log_warn(lua: &Lua, value: Value) -> LuaResult<()> {
-    let msg = value_to_string(lua, value);
-    let caller = get_caller_info(lua);
-    tracing::warn!(
-        lua_source = %caller.source,
-        lua_line = caller.line,
-        lua_fn = %caller.fn_name,
-        "{}",
-        msg
-    );
-    Ok(())
-}
-
-/// Log at ERROR level.
-fn log_error(lua: &Lua, value: Value) -> LuaResult<()> {
-    let msg = value_to_string(lua, value);
-    let caller = get_caller_info(lua);
-    tracing::error!(
-        lua_source = %caller.source,
-        lua_line = caller.line,
-        lua_fn = %caller.fn_name,
-        "{}",
-        msg
-    );
-    Ok(())
-}
+log_fn!(log_trace => trace);
+log_fn!(log_debug => debug);
+log_fn!(log_info => info);
+log_fn!(log_warn => warn);
+log_fn!(log_error => error);

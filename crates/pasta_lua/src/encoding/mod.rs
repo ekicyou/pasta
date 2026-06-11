@@ -8,19 +8,13 @@
 //! On non-Windows systems, this module provides passthrough implementations
 //! that simply return the original UTF-8 strings.
 
+// The platform modules only provide `Encoder` trait impls for `Encoding`,
+// so declaring the module is sufficient — no re-export is needed.
 #[cfg(windows)]
 mod windows;
 
-#[cfg(windows)]
-#[allow(unused_imports)]
-pub(crate) use self::windows::*;
-
 #[cfg(not(windows))]
 mod unix;
-
-#[cfg(not(windows))]
-#[allow(unused_imports)]
-pub(crate) use self::unix::*;
 
 use std::io::Result;
 
@@ -143,5 +137,20 @@ mod tests {
         let ansi_bytes = to_ansi_bytes(original).unwrap();
         let restored = Encoding::ANSI.to_string(&ansi_bytes).unwrap();
         assert_eq!(restored, original);
+    }
+
+    #[test]
+    fn test_path_from_lua_ascii_passthrough() {
+        // ASCII paths are identical in ANSI and UTF-8, so the conversion
+        // must return the exact same string on every platform.
+        let result = path_from_lua("ghost/master/scripts/main.lua").unwrap();
+        assert_eq!(result, "ghost/master/scripts/main.lua");
+    }
+
+    #[test]
+    fn test_path_from_lua_empty() {
+        // Empty input must convert to an empty string, not an error.
+        let result = path_from_lua("").unwrap();
+        assert_eq!(result, "");
     }
 }

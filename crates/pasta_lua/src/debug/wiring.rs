@@ -66,6 +66,18 @@
 //! (deferred: only the `SessionEvent::Threads` produces the wire response) and
 //! `setBreakpoints` (only the bridge-applied `Breakpoints` event produces it).
 //!
+//! # `.pasta` presentation seam
+//!
+//! [`SourceMapWiring`] threads the optional shared `Arc<SourceMap>` plus the
+//! shared effective [`SourceMode`] into this module's consumers: the `.pasta`
+//! source resolver ([`attach_pasta_resolver`], task 5.2), the `.pasta`→`.lua`
+//! breakpoint translation ([`translate_pasta_breakpoints`], task 5.3) and the
+//! runtime presentation toggle / `attach` override handled in [`handle_inbound`]
+//! (tasks 3.1 / 5.5). Each consumer gates on
+//! [`SourceMapWiring::pasta_active`] at use time, so a mode flip is observed
+//! immediately; with no map or in `Lua` mode the existing `.lua` behavior is
+//! kept byte-for-byte (requirements 6.1 / 6.2 / 7.2).
+//!
 //! # Shutdown (no hang)
 //!
 //! A shared [`AtomicBool`] shutdown flag lets the owner ([`DebugHandle`]) signal
@@ -74,8 +86,6 @@
 //! winds the transport down). The encoder thread ends when the session's
 //! `event_rx` closes (the VM thread finished and dropped the session) or when
 //! the frame channel's receiver is gone.
-
-#![allow(dead_code)]
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -95,17 +105,21 @@ use crate::debug::types::{
 };
 
 /// The (optional) shared source map + present mode threaded from
-/// [`enable`](crate::debug::enable) to the I/O-side consumers (task 4.2 plumbing).
+/// [`enable`](crate::debug::enable) to the I/O-side consumers (task 4.2).
 ///
-/// Carries the immutable `Arc<SourceMap>` and the resolved [`SourceMode`] to the
-/// socket-bridge thread, which owns the [`DapAdapter`] where the `.pasta` source
-/// RESOLVER attaches (task 5.2) and applies `setBreakpoints` where the `.pasta`
-/// BP TRANSLATION attaches (task 5.3). This task only DELIVERS the map+mode to
-/// those attachment points; the resolver/translation LOGIC is 5.x.
+/// Carries the immutable `Arc<SourceMap>` and the shared effective [`SourceMode`]
+/// to the socket-bridge thread, which owns the [`DapAdapter`] where the `.pasta`
+/// source RESOLVER attaches ([`attach_pasta_resolver`], task 5.2) and applies
+/// `setBreakpoints` where the `.pasta` BP TRANSLATION attaches
+/// ([`translate_pasta_breakpoints`], task 5.3) — both consumers live in this
+/// module.
 ///
-/// `source_map` is `Some` only when `enable` was given a map AND the present mode
-/// is [`SourceMode::Pasta`] (the gating decision lives in `enable`, design 582);
-/// for `None`/[`SourceMode::Lua`] the bridge keeps its existing default `.lua`
+/// `source_map` is `Some` whenever `enable` was given a map, REGARDLESS of the
+/// initial mode: the mode half of the gate is decided at CONSUMPTION time by
+/// [`pasta_active`](Self::pasta_active) (design 582), because a DAP `attach`
+/// `sourcePresentation` can flip the mode AFTER `enable` — including Lua→Pasta,
+/// which needs the map available. With no map, or while the effective mode is
+/// [`SourceMode::Lua`], every consumer keeps the existing default `.lua`
 /// behavior byte-for-byte (requirements 6.1 / 6.2 / 7.2).
 #[derive(Clone)]
 pub(crate) struct SourceMapWiring {
@@ -124,6 +138,11 @@ pub(crate) struct SourceMapWiring {
 impl SourceMapWiring {
     /// The default (disabled) wiring: no map, effective mode default `.pasta` —
     /// but with no map the consumers behave exactly as today's `.lua` path (7.2).
+    ///
+    /// Test-only constructor: production (`enable` in `mod.rs`) always builds the
+    /// wiring via the struct literal with the resolved map/mode, so this shorthand
+    /// is exercised only by the in-file test modules.
+    #[cfg(test)]
     pub(crate) fn disabled() -> Self {
         Self {
             source_map: None,
@@ -175,23 +194,22 @@ pub(crate) type SharedAdapter = Arc<Mutex<DapAdapter>>;
 /// resets to the default `.lua` resolver on a Pasta→Lua flip (so the resolver
 /// presentation always matches the FINAL effective mode, requirement 6.3).
 fn attach_pasta_resolver(adapter: &SharedAdapter, source_map: &SourceMapWiring) {
-    if !source_map.pasta_active() {
+    let resolver = if source_map.pasta_active() {
+        // `pasta_active()` guarantees the map is `Some`; degrade to a no-op if it
+        // is somehow absent (never panic in the bridge).
+        match &source_map.source_map {
+            Some(map) => pasta_source_resolver(Arc::clone(map)), // 5.1, 5.2, 5.3
+            None => return,
+        }
+    } else {
         // Lua mode / no map → ensure the default `.lua` resolver (6.2/7.2). This
         // RESETS a previously-installed `.pasta` resolver on a Pasta→Lua `attach`
         // flip (task 5.5); on the first call (default adapter) it is a harmless
         // re-assert of the already-default resolver.
-        if let Ok(mut dap) = adapter.lock() {
-            dap.set_source_resolver(crate::debug::dap::default_source_resolver());
-        }
-        return;
-    }
-    // `pasta_active()` guarantees the map is `Some`.
-    let map = match &source_map.source_map {
-        Some(map) => Arc::clone(map),
-        None => return,
+        crate::debug::dap::default_source_resolver()
     };
     if let Ok(mut dap) = adapter.lock() {
-        dap.set_source_resolver(pasta_source_resolver(map)); // 5.1, 5.2, 5.3
+        dap.set_source_resolver(resolver);
     }
 }
 
@@ -219,8 +237,7 @@ pub(crate) fn run_socket_bridge(
     shutdown: Arc<AtomicBool>,
     // The (optional) shared map + present mode delivered to the `.pasta` resolver
     // (5.2, attached just below) and BP-translation (5.3) attachment points on
-    // this thread. `disabled()`/`Lua`/`None` → existing `.lua` behavior
-    // (6.1/6.2/7.2).
+    // this thread. No map / `Lua` mode → existing `.lua` behavior (6.1/6.2/7.2).
     source_map: SourceMapWiring,
 ) {
     // Task 5.2: install the `.pasta` source resolver on the shared adapter when
@@ -266,10 +283,11 @@ fn handle_inbound(
     breakpoints: &BreakpointSet,
     cmd_tx: &Sender<SessionCommand>,
     req: &Value,
-    // Task 4.2 plumbing: reaches the `setBreakpoints` branch below, where the
-    // `.pasta` BP TRANSLATION (task 5.3) will consult `source_map` when
-    // `pasta_active()`. This task only DELIVERS it here; no translation yet, so
-    // the `.lua` path is unchanged (requirements 6.2 / 7.2).
+    // The shared map + present mode, consulted by the `setBreakpoints` branch
+    // below: when `pasta_active()` a `.pasta` source is routed through
+    // `translate_pasta_breakpoints` (task 5.3), otherwise the `.lua` direct path
+    // is unchanged (requirements 6.2 / 7.2). Also read by the presentation-toggle
+    // / `attach` branches to flip the shared effective mode (tasks 3.1 / 5.5).
     source_map: &SourceMapWiring,
 ) -> bool {
     // The RAW request command string. Needed to disambiguate the runtime toggle
@@ -361,10 +379,10 @@ fn handle_inbound(
     }
 
     // (a) Immediate response (acks / initialize / scopes self-answer).
-    if let Some(response) = decoded.response {
-        if transport.send(response).is_err() {
-            return false;
-        }
+    if let Some(response) = decoded.response
+        && transport.send(response).is_err()
+    {
+        return false;
     }
     // (b) Immediate unsolicited events (the `initialized` handshake event).
     for ev in decoded.events {
@@ -1895,6 +1913,56 @@ mod bp_translator_tests {
         );
         assert!(set.should_pause(r"@C:\proj\cache\scene.lua", 20), "新座標が登録される");
     }
+
+    /// 4.4 / 8.2: 空行リスト（DAP の「この source の BP を全消去」）での再設定は
+    /// 当該 present source の既存座標を権威的に除去し、空の resolved を返す。
+    /// [`BreakpointSet::register`] の置換セマンティクスが空 entries でも成立する
+    /// ことを翻訳経路越しに固定する。
+    #[test]
+    fn re_setting_pasta_source_with_empty_lines_clears_its_coords() {
+        let file = "C:/proj/scene.pasta";
+        let map = map_from(file, &[("C:/proj/cache/scene.lua", 10, 3)]);
+        let wiring = pasta_wiring(map);
+        let set = BreakpointSet::new();
+
+        // 行 3（→ `.lua` 10）を登録して発火を確認。
+        let resolved = translate_pasta_breakpoints(&set, &wiring, &SourceRef::new(file), &[3]);
+        assert_eq!(resolved.len(), 1);
+        assert!(set.should_pause(r"@C:\proj\cache\scene.lua", 10));
+
+        // 同 `.pasta` を空行リストで再設定: resolved は空、旧座標は全除去。
+        let cleared = translate_pasta_breakpoints(&set, &wiring, &SourceRef::new(file), &[]);
+        assert!(cleared.is_empty(), "空要求の resolved は空集合");
+        assert!(
+            !set.should_pause(r"@C:\proj\cache\scene.lua", 10),
+            "空再設定は当該 present source の全座標を権威的に除去する"
+        );
+    }
+
+    /// [`translate_pasta_breakpoints`] 冒頭の防御分岐: `pasta_active()` が保証する
+    /// はずの map が万一 `None` でも `.lua` 直接登録経路
+    /// （[`BreakpointSet::set_breakpoints`]）へ安全劣化し、ブリッジは決して
+    /// パニックしない（要求行どおり verified・present source 自身が実行座標）。
+    #[test]
+    fn translate_without_map_degrades_to_direct_lua_registration() {
+        let wiring = SourceMapWiring {
+            source_map: None,
+            source_mode: SharedSourceMode::new(SourceMode::Pasta),
+        };
+        let set = BreakpointSet::new();
+        let src = SourceRef::new("C:/proj/scene.pasta");
+
+        let resolved = translate_pasta_breakpoints(&set, &wiring, &src, &[4, 9]);
+
+        // `.lua` 直接経路の形: 要求順ミラー・全 verified・原行のまま。
+        assert_eq!(resolved.len(), 2);
+        assert!(resolved.iter().all(|bp| bp.verified), "直接経路は全行 verified");
+        assert_eq!(resolved[0].line, 4);
+        assert_eq!(resolved[1].line, 9);
+        // present source == chunk として直接登録される（翻訳なし）。
+        assert!(set.should_pause("C:/proj/scene.pasta", 4));
+        assert!(set.should_pause("C:/proj/scene.pasta", 9));
+    }
 }
 
 #[cfg(test)]
@@ -2208,7 +2276,7 @@ package.loaded['pasta.global'] = {}
             // 走らせる。フックはこの source を報告し、`should_pause` が正規化突合する
             // ので `.pasta` BP（→ `.lua` 行登録）が発火する（4.2）。
             lua.load(&lua_source)
-                .set_name(&format!("@{chunk_name}"))
+                .set_name(format!("@{chunk_name}"))
                 .exec()
                 .map_err(|e| format!("scenario exec failed: {e}"))?;
             lua.remove_global_hook();
@@ -2591,8 +2659,7 @@ return f
     /// `resolve_lua_to_pasta` で `.pasta` 行を引き、シナリオが要求する関係（同一/異なる/
     /// 未対応）を build 時に表明する。各テストはこの導出値に対してアサートする。
     struct Expected {
-        /// BP/step over 起点の `.lua` 行（単一 `.lua` 行）と対応 `.pasta` 行。
-        origin_lua: u32,
+        /// BP/step over 起点（単一 `.lua` 行・`derive` 内アンカー行 18）の対応 `.pasta` 行。
         origin_pasta: u32,
         /// E1: 複数 `.lua` 行へ展開された `.pasta` 行（行19/20 = 同一 `.pasta`）と、その
         /// `.lua` 行（1 本目/2 本目）。1 回目 step over の停止先（= 起点の次の異なる
@@ -2608,22 +2675,18 @@ return f
         call_helper_pasta: u32,
         /// E3: helper 内の未対応 `.lua` 行（step into で通過）。
         callee_unmapped_lua: u32,
-        /// E3: helper 内の最初の対応 `.lua` 行（step into 停止先）と `.pasta` 行。
-        callee_first_lua: u32,
+        /// E3: helper 内の最初の対応 `.lua` 行（step into 停止先・`derive` 内アンカー
+        /// 行 3）の `.pasta` 行。
         callee_first_pasta: u32,
         /// E2/E5: helper / recur 呼び出し行から step over した停止先（呼出元フレームの
-        /// 次の `.pasta` 行 = 再帰呼び出し行）と `.pasta` 行。
-        next_caller_lua: u32,
+        /// 次の `.pasta` 行 = 再帰呼び出し行）の `.pasta` 行。
         next_caller_pasta: u32,
-        /// E4: step out が呼出元で停止する `.lua` 行と `.pasta` 行（呼出行の次の対応行）。
-        step_out_lua: u32,
+        /// E4: step out が呼出元で停止する `.pasta` 行（呼出行の次の対応行）。
         step_out_pasta: u32,
-        /// E5: 再帰呼び出し行（step over 起点）と `.pasta` 行。
-        recur_call_lua: u32,
+        /// E5: 再帰呼び出し行（step over 起点・`derive` 内アンカー行 23）の `.pasta` 行。
         recur_call_pasta: u32,
         /// E5: 再帰呼び出し行から step over した停止先（呼出元フレームの次の `.pasta`
-        /// 行 = 行24）と `.pasta` 行。recur 内の同一 `.pasta` 行（40/41）ではない。
-        after_recur_lua: u32,
+        /// 行 = 行24）の `.pasta` 行。recur 内の同一 `.pasta` 行（40/41）ではない。
         after_recur_pasta: u32,
         /// E7: コルーチン本体 step 起点（`.pasta` 行）。
         co_origin_pasta: u32,
@@ -2706,12 +2769,10 @@ return f
 
             // E2: helper 呼び出し行（行22）から step over → 呼出元フレームの次の `.pasta`
             // 行 = 行23（recur 呼び出し・`.pasta` 13）。helper の `.pasta`（30/31）ではない。
-            let next_caller_lua = recur_call_lua;
             let next_caller_pasta = recur_call_pasta;
 
             // E4 step out: helper から戻り、呼出元の次の対応行 = 行23（recur 呼び出し）。
             // helper 呼び出し行（行22）の直後の対応行であり、呼出行の `.pasta` とは異なる。
-            let step_out_lua = recur_call_lua;
             let step_out_pasta = recur_call_pasta;
             assert_ne!(
                 step_out_pasta, call_helper_pasta,
@@ -2728,7 +2789,6 @@ return f
             );
 
             Expected {
-                origin_lua,
                 origin_pasta,
                 multi_pasta,
                 multi_lua_first,
@@ -2737,15 +2797,10 @@ return f
                 call_helper_lua,
                 call_helper_pasta,
                 callee_unmapped_lua,
-                callee_first_lua,
                 callee_first_pasta,
-                next_caller_lua,
                 next_caller_pasta,
-                step_out_lua,
                 step_out_pasta,
-                recur_call_lua,
                 recur_call_pasta,
-                after_recur_lua,
                 after_recur_pasta,
                 co_origin_pasta,
                 co_yield_pasta,
@@ -4257,7 +4312,7 @@ function ACT.init_scene(_self, _scene) return {}, {} end
             // 定義する。多対1 行 BP はまだ張られていないので、定義時に `.lua` 行 7（→ `.pasta`
             // 21）を通過しても停止しない（BP 設定前）。
             lua.load(&lua_source)
-                .set_name(&format!("@{chunk_name}"))
+                .set_name(format!("@{chunk_name}"))
                 .exec()
                 .map_err(|e| format!("chunk (definitions) exec failed: {e}"))?;
 
@@ -4426,6 +4481,7 @@ function ACT.init_scene(_self, _scene) return {}, {} end
     /// 本体行へ再入するたびにアンカーがクリアされ、再び停止する。したがって観測される停止数は
     ///   - over-suppression（coalescing がループをまたいで効いてしまう）なら **< N**、
     ///   - 壊れた coalescing（同一行内で複数停止）なら **> N**、
+    ///
     /// となり、**ちょうど N** を要求することで両誤りを弁別する（テストの「歯」）。
     ///
     /// # ハーネス
@@ -4517,7 +4573,7 @@ function ACT.init_scene(_self, _scene) return {}, {} end
             // 生成 `.lua` 本文をローダ由来チャンク名で実行し、`SCENE.加算ループ` 等を定義する。
             // BP 未設定なので定義時の通過では停止しない。
             lua.load(&lua_source)
-                .set_name(&format!("@{chunk_name}"))
+                .set_name(format!("@{chunk_name}"))
                 .exec()
                 .map_err(|e| format!("chunk (definitions) exec failed: {e}"))?;
 
@@ -5016,6 +5072,468 @@ mod source_presentation_toggle_tests {
         assert_eq!(
             ev["body"]["mode"], "pasta",
             "2.5: no-arg attach still publishes the resolved initial mode"
+        );
+    }
+}
+
+#[cfg(test)]
+mod bridge_lifecycle_tests {
+    //! Bridge-thread LIFECYCLE and degraded paths that the E2E suites above
+    //! never reach in isolation: [`run_event_encoder`] termination conditions
+    //! (event channel close / frame receiver gone / poisoned adapter),
+    //! [`drain_outbound`]'s "closed `out_rx` is NOT a stop condition" contract,
+    //! [`run_socket_bridge`]'s preset-shutdown fast exit and its
+    //! flush-pending-outbound-on-client-disconnect branch, and
+    //! [`handle_inbound`]'s error/fallback paths (missing `seq` → `request_seq`
+    //! 0, session gone → `false` after the already-written ack frames,
+    //! unknown/missing command silently ignored, poisoned adapter → stop, never
+    //! panic).
+    //!
+    //! All sockets bind `127.0.0.1:0` (ephemeral); every wait is a bounded
+    //! blocking wait on a channel/socket (no sleeps-as-sync).
+
+    use std::io::BufReader;
+    use std::net::{Shutdown, SocketAddr, TcpStream};
+    use std::sync::atomic::AtomicBool;
+    use std::sync::mpsc::{self, RecvTimeoutError};
+    use std::sync::{Arc, Mutex};
+    use std::time::Duration;
+
+    use serde_json::{Value, json};
+
+    use crate::debug::SourceMode;
+    use crate::debug::breakpoints::BreakpointSet;
+    use crate::debug::dap::DapAdapter;
+    use crate::debug::source_map::SourceMap;
+    use crate::debug::transport::{Transport, read_frame, write_frame};
+    use crate::debug::types::{SessionCommand, SessionEvent, StopReason};
+
+    use super::{
+        SharedAdapter, SourceMapWiring, attach_pasta_resolver, drain_outbound, handle_inbound,
+        run_event_encoder, run_socket_bridge,
+    };
+
+    /// TEST-ONLY watchdog so a lifecycle test cannot hang on a read/join.
+    const WATCHDOG: Duration = Duration::from_secs(10);
+
+    fn shared_adapter() -> SharedAdapter {
+        Arc::new(Mutex::new(DapAdapter::new()))
+    }
+
+    /// Poison `adapter`'s mutex by panicking a scratch thread while it holds the
+    /// lock (the only way a `Mutex` becomes poisoned).
+    fn poison(adapter: &SharedAdapter) {
+        let poisoner = Arc::clone(adapter);
+        let _ = std::thread::spawn(move || {
+            let _guard = poisoner.lock().unwrap();
+            panic!("TEST-ONLY: poison the shared adapter lock");
+        })
+        .join();
+        assert!(adapter.lock().is_err(), "the adapter lock must now be poisoned");
+    }
+
+    /// A real loopback [`Transport`] plus a connected client end (same pattern as
+    /// `source_presentation_toggle_tests::Harness`, with a write half so a test
+    /// can also push requests toward the bridge).
+    struct Harness {
+        transport: Transport,
+        client: BufReader<TcpStream>,
+        writer: TcpStream,
+    }
+
+    impl Harness {
+        fn new() -> Self {
+            let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
+            let transport = Transport::start(Some(addr)).expect("bind loopback transport");
+            let bound = transport.local_addr().expect("bound addr");
+            let stream = TcpStream::connect(bound).expect("client connects to bridge");
+            stream
+                .set_read_timeout(Some(WATCHDOG))
+                .expect("TEST-ONLY read timeout");
+            let writer = stream.try_clone().expect("clone client socket for writing");
+            Self {
+                transport,
+                client: BufReader::new(stream),
+                writer,
+            }
+        }
+
+        /// Read the next framed message the bridge wrote (bounded by the timeout).
+        fn recv(&mut self) -> Value {
+            read_frame(&mut self.client)
+                .expect("client read must succeed (TEST-ONLY timeout)")
+                .expect("a frame must be present")
+        }
+    }
+
+    /// [`run_event_encoder`] happy path + clean termination: a session event is
+    /// encoded into a DAP frame on `out_tx`, and closing the session's event
+    /// channel ends the encoder thread (never a hang).
+    #[test]
+    fn event_encoder_forwards_frames_and_ends_when_event_channel_closes() {
+        let adapter = shared_adapter();
+        let (event_tx, event_rx) = mpsc::channel();
+        let (out_tx, out_rx) = mpsc::channel();
+        let encoder = std::thread::spawn(move || run_event_encoder(adapter, event_rx, out_tx));
+
+        event_tx
+            .send(SessionEvent::Stopped {
+                reason: StopReason::Breakpoint,
+                thread_id: 1,
+            })
+            .expect("encoder is alive");
+        let frame = out_rx
+            .recv_timeout(WATCHDOG)
+            .expect("the encoded frame must arrive on out_tx");
+        assert_eq!(frame["type"], "event");
+        assert_eq!(frame["event"], "stopped");
+        assert_eq!(frame["body"]["reason"], "breakpoint");
+        assert_eq!(frame["body"]["threadId"], 1);
+
+        drop(event_tx);
+        encoder
+            .join()
+            .expect("closing the event channel must end the encoder cleanly");
+    }
+
+    /// [`run_event_encoder`] ends when the frame channel's receiver is gone (the
+    /// socket bridge exited first): the next encoded frame fails to send and the
+    /// encoder returns instead of looping or panicking.
+    #[test]
+    fn event_encoder_ends_when_frame_receiver_is_gone() {
+        let adapter = shared_adapter();
+        let (event_tx, event_rx) = mpsc::channel();
+        let (out_tx, out_rx) = mpsc::channel::<Value>();
+        drop(out_rx); // socket bridge already gone
+        let encoder = std::thread::spawn(move || run_event_encoder(adapter, event_rx, out_tx));
+
+        event_tx
+            .send(SessionEvent::Terminated)
+            .expect("queued before the encoder observes the closed frame channel");
+        encoder
+            .join()
+            .expect("a gone frame receiver must end the encoder, not panic it");
+        // event_tx is still alive: termination was driven by the frame channel.
+        drop(event_tx);
+    }
+
+    /// [`run_event_encoder`] under a POISONED shared adapter: the encoder returns
+    /// (no panic propagation, no busy loop) and emits no frame.
+    #[test]
+    fn event_encoder_ends_on_poisoned_adapter_without_panic() {
+        let adapter = shared_adapter();
+        poison(&adapter);
+        let (event_tx, event_rx) = mpsc::channel();
+        let (out_tx, out_rx) = mpsc::channel::<Value>();
+        let encoder = std::thread::spawn(move || run_event_encoder(adapter, event_rx, out_tx));
+
+        event_tx
+            .send(SessionEvent::Terminated)
+            .expect("encoder is blocked on recv, channel is open");
+        encoder
+            .join()
+            .expect("a poisoned adapter must end the encoder cleanly, not panic it");
+        assert!(
+            out_rx.try_recv().is_err(),
+            "no frame may be emitted under a poisoned adapter"
+        );
+    }
+
+    /// [`drain_outbound`]'s documented contract: pending frames are flushed to
+    /// the socket, and a CLOSED `out_rx` (encoder thread ended) is NOT a stop
+    /// condition — the bridge must keep serving inbound, so it returns `true`.
+    #[test]
+    fn drain_outbound_flushes_pending_and_treats_closed_channel_as_ok() {
+        let mut h = Harness::new();
+        let (out_tx, out_rx) = mpsc::channel();
+        out_tx.send(json!({ "type": "event", "event": "first" })).unwrap();
+        out_tx.send(json!({ "type": "event", "event": "second" })).unwrap();
+        drop(out_tx); // encoder thread is gone; frames are still queued
+
+        assert!(
+            drain_outbound(&h.transport, &out_rx),
+            "a closed out_rx must NOT stop the bridge (inbound may still arrive)"
+        );
+        assert_eq!(h.recv()["event"], "first", "queued frames are flushed in order");
+        assert_eq!(h.recv()["event"], "second");
+    }
+
+    /// [`run_socket_bridge`] honours a PRESET shutdown flag: it exits before
+    /// serving anything — a request already queued by the client gets no
+    /// response; the client just observes the connection winding down.
+    #[test]
+    fn socket_bridge_exits_on_preset_shutdown_without_serving() {
+        let Harness {
+            transport,
+            mut client,
+            mut writer,
+        } = Harness::new();
+        write_frame(
+            &mut writer,
+            &json!({ "seq": 1, "type": "request", "command": "initialize", "arguments": {} }),
+        )
+        .expect("client queues a request before the bridge starts");
+
+        let (cmd_tx, _cmd_rx) = mpsc::channel();
+        let (_out_tx, out_rx) = mpsc::channel();
+        let shutdown = Arc::new(AtomicBool::new(true)); // PRESET before the loop
+        let adapter = shared_adapter();
+        let bridge = std::thread::spawn(move || {
+            run_socket_bridge(
+                transport,
+                adapter,
+                BreakpointSet::new(),
+                cmd_tx,
+                out_rx,
+                shutdown,
+                SourceMapWiring::disabled(),
+            )
+        });
+        bridge
+            .join()
+            .expect("a preset shutdown flag must end the bridge immediately");
+
+        // The bridge exited BEFORE answering: EOF/reset (`Ok(None)`/`Err` are
+        // both a clean wind-down), never an initialize response frame.
+        if let Ok(Some(frame)) = read_frame(&mut client) {
+            panic!("bridge must exit before serving the queued request; got {frame}");
+        }
+    }
+
+    /// [`run_socket_bridge`]'s inbound-`Disconnected` arm: when the client
+    /// disconnects (write half closed → reader EOF → inbound channel closes),
+    /// frames still pending in `out_rx` are FLUSHED to the socket before the
+    /// bridge returns — the client can read them up to EOF.
+    #[test]
+    fn socket_bridge_flushes_pending_outbound_on_client_disconnect() {
+        let Harness {
+            transport,
+            mut client,
+            writer,
+        } = Harness::new();
+
+        // Half-close the client's write side, then wait (bounded, channel-close
+        // based) until the transport reader saw EOF — the bridge's FIRST inbound
+        // poll is then deterministically `Disconnected`.
+        writer
+            .shutdown(Shutdown::Write)
+            .expect("half-close the client write side");
+        match transport.inbound().recv_timeout(WATCHDOG) {
+            Err(RecvTimeoutError::Disconnected) => {}
+            other => panic!("inbound must close on client write-shutdown, got {other:?}"),
+        }
+
+        // Frames the (already finished) encoder left behind.
+        let (out_tx, out_rx) = mpsc::channel();
+        out_tx.send(json!({ "type": "event", "event": "pending-1" })).unwrap();
+        out_tx.send(json!({ "type": "event", "event": "pending-2" })).unwrap();
+        drop(out_tx);
+
+        let (cmd_tx, _cmd_rx) = mpsc::channel();
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let adapter = shared_adapter();
+        let bridge = std::thread::spawn(move || {
+            run_socket_bridge(
+                transport,
+                adapter,
+                BreakpointSet::new(),
+                cmd_tx,
+                out_rx,
+                shutdown,
+                SourceMapWiring::disabled(),
+            )
+        });
+        bridge
+            .join()
+            .expect("the bridge must end on inbound disconnect, not hang");
+
+        // The pending frames were flushed before the transport wound down.
+        let first = read_frame(&mut client)
+            .expect("read flushed frame")
+            .expect("pending-1 must be flushed on disconnect");
+        assert_eq!(first["event"], "pending-1");
+        let second = read_frame(&mut client)
+            .expect("read flushed frame")
+            .expect("pending-2 must be flushed on disconnect");
+        assert_eq!(second["event"], "pending-2");
+        // Then the connection winds down (EOF or reset), with no further frames.
+        if let Ok(Some(frame)) = read_frame(&mut client) {
+            panic!("no further frames expected; got {frame}");
+        }
+    }
+
+    /// A `pasta/sourcePresentation` toggle WITHOUT a `seq` field degrades to
+    /// `request_seq` 0 in the acceptance response (the documented fallback at
+    /// the toggle entry) — the toggle itself still fully applies.
+    #[test]
+    fn toggle_missing_seq_acks_with_request_seq_zero() {
+        let mut h = Harness::new();
+        let adapter = shared_adapter();
+        let breakpoints = BreakpointSet::new();
+        let (cmd_tx, cmd_rx) = mpsc::channel();
+        let wiring = SourceMapWiring::disabled(); // effective mode starts Pasta
+
+        let req = json!({
+            "type": "request",
+            "command": "pasta/sourcePresentation",
+            "arguments": { "mode": "lua" },
+        }); // NO "seq"
+        assert!(handle_inbound(
+            &h.transport,
+            &adapter,
+            &breakpoints,
+            &cmd_tx,
+            &req,
+            &wiring
+        ));
+
+        assert_eq!(wiring.source_mode.get(), SourceMode::Lua, "the toggle still applies");
+        let ack = h.recv();
+        assert_eq!(ack["command"], "pasta/sourcePresentation");
+        assert_eq!(ack["request_seq"], 0, "missing seq must degrade to request_seq 0");
+        assert_eq!(ack["body"]["mode"], "lua");
+        let ev = h.recv();
+        assert_eq!(ev["event"], "pasta/sourcePresentation");
+        assert_eq!(
+            cmd_rx.recv_timeout(WATCHDOG).expect("RefreshPresentation forwarded"),
+            SessionCommand::RefreshPresentation
+        );
+    }
+
+    /// A valid toggle when the SESSION IS GONE (`cmd_rx` dropped): the ack and
+    /// the custom event are already on the wire (they precede the forward), and
+    /// `handle_inbound` then reports `false` so the bridge stops.
+    #[test]
+    fn toggle_with_session_gone_still_acks_then_reports_stop() {
+        let mut h = Harness::new();
+        let adapter = shared_adapter();
+        let breakpoints = BreakpointSet::new();
+        let (cmd_tx, cmd_rx) = mpsc::channel();
+        drop(cmd_rx); // session controller gone
+        let wiring = SourceMapWiring::disabled();
+
+        let req = json!({
+            "seq": 5,
+            "type": "request",
+            "command": "pasta/sourcePresentation",
+            "arguments": { "mode": "lua" },
+        });
+        assert!(
+            !handle_inbound(&h.transport, &adapter, &breakpoints, &cmd_tx, &req, &wiring),
+            "a gone session must stop the bridge (false)"
+        );
+
+        // Ack + event were written BEFORE the failed RefreshPresentation forward.
+        let ack = h.recv();
+        assert_eq!(ack["command"], "pasta/sourcePresentation");
+        assert_eq!(ack["request_seq"], 5);
+        let ev = h.recv();
+        assert_eq!(ev["event"], "pasta/sourcePresentation");
+    }
+
+    /// A stop-context command (here `continue`) when the SESSION IS GONE: the
+    /// immediate ack response is already on the wire, then the failed forward
+    /// makes `handle_inbound` report `false`.
+    #[test]
+    fn stop_context_command_with_session_gone_reports_stop_after_ack() {
+        let mut h = Harness::new();
+        let adapter = shared_adapter();
+        let breakpoints = BreakpointSet::new();
+        let (cmd_tx, cmd_rx) = mpsc::channel();
+        drop(cmd_rx); // session controller gone
+
+        let req = json!({ "seq": 3, "type": "request", "command": "continue", "arguments": {} });
+        assert!(
+            !handle_inbound(
+                &h.transport,
+                &adapter,
+                &breakpoints,
+                &cmd_tx,
+                &req,
+                &SourceMapWiring::disabled()
+            ),
+            "a gone session must stop the bridge (false)"
+        );
+
+        let ack = h.recv();
+        assert_eq!(ack["command"], "continue", "the ack precedes the failed forward");
+        assert_eq!(ack["request_seq"], 3);
+    }
+
+    /// Unknown / missing `command` requests decode to an empty outcome and are
+    /// silently ignored (`true`): no frame, no session command — and the bridge
+    /// keeps serving subsequent valid requests on the same connection.
+    #[test]
+    fn unknown_and_missing_command_are_ignored_and_bridge_keeps_serving() {
+        let mut h = Harness::new();
+        let adapter = shared_adapter();
+        let breakpoints = BreakpointSet::new();
+        let (cmd_tx, cmd_rx) = mpsc::channel::<SessionCommand>();
+        let wiring = SourceMapWiring::disabled();
+
+        // (1) No "command" key at all → unwrap_or("") → empty Decoded → ignored.
+        let no_command = json!({ "seq": 1, "type": "request" });
+        assert!(handle_inbound(
+            &h.transport,
+            &adapter,
+            &breakpoints,
+            &cmd_tx,
+            &no_command,
+            &wiring
+        ));
+        // (2) An unrecognized command → empty Decoded → ignored.
+        let bogus = json!({ "seq": 2, "type": "request", "command": "bogusCommand" });
+        assert!(handle_inbound(&h.transport, &adapter, &breakpoints, &cmd_tx, &bogus, &wiring));
+        assert!(
+            cmd_rx.try_recv().is_err(),
+            "ignored requests must forward no session command"
+        );
+
+        // (3) The bridge still serves: a valid initialize round-trips, and its
+        // response is the FIRST frame on the wire (the ignored requests wrote
+        // nothing before it — TCP preserves order).
+        let init = json!({ "seq": 3, "type": "request", "command": "initialize", "arguments": {} });
+        assert!(handle_inbound(&h.transport, &adapter, &breakpoints, &cmd_tx, &init, &wiring));
+        let resp = h.recv();
+        assert_eq!(resp["command"], "initialize", "first wire frame is the initialize response");
+        assert_eq!(resp["request_seq"], 3);
+        let ev = h.recv();
+        assert_eq!(ev["event"], "initialized");
+    }
+
+    /// POISONED shared adapter: [`attach_pasta_resolver`] must not panic on
+    /// either gate outcome (active and inactive), and [`handle_inbound`] reports
+    /// `false` (stop the bridge) instead of panicking.
+    #[test]
+    fn poisoned_adapter_never_panics_resolver_attach_and_stops_inbound() {
+        let h = Harness::new();
+        let adapter = shared_adapter();
+        poison(&adapter);
+
+        // Inactive gate (no map): the default-resolver reset path is skipped
+        // silently on a poisoned lock.
+        attach_pasta_resolver(&adapter, &SourceMapWiring::disabled());
+        // Active gate (map + Pasta): the `.pasta`-resolver install path is
+        // likewise skipped silently.
+        let active = SourceMapWiring {
+            source_map: Some(Arc::new(SourceMap::new())),
+            source_mode: crate::debug::SharedSourceMode::new(SourceMode::Pasta),
+        };
+        attach_pasta_resolver(&adapter, &active);
+
+        // handle_inbound cannot decode under a poisoned lock → stop, no panic.
+        let (cmd_tx, _cmd_rx) = mpsc::channel();
+        let req = json!({ "seq": 1, "type": "request", "command": "initialize", "arguments": {} });
+        assert!(
+            !handle_inbound(
+                &h.transport,
+                &adapter,
+                &BreakpointSet::new(),
+                &cmd_tx,
+                &req,
+                &SourceMapWiring::disabled()
+            ),
+            "a poisoned adapter must stop the bridge, never panic it"
         );
     }
 }

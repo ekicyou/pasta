@@ -152,6 +152,31 @@ check('tokenize("造体") == ["造体"]',
 check('tokenize("Lua API") は ASCII 語を保持',
   JSON.stringify(tokenize('Lua API')) === JSON.stringify(['lua', 'api']),
   JSON.stringify(tokenize('Lua API')));
+
+// --- tokenize 境界・正規化の単体検証（3.63 G1 追加） ---
+// 索引・クエリ双方の正準規則（head.hbs ミラーと同一）を網羅的に固定する。
+function checkTokens(input, expected, label) {
+  const got = tokenize(input);
+  check(`tokenize ${label}`,
+    JSON.stringify(got) === JSON.stringify(expected), JSON.stringify(got));
+}
+checkTokens(null, [], 'null -> []（null ガード）');
+checkTokens(undefined, [], 'undefined -> []（undefined ガード）');
+checkTokens('', [], '空文字列 -> []');
+checkTokens(123, ['123'], '数値 123 は String 化して語トークン');
+checkTokens('猫', ['猫'], '単独 CJK 1 文字はそのまま 1 トークン');
+checkTokens('a猫b', ['a', '猫', 'b'], 'ASCII に挟まれた単独 CJK の分割');
+checkTokens('ＰＡＳＴＡ ０１', ['pasta', '01'], '全角英数の半角化＋小文字化');
+checkTokens('ｱｲｳ', ['ｱｲ', 'ｲｳ'], '半角カタカナも bigram 化');
+checkTokens('サーバー', ['サー', 'ーバ', 'バー'], '長音記号 ー は CJK ランに連結');
+checkTokens('spec-driven', ['spec', 'driven'], 'ハイフンは語区切り');
+checkTokens('foo\tbar\nbaz', ['foo', 'bar', 'baz'], 'タブ・改行も空白区切り');
+checkTokens('構造体abc', ['構造', '造体', 'abc'], 'CJK/ASCII 境界でラン分離');
+checkTokens('㐀㐁', ['㐀㐁'], 'CJK 拡張A（BMP 内）は bigram 化');
+// 特性固定: CJK 拡張B（U+20000 以降・サロゲートペア）は text[i] のコード単位走査
+// により isCjk の 0x20000 分岐へ到達せず、非 CJK ランとして 1 語トークンになる。
+// head.hbs ミラーも同一規則のため索引・クエリは整合する（現行挙動の文書化）。
+checkTokens('𠀋𠀋', ['𠀋𠀋'], 'CJK 拡張B はサロゲート単位走査により 1 語トークン（特性固定）');
 log('');
 
 log(`RESULT: ${passed} passed, ${failed} failed`);

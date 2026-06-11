@@ -22,7 +22,10 @@ fn test_full_parse_success_no_fallback() {
     let source = "＊挨拶\n  Alice：こんにちは\n";
     let result = AnalysisEngine::analyze(source);
     assert!(!result.tokens.is_empty(), "完全パース成功時はトークンあり");
-    assert!(result.diagnostics.is_empty(), "完全パース成功時はDiagnosticsなし");
+    assert!(
+        result.diagnostics.is_empty(),
+        "完全パース成功時はDiagnosticsなし"
+    );
 }
 
 #[test]
@@ -31,7 +34,10 @@ fn test_complete_failure_still_returns_result() {
     let result = AnalysisEngine::analyze(source);
     // Even on total failure, the function should return without panicking
     // and provide some diagnostics
-    assert!(!result.diagnostics.is_empty(), "完全失敗でもDiagnosticsを返す");
+    assert!(
+        !result.diagnostics.is_empty(),
+        "完全失敗でもDiagnosticsを返す"
+    );
 }
 
 #[test]

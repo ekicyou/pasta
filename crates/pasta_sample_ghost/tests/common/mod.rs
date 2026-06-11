@@ -4,11 +4,11 @@ use std::path::{Path, PathBuf};
 
 /// ワークスペースルートを取得
 pub fn workspace_root() -> PathBuf {
-    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR")
-        .expect("CARGO_MANIFEST_DIR が設定されていません");
+    let manifest_dir =
+        std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR が設定されていません");
     PathBuf::from(manifest_dir)
-        .parent()  // crates/
-        .and_then(|p| p.parent())  // pasta/
+        .parent() // crates/
+        .and_then(|p| p.parent()) // pasta/
         .expect("ワークスペースルートが見つかりません")
         .to_path_buf()
 }
@@ -40,8 +40,7 @@ pub fn copy_pasta_shiori_dll(dest_dir: &Path) -> Result<(), String> {
     std::fs::create_dir_all(dest_dir).map_err(|e| e.to_string())?;
 
     let dest_path = dest_dir.join("pasta.dll");
-    std::fs::copy(&dll_path, &dest_path)
-        .map_err(|e| format!("DLL コピー失敗: {}", e))?;
+    std::fs::copy(&dll_path, &dest_path).map_err(|e| format!("DLL コピー失敗: {}", e))?;
 
     Ok(())
 }

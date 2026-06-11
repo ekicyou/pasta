@@ -19,6 +19,8 @@
 // 本テストは ScopeClassMapper（scope-map.mjs・タスク 2.1）に依存しない。トークナイズ結果の
 // スコープ検証はスコープ文字列を直接 assert する（境界は PastaTokenizer のみ）。
 
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createPastaTokenizer } from './tokenizer.mjs';
@@ -324,6 +326,160 @@ async function run() {
     const b = tok.tokenizeText(PASTA_WITH_LUA);
     check('決定論: 同一 text を 2 回トークナイズして同一結果',
       JSON.stringify(a) === JSON.stringify(b));
+  }
+  log('');
+
+  // -----------------------------------------------------------------------
+  // load 前呼び出しガード: tokenizeText / tokenizeTextSinglePass は load 前に例外。
+  // -----------------------------------------------------------------------
+  {
+    const fresh = createPastaTokenizer();
+    let threw1 = false;
+    try {
+      fresh.tokenizeText('＊シーン');
+    } catch (e) {
+      threw1 = true;
+    }
+    check('ガード: load 前の tokenizeText が例外', threw1);
+    let threw2 = false;
+    try {
+      fresh.tokenizeTextSinglePass('＊シーン');
+    } catch (e) {
+      threw2 = true;
+    }
+    check('ガード: load 前の tokenizeTextSinglePass が例外', threw2);
+  }
+  log('');
+
+  // -----------------------------------------------------------------------
+  // load 引数バリデーション: paths 欠落・非文字列パスで例外/リジェクト（6.2）。
+  // -----------------------------------------------------------------------
+  {
+    const cases = [
+      ['引数なし', undefined],
+      ['空オブジェクト', {}],
+      ['pasta が非文字列', { pasta: 123, lua: LUA_GRAMMAR }],
+      ['lua が欠落', { pasta: PASTA_GRAMMAR }],
+    ];
+    for (const [desc, arg] of cases) {
+      const t = createPastaTokenizer();
+      let threw = false;
+      try {
+        await t.load(arg);
+      } catch (e) {
+        threw = true;
+      }
+      check(`6.2: load(${desc}) が例外/リジェクト`, threw);
+    }
+  }
+  log('');
+
+  // -----------------------------------------------------------------------
+  // scopeName 欠落文法で例外（6.2）: JSON としては妥当だが TextMate 文法でない
+  // ファイルを一時ディレクトリに置いて load がリジェクトされることを確認。
+  // -----------------------------------------------------------------------
+  {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'tok-test-'));
+    const badGrammar = path.join(tmp, 'bad.tmLanguage.json');
+    fs.writeFileSync(badGrammar, JSON.stringify({ patterns: [] }), 'utf8');
+    const t = createPastaTokenizer();
+    let threw = false;
+    let msg = '';
+    try {
+      await t.load({ pasta: badGrammar, lua: LUA_GRAMMAR });
+    } catch (e) {
+      threw = true;
+      msg = String(e && e.message ? e.message : e);
+    }
+    check('6.2: scopeName 欠落の文法 JSON で load() が例外/リジェクト',
+      threw && msg.includes('Invalid TextMate grammar'), msg);
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+  log('');
+
+  // -----------------------------------------------------------------------
+  // 境界入力: 空テキスト・空行混在でも行数一致＋被覆（Post 条件の境界）。
+  // -----------------------------------------------------------------------
+  {
+    const empty = tok.tokenizeText('');
+    check('境界: 空テキスト("") → 1 行・空 span 配列',
+      empty.length === 1 && Array.isArray(empty[0]) && empty[0].length === 0,
+      JSON.stringify(empty));
+
+    const text = '＊シーン\n\n　こんにちは';
+    const lines = text.split('\n');
+    const result = tok.tokenizeText(text);
+    check('境界: 空行混在でも行数一致', result.length === lines.length,
+      `got=${result.length}`);
+    check('境界: 空行は空 span 配列（被覆と整合）', result[1].length === 0,
+      JSON.stringify(result[1]));
+    let allCover = true;
+    for (let i = 0; i < lines.length; i++) {
+      if (!coversLine(result[i], lines[i])) allCover = false;
+    }
+    check('境界: 空行混在でも各行被覆', allCover);
+  }
+  log('');
+
+  // -----------------------------------------------------------------------
+  // 複数 lua ブロック分離: pasta 行を挟む 2 つの lua ブロックがそれぞれ独立に
+  // 二段化される（ブロック間 flush と lua ruleStack の分離）。
+  // -----------------------------------------------------------------------
+  {
+    const text = [
+      '＊二つ',            // 0 pasta
+      '```lua',            // 1 fence
+      'local a = 1',       // 2 lua block 1
+      '```',               // 3 fence
+      '　間のトーク',      // 4 pasta（ブロック分離の楔）
+      '```lua',            // 5 fence
+      'local b = [[',      // 6 lua block 2: 複数行文字列開始
+      ']]',                // 7 lua block 2: 文字列終了
+      '```',               // 8 fence
+    ].join('\n');
+    const lines = text.split('\n');
+    const result = tok.tokenizeText(text);
+    check('複数ブロック: 行数一致', result.length === lines.length);
+    check('複数ブロック: 1 つ目のブロックに lua スコープ（local）',
+      hasLeafScopeForText(result[2], lines[2], 'keyword.local.lua', 'local'));
+    check('複数ブロック: 2 つ目のブロックにも lua スコープ（local）',
+      hasLeafScopeForText(result[6], lines[6], 'keyword.local.lua', 'local'));
+    check('複数ブロック: 間の pasta 行に lua スコープが漏れない',
+      !hasAnyScope(result[4], 'source.lua') &&
+        !result[4].some((s) => s.scopes.some((sc) => sc.endsWith('.lua'))),
+      JSON.stringify(result[4]));
+    // ブロック 2 内の複数行文字列が継続している（ブロック単位の ruleStack 引き回し）。
+    check('複数ブロック: 2 つ目のブロック内で複数行文字列が継続',
+      hasAnyScope(result[7], 'string.quoted'),
+      JSON.stringify(result[7]));
+  }
+  log('');
+
+  // -----------------------------------------------------------------------
+  // 未終端 lua ブロック: 閉じフェンス無しで EOF に達しても例外を出さず、
+  // 末尾までの lua 本体行が二段化される（末尾 flush 経路）。
+  // -----------------------------------------------------------------------
+  {
+    const text = [
+      '＊未終端',
+      '```lua',
+      'local x = 1',
+      'return x', // EOF（閉じ ``` なし）
+    ].join('\n');
+    const lines = text.split('\n');
+    let result = null;
+    let threw = false;
+    try {
+      result = tok.tokenizeText(text);
+    } catch (e) {
+      threw = true;
+    }
+    check('未終端: 例外を出さず行数一致', !threw && result && result.length === lines.length);
+    if (result) {
+      check('未終端: EOF 直前の lua 行も二段化される（return が keyword.control.lua）',
+        hasLeafScopeForText(result[3], lines[3], 'keyword.control.lua', 'return'),
+        JSON.stringify(result[3]));
+    }
   }
   log('');
 

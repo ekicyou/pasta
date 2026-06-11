@@ -128,7 +128,10 @@ end
 -------------------------------------------
 
 --- 値を解決（関数なら実行、配列なら最初の要素、その他はそのまま）
---- ACT_IMPL.word と PROXY_IMPL.word から共通利用
+---
+--- 旧 ACT_IMPL.word / PROXY_IMPL.word の検索パスで共通利用されていた汎用ユーティリティ。
+--- handler-resolution-fallback 以降 pasta_scripts 内に呼び出し元はないが、
+--- 出荷物の公開 API（外部ゴーストスクリプトからの利用面）として維持する。
 --- @param value any 検索結果
 --- @param act Act アクションオブジェクト
 --- @return any 解決後の値

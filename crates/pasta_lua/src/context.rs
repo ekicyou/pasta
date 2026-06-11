@@ -338,6 +338,56 @@ mod tests {
     }
 
     #[test]
+    fn test_get_current_module_none_by_default() {
+        let ctx = TranspileContext::new();
+        assert_eq!(ctx.get_current_module(), None);
+    }
+
+    #[test]
+    fn test_merge_from_combines_scene_and_word_registries() {
+        let mut ctx1 = TranspileContext::new();
+        ctx1.register_global_scene(&create_test_scene("メイン"));
+        ctx1.word_registry
+            .register_global("挨拶", vec!["こんにちは".to_string()]);
+
+        let mut ctx2 = TranspileContext::new();
+        ctx2.register_global_scene(&create_test_scene("サブ"));
+        ctx2.word_registry
+            .register_global("別れ", vec!["さようなら".to_string()]);
+
+        ctx1.merge_from(ctx2);
+
+        let scenes = ctx1.scene_registry.all_scenes();
+        assert_eq!(scenes.len(), 2, "scenes from both contexts must be merged");
+        let names: Vec<&str> = scenes.iter().map(|s| s.name.as_str()).collect();
+        assert!(names.contains(&"メイン"));
+        assert!(names.contains(&"サブ"));
+
+        let entries = ctx1.word_registry.all_entries();
+        assert_eq!(entries.len(), 2, "words from both contexts must be merged");
+        let keys: Vec<&str> = entries.iter().map(|e| e.key.as_str()).collect();
+        assert!(keys.contains(&"挨拶"));
+        assert!(keys.contains(&"別れ"));
+    }
+
+    #[test]
+    fn test_merge_from_does_not_merge_file_attrs() {
+        // File attributes are file-specific and must NOT leak across contexts.
+        let mut ctx1 = TranspileContext::new();
+        ctx1.accumulate_file_attr(&create_attr("author", "Alice"));
+
+        let mut ctx2 = TranspileContext::new();
+        ctx2.accumulate_file_attr(&create_attr("version", "2.0"));
+
+        ctx1.merge_from(ctx2);
+
+        let attrs = ctx1.file_attrs();
+        assert_eq!(attrs.len(), 1, "other context's file attrs must be dropped");
+        assert!(attrs.contains_key("author"));
+        assert!(!attrs.contains_key("version"));
+    }
+
+    #[test]
     fn test_merge_attrs_scene_adds_new_key() {
         let mut ctx = TranspileContext::new();
         ctx.accumulate_file_attr(&create_attr("author", "Alice"));

@@ -30,6 +30,7 @@ tempfile.workspace = true
 # 統合テスト: 実ローダーを駆動して自己展開（self-deploy）を検証する
 pasta_lua.workspace = true
 # 統合テスト: tracing ログ捕捉（自己展開失敗時の ERROR ログ検証）
+# tracing は tracing-test の #[traced_test] マクロ展開が直接参照するため必須
 tracing.workspace = true
 tracing-test.workspace = true
 

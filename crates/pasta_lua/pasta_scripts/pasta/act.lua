@@ -163,7 +163,7 @@ function ACT.new(actors)
     local obj = {
         actors = actors or {},
         save = require("pasta.save"),
-        app_ctx = require("pasta.store").app_ctx,
+        app_ctx = STORE.app_ctx,
         var = {},
         token = {},
         current_scene = nil,
@@ -268,6 +268,27 @@ function ACT_IMPL.choice_timeout(self, seconds)
     return self
 end
 
+--- 辞書前方一致検索（find_act_handler の L2/L5 共通処理・モード別ディスパッチ）
+---
+--- word モードは SEARCH:search_word、scene/expr モードは SCENE.search を使用する。
+--- SCENE.search はモジュールテーブル経由で呼び出す（テストでの差し替えを許容）。
+---
+--- @param SEARCH table @pasta_search モジュール
+--- @param mode string "word" | "scene" | "expr"
+--- @param key string 検索キー
+--- @param scene_name string|nil ローカル検索時のシーン名（nil でグローバル検索）
+--- @return any|nil 見つかったハンドラー、またはnil
+local function search_dictionary(SEARCH, mode, key, scene_name)
+    if mode == "word" then
+        local result = SEARCH:search_word(key, scene_name)
+        if result ~= nil then return result end
+    else
+        local result = SCENE.search(key, scene_name)
+        if result then return result.func end
+    end
+    return nil
+end
+
 --- ハンドラーフォールバック検索コア（6段階）
 ---
 --- 検索レベル:
@@ -284,7 +305,8 @@ end
 --- @param key string 検索キー
 --- @return any|nil 見つかったハンドラー（関数または値）、またはnil
 function ACT_IMPL.find_act_handler(self, mode, key)
-    -- @pasta_search 可用性チェック（オプショナルモジュールのため pcall による1回チェック・値保持）
+    -- @pasta_search 可用性チェック（オプショナルモジュールのため呼び出し毎に pcall で確認。
+    -- require はロード済みキャッシュを返すため低コスト）
     local ok, SEARCH = pcall(require, "@pasta_search")
     if not ok then SEARCH = nil end
 
@@ -293,20 +315,11 @@ function ACT_IMPL.find_act_handler(self, mode, key)
         return self.current_scene[key]
     end
 
-    -- L2: ローカル辞書前方一致
+    -- L2: ローカル辞書前方一致（@pasta_search 利用可能かつ scene_name あり時のみ）
     local scene_name = self.current_scene and self.current_scene.__global_name__
-    if mode == "word" then
-        -- word モード: @pasta_search.search_word が必須（未利用時はスキップ）
-        if SEARCH and scene_name then
-            local result = SEARCH:search_word(key, scene_name)
-            if result ~= nil then return result end
-        end
-    else
-        -- scene / expr モード: @pasta_search 利用可能かつ scene_name あり時のみ
-        if SEARCH and scene_name then
-            local result = SCENE.search(key, scene_name)
-            if result then return result.func end
-        end
+    if SEARCH and scene_name then
+        local result = search_dictionary(SEARCH, mode, key, scene_name)
+        if result ~= nil then return result end
     end
 
     -- L3: self[key] function型のみ（act.XX / SHIORI_ACT_IMPL 継承チェーンを含む）
@@ -320,19 +333,10 @@ function ACT_IMPL.find_act_handler(self, mode, key)
         return GLOBAL[key]
     end
 
-    -- L5: グローバル辞書前方一致（word: search_word(key, nil)、scene/expr: SCENE.search(key, nil)）
-    if mode == "word" then
-        -- word モード: @pasta_search.search_word が必須
-        if SEARCH then
-            local result = SEARCH:search_word(key, nil)
-            if result ~= nil then return result end
-        end
-    else
-        -- scene / expr モード: @pasta_search 利用可能時のみ
-        if SEARCH then
-            local result = SCENE.search(key, nil)
-            if result then return result.func end
-        end
+    -- L5: グローバル辞書前方一致（@pasta_search 利用可能時のみ・key をグローバル検索）
+    if SEARCH then
+        local result = search_dictionary(SEARCH, mode, key, nil)
+        if result ~= nil then return result end
     end
 
     return nil

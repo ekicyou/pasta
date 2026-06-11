@@ -335,4 +335,156 @@ mod tests {
         assert_eq!(SceneRegistry::sanitize_name("会話"), "会話");
         assert_eq!(SceneRegistry::sanitize_name("＊会話"), "_会話");
     }
+
+    #[test]
+    fn test_get_scene_invalid_ids() {
+        let mut registry = SceneRegistry::new();
+        registry.register_global("会話", HashMap::new());
+
+        // id < 1 must return None (IDs are 1-based)
+        assert!(registry.get_scene(0).is_none());
+        assert!(registry.get_scene(-1).is_none());
+        // out-of-range ID must return None
+        assert!(registry.get_scene(2).is_none());
+        // valid ID still works
+        assert!(registry.get_scene(1).is_some());
+    }
+
+    #[test]
+    fn test_register_global_raw_basic() {
+        let mut registry = SceneRegistry::new();
+
+        // full_name already contains the counter; no auto-increment
+        let id = registry.register_global_raw("OnBoot1", &[], HashMap::new());
+        assert_eq!(id, 1);
+
+        let scene = registry.get_scene(id).unwrap();
+        assert_eq!(scene.name, "OnBoot1");
+        assert_eq!(scene.fn_name, "OnBoot1::__start__");
+        assert_eq!(scene.fn_path, "crate::OnBoot1::__start__");
+        assert_eq!(scene.parent, None);
+    }
+
+    #[test]
+    fn test_register_global_raw_with_locals_excludes_start() {
+        let mut registry = SceneRegistry::new();
+
+        let locals = vec!["__start__".to_string(), "__選択肢_1__".to_string()];
+        let global_id = registry.register_global_raw("会話1", &locals, HashMap::new());
+
+        // Returns the GLOBAL scene's ID
+        assert_eq!(global_id, 1);
+
+        // __start__ must NOT be registered as a separate local scene
+        let scenes = registry.all_scenes();
+        assert_eq!(scenes.len(), 2); // global + 1 local (not 3)
+
+        let local = registry.get_scene(2).unwrap();
+        assert_eq!(local.name, "__選択肢_1__");
+        assert_eq!(local.fn_name, "会話1::__選択肢_1__");
+        assert_eq!(local.fn_path, "crate::会話1::__選択肢_1__");
+        assert_eq!(local.parent, Some("会話1".to_string()));
+    }
+
+    #[test]
+    fn test_register_global_raw_propagates_attributes_to_locals() {
+        let mut registry = SceneRegistry::new();
+
+        let mut attrs = HashMap::new();
+        attrs.insert("季節".to_string(), "春".to_string());
+        let locals = vec!["item_1".to_string()];
+        registry.register_global_raw("Scene1", &locals, attrs);
+
+        // Both global and local scenes carry the same attributes
+        assert_eq!(
+            registry.get_scene(1).unwrap().attributes.get("季節"),
+            Some(&"春".to_string())
+        );
+        assert_eq!(
+            registry.get_scene(2).unwrap().attributes.get("季節"),
+            Some(&"春".to_string())
+        );
+    }
+
+    #[test]
+    fn test_register_global_raw_does_not_touch_counters() {
+        let mut registry = SceneRegistry::new();
+
+        // raw registration must not consume a counter for "会話"
+        registry.register_global_raw("会話1", &[], HashMap::new());
+
+        // counter-based registration still starts at 1
+        let (_, counter) = registry.register_global("会話", HashMap::new());
+        assert_eq!(counter, 1);
+    }
+
+    #[test]
+    fn test_merge_from_reassigns_ids() {
+        let mut a = SceneRegistry::new();
+        a.register_global("会話", HashMap::new());
+
+        let mut b = SceneRegistry::new();
+        b.register_global("別会話", HashMap::new());
+        b.register_global("第三会話", HashMap::new());
+
+        a.merge_from(b);
+
+        // Merged scenes get sequential IDs continuing from existing scenes
+        let scenes = a.all_scenes();
+        assert_eq!(scenes.len(), 3);
+        assert_eq!(scenes[0].id, 1);
+        assert_eq!(scenes[1].id, 2);
+        assert_eq!(scenes[2].id, 3);
+        assert_eq!(scenes[1].name, "別会話");
+        assert_eq!(scenes[2].name, "第三会話");
+
+        // get_scene works with reassigned IDs
+        assert_eq!(a.get_scene(3).unwrap().name, "第三会話");
+    }
+
+    #[test]
+    fn test_merge_from_takes_max_counter() {
+        let mut a = SceneRegistry::new();
+        a.register_global("会話", HashMap::new()); // counter "会話" = 1
+
+        let mut b = SceneRegistry::new();
+        b.register_global("会話", HashMap::new()); // counter "会話" = 1
+        b.register_global("会話", HashMap::new()); // counter "会話" = 2
+
+        a.merge_from(b);
+
+        // After merge, the counter must be max(1, 2) = 2, so next is 3
+        let (_, counter) = a.register_global("会話", HashMap::new());
+        assert_eq!(counter, 3);
+    }
+
+    #[test]
+    fn test_merge_from_keeps_higher_existing_counter() {
+        let mut a = SceneRegistry::new();
+        a.register_global("会話", HashMap::new()); // counter = 1
+        a.register_global("会話", HashMap::new()); // counter = 2
+
+        let mut b = SceneRegistry::new();
+        b.register_global("会話", HashMap::new()); // counter = 1
+
+        a.merge_from(b);
+
+        // Existing counter (2) is higher; next must be 3
+        let (_, counter) = a.register_global("会話", HashMap::new());
+        assert_eq!(counter, 3);
+    }
+
+    #[test]
+    fn test_register_local_sanitizes_names() {
+        let mut registry = SceneRegistry::new();
+        let (_, counter) = registry.register_global("親-シーン", HashMap::new());
+        let local_id =
+            registry.register_local("子-シーン", "親-シーン", counter, 1, HashMap::new());
+
+        let local = registry.get_scene(local_id).unwrap();
+        // Both parent and child names are sanitized in fn_name; original name preserved
+        assert_eq!(local.fn_name, "親_シーン_1::子_シーン_1");
+        assert_eq!(local.name, "子-シーン");
+        assert_eq!(local.parent, Some("親-シーン".to_string()));
+    }
 }

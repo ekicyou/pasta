@@ -18,10 +18,10 @@ pasta_shiori
 │   ├── request        # イベント処理
 │   └── unload         # 終了
 ├── Lua Integration    # pasta_lua ランタイムとの統合
-│   ├── PastaLoader    # スクリプトロード
-│   └── LuaRequest     # Luaへのリクエスト変換
-└── Windows DLL        # C FFI エクスポート
-    └── shiori32       # DLL エントリポイント
+│   ├── PastaLoader    # スクリプトロード（pasta_lua 提供）
+│   └── lua_request    # SHIORI リクエスト→Lua テーブル変換
+└── Windows DLL        # C FFI エクスポート（windows.rs）
+    └── load / unload / request  # SHIORI DLL エントリポイント（+ DllMain）
 ```
 
 ## ディレクトリ構成
@@ -36,7 +36,9 @@ pasta_shiori/
     ├── shiori_tests.rs  # SHIORI テストモジュール（#[path]属性による例外的配置）
     ├── lua_request.rs   # Lua リクエスト処理
     ├── windows.rs       # Windows DLL エクスポート（#[cfg(windows)]）
-    └── util/            # ユーティリティ関数
+    └── util/            # ユーティリティ
+        ├── hglobal/     # HGLOBAL 文字列・ANSI/UTF-8 エンコーディング（#[cfg(windows)]）
+        └── parsers/     # SHIORI リクエストパーサー（pest 文法）
 ```
 
 ## SHIORI プロトコル
@@ -82,24 +84,43 @@ Value: \0\s[0]初めまして！\e
 
 ```
 
+### FFI 境界の安全性
+
+`windows.rs` の DLL エントリポイントは、SHIORI ホスト（SSP 等）を巻き込む
+クラッシュを防ぐため、次の安全性保証を実装しています。
+
+- **パニック封じ込め**: `load` / `request` / `unload` の各ディスパッチは
+  `catch_unwind` で全包囲され、パニックは SHIORI エラー契約へ縮退します
+  （`load`→`false`、`request`→`500` + `X-ERROR-REASON`、`unload`→`true`）。
+  FFI 境界を越えるパニックは未定義動作であるためです。
+- **入力 HGLOBAL の解放保証**: 入力 HGLOBAL の所有権は SHIORI 契約により
+  DLL 側へ移転します。長さ 0・未初期化などのガードパスを含む全経路で解放されます。
+- **アロケーション失敗の明示エラー化**: `GlobalAlloc` 失敗は null ポインタの
+  まま流通させず、明示的なエラーとして処理されます。
+- **反復パース**: SHIORI リクエストヘッダのパースは反復実装であり、
+  ホスト制御のヘッダ数によるスタック枯渇は発生しません。
+
 ## 公開API
 
 ### PastaShiori
 
-| メソッド                | 説明                  |
-| ----------------------- | --------------------- |
-| `load(hinst, load_dir)` | ランタイム初期化      |
-| `request(request)`      | SHIORI リクエスト処理 |
-| `Default::default()`    | 新規インスタンス作成  |
+| メソッド                | 説明                                       |
+| ----------------------- | ------------------------------------------ |
+| `load(hinst, load_dir)` | ランタイム初期化                           |
+| `request(request)`      | SHIORI リクエスト処理                      |
+| `runtime()`             | ロード済み Lua ランタイム参照（テスト用） |
+| `Default::default()`    | 新規インスタンス作成                       |
 
 ### Shiori トレイト
 
 ```rust
 pub trait Shiori {
-    fn load<S: AsRef<OsStr>>(&mut self, hinst: isize, load_dir: S) -> Result<bool>;
-    fn request<S: AsRef<str>>(&mut self, request: S) -> Result<String>;
+    fn load<S: AsRef<OsStr>>(&mut self, hinst: isize, load_dir: S) -> MyResult<bool>;
+    fn request<S: AsRef<str>>(&mut self, request: S) -> MyResult<String>;
 }
 ```
+
+`MyResult` は `error` モジュールの `MyError` を用いた Result 型エイリアスです。
 
 ## 使用例
 
@@ -141,19 +162,28 @@ ghost/
 
 ## 依存関係
 
-| クレート           | バージョン | 用途                                              |
-| ------------------ | ---------- | ------------------------------------------------- |
-| pasta_core         | workspace  | レジストリ                                        |
-| pasta_lua          | workspace  | Luaランタイム（pasta_dsl経由でDSLパーサーに依存） |
-| time               | 0.3        | タイムスタンプ処理                                |
-| tracing            | 0.1        | ロギング                                          |
-| thiserror          | 2          | エラー型定義                                      |
+バージョンはすべてワークスペース（ルート `Cargo.toml`）で一元管理されています。
+
+| クレート    | バージョン | 用途                                              |
+| ----------- | ---------- | ------------------------------------------------- |
+| pasta_lua   | workspace  | Luaランタイム（pasta_dsl経由でDSLパーサーに依存） |
+| time        | 0.3        | タイムスタンプ処理                                |
+| tracing     | 0.1        | ロギング                                          |
+| thiserror   | 2          | エラー型定義                                      |
+| pest        | 2.8        | SHIORI リクエストパース                           |
+| pest_derive | 2.8        | pest パーサー導出マクロ                           |
 
 ### Windows 専用
 
 | クレート    | バージョン | 用途                              |
 | ----------- | ---------- | --------------------------------- |
-| windows-sys | 0.59       | Windows API（メモリ、文字コード） |
+| windows-sys | 0.61       | Windows API（メモリ、文字コード） |
+
+### 開発用（dev-dependencies）
+
+| クレート | バージョン | 用途                     |
+| -------- | ---------- | ------------------------ |
+| tempfile | 3          | テスト用一時ディレクトリ |
 
 ## ビルド
 

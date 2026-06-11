@@ -46,10 +46,10 @@ fn read_frame<R: BufRead>(reader: &mut R) -> std::io::Result<Option<Value>> {
         if trimmed.is_empty() {
             break; // blank line → end of headers.
         }
-        if let Some((name, val)) = trimmed.split_once(':') {
-            if name.trim().eq_ignore_ascii_case("Content-Length") {
-                content_length = val.trim().parse::<usize>().ok();
-            }
+        if let Some((name, val)) = trimmed.split_once(':')
+            && name.trim().eq_ignore_ascii_case("Content-Length")
+        {
+            content_length = val.trim().parse::<usize>().ok();
         }
     }
     let len = content_length.expect("framed message must carry a Content-Length");

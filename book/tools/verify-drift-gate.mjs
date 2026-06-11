@@ -25,7 +25,6 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 import {
@@ -42,10 +41,6 @@ function check(name, cond, detail = '') {
   results.push({ name, ok: !!cond, detail });
   const tag = cond ? 'PASS' : 'FAIL';
   console.log(`  [${tag}] ${name}${detail ? `  — ${detail}` : ''}`);
-}
-
-function sha256(buf) {
-  return crypto.createHash('sha256').update(buf).digest('hex');
 }
 
 // ---- サンドボックス構築 ----

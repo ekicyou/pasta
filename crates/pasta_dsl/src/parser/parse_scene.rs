@@ -167,14 +167,10 @@ pub(crate) fn parse_actors_item(
     }
 
     // C#のenum採番ルールを適用
-    let number = if let Some(n) = explicit_number {
-        *next_number = n + 1;
-        n
-    } else {
-        let n = *next_number;
-        *next_number += 1;
-        n
-    };
+    // 飽和加算: 明示番号 u32::MAX などでの整数オーバーフロー panic を防止
+    // （不正入力ハードニング。通常範囲の番号では挙動不変）
+    let number = explicit_number.unwrap_or(*next_number);
+    *next_number = number.saturating_add(1);
 
     Ok(SceneActorItem { name, number, span })
 }

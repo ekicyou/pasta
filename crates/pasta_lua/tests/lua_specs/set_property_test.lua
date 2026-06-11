@@ -12,6 +12,14 @@ local function create_mock_actors()
     }
 end
 
+-- 新規 act を生成する共通ヘルパー
+-- require はテスト実行時に都度行い、先行スイートの package.loaded リセットに追従する
+local function new_act()
+    local SHIORI_ACT = require("pasta.shiori.act")
+    local actors = create_mock_actors()
+    return SHIORI_ACT.new(actors), actors
+end
+
 -- ============================================================================
 -- Group A: set_property 単体テスト（トークン生成）
 -- Requirement 1.1, 1.2, 2.2, 2.3, 2.4
@@ -19,8 +27,7 @@ end
 
 describe("SHIORI_ACT_IMPL.set_property() - token generation", function()
     test("通常のname/valueでraw_scriptトークンが生成される", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local act = SHIORI_ACT.new(create_mock_actors())
+        local act = new_act()
 
         act:set_property("prop.name", "value")
 
@@ -30,8 +37,7 @@ describe("SHIORI_ACT_IMPL.set_property() - token generation", function()
     end)
 
     test("valueがnilの場合、空文字列として処理され ,] で終わるトークンを生成する", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local act = SHIORI_ACT.new(create_mock_actors())
+        local act = new_act()
 
         act:set_property("mykey", nil)
 
@@ -41,8 +47,7 @@ describe("SHIORI_ACT_IMPL.set_property() - token generation", function()
     end)
 
     test("valueが数値の場合、tostringで文字列に変換される", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local act = SHIORI_ACT.new(create_mock_actors())
+        local act = new_act()
 
         act:set_property("count", 42)
 
@@ -51,9 +56,7 @@ describe("SHIORI_ACT_IMPL.set_property() - token generation", function()
     end)
 
     test("戻り値がact自身であり、メソッドチェーンが可能", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-        local act = SHIORI_ACT.new(actors)
+        local act = new_act()
 
         local returned = act:set_property("k", "v")
 
@@ -61,8 +64,7 @@ describe("SHIORI_ACT_IMPL.set_property() - token generation", function()
     end)
 
     test("valueが空文字列の場合、空のvalue部分を持つタグを生成する", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local act = SHIORI_ACT.new(create_mock_actors())
+        local act = new_act()
 
         act:set_property("mykey", "")
 
@@ -70,8 +72,7 @@ describe("SHIORI_ACT_IMPL.set_property() - token generation", function()
     end)
 
     test("複数回呼び出すと呼び出し順に2件のraw_scriptトークンが生成される", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local act = SHIORI_ACT.new(create_mock_actors())
+        local act = new_act()
 
         act:set_property("k1", "v1")
         act:set_property("k2", "v2")
@@ -89,8 +90,7 @@ end)
 
 describe("SHIORI_ACT_IMPL.set_property() - validation", function()
     test("nameがnilの場合errorが発生する", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local act = SHIORI_ACT.new(create_mock_actors())
+        local act = new_act()
 
         local ok, err = pcall(function()
             act:set_property(nil, "value")
@@ -101,8 +101,7 @@ describe("SHIORI_ACT_IMPL.set_property() - validation", function()
     end)
 
     test("nameが空文字列の場合errorが発生する", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local act = SHIORI_ACT.new(create_mock_actors())
+        local act = new_act()
 
         local ok, err = pcall(function()
             act:set_property("", "value")
@@ -120,8 +119,7 @@ end)
 
 describe("escape_tag_arg() - via set_property token.text", function()
     test("バックスラッシュ \\ が \\\\ にエスケープされる", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local act = SHIORI_ACT.new(create_mock_actors())
+        local act = new_act()
 
         -- value = "\" (シングルバックスラッシュ、Luaリテラルで "\\" )
         act:set_property("name", "\\")
@@ -133,8 +131,7 @@ describe("escape_tag_arg() - via set_property token.text", function()
     end)
 
     test("% が \\% にエスケープされる", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local act = SHIORI_ACT.new(create_mock_actors())
+        local act = new_act()
 
         act:set_property("name", "%value%")
 
@@ -144,8 +141,7 @@ describe("escape_tag_arg() - via set_property token.text", function()
     end)
 
     test("] が \\] にエスケープされる", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local act = SHIORI_ACT.new(create_mock_actors())
+        local act = new_act()
 
         act:set_property("name", "a]b")
 
@@ -155,8 +151,7 @@ describe("escape_tag_arg() - via set_property token.text", function()
     end)
 
     test(", を含む場合 \"\" でクォートされる", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local act = SHIORI_ACT.new(create_mock_actors())
+        local act = new_act()
 
         act:set_property("name", "foo,bar")
 
@@ -165,8 +160,7 @@ describe("escape_tag_arg() - via set_property token.text", function()
     end)
 
     test('" を含む場合 "" でクォートされ、内部 " が "" に変換される', function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local act = SHIORI_ACT.new(create_mock_actors())
+        local act = new_act()
 
         -- value: say "hello"  (ダブルクォートを含む)
         act:set_property("name", 'say "hello"')
@@ -176,8 +170,7 @@ describe("escape_tag_arg() - via set_property token.text", function()
     end)
 
     test(", と \\ が混在する場合、文字エスケープ後にクォートされる", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local act = SHIORI_ACT.new(create_mock_actors())
+        local act = new_act()
 
         -- value: "a,b\c"  (カンマとバックスラッシュが混在)
         act:set_property("name", "a,b\\c")
@@ -190,8 +183,7 @@ describe("escape_tag_arg() - via set_property token.text", function()
     end)
 
     test("特殊文字を含まない値はエスケープされない", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local act = SHIORI_ACT.new(create_mock_actors())
+        local act = new_act()
 
         act:set_property("sakura.name", "Alice")
 
@@ -199,8 +191,7 @@ describe("escape_tag_arg() - via set_property token.text", function()
     end)
 
     test("nameに特殊文字を含む場合nameもエスケープされる", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local act = SHIORI_ACT.new(create_mock_actors())
+        local act = new_act()
 
         -- name: "a\b" → "a\\b"（バックスラッシュエスケープ）
         act:set_property("a\\b", "v")
@@ -216,8 +207,7 @@ end)
 
 describe("set_property() - integration build via SHIORI_ACT", function()
     test("set_property 単独でビルドした出力が \\![set,property,name,value]\\e 形式になる", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local act = SHIORI_ACT.new(create_mock_actors())
+        local act = new_act()
 
         act:set_property("prop.name", "value")
         local result = act:build()
@@ -226,10 +216,8 @@ describe("set_property() - integration build via SHIORI_ACT", function()
     end)
 
     test("talk と set_property を混在させた場合、set_property が先に出力される", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
+        local act, actors = new_act()
         local sakura = actors["さくら"]
-        local act = SHIORI_ACT.new(actors)
 
         act:set_property("mood", "happy")
         act:talk(sakura, "こんにちは")

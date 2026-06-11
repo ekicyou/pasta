@@ -123,10 +123,10 @@ fn read_frame<R: BufRead>(reader: &mut R) -> std::io::Result<Option<Value>> {
         if trimmed.is_empty() {
             break;
         }
-        if let Some((name, val)) = trimmed.split_once(':') {
-            if name.trim().eq_ignore_ascii_case("Content-Length") {
-                content_length = val.trim().parse::<usize>().ok();
-            }
+        if let Some((name, val)) = trimmed.split_once(':')
+            && name.trim().eq_ignore_ascii_case("Content-Length")
+        {
+            content_length = val.trim().parse::<usize>().ok();
         }
     }
     let len = content_length.expect("framed message must carry a Content-Length");
@@ -1471,6 +1471,7 @@ enabled = false
 ///   - `debug_source_mode() == None`（トグルが反転させる提示モードセルが存在しない）。
 ///   - `debug_local_addr() == None`（カスタムリクエストを受ける接続口が無い）。
 ///   - `debug_source_map() == None`（モード別提示の対象となるマップが構築されない）。
+///
 /// これは既存ゼロコストテスト（フック非設置・`std_debug` 非露出・生成 `.lua` バイト不変）を
 /// 複製せず、**トグル状態が OFF では到達不能**であることだけを集中的に表明する
 /// （design "No-Regression": 「OFF でカスタムリクエスト経路が一切走らないこと（6.2）」）。

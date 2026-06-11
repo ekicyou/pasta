@@ -21,9 +21,9 @@
 //! 3. The callback ALWAYS returns `Ok(VmState::Continue)` (LuaJIT cannot Yield
 //!    from a hook).
 //! 4. The callback delegates each line to a per-line [`LineHook`] handler seam
-//!    so the future `DebugSession` (task 2.2) and full wiring (task 4.1) plug in
-//!    WITHOUT rewriting this file. The seam's call shape is
-//!    `on_line(lua, &debug)` to match the design intent
+//!    so [`DebugSession`](crate::debug::session::DebugSession) and the wiring
+//!    ([`crate::debug::enable`]) plug in WITHOUT rewriting this file. The
+//!    seam's call shape is `on_line(lua, &debug)` to match the design intent
 //!    `cb: move |lua, debug| { session.on_line(lua, &debug) }`.
 //!
 //! # Hook-internal panic capture (design "VmHook" + "Error Handling")
@@ -55,8 +55,6 @@
 //! library is excluded); this module relies solely on the Rust-side
 //! `set_global_hook` API and never enables `std_debug`.
 
-#![allow(dead_code)]
-
 use std::panic::{self, AssertUnwindSafe};
 use std::sync::{Arc, Mutex};
 
@@ -72,13 +70,14 @@ pub(crate) type PanicCause = Arc<Mutex<Option<String>>>;
 /// Per-line handler seam invoked by the installed line hook.
 ///
 /// The call shape is `on_line(lua, &debug)` to match the design intent
-/// `cb: move |lua, debug| { session.on_line(lua, &debug) }`. The future
-/// `DebugSession` (task 2.2) implements this trait so it plugs into [`install`]
-/// without rewriting this file.
+/// `cb: move |lua, debug| { session.on_line(lua, &debug) }`.
+/// [`DebugSession`](crate::debug::session::DebugSession) implements this trait
+/// so it plugs into [`install`] without rewriting this file.
 ///
 /// Implementations should return `Ok(VmState::Continue)` (LuaJIT cannot Yield
-/// from a hook). A returned `Err` propagates as a Lua error; a *panic* is
-/// captured by [`install`]'s wrapper and does not abort the VM.
+/// from a hook). A returned `Err` is swallowed by [`install`]'s wrapper (the
+/// hook contract is "always Continue"; error routing is owned by the session);
+/// a *panic* is captured by the wrapper and does not abort the VM.
 pub(crate) trait LineHook: 'static {
     /// Called once per executed line, on the VM thread.
     fn on_line(&self, lua: &Lua, debug: &Debug) -> mlua::Result<VmState>;
@@ -86,9 +85,9 @@ pub(crate) trait LineHook: 'static {
 
 /// Blanket impl so a plain closure can be used as a [`LineHook`].
 ///
-/// This lets callers pass `|lua, debug| { ... }` directly while task 2.2 can
-/// pass a `DebugSession` that implements the trait. The bound matches the design
-/// seam (`FnMut`-shaped per-line callback) while keeping a single hook entry.
+/// This lets callers (tests) pass `|lua, debug| { ... }` directly while the
+/// wiring passes a `DebugSession` that implements the trait. The bound matches
+/// the design seam (`FnMut`-shaped per-line callback) with a single hook entry.
 impl<F> LineHook for F
 where
     F: Fn(&Lua, &Debug) -> mlua::Result<VmState> + 'static,
@@ -106,6 +105,10 @@ where
 /// be recorded without aborting the VM).
 #[derive(Clone)]
 pub(crate) struct HookHandle {
+    // Production wiring (debug::enable → install) currently discards the
+    // handle — error routing to the controller is owned by the session seam —
+    // so outside test builds this observation channel is intentionally unread.
+    #[cfg_attr(not(test), allow(dead_code))]
     panic_cause: PanicCause,
 }
 
@@ -113,6 +116,9 @@ impl HookHandle {
     /// The side channel a captured hook panic's cause is recorded into.
     ///
     /// `None` until a handler panic is captured; `Some(cause)` afterwards.
+    /// Read by tests (and future error routing); production wiring discards
+    /// the handle, hence the non-test dead-code allowance.
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn panic_cause(&self) -> &PanicCause {
         &self.panic_cause
     }
@@ -141,9 +147,9 @@ fn apply_jit_off(lua: &Lua) -> mlua::Result<()> {
 ///    [`catch_unwind`](std::panic::catch_unwind) so a handler panic is recorded
 ///    to the returned [`HookHandle::panic_cause`] side channel and does NOT
 ///    abort the VM. `cb` ALWAYS returns `Ok(VmState::Continue)` (LuaJIT cannot
-///    Yield from a hook); on a handler `Err` it currently also continues (the
-///    error is surfaced via the side channel in a follow-up task — task 2.2/4.1
-///    owns error routing), matching the "always Continue" hook contract.
+///    Yield from a hook); on a handler `Err` it also continues — error routing
+///    is owned by the session seam, not by aborting the hook — matching the
+///    "always Continue" hook contract.
 ///
 /// `std_debug` is never exposed (R5.3): the VM is ALL_SAFE and only the Rust
 /// `set_global_hook` API is used.
@@ -560,6 +566,135 @@ return b
             recorded_cause.contains(PANIC_MSG),
             "the recorded panic cause must carry the injected message. got: {recorded_cause:?}"
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // (hook contract) A handler `Err` is swallowed: the VM continues and the
+    // panic side channel stays untouched (an Err is NOT a panic).
+    // -----------------------------------------------------------------------
+
+    /// A handler returning `Err` must NOT abort or error the running chunk
+    /// (the hook contract is "always Continue"; error routing is owned by the
+    /// session/wiring seam). The chunk must run to completion with the correct
+    /// result and the panic side channel must remain `None`.
+    #[test]
+    fn handler_error_is_swallowed_and_vm_continues() {
+        const ERR_SOURCE: &str = "@handler_err_chunk";
+
+        let lua = build_all_safe_vm();
+        let handle = install(&lua, move |_lua: &Lua, debug: &Debug| {
+            let src = debug
+                .source()
+                .source
+                .as_ref()
+                .map(|c| c.as_ref().to_string())
+                .unwrap_or_default();
+            if src == ERR_SOURCE {
+                // Err on EVERY line of the target chunk: the wrapper must
+                // swallow each one and keep the VM running.
+                return Err(mlua::Error::runtime("injected handler error"));
+            }
+            Ok(VmState::Continue)
+        })
+        .expect("install must succeed");
+
+        let result: i64 = lua
+            .load(
+                "\
+local a = 1
+local b = a + 1
+return b + 1
+",
+            )
+            .set_name(ERR_SOURCE)
+            .eval()
+            .expect("a handler Err must be swallowed: the chunk keeps executing");
+        lua.remove_global_hook();
+
+        assert_eq!(
+            result, 3,
+            "the chunk must run to completion with the correct result despite handler Errs"
+        );
+        assert!(
+            handle.panic_cause().lock().unwrap().is_none(),
+            "a handler Err is NOT a panic: the panic side channel must stay None"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // record_panic_cause preference order (module docs steps 1-3) + lock
+    // poisoning tolerance. The in-VM panic tests above cannot discriminate
+    // these branches (pre-record and payload carry the same message there), so
+    // each branch is pinned directly.
+    // -----------------------------------------------------------------------
+
+    /// (1) A handler-pre-recorded cause is MORE specific and must be preserved:
+    /// the catch_unwind payload must NOT overwrite it.
+    #[test]
+    fn record_panic_cause_prefers_prerecorded_cause_over_payload() {
+        let cause: PanicCause = Arc::new(Mutex::new(Some("pre-recorded specific cause".into())));
+        record_panic_cause(&cause, Box::new("payload that must NOT win"));
+        assert_eq!(
+            cause.lock().unwrap().as_deref(),
+            Some("pre-recorded specific cause"),
+            "a pre-recorded cause must be preserved (preference step 1), not overwritten"
+        );
+    }
+
+    /// (2a) Without a pre-record, a `&'static str` panic payload is recovered.
+    #[test]
+    fn record_panic_cause_recovers_static_str_payload() {
+        let cause: PanicCause = Arc::new(Mutex::new(None));
+        record_panic_cause(&cause, Box::new("static str payload"));
+        assert_eq!(
+            cause.lock().unwrap().as_deref(),
+            Some("static str payload"),
+            "a &'static str payload must be recovered (preference step 2)"
+        );
+    }
+
+    /// (2b) Without a pre-record, an owned `String` panic payload (the shape
+    /// `panic!(\"{x}\")` produces) is recovered.
+    #[test]
+    fn record_panic_cause_recovers_string_payload() {
+        let cause: PanicCause = Arc::new(Mutex::new(None));
+        record_panic_cause(&cause, Box::new(String::from("owned String payload")));
+        assert_eq!(
+            cause.lock().unwrap().as_deref(),
+            Some("owned String payload"),
+            "an owned String payload must be recovered (preference step 2)"
+        );
+    }
+
+    /// (3) A payload that is neither `&str` nor `String` falls back to the
+    /// generic marker — never panics, never leaves the channel empty.
+    #[test]
+    fn record_panic_cause_falls_back_to_generic_marker() {
+        let cause: PanicCause = Arc::new(Mutex::new(None));
+        record_panic_cause(&cause, Box::new(42_i32));
+        assert_eq!(
+            cause.lock().unwrap().as_deref(),
+            Some("hook handler panicked"),
+            "a non-string payload must record the generic marker (preference step 3)"
+        );
+    }
+
+    /// A poisoned side-channel lock must be tolerated: record_panic_cause
+    /// returns without panicking (the VM continues; nothing more can be done).
+    #[test]
+    fn record_panic_cause_tolerates_poisoned_lock() {
+        let cause: PanicCause = Arc::new(Mutex::new(None));
+
+        // Poison the mutex: panic while holding the guard.
+        let poisoner = Arc::clone(&cause);
+        let _ = panic::catch_unwind(AssertUnwindSafe(move || {
+            let _guard = poisoner.lock().unwrap();
+            panic!("poison the lock");
+        }));
+        assert!(cause.lock().is_err(), "the lock must be poisoned (premise)");
+
+        // Must NOT panic on the poisoned lock (graceful no-op).
+        record_panic_cause(&cause, Box::new("payload after poison"));
     }
 
     /// When the handler does NOT pre-record a cause, the wrapper itself must

@@ -9,6 +9,20 @@ local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect
 local mocks = require("lua_test.mocks")
 
+-- 共通リロード: callback/store（reset_res=true なら res も）を package.loaded から
+-- 一括リロードする（スイート分離規約）。呼び出し前に mocks.install を済ませること。
+local function reload_callback_modules(reset_res)
+    package.loaded["pasta.shiori.event.callback"] = nil
+    package.loaded["pasta.store"] = nil
+    if reset_res then
+        package.loaded["pasta.shiori.res"] = nil
+    end
+    local STORE = require("pasta.store")
+    local CALLBACK = require("pasta.shiori.event.callback")
+    CALLBACK.reset()
+    return CALLBACK, STORE
+end
+
 -- ============================================================================
 -- Task 3.1: ID generation and staging tests
 -- ============================================================================
@@ -18,11 +32,8 @@ describe("CALLBACK - ID generation and staging", function()
     local function setup()
         mocks.reset()
         mocks.install()
-        package.loaded["pasta.shiori.event.callback"] = nil
-        package.loaded["pasta.store"] = nil
-        STORE = require("pasta.store")
-        CALLBACK = require("pasta.shiori.event.callback")
-        CALLBACK.reset()
+        -- pasta.shiori.res は従来からリロード対象外（reset_res=false）
+        CALLBACK, STORE = reload_callback_modules(false)
     end
 
     test("next_event_id generates sequential IDs", function()
@@ -111,13 +122,7 @@ describe("CALLBACK.try_route", function()
     local function setup()
         mocks.reset()
         mocks.install()
-        package.loaded["pasta.shiori.event.callback"] = nil
-        package.loaded["pasta.store"] = nil
-        package.loaded["pasta.shiori.res"] = nil
-        -- Reload store and callback
-        require("pasta.store")
-        CALLBACK = require("pasta.shiori.event.callback")
-        CALLBACK.reset()
+        CALLBACK = reload_callback_modules(true)
     end
 
     test("returns nil when req.id does not match any pending entry", function()
@@ -130,14 +135,7 @@ describe("CALLBACK.try_route", function()
     test("resumes coroutine with 1-based refs and returns 200 OK response", function()
         setup()
         local received_refs = nil
-        local co = coroutine.create(function(refs)
-            received_refs = refs
-            coroutine.yield("hello world\\e")
-        end)
-        -- Start coroutine first (it needs to be suspended)
-        coroutine.resume(co) -- initial start, yields immediately... no, we need to design correctly
-
-        -- Actually: the coroutine should first yield to be in suspended state,
+        -- The coroutine first yields to become suspended,
         -- then try_route resumes it with refs
         local co2 = coroutine.create(function()
             local refs = coroutine.yield()    -- first yield to become suspended
@@ -201,7 +199,7 @@ describe("CALLBACK.try_route", function()
         setup()
         -- Coroutine that chains: receives refs, stages a new pending, yields
         local co = coroutine.create(function()
-            local refs = coroutine.yield() -- first callback wait
+            coroutine.yield() -- first callback wait (refs は本テストでは未使用)
             -- After receiving refs, stage another callback (simulating get_property again)
             CALLBACK.stage_pending("OnPastaCallBack2", 999999, "chained timeout")
             coroutine.yield("intermediate response") -- yield again for second callback
@@ -230,6 +228,37 @@ describe("CALLBACK.try_route", function()
         expect(CALLBACK.pending["OnPastaCallBack2"].on_timeout):toBe("chained timeout")
         -- Response from intermediate yield
         expect(result:find("200 OK")).not_:toBe(nil)
+    end)
+
+    -- ========================================================================
+    -- 3.49 (G3) 境界回帰テスト: reference 欠落 req のハードニング
+    -- Rust 境界（lua_request.rs）は reference テーブルを常時生成するが、
+    -- Lua 側から直接 EVENT.fire/try_route を呼ぶ経路では欠落しうる。
+    -- 旧実装は pending 削除後に nil 添字エラーとなり待機コルーチンを孤児化していた。
+    -- ========================================================================
+    test("try_route: reference 欠落 req でもエラーにならず空 refs で resume する (3.49 G3)", function()
+        setup()
+        local received_refs = "not_set"
+        local co = coroutine.create(function()
+            received_refs = coroutine.yield()
+            coroutine.yield("recovered\\e")
+        end)
+        coroutine.resume(co)
+
+        CALLBACK.pending["OnPastaCallBack1"] = {
+            co = co,
+            act = {},
+            timeout_at = 999999,
+            on_timeout = nil,
+        }
+
+        -- reference フィールドなしの req
+        local result = CALLBACK.try_route({ id = "OnPastaCallBack1" })
+
+        expect(type(received_refs)):toBe("table")
+        expect(next(received_refs)):toBe(nil)
+        expect(result:find("200 OK")).not_:toBe(nil)
+        expect(CALLBACK.pending["OnPastaCallBack1"]):toBe(nil)
     end)
 
     test("propagates error when coroutine errors during resume", function()
@@ -275,12 +304,7 @@ describe("CALLBACK.sweep", function()
                 error = function() end,
             },
         })
-        package.loaded["pasta.shiori.event.callback"] = nil
-        package.loaded["pasta.store"] = nil
-        package.loaded["pasta.shiori.res"] = nil
-        require("pasta.store")
-        CALLBACK = require("pasta.shiori.event.callback")
-        CALLBACK.reset()
+        CALLBACK = reload_callback_modules(true)
     end
 
     test("does nothing when no entries exist", function()
@@ -335,7 +359,9 @@ describe("CALLBACK.sweep", function()
         expect(CALLBACK.pending["OnPastaCallBack1"]):toBe(nil)
         -- 500 response returned
         expect(result:find("500 Internal Server Error")).not_:toBe(nil)
-        expect(result:find("X%-ERROR%-REASON: callback timeout: get_property")).not_:toBe(nil)
+        -- 3.49 (G3) 随伴更新: sweep が RES.err 経路へ統一され、ヘッダーキーは
+        -- res.lua 正準の "X-Error-Reason" となった（旧: インライン構築の "X-ERROR-REASON"）
+        expect(result:find("X%-Error%-Reason: callback timeout: get_property")).not_:toBe(nil)
         -- log.warn called
         expect(#warn_calls):toBe(1)
         expect(warn_calls[1]:find("OnPastaCallBack1")).not_:toBe(nil)
@@ -398,6 +424,52 @@ describe("CALLBACK.sweep", function()
         expect(result:find("500 Internal Server Error")).not_:toBe(nil)
         -- Both should have been logged
         expect(#warn_calls):toBe(2)
+    end)
+
+    -- ========================================================================
+    -- 3.49 (G3) 境界回帰テスト: sweep タイムアウト 500 の RES.err 経路統一
+    -- （X-Error-Reason 正準ケーシング・標準ヘッダー付与・空文字列正規化）
+    -- ========================================================================
+    test("sweep: タイムアウト 500 は RES.err 経路で X-Error-Reason 正準ヘッダーを出力する (3.49 G3)", function()
+        setup()
+        local co = coroutine.create(function() coroutine.yield() end)
+        coroutine.resume(co)
+
+        CALLBACK.pending["OnPastaCallBack1"] = {
+            co = co,
+            act = {},
+            timeout_at = 100,
+            on_timeout = "timeout via sweep",
+        }
+
+        local result = CALLBACK.sweep(200)
+
+        expect(result:find("500 Internal Server Error", 1, true)).not_:toBe(nil)
+        -- 正準ケーシングを plain find（大文字小文字厳密）で固定
+        expect(result:find("X-Error-Reason: timeout via sweep", 1, true)).not_:toBe(nil)
+        expect(result:find("X-ERROR-REASON", 1, true)):toBe(nil)
+        -- RES.build 標準ヘッダー3種を含む（旧インライン構築でも同一だが経路統一を固定）
+        expect(result:find("Charset: ", 1, true)).not_:toBe(nil)
+        expect(result:find("Sender: ", 1, true)).not_:toBe(nil)
+        expect(result:find("SecurityLevel: ", 1, true)).not_:toBe(nil)
+    end)
+
+    test("sweep: 空文字列 on_timeout は RES.err 規約で Unknown error に正規化される (3.49 G3)", function()
+        setup()
+        local co = coroutine.create(function() coroutine.yield() end)
+        coroutine.resume(co)
+
+        CALLBACK.pending["OnPastaCallBack1"] = {
+            co = co,
+            act = {},
+            timeout_at = 100,
+            on_timeout = "",
+        }
+
+        local result = CALLBACK.sweep(200)
+
+        expect(result:find("500 Internal Server Error", 1, true)).not_:toBe(nil)
+        expect(result:find("X-Error-Reason: Unknown error", 1, true)).not_:toBe(nil)
     end)
 
     test("handles mixed on_timeout types (string and nil)", function()

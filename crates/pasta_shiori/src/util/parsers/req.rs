@@ -7,8 +7,8 @@ pub(crate) type ParseError = pest::error::Error<Rule>;
 mod tests {
     use super::*;
     use crate::error::*;
-    use pest::iterators::FlatPairs;
     use pest::Parser as PestParser;
+    use pest::iterators::FlatPairs;
     use std::collections::HashMap;
 
     /// SHIORI3リクエストの解析結果を格納します（テスト専用）。

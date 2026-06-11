@@ -8,4 +8,5 @@ mod common;
 
 mod basic_test;
 mod budoux_test;
+mod edge_case_test;
 mod output_test;

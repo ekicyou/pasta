@@ -7,6 +7,28 @@ local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect
 
+-- 共通セットアップ: 関連モジュールを package.loaded から一括リロードする（スイート分離規約）。
+-- pasta.shiori.res は pasta.shiori.event のリロード時に内部 require で追従する（純モジュール）。
+local function reload_modules()
+    package.loaded["pasta.store"] = nil
+    package.loaded["pasta.shiori.event"] = nil
+    package.loaded["pasta.shiori.event.register"] = nil
+    package.loaded["pasta.shiori.res"] = nil
+    package.loaded["pasta.shiori.act"] = nil
+
+    local STORE = require("pasta.store")
+    local EVENT = require("pasta.shiori.event")
+    local REG = require("pasta.shiori.event.register")
+
+    -- Setup actors for SHIORI_ACT
+    STORE.actors = { sakura = { name = "さくら", spot = "sakura" } }
+
+    -- Ensure clean state
+    STORE.co_scene = nil
+
+    return EVENT, REG, STORE
+end
+
 -- ============================================================================
 -- Task 7.1: E2Eテストでact:yield()とチェイントークを検証
 -- ============================================================================
@@ -15,26 +37,9 @@ describe("Integration - act:yield() and chain talk", function()
     local EVENT
     local STORE
     local REG
-    local RES
 
     local function setup()
-        -- Reset all modules
-        package.loaded["pasta.store"] = nil
-        package.loaded["pasta.shiori.event"] = nil
-        package.loaded["pasta.shiori.event.register"] = nil
-        package.loaded["pasta.shiori.res"] = nil
-        package.loaded["pasta.shiori.act"] = nil
-
-        STORE = require("pasta.store")
-        EVENT = require("pasta.shiori.event")
-        REG = require("pasta.shiori.event.register")
-        RES = require("pasta.shiori.res")
-
-        -- Setup actors for SHIORI_ACT
-        STORE.actors = { sakura = { name = "さくら", spot = "sakura" } }
-
-        -- Ensure clean state
-        STORE.co_scene = nil
+        EVENT, REG, STORE = reload_modules()
     end
 
     test("yield() returns value and sets STORE.co_scene", function()
@@ -169,29 +174,14 @@ describe("Integration - error handling", function()
     local REG
 
     local function setup()
-        -- Reset all modules
-        package.loaded["pasta.store"] = nil
-        package.loaded["pasta.shiori.event"] = nil
-        package.loaded["pasta.shiori.event.register"] = nil
-        package.loaded["pasta.shiori.res"] = nil
-        package.loaded["pasta.shiori.act"] = nil
-
-        STORE = require("pasta.store")
-        EVENT = require("pasta.shiori.event")
-        REG = require("pasta.shiori.event.register")
-
-        -- Setup actors for SHIORI_ACT
-        STORE.actors = { sakura = { name = "さくら", spot = "sakura" } }
-
-        -- Ensure clean state
-        STORE.co_scene = nil
+        EVENT, REG, STORE = reload_modules()
     end
 
     test("coroutine error clears STORE.co_scene", function()
         setup()
 
         REG.OnErrorTest = function(act)
-            return coroutine.create(function(act)
+            return coroutine.create(function()
                 error("Test error")
             end)
         end
@@ -211,15 +201,12 @@ describe("Integration - error handling", function()
     test("new coroutine closes existing suspended coroutine", function()
         setup()
 
-        local old_co_closed = false
         local old_co
 
         -- First handler that yields
         REG.OnFirst = function(act)
-            old_co = coroutine.create(function(act)
+            old_co = coroutine.create(function()
                 coroutine.yield("first")
-                -- If we get here, the coroutine wasn't closed
-                old_co_closed = false
             end)
             return old_co
         end
@@ -231,7 +218,7 @@ describe("Integration - error handling", function()
 
         -- Second handler that returns a NEW coroutine
         REG.OnSecond = function(act)
-            return coroutine.create(function(act)
+            return coroutine.create(function()
                 return "second result"
             end)
         end
@@ -257,7 +244,7 @@ describe("Integration - error handling", function()
         local co
 
         REG.OnResetTest = function(act)
-            co = coroutine.create(function(act)
+            co = coroutine.create(function()
                 coroutine.yield("message")
             end)
             return co

@@ -30,20 +30,9 @@ impl super::AnalysisEngine {
         if scene.span.is_valid() {
             // Only emit NAMESPACE token for the marker line (e.g., "＊メイン"),
             // NOT the entire scope. Otherwise it overshadows child tokens.
-            let line = scene.span.start_line;
-            let line_text = get_line_text(source, line);
-            let line_start = line_byte_offset(source, line);
-            let start_in_line = scene.span.start_byte.saturating_sub(line_start);
-            let start_char = utf8_offset_to_utf16(line_text, start_in_line);
-            let line_len = utf8_len_to_utf16(line_text);
-            if line_len > start_char {
-                tokens.push(RawToken {
-                    line: (line - 1) as u32,
-                    start_char,
-                    length: line_len.saturating_sub(start_char),
-                    token_type: token_type::NAMESPACE,
-                    modifiers: 0,
-                });
+            let token = Self::marker_line_token(&scene.span, source, token_type::NAMESPACE);
+            if token.length > 0 {
+                tokens.push(token);
             }
         }
         for attr in &scene.attrs {
@@ -65,19 +54,11 @@ impl super::AnalysisEngine {
         // Anonymous local_start_scene_scope (name=None) has no marker line, and emitting
         // a SCENE token would overlap with the action line tokens within the scope.
         if scene.name.is_some() && scene.span.is_valid() {
-            let line = scene.span.start_line;
-            let line_text = get_line_text(source, line);
-            let line_start = line_byte_offset(source, line);
-            let start_in_line = scene.span.start_byte.saturating_sub(line_start);
-            let start_char = utf8_offset_to_utf16(line_text, start_in_line);
-            let line_len = utf8_len_to_utf16(line_text);
-            tokens.push(RawToken {
-                line: (line - 1) as u32,
-                start_char,
-                length: line_len.saturating_sub(start_char),
-                token_type: token_type::SCENE,
-                modifiers: 0,
-            });
+            tokens.push(Self::marker_line_token(
+                &scene.span,
+                source,
+                token_type::SCENE,
+            ));
         }
         for attr in &scene.attrs {
             Self::visit_attr(attr, source, tokens);
@@ -94,20 +75,9 @@ impl super::AnalysisEngine {
         if actor.span.is_valid() {
             // Only emit ACTOR token for the marker line (e.g., "％さくら"),
             // NOT the entire scope. Otherwise it overshadows child tokens.
-            let line = actor.span.start_line;
-            let line_text = get_line_text(source, line);
-            let line_start = line_byte_offset(source, line);
-            let start_in_line = actor.span.start_byte.saturating_sub(line_start);
-            let start_char = utf8_offset_to_utf16(line_text, start_in_line);
-            let line_len = utf8_len_to_utf16(line_text);
-            if line_len > start_char {
-                tokens.push(RawToken {
-                    line: (line - 1) as u32,
-                    start_char,
-                    length: line_len.saturating_sub(start_char),
-                    token_type: token_type::ACTOR,
-                    modifiers: 0,
-                });
+            let token = Self::marker_line_token(&actor.span, source, token_type::ACTOR);
+            if token.length > 0 {
+                tokens.push(token);
             }
         }
         for attr in &actor.attrs {
@@ -147,15 +117,7 @@ impl super::AnalysisEngine {
             return;
         }
         let line = vs.span.start_line;
-        let line_text = get_line_text(source, line);
-        let line_start = line_byte_offset(source, line);
-        let span_start_in_line = vs.span.start_byte.saturating_sub(line_start);
-        let span_end_in_line = vs
-            .span
-            .end_byte
-            .saturating_sub(line_start)
-            .min(line_text.len());
-        let span_text = &line_text[span_start_in_line..span_end_in_line];
+        let (line_text, span_text, span_start_in_line) = Self::span_line_window(&vs.span, source);
 
         // Parse sub-tokens from the span text using cursor-based scanning
         Self::tokenize_var_set_text(span_text, span_start_in_line, line, vs, tokens, line_text);
@@ -388,16 +350,16 @@ impl super::AnalysisEngine {
             Expr::Paren(inner) => {
                 // Find opening paren
                 if let Some(paren_pos) = find_open_paren(text) {
-                    let paren_char = &text[paren_pos..paren_pos + char_len_at(text, paren_pos)];
-                    tokens.push(RawToken {
+                    let paren_len = Self::push_char_op_token(
+                        text,
+                        paren_pos,
+                        base_offset,
                         line,
-                        start_char: utf8_offset_to_utf16(line_text, base_offset + paren_pos),
-                        length: utf8_len_to_utf16(paren_char),
-                        token_type: token_type::OPERATOR,
-                        modifiers: 0,
-                    });
+                        tokens,
+                        line_text,
+                    );
                     // Inner expression
-                    let inner_start = paren_pos + paren_char.len();
+                    let inner_start = paren_pos + paren_len;
                     let close_pos = find_close_paren(text, inner_start);
                     let inner_text = if let Some(cp) = close_pos {
                         &text[inner_start..cp]
@@ -414,14 +376,7 @@ impl super::AnalysisEngine {
                     );
                     // Closing paren
                     if let Some(cp) = close_pos {
-                        let close_char = &text[cp..cp + char_len_at(text, cp)];
-                        tokens.push(RawToken {
-                            line,
-                            start_char: utf8_offset_to_utf16(line_text, base_offset + cp),
-                            length: utf8_len_to_utf16(close_char),
-                            token_type: token_type::OPERATOR,
-                            modifiers: 0,
-                        });
+                        Self::push_char_op_token(text, cp, base_offset, line, tokens, line_text);
                     }
                 }
             }
@@ -496,16 +451,10 @@ impl super::AnalysisEngine {
         if let Expr::FnCall { args, .. } = fn_expr {
             // Find opening paren
             if let Some(paren_pos) = find_open_paren(text) {
-                let paren_char = &text[paren_pos..paren_pos + char_len_at(text, paren_pos)];
-                tokens.push(RawToken {
-                    line,
-                    start_char: utf8_offset_to_utf16(line_text, base_offset + paren_pos),
-                    length: utf8_len_to_utf16(paren_char),
-                    token_type: token_type::OPERATOR,
-                    modifiers: 0,
-                });
+                let paren_len =
+                    Self::push_char_op_token(text, paren_pos, base_offset, line, tokens, line_text);
 
-                let inner_start = paren_pos + paren_char.len();
+                let inner_start = paren_pos + paren_len;
                 let close_pos = find_close_paren(text, inner_start);
                 let args_text = if let Some(cp) = close_pos {
                     &text[inner_start..cp]
@@ -543,14 +492,7 @@ impl super::AnalysisEngine {
 
                 // Closing paren
                 if let Some(cp) = close_pos {
-                    let close_char = &text[cp..cp + char_len_at(text, cp)];
-                    tokens.push(RawToken {
-                        line,
-                        start_char: utf8_offset_to_utf16(line_text, base_offset + cp),
-                        length: utf8_len_to_utf16(close_char),
-                        token_type: token_type::OPERATOR,
-                        modifiers: 0,
-                    });
+                    Self::push_char_op_token(text, cp, base_offset, line, tokens, line_text);
                 }
             }
         }
@@ -578,15 +520,7 @@ impl super::AnalysisEngine {
 
     fn visit_cue_command(cue: &CueCommandNode, source: &str, tokens: &mut Vec<RawToken>) {
         let line = cue.span.start_line;
-        let line_text = get_line_text(source, line);
-        let line_start = line_byte_offset(source, line);
-        let span_start_in_line = cue.span.start_byte.saturating_sub(line_start);
-        let span_end_in_line = cue
-            .span
-            .end_byte
-            .saturating_sub(line_start)
-            .min(line_text.len());
-        let span_text = &line_text[span_start_in_line..span_end_in_line];
+        let (line_text, span_text, span_start_in_line) = Self::span_line_window(&cue.span, source);
         let base_offset = span_start_in_line;
         let line0 = (line - 1) as u32;
 
@@ -631,7 +565,10 @@ impl super::AnalysisEngine {
         {
             Self::add_token_from_span(&scope.span, source, token_type::WORD, 0, tokens);
             // カーソルを scope 後に進める
-            let scope_end = scope.span.end_byte.saturating_sub(line_start);
+            let scope_end = scope
+                .span
+                .end_byte
+                .saturating_sub(line_byte_offset(source, line));
             if scope_end > cursor + span_start_in_line {
                 cursor = scope_end - span_start_in_line;
             }
@@ -643,17 +580,16 @@ impl super::AnalysisEngine {
             // 開き括弧検出
             if let Some(paren_pos) = find_open_paren(remaining) {
                 let abs_paren = cursor + paren_pos;
-                let paren_char =
-                    &span_text[abs_paren..abs_paren + char_len_at(span_text, abs_paren)];
-                tokens.push(RawToken {
-                    line: line0,
-                    start_char: utf8_offset_to_utf16(line_text, base_offset + abs_paren),
-                    length: utf8_len_to_utf16(paren_char),
-                    token_type: token_type::OPERATOR,
-                    modifiers: 0,
-                });
+                let paren_len = Self::push_char_op_token(
+                    span_text,
+                    abs_paren,
+                    base_offset,
+                    line0,
+                    tokens,
+                    line_text,
+                );
 
-                let inner_start = abs_paren + paren_char.len();
+                let inner_start = abs_paren + paren_len;
                 let close_pos = find_close_paren(span_text, inner_start);
                 let args_text = if let Some(cp) = close_pos {
                     &span_text[inner_start..cp]
@@ -734,14 +670,7 @@ impl super::AnalysisEngine {
 
                 // 閉じ括弧
                 if let Some(cp) = close_pos {
-                    let close_char = &span_text[cp..cp + char_len_at(span_text, cp)];
-                    tokens.push(RawToken {
-                        line: line0,
-                        start_char: utf8_offset_to_utf16(line_text, base_offset + cp),
-                        length: utf8_len_to_utf16(close_char),
-                        token_type: token_type::OPERATOR,
-                        modifiers: 0,
-                    });
+                    Self::push_char_op_token(span_text, cp, base_offset, line0, tokens, line_text);
                 }
             }
         }
@@ -854,6 +783,63 @@ impl super::AnalysisEngine {
     // ========================================================================
     // Helpers
     // ========================================================================
+
+    /// スコープマーカー行（＊/・/％）のトークンを構築する: span 開始位置から行末まで。
+    /// `length` は 0 になりうる（span 開始が行末以降）— 扱いは呼び出し側が決める。
+    fn marker_line_token(span: &Span, source: &str, token_type: u32) -> RawToken {
+        let line = span.start_line;
+        let line_text = get_line_text(source, line);
+        let line_start = line_byte_offset(source, line);
+        let start_in_line = span.start_byte.saturating_sub(line_start);
+        let start_char = utf8_offset_to_utf16(line_text, start_in_line);
+        let line_len = utf8_len_to_utf16(line_text);
+        RawToken {
+            line: (line - 1) as u32,
+            start_char,
+            length: line_len.saturating_sub(start_char),
+            token_type,
+            modifiers: 0,
+        }
+    }
+
+    /// span の開始行テキストと、行内に切り詰めた span スライスを取り出す。
+    /// 戻り値: (line_text, span_text, span_start_in_line)
+    fn span_line_window<'s>(span: &Span, source: &'s str) -> (&'s str, &'s str, usize) {
+        let line = span.start_line;
+        let line_text = get_line_text(source, line);
+        let line_start = line_byte_offset(source, line);
+        let span_start_in_line = span.start_byte.saturating_sub(line_start);
+        let span_end_in_line = span
+            .end_byte
+            .saturating_sub(line_start)
+            .min(line_text.len());
+        (
+            line_text,
+            &line_text[span_start_in_line..span_end_in_line],
+            span_start_in_line,
+        )
+    }
+
+    /// `text[pos]` の 1 文字（括弧等）を OPERATOR トークンとして追加し、
+    /// その文字のバイト長を返す。
+    fn push_char_op_token(
+        text: &str,
+        pos: usize,
+        base_offset: usize,
+        line: u32,
+        tokens: &mut Vec<RawToken>,
+        line_text: &str,
+    ) -> usize {
+        let ch = &text[pos..pos + char_len_at(text, pos)];
+        tokens.push(RawToken {
+            line,
+            start_char: utf8_offset_to_utf16(line_text, base_offset + pos),
+            length: utf8_len_to_utf16(ch),
+            token_type: token_type::OPERATOR,
+            modifiers: 0,
+        });
+        ch.len()
+    }
 
     fn add_token_from_span(
         span: &Span,

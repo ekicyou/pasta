@@ -483,7 +483,7 @@ fn test_search_unavailable_before_finalize() {
         .to_string_lossy()
         .replace('\\', "/");
 
-    lua.load(&format!(
+    lua.load(format!(
         r#"
         package.path = "{scripts_dir}/?.lua;{scripts_dir}/?/init.lua;" .. package.path
         "#

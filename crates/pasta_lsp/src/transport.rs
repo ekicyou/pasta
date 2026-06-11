@@ -91,7 +91,11 @@ impl From<&AnalysisResult> for WasmAnalysisResult {
     fn from(result: &AnalysisResult) -> Self {
         Self {
             tokens: result.tokens.iter().map(WasmSemanticToken::from).collect(),
-            diagnostics: result.diagnostics.iter().map(WasmDiagnostic::from).collect(),
+            diagnostics: result
+                .diagnostics
+                .iter()
+                .map(WasmDiagnostic::from)
+                .collect(),
         }
     }
 }
@@ -270,6 +274,39 @@ mod tests {
         assert_eq!(wasm_result.diagnostics[0].message, "test error");
         assert_eq!(wasm_result.diagnostics[0].range.start.line, 0);
         assert_eq!(wasm_result.diagnostics[0].range.end.character, 5);
+    }
+
+    #[test]
+    fn test_wasm_diagnostic_severity_mapping_information_hint_and_none() {
+        use tower_lsp::lsp_types::{Diagnostic, DiagnosticSeverity, Position, Range};
+
+        let range = Range {
+            start: Position {
+                line: 0,
+                character: 0,
+            },
+            end: Position {
+                line: 0,
+                character: 1,
+            },
+        };
+        let make = |severity: Option<DiagnosticSeverity>| Diagnostic {
+            range,
+            severity,
+            message: "m".to_string(),
+            ..Default::default()
+        };
+
+        // INFORMATION → 3, HINT → 4, None → 1 (Error 既定) の全分岐を固定
+        assert_eq!(
+            WasmDiagnostic::from(&make(Some(DiagnosticSeverity::INFORMATION))).severity,
+            3
+        );
+        assert_eq!(
+            WasmDiagnostic::from(&make(Some(DiagnosticSeverity::HINT))).severity,
+            4
+        );
+        assert_eq!(WasmDiagnostic::from(&make(None)).severity, 1);
     }
 
     #[test]

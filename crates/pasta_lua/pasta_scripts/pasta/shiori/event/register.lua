@@ -4,10 +4,10 @@
 --- ゴースト開発者がイベントハンドラを登録するためのテーブル。
 --- 依存モジュールなし（循環参照回避のため）。
 ---
---- ハンドラシグネチャ:
----   function(req: table) -> string
+--- ハンドラシグネチャ（EVENT.fire は act オブジェクトを渡す）:
+---   function(act: ShioriAct) -> string|thread|nil
 ---
---- reqテーブル構造（Rust側 parse_request() により生成）:
+--- act.req テーブル構造（Rust側 parse_request() により生成）:
 ---   - req.id: イベント名（例: "OnBoot", "OnClose"）
 ---   - req.method: "get" | "notify"
 ---   - req.version: 30（SHIORI/3.0）
@@ -16,27 +16,27 @@
 ---   - req.reference: 参照テーブル（reference[0], reference[1], ...）
 ---   - req.dic: 全ヘッダー辞書
 ---
---- 注意: reqテーブルはread-only契約。ハンドラ内で変更しないこと。
+--- 注意: act.req テーブルはread-only契約。ハンドラ内で変更しないこと。
 ---
 --- 使用例:
 --- ```lua
 --- local REG = require("pasta.shiori.event.register")
 --- local RES = require("pasta.shiori.res")
 ---
---- REG.OnBoot = function(req)
+--- REG.OnBoot = function(act)
 ---     return RES.ok([[\0\s[0]こんにちは\e]])
 --- end
 ---
---- REG.OnClose = function(req)
+--- REG.OnClose = function(act)
 ---     return RES.ok([[\0\s[0]さようなら\e]])
 --- end
 ---
---- REG.OnMouseDoubleClick = function(req)
+--- REG.OnMouseDoubleClick = function(act)
 ---     return RES.ok([[\0\s[0]なあに？\e]])
 --- end
 --- ```
 
---- @type table<string, fun(req: table): string>
+--- @type table<string, fun(act: table): string|thread|nil>
 local REG = {}
 
 return REG

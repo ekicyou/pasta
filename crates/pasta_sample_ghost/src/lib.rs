@@ -20,45 +20,6 @@ pub enum GhostError {
 
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
-
-    #[error("Configuration error: {0}")]
-    ConfigError(String),
-}
-
-/// ゴースト設定
-#[derive(Debug, Clone)]
-pub struct GhostConfig {
-    /// ゴースト名
-    pub name: String,
-    /// バージョン
-    pub version: String,
-    /// sakura キャラクター名
-    pub sakura_name: String,
-    /// kero キャラクター名
-    pub kero_name: String,
-    /// 作者ID
-    pub craftman: String,
-    /// 作者名（日本語）
-    pub craftman_w: String,
-    /// SHIORI DLL名
-    pub shiori: String,
-    /// ホームURL
-    pub homeurl: String,
-}
-
-impl Default for GhostConfig {
-    fn default() -> Self {
-        Self {
-            name: "hello-pasta".to_string(),
-            version: "1.0.0".to_string(),
-            sakura_name: "女の子".to_string(),
-            kero_name: "男の子".to_string(),
-            craftman: "ekicyou".to_string(),
-            craftman_w: "どっとステーション駅長".to_string(),
-            shiori: "pasta.dll".to_string(),
-            homeurl: "https://github.com/ekicyou/pasta".to_string(),
-        }
-    }
 }
 
 /// ゴースト配布物を生成（画像＋surfaces.txt のみ）
@@ -67,11 +28,10 @@ impl Default for GhostConfig {
 ///
 /// # Arguments
 /// * `output_dir` - 出力先ディレクトリ（hello-pasta/ が作成される）
-/// * `_config` - ゴースト設定（API 互換性のため保持）
 ///
 /// # Returns
 /// 成功時は Ok(()), 失敗時は GhostError
-pub fn generate_ghost(output_dir: &Path, _config: &GhostConfig) -> Result<(), GhostError> {
+pub fn generate_ghost(output_dir: &Path) -> Result<(), GhostError> {
     // シェルディレクトリ作成（画像生成前に必要）
     let shell_dir = output_dir.join("shell/master");
     fs::create_dir_all(&shell_dir)?;
@@ -88,18 +48,42 @@ pub fn generate_ghost(output_dir: &Path, _config: &GhostConfig) -> Result<(), Gh
     Ok(())
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_default_config() {
-        let config = GhostConfig::default();
-        assert_eq!(config.name, "hello-pasta");
-        assert_eq!(config.sakura_name, "女の子");
-        assert_eq!(config.kero_name, "男の子");
-        assert_eq!(config.shiori, "pasta.dll");
+    fn generate_ghost_writes_surfaces_txt_matching_template() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let ghost_root = temp.path().join("hello-pasta");
+
+        generate_ghost(&ghost_root).unwrap();
+
+        // 書き出された surfaces.txt がテンプレート出力と完全一致すること
+        // （生成パイプラインが内容を変質させない）
+        let written = fs::read_to_string(ghost_root.join("shell/master/surfaces.txt")).unwrap();
+        assert_eq!(written, config_templates::generate_surfaces_txt());
+    }
+
+    #[test]
+    fn generate_ghost_is_idempotent_over_existing_output() {
+        // 既存出力ディレクトリへの再実行（リリース手順での再生成シナリオ）が
+        // エラーなく成功し、ファイル集合が変わらないこと
+        let temp = tempfile::TempDir::new().unwrap();
+        let ghost_root = temp.path().join("hello-pasta");
+
+        generate_ghost(&ghost_root).unwrap();
+        let count_files =
+            |dir: &Path| -> usize { fs::read_dir(dir).map(|d| d.flatten().count()).unwrap_or(0) };
+        let shell_dir = ghost_root.join("shell/master");
+        let first = count_files(&shell_dir);
+        assert_eq!(first, 19, "初回生成は surface*.png 18 + surfaces.txt 1");
+
+        generate_ghost(&ghost_root).unwrap();
+        assert_eq!(
+            count_files(&shell_dir),
+            first,
+            "再実行でファイル集合が変化しました"
+        );
     }
 }

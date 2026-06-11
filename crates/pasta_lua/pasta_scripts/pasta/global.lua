@@ -22,8 +22,8 @@ function GLOBAL.yield(act)
     act:yield()
 end
 
-GLOBAL.チェイントーク = GLOBAL.yield
-
-
+-- ブラケット記法を使用: 非 ASCII 識別子（GLOBAL.チェイントーク）は LuaJIT 拡張のため、
+-- 標準 Lua パーサー（luacheck 等の静的解析）が解釈できる等価表記で定義する。
+GLOBAL["チェイントーク"] = GLOBAL.yield
 
 return GLOBAL

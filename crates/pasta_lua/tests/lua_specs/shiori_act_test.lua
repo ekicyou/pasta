@@ -29,12 +29,19 @@ local function create_mock_ctx()
     }
 end
 
+-- ヘルパー: テストごとの共通セットアップ（act と actors を返す）
+-- リロード規約（先行スイートの package.loaded 操作）を保存するため、
+-- require はファイル先頭ではなくテスト実行時に行う
+local function new_act(req)
+    local SHIORI_ACT = require("pasta.shiori.act")
+    local actors = create_mock_actors()
+    return SHIORI_ACT.new(actors, req), actors
+end
+
 -- Test inheritance from pasta.act
 describe("SHIORI_ACT - inheritance", function()
     test("inherits ACT.IMPL methods", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-        local act = SHIORI_ACT.new(actors)
+        local act = new_act()
 
         -- raw_script() is inherited from ACT_IMPL
         act:raw_script("\\e")
@@ -51,9 +58,7 @@ describe("SHIORI_ACT - inheritance", function()
     end)
 
     test("inherits word() method", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-        local act = SHIORI_ACT.new(actors)
+        local act = new_act()
 
         -- word() method should be accessible (returns nil for unknown word)
         local result = act:word("unknown_word")
@@ -101,9 +106,7 @@ end)
 -- Test talk() method override
 describe("SHIORI_ACT - talk()", function()
     test("appends scope tag on first actor", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-        local act = SHIORI_ACT.new(actors)
+        local act, actors = new_act()
 
         act:talk(actors.sakura, "Hello")
         local result = act:build()
@@ -115,9 +118,7 @@ describe("SHIORI_ACT - talk()", function()
     end)
 
     test("appends scope tag on actor switch", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-        local act = SHIORI_ACT.new(actors)
+        local act, actors = new_act()
 
         -- 新アーキテクチャ: set_spot()でスポット位置を明示的に設定
         act:set_spot("sakura", 0)
@@ -133,9 +134,7 @@ describe("SHIORI_ACT - talk()", function()
     end)
 
     test("does not append scope tag on same actor", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-        local act = SHIORI_ACT.new(actors)
+        local act, actors = new_act()
 
         act:talk(actors.sakura, "Hello")
         act:talk(actors.sakura, "World")
@@ -147,9 +146,7 @@ describe("SHIORI_ACT - talk()", function()
     end)
 
     test("uses \\p[N] for char2+ actors", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-        local act = SHIORI_ACT.new(actors)
+        local act, actors = new_act()
 
         -- 新アーキテクチャ: set_spot()でスポット位置を明示的に設定
         act:set_spot("char2", 2)
@@ -161,9 +158,7 @@ describe("SHIORI_ACT - talk()", function()
     end)
 
     test("adds newline after spot switch", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-        local act = SHIORI_ACT.new(actors)
+        local act, actors = new_act()
 
         -- 新アーキテクチャ: set_spot()でスポット位置を明示的に設定
         act:set_spot("sakura", 0)
@@ -179,18 +174,14 @@ describe("SHIORI_ACT - talk()", function()
     end)
 
     test("supports method chaining", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-        local act = SHIORI_ACT.new(actors)
+        local act, actors = new_act()
 
         local returned = act:talk(actors.sakura, "Hello")
         expect(returned):toBe(act)
     end)
 
     test("also updates token buffer (parent behavior)", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-        local act = SHIORI_ACT.new(actors)
+        local act, actors = new_act()
 
         act:talk(actors.sakura, "Hello")
         expect(#act.token):toBeGraterThan(0)
@@ -200,9 +191,7 @@ end)
 -- Test surface() method (グループ化対応版: surfaceはtalkのactorグループ内で処理される)
 describe("SHIORI_ACT - surface()", function()
     test("appends surface tag with number", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-        local act = SHIORI_ACT.new(actors)
+        local act, actors = new_act()
 
         -- グループ化後: surfaceはtalkのactorグループ内で処理される
         act:talk(actors.sakura, "")
@@ -213,9 +202,7 @@ describe("SHIORI_ACT - surface()", function()
     end)
 
     test("appends surface tag with alias string", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-        local act = SHIORI_ACT.new(actors)
+        local act, actors = new_act()
 
         -- グループ化後: surfaceはtalkのactorグループ内で処理される
         act:talk(actors.sakura, "")
@@ -226,9 +213,7 @@ describe("SHIORI_ACT - surface()", function()
     end)
 
     test("supports method chaining", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-        local act = SHIORI_ACT.new(actors)
+        local act = new_act()
 
         local returned = act:surface(5)
         expect(returned):toBe(act)
@@ -238,9 +223,7 @@ end)
 -- Test wait() method (グループ化対応版: waitはtalkのactorグループ内で処理される)
 describe("SHIORI_ACT - wait()", function()
     test("appends wait tag", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-        local act = SHIORI_ACT.new(actors)
+        local act, actors = new_act()
 
         act:talk(actors.sakura, "")
         act:wait(500)
@@ -250,9 +233,7 @@ describe("SHIORI_ACT - wait()", function()
     end)
 
     test("handles negative values as 0", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-        local act = SHIORI_ACT.new(actors)
+        local act, actors = new_act()
 
         act:talk(actors.sakura, "")
         act:wait(-100)
@@ -262,9 +243,7 @@ describe("SHIORI_ACT - wait()", function()
     end)
 
     test("truncates float to integer", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-        local act = SHIORI_ACT.new(actors)
+        local act, actors = new_act()
 
         act:talk(actors.sakura, "")
         act:wait(500.7)
@@ -274,9 +253,7 @@ describe("SHIORI_ACT - wait()", function()
     end)
 
     test("supports method chaining", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-        local act = SHIORI_ACT.new(actors)
+        local act = new_act()
 
         local returned = act:wait(500)
         expect(returned):toBe(act)
@@ -286,9 +263,7 @@ end)
 -- Test newline() method (グループ化対応版: newlineはtalkのactorグループ内で処理される)
 describe("SHIORI_ACT - newline()", function()
     test("appends single newline by default", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-        local act = SHIORI_ACT.new(actors)
+        local act, actors = new_act()
 
         act:talk(actors.sakura, "")
         act:newline()
@@ -298,9 +273,7 @@ describe("SHIORI_ACT - newline()", function()
     end)
 
     test("appends multiple newlines", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-        local act = SHIORI_ACT.new(actors)
+        local act, actors = new_act()
 
         act:talk(actors.sakura, "")
         act:newline(3)
@@ -310,9 +283,7 @@ describe("SHIORI_ACT - newline()", function()
     end)
 
     test("does nothing for n < 1", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-        local act = SHIORI_ACT.new(actors)
+        local act, actors = new_act()
 
         act:talk(actors.sakura, "")
         act:newline(0)
@@ -325,9 +296,7 @@ describe("SHIORI_ACT - newline()", function()
     end)
 
     test("supports method chaining", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-        local act = SHIORI_ACT.new(actors)
+        local act = new_act()
 
         local returned = act:newline()
         expect(returned):toBe(act)
@@ -337,9 +306,7 @@ end)
 -- Test clear() method (グループ化対応版: clearはtalkのactorグループ内で処理される)
 describe("SHIORI_ACT - clear()", function()
     test("appends clear tag", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-        local act = SHIORI_ACT.new(actors)
+        local act, actors = new_act()
 
         act:talk(actors.sakura, "")
         act:clear()
@@ -349,9 +316,7 @@ describe("SHIORI_ACT - clear()", function()
     end)
 
     test("supports method chaining", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-        local act = SHIORI_ACT.new(actors)
+        local act = new_act()
 
         local returned = act:clear()
         expect(returned):toBe(act)
@@ -361,9 +326,7 @@ end)
 -- Test build() method
 describe("SHIORI_ACT - build()", function()
     test("returns nil for empty buffer (act-build-early-return)", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-        local act = SHIORI_ACT.new(actors)
+        local act = new_act()
 
         local result = act:build()
 
@@ -371,9 +334,7 @@ describe("SHIORI_ACT - build()", function()
     end)
 
     test("appends \\e to end", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-        local act = SHIORI_ACT.new(actors)
+        local act, actors = new_act()
 
         act:talk(actors.sakura, "")
         act:surface(5):wait(100)
@@ -383,9 +344,7 @@ describe("SHIORI_ACT - build()", function()
     end)
 
     test("auto-resets after build", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-        local act = SHIORI_ACT.new(actors)
+        local act, actors = new_act()
 
         act:talk(actors.sakura, "test")
         act:surface(5)
@@ -405,9 +364,7 @@ end)
 -- Test talk_to_script conversion (wait insertion)
 describe("SHIORI_ACT - talk_to_script変換", function()
     test("通常テキストがそのまま出力される（デフォルト設定）", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-        local act = SHIORI_ACT.new(actors)
+        local act, actors = new_act()
 
         act:talk(actors.sakura, "Hello")
         local result = act:build()
@@ -417,9 +374,7 @@ describe("SHIORI_ACT - talk_to_script変換", function()
     end)
 
     test("句点にはウェイトタグが挿入される", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-        local act = SHIORI_ACT.new(actors)
+        local act, actors = new_act()
 
         act:talk(actors.sakura, "あ。")
         local result = act:build()
@@ -430,9 +385,7 @@ describe("SHIORI_ACT - talk_to_script変換", function()
     end)
 
     test("読点にはウェイトタグが挿入される", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-        local act = SHIORI_ACT.new(actors)
+        local act, actors = new_act()
 
         act:talk(actors.sakura, "あ、")
         local result = act:build()
@@ -446,9 +399,7 @@ end)
 -- E2E scenario test
 describe("SHIORI_ACT - E2E scenario", function()
     test("complex script generation", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-        local act = SHIORI_ACT.new(actors)
+        local act, actors = new_act()
 
         -- 新アーキテクチャ: set_spot()でスポット位置を明示的に設定
         act:set_spot("sakura", 0)
@@ -474,9 +425,7 @@ describe("SHIORI_ACT - E2E scenario", function()
     end)
 
     test("multiple rounds (build auto-resets)", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-        local act = SHIORI_ACT.new(actors)
+        local act, actors = new_act()
 
         -- First round
         act:talk(actors.sakura, "First")
@@ -498,8 +447,6 @@ end)
 -- Test act.req field
 describe("SHIORI_ACT - req field", function()
     test("stores req parameter in act.req", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
         local req = {
             id = "OnTest",
             method = "get",
@@ -507,7 +454,7 @@ describe("SHIORI_ACT - req field", function()
             reference = { "ref0", "ref1" },
         }
 
-        local act = SHIORI_ACT.new(actors, req)
+        local act = new_act(req)
 
         expect(act.req):toBe(req)
         expect(act.req.id):toBe("OnTest")
@@ -516,14 +463,12 @@ describe("SHIORI_ACT - req field", function()
     end)
 
     test("req reference is same object (not a copy)", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
         local req = {
             id = "OnBoot",
             reference = { "value0" },
         }
 
-        local act = SHIORI_ACT.new(actors, req)
+        local act = new_act(req)
 
         -- Same reference check
         expect(act.req == req):toBe(true)
@@ -531,8 +476,6 @@ describe("SHIORI_ACT - req field", function()
     end)
 
     test("act.req.date contains date info when provided", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
         local req = {
             id = "OnSecondChange",
             date = {
@@ -542,7 +485,7 @@ describe("SHIORI_ACT - req field", function()
             },
         }
 
-        local act = SHIORI_ACT.new(actors, req)
+        local act = new_act(req)
 
         expect(act.req.date.unix):toBe(1704067200)
         expect(act.req.date.hour):toBe(12)
@@ -557,8 +500,6 @@ end)
 describe("SHIORI_ACT - transfer_date_to_var()", function()
     -- 正常系: 全フィールド転記確認（英語・数値型）
     test("transfers all date fields from req.date to var", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
         local req = {
             id = "OnSecondChange",
             date = {
@@ -575,7 +516,7 @@ describe("SHIORI_ACT - transfer_date_to_var()", function()
             },
         }
 
-        local act = SHIORI_ACT.new(actors, req)
+        local act = new_act(req)
         act:transfer_date_to_var()
 
         -- 英語フィールド（数値型）確認
@@ -595,10 +536,7 @@ describe("SHIORI_ACT - transfer_date_to_var()", function()
 
     -- req 不在時の安全終了
     test("returns self safely when req is nil", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-
-        local act = SHIORI_ACT.new(actors, nil)
+        local act = new_act(nil)
         local result = act:transfer_date_to_var()
 
         -- 何もせず正常終了、メソッドチェーン用に self を返す
@@ -607,11 +545,9 @@ describe("SHIORI_ACT - transfer_date_to_var()", function()
 
     -- req.date 不在時の安全終了
     test("returns self safely when req.date is nil", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
         local req = { id = "OnSecondChange" }
 
-        local act = SHIORI_ACT.new(actors, req)
+        local act = new_act(req)
         local result = act:transfer_date_to_var()
 
         -- 何もせず正常終了、メソッドチェーン用に self を返す
@@ -620,8 +556,6 @@ describe("SHIORI_ACT - transfer_date_to_var()", function()
 
     -- 日本語変数マッピング確認（年月日時分秒）
     test("maps Japanese variable names with formatted strings", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
         local req = {
             id = "OnSecondChange",
             date = {
@@ -635,7 +569,7 @@ describe("SHIORI_ACT - transfer_date_to_var()", function()
             },
         }
 
-        local act = SHIORI_ACT.new(actors, req)
+        local act = new_act(req)
         act:transfer_date_to_var()
 
         -- 日本語変数（文字列型）確認
@@ -649,9 +583,6 @@ describe("SHIORI_ACT - transfer_date_to_var()", function()
 
     -- 曜日変換確認（wday 0-6 全パターン）
     test("converts wday to Japanese and English weekday names", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-
         local weekdays_ja = { "日曜日", "月曜日", "火曜日", "水曜日", "木曜日", "金曜日", "土曜日" }
         local weekdays_en = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" }
 
@@ -660,7 +591,7 @@ describe("SHIORI_ACT - transfer_date_to_var()", function()
                 id = "OnSecondChange",
                 date = { year = 2026, month = 2, day = 1, hour = 0, min = 0, sec = 0, wday = wday },
             }
-            local act = SHIORI_ACT.new(actors, req)
+            local act = new_act(req)
             act:transfer_date_to_var()
 
             expect(act.var["曜日"]):toBe(weekdays_ja[wday + 1])
@@ -670,9 +601,6 @@ describe("SHIORI_ACT - transfer_date_to_var()", function()
 
     -- 12時間制変換確認（hour 0, 1, 11, 12, 13, 23 のケース）
     test("converts hour to 12-hour format with 深夜0時/正午 special cases", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
-
         local test_cases = {
             { hour = 0, expected = "深夜0時" },
             { hour = 1, expected = "午前1時" },
@@ -687,7 +615,7 @@ describe("SHIORI_ACT - transfer_date_to_var()", function()
                 id = "OnSecondChange",
                 date = { year = 2026, month = 2, day = 1, hour = tc.hour, min = 0, sec = 0, wday = 0 },
             }
-            local act = SHIORI_ACT.new(actors, req)
+            local act = new_act(req)
             act:transfer_date_to_var()
 
             expect(act.var["時１２"]):toBe(tc.expected)
@@ -696,14 +624,12 @@ describe("SHIORI_ACT - transfer_date_to_var()", function()
 
     -- メソッドチェーン用に self を返す
     test("returns self for method chaining", function()
-        local SHIORI_ACT = require("pasta.shiori.act")
-        local actors = create_mock_actors()
         local req = {
             id = "OnSecondChange",
             date = { year = 2026, month = 2, day = 1, hour = 14, min = 37, sec = 45, wday = 0 },
         }
 
-        local act = SHIORI_ACT.new(actors, req)
+        local act = new_act(req)
         local result = act:transfer_date_to_var()
 
         expect(result):toBe(act)

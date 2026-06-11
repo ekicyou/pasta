@@ -251,6 +251,84 @@ fn test_load_empty_dic() {
     assert_eq!(result.as_i64(), Some(42));
 }
 
+#[test]
+fn test_load_missing_pasta_toml() {
+    // Base dir exists but has no pasta.toml -> ConfigNotFound surfaced via load()
+    let temp = TempDir::new().unwrap();
+
+    let result = PastaLoader::load(temp.path());
+
+    assert!(result.is_err());
+    match result {
+        Err(LoaderError::ConfigNotFound(path)) => {
+            assert_eq!(path, temp.path().join("pasta.toml"));
+        }
+        Err(other) => panic!("Expected ConfigNotFound error, got: {}", other),
+        Ok(_) => panic!("Expected ConfigNotFound error, got Ok"),
+    }
+}
+
+#[test]
+fn test_load_custom_pasta_patterns() {
+    // Custom [loader] pasta_patterns are honored, and the derived .lua pattern
+    // (".pasta" -> ".lua") discovers passthrough .lua files in the same dirs.
+    let temp = TempDir::new().unwrap();
+    let base_dir = temp.path();
+
+    std::fs::write(
+        base_dir.join("pasta.toml"),
+        "[loader]\ndebug_mode = true\npasta_patterns = [\"dic/*/*.pasta\", \"extra/*.pasta\"]\n",
+    )
+    .unwrap();
+
+    std::fs::create_dir_all(base_dir.join("dic/talk")).unwrap();
+    std::fs::write(
+        base_dir.join("dic/talk/hello.pasta"),
+        "＊テスト\n  ゴースト：「こんにちは」\n",
+    )
+    .unwrap();
+
+    std::fs::create_dir_all(base_dir.join("extra")).unwrap();
+    std::fs::write(
+        base_dir.join("extra/foo.pasta"),
+        "＊エクストラ\n  ゴースト：「extra」\n",
+    )
+    .unwrap();
+    std::fs::write(base_dir.join("extra/bar.lua"), "return { bar = true }\n").unwrap();
+
+    // Copy runtime deps (pasta_scripts, scriptlibs)
+    let crate_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    for dir_name in &["pasta_scripts", "scriptlibs"] {
+        let src = crate_root.join(dir_name);
+        let dst = base_dir.join(dir_name);
+        if src.exists() {
+            std::fs::create_dir_all(&dst).unwrap();
+            copy_dir_recursive(&src, &dst).unwrap();
+        }
+    }
+
+    let _runtime = PastaLoader::load(base_dir).unwrap();
+
+    // All three modules must be registered in scene_dic.lua
+    let scene_dic_path = base_dir.join("profile/pasta/cache/lua/pasta/scene_dic.lua");
+    let scene_dic = std::fs::read_to_string(&scene_dic_path).unwrap();
+    assert!(
+        scene_dic.contains("pasta.scene.talk.hello"),
+        "default-pattern module missing: {}",
+        scene_dic
+    );
+    assert!(
+        scene_dic.contains("pasta.scene.extra.foo"),
+        "custom-pattern .pasta module missing: {}",
+        scene_dic
+    );
+    assert!(
+        scene_dic.contains("pasta.scene.extra.bar"),
+        "derived .lua pattern module missing: {}",
+        scene_dic
+    );
+}
+
 // ============================================================================
 // Config Loading Tests
 // ============================================================================

@@ -57,7 +57,8 @@
 //!   its `variablesReference` straight through into
 //!   [`SessionCommand::Variables`]; the session side owns the `var_ref -> frame`
 //!   decode. Note: this adapter emits the `Locals` scope itself from the frame
-//!   list rather than relying on the session's [`Scope`] handles, so the scheme
+//!   list rather than relying on the session's [`Scope`](crate::debug::types::Scope)
+//!   handles, so the scheme
 //!   is self-contained and deterministic.
 //!
 //! # Error mapping (design "Event Contract": `output` optional)
@@ -68,8 +69,6 @@
 //! need a request to correlate to, which an asynchronous VM/FFI error does not
 //! have).
 
-#![allow(dead_code)]
-
 use std::collections::VecDeque;
 use std::sync::Arc;
 
@@ -78,8 +77,7 @@ use serde_json::{Value, json};
 use crate::debug::SourceMode;
 use crate::debug::source_map::SourceMap;
 use crate::debug::types::{
-    ResolvedBreakpoint, Scope, SessionCommand, SessionEvent, SourceRef, StopReason, ThreadInfo,
-    Variable,
+    ResolvedBreakpoint, SessionCommand, SessionEvent, SourceRef, StopReason, ThreadInfo, Variable,
 };
 
 /// The DAP `source` presentation for one frame: the `source` JSON object and
@@ -376,11 +374,9 @@ impl DapAdapter {
                 // client).
                 let initialized = self.event("initialized", json!({}));
                 Decoded {
-                    command: None,
                     response: Some(response),
                     events: vec![initialized],
-                    attach_source_mode: None,
-                    requested_source_mode: None,
+                    ..Decoded::default()
                 }
             }
             "setBreakpoints" => {
@@ -390,40 +386,28 @@ impl DapAdapter {
                 self.pending.push(PendingKind::SetBreakpoints, request_seq);
                 Decoded {
                     command: Some(SessionCommand::SetBreakpoints { source, lines }),
-                    response: None,
-                    events: Vec::new(),
-                    attach_source_mode: None,
-                    requested_source_mode: None,
+                    ..Decoded::default()
                 }
             }
             "configurationDone" => {
                 let response = self.response(request_seq, "configurationDone", Value::Null);
                 Decoded {
-                    command: None,
                     response: Some(response),
-                    events: Vec::new(),
-                    attach_source_mode: None,
-                    requested_source_mode: None,
+                    ..Decoded::default()
                 }
             }
             "threads" => {
                 self.pending.push(PendingKind::Threads, request_seq);
                 Decoded {
                     command: Some(SessionCommand::Threads),
-                    response: None,
-                    events: Vec::new(),
-                    attach_source_mode: None,
-                    requested_source_mode: None,
+                    ..Decoded::default()
                 }
             }
             "stackTrace" => {
                 self.pending.push(PendingKind::StackTrace, request_seq);
                 Decoded {
                     command: Some(SessionCommand::StackTrace),
-                    response: None,
-                    events: Vec::new(),
-                    attach_source_mode: None,
-                    requested_source_mode: None,
+                    ..Decoded::default()
                 }
             }
             "scopes" => {
@@ -436,7 +420,10 @@ impl DapAdapter {
                     .and_then(|a| a.get("frameId"))
                     .and_then(Value::as_u64)
                     .unwrap_or(0) as u32;
-                let var_ref = frame_id + 1;
+                // Saturating: `frameId` is untrusted client JSON, and a plain
+                // `+ 1` on `u32::MAX` would overflow-panic in debug builds.
+                // Saturation keeps the reference non-zero (DAP reserves 0).
+                let var_ref = frame_id.saturating_add(1);
                 let response = self.response(
                     request_seq,
                     "scopes",
@@ -451,9 +438,7 @@ impl DapAdapter {
                 Decoded {
                     command: Some(SessionCommand::Scopes { frame_id }),
                     response: Some(response),
-                    events: Vec::new(),
-                    attach_source_mode: None,
-                    requested_source_mode: None,
+                    ..Decoded::default()
                 }
             }
             "variables" => {
@@ -464,10 +449,7 @@ impl DapAdapter {
                 self.pending.push(PendingKind::Variables, request_seq);
                 Decoded {
                     command: Some(SessionCommand::Variables { var_ref }),
-                    response: None,
-                    events: Vec::new(),
-                    attach_source_mode: None,
-                    requested_source_mode: None,
+                    ..Decoded::default()
                 }
             }
             "continue" => {
@@ -479,9 +461,7 @@ impl DapAdapter {
                 Decoded {
                     command: Some(SessionCommand::Continue),
                     response: Some(response),
-                    events: Vec::new(),
-                    attach_source_mode: None,
-                    requested_source_mode: None,
+                    ..Decoded::default()
                 }
             }
             "next" => self.step_ack(request_seq, "next", SessionCommand::Next),
@@ -504,11 +484,9 @@ impl DapAdapter {
                     .map(SourceMode::parse);
                 let response = self.response(request_seq, "attach", Value::Null);
                 Decoded {
-                    command: None,
                     response: Some(response),
-                    events: Vec::new(),
                     attach_source_mode,
-                    requested_source_mode: None,
+                    ..Decoded::default()
                 }
             }
             "pasta/sourcePresentation" => {
@@ -535,11 +513,8 @@ impl DapAdapter {
                     .and_then(Value::as_str)
                     .and_then(parse_source_mode_strict);
                 Decoded {
-                    command: None,
-                    response: None,
-                    events: Vec::new(),
-                    attach_source_mode: None,
                     requested_source_mode,
+                    ..Decoded::default()
                 }
             }
             "disconnect" => {
@@ -547,9 +522,7 @@ impl DapAdapter {
                 Decoded {
                     command: Some(SessionCommand::Disconnect),
                     response: Some(response),
-                    events: Vec::new(),
-                    attach_source_mode: None,
-                    requested_source_mode: None,
+                    ..Decoded::default()
                 }
             }
             _ => Decoded::default(),
@@ -563,9 +536,7 @@ impl DapAdapter {
         Decoded {
             command: Some(cmd),
             response: Some(response),
-            events: Vec::new(),
-            attach_source_mode: None,
-            requested_source_mode: None,
+            ..Decoded::default()
         }
     }
 
@@ -800,21 +771,11 @@ fn encode_variables(vars: &[Variable]) -> Vec<Value> {
         .collect()
 }
 
-/// Encode a session [`Scope`] (unused on the immediate-scopes path; retained for
-/// completeness so a future richer scopes flow can reuse it).
-fn encode_scope(scope: &Scope) -> Value {
-    json!({
-        "name": scope.name,
-        "variablesReference": scope.variables_reference,
-        "expensive": false,
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    use crate::debug::types::FrameInfo;
+    use crate::debug::types::{FrameInfo, Scope};
 
     /// Build a minimal DAP request value.
     fn request(seq: u64, command: &str, arguments: Value) -> Value {
@@ -1660,5 +1621,198 @@ mod tests {
         // フレーム 1: 対応なし → 生成 `.lua` 提示（R5.3 判別可能フォールバック）。
         assert_eq!(frames[1]["source"], json!({ "path": r"@C:\proj\cache\scene.lua" }));
         assert_eq!(frames[1]["line"], 2);
+    }
+
+    // --- malformed-request degradation (documented graceful fallbacks) ------
+
+    /// `parse_set_breakpoints` degradation: a `setBreakpoints` whose arguments
+    /// lack the `source.path` decodes to an EMPTY path (not a panic, not a
+    /// dropped command), and breakpoint entries without a numeric `line` are
+    /// SKIPPED while well-formed siblings survive (documented "missing pieces
+    /// degrade gracefully").
+    #[test]
+    fn set_breakpoints_malformed_args_degrade_gracefully() {
+        let mut dap = DapAdapter::new();
+        // No `source` at all + a mix of well-formed and malformed entries.
+        let decoded = dap.decode_request(&request(
+            9,
+            "setBreakpoints",
+            json!({
+                "breakpoints": [
+                    { "line": 4 },
+                    { "noline": true },        // no `line` key → skipped
+                    { "line": "seven" },        // non-numeric line → skipped
+                    { "line": 9 },
+                ],
+            }),
+        ));
+        assert_eq!(
+            decoded.command,
+            Some(SessionCommand::SetBreakpoints {
+                source: SourceRef::new(""),
+                lines: vec![4, 9],
+            }),
+            "missing source.path → empty path; malformed entries skipped, \
+             well-formed lines preserved in order"
+        );
+    }
+
+    /// Envelope degradation: a request with a MISSING (or non-numeric) `seq`
+    /// falls back to `request_seq = 0` in the correlated response rather than
+    /// failing to decode.
+    #[test]
+    fn missing_or_non_numeric_seq_falls_back_to_zero() {
+        let mut dap = DapAdapter::new();
+        // No `seq` key at all.
+        let decoded = dap.decode_request(&json!({
+            "type": "request",
+            "command": "configurationDone",
+        }));
+        let resp = decoded.response.expect("still acks without a seq");
+        assert_eq!(resp["request_seq"], 0, "missing seq → request_seq 0");
+
+        // A non-numeric seq is treated the same way.
+        let decoded2 = dap.decode_request(&json!({
+            "seq": "twelve",
+            "type": "request",
+            "command": "configurationDone",
+        }));
+        assert_eq!(
+            decoded2.response.expect("acks")["request_seq"],
+            0,
+            "non-numeric seq → request_seq 0"
+        );
+    }
+
+    /// `scopes` without a `frameId` defaults to frame 0, so the synthetic
+    /// `Locals` scope reports `variablesReference = 0 + 1 = 1` (still non-zero,
+    /// still decodable).
+    #[test]
+    fn scopes_missing_frame_id_defaults_to_frame_zero() {
+        let mut dap = DapAdapter::new();
+        let decoded = dap.decode_request(&request(14, "scopes", json!({})));
+        assert_eq!(decoded.command, Some(SessionCommand::Scopes { frame_id: 0 }));
+        let resp = decoded.response.expect("scopes answered immediately");
+        let scopes = resp["body"]["scopes"].as_array().expect("scopes array");
+        assert_eq!(
+            scopes[0]["variablesReference"], 1,
+            "missing frameId → frame 0 → variablesReference 1 (non-zero)"
+        );
+    }
+
+    /// Hardening regression (trust boundary): a hostile or buggy client sending
+    /// `frameId: u32::MAX` must NOT panic the adapter (the synthetic scope's
+    /// `variablesReference = frame_id + 1` would overflow in debug builds).
+    /// The reference saturates at `u32::MAX` instead — still non-zero, and the
+    /// request is still answered immediately like any other `scopes`.
+    #[test]
+    fn scopes_huge_frame_id_does_not_overflow() {
+        let mut dap = DapAdapter::new();
+        let decoded = dap.decode_request(&request(17, "scopes", json!({ "frameId": u32::MAX })));
+        assert_eq!(
+            decoded.command,
+            Some(SessionCommand::Scopes { frame_id: u32::MAX }),
+            "the command still forwards the (extreme) frame id"
+        );
+        let resp = decoded.response.expect("scopes still answered immediately");
+        let scopes = resp["body"]["scopes"].as_array().expect("scopes array");
+        assert_eq!(
+            scopes[0]["variablesReference"],
+            u32::MAX,
+            "variablesReference saturates at u32::MAX (non-zero, no overflow panic)"
+        );
+    }
+
+    /// `variables` without a `variablesReference` degrades to `var_ref = 0`
+    /// and still forwards the command (the session side owns the decode).
+    #[test]
+    fn variables_missing_reference_defaults_to_zero() {
+        let mut dap = DapAdapter::new();
+        let decoded = dap.decode_request(&request(16, "variables", json!({})));
+        assert_eq!(
+            decoded.command,
+            Some(SessionCommand::Variables { var_ref: 0 }),
+            "missing variablesReference → var_ref 0"
+        );
+        assert!(decoded.response.is_none(), "variables stays deferred");
+    }
+
+    /// `attach` with a NON-STRING `sourcePresentation` (e.g. a number) yields
+    /// `None` — the value never reaches `SourceMode::parse`, so unlike an
+    /// invalid STRING (which falls back to `Pasta`, design 615) the resolved
+    /// env > file > 既定 mode is kept. This pins the documented type gate.
+    #[test]
+    fn attach_non_string_source_presentation_is_none() {
+        let mut dap = DapAdapter::new();
+        let decoded = dap.decode_request(&request(
+            4,
+            "attach",
+            json!({ "sourcePresentation": 1 }),
+        ));
+        assert_eq!(
+            decoded.attach_source_mode, None,
+            "non-string sourcePresentation → None (no Pasta fallback)"
+        );
+        // The handshake still proceeds.
+        assert!(decoded.response.is_some(), "attach still acks");
+    }
+
+    // --- pending-table edge behaviour ---------------------------------------
+
+    /// A deferred-kind event arriving with NO outstanding request (spurious /
+    /// out-of-band) is still encoded, correlated to the documented fallback
+    /// `request_seq = 0` instead of panicking or being dropped.
+    #[test]
+    fn spurious_deferred_event_correlates_to_request_seq_zero() {
+        let mut dap = DapAdapter::new();
+        // No threads request was ever decoded.
+        let out = dap.encode_event(SessionEvent::Threads(vec![]));
+        assert_eq!(out.len(), 1, "spurious event still produces a frame");
+        assert_eq!(out[0]["type"], "response");
+        assert_eq!(out[0]["command"], "threads");
+        assert_eq!(out[0]["request_seq"], 0, "no pending request → fallback 0");
+    }
+
+    /// `SessionEvent::Scopes` is documented as a deliberate NO-OP on the wire
+    /// (the `scopes` response was already answered at decode time): encoding it
+    /// must yield zero frames and must not disturb the seq counter.
+    #[test]
+    fn scopes_event_is_a_wire_no_op() {
+        let mut dap = DapAdapter::new();
+        let out = dap.encode_event(SessionEvent::Scopes(vec![Scope {
+            name: "Locals".to_string(),
+            variables_reference: 1,
+        }]));
+        assert!(out.is_empty(), "Scopes event emits nothing on the wire");
+
+        // The seq counter was not consumed: the next emission starts at 1.
+        let ev = dap.encode_event(SessionEvent::Terminated);
+        assert_eq!(ev[0]["seq"], 1, "no-op event must not consume a seq");
+    }
+
+    /// The pending FIFO is keyed PER KIND: with one `threads` and one
+    /// `stackTrace` outstanding, delivering the events in the OPPOSITE order
+    /// still pairs each response to its own request's seq (no cross-kind
+    /// stealing).
+    #[test]
+    fn pending_kinds_are_independent_fifos() {
+        let mut dap = DapAdapter::new();
+        dap.decode_request(&request(200, "threads", json!({})));
+        dap.decode_request(&request(201, "stackTrace", json!({})));
+
+        // Stack arrives FIRST even though threads was requested first.
+        let stack = dap.encode_event(SessionEvent::Stack(vec![]));
+        assert_eq!(stack[0]["command"], "stackTrace");
+        assert_eq!(
+            stack[0]["request_seq"], 201,
+            "Stack pairs to the stackTrace request, not the older threads one"
+        );
+
+        let threads = dap.encode_event(SessionEvent::Threads(vec![]));
+        assert_eq!(threads[0]["command"], "threads");
+        assert_eq!(
+            threads[0]["request_seq"], 200,
+            "Threads still pairs to its own kind's pending seq"
+        );
     }
 }

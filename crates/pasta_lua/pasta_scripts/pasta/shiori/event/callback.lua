@@ -78,10 +78,14 @@ function CALLBACK.try_route(req)
     CALLBACK.pending[req.id] = nil
 
     -- Convert 0-indexed reference to 1-based array
+    -- ハードニング (3.49 G3): Rust 境界（lua_request.rs）は reference を常時生成するが、
+    -- Lua 側から直接呼ばれる経路で reference が欠落しても、pending 削除済みの
+    -- 待機コルーチンを孤児化（nil 添字エラー）させず空 refs で継続する
+    local reference = req.reference or {}
     local refs = {}
     local i = 0
-    while req.reference[i] ~= nil do
-        refs[i + 1] = req.reference[i]
+    while reference[i] ~= nil do
+        refs[i + 1] = reference[i]
         i = i + 1
     end
 
@@ -111,10 +115,10 @@ function CALLBACK.sweep(now)
             if type(entry.on_timeout) == "string" then
                 coroutine.resume(entry.co, nil, entry.on_timeout)
                 log.warn(event_id .. ": " .. entry.on_timeout)
+                -- 3.49 (G3): RES.err 経路へ統一（旧インライン構築はヘッダーキーが
+                -- "X-ERROR-REASON" で res.lua の "X-Error-Reason" と不一致だった）
                 if timeout_response == nil then
-                    timeout_response = RES.build("500 Internal Server Error", {
-                        ["X-ERROR-REASON"] = entry.on_timeout,
-                    })
+                    timeout_response = RES.err(entry.on_timeout)
                 end
             else
                 coroutine.resume(entry.co, nil)

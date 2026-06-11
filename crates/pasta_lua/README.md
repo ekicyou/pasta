@@ -28,19 +28,24 @@ SHIORI Integration (プロトコル処理)
 ```
 pasta_lua/
 ├── Cargo.toml
+├── build.rs                  # pasta_scripts/ の決定論的 zip 埋め込み
+├── build_zip.rs              # 決定論的 zip パッカー（build.rs/テスト共有）
 └── src/
-    ├── lib.rs              # クレートエントリーポイント
-    ├── transpiler.rs       # LuaTranspiler（トランスパイラエントリ）
-    ├── code_gen/           # コード生成モジュール
-    │   ├── mod.rs          # CodeGenerator インターフェース
-    │   ├── scope_gen.rs    # スコープコード生成
-    │   └── element_gen.rs  # 要素コード生成
-    ├── runtime/            # Lua VM ランタイム
-    │   ├── mod.rs             # PastaLuaRuntime
-    │   ├── runtime_config.rs  # RuntimeConfig（設定型）
-    │   └── module_registry.rs # Lua モジュール登録管理
-    └── loader/             # 起動・設定読み込み
-        └── config.rs       # pasta.toml 読み込み
+    ├── lib.rs                # クレートエントリーポイント
+    ├── transpiler.rs         # LuaTranspiler（トランスパイラエントリ）
+    ├── config.rs             # TranspilerConfig / LineEnding
+    ├── context.rs            # TranspileContext（レジストリ・属性管理）
+    ├── error.rs              # TranspileError / ConfigError
+    ├── normalize.rs          # 出力正規化・LineShift（行番号リベース）
+    ├── string_literalizer.rs # Lua 文字列リテラル変換
+    ├── code_gen/             # コード生成モジュール
+    ├── loader/               # 起動・設定読み込み・キャッシュ
+    ├── runtime/              # Lua VM ランタイム（PastaLuaRuntime）
+    ├── debug/                # DAP デバッグサポート・ソースマップ
+    ├── encoding/             # 文字エンコーディング変換
+    ├── logging/              # tracing ログ統合
+    ├── search/               # シーン・単語検索 API
+    └── sakura_script/        # さくらスクリプト変換
 ```
 
 > **Note**: テストは `tests/common/mod.rs` に共有ヘルパーを集約し、統合テストを複数ファイルに分割しています。
@@ -150,7 +155,7 @@ rotation_days = 7
 # 有効にするライブラリの配列（Cargo風記法）
 # デフォルト: ["std_all", "assertions", "testing", "regex", "json", "yaml"]
 libs = [
-    "std_all",      # Lua安全標準ライブラリ (coroutine, table, io, os, string, utf8, math, package)
+    "std_all",      # Lua安全標準ライブラリ全部（debug を除く）
     "assertions",   # @assertions モジュール
     "testing",      # @testing モジュール
     "regex",        # @regex モジュール
@@ -233,10 +238,12 @@ print(sakura.spot)  -- 0（CONFIG由来プロパティを保持）
 | `std_io`         | io ライブラリ                                |
 | `std_os`         | os ライブラリ                                |
 | `std_string`     | string ライブラリ                            |
-| `std_utf8`       | utf8 ライブラリ                              |
 | `std_math`       | math ライブラリ                              |
 | `std_package`    | package ライブラリ（require等）              |
 | `std_debug`      | **debug ライブラリ（セキュリティ警告発生）** |
+| `std_jit`        | jit ライブラリ（LuaJIT）                     |
+| `std_ffi`        | ffi ライブラリ（LuaJIT）                     |
+| `std_bit`        | bit ライブラリ（LuaJIT）                     |
 
 **mlua-stdlib モジュール:**
 
@@ -303,6 +310,7 @@ libs = [
 | `@pasta_config`        | pasta.toml のカスタムフィールド | 常に有効                   |
 | `@pasta_sakura_script` | さくらスクリプト変換 API        | 常に有効                   |
 | `@pasta_log`           | Lua→Rust tracing ログブリッジ   | 常に有効                   |
+| `@pasta_persistence`   | 永続化データの load/save        | 常に有効                   |
 | `@enc`                 | エンコーディング変換            | 常に有効                   |
 | `@assertions`          | アサーション関数                | 有効                       |
 | `@testing`             | テストフレームワーク            | 有効                       |

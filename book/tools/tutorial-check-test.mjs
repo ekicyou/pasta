@@ -18,6 +18,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
   REPO_ROOT,
@@ -169,6 +170,78 @@ log('\n== (B-5) ユニット: normalizeForCompare / matchDicFile ==');
     matchDicFile(dic, ['＃ x\r\n％女の子\r\n　＠笑顔：\\s[0]\r\n']) === true);
   check('matchDicFile: 1 文字違いは不一致',
     matchDicFile(dic, ['＃ x\n％男の子\n　＠笑顔：\\s[0]\n']) === false);
+
+  // ハードニング境界（cell 3.59）: 単独 CR（旧 Mac 改行）も LF と同一視する
+  // （drift-check.mjs sha256File の /\r\n?/g 正規化と対称。改行コード差は内容差でない）。
+  check('単独 CR と LF を同一視（\\r\\n? 正規化・drift-check と対称）',
+    normalizeForCompare('a\rb\r') === normalizeForCompare('a\nb\n'));
+  check('matchDicFile: 単独 CR の dic でも LF ブロックと一致',
+    matchDicFile('＃ x\r％女の子\r　＠笑顔：\\s[0]\r', [dic]) === true);
+}
+
+// ============================================================
+log('\n== (B-6) fatal 経路（チュートリアル不在） ==');
+{
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tutorial-check-'));
+  try {
+    const result = runTutorialCheck(root);
+    check('チュートリアル不在で ok=false', result.ok === false);
+    check('fatal メッセージにチュートリアルパスを含む',
+      typeof result.fatal === 'string' && result.fatal.includes(TUTORIAL_REL),
+      String(result.fatal));
+    check('fatal 時は results が空', result.results.length === 0);
+    const rep = reportTutorialCheck(result);
+    check('レポートに FATAL 行', rep.includes('FATAL'));
+    check('レポートが RESULT: FAIL', rep.includes('RESULT: FAIL'));
+  } finally {
+    rmrf(root);
+  }
+}
+
+// ============================================================
+log('\n== (B-7) レポート分岐（MISMATCH 表示・対処ガイダンス / OK 表示） ==');
+{
+  const bad = makeSandbox({ corruptFile: 'talk.pasta' });
+  const good = makeSandbox();
+  try {
+    const repBad = reportTutorialCheck(runTutorialCheck(bad));
+    check('MISMATCH 行に対象 dic を表示', /MISMATCH\s+\S*talk\.pasta/.test(repBad), repBad);
+    check('失敗レポートに RESULT: FAIL と対処ガイダンス',
+      repBad.includes('RESULT: FAIL') && repBad.includes('対処'));
+
+    const repGood = reportTutorialCheck(runTutorialCheck(good));
+    check('一致レポートに RESULT: OK', repGood.includes('RESULT: OK'));
+    check('一致レポートに MATCH 行', /MATCH\s+\S*boot\.pasta/.test(repGood));
+  } finally {
+    rmrf(bad);
+    rmrf(good);
+  }
+}
+
+// ============================================================
+log('\n== (B-8) extractPastaBlocks 端ケース（CRLF / 行内空白 / 類似言語名 / 未閉鎖） ==');
+{
+  check('CRLF フェンスを抽出',
+    extractPastaBlocks('```pasta\r\n＃ X\r\n```\r\n').length === 1);
+  check('```pasta 後の行内空白を許容',
+    extractPastaBlocks('```pasta  \n＃ Y\n```\n').length === 1);
+  check('pasta 始まりの別言語注記（```pastalang）は拾わない',
+    extractPastaBlocks('```pastalang\n＃ Z\n```\n').length === 0);
+  check('未閉鎖フェンスは抽出しない',
+    extractPastaBlocks('```pasta\n＃ W\n').length === 0);
+}
+
+// ============================================================
+log('\n== (B-9) CLI 結線（exit code / RESULT 出力） ==');
+{
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const r = spawnSync(process.execPath, [path.join(here, 'tutorial-check.mjs')], {
+    encoding: 'utf8',
+    timeout: 60000,
+  });
+  check('CLI: 逐語一致の実リポジトリで exit 0', r.status === 0, `status=${r.status}`);
+  check('CLI: RESULT: OK を出力', /RESULT: OK/.test(r.stdout || ''),
+    (r.stdout || '').slice(-200));
 }
 
 // ============================================================

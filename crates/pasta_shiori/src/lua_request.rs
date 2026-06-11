@@ -1,4 +1,3 @@
-#![allow(clippy::trivially_copy_pass_by_ref)]
 use crate::error::{MyError, MyResult};
 use crate::util::parsers::req::{Parser, Rule};
 use pasta_lua::mlua::{Lua, Table};
@@ -76,35 +75,37 @@ pub fn parse_request(lua: &Lua, text: &str) -> MyResult<Table> {
 }
 
 fn parse1(table: &Table, mut it: FlatPairs<'_, Rule>) -> MyResult<()> {
-    let pair = match it.next() {
-        Some(a) => a,
-        None => return Ok(()),
-    };
-    let rule = pair.as_rule();
-    match rule {
-        Rule::key_value => parse_key_value(table, &mut it)?,
-        Rule::get => table.set("method", "get")?,
-        Rule::notify => table.set("method", "notify")?,
-        Rule::header3 => table.set("version", 30)?,
-        Rule::shiori2_id => table.set("id", pair.as_str())?,
-        Rule::shiori2_ver => {
-            let version = {
-                let nums: i32 = pair.as_str().parse().map_err(|_| MyError::Script {
-                    message: format!("Invalid SHIORI2 version number: '{}'", pair.as_str()),
-                })?;
-                if nums < 0 {
-                    20
-                } else if nums > 9 {
-                    29
-                } else {
-                    nums + 20
-                }
-            };
-            table.set("version", version)?
-        }
-        _ => (),
-    };
-    parse1(table, it)
+    // 3.37 (G3): iterate instead of recursing. The pair stream length is
+    // host-controlled (one element per header); recursing per pair allowed a
+    // hostile request to exhaust the stack, which aborts the whole host
+    // process across the SHIORI boundary (cannot be caught).
+    while let Some(pair) = it.next() {
+        let rule = pair.as_rule();
+        match rule {
+            Rule::key_value => parse_key_value(table, &mut it)?,
+            Rule::get => table.set("method", "get")?,
+            Rule::notify => table.set("method", "notify")?,
+            Rule::header3 => table.set("version", 30)?,
+            Rule::shiori2_id => table.set("id", pair.as_str())?,
+            Rule::shiori2_ver => {
+                let version = {
+                    let nums: i32 = pair.as_str().parse().map_err(|_| MyError::Script {
+                        message: format!("Invalid SHIORI2 version number: '{}'", pair.as_str()),
+                    })?;
+                    if nums < 0 {
+                        20
+                    } else if nums > 9 {
+                        29
+                    } else {
+                        nums + 20
+                    }
+                };
+                table.set("version", version)?
+            }
+            _ => (),
+        };
+    }
+    Ok(())
 }
 
 fn parse_key_value(table: &Table, it: &mut FlatPairs<'_, Rule>) -> MyResult<()> {

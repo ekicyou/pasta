@@ -17,6 +17,7 @@
 // mdBook 検索 UI と同一のクエリオプションを再現して 2.4 の成立を立証する。
 
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -25,6 +26,7 @@ import { tokenize } from './tokenize.mjs';
 import {
   resolveHashed,
   readSearchIndex,
+  extractJsonLiteral,
   rebuildBigramIndex,
   serializeSearchIndex,
   buildBigramIndex,
@@ -60,6 +62,90 @@ function check(name, cond, detail) {
     log(`  FAIL  ${name}${detail ? '  -- ' + detail : ''}`);
   }
 }
+
+// =========================================================================
+// UNIT: extractJsonLiteral / serializeSearchIndex / resolveHashed（3.63 G1 追加）
+//   フィクスチャ非依存の純関数・IO 関数を直接検証する。
+// =========================================================================
+log('--- UNIT (extract / serialize / resolve) ---');
+{
+  // 例外を捕捉して message を返す（throw しなければ null）。
+  const thrown = (fn) => {
+    try { fn(); return null; } catch (e) { return String(e && e.message ? e.message : e); }
+  };
+
+  // 基本形: jsonStr と open/close（リテラル本文のソース上境界）が正しい。
+  {
+    const src = `window.search = Object.assign(window.search, JSON.parse('{"a":1}'));`;
+    const { jsonStr, open, close } = extractJsonLiteral(src);
+    check('UNIT: extractJsonLiteral 基本形の jsonStr', jsonStr === '{"a":1}', jsonStr);
+    check('UNIT: extractJsonLiteral open/close がリテラル本文境界を指す',
+      src.slice(open, close) === '{"a":1}', `open=${open} close=${close}`);
+  }
+
+  // 動機ケース（1.2 申し送り①）: JSON 本文中の `))` で過少切り出しされない。
+  {
+    const payload = '{"code":"f(g(x)))) end"}';
+    const src = `JSON.parse('${payload}'));`;
+    const { jsonStr } = extractJsonLiteral(src);
+    check('UNIT: JSON 本文中の `))` があっても正しい境界で抽出', jsonStr === payload, jsonStr);
+  }
+
+  // エスケープ復号: \' \\ \n \r \t と未知エスケープのパススルー。
+  {
+    const src = `JSON.parse('a\\'b\\\\c\\nd\\re\\tf\\dg'));`;
+    const { jsonStr } = extractJsonLiteral(src);
+    check('UNIT: エスケープ復号（quote/backslash/n/r/t/未知 \\d 保持）',
+      jsonStr === "a'b\\c\nd\re\tf\\dg", JSON.stringify(jsonStr));
+  }
+
+  // marker 直後の空白を許容する。
+  {
+    const { jsonStr } = extractJsonLiteral(`JSON.parse(  '{}'));`);
+    check('UNIT: JSON.parse( 直後の空白を読み飛ばす', jsonStr === '{}', jsonStr);
+  }
+
+  // エラー系 4 種: marker 欠落 / 二重引用符 / 末尾エスケープ / 未終端。
+  check('UNIT: marker 欠落で明示エラー',
+    /JSON\.parse\( not found/.test(thrown(() => extractJsonLiteral('var x = 1;'))));
+  check('UNIT: 二重引用符リテラルは拒否',
+    /single-quoted/.test(thrown(() => extractJsonLiteral(`JSON.parse("{}"));`))));
+  check('UNIT: 末尾の宙ぶらりんエスケープで明示エラー',
+    /dangling escape/.test(thrown(() => extractJsonLiteral(`JSON.parse('abc\\`))));
+  check('UNIT: 未終端リテラルで明示エラー',
+    /unterminated/.test(thrown(() => extractJsonLiteral(`JSON.parse('abc`))));
+
+  // serialize -> extract ラウンドトリップ（単引用符・バックスラッシュ・改行・`))`）。
+  {
+    const obj = { a: "it's", b: 'back\\slash', c: 'new\nline', d: 'paren))' };
+    const s = serializeSearchIndex(obj);
+    check('UNIT: serializeSearchIndex はラッパ形式（window.search = ... JSON.parse(...)）を維持',
+      s.startsWith(`window.search = Object.assign(window.search, JSON.parse('`) &&
+      s.endsWith(`'));`), s.slice(0, 60));
+    const { jsonStr } = extractJsonLiteral(s);
+    check('UNIT: serialize -> extract ラウンドトリップで同一オブジェクト',
+      JSON.stringify(JSON.parse(jsonStr)) === JSON.stringify(obj), jsonStr);
+  }
+
+  // resolveHashed / readSearchIndex: 一時ディレクトリで IO 経路を検証。
+  {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bigram-index-test-'));
+    try {
+      const file = path.join(tmp, 'searchindex-deadbeef.js');
+      fs.writeFileSync(file, `window.search = Object.assign(window.search, JSON.parse('{"doc_urls":["x.html"]}'));`, 'utf8');
+      check('UNIT: resolveHashed がハッシュ付きファイルをグロブ解決',
+        resolveHashed(tmp, /^searchindex-.*\.js$/) === file);
+      check('UNIT: resolveHashed 不一致は明示エラー',
+        /not found/.test(thrown(() => resolveHashed(tmp, /^elasticlunr-.*\.min\.js$/))));
+      const parsed = readSearchIndex(file);
+      check('UNIT: readSearchIndex がファイルから JSON を復元',
+        JSON.stringify(parsed.doc_urls) === JSON.stringify(['x.html']));
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  }
+}
+log('');
 
 // mdBook 標準検索 UI と同一のクエリオプション（searcher.js 由来）。
 const SEARCH_OPTIONS = {
@@ -223,6 +309,52 @@ log('--- ROUND-TRIP (write -> re-read) ---');
       `urls=${JSON.stringify(urls.slice(0, 5))}`);
   } finally {
     elasticlunr.tokenizer = savedTok;
+  }
+}
+log('');
+
+// =========================================================================
+// DRY-RUN & CLI 契約（3.63 G1/G3 追加）
+// =========================================================================
+log('--- DRY-RUN (write:false) & CLI contract ---');
+{
+  // write:false はファイルを変更せずサイズのみ報告する（ドライラン契約）。
+  const file = resolveHashed(bookOut, /^searchindex-.*\.js$/);
+  const before = fs.readFileSync(file);
+  const dry = buildBigramIndex(bookOut, { write: false });
+  const after = fs.readFileSync(file);
+  check('DRY-RUN: write:false でファイルが変更されない', before.equals(after),
+    `before=${before.length} after=${after.length}`);
+  check('DRY-RUN: 報告サイズが書き込み済み実ファイルと一致', dry.sizeBytes === after.length,
+    `size=${dry.sizeBytes} file=${after.length}`);
+
+  const buildIndexScript = path.resolve(here, 'build-index.mjs');
+
+  // CLI 引数なし: モジュール位置基準の既定パス（../../book = book/book）で動作する。
+  // 回帰固定（3.63 G3）: 旧実装は new URL().pathname を直接 path.resolve しており、
+  // Windows で `C:\C:\...` に壊れ ENOENT exit 1 だった（fileURLToPath 化で修正）。
+  {
+    const out = execFileSync('node', [buildIndexScript], { encoding: 'utf8' });
+    check('CLI: 引数なしで既定パス（book/book）に対し exit 0',
+      /bigram index written:/.test(out), out.slice(0, 200));
+  }
+
+  // CLI 失敗契約: 存在しないディレクトリ指定は非ゼロ終了＋診断メッセージ。
+  {
+    let status = 0;
+    let stderr = '';
+    try {
+      // stdio 明示で子プロセスの stderr が本テスト出力へ漏れないようにする
+      // （既定では親の stderr へ転写され FAIL に見えるノイズになる）。
+      execFileSync('node', [buildIndexScript, path.join(bookOut, 'no-such-dir')],
+        { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    } catch (e) {
+      status = e.status;
+      stderr = String(e.stderr || '');
+    }
+    check('CLI: 不正ディレクトリで exit 1', status === 1, `status=${status}`);
+    check('CLI: 失敗時に build-index failed 診断を stderr へ出力',
+      /build-index failed:/.test(stderr), stderr.slice(0, 200));
   }
 }
 log('');

@@ -116,6 +116,80 @@ fn test_enc_nil_handling() {
     assert_eq!(status, "error");
 }
 
+/// to_ansi に不正な UTF-8 バイト列を渡すと (nil, "invalid UTF-8 ...") を返す
+/// （review-improvement-loop セル 3.16 / G1 追加: 入力検証エラーパス）。
+#[test]
+fn test_enc_to_ansi_invalid_utf8_input_error() {
+    let runtime = create_test_runtime();
+
+    // "\255\254" は UTF-8 として不正なバイト列（Lua 文字列は任意バイトを保持できる）
+    let script = r#"
+        local enc = require "@enc"
+        local result, err = enc.to_ansi("\255\254")
+        if result ~= nil then
+            return "unexpected_success"
+        end
+        return err
+    "#;
+
+    let result = runtime.exec(script).unwrap();
+    let err = result.as_string().unwrap().to_str().unwrap().to_string();
+    assert!(
+        err.contains("invalid UTF-8"),
+        "error should mention invalid UTF-8: {err}"
+    );
+}
+
+/// ANSI コードページで表現できない文字（絵文字）は (nil, "ANSI conversion failed ...")
+/// を返す（Windows のみ: Unix 実装は UTF-8 パススルー）。
+#[cfg(windows)]
+#[test]
+fn test_enc_to_ansi_unmappable_char_error() {
+    let runtime = create_test_runtime();
+
+    // "\240\159\152\128" = U+1F600 (😀)。CP932/CP1252 等の ANSI には存在しない
+    let script = r#"
+        local enc = require "@enc"
+        local result, err = enc.to_ansi("\240\159\152\128")
+        if result ~= nil then
+            return "unexpected_success"
+        end
+        return err
+    "#;
+
+    let result = runtime.exec(script).unwrap();
+    let err = result.as_string().unwrap().to_str().unwrap().to_string();
+    assert!(
+        err.contains("ANSI conversion failed"),
+        "error should mention ANSI conversion failure: {err}"
+    );
+}
+
+/// ANSI として不正なバイト列を to_utf8 に渡すと (nil, "UTF-8 conversion failed ...")
+/// を返す（Windows のみ: MB_ERR_INVALID_CHARS による検証）。
+#[cfg(windows)]
+#[test]
+fn test_enc_to_utf8_invalid_ansi_bytes_error() {
+    let runtime = create_test_runtime();
+
+    // 0x81 単独は CP932 では後続バイト欠落、CP1252 では未定義 → どちらも不正
+    let script = r#"
+        local enc = require "@enc"
+        local result, err = enc.to_utf8("\129")
+        if result ~= nil then
+            return "unexpected_success"
+        end
+        return err
+    "#;
+
+    let result = runtime.exec(script).unwrap();
+    let err = result.as_string().unwrap().to_str().unwrap().to_string();
+    assert!(
+        err.contains("UTF-8 conversion failed"),
+        "error should mention UTF-8 conversion failure: {err}"
+    );
+}
+
 // ============================================================================
 // Windows-specific tests (Japanese path support)
 // ============================================================================

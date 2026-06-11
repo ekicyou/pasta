@@ -136,12 +136,12 @@ mod lua_date_tests {
 
         // Basic sanity checks
         assert!(
-            year >= 2020 && year <= 2100,
+            (2020..=2100).contains(&year),
             "year should be reasonable: {}",
             year
         );
-        assert!(month >= 1 && month <= 12, "month should be 1-12: {}", month);
-        assert!(day >= 1 && day <= 31, "day should be 1-31: {}", day);
+        assert!((1..=12).contains(&month), "month should be 1-12: {}", month);
+        assert!((1..=31).contains(&day), "day should be 1-31: {}", day);
         assert!(hour <= 23, "hour should be 0-23: {}", hour);
         assert!(min <= 59, "min should be 0-59: {}", min);
         assert!(sec <= 59, "sec should be 0-59: {}", sec);
@@ -171,7 +171,7 @@ mod lua_date_tests {
         );
 
         // Sanity checks
-        assert!(yday >= 1 && yday <= 366, "yday should be 1-366: {}", yday);
+        assert!((1..=366).contains(&yday), "yday should be 1-366: {}", yday);
         assert!(wday <= 6, "wday should be 0-6: {}", wday);
     }
 }
@@ -304,9 +304,9 @@ mod parse_request_basic_tests {
         let _wday: u8 = date.get("wday").expect("date.wday should exist");
 
         // Sanity checks
-        assert!(year >= 2020 && year <= 2100, "year should be reasonable");
-        assert!(month >= 1 && month <= 12, "month should be 1-12");
-        assert!(day >= 1 && day <= 31, "day should be 1-31");
+        assert!((2020..=2100).contains(&year), "year should be reasonable");
+        assert!((1..=12).contains(&month), "month should be 1-12");
+        assert!((1..=31).contains(&day), "day should be 1-31");
         assert!(hour <= 23, "hour should be 0-23");
         assert!(min <= 59, "min should be 0-59");
         assert!(sec <= 59, "sec should be 0-59");
@@ -375,7 +375,7 @@ mod shiori2_tests {
 
         assert_eq!(method, "get");
         assert!(
-            version >= 20 && version <= 29,
+            (20..=29).contains(&version),
             "SHIORI/2.x version should be 20-29: {}",
             version
         );
@@ -440,6 +440,120 @@ mod edge_case_tests {
 
         assert_eq!(ref0, "こんにちは");
         assert_eq!(ref1, "さようなら");
+    }
+}
+
+// ============================================================================
+// G1 (3.35): parse_request edge cases — previously unreached branches
+// ============================================================================
+
+mod g1_edge_case_tests {
+    use super::*;
+    use pasta::error::MyError;
+    use pasta::lua_request::parse_request;
+
+    /// Reference index that overflows i32 hits the "Invalid reference number"
+    /// Script error branch (previously unreached — grammar accepts any digit
+    /// run, the i32 parse is the only guard).
+    #[test]
+    fn test_reference_number_overflow_returns_script_error() {
+        let lua = create_test_lua();
+        let request = "GET SHIORI/3.0\r\n\
+            Charset: UTF-8\r\n\
+            ID: OnBoot\r\n\
+            Reference99999999999: value\r\n\
+            \r\n";
+
+        let err = parse_request(&lua, request).expect_err("overflowing reference must error");
+        match err {
+            MyError::Script { ref message } => {
+                assert!(
+                    message.contains("Invalid reference number: '99999999999'"),
+                    "Error should name the offending number: {message}"
+                );
+            }
+            other => panic!("Expected MyError::Script, got {other:?}"),
+        }
+    }
+
+    /// Duplicate header keys: both the top-level field and dic entry take the
+    /// LAST occurrence (Table::set overwrites). Pins the production semantics
+    /// (note: the test-only ShioriRequest helper in src uses first-wins for
+    /// dic — production behavior is authoritative).
+    #[test]
+    fn test_duplicate_keys_last_value_wins() {
+        let lua = create_test_lua();
+        let request = "GET SHIORI/3.0\r\n\
+            Charset: UTF-8\r\n\
+            ID: First\r\n\
+            ID: Second\r\n\
+            \r\n";
+
+        let table = parse_request(&lua, request).expect("parse_request should succeed");
+        let id: String = table.get("id").unwrap();
+        assert_eq!(id, "Second", "top-level id should be the last occurrence");
+
+        let dic: pasta_lua::mlua::Table = table.get("dic").unwrap();
+        let dic_id: String = dic.get("ID").unwrap();
+        assert_eq!(dic_id, "Second", "dic ID should be the last occurrence");
+    }
+
+    /// The grammar accepts bare-LF line endings (_eol = "\r\n" | "\n" | "\r").
+    /// All existing tests use CRLF; pin the LF tolerance.
+    #[test]
+    fn test_lf_only_line_endings_accepted() {
+        let lua = create_test_lua();
+        let request = "GET SHIORI/3.0\nCharset: UTF-8\nID: OnBoot\n\n";
+
+        let table = parse_request(&lua, request).expect("LF-only request should parse");
+        let method: String = table.get("method").unwrap();
+        let id: String = table.get("id").unwrap();
+        assert_eq!(method, "get");
+        assert_eq!(id, "OnBoot");
+    }
+
+    /// Unknown (key_other) headers land in dic only and never pollute the
+    /// fixed top-level fields.
+    #[test]
+    fn test_custom_header_stored_in_dic_only() {
+        let lua = create_test_lua();
+        let request = "GET SHIORI/3.0\r\n\
+            Charset: UTF-8\r\n\
+            ID: OnBoot\r\n\
+            X-Custom-Key: custom-value\r\n\
+            \r\n";
+
+        let table = parse_request(&lua, request).expect("parse_request should succeed");
+
+        let dic: pasta_lua::mlua::Table = table.get("dic").unwrap();
+        let custom: String = dic.get("X-Custom-Key").unwrap();
+        assert_eq!(custom, "custom-value");
+
+        // No top-level entry is created for unknown keys.
+        let top_level: Option<String> = table.get("X-Custom-Key").unwrap();
+        assert!(top_level.is_none(), "unknown keys must stay inside dic");
+        // Fixed fields not present in the request stay unset.
+        let sender: Option<String> = table.get("sender").unwrap();
+        assert!(sender.is_none(), "sender was not sent and must stay nil");
+    }
+
+    /// Empty header values are accepted (remain matches zero characters).
+    #[test]
+    fn test_empty_header_value_accepted() {
+        let lua = create_test_lua();
+        let request = "GET SHIORI/3.0\r\n\
+            Charset: UTF-8\r\n\
+            ID: OnBoot\r\n\
+            Status: \r\n\
+            \r\n";
+
+        let table = parse_request(&lua, request).expect("empty value should parse");
+        let status: String = table.get("status").unwrap();
+        assert_eq!(status, "", "empty value should yield an empty string");
+
+        let dic: pasta_lua::mlua::Table = table.get("dic").unwrap();
+        let dic_status: String = dic.get("Status").unwrap();
+        assert_eq!(dic_status, "");
     }
 }
 
@@ -545,9 +659,13 @@ mod x_pasta_time_tests {
         let month: u8 = date.get("month").unwrap();
         let day: u8 = date.get("day").unwrap();
 
-        assert!(year >= 2020 && year <= 2100, "year should be reasonable: {}", year);
-        assert!(month >= 1 && month <= 12, "month should be 1-12: {}", month);
-        assert!(day >= 1 && day <= 31, "day should be 1-31: {}", day);
+        assert!(
+            (2020..=2100).contains(&year),
+            "year should be reasonable: {}",
+            year
+        );
+        assert!((1..=12).contains(&month), "month should be 1-12: {}", month);
+        assert!((1..=31).contains(&day), "day should be 1-31: {}", day);
     }
 
     /// Invalid value: 不正な X-Pasta-Time → エラーが返ること
@@ -569,5 +687,53 @@ mod x_pasta_time_tests {
             "Error message should mention the invalid value: {}",
             err_msg
         );
+    }
+}
+
+// ============================================================================
+// 3.37 (G3): FFI boundary stack-safety regression.
+//
+// parse_request is reached from the extern "C" `request` entry point with
+// host-controlled text. Stack exhaustion inside that call graph aborts the
+// whole host process (SSP) — it cannot be caught. The parser must therefore
+// use constant stack space regardless of the number of headers.
+// ============================================================================
+
+mod stack_safety_tests {
+    use super::*;
+    use pasta::lua_request::parse_request;
+
+    /// RED evidence (3.37): with the recursive parse1 (one stack frame per
+    /// header pair), this test crashed the test process with
+    /// "thread '...' has overflowed its stack" inside the 256 KiB worker
+    /// thread. After the iterative rewrite it passes.
+    #[test]
+    fn test_parse_request_many_headers_constant_stack() {
+        // 256 KiB: ample for the iterative parser + a Lua state, nowhere near
+        // enough for one frame per header (50_000 frames).
+        let worker = std::thread::Builder::new()
+            .name("parse-small-stack".into())
+            .stack_size(256 * 1024)
+            .spawn(|| {
+                let lua = create_test_lua();
+                let mut request = String::from(
+                    "GET SHIORI/3.0\r\n\
+                     Charset: UTF-8\r\n\
+                     Sender: SSP\r\n\
+                     ID: OnTest\r\n",
+                );
+                for i in 0..50_000 {
+                    request.push_str(&format!("Reference{i}: v{i}\r\n"));
+                }
+                request.push_str("\r\n");
+
+                let table =
+                    parse_request(&lua, &request).expect("hostile-size request should still parse");
+                let reference: pasta_lua::mlua::Table = table.get("reference").unwrap();
+                let last: String = reference.get(49_999).unwrap();
+                assert_eq!(last, "v49999");
+            })
+            .expect("spawn worker");
+        worker.join().expect("worker thread must not crash");
     }
 }

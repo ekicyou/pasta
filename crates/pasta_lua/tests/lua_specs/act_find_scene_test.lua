@@ -7,7 +7,14 @@ local expect = require("lua_test.test").expect
 
 local ACT = require("pasta.act")
 local SCENE = require("pasta.scene")
-local GLOBAL = require("pasta.global")
+
+-- act.lua が参照する GLOBAL と同一テーブルを取得するためのモジュール再読込ヘルパ
+-- （global_chaintalk_integration_test が package.loaded["pasta.global"] をリセットするため、
+--   act.lua 内の GLOBAL 参照と一致させるには pasta.act の再読込が必要）
+local function reload_fresh_modules()
+    package.loaded["pasta.act"] = nil
+    return require("pasta.act"), require("pasta.global")
+end
 
 -- Task 4.1: Level 1 — current_scene ローカル検索
 describe("act:find_scene - Level 1 (current_scene)", function()
@@ -75,14 +82,10 @@ describe("act:find_scene - Level 2 (SCENE.search scoped)", function()
 end)
 
 -- Task 4.3: Level 3 — GLOBAL テーブル（本仕様の主要修正点）
--- Note: global_chaintalk_integration_test が package.loaded["pasta.global"] をリセットする
--- ため、act.lua 内の GLOBAL 参照と一致させるにはモジュール再読込が必要
 describe("act:find_scene - Level 3 (GLOBAL)", function()
     test("GLOBAL[key] から関数を取得できる", function()
         -- モジュール同期: act.lua が参照する GLOBAL と同一テーブルを取得
-        package.loaded["pasta.act"] = nil
-        local fresh_ACT = require("pasta.act")
-        local fresh_GLOBAL = require("pasta.global")
+        local fresh_ACT, fresh_GLOBAL = reload_fresh_modules()
 
         local handler = function() return "L3" end
         fresh_GLOBAL.L3_test_scene = handler
@@ -97,9 +100,7 @@ describe("act:find_scene - Level 3 (GLOBAL)", function()
     end)
 
     test("L1・L2 が nil で GLOBAL に関数があるとき L3 が返る", function()
-        package.loaded["pasta.act"] = nil
-        local fresh_ACT = require("pasta.act")
-        local fresh_GLOBAL = require("pasta.global")
+        local fresh_ACT, fresh_GLOBAL = reload_fresh_modules()
 
         local handler = function() return "global_handler" end
         fresh_GLOBAL.L3_fallback_test = handler
@@ -199,9 +200,7 @@ end)
 -- Task 4.7: 優先順位検証（L1 > L3）
 describe("act:find_scene - Priority", function()
     test("L1 と L3 の両方に同じキーがある場合 L1 が優先", function()
-        package.loaded["pasta.act"] = nil
-        local fresh_ACT = require("pasta.act")
-        local fresh_GLOBAL = require("pasta.global")
+        local fresh_ACT, fresh_GLOBAL = reload_fresh_modules()
 
         local l1_handler = function() return "L1" end
         local l3_handler = function() return "L3" end
@@ -217,9 +216,7 @@ describe("act:find_scene - Priority", function()
     end)
 
     test("L1 が nil で L3 がある場合 L3 が使われる", function()
-        package.loaded["pasta.act"] = nil
-        local fresh_ACT = require("pasta.act")
-        local fresh_GLOBAL = require("pasta.global")
+        local fresh_ACT, fresh_GLOBAL = reload_fresh_modules()
 
         local l3_handler = function() return "L3" end
         fresh_GLOBAL.priority_find_test2 = l3_handler

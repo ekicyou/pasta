@@ -92,6 +92,25 @@ fn test_span_extract_source_out_of_bounds_error() {
 }
 
 #[test]
+fn test_span_extract_source_reversed_offsets_error() {
+    // ハードニング回帰テスト: start_byte > end_byte の逆転 Span（pub フィールド経由で
+    // 構築可能）が panic せず OutOfBounds エラーを返す境界を固定する
+    let source = "こんにちは";
+    // 9 と 3 はともに有効な UTF-8 文字境界だが start > end
+    let span = Span::new(1, 4, 1, 2, 9, 3);
+
+    let result = span.extract_source(source);
+    assert!(result.is_err());
+    match result.unwrap_err() {
+        SpanError::OutOfBounds { start, end, .. } => {
+            assert_eq!(start, 9);
+            assert_eq!(end, 3);
+        }
+        _ => panic!("Expected OutOfBounds error"),
+    }
+}
+
+#[test]
 fn test_span_extract_source_invalid_utf8_boundary() {
     // UTF-8 文字境界検証（無効境界でエラー）
     let source = "こんにちは";

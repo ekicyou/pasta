@@ -71,18 +71,39 @@ pub fn string_to_multibyte(codepage: u32, data: &str, default_char: Option<u8>) 
     })
 }
 
+/// Convert a Rust buffer length to the `i32` the Win32 conversion APIs take.
+/// 3.37 (G3): lengths above `i32::MAX` are rejected — a plain `as` cast would
+/// wrap (e.g. `u32::MAX as i32 == -1`, which `MultiByteToWideChar` /
+/// `WideCharToMultiByte` interpret as "null-terminated input", reading past
+/// the end of the borrowed slice). Same defect class as pasta_lua 3.11.
+fn buffer_len_to_i32(len: usize) -> Result<i32> {
+    i32::try_from(len).map_err(|_| {
+        Error::new(
+            ErrorKind::InvalidInput,
+            "Input too large for Windows code page conversion (must be < 2 GiB)",
+        )
+    })
+}
+
 /// Wrapper for MultiByteToWideChar.
 ///
 /// See https://msdn.microsoft.com/en-us/library/windows/desktop/dd319072(v=vs.85).aspx
 /// for more details.
-pub(crate) fn multi_byte_to_wide_char(codepage: u32, flags: u32, multi_byte_str: &[u8]) -> Result<String> {
+pub(crate) fn multi_byte_to_wide_char(
+    codepage: u32,
+    flags: u32,
+    multi_byte_str: &[u8],
+) -> Result<String> {
     // Empty string
     if multi_byte_str.is_empty() {
         return Ok(String::new());
     }
+    // Reject lengths the Win32 API cannot represent (prevents `as` cast wrap).
+    let in_len = buffer_len_to_i32(multi_byte_str.len())?;
     // SAFETY: MultiByteToWideChar is called with valid inputs:
     // - codepage and flags are caller-provided API parameters
     // - multi_byte_str.as_ptr() is valid for multi_byte_str.len() bytes (Rust slice guarantee)
+    // - in_len exactly matches the slice length (guarded above)
     // - Empty input is handled above before entering the unsafe block
     // First call with null output gets required buffer length;
     // second call fills the pre-allocated Vec.
@@ -91,7 +112,7 @@ pub(crate) fn multi_byte_to_wide_char(codepage: u32, flags: u32, multi_byte_str:
             codepage,
             flags,
             multi_byte_str.as_ptr() as _,
-            multi_byte_str.len() as _,
+            in_len,
             ptr::null_mut(),
             0,
         );
@@ -109,7 +130,7 @@ pub(crate) fn multi_byte_to_wide_char(codepage: u32, flags: u32, multi_byte_str:
                 codepage,
                 flags,
                 multi_byte_str.as_ptr() as _,
-                multi_byte_str.len() as _,
+                in_len,
                 wstr.as_mut_ptr(),
                 len,
             );
@@ -138,9 +159,12 @@ pub fn wide_char_to_multi_byte(
     if wide_char_str.is_empty() {
         return Ok((Vec::new(), false));
     }
+    // Reject lengths the Win32 API cannot represent (prevents `as` cast wrap).
+    let in_len = buffer_len_to_i32(wide_char_str.len())?;
     // SAFETY: WideCharToMultiByte is called with valid inputs:
     // - codepage and flags are caller-provided API parameters
     // - wide_char_str.as_ptr() is valid for wide_char_str.len() u16 elements (Rust slice guarantee)
+    // - in_len exactly matches the slice length (guarded above)
     // - Empty input is handled above before entering the unsafe block
     // First call with null output gets required buffer length;
     // second call fills the pre-allocated Vec.
@@ -150,7 +174,7 @@ pub fn wide_char_to_multi_byte(
             codepage,
             flags,
             wide_char_str.as_ptr(),
-            wide_char_str.len() as _,
+            in_len,
             ptr::null_mut(),
             0,
             ptr::null(),
@@ -176,7 +200,7 @@ pub fn wide_char_to_multi_byte(
                 codepage,
                 flags,
                 wide_char_str.as_ptr(),
-                wide_char_str.len() as _,
+                in_len,
                 astr.as_mut_ptr() as _,
                 len,
                 match default_char {
@@ -198,6 +222,38 @@ pub fn wide_char_to_multi_byte(
         }
         Err(Error::last_os_error())
     }
+}
+
+// ----------------------------------------------------------------------
+// 3.37 (G3): boundary regression for the FFI length guard.
+// Direct >2GiB inputs cannot be allocated in a test, so the guard is pinned
+// at the helper level (the production functions feed every length through
+// it). RED evidence: with the guard mutated back to `Ok(len as i32)`, the
+// rejection test fails (u32::MAX wraps to -1 == "null-terminated input").
+// ----------------------------------------------------------------------
+
+#[test]
+fn buffer_len_to_i32_accepts_representable_lengths() {
+    assert_eq!(buffer_len_to_i32(0).unwrap(), 0);
+    assert_eq!(buffer_len_to_i32(1).unwrap(), 1);
+    assert_eq!(
+        buffer_len_to_i32(i32::MAX as usize).unwrap(),
+        i32::MAX,
+        "i32::MAX is the largest representable Win32 buffer length"
+    );
+}
+
+#[test]
+fn buffer_len_to_i32_rejects_overlong_lengths() {
+    let just_over = i32::MAX as usize + 1;
+    let err = buffer_len_to_i32(just_over).expect_err("i32::MAX+1 must be rejected");
+    assert_eq!(err.kind(), ErrorKind::InvalidInput);
+
+    // u32::MAX is the most dangerous value — it wraps to -1, which the
+    // Win32 APIs treat as "null-terminated input" (out-of-bounds read).
+    let wraps_to_minus_one = u32::MAX as usize;
+    let err = buffer_len_to_i32(wraps_to_minus_one).expect_err("u32::MAX must be rejected");
+    assert_eq!(err.kind(), ErrorKind::InvalidInput);
 }
 
 #[test]

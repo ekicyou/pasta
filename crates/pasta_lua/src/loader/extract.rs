@@ -24,6 +24,7 @@
 //! 3. スワップ成功後にのみ `.md5` マーカーを書き込む（Req 2.4）。
 //! 4. 一時展開／差し込みが失敗したら自己展開先の直前状態を保全し、残骸を掃除して
 //!    `LoaderError::SelfDeploy` を返す（Req 2.3 / フォールバック）。
+//!
 //! 操作対象は自己展開先＋同一領域の一時／退避シブリングのみで、`scripts/` や他のゴースト
 //! ファイルには一切触れない（Req 2.5）。展開物は解凍済みの生テキストとして配置する（Req 2.6）。
 
@@ -54,11 +55,14 @@ const MARKER_NAME: &str = ".md5";
 static UNIQUE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 /// 起動時自己展開の結果。
+///
+/// 使用された版のダイジェストは常にコンパイル時定数 `EXPECTED_MD5` であり、
+/// 各分岐内のログ（DEBUG/INFO）に記録される（バリアントでは保持しない）。
 pub(crate) enum SyncOutcome {
     /// マーカー一致（高速パス）。書き込みは発生していない。
-    Skipped { digest: String },
+    Skipped,
     /// 再展開を実施した。
-    Deployed { digest: String },
+    Deployed,
 }
 
 /// 起動時自己展開。Phase 2.5 で `base_dir` を受けて呼ばれる。
@@ -83,9 +87,7 @@ pub(crate) fn sync_pasta_scripts(base_dir: &Path) -> Result<SyncOutcome, LoaderE
             path = %target_dir.display(),
             "pasta_scripts up-to-date (fast path); using embedded version"
         );
-        return Ok(SyncOutcome::Skipped {
-            digest: EXPECTED_MD5.to_string(),
-        });
+        return Ok(SyncOutcome::Skipped);
     }
 
     // 不一致/欠落: 再展開（Req 1.3 / Req 1.4 / Req 5.5）。
@@ -127,12 +129,10 @@ fn deploy(target_dir: &Path, marker_path: &Path) -> Result<SyncOutcome, LoaderEr
 
     // --- 2. live があれば退避（旧退避） ---
     let had_live = target_dir.exists();
-    if had_live {
-        if let Err(e) = std::fs::rename(target_dir, &backup_dir) {
-            // 退避に失敗: live は無傷のまま。一時を掃除して返す（Req 2.3）。
-            let _ = std::fs::remove_dir_all(&temp_dir);
-            return Err(LoaderError::self_deploy(target_dir, e));
-        }
+    if had_live && let Err(e) = std::fs::rename(target_dir, &backup_dir) {
+        // 退避に失敗: live は無傷のまま。一時を掃除して返す（Req 2.3）。
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        return Err(LoaderError::self_deploy(target_dir, e));
     }
 
     // --- 3. 一時を live へ差し込み（新差し込み） ---
@@ -161,9 +161,7 @@ fn deploy(target_dir: &Path, marker_path: &Path) -> Result<SyncOutcome, LoaderEr
         "pasta_scripts self-deployed (extracted embedded version)"
     );
 
-    Ok(SyncOutcome::Deployed {
-        digest: EXPECTED_MD5.to_string(),
-    })
+    Ok(SyncOutcome::Deployed)
 }
 
 /// 内蔵 zip の全エントリを `dest` へ解凍済み生ファイルとして展開する（Req 2.6）。
@@ -288,8 +286,8 @@ mod tests {
         let outcome = sync_pasta_scripts(base.path()).expect("sync ok");
 
         match outcome {
-            SyncOutcome::Skipped { digest } => assert_eq!(digest, EXPECTED_MD5),
-            SyncOutcome::Deployed { .. } => panic!("expected Skipped on marker match"),
+            SyncOutcome::Skipped => {}
+            SyncOutcome::Deployed => panic!("expected Skipped on marker match"),
         }
 
         // 書き込みが一切発生していないこと: ファイル集合・内容・mtime が完全一致。
@@ -298,6 +296,32 @@ mod tests {
             before, after,
             "no writes must occur on fast path (files/contents/mtimes unchanged)"
         );
+    }
+
+    /// FAST PATH の比較は trim 後の文字列一致: マーカーに前後空白・改行が
+    /// 付いていても一致と判定され、無書き込みで `Skipped` を返すこと（Req 1.5）。
+    #[test]
+    fn marker_with_surrounding_whitespace_still_skips() {
+        let base = tempfile::tempdir().expect("tempdir");
+        let target = base.path().join(SELF_DEPLOY_REL);
+        std::fs::create_dir_all(&target).expect("mkdir target");
+        std::fs::write(target.join("existing.lua"), b"-- pre-existing\n").expect("write file");
+        std::fs::write(target.join(MARKER_NAME), format!("  {EXPECTED_MD5}\r\n"))
+            .expect("write padded marker");
+
+        let before = snapshot(&target);
+
+        let outcome = sync_pasta_scripts(base.path()).expect("sync ok");
+        match outcome {
+            SyncOutcome::Skipped => {}
+            SyncOutcome::Deployed => {
+                panic!("expected Skipped: padded marker must match after trim")
+            }
+        }
+
+        // 一致パスなので一切書き込みが発生しないこと（マーカーの正規化書き戻しも無し）。
+        let after = snapshot(&target);
+        assert_eq!(before, after, "no writes on trimmed-match fast path");
     }
 
     /// マーカーが一致しない（trim 後に異なる）→ 再展開（`Deployed`）。
@@ -312,13 +336,13 @@ mod tests {
 
         let outcome = sync_pasta_scripts(base.path()).expect("sync ok");
         match outcome {
-            SyncOutcome::Deployed { digest } => {
-                assert_eq!(digest, EXPECTED_MD5);
+            SyncOutcome::Deployed => {
                 // 展開後はマーカーが基準ダイジェストへ更新される。
-                let marker = std::fs::read_to_string(target.join(MARKER_NAME)).expect("read marker");
+                let marker =
+                    std::fs::read_to_string(target.join(MARKER_NAME)).expect("read marker");
                 assert_eq!(marker.trim(), EXPECTED_MD5);
             }
-            SyncOutcome::Skipped { .. } => panic!("expected Deployed on marker mismatch"),
+            SyncOutcome::Skipped => panic!("expected Deployed on marker mismatch"),
         }
     }
 
@@ -330,8 +354,8 @@ mod tests {
 
         let outcome = sync_pasta_scripts(base.path()).expect("sync ok");
         match outcome {
-            SyncOutcome::Deployed { digest } => assert_eq!(digest, EXPECTED_MD5),
-            SyncOutcome::Skipped { .. } => panic!("expected Deployed when marker missing"),
+            SyncOutcome::Deployed => {}
+            SyncOutcome::Skipped => panic!("expected Deployed when marker missing"),
         }
 
         // 展開先とマーカーが生成されていること。
@@ -352,8 +376,11 @@ mod tests {
         // stale マーカー（不一致）と orphan ファイルを投入。
         std::fs::write(target.join(MARKER_NAME), "stale-digest-not-expected")
             .expect("write stale marker");
-        std::fs::write(target.join("zzz_orphan.lua"), b"-- orphan from old version\n")
-            .expect("write orphan");
+        std::fs::write(
+            target.join("zzz_orphan.lua"),
+            b"-- orphan from old version\n",
+        )
+        .expect("write orphan");
         // ネストした orphan も投入（サブツリーごと消えること）。
         std::fs::create_dir_all(target.join("ghost_subdir")).expect("mkdir orphan subdir");
         std::fs::write(target.join("ghost_subdir/old.lua"), b"-- nested orphan\n")
@@ -361,8 +388,8 @@ mod tests {
 
         let outcome = sync_pasta_scripts(base.path()).expect("sync ok");
         match outcome {
-            SyncOutcome::Deployed { digest } => assert_eq!(digest, EXPECTED_MD5),
-            SyncOutcome::Skipped { .. } => panic!("expected Deployed on stale marker"),
+            SyncOutcome::Deployed => {}
+            SyncOutcome::Skipped => panic!("expected Deployed on stale marker"),
         }
 
         // orphan が消滅していること（内容＝zip エントリ集合）。
@@ -393,7 +420,7 @@ mod tests {
         let base = tempfile::tempdir().expect("tempdir");
 
         let outcome = sync_pasta_scripts(base.path()).expect("sync ok");
-        assert!(matches!(outcome, SyncOutcome::Deployed { .. }));
+        assert!(matches!(outcome, SyncOutcome::Deployed));
 
         let target = base.path().join(SELF_DEPLOY_REL);
         let marker = std::fs::read_to_string(target.join(MARKER_NAME)).expect("read marker");
@@ -401,7 +428,10 @@ mod tests {
 
         // temp/backup シブリングの残骸が profile/pasta/ 配下に残っていないこと。
         let pasta_dir = base.path().join("profile/pasta");
-        for entry in std::fs::read_dir(&pasta_dir).expect("read profile/pasta").flatten() {
+        for entry in std::fs::read_dir(&pasta_dir)
+            .expect("read profile/pasta")
+            .flatten()
+        {
             let name = entry.file_name();
             let name = name.to_string_lossy();
             assert!(
@@ -430,7 +460,7 @@ mod tests {
         let before_other = std::fs::read(&other).expect("read other");
 
         let outcome = sync_pasta_scripts(base.path()).expect("sync ok");
-        assert!(matches!(outcome, SyncOutcome::Deployed { .. }));
+        assert!(matches!(outcome, SyncOutcome::Deployed));
 
         // scripts/ がファイル集合・内容・mtime すべて不変であること。
         let after = snapshot(&scripts);
@@ -498,8 +528,8 @@ mod tests {
             Err(other) => panic!("expected SelfDeploy error, got {other:?}"),
             Ok(outcome) => {
                 let kind = match outcome {
-                    SyncOutcome::Skipped { .. } => "Skipped",
-                    SyncOutcome::Deployed { .. } => "Deployed",
+                    SyncOutcome::Skipped => "Skipped",
+                    SyncOutcome::Deployed => "Deployed",
                 };
                 panic!("expected Err(SelfDeploy) when swap is blocked, got Ok({kind})");
             }
@@ -541,7 +571,10 @@ mod tests {
 
         // エラーパスの掃除: temp/backup シブリングの残骸が profile/pasta/ に残らないこと。
         let pasta_dir = base.path().join("profile/pasta");
-        for entry in std::fs::read_dir(&pasta_dir).expect("read profile/pasta").flatten() {
+        for entry in std::fs::read_dir(&pasta_dir)
+            .expect("read profile/pasta")
+            .flatten()
+        {
             let name = entry.file_name();
             let name = name.to_string_lossy();
             assert!(

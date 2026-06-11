@@ -22,6 +22,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
 import { tokenize } from './tokenize.mjs';
 
 const require = createRequire(import.meta.url);
@@ -142,14 +143,6 @@ export function serializeSearchIndex(indexObj) {
   return `window.search = Object.assign(window.search, JSON.parse(${literal}));`;
 }
 
-// searchindex ファイルを bigram 索引で上書きする（ラッパ形式を維持）。
-// 書き込んだ UTF-8 バイト数を返す。
-export function writeSearchIndex(searchIndexFile, indexObj) {
-  const content = serializeSearchIndex(indexObj);
-  fs.writeFileSync(searchIndexFile, content, 'utf8');
-  return Buffer.byteLength(content, 'utf8');
-}
-
 // 高レベル API: book 出力ディレクトリの searchindex を bigram 化して上書きする。
 // 索引サイズを 10MB 閾値で監視し、超過時は warnings に記録する（既定では非致命）。
 export function buildBigramIndex(bookOutDir, { write = true } = {}) {
@@ -190,8 +183,11 @@ export function buildBigramIndex(bookOutDir, { write = true } = {}) {
 // CLI: node build-index.mjs <book-out-dir>
 // 成功時 exit 0、失敗時は例外を投げて非ゼロ終了（mdbook build 後段でビルド失敗扱い）。
 if (process.argv[1] && import.meta.url.endsWith(path.basename(process.argv[1]))) {
+  // 既定パスはモジュール位置基準で book/book を指す。new URL().pathname は
+  // Windows でドライブ文字つき `/C:/...` を返し path.resolve が `C:\C:\...` に
+  // 壊れるため、fileURLToPath で正規に OS パスへ変換する（POSIX では同一挙動）。
   const dir = process.argv[2] || path.resolve(
-    path.dirname(new URL(import.meta.url).pathname), '../../book',
+    path.dirname(fileURLToPath(import.meta.url)), '../../book',
   );
   try {
     const { searchIndexFile, sizeBytes, warnings } = buildBigramIndex(dir);

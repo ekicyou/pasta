@@ -466,6 +466,92 @@ mod tests {
         }
     }
 
+    #[test]
+    fn remaining_command_vocabulary_is_distinct_and_cloneable() {
+        // Lock the rest of the controller→session command vocabulary: each
+        // payload-less command is Eq to itself, Clone-able, and distinct from
+        // the others (the DAP adapter dispatches on exactly these identities).
+        let commands = [
+            SessionCommand::Continue,
+            SessionCommand::Next,
+            SessionCommand::StepIn,
+            SessionCommand::StepOut,
+            SessionCommand::StackTrace,
+            SessionCommand::Threads,
+            SessionCommand::RefreshPresentation,
+            SessionCommand::Disconnect,
+        ];
+        for (i, a) in commands.iter().enumerate() {
+            assert_eq!(a.clone(), *a, "clone preserves identity: {a:?}");
+            for (j, b) in commands.iter().enumerate() {
+                if i != j {
+                    assert_ne!(a, b, "commands must be pairwise distinct");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn result_carrying_events_round_trip_their_payloads() {
+        // The session→controller result events carry their payload vectors
+        // intact (Clone + Eq over the whole payload).
+        let bps = SessionEvent::Breakpoints(vec![ResolvedBreakpoint {
+            source: SourceRef::new("@scene.lua"),
+            line: 3,
+            verified: false, // the unbound-line shape the controller reports
+        }]);
+        assert_eq!(bps.clone(), bps);
+
+        let stack = SessionEvent::Stack(vec![FrameInfo {
+            source: "@scene.lua".to_string(),
+            line: 1,
+            func_name: None,
+        }]);
+        assert_eq!(stack.clone(), stack);
+
+        let scopes = SessionEvent::Scopes(vec![Scope {
+            name: "Upvalues".to_string(),
+            variables_reference: 2002,
+        }]);
+        assert_eq!(scopes.clone(), scopes);
+
+        let vars = SessionEvent::Variables(vec![Variable {
+            name: "t".to_string(),
+            type_name: "table".to_string(),
+            repr: "{...}".to_string(),
+        }]);
+        assert_eq!(vars.clone(), vars);
+
+        let threads = SessionEvent::Threads(vec![ThreadInfo {
+            id: 2,
+            name: "coroutine".to_string(),
+        }]);
+        assert_eq!(threads.clone(), threads);
+
+        // Terminated is payload-less and distinct from every result event.
+        assert_eq!(SessionEvent::Terminated, SessionEvent::Terminated);
+        for ev in [&bps, &stack, &scopes, &vars, &threads] {
+            assert_ne!(*ev, SessionEvent::Terminated);
+        }
+    }
+
+    #[test]
+    fn stop_reasons_are_pairwise_distinct() {
+        // All four stop reasons (R1.2–R1.5 / entry / pause) are distinct Copy
+        // values — the controller maps each to a different DAP reason string.
+        let reasons = [
+            StopReason::Breakpoint,
+            StopReason::Step,
+            StopReason::Entry,
+            StopReason::Pause,
+        ];
+        for (i, a) in reasons.iter().enumerate() {
+            for (j, b) in reasons.iter().enumerate() {
+                assert_eq!(i == j, a == b, "{a:?} vs {b:?}");
+            }
+        }
+    }
+
     /// Compile-time proof that the channel-seam payloads are `Send`.
     fn _assert_send<T: Send>() {}
 

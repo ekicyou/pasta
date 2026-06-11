@@ -54,7 +54,7 @@ impl SourceMapSink for LinePairSink {
 /// 既知 `.pasta` 行を持つ有効 span（end_byte > 0）を作る小ヘルパ。
 fn span_at(line: usize) -> Span {
     // start_line/col, end_line/col, start_byte, end_byte（end_byte>0 で is_valid）
-    Span::new(line, 1, line, 10, (line * 10) as usize, (line * 10 + 9) as usize)
+    Span::new(line, 1, line, 10, line * 10, line * 10 + 9)
 }
 
 // ============================================================================

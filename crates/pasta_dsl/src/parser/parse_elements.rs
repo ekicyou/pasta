@@ -138,14 +138,11 @@ pub(crate) fn parse_var_set(pair: Pair<Rule>) -> Result<VarSet, ParseError> {
                     }
                 }
             }
-            Rule::add_op => operators.push(BinOp::Add),
-            Rule::sub_op => operators.push(BinOp::Sub),
-            Rule::mul_op => operators.push(BinOp::Mul),
-            Rule::div_op => operators.push(BinOp::Div),
-            Rule::modulo_op => operators.push(BinOp::Mod),
-            _ => {
-                // Try to parse as expression (term)
-                if let Some(expr) = try_parse_expr(inner) {
+            rule => {
+                if let Some(op) = bin_op_from_rule(rule) {
+                    operators.push(op);
+                } else if let Some(expr) = try_parse_expr(inner) {
+                    // Parse as expression (term)
                     terms.push(expr);
                 }
             }

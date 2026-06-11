@@ -37,8 +37,6 @@ import { tokenize } from './bigram-index/tokenize.mjs';
 import {
   resolveHashed,
   readSearchIndex,
-  rebuildBigramIndex,
-  serializeSearchIndex,
   SIZE_WARN_THRESHOLD_BYTES,
 } from './bigram-index/build-index.mjs';
 

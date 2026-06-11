@@ -6,7 +6,6 @@
 
 local STORE = require("pasta.store")
 local WORD = require("pasta.word")
-local GLOBAL = require("pasta.global")
 local log = require "@pasta_log"
 
 --- @class Actor アクターオブジェクト
@@ -25,8 +24,6 @@ ACTOR_IMPL.__index = ACTOR_IMPL
 --- ActorWordBuilderクラス実装メタテーブル（WordBuilderを拡張）
 --- word.lua辞書への登録とACTORプロパティへの設定を同時に行う
 --- @class ActorWordBuilder
---- @field _actor Actor アクターオブジェクト
---- @field _key string 単語キー
 --- @field _word_builder WordBuilder 内部のWordBuilder
 local ACTOR_WORD_BUILDER_IMPL = {}
 ACTOR_WORD_BUILDER_IMPL.__index = ACTOR_WORD_BUILDER_IMPL
@@ -50,8 +47,6 @@ end
 --- @return ActorWordBuilder ビルダーオブジェクト
 function ACTOR_IMPL.create_word(self, key)
     local builder = {
-        _actor = self,
-        _key = key,
         _word_builder = WORD.create_actor(self.name, key),
     }
     return setmetatable(builder, ACTOR_WORD_BUILDER_IMPL)

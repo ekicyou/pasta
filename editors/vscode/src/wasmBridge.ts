@@ -30,6 +30,27 @@ export interface WasmAnalysisResult {
   diagnostics: ReadonlyArray<DiagnosticData>;
 }
 
+/** Shape of the wasm-bindgen CJS bindings module loaded by {@link WasmBridge}. */
+interface WasmBindings {
+  wasm_analyze(text: string): unknown;
+}
+
+/**
+ * Boundary validation for the untyped `wasm_analyze` result (cell 3.56 / G3):
+ * the result must carry `tokens` and `diagnostics` arrays. Rejecting a
+ * malformed shape HERE keeps the failure on the callers' established
+ * `WASM analysis failed` exception path instead of escaping as a distant
+ * TypeError when the result is spread/iterated later.
+ */
+function isWasmAnalysisResult(value: unknown): value is WasmAnalysisResult {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    Array.isArray((value as { tokens?: unknown }).tokens) &&
+    Array.isArray((value as { diagnostics?: unknown }).diagnostics)
+  );
+}
+
 /**
  * Bridge to pasta_lsp WASM module.
  *
@@ -37,7 +58,7 @@ export interface WasmAnalysisResult {
  * synchronous document analysis via wasm_analyze().
  */
 export class WasmBridge {
-  private wasmModule: any = null;
+  private wasmModule: WasmBindings | null = null;
   private ready = false;
   private readonly outputChannel: vscode.OutputChannel;
 
@@ -86,7 +107,10 @@ export class WasmBridge {
 
     try {
       const result = this.wasmModule.wasm_analyze(text);
-      return result as WasmAnalysisResult;
+      if (!isWasmAnalysisResult(result)) {
+        throw new Error('malformed result (expected { tokens: [...], diagnostics: [...] })');
+      }
+      return result;
     } catch (error) {
       throw new Error(`WASM analysis failed: ${error}`);
     }

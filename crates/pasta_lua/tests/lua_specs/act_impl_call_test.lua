@@ -5,7 +5,6 @@ local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect
 
 local ACT = require("pasta.act")
-local SCENE = require("pasta.scene")
 local GLOBAL = require("pasta.global")
 
 -- モック用のCTXオブジェクトを作成

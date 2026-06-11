@@ -30,7 +30,7 @@ fn run_lua_unit_tests() -> LuaResult<()> {
         lua_specs_path.display()
     );
 
-    lua.load(&format!(
+    lua.load(format!(
         r#"
         package.path = "{};;" .. package.path
         print("Lua package.path configured:")

@@ -302,6 +302,79 @@ fn test_search_scene_returns_transpiler_format() {
 }
 
 #[test]
+fn test_search_word_deterministic_with_mock_selector() {
+    let ctx = create_test_context();
+    let runtime = PastaLuaRuntime::new(ctx).unwrap();
+
+    // MockRandomSelector disables shuffling, so "場所" words come back in
+    // registration order without repetition: 東京 → 大阪.
+    let result = runtime.exec(
+        r#"
+        local SEARCH = require "@pasta_search"
+        SEARCH:set_word_selector(0)
+        local first = SEARCH:search_word("場所", nil)
+        local second = SEARCH:search_word("場所", nil)
+        return first == "東京" and second == "大阪"
+    "#,
+    );
+
+    assert!(result.is_ok(), "Expected Ok, got Err: {:?}", result);
+    let value = result.unwrap();
+    assert!(
+        value.as_boolean().unwrap_or(false),
+        "Expected deterministic word order 東京 → 大阪"
+    );
+}
+
+#[test]
+fn test_search_word_global_not_visible_with_parent_scope() {
+    let ctx = create_test_context();
+    let runtime = PastaLuaRuntime::new(ctx).unwrap();
+
+    // "場所" is registered globally only. With a parent scope the search is
+    // local-only (no fallback), so it must return nil.
+    let result = runtime.exec(
+        r#"
+        local SEARCH = require "@pasta_search"
+        local word = SEARCH:search_word("場所", "メイン_1")
+        return word == nil
+    "#,
+    );
+
+    assert!(result.is_ok());
+    let value = result.unwrap();
+    assert!(
+        value.as_boolean().unwrap_or(false),
+        "Global-only word should not be found with a parent scope"
+    );
+}
+
+#[test]
+fn test_search_scene_empty_name_raises_error() {
+    let ctx = create_test_context();
+    let runtime = PastaLuaRuntime::new(ctx).unwrap();
+
+    // An empty search key is an internal error (InvalidScene), surfaced to
+    // Lua as a runtime error, which pcall must catch.
+    let result = runtime.exec(
+        r#"
+        local SEARCH = require "@pasta_search"
+        local ok = pcall(function()
+            SEARCH:search_scene("", nil)
+        end)
+        return ok == false
+    "#,
+    );
+
+    assert!(result.is_ok());
+    let value = result.unwrap();
+    assert!(
+        value.as_boolean().unwrap_or(false),
+        "Empty scene name should raise a Lua error"
+    );
+}
+
+#[test]
 fn test_search_scene_local_returns_transpiler_format() {
     let ctx = create_test_context();
     let runtime = PastaLuaRuntime::new(ctx).unwrap();

@@ -108,7 +108,7 @@ end
 
 --- シーン関数からthreadを生成（実行しない）
 ---@param event_name string イベント名 ("OnTalk" or "OnHour")
----@param act ShioriAct actオブジェクト（未使用、将来拡張用）
+---@param act ShioriAct actオブジェクト（SCENE.co_exec / テスト用 scene_executor へ渡される）
 ---@return thread|nil コルーチンまたはnil
 local function create_scene_thread(event_name, act)
     -- テスト用オーバーライドがあれば使用

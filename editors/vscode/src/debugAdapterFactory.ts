@@ -7,8 +7,8 @@
 //
 // The host/port resolution is intentionally kept in a separate, `vscode`-free
 // module (`debugAttachTarget.ts`) so it can be exercised by plain node unit
-// tests. This module re-exports those helpers for convenience; only the
-// factory class below references the `vscode` runtime.
+// tests (which import it directly); only the factory class below references
+// the `vscode` runtime.
 
 import * as vscode from 'vscode';
 import {
@@ -17,15 +17,6 @@ import {
   resolveSourcePresentation,
   SOURCE_PRESENTATION_KEY,
 } from './debugAttachTarget';
-
-export {
-  DEFAULT_DEBUG_PORT,
-  DEFAULT_DEBUG_HOST,
-  resolveAttachTarget,
-  resolveSourcePresentation,
-  SOURCE_PRESENTATION_KEY,
-} from './debugAttachTarget';
-export type { AttachConfig, AttachTarget, SourcePresentation } from './debugAttachTarget';
 
 /**
  * Returns a {@link vscode.DebugAdapterServer} descriptor pointing at the

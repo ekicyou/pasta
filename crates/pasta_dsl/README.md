@@ -29,7 +29,7 @@ let ast = parse_str(source, "test.pasta").unwrap();
 for item in &ast.items {
     match item {
         FileItem::FileAttr(attr) => println!("Attr: {}", attr.key),
-        FileItem::GlobalWord(word) => println!("Word: {}", word.name),
+        FileItem::GlobalWord(word) => println!("Word: {}", word.name()),
         FileItem::GlobalSceneScope(scene) => println!("Scene: {}", scene.name),
         FileItem::ActorScope(actor) => println!("Actor: {}", actor.name),
     }
@@ -42,6 +42,7 @@ for item in &ast.items {
 
 - `parse_str(source, filename)` — 文字列からDSLをパース
 - `parse_file(path)` — ファイルからDSLをパース
+- `parse_str_partial(source)` — 部分パース（3段階フォールバック: 全体→スコープ分割→行単位）
 
 ### AST Types
 
@@ -51,6 +52,7 @@ for item in &ast.items {
 - `LocalSceneScope` — ローカルシーン定義
 - `ActorScope` — アクター定義
 - `Action` — アクション（Talk, WordRef, VarRef, FnCall, SakuraScript, Escape）
+- `CueCommandNode` / `ChoiceNode` — キューコマンド行・選択肢行
 - `Span` — ソース位置情報（行/列 + バイトオフセット）
 
 ### Error Types
@@ -58,6 +60,7 @@ for item in &ast.items {
 - `ParseError` — パースエラー（SyntaxError, PestError, IoError, MultipleErrors）
 - `ParseErrorInfo` — 個別パースエラー情報
 - `ParseResult<T>` — `Result<T, ParseError>` エイリアス
+- `PartialParseResult` / `PartialParseError` — 部分パース結果・行単位エラー
 
 ## Dependencies
 
@@ -76,6 +79,7 @@ pasta_dsl
 ├── src/
 │   ├── lib.rs               # クレートエントリーポイント
 │   ├── error.rs             # ParseError, ParseErrorInfo, ParseResult
+│   ├── partial.rs           # 部分パースAPI（parse_str_partial）
 │   └── parser/
 │       ├── mod.rs           # パーサーAPI（parse_str, parse_file）
 │       ├── parse_scene.rs   # シーン解析
@@ -85,15 +89,24 @@ pasta_dsl
 │       │   ├── mod.rs       # AST公開エントリ
 │       │   ├── span.rs      # Span型定義
 │       │   ├── scene.rs     # シーン関連AST
-│       │   └── action.rs    # アクション関連AST
+│       │   ├── action.rs    # アクション関連AST
+│       │   └── cue.rs       # キューコマンド関連AST
 │       └── grammar.pest     # Pest文法定義（権威的仕様）
 └── tests/
     ├── actor_code_block_test.rs   # アクターコードブロック解析テスト
     ├── ast_test.rs                # AST型テスト
+    ├── choice_line_test.rs        # 選択肢行テスト
+    ├── cue_cmd_test.rs            # キューコマンド行テスト
     ├── digit_id_var_test.rs       # 全角数字変数テスト
+    ├── dynamic_call_test.rs       # 動的コールテスト
+    ├── error_api_test.rs          # ParseError APIテスト
+    ├── expr_parse_test.rs         # 式ASTパーステスト
     ├── parser_test.rs             # パーサー統合テスト
+    ├── partial_parse_test.rs      # 部分パースAPIテスト
+    ├── property_scope_test.rs     # プロパティスコープテスト
     ├── sakura_symbol_tag_test.rs  # さくらスクリプト記号タグテスト
-    └── span_byte_offset_test.rs   # バイトオフセットテスト
+    ├── span_byte_offset_test.rs   # バイトオフセットテスト
+    └── var_set_none_test.rs       # 式文（$=）テスト
 ```
 
 ## License

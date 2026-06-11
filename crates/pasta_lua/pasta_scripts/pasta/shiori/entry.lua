@@ -20,7 +20,9 @@ function GLOBAL.close_ghost(act, ms)
     act:raw_script([=[\-]=])
 end
 
-GLOBAL.ゴースト終了 = GLOBAL.close_ghost
+-- 非ASCII識別子のドット記法は LuaJIT 拡張のため、標準 Lua パーサー
+-- （luacheck）互換の等価なブラケット記法で定義する（3.47 global.lua と同方針）
+GLOBAL["ゴースト終了"] = GLOBAL.close_ghost
 
 -- グローバル SHIORI テーブルを初期化（既存の場合は維持）
 SHIORI = SHIORI or {}
@@ -67,7 +69,7 @@ end
 --- @param req table パース済み SHIORI リクエストテーブル
 --- @field req.id string イベントID（例: "OnBoot", "OnSecondChange"）
 --- @field req.method string HTTP風メソッド（"GET", "NOTIFY"）
---- @field req.version string プロトコルバージョン（例: "3.0"）
+--- @field req.version integer プロトコルバージョン（SHIORI/3.0 は 30）
 --- @field req.charset string 文字エンコーディング（例: "UTF-8"）
 --- @field req.sender string 送信者識別子
 --- @field req.reference table Reference 値の配列（0始まりインデックス）

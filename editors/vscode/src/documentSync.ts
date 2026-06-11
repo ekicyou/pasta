@@ -37,8 +37,14 @@ export class DocumentSync implements vscode.Disposable {
     this.outputChannel = outputChannel;
   }
 
-  /** Register document event listeners */
-  activate(context: vscode.ExtensionContext): void {
+  /**
+   * Register document event listeners.
+   *
+   * The extension context is not used: the listeners are tracked in
+   * `this.disposables` and released by `dispose()` (this instance is itself
+   * pushed onto `context.subscriptions` by the caller).
+   */
+  activate(_context: vscode.ExtensionContext): void {
     this.disposables.push(
       vscode.workspace.onDidOpenTextDocument((doc) => this.onDocumentOpen(doc)),
       vscode.workspace.onDidChangeTextDocument((e) => this.onDocumentChange(e)),

@@ -1,7 +1,7 @@
 // SemanticTokensProvider - Provides semantic tokens from WASM analysis
 //
 // Implements vscode.DocumentSemanticTokensProvider to deliver
-// pasta_lsp's 14 semantic token types + 3 modifiers.
+// pasta_lsp's 17 semantic token types + 3 modifiers.
 
 import * as vscode from 'vscode';
 import { WasmBridge, SemanticTokenData } from './wasmBridge';

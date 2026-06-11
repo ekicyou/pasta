@@ -238,6 +238,70 @@ mod tests {
         assert!(bytes.contains(&b';'));
     }
 
+    #[test]
+    fn test_generate_package_path_init_patterns_in_order() {
+        // Each search path yields BOTH "?.lua" and "?/init.lua", in declared order.
+        let ctx = LoaderContext::new(
+            "/ghost/master",
+            vec!["scripts".to_string(), "lib".to_string()],
+            toml::Table::new(),
+        );
+
+        let path = ctx.generate_package_path();
+        assert_eq!(
+            path,
+            "/ghost/master/scripts/?.lua;/ghost/master/scripts/?/init.lua;\
+             /ghost/master/lib/?.lua;/ghost/master/lib/?/init.lua"
+        );
+    }
+
+    #[test]
+    fn test_generate_package_path_normalizes_backslashes() {
+        // Backslash separators (Windows style) are normalized to "/" for Lua.
+        let ctx = LoaderContext::new(
+            r"C:\ghost\master",
+            vec!["scripts".to_string()],
+            toml::Table::new(),
+        );
+
+        let path = ctx.generate_package_path();
+        assert!(!path.contains('\\'), "no backslashes expected: {}", path);
+        assert!(path.contains("C:/ghost/master/scripts/?.lua"));
+        assert!(path.contains("C:/ghost/master/scripts/?/init.lua"));
+    }
+
+    #[test]
+    fn test_generate_package_path_empty_search_paths() {
+        let ctx = LoaderContext::new("/ghost/master", Vec::new(), toml::Table::new());
+        assert_eq!(ctx.generate_package_path(), "");
+        assert!(ctx.absolute_search_paths().is_empty());
+    }
+
+    #[test]
+    fn test_from_config_existing_dir_is_absolute_without_extended_prefix() {
+        // Existing dir -> canonicalized to an absolute path; on Windows the
+        // \\?\ extended-length prefix must be stripped for Lua compatibility.
+        let temp = tempfile::TempDir::new().unwrap();
+        let config = PastaConfig::default();
+        let ctx = LoaderContext::from_config(temp.path(), &config);
+
+        assert!(ctx.base_dir.is_absolute());
+        assert!(
+            !ctx.base_dir.to_string_lossy().starts_with(r"\\?\"),
+            "extended-length prefix must be stripped: {}",
+            ctx.base_dir.display()
+        );
+    }
+
+    #[test]
+    fn test_from_config_nonexistent_dir_falls_back_to_input() {
+        // canonicalize() fails for a nonexistent path -> input path kept as-is.
+        let config = PastaConfig::default();
+        let input = Path::new("definitely_nonexistent_loader_ctx_dir/sub");
+        let ctx = LoaderContext::from_config(input, &config);
+        assert_eq!(ctx.base_dir, input.to_path_buf());
+    }
+
     #[cfg(windows)]
     #[test]
     fn test_generate_package_path_bytes_japanese() {

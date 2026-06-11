@@ -42,7 +42,7 @@ fn string_buffer_adopted_on_target_runtime() -> LuaResult<()> {
         scripts_path.display()
     );
 
-    lua.load(&format!(
+    lua.load(format!(
         r#"package.path = "{};;" .. package.path"#,
         package_path.replace('\\', "\\\\")
     ))

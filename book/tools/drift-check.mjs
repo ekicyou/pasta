@@ -248,6 +248,13 @@ export function githubUrlToRepoPath(url) {
   return m[1];
 }
 
+// 解決済み絶対パスが repoRoot 配下に留まるか（`..` 等による境界脱出の検出）。
+// repoRoot 自身は配下とみなす。脱出していれば false。
+function isWithinRoot(repoRoot, absPath) {
+  const rel = path.relative(path.resolve(repoRoot), absPath);
+  return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+}
+
 export function detectBrokenLinks(repoRoot = REPO_ROOT) {
   const srcDir = path.resolve(repoRoot, 'book/src');
   const files = listMarkdownFiles(srcDir);
@@ -264,6 +271,17 @@ export function detectBrokenLinks(repoRoot = REPO_ROOT) {
       const repoPath = githubUrlToRepoPath(target);
       if (repoPath !== null) {
         const abs = path.resolve(repoRoot, repoPath);
+        // ハードニング: `..` 等で repoRoot 外へ脱出するパスは、実在有無に
+        // かかわらずリンク切れとして報告する（リポジトリ外の存在プローブ防止）。
+        if (!isWithinRoot(repoRoot, abs)) {
+          broken.push({
+            file: relFile,
+            target: rawTarget,
+            kind: 'github-repo-path',
+            detail: `リポジトリ外を指すパス（トラバーサル）: ${repoPath}`,
+          });
+          continue;
+        }
         if (!fs.existsSync(abs)) {
           broken.push({
             file: relFile,
@@ -286,6 +304,17 @@ export function detectBrokenLinks(repoRoot = REPO_ROOT) {
       //     book 内資産は .md リンクのみが移動対象。画像等は対象外として .md に限定。
       if (target.endsWith('.md')) {
         const abs = path.resolve(path.dirname(file), target);
+        // ハードニング: 相対リンクが repoRoot 外へ脱出する場合も、実在有無に
+        // かかわらずリンク切れとして報告する（repoRoot 内の `..` 参照は従来どおり許容）。
+        if (!isWithinRoot(repoRoot, abs)) {
+          broken.push({
+            file: relFile,
+            target: rawTarget,
+            kind: 'internal-md',
+            detail: `リポジトリ外を指すリンク（トラバーサル）: ${target}`,
+          });
+          continue;
+        }
         if (!fs.existsSync(abs)) {
           broken.push({
             file: relFile,

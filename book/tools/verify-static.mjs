@@ -23,6 +23,7 @@
 //   node book/tools/verify-static.mjs --self-test # 検証ロジック自身の健全性テストも実行
 
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -207,10 +208,7 @@ function analyze(root) {
     const base = path.basename(f.rel);
     const ext = path.extname(base).toLowerCase();
     if (SERVER_EXTS.has(ext)) serverFiles.push(f.rel);
-    const allowed =
-      ALLOWED_EXTS.has(ext) ||
-      ALLOWED_NOEXT_NAMES.has(base) ||
-      (ext === '' && ALLOWED_NOEXT_NAMES.has(base));
+    const allowed = ALLOWED_EXTS.has(ext) || ALLOWED_NOEXT_NAMES.has(base);
     if (!allowed) nonStatic.push(f.rel);
   }
 
@@ -280,7 +278,7 @@ function analyze(root) {
 function runSelfTest() {
   log('');
   log('=== SELF-TEST (検証ロジックの健全性) ===');
-  const tmp = fs.mkdtempSync(path.join(fs.realpathSync(require_os_tmpdir()), 'verify-static-'));
+  const tmp = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), 'verify-static-'));
   try {
     copyDir(outDir, tmp);
 
@@ -314,11 +312,6 @@ function runSelfTest() {
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
-}
-
-function require_os_tmpdir() {
-  // import を最小に保つためのローカルヘルパ。
-  return process.env.TEMP || process.env.TMP || process.env.TMPDIR || '/tmp';
 }
 
 function copyDir(src, dst) {

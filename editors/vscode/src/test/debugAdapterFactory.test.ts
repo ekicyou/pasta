@@ -97,6 +97,40 @@ test('resolveSourcePresentation ignores an invalid value (server falls back to d
   assert.strictEqual(resolveSourcePresentation({ sourcePresentation: 42 as unknown as string }), undefined);
 });
 
+// ---------------------------------------------------------------------------
+// Port hardening (cell 3.56 / G3): an invalid `port` value must fall back to
+// DEFAULT_DEBUG_PORT instead of producing a broken DebugAdapterServer
+// descriptor (NaN / out-of-range / non-integer port). Valid numeric and
+// numeric-string ports are unaffected (behaviour-preserving for valid input).
+// ---------------------------------------------------------------------------
+
+test('resolveAttachTarget falls back to the default port for a non-numeric string', () => {
+  const target = resolveAttachTarget({ port: 'abc' });
+  assert.strictEqual(target.port, DEFAULT_DEBUG_PORT);
+});
+
+test('resolveAttachTarget falls back to the default port for out-of-range values', () => {
+  assert.strictEqual(resolveAttachTarget({ port: 0 }).port, DEFAULT_DEBUG_PORT);
+  assert.strictEqual(resolveAttachTarget({ port: -1 }).port, DEFAULT_DEBUG_PORT);
+  assert.strictEqual(resolveAttachTarget({ port: 65536 }).port, DEFAULT_DEBUG_PORT);
+});
+
+test('resolveAttachTarget falls back to the default port for a non-integer port', () => {
+  assert.strictEqual(resolveAttachTarget({ port: 12.5 }).port, DEFAULT_DEBUG_PORT);
+});
+
+test('resolveAttachTarget falls back to the default port for non-number/non-string types', () => {
+  // Number(true) === 1 would otherwise silently "work"; reject wrong types.
+  assert.strictEqual(resolveAttachTarget({ port: true }).port, DEFAULT_DEBUG_PORT);
+  assert.strictEqual(resolveAttachTarget({ port: {} }).port, DEFAULT_DEBUG_PORT);
+  assert.strictEqual(resolveAttachTarget({ port: [] }).port, DEFAULT_DEBUG_PORT);
+});
+
+test('resolveAttachTarget keeps accepting the valid port boundary values', () => {
+  assert.strictEqual(resolveAttachTarget({ port: 1 }).port, 1);
+  assert.strictEqual(resolveAttachTarget({ port: 65535 }).port, 65535);
+});
+
 console.log(`\nDebugAdapterFactory: ${passed} passed, ${failed} failed\n`);
 if (failed > 0) {
   process.exit(1);

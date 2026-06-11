@@ -188,6 +188,48 @@ mod tests {
     }
 
     #[test]
+    fn test_literalize_empty_string() {
+        // Empty string has no escape-needing characters: simple quoted form.
+        let result = StringLiteralizer::literalize("").unwrap();
+        assert_eq!(result, "\"\"");
+    }
+
+    #[test]
+    fn test_literalize_max_equals_boundary_success() {
+        // `]` + 9 `=` forces n=10 (== MAX_EQUALS), the last level that succeeds.
+        let text = "\\x]=========y";
+        let result = StringLiteralizer::literalize(text).unwrap();
+        assert_eq!(result, format!("[{0}[{1}]{0}]", "=".repeat(10), text));
+    }
+
+    #[test]
+    fn test_literalize_error_when_all_formats_dangerous() {
+        // `]` + 10 `=` contains the danger pattern for every n in 0..=MAX_EQUALS
+        // (each `]` + k `=` for k <= 10 is a substring), so no format is safe.
+        let text = "\\x]==========y";
+        let err = StringLiteralizer::literalize(text).unwrap_err();
+        match err {
+            TranspileError::StringLiteralError { text: t, .. } => {
+                assert_eq!(t, text, "error must carry the offending text");
+            }
+            other => panic!("expected StringLiteralError, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_literalize_with_span_error_carries_span() {
+        let span = Span::new(8, 4, 8, 20, 0, 16);
+        let err =
+            StringLiteralizer::literalize_with_span("\\x]==========y", &span).unwrap_err();
+        let msg = format!("{}", err);
+        assert!(msg.contains("String literal cannot be converted"));
+        assert!(
+            msg.contains("[L8:4-L8:20]"),
+            "error message must include the caller-provided span: {msg}"
+        );
+    }
+
+    #[test]
     fn test_danger_pattern_n2() {
         assert!(StringLiteralizer::contains_danger_pattern(
             "hello]==world",

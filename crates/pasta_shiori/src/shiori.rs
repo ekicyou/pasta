@@ -180,47 +180,32 @@ impl PastaShiori {
         let shiori_table: Result<Table, _> = globals.get("SHIORI");
         match shiori_table {
             Ok(table) => {
-                // Cache SHIORI.load function
-                self.load_fn = match table.get::<Function>("load") {
-                    Ok(f) => {
-                        trace!("SHIORI.load function cached");
-                        Some(f)
-                    }
-                    Err(_) => {
-                        warn!("SHIORI.load function not found");
-                        None
-                    }
-                };
-
-                // Cache SHIORI.request function
-                self.request_fn = match table.get::<Function>("request") {
-                    Ok(f) => {
-                        trace!("SHIORI.request function cached");
-                        Some(f)
-                    }
-                    Err(_) => {
-                        warn!("SHIORI.request function not found");
-                        None
-                    }
-                };
-
-                // Cache SHIORI.unload function
-                self.unload_fn = match table.get::<Function>("unload") {
-                    Ok(f) => {
-                        trace!("SHIORI.unload function cached");
-                        Some(f)
-                    }
-                    Err(_) => {
-                        debug!("SHIORI.unload function not found (optional)");
-                        None
-                    }
-                };
+                self.load_fn = Self::lookup_lua_fn(&table, "load", false);
+                self.request_fn = Self::lookup_lua_fn(&table, "request", false);
+                self.unload_fn = Self::lookup_lua_fn(&table, "unload", true);
             }
             Err(e) => {
                 warn!(error = %e, "SHIORI table not found");
-                self.load_fn = None;
-                self.request_fn = None;
-                self.unload_fn = None;
+                self.clear_cached_lua_functions();
+            }
+        }
+    }
+
+    /// Look up `SHIORI.<name>` in the table, logging cache hit/miss.
+    /// `optional` functions log a miss at debug level instead of warn.
+    fn lookup_lua_fn(table: &Table, name: &str, optional: bool) -> Option<Function> {
+        match table.get::<Function>(name) {
+            Ok(f) => {
+                trace!("SHIORI.{} function cached", name);
+                Some(f)
+            }
+            Err(_) if optional => {
+                debug!("SHIORI.{} function not found (optional)", name);
+                None
+            }
+            Err(_) => {
+                warn!("SHIORI.{} function not found", name);
+                None
             }
         }
     }
@@ -340,7 +325,6 @@ impl PastaShiori {
          \r\n"
             .to_string()
     }
-
 }
 
 #[cfg(test)]

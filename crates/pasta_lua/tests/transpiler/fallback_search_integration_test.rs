@@ -60,15 +60,15 @@ fn test_actor_code_blocks_parsed() {
     let file = parse_str(COMPREHENSIVE_FALLBACK_PASTA, "test.pasta").unwrap();
 
     for item in &file.items {
-        if let pasta_dsl::parser::FileItem::ActorScope(actor) = item {
-            if actor.name == "さくら" {
-                assert!(
-                    !actor.code_blocks.is_empty(),
-                    "さくら should have code_blocks"
-                );
-                assert_eq!(actor.code_blocks[0].language.as_deref(), Some("lua"));
-                assert!(actor.code_blocks[0].content.contains("function ACTOR.時刻"));
-            }
+        if let pasta_dsl::parser::FileItem::ActorScope(actor) = item
+            && actor.name == "さくら"
+        {
+            assert!(
+                !actor.code_blocks.is_empty(),
+                "さくら should have code_blocks"
+            );
+            assert_eq!(actor.code_blocks[0].language.as_deref(), Some("lua"));
+            assert!(actor.code_blocks[0].content.contains("function ACTOR.時刻"));
         }
     }
 }
@@ -197,7 +197,7 @@ fn setup_runtime() -> mlua::Lua {
         .to_string_lossy()
         .replace('\\', "/");
 
-    lua.load(&format!(
+    lua.load(format!(
         r#"
         package.path = "{scripts_dir}/?.lua;{scripts_dir}/?/init.lua;" .. package.path
         -- @pasta_log スタブ（テスト環境用）

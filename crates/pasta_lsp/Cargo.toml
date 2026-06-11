@@ -21,9 +21,11 @@ crate-type = ["cdylib", "rlib"]
 pasta_dsl.workspace = true
 thiserror.workspace = true
 serde.workspace = true
-serde_json.workspace = true
 tower-lsp.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen.workspace = true
 serde-wasm-bindgen.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

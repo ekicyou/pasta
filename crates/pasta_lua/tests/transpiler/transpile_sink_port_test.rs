@@ -12,7 +12,7 @@
 //! design.md 参照:
 //! - "File Structure Plan" → Modified Files producer `transpiler.rs`（153 行）:
 //!   「`transpile` にオプショナル `&mut dyn SourceMapSink` 受け渡し口を追加。既存
-//!    シグネチャは sink なしの薄いラッパで互換維持」。
+//!   シグネチャは sink なしの薄いラッパで互換維持」。
 //! - Components "TranspileSinkPort"（300 行）: 「sink を transpile へ受け渡し」。
 //! - "Existing Architecture Analysis"（70 行）: `LuaTranspiler::transpile()` は現状 sink を
 //!   通さない（本番ローダから到達不能）→ 本タスクで受け渡し口を追加。

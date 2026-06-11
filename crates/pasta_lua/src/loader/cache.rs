@@ -164,8 +164,15 @@ impl CacheManager {
         let cache_path = self.source_to_cache_path(source_path);
         let module_name = self.source_to_module_name(source_path);
 
-        // Validate cache path stays within cache directory (prevent directory traversal)
-        if !cache_path.starts_with(&self.cache_dir) {
+        // Validate cache path stays within cache directory (prevent directory traversal).
+        // `Path::starts_with` alone is lexical: a path like
+        // `{cache_dir}/pasta/scene/../../../evil.lua` passes the prefix check but
+        // escapes after OS resolution. Reject any `..` component in the remainder.
+        let escapes_cache_dir = match cache_path.strip_prefix(&self.cache_dir) {
+            Ok(rel) => rel.components().any(|c| matches!(c, Component::ParentDir)),
+            Err(_) => true,
+        };
+        if escapes_cache_dir {
             return Err(LoaderError::cache_write(
                 &cache_path,
                 std::io::Error::new(
@@ -204,11 +211,7 @@ impl CacheManager {
         let relative = self.get_relative_path(source_path);
 
         // Remove dic/ prefix and .pasta extension
-        let without_prefix = relative.strip_prefix(&self.dic_prefix).unwrap_or(&relative);
-        let without_prefix = without_prefix
-            .strip_prefix('/')
-            .or_else(|| without_prefix.strip_prefix('\\'))
-            .unwrap_or(without_prefix);
+        let without_prefix = Self::strip_component_prefix(&relative, &self.dic_prefix);
 
         let stem = Path::new(without_prefix).with_extension("");
         let stem_str = stem.to_string_lossy();
@@ -227,17 +230,30 @@ impl CacheManager {
         let relative = self.get_relative_path(source_path);
 
         // Remove dic/ prefix
-        let without_prefix = relative.strip_prefix(&self.dic_prefix).unwrap_or(&relative);
-        let without_prefix = without_prefix
-            .strip_prefix('/')
-            .or_else(|| without_prefix.strip_prefix('\\'))
-            .unwrap_or(without_prefix);
+        let without_prefix = Self::strip_component_prefix(&relative, &self.dic_prefix);
 
         // Replace extension and convert hyphens
         let lua_path = without_prefix.replace('-', "_");
         let lua_path = Path::new(&lua_path).with_extension("lua");
 
         self.cache_dir.join("pasta/scene").join(lua_path)
+    }
+
+    /// Strip `prefix` from a relative path string, only when it ends at a path
+    /// component boundary (`{prefix}/...`, `{prefix}\...`, or exactly `{prefix}`).
+    ///
+    /// Names that merely start with the same characters (e.g. `dictionary.pasta`
+    /// or `dicx/foo.pasta` for prefix `dic`) are returned unchanged. A plain
+    /// `str::strip_prefix` would mis-strip those into `tionary.pasta` / `x/foo.pasta`.
+    fn strip_component_prefix<'a>(relative: &'a str, prefix: &str) -> &'a str {
+        let Some(rest) = relative.strip_prefix(prefix) else {
+            return relative;
+        };
+        match rest.strip_prefix('/').or_else(|| rest.strip_prefix('\\')) {
+            Some(stripped) => stripped,
+            None if rest.is_empty() => rest,
+            None => relative,
+        }
     }
 
     /// Get relative path from base_dir.

@@ -123,7 +123,7 @@ fn compare_lua_output(expected: &str, actual: &str) -> (Vec<LineMismatch>, TestS
 fn generate_mismatch_report(mismatches: &[LineMismatch], stats: &TestStatistics) -> String {
     let mut report = String::new();
 
-    report.push_str("\n");
+    report.push('\n');
     report.push_str(
         "================================================================================\n",
     );
@@ -138,14 +138,14 @@ fn generate_mismatch_report(mismatches: &[LineMismatch], stats: &TestStatistics)
     report.push_str(&format!("  一致行数:     {}\n", stats.matched_lines));
     report.push_str(&format!("  不一致行数:   {}\n", stats.mismatched_lines));
     report.push_str(&format!("  一致率:       {:.1}%\n", stats.match_rate()));
-    report.push_str("\n");
+    report.push('\n');
 
     // Mismatch pattern classification
     report.push_str("【不一致パターン分類】\n");
     report.push_str(&format!("  内容差異:     {}\n", stats.content_differences));
     report.push_str(&format!("  欠落行:       {}\n", stats.missing_lines));
     report.push_str(&format!("  余剰行:       {}\n", stats.extra_lines));
-    report.push_str("\n");
+    report.push('\n');
 
     // Detailed mismatch list (limit to first 20 for readability)
     if !mismatches.is_empty() {

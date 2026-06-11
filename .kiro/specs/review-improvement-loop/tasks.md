@@ -23,7 +23,7 @@
 
 ## Task 1: 環境プリフライトとベースライン検証
 
-- [ ] 1. 既知環境制約を無害化し、グリーンベースラインを確立する
+- [x] 1. 既知環境制約を無害化し、グリーンベースラインを確立する
   - steering（tech.md / workflow.md）・プロジェクトメモリ・design.md「環境制約表」を読み、検証コマンドに影響する既知制約（本リポジトリでは `NoDefaultCurrentDirectoryInExePath`・`PASTA_DEBUG`・`PASTA_DEBUG_PORT` の解除）を列挙する
   - 無害化をコマンド文字列として織り込んだ正準コマンド表（design.md「検証コマンドメニュー」の本実行インスタンス）を確定し、tasks.md の Implementation Notes へ記録する（以後の全サブエージェントへコマンド文字列として伝搬し、解釈余地を残さない。無害化はコマンド毎に適用する）
   - 正準全体検証（本リポジトリでは env 無害化付き `cargo test --workspace` を軸とする全体テスト）を実行し、グリーン状態を確認する
@@ -34,7 +34,7 @@
 
 ## Task 2: 領域発見・マトリクス生成・セルタスク生成
 
-- [ ] 2. レビュー領域を自己発見し、マトリクスとセルサブタスクを生成する
+- [x] 2. レビュー領域を自己発見し、マトリクスとセルサブタスクを生成する
   - design.md「領域発見プロトコル」の資産カテゴリ検出規則（マニフェストファイルの存在からのエコシステム検出 — 事前定義の固定領域リストは使用禁止）により、対象リポジトリの全ソース資産カテゴリを実行時に発見する（移植先でも同一規則で再発見できること）
   - 各資産カテゴリの品質検証インフラ（テスト・lint・監査ツール）を検出し、Task 1 の正準コマンド表と突き合わせる
   - 領域分割規則を適用する: トップレベル構成単位（クレート・パッケージ・資産ディレクトリ）を最小粒度とし、src 実測行数が約 3,000 行を超える単位はサブモジュール境界で細分化する（1 ディスパッチの点検対象 ≦ 約 2,000 行）
@@ -48,7 +48,7 @@
 
 ## Task 3: セル実行ループ（サブタスク 3.x は Task 2 が動的生成）
 
-- [ ] 3. 全セルを点検・改善・検証・記録し、終端状態へ到達させる（コンテナタスク）
+- [x] 3. 全セルを点検・改善・検証・記録し、終端状態へ到達させる（コンテナタスク）
   - 本メジャータスクは直接の実行単位ではない。実行単位は GENERATED-CELLS 区間に Task 2 が追記するサブタスク 3.x である
   - 前提: GENERATED-CELLS 区間に 3.x サブタスクが 1 件以上存在すること（空であれば Task 2 が未完了 — 本タスクに着手しない）
   - 各セルは design.md「セル実行プロトコル」に従う: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）→ 点検 → 改善（G1→G2→G3→G4→G5 の昇リスク順・資産種別に適用不能な次元は N/A＋理由を記録）→ 2 段検証（領域スコープ → コミット前全体）→ 改善ありセルのみ独立レビュー（kiro-review）→ コミット（`Riloop-Cell: {area}x{group}` トレーラ必須・個別 `git add`）
@@ -60,11 +60,728 @@
   - _Boundary: セル実行プロトコル（各セルの変更可能範囲は当該サブタスクの `_Boundary:` paths に限定。クレート単位検査の指摘は design.md「指摘の帰属規則」に従う）_
 
 <!-- GENERATED-CELLS:BEGIN (Task 2 が生成。固定部の編集禁止) -->
+- [x] 3.1 セル pasta_core × G1: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_core/**（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G1 テスト網羅（D1）: 未テストの公開挙動・未到達分岐を特定してテストを追加する。不要テストの除外は根拠明記の上で慎重に行う
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_core` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.2, 2.3, 3.1, 4.3, 4.4_
+  - _Boundary: crates/pasta_core/**_
+- [x] 3.2 セル pasta_core × G2+G3+G4+G5: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_core/**（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G2 静的衛生（D4+D5）: clippy 警告ゼロ化（機械修正 `cargo clippy --fix` を一次手段とし非機械的警告のみ個別判断）・デッドコード/未使用 pub の除去（クレート単位検査の指摘は帰属規則に従い境界外は matrix.md Notes へ申し送り）
+    - G3 ハードニング（D3+D6）: 脆弱性レビューと対策・到達可能パニック経路（unwrap/expect/インデックス）の Result 化。許容ハードニングは変化の境界を示す回帰テストを必ず追加し matrix.md に記録
+    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G5 文書/依存整合（D7 領域分）: 領域ドキュメント（クレート README・TEST_COVERAGE.md 該当部）と依存の整合確認・同期
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_core` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.1, 3.2, 3.3, 3.6, 3.7, 4.3, 4.4_
+  - _Boundary: crates/pasta_core/**_
+- [x] 3.3 セル pasta_dsl × G1: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_dsl/**（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G1 テスト網羅（D1）: 未テストの公開挙動・未到達分岐を特定してテストを追加する。不要テストの除外は根拠明記の上で慎重に行う
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_dsl` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.2, 2.3, 3.1, 4.3, 4.4_
+  - _Boundary: crates/pasta_dsl/**_
+- [x] 3.4 セル pasta_dsl × G2+G3: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_dsl/**（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G2 静的衛生（D4+D5）: clippy 警告ゼロ化（機械修正 `cargo clippy --fix` を一次手段とし非機械的警告のみ個別判断）・デッドコード/未使用 pub の除去（クレート単位検査の指摘は帰属規則に従い境界外は matrix.md Notes へ申し送り）
+    - G3 ハードニング（D3+D6）: 脆弱性レビューと対策・到達可能パニック経路（unwrap/expect/インデックス）の Result 化。許容ハードニングは変化の境界を示す回帰テストを必ず追加し matrix.md に記録
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_dsl` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.5, 2.6, 2.7, 2.8, 3.1, 3.2, 3.3, 3.6, 3.7, 4.3, 4.4_
+  - _Boundary: crates/pasta_dsl/**_
+- [x] 3.5 セル pasta_dsl × G4+G5: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_dsl/**（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G5 文書/依存整合（D7 領域分）: 領域ドキュメント（クレート README・TEST_COVERAGE.md 該当部）と依存の整合確認・同期
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_dsl` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.4, 2.9, 3.1, 4.3, 4.4_
+  - _Boundary: crates/pasta_dsl/**_
+- [x] 3.6 セル pasta_lua-root × G1: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/src/*.rs（直下のみ）, crates/pasta_lua/build.rs, crates/pasta_lua/build_zip.rs, crates/pasta_lua/Cargo.toml, crates/pasta_lua/README.md, crates/pasta_lua/tests/*.rs, crates/pasta_lua/tests/{common,fixtures,transpiler}/**（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G1 テスト網羅（D1）: 未テストの公開挙動・未到達分岐を特定してテストを追加する。不要テストの除外は根拠明記の上で慎重に行う
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.2, 2.3, 3.1, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/src/*.rs（直下のみ）, crates/pasta_lua/build.rs, crates/pasta_lua/build_zip.rs, crates/pasta_lua/Cargo.toml, crates/pasta_lua/README.md, crates/pasta_lua/tests/*.rs, crates/pasta_lua/tests/{common,fixtures,transpiler}/**_
+- [x] 3.7 セル pasta_lua-root × G2+G3+G4+G5: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/src/*.rs（直下のみ）, crates/pasta_lua/build.rs, crates/pasta_lua/build_zip.rs, crates/pasta_lua/Cargo.toml, crates/pasta_lua/README.md, crates/pasta_lua/tests/*.rs, crates/pasta_lua/tests/{common,fixtures,transpiler}/**（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G2 静的衛生（D4+D5）: clippy 警告ゼロ化（機械修正 `cargo clippy --fix` を一次手段とし非機械的警告のみ個別判断）・デッドコード/未使用 pub の除去（クレート単位検査の指摘は帰属規則に従い境界外は matrix.md Notes へ申し送り）
+    - G3 ハードニング（D3+D6）: 脆弱性レビューと対策・到達可能パニック経路（unwrap/expect/インデックス）の Result 化。許容ハードニングは変化の境界を示す回帰テストを必ず追加し matrix.md に記録
+    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G5 文書/依存整合（D7 領域分）: 領域ドキュメント（クレート README・TEST_COVERAGE.md 該当部）と依存の整合確認・同期
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.1, 3.2, 3.3, 3.6, 3.7, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/src/*.rs（直下のみ）, crates/pasta_lua/build.rs, crates/pasta_lua/build_zip.rs, crates/pasta_lua/Cargo.toml, crates/pasta_lua/README.md, crates/pasta_lua/tests/*.rs, crates/pasta_lua/tests/{common,fixtures,transpiler}/**_
+- [x] 3.8 セル pasta_lua/code_gen × G1: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/src/code_gen/**, crates/pasta_lua/tests/code_gen/**（新設可）（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G1 テスト網羅（D1）: 未テストの公開挙動・未到達分岐を特定してテストを追加する。不要テストの除外は根拠明記の上で慎重に行う
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.2, 2.3, 3.1, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/src/code_gen/**, crates/pasta_lua/tests/code_gen/**（新設可）_
+- [x] 3.9 セル pasta_lua/code_gen × G2+G3+G4+G5: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/src/code_gen/**, crates/pasta_lua/tests/code_gen/**（新設可）（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G2 静的衛生（D4+D5）: clippy 警告ゼロ化（機械修正 `cargo clippy --fix` を一次手段とし非機械的警告のみ個別判断）・デッドコード/未使用 pub の除去（クレート単位検査の指摘は帰属規則に従い境界外は matrix.md Notes へ申し送り）
+    - G3 ハードニング（D3+D6）: 脆弱性レビューと対策・到達可能パニック経路（unwrap/expect/インデックス）の Result 化。許容ハードニングは変化の境界を示す回帰テストを必ず追加し matrix.md に記録
+    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G5 文書/依存整合（D7 領域分）: 領域ドキュメント（クレート README・TEST_COVERAGE.md 該当部）と依存の整合確認・同期
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.1, 3.2, 3.3, 3.6, 3.7, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/src/code_gen/**, crates/pasta_lua/tests/code_gen/**（新設可）_
+- [x] 3.10 セル pasta_lua/enc-log-search × G1: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/src/{encoding,logging,search}/**, crates/pasta_lua/tests/{log,search}/**（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G1 テスト網羅（D1）: 未テストの公開挙動・未到達分岐を特定してテストを追加する。不要テストの除外は根拠明記の上で慎重に行う
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.2, 2.3, 3.1, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/src/{encoding,logging,search}/**, crates/pasta_lua/tests/{log,search}/**_
+- [x] 3.11 セル pasta_lua/enc-log-search × G2+G3+G4+G5: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/src/{encoding,logging,search}/**, crates/pasta_lua/tests/{log,search}/**（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G2 静的衛生（D4+D5）: clippy 警告ゼロ化（機械修正 `cargo clippy --fix` を一次手段とし非機械的警告のみ個別判断）・デッドコード/未使用 pub の除去（クレート単位検査の指摘は帰属規則に従い境界外は matrix.md Notes へ申し送り）
+    - G3 ハードニング（D3+D6）: 脆弱性レビューと対策・到達可能パニック経路（unwrap/expect/インデックス）の Result 化。許容ハードニングは変化の境界を示す回帰テストを必ず追加し matrix.md に記録
+    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G5 文書/依存整合（D7 領域分）: 領域ドキュメント（クレート README・TEST_COVERAGE.md 該当部）と依存の整合確認・同期
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.1, 3.2, 3.3, 3.6, 3.7, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/src/{encoding,logging,search}/**, crates/pasta_lua/tests/{log,search}/**_
+- [x] 3.12 セル pasta_lua/loader-core × G1: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/src/loader/{mod,context,discovery,error}.rs, crates/pasta_lua/tests/loader/**（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G1 テスト網羅（D1）: 未テストの公開挙動・未到達分岐を特定してテストを追加する。不要テストの除外は根拠明記の上で慎重に行う
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.2, 2.3, 3.1, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/src/loader/{mod,context,discovery,error}.rs, crates/pasta_lua/tests/loader/**_
+- [x] 3.13 セル pasta_lua/loader-core × G2+G3+G4+G5: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/src/loader/{mod,context,discovery,error}.rs, crates/pasta_lua/tests/loader/**（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G2 静的衛生（D4+D5）: clippy 警告ゼロ化（機械修正 `cargo clippy --fix` を一次手段とし非機械的警告のみ個別判断）・デッドコード/未使用 pub の除去（クレート単位検査の指摘は帰属規則に従い境界外は matrix.md Notes へ申し送り）
+    - G3 ハードニング（D3+D6）: 脆弱性レビューと対策・到達可能パニック経路（unwrap/expect/インデックス）の Result 化。許容ハードニングは変化の境界を示す回帰テストを必ず追加し matrix.md に記録
+    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G5 文書/依存整合（D7 領域分）: 領域ドキュメント（クレート README・TEST_COVERAGE.md 該当部）と依存の整合確認・同期
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.1, 3.2, 3.3, 3.6, 3.7, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/src/loader/{mod,context,discovery,error}.rs, crates/pasta_lua/tests/loader/**_
+- [x] 3.14 セル pasta_lua/loader-io × G1: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/src/loader/{cache,config,extract}.rs, crates/pasta_lua/tests/loader/**（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G1 テスト網羅（D1）: 未テストの公開挙動・未到達分岐を特定してテストを追加する。不要テストの除外は根拠明記の上で慎重に行う
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.2, 2.3, 3.1, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/src/loader/{cache,config,extract}.rs, crates/pasta_lua/tests/loader/**_
+- [x] 3.15 セル pasta_lua/loader-io × G2+G3+G4+G5: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/src/loader/{cache,config,extract}.rs, crates/pasta_lua/tests/loader/**（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G2 静的衛生（D4+D5）: clippy 警告ゼロ化（機械修正 `cargo clippy --fix` を一次手段とし非機械的警告のみ個別判断）・デッドコード/未使用 pub の除去（クレート単位検査の指摘は帰属規則に従い境界外は matrix.md Notes へ申し送り）
+    - G3 ハードニング（D3+D6）: 脆弱性レビューと対策・到達可能パニック経路（unwrap/expect/インデックス）の Result 化。許容ハードニングは変化の境界を示す回帰テストを必ず追加し matrix.md に記録
+    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G5 文書/依存整合（D7 領域分）: 領域ドキュメント（クレート README・TEST_COVERAGE.md 該当部）と依存の整合確認・同期
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.1, 3.2, 3.3, 3.6, 3.7, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/src/loader/{cache,config,extract}.rs, crates/pasta_lua/tests/loader/**_
+- [x] 3.16 セル pasta_lua/runtime × G1: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/src/runtime/**, crates/pasta_lua/tests/{runtime,shiori}/**（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G1 テスト網羅（D1）: 未テストの公開挙動・未到達分岐を特定してテストを追加する。不要テストの除外は根拠明記の上で慎重に行う
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.2, 2.3, 3.1, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/src/runtime/**, crates/pasta_lua/tests/{runtime,shiori}/**_
+- [x] 3.17 セル pasta_lua/runtime × G2+G3: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/src/runtime/**, crates/pasta_lua/tests/{runtime,shiori}/**（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G2 静的衛生（D4+D5）: clippy 警告ゼロ化（機械修正 `cargo clippy --fix` を一次手段とし非機械的警告のみ個別判断）・デッドコード/未使用 pub の除去（クレート単位検査の指摘は帰属規則に従い境界外は matrix.md Notes へ申し送り）
+    - G3 ハードニング（D3+D6）: 脆弱性レビューと対策・到達可能パニック経路（unwrap/expect/インデックス）の Result 化。許容ハードニングは変化の境界を示す回帰テストを必ず追加し matrix.md に記録
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.5, 2.6, 2.7, 2.8, 3.1, 3.2, 3.3, 3.6, 3.7, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/src/runtime/**, crates/pasta_lua/tests/{runtime,shiori}/**_
+- [x] 3.18 セル pasta_lua/runtime × G4+G5: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/src/runtime/**, crates/pasta_lua/tests/{runtime,shiori}/**（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G5 文書/依存整合（D7 領域分）: 領域ドキュメント（クレート README・TEST_COVERAGE.md 該当部）と依存の整合確認・同期
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.4, 2.9, 3.1, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/src/runtime/**, crates/pasta_lua/tests/{runtime,shiori}/**_
+- [x] 3.19 セル pasta_lua/sakura_script × G1: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/src/sakura_script/**, crates/pasta_lua/tests/sakura_script/**（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G1 テスト網羅（D1）: 未テストの公開挙動・未到達分岐を特定してテストを追加する。不要テストの除外は根拠明記の上で慎重に行う
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.2, 2.3, 3.1, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/src/sakura_script/**, crates/pasta_lua/tests/sakura_script/**_
+- [x] 3.20 セル pasta_lua/sakura_script × G2+G3+G4+G5: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/src/sakura_script/**, crates/pasta_lua/tests/sakura_script/**（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G2 静的衛生（D4+D5）: clippy 警告ゼロ化（機械修正 `cargo clippy --fix` を一次手段とし非機械的警告のみ個別判断）・デッドコード/未使用 pub の除去（クレート単位検査の指摘は帰属規則に従い境界外は matrix.md Notes へ申し送り）
+    - G3 ハードニング（D3+D6）: 脆弱性レビューと対策・到達可能パニック経路（unwrap/expect/インデックス）の Result 化。許容ハードニングは変化の境界を示す回帰テストを必ず追加し matrix.md に記録
+    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G5 文書/依存整合（D7 領域分）: 領域ドキュメント（クレート README・TEST_COVERAGE.md 該当部）と依存の整合確認・同期
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.1, 3.2, 3.3, 3.6, 3.7, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/src/sakura_script/**, crates/pasta_lua/tests/sakura_script/**_
+- [x] 3.21 セル pasta_lua/debug-core × G1: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/src/debug/{mod,types,transport}.rs, crates/pasta_lua/tests/debug/**（新設可）（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G1 テスト網羅（D1）: 未テストの公開挙動・未到達分岐を特定してテストを追加する。不要テストの除外は根拠明記の上で慎重に行う
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.2, 2.3, 3.1, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/src/debug/{mod,types,transport}.rs, crates/pasta_lua/tests/debug/**（新設可）_
+- [x] 3.22 セル pasta_lua/debug-core × G2+G3+G4+G5: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/src/debug/{mod,types,transport}.rs, crates/pasta_lua/tests/debug/**（新設可）（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G2 静的衛生（D4+D5）: clippy 警告ゼロ化（機械修正 `cargo clippy --fix` を一次手段とし非機械的警告のみ個別判断）・デッドコード/未使用 pub の除去（クレート単位検査の指摘は帰属規則に従い境界外は matrix.md Notes へ申し送り）
+    - G3 ハードニング（D3+D6）: 脆弱性レビューと対策・到達可能パニック経路（unwrap/expect/インデックス）の Result 化。許容ハードニングは変化の境界を示す回帰テストを必ず追加し matrix.md に記録
+    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G5 文書/依存整合（D7 領域分）: 領域ドキュメント（クレート README・TEST_COVERAGE.md 該当部）と依存の整合確認・同期
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.1, 3.2, 3.3, 3.6, 3.7, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/src/debug/{mod,types,transport}.rs, crates/pasta_lua/tests/debug/**（新設可）_
+- [x] 3.23 セル pasta_lua/debug-dap × G1: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/src/debug/{dap,breakpoints}.rs, crates/pasta_lua/tests/debug/**（新設可）（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G1 テスト網羅（D1）: 未テストの公開挙動・未到達分岐を特定してテストを追加する。不要テストの除外は根拠明記の上で慎重に行う
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.2, 2.3, 3.1, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/src/debug/{dap,breakpoints}.rs, crates/pasta_lua/tests/debug/**（新設可）_
+- [x] 3.24 セル pasta_lua/debug-dap × G2+G3+G4+G5: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/src/debug/{dap,breakpoints}.rs, crates/pasta_lua/tests/debug/**（新設可）（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G2 静的衛生（D4+D5）: clippy 警告ゼロ化（機械修正 `cargo clippy --fix` を一次手段とし非機械的警告のみ個別判断）・デッドコード/未使用 pub の除去（クレート単位検査の指摘は帰属規則に従い境界外は matrix.md Notes へ申し送り）
+    - G3 ハードニング（D3+D6）: 脆弱性レビューと対策・到達可能パニック経路（unwrap/expect/インデックス）の Result 化。許容ハードニングは変化の境界を示す回帰テストを必ず追加し matrix.md に記録
+    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G5 文書/依存整合（D7 領域分）: 領域ドキュメント（クレート README・TEST_COVERAGE.md 該当部）と依存の整合確認・同期
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.1, 3.2, 3.3, 3.6, 3.7, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/src/debug/{dap,breakpoints}.rs, crates/pasta_lua/tests/debug/**（新設可）_
+- [x] 3.25 セル pasta_lua/debug-hook-inspect × G1: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/src/debug/{hook,inspect}.rs, crates/pasta_lua/tests/debug/**（新設可）（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G1 テスト網羅（D1）: 未テストの公開挙動・未到達分岐を特定してテストを追加する。不要テストの除外は根拠明記の上で慎重に行う
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.2, 2.3, 3.1, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/src/debug/{hook,inspect}.rs, crates/pasta_lua/tests/debug/**（新設可）_
+- [x] 3.26 セル pasta_lua/debug-hook-inspect × G2+G3+G4+G5: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/src/debug/{hook,inspect}.rs, crates/pasta_lua/tests/debug/**（新設可）（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G2 静的衛生（D4+D5）: clippy 警告ゼロ化（機械修正 `cargo clippy --fix` を一次手段とし非機械的警告のみ個別判断）・デッドコード/未使用 pub の除去（クレート単位検査の指摘は帰属規則に従い境界外は matrix.md Notes へ申し送り）
+    - G3 ハードニング（D3+D6）: 脆弱性レビューと対策・到達可能パニック経路（unwrap/expect/インデックス）の Result 化。許容ハードニングは変化の境界を示す回帰テストを必ず追加し matrix.md に記録
+    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G5 文書/依存整合（D7 領域分）: 領域ドキュメント（クレート README・TEST_COVERAGE.md 該当部）と依存の整合確認・同期
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.1, 3.2, 3.3, 3.6, 3.7, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/src/debug/{hook,inspect}.rs, crates/pasta_lua/tests/debug/**（新設可）_
+- [x] 3.27 セル pasta_lua/debug-session × G1: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/src/debug/session.rs, crates/pasta_lua/tests/debug/**（新設可）（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G1 テスト網羅（D1）: 未テストの公開挙動・未到達分岐を特定してテストを追加する。不要テストの除外は根拠明記の上で慎重に行う
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.2, 2.3, 3.1, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/src/debug/session.rs, crates/pasta_lua/tests/debug/**（新設可）_
+- [x] 3.28 セル pasta_lua/debug-session × G2+G3: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/src/debug/session.rs, crates/pasta_lua/tests/debug/**（新設可）（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G2 静的衛生（D4+D5）: clippy 警告ゼロ化（機械修正 `cargo clippy --fix` を一次手段とし非機械的警告のみ個別判断）・デッドコード/未使用 pub の除去（クレート単位検査の指摘は帰属規則に従い境界外は matrix.md Notes へ申し送り）
+    - G3 ハードニング（D3+D6）: 脆弱性レビューと対策・到達可能パニック経路（unwrap/expect/インデックス）の Result 化。許容ハードニングは変化の境界を示す回帰テストを必ず追加し matrix.md に記録
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.5, 2.6, 2.7, 2.8, 3.1, 3.2, 3.3, 3.6, 3.7, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/src/debug/session.rs, crates/pasta_lua/tests/debug/**（新設可）_
+- [x] 3.29 セル pasta_lua/debug-session × G4+G5: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/src/debug/session.rs, crates/pasta_lua/tests/debug/**（新設可）（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G5 文書/依存整合（D7 領域分）: 領域ドキュメント（クレート README・TEST_COVERAGE.md 該当部）と依存の整合確認・同期
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.4, 2.9, 3.1, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/src/debug/session.rs, crates/pasta_lua/tests/debug/**（新設可）_
+- [x] 3.30 セル pasta_lua/debug-source_map × G1: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/src/debug/source_map.rs, crates/pasta_lua/tests/debug/**（新設可）（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G1 テスト網羅（D1）: 未テストの公開挙動・未到達分岐を特定してテストを追加する。不要テストの除外は根拠明記の上で慎重に行う
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.2, 2.3, 3.1, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/src/debug/source_map.rs, crates/pasta_lua/tests/debug/**（新設可）_
+- [x] 3.31 セル pasta_lua/debug-source_map × G2+G3+G4+G5: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/src/debug/source_map.rs, crates/pasta_lua/tests/debug/**（新設可）（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G2 静的衛生（D4+D5）: clippy 警告ゼロ化（機械修正 `cargo clippy --fix` を一次手段とし非機械的警告のみ個別判断）・デッドコード/未使用 pub の除去（クレート単位検査の指摘は帰属規則に従い境界外は matrix.md Notes へ申し送り）
+    - G3 ハードニング（D3+D6）: 脆弱性レビューと対策・到達可能パニック経路（unwrap/expect/インデックス）の Result 化。許容ハードニングは変化の境界を示す回帰テストを必ず追加し matrix.md に記録
+    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G5 文書/依存整合（D7 領域分）: 領域ドキュメント（クレート README・TEST_COVERAGE.md 該当部）と依存の整合確認・同期
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.1, 3.2, 3.3, 3.6, 3.7, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/src/debug/source_map.rs, crates/pasta_lua/tests/debug/**（新設可）_
+- [x] 3.32 セル pasta_lua/debug-wiring × G1: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/src/debug/wiring.rs, crates/pasta_lua/tests/debug/**（新設可）（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G1 テスト網羅（D1）: 未テストの公開挙動・未到達分岐を特定してテストを追加する。不要テストの除外は根拠明記の上で慎重に行う
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.2, 2.3, 3.1, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/src/debug/wiring.rs, crates/pasta_lua/tests/debug/**（新設可）_
+- [x] 3.33 セル pasta_lua/debug-wiring × G2+G3: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/src/debug/wiring.rs, crates/pasta_lua/tests/debug/**（新設可）（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G2 静的衛生（D4+D5）: clippy 警告ゼロ化（機械修正 `cargo clippy --fix` を一次手段とし非機械的警告のみ個別判断）・デッドコード/未使用 pub の除去（クレート単位検査の指摘は帰属規則に従い境界外は matrix.md Notes へ申し送り）
+    - G3 ハードニング（D3+D6）: 脆弱性レビューと対策・到達可能パニック経路（unwrap/expect/インデックス）の Result 化。許容ハードニングは変化の境界を示す回帰テストを必ず追加し matrix.md に記録
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.5, 2.6, 2.7, 2.8, 3.1, 3.2, 3.3, 3.6, 3.7, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/src/debug/wiring.rs, crates/pasta_lua/tests/debug/**（新設可）_
+- [x] 3.34 セル pasta_lua/debug-wiring × G4+G5: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/src/debug/wiring.rs, crates/pasta_lua/tests/debug/**（新設可）（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G5 文書/依存整合（D7 領域分）: 領域ドキュメント（クレート README・TEST_COVERAGE.md 該当部）と依存の整合確認・同期
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.4, 2.9, 3.1, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/src/debug/wiring.rs, crates/pasta_lua/tests/debug/**（新設可）_
+- [x] 3.35 セル pasta_shiori × G1: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_shiori/**（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G1 テスト網羅（D1）: 未テストの公開挙動・未到達分岐を特定してテストを追加する。不要テストの除外は根拠明記の上で慎重に行う
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_shiori` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.2, 2.3, 3.1, 4.3, 4.4_
+  - _Boundary: crates/pasta_shiori/**_
+- [x] 3.36 セル pasta_shiori × G2: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_shiori/**（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G2 静的衛生（D4+D5）: clippy 警告ゼロ化（機械修正 `cargo clippy --fix` を一次手段とし非機械的警告のみ個別判断）・デッドコード/未使用 pub の除去（クレート単位検査の指摘は帰属規則に従い境界外は matrix.md Notes へ申し送り）
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_shiori` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.6, 2.7, 3.1, 4.3, 4.4_
+  - _Boundary: crates/pasta_shiori/**_
+- [x] 3.37 セル pasta_shiori × G3: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_shiori/**（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G3 ハードニング（D3+D6）: 脆弱性レビューと対策・到達可能パニック経路の Result 化。FFI/SHIORI 境界（unsafe 集中領域 — 境界を越えるパニックは未定義動作であり削減は安全性修正）を最優先で点検する。許容ハードニングは境界回帰テストを必ず追加し matrix.md に記録
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_shiori` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.5, 2.8, 3.1, 3.2, 3.3, 3.6, 3.7, 4.3, 4.4_
+  - _Boundary: crates/pasta_shiori/**_
+- [x] 3.38 セル pasta_shiori × G4: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_shiori/**（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_shiori` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.4, 3.1, 4.3, 4.4_
+  - _Boundary: crates/pasta_shiori/**_
+- [x] 3.39 セル pasta_shiori × G5: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_shiori/**（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G5 文書/依存整合（D7 領域分）: 領域ドキュメント（クレート README・TEST_COVERAGE.md 該当部）と依存の整合確認・同期
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_shiori` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.9, 3.1, 4.3, 4.4_
+  - _Boundary: crates/pasta_shiori/**_
+- [x] 3.40 セル pasta_lsp × G1: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lsp/**（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G1 テスト網羅（D1）: 未テストの公開挙動・未到達分岐を特定してテストを追加する。不要テストの除外は根拠明記の上で慎重に行う
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lsp` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.2, 2.3, 3.1, 4.3, 4.4_
+  - _Boundary: crates/pasta_lsp/**_
+- [x] 3.41 セル pasta_lsp × G2+G3+G4+G5: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lsp/**（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G2 静的衛生（D4+D5）: clippy 警告ゼロ化（機械修正 `cargo clippy --fix` を一次手段とし非機械的警告のみ個別判断）・デッドコード/未使用 pub の除去（クレート単位検査の指摘は帰属規則に従い境界外は matrix.md Notes へ申し送り）
+    - G3 ハードニング（D3+D6）: 脆弱性レビューと対策・到達可能パニック経路（unwrap/expect/インデックス）の Result 化。許容ハードニングは変化の境界を示す回帰テストを必ず追加し matrix.md に記録
+    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G5 文書/依存整合（D7 領域分）: 領域ドキュメント（クレート README・TEST_COVERAGE.md 該当部）と依存の整合確認・同期
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lsp` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.1, 3.2, 3.3, 3.6, 3.7, 4.3, 4.4_
+  - _Boundary: crates/pasta_lsp/**_
+- [x] 3.42 セル pasta_check × G1: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_check/**（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G1 テスト網羅（D1）: 未テストの公開挙動・未到達分岐を特定してテストを追加する。不要テストの除外は根拠明記の上で慎重に行う
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_check` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.2, 2.3, 3.1, 4.3, 4.4_
+  - _Boundary: crates/pasta_check/**_
+- [x] 3.43 セル pasta_check × G2+G3+G4+G5: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_check/**（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G2 静的衛生（D4+D5）: clippy 警告ゼロ化（機械修正 `cargo clippy --fix` を一次手段とし非機械的警告のみ個別判断）・デッドコード/未使用 pub の除去（クレート単位検査の指摘は帰属規則に従い境界外は matrix.md Notes へ申し送り）
+    - G3 ハードニング（D3+D6）: 脆弱性レビューと対策・到達可能パニック経路（unwrap/expect/インデックス）の Result 化。許容ハードニングは変化の境界を示す回帰テストを必ず追加し matrix.md に記録
+    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G5 文書/依存整合（D7 領域分）: 領域ドキュメント（クレート README・TEST_COVERAGE.md 該当部）と依存の整合確認・同期
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_check` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.1, 3.2, 3.3, 3.6, 3.7, 4.3, 4.4_
+  - _Boundary: crates/pasta_check/**_
+- [x] 3.44 セル pasta_sample_ghost × G1: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_sample_ghost/**（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G1 テスト網羅（D1）: 未テストの公開挙動・未到達分岐を特定してテストを追加する。不要テストの除外は根拠明記の上で慎重に行う
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_sample_ghost` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.2, 2.3, 3.1, 4.3, 4.4_
+  - _Boundary: crates/pasta_sample_ghost/**_
+- [x] 3.45 セル pasta_sample_ghost × G2+G3+G4+G5: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_sample_ghost/**（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G2 静的衛生（D4+D5）: clippy 警告ゼロ化（機械修正 `cargo clippy --fix` を一次手段とし非機械的警告のみ個別判断）・デッドコード/未使用 pub の除去（クレート単位検査の指摘は帰属規則に従い境界外は matrix.md Notes へ申し送り）
+    - G3 ハードニング（D3+D6）: 脆弱性レビューと対策・到達可能パニック経路（unwrap/expect/インデックス）の Result 化。許容ハードニングは変化の境界を示す回帰テストを必ず追加し matrix.md に記録
+    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G5 文書/依存整合（D7 領域分）: 領域ドキュメント（クレート README・TEST_COVERAGE.md 該当部）と依存の整合確認・同期
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_sample_ghost` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.1, 3.2, 3.3, 3.6, 3.7, 4.3, 4.4_
+  - _Boundary: crates/pasta_sample_ghost/**_
+- [x] 3.46 セル lua-pasta_scripts-core × G1: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/pasta_scripts/{ct.lua,main.lua,README.md}, crates/pasta_lua/pasta_scripts/pasta/*.lua, crates/pasta_lua/pasta_scripts/pasta/areka/**, crates/pasta_lua/.luacheckrc, crates/pasta_lua/tests/lua_specs/**（テスト追加のみ）（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G1 テスト網羅（D1）: lua_specs（lua_unittest_runner 経由）への不足テスト追加。不要テストの除外は根拠明記の上で慎重に行う
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua --test lua_unittest_runner -- --nocapture` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.2, 2.3, 2.10, 3.1, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/pasta_scripts/{ct.lua,main.lua,README.md}, crates/pasta_lua/pasta_scripts/pasta/*.lua, crates/pasta_lua/pasta_scripts/pasta/areka/**, crates/pasta_lua/.luacheckrc, crates/pasta_lua/tests/lua_specs/**（テスト追加のみ）_
+- [x] 3.47 セル lua-pasta_scripts-core × G2+G3+G4+G5: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/pasta_scripts/{ct.lua,main.lua,README.md}, crates/pasta_lua/pasta_scripts/pasta/*.lua, crates/pasta_lua/pasta_scripts/pasta/areka/**, crates/pasta_lua/.luacheckrc, crates/pasta_lua/tests/lua_specs/**（テスト追加のみ）（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G2 静的衛生（D4+D5）: luacheck lint（CLI 未導入 — D-6 ポリシーで dev 環境へ導入可・導入不能なら N/A（ツール不可）を matrix.md に記録）・未使用関数/変数/require の除去
+    - G3 ハードニング（D3+D6）: 不正入力（SHIORI イベント・設定値）の検証強化・error() 経路の整理。許容ハードニングは境界回帰テストを必ず追加し matrix.md に記録
+    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G5 文書/依存整合（D7 領域分）: pasta_scripts README・関連ドキュメントとの同期確認
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua --test lua_unittest_runner -- --nocapture` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10, 3.1, 3.2, 3.3, 3.6, 3.7, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/pasta_scripts/{ct.lua,main.lua,README.md}, crates/pasta_lua/pasta_scripts/pasta/*.lua, crates/pasta_lua/pasta_scripts/pasta/areka/**, crates/pasta_lua/.luacheckrc, crates/pasta_lua/tests/lua_specs/**（テスト追加のみ）_
+- [x] 3.48 セル lua-pasta_scripts-shiori × G1: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/pasta_scripts/pasta/shiori/**, crates/pasta_lua/tests/lua_specs/**（テスト追加のみ）（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G1 テスト網羅（D1）: lua_specs（lua_unittest_runner 経由）への不足テスト追加。不要テストの除外は根拠明記の上で慎重に行う
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua --test lua_unittest_runner -- --nocapture` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.2, 2.3, 2.10, 3.1, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/pasta_scripts/pasta/shiori/**, crates/pasta_lua/tests/lua_specs/**（テスト追加のみ）_
+- [x] 3.49 セル lua-pasta_scripts-shiori × G2+G3+G4+G5: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/pasta_scripts/pasta/shiori/**, crates/pasta_lua/tests/lua_specs/**（テスト追加のみ）（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G2 静的衛生（D4+D5）: luacheck lint（CLI 未導入 — D-6 ポリシーで dev 環境へ導入可・導入不能なら N/A（ツール不可）を matrix.md に記録）・未使用関数/変数/require の除去
+    - G3 ハードニング（D3+D6）: 不正入力（SHIORI イベント・設定値）の検証強化・error() 経路の整理。許容ハードニングは境界回帰テストを必ず追加し matrix.md に記録
+    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G5 文書/依存整合（D7 領域分）: pasta_scripts README・関連ドキュメントとの同期確認
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua --test lua_unittest_runner -- --nocapture` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10, 3.1, 3.2, 3.3, 3.6, 3.7, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/pasta_scripts/pasta/shiori/**, crates/pasta_lua/tests/lua_specs/**（テスト追加のみ）_
+- [x] 3.50 セル lua_specs-act × G2+G4+G5: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/tests/lua_specs/act_*.lua（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G2 静的衛生（D4+D5）: luacheck lint（D-6 で導入可・不能なら N/A（ツール不可）記録）・未使用ヘルパ/require の除去。G1（テスト網羅）と G3（ハードニング）はテスト資産自体につき N/A — 理由を matrix.md に記録（網羅性の所掌は対応するソース領域の G1 セル）
+    - G4 簡素化（D2）: テストコードの簡素化（重複ヘルパの統合等）。検証内容（アサーションの意味）を変えない
+    - G5 文書/依存整合（D7 領域分）: lua_specs README・TEST_COVERAGE.md との整合確認
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua --test lua_unittest_runner -- --nocapture` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.4, 2.6, 2.7, 2.9, 2.10, 3.1, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/tests/lua_specs/act_*.lua_
+- [x] 3.51 セル lua_specs-runtime × G2+G4+G5: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/tests/lua_specs/{actor_word_test,buf_test,callback_module_test,choice_select_test,event_coroutine_test,event_no_entry_test,init,integration_coroutine_test,lua_version_test,mocks_test}.lua（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G2 静的衛生（D4+D5）: luacheck lint（D-6 で導入可・不能なら N/A（ツール不可）記録）・未使用ヘルパ/require の除去。G1（テスト網羅）と G3（ハードニング）はテスト資産自体につき N/A — 理由を matrix.md に記録（網羅性の所掌は対応するソース領域の G1 セル）
+    - G4 簡素化（D2）: テストコードの簡素化（重複ヘルパの統合等）。検証内容（アサーションの意味）を変えない
+    - G5 文書/依存整合（D7 領域分）: lua_specs README・TEST_COVERAGE.md との整合確認
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua --test lua_unittest_runner -- --nocapture` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.4, 2.6, 2.7, 2.9, 2.10, 3.1, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/tests/lua_specs/{actor_word_test,buf_test,callback_module_test,choice_select_test,event_coroutine_test,event_no_entry_test,init,integration_coroutine_test,lua_version_test,mocks_test}.lua_
+- [x] 3.52 セル lua_specs-property-global × G2+G4+G5: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/tests/lua_specs/{get_property_test,set_property_test,global_chaintalk_call_test,global_chaintalk_integration_test,global_fallback_integration_test,transfer_req_to_var_test,proxy_find_handler_test}.lua（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G2 静的衛生（D4+D5）: luacheck lint（D-6 で導入可・不能なら N/A（ツール不可）記録）・未使用ヘルパ/require の除去。G1（テスト網羅）と G3（ハードニング）はテスト資産自体につき N/A — 理由を matrix.md に記録（網羅性の所掌は対応するソース領域の G1 セル）
+    - G4 簡素化（D2）: テストコードの簡素化（重複ヘルパの統合等）。検証内容（アサーションの意味）を変えない
+    - G5 文書/依存整合（D7 領域分）: lua_specs README・TEST_COVERAGE.md との整合確認
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua --test lua_unittest_runner -- --nocapture` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.4, 2.6, 2.7, 2.9, 2.10, 3.1, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/tests/lua_specs/{get_property_test,set_property_test,global_chaintalk_call_test,global_chaintalk_integration_test,global_fallback_integration_test,transfer_req_to_var_test,proxy_find_handler_test}.lua_
+- [x] 3.53 セル lua_specs-persist-dispatch × G2+G4+G5: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/tests/lua_specs/{persist_spot_position_test,persistence_spec,store_coroutine_test,store_last_global_scene_test,store_save_test,second_change_thread_test,res_ok_test,virtual_dispatcher_spec,virtual_dispatcher_thread_test}.lua（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G2 静的衛生（D4+D5）: luacheck lint（D-6 で導入可・不能なら N/A（ツール不可）記録）・未使用ヘルパ/require の除去。G1（テスト網羅）と G3（ハードニング）はテスト資産自体につき N/A — 理由を matrix.md に記録（網羅性の所掌は対応するソース領域の G1 セル）
+    - G4 簡素化（D2）: テストコードの簡素化（重複ヘルパの統合等）。検証内容（アサーションの意味）を変えない
+    - G5 文書/依存整合（D7 領域分）: lua_specs README・TEST_COVERAGE.md との整合確認
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua --test lua_unittest_runner -- --nocapture` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.4, 2.6, 2.7, 2.9, 2.10, 3.1, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/tests/lua_specs/{persist_spot_position_test,persistence_spec,store_coroutine_test,store_last_global_scene_test,store_save_test,second_change_thread_test,res_ok_test,virtual_dispatcher_spec,virtual_dispatcher_thread_test}.lua_
+- [x] 3.54 セル lua_specs-sakura-shiori × G2+G4+G5: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: crates/pasta_lua/tests/lua_specs/{sakura_builder_test,shiori_act_test}.lua（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G2 静的衛生（D4+D5）: luacheck lint（D-6 で導入可・不能なら N/A（ツール不可）記録）・未使用ヘルパ/require の除去。G1（テスト網羅）と G3（ハードニング）はテスト資産自体につき N/A — 理由を matrix.md に記録（網羅性の所掌は対応するソース領域の G1 セル）
+    - G4 簡素化（D2）: テストコードの簡素化（重複ヘルパの統合等）。検証内容（アサーションの意味）を変えない
+    - G5 文書/依存整合（D7 領域分）: lua_specs README・TEST_COVERAGE.md との整合確認
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua --test lua_unittest_runner -- --nocapture` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.4, 2.6, 2.7, 2.9, 2.10, 3.1, 4.3, 4.4_
+  - _Boundary: crates/pasta_lua/tests/lua_specs/{sakura_builder_test,shiori_act_test}.lua_
+- [x] 3.55 セル vscode-extension × G1: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: editors/vscode/**（node_modules/・out/ を除く）（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G1 テスト網羅（D1）: src/test 基盤（unit / integration / tmGrammar / e2e）への不足テスト追加。不要テストの除外は根拠明記の上で慎重に行う
+  - スコープ検証: `npm --prefix C:/home/maz/git/pasta/editors/vscode run test` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.2, 2.3, 3.1, 4.3, 4.4_
+  - _Boundary: editors/vscode/**（node_modules/・out/ を除く）_
+- [x] 3.56 セル vscode-extension × G2+G3: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: editors/vscode/**（node_modules/・out/ を除く）（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G2 静的衛生（D4+D5）: `npm run lint`（eslint）警告ゼロ化・未使用エクスポート/依存の除去
+    - G3 ハードニング（D3+D6）: 入力検証（LSP/wasm/デバッグアダプタ境界・設定値）の強化と例外経路の整理。許容ハードニングは境界回帰テストを必ず追加し matrix.md に記録
+  - スコープ検証: `npm --prefix C:/home/maz/git/pasta/editors/vscode run test` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.5, 2.6, 2.7, 2.8, 3.1, 3.2, 3.3, 3.6, 3.7, 4.3, 4.4_
+  - _Boundary: editors/vscode/**（node_modules/・out/ を除く）_
+- [x] 3.57 セル vscode-extension × G4+G5: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: editors/vscode/**（node_modules/・out/ を除く）（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G5 文書/依存整合（D7 領域分）: 拡張 README・package.json メタデータ・依存の整合確認
+  - スコープ検証: `npm --prefix C:/home/maz/git/pasta/editors/vscode run test` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.4, 2.9, 3.1, 4.3, 4.4_
+  - _Boundary: editors/vscode/**（node_modules/・out/ を除く）_
+- [x] 3.58 セル book-tools-core × G1: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: book/tools/*.mjs（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G1 テスト網羅（D1）: 対応する *-test.mjs への不足テスト追加。不要テストの除外は根拠明記の上で慎重に行う
+  - スコープ検証: `node C:/home/maz/git/pasta/book/tools/drift-check-test.mjs && node C:/home/maz/git/pasta/book/tools/tutorial-check-test.mjs` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.2, 2.3, 2.10, 3.1, 4.3, 4.4_
+  - _Boundary: book/tools/*.mjs_
+- [x] 3.59 セル book-tools-core × G2+G3: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: book/tools/*.mjs（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G2 静的衛生（D4+D5）: lint 基盤なし（N/A を matrix.md に記録）・デッドコード/未使用関数の手動点検と除去
+    - G3 ハードニング（D3+D6）: 外部入力（ファイルパス・HTML・検索クエリ）検証の強化。許容ハードニングは境界回帰テストを必ず追加し matrix.md に記録
+  - スコープ検証: `node C:/home/maz/git/pasta/book/tools/drift-check-test.mjs && node C:/home/maz/git/pasta/book/tools/tutorial-check-test.mjs` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.5, 2.6, 2.7, 2.8, 2.10, 3.1, 3.2, 3.3, 3.6, 3.7, 4.3, 4.4_
+  - _Boundary: book/tools/*.mjs_
+- [x] 3.60 セル book-tools-core × G4+G5: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: book/tools/*.mjs（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G5 文書/依存整合（D7 領域分）: book/AUTHORING.md・ツール README との整合確認
+  - スコープ検証: `node C:/home/maz/git/pasta/book/tools/drift-check-test.mjs && node C:/home/maz/git/pasta/book/tools/tutorial-check-test.mjs` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.4, 2.9, 2.10, 3.1, 4.3, 4.4_
+  - _Boundary: book/tools/*.mjs_
+- [x] 3.61 セル book-tools-highlight × G1: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: book/tools/highlight/**（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G1 テスト網羅（D1）: 対応する *-test.mjs への不足テスト追加。不要テストの除外は根拠明記の上で慎重に行う
+  - スコープ検証: `node C:/home/maz/git/pasta/book/tools/highlight/highlight-html-test.mjs && node C:/home/maz/git/pasta/book/tools/highlight/tokenizer-test.mjs && node C:/home/maz/git/pasta/book/tools/highlight/neutralizer-test.mjs && node C:/home/maz/git/pasta/book/tools/highlight/scope-map-test.mjs` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.2, 2.3, 2.10, 3.1, 4.3, 4.4_
+  - _Boundary: book/tools/highlight/**_
+- [x] 3.62 セル book-tools-highlight × G2+G3+G4+G5: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: book/tools/highlight/**（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G2 静的衛生（D4+D5）: lint 基盤なし（N/A を matrix.md に記録）・デッドコード/未使用関数の手動点検と除去
+    - G3 ハードニング（D3+D6）: 外部入力（ファイルパス・HTML・検索クエリ）検証の強化。許容ハードニングは境界回帰テストを必ず追加し matrix.md に記録
+    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G5 文書/依存整合（D7 領域分）: book/AUTHORING.md・ツール README との整合確認
+  - スコープ検証: `node C:/home/maz/git/pasta/book/tools/highlight/highlight-html-test.mjs && node C:/home/maz/git/pasta/book/tools/highlight/tokenizer-test.mjs && node C:/home/maz/git/pasta/book/tools/highlight/neutralizer-test.mjs && node C:/home/maz/git/pasta/book/tools/highlight/scope-map-test.mjs` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10, 3.1, 3.2, 3.3, 3.6, 3.7, 4.3, 4.4_
+  - _Boundary: book/tools/highlight/**_
+- [x] 3.63 セル book-tools-bigram-index × G1+G2+G3+G4+G5: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: book/tools/bigram-index/**（poc/book/ の生成物を除く）（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - G1 テスト網羅（D1）: 対応する *-test.mjs への不足テスト追加。不要テストの除外は根拠明記の上で慎重に行う
+    - G2 静的衛生（D4+D5）: lint 基盤なし（N/A を matrix.md に記録）・デッドコード/未使用関数の手動点検と除去
+    - G3 ハードニング（D3+D6）: 外部入力（ファイルパス・HTML・検索クエリ）検証の強化。許容ハードニングは境界回帰テストを必ず追加し matrix.md に記録
+    - G4 簡素化（D2）: karpathy-guidelines 準拠検証と逸脱の是正（テスト安全網の存在を確認してから実施）
+    - G5 文書/依存整合（D7 領域分）: book/AUTHORING.md・ツール README との整合確認
+  - スコープ検証: `node C:/home/maz/git/pasta/book/tools/bigram-index/build-index-test.mjs && node C:/home/maz/git/pasta/book/tools/bigram-index/poc-test.mjs` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10, 3.1, 3.2, 3.3, 3.6, 3.7, 4.3, 4.4_
+  - _Boundary: book/tools/bigram-index/**（poc/book/ の生成物を除く）_
+- [x] 3.64 セル global × D7: 点検・改善・検証・記録
+  - 着手前: 自己修復プレリュード（porcelain 確認・前セル Blocked 残置の巻き戻し＋SKIPPED 遡及記録）を実行
+  - 対象: TEST_COVERAGE.md, deny.toml, Cargo.lock（監査対応の更新のみ）, editors/vscode/package.json・package-lock.json（npm audit 対応のみ）, book/package.json・package-lock.json（同）, book/src/**（drift-check 同期のみ）（この境界外のファイル変更は禁止。クレート単位検査の指摘は帰属規則に従う）
+  - 次元グループ:
+    - D7 横断（サプライチェーン監査・台帳同期・整合検査）: cargo audit 実行・cargo-deny / cargo-machete の D-6 導入判断と実行（導入失敗時は N/A（ツール不可）を記録）・npm audit（editors/vscode・book）・TEST_COVERAGE.md 台帳をループ成果と同期・book drift-check / tutorial-check の整合確認
+  - スコープ検証: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo audit && npm --prefix C:/home/maz/git/pasta/editors/vscode audit && npm --prefix C:/home/maz/git/pasta/book audit && node C:/home/maz/git/pasta/book/tools/drift-check.mjs` / コミット前: 正準全体検証
+  - 挙動保存: design.md「セルエージェントへの必須プロンプト制約」に従う
+  - 完了 = コミット済み or NO_CHANGE 記録（次元別の新鮮な証拠必須）or 巻き戻し+SKIPPED 記録。matrix.md 更新は完了条件（台帳はコミットへ同梱）
+  - _Requirements: 2.9, 2.10, 3.1, 4.3, 4.4_
+  - _Boundary: TEST_COVERAGE.md, deny.toml, Cargo.lock（監査対応の更新のみ）, editors/vscode/package.json・package-lock.json（npm audit 対応のみ）, book/package.json・package-lock.json（同）, book/src/**（drift-check 同期のみ）_
 <!-- GENERATED-CELLS:END -->
 
 ## Task 4: 改善レポート集約
 
-- [ ] 4. matrix.md とコミット履歴から改善内容レポートを生成する
+- [x] 4. matrix.md とコミット履歴から改善内容レポートを生成する
   - 前提クリーンチェック: `git status --porcelain` を確認し、最終セルが Blocked で変更残置がある場合は自己修復プレリュードと同じ手順（巻き戻し＋SKIPPED 遡及記録＋台帳 chore コミット）を実行する
   - 前提条件: matrix.md に PENDING が存在しないこと（存在する場合は Task 3 のセル処理へ戻る）
   - matrix.md と `git log --grep "Riloop-Cell:"`（ループ開始コミット以降）を入力として、`reports/{YYYY-MM-DD}-improvement-report.md` を生成する（同日再実行時は上書きせず `-2` 等のサフィックスで併存）
@@ -75,14 +792,14 @@
 
 ## Task 5: ドキュメント整合性確認と完了検証
 
-- [ ] 5. ドキュメント整合性の確認と完了検証
-- [ ] 5.1 ドキュメント整合性の確認と更新
+- [x] 5. ドキュメント整合性の確認と完了検証
+- [x] 5.1 ドキュメント整合性の確認と更新
   - 改善ループの成果と以下のドキュメントの整合性を確認・更新する: SOUL.md（コアバリュー・設計原則との整合）/ doc/spec/（該当する場合）/ GRAMMAR.md（該当する場合）/ TEST_COVERAGE.md（ループで追加したテストのマッピング）/ クレート README（該当する場合）/ steering/*（該当領域）/ .agents/skills/pasta-ghost-authoring・pasta-lua-coding（DSL 文法・Lua API 変更時のみ — 本ループは外部仕様を変更しないため通常「該当なし」）
   - 横断 D7 セル（Task 3）で同期済みの項目は差分が無いことの確認のみで可（確認結果を記録する）
   - 更新が発生した場合は個別 `git add` でコミットする
   - 完了条件: 上記チェックリストの全項目が「更新済み（コミット参照）」または「該当なし（理由）」として記録されている
   - _Requirements: 2.9_
-- [ ] 5.2 完了検証と完走宣言
+- [x] 5.2 完了検証と完走宣言
   - kiro-verify-completion により、新鮮な証拠（正準全体検証の再実行エビデンス・matrix.md の PENDING ゼロ・レポートファイルの存在と必須セクション充足）に基づいて完了を検証する
   - 本仕様ディレクトリは completed/ へ移動しない（再実行型 — kiro-spec-complete のアーカイブ手順は適用外）
   - 全セルの終端状態が確認できない場合は完走を宣言しない（途中中断・部分完了の完成宣言は禁止）
@@ -93,3 +810,43 @@
 
 <!-- Task 1 が正準コマンド表とベースラインエビデンスをここへ記録する。
      kiro-impl の実行学習メモも本セクションに追記される。 -->
+
+### Task 1: 環境制約表（2026-06-10 実測確認済み — 3 変数とも現環境で設定中）
+
+| 制約 | 現在値 | 無害化 |
+|---|---|---|
+| `NoDefaultCurrentDirectoryInExePath` | `1`（設定中） | 全 cargo コマンドの実行文字列に `env -u` で織り込み |
+| `PASTA_DEBUG` | `1`（設定中） | 同上 |
+| `PASTA_DEBUG_PORT` | `9276`（設定中） | 同上 |
+
+シェル状態はツールコール間で持続しないため、無害化はセッション unset ではなく**各コマンド文字列にインライン**で適用する。正準形は **Bash ツール実行**。以下のコマンドはすべて逐語コピーで実行可能。
+
+### Task 1: 正準コマンド表（本実行インスタンス）
+
+| 資産 | スコープ検証 | 全体検証 | lint | 監査 |
+|---|---|---|---|---|
+| Rust クレート | `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p {crate}` | `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test --workspace` | `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo clippy -p {crate} --all-targets` | `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo audit`（導入済み）。`cargo-deny`・`cargo-machete` は未導入（D-6 ポリシーにより該当セルで導入可。導入後も同じ `env -u` プレフィックス必須） |
+| Lua 資産 | `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test -p pasta_lua --test lua_unittest_runner -- --nocapture` | 同・全体検証（workspace） | luacheck CLI 未導入（vendored ライブラリのみ・設定は `crates/pasta_lua/.luacheckrc`）→ D-6 で導入可、不能なら N/A（ツール不可）記録 | —（cargo audit が包含） |
+| VSCode 拡張 | `npm --prefix C:/home/maz/git/pasta/editors/vscode run test` | `npm --prefix C:/home/maz/git/pasta/editors/vscode run compile && npm --prefix C:/home/maz/git/pasta/editors/vscode run lint && npm --prefix C:/home/maz/git/pasta/editors/vscode run test` | `npm --prefix C:/home/maz/git/pasta/editors/vscode run lint` | `npm --prefix C:/home/maz/git/pasta/editors/vscode audit` |
+| book/tools | `node C:/home/maz/git/pasta/book/tools/{tool}-test.mjs`（実在: `drift-check-test.mjs`・`tutorial-check-test.mjs` — フラット配置。design の `{tool}/*-test.mjs` パターンの本実行インスタンス補正） | `node C:/home/maz/git/pasta/book/tools/drift-check-test.mjs && node C:/home/maz/git/pasta/book/tools/tutorial-check-test.mjs && node C:/home/maz/git/pasta/book/tools/drift-check.mjs` | —（N/A 記録） | `npm --prefix C:/home/maz/git/pasta/book audit` |
+
+注: npm/node コマンドに cargo 環境制約は影響しないため、無害化は cargo を含むコマンドのみに適用する。`{crate}` ∈ {pasta_dsl, pasta_core, pasta_lua, pasta_shiori, pasta_lsp, pasta_check, pasta_sample_ghost}。
+
+### Task 1: ベースラインエビデンス
+
+- コマンド: `env -u NoDefaultCurrentDirectoryInExePath -u PASTA_DEBUG -u PASTA_DEBUG_PORT cargo test --workspace`
+- 結果: **GREEN** — 64 スイート / 1510 passed / 0 failed / 11 ignored / 18.2 秒（warm。実装者・レビュアー双方が独立再現）
+- ベースラインコミット: `4027097`
+- ツール有無: cargo 1.96.0 ✓ / clippy 0.1.96 ✓ / cargo-audit 0.22.2 ✓ / npm 11.16.0 ✓ / node v25.0.0 ✓ / cargo-deny ✗ / cargo-machete ✗ / luacheck CLI ✗
+- 学習メモ: VSCode 拡張 `test:e2e` は wasm ビルド成果物に依存する可能性（wasm-pack 導入済み・必要時 `build:wasm`）。cargo test は cold 時数分かかるためセル時間見積りに注意。
+
+### 実行学習メモ（kiro-impl 追記）
+
+- **公開クレートの pub API は除去禁止**（3.13 で確立・3.2 前例と統一）: pasta_core/pasta_dsl/pasta_lua 等 `publish = true` のクレートは crates.io 公開済み（pasta_lua v0.2.2 等）。workspace 内未使用でも pub シンボル除去は semver-major 破壊＝R3.5 違反。D5 デッドコード除去は非 pub に限定し、未使用 pub は「公開 API 面につき維持」と Notes 記録する。
+- src/debug の clippy `never_loop` 2 件（session.rs:1353・transport.rs:639）は deny-by-default の **error** で `cargo clippy -p pasta_lua --all-targets` 全体が fail する — debug 領域の G2 セルで最優先対応。
+- G2-G5 セルのサブエージェントが全体検証待ちで応答切れする事例 2 件（3.5・3.11）→ 完了再派遣で回収可能（作業自体は健在）。
+- **luacheck CLI は 3.47 で dev 環境へ導入済み**（winget `DEVCOM.Lua` 5.4.6 ＋ luarocks → luacheck 1.2.0・`%APPDATA%\luarocks` 配下・リポジトリ非変更）。後続 Lua セル（3.48〜3.54）は導入済みとして `--config crates/pasta_lua/.luacheckrc` で実行可。lua_specs 側に luacheck 54 警告/3 エラー（非 ASCII 識別子 false positive 3 件含む）が既知残存 — 3.50〜3.54 の G2 所掌。
+- `crates/pasta_shiori/tests/support/scripts/pasta/` は pasta_scripts の旧コピーでドリフト残存（3.47 レビューで発見・境界外）— pasta_shiori 関連セルまたは将来の同期対象として申し送り。
+- X-Error-Reason 綴り: 3.49 で Lua 側（callback.lua sweep）を res.lua 正準 `X-Error-Reason` へ統一。ただし Rust 側 `pasta_shiori/src/error.rs:83,94` は `X-ERROR-REASON` のまま・完了済み spec shiori-async-talk の文言も旧綴り — リポジトリ全体統一は本ループ外の課題（パーサーは大文字小文字非区別で実害なし）。
+- workspace 全体検証ベースラインは 3.45 完了時点で **1956 passed**（3.45 の GhostConfig 除去随伴でテスト 2 件削除・1958→1956。R2.3 根拠は matrix.md 3.45 Notes）。
+- **公開クレートの pub enum への変種追加も semver-major 破壊**（3.37 で確立）: `#[non_exhaustive]` なし pub enum への変種追加は下流の網羅 match を壊す＝R3.5 違反（non_exhaustive 付与自体も破壊的変更）。新エラー種別は既存変種への相乗り（message へ診断情報格納）で対応する。pasta_shiori も crates.io 公開済み（0.2.2）。

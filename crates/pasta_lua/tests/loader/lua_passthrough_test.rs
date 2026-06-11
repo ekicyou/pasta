@@ -225,6 +225,51 @@ fn test_pasta_takes_priority_over_lua_on_conflict() {
 }
 
 #[test]
+fn test_hyphen_normalized_module_name_conflict() {
+    // Module names normalize '-' to '_', so "my-mod.pasta" and "my_mod.lua"
+    // collide on the same module key -> .pasta wins, .lua is ignored.
+    let temp = create_test_base();
+    let base_dir = temp.path();
+
+    fs::create_dir_all(base_dir.join("dic/test")).unwrap();
+    fs::write(
+        base_dir.join("dic/test/my-mod.pasta"),
+        "＊ハイフン\n  ゴースト：「パスタ優先」\n",
+    )
+    .unwrap();
+    fs::write(
+        base_dir.join("dic/test/my_mod.lua"),
+        "-- lua side should be ignored\nreturn {}\n",
+    )
+    .unwrap();
+
+    let _runtime = PastaLoader::load(base_dir).unwrap();
+
+    // Normalized module appears exactly once in scene_dic.lua
+    let scene_dic_path = base_dir.join("profile/pasta/cache/lua/pasta/scene_dic.lua");
+    let scene_dic = fs::read_to_string(&scene_dic_path).unwrap();
+    let count = scene_dic.matches("pasta.scene.test.my_mod").count();
+    assert_eq!(
+        count, 1,
+        "Normalized module should appear exactly once, found {} in:\n{}",
+        count, scene_dic
+    );
+
+    // Cached module body comes from the transpiled .pasta, not the raw .lua
+    let cache_path = base_dir.join("profile/pasta/cache/lua/pasta/scene/test/my_mod.lua");
+    assert!(
+        cache_path.exists(),
+        "Cache file should exist at: {}",
+        cache_path.display()
+    );
+    let cached = fs::read_to_string(&cache_path).unwrap();
+    assert!(
+        !cached.contains("-- lua side should be ignored"),
+        "Cache must contain transpiled .pasta code, not the conflicting raw .lua"
+    );
+}
+
+#[test]
 fn test_no_conflict_different_dirs() {
     let temp = create_test_base();
     let base_dir = temp.path();
@@ -495,8 +540,16 @@ fn test_partial_transpile_error_display_includes_paths() {
     );
 
     let msg = format!("{}", err);
-    assert!(msg.contains("3 succeeded"), "Should show success count: {}", msg);
-    assert!(msg.contains("2 failed"), "Should show failure count: {}", msg);
+    assert!(
+        msg.contains("3 succeeded"),
+        "Should show success count: {}",
+        msg
+    );
+    assert!(
+        msg.contains("2 failed"),
+        "Should show failure count: {}",
+        msg
+    );
     assert!(
         msg.contains("dic/talk.pasta"),
         "Should contain first failure path: {}",

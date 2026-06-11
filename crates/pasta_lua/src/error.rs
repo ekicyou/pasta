@@ -165,8 +165,7 @@ mod tests {
 
     #[test]
     fn test_transpile_error_io() {
-        let err =
-            TranspileError::IoError(std::io::Error::new(std::io::ErrorKind::Other, "test error"));
+        let err = TranspileError::IoError(std::io::Error::other("test error"));
         assert!(format!("{}", err).contains("IO error"));
     }
 
@@ -187,5 +186,92 @@ mod tests {
         let msg = format!("{}", err);
         assert!(msg.contains("Continuation action without actor"));
         assert!(msg.contains("[L25:1-L25:8]"));
+    }
+
+    #[test]
+    fn test_transpile_error_undefined_scene_display() {
+        let span = Span::new(3, 5, 3, 12, 0, 7);
+        let err = TranspileError::UndefinedScene {
+            name: "メイン".to_string(),
+            span: SpanDisplay::from(span),
+        };
+        let msg = format!("{}", err);
+        assert!(msg.contains("Undefined scene"));
+        assert!(msg.contains("'メイン'"));
+        assert!(msg.contains("[L3:5-L3:12]"));
+    }
+
+    #[test]
+    fn test_transpile_error_undefined_word_display() {
+        let span = Span::new(7, 2, 7, 6, 0, 4);
+        let err = TranspileError::UndefinedWord {
+            name: "挨拶".to_string(),
+            span: SpanDisplay::from(span),
+        };
+        let msg = format!("{}", err);
+        assert!(msg.contains("Undefined word"));
+        assert!(msg.contains("'挨拶'"));
+        assert!(msg.contains("[L7:2-L7:6]"));
+    }
+
+    #[test]
+    fn test_transpile_error_too_many_local_variables_display() {
+        let span = Span::new(100, 1, 100, 1, 0, 0);
+        let err = TranspileError::TooManyLocalVariables {
+            count: 250,
+            span: SpanDisplay::from(span),
+        };
+        let msg = format!("{}", err);
+        assert!(msg.contains("Too many local variables"));
+        assert!(msg.contains("250"));
+        assert!(msg.contains("[L100:1-L100:1]"));
+    }
+
+    #[test]
+    fn test_transpile_error_unsupported_constructor_display() {
+        let span = Span::new(12, 3, 12, 20, 0, 17);
+        let err = TranspileError::unsupported(&span, "goto labels");
+        let msg = format!("{}", err);
+        assert!(msg.contains("Unsupported feature"));
+        assert!(msg.contains("goto labels"));
+        assert!(msg.contains("[L12:3-L12:20]"));
+    }
+
+    #[test]
+    fn test_transpile_error_string_literal_constructor_display() {
+        let span = Span::new(4, 1, 4, 30, 0, 29);
+        let err = TranspileError::string_literal_error(&span, "\\bad]==========text");
+        // The Display message reports the span and the danger-pattern diagnosis.
+        let msg = format!("{}", err);
+        assert!(msg.contains("String literal cannot be converted"));
+        assert!(msg.contains("dangerous pattern detected"));
+        assert!(msg.contains("[L4:1-L4:30]"));
+        // The offending text is preserved on the variant for programmatic access.
+        match err {
+            TranspileError::StringLiteralError { text, .. } => {
+                assert_eq!(text, "\\bad]==========text");
+            }
+            other => panic!("expected StringLiteralError, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_transpile_error_property_in_expression_constructor_display() {
+        let err = TranspileError::property_in_expression();
+        assert!(matches!(err, TranspileError::PropertyInExpression));
+        let msg = format!("{}", err);
+        assert!(msg.contains("Property reference cannot be used in expressions"));
+        assert!(msg.contains("use variable assignment first"));
+    }
+
+    #[test]
+    fn test_config_error_unknown_library_display() {
+        let err = ConfigError::UnknownLibrary("std_bogus".to_string());
+        let msg = format!("{}", err);
+        assert!(msg.contains("Unknown library: std_bogus"));
+        // The message must enumerate valid library names to guide the user.
+        assert!(msg.contains("std_all"));
+        assert!(msg.contains("regex"));
+        assert!(msg.contains("yaml"));
     }
 }

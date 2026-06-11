@@ -2,7 +2,11 @@
 //
 // 役割（design.md「HtmlHighlighter」Batch / Job Contract）:
 //   - mdbook build 後段で動作。`<book-out-dir>/**/*.html` をグロブ列挙し、
-//     `<pre><code class="language-pasta">…</code></pre>` ブロックのみを処理する。
+//     `<code class="language-pasta">…</code>` ブロックのみを処理する。
+//     注: 抽出は `<code>` のクラス基準であり、外側の `<pre>` は要求しない。mdBook が
+//     language-pasta クラスを与えるのはフェンスブロック（`<pre>` 内）のみだが、もし
+//     インライン `<code class="language-pasta">` が現れた場合も同様に着色対象となる
+//     （現 book 出力では非発生・テストで挙動固定済み）。
 //   - 各ブロック内容をタグ除去＋実体参照デコードでソース復元 → 行分割 →
 //     PastaTokenizer でトークナイズ → scopesToClass で hljs 互換クラスへ写像 →
 //     非 null はそのクラスの <span> で包み、null は素のテキスト（プレーン＝6.1）→
@@ -37,7 +41,8 @@ export const GRAMMAR_PATHS = Object.freeze({
 });
 
 // language-pasta コードブロックを抽出する正規表現。
-//   - `<pre><code ... class="… language-pasta …">…</code></pre>` を捕捉。
+//   - `<code ... class="… language-pasta …">…</code>` を捕捉（外側 `<pre>` は不問。
+//     ヘッダコメント参照 — インライン <code> でも同クラスなら処理対象）。
 //   - class 属性内で language-pasta が他クラスと併記される形にも頑健（\b 区切り）。
 //   - `</code>` がブロック内に実体参照化されずに出現しない前提で安全に区切る
 //     （design Batch Contract）。中身は最短一致で取る。

@@ -146,7 +146,63 @@ export class MockDiagnosticCollection {
   }
 }
 
-// Stubs for vscode.languages / vscode.workspace / vscode.window
+// ---------------------------------------------------------------------------
+// Additional API surface so REAL extension modules can run against this mock
+// (bundled via esbuild --alias:vscode=./src/test/mock/vscode.ts).
+// Test-only helpers are exported alongside; the module is a singleton within
+// a test bundle, so tests importing './mock/vscode' directly observe the same
+// state the module under test mutates.
+// ---------------------------------------------------------------------------
+
+export class ThemeColor {
+  constructor(readonly id: string) {}
+}
+
+export enum StatusBarAlignment {
+  Left = 1,
+  Right = 2,
+}
+
+export class DebugAdapterServer {
+  constructor(readonly port: number, readonly host?: string) {}
+}
+
+export class MockStatusBarItem {
+  text = '';
+  tooltip: string | undefined;
+  command: string | undefined;
+  visible = false;
+  show(): void { this.visible = true; }
+  hide(): void { this.visible = false; }
+  dispose(): void { /* no-op */ }
+}
+
+export class MockTextEditorDecorationType {
+  disposed = false;
+  constructor(readonly options: unknown) {}
+  dispose(): void { this.disposed = true; }
+}
+
+// --- test-observable state ---------------------------------------------------
+
+/** All status bar items created via window.createStatusBarItem (in order). */
+export const createdStatusBarItems: MockStatusBarItem[] = [];
+
+/** All user-facing messages shown via showErrorMessage / showWarningMessage. */
+export const shownMessages: Array<{ kind: 'error' | 'warning'; message: string }> = [];
+
+// --- event emitters (exported so tests can fire events) ----------------------
+
+export const didOpenTextDocumentEmitter = new EventEmitter<any>();
+export const didChangeTextDocumentEmitter = new EventEmitter<any>();
+export const didCloseTextDocumentEmitter = new EventEmitter<any>();
+export const didChangeActiveTextEditorEmitter = new EventEmitter<any>();
+export const debugCustomEventEmitter = new EventEmitter<any>();
+export const didChangeActiveDebugSessionEmitter = new EventEmitter<any>();
+export const didTerminateDebugSessionEmitter = new EventEmitter<any>();
+
+// --- namespaces ---------------------------------------------------------------
+
 export const languages = {
   createDiagnosticCollection: (name: string) => new MockDiagnosticCollection(name),
   registerDocumentSemanticTokensProvider: () => ({ dispose: () => {} }),
@@ -154,19 +210,66 @@ export const languages = {
 
 export const workspace = {
   textDocuments: [] as any[],
-  onDidOpenTextDocument: () => ({ dispose: () => {} }),
-  onDidChangeTextDocument: () => ({ dispose: () => {} }),
-  onDidCloseTextDocument: () => ({ dispose: () => {} }),
+  onDidOpenTextDocument: didOpenTextDocumentEmitter.event,
+  onDidChangeTextDocument: didChangeTextDocumentEmitter.event,
+  onDidCloseTextDocument: didCloseTextDocumentEmitter.event,
   fs: {
     readFile: async () => new Uint8Array(0),
   },
 };
 
 export const window = {
+  activeTextEditor: undefined as any,
   createOutputChannel: (name: string) => ({
     name,
     appendLine: (_msg: string) => {},
     dispose: () => {},
   }),
-  showErrorMessage: (_msg: string) => {},
+  showErrorMessage: (message: string) => {
+    shownMessages.push({ kind: 'error', message });
+    return Promise.resolve(undefined);
+  },
+  showWarningMessage: (message: string) => {
+    shownMessages.push({ kind: 'warning', message });
+    return Promise.resolve(undefined);
+  },
+  createStatusBarItem: (_alignment?: StatusBarAlignment) => {
+    const item = new MockStatusBarItem();
+    createdStatusBarItems.push(item);
+    return item;
+  },
+  createTextEditorDecorationType: (options: unknown) => new MockTextEditorDecorationType(options),
+  onDidChangeActiveTextEditor: didChangeActiveTextEditorEmitter.event,
+};
+
+export const registeredCommands = new Map<string, (...args: any[]) => any>();
+
+export const commands = {
+  registerCommand: (id: string, fn: (...args: any[]) => any) => {
+    registeredCommands.set(id, fn);
+    return { dispose: () => { registeredCommands.delete(id); } };
+  },
+  executeCommand: (id: string, ...args: any[]) => {
+    const fn = registeredCommands.get(id);
+    return Promise.resolve(fn ? fn(...args) : undefined);
+  },
+};
+
+/** Debug adapter factories / config providers registered by the extension. */
+export const registeredDebugFactories: any[] = [];
+export const registeredDebugConfigProviders: any[] = [];
+
+export const debug = {
+  activeDebugSession: undefined as any,
+  registerDebugAdapterDescriptorFactory: (_type: string, factory: any) => {
+    registeredDebugFactories.push(factory);
+    return { dispose: () => {} };
+  },
+  registerDebugConfigurationProvider: (_type: string, provider: any) => {
+    registeredDebugConfigProviders.push(provider);
+    return { dispose: () => {} };
+  },
+  onDidReceiveDebugSessionCustomEvent: debugCustomEventEmitter.event,
+  onDidChangeActiveDebugSession: didChangeActiveDebugSessionEmitter.event,
+  onDidTerminateDebugSession: didTerminateDebugSessionEmitter.event,
 };

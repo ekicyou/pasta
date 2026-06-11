@@ -91,6 +91,8 @@ impl PastaLuaRuntime {
     /// - `@regex` module for regular expression support
     /// - `@json` module for JSON encoding/decoding
     /// - `@yaml` module for YAML encoding/decoding
+    /// - `@pasta_log` module for the Lua→Rust tracing log bridge
+    ///   (always registered, independent of `RuntimeConfig::libs`)
     ///
     /// Note: `@env` module is disabled by default for security reasons.
     /// Use `RuntimeConfig::full()` or enable it explicitly to access environment variables.

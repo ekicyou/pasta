@@ -224,10 +224,17 @@ fn write_failure_logs_error_and_continues() {
 
     // --- 準備: 一度フレッシュにロードして「実際に動く」既存の自己展開先を作る ---
     {
-        let runtime = PastaLoader::load(base).expect("initial fresh load to establish live scripts");
+        let runtime =
+            PastaLoader::load(base).expect("initial fresh load to establish live scripts");
         // 既存版が機能していること（フレームワークが解決する）を軽く確認。
-        let ok = runtime.exec("return (require('pasta') ~= nil)").expect("exec require");
-        assert_eq!(ok.as_boolean(), Some(true), "framework must resolve from initial deploy");
+        let ok = runtime
+            .exec("return (require('pasta') ~= nil)")
+            .expect("exec require");
+        assert_eq!(
+            ok.as_boolean(),
+            Some(true),
+            "framework must resolve from initial deploy"
+        );
     }
     assert!(
         target.join("pasta/init.lua").exists(),
@@ -254,7 +261,11 @@ fn write_failure_logs_error_and_continues() {
 
     // 起動継続の裏取り: runtime が使用可能で、既存フレームワークが依然解決すること。
     let ok = runtime.exec("return 1+1").expect("exec after continue");
-    assert_eq!(ok.as_i64(), Some(2), "runtime must be usable after non-fatal self-deploy failure");
+    assert_eq!(
+        ok.as_i64(),
+        Some(2),
+        "runtime must be usable after non-fatal self-deploy failure"
+    );
     let resolved = runtime
         .exec("return (require('pasta') ~= nil)")
         .expect("exec require after continue");

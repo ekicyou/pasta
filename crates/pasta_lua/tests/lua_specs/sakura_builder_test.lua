@@ -15,14 +15,20 @@ local function create_mock_actors()
     }
 end
 
+-- ヘルパー: テストごとの共通セットアップ（BUILDER と actors を返す）
+-- リロード規約（先行スイートの package.loaded 操作）を保存するため、
+-- require はファイル先頭ではなくテスト実行時に行う
+local function setup()
+    return require("pasta.shiori.sakura_builder"), create_mock_actors()
+end
+
 -- ============================================================================
 -- Requirement 6: sakura_builderモジュール（グループ化形式）
 -- ============================================================================
 
 describe("SAKURA_BUILDER - talk token", function()
     test("talkトークンがtalk_to_scriptで変換される", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             {
@@ -42,8 +48,7 @@ describe("SAKURA_BUILDER - talk token", function()
     end)
 
     test("句点にはウェイトタグが挿入される", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             {
@@ -62,8 +67,7 @@ describe("SAKURA_BUILDER - talk token", function()
     end)
 
     test("読点にはウェイトタグが挿入される", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             {
@@ -84,8 +88,7 @@ end)
 
 describe("SAKURA_BUILDER - surface token", function()
     test("surfaceトークンを \\s[id] に変換する", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             {
@@ -103,8 +106,7 @@ describe("SAKURA_BUILDER - surface token", function()
     end)
 
     test("文字列IDをサポートする", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             {
@@ -124,8 +126,7 @@ end)
 
 describe("SAKURA_BUILDER - wait token", function()
     test("waitトークンを \\w[ms] に変換する", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             {
@@ -145,8 +146,7 @@ end)
 
 describe("SAKURA_BUILDER - newline token", function()
     test("newlineトークンを \\n に変換する（n=1）", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             {
@@ -164,8 +164,7 @@ describe("SAKURA_BUILDER - newline token", function()
     end)
 
     test("複数改行を連続出力する（n=3）", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             {
@@ -185,8 +184,7 @@ end)
 
 describe("SAKURA_BUILDER - clear token", function()
     test("clearトークンを \\c に変換する", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             {
@@ -206,8 +204,7 @@ end)
 
 describe("SAKURA_BUILDER - raw_script token", function()
     test("raw_scriptトークンをそのまま出力する（エスケープなし）", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             {
@@ -227,8 +224,7 @@ end)
 
 describe("SAKURA_BUILDER - yield token", function()
     test("yieldトークンは無視される", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             {
@@ -249,8 +245,7 @@ end)
 
 describe("SAKURA_BUILDER - \\e終端", function()
     test("出力末尾に \\e を付与する", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             {
@@ -267,7 +262,7 @@ describe("SAKURA_BUILDER - \\e終端", function()
     end)
 
     test("空トークン配列でも \\e を付与する", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
+        local BUILDER = setup()
 
         local result = BUILDER.build({}, {})
 
@@ -277,8 +272,7 @@ end)
 
 describe("SAKURA_BUILDER - 複合シナリオ", function()
     test("複数トークンを正しく連結する", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             { type = "spot", actor = actors.sakura, spot = 0 },
@@ -319,8 +313,7 @@ end)
 
 describe("SAKURA_BUILDER - talk_to_script変換", function()
     test("テキストがtalk_to_scriptで変換される", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             {
@@ -345,8 +338,7 @@ end)
 
 describe("SAKURA_BUILDER - spotトークン処理", function()
     test("spotトークン処理でactor_spots[actor.name]が正しく更新される", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             { type = "spot", actor = actors.sakura, spot = 0 },
@@ -366,8 +358,7 @@ describe("SAKURA_BUILDER - spotトークン処理", function()
     end)
 
     test("複数actorのspot独立管理を確認", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             { type = "spot", actor = actors.sakura, spot = 0 },
@@ -401,8 +392,7 @@ end)
 
 describe("SAKURA_BUILDER - clear_spotトークン処理", function()
     test("clear_spotトークン処理でactor_spots={}にリセットされる", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             { type = "spot",      actor = actors.sakura, spot = 5 },
@@ -423,8 +413,7 @@ describe("SAKURA_BUILDER - clear_spotトークン処理", function()
     end)
 
     test("clear_spotトークン処理でlast_actor=nilにリセットされる", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             {
@@ -461,8 +450,7 @@ end)
 
 describe("SAKURA_BUILDER - actorトークンのactor切り替え検出", function()
     test("actor_spots未設定時にデフォルト値0を使用する", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             {
@@ -481,8 +469,7 @@ describe("SAKURA_BUILDER - actorトークンのactor切り替え検出", functio
     end)
 
     test("last_actor != token.actor時に\\p[spot]を出力する", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             { type = "spot", actor = actors.sakura, spot = 0 },
@@ -510,8 +497,7 @@ describe("SAKURA_BUILDER - actorトークンのactor切り替え検出", functio
     end)
 
     test("spot変更時に\\n[N]を出力する（Nはconfig.spot_newlines * 100）", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             { type = "spot", actor = actors.sakura, spot = 0 },
@@ -538,8 +524,7 @@ describe("SAKURA_BUILDER - actorトークンのactor切り替え検出", functio
     end)
 
     test("同じactorの連続actorトークンではスポットタグを出力しない", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             {
@@ -575,8 +560,7 @@ end)
 
 describe("SAKURA_BUILDER - 統合シナリオ（グループ化トークン構造）", function()
     test("set_spot()なしでのtalk() → デフォルトspot(0)使用を確認", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             {
@@ -594,8 +578,7 @@ describe("SAKURA_BUILDER - 統合シナリオ（グループ化トークン構�
     end)
 
     test("set_spot() → talk() → spot切り替えとスポットタグ出力を確認", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             { type = "spot", actor = actors.sakura, spot = 0 },
@@ -622,8 +605,7 @@ describe("SAKURA_BUILDER - 統合シナリオ（グループ化トークン構�
     end)
 
     test("clear_spot() → talk() → デフォルトspot(0)への復帰を確認", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             { type = "spot",      actor = actors.sakura, spot = 5 },
@@ -656,8 +638,7 @@ end)
 
 describe("SAKURA_BUILDER - persist-spot-position: 純粋関数性テスト (Task 5.3)", function()
     test("入力テーブルがspotトークンで直接変更されることを確認", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local input_spots = {}
         local tokens = {
@@ -680,8 +661,7 @@ describe("SAKURA_BUILDER - persist-spot-position: 純粋関数性テスト (Task
     end)
 
     test("nil入力時に空テーブルとして扱われることを確認", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             {
@@ -700,8 +680,7 @@ describe("SAKURA_BUILDER - persist-spot-position: 純粋関数性テスト (Task
     end)
 
     test("spotトークンでinput_spotsが直接変更される", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local input_spots = {}
         local tokens = {
@@ -722,8 +701,7 @@ describe("SAKURA_BUILDER - persist-spot-position: 純粋関数性テスト (Task
     end)
 
     test("後方互換性: actor_spots省略時も正常動作", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             {
@@ -744,8 +722,7 @@ end)
 
 describe("SAKURA_BUILDER - persist-spot-position: clear_spotトークン処理 (Task 5.4)", function()
     test("clear_spotトークンで入力のactor_spotsがリセットされる", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local input_spots = { ["さくら"] = 5, ["うにゅう"] = 3 }
         local tokens = {
@@ -769,7 +746,7 @@ describe("SAKURA_BUILDER - persist-spot-position: clear_spotトークン処理 (
     end)
 
     test("直接変更: clear_spotで入力テーブルのエントリがクリアされる", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
+        local BUILDER = setup()
 
         local input_spots = { ["さくら"] = 5, ["うにゅう"] = 3 }
         local tokens = {
@@ -786,8 +763,7 @@ end)
 
 describe("SAKURA_BUILDER - persist-spot-position: spotトークン処理 (Task 5.5)", function()
     test("spotトークンで入力のactor_spotsが正しく更新される", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local input_spots = { ["さくら"] = 0 }
         local tokens = {
@@ -809,8 +785,7 @@ describe("SAKURA_BUILDER - persist-spot-position: spotトークン処理 (Task 5
     end)
 
     test("入力actor_spotsの値を引き継いでスポットタグが出力される", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         -- 前回のスポット状態を入力として渡す
         local input_spots = { ["さくら"] = 0, ["うにゅう"] = 1 }
@@ -851,8 +826,7 @@ end)
 
 describe("SAKURA_BUILDER - sakura_scriptトークン処理", function()
     test("sakura_scriptトークンがtalk_to_scriptで変換される", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             {
@@ -871,8 +845,7 @@ describe("SAKURA_BUILDER - sakura_scriptトークン処理", function()
     end)
 
     test("talk + sakura_script混合がそれぞれ処理される", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             {
@@ -893,8 +866,7 @@ describe("SAKURA_BUILDER - sakura_scriptトークン処理", function()
     end)
 
     test("raw_scriptトークンの既存動作が変化していない", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             {
@@ -917,8 +889,7 @@ end)
 
 describe("SAKURA_BUILDER - choiceトークン処理", function()
     test("choiceトークンを \\![*]\\q[display,target] に変換する", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             {
@@ -936,8 +907,7 @@ describe("SAKURA_BUILDER - choiceトークン処理", function()
     end)
 
     test("displayテキスト内の ] をエスケープする", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             {
@@ -954,8 +924,7 @@ describe("SAKURA_BUILDER - choiceトークン処理", function()
     end)
 
     test("displayテキスト内の , をエスケープする", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             {
@@ -972,8 +941,7 @@ describe("SAKURA_BUILDER - choiceトークン処理", function()
     end)
 
     test("displayテキスト内の \\ をエスケープする", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             {
@@ -990,8 +958,7 @@ describe("SAKURA_BUILDER - choiceトークン処理", function()
     end)
 
     test("displayテキスト内の複合デリミタをエスケープする（], ,, \\）", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             {
@@ -1009,8 +976,7 @@ describe("SAKURA_BUILDER - choiceトークン処理", function()
     end)
 
     test("targetテキスト内のデリミタもエスケープされる", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             {
@@ -1029,8 +995,7 @@ end)
 
 describe("SAKURA_BUILDER - choice_timeoutトークン処理", function()
     test("choice_timeoutトークンを \\![set,choicetimeout,<ms>] に変換する", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             {
@@ -1048,8 +1013,7 @@ describe("SAKURA_BUILDER - choice_timeoutトークン処理", function()
     end)
 
     test("choice_timeout seconds=nil の場合は 0 を出力する", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             {
@@ -1066,8 +1030,7 @@ describe("SAKURA_BUILDER - choice_timeoutトークン処理", function()
     end)
 
     test("choice_timeout 小数秒をミリ秒に変換し floor する", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             {
@@ -1086,8 +1049,7 @@ end)
 
 describe("SAKURA_BUILDER - choice統合シナリオ", function()
     test("talk + choice_timeout + choice の複合トークンが正しく連結される", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
-        local actors = create_mock_actors()
+        local BUILDER, actors = setup()
 
         local tokens = {
             {
@@ -1121,7 +1083,7 @@ end)
 describe("SAKURA_BUILDER - string-buffer: 空入力 (Task 3.1)", function()
     -- 要件 3.4: 空の grouped_tokens に対しては \e のみを返す
     test("空の grouped_tokens で build() が \\e のみを返す", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
+        local BUILDER = setup()
 
         local result = BUILDER.build({}, {})
 
@@ -1129,7 +1091,7 @@ describe("SAKURA_BUILDER - string-buffer: 空入力 (Task 3.1)", function()
     end)
 
     test("空入力はネイティブ/フォールバック両経路で \\e のみを返す", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
+        local BUILDER = setup()
         local buf = require("pasta.buf")
 
         local native = BUILDER.build({}, {})
@@ -1179,9 +1141,8 @@ describe("SAKURA_BUILDER - string-buffer: フォールバック実走バイト�
     end
 
     test("複合入力（spot/talk/surface/wait/newline/choice 等）でバイト一致する", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
+        local BUILDER, actors = setup()
         local buf = require("pasta.buf")
-        local actors = create_mock_actors()
 
         local config = { spot_newlines = 1.5 }
 
@@ -1205,9 +1166,8 @@ describe("SAKURA_BUILDER - string-buffer: フォールバック実走バイト�
     end)
 
     test("spot 変更・改行を含む入力でバイト一致する", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
+        local BUILDER, actors = setup()
         local buf = require("pasta.buf")
-        local actors = create_mock_actors()
 
         local function make_tokens()
             return {
@@ -1251,9 +1211,8 @@ describe("SAKURA_BUILDER - string-buffer: フォールバック実走バイト�
     end)
 
     test("choice/raw_script/sakura_script を含む単一actor入力でバイト一致する", function()
-        local BUILDER = require("pasta.shiori.sakura_builder")
+        local BUILDER, actors = setup()
         local buf = require("pasta.buf")
-        local actors = create_mock_actors()
 
         local function make_tokens()
             return {

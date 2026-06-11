@@ -98,7 +98,9 @@ impl LanguageServer for PastaLangServer {
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
         let DidOpenTextDocumentParams { text_document } = params;
-        let TextDocumentItem { uri, text, version, .. } = text_document;
+        let TextDocumentItem {
+            uri, text, version, ..
+        } = text_document;
 
         {
             let Ok(mut docs) = self.documents.write() else {

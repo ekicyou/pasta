@@ -150,6 +150,41 @@ mod tests {
         assert!(err.to_string().contains("path traversal detected"));
     }
 
+    /// コピー元が存在しない場合は `read_dir` のエラーがそのまま伝播する
+    #[test]
+    fn test_copy_dir_recursive_missing_src_errors() {
+        let temp = TempDir::new().unwrap();
+        let src = temp.path().join("no_such_dir");
+        let dst = temp.path().join("dst");
+        assert!(copy_dir_recursive(&src, &dst).is_err());
+    }
+
+    /// 空のコピー元: コピー数 0 だがコピー先ディレクトリは作成される
+    #[test]
+    fn test_copy_dir_recursive_empty_src() {
+        let temp = TempDir::new().unwrap();
+        let src = temp.path().join("src");
+        let dst = temp.path().join("dst");
+        fs::create_dir_all(&src).unwrap();
+
+        let count = copy_dir_recursive(&src, &dst).unwrap();
+        assert_eq!(count, 0);
+        assert!(dst.is_dir());
+    }
+
+    /// release パスに同名の既存「ファイル」がある場合は `remove_dir_all` が
+    /// 失敗しエラーが伝播する（ディレクトリ専用 API の現行挙動を固定）
+    #[test]
+    fn test_prepare_release_dir_on_existing_file_errors() {
+        let temp = TempDir::new().unwrap();
+        let release = temp.path().join("release");
+        fs::write(&release, "i am a file").unwrap();
+
+        assert!(prepare_release_dir(&release).is_err());
+        // 入力ファイルは破壊されない
+        assert_eq!(fs::read_to_string(&release).unwrap(), "i am a file");
+    }
+
     #[cfg(unix)]
     #[test]
     fn test_copy_skips_symlinks() {

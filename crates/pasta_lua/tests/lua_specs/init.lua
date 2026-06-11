@@ -42,6 +42,15 @@ local specs = {
     "act_choice_test",                   -- act:choice / act:choice_timeout トークン蓄積テスト (choice-definition-dsl)
     "act_init_scene_global_record_test",  -- init_scene グローバルシーン名記録テスト (choice-definition-dsl)
     "choice_select_test",                 -- OnChoiceSelectEx 自動ルーティングハンドラテスト (choice-definition-dsl)
+    "ct_test",                            -- ct キャンセルトークン defer/cancel/__close テスト (review-improvement-loop 3.46)
+    "config_get_test",                    -- pasta.config PASTA_CONFIG.get テスト (review-improvement-loop 3.46)
+    "scene_registry_test",                -- pasta.scene レジストリ・search ガード・co_exec テスト (review-improvement-loop 3.46)
+    "word_builder_test",                  -- pasta.word ビルダー境界・resolve_value テスト (review-improvement-loop 3.46)
+    "actor_module_test",                  -- pasta.actor キャッシュ・ビルダー・プロキシ後処理テスト (review-improvement-loop 3.46)
+    "config_actor_init_test",             -- CONFIG.actor 由来初期化（spot 転送・name 補完）テスト (review-improvement-loop 3.46)
+    "act_word_expr_test",                 -- pasta.act word/expr_fn 後処理・call nil ガードテスト (review-improvement-loop 3.46)
+    "pasta_init_test",                    -- PASTA 公開 API リダイレクト・GLOBAL エイリアステスト (review-improvement-loop 3.46)
+    "shiori_entry_test",                  -- pasta.shiori.entry 統合テスト (review-improvement-loop 3.48)
     -- 将来のテストスイートをここに追加
     -- "code_generator_test",
     -- "context_test",

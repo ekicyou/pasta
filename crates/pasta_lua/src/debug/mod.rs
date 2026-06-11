@@ -19,12 +19,12 @@
 //! - The listener address is materialised only when `enabled` is true; otherwise
 //!   `listen` is `None` so no port is ever opened.
 //!
-//! # Incremental wiring
+//! # Wiring
 //!
-//! This is the foundation module. [`enable`]'s transport startup is wired in
-//! task 4.1; the VM hook install is wired in task 1.3. For now, the enabled
-//! path returns a skeleton [`DebugHandle`] without starting a listener or
-//! installing a hook.
+//! [`enable`] is the fully wired entry point: when enabled it installs the VM
+//! line hook, binds the DAP transport listener, and spawns the socket-bridge /
+//! event-encoder threads, returning a [`DebugHandle`] that owns the teardown.
+//! See [`enable`] and [`wiring`] for the thread topology.
 
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -42,7 +42,7 @@ use crate::debug::dap::DapAdapter;
 use crate::debug::session::DebugSession;
 use crate::debug::transport::Transport;
 // `SessionCommand` / `SessionEvent` are already in scope via the `pub use
-// types::{…}` re-export above; do not re-import them here.
+// types::{…}` re-export below; do not re-import them here.
 
 pub(crate) mod breakpoints;
 pub(crate) mod dap;
@@ -517,8 +517,8 @@ impl Drop for DebugHandle {
 ///   1. a shared [`BreakpointSet`] (settable while the VM runs),
 ///   2. a [`DebugSession`] over the VM-thread ends of the command/event
 ///      channels, installed into the line hook via
-///      [`hook::install`](crate::debug::hook::install) (engine-wide `jit.off()`
-///      + a coroutine-crossing `EVERY_LINE` hook) — this is the VM-thread stop
+///      [`hook::install`](crate::debug::hook::install) (engine-wide `jit.off()` +
+///      a coroutine-crossing `EVERY_LINE` hook) — this is the VM-thread stop
 ///      core; inspect/step/continue are processed in its hook loop ON THIS
 ///      THREAD (the `mlua::Lua` never crosses a thread, R6 / `!Send`),
 ///   3. a [`Transport`] bound to `cfg.listen` (the OS-assigned port is readable
@@ -528,8 +528,8 @@ impl Drop for DebugHandle {
 ///
 /// # Thread topology (design "Architecture" / "System Flows")
 ///
-/// One VM host thread (the caller, owns `mlua::Lua` and the session in the hook)
-/// + one socket-bridge thread (sole [`Transport`] owner: multiplexes inbound
+/// One VM host thread (the caller, owns `mlua::Lua` and the session in the hook) +
+/// one socket-bridge thread (sole [`Transport`] owner: multiplexes inbound
 /// socket reads and outbound socket writes, since `Transport` is `!Sync` and
 /// `mpsc` has no `select`) + one event-encoder thread (session events → DAP
 /// frames). The socket bridge and encoder share the [`DapAdapter`] behind an
@@ -862,6 +862,88 @@ mod tests {
         // Dropping the handle tears the backend down without hanging.
         drop(handle);
         lua.remove_global_hook();
+    }
+
+    #[test]
+    fn enable_bind_failure_surfaces_debug_error_bind() {
+        // Occupy a concrete loopback port so the backend's bind must fail.
+        let blocker =
+            std::net::TcpListener::bind("127.0.0.1:0").expect("test listener must bind");
+        let taken = blocker.local_addr().expect("bound addr");
+
+        // ALL_SAFE VM: the hook (installed BEFORE the transport bind) needs jit.
+        let lua = unsafe {
+            mlua::Lua::unsafe_new_with(mlua::StdLib::ALL_SAFE, mlua::LuaOptions::default())
+        };
+        let cfg = DebugConfig {
+            enabled: true,
+            listen: Some(taken),
+            ..Default::default()
+        };
+
+        // R3.1 / R5.5: a bind failure is surfaced as DebugError::Bind, not a
+        // panic and not a silently disabled backend.
+        let err = enable(&lua, &cfg, None).expect_err("bind to an occupied port must fail");
+        assert!(
+            matches!(err, DebugError::Bind(_)),
+            "expected DebugError::Bind, got: {err:?}"
+        );
+        assert!(
+            format!("{err}").to_lowercase().contains("bind"),
+            "Bind display names the failure: {err}"
+        );
+
+        // Clean up the hook the failed enable() left installed (the install
+        // step precedes the bind; the test VM is dropped right after anyway).
+        lua.remove_global_hook();
+        drop(blocker);
+    }
+
+    // --- SharedSourceMode: shared effective-mode cell (task 5.5 / 6.3) ---
+
+    #[test]
+    fn shared_source_mode_get_set_round_trip() {
+        // The cell is initialised to the enable-time resolved mode...
+        let cell = SharedSourceMode::new(SourceMode::Pasta);
+        assert_eq!(cell.get(), SourceMode::Pasta);
+
+        // ...a clone shares the SAME underlying cell (Arc semantics: the
+        // socket-bridge writer and the VM-thread reader observe one value)...
+        let reader = cell.clone();
+        cell.set(SourceMode::Lua);
+        assert_eq!(reader.get(), SourceMode::Lua, "clone observes the write");
+
+        // ...and the flip is reversible (attach can switch Lua→Pasta too).
+        cell.set(SourceMode::Pasta);
+        assert_eq!(reader.get(), SourceMode::Pasta);
+    }
+
+    #[test]
+    fn source_mode_u8_codec_round_trips_and_defends_unknown() {
+        // as_u8 / from_u8 round-trip for both variants.
+        assert_eq!(SourceMode::from_u8(SourceMode::Pasta.as_u8()), SourceMode::Pasta);
+        assert_eq!(SourceMode::from_u8(SourceMode::Lua.as_u8()), SourceMode::Lua);
+        // Defensive default: any unknown byte decodes to Pasta (6.1).
+        assert_eq!(SourceMode::from_u8(42), SourceMode::Pasta);
+        assert_eq!(SourceMode::from_u8(u8::MAX), SourceMode::Pasta);
+    }
+
+    // --- file_source_mode: invalid [debug] present_as tolerated (6.1/6.3) ---
+
+    #[test]
+    fn from_file_invalid_present_as_falls_back_to_pasta() {
+        // An invalid pasta.toml `present_as` value must not break resolution:
+        // it parses back to the default `.pasta` (design Error line 615).
+        let file = DebugFileConfig {
+            present_as: Some("garbage".to_string()),
+            ..Default::default()
+        };
+        let cfg = DebugConfig::from_file(Some(&file));
+        assert_eq!(
+            cfg.source_mode,
+            SourceMode::Pasta,
+            "invalid present_as tolerated → default .pasta"
+        );
     }
 
     // --- DebugFileConfig serde defaults ---

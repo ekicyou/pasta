@@ -281,6 +281,129 @@ mod tests {
         assert_eq!(format_datetime(t), "2024-01-01T00:00:00");
     }
 
+    /// days_to_ymd のうるう年分岐: うるう日当日・400年規則・100年規則（非うるう）・年末境界
+    #[test]
+    fn test_format_datetime_leap_year_branches() {
+        // 2024-02-29T12:34:56 (通常のうるう年のうるう日)
+        let t = UNIX_EPOCH + std::time::Duration::from_secs(1_709_210_096);
+        assert_eq!(format_datetime(t), "2024-02-29T12:34:56");
+
+        // 2000-02-29T00:00:00 (400 で割り切れる年はうるう年)
+        let t = UNIX_EPOCH + std::time::Duration::from_secs(951_782_400);
+        assert_eq!(format_datetime(t), "2000-02-29T00:00:00");
+
+        // 2100-03-01T00:00:00 (100 で割り切れ 400 で割り切れない年は非うるう年。
+        // 2100 をうるう年と誤判定すると 2100-02-29 になる)
+        let t = UNIX_EPOCH + std::time::Duration::from_secs(4_107_542_400);
+        assert_eq!(format_datetime(t), "2100-03-01T00:00:00");
+
+        // 2023-12-31T23:59:59 (年末・12月末日の繰り上がり境界)
+        let t = UNIX_EPOCH + std::time::Duration::from_secs(1_704_067_199);
+        assert_eq!(format_datetime(t), "2023-12-31T23:59:59");
+    }
+
+    /// 対象ファイルが 0 件の場合は早期 return し updates.txt を生成しない
+    #[test]
+    fn test_generate_update_files_empty_dir_creates_nothing() {
+        let temp = TempDir::new().unwrap();
+        let count = generate_update_files(temp.path()).unwrap();
+        assert_eq!(count, 0);
+        assert!(!temp.path().join("updates.txt").exists());
+    }
+
+    /// root が存在しない場合も collect_files が空集合へフォールバックし Ok(0)
+    #[test]
+    fn test_generate_update_files_nonexistent_root_returns_zero() {
+        let temp = TempDir::new().unwrap();
+        let missing = temp.path().join("no_such_dir");
+        let count = generate_update_files(&missing).unwrap();
+        assert_eq!(count, 0);
+    }
+
+    /// EXCLUDED_DIRS の "var" ディレクトリが除外されること（profile は既存テストで担保）
+    #[test]
+    fn test_collect_files_excludes_var_dir() {
+        let temp = TempDir::new().unwrap();
+        fs::write(temp.path().join("keep.txt"), "keep").unwrap();
+        let var_dir = temp.path().join("var");
+        fs::create_dir(&var_dir).unwrap();
+        fs::write(var_dir.join("state.txt"), "state").unwrap();
+
+        let entries = collect_files(temp.path()).unwrap();
+        let paths: Vec<&str> = entries.iter().map(|e| e.path.as_str()).collect();
+        assert_eq!(paths, vec!["keep.txt"]);
+    }
+
+    /// EXCLUDED_FILES の developer_options.txt が除外されること
+    #[test]
+    fn test_collect_files_excludes_developer_options() {
+        let temp = TempDir::new().unwrap();
+        fs::write(temp.path().join("keep.txt"), "keep").unwrap();
+        fs::write(temp.path().join("developer_options.txt"), "dev only").unwrap();
+
+        let entries = collect_files(temp.path()).unwrap();
+        let paths: Vec<&str> = entries.iter().map(|e| e.path.as_str()).collect();
+        assert_eq!(paths, vec!["keep.txt"]);
+    }
+
+    /// updates.txt のエントリはパスの辞書順でソートされる（決定的出力）
+    /// `pkg.txt` と `pkg/inner.txt` は '.' (0x2E) < '/' (0x2F) により
+    /// `pkg.txt` が先となる — ディレクトリ走査順（`pkg/` ディレクトリが先）とは
+    /// 一致しないため、`collect_files` の sort を除去するとこの test は fail する
+    #[test]
+    fn test_updates_txt_entries_sorted_by_path() {
+        let temp = TempDir::new().unwrap();
+        fs::write(temp.path().join("zeta.txt"), "z").unwrap();
+        fs::write(temp.path().join("alpha.txt"), "a").unwrap();
+        let sub = temp.path().join("pkg");
+        fs::create_dir_all(&sub).unwrap();
+        fs::write(sub.join("inner.txt"), "i").unwrap();
+        fs::write(temp.path().join("pkg.txt"), "p").unwrap();
+
+        generate_update_files(temp.path()).unwrap();
+        let content = fs::read_to_string(temp.path().join("updates.txt")).unwrap();
+        let file_paths: Vec<&str> = content
+            .lines()
+            .filter(|l| l.starts_with("file,"))
+            .map(|l| {
+                l.strip_prefix("file,")
+                    .unwrap()
+                    .split('\x01')
+                    .next()
+                    .unwrap()
+            })
+            .collect();
+        assert_eq!(
+            file_paths,
+            vec!["alpha.txt", "pkg.txt", "pkg/inner.txt", "zeta.txt"]
+        );
+    }
+
+    /// 空ファイルの MD5（既知ベクトル）
+    #[test]
+    fn test_calculate_md5_empty_file() {
+        let temp = TempDir::new().unwrap();
+        let empty = temp.path().join("empty.bin");
+        fs::write(&empty, b"").unwrap();
+        assert_eq!(
+            calculate_md5(&empty).unwrap(),
+            "d41d8cd98f00b204e9800998ecf8427e"
+        );
+    }
+
+    /// 8192 バイトのバッファ境界をまたぐストリーミング読みが一括計算と一致すること
+    /// （チャンク分割の継ぎ目にバグが入ると fail する）
+    #[test]
+    fn test_calculate_md5_multi_chunk_matches_one_shot() {
+        let temp = TempDir::new().unwrap();
+        let big = temp.path().join("big.bin");
+        let data: Vec<u8> = (0..20_000u32).map(|i| (i % 251) as u8).collect();
+        fs::write(&big, &data).unwrap();
+
+        let expected = format!("{:032x}", md5::compute(&data));
+        assert_eq!(calculate_md5(&big).unwrap(), expected);
+    }
+
     /// updates.txt の file 行は SOH (\x01) でフィールド区切りされること
     #[test]
     fn test_updates_txt_soh_delimiters() {

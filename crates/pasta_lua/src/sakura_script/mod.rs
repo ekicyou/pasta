@@ -46,7 +46,7 @@ struct SakuraScriptState {
 /// * `config` - TalkConfig (uses hardcoded defaults if None)
 ///
 /// # Returns
-/// Module table containing `talk_to_script` function
+/// Module table containing `talk_to_script` and `break_lines` functions
 pub fn register(lua: &Lua, config: Option<&TalkConfig>) -> LuaResult<Table> {
     let config = config.cloned().unwrap_or_default();
 
@@ -74,8 +74,8 @@ pub fn register(lua: &Lua, config: Option<&TalkConfig>) -> LuaResult<Table> {
     // Create talk_to_script function
     let state_clone = Arc::clone(&state);
     let talk_to_script =
-        lua.create_function(move |lua, (actor, talk): (Value, Option<String>)| {
-            talk_to_script_impl(lua, &state_clone, actor, talk)
+        lua.create_function(move |_lua, (actor, talk): (Value, Option<String>)| {
+            talk_to_script_impl(&state_clone, actor, talk)
         })?;
 
     module.set("talk_to_script", talk_to_script)?;
@@ -94,7 +94,6 @@ pub fn register(lua: &Lua, config: Option<&TalkConfig>) -> LuaResult<Table> {
 
 /// Implementation of talk_to_script function.
 fn talk_to_script_impl(
-    lua: &Lua,
     state: &SakuraScriptState,
     actor: Value,
     talk: Option<String>,
@@ -106,7 +105,7 @@ fn talk_to_script_impl(
     };
 
     // Resolve wait values from actor table or use defaults
-    let wait_values = resolve_wait_values(lua, &actor, &state.default_wait_values)?;
+    let wait_values = resolve_wait_values(&actor, &state.default_wait_values)?;
 
     // Tokenize the input
     let tokens = state.tokenizer.tokenize(&talk);
@@ -132,14 +131,7 @@ fn apply_budoux_if_configured(
     };
 
     let widths: Vec<usize> = match actor_table.get::<Value>("budoux")? {
-        Value::Table(t) => {
-            let mut v = Vec::new();
-            for i in 1..=t.raw_len() {
-                let w: i64 = t.get(i)?;
-                v.push(w as usize);
-            }
-            v
-        }
+        Value::Table(t) => table_to_widths(&t)?,
         _ => return Ok(text),
     };
 
@@ -155,10 +147,22 @@ fn apply_budoux_if_configured(
     ))
 }
 
+/// Convert a Lua array table of widths to `Vec<usize>`.
+///
+/// Non-integer entries propagate as a Lua error.
+fn table_to_widths(t: &Table) -> LuaResult<Vec<usize>> {
+    let mut v = Vec::new();
+    for i in 1..=t.raw_len() {
+        let w: i64 = t.get(i)?;
+        v.push(w as usize);
+    }
+    Ok(v)
+}
+
 /// Resolve wait values from actor table with fallback to defaults.
 ///
 /// 3-level fallback: actor -> config -> hardcoded
-fn resolve_wait_values(_lua: &Lua, actor: &Value, defaults: &WaitValues) -> LuaResult<WaitValues> {
+fn resolve_wait_values(actor: &Value, defaults: &WaitValues) -> LuaResult<WaitValues> {
     // If actor is nil or not a table, use defaults
     let actor_table = match actor {
         Value::Table(t) => t,
@@ -191,14 +195,7 @@ fn break_lines_lua_impl(
 
     // Convert Lua table to Vec<usize>
     let widths_vec: Vec<usize> = match widths {
-        Value::Table(t) => {
-            let mut v = Vec::new();
-            for i in 1..=t.raw_len() {
-                let w: i64 = t.get(i)?;
-                v.push(w as usize);
-            }
-            v
-        }
+        Value::Table(t) => table_to_widths(&t)?,
         _ => return Ok(text),
     };
 

@@ -2,7 +2,7 @@
 
 mod common;
 
-use pasta_sample_ghost::{GhostConfig, generate_ghost};
+use pasta_sample_ghost::generate_ghost;
 use std::path::PathBuf;
 use tempfile::TempDir;
 
@@ -16,9 +16,8 @@ fn ghost_dir() -> PathBuf {
 fn test_generated_images_structure() {
     let temp = TempDir::new().unwrap();
     let ghost_root = temp.path().join("hello-pasta");
-    let config = GhostConfig::default();
 
-    generate_ghost(&ghost_root, &config).unwrap();
+    generate_ghost(&ghost_root).unwrap();
 
     let shell_dir = ghost_root.join("shell/master");
 
@@ -46,9 +45,8 @@ fn test_generated_images_structure() {
 fn test_shell_images() {
     let temp = TempDir::new().unwrap();
     let ghost_root = temp.path().join("hello-pasta");
-    let config = GhostConfig::default();
 
-    generate_ghost(&ghost_root, &config).unwrap();
+    generate_ghost(&ghost_root).unwrap();
 
     let shell_dir = ghost_root.join("shell/master");
 
@@ -70,8 +68,7 @@ fn test_shell_images() {
 /// 仕様準拠: requirements.md Requirement 7.1-7.4
 #[test]
 fn test_pasta_toml_content() {
-    let content =
-        std::fs::read_to_string(ghost_dir().join("ghost/master/pasta.toml")).unwrap();
+    let content = std::fs::read_to_string(ghost_dir().join("ghost/master/pasta.toml")).unwrap();
 
     // 必須セクション確認 (Req 7.1)
     assert!(
@@ -189,8 +186,7 @@ fn test_ukadoc_files() {
     );
 
     // ghost descript.txt (Req 9.2)
-    let ghost_desc =
-        std::fs::read_to_string(ghost_dir.join("ghost/master/descript.txt")).unwrap();
+    let ghost_desc = std::fs::read_to_string(ghost_dir.join("ghost/master/descript.txt")).unwrap();
     assert!(
         ghost_desc.contains("charset,UTF-8"),
         "ghost descript.txt に charset がありません"
@@ -225,8 +221,7 @@ fn test_ukadoc_files() {
     );
 
     // shell descript.txt (Req 9.3)
-    let shell_desc =
-        std::fs::read_to_string(ghost_dir.join("shell/master/descript.txt")).unwrap();
+    let shell_desc = std::fs::read_to_string(ghost_dir.join("shell/master/descript.txt")).unwrap();
     assert!(
         shell_desc.contains("charset,UTF-8"),
         "shell descript.txt に charset がありません"
@@ -296,7 +291,10 @@ fn test_pasta_scripts() {
     // talk.pasta
     let talk = std::fs::read_to_string(dic_dir.join("talk.pasta")).unwrap();
     assert!(talk.contains("＊OnTalk"), "OnTalk シーンがありません");
-    assert!(talk.contains("＊時報その他"), "時報その他 シーンがありません");
+    assert!(
+        talk.contains("＊時報その他"),
+        "時報その他 シーンがありません"
+    );
     assert!(talk.contains("＊時報12"), "時報12 シーンがありません");
     assert!(talk.contains("＄時"), "時刻変数参照がありません");
     assert!(
@@ -327,8 +325,7 @@ fn test_pasta_scripts() {
 /// ランダムトークパターン数テスト（ghosts/hello-pasta 直接読み込み）
 #[test]
 fn test_random_talk_patterns() {
-    let talk =
-        std::fs::read_to_string(ghost_dir().join("ghost/master/dic/talk.pasta")).unwrap();
+    let talk = std::fs::read_to_string(ghost_dir().join("ghost/master/dic/talk.pasta")).unwrap();
 
     // OnTalk パターン数（5〜10種）
     let talk_count = talk.matches("＊OnTalk").count();
@@ -343,8 +340,7 @@ fn test_random_talk_patterns() {
 /// 時報パターンテスト（ghosts/hello-pasta 直接読み込み）
 #[test]
 fn test_hour_chime_patterns() {
-    let talk =
-        std::fs::read_to_string(ghost_dir().join("ghost/master/dic/talk.pasta")).unwrap();
+    let talk = std::fs::read_to_string(ghost_dir().join("ghost/master/dic/talk.pasta")).unwrap();
 
     // 時報その他パターン存在確認
     let hour_count = talk.matches("＊時報その他").count();

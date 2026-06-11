@@ -95,6 +95,20 @@ local function to_12hour_format(hour)
     end
 end
 
+--- 英語フィールド（数値型）の転記対象
+--- 転記対象外: unix, ns, yday, ordinal, num_days_from_sunday
+local DATE_NUM_FIELDS = { "year", "month", "day", "hour", "min", "sec", "wday" }
+
+--- 日本語変数マッピング（文字列型）: { dateフィールド名, 単位サフィックス＝変数名 }
+local DATE_JA_FIELDS = {
+    { "year",  "年" },
+    { "month", "月" },
+    { "day",   "日" },
+    { "hour",  "時" },
+    { "min",   "分" },
+    { "sec",   "秒" },
+}
+
 --- 日時フィールドを req.date から var へ転記
 --- @param self ShioriAct アクションオブジェクト
 --- @return ShioriAct self メソッドチェーン用
@@ -107,23 +121,15 @@ function SHIORI_ACT_IMPL.transfer_date_to_var(self)
     local date = self.req.date
 
     -- 英語フィールド（数値型）を転記
-    -- 転記対象: year, month, day, hour, min, sec, wday
-    -- 転記対象外: unix, ns, yday, ordinal, num_days_from_sunday
-    if date.year then self.var.year = date.year end
-    if date.month then self.var.month = date.month end
-    if date.day then self.var.day = date.day end
-    if date.hour then self.var.hour = date.hour end
-    if date.min then self.var.min = date.min end
-    if date.sec then self.var.sec = date.sec end
-    if date.wday then self.var.wday = date.wday end
+    for _, f in ipairs(DATE_NUM_FIELDS) do
+        if date[f] then self.var[f] = date[f] end
+    end
 
-    -- 日本語変数マッピング（文字列型）
-    if date.year then self.var["年"] = string.format("%d年", date.year) end
-    if date.month then self.var["月"] = string.format("%d月", date.month) end
-    if date.day then self.var["日"] = string.format("%d日", date.day) end
-    if date.hour then self.var["時"] = string.format("%d時", date.hour) end
-    if date.min then self.var["分"] = string.format("%d分", date.min) end
-    if date.sec then self.var["秒"] = string.format("%d秒", date.sec) end
+    -- 日本語変数マッピング（文字列型: 値＋単位サフィックス。例: 年=「2026年」）
+    for _, m in ipairs(DATE_JA_FIELDS) do
+        local f, suffix = m[1], m[2]
+        if date[f] then self.var[suffix] = string.format("%d%s", date[f], suffix) end
+    end
 
     -- 曜日変換
     if date.wday then
@@ -225,14 +231,11 @@ function SHIORI_ACT_IMPL.set_property(self, name, value)
     return self
 end
 
---- SSPプロパティ読み取りタグ（\![get,property,{id},{names...}]）を蓄積し、yield で値を受け取る
---- @param self ShioriAct アクションオブジェクト
+--- get_property の第1引数を names 配列へ正規化し、各名前を検証する
 --- @param name_or_names string|string[] プロパティ名または名前の配列
---- @param timeout number|nil タイムアウト秒数（デフォルト 5）
---- @param timeout_message string|nil タイムアウト時のエラーメッセージ
---- @return any ... プロパティ値（多値返却）
-function SHIORI_ACT_IMPL.get_property(self, name_or_names, timeout, timeout_message)
-    -- 引数正規化: string → 配列化
+--- @return string[] names 正規化済み配列
+--- @return number n 名前数
+local function normalize_property_names(name_or_names)
     local names
     if type(name_or_names) == "string" then
         names = { name_or_names }
@@ -242,18 +245,28 @@ function SHIORI_ACT_IMPL.get_property(self, name_or_names, timeout, timeout_mess
         error("get_property: first argument must be a property name (string) or array of names (table)")
     end
     local n = #names
-
-    -- バリデーション
     if n == 0 then error("get_property: at least one property name required") end
-    local co, is_main = coroutine.running()
-    if is_main or co == nil then
-        error("get_property: must be called inside a scene coroutine")
-    end
     for i = 1, n do
         local name = names[i]
         if name == nil or name == "" then
             error("get_property: name must not be nil or empty")
         end
+    end
+    return names, n
+end
+
+--- SSPプロパティ読み取りタグ（\![get,property,{id},{names...}]）を蓄積し、yield で値を受け取る
+--- @param self ShioriAct アクションオブジェクト
+--- @param name_or_names string|string[] プロパティ名または名前の配列
+--- @param timeout number|nil タイムアウト秒数（デフォルト 5）
+--- @param timeout_message string|nil タイムアウト時のエラーメッセージ
+--- @return any ... プロパティ値（多値返却）
+function SHIORI_ACT_IMPL.get_property(self, name_or_names, timeout, timeout_message)
+    -- 引数正規化＋バリデーション
+    local names, n = normalize_property_names(name_or_names)
+    local co, is_main = coroutine.running()
+    if is_main or co == nil then
+        error("get_property: must be called inside a scene coroutine")
     end
 
     -- デフォルト適用
@@ -287,11 +300,8 @@ function SHIORI_ACT_IMPL.get_property(self, name_or_names, timeout, timeout_mess
     if reason then
         error(reason)
     end
-    if refs == nil then
-        local nils = {}
-        for i = 1, n do nils[i] = nil end
-        return table.unpack(nils, 1, n)
-    end
+    -- refs == nil（タイムアウト静黙経路）は空テーブル扱い → 全要素 nil の n 値返却（等価簡素化）
+    refs = refs or {}
     local out = {}
     for i = 1, n do
         local v = refs[i]

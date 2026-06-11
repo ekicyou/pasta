@@ -208,6 +208,18 @@ pub(crate) fn parse_args(pair: Pair<Rule>) -> Result<Args, ParseError> {
     Ok(Args { items, span })
 }
 
+/// Map a binary operator rule to its `BinOp`, or `None` for non-operator rules.
+pub(crate) fn bin_op_from_rule(rule: Rule) -> Option<BinOp> {
+    match rule {
+        Rule::add_op => Some(BinOp::Add),
+        Rule::sub_op => Some(BinOp::Sub),
+        Rule::mul_op => Some(BinOp::Mul),
+        Rule::div_op => Some(BinOp::Div),
+        Rule::modulo_op => Some(BinOp::Mod),
+        _ => None,
+    }
+}
+
 /// Parse an expression from parts (terms and binary operators).
 /// Handles the case where expr = term ~ (bin_op ~ term)* expands into multiple pairs.
 pub(crate) fn parse_expr_from_parts(pair: Pair<Rule>) -> Option<Expr> {
@@ -215,17 +227,10 @@ pub(crate) fn parse_expr_from_parts(pair: Pair<Rule>) -> Option<Expr> {
     let mut operators: Vec<BinOp> = Vec::new();
 
     for expr_inner in pair.into_inner() {
-        match expr_inner.as_rule() {
-            Rule::add_op => operators.push(BinOp::Add),
-            Rule::sub_op => operators.push(BinOp::Sub),
-            Rule::mul_op => operators.push(BinOp::Mul),
-            Rule::div_op => operators.push(BinOp::Div),
-            Rule::modulo_op => operators.push(BinOp::Mod),
-            _ => {
-                if let Some(term) = try_parse_expr(expr_inner) {
-                    terms.push(term);
-                }
-            }
+        if let Some(op) = bin_op_from_rule(expr_inner.as_rule()) {
+            operators.push(op);
+        } else if let Some(term) = try_parse_expr(expr_inner) {
+            terms.push(term);
         }
     }
 
@@ -252,13 +257,10 @@ pub(crate) fn parse_key_arg(pair: Pair<Rule>) -> Result<(String, Expr), ParseErr
                             key = kv_inner.as_str().to_string();
                         }
                     }
-                    Rule::add_op => operators.push(BinOp::Add),
-                    Rule::sub_op => operators.push(BinOp::Sub),
-                    Rule::mul_op => operators.push(BinOp::Mul),
-                    Rule::div_op => operators.push(BinOp::Div),
-                    Rule::modulo_op => operators.push(BinOp::Mod),
-                    _ => {
-                        if let Some(expr) = try_parse_expr(kv_inner) {
+                    rule => {
+                        if let Some(op) = bin_op_from_rule(rule) {
+                            operators.push(op);
+                        } else if let Some(expr) = try_parse_expr(kv_inner) {
                             terms.push(expr);
                         }
                     }
@@ -277,16 +279,21 @@ pub(crate) fn parse_key_arg(pair: Pair<Rule>) -> Result<(String, Expr), ParseErr
 }
 
 /// Build a left-associative binary expression from terms and operators.
-pub(crate) fn build_left_assoc_expr(mut terms: Vec<Expr>, operators: Vec<BinOp>) -> Expr {
-    let mut result = terms.remove(0);
-    for (i, op) in operators.into_iter().enumerate() {
-        if i < terms.len() {
-            result = Expr::Binary {
-                op,
-                lhs: Box::new(result),
-                rhs: Box::new(terms[i].clone()),
-            };
-        }
+///
+/// Callers guarantee `terms` is non-empty. Surplus operators or terms
+/// (beyond the pairwise zip) are ignored, matching the grammar's
+/// `term ~ (bin_op ~ term)*` shape.
+pub(crate) fn build_left_assoc_expr(terms: Vec<Expr>, operators: Vec<BinOp>) -> Expr {
+    let mut terms = terms.into_iter();
+    let mut result = terms
+        .next()
+        .expect("build_left_assoc_expr requires at least one term");
+    for (op, rhs) in operators.into_iter().zip(terms) {
+        result = Expr::Binary {
+            op,
+            lhs: Box::new(result),
+            rhs: Box::new(rhs),
+        };
     }
     result
 }

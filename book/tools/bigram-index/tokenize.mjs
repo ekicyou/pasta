@@ -5,11 +5,15 @@
 //     位置非依存で全 2-gram を索引・クエリの双方で同一規則生成することで、
 //     「任意の連続2文字以上の日本語語句」がその語を含むページにヒットする（要件 2.4）。
 //   - ASCII 語（英数）は従来どおり空白・ハイフン区切りの単語トークンを維持する。
-//   - 索引側ビルダ（build-index.mjs）とクエリ側（theme/searcher.js 経由）で
-//     この関数を共有し、規則不一致による検索破綻を防ぐ（design Invariants）。
+//   - 索引側ビルダ（build-index.mjs）とクエリ側でこの関数を共有し、
+//     規則不一致による検索破綻を防ぐ（design Invariants）。
 //
-// ブラウザ（searcher.js）からも同一ロジックを使えるよう、依存ゼロの純関数とする。
-// 本実装タスク 3.2 で searcher.js へ注入/同梱する前提（PoC では Node から利用）。
+// クエリ側の実態（本実装タスク 3.2 の確定方式）: ブラウザは ESM import 不可のため、
+// theme/head.hbs に本関数のミラー（ES5 化した同一規則のコピー）をインライン同梱し、
+// defineProperty フックで elasticlunr.tokenizer を差し替えている。
+// 本ファイルを変更した場合は head.hbs の BEGIN/END canonical bigram tokenize
+// ブロックも必ず同期すること（verify-search.mjs が規則一致を検証する）。
+// 依存ゼロの純関数とする。
 
 // 正規化: 小文字化 + 全角英数を半角へ（NFKC は CJK 互換まで畳むため使わず、英数記号のみ畳む）。
 function normalize(text) {
@@ -79,5 +83,3 @@ export function tokenize(input) {
   }
   return tokens.filter((t) => t.length > 0);
 }
-
-export default tokenize;
