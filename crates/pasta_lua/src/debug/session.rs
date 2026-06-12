@@ -715,12 +715,6 @@ impl DebugSession {
     fn on_line_impl(&self, lua: &Lua, debug: &Debug) -> mlua::Result<VmState> {
         let (source, line) = Self::source_and_line(debug);
 
-        // TEMP DIAGNOSTIC (CI-only "breakpoint never held" investigation): log the
-        // raw (source, line) every hook line so the executed coordinates can be
-        // compared against the bound breakpoint. Reveals whether the hook reports a
-        // different chunk name, a different line, or never fires for the scene chunk.
-        tracing::debug!("PASTA_DBG_DIAG hook-line source={source:?} line={line} pause={}", self.breakpoints.should_pause(&source, line));
-
         // `.pasta` break-anchor processing (task 2 / design §State Management
         // 183-191). ONLY active in `SourceMode::Pasta` WITH a `source_map` — the
         // single gate that keeps `.lua` mode / no-map / OFF byte-identical to

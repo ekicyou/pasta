@@ -924,23 +924,6 @@ fn no_attach_arg_no_config_resolves_initial_pasta_then_toggle_overrides() {
 /// ステップ粒度フィクスチャ（1つの `.pasta` トーク行が複数 `.lua` 行へ展開される）。
 const STEP_FIXTURE: &str = include_str!("../fixtures/debug_toggle_step_e2e.pasta");
 
-/// DIAGNOSTIC (CI-only "breakpoint never held" investigation): report the JIT and
-/// line-hook state of the live runtime. `jit_on=true` would mean `jit.off()` did
-/// not stop the engine (so JIT-compiled lines skip the line hook); `co_hook=false`
-/// would mean the hook did not propagate into a freshly created coroutine (the
-/// scene body runs in a coroutine). `debug` may be sandboxed out, so each probe is
-/// `pcall`-guarded and degrades to a printable token rather than erroring.
-const HOOK_STATE_PROBE: &str = r#"
-    local function tok(ok, v) if not ok then return "err" end if v == nil then return "nil" end return tostring(v) end
-    local oj, jon = pcall(function() return jit and jit.status() end)
-    local oh, mh = pcall(function() return debug ~= nil and (debug.gethook() ~= nil) end)
-    local oc, ch = pcall(function()
-        local co = coroutine.create(function() return 1 end)
-        return debug ~= nil and (debug.gethook(co) ~= nil)
-    end)
-    return "jit_on=" .. tok(oj, jon) .. " main_hook=" .. tok(oh, mh) .. " co_hook=" .. tok(oc, ch)
-"#;
-
 /// base_dir 配下にステップ用フィクスチャ `.pasta` と `[debug] enabled, port=0` の pasta.toml を
 /// 配置し、pasta_scripts / scriptlibs をコピーする（`make_base_dir` と同構成・別フィクスチャ）。
 /// `.pasta` の絶対パスを返す。
@@ -1152,20 +1135,14 @@ fn start_step_session(coords: &StepCoords, initial_mode: &str) -> StepSession {
     let base_for_host = coords.base.clone();
     let chunk_for_host = coords.chunk.clone();
     let generated_for_host = coords.generated_lua.clone();
-    // DIAGNOSTIC: carry the test-side coords into the host so it can compare them
-    // against the backend's own `debug_source_map()` (the map the breakpoint is
-    // verified against). A divergence here means the breakpoint binds to a line
-    // the executed `.lua` never reports — the leading hypothesis for the CI-only
-    // "breakpoint never held" failure.
-    let pk_for_host = coords.pasta_file_key.clone();
-    let origin_pasta_for_host = coords.origin_pasta_line;
-    let origin_lua_for_host = coords.origin_lua_line;
 
     let host = std::thread::spawn(move || -> Result<(), String> {
         // Run the host body in an inner closure so its final `Result` (whichever
         // `?` short-circuited) can be reported on `status_tx` before the thread
-        // exits and drops the runtime (which closes the client socket).
-        let body = || -> Result<String, String> {
+        // exits and drops the runtime (which closes the client socket). Without
+        // this, a host-side failure is hidden behind the client's bare
+        // "peer did not close" frame-recv panic.
+        let body = || -> Result<(), String> {
             let runtime = PastaLoader::load_with_config(&base_for_host, RuntimeConfig::new())
                 .map_err(|e| format!("loader must build an enabled-debug runtime: {e}"))?;
             if !runtime.debug_enabled() {
@@ -1189,61 +1166,23 @@ fn start_step_session(coords: &StepCoords, initial_mode: &str) -> StepSession {
             go_rx
                 .recv_timeout(WATCHDOG)
                 .map_err(|_| "no go signal before driver exec".to_string())?;
-
-            // DIAGNOSTIC: capture JIT + hook state right before the driver runs the
-            // scene body. The observed CI failure is host `Ok(())` (driver ran to
-            // completion without the breakpoint ever holding the VM); this probe
-            // distinguishes "JIT re-enabled so line hooks are skipped"
-            // (jit_on=true) from a hook-propagation gap into the scene coroutine.
-            let probe = match runtime.exec(HOOK_STATE_PROBE) {
-                Ok(v) => v
-                    .as_str()
-                    .map(|s| s.to_string())
-                    .unwrap_or_else(|| format!("{v:?}")),
-                Err(e) => format!("probe-error: {e}"),
-            };
-
-            // DIAGNOSTIC: compare the backend's live source map (what the breakpoint
-            // verifies/binds against) with the test-side coords (what the BP line is
-            // taken from). If `be_p2l` (origin `.pasta` line -> `.lua`) does not
-            // contain `origin_lua` (=`oll`), or `be_l2p` does not map back to the
-            // origin `.pasta` line, the BP is bound to a line the executed `.lua`
-            // never reports -> the hook can never stop there.
-            let map_diag = match runtime.debug_source_map() {
-                Some(map) => {
-                    let be_p2l: Vec<u32> = map
-                        .resolve_pasta_to_lua(&pk_for_host, origin_pasta_for_host)
-                        .into_iter()
-                        .map(|(_, l)| l)
-                        .collect();
-                    let be_l2p = map
-                        .resolve_lua_to_pasta(&chunk_for_host, origin_lua_for_host)
-                        .map(|p| p.line);
-                    format!(
-                        "coords(pasta={origin_pasta_for_host},lua={origin_lua_for_host}) \
-                         backend_p2l={be_p2l:?} backend_l2p={be_l2p:?}"
-                    )
-                }
-                None => "no-backend-map".to_string(),
-            };
-            let probe = format!("{probe} | {map_diag}");
-
             // (driver) `__start__` を駆動 -> talk 本体行が実行され BP ヒット。
             // BP がヒットすれば VM はここで停止しブロックする。BP が当たらなければ
-            // driver はそのまま完走して戻る（= 観測される失敗モードの候補）。
+            // driver はそのまま完走して戻る。
             runtime
                 .exec(STEP_DRIVER)
-                .map_err(|e| format!("scene driver exec failed [{probe}]: {e}"))?;
+                .map_err(|e| format!("scene driver exec failed: {e}"))?;
 
             drop(runtime);
-            Ok(probe)
+            Ok(())
         };
         let result = body();
-        // Report the final outcome regardless of success/failure. On the failing
-        // path this carries the underlying `exec` error (or `Ok(())` when the
-        // driver ran to completion without the breakpoint ever holding the VM).
+        // Report the final outcome regardless of success/failure so a host-side
+        // failure (or a driver that completed without the breakpoint ever holding
+        // the VM, = `Ok(())`) surfaces in the client's panic instead of a bare
+        // "peer did not close".
         let _ = status_tx.send(format!("[{mode_label}] thread result = {result:?}"));
-        result.map(|_| ())
+        result
     });
 
     let addr = addr_rx
@@ -1279,16 +1218,6 @@ fn start_step_session(coords: &StepCoords, initial_mode: &str) -> StepSession {
     );
     let bp_resp = client.recv_until(|m| is_response(m, "setBreakpoints"));
     let bps = bp_resp["body"]["breakpoints"].as_array().expect("breakpoints array");
-    // DIAGNOSTIC (client thread => reliably captured by libtest): show the line we
-    // requested vs the line the backend verified the BP at. If the verified line
-    // differs from the executed line, the hook can never stop there. Emitted before
-    // the `verified` assertion so it appears even when the run later fails.
-    eprintln!(
-        "[bp:{initial_mode}] requested(path-tail={}, line={bp_line}) verified={:?} verified_line={:?}",
-        bp_source_path.rsplit(['/', '\\']).next().unwrap_or(&bp_source_path),
-        bps.first().map(|b| b["verified"].clone()),
-        bps.first().map(|b| b["line"].clone()),
-    );
     assert_eq!(bps.len(), 1, "exactly one breakpoint resolved");
     assert_eq!(
         bps[0]["verified"], true,
