@@ -33,4 +33,6 @@ pasta_lua.workspace = true
 # tracing は tracing-test の #[traced_test] マクロ展開が直接参照するため必須
 tracing.workspace = true
 tracing-test.workspace = true
+# 統合テスト: テスト前に ambient な PASTA_DEBUG を中和するための before-main フック
+ctor = "0.2"
 

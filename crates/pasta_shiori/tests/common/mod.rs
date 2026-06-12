@@ -8,6 +8,26 @@ pub mod test_env;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
+/// Neutralize ambient DAP debug env vars before any test thread starts.
+///
+/// The developer session may export `PASTA_DEBUG=1` / `PASTA_DEBUG_PORT=9276`.
+/// Without this guard, every `PastaLoader::load` driven through SHIORI here would
+/// enable the DAP listener and bind that single fixed port; the multiple loads in
+/// one integration-test binary then collide with `AddrInUse` and the tests fail.
+/// Tests must behave identically regardless of the session environment, so we
+/// clear these here.
+///
+/// Running inside a `#[ctor]` (executed before `main`, while the process is still
+/// single-threaded) makes the `remove_var` calls race-free under the Rust 2024
+/// edition where `std::env::remove_var` is `unsafe`.
+#[ctor::ctor]
+fn neutralize_debug_env() {
+    unsafe {
+        std::env::remove_var("PASTA_DEBUG");
+        std::env::remove_var("PASTA_DEBUG_PORT");
+    }
+}
+
 /// Copy fixture directory to a temporary location for isolated testing.
 ///
 /// This function copies both the fixture files and the support files

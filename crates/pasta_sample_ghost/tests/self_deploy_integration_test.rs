@@ -21,6 +21,25 @@ use pasta_lua::loader::PastaLoader;
 use pasta_lua::mlua;
 use tempfile::TempDir;
 
+/// Neutralize ambient DAP debug env vars before any test thread starts.
+///
+/// The developer session may export `PASTA_DEBUG=1` / `PASTA_DEBUG_PORT=9276`.
+/// Without this guard, every `PastaLoader::load` here would enable the DAP
+/// listener and bind that single fixed port; the multiple loads performed in this
+/// binary then collide with `AddrInUse` and the tests fail. Tests must behave
+/// identically regardless of the session environment, so we clear these here.
+///
+/// Running inside a `#[ctor]` (executed before `main`, while the process is still
+/// single-threaded) makes the `remove_var` calls race-free under the Rust 2024
+/// edition where `std::env::remove_var` is `unsafe`.
+#[ctor::ctor]
+fn neutralize_debug_env() {
+    unsafe {
+        std::env::remove_var("PASTA_DEBUG");
+        std::env::remove_var("PASTA_DEBUG_PORT");
+    }
+}
+
 /// Lua の文字列値を Rust 文字列として取り出すヘルパー。
 fn value_as_str(value: &mlua::Value) -> Option<String> {
     value

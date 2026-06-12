@@ -42,3 +42,4 @@ tempfile.workspace = true
 insta.workspace = true
 tracing-test.workspace = true
 md5.workspace = true
+ctor = "0.2"

@@ -2,6 +2,25 @@ use super::*;
 use std::path::PathBuf;
 use tempfile::TempDir;
 
+/// Neutralize ambient DAP debug env vars before any test thread starts.
+///
+/// The developer session may export `PASTA_DEBUG=1` / `PASTA_DEBUG_PORT=9276`.
+/// Without this guard, every `PastaLoader::load` driven through SHIORI here would
+/// enable the DAP listener and bind that single fixed port; the multiple loads in
+/// this test binary then collide with `AddrInUse` and the tests fail. Tests must
+/// behave identically regardless of the session environment, so we clear these.
+///
+/// Running inside a `#[ctor]` (executed before `main`, while the process is still
+/// single-threaded) makes the `remove_var` calls race-free under the Rust 2024
+/// edition where `std::env::remove_var` is `unsafe`.
+#[ctor::ctor]
+fn neutralize_debug_env() {
+    unsafe {
+        std::env::remove_var("PASTA_DEBUG");
+        std::env::remove_var("PASTA_DEBUG_PORT");
+    }
+}
+
 /// Copy fixture to a temporary directory for testing.
 fn copy_fixture_to_temp(fixture_name: &str) -> TempDir {
     let src = PathBuf::from(env!("CARGO_MANIFEST_DIR"))

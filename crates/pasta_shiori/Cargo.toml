@@ -27,3 +27,5 @@ windows-sys.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+# テスト前に ambient な PASTA_DEBUG を中和するための before-main フック
+ctor = "0.2"
