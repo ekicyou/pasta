@@ -924,6 +924,23 @@ fn no_attach_arg_no_config_resolves_initial_pasta_then_toggle_overrides() {
 /// ステップ粒度フィクスチャ（1つの `.pasta` トーク行が複数 `.lua` 行へ展開される）。
 const STEP_FIXTURE: &str = include_str!("../fixtures/debug_toggle_step_e2e.pasta");
 
+/// DIAGNOSTIC (CI-only "breakpoint never held" investigation): report the JIT and
+/// line-hook state of the live runtime. `jit_on=true` would mean `jit.off()` did
+/// not stop the engine (so JIT-compiled lines skip the line hook); `co_hook=false`
+/// would mean the hook did not propagate into a freshly created coroutine (the
+/// scene body runs in a coroutine). `debug` may be sandboxed out, so each probe is
+/// `pcall`-guarded and degrades to a printable token rather than erroring.
+const HOOK_STATE_PROBE: &str = r#"
+    local function tok(ok, v) if not ok then return "err" end if v == nil then return "nil" end return tostring(v) end
+    local oj, jon = pcall(function() return jit and jit.status() end)
+    local oh, mh = pcall(function() return debug ~= nil and (debug.gethook() ~= nil) end)
+    local oc, ch = pcall(function()
+        local co = coroutine.create(function() return 1 end)
+        return debug ~= nil and (debug.gethook(co) ~= nil)
+    end)
+    return "jit_on=" .. tok(oj, jon) .. " main_hook=" .. tok(oh, mh) .. " co_hook=" .. tok(oc, ch)
+"#;
+
 /// base_dir 配下にステップ用フィクスチャ `.pasta` と `[debug] enabled, port=0` の pasta.toml を
 /// 配置し、pasta_scripts / scriptlibs をコピーする（`make_base_dir` と同構成・別フィクスチャ）。
 /// `.pasta` の絶対パスを返す。
@@ -1140,7 +1157,7 @@ fn start_step_session(coords: &StepCoords, initial_mode: &str) -> StepSession {
         // Run the host body in an inner closure so its final `Result` (whichever
         // `?` short-circuited) can be reported on `status_tx` before the thread
         // exits and drops the runtime (which closes the client socket).
-        let body = || -> Result<(), String> {
+        let body = || -> Result<String, String> {
             let runtime = PastaLoader::load_with_config(&base_for_host, RuntimeConfig::new())
                 .map_err(|e| format!("loader must build an enabled-debug runtime: {e}"))?;
             if !runtime.debug_enabled() {
@@ -1164,22 +1181,36 @@ fn start_step_session(coords: &StepCoords, initial_mode: &str) -> StepSession {
             go_rx
                 .recv_timeout(WATCHDOG)
                 .map_err(|_| "no go signal before driver exec".to_string())?;
+
+            // DIAGNOSTIC: capture JIT + hook state right before the driver runs the
+            // scene body. The observed CI failure is host `Ok(())` (driver ran to
+            // completion without the breakpoint ever holding the VM); this probe
+            // distinguishes "JIT re-enabled so line hooks are skipped"
+            // (jit_on=true) from a hook-propagation gap into the scene coroutine.
+            let probe = match runtime.exec(HOOK_STATE_PROBE) {
+                Ok(v) => v
+                    .as_str()
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| format!("{v:?}")),
+                Err(e) => format!("probe-error: {e}"),
+            };
+
             // (driver) `__start__` を駆動 -> talk 本体行が実行され BP ヒット。
             // BP がヒットすれば VM はここで停止しブロックする。BP が当たらなければ
             // driver はそのまま完走して戻る（= 観測される失敗モードの候補）。
             runtime
                 .exec(STEP_DRIVER)
-                .map_err(|e| format!("scene driver exec failed: {e}"))?;
+                .map_err(|e| format!("scene driver exec failed [{probe}]: {e}"))?;
 
             drop(runtime);
-            Ok(())
+            Ok(probe)
         };
         let result = body();
         // Report the final outcome regardless of success/failure. On the failing
         // path this carries the underlying `exec` error (or `Ok(())` when the
         // driver ran to completion without the breakpoint ever holding the VM).
         let _ = status_tx.send(format!("[{mode_label}] thread result = {result:?}"));
-        result
+        result.map(|_| ())
     });
 
     let addr = addr_rx
