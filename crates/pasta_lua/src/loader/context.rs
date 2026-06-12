@@ -40,41 +40,38 @@ impl LoaderContext {
 
     /// Create LoaderContext from PastaConfig.
     ///
-    /// Converts base_dir to absolute path and extracts relevant settings.
+    /// Makes `base_dir` absolute **without resolving 8.3 short names or
+    /// symlinks**, so the form is preserved exactly.
+    ///
+    /// # Why not `canonicalize()`
+    ///
+    /// `base_dir` flows into `package.path`, which determines the chunk name Lua
+    /// reports for every `require`d scene (`@<package.path with ? filled>`). The
+    /// debugger keys breakpoints on that chunk name via
+    /// [`canonicalize_chunk_name`](crate::debug::source_map::canonicalize_chunk_name)
+    /// (separator + case normalization only — it does NOT resolve 8.3 short
+    /// names). The cache paths, the aggregated source map, and the breakpoint
+    /// store all derive from the **raw** `base_dir` the loader was given.
+    ///
+    /// `std::fs::canonicalize()` resolves Windows 8.3 short names to their long
+    /// form (e.g. a temp dir handed in as `C:\Users\RUNNER~1\...` becomes
+    /// `C:\Users\runneradmin\...`) and symlinks. That made `package.path`
+    /// (→ runtime chunk names) diverge from the cache/source-map/breakpoint form,
+    /// so `should_pause` never matched and breakpoints silently never fired when
+    /// the base path differed from its canonical form — reproducible on CI (whose
+    /// `%TEMP%` is an 8.3 short name) and possible for any real ghost installed
+    /// under an 8.3-generating path. `std::path::absolute` makes the path absolute
+    /// (resolving `.`/`..`) while preserving the exact short/long form, keeping
+    /// every path identity consistent. It also never emits the `\\?\`
+    /// extended-length prefix, so no stripping is needed.
     pub fn from_config(base_dir: &Path, config: &PastaConfig) -> Self {
-        let abs_base = base_dir
-            .canonicalize()
-            .unwrap_or_else(|_| base_dir.to_path_buf());
-
-        // On Windows, canonicalize returns extended-length paths (\\?\C:\...)
-        // Strip this prefix for Lua compatibility
-        let abs_base = Self::strip_windows_prefix(&abs_base);
+        let abs_base = std::path::absolute(base_dir).unwrap_or_else(|_| base_dir.to_path_buf());
 
         Self {
             base_dir: abs_base,
             lua_search_paths: config.loader.lua_search_paths.clone(),
             custom_fields: config.custom_fields.clone(),
         }
-    }
-
-    /// Strip Windows extended-length path prefix (\\?\) if present.
-    ///
-    /// Windows `canonicalize()` returns paths like `\\?\C:\path` which
-    /// cause issues with Lua's package.path. This function removes the
-    /// prefix to get a normal path like `C:\path`.
-    #[cfg(windows)]
-    fn strip_windows_prefix(path: &Path) -> PathBuf {
-        let path_str = path.to_string_lossy();
-        if let Some(stripped) = path_str.strip_prefix(r"\\?\") {
-            PathBuf::from(stripped)
-        } else {
-            path.to_path_buf()
-        }
-    }
-
-    #[cfg(not(windows))]
-    fn strip_windows_prefix(path: &Path) -> PathBuf {
-        path.to_path_buf()
     }
 
     /// Generate absolute Lua module search paths.
@@ -279,8 +276,8 @@ mod tests {
 
     #[test]
     fn test_from_config_existing_dir_is_absolute_without_extended_prefix() {
-        // Existing dir -> canonicalized to an absolute path; on Windows the
-        // \\?\ extended-length prefix must be stripped for Lua compatibility.
+        // Existing dir -> absolute path with NO \\?\ extended-length prefix
+        // (`std::path::absolute` never emits it, so Lua's package.path stays clean).
         let temp = tempfile::TempDir::new().unwrap();
         let config = PastaConfig::default();
         let ctx = LoaderContext::from_config(temp.path(), &config);
@@ -288,18 +285,36 @@ mod tests {
         assert!(ctx.base_dir.is_absolute());
         assert!(
             !ctx.base_dir.to_string_lossy().starts_with(r"\\?\"),
-            "extended-length prefix must be stripped: {}",
+            "extended-length prefix must not be present: {}",
             ctx.base_dir.display()
         );
     }
 
     #[test]
-    fn test_from_config_nonexistent_dir_falls_back_to_input() {
-        // canonicalize() fails for a nonexistent path -> input path kept as-is.
+    fn test_from_config_preserves_path_form_without_resolving_short_names() {
+        // `std::path::absolute` must NOT resolve 8.3 short names or symlinks (the
+        // regression guard for the breakpoint chunk-identity mismatch): the base
+        // must remain byte-for-byte the input's form once absolute. An already
+        // absolute input is therefore returned unchanged.
+        let temp = tempfile::TempDir::new().unwrap();
+        let config = PastaConfig::default();
+        let ctx = LoaderContext::from_config(temp.path(), &config);
+        assert_eq!(
+            ctx.base_dir,
+            std::path::absolute(temp.path()).unwrap(),
+            "base form must be preserved (no 8.3/symlink resolution)"
+        );
+    }
+
+    #[test]
+    fn test_from_config_makes_relative_dir_absolute() {
+        // A relative (here nonexistent) path is made absolute lexically; unlike
+        // `canonicalize()` this does not require the path to exist.
         let config = PastaConfig::default();
         let input = Path::new("definitely_nonexistent_loader_ctx_dir/sub");
         let ctx = LoaderContext::from_config(input, &config);
-        assert_eq!(ctx.base_dir, input.to_path_buf());
+        assert!(ctx.base_dir.is_absolute());
+        assert!(ctx.base_dir.ends_with("definitely_nonexistent_loader_ctx_dir/sub"));
     }
 
     #[cfg(windows)]
