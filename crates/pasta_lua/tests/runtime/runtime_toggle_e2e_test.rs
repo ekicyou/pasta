@@ -1152,6 +1152,14 @@ fn start_step_session(coords: &StepCoords, initial_mode: &str) -> StepSession {
     let base_for_host = coords.base.clone();
     let chunk_for_host = coords.chunk.clone();
     let generated_for_host = coords.generated_lua.clone();
+    // DIAGNOSTIC: carry the test-side coords into the host so it can compare them
+    // against the backend's own `debug_source_map()` (the map the breakpoint is
+    // verified against). A divergence here means the breakpoint binds to a line
+    // the executed `.lua` never reports — the leading hypothesis for the CI-only
+    // "breakpoint never held" failure.
+    let pk_for_host = coords.pasta_file_key.clone();
+    let origin_pasta_for_host = coords.origin_pasta_line;
+    let origin_lua_for_host = coords.origin_lua_line;
 
     let host = std::thread::spawn(move || -> Result<(), String> {
         // Run the host body in an inner closure so its final `Result` (whichever
@@ -1194,6 +1202,31 @@ fn start_step_session(coords: &StepCoords, initial_mode: &str) -> StepSession {
                     .unwrap_or_else(|| format!("{v:?}")),
                 Err(e) => format!("probe-error: {e}"),
             };
+
+            // DIAGNOSTIC: compare the backend's live source map (what the breakpoint
+            // verifies/binds against) with the test-side coords (what the BP line is
+            // taken from). If `be_p2l` (origin `.pasta` line -> `.lua`) does not
+            // contain `origin_lua` (=`oll`), or `be_l2p` does not map back to the
+            // origin `.pasta` line, the BP is bound to a line the executed `.lua`
+            // never reports -> the hook can never stop there.
+            let map_diag = match runtime.debug_source_map() {
+                Some(map) => {
+                    let be_p2l: Vec<u32> = map
+                        .resolve_pasta_to_lua(&pk_for_host, origin_pasta_for_host)
+                        .into_iter()
+                        .map(|(_, l)| l)
+                        .collect();
+                    let be_l2p = map
+                        .resolve_lua_to_pasta(&chunk_for_host, origin_lua_for_host)
+                        .map(|p| p.line);
+                    format!(
+                        "coords(pasta={origin_pasta_for_host},lua={origin_lua_for_host}) \
+                         backend_p2l={be_p2l:?} backend_l2p={be_l2p:?}"
+                    )
+                }
+                None => "no-backend-map".to_string(),
+            };
+            let probe = format!("{probe} | {map_diag}");
 
             // (driver) `__start__` を駆動 -> talk 本体行が実行され BP ヒット。
             // BP がヒットすれば VM はここで停止しブロックする。BP が当たらなければ
@@ -1246,6 +1279,16 @@ fn start_step_session(coords: &StepCoords, initial_mode: &str) -> StepSession {
     );
     let bp_resp = client.recv_until(|m| is_response(m, "setBreakpoints"));
     let bps = bp_resp["body"]["breakpoints"].as_array().expect("breakpoints array");
+    // DIAGNOSTIC (client thread => reliably captured by libtest): show the line we
+    // requested vs the line the backend verified the BP at. If the verified line
+    // differs from the executed line, the hook can never stop there. Emitted before
+    // the `verified` assertion so it appears even when the run later fails.
+    eprintln!(
+        "[bp:{initial_mode}] requested(path-tail={}, line={bp_line}) verified={:?} verified_line={:?}",
+        bp_source_path.rsplit(['/', '\\']).next().unwrap_or(&bp_source_path),
+        bps.first().map(|b| b["verified"].clone()),
+        bps.first().map(|b| b["line"].clone()),
+    );
     assert_eq!(bps.len(), 1, "exactly one breakpoint resolved");
     assert_eq!(
         bps[0]["verified"], true,
