@@ -61,6 +61,14 @@ const BP_PASTA_LINE: u32 = 4;
 struct DapClient {
     reader: BufReader<TcpStream>,
     writer: TcpStream,
+    /// Optional host-status receiver. When the peer (VM host thread) closes the
+    /// socket cleanly before sending an expected frame, the host has exited — the
+    /// generic "peer did not close" panic then hides *why* it exited (a failed
+    /// `exec`, a missing scene, etc.). If wired, the host sends a descriptive
+    /// final-status string just before exiting, and `recv` surfaces it instead of
+    /// the bare panic. This makes host-side failures diagnosable from the client
+    /// panic alone — essential when the failure only reproduces on CI.
+    host_status: Option<mpsc::Receiver<String>>,
 }
 
 impl DapClient {
@@ -73,6 +81,7 @@ impl DapClient {
         Self {
             reader: BufReader::new(stream),
             writer,
+            host_status: None,
         }
     }
 
@@ -87,9 +96,21 @@ impl DapClient {
     }
 
     fn recv(&mut self) -> Value {
-        read_frame(&mut self.reader)
-            .expect("client read must succeed (TEST-ONLY timeout)")
-            .expect("a frame must be present (peer did not close)")
+        match read_frame(&mut self.reader).expect("client read must succeed (TEST-ONLY timeout)") {
+            Some(value) => value,
+            None => {
+                // Clean EOF: the host (VM) thread closed the socket, i.e. it has
+                // exited. Surface its actual final status (a failed `exec`, a
+                // breakpoint that never held, etc.) so the cause is visible from
+                // this panic — instead of the bare "peer did not close".
+                if let Some(rx) = &self.host_status
+                    && let Ok(status) = rx.recv_timeout(Duration::from_secs(5))
+                {
+                    panic!("a frame must be present, but the peer closed first; host {status}");
+                }
+                panic!("a frame must be present (peer did not close)");
+            }
+        }
     }
 
     fn recv_until(&mut self, mut pred: impl FnMut(&Value) -> bool) -> Value {
@@ -1104,48 +1125,68 @@ struct StepSession {
 fn start_step_session(coords: &StepCoords, initial_mode: &str) -> StepSession {
     let (addr_tx, addr_rx) = mpsc::channel::<SocketAddr>();
     let (go_tx, go_rx) = mpsc::channel::<()>();
+    // Host-status channel (see `DapClient::host_status`): the host reports its
+    // final outcome here before exiting, so a host-side failure surfaces in the
+    // client's panic even when it closes the socket first. The label distinguishes
+    // the two step sessions (initial `.lua` vs `.pasta`) in CI logs.
+    let (status_tx, status_rx) = mpsc::channel::<String>();
+    let mode_label = initial_mode.to_string();
 
     let base_for_host = coords.base.clone();
     let chunk_for_host = coords.chunk.clone();
     let generated_for_host = coords.generated_lua.clone();
 
     let host = std::thread::spawn(move || -> Result<(), String> {
-        let runtime = PastaLoader::load_with_config(&base_for_host, RuntimeConfig::new())
-            .map_err(|e| format!("loader must build an enabled-debug runtime: {e}"))?;
-        if !runtime.debug_enabled() {
-            return Err("enabled [debug] must install the backend".to_string());
-        }
-        if runtime.debug_source_map().is_none() {
-            return Err("enabled debug runtime must hold the aggregated source map".to_string());
-        }
+        // Run the host body in an inner closure so its final `Result` (whichever
+        // `?` short-circuited) can be reported on `status_tx` before the thread
+        // exits and drops the runtime (which closes the client socket).
+        let body = || -> Result<(), String> {
+            let runtime = PastaLoader::load_with_config(&base_for_host, RuntimeConfig::new())
+                .map_err(|e| format!("loader must build an enabled-debug runtime: {e}"))?;
+            if !runtime.debug_enabled() {
+                return Err("enabled [debug] must install the backend".to_string());
+            }
+            if runtime.debug_source_map().is_none() {
+                return Err("enabled debug runtime must hold the aggregated source map".to_string());
+            }
 
-        let addr = runtime
-            .debug_local_addr()
-            .ok_or_else(|| "enabled runtime must expose a bound debug addr (port 0)".to_string())?;
-        addr_tx.send(addr).map_err(|_| "addr send failed".to_string())?;
+            let addr = runtime.debug_local_addr().ok_or_else(|| {
+                "enabled runtime must expose a bound debug addr (port 0)".to_string()
+            })?;
+            addr_tx.send(addr).map_err(|_| "addr send failed".to_string())?;
 
-        // (define) scene を**定義**する。BP は未設定なので talk 本体行では止まらない。
-        runtime
-            .exec_named(&generated_for_host, &chunk_for_host)
-            .map_err(|e| format!("scene define exec failed: {e}"))?;
+            // (define) scene を**定義**する。BP は未設定なので talk 本体行では止まらない。
+            runtime
+                .exec_named(&generated_for_host, &chunk_for_host)
+                .map_err(|e| format!("scene define exec failed: {e}"))?;
 
-        // クライアントが BP+configurationDone を終えるまで待つ。
-        go_rx
-            .recv_timeout(WATCHDOG)
-            .map_err(|_| "no go signal before driver exec".to_string())?;
-        // (driver) `__start__` を駆動 -> talk 本体行が実行され BP ヒット。
-        runtime
-            .exec(STEP_DRIVER)
-            .map_err(|e| format!("scene driver exec failed: {e}"))?;
+            // クライアントが BP+configurationDone を終えるまで待つ。
+            go_rx
+                .recv_timeout(WATCHDOG)
+                .map_err(|_| "no go signal before driver exec".to_string())?;
+            // (driver) `__start__` を駆動 -> talk 本体行が実行され BP ヒット。
+            // BP がヒットすれば VM はここで停止しブロックする。BP が当たらなければ
+            // driver はそのまま完走して戻る（= 観測される失敗モードの候補）。
+            runtime
+                .exec(STEP_DRIVER)
+                .map_err(|e| format!("scene driver exec failed: {e}"))?;
 
-        drop(runtime);
-        Ok(())
+            drop(runtime);
+            Ok(())
+        };
+        let result = body();
+        // Report the final outcome regardless of success/failure. On the failing
+        // path this carries the underlying `exec` error (or `Ok(())` when the
+        // driver ran to completion without the breakpoint ever holding the VM).
+        let _ = status_tx.send(format!("[{mode_label}] thread result = {result:?}"));
+        result
     });
 
     let addr = addr_rx
         .recv_timeout(WATCHDOG)
         .expect("host must publish the bound addr before the watchdog");
     let mut client = DapClient::connect(addr);
+    client.host_status = Some(status_rx);
 
     client.send_request(1, "initialize", json!({ "adapterID": "pasta" }));
     let _ = client.recv_until(|m| is_response(m, "initialize"));
