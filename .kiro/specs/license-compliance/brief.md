@@ -68,3 +68,24 @@
 - Output documentation should be human-readable and suitable for publication on README or in release notes
 - Must comply with common open-source practices (SPDX, REUSE, or similar)
 - Should be repeatable and maintainable as dependencies change
+
+## AI Capability Deployment
+
+This specification benefits significantly from strong AI model involvement at multiple phases:
+
+### Phase 1: Gap Analysis (Medium–High Value)
+- **Why**: Assessing the current state (partial deny.toml configuration, no inventory document, mixed license declarations) against industry best practices requires domain expertise in license compliance standards (SPDX, REUSE, SBOM, etc.).
+- **Kiro Command**: Optional `/kiro-validate-gap license-compliance` before design
+- **Benefit**: Rapid identification of missing controls, best-practice precedents, and clear articulation of today's compliance posture
+
+### Phase 2: Design Phase (High Value) ⭐ **Recommended**
+- **Why**: Multiple viable audit approaches exist (cargo-deny strict enforcement, cargo-license enumeration, bespoke Rust AST parsing, SPDX tooling integration). Selecting the right combination requires evaluating trade-offs: accuracy, maintainability, CI/CD integration cost, ecosystem maturity, license classification accuracy across SPDX versions, and future scalability. A strong AI model can synthesize research on current tool versions, compatibility matrices, and evolving open-source best practices.
+- **Kiro Command**: `/kiro-spec-design license-compliance -y`
+- **Benefit**: Well-reasoned, evidence-based technical design that accounts for multiple tool ecosystems, compatibility concerns, and reproducibility; avoids ad-hoc tool selection
+
+### Phase 3: Implementation Phase (Very High Value) ⭐ **Most Critical**
+- **Why**: Audit execution will produce large volumes of raw license metadata (version-specific SPDX tags, transitive dependency trees, exception codes) that must be systematically classified, validated for accuracy, cross-referenced for conflicts, annotated with compliance notes, and synthesized into a professional inventory document with clear human-readable attribution and compatibility guidance. This requires precise categorization, logical deduction of license composition rules (e.g., "MIT OR Apache-2.0" interpretation), and persuasive technical exposition.
+- **Benefit**: Ensures completeness, accuracy, and professional presentation; minimizes errors in license classification; produces documentation that is both defensible and accessible to non-specialists
+
+### Rationale
+The heaviest AI value is at **Implementation**, not Gap Analysis, because the raw audit data is voluminous and its transformation into clear, accurate, legally defensible documentation requires both technical rigor and communication skill. Design is also high-value to avoid selecting suboptimal tools that would later compromise reproducibility or compliance assurance.
