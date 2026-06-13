@@ -145,7 +145,7 @@
 
 1. **C3 責務境界の確定**（Unknown）: `visitors.rs`（AST ビジター群）・`loader/mod.rs`・`runtime/mod.rs` を、既存ディレクトリモジュール流儀（`code_gen/`・`loader/`）に沿ってどの責務軸で分割するか。公開 API（`mod.rs` の `pub use` re-export）を不変に保つサブモジュール構成案を design で確定。
 2. **C2 クラスタ境界の定義**（Constraint）: `runtime_toggle_e2e_test.rs`(1612)・`cue_cmd_test.rs`(961) 等を、`tests/<category>/main.rs`+`mod` 規約のどの粒度で再分割するか。10 本超クレートのサブディレクトリ化方針（structure.md 258–266）との整合。
-3. **C4 順序保証のドキュメント化＋テスト**（Constraint, High）: 抽出後ヘルパーの呼び出し順 `apply→response→event→command` をコードコメント＋（可能なら）順序検証テストで担保する方式を design で確定。`setBreakpoints` 原子境界の正確な行範囲を実装時に再取得。
+3. **C4 順序保証のドキュメント化＋特性化テスト先行**（Constraint, High）: 抽出後ヘルパーの呼び出し順 `apply→response→event→command` をコードコメントで担保しつつ、**解体着手前に当該順序と `setBreakpoints` 原子性を固定する最小限の特性化テスト（characterization test）を先行整備**する（議題4で決定・新規テスト禁止の明示的例外）。既存テストでカバー済みなら流用、不足分のみ追加。解体は「1 ヘルパー抽出 = 1 検証 = 1 コミット」の独立 green・revert 可能な小ステップで実施。`setBreakpoints` 原子境界の正確な行範囲を実装時に再取得。
 4. **インベントリ再スナップショット**（運用 Constraint）: brief→現状の drift（`transport.rs`/`debug/mod.rs` 増大・`debug_integration_test.rs` 新規）を踏まえ、**実装着手時に 600 行超リストと `wiring.rs` mod 行番号を再取得**してから着手する手順を tasks に明記。
 5. **段階検証の粒度とコミット境界**（Constraint）: 「1 ファイル＝1 検証＝1 コミット」を基本とするか、クレート単位でまとめるか。`NoDefaultCurrentDirectoryInExePath` 無効化を各 `cargo` 実行の前段に組み込む運用も明記。
 6. **debug テスト外出し時のポートガード保全**（Constraint, Medium）: `wiring.rs`/`transport.rs`/`session.rs` 等の debug テストは、固定ポート枯渇（`PASTA_DEBUG`/9276）による `AddrInUse` 回避のため `#[ctor]` による環境中和に依存している（既知問題・解決済 `c59ee8d`）。インラインテストを兄弟ファイルへ移動する際、当該 `#[ctor]` ガードと env 前提が**同一クレートのテストビルドに対して引き続き有効**であることを保証する（移動のみ・新規ガード追加なしが原則だが、外出し先からガードが効くモジュールパスかを design/impl で確認）。

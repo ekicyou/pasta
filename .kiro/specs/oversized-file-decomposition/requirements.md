@@ -31,7 +31,7 @@
   - `run_socket_bridge` のループ多重化コアそのものの書き換え
   - TypeScript（vscode 拡張）のテストファイル分割
   - 公開 API シグネチャ・可視性の変更、および可視性変更を伴う `tests/` への完全外部化
-  - 新規テストケースの追加（既存テストの移動・分割のみ）
+  - 新規テストケースの追加（既存テストの移動・分割のみ）。ただし R4 `handle_inbound` の順序保証（`apply→response→event→command`）と `setBreakpoints` 原子性を解体前に固定する最小限の特性化テスト（characterization test）は、純粋リファクタリングの安全網として例外的に許可する
 - **Adjacent expectations**:
   - 上流規約 `.kiro/steering/structure.md`（`#[cfg(test)] #[path]` 規約・命名規則）に準拠する。本仕様は規約を変更せず、適用するのみ。
   - 前例 `pasta_core/src/registry/scene_table_tests.rs`・`pasta_shiori/src/shiori_tests.rs` のパターンを踏襲する。
@@ -75,6 +75,8 @@
 2. When `handle_inbound` の分岐をヘルパー関数へ抽出する時, the 是正作業 shall `apply → response → event → command` の処理順序を保持し、その順序保証をドキュメント化する。
 3. The 是正作業 shall ヘルパー抽出後も、抽出前と同一の入力に対して同一の出力・副作用を生じる（振る舞い不変）。
 4. The 是正作業 shall `run_socket_bridge` のループ多重化コアそのものの書き換えを行わない。
+5. When `handle_inbound` の解体に着手する時, the 是正作業 shall まず既存テストが当該順序（`apply → response → event → command`）と `setBreakpoints` 原子性をカバーしているか確認し、カバーが不足する場合は順序を固定する最小限の特性化テストを追加してからヘルパー抽出に着手する（安全網先行）。
+6. The 是正作業 shall `handle_inbound` の解体を、各々が独立して green かつ revert 可能な小ステップ（1 ヘルパー抽出 = 1 検証 = 1 コミット）で実施する。
 
 ### Requirement 5: 振る舞い不変と段階的検証
 **Objective:** 開発者として、全是正作業を通じてコードベースが回帰なく動作し続けることを保証したい。それにより純粋リファクタリングであることが検証可能になるからである。
