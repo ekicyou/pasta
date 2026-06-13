@@ -100,7 +100,7 @@
 ## 設計合成（Synthesis）— 2026-06-13
 
 ### 設計判断の確定（DD1–DD5、design.md と同期）
-- **DD1 (U2)**: ブランチ削除＝`gh pr merge --squash --delete-branch`（リモート）＋ローカル後始末はハーネス委譲。多重防御で repo `--delete-branch-on-merge` も有効化。
+- **DD1 (U2)**: ブランチ削除＝`gh pr merge --squash --delete-branch`（リモートを API 削除）＋ローカル後始末はハーネス委譲。**スキルは自分のワークツリー／カレントブランチを削除しない／できない**（cwd 内・チェックアウト中で git が構造的に拒否。`git worktree list` 実測で確認: 本セッションは `.claude/worktrees/festive-colden-61e78e` / ブランチ `claude/festive-colden-61e78e`、main はプライマリ worktree）。teardown はハーネスがセッション/タスク境界で実施。マージ成否は API 結果のみで判定し `--delete-branch` のローカル警告と混同しない。多重防御で repo `--delete-branch-on-merge` も有効化。
 - **DD2 (U3)**: `kiro-complete` に Step 0（決定的解決）を新規導入。`origin`/`main` ハードコード撤去。kiro-tasks 撤去で kiro-complete が主要 git-ops スキルになるため移植性が必須化。
 - **DD3 (Req 1.5)**: squash メッセージは `gh pr merge --subject/--body` で供給。本文は `merge-base..HEAD` 履歴＋ spec タイトル要約。方針は workflow.md、実行は kiro-complete。
 - **DD4 (検証)**: 静的整合チェック＋`verify-drift-gate.mjs`＋使い捨てブランチ dry-run の3層。ランタイムテストは非該当。

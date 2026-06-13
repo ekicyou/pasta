@@ -50,7 +50,7 @@ kiro ワークフローの `kiro-start` / `kiro-tasks` / `kiro-spec-complete` �
 
 1. When kiro-complete が完了フローのリモート同期段階に到達したとき, the kiro-complete スキル shall 現在の feature ブランチから PR を作成し、squash 方式でマージする。
 2. The kiro-complete スキル shall デフォルトブランチへの直接 push および手作業 squash-ff-push 儀式を実行しない。
-3. When PR の squash マージが成功したとき, the kiro-complete スキル shall 当該 feature ブランチをローカルおよびリモートから削除する。
+3. When PR の squash マージが成功したとき, the kiro-complete スキル shall リモートの feature ブランチを削除する。ローカルブランチおよびワークツリーの削除は、カレントワークツリーで実行中のため kiro-complete では行わず（構造的に不可）、ハーネスのワークツリー teardown に委ねる。
 4. If PR の作成またはマージが失敗した（コンフリクト／マージ不可／権限不足等）とき, then the kiro-complete スキル shall ブランチを削除せず処理を中断し、開発者へ報告する。
 5. Where 対象が繰り返し仕様（release-workflow 等）の場合, the kiro-complete スキル shall `completed/` への移動をスキップしつつ、リモート同期を PR ベースで実行する。
 6. While 現在のブランチがデフォルトブランチである、または PR 作成が不可能なとき, the kiro-complete スキル shall 警告を出力し、PR 作成・push を行わずローカルコミットを保持したまま継続する（デフォルトブランチへの直接 push は一切行わない）。

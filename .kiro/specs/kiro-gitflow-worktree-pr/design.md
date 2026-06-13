@@ -152,7 +152,7 @@ sequenceDiagram
 
 **Gating decisions**:
 - **PR 可否判定**: 非デフォルトブランチ かつ `{remote}` あり かつ `gh` 認証あり のときのみ PR を作成・マージ。いずれか欠ける場合は警告してスキップ（main 直 push は行わない）。
-- **ブランチ削除**: リモートブランチは `gh pr merge --delete-branch` が削除。ローカルブランチ／ワークツリーの後始末はハーネスへ委譲（カレントワークツリーがチェックアウト中のため、ローカル削除がブロックされても警告のみ）。
+- **ブランチ削除**: リモートブランチは `gh pr merge --delete-branch` が API で削除。**PR マージ成否（API 結果）とローカル後始末の警告を分離する** ── `--delete-branch` のローカル削除試行はカレントワークツリーでブロックされ警告を出すが、これは非致命でありマージ成功を覆さない（Req 2.4 の中断はマージ API 失敗時のみ）。kiro-complete は自分のワークツリー／カレントブランチを削除しない（構造的に不可）。ローカル teardown はハーネスがセッション/タスク境界で実施する。スキルはブランチ名（`feat/`・`claude/...` 等）を問わず「現在ブランチ」で動作する。
 - **squash メッセージ**: `--subject` / `--body` を `merge-base..HEAD` 履歴＋ requirements/design タイトルから構築（方針は `workflow.md` §3、実行は kiro-complete）。
 
 ### Lifecycle Command Flow (after change)
@@ -233,9 +233,10 @@ graph LR
 
 **Responsibilities & Constraints**
 - **Step 0（新規）**: `{remote}`（`origin`→単一→none）と `{default-branch}`（`symbolic-ref`→`main`→`master`→現ブランチ）を決定的解決し、`origin`/`main` ハードコードを撤去（7.1）。
-- **Step 8（置換）**: PR 可否判定後、`gh pr create --base {default-branch} --head {current}` → `gh pr merge --squash --delete-branch --subject … --body …`。成功でリモートブランチ削除、ローカル後始末はハーネス委譲（2.1, 2.3）。
+- **Step 8（置換）**: PR 可否判定後、`gh pr create --base {default-branch} --head {current}` → `gh pr merge --squash --delete-branch --subject … --body …`。成功でリモートブランチ削除。ローカルブランチ／ワークツリーは削除しない（構造的に不可。ハーネス teardown 委譲）（2.1, 2.3）。
 - 直接 push・手作業 squash-ff-push を行わない（2.2）。
-- PR 作成／マージ失敗時はブランチを残し中断・報告（2.4, 7.4）。
+- **マージ成否判定はマージ API の結果のみに基づく**。`--delete-branch` のローカル削除警告は非致命として継続し、Req 2.4 の中断と混同しない。
+- PR 作成／マージ（API）失敗時はブランチを残し中断・報告（2.4, 7.4）。
 - 繰り返し仕様（`release-workflow` 等）は `completed/` 移動をスキップしつつ PR ベース同期（2.5）。
 - default ブランチ上 or PR 不可（remote none/未認証）時は警告して push スキップ、ローカルコミット保持（2.6, 7.2）。
 - リネーム後も DoD ゲート・コミット・アーカイブの振る舞いは不変（8.5）。
@@ -318,7 +319,7 @@ graph LR
 
 | ID | 決定事項 | 内容 | 根拠 |
 |----|---------|------|------|
-| DD1 (U2) | ブランチ削除手段 | 主: `gh pr merge --squash --delete-branch`（リモート削除）。ローカル／ワークツリー後始末はハーネス委譲。副: repo `--delete-branch-on-merge` を多重防御で有効化 | ワークツリー隔離モデルと整合、削除漏れ二重防止 |
+| DD1 (U2) | ブランチ削除手段 | 主: `gh pr merge --squash --delete-branch`（リモートを API で確実削除）。ローカルブランチ／ワークツリーは kiro-complete が**削除しない／できない**（cwd がワークツリー内・カレントブランチがチェックアウト中で git が構造的に拒否）ため、ハーネスがセッション/タスク境界で teardown する。副: repo `--delete-branch-on-merge` を多重防御で有効化 | ワークツリー隔離モデルと整合、削除漏れ二重防止、自己ワークツリー削除の構造的禁止 |
 | DD2 (U3) | kiro-complete の決定的解決 | Step 0 を新規導入し `{remote}`/`{default-branch}` を解決（kiro-start の固定優先順序を再利用）。`origin`/`main` ハードコード撤去 | 移植性（7.1）、kiro-tasks 撤去により kiro-complete が主要 git-ops スキル化 |
 | DD3 (1.5) | squash メッセージ供給 | `gh pr merge --squash --subject --body`。本文は `merge-base..HEAD` 履歴＋ requirements/design タイトルから要約。方針は workflow.md、実行は kiro-complete | 既存メッセージ生成方針を PR 文脈へ移植 |
 | DD4 (検証) | 検証戦略 | ランタイムテスト無し。代替: ①ドキュメント整合の静的チェック（旧名が運用ドキュメントに残らない）②`verify-drift-gate.mjs` パス（パス更新後）③使い捨てブランチでの PR フロー dry-run を受け入れ手順として記録 | コード非変更ゆえ手動受け入れ中心 |
