@@ -3,7 +3,7 @@
 > 純粋リファクタリング（振る舞い不変）。全ステップで `cargo build --workspace` / `cargo test --workspace`（env `NoDefaultCurrentDirectoryInExePath` 無効化前提）を green に保ち、1 ファイル/単位 = 1 検証 = 1 コミットの revert 可能な小ステップで進める。各兄弟テストファイルは `use super::*;`、本番側は `#[cfg(test)] #[path] mod ...;`。正確なファイル割当は design.md「File Structure Plan」を参照。
 
 - [ ] 1. Foundation: 検証ベースラインと是正対象集合の確定
-- [ ] 1.1 テスト棚卸しベースライン捕捉と対象集合確定
+- [x] 1.1 テスト棚卸しベースライン捕捉と対象集合確定
   - `cargo` 実行前に `NoDefaultCurrentDirectoryInExePath` 環境変数を無効化する手順を確立する
   - 是正着手前に全テスト関数名の集合（`cargo test --workspace -- --list` 相当）をベースラインとして記録する
   - 確定インベントリ（design.md / research.md §2.1）と現状再スキャン（`src/` 本番にインライン `#[cfg(test)]` を持つ全ファイル＋純粋肥大本番）の和集合で是正対象ファイル集合を確定する
