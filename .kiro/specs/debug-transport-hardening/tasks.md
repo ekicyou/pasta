@@ -52,7 +52,7 @@ reload バグの根治（中断可能 accept ＋ 同期 teardown join）と防�
   - _Depends: 2.4_
   - _Boundary: Transport tests_
 
-- [ ] 4.2 (P) 同一プロセス reload 結合テスト（runtime/enable レベルの再 bind 成功）
+- [x] 4.2 (P) 同一プロセス reload 結合テスト（runtime/enable レベルの再 bind 成功）
   - enable した runtime を同一プロセスで drop → 再 enable し、同一構成・固定ポートで再 bind が成功する（no-client 経路＝真因）。接続中クライアントを伴う reload も成功する（`SO_REUSEADDR` の TIME_WAIT 防御を確認）。連続 2 回以上の reload が各回成功する
   - ポートは `:0` で OS 割当を capture し同一ポートで teardown→rebind を実施。`#[ctor]` による `PASTA_DEBUG*` env 中和・watchdog bounded-join を流用。スレッド終了の直接検証は 4.1 が所有し、本タスクは結合レベルの rebind 成功を担う
   - 観測: runtime レベルの同一ポート reload が各回緑
