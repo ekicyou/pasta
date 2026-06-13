@@ -61,7 +61,7 @@
   - _Depends: 1.1_
 
 - [ ] 5. kiro-start のハーネスワークツリー委譲整合
-- [ ] 5.1 (P) kiro-start の feat ブランチ生成撤去と default 上 STOP
+- [x] 5.1 (P) kiro-start の feat ブランチ生成撤去と default 上 STOP
   - feat/{feature} 自動生成ロジック（Step 2）を撤去、自前のブランチ/ワークツリー作成をしない
   - 非デフォルト（ハーネス作業ブランチ）上では spec 初期化を実行し現在ブランチへ commit、push しない
   - デフォルトブランチ上実行時は STOP し、ワークツリーでの再実行を促す
