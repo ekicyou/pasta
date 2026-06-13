@@ -174,7 +174,9 @@
 > **【議題1 決定 2026-06-14】**: **Option 2「統合先・公開後」を採用**。安全順序を「main 統合（タグ・PR マージ）→ crates.io 公開 → GitHub Release」へ反転し、不可逆な公開を可逆な統合の後段に置く。これにより「公開済みだが統合不能」の窓が消滅（統合が先・ゲートになる）。統合成功後に公開が失敗した場合は main は既に正しいリリース状態であり、公開リトライ／中断で回復（Req 8.5・10 AC8）。要件側は Req 8.5・8.2・6.1・3.1・10 AC2/6–8 を更新済み。設計フェーズは Stage 順序を「Stage A 準備・ビルド → Stage B 統合（tag+PR merge）→ Stage C 公開（crates.io ∥ Marketplace）→ Stage D GitHub Release」へ再構成すること。
 
 ### ⚠️ 落とし穴3: settings.json／steering がカーブアウト（直 push）前提のまま
-`.claude/settings.json` の `Bash(git push origin main:*)` と `workflow.md` L113 カーブアウト（DD5, kiro-gitflow-worktree-pr 由来）は**リリース直 push を許容する設計**で、Req 10（PR ベース・直 push 禁止）と矛盾する。Req 10 では (a) **タグ push 許可**（例 `Bash(git push origin v*:*)` 等）を追加し、(b) 直 push 許可とカーブアウトを**タグ公開限定に縮退 or 撤去**する必要がある。→ Steering Gate / 設計フェーズで対応。
+`.claude/settings.json` の `Bash(git push origin main:*)` と `workflow.md` L113 カーブアウト（DD5, kiro-gitflow-worktree-pr 由来）は**リリース直 push を許容する設計**で、Req 10（PR ベース・直 push 禁止）と矛盾する。Req 10 では (a) **タグ push 許可**（例 `Bash(git push origin v*:*)` 等）を追加し、(b) 直 push 許可とカーブアウトを**タグ公開限定に縮退 or 撤去**する必要がある。
+>
+> **【議題2 決定 2026-06-14】**: これら周辺設定変更（settings.json 許可・workflow.md カーブアウト改訂・repo merge-commit 有効化）は **release-workflow の繰り返しタスクには含めない一回限りのセットアップ**として扱う。`spawn_task`（チップス）等での別セッション委譲はワークツリー隔離のため不可（別セッションは独自ワークツリーで起動し本ブランチの未コミット状態を継承できない）。よって**本セッション内で、設計確定後（タスク分解の前後）にエージェントが手動で実施**する。Steering Gate でも整合確認。
 
 ## 4. 実装アプローチ評価
 

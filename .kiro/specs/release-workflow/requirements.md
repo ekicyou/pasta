@@ -50,7 +50,7 @@
 
 - **In scope**: Cargo.toml / package.json のバージョン更新、crates.io 公開（5クレート）、VSCode Marketplace 公開、サンプルゴーストビルド、Git タグ・プッシュ、GitHub Release 作成、これらの**実行順序と並行スケジューリング**、ならびに**ワークツリー（非デフォルトブランチ）上での実行と、リリースコミット・タグの PR マージコミット方式（非 squash）による main 統合**
 - **Out of scope**: CI/CD パイプライン統合、クロスプラットフォーム対応、認証トークンの自動設定、pasta_lsp の独立リリース管理、release.ps1 スクリプト自体の修正、**spec 完了の squash-PR 統合フロー**（リリースは別系統のため対象外）、**GitHub ブランチ保護設定そのものの構成**（本仕様は保護下でも成立する手順を定めるが、保護ルールの設定作業は対象外）
-- **Adjacent expectations**: `release.ps1` は既存の成熟スクリプトとしてそのまま利用する。`gh` CLI および `cargo` / `vsce` の認証は事前に設定済みであることを前提とする。フィーチャーブランチ／ワークツリーは Claude Code ハーネスが供給する。リリースの main 統合は **PR ベース**（マージコミット方式 `--merge`、squash を行わない）で行い、将来 GitHub 側で main への直接 push を禁止しても成立させる。なお steering `workflow.md` の「リリースタグ公開のカーブアウト（直接 push 容認）」は本変更に伴い PR ベースへ見直す必要があり、整合は設計フェーズおよび Steering Gate で対応する
+- **Adjacent expectations**: `release.ps1` は既存の成熟スクリプトとしてそのまま利用する。`gh` CLI および `cargo` / `vsce` の認証は事前に設定済みであることを前提とする。フィーチャーブランチ／ワークツリーは Claude Code ハーネスが供給する。リリースの main 統合は **PR ベース**（マージコミット方式 `--merge`、squash を行わない）で行い、将来 GitHub 側で main への直接 push を禁止しても成立させる。なお steering `workflow.md` のリリースカーブアウト改訂、`.claude/settings.json` のタグ push 許可追加・`git push origin main` 許可の縮退、および repo の merge-commit 有効化（必要時）は、**繰り返し実行されるリリース手順には含めない一回限りのセットアップ**として扱い、本 spec の設計確定後（タスク分解の前後）に**手動で実施**する（ワークツリー隔離のため別セッションへは委譲しない）。整合は Steering Gate でも確認する
 
 ---
 
