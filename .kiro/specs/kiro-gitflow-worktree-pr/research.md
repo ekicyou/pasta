@@ -48,7 +48,7 @@
   - ~~**U1**: ワークツリー委譲下で `kiro-start` が `feat/{feature}` ブランチを引き続き作るのか~~ → **解決済み（要件ディスカッション #1）**: 完全ハーネス委譲。kiro スキルはブランチ／ワークツリーを自前で作らず、Claude Code のワークツリー機能が非デフォルト作業ブランチを供給する前提。`kiro-start` の `feat/{feature}` 自動生成は撤去（Req 4.1/4.2 更新）。default ブランチ上で走らせた場合は警告して継続。
   - **U2**: PR マージ後のブランチ削除を `gh pr merge --delete-branch` で行うか、リポジトリ `deleteBranchOnMerge` 設定で行うか（Req 2.3 / Req 6 の連動）。
   - **U3**: `kiro-spec-complete` に決定的解決（Step 0）を新規導入して移植性を `kiro-tasks` と揃えるか、最小改訂に留めるか（Req 7.1 のスコープ）。
-  - **U4**: 繰り返し仕様（release-workflow）が default-branch 上で走る場合の PR フロー（自分自身へ PR は作れない）。default 上のときの分岐をどう定義するか。
+  - ~~**U4**: 繰り返し仕様（release-workflow）が default-branch 上で走る場合の PR フロー~~ → **解決済み（要件ディスカッション #2）**: `kiro-start` は default ブランチ上なら**中断（STOP）**。`kiro-spec-complete` は PR 動作可能なら警告して継続し PR squash マージ、default 上／PR 不可時は**警告して push をスキップ**（main 直 push は一切しない、Req 2.6 追加）。繰り返し仕様も例外にせず PR 化（completed/ 移動はしない）。
 
 ## 3. 実装アプローチ選択肢（Options）
 

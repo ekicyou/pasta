@@ -50,6 +50,7 @@ kiro ワークフローの `kiro-start` / `kiro-tasks` / `kiro-spec-complete` �
 3. When PR の squash マージが成功したとき, the kiro-spec-complete スキル shall 当該 feature ブランチをローカルおよびリモートから削除する。
 4. If PR の作成またはマージが失敗した（コンフリクト／マージ不可／権限不足等）とき, then the kiro-spec-complete スキル shall ブランチを削除せず処理を中断し、開発者へ報告する。
 5. Where 対象が繰り返し仕様（release-workflow 等）の場合, the kiro-spec-complete スキル shall `completed/` への移動をスキップしつつ、リモート同期を PR ベースで実行する。
+6. While 現在のブランチがデフォルトブランチである、または PR 作成が不可能なとき, the kiro-spec-complete スキル shall 警告を出力し、PR 作成・push を行わずローカルコミットを保持したまま継続する（デフォルトブランチへの直接 push は一切行わない）。
 
 ### Requirement 3: kiro-tasks の簡素化（中間統合とimplブランチの撤去）
 
@@ -72,7 +73,7 @@ kiro ワークフローの `kiro-start` / `kiro-tasks` / `kiro-spec-complete` �
 1. The kiro-start スキル shall フィーチャーブランチおよびワークツリーの作成を Claude Code（ハーネス）のワークツリー機能へ委譲し、自前でブランチ／ワークツリーを作成しない。
 2. The kiro-start スキル shall フィーチャーブランチ（`feat/{feature}`）の自動生成ロジックを撤去する。
 3. The kiro-start スキル shall spec 初期化フェーズで push を実行しない。
-4. While 現在のブランチがデフォルトブランチのとき, the kiro-start スキル shall フィーチャーブランチを作成せず、ハーネスが供給する非デフォルトの作業ブランチ（ワークツリー）上での実行を促す旨を警告して継続する。
+4. If 現在のブランチがデフォルトブランチのとき, then the kiro-start スキル shall 処理を中断（STOP）し、ハーネスのワークツリー（非デフォルトの作業ブランチ）上で再実行するよう報告する（デフォルトブランチ上で spec 初期化を進めない）。
 
 ### Requirement 5: kiro-impl の互換性維持
 
