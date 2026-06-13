@@ -44,7 +44,7 @@ reload バグの根治（中断可能 accept ＋ 同期 teardown join）と防�
   - _Boundary: DebugHandle_
 
 - [ ] 4. Validation: テストと無回帰
-- [ ] 4.1 (P) Transport 単体テスト（中断 join・SO_REUSEADDR・接続中 teardown・リーク検出）
+- [x] 4.1 (P) Transport 単体テスト（中断 join・SO_REUSEADDR・接続中 teardown・リーク検出）
   - クライアント未接続で `start` → `shutdown()` + bounded join が有界完了し、リスナースレッドが終了する（watchdog 付き join 完了）。これが 1.4 のリーク検出器：中断可能 accept + 同期 join が無ければ join が完了せず/タイムアウトする形で居残りを検出する
   - enabled transport が `SO_REUSEADDR` 付き bind と双方向フレーミング round-trip を維持。接続中クライアントを drop すると reader を join して return。`listen == None` のゼロコスト無効パスを維持
   - 観測: 上記が緑で、スレッド終了（join 完了）を一次シグナルとして観測できる

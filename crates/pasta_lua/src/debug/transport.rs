@@ -1235,6 +1235,84 @@ mod tests {
         );
     }
 
+    /// R1.3/R2.4 (robustness, Transport unit level): a REPEATED teardown→rebind
+    /// cycle on the SAME fixed port must succeed every time. The production reload
+    /// bug is a SECOND (and Nth) bind onto the SAME port failing because the prior
+    /// listener thread was detached and still held it; a single rebind
+    /// (`drop_synchronously_frees_port_for_plain_rebind`) proves one cycle, but the
+    /// reload contract (R1.3: "最低でも約15秒間隔で2回以上") is about MULTIPLE
+    /// cycles holding deterministically. This drives the no-client teardown path
+    /// through ~3 `Transport::start(Some(P)) → drop` cycles on one OS-assigned port
+    /// and asserts each successive `start` on the SAME port succeeds.
+    ///
+    /// Mechanism under test: the synchronous Drop join (R2.4) makes each rebind
+    /// deterministic — every cycle's listener thread is joined (port released)
+    /// BEFORE `drop` returns, so the next `start` cannot race a still-held port.
+    /// On detached/non-joining teardown the 2nd `start` would fail with `AddrInUse`
+    /// (`os error 10048`); here `start` returning `DebugError::Bind` is the failure
+    /// surface. Each cycle is bounded by the WATCHDOG so a hung teardown fails fast
+    /// instead of stalling CI. We use a `socket2`-built `Transport::start` rebind
+    /// (not a plain bind) deliberately — this exercises the REAL production rebind
+    /// path repeatedly; the masking-aware plain-bind detector is the separate
+    /// `drop_synchronously_frees_port_for_plain_rebind` test.
+    #[test]
+    fn repeated_teardown_rebind_same_port_succeeds() {
+        // Capture an OS-assigned loopback port P via a throwaway transport, then
+        // drop it (synchronous join frees P) so we can reuse the SAME fixed port.
+        let port = {
+            let throwaway = Transport::start(Some("127.0.0.1:0".parse().unwrap()))
+                .expect("throwaway bind must succeed");
+            let p = throwaway
+                .local_addr()
+                .expect("enabled transport must expose its bound addr")
+                .port();
+            assert_ne!(p, 0, "OS must assign a concrete port");
+            drop(throwaway); // synchronous join releases P before the next start
+            p
+        };
+        let fixed: SocketAddr = format!("127.0.0.1:{port}").parse().unwrap();
+
+        // ~3 cycles of start(SAME port) → no client → bounded teardown. Each start
+        // must succeed; a leaked/held listener from the previous cycle would make
+        // the next start fail with DebugError::Bind (AddrInUse / 10048).
+        for cycle in 0..3 {
+            let mut transport = Transport::start(Some(fixed)).unwrap_or_else(|e| {
+                panic!(
+                    "cycle {cycle}: rebind of fixed port {port} must succeed \
+                     (prior cycle's listener was synchronously joined); got {e:?}"
+                )
+            });
+            assert_eq!(
+                transport.local_addr().map(|a| a.port()),
+                Some(port),
+                "cycle {cycle}: must rebind the SAME fixed port",
+            );
+
+            // No client connects → serve() is parked in the interruptible accept
+            // poll loop. Tear down via the bounded watchdog join so a regression
+            // that fails to wind the listener down fails fast (no CI stall) and the
+            // port is provably released before the next cycle's start.
+            let handle = transport.handle.take();
+            transport.shutdown.store(true, Ordering::Release);
+            transport.outbound = None;
+            if let Some(handle) = handle {
+                let (done_tx, done_rx) = std::sync::mpsc::channel();
+                std::thread::spawn(move || {
+                    let _ = done_tx.send(handle.join());
+                });
+                done_rx
+                    .recv_timeout(WATCHDOG)
+                    .unwrap_or_else(|_| panic!(
+                        "cycle {cycle}: listener must wind down within the watchdog \
+                         (no hang) so the port is freed for the next rebind"
+                    ))
+                    .unwrap_or_else(|_| panic!("cycle {cycle}: listener thread must not panic"));
+            }
+            // `transport` is dropped here; the handle was already taken, so Drop's
+            // join is a no-op (no double-join) — the port is already released.
+        }
+    }
+
     // -----------------------------------------------------------------------
     // Test helpers (TEST-ONLY bounded join; production has no timeout)
     // -----------------------------------------------------------------------
