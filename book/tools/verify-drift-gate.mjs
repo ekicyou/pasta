@@ -236,7 +236,7 @@ function testGateWiring() {
     REPO_ROOT,
     '.claude',
     'skills',
-    'kiro-spec-complete',
+    'kiro-complete',
     'SKILL.md',
   );
 

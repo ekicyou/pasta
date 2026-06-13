@@ -1,6 +1,6 @@
 ---
-name: kiro-spec-complete
-description: 'Kiro仕様駆動開発のSpec完了ワークフローを実行する。DoDゲート検証→コミット→completedフォルダ移動→spec.json更新→参照パス修正→ロードマップ更新→スキルドキュメント同期→最終コミット→pushまでを中断なく完遂する。Use when: 実装完了を承認する, 承認してください, 完了を承認, spec承認, approve implementation, kiro承認完了。DO NOT USE when: 実装が完了したのみ（承認の明示がない場合）、タスクが終わっただけ'
+name: kiro-complete
+description: 'Kiro仕様駆動開発のSpec完了ワークフローを実行する。DoDゲート検証→コミット→completedフォルダ移動→spec.json更新→参照パス修正→ロードマップ更新→スキルドキュメント同期→最終コミット→PR作成→squashマージまでを中断なく完遂する。Use when: 実装完了を承認する, 承認してください, 完了を承認, spec承認, approve implementation, kiro承認完了。DO NOT USE when: 実装が完了したのみ（承認の明示がない場合）、タスクが終わっただけ'
 argument-hint: <feature-name>
 ---
 

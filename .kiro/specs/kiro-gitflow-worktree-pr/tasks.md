@@ -34,7 +34,7 @@
   - _Depends: 1.1, 2.1_
 
 - [ ] 3. kiro-complete へのリネームと参照更新
-- [ ] 3.1 kiro-spec-complete スキルを kiro-complete へリネーム
+- [x] 3.1 kiro-spec-complete スキルを kiro-complete へリネーム
   - ディレクトリ .claude/skills/kiro-spec-complete/ → .claude/skills/kiro-complete/
   - frontmatter name: kiro-spec-complete → kiro-complete
   - 後方互換エイリアスを設けない、完了ワークフローの振る舞いは不変
@@ -42,7 +42,7 @@
   - _Requirements: 8.1, 8.2, 8.4, 8.5_
   - _Boundary: kiro-complete_
   - _Depends: 2.2_
-- [ ] 3.2 kiro-spec-complete への全参照を kiro-complete へ更新
+- [x] 3.2 kiro-spec-complete への全参照を kiro-complete へ更新
   - book/tools/verify-drift-gate.mjs L239 のパス要素を kiro-complete へ更新
   - workflow.md・関連スキルの kiro-spec-complete 参照を更新（CLAUDE.md は名指し参照なしを確認）
   - 完了状態: grep kiro-spec-complete が運用ドキュメント/verify-drift-gate.mjs にヒットしない

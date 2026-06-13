@@ -37,7 +37,7 @@ requirements → design → tasks → implementation → implementation-complete
 
 #### 6. Manual Sync Gate（条件付き）
 
-**ルール本体はこのゲートに置く**（権威）。`kiro-spec-complete` はこのゲートを発火・オーケストレーションするのみで、判定ルールを複製しない。
+**ルール本体はこのゲートに置く**（権威）。`kiro-complete` はこのゲートを発火・オーケストレーションするのみで、判定ルールを複製しない。
 
 - **発火条件**: 当該 spec の変更が `doc/spec/` または `book/` に**触れる場合のみ**発火する。
 - **スキップ**: 当該 spec の変更が `doc/spec/` にも `book/` にも触れない場合は、このゲートを**スキップ**する（無関係な spec の完了承認を重くしない）。Gate 1〜5 のみで完了可とする。
