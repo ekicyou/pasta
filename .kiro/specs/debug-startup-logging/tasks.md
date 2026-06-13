@@ -10,7 +10,7 @@
   - _Boundary: enable() ログ点_
 
 - [ ] 2. 検証
-- [ ] 2.1 ログ出力/非出力のユニットテスト追加
+- [x] 2.1 ログ出力/非出力のユニットテスト追加
   - 既存 enable テストに `#[traced_test]` を付与し、有効時に `debug backend listening` と取得した実 local_addr 文字列が出力されることを検証（port 0 で要求値ではなく実ポート確定を確認）
   - 無効時に待ち受け関連ログが一切出ないことを logs_contain の否定で検証
   - バインド失敗時に warn（`debug transport bind failed`）が出て info（`debug backend listening`）が出ないことを検証

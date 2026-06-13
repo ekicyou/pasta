@@ -827,6 +827,7 @@ mod tests {
 
     // --- enable() gate ---
 
+    #[tracing_test::traced_test]
     #[test]
     fn enable_disabled_returns_none_and_no_trace() {
         let lua = mlua::Lua::new();
@@ -840,6 +841,20 @@ mod tests {
             .eval()
             .expect("eval should succeed");
         assert!(debug_is_nil, "disabled gate must not expose std_debug");
+
+        // 3.1 (無効時は無言): the disabled gate is the true zero-cost path — it
+        // opens no port and binds nothing, so NEITHER the success `info` NOR the
+        // failure `warn` must ever be emitted. Verifying both negatives here makes
+        // the previously-unchecked "no_trace" name effective and completes the
+        // output/no-output matrix (design Testing Strategy item 2).
+        assert!(
+            !logs_contain("debug backend listening"),
+            "disabled enable() must emit no listening info (3.1)"
+        );
+        assert!(
+            !logs_contain("debug transport bind failed"),
+            "disabled enable() must emit no bind-failure warn (3.1)"
+        );
     }
 
     #[test]
