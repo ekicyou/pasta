@@ -88,7 +88,7 @@
   - _Boundary: GitHub 設定タスク_
 
 - [ ] 8. 検証（静的整合・ツール・dry-run）
-- [ ] 8.1 静的整合チェックと verify-drift-gate.mjs 通過
+- [x] 8.1 静的整合チェックと verify-drift-gate.mjs 通過
   - grep: 旧名（kiro-tasks / kiro-spec-complete）が運用ドキュメントに残らない、workflow.md §3 に「直接 push」「merge-base squash」「--ff-only」手順が無く PR フロー定義が存在
   - node book/tools/verify-drift-gate.mjs が成功（kiro-complete/SKILL.md パス解決、workflow.md DoD 結線アサート）
   - 完了状態: grep がクリーン、verify-drift-gate.mjs が exit 0
@@ -103,7 +103,7 @@
   - _Depends: 2.2, 7.1_
 
 - [ ] 9. ドキュメント整合性の確認と更新（必須・最終）
-- [ ] 9.1 ドキュメント整合性の確認と更新
+- [x] 9.1 ドキュメント整合性の確認と更新
   - SOUL.md: コアバリュー影響なし（git ワークフロー変更、N/A 確認）
   - doc/spec/・GRAMMAR.md・TEST_COVERAGE.md・クレートREADME: DSL/Lua/API 非変更（N/A）
   - steering/*: workflow.md 改訂済み（本体）。structure.md 等に kiro-tasks/kiro-spec-complete 言及がないことを確認
