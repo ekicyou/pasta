@@ -322,7 +322,9 @@ graph LR
 | DD1 (U2) | ブランチ削除手段 | 主: `gh pr merge --squash --delete-branch`（リモートを API で確実削除）。ローカルブランチ／ワークツリーは kiro-complete が**削除しない／できない**（cwd がワークツリー内・カレントブランチがチェックアウト中で git が構造的に拒否）ため、ハーネスがセッション/タスク境界で teardown する。副: repo `--delete-branch-on-merge` を多重防御で有効化 | ワークツリー隔離モデルと整合、削除漏れ二重防止、自己ワークツリー削除の構造的禁止 |
 | DD2 (U3) | kiro-complete の決定的解決 | Step 0 を新規導入し `{remote}`/`{default-branch}` を解決（kiro-start の固定優先順序を再利用）。`origin`/`main` ハードコード撤去 | 移植性（7.1）、kiro-tasks 撤去により kiro-complete が主要 git-ops スキル化 |
 | DD3 (1.5) | squash メッセージ供給 | `gh pr merge --squash --subject --body`。本文は `merge-base..HEAD` 履歴＋ requirements/design タイトルから要約。方針は workflow.md、実行は kiro-complete | 既存メッセージ生成方針を PR 文脈へ移植 |
-| DD4 (検証) | 検証戦略 | ランタイムテスト無し。代替: ①ドキュメント整合の静的チェック（旧名が運用ドキュメントに残らない）②`verify-drift-gate.mjs` パス（パス更新後）③使い捨てブランチでの PR フロー dry-run を受け入れ手順として記録 | コード非変更ゆえ手動受け入れ中心 |
+| DD4 (検証) | 検証戦略 | ランタイムテスト無し。代替: ①ドキュメント整合の静的チェック（旧名が運用ドキュメントに残らない、**手動ガイダンス**）②`verify-drift-gate.mjs` は **L239 のリネーム追従のみ**（パス更新後の通過確認）③使い捨てブランチでの PR フロー dry-run を受け入れ手順として記録 | コード非変更ゆえ手動受け入れ中心 |
+
+> **スコープ注記（設計ディスカッション #2）**: 不変条件（§3 に直接 push 記述なし・kiro-tasks 不在 等）の**退行ガード機械化は本 spec のスコープ外**（requirements.md のどの要件にも含まれない任意の将来改善）。Static Consistency Checks は手動ガイダンスとして示すに留め、`verify-drift-gate.mjs` への新規アサート追加は行わない（変更は L239 のリネーム追従のみ）。将来必要なら別 spec で機械化を検討する。
 | DD5 (境界) | release タグ公開カーブアウト | §3 を「spec 完了ブランチ統合」に限定し、`git push origin main --tags` 等のタグ公開を禁止対象外と明記。release-workflow 内部手順は不変 | release-workflow の引用・settings.json 許可を有効に保つ |
 
 > **既知リスク（DD5 補足・Out of Boundary）**: release-workflow をハーネスワークツリー（非デフォルトブランチ）上で実行すると、バージョン bump コミットは PR 経由で main へ反映される一方、`git push origin main --tags` はローカル main（bump 未反映の可能性）からタグを push するため、タグとコミットが乖離し得る。本 spec は release-workflow 内部手順を変更しない（Out of Boundary）が、PR ベース化に伴い**この相互作用は別 spec で再検証が必要**である（Revalidation Triggers 参照）。
