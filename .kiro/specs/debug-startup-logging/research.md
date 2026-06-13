@@ -74,7 +74,7 @@
 ### 設計で確定すべき判断（Decisions for design）
 1. **バインド失敗時 warn の発火点（R2.2）**: `mod.rs:638` の `Transport::start(cfg.listen)?` は失敗を `?` で短絡するため、warn を出すには `.map_err(|e| { tracing::warn!(...); e })?` 等で失敗事由（`io::Error`）と試行アドレス（`cfg.listen`）を握ってからログする。`info`（成功）は従来どおり `:639` 以降に置く。配置順で R2.1（失敗時 info を出さない）が自動充足される。
 2. **`local_addr` の `Option` 処理（R1.4）**: 成功経路では必ず `Some`。`if let Some(addr)` で握る（防御的）か、契約上 `expect`/`unwrap` 可とするか。ログ目的なら `if let Some` が無難。
-3. **ログ文言（R1.3 / R2.3）**: 待ち受け info は「デバッグモードで待ち受け開始」と識別でき、loopback `host:port` のみ含む（秘密情報非混入）。失敗 warn は試行アドレス＋失敗事由のみ。具体文言・言語（議題 2 の決定に従う）を design で確定。
+3. **ログ文言（R1.3 / R2.3）**: 待ち受け info は「デバッグモードで待ち受け開始」と識別でき、loopback `host:port` のみ含む（秘密情報非混入）。失敗 warn は試行アドレス＋失敗事由のみ。**言語は簡潔な英語に確定**（議題 2 / 2026-06-13。既存 tracing ログと一貫）。例: info `debug backend listening on 127.0.0.1:9276` / warn `debug transport bind failed on 127.0.0.1:9276: {err}`。具体文言を design で最終確定。
 
 ### Research Needed（設計時に確認）
 - **`#[traced_test]` × 既存 env ガードの整合**: `enable()` を叩くテストは `PASTA_DEBUG` 環境変数の汚染で固定ポート枯渇する既知問題あり（crate 全体に `#[ctor]` 中和ガードが入っているため新テストも自動適用される想定だが、新規ログ検証テスト追加時に再確認）。テストはポート 0 を使用すること。
