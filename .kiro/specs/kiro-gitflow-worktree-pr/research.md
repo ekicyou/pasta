@@ -34,7 +34,7 @@
 |---|---|---|---|
 | **1** workflow.md PR 化 | `workflow.md` §3 全面改訂（L83–139） | 既存 prose 置換 | **Constraint**: 権威ソース。3スキルが参照する単一定義元なので**最初に確定**する必要 |
 | **2** spec-complete PR 化 | `kiro-spec-complete` Step 8（L184–250）/ 繰り返し分岐（L49–62）/ チェックリスト（L267–270）/ エラー回避（L292–310） | Step 8 を `gh pr create`+`gh pr merge --squash` へ置換 | **Constraint**: Step 0 不在（`origin`/`main` ハードコード）。移植性のため決定的解決の導入も要検討。**Unknown**: ブランチ削除手段（`--delete-branch` vs repo 設定） |
-| **3** tasks 簡素化 | `kiro-tasks` Step 5（L112–182）/ Step 6（L184–199）撤去、Core Task（L11–12）/ frontmatter description（L3）/ Output §4–5（L221–226）/ Constraints（L202–210）/ Safety（L243–248）整合 | 大幅削除 + 周辺記述整合 | **Constraint**: description（frontmatter）にも squash/impl 記述があり同期必須 |
+| **3** kiro-tasks 撤去 | `kiro-tasks/` スキルディレクトリ全体を削除（ディスカッション #3 で「簡素化」→「撤去」へ変更）。CLAUDE.md・`workflow.md`・関連スキルの `kiro-tasks` 参照を grep して整理 | スキル削除 + 参照整理 | **Constraint**: タスク生成は `/kiro-spec-tasks -y` 直接実行へ移行。tasks.md commit は kiro-impl / kiro-spec-complete が拾う。**Research Needed**: `kiro-tasks` 参照箇所の網羅（grep `kiro-tasks`） |
 | **4** kiro-start 整合 | `kiro-start` Step 2（L65–87）/ frontmatter description（L3）/ Constraints（L144） | branch 方針の注記更新 | **Unknown（要設計判断）**: ワークツリー委譲下で `feat/{feature}` を**今後も作るのか**。1 feature=1 branch の起点をどこが用意するか |
 | **5** kiro-impl 注記 | `kiro-impl/SKILL.md` | 注記追加のみ | **Low**: 機能変更なし |
 | **6** GitHub squash 限定 | リポジトリ設定（コードでなく構成） | `gh repo edit` タスク化 | **Missing**: 設定作業そのものは未実施。タスク化が必要 |
@@ -79,7 +79,7 @@
 ## 5. 設計フェーズへの推奨（Recommendations）
 
 ### 推奨アプローチ
-**Option B（権威ソース改訂 + `kiro-spec-complete` への決定的解決統一）を軸に、Option C の「workflow.md を唯一の手順実体に」要素を部分採用**するのが、Req 1（単一定義元）・Req 7（移植性）を同時に満たし保守コストを下げる。改訂順序は厳守：**① workflow.md §3 → ② kiro-spec-complete → ③ kiro-tasks → ④ kiro-start → ⑤ kiro-impl 注記 → ⑥ GitHub 設定タスク**。
+**Option B（権威ソース改訂 + `kiro-spec-complete` への決定的解決統一）を軸に、Option C の「workflow.md を唯一の手順実体に」要素を部分採用**するのが、Req 1（単一定義元）・Req 7（移植性）を同時に満たし保守コストを下げる。改訂順序は厳守：**① workflow.md §3 → ② kiro-spec-complete → ③ kiro-tasks 撤去＋参照整理 → ④ kiro-start（feat ブランチ生成撤去・default 上 STOP） → ⑤ kiro-impl 注記 → ⑥ GitHub 設定タスク**。
 
 ### 設計で決すべき判断（Carry-forward）
 - **U1**: `kiro-start` は `feat/{feature}` を作り続けるか／ワークツリー前提に委ねるか。→ 「1 feature=1 branch=1 PR」の branch 起点を誰が用意するかを設計で確定（Req 3.4 / Req 4 と直結）。
