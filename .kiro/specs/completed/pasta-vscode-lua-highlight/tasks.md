@@ -1,7 +1,7 @@
 # 実装計画
 
-- [ ] 1. 基盤: 注入文法テストのための結線基盤を整備する
-- [ ] 1.1 テスト専用 vendored lua 文法を導入する
+- [x] 1. 基盤: 注入文法テストのための結線基盤を整備する
+- [x] 1.1 テスト専用 vendored lua 文法を導入する
   - VS Code 組み込み `source.lua` がテスト環境に存在しないため、`source.lua` として登録可能なテスト専用の最小 Lua 文法フィクスチャを editors/vscode 配下に追加する
   - vendored Lua 文法のライセンス表記ファイルを併せて追加する（出所・ライセンス条項を明記）
   - フィクスチャは Lua のキーワード・文字列・コメントを区別する最小スコープを付与し、ランタイムには同梱しない（テスト専用）
@@ -9,7 +9,7 @@
   - _Requirements: 1.2_
   - _Boundary: Lua Injection Grammar_
 
-- [ ] 1.2 grammar テストの registry を注入対応へ拡張する
+- [x] 1.2 grammar テストの registry を注入対応へ拡張する
   - vscode-textmate の `Registry` を `getInjections('source.pasta') → ['pasta-lua.injection']` を返すよう構成し、注入が実際に行使される結線にする
   - `loadGrammar` が `source.pasta`・`pasta-lua.injection`・`source.lua`（1.1 の vendored fixture）の3文法を解決できるよう拡張する
   - 既存の単一文法ベースの `tokenizeLine` ヘルパ経路を壊さず、注入を伴う行トークナイズが可能な検証経路を用意する
@@ -18,8 +18,8 @@
   - _Boundary: Lua Injection Grammar_
   - _Depends: 1.1_
 
-- [ ] 2. コア: Lua ブロック本文への source.lua 注入文法を実装する
-- [ ] 2.1 注入文法ファイルを新規作成し拡張へ登録する
+- [x] 2. コア: Lua ブロック本文への source.lua 注入文法を実装する
+- [x] 2.1 注入文法ファイルを新規作成し拡張へ登録する
   - `meta.embedded.block.lua.content` スコープ配下にのみ `source.lua` を注入する VS Code 注入文法ファイルを新規作成する（`injectionSelector` は content 限定・`L:` 左優先）
   - 拡張マニフェストの文法コントリビューションへ、当該注入文法を `injectTo: ["source.pasta"]` で登録する
   - 共有 SSOT 文法（pasta 本体）およびセマンティックトークン凡例の登録は一切変更しない（読み取り標的のみ）
@@ -28,7 +28,7 @@
   - _Boundary: Lua Injection Grammar_
   - _Depends: 1.2_
 
-- [ ] 2.2 注入着色とフェンス保持・非注入境界を検証するテストを追加する
+- [x] 2.2 注入着色とフェンス保持・非注入境界を検証するテストを追加する
   - ```` ```lua ```` ブロック本文の `print("hello")` に `source.lua` 系スコープが付与されることを検証する（本文 Lua 着色）
   - 言語名なしフェンス（```` ``` ````）で開始するブロック本文にも Lua 着色が注入されることを検証する
   - 開始/終了フェンス行に pasta スコープ（フェンス句読点・言語名スコープ）が保持されることを検証する
@@ -38,8 +38,8 @@
   - _Boundary: Lua Injection Grammar_
   - _Depends: 2.1_
 
-- [ ] 3. コア: セマンティックトークン codeBlock をフェンス行限定へ縮小する
-- [ ] 3.1 (P) コードブロックトークン出力をフェンス行のみへ変更する
+- [x] 3. コア: セマンティックトークン codeBlock をフェンス行限定へ縮小する
+- [x] 3.1 (P) コードブロックトークン出力をフェンス行のみへ変更する
   - Lua ブロックのトークン生成を、ブロック全域を覆う単一 `codeBlock` 出力から、開始フェンス行と終了フェンス行のみへ `codeBlock` を出力する実装へ変更する
   - 本文行（開始フェンス行と終了フェンス行の間）には `codeBlock` を一切出力しない
   - 他の visitor・他トークン種別・凡例（種別の並び順・`CODE_BLOCK` の凡例位置）には一切手を加えない
@@ -48,7 +48,7 @@
   - _Requirements: 3.1, 3.2, 3.3, 4.2, 4.4_
   - _Boundary: CodeBlock Token Narrowing_
 
-- [ ] 3.2 (P) フェンス限定化と無回帰を検証するユニットテストを追加する
+- [x] 3.2 (P) フェンス限定化と無回帰を検証するユニットテストを追加する
   - 開始/終了フェンス行に `codeBlock` トークンが出力されることを検証する
   - 単数および複数本文行のブロックで、すべての本文行に `codeBlock` が無くフェンス2行のみに出力されることを検証する
   - Lua ブロックと pasta 要素（シーン・アクター・単語）が混在する文書で、`codeBlock` 以外のトークン列が変更前と同一であることを検証する
@@ -58,8 +58,8 @@
   - _Boundary: CodeBlock Token Narrowing_
   - _Depends: 3.1_
 
-- [ ] 4. 検証: 無回帰と合成可視性を最終確認する
-- [ ] 4.1 既存スイートと book ハイライト無回帰を確認する
+- [x] 4. 検証: 無回帰と合成可視性を最終確認する
+- [x] 4.1 既存スイートと book ハイライト無回帰を確認する
   - pasta_lsp の `cargo test` と VS Code 拡張の grammar/unit/e2e テストスイートを全実行し、全パスを確認する
   - book ハイライタ（tokenizer / scope-map / highlight-html）のテストを実行し、SSOT 文法・book 未改変により出力が不変であることを確認する
   - Lua ブロック外の pasta 固有ハイライトおよび Lua ブロック無し文書のセマンティックトークン出力が導入前と同一であることを、既存スイートのグリーンで担保する
@@ -68,10 +68,15 @@
   - _Requirements: 4.1, 4.2, 4.3, 4.5, 5.1, 5.3_
   - _Depends: 2.2, 3.2_
 
-- [ ] 4.2 実 VS Code での合成可視性を目視確認する（DoD）
+- [x] 4.2 実 VS Code での合成可視性を目視確認する（DoD）
   - 実 VS Code で `.pasta` ファイルを開き、Lua ブロック本文が Lua 文法の色（キーワード・文字列・コメント・数値・関数名の区別）で表示されることを目視確認する
   - フェンス外の pasta 固有ハイライトが本機能導入前と変化していないことを目視確認する
   - 追加のコマンド実行やモード切替なしに着色が適用されていることを目視確認する
   - 完了条件: 上記の合成可視性が実エディタ上で確認され、本機能の完了条件（DoD）を満たす
   - _Requirements: 1.3, 3.3_
   - _Depends: 4.1_
+
+## Implementation Notes
+- 1.1 の vendored test lua fixture（book 由来）は backtick `` ` `` を `string.quoted.double.lua` の文字列デリミタとして扱う。このため注入下では終端フェンス ```` ``` ```` が lua 文字列として飲み込まれる。これは**テスト fixture の制約であって実ランタイムの欠陥ではない**（実 Lua / VS Code 組み込み source.lua に backtick 文字列は無い）。終端フェンスのスコープ保持は host SSOT 文法の end ルールが支配し注入文法と独立のため、2.2 では終端フェンス検証を非注入経路で実施。開始フェンス＋言語名保持は注入経路で検証済み。
+- grammar テストの実行時 `__dirname` は esbuild バンドル先 `out/test`。文法/fixture は editors/vscode ルート相対（`..`/`..`/`syntaxes` 等）で解決する。
+- **parser の `CodeBlock.span.end_line` は終端フェンスの1行先を指す**（`end_byte` は 0-based exclusive で末尾 `\n` の次を指すため）。終端フェンス行はバイト範囲（`end_byte - 1` を含む最終行）から導出する。3.1 実装は `last_line_in_byte_range` ＋ `add_full_line_token` の private helper でこれを処理。**3.2 のテストは終端フェンス行を `end_line` ではなくバイト導出行で検証すること。** 設計の Implementation Notes の「add_token_from_span 単一行経路の再利用」案は end_line 誤前提のため非採用（契約=どの行に codeBlock が乗るかは充足）。

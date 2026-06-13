@@ -1,0 +1,10 @@
+{
+    "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+    "scopeName": "pasta-lua.injection",
+    "injectionSelector": "L:meta.embedded.block.lua.content",
+    "patterns": [
+        {
+            "include": "source.lua"
+        }
+    ]
+}

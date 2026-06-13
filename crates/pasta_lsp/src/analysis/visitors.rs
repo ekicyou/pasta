@@ -107,9 +107,70 @@ impl super::AnalysisEngine {
     }
 
     fn visit_code_block(cb: &CodeBlock, source: &str, tokens: &mut Vec<RawToken>) {
-        if cb.span.is_valid() {
-            Self::add_token_from_span(&cb.span, source, token_type::CODE_BLOCK, 0, tokens);
+        if !cb.span.is_valid() {
+            return;
         }
+        // Emit a `codeBlock` token ONLY on the opening fence line and the closing
+        // fence line. Body lines (between the fences) get no token, so that an
+        // editor-side injection grammar can colorize the body as Lua.
+        //
+        // Note: the parser's `cb.span` covers the whole block, but its `end_line`
+        // lands on the position *after* the closing fence's trailing newline (i.e.
+        // the start of the next line), not on the closing fence line itself.
+        // Derive the actual closing fence line from the span's byte range instead.
+        let open_fence_line = cb.span.start_line;
+        let close_fence_line = Self::last_line_in_byte_range(source, cb.span.end_byte, open_fence_line);
+
+        Self::add_full_line_token(open_fence_line, source, token_type::CODE_BLOCK, 0, tokens);
+        // A real fenced block has distinct open/close fence lines. Guard against a
+        // degenerate single-line span to avoid emitting a duplicate token.
+        if close_fence_line != open_fence_line {
+            Self::add_full_line_token(close_fence_line, source, token_type::CODE_BLOCK, 0, tokens);
+        }
+    }
+
+    /// Find the closing fence line for a code block: the largest (1-based) line
+    /// number whose line start byte is strictly less than `end_byte`, i.e. the
+    /// last line that actually contains span content. Falls back to `min_line`
+    /// when the range is degenerate.
+    fn last_line_in_byte_range(source: &str, end_byte: usize, min_line: usize) -> usize {
+        if end_byte == 0 {
+            return min_line;
+        }
+        // The last content byte is end_byte - 1; the line containing it is the
+        // closing fence line. Walk forward counting newlines up to that byte.
+        let last_byte = end_byte - 1;
+        let bytes = source.as_bytes();
+        let limit = last_byte.min(bytes.len());
+        let mut line = 1usize;
+        for &b in &bytes[..limit] {
+            if b == b'\n' {
+                line += 1;
+            }
+        }
+        line.max(min_line)
+    }
+
+    /// Emit a token covering the entire content of a single (1-based) line.
+    /// Used for code-block fence lines, where the whole fence line is highlighted.
+    fn add_full_line_token(
+        line: usize,
+        source: &str,
+        token_type: u32,
+        modifiers: u32,
+        tokens: &mut Vec<RawToken>,
+    ) {
+        let line_text = get_line_text(source, line);
+        if line_text.is_empty() {
+            return;
+        }
+        tokens.push(RawToken {
+            line: (line - 1) as u32,
+            start_char: 0,
+            length: utf8_len_to_utf16(line_text),
+            token_type,
+            modifiers,
+        });
     }
 
     fn visit_var_set(vs: &VarSet, source: &str, tokens: &mut Vec<RawToken>) {
@@ -136,6 +197,12 @@ impl super::AnalysisEngine {
         let mut cursor = 0usize; // byte offset within span_text
 
         // 1) Marker: ＄＊ or ＄ (variable marker with optional global prefix)
+        //
+        // 健全な var_set 行は必ずマーカーで始まる。span_text がどのマーカーでも
+        // 始まらない場合、span がこの行に整合していない（部分パースのチャンク相対
+        // span がフルソースの別行に当たった等）ため、安全に何も出さず打ち切る。
+        // これを fallback で `$` 等にしてしまうと cursor が span_text 長を超え、
+        // 後続の `span_text[cursor..]` がパニックする。
         let marker = match vs.scope {
             VarScope::Global => {
                 // Try ＄＊ first, then $*
@@ -145,15 +212,19 @@ impl super::AnalysisEngine {
                     "$*"
                 } else if span_text.starts_with("＄") {
                     "＄"
-                } else {
+                } else if span_text.starts_with("$") {
                     "$"
+                } else {
+                    return;
                 }
             }
             _ => {
                 if span_text.starts_with("＄") {
                     "＄"
-                } else {
+                } else if span_text.starts_with("$") {
                     "$"
+                } else {
+                    return;
                 }
             }
         };
@@ -802,17 +873,34 @@ impl super::AnalysisEngine {
         }
     }
 
+    /// `byte` を `[0, text.len()]` に収め、UTF-8 文字境界まで切り下げる。
+    /// これにより `text[..byte]` / `text[byte..]` のバイトスライスが
+    /// マルチバイト文字の途中で割れてパニックすることがなくなる。
+    ///
+    /// span のバイトオフセットは完全パース経路ではフルソース座標で行に整合
+    /// するが、部分パース（`parse_str_partial`）のフォールバック経路では
+    /// チャンク相対座標になり、対象行の外やマルチバイト文字の途中を
+    /// 指しうる。本ヘルパーでどちらの経路でも安全に描画できるようにする。
+    fn safe_boundary(text: &str, byte: usize) -> usize {
+        let mut b = byte.min(text.len());
+        while b > 0 && !text.is_char_boundary(b) {
+            b -= 1;
+        }
+        b
+    }
+
     /// span の開始行テキストと、行内に切り詰めた span スライスを取り出す。
     /// 戻り値: (line_text, span_text, span_start_in_line)
+    ///
+    /// span_start_in_line / span_end_in_line は char 境界へスナップし、
+    /// かつ start <= end を保証する（不整合な span でもスライスが panic しない）。
     fn span_line_window<'s>(span: &Span, source: &'s str) -> (&'s str, &'s str, usize) {
         let line = span.start_line;
         let line_text = get_line_text(source, line);
         let line_start = line_byte_offset(source, line);
-        let span_start_in_line = span.start_byte.saturating_sub(line_start);
-        let span_end_in_line = span
-            .end_byte
-            .saturating_sub(line_start)
-            .min(line_text.len());
+        let span_end_in_line = Self::safe_boundary(line_text, span.end_byte.saturating_sub(line_start));
+        let span_start_in_line =
+            Self::safe_boundary(line_text, span.start_byte.saturating_sub(line_start)).min(span_end_in_line);
         (
             line_text,
             &line_text[span_start_in_line..span_end_in_line],
@@ -856,11 +944,10 @@ impl super::AnalysisEngine {
             let line = span.start_line;
             let line_text = get_line_text(source, line);
             let line_start = line_byte_offset(source, line);
-            let start_in_line = span.start_byte.saturating_sub(line_start);
-            let end_in_line = span
-                .end_byte
-                .saturating_sub(line_start)
-                .min(line_text.len());
+            let end_in_line =
+                Self::safe_boundary(line_text, span.end_byte.saturating_sub(line_start));
+            let start_in_line =
+                Self::safe_boundary(line_text, span.start_byte.saturating_sub(line_start));
             if start_in_line >= end_in_line {
                 return;
             }
@@ -879,13 +966,14 @@ impl super::AnalysisEngine {
                 let line_start = line_byte_offset(source, line_num);
 
                 let (start_in_line, end_in_line) = if line_num == span.start_line {
-                    (span.start_byte.saturating_sub(line_start), line_text.len())
+                    (
+                        Self::safe_boundary(line_text, span.start_byte.saturating_sub(line_start)),
+                        line_text.len(),
+                    )
                 } else if line_num == span.end_line {
                     (
                         0,
-                        span.end_byte
-                            .saturating_sub(line_start)
-                            .min(line_text.len()),
+                        Self::safe_boundary(line_text, span.end_byte.saturating_sub(line_start)),
                     )
                 } else {
                     (0, line_text.len())

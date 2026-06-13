@@ -72,6 +72,13 @@
                 "language": "pasta",
                 "scopeName": "source.pasta",
                 "path": "./syntaxes/pasta.tmLanguage.json"
+            },
+            {
+                "scopeName": "pasta-lua.injection",
+                "path": "./syntaxes/pasta-lua-injection.tmLanguage.json",
+                "injectTo": [
+                    "source.pasta"
+                ]
             }
         ],
         "semanticTokenTypes": [

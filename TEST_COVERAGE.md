@@ -139,6 +139,7 @@
 | 機能                             | テストファイル                | 状態   | 説明                                              |
 | -------------------------------- | ----------------------------- | ------ | ------------------------------------------------- |
 | セマンティックトークン識別       | `semantic_token_test.rs`      | ✅ 完了 | 9テスト（17トークンタイプ）                       |
+| Luaコードブロック codeBlock フェンス限定化 | `code_block_token_test.rs` | ✅ 完了 | 6テスト（pasta-vscode-lua-highlight・開始/終了フェンス行のみ出力・本文行非出力・無回帰・凡例不変ガード） |
 | 全角/半角マーカー同等認識        | `fullwidth_halfwidth_test.rs` | ✅ 完了 | 5テスト                                           |
 | 日本語識別子トークン化           | `japanese_identifier_test.rs` | ✅ 完了 | 5テスト                                           |
 | UTF-8→UTF-16位置変換             | `utf16_conversion_test.rs`    | ✅ 完了 | 12テスト（サロゲートペア含む）                    |
@@ -251,11 +252,11 @@
 | pasta_dsl    | 239       | 239       | 0     | 優秀（cue_cmd 63テスト含む、review-improvement-loop で ParseError API・式 AST 33テスト追加） |
 | pasta_core   | 105       | 105       | 0     | ⭐⭐⭐⭐⭐ 優秀（review-improvement-loop で境界回帰38テスト追加） |
 | pasta_lua    | 1240      | 1240      | 0     | 優秀（cue_command_passthrough 5テスト・mocks 8テスト含む、review-improvement-loop で code_gen 直接ユニット31・enc-log-search 38・FFI 長ガード回帰2・loader-core 27＋junction 回帰1・loader-io 21＋ハードニング回帰4・runtime API 28＋log 深さゲート回帰2＋境界ペア2・sakura_script エッジケース21・debug-core 未到達経路14＋Content-Length 上限ガード回帰1・debug-dap/breakpoints 劣化経路10・scopes frameId オーバーフロー飽和回帰1・debug-hook/inspect 未到達経路10・debug-session stop_loop ルーティング/純粋判定12＋scopes 飽和回帰1・debug-source_map 未到達経路11＋stale 残留是正回帰1・debug-wiring 未到達経路13テスト追加 1240/0） |
-| pasta_lsp    | 112       | 112       | 0     | ⭐⭐⭐⭐⭐ 優秀（review-improvement-loop 3.40 で var_set トークン・コメント走査ほか18テスト追加 92→110、3.41 で逆転 range ハードニング回帰＋敵対的入力コーパス2テスト追加 110→112） |
+| pasta_lsp    | 118       | 118       | 0     | ⭐⭐⭐⭐⭐ 優秀（review-improvement-loop 3.40 で var_set トークン・コメント走査ほか18テスト追加 92→110、3.41 で逆転 range ハードニング回帰＋敵対的入力コーパス2テスト追加 110→112、pasta-vscode-lua-highlight で codeBlock フェンス限定化6テスト追加 112→118） |
 | pasta_shiori | 157       | 157       | 0     | ⭐⭐⭐⭐⭐ 優秀（ShioriTestEnv・X-Pasta-Time、review-improvement-loop 3.35/3.37 で windows.rs FFI 層・エラーパス・HGLOBAL リーク回帰・スタック安全 37 テスト追加 120→157） |
 | pasta_sample_ghost | 38  | 38        | 0     | 優秀（review-improvement-loop 3.44/3.45 でスクリプト整合・画像構造ほか追加。Rust 実測 38/0） |
-| pasta-vscode | 135       | 135       | 0     | ⭐⭐⭐⭐⭐ 優秀（tmGrammar 27＋debugAdapterFactory 16＋sourcePresentationToggle 17＋vscodeModules 45＋e2e 30 — npm run test 実測） |
-| **合計**     | **2091**  | **2091**  | **0** | **100%パス率（Rust workspace 1956＋vscode 135 — 2026-06-12 実測。Lua spec 598 件は lua_unittest_runner 経由で workspace 数値に内包）** |
+| pasta-vscode | 141       | 141       | 0     | ⭐⭐⭐⭐⭐ 優秀（tmGrammar 33[pasta-vscode-lua-highlight 注入着色6テスト追加 27→33]＋debugAdapterFactory 16＋sourcePresentationToggle 17＋vscodeModules 45＋e2e 30 — npm run test 実測） |
+| **合計**     | **2103**  | **2103**  | **0** | **100%パス率（Rust workspace 1962＋vscode 141 — 2026-06-13 実測。Lua spec 598 件は lua_unittest_runner 経由で workspace 数値に内包）** |
 
 ---
 
