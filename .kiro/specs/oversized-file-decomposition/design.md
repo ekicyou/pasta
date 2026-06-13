@@ -391,8 +391,13 @@ fn route_command(
 
 ## Testing Strategy
 
+### Test Inventory Baseline（移動不変の安全網・C1/C2 必須）
+- 是正着手**前に一度** `cargo test --workspace -- --list` でテスト関数の完全な棚卸し（テスト名の集合）をベースラインとして捕捉する。
+- C1/C2 の各移動ステップ後に再取得し、ベースラインとの**差分がゼロ**（テスト名集合が不変・追加削除なし）であることを確認する。これにより「移動先 `mod` 登録漏れでテストが走らない」「テストの暗黙的欠落・改名」を全 WS green の裏で見逃さない。
+- 例外: C4 の順序固定特性化テスト 1 本のみ、ベースラインに対する**唯一の許容追加**として明示記録する。
+
 ### Unit / Module Tests（既存テストの保全が主目的）
-- C1: 各本番ファイルの兄弟外出し後、当該テストモジュールの**テスト名・件数が移動前と一致**することを `cargo test --workspace` の集計で確認（例: `session_*_tests`・`dap_*_tests`・`transpiler_tests`）。
+- C1: 各本番ファイルの兄弟外出し後、当該テストモジュールの**テスト名・件数が移動前と一致**することを上記ベースライン差分で確認（例: `session_*_tests`・`dap_*_tests`・`transpiler_tests`）。
 - C3: `cargo check -p pasta_lua` / `-p pasta_lsp` で split-`impl` の private 参照がコンパイルを通ることを早期確認。
 
 ### Integration Tests
