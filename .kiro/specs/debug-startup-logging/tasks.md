@@ -1,7 +1,7 @@
 # Implementation Plan
 
 - [ ] 1. デバッグ起動ログの実装
-- [ ] 1.1 待ち受け成功 info ログとバインド失敗 warn ログを enable() に追加
+- [x] 1.1 待ち受け成功 info ログとバインド失敗 warn ログを enable() に追加
   - 有効ゲート通過後・local_addr 取得後に、実バインドアドレスを含む info ログ（メッセージ `debug backend listening`、`addr` 構造化フィールド）を 1 件出力する
   - Transport::start 失敗時に、試行アドレスと失敗事由を含む warn ログ（メッセージ `debug transport bind failed`、`addr` / `error` フィールド）を 1 件出力し、DebugError::Bind の伝播挙動は変えない（cfg.listen は Option のため Some を分割代入してから Display 出力）
   - 無効時の早期 return 経路には一切手を入れず、ゼロコスト・無言を維持する
