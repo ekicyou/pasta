@@ -13,7 +13,7 @@
   - _Boundary: workflow.md §3_
 
 - [ ] 2. kiro-complete の PR 化と決定的解決
-- [ ] 2.1 kiro-spec-complete に Step 0（決定的解決）を導入
+- [x] 2.1 kiro-spec-complete に Step 0（決定的解決）を導入
   - {remote}（origin→単一→none）と {default-branch}（symbolic-ref→main→master→現ブランチ）を固定優先順序で解決
   - origin/main のハードコードを撤去
   - 完了状態: kiro-spec-complete のリモート操作が origin/main ハードコードに依存しない

@@ -64,6 +64,45 @@ argument-hint: <feature-name>
 
 ## 手順
 
+### ステップ0: 決定的解決（portable context）
+
+リモート操作で用いる `{remote}` と `{default-branch}` を、**固定優先順序で1回だけ決定的に解決**する。各値はちょうど1つの結果（または明示的なスキップ）に収束させ、推測しない。解決した値は以降のステップ（特にステップ8）で `origin`/`main` のハードコードの代わりに再利用する。この優先順序は `kiro-start` の「Step 0: Resolve portable context」と整合している。
+
+1. **デフォルトリモート（`{remote}`）**: `git remote` を実行し、以下の固定ルールを適用する。
+   - `origin` が存在する → `{remote}` = `origin`。
+   - そうでなく、リモートがちょうど1つだけ存在する → `{remote}` = そのリモート。
+   - それ以外（リモートなし、または `origin` を含まない複数リモート）→ `{remote}` = none。リモート操作はすべてスキップ扱いとする（一度だけ警告する）。
+
+   ```powershell
+   $remotes = git remote
+   if ($remotes -contains "origin") { $remote = "origin" }
+   elseif (@($remotes).Count -eq 1) { $remote = $remotes }
+   else { $remote = $null }  # none: リモート操作はスキップ
+   ```
+
+2. **デフォルトブランチ（`{default-branch}`）**: 以下の固定優先順序で決定的に解決する。
+   - `{remote}` が解決済みなら、`git symbolic-ref --quiet --short refs/remotes/{remote}/HEAD` を読み、先頭の `"{remote}/"` プレフィックスを除去した名前。
+   - それが空で、ローカルに `main` ブランチが存在する → `{default-branch}` = `main`。
+   - そうでなく、ローカルに `master` ブランチが存在する → `{default-branch}` = `master`。
+   - それ以外 → `{default-branch}` = 現在のブランチ。
+
+   ```powershell
+   $defaultBranch = $null
+   if ($remote) {
+     $defaultBranch = git symbolic-ref --quiet --short "refs/remotes/$remote/HEAD"
+     if ($defaultBranch) { $defaultBranch = $defaultBranch -replace "^$remote/", "" }
+   }
+   if (-not $defaultBranch) {
+     if (git show-ref --verify --quiet "refs/heads/main") { $defaultBranch = "main" }
+     elseif (git show-ref --verify --quiet "refs/heads/master") { $defaultBranch = "master" }
+     else { $defaultBranch = git branch --show-current }
+   }
+   ```
+
+   `{default-branch}` は1つの具体的なブランチ名として確定し、以降で再評価しない。
+
+> **以降のステップは、`origin`/`main` のハードコードではなく、ここで解決した `{remote}` / `{default-branch}` を用いる前提とする。** `{remote}` が none の場合、リモート同期（ステップ8）は安全にスキップし警告する。
+
 ### ステップ1: DoD（完了基準）ゲート検証
 
 `.kiro/steering/workflow.md` の「完了基準（DoD）」セクションを読み込み、**workflow.md が定義する全ゲートを順に検証**する。判定ルールの本体は workflow.md（権威）にあり、このスキルは発火・オーケストレーションのみを行いルールを複製しない。
@@ -185,58 +224,60 @@ git commit -m "chore({feature-name}): spec完了・アーカイブ"
 
 > **権威的ソース**: workflow.md「実装完了時アクション > 3. リモート同期（ブランチ戦略）」に従う。
 
+> **前提**: 本ステップは `origin`/`main` をハードコードせず、ステップ0で解決した `{remote}` / `{default-branch}` を用いる。`{remote}` が none の場合はリモート同期を安全にスキップし、一度だけ警告する。
+
 確認不要。現在のブランチを判定し、以下を中断なく実行する。
 
 ```powershell
 $branchA = git rev-parse --abbrev-ref HEAD
 ```
 
-#### ケース1: 現在のブランチが main
+#### ケース1: 現在のブランチが `{default-branch}`
 
 そのまま同期する。
 
 ```powershell
-git push origin main
+git push {remote} {default-branch}
 ```
 
-#### ケース2: 現在のブランチが main 以外（= ブランチA）
+#### ケース2: 現在のブランチが `{default-branch}` 以外（= ブランチA）
 
-ブランチAの「mainからの分岐点以降の差分」を1コミットに集約した squash ブランチ `squash/$branchA`（= ブランチB）を作り、main へ fast-forward マージしてから push する。すべて成功したらブランチ A/B をローカル・リモート両方から削除する。
+ブランチAの「`{default-branch}` からの分岐点以降の差分」を1コミットに集約した squash ブランチ `squash/$branchA`（= ブランチB）を作り、`{default-branch}` へ fast-forward マージしてから push する。すべて成功したらブランチ A/B をローカル・リモート両方から削除する。
 
 ```powershell
 $branchB = "squash/$branchA"
 
 # 1. リモート最新を取得（push reject 予防）
-git fetch origin
+git fetch {remote}
 
-# 2. origin/main を起点にブランチBを作成し、Aの全差分を1コミットへ集約
-git switch -c $branchB origin/main
+# 2. {remote}/{default-branch} を起点にブランチBを作成し、Aの全差分を1コミットへ集約
+git switch -c $branchB {remote}/{default-branch}
 git merge --squash $branchA
 
 # 2-1. squash コミットメッセージは分岐点以降の履歴を要約して生成する（下記「メッセージ生成」参照）
-git log --no-merges --pretty=format:"%h %s%n%b" origin/main..$branchA
+git log --no-merges --pretty=format:"%h %s%n%b" {remote}/{default-branch}..$branchA
 git commit -F <生成した要約メッセージ>   # 履歴要約から作成
 
-# 3. main を fast-forward マージ（Bはmain先端+1コミットなので構造上必ずff可能）
-git switch main
+# 3. {default-branch} を fast-forward マージ（Bは {default-branch} 先端+1コミットなので構造上必ずff可能）
+git switch {default-branch}
 git merge --ff-only $branchB
 
 # 4. push
-git push origin main
+git push {remote} {default-branch}
 
 # 5. すべて成功したらブランチ A/B をローカル削除
 git branch -D $branchA
 git branch -D $branchB
 
 # 6. リモートに存在すれば削除
-if (git ls-remote --heads origin $branchA) { git push origin --delete $branchA }
-if (git ls-remote --heads origin $branchB) { git push origin --delete $branchB }
+if (git ls-remote --heads {remote} $branchA) { git push {remote} --delete $branchA }
+if (git ls-remote --heads {remote} $branchB) { git push {remote} --delete $branchB }
 ```
 
 **メッセージ生成**（ステップ2-1 の squash コミット）:
 - 固定文言にせず、**分岐点以降のコミット履歴を要約**して作成する。
 - 手順:
-  1. `git log --no-merges --pretty=format:"%h %s%n%b" origin/main..$branchA` で全コミットを取得
+  1. `git log --no-merges --pretty=format:"%h %s%n%b" {remote}/{default-branch}..$branchA` で全コミットを取得
   2. 対象 spec の `requirements.md` / `design.md` のタイトル・概要も参照し意図を補強
   3. 以下の形へ再構成:
      - **subject**: `<type>({feature-name}): <機能全体を1文で表す要約>`
@@ -264,9 +305,10 @@ if (git ls-remote --heads origin $branchB) { git push origin --delete $branchB }
 - [ ] ロードマップ更新済み（スコープ内の場合）
 - [ ] スキルドキュメント同期済み（該当する場合）
 - [ ] 完了コミット済み（ステップ7）
-- [ ] リモート同期完了（ステップ8）
-      - main: `git push origin main` のみ
-      - main以外: squashブランチB作成（コミットメッセージは分岐点以降の履歴を要約）→mainへff-onlyマージ→push→A/B削除（ローカル＋リモート）
+- [ ] ステップ0で `{remote}` / `{default-branch}` を決定的解決済み
+- [ ] リモート同期完了（ステップ8、解決した `{remote}`/`{default-branch}` を使用）
+      - `{default-branch}` 上: `git push {remote} {default-branch}` のみ
+      - `{default-branch}` 以外: squashブランチB作成（コミットメッセージは分岐点以降の履歴を要約）→ `{default-branch}` へff-onlyマージ→push→A/B削除（ローカル＋リモート）
 ```
 
 ---
@@ -293,13 +335,13 @@ if (git ls-remote --heads origin $branchB) { git push origin --delete $branchB }
 
 #### ff不可（fast-forward 不可）
 - **症状**: `git merge --ff-only $branchB` が失敗
-- **理由**: 構造上ほぼ発生しない。ブランチBは `origin/main` 先端から作るため、main は必ず祖先になる。発生するのはローカル main に未push の独自コミットがある異常時のみ
-- **対策**: 中断して開発者へ報告（ローカル main の状態を確認）
+- **理由**: 構造上ほぼ発生しない。ブランチBは `{remote}/{default-branch}` 先端から作るため、`{default-branch}` は必ず祖先になる。発生するのはローカル `{default-branch}` に未push の独自コミットがある異常時のみ
+- **対策**: 中断して開発者へ報告（ローカル `{default-branch}` の状態を確認）
 
 #### push reject
-- **症状**: `git push origin main` が non-fast-forward で拒否される
-- **理由**: リモート main がローカルより先行（他者または別マシンが間に push）。特殊ケース
-- **対策**: 事前の `git fetch origin` で大半は予防。発生時は中断して報告
+- **症状**: `git push {remote} {default-branch}` が non-fast-forward で拒否される
+- **理由**: リモート `{default-branch}` がローカルより先行（他者または別マシンが間に push）。特殊ケース
+- **対策**: 事前の `git fetch {remote}` で大半は予防。発生時は中断して報告
 
 #### squash マージのコンフリクト
 - **症状**: `git merge --squash $branchA` がコンフリクトで停止
