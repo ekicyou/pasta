@@ -1,7 +1,7 @@
 # Implementation Plan
 
 - [ ] 1. 権威ソース（workflow.md §3）の PR ベース改訂
-- [ ] 1.1 workflow.md §3「リモート同期（ブランチ戦略）」を PR ベースのブランチ戦略へ全面改訂
+- [x] 1.1 workflow.md §3「リモート同期（ブランチ戦略）」を PR ベースのブランチ戦略へ全面改訂
   - 「commit → gh pr create → gh pr merge --squash --delete-branch → ブランチ削除」を唯一の手順実体として定義
   - 「直接 push」注記、merge-base squash、--ff-only、squash/<A> 生成手順を撤去
   - squash コミットメッセージ生成方針を PR squash 文脈（--subject/--body、merge-base..HEAD 履歴＋spec タイトル要約）へ移植
