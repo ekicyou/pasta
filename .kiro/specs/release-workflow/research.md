@@ -246,6 +246,13 @@ Option A に対しマージ可能性プローブのみ独立サブステップ�
 - **Trade-offs**: 検知ロジックと冪等公開判定の複雑性増。新ワークツリーでの成果物再ビルドコスト（回復時のみ）。
 - **Impact**: design.md Phase 1 Resume 検知・「Resume Mode」節・Req 9.5 行を追加。Req 9.5 / 1.7 を更新。
 
+### Decision: タグ push を Stage D（公開後）へ遅延（設計議題3 2026-06-14）
+- **Context**: タグを Stage B（公開前）で push すると「タグはあるが crates.io 未公開」の窓が生じる。機能上タグを消費するのは Stage D（Release 作成）のみ。
+- **Selected**: タグ**作成**は Stage B（ローカル）のまま、タグ**push**を Track X 成功後の Stage D（Phase 7a）へ遅延。PR マージ（main 更新）は先（統合先の方針維持）。リモートのタグは常に crates.io 公開済みを含意する。
+- **無矛盾化**: 議題2の Resume 検知シグナルを「タグ存在」から「**main の現行バージョンが完全公開（全クレート公開・タグ push・Release）に至っているか**」へ変更。タグ未 push でも統合シグナル（main の bump 反映）で resume を検知できる。
+- **基本方針（ユーザー指示・恒久）**: 「時間はかかってもよい、なるべく自律的に解決し完遂できる手順であること。実行中、一時的に外部から変な状態が観測されることは許容する」。本方針を design.md Goals に明記。タグ遅延はこの方針下での品質向上（必須ではないが望ましい）。
+- **Impact**: design.md Stage B/D 記述・mermaid（graph/sequence）・Phase 6/7・Resume Mode・トレーサビリティ（6.4/6.5/10.5）を更新。Req 6.4/9.5/10.5 と 1.7 resume 節を更新。
+
 ## References（追加）
 - `.claude/skills/kiro-complete/SKILL.md` — PR 可否判定・PR 作成/マージ・中断条件・エラー回避（流用元の参照実装）
 - `.kiro/steering/workflow.md` L83–113 — リモート同期（PR squash）＋リリースタグ公開カーブアウト

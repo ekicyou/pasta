@@ -15,6 +15,7 @@
 - 共有リソース制約（cargo ロック / git ワークツリー / ネットワーク）を尊重した安全な並行スケジューリングを行う
 - 非クリティカルフェーズ（Marketplace 公開）を隔離し、独立した公開トラックを並行化する
 - 繰り返し実行可能な設計を維持する（仕様は `completed` に遷移しない）
+- **完遂優先の自律実行**（基本方針）: 時間がかかっても、なるべく自律的に解決し**完遂できる手順**であることを最優先する。これを条件に、実行中に一時的に外部から観測される中間状態（例: main 統合済みだがタグ未 push）は許容する
 
 ### Non-Goals
 - リリース自動化スクリプトの新規作成（LLM による対話的実行で代替）
@@ -108,11 +109,11 @@
 **選択パターン**: Resource-Aware Staged Concurrency — リソース制約と安全順序に基づき処理を 4 ステージに分割。
 
 - **Stage A — Prepare & Build（ローカル・直列、R1+R2 排他）**: 前提確認 → バージョン決定・検証 → バージョン更新ビルド → ゴーストビルド → VSCode パッケージング → チェンジログ整形（読み取り専用）。終了時ワークツリーはクリーン、全成果物生成済み。
-- **Stage B — Integrate（git + ネットワーク、安全順序のゲート）**: タグ作成 → `gh pr create` → `gh pr merge --merge --delete-branch` → タグ push。成功で main にリリースコミットがマージコミット経由で反映され、タグが main から到達可能になる。**このステージが安全ゲート**であり、失敗時は Stage C/D を実行しない。
+- **Stage B — Integrate（git + ネットワーク、安全順序のゲート）**: タグ作成（ローカル）→ `gh pr create` → `gh pr merge --merge --delete-branch`。成功で main にリリースコミットがマージコミット経由で反映され、タグ対象コミットが main から到達可能になる。**このステージが安全ゲート**であり、失敗時は Stage C/D を実行しない。**タグの push はここでは行わず Stage D まで遅延する**（タグの公開が常に crates.io 公開済みを含意するようにするため）。
 - **Stage C — Publish（ネットワーク・並行、R2 不変）**: 統合成功後に 2 トラックを並行実行。
   - Track X（クリティカル）: crates.io 公開（依存関係順に内部直列）
   - Track Y（非クリティカル）: Marketplace 公開（VSIX upload）
-- **Stage D — GitHub Release（ネットワーク）**: Track X 成功後、アセット＋チェンジログで Release 作成。
+- **Stage D — Tag Push & GitHub Release（ネットワーク）**: Track X 成功後、**タグ push** → アセット＋チェンジログで Release 作成。タグと Release はともに crates.io 公開成功後に公開される。
 
 ```mermaid
 graph TB
@@ -130,11 +131,10 @@ graph TB
     end
 
     subgraph StageB ["Stage B: Integrate （安全ゲート git + network）"]
-        B1[Phase 6a: アノテーションタグ作成 ローカル]
+        B1[Phase 6a: アノテーションタグ作成 ローカルのみ]
         B2[Phase 6b: gh pr create base main head 作業ブランチ]
         B3[Phase 6c: gh pr merge --merge --delete-branch]
-        B4[Phase 6d: git push origin タグ ref]
-        B1 --> B2 --> B3 --> B4
+        B1 --> B2 --> B3
     end
 
     subgraph StageC ["Stage C: Publish （ネットワーク並行 R2 不変）"]
@@ -142,22 +142,25 @@ graph TB
         CY[Track Y 非クリティカル: vsce publish Marketplace]
     end
 
-    subgraph StageD ["Stage D: GitHub Release （ネットワーク）"]
-        D1[Phase 7: gh release create assets notes 完了サマリー]
+    subgraph StageD ["Stage D: Tag Push and GitHub Release （ネットワーク）"]
+        D0[Phase 7a: git push origin タグ ref]
+        D1[Phase 7b: gh release create assets notes 完了サマリー]
+        D0 --> D1
     end
 
     A3 --> StageB
     A4 --> StageB
     AZ -.->|チェンジログ供給| D1
     StageB -->|統合成功が前提| StageC
-    CX -->|crates.io 公開成功が前提| D1
+    CX -->|crates.io 公開成功が前提| D0
     CY -.->|VSIX URL を供給 任意 非ブロッキング| D1
 ```
 
 **スケジューリング規則**:
 - Stage A は完全直列（R1+R2 排他）。完了＝ワークツリークリーン＋全成果物（pasta.dll.zip / hello-pasta.nar / VSIX）生成済み＋チェンジログ整形済み。
-- **安全ゲート（Req 8.5・10 AC6/7）**: Stage B（タグ・PR マージ）が成功するまで Stage C（不可逆な公開）へ進まない。Stage B が失敗（PR 作成・マージ失敗）したら Stage C/D を実行せず、非破壊で中断する。Stage B 到達時点では未プッシュのローカルコミットのみが存在するため、失敗時のロールバック負担は最小。
-- **統合後の公開失敗（Req 10 AC8）**: Stage C Track X（crates.io）が失敗しても、main は既に正しいリリース状態（コミット・タグ反映済み）。公開を段階的バックオフでリトライし、最大リトライ後も失敗なら中断・報告する（既公開クレートは残す）。
+- **安全ゲート（Req 8.5・10 AC6/7）**: Stage B（タグ作成・PR マージ）が成功するまで Stage C（不可逆な公開）へ進まない。Stage B が失敗（PR 作成・マージ失敗）したら Stage C/D を実行せず、非破壊で中断する。Stage B 到達時点では未プッシュのローカルコミット＋ローカルタグのみが存在するため、失敗時のロールバック負担は最小。
+- **タグ公開の遅延（議題3）**: タグ push は Stage D（Track X 成功後）で行う。これによりリモートのタグ `vX.Y.Z` は常に crates.io 公開済みを含意する。実行中、main にリリースコミットが反映されつつタグ未 push という一時状態が外部から観測され得るが、これは許容する（基本方針: 完遂優先・実行中の一時的な外部状態は許容）。
+- **統合後の公開失敗（Req 10 AC8）**: Stage C Track X（crates.io）が失敗しても、main は既に正しいリリース状態（コミット反映済み・タグはローカル保持）。公開を段階的バックオフでリトライし、最大リトライ後も失敗なら中断・報告する（既公開クレートは残す）。
 - Stage C の 2 トラックは並行。Track Y（非クリティカル）の失敗は隔離され X・D を妨げない（Req 8.4）。
 - Stage D は Track X 成功＋チェンジログ完了を待つ。Track Y は非ブロッキング（VSIX が間に合えば添付）。
 
@@ -239,14 +242,13 @@ sequenceDiagram
     Note right of LLM: Stage A 完了 ワークツリークリーン 全成果物生成済み
 
     Note over Dev,Net: Stage B — Integrate （安全ゲート）
-    LLM->>Local: git tag -a vX.Y.Z 作業ブランチ HEAD
+    LLM->>Local: git tag -a vX.Y.Z 作業ブランチ HEAD ローカルのみ
     LLM->>GH: gh pr create base main head 作業ブランチ
     LLM->>GH: gh pr merge --merge --delete-branch
     alt 統合失敗 PR 作成 or マージ
         LLM->>Dev: 非破壊で中断 Stage C/D 実行しない
     end
-    LLM->>GH: git push origin vX.Y.Z タグ ref
-    Note right of LLM: main にリリースコミット反映 タグ main から到達可能
+    Note right of LLM: main にリリースコミット反映 タグはローカル保持 push 待ち
 
     Note over Dev,Net: Stage C — Publish （並行 2 トラック）
     par Track X クリティカル
@@ -258,7 +260,8 @@ sequenceDiagram
         LLM->>Dev: main 統合状態は保持 公開リトライ or 中断報告 Stage D 実行しない
     end
 
-    Note over Dev,Net: Stage D — GitHub Release
+    Note over Dev,Net: Stage D — Tag Push and GitHub Release
+    LLM->>GH: git push origin vX.Y.Z タグ ref crates.io 公開後
     LLM->>GH: gh release create assets notes
     LLM->>Dev: 完了サマリー 各トラック成否
 ```
@@ -316,7 +319,8 @@ flowchart TD
 | 5.1–5.9     | release.ps1 実行・成果物確認・zip・コミット・crates.io 非依存 | A / Phase 5 | メインフロー: Stage A    |
 | 6.1         | **統合直前**にアノテーションタグ作成          | B / Phase 6a      | メインフロー: Stage B          |
 | 6.2–6.3     | タグメッセージ・既存タグ競合時エラー          | B / Phase 6a      | エラーフロー: Stage B          |
-| 6.4–6.5     | **PR マージコミット統合**・タグ push・失敗時案内 | B / Phase 6b-d  | メインフロー: Stage B          |
+| 6.4         | PR マージコミット統合（Stage B）・タグ push（Stage D） | B,D / Phase 6,7a | メインフロー: Stage B→D    |
+| 6.5         | タグ push 失敗時の手動案内                    | D / Phase 7a      | メインフロー: Stage D          |
 | 7.1–7.3     | git log 取得・分類・整形                      | A / Phase Z       | メインフロー: Stage A          |
 | 7.4–7.9     | Release 作成・アセット添付（VSIX 任意）・初回全履歴 | D / Phase 7   | メインフロー: Stage D          |
 | 8.1         | リソース分類とスケジューリング                | 全 Stage          | 共有リソースモデル             |
@@ -332,7 +336,7 @@ flowchart TD
 | 10.2        | コミットを作業ブランチに保持・統合は統合フェーズのみ | A → B          | メインフロー: Stage A→B        |
 | 10.3        | PR マージコミット方式で SHA 保持・main 到達可能 | B / Phase 6b-c   | メインフロー: Stage B          |
 | 10.4        | squash-PR・直 push を使用しない               | B / Phase 6       | スケジューリング規則           |
-| 10.5        | タグの到達性保証・タグ ref push               | B / Phase 6a,6d   | メインフロー: Stage B          |
+| 10.5        | タグ到達性保証・タグ push は crates.io 公開後（Stage D） | B,D / Phase 6a,7a | メインフロー: Stage B→D |
 | 10.6        | 統合成功確認後に crates.io 公開開始           | B → C             | 安全ゲート                     |
 | 10.7        | 統合失敗時は公開せず非破壊中断                | B / Phase 6       | エラーフロー: Stage B          |
 | 10.8        | 統合成功後の公開失敗は main 保持・リトライ/中断 | C / Track X      | エラーフロー: Track X          |
@@ -348,10 +352,10 @@ flowchart TD
 | Phase 5: GhostBuild    | A     | サンプルゴーストビルド（ローカル）       | 5.1–5.9         | release.ps1 (R1+R2), i686 target                     | yes       |
 | Phase 4a: VsixPackage  | A     | VSCode 拡張ビルド・VSIX 生成             | 4.1, 4.2, 4.6   | npm/build:wasm (R1+R2)                               | no        |
 | Phase Z: Changelog     | A     | チェンジログ整形（読み取り専用）         | 7.1–7.3, 7.9    | git log (read-only)                                  | no        |
-| Phase 6: Integrate     | B     | タグ作成・PR マージコミット統合・タグ push | 6.1–6.5, 10.2–10.7 | git (R2), gh pr (R3), GitHub remote (R3)        | yes       |
+| Phase 6: Integrate     | B     | タグ作成（ローカル）・PR マージコミット統合 | 6.1–6.4, 10.2–10.4, 10.6–10.7, 10.9 | git (R2), gh pr (R3), GitHub remote (R3) | yes |
 | Track X: CratesPublish | C     | crates.io 公開（内部直列）               | 3.1–3.6, 10.8   | cargo publish (R1+R3), crates.io index (R3)          | yes       |
 | Track Y: VsixPublish   | C     | Marketplace 公開                         | 4.3–4.5, 4.7    | vsce (R3)                                            | no        |
-| Phase 7: Release       | D     | GitHub Release 作成                      | 7.4–7.8, 9.4    | gh CLI (R3)                                          | yes       |
+| Phase 7: TagPush & Release | D | タグ push（公開後）・GitHub Release 作成 | 6.4–6.5, 7.4–7.8, 9.4, 10.5 | git (R3), gh CLI (R3)                    | yes       |
 
 ### Stage A — Prepare & Build
 
@@ -378,7 +382,7 @@ flowchart TD
 
 **実行手順**
 1. **バージョン決定** (1.1–1.7): 開発者指定があれば使用 (1.1)。なければ全ソース調査（`Cargo.toml`、`package.json`、`git tag -l "v*"`、crates.io / GitHub Releases / Marketplace）し最大バージョン PATCH+1 を提案 (1.2)、承認を求める (1.3)。拒否時は希望入力 (1.4)、semver 検証 `^[0-9]+\.[0-9]+\.[0-9]+$` (1.5, 1.6)、重複チェック (1.7)。
-   - **Resume 検知** (1.7, 9.5): 重複チェックで「タグ `vX.Y.Z` が存在（= 統合済み）かつ crates.io に当該バージョンが**一部のみ**公開済み」を検知した場合はエラーとせず、**Resume Mode**（後述）へ分岐する。「未統合（タグ無し）でバージョン重複」は従来どおりエラー。
+   - **Resume 検知** (1.7, 9.5): main の現行 Cargo.toml バージョン V を取得し、V が**完全公開**（全公開クレートが crates.io に V で存在 かつ タグ `vV` が push 済み かつ GitHub Release が存在）かを確認する。V が完全公開に至っていなければ（= 前回リリースが途中で中断）V について **Resume Mode**（後述）へ分岐する（バージョン提案・bump・統合をスキップ）。完全公開済みなら通常どおり V の PATCH+1 を提案する。タグ未 push 状態でも統合シグナル（main の bump 反映）で検知できるため、タグ遅延（Stage D）と整合する。
 2. **ワークツリー整理** (1.8, 1.9): `git status --porcelain` が空でなければ `git add -A; git commit -m "chore(release): prepare release vX.Y.Z"`。
 3. **ブランチ現在性の確保（ビルド前・自動更新）** (10.9): `git fetch origin {default-branch}`。`origin/{default-branch}` が作業ブランチの HEAD の祖先でなければ（= main が先行）、`git merge origin/{default-branch}` で**非破壊マージ**により取り込む（steering の危険 git 操作禁止に準拠。`reset`/`rebase` は使わない）。これによりビルド・公開は統合後 main と同一ツリー上で行われ、公開内容と main の一致が保証される。**コンフリクト時は `git merge --abort` で復帰し中止・報告**。
 4. **テスト実行** (1.10, 1.11): `cargo test --all` — 失敗時は中止。
@@ -454,7 +458,7 @@ flowchart TD
 | Field        | Detail                                                                |
 | ------------ | -------------------------------------------------------------------- |
 | Intent       | タグを作成し、PR マージコミット方式で作業ブランチを main へ統合する  |
-| Requirements | 6.1–6.5, 10.2–10.7                                                   |
+| Requirements | 6.1–6.4, 10.2–10.4, 10.6–10.7, 10.9                                  |
 
 **Responsibilities & Constraints**
 - **前提**: Stage A 完了（ワークツリークリーン、全成果物生成済み）。
@@ -469,8 +473,9 @@ flowchart TD
 2. **タグ作成** (6.1, 6.2): `git tag -a vX.Y.Z -m "Release vX.Y.Z"`（作業ブランチ HEAD = Phase 5 コミットを指す。マージコミット方式によりこのコミットは統合後 main から到達可能になる = 10.5）。
 3. **PR 作成** (6.4, 10.3): `gh pr create --base main --head <作業ブランチ> --title "release: vX.Y.Z" --body <要約>`（本文は `merge-base..HEAD` 履歴と requirements/design 概要から要約。kiro-complete のメッセージ生成方針を流用）。
 4. **マージコミット統合** (6.4, 10.3, 10.4): `gh pr merge --merge --delete-branch`（**`--squash`/`--rebase` を使わず**コミット SHA を保持）。失敗時は段階的バックオフ → 最大リトライ後も失敗なら非破壊中断（10.7）。
-5. **タグ push** (6.4, 10.5): `git push origin vX.Y.Z`（タグ ref の push。統合成功後に実行し、タグが main から到達可能であることを保証）。失敗時はバックオフ → 「手動で再実行してください」と案内 (6.5)。
-6. **統合失敗時のローカルタグ** (10.7): マージ失敗で中断する場合、ローカルタグ `vX.Y.Z` は `git tag -d`（安全なローカル操作）で削除し、再実行をクリーンにしてよい。リモートには未反映。
+5. **統合失敗時のローカルタグ** (10.7): マージ失敗で中断する場合、ローカルタグ `vX.Y.Z` は `git tag -d`（安全なローカル操作）で削除し、再実行をクリーンにしてよい。リモートには未反映。
+
+> **タグ push は Stage D へ遅延（議題3）**: タグの push（`git push origin vX.Y.Z`）は本フェーズでは行わず、Track X（crates.io）成功後の Stage D Phase 7a で実行する。これによりリモートのタグ公開が常に crates.io 公開済みを含意する。本フェーズではローカルタグ作成・PR マージまでを完了し、タグは push 待ちの状態とする。
 
 > **設計判断（タグの指す先）**: タグは Stage A HEAD（ゴーストビルドコミット）を指す。マージコミット方式では当該コミットがマージコミットの親として main 履歴に残るため、`git describe`・Release のコミットリンク・チェンジログ compare URL が main 上で有効に解決する。Stage C の `cargo publish` はローカル作業ブランチ（= 同一ツリー内容）から実行するため、公開内容とタグ・main の整合が保たれる。
 
@@ -500,18 +505,19 @@ flowchart TD
 
 **Responsibilities & Constraints**: Track X と並行実行可能。`vsce publish` 失敗時は段階的バックオフ → 最大リトライ後も失敗なら**警告記録のみで継続**（失敗隔離 8.4）。成功時は Marketplace URL を記録 (4.7)。
 
-### Stage D — GitHub Release
+### Stage D — Tag Push & GitHub Release
 
-#### Phase 7: Release
+#### Phase 7: Tag Push & Release
 
 | Field        | Detail                                                             |
 | ------------ | ------------------------------------------------------------------ |
-| Intent       | チェンジログ付きの GitHub Release を作成しアセットを添付する        |
-| Requirements | 7.4–7.8, 9.4                                                       |
+| Intent       | タグを push し、チェンジログ付きの GitHub Release を作成・添付する  |
+| Requirements | 6.4, 6.5, 7.4–7.8, 9.4, 10.5                                       |
 
 **Responsibilities & Constraints**: **前提**: Stage C Track X 成功＋Phase Z（チェンジログ）完了。Track Y は非ブロッキング（VSIX が間に合えば添付、なければ dll.zip + .nar のみ）。
 
 **実行手順**
+0. **タグ push** (6.4, 6.5, 10.5): `git push origin vX.Y.Z`（Stage B で作成済みのローカルタグ ref を push）。crates.io 公開成功後に実行するため、リモートのタグは常に crates.io 公開済みを含意する。タグ対象コミットは Stage B の `--merge` で main から到達可能（10.5）。失敗時はバックオフ → 「手動で再実行してください」と案内 (6.5)。
 1. **Release 作成** (7.4–7.7):
    ```powershell
    $assets = @(
@@ -556,19 +562,21 @@ LLM セッションが途中で切断された場合の復旧:
 
 ### Resume Mode（統合済み・部分公開からの自動回復）
 
-**新規セッション／新規ワークツリー**で `/kiro-impl` が再実行されると Req 9.1 によりタスク状態はリセットされるが、外部状態（タグ・main・crates.io）は残存する。Phase 1 の Resume 検知（タグ `vX.Y.Z` 存在 かつ crates.io 一部公開）に該当する場合、以下の冪等な回復経路をとる（Req 9.5, 1.7）。
+**新規セッション／新規ワークツリー**で `/kiro-impl` が再実行されると Req 9.1 によりタスク状態はリセットされるが、外部状態（main・crates.io・Marketplace・タグ・Release）は残存する。Phase 1 の Resume 検知（**main の現行バージョン V が完全公開に至っていない**）に該当する場合、V について以下の冪等な回復経路をとる（Req 9.5, 1.7）。タグ push は Stage D で行うため、Resume 検知は**タグの有無に依存しない**（統合シグナル = main の bump 反映で判定）。
 
 | ステップ | 通常実行 | Resume 実行 |
 | -------- | -------- | ----------- |
-| バージョン決定・bump・統合（Stage A P1-2 / Stage B） | 実行 | **スキップ**（Cargo.toml は main 上で X.Y.Z 済み、タグ・統合済み） |
-| ローカルビルド成果物（ghost dll.zip / nar / VSIX） | 生成 | **再生成**（新ワークツリーには成果物が無いため、Release 添付用に再ビルド。バージョンは X.Y.Z で確定済み） |
+| バージョン決定・bump・統合（Stage A P1-2 / Stage B） | 実行 | **スキップ**（Cargo.toml は main 上で V 済み・統合済み） |
+| ローカルビルド成果物（ghost dll.zip / nar / VSIX） | 生成 | **再生成**（新ワークツリーには成果物が無いため、Release 添付用に再ビルド。バージョンは V で確定済み） |
 | Track X crates.io 公開 | 全クレート | **未公開クレートのみ**（各 `cargo publish` 前に crates.io で公開済みか確認しスキップ） |
-| Track Y Marketplace | 公開 | Marketplace に X.Y.Z が無ければ公開、あればスキップ |
+| Track Y Marketplace | 公開 | Marketplace に V が無ければ公開、あればスキップ |
+| Stage D タグ push | 実行 | タグ `vV` が未 push なら push、あればスキップ |
 | Stage D GitHub Release | 作成 | Release が無ければ作成、あればアセット添付の不足のみ補完 |
 
 **冪等性の担保**:
-- Resume 時はローカルワークツリーを統合済み状態に揃える（新ワークツリーは `origin/main`（= マージ済み、Cargo.toml X.Y.Z）を基点とするため、追加の checkout は不要。タグ `vX.Y.Z` の指すツリーと一致）。
-- 公開可否判定は crates.io / Marketplace / GitHub Release の**実状態**を都度確認して行う（タスク状態に依存しない）。これにより Req 9.3（前回実行に依存しない独立動作）と両立する。
+- Resume 時はローカルワークツリーを統合済み状態に揃える（新ワークツリーは `origin/main`（= マージ済み、Cargo.toml V）を基点とするため追加の checkout は不要。タグ `vV` の指すコミットと内容一致）。
+- 公開可否判定は crates.io / Marketplace / GitHub Release / タグの**実状態**を都度確認して行う（タスク状態に依存しない）。これにより Req 9.3（前回実行に依存しない独立動作）と両立する。
+- 完全公開（全クレート公開・タグ push・Release 作成）に到達した時点で V のリリースは完了とみなし、次回実行は通常の新規リリース（V の PATCH+1 提案）となる。
 
 ## Testing Strategy
 

@@ -68,7 +68,7 @@
 4. If 開発者が提案バージョンを承認しない, the Release Workflow shall 開発者に希望するバージョン番号の入力を求める
 5. When バージョン番号が提供される, the Release Workflow shall semver 形式（例: `1.2.0`）として妥当性を検証する
 6. If バージョン番号が semver 形式でない, the Release Workflow shall エラーを報告し再入力を求める
-7. When バージョン番号が確定する, the Release Workflow shall 全バージョンソースに対して重複チェックを行い、同一バージョンが既に存在する場合はエラーを報告し別のバージョン番号の入力を求める。If 当該バージョンが本ワークフローの統合済み未完了リリース（タグ存在かつ一部のみ公開済み）である, the Release Workflow shall エラーとせず Requirement 9.5 の resume モードに従って再開する
+7. When バージョン番号が確定する, the Release Workflow shall 全バージョンソースに対して重複チェックを行い、同一バージョンが既に存在する場合はエラーを報告し別のバージョン番号の入力を求める。If 当該バージョンが本ワークフローの統合済み未完了リリース（main 統合済みだが完全公開に至っていない）である, the Release Workflow shall エラーとせず Requirement 9.5 の resume モードに従って再開する
 8. When リリース作業が開始される, the Release Workflow shall ワークツリーに未コミットの変更があるか確認する
 9. If 未コミットの変更が存在する, the Release Workflow shall すべての変更をリリース準備コミットとしてコミットする
 10. When リリース作業が開始される, the Release Workflow shall 全テストを実行し通過を確認する
@@ -139,7 +139,7 @@
 1. When 全ローカルビルド・コミットが完了し、作業ブランチが main へマージ可能である, the Release Workflow shall `vX.Y.Z` 形式のアノテーションタグを作成する
 2. When タグが作成される, the Release Workflow shall タグメッセージに `Release vX.Y.Z` を設定する
 3. If 同名のタグが既に存在する, the Release Workflow shall エラーを報告し開発者に対応方法を確認する（既存タグの削除は自動実行しない）
-4. When タグが作成される, the Release Workflow shall 作業ブランチのリリースコミットを、squash を行わず PR のマージコミット方式でデフォルトブランチ（main）へ統合し、注釈タグはタグ参照として push する（統合方式は Requirement 10 に従う）
+4. When タグが作成される, the Release Workflow shall 作業ブランチのリリースコミットを、squash を行わず PR のマージコミット方式でデフォルトブランチ（main）へ統合する。注釈タグの push は crates.io 公開成功後に行い、リモートのタグが常に公開済みを含意するようにする（統合方式は Requirement 10 に従う）
 5. If プッシュが失敗する, the Release Workflow shall エラーを報告し手動での対応を開発者に促す
 
 ### Requirement 7: GitHub Release 作成
@@ -184,7 +184,7 @@
 2. The Release Workflow shall spec.json の `phase` を `completed` に変更しない（常に `ready_for_implementation` を維持する）
 3. The Release Workflow shall 各実行が前回の実行状態に依存しない独立した作業として動作する
 4. When リリース作業が完了する, the Release Workflow shall 実行結果のサマリー（バージョン、公開クレート、Release URL、Marketplace 公開結果、各並行トラックの成否）を開発者に報告する
-5. When 同一バージョンのリリースが統合済み（タグ `vX.Y.Z` が存在）かつ crates.io 公開が一部のみ完了した状態で再実行される, the Release Workflow shall バージョン再決定・バージョン更新・main 統合をスキップし、未公開クレートの公開・Marketplace 公開・GitHub Release 作成を冪等に再開する（resume モード）
+5. When 再実行時に main の現行バージョンが完全公開（全公開クレートが crates.io に存在・タグ push 済み・GitHub Release 作成済み）に至っていないことを検出する, the Release Workflow shall バージョン再決定・バージョン更新・main 統合をスキップし、未完了の crates.io 公開・Marketplace 公開・タグ push・GitHub Release 作成を冪等に再開する（resume モード）
 
 ### Requirement 10: ワークツリー実行と PR ベース main 統合
 
@@ -198,7 +198,7 @@
 2. While リリースコミット（prepare / bump / ghost build）が作業ブランチ上に作成される, the Release Workflow shall これらを作業ブランチに保持し、main への統合を統合フェーズ（全ローカルビルド完了後・crates.io 公開前）でのみ行う
 3. When 作業ブランチのコミットを main へ統合する, the Release Workflow shall PR を作成し、マージコミット方式（`--squash` でも `--rebase` でもない）でマージして、各リリースコミットの SHA を保持したまま main から到達可能にする
 4. The Release Workflow shall spec 完了で用いる squash-PR フロー（`--squash`）を使用せず、main への直接 push も行わない
-5. When 注釈タグを作成する, the Release Workflow shall タグが統合後の main から到達可能なコミット（リリース HEAD コミット）を指すことを保証し、タグはタグ参照の push として反映する
+5. When 注釈タグを作成する, the Release Workflow shall タグが統合後の main から到達可能なコミット（リリース HEAD コミット）を指すことを保証し、タグ参照の push は crates.io 公開成功後（GitHub Release 作成の直前）に行う
 6. When main への統合（タグ作成・PR マージ）が完了する, the Release Workflow shall その成功を確認してから不可逆な crates.io 公開を開始する
 7. If main への統合（PR の作成またはマージ）が失敗する（コンフリクト・mergeable でない・権限不足等）, the Release Workflow shall crates.io 公開を実行せず、force push・リモート履歴の書き換え・マージ成功前のブランチ削除を行わずに中断し、開発者に解消を求める
 8. If main 統合の成功後に crates.io 公開が失敗する, the Release Workflow shall 統合済みの main 状態（コミット・タグ）を保持したまま、公開を段階的バックオフでリトライし、最大リトライ後も失敗なら中断して開発者に報告する
