@@ -3,15 +3,5 @@
     "allow": [
       "Bash(git push origin main:*)"
     ]
-  },
-  "autoMode": {
-    "environment": [
-      "$defaults",
-      "ソロ個人開発リポジトリ: main への直接 push が通常のワークフロー（PR レビューは運用していない）"
-    ],
-    "allow": [
-      "$defaults",
-      "main ブランチへの直接 push を許可する: 個人開発リポジトリであり PR レビュープロセスを持たないため"
-    ]
   }
 }
