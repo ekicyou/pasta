@@ -635,8 +635,25 @@ pub fn enable(
     // client). A bind failure surfaces as DebugError::Bind (R3.1 / R5.5). The
     // bound addr is read NOW and stored in the handle, because the transport is
     // moved into the socket-bridge thread (it is `!Sync`, single-owner).
-    let transport = Transport::start(cfg.listen)?;
+    let transport = Transport::start(cfg.listen).map_err(|e| {
+        // 2.1/2.3 (failure warn): name the attempted bind addr + io cause, then
+        // propagate `DebugError::Bind` unchanged. `cfg.listen` is `Option`, so
+        // bind it (the enabled gate guarantees `Some` — R5.5 only materialises a
+        // listen addr when enabled) before applying `%` (Display).
+        let Some(listen) = cfg.listen else {
+            unreachable!("enabled => cfg.listen is Some (R5.5)")
+        };
+        tracing::warn!(addr = %listen, error = %e, "debug transport bind failed");
+        e
+    })?;
     let local_addr = transport.local_addr();
+
+    // 1.1/1.3/1.4/1.5 (success info): one line carrying the REAL bound loopback
+    // addr (`local_addr()`'s `Some`, defensively matched). On port 0 this is the
+    // OS-assigned port read back from the transport.
+    if let Some(addr) = local_addr {
+        tracing::info!(addr = %addr, "debug backend listening");
+    }
 
     // (5) Shared DAP adapter (seq counter + per-kind FIFO request correlation),
     // mutated by BOTH the socket bridge and the event encoder → Arc<Mutex<…>>.
@@ -810,6 +827,7 @@ mod tests {
 
     // --- enable() gate ---
 
+    #[tracing_test::traced_test]
     #[test]
     fn enable_disabled_returns_none_and_no_trace() {
         let lua = mlua::Lua::new();
@@ -823,6 +841,20 @@ mod tests {
             .eval()
             .expect("eval should succeed");
         assert!(debug_is_nil, "disabled gate must not expose std_debug");
+
+        // 3.1 (無効時は無言): the disabled gate is the true zero-cost path — it
+        // opens no port and binds nothing, so NEITHER the success `info` NOR the
+        // failure `warn` must ever be emitted. Verifying both negatives here makes
+        // the previously-unchecked "no_trace" name effective and completes the
+        // output/no-output matrix (design Testing Strategy item 2).
+        assert!(
+            !logs_contain("debug backend listening"),
+            "disabled enable() must emit no listening info (3.1)"
+        );
+        assert!(
+            !logs_contain("debug transport bind failed"),
+            "disabled enable() must emit no bind-failure warn (3.1)"
+        );
     }
 
     #[test]
@@ -895,6 +927,79 @@ mod tests {
 
         // Clean up the hook the failed enable() left installed (the install
         // step precedes the bind; the test VM is dropped right after anyway).
+        lua.remove_global_hook();
+        drop(blocker);
+    }
+
+    // --- enable() startup logging (task 1.1 / requirements 1, 2, 3) ---
+
+    #[tracing_test::traced_test]
+    #[test]
+    fn enable_enabled_emits_listening_info() {
+        // 1.1/1.3/1.4: enabling the backend emits a single `info` carrying the
+        // real bound loopback addr. ALL_SAFE so the hook's `jit.off()` works;
+        // port 0 → OS-assigned free loopback port (env-independent, no clash).
+        let lua = unsafe {
+            mlua::Lua::unsafe_new_with(mlua::StdLib::ALL_SAFE, mlua::LuaOptions::default())
+        };
+        let cfg = DebugConfig {
+            enabled: true,
+            listen: Some("127.0.0.1:0".parse().unwrap()),
+            ..Default::default()
+        };
+        let handle = enable(&lua, &cfg, None)
+            .expect("enable must succeed when enabled")
+            .expect("enabled enable() returns Some(handle)");
+
+        // The fixed identifying message is emitted (1.3) at `info` (1.2)...
+        assert!(
+            logs_contain("debug backend listening"),
+            "enable() must emit the listening info (1.1/1.3)"
+        );
+        // ...and carries the real bound loopback host:port (1.4/1.5).
+        let port = handle.local_addr().expect("bound addr").port();
+        assert!(
+            logs_contain(&format!("addr=127.0.0.1:{port}")),
+            "listening info must carry the real bound addr (1.4/1.5)"
+        );
+
+        drop(handle);
+        lua.remove_global_hook();
+    }
+
+    #[tracing_test::traced_test]
+    #[test]
+    fn enable_bind_failure_emits_warn_and_no_info() {
+        // 2.1/2.2/2.3: a bind failure emits a `warn` naming the attempted addr,
+        // and NO listening `info` is emitted. Occupy a concrete loopback port so
+        // the backend's bind must fail.
+        let blocker =
+            std::net::TcpListener::bind("127.0.0.1:0").expect("test listener must bind");
+        let taken = blocker.local_addr().expect("bound addr");
+
+        let lua = unsafe {
+            mlua::Lua::unsafe_new_with(mlua::StdLib::ALL_SAFE, mlua::LuaOptions::default())
+        };
+        let cfg = DebugConfig {
+            enabled: true,
+            listen: Some(taken),
+            ..Default::default()
+        };
+
+        let err = enable(&lua, &cfg, None).expect_err("bind to an occupied port must fail");
+        assert!(matches!(err, DebugError::Bind(_)), "expected Bind, got {err:?}");
+
+        // 2.1/2.3: a warn names the bind failure...
+        assert!(
+            logs_contain("debug transport bind failed"),
+            "bind failure must emit a warn (2.1)"
+        );
+        // 2.2: ...and no listening info is emitted on the failure path.
+        assert!(
+            !logs_contain("debug backend listening"),
+            "no listening info must be emitted when the bind fails (2.2)"
+        );
+
         lua.remove_global_hook();
         drop(blocker);
     }

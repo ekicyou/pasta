@@ -79,7 +79,7 @@ pasta ゴースト作者向けの利用者マニュアルを、mdBook で**サ�
   - 実装完了 2026-06-08（全8タスク・各独立レビュー APPROVED・機能レベルバリデーション GO・mdbook build/verify-content(G+A〜F)/verify-static/verify-search/drift-check 全緑）。spec 完了フロー未実施
 
 ### Phase 5 派生（デバッグ観測性）
-- [ ] debug-startup-logging -- pasta_lua デバッグバックエンドの `enable()` に「デバッグ有効化・DAP 待ち受け開始（実バインドアドレス `host:port`）」の `info!` 起動ログを追加し、`pasta.log` で起動確認できるようにする。無効時は無言・ゼロコスト維持。Dependencies: pasta-vscode-lua-debug
+- [x] debug-startup-logging -- pasta_lua デバッグバックエンドの `enable()` に「デバッグ有効化・DAP 待ち受け開始（実バインドアドレス `host:port`）」の `info!` 起動ログを追加し、`pasta.log` で起動確認できるようにする。無効時は無言・ゼロコスト維持。Dependencies: pasta-vscode-lua-debug
   - 由来: pasta-manual-debugging 実装後のユーザー検証（2026-06-08）で「pasta.log でデバッグ起動を確認したいが、現状ログが出ない」と判明。デバッグ実装側の観測性ギャップ（pasta-manual-debugging は文書のみ・R8.3 で実装非変更のため境界外）。brief.md 作成済み（`.kiro/specs/debug-startup-logging/brief.md`）。完了後、pasta-manual-debugging のデバッグ章へ「ログ＋ポート確認」手順を小追補可能
 
 ## Phase 5: VSCode Lua デバッグ連携
