@@ -127,3 +127,16 @@
 1. **#1 accept 中断方式の確定**（§5.2）: `set_nonblocking(true)` + shutdown フラグ poll ループ（既存 `wiring::POLL_INTERVAL` 規約に整合）か、自己接続で accept を起こすか。接続確立後の reader スレッド停止（socket shutdown による EOF 誘発）と、**unload 時の同期 join の有界性**の担保。
 2. **#2 `SO_REUSEADDR` の実装手段**（§5.1/§5.6）: `socket2` 導入か `windows-sys`＋`libc` の OS 別 raw setsockopt か。Windows/Unix の `SO_REUSEADDR` 意味差と、他プラットフォーム非破壊。
 3. **回帰テストの 10048 再現設計**（§5.5）: 真因は live-thread リークで TIME_WAIT 非依存＝即時再現可（実時間 15秒待機は不要）。固定ポート再現テストの flaky 回避（既存 `#[ctor]` env 中和・ポート 0 規約との両立）。
+
+---
+
+## 設計フェーズの決定（design synthesis 2026-06-13）
+
+縮小後スコープ（R1+R2+R3+R4）に対し、設計フェーズで以下を確定（詳細は `design.md`）。
+
+1. **#1 accept 中断方式 → 非ブロック poll（Option A/C）に確定**。`serve()` で listener を `set_nonblocking(true)` し `POLL_INTERVAL`（5ms・既存規約）で内部 `Arc<AtomicBool>` shutdown を poll。単一 accept 成功後は listener を即 drop（早期ポート解放）。接続後の writer ループも `recv_timeout(POLL_INTERVAL)` + フラグ poll、reader は `stream.shutdown(Both)` の EOF で停止させ join。`Transport::drop`/`shutdown()` が「フラグ立て → serve handle 同期 join」を完結。自己接続（Option B）は競合接続レースのため不採用。
+2. **#2 `SO_REUSEADDR` 実装 → `socket2 = "0.5"` 採用**。`Socket::new(IPV4,STREAM,TCP)` → `set_reuse_address(true)` → `bind` → `listen` → `TcpListener::from` → `set_nonblocking(true)`。OS 別 raw setsockopt（`windows-sys`+`libc`）案は cfg 分岐の保守コストで不採用。MIT/Apache-2.0・`cargo-deny` 整合要確認。workspace deps へ `socket2 = "0.5"` 追加、`pasta_lua` で `socket2.workspace = true`。
+3. **teardown 同期化の境界 → socket-bridge スレッドの join**。`DebugHandle::drop` を `socket_handle` detach → join へ変更（`encoder_handle` は socket/port 非保持のため detach 維持、`terminate_tx` 保持中 join のデッドロック回避）。bridge join ⊇ `Transport` drop ⊇ serve 同期 join ⊇ ポート解放。全待ちが `POLL_INTERVAL` 境界 + 中断可能 accept で有界。
+4. **Web 検証で得た重要知見（Windows `SO_REUSEADDR` の masking）**: Windows では `SO_REUSEADDR` が「listen 中ソケットにも bind 許可（hijack）」の意味を持つため、**#1 を欠いたまま #2 だけ入れると漏れた listener が生きていても rebind が成功し真因をマスクする**。よって #1（同期 join）が一次治療、#2 は接続中 reload の TIME_WAIT 防御層に限定。回帰テスト（1.4）は「rebind 成功」ではなく**リスナースレッド終了（join 完了）**を一次シグナルとする。hijack リスクは loopback 限定・dev opt-in・既定 off により許容。
+   - Sources: [socket2 Socket docs](https://docs.rs/socket2/latest/socket2/struct.Socket.html) / [Windows SO_REUSEADDR](https://learn.microsoft.com/en-us/windows-hardware/drivers/network/so-reuseaddr) / [Windows SO_EXCLUSIVEADDRUSE](https://learn.microsoft.com/en-us/windows-hardware/drivers/network/so-exclusiveaddruse)
+5. **`wiring.rs` は変更不要**: 既存の shutdown poll + `Transport` by-value drop がそのまま同期 join を引き起こす。回帰テストはポートを `:0` で取得・capture して同一ポート teardown→rebind を回し（固定 9276 直書きの CI flakiness 回避）、`#[ctor]` env 中和・watchdog bounded-join を流用。
