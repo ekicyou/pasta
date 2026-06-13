@@ -170,6 +170,8 @@
 
 ### ⚠️ 落とし穴2: 不可逆な crates.io 公開とマージ失敗の順序リスク
 現行設計は Stage B（crates.io 公開＝不可逆）→ Stage C（タグ・統合）。PR マージはこれより後段になるため、「公開済みだが PR マージ失敗（コンフリクト等）」の窓が生じる。Req 10 AC6/7 はこれを「**不可逆公開の前に**マージ可能性を検証」で緩和する設計意図だが、**検証手段とタイミングが未設計**。→ **Research Needed #2**（PR 早期作成＋`mergeable` ポーリング vs `git fetch origin {default} && git merge-tree`/dry-run マージ）。残余リスク（検証〜マージ間の main 移動）は既存 Req 3.4「既公開クレートは残し開発者指示待ち」の許容範囲内。
+>
+> **【議題1 決定 2026-06-14】**: **Option 2「統合先・公開後」を採用**。安全順序を「main 統合（タグ・PR マージ）→ crates.io 公開 → GitHub Release」へ反転し、不可逆な公開を可逆な統合の後段に置く。これにより「公開済みだが統合不能」の窓が消滅（統合が先・ゲートになる）。統合成功後に公開が失敗した場合は main は既に正しいリリース状態であり、公開リトライ／中断で回復（Req 8.5・10 AC8）。要件側は Req 8.5・8.2・6.1・3.1・10 AC2/6–8 を更新済み。設計フェーズは Stage 順序を「Stage A 準備・ビルド → Stage B 統合（tag+PR merge）→ Stage C 公開（crates.io ∥ Marketplace）→ Stage D GitHub Release」へ再構成すること。
 
 ### ⚠️ 落とし穴3: settings.json／steering がカーブアウト（直 push）前提のまま
 `.claude/settings.json` の `Bash(git push origin main:*)` と `workflow.md` L113 カーブアウト（DD5, kiro-gitflow-worktree-pr 由来）は**リリース直 push を許容する設計**で、Req 10（PR ベース・直 push 禁止）と矛盾する。Req 10 では (a) **タグ push 許可**（例 `Bash(git push origin v*:*)` 等）を追加し、(b) 直 push 許可とカーブアウトを**タグ公開限定に縮退 or 撤去**する必要がある。→ Steering Gate / 設計フェーズで対応。
@@ -203,7 +205,7 @@ Option A に対しマージ可能性プローブのみ独立サブステップ�
 
 ### Research Needed（設計フェーズで調査）
 1. **【最優先】** repo の merge-commit 許可状態（`gh repo view --json mergeCommitAllowed,squashMergeAllowed,deleteBranchOnMerge`）。無効なら有効化要否を判断。
-2. マージ可能性プローブの最適手段とタイミング（PR 早期作成＋`mergeable` ポーリング vs ローカル `git fetch`＋dry-run）。
+2. （議題1で方針確定）マージ可能性は **PR マージ実行そのものがゲート**となる（統合先・公開後 = Option 2 採用）。事前の読み取り専用プローブは安全ゲートとしては不要化。残る検討は「ビルド前に早期 fast-fail させるための任意の事前チェックを置くか」のみ（任意・最適化）。
 3. 将来の GitHub ブランチ保護／タグ保護と本フローの相互作用（main 保護はタグ push を妨げないが、必須ステータスチェック有効化時は `gh pr merge` 即時マージがブロックされ得る）。
 4. settings.json 許可エントリの最終形（タグ push 許可の具体パターン、`git push origin main` 撤去可否）。
 5. タグ push と PR マージの実行順序（タグ ref を merge 前に push するか後にするか）と、Release 作成（Stage D）のマージ後実行の確定。

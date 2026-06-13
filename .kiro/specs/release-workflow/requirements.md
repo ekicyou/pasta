@@ -93,7 +93,7 @@
 
 #### Acceptance Criteria
 
-1. When ローカルビルドステージが完了しワークツリーがクリーンである, the Release Workflow shall クレートを依存関係順（`pasta_core` → `pasta_dsl` → `pasta_lua` → `pasta_shiori` → `pasta_check`）に公開する
+1. When ローカルビルドが完了しワークツリーがクリーンで、かつ main 統合（タグ作成・PR マージ）が成功している, the Release Workflow shall クレートを依存関係順（`pasta_core` → `pasta_dsl` → `pasta_lua` → `pasta_shiori` → `pasta_check`）に公開する
 2. When クレートを公開する, the Release Workflow shall 各クレートの公開成功を確認してから次のクレートに進む
 3. If クレートの公開が失敗する, the Release Workflow shall 段階的バックオフでリトライを試みる（待機時間を1分から1分ずつ増加し最大10分まで、最大10回リトライ）
 4. If 最大リトライ後も失敗する, the Release Workflow shall エラーを報告し、以降の公開を中断し、既に公開されたクレートはそのまま残し、開発者の指示を待つ
@@ -136,7 +136,7 @@
 
 #### Acceptance Criteria
 
-1. When crates.io 公開が成功し全ローカルコミットが完了する, the Release Workflow shall `vX.Y.Z` 形式のアノテーションタグを作成する
+1. When 全ローカルビルド・コミットが完了し、作業ブランチが main へマージ可能である, the Release Workflow shall `vX.Y.Z` 形式のアノテーションタグを作成する
 2. When タグが作成される, the Release Workflow shall タグメッセージに `Release vX.Y.Z` を設定する
 3. If 同名のタグが既に存在する, the Release Workflow shall エラーを報告し開発者に対応方法を確認する（既存タグの削除は自動実行しない）
 4. When タグが作成される, the Release Workflow shall 作業ブランチのリリースコミットを、squash を行わず PR のマージコミット方式でデフォルトブランチ（main）へ統合し、注釈タグはタグ参照として push する（統合方式は Requirement 10 に従う）
@@ -167,10 +167,10 @@
 #### Acceptance Criteria
 
 1. When リリース作業をスケジュールする, the Release Workflow shall 各処理を要求リソース（R1 cargo ロック / R2 ワークツリー / R3 ネットワーク）で分類し、排他リソースを共有する処理を直列化する
-2. While ワークツリーを変更するローカルビルド（バージョン更新ビルド、サンプルゴーストビルド、VSCode 拡張パッケージング）が R1・R2 を共有する, the Release Workflow shall これら全ローカルビルドとコミットを完了しワークツリーをクリーン化してから crates.io 公開（R3 を要し R2 のクリーン状態を前提とする）を開始する
+2. While ワークツリーを変更するローカルビルド（バージョン更新ビルド、サンプルゴーストビルド、VSCode 拡張パッケージング）が R1・R2 を共有する, the Release Workflow shall これら全ローカルビルドとコミットを完了しワークツリーをクリーン化してから main 統合（タグ作成・PR マージ）および crates.io 公開（R3 を要し R2 のクリーン状態を前提とする）を開始する
 3. Where crates.io 公開・Marketplace 公開・チェンジログ生成は互いに独立しワークツリーを変更しない, the Release Workflow shall これらを並行（concurrent）に実行してよい
 4. If 非クリティカルな処理（Marketplace 公開）が失敗する, the Release Workflow shall クリティカルな処理（crates.io 公開、タグ・プッシュ、GitHub Release）の進行を妨げず継続する（失敗隔離）
-5. While crates.io 公開は不可逆である, the Release Workflow shall crates.io 公開をタグ作成・PR 統合（マージ）および GitHub Release より前に完了させる。If crates.io 公開が中断する, the Release Workflow shall タグ作成・PR 統合および GitHub Release を実行しない（安全順序保証。統合方式は Requirement 10 に従う）
+5. While main 統合（タグ作成・PR マージ）は revert で可逆だが crates.io 公開は不可逆である, the Release Workflow shall 「main 統合 → crates.io 公開 → GitHub Release 作成」の順で実行し、不可逆な crates.io 公開を可逆な main 統合の後段に置く。If main 統合が失敗する, the Release Workflow shall crates.io 公開および GitHub Release を実行しない。If main 統合の成功後に crates.io 公開が失敗する, the Release Workflow shall 統合済み main 状態（コミット・タグ）を保持したまま公開をリトライまたは中断して報告し、GitHub Release は crates.io 公開成功まで作成しない（安全順序保証。統合方式は Requirement 10 に従う）
 6. The Release Workflow shall 独立した処理を不要に直列化しない（偽の依存関係の排除）。特にサンプルゴーストビルドを crates.io 公開の後段に配置しない
 7. When 並行実行する処理のいずれかがバックグラウンドで進行する, the Release Workflow shall 各並行トラックの完了・失敗を個別に検証し、結果をサマリーに反映する
 
@@ -194,13 +194,13 @@
 #### Acceptance Criteria
 
 1. When リリース作業が開始される, the Release Workflow shall ハーネスが供給する現在の作業ブランチ（ワークツリーブランチ）上で動作し、main ブランチ上での実行や main への直接 push を前提条件としない
-2. While リリースコミット（prepare / bump / ghost build）が作業ブランチ上に作成される, the Release Workflow shall これらを作業ブランチに保持し、main への統合を Stage C（タグ・統合フェーズ）でのみ行う
+2. While リリースコミット（prepare / bump / ghost build）が作業ブランチ上に作成される, the Release Workflow shall これらを作業ブランチに保持し、main への統合を統合フェーズ（全ローカルビルド完了後・crates.io 公開前）でのみ行う
 3. When 作業ブランチのコミットを main へ統合する, the Release Workflow shall PR を作成し、マージコミット方式（`--squash` でも `--rebase` でもない）でマージして、各リリースコミットの SHA を保持したまま main から到達可能にする
 4. The Release Workflow shall spec 完了で用いる squash-PR フロー（`--squash`）を使用せず、main への直接 push も行わない
 5. When 注釈タグを作成する, the Release Workflow shall タグが統合後の main から到達可能なコミット（リリース HEAD コミット）を指すことを保証し、タグはタグ参照の push として反映する
-6. When crates.io 公開（不可逆）の開始前に統合可能性を検証する, the Release Workflow shall 作業ブランチが main へコンフリクトなくマージ可能であることを読み取り専用で確認する（この検証は main への反映・統合を伴わない）
-7. If 作業ブランチが main へマージ可能でない（main が分岐している等）, the Release Workflow shall 不可逆な crates.io 公開を行う前にリリース作業を中止し、開発者に解消を求める
-8. If PR の作成またはマージが失敗する, the Release Workflow shall エラーを報告して中止し、force push・リモート履歴の書き換え・マージ成功前のブランチ削除を行わない
+6. When main への統合（タグ作成・PR マージ）が完了する, the Release Workflow shall その成功を確認してから不可逆な crates.io 公開を開始する
+7. If main への統合（PR の作成またはマージ）が失敗する（コンフリクト・mergeable でない・権限不足等）, the Release Workflow shall crates.io 公開を実行せず、force push・リモート履歴の書き換え・マージ成功前のブランチ削除を行わずに中断し、開発者に解消を求める
+8. If main 統合の成功後に crates.io 公開が失敗する, the Release Workflow shall 統合済みの main 状態（コミット・タグ）を保持したまま、公開を段階的バックオフでリトライし、最大リトライ後も失敗なら中断して開発者に報告する
 
 ---
 
@@ -213,4 +213,4 @@
 5. **安全順序保証の明文化（Req 8.5）**: 不可逆な crates.io 公開をタグ・プッシュ／GitHub Release より前に完了させ、crates.io 公開中断時はタグ・プッシュを行わないことを要件化
 6. **cc-sdd 3.0 タスク注釈の採用**: tasks.md に `(P)` 並行マーカー、`_Depends:_`、`_Boundary:_` を導入し、並行実行可能なタスクと依存関係を明示
 7. **番号体系**: 旧 Req 8（繰り返し実行）→ Req 9 に繰り下げ（Req 8 を実行モデルに割当）
-8. **ワークツリー実行と PR ベース main 統合の追加（Req 10 新設）**: Claude Code ハーネスのワークツリー（非デフォルトブランチ）上での起動を前提とし、リリースコミット・タグを **PR のマージコミット方式（`--merge`）** で main へ統合する要件を新設。spec 完了用の squash-PR や直接 push を排除し、コミット SHA とタグの参照整合性を保ちつつ将来の GitHub ブランチ保護に前方互換とする。これに伴い Req 6.4（タグ・プッシュ）の統合方式を更新し、Boundary Context に統合方針を明記
+8. **ワークツリー実行と PR ベース main 統合の追加（Req 10 新設）**: Claude Code ハーネスのワークツリー（非デフォルトブランチ）上での起動を前提とし、リリースコミット・タグを **PR のマージコミット方式（`--merge`）** で main へ統合する要件を新設。spec 完了用の squash-PR や直接 push を排除し、コミット SHA とタグの参照整合性を保ちつつ将来の GitHub ブランチ保護に前方互換とする。これに伴い Req 6.4（タグ・プッシュ）の統合方式を更新し、Boundary Context に統合方針を明記。さらに**安全順序を「main 統合 → crates.io 公開 → GitHub Release」へ反転**し、不可逆な crates.io 公開を可逆な main 統合の後段に配置（Req 8.5・8.2・6.1・3.1・10 AC6–8 を更新。旧仕様は crates.io 公開を先行させていた）
