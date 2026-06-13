@@ -19,7 +19,7 @@
   - _Depends: 1.1_
   - _Boundary: enable() ログ点（#[cfg(test)] mod tests）_
 
-- [ ] 2.2 非回帰確認
+- [x] 2.2 非回帰確認
   - `cargo test --all` が緑であることを確認（既存デバッグ機能挙動の不変・ログ基盤不変・新依存なし）
   - LuaJIT ビルドは環境変数 `NoDefaultCurrentDirectoryInExePath` を外して実行する
   - 観測: `cargo test --all` 全パス、Cargo.toml に新規依存の差分なし
