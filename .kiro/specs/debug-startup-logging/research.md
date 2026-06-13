@@ -74,7 +74,7 @@
 ### 設計で確定すべき判断（Decisions for design）
 1. **バインド失敗時 warn の発火点（R2.2）**: `mod.rs:638` の `Transport::start(cfg.listen)?` は失敗を `?` で短絡するため、warn を出すには `.map_err(|e| { tracing::warn!(...); e })?` 等で失敗事由（`io::Error`）と試行アドレス（`cfg.listen`）を握ってからログする。`info`（成功）は従来どおり `:639` 以降に置く。配置順で R2.1（失敗時 info を出さない）が自動充足される。
 2. **`Option` 処理（R1.4 成功側 / R2.3 失敗側）**: 成功 `info` の `local_addr` は成功経路で必ず `Some` → `if let Some(addr)` で握る（防御的）。失敗 `warn` の `cfg.listen` も `Option<SocketAddr>` で `%`(Display)不可 → 有効ゲート通過済み＝`Some` 確定を前提に分割代入してから `%addr` で出す（`?cfg.listen` の `Some(...)` 表記は非推奨）。両側とも Display を効かせるため Option を先に剥がす。
-3. **ログ文言（R1.3 / R2.3）**: 待ち受け info は「デバッグモードで待ち受け開始」と識別でき、loopback `host:port` のみ含む（秘密情報非混入）。失敗 warn は試行アドレス＋失敗事由のみ。**言語は簡潔な英語に確定**（議題 2 / 2026-06-13。既存 tracing ログと一貫）。例: info `debug backend listening on 127.0.0.1:9276` / warn `debug transport bind failed on 127.0.0.1:9276: {err}`。具体文言を design で最終確定。
+3. **ログ文言（R1.3 / R2.3）— 確定**: 言語は簡潔な英語（議題 2 / 2026-06-13）。様式はコードベース全体の支配的慣習（構造化フィールド `field = %値, "静的英語メッセージ"`。例 `runtime/mod.rs:579` / `enc.rs` / `shiori.rs`）に揃える（設計ディスカッション #1 / 2026-06-13「他の使い方と合わせて」）。casing は同一モジュール `mod.rs:98` の小文字始まりに一致。**確定文言**: info `tracing::info!(addr = %addr, "debug backend listening")` / warn `tracing::warn!(addr = %listen, error = %e, "debug transport bind failed")`。loopback `host:port` と io エラー事由のみ含み秘密情報非混入。
 
 ### Research Needed（設計時に確認）
 - **`#[traced_test]` × 既存 env ガードの整合**: `enable()` を叩くテストは `PASTA_DEBUG` 環境変数の汚染で固定ポート枯渇する既知問題あり（crate 全体に `#[ctor]` 中和ガードが入っているため新テストも自動適用される想定だが、新規ログ検証テスト追加時に再確認）。テストはポート 0 を使用すること。

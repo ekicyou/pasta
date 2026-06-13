@@ -148,7 +148,9 @@ graph TB
 **Contracts**: State [x]（観測のみ。新規 Service/API/Event/Batch 契約なし）
 
 **Implementation Notes**
-- Integration: 成功 `info` の参考文言 `tracing::info!(addr = %addr, "debug backend listening")`（`addr` は `local_addr` の `Some` 値）。失敗 `warn` は `cfg.listen` が `Option<SocketAddr>` のため `%`（Display）を直接適用できない。有効ゲート通過済み＝`Some` 確定を前提に**分割代入してから** `%addr` で出す（例: `let Some(listen) = cfg.listen else { unreachable!("enabled => Some") };` 後に `tracing::warn!(addr = %listen, error = %e, "debug transport bind failed")`）。`?cfg.listen`（Debug, `Some(addr)` 表記）でも可だが出力が `Some(...)` で汚れるため非推奨。最終文言は実装時に上記制約内で確定。
+- Integration / ログ文言（確定）: コードベース全体の支配的慣習（`構造化フィールド = %値, "静的英語メッセージ"`。例: `runtime/mod.rs:579`、`runtime/enc.rs`、`shiori.rs`）に揃える。casing は同一モジュールの既存 warn（`mod.rs:98` 小文字始まり）に合わせる。確定文言:
+  - 成功 `info`: `tracing::info!(addr = %addr, "debug backend listening")`（`addr` は `local_addr` の `Some` 値）。
+  - 失敗 `warn`: `tracing::warn!(addr = %listen, error = %e, "debug transport bind failed")`。`cfg.listen` は `Option<SocketAddr>` で `%`（Display）を直接適用できないため、有効ゲート通過済み＝`Some` 確定を前提に**分割代入してから** `%listen` で出す（例: `let Some(listen) = cfg.listen else { unreachable!("enabled => Some") };`）。`?cfg.listen`（`Some(...)` 表記）は非推奨。
 - Validation: `#[traced_test]` + `logs_contain(...)` で出力/非出力を検証（下記 Testing Strategy）。
 - Risks: 低。挿入点・実バインドアドレス読み戻し・テスト基盤すべて既存で確認済み。無効経路はゲートで物理隔離。
 
