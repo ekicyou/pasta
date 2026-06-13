@@ -42,14 +42,15 @@
 
 ### Requirement 2: teardown による待受ソケットの確実な解放
 
-**Objective:** pasta ランタイムの保守担当として、ランタイム破棄（unload）時に debug transport が確保した待受ポートとリスナースレッドが確実に後始末されてほしい。そうすれば、同一プロセス内にポートやスレッドが居残らず、リソースリークを起こさない。
+**Objective:** pasta ランタイムの保守担当として、ランタイム破棄（unload）時に debug transport が確保した待受ポートとリスナースレッドが、unload 完了までに**同期的に**確実に後始末されてほしい。そうすれば、同一プロセス内にポートやスレッドが居残らず、リソースリークを起こさない。
 
 #### Acceptance Criteria
 
 1. When debug transport が有効なランタイムが unload される, the pasta debug transport は 待受ソケットを閉じ、当該待受ポートを同一プロセス内に保持し続けない。
-2. When teardown が要求される, the pasta debug transport は クライアント未接続で待受待ち状態にあるリスナースレッドを終了させ、デタッチしたまま生存させない。
-3. While teardown が進行している, the pasta debug transport は debug transport 以外のランタイム破棄処理を不当にブロックせず、有界な時間内に完了する。
+2. When unload（teardown）が要求される, the pasta debug transport は 待受待ち状態のリスナースレッドを中断・終了させ、その終了を同期的に join して確認したうえで unload を完了する（デタッチしたまま生存させない・投げっぱなしにしない）。
+3. While teardown が進行している, the pasta debug transport は リスナースレッドの中断機構により join を有界な時間内に完了し、debug transport 以外のランタイム破棄処理を不当にブロックしない（無限ブロックする accept を join してハングすることがない）。
 4. The pasta debug transport は teardown 完了後、同一構成での再 start を可能な状態にする。
+5. While デバッガクライアントが接続中に unload が要求される, the pasta debug transport は 接続中の socket を含めて同期的に解放し、リスナースレッドの join を有界な時間内に完了する。
 
 ### Requirement 3: 待受ソケットの再利用耐性（SO_REUSEADDR 相当）
 
