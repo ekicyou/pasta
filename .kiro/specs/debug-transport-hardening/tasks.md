@@ -3,7 +3,7 @@
 reload バグの根治（中断可能 accept ＋ 同期 teardown join）と防御層（`SO_REUSEADDR`）を、`Transport` → `DebugHandle` → テストの順で段階実装する。変更は `transport.rs` ＋ `mod.rs`（`DebugHandle::drop`）＋ Cargo ＋ テストに限定し、`wiring.rs` は無変更（既存の poll + by-value drop が同期 drop を駆動）。
 
 - [ ] 1. Foundation: 依存追加
-- [ ] 1.1 socket2 依存をワークスペースと pasta_lua に追加
+- [x] 1.1 socket2 依存をワークスペースと pasta_lua に追加
   - ルート `Cargo.toml` の `[workspace.dependencies]` に `socket2 = "0.5"` を追加し、`crates/pasta_lua/Cargo.toml` の `[dependencies]` に `socket2.workspace = true` を追加（cross-platform、`cfg` 分岐なし）
   - 観測: `cargo build -p pasta_lua` が `socket2` を解決して通り、`cargo-deny`（deny.toml）がライセンス（MIT OR Apache-2.0）・監査を通す
   - _Requirements: 4.5_
