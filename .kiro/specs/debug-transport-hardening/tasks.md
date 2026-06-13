@@ -16,7 +16,7 @@ reload バグの根治（中断可能 accept ＋ 同期 teardown join）と防�
   - _Requirements: 3.1, 3.2, 3.3, 4.5_
   - _Boundary: Transport_
 
-- [ ] 2.2 リスナースレッドの中断可能化（非ブロック accept + 内部 shutdown フラグ）
+- [x] 2.2 リスナースレッドの中断可能化（非ブロック accept + 内部 shutdown フラグ）
   - `Transport` に内部 `Arc<AtomicBool>` shutdown 信号を追加。`serve()` の `accept()` を非ブロック poll 化し、`WouldBlock` 時に `POLL_INTERVAL`（既存 5ms 規約）で shutdown を確認、立てば listener を drop して return。単一 accept 成功後は listener を即 drop（早期ポート解放）
   - 観測: クライアント未接続でも shutdown フラグにより `serve()` が有界時間で return する（`accept()` で永久ブロックしない）
   - _Requirements: 2.2, 2.3_
