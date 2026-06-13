@@ -1,0 +1,6 @@
+# 最小構成: 必須の [actor] のみ。他は SHIORI デフォルトで補完される。
+[actor."女の子"]
+spot = 0
+
+[actor."男の子"]
+spot = 1

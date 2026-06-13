@@ -394,46 +394,24 @@ homeurl,https://github.com/ekicyou/pasta
 
 ### ghost/master/pasta.toml
 
-pasta の動作設定ファイルである。辞書ファイルの読み込みパターンや、ランダムトークの間隔、アクターの配置位置などを指定する。最小構成では `[package]` と `[loader]` があればよいが、hello-pasta では教育用に各項目をコメント付きで記述している。
+pasta の動作設定ファイルである。辞書ファイルの読み込みパターンや、ランダムトークの間隔、アクターの配置位置などを指定する。
+
+**起動に必須なのは `[actor]` セクションだけ**である。他の全セクション（`[loader]` / `[ghost]` / `[talk]` / `[logging]` など）は省略でき、省略すると pasta が無難なデフォルト値を自動補完する。`[package]` は SHIORI 用途では不要で、書いても無視される。したがって、最小構成は次のように `[actor]` だけで完結する。
 
 ```toml
-[package]
-name = "hello-pasta"
-version = "1.0.0"
-edition = "2024"
-
-[loader]
-# pasta DSL ファイルパターン
-pasta_patterns = ["dic/*.pasta"]
-# Lua モジュール検索パス（優先順位順）
-lua_search_paths = [
-    "profile/pasta/save/lua",
-    "scripts",
-    "profile/pasta/pasta_scripts",
-    "profile/pasta/cache/lua",
-    "scriptlibs",
-]
-# トランスパイル出力先
-transpiled_output_dir = "profile/pasta/cache/lua"
-
-[ghost]
-# ランダムトーク発生間隔（秒）
-talk_interval_min = 180
-talk_interval_max = 300
-
+# 最小構成: 必須の [actor] のみ。他は SHIORI デフォルトで補完される。
 [actor."女の子"]
 spot = 0
 
 [actor."男の子"]
 spot = 1
-
-[persistence]
-data_dir = "profile/pasta/save"
 ```
 
-`pasta_patterns = ["dic/*.pasta"]` の指定により、`dic/` フォルダの `.pasta` ファイル（ステップ 2〜6 で書いた 5 つ）がすべて自動的に読み込まれる。
+- `"女の子"` / `"男の子"` は、`descript.txt` の `sakura.name` / `kero.name` と一致させる。
+- `spot` はバルーン位置（`0`=sakura 側 / `1`=kero 側）で、ゴースト固有のためデフォルト化できず、各アクターで必ず指定する。
+- 辞書は `[loader]` を書かなくても、`pasta_patterns` のデフォルト `["dic/**/*.pasta"]` により `dic/` 配下の `.pasta` ファイル（ステップ 2〜6 で書いた 5 つ）がすべて自動的に読み込まれる。
 
-pasta.toml には他にもログ設定（`[logging]`）やトークウェイト設定（`[talk]`）などを書ける。完全な設定例は [hello-pasta の pasta.toml](https://github.com/ekicyou/pasta/blob/main/crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/pasta.toml) を参照すること。
+この最小構成をそのまま `ghost/master/pasta.toml` として保存すれば、hello-pasta は起動する。各セクションの分類（省略可 / 必須 / エンジンプロファイル専用）と全フィールドのデフォルト値、フルリファレンステンプレートは設定ファイルリファレンスにまとまっている。ランダムトーク間隔（`[ghost]`）やログ設定（`[logging]`）などを明示したくなったら、そちらを参照して必要な項目だけ書き足すとよい。配布版 hello-pasta の完全な設定例は [hello-pasta の pasta.toml](https://github.com/ekicyou/pasta/blob/main/crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/pasta.toml) を参照すること。
 
 ### pasta.dll と Lua ランタイム
 
@@ -459,7 +437,7 @@ pasta.toml には他にもログ設定（`[logging]`）やトークウェイト�
 
 - **文字化けする / 辞書が読めない**: ファイルが UTF-8 で保存されているか確認する。設定ファイル先頭の `charset,UTF-8` も確認する。
 - **何も表示されない**: `ghost/master/` に `pasta.dll` が置かれているか、`descript.txt` に `shiori,pasta.dll` があるか確認する。
-- **辞書が反映されない**: `dic/` フォルダの中に `.pasta` ファイルがあるか、`pasta.toml` の `pasta_patterns` が `dic/*.pasta` になっているか確認する。
+- **辞書が反映されない**: `dic/` フォルダの中に `.pasta` ファイルがあるか確認する。`pasta_patterns` を省略していればデフォルトの `["dic/**/*.pasta"]` で読み込まれる。明示している場合はそのパターンが `dic/` 配下を網羅しているか確認する。
 
 ---
 

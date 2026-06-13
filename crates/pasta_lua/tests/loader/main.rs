@@ -8,6 +8,7 @@ mod common;
 
 mod cache_test;
 mod config_actors_initialization_test;
+mod config_defaults_test;
 mod config_test;
 mod lifecycle_test;
 mod lua_passthrough_test;

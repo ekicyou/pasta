@@ -439,6 +439,196 @@ mod tests {
         assert!(!file_names.contains(&"secret.pasta".to_string()));
     }
 
+    // --- Recursive default pattern (`dic/**/*.pasta`) tests ---
+    //
+    // Task 1.2 changed the default discovery glob to `dic/**/*.pasta` (recursive).
+    // These tests pin the recursive-glob behavior for flat / one-level /
+    // multi-level placements, fix the existing nested layout as a
+    // non-destructive regression, and confirm exclusion rules (profile/,
+    // traversal, symlink/junction) remain invariant under the recursive pattern.
+
+    /// Flat: a file directly under `dic/` IS discovered with `dic/**/*.pasta`.
+    /// (The old one-level pattern `dic/*/*.pasta` excludes it — see
+    /// `test_discover_excludes_root_dic` — but the recursive default includes it.)
+    #[test]
+    fn test_discover_recursive_includes_flat_root() {
+        let temp = TempDir::new().unwrap();
+        let base_dir = create_test_structure(&temp);
+
+        let patterns = vec!["dic/**/*.pasta".to_string()];
+        let files = discover_files(&base_dir, &patterns).unwrap();
+        let file_names: Vec<_> = files
+            .iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+
+        // dic/root.pasta sits directly under dic/ and must now be found.
+        assert!(
+            file_names.contains(&"root.pasta".to_string()),
+            "recursive pattern must include flat dic/root.pasta, got {file_names:?}"
+        );
+    }
+
+    /// One-level: files under `dic/<sub>/*.pasta` are discovered with the
+    /// recursive pattern (non-destructive: the existing nested layout still
+    /// loads exactly as it did under `dic/*/*.pasta`).
+    #[test]
+    fn test_discover_recursive_includes_one_level_nested() {
+        let temp = TempDir::new().unwrap();
+        let base_dir = create_test_structure(&temp);
+
+        let patterns = vec!["dic/**/*.pasta".to_string()];
+        let files = discover_files(&base_dir, &patterns).unwrap();
+        let file_names: Vec<_> = files
+            .iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+
+        // The pre-existing one-level nested files remain discovered (regression).
+        assert!(file_names.contains(&"hello.pasta".to_string()));
+        assert!(file_names.contains(&"goodbye.pasta".to_string()));
+        assert!(file_names.contains(&"chat.pasta".to_string()));
+    }
+
+    /// Multi-level: a file deeper than one level (`dic/a/b/c.pasta`) IS
+    /// discovered with `dic/**/*.pasta`. The old one-level default
+    /// (`dic/*/*.pasta`) would NOT match this — pin the new capability.
+    #[test]
+    fn test_discover_recursive_includes_multi_level_nested() {
+        let temp = TempDir::new().unwrap();
+        let base_dir = create_test_structure(&temp);
+        fs::create_dir_all(base_dir.join("dic/a/b")).unwrap();
+        fs::write(base_dir.join("dic/a/b/c.pasta"), "# deep").unwrap();
+
+        let patterns = vec!["dic/**/*.pasta".to_string()];
+        let files = discover_files(&base_dir, &patterns).unwrap();
+        let file_names: Vec<_> = files
+            .iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+
+        // Deep file must be found by the recursive pattern.
+        assert!(
+            file_names.contains(&"c.pasta".to_string()),
+            "recursive pattern must include multi-level dic/a/b/c.pasta, got {file_names:?}"
+        );
+
+        // Sanity: the old one-level pattern would NOT reach the deep file,
+        // confirming this is genuinely new recursive capability.
+        let one_level = discover_files(&base_dir, &["dic/*/*.pasta".to_string()]).unwrap();
+        let one_level_names: Vec<_> = one_level
+            .iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+        assert!(!one_level_names.contains(&"c.pasta".to_string()));
+    }
+
+    /// Full default-pattern picture: with `dic/**/*.pasta` the discovered set is
+    /// exactly the flat file plus the one-level nested files (additive vs. the
+    /// old `dic/*/*.pasta` result, which had 3 files and excluded root).
+    #[test]
+    fn test_discover_recursive_default_full_set() {
+        let temp = TempDir::new().unwrap();
+        let base_dir = create_test_structure(&temp);
+
+        let patterns = vec!["dic/**/*.pasta".to_string()];
+        let files = discover_files(&base_dir, &patterns).unwrap();
+        let mut file_names: Vec<_> = files
+            .iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+        file_names.sort();
+
+        assert_eq!(
+            file_names,
+            vec![
+                "chat.pasta".to_string(),
+                "goodbye.pasta".to_string(),
+                "hello.pasta".to_string(),
+                "root.pasta".to_string(),
+            ],
+            "recursive default must additively include flat + nested files"
+        );
+    }
+
+    /// Exclusion invariant: `profile/` files stay excluded under the recursive
+    /// `dic/**/*.pasta` pattern as well. We place a `.pasta` inside a `profile/`
+    /// dir nested under `dic/` to ensure the profile exclusion still wins even
+    /// when reached via the recursive glob.
+    #[test]
+    fn test_discover_recursive_excludes_profile() {
+        let temp = TempDir::new().unwrap();
+        let base_dir = create_test_structure(&temp);
+        // profile/ directly under base — reachable via the broad recursive glob.
+        fs::create_dir_all(base_dir.join("profile/nested")).unwrap();
+        fs::write(base_dir.join("profile/nested/secret.pasta"), "# secret").unwrap();
+
+        // Use a base-rooted recursive pattern so a profile match is even possible,
+        // then confirm exclusion still holds.
+        let patterns = vec!["**/*.pasta".to_string()];
+        let files = discover_files(&base_dir, &patterns).unwrap();
+        let file_names: Vec<_> = files
+            .iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+
+        assert!(!file_names.contains(&"secret.pasta".to_string()));
+        assert!(!file_names.contains(&"cached.pasta".to_string()));
+        // dic content is still present.
+        assert!(file_names.contains(&"hello.pasta".to_string()));
+        assert!(file_names.contains(&"root.pasta".to_string()));
+    }
+
+    /// Exclusion invariant: directory-traversal patterns are still rejected when
+    /// combined with the recursive default — the valid recursive pattern keeps
+    /// working, the `..` pattern contributes nothing.
+    #[test]
+    fn test_discover_recursive_rejects_traversal_preserves_valid() {
+        let temp = TempDir::new().unwrap();
+        let base_dir = create_test_structure(&temp);
+
+        let patterns = vec![
+            "../secret/**/*.pasta".to_string(),
+            "dic/**/*.pasta".to_string(),
+        ];
+        let files = discover_files(&base_dir, &patterns).unwrap();
+        let file_names: Vec<_> = files
+            .iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+
+        // Recursive default yields flat + nested (4 files); traversal added none.
+        assert_eq!(files.len(), 4);
+        assert!(file_names.contains(&"root.pasta".to_string()));
+        assert!(file_names.contains(&"hello.pasta".to_string()));
+    }
+
+    /// Exclusion invariant (Unix): a symlinked file matched via the recursive
+    /// `dic/**/*.pasta` pattern is still skipped.
+    #[cfg(unix)]
+    #[test]
+    fn test_discover_recursive_skips_symlinked_file() {
+        use std::os::unix::fs as unix_fs;
+
+        let temp = TempDir::new().unwrap();
+        let base_dir = create_test_structure(&temp);
+        let external = temp.path().join("external.pasta");
+        fs::write(&external, "# external").unwrap();
+        unix_fs::symlink(&external, base_dir.join("dic/greeting/link.pasta")).unwrap();
+
+        let patterns = vec!["dic/**/*.pasta".to_string()];
+        let files = discover_files(&base_dir, &patterns).unwrap();
+        let file_names: Vec<_> = files
+            .iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy().to_string())
+            .collect();
+
+        assert!(!file_names.contains(&"link.pasta".to_string()));
+        // Real files (including the flat root) remain discovered.
+        assert!(file_names.contains(&"root.pasta".to_string()));
+        assert!(file_names.contains(&"hello.pasta".to_string()));
+    }
+
     #[cfg(unix)]
     #[test]
     fn test_discover_skips_symlinked_directory() {

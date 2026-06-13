@@ -4,8 +4,8 @@
 //! default_lua_search_paths, default_log_file_path: pub に昇格
 
 use pasta_lua::loader::{
-    LoaderConfig, LoaderError, LoggingConfig, LuaConfig, PastaConfig, PersistenceConfig, TalkConfig,
-    default_log_file_path, default_lua_search_paths,
+    GhostConfig, LoaderConfig, LoaderError, LoggingConfig, LuaConfig, PastaConfig,
+    PersistenceConfig, TalkConfig, default_log_file_path, default_lua_search_paths,
 };
 
 // ============================================================================
@@ -112,7 +112,7 @@ fn debug_file_config_serde_defaults_for_new_fields() {
 #[test]
 fn test_default_config() {
     let config = PastaConfig::default();
-    assert_eq!(config.loader.pasta_patterns, vec!["dic/*/*.pasta"]);
+    assert_eq!(config.loader.pasta_patterns, vec!["dic/**/*.pasta"]);
     assert_eq!(
         config.loader.lua_search_paths,
         vec![
@@ -137,7 +137,7 @@ fn test_deserialize_minimal_config() {
 [loader]
 "#;
     let config = PastaConfig::from_str(toml_str).unwrap();
-    assert_eq!(config.loader.pasta_patterns, vec!["dic/*/*.pasta"]);
+    assert_eq!(config.loader.pasta_patterns, vec!["dic/**/*.pasta"]);
     assert!(config.loader.debug_mode);
 }
 
@@ -206,7 +206,7 @@ ghost_name = "NoLoaderGhost"
 "#;
     let config = PastaConfig::from_str(toml_str).unwrap();
     // Should use defaults for loader
-    assert_eq!(config.loader.pasta_patterns, vec!["dic/*/*.pasta"]);
+    assert_eq!(config.loader.pasta_patterns, vec!["dic/**/*.pasta"]);
     assert_eq!(
         config.custom_fields.get("ghost_name"),
         Some(&toml::Value::String("NoLoaderGhost".to_string()))
@@ -676,5 +676,129 @@ fn test_loader_config_default_includes_user_scripts() {
             .lua_search_paths
             .contains(&"profile/pasta/pasta_scripts".to_string()),
         "Default LoaderConfig should include profile/pasta/pasta_scripts"
+    );
+}
+
+// ----- GhostConfig SSOT -----
+
+/// `[ghost]` の SHIORI デフォルト値の単一供給源（SSOT）。
+/// `GhostConfig::default()` が現行 Lua リテラルと同値の
+/// `180 / 300 / 30 / 1.5` をそのまま返すことを固定する（要件 1.2 / 1.3 / 3.3）。
+#[test]
+fn test_ghost_config_default_values() {
+    let config = GhostConfig::default();
+    assert_eq!(config.talk_interval_min, 180);
+    assert_eq!(config.talk_interval_max, 300);
+    assert_eq!(config.hour_margin, 30);
+    assert_eq!(config.spot_newlines, 1.5);
+}
+
+// ----- [ghost] 実体化（補完後形状）の公開API検証 -----
+//
+// 要件 6.3 / 3.1 / 3.3: ロード後の単一補完ステップ（apply_shiori_defaults）が
+// `from_str`（公開パースエントリ）経路上で1回適用され、`[ghost]` を書かなくても
+// 補完後の `custom_fields` に `ghost` セクションが実体化することを、公開API境界で固定する。
+// （クレート内 parse_materializes_ghost_section_with_defaults の公開API版ミラー。
+// 同時に test_default_config の `custom_fields.is_empty()`（Default 経路・補完バイパス）
+// が依然有効であることの対になる、from_str 経路の補完後形状を押さえる。）
+
+/// `from_str` 補助: 補完後の `custom_fields["ghost"]` をテーブルとして取り出す。
+fn materialized_ghost_table(config: &PastaConfig) -> &toml::Table {
+    config
+        .custom_fields
+        .get("ghost")
+        .expect("from_str must materialize a [ghost] section via apply_shiori_defaults")
+        .as_table()
+        .expect("materialized ghost entry must be a table")
+}
+
+/// `[ghost]` を一切書かない設定を **公開API** `PastaConfig::from_str` でパースすると、
+/// 補完後の `custom_fields` に `ghost` テーブルが実体化し、4つの SSOT 既定値
+/// （180 / 300 / 30 / 1.5）が揃うこと。
+///
+/// もし補完（apply_shiori_defaults）が parse 経路から外れれば、`ghost` キー自体が
+/// 欠落して `materialized_ghost_table` の expect が失敗するため、このテストは
+/// 実体化コントラクトを境界でピン留めする（タスク 2.3 の配線が存在するため通る）。
+#[test]
+fn test_from_str_materializes_ghost_defaults_when_section_omitted() {
+    // `[ghost]` を含まない最小構成（`[actor]` のみ）。
+    let config = PastaConfig::from_str("[actor]\nname = \"sakura\"\nspot = 0\n").unwrap();
+
+    let ghost = materialized_ghost_table(&config);
+    assert_eq!(
+        ghost.get("talk_interval_min").and_then(toml::Value::as_integer),
+        Some(180),
+        "6.3/3.3: omitted [ghost] must materialize talk_interval_min=180 at the public API"
+    );
+    assert_eq!(
+        ghost.get("talk_interval_max").and_then(toml::Value::as_integer),
+        Some(300),
+        "6.3/3.3: omitted [ghost] must materialize talk_interval_max=300 at the public API"
+    );
+    assert_eq!(
+        ghost.get("hour_margin").and_then(toml::Value::as_integer),
+        Some(30),
+        "6.3/3.3: omitted [ghost] must materialize hour_margin=30 at the public API"
+    );
+    assert_eq!(
+        ghost.get("spot_newlines").and_then(toml::Value::as_float),
+        Some(1.5),
+        "6.3/3.3: omitted [ghost] must materialize spot_newlines=1.5 at the public API"
+    );
+}
+
+/// 明示カスタムフィールドを持ちつつ `[ghost]` を省略した設定を `from_str` でパースすると、
+/// 作者が書いた明示フィールド（top-level `ghost_name` と `[user_data]` セクション）が
+/// **保持**され、その隣に `ghost` が実体化すること（明示値を clobber しない）。
+///
+/// 補完は欠落キーの追加のみを行い、既存の custom_fields を破壊しないことを境界で固定する。
+#[test]
+fn test_from_str_preserves_explicit_custom_fields_alongside_materialized_ghost() {
+    let toml_str = r#"
+ghost_name = "TestGhost"
+
+[actor]
+name = "sakura"
+spot = 0
+
+[user_data]
+key1 = "value1"
+"#;
+    let config = PastaConfig::from_str(toml_str).unwrap();
+
+    // 明示カスタムフィールドは補完で上書き・除去されない。
+    assert_eq!(
+        config.custom_fields.get("ghost_name"),
+        Some(&toml::Value::String("TestGhost".to_string())),
+        "explicit top-level custom field must survive default materialization"
+    );
+    let user_data = config
+        .custom_fields
+        .get("user_data")
+        .and_then(toml::Value::as_table)
+        .expect("explicit [user_data] section must survive default materialization");
+    assert_eq!(
+        user_data.get("key1"),
+        Some(&toml::Value::String("value1".to_string())),
+        "explicit nested custom field must survive default materialization"
+    );
+
+    // 明示フィールドの隣に ghost が実体化し、SSOT 既定値が揃う。
+    let ghost = materialized_ghost_table(&config);
+    assert_eq!(
+        ghost.get("talk_interval_min").and_then(toml::Value::as_integer),
+        Some(180)
+    );
+    assert_eq!(
+        ghost.get("talk_interval_max").and_then(toml::Value::as_integer),
+        Some(300)
+    );
+    assert_eq!(
+        ghost.get("hour_margin").and_then(toml::Value::as_integer),
+        Some(30)
+    );
+    assert_eq!(
+        ghost.get("spot_newlines").and_then(toml::Value::as_float),
+        Some(1.5)
     );
 }

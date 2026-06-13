@@ -71,10 +71,82 @@ impl PastaConfig {
         let custom_fields = table;
 
         tracing::debug!("Parsed configuration");
-        Ok(Self {
+        let mut config = Self {
             loader,
             custom_fields,
-        })
+        };
+
+        // Single SHIORI-defaults completion choke point: applied exactly once,
+        // here at the sole config-construction site, so both the Rust consumers
+        // and the Lua exposure path (`@pasta_config` via `custom_fields`) observe
+        // the same post-completion state (requirements 3.1/3.3). Do NOT call
+        // `apply_shiori_defaults` anywhere else.
+        config.apply_shiori_defaults();
+
+        Ok(config)
+    }
+
+    /// Fill missing SHIORI-profile defaults into `custom_fields`.
+    ///
+    /// This is the single post-load completion choke point for SHIORI-profile
+    /// custom-field sections. Currently it normalizes the `[ghost]` section by
+    /// filling **only the missing keys** from [`GhostConfig::default()`] (the
+    /// SSOT) without ever overwriting values the author wrote explicitly
+    /// (requirements 3.1/3.2/3.4). If the `[ghost]` table is absent it is
+    /// created and all four keys are filled (so `@pasta_config.ghost.*` always
+    /// exists — requirement 3.3).
+    ///
+    /// The operation is **idempotent**: applying it twice yields the same
+    /// result. Engine-profile-only sections (`[package]`) and every non-`[ghost]`
+    /// section are left untouched. The `[ghost]` section keeps flowing through
+    /// `custom_fields` to Lua — it is not extracted into a typed field.
+    ///
+    /// Invoked exactly once from [`PastaConfig::parse`] (the sole config
+    /// construction site), just before returning, so it is the single completion
+    /// choke point. It must not be called from anywhere else.
+    fn apply_shiori_defaults(&mut self) {
+        let defaults = GhostConfig::default();
+
+        // Ensure the `ghost` entry exists as a table, then fill only missing
+        // keys. `entry(..).or_insert_with(..)` keeps an existing table (and its
+        // explicit values) intact, guaranteeing idempotence and non-override.
+        let ghost = self
+            .custom_fields
+            .entry("ghost")
+            .or_insert_with(|| toml::Value::Table(toml::Table::new()));
+
+        if let Some(ghost) = ghost.as_table_mut() {
+            ghost
+                .entry("talk_interval_min")
+                .or_insert_with(|| toml::Value::Integer(defaults.talk_interval_min));
+            ghost
+                .entry("talk_interval_max")
+                .or_insert_with(|| toml::Value::Integer(defaults.talk_interval_max));
+            ghost
+                .entry("hour_margin")
+                .or_insert_with(|| toml::Value::Integer(defaults.hour_margin));
+            ghost
+                .entry("spot_newlines")
+                .or_insert_with(|| toml::Value::Float(defaults.spot_newlines));
+        }
+
+        // `[actor]` is the single SHIORI-required section (requirement 2.1). Its
+        // value (name/spot) is ghost-specific and cannot be defaulted, so we do
+        // NOT block startup when it is missing — we emit ONE lightweight warning
+        // so the author can tell the omission apart (requirement 2.3). Mirrors
+        // `RuntimeConfig::validate_and_warn` in tone. The message is intentionally
+        // generic: no file paths, no secrets (Security Considerations).
+        let has_actor_table = self
+            .custom_fields
+            .get("actor")
+            .is_some_and(toml::Value::is_table);
+        if !has_actor_table {
+            tracing::warn!(
+                "No [actor] section is defined in pasta.toml. \
+                 At least one [actor] is required for the ghost to act as a SHIORI; \
+                 without it the ghost may not function correctly."
+            );
+        }
     }
 
     /// Get a custom configuration section by key.
@@ -128,7 +200,7 @@ impl PastaConfig {
 /// Loader-specific configuration ([loader] section).
 #[derive(Debug, Clone, Deserialize)]
 pub struct LoaderConfig {
-    /// Pasta file discovery patterns (default: ["dic/*/*.pasta"])
+    /// Pasta file discovery patterns (default: ["dic/**/*.pasta"])
     #[serde(default = "default_pasta_patterns")]
     pub pasta_patterns: Vec<String>,
 
@@ -157,7 +229,7 @@ impl Default for LoaderConfig {
 }
 
 fn default_pasta_patterns() -> Vec<String> {
-    vec!["dic/*/*.pasta".to_string()]
+    vec!["dic/**/*.pasta".to_string()]
 }
 
 pub fn default_lua_search_paths() -> Vec<String> {
@@ -422,6 +494,71 @@ impl Default for TalkConfig {
     }
 }
 
+/// Ghost configuration defaults for the `[ghost]` section in pasta.toml.
+///
+/// Acts as the single source of truth (SSOT) for the SHIORI default values of
+/// the `[ghost]` section. The defaults (`talk_interval_min = 180`,
+/// `talk_interval_max = 300`, `hour_margin = 30`, `spot_newlines = 1.5`) match
+/// the current Lua literal fallbacks so that omitting `[ghost]` keeps the
+/// historical behavior (requirements 1.2 / 1.3 / 3.3).
+///
+/// This struct is a **value supply source only**: it provides the default
+/// values for the later `apply_shiori_defaults` completion step. It is
+/// intentionally NOT wired into [`PastaConfig::parse`] and does not extract
+/// `[ghost]` out of `custom_fields` — the `[ghost]` section keeps flowing
+/// through to Lua via `custom_fields` (the `@pasta_config` exposure path stays
+/// unchanged).
+#[derive(Debug, Clone)]
+pub struct GhostConfig {
+    /// Minimum interval between random talks, in seconds.
+    /// Default: 180
+    pub talk_interval_min: i64,
+
+    /// Maximum interval between random talks, in seconds.
+    /// Default: 300
+    pub talk_interval_max: i64,
+
+    /// Margin (in seconds) around the top of the hour during which a random
+    /// talk is suppressed in favor of the hourly event.
+    /// Default: 30
+    pub hour_margin: i64,
+
+    /// Number of blank lines inserted on actor/spot switch (as a ratio).
+    /// Default: 1.5
+    pub spot_newlines: f64,
+}
+
+impl Default for GhostConfig {
+    fn default() -> Self {
+        Self {
+            talk_interval_min: default_talk_interval_min(),
+            talk_interval_max: default_talk_interval_max(),
+            hour_margin: default_hour_margin(),
+            spot_newlines: default_spot_newlines(),
+        }
+    }
+}
+
+/// Default minimum random-talk interval in seconds (`180`).
+pub const fn default_talk_interval_min() -> i64 {
+    180
+}
+
+/// Default maximum random-talk interval in seconds (`300`).
+pub const fn default_talk_interval_max() -> i64 {
+    300
+}
+
+/// Default top-of-hour suppression margin in seconds (`30`).
+pub const fn default_hour_margin() -> i64 {
+    30
+}
+
+/// Default spot/actor switch blank-line ratio (`1.5`).
+pub const fn default_spot_newlines() -> f64 {
+    1.5
+}
+
 /// Debug configuration from `[debug]` section in pasta.toml.
 ///
 /// Controls the Rust-hosted DAP debug backend embedded in pasta_lua.
@@ -482,4 +619,180 @@ impl Default for DebugFileConfig {
 /// Default debug listener port.
 pub const fn default_debug_port() -> u16 {
     9276
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 既定の探索パターンは慣例 dic 配置（直下・一階層・多階層）を網羅する
+    /// 再帰形 glob を返す（Requirement 2.5）。
+    #[test]
+    fn default_pasta_patterns_is_recursive() {
+        assert_eq!(default_pasta_patterns(), vec!["dic/**/*.pasta".to_string()]);
+    }
+
+    /// `LoaderConfig::default()` の `pasta_patterns` も同じ再帰形既定を採用する。
+    #[test]
+    fn loader_config_default_uses_recursive_pasta_patterns() {
+        assert_eq!(
+            LoaderConfig::default().pasta_patterns,
+            vec!["dic/**/*.pasta".to_string()]
+        );
+    }
+
+    /// テスト補助: `custom_fields["ghost"]` をテーブルとして取り出す。
+    fn ghost_table(config: &PastaConfig) -> &toml::Table {
+        config
+            .custom_fields
+            .get("ghost")
+            .and_then(|v| v.as_table())
+            .expect("ghost section should exist after apply_shiori_defaults")
+    }
+
+    /// `[ghost]` セクションを完全に省略した場合、補完後に全4キーが
+    /// SSOT 既定値（180/300/30/1.5）で埋まる（Requirement 3.1/3.2/3.3）。
+    #[test]
+    fn apply_shiori_defaults_fills_all_ghost_keys_when_section_omitted() {
+        // Construct a ghost-absent config WITHOUT routing through `from_str`,
+        // because `parse`/`from_str` now applies `apply_shiori_defaults` once and
+        // would materialize `[ghost]` before this test could observe its absence.
+        // Building `custom_fields` directly lets us exercise the function in
+        // isolation on a genuinely ghost-absent input.
+        let mut config = PastaConfig::default();
+        config
+            .custom_fields
+            .insert("actor".to_string(), {
+                let mut actor = toml::Table::new();
+                actor.insert("name".to_string(), toml::Value::String("sakura".to_string()));
+                toml::Value::Table(actor)
+            });
+        assert!(
+            config.custom_fields.get("ghost").is_none(),
+            "precondition: ghost section absent before apply"
+        );
+
+        config.apply_shiori_defaults();
+
+        let ghost = ghost_table(&config);
+        assert_eq!(ghost.get("talk_interval_min").unwrap().as_integer(), Some(180));
+        assert_eq!(ghost.get("talk_interval_max").unwrap().as_integer(), Some(300));
+        assert_eq!(ghost.get("hour_margin").unwrap().as_integer(), Some(30));
+        assert_eq!(ghost.get("spot_newlines").unwrap().as_float(), Some(1.5));
+    }
+
+    /// 部分的に書かれた `[ghost]`（明示値 `talk_interval_min=120`）は不変で、
+    /// 欠落キーのみ既定で補完される（Requirement 3.4: 明示値を上書きしない）。
+    #[test]
+    fn apply_shiori_defaults_preserves_explicit_ghost_values() {
+        let mut config =
+            PastaConfig::from_str("[ghost]\ntalk_interval_min = 120\n").unwrap();
+
+        config.apply_shiori_defaults();
+
+        let ghost = ghost_table(&config);
+        // 明示値は不変
+        assert_eq!(ghost.get("talk_interval_min").unwrap().as_integer(), Some(120));
+        // 欠落キーは既定で補完
+        assert_eq!(ghost.get("talk_interval_max").unwrap().as_integer(), Some(300));
+        assert_eq!(ghost.get("hour_margin").unwrap().as_integer(), Some(30));
+        assert_eq!(ghost.get("spot_newlines").unwrap().as_float(), Some(1.5));
+    }
+
+    /// 補完は冪等: 二重適用しても結果が変わらない（Service Interface invariant）。
+    #[test]
+    fn apply_shiori_defaults_is_idempotent() {
+        let mut once = PastaConfig::from_str("[ghost]\ntalk_interval_min = 120\n").unwrap();
+        once.apply_shiori_defaults();
+
+        let mut twice = PastaConfig::from_str("[ghost]\ntalk_interval_min = 120\n").unwrap();
+        twice.apply_shiori_defaults();
+        twice.apply_shiori_defaults();
+
+        assert_eq!(ghost_table(&once), ghost_table(&twice));
+    }
+
+    /// `[package]`（エンジンプロファイル専用）は補完対象外であり、
+    /// 補完後も追加・削除・変更されない（Design: [package] は補完しない）。
+    #[test]
+    fn apply_shiori_defaults_does_not_touch_package_section() {
+        let mut config = PastaConfig::from_str(
+            "[package]\nname = \"demo\"\nversion = \"1.0\"\n",
+        )
+        .unwrap();
+        let before = config.custom_fields.get("package").cloned();
+
+        config.apply_shiori_defaults();
+
+        let after = config.custom_fields.get("package").cloned();
+        assert_eq!(
+            before, after,
+            "[package] section must be untouched by apply_shiori_defaults"
+        );
+    }
+
+    /// `[actor]` セクションが存在しない補完時は、起動を妨げない軽量な警告
+    /// （warn レベルのログ）を1回発し、かつ補完処理は正常終了する
+    /// （Requirement 2.3: 起動継続・判別可能化）。
+    #[tracing_test::traced_test]
+    #[test]
+    fn apply_shiori_defaults_warns_when_actor_section_absent() {
+        // `[actor]` を含まない最小構成（[ghost] のみ）。
+        let mut config =
+            PastaConfig::from_str("[ghost]\ntalk_interval_min = 120\n").unwrap();
+        assert!(
+            config.custom_fields.get("actor").is_none(),
+            "precondition: actor section absent before apply"
+        );
+
+        // 補完はエラーや panic を起こさず正常終了する（起動継続）。
+        config.apply_shiori_defaults();
+
+        // actor 不在の警告が発火している（判別可能化）。
+        // 注: `tracing-test` の `logs_contain` はスパン名（=テスト関数名）も
+        // 走査するため、関数名に含まれない識別フレーズで照合する。
+        assert!(
+            logs_contain("No [actor] section is defined"),
+            "actor-absence warning should be emitted when [actor] is missing"
+        );
+    }
+
+    /// `[actor]` セクション（テーブル）が存在する場合は、actor 不在警告を
+    /// 発しない（誤検知しない）。補完処理は正常終了する。
+    #[tracing_test::traced_test]
+    #[test]
+    fn apply_shiori_defaults_does_not_warn_when_actor_section_present() {
+        let mut config =
+            PastaConfig::from_str("[actor]\nname = \"sakura\"\n").unwrap();
+
+        config.apply_shiori_defaults();
+
+        // actor が存在するので不在警告は出ない。
+        assert!(
+            !logs_contain("No [actor] section is defined"),
+            "no actor-absence warning should be emitted when [actor] is present"
+        );
+    }
+
+    /// `[ghost]` を一切書かない設定を `parse`（`from_str`）するだけで、補完
+    /// チョークポイント（`apply_shiori_defaults`）が経路上で1回適用され、結果の
+    /// `custom_fields` に `ghost` セクションが実体化し既定値（180/300/30/1.5）が
+    /// 入る（Requirement 3.1/3.3, Design: parse 戻り直前の単一補完）。
+    #[test]
+    fn parse_materializes_ghost_section_with_defaults() {
+        // `[ghost]` を含まない最小構成（`[actor]` のみ）。
+        let config = PastaConfig::from_str("[actor]\nname = \"sakura\"\n").unwrap();
+
+        let ghost = ghost_table(&config);
+        assert_eq!(
+            ghost.get("talk_interval_min").unwrap().as_integer(),
+            Some(180)
+        );
+        assert_eq!(
+            ghost.get("talk_interval_max").unwrap().as_integer(),
+            Some(300)
+        );
+        assert_eq!(ghost.get("hour_margin").unwrap().as_integer(), Some(30));
+        assert_eq!(ghost.get("spot_newlines").unwrap().as_float(), Some(1.5));
+    }
 }

@@ -65,16 +65,34 @@ fn test_shell_images() {
 
 /// pasta.toml 内容検証テスト（ghosts/hello-pasta 直接読み込み）
 ///
-/// 仕様準拠: requirements.md Requirement 7.1-7.4
+/// 仕様準拠: pasta-config-restructure R4（`[package]` のエンジンプロファイル化と除去）。
+/// 旧サンプルゴースト仕様の「Req 7.1」が要求していた `[package]` の存在期待は、
+/// 本仕様 R4.4 が上書きする（cross-spec 改訂を pasta-config-restructure が所有）。
 #[test]
 fn test_pasta_toml_content() {
     let content = std::fs::read_to_string(ghost_dir().join("ghost/master/pasta.toml")).unwrap();
 
-    // 必須セクション確認 (Req 7.1)
+    // [package] 不在確認 (R4.3, R4.4)
+    // `[package]` は SHIORI 用途では不要な「エンジンプロファイル専用」として
+    // サンプルから除去された。name/version/edition も併せて不在であること。
     assert!(
-        content.contains("[package]"),
-        "[package] セクションがありません"
+        !content.contains("[package]"),
+        "[package] セクションが残っています（R4.4: サンプルから除去されているべき）"
     );
+    assert!(
+        !content.contains(r#"name = "hello-pasta""#),
+        "package name が残っています（R4.4: 除去されているべき）"
+    );
+    assert!(
+        !content.contains(r#"version = "1.0.0""#),
+        "package version が残っています（R4.4: 除去されているべき）"
+    );
+    assert!(
+        !content.contains(r#"edition = "2024""#),
+        "package edition が残っています（R4.4: 除去されているべき）"
+    );
+
+    // 後方互換のため維持される他セクション確認
     assert!(
         content.contains("[loader]"),
         "[loader] セクションがありません"
@@ -86,20 +104,6 @@ fn test_pasta_toml_content() {
     assert!(
         content.contains("[persistence]"),
         "[persistence] セクションがありません"
-    );
-
-    // [package] セクション内容確認 (Req 7.1)
-    assert!(
-        content.contains(r#"name = "hello-pasta""#),
-        "package name がありません"
-    );
-    assert!(
-        content.contains(r#"version = "1.0.0""#),
-        "package version がありません"
-    );
-    assert!(
-        content.contains(r#"edition = "2024""#),
-        "package edition がありません"
     );
 
     // [loader] セクション内容確認 (Req 7.1, 7.2)

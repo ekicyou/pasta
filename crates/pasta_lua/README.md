@@ -105,8 +105,8 @@ pasta_lua/
 | パス                             | 用途                      | 備考                                     |
 | -------------------------------- | ------------------------- | ---------------------------------------- |
 | `pasta.toml`                     | 設定ファイル              | 必須。存在しない場合はエラー             |
-| `dic/*/*.pasta`                  | Pasta DSL ソース          | デフォルトの検出パターン                 |
-| `dic/*/*.lua`                    | Lua パススルー            | トランスパイルなしでキャッシュにコピー   |
+| `dic/**/*.pasta`                 | Pasta DSL ソース          | デフォルトの検出パターン（再帰）         |
+| `dic/**/*.lua`                   | Lua パススルー            | トランスパイルなしでキャッシュにコピー   |
 | `scripts/`                       | ユーザーカスタム Lua | `pasta_scripts/` より優先される             |
 | `pasta_scripts/`                 | 標準ランタイム        | エンジン同梱スクリプト                 |
 | `pasta_scripts/pasta/`           | Pasta ランタイム          | トランスパイル済みコードから呼び出される |
@@ -118,68 +118,30 @@ pasta_lua/
 
 ## 設定ファイル（pasta.toml）
 
+`pasta.toml` の各セクション・各フィールドは、**プロファイルモデル**に基づき次の3分類のいずれか1つへ一意に分類されます。
+
+1. **SHIORI デフォルト有（省略可）** — 省略すると SSOT（Rust ローダ）のデフォルト値が自動補完されます。最小構成では書かなくてよい。`[loader]` / `[ghost]` / `[talk]` / `[persistence]` / `[logging]` / `[lua]` / `[debug]` が該当します。
+2. **必須（デフォルト不能）** — ゴースト固有でデフォルト化できないため必ず記述が必要。現状は `[actor]`（1つ以上）のみ。
+3. **エンジンプロファイル専用** — SHIORI 用途では記述不要。現状は `[package]` のみ（記述しても無視され、従来どおり起動します）。
+
+### 最小構成（必須の `[actor]` のみ）
+
+SHIORI として起動するために**必須なのは `[actor]` だけ**です。他の全セクションは省略でき、SSOT デフォルトが自動補完されます。`[package]` / `[loader]` を含む必要はありません。
+
 ```toml
-[loader]
-# Pasta ファイルの検出パターン（glob形式）
-# デフォルト: ["dic/*/*.pasta"]
-pasta_patterns = ["dic/*/*.pasta"]
-
-# Lua モジュール検索パス（優先度順）
-# デフォルト: 下記参照
-lua_search_paths = [
-    "profile/pasta/save/lua",  # 1. 永続化モジュール（最優先）
-    "scripts",                 # 2. ユーザーカスタムスクリプト
-    "pasta_scripts",           # 3. 標準ランタイムスクリプト
-    "profile/pasta/cache/lua", # 4. トランスパイル済みキャッシュ
-    "scriptlibs",              # 5. 外部ライブラリ
-]
-
-# トランスパイル出力ディレクトリ
-# デフォルト: "profile/pasta/cache/lua"
-transpiled_output_dir = "profile/pasta/cache/lua"
-
-# デバッグモード（トランスパイル結果をファイル保存）
-# デフォルト: true
-debug_mode = true
-
-[logging]
-# ログファイルパス（base_dir からの相対パス）
-# デフォルト: "profile/pasta/logs/pasta.log"
-file_path = "profile/pasta/logs/pasta.log"
-
-# ログローテーション日数
-# デフォルト: 7
-rotation_days = 7
-
-[lua]
-# 有効にするライブラリの配列（Cargo風記法）
-# デフォルト: ["std_all", "assertions", "testing", "regex", "json", "yaml"]
-libs = [
-    "std_all",      # Lua安全標準ライブラリ全部（debug を除く）
-    "assertions",   # @assertions モジュール
-    "testing",      # @testing モジュール
-    "regex",        # @regex モジュール
-    "json",         # @json モジュール
-    "yaml",         # @yaml モジュール
-    # "-std_io",    # 減算記法: std_io を除外
-    # "env",        # @env モジュール（セキュリティ上デフォルト無効）
-    # "std_debug",  # debug ライブラリ（セキュリティ上デフォルト無効）
-]
-
-# カスタムフィールド（Lua から @pasta_config で参照可能）
-[user]
-ghost_name = "MyGhost"
-version = "1.0.0"
-
-# アクター定義（STORE.actors に自動初期化）
-[actor."さくら"]
+# 最小構成: 必須の [actor] のみ。他は SHIORI デフォルトで補完される。
+[actor."女の子"]
 spot = 0
-default_surface = 0
 
-[actor."うにゅう"]
+[actor."男の子"]
 spot = 1
-default_surface = 10
 ```
+
+- `"名前"` は `descript.txt` の `sakura.name` / `kero.name` と一致させます。
+- `spot` はゴースト固有でデフォルト化できないため、各アクターで必ず指定します（`0`=sakura 側 / `1`=kero 側）。
+- 慣例的な dic 配置（`dic/**/*.pasta`）の辞書は、`[loader]` を書かなくても `pasta_patterns` の SHIORI デフォルト `["dic/**/*.pasta"]` で読み込まれます。
+
+全セクション・全フィールドの分類と SHIORI デフォルト値（SSOT 由来）、およびフルリファレンステンプレートは、設定ファイルリファレンス [`pasta-toml.md`](../../.claude/skills/pasta-ghost-authoring/references/pasta-toml.md) を参照してください。
 
 ### [actor.*] セクション
 
@@ -541,11 +503,11 @@ local script = BUILDER.build(tokens, config)
 
 ## ファイル検出パターン
 
-デフォルトの `dic/*/*.pasta` パターンでは：
+デフォルトの `dic/**/*.pasta` パターン（再帰）では：
 
+- ✅ `dic/root.pasta` - 検出される（直下も対象）
 - ✅ `dic/baseware/system.pasta` - 検出される
 - ✅ `dic/talk/greeting.pasta` - 検出される
-- ❌ `dic/root.pasta` - 検出されない（直下は対象外）
 - ❌ `profile/pasta/cache/lua/cached.pasta` - 除外される
 
 カスタムパターン例：

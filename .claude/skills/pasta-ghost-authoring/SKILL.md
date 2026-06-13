@@ -14,7 +14,7 @@ description: >-
   SHIORIプロトコル実装, Luaランタイム開発, pasta言語仕様の設計変更.
 metadata:
   author: ekicyou
-  version: "1.5.0"
+  version: "1.5.1"
 ---
 
 # Pasta Ghost Authoring Skill
