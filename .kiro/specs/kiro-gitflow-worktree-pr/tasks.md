@@ -94,7 +94,7 @@
   - 完了状態: grep がクリーン、verify-drift-gate.mjs が exit 0
   - _Requirements: 1.1, 1.2, 3.1, 8.1, 8.3_
   - _Depends: 3.2, 4.1_
-- [ ] 8.2 PR フロー dry-run と GitHub 設定確認
+- [x] 8.2 PR フロー dry-run と GitHub 設定確認
   - 使い捨てブランチで gh pr create → gh pr merge --squash --delete-branch を実行し、squash 1 コミットで main 反映・リモートブランチ削除を確認
   - {remote} を一時的に none とした環境で kiro-complete が警告継続・push スキップすることを確認
   - gh repo view --json で squash のみ true・deleteBranchOnMerge true を確認
@@ -115,3 +115,4 @@
 ## Implementation Notes
 
 - 2.2: kiro-spec-complete の frontmatter `description` 末尾が旧表現「…最終コミット→push まで」のまま。Task 3.1（frontmatter 編集）で PR squash マージ文脈へ更新すること。
+- 8.2: live dry-run（PR #2 #3, ekicyou/pasta）で PR squash マージ（親数=1）＋リモートブランチ自動削除を実地確認。DD1 を立証 — `gh pr merge --squash --delete-branch` 後もローカルブランチは残存（リモート削除のみ確実）。設計どおりローカル/ワークツリー後始末はハーネス委譲が正。なお dry-run で origin/main が 5d5135e→361f5ab へ前進（プライマリ worktree のローカル main は要 pull 同期、ただし無害）。
