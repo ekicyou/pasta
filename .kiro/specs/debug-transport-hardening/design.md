@@ -226,6 +226,7 @@ sequenceDiagram
 
 **Responsibilities & Constraints**
 - `Drop` で Terminated 送出（best-effort）+ 有界 flush sleep の後、`shutdown` フラグを立て、**`socket_handle` を join**（従来 detach から変更）。これにより `run_socket_bridge` 戻り → `Transport` drop → serve 同期 join → ポート解放まで待ち合わせる。
+- **Terminated 送出 + 30ms flush sleep は既存挙動として保存し、本仕様では変更しない**（R4.2：観測可能なデバッグ挙動の保存。設計ディスカッション 2026-06-13 で確認）。本仕様の唯一の変更は `socket_handle` の detach→join 化。flush sleep は接続中クライアントへ terminated フレームを届ける猶予であり、未接続 reload では ~30ms の無視可能な遅延に留まる（約15秒間隔運用で問題なし）。
 - `encoder_handle` は detach のまま（socket/port 非保持。`terminate_tx` 保持中の join はデッドロック源のため避ける）。
 
 **Contracts**: State [x]
