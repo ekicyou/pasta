@@ -239,6 +239,13 @@ Option A に対しマージ可能性プローブのみ独立サブステップ�
 - **Trade-offs**: main 先行時にマージコミットが作業ブランチに増える（rebase の線形性より保守的だが安全）。再ビルドコストは「先行検出時のみ」に限定。
 - **Impact**: design.md Phase 1 step3・Phase 6 step0・Track X 前提・Req 10.9 を追加。settings.json 一回限りセットアップに `git fetch`/`git merge` 許可を追加。
 
+### Decision: 部分公開からの自動回復（Resume Mode）（設計議題2 2026-06-14）
+- **Context**: Track X 部分公開後、新規 `/kiro-impl`（Req 9.1 リセット）+ 重複チェック(1.7)+ 統合済み main/タグ、により再実行が不能になる（レビュー Critical Issue 3）。
+- **Selected**: Phase 1 で「タグ存在かつ crates.io 一部公開」を検知し **Resume Mode** へ分岐。バージョン再決定・bump・統合をスキップし、成果物は再ビルド、未公開クレートのみ公開、Marketplace/Release は実状態を確認して不足のみ補完。冪等性は外部実状態（crates.io/Marketplace/GitHub）の都度確認で担保（タスク状態非依存 = Req 9.3 と両立）。
+- **Rationale**: 不可逆な部分公開を新規セッションでも完遂できる（ユーザーの完成度志向）。Req 9.5 新設・1.7 に resume 例外節を追加。
+- **Trade-offs**: 検知ロジックと冪等公開判定の複雑性増。新ワークツリーでの成果物再ビルドコスト（回復時のみ）。
+- **Impact**: design.md Phase 1 Resume 検知・「Resume Mode」節・Req 9.5 行を追加。Req 9.5 / 1.7 を更新。
+
 ## References（追加）
 - `.claude/skills/kiro-complete/SKILL.md` — PR 可否判定・PR 作成/マージ・中断条件・エラー回避（流用元の参照実装）
 - `.kiro/steering/workflow.md` L83–113 — リモート同期（PR squash）＋リリースタグ公開カーブアウト

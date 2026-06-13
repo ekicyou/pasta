@@ -327,6 +327,7 @@ flowchart TD
 | 8.6         | 偽の依存関係の排除（ゴーストビルド先行）      | A / Phase 5       | 共有リソースモデル             |
 | 8.7         | 各並行トラックの完了検証                      | C → D             | Stage C/D 同期点               |
 | 9.1–9.4     | 繰り返し実行・状態初期化・完了サマリー        | — / Phase 7       | 繰り返し実行の仕様特性         |
+| 9.5         | 統合済み・部分公開からの resume モード        | A / Phase 1 + Resume Mode | Resume Mode（自動回復）  |
 | 10.1        | ワークツリーブランチ上で動作・直 push 非前提  | A–D / 全体        | メインフロー全体               |
 | 10.2        | コミットを作業ブランチに保持・統合は統合フェーズのみ | A → B          | メインフロー: Stage A→B        |
 | 10.3        | PR マージコミット方式で SHA 保持・main 到達可能 | B / Phase 6b-c   | メインフロー: Stage B          |
@@ -377,6 +378,7 @@ flowchart TD
 
 **実行手順**
 1. **バージョン決定** (1.1–1.7): 開発者指定があれば使用 (1.1)。なければ全ソース調査（`Cargo.toml`、`package.json`、`git tag -l "v*"`、crates.io / GitHub Releases / Marketplace）し最大バージョン PATCH+1 を提案 (1.2)、承認を求める (1.3)。拒否時は希望入力 (1.4)、semver 検証 `^[0-9]+\.[0-9]+\.[0-9]+$` (1.5, 1.6)、重複チェック (1.7)。
+   - **Resume 検知** (1.7, 9.5): 重複チェックで「タグ `vX.Y.Z` が存在（= 統合済み）かつ crates.io に当該バージョンが**一部のみ**公開済み」を検知した場合はエラーとせず、**Resume Mode**（後述）へ分岐する。「未統合（タグ無し）でバージョン重複」は従来どおりエラー。
 2. **ワークツリー整理** (1.8, 1.9): `git status --porcelain` が空でなければ `git add -A; git commit -m "chore(release): prepare release vX.Y.Z"`。
 3. **ブランチ現在性の確保（ビルド前・自動更新）** (10.9): `git fetch origin {default-branch}`。`origin/{default-branch}` が作業ブランチの HEAD の祖先でなければ（= main が先行）、`git merge origin/{default-branch}` で**非破壊マージ**により取り込む（steering の危険 git 操作禁止に準拠。`reset`/`rebase` は使わない）。これによりビルド・公開は統合後 main と同一ツリー上で行われ、公開内容と main の一致が保証される。**コンフリクト時は `git merge --abort` で復帰し中止・報告**。
 4. **テスト実行** (1.10, 1.11): `cargo test --all` — 失敗時は中止。
@@ -551,6 +553,22 @@ LLM セッションが途中で切断された場合の復旧:
 2. **統合状態の判定**: `gh pr list --state merged --head <作業ブランチ>` または `git ls-remote origin vX.Y.Z`（タグ）、`gh pr view` で Stage B の完了を判定。
 3. **公開進捗の判定**: crates.io の各クレートページで Track X の進捗（どこまで公開済みか）を確認。
 4. 完了済みステージ／トラックをスキップして再開。**Track X が一部公開済みの場合、公開済みクレートは再公開せず未公開分から再開**。**Stage B 統合済みなら公開のみ再開**（main 再統合はしない）。
+
+### Resume Mode（統合済み・部分公開からの自動回復）
+
+**新規セッション／新規ワークツリー**で `/kiro-impl` が再実行されると Req 9.1 によりタスク状態はリセットされるが、外部状態（タグ・main・crates.io）は残存する。Phase 1 の Resume 検知（タグ `vX.Y.Z` 存在 かつ crates.io 一部公開）に該当する場合、以下の冪等な回復経路をとる（Req 9.5, 1.7）。
+
+| ステップ | 通常実行 | Resume 実行 |
+| -------- | -------- | ----------- |
+| バージョン決定・bump・統合（Stage A P1-2 / Stage B） | 実行 | **スキップ**（Cargo.toml は main 上で X.Y.Z 済み、タグ・統合済み） |
+| ローカルビルド成果物（ghost dll.zip / nar / VSIX） | 生成 | **再生成**（新ワークツリーには成果物が無いため、Release 添付用に再ビルド。バージョンは X.Y.Z で確定済み） |
+| Track X crates.io 公開 | 全クレート | **未公開クレートのみ**（各 `cargo publish` 前に crates.io で公開済みか確認しスキップ） |
+| Track Y Marketplace | 公開 | Marketplace に X.Y.Z が無ければ公開、あればスキップ |
+| Stage D GitHub Release | 作成 | Release が無ければ作成、あればアセット添付の不足のみ補完 |
+
+**冪等性の担保**:
+- Resume 時はローカルワークツリーを統合済み状態に揃える（新ワークツリーは `origin/main`（= マージ済み、Cargo.toml X.Y.Z）を基点とするため、追加の checkout は不要。タグ `vX.Y.Z` の指すツリーと一致）。
+- 公開可否判定は crates.io / Marketplace / GitHub Release の**実状態**を都度確認して行う（タスク状態に依存しない）。これにより Req 9.3（前回実行に依存しない独立動作）と両立する。
 
 ## Testing Strategy
 

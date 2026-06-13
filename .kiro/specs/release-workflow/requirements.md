@@ -68,7 +68,7 @@
 4. If 開発者が提案バージョンを承認しない, the Release Workflow shall 開発者に希望するバージョン番号の入力を求める
 5. When バージョン番号が提供される, the Release Workflow shall semver 形式（例: `1.2.0`）として妥当性を検証する
 6. If バージョン番号が semver 形式でない, the Release Workflow shall エラーを報告し再入力を求める
-7. When バージョン番号が確定する, the Release Workflow shall 全バージョンソースに対して重複チェックを行い、同一バージョンが既に存在する場合はエラーを報告し別のバージョン番号の入力を求める
+7. When バージョン番号が確定する, the Release Workflow shall 全バージョンソースに対して重複チェックを行い、同一バージョンが既に存在する場合はエラーを報告し別のバージョン番号の入力を求める。If 当該バージョンが本ワークフローの統合済み未完了リリース（タグ存在かつ一部のみ公開済み）である, the Release Workflow shall エラーとせず Requirement 9.5 の resume モードに従って再開する
 8. When リリース作業が開始される, the Release Workflow shall ワークツリーに未コミットの変更があるか確認する
 9. If 未コミットの変更が存在する, the Release Workflow shall すべての変更をリリース準備コミットとしてコミットする
 10. When リリース作業が開始される, the Release Workflow shall 全テストを実行し通過を確認する
@@ -184,6 +184,7 @@
 2. The Release Workflow shall spec.json の `phase` を `completed` に変更しない（常に `ready_for_implementation` を維持する）
 3. The Release Workflow shall 各実行が前回の実行状態に依存しない独立した作業として動作する
 4. When リリース作業が完了する, the Release Workflow shall 実行結果のサマリー（バージョン、公開クレート、Release URL、Marketplace 公開結果、各並行トラックの成否）を開発者に報告する
+5. When 同一バージョンのリリースが統合済み（タグ `vX.Y.Z` が存在）かつ crates.io 公開が一部のみ完了した状態で再実行される, the Release Workflow shall バージョン再決定・バージョン更新・main 統合をスキップし、未公開クレートの公開・Marketplace 公開・GitHub Release 作成を冪等に再開する（resume モード）
 
 ### Requirement 10: ワークツリー実行と PR ベース main 統合
 
