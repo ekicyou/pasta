@@ -324,6 +324,8 @@ graph LR
 | DD4 (検証) | 検証戦略 | ランタイムテスト無し。代替: ①ドキュメント整合の静的チェック（旧名が運用ドキュメントに残らない）②`verify-drift-gate.mjs` パス（パス更新後）③使い捨てブランチでの PR フロー dry-run を受け入れ手順として記録 | コード非変更ゆえ手動受け入れ中心 |
 | DD5 (境界) | release タグ公開カーブアウト | §3 を「spec 完了ブランチ統合」に限定し、`git push origin main --tags` 等のタグ公開を禁止対象外と明記。release-workflow 内部手順は不変 | release-workflow の引用・settings.json 許可を有効に保つ |
 
+> **既知リスク（DD5 補足・Out of Boundary）**: release-workflow をハーネスワークツリー（非デフォルトブランチ）上で実行すると、バージョン bump コミットは PR 経由で main へ反映される一方、`git push origin main --tags` はローカル main（bump 未反映の可能性）からタグを push するため、タグとコミットが乖離し得る。本 spec は release-workflow 内部手順を変更しない（Out of Boundary）が、PR ベース化に伴い**この相互作用は別 spec で再検証が必要**である（Revalidation Triggers 参照）。
+
 ## Error Handling
 
 ### Error Strategy
