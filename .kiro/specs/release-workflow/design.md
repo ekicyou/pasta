@@ -16,6 +16,7 @@
 - 非クリティカルフェーズ（Marketplace 公開）を隔離し、独立した公開トラックを並行化する
 - 繰り返し実行可能な設計を維持する（仕様は `completed` に遷移しない）
 - **完遂優先の自律実行**（基本方針）: 時間がかかっても、なるべく自律的に解決し**完遂できる手順**であることを最優先する。これを条件に、実行中に一時的に外部から観測される中間状態（例: main 統合済みだがタグ未 push）は許容する
+- **完遂保証（no half-done）**: 全ターゲット（crates.io 全クレート・Marketplace・タグ・Release）成功までリリースを「完了」としない。失敗しやすい手順（特に Marketplace）はセッション内バックオフ → スケジュール永続リトライで完遂まで粘る（Req 11）
 
 ### Non-Goals
 - リリース自動化スクリプトの新規作成（LLM による対話的実行で代替）
@@ -58,6 +59,7 @@
 - Pattern: `kiro-complete` SKILL.md の PR 統合パターン（PR 可否判定・中断セマンティクス・ローカル削除警告の非致命扱い）を**流用**（`--squash` → `--merge` に置換）(P1)
 - One-Time: `gh repo edit --enable-merge-commit` — repo の merge-commit 方式の有効化（前提セットアップ）(P0)
 - Infra: crates.io registry / VSCode Marketplace — 公開先（R3）(P1)
+- Infra: ハーネスのスケジュール実行機構（cron 系スケジュールタスク）— 第2段スケジュール永続リトライ（セッション跨ぎで完遂まで再起動）(P1)
 
 ### Revalidation Triggers
 - Cargo.toml の workspace 構造変更（クレート追加・削除）
@@ -112,7 +114,7 @@
 - **Stage B — Integrate（git + ネットワーク、安全順序のゲート）**: タグ作成（ローカル）→ `gh pr create` → `gh pr merge --merge --delete-branch`。成功で main にリリースコミットがマージコミット経由で反映され、タグ対象コミットが main から到達可能になる。**このステージが安全ゲート**であり、失敗時は Stage C/D を実行しない。**タグの push はここでは行わず Stage D まで遅延する**（タグの公開が常に crates.io 公開済みを含意するようにするため）。
 - **Stage C — Publish（ネットワーク・並行、R2 不変）**: 統合成功後に 2 トラックを並行実行。
   - Track X（クリティカル）: crates.io 公開（依存関係順に内部直列）
-  - Track Y（非クリティカル）: Marketplace 公開（VSIX upload）
+  - Track Y（隔離・完遂必須）: Marketplace 公開（VSIX upload）。他トラックをブロックしないが未公開のまま完了しない（Req 11）
 - **Stage D — Tag Push & GitHub Release（ネットワーク）**: Track X 成功後、**タグ push** → アセット＋チェンジログで Release 作成。タグと Release はともに crates.io 公開成功後に公開される。
 
 ```mermaid
@@ -161,8 +163,8 @@ graph TB
 - **安全ゲート（Req 8.5・10 AC6/7）**: Stage B（タグ作成・PR マージ）が成功するまで Stage C（不可逆な公開）へ進まない。Stage B が失敗（PR 作成・マージ失敗）したら Stage C/D を実行せず、非破壊で中断する。Stage B 到達時点では未プッシュのローカルコミット＋ローカルタグのみが存在するため、失敗時のロールバック負担は最小。
 - **タグ公開の遅延（議題3）**: タグ push は Stage D（Track X 成功後）で行う。これによりリモートのタグ `vX.Y.Z` は常に crates.io 公開済みを含意する。実行中、main にリリースコミットが反映されつつタグ未 push という一時状態が外部から観測され得るが、これは許容する（基本方針: 完遂優先・実行中の一時的な外部状態は許容）。
 - **統合後の公開失敗（Req 10 AC8）**: Stage C Track X（crates.io）が失敗しても、main は既に正しいリリース状態（コミット反映済み・タグはローカル保持）。公開を段階的バックオフでリトライし、最大リトライ後も失敗なら中断・報告する（既公開クレートは残す）。
-- Stage C の 2 トラックは並行。Track Y（非クリティカル）の失敗は隔離され X・D を妨げない（Req 8.4）。
-- Stage D は Track X 成功＋チェンジログ完了を待つ。Track Y は非ブロッキング（VSIX が間に合えば添付）。
+- Stage C の 2 トラックは並行。Track Y（隔離・完遂必須）の失敗は他トラックを妨げないが、未公開のまま完了せず Req 11 のスケジュール再試行で完遂する（Req 8.4）。
+- Stage D は Track X 成功＋チェンジログ完了を待つ。Track Y は Stage D の Release 作成をブロックしない（VSIX が間に合えば添付、間に合わなければ Resume Mode で後刻添付）。ただし Marketplace 公開自体は完遂必須。
 
 **Steering 準拠**:
 - workflow.md「危険な Git 操作の禁止」に準拠（`git reset --hard` / `git revert` / `git checkout -- ` / `git clean -fd` 不使用。ロールバックは `git restore <file>` のファイル単位のみ）
@@ -266,20 +268,26 @@ sequenceDiagram
     LLM->>Dev: 完了サマリー 各トラック成否
 ```
 
-### 共通リトライ戦略（段階的バックオフ）
+### 共通リトライ戦略（二段: 短期バックオフ → スケジュール永続リトライ）
 
-外部サービス通信（`cargo publish`, `vsce publish`, `gh pr merge`, `git push`, `gh release create`）はネットワーク一時障害に対し段階的バックオフを適用する:
+外部サービス通信（`cargo publish`, `vsce publish`, `gh pr merge`, `git push`, `gh release create`）は相手側ビジー・レート制限・一時的ネットワーク障害で失敗し得る。**完遂保証（no half-done）**のため、Req 11 に基づき二段で粘る:
 
 ```
-待機時間系列: 1分 → 2分 → 3分 → ... → 10分
-最大試行回数: 初回 + リトライ10回 = 合計11回（最大累計待機 55分）
+第1段（セッション内・短期バックオフ）: 1分 → 2分 → ... → 10分（初回+10回=11回、累計約55分）
+第2段（スケジュール永続リトライ）: 第1段で未完了が残れば、スケジュールタスクを設定し
+        後刻 /kiro-impl を再起動 → Resume Mode で未完了分のみ続行。全完遂まで繰り返し、
+        完遂で自己解除。回数・累計時間に固定上限を設けない（Req 11.2–11.4, 11.7）。
 ```
 
-**適用とクリティカル度**:
-- Stage B: `gh pr merge --merge` — **クリティカル**（失敗時は Stage C/D を実行せず非破壊中断）
-- Track X: `cargo publish` — **クリティカル**（失敗時は Stage D を実行しない。main 統合は保持）
-- Track Y: `vsce publish` — **非クリティカル**（失敗時は警告のみで後続継続）
-- Stage D: `gh release create` — **クリティカル**（失敗時は手動手順を案内）
+**一時障害 vs 非一時障害の判別（Req 11.6）**: ビジー/レート制限/タイムアウト/5xx 等は**一時障害**として第2段（スケジュール再試行）へ。認証無効・権限不足・ビルドエラー・コンフリクト等は**非一時障害**としてスケジュール再試行せず未完了報告し、開発者対応後に Resume で完遂する。
+
+**適用とステージ依存**（クリティカル度ではなく「完遂必須・隔離可否」で整理）:
+- Stage B: `gh pr merge --merge` — 安全ゲート。第1段で失敗時は Stage C/D へ進まず、一時障害なら第2段、非一時障害（コンフリクト等）なら未完了報告
+- Track X: `cargo publish` — 第1段→第2段で全クレート完遂まで。main 統合は保持、既公開クレートは残し未公開分のみ再試行
+- Track Y: `vsce publish` — **隔離されるが完遂必須**（他トラックをブロックしないが、未公開のまま完了しない。第1段→第2段で完遂）
+- Stage D: `git push`（タグ）/ `gh release create` — 第1段→第2段で完遂まで
+
+> **完了条件**: 全ターゲット（crates.io 全クレート・Marketplace・タグ push・GitHub Release）成功で初めて「完了」。未完了が残る限りリリースは「未完了（再試行待ち）」として扱う（Req 11.1, 11.5）。
 
 ### エラー時ロールバックフロー
 
@@ -296,10 +304,10 @@ flowchart TD
     B --> B1[作業不要 変更なし]
     C --> C1[git restore Cargo.toml package.json]
     P5 --> P51[エラー報告 手動対応]
-    INT --> INT1[非破壊中断 ブランチ非削除 公開未実行 タグ未push or ローカルタグ削除]
-    X --> X1[main 統合は保持 公開リトライ or 中断 既公開クレートは残す]
-    Y --> Y1[警告記録のみ 隔離して継続]
-    D --> D1[エラー報告 手動 gh release 手順案内]
+    INT --> INT1[非破壊中断 第2段スケジュール再試行 or 非一時は未完了報告 Stage C/D 不実行]
+    X --> X1[main 統合は保持 未公開分を第2段スケジュール再試行 既公開は残す]
+    Y --> Y1[隔離 完了とせず 第2段スケジュール再試行 で完遂]
+    D --> D1[第2段スケジュール再試行 で完遂まで]
 ```
 
 ## Requirements Traceability
@@ -341,6 +349,11 @@ flowchart TD
 | 10.7        | 統合失敗時は公開せず非破壊中断                | B / Phase 6       | エラーフロー: Stage B          |
 | 10.8        | 統合成功後の公開失敗は main 保持・リトライ/中断 | C / Track X      | エラーフロー: Track X          |
 | 10.9        | ビルド前に main を非破壊マージで取り込み（自動更新）・コンフリクト時中止 | A / Phase 1 (+B Phase6 ff 再検証) | メインフロー: Stage A          |
+| 11.1        | 完遂保証（全ターゲット成功まで完了としない）   | 全 Stage / 完了判定 | 共通リトライ戦略・完遂保証      |
+| 11.2–11.4   | 短期バックオフ→スケジュール永続リトライ・冪等再試行・自己解除 | 共通リトライ / 完遂保証節 | 共通リトライ戦略 |
+| 11.5        | 未完了（再試行待ち）の明示報告                | D / Phase 7 サマリー | 完遂保証                       |
+| 11.6        | 非一時障害は再試行せず未完了報告              | 全 Stage / エラー処理 | Error Handling                |
+| 11.7        | 固定上限なし・完遂まで継続                    | 共通リトライ戦略   | 共通リトライ戦略               |
 
 ## Components and Interfaces
 
@@ -354,7 +367,7 @@ flowchart TD
 | Phase Z: Changelog     | A     | チェンジログ整形（読み取り専用）         | 7.1–7.3, 7.9    | git log (read-only)                                  | no        |
 | Phase 6: Integrate     | B     | タグ作成（ローカル）・PR マージコミット統合 | 6.1–6.4, 10.2–10.4, 10.6–10.7, 10.9 | git (R2), gh pr (R3), GitHub remote (R3) | yes |
 | Track X: CratesPublish | C     | crates.io 公開（内部直列）               | 3.1–3.6, 10.8   | cargo publish (R1+R3), crates.io index (R3)          | yes       |
-| Track Y: VsixPublish   | C     | Marketplace 公開                         | 4.3–4.5, 4.7    | vsce (R3)                                            | no        |
+| Track Y: VsixPublish   | C     | Marketplace 公開（隔離・完遂必須）       | 4.3–4.7, 11.1–11.7 | vsce (R3), スケジュール機構                       | 隔離/必須 |
 | Phase 7: TagPush & Release | D | タグ push（公開後）・GitHub Release 作成 | 6.4–6.5, 7.4–7.8, 9.4, 10.5 | git (R3), gh CLI (R3)                    | yes       |
 
 ### Stage A — Prepare & Build
@@ -496,14 +509,14 @@ flowchart TD
 - 各公開後 `Start-Sleep -Seconds 10`（index 更新待機、最後は不要）(3.6)。
 - 失敗時は段階的バックオフ。最大リトライ後も失敗なら**中断**し、既公開クレートは残す。**main は既に正しいリリース状態（コミット・タグ反映済み）であり、公開のみリトライ／中断する**（10.8）。**Stage D は実行しない**（Track X 成功が前提）(3.3, 3.4)。
 
-#### Track Y: VsixPublish（非クリティカル）
+#### Track Y: VsixPublish（隔離・完遂必須）
 
 | Field        | Detail                                               |
 | ------------ | ---------------------------------------------------- |
 | Intent       | 生成済み VSIX を Marketplace へ公開する（R3 のみ）    |
-| Requirements | 4.3, 4.4, 4.5, 4.7                                   |
+| Requirements | 4.3–4.7, 11.1–11.7                                   |
 
-**Responsibilities & Constraints**: Track X と並行実行可能。`vsce publish` 失敗時は段階的バックオフ → 最大リトライ後も失敗なら**警告記録のみで継続**（失敗隔離 8.4）。成功時は Marketplace URL を記録 (4.7)。
+**Responsibilities & Constraints**: Track X と並行実行可能（他トラックを**ブロックしない＝隔離**、Req 8.4）。ただし Marketplace 公開は**完遂必須**であり、未公開のまま完了しない。`vsce publish` 失敗時は第1段バックオフ → なお失敗なら第2段スケジュール再試行で完遂まで粘る（Req 11）。Marketplace に既に当該バージョンが存在すれば公開をスキップ（冪等）。成功時は Marketplace URL を記録 (4.7)。非一時障害（`VSCE_PAT` 無効等）はスケジュール再試行に載せず未完了報告する（11.6）。
 
 ### Stage D — Tag Push & GitHub Release
 
@@ -512,7 +525,7 @@ flowchart TD
 | Field        | Detail                                                             |
 | ------------ | ------------------------------------------------------------------ |
 | Intent       | タグを push し、チェンジログ付きの GitHub Release を作成・添付する  |
-| Requirements | 6.4, 6.5, 7.4–7.8, 9.4, 10.5                                       |
+| Requirements | 6.4, 6.5, 7.4–7.8, 9.4, 10.5, 11.1, 11.5                            |
 
 **Responsibilities & Constraints**: **前提**: Stage C Track X 成功＋Phase Z（チェンジログ）完了。Track Y は非ブロッキング（VSIX が間に合えば添付、なければ dll.zip + .nar のみ）。
 
@@ -529,13 +542,13 @@ flowchart TD
    ```
 2. **一時ファイル削除**: `Remove-Item release-notes-vX.Y.Z.md`。
 3. **エラーハンドリング** (7.8): 失敗時は手動 `gh release create ...` 手順を案内。
-4. **完了サマリー** (9.4): バージョン、公開クレート、Release URL、Marketplace（Track Y）結果、各トラック（統合 / X / Y）の成否。
+4. **完了サマリー** (9.4, 11.1, 11.5): 全ターゲット（crates.io 全クレート・Marketplace・タグ push・GitHub Release）完遂時のみ「**完了**」として、バージョン・公開クレート・Release URL・Marketplace 結果・各トラック成否を報告する。**未完了ターゲットが残る場合は「未完了（再試行待ち）」**として、残作業・障害種別（一時/非一時）・第2段スケジュールの次回起動予定を報告する（完了済みと報告しない）。
 
 ## Error Handling
 
 ### Error Strategy
 
-各ステージはゲート方式で制御される。Stage A の失敗はローカルのみで停止（対外影響なし）。**Stage B（統合）の失敗は不可逆な Stage C/D をブロックする**（安全ゲート）。Stage C Track X の失敗は Stage D をブロックするが main 統合は保持される。Track Y の失敗は隔離される。
+各ステージはゲート方式で制御される。Stage A の失敗はローカルのみで停止（対外影響なし）。**Stage B（統合）の失敗は不可逆な Stage C/D をブロックする**（安全ゲート）。Stage C Track X の失敗は Stage D をブロックするが main 統合は保持される。Track Y の失敗は他トラックから隔離される。外部通信の一時障害はいずれも**第1段バックオフ → 第2段スケジュール再試行**で完遂まで粘り、**未完了のまま「完了」としない**（Req 11、no half-done）。非一時障害はスケジュール再試行に載せず未完了報告する。
 
 ### Error Categories and Responses
 
@@ -545,11 +558,11 @@ flowchart TD
 | A / Phase 1         | テスト失敗             | エラー報告・中止                                      | 不要（変更なし）                   |
 | A / Phase 2         | ビルド失敗             | `git restore Cargo.toml editors/vscode/package.json`  | Cargo.toml + package.json 復元     |
 | A / Phase 5         | release.ps1 失敗       | エラー報告・中断                                      | 手動対応                           |
-| A / Phase 4a        | npm/package 失敗       | 警告記録・継続                                        | 不要（非クリティカル）             |
-| B / Phase 6         | PR 作成/マージ失敗     | バックオフ → **非破壊中断（Stage C/D 不実行）**       | ブランチ非削除・公開未実行・ローカルタグ削除可 |
-| C / Track X         | cargo publish 失敗     | バックオフ → 中断（Stage D 不実行）                   | **main 統合は保持**・既公開クレートは残す |
-| C / Track Y         | vsce publish 失敗      | 警告記録・隔離継続                                    | 不要（非クリティカル）             |
-| D / Phase 7         | gh release 失敗        | 手動手順案内                                          | 手動実行                           |
+| A / Phase 4a        | npm/package 失敗       | 一時障害→第2段スケジュール再試行 / 非一時(ビルドエラー)→未完了報告。**完了とせず**（VSIX 未生成のまま完了しない） | 不要 |
+| B / Phase 6         | PR 作成/マージ失敗     | 第1段バックオフ → 一時障害は第2段スケジュール再試行 / 非一時(コンフリクト)は未完了報告。Stage C/D 不実行 | ブランチ非削除・公開未実行・ローカルタグ削除可 |
+| C / Track X         | cargo publish 失敗     | 第1段 → 第2段スケジュール再試行（未公開分のみ、Stage D は全公開後） | **main 統合は保持**・既公開クレートは残す |
+| C / Track Y         | vsce publish 失敗      | 第1段 → 第2段スケジュール再試行（一時障害）/ 未完了報告（非一時）。**隔離するが完了とせず** | 不要（他トラック非ブロック・Req 11 で完遂） |
+| D / Phase 7         | タグ push / gh release 失敗 | 第1段 → 第2段スケジュール再試行（完遂まで）        | 完了とせず Req 11 で完遂           |
 
 ### セッション中断からの復旧
 
@@ -577,6 +590,25 @@ LLM セッションが途中で切断された場合の復旧:
 - Resume 時はローカルワークツリーを統合済み状態に揃える（新ワークツリーは `origin/main`（= マージ済み、Cargo.toml V）を基点とするため追加の checkout は不要。タグ `vV` の指すコミットと内容一致）。
 - 公開可否判定は crates.io / Marketplace / GitHub Release / タグの**実状態**を都度確認して行う（タスク状態に依存しない）。これにより Req 9.3（前回実行に依存しない独立動作）と両立する。
 - 完全公開（全クレート公開・タグ push・Release 作成）に到達した時点で V のリリースは完了とみなし、次回実行は通常の新規リリース（V の PATCH+1 提案）となる。
+
+### 完遂保証とスケジュール永続リトライ（Req 11）
+
+**目的**: 相手側サーバーのビジー等で失敗しやすい手順を、セッションを跨いで完遂まで自動的に粘る。**中途半端な完了を起こさない**。
+
+**二段リトライの接続**:
+1. **第1段（セッション内）**: 各外部通信は短期バックオフ（1→10分、計約55分）で再試行する。
+2. **第2段（スケジュール）**: 第1段を使い切っても未完了ターゲットが残る場合、**スケジュールタスクを設定**して `/kiro-impl release-workflow` を後刻自動再起動する。再起動時は **Resume Mode** が未完了分（未公開クレート・Marketplace・タグ push・Release）のみを冪等に続行する。
+
+**スケジュール機構**:
+- ハーネスのスケジュール実行機構（cron 系スケジュールタスク）を用いる。LLM エージェントがタスクを**作成・更新・自己解除**する。
+- **作成**: 第1段枯渇かつ一時障害のとき、適度な間隔（既定: 30〜60 分間隔、相手側回復を待つ）で再試行タスクを登録。
+- **継続**: 各起動で Resume 検知 → 未完了分を第1段リトライ。なお失敗なら次回スケジュールへ。
+- **自己解除（Req 11.4）**: 全ターゲット完遂を確認した起動が、当該スケジュールタスクを削除する。重複登録を避けるため、登録前に既存の同一バージョン用タスクの有無を確認する。
+- **セッション跨ぎ**: スケジュールはセッション終了後も生存するため、長時間の相手側障害でも現在セッションを拘束しない（議題3 の基本方針「完遂優先・一時的な外部状態は許容」と整合）。
+
+**非一時障害の扱い（Req 11.6）**: 認証無効・権限不足・ビルドエラー・マージコンフリクト等、リトライで解消しない種別はスケジュール再試行に載せず、「未完了・要対応」として原因と必要対応を報告する。開発者対応後、通常の再実行が Resume Mode で完遂する。
+
+**完了判定（Req 11.1, 11.5）**: 全ターゲット（crates.io 全クレート・Marketplace・タグ push・GitHub Release）成功で「完了」。未完了が残る限り「未完了（再試行待ち）」として報告し、スケジュール状態（次回起動予定）を併記する。
 
 ## Testing Strategy
 

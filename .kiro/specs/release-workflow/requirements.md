@@ -13,7 +13,7 @@
 | 対象                                                        | 公開先             | 備考                               |
 | ----------------------------------------------------------- | ------------------ | ---------------------------------- |
 | pasta_core, pasta_dsl, pasta_lua, pasta_shiori, pasta_check | crates.io          | 依存関係順に公開（クリティカル）   |
-| pasta-vscode (VSCode 拡張)                                  | VSCode Marketplace | 非クリティカル（失敗時も後続継続） |
+| pasta-vscode (VSCode 拡張)                                  | VSCode Marketplace | 隔離されるが完遂必須（Req 11 のスケジュール再試行で粘る） |
 | hello-pasta.nar, pasta.dll.zip                              | GitHub Release     | リリースアセット                   |
 | VSIX ファイル                                               | GitHub Release     | 存在する場合のみ添付               |
 
@@ -96,7 +96,7 @@
 1. When ローカルビルドが完了しワークツリーがクリーンで、かつ main 統合（タグ作成・PR マージ）が成功している, the Release Workflow shall クレートを依存関係順（`pasta_core` → `pasta_dsl` → `pasta_lua` → `pasta_shiori` → `pasta_check`）に公開する
 2. When クレートを公開する, the Release Workflow shall 各クレートの公開成功を確認してから次のクレートに進む
 3. If クレートの公開が失敗する, the Release Workflow shall 段階的バックオフでリトライを試みる（待機時間を1分から1分ずつ増加し最大10分まで、最大10回リトライ）
-4. If 最大リトライ後も失敗する, the Release Workflow shall エラーを報告し、以降の公開を中断し、既に公開されたクレートはそのまま残し、開発者の指示を待つ
+4. If セッション内の段階的バックオフを使い切っても失敗する, the Release Workflow shall 既に公開されたクレートはそのまま残し、一時障害なら Requirement 11 のスケジュール再試行へ、非一時障害なら原因を報告する。いずれの場合もリリースを完了済みとしない（未公開クレートを残したまま完了しない）
 5. While `pasta_sample_ghost` は `publish = false` である, the Release Workflow shall このクレートの公開をスキップする
 6. When 前のクレートを公開した直後, the Release Workflow shall crates.io のインデックス更新を待つため待機時間を設ける
 
@@ -109,9 +109,9 @@
 1. When ローカルビルドステージが実行される, the Release Workflow shall VSCode 拡張のビルド（パッケージング）を実行する
 2. When パッケージングが成功する, the Release Workflow shall VSIX ファイルが生成されたことを確認しパスを記録する
 3. When VSIX ファイルが存在する, the Release Workflow shall VSCode Marketplace への公開を実行する
-4. If Marketplace 公開が失敗する, the Release Workflow shall 段階的バックオフでリトライを試みる
-5. If 最大リトライ後も公開が失敗する, the Release Workflow shall 警告を記録し後続のフェーズへ継続する（非クリティカル）
-6. If VSCode 拡張のビルドが失敗する, the Release Workflow shall 警告を記録し後続のフェーズへ継続する（非クリティカル）。この場合 VSIX アセットは GitHub Release に添付されない
+4. If Marketplace 公開が失敗する, the Release Workflow shall まずセッション内の段階的バックオフでリトライを試みる
+5. If セッション内の段階的バックオフを使い切っても Marketplace 公開が失敗する, the Release Workflow shall リリースを完了とせず、Requirement 11 のスケジュール再試行に委ねて未完了として扱う（他トラックの進行は妨げない＝隔離は維持するが完遂は必須）
+6. If VSCode 拡張のビルドが失敗する, the Release Workflow shall 一時障害なら Requirement 11 のスケジュール再試行へ、非一時障害（ビルドエラー等）なら未完了として原因を報告する。いずれの場合もリリースを完了済みとしない（VSIX 未生成のまま完了しない）
 7. When Marketplace 公開が成功する, the Release Workflow shall 公開結果（Marketplace URL）を記録する
 
 ### Requirement 5: サンプルゴーストビルド
@@ -169,7 +169,7 @@
 1. When リリース作業をスケジュールする, the Release Workflow shall 各処理を要求リソース（R1 cargo ロック / R2 ワークツリー / R3 ネットワーク）で分類し、排他リソースを共有する処理を直列化する
 2. While ワークツリーを変更するローカルビルド（バージョン更新ビルド、サンプルゴーストビルド、VSCode 拡張パッケージング）が R1・R2 を共有する, the Release Workflow shall これら全ローカルビルドとコミットを完了しワークツリーをクリーン化してから main 統合（タグ作成・PR マージ）および crates.io 公開（R3 を要し R2 のクリーン状態を前提とする）を開始する
 3. Where crates.io 公開・Marketplace 公開・チェンジログ生成は互いに独立しワークツリーを変更しない, the Release Workflow shall これらを並行（concurrent）に実行してよい
-4. If 非クリティカルな処理（Marketplace 公開）が失敗する, the Release Workflow shall クリティカルな処理（crates.io 公開、タグ・プッシュ、GitHub Release）の進行を妨げず継続する（失敗隔離）
+4. If Marketplace 公開が失敗する, the Release Workflow shall 他の処理（crates.io 公開、タグ・プッシュ、GitHub Release）の進行を妨げず継続する（失敗隔離）。ただし Marketplace 公開はリリース完遂の必須要素であり、未完了のまま全体を完了済みとせず Requirement 11 のスケジュール再試行で完遂する
 5. While main 統合（タグ作成・PR マージ）は revert で可逆だが crates.io 公開は不可逆である, the Release Workflow shall 「main 統合 → crates.io 公開 → GitHub Release 作成」の順で実行し、不可逆な crates.io 公開を可逆な main 統合の後段に置く。If main 統合が失敗する, the Release Workflow shall crates.io 公開および GitHub Release を実行しない。If main 統合の成功後に crates.io 公開が失敗する, the Release Workflow shall 統合済み main 状態（コミット・タグ）を保持したまま公開をリトライまたは中断して報告し、GitHub Release は crates.io 公開成功まで作成しない（安全順序保証。統合方式は Requirement 10 に従う）
 6. The Release Workflow shall 独立した処理を不要に直列化しない（偽の依存関係の排除）。特にサンプルゴーストビルドを crates.io 公開の後段に配置しない
 7. When 並行実行する処理のいずれかがバックグラウンドで進行する, the Release Workflow shall 各並行トラックの完了・失敗を個別に検証し、結果をサマリーに反映する
@@ -183,7 +183,7 @@
 1. The Release Workflow shall `/kiro-impl release-workflow` が実行されるたびにタスク状態を初期化（全タスクを未完了に戻す）する
 2. The Release Workflow shall spec.json の `phase` を `completed` に変更しない（常に `ready_for_implementation` を維持する）
 3. The Release Workflow shall 各実行が前回の実行状態に依存しない独立した作業として動作する
-4. When リリース作業が完了する, the Release Workflow shall 実行結果のサマリー（バージョン、公開クレート、Release URL、Marketplace 公開結果、各並行トラックの成否）を開発者に報告する
+4. When リリース作業が完了する（全ターゲット完遂時）, the Release Workflow shall 実行結果のサマリー（バージョン、公開クレート、Release URL、Marketplace 公開結果、各並行トラックの成否）を開発者に報告する。While 未完了ターゲットが残る, the Release Workflow shall 「未完了（再試行待ち）」として残作業とスケジュール状態を報告する（完了済みと報告しない）
 5. When 再実行時に main の現行バージョンが完全公開（全公開クレートが crates.io に存在・タグ push 済み・GitHub Release 作成済み）に至っていないことを検出する, the Release Workflow shall バージョン再決定・バージョン更新・main 統合をスキップし、未完了の crates.io 公開・Marketplace 公開・タグ push・GitHub Release 作成を冪等に再開する（resume モード）
 
 ### Requirement 10: ワークツリー実行と PR ベース main 統合
@@ -201,8 +201,24 @@
 5. When 注釈タグを作成する, the Release Workflow shall タグが統合後の main から到達可能なコミット（リリース HEAD コミット）を指すことを保証し、タグ参照の push は crates.io 公開成功後（GitHub Release 作成の直前）に行う
 6. When main への統合（タグ作成・PR マージ）が完了する, the Release Workflow shall その成功を確認してから不可逆な crates.io 公開を開始する
 7. If main への統合（PR の作成またはマージ）が失敗する（コンフリクト・mergeable でない・権限不足等）, the Release Workflow shall crates.io 公開を実行せず、force push・リモート履歴の書き換え・マージ成功前のブランチ削除を行わずに中断し、開発者に解消を求める
-8. If main 統合の成功後に crates.io 公開が失敗する, the Release Workflow shall 統合済みの main 状態（コミット・タグ）を保持したまま、公開を段階的バックオフでリトライし、最大リトライ後も失敗なら中断して開発者に報告する
+8. If main 統合の成功後に crates.io 公開が失敗する, the Release Workflow shall 統合済みの main 状態（コミット反映済み・タグはローカル保持）を維持したまま、セッション内バックオフ → Requirement 11 のスケジュール再試行で未公開分を完遂まで再試行する（既公開クレートは残す）
 9. When ローカルビルドの前に作業ブランチが main より遅れている（main が先行している）ことを検出する, the Release Workflow shall main を作業ブランチへ非破壊マージで取り込み、更新後のツリー上でビルドと公開を行う。If 取り込みでコンフリクトが生じる, the Release Workflow shall リリース作業を中止し開発者に解消を求める
+
+### Requirement 11: 完遂保証とスケジュール永続リトライ
+
+**Objective:** As a 開発者, I want 相手側サーバーのビジー等で失敗しやすい手順（特に Marketplace 公開）を、時間がかかってもスケジュール再試行で完遂まで自動的に粘ってほしい, so that 中途半端な状態でリリースが「完了」することが決して起きない
+
+> **背景**: リリースの各公開先（crates.io / VSCode Marketplace / GitHub）は相手側サーバーのビジー・レート制限・一時的ネットワーク障害で失敗し得る。基本方針は「時間はいくらでもかかってよいが、中途半端な状態での完了は避ける」。よって有限回で打ち切って一部未公開のまま完了する従来方針を改め、**全ターゲット完遂まで（短期バックオフ→スケジュール再試行の二段で）粘る**。
+
+#### Acceptance Criteria
+
+1. The Release Workflow shall すべてのリリースターゲット（全公開クレートの crates.io 公開、VSCode Marketplace 公開、タグ push、GitHub Release 作成）が成功するまで、リリースを「完了」と報告しない（完遂保証 / no half-done）
+2. When 外部サービス通信が一時障害（サーバービジー・レート制限・ネットワーク等）で失敗する, the Release Workflow shall まずセッション内で段階的バックオフによる短期リトライを行う
+3. If セッション内の短期リトライを使い切っても未完了ターゲットが残る, the Release Workflow shall スケジュールされた再試行タスクを設定し、後刻 resume モード（Requirement 9.5）で未完了分の続行を繰り返す
+4. When スケジュール再試行が起動する, the Release Workflow shall 各ターゲットの実状態を確認して未完了分のみを冪等に再試行し、全ターゲット完遂を確認したら当該スケジュールタスクを自己解除する
+5. While 未完了ターゲットが残る, the Release Workflow shall リリースを「未完了（再試行待ち）」状態として報告し、完了済みと誤認させない
+6. If 失敗が非一時的（認証無効・権限不足・ビルドエラー等、リトライで解消しない種別）である, the Release Workflow shall リリースを完了とせず、原因と必要な対応を開発者に報告し、対応後に resume で完遂できる状態を保つ
+7. The Release Workflow shall リトライ回数・累計時間に固定上限を設けず、全ターゲット完遂または開発者の明示的中止まで再試行を継続する（所要時間は完了条件としない）
 
 ---
 
