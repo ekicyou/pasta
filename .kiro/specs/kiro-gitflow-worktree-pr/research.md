@@ -79,7 +79,9 @@
 ## 5. 設計フェーズへの推奨（Recommendations）
 
 ### 推奨アプローチ
-**Option B（権威ソース改訂 + `kiro-spec-complete` への決定的解決統一）を軸に、Option C の「workflow.md を唯一の手順実体に」要素を部分採用**するのが、Req 1（単一定義元）・Req 7（移植性）を同時に満たし保守コストを下げる。改訂順序は厳守：**① workflow.md §3 → ② kiro-spec-complete → ③ kiro-tasks 撤去＋参照整理 → ④ kiro-start（feat ブランチ生成撤去・default 上 STOP） → ⑤ kiro-impl 注記 → ⑥ GitHub 設定タスク**。
+**Option B（権威ソース改訂 + `kiro-spec-complete` への決定的解決統一）を軸に、Option C の「workflow.md を唯一の手順実体に」要素を部分採用**するのが、Req 1（単一定義元）・Req 7（移植性）を同時に満たし保守コストを下げる。改訂順序は厳守：**① workflow.md §3 → ② kiro-spec-complete（PR 化）→ ③ kiro-spec-complete → kiro-complete へリネーム＋全参照更新（ディスカッション #4）→ ④ kiro-tasks 撤去＋参照整理 → ⑤ kiro-start（feat ブランチ生成撤去・default 上 STOP）→ ⑥ kiro-impl 注記 → ⑦ GitHub 設定タスク**。
+
+> **リネーム注記（#4）**: `kiro-spec-complete` → `kiro-complete`。ライフサイクル入口（`kiro-start`/`kiro-impl`/`kiro-complete`）の命名統一が狙い。後方互換エイリアスなし＝クリーン置換。参照は `grep -r kiro-spec-complete` で網羅（CLAUDE.md・workflow.md・sibling skills・registry 説明）。**Research Needed**: 参照箇所の完全列挙。PR 化（②）とリネーム（③）は同一スキルを触るため、PR 化を先に完了させてからディレクトリ名変更を行うと差分が読みやすい。
 
 ### 設計で決すべき判断（Carry-forward）
 - **U1**: `kiro-start` は `feat/{feature}` を作り続けるか／ワークツリー前提に委ねるか。→ 「1 feature=1 branch=1 PR」の branch 起点を誰が用意するかを設計で確定（Req 3.4 / Req 4 と直結）。
