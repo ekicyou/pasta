@@ -166,7 +166,9 @@
 ## 3. 重大な落とし穴（Critical Findings）
 
 ### ⚠️ 落とし穴1: repo が merge-commit を許可しているか未確認（最優先）
-`gh pr merge --merge`（マージコミット方式）は repo 設定 `mergeCommitAllowed: true` を要する。本 repo は spec 完了で `--squash` を常用しており、**merge-commit が有効かは不明**。無効の場合 Req 10 の中核が成立しない。→ **Research Needed #1**（`gh repo view --json mergeCommitAllowed,squashMergeAllowed,deleteBranchOnMerge` で確認。無効なら `gh repo edit --enable-merge-commit` で有効化、または rebase 不可のため方針再考）。
+`gh pr merge --merge`（マージコミット方式）は repo 設定 `mergeCommitAllowed: true` を要する。本 repo は spec 完了で `--squash` を常用しており、**merge-commit が有効かは不明**。無効の場合 Req 10 の中核が成立しない。
+
+> **【確認結果 2026-06-14・設計フェーズ】** `gh repo view --json mergeCommitAllowed,squashMergeAllowed,rebaseMergeAllowed,deleteBranchOnMerge` 実行: `mergeCommitAllowed=false`, `squashMergeAllowed=true`, `rebaseMergeAllowed=false`, `deleteBranchOnMerge=true`（`ekicyou/pasta`, default=`main`）。**→ merge-commit は現状無効。`gh pr merge --merge` は今のままでは失敗する。** Req 10 成立には一回限りで `gh repo edit --enable-merge-commit` を実施（squash は spec 完了フローで使用中のため**併存維持**＝両方有効）。なお `deleteBranchOnMerge=true`（旧 kiro-gitflow 記録の `false` から変化済み）のため `--delete-branch` は冗長だが無害。**Research Needed #1 解決済み**。
 
 ### ⚠️ 落とし穴2: 不可逆な crates.io 公開とマージ失敗の順序リスク
 現行設計は Stage B（crates.io 公開＝不可逆）→ Stage C（タグ・統合）。PR マージはこれより後段になるため、「公開済みだが PR マージ失敗（コンフリクト等）」の窓が生じる。Req 10 AC6/7 はこれを「**不可逆公開の前に**マージ可能性を検証」で緩和する設計意図だが、**検証手段とタイミングが未設計**。→ **Research Needed #2**（PR 早期作成＋`mergeable` ポーリング vs `git fetch origin {default} && git merge-tree`/dry-run マージ）。残余リスク（検証〜マージ間の main 移動）は既存 Req 3.4「既公開クレートは残し開発者指示待ち」の許容範囲内。
@@ -212,6 +214,23 @@ Option A に対しマージ可能性プローブのみ独立サブステップ�
 4. settings.json 許可エントリの最終形（タグ push 許可の具体パターン、`git push origin main` 撤去可否）。
 5. タグ push と PR マージの実行順序（タグ ref を merge 前に push するか後にするか）と、Release 作成（Stage D）のマージ後実行の確定。
 6. リリース PR の title/body 生成方針（`--merge` のマージコミットメッセージは自動付与のため、PR 本文の供給方法を決める。kiro-complete の squash メッセージ生成方針（`merge-base..HEAD` 履歴要約）を流用するか）。
+
+## Design Synthesis（Req 10 設計フェーズ 2026-06-14）
+
+### Build vs Adopt
+- **Adopt**: PR 統合の制御ロジック（PR 可否判定・中断セマンティクス・`--delete-branch` ローカル削除警告の非致命扱い・メッセージ生成方針）は `kiro-complete` SKILL.md に検証済み実装がある。**新規構築せず流用**し、`--squash` を `--merge` に置換するのみ。リリース固有差分（マージコミット方式・タグ ref push・統合をゲートとする安全順序）だけを上乗せする。
+
+### Simplification
+- 議題1の Option 2（統合先・公開後）採用により、当初検討した「不可逆公開前の読み取り専用マージ可能性プローブ」は**不要化**。**PR マージ実行そのものが安全ゲート**となる（統合が先・失敗したら公開しない）。これにより別手段のプローブ設計（Research Needed #2）を削減し、Stage 構成を単純化。
+- 早期 fast-fail のための任意事前チェックは設計に含めない（過剰）。Phase 0 で merge-commit 許可と非デフォルトブランチを確認するのみ。
+
+### Generalization
+- Stage モデルを「準備 → **統合** → 公開 → Release」の 4 段に一般化。統合フェーズ（Stage B）を独立の安全ゲートとして切り出し、将来 main 直 push 禁止（ブランチ保護）が有効化されても同一フローで成立する構造とした。
+
+### Decision: 4-Stage Resource-Aware Staged Concurrency（改訂版・採用）
+- **Selected**: Stage A（ローカル直列）→ Stage B（統合 = tag + PR merge --merge、安全ゲート）→ Stage C（公開 crates.io ∥ Marketplace）→ Stage D（GitHub Release）
+- **Rationale**: 不可逆な crates.io 公開を可逆な main 統合の後段に置き、「公開済みだが統合不能」を排除。PR マージコミット方式で SHA・タグの参照整合性を保ち、直 push を廃して将来のブランチ保護に前方互換。
+- **Trade-offs**: main にマージコミットが 1 つ増える（squash の単一コミットより履歴は冗長）。repo の merge-commit 有効化（一回限りセットアップ）が前提。
 
 ## References（追加）
 - `.claude/skills/kiro-complete/SKILL.md` — PR 可否判定・PR 作成/マージ・中断条件・エラー回避（流用元の参照実装）

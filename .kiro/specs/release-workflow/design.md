@@ -2,17 +2,18 @@
 
 ## Overview
 
-**Purpose**: 本設計は、pasta プロジェクトのリリース作業（crates.io 公開、VSCode Marketplace 公開、GitHub Release 作成）を、LLM エージェントが繰り返し実行するためのオペレーション設計を定義する。本書き直し版では、各処理が要求する**共有リソース**を分析し、安全に並行化できる処理を並行実行する **リソース認識型ステージ並行モデル（Resource-Aware Staged Concurrency）** を採用する。
+**Purpose**: 本設計は、pasta プロジェクトのリリース作業（crates.io 公開、VSCode Marketplace 公開、GitHub Release 作成）を、LLM エージェントが Claude Code ハーネスのワークツリー上で繰り返し実行するためのオペレーション設計を定義する。各処理が要求する**共有リソース**を分析し、安全に並行化できる処理を並行実行する **リソース認識型ステージ並行モデル（Resource-Aware Staged Concurrency）** を採用する。本改訂版では、(a) ワークツリー（非デフォルトブランチ）上での実行、(b) リリースコミット・タグの **PR マージコミット方式（`gh pr merge --merge`）による main 統合**（直接 push 廃止）、(c) 不可逆な crates.io 公開を可逆な main 統合の**後段**へ置く安全順序の反転、を導入する。
 
-**Users**: 開発者（ekicyou）が `/kiro-impl release-workflow` を実行するたびに、LLM エージェントが本設計に従ってリリース作業を遂行する。
+**Users**: 開発者（ekicyou）が `/kiro-impl release-workflow` を実行するたびに、LLM エージェントが本設計に従ってワークツリー上でリリース作業を遂行する。
 
-**Impact**: 手動リリース手順を体系化し、全工程を一貫した品質で繰り返し実行可能にする。旧設計（単一直列 Pipeline）に対し、(a) 偽の依存関係（crates.io → ゴーストビルド）を排除し、(b) 独立した公開トラック（crates.io / Marketplace / チェンジログ）を並行化することで wall-clock を短縮し、(c) 非クリティカルな失敗を隔離する。
+**Impact**: 旧設計（crates.io 公開 → タグ作成 → main 直接 push）を、ワークツリー隔離実行・PR マージコミット統合・安全順序反転（**統合先・公開後**）へ改める。これにより、ハーネスのワークツリー環境で実行でき、コミット SHA とタグの参照整合性が保たれ、将来の GitHub ブランチ保護（main 直接 push 禁止）に前方互換となり、不可逆な公開を可逆な統合の後段に置くことで「公開済みだが統合不能」という不可逆事故の窓を排除する。
 
 ### Goals
-- バージョン更新から GitHub Release 作成までの全工程を LLM が実行する
+- バージョン更新から GitHub Release 作成までの全工程を、ワークツリー上で LLM が実行する
+- リリースコミット・タグを **非 squash・マージコミット方式**で main へ統合し、コミット SHA とタグの到達性を保証する（直接 push を行わない）
+- 不可逆な crates.io 公開を可逆な main 統合の**後段**に置き、安全順序「main 統合 → crates.io 公開 → GitHub Release」を保証する
 - 共有リソース制約（cargo ロック / git ワークツリー / ネットワーク）を尊重した安全な並行スケジューリングを行う
 - 非クリティカルフェーズ（Marketplace 公開）を隔離し、独立した公開トラックを並行化する
-- 不可逆な処理（crates.io 公開）の順序安全性を保証する
 - 繰り返し実行可能な設計を維持する（仕様は `completed` に遷移しない）
 
 ### Non-Goals
@@ -22,18 +23,21 @@
 - `cargo publish` / `vsce` 認証トークンの自動設定（手動設定を前提とする）
 - pasta_lsp の独立リリース管理
 - マルチマシン分散実行（単一ワークツリー・単一マシン前提）
+- **GitHub ブランチ保護ルールそのものの構成**（本設計は保護下でも成立する手順を定めるが、保護ルールの設定作業は対象外）
+- **spec 完了の squash-PR 統合フロー**（kiro-complete が管轄。リリースは別系統）
 
 ## Boundary Commitments
 
 ### This Spec Owns
 - バージョン番号の決定・検証・全ソース調査
-- Cargo.toml（6箇所）および package.json のバージョン更新
-- crates.io への依存関係順公開（5クレート）
+- Cargo.toml（5箇所）および package.json のバージョン更新
+- crates.io への依存関係順公開（4クレート + pasta_check の計5クレート）
 - VSCode 拡張のビルド（パッケージング）と Marketplace 公開（非クリティカル）
 - サンプルゴースト（hello-pasta）のビルドと成果物確認
-- Git タグ作成・リモートプッシュ
+- Git タグ作成、および **PR マージコミット方式による作業ブランチ → main の統合とタグ公開**
 - GitHub Release 作成（チェンジログ生成・アセット添付）
-- **リリース作業全体の実行スケジューリング（ステージ分割・並行トラック管理）とエラーハンドリング・ロールバック**
+- **リリース作業全体の実行スケジューリング（4ステージ分割・並行トラック管理）、安全順序（統合 → 公開 → Release）、エラーハンドリング・ロールバック**
+- **一回限りセットアップ**（repo の merge-commit 有効化、`.claude/settings.json` 許可調整、`workflow.md` カーブアウト改訂）の定義（繰り返し手順とは分離した前提セットアップ）
 
 ### Out of Boundary
 - pasta_lsp の crates.io 公開（`publish = true` だが本ワークフロー対象外）
@@ -41,238 +45,258 @@
 - 認証トークンの設定・管理
 - release.ps1 スクリプト自体の修正
 - crates.io に公開済みクレートの yank 操作
+- **spec 完了の squash-PR 統合フロー**（kiro-complete が管轄）
+- **GitHub ブランチ保護／タグ保護ルールの構成**
 
 ### Allowed Dependencies
 - External: `cargo` CLI — ビルド・テスト・公開（R1 cargo ロックを保持）(P0)
-- External: `git` CLI — バージョン管理・タグ・プッシュ（R2 ワークツリーを保持）(P0)
-- External: `gh` CLI — GitHub Release 作成（R3 ネットワーク）(P0)
+- External: `git` CLI — バージョン管理・タグ・タグ push（R2 ワークツリーを保持）(P0)
+- External: `gh` CLI — **PR 作成・マージコミット統合**（`gh pr create` / `gh pr merge --merge --delete-branch`、R3）および GitHub Release 作成（R3）(P0)
 - External: `npm` / `vsce` — VSCode 拡張ビルド・公開（build:wasm は R1、publish は R3）(P0)
 - Script: `release.ps1` — サンプルゴーストビルド（内部で cargo を呼び R1 を保持）(P0)
-- Infra: crates.io registry — インデックス更新待機（R3）(P1)
-- Infra: VSCode Marketplace — 拡張公開（R3）(P1)
+- Pattern: `kiro-complete` SKILL.md の PR 統合パターン（PR 可否判定・中断セマンティクス・ローカル削除警告の非致命扱い）を**流用**（`--squash` → `--merge` に置換）(P1)
+- One-Time: `gh repo edit --enable-merge-commit` — repo の merge-commit 方式の有効化（前提セットアップ）(P0)
+- Infra: crates.io registry / VSCode Marketplace — 公開先（R3）(P1)
 
 ### Revalidation Triggers
 - Cargo.toml の workspace 構造変更（クレート追加・削除）
-- release.ps1 のインターフェース変更（パラメータ・出力パス変更）。**特にローカルビルド方式（`cargo build -p pasta_shiori`）が crates.io 依存へ変わると Req 5.9 / 8.6 の前提が崩れる**
-- VSCode 拡張のビルドパイプライン変更（scripts セクション、特に `build:wasm` が R1 を要するか）
-- 新しい公開対象（例: pasta_lsp）の追加
-- `cargo publish` のワークツリー要件（クリーン状態／`--allow-dirty`）の前提変更
+- release.ps1 のインターフェース変更（特にローカルビルド方式が crates.io 依存へ変わると Req 5.9 / 8.6 の前提が崩れる）
+- VSCode 拡張のビルドパイプライン変更（特に `build:wasm` が R1 を要するか）
+- **repo の merge-method 設定変更**（merge-commit 無効化／squash 無効化）→ Req 10 AC3 の前提が崩れる
+- **GitHub ブランチ保護／タグ保護の有効化**（必須ステータスチェックは `gh pr merge` 即時マージをブロックし得る）
+- **ハーネスのワークツリー供給仕様の変更**（作業ブランチが供給されない／デフォルトブランチ上で起動する等）
+- `.claude/settings.json` の push 許可エントリの変更
 
 ## Architecture
 
 ### Existing Architecture Analysis
 
-本仕様はコードの新規作成・変更を伴わない**オペレーション仕様**である。既存のツール群を組み合わせて LLM が実行する。
+本仕様はコードの新規作成・変更を伴わない**オペレーション仕様**である。既存のツール群を組み合わせて LLM がワークツリー上で実行する。
 
 **既存アセット**:
 
-| アセット                      | 状態                     | 本設計での役割                 |
-| ----------------------------- | ------------------------ | ------------------------------ |
-| `Cargo.toml`（ルート）        | ✅ ワークスペース集中管理 | バージョン更新対象（6箇所）    |
-| `editors/vscode/package.json` | ✅ バージョン同期対象     | バージョン更新対象（1箇所）    |
-| `release.ps1`                 | ✅ 成熟スクリプト         | ゴーストビルド実行（ローカル） |
-| `gh` CLI                      | ✅ 認証済み（ekicyou）    | GitHub Release 作成            |
-| `cargo`                       | ✅ 利用可能               | テスト・ビルド・公開           |
-| `git`                         | ✅ 利用可能               | バージョン管理・タグ・プッシュ |
-| `npm` / `vsce`                | ✅ 利用可能               | VSCode 拡張ビルド・公開        |
+| アセット                      | 状態                     | 本設計での役割                       |
+| ----------------------------- | ------------------------ | ------------------------------------ |
+| `Cargo.toml`（ルート）        | ✅ ワークスペース集中管理 | バージョン更新対象（6箇所）          |
+| `editors/vscode/package.json` | ✅ バージョン同期対象     | バージョン更新対象（1箇所）          |
+| `release.ps1`                 | ✅ 成熟スクリプト         | ゴーストビルド実行（ローカル）       |
+| `gh` CLI                      | ✅ 認証済み（ekicyou）    | PR 統合・GitHub Release 作成         |
+| `kiro-complete` SKILL.md      | ✅ PR 統合の参照実装      | PR 可否判定・中断セマンティクスを流用 |
+| `cargo` / `git` / `npm`/`vsce`| ✅ 利用可能              | テスト・ビルド・公開・統合           |
 
-**確認済みの重要事実（並行性判断の根拠）**:
-- `release.ps1` は `cargo build --release --target i686-pc-windows-msvc -p pasta_shiori` で **ローカルソースから** pasta.dll をビルドする。crates.io の公開済みクレートには依存しない（→ ゴーストビルドは crates.io 公開に非依存）
-- VSCode の `prepackage` は `build:wasm`（`scripts/build-wasm.ps1`、内部で cargo/wasm ビルド）を実行する → **R1 cargo ロックを保持する**
+**確認済みの重要事実**:
+- `release.ps1` は `cargo build --release --target i686-pc-windows-msvc -p pasta_shiori` で **ローカルソースから** pasta.dll をビルドする（crates.io 非依存 → ゴーストビルドは crates.io 公開に非依存）
+- VSCode の `prepackage` は `build:wasm`（内部で cargo/wasm ビルド）を実行 → **R1 cargo ロックを保持**
 - `cargo publish` は既定で検証ビルド（R1）を行い、クリーンなワークツリー（R2）を前提とする
+- **repo merge-method 設定（2026-06-14 確認）**: `mergeCommitAllowed=false`, `squashMergeAllowed=true`, `rebaseMergeAllowed=false`, `deleteBranchOnMerge=true`（`ekicyou/pasta`, default=`main`）。**merge-commit は現状無効**であり、Req 10 成立には一回限りで `gh repo edit --enable-merge-commit` を実施する（squash は spec 完了で使用中のため併存維持）。
 
 ### 共有リソースモデル
 
-並行スケジューリングの基礎として、各処理が要求する排他／非排他リソースを定義する（Req 8.1）。
-
 | リソース | 種別 | 保持する処理 | 並行制約 |
 | -------- | ---- | ------------ | -------- |
-| **R1: cargo ターゲットロック** | 排他（単一保持） | `cargo build/test/run/publish`、VSCode `build:wasm` | 同時実行不可。cargo は自動でロック待機（ブロック）するため壊れはしないが直列化される |
+| **R1: cargo ターゲットロック** | 排他（単一保持） | `cargo build/test/run/publish`、VSCode `build:wasm` | 同時実行不可。cargo は自動でロック待機するため壊れはしないが直列化される |
 | **R2: git ワークツリー＋index** | 排他（単一保持） | ファイル生成、`git add/commit/restore/tag`、`release.ps1` の成果物生成 | 同時変更は不整合・コミット競合を招く。`cargo publish` はクリーン状態を要求 |
-| **R3: ネットワーク**（crates.io / Marketplace / GitHub） | 非排他（実質無制限） | `cargo publish` の upload・インデックス待機、`vsce publish`、`gh release create` | 並行実行可。待機時間（index 伝播・backoff）は重ね合わせられる |
+| **R3: ネットワーク**（crates.io / Marketplace / GitHub） | 非排他（実質無制限） | `cargo publish` の upload・index 待機、`vsce publish`、`gh pr create/merge`、`gh release create`、`git push`（タグ） | 並行実行可。待機時間（index 伝播・backoff）は重ね合わせられる |
 
 **設計上の帰結**:
-- R1・R2 を共有する処理（＝全ローカルビルド）は**真の並行実行ができない**。よって全ローカルビルドとコミットを 1 つの直列ステージ（Stage A）に集約し、**ワークツリーをクリーン化してから** crates.io 公開を始める（Req 8.2）。
-- crates.io 公開（R3 + 検証ビルド R1）・Marketplace 公開（R3 のみ）・チェンジログ生成（読み取り専用）はワークツリーを変更しないため、Stage B として**並行実行できる**（Req 8.3）。`vsce publish` と `gh` は R1 を必要とせず、crates.io 公開の長いインデックス待機に重ねられる。
+- R1・R2 を共有する全ローカルビルドは真の並行実行ができないため、1つの直列ステージ（Stage A）に集約し、**ワークツリーをクリーン化してから** main 統合・公開を始める（Req 8.2）。
+- main 統合（タグ作成 = R2、PR マージ = R3）は可逆（revert 可能）。crates.io 公開（R3 + 検証ビルド R1）は不可逆。**安全順序は「統合 → 公開」**とし、不可逆処理を可逆処理の後段に置く（Req 8.5・10）。
+- crates.io 公開（Track X）と Marketplace 公開（Track Y）は R2 を変更せず互いに独立するため、統合成功後に**並行実行できる**（Req 8.3）。チェンジログ生成は読み取り専用のため Stage A で先行生成する。
 
 ### Architecture Pattern & Boundary Map
 
-**選択パターン**: Resource-Aware Staged Concurrency — リソース制約に基づき処理を 4 ステージに分割。ステージ内で安全な処理は並行トラックとして実行する。
+**選択パターン**: Resource-Aware Staged Concurrency — リソース制約と安全順序に基づき処理を 4 ステージに分割。
 
-- **Stage A — Prepare & Build（ローカル・直列、R1+R2 排他）**: 検証 → バージョン更新 → ゴーストビルド → VSCode パッケージング。終了時ワークツリーはクリーン。
-- **Stage B — Publish（ネットワーク・並行、R2 不変）**: 3 トラックを並行実行。
+- **Stage A — Prepare & Build（ローカル・直列、R1+R2 排他）**: 前提確認 → バージョン決定・検証 → バージョン更新ビルド → ゴーストビルド → VSCode パッケージング → チェンジログ整形（読み取り専用）。終了時ワークツリーはクリーン、全成果物生成済み。
+- **Stage B — Integrate（git + ネットワーク、安全順序のゲート）**: タグ作成 → `gh pr create` → `gh pr merge --merge --delete-branch` → タグ push。成功で main にリリースコミットがマージコミット経由で反映され、タグが main から到達可能になる。**このステージが安全ゲート**であり、失敗時は Stage C/D を実行しない。
+- **Stage C — Publish（ネットワーク・並行、R2 不変）**: 統合成功後に 2 トラックを並行実行。
   - Track X（クリティカル）: crates.io 公開（依存関係順に内部直列）
   - Track Y（非クリティカル）: Marketplace 公開（VSIX upload）
-  - Track Z（準備・読み取り専用）: チェンジログ生成
-- **Stage C — Tag & Push（ローカル git、R2 排他）**: Track X 成功後にタグ作成＋プッシュ。
-- **Stage D — GitHub Release（ネットワーク）**: タグプッシュ後、アセット＋チェンジログで Release 作成。
+- **Stage D — GitHub Release（ネットワーク）**: Track X 成功後、アセット＋チェンジログで Release 作成。
 
 ```mermaid
 graph TB
-    subgraph StageA ["Stage A: Prepare & Build （ローカル・直列 / R1+R2 排他）"]
-        A0[Phase 0: gh auth 確認]
+    subgraph StageA ["Stage A: Prepare and Build （ローカル直列 R1+R2 排他）"]
+        A0[Phase 0: gh auth と merge-commit 許可の確認]
         A1[Phase 1: バージョン決定 + 未コミット自動コミット + cargo test]
-        A2[Phase 2: Cargo.toml 6箇所 + package.json 更新 → cargo build → commit]
-        A3[Phase 5: release.ps1 ローカルビルド → dll.zip 圧縮 → commit]
-        A4[Phase 4a: npm install + npm run package（build:wasm=R1）→ VSIX 生成]
+        A2[Phase 2: Cargo.toml 6箇所 + package.json 更新 build commit]
+        A3[Phase 5: release.ps1 ローカルビルド dll.zip 圧縮 commit]
+        A4[Phase 4a: npm package build wasm R1 VSIX 生成]
+        AZ[Phase Z: git log チェンジログ整形 読み取り専用]
         A0 --> A1 --> A2
         A2 --> A3
         A2 --> A4
+        A2 --> AZ
     end
 
-    subgraph StageB ["Stage B: Publish （ネットワーク・並行 / R2 不変）"]
-        BX[Track X クリティカル: crates.io publish<br/>core→dsl→lua→shiori→check（内部直列）]
-        BY[Track Y 非クリティカル: vsce publish<br/>Marketplace upload]
-        BZ[Track Z 準備: git log → チェンジログ整形]
+    subgraph StageB ["Stage B: Integrate （安全ゲート git + network）"]
+        B1[Phase 6a: アノテーションタグ作成 ローカル]
+        B2[Phase 6b: gh pr create base main head 作業ブランチ]
+        B3[Phase 6c: gh pr merge --merge --delete-branch]
+        B4[Phase 6d: git push origin タグ ref]
+        B1 --> B2 --> B3 --> B4
     end
 
-    subgraph StageC ["Stage C: Tag & Push （ローカル git / R2 排他）"]
-        C1[Phase 6: git tag -a vX.Y.Z → git push origin main --tags]
+    subgraph StageC ["Stage C: Publish （ネットワーク並行 R2 不変）"]
+        CX[Track X クリティカル: crates.io publish 内部直列]
+        CY[Track Y 非クリティカル: vsce publish Marketplace]
     end
 
     subgraph StageD ["Stage D: GitHub Release （ネットワーク）"]
-        D1[Phase 7: gh release create（assets + notes）→ 完了サマリー]
+        D1[Phase 7: gh release create assets notes 完了サマリー]
     end
 
     A3 --> StageB
     A4 --> StageB
-    BX -->|crates.io 公開成功が前提| C1
-    BZ -.->|チェンジログを供給| D1
-    BY -.->|VSIX/URL を供給（任意・非ブロッキング）| D1
-    C1 --> D1
+    AZ -.->|チェンジログ供給| D1
+    StageB -->|統合成功が前提| StageC
+    CX -->|crates.io 公開成功が前提| D1
+    CY -.->|VSIX URL を供給 任意 非ブロッキング| D1
 ```
 
-**ドメイン境界・スケジューリング規則**:
-- Stage A は完全直列（R1+R2 排他）。Stage A 完了＝ワークツリークリーン＋全成果物（pasta.dll.zip / hello-pasta.nar / VSIX）生成済み。
-- Stage B の 3 トラックは並行。Track Y（非クリティカル）の失敗は隔離され、X・C・D を妨げない（Req 8.4）。Track Z は読み取り専用で副作用なし。
-- **安全順序保証（Req 8.5）**: 不可逆な Track X（crates.io）が成功するまで Stage C（タグ・プッシュ）へ進まない。X が中断したら C・D は実行しない。Stage C 到達時点では git 上に未プッシュのローカルコミットしか存在しないため、X 失敗時のロールバック負担は最小。
-- Track Y の成否は GitHub Release（Stage D）の VSIX 添付に影響するのみで、ブロッキングしない。
+**スケジューリング規則**:
+- Stage A は完全直列（R1+R2 排他）。完了＝ワークツリークリーン＋全成果物（pasta.dll.zip / hello-pasta.nar / VSIX）生成済み＋チェンジログ整形済み。
+- **安全ゲート（Req 8.5・10 AC6/7）**: Stage B（タグ・PR マージ）が成功するまで Stage C（不可逆な公開）へ進まない。Stage B が失敗（PR 作成・マージ失敗）したら Stage C/D を実行せず、非破壊で中断する。Stage B 到達時点では未プッシュのローカルコミットのみが存在するため、失敗時のロールバック負担は最小。
+- **統合後の公開失敗（Req 10 AC8）**: Stage C Track X（crates.io）が失敗しても、main は既に正しいリリース状態（コミット・タグ反映済み）。公開を段階的バックオフでリトライし、最大リトライ後も失敗なら中断・報告する（既公開クレートは残す）。
+- Stage C の 2 トラックは並行。Track Y（非クリティカル）の失敗は隔離され X・D を妨げない（Req 8.4）。
+- Stage D は Track X 成功＋チェンジログ完了を待つ。Track Y は非ブロッキング（VSIX が間に合えば添付）。
 
 **Steering 準拠**:
-- workflow.md「危険な Git 操作の禁止」に準拠（`git reset --hard` / `git revert` / `git checkout -- ` / `git clean -fd` は使用しない。ロールバックは `git restore <file>` のファイル単位のみ）
-- workflow.md「リモート同期」に準拠（main ブランチは直接 push）
+- workflow.md「危険な Git 操作の禁止」に準拠（`git reset --hard` / `git revert` / `git checkout -- ` / `git clean -fd` 不使用。ロールバックは `git restore <file>` のファイル単位のみ）
+- workflow.md「リモート同期（PR ベース）」の思想に整合（**main 直接 push を行わず PR 経由**）。ただし統合方式は spec 完了の `--squash` ではなく `--merge`（リリースは別系統）。リリースカーブアウト（L113）は本仕様に合わせて改訂する（一回限りセットアップ）。
 - tech.md のセマンティックバージョニング、Conventional Commits 規約に準拠
 
 ### Technology Stack
 
-| Layer   | Choice / Version           | Role in Feature                          | Resource | Notes                                 |
-| ------- | -------------------------- | ---------------------------------------- | -------- | ------------------------------------- |
-| CLI     | `cargo` (Rust toolchain)   | テスト・ビルド・crates.io 公開           | R1+R3    | `cargo publish -p <crate>`            |
-| CLI     | `git`                      | バージョン管理・タグ・プッシュ           | R2(+R3)  | アノテーションタグ使用                |
-| CLI     | `gh` (GitHub CLI)          | GitHub Release 作成・アセット添付        | R3       | 認証済み（ekicyou）                   |
-| CLI     | `npm` / `vsce`             | VSCode 拡張ビルド・公開                  | R1(build)/R3(publish) | `@vscode/vsce ^3.0.0`     |
-| Script  | `release.ps1` (PowerShell) | x86 DLL ビルド + .nar 生成               | R1+R2    | 既存成熟スクリプト・ローカルビルド    |
-| Editor  | LLM エディタツール         | Cargo.toml / package.json バージョン編集 | R2       | `replace_string_in_file`              |
-| Runtime | Windows + PowerShell       | 実行環境                                 | —        | `i686-pc-windows-msvc` ターゲット必須 |
+| Layer   | Choice / Version           | Role in Feature                          | Resource | Notes                                      |
+| ------- | -------------------------- | ---------------------------------------- | -------- | ------------------------------------------ |
+| CLI     | `cargo` (Rust toolchain)   | テスト・ビルド・crates.io 公開           | R1+R3    | `cargo publish -p <crate>`                 |
+| CLI     | `git`                      | バージョン管理・タグ作成・タグ push      | R2(+R3)  | アノテーションタグ。タグ ref push（非ブランチ push） |
+| CLI     | `gh` (GitHub CLI)          | **PR 作成・マージコミット統合**・Release | R3       | `gh pr merge --merge --delete-branch`      |
+| CLI     | `npm` / `vsce`             | VSCode 拡張ビルド・公開                  | R1(build)/R3(publish) | `@vscode/vsce ^3.0.0`         |
+| Script  | `release.ps1` (PowerShell) | x86 DLL ビルド + .nar 生成               | R1+R2    | 既存成熟スクリプト・ローカルビルド         |
+| Config  | repo merge-method 設定     | `--merge` 方式の有効化（一回限り）       | —        | `gh repo edit --enable-merge-commit`       |
+| Runtime | Windows + PowerShell       | 実行環境                                 | —        | `i686-pc-windows-msvc` ターゲット必須      |
+
+## One-Time Setup（前提セットアップ・繰り返し手順外）
+
+> **位置づけ**: 以下は**一回限りのセットアップ**であり、`/kiro-impl release-workflow` のたびにリセット・再実行される繰り返しリリース手順には含めない。議題2の決定により、`spawn_task`（別セッション）はワークツリー隔離のため使用せず、本仕様の設計確定後（タスク分解の前後）にエージェントが**本セッション内で手動実施**する。実施後は Stage A Phase 0 が状態を検証する。
+
+| # | セットアップ | コマンド / 変更 | 目的 |
+| - | ------------ | --------------- | ---- |
+| 1 | repo の merge-commit 有効化 | `gh repo edit ekicyou/pasta --enable-merge-commit` | `gh pr merge --merge` を成立させる（squash は維持＝両方有効） |
+| 2 | settings.json 許可調整 | `.claude/settings.json`: タグ push 許可（例 `Bash(git push origin v*:*)`）・`gh pr create`/`gh pr merge` 許可を追加、`Bash(git push origin main:*)` を縮退/撤去 | PR 統合・タグ push の実行許可。直 push 経路の撤去 |
+| 3 | steering カーブアウト改訂 | `.kiro/steering/workflow.md` L113: リリースの main 反映を「直接 push 容認」から「**PR マージコミット方式**」へ改訂。カーブアウトは**タグ ref push 限定**（タグはブランチ push ではないため将来の main ブランチ保護下でも許容）に縮退 | Req 10 と steering の整合（Steering Gate） |
+
+**検証**: `gh repo view --json mergeCommitAllowed` が `true` を返すこと。`workflow.md` と `settings.json` が Req 10 と矛盾しないこと。
 
 ## File Structure Plan
 
-本仕様はオペレーション仕様であり、コードの新規作成を伴わない。以下はリリース作業中に変更されるファイル一覧である。
+本仕様はコードの新規作成を伴わない。以下は変更対象ファイルの一覧である。
+
+### リリース作業中に変更されるファイル（繰り返し手順）
 
 | ファイル                                            | 変更内容                                                                        | Stage   |
 | --------------------------------------------------- | ------------------------------------------------------------------------------- | ------- |
 | `Cargo.toml`                                        | `[workspace.package].version` + 5クレートの `version` フィールド更新（計6箇所） | A (P2)  |
 | `editors/vscode/package.json`                       | `version` フィールド更新                                                        | A (P2)  |
 | `release/hello-pasta.nar`                           | release.ps1 による再生成                                                        | A (P5)  |
-| `target/i686-pc-windows-msvc/release/pasta.dll`     | release.ps1 によるビルド                                                        | A (P5)  |
-| `target/i686-pc-windows-msvc/release/pasta.dll.zip` | DLL の zip 圧縮                                                                 | A (P5)  |
+| `target/i686-pc-windows-msvc/release/pasta.dll(.zip)` | release.ps1 ビルド + zip 圧縮                                                  | A (P5)  |
 | `editors/vscode/pasta-vscode-X.Y.Z.vsix`            | npm run package による生成                                                      | A (P4a) |
-| `release-notes-vX.Y.Z.md`                           | 一時ファイル（Stage D 完了後削除）                                              | B (Z)   |
+| `release-notes-vX.Y.Z.md`                           | 一時ファイル（Stage D 完了後削除）                                              | A (Z)   |
+| （git 参照）作業ブランチ → `main`、タグ `vX.Y.Z`    | PR マージコミット統合 + タグ push                                               | B (P6)  |
+
+### 一回限りセットアップで変更するファイル（繰り返し手順外）
+
+| ファイル                       | 変更内容                                                                 |
+| ------------------------------ | ----------------------------------------------------------------------- |
+| repo 設定（GitHub 側）         | `gh repo edit --enable-merge-commit`（merge-commit 有効化、squash 維持） |
+| `.claude/settings.json`        | タグ push・`gh pr` 許可を追加、`git push origin main` 許可を縮退/撤去    |
+| `.kiro/steering/workflow.md`   | L113 リリースカーブアウトを PR マージコミット方式へ改訂、タグ push 限定へ縮退 |
 
 ## System Flows
 
-### メインリリースフロー（ステージ並行モデル）
+### メインリリースフロー（4ステージ・統合先/公開後）
 
 ```mermaid
 sequenceDiagram
     participant Dev as 開発者
     participant LLM as LLM Agent
-    participant Local as Local (cargo/git/npm)
-    participant Net as Network (crates.io/MP/GH)
+    participant Local as Local cargo git npm
+    participant GH as GitHub PR and Release
+    participant Net as Network crates.io and MP
 
-    Note over Dev,Net: Stage A — Prepare & Build（直列・R1+R2 排他）
-    LLM->>Local: gh auth status
-    LLM->>Dev: バージョン確認（PATCH+1 提案）
+    Note over Dev,Net: Stage A — Prepare and Build （直列 R1+R2 排他）
+    LLM->>Local: gh auth status と merge-commit 許可確認
+    LLM->>Dev: バージョン確認 PATCH+1 提案
     Dev-->>LLM: 承認
-    LLM->>Local: git status → 未コミットなら commit
+    LLM->>Local: git status 未コミットなら commit
     LLM->>Local: cargo test --all
-    alt テスト失敗
-        LLM->>Dev: 中止
-    end
-    LLM->>Local: Cargo.toml 6箇所 + package.json 更新
-    LLM->>Local: cargo build --workspace
-    alt ビルド失敗
-        LLM->>Local: git restore Cargo.toml package.json
-        LLM->>Dev: 中止
-    end
-    LLM->>Local: commit（bump）
-    LLM->>Local: release.ps1（ローカル dll ビルド）→ dll.zip → commit（ghost）
-    LLM->>Local: npm install + npm run package（build:wasm=R1）→ VSIX
-    Note right of LLM: Stage A 完了 = ワークツリークリーン + 全成果物生成済み
+    LLM->>Local: Cargo.toml 6箇所 + package.json 更新 cargo build commit
+    LLM->>Local: release.ps1 dll ビルド dll.zip commit
+    LLM->>Local: npm run package VSIX 生成
+    LLM->>Local: git log 前回タグ..HEAD チェンジログ整形
+    Note right of LLM: Stage A 完了 ワークツリークリーン 全成果物生成済み
 
-    Note over Dev,Net: Stage B — Publish（並行 3 トラック・R2 不変）
+    Note over Dev,Net: Stage B — Integrate （安全ゲート）
+    LLM->>Local: git tag -a vX.Y.Z 作業ブランチ HEAD
+    LLM->>GH: gh pr create base main head 作業ブランチ
+    LLM->>GH: gh pr merge --merge --delete-branch
+    alt 統合失敗 PR 作成 or マージ
+        LLM->>Dev: 非破壊で中断 Stage C/D 実行しない
+    end
+    LLM->>GH: git push origin vX.Y.Z タグ ref
+    Note right of LLM: main にリリースコミット反映 タグ main から到達可能
+
+    Note over Dev,Net: Stage C — Publish （並行 2 トラック）
     par Track X クリティカル
-        LLM->>Net: cargo publish core→dsl→lua→shiori→check（内部直列・index 待機）
+        LLM->>Net: cargo publish core dsl lua shiori check 内部直列 index 待機
     and Track Y 非クリティカル
-        LLM->>Net: vsce publish（失敗は警告のみ・隔離）
-    and Track Z 準備
-        LLM->>Local: git log 前回タグ..HEAD → チェンジログ整形（読み取り専用）
+        LLM->>Net: vsce publish 失敗は警告のみ 隔離
     end
-    alt Track X 中断
-        LLM->>Dev: 報告・Stage C/D を実行しない（安全順序保証）
+    alt Track X 失敗
+        LLM->>Dev: main 統合状態は保持 公開リトライ or 中断報告 Stage D 実行しない
     end
-
-    Note over Dev,Net: Stage C — Tag & Push（X 成功後・R2 排他）
-    LLM->>Local: git tag -a vX.Y.Z
-    LLM->>Net: git push origin main --tags
 
     Note over Dev,Net: Stage D — GitHub Release
-    LLM->>Net: gh release create（pasta.dll.zip + .nar [+ VSIX] + notes）
-    LLM->>Dev: 完了サマリー（各トラック成否を含む）
+    LLM->>GH: gh release create assets notes
+    LLM->>Dev: 完了サマリー 各トラック成否
 ```
-
-### Stage B 並行トラックの実行ノート
-
-- **オーケストレーション**: LLM エージェントは Track X（crates.io 公開、長いインデックス待機を含む）を主軸に進めつつ、その待機時間に Track Y（vsce publish）と Track Z（チェンジログ整形）を重ねる。バックグラウンド実行が可能な環境では `run_in_background` で Track Y を起動し、Track X 進行中にポーリングせず完了通知で回収する。逐次環境では「X の各 index 待機の間に Y/Z の 1 ステップを進める」インターリーブで近似する。
-- **失敗隔離（Req 8.4）**: Track Y の失敗・タイムアウトは警告として記録し、Stage C/D を妨げない。VSIX が未生成・未公開でも Stage D は dll.zip と .nar のみで Release を作成する。
-- **同期点**: Stage C は Track X の成功のみを待つ。Stage D は Stage C 完了＋Track Z 完了を待ち、Track Y は「間に合っていれば VSIX/URL を反映」する非ブロッキング依存とする。
 
 ### 共通リトライ戦略（段階的バックオフ）
 
-外部サービス通信（`cargo publish`, `vsce publish`, `git push`, `gh release create`）はネットワーク一時障害に対し段階的バックオフを適用する:
+外部サービス通信（`cargo publish`, `vsce publish`, `gh pr merge`, `git push`, `gh release create`）はネットワーク一時障害に対し段階的バックオフを適用する:
 
 ```
 待機時間系列: 1分 → 2分 → 3分 → ... → 10分
 最大試行回数: 初回 + リトライ10回 = 合計11回（最大累計待機 55分）
 ```
 
-**手順**: コマンド実行 → 失敗時 N=1 分から `Start-Sleep -Seconds (N*60)` 後にリトライ → 失敗ごとに N を 1 ずつ増加 → N=10 でも失敗なら中断（クリティカル）または警告継続（非クリティカル）。
-
 **適用とクリティカル度**:
-- Track X: `cargo publish` — **クリティカル**（失敗時は以降の公開を中断し Stage C/D を実行しない）
+- Stage B: `gh pr merge --merge` — **クリティカル**（失敗時は Stage C/D を実行せず非破壊中断）
+- Track X: `cargo publish` — **クリティカル**（失敗時は Stage D を実行しない。main 統合は保持）
 - Track Y: `vsce publish` — **非クリティカル**（失敗時は警告のみで後続継続）
-- Stage C: `git push` — **クリティカル**（失敗時は手動対応を案内）
 - Stage D: `gh release create` — **クリティカル**（失敗時は手動手順を案内）
 
 ### エラー時ロールバックフロー
 
 ```mermaid
 flowchart TD
-    A{エラー発生ステージ} --> B[Stage A: 検証 Phase0-1]
-    A --> C[Stage A: Phase2 bump]
-    A --> P5[Stage A: Phase5 ghost]
-    A --> X[Stage B Track X: crates.io]
-    A --> Y[Stage B Track Y: vsce]
-    A --> CC[Stage C: tag/push]
-    A --> D[Stage D: gh release]
+    A{エラー発生ステージ} --> B[Stage A 検証 Phase0-1]
+    A --> C[Stage A Phase2 bump]
+    A --> P5[Stage A Phase5 ghost]
+    A --> INT[Stage B 統合 tag PR merge]
+    A --> X[Stage C Track X crates.io]
+    A --> Y[Stage C Track Y vsce]
+    A --> D[Stage D gh release]
 
-    B --> B1[作業不要 - 変更なし]
+    B --> B1[作業不要 変更なし]
     C --> C1[git restore Cargo.toml package.json]
-    P5 --> P51[エラー報告 - 手動対応]
-    X --> X1[中断 - 既公開クレートは残す / Stage C-D を実行しない]
-    Y --> Y1[警告記録のみ - 隔離して継続]
-    CC --> CC1[エラー報告 - 手動リトライ]
-    D --> D1[エラー報告 - 手動手順案内]
+    P5 --> P51[エラー報告 手動対応]
+    INT --> INT1[非破壊中断 ブランチ非削除 公開未実行 タグ未push or ローカルタグ削除]
+    X --> X1[main 統合は保持 公開リトライ or 中断 既公開クレートは残す]
+    Y --> Y1[警告記録のみ 隔離して継続]
+    D --> D1[エラー報告 手動 gh release 手順案内]
 ```
 
 ## Requirements Traceability
@@ -283,63 +307,63 @@ flowchart TD
 | 1.8–1.9     | 未コミット変更の自動コミット                  | A / Phase 1       | メインフロー: Stage A          |
 | 1.10–1.11   | cargo test 実行・失敗時中止                   | A / Phase 1       | エラーフロー: Stage A 検証     |
 | 2.1–2.3     | Cargo.toml 6箇所 + package.json 更新          | A / Phase 2       | メインフロー: Stage A          |
-| 2.4–2.5     | cargo build 検証・失敗時 git restore          | A / Phase 2       | エラーフロー: Stage A Phase2   |
-| 2.6         | バージョン更新コミット                        | A / Phase 2       | メインフロー: Stage A          |
-| 3.1–3.2     | 依存関係順 publish・成功確認後に次             | B / Track X       | メインフロー: Stage B Track X  |
-| 3.3–3.4     | 段階的リトライ・失敗時中断                     | B / Track X       | 共通リトライ戦略               |
-| 3.5         | pasta_sample_ghost スキップ                   | B / Track X       | メインフロー: Stage B Track X  |
-| 3.6         | crates.io インデックス待機                    | B / Track X       | メインフロー: Stage B Track X  |
+| 2.4–2.6     | cargo build 検証・失敗時 git restore・コミット | A / Phase 2       | エラーフロー: Stage A Phase2   |
+| 3.1         | ローカル完了＋**統合成功後**に依存関係順 publish | C / Track X     | メインフロー: Stage C Track X  |
+| 3.2–3.4     | 成功確認後に次・段階的リトライ・失敗時中断     | C / Track X       | 共通リトライ戦略               |
+| 3.5–3.6     | pasta_sample_ghost スキップ・index 待機       | C / Track X       | メインフロー: Stage C Track X  |
 | 4.1–4.2     | VSCode 拡張ビルド・VSIX 生成確認              | A / Phase 4a      | メインフロー: Stage A          |
-| 4.3–4.4     | Marketplace 公開・リトライ                    | B / Track Y       | メインフロー: Stage B Track Y  |
-| 4.5–4.6     | 公開／ビルド失敗→警告・継続（隔離）           | B / Track Y       | エラーフロー: Track Y          |
-| 4.7         | Marketplace 成功時 URL 記録                   | B / Track Y       | メインフロー: Stage B Track Y  |
-| 5.1–5.4     | release.ps1 実行・成果物確認・失敗時中断      | A / Phase 5       | メインフロー: Stage A          |
-| 5.5–5.7     | DLL zip 圧縮・存在確認・失敗時中断            | A / Phase 5       | メインフロー: Stage A          |
-| 5.8         | ゴーストビルドコミット                        | A / Phase 5       | メインフロー: Stage A          |
-| 5.9         | ゴーストビルドは crates.io 非依存             | A / Phase 5       | 共有リソースモデル             |
-| 6.1–6.2     | アノテーションタグ作成・メッセージ            | C / Phase 6       | メインフロー: Stage C          |
-| 6.3         | 既存タグ競合時エラー                          | C / Phase 6       | エラーフロー: Stage C          |
-| 6.4–6.5     | push・失敗時手動対応案内                      | C / Phase 6       | メインフロー: Stage C          |
-| 7.1–7.3     | git log 取得・分類・整形                      | B / Track Z       | メインフロー: Stage B Track Z  |
-| 7.4–7.7     | Release 作成・アセット添付（VSIX 任意）       | D / Phase 7       | メインフロー: Stage D          |
-| 7.8         | gh 失敗時手動手順案内                         | D / Phase 7       | エラーフロー: Stage D          |
-| 7.9         | 初回リリース時の全履歴使用                    | B / Track Z       | メインフロー: Stage B Track Z  |
+| 4.3–4.7     | Marketplace 公開・リトライ・隔離・URL 記録    | C / Track Y       | メインフロー: Stage C Track Y  |
+| 5.1–5.9     | release.ps1 実行・成果物確認・zip・コミット・crates.io 非依存 | A / Phase 5 | メインフロー: Stage A    |
+| 6.1         | **統合直前**にアノテーションタグ作成          | B / Phase 6a      | メインフロー: Stage B          |
+| 6.2–6.3     | タグメッセージ・既存タグ競合時エラー          | B / Phase 6a      | エラーフロー: Stage B          |
+| 6.4–6.5     | **PR マージコミット統合**・タグ push・失敗時案内 | B / Phase 6b-d  | メインフロー: Stage B          |
+| 7.1–7.3     | git log 取得・分類・整形                      | A / Phase Z       | メインフロー: Stage A          |
+| 7.4–7.9     | Release 作成・アセット添付（VSIX 任意）・初回全履歴 | D / Phase 7   | メインフロー: Stage D          |
 | 8.1         | リソース分類とスケジューリング                | 全 Stage          | 共有リソースモデル             |
-| 8.2         | ローカルビルド完了→ワークツリークリーン化後 publish | A → B        | スケジューリング規則           |
-| 8.3         | 公開トラックの並行実行                        | B / X∥Y∥Z         | Stage B 並行トラック           |
-| 8.4         | 非クリティカル失敗の隔離                      | B / Track Y       | 失敗隔離                       |
-| 8.5         | 不可逆処理の順序安全性                        | B Track X → C/D   | 安全順序保証                   |
-| 8.6         | 偽の依存関係の排除                            | A / Phase 5       | 共有リソースモデル             |
-| 8.7         | 各並行トラックの完了検証                      | B → D             | Stage B 同期点                 |
-| 9.1–9.3     | 繰り返し実行・状態初期化                      | —                 | 繰り返し実行の仕様特性         |
-| 9.4         | 完了サマリー報告                              | D / Phase 7       | メインフロー: Stage D          |
+| 8.2         | ローカルビルド完了→クリーン化後に統合・公開    | A → B → C         | スケジューリング規則           |
+| 8.3         | 公開トラックの並行実行                        | C / X∥Y           | Stage C 並行トラック           |
+| 8.4         | 非クリティカル失敗の隔離                      | C / Track Y       | 失敗隔離                       |
+| 8.5         | 安全順序「統合 → 公開 → Release」             | B → C → D         | スケジューリング規則           |
+| 8.6         | 偽の依存関係の排除（ゴーストビルド先行）      | A / Phase 5       | 共有リソースモデル             |
+| 8.7         | 各並行トラックの完了検証                      | C → D             | Stage C/D 同期点               |
+| 9.1–9.4     | 繰り返し実行・状態初期化・完了サマリー        | — / Phase 7       | 繰り返し実行の仕様特性         |
+| 10.1        | ワークツリーブランチ上で動作・直 push 非前提  | A–D / 全体        | メインフロー全体               |
+| 10.2        | コミットを作業ブランチに保持・統合は統合フェーズのみ | A → B          | メインフロー: Stage A→B        |
+| 10.3        | PR マージコミット方式で SHA 保持・main 到達可能 | B / Phase 6b-c   | メインフロー: Stage B          |
+| 10.4        | squash-PR・直 push を使用しない               | B / Phase 6       | スケジューリング規則           |
+| 10.5        | タグの到達性保証・タグ ref push               | B / Phase 6a,6d   | メインフロー: Stage B          |
+| 10.6        | 統合成功確認後に crates.io 公開開始           | B → C             | 安全ゲート                     |
+| 10.7        | 統合失敗時は公開せず非破壊中断                | B / Phase 6       | エラーフロー: Stage B          |
+| 10.8        | 統合成功後の公開失敗は main 保持・リトライ/中断 | C / Track X      | エラーフロー: Track X          |
 
 ## Components and Interfaces
 
 | Component              | Stage | Intent                                   | Req Coverage    | Key Dependencies (Resource)                          | Critical? |
 | ---------------------- | ----- | ---------------------------------------- | --------------- | ---------------------------------------------------- | --------- |
-| Phase 0: Prerequisites | A     | gh 認証確認                              | —（暗黙的前提） | gh auth (R3)                                         | yes       |
+| Phase 0: Prerequisites | A     | gh 認証・merge-commit 許可確認           | 10.3（前提）    | gh auth / gh repo view (R3)                          | yes       |
 | Phase 1: Validation    | A     | バージョン決定と事前検証                 | 1.1–1.11        | Cargo.toml (R2), cargo test (R1), git (R2)           | yes       |
 | Phase 2: VersionBump   | A     | Cargo.toml + package.json 更新           | 2.1–2.6         | Cargo.toml/package.json (R2), cargo build (R1)       | yes       |
 | Phase 5: GhostBuild    | A     | サンプルゴーストビルド（ローカル）       | 5.1–5.9         | release.ps1 (R1+R2), i686 target                     | yes       |
 | Phase 4a: VsixPackage  | A     | VSCode 拡張ビルド・VSIX 生成             | 4.1, 4.2, 4.6   | npm/build:wasm (R1+R2)                               | no        |
-| Track X: CratesPublish | B     | crates.io 公開（内部直列）               | 3.1–3.6         | cargo publish (R1+R3), crates.io index (R3)          | yes       |
-| Track Y: VsixPublish   | B     | Marketplace 公開                         | 4.3–4.5, 4.7    | vsce (R3)                                            | no        |
-| Track Z: Changelog     | B     | チェンジログ生成（読み取り専用）         | 7.1–7.3, 7.9    | git log (read-only)                                  | no        |
-| Phase 6: TagPush       | C     | タグ作成とプッシュ                       | 6.1–6.5         | git (R2+R3), GitHub remote (R3)                      | yes       |
+| Phase Z: Changelog     | A     | チェンジログ整形（読み取り専用）         | 7.1–7.3, 7.9    | git log (read-only)                                  | no        |
+| Phase 6: Integrate     | B     | タグ作成・PR マージコミット統合・タグ push | 6.1–6.5, 10.2–10.7 | git (R2), gh pr (R3), GitHub remote (R3)        | yes       |
+| Track X: CratesPublish | C     | crates.io 公開（内部直列）               | 3.1–3.6, 10.8   | cargo publish (R1+R3), crates.io index (R3)          | yes       |
+| Track Y: VsixPublish   | C     | Marketplace 公開                         | 4.3–4.5, 4.7    | vsce (R3)                                            | no        |
 | Phase 7: Release       | D     | GitHub Release 作成                      | 7.4–7.8, 9.4    | gh CLI (R3)                                          | yes       |
 
-### Stage A — Prepare & Build（ローカル・直列）
+### Stage A — Prepare & Build
 
 #### Phase 0: Prerequisites
 
-| Field        | Detail                          |
-| ------------ | ------------------------------- |
-| Intent       | GitHub CLI の認証状態を確認する |
-| Requirements | — （暗黙的前提条件）            |
+| Field        | Detail                                                        |
+| ------------ | ------------------------------------------------------------ |
+| Intent       | GitHub CLI の認証状態と repo の merge-commit 許可を確認する  |
+| Requirements | 10.3（前提条件）                                             |
 
 **実行手順**
-1. `gh auth status` — 認証済みなら続行。未認証なら「`gh auth login` を実行してください」とガイダンス。
+1. `gh auth status` — 未認証なら「`gh auth login` を実行してください」とガイダンス。
+2. `gh repo view --json mergeCommitAllowed` — `false` の場合は「一回限りセットアップ（`gh repo edit --enable-merge-commit`）が未実施です」と報告し中止。`true` なら続行。
+3. 現在ブランチが**非デフォルトブランチ（ワークツリー）**であることを確認（`git rev-parse --abbrev-ref HEAD` が `main` でない）。`main` 上ならハーネスのワークツリー上での再実行を促す（10.1）。
 
 **Note**: `cargo publish` の認証は環境変数 `CARGO_REGISTRY_TOKEN`、`vsce` は `VSCE_PAT` で有効なためチェック不要。
 
@@ -351,52 +375,38 @@ flowchart TD
 | Requirements | 1.1–1.11                                                           |
 
 **実行手順**
-
-1. **バージョン決定** (1.1–1.7):
-   - 開発者指定があればそれを使用 (1.1)。なければ全ソース調査:
-     - `Cargo.toml` の `[workspace.package].version`
-     - `editors/vscode/package.json` の `version`
-     - `git tag -l "v*"` の最新
-     - crates.io / GitHub Releases / Marketplace の最新（参考）
-   - 最大バージョンの PATCH を +1 して提案 (1.2)、開発者承認を求める (1.3)
-   - 拒否時は希望バージョン入力を求める (1.4)、semver 検証 `^[0-9]+\.[0-9]+\.[0-9]+$` (1.5, 1.6)
-   - 重複チェック: 全ソースに同一バージョンが無いことを確認 (1.7)
-2. **ワークツリー整理** (1.8, 1.9): `git status --porcelain` が空でなければ `git add -A; git commit -m "chore(release): prepare release vX.Y.Z"`
-3. **テスト実行** (1.10, 1.11): `cargo test --all` — 失敗時は中止
+1. **バージョン決定** (1.1–1.7): 開発者指定があれば使用 (1.1)。なければ全ソース調査（`Cargo.toml`、`package.json`、`git tag -l "v*"`、crates.io / GitHub Releases / Marketplace）し最大バージョン PATCH+1 を提案 (1.2)、承認を求める (1.3)。拒否時は希望入力 (1.4)、semver 検証 `^[0-9]+\.[0-9]+\.[0-9]+$` (1.5, 1.6)、重複チェック (1.7)。
+2. **ワークツリー整理** (1.8, 1.9): `git status --porcelain` が空でなければ `git add -A; git commit -m "chore(release): prepare release vX.Y.Z"`。
+3. **テスト実行** (1.10, 1.11): `cargo test --all` — 失敗時は中止。
 
 #### Phase 2: VersionBump
 
-| Field        | Detail                                                                   |
-| ------------ | ------------------------------------------------------------------------ |
-| Intent       | ワークスペース全体のバージョンを一括更新し、ビルド検証する               |
-| Requirements | 2.1–2.6                                                                  |
+| Field        | Detail                                                       |
+| ------------ | ----------------------------------------------------------- |
+| Intent       | ワークスペース全体のバージョンを一括更新し、ビルド検証する  |
+| Requirements | 2.1–2.6                                                     |
 
 **実行手順**
-
-1. **Cargo.toml 更新（6箇所）** (2.1, 2.2): `[workspace.package].version` および `[workspace.dependencies]` の `pasta_core` / `pasta_dsl` / `pasta_lua` / `pasta_shiori` / `pasta_check` の `version` を新バージョンへ
-2. **package.json 更新** (2.3): `editors/vscode/package.json` の `"version"`
-3. **ビルド検証** (2.4): `cargo build --workspace`
-4. **エラーハンドリング** (2.5): 失敗時 `git restore Cargo.toml editors/vscode/package.json`（危険操作禁止に準拠したファイル単位復元）→ 中止
-5. **コミット** (2.6): `git add Cargo.toml editors/vscode/package.json; git commit -m "chore(release): bump version to vX.Y.Z"`
+1. **Cargo.toml 更新（6箇所）** (2.1, 2.2): `[workspace.package].version` および `[workspace.dependencies]` の `pasta_core`/`pasta_dsl`/`pasta_lua`/`pasta_shiori`/`pasta_check` の `version`。
+2. **package.json 更新** (2.3)。
+3. **ビルド検証** (2.4): `cargo build --workspace`。失敗時 `git restore Cargo.toml editors/vscode/package.json`（ファイル単位復元）→ 中止 (2.5)。
+4. **コミット** (2.6): `git commit -m "chore(release): bump version to vX.Y.Z"`。
 
 #### Phase 5: GhostBuild
 
-| Field        | Detail                                                                                 |
-| ------------ | -------------------------------------------------------------------------------------- |
-| Intent       | x86 リリースビルドの pasta.dll と hello-pasta.nar を生成し pasta.dll.zip に圧縮する     |
-| Requirements | 5.1–5.9                                                                                |
+| Field        | Detail                                                                             |
+| ------------ | --------------------------------------------------------------------------------- |
+| Intent       | x86 リリースビルドの pasta.dll と hello-pasta.nar を生成し pasta.dll.zip に圧縮する |
+| Requirements | 5.1–5.9                                                                            |
 
 **Responsibilities & Constraints**
-- `release.ps1` を `crates/pasta_sample_ghost/` で実行（内部で `cargo build -p pasta_shiori` 等のローカルビルドを行う）
-- **crates.io 公開に依存しない**（5.9, 8.6）。バージョン更新コミット（Phase 2）にのみ依存する
-- 成果物（`release/hello-pasta.nar`, `target/i686-pc-windows-msvc/release/pasta.dll`）の存在確認
-- `pasta.dll` を `pasta.dll.zip` に圧縮（`Compress-Archive -Force`）
+- `release.ps1` を `crates/pasta_sample_ghost/` で実行（内部で `cargo build -p pasta_shiori` 等のローカルビルド）。**crates.io 公開に非依存**（5.9, 8.6）。バージョン更新コミット（Phase 2）にのみ依存。
 
 **実行手順**
-1. **ビルド** (5.1): `Push-Location crates/pasta_sample_ghost; PowerShell -ExecutionPolicy Bypass -File release.ps1; Pop-Location`
-2. **成果物確認** (5.2–5.4): `Test-Path release/hello-pasta.nar` と `Test-Path target/i686-pc-windows-msvc/release/pasta.dll`。いずれか False なら中断
-3. **zip 圧縮** (5.5–5.7): `Compress-Archive -Path .../pasta.dll -DestinationPath .../pasta.dll.zip -Force` → `Test-Path` 確認。失敗時中断
-4. **コミット** (5.8): `git add -A; git commit -m "chore(release): build hello-pasta vX.Y.Z"`
+1. **ビルド** (5.1): `Push-Location crates/pasta_sample_ghost; PowerShell -ExecutionPolicy Bypass -File release.ps1; Pop-Location`。
+2. **成果物確認** (5.2–5.4): `Test-Path release/hello-pasta.nar` と `Test-Path target/i686-pc-windows-msvc/release/pasta.dll`。いずれか False なら中断。
+3. **zip 圧縮** (5.5–5.7): `Compress-Archive -Path .../pasta.dll -DestinationPath .../pasta.dll.zip -Force` → `Test-Path` 確認。
+4. **コミット** (5.8): `git commit -m "chore(release): build hello-pasta vX.Y.Z"`（Stage A の HEAD コミット = タグ対象）。
 
 #### Phase 4a: VsixPackage（非クリティカル）
 
@@ -405,33 +415,74 @@ flowchart TD
 | Intent       | VSCode 拡張をビルドして VSIX を生成する（R1 を要する）|
 | Requirements | 4.1, 4.2, 4.6                                        |
 
-**Responsibilities & Constraints**
-- `npm run package` は `prepackage`（`build:wasm` = cargo/wasm ビルド、R1）→ `vsce package` を実行するため**ローカルビルドステージ（Stage A）に配置**する
-- 失敗時は警告を記録し継続（Stage B 以降を妨げない）。生成 VSIX パスを `$env:VSIX_PATH` に保持
+**実行手順**: `cd editors/vscode; npm install`（失敗→警告継続）→ `npm run package`（`prepackage`=`build:wasm`=R1）→ `$env:VSIX_PATH = "editors/vscode/pasta-vscode-X.Y.Z.vsix"`。失敗は警告記録し継続。
+
+> **配置の根拠**: `build:wasm` が R1（cargo ロック）を保持するため、ビルドは Stage A で直列実施し、R3 のみの publish（upload）部分のみ Stage C Track Y へ分離する。
+
+#### Phase Z: Changelog（読み取り専用・先行生成）
+
+| Field        | Detail                                       |
+| ------------ | -------------------------------------------- |
+| Intent       | git log からチェンジログを整形する           |
+| Requirements | 7.1, 7.2, 7.3, 7.9                           |
 
 **実行手順**
-1. `cd editors/vscode; npm install`（失敗→警告・継続）
-2. `npm run package`（失敗→警告・継続）→ 生成物 `pasta-vscode-X.Y.Z.vsix`
-3. `$env:VSIX_PATH = "editors/vscode/pasta-vscode-X.Y.Z.vsix"`
+1. **履歴取得** (7.1, 7.9): `git tag -l "v*" --sort=-version:refname` で前回タグ特定。前回タグありなら `git log <前回タグ>..HEAD --oneline --no-merges`、なければ（初回）`git log --oneline --no-merges`。HEAD = Phase 5 のコミット（タグ作成前でも内容は確定）。
+2. **整形** (7.2, 7.3): Conventional Commits で分類。
 
-> **配置の根拠**: `build:wasm` が R1（cargo ロック）を保持するため、crates.io 公開（Track X の検証ビルドも R1）やゴーストビルドと真の並行ができない。よってビルドは Stage A で直列実施し、R3 のみの **publish（upload）部分のみ Stage B Track Y へ分離**する。
+   | Prefix | 見出し | | Prefix | 見出し |
+   | --- | --- | --- | --- | --- |
+   | `feat` | ✨ Features | | `docs` | 📝 Documentation |
+   | `fix` | 🐛 Bug Fixes | | `test` | 🧪 Tests |
+   | `refactor` | ♻️ Refactoring | | `chore` | 🔧 Maintenance |
 
-### Stage B — Publish（ネットワーク・並行 3 トラック）
+   **除外**: スコープ `spec` のコミット（`chore(spec):` 等）。空グループは省略。
+3. **一時ファイル書き出し**: `release-notes-vX.Y.Z.md`（`**Full Changelog**: https://github.com/ekicyou/pasta/compare/<前回タグ>...vX.Y.Z` を含む）。
 
-> Stage A 完了（ワークツリークリーン、全成果物生成済み）が Stage B 開始の前提条件（8.2）。3 トラックは R2 を変更しないため並行実行可能（8.3）。
+> **配置の根拠**: 読み取り専用で副作用がないため、Stage A の最後で先行生成しておき、Stage D で利用する。チェンジログ比較 URL のタグ名は文字列として既知のため、タグ作成前でも整形できる。
+
+### Stage B — Integrate（安全ゲート）
+
+#### Phase 6: Integrate
+
+| Field        | Detail                                                                |
+| ------------ | -------------------------------------------------------------------- |
+| Intent       | タグを作成し、PR マージコミット方式で作業ブランチを main へ統合する  |
+| Requirements | 6.1–6.5, 10.2–10.7                                                   |
+
+**Responsibilities & Constraints**
+- **前提**: Stage A 完了（ワークツリークリーン、全成果物生成済み）。
+- `kiro-complete` SKILL.md の PR 統合パターンを流用し、`--squash` を **`--merge`**（マージコミット方式）に置換する。
+- **PR 可否判定**（kiro-complete 準拠）: 非デフォルトブランチ かつ `{remote}`（`origin`）あり かつ `gh` 認証あり、のとき PR 統合可。欠ける場合は警告し中断（直 push は行わない）。
+- **マージ成否は `gh pr merge` API の結果のみで判定**。`--delete-branch` のローカル削除警告（カレントワークツリーでチェックアウト中のためブロック）は**非致命**として無視。リモートブランチは API で削除済み（repo `deleteBranchOnMerge=true` のため `--delete-branch` は冗長だが無害）。
+- **安全ゲート**: 統合（PR 作成・マージ）が成功するまで Stage C（不可逆な公開）へ進まない（10.6）。失敗時は **force push・履歴書き換え・マージ成功前のブランチ削除を行わず**非破壊で中断（10.7, 6.5）。
+
+**実行手順**
+1. **既存タグ確認** (6.3): `git tag -l "vX.Y.Z"` — 出力ありなら「既存タグ削除が必要です。手動対応しますか？」と確認（自動削除しない）。
+2. **タグ作成** (6.1, 6.2): `git tag -a vX.Y.Z -m "Release vX.Y.Z"`（作業ブランチ HEAD = Phase 5 コミットを指す。マージコミット方式によりこのコミットは統合後 main から到達可能になる = 10.5）。
+3. **PR 作成** (6.4, 10.3): `gh pr create --base main --head <作業ブランチ> --title "release: vX.Y.Z" --body <要約>`（本文は `merge-base..HEAD` 履歴と requirements/design 概要から要約。kiro-complete のメッセージ生成方針を流用）。
+4. **マージコミット統合** (6.4, 10.3, 10.4): `gh pr merge --merge --delete-branch`（**`--squash`/`--rebase` を使わず**コミット SHA を保持）。失敗時は段階的バックオフ → 最大リトライ後も失敗なら非破壊中断（10.7）。
+5. **タグ push** (6.4, 10.5): `git push origin vX.Y.Z`（タグ ref の push。統合成功後に実行し、タグが main から到達可能であることを保証）。失敗時はバックオフ → 「手動で再実行してください」と案内 (6.5)。
+6. **統合失敗時のローカルタグ** (10.7): マージ失敗で中断する場合、ローカルタグ `vX.Y.Z` は `git tag -d`（安全なローカル操作）で削除し、再実行をクリーンにしてよい。リモートには未反映。
+
+> **設計判断（タグの指す先）**: タグは Stage A HEAD（ゴーストビルドコミット）を指す。マージコミット方式では当該コミットがマージコミットの親として main 履歴に残るため、`git describe`・Release のコミットリンク・チェンジログ compare URL が main 上で有効に解決する。Stage C の `cargo publish` はローカル作業ブランチ（= 同一ツリー内容）から実行するため、公開内容とタグ・main の整合が保たれる。
+
+### Stage C — Publish（並行 2 トラック）
+
+> Stage B 統合成功が Stage C 開始の前提（10.6）。2 トラックは R2 を変更せず並行実行可能（8.3）。
 
 #### Track X: CratesPublish（クリティカル）
 
 | Field        | Detail                                       |
 | ------------ | -------------------------------------------- |
 | Intent       | 依存関係順に5クレートを crates.io へ公開する |
-| Requirements | 3.1–3.6                                      |
+| Requirements | 3.1–3.6, 10.8                                |
 
 **Responsibilities & Constraints**
-- 順序固定: `pasta_core` → `pasta_dsl` → `pasta_lua` → `pasta_shiori` → `pasta_check`（pasta_check は他 pasta_* に非依存のバイナリ、最後）
-- `pasta_sample_ghost`（`publish = false`）はスキップ (3.5)
-- 各公開後 `Start-Sleep -Seconds 10`（インデックス更新待機、最後のクレートは不要）(3.6)
-- 失敗時は段階的バックオフ。最大リトライ後も失敗なら**中断**し、既公開クレートは残す。**Stage C/D は実行しない**（安全順序保証 8.5） (3.3, 3.4)
+- **前提**: Stage B 統合成功（3.1, 10.6）。
+- 順序固定: `pasta_core` → `pasta_dsl` → `pasta_lua` → `pasta_shiori` → `pasta_check`。`pasta_sample_ghost`（`publish = false`）はスキップ (3.5)。
+- 各公開後 `Start-Sleep -Seconds 10`（index 更新待機、最後は不要）(3.6)。
+- 失敗時は段階的バックオフ。最大リトライ後も失敗なら**中断**し、既公開クレートは残す。**main は既に正しいリリース状態（コミット・タグ反映済み）であり、公開のみリトライ／中断する**（10.8）。**Stage D は実行しない**（Track X 成功が前提）(3.3, 3.4)。
 
 #### Track Y: VsixPublish（非クリティカル）
 
@@ -440,57 +491,7 @@ flowchart TD
 | Intent       | 生成済み VSIX を Marketplace へ公開する（R3 のみ）    |
 | Requirements | 4.3, 4.4, 4.5, 4.7                                   |
 
-**Responsibilities & Constraints**
-- Track X と並行実行可能（R1 不要・R2 不変）。Track X の index 待機に重ねることで wall-clock を短縮
-- `vsce publish` 失敗時は段階的バックオフ → 最大リトライ後も失敗なら**警告記録のみで継続**（失敗隔離 8.4）
-- 成功時は Marketplace URL を記録 (4.7)
-
-#### Track Z: Changelog（準備・読み取り専用）
-
-| Field        | Detail                                       |
-| ------------ | -------------------------------------------- |
-| Intent       | git log からチェンジログを整形する           |
-| Requirements | 7.1, 7.2, 7.3, 7.9                           |
-
-**実行手順**
-1. **履歴取得** (7.1, 7.9): `git tag -l "v*" --sort=-version:refname` で前回タグ特定。前回タグありなら `git log <前回タグ>..HEAD --oneline --no-merges`、なければ（初回）`git log --oneline --no-merges`。HEAD = Phase 5 のゴーストビルドコミット（タグ前でも内容は確定）
-2. **整形** (7.2, 7.3): Conventional Commits で分類
-
-   | Prefix | 見出し | | Prefix | 見出し |
-   | --- | --- | --- | --- | --- |
-   | `feat` | ✨ Features | | `docs` | 📝 Documentation |
-   | `fix` | 🐛 Bug Fixes | | `test` | 🧪 Tests |
-   | `refactor` | ♻️ Refactoring | | `chore` | 🔧 Maintenance |
-
-   **除外**: スコープ `spec` のコミット（`chore(spec):`, `docs(spec):` 等）。空グループは見出しごと省略。
-3. **一時ファイル書き出し**: `release-notes-vX.Y.Z.md`
-
-   ```markdown
-   ## What's Changed
-
-   ### ✨ Features
-   - サマリー (@author)
-   ...
-   **Full Changelog**: https://github.com/ekicyou/pasta/compare/<前回タグ>...vX.Y.Z
-   ```
-
-### Stage C — Tag & Push
-
-#### Phase 6: TagPush
-
-| Field        | Detail                                                  |
-| ------------ | ------------------------------------------------------- |
-| Intent       | リリースポイントを Git タグで記録しリモートに反映する   |
-| Requirements | 6.1–6.5                                                 |
-
-**Responsibilities & Constraints**
-- **前提**: Track X（crates.io 公開）が成功していること（8.5）
-- アノテーションタグ（`-a`）を使用。既存タグ競合時は自動削除せず開発者に確認 (6.3)
-
-**実行手順**
-1. **既存タグ確認** (6.3): `git tag -l "vX.Y.Z"` — 出力ありなら「既存タグ削除が必要です。手動で対応しますか？」と確認
-2. **タグ作成** (6.1, 6.2): `git tag -a vX.Y.Z -m "Release vX.Y.Z"`
-3. **プッシュ** (6.4, 6.5): `git push origin main --tags`（main 直接 push、workflow.md 準拠）。失敗時は段階的バックオフ → 「手動で再実行してください」と案内
+**Responsibilities & Constraints**: Track X と並行実行可能。`vsce publish` 失敗時は段階的バックオフ → 最大リトライ後も失敗なら**警告記録のみで継続**（失敗隔離 8.4）。成功時は Marketplace URL を記録 (4.7)。
 
 ### Stage D — GitHub Release
 
@@ -501,8 +502,7 @@ flowchart TD
 | Intent       | チェンジログ付きの GitHub Release を作成しアセットを添付する        |
 | Requirements | 7.4–7.8, 9.4                                                       |
 
-**Responsibilities & Constraints**
-- **前提**: Stage C 完了＋Track Z 完了。Track Y は非ブロッキング（VSIX が間に合えば添付、なければ dll.zip + .nar のみ）
+**Responsibilities & Constraints**: **前提**: Stage C Track X 成功＋Phase Z（チェンジログ）完了。Track Y は非ブロッキング（VSIX が間に合えば添付、なければ dll.zip + .nar のみ）。
 
 **実行手順**
 1. **Release 作成** (7.4–7.7):
@@ -514,72 +514,65 @@ flowchart TD
    if ($env:VSIX_PATH -and (Test-Path $env:VSIX_PATH)) { $assets += $env:VSIX_PATH }
    gh release create vX.Y.Z $assets --title "pasta vX.Y.Z" --notes-file release-notes-vX.Y.Z.md
    ```
-2. **一時ファイル削除**: `Remove-Item release-notes-vX.Y.Z.md`
-3. **エラーハンドリング** (7.8): 失敗時はエラー報告し手動 `gh release create ...` 手順を案内
-4. **完了サマリー** (9.4):
-   - バージョン: `vX.Y.Z`
-   - 公開クレート: `pasta_core`, `pasta_dsl`, `pasta_lua`, `pasta_shiori`, `pasta_check`
-   - Release URL: `https://github.com/ekicyou/pasta/releases/tag/vX.Y.Z`
-   - Marketplace（Track Y）: 公開成功 URL or 警告
-   - 各並行トラックの成否（X / Y / Z）
+2. **一時ファイル削除**: `Remove-Item release-notes-vX.Y.Z.md`。
+3. **エラーハンドリング** (7.8): 失敗時は手動 `gh release create ...` 手順を案内。
+4. **完了サマリー** (9.4): バージョン、公開クレート、Release URL、Marketplace（Track Y）結果、各トラック（統合 / X / Y）の成否。
 
 ## Error Handling
 
 ### Error Strategy
 
-各ステージはゲート方式で制御される。Stage A の失敗はその場で停止（ローカルのみ、対外影響なし）。Stage B Track X の失敗は Stage C/D をブロックする（安全順序保証）。Track Y の失敗は隔離される。
+各ステージはゲート方式で制御される。Stage A の失敗はローカルのみで停止（対外影響なし）。**Stage B（統合）の失敗は不可逆な Stage C/D をブロックする**（安全ゲート）。Stage C Track X の失敗は Stage D をブロックするが main 統合は保持される。Track Y の失敗は隔離される。
 
 ### Error Categories and Responses
 
-| ステージ            | エラー種別         | 対応                                          | ロールバック                   |
-| ------------------- | ------------------ | --------------------------------------------- | ------------------------------ |
-| A / Phase 0         | gh 認証未設定      | ガイダンス提示 → 設定待ち                     | 不要                           |
-| A / Phase 1         | テスト失敗         | エラー報告・中止                              | 不要（変更なし）               |
-| A / Phase 2         | ビルド失敗         | `git restore Cargo.toml editors/vscode/package.json` | Cargo.toml + package.json 復元 |
-| A / Phase 5         | release.ps1 失敗   | エラー報告・中断                              | 手動対応                       |
-| A / Phase 4a        | npm/package 失敗   | 警告記録・継続                                | 不要（非クリティカル）         |
-| B / Track X         | cargo publish 失敗 | バックオフ → 中断（Stage C/D 不実行）         | 既公開クレートは残す           |
-| B / Track Y         | vsce publish 失敗  | 警告記録・隔離継続                            | 不要（非クリティカル）         |
-| C / Phase 6         | タグ競合 / push 失敗 | 開発者確認 / 手動リトライ案内                | 手動対応                       |
-| D / Phase 7         | gh 失敗            | 手動手順案内                                  | 手動実行                       |
+| ステージ            | エラー種別             | 対応                                                  | ロールバック                       |
+| ------------------- | ---------------------- | ----------------------------------------------------- | ---------------------------------- |
+| A / Phase 0         | gh 未認証 / merge-commit 無効 / main 上 | ガイダンス提示 → 中止                | 不要                               |
+| A / Phase 1         | テスト失敗             | エラー報告・中止                                      | 不要（変更なし）                   |
+| A / Phase 2         | ビルド失敗             | `git restore Cargo.toml editors/vscode/package.json`  | Cargo.toml + package.json 復元     |
+| A / Phase 5         | release.ps1 失敗       | エラー報告・中断                                      | 手動対応                           |
+| A / Phase 4a        | npm/package 失敗       | 警告記録・継続                                        | 不要（非クリティカル）             |
+| B / Phase 6         | PR 作成/マージ失敗     | バックオフ → **非破壊中断（Stage C/D 不実行）**       | ブランチ非削除・公開未実行・ローカルタグ削除可 |
+| C / Track X         | cargo publish 失敗     | バックオフ → 中断（Stage D 不実行）                   | **main 統合は保持**・既公開クレートは残す |
+| C / Track Y         | vsce publish 失敗      | 警告記録・隔離継続                                    | 不要（非クリティカル）             |
+| D / Phase 7         | gh release 失敗        | 手動手順案内                                          | 手動実行                           |
 
 ### セッション中断からの復旧
 
 LLM セッションが途中で切断された場合の復旧:
 
-1. `git log --oneline -5` で最後のコミットを確認
-2. コミットメッセージから進捗を判断:
-   - `chore(release): prepare release vX.Y.Z` → Phase 1 完了
-   - `chore(release): bump version to vX.Y.Z` → Phase 2 完了
-   - `chore(release): build hello-pasta vX.Y.Z` → Phase 5 完了（= Stage A 完了）
-   - タグ `vX.Y.Z` の有無 → Stage C 完了判定
-   - `gh release view vX.Y.Z` → Stage D 完了判定
-   - crates.io の各クレートページ → Track X の進捗判定（どこまで公開済みか）
-3. 完了済みステージ／トラックをスキップして再開。**Track X が一部公開済みの場合、公開済みクレートは再公開せず未公開分から再開**
+1. `git log --oneline -5` で最後のコミットを確認（`prepare` → Phase1 / `bump` → Phase2 / `build hello-pasta` → Phase5 = Stage A 完了）。
+2. **統合状態の判定**: `gh pr list --state merged --head <作業ブランチ>` または `git ls-remote origin vX.Y.Z`（タグ）、`gh pr view` で Stage B の完了を判定。
+3. **公開進捗の判定**: crates.io の各クレートページで Track X の進捗（どこまで公開済みか）を確認。
+4. 完了済みステージ／トラックをスキップして再開。**Track X が一部公開済みの場合、公開済みクレートは再公開せず未公開分から再開**。**Stage B 統合済みなら公開のみ再開**（main 再統合はしない）。
 
 ## Testing Strategy
 
 本仕様はオペレーション仕様であり自動テストの対象外。品質は以下で担保:
 
+- **Phase 0**: `gh repo view --json mergeCommitAllowed` が `true`（一回限りセットアップ完了の検証）
 - **Phase 1**: `cargo test --all` による全テスト通過
 - **Phase 2**: `cargo build --workspace` によるビルド検証
 - **Phase 5**: `release.ps1` による成果物生成と存在確認
+- **Stage B**: `gh pr merge --merge` 成功（API 結果）、タグが main から到達可能（`git describe` / Release コミットリンク）
 - **Stage D**: GitHub Release の作成成功確認
 
 ### 手動検証項目
 
-| 確認項目                                | 確認方法                                   | タイミング         |
-| --------------------------------------- | ------------------------------------------ | ------------------ |
-| crates.io にクレートが公開されたか      | https://crates.io/crates/pasta_core を確認 | Track X 完了後     |
-| Marketplace に拡張が公開されたか        | Marketplace ページで確認                   | Track Y 完了後     |
-| GitHub Release にアセットが添付されたか | Release ページで確認                       | Stage D 完了後     |
-| .nar ファイルが正常か                   | areka で読み込みテスト                     | リリース後（任意） |
+| 確認項目                                   | 確認方法                                          | タイミング         |
+| ------------------------------------------ | ------------------------------------------------- | ------------------ |
+| 作業ブランチがマージコミットで main 反映済 | `git log --merges main` / PR が merged 状態       | Stage B 完了後     |
+| タグが main から到達可能                   | `git describe vX.Y.Z` が main 履歴上で解決        | Stage B 完了後     |
+| crates.io にクレートが公開されたか         | https://crates.io/crates/pasta_core を確認        | Track X 完了後     |
+| Marketplace に拡張が公開されたか           | Marketplace ページで確認                          | Track Y 完了後     |
+| GitHub Release にアセットが添付されたか     | Release ページで確認                              | Stage D 完了後     |
 
 ## 繰り返し実行の仕様特性
 
 本仕様は Requirement 9 に基づく特殊な運用モデルを持つ:
 
-- `/kiro-impl release-workflow` 実行のたびに全タスク状態が初期化される (9.1)
-- `spec.json` の `phase` は `completed` に遷移せず `ready_for_implementation` を維持 (9.2)
-- 各実行は前回に依存しない独立作業として動作 (9.3)
-- 完了時にサマリー（各並行トラックの成否を含む）を報告 (9.4)
+- `/kiro-impl release-workflow` 実行のたびに全タスク状態が初期化される (9.1)。一回限りセットアップ（One-Time Setup）は対象外。
+- `spec.json` の `phase` は `completed` に遷移せず `ready_for_implementation` を維持 (9.2)。
+- 各実行は前回に依存しない独立作業として動作 (9.3)。各回でハーネスが新しいワークツリーブランチを供給する。
+- 完了時にサマリー（各並行トラックの成否を含む）を報告 (9.4)。
