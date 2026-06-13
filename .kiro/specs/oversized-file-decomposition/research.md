@@ -148,6 +148,7 @@
 3. **C4 順序保証のドキュメント化＋テスト**（Constraint, High）: 抽出後ヘルパーの呼び出し順 `apply→response→event→command` をコードコメント＋（可能なら）順序検証テストで担保する方式を design で確定。`setBreakpoints` 原子境界の正確な行範囲を実装時に再取得。
 4. **インベントリ再スナップショット**（運用 Constraint）: brief→現状の drift（`transport.rs`/`debug/mod.rs` 増大・`debug_integration_test.rs` 新規）を踏まえ、**実装着手時に 600 行超リストと `wiring.rs` mod 行番号を再取得**してから着手する手順を tasks に明記。
 5. **段階検証の粒度とコミット境界**（Constraint）: 「1 ファイル＝1 検証＝1 コミット」を基本とするか、クレート単位でまとめるか。`NoDefaultCurrentDirectoryInExePath` 無効化を各 `cargo` 実行の前段に組み込む運用も明記。
+6. **debug テスト外出し時のポートガード保全**（Constraint, Medium）: `wiring.rs`/`transport.rs`/`session.rs` 等の debug テストは、固定ポート枯渇（`PASTA_DEBUG`/9276）による `AddrInUse` 回避のため `#[ctor]` による環境中和に依存している（既知問題・解決済 `c59ee8d`）。インラインテストを兄弟ファイルへ移動する際、当該 `#[ctor]` ガードと env 前提が**同一クレートのテストビルドに対して引き続き有効**であることを保証する（移動のみ・新規ガード追加なしが原則だが、外出し先からガードが効くモジュールパスかを design/impl で確認）。
 
 ## 7. Recommendations for Design Phase
 
