@@ -94,3 +94,26 @@
 ### 持ち越す調査項目（Research Needed）
 - `gh pr create` / `gh pr merge --squash` の最小オプションセットと、`{remote}` 不在時のスキップ挙動の標準化。
 - branch ruleset（PR 必須 / linear history）併用の要否（Req 6.3、任意）。
+
+---
+
+## 設計合成（Synthesis）— 2026-06-13
+
+### 設計判断の確定（DD1–DD5、design.md と同期）
+- **DD1 (U2)**: ブランチ削除＝`gh pr merge --squash --delete-branch`（リモート）＋ローカル後始末はハーネス委譲。多重防御で repo `--delete-branch-on-merge` も有効化。
+- **DD2 (U3)**: `kiro-complete` に Step 0（決定的解決）を新規導入。`origin`/`main` ハードコード撤去。kiro-tasks 撤去で kiro-complete が主要 git-ops スキルになるため移植性が必須化。
+- **DD3 (Req 1.5)**: squash メッセージは `gh pr merge --subject/--body` で供給。本文は `merge-base..HEAD` 履歴＋ spec タイトル要約。方針は workflow.md、実行は kiro-complete。
+- **DD4 (検証)**: 静的整合チェック＋`verify-drift-gate.mjs`＋使い捨てブランチ dry-run の3層。ランタイムテストは非該当。
+- **DD5 (境界)**: workflow.md §3 を「spec 完了ブランチ統合」に限定し、release タグ公開（`git push origin main --tags`）を禁止対象外と明記（カーブアウト）。
+
+### 参照インベントリ（grep 確定。Req 3.3 / 8.3）
+| ファイル | 参照 | 対応 |
+|---|---|---|
+| `.kiro/steering/workflow.md` | §3 全体（直接 push・squash 儀式・メッセージ方針） | **改訂**（権威） |
+| `.claude/skills/kiro-tasks/SKILL.md` | スキル本体 | **削除** |
+| `.claude/skills/kiro-spec-complete/SKILL.md` | スキル本体・name | **リネーム＋PR 化** → `kiro-complete/` |
+| `book/tools/verify-drift-gate.mjs` L239 | `.claude/skills/kiro-spec-complete/SKILL.md` パスをハードコード | **`kiro-complete` へ更新**（更新しないとテスト失敗） |
+| `CLAUDE.md` | `/kiro-tasks`・`/kiro-spec-complete` の名指し参照 | **なし**（grep 確認済み。新フロー注記は任意） |
+| `.claude/settings.json` L4 | `Bash(git push origin main:*)` 許可 | **保持**（release タグ push に必要。Out of Boundary） |
+| `.kiro/specs/release-workflow/{design,tasks}.md` | `git push origin main --tags`「workflow.md 準拠」 | **保持**（DD5 カーブアウトで引用を有効化。本 spec では編集しない） |
+| `.kiro/specs/review-improvement-loop/*`, `.kiro/specs/completed/**` | 記述的言及 | **対象外**（運用依存なし。Out of Boundary） |
