@@ -80,7 +80,7 @@
 **Objective:** 開発者として、全是正作業を通じてコードベースが回帰なく動作し続けることを保証したい。それにより純粋リファクタリングであることが検証可能になるからである。
 
 #### Acceptance Criteria
-1. When 任意のファイル/クレート単位の分割を完了した時, the 是正作業 shall そのステップ直後に `cargo build`（全クレート）と `cargo test`（全クレート）を実行し、両者が green であることを確認する。
+1. When 各ファイル/クレート単位の分割を完了した時, the 是正作業 shall そのステップ直後に毎回 `cargo build --workspace` と `cargo test --workspace`（全クレート）を実行し、両者が green であることを確認する。回帰安全を速度より優先し、ファイル単位ステップを当該クレートのみのテストへ簡略化しない。
 2. If 分割の途中で `cargo build` または `cargo test` が失敗した場合, then the 是正作業 shall 次のステップへ進む前に当該ステップ内で原因を是正し、green を回復する。
 3. The 是正作業 shall 全是正の前後で観測可能な振る舞い（テスト結果・公開 API・実行時挙動）を不変に保つ。
 4. Where LuaJIT ビルドを伴う `cargo` 実行を行う場合, the 是正作業 shall `cargo` 実行前に `NoDefaultCurrentDirectoryInExePath` 環境変数を無効化する。
