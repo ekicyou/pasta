@@ -1,0 +1,89 @@
+# Requirements Document
+
+## Project Description (Input)
+エージェント開発中に「`wiring.rs` は巨大（267KB）ですわね。要点だけ狙い撃ちで掴みますわ」という挙動が発生した。巨大ファイルは、AI・人間の双方にとって全体把握のコストを跳ね上げ、編集・レビュー・差分理解を阻害する技術的負債のサインである。開発者（および支援AI）が、ファイル全体を俯瞰できず部分的な「狙い撃ち」読解を強いられている。
+
+リポジトリ全体を俯瞰した結果、巨大ファイル問題の主因は本番ロジックの設計崩壊ではなく、`#[cfg(test)]` のインラインテストモジュールが `src/` 内に大量同居していることと判明した。リポジトリ規約（`.kiro/steering/structure.md`）は既に「private フィールドアクセスが必要な `src/` 内テストは `#[cfg(test)] #[path = "<name>_tests.rs"] mod tests;` で兄弟ファイルへ外出しする」と定めており、前例も存在するが、`debug/` モジュール等はこの規約から取り残されている。
+
+本仕様は、リポジトリ全体の Rust ファイルを「AI・人間ともに俯瞰できる」サイズへ純粋リファクタリング（振る舞い不変）で是正する。主機構はインラインテストの兄弟ファイルへの外出し、加えて巨大テストファイルのクラスタ分割、純粋に肥大した本番ファイルの構造分割、および `debug/wiring.rs` の `handle_inbound` ループの順序保証を保った解体を含む。
+
+## Introduction
+
+本仕様は、pasta リポジトリ内の巨大な Rust ソースファイルを、AI・人間の双方が「全体を俯瞰できる」サイズへ是正することを目的とする純粋リファクタリングである。観測可能な成果物の振る舞いは変更せず、既存テストが green を維持することを絶対条件とする。
+
+是正は 4 つの機構から成る。(1) `src/` 内のインライン `#[cfg(test)]` テストモジュールを、リポジトリ規約 `#[cfg(test)] #[path = "<name>_tests.rs"] mod ...;` に従って論理クラスタ別の兄弟テストファイルへ外出しする（主機構・最高 ROI）。(2) 既に外出し済みでも巨大なテストファイルを論理単位で複数ファイルへ再分割する。(3) 純粋に肥大した本番ファイル（テスト比率がほぼ 0）を責務単位のサブモジュールへ分割する。(4) `debug/wiring.rs` の `handle_inbound` ループを、`setBreakpoints` 分岐を原子的に保持しつつ、残り分岐を順序保証付きヘルパーへ解体する。
+
+各変更は段階的に（ファイル/クレート単位で）行い、各ステップで `cargo build` と `cargo test` の green を確認しながら進める。本仕様は機能追加・バグ修正・最適化・公開 API シグネチャや可視性の変更を一切含まない。
+
+## Boundary Context
+
+- **In scope**:
+  - リポジトリ全 Rust ファイルの巨大ファイル是正（インラインテストの兄弟ファイルへの外出し、巨大テストファイルのクラスタ分割、純粋肥大本番ファイルの責務単位サブモジュール分割）
+  - `debug/wiring.rs` の `handle_inbound` ループ解体（順序保証を保つ範囲）
+  - `.kiro/steering/structure.md` の `#[cfg(test)] #[path]` 規約への全面準拠
+  - 振る舞い不変の純粋リファクタリング（既存テストが green を維持）
+- **Out of scope**:
+  - 機能追加・バグ修正・最適化・あらゆる振る舞いの変更
+  - `setBreakpoints` 分岐の内部分解（不変条件保護のため原子的に保持）
+  - `run_socket_bridge` のループ多重化コアそのものの書き換え
+  - TypeScript（vscode 拡張）のテストファイル分割
+  - 公開 API シグネチャ・可視性の変更、および可視性変更を伴う `tests/` への完全外部化
+  - 新規テストケースの追加（既存テストの移動・分割のみ）
+- **Adjacent expectations**:
+  - 上流規約 `.kiro/steering/structure.md`（`#[cfg(test)] #[path]` 規約・命名規則）に準拠する。本仕様は規約を変更せず、適用するのみ。
+  - 前例 `pasta_core/src/registry/scene_table_tests.rs`・`pasta_shiori/src/shiori_tests.rs` のパターンを踏襲する。
+  - LuaJIT ビルドのため、`cargo` 実行前に `NoDefaultCurrentDirectoryInExePath` 環境変数を無効化する必要がある（既知の落とし穴・環境前提）。
+
+## Requirements
+
+### Requirement 1: インラインテストの兄弟ファイルへの外出し
+**Objective:** 開発者および支援 AI として、`src/` 内本番ファイルに同居するインラインテストを規約準拠の兄弟ファイルへ外出ししたい。それにより本番ロジックがテストコードに埋もれず、ファイルを俯瞰できるようになるからである。
+
+#### Acceptance Criteria
+1. Where 本番 `src/` ファイルがインライン `#[cfg(test)] mod ...` を含む場合, the 是正作業 shall そのテストモジュールを論理クラスタ別の兄弟テストファイル `<name>_<topic>_tests.rs`（単一クラスタの場合は `<name>_tests.rs`）へ移動する。
+2. When インラインテストを兄弟ファイルへ外出しする時, the 是正作業 shall `.kiro/steering/structure.md` 規約の `#[cfg(test)] #[path = "<file>"] mod ...;` 宣言と `use super::*;` パターンを用い、同一モジュールパスを維持する。
+3. The 是正作業 shall テストが参照する private / `pub(crate)` 項目への到達性を、本番コードの可視性を変更することなく `use super::*;` 経由で保持する。
+4. Where 1 本番ファイルが複数の独立した `mod NAME` テストブロックを持つ場合, the 是正作業 shall 各論理クラスタを 1 兄弟ファイルへ対応付けて分割する。
+5. When 外出しを実施した後, the 是正作業 shall 既存テストの集合（テスト名・件数・アサーション）を移動のみに留め、新規テストの追加や既存テストの削除を行わない。
+
+### Requirement 2: 巨大テストファイルのクラスタ分割
+**Objective:** 開発者および支援 AI として、既に外出し済みでも巨大なテストファイルを論理単位で再分割したい。それにより関連テスト群を素早く特定・俯瞰できるようになるからである。
+
+#### Acceptance Criteria
+1. Where 既存テストファイルが巨大で複数の論理テストクラスタを含む場合, the 是正作業 shall それを論理単位で複数のテストファイルへ再分割する。
+2. When テストファイルを再分割する時, the 是正作業 shall 当該クレートのテストモジュール構成規約（`tests/<category>/main.rs` + `mod` 宣言、`common/` 参照規約等）に準拠する。
+3. The 是正作業 shall 再分割の前後でテストの集合と検証内容を不変に保ち、テストの追加・削除・意味変更を行わない。
+
+### Requirement 3: 純粋肥大本番ファイルの責務単位サブモジュール分割
+**Objective:** 開発者および支援 AI として、テストをほとんど含まず本番ロジックのみで肥大したファイルを責務単位のサブモジュールへ分割したい。それにより各責務を独立して把握・編集できるようになるからである。
+
+#### Acceptance Criteria
+1. Where 本番ファイルがテストをほぼ含まず単独で肥大している場合, the 是正作業 shall そのファイルを責務単位の複数サブモジュールへ分割する。
+2. When 本番ファイルをサブモジュールへ分割する時, the 是正作業 shall 公開 API のシグネチャと可視性を不変に保ち、外部から観測可能なインターフェースを変更しない。
+3. The 是正作業 shall 本番構造分割を通じて実行時の振る舞いを不変に保つ（純粋リファクタリング）。
+
+### Requirement 4: handle_inbound ループの順序保証付き解体
+**Objective:** 開発者および支援 AI として、`debug/wiring.rs` の最も絡み合った制御フロー `handle_inbound` を責務単位のヘルパーへ解体したい。それによりデバッグ制御フローの可読性とテスト容易性が向上するからである。
+
+#### Acceptance Criteria
+1. While `handle_inbound` を解体する間, the 是正作業 shall `setBreakpoints` 分岐（VM 実行中に有効な唯一のコマンド・session 非転送という不変条件を持つ）を原子的に保持し、内部を分解しない。
+2. When `handle_inbound` の分岐をヘルパー関数へ抽出する時, the 是正作業 shall `apply → response → event → command` の処理順序を保持し、その順序保証をドキュメント化する。
+3. The 是正作業 shall ヘルパー抽出後も、抽出前と同一の入力に対して同一の出力・副作用を生じる（振る舞い不変）。
+4. The 是正作業 shall `run_socket_bridge` のループ多重化コアそのものの書き換えを行わない。
+
+### Requirement 5: 振る舞い不変と段階的検証
+**Objective:** 開発者として、全是正作業を通じてコードベースが回帰なく動作し続けることを保証したい。それにより純粋リファクタリングであることが検証可能になるからである。
+
+#### Acceptance Criteria
+1. When 任意のファイル/クレート単位の分割を完了した時, the 是正作業 shall そのステップ直後に `cargo build`（全クレート）と `cargo test`（全クレート）を実行し、両者が green であることを確認する。
+2. If 分割の途中で `cargo build` または `cargo test` が失敗した場合, then the 是正作業 shall 次のステップへ進む前に当該ステップ内で原因を是正し、green を回復する。
+3. The 是正作業 shall 全是正の前後で観測可能な振る舞い（テスト結果・公開 API・実行時挙動）を不変に保つ。
+4. Where LuaJIT ビルドを伴う `cargo` 実行を行う場合, the 是正作業 shall `cargo` 実行前に `NoDefaultCurrentDirectoryInExePath` 環境変数を無効化する。
+
+### Requirement 6: リポジトリ規約への準拠
+**Objective:** 開発者および支援 AI として、全是正がリポジトリの既存規約に準拠することを保証したい。それにより成果が将来の開発と一貫し、規約から取り残されたモジュールが解消されるからである。
+
+#### Acceptance Criteria
+1. The 是正作業 shall `.kiro/steering/structure.md` で定義された `src/` 内テスト配置方針・テストファイル命名規則・テストサブモジュール化方針に準拠する。
+2. Where テスト対象が private / `pub(crate)` 以下のフィールドへの直接アクセスを必要とする場合, the 是正作業 shall 当該テストを `src/` 内の兄弟ファイルへ配置し、`tests/` への外部化（可視性変更を要するもの）を行わない。
+3. When `debug/` モジュール等の規約未準拠ファイルを是正した後, the 是正作業 shall それらが前例（`scene_table_tests.rs`・`shiori_tests.rs`）と同一のパターンに整合した状態にする。
