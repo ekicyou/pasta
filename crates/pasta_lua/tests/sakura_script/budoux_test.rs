@@ -118,7 +118,7 @@ fn test_break_lines_multiple_widths() {
         .load(
             r#"
             local SAKURA = require "@pasta_sakura_script"
-            return SAKURA.break_lines("あいうえおかきくけこさしすせそたちつてと", {4, 6})
+            return SAKURA.break_lines("私は今日学校へ行って友達と一緒に勉強をしました", {4, 6})
             "#,
         )
         .eval()
@@ -335,7 +335,7 @@ fn test_talk_to_script_budoux_multi_width_array() {
             local SAKURA = require "@pasta_sakura_script"
             -- 複数要素の幅配列: 1行目=4, 2行目以降=8 (繰り返し)
             local actor = { budoux = {4, 8} }
-            return SAKURA.talk_to_script(actor, "あいうえおかきくけこさしすせそたちつてと")
+            return SAKURA.talk_to_script(actor, "私は今日学校へ行って友達と一緒に勉強をしました")
             "#,
         )
         .eval()
@@ -366,7 +366,7 @@ fn test_talk_to_script_budoux_last_value_repeats() {
             local SAKURA = require "@pasta_sakura_script"
             return SAKURA.talk_to_script(
                 { budoux = {4, 4} },
-                "あいうえおかきくけこさしすせそたちつてと"
+                "私は今日学校へ行って友達と一緒に勉強をしました"
             )
             "#,
         )
@@ -379,7 +379,7 @@ fn test_talk_to_script_budoux_last_value_repeats() {
             local SAKURA = require "@pasta_sakura_script"
             return SAKURA.talk_to_script(
                 { budoux = {4, 4, 4} },
-                "あいうえおかきくけこさしすせそたちつてと"
+                "私は今日学校へ行って友達と一緒に勉強をしました"
             )
             "#,
         )

@@ -40,7 +40,7 @@
 - **flate2 1.x**: gzip圧縮（キャッシュ等）
 - **zip 8.6 (deflate)**: pasta_scripts 自己展開（起動時 zip 解凍）・ビルド時の決定論 zip 生成
 - **md5 0.8**: ビルド時の基準ダイジェスト算出（pasta_scripts 自己展開のドリフト検知、build/dev-dependency。ランタイムはマーカー文字列比較のみで md5 不使用）
-- **budoux 0.1.1**: 日本語改行位置推定（BudouX）
+- **budouy 0.2.2**: 日本語改行位置推定（BudouX、vendored-models）
 - **unicode-width 0.2.2**: Unicode文字幅計算
 - **tracing 0.1 / tracing-appender 0.2 / tracing-subscriber 0.3**: ロギング・診断
 - **windows-sys 0.61**: Windows API（Shift_JISエンコーディング等、cfg(windows)）

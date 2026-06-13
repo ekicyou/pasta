@@ -1,6 +1,6 @@
 # Implementation Plan
 
-- [ ] 1. 分かち書き依存を budoux から budouy へ差し替える
+- [x] 1. 分かち書き依存を budoux から budouy へ差し替える
   - ワークスペース集中依存定義から旧クレート `budoux 0.1.1` の宣言を除去し、`budouy 0.2.2` を `vendored-models` feature 有効で宣言する
   - `pasta_lua` クレートの依存参照を旧クレートから新クレート（workspace 継承）へ切り替える
   - 観測可能な完了条件: ワークスペース依存定義に `budoux` が一切残らず、`budouy 0.2.2` が `vendored-models` 付きで参照され、`cargo metadata`（または依存解決）が新クレートを認識する
@@ -8,7 +8,7 @@
   - _Requirements: 1.1, 1.2, 1.3, 1.5, 6.1, 6.2_
   - _Boundary: 依存定義_
 
-- [ ] 2. 分かち書きライブラリの保持・初期化・呼び出しを新 API へ最小修正する
+- [x] 2. 分かち書きライブラリの保持・初期化・呼び出しを新 API へ最小修正する
   - SakuraScript の内部状態が保持する分かち書きオブジェクトを、旧モデル型から budouy パーサー型へ置換し、初期化を同梱モデルによる既定日本語パーサー取得へ変更する
   - 分割呼び出し箇所（Phase 2 のセグメント取得）を新パーサーの分割呼び出しへ置換し、戻り値の文字列リストを従来どおり幅計算ループ・再構築へ渡す
   - 状態保持から分割実装へ渡す参照渡し経路（自動改行適用・break_lines 経路の 2 箇所）を新フィールドへ追従させる
@@ -18,7 +18,7 @@
   - _Boundary: SakuraScriptState, break_lines_impl_
   - _Depends: 1_
 
-- [ ] 3. 既存の改行テストを新 API へ適合させ緑化する
+- [x] 3. 既存の改行テストを新 API へ適合させ緑化する
   - ユニットテストのモデル取得ヘルパを新パーサー取得へ適合させ、呼び出し側を新シグネチャ（参照渡し）へ追従させる。入力・テストケース構造は流用する
   - Lua API 経由の統合テストは公開 API 不変のためコード変更せず通過することを確認する
   - 模型差により特定テストの期待する分割位置が変化した場合のみ、当該期待値の妥当性を個別に判断したうえで更新する（機能的同等：`\n` 挿入・平文／さくらスクリプトタグ保持を基準とする）
@@ -27,7 +27,7 @@
   - _Boundary: break_lines_impl, budoux_test_
   - _Depends: 2_
 
-- [ ] 4. ワークスペースのビルド・静的解析・テストと依存／ライセンスを検証する
+- [x] 4. ワークスペースのビルド・静的解析・テストと依存／ライセンスを検証する
   - ロックファイルを再生成し、旧クレート `budoux` のエントリが含まれないこと（grep 確認）と budouy が反映されることを確認する
   - `cargo build --workspace` がエラーなく完了することを確認する
   - `cargo clippy --workspace` が本移行に起因する新規の警告／エラーを出さないことを確認する
@@ -37,10 +37,15 @@
   - _Requirements: 1.4, 4.1, 4.2, 4.3, 6.1_
   - _Depends: 1, 2, 3_
 
-- [ ] 5. (P) 関連ドキュメントの内部依存クレート記載を同期更新する
+- [x] 5. (P) 関連ドキュメントの内部依存クレート記載を同期更新する
   - steering の依存一覧における内部実装の依存クレートとしての旧クレート名・バージョン記載（`budoux 0.1.1`）を移行後ライブラリ（`budouy 0.2.2`）の記載へ更新する
   - 改行機構の外部呼称「BudouX」・公開設定キー名 `actor.budoux`・利用者マニュアル `book/` の機構記載・完了 spec 名 `budoux-line-breaker` は外部表記名として更新せず維持する
   - 観測可能な完了条件: steering 依存一覧に内部依存クレートとしての `budoux 0.1.1` 記載が残らず `budouy 0.2.2` を反映し、外部呼称・公開設定キー・マニュアル機構名は不変のまま
   - _Requirements: 5.1, 5.2_
   - _Boundary: tech.md_
   - _Depends: 1_
+
+## Implementation Notes
+- Task 2: `budouy::model::load_default_japanese_parser()` は `Parser` を直接返す（`Result` ではない）。`parser.parse(&str) -> Vec<String>` は budoux と同型のため幅計算ループは無変更で済んだ。
+- Task 3: budouy の vendored 既定モデルは、無意味な連続ひらがな（例 `あいうえお…てと`）を**単一トークン**として返す（budoux は分割していた）。幅閾値アルゴリズムは単一の過大語を強制分割しないため、こうした人工入力では `\n` が生成されず `contains("\n")` 系テストが落ちる。強制改行を検証するテストには**自然な日本語文**を入力に使うこと（assertion は弱めない＝Req 3.3 機能的同等）。
+- Task 4: budouy は推移的依存に `seahorse 2.2.0`（`license-file = "LICENSE"`、実体は MIT）を引き込む。`cargo deny` は `no-license-field` 警告を出すが clearlydefined fallback で `licenses ok`（exit 0）。GPL 汚染なし。

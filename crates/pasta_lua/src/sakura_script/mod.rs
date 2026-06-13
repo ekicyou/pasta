@@ -36,7 +36,7 @@ const DESCRIPTION: &str = "Sakura Script wait insertion module for natural conve
 struct SakuraScriptState {
     tokenizer: Tokenizer,
     default_wait_values: WaitValues,
-    budoux_model: budoux::Model,
+    budoux_parser: budouy::Parser,
 }
 
 /// Register the `@pasta_sakura_script` module to Lua.
@@ -61,7 +61,7 @@ pub fn register(lua: &Lua, config: Option<&TalkConfig>) -> LuaResult<Table> {
     let state = Arc::new(SakuraScriptState {
         tokenizer,
         default_wait_values,
-        budoux_model: budoux::models::default_japanese_model().clone(),
+        budoux_parser: budouy::model::load_default_japanese_parser(),
     });
 
     // Create module table
@@ -143,7 +143,7 @@ fn apply_budoux_if_configured(
         &text,
         &widths,
         state.tokenizer.tag_regex(),
-        &state.budoux_model,
+        &state.budoux_parser,
     ))
 }
 
@@ -207,7 +207,7 @@ fn break_lines_lua_impl(
         &text,
         &widths_vec,
         state.tokenizer.tag_regex(),
-        &state.budoux_model,
+        &state.budoux_parser,
     );
 
     Ok(result)
