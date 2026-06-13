@@ -1,16 +1,16 @@
 {
   "feature_name": "oversized-file-decomposition",
   "created_at": "2026-06-13T22:32:01Z",
-  "updated_at": "2026-06-13T22:32:01Z",
+  "updated_at": "2026-06-13T23:11:10Z",
   "language": "ja",
-  "phase": "requirements-generated",
+  "phase": "design-generated",
   "approvals": {
     "requirements": {
       "generated": true,
-      "approved": false
+      "approved": true
     },
     "design": {
-      "generated": false,
+      "generated": true,
       "approved": false
     },
     "tasks": {

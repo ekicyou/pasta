@@ -148,7 +148,14 @@
 3. **C4 順序保証のドキュメント化＋特性化テスト先行**（Constraint, High）: 抽出後ヘルパーの呼び出し順 `apply→response→event→command` をコードコメントで担保しつつ、**解体着手前に当該順序と `setBreakpoints` 原子性を固定する最小限の特性化テスト（characterization test）を先行整備**する（議題4で決定・新規テスト禁止の明示的例外）。既存テストでカバー済みなら流用、不足分のみ追加。解体は「1 ヘルパー抽出 = 1 検証 = 1 コミット」の独立 green・revert 可能な小ステップで実施。`setBreakpoints` 原子境界の正確な行範囲を実装時に再取得。
 4. **インベントリ再スナップショット**（運用 Constraint）: brief→現状の drift（`transport.rs`/`debug/mod.rs` 増大・`debug_integration_test.rs` 新規）を踏まえ、**実装着手時に 600 行超リストと `wiring.rs` mod 行番号を再取得**してから着手する手順を tasks に明記。
 5. **段階検証の粒度とコミット境界**（Constraint）: 「1 ファイル＝1 検証＝1 コミット」を基本とするか、クレート単位でまとめるか。`NoDefaultCurrentDirectoryInExePath` 無効化を各 `cargo` 実行の前段に組み込む運用も明記。
-6. **debug テスト外出し時のポートガード保全**（Constraint, Medium）: `wiring.rs`/`transport.rs`/`session.rs` 等の debug テストは、固定ポート枯渇（`PASTA_DEBUG`/9276）による `AddrInUse` 回避のため `#[ctor]` による環境中和に依存している（既知問題・解決済 `c59ee8d`）。インラインテストを兄弟ファイルへ移動する際、当該 `#[ctor]` ガードと env 前提が**同一クレートのテストビルドに対して引き続き有効**であることを保証する（移動のみ・新規ガード追加なしが原則だが、外出し先からガードが効くモジュールパスかを design/impl で確認）。
+6. **debug テスト外出し時のポートガード保全**（Constraint, Low — 設計調査で de-risk 済）: 設計フェーズの実コード調査により、`debug/*.rs` の src インラインテストモジュールには `#[ctor]` も env 操作（`set_var`/`remove_var`）も**存在しない**ことが判明。debug テストは OS 割当ポート0（loopback）で bind し `PASTA_DEBUG*` を読むのみのため env 非依存で、src→兄弟ファイル移動は純機械的（保全すべきガード無し）。固定ポート中和の `#[ctor]` は **runtime テストハーネス側**（`tests/` 配下）に存在するため、C2 で `tests/runtime/runtime_toggle_e2e_test.rs`・`debug_integration_test.rs` を分割する際は、当該ハーネスの `#[ctor]` がテストバイナリに引き続きリンクされること（共有 `common`/support モジュール経由）のみ確認する。
+
+## 8. Synthesis Decisions（design 合成結果）
+
+- **一般化**: 4 カテゴリは各々が単一の反復操作。C1=「1 インライン `#[cfg(test)] mod` → 1 兄弟 `#[path]` ファイル＋`use super::*;`」、C3=「単一 `impl Type` を子モジュール群へ分割（祖先 private 参照は可視性変更不要）」、C2=「論理クラスタ → 複数テストファイル＋`main.rs` の `mod` 登録 / `#[path]` 多重宣言」、C4=「分岐 → 順序固定ヘルパー」。各カテゴリ内は機械的反復。
+- **Build vs Adopt**: 新規構築・新規依存ゼロ。Rust ネイティブのモジュール／`#[path]`／split-`impl` と既存前例（`scene_table.rs`・`shiori.rs`）を adopt するのみ。
+- **簡素化（最小設計）**: テスト外出しは**単一兄弟ファイルを既定**とし、単一移動後も 600 行超かつ自然なクラスタを持つ大型ファイル（`session_tests`・`dap_tests`・`source_map_tests` 等）に限り `#[path]` 多重宣言で複数兄弟へ分割する。投機的な抽象化・先回り分割はしない。
+- **可視性変更の最小化**: C3 で必要な可視性変更は `loader::ProcessStats` の `private→pub(super)` 1 箇所のみ（never re-export・外部影響なし）。それ以外は Rust の「子モジュールは祖先の private 項目を参照可」規則に依拠し、フィールド／メソッド可視性を一切広げない。
 
 ## 7. Recommendations for Design Phase
 
