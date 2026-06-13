@@ -51,7 +51,7 @@
   - _Depends: 3.1_
 
 - [ ] 4. kiro-tasks スキルの撤去と参照整理
-- [ ] 4.1 kiro-tasks スキルディレクトリの撤去と参照整理
+- [x] 4.1 kiro-tasks スキルディレクトリの撤去と参照整理
   - .claude/skills/kiro-tasks/ を削除
   - workflow.md・関連スキルの kiro-tasks 参照を撤去後運用へ整合（タスク生成は /kiro-spec-tasks -y 直接実行）
   - squash 統合（旧 Step 5）・impl/{feature} 生成（旧 Step 6）を他スキルへ再導入しない
