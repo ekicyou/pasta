@@ -60,7 +60,7 @@ reload バグの根治（中断可能 accept ＋ 同期 teardown join）と防�
   - _Depends: 3.1_
   - _Boundary: Integration tests_
 
-- [ ] 4.3 全テスト無回帰・クロスコンパイル非破壊確認
+- [x] 4.3 全テスト無回帰・クロスコンパイル非破壊確認
   - `cargo test --workspace` 緑（LuaJIT ビルドは環境変数 `NoDefaultCurrentDirectoryInExePath` を外して実行）。既存デバッグ挙動（BP/ステップ/変数 inspect/コルーチン/提示モード/ソースマップ/サイドカー）の無回帰を確認
   - `socket2` は cross-platform で新たな `cfg(windows)` 分岐を増やさず、クロスコンパイルを壊さない（実行検証は対象環境 Windows で 10048 解消を確認）
   - 観測: 全テスト緑、既存 transport/wiring テストを維持し、変化が teardown 同期化 ＋ `SO_REUSEADDR` に限定されている
