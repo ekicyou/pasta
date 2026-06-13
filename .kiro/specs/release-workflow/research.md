@@ -131,3 +131,86 @@
 - [cargo publish](https://doc.rust-lang.org/cargo/commands/cargo-publish.html) — crates.io 公開コマンド
 - [gh release create](https://cli.github.com/manual/gh_release_create) — GitHub Release 作成コマンド
 - gap-analysis.md — 既存アセットとギャップの詳細分析
+
+---
+
+# ギャップ分析（Req 10 追加: ワークツリー実行・PR ベース main 統合）
+
+> 2026-06-14 追記。本セクションは新設 **Requirement 10**（ワークツリー実行と PR マージコミット方式での main 統合）に限定したギャップ分析である。旧仕様（v0.1.2 基準）の Req 1–9 のギャップは上記既存セクションおよび `gap-analysis.md` を参照。
+
+## 1. 現状調査（Req 10 関連アセット）
+
+| 要件領域 | 既存アセット | 状態 |
+|----------|-------------|------|
+| ワークツリー供給 | Claude Code ハーネスが非デフォルトブランチを供給（kiro-complete と同一前提） | ✅ 既に成立 |
+| PR 作成・マージ機構 | `kiro-complete` SKILL.md「PR 可否判定 / PR 作成→マージ→ブランチ削除 / 中断条件 / エラー回避」 | ✅ **ほぼ完全な参照実装**（`--squash` 版） |
+| PR 可否ゲート | 非デフォルトブランチ＋`{remote}`あり＋`gh` 認証（kiro-complete） | ✅ そのまま流用可 |
+| ブランチ削除 | `gh pr merge --delete-branch`（repo `deleteBranchOnMerge: false` のため API 削除に依存） | ✅ 流用可 |
+| 失敗時セマンティクス | 「ブランチを残し中断」「ローカル削除警告は非致命」（kiro-complete） | ✅ 流用可 |
+| push 許可 | `.claude/settings.json` L4 `Bash(git push origin main:*)`（カーブアウト用直 push 許可） | ⚠️ PR 化で**不要化**、別途タグ push 許可が**未整備** |
+| ステアリング | `workflow.md` §3（PR squash）＋ L113 リリースカーブアウト（直 push 容認・settings 許可保持） | ⚠️ Req 10 と**整合せず要改訂** |
+| 現行設計/タスク | `design.md` L130/227/493・`tasks.md` L128 が `git push origin main --tags`（直 push 前提） | ⚠️ Stage C を**全面書き換え対象** |
+
+## 2. Requirement-to-Asset Map（Req 10）
+
+| AC | 必要機能 | 既存アセット | ギャップ |
+|----|---------|-------------|---------|
+| 10.1 ワークツリー上で動作 | 現在ブランチ上で実行 | ハーネス供給（kiro-complete 同様） | **なし**（前提が既に成立） |
+| 10.2 コミットを作業ブランチに保持 | `git commit`（Stage A） | 既存 | **なし** |
+| 10.3 PR マージコミット統合・SHA 保持 | `gh pr create` + `gh pr merge --merge` | kiro-complete の PR 機構（`--squash`） | **Constraint**: `--merge` へ変更／**repo の merge-commit 許可が要確認** |
+| 10.4 squash-PR・直 push 禁止 | フロー選択・経路撤去 | settings.json 直 push 許可 | **Constraint**: 直 push 経路撤去、許可エントリ見直し |
+| 10.5 タグ到達性・タグ push | タグ ref の push | `git tag -a` / `git push`（既存手順） | **Missing**: settings.json に**タグ push 許可なし**（`git push origin main:*` はタグ ref を被覆しない） |
+| 10.6 / 10.7 公開前のマージ可能性検証 | `gh pr view --json mergeable` or `git fetch`+dry-run | なし | **Missing**: 不可逆 crates.io 公開前の**マージ可能性プローブ**が未設計 |
+| 10.8 失敗時は非破壊で中断 | ブランチ非削除・中断 | kiro-complete の中断セマンティクス | **なし**（パターン流用） |
+
+## 3. 重大な落とし穴（Critical Findings）
+
+### ⚠️ 落とし穴1: repo が merge-commit を許可しているか未確認（最優先）
+`gh pr merge --merge`（マージコミット方式）は repo 設定 `mergeCommitAllowed: true` を要する。本 repo は spec 完了で `--squash` を常用しており、**merge-commit が有効かは不明**。無効の場合 Req 10 の中核が成立しない。→ **Research Needed #1**（`gh repo view --json mergeCommitAllowed,squashMergeAllowed,deleteBranchOnMerge` で確認。無効なら `gh repo edit --enable-merge-commit` で有効化、または rebase 不可のため方針再考）。
+
+### ⚠️ 落とし穴2: 不可逆な crates.io 公開とマージ失敗の順序リスク
+現行設計は Stage B（crates.io 公開＝不可逆）→ Stage C（タグ・統合）。PR マージはこれより後段になるため、「公開済みだが PR マージ失敗（コンフリクト等）」の窓が生じる。Req 10 AC6/7 はこれを「**不可逆公開の前に**マージ可能性を検証」で緩和する設計意図だが、**検証手段とタイミングが未設計**。→ **Research Needed #2**（PR 早期作成＋`mergeable` ポーリング vs `git fetch origin {default} && git merge-tree`/dry-run マージ）。残余リスク（検証〜マージ間の main 移動）は既存 Req 3.4「既公開クレートは残し開発者指示待ち」の許容範囲内。
+
+### ⚠️ 落とし穴3: settings.json／steering がカーブアウト（直 push）前提のまま
+`.claude/settings.json` の `Bash(git push origin main:*)` と `workflow.md` L113 カーブアウト（DD5, kiro-gitflow-worktree-pr 由来）は**リリース直 push を許容する設計**で、Req 10（PR ベース・直 push 禁止）と矛盾する。Req 10 では (a) **タグ push 許可**（例 `Bash(git push origin v*:*)` 等）を追加し、(b) 直 push 許可とカーブアウトを**タグ公開限定に縮退 or 撤去**する必要がある。→ Steering Gate / 設計フェーズで対応。
+
+## 4. 実装アプローチ評価
+
+### Option A: 既存 Stage C を PR 化＋kiro-complete パターン流用（推奨）
+Stage C を「タグ作成 → `gh pr create` → `gh pr merge --merge --delete-branch` → タグ push」へ置換し、PR 可否ゲート・中断セマンティクス・ローカル削除警告の非致命扱いを kiro-complete から流用。Stage B 直前にマージ可能性プローブ（AC6/7）を追加。settings.json／workflow.md を更新。
+- ✅ 検証済み PR パターンの再利用で設計・実装コスト最小／挙動の一貫性
+- ✅ コード新規作成ゼロ（オペレーション仕様の性質を維持）
+- ❌ Stage 順序にマージ可能性プローブを挿入する調整が必要
+
+### Option B: リリース専用 PR ヘルパー部品を新設
+- ❌ 対話的 LLM 実行の趣旨に反し、新部品は過剰。不採用
+
+### Option C: ハイブリッド（流用＋専用プローブ）
+Option A に対しマージ可能性プローブのみ独立サブステップ化。実質 A の一形態。プローブ手段が確定するまでの暫定整理として有効。
+
+## 5. 複雑度・リスク評価
+
+- **Effort: S（1–3日）** — オペレーション仕様の手順差し替え。PR 機構は kiro-complete から流用、新規コードなし。主作業は design/tasks の Stage C 改訂＋settings.json＋workflow.md 更新。
+- **Risk: Medium** — 単独では Low だが、(1) repo の merge-commit 許可状態が未確認（中核を左右）、(2) 不可逆公開×PR マージの順序リスク、の2点が Medium 要因。落とし穴1の確認で High/Low が確定する。
+
+## 6. 設計フェーズへの推奨事項
+
+1. **推奨アプローチ**: Option A。Stage C を PR マージコミット方式へ置換し kiro-complete パターンを流用。
+2. **着手前に Research Needed #1（merge-commit 許可）を解消**してから設計確定すること。
+3. Stage B 直前に **マージ可能性プローブ**（Req 10 AC6/7）を新ステップとして配置し、不可逆公開前ゲートとする。
+4. **タグはタグ ref push**（`git push origin vX.Y.Z`）とし、`--merge` 後に main から到達可能化。Stage D（Release 作成）はマージ後に実行。
+5. **settings.json／workflow.md の整合更新**を設計の File Structure Plan ＋ Steering Gate に明記（タグ push 許可追加、直 push 許可・カーブアウトの縮退）。
+
+### Research Needed（設計フェーズで調査）
+1. **【最優先】** repo の merge-commit 許可状態（`gh repo view --json mergeCommitAllowed,squashMergeAllowed,deleteBranchOnMerge`）。無効なら有効化要否を判断。
+2. マージ可能性プローブの最適手段とタイミング（PR 早期作成＋`mergeable` ポーリング vs ローカル `git fetch`＋dry-run）。
+3. 将来の GitHub ブランチ保護／タグ保護と本フローの相互作用（main 保護はタグ push を妨げないが、必須ステータスチェック有効化時は `gh pr merge` 即時マージがブロックされ得る）。
+4. settings.json 許可エントリの最終形（タグ push 許可の具体パターン、`git push origin main` 撤去可否）。
+5. タグ push と PR マージの実行順序（タグ ref を merge 前に push するか後にするか）と、Release 作成（Stage D）のマージ後実行の確定。
+6. リリース PR の title/body 生成方針（`--merge` のマージコミットメッセージは自動付与のため、PR 本文の供給方法を決める。kiro-complete の squash メッセージ生成方針（`merge-base..HEAD` 履歴要約）を流用するか）。
+
+## References（追加）
+- `.claude/skills/kiro-complete/SKILL.md` — PR 可否判定・PR 作成/マージ・中断条件・エラー回避（流用元の参照実装）
+- `.kiro/steering/workflow.md` L83–113 — リモート同期（PR squash）＋リリースタグ公開カーブアウト
+- `.claude/settings.json` — `git push origin main` 許可（カーブアウト用、要見直し）
+- `.kiro/specs/completed/kiro-gitflow-worktree-pr/` — PR 化の設計判断（DD5 カーブアウト、`deleteBranchOnMerge: false` 等）
