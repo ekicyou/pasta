@@ -37,7 +37,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 glob = "0.3"
 flate2 = "1.1.9"
-budoux = "0.1.1"
+budouy = { version = "0.2.2", features = ["vendored-models"] }
 unicode-width = "0.2.2"
 
 # pasta_check dependencies
