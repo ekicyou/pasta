@@ -370,14 +370,28 @@ impl Transport {
 
 impl Drop for Transport {
     fn drop(&mut self) {
-        // Best-effort: set the internal shutdown flag so a `serve` parked in the
-        // accept poll loop winds down (R2.2), and drop the outbound sender to
-        // unblock the writer. We do NOT block-join in Drop yet (the connected
-        // reader may be parked on a blocking socket read with no timeout); the
-        // synchronous join is wired in a later task, so `Drop` stays
-        // non-hanging.
+        // Synchronous teardown (R2.1/R2.2/R2.4/R2.5): set the internal shutdown
+        // flag FIRST so a `serve` parked in the interruptible accept poll loop —
+        // or in the connected-state writer poll — observes it within one
+        // POLL_INTERVAL, then drop the outbound sender to unblock the writer.
+        // ORDER MATTERS: the flag must be set BEFORE the join, otherwise the join
+        // would wait on a `serve()` that has not yet been told to stop.
         self.shutdown.store(true, Ordering::Release);
         self.outbound = None;
+
+        // Block-JOIN the serve listener thread so the bound port is released
+        // BEFORE drop returns (no detached-listener port leak — the root cause of
+        // the unload→reload 10048; design "State Management" invariant: after
+        // teardown the handle is joined, not detached). This join is BOUNDED, not
+        // a hang risk: every blocking point inside `serve()` is an interruptible
+        // POLL_INTERVAL poll (accept poll, connected writer poll, and the reader
+        // sub-thread's own flag poll), so `serve()` winds down within ~one
+        // POLL_INTERVAL of the flag being set above. If the handle was already
+        // taken (e.g. by the test-only `join()` / watchdog helper, or a prior
+        // `shutdown()`+`join()`), this is a no-op — no double-join.
+        if let Some(handle) = self.handle.take() {
+            let _ = handle.join();
+        }
     }
 }
 
@@ -1172,6 +1186,53 @@ mod tests {
         drop(client_writer);
         drop(client_reader);
         drop(client);
+    }
+
+    /// R2.4 (teardown 後の再 start 可能性, masking-aware): dropping a
+    /// no-client `Transport` must SYNCHRONOUSLY join the serve listener thread
+    /// so the bound port is released BEFORE `drop` returns. We prove this with a
+    /// PLAIN `TcpListener::bind` (NO socket2, NO `SO_REUSEADDR`) on the very same
+    /// port immediately after the drop: a plain rebind has no Windows
+    /// `SO_REUSEADDR` hijack semantics, so it can ONLY succeed if the previous
+    /// listener was truly gone (design Security Considerations — `SO_REUSEADDR`
+    /// must not be allowed to MASK a still-held leaked listener).
+    ///
+    /// On the pre-2.4 code (`Drop` sets the flag and drops outbound but does NOT
+    /// join the serve handle) `drop` returns while `serve()` may still hold the
+    /// listener, so the immediate plain rebind fails with `AddrInUse`
+    /// (`os error 10048`). After 2.4 `Drop` block-joins the interruptible
+    /// `serve()`, so the rebind deterministically succeeds.
+    #[test]
+    fn drop_synchronously_frees_port_for_plain_rebind() {
+        use std::net::TcpListener as PlainTcpListener;
+
+        // Start enabled with an OS-assigned loopback port; capture the port P.
+        let transport =
+            Transport::start(Some("127.0.0.1:0".parse().unwrap())).expect("bind must succeed");
+        let addr = transport
+            .local_addr()
+            .expect("enabled transport must expose its bound addr");
+        let port = addr.port();
+        assert_ne!(port, 0, "OS must assign a concrete port");
+
+        // No client connects → serve() is parked in the interruptible accept
+        // poll loop, holding the listener on port P. Drop the Transport DIRECTLY
+        // (not via the watchdog helper that pre-takes/joins the handle): Drop
+        // must set the flag AND synchronously join serve() before returning.
+        drop(transport);
+
+        // Immediately rebind the SAME port with a PLAIN listener — no socket2, no
+        // SO_REUSEADDR. This must SUCCEED, proving the serve listener was joined
+        // and the port freed before drop() returned. A plain bind deliberately
+        // avoids the Windows SO_REUSEADDR hijack that could otherwise mask a
+        // still-held listener (design Security Considerations / R2.4).
+        let rebind = PlainTcpListener::bind(("127.0.0.1", port));
+        assert!(
+            rebind.is_ok(),
+            "plain rebind of port {port} immediately after drop must succeed \
+             (synchronous serve join freed the port); got: {:?}",
+            rebind.err()
+        );
     }
 
     // -----------------------------------------------------------------------

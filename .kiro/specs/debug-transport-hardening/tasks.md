@@ -28,7 +28,7 @@ reload バグの根治（中断可能 accept ＋ 同期 teardown join）と防�
   - _Requirements: 2.5_
   - _Boundary: Transport_
 
-- [ ] 2.4 Transport の同期 teardown 確定（Drop/shutdown でフラグ立て → serve handle join）
+- [x] 2.4 Transport の同期 teardown 確定（Drop/shutdown でフラグ立て → serve handle join）
   - `Transport::drop` と `shutdown()` を「内部 shutdown フラグを立てる → serve handle を同期 join」に変更する。join 完了後はポートが解放され、同一構成での再 start が可能
   - 観測: `Transport::shutdown()` + watchdog 付き bounded join が有界時間で完了し、リスナースレッドがデタッチ生存しない。teardown 後の同一ポート再 start が成功する
   - _Requirements: 2.1, 2.2, 2.3, 2.4_
