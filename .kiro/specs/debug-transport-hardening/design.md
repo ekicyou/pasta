@@ -209,7 +209,7 @@ sequenceDiagram
 - 不変条件: teardown 後 `handle` は join 済み（デタッチ生存しない・2.2）。`local_addr`/`send`/`inbound` の公開挙動は不変。
 
 **Implementation Notes**
-- Integration: 待受ソケット生成のみ `socket2` 経由へ差し替え。`Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP))` → `set_reuse_address(true)` → `bind(addr.into())` → `listen(backlog)` → `TcpListener::from(socket)` → `set_nonblocking(true)`。bind 失敗は従来どおり `DebugError::Bind` へマップ（1.1/3.1）。
+- Integration: 待受ソケット生成のみ `socket2` 経由へ差し替え。`Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP))` → `set_reuse_address(true)` → `bind(addr.into())` → `listen(backlog)` → `TcpListener::from(socket)` → `set_nonblocking(true)`。`backlog` は単一クライアント設計のため小さい値（例 `1`）で足りる。bind 失敗は従来どおり `DebugError::Bind` へマップ（1.1/3.1）。
 - Integration: `serve(listener, in_tx, out_rx, shutdown)` へ shutdown 信号を追加。単一 accept 成功後 listener を即 drop（早期ポート解放）。
 - Validation: 既存 `Transport` ユニットテスト（disabled/enabled 双方向フレーミング、shutdown 冪等、watchdog join）を全て緑に保つ。
 - Risks: 接続後 reader の blocking read 停止が `stream.shutdown(Both)` の EOF に依存。EOF が来ない異常時に備え serve は reader join を watchdog 観点で有界に扱う（production は無限ブロックを作らない設計を維持）。
@@ -275,7 +275,7 @@ sequenceDiagram
 
 ### Integration Tests（`crates/pasta_lua/tests/`）
 - 同一プロセス・同一ポートで start → teardown → 再 start が成功（1.1/2.4）。
-- クライアント未接続のまま teardown→rebind が成功（真因の no-client 経路、1.1）。修正なし版では**リスナースレッドが居残ること**を検出して fail（1.4。前述のとおり Windows では `SO_REUSEADDR` が rebind を見かけ上成功させうるため、bind 成否ではなく**スレッド終了＝join 完了**を一次シグナルとする）。
+- クライアント未接続のまま teardown→rebind が成功（真因の no-client 経路、1.1）。修正なし版では**リスナースレッドが居残ること**を検出して fail（1.4。前述のとおり Windows では `SO_REUSEADDR` が rebind を見かけ上成功させうるため、bind 成否ではなく**スレッド終了＝join 完了**を一次シグナルとする）。この「スレッド終了」検証は **Transport 単体テスト**（`Transport::shutdown()` + watchdog 付き bounded join の完了）で直接観測する。runtime/SHIORI レベルの rebind 成功は結合シグナルとして補完的に用いる。
 - 連続 2 回以上の reload が各回成功（1.3）。
 - 接続中クライアントを伴う reload で再 bind 成功（2.5 + 3.2 の TIME_WAIT 防御確認）。
 
