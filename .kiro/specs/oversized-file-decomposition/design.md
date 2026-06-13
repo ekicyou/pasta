@@ -134,22 +134,22 @@ crates/pasta_shiori/src/windows_tests.rs   # [新] 単一
 
 ### C2 — 巨大テストファイルのクラスタ分割
 
+> **粒度上限ルール（議題2で確定）**: C2 分割は「各ファイルが **600 行未満に収まる最小限**の分割を、自然な凝集境界（task banner / 内側 `mod` / 被テスト本番モジュール単位）で行う」。調査隊の最大分割案（1クラスタ=1ファイル）は**参考に留め採用しない**。600 行を僅かに超える程度（例 `virtual_event_config_test.rs` 605）は凝集を優先して**据え置き、理由を記録**（R5.5）。
+
 ```
-crates/pasta_lua/tests/runtime/
-├── main.rs   # [変更] 新規 mod 宣言を追加
-├── runtime_toggle_bp_e2e_test.rs / _mode_resolution_ / _step_granularity_ / _no_regression_  # [新] runtime_toggle_e2e_test.rs を4分割
-├── runtime_toggle_e2e_common.rs    # [新] 共有 DapClient/is_event/is_response（#[path] 共有）
-└── debug_zero_cost_sandbox_regression_test.rs  # [新] debug_integration_test.rs から内側 mod を抽出
-crates/pasta_lua/tests/loader/main.rs     # [変更] config_test.rs を機能別8ファイルへ（既存同名と区別）
-crates/pasta_lua/tests/transpiler/main.rs # [変更] record_wiring_test.rs を element/scope 2分割
-crates/pasta_lua/tests/shiori/main.rs     # [変更] virtual_event_config_test.rs を6分割
-crates/pasta_dsl/tests/    # cue_cmd_test.rs を5ファイルへ（flat・各々が test binary）
-crates/pasta_shiori/tests/ # async_callback_integration_test.rs 3分割・lua_request_test.rs を内側mod単位で7分割（flat）
-crates/pasta_shiori/src/shiori_tests.rs    # [変更] #[path] 単一 → 4サブファイル＋多重 #[path] 宣言
-crates/pasta_core/src/registry/scene_table_tests.rs  # [変更] #[path] 単一 → 5サブファイル＋多重 #[path] 宣言
+crates/pasta_lua/tests/runtime/main.rs   # [変更] mod 宣言追加
+├── runtime_toggle_e2e_test.rs (1612) → 3分割（task banner境界・各<600）＋共有 DapClient/is_event を runtime_toggle_e2e_common.rs（#[path]共有）へ
+└── debug_integration_test.rs (758) → 2分割（top-level＋内側 zero_cost_sandbox_regression mod）
+crates/pasta_lua/tests/loader/main.rs     # [変更] config_test.rs (804) → 2分割（凝集境界・既存同名と区別）
+crates/pasta_lua/tests/transpiler/main.rs # [変更] record_wiring_test.rs (635) → 2分割（element/scope・被テスト本番モジュール境界）
+crates/pasta_lua/tests/shiori/main.rs     # [変更] virtual_event_config_test.rs (605) → 据え置き候補（僅少超過・凝集優先で理由記録 or 必要時2分割）
+crates/pasta_dsl/tests/    # cue_cmd_test.rs (961) → 2分割（flat・各々が test binary）
+crates/pasta_shiori/tests/ # async_callback_integration_test.rs (817) → 2分割・lua_request_test.rs (739) → 2分割（内側 mod を凝集グルーピング・flat）
+crates/pasta_shiori/src/shiori_tests.rs    # [変更] #[path] 単一 → 2サブファイル＋多重 #[path] 宣言（各<600）
+crates/pasta_core/src/registry/scene_table_tests.rs  # [変更] #[path] 単一 → 2サブファイル＋多重 #[path] 宣言（各<600）
 ```
 
-> `tests/<category>/` 配下は新規ファイルを作成し当該 `main.rs` に `mod <name>;` を登録。flat な `tests/*.rs`（pasta_dsl・pasta_shiori）は各ファイルが独立テストバイナリ。`#[path]` src テストは親サイトの単一 `#[path] mod tests;` を複数 `#[cfg(test)] #[path=...] mod NAME;` へ置換し、各サブファイルに `use super::*;`。
+> `tests/<category>/` 配下は新規ファイルを作成し当該 `main.rs` に `mod <name>;` を登録。flat な `tests/*.rs`（pasta_dsl・pasta_shiori）は各ファイルが独立テストバイナリ。`#[path]` src テストは親サイトの単一 `#[path] mod tests;` を複数 `#[cfg(test)] #[path=...] mod NAME;` へ置換し、各サブファイルに `use super::*;`。実際の分割数は着手時の正確な行数で「600 行直下の最小分割」を再判定する。
 
 ### C3 — 純粋本番の責務分割（split-`impl`・型と pub API は親に残置）
 
@@ -288,6 +288,7 @@ graph TB
 | Requirements | 2.1, 2.2, 2.3, 6.1 |
 
 **Responsibilities & Constraints**
+- **粒度上限**: 各ファイルが 600 行未満に収まる最小限の分割を凝集境界で行う（最大分割はしない・R5.5）。僅少超過は凝集優先で据え置き・理由記録。
 - `tests/<category>/` 配下: 新規ファイル作成＋当該 `main.rs` に `mod <name>;` 登録。共有ヘルパー（`DapClient`・`mod common`）は `#[path]` 共有 or `common/` で到達性維持。
 - flat `tests/*.rs`（pasta_dsl/pasta_shiori）: 各ファイルが独立テストバイナリ。
 - `#[path]` src テスト（`shiori_tests.rs`・`scene_table_tests.rs`）: 単一 `#[path]` を複数サブファイル＋多重 `#[cfg(test)] #[path=...] mod NAME;` へ。各サブに `use super::*;`。
