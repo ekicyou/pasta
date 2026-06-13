@@ -185,7 +185,7 @@ graph TB
 | # | セットアップ | コマンド / 変更 | 目的 |
 | - | ------------ | --------------- | ---- |
 | 1 | repo の merge-commit 有効化 | `gh repo edit ekicyou/pasta --enable-merge-commit` | `gh pr merge --merge` を成立させる（squash は維持＝両方有効） |
-| 2 | settings.json 許可調整 | `.claude/settings.json`: タグ push 許可（例 `Bash(git push origin v*:*)`）・`gh pr create`/`gh pr merge` 許可を追加、`Bash(git push origin main:*)` を縮退/撤去 | PR 統合・タグ push の実行許可。直 push 経路の撤去 |
+| 2 | settings.json 許可調整 | `.claude/settings.json`: タグ push 許可（例 `Bash(git push origin v*:*)`）・`gh pr create`/`gh pr merge` 許可・`git fetch`/`git merge`（ブランチ自動更新用）許可を追加、`Bash(git push origin main:*)` を縮退/撤去 | PR 統合・タグ push・ブランチ自動更新の実行許可。直 push 経路の撤去 |
 | 3 | steering カーブアウト改訂 | `.kiro/steering/workflow.md` L113: リリースの main 反映を「直接 push 容認」から「**PR マージコミット方式**」へ改訂。カーブアウトは**タグ ref push 限定**（タグはブランチ push ではないため将来の main ブランチ保護下でも許容）に縮退 | Req 10 と steering の整合（Steering Gate） |
 
 **検証**: `gh repo view --json mergeCommitAllowed` が `true` を返すこと。`workflow.md` と `settings.json` が Req 10 と矛盾しないこと。
@@ -335,6 +335,7 @@ flowchart TD
 | 10.6        | 統合成功確認後に crates.io 公開開始           | B → C             | 安全ゲート                     |
 | 10.7        | 統合失敗時は公開せず非破壊中断                | B / Phase 6       | エラーフロー: Stage B          |
 | 10.8        | 統合成功後の公開失敗は main 保持・リトライ/中断 | C / Track X      | エラーフロー: Track X          |
+| 10.9        | ビルド前に main を非破壊マージで取り込み（自動更新）・コンフリクト時中止 | A / Phase 1 (+B Phase6 ff 再検証) | メインフロー: Stage A          |
 
 ## Components and Interfaces
 
@@ -377,7 +378,10 @@ flowchart TD
 **実行手順**
 1. **バージョン決定** (1.1–1.7): 開発者指定があれば使用 (1.1)。なければ全ソース調査（`Cargo.toml`、`package.json`、`git tag -l "v*"`、crates.io / GitHub Releases / Marketplace）し最大バージョン PATCH+1 を提案 (1.2)、承認を求める (1.3)。拒否時は希望入力 (1.4)、semver 検証 `^[0-9]+\.[0-9]+\.[0-9]+$` (1.5, 1.6)、重複チェック (1.7)。
 2. **ワークツリー整理** (1.8, 1.9): `git status --porcelain` が空でなければ `git add -A; git commit -m "chore(release): prepare release vX.Y.Z"`。
-3. **テスト実行** (1.10, 1.11): `cargo test --all` — 失敗時は中止。
+3. **ブランチ現在性の確保（ビルド前・自動更新）** (10.9): `git fetch origin {default-branch}`。`origin/{default-branch}` が作業ブランチの HEAD の祖先でなければ（= main が先行）、`git merge origin/{default-branch}` で**非破壊マージ**により取り込む（steering の危険 git 操作禁止に準拠。`reset`/`rebase` は使わない）。これによりビルド・公開は統合後 main と同一ツリー上で行われ、公開内容と main の一致が保証される。**コンフリクト時は `git merge --abort` で復帰し中止・報告**。
+4. **テスト実行** (1.10, 1.11): `cargo test --all` — 失敗時は中止。
+
+> **配置の根拠**: main の取り込みを**ビルド前**に行うことで、Stage A の成果物（crates / ghost / VSIX）が更新後ツリーを反映する。取り込みを Stage B（ビルド後）に置くと成果物が陳腐化し再ビルドが必要になるため、本フェーズで前倒しする。
 
 #### Phase 2: VersionBump
 
@@ -458,6 +462,7 @@ flowchart TD
 - **安全ゲート**: 統合（PR 作成・マージ）が成功するまで Stage C（不可逆な公開）へ進まない（10.6）。失敗時は **force push・履歴書き換え・マージ成功前のブランチ削除を行わず**非破壊で中断（10.7, 6.5）。
 
 **実行手順**
+0. **最終 ff 検証** (10.6, 10.9): `git fetch origin {default-branch}`。`origin/{default-branch}` が HEAD の祖先であることを再確認する。Phase 1 の取り込み後に main が**再度**先行した稀なケースでは、リビルドループを避けるため**中止して開発者に再実行を促す**（再実行時に Phase 1 が改めて取り込む）。祖先であれば（ff 相当）マージコミットの tree はローカル HEAD の tree と一致し、公開内容・タグ・main の整合が保証される。
 1. **既存タグ確認** (6.3): `git tag -l "vX.Y.Z"` — 出力ありなら「既存タグ削除が必要です。手動対応しますか？」と確認（自動削除しない）。
 2. **タグ作成** (6.1, 6.2): `git tag -a vX.Y.Z -m "Release vX.Y.Z"`（作業ブランチ HEAD = Phase 5 コミットを指す。マージコミット方式によりこのコミットは統合後 main から到達可能になる = 10.5）。
 3. **PR 作成** (6.4, 10.3): `gh pr create --base main --head <作業ブランチ> --title "release: vX.Y.Z" --body <要約>`（本文は `merge-base..HEAD` 履歴と requirements/design 概要から要約。kiro-complete のメッセージ生成方針を流用）。
@@ -479,7 +484,7 @@ flowchart TD
 | Requirements | 3.1–3.6, 10.8                                |
 
 **Responsibilities & Constraints**
-- **前提**: Stage B 統合成功（3.1, 10.6）。
+- **前提**: Stage B 統合成功（3.1, 10.6）。**公開はローカル作業ブランチ（= Phase 1 で main を取り込み済み・Stage B で ff 相当を検証済みの統合後ツリー）から行う**ため、公開内容は main・タグと一致する（10.9 により保証）。
 - 順序固定: `pasta_core` → `pasta_dsl` → `pasta_lua` → `pasta_shiori` → `pasta_check`。`pasta_sample_ghost`（`publish = false`）はスキップ (3.5)。
 - 各公開後 `Start-Sleep -Seconds 10`（index 更新待機、最後は不要）(3.6)。
 - 失敗時は段階的バックオフ。最大リトライ後も失敗なら**中断**し、既公開クレートは残す。**main は既に正しいリリース状態（コミット・タグ反映済み）であり、公開のみリトライ／中断する**（10.8）。**Stage D は実行しない**（Track X 成功が前提）(3.3, 3.4)。

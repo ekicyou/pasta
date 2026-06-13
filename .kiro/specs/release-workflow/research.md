@@ -232,6 +232,13 @@ Option A に対しマージ可能性プローブのみ独立サブステップ�
 - **Rationale**: 不可逆な crates.io 公開を可逆な main 統合の後段に置き、「公開済みだが統合不能」を排除。PR マージコミット方式で SHA・タグの参照整合性を保ち、直 push を廃して将来のブランチ保護に前方互換。
 - **Trade-offs**: main にマージコミットが 1 つ増える（squash の単一コミットより履歴は冗長）。repo の merge-commit 有効化（一回限りセットアップ）が前提。
 
+### Decision: ブランチ現在性は「ビルド前の自動非破壊マージ」（設計議題1 2026-06-14）
+- **Context**: `gh pr merge --merge` は main 分岐時に 3-way マージとなり、(a) ローカル HEAD と統合後 main の乖離、(b) ローカル HEAD から実行する `cargo publish` の公開内容が main と不一致、という二重リスクがある（レビュー Critical Issue 1・2）。
+- **Selected**: main 先行を検出したら **Phase 1（ビルド前）で `git merge origin/{default}` により非破壊で取り込む**（自動更新）。`reset`/`rebase` は使わず steering の危険 git 操作禁止に準拠。コンフリクト時は `git merge --abort` で中止・報告。Stage B Phase 6 で**最終 ff 再検証**し、Phase 1 後に main が再先行した稀ケースはリビルドループ回避のため中止・再実行誘導。
+- **Rationale**: ビルド前取り込みにより成果物（crates/ghost/VSIX）が更新後ツリーを反映し、公開内容＝main＝タグの整合が保証される（Req 10.9）。取り込みを Stage B に置くと成果物が陳腐化し再ビルドが必要になるため前倒し。
+- **Trade-offs**: main 先行時にマージコミットが作業ブランチに増える（rebase の線形性より保守的だが安全）。再ビルドコストは「先行検出時のみ」に限定。
+- **Impact**: design.md Phase 1 step3・Phase 6 step0・Track X 前提・Req 10.9 を追加。settings.json 一回限りセットアップに `git fetch`/`git merge` 許可を追加。
+
 ## References（追加）
 - `.claude/skills/kiro-complete/SKILL.md` — PR 可否判定・PR 作成/マージ・中断条件・エラー回避（流用元の参照実装）
 - `.kiro/steering/workflow.md` L83–113 — リモート同期（PR squash）＋リリースタグ公開カーブアウト

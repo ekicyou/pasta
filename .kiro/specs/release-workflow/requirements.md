@@ -201,6 +201,7 @@
 6. When main への統合（タグ作成・PR マージ）が完了する, the Release Workflow shall その成功を確認してから不可逆な crates.io 公開を開始する
 7. If main への統合（PR の作成またはマージ）が失敗する（コンフリクト・mergeable でない・権限不足等）, the Release Workflow shall crates.io 公開を実行せず、force push・リモート履歴の書き換え・マージ成功前のブランチ削除を行わずに中断し、開発者に解消を求める
 8. If main 統合の成功後に crates.io 公開が失敗する, the Release Workflow shall 統合済みの main 状態（コミット・タグ）を保持したまま、公開を段階的バックオフでリトライし、最大リトライ後も失敗なら中断して開発者に報告する
+9. When ローカルビルドの前に作業ブランチが main より遅れている（main が先行している）ことを検出する, the Release Workflow shall main を作業ブランチへ非破壊マージで取り込み、更新後のツリー上でビルドと公開を行う。If 取り込みでコンフリクトが生じる, the Release Workflow shall リリース作業を中止し開発者に解消を求める
 
 ---
 
