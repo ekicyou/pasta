@@ -80,7 +80,7 @@
   - _Boundary: kiro-impl_
 
 - [ ] 7. GitHub リポジトリの squash 限定設定（一度きり）
-- [ ] 7.1 (P) gh repo edit でマージ方式を squash 限定化
+- [x] 7.1 (P) gh repo edit でマージ方式を squash 限定化
   - gh repo edit ekicyou/pasta --enable-squash-merge --enable-merge-commit=false --enable-rebase-merge=false --delete-branch-on-merge
   - 任意強制（squash メッセージ既定形、branch ruleset: PR 必須/linear history）は選択肢として提示し既定では有効化しない
   - 完了状態: gh repo view が squashMergeAllowed のみ true、deleteBranchOnMerge true を返す
