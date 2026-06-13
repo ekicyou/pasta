@@ -222,8 +222,10 @@ pub(crate) struct Transport {
     /// [`POLL_INTERVAL`]; setting it (via [`shutdown`](Transport::shutdown) or
     /// [`Drop`]) interrupts a parked accept so the listener thread can wind down
     /// and its port be released. This is the fix for the parked-listener
-    /// port-leak that breaks unload→reload. (The CONNECTED-state bridge poll +
-    /// reader join that this flag will also drive is wired in a later task.)
+    /// port-leak that breaks unload→reload. The same flag also drives the
+    /// CONNECTED-state writer poll in [`serve`] (interruptible `recv_timeout` +
+    /// flag check), after which the reader sub-thread is joined — so a connected
+    /// client's socket is released synchronously at teardown too (R2.5).
     shutdown: Arc<AtomicBool>,
 }
 
@@ -350,6 +352,20 @@ impl Transport {
             let _ = handle.join();
         }
     }
+
+    /// TEST-ONLY: raise the internal cooperative shutdown flag WITHOUT dropping
+    /// the outbound sender.
+    ///
+    /// Production teardown ([`shutdown`](Transport::shutdown) / [`Drop`]) always
+    /// raises the flag AND drops the outbound sender together, so either signal
+    /// alone is enough to stop the writer. This helper isolates the FLAG signal
+    /// so a test can prove the connected writer loop breaks on the flag even
+    /// while the outbound channel is still open (R2.5) — the property that the
+    /// pre-2.3 `while out_rx.recv()` loop did not have.
+    #[cfg(test)]
+    fn signal_shutdown_flag_only(&self) {
+        self.shutdown.store(true, Ordering::Release);
+    }
 }
 
 impl Drop for Transport {
@@ -369,14 +385,29 @@ impl Drop for Transport {
 ///
 /// Accepts exactly one client (single-client by design), then runs the
 /// socket↔channel bridge with two sub-threads:
-/// - **reader**: parse `Content-Length` frames off the socket and forward each
-///   as a [`serde_json::Value`] to `in_tx`. Returns on EOF / I/O error / when
-///   `in_tx`'s receiver is gone.
-/// - **writer**: drain `out_rx` and write each value to the socket as a frame.
-///   Returns when `out_rx` disconnects (the [`Transport`]'s sender dropped) or
-///   on a socket write error.
+/// - **reader** (sub-thread, `JoinHandle` kept): parse `Content-Length` frames
+///   off the socket and forward each as a [`serde_json::Value`] to `in_tx`.
+///   Returns on EOF / I/O error / when `in_tx`'s receiver is gone, OR when the
+///   `shutdown` flag is observed between frames. To make the flag interruption
+///   reliable cross-platform the reader's socket carries a [`POLL_INTERVAL`]
+///   read timeout: it polls for inbound data at each frame boundary (a timeout
+///   yields no data → re-check the flag), then parses a full frame with blocking
+///   reads once data is present (so framing is never split by the timeout).
+/// - **writer** (this thread): an interruptible poll of `out_rx` — each
+///   iteration checks the `shutdown` flag, then `recv_timeout(POLL_INTERVAL)`;
+///   it writes each value as a frame and returns when the flag is set, the
+///   outbound channel disconnects (the [`Transport`]'s sender dropped), or a
+///   socket write fails.
 ///
-/// Mirrors the PoC's "safe return on error" so neither side hangs.
+/// At teardown the writer breaks (flag OR disconnect), then `shutdown(Both)` is
+/// called and the reader is JOINED before `serve` returns — so a connected
+/// client's socket is released synchronously (R2.5). The reader join is bounded
+/// because the reader winds down within one `POLL_INTERVAL` of the flag even
+/// when the peer keeps the connection open (a local socket `shutdown` does NOT
+/// reliably cancel an in-flight blocking recv on Windows, so the flag poll — not
+/// the `shutdown(Both)` EOF — is the load-bearing interrupt for the connected
+/// path; design "Transport" Risks). Mirrors the PoC's "safe return on error" so
+/// neither side hangs.
 ///
 /// The listener is NON-BLOCKING: `accept()` is polled on a [`POLL_INTERVAL`]
 /// cadence so the `shutdown` flag can interrupt a parked accept (no client
@@ -433,15 +464,62 @@ fn serve(
         Err(_) => return,
     };
 
-    // Reader sub-thread: socket → in_tx. DETACHED: it self-terminates on EOF /
-    // I/O error / when `in_tx`'s receiver is gone. We never block-join it (a
-    // production reader has no timeout and may be parked on a blocking read), so
-    // `serve` cannot hang on the reader. Dropping `in_tx` here closes the inbound
-    // channel, which is the owner's "reader done" signal.
-    std::thread::spawn(move || {
+    // Give the reader's socket a POLL_INTERVAL read timeout so its frame-boundary
+    // poll can observe the shutdown flag within one interval even while the peer
+    // keeps the connection open. A local `shutdown(Both)` does NOT reliably cancel
+    // an in-flight blocking recv on Windows, so this cooperative poll — mirroring
+    // the writer's `recv_timeout(POLL_INTERVAL)` — is what makes the reader join
+    // bounded at teardown (R2.5). If setting the timeout fails we cannot guarantee
+    // a bounded reader join, so return without spawning a reader we could not
+    // interrupt (safe: no client bridge, serve winds down).
+    if stream.set_read_timeout(Some(POLL_INTERVAL)).is_err() {
+        return;
+    }
+
+    // Reader sub-thread: socket → in_tx. Its `JoinHandle` is KEPT (not detached)
+    // and joined after the writer loop ends, so the accepted connection is
+    // released SYNCHRONOUSLY before `serve` returns (R2.5). The reader returns on
+    // EOF / I/O error / when `in_tx`'s receiver is gone, or when the `shutdown`
+    // flag is observed between frames. Dropping `in_tx` here (when the reader
+    // returns) closes the inbound channel — the owner's "reader done" signal.
+    let reader_shutdown = Arc::clone(&shutdown);
+    let reader_handle = std::thread::spawn(move || {
         let mut reader = BufReader::new(stream);
         loop {
-            match read_frame(&mut reader) {
+            // (1) Teardown requested → stop between frames (bounded by one
+            // POLL_INTERVAL of the read timeout below).
+            if reader_shutdown.load(Ordering::Acquire) {
+                return;
+            }
+            // (2) Frame-boundary poll: wait for inbound data with the read
+            // timeout. No data this interval (Timeout/WouldBlock) → re-check the
+            // flag. Clean EOF (empty fill) → peer closed → done. Other error →
+            // safe return.
+            match reader.fill_buf() {
+                Ok([]) => return, // EOF between frames → peer closed
+                Ok(_) => {}       // data buffered → a full frame can be parsed
+                Err(e)
+                    if e.kind() == io::ErrorKind::WouldBlock
+                        || e.kind() == io::ErrorKind::TimedOut =>
+                {
+                    continue;
+                }
+                Err(_) => return,
+            }
+            // (3) Data is present at a frame boundary → parse ONE full frame with
+            // BLOCKING reads. The read timeout is cleared for the duration of the
+            // parse so a frame split across TCP segments is never mis-read as a
+            // truncation error, then restored for the next boundary poll. (The
+            // flag is only polled BETWEEN frames; a frame, once started, is read to
+            // completion — DAP frames are tiny, so this window is negligible.)
+            if reader.get_ref().set_read_timeout(None).is_err() {
+                return;
+            }
+            let parsed = read_frame(&mut reader);
+            if reader.get_ref().set_read_timeout(Some(POLL_INTERVAL)).is_err() {
+                return;
+            }
+            match parsed {
                 Ok(Some(value)) => {
                     // Owner gone → stop reading (clean shutdown).
                     if in_tx.send(value).is_err() {
@@ -456,22 +534,54 @@ fn serve(
         }
     });
 
-    // Writer loop runs on THIS (listener) thread: out_rx → socket. It ends when
-    // the outbound channel disconnects (the `Transport`'s sender dropped on
-    // shutdown / drop) or on a socket write error.
+    // Connected-state writer loop runs on THIS (listener) thread: out_rx →
+    // socket. It is an INTERRUPTIBLE poll (R2.5) so teardown breaks it on EITHER
+    // the internal `shutdown` flag OR the outbound sender being dropped:
+    // - flag set (e.g. `shutdown()`/`Drop`, or the flag alone) → FLUSH any
+    //   already-queued frames, then break (the outbound owner — the socket bridge
+    //   — relies on pending frames being flushed before teardown);
+    // - `recv_timeout` `Ok(frame)` → write it (stop on a socket write error);
+    // - `Timeout` → re-check the flag (this is the `POLL_INTERVAL` cadence);
+    // - `Disconnected` (outbound sender dropped) → drain the rest, then done.
     let mut writer = write_half;
-    while let Ok(value) = out_rx.recv() {
-        if write_frame(&mut writer, &value).is_err() {
-            // Socket write failed (peer gone) → stop writing.
+    'writer: loop {
+        if shutdown.load(Ordering::Acquire) {
+            // Teardown via the flag: the outbound sender may still be alive with
+            // frames already queued (e.g. the bridge enqueued a final flush then
+            // dropped the Transport, racing the flag). Drain whatever is currently
+            // buffered so those frames still reach the peer, then break.
+            while let Ok(value) = out_rx.try_recv() {
+                if write_frame(&mut writer, &value).is_err() {
+                    break;
+                }
+            }
             break;
+        }
+        match out_rx.recv_timeout(POLL_INTERVAL) {
+            Ok(value) => {
+                if write_frame(&mut writer, &value).is_err() {
+                    // Socket write failed (peer gone) → stop writing.
+                    break 'writer;
+                }
+            }
+            // No outbound frame this interval → loop and re-check the flag.
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => continue,
+            // Outbound sender dropped (shutdown / drop) → `recv_timeout` has
+            // already yielded every queued frame above, so nothing remains; done.
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break 'writer,
         }
     }
 
-    // Outbound channel closed (shutdown) or write error: best-effort shutdown of
-    // the socket so the detached reader observes EOF and self-terminates. We do
-    // NOT join the reader (it is detached) — `serve` returns immediately so the
-    // listener thread never hangs.
+    // Writer loop ended (flag, disconnect, or write error). Shut the socket down
+    // (best-effort EOF for the reader on the peer-alive write path), THEN join the
+    // reader so the accepted connection is released synchronously before `serve`
+    // returns (R2.5). The join is bounded because the reader also winds down within
+    // one POLL_INTERVAL via its own `shutdown` flag poll — on Windows a local
+    // `shutdown(Both)` does NOT reliably cancel an in-flight blocking recv, so the
+    // flag poll (not this shutdown) is the load-bearing interrupt. `serve` thus
+    // never hangs on the reader.
     let _ = writer.shutdown(std::net::Shutdown::Both);
+    let _ = reader_handle.join();
 }
 
 #[cfg(test)]
@@ -954,6 +1064,114 @@ mod tests {
         // Setting the shutdown flag must wind it down.
         transport.shutdown();
         join_transport_with_watchdog(transport, WATCHDOG);
+    }
+
+    /// R2.5: with a client CONNECTED, the connected-state writer loop must honor
+    /// the internal `shutdown` FLAG — not only an outbound-sender drop. Here we
+    /// raise the flag WHILE keeping the outbound sender alive (and the inbound
+    /// receiver held so the reader is not torn down by an owner-gone signal),
+    /// then join the listener handle under the watchdog.
+    ///
+    /// On the pre-2.3 connected writer loop (`while let Ok(_) = out_rx.recv()`,
+    /// flag not consulted, outbound still alive) the writer never returns, the
+    /// reader is detached, and `serve()` hangs → the watchdog join FAILS. After
+    /// 2.3 the writer breaks on the flag, `writer.shutdown(Both)` EOFs the reader,
+    /// the reader is joined, and `serve()` returns within the watchdog.
+    #[test]
+    fn connected_writer_honors_shutdown_flag_while_outbound_alive() {
+        let mut transport =
+            Transport::start(Some("127.0.0.1:0".parse().unwrap())).expect("bind must succeed");
+        let addr = transport.local_addr().expect("enabled transport binds");
+
+        // Connect so serve() leaves the accept loop and enters the connected-state
+        // bridge (reader sub-thread + writer loop). Keep the client alive so the
+        // reader's blocking read does NOT see a peer EOF on its own — teardown
+        // must come from the flag → writer.shutdown(Both), not from the client.
+        let client = connect_client(addr).expect("client connect must succeed");
+        client
+            .set_read_timeout(Some(WATCHDOG))
+            .expect("TEST-ONLY read timeout");
+
+        // Give serve() a moment to accept and spin up the bridge before signaling.
+        // (Bounded; the watchdog join below is the real timeout guard.)
+        std::thread::sleep(Duration::from_millis(50));
+
+        // Raise the FLAG ONLY — outbound sender stays alive. This is the signal a
+        // pre-2.3 `while out_rx.recv()` writer loop ignores.
+        transport.signal_shutdown_flag_only();
+
+        // Join the listener handle under the watchdog WITHOUT dropping the outbound
+        // sender (the whole point is that the flag alone tears the writer down).
+        let handle = transport.handle.take().expect("enabled transport has a handle");
+        let (done_tx, done_rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = done_tx.send(handle.join());
+        });
+        done_rx
+            .recv_timeout(WATCHDOG)
+            .expect("connected writer must break on the shutdown FLAG and serve() must return (R2.5)")
+            .expect("listener thread must not panic");
+
+        // Keep the client alive until after the join so its EOF could not have been
+        // the thing that woke the reader.
+        drop(client);
+    }
+
+    /// R2.5 (normal path): with a client still CONNECTED, `shutdown()` (which
+    /// drops the outbound sender) must tear the connected bridge down
+    /// synchronously — the writer breaks on the outbound disconnect and the
+    /// reader is joined — so `serve()` returns within the watchdog even though
+    /// the peer never closed its end. This is the everyday unload-while-connected
+    /// case (R2.5); the flag-only test above isolates the OTHER teardown trigger.
+    #[test]
+    fn connected_shutdown_tears_down_synchronously_with_client_alive() {
+        let transport =
+            Transport::start(Some("127.0.0.1:0".parse().unwrap())).expect("bind must succeed");
+        let addr = transport.local_addr().expect("enabled transport binds");
+
+        // Connect and round-trip one frame each way so we are definitely in the
+        // connected-state bridge, then leave the client ALIVE.
+        let client = connect_client(addr).expect("client connect must succeed");
+        client
+            .set_read_timeout(Some(WATCHDOG))
+            .expect("TEST-ONLY read timeout");
+        let mut client_writer = client.try_clone().expect("clone client");
+        let mut client_reader = BufReader::new(client.try_clone().expect("clone client"));
+
+        write_frame(&mut client_writer, &json!({ "seq": 1, "command": "ping" }))
+            .expect("client write");
+        let delivered = transport
+            .inbound()
+            .recv_timeout(WATCHDOG)
+            .expect("inbound frame delivered");
+        assert_eq!(delivered["command"], json!("ping"));
+
+        transport.send(json!({ "seq": 1, "type": "response" })).expect("send");
+        let received = read_frame(&mut client_reader)
+            .expect("client read")
+            .expect("client frame");
+        assert_eq!(received["type"], json!("response"));
+
+        // Teardown via shutdown() (drops outbound) with the client STILL ALIVE.
+        // The writer must break on the outbound disconnect and the reader must be
+        // joined → serve returns within the watchdog.
+        let mut transport = transport;
+        transport.shutdown();
+        let handle = transport.handle.take().expect("enabled transport has a handle");
+        let (done_tx, done_rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = done_tx.send(handle.join());
+        });
+        done_rx
+            .recv_timeout(WATCHDOG)
+            .expect("connected shutdown() must tear down synchronously (R2.5)")
+            .expect("listener thread must not panic");
+
+        // Client kept alive until after the join, proving teardown did not depend
+        // on a peer EOF.
+        drop(client_writer);
+        drop(client_reader);
+        drop(client);
     }
 
     // -----------------------------------------------------------------------

@@ -22,7 +22,7 @@ reload バグの根治（中断可能 accept ＋ 同期 teardown join）と防�
   - _Requirements: 2.2, 2.3_
   - _Boundary: Transport_
 
-- [ ] 2.3 接続後の同期 teardown（writer ループ poll + reader join + socket 解放）
+- [x] 2.3 接続後の同期 teardown（writer ループ poll + reader join + socket 解放）
   - 接続確立後の writer ループを `out_rx.recv_timeout(POLL_INTERVAL)` + shutdown poll 化。teardown 時に `stream.shutdown(Both)` で reader を EOF させ、reader サブスレッドの `JoinHandle` を保持して join する
   - 観測: デバッガクライアント接続中に shutdown されても、接続中 socket を解放し reader を join して `serve()` が有界時間で return する
   - _Requirements: 2.5_
@@ -66,3 +66,7 @@ reload バグの根治（中断可能 accept ＋ 同期 teardown join）と防�
   - 観測: 全テスト緑、既存 transport/wiring テストを維持し、変化が teardown 同期化 ＋ `SO_REUSEADDR` に限定されている
   - _Requirements: 4.1, 4.2, 4.4, 4.5_
   - _Depends: 4.1, 4.2_
+
+## Implementation Notes
+- 2.3: Windows では `TcpStream::shutdown(Both)` が peer 生存中の in-flight blocking `recv` をキャンセルしない（実証済み・design Risks 節が予見）。reader の teardown は `shutdown(Both)` 依存ではなく、**read timeout（POLL_INTERVAL）＋フレーム境界での shutdown フラグ poll** による協調的中断で有界化する（フレーム parse 中は timeout を解除し framing を割らない）。`shutdown(Both)` は best-effort 併用。2.4（Drop join）・4.x テストでもこの前提を踏襲する（production に hard deadline を焼き込まない）。
+- 2.3: writer ループの flag-break パスは break 前に `try_recv` で滞留 outbound を drain し、「teardown 時の pending flush」契約（wiring e2e）を保持する。
