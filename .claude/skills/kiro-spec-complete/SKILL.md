@@ -56,8 +56,8 @@ argument-hint: <feature-name>
 
 繰り返し仕様の場合:
 1. ステップ1（DoD検証）とステップ2（コミット）のみ実行
-2. ステップ3〜5（移動・パス更新・ロードマップ）をスキップ
-3. ステップ8（リモート同期＝ブランチ戦略）を実行
+2. ステップ3〜5（移動・パス更新・ロードマップ）をスキップ（`completed/` へは移動しない）
+3. ステップ8（リモート同期＝PR ベース）を実行
 4. tasks.md のチェックボックスをリセット（全 `[x]` → `[ ]`）
 
 ---
@@ -220,75 +220,64 @@ git add -A
 git commit -m "chore({feature-name}): spec完了・アーカイブ"
 ```
 
-### ステップ8: リモート同期（ブランチ戦略）
+### ステップ8: リモート同期（PR ベース）
 
-> **権威的ソース**: workflow.md「実装完了時アクション > 3. リモート同期（ブランチ戦略）」に従う。
+> **権威的ソース**: workflow.md「実装完了時アクション > 3. リモート同期（ブランチ戦略）」に従う。リモート同期は **PR（Pull Request）ベース**であり、これが唯一の手順実体である。このスキルはフローを複製せず、本セクションを参照したうえで以下を実行する。
 
-> **前提**: 本ステップは `origin`/`main` をハードコードせず、ステップ0で解決した `{remote}` / `{default-branch}` を用いる。`{remote}` が none の場合はリモート同期を安全にスキップし、一度だけ警告する。
+> **前提**: 本ステップは `origin`/`main` をハードコードせず、ステップ0で解決した `{remote}` / `{default-branch}` を用いる。フィーチャーブランチ／ワークツリーは Claude Code（ハーネス）が供給しており、このスキルは自前でブランチ／ワークツリーを作成・削除しない。1つの feature = 1つのブランチ = 1つの PR とし、完了時に1回だけ PR を作成して squash マージする。**`{default-branch}` への直接 push は一切行わない。**
 
 確認不要。現在のブランチを判定し、以下を中断なく実行する。
 
 ```powershell
-$branchA = git rev-parse --abbrev-ref HEAD
+$branch = git rev-parse --abbrev-ref HEAD   # 現在の作業ブランチ（ハーネス供給）
 ```
 
-#### ケース1: 現在のブランチが `{default-branch}`
+#### PR 可否判定
 
-そのまま同期する。
+以下を**すべて満たす**ときのみ PR を作成・マージする（PR 可）:
+
+1. 現在ブランチが `{default-branch}` 以外（非デフォルトブランチ）。
+2. ステップ0で解決した `{remote}` が none でない（リモートあり）。
+3. `gh` が認証済み（`gh auth status` が成功）。
+
+いずれかが欠ける場合は **PR 不可** とし、下記「フォールバック（PR 不可時）」へ進む。
+
+#### PR 可: PR 作成 → squash マージ → リモートブランチ削除
 
 ```powershell
-git push {remote} {default-branch}
+# 1. 現在ブランチを push して PR を作成（base = {default-branch}, head = 現在ブランチ）
+gh pr create --base {default-branch} --head $branch --title "<subject>" --body "<body>"
+
+# 2. squash マージ（--squash 固定、--delete-branch でリモートブランチを API 削除）
+#    --subject / --body は下記「squash メッセージ生成」に従って供給する
+gh pr merge --squash --delete-branch --subject "<subject>" --body "<body>"
 ```
 
-#### ケース2: 現在のブランチが `{default-branch}` 以外（= ブランチA）
+- **マージ成否はマージ API の結果のみで判定する。** `gh pr merge` の成否がマージ成否であり、それ以外の警告でマージ成功を覆さない。
+- **リモートブランチ削除**: `gh pr merge --delete-branch` が **PR マージ成功後に** API でリモート feature ブランチを削除する。
+- **ローカル後始末警告は非致命**: `--delete-branch` のローカル削除試行は、カレントワークツリーでブランチがチェックアウト中のため**ブロックされ警告を出す**ことがある。これは**非致命**でありマージ成功（API 結果）を覆さない。リモートブランチは API により削除済みである。
+- **ローカルブランチ／ワークツリーの後始末はハーネスへ委譲**: このスキルは自分のワークツリー／カレントブランチを削除しない（構造的に不可）。ローカルブランチ・ワークツリーの teardown はハーネスがセッション/タスク境界で実施する。
 
-ブランチAの「`{default-branch}` からの分岐点以降の差分」を1コミットに集約した squash ブランチ `squash/$branchA`（= ブランチB）を作り、`{default-branch}` へ fast-forward マージしてから push する。すべて成功したらブランチ A/B をローカル・リモート両方から削除する。
-
-```powershell
-$branchB = "squash/$branchA"
-
-# 1. リモート最新を取得（push reject 予防）
-git fetch {remote}
-
-# 2. {remote}/{default-branch} を起点にブランチBを作成し、Aの全差分を1コミットへ集約
-git switch -c $branchB {remote}/{default-branch}
-git merge --squash $branchA
-
-# 2-1. squash コミットメッセージは分岐点以降の履歴を要約して生成する（下記「メッセージ生成」参照）
-git log --no-merges --pretty=format:"%h %s%n%b" {remote}/{default-branch}..$branchA
-git commit -F <生成した要約メッセージ>   # 履歴要約から作成
-
-# 3. {default-branch} を fast-forward マージ（Bは {default-branch} 先端+1コミットなので構造上必ずff可能）
-git switch {default-branch}
-git merge --ff-only $branchB
-
-# 4. push
-git push {remote} {default-branch}
-
-# 5. すべて成功したらブランチ A/B をローカル削除
-git branch -D $branchA
-git branch -D $branchB
-
-# 6. リモートに存在すれば削除
-if (git ls-remote --heads {remote} $branchA) { git push {remote} --delete $branchA }
-if (git ls-remote --heads {remote} $branchB) { git push {remote} --delete $branchB }
-```
-
-**メッセージ生成**（ステップ2-1 の squash コミット）:
+**squash メッセージ生成**（`gh pr merge --squash` の `--subject` / `--body`）:
 - 固定文言にせず、**分岐点以降のコミット履歴を要約**して作成する。
 - 手順:
-  1. `git log --no-merges --pretty=format:"%h %s%n%b" {remote}/{default-branch}..$branchA` で全コミットを取得
+  1. `git log --no-merges --pretty=format:"%h %s%n%b" {default-branch}..HEAD`（= `merge-base..HEAD`）で分岐点以降の全コミットを取得
   2. 対象 spec の `requirements.md` / `design.md` のタイトル・概要も参照し意図を補強
   3. 以下の形へ再構成:
-     - **subject**: `<type>({feature-name}): <機能全体を1文で表す要約>`
-     - **body**: 主な開発仕様・変更内容を箇条書き（3〜7項目目安）。関連コミットは統合し、`fixup`/typo/WIP 等の些末な履歴は集約・省略。個々のコミット羅列ではなく「何を・なぜ作ったか」の開発単位で再構成する。
+     - **subject**（`--subject`）: `<type>({feature-name}): <機能全体を1文で表す要約>`
+     - **body**（`--body`）: 主な開発仕様・変更内容を箇条書き（3〜7項目目安）。関連コミットは統合し、`fixup`/typo/WIP 等の些末な履歴は集約・省略。個々のコミット羅列ではなく「何を・なぜ作ったか」の開発単位で再構成する。
 
-**コンフリクト時の対応**（ステップ2の `git merge --squash` で発生し得る）:
-- 内容を精査して解決する。spec完了文脈では**ブランチA側の変更が原則正**。
-- 解決できたら `git add -A; git commit` で継続する。
-- 意味的に危険・判断不能な場合は**中断し開発者へ報告**（ブランチ A/B は削除しない）。
+#### フォールバック（PR 不可時）
 
-**中断条件**: コンフリクト解決不能 / `--ff-only` マージ失敗 / push reject のいずれかが発生した場合は、**ブランチ A/B を削除せず**処理を中断して報告する（復旧可能性を確保するため）。
+現在ブランチが `{default-branch}` である / `{remote}` が none（リモートなし・オフライン）/ `gh` 未認証 のいずれかの場合:
+
+- **警告を出力**し、PR 作成・push を**スキップ**する。
+- ローカルコミットは**そのまま保持**して継続する。
+- **`{default-branch}` への直接 push は一切行わない。**
+
+#### 中断条件
+
+PR の**作成またはマージ（API）が失敗**した場合（コンフリクト / mergeable でない / 権限不足等）は、**ブランチを削除せず**処理を中断し開発者へ報告する（復旧可能性を確保するため）。中断するのは**マージ API が失敗したとき**のみであり、`--delete-branch` のローカル削除警告（非致命）とは区別する。
 
 ---
 
@@ -306,9 +295,10 @@ if (git ls-remote --heads {remote} $branchB) { git push {remote} --delete $branc
 - [ ] スキルドキュメント同期済み（該当する場合）
 - [ ] 完了コミット済み（ステップ7）
 - [ ] ステップ0で `{remote}` / `{default-branch}` を決定的解決済み
-- [ ] リモート同期完了（ステップ8、解決した `{remote}`/`{default-branch}` を使用）
-      - `{default-branch}` 上: `git push {remote} {default-branch}` のみ
-      - `{default-branch}` 以外: squashブランチB作成（コミットメッセージは分岐点以降の履歴を要約）→ `{default-branch}` へff-onlyマージ→push→A/B削除（ローカル＋リモート）
+- [ ] リモート同期完了（ステップ8、PR ベース。解決した `{remote}`/`{default-branch}` を使用）
+      - PR 可（非デフォルトブランチ かつ `{remote}` あり かつ `gh` 認証あり）: `gh pr create --base {default-branch} --head <current>` → `gh pr merge --squash --delete-branch --subject … --body …`（メッセージは `merge-base..HEAD` 履歴を要約）。マージ成否は API 結果のみで判定し、`--delete-branch` のローカル削除警告は非致命として継続。リモートブランチは API 削除、ローカルブランチ／ワークツリーはハーネス teardown へ委譲
+      - PR 不可（`{default-branch}` 上 / `{remote}` none / `gh` 未認証）: 警告して PR・push スキップ、ローカルコミット保持（`{default-branch}` への直接 push なし）
+      - PR 作成／マージ（API）失敗: ブランチを残し中断・報告
 ```
 
 ---
@@ -331,22 +321,24 @@ if (git ls-remote --heads {remote} $branchB) { git push {remote} --delete $branc
 - **症状**: `cargo test --all` が失敗
 - **対策**: ワークフローを中断し開発者に報告。テスト修正後に再実行
 
-### ブランチ戦略関連（ステップ8 ケース2）
+### リモート同期関連（ステップ8 PR ベース）
 
-#### ff不可（fast-forward 不可）
-- **症状**: `git merge --ff-only $branchB` が失敗
-- **理由**: 構造上ほぼ発生しない。ブランチBは `{remote}/{default-branch}` 先端から作るため、`{default-branch}` は必ず祖先になる。発生するのはローカル `{default-branch}` に未push の独自コミットがある異常時のみ
-- **対策**: 中断して開発者へ報告（ローカル `{default-branch}` の状態を確認）
+#### PR 作成失敗
+- **症状**: `gh pr create` が失敗（既存 PR との衝突 / push 権限不足 / ネットワーク等）
+- **対策**: **ブランチを削除せず**中断して開発者へ報告。既存 PR がある場合はその PR を確認して再マージを検討
 
-#### push reject
-- **症状**: `git push {remote} {default-branch}` が non-fast-forward で拒否される
-- **理由**: リモート `{default-branch}` がローカルより先行（他者または別マシンが間に push）。特殊ケース
-- **対策**: 事前の `git fetch {remote}` で大半は予防。発生時は中断して報告
+#### マージ不可（mergeable でない / API 失敗）
+- **症状**: `gh pr merge --squash` が失敗（コンフリクトで mergeable=false / 必須チェック未通過 / 権限不足等）
+- **対策**: **ブランチを削除せず**中断して開発者へ報告。コンフリクトは GitHub 上または別途解決のうえ再実行。中断判定は**マージ API の結果のみ**で行い、`--delete-branch` のローカル削除警告とは混同しない
 
-#### squash マージのコンフリクト
-- **症状**: `git merge --squash $branchA` がコンフリクトで停止
-- **対策**: 内容を精査して解決（A側が原則正）。解決後コミットして継続。判断不能なら中断、**ブランチ A/B は残す**
+#### gh 未認証 / リモートなし（PR 不可）
+- **症状**: `gh auth status` が失敗、または `{remote}` が none
+- **対策**: 警告を出力し PR・push をスキップ。ローカルコミットは保持して継続する。**`{default-branch}` への直接 push は行わない**
 
-#### ブランチ削除のタイミング
-- **原則**: ブランチ A/B の削除は**マージ・push がすべて成功した後のみ**実行する
-- **理由**: 途中失敗時に A/B を残すことで、いつでも元の状態へ復旧できる
+#### `{default-branch}` 上で承認された
+- **症状**: 現在ブランチが `{default-branch}`（PR の head に使えない）
+- **対策**: 警告を出力し PR・push をスキップ、ローカルコミット保持。通常はハーネス供給の非デフォルトブランチ上で完了する想定
+
+#### `--delete-branch` のローカル削除警告
+- **症状**: `gh pr merge --delete-branch` がローカルブランチ削除を試みてブロックされ警告を出す（カレントワークツリーでチェックアウト中のため）
+- **対策**: **非致命として無視し継続**。リモートブランチは API で削除済み。ローカルブランチ／ワークツリーの後始末はハーネスのワークツリー teardown に委ねる（このスキルは自分のワークツリーを削除しない／できない）

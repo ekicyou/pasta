@@ -20,7 +20,7 @@
   - _Requirements: 7.1_
   - _Boundary: kiro-complete_
   - _Depends: 1.1_
-- [ ] 2.2 kiro-spec-complete の Step 8 を PR ベース完了フローへ置換
+- [x] 2.2 kiro-spec-complete の Step 8 を PR ベース完了フローへ置換
   - gh pr create --base {default-branch} --head {current} → gh pr merge --squash --delete-branch --subject --body
   - マージ成否（API 結果）とローカル後始末警告を分離（--delete-branch のローカル削除警告は非致命で継続）
   - 直接 push・手作業 squash-ff-push を撤去
@@ -111,3 +111,7 @@
   - pasta-ghost-authoring / pasta-lua-coding: DSL/Lua 非変更（N/A）
   - 完了状態: 全ドキュメントの整合確認完了、該当箇所更新済み
   - _Requirements: 3.3, 8.3_
+
+## Implementation Notes
+
+- 2.2: kiro-spec-complete の frontmatter `description` 末尾が旧表現「…最終コミット→push まで」のまま。Task 3.1（frontmatter 編集）で PR squash マージ文脈へ更新すること。
