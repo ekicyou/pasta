@@ -47,10 +47,14 @@
 
 use std::io::{self, BufRead, BufReader, Write};
 use std::net::{SocketAddr, TcpListener};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, Sender};
 use std::thread::JoinHandle;
+use std::time::Duration;
 
 use serde_json::Value;
+use socket2::{Domain, Protocol, Socket, Type};
 
 use crate::debug::DebugError;
 
@@ -65,6 +69,15 @@ const CONTENT_LENGTH: &str = "Content-Length";
 /// read (memory-exhaustion DoS). Real DAP messages are tiny; 16 MiB is far
 /// above any legitimate frame while keeping the worst-case allocation bounded.
 const MAX_CONTENT_LENGTH: usize = 16 * 1024 * 1024;
+
+/// Poll cadence for the interruptible non-blocking `accept()` loop in
+/// [`serve`]. Matches the established 5ms cooperative-poll convention used by
+/// the socket bridge (`wiring::POLL_INTERVAL`): small enough to be
+/// imperceptible at teardown while keeping the parked accept from busy-spinning
+/// (it sleeps for this interval when no client is waiting). The shutdown flag is
+/// checked once per interval, so a parked accept winds down within ~one
+/// `POLL_INTERVAL` of [`Transport::shutdown`] / drop (design "State Management").
+const POLL_INTERVAL: Duration = Duration::from_millis(5);
 
 // ---------------------------------------------------------------------------
 // Frame codec (Content-Length framing) — pure, Lua-free, unit-testable
@@ -204,6 +217,16 @@ pub(crate) struct Transport {
     /// The bound local address, when enabled. `None` when disabled (R5.5: no
     /// port is opened, so there is no address to report).
     local_addr: Option<SocketAddr>,
+    /// Internal cooperative shutdown signal (R2.2/R2.3). A clone is moved into
+    /// [`serve`], whose non-blocking accept poll loop checks it once per
+    /// [`POLL_INTERVAL`]; setting it (via [`shutdown`](Transport::shutdown) or
+    /// [`Drop`]) interrupts a parked accept so the listener thread can wind down
+    /// and its port be released. This is the fix for the parked-listener
+    /// port-leak that breaks unload→reload. The same flag also drives the
+    /// CONNECTED-state writer poll in [`serve`] (interruptible `recv_timeout` +
+    /// flag check), after which the reader sub-thread is joined — so a connected
+    /// client's socket is released synchronously at teardown too (R2.5).
+    shutdown: Arc<AtomicBool>,
 }
 
 impl Transport {
@@ -231,21 +254,42 @@ impl Transport {
                 outbound: None,
                 handle: None,
                 local_addr: None,
+                shutdown: Arc::new(AtomicBool::new(false)),
             });
         };
 
-        // Enabled: bind (bind failure → DebugError::Bind, R3.1/R5.5).
-        let listener = TcpListener::bind(addr).map_err(DebugError::Bind)?;
+        // Enabled: build the listener via socket2 so SO_REUSEADDR is set BEFORE
+        // bind (R3.1). std `TcpListener::bind` cannot set SO_REUSEADDR pre-bind,
+        // so we drive the raw socket: SO_REUSEADDR → bind → listen → convert to a
+        // std `TcpListener`, then set it NON-BLOCKING. Non-blocking is the
+        // precondition for `serve()`'s interruptible accept poll loop: a parked
+        // accept must yield `WouldBlock` so the loop can check the shutdown flag
+        // and wind down (R2.2/R2.3). Any socket2 / nonblocking step failing maps
+        // to `DebugError::Bind` (same as today's bind-failure path, R3.1).
+        let socket = Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP))
+            .map_err(DebugError::Bind)?;
+        socket.set_reuse_address(true).map_err(DebugError::Bind)?; // SO_REUSEADDR (R3.1/R3.2)
+        socket.bind(&addr.into()).map_err(DebugError::Bind)?;
+        socket.listen(1).map_err(DebugError::Bind)?; // single-client design → tiny backlog
+        let listener = TcpListener::from(socket);
         let local_addr = listener.local_addr().map_err(DebugError::Bind)?;
+        // Interruptible accept (R2.2): the poll loop in `serve` relies on this.
+        listener.set_nonblocking(true).map_err(DebugError::Bind)?;
 
         // Channels are the ONLY seam. The transport thread owns the socket ends;
         // the owner keeps the other ends.
         let (in_tx, in_rx) = std::sync::mpsc::channel::<Value>();
         let (out_tx, out_rx) = std::sync::mpsc::channel::<Value>();
 
+        // Internal shutdown signal: a clone is moved into `serve` so the accept
+        // poll loop can be interrupted; the `Transport` retains the original to
+        // set on `shutdown()` / `Drop`.
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let serve_shutdown = Arc::clone(&shutdown);
+
         // Long-lived listener thread (socket I/O only — no Lua).
         let handle = std::thread::spawn(move || {
-            serve(listener, in_tx, out_rx);
+            serve(listener, in_tx, out_rx, serve_shutdown);
         });
 
         Ok(Self {
@@ -253,6 +297,7 @@ impl Transport {
             outbound: Some(out_tx),
             handle: Some(handle),
             local_addr: Some(local_addr),
+            shutdown,
         })
     }
 
@@ -289,6 +334,11 @@ impl Transport {
     /// form is exercised by the `#[cfg(test)]` teardown paths.
     #[allow(dead_code)] // test-facing; production uses Drop (kept per design seam)
     pub(crate) fn shutdown(&mut self) {
+        // Set the internal shutdown flag so a parked non-blocking accept poll
+        // loop in `serve` observes it within one POLL_INTERVAL and returns even
+        // when NO client ever connects (R2.2/R2.3). `Release` pairs with the
+        // loop's `Acquire` load.
+        self.shutdown.store(true, Ordering::Release);
         // Dropping the outbound Sender closes the channel; the writer loop sees a
         // disconnect and returns. The reader loop returns on socket EOF/error.
         self.outbound = None;
@@ -302,14 +352,46 @@ impl Transport {
             let _ = handle.join();
         }
     }
+
+    /// TEST-ONLY: raise the internal cooperative shutdown flag WITHOUT dropping
+    /// the outbound sender.
+    ///
+    /// Production teardown ([`shutdown`](Transport::shutdown) / [`Drop`]) always
+    /// raises the flag AND drops the outbound sender together, so either signal
+    /// alone is enough to stop the writer. This helper isolates the FLAG signal
+    /// so a test can prove the connected writer loop breaks on the flag even
+    /// while the outbound channel is still open (R2.5) — the property that the
+    /// pre-2.3 `while out_rx.recv()` loop did not have.
+    #[cfg(test)]
+    fn signal_shutdown_flag_only(&self) {
+        self.shutdown.store(true, Ordering::Release);
+    }
 }
 
 impl Drop for Transport {
     fn drop(&mut self) {
-        // Best-effort: drop the outbound sender to unblock the writer. We do NOT
-        // block-join in Drop (the reader may be parked on a blocking socket read
-        // in production, which has no timeout); tests join explicitly.
+        // Synchronous teardown (R2.1/R2.2/R2.4/R2.5): set the internal shutdown
+        // flag FIRST so a `serve` parked in the interruptible accept poll loop —
+        // or in the connected-state writer poll — observes it within one
+        // POLL_INTERVAL, then drop the outbound sender to unblock the writer.
+        // ORDER MATTERS: the flag must be set BEFORE the join, otherwise the join
+        // would wait on a `serve()` that has not yet been told to stop.
+        self.shutdown.store(true, Ordering::Release);
         self.outbound = None;
+
+        // Block-JOIN the serve listener thread so the bound port is released
+        // BEFORE drop returns (no detached-listener port leak — the root cause of
+        // the unload→reload 10048; design "State Management" invariant: after
+        // teardown the handle is joined, not detached). This join is BOUNDED, not
+        // a hang risk: every blocking point inside `serve()` is an interruptible
+        // POLL_INTERVAL poll (accept poll, connected writer poll, and the reader
+        // sub-thread's own flag poll), so `serve()` winds down within ~one
+        // POLL_INTERVAL of the flag being set above. If the handle was already
+        // taken (e.g. by the test-only `join()` / watchdog helper, or a prior
+        // `shutdown()`+`join()`), this is a no-op — no double-join.
+        if let Some(handle) = self.handle.take() {
+            let _ = handle.join();
+        }
     }
 }
 
@@ -317,19 +399,77 @@ impl Drop for Transport {
 ///
 /// Accepts exactly one client (single-client by design), then runs the
 /// socket↔channel bridge with two sub-threads:
-/// - **reader**: parse `Content-Length` frames off the socket and forward each
-///   as a [`serde_json::Value`] to `in_tx`. Returns on EOF / I/O error / when
-///   `in_tx`'s receiver is gone.
-/// - **writer**: drain `out_rx` and write each value to the socket as a frame.
-///   Returns when `out_rx` disconnects (the [`Transport`]'s sender dropped) or
-///   on a socket write error.
+/// - **reader** (sub-thread, `JoinHandle` kept): parse `Content-Length` frames
+///   off the socket and forward each as a [`serde_json::Value`] to `in_tx`.
+///   Returns on EOF / I/O error / when `in_tx`'s receiver is gone, OR when the
+///   `shutdown` flag is observed between frames. To make the flag interruption
+///   reliable cross-platform the reader's socket carries a [`POLL_INTERVAL`]
+///   read timeout: it polls for inbound data at each frame boundary (a timeout
+///   yields no data → re-check the flag), then parses a full frame with blocking
+///   reads once data is present (so framing is never split by the timeout).
+/// - **writer** (this thread): an interruptible poll of `out_rx` — each
+///   iteration checks the `shutdown` flag, then `recv_timeout(POLL_INTERVAL)`;
+///   it writes each value as a frame and returns when the flag is set, the
+///   outbound channel disconnects (the [`Transport`]'s sender dropped), or a
+///   socket write fails.
 ///
-/// Mirrors the PoC's "safe return on error" so neither side hangs.
-fn serve(listener: TcpListener, in_tx: Sender<Value>, out_rx: Receiver<Value>) {
-    // Accept exactly ONE client (single-client per design).
-    let stream = match listener.accept() {
-        Ok((s, _peer)) => s,
-        Err(_) => return,
+/// At teardown the writer breaks (flag OR disconnect), then `shutdown(Both)` is
+/// called and the reader is JOINED before `serve` returns — so a connected
+/// client's socket is released synchronously (R2.5). The reader join is bounded
+/// because the reader winds down within one `POLL_INTERVAL` of the flag even
+/// when the peer keeps the connection open (a local socket `shutdown` does NOT
+/// reliably cancel an in-flight blocking recv on Windows, so the flag poll — not
+/// the `shutdown(Both)` EOF — is the load-bearing interrupt for the connected
+/// path; design "Transport" Risks). Mirrors the PoC's "safe return on error" so
+/// neither side hangs.
+///
+/// The listener is NON-BLOCKING: `accept()` is polled on a [`POLL_INTERVAL`]
+/// cadence so the `shutdown` flag can interrupt a parked accept (no client
+/// connected). Once a client connects the listener is dropped immediately
+/// (single-client design → no further accepts, earliest possible port release).
+fn serve(
+    listener: TcpListener,
+    in_tx: Sender<Value>,
+    out_rx: Receiver<Value>,
+    shutdown: Arc<AtomicBool>,
+) {
+    // Interruptible accept poll loop (R2.2/R2.3): the listener is non-blocking,
+    // so a parked accept yields `WouldBlock`; we sleep one POLL_INTERVAL and
+    // re-check the shutdown flag. This is what lets a no-client teardown wind the
+    // listener thread down (and release the port) instead of leaking it.
+    let stream = loop {
+        // Shutdown requested while waiting for a client → drop the listener (the
+        // `match` binding `listener` is moved out at the end of `serve`; an early
+        // return drops it here) and return with no client.
+        if shutdown.load(Ordering::Acquire) {
+            return;
+        }
+        match listener.accept() {
+            // Got the single client → stop accepting. Drop the listener NOW so
+            // the port is released at the earliest point (single-client design).
+            Ok((s, _peer)) => {
+                // The accepted stream inherits the listener's non-blocking flag
+                // (Windows/BSD). The CONNECTED-state bridge below expects a
+                // BLOCKING stream (the reader parks on a blocking read, the
+                // writer blocks on write); restore blocking so a transient
+                // `WouldBlock` is never mistaken for an error/EOF that would
+                // abort the freshly accepted connection. (Interruptible poll for
+                // the connected bridge is a later task; this keeps the existing
+                // blocking bridge unchanged in behavior.)
+                if s.set_nonblocking(false).is_err() {
+                    return;
+                }
+                drop(listener);
+                break s;
+            }
+            // No client yet → sleep one interval and re-check the flag.
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                std::thread::sleep(POLL_INTERVAL);
+                continue;
+            }
+            // Any other accept error → safe return (no hang), as today.
+            Err(_) => return,
+        }
     };
     // Read and write halves share the socket; clone so the reader thread owns one
     // half (BufReader) and the writer the other.
@@ -338,15 +478,62 @@ fn serve(listener: TcpListener, in_tx: Sender<Value>, out_rx: Receiver<Value>) {
         Err(_) => return,
     };
 
-    // Reader sub-thread: socket → in_tx. DETACHED: it self-terminates on EOF /
-    // I/O error / when `in_tx`'s receiver is gone. We never block-join it (a
-    // production reader has no timeout and may be parked on a blocking read), so
-    // `serve` cannot hang on the reader. Dropping `in_tx` here closes the inbound
-    // channel, which is the owner's "reader done" signal.
-    std::thread::spawn(move || {
+    // Give the reader's socket a POLL_INTERVAL read timeout so its frame-boundary
+    // poll can observe the shutdown flag within one interval even while the peer
+    // keeps the connection open. A local `shutdown(Both)` does NOT reliably cancel
+    // an in-flight blocking recv on Windows, so this cooperative poll — mirroring
+    // the writer's `recv_timeout(POLL_INTERVAL)` — is what makes the reader join
+    // bounded at teardown (R2.5). If setting the timeout fails we cannot guarantee
+    // a bounded reader join, so return without spawning a reader we could not
+    // interrupt (safe: no client bridge, serve winds down).
+    if stream.set_read_timeout(Some(POLL_INTERVAL)).is_err() {
+        return;
+    }
+
+    // Reader sub-thread: socket → in_tx. Its `JoinHandle` is KEPT (not detached)
+    // and joined after the writer loop ends, so the accepted connection is
+    // released SYNCHRONOUSLY before `serve` returns (R2.5). The reader returns on
+    // EOF / I/O error / when `in_tx`'s receiver is gone, or when the `shutdown`
+    // flag is observed between frames. Dropping `in_tx` here (when the reader
+    // returns) closes the inbound channel — the owner's "reader done" signal.
+    let reader_shutdown = Arc::clone(&shutdown);
+    let reader_handle = std::thread::spawn(move || {
         let mut reader = BufReader::new(stream);
         loop {
-            match read_frame(&mut reader) {
+            // (1) Teardown requested → stop between frames (bounded by one
+            // POLL_INTERVAL of the read timeout below).
+            if reader_shutdown.load(Ordering::Acquire) {
+                return;
+            }
+            // (2) Frame-boundary poll: wait for inbound data with the read
+            // timeout. No data this interval (Timeout/WouldBlock) → re-check the
+            // flag. Clean EOF (empty fill) → peer closed → done. Other error →
+            // safe return.
+            match reader.fill_buf() {
+                Ok([]) => return, // EOF between frames → peer closed
+                Ok(_) => {}       // data buffered → a full frame can be parsed
+                Err(e)
+                    if e.kind() == io::ErrorKind::WouldBlock
+                        || e.kind() == io::ErrorKind::TimedOut =>
+                {
+                    continue;
+                }
+                Err(_) => return,
+            }
+            // (3) Data is present at a frame boundary → parse ONE full frame with
+            // BLOCKING reads. The read timeout is cleared for the duration of the
+            // parse so a frame split across TCP segments is never mis-read as a
+            // truncation error, then restored for the next boundary poll. (The
+            // flag is only polled BETWEEN frames; a frame, once started, is read to
+            // completion — DAP frames are tiny, so this window is negligible.)
+            if reader.get_ref().set_read_timeout(None).is_err() {
+                return;
+            }
+            let parsed = read_frame(&mut reader);
+            if reader.get_ref().set_read_timeout(Some(POLL_INTERVAL)).is_err() {
+                return;
+            }
+            match parsed {
                 Ok(Some(value)) => {
                     // Owner gone → stop reading (clean shutdown).
                     if in_tx.send(value).is_err() {
@@ -361,22 +548,54 @@ fn serve(listener: TcpListener, in_tx: Sender<Value>, out_rx: Receiver<Value>) {
         }
     });
 
-    // Writer loop runs on THIS (listener) thread: out_rx → socket. It ends when
-    // the outbound channel disconnects (the `Transport`'s sender dropped on
-    // shutdown / drop) or on a socket write error.
+    // Connected-state writer loop runs on THIS (listener) thread: out_rx →
+    // socket. It is an INTERRUPTIBLE poll (R2.5) so teardown breaks it on EITHER
+    // the internal `shutdown` flag OR the outbound sender being dropped:
+    // - flag set (e.g. `shutdown()`/`Drop`, or the flag alone) → FLUSH any
+    //   already-queued frames, then break (the outbound owner — the socket bridge
+    //   — relies on pending frames being flushed before teardown);
+    // - `recv_timeout` `Ok(frame)` → write it (stop on a socket write error);
+    // - `Timeout` → re-check the flag (this is the `POLL_INTERVAL` cadence);
+    // - `Disconnected` (outbound sender dropped) → drain the rest, then done.
     let mut writer = write_half;
-    while let Ok(value) = out_rx.recv() {
-        if write_frame(&mut writer, &value).is_err() {
-            // Socket write failed (peer gone) → stop writing.
+    'writer: loop {
+        if shutdown.load(Ordering::Acquire) {
+            // Teardown via the flag: the outbound sender may still be alive with
+            // frames already queued (e.g. the bridge enqueued a final flush then
+            // dropped the Transport, racing the flag). Drain whatever is currently
+            // buffered so those frames still reach the peer, then break.
+            while let Ok(value) = out_rx.try_recv() {
+                if write_frame(&mut writer, &value).is_err() {
+                    break;
+                }
+            }
             break;
+        }
+        match out_rx.recv_timeout(POLL_INTERVAL) {
+            Ok(value) => {
+                if write_frame(&mut writer, &value).is_err() {
+                    // Socket write failed (peer gone) → stop writing.
+                    break 'writer;
+                }
+            }
+            // No outbound frame this interval → loop and re-check the flag.
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => continue,
+            // Outbound sender dropped (shutdown / drop) → `recv_timeout` has
+            // already yielded every queued frame above, so nothing remains; done.
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break 'writer,
         }
     }
 
-    // Outbound channel closed (shutdown) or write error: best-effort shutdown of
-    // the socket so the detached reader observes EOF and self-terminates. We do
-    // NOT join the reader (it is detached) — `serve` returns immediately so the
-    // listener thread never hangs.
+    // Writer loop ended (flag, disconnect, or write error). Shut the socket down
+    // (best-effort EOF for the reader on the peer-alive write path), THEN join the
+    // reader so the accepted connection is released synchronously before `serve`
+    // returns (R2.5). The join is bounded because the reader also winds down within
+    // one POLL_INTERVAL via its own `shutdown` flag poll — on Windows a local
+    // `shutdown(Both)` does NOT reliably cancel an in-flight blocking recv, so the
+    // flag poll (not this shutdown) is the load-bearing interrupt. `serve` thus
+    // never hangs on the reader.
     let _ = writer.shutdown(std::net::Shutdown::Both);
+    let _ = reader_handle.join();
 }
 
 #[cfg(test)]
@@ -707,6 +926,27 @@ mod tests {
         join_transport_with_watchdog(transport, WATCHDOG);
     }
 
+    /// R3.1: the enabled path is built via the `socket2` (SO_REUSEADDR) chain
+    /// and still binds an OS-assigned loopback port, exposing a concrete
+    /// `local_addr`. (SO_REUSEADDR cannot be read back via getsockopt once the
+    /// socket is converted to `TcpListener`; the rebind/reuse behavior is
+    /// verified by later tasks. This pins that the socket2 bind path works.)
+    #[test]
+    fn enabled_socket2_path_binds_and_exposes_local_addr() {
+        let mut transport =
+            Transport::start(Some("127.0.0.1:0".parse().unwrap())).expect("socket2 bind must succeed");
+        let addr = transport
+            .local_addr()
+            .expect("socket2-built enabled transport must expose its bound addr (R3.1)");
+        assert_eq!(addr.ip().to_string(), "127.0.0.1");
+        assert_ne!(addr.port(), 0, "OS must assign a concrete port via the socket2 listener");
+
+        // Unblock the listener (parked in accept()) so the bounded join completes.
+        transport.shutdown();
+        let _ = connect_client(addr);
+        join_transport_with_watchdog(transport, WATCHDOG);
+    }
+
     // -----------------------------------------------------------------------
     // Enabled path: bind 127.0.0.1:0, one client, framed round-trip both ways
     // -----------------------------------------------------------------------
@@ -820,6 +1060,259 @@ mod tests {
         join_transport_with_watchdog(transport, WATCHDOG);
     }
 
+    /// R2.2/R2.3: with NO client connecting, the listener thread is parked in
+    /// `accept()`. `shutdown()` must set the internal shutdown flag so the
+    /// non-blocking accept poll loop observes it and `serve()` returns, letting
+    /// the listener handle join within the bounded watchdog — proving a parked
+    /// accept is interruptible (the root-cause of the port-leak reload bug).
+    ///
+    /// On the pre-2.2 code (blocking accept, flag not consulted) this hangs and
+    /// the watchdog join fails.
+    #[test]
+    fn no_client_shutdown_unblocks_serve() {
+        let mut transport =
+            Transport::start(Some("127.0.0.1:0".parse().unwrap())).expect("bind must succeed");
+        assert!(transport.local_addr().is_some(), "enabled transport binds");
+
+        // No client ever connects → serve() is parked in the accept poll loop.
+        // Setting the shutdown flag must wind it down.
+        transport.shutdown();
+        join_transport_with_watchdog(transport, WATCHDOG);
+    }
+
+    /// R2.5: with a client CONNECTED, the connected-state writer loop must honor
+    /// the internal `shutdown` FLAG — not only an outbound-sender drop. Here we
+    /// raise the flag WHILE keeping the outbound sender alive (and the inbound
+    /// receiver held so the reader is not torn down by an owner-gone signal),
+    /// then join the listener handle under the watchdog.
+    ///
+    /// On the pre-2.3 connected writer loop (`while let Ok(_) = out_rx.recv()`,
+    /// flag not consulted, outbound still alive) the writer never returns, the
+    /// reader is detached, and `serve()` hangs → the watchdog join FAILS. After
+    /// 2.3 the writer breaks on the flag, `writer.shutdown(Both)` EOFs the reader,
+    /// the reader is joined, and `serve()` returns within the watchdog.
+    #[test]
+    fn connected_writer_honors_shutdown_flag_while_outbound_alive() {
+        let mut transport =
+            Transport::start(Some("127.0.0.1:0".parse().unwrap())).expect("bind must succeed");
+        let addr = transport.local_addr().expect("enabled transport binds");
+
+        // Connect so serve() leaves the accept loop and enters the connected-state
+        // bridge (reader sub-thread + writer loop). Keep the client alive so the
+        // reader's blocking read does NOT see a peer EOF on its own — teardown
+        // must come from the flag → writer.shutdown(Both), not from the client.
+        let client = connect_client(addr).expect("client connect must succeed");
+        client
+            .set_read_timeout(Some(WATCHDOG))
+            .expect("TEST-ONLY read timeout");
+
+        // Give serve() a moment to accept and spin up the bridge before signaling.
+        // (Bounded; the watchdog join below is the real timeout guard.)
+        std::thread::sleep(Duration::from_millis(50));
+
+        // Raise the FLAG ONLY — outbound sender stays alive. This is the signal a
+        // pre-2.3 `while out_rx.recv()` writer loop ignores.
+        transport.signal_shutdown_flag_only();
+
+        // Join the listener handle under the watchdog WITHOUT dropping the outbound
+        // sender (the whole point is that the flag alone tears the writer down).
+        let handle = transport.handle.take().expect("enabled transport has a handle");
+        let (done_tx, done_rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = done_tx.send(handle.join());
+        });
+        done_rx
+            .recv_timeout(WATCHDOG)
+            .expect("connected writer must break on the shutdown FLAG and serve() must return (R2.5)")
+            .expect("listener thread must not panic");
+
+        // Keep the client alive until after the join so its EOF could not have been
+        // the thing that woke the reader.
+        drop(client);
+    }
+
+    /// R2.5 (normal path): with a client still CONNECTED, `shutdown()` (which
+    /// drops the outbound sender) must tear the connected bridge down
+    /// synchronously — the writer breaks on the outbound disconnect and the
+    /// reader is joined — so `serve()` returns within the watchdog even though
+    /// the peer never closed its end. This is the everyday unload-while-connected
+    /// case (R2.5); the flag-only test above isolates the OTHER teardown trigger.
+    #[test]
+    fn connected_shutdown_tears_down_synchronously_with_client_alive() {
+        let transport =
+            Transport::start(Some("127.0.0.1:0".parse().unwrap())).expect("bind must succeed");
+        let addr = transport.local_addr().expect("enabled transport binds");
+
+        // Connect and round-trip one frame each way so we are definitely in the
+        // connected-state bridge, then leave the client ALIVE.
+        let client = connect_client(addr).expect("client connect must succeed");
+        client
+            .set_read_timeout(Some(WATCHDOG))
+            .expect("TEST-ONLY read timeout");
+        let mut client_writer = client.try_clone().expect("clone client");
+        let mut client_reader = BufReader::new(client.try_clone().expect("clone client"));
+
+        write_frame(&mut client_writer, &json!({ "seq": 1, "command": "ping" }))
+            .expect("client write");
+        let delivered = transport
+            .inbound()
+            .recv_timeout(WATCHDOG)
+            .expect("inbound frame delivered");
+        assert_eq!(delivered["command"], json!("ping"));
+
+        transport.send(json!({ "seq": 1, "type": "response" })).expect("send");
+        let received = read_frame(&mut client_reader)
+            .expect("client read")
+            .expect("client frame");
+        assert_eq!(received["type"], json!("response"));
+
+        // Teardown via shutdown() (drops outbound) with the client STILL ALIVE.
+        // The writer must break on the outbound disconnect and the reader must be
+        // joined → serve returns within the watchdog.
+        let mut transport = transport;
+        transport.shutdown();
+        let handle = transport.handle.take().expect("enabled transport has a handle");
+        let (done_tx, done_rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = done_tx.send(handle.join());
+        });
+        done_rx
+            .recv_timeout(WATCHDOG)
+            .expect("connected shutdown() must tear down synchronously (R2.5)")
+            .expect("listener thread must not panic");
+
+        // Client kept alive until after the join, proving teardown did not depend
+        // on a peer EOF.
+        drop(client_writer);
+        drop(client_reader);
+        drop(client);
+    }
+
+    /// R2.4 (teardown 後の再 start 可能性, masking-aware): dropping a
+    /// no-client `Transport` must SYNCHRONOUSLY join the serve listener thread
+    /// so the bound port is released BEFORE `drop` returns. We prove this with a
+    /// PLAIN `TcpListener::bind` (NO socket2, NO `SO_REUSEADDR`) on the very same
+    /// port immediately after the drop: a plain rebind has no Windows
+    /// `SO_REUSEADDR` hijack semantics, so it can ONLY succeed if the previous
+    /// listener was truly gone (design Security Considerations — `SO_REUSEADDR`
+    /// must not be allowed to MASK a still-held leaked listener).
+    ///
+    /// On the pre-2.4 code (`Drop` sets the flag and drops outbound but does NOT
+    /// join the serve handle) `drop` returns while `serve()` may still hold the
+    /// listener, so the immediate plain rebind fails with `AddrInUse`
+    /// (`os error 10048`). After 2.4 `Drop` block-joins the interruptible
+    /// `serve()`, so the rebind deterministically succeeds.
+    #[test]
+    fn drop_synchronously_frees_port_for_plain_rebind() {
+        use std::net::TcpListener as PlainTcpListener;
+
+        // Start enabled with an OS-assigned loopback port; capture the port P.
+        let transport =
+            Transport::start(Some("127.0.0.1:0".parse().unwrap())).expect("bind must succeed");
+        let addr = transport
+            .local_addr()
+            .expect("enabled transport must expose its bound addr");
+        let port = addr.port();
+        assert_ne!(port, 0, "OS must assign a concrete port");
+
+        // No client connects → serve() is parked in the interruptible accept
+        // poll loop, holding the listener on port P. Drop the Transport DIRECTLY
+        // (not via the watchdog helper that pre-takes/joins the handle): Drop
+        // must set the flag AND synchronously join serve() before returning.
+        drop(transport);
+
+        // Immediately rebind the SAME port with a PLAIN listener — no socket2, no
+        // SO_REUSEADDR. This must SUCCEED, proving the serve listener was joined
+        // and the port freed before drop() returned. A plain bind deliberately
+        // avoids the Windows SO_REUSEADDR hijack that could otherwise mask a
+        // still-held listener (design Security Considerations / R2.4).
+        let rebind = PlainTcpListener::bind(("127.0.0.1", port));
+        assert!(
+            rebind.is_ok(),
+            "plain rebind of port {port} immediately after drop must succeed \
+             (synchronous serve join freed the port); got: {:?}",
+            rebind.err()
+        );
+    }
+
+    /// R1.3/R2.4 (robustness, Transport unit level): a REPEATED teardown→rebind
+    /// cycle on the SAME fixed port must succeed every time. The production reload
+    /// bug is a SECOND (and Nth) bind onto the SAME port failing because the prior
+    /// listener thread was detached and still held it; a single rebind
+    /// (`drop_synchronously_frees_port_for_plain_rebind`) proves one cycle, but the
+    /// reload contract (R1.3: "最低でも約15秒間隔で2回以上") is about MULTIPLE
+    /// cycles holding deterministically. This drives the no-client teardown path
+    /// through ~3 `Transport::start(Some(P)) → drop` cycles on one OS-assigned port
+    /// and asserts each successive `start` on the SAME port succeeds.
+    ///
+    /// Mechanism under test: the synchronous Drop join (R2.4) makes each rebind
+    /// deterministic — every cycle's listener thread is joined (port released)
+    /// BEFORE `drop` returns, so the next `start` cannot race a still-held port.
+    /// On detached/non-joining teardown the 2nd `start` would fail with `AddrInUse`
+    /// (`os error 10048`); here `start` returning `DebugError::Bind` is the failure
+    /// surface. Each cycle is bounded by the WATCHDOG so a hung teardown fails fast
+    /// instead of stalling CI. We use a `socket2`-built `Transport::start` rebind
+    /// (not a plain bind) deliberately — this exercises the REAL production rebind
+    /// path repeatedly; the masking-aware plain-bind detector is the separate
+    /// `drop_synchronously_frees_port_for_plain_rebind` test.
+    #[test]
+    fn repeated_teardown_rebind_same_port_succeeds() {
+        // Capture an OS-assigned loopback port P via a throwaway transport, then
+        // drop it (synchronous join frees P) so we can reuse the SAME fixed port.
+        let port = {
+            let throwaway = Transport::start(Some("127.0.0.1:0".parse().unwrap()))
+                .expect("throwaway bind must succeed");
+            let p = throwaway
+                .local_addr()
+                .expect("enabled transport must expose its bound addr")
+                .port();
+            assert_ne!(p, 0, "OS must assign a concrete port");
+            drop(throwaway); // synchronous join releases P before the next start
+            p
+        };
+        let fixed: SocketAddr = format!("127.0.0.1:{port}").parse().unwrap();
+
+        // ~3 cycles of start(SAME port) → no client → bounded teardown. Each start
+        // must succeed; a leaked/held listener from the previous cycle would make
+        // the next start fail with DebugError::Bind (AddrInUse / 10048).
+        for cycle in 0..3 {
+            let mut transport = Transport::start(Some(fixed)).unwrap_or_else(|e| {
+                panic!(
+                    "cycle {cycle}: rebind of fixed port {port} must succeed \
+                     (prior cycle's listener was synchronously joined); got {e:?}"
+                )
+            });
+            assert_eq!(
+                transport.local_addr().map(|a| a.port()),
+                Some(port),
+                "cycle {cycle}: must rebind the SAME fixed port",
+            );
+
+            // No client connects → serve() is parked in the interruptible accept
+            // poll loop. Tear down via the bounded watchdog join so a regression
+            // that fails to wind the listener down fails fast (no CI stall) and the
+            // port is provably released before the next cycle's start.
+            let handle = transport.handle.take();
+            transport.shutdown.store(true, Ordering::Release);
+            transport.outbound = None;
+            if let Some(handle) = handle {
+                let (done_tx, done_rx) = std::sync::mpsc::channel();
+                std::thread::spawn(move || {
+                    let _ = done_tx.send(handle.join());
+                });
+                done_rx
+                    .recv_timeout(WATCHDOG)
+                    .unwrap_or_else(|_| panic!(
+                        "cycle {cycle}: listener must wind down within the watchdog \
+                         (no hang) so the port is freed for the next rebind"
+                    ))
+                    .unwrap_or_else(|_| panic!("cycle {cycle}: listener thread must not panic"));
+            }
+            // `transport` is dropped here; the handle was already taken, so Drop's
+            // join is a no-op (no double-join) — the port is already released.
+        }
+    }
+
     // -----------------------------------------------------------------------
     // Test helpers (TEST-ONLY bounded join; production has no timeout)
     // -----------------------------------------------------------------------
@@ -828,7 +1321,10 @@ mod tests {
     /// regression that hangs the thread fails the test instead of the suite.
     fn join_transport_with_watchdog(mut transport: Transport, timeout: Duration) {
         let handle = transport.handle.take();
-        // Drop the outbound sender so the writer unblocks.
+        // Set the internal shutdown flag so a `serve` parked in the accept poll
+        // loop (no client connected) winds down, and drop the outbound sender so
+        // the writer unblocks.
+        transport.shutdown.store(true, Ordering::Release);
         transport.outbound = None;
         if let Some(handle) = handle {
             let (done_tx, done_rx) = std::sync::mpsc::channel();

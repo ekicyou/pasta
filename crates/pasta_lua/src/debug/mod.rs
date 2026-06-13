@@ -420,14 +420,21 @@ pub enum DebugError {
 /// the session ends of the command/event channels; `mlua::Lua` never crosses a
 /// thread (it is `!Send`).
 ///
-/// # Teardown (no hang)
+/// # Teardown (synchronous port release, bounded)
 ///
-/// [`Drop`] is non-blocking: it sets the shared shutdown flag (the socket bridge
-/// observes it within its poll interval, drops the [`Transport`], and exits) and
-/// does NOT join the bridge threads. The backend also winds down naturally when
-/// the VM thread finishes Lua execution (the session's channel ends drop,
-/// closing the encoder) or the DAP client disconnects (the transport closes the
-/// inbound channel).
+/// [`Drop`] sets the shared shutdown flag and then SYNCHRONOUSLY JOINS the
+/// socket-bridge thread (task 3.1): the bridge observes the flag within one
+/// `POLL_INTERVAL`, returns, and drops its by-value [`Transport`], whose own
+/// `Drop` joins the `serve()` listener thread — so the listening port is
+/// RELEASED before this `Drop` returns. This makes a SHIORI unload free the
+/// fixed DAP port deterministically before the next reload re-binds it (R1.x /
+/// R2.x). The join is bounded because every downstream blocking point is an
+/// interruptible `POLL_INTERVAL` poll, so teardown cannot hang. The
+/// event-encoder thread (which owns no socket/port) is left DETACHED — joining
+/// it while this `Drop` still holds `terminate_tx` would deadlock. The backend
+/// also winds down naturally when the VM thread finishes Lua execution (the
+/// session's channel ends drop, closing the encoder) or the DAP client
+/// disconnects (the transport closes the inbound channel).
 pub struct DebugHandle {
     /// Resolved configuration this handle was created from.
     config: DebugConfig,
@@ -497,12 +504,30 @@ impl Drop for DebugHandle {
         // socket while staying effectively non-blocking for teardown.
         std::thread::sleep(std::time::Duration::from_millis(30));
 
-        // (3) Non-blocking teardown: signal the socket bridge to stop (it observes
-        // the flag within its poll interval, drops the Transport, and exits) and
-        // detach the bridge threads (do NOT join in Drop — a never-resumed,
-        // never-disconnected session must not hang this Drop call).
+        // (3) Synchronous teardown (task 3.1, R1.1/R1.2/R1.3/R2.1/R2.2): signal
+        // the socket bridge to stop FIRST (it observes the flag within one
+        // `POLL_INTERVAL`, returns, and drops the `Transport`), THEN JOIN it. The
+        // flag MUST be set before the join, otherwise the join would wait on a
+        // bridge that was never told to stop. Joining the socket bridge waits for
+        // `run_socket_bridge` to return → the by-value `Transport` is dropped →
+        // `Transport::drop` synchronously joins its `serve()` listener thread
+        // (tasks 2.1-2.4) → the listening port is RELEASED before this `drop`
+        // returns. The join is bounded: every blocking point downstream is an
+        // interruptible `POLL_INTERVAL` poll, so this never hangs (a hang would
+        // wedge the test; production teardown is watchdog-free by design).
         self.shutdown.store(true, Ordering::SeqCst);
-        let _ = self.socket_handle.take();
+        if let Some(h) = self.socket_handle.take() {
+            // Synchronous JOIN: blocks until the bridge returns → Transport drop →
+            // serve join → port freed. A panicked bridge yields `Err`; ignore it,
+            // teardown still completed (the thread is no longer running).
+            let _ = h.join();
+        }
+
+        // The event-encoder owns no socket / port, so joining it is unnecessary
+        // for releasing the port. Keep it DETACHED: this `Drop` still holds
+        // `terminate_tx` (a `Sender` clone of the encoder's `event_rx`), so the
+        // encoder cannot observe channel disconnect and exit until AFTER this
+        // method returns and drops `terminate_tx`; joining it here would deadlock.
         let _ = self.encoder_handle.take();
     }
 }
@@ -893,6 +918,56 @@ mod tests {
 
         // Dropping the handle tears the backend down without hanging.
         drop(handle);
+        lua.remove_global_hook();
+    }
+
+    #[test]
+    fn unload_synchronously_frees_port_for_plain_rebind() {
+        // R1.1/R1.2/R1.3/R2.1/R2.2: `DebugHandle::drop` must JOIN the socket
+        // bridge (not detach), so the bridge returns → `Transport` drops →
+        // `serve()` join releases the listening port BEFORE drop returns. We
+        // prove the port is freed synchronously by immediately re-binding it with
+        // a PLAIN `TcpListener::bind` (NO SO_REUSEADDR / NO socket2) — a masking
+        // -aware rebind. With the pre-3.1 detached bridge, drop returns while the
+        // bridge is still winding down asynchronously, so this plain rebind races
+        // the still-open listener and fails with AddrInUse (10048 on Windows).
+        let lua = unsafe {
+            mlua::Lua::unsafe_new_with(mlua::StdLib::ALL_SAFE, mlua::LuaOptions::default())
+        };
+        let cfg = DebugConfig {
+            enabled: true,
+            listen: Some("127.0.0.1:0".parse().unwrap()),
+            ..Default::default()
+        };
+        let handle = enable(&lua, &cfg, None)
+            .expect("enable must succeed when enabled")
+            .expect("enabled enable() returns Ok(Some(DebugHandle))");
+
+        // The OS-assigned loopback port the backend is listening on. NO client
+        // connects — the serve listener is parked in its interruptible accept.
+        let port = handle
+            .local_addr()
+            .expect("enabled handle must expose a bound addr (R3.1)")
+            .port();
+        assert_ne!(port, 0, "OS must assign a concrete port");
+
+        // Synchronous teardown: drop must block until the bridge joins → Transport
+        // drops → serve join → listener dropped → port released.
+        drop(handle);
+
+        // Immediately rebind the SAME port with a PLAIN listener (no SO_REUSEADDR).
+        // This succeeds only if the previous listener was fully released by the
+        // time `drop` returned — i.e. teardown was synchronous (R2.1/R2.2).
+        let rebind = std::net::TcpListener::bind(("127.0.0.1", port));
+        assert!(
+            rebind.is_ok(),
+            "plain rebind of port {port} must succeed after synchronous unload \
+             (got {:?}); a failure proves the listener was still open (detached \
+             teardown / AddrInUse 10048)",
+            rebind.as_ref().err()
+        );
+        drop(rebind);
+
         lua.remove_global_hook();
     }
 

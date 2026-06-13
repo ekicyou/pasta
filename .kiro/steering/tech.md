@@ -42,6 +42,7 @@
 - **md5 0.8**: ビルド時の基準ダイジェスト算出（pasta_scripts 自己展開のドリフト検知、build/dev-dependency。ランタイムはマーカー文字列比較のみで md5 不使用）
 - **budouy 0.2.2**: 日本語改行位置推定（BudouX、vendored-models）
 - **unicode-width 0.2.2**: Unicode文字幅計算
+- **socket2 0.5**: debug transport 待受ソケットの `SO_REUSEADDR` 設定・非ブロック化（reload 時の再バインド堅牢化、cross-platform）
 - **tracing 0.1 / tracing-appender 0.2 / tracing-subscriber 0.3**: ロギング・診断
 - **windows-sys 0.61**: Windows API（Shift_JISエンコーディング等、cfg(windows)）
 - **luacheck v1.2.0**: 静的解析ツール（scriptlibs/）

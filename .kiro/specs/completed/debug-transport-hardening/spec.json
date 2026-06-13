@@ -1,0 +1,23 @@
+{
+  "feature_name": "debug-transport-hardening",
+  "created_at": "2026-06-13T10:53:53Z",
+  "updated_at": "2026-06-14T00:00:00Z",
+  "language": "ja",
+  "phase": "completed",
+  "completed_at": "2026-06-14T00:00:00Z",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true
+}
