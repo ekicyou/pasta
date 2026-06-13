@@ -9,7 +9,7 @@ reload バグの根治（中断可能 accept ＋ 同期 teardown join）と防�
   - _Requirements: 4.5_
 
 - [ ] 2. Core: Transport の bind/teardown ライフサイクル改修
-- [ ] 2.1 socket2 で SO_REUSEADDR を設定した待受ソケット生成へ切替
+- [x] 2.1 socket2 で SO_REUSEADDR を設定した待受ソケット生成へ切替
   - `Transport::start` の待受ソケット生成を `socket2` 経由（`Socket::new(IPV4,STREAM,TCP)` → `set_reuse_address(true)` → `bind` → `listen(1)` → `TcpListener::from` → `set_nonblocking(true)`）に切り替える。`backlog` は単一クライアント設計のため `1` で足りる
   - `listen == None` のゼロコスト無効パス（ソケット・ポート・スレッドを一切開かない）は不変。bind 失敗は従来どおり `DebugError::Bind` へマップ
   - 観測: enabled transport が `SO_REUSEADDR` 付きで bind して `local_addr` を返し、残存接続状態（TIME_WAIT 等）のみを理由としたバインド失敗を起こさない。無効時は一切のソケットを生成しない

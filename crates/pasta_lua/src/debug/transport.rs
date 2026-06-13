@@ -51,6 +51,7 @@ use std::sync::mpsc::{Receiver, Sender};
 use std::thread::JoinHandle;
 
 use serde_json::Value;
+use socket2::{Domain, Protocol, Socket, Type};
 
 use crate::debug::DebugError;
 
@@ -234,8 +235,20 @@ impl Transport {
             });
         };
 
-        // Enabled: bind (bind failure → DebugError::Bind, R3.1/R5.5).
-        let listener = TcpListener::bind(addr).map_err(DebugError::Bind)?;
+        // Enabled: build the listener via socket2 so SO_REUSEADDR is set BEFORE
+        // bind (R3.1). std `TcpListener::bind` cannot set SO_REUSEADDR pre-bind,
+        // so we drive the raw socket: SO_REUSEADDR → bind → listen → convert to a
+        // std `TcpListener`. The listener stays in BLOCKING mode here — the
+        // interruptible non-blocking accept poll loop is a separate later task,
+        // and `serve()`'s blocking `accept()` relies on this blocking listener.
+        // Any socket2 step failing maps to `DebugError::Bind` (same as today's
+        // bind-failure path, R3.1).
+        let socket = Socket::new(Domain::IPV4, Type::STREAM, Some(Protocol::TCP))
+            .map_err(DebugError::Bind)?;
+        socket.set_reuse_address(true).map_err(DebugError::Bind)?; // SO_REUSEADDR (R3.1/R3.2)
+        socket.bind(&addr.into()).map_err(DebugError::Bind)?;
+        socket.listen(1).map_err(DebugError::Bind)?; // single-client design → tiny backlog
+        let listener = TcpListener::from(socket);
         let local_addr = listener.local_addr().map_err(DebugError::Bind)?;
 
         // Channels are the ONLY seam. The transport thread owns the socket ends;
@@ -704,6 +717,27 @@ mod tests {
         // can complete: connect-and-drop makes accept return, the reader sees
         // EOF, and the writer sees the already-closed outbound channel.
         let _ = connect_client(transport.local_addr().unwrap());
+        join_transport_with_watchdog(transport, WATCHDOG);
+    }
+
+    /// R3.1: the enabled path is built via the `socket2` (SO_REUSEADDR) chain
+    /// and still binds an OS-assigned loopback port, exposing a concrete
+    /// `local_addr`. (SO_REUSEADDR cannot be read back via getsockopt once the
+    /// socket is converted to `TcpListener`; the rebind/reuse behavior is
+    /// verified by later tasks. This pins that the socket2 bind path works.)
+    #[test]
+    fn enabled_socket2_path_binds_and_exposes_local_addr() {
+        let mut transport =
+            Transport::start(Some("127.0.0.1:0".parse().unwrap())).expect("socket2 bind must succeed");
+        let addr = transport
+            .local_addr()
+            .expect("socket2-built enabled transport must expose its bound addr (R3.1)");
+        assert_eq!(addr.ip().to_string(), "127.0.0.1");
+        assert_ne!(addr.port(), 0, "OS must assign a concrete port via the socket2 listener");
+
+        // Unblock the listener (parked in accept()) so the bounded join completes.
+        transport.shutdown();
+        let _ = connect_client(addr);
         join_transport_with_watchdog(transport, WATCHDOG);
     }
 
