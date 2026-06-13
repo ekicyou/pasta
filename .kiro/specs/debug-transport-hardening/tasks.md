@@ -35,7 +35,7 @@ reload バグの根治（中断可能 accept ＋ 同期 teardown join）と防�
   - _Boundary: Transport_
 
 - [ ] 3. Integration: DebugHandle teardown 同期化（unload 連鎖）
-- [ ] 3.1 DebugHandle::drop を detach→join 化
+- [x] 3.1 DebugHandle::drop を detach→join 化
   - `DebugHandle::drop` の `socket_handle` を detach から join へ変更（`encoder_handle` は socket/port を持たないため detach 維持）。Terminated 送出 + 30ms flush sleep は既存挙動として保存（R4.2）。これで runtime drop（unload）→ `DebugHandle::drop` → bridge join → `Transport` drop → serve join → ポート解放まで同期する
   - 観測（reload 成立）: enable した runtime を drop すると unload 完了までに待受ポートが解放され、同一プロセス・同一構成で再 enable→bind が成功する。drop がハングしない
   - 観測（wiring 無変更）: `wiring::run_socket_bridge` は変更せず、その shutdown 観測 → 関数 return（`Transport` を by-value drop）が `Transport` の同期 drop（serve join）を駆動し続けることを、上記 reload 成功で確認する
