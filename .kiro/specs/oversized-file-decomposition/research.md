@@ -155,7 +155,8 @@
 - **一般化**: 4 カテゴリは各々が単一の反復操作。C1=「1 インライン `#[cfg(test)] mod` → 1 兄弟 `#[path]` ファイル＋`use super::*;`」、C3=「単一 `impl Type` を子モジュール群へ分割（祖先 private 参照は可視性変更不要）」、C2=「論理クラスタ → 複数テストファイル＋`main.rs` の `mod` 登録 / `#[path]` 多重宣言」、C4=「分岐 → 順序固定ヘルパー」。各カテゴリ内は機械的反復。
 - **Build vs Adopt**: 新規構築・新規依存ゼロ。Rust ネイティブのモジュール／`#[path]`／split-`impl` と既存前例（`scene_table.rs`・`shiori.rs`）を adopt するのみ。
 - **簡素化（最小設計）**: テスト外出しは**単一兄弟ファイルを既定**とし、単一移動後も 600 行超かつ自然なクラスタを持つ大型ファイル（`session_tests`・`dap_tests`・`source_map_tests` 等）に限り `#[path]` 多重宣言で複数兄弟へ分割する。投機的な抽象化・先回り分割はしない。
-- **可視性変更の最小化**: C3 で必要な可視性変更は `loader::ProcessStats` の `private→pub(super)` 1 箇所のみ（never re-export・外部影響なし）。それ以外は Rust の「子モジュールは祖先の private 項目を参照可」規則に依拠し、フィールド／メソッド可視性を一切広げない。
+- **可視性変更の最小化**: C3 で必要なクレート内シームは 3 箇所のみ（いずれも never re-export・公開 API 不変）: (1) `loader::ProcessStats` `private→pub(super)`、(2) `DebugHandle::new()` を `pub(crate)` 追加、(3) `dap/codec.rs` 共有ヘルパーを `pub(super)`。それ以外は Rust の「**子孫**モジュールは祖先の private 項目を参照可」規則に依拠。**重要な例外**: この規則は子孫にのみ適用され、**兄弟**モジュール間では struct literal 構築（`enable.rs`→`DebugHandle{..}`）と private 自由関数（`codec.rs`→`decode/encode`）は不可視。よって兄弟跨ぎが生じる箇所のみ上記 (2)(3) のシームを設ける。
+- **dap.rs / debug/mod.rs の C3 分割（設計ディスカッション議題1で確定）**: `dap.rs`（本番残~773行）→ `dap/` ディレクトリモジュール6ファイル（mod hub/resolver/pending/decode/encode/codec）。`debug/mod.rs`（本番~735行）→ hub 残置＋5兄弟（source_mode/config/error/handle/enable）。各<250行で `lib.rs:51` の公開再公開（`DebugConfig/DebugError/DebugHandle/SourceMode/enable`）は byte 不変。`enable()` の zero-cost 無効化 early-return は verbatim 保持。
 
 ## 7. Recommendations for Design Phase
 

@@ -168,9 +168,25 @@ crates/pasta_lua/src/runtime/
 ├── factory.rs    # [新] impl PastaLuaRuntime: from_loader(_with_scene_dic)/load_scene_dic（~230行）
 ├── exec.rs       # [新] impl PastaLuaRuntime: exec/exec_named/exec_file/register_module＋accessors（~130行）
 └── lifecycle.rs  # [新] impl PastaLuaRuntime: save_persistence_data＋impl Drop（~55行）
+crates/pasta_lua/src/debug/   # dap.rs（本番残~773行）→ dap/ ディレクトリモジュール化
+├── dap/
+│   ├── mod.rs      # [変更] pub(crate) mod dap の hub。doc＋mod 宣言＋pub use（resolver/decode 型）＋DapAdapter struct/envelope core（~120行）
+│   ├── resolver.rs # [新] ResolvedSource/SourceResolver/default_source_resolver/pasta_source_resolver（~85行）
+│   ├── pending.rs  # [新] PendingKind/PendingTable（応答FIFO相関）（~50行）
+│   ├── decode.rs   # [新] Decoded＋impl DapAdapter: decode_request/source_presentation_*（~180行）
+│   ├── encode.rs   # [新] impl DapAdapter: encode_event（~95行）
+│   └── codec.rs    # [新] JSON parse/encode 自由関数群（共有分は pub(super)）（~135行）
+crates/pasta_lua/src/debug/   # debug/mod.rs（本番~735行）→ hub 残置＋5兄弟
+├── mod.rs          # [変更] doc＋全 mod 宣言＋re-export ハブ残置。mod source_mode/config/error/handle/enable; 追加。pub use で SourceMode/DebugConfig/DebugError/DebugHandle/enable を再公開（lib.rs:51 不変）
+├── source_mode.rs  # [新] SourceMode enum＋SharedSourceMode（~110行）
+├── config.rs       # [新] DebugConfig（resolve/from_env/from_file）＋LOOPBACK const＋env helpers＋zero-cost gate（~225行）
+├── error.rs        # [新] DebugError enum（~30行）
+├── handle.rs       # [新] DebugHandle struct＋Drop＋config/local_addr＋pub(crate) fn new()（~135行）
+└── enable.rs       # [新] enable() 起動エントリ＋全 wiring（~205行）
 ```
 
-> split-`impl` 方式: 型定義・公開 API・`pub use` re-export は親 `mod.rs` に残置。メソッド本体のみ子モジュールの `impl Type {}` へ分配。子モジュールは祖先 `mod.rs` の private フィールド・private 自由関数を参照可（**可視性変更不要**）。例外は `loader::ProcessStats` の `private→pub(super)` 1 箇所のみ。
+> split-`impl` 方式: 型定義・公開 API・`pub use` re-export は親 `mod.rs`/`dap/mod.rs` に残置。メソッド本体のみ子モジュールの `impl Type {}` へ分配。子モジュールは祖先の private **フィールド／メソッド**を参照可（可視性変更不要）。
+> **兄弟間の注意（子孫規則の例外）**: 「祖先 private 参照可」は子孫にのみ適用。兄弟モジュール間では (1) **struct literal 構築**（`enable.rs` から `DebugHandle{..}`）と (2) **private 自由関数**（`codec.rs` ヘルパーを `decode/encode` から）は見えない。よって 2 つのクレート内追加シームを設ける: `DebugHandle` に `pub(crate) fn new(...)` を追加（カプセル化強化）、`codec.rs` の共有ヘルパーを `pub(super)` に。いずれも**公開 API 不変**。外部に再公開される項目の可視性は一切広げない。
 
 ### C4 — handle_inbound 解体（同一モジュール内 private free fn）
 
@@ -308,7 +324,7 @@ graph TB
 **Implementation Notes**
 - Integration: 各 private 自由関数（`module_key`/`build_source_map_inner`）は唯一の呼び出し元と同一サブファイルへ同梱し、跨ぎ `use` を回避。
 - Validation: C1 完了後に着手（`dap.rs`/`debug/mod.rs` の本番残余サイズ確定後に責務分割判断）。`cargo check -p <crate>` で private 参照のコンパイルを早期確認。
-- Risks: 唯一の可視性変更 `loader::ProcessStats` `private→pub(super)`（`load_with_config` が `process.rs` の戻り値フィールドを読むため。never re-export・外部影響なし）。`visitors.rs` は unit struct・状態なしで最低リスク、`runtime/mod.rs` は private フィールド跨ぎ参照が多く最高リスク（要 `cargo check` 確認）。
+- Risks: 公開 API は不変。クレート内の追加シームは 3 箇所のみ — (1) `loader::ProcessStats` `private→pub(super)`（`load_with_config` が `process.rs` 戻り値を読む）、(2) `DebugHandle::new()` を `pub(crate)` で追加（兄弟 `enable.rs` からの構築用・カプセル化強化）、(3) `dap/codec.rs` 共有ヘルパーを `pub(super)`（兄弟 `decode/encode` から呼ぶ）。いずれも never re-export・外部影響なし。リスク順: `visitors.rs`（unit struct・状態なし）最低 → `dap/`（自由関数 privacy）→ `debug/`（兄弟 struct literal 構築）→ `runtime/mod.rs`（private フィールド跨ぎ参照多数）最高。各分割後 `cargo check -p <crate>` で早期確認。`enable()` の disabled 早期 return（zero-cost gate）は verbatim 移動で不変保持。
 
 #### C4 — handle_inbound Decomposition
 
