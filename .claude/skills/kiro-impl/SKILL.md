@@ -21,6 +21,10 @@ You operate in two modes:
   - Implementation aligns with design and requirements
   - Independent reviewer approves each task before completion
 
+> **Branch & commit model (compatibility note):** kiro-impl operates on the single feature working branch supplied by the Claude Code harness worktree. It **only commits to the current branch** and does NOT create branches or push — branch creation is the harness's responsibility, and push happens later in the kiro-complete PR flow. This note documents existing behavior; it introduces no new branch/push logic.
+>
+> If `tasks.md` was not committed in a prior phase, there is **no dedicated task-phase commit**: the uncommitted `tasks.md` is picked up by the per-task commits below, which already include `tasks.md` in their selective staging (changed files + `tasks.md`). This stays within the existing selective-staging convention — it does **not** authorize `git add -A` or `git add .`.
+
 ## Execution Steps
 
 ### Step 1: Gather Context

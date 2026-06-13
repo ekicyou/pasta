@@ -166,7 +166,7 @@ graph LR
     Impl --> Complete[kiro-complete PR squash]
 ```
 
-`kiro-tasks` 撤去後、タスク生成は `/kiro-spec-tasks -y` を直接実行。tasks.md のコミットは後続 `kiro-impl` または `kiro-complete` が `git add -A` で取り込む（専用タスクフェーズコミットは設けない）。
+`kiro-tasks` 撤去後、タスク生成は `/kiro-spec-tasks -y` を直接実行。tasks.md のコミットは後続 `kiro-impl` または `kiro-complete` が各コミットの選択的ステージングに tasks.md を含めて取り込む（専用タスクフェーズコミットは設けない。kiro-impl の `git add -A` 禁止規約と整合）。
 
 ## Requirements Traceability
 
@@ -296,7 +296,7 @@ graph LR
 **Responsibilities & Constraints**
 - 現在ブランチへの commit のみ。ブランチ生成・push を導入しない（5.1）。
 - 「ハーネス供給の単一作業ブランチ上で動作」する旨の注記を追加（5.2）。
-- tasks.md 未コミット時は `git add -A` で取り込む（3.5、振る舞い不変）。
+- tasks.md 未コミット時は、各タスクコミットの選択的ステージングに tasks.md を含めて取り込む（3.5、振る舞い不変。kiro-impl の `git add -A` 禁止規約と整合）。
 
 ### インフラ層
 

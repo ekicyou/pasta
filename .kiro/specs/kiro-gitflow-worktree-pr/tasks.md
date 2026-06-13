@@ -72,7 +72,7 @@
   - _Depends: 1.1_
 
 - [ ] 6. kiro-impl 互換注記
-- [ ] 6.1 (P) kiro-impl に単一 feature ブランチ互換注記を追加
+- [x] 6.1 (P) kiro-impl に単一 feature ブランチ互換注記を追加
   - 「ハーネス供給の単一作業ブランチ上で動作、commit のみ、ブランチ生成・push を導入しない」旨の注記
   - tasks.md 未コミット時は git add -A で取り込む旨（振る舞い不変）
   - 完了状態: kiro-impl/SKILL.md に注記が存在し、振る舞いは変更されていない
