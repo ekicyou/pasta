@@ -194,3 +194,23 @@
 | `debug/source_map.rs` | 607 | C1済・本番残 | 本番ロジック 579 行＋`#[path]` 宣言。実質 600 直下。C3 未対象 |
 
 **判断**: 主基準（必達）は完全達成、振る舞い不変も完全。副基準（600 目安）は上記 5 件が承認済みスコープ外の本番肥大として残存。これらの責務単位ファイル分割（session→状態機械/StepController 等、wiring→ディレクトリモジュール化、config/transport の責務分割）は、本仕様の C3 メカニズム（split-`impl`/ディレクトリモジュール）をそのまま適用できる **follow-up spec の候補**。本仕様の承認済みタスク範囲は完遂。
+
+---
+
+## 10. C5 追加分割による副基準完全達成（ユーザー承認の追加スコープ）
+
+§9 で「副基準（600行）に5件の文書化済み超過」と記録した本番ファイルを、ユーザー承認（実装フェーズでの追加スコープ判断）のもと task 7.1–7.5 として同じ C3 メカニズム（ディレクトリモジュール化）で責務分割し、**副基準も完全達成**した。
+
+| 旧 | 行数 | → 分割後 | 最大ファイル |
+|---|---:|---|---:|
+| `debug/session.rs` | 863 | `debug/session/`（mod/stepping/anchor/stop_loop） | 371 |
+| `debug/wiring.rs` | 787 | `debug/wiring/`（mod/bridge/inbound/resolver） | 351 |
+| `loader/config.rs` | 626 | `loader/config/`（mod/sections） | 380 |
+| `debug/transport.rs` | 618 | `debug/transport/`（mod/framing） | 520 |
+| `debug/source_map.rs` | 607 | `debug/source_map/`（mod/sidecar） | 491 |
+
+### 最終状態（C1–C5 全完了）
+- **ワークスペース全体で 600 行を超える `.rs` ファイルはゼロ**（src + tests 全て < 600）。主基準・副基準ともに完全達成。
+- 全 C5 分割は振る舞い不変：本番 body byte 同一、公開 API・可視性不変（`run_socket_bridge` byte 不変・`handle_inbound` A→B→C→D→E 順序・`setBreakpoints` 原子性・`enable()` zero-cost gate verbatim を保持）、テスト `#[path]` を `../` 再配線。
+- `cargo build/test --workspace` green、ワークスペース警告ゼロ、`--list` == 2022（2021 ＋ C4 特性化テスト 1 本）。
+- 可視性変更は全て内部限定（`pub(super)` 数件＋`loader::ProcessStats`/`MAX_CONTENT_LENGTH` の内部 widening）。外部公開 API は完全不変。
