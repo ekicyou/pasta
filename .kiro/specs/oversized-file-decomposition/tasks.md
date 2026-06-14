@@ -19,7 +19,7 @@
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 5.5, 6.1, 6.2, 6.3_
   - _Boundary: C1 Inline Test Externalization (debug session)_
 
-- [ ] 2.2 (P) debug dap モジュールのインラインテスト外出し
+- [x] 2.2 (P) debug dap モジュールのインラインテスト外出し
   - 単一インライン `mod tests` を論理クラスタ別の複数兄弟テストファイルへ分離
   - private / `pub(crate)` 到達性を `use super::*;` 経由で保持、移動のみ
   - 観測: dap 本番にインライン `mod tests` 残存せず、全WS test green、差分ゼロ、各兄弟 < 600 行
