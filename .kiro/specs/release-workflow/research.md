@@ -280,6 +280,12 @@ Option A に対しマージ可能性プローブのみ独立サブステップ�
 - **上書き**: 本決定は同ラウンドの「完全自律 cron」決定（コミット 8608807）を**上書き**する。エスカレーション（議題2・コミット 039fd94）はセッション内プッシュ通知として存続。
 - **Impact**: design.md 共通リトライ戦略・完遂保証節（ScheduleWakeup 全面書換）・Non-Goals（無人完遂を除外）・Phase 0 step4（cron 前提撤去）・Allowed Dependencies（cron→ScheduleWakeup）・File Structure（status ファイル撤去）・エラー処理表・コンポーネント表・トレーサビリティを更新。Req 11.3/11.4 を ScheduleWakeup へ。
 
+### Clarifications: 最終バリデーション round の文言補足（2026-06-14）
+- **Issue 1（Req 11.7 律速）**: 「固定上限なし」はリトライ論理の話であり、自律継続の実寿命は ScheduleWakeup ループ TTL（約7日）／セッション寿命に律速される。超過時は手動 resume で継続（Non-Goal の無人完遂と整合）。Req 11.7・design 完遂保証節に明記。
+- **Issue 2（待機機構）**: 待機は ScheduleWakeup を基本とし、前景の長時間 Start-Sleep は使わない（〜1分のみ Start-Sleep 可）。design 共通リトライ戦略に明記。
+- **Issue 3（状態クエリ）**: 冪等な完遂/Resume 判定の状態確認手段を具体化（crates.io index HTTP、`vsce show --json`、`gh release view`、`git ls-remote --tags`）。design Resume Mode 冪等性に明記。
+- いずれも振る舞い変更なしの明確化（カテゴリA）。
+
 ## References（追加）
 - Claude Code スケジュール機構: [Desktop Scheduled Tasks](https://code.claude.com/docs/en/desktop-scheduled-tasks.md) / [Routines](https://code.claude.com/docs/en/routines.md) / [/loop scheduled-tasks](https://code.claude.com/docs/en/scheduled-tasks.md)
 - `.claude/skills/kiro-complete/SKILL.md` — PR 可否判定・PR 作成/マージ・中断条件・エラー回避（流用元の参照実装）
