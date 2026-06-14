@@ -9,5 +9,6 @@ mod common;
 mod event_dispatch_test;
 mod event_handler_test;
 mod res_test;
-mod virtual_event_config_test;
+mod virtual_event_config_resolution_test;
 mod virtual_event_dispatch_test;
+mod virtual_event_status_skip_test;

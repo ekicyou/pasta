@@ -96,7 +96,7 @@
   - _Requirements: 2.1, 2.2, 2.3, 5.5, 6.1_
   - _Boundary: C2 Test File Clustering (pasta_lua tests/transpiler)_
 
-- [ ] 3.4 (P) shiori 仮想イベント設定テストの分割判定
+- [x] 3.4 (P) shiori 仮想イベント設定テストの分割判定
   - 僅少超過（~605 行）を凝集優先で据え置くか最小 2 分割するかを判定し、据え置く場合は理由を記録
   - 観測: 判定結果を反映し全WS green、差分ゼロ、超過据え置き時は理由が記録済み
   - _Requirements: 2.1, 2.3, 5.5, 6.1_
