@@ -421,6 +421,75 @@ fn unknown_and_missing_command_are_ignored_and_bridge_keeps_serving() {
     assert_eq!(ev["event"], "initialized");
 }
 
+/// C4 ORDER/ATOMICITY characterization (requirement 4.1 / 4.5, the design's
+/// sanctioned SINGLE new test): pin the load-bearing `setBreakpoints` invariants
+/// against the CURRENT (un-decomposed) `handle_inbound`, as the safety net for
+/// the 5.2-5.4 helper extraction.
+///
+/// A `setBreakpoints` request (a `.lua` source under the disabled/no-map wiring,
+/// so the existing direct `.lua` path runs) MUST:
+/// 1. return `true`,
+/// 2. write EXACTLY ONE `setBreakpoints` response frame to the wire, and
+/// 3. forward NOTHING to the session command channel (`cmd_rx.try_recv()` errs)
+///    — `setBreakpoints` is applied atomically to the shared store, never
+///    forwarded (it would block off a stop).
+///
+/// As a CONTRAST control, a stop-context command (`continue`) forwards EXACTLY
+/// ONE `SessionCommand` to the session channel — proving the `match` arms are
+/// genuinely distinguished (the non-forward above is not a vacuous "nothing ever
+/// forwards").
+#[test]
+fn set_breakpoints_is_atomic_non_forward_while_stop_context_forwards() {
+    let mut h = Harness::new();
+    let adapter = shared_adapter();
+    let breakpoints = BreakpointSet::new();
+    let (cmd_tx, cmd_rx) = mpsc::channel::<SessionCommand>();
+    let wiring = SourceMapWiring::disabled(); // no map → existing `.lua` direct path
+
+    // (1) setBreakpoints on a `.lua` source: applied to the shared store and
+    // answered directly, NOT forwarded to the session.
+    let set_bp = json!({
+        "seq": 1,
+        "type": "request",
+        "command": "setBreakpoints",
+        "arguments": {
+            "source": { "path": "@scene.lua" },
+            "breakpoints": [{ "line": 3 }, { "line": 7 }],
+        },
+    });
+    assert!(
+        handle_inbound(&h.transport, &adapter, &breakpoints, &cmd_tx, &set_bp, &wiring),
+        "setBreakpoints must keep the bridge serving (true)"
+    );
+    let resp = h.recv();
+    assert_eq!(
+        resp["command"], "setBreakpoints",
+        "exactly one setBreakpoints response frame is on the wire"
+    );
+    assert_eq!(resp["type"], "response");
+    assert_eq!(resp["request_seq"], 1, "the response correlates to the request seq");
+    assert!(
+        cmd_rx.try_recv().is_err(),
+        "setBreakpoints is atomic + NON-FORWARD: nothing reaches the session channel"
+    );
+
+    // (2) CONTRAST: a stop-context command (`continue`) forwards exactly one
+    // SessionCommand to the session channel.
+    let cont = json!({ "seq": 2, "type": "request", "command": "continue", "arguments": {} });
+    assert!(
+        handle_inbound(&h.transport, &adapter, &breakpoints, &cmd_tx, &cont, &wiring),
+        "a forwardable stop-context command keeps the bridge serving (true)"
+    );
+    assert!(
+        cmd_rx.try_recv().is_ok(),
+        "a stop-context command forwards exactly one SessionCommand (match arms are distinct)"
+    );
+    assert!(
+        cmd_rx.try_recv().is_err(),
+        "exactly ONE command was forwarded, no more"
+    );
+}
+
 /// POISONED shared adapter: [`attach_pasta_resolver`] must not panic on
 /// either gate outcome (active and inactive), and [`handle_inbound`] reports
 /// `false` (stop the bridge) instead of panicking.

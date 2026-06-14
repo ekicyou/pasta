@@ -165,7 +165,7 @@
   - _Boundary: C3 Production Responsibility Split (debug mod)_
 
 - [ ] 5. C4: handle_inbound ループの順序保証付き解体
-- [ ] 5.1 順序・原子性を固定する特性化テストの先行追加
+- [x] 5.1 順序・原子性を固定する特性化テストの先行追加
   - 解体着手前に、`setBreakpoints` 要求が単一の breakpoints 応答を返し、かつ session へ何も転送しないこと（非転送・原子性）を直接 pin する特性化テストを追加
   - 対照として stop-context コマンドが session へ 1 件転送することを検証し、`apply→response→event→command` 順序の既存カバレッジを確認
   - 観測: 新規特性化テストが green、ベースラインに対する唯一の許容追加として記録、全WS green
@@ -213,3 +213,4 @@
 - `cargo` 実行前に必ず `unset NoDefaultCurrentDirectoryInExePath`（さもないと LuaJIT/mlua ビルドが exit 101）。
 - C1 外出しは BYTE-IDENTICAL であること（task 2.5 でコメント1語の改変が reject された）。許容変換は `mod tests {` ラッパ除去＋本体の1段(4スペース)デデントのみ。コメント・空行・空白を一切変えない。報告前に `diff <(git show HEAD:<file> | sed -n '<start>,<end>p' | sed 's/^    //') <sibling>` が空であることを確認する。
 - `--list` 不変条件の正準メトリクスは `cargo test --workspace -- --list | grep -cE ': test$'` == 2021（バイナリ別サマリ行の素朴な合計 2014 とは別物。後者を使わない）。
+- task 5.1 で C4 特性化テストを1本追加したため、**ベースライン不変条件は 2021 → 2022 に更新**。以降の C4 解体(5.2-5.4)と最終検証(6.1)は `cargo test --workspace -- --list | grep -cE ': test$'` == **2022** を維持すること。
