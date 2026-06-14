@@ -229,7 +229,7 @@
   - 観測: `cargo check` 成功、全WS green、`--list` 2022、各ファイル < 600、公開API不変
   - _Requirements: 3.1, 3.2, 3.3, 5.5, 6.1_
   - _Boundary: C5 Production Split (debug transport)_
-- [ ] 7.5 debug source_map 本番の最小分割
+- [x] 7.5 debug source_map 本番の最小分割
   - 607行の `debug/source_map.rs` 本番を凝集境界で最小分割し hub を < 600、公開API・可視性不変（僅少超過のため最小限の責務切り出し）
   - 観測: `cargo check` 成功、全WS green、`--list` 2022、各ファイル < 600、公開API不変
   - _Requirements: 3.1, 3.2, 3.3, 5.5, 6.1_
