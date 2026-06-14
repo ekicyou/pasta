@@ -206,6 +206,35 @@
   - _Requirements: 1.6, 3.2, 5.1, 5.3, 6.1, 6.2, 6.3_
   - _Depends: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 4.1, 4.2, 4.3, 4.4, 4.5, 5.4_
 
+- [ ] 7. C5: 追加本番分割（テスト外出し後に判明した600超本番ファイルの責務分割・ユーザー承認の追加スコープ）
+- [x] 7.1 debug session 本番の責務分割
+  - テスト外出し後も863行の `debug/session.rs` 本番を split-`impl` で責務単位サブモジュール（停止状態機械 / StepController / ソースマップ injection 等）へ分割し、各ファイル < 600 行に収める
+  - 公開/`pub(crate)` API・可視性を不変に保ち、`#[path]` テスト宣言の到達性を維持
+  - 観測: `cargo check -p pasta_lua` 成功、全WS green、`--list` 2022、各ファイル < 600、公開API不変
+  - _Requirements: 3.1, 3.2, 3.3, 5.5, 6.1_
+  - _Boundary: C5 Production Split (debug session)_
+- [ ] 7.2 debug wiring 本番のディレクトリモジュール化
+  - 787行の `debug/wiring.rs` を `wiring/` ディレクトリモジュールへ（hub＋run_socket_bridge / handle_inbound＋helpers / resolver・bp変換 等）分割し各 < 600
+  - `#[path]` テスト宣言（wiring_*_tests）を `wiring/mod.rs` へ `../` 再配線、`run_socket_bridge`・順序・setBreakpoints原子性を不変に保つ
+  - 観測: `cargo check` 成功、全WS green、特性化テスト pass、`--list` 2022、各ファイル < 600、公開到達性不変
+  - _Requirements: 3.1, 3.2, 3.3, 4.1, 4.4, 5.5, 6.1_
+  - _Boundary: C5 Production Split (debug wiring)_
+- [ ] 7.3 loader config 本番の責務分割
+  - 626行の `loader/config.rs` 本番を責務単位（設定セクション別 等）へ最小分割し各 < 600、公開API・可視性不変
+  - 観測: `cargo check` 成功、全WS green、`--list` 2022、各ファイル < 600、公開API不変
+  - _Requirements: 3.1, 3.2, 3.3, 5.5, 6.1_
+  - _Boundary: C5 Production Split (loader config)_
+- [ ] 7.4 debug transport 本番の責務分割
+  - 618行の `debug/transport.rs` 本番を責務単位（フレーミング / I/O 等）へ最小分割し各 < 600、公開API・可視性不変
+  - 観測: `cargo check` 成功、全WS green、`--list` 2022、各ファイル < 600、公開API不変
+  - _Requirements: 3.1, 3.2, 3.3, 5.5, 6.1_
+  - _Boundary: C5 Production Split (debug transport)_
+- [ ] 7.5 debug source_map 本番の最小分割
+  - 607行の `debug/source_map.rs` 本番を凝集境界で最小分割し hub を < 600、公開API・可視性不変（僅少超過のため最小限の責務切り出し）
+  - 観測: `cargo check` 成功、全WS green、`--list` 2022、各ファイル < 600、公開API不変
+  - _Requirements: 3.1, 3.2, 3.3, 5.5, 6.1_
+  - _Boundary: C5 Production Split (debug source_map)_
+
 ## Implementation Notes
 - ベースライン不変条件は `cargo test --workspace -- --list` の総数 **2021**（leaf 名 multiset 一致）。実行 passed 数(2010)ではなく `--list` 総数で差分判定する。
 - マルチクラスタ分割でクラスタ跨ぎの共有テストヘルパーが必要な場合: 専用の `<name>_test_support.rs` 兄弟に `pub(super)` でまとめ、各クラスタが `use super::<name>_test_support::*;` で参照する（本番可視性は不変。test-only ヘルパーのみ pub(super) 化可）。各クラスタ <600行。
