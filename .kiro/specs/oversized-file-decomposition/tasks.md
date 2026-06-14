@@ -148,7 +148,7 @@
   - _Requirements: 3.1, 3.2, 3.3, 5.5, 6.1_
   - _Boundary: C3 Production Responsibility Split (runtime mod)_
 
-- [ ] 4.4 (P) DAP 本番残余のディレクトリモジュール化
+- [x] 4.4 (P) DAP 本番残余のディレクトリモジュール化
   - テスト外出し後の DAP 本番を resolver / pending / decode / encode / codec ＋ hub のサブモジュールへ分割
   - 共有 private 自由関数の兄弟参照は `pub(super)` の最小シームで成立させ、`DapAdapter` の公開到達性（fully-qualified path）を不変に保つ
   - 観測: `cargo check -p pasta_lua` 成功、全WS green、各ファイル < 600 行、外部到達名不変
