@@ -114,7 +114,7 @@
   - _Requirements: 2.1, 2.2, 2.3, 5.5, 6.1_
   - _Boundary: C2 Test File Clustering (pasta_shiori tests)_
 
-- [ ] 3.7 (P) pasta_shiori 兄弟テスト (shiori_tests) の再分割
+- [x] 3.7 (P) pasta_shiori 兄弟テスト (shiori_tests) の再分割
   - 既 `#[path]` 外出し済みの巨大テストを 2 サブファイルへ分割し、親サイトを多重 `#[cfg(test)] #[path] mod` 宣言へ置換（各サブに `use super::*;`）
   - 観測: 全WS green、差分ゼロ、各サブファイル < 600 行
   - _Requirements: 2.1, 2.2, 2.3, 5.5, 6.1_

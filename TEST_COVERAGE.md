@@ -130,7 +130,7 @@
 | Luaパススルー（孤立キャッシュ）       | `lua_passthrough_test.rs`                                         | ✅ 完了 | 2テスト（lua-passthrough）                                       |
 | トランスパイル失敗中止                | `lua_passthrough_test.rs`                                         | ✅ 完了 | 2テスト（load-error-logging）                                    |
 | ログファイル名固定（Rotation::NEVER） | `logger.rs`                                                       | ✅ 完了 | 1テスト（load-error-logging）                                    |
-| load失敗→requestエラー伝搬            | `shiori_tests.rs`                                                 | ✅ 完了 | 1テスト（load-error-logging）                                    |
+| load失敗→requestエラー伝搬            | `shiori_request_tests.rs`                                         | ✅ 完了 | 1テスト（load-error-logging）                                    |
 | 非同期コールバック統合（SHIORI層）    | `async_callback_simple_test.rs` / `async_callback_chain_test.rs`  | ✅ 完了 | 12テスト（shiori-async-talk、property-dsl-extension追加2テスト） |
 | OnChoiceSelectEx 自動ルーティング     | `choice_select_test.lua`（Luaテストスイート）                     | ✅ 完了 | 選択肢コールバック→シーン自動解決                                |
 
