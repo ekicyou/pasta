@@ -26,7 +26,7 @@
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 5.5, 6.1, 6.2, 6.3_
   - _Boundary: C1 Inline Test Externalization (debug dap)_
 
-- [ ] 2.3 (P) debug source_map モジュールのインラインテスト外出し
+- [x] 2.3 (P) debug source_map モジュールのインラインテスト外出し
   - 単一インライン `mod tests` を論理クラスタ別（resolve / builder / sidecar 等）の複数兄弟へ分離
   - 観測: source_map 本番にインライン `mod tests` 残存せず、全WS green、差分ゼロ、各兄弟 < 600 行
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 5.5, 6.1, 6.2, 6.3_
