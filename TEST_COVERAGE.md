@@ -50,13 +50,13 @@
 | 機能                       | テストファイル                                                   | 状態   | 説明                        |
 | -------------------------- | ---------------------------------------------------------------- | ------ | --------------------------- |
 | シーン前方一致検索         | `search_module_test.rs`<br>`fallback_search_integration_test.rs` | ✅ 完了 | 前方一致+ランダム選択       |
-| シーンサイクリングリセット | `scene_table_tests.rs`（`#[path]`テスト）                        | ✅ 完了 | 循環リセット検証（4テスト） |
+| シーンサイクリングリセット | `scene_table_candidate_tests.rs`（`#[path]`テスト）              | ✅ 完了 | 循環リセット検証（4テスト） |
 | 単語前方一致検索           | `search_module_test.rs`                                          | ✅ 完了 | 単語辞書検索                |
 | 単語ランダム選択           | `search_module_test.rs`                                          | 🔶 部分 | ランダム性検証              |
 | アクター単語辞書           | `actor_word_dictionary_test.rs`                                  | ✅ 完了 | アクタースコープ単語        |
 | finalize_scene処理         | `finalize_scene_test.rs`                                         | ✅ 完了 | シーン初期化                |
 | SCENE.search() API         | `scene_search_test.rs`                                           | ✅ 完了 | 14テスト                    |
-| Registry境界回帰テスト     | `scene_registry.rs`<br>`word_registry.rs`<br>`scene_table_tests.rs`<br>`word_table_test.rs`<br>`random.rs`<br>`error.rs`（各内テスト） | ✅ 完了 | 38テスト（merge_from/register_global_raw/解決境界/セレクタ契約/エラー表示文言） |
+| Registry境界回帰テスト     | `scene_registry.rs`<br>`word_registry.rs`<br>`scene_table_candidate_tests.rs`<br>`scene_table_resolve_filter_tests.rs`<br>`word_table_test.rs`<br>`random.rs`<br>`error.rs`（各内テスト） | ✅ 完了 | 38テスト（merge_from/register_global_raw/解決境界/セレクタ契約/エラー表示文言） |
 
 ### 2.3 Transpiler層テスト（Lua変換）
 

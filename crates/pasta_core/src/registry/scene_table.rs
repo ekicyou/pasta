@@ -415,5 +415,9 @@ impl SceneTable {
 
 
 #[cfg(test)]
-#[path = "scene_table_tests.rs"]
-mod tests;
+#[path = "scene_table_candidate_tests.rs"]
+mod scene_table_candidate_tests;
+
+#[cfg(test)]
+#[path = "scene_table_resolve_filter_tests.rs"]
+mod scene_table_resolve_filter_tests;

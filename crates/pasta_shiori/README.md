@@ -33,7 +33,8 @@ pasta_shiori/
     ├── lib.rs           # クレートエントリーポイント
     ├── error.rs         # エラー型定義
     ├── shiori.rs        # PastaShiori - SHIORI プロトコル実装
-    ├── shiori_tests.rs  # SHIORI テストモジュール（#[path]属性による例外的配置）
+    ├── shiori_lifecycle_tests.rs # SHIORI テスト（load/reload/unload ライフサイクル・#[path]属性）
+    ├── shiori_request_tests.rs   # SHIORI テスト（リクエスト処理/エラーパス・#[path]属性）
     ├── lua_request.rs   # Lua リクエスト処理
     ├── windows.rs       # Windows DLL エクスポート（#[cfg(windows)]）
     └── util/            # ユーティリティ
