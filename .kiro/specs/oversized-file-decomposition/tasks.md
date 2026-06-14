@@ -76,7 +76,7 @@
   - _Boundary: C1 Inline Test Externalization (debug wiring)_
 
 - [ ] 3. C2: 巨大テストファイルのクラスタ分割
-- [ ] 3.1 (P) runtime 統合テスト群のクラスタ分割
+- [x] 3.1 (P) runtime 統合テスト群のクラスタ分割
   - 巨大な runtime トグル E2E テストを task banner 境界で各 < 600 行の最小分割へ、共有ヘルパーは共有モジュール化
   - debug 統合テストを top-level と内側 mod の 2 ファイルへ分割し、各カテゴリ `main.rs` に `mod` 登録
   - 固定ポート中和 `#[ctor]`（テストハーネス側）がテストバイナリにリンクされ続けることを確認
