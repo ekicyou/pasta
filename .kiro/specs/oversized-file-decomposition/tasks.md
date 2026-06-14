@@ -134,7 +134,7 @@
   - _Requirements: 3.1, 3.2, 3.3, 5.5, 6.1_
   - _Boundary: C3 Production Responsibility Split (pasta_lsp analysis)_
 
-- [ ] 4.2 (P) ローダーエントリの責務分割
+- [x] 4.2 (P) ローダーエントリの責務分割
   - 肥大したローダーエントリを起動オーケストレーション / 処理パイプライン / ソースマップ構築の責務へ split-`impl` 分割
   - 公開 API・可視性を不変に保ち、内部で必要な可視性調整は never re-export の範囲に限定（戻り値構造体の `pub(super)` 化のみ）
   - 観測: `cargo check -p pasta_lua` 成功、全WS green、各ファイル < 600 行、公開 API 不変
