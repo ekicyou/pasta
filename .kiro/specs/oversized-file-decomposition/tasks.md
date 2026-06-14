@@ -102,7 +102,7 @@
   - _Requirements: 2.1, 2.3, 5.5, 6.1_
   - _Boundary: C2 Test File Clustering (pasta_lua tests/shiori)_
 
-- [ ] 3.5 (P) pasta_dsl キューコマンドテストのクラスタ分割
+- [x] 3.5 (P) pasta_dsl キューコマンドテストのクラスタ分割
   - 巨大な cue コマンドテストを凝集境界で各 < 600 行の最小分割へ（flat tests・各々が独立テストバイナリ）
   - 観測: 全WS green、差分ゼロ、各ファイル < 600 行
   - _Requirements: 2.1, 2.2, 2.3, 5.5, 6.1_
