@@ -90,7 +90,7 @@
   - _Requirements: 2.1, 2.2, 2.3, 5.5, 6.1_
   - _Boundary: C2 Test File Clustering (pasta_lua tests/loader)_
 
-- [ ] 3.3 (P) transpiler 統合テストのクラスタ分割
+- [x] 3.3 (P) transpiler 統合テストのクラスタ分割
   - record-wiring テストを被テスト本番モジュール境界（element / scope）で 2 分割、`main.rs` に `mod` 登録
   - 観測: 全WS green、差分ゼロ、各ファイル < 600 行
   - _Requirements: 2.1, 2.2, 2.3, 5.5, 6.1_
