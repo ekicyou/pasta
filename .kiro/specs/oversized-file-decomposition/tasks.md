@@ -56,7 +56,7 @@
   - _Requirements: 1.1, 1.2, 1.3, 1.5, 1.6, 5.5, 6.1, 6.2, 6.3_
   - _Boundary: C1 Inline Test Externalization (loader)_
 
-- [ ] 2.8 (P) transpiler のインラインテスト外出し
+- [x] 2.8 (P) transpiler のインラインテスト外出し
   - 単一インライン `mod tests` を 1 兄弟ファイルへ移動
   - 観測: transpiler 本番にインライン `mod tests` 残存せず、全WS green、差分ゼロ
   - _Requirements: 1.1, 1.2, 1.3, 1.5, 1.6, 5.5, 6.1, 6.2, 6.3_
