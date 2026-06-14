@@ -189,7 +189,7 @@
   - _Depends: 5.2_
   - _Boundary: C4 handle_inbound Decomposition (wiring)_
 
-- [ ] 5.4 コマンド routing 抽出と順序文書化の確定
+- [x] 5.4 コマンド routing 抽出と順序文書化の確定
   - コマンド routing を private free fn へ抽出し、`setBreakpoints` 分岐を単一ユニットとして原子保持・session 非転送を維持（E）
   - `handle_inbound` に `apply→response→event→command` 順序を列挙する doc comment を確定し、`run_socket_bridge` のシグネチャ・I/O 多重化コアを不変に保つ
   - 観測: 抽出後も特性化テスト・全WS green、差分ゼロ、`run_socket_bridge` 無変更、順序 doc 記載済み

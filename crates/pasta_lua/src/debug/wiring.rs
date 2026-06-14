@@ -277,6 +277,27 @@ pub(crate) fn run_socket_bridge(
 
 /// Decode and act on one inbound DAP request frame. Returns `false` if the peer
 /// is gone (a transport write failed) so the caller stops.
+///
+/// # Fixed `apply → response → event → command` order (requirement 4.2)
+///
+/// After the inline poison/decode guard, the work is a FIXED sequence of helper
+/// calls A→B→C→D→E that MUST NOT be reordered — the order is the load-bearing
+/// contract (design "System Flows / C4"):
+///
+/// - **A** [`try_source_presentation_toggle`]: the self-contained
+///   `pasta/sourcePresentation` runtime toggle (`apply → ack → event →
+///   RefreshPresentation`); when it handles the request it returns directly.
+/// - **B** [`apply_attach_source_mode`]: APPLY an explicit `attach`
+///   `sourcePresentation` to the shared effective mode BEFORE replying.
+/// - **C** [`send_immediate_response_and_events`]: the immediate RESPONSE
+///   (acks / initialize / scopes self-answer) then the immediate handshake
+///   EVENTS — response strictly before events.
+/// - **D** [`emit_attach_initial_presentation_event`]: the `attach`-completion
+///   initial-presentation EVENT, emitted AFTER the attach ack (ack before event).
+/// - **E** [`route_command`]: COMMAND routing. `setBreakpoints` is applied
+///   ATOMICALLY to the shared breakpoint store (apply + encode + send) and is
+///   NEVER forwarded to the session `cmd_tx` (that would block off a stop);
+///   every other stop-context command is forwarded as-is (requirement 4.1).
 fn handle_inbound(
     transport: &Transport,
     adapter: &SharedAdapter,
@@ -336,7 +357,33 @@ fn handle_inbound(
         return false;
     }
 
-    // (c) Command routing.
+    // (c) Command routing (Helper E). `setBreakpoints` is applied atomically and
+    // NOT forwarded; every other stop-context command is forwarded as-is. `decoded`
+    // is consumed here since E is the last step.
+    route_command(transport, adapter, breakpoints, cmd_tx, source_map, decoded)
+}
+
+/// Helper E (task 5.4 / design "Components / C4" Service Interface・"System Flows /
+/// C4" step E): the command-routing `match decoded.command { ... }` block extracted
+/// verbatim from `handle_inbound`. It is the LAST step, so it takes `decoded` BY
+/// VALUE (the `match decoded.command` consumes it). Returns the same bool the inline
+/// match produced: `true` for a handled / `None` command, `false` on a peer- or
+/// session-gone send failure (so the bridge stops).
+///
+/// CRITICAL invariants (requirements 4.1 / 4.4), byte-identical to the inlined
+/// branch:
+/// - The `SetBreakpoints` arm stays a SINGLE atomic unit — apply to the shared
+///   store + encode + send — and is NEVER forwarded to `cmd_tx`.
+/// - The generic `Some(cmd) => cmd_tx.send(...)` forward and the `None` no-op are
+///   unchanged.
+fn route_command(
+    transport: &Transport,
+    adapter: &SharedAdapter,
+    breakpoints: &BreakpointSet,
+    cmd_tx: &Sender<SessionCommand>,
+    source_map: &SourceMapWiring,
+    decoded: Decoded,
+) -> bool {
     match decoded.command {
         // `setBreakpoints` is the ONE command valid while the VM runs: apply it
         // directly to the shared store and synthesize the DAP response via the
