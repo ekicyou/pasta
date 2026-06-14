@@ -12,7 +12,7 @@
   - _Requirements: 1.7, 5.1, 5.2, 5.3, 5.4_
 
 - [ ] 2. C1: インラインテストの兄弟ファイルへの外出し
-- [ ] 2.1 (P) debug session モジュールのインラインテスト外出し
+- [x] 2.1 (P) debug session モジュールのインラインテスト外出し
   - 単一インライン `mod tests` を論理クラスタ別の複数兄弟テストファイルへ分離（単一移動後も肥大のため複数クラスタへ）
   - テストが参照する private / `pub(crate)` 項目への到達性を可視性変更なしで保持し、テスト集合（名前・件数・アサーション）を移動のみに留める
   - 観測: session 本番にインライン `mod tests` が残存せず、全WS test green、ベースライン差分ゼロ、各兄弟ファイル < 600 行
@@ -205,3 +205,9 @@
   - 観測: 上記すべてを満たす検証結果が記録済み、回帰ゼロ
   - _Requirements: 1.6, 3.2, 5.1, 5.3, 6.1, 6.2, 6.3_
   - _Depends: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 4.1, 4.2, 4.3, 4.4, 4.5, 5.4_
+
+## Implementation Notes
+- ベースライン不変条件は `cargo test --workspace -- --list` の総数 **2021**（leaf 名 multiset 一致）。実行 passed 数(2010)ではなく `--list` 総数で差分判定する。
+- マルチクラスタ分割でクラスタ跨ぎの共有テストヘルパーが必要な場合: 専用の `<name>_test_support.rs` 兄弟に `pub(super)` でまとめ、各クラスタが `use super::<name>_test_support::*;` で参照する（本番可視性は不変。test-only ヘルパーのみ pub(super) 化可）。各クラスタ <600行。
+- `cargo test` 実行は `crates/pasta_lua/tests/fixtures/sample.generated.lua` を LF→CRLF で touch する（内容差分ゼロ）。dirty 化したら `git checkout --` で復元し boundary を保つ。
+- `cargo` 実行前に必ず `unset NoDefaultCurrentDirectoryInExePath`（さもないと LuaJIT/mlua ビルドが exit 101）。
