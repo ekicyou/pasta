@@ -323,40 +323,17 @@ fn handle_inbound(
 
     apply_attach_source_mode(adapter, source_map, &decoded);
 
-    // (a) Immediate response (acks / initialize / scopes self-answer).
-    if let Some(response) = decoded.response
-        && transport.send(response).is_err()
-    {
+    // (a)+(b) Immediate response (acks / initialize / scopes self-answer) followed
+    // by the immediate unsolicited handshake events (task 5.3 Helper C). Peer gone
+    // while replying → stop.
+    if !send_immediate_response_and_events(transport, &decoded) {
         return false;
     }
-    // (b) Immediate unsolicited events (the `initialized` handshake event).
-    for ev in decoded.events {
-        if transport.send(ev).is_err() {
-            return false;
-        }
-    }
 
-    // Task 3.1 case B (requirement 2.5 initial display / design "Event Contract"
-    // (a)): on `attach` completion, emit the resolved initial-mode
-    // `pasta/sourcePresentation` event so the extension can show the resolved
-    // INITIAL mode (the single source of truth for the status bar, no query). This
-    // covers BOTH the explicit-`sourcePresentation` attach (mode just applied
-    // above) AND the no-arg attach (the resolved env > file > 既定 mode kept); the
-    // RESULTING cell mode is read in either case. Keyed off the raw command string
-    // (the no-arg case has `attach_source_mode == None`, indistinguishable by the
-    // Option), and emitted AFTER the attach ack so the ack precedes the event.
-    if command == "attach" {
-        let current = source_map.source_mode.get();
-        let event = {
-            let mut dap = match adapter.lock() {
-                Ok(g) => g,
-                Err(_) => return false,
-            };
-            dap.source_presentation_event(current)
-        };
-        if transport.send(event).is_err() {
-            return false;
-        }
+    // Attach-completion initial-presentation event, emitted AFTER the attach ack so
+    // the ack precedes the event (task 5.3 Helper D). Peer gone → stop.
+    if !emit_attach_initial_presentation_event(transport, adapter, source_map, command) {
+        return false;
     }
 
     // (c) Command routing.
@@ -507,6 +484,64 @@ fn apply_attach_source_mode(
         source_map.source_mode.set(mode);
         attach_pasta_resolver(adapter, source_map);
     }
+}
+
+/// Helper C (task 5.3 / design "Components / C4" Service Interface・"System Flows /
+/// C4" step C): the immediate response + handshake events send extracted verbatim
+/// from `handle_inbound`. Returns `false` where the original branch returned
+/// `false` on peer-gone (a transport write failed), else `true` to continue. The
+/// response-before-events order is byte-identical to the inlined branch.
+fn send_immediate_response_and_events(transport: &Transport, decoded: &Decoded) -> bool {
+    // (a) Immediate response (acks / initialize / scopes self-answer).
+    if let Some(response) = &decoded.response
+        && transport.send(response.clone()).is_err()
+    {
+        return false;
+    }
+    // (b) Immediate unsolicited events (the `initialized` handshake event).
+    for ev in &decoded.events {
+        if transport.send(ev.clone()).is_err() {
+            return false;
+        }
+    }
+    true
+}
+
+/// Helper D (task 5.3 / design "Components / C4" Service Interface・"System Flows /
+/// C4" step D): the `attach`-completion initial-presentation event emit extracted
+/// verbatim from `handle_inbound`. Returns `false` on peer-gone (a transport write
+/// failed) else `true`. Emitted AFTER the attach ack so the ack precedes the event
+/// (ack-before-event preserved); keyed off the raw command string exactly as the
+/// inlined branch.
+fn emit_attach_initial_presentation_event(
+    transport: &Transport,
+    adapter: &SharedAdapter,
+    source_map: &SourceMapWiring,
+    command: &str,
+) -> bool {
+    // Task 3.1 case B (requirement 2.5 initial display / design "Event Contract"
+    // (a)): on `attach` completion, emit the resolved initial-mode
+    // `pasta/sourcePresentation` event so the extension can show the resolved
+    // INITIAL mode (the single source of truth for the status bar, no query). This
+    // covers BOTH the explicit-`sourcePresentation` attach (mode just applied
+    // above) AND the no-arg attach (the resolved env > file > 既定 mode kept); the
+    // RESULTING cell mode is read in either case. Keyed off the raw command string
+    // (the no-arg case has `attach_source_mode == None`, indistinguishable by the
+    // Option), and emitted AFTER the attach ack so the ack precedes the event.
+    if command == "attach" {
+        let current = source_map.source_mode.get();
+        let event = {
+            let mut dap = match adapter.lock() {
+                Ok(g) => g,
+                Err(_) => return false,
+            };
+            dap.source_presentation_event(current)
+        };
+        if transport.send(event).is_err() {
+            return false;
+        }
+    }
+    true
 }
 
 /// Whether a DAP `setBreakpoints` source path names a `.pasta` file (design

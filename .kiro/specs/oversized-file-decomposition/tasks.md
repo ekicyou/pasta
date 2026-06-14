@@ -181,7 +181,7 @@
   - _Depends: 5.1_
   - _Boundary: C4 handle_inbound Decomposition (wiring)_
 
-- [ ] 5.3 応答/イベント送出分岐のヘルパー抽出
+- [x] 5.3 応答/イベント送出分岐のヘルパー抽出
   - 即時応答＋handshake イベント送出と attach 完了時の初期プレゼンテーションイベント送出を private free fn へ抽出（C・D）
   - ack が event より前に出る順序とピア切断→`false` 伝播を保持
   - 観測: 抽出後も特性化テスト・全WS green、差分ゼロ
