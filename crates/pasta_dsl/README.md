@@ -96,7 +96,8 @@ pasta_dsl
     ├── actor_code_block_test.rs   # アクターコードブロック解析テスト
     ├── ast_test.rs                # AST型テスト
     ├── choice_line_test.rs        # 選択肢行テスト
-    ├── cue_cmd_test.rs            # キューコマンド行テスト
+    ├── cue_cmd_grammar_test.rs    # キューコマンド行テスト（文法・AST）
+    ├── cue_cmd_parse_test.rs      # キューコマンド行テスト（パース・行推論）
     ├── digit_id_var_test.rs       # 全角数字変数テスト
     ├── dynamic_call_test.rs       # 動的コールテスト
     ├── error_api_test.rs          # ParseError APIテスト

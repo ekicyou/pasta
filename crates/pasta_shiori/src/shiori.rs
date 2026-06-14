@@ -328,5 +328,9 @@ impl PastaShiori {
 }
 
 #[cfg(test)]
-#[path = "shiori_tests.rs"]
-mod tests;
+#[path = "shiori_lifecycle_tests.rs"]
+mod shiori_lifecycle_tests;
+
+#[cfg(test)]
+#[path = "shiori_request_tests.rs"]
+mod shiori_request_tests;

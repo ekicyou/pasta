@@ -36,7 +36,8 @@ pasta_core/
 │       ├── scene_types.rs      # SceneId, SceneScope, SceneInfo（抽出型）
 │       ├── word_registry.rs    # WordDefRegistry
 │       ├── scene_table.rs      # SceneTable（Radix Trie）
-│       ├── scene_table_tests.rs # SceneTable テスト（#[path]属性）
+│       ├── scene_table_candidate_tests.rs      # SceneTable テスト（候補収集/解決/#[path]属性）
+│       ├── scene_table_resolve_filter_tests.rs # SceneTable テスト（解決境界/属性フィルタ/アクセサ）
 │       ├── word_table.rs       # WordTable
 │       └── random.rs           # RandomSelector インターフェース
 └── tests/

@@ -50,13 +50,13 @@
 | 機能                       | テストファイル                                                   | 状態   | 説明                        |
 | -------------------------- | ---------------------------------------------------------------- | ------ | --------------------------- |
 | シーン前方一致検索         | `search_module_test.rs`<br>`fallback_search_integration_test.rs` | ✅ 完了 | 前方一致+ランダム選択       |
-| シーンサイクリングリセット | `scene_table_tests.rs`（`#[path]`テスト）                        | ✅ 完了 | 循環リセット検証（4テスト） |
+| シーンサイクリングリセット | `scene_table_candidate_tests.rs`（`#[path]`テスト）              | ✅ 完了 | 循環リセット検証（4テスト） |
 | 単語前方一致検索           | `search_module_test.rs`                                          | ✅ 完了 | 単語辞書検索                |
 | 単語ランダム選択           | `search_module_test.rs`                                          | 🔶 部分 | ランダム性検証              |
 | アクター単語辞書           | `actor_word_dictionary_test.rs`                                  | ✅ 完了 | アクタースコープ単語        |
 | finalize_scene処理         | `finalize_scene_test.rs`                                         | ✅ 完了 | シーン初期化                |
 | SCENE.search() API         | `scene_search_test.rs`                                           | ✅ 完了 | 14テスト                    |
-| Registry境界回帰テスト     | `scene_registry.rs`<br>`word_registry.rs`<br>`scene_table_tests.rs`<br>`word_table_test.rs`<br>`random.rs`<br>`error.rs`（各内テスト） | ✅ 完了 | 38テスト（merge_from/register_global_raw/解決境界/セレクタ契約/エラー表示文言） |
+| Registry境界回帰テスト     | `scene_registry.rs`<br>`word_registry.rs`<br>`scene_table_candidate_tests.rs`<br>`scene_table_resolve_filter_tests.rs`<br>`word_table_test.rs`<br>`random.rs`<br>`error.rs`（各内テスト） | ✅ 完了 | 38テスト（merge_from/register_global_raw/解決境界/セレクタ契約/エラー表示文言） |
 
 ### 2.3 Transpiler層テスト（Lua変換）
 
@@ -130,8 +130,8 @@
 | Luaパススルー（孤立キャッシュ）       | `lua_passthrough_test.rs`                                         | ✅ 完了 | 2テスト（lua-passthrough）                                       |
 | トランスパイル失敗中止                | `lua_passthrough_test.rs`                                         | ✅ 完了 | 2テスト（load-error-logging）                                    |
 | ログファイル名固定（Rotation::NEVER） | `logger.rs`                                                       | ✅ 完了 | 1テスト（load-error-logging）                                    |
-| load失敗→requestエラー伝搬            | `shiori_tests.rs`                                                 | ✅ 完了 | 1テスト（load-error-logging）                                    |
-| 非同期コールバック統合（SHIORI層）    | `async_callback_integration_test.rs`                              | ✅ 完了 | 12テスト（shiori-async-talk、property-dsl-extension追加2テスト） |
+| load失敗→requestエラー伝搬            | `shiori_request_tests.rs`                                         | ✅ 完了 | 1テスト（load-error-logging）                                    |
+| 非同期コールバック統合（SHIORI層）    | `async_callback_simple_test.rs` / `async_callback_chain_test.rs`  | ✅ 完了 | 12テスト（shiori-async-talk、property-dsl-extension追加2テスト） |
 | OnChoiceSelectEx 自動ルーティング     | `choice_select_test.lua`（Luaテストスイート）                     | ✅ 完了 | 選択肢コールバック→シーン自動解決                                |
 
 ### 2.5 LSP層テスト（Language Server）
@@ -172,7 +172,7 @@
 | 機能                          | テストファイル                                                                                      | 状態   | 説明                                                                                                       |
 | ----------------------------- | --------------------------------------------------------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------- |
 | SHIORI.DLL インターフェース   | `shiori_lifecycle_test.rs`                                                                          | ✅ 完了 | 5テスト全パス                                                                                              |
-| SHIORI リクエスト処理         | `lua_request_test.rs`                                                                               | ✅ 完了 | 29テスト（X-Pasta-Time時刻注入 5・review-improvement-loop 3.35/3.37 エラーパス＋スタック安全追加分含む）   |
+| SHIORI リクエスト処理         | `lua_request_date_test.rs` / `lua_request_parse_test.rs`                                                                               | ✅ 完了 | 29テスト（X-Pasta-Time時刻注入 5・review-improvement-loop 3.35/3.37 エラーパス＋スタック安全追加分含む）   |
 | ShioriTestEnv統合テスト       | `shiori_test_env_test.rs`<br>`common/response.rs`                                                   | ✅ 完了 | 5+9テスト（ShioriTestEnv E2E・ShioriResponseパーサー）                                                     |
 | Runtime E2E                   | `runtime_scene_test.rs`<br>`runtime_syntax_test.rs`                                                 | ✅ 完了 | 16テスト（2ファイルに分割）                                                                                |
 | Finalize Scene                | `finalize_scene_test.rs`                                                                            | ✅ 完了 | 14テスト                                                                                                   |

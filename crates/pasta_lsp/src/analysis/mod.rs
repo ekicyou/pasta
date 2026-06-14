@@ -5,7 +5,9 @@
 
 mod text_utils;
 mod token_types;
-mod visitors;
+mod visit_action;
+mod visit_expr;
+mod visit_scope;
 
 // Re-export public API (preserve existing import paths)
 pub use text_utils::{get_line_text, line_byte_offset};

@@ -36,7 +36,8 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │   │           ├── scene_registry.rs  # SceneRegistry - シーン管理
 │   │           ├── word_registry.rs   # WordDefRegistry - 単語辞書
 │   │           ├── scene_table.rs     # SceneTable - シーン検索
-│   │           ├── scene_table_tests.rs # シーンテーブルテスト（#[path]パターン）
+│   │           ├── scene_table_candidate_tests.rs      # シーンテーブルテスト（候補収集/解決・#[path]パターン）
+│   │           ├── scene_table_resolve_filter_tests.rs # シーンテーブルテスト（解決境界/フィルタ/アクセサ・#[path]パターン）
 │   │           ├── scene_types.rs     # シーンID・スコープ・情報型定義
 │   │           ├── word_table.rs      # WordTable - 単語検索
 │   │           └── random.rs          # RandomSelector - ランダム選択
@@ -272,8 +273,8 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 3. 判断基準: テスト対象の構造体が `pub(crate)` 以下のフィールドを持ち、それらに直接アクセスしなければテストが成立しない場合に限り `src/` 内に配置する
 
 **既存の適用例**:
-- `pasta_core/src/registry/scene_table_tests.rs`（SceneTable の labels, prefix_index への直接アクセス）
-- `pasta_shiori/src/shiori_tests.rs`（ShioriService の cache への直接アクセス）
+- `pasta_core/src/registry/scene_table_candidate_tests.rs`・`scene_table_resolve_filter_tests.rs`（SceneTable の labels, prefix_index への直接アクセス）
+- `pasta_shiori/src/shiori_lifecycle_tests.rs`・`shiori_request_tests.rs`（ShioriService の cache への直接アクセス）
 
 ### 文法定義
 - Pest文法: `src/parser/pasta.pest`
