@@ -273,7 +273,15 @@ Option A に対しマージ可能性プローブのみ独立サブステップ�
 - **Rationale**: 完全自律（議題1）・時間無制限を保ったまま「完遂待ち vs 実質詰み」を判別可能にし、開発者が手動中止・再分類できる。
 - **Impact**: Req 11.8 新設。design.md エスカレーション節・traceability 11.8・Allowed Dependencies（通知機構）・File Structure（status ファイル）を更新。
 
+### Decision: 第2段は ScheduleWakeup のみ（同一セッション）— cron/Desktop 案を上書き（設計議題3-再 2026-06-14）
+- **Context**: claude-code-guide で Claude Code のスケジュール機構を事実確認: (1) Routines=クラウドLinux（Windows MSVC ビルド不可）、(2) Desktop Scheduled Tasks=ローカル実行・OS非依存・セッション跨ぎ生存だが**Desktopアプリ常時起動が必須**、(3) `/loop`/ScheduleWakeup=同一セッション内待機→再開・セッション終了で消滅。さらに `mcp__ccd_session_mgmt__send_message`（別セッション→現セッション通知）は「対象セッション起動中・常にユーザー確認・unsupervised モード不可」のため自律完遂に使えないことも確認。
+- **Selected（ユーザー決定: ScheduleWakeup のみ／セッション維持）**: 第2段は **ScheduleWakeup**（同一セッション内で待機→再開）で実装。第1段（短期バックオフ約55分）→ 第2段（ScheduleWakeup 30〜60分間隔で完遂まで）。**同一セッション継続のため多重実行が原理的に起きず single-flight ロック不要**。cron / Desktop Scheduled Tasks / 別セッション起動・通知ハンドオフは**すべて不採用**。
+- **トレードオフ（明示的に許容）**: 完遂まで**セッションを開いておく前提**。完遂前にセッションを閉じた／マシンを落とした場合は停止 → 手動 `/kiro-impl` 再実行で Resume Mode（Req 9.5）が外部実状態から続行。**無人（セッション閉・マシンオフ）自動完遂は Non-Goal**。
+- **上書き**: 本決定は同ラウンドの「完全自律 cron」決定（コミット 8608807）を**上書き**する。エスカレーション（議題2・コミット 039fd94）はセッション内プッシュ通知として存続。
+- **Impact**: design.md 共通リトライ戦略・完遂保証節（ScheduleWakeup 全面書換）・Non-Goals（無人完遂を除外）・Phase 0 step4（cron 前提撤去）・Allowed Dependencies（cron→ScheduleWakeup）・File Structure（status ファイル撤去）・エラー処理表・コンポーネント表・トレーサビリティを更新。Req 11.3/11.4 を ScheduleWakeup へ。
+
 ## References（追加）
+- Claude Code スケジュール機構: [Desktop Scheduled Tasks](https://code.claude.com/docs/en/desktop-scheduled-tasks.md) / [Routines](https://code.claude.com/docs/en/routines.md) / [/loop scheduled-tasks](https://code.claude.com/docs/en/scheduled-tasks.md)
 - `.claude/skills/kiro-complete/SKILL.md` — PR 可否判定・PR 作成/マージ・中断条件・エラー回避（流用元の参照実装）
 - `.kiro/steering/workflow.md` L83–113 — リモート同期（PR squash）＋リリースタグ公開カーブアウト
 - `.claude/settings.json` — `git push origin main` 許可（カーブアウト用、要見直し）

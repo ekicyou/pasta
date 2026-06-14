@@ -214,8 +214,8 @@
 
 1. The Release Workflow shall すべてのリリースターゲット（全公開クレートの crates.io 公開、VSCode Marketplace 公開、タグ push、GitHub Release 作成）が成功するまで、リリースを「完了」と報告しない（完遂保証 / no half-done）
 2. When 外部サービス通信が一時障害（サーバービジー・レート制限・ネットワーク等）で失敗する, the Release Workflow shall まずセッション内で段階的バックオフによる短期リトライを行う
-3. If セッション内の短期リトライを使い切っても未完了ターゲットが残る, the Release Workflow shall スケジュールされた再試行タスクを設定し、後刻 resume モード（Requirement 9.5）で未完了分の続行を繰り返す
-4. When スケジュール再試行が起動する, the Release Workflow shall 各ターゲットの実状態を確認して未完了分のみを冪等に再試行し、全ターゲット完遂を確認したら当該スケジュールタスクを自己解除する
+3. If 短期バックオフの一巡で未完了ターゲットが残る, the Release Workflow shall 同一セッション内で ScheduleWakeup により次回再試行時刻まで待機し、再開して未完了分の続行を全ターゲット完遂まで繰り返す（セッションを開いている限り継続。完遂前にセッションが終了した場合は手動再実行が Requirement 9.5 の resume モードで続行する）
+4. When 待機から再開する, the Release Workflow shall 各ターゲットの実状態を確認して未完了分のみを冪等に再試行し、全ターゲット完遂で待機ループを終了する
 5. While 未完了ターゲットが残る, the Release Workflow shall リリースを「未完了（再試行待ち）」状態として報告し、完了済みと誤認させない
 6. If 失敗が非一時的（認証無効・権限不足・ビルドエラー等、リトライで解消しない種別）である, the Release Workflow shall リリースを完了とせず、原因と必要な対応を開発者に報告し、対応後に resume で完遂できる状態を保つ
 7. The Release Workflow shall リトライ回数・累計時間に固定上限を設けず、全ターゲット完遂または開発者の明示的中止まで再試行を継続する（所要時間は完了条件としない）
