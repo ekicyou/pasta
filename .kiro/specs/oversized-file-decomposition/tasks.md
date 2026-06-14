@@ -127,7 +127,7 @@
   - _Boundary: C2 Test File Clustering (pasta_core scene_table_tests)_
 
 - [ ] 4. C3: 純粋肥大本番ファイルの責務単位サブモジュール分割
-- [ ] 4.1 (P) LSP 解析ビジターの責務分割
+- [x] 4.1 (P) LSP 解析ビジターの責務分割
   - テストを含まない AST ビジター群を責務単位（scope / expr / action 系）の複数サブモジュールへ split-`impl` 分割
   - 親モジュールの公開 API・re-export を不変に保ち、実行時振る舞いを不変に保つ
   - 観測: `cargo check -p pasta_lsp` がコンパイル成功、全WS test green、各ファイル < 600 行、公開 API 不変
