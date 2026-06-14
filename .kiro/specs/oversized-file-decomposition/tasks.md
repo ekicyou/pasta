@@ -68,7 +68,7 @@
   - _Requirements: 1.1, 1.2, 1.3, 1.5, 1.6, 5.5, 6.1, 6.2, 6.3_
   - _Boundary: C1 Inline Test Externalization (pasta_shiori windows)_
 
-- [ ] 2.10 (P) debug wiring モジュールのインラインテスト外出し
+- [x] 2.10 (P) debug wiring モジュールのインラインテスト外出し
   - 11 個の独立テスト `mod` を 11 兄弟ファイルへ 1:1 対応で分離（既存モジュール = 1 兄弟）
   - private / `pub(crate)` 到達性を保持、移動のみ・新規追加なし
   - 観測: wiring 本番にインライン `mod tests` が残存せず、全WS test green、差分ゼロ、各兄弟 < 600 行
