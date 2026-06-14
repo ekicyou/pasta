@@ -44,7 +44,7 @@
   - _Requirements: 1.1, 1.2, 1.3, 1.5, 1.6, 5.5, 6.1, 6.2, 6.3_
   - _Boundary: C1 Inline Test Externalization (debug mod)_
 
-- [ ] 2.6 (P) code_gen (element_gen / scope_gen) のインラインテスト外出し
+- [x] 2.6 (P) code_gen (element_gen / scope_gen) のインラインテスト外出し
   - 各ファイルの単一インライン `mod tests` を 1 兄弟ファイルへ移動
   - 観測: 2 ファイル本番にインライン `mod tests` 残存せず、全WS green、差分ゼロ
   - _Requirements: 1.1, 1.2, 1.3, 1.5, 1.6, 5.5, 6.1, 6.2, 6.3_
@@ -211,3 +211,5 @@
 - マルチクラスタ分割でクラスタ跨ぎの共有テストヘルパーが必要な場合: 専用の `<name>_test_support.rs` 兄弟に `pub(super)` でまとめ、各クラスタが `use super::<name>_test_support::*;` で参照する（本番可視性は不変。test-only ヘルパーのみ pub(super) 化可）。各クラスタ <600行。
 - `cargo test` 実行は `crates/pasta_lua/tests/fixtures/sample.generated.lua` を LF→CRLF で touch する（内容差分ゼロ）。dirty 化したら `git checkout --` で復元し boundary を保つ。
 - `cargo` 実行前に必ず `unset NoDefaultCurrentDirectoryInExePath`（さもないと LuaJIT/mlua ビルドが exit 101）。
+- C1 外出しは BYTE-IDENTICAL であること（task 2.5 でコメント1語の改変が reject された）。許容変換は `mod tests {` ラッパ除去＋本体の1段(4スペース)デデントのみ。コメント・空行・空白を一切変えない。報告前に `diff <(git show HEAD:<file> | sed -n '<start>,<end>p' | sed 's/^    //') <sibling>` が空であることを確認する。
+- `--list` 不変条件の正準メトリクスは `cargo test --workspace -- --list | grep -cE ': test$'` == 2021（バイナリ別サマリ行の素朴な合計 2014 とは別物。後者を使わない）。
