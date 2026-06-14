@@ -213,7 +213,7 @@
   - 観測: `cargo check -p pasta_lua` 成功、全WS green、`--list` 2022、各ファイル < 600、公開API不変
   - _Requirements: 3.1, 3.2, 3.3, 5.5, 6.1_
   - _Boundary: C5 Production Split (debug session)_
-- [ ] 7.2 debug wiring 本番のディレクトリモジュール化
+- [x] 7.2 debug wiring 本番のディレクトリモジュール化
   - 787行の `debug/wiring.rs` を `wiring/` ディレクトリモジュールへ（hub＋run_socket_bridge / handle_inbound＋helpers / resolver・bp変換 等）分割し各 < 600
   - `#[path]` テスト宣言（wiring_*_tests）を `wiring/mod.rs` へ `../` 再配線、`run_socket_bridge`・順序・setBreakpoints原子性を不変に保つ
   - 観測: `cargo check` 成功、全WS green、特性化テスト pass、`--list` 2022、各ファイル < 600、公開到達性不変
