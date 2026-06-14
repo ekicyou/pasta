@@ -44,8 +44,17 @@
 //! the writer; the reader unblocks on the next socket EOF / error. Tests use a
 //! TEST-ONLY `set_read_timeout` and bounded joins so CI cannot hang; the
 //! production path has no timeout baked in.
+//!
+//! # Module layout (C3 directory module)
+//!
+//! This hub holds the [`Transport`] type, its impls, [`Drop`], and the listener
+//! thread body [`serve`]. The frame codec (Content-Length framing) lives in the
+//! [`framing`] submodule and is re-exported here so the wire-level seam reads as
+//! a single `transport` surface (`read_frame` / `write_frame`).
 
-use std::io::{self, BufRead, BufReader, Write};
+mod framing;
+
+use std::io::{self, BufRead, BufReader};
 use std::net::{SocketAddr, TcpListener};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -58,17 +67,17 @@ use socket2::{Domain, Protocol, Socket, Type};
 
 use crate::debug::DebugError;
 
-/// The DAP header that carries the body byte length.
-const CONTENT_LENGTH: &str = "Content-Length";
-
-/// Upper bound for an inbound frame body accepted by [`read_frame`].
-///
-/// The `Content-Length` value is **attacker-controlled** (the TCP debugger
-/// client is a trust boundary): without a cap, a single malicious header could
-/// drive an arbitrarily large body allocation before any byte of the body is
-/// read (memory-exhaustion DoS). Real DAP messages are tiny; 16 MiB is far
-/// above any legitimate frame while keeping the worst-case allocation bounded.
-const MAX_CONTENT_LENGTH: usize = 16 * 1024 * 1024;
+// Re-export the codec at the `transport` module path so the wire-level seam
+// (`crate::debug::transport::{read_frame, write_frame}`) reads as a single
+// surface — preserving the pre-split public path used by sibling debug modules
+// and their externalized tests.
+pub(crate) use framing::{read_frame, write_frame};
+// Re-exported for the externalized codec tests (`transport_codec_tests.rs`),
+// which reach module-scope items via `use super::*`; production code does not
+// reference the cap directly (the codec enforces it internally), so the
+// re-export is test-only to avoid an unused-import warning in the lib build.
+#[cfg(test)]
+pub(crate) use framing::MAX_CONTENT_LENGTH;
 
 /// Poll cadence for the interruptible non-blocking `accept()` loop in
 /// [`serve`]. Matches the established 5ms cooperative-poll convention used by
@@ -78,114 +87,6 @@ const MAX_CONTENT_LENGTH: usize = 16 * 1024 * 1024;
 /// checked once per interval, so a parked accept winds down within ~one
 /// `POLL_INTERVAL` of [`Transport::shutdown`] / drop (design "State Management").
 const POLL_INTERVAL: Duration = Duration::from_millis(5);
-
-// ---------------------------------------------------------------------------
-// Frame codec (Content-Length framing) — pure, Lua-free, unit-testable
-// ---------------------------------------------------------------------------
-
-/// Serialize `value` into a `Content-Length`-framed DAP wire frame and write it
-/// to `out`.
-///
-/// The body is compact UTF-8 JSON; the header reports its **byte** length
-/// (`buf.len()` of the UTF-8 encoding, NOT the char count), then a blank
-/// `\r\n\r\n` separates the header block from the body. The whole frame is
-/// flushed so the peer can read it immediately.
-///
-/// I/O only — never touches Lua.
-pub(crate) fn write_frame<W: Write>(out: &mut W, value: &Value) -> io::Result<()> {
-    // Compact JSON body. `to_vec` yields the exact UTF-8 bytes; the header MUST
-    // use this byte length (multi-byte UTF-8 makes bytes != chars).
-    let body = serde_json::to_vec(value)
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-    write!(out, "{CONTENT_LENGTH}: {}\r\n\r\n", body.len())?;
-    out.write_all(&body)?;
-    out.flush()
-}
-
-/// Read one `Content-Length`-framed DAP wire frame from `reader` and parse the
-/// body into a [`serde_json::Value`].
-///
-/// Parsing is robust to header ordering and to extra headers: the header block
-/// is read line by line until a blank line (the `\r\n\r\n` separator), and only
-/// the `Content-Length` header is significant (its name is matched
-/// case-insensitively, surrounding whitespace trimmed). Then EXACTLY that many
-/// body bytes are read (no over- or under-read), decoded as UTF-8, and parsed.
-///
-/// Returns `Ok(None)` on a clean EOF *before* any header bytes (the peer closed
-/// the connection between frames). Any malformed frame (missing
-/// `Content-Length`, truncated body, non-UTF-8, invalid JSON) is an
-/// [`io::Error`].
-///
-/// I/O only — never touches Lua.
-pub(crate) fn read_frame<R: BufRead>(reader: &mut R) -> io::Result<Option<Value>> {
-    let mut content_length: Option<usize> = None;
-    let mut saw_any_header_byte = false;
-
-    // (1) Read the header block, line by line, until a blank line.
-    loop {
-        let mut line = String::new();
-        let n = reader.read_line(&mut line)?;
-        if n == 0 {
-            // EOF. If it landed exactly between frames (no header bytes read),
-            // it's a clean close; otherwise the frame was truncated.
-            if saw_any_header_byte {
-                return Err(io::Error::new(
-                    io::ErrorKind::UnexpectedEof,
-                    "EOF in the middle of a frame header block",
-                ));
-            }
-            return Ok(None);
-        }
-        saw_any_header_byte = true;
-
-        // The blank line (`\r\n` or `\n`) terminates the header block.
-        let trimmed = line.trim_end_matches(['\r', '\n']);
-        if trimmed.is_empty() {
-            break;
-        }
-
-        // Parse `Header-Name: value`; only Content-Length matters. Robust to
-        // ordering and to additional headers (which are ignored).
-        if let Some((name, value)) = trimmed.split_once(':')
-            && name.trim().eq_ignore_ascii_case(CONTENT_LENGTH)
-        {
-            let parsed = value.trim().parse::<usize>().map_err(|_| {
-                io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("invalid Content-Length value: {value:?}"),
-                )
-            })?;
-            content_length = Some(parsed);
-        }
-    }
-
-    let len = content_length.ok_or_else(|| {
-        io::Error::new(
-            io::ErrorKind::InvalidData,
-            "frame header block missing Content-Length",
-        )
-    })?;
-
-    // DoS guard: the length is attacker-controlled, so reject absurd values
-    // BEFORE allocating the body buffer (see [`MAX_CONTENT_LENGTH`]).
-    if len > MAX_CONTENT_LENGTH {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!("Content-Length {len} exceeds the maximum {MAX_CONTENT_LENGTH}"),
-        ));
-    }
-
-    // (2) Read EXACTLY `len` body bytes (no over/under-read).
-    let mut body = vec![0u8; len];
-    reader.read_exact(&mut body)?;
-
-    // (3) Decode UTF-8 and parse JSON.
-    let text = String::from_utf8(body)
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-    let value = serde_json::from_str::<Value>(&text)
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-    Ok(Some(value))
-}
 
 // ---------------------------------------------------------------------------
 // Transport: bind + accept (single client) + socket<->channel bridge
@@ -605,14 +506,15 @@ fn serve(
 //   - トランスポート・ライフサイクル（bind/accept/teardown/再bind）→ transport_lifecycle_tests.rs
 // 各兄弟は先頭に `use super::*;` を持つ。クラスタ間で共有するヘルパーは無いため
 // `_test_support.rs` は設けず、各クラスタが必要なヘルパーを自クラスタ内に保持する。
+// テストファイルは `debug/` 直下に留まるため、この `transport/` ハブからは `../` で参照する。
 // ===========================================================================
 
 /// frame コーデック単体クラスタ（`write_frame`/`read_frame` の純粋単体仕様）。
 #[cfg(test)]
-#[path = "transport_codec_tests.rs"]
+#[path = "../transport_codec_tests.rs"]
 mod transport_codec_tests;
 
 /// トランスポート・ライフサイクルクラスタ（bind/accept・両方向往復・teardown・再bind）。
 #[cfg(test)]
-#[path = "transport_lifecycle_tests.rs"]
+#[path = "../transport_lifecycle_tests.rs"]
 mod transport_lifecycle_tests;

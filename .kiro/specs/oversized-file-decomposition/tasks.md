@@ -224,7 +224,7 @@
   - 観測: `cargo check` 成功、全WS green、`--list` 2022、各ファイル < 600、公開API不変
   - _Requirements: 3.1, 3.2, 3.3, 5.5, 6.1_
   - _Boundary: C5 Production Split (loader config)_
-- [ ] 7.4 debug transport 本番の責務分割
+- [x] 7.4 debug transport 本番の責務分割
   - 618行の `debug/transport.rs` 本番を責務単位（フレーミング / I/O 等）へ最小分割し各 < 600、公開API・可視性不変
   - 観測: `cargo check` 成功、全WS green、`--list` 2022、各ファイル < 600、公開API不変
   - _Requirements: 3.1, 3.2, 3.3, 5.5, 6.1_
