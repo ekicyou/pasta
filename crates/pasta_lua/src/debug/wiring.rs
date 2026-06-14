@@ -97,7 +97,7 @@ use serde_json::Value;
 
 use crate::debug::{SharedSourceMode, SourceMode};
 use crate::debug::breakpoints::BreakpointSet;
-use crate::debug::dap::{DapAdapter, pasta_source_resolver};
+use crate::debug::dap::{DapAdapter, Decoded, pasta_source_resolver};
 use crate::debug::source_map::SourceMap;
 use crate::debug::transport::Transport;
 use crate::debug::types::{
@@ -315,68 +315,13 @@ fn handle_inbound(
     // command for it), so it is handled here and returns directly — keeping the
     // ORDER apply → ack → event → RefreshPresentation exact and free of any
     // interleaving with the generic response/command routing below.
-    if command == "pasta/sourcePresentation" {
-        let request_seq = req.get("seq").and_then(Value::as_u64).unwrap_or(0);
-
-        // (1) APPLY first, so the resolver/stepper switch is already in effect for
-        // the subsequent redraw's stackTrace/source (requirements 3.1/3.2/3.4/3.5).
-        // A `Some(mode)` is a valid toggle: write the SHARED effective mode cell
-        // (requirements 1.1/1.2/4.2/4.3) — read by the VM-thread stepper per line —
-        // and RE-RUN `attach_pasta_resolver` to swap the DAP source resolver to the
-        // FINAL effective mode (`.pasta` resolver on Pasta+map, default `.lua`
-        // otherwise — task 5.2). `None` is an UNRECOGNIZED mode value: make NO
-        // change (requirement 1.4) — leave the cell and resolver as-is.
-        if let Some(mode) = decoded.requested_source_mode {
-            source_map.source_mode.set(mode);
-            attach_pasta_resolver(adapter, source_map);
-        }
-
-        // The RESULTING current mode after applying (or NOT applying, for 1.4).
-        let current = source_map.source_mode.get();
-
-        // (2) Acceptance RESPONSE first, BEFORE the redraw (requirement 1.3): echo
-        // the resolved current mode, correlated to the incoming request seq.
-        let (response, event) = {
-            let mut dap = match adapter.lock() {
-                Ok(g) => g,
-                Err(_) => return false,
-            };
-            (
-                dap.source_presentation_response(request_seq, current),
-                dap.source_presentation_event(current),
-            )
-        };
-        if transport.send(response).is_err() {
-            return false;
-        }
-        // (3) Custom EVENT carrying the current mode (the status-bar push
-        // notification — requirements 2.5/2.6).
-        if transport.send(event).is_err() {
-            return false;
-        }
-        // (4) Forward `RefreshPresentation` to the session: while STOPPED it
-        // re-emits the current `Stopped` so the client refetches in the new mode
-        // (requirement 3.3); while RUNNING it is a no-op until the next natural
-        // stop (requirement 1.5).
-        if cmd_tx.send(SessionCommand::RefreshPresentation).is_err() {
-            return false;
-        }
-        return true;
+    if let Some(done) =
+        try_source_presentation_toggle(transport, adapter, cmd_tx, req, source_map, command, &decoded)
+    {
+        return done;
     }
 
-    // Task 5.5 (requirement 6.3 / design 581/586): an `attach` request carrying an
-    // explicit `sourcePresentation` is the HIGHEST-precedence present-mode source.
-    // Apply it to THIS session BEFORE replying so the resolver/stepper switch is
-    // already in effect: (1) write the SHARED effective mode (read by the VM-thread
-    // stepper per line, task 5.4), and (2) RE-RUN `attach_pasta_resolver` so the
-    // DAP source resolver presentation matches the FINAL effective mode (attach
-    // `.pasta` resolver on Pasta+map, reset to default `.lua` otherwise — task
-    // 5.2). When the `attach` arg is ABSENT (`None`) this is skipped, so the
-    // resolved env > file > 既定 mode stays in effect (no client-default override).
-    if let Some(mode) = decoded.attach_source_mode {
-        source_map.source_mode.set(mode);
-        attach_pasta_resolver(adapter, source_map);
-    }
+    apply_attach_source_mode(adapter, source_map, &decoded);
 
     // (a) Immediate response (acks / initialize / scopes self-answer).
     if let Some(response) = decoded.response
@@ -460,6 +405,108 @@ fn handle_inbound(
         None => {}
     }
     true
+}
+
+/// Helper A (task 5.2 / design "Components / C4" Service Interface・"System Flows /
+/// C4" step A): the self-contained `pasta/sourcePresentation` runtime TOGGLE
+/// exchange extracted verbatim from `handle_inbound`. Returns `Some(true)` /
+/// `Some(false)` exactly where the original branch returned `true` / `false`
+/// (handled), and `None` when `command != "pasta/sourcePresentation"` so
+/// `handle_inbound` falls through to the attach-apply / response / event / command
+/// branches. The internal `apply → response → event → command` order and the
+/// poison/peer-gone `Some(false)` propagation are byte-identical to the inlined
+/// branch.
+fn try_source_presentation_toggle(
+    transport: &Transport,
+    adapter: &SharedAdapter,
+    cmd_tx: &Sender<SessionCommand>,
+    req: &Value,
+    source_map: &SourceMapWiring,
+    command: &str,
+    decoded: &Decoded,
+) -> Option<bool> {
+    // Task 3.1 (requirements 1.1/1.2/1.3/1.4/1.5, 2.5/2.6, 3.1/3.2/3.4/3.5,
+    // 4.2/4.3 / design "DAP custom request handler"): the runtime presentation
+    // TOGGLE. `handle_inbound` is the application authority. Detected by the raw
+    // command string (see above): a `pasta/sourcePresentation` request is a
+    // self-contained exchange (the adapter `decode_request` emits no response /
+    // command for it), so it is handled here and returns directly — keeping the
+    // ORDER apply → ack → event → RefreshPresentation exact and free of any
+    // interleaving with the generic response/command routing below.
+    if command == "pasta/sourcePresentation" {
+        let request_seq = req.get("seq").and_then(Value::as_u64).unwrap_or(0);
+
+        // (1) APPLY first, so the resolver/stepper switch is already in effect for
+        // the subsequent redraw's stackTrace/source (requirements 3.1/3.2/3.4/3.5).
+        // A `Some(mode)` is a valid toggle: write the SHARED effective mode cell
+        // (requirements 1.1/1.2/4.2/4.3) — read by the VM-thread stepper per line —
+        // and RE-RUN `attach_pasta_resolver` to swap the DAP source resolver to the
+        // FINAL effective mode (`.pasta` resolver on Pasta+map, default `.lua`
+        // otherwise — task 5.2). `None` is an UNRECOGNIZED mode value: make NO
+        // change (requirement 1.4) — leave the cell and resolver as-is.
+        if let Some(mode) = decoded.requested_source_mode {
+            source_map.source_mode.set(mode);
+            attach_pasta_resolver(adapter, source_map);
+        }
+
+        // The RESULTING current mode after applying (or NOT applying, for 1.4).
+        let current = source_map.source_mode.get();
+
+        // (2) Acceptance RESPONSE first, BEFORE the redraw (requirement 1.3): echo
+        // the resolved current mode, correlated to the incoming request seq.
+        let (response, event) = {
+            let mut dap = match adapter.lock() {
+                Ok(g) => g,
+                Err(_) => return Some(false),
+            };
+            (
+                dap.source_presentation_response(request_seq, current),
+                dap.source_presentation_event(current),
+            )
+        };
+        if transport.send(response).is_err() {
+            return Some(false);
+        }
+        // (3) Custom EVENT carrying the current mode (the status-bar push
+        // notification — requirements 2.5/2.6).
+        if transport.send(event).is_err() {
+            return Some(false);
+        }
+        // (4) Forward `RefreshPresentation` to the session: while STOPPED it
+        // re-emits the current `Stopped` so the client refetches in the new mode
+        // (requirement 3.3); while RUNNING it is a no-op until the next natural
+        // stop (requirement 1.5).
+        if cmd_tx.send(SessionCommand::RefreshPresentation).is_err() {
+            return Some(false);
+        }
+        return Some(true);
+    }
+
+    None
+}
+
+/// Helper B (task 5.2 / design "Components / C4" Service Interface・"System Flows /
+/// C4" step B): the explicit `attach`-mode apply extracted verbatim from
+/// `handle_inbound`. Sets the SHARED effective mode and re-runs the resolver when
+/// `decoded.attach_source_mode` is `Some`; never sends, never returns.
+fn apply_attach_source_mode(
+    adapter: &SharedAdapter,
+    source_map: &SourceMapWiring,
+    decoded: &Decoded,
+) {
+    // Task 5.5 (requirement 6.3 / design 581/586): an `attach` request carrying an
+    // explicit `sourcePresentation` is the HIGHEST-precedence present-mode source.
+    // Apply it to THIS session BEFORE replying so the resolver/stepper switch is
+    // already in effect: (1) write the SHARED effective mode (read by the VM-thread
+    // stepper per line, task 5.4), and (2) RE-RUN `attach_pasta_resolver` so the
+    // DAP source resolver presentation matches the FINAL effective mode (attach
+    // `.pasta` resolver on Pasta+map, reset to default `.lua` otherwise — task
+    // 5.2). When the `attach` arg is ABSENT (`None`) this is skipped, so the
+    // resolved env > file > 既定 mode stays in effect (no client-default override).
+    if let Some(mode) = decoded.attach_source_mode {
+        source_map.source_mode.set(mode);
+        attach_pasta_resolver(adapter, source_map);
+    }
 }
 
 /// Whether a DAP `setBreakpoints` source path names a `.pasta` file (design

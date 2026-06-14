@@ -173,7 +173,7 @@
   - _Depends: 2.10_
   - _Boundary: C4 handle_inbound Decomposition (wiring tests)_
 
-- [ ] 5.2 トグル/attach 適用分岐のヘルパー抽出
+- [x] 5.2 トグル/attach 適用分岐のヘルパー抽出
   - source-presentation トグル交換と明示 attach モード適用の分岐を、同一モジュール内 private free fn へ抽出（A・B）
   - apply が response/event より前に走る順序と poison→停止(非 panic) 不変条件を保持
   - 観測: 抽出後も特性化テスト・全WS test green、差分ゼロ、`handle_inbound` 呼び出し列が固定順序
