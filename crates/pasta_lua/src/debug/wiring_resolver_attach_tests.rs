@@ -3,7 +3,6 @@
 //! [`pasta_source_resolver`](crate::debug::dap::pasta_source_resolver) IFF
 //! `pasta_active()` (a map present AND `SourceMode::Pasta`, design 509/582);
 //! otherwise the adapter keeps its default `.lua` resolver (R6.2 / 7.2).
-use super::*;
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};

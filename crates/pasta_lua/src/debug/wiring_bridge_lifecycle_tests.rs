@@ -11,7 +11,6 @@
 //!
 //! All sockets bind `127.0.0.1:0` (ephemeral); every wait is a bounded
 //! blocking wait on a channel/socket (no sleeps-as-sync).
-use super::*;
 
 use std::io::BufReader;
 use std::net::{Shutdown, SocketAddr, TcpStream};

@@ -6,7 +6,6 @@
 //! thread; only channels / the bound address (a `SocketAddr`, `Copy`) cross
 //! the thread boundary. All client-side waits use a TEST-ONLY watchdog so CI
 //! cannot hang; the stop core itself stays unbounded.
-use super::*;
 
 use std::io::BufReader;
 use std::net::{SocketAddr, TcpStream};

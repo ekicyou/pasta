@@ -13,7 +13,6 @@
 //! [`Transport`] (a connected client reads the response/event frames), so the
 //! exact wire frames, the cell state, the swapped resolver (observed via a
 //! subsequent `stackTrace` encode), and the forwarded command are all asserted.
-use super::*;
 
 use std::collections::BTreeMap;
 use std::io::BufReader;

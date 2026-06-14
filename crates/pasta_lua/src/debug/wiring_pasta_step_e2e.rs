@@ -38,7 +38,6 @@
 //! `mlua::Lua`（`!Send`）は VM ホストスレッドにのみ生存し、バウンド `SocketAddr`
 //! （`Copy`）と go/done チャネルだけが越境する。全クライアント待機は TEST-ONLY
 //! watchdog でバウンドし CI がハングしないようにする（停止コアは無期限）。
-use super::*;
 
 use std::collections::BTreeMap;
 use std::io::BufReader;

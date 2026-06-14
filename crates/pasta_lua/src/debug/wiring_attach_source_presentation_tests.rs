@@ -9,7 +9,6 @@
 //! These tests drive the resolver-attachment + shared-mode decision DIRECTLY
 //! (the unit-testable core of the integration); the VM-thread step granularity
 //! half is covered in `session.rs` (`attach_*` tests via [`SharedSourceMode`]).
-use super::*;
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};

@@ -2,7 +2,6 @@
 //! (resolver 5.2 / BP translation 5.3) are reached. `pasta_active()` is the
 //! single gate: a map present AND `SourceMode::Pasta` (design 582). Otherwise
 //! the bridge keeps its default `.lua` behavior (requirements 6.1/6.2/7.2).
-use super::*;
 
 use std::sync::Arc;
 

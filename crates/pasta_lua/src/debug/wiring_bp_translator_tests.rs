@@ -7,7 +7,6 @@
 //! `nearest_pasta_line_with_mapping` で後続最近接へ調整して `verified`＋調整後
 //! 行を返す（4.3）。登録した `.pasta` BP が **生フック座標**で `should_pause`
 //! を発火することも end-to-end で検証する（5.1 review のキー再整合・4.2）。
-use super::*;
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
