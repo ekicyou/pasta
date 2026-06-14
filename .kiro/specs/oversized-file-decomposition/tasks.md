@@ -108,7 +108,7 @@
   - _Requirements: 2.1, 2.2, 2.3, 5.5, 6.1_
   - _Boundary: C2 Test File Clustering (pasta_dsl tests)_
 
-- [ ] 3.6 (P) pasta_shiori 統合テスト群のクラスタ分割
+- [x] 3.6 (P) pasta_shiori 統合テスト群のクラスタ分割
   - 非同期コールバック統合テストと Lua リクエストテストを各 < 600 行の最小分割へ（内側 mod を凝集グルーピング・flat tests）
   - 観測: 全WS green、差分ゼロ、各ファイル < 600 行
   - _Requirements: 2.1, 2.2, 2.3, 5.5, 6.1_
