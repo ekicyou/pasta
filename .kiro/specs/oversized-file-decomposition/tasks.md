@@ -198,7 +198,7 @@
   - _Boundary: C4 handle_inbound Decomposition (wiring)_
 
 - [ ] 6. Validation: 全体回帰と完了基準の検証
-- [ ] 6.1 完了基準の最終検証
+- [x] 6.1 完了基準の最終検証
   - 全是正の最終状態で `cargo build --workspace` / `cargo test --workspace` が green、ベースラインのテスト名集合が不変（C4 特性化テスト 1 本の追加のみ許容）であることを確認
   - 主基準（バイナリ）: `src/` 本番ファイルにインライン `#[cfg(test)] mod` テストが残存しないことを確認
   - 副基準: 是正対象の各 Rust ファイルが 600 行未満（凝集優先の超過は理由記録済み）、公開 API シグネチャ・可視性が不変であることを確認

@@ -164,3 +164,33 @@
 - **主要な設計判断**: (1) C3 各ファイルの責務軸とサブモジュール構成（公開 API 不変）、(2) C4 ヘルパー抽出の関数分割境界と順序保証の表現方式、(3) C2 クラスタ分割の粒度。
 - **繰越研究項目**: 上記 §6 の 1–5。特に C3 責務境界（Unknown）と C4 順序保証（High Risk）を design で重点設計。
 - **不変条件チェックリスト**（全層共通）: 公開 API シグネチャ・可視性不変／テスト集合（名前・件数・アサーション）の移動のみ／各ステップ `cargo build`+`cargo test` green／`setBreakpoints` 原子性・bridge 非 panic。
+
+---
+
+## 9. 完了検証記録 (task 6.1)
+
+実装完了時点の最終検証結果（全 C1–C4 完了後）。
+
+### 主基準（バイナリ・必達）= MET
+- 是正対象 15 ファイル（debug の session/source_map/transport/inspect/hook/mod/wiring、code_gen の element_gen/scope_gen、loader の config/discovery/extract、transpiler、pasta_shiori windows）すべてでインライン `#[cfg(test)] mod NAME { ... }` ブロックが残存しない（`#[cfg(test)] #[path] mod ...;` 宣言形へ外出し済み）。
+- `dap.rs` は `dap/` ディレクトリモジュールへ分割完了。
+- C3 純粋本番分割 5 件（visitors / loader_mod / runtime_mod / dap / debug_mod）完了、公開 API・可視性不変。
+- 残存する `mod tests {` は**すべて是正対象外**（error.rs 等の <600 行小ファイル群、および設計で「任意外出し候補」とした debug/breakpoints.rs(591)・debug/types.rs(567) — いずれも <600）。
+
+### 振る舞い不変 = MET
+- `cargo build --workspace` / `cargo test --workspace`（env `NoDefaultCurrentDirectoryInExePath` 無効化）green、回帰ゼロ。
+- テスト不変条件: `--list` == **2022**（ベースライン 2021 ＋ C4 特性化テスト 1 本の sanctioned 追加）。テスト集合は移動のみ・leaf 名 multiset 保存。
+- 公開 API シグネチャ・可視性不変（lib.rs re-export 解決をビルド green が実証）。`run_socket_bridge` byte 不変。`enable()` zero-cost gate verbatim。
+
+### 副基準（600 行・努力目標）= 5 件の文書化済み超過（R5.5 に基づく許容）
+是正後も 600 行を超える本番ファイル 5 件。いずれも C1（テスト外出し）対象で、**本番ロジック自体が 600 行を超える**ため、承認済み設計の C3 ファイル分割スコープ（visitors/loader_mod/runtime_mod/dap/debug_mod の 5 件のみ）には含まれなかった。brief のカテゴリ1表が session.rs 等の本番行数を過小評価（session 本番を ~300 と記載、実測 ~830）していたことに起因する。
+
+| ファイル | 行数 | 区分 | 超過理由（R5.5 記録） |
+|---|---:|---|---|
+| `debug/session.rs` | 863 | C1済・本番残 | 停止状態機械＋StepController の凝集した本番ロジック。C3 未対象。責務分割は follow-up 候補 |
+| `debug/wiring.rs` | 787 | C1+C4済・本番残 | handle_inbound は A→B→C→D→E ヘルパーへ解体済み（関数可読性は改善）。ファイル分割は設計スコープ外（C4 は関数分解のみ） |
+| `loader/config.rs` | 626 | C1済・本番残 | ローダー設定 deserialize ロジックの凝集本番。C3 未対象 |
+| `debug/transport.rs` | 618 | C1済・本番残 | TCP＋Content-Length フレーミング I/O の凝集本番。C3 未対象 |
+| `debug/source_map.rs` | 607 | C1済・本番残 | 本番ロジック 579 行＋`#[path]` 宣言。実質 600 直下。C3 未対象 |
+
+**判断**: 主基準（必達）は完全達成、振る舞い不変も完全。副基準（600 目安）は上記 5 件が承認済みスコープ外の本番肥大として残存。これらの責務単位ファイル分割（session→状態機械/StepController 等、wiring→ディレクトリモジュール化、config/transport の責務分割）は、本仕様の C3 メカニズム（split-`impl`/ディレクトリモジュール）をそのまま適用できる **follow-up spec の候補**。本仕様の承認済みタスク範囲は完遂。
