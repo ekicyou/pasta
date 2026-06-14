@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git push origin main:*)"
+      "Bash(git fetch:*)",
+      "Bash(git merge origin/main:*)",
+      "Bash(git merge --abort)",
+      "Bash(git push origin v*:*)",
+      "Bash(gh pr create:*)",
+      "Bash(gh pr merge:*)"
     ]
   }
 }
