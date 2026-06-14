@@ -261,6 +261,12 @@ Option A に対しマージ可能性プローブのみ独立サブステップ�
 - **Trade-offs**: スケジュールタスクのライフサイクル管理（作成・重複回避・自己解除）と一時/非一時の判別ロジックが必要。完遂まで時間を要し得る（要件として許容）。
 - **Impact**: requirements に Req 11 新設＋ Req 3.4/4.5/4.6/8.4/9.4/10.8・リリース対象表を更新。design に「共通リトライ戦略（二段）」「完遂保証とスケジュール永続リトライ」節・Track Y 再分類・エラー処理表・トレーサビリティ・完了サマリーを更新。Allowed Dependencies にスケジュール機構を追加。
 
+### Decision: 第2段は完全自律 cron（設計議題1-再 2026-06-14）
+- **Context**: 再レビュー Critical Issue 1。第2段スケジュール再試行の実行環境（ワークツリー/認証/ツール）が前提のままだった。
+- **Selected**: **完全自律 cron のみ**。cron 系機構で `/kiro-impl` をヘッドレス自律再起動。元ワークツリーは PR マージで削除済みのため **main の clean checkout** を基点（feature ブランチ不要）。認証は env ベース（`CARGO_REGISTRY_TOKEN`/`VSCE_PAT`/`gh`）がヘッドレスで有効である前提。通知フォールバックは持たない。
+- **安全網**: 前提（cron/env 認証/checkout）が欠ける場合は**非一時障害**として未完了報告＋エスカレーション（議題2）に回し、黙って消えない。Phase 0 で前提を事前検証。
+- **Impact**: design.md スケジュール機構・Phase 0（手順4 追加）・Allowed Dependencies（cron を P0・ヘッドレス前提明記）・コンポーネント表 Phase 0 行を更新。
+
 ## References（追加）
 - `.claude/skills/kiro-complete/SKILL.md` — PR 可否判定・PR 作成/マージ・中断条件・エラー回避（流用元の参照実装）
 - `.kiro/steering/workflow.md` L83–113 — リモート同期（PR squash）＋リリースタグ公開カーブアウト

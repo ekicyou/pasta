@@ -59,7 +59,7 @@
 - Pattern: `kiro-complete` SKILL.md の PR 統合パターン（PR 可否判定・中断セマンティクス・ローカル削除警告の非致命扱い）を**流用**（`--squash` → `--merge` に置換）(P1)
 - One-Time: `gh repo edit --enable-merge-commit` — repo の merge-commit 方式の有効化（前提セットアップ）(P0)
 - Infra: crates.io registry / VSCode Marketplace — 公開先（R3）(P1)
-- Infra: ハーネスのスケジュール実行機構（cron 系スケジュールタスク）— 第2段スケジュール永続リトライ（セッション跨ぎで完遂まで再起動）(P1)
+- Infra: ハーネスの cron 系スケジュール実行機構 — 第2段スケジュール永続リトライ（**完全自律・ヘッドレス**で `/kiro-impl` を再起動、セッション跨ぎで完遂まで）。前提: env ベース認証（`CARGO_REGISTRY_TOKEN`/`VSCE_PAT`/`gh`）がヘッドレスで有効、main の clean checkout を確保できること (P0)
 
 ### Revalidation Triggers
 - Cargo.toml の workspace 構造変更（クレート追加・削除）
@@ -359,7 +359,7 @@ flowchart TD
 
 | Component              | Stage | Intent                                   | Req Coverage    | Key Dependencies (Resource)                          | Critical? |
 | ---------------------- | ----- | ---------------------------------------- | --------------- | ---------------------------------------------------- | --------- |
-| Phase 0: Prerequisites | A     | gh 認証・merge-commit 許可確認           | 10.3（前提）    | gh auth / gh repo view (R3)                          | yes       |
+| Phase 0: Prerequisites | A     | gh 認証・merge-commit 許可・第2段前提確認 | 10.3, 11.2–11.4 | gh auth / gh repo view (R3), cron 機構, env 認証      | yes       |
 | Phase 1: Validation    | A     | バージョン決定と事前検証                 | 1.1–1.11        | Cargo.toml (R2), cargo test (R1), git (R2)           | yes       |
 | Phase 2: VersionBump   | A     | Cargo.toml + package.json 更新           | 2.1–2.6         | Cargo.toml/package.json (R2), cargo build (R1)       | yes       |
 | Phase 5: GhostBuild    | A     | サンプルゴーストビルド（ローカル）       | 5.1–5.9         | release.ps1 (R1+R2), i686 target                     | yes       |
@@ -376,15 +376,16 @@ flowchart TD
 
 | Field        | Detail                                                        |
 | ------------ | ------------------------------------------------------------ |
-| Intent       | GitHub CLI の認証状態と repo の merge-commit 許可を確認する  |
-| Requirements | 10.3（前提条件）                                             |
+| Intent       | gh 認証・merge-commit 許可・第2段自律再試行の前提を確認する |
+| Requirements | 10.3, 11.2–11.4, 11.6（前提条件）                            |
 
 **実行手順**
 1. `gh auth status` — 未認証なら「`gh auth login` を実行してください」とガイダンス。
 2. `gh repo view --json mergeCommitAllowed` — `false` の場合は「一回限りセットアップ（`gh repo edit --enable-merge-commit`）が未実施です」と報告し中止。`true` なら続行。
 3. 現在ブランチが**非デフォルトブランチ（ワークツリー）**であることを確認（`git rev-parse --abbrev-ref HEAD` が `main` でない）。`main` 上ならハーネスのワークツリー上での再実行を促す（10.1）。
+4. **第2段スケジュール前提の確認**（議題1・Req 11.2–11.4, 11.6）: (a) cron 系スケジュール機構が利用可能か、(b) `CARGO_REGISTRY_TOKEN` / `VSCE_PAT` が**環境変数で設定済み**か（ヘッドレス自律再試行で必須）を確認する。欠けていれば警告する（初回実行は継続可能だが、第2段が必要になった際に自律再試行できないため、その時点で非一時障害として未完了報告・エスカレーションされる）。
 
-**Note**: `cargo publish` の認証は環境変数 `CARGO_REGISTRY_TOKEN`、`vsce` は `VSCE_PAT` で有効なためチェック不要。
+**Note**: `cargo publish` の認証は環境変数 `CARGO_REGISTRY_TOKEN`、`vsce` は `VSCE_PAT`、`gh` は env トークンで有効。**これら env ベース認証はヘッドレス cron 実行（第2段）でも有効である必要がある**（議題1）。
 
 #### Phase 1: Validation
 
@@ -600,11 +601,16 @@ LLM セッションが途中で切断された場合の復旧:
 2. **第2段（スケジュール）**: 第1段を使い切っても未完了ターゲットが残る場合、**スケジュールタスクを設定**して `/kiro-impl release-workflow` を後刻自動再起動する。再起動時は **Resume Mode** が未完了分（未公開クレート・Marketplace・タグ push・Release）のみを冪等に続行する。
 
 **スケジュール機構**:
-- ハーネスのスケジュール実行機構（cron 系スケジュールタスク）を用いる。LLM エージェントがタスクを**作成・更新・自己解除**する。
-- **作成**: 第1段枯渇かつ一時障害のとき、適度な間隔（既定: 30〜60 分間隔、相手側回復を待つ）で再試行タスクを登録。
-- **継続**: 各起動で Resume 検知 → 未完了分を第1段リトライ。なお失敗なら次回スケジュールへ。
-- **自己解除（Req 11.4）**: 全ターゲット完遂を確認した起動が、当該スケジュールタスクを削除する。重複登録を避けるため、登録前に既存の同一バージョン用タスクの有無を確認する。
-- **セッション跨ぎ**: スケジュールはセッション終了後も生存するため、長時間の相手側障害でも現在セッションを拘束しない（議題3 の基本方針「完遂優先・一時的な外部状態は許容」と整合）。
+- **実行形態（議題1 決定: 完全自律 cron）**: 第2段はハーネスの cron 系スケジュール機構で `/kiro-impl release-workflow` を**無人（ヘッドレス）で自律再起動**する。人手の介在・通知フォールバックは前提としない。成立条件は以下で、Phase 0 が事前検証する:
+  - **認証**: `CARGO_REGISTRY_TOKEN` / `VSCE_PAT` / `gh`（いずれも環境変数ベース）がヘッドレス環境で有効であること。
+  - **ソース**: 元のワークツリーは PR マージ時に削除済みのため、第2段は **main の clean checkout**（リリース版 V を含む）を基点とする。feature ブランチは不要。新規 checkout/同期は cron 実行手順内で確保する。
+  - **スケジュール機構**: cron 系タスクの作成・削除 API が利用可能であること。
+  - これらが揃わない場合は**非一時障害**として扱い、未完了報告＋エスカレーション（議題2）に回す（黙って消えない）。
+- LLM エージェントがタスクを**作成・更新・自己解除**する。
+- **作成**: 第1段枯渇かつ一時障害のとき、適度な間隔（既定: 30〜60 分間隔、相手側回復を待つ）で再試行 cron タスクを登録。
+- **継続**: 各 cron 起動は **Resume 限定モード**（議題3）で起動し、Resume 検知 → 未完了分を第1段リトライ。なお失敗なら次回スケジュールへ。
+- **自己解除（Req 11.4）**: 全ターゲット完遂を確認した起動が、当該 cron タスクを削除する。重複登録を避けるため、登録前に既存の同一バージョン用タスクの有無を確認する。
+- **セッション跨ぎ**: cron タスクはセッション終了後も生存するため、長時間の相手側障害でも現在セッションを拘束しない（基本方針「完遂優先・一時的な外部状態は許容」と整合）。
 
 **非一時障害の扱い（Req 11.6）**: 認証無効・権限不足・ビルドエラー・マージコンフリクト等、リトライで解消しない種別はスケジュール再試行に載せず、「未完了・要対応」として原因と必要対応を報告する。開発者対応後、通常の再実行が Resume Mode で完遂する。
 
