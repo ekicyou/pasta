@@ -267,6 +267,12 @@ Option A に対しマージ可能性プローブのみ独立サブステップ�
 - **安全網**: 前提（cron/env 認証/checkout）が欠ける場合は**非一時障害**として未完了報告＋エスカレーション（議題2）に回し、黙って消えない。Phase 0 で前提を事前検証。
 - **Impact**: design.md スケジュール機構・Phase 0（手順4 追加）・Allowed Dependencies（cron を P0・ヘッドレス前提明記）・コンポーネント表 Phase 0 行を更新。
 
+### Decision: 永続リトライは定期通知＋無限継続（設計議題2-再 2026-06-14）
+- **Context**: 再レビュー Critical Issue 2。上限なし自律リトライに可観測性がなく、恒久障害の誤分類で静かに無限ループするリスク。
+- **Selected**: 無限自律リトライを継続しつつ、**5 回ごと/24 時間経過ごとにプッシュ通知**で「未完遂・継続中・累計試行・最終エラー・分類」を報告。試行履歴は gitignore 対象の機械可読 status ファイル（`release/.release-retry-status-vX.Y.Z.json`）に保持し cron 起動を跨いで更新、完遂で削除。非一時障害は即時通知。
+- **Rationale**: 完全自律（議題1）・時間無制限を保ったまま「完遂待ち vs 実質詰み」を判別可能にし、開発者が手動中止・再分類できる。
+- **Impact**: Req 11.8 新設。design.md エスカレーション節・traceability 11.8・Allowed Dependencies（通知機構）・File Structure（status ファイル）を更新。
+
 ## References（追加）
 - `.claude/skills/kiro-complete/SKILL.md` — PR 可否判定・PR 作成/マージ・中断条件・エラー回避（流用元の参照実装）
 - `.kiro/steering/workflow.md` L83–113 — リモート同期（PR squash）＋リリースタグ公開カーブアウト
