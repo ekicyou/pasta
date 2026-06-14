@@ -156,7 +156,7 @@
   - _Depends: 2.2_
   - _Boundary: C3 Production Responsibility Split (debug dap)_
 
-- [ ] 4.5 (P) デバッグバックエンドエントリの責務分割
+- [x] 4.5 (P) デバッグバックエンドエントリの責務分割
   - 本番を hub 残置＋プレゼンテーションモード値型 / 設定解決(zero-cost gate) / エラー型 / ハンドル(Drop) / 起動エントリの兄弟へ分割
   - 兄弟からの構築用に `pub(crate) fn new()` をハンドルへ追加（カプセル化強化・公開 API 不変）、`enable()` の無効時 early-return(zero-cost) を verbatim 保持
   - 観測: `cargo check -p pasta_lua` 成功、全WS green、各ファイル < 600 行、`lib.rs` 公開再公開が byte 不変
