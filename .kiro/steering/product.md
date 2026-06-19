@@ -19,7 +19,7 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 - [x] シーンジャンプテーブル設計の修正 → `scene-search-integration` 完了
 - [x] 宣言的制御フロー（Call/Jump文）の再実装 → `act-impl-call` 完了
 
-**完了仕様**: 110件（`.kiro/specs/completed/` に格納）
+**完了仕様**: 127件（`.kiro/specs/completed/` に格納）
 
 **主要成果**:
 - ✅ **act-impl-call** - `ACT_IMPL.call` 4段階優先順位検索実装
@@ -41,7 +41,7 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 - [x] SHIORI インターフェース（pasta_shiori）- DLL エクスポート
 
 ### Phase 2: コア機能拡張（進行中）🔄
-**最終更新**: 2026-06-05（現行バージョン v0.2.0）
+**最終更新**: 2026-06-19（現行バージョン v0.2.4）
 
 **繰り返し仕様**:
 - 🔁 **release-workflow** - リリース作業手順（`/kiro-spec-impl` 実行のたびにタスクリセット、永続的に未完了）
@@ -69,6 +69,22 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 
 **ドキュメント整備**:
 - ✅ **pasta-user-manual** - 利用者（ゴースト作者）向けマニュアル。Pasta DSL 文法・Lua API/コーディング・入門チュートリアルを mdBook 製の静的サイトへ統合し、GitHub Pages で公開（[https://ekicyou.github.io/pasta/](https://ekicyou.github.io/pasta/)）。日本語 bigram 検索・doc/spec ドリフト検出ゲートを含む
+
+**VSCode 拡張・デバッグ基盤**（ゴースト作者の開発体験向上）:
+- ✅ **pasta-vscode-extension** - VSCode 拡張本体（TypeScript + WASM 統合、`editors/vscode/`）
+- ✅ **pasta-vscode-lua-highlight** - `.pasta` 内 Lua ブロックの自動シンタックスハイライト（injection grammar）
+- ✅ **pasta-vscode-lua-debug** - VSCode Lua デバッグバックエンド（DAP 最小サブセット・`pasta_lua/src/debug/`・既定無効/ゼロコスト）
+- ✅ **pasta-debug-break-coalesce** / **pasta-debug-lua-view-toggle** - ブレーク合体・Lua ビュー切替
+- ✅ **debug-transport-hardening** - reload 再バインド失敗（WSAEADDRINUSE/10048）の根治
+- ✅ **debug-startup-logging** - デバッグバックエンド起動時の info/warn 観測ログ
+- ✅ **vscode-extension-release** / **vscode-trailing-newline** - 拡張リリース・末尾改行整備
+
+**保守性・基盤整備**:
+- ✅ **oversized-file-decomposition** - 巨大 Rust ファイルを俯瞰可能サイズへ振る舞い不変分解（全ファイル < 600 行）
+- ✅ **pasta-config-restructure** - `pasta.toml` をデフォルトプロファイルモデルへ再整理（記述負担軽減）
+- ✅ **budouy-migration** - 分かち書きクレートを budoux → budouy へ移行
+- ✅ **review-improvement-loop** - コードベース総合レビュー＆改善ループ完走（64 セル）
+- ✅ **kiro-gitflow-worktree-pr** - kiro git 統合をワークツリー隔離 + PR ベース squash マージへ移行
 
 **Phase 3（監査）: 脆弱性監査・コード簡素化 ✅ 完了**（全クレート対象、外部振る舞い不変）:
 - ✅ **Wave 1**: `audit-pasta-core` / `audit-pasta-dsl` / `audit-pasta-lua` / `audit-pasta-shiori` / `audit-pasta-check` / `audit-pasta-lsp` / `audit-pasta-sample-ghost`
