@@ -57,15 +57,18 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       │   │   └── source_map.rs   # .pastaソースマップ記録シーム（SourceMapSink/PastaPos）
 │       │   ├── debug/      # VSCode Luaデバッグバックエンド（DAP・既定無効/ゼロコスト・SHIORI非依存）
 │       │   │   ├── mod.rs          # DebugConfig/enable()/DebugHandle/DebugError・有効化ゲート
+│       │   │   ├── config.rs / enable.rs / error.rs / handle.rs # 設定・有効化・エラー・ハンドル（フラットモジュール）
 │       │   │   ├── types.rs        # 共有DTO（SessionCommand/Event・FrameInfo・ThreadId等）
 │       │   │   ├── breakpoints.rs  # BreakpointSet（Arc<Mutex>共有）
 │       │   │   ├── hook.rs         # set_global_hook＋jit.off・LineHookシーム
-│       │   │   ├── session.rs      # 停止状態機械・StepController（over/in/out）
 │       │   │   ├── inspect.rs      # FrameInspector（mlua::ffi・コルーチンstate走査）
-│       │   │   ├── transport.rs    # TCP＋Content-Lengthフレーミング（I/O専用）
-│       │   │   ├── dap.rs          # DAP最小サブセット（serde_json手書き）
-│       │   │   ├── wiring.rs       # transport↔dap↔session↔hook結線（ブリッジスレッド）
-│       │   │   └── source_map.rs   # .pasta本番ソースマップ（ChunkSourceMap/MapBuilderSink/SourceMap・正規化キー・任意サイドカー）
+│       │   │   ├── source_mode.rs  # ソース表示モード（.pasta/Lua ビュー切替）
+│       │   │   ├── session/        # 停止状態機械（mod/anchor/stepping/stop_loop に分解）
+│       │   │   ├── dap/            # DAP最小サブセット（codec/decode/encode/pending/resolver・serde_json手書き）
+│       │   │   ├── transport/      # TCP＋Content-Lengthフレーミング（mod/framing・I/O専用）
+│       │   │   ├── wiring/         # transport↔dap↔session↔hook結線（mod/bridge/inbound/resolver）
+│       │   │   └── source_map/     # .pasta本番ソースマップ（mod/sidecar・正規化キー・任意サイドカー）
+│       │   │   # 注: 上記に対応する src 内テスト（*_tests.rs）・共有ヘルパ（*_test_support.rs）が多数併置（後述「src/ 内テスト配置方針」）
 │       │   ├── context.rs   # トランスパイルコンテキスト
 │       │   ├── error.rs     # エラー型
 │       │   ├── encoding/    # エンコーディング処理（プラットフォーム別分割）
@@ -167,7 +170,9 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │   │       ├── analysis/    # 解析エンジン（ディレクトリモジュール）
 │   │       │   ├── mod.rs          # 解析API・全公開型 re-export
 │   │       │   ├── token_types.rs  # トークン型定義
-│   │       │   ├── visitors.rs     # ASTビジター群
+│   │       │   ├── visit_scope.rs  # スコープ走査ビジター（旧 visitors.rs を分解）
+│   │       │   ├── visit_action.rs # アクション走査ビジター
+│   │       │   ├── visit_expr.rs   # 式走査ビジター
 │   │       │   └── text_utils.rs   # テキストユーティリティ
 │   │       ├── document.rs  # ドキュメント状態管理
 │   │       ├── error.rs     # LangServerError型定義
@@ -275,9 +280,20 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 **既存の適用例**:
 - `pasta_core/src/registry/scene_table_candidate_tests.rs`・`scene_table_resolve_filter_tests.rs`（SceneTable の labels, prefix_index への直接アクセス）
 - `pasta_shiori/src/shiori_lifecycle_tests.rs`・`shiori_request_tests.rs`（ShioriService の cache への直接アクセス）
+- `pasta_lua/src/debug/` 配下（`*_tests.rs` 多数。デバッグ状態機械・DAP・wiring の内部状態を直接検証）
+
+**命名規約（src 内テスト）**:
+- テストモジュール本体: `<feature>_tests.rs`（複数形 `_tests`。`tests/` 配下の統合テスト `<feature>_test.rs`（単数形）と区別する）
+- 共有テストヘルパ: `<feature>_test_support.rs`（複数の `*_tests.rs` から `#[path]` 等で共有されるモック/ビルダ/フィクスチャ。テスト関数は置かない）
 
 ### 文法定義
 - Pest文法: `src/parser/pasta.pest`
+
+### ファイルサイズ方針（俯瞰可能性）
+
+- **目安上限 600 行**: Rust ソース・テストファイルは 1 ファイルあたり概ね 600 行未満を保つ（`oversized-file-decomposition` で全ファイルを俯瞰可能サイズへ振る舞い不変分解済み）。
+- **分解の方向**: 肥大化したファイルは、フラットな単一ファイル → 同名のディレクトリモジュール（`mod.rs` + 責務別サブモジュール）へ展開する。例: `debug/dap.rs` → `debug/dap/{mod,codec,decode,encode,pending,resolver}.rs`。
+- **不変条件**: 分解はあくまで振る舞い不変（pub API・テスト結果を変えない）。新規実装でこの上限のために責務をまたぐ分割をしない。
 
 ## モジュール構成
 
