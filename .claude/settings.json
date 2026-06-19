@@ -8,5 +8,11 @@
       "Bash(gh pr create:*)",
       "Bash(gh pr merge:*)"
     ]
+  },
+  "autoMode": {
+    "allow": [
+      "$defaults",
+      "gh pr merge による pull request の default ブランチ（main 等）への squash マージを許可する。self-created PR を含み、kiro-complete の完了フローでの自動マージを想定する。"
+    ]
   }
 }
