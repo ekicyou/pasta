@@ -104,9 +104,11 @@
 7. If GET の block-on-reply がタイムアウト閾値を超えてアクタースレッドの応答が得られないとき, then the marshaling 層 shall 204 No Content を返して SHIORI スレッドの待機を打ち切る（SSP を凍結させない）。このとき the pasta システム shall シーンコルーチン（`STORE.co_scene`）の中断状態を破棄せず生かし、後続の `OnSecondChange`（`resume_until_valid` 駆動）が同コルーチンを resume して処理を回復できるようにする。
 8. The GET タイムアウト閾値 shall 通常運転（デバッガ非停止かつアクタースレッドが正常進行）における正規の GET 処理では発火しない値に設定し、通常経路の応答バイト列をバイト不変に保つ（Requirement 1 と整合）。タイムアウト発火は、デバッガ一時停止・異常ブロック等の非通常時に限る安全網とする。
 9. While デバッガがブレークポイントで一時停止している間, the marshaling 層 shall GET タイムアウト→204 を抑止せず通常通り発動させ、SSP の応答性を維持する（停止中の 204 は次 tick の `OnSecondChange` で回復するため、デバッグ容易性を損なわない。Requirement 10 と整合）。
+10. The アクタースレッド・marshaling・teardown の正常経路 shall 既存コードベースの panic 回避姿勢を継続し、fallible 操作を `Result` で扱う（`unwrap`／`expect`／境界外索引等の panic 経路を正常系に持ち込まない）ことで、リリースビルド（`panic=abort`）でのプロセス abort を構造的に誘発しない。
+11. While drop→204 ガードが panic 経路の保険として働く場合, the pasta システム shall その厳密保証が unwind プロファイル（dev/test）に限られることを前提とし、リリース（`panic=abort`）では既存 `windows.rs` の `catch_unwind` 同様「到達不能の dev/test 向け保険」として扱う（リリースのビルドプロファイルは変更しない）。
 
 > **決定（ディスカッション #3, 2026-06-22）**: GET timeout→204 フォールバックを**本仕様で実装**し、初期閾値は PoC 申し送りの **6.68ms 候補**を採用する。**デバッガ停止中もタイムアウトを抑止しない**——停止中に 204 が返っても SSP を凍結させない方が望ましく、`co_scene`/`resume_until_valid` のポーリング回復モデルにより次 `OnSecondChange` で同コルーチンが resume され処理が回復する（work は失われない）。重要な制約として、LuaJIT はプリエンプション不可ゆえタイムアウトは SHIORI スレッドの待機を打ち切るのみ（アクタースレッドの Lua 実行は止めない）。したがって閾値は「通常処理では決して発火せず、停止／異常ブロック時のみ発動する安全網」として設定し（AC8）、通常経路のバイト不変（R1）を担保する。実機実測に基づく閾値の最終確定・チューニングは設計フェーズ以降に委ねる（初期値は 6.68ms）。
-> **assumption（panic=abort 前提）**: drop→204 ガードは unwind に依存する。リリースビルドは `panic=abort` のため、panic 経路での drop→204 保証は test/unwind プロファイルでのみ厳密に成立する（PoC 申し送り）。本仕様はこの前提を維持し、リリースビルドでの panic 時挙動の扱いはディスカッションで確認する（OPEN QUESTION Q4）。
+> **決定（ディスカッション #4, 2026-06-22）**: `panic=abort` 下の drop→204 ガードは「**dev/test/unwind プロファイル限定の安全網**」と明示割り切り（受容）＋ アクター/marshaling/teardown **正常経路の構造的 panic-free 化を受入基準化**（R5-AC10/AC11）。リリースのビルドプロファイル（`panic=abort`）は変更しない（横断的ビルド変更は本仕様スコープ外）。理由 = (1) `panic=abort` は意図的な既存方針で、既存 `windows.rs` の `catch_unwind` も既に「リリース到達不能・dev/test 向け」と割り切っており、二重基準を作らない一貫姿勢が健全。(2) 既存コードは元来 panic 回避を旨としているため、構造的 panic-free 化は新規負担ではなく既存姿勢の新経路への継続。(3) dev=unwind（panic 捕捉・ログ・drop→204 で観測可）／release=abort（高速）の分割は、リリース前に unwind 下で panic 経路を炙り出せるためデバッグ容易性に資する（R10 と整合）。
 
 ### Requirement 6: 単一直列キューによる順序保存とデータ競合排除
 
