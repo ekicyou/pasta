@@ -15,6 +15,9 @@ pub mod actor_thread;
 /// reload teardown と反復リーク検査（shutdown→再 spawn を N 回・実ハンドル計測・R1.2/R1.3）。
 pub mod teardown;
 
+/// R1 ブロッカー記録経路（VM ホスト/teardown 不成立条件を切り分け record_blocker・R1.4）。
+pub mod r1_probe;
+
 /// テスト隔離土台（socket2 エフェメラル待受の写経・R7.4）。
 pub mod test_isolation;
 

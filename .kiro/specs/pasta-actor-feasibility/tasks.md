@@ -38,7 +38,7 @@
   - 観測可能な完了条件: N 回 reload 後もハンドル/ポートが枯渇せず clean teardown する統合テストが緑。
   - _Requirements: 1.2, 1.3_
   - _Depends: 2.1_
-- [ ] 2.3 R1 ブロッカー記録経路
+- [x] 2.3 R1 ブロッカー記録経路
   - VM ホスト/teardown 不成立（`!Send` 違反・リーク・reload 後クラッシュ等）の条件を切り分け `record_blocker` で残す。
   - 観測可能な完了条件: 失敗注入で `record_blocker` がブロッカー条件を記録し NO-GO 根拠化されることをテストで確認。
   - _Requirements: 1.4_
