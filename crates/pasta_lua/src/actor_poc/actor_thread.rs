@@ -61,6 +61,20 @@ enum ActorCommand {
         /// 結果（または実行エラー文字列）を 1 回だけ返す reply チャネル。
         reply: Sender<Result<LuaProbeOutcome, String>>,
     },
+    /// Lua スニペットをアクタースレッド上の VM で実行し、**文字列結果** を reply で
+    /// 返す（task 4.1 [`CoroutineProbe`](super::coroutine_probe) 用）。
+    ///
+    /// `RunLua` は `return <int>` 専用だが、実コルーチン／callback の駆動では文字列
+    /// （継続状態の観測値・JSON 風タグ等）を返す必要がある。VM 操作はこのコマンドの
+    /// 処理＝アクタースレッドに閉じ、**1 回の RunLuaString = 1 回の executor ポーリング
+    /// （driving step）** となる。コルーチンの各 resume を別個のコマンドで投入すれば、
+    /// それぞれが別個の executor 駆動契機になる（ホスト tick ではない・R4.1）。
+    RunLuaString {
+        /// 実行する Lua スニペット（文字列を `return` することを想定。`nil`/数値も可）。
+        script: String,
+        /// 文字列結果（または実行エラー文字列）を 1 回だけ返す reply チャネル。
+        reply: Sender<Result<String, String>>,
+    },
 }
 
 /// アクタースレッドのハンドル。
@@ -205,6 +219,35 @@ impl ActorThread {
             .map_err(|_| "actor thread dropped the reply channel".to_string())?
     }
 
+    /// Lua スニペットをアクタースレッド上の VM で実行し、**文字列結果** を
+    /// block-on-reply で受け取る（task 4.1）。
+    ///
+    /// 1 回の呼び出し = 1 件の [`ActorCommand::RunLuaString`] 投入 = アクター future の
+    /// 1 回の executor ポーリングで処理される。コルーチンの各 resume を別個の
+    /// `run_lua_string` で投入すれば、それぞれが **別個の executor 駆動契機**（ホスト
+    /// tick ではない）となる。VM 操作はアクタースレッドに閉じ、値（文字列）だけが
+    /// reply チャネルを越境する。
+    ///
+    /// Lua が `nil` を返した場合は空文字列を返す（PoC の観測では `nil`＝「値なし」を
+    /// 空として扱う）。実行エラーは `Err(String)` で返る。
+    pub fn run_lua_string(&self, script: &str) -> Result<String, String> {
+        let (reply_tx, reply_rx) = mpsc::channel::<Result<String, String>>();
+        self.cmd_tx
+            .send(ActorCommand::RunLuaString {
+                script: script.to_string(),
+                reply: reply_tx,
+            })
+            .map_err(|_| "actor thread is no longer accepting commands".to_string())?;
+
+        // 送信したコマンドを処理させるため、アクター future を起こす（1 drive）。
+        self.wake_actor();
+
+        // block-on-reply: アクタースレッドが結果を返すまでブロックする。
+        reply_rx
+            .recv()
+            .map_err(|_| "actor thread dropped the reply channel".to_string())?
+    }
+
     /// アクター future のメッセージループを再ポーリングへ進める。
     ///
     /// 最初のポーリングで `Waker` が捕捉されている前提（spawn 直後に block_on が
@@ -295,6 +338,11 @@ async fn actor_future(
                     // 値（または文字列エラー）だけが越境する。VM は越えない。
                     let _ = reply.send(outcome);
                 }
+                Ok(ActorCommand::RunLuaString { script, reply }) => {
+                    // 文字列結果だけが越境する（VM は越えない・task 4.1）。
+                    let outcome = run_lua_string_on_vm(&runtime, &script);
+                    let _ = reply.send(outcome);
+                }
                 Err(mpsc::TryRecvError::Empty) => break,
                 Err(mpsc::TryRecvError::Disconnected) => {
                     // producer が全 sender を drop した。これ以上コマンドは来ない。
@@ -363,5 +411,24 @@ fn run_lua_on_vm(runtime: &PastaLuaRuntime, script: &str) -> Result<LuaProbeOutc
     Ok(LuaProbeOutcome {
         lua_result,
         exec_thread_id: thread::current().id(),
+    })
+}
+
+/// アクタースレッド上の VM で Lua を実行し、**文字列結果** を取り出す（task 4.1）。
+///
+/// `run_lua_on_vm` と同じくアクタースレッド上でのみ呼ばれる（`runtime` は `!Send`）。
+/// 戻り値の Lua 値は文字列化する: `String` はそのまま、`nil` は空文字列、その他
+/// （数値・真偽値）は Debug 表現を介して文字列化する（PoC の観測値として十分）。
+fn run_lua_string_on_vm(runtime: &PastaLuaRuntime, script: &str) -> Result<String, String> {
+    let value = runtime
+        .exec(script)
+        .map_err(|e| format!("Lua exec failed on actor thread: {e}"))?;
+    Ok(match value {
+        mlua::Value::String(s) => s.to_string_lossy().to_string(),
+        mlua::Value::Nil => String::new(),
+        mlua::Value::Integer(i) => i.to_string(),
+        mlua::Value::Number(n) => n.to_string(),
+        mlua::Value::Boolean(b) => b.to_string(),
+        other => format!("{other:?}"),
     })
 }

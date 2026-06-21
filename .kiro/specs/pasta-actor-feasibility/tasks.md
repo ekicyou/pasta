@@ -59,7 +59,7 @@
   - _Depends: 1.4, 2.1, 3.1_
 
 - [ ] 4. R4: coroutine/callback 生存
-- [ ] 4.1 実 `*.lua` を executor 駆動で resume／callback 生存検証
+- [x] 4.1 実 `*.lua` を executor 駆動で resume／callback 生存検証
   - `store.lua`／`event/init.lua`／`callback.lua`／`second_change.lua` を無改変で executor 駆動。`STORE.co_scene` を中断地点から resume、`CALLBACK.pending` を後続契機で解決、喪失条件を記録。シーン中核・コルーチン意味論は Lua のまま（Rust 化しない）。
   - 観測可能な完了条件: executor 駆動下で `co_scene` が中断地点から継続し `CALLBACK` が解決する統合テストが緑。
   - _Requirements: 4.1, 4.2, 4.3, 4.4_

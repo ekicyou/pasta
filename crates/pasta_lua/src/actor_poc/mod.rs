@@ -29,3 +29,6 @@ pub mod responder;
 
 /// 段階判定レコーダ土台（項目別 outcome／blocker 累積・隔離前提・R8.2/R8.3/R7.3）。
 pub mod verdict;
+
+/// CoroutineProbe（executor 駆動下で実 `*.lua` の coroutine resume／callback 生存・R4.1〜R4.4）。
+pub mod coroutine_probe;
