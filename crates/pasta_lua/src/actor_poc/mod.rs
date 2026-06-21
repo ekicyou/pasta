@@ -32,3 +32,6 @@ pub mod verdict;
 
 /// CoroutineProbe（executor 駆動下で実 `*.lua` の coroutine resume／callback 生存・R4.1〜R4.4）。
 pub mod coroutine_probe;
+
+/// SimDriver 忠実シミュレータ（OnSecondChange 周期＋GET/NOTIFY≡Reference3 自前タグ付け＋Status: talking 遷移・R5.6）。
+pub mod sim_driver;

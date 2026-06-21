@@ -67,7 +67,7 @@
   - _Depends: 2.1_
 
 - [ ] 5. R5: 忠実シミュレータとキック配信
-- [ ] 5.1 (P) SimDriver 忠実シミュレータ
+- [x] 5.1 (P) SimDriver 忠実シミュレータ
   - OnSecondChange を `tick(playable)` で発火し、`playable=true→GET(Ref3=1)`／`false→NOTIFY(Ref3=0)` として**自身が method タグ付け**（Marshal の再パースには依存しない生成器）。`set_talking` で `Status: talking` 遷移を制御。
   - 観測可能な完了条件: `tick(playable)` が GET/NOTIFY tick を発火し `set_talking` が遷移する単体テストが緑。
   - _Requirements: 5.6_
