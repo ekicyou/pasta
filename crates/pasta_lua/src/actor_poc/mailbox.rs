@@ -10,7 +10,7 @@
 //! ため、単一 mailbox の直列処理により処理順序が構造的に確定する
 //! （design.md「Mailbox / State: FIFO 順序保証」）。
 
-use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
+use std::sync::mpsc::{self, Receiver, Sender};
 
 use super::responder::Responder;
 
@@ -114,11 +114,8 @@ impl MailboxReceiver {
     /// 分だけを返す（OnSecondChange のような周期 drain 契機を模す）。
     pub fn drain(&self) -> Vec<ActorMsg> {
         let mut out = Vec::new();
-        loop {
-            match self.rx.try_recv() {
-                Ok(msg) => out.push(msg),
-                Err(TryRecvError::Empty) | Err(TryRecvError::Disconnected) => break,
-            }
+        while let Ok(msg) = self.rx.try_recv() {
+            out.push(msg);
         }
         out
     }
