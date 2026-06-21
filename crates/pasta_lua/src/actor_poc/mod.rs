@@ -35,3 +35,6 @@ pub mod coroutine_probe;
 
 /// SimDriver 忠実シミュレータ（OnSecondChange 周期＋GET/NOTIFY≡Reference3 自前タグ付け＋Status: talking 遷移・R5.6）。
 pub mod sim_driver;
+
+/// KickHarness（talk FIFO・二層 gate・即時 preempt・実 `coroutine.close()` 上書き・R5.1/R5.2/R5.3）。
+pub mod kick_harness;
