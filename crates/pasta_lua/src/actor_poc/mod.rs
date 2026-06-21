@@ -11,3 +11,6 @@
 
 /// テスト隔離土台（socket2 エフェメラル待受の写経・R7.4）。
 pub mod test_isolation;
+
+/// 単一直列 mailbox（enqueue／drain・FIFO 順序・スレッド分離・R2.3）。
+pub mod mailbox;

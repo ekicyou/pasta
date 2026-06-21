@@ -15,7 +15,7 @@
   - debug 前例から `#[ctor]` による `PASTA_DEBUG`／`PASTA_DEBUG_PORT` 中和、socket2 `set_reuse_address`＋port 0 のエフェメラル待受土台を写経。
   - 観測可能な完了条件: `actor-poc` テストが固定ポート枯渇・`PASTA_DEBUG` 汚染なしで反復実行できる。
   - _Requirements: 7.4_
-- [ ] 1.4 単一直列 mailbox
+- [x] 1.4 単一直列 mailbox
   - `GetMsg`／`NotifyMsg`／`KickMsg` 判別共用体、enqueue（SSP 側）／drain（アクター側）、FIFO 順序保証、スレッド分離。
   - 観測可能な完了条件: enqueue 順に drain され、VM 操作が drain 側スレッドに閉じることを示す単体テストが緑。
   - _Requirements: 2.3_
