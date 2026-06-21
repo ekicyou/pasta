@@ -1,0 +1,68 @@
+{
+  "schema": "pasta-actor-feasibility/baseline@1",
+  "captured_at_utc": "2026-06-21T05:51:02.3382636Z",
+  "purpose": "Requirement 7.2 byte-invariance baseline (actor-poc 導入前)。task 8.1 が参照する。",
+  "release_profile": "opt-level=z, lto=true, codegen-units=1, panic=abort, strip=true",
+  "reproducibility": "pasta.dll=normalized（PE TimeDateStamp/CheckSum/DebugDir timestamps/RSDS GUID の非決定 20 bytes をゼロ埋め）が authoritative なバイト不変基準。verify 合否はこの 1 点のみで決まる。rlib=informational（whole-file sha は symbol table / crate SVH fingerprint 由来で非決定。pre-actor-poc ソースでも再現せず、合否に算入しない。詳細は verify_8_1_result.md）。",
+  "artifacts": [
+    {
+      "name": "pasta.dll",
+      "size": 4031488,
+      "sha256": "ae5a2f7e70b98dc92c0e826608952a456250d5d787c5dc5efad3dcc635c98d08",
+      "normalized_sha256": "adae6b39055f9f819ce38f4dc483214725e6084ee0d96faa29a5783199e24b24",
+      "reproducible": "normalized",
+      "authoritative": true,
+      "zeroed_ranges": [
+        {
+          "offset": 264,
+          "len": 4,
+          "field": "COFF.TimeDateStamp"
+        },
+        {
+          "offset": 344,
+          "len": 4,
+          "field": "OptionalHeader.CheckSum"
+        },
+        {
+          "offset": 3731252,
+          "len": 4,
+          "field": "DebugDir[0].TimeDateStamp"
+        },
+        {
+          "offset": 3731792,
+          "len": 16,
+          "field": "CodeView.RSDS.Guid[0]"
+        },
+        {
+          "offset": 3731280,
+          "len": 4,
+          "field": "DebugDir[1].TimeDateStamp"
+        },
+        {
+          "offset": 3731308,
+          "len": 4,
+          "field": "DebugDir[2].TimeDateStamp"
+        }
+      ],
+      "note": "pasta.dll の生 sha256 はリンク時刻/build-id GUID により毎ビルド変動する。normalized_sha256（PE 非決定領域をゼロ埋め後の digest）が 8.1 のバイト不変基準。"
+    },
+    {
+      "name": "libpasta.rlib",
+      "size": 2270136,
+      "sha256": "d67cb3c8d35214a759dabbcd6e5808291f2458ee54e569ec4f1f6271a560476c",
+      "normalized_sha256": "d67cb3c8d35214a759dabbcd6e5808291f2458ee54e569ec4f1f6271a560476c",
+      "reproducible": "informational",
+      "authoritative": false,
+      "note": "rlib whole-file sha は symbol table / crate SVH fingerprint 由来で非決定（task 1.1 note の exact 再現は object コードには当てはまるが whole-file には当てはまらない。pre-actor-poc commit 1e94b34a のソースでも committed 値を再現しない）。informational 報告のみで verify 合否には算入しない。object コード member は bit 一致で actor-poc 混入なしを実証済み（verify_8_1_result.md §2b）。"
+    },
+    {
+      "name": "libpasta_lua.rlib",
+      "size": 7908898,
+      "sha256": "6ce8c6760df3e06e100d5bd34a47600f5070494ec84f7e583fb8a74da986d2f8",
+      "normalized_sha256": "6ce8c6760df3e06e100d5bd34a47600f5070494ec84f7e583fb8a74da986d2f8",
+      "reproducible": "informational",
+      "authoritative": false,
+      "note": "rlib whole-file sha は symbol table / crate SVH fingerprint 由来で非決定（pre-actor-poc commit 1e94b34a のソースでも committed 値を再現しない）。informational 報告のみで verify 合否には算入しない。object コード member の差分は SVH 由来の約 4 バイトのみで actor-poc コード（cfg 除外）の混入ではない（verify_8_1_result.md §2b）。"
+    }
+  ]
+}

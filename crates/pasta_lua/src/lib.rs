@@ -29,6 +29,8 @@
 //! runtime.exec(&lua_code)?;
 //! ```
 
+#[cfg(feature = "actor-poc")]
+pub mod actor_poc;
 pub mod code_gen;
 pub mod config;
 pub mod context;
