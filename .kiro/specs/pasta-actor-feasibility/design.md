@@ -335,7 +335,10 @@ Marshal::dispatch(method: ShioriMethod, req: RequestTable) -> ShioriResponse
 - Error envelope: 応答経路 drop / panic → 204（`Responder` ガードに委譲）。
 
 **Implementation Notes**
-- Integration: 既存 `shiori.rs:request()` 同期経路は**置換しない**。PoC は別ハーネスとして pest 解決値を消費する（出荷経路バイト不変）。
+- Integration: 既存 `shiori.rs:request()` 同期経路は**置換しない**。PoC ハーネスは独自に request 文字列を pest で**再パース**して `method` を得る（出荷 `.rs` は diff ゼロ＝最強のバイト不変。実 request() への接合は `pasta-actor-runtime` の責務）。設計ディスカッション#2で確定。
+- **責務配置方針（Rust 寄せ）**: GET/NOTIFY 判定・marshaling 分岐・FIFO/gate のような**決定論的でやることが確定したロジックは Rust 側で処理**する（現状の「全部 Lua へ投げる」から、明確なロジックを Rust へ寄せる方針）。Marshal は method 振り分けと block-on-reply/204 を Rust で完結させる。
+- **境界線（R4 を壊さないための制約）**: ただし**シーン実行・コルーチン継続・callback 待機の意味論は Lua のまま**駆動する（`CoroutineProbe` は実 `*.lua` を無改変で動かす）。R4（coroutine 生存）の実証は「既存 Lua コルーチンモデルが executor 移設後も生きる」ことが目的ゆえ、ここを Rust 化すると検証目的そのものが失われる。Rust 寄せは marshaling/dispatch の殻に限定し、シーン中核は Lua を保つ。
+- **本番申し送り**: 上記「決定論ロジックの Rust 寄せ／シーン中核は Lua」という責務再配分の方針は、`pasta-actor-runtime` の本番設計が引き継いで本格適用する（PoC では marshaling の殻に限定）。
 - Risks: 同期契約×スレッド分離×デッドロック回避（High）。不成立は `Verdict::record_blocker`。
 
 #### Responder
@@ -550,6 +553,6 @@ PoC の「エラー」は二種類に分かれる: (a) **検証対象の失敗**
 
 - ~~**Q1（依存解決）**~~ **【設計ディスカッション#1で解決】**: crate 名 `wintf-winmsg-executor`（crates.io・プロジェクト用フォーク・MIT OR Apache-2.0）、**最新版 0.0.3 で固定**（`wintf-winmsg-executor = { version = "0.0.3", optional = true }`）。公開 API `block_on`／`spawn_local`／`MessageLoop`／`JoinHandle`／`FilterResult` を crates.io 公開版として確認済み。cargo-deny supply-chain 監査も crates.io 版で素直に通る。
 - **Q2（executor 統合形）**: `block_on` が呼び出しスレッドのメッセージループを回す前提、`spawn_local`（サブタスク）・`JoinHandle`（teardown 待ち）・メッセージ専用ウィンドウの Drop 時解放挙動は**実機確認**が必要（Research Needed #1）。R1 検証そのものでもあるため、設計は std::thread＋block_on のアクタースレッド型を仮置きし、確証は R1 実装で得る。
-- **Q3（marshaling 反転の出荷経路非干渉）**: PoC の `Marshal` は既存 `shiori.rs:request()` 同期経路を置換せず別ハーネスで pest 解決値を消費する前提だが、pest 解決結果を出荷経路を改変せず PoC ハーネスへ供給する取り回し（再パース or 共有）の具体形が未確定。**仮定**: PoC ハーネスは独自に request 文字列を pest で再解決し method を得る（出荷経路バイト不変を優先）。
+- ~~**Q3（marshaling 反転の出荷経路非干渉）**~~ **【設計ディスカッション#2で解決】**: **再パース**を採用。PoC ハーネスは独自に request 文字列を pest で再解決し method を得る（出荷 `.rs` は diff ゼロ）。実 request() への接合は `pasta-actor-runtime` の責務として繰り延べ。あわせて**責務配置方針＝決定論ロジック（method 振り分け・marshaling・FIFO/gate）は Rust 寄せ／シーン中核・コルーチン意味論は Lua 維持**を確定（R4 検証目的を保護）。本番の責務再配分は `pasta-actor-runtime` が本格適用。
 - **Q4（gate 検証の実機補助）**: 再生中（`Status: talking`）に SSP が OnSecondChange tick を送り続けるかは忠実シミュレータの設計前提（R5.2 gate）であり、ukadoc 確認＋任意実機スモークの要否・範囲が未確定（Research Needed #3）。**仮定**: シミュレータは「talking 中も tick 継続・drain のみ gate」を再現し、実機差異は任意スモークで補助確認。
 - **Q5（responder oneshot 実装選択）**: GET 応答の oneshot を `std::sync::mpsc`（1 回受信）で済ませるか軽量 oneshot crate を導入するかが未確定。**仮定**: 追加依存を避け `std::sync::mpsc` ＋ Drop ガードで実装（バイト不変・最小依存を優先）。
