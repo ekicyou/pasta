@@ -110,7 +110,7 @@
   - 観測可能な完了条件: feature off ビルド成果物がベースラインとバイト一致することを確認する検証が緑。
   - _Requirements: 7.2_
   - _Depends: 1.1, 1.2_
-- [ ] 8.2 統合走行と VerdictDocument 生成
+- [x] 8.2 統合走行と VerdictDocument 生成
   - 全 probe（R1〜R6）を結線して `run_all` を end-to-end 実行し、項目別試行結果・段階判定・後続申し送りを含む実 `VerdictDocument` 成果物を生成・出力する。
   - 観測可能な完了条件: end-to-end 走行が全項目試行を含む段階判定文書を成果物として出力する。
   - _Requirements: 7.3, 8.2_
