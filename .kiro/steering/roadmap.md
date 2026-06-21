@@ -135,3 +135,44 @@ pasta-source-map 完成後のユーザー実機検証（2026-06-08）で判明�
 
 ### Specs (dependency order)
 - [ ] review-improvement-loop -- 移植可能・再実行型のコード総合レビュー＆改善ループ（領域自己発見 × 7 次元マトリクス・サブエージェント委譲・破壊検知＋巻き戻し・改善レポート）。Dependencies: none。brief.md 作成済み（`.kiro/specs/review-improvement-loop/brief.md`）
+
+## Phase 7: アクターモデル駆動エンジン（独立スレッド化＋シーン再生キック）
+
+### 概要
+Phase 5 でデバッガ（DAP バックエンド）を組み込んだ結果、ゴーストのデバッグ／オーサリングに本当に必要なのは「デバッグ位置でのブレーク」ではなく「**任意シーンの再生を今すぐキック**」することだと判明した。しかし現状エンジンは SHIORI スレッドに束縛され、ホストのリクエスト周期（OnSecondChange 毎秒等）が唯一の駆動軸＝エンジンは自前の時計を持たない。
+
+本フェーズは、エンジンコアを**宿主非依存・自前スレッド（アクター）化**し、SHIORI アダプタが pull 契約を FIFO/OnSecondChange でブリッジする。これにより任意シーンキックを実現すると同時に、**将来のノベルゲームエンジン化との整合**（SHIORI=pull と novel=push/常駐を一つのコアで支える）を確保する。
+
+### アプローチ決定（Phase 7・2026-06-21 discovery）
+- **採用**: 宿主非依存エンジンコア（`pasta_lua`・`!Send`・executor 非依存・**presentation event stream** 出力）＋ 差し替え可能アダプタ（SHIORI=`wintf_winmsg_executor`／将来 novel）。**PoC 先行（feasibility gate）→ 本番**（`pasta-lua-debug-feasibility` と同型）
+- **理由**: SHIORI(pull) とノベルゲーム(push/常駐) という真逆の駆動を一つのコアで支えるには、コアが自前の時計＝自前スレッドを持つしかない。executor 選択をアダプタ層に閉じ込めればコア純度を保てる。構造的未知（block-on-reply 反転・reload teardown・coroutine 生存）は PoC で潰してから本番へ
+- **挙動保存**: SHIORI 経路の外部挙動は**バイト不変**（純内部リファクタ）。シーンキックは別チャネルの追加機能。`unsafe impl Send`＋Mutex ハックは VM pin により解消（副産物）
+- **却下**:
+  - 単一基盤 spec 一気通し — 基盤 refactor が最大級の塊。新機能と混ぜるとコミット粒度とリスクが乱れる
+  - VM 据え置き＋スレッドセーフキューのみ — SHIORI 単体なら省けるが、ノベルゲーム整合が崩れ将来コアが二重化
+  - SSTP/`\![raise]` ライブ push 出力 — pull 契約と衝突。別境界（将来仕様）へ分離
+
+### 出力機構（確定設計）
+作者が VSCode（将来は `*.pasta` 編集ウィンドウ）からキック → pasta.dll 内 **talk FIFO** へ積む → **OnSecondChange** 受信時に drain → SSP がライブ再生。別プレビュー画面は不要（ライブ SSP がプレビューを兼ねる）。
+- **抑制**: SSP `Status: talking`（権威は SSP）で gate。会話中は通常 FIFO を消費しない
+- **即時フラグ**: `talking` でも問答無用で FIFO 消費 → スクリプト応答 → preempt（中断側の前 `co_scene` は閉じる・自動復帰しない）。デバッグ即時再生用
+- **入力 marshaling**: SHIORI event を CH 送受信。GET＝応答 tx 付き（受信側が応答義務）、NOTIFY＝義務なし（即 204）、**drop→204 ガード**（panic/忘れでもハング不能）、GET ブロックは短く（キックは executor で非同期実行）、エンジンは yield して block-wait しない、単一直列キューで順序保存
+
+### スコープ
+- **対象**: 宿主非依存化、presentation event stream 契約、さくらスクリプト描画の `pasta_shiori` 移設、アクタースレッド（`wintf_winmsg_executor`）、SHIORI marshaling（CH＋GET/NOTIFY＋drop→204）、talk FIFO＋Status-gated drain＋即時 preempt、VSCode キック、debug backend のアクタークライアント化
+- **対象外**: ライブ SSP への SSTP/`\![raise]` push 出力（別境界）、`*.pasta` 編集ウィンドウ（別境界）、`pasta_novel` アダプタ実装（遠い将来）、トーク/応答セマンティクス変更（非同期トーク等）
+
+### 境界戦略
+- **分割理由**: PoC（使い捨て・GO/no-go）／基盤 refactor（挙動バイト不変・回帰不変性で検証）／キック機能（新挙動・新テスト）は、ライフサイクルと検証方法が根本的に異なる。キックは基盤の存在を前提に初めて設計可能（依存順の自然な境界）
+- **共有接点**: 3 spec とも `pasta_lua` runtime 境界と `pasta_shiori` FFI を触る。**presentation event stream** がコア↔アダプタの縫い目。`debug/` の CH 機構はキックの transport へ一般化
+- **再統合の余地**: Spec 2/3 は設計フェーズで縫い目が人工的と判明したら統合可（scope-evolution 準拠）
+
+### Specs (dependency order)
+- [ ] pasta-actor-feasibility -- 使い捨て PoC（feature-gated）。wintf_winmsg_executor による !Send VM ホスト＋reload teardown／block-on-reply marshaling／drop→204 デッドロック消滅／coroutine 生存／FIFO+OnSecondChange+Status gate+即時 preempt の実 SSP ≤1秒キック配信／GET レイテンシ実測 を **GO/no-go 判定**。Dependencies: none。brief.md 作成済み（`.kiro/specs/pasta-actor-feasibility/brief.md`）
+- [ ] pasta-actor-runtime -- 本番基盤 refactor。宿主非依存エンジンコア＋presentation event stream 契約＋さくらスクリプト描画の pasta_shiori 移設＋アクタースレッド/VM pin＋CH marshaling（GET/NOTIFY/drop→204）＋unsafe Send 解消。**外部 SHIORI 挙動バイト不変・全既存テスト回帰不変**。Dependencies: pasta-actor-feasibility（=GO）。brief.md 作成済み（`.kiro/specs/pasta-actor-runtime/brief.md`）
+- [ ] pasta-scene-kick -- キック機能本番化。talk FIFO＋Status-gated drain＋即時 preempt（前 co_scene close）＋VSCode キックコマンド＋debug DAP チャネル一般化（playScene custom request）＋debug backend のアクタークライアント化。Dependencies: pasta-actor-runtime。brief.md 作成済み（`.kiro/specs/pasta-scene-kick/brief.md`）
+
+### 将来境界（Phase 7 派生・未着手）
+- [ ] pasta-sstp-live-output -- ライブ SSP への SSTP/`\![raise]` による push 出力経路（pull 契約を介さない即時出力）。Dependencies: pasta-scene-kick
+- [ ] pasta-authoring-window -- `*.pasta` 編集/プレビュー専用ウィンドウ。executor スレッドにメッセージポンプ同居させ、`!Send` VM へ同スレッド直接アクセス（マーシャリング不要）。Dependencies: pasta-scene-kick
+- `pasta_novel` アダプタ（ノベルゲーム宿主）は遠い将来。本フェーズの宿主非依存コア＋presentation event stream 契約がそれを可能にする土台となる
