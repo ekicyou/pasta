@@ -418,8 +418,8 @@ CoroutineProbe::resolve_callback() -> ProbeResult // CALLBACK.pending を後続�
 
 **Responsibilities & Constraints**
 - 1 シーンのキックを talk FIFO に投入→`SimDriver` の OnSecondChange drain 契機で排出・再生（R5.1）。
-- `Status: talking` 中は drain を gate（抑止）し再生中トークへの割り込みを防ぐ（R5.2）。
-- 即時 preempt は先行トークを `coroutine.close()`（`set_co_scene` 素地）で閉じ、`talking` 無視で常時さくらスクリプト上書き＝破棄（R5.3、要件ディスカッション#2 不変条件）。
+- **二層 gate**（R5.2）: ①礼儀 gate＝`Status: talking` 中は**非即時**の drain を抑止（割り込まない）。②配信可否 gate＝スクリプトを実際に届けられるのは **GET tick（Reference3=1）のみ**（NOTIFY/Ref3=0 では SSP に無視される＝ukadoc 明記）。
+- 即時 preempt（R5.3）: ①礼儀 gate を**無視**して先行トークを `coroutine.close()`（`set_co_scene` 素地）で閉じ、さくらスクリプトで上書き＝破棄（要件ディスカッション#2 不変条件）。ただし②配信可否 gate には従い **GET tick で上書き配信**（GET＝上書き可は決め打ち・設計ディスカッション#3）。NOTIFY しか来ない再生不能状態では次の GET tick まで遅延。
 - キック指示→配信の所要時間を実測し ≤1 秒を確認・記録（R5.4）。
 
 **Dependencies**: Inbound: `SimDriver`（P0）、`Mailbox`（P1）
@@ -445,16 +445,16 @@ KickHarness::measure() -> KickLatencyReport     // キック→配信レイテ�
 | Requirements | 5.6, 5.1, 5.2 |
 
 **Responsibilities & Constraints**
-- OnSecondChange 周期で tick を発行し FIFO drain 契機を駆動。`Status: talking` 遷移を制御し gate 検証の前提を作る。
-- 実機 SSP attach 計測は**任意**（補助スモーク）。実機絶対性能保証は `pasta-actor-runtime` へ申し送り。
-- 再生中に SSP が tick を送り続けるか（gate 検証前提）は ukadoc／任意実機スモークで補助確認（Research Needed #3）。
+- OnSecondChange 周期で tick を発行し FIFO drain 契機を駆動。**各 tick を GET（Reference3=1・再生可）／NOTIFY（Reference3=0・再生不能）として発火**し、`Status: talking` 遷移も併せて制御する。
+- **gate の権威は OnSecondChange の method（GET/NOTIFY ≡ Reference3）**。ukadoc 明記: 再生不能（NOTIFY/Ref3=0）時は返したスクリプトが無視される。**GET tick（Ref3=1）が来ている＝トーク上書き可**を決め打ち（設計ディスカッション#3で確定・実機スモーク不要）。この method 判定は議題2の pest 再パースをそのまま再利用。
+- 実機 SSP attach 計測は不要（GET tick=上書き可を決め打ち）。実機絶対性能保証は `pasta-actor-runtime` へ申し送り。
 
 **Contracts**: Service [x] / State [x]
 
 ##### Service Interface
 ```text
-SimDriver::tick()                  // OnSecondChange 1 周期を発火
-SimDriver::set_talking(bool)       // Status: talking 遷移を制御
+SimDriver::tick(playable: bool)    // OnSecondChange 1 周期を発火。playable=true→GET(Ref3=1)、false→NOTIFY(Ref3=0)
+SimDriver::set_talking(bool)       // Status: talking 遷移を制御（非即時の礼儀 gate 用）
 ```
 
 ### 計測・判定
@@ -554,5 +554,5 @@ PoC の「エラー」は二種類に分かれる: (a) **検証対象の失敗**
 - ~~**Q1（依存解決）**~~ **【設計ディスカッション#1で解決】**: crate 名 `wintf-winmsg-executor`（crates.io・プロジェクト用フォーク・MIT OR Apache-2.0）、**最新版 0.0.3 で固定**（`wintf-winmsg-executor = { version = "0.0.3", optional = true }`）。公開 API `block_on`／`spawn_local`／`MessageLoop`／`JoinHandle`／`FilterResult` を crates.io 公開版として確認済み。cargo-deny supply-chain 監査も crates.io 版で素直に通る。
 - **Q2（executor 統合形）**: `block_on` が呼び出しスレッドのメッセージループを回す前提、`spawn_local`（サブタスク）・`JoinHandle`（teardown 待ち）・メッセージ専用ウィンドウの Drop 時解放挙動は**実機確認**が必要（Research Needed #1）。R1 検証そのものでもあるため、設計は std::thread＋block_on のアクタースレッド型を仮置きし、確証は R1 実装で得る。
 - ~~**Q3（marshaling 反転の出荷経路非干渉）**~~ **【設計ディスカッション#2で解決】**: **再パース**を採用。PoC ハーネスは独自に request 文字列を pest で再解決し method を得る（出荷 `.rs` は diff ゼロ）。実 request() への接合は `pasta-actor-runtime` の責務として繰り延べ。あわせて**責務配置方針＝決定論ロジック（method 振り分け・marshaling・FIFO/gate）は Rust 寄せ／シーン中核・コルーチン意味論は Lua 維持**を確定（R4 検証目的を保護）。本番の責務再配分は `pasta-actor-runtime` が本格適用。
-- **Q4（gate 検証の実機補助）**: 再生中（`Status: talking`）に SSP が OnSecondChange tick を送り続けるかは忠実シミュレータの設計前提（R5.2 gate）であり、ukadoc 確認＋任意実機スモークの要否・範囲が未確定（Research Needed #3）。**仮定**: シミュレータは「talking 中も tick 継続・drain のみ gate」を再現し、実機差異は任意スモークで補助確認。
+- ~~**Q4（gate 検証の実機補助）**~~ **【設計ディスカッション#3で解決】**: gate の権威は **OnSecondChange の method（GET/NOTIFY ≡ Reference3）**。ukadoc 明記＝再生不能（NOTIFY/Ref3=0）時は返却スクリプト無視。**GET tick が来ている＝トーク上書き可**を決め打ち（実機スモーク不要）。シミュレータは GET tick（Ref3=1）／NOTIFY tick（Ref3=0）の両方を再現し、即時 preempt は GET tick で上書き配信・NOTIFY 状態では次 GET tick まで遅延。gate 判定は議題2の pest method 再パースを再利用。
 - **Q5（responder oneshot 実装選択）**: GET 応答の oneshot を `std::sync::mpsc`（1 回受信）で済ませるか軽量 oneshot crate を導入するかが未確定。**仮定**: 追加依存を避け `std::sync::mpsc` ＋ Drop ガードで実装（バイト不変・最小依存を優先）。
