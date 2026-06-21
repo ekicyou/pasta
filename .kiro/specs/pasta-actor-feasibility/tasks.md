@@ -20,7 +20,7 @@
   - 観測可能な完了条件: enqueue 順に drain され、VM 操作が drain 側スレッドに閉じることを示す単体テストが緑。
   - _Requirements: 2.3_
   - _Boundary: Mailbox_
-- [ ] 1.5 Verdict レコーダ土台
+- [x] 1.5 Verdict レコーダ土台
   - 各 probe が成否・採用方式・制約・ブロッカーを記録する累積器（`record_item`／`record_blocker`）と、隔離前提（default off・バイト不変・非汚染）の `assert_isolation`。
   - 観測可能な完了条件: 項目別の結果・ブロッカーが蓄積され取り出せる単体テストが緑。
   - _Requirements: 8.2, 8.3, 7.3_
