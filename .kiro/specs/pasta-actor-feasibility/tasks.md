@@ -1,0 +1,122 @@
+# Implementation Plan
+
+> 使い捨て feature-gated PoC（`actor-poc`・default off）。出荷コードは読み取り・再利用のみ、振る舞い非改変。リスク順に R1（本丸）を最初の実証スライスへ。
+
+- [ ] 1. Foundation: 隔離足場と共有基盤
+- [ ] 1.1 release バイト・ベースラインの取得（actor-poc 導入前）
+  - `actor-poc` 関連コードを一切入れていない現状の release ビルド成果物（両クレート）のダイジェストを採取・保存する。
+  - 観測可能な完了条件: 導入前 release 成果物のダイジェスト基準が記録され、後続のバイト不変検証（8.1）が参照できる。
+  - _Requirements: 7.2_
+- [ ] 1.2 feature-gate と依存の新設（両クレート）
+  - `pasta_lua`／`pasta_shiori` に `[features]` を新設、`actor-poc`（default off）、`wintf-winmsg-executor = { version = "0.0.3", optional = true }`、`lib.rs` に `#[cfg(feature = "actor-poc")]` の mod 宣言を追加。`pasta_shiori` は `pasta_lua/actor-poc` を伝播。
+  - 観測可能な完了条件: feature off では `actor_poc` 不在のまま `cargo build` 成功、`--features actor-poc` で `actor_poc` モジュールがコンパイル対象になる。
+  - _Requirements: 7.1, 7.2_
+- [ ] 1.3 テスト隔離土台の写経（env 中和・エフェメラルポート）
+  - debug 前例から `#[ctor]` による `PASTA_DEBUG`／`PASTA_DEBUG_PORT` 中和、socket2 `set_reuse_address`＋port 0 のエフェメラル待受土台を写経。
+  - 観測可能な完了条件: `actor-poc` テストが固定ポート枯渇・`PASTA_DEBUG` 汚染なしで反復実行できる。
+  - _Requirements: 7.4_
+- [ ] 1.4 単一直列 mailbox
+  - `GetMsg`／`NotifyMsg`／`KickMsg` 判別共用体、enqueue（SSP 側）／drain（アクター側）、FIFO 順序保証、スレッド分離。
+  - 観測可能な完了条件: enqueue 順に drain され、VM 操作が drain 側スレッドに閉じることを示す単体テストが緑。
+  - _Requirements: 2.3_
+  - _Boundary: Mailbox_
+- [ ] 1.5 Verdict レコーダ土台
+  - 各 probe が成否・採用方式・制約・ブロッカーを記録する累積器（`record_item`／`record_blocker`）と、隔離前提（default off・バイト不変・非汚染）の `assert_isolation`。
+  - 観測可能な完了条件: 項目別の結果・ブロッカーが蓄積され取り出せる単体テストが緑。
+  - _Requirements: 8.2, 8.3, 7.3_
+  - _Boundary: Verdict_
+
+- [ ] 2. R1（本丸）: executor 上 VM ホスト＋reload teardown
+- [ ] 2.1 アクタースレッドで `block_on` ＋ `!Send` VM pin
+  - `std::thread::spawn` 内で `wintf-winmsg-executor::block_on(actor future)` を回し、future が `PastaLuaRuntime`（`!Send` VM）を生成・所有。VM はアクタースレッドを越えない。`JoinHandle` 保持・shutdown `AtomicBool` idiom 写経。
+  - 観測可能な完了条件: VM がアクタースレッド内で Lua 実行を完了し、スレッド境界を越えないことを assert するテストが緑。
+  - _Requirements: 1.1, 2.3_
+  - _Boundary: ActorThread_
+  - _Depends: 1.2, 1.4_
+- [ ] 2.2 reload teardown と反復リーク検査
+  - shutdown→再 spawn の reload サイクルを N 回反復。メッセージ専用ウィンドウ・スレッド・チャネルの解放、ポート/ハンドル枯渇なしを確認。`DebugHandle::Drop` idiom（shutdown フラグ→join）を写経。
+  - 観測可能な完了条件: N 回 reload 後もハンドル/ポートが枯渇せず clean teardown する統合テストが緑。
+  - _Requirements: 1.2, 1.3_
+  - _Depends: 2.1_
+- [ ] 2.3 R1 ブロッカー記録経路
+  - VM ホスト/teardown 不成立（`!Send` 違反・リーク・reload 後クラッシュ等）の条件を切り分け `record_blocker` で残す。
+  - 観測可能な完了条件: 失敗注入で `record_blocker` がブロッカー条件を記録し NO-GO 根拠化されることをテストで確認。
+  - _Requirements: 1.4_
+  - _Depends: 1.5, 2.1_
+
+- [ ] 3. R2/R3: block-on-reply marshaling と drop→204 ガード
+- [ ] 3.1 Responder drop→204 ガード
+  - GET 応答 oneshot（`std::sync::mpsc` 1 回受信）を包み、未 reply のまま drop（panic 巻き戻し含む）したら 204 を自動送信。「reply 1 回」または「drop→204」で必ず終結。
+  - 観測可能な完了条件: 未 reply drop と panic 注入の双方で SSP 側が 204 を受け取り無限待機しない単体テストが緑。
+  - _Requirements: 3.1, 3.2, 3.3, 3.4_
+  - _Boundary: Responder_
+  - _Depends: 1.4_
+- [ ] 3.2 Marshal GET/NOTIFY 分岐＋pest 再パース
+  - PoC ハーネスが request 文字列を pest で再パースして `method` を得（出荷 `shiori.rs` 非改変）、`get`→`GetMsg`＋block-on-reply／`notify`→即 204 fire-and-forget へ分岐。決定論ロジックは Rust 側で完結。
+  - 観測可能な完了条件: GET が応答値（または drop→204）、NOTIFY が即 204 を返し、VM 操作が drain 側に閉じる統合テストが緑。
+  - _Requirements: 2.1, 2.2, 2.4_
+  - _Boundary: Marshal_
+  - _Depends: 1.4, 2.1, 3.1_
+
+- [ ] 4. R4: coroutine/callback 生存
+- [ ] 4.1 実 `*.lua` を executor 駆動で resume／callback 生存検証
+  - `store.lua`／`event/init.lua`／`callback.lua`／`second_change.lua` を無改変で executor 駆動。`STORE.co_scene` を中断地点から resume、`CALLBACK.pending` を後続契機で解決、喪失条件を記録。シーン中核・コルーチン意味論は Lua のまま（Rust 化しない）。
+  - 観測可能な完了条件: executor 駆動下で `co_scene` が中断地点から継続し `CALLBACK` が解決する統合テストが緑。
+  - _Requirements: 4.1, 4.2, 4.3, 4.4_
+  - _Boundary: CoroutineProbe_
+  - _Depends: 2.1_
+
+- [ ] 5. R5: 忠実シミュレータとキック配信
+- [ ] 5.1 (P) SimDriver 忠実シミュレータ
+  - OnSecondChange を `tick(playable)` で発火し、`playable=true→GET(Ref3=1)`／`false→NOTIFY(Ref3=0)` として**自身が method タグ付け**（Marshal の再パースには依存しない生成器）。`set_talking` で `Status: talking` 遷移を制御。
+  - 観測可能な完了条件: `tick(playable)` が GET/NOTIFY tick を発火し `set_talking` が遷移する単体テストが緑。
+  - _Requirements: 5.6_
+  - _Boundary: SimDriver_
+  - _Depends: 1.2_
+- [ ] 5.2 KickHarness: talk FIFO・二層 gate・即時 preempt
+  - talk FIFO 投入→OnSecondChange drain で再生。二層 gate（①礼儀＝`talking` 中は非即時 drain を抑止／②配信可否＝GET tick のみ配信、NOTIFY/Ref3=0 では無視）。即時 preempt は礼儀 gate を無視し先行トークを `coroutine.close()` で閉じ GET tick で上書き、NOTIFY 状態では次 GET tick まで遅延。
+  - 観測可能な完了条件: FIFO 投入→GET tick drain で再生、`talking` 中は非即時抑止、即時は GET tick で上書き配信される統合テストが緑。
+  - _Requirements: 5.1, 5.2, 5.3_
+  - _Boundary: KickHarness_
+  - _Depends: 5.1, 1.4, 2.1_
+- [ ] 5.3 キック→配信 ≤1 秒レイテンシ実測
+  - キック指示から配信までの所要時間を忠実シミュレータ上で実測し ≤1 秒を確認・記録。未達条件（drain 不発・gate 誤動作・preempt 不能・遅延 >1 秒）と実測値を `record_blocker`。
+  - 観測可能な完了条件: キック→配信レイテンシを実測し ≤1 秒判定（または未達条件と実測値）を出力する統合テストが緑。
+  - _Requirements: 5.4, 5.5_
+  - _Boundary: KickHarness_
+  - _Depends: 5.2_
+
+- [ ] 6. R6: GET レイテンシ実測とフォールバック判断
+- [ ] 6.1 GET block-on-reply レイテンシ実測＋フォールバック要否
+  - 忠実シミュレータ（実機 attach 任意）の呼び出しパターンで GET を反復実行し代表値（最大・分布）を集計。GET タイムアウト→204 フォールバックの要否と閾値候補を判断・文書化、超過経路は `pasta-actor-runtime` へ申し送り。
+  - 観測可能な完了条件: n 回 GET の代表値を集計し、フォールバック要否判断＋閾値候補を出力する統合テストが緑。
+  - _Requirements: 6.1, 6.2, 6.3_
+  - _Boundary: Latency_
+  - _Depends: 3.2_
+
+- [ ] 7. Integration: 段階判定オーケストレータ
+- [ ] 7.1 Verdict 段階判定ロジックと run_all 結線
+  - 各 probe 結果を集約し段階を確定（**NO-GO**（R1 不成立）／**条件付き GO**（R1+R2+R3）／**GO**（+R4）／**GO+**（+R5+R6））。全項目を成否にかかわらず試行する `run_all` を結線。
+  - 観測可能な完了条件: R1〜R6 の成否組合せに対し正しい段階が決まる単体テストが緑。
+  - 観測可能な完了条件: 最低ライン（R1+R2+R3）未達時に NO-GO 文書（ブロッカー＋回避候補）が出力される。
+  - 観測可能な完了条件: 条件付き GO 以上で後続前提結論（採用 executor 統合方式・VM pin/teardown 方針・marshaling 契約・drop→204 ガード方針・coroutine 生存条件・GET レイテンシとフォールバック要否）が明記される。
+  - _Requirements: 8.1, 8.4, 8.5, 7.3_
+  - _Boundary: Verdict_
+  - _Depends: 1.5, 2.2, 2.3, 3.2, 4.1, 5.3, 6.1_
+
+- [ ] 8. Validation: バイト不変・統合走行・撤去
+- [ ] 8.1 バイト不変検証（actor-poc 無効）
+  - `actor-poc` 無効の release ビルド成果物が 1.1 のベースライン・ダイジェストと一致（diff ゼロ）することを確認。
+  - 観測可能な完了条件: feature off ビルド成果物がベースラインとバイト一致することを確認する検証が緑。
+  - _Requirements: 7.2_
+  - _Depends: 1.1, 1.2_
+- [ ] 8.2 統合走行と VerdictDocument 生成
+  - 全 probe（R1〜R6）を結線して `run_all` を end-to-end 実行し、項目別試行結果・段階判定・後続申し送りを含む実 `VerdictDocument` 成果物を生成・出力する。
+  - 観測可能な完了条件: end-to-end 走行が全項目試行を含む段階判定文書を成果物として出力する。
+  - _Requirements: 7.3, 8.2_
+  - _Depends: 7.1_
+- [ ] 8.3 撤去手順の確認（使い捨て）
+  - `actor-poc` feature・`actor_poc/` モジュール・`lib.rs` の cfg-mod 宣言・`Cargo.toml` の feature/依存を削除する撤去手順を確認し、痕跡なく本体バイト不変へ戻ることを検証。
+  - 観測可能な完了条件: 撤去手順適用後に `actor-poc` 関連が完全除去され、release 成果物が 1.1 ベースラインへ戻る。
+  - _Requirements: 7.5_
+  - _Depends: 8.1_
