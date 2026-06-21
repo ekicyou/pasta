@@ -56,7 +56,7 @@ debug/ と同型の sibling モジュール（feature `actor-poc` でガード�
 2. **GET/NOTIFY 判定点**: `pasta_shiori` の pest プロトコルパーサでメソッド（GET/NOTIFY）が VM 投入**前**に取得できるか。marshaling 分岐（block-on-reply か即 204）の判断に必要。
 3. **実 SSP 計測**【要件ディスカッション#1で決定: 忠実シミュレータ採用】: R5/R6 の「実 SSP 相当」は OnSecondChange 周期＋`Status: talking` 遷移を忠実に再現する自前ドライバ（実機 attach は任意）と要件側で定義済み（R5.6）。設計は忠実シミュレータの構築を主とし、再生中に SSP が tick を送り続けるか（gate 検証前提）は ukadoc/任意実機スモークで補助確認。実機絶対性能保証は `pasta-actor-runtime` へ申し送り。
 4. **feature 衛生とバイト不変検証法**: `pasta_lua`（必要なら `pasta_shiori`）に default-off `actor-poc` を導入し、無効時の release 成果物バイト不変を成果物 diff で検証する手順を確立。
-5. **リエントランシー順序**: executor がキック処理中に到着する `OnPastaCallBack` GET（pending コルーチン resume 必須）の単一 mailbox 内順序制御。
+5. **リエントランシー順序**【要件ディスカッション#2で決定: 設計不変条件として解決済み・新規要件不要】: 順序はアクターモデルの**単一 mailbox 直列処理**で構造的に確定し、キックは**FIFO 投入→OnSecondChange の排出点でのみ消費**、即時再生は**`talking` を無視して常にさくらスクリプトで上書き（preempt＝破棄、保全分岐なし）**。よってレース／状態破壊は原理的に発生しない。PoC では独立試験を立てず、**R1（executor/アクター）＋R4（coroutine 生存）＋R5（FIFO drain＋preempt）を複合シナリオで走らせて**暗黙にカバーする。設計はこの不変条件（順序＝直列 mailbox 保証／即時＝常時上書き）を前提とすること。
 6. **隔離の二択**: 実行時config 流儀（debug 同様ゼロコスト）と cargo feature 流儀（撤去済み `lua-debug-poc` 同様）の最終選択。R7.2 バイト不変要件は後者寄り。
 
 ## 推奨
