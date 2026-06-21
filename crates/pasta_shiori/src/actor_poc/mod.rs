@@ -4,6 +4,9 @@
 //! SSP スレッド側の FFI 反転ハーネス（pest method 判定→GET block-on-reply／
 //! NOTIFY 即 204 marshaling）を担う。
 //!
-//! 後続タスク（2.x 以降）が `ffi_marshal` 等のサブモジュールをここに追加する。
 //! 出荷経路（`shiori::request`）は改変せず、request 文字列を独自に再パースする
 //! 方針（design.md Q3）。feature 無効時はコンパイル単位に現れない。
+
+/// SSP スレッド側 FFI 反転ハーネス（pest method 再パース→GET block-on-reply／
+/// NOTIFY 即 204・R2.1/R2.2/R2.4）。
+pub mod ffi_marshal;

@@ -15,7 +15,12 @@ name = "pasta"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-# 使い捨て検証ハーネス（PoC）。default 無効。pasta_lua/actor-poc へ伝播する。
+# 使い捨て検証ハーネス（PoC）。default 無効。pasta_lua/actor-poc へ伝播するだけ。
+# Marshal（task 3.2）は自前のアクタースレッド／executor を建てず、pasta_lua の
+# レビュー済み `ActorThread`（block_on＋!Send VM ホスト）／`Mailbox`／`Responder` を
+# 再利用する。よって executor 依存は pasta_lua 側に閉じ、pasta_shiori は
+# wintf-winmsg-executor を直接リンクしない。default 無効なので feature off の
+# リリースビルドは引き続きバイト不変（R7.2）。
 actor-poc = ["pasta_lua/actor-poc"]
 
 [dependencies]

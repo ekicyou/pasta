@@ -12,30 +12,41 @@
 
 use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
 
+use super::responder::Responder;
+
 /// mailbox を流れるメッセージの判別共用体。
 ///
 /// SHIORI marshaling の 3 種を表す:
-/// - `GetMsg`: GET 同期契約。応答値を SSP スレッドへ返すための reply チャネルを
-///   内包する。本タスク（1.4）では FIFO ＋スレッド分離の実証に十分な最小の
-///   `std::sync::mpsc::Sender` 1 回送信で reply を表現する。タスク 3.1 が
-///   この reply 経路を Drop→204 ガード付きの `Responder` でラップし、応答未送信の
-///   まま drop された場合に 204 フォールバックを撃つ保護へ発展させる。
+/// - `GetMsg`: GET 同期契約。応答値を SSP スレッドへ返すための応答経路を内包する。
+///   応答経路は **タスク 3.1 でレビュー済みの [`Responder`]**（Drop→204 ガード付き）で
+///   あり、GET 処理側が reply せずに drop（応答忘れ／panic）した場合でも 204
+///   フォールバックを撃ち、SSP 側の無限待機を原理的に消す（design.md「Mailbox」の
+///   doc が予告した 1.4→3.1 の加算的進化＝`reply: Sender<u64>` から `Responder` への
+///   置き換え）。`script` は GET 処理で VM が実行する Lua スニペット。
 /// - `NotifyMsg`: NOTIFY fire-and-forget。応答を持たず即 204 で終結する経路。
 /// - `KickMsg`: talk FIFO へのキック投入。OnSecondChange drain 契機で消費される。
 #[derive(Debug)]
 pub enum ActorMsg {
-    /// GET 同期メッセージ。`payload` は要求識別子相当、`reply` は応答経路。
+    /// GET 同期メッセージ。`payload` は要求識別子相当（順序確認に用いる）、
+    /// `responder` は Drop→204 ガード付きの応答経路、`script` は GET 処理で VM が
+    /// 実行する Lua スニペット。
     Get {
         /// 要求を識別する最小ペイロード（PoC では順序確認に用いる）。
         payload: u64,
-        /// 応答値を SSP スレッドへ返す reply チャネル。
-        /// 3.1 で Drop→204 ガード付き `Responder` に置き換わる予定の最小素地。
-        reply: Sender<u64>,
+        /// GET 処理側でアクタースレッド上の VM が実行する Lua スニペット
+        /// （`return <expr>` を想定）。FIFO 順序のみを確認するテストでは空文字でよい。
+        script: String,
+        /// 応答値を SSP スレッドへ返す Drop→204 ガード付き応答経路（task 3.1）。
+        /// reply されないまま drop されると 204 フォールバックが撃たれる。
+        responder: Responder,
     },
     /// NOTIFY fire-and-forget メッセージ。応答経路を持たない。
     Notify {
         /// 通知ペイロード（PoC では順序確認に用いる）。
         payload: u64,
+        /// NOTIFY 処理側でアクタースレッド上の VM が実行する Lua スニペット。
+        /// FIFO 順序のみを確認するテストでは空文字でよい。
+        script: String,
     },
     /// talk FIFO へのキックメッセージ。
     Kick {
@@ -52,7 +63,7 @@ impl ActorMsg {
     pub fn payload(&self) -> u64 {
         match self {
             ActorMsg::Get { payload, .. } => *payload,
-            ActorMsg::Notify { payload } => *payload,
+            ActorMsg::Notify { payload, .. } => *payload,
             ActorMsg::Kick { scene } => *scene,
         }
     }
@@ -124,7 +135,7 @@ impl MailboxReceiver {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::mpsc as std_mpsc;
+    use crate::actor_poc::responder::PocResponse;
     use std::thread;
 
     /// `!Send` を表すマーカー。VM 所有権の代理として drain 側スレッドが構築・保持し、
@@ -154,8 +165,11 @@ mod tests {
         const N: u64 = 100;
 
         for i in 1..=N {
-            tx.enqueue(ActorMsg::Notify { payload: i })
-                .expect("enqueue should succeed while receiver is alive");
+            tx.enqueue(ActorMsg::Notify {
+                payload: i,
+                script: String::new(),
+            })
+            .expect("enqueue should succeed while receiver is alive");
         }
         // producer 側を drop して drain がキュー終端を検出できるようにする。
         drop(tx);
@@ -173,13 +187,31 @@ mod tests {
     #[test]
     fn all_variants_preserve_fifo_order() {
         let (tx, rx) = mailbox();
-        let (reply_tx, _reply_rx) = std_mpsc::channel::<u64>();
+
+        // GET は task 3.1 の `Responder`（Drop→204 ガード付き）を応答経路に持つ。
+        // 受信端は順序確認では使わないが、drop しないよう保持しておく。
+        let (responder_a, _rx_a) = Responder::new();
+        let (responder_b, _rx_b) = Responder::new();
 
         // 種別を意図的に交互配置し、順序が種別ではなく投入順で決まることを示す。
         tx.enqueue(ActorMsg::Kick { scene: 10 }).unwrap();
-        tx.enqueue(ActorMsg::Get { payload: 11, reply: reply_tx.clone() }).unwrap();
-        tx.enqueue(ActorMsg::Notify { payload: 12 }).unwrap();
-        tx.enqueue(ActorMsg::Get { payload: 13, reply: reply_tx }).unwrap();
+        tx.enqueue(ActorMsg::Get {
+            payload: 11,
+            script: String::new(),
+            responder: responder_a,
+        })
+        .unwrap();
+        tx.enqueue(ActorMsg::Notify {
+            payload: 12,
+            script: String::new(),
+        })
+        .unwrap();
+        tx.enqueue(ActorMsg::Get {
+            payload: 13,
+            script: String::new(),
+            responder: responder_b,
+        })
+        .unwrap();
         tx.enqueue(ActorMsg::Kick { scene: 14 }).unwrap();
         drop(tx);
 
@@ -203,12 +235,22 @@ mod tests {
         let (tx, rx) = mailbox();
         let producer_id = thread::current().id();
 
-        // GET の reply 経路で、drain スレッドが「VM 操作」を行ったスレッド id を
-        // producer スレッドへ返してもらう（値だけが戻り、VM マーカー自体は越えない）。
-        let (reply_tx, reply_rx) = std_mpsc::channel::<u64>();
-        tx.enqueue(ActorMsg::Get { payload: 1, reply: reply_tx }).unwrap();
+        // GET の応答経路は task 3.1 の `Responder`（Drop→204 ガード付き）。drain
+        // スレッドが「VM 操作」を行ったスレッド id を `Responder::reply` で producer
+        // へ返してもらう（値だけが戻り、VM マーカー自体は越えない）。
+        let (responder, reply_rx) = Responder::new();
+        tx.enqueue(ActorMsg::Get {
+            payload: 1,
+            script: String::new(),
+            responder,
+        })
+        .unwrap();
         for i in 2..=5u64 {
-            tx.enqueue(ActorMsg::Notify { payload: i }).unwrap();
+            tx.enqueue(ActorMsg::Notify {
+                payload: i,
+                script: String::new(),
+            })
+            .unwrap();
         }
         drop(tx);
 
@@ -228,12 +270,11 @@ mod tests {
             let order: Vec<u64> = msgs.iter().map(ActorMsg::payload).collect();
             assert_eq!(order, vec![1, 2, 3, 4, 5], "FIFO order on drain thread");
 
-            // GET の reply に、VM 操作を実行したスレッド id を返す（値のみ越境）。
-            for m in &msgs {
-                if let ActorMsg::Get { reply, .. } = m {
-                    reply
-                        .send(drain_thread_id_as_u64(drain_thread_id))
-                        .expect("reply should reach the blocked producer");
+            // GET の `Responder` に、VM 操作を実行したスレッド id を載せて reply
+            // する（値のみ越境・`Responder` を consume するので Drop→204 は撃たない）。
+            for m in msgs {
+                if let ActorMsg::Get { responder, .. } = m {
+                    responder.reply(PocResponse::Value(drain_thread_id_as_u64(drain_thread_id)));
                 }
             }
             drain_thread_id
@@ -249,10 +290,10 @@ mod tests {
             "drain must run on a thread distinct from the producer/enqueue thread"
         );
         // reply で返ってきた id が drain スレッド由来であること（VM 操作が drain
-        // 側に閉じていた証跡）。
+        // 側に閉じていた証跡）。`Responder` の Value 応答として届く。
         assert_eq!(
             replied,
-            drain_thread_id_as_u64(drain_thread_id),
+            PocResponse::Value(drain_thread_id_as_u64(drain_thread_id)),
             "the GET reply value must originate from the drain thread's VM op"
         );
     }

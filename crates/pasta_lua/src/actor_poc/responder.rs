@@ -65,6 +65,17 @@ pub struct Responder {
     tx: Option<Sender<PocResponse>>,
 }
 
+impl std::fmt::Debug for Responder {
+    /// `Sender` は `Debug` だがチャネル内容を晒さない。`Responder` を内包する
+    /// `ActorMsg`（`#[derive(Debug)]`）が `enqueue` の `Result<_, ActorMsg>` 経由で
+    /// `Debug` を要求するため、未 reply か否かだけを表す最小の Debug を与える。
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Responder")
+            .field("pending", &self.tx.is_some())
+            .finish()
+    }
+}
+
 impl Responder {
     /// 新しい responder と、その応答を受け取る `Receiver` のペアを作る。
     ///

@@ -31,6 +31,8 @@ use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll, Waker};
 use std::thread::{self, JoinHandle, ThreadId};
 
+use super::mailbox::{mailbox, ActorMsg, MailboxReceiver, MailboxSender};
+use super::responder::PocResponse;
 use crate::context::TranspileContext;
 use crate::runtime::PastaLuaRuntime;
 
@@ -68,6 +70,14 @@ enum ActorCommand {
 pub struct ActorThread {
     /// アクター future へコマンドを送る mailbox 送信端。
     cmd_tx: Sender<ActorCommand>,
+    /// task 1.4 の単一直列 [`Mailbox`](super::mailbox) 送信端（GET/NOTIFY marshaling 用）。
+    ///
+    /// `RunLua` コマンド経路（task 2.1 の R1 プローブ）とは別に、SHIORI marshaling
+    /// （[`ActorMsg::Get`]／[`ActorMsg::Notify`]）を同一のアクタースレッド＝同一の
+    /// `!Send` VM へ流すための加算的な経路。`ffi_marshal`（task 3.2）がここへ enqueue
+    /// する。actor future は両経路を同じ poll で drain するため、VM はアクター
+    /// スレッドに pin されたまま GET/NOTIFY を処理する（R2.3 スレッド分離）。
+    mailbox_tx: MailboxSender,
     /// アクター future の最初のポーリングで捕捉した `Waker`。コマンド送信後に
     /// `wake()` してメッセージループを再ポーリングへ進める（スピン回避）。
     /// `Waker` は `Send + Sync`（`async_task` 由来）なので producer 側から起こせる。
@@ -100,6 +110,7 @@ impl ActorThread {
     /// スレッド起動と同時にアクタースレッド id を受け取り、ハンドルに保持する。
     pub fn spawn() -> Self {
         let (cmd_tx, cmd_rx) = mpsc::channel::<ActorCommand>();
+        let (mailbox_tx, mailbox_rx) = mailbox();
         let waker: Arc<Mutex<Option<Waker>>> = Arc::new(Mutex::new(None));
         let shutdown = Arc::new(AtomicBool::new(false));
 
@@ -119,6 +130,7 @@ impl ActorThread {
                 // メッセージループを回す。actor future は !Send VM を所有する。
                 wintf_winmsg_executor::block_on(actor_future(
                     cmd_rx,
+                    mailbox_rx,
                     thread_waker,
                     thread_shutdown,
                 ));
@@ -131,6 +143,7 @@ impl ActorThread {
 
         ActorThread {
             cmd_tx,
+            mailbox_tx,
             waker,
             shutdown,
             join_handle: Some(join_handle),
@@ -141,6 +154,32 @@ impl ActorThread {
     /// アクタースレッドの id（VM が pin されているスレッド）。
     pub fn actor_thread_id(&self) -> ThreadId {
         self.actor_thread_id
+    }
+
+    /// task 1.4 の [`Mailbox`](super::mailbox) 送信端を複製して返す。
+    ///
+    /// SHIORI marshaling 側（`ffi_marshal` / task 3.2）が GET/NOTIFY を同一の
+    /// アクタースレッド＝同一の `!Send` VM へ enqueue するための加算的アクセサ。
+    /// `MailboxSender` は `Clone`（mpsc 意味論）なので、複数の経路から単一直列
+    /// キューへ合流できる。
+    pub fn mailbox_sender(&self) -> MailboxSender {
+        self.mailbox_tx.clone()
+    }
+
+    /// [`ActorMsg`] を mailbox に投入し、アクター future を起こす（加算的経路）。
+    ///
+    /// GET は [`ActorMsg::Get`] の `responder` を内包させて enqueue し、呼び出し側
+    /// （SSP/test）は対応する `Receiver<PocResponse>` を block-on-reply する。NOTIFY は
+    /// [`ActorMsg::Notify`] を enqueue し即制御を返す（fire-and-forget）。投入後に
+    /// 保持済み `Waker` を起こしてメッセージループを再ポーリングへ進める（スピン回避）。
+    ///
+    /// アクタースレッドが既に teardown 済みでキューの受信端が drop されている場合は
+    /// 投入したメッセージを `Err` として返す（GET の `responder` も `Err` に同梱されて
+    /// 返り、呼び出し側が drop すれば Drop→204 ガードが撃たれる）。
+    pub fn submit(&self, msg: ActorMsg) -> Result<(), ActorMsg> {
+        self.mailbox_tx.enqueue(msg)?;
+        self.wake_actor();
+        Ok(())
     }
 
     /// Lua スニペットをアクタースレッド上の VM で実行し、(結果, 実行スレッド id) を
@@ -226,6 +265,7 @@ impl Drop for ActorThread {
 /// 制約により **構造的に** このスレッドを越えられない（越えようとすればコンパイル不可）。
 async fn actor_future(
     cmd_rx: Receiver<ActorCommand>,
+    mailbox_rx: MailboxReceiver,
     waker_slot: Arc<Mutex<Option<Waker>>>,
     shutdown: Arc<AtomicBool>,
 ) {
@@ -247,7 +287,7 @@ async fn actor_future(
             return Poll::Ready(());
         }
 
-        // (3) 溜まっているコマンドをすべて処理（VM 操作はこのスレッドに閉じる）。
+        // (3a) R1 プローブ用 `RunLua` コマンド経路を drain（task 2.1 既存）。
         loop {
             match cmd_rx.try_recv() {
                 Ok(ActorCommand::RunLua { script, reply }) => {
@@ -264,10 +304,49 @@ async fn actor_future(
             }
         }
 
+        // (3b) SHIORI marshaling 用 task 1.4 mailbox を投入順（FIFO）に drain して
+        //      VM 上で処理する（task 3.2 が enqueue する GET/NOTIFY/Kick）。VM 操作は
+        //      この drain＝アクタースレッドに閉じる（R2.3）。GET は `Responder` で
+        //      reply（VM 失敗時は reply せず drop→204 ガード）。NOTIFY は reply 無し
+        //      fire-and-forget。Kick は本タスクの責務外（task 5 で消費）なので無視。
+        for msg in mailbox_rx.drain() {
+            match msg {
+                ActorMsg::Get {
+                    script, responder, ..
+                } => match run_lua_on_vm(&runtime, &script) {
+                    // 応答値には VM 実行スレッド id 由来の数値を載せる（R2.3 の証跡）。
+                    Ok(outcome) => {
+                        responder.reply(PocResponse::Value(thread_id_digits(outcome.exec_thread_id)))
+                    }
+                    // VM 失敗＝応答未送信扱い。responder を drop すると Drop→204 ガードが
+                    // 撃たれ、SSP 側の block-on-reply は無限待機せず 204 で終結（R3.1/R2.4）。
+                    Err(_) => drop(responder),
+                },
+                ActorMsg::Notify { script, .. } => {
+                    // fire-and-forget: VM を実行するが応答経路を持たない。
+                    let _ = run_lua_on_vm(&runtime, &script);
+                }
+                ActorMsg::Kick { .. } => {
+                    // talk FIFO のキックは task 5（KickHarness/SimDriver）の責務。
+                    // 本アクターループは marshaling（GET/NOTIFY）に限定する。
+                }
+            }
+        }
+
         // (4) まだ続く。メッセージループへ制御を返す（次の wake で再ポーリング）。
         Poll::Pending
     })
     .await;
+}
+
+/// `ThreadId` の Debug 表現（"ThreadId(N)"）から N を抽出して u64 にする。
+///
+/// `ThreadId` は安定した数値化 API を公開していないため、`PocResponse::Value` に
+/// 載せてチャネルを越境させる用途に限り Debug 表現を介す（R2.3 の証跡値）。
+pub fn thread_id_digits(id: ThreadId) -> u64 {
+    let s = format!("{id:?}");
+    let digits: String = s.chars().filter(|c| c.is_ascii_digit()).collect();
+    digits.parse().unwrap_or(0)
 }
 
 /// アクタースレッド上の VM で Lua を実行し、結果と実行スレッド id を集約する。
