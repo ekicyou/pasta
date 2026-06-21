@@ -115,7 +115,7 @@
   - 観測可能な完了条件: end-to-end 走行が全項目試行を含む段階判定文書を成果物として出力する。
   - _Requirements: 7.3, 8.2_
   - _Depends: 7.1_
-- [ ] 8.3 撤去手順の確認（使い捨て）
+- [x] 8.3 撤去手順の確認（使い捨て）
   - `actor-poc` feature・`actor_poc/` モジュール・`lib.rs` の cfg-mod 宣言・`Cargo.toml` の feature/依存を削除する撤去手順を確認し、痕跡なく本体バイト不変へ戻ることを検証。
   - 観測可能な完了条件: 撤去手順適用後に `actor-poc` 関連が完全除去され、release 成果物が 1.1 ベースラインへ戻る。
   - _Requirements: 7.5_
