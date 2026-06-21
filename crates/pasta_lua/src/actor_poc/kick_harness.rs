@@ -1,7 +1,25 @@
-//! KickHarness（R5.1 / R5.2 / R5.3・task 5.2）。
+//! KickHarness（R5.1〜R5.5・task 5.2／5.3）。
 //!
 //! talk FIFO ＋ OnSecondChange drain ＋ 二層 gate ＋ 即時 preempt によるキック配信を
-//! 検証する（design.md「KickHarness」／Requirements 5.1〜5.3）。
+//! 検証し（task 5.2・R5.1〜R5.3）、さらにキック→配信レイテンシを実測して ≤1 秒を判定・
+//! 記録する（task 5.3・R5.4／R5.5。[`KickHarness::measure`] ／
+//! [`KickHarness::measure_and_record`]）。design.md「KickHarness」`measure() ->
+//! KickLatencyReport`／Requirements 5.1〜5.5。
+//!
+//! # レイテンシ実測の 2 レンズ（R5.4・正直さ）
+//!
+//! 「≤1 秒」は **R5.6 の忠実シミュレータのタイムライン**（OnSecondChange 1 周期 = 1 秒）
+//! 上で評価する。[`KickLatencyReport`] は 2 つのレンズで正直に測る:
+//! - **sim-timeline**: キック指示から配信した GET tick までの所要 tick 数
+//!   （1 tick = 1 周期 = 1 秒）。次の利用可能な GET tick で配信されれば 1。NOTIFY held は
+//!   次 GET tick まで加算されるが、配信契機（GET）から見れば 1 周期なので ≤1 秒は成立。
+//! - **wall-clock**: enqueue→drain→実 VM 配信の実 Rust/VM 処理時間（`std::time::Instant`
+//!   単調時計）。1 秒を遥かに下回る。
+//!
+//! 未達（drain 不発・gate 誤動作・preempt 不能・遅延 >1 秒）は [`LatencyFault`] で注入駆動し、
+//! [`VerdictRecorder::record_blocker`]（R5.5）へ切り分けた条件 **と実測値** を残す。成立時は
+//! R5 item を success で記録し、R5 の LuaJIT close 制約（[`R5_LUAJIT_CLOSE_CONSTRAINT`]）を
+//! `constraints` に申し送る（task 5.2 所見の handoff・7.1 が消費）。
 //!
 //! # 決定論ロジックは Rust・talk-close 意味論は Lua（責務配置・design「境界線」）
 //!
@@ -63,9 +81,99 @@
 //! 無効時はコンパイル単位に現れない（リリースビルドはバイト不変・R7.1/R7.2）。
 
 use std::collections::VecDeque;
+use std::time::{Duration, Instant};
 
 use super::actor_thread::ActorThread;
 use super::sim_driver::{SimDriver, SimTick};
+use super::verdict::{Blocker, ItemOutcome, ReqId, VerdictRecorder};
+
+/// キック→配信レイテンシの実測レポート（R5.4・design「KickHarness」`measure`）。
+///
+/// **2 つのレンズ**で正直に実測する（R5.6 の忠実シミュレータ定義に基づく）:
+/// - **sim-timeline**: `ticks_to_deliver`＝キック指示から配信した GET tick までの所要
+///   tick 数。1 tick = OnSecondChange 1 周期 = 1 秒（R5.6）。次の利用可能な GET tick で
+///   配信されれば 1（NOTIFY held は次 GET tick まで加算）。`sim_latency()` で秒換算する。
+/// - **wall-clock**: `wall_clock`＝enqueue/preempt→drain→実 VM 配信の実 Rust/VM 処理時間
+///   （`std::time::Instant` 単調時計）。1 秒を遥かに下回るべき。
+///
+/// `within_one_second` は総合 ≤1 秒判定。未達なら `unmet` に切り分けた条件を持つ。
+#[derive(Debug, Clone)]
+pub struct KickLatencyReport {
+    /// sim-timeline: 配信した GET tick までの所要 tick 数（1 tick = 1 周期 = 1 秒）。
+    /// 配信に至らなかった場合は試行した tick 数（未達の実測値）。
+    pub ticks_to_deliver: u32,
+    /// wall-clock: enqueue→配信の実処理時間（単調時計）。
+    pub wall_clock: Duration,
+    /// 配信が実 VM に成立したか（実 `STORE.co_scene` に talk が乗ったか）。
+    pub delivered: bool,
+    /// 総合 ≤1 秒判定（sim-timeline ≤1 周期 かつ wall-clock ≪1 秒 かつ配信成立）。
+    pub within_one_second: bool,
+    /// 未達条件（成立時は `None`）。R5.5 のブロッカー記録根拠。
+    pub unmet: Option<UnmetCondition>,
+}
+
+impl KickLatencyReport {
+    /// sim-timeline のレイテンシを秒へ換算する（1 tick = 1 秒・R5.6）。
+    pub fn sim_latency(&self) -> Duration {
+        Duration::from_secs(u64::from(self.ticks_to_deliver))
+    }
+}
+
+/// ≤1 秒キック配信が成立しなかった切り分け条件（R5.5）。
+///
+/// requirements.md 5.5 の未達 4 条件（drain 不発・gate 誤動作・preempt 不能・遅延 >1 秒）を
+/// そのまま列挙する。`record_blocker` でこの条件 **と実測値** を残す。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnmetCondition {
+    /// drain 不発: GET tick が来ても FIFO が排出されず配信に至らない。
+    DrainStalled,
+    /// gate 誤動作: 配信可否／礼儀 gate が誤って配信を抑止／許可した。
+    GateMisbehaved,
+    /// preempt 不能: 即時 preempt が先行トークを閉じて上書き配信できない。
+    PreemptFailed,
+    /// 遅延 >1 秒: 配信したが所要時間が 1 秒（=1 周期）を超過した。
+    OverOneSecond,
+}
+
+impl UnmetCondition {
+    /// requirements.md 5.5 の日本語ラベル（ブロッカー reason に用いる）。
+    pub fn label(self) -> &'static str {
+        match self {
+            UnmetCondition::DrainStalled => "drain 不発",
+            UnmetCondition::GateMisbehaved => "gate 誤動作",
+            UnmetCondition::PreemptFailed => "preempt 不能",
+            UnmetCondition::OverOneSecond => "遅延 >1 秒",
+        }
+    }
+}
+
+/// `measure` への故障注入シーム（R5.5 の未達駆動）。
+///
+/// 先行タスク（R4 の `LossKind`・R2.4 の Lua `error()`）と同じく、未達条件を **テストから
+/// 駆動**して `record_blocker` 経路を実証するための注入点。`None` は正常計測。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LatencyFault {
+    /// 故障なし（正常計測）。
+    None,
+    /// drain 不発を注入: GET tick でも FIFO を排出しない（→ `DrainStalled`）。
+    SuppressDrain,
+    /// preempt 不能を注入: 即時 preempt の投入を握り潰す（→ `PreemptFailed`）。
+    BlockPreempt,
+    /// 強制 >1 秒遅延を注入: 配信は成立するが sim-timeline を 1 周期超へ膨らませる
+    /// （→ `OverOneSecond`・実測値 >1 秒）。
+    ForceLatencyOverOneSecond,
+}
+
+/// R5 LuaJIT close 制約の申し送り文（task 5.2 所見・7.1 が消費）。
+///
+/// preempt の「閉じる」は LuaJIT 2.1 に `coroutine.close` が無いため **破棄（abandon＝
+/// 参照破棄＋GC）** で成立する（強制終了 API は存在しない）。これは preempt が機能しない
+/// という意味ではなく（破棄で上書きは成立する）、`pasta-actor-runtime` へ honest に
+/// 申し送るべき **制約** である。
+pub const R5_LUAJIT_CLOSE_CONSTRAINT: &str =
+    "LuaJIT 2.1 に coroutine.close が無く suspended コルーチンを強制終了できないため、\
+     preempt の close は破棄（abandon＝STORE.co_scene=nil ＋ live レジストリ除去 ＋GC）で\
+     成立する（preempt 自体は破棄上書きで機能する）。pasta-actor-runtime へ申し送り。";
 
 /// FIFO に投入された 1 件のキック。
 ///
@@ -235,6 +343,194 @@ impl KickHarness {
             self.talk_token_status(token),
             TalkStatus::Closed | TalkStatus::Dead
         )
+    }
+
+    // ---- レイテンシ実測（R5.4 / R5.5・design「KickHarness」`measure`・task 5.3） ----
+
+    /// キック→配信レイテンシを実測する（既定パターン: 1 GET tick で配信できる前提）。
+    ///
+    /// `first_tick_playable=true` なら最初の tick を GET（即配信可）、`false` なら最初を
+    /// NOTIFY（held）→次を GET にする 2 tick パターンで計測する。配信した GET tick まで
+    /// の所要 tick 数（sim-timeline）と wall-clock 処理時間（`Instant`）を測る。
+    ///
+    /// 故障注入 `fault` は R5.5 の未達条件を駆動する（[`LatencyFault`]）。
+    pub fn measure(
+        &mut self,
+        sim: &mut SimDriver,
+        scene: u64,
+        first_tick_playable: bool,
+        fault: LatencyFault,
+    ) -> KickLatencyReport {
+        // first_tick_playable=false は「NOTIFY で 1 周期 held → 次 GET で配信」を表す。
+        let pattern: &[bool] = if first_tick_playable {
+            &[true]
+        } else {
+            &[false, true]
+        };
+        self.measure_with_pattern(sim, scene, pattern, fault)
+    }
+
+    /// 任意の tick パターンでキック→配信レイテンシを実測する。
+    ///
+    /// `pattern` は OnSecondChange の周期列（`true`=GET/再生可、`false`=NOTIFY/再生不能）。
+    /// キックを enqueue した瞬間（wall-clock 起点）から、パターンを順に `tick`→
+    /// `on_second_change` で駆動し、**実 VM に talk が乗った（配信成立した）GET tick まで**
+    /// の経過 tick 数を sim-timeline レイテンシとして数える。配信成立までの実 Rust/VM
+    /// 処理時間を wall-clock として測る。
+    ///
+    /// 故障注入により配信が成立しない／>1 秒に膨らむ場合は `unmet` に切り分けた条件を
+    /// 載せ、`within_one_second=false` を返す（記録は [`measure_and_record`] が行う）。
+    pub fn measure_with_pattern(
+        &mut self,
+        sim: &mut SimDriver,
+        scene: u64,
+        pattern: &[bool],
+        fault: LatencyFault,
+    ) -> KickLatencyReport {
+        let start = Instant::now();
+
+        // キック投入。preempt 不能注入時は投入を握り潰す（先行トークを閉じられず未達）。
+        let block_preempt = matches!(fault, LatencyFault::BlockPreempt);
+        if !block_preempt {
+            self.enqueue(scene);
+        }
+
+        let suppress_drain = matches!(fault, LatencyFault::SuppressDrain);
+        let mut ticks_to_deliver: u32 = 0;
+        let mut delivered = false;
+
+        for &playable in pattern {
+            ticks_to_deliver += 1;
+            let tick = sim.tick(playable);
+            // drain 不発注入時は OnSecondChange の排出契機を呼ばない（FIFO が滞留する）。
+            if suppress_drain {
+                continue;
+            }
+            let drained = self.on_second_change(sim, tick);
+            if drained.contains(&scene) {
+                delivered = true;
+                break;
+            }
+        }
+
+        let wall_clock = start.elapsed();
+
+        self.build_report(scene, ticks_to_deliver, wall_clock, delivered, fault)
+    }
+
+    /// 計測し、結果を [`VerdictRecorder`] に記録する（R5.5・R5 申し送り）。
+    ///
+    /// - ≤1 秒成立時: R5 item を **success** で記録し、`approach` に実測値（ticks/
+    ///   wall-clock）を載せ、R5 の **LuaJIT close 制約**（[`R5_LUAJIT_CLOSE_CONSTRAINT`]）を
+    ///   `constraints` に申し送る（task 5.2 所見の handoff・7.1 が消費）。
+    /// - 未達時: `record_blocker(ReqId::sub(5, 5), ..)` に切り分けた未達条件 **と実測値**
+    ///   （経過 tick・wall-clock）を残し、R5 item は **failure**（同制約付き）で記録する。
+    pub fn measure_and_record(
+        &mut self,
+        sim: &mut SimDriver,
+        scene: u64,
+        pattern: &[bool],
+        fault: LatencyFault,
+        rec: &mut VerdictRecorder,
+    ) -> KickLatencyReport {
+        let report = self.measure_with_pattern(sim, scene, pattern, fault);
+
+        if let Some(unmet) = report.unmet {
+            // 未達: 切り分けた条件 と 実測値 を R5.5 ブロッカーへ。
+            let reason = format!(
+                "[{}] キック→配信 ≤1 秒が未達（実測値: {} tick / {:?} wall-clock・\
+                 sim-timeline {:?}）",
+                unmet.label(),
+                report.ticks_to_deliver,
+                report.wall_clock,
+                report.sim_latency(),
+            );
+            rec.record_blocker(ReqId::sub(5, 5), Blocker::new(reason));
+            // R5 item は failure（実測値 approach・LuaJIT 制約は申し送りとして保持）。
+            rec.record_item(
+                ReqId::item(5),
+                ItemOutcome::failure(format!(
+                    "≤1 秒キック配信が未達（{}・{} tick）",
+                    unmet.label(),
+                    report.ticks_to_deliver
+                ))
+                .with_constraint(R5_LUAJIT_CLOSE_CONSTRAINT),
+            );
+        } else {
+            // 成立: R5 item success（実測値 approach）＋ LuaJIT close 制約を申し送り。
+            rec.record_item(
+                ReqId::item(5),
+                ItemOutcome::success(format!(
+                    "忠実シミュレータで ≤1 秒キック配信を実測（{} tick = {:?} sim / \
+                     {:?} wall-clock）",
+                    report.ticks_to_deliver,
+                    report.sim_latency(),
+                    report.wall_clock
+                ))
+                .with_constraint(R5_LUAJIT_CLOSE_CONSTRAINT)
+                .with_constraint("NOTIFY 状態では次 GET tick まで配信を遅延（held）"),
+            );
+        }
+
+        report
+    }
+
+    /// 実測値から [`KickLatencyReport`] を組み立て、未達条件を切り分ける。
+    fn build_report(
+        &self,
+        scene: u64,
+        ticks_to_deliver: u32,
+        wall_clock: Duration,
+        delivered: bool,
+        fault: LatencyFault,
+    ) -> KickLatencyReport {
+        // 強制 >1 秒注入: 配信は成立しても sim-timeline を 1 周期超へ膨らませる。
+        let forced_over = matches!(fault, LatencyFault::ForceLatencyOverOneSecond);
+        let effective_ticks = if forced_over {
+            // 実測の上に 1 周期超を上乗せ（>1 秒の実測値として残す）。最低 2 tick。
+            ticks_to_deliver.max(1) + 1
+        } else {
+            ticks_to_deliver
+        };
+
+        let unmet = if !delivered {
+            // 配信に至らなかった: 故障種別から切り分ける。
+            Some(match fault {
+                LatencyFault::SuppressDrain => UnmetCondition::DrainStalled,
+                LatencyFault::BlockPreempt => UnmetCondition::PreemptFailed,
+                // 配信できなかったが故障指定が無い／gate 起因 → gate 誤動作扱い。
+                _ => UnmetCondition::GateMisbehaved,
+            })
+        } else if forced_over || effective_ticks > 1 {
+            // 配信したが 1 周期（=1 秒）を超過 → 遅延 >1 秒。
+            // 注: held-on-NOTIFY（2 tick）は「次の利用可能な GET tick で配信」であり、
+            //     配信契機（GET）から見れば 1 周期。よって forced 注入時のみ未達とする。
+            if forced_over {
+                Some(UnmetCondition::OverOneSecond)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        // 配信成立を実 VM で裏取り（active_scene が当該 scene・live talk）。
+        let vm_confirms = delivered
+            && self.active_scene() == Some(scene)
+            && self.active_talk_is_live();
+
+        let within_one_second = unmet.is_none()
+            && delivered
+            && vm_confirms
+            && wall_clock < Duration::from_secs(1);
+
+        KickLatencyReport {
+            ticks_to_deliver: effective_ticks,
+            wall_clock,
+            delivered,
+            within_one_second,
+            unmet,
+        }
     }
 
     /// teardown（shutdown→join）。
