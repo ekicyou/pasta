@@ -106,3 +106,63 @@ Constraints（制約）に従い、**特性化テスト（FFI 入口の応答バ
 3. **Q3（GET タイムアウト閾値）— ✅ 解決（ディスカッション #3）**: GET timeout→204 を**本仕様で実装**・初期閾値 **6.68ms 候補**採用。**デバッガ停止中も抑止しない**（停止中の 204 は次 `OnSecondChange` の `resume_until_valid` で回復・work 不失。LuaJIT プリエンプション不可ゆえタイムアウトは SHIORI 待機打ち切りのみ）。閾値は「通常処理では発火せず停止／異常時のみ発動する安全網」とし通常経路バイト不変（R1）を担保。実機チューニングは設計以降。R5-AC7〜9 化。
 4. **Q4（panic=abort 下のガード）— ✅ 解決（ディスカッション #4）**: 「dev/test/unwind 限定の安全網」と明示受容＋正常経路の**構造的 panic-free 化を受入基準化**（R5-AC10/AC11）。リリースの `panic=abort` プロファイルは不変（横断ビルド変更はスコープ外）。既存 `windows.rs` の `catch_unwind` 姿勢と一貫・既存コードの panic 回避を新経路へ継続。dev=unwind/release=abort の分割はデバッグ容易性に資する（R10 整合）。
 5. **Q5（PoC `actor_poc/` の扱い）— ✅ 解決（ディスカッション #5）**: 「昇格してから撤去」を本仕様の責務とする。デバッグ資産（`sim_driver`／`mailbox`／`responder`／`coroutine_probe`）は **R10-AC5 の本番テスト基盤へ昇格**、feature-gated 使い捨て足場（`verdict.rs`・scaffold・`actor-poc` gate）は**最終タスクで撤去**し、出荷 `pasta.dll` バイト不変を正規化 sha で確認（actor_poc は default-off ゆえ出荷に元から不含・feasibility 実証済み）。実装中は参照テンプレートとして保持。R10-AC8 化。
+
+---
+
+# 設計フェーズ Discovery / Synthesis（2026-06-22）
+
+設計フェーズでの light＋統合フォーカス discovery（既存コード精査）の結果と、設計シンセシス（一般化・build vs adopt・簡素化）の結論を記録する。design.md はこの結論で自己完結している。
+
+## 1. Discovery 確認事実（コード精査・design.md の根拠）
+
+### 所有モデル現状（RN6 の前提）
+- `static SHIORI: OnceLock<RawShiori<PastaShiori>>`（`windows.rs:14`）。`RawShiori(isize, Arc<Mutex<Option<PastaShiori>>>)`（`windows.rs:148`）。
+- `PastaShiori` は `runtime: Option<PastaLuaRuntime>`（`!Send`）と `SHIORI.load/request/unload` の `Function` キャッシュを保持。`unsafe impl Send/Sync`（`shiori.rs:51-52`）の健全性は「`OnceLock` 単一＋`Mutex` 直列化＋メインスレッドのみ呼出し」の運用仮定依存。
+- FFI dispatch は `catch_unwind(AssertUnwindSafe(..))` で panic→`MyError`→SHIORI 応答。リリース `panic=abort` で catch 到達不能（dev/test 保険）。
+- **`HGLOBAL` 所有移譲**: `load`/`request` は受領 `HGLOBAL` を `ShioriString::capture`（drop で free）、応答は `clone_from_str_nofree`（呼出側 free）。`ShioriString` にも `unsafe impl Send/Sync`（排他所有・別 unsafe）が存在するが本仕様の解消対象外（VM 束縛 unsafe のみが対象）。
+- **`req.method` 確定点**: `lua_request.rs:86-87` の pest `Rule::get|Rule::notify` で VM 投入前に確定。marshaling 分岐入力に再利用可能。
+
+### 描画縫い目現状（RN3 の前提）
+- 唯一の描画接点 = Lua `SAKURA.talk_to_script(actor, text)`。`@pasta_sakura_script` を `register_sakura_script_module`（`module_registry.rs:128-137`）がコア初期化時（`factory.rs:172`）に `package.loaded` へ無条件登録。
+- `register(lua, config: Option<&TalkConfig>) -> LuaResult<Table>`（`sakura_script/mod.rs:50`）。`config` は `PastaConfig::talk()` 由来。budouy/unicode-width で改行処理。
+- `BUILDER.build(grouped_tokens, config, actor_spots)`（`sakura_builder.lua`）が grouped token を走査、`emit_inner_token` が `talk/surface/wait/newline/clear/choice/yield` を分類処理。**マーカー最小集合（talk/actor 切替/wait/choice）の逆算出発点**。`act.lua:build` が `STORE.actor_spots` を in-place 更新。
+
+### アクター PoC 実証テンプレート（RN1 の前提）
+- `actor_poc/actor_thread.rs`: `ActorThread::spawn()` が `thread::spawn` 内で `wintf_winmsg_executor::block_on(actor_future(..))` を回し、`actor_future` 内で `PastaLuaRuntime::new(..)` を生成し `!Send` VM を pin。`MailboxSender`/`shutdown: Arc<AtomicBool>`/`join_handle: Option<JoinHandle>`/`actor_thread_id`。
+- `block_on<'a, T: 'a>(future: impl Future<Output=T> + 'a) -> T`。再 poll は内部 `MSG_ID_WAKE`＋`Waker::wake_by_ref()`。メッセージ専用ウィンドウは executor 内部生成（ユーザコード非関与）。
+- `mailbox.rs`: `enum ActorMsg{ Get{payload,script,responder}, Notify{payload,script}, Kick{scene} }`、`mpsc` FIFO、`MailboxReceiver: !Sync`（drain スレッド pin）。
+- `responder.rs`: `enum PocResponse{ Value(u64), NoContent204 }`、`Responder{ tx: Option<Sender> }`、`reply()` XOR `drop()→204` exactly-once（`take()`）。**drop→204 は unwind 限定**（release `panic=abort` で非発火）。
+- `teardown.rs`: `ReloadProbe::run_cycles(n)` が warmup 3＋N サイクルでハンドル（`GetProcessHandleCount`）／USER オブジェクト（`GetGuiResources`）成長を計測。teardown idiom = shutdown フラグ→wake→join、`take()` 二重 join 回避。
+- feature gate: `actor-poc = ["dep:wintf-winmsg-executor", "windows-sys/Win32_System_Threading"]`（`pasta_lua/Cargo.toml`）。`wintf-winmsg-executor = { version = "0.0.3", optional = true }`。`pasta_shiori` は `actor-poc = ["pasta_lua/actor-poc"]` のみ（executor 直接依存なし）。
+
+### debug backend スレッドモデル（R10 の前提）
+- `set_global_hook(EVERY_LINE)` は **VM 実行スレッド上で同期発火**（`debug/hook.rs`）。ブレーク停止もフックループ内（同スレッド）で処理。LuaJIT は `lua_sethook` がメインステート全体に作用＝全コルーチン横断発火。
+- socket bridge（`Transport` 単独所有・`!Sync`）／event encoder／transport listener は VM スレッドから `mpsc`（`Send` のみ）で分離。`mlua::Lua` はスレッドを越えない。
+- `enable(lua, cfg, source_map) -> Result<Option<DebugHandle>, DebugError>`。無効時 `Ok(None)`（ゼロコスト）。`DebugHandle::Drop` = Terminated emit→30ms flush→shutdown フラグ→socket_handle join（port 解放）→encoder detach。`take()` 二重 join 回避。
+- **設計含意**: VM がアクタースレッドへ移ると `set_global_hook`／`enable()` はアクタースレッドで呼ぶ必要がある。debug teardown はアクタースレッド join **前**に完了させ port 残留を防ぐ。
+
+## 2. Synthesis 結論
+
+### 一般化（Generalization）
+- R2（マーカー契約）と R3（レンダラ注入）は「コア↔アダプタ境界を contract 化する」同一問題の二側面。マーカー型体系を拡張可能な境界 API（未知マーカーをレンダラが既定動作で受容）として一般化し、SHIORI さくらレンダラを最初の実装として注入する形に統一。実装は最小集合のみ（インタフェースのみ一般化、実装は一般化しない）。
+- R5（marshaling）と R6（直列キュー）と R7（teardown）は `actor_poc` の `{mailbox,responder,teardown}` で既に統合実証済み。本番化は「同一プリミティブを出荷経路へ昇格」する単一の移行。
+
+### Build vs Adopt
+- **Adopt**: `wintf-winmsg-executor` 0.0.3（`block_on` メッセージループ・`!Send` future 駆動・内部メッセージウィンドウ）。PoC（GO+）で適合実証済み。自作の Win メッセージループは再発明。
+- **Adopt**: `actor_poc/` の `ActorThread`/`Mailbox`/`Responder`/`Teardown` をテンプレートとして昇格（再設計しない）。
+- **Adopt**: 既存 teardown idiom（`Arc<AtomicBool>`＋`take()`＋socket2 SO_REUSEADDR）と debug backend の VM スレッド同期フックモデル（変更せず VM=アクタースレッドへ移すのみ）。
+- **Build（薄く）**: presentation マーカー層は新規だが「現状トークンを宿主非依存名で表現する薄い層」に留める（バイト不変逆算を崩さない）。
+
+### 簡素化（Simplification）
+- マーカー型を Rust 側へ厚く持たない。Lua トークン→さくらスクリプトのバイト不変経路を維持し、マーカー契約は薄い命名層。
+- レンダラ注入 IF を過度に抽象化しない（単一実装の不要な間接化回避）。最小の差し替え点（注入なし＝既存挙動バイト不変）に留める。
+- `actor_poc` の PoC 専用フィールド（`payload: u64`・`Kick{scene}`・`PocResponse::Value(u64)`）は本番昇格時に本番応答型（SHIORI 応答 `String`）へ整理。`verdict.rs`/`latency.rs`/`sim_driver` の使い捨て計測足場は撤去（`sim_driver` 等のデバッグ資産はテストへ昇格）。
+
+## 3. 設計フェーズ繰り越し（OPEN QUESTIONS — design-discussion へ）
+
+design.md の Open Questions と一致。要約:
+1. **RN6 所有モデル**: `OnceLock<RawShiori>`＋`Arc<Mutex<Option<PastaShiori>>>`→`ActorHandle` 保持形。`OnceLock` 再代入不可ゆえ reload 再 spawn を許す所有形（`Mutex<Option<ActorHandle>>` 等）と `DllMain` attach/detach × `load`/`unload` 二重ライフサイクル整合。
+2. **RN1 executor 本番統合形**: `wintf` 0.0.3 のメッセージ専用ウィンドウ Drop 解放・`JoinHandle` の `pasta_shiori` 側所有での本番統合形。executor 依存を `pasta_lua` 留置／`pasta_shiori` 移設のいずれにするか。
+3. **RN4 GET timeout 閾値**: 6.68ms 初期値の実機実測調整と通常経路非発火の実証手段。
+4. **RN2 マーカースキーマ**: Rust enum 形・Lua テーブル表現・両者整合の具体データ表現。
+5. **RN3 レンダラ注入 IF 形**: trait object／関数ポインタ／登録フラグのいずれか。`TalkConfig` 受け渡しと `@pasta_sakura_script` アダプタ起点化の最小実装。
