@@ -2,7 +2,7 @@
 
 > 使い捨て feature-gated PoC（`actor-poc`・default off）。出荷コードは読み取り・再利用のみ、振る舞い非改変。リスク順に R1（本丸）を最初の実証スライスへ。
 
-- [ ] 1. Foundation: 隔離足場と共有基盤
+- [x] 1. Foundation: 隔離足場と共有基盤
 - [x] 1.1 release バイト・ベースラインの取得（actor-poc 導入前）
   - `actor-poc` 関連コードを一切入れていない現状の release ビルド成果物（両クレート）のダイジェストを採取・保存する。
   - 観測可能な完了条件: 導入前 release 成果物のダイジェスト基準が記録され、後続のバイト不変検証（8.1）が参照できる。
@@ -26,7 +26,7 @@
   - _Requirements: 8.2, 8.3, 7.3_
   - _Boundary: Verdict_
 
-- [ ] 2. R1（本丸）: executor 上 VM ホスト＋reload teardown
+- [x] 2. R1（本丸）: executor 上 VM ホスト＋reload teardown
 - [x] 2.1 アクタースレッドで `block_on` ＋ `!Send` VM pin
   - `std::thread::spawn` 内で `wintf-winmsg-executor::block_on(actor future)` を回し、future が `PastaLuaRuntime`（`!Send` VM）を生成・所有。VM はアクタースレッドを越えない。`JoinHandle` 保持・shutdown `AtomicBool` idiom 写経。
   - 観測可能な完了条件: VM がアクタースレッド内で Lua 実行を完了し、スレッド境界を越えないことを assert するテストが緑。
@@ -44,7 +44,7 @@
   - _Requirements: 1.4_
   - _Depends: 1.5, 2.1_
 
-- [ ] 3. R2/R3: block-on-reply marshaling と drop→204 ガード
+- [x] 3. R2/R3: block-on-reply marshaling と drop→204 ガード
 - [x] 3.1 Responder drop→204 ガード
   - GET 応答 oneshot（`std::sync::mpsc` 1 回受信）を包み、未 reply のまま drop（panic 巻き戻し含む）したら 204 を自動送信。「reply 1 回」または「drop→204」で必ず終結。
   - 観測可能な完了条件: 未 reply drop と panic 注入の双方で SSP 側が 204 を受け取り無限待機しない単体テストが緑。
@@ -58,7 +58,7 @@
   - _Boundary: Marshal_
   - _Depends: 1.4, 2.1, 3.1_
 
-- [ ] 4. R4: coroutine/callback 生存
+- [x] 4. R4: coroutine/callback 生存
 - [x] 4.1 実 `*.lua` を executor 駆動で resume／callback 生存検証
   - `store.lua`／`event/init.lua`／`callback.lua`／`second_change.lua` を無改変で executor 駆動。`STORE.co_scene` を中断地点から resume、`CALLBACK.pending` を後続契機で解決、喪失条件を記録。シーン中核・コルーチン意味論は Lua のまま（Rust 化しない）。
   - 観測可能な完了条件: executor 駆動下で `co_scene` が中断地点から継続し `CALLBACK` が解決する統合テストが緑。
@@ -66,7 +66,7 @@
   - _Boundary: CoroutineProbe_
   - _Depends: 2.1_
 
-- [ ] 5. R5: 忠実シミュレータとキック配信
+- [x] 5. R5: 忠実シミュレータとキック配信
 - [x] 5.1 (P) SimDriver 忠実シミュレータ
   - OnSecondChange を `tick(playable)` で発火し、`playable=true→GET(Ref3=1)`／`false→NOTIFY(Ref3=0)` として**自身が method タグ付け**（Marshal の再パースには依存しない生成器）。`set_talking` で `Status: talking` 遷移を制御。
   - 観測可能な完了条件: `tick(playable)` が GET/NOTIFY tick を発火し `set_talking` が遷移する単体テストが緑。
@@ -86,7 +86,7 @@
   - _Boundary: KickHarness_
   - _Depends: 5.2_
 
-- [ ] 6. R6: GET レイテンシ実測とフォールバック判断
+- [x] 6. R6: GET レイテンシ実測とフォールバック判断
 - [x] 6.1 GET block-on-reply レイテンシ実測＋フォールバック要否
   - 忠実シミュレータ（実機 attach 任意）の呼び出しパターンで GET を反復実行し代表値（最大・分布）を集計。GET タイムアウト→204 フォールバックの要否と閾値候補を判断・文書化、超過経路は `pasta-actor-runtime` へ申し送り。
   - 観測可能な完了条件: n 回 GET の代表値を集計し、フォールバック要否判断＋閾値候補を出力する統合テストが緑。
@@ -94,7 +94,7 @@
   - _Boundary: Latency_
   - _Depends: 3.2_
 
-- [ ] 7. Integration: 段階判定オーケストレータ
+- [x] 7. Integration: 段階判定オーケストレータ
 - [x] 7.1 Verdict 段階判定ロジックと run_all 結線
   - 各 probe 結果を集約し段階を確定（**NO-GO**（R1 不成立）／**条件付き GO**（R1+R2+R3）／**GO**（+R4）／**GO+**（+R5+R6））。全項目を成否にかかわらず試行する `run_all` を結線。
   - 観測可能な完了条件: R1〜R6 の成否組合せに対し正しい段階が決まる単体テストが緑。
@@ -104,7 +104,7 @@
   - _Boundary: Verdict_
   - _Depends: 1.5, 2.2, 2.3, 3.2, 4.1, 5.3, 6.1_
 
-- [ ] 8. Validation: バイト不変・統合走行・撤去
+- [x] 8. Validation: バイト不変・統合走行・撤去
 - [x] 8.1 バイト不変検証（actor-poc 無効）
   - `actor-poc` 無効の release ビルド成果物が 1.1 のベースライン・ダイジェストと一致（diff ゼロ）することを確認。
   - 観測可能な完了条件: feature off ビルド成果物がベースラインとバイト一致することを確認する検証が緑。
