@@ -65,14 +65,15 @@ Phase 5 デバッガ実装後の結論として、ゴースト作者にとって
 1. When 検証ハーネスが executor 経由で 1 シーンのキックを talk FIFO に投入したとき, the 検証ハーネス shall OnSecondChange の drain 契機で FIFO が排出されシーンが SSP で再生されることを確認する
 2. While SSP が `Status: talking`（再生中）である間, the 検証ハーネス shall talk FIFO の drain を gate（抑止）し、再生中トークへの割り込み配信を防ぐことを確認する
 3. When 即時 preempt（先行トークを閉じて新規キックを優先）を指示したとき, the 検証ハーネス shall キックされたシーンが先行トークより優先して配信されることを確認する
-4. When 実 SSP（ロード実機）相当の呼び出しパターンでキックを発行したとき, the 検証ハーネス shall キック指示から SSP 配信までの所要時間を実測し ≤1 秒で配信されることを確認・記録する
+4. When 実 SSP 相当の呼び出しパターンでキックを発行したとき, the 検証ハーネス shall キック指示から配信までの所要時間を実測し ≤1 秒で配信されることを確認・記録する
 5. If ≤1 秒キック配信が成立しない（drain 不発・gate 誤動作・preempt 不能・配信遅延 >1 秒）, then the 検証ハーネス shall 未達条件と実測値を記録し NO-GO もしくは制約付き判定の根拠として残す
+6. The 検証ハーネス shall 本仕様における「実 SSP 相当」を、OnSecondChange の周期と `Status: talking` 遷移を忠実に再現する自前ドライバ（忠実シミュレータ）と定義する（実機 SSP への attach 計測は任意とし、実機での絶対性能保証は後続実装仕様 `pasta-actor-runtime` へ申し送る）
 
 ### Requirement 6: GET block-on-reply レイテンシ実測とフォールバック要否判断
 **Objective:** As a pasta 開発者, I want GET block-on-reply の実レイテンシを実機で実測したい, so that GET タイムアウト→204 フォールバックの要否を根拠付きで判断できる
 
 #### Acceptance Criteria
-1. When 実 SSP 相当の呼び出しパターンで GET block-on-reply を反復実行したとき, the 検証ハーネス shall 各 GET の応答レイテンシを実測し代表値（最大・分布等）を記録する
+1. When 実 SSP 相当の呼び出しパターン（R5.6 で定義する忠実シミュレータ。実機 attach は任意）で GET block-on-reply を反復実行したとき, the 検証ハーネス shall 各 GET の応答レイテンシを実測し代表値（最大・分布等）を記録する
 2. When レイテンシ実測値が得られたとき, the 検証ハーネス shall GET タイムアウト→204 フォールバックが必要か否かの判断と、必要な場合の閾値候補を文書化する
 3. If GET レイテンシが宿主の許容応答時間を超過しうる経路が観測される, then the 検証ハーネス shall 当該経路・条件・推奨フォールバック方針を記録し後続実装仕様への申し送りとして残す
 
