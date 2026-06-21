@@ -269,7 +269,7 @@ teardown 順序は debug backend（socket bridge join・port 解放）をアク�
 **Responsibilities & Constraints**
 - `wintf_winmsg_executor::block_on` を回すアクタースレッドを `spawn` し、`PastaLuaRuntime` をそのスレッドに pin する。
 - SHIORI スレッドは `ActorHandle` 経由（mailbox 送信）でのみ VM へアクセスする。`ActorHandle` 自体は `Send`（内部は `mpsc::Sender`＋join handle＋shutdown フラグのみで、`!Send` VM を保持しない）。
-- 旧 `OnceLock<RawShiori>`＋`Arc<Mutex<Option<PastaShiori>>>`＋`unsafe impl Send/Sync` を置換する。所有は `OnceLock<ActorHandle>` 形（`ActorHandle` が真に `Send`）。
+- 旧 `OnceLock<RawShiori>`＋`Arc<Mutex<Option<PastaShiori>>>`＋`unsafe impl Send/Sync` を置換する。所有は **`static SHIORI: Mutex<Option<ActorHandle>>`（const 初期化・抜き差し可能な単一スロット）**。`ActorHandle` が真に `Send`（`!Send` VM を保持しない）ため Mutex で包んでも unsafe 不要。reload は `lock → take()（旧ハンドルを shutdown→join）→ 新 spawn を代入` で差し替え、`DllMain` detach と `unload` の二重契機は「`take()` 済みなら no-op」で冪等化。
 - `DllMain` attach で spawn、detach（および `unload`）で shutdown。
 
 **Dependencies**
@@ -302,7 +302,7 @@ impl ActorHandle {
 **Implementation Notes**
 - Integration: `windows.rs` の `request` 内で `req.method` により `submit_get`/`submit_notify` を分岐。`load`/`unload` は `spawn`/`shutdown`。
 - Validation: `actor_thread_id` を VM 実行スレッドと一致確認（テスト）。
-- Risks: `OnceLock<ActorHandle>` の再 load（unload→load）で `OnceLock` 再代入不可問題。**OPEN QUESTION 1** 参照（`OnceLock` か別所有形か）。
+- 所有モデル（**ディスカッション #1 解決**）: `static SHIORI: Mutex<Option<ActorHandle>>`（const 初期化）で抜き差し可能な単一スロットとする。`OnceLock` の再代入不可問題を回避し、`OnceLock` 入れ子（案 A）や RwLock（案 C・SHIORI は実質直列ゆえ過剰）より単純。`ActorHandle` が真に `Send` ゆえ unsafe 不要（R8 構造的達成）。reload は take→shutdown→join→再 spawn 代入、契機重複は `take()` 冪等で吸収。
 
 #### ActorThread
 
@@ -520,7 +520,7 @@ fn register_sakura_script_module(
 - **直列キュー（6）**: 単一直列処理により VM 状態へのデータ競合ゼロ。スループットより順序保存・正当性を優先（プロジェクト方針「検証は速度より優先」）。
 
 ## Open Questions / Risks
-1. **所有モデル（RN6）**: `OnceLock<RawShiori>`＋`Arc<Mutex<Option<PastaShiori>>>` を `ActorHandle` 保持型へ再設計する具体形。`OnceLock` は再代入不可のため reload（unload→load）でアクタースレッドを再 spawn する所有形（`Mutex<Option<ActorHandle>>` 等）が必要。`DllMain` attach/detach と `load`/`unload` の二重ライフサイクル整合。
+1. **所有モデル（RN6）— ✅ 解決（ディスカッション #1）**: `static SHIORI: Mutex<Option<ActorHandle>>`（const 初期化・抜き差し可能な単一スロット）に確定。`OnceLock` 再代入不可問題を回避、`OnceLock<Mutex<...>>` 入れ子や RwLock より単純（YAGNI）。`ActorHandle` が真に `Send` ゆえ unsafe 不要で R8 を構造的達成。reload = `lock→take()→旧 shutdown/join→新 spawn 代入`、`DllMain` detach と `unload` の重複契機は `take()` 冪等（済みなら no-op）で吸収。残る実装詳細（attach/detach と load/unload の正確な結線順序）は実装時に確定。
 2. **executor 本番統合形（RN1）**: `wintf_winmsg_executor` 0.0.3 の `block_on` のメッセージ専用ウィンドウ Drop 解放挙動・`spawn_local`/`JoinHandle` の本番統合形。PoC で部分実証済みだが `pasta_shiori` 側所有での本番統合形は要確認。executor 依存を `pasta_lua`（現状）から `pasta_shiori` へ移すか、`pasta_lua` 側に留め `pasta_shiori` が呼ぶか。
 3. **GET timeout 閾値チューニング（RN4）**: 6.68ms 初期値の実機実測調整方針。通常経路非発火の実証手段。
 4. **マーカースキーマ（RN2）**: presentation event マーカーの具体データ表現（Rust enum 形・Lua テーブル表現・両者整合）。現状トークンからのバイト不変逆算の最小集合確定。
