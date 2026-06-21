@@ -237,6 +237,366 @@ impl VerdictRecorder {
     pub fn assert_isolation(&self) -> IsolationStatus {
         IsolationStatus::in_force()
     }
+
+    /// 指定チャレンジ項目（R1〜R6）が **成立** として記録されているかを判定する。
+    ///
+    /// 段階確定（[`stage`](Self::stage)）の純関数的な土台。`record_item(R<n>, ..)` が
+    /// success outcome で記録されていれば true。未記録または failure outcome なら
+    /// false（未記録は保守的に不成立として扱う）。`ReqId::item(n)`（副基準なし）の
+    /// outcome のみを見る（`.4`/`.5` のブロッカー枝番は段階に直接効かない）。
+    pub fn challenge_succeeded(&self, challenge: u8) -> bool {
+        self.items
+            .get(&ReqId::item(challenge))
+            .map(|o| o.success)
+            .unwrap_or(false)
+    }
+
+    /// 記録済み項目 outcome から段階的 go/no-go を確定する（R8.1）。
+    ///
+    /// design.md「Verdict」R8.1 の段階定義に厳密に従う **純粋・決定論的** ロジック:
+    /// - **NO-GO**: R1 不成立（executor 上 VM ホスト・reload teardown がいかなる方式でも
+    ///   成立しない）。R2〜R6 の成否に依らず NO-GO。
+    /// - **条件付き GO（最低ライン）**: R1 ∧ R2 ∧ R3（安全な marshaling 基盤が成立）。
+    /// - **GO（標準）**: 最低ライン ∧ R4（coroutine/callback 生存）。
+    /// - **GO+（高信頼）**: GO ∧ R5 ∧ R6（≤1 秒キック配信＋GET レイテンシ実測）。
+    ///
+    /// 各段階は **下位段階の全前提を含む**（R3 欠落は R4/R5/R6 が成立していても昇格
+    /// できない）。これにより「R1+R2+R4 だが R3 欠落」は条件付き GO に到達できず NO-GO。
+    pub fn stage(&self) -> GoNoGoStage {
+        let r1 = self.challenge_succeeded(1);
+        let r2 = self.challenge_succeeded(2);
+        let r3 = self.challenge_succeeded(3);
+        let r4 = self.challenge_succeeded(4);
+        let r5 = self.challenge_succeeded(5);
+        let r6 = self.challenge_succeeded(6);
+
+        // R1 が本丸。不成立なら他が何であれ NO-GO。
+        if !r1 {
+            return GoNoGoStage::NoGo;
+        }
+        // 最低ライン: R1 ∧ R2 ∧ R3。未達なら NO-GO（R4 以降が成立していても昇格不可）。
+        if !(r2 && r3) {
+            return GoNoGoStage::NoGo;
+        }
+        // ここから最低ライン到達。R4 で GO、さらに R5 ∧ R6 で GO+。
+        if r4 {
+            if r5 && r6 {
+                GoNoGoStage::GoPlus
+            } else {
+                GoNoGoStage::Go
+            }
+        } else {
+            GoNoGoStage::ConditionalGo
+        }
+    }
+
+    /// 記録済みの全項目・全ブロッカー・隔離前提・確定段階から判定文書を生成する
+    /// （R8.2 / R8.4 / R8.5 / 7.3）。
+    ///
+    /// - 全 probe（R1〜R6）の成否・採用方式・制約を項目別に載せる（R8.2）。
+    /// - 最低ライン（R1+R2+R3）未達 = NO-GO 時は、記録済みブロッカー＋回避候補を載せた
+    ///   NO-GO 文書とし、後続前提結論は **出さない**（R8.4）。
+    /// - 条件付き GO 以上では、実際の probe 結果から合成した後続前提結論（6 トピック）を
+    ///   `conclusions` に明記する（R8.5）。結論は本レコーダの記録から **導出** され、
+    ///   定型文ではない。
+    pub fn render(&self) -> VerdictDocument {
+        let stage = self.stage();
+
+        let items: Vec<(ReqId, ItemOutcome)> =
+            self.items.iter().map(|(id, o)| (*id, o.clone())).collect();
+        let blockers: Vec<(ReqId, Blocker)> = self
+            .blockers
+            .iter()
+            .flat_map(|(id, list)| list.iter().map(move |b| (*id, b.clone())))
+            .collect();
+
+        // 条件付き GO 以上でのみ後続前提結論を明記する（R8.5・R8.4 の裏返し）。
+        let conclusions = if stage.is_go_or_above() {
+            Some(self.derive_conclusions())
+        } else {
+            None
+        };
+
+        VerdictDocument {
+            stage,
+            items,
+            blockers,
+            isolation: self.assert_isolation(),
+            conclusions,
+        }
+    }
+
+    /// 条件付き GO 以上で `pasta-actor-runtime` が前提とする 6 つの後続前提結論を、
+    /// 実際の probe 記録（item outcome・制約・ブロッカー）から **合成** する（R8.5）。
+    ///
+    /// design.md「Verdict」R8.5 が列挙する 6 トピックを、本仕様の確定済み所見と
+    /// 各 probe が残した実測値・制約（特に R5 の LuaJIT `coroutine.close` 不在制約、
+    /// R6 の in-process sub-ms 実測＋フォールバック申し送り）から導く。各結論は
+    /// 「採用方式（detail）」と、関連する probe 記録から取った「根拠（basis）」を持つ。
+    fn derive_conclusions(&self) -> Vec<Conclusion> {
+        // 各 probe の採用方式（approach）を引いて根拠に織り込む（定型文化を避ける）。
+        let r1_basis = self
+            .item(ReqId::item(1))
+            .map(|o| o.approach.clone())
+            .unwrap_or_default();
+        let r2_basis = self
+            .item(ReqId::item(2))
+            .map(|o| o.approach.clone())
+            .unwrap_or_default();
+        let r3_basis = self
+            .item(ReqId::item(3))
+            .map(|o| o.approach.clone())
+            .unwrap_or_default();
+        let r4_basis = self
+            .item(ReqId::item(4))
+            .map(|o| o.approach.clone())
+            .unwrap_or_default();
+        // R5 の制約（LuaJIT close 不在）を結論へ申し送る。
+        let r5_constraints = self
+            .item(ReqId::item(5))
+            .map(|o| o.constraints.join(" / "))
+            .unwrap_or_default();
+        let r5_basis = self
+            .item(ReqId::item(5))
+            .map(|o| o.approach.clone())
+            .unwrap_or_default();
+        // R6 のフォールバック申し送り（R6.3 ブロッカーの workaround を閾値候補として拾う）。
+        let r6_basis = self
+            .item(ReqId::item(6))
+            .map(|o| o.approach.clone())
+            .unwrap_or_default();
+        let r6_fallback = self
+            .blockers(ReqId::sub(6, 3))
+            .iter()
+            .find_map(|b| b.workaround.clone())
+            .unwrap_or_default();
+
+        let r4_alive = self.challenge_succeeded(4);
+        let r5_alive = self.challenge_succeeded(5);
+        let r6_alive = self.challenge_succeeded(6);
+
+        vec![
+            Conclusion {
+                topic: "採用 executor 統合方式".to_string(),
+                detail:
+                    "std::thread::spawn 内で wintf-winmsg-executor の block_on を回し、その future が \
+                     !Send な実 PastaLuaRuntime（mlua VM）を生成・所有する。再ポーリングは executor の \
+                     MSG_ID_WAKE（Waker）で駆動し、値のみを mpsc で越境させる。"
+                        .to_string(),
+                basis: format!("R1 実証: {r1_basis}"),
+            },
+            Conclusion {
+                topic: "VM pin / teardown 方針".to_string(),
+                detail:
+                    "mlua の !Send 制約により VM はアクタースレッドを構造的に越えない（pin）。teardown は \
+                     Arc<AtomicBool>(SeqCst)→wake→JoinHandle::join、Drop は take() で二重 join を回避する \
+                     （debug DebugHandle::Drop idiom）。reload は shutdown→再 spawn の反復で clean teardown \
+                     とハンドル/ポート非枯渇を確認する。"
+                        .to_string(),
+                basis: format!("R1 teardown 実証: {r1_basis}"),
+            },
+            Conclusion {
+                topic: "marshaling 契約".to_string(),
+                detail:
+                    "GET = block-on-reply（ActorMsg::Get に Responder を載せ enqueue→応答受信までブロック \
+                     し応答値を戻す・SHIORI/3.0 同期契約）。NOTIFY = 即 204 fire-and-forget（応答経路なし）。 \
+                     method 判定・marshaling 分岐は決定論ロジックとして Rust 側で完結し、シーン中核は Lua の \
+                     まま保つ。"
+                        .to_string(),
+                basis: format!("R2 実証: {r2_basis}"),
+            },
+            Conclusion {
+                topic: "drop→204 ガード方針".to_string(),
+                detail:
+                    "GET 応答 Responder を採用し、応答未送信のまま drop（応答忘れ／panic 巻き戻し）されたら \
+                     自動的に 204 を撃つ。これにより『応答未送信のまま drop』のデッドロック経路が原理的に \
+                     消滅する。注意: release は panic=abort のため unwind に依存する panic 経路の保証は \
+                     test/unwind profile でのみ成立する（pasta-actor-runtime へ申し送り）。"
+                        .to_string(),
+                basis: format!("R3 実証: {r3_basis}"),
+            },
+            Conclusion {
+                topic: "coroutine 生存条件".to_string(),
+                detail: if r4_alive {
+                    "駆動主体をホスト tick から executor へ移しても、実 *.lua（STORE.co_scene／\
+                     CALLBACK.pending）が中断地点から resume し callback が解決する。各 resume は別個の \
+                     executor 駆動（ホスト tick ではない）であり、コルーチン意味論は Lua のまま保つ。"
+                        .to_string()
+                } else {
+                    "R4 が不成立のため coroutine/callback 生存は GO 前提として満たされていない（条件付き \
+                     GO 止まり）。executor 移設での継続喪失条件を解消するまで GO へは昇格できない。"
+                        .to_string()
+                },
+                basis: format!("R4 実証: {r4_basis}"),
+            },
+            Conclusion {
+                topic: "GET レイテンシとフォールバック要否".to_string(),
+                detail: {
+                    let kick = if r5_alive {
+                        "R5: 忠実シミュレータ上で ≤1 秒キック配信を実測（GET tick=Ref3=1 のみ配信・NOTIFY \
+                         状態では次 GET tick まで held）。"
+                    } else {
+                        "R5: ≤1 秒キック配信は GO+ 前提として未確定。"
+                    };
+                    let lat = if r6_alive {
+                        "R6: GET block-on-reply は in-process 実測で十分速いが、防御として GET タイムアウト \
+                         →204 フォールバックを推奨する。"
+                    } else {
+                        "R6: GET レイテンシ実測／フォールバック判断は GO+ 前提として未確定。"
+                    };
+                    format!(
+                        "{kick} {lat} R5 制約: {r5_constraints}。推奨フォールバック方針: {r6_fallback}"
+                    )
+                },
+                basis: format!("R5 実証: {r5_basis}／R6 実証: {r6_basis}"),
+            },
+        ]
+    }
+}
+
+/// 段階的 go/no-go 判定（R8.1）。
+///
+/// design.md「Verdict」R8.1 の 4 段階。下位段階の全前提を含む単調な序列で、
+/// `stage()` がレコーダ状態から決定論的に確定する。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum GoNoGoStage {
+    /// NO-GO: R1（executor 上 VM ホスト・reload teardown）がいかなる方式でも不成立。
+    NoGo,
+    /// 条件付き GO（最低ライン）: R1 ∧ R2 ∧ R3。安全な marshaling 基盤が成立。
+    ConditionalGo,
+    /// GO（標準）: 最低ライン ∧ R4（coroutine/callback 生存）。
+    Go,
+    /// GO+（高信頼）: GO ∧ R5（≤1 秒キック配信）∧ R6（GET レイテンシ実測）。
+    GoPlus,
+}
+
+impl GoNoGoStage {
+    /// 文書に載せる段階ラベル（requirements.md R8.1 の日本語表記）。
+    pub fn label(self) -> &'static str {
+        match self {
+            GoNoGoStage::NoGo => "NO-GO",
+            GoNoGoStage::ConditionalGo => "条件付き GO（最低ライン）",
+            GoNoGoStage::Go => "GO（標準）",
+            GoNoGoStage::GoPlus => "GO+（高信頼）",
+        }
+    }
+
+    /// 最低ライン（条件付き GO）以上に到達しているか。
+    ///
+    /// これが true のときのみ後続前提結論（R8.5）を明記する。false（NO-GO）のときは
+    /// NO-GO 文書（ブロッカー＋回避候補・R8.4）を出す。
+    pub fn is_go_or_above(self) -> bool {
+        self >= GoNoGoStage::ConditionalGo
+    }
+}
+
+/// 後続実装仕様 `pasta-actor-runtime` が前提とする 1 つの結論（R8.5）。
+///
+/// `topic` は前提トピック名、`detail` は確定した採用方式、`basis` は本 PoC の
+/// どの probe 記録から導いたかの根拠（定型文ではなく実記録の持ち回り）。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Conclusion {
+    /// 前提トピック名（例: "marshaling 契約"）。
+    pub topic: String,
+    /// 確定した採用方式・方針。
+    pub detail: String,
+    /// 本結論を導いた probe 記録の根拠。
+    pub basis: String,
+}
+
+/// 段階判定の成果物文書（R8.2 / R8.4 / R8.5 / 7.3）。
+///
+/// `render()` が生成する。全 probe の項目別記録・ブロッカー・隔離前提・確定段階を
+/// 保持し、条件付き GO 以上では後続前提結論（`conclusions`）を持つ。`to_text` で
+/// 人間可読なレポートへ整形する（一次成果物）。
+#[derive(Debug, Clone)]
+pub struct VerdictDocument {
+    /// 確定した段階（R8.1）。
+    pub stage: GoNoGoStage,
+    /// 全 probe の項目別 outcome（R8.2・`ReqId` 昇順）。
+    pub items: Vec<(ReqId, ItemOutcome)>,
+    /// 全ブロッカー（R8.4 の NO-GO 根拠・各 R の `.4`/`.5`・`ReqId` 昇順）。
+    pub blockers: Vec<(ReqId, Blocker)>,
+    /// 隔離前提の確認結果（R8.3）。
+    pub isolation: IsolationStatus,
+    /// 後続前提結論（R8.5）。条件付き GO 以上でのみ `Some`、NO-GO では `None`。
+    pub conclusions: Option<Vec<Conclusion>>,
+}
+
+impl VerdictDocument {
+    /// NO-GO 文書か（最低ライン未達）。
+    pub fn is_no_go(&self) -> bool {
+        self.stage == GoNoGoStage::NoGo
+    }
+
+    /// 人間可読な判定レポートへ整形する（一次成果物・R8.2/R8.4/R8.5）。
+    ///
+    /// 段階・隔離前提・項目別結果（成否・採用方式・制約）・ブロッカー（理由＋回避候補）・
+    /// 後続前提結論を順に並べる。NO-GO 時はブロッカー＋回避候補が必ず現れ、条件付き
+    /// GO 以上では 6 つの後続前提結論が現れる。
+    pub fn to_text(&self) -> String {
+        let mut out = String::new();
+        out.push_str("# pasta-actor-feasibility 段階判定文書（R8）\n\n");
+        out.push_str(&format!("## 判定段階: {}\n\n", self.stage.label()));
+
+        // 隔離前提（R8.3）。
+        out.push_str("## 隔離前提（R8.3・判定妥当性の前提）\n");
+        out.push_str(&format!(
+            "- default 無効 feature-gate: {}\n- バイト不変（前提）: {}\n- テスト非汚染（前提）: {}\n\n",
+            self.isolation.default_off_gate,
+            self.isolation.byte_invariant_assumed,
+            self.isolation.non_pollution_assumed,
+        ));
+
+        // 項目別結果（R8.2）。
+        out.push_str("## 項目別試行結果（R8.2・全項目を成否にかかわらず記録）\n");
+        for (id, o) in &self.items {
+            out.push_str(&format!(
+                "- {}: {} — {}\n",
+                id,
+                if o.success { "成立" } else { "不成立" },
+                o.approach,
+            ));
+            for c in &o.constraints {
+                out.push_str(&format!("    - 制約: {c}\n"));
+            }
+        }
+        out.push('\n');
+
+        // ブロッカー＋回避候補（R8.4）。
+        out.push_str("## ブロッカーと回避候補（R8.4・NO-GO/制約付き判定の根拠）\n");
+        if self.blockers.is_empty() {
+            out.push_str("- （記録されたブロッカーなし）\n");
+        } else {
+            for (id, b) in &self.blockers {
+                out.push_str(&format!("- {}: {}\n", id, b.reason));
+                if let Some(w) = &b.workaround {
+                    out.push_str(&format!("    - 回避候補: {w}\n"));
+                }
+            }
+        }
+        out.push('\n');
+
+        // 後続前提結論（R8.5）。
+        match &self.conclusions {
+            Some(conclusions) => {
+                out.push_str(
+                    "## 後続実装仕様 pasta-actor-runtime への前提結論（R8.5）\n",
+                );
+                for c in conclusions {
+                    out.push_str(&format!("- {}: {}\n", c.topic, c.detail));
+                    out.push_str(&format!("    - 根拠: {}\n", c.basis));
+                }
+            }
+            None => {
+                out.push_str(
+                    "## 後続前提結論（R8.5）\n- 最低ライン（R1+R2+R3）未達のため後続前提結論は明記しない（NO-GO）。\n",
+                );
+            }
+        }
+
+        out
+    }
 }
 
 #[cfg(test)]
