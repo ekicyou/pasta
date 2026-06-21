@@ -7,7 +7,7 @@
   - `actor-poc` 関連コードを一切入れていない現状の release ビルド成果物（両クレート）のダイジェストを採取・保存する。
   - 観測可能な完了条件: 導入前 release 成果物のダイジェスト基準が記録され、後続のバイト不変検証（8.1）が参照できる。
   - _Requirements: 7.2_
-- [ ] 1.2 feature-gate と依存の新設（両クレート）
+- [x] 1.2 feature-gate と依存の新設（両クレート）
   - `pasta_lua`／`pasta_shiori` に `[features]` を新設、`actor-poc`（default off）、`wintf-winmsg-executor = { version = "0.0.3", optional = true }`、`lib.rs` に `#[cfg(feature = "actor-poc")]` の mod 宣言を追加。`pasta_shiori` は `pasta_lua/actor-poc` を伝播。
   - 観測可能な完了条件: feature off では `actor_poc` 不在のまま `cargo build` 成功、`--features actor-poc` で `actor_poc` モジュールがコンパイル対象になる。
   - _Requirements: 7.1, 7.2_

@@ -14,6 +14,10 @@ documentation.workspace = true
 name = "pasta"
 crate-type = ["cdylib", "rlib"]
 
+[features]
+# 使い捨て検証ハーネス（PoC）。default 無効。pasta_lua/actor-poc へ伝播する。
+actor-poc = ["pasta_lua/actor-poc"]
+
 [dependencies]
 pasta_lua.workspace = true
 time.workspace = true

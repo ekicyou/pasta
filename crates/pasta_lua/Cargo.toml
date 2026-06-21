@@ -11,6 +11,11 @@ repository.workspace = true
 homepage.workspace = true
 documentation.workspace = true
 
+[features]
+# 使い捨て検証ハーネス（PoC）。default 無効。有効時のみ actor_poc モジュールと
+# wintf-winmsg-executor がコンパイル対象になる（無効時はバイト不変）。
+actor-poc = ["dep:wintf-winmsg-executor"]
+
 [dependencies]
 pasta_core.workspace = true
 pasta_dsl.workspace = true
@@ -30,6 +35,8 @@ budouy.workspace = true
 unicode-width.workspace = true
 socket2.workspace = true
 zip.workspace = true
+# actor-poc feature 有効時のみリンクする使い捨て PoC 用 executor（公開フォーク）
+wintf-winmsg-executor = { version = "0.0.3", optional = true }
 
 [build-dependencies]
 zip.workspace = true
