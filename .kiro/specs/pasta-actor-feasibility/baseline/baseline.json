@@ -1,0 +1,65 @@
+{
+  "schema": "pasta-actor-feasibility/baseline@1",
+  "captured_at_utc": "2026-06-21T05:51:02.3382636Z",
+  "purpose": "Requirement 7.2 byte-invariance baseline (actor-poc 導入前)。task 8.1 が参照する。",
+  "release_profile": "opt-level=z, lto=true, codegen-units=1, panic=abort, strip=true",
+  "reproducibility": "rlib=exact; pasta.dll=normalized only (PE TimeDateStamp/CheckSum/DebugDir timestamps/RSDS GUID が非決定の 20 bytes)",
+  "artifacts": [
+    {
+      "name": "pasta.dll",
+      "size": 4031488,
+      "sha256": "ae5a2f7e70b98dc92c0e826608952a456250d5d787c5dc5efad3dcc635c98d08",
+      "normalized_sha256": "adae6b39055f9f819ce38f4dc483214725e6084ee0d96faa29a5783199e24b24",
+      "reproducible": "normalized",
+      "zeroed_ranges": [
+        {
+          "offset": 264,
+          "len": 4,
+          "field": "COFF.TimeDateStamp"
+        },
+        {
+          "offset": 344,
+          "len": 4,
+          "field": "OptionalHeader.CheckSum"
+        },
+        {
+          "offset": 3731252,
+          "len": 4,
+          "field": "DebugDir[0].TimeDateStamp"
+        },
+        {
+          "offset": 3731792,
+          "len": 16,
+          "field": "CodeView.RSDS.Guid[0]"
+        },
+        {
+          "offset": 3731280,
+          "len": 4,
+          "field": "DebugDir[1].TimeDateStamp"
+        },
+        {
+          "offset": 3731308,
+          "len": 4,
+          "field": "DebugDir[2].TimeDateStamp"
+        }
+      ],
+      "note": "pasta.dll の生 sha256 はリンク時刻/build-id GUID により毎ビルド変動する。normalized_sha256（PE 非決定領域をゼロ埋め後の digest）が 8.1 のバイト不変基準。"
+    },
+    {
+      "name": "libpasta.rlib",
+      "size": 2270136,
+      "sha256": "d67cb3c8d35214a759dabbcd6e5808291f2458ee54e569ec4f1f6271a560476c",
+      "normalized_sha256": "d67cb3c8d35214a759dabbcd6e5808291f2458ee54e569ec4f1f6271a560476c",
+      "reproducible": "exact",
+      "note": "rlib はクリーンビルド間で完全にバイト再現する。生 sha256 が基準。"
+    },
+    {
+      "name": "libpasta_lua.rlib",
+      "size": 7908898,
+      "sha256": "6ce8c6760df3e06e100d5bd34a47600f5070494ec84f7e583fb8a74da986d2f8",
+      "normalized_sha256": "6ce8c6760df3e06e100d5bd34a47600f5070494ec84f7e583fb8a74da986d2f8",
+      "reproducible": "exact",
+      "note": "rlib はクリーンビルド間で完全にバイト再現する。生 sha256 が基準。"
+    }
+  ]
+}

@@ -3,7 +3,7 @@
 > 使い捨て feature-gated PoC（`actor-poc`・default off）。出荷コードは読み取り・再利用のみ、振る舞い非改変。リスク順に R1（本丸）を最初の実証スライスへ。
 
 - [ ] 1. Foundation: 隔離足場と共有基盤
-- [ ] 1.1 release バイト・ベースラインの取得（actor-poc 導入前）
+- [x] 1.1 release バイト・ベースラインの取得（actor-poc 導入前）
   - `actor-poc` 関連コードを一切入れていない現状の release ビルド成果物（両クレート）のダイジェストを採取・保存する。
   - 観測可能な完了条件: 導入前 release 成果物のダイジェスト基準が記録され、後続のバイト不変検証（8.1）が参照できる。
   - _Requirements: 7.2_
@@ -120,3 +120,9 @@
   - 観測可能な完了条件: 撤去手順適用後に `actor-poc` 関連が完全除去され、release 成果物が 1.1 ベースラインへ戻る。
   - _Requirements: 7.5_
   - _Depends: 8.1_
+
+## Implementation Notes
+
+- 1.1: `pasta.dll`（cdylib）は同一ソースのクリーンビルド間で 20 バイト（PE TimeDateStamp/CheckSum/DebugDir timestamps×3/RSDS build-id GUID）が非決定。生 sha256 比較は actor-poc 無関係に偽 FAIL する。ベースラインは `.kiro/specs/pasta-actor-feasibility/baseline/`（`baseline.json`＋`capture_baseline.ps1`）に**正規化 sha256**（PE 非決定領域ゼロ埋め）で保存済み。rlib（`libpasta.rlib`/`libpasta_lua.rlib`）は exact 一致。**タスク 8.1 は必ず `capture_baseline.ps1 -Mode verify`（正規化比較）を使うこと**。release は `lto=true/codegen-units=1/strip=true/panic=abort`。クリーン release ビルドは実機で約 1〜1.5 分/回。
+- env: cargo build/test/clean は毎回 PowerShell 同一呼び出し内で `Remove-Item Env:\NoDefaultCurrentDirectoryInExePath -ErrorAction SilentlyContinue;` を前置しないと LuaJIT/mlua-sys ビルドが exit 101 で死ぬ。
+- release profile が `panic = "abort"` のため、Responder の drop→204 ガード（3.1/3.2、panic unwind 依存）は release では巻き戻らない。検証は `cargo test`（dev/test profile = unwind）でのみ成立。3.1/3.2 はこの前提でテストすること。
