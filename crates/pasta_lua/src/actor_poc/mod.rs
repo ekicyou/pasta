@@ -9,6 +9,9 @@
 //! サブモジュールをここに追加する。本モジュールは出荷コードを改変せず、
 //! feature 無効時はコンパイル単位に現れない（リリースビルドはバイト不変）。
 
+/// アクタースレッド（block_on ＋ `!Send` VM pin・JoinHandle/shutdown idiom・R1.1/R2.3）。
+pub mod actor_thread;
+
 /// テスト隔離土台（socket2 エフェメラル待受の写経・R7.4）。
 pub mod test_isolation;
 

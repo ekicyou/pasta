@@ -27,7 +27,7 @@
   - _Boundary: Verdict_
 
 - [ ] 2. R1（本丸）: executor 上 VM ホスト＋reload teardown
-- [ ] 2.1 アクタースレッドで `block_on` ＋ `!Send` VM pin
+- [x] 2.1 アクタースレッドで `block_on` ＋ `!Send` VM pin
   - `std::thread::spawn` 内で `wintf-winmsg-executor::block_on(actor future)` を回し、future が `PastaLuaRuntime`（`!Send` VM）を生成・所有。VM はアクタースレッドを越えない。`JoinHandle` 保持・shutdown `AtomicBool` idiom 写経。
   - 観測可能な完了条件: VM がアクタースレッド内で Lua 実行を完了し、スレッド境界を越えないことを assert するテストが緑。
   - _Requirements: 1.1, 2.3_
@@ -126,3 +126,5 @@
 - 1.1: `pasta.dll`（cdylib）は同一ソースのクリーンビルド間で 20 バイト（PE TimeDateStamp/CheckSum/DebugDir timestamps×3/RSDS build-id GUID）が非決定。生 sha256 比較は actor-poc 無関係に偽 FAIL する。ベースラインは `.kiro/specs/pasta-actor-feasibility/baseline/`（`baseline.json`＋`capture_baseline.ps1`）に**正規化 sha256**（PE 非決定領域ゼロ埋め）で保存済み。rlib（`libpasta.rlib`/`libpasta_lua.rlib`）は exact 一致。**タスク 8.1 は必ず `capture_baseline.ps1 -Mode verify`（正規化比較）を使うこと**。release は `lto=true/codegen-units=1/strip=true/panic=abort`。クリーン release ビルドは実機で約 1〜1.5 分/回。
 - env: cargo build/test/clean は毎回 PowerShell 同一呼び出し内で `Remove-Item Env:\NoDefaultCurrentDirectoryInExePath -ErrorAction SilentlyContinue;` を前置しないと LuaJIT/mlua-sys ビルドが exit 101 で死ぬ。
 - release profile が `panic = "abort"` のため、Responder の drop→204 ガード（3.1/3.2、panic unwind 依存）は release では巻き戻らない。検証は `cargo test`（dev/test profile = unwind）でのみ成立。3.1/3.2 はこの前提でテストすること。
+- 2.1（R1 本丸＝GO）: 実 `PastaLuaRuntime::new(TranspileContext::new())`（重フィクスチャ不要・軽量構築）を `std::thread::spawn` 内の `wintf_winmsg_executor::block_on(future)` の future ローカルとして所有すれば `!Send` mlua VM をアクタースレッドに pin できる（mlua の `!Send` が越境を構造的に禁止、値のみ mpsc で越境）。executor 0.0.3 実 API（registry source 実読）: `block_on<'a,T:'a>(future: impl Future<Output=T>+'a)->T`（呼び出しスレッドの message loop を回す）／`spawn_local<T:'static>(...)->JoinHandle<T>`／`JoinHandle`（Drop で detach・Future 実装）／`FilterResult{Forward,Drop}`／`MessageLoop`（直接構築不可）。再ポーリングは executor の `MSG_ID_WAKE`(WM_USER)＋`Waker` 機構を使う（`poll_fn` で waker 捕捉→producer が `wake_by_ref`、spin 回避）。teardown は `Arc<AtomicBool>`(SeqCst)→`wake`→`JoinHandle::join`、`Drop` は `take()` で二重 join 回避（debug `DebugHandle::Drop` idiom 写経）。`ActorThread` は `crates/pasta_lua/src/actor_poc/actor_thread.rs`。2.2/2.3/3.2/4.1 はこの土台に乗る。
+- 既知の非ブロッキング lint: `tests/actor_poc_actor_thread.rs:20-21` に `clippy::doc_overindented_list_items`（doc コメント整形のみ）。CI は clippy 非実行・`-D warnings` 不使用のため無害。mailbox.rs:106 の `clippy::needless`（task 1.4 由来）も既存・境界外。
