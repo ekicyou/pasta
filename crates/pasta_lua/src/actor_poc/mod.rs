@@ -38,3 +38,6 @@ pub mod sim_driver;
 
 /// KickHarness（talk FIFO・二層 gate・即時 preempt・実 `coroutine.close()` 上書き・R5.1/R5.2/R5.3）。
 pub mod kick_harness;
+
+/// Latency（GET block-on-reply レイテンシ実測・代表値集計・フォールバック要否判断・R6.1/R6.2/R6.3）。
+pub mod latency;
