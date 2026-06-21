@@ -11,7 +11,7 @@
   - `pasta_lua`／`pasta_shiori` に `[features]` を新設、`actor-poc`（default off）、`wintf-winmsg-executor = { version = "0.0.3", optional = true }`、`lib.rs` に `#[cfg(feature = "actor-poc")]` の mod 宣言を追加。`pasta_shiori` は `pasta_lua/actor-poc` を伝播。
   - 観測可能な完了条件: feature off では `actor_poc` 不在のまま `cargo build` 成功、`--features actor-poc` で `actor_poc` モジュールがコンパイル対象になる。
   - _Requirements: 7.1, 7.2_
-- [ ] 1.3 テスト隔離土台の写経（env 中和・エフェメラルポート）
+- [x] 1.3 テスト隔離土台の写経（env 中和・エフェメラルポート）
   - debug 前例から `#[ctor]` による `PASTA_DEBUG`／`PASTA_DEBUG_PORT` 中和、socket2 `set_reuse_address`＋port 0 のエフェメラル待受土台を写経。
   - 観測可能な完了条件: `actor-poc` テストが固定ポート枯渇・`PASTA_DEBUG` 汚染なしで反復実行できる。
   - _Requirements: 7.4_
