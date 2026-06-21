@@ -1,0 +1,105 @@
+# ギャップ分析: pasta-actor-runtime
+
+本ドキュメントは、生成済み要件（`requirements.md`）と既存コードベースの間のギャップを分析し、設計フェーズの実装戦略を導く。先行 PoC 仕様 `pasta-actor-feasibility`（判定 GO+・`.kiro/specs/completed/pasta-actor-feasibility/`）の結論を着手前提とする。
+
+## 1. 現状調査（Current State Investigation）
+
+### 主要資産とディレクトリ
+- **SHIORI アダプタ層**: `crates/pasta_shiori/src/`
+  - `windows.rs` — FFI 入口（`DllMain`／`load`／`unload`／`request`）。`OnceLock<RawShiori<PastaShiori>>` がプロセスグローバル。`RawShiori` 各 dispatch は `catch_unwind` で panic を SHIORI エラー契約へ変換（リリースは `panic=abort` で catch 到達不能・dev/test/rlib 向け）。
+  - `shiori.rs` — `PastaShiori`（`Shiori` trait 実装）。`PastaLuaRuntime` を `Option` で保持。**`unsafe impl Send` / `unsafe impl Sync`**（`shiori.rs:51-52`）と `windows.rs:148` の `Arc<Mutex<Option<PastaShiori>>>` で VM を SHIORI スレッドへ束縛。SHIORI.load/request/unload を `Function` キャッシュ。
+  - `lua_request.rs` — pest プロトコルパーサ。`req.method`（get/notify）は VM 投入**前**に確定（`parse1`、`lua_request.rs:86-87`）。marshaling 分岐点として再利用可能。
+- **エンジンコア層**: `crates/pasta_lua/src/`
+  - `runtime/mod.rs` — `PastaLuaRuntime{ lua: mlua::Lua(!Send), ... }`。公開アクセサ `lua()`／`exec*()`。VM 構築は `runtime/factory.rs`。**型自体に Send/Sync 実装なし**（unsafe ハックは `PastaShiori` 側にのみ存在）。
+  - `sakura_script/`（`mod.rs`・`tokenizer.rs`・`wait_inserter.rs`・`line_breaker.rs`）— **さくらスクリプト描画**。公開: `register(lua, config) -> Table`、Lua 側 `SAKURA.talk_to_script(actor, text)`／`SAKURA.break_lines(text, widths)`。
+  - `runtime/module_registry.rs:125-137` — `register_sakura_script_module` が `@pasta_sakura_script` を `package.loaded` に登録。`factory.rs:172` から初期化時に呼ばれる。
+- **Lua ランタイムスクリプト**: `crates/pasta_lua/pasta_scripts/pasta/`
+  - `store.lua`（`STORE.co_scene`／`co_callback`／`actor_spots`）、`shiori/event/init.lua`（`set_co_scene`／`resume_until_valid`／`EVENT.fire`）、`shiori/event/callback.lua`（`CALLBACK.pending`／`stage_pending`／`consume_staged`／`sweep`）、`shiori/event/second_change.lua`（`OnSecondChange` が sweep／dispatch を駆動）。
+  - `shiori/act.lua`・`shiori/sakura_builder.lua`（`BUILDER.build`）— **presentation/talk 出力の縫い目**。`act:talk` でトークン蓄積→`act:build`→`BUILDER.build(grouped_tokens, ...)`→`SAKURA.talk_to_script()` 呼び出し→さくらスクリプト文字列。
+- **PoC 参照資産（feature-gated・default off）**: `crates/pasta_lua/src/actor_poc/`（`actor_thread.rs`・`mailbox.rs`・`responder.rs`・`teardown.rs`・`coroutine_probe.rs`・`sim_driver.rs`・`latency.rs`・`verdict.rs` ほか）。本番化の**実証済みテンプレート**。`pasta_shiori/Cargo.toml` は `actor-poc = ["pasta_lua/actor-poc"]` のみ（executor 依存は `pasta_lua` 側に閉じる）。
+
+### 規約・パターン
+- レイヤー依存方向: `pasta_dsl → pasta_core → pasta_lua → pasta_shiori`。コアは宿主非依存、アダプタが SHIORI 固有。
+- ファイルサイズ目安 < 600 行（`oversized-file-decomposition` 適用済み）。分解は振る舞い不変が不変条件。
+- テスト配置: 統合 `crates/*/tests/<feature>_test.rs`（単数）、src 内 `<feature>_tests.rs`（複数）。`#[ctor]` で `PASTA_DEBUG` 中和（固定ポート枯渇回避）。
+- 既存 teardown idiom: `pasta_lua/src/debug/`（thread＋mpsc＋`Arc<AtomicBool>` shutdown＋`Drop` teardown＋socket2 エフェメラル）。`DebugHandle::Drop` の二重 join 回避（`take()`）。
+
+### 統合面（Integration Surfaces）
+- FFI 境界: `windows.rs` の `load`/`unload`/`request`（HGLOBAL 所有権移譲・ANSI/UTF-8 変換）。**この入口バイト列が外部観測点**＝R1 バイト不変の検証点。
+- Rust↔Lua 境界: `@pasta_sakura_script` 登録（`module_registry.rs`）と `SHIORI.request` Function 呼び出し（`shiori.rs:call_lua_request`）。
+- コア↔アダプタ境界（現状）: **唯一の描画関数 `SAKURA.talk_to_script()`** が `sakura_builder.lua` から呼ばれる。これが presentation event stream の縫い目候補（要件 R2/R3）。
+
+## 2. 要件→資産マップ（Requirement-to-Asset Map）
+
+| 要件 | 関連既存資産 | ギャップ区分 | 内容 |
+|------|--------------|--------------|------|
+| R1 バイト不変 | `windows.rs` FFI 入口・全既存テスト | **Constraint** | FFI 入口応答バイト列＝検証点。特性化テスト先行で全リファクタを縛る。差分検出は既存テスト＋応答バイト比較。 |
+| R2 presentation event stream | `sakura_builder.lua`（`BUILDER.build`→`talk_to_script`）・Lua トークン`{type,actor,text}` | **Missing** | 宿主非依存マーカー契約は未定義。現状はトークン→直接さくらスクリプト文字列。マーカー粒度/スキーマ要設計（Q1）。 |
+| R3 さくらスクリプト移設 | `pasta_lua/src/sakura_script/`・`@pasta_sakura_script` 登録・`sakura_builder.lua` | **Constraint/Missing** | 実装は存在するがコア側に配置。アダプタ責務への再配置（物理移動 or 論理隔離）が未決（Q2）。バイト不変が制約。 |
+| R4 アクタースレッド＋VM pin | `actor_poc/actor_thread.rs`（実証済み）・`PastaLuaRuntime`（`!Send`） | **Missing（本番）** | PoC が実証。本番では `pasta_shiori` がアクタースレッドを所有し executor 依存を閉じ込める。出荷経路への接合が新規。 |
+| R5 CH marshaling（GET/NOTIFY/drop→204） | `lua_request.rs`（method 確定）・`actor_poc/{mailbox,responder}.rs`・`shiori.rs:request` | **Missing（本番）** | PoC は再パースで出荷経路非干渉。本番は実 `request()` 同期経路を marshaling へ置換。GET timeout→204 閾値（6.68ms）要確定（Q3）。 |
+| R6 単一直列キュー | `actor_poc/mailbox.rs`（実証済み） | **Missing（本番）** | PoC が直列順序を構造保証。本番 mailbox を出荷経路へ。 |
+| R7 reload teardown 本番化 | `actor_poc/teardown.rs`・`debug/`(idiom)・`shiori.rs:load`(既存 reload) | **Missing（本番）** | 既存 reload は VM を `None` に落とすのみ。アクタースレッドの shutdown→join＋リーク不在を本番化。 |
+| R8 `unsafe impl Send` 解消 | `shiori.rs:51-52`・`windows.rs:148`(`Arc<Mutex>`) | **Constraint→解消対象** | VM pin で構造的に充足し unsafe を撤去。`OnceLock`/`Arc<Mutex>` の所有モデル再設計が必要。 |
+| R9 コルーチン/callback 意味論維持 | `store.lua`・`event/init.lua`・`callback.lua`・`second_change.lua`・`actor_poc/coroutine_probe.rs`(実証済み) | **Constraint** | PoC が executor 駆動下の生存を実証。Lua 意味論は無改変維持（Rust 化は marshaling の殻のみ）。 |
+
+**複雑性シグナル**: 単純 CRUD ではなく、**スレッドモデル転換＋FFI 同期契約＋Lua コルーチン生存＋バイト不変**の複合。外部統合（`wintf_winmsg_executor`・Windows メッセージループ）あり。
+
+## 3. 実装アプローチ選択肢
+
+### Option A: 出荷経路を直接アクター化（in-place 置換）
+`shiori.rs`/`windows.rs` の既存同期 `request()` 経路を、PoC の `ActorThread`/`Mailbox`/`Responder` を本番モジュールへ昇格して直接置換し、`Arc<Mutex>+unsafe impl Send` をアクタースレッド所有モデルへ差し替える。さくらスクリプトは登録経路をアダプタ起点へ移す。
+
+- **対象**: `pasta_shiori/src/{windows.rs, shiori.rs}`、`pasta_lua` のアクタープリミティブ昇格、`module_registry` 登録経路。
+- **トレードオフ**: ✅ 新規ファイル最小・PoC 資産を最大活用・最短経路。❌ 出荷の中核（FFI 入口・VM 所有）を一度に触るためバイト不変リスクが集中。`oversized-file` 方針との両立に注意。
+
+### Option B: 新規アクターランタイムモジュール＋段階接合
+`pasta_shiori` に新規アクターランタイムモジュール（PoC 由来を昇格・整理）を作り、まず presentation event stream 契約とさくらスクリプトアダプタを確立、次にアクタースレッド＋marshaling、最後に `unsafe` 撤去、という独立コンポーネントを段階接合する。
+
+- **対象**: `pasta_shiori/src/actor/`（新規）、`pasta_shiori/src/sakura/`（移設先・新規）、`pasta_lua` 側マーカー出力 API。
+- **トレードオフ**: ✅ 責務分離が明快・テスト容易・1 抽出=1 検証=1 コミットに乗せやすい。❌ ファイル増・境界 API 設計コスト・移行期に二経路併存の一貫性管理。
+
+### Option C: ハイブリッド（特性化テスト先行の段階移行）— **推奨**
+Constraints（制約）に従い、**特性化テスト（FFI 入口の応答バイト固定）を最初に敷設**したうえで、(1) presentation event stream 契約 + さくらスクリプトアダプタ移設（R2/R3、バイト不変を局所検証）、(2) アクタースレッド＋mailbox＋marshaling 本番化（R4/R5/R6、PoC 昇格）、(3) reload teardown 本番化（R7）、(4) `unsafe impl Send` 撤去（R8）の順で、各抽出を 1 検証 1 コミット（revert 可能）で進める。R1/R9 は全段階を貫く不変条件として常時検証。
+
+- **段階方針**: 各段で「特性化テスト緑→抽出→再検証緑→コミット」を守る。さくらスクリプト移設を marshaling より先に置くのは、描画は純関数寄りでバイト差分の局所検証が容易なため。
+- **リスク軽減**: 段階ごとに revert 境界を持つ。PoC の `actor_poc/` を参照テンプレートに保持（撤去は本番接合完了後）。
+- **トレードオフ**: ✅ バイト不変リスクを分散・検証先行・記憶（`refactoring-safe-reversible`）と整合。❌ 計画コストと中間状態管理。プロジェクト方針「完全達成かリジェクト」に最適合。
+
+## 4. Research Needed（設計フェーズ繰り延べ）
+- **RN1**: `wintf_winmsg_executor` の `block_on` がメッセージループを回す前提、`spawn_local`／`JoinHandle`／メッセージ専用ウィンドウの Drop 解放挙動の本番確認（PoC Q2 申し送り。R1 で部分実証済みだが本番統合形は要確認）。
+- **RN2**: presentation event のマーカー種別・粒度・データ表現（Q1）。現 Lua トークン＋既存さくらスクリプト出力からバイト不変で逆算する最小集合の確定。
+- **RN3**: さくらスクリプト実装の物理移設範囲（Q2）。Rust 実装を `pasta_shiori` へ移すか、`pasta_lua` 内に残し登録経路のみアダプタ起点化するか。`line_breaker`（budouy 依存）・`TalkConfig` 依存の移送可否。
+- **RN4**: GET timeout→204 フォールバック閾値（Q3、初期値 6.68ms）の実機実測調整方針。
+- **RN5**: リリース `panic=abort` 下の drop→204 ガード保証範囲（Q4）。unwind 前提の成立範囲と、abort プロファイルでの代替防御要否。
+- **RN6**: `OnceLock<RawShiori>`＋`Arc<Mutex>` の所有モデルを、アクタースレッドハンドル保持型へ再設計する形（R8）。`DllMain` の attach/detach ライフサイクルとの整合。
+
+## 5. 実装複雑性・リスク
+
+| 区分 | 評価 | 根拠（1 行） |
+|------|------|--------------|
+| 全体工数 | **L（1〜2 週間）** | スレッドモデル転換＋FFI 同期契約＋さくらスクリプト移設＋unsafe 撤去の複合。PoC 資産で短縮されるが出荷経路接合と特性化テスト敷設が重い。 |
+| 全体リスク | **Medium** | 中核未知は PoC（GO+）で解消済み。残りは「実証済み方式の本番接合＋バイト不変維持」で、ガイダンス（PoC 設計／verdict）が明確。 |
+| R2/R3（event stream＋移設） | 工数 M / リスク Medium | 縫い目は `talk_to_script` 単一で狭いが、マーカー契約設計とバイト不変逆算が新規。 |
+| R4/R5/R6（アクター＋marshaling） | 工数 M / リスク Medium | PoC 昇格だが出荷 `request()` 同期経路の置換は High 寄り。直列 mailbox で順序は構造保証。 |
+| R7（teardown） | 工数 S / リスク Low | debug idiom＋PoC `teardown.rs` 実証済み。 |
+| R8（unsafe 撤去） | 工数 S〜M / リスク Medium | 所有モデル再設計が `DllMain` ライフサイクルと絡む。 |
+| R1/R9（バイト不変・意味論維持） | 工数 M / リスク Medium | 全段横断の不変条件。特性化テスト品質に依存。 |
+
+## 6. 設計フェーズへの推奨
+
+- **推奨アプローチ**: Option C（特性化テスト先行のハイブリッド段階移行）。プロジェクト方針「リファクタは安全かつ可逆／1 抽出=1 検証=1 コミット」「完全達成かリジェクト」に最適合。
+- **主要な設計判断（design フェーズで Boundary Commitments 化）**:
+  1. presentation event stream のマーカースキーマ確定（RN2/Q1）と縫い目位置（`talk_to_script` 置換点）。
+  2. さくらスクリプト移設の物理形態（RN3/Q2）。
+  3. アクタースレッド所有・executor 閉じ込めの本番型（RN1/RN6）と `OnceLock`/`Arc<Mutex>`→アクターハンドルの所有モデル（R8）。
+  4. GET timeout→204 閾値（RN4/Q3）と panic=abort 下のガード範囲（RN5/Q4）。
+- **持ち越し研究項目**: RN1〜RN6（上記）。とりわけ RN1（executor 本番統合形）と RN2（マーカー契約）が設計の中核。
+- **特性化テスト戦略**: FFI 入口（`request`）の応答バイト列を、代表的 SHIORI イベント列（OnBoot／OnSecondChange／GET property／コルーチン継続を含む）で固定するゴールデンテストを最初に敷設し、全段階で緑を維持する。
+
+## OPEN QUESTIONS（要件ディスカッションへの申し送り）
+1. **Q1（マーカー粒度）**: presentation event のマーカー種別・粒度・データ表現（列挙/スキーマ）をどこまで本仕様で確定するか。最小集合（talk/アクター切替/wait/choice）で十分か、将来のノベルゲーム宿主を見据えた拡張余地をどこまで持たせるか。
+2. **Q2（移設の物理形態）**: さくらスクリプト Rust 実装（`pasta_lua/src/sakura_script/`・budouy 依存の `line_breaker`・`TalkConfig`）を物理的に `pasta_shiori` crate へ移すか、`pasta_lua` 内に残しつつ登録経路をアダプタ起点へ論理隔離するか。crate 間依存とビルド影響の許容度。
+3. **Q3（GET タイムアウト閾値）**: GET timeout→204 フォールバックを本仕様で実装するか（PoC 申し送りの 6.68ms を初期値とする）。実機実測調整は本仕様内か後続か。
+4. **Q4（panic=abort 下のガード）**: リリース `panic=abort` 下で drop→204 ガードの厳密保証が test/unwind プロファイルに限られる点を、本仕様の受入としてどう扱うか（許容／代替防御の要否）。
+5. **Q5（PoC `actor_poc/` の扱い）**: 本番化完了後に `actor_poc/`（feature-gated 使い捨て）を撤去するのは本仕様の責務か、別途か。撤去タイミングと痕跡ゼロ（バイト不変）の確認方法。
