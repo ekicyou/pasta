@@ -33,7 +33,7 @@
   - _Requirements: 1.1, 2.3_
   - _Boundary: ActorThread_
   - _Depends: 1.2, 1.4_
-- [ ] 2.2 reload teardown と反復リーク検査
+- [x] 2.2 reload teardown と反復リーク検査
   - shutdown→再 spawn の reload サイクルを N 回反復。メッセージ専用ウィンドウ・スレッド・チャネルの解放、ポート/ハンドル枯渇なしを確認。`DebugHandle::Drop` idiom（shutdown フラグ→join）を写経。
   - 観測可能な完了条件: N 回 reload 後もハンドル/ポートが枯渇せず clean teardown する統合テストが緑。
   - _Requirements: 1.2, 1.3_
@@ -128,3 +128,4 @@
 - release profile が `panic = "abort"` のため、Responder の drop→204 ガード（3.1/3.2、panic unwind 依存）は release では巻き戻らない。検証は `cargo test`（dev/test profile = unwind）でのみ成立。3.1/3.2 はこの前提でテストすること。
 - 2.1（R1 本丸＝GO）: 実 `PastaLuaRuntime::new(TranspileContext::new())`（重フィクスチャ不要・軽量構築）を `std::thread::spawn` 内の `wintf_winmsg_executor::block_on(future)` の future ローカルとして所有すれば `!Send` mlua VM をアクタースレッドに pin できる（mlua の `!Send` が越境を構造的に禁止、値のみ mpsc で越境）。executor 0.0.3 実 API（registry source 実読）: `block_on<'a,T:'a>(future: impl Future<Output=T>+'a)->T`（呼び出しスレッドの message loop を回す）／`spawn_local<T:'static>(...)->JoinHandle<T>`／`JoinHandle`（Drop で detach・Future 実装）／`FilterResult{Forward,Drop}`／`MessageLoop`（直接構築不可）。再ポーリングは executor の `MSG_ID_WAKE`(WM_USER)＋`Waker` 機構を使う（`poll_fn` で waker 捕捉→producer が `wake_by_ref`、spin 回避）。teardown は `Arc<AtomicBool>`(SeqCst)→`wake`→`JoinHandle::join`、`Drop` は `take()` で二重 join 回避（debug `DebugHandle::Drop` idiom 写経）。`ActorThread` は `crates/pasta_lua/src/actor_poc/actor_thread.rs`。2.2/2.3/3.2/4.1 はこの土台に乗る。
 - 既知の非ブロッキング lint: `tests/actor_poc_actor_thread.rs:20-21` に `clippy::doc_overindented_list_items`（doc コメント整形のみ）。CI は clippy 非実行・`-D warnings` 不使用のため無害。mailbox.rs:106 の `clippy::needless`（task 1.4 由来）も既存・境界外。
+- 2.2: ハンドルリーク計測 API（`GetProcessHandleCount`/`GetGuiResources`）のため `crates/pasta_lua/Cargo.toml` の `actor-poc` feature に `windows-sys/Win32_System_Threading` を追加（default/base には未追加＝feature off で非活性）。`ReloadProbe`＝`crates/pasta_lua/src/actor_poc/teardown.rs`。`PastaLuaRuntime::new(TranspileContext::new())` は in-memory・disk 自己展開なし（reload 反復で profile 汚染なし）。**8.1 はこの Cargo.toml 変更後の feature-off release を再ビルドして 1.1 正規化ベースラインと一致確認すること**（feature 加算はビルド単位ごとなので off ビルドに windows-sys 追加 feature は載らない想定）。

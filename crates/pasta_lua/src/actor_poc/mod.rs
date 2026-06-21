@@ -12,6 +12,9 @@
 /// アクタースレッド（block_on ＋ `!Send` VM pin・JoinHandle/shutdown idiom・R1.1/R2.3）。
 pub mod actor_thread;
 
+/// reload teardown と反復リーク検査（shutdown→再 spawn を N 回・実ハンドル計測・R1.2/R1.3）。
+pub mod teardown;
+
 /// テスト隔離土台（socket2 エフェメラル待受の写経・R7.4）。
 pub mod test_isolation;
 
