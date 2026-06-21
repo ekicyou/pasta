@@ -24,5 +24,8 @@ pub mod test_isolation;
 /// 単一直列 mailbox（enqueue／drain・FIFO 順序・スレッド分離・R2.3）。
 pub mod mailbox;
 
+/// GET oneshot responder ＋ Drop で未送信時 204 ガード（R3.1/R3.2/R3.3/R3.4）。
+pub mod responder;
+
 /// 段階判定レコーダ土台（項目別 outcome／blocker 累積・隔離前提・R8.2/R8.3/R7.3）。
 pub mod verdict;

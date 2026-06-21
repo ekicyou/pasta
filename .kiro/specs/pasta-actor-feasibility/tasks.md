@@ -45,7 +45,7 @@
   - _Depends: 1.5, 2.1_
 
 - [ ] 3. R2/R3: block-on-reply marshaling と drop→204 ガード
-- [ ] 3.1 Responder drop→204 ガード
+- [x] 3.1 Responder drop→204 ガード
   - GET 応答 oneshot（`std::sync::mpsc` 1 回受信）を包み、未 reply のまま drop（panic 巻き戻し含む）したら 204 を自動送信。「reply 1 回」または「drop→204」で必ず終結。
   - 観測可能な完了条件: 未 reply drop と panic 注入の双方で SSP 側が 204 を受け取り無限待機しない単体テストが緑。
   - _Requirements: 3.1, 3.2, 3.3, 3.4_
