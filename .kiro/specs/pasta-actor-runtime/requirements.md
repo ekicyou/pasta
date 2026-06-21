@@ -22,6 +22,7 @@
   - 単一直列キューによる全 VM アクセスの順序保存・データ競合排除
   - reload（unload→再ロード）teardown の本番化（clean teardown・リーク／枯渇不在）
   - `unsafe impl Send` / `unsafe impl Sync` ハックの解消
+  - PoC `actor_poc/` の**デバッグ資産（`sim_driver`／`mailbox`／`responder`／`coroutine_probe` 検証等）を本番テスト基盤へ昇格**し、feature-gated 使い捨て足場（`verdict.rs`・PoC scaffold・`actor-poc` feature gate）を**最終タスクで撤去**（痕跡ゼロ＝出荷バイト不変を正規化 sha で確認）
   - 全既存テストの回帰不変維持
 - **Out of scope（本仕様が扱わない範囲）**:
   - talk FIFO・`Status: talking` gate・即時 preempt・キック transport（後続仕様 `pasta-scene-kick`）
@@ -167,3 +168,4 @@
 5. The pasta システム shall アクター機構の振る舞いを、ホスト（SSP）非依存に再現・検証できる決定論的テストハーネス（PoC `actor_poc/` の `sim_driver`／`mailbox` 検証等を本番化した形）で観測・デバッグ可能にする。
 6. While 並行機構を実装・デバッグしている間, the 開発プロセス shall 特性化テスト先行・1 抽出=1 検証=1 コミットの revert 可能な小ステップを守り、各ステップで挙動差分を局所的に観測・切り分け可能に保つ。
 7. The pasta システム shall データ競合・デッドロック・スレッド非決定性を、単一直列キューによる順序保存（Requirement 6）と drop→204 ガード（Requirement 5）により構造的に排除し、再現困難な並行バグの混入経路を最小化する。
+8. When 本番接合（アクター機構・marshaling・teardown の出荷経路化）が完了したとき, the 開発プロセス shall PoC `actor_poc/` の使い捨て足場（`verdict.rs`・PoC scaffold・`actor-poc` feature gate）を最終タスクで撤去し、撤去前後で出荷 `pasta.dll` のバイト列が不変であること（正規化 sha 一致）を検証する。デバッグ資産（`sim_driver`／`mailbox`／`responder`／`coroutine_probe` 検証）は撤去対象に含めず、AC5 の本番テスト基盤へ昇格済みであることを前提とする。
