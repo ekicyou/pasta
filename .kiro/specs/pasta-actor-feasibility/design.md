@@ -105,7 +105,7 @@ graph TB
 
 | Layer | Choice / Version | Role in Feature | Notes |
 |-------|------------------|-----------------|-------|
-| Runtime / Executor | `wintf_winmsg_executor`（公開フォーク） | アクタースレッド上の `block_on`／`spawn_local`／`MessageLoop`。`!Send` future を per-thread でホスト | **新規依存・feature-gated**。version/source は OPEN QUESTION（Q1） |
+| Runtime / Executor | `wintf-winmsg-executor` 0.0.3（crates.io・プロジェクト用フォーク・MIT OR Apache-2.0） | アクタースレッド上の `block_on`／`spawn_local`／`MessageLoop`／`JoinHandle`／`FilterResult`。`!Send` future を per-thread でホスト | **新規依存・feature-gated**。crates.io 最新版で固定（設計ディスカッション#1で確定） |
 | VM / Scripting | `mlua` 0.11（LuaJIT 2.1、`!Send + !Sync`） | 実 Lua VM。`PastaLuaRuntime` 経由で再利用 | 既存。VM はアクタースレッドを越えない |
 | Messaging / Marshaling | `std::sync::mpsc`（mailbox）＋ oneshot 相当（GET 応答） | SSP↔アクター marshaling。GET=block-on-reply／NOTIFY=即 204 | debug の mpsc 前例を写経。oneshot は `std::sync::mpsc` 1 回受信 or 軽量 oneshot |
 | Isolation / Test | `socket2`（待受時のみ）＋ `ctor` | エフェメラル／再利用ポート、`#[ctor]` env ガード | 既存依存。R5 で待受を用いる場合のみ |
@@ -140,7 +140,7 @@ tests/  (各クレート tests/ 配下、actor-poc feature 有効時のみコン
 ```
 
 ### Modified Files
-- `crates/pasta_lua/Cargo.toml` — `[features]` セクション新設、`actor-poc = ["dep:wintf_winmsg_executor"]`、`wintf_winmsg_executor` を `optional = true` 依存追加。default に含めない（R7.1/7.2）。
+- `crates/pasta_lua/Cargo.toml` — `[features]` セクション新設、`actor-poc = ["dep:wintf-winmsg-executor"]`、`wintf-winmsg-executor = { version = "0.0.3", optional = true }` 依存追加（crates.io 最新）。default に含めない（R7.1/7.2）。
 - `crates/pasta_shiori/Cargo.toml` — `[features]` 新設、`actor-poc = ["pasta_lua/actor-poc"]` で feature 伝播。
 - `crates/pasta_lua/src/lib.rs` — `#[cfg(feature = "actor-poc")] pub mod actor_poc;` の 1 行追加（無効時は不在＝バイト不変）。
 - `crates/pasta_shiori/src/lib.rs`（または相当の crate root）— 同様に `#[cfg(feature = "actor-poc")] mod actor_poc;` を追加。
@@ -548,7 +548,7 @@ PoC の「エラー」は二種類に分かれる: (a) **検証対象の失敗**
 
 設計ディスカッションフェーズで解決する未決事項（本設計は best-effort 仮置きで進行）:
 
-- **Q1（依存解決）**: `wintf_winmsg_executor` の正確な crate 名／version／source（crates.io か git フォークか）が未確定。upstream `winmsg-executor` は `block_on`／`spawn_local`／message-only window／`!Send` 不要を提供することは確認済みだが、ブリーフが指す「公開済みフォーク」の参照先・公開 API（`MessageLoop`／`JoinHandle`／`FilterResult`）の正確な形は実依存追加時に確定が必要。**仮定**: ブリーフ記載どおり `block_on`／`spawn_local`／`MessageLoop`／`JoinHandle`／`FilterResult` を提供する公開フォークが入手可能。
+- ~~**Q1（依存解決）**~~ **【設計ディスカッション#1で解決】**: crate 名 `wintf-winmsg-executor`（crates.io・プロジェクト用フォーク・MIT OR Apache-2.0）、**最新版 0.0.3 で固定**（`wintf-winmsg-executor = { version = "0.0.3", optional = true }`）。公開 API `block_on`／`spawn_local`／`MessageLoop`／`JoinHandle`／`FilterResult` を crates.io 公開版として確認済み。cargo-deny supply-chain 監査も crates.io 版で素直に通る。
 - **Q2（executor 統合形）**: `block_on` が呼び出しスレッドのメッセージループを回す前提、`spawn_local`（サブタスク）・`JoinHandle`（teardown 待ち）・メッセージ専用ウィンドウの Drop 時解放挙動は**実機確認**が必要（Research Needed #1）。R1 検証そのものでもあるため、設計は std::thread＋block_on のアクタースレッド型を仮置きし、確証は R1 実装で得る。
 - **Q3（marshaling 反転の出荷経路非干渉）**: PoC の `Marshal` は既存 `shiori.rs:request()` 同期経路を置換せず別ハーネスで pest 解決値を消費する前提だが、pest 解決結果を出荷経路を改変せず PoC ハーネスへ供給する取り回し（再パース or 共有）の具体形が未確定。**仮定**: PoC ハーネスは独自に request 文字列を pest で再解決し method を得る（出荷経路バイト不変を優先）。
 - **Q4（gate 検証の実機補助）**: 再生中（`Status: talking`）に SSP が OnSecondChange tick を送り続けるかは忠実シミュレータの設計前提（R5.2 gate）であり、ukadoc 確認＋任意実機スモークの要否・範囲が未確定（Research Needed #3）。**仮定**: シミュレータは「talking 中も tick 継続・drain のみ gate」を再現し、実機差異は任意スモークで補助確認。
