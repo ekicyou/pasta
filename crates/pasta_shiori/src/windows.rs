@@ -1,17 +1,31 @@
 //! Windows SHIORI DLL interface
 //!
 //! Provides SHIORI protocol entry points for Windows DLL.
+//!
+//! # 所有モデル（task 5.1・R8.1/R8.2/R8.3/R8.4）
+//! FFI 入口は旧来の同期 in-place VM モデル（`OnceLock<RawShiori<PastaShiori>>` ＋
+//! `Arc<Mutex<Option<PastaShiori>>>` ＋ `unsafe impl Send/Sync`）から、**アクタースレッドへ
+//! VM を pin し `static MAILBOX`（flume `Sender`）越しにメッセージ送信でのみアクセスする**
+//! 本番アクターモデル（[`crate::actor::lifecycle`]）へ再配線済み。VM（`!Send`）はアクター
+//! スレッドを越えないため `unsafe impl Send/Sync` は構造的に不要（撤去済み）。
+//!
+//! - `load`   → [`lifecycle::spawn_actor`]（mailbox 生成 → アクタースレッド spawn → `Sender`
+//!   を MAILBOX へ格納）。スレッド spawn は **load 起点**で行い loader lock を回避する（R4.4）。
+//! - `request`→ [`lifecycle::marshal_request`]（GET=block-on-reply／NOTIFY=即 204）。
+//! - `unload` / `DllMain detach` → [`lifecycle::teardown_actor`]（`Stop{done}` ack → detach）。
+//!
+//! # panic 封じ込め（R3.7 維持）
+//! 各 extern 入口は引き続き [`catch_unwind`] で panic を SHIORI エラー契約へ封じる
+//! （unwind プロファイル＝dev/test 向けの保険。release `panic=abort` では到達不能）。
+//! marshaling 自体は正常経路 panic-free（R5.10）で、アクタースレッド上の VM panic は
+//! アクター側で捕捉され reply drop → 204 へ倒れる（SHIORI スレッドへ unwind しない）。
 
-use crate::error::*;
-use crate::shiori::*;
+use crate::actor::lifecycle;
 use crate::util::hglobal::*;
-use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
-use std::sync::*;
 use tracing::{error, warn};
 use windows_sys::Win32::Foundation::*;
-
-static SHIORI: OnceLock<RawShiori<PastaShiori>> = OnceLock::new();
 
 /// Windows DLL entry point
 /// Initializes SHIORI at DLL load/unload time.
@@ -23,27 +37,25 @@ static SHIORI: OnceLock<RawShiori<PastaShiori>> = OnceLock::new();
 /// - `_reserved` may be null or a valid pointer depending on `call_reason`
 ///
 /// `#[unsafe(no_mangle)]` is required for the Windows loader to find this symbol.
+///
+/// # ロード起点 spawn / loader lock 回避（R4.4）
+/// DllMain attach ではアクタースレッドを spawn しない（DllMain は loader lock 保持下で
+/// 呼ばれ、スレッド生成は deadlock を招きうる）。スレッド spawn は SHIORI `load` 起点で
+/// 行う。detach ではアクターを teardown する（VM・スレッド・チャネルの解放）。
 #[unsafe(no_mangle)]
 extern "system" fn DllMain(
-    hinst: isize,
+    _hinst: isize,
     call_reason: u32,
     _reserved: *mut std::ffi::c_void,
 ) -> bool {
-    const DLL_PROCESS_ATTACH: u32 = 1;
     const DLL_PROCESS_DETACH: u32 = 0;
 
-    match call_reason {
-        DLL_PROCESS_ATTACH => {
-            // Initialize SHIORI instance when DLL is loaded
-            // get_or_init ensures single initialization even if called multiple times
-            SHIORI.get_or_init(|| RawShiori::new(hinst));
-            true
-        }
-        DLL_PROCESS_DETACH => {
-            // Cleanup is handled by Drop implementations
-            unload()
-        }
-        _ => true,
+    if call_reason == DLL_PROCESS_DETACH {
+        // detach: アクタースレッドを teardown（unload と重なっても冪等 no-op で安全）。
+        unload()
+    } else {
+        // attach を含む他の通知では何もしない（spawn は load 起点・loader lock 回避）。
+        true
     }
 }
 
@@ -65,21 +77,37 @@ pub extern "C" fn load(hdir: HGLOBAL, len: usize) -> bool {
         warn!("load called with null HGLOBAL");
         return false;
     }
-    // 3.37 (G3): ownership of `hdir` transfers to the callee on entry, so
-    // every early-return path below must free it (previously leaked).
+    // ownership of `hdir` transfers to the callee on entry: every early-return
+    // path must free it (capture takes ownership; Drop frees).
+    let hdir = ShioriString::capture(hdir, len);
     if len == 0 {
         warn!("load called with zero length");
-        drop(ShioriString::capture(hdir, len));
         return false;
     }
-    // SHIORI is already initialized in DllMain
-    match SHIORI.get() {
-        Some(raw) => raw.load(hdir, len),
-        None => {
-            drop(ShioriString::capture(hdir, len));
+    // panic 封じ込め: load 処理（dir デコード→spawn_actor）を catch_unwind で囲む。
+    let result = catch_unwind(AssertUnwindSafe(|| load_impl(&hdir)));
+    match result {
+        Ok(rc) => rc,
+        Err(p) => {
+            error!("[pasta_shiori::load] panic at SHIORI boundary: {}", panic_msg(&p));
             false
         }
     }
+}
+
+/// load 本体: ANSI dir をデコードしてアクタースレッドを spawn（MAILBOX 設定）する。
+fn load_impl(hdir: &ShioriString) -> bool {
+    let dir = match hdir.to_ansi_str() {
+        Ok(d) => d,
+        Err(e) => {
+            error!("[pasta_shiori::load] dir decode failed: {e}");
+            return false;
+        }
+    };
+    // hinst は本番アクター経路では VM 構築の付随情報。SHIORI 仕様上 load では渡されない
+    // ため 0 を渡す（旧実装も DllMain で受けた hinst を保持していたが、本番では
+    // load_dir のみが VM 構築に必須）。
+    lifecycle::spawn_actor(0, std::path::PathBuf::from(dir))
 }
 
 /// SHIORI unload entry point
@@ -91,10 +119,18 @@ pub extern "C" fn load(hdir: HGLOBAL, len: usize) -> bool {
 /// `#[unsafe(no_mangle)]` is required for the SHIORI host to find this symbol.
 #[unsafe(no_mangle)]
 pub extern "C" fn unload() -> bool {
-    match SHIORI.get() {
-        Some(raw) => raw.unload(),
-        None => false,
+    // teardown は冪等（二重 teardown／unload×detach 競合でも安全）。panic は封じる。
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        let report = lifecycle::teardown_actor();
+        if let Some(anomaly) = report.anomaly {
+            warn!("[pasta_shiori::unload] teardown anomaly: {anomaly}");
+        }
+    }));
+    if let Err(p) = result {
+        error!("[pasta_shiori::unload] panic at SHIORI boundary: {}", panic_msg(&p));
     }
+    // SHIORI 契約上 unload は常に true（既存の always-true 姿勢を維持）。
+    true
 }
 
 /// SHIORI request entry point
@@ -118,161 +154,73 @@ pub extern "C" fn request(req: HGLOBAL, len: &mut usize) -> HGLOBAL {
         *len = 0;
         return ptr::null_mut();
     }
-    match SHIORI.get() {
-        Some(raw) => raw.request(req, len),
-        None => {
-            // 3.37 (G3): the incoming HGLOBAL is owned by the callee even on
-            // this degenerate path (previously leaked).
-            drop(ShioriString::capture(req, *len));
-            *len = 0;
-            ptr::null_mut()
+    // ownership transfer: capture frees the incoming HGLOBAL on every path.
+    let hreq = ShioriString::capture(req, *len);
+    let result = catch_unwind(AssertUnwindSafe(|| request_impl(&hreq)));
+    match result {
+        Ok((res, res_len)) => {
+            *len = res_len;
+            res
+        }
+        Err(p) => {
+            error!("[pasta_shiori::request] panic at SHIORI boundary: {}", panic_msg(&p));
+            // panic 時も 204 を返し（marshaling の安全網と同一バイト）、ホストへ unwind しない。
+            emit_response(&crate::actor::marshaling::default_204(), len)
         }
     }
 }
 
-/// Convert a caught panic payload into a MyError so the FFI dispatch layer
-/// can route it through the normal SHIORI error contract (3.37 / R3.7).
-fn panic_to_error(payload: Box<dyn std::any::Any + Send>) -> MyError {
-    let msg = if let Some(s) = payload.downcast_ref::<&str>() {
+/// request 本体: UTF-8 デコード → marshaling → 応答 HGLOBAL 化。
+fn request_impl(hreq: &ShioriString) -> (HGLOBAL, usize) {
+    let req = match hreq.to_utf8_str() {
+        Ok(r) => r,
+        Err(e) => {
+            // 不正バイト列: 安全網 204（旧実装は 500 を返したが、本番アクター経路は
+            // SHIORI スレッドを無限待機させず必ず文字列を返す契約に統一する・R5.6）。
+            warn!("[pasta_shiori::request] utf8 decode failed: {e}");
+            let mut len = 0usize;
+            return emit_response_into(&crate::actor::marshaling::default_204(), &mut len);
+        }
+    };
+    let response = lifecycle::marshal_request(req);
+    let mut len = 0usize;
+    emit_response_into(&response, &mut len)
+}
+
+/// 応答文字列を HGLOBAL（nofree・呼び出し側所有）へ載せ、`*len` を更新して返す。
+/// 確保失敗時は null+len0（ホストは null を「応答なし」と解釈する）。
+fn emit_response(response: &str, len: &mut usize) -> HGLOBAL {
+    let (h, l) = emit_response_into(response, len);
+    *len = l;
+    h
+}
+
+/// 応答文字列を HGLOBAL 化して `(handle, len)` を返す（`len` out も更新）。
+fn emit_response_into(response: &str, len: &mut usize) -> (HGLOBAL, usize) {
+    match ShioriString::clone_from_str_nofree(response) {
+        Ok(hres) => {
+            let (h, l) = hres.value();
+            *len = l;
+            (h, l)
+        }
+        Err(_) => {
+            *len = 0;
+            (ptr::null_mut(), 0)
+        }
+    }
+}
+
+/// 捕捉した panic ペイロードからメッセージ文字列を取り出す。
+fn panic_msg(payload: &Box<dyn std::any::Any + Send>) -> String {
+    if let Some(s) = payload.downcast_ref::<&str>() {
         (*s).to_string()
     } else if let Some(s) = payload.downcast_ref::<String>() {
         s.clone()
     } else {
         "unknown panic payload".to_string()
-    };
-    MyError::Script {
-        message: format!("panic at SHIORI boundary: {msg}"),
     }
 }
 
-struct RawShiori<T: Shiori + Default + Sized>(isize, Arc<Mutex<Option<T>>>);
-
-// 3.37 (G3): each dispatch method wraps its *_impl in catch_unwind.
-// A panic unwinding out of the extern "C" entry points is undefined behavior
-// historically and an immediate process abort since Rust 1.81 — either way it
-// takes the host (SSP) down. catch_unwind converts it to the SHIORI error
-// contract instead (load→false, request→500 response, unload→true).
-// AssertUnwindSafe is sound here: the only state the closures touch is behind
-// the Mutex, and a panic while holding the lock poisons it, after which every
-// later call degrades to MyError::Poison rather than observing torn state.
-// (In the release DLL panic=abort makes the catch unreachable; this protects
-// dev/test builds and rlib consumers with the default unwind strategy.)
-impl<T: Shiori + Default + Sized> RawShiori<T> {
-    fn new(hinst: isize) -> Self {
-        // Note: tracing subscriber is NOT initialized here.
-        // It is deferred to PastaShiori::load() after pasta.toml is read,
-        // so that [logging] configuration can be applied (Requirement 6).
-        RawShiori(hinst, Arc::new(Mutex::new(None)))
-    }
-
-    fn unload(&self) -> bool {
-        let result = catch_unwind(AssertUnwindSafe(|| self.unload_impl()))
-            .unwrap_or_else(|p| Err(panic_to_error(p)));
-        if let Err(e) = result {
-            error!("[pasta_shiori::unload] {e}");
-        }
-        true
-    }
-
-    fn load(&self, hdir: HGLOBAL, len: usize) -> bool {
-        let result = catch_unwind(AssertUnwindSafe(|| self.load_impl(hdir, len)))
-            .unwrap_or_else(|p| Err(panic_to_error(p)));
-        match result {
-            Ok(ret) => ret,
-            Err(e) => {
-                error!("[pasta_shiori::load] {e}");
-                false
-            }
-        }
-    }
-
-    fn request(&self, req: HGLOBAL, len: &mut usize) -> HGLOBAL {
-        let result = catch_unwind(AssertUnwindSafe(|| self.request_impl(req, *len)))
-            .unwrap_or_else(|p| Err(panic_to_error(p)));
-        match result {
-            Ok((res, res_len)) => {
-                *len = res_len;
-                res
-            }
-            Err(e) => {
-                error!("[pasta_shiori::request] {e}");
-                let (res, res_len) = Self::error_response(e);
-                *len = res_len;
-                res
-            }
-        }
-    }
-}
-
-impl<T: Shiori + Default + Sized> RawShiori<T> {
-    fn unload_impl(&self) -> MyResult<bool> {
-        let mut guard = self.1.lock()?;
-        *guard = None;
-        Ok(true)
-    }
-
-    fn load_impl(&self, hdir: HGLOBAL, len: usize) -> MyResult<bool> {
-        let hinst = self.0;
-        // 3.37 (G3, round 2): capture FIRST — ownership of `hdir` transfers
-        // to the callee on entry, so the poisoned-lock early return (`?`) and
-        // a panic inside T::default() must both free it via Drop (previously
-        // leaked). Capture only takes ownership of the handle; ordering vs
-        // the lock has no protocol-visible effect.
-        let hdir = ShioriString::capture(hdir, len);
-        let mut guard = self.1.lock()?;
-        *guard = None;
-        let mut shiori = T::default();
-        let dir = hdir.to_ansi_str()?;
-        let rc = shiori.load(hinst, dir)?;
-        *guard = Some(shiori);
-        Ok(rc)
-    }
-
-    fn request_impl(&self, hreq: HGLOBAL, len: usize) -> MyResult<(HGLOBAL, usize)> {
-        // 3.37 (G3, round 2): capture FIRST — the Err(Poison) and
-        // Err(NotInitialized) early returns below previously returned before
-        // taking ownership, leaking the incoming HGLOBAL on every request
-        // sent before load (or after a panic poisoned the lock). Capture
-        // only decodes/frees the request handle; moving it ahead of the lock
-        // changes nothing observable for valid inputs.
-        let hreq = ShioriString::capture(hreq, len);
-        let mut guard = self.1.lock()?;
-        match *guard {
-            None => Err(MyError::NotInitialized),
-            Some(ref mut shiori) => {
-                let req = hreq.to_utf8_str()?;
-                let res = shiori.request(req)?;
-                let hres = ShioriString::clone_from_str_nofree(res)?;
-                Ok(hres.value())
-            }
-        }
-    }
-
-    fn error_response(e: MyError) -> (HGLOBAL, usize) {
-        let res = e.to_shiori_response();
-        match ShioriString::clone_from_str_nofree(res) {
-            Ok(hres) => hres.value(),
-            // 3.37 (G3): if even the error response cannot be allocated,
-            // degrade to "no response" (null + len 0) — the host treats a
-            // null return as an absent response. Never hand out null+len>0.
-            Err(_) => (ptr::null_mut(), 0),
-        }
-    }
-}
-
-// ============================================================================
-// G1 (3.35): RawShiori dispatch layer / extern entry point tests.
-//
-// This module previously had ZERO tests. RawShiori<T> is generic over the
-// Shiori trait, so the dispatch, error-response, and state-reset logic is
-// testable in-process with a mock — no SSP host and no DLL loading required.
-//
-// IMPORTANT: none of these tests may call DllMain with DLL_PROCESS_ATTACH.
-// The static SHIORI OnceLock is process-global; initializing it would make
-// the "uninitialized" assertions below order-dependent across parallel tests.
-// All extern-fn tests rely on the OnceLock staying uninitialized for the
-// whole test process.
-// ============================================================================
 #[cfg(test)]
 #[path = "windows_tests.rs"]
 mod tests;

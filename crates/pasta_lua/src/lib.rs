@@ -29,8 +29,6 @@
 //! runtime.exec(&lua_code)?;
 //! ```
 
-#[cfg(feature = "actor-poc")]
-pub mod actor_poc;
 pub mod code_gen;
 pub mod config;
 pub mod context;
@@ -40,6 +38,7 @@ pub mod error;
 pub mod loader;
 pub mod logging;
 pub mod normalize;
+pub mod presentation;
 pub mod runtime;
 pub mod sakura_script;
 pub mod search;

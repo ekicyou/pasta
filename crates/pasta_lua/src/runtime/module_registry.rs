@@ -7,6 +7,7 @@ use super::PastaLuaRuntime;
 use super::enc;
 use super::log;
 use super::persistence;
+use super::renderer_injection::RendererInjection;
 use crate::loader::{LoaderContext, PastaConfig};
 use mlua::{IntoLua, Lua, Result as LuaResult, Table, Value};
 use std::path::{Path, PathBuf};
@@ -122,17 +123,27 @@ impl PastaLuaRuntime {
         set_loaded_module(lua, "@pasta_persistence", persistence_table)
     }
 
-    /// Register @pasta_sakura_script module for wait insertion.
+    /// Register @pasta_sakura_script module via an adapter-injected renderer.
     ///
-    /// Provides talk_to_script function for natural conversation tempo.
+    /// 設計の **SakuraRenderer（アダプタ注入）** Service Interface
+    /// (`register_sakura_script_module(lua, config, renderer)`)。コアはさくら描画を
+    /// **無条件 hard-code 起点としては保持せず**、注入された [`RendererInjection`] を
+    /// 通じてのみレンダラを登録する（R3.1/R3.2/R3.3）。
+    ///
+    /// `renderer` の既定（[`RendererInjection::default`]）は SHIORI さくらレンダラ
+    /// （= 既存 `crate::sakura_script::register` 経路）であり、`talk_to_script` 出力は
+    /// ゴールデンとバイト不変（R3.5/R3.6）。実レンダリングは VM 内 Lua に維持される
+    /// （Lua 集約死守・物理移動なし）。
     pub(crate) fn register_sakura_script_module(
         lua: &Lua,
         config: &Option<PastaConfig>,
+        renderer: RendererInjection,
     ) -> LuaResult<()> {
         // Get talk config, use defaults if not specified
         let talk_config = config.as_ref().and_then(|c| c.talk());
 
-        let sakura_module = crate::sakura_script::register(lua, talk_config.as_ref())?;
+        // アダプタ注入レンダラ経由で登録（既定 = SHIORI さくらレンダラ = 既存挙動）。
+        let sakura_module = renderer.register_module(lua, talk_config.as_ref())?;
         set_loaded_module(lua, "@pasta_sakura_script", sakura_module)
     }
 

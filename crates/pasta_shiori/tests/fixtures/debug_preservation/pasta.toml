@@ -1,0 +1,25 @@
+# Debug-preservation fixture (task 6.1 / pasta-actor-runtime).
+#
+# Enables the Phase-5 debug backend so `PastaShiori::load` — which now runs on
+# the dedicated ACTOR THREAD — calls `debug::enable` there, installing the
+# `set_global_hook` line hook on the actor thread (R10.1/R10.2). `port = 0`
+# requests an OS-assigned EPHEMERAL loopback port: there is NO fixed-port
+# (9276) contention, so this fixture is CI-safe even when multiple debug VMs
+# come up in one test binary. The bound port is read back from the actor thread
+# and a DAP client attaches to it over TCP.
+[loader]
+debug_mode = true
+
+[debug]
+enabled = true
+port = 0
+present_as = "lua"
+
+# テスト用アクター定義（async_callback フィクスチャと同一）。
+[actor."さくら"]
+spot = 0
+default_surface = 0
+
+[actor."うにゅう"]
+spot = 1
+default_surface = 10

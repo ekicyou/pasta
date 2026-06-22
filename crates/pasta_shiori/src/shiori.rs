@@ -42,14 +42,12 @@ pub struct PastaShiori {
     unload_fn: Option<Function>,
 }
 
-// SAFETY: PastaShiori is used within a single-instance SHIORI DLL context.
-// The OnceLock<RawShiori<PastaShiori>> ensures only one instance is created.
-// The Arc<Mutex<Option<PastaShiori>>> provides interior mutability with lock-based
-// synchronization, ensuring that all access to the Lua runtime and cached
-// functions is serialized. The Lua runtime (mlua) itself is !Send+!Sync, but
-// SHIORI DLL is only ever accessed from the host application's main thread.
-unsafe impl Send for PastaShiori {}
-unsafe impl Sync for PastaShiori {}
+// 旧来の `unsafe impl Send for PastaShiori` / `unsafe impl Sync` は task 5.1（R8.1/R8.3）で
+// **撤去**した。VM（`!Send` な mlua ランタイム）は本番アクタースレッド（`actor::thread`）へ
+// pin され、`static MAILBOX`（`actor::lifecycle`）越しのメッセージ送信でのみアクセスされる。
+// `PastaShiori` がスレッドを越境しない構造的不変条件によりスレッド安全性を担保するため、
+// `unsafe` の健全性仮定（「ホストのメインスレッドからのみ呼ばれる」運用前提）は不要になった。
+// `PastaShiori` は `!Send`（mlua 由来）のままでよい——アクタースレッド上でのみ構築・所有される。
 
 impl Drop for PastaShiori {
     fn drop(&mut self) {

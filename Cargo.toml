@@ -41,6 +41,11 @@ budouy = { version = "0.2.2", features = ["vendored-models"] }
 unicode-width = "0.2.2"
 socket2 = "0.5"
 
+# pasta_shiori actor-runtime dependencies
+flume = "0.12"
+wintf-winmsg-executor = "0.0.3"
+arc-swap = "1.9"
+
 # pasta_check dependencies
 lexopt = "0.3"
 md5 = "0.8"
