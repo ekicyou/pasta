@@ -117,6 +117,8 @@ pub fn teardown_via_sender(tx: &Sender<ActorMsg>, timeout: Duration) -> Teardown
     // drain）。receiver drop 済みなら Disconnected = already-done（冪等 no-op）。
     if tx.send(stop).is_err() {
         tracing::debug!(
+            seam = "actor.stop",
+            ok = false,
             "teardown: mailbox receiver already gone; treating as already-done (idempotent no-op)"
         );
         return TeardownReport {
@@ -125,15 +127,21 @@ pub fn teardown_via_sender(tx: &Sender<ActorMsg>, timeout: Duration) -> Teardown
             anomaly: None,
         };
     }
+    // 観測ログ点（R10.4・無効時ゼロコスト）: Stop を mailbox へ投入し done ack を待つ。
+    tracing::debug!(seam = "actor.stop", ok = true, "teardown: Stop enqueued; awaiting done ack");
 
     // done ack を有界に待つ。teardown が壊れて ack を返さない／drain せず break した
     // 場合に無限待機せず、異常として終結させる（テストはハングせず失敗する）。
     match done_rx.recv_timeout(timeout) {
-        Ok(()) => TeardownReport {
-            acked: true,
-            already_done: false,
-            anomaly: None,
-        },
+        Ok(()) => {
+            // 観測ログ点（R10.4）: done ack 受信＝drain/VM 破棄/cleanup 完了（clean teardown）。
+            tracing::debug!(seam = "actor.done", acked = true, "teardown: done ack received (resources released)");
+            TeardownReport {
+                acked: true,
+                already_done: false,
+                anomaly: None,
+            }
+        }
         Err(flume::RecvTimeoutError::Timeout) => {
             // ack が来ない = drain/cleanup/ack のいずれかが完了していない疑い。
             // 記録するがホスト（SSP）プロセスは巻き込まない（R7.5）。

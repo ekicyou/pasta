@@ -82,6 +82,8 @@ pub fn spawn_actor(hinst: isize, load_dir: PathBuf) -> bool {
     let (tx, rx) = mailbox();
     let actor = spawn_actor_thread(hinst, load_dir, rx);
     let loaded = actor.loaded();
+    // 観測ログ点（R10.4・無効時ゼロコスト）: FFI load 起点でアクターを起動した（R4.4）。
+    tracing::debug!(seam = "actor.spawn", loaded, "lifecycle: actor spawned from FFI load entry");
 
     // 送信端を lock-free スロットへ格納（以後の送信は MAILBOX.load() で参照）。
     MAILBOX.store(Some(std::sync::Arc::new(tx)));

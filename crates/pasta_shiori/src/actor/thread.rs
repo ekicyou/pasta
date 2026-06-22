@@ -157,6 +157,9 @@ pub fn spawn_actor_thread(
                     .runtime()
                     .and_then(|r| r.debug_local_addr());
 
+                // 観測ログ点（R10.4・無効時ゼロコスト）: アクタースレッド起動・VM pin 完了。
+                tracing::debug!(seam = "actor.spawn", loaded, "actor thread spawned; VM pinned on this thread");
+
                 // 実行スレッド id・ロード成否・debug 束縛アドレスを返す（VM 本体は越境しない）。
                 let _ = ready_tx.send((thread::current().id(), loaded, debug_local_addr));
 
@@ -172,22 +175,39 @@ pub fn spawn_actor_thread(
                         // co_scene は VM 内に persist し、resume_until_valid/CALLBACK が
                         // メッセージ間で継続する（コルーチン意味論不変）。
                         ActorMsg::Get { req, reply } => {
+                            let seq = req.seq;
+                            // 観測ログ点（R10.4・無効時ゼロコスト）: GET を mailbox から受信。
+                            tracing::trace!(seam = "actor.recv", method = "get", seq, "actor received GET");
                             // task 3.4 申し送り: 完全な timeout/drop→204 marshaling は 3.4。
                             // ここでは VM 応答文字列を Reply::Value で返す最小実装。
                             // エラー時は reply を送らず drop（受信側 Disconnected→3.4 で 204）。
-                            if let Ok(resp) = shiori.request(&req.raw) {
-                                let _ = reply.send(Reply::Value(resp));
+                            match shiori.request(&req.raw) {
+                                Ok(resp) => {
+                                    let _ = reply.send(Reply::Value(resp));
+                                    // 観測ログ点（R10.4）: VM 応答を reply で返した（exactly-once move）。
+                                    tracing::trace!(seam = "actor.reply", method = "get", seq, "actor replied with VM response");
+                                }
+                                Err(_) => {
+                                    // reply を送らず drop（受信側 Disconnected→marshaling で 204）。
+                                    drop(reply);
+                                    // 観測ログ点（R10.4）: VM 失敗で reply を drop（exactly-once drop）。
+                                    tracing::debug!(seam = "actor.drop", method = "get", seq, "actor dropped reply (VM request failed) -> 204");
+                                }
                             }
                         }
                         // NOTIFY fire-and-forget: VM 上で処理し応答経路は持たない。
                         // 応答は捨てる（NOTIFY は即 204 で終結する・3.4 で契約確定）。
                         ActorMsg::Notify { req } => {
+                            // 観測ログ点（R10.4）: NOTIFY を mailbox から受信（応答経路なし）。
+                            tracing::trace!(seam = "actor.recv", method = "notify", seq = req.seq, "actor received NOTIFY");
                             let _ = shiori.request(&req.raw);
                         }
                         // teardown: ack 経路を保持してループを抜ける。Stop は同一 FIFO を
                         // 通るため、ここに到達した時点で先行メッセージは drain 済み
                         // （clean drain）。ack はループ脱出後・cleanup 完了後に送る。
                         ActorMsg::Stop { done } => {
+                            // 観測ログ点（R10.4）: Stop を受信しループ脱出（clean drain 完了）。
+                            tracing::debug!(seam = "actor.stop", "actor received Stop; draining done, breaking loop");
                             done_ack = Some(done);
                             break;
                         }
@@ -207,6 +227,8 @@ pub fn spawn_actor_thread(
                 //     ack 経路を持たない（done_ack=None）ので送らない。
                 if let Some(done) = done_ack {
                     let _ = done.send(());
+                    // 観測ログ点（R10.4）: cleanup 完了後に done ack を送出（全資源解放済み）。
+                    tracing::debug!(seam = "actor.done", "actor sent done ack after VM/resource cleanup");
                 }
                 // block_on はこの async ブロック完了で戻り、メッセージ専用ウィンドウ等
                 // executor 資源が解放される。スレッドは SHIORI 側が detach 済み。

@@ -81,7 +81,7 @@
   - _Requirements: 10.1, 10.2, 10.3_
   - _Boundary: DebugBackend 統合_
   - _Depends: 3.3_
-- [ ] 6.2 観測ログ点の付与と決定論テストハーネスの本番昇格
+- [x] 6.2 観測ログ点の付与と決定論テストハーネスの本番昇格
   - marshaling/teardown の主要シーム（try_send／recv／reply／drop／timeout／spawn／stop／done）に `tracing`/`@pasta_log` のログ点を付与する（無効時ゼロコスト）
   - `actor_poc` の `sim_driver`／`mailbox`／`coroutine_probe` 検証＋reply move/drop の exactly-once をホスト非依存の決定論テストハーネスへ昇格する
   - 観測: ログ無効時に応答バイト不変・決定論ハーネスが緑でアクター機構を観測・デバッグできる

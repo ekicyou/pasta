@@ -139,6 +139,7 @@ pub fn marshal_get_with_timeout(
     // flume・同期 recv_timeout で受ける reply 経路（exactly-once は move/drop 意味論）。
     let (reply_tx, reply_rx) = bounded::<Reply>(1);
 
+    let seq = req.seq;
     // try_send 失敗＝アクタースレッド不在/異常/満杯（R5.6）。reply_tx はここで drop され、
     // 受信側を作らないため無限待機は生じない。安全側として 204 を返す。
     if tx
@@ -148,17 +149,34 @@ pub fn marshal_get_with_timeout(
         })
         .is_err()
     {
+        // 観測ログ点（R10.4・無効時ゼロコスト）: GET の try_send が失敗（アクター不在/満杯）。
+        tracing::debug!(seam = "actor.try_send", method = "get", seq, ok = false, "GET try_send failed (actor absent/full) -> 204");
         return default_204();
     }
+    // 観測ログ点（R10.4）: GET を mailbox へ投入し reply を待つ。
+    tracing::trace!(seam = "actor.try_send", method = "get", seq, ok = true, "GET enqueued; awaiting reply");
 
     // wake は flume の native Waker が executor を起こす（手動 wake 不要・task 3.1 実証）。
     // 同期 recv_timeout ゆえ flume の cancel 欠陥に無関係。
     match reply_rx.recv_timeout(timeout) {
         // 値到達: アクター VM が構築した応答文字列を返す（R5.1・通常経路バイト不変 R5.8）。
-        Ok(Reply::Value(s)) => s,
-        // Disconnected（reply drop・R5.3）/ Timeout（R5.7）のいずれも 204 に倒す。
-        // timeout は SHIORI 待機の打ち切りのみ。アクターの Lua（co_scene）は止めない。
-        Err(_) => default_204(),
+        Ok(Reply::Value(s)) => {
+            // 観測ログ点（R10.4）: reply 値が SHIORI スレッドへ到達（exactly-once の move 側）。
+            tracing::trace!(seam = "actor.reply", method = "get", seq, "GET reply value received");
+            s
+        }
+        // Disconnected（reply drop・R5.3）: アクターが reply を送らず drop → 204。
+        Err(flume::RecvTimeoutError::Disconnected) => {
+            // 観測ログ点（R10.4）: reply drop（exactly-once の drop 側）→ 204。
+            tracing::debug!(seam = "actor.drop", method = "get", seq, "GET reply dropped (Disconnected) -> 204");
+            default_204()
+        }
+        // Timeout（R5.7）: 閾値超過。SHIORI 待機を打ち切るが Lua（co_scene）は止めない。
+        Err(flume::RecvTimeoutError::Timeout) => {
+            // 観測ログ点（R10.4）: timeout で SHIORI 待機を打ち切り 204（アクターは継続）。
+            tracing::debug!(seam = "actor.timeout", method = "get", seq, ?timeout, "GET reply timed out -> 204 (actor work not killed)");
+            default_204()
+        }
     }
 }
 
@@ -168,8 +186,11 @@ pub fn marshal_get_with_timeout(
 /// 即 204 を返す（fire-and-forget）。`try_send` の成否に関わらず SHIORI スレッドは
 /// ブロックしない（アクター不在でも即 204・無限待機なし）。
 pub fn marshal_notify(tx: &Sender<ActorMsg>, req: MailboxRequest) -> String {
+    let seq = req.seq;
     // 送信失敗（アクター不在）でも契約上 SSP 側はブロックしない。即 204 で終結する。
-    let _ = tx.try_send(ActorMsg::Notify { req });
+    let ok = tx.try_send(ActorMsg::Notify { req }).is_ok();
+    // 観測ログ点（R10.4・無効時ゼロコスト）: NOTIFY を fire-and-forget で投入し即 204。
+    tracing::trace!(seam = "actor.try_send", method = "notify", seq, ok, "NOTIFY enqueued (fire-and-forget) -> 204");
     default_204()
 }
 
