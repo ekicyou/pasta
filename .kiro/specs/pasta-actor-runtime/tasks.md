@@ -46,7 +46,7 @@
   - _Requirements: 4.1, 4.2, 4.3, 4.5, 9.1, 9.2, 9.3, 9.4_
   - _Boundary: ActorThread_
   - _Depends: 3.1, 3.2_
-- [ ] 3.4 GET/NOTIFY/drop→204/timeout→204 marshaling の本番化
+- [x] 3.4 GET/NOTIFY/drop→204/timeout→204 marshaling の本番化
   - GET＝reply tx 同梱で `try_send`→同期 `recv_timeout(6.68ms)`→値 or 204、NOTIFY＝即 204、応答経路 drop（Disconnected）→204、アクター異常→204 を実装する
   - GET タイムアウト閾値は通常運転で発火しない安全網に設定し、デバッガ停止中も抑止せず、停止中の 204 は次 `OnSecondChange` で回復させる（コルーチン状態保存）
   - 観測: marshaling 置換後も応答バイト列がゴールデンと不変・timeout/drop で必ず 204・無限待機やデッドロックが発生しない

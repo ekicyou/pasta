@@ -22,3 +22,10 @@ pub mod mailbox;
 /// 駆動する。wintf（`block_on`）依存のため `actor-poc` feature 有効時のみコンパイル。
 #[cfg(feature = "actor-poc")]
 pub mod thread;
+
+/// 本番 marshaling 層（task 3.4）。GET=block-on-reply（`recv_timeout`）／NOTIFY=即 204／
+/// drop・timeout・異常→204 の同期契約を、SHIORI スレッドとアクタースレッド（task 3.3）の
+/// 間で本番化する。mailbox 型と wintf 依存のアクタースレッドを使うため、task 3.3 と同じく
+/// `actor-poc` feature でガードする。FFI 入口（`static MAILBOX`）への配線は task 5.1。
+#[cfg(feature = "actor-poc")]
+pub mod marshaling;
