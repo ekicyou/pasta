@@ -82,13 +82,25 @@ pub enum ShioriMethod {
 
 /// 既定の 204 No Content 応答（marshaling の安全網フォールバック）。
 ///
-/// バイト列は出荷経路 `PastaShiori::default_204_response` と同一（`SHIORI/3.0 204 No
-/// Content` + `Charset`/`Sender` + 終端）。timeout/drop/異常/未初期化のいずれでも
-/// SHIORI スレッドへ必ずこの応答を返し、無限待機を生じさせない。
+/// バイト列は **リファクタ前の出荷 NOTIFY/204 経路が返していた VM 産 204**
+/// （`pasta_scripts/pasta/shiori/res.lua` の `RES.no_content` → `RES.build`）と
+/// バイト同一であり、標準ヘッダ 3 種（`Charset`/`Sender`/`SecurityLevel: local`）を
+/// すべて含む。すなわち `byte_invariant_test` の `GOLDEN_NOTIFY_204` /
+/// `GOLDEN_ON_SECOND_CHANGE_204`（外部観測点で固定された特性化ゴールデン）と一致する。
+///
+/// これにより NOTIFY の即 204（R5.2）も、GET の timeout/drop/異常/未初期化フォールバック
+/// （R5.3/R5.6/R5.7）も、**唯一の正準 204** を返し、出荷経路が R1.1（外部 SHIORI 挙動
+/// バイト不変）を満たす。Rust 安全網 `PastaShiori::default_204_response` は SHIORI.request
+/// 未登録時のみ通る経路でヘッダ 2 種だが、代表イベント列（NOTIFY/OnSecondChange）の
+/// pre-refactor 観測値は VM 産 204（SecurityLevel あり）であり、それがゴールデンの真値である。
+///
+/// timeout/drop/異常/未初期化のいずれでも SHIORI スレッドへ必ずこの応答を返し、
+/// 無限待機を生じさせない。
 pub fn default_204() -> String {
     "SHIORI/3.0 204 No Content\r\n\
      Charset: UTF-8\r\n\
      Sender: Pasta\r\n\
+     SecurityLevel: local\r\n\
      \r\n"
         .to_string()
 }
@@ -230,12 +242,16 @@ mod tests {
         assert_eq!(determine_method("not a shiori request"), None);
     }
 
-    /// default_204（R5.6 等）: 安全網 204 のバイト列が出荷 204 と同一であること。
+    /// default_204（R5.6 等）: 安全網 204 のバイト列が **リファクタ前 VM 産 204** と同一で
+    /// あること（標準ヘッダ 3 種・`SecurityLevel: local` を含む）。これは
+    /// `byte_invariant_test` の `GOLDEN_NOTIFY_204`/`GOLDEN_ON_SECOND_CHANGE_204` と
+    /// バイト同一であり、出荷経路の R1.1（外部 SHIORI 挙動バイト不変）を保証する正準 204。
     #[test]
     fn default_204_matches_shipping_bytes() {
         let expected = "SHIORI/3.0 204 No Content\r\n\
                         Charset: UTF-8\r\n\
                         Sender: Pasta\r\n\
+                        SecurityLevel: local\r\n\
                         \r\n";
         assert_eq!(default_204().as_bytes(), expected.as_bytes());
     }

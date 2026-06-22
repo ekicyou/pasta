@@ -55,3 +55,10 @@ serde_json.workspace = true
 # 観測ログ点（task 6.2）の検証: `#[traced_test]` でテストローカルに subscriber を装着し、
 # アクター/marshaling/teardown シームの tracing イベント発火を `logs_contain` で観測する。
 tracing-test.workspace = true
+
+[target.'cfg(windows)'.dev-dependencies]
+# 機能レベル統合 E2E（task 7.1）が、出荷 extern FFI 入口（`load`）へ渡す ghost ディレクトリを
+# 本番 `to_ansi_str`（CP_ACP デコード）と対称な `WideCharToMultiByte`/CP_ACP で ANSI エンコードし、
+# 応答 HGLOBAL を read/free するために Win32 Memory/Globalization を直接利用する。
+# 本体は既に windows-sys を通常依存として持つため、dev 側はリンク可能化のための再宣言のみ。
+windows-sys = { workspace = true }

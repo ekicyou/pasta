@@ -18,3 +18,11 @@ mod windows;
 
 // Re-export for integration tests
 pub use shiori::{PastaShiori, Shiori};
+
+// 出荷 SHIORI extern FFI 入口（`#[unsafe(no_mangle)] extern "C"`）を Rust パスでも到達可能にする。
+// これらは SSP 等のホストが C ABI で呼ぶ出荷シンボルそのものであり、cdylib エクスポートが
+// 主用途。Rust 再エクスポートは追加的（非破壊）で、機能レベル統合 E2E（task 7.1）が
+// 出荷シンボルを通じて load→request→unload を駆動・検証できるようにする
+// （rlib 経由の統合テストでは no_mangle シンボルがリンク到達するために Rust から参照が必要）。
+#[cfg(windows)]
+pub use windows::{load, request, unload};

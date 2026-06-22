@@ -90,7 +90,7 @@
   - _Depends: 3.4, 4.1_
 
 - [ ] 7. 統合・機能レベル検証・PoC 足場撤去
-- [ ] 7.1 全経路統合と機能レベルバイト不変回帰
+- [x] 7.1 全経路統合と機能レベルバイト不変回帰
   - 全コンポーネントを出荷 `request` 経路へ統合し、代表 SHIORI イベント列で機能レベルのバイト不変と全既存テスト回帰不変を確認する
   - 観測: `cargo test --all` 緑・ByteInvariantSuite 緑・OnBoot/OnSecondChange/GET property/コルーチン継続が end-to-end でバイト不変
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 9.1, 9.2, 9.3, 9.4_
