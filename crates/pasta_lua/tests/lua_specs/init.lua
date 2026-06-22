@@ -51,6 +51,7 @@ local specs = {
     "act_word_expr_test",                 -- pasta.act word/expr_fn 後処理・call nil ガードテスト (review-improvement-loop 3.46)
     "pasta_init_test",                    -- PASTA 公開 API リダイレクト・GLOBAL エイリアステスト (review-improvement-loop 3.46)
     "shiori_entry_test",                  -- pasta.shiori.entry 統合テスト (review-improvement-loop 3.48)
+    "store_kick_pending_test",            -- STORE.kick_pending / kick_force フィールドテスト (pasta-scene-kick 1.3)
     -- 将来のテストスイートをここに追加
     -- "code_generator_test",
     -- "context_test",
