@@ -8,7 +8,7 @@
   - 以後の全段で緑維持する回帰ガードとして**最初に**確立（新依存・新実装の前）
   - 観測: ゴールデンテストが現行実装で緑になり、以後の各段で応答バイト差分を検出できる
   - _Requirements: 1.1, 1.2, 1.4_
-- [ ] 1.2 flume 依存追加と executor 依存のアダプタ移設
+- [x] 1.2 flume 依存追加と executor 依存のアダプタ移設
   - `pasta_shiori` に flume 0.12 を依存追加（mailbox＝`recv_async`／reply・done＝`recv_timeout` 兼用）
   - `wintf-winmsg-executor` をアクタースレッド所有者の `pasta_shiori` 側で利用可能にし、executor 選択をアダプタ層に閉じ込める
   - 観測: 新依存込みで `cargo build` 成功し、1.1 のゴールデン＋既存テストが回帰不変で緑

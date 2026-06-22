@@ -15,13 +15,14 @@ name = "pasta"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-# 使い捨て検証ハーネス（PoC）。default 無効。pasta_lua/actor-poc へ伝播するだけ。
-# Marshal（task 3.2）は自前のアクタースレッド／executor を建てず、pasta_lua の
-# レビュー済み `ActorThread`（block_on＋!Send VM ホスト）／`Mailbox`／`Responder` を
-# 再利用する。よって executor 依存は pasta_lua 側に閉じ、pasta_shiori は
-# wintf-winmsg-executor を直接リンクしない。default 無効なので feature off の
-# リリースビルドは引き続きバイト不変（R7.2）。
-actor-poc = ["pasta_lua/actor-poc"]
+# アクターランタイム用ハーネス。default 無効。pasta_lua/actor-poc へ伝播しつつ、
+# 本番アクタースレッド（task 3.x）を所有する pasta_shiori 側で executor を直接
+# 使えるようにするため `wintf-winmsg-executor` を本クレートの optional 依存へ
+# 昇格する（R4.4: アクタースレッド所有・executor 選択をアダプタ層に閉じ込める）。
+# wintf は本 feature 有効時のみリンクされるため、default 無効のリリースビルドは
+# 引き続きバイト不変（R7.2）。flume は feature 非依存だが未使用のため
+# 出荷応答バイトには影響しない。
+actor-poc = ["pasta_lua/actor-poc", "dep:wintf-winmsg-executor"]
 
 [dependencies]
 pasta_lua.workspace = true
@@ -30,6 +31,10 @@ tracing.workspace = true
 thiserror.workspace = true
 pest.workspace = true
 pest_derive.workspace = true
+# mailbox=recv_async／reply・done=recv_timeout（task 3.x で使用）
+flume.workspace = true
+# 本番アクタースレッドの block_on メッセージループ（actor-poc 有効時のみリンク）
+wintf-winmsg-executor = { workspace = true, optional = true }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys.workspace = true

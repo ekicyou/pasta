@@ -41,7 +41,7 @@ unicode-width.workspace = true
 socket2.workspace = true
 zip.workspace = true
 # actor-poc feature 有効時のみリンクする使い捨て PoC 用 executor（公開フォーク）
-wintf-winmsg-executor = { version = "0.0.3", optional = true }
+wintf-winmsg-executor = { workspace = true, optional = true }
 
 [build-dependencies]
 zip.workspace = true
