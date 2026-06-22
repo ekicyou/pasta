@@ -26,8 +26,8 @@
 //!   `Sender` を直接渡す）。これにより既存出荷 `PastaShiori::request` 同期経路を一切
 //!   改変せず（byte-invariant ゴールデン 4/4 を緑のまま保つ）、5.1 の所有モデル再配線へ
 //!   素直に接続できる。
-//! - 本モジュール全体は task 3.3 と同じく `actor-poc` feature でガードされる（mailbox 型の
-//!   再利用と wintf 依存のアクタースレッドを使うため）。
+//! - 本モジュールは task 5.1 で FFI 出荷経路（`windows.rs`→`lifecycle::marshal_request`）へ
+//!   接続され、既定（本番）ビルドに含まれる。
 //!
 //! # GET タイムアウト閾値（R5.8/R5.9・RN4 決定）
 //! [`GET_TIMEOUT`] は **通常運転で決して発火しない安全網**である（R5.8: 通常経路バイト不変）。
