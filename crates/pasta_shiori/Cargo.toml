@@ -49,3 +49,6 @@ windows-sys = { workspace = true, features = ["Win32_System_Threading"] }
 tempfile.workspace = true
 # テスト前に ambient な PASTA_DEBUG を中和するための before-main フック
 ctor = "0.2"
+# 作者デバッグ保全 E2E（task 6.1）の最小 DAP-over-TCP クライアントが DAP フレームを
+# 組み立て・解析するために使用する。
+serde_json.workspace = true

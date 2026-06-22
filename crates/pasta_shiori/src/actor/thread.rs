@@ -32,6 +32,7 @@
 //! （エラー時は reply を drop → marshaling 側で 204）。wintf（`block_on`）は本スレッドの
 //! メッセージループに必須のため出荷依存である。
 
+use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::thread::{self, JoinHandle, ThreadId};
 
@@ -52,6 +53,14 @@ pub struct ActorThread {
     /// ロード成否（`SHIORI.load` 成功＝true）。失敗時もスレッドは drain を続ける
     /// （request は NotInitialized/Load エラーを返す）。
     loaded: bool,
+    /// アクタースレッド上で `debug::enable` が束縛した DAP リスナアドレス（R10.1/R10.2）。
+    ///
+    /// debug backend が **アクタースレッド上で**有効化された（＝`set_global_hook` が
+    /// アクタースレッドに装着された）ことの観測点。`pasta.toml [debug] enabled=true`
+    /// （port=0 でエフェメラル）のときのみ `Some`。debug 無効（既定・zero-cost）では
+    /// `None`（ポートを開かない・R5.5）。VM 本体は越境しないが、束縛アドレス
+    /// （`SocketAddr` は `Copy`・`Send`）はアクタースレッドから読み戻して観測できる。
+    debug_local_addr: Option<SocketAddr>,
 }
 
 impl ActorThread {
@@ -63,6 +72,15 @@ impl ActorThread {
     /// `SHIORI.load` がアクタースレッド上で成功したか。
     pub fn loaded(&self) -> bool {
         self.loaded
+    }
+
+    /// アクタースレッド上で debug backend が束縛した DAP リスナアドレス（R10.1/R10.2）。
+    ///
+    /// `Some(addr)` は `debug::enable` がアクタースレッド上で成立し、`set_global_hook`
+    /// がアクタースレッドに装着された証跡（VSCode は `addr` へ attach する）。debug 無効
+    /// （既定）では `None`（ポート不開放・zero-cost・R5.5）。
+    pub fn debug_local_addr(&self) -> Option<SocketAddr> {
+        self.debug_local_addr
     }
 
     /// アクタースレッドを join する（テスト／teardown 用）。
@@ -114,8 +132,10 @@ pub fn spawn_actor_thread(
     load_dir: PathBuf,
     rx: Receiver<ActorMsg>,
 ) -> ActorThread {
-    // VM 実行スレッド id とロード成否を呼び出し側へ返す小チャネル（値のみ越境）。
-    let (ready_tx, ready_rx) = flume::bounded::<(ThreadId, bool)>(1);
+    // VM 実行スレッド id・ロード成否・debug DAP 束縛アドレスを呼び出し側へ返す小チャネル
+    // （いずれも `Send` な値のみ越境・VM 本体は越境しない）。`SocketAddr` は `Copy`。
+    let (ready_tx, ready_rx) =
+        flume::bounded::<(ThreadId, bool, Option<SocketAddr>)>(1);
 
     let handle = thread::Builder::new()
         .name("pasta-actor".to_string())
@@ -129,8 +149,16 @@ pub fn spawn_actor_thread(
                     .load(hinst, load_dir.as_os_str())
                     .unwrap_or(false);
 
-                // 実行スレッド id とロード成否を返す（VM 本体は越境しない）。
-                let _ = ready_tx.send((thread::current().id(), loaded));
+                // debug backend がアクタースレッド上で束縛した DAP アドレスを観測する
+                // （R10.1/R10.2）。`debug::enable` は VM 構築（`load` 内）の一部として
+                // **このアクタースレッド上で**呼ばれるため、`set_global_hook` はこの
+                // スレッドに装着される。`Some` はその成立証跡（debug 無効なら `None`）。
+                let debug_local_addr = shiori
+                    .runtime()
+                    .and_then(|r| r.debug_local_addr());
+
+                // 実行スレッド id・ロード成否・debug 束縛アドレスを返す（VM 本体は越境しない）。
+                let _ = ready_tx.send((thread::current().id(), loaded, debug_local_addr));
 
                 // (2) 単一 recv ループ（select! なし・手動 wake なし）。
                 //     Stop で break → cleanup → done ack → async ブロック完了 → block_on が戻る。
@@ -186,8 +214,8 @@ pub fn spawn_actor_thread(
         })
         .expect("actor thread must spawn");
 
-    // VM 構築完了（実行スレッド id・ロード成否）を待つ。
-    let (actor_thread_id, loaded) = ready_rx
+    // VM 構築完了（実行スレッド id・ロード成否・debug DAP 束縛アドレス）を待つ。
+    let (actor_thread_id, loaded, debug_local_addr) = ready_rx
         .recv()
         .expect("actor thread must report readiness");
 
@@ -195,5 +223,6 @@ pub fn spawn_actor_thread(
         handle: Some(handle),
         actor_thread_id,
         loaded,
+        debug_local_addr,
     }
 }
