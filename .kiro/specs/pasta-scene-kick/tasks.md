@@ -1,0 +1,140 @@
+# Implementation Plan
+
+- [ ] 1. 基盤: 共有シーム・状態・mailbox variant
+- [ ] 1.1 キック sink シームの型と RuntimeConfig 配線口を定義する
+  - `pasta_lua` 側に「型を知らない汎用キック sink（シーン名つきリクエストを受けるクロージャ）」と最小リクエスト型を定義し、依存方向（`pasta_shiori`→`pasta_lua`）を順守する
+  - `RuntimeConfig` に sink を保持する builder を追加し、未注入（None）を既定とする
+  - 完了状態: `RuntimeConfig` に sink を渡せて、未注入時はキック経路が起動しないことが型・既定値で確認できる
+  - _Requirements: 2.4, 2.6_
+  - _Boundary: KickSinkSeam（debug/kick.rs, runtime_config.rs）_
+- [ ] 1.2 (P) アクター mailbox にキック variant を追加する
+  - 単一 mailbox の `ActorMsg`（予約 docstring）に「シーン名つきキック」variant を追加し、docstring の予約記述を実体化する
+  - executor 受信ループの match が新 variant を未処理で落とさないよう網羅する
+  - 完了状態: キック variant を mailbox へ送信でき、単一 consumer が FIFO 順に受信することがテストで確認できる
+  - _Requirements: 3.1_
+  - _Boundary: ActorKickMsg（mailbox.rs）_
+- [ ] 1.3 (P) キック保留フラグを VM 永続状態へ追加する
+  - VM セッション状態に「保留シーン名」と「割り込み許可フラグ」を追加し、リセットで初期化する
+  - 既定は保留なし（通常挙動に一切影響しない）
+  - 完了状態: フラグの設置・参照・リセットが単体で確認でき、未設置時は通常 dispatch が変化しない
+  - _Requirements: 3.1, 5.4, 5.5_
+  - _Boundary: KickInstall（store.lua）_
+
+- [ ] 2. キック transport（DAP・pasta_lua debug backend）
+- [ ] 2.1 (P) playScene カスタムリクエストを decode する
+  - 既存 DAP decode に playScene 文字列マッチを追加し、デコード結果へシーン名フィールドを足して抽出する
+  - 空・欠落シーン名は不正（None）として表現し、汎用 routing（停止ループ経由）に落とさない
+  - 別 transport を新設せず既存 DAP フレーム拡張に留める
+  - 完了状態: 正常名は Some、空/欠落は None に decode される単体テストが緑
+  - _Requirements: 2.1, 2.2, 2.3, 2.5_
+  - _Boundary: PlaySceneDecode（dap/decode.rs）_
+- [ ] 2.2 playScene 自己完結ハンドラから sink を呼ぶ
+  - inbound 固定順に自己完結ハンドラを追加し、有効シーン名で sink を呼び成功 ack を返す
+  - 空/不正は実行せずエラー応答を要求元へ返す
+  - sink 未注入（debug 無効）時は経路を有効化しない
+  - 完了状態: 有効名で sink が 1 回呼ばれ、空名で sink 非呼び出し＋エラー応答となるテストが緑
+  - _Requirements: 2.3, 2.5, 2.6_
+  - _Depends: 1.1, 2.1_
+  - _Boundary: KickInboundHandler（wiring/inbound.rs）_
+- [ ] 2.3 enable から socket-bridge へ sink を透過配線する
+  - debug enable シグネチャへ sink を追加し、socket-bridge spawn 時に inbound ハンドラへ供給する
+  - runtime 構築経路から sink を透過し、enabled=false 時は sink を消費せず非活性に保つ
+  - 完了状態: debug 有効＋sink 注入で inbound→sink が到達し、enabled=false で sink が消費されないテストが緑
+  - _Requirements: 2.4, 2.6_
+  - _Depends: 1.1, 2.2_
+  - _Boundary: KickSinkSeam（enable.rs, wiring/mod.rs, runtime/mod.rs）_
+
+- [ ] 3. アクタークライアント化（pasta_shiori）
+- [ ] 3.1 (P) MAILBOX 投函クロージャを sink として注入する
+  - VM 構築前に「sink 受領→`MAILBOX` へキック variant を送る」クロージャを束縛する
+  - teardown/reload 競合（MAILBOX 不在）は黙って no-op＋診断ログ（ベストエフォート）とする
+  - 完了状態: MAILBOX 設定時はキックが到達し、swap(None) 後は no-op となるテストが緑
+  - _Requirements: 2.4_
+  - _Depends: 1.1, 1.2_
+  - _Boundary: MailboxKickInjector（lifecycle.rs）_
+- [ ] 3.2 (P) executor 腕と Rust↔Lua キックブリッジを実装する
+  - executor 受信 match にキック variant 腕を追加し、アクタースレッド上で Rust↔Lua ブリッジ（Lua のキック入口）を fire-and-forget で起動する（応答なし）
+  - 複数キックは FIFO 順に処理され、最後のキックが保留を上書きする
+  - 完了状態: キック variant 受信で Lua キック入口が 1 回呼ばれ、連続キックで最後の値が保留となるテストが緑
+  - _Requirements: 3.1_
+  - _Depends: 1.2_
+  - _Boundary: ActorKickMsg（thread.rs, shiori.rs ブリッジ）_
+
+- [ ] 4. Lua キック設置・dispatch 注入（pasta_scripts）
+- [ ] 4.1 (P) キック入口で保留フラグを設置する（非ブロッキング）
+  - Lua のキック入口を公開・登録し、保留シーン名と割り込み許可フラグを設置するのみ（resume・レンダリングしない）
+  - 即時単一モード（モードフラグを持たない）
+  - 完了状態: キック入口呼び出し後に保留フラグが立ち、進行中シーン状態が未変更（resume していない）ことがテストで確認できる
+  - _Requirements: 3.1, 5.4_
+  - _Depends: 1.3_
+  - _Boundary: KickInstall（event/kick.lua, shiori/init.lua）_
+- [ ] 4.2 保留キックシーンを既存 ctx 合成で解決し co を返す
+  - 当該 OnSecondChange の act を流用してシーン名を解決し、シーンコルーチンを生成する（通常トーク再生と同一の合成手順を流用）
+  - 解決不能シーンは co を据えず破棄＋診断ログ（前会話を保持）
+  - キック専用の出力キューを設けず、既存の継続機構へ委譲する
+  - 完了状態: 解決成功で co が返り、未解決で nil＋ログとなる単体テストが緑
+  - _Requirements: 3.2, 3.3, 3.5_
+  - _Depends: 1.3, 4.1_
+  - _Boundary: KickDispatchHook（event/kick.lua の解決ロジック）_
+- [ ] 4.3 割り込み許可ゲートを dispatch 入口へ組み込む
+  - dispatch 入口で割り込み許可フラグが立つとき抑制ゲート（`is_blocked`）をワンショットで突破し、起動（または未解決判定）後にフラグを消費して false 化する
+  - 2 ビート目以降および通常イベント経路では抑制ゲートを従来どおり機能させ、`Status` 解釈を変えない
+  - 完了状態: `talking` 中でも force 時のみ dispatch が非ブロックとなり、直後にフラグ消費され次 tick の `talking` は通常ブロックとなるテストが緑
+  - _Requirements: 5.5, 6.4_
+  - _Depends: 1.3_
+  - _Boundary: KickForceGate（virtual_dispatcher.lua の抑制ゲート条件）_
+- [ ] 4.4 dispatch 前段へキック起動と preempt を組み込む
+  - dispatch 前段（既存トーク継続・ランダムトークより前）で保留シーンを起動し、前進行中シーンを閉じて（preempt・自動復帰なし）初回ビートを GET 応答として返す
+  - 1 GET につき高々 1 ビートとし、2 ビート目以降は既存の進行中シーン継続が後続 tick に順序どおり配信する
+  - 保留なし時はフックが完全素通りし、通常応答をバイト不変に保つ（押し出しせず pull 機会に限定）
+  - 完了状態: `talking` 中でも初回ビートが割り込み配信され、保留なし時は既存 dispatch とバイト一致となる結合テストが緑
+  - _Requirements: 3.4, 4.1, 4.2, 4.3, 4.4, 4.5, 5.1, 5.2, 5.3, 6.1, 6.2, 6.3_
+  - _Depends: 4.2, 4.3_
+  - _Boundary: KickDispatchHook, KickPreempt（virtual_dispatcher.lua の dispatch 前段フック）_
+
+- [ ] 5. VSCode キックコマンド（TypeScript）
+- [ ] 5.1 (P) playScene リクエストの純ロジックを実装する
+  - command 名・payload 生成・シーン名検証（空/空白は不正）を純関数として実装する
+  - command 名は Rust decode の文字列と一致させる（契約）
+  - 完了状態: payload 生成と検証（空→false・非空→true）の単体テストが緑
+  - _Requirements: 1.2, 2.5_
+  - _Boundary: PlaySceneRequest（playSceneRequest.ts）_
+- [ ] 5.2 キックコマンドを登録し customRequest を送信する
+  - コマンド登録・pasta セッションガード（未接続は案内し送信しない）・シーン名入力（取消は送信しない）・customRequest 送信・失敗時エラー提示を実装する
+  - コマンド／メニュー貢献（pasta デバッグセッション時のみ）をマニフェストへ追加する
+  - 完了状態: モック session で「未接続→警告・送信なし」「取消→送信なし」「正常→payload 送信」が確認できる
+  - _Requirements: 1.1, 1.2, 1.3, 1.4_
+  - _Depends: 5.1_
+  - _Boundary: PlaySceneCommand（extension.ts, package.json）_
+
+- [ ] 6. 統合: ライブキック経路の結線と疎通
+- [ ] 6.1 DAP から OnSecondChange までの全経路を疎通する
+  - playScene 受理から、sink→MAILBOX→キック variant→Lua 保留設置→次 OnSecondChange の dispatch 起動→初回ビート配信までを結線する
+  - 停止ループを経由せず socket-bridge inbound（停止非依存）から運ぶことを確認する
+  - 完了状態: VSCode 相当のキック送信で、次 OnSecondChange の応答に指定シーンの初回ビートが現れる結合テストが緑
+  - _Requirements: 2.4, 3.1, 4.2_
+  - _Depends: 2.3, 3.1, 3.2, 4.1, 4.2, 4.4_
+
+- [ ] 7. 検証: 回帰・マルチビート・preempt・ゲート
+- [ ] 7.1 キック未使用時のバイト不変回帰を特性化する
+  - 保留なし時、OnSecondChange を含む通常 SHIORI 応答がキック導入前とバイト一致することを特性化テストで固定する（PASTA_DEBUG ガード留意）
+  - 完了状態: キック未使用の通常応答がベースラインとバイト一致するテストが緑
+  - _Requirements: 6.2, 6.3_
+  - _Depends: 4.4_
+- [ ] 7.2 マルチビートシーンの配信を E2E 検証する
+  - 複数 yield を持つシーンをキックし、初回ビートが割り込み配信され、2 ビート目以降が既存継続で後続 tick に順序どおり配信されることを検証する
+  - 同一 tick の二重出力・順序逆転・継続コルーチンの stuck が無いこと
+  - 完了状態: マルチ yield シーンが tick ごとに 1 ビートずつ順序どおり配信される E2E が緑
+  - _Requirements: 4.1, 4.4, 5.5_
+  - _Depends: 6.1_
+- [ ] 7.3 preempt-and-abort と割り込みゲートを検証する
+  - 進行中会話中のキックで前進行中シーンが閉じ再開されない（自動復帰なし）こと
+  - 割り込み許可は初回ビートのみ（直後 tick の `talking` は通常ブロック）、連続キックは最新が勝ち前を preempt すること
+  - 完了状態: preempt 後に前シーンが再開されず、force が初回のみ突破する特性化テストが緑
+  - _Requirements: 5.1, 5.2, 5.3, 5.5_
+  - _Depends: 4.3, 4.4_
+- [ ] 7.4 debug 無効・未解決・drop の各ゲートを検証する
+  - enabled=false でキック経路が非活性であること、未解決シーンは進行中シーンを変えず破棄＋ログとなること、teardown 競合は破棄をベストエフォートで握ること
+  - 完了状態: 3 ゲート（非活性・未解決破棄・drop）の各テストが緑
+  - _Requirements: 2.6, 3.5_
+  - _Depends: 2.3, 3.1, 4.2_
