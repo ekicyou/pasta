@@ -29,7 +29,7 @@
   - _Boundary: SakuraRenderer_
 
 - [ ] 3. アクタースレッド・単一直列 mailbox・marshaling の本番化
-- [ ] 3.1 flume Waker × wintf executor の wake 統合実証
+- [x] 3.1 flume Waker × wintf executor の wake 統合実証
   - アクタースレッドで wintf `block_on` 上の `recv_async().await` が、別スレッドからの `try_send` で起床することを最小実証する（RN1 の薄い実証）
   - 観測: 別スレッドからの `try_send` で `block_on` の future が起床しメッセージを消費するテストが緑
   - _Requirements: 4.1, 4.5_

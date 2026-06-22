@@ -10,3 +10,7 @@
 /// SSP スレッド側 FFI 反転ハーネス（pest method 再パース→GET block-on-reply／
 /// NOTIFY 即 204・R2.1/R2.2/R2.4）。
 pub mod ffi_marshal;
+
+/// RN1 薄い実証: flume `recv_async().await` × wintf `block_on` の wake 統合
+/// （別スレッドの `try_send` が手動 wake なしで `recv_async` を起床させる・task 3.1・R4.1/R4.5）。
+pub mod flume_wake;
