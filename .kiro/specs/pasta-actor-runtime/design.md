@@ -48,6 +48,7 @@
 ### Allowed Dependencies
 - 上流 `pasta-actor-feasibility`（GO+）の確定方式・PoC 参照実装（`crates/pasta_lua/src/actor_poc/`）。
 - 外部依存 `wintf-winmsg-executor` 0.0.3（現状 `pasta_lua` の `actor-poc` feature 下・optional）。本仕様で出荷経路（`pasta_shiori` 側のアクタースレッド所有）へ昇格する。
+- 新規外部依存 `async-channel` 2.5（MIT/Apache・runtime 非依存・cancel-safe・Sender `Send+Sync+Clone`）を mailbox に追加する。flume は cancel-safety 未解決（Issue #104/#135・0.12 未修正）のため不採用。reply/done は `std::sync::mpsc`（追加依存なし）。crossbeam-channel は不要。
 - 既存 debug backend（`pasta_lua/src/debug/`）— VM スレッド上で `set_global_hook` を発火させる既存スレッドモデル。本仕様は「VM スレッド＝アクタースレッド」へ移しても発火が成立することのみ保証。
 - 既存 teardown idiom（`Arc<AtomicBool>` shutdown ＋ `take()` 二重 join 回避 ＋ socket2 SO_REUSEADDR）。
 - 依存方向 `pasta_dsl → pasta_core → pasta_lua → pasta_shiori` は不変。executor 所有は `pasta_shiori` に閉じ込め、コアの純度を損なわない。
@@ -121,7 +122,8 @@ graph TB
 | Layer | Choice / Version | Role in Feature | Notes |
 |-------|------------------|-----------------|-------|
 | Backend / Runtime | Rust 2024 / mlua 0.11 (LuaJIT 2.1) | `!Send` VM のアクタースレッド pin | LuaJIT はプリエンプション不可（timeout は SHIORI 待機打ち切りのみ） |
-| Messaging / Events | `std::sync::mpsc` | 単一直列 mailbox・応答チャネル・shutdown | PoC で FIFO 順序保証実証済み |
+| Messaging（mailbox: SHIORI→アクター） | `async-channel` 2.5（unbounded） | 単一直列 mailbox。アクターが `recv().await`（executor と native 統合・手動 wake 不要）。Sender が `Send+Sync+Clone` ゆえ `static` へ lock-free 共有可（Mutex 不要） | **cancel-safe**（flume #104/#135 の cancel 欠陥を回避）・runtime 非依存・MIT/Apache |
+| Messaging（reply/done: アクター→SHIORI） | `std::sync::mpsc`（`recv_timeout`） | GET 応答／teardown done ack。SHIORI スレッド（非 async）が同期ブロックで待つ。Sender はメッセージに同梱して move（共有しないので `!Sync` 無問題） | 追加依存ゼロ。GET timeout→204 を `recv_timeout(6.68ms)` で実現 |
 | Infrastructure / Runtime | `wintf-winmsg-executor` 0.0.3 | アクタースレッドの `block_on` メッセージループ | 現状 `pasta_lua` の `actor-poc` 下。本仕様で `pasta_shiori` 側の出荷経路へ昇格 |
 | Infrastructure / Runtime | `socket2` 0.5 / `windows-sys` 0.61 | reload 再バインド堅牢化・FFI | 既存 idiom 流用 |
 | Observability | `tracing` 0.1 / `@pasta_log` | marshaling/teardown シームの観測ログ点 | 無効時ゼロコスト |
@@ -133,15 +135,14 @@ graph TB
 ### Directory Structure
 ```
 crates/pasta_shiori/src/
-├── windows.rs              # 変更: FFI 入口を ActorHandle 所有モデルへ再配線（OnceLock/Arc<Mutex>/unsafe 撤去）
+├── windows.rs              # 変更: FFI 入口を static MAILBOX 所有モデルへ再配線（OnceLock<RawShiori>/Arc<Mutex>/unsafe 撤去）
 ├── shiori.rs               # 変更: PastaShiori から unsafe impl Send/Sync 撤去。VM 直接保持を廃し marshaling 経由へ
 ├── lua_request.rs          # 不変（参照）: req.method 判定を marshaling 分岐入力として再利用
-├── actor/                  # 新規: アクターランタイム本番モジュール（actor_poc 昇格先）
-│   ├── mod.rs              # ActorHandle 公開 API・ライフサイクル（spawn/submit_get/submit_notify/shutdown）
-│   ├── thread.rs           # アクタースレッド起動（wintf block_on）・VM 所有・actor_future
-│   ├── mailbox.rs          # 単一直列 mailbox（ActorMsg・FIFO・MailboxReceiver !Sync）
-│   ├── responder.rs        # GET 応答経路（reply XOR drop→204 exactly-once）
-│   └── teardown.rs         # shutdown→wake→join・reload clean teardown
+├── actor/                  # 新規: アクターランタイム本番モジュール（actor_poc 昇格先・channel は async-channel/std mpsc へ）
+│   ├── mod.rs              # 公開 API: static MAILBOX・自由関数（spawn_actor/marshal_get/marshal_notify/teardown_actor）。ActorHandle 構造体なし
+│   ├── thread.rs           # アクタースレッド起動（wintf block_on）・VM 所有・recv().await ループ
+│   ├── mailbox.rs          # 単一直列 mailbox（async-channel unbounded・ActorMsg{Get/Notify/Stop}・単一 consumer）
+│   └── teardown.rs         # Stop{done} 制御メッセージ→drain→cleanup→done ack（join/AtomicBool/take 不要・detach）
 crates/pasta_lua/src/
 ├── presentation/           # 新規: 宿主非依存マーカー契約（コア出力）
 │   ├── mod.rs              # PresentationEvent 型体系・拡張可能境界 API
@@ -151,10 +152,10 @@ crates/pasta_lua/src/
 └── sakura_script/               # 不変（物理維持）: 描画コードは pasta_lua 内に残す。登録起点のみ論理デカップリング
 ```
 
-> `actor/` は `actor_poc/` の `actor_thread.rs`/`mailbox.rs`/`responder.rs`/`teardown.rs` を本番品質へ昇格した先。`coroutine_probe`/`sim_driver` 等のデバッグ資産はテスト基盤（下記）へ昇格する。
+> `actor/` は `actor_poc/` の `actor_thread.rs`/`mailbox.rs`/`teardown.rs` を本番品質へ昇格した先（channel は async-channel/std mpsc へ差し替え。PoC の独自 `responder.rs` exactly-once は std mpsc の move/drop 意味論へ単純化し専用ファイル不要）。`coroutine_probe`/`sim_driver` 等のデバッグ資産はテスト基盤（下記）へ昇格する。
 
 ### Modified Files
-- `crates/pasta_shiori/src/windows.rs` — `OnceLock<RawShiori<PastaShiori>>`＋`Arc<Mutex<Option<...>>>` を、アクターハンドルを保持する所有モデルへ置換。`DllMain` の attach=spawn / detach=shutdown へ結線。`catch_unwind` 姿勢は維持。
+- `crates/pasta_shiori/src/windows.rs` — `OnceLock<RawShiori<PastaShiori>>`＋`Arc<Mutex<Option<...>>>` を、`static MAILBOX`（async-channel `Sender`）所有モデルへ置換。`load`=`spawn_actor` / `unload`・`DllMain detach`=`teardown_actor`（Stop{done} ack）へ結線。`catch_unwind` 姿勢は維持。
 - `crates/pasta_shiori/src/shiori.rs` — `unsafe impl Send/Sync`（51-52 行）撤去。`PastaShiori` から VM 直接保持を廃し、marshaling で GET/NOTIFY を mailbox へ送る。`Function` キャッシュはアクタースレッド内（VM 同居）へ移動。
 - `crates/pasta_lua/src/runtime/module_registry.rs` — `register_sakura_script_module` を、レンダラ注入（アダプタ起点）を受け入れられる形へ。注入が無ければ既存どおり登録しバイト不変。
 - `crates/pasta_lua/src/runtime/factory.rs` — VM 初期化時のレンダラ注入フック受け口を追加（既定挙動はバイト不変）。
@@ -178,14 +179,14 @@ sequenceDiagram
     participant Actor as Actor thread VM
     Host->>SHIORI: request GET
     SHIORI->>SHIORI: parse method get
-    SHIORI->>MB: enqueue Get with responder reply_rx
-    SHIORI->>SHIORI: block on reply_rx with timeout 6.68ms
-    MB->>Actor: dequeue serial
+    SHIORI->>MB: try_send Get with std mpsc reply tx
+    SHIORI->>SHIORI: reply_rx recv_timeout 6.68ms
+    MB->>Actor: recv await serial
     Actor->>Actor: run scene coroutine build markers render
     alt reply in time
-        Actor->>SHIORI: responder reply value
+        Actor->>SHIORI: reply tx send value
         SHIORI->>Host: SHIORI response bytes
-    else timeout or responder dropped
+    else timeout or reply tx dropped
         SHIORI->>Host: 204 No Content
         Note over Actor: coroutine state preserved next OnSecondChange resumes
     end
@@ -201,27 +202,29 @@ sequenceDiagram
     participant MB as Mailbox
     participant Actor as Actor thread
     SHIORI->>SHIORI: parse method notify
-    SHIORI->>MB: enqueue Notify no responder
+    SHIORI->>MB: try_send Notify no reply
     SHIORI-->>SHIORI: return 204 immediately
-    MB->>Actor: dequeue and process async
+    MB->>Actor: recv await and process
 ```
 
-### reload teardown
+### reload teardown（Stop ＋ done ack）
 
 ```mermaid
 sequenceDiagram
     participant DllMain as DllMain detach or unload
-    participant Handle as ActorHandle
+    participant Boundary as SHIORI thread teardown_actor
+    participant MB as Mailbox FIFO
     participant Actor as Actor thread
-    DllMain->>Handle: shutdown
-    Handle->>Handle: set shutdown flag SeqCst
-    Handle->>Actor: wake executor
-    Actor->>Actor: observe flag drop VM teardown debug backend
-    Handle->>Handle: join take prevents double join
-    Note over Handle: re load spawns fresh actor thread and VM
+    DllMain->>Boundary: teardown_actor
+    Boundary->>MB: send Stop with done tx
+    MB->>Actor: drain prior messages then Stop
+    Actor->>Actor: drop VM teardown debug backend destroy window
+    Actor->>Boundary: done ack send
+    Boundary->>Boundary: done_rx recv completes thread detached
+    Note over Boundary: re load spawns fresh actor thread and channel
 ```
 
-teardown 順序は debug backend（socket bridge join・port 解放）をアクタースレッド join **前**に完了させ port 残留を防ぐ。
+teardown はアクター側で debug backend（socket bridge・port 解放）を VM 破棄前後の適切な順序で完了させ、done ack 送信時には全資源が解放済みであることを保証（port 残留なし）。`JoinHandle`／二重 join 回避は不要（done ack で完了確認・スレッド detach）。
 
 ## Requirements Traceability
 
@@ -231,13 +234,13 @@ teardown 順序は debug backend（socket bridge join・port 解放）をアク�
 | 2.1, 2.2, 2.3, 2.4 | presentation event 契約 | PresentationMarker・SakuraRenderer | `PresentationEvent` 型・`render(events)→String` | GET marshaling 内のシーン実行 |
 | 2.5, 2.6, 2.7, 2.8 | UI 独立・拡張可能・最小集合・VM 内観測 | PresentationMarker | 拡張可能 enum 境界 API | VM 内デバッグ観測経路 |
 | 3.1, 3.2, 3.3, 3.4, 3.5, 3.6 | さくらスクリプト論理デカップリング | SakuraRenderer 注入・module_registry | レンダラ注入 IF・`@pasta_sakura_script` アダプタ起点登録 | VM 内レンダリング維持 |
-| 4.1, 4.2, 4.3, 4.4, 4.5 | アクタースレッド＋VM pin | ActorThread・ActorHandle | `spawn()`・`actor_thread_id()` | reload teardown・GET/NOTIFY |
-| 5.1, 5.2, 5.3, 5.4, 5.5 | GET/NOTIFY marshaling | MarshalingLayer・Responder・Mailbox | `submit_get`/`submit_notify`・`reply` XOR `drop→204` | GET/NOTIFY フロー |
-| 5.6, 5.7, 5.8, 5.9 | drop→204・timeout→204・閾値・停止中発火 | MarshalingLayer・Responder | timeout 付き block-on-reply（6.68ms） | GET フロー alt 分岐 |
+| 4.1, 4.2, 4.3, 4.4, 4.5 | アクタースレッド＋VM pin | ActorThread・ActorLifecycle | `spawn_actor()`・VM pin・スレッド ID 一致 | reload teardown・GET/NOTIFY |
+| 5.1, 5.2, 5.3, 5.4, 5.5 | GET/NOTIFY marshaling | MarshalingLayer・Reply・Mailbox | `marshal_get`/`marshal_notify`・std mpsc reply XOR `Disconnected→204` | GET/NOTIFY フロー |
+| 5.6, 5.7, 5.8, 5.9 | drop→204・timeout→204・閾値・停止中発火 | MarshalingLayer・Reply | std mpsc `recv_timeout`（6.68ms）・lock-free `try_send` | GET フロー alt 分岐 |
 | 5.10, 5.11 | 正常経路 panic-free・abort 下ガード割り切り | ActorThread・MarshalingLayer・Teardown | `Result` ベース fallible 操作 | 全アクターフロー |
-| 6.1, 6.2, 6.3, 6.4 | 単一直列キュー順序保存 | Mailbox | FIFO `mpsc`・`MailboxReceiver: !Sync` | mailbox dequeue |
-| 7.1, 7.2, 7.3, 7.4, 7.5 | reload teardown 本番化 | Teardown・ActorHandle | shutdown→wake→join・`take()` 二重 join 回避 | reload teardown フロー |
-| 8.1, 8.2, 8.3, 8.4 | unsafe impl Send/Sync 解消 | ActorHandle・PastaShiori 再設計 | VM pin 構造不変条件・メッセージ送信経路 | 所有モデル再設計 |
+| 6.1, 6.2, 6.3, 6.4 | 単一直列キュー順序保存 | Mailbox | async-channel unbounded FIFO・単一 consumer `recv().await` | mailbox 消費 |
+| 7.1, 7.2, 7.3, 7.4, 7.5 | reload teardown 本番化 | Teardown・ActorLifecycle | `Stop{done}`→drain→cleanup→done ack（join 不要・detach） | reload teardown フロー |
+| 8.1, 8.2, 8.3, 8.4 | unsafe impl Send/Sync 解消 | ActorLifecycle（`static MAILBOX`）・PastaShiori 再設計 | async-channel `Sender`（Send+Sync）lock-free・Mutex/unsafe なし | 所有モデル再設計 |
 | 9.1, 9.2, 9.3, 9.4 | コルーチン/callback 意味論維持 | Lua スクリプト無改変・ActorThread | `co_scene`/`resume_until_valid`/`CALLBACK` 不変 | executor 駆動下 resume |
 | 10.1, 10.2, 10.3 | 作者デバッグ保全 | DebugBackend 統合 | `set_global_hook` をアクタースレッド発火 | debug hook フロー |
 | 10.4, 10.5, 10.6, 10.7, 10.8 | 開発デバッグ環境・テスト昇格・足場撤去 | ログ点・ActorTestHarness・足場撤去 | `tracing` シーム・決定論ハーネス・正規化 sha | 全シーム観測 |
@@ -246,11 +249,11 @@ teardown 順序は debug backend（socket bridge join・port 解放）をアク�
 
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies (P0/P1) | Contracts |
 |-----------|--------------|--------|--------------|--------------------------|-----------|
-| ActorHandle | pasta_shiori / Runtime | アクタースレッド所有・ライフサイクル | 4, 7, 8 | wintf-winmsg-executor (P0), Mailbox (P0) | Service, State |
-| ActorThread | pasta_shiori / Runtime | VM pin・executor 駆動・actor_future | 4, 9, 10 | PastaLuaRuntime (P0), wintf (P0) | Service, State |
-| Mailbox | pasta_shiori / Messaging | 単一直列 FIFO キュー | 6 | mpsc (P0) | Event, State |
-| MarshalingLayer | pasta_shiori / Runtime | GET/NOTIFY/drop/timeout 分岐 | 5, 1 | lua_request method (P0), Responder (P0) | Service |
-| Responder | pasta_shiori / Messaging | GET 応答 exactly-once（reply XOR 204） | 5 | mpsc (P0) | Event |
+| ActorLifecycle | pasta_shiori / Runtime | アクタースレッド spawn/teardown・`static MAILBOX` 所有（**構造体でなく自由関数＋static**） | 4, 7, 8 | wintf-winmsg-executor (P0), Mailbox (P0) | Service, State |
+| ActorThread | pasta_shiori / Runtime | VM pin・executor 駆動・`recv().await` ループ | 4, 9, 10 | PastaLuaRuntime (P0), wintf (P0) | Service, State |
+| Mailbox | pasta_shiori / Messaging | 単一直列 FIFO キュー（async-channel unbounded） | 6 | async-channel (P0) | Event, State |
+| MarshalingLayer | pasta_shiori / Runtime | GET/NOTIFY/drop/timeout 分岐（lock-free 送信） | 5, 1 | lua_request method (P0), Reply (P0) | Service |
+| Reply | pasta_shiori / Messaging | GET 応答 exactly-once（reply XOR 204・std mpsc） | 5 | std::sync::mpsc (P0) | Event |
 | Teardown | pasta_shiori / Runtime | clean teardown・リーク不在 | 7 | ActorThread (P0), DebugHandle (P1) | Service |
 | PresentationMarker | pasta_lua / Core | 宿主非依存マーカー型体系 | 2 | — | State, Event |
 | SakuraRenderer | pasta_lua / Core | アダプタ注入レンダラ（VM 内） | 3 | sakura_script (P0), module_registry (P0) | Service |
@@ -259,50 +262,56 @@ teardown 順序は debug backend（socket bridge join・port 解放）をアク�
 
 ### pasta_shiori / Runtime
 
-#### ActorHandle
+#### ActorLifecycle（`static MAILBOX` ＋ 自由関数）
 
 | Field | Detail |
 |-------|--------|
-| Intent | アクタースレッドを所有し SHIORI スレッドへの公開 API を提供する所有モデルの中核 |
+| Intent | アクタースレッドの spawn/teardown と SHIORI スレッドへの送信口を提供する。**`ActorHandle` 構造体は設けず、住所＝async-channel の `Sender` そのもの**とする |
 | Requirements | 4.1, 4.2, 4.3, 4.4, 7.1, 7.2, 8.1, 8.2, 8.3 |
 
 **Responsibilities & Constraints**
-- `wintf_winmsg_executor::block_on` を回すアクタースレッドを `spawn` し、`PastaLuaRuntime` をそのスレッドに pin する。
-- SHIORI スレッドは `ActorHandle` 経由（mailbox 送信）でのみ VM へアクセスする。`ActorHandle` 自体は `Send`（内部は `mpsc::Sender`＋join handle＋shutdown フラグのみで、`!Send` VM を保持しない）。
-- 旧 `OnceLock<RawShiori>`＋`Arc<Mutex<Option<PastaShiori>>>`＋`unsafe impl Send/Sync` を置換する。所有は **`static SHIORI: Mutex<Option<ActorHandle>>`（const 初期化・抜き差し可能な単一スロット）**。`ActorHandle` が真に `Send`（`!Send` VM を保持しない）ため Mutex で包んでも unsafe 不要。reload は `lock → take()（旧ハンドルを shutdown→join）→ 新 spawn を代入` で差し替え、`DllMain` detach と `unload` の二重契機は「`take()` 済みなら no-op」で冪等化。
-- `DllMain` attach で spawn、detach（および `unload`）で shutdown。
+- アクタースレッドを spawn し、`wintf_winmsg_executor::block_on` 上で `PastaLuaRuntime` をそのスレッドに pin する。
+- SHIORI スレッドは **`static MAILBOX` に置いた async-channel `Sender` を lock-free に読み**、`try_send` で VM へメッセージを送る。`Sender` は `Send+Sync+Clone` ゆえ **Mutex 不要・`ActorHandle` 構造体不要**。
+- 旧 `OnceLock<RawShiori>`＋`Arc<Mutex<Option<PastaShiori>>>`＋`unsafe impl Send/Sync` を置換。所有は **`static MAILBOX`（async-channel `Sender` を保持）**。`Sender` が真に `Send+Sync` ゆえ unsafe は完全に不要（R8 構造的達成）。
+- teardown は **`ActorMsg::Stop { done }` 制御メッセージ**を送り、アクターが VM 破棄・debug teardown・ウィンドウ破棄を終えた後に `done` ack を返す。SHIORI 側は ack を待って完了（join 相当をチャンネルで実現・`JoinHandle`／二重 join 回避の小細工が不要）。スレッドは detach。
 
 **Dependencies**
-- Outbound: Mailbox — GET/NOTIFY メッセージ enqueue（P0）
+- Outbound: Mailbox — GET/NOTIFY/Stop メッセージ送信（P0）
 - Outbound: ActorThread — スレッド／VM ライフサイクル（P0）
 - External: wintf-winmsg-executor 0.0.3 — `block_on` メッセージループ（P0）
+- External: async-channel 2.5 — mailbox（P0）
 
 **Contracts**: Service [x] / API [ ] / Event [ ] / Batch [ ] / State [x]
 
 ##### Service Interface
 ```rust
-struct ActorHandle {
-    mailbox_tx: MailboxSender,           // Send: 応答 tx を持つ GET / 義務なし NOTIFY を enqueue
-    shutdown: Arc<AtomicBool>,
-    join_handle: Option<JoinHandle<()>>, // take() で二重 join 回避
-    actor_thread_id: ThreadId,
+use async_channel::{Sender, Receiver};
+use std::sync::mpsc as reply;            // GET 応答／done ack（同期 recv_timeout）
+
+// 住所＝チャンネル送信端のみ。Sender は Send+Sync+Clone ゆえ static 共有 lock-free・Mutex 不要。
+// ※スロット型は reload ライフサイクル（RN6）次第: persistent なら OnceLock<Sender>、
+//   respawn なら差し替え可能・lock-free な ArcSwapOption<Sender> 等（いずれも送信パスに Mutex を置かない）。
+static MAILBOX: OnceLock<Sender<ActorMsg>> = OnceLock::new();
+
+enum ActorMsg {
+    Get    { req: LuaRequestTable, reply: reply::Sender<Reply> }, // 応答必須
+    Notify { req: LuaRequestTable },                              // 即 204
+    Stop   { done: reply::Sender<()> },                          // teardown 完了 ack
 }
 
-impl ActorHandle {
-    fn spawn(load_dir: PathBuf, debug: DebugConfig) -> Result<ActorHandle, ActorError>;
-    fn submit_get(&self, req: LuaRequestTable) -> Result<String, ActorError>; // block-on-reply + timeout→204
-    fn submit_notify(&self, req: LuaRequestTable) -> Result<(), ActorError>;   // enqueue then immediate 204
-    fn shutdown(self) -> TeardownReport;
-}
+fn spawn_actor(load_dir: PathBuf, debug: DebugConfig) -> Result<(), ActorError>; // MAILBOX 初期化＋スレッド起動
+fn marshal_get(req: LuaRequestTable) -> String;     // try_send → reply_rx.recv_timeout(6.68ms) → 値 or 204
+fn marshal_notify(req: LuaRequestTable);            // try_send → 即 204
+fn teardown_actor() -> TeardownReport;              // Stop{done} 送信 → done ack 待ち → detach
 ```
-- Preconditions: `spawn` はアクタースレッド未起動時に呼ぶ。`submit_*` はアクタースレッド稼働中。
-- Postconditions: `submit_get` は応答文字列か 204 を必ず返す（無限待機しない）。`shutdown` はスレッド join 完了。
-- Invariants: `!Send` VM は `ActorHandle` を越えない。`ActorHandle` は `unsafe impl` なしで `Send`。
+- Preconditions: `spawn_actor` はアクタースレッド未起動時。`marshal_*` は MAILBOX 初期化済み（未初期化なら 204）。
+- Postconditions: `marshal_get` は応答文字列か 204 を必ず返す（無限待機なし）。`teardown_actor` は done ack を受けて完了。
+- Invariants: `!Send` VM はアクタースレッドを越えない。送信は lock-free（Mutex なし）。unsafe 不使用。
 
 **Implementation Notes**
-- Integration: `windows.rs` の `request` 内で `req.method` により `submit_get`/`submit_notify` を分岐。`load`/`unload` は `spawn`/`shutdown`。
-- Validation: `actor_thread_id` を VM 実行スレッドと一致確認（テスト）。
-- 所有モデル（**ディスカッション #1 解決**）: `static SHIORI: Mutex<Option<ActorHandle>>`（const 初期化）で抜き差し可能な単一スロットとする。`OnceLock` の再代入不可問題を回避し、`OnceLock` 入れ子（案 A）や RwLock（案 C・SHIORI は実質直列ゆえ過剰）より単純。`ActorHandle` が真に `Send` ゆえ unsafe 不要（R8 構造的達成）。reload は take→shutdown→join→再 spawn 代入、契機重複は `take()` 冪等で吸収。
+- Integration: `windows.rs` の `request` で `req.method` により `marshal_get`/`marshal_notify` を分岐。`load`=`spawn_actor`、`unload`/`DllMain detach`=`teardown_actor`。
+- Validation: VM 実行スレッド ID＝アクタースレッド ID をテストで確認。
+- 所有モデル（**ディスカッション #1/#2 解決**）: `ActorHandle` 構造体を**廃止**し、住所＝async-channel `Sender` に収斂。Mutex は**送信パスから完全排除**（`Sender` が `Sync` ゆえ lock-free 共有）。teardown は `Stop{done}` ack でチャンネル化し `JoinHandle`／二重 join 回避を不要化。スロットの最終型（`OnceLock` persistent / `ArcSwapOption` respawn）は reload ライフサイクル（RN6）で確定するが、**いずれも送信パスに Mutex を置かない**。
 
 #### ActorThread
 
@@ -312,7 +321,7 @@ impl ActorHandle {
 | Requirements | 4.1, 4.2, 4.5, 9.1, 9.2, 9.3, 10.2 |
 
 **Responsibilities & Constraints**
-- `actor_future`（`block_on` に渡す future）内で `PastaLuaRuntime::new(...)` を生成し VM を pin。mailbox を drain して `SHIORI.request` Function を呼ぶ。
+- `block_on` に渡す future 内で `PastaLuaRuntime::new(...)` を生成し VM を pin。**`while let Ok(msg) = rx.recv().await`** で mailbox を消費し `SHIORI.request` Function を呼ぶ。`recv().await` は async-channel の **cancel-safe** な future で、wintf executor の Waker と native 統合する（**手動 wake / `try_recv` ポーリング不要**）。
 - Lua コルーチン意味論（`co_scene`/`resume_until_valid`/`CALLBACK`）は無改変。Rust 化は marshaling の殻のみ。
 - debug backend の `set_global_hook` はこのアクタースレッド上で発火する（VM 同居）。`enable()` はアクタースレッド内で呼ぶ。
 
@@ -346,20 +355,23 @@ impl ActorHandle {
 
 ##### Service Interface
 ```rust
+use std::sync::mpsc as reply;
 const GET_TIMEOUT: Duration = Duration::from_micros(6_680); // 初期値 6.68ms RN4 で実機調整
 
-fn marshal_get(handle: &ActorHandle, req: LuaRequestTable) -> String {
-    let (responder, reply_rx) = Responder::new();
-    if handle.enqueue(ActorMsg::Get { req, responder }).is_err() {
-        return default_204(); // アクタースレッド異常 5.6
+fn marshal_get(req: LuaRequestTable) -> String {
+    let (reply_tx, reply_rx) = reply::channel();             // std mpsc（同期 recv_timeout）
+    let Some(tx) = MAILBOX.get() else { return default_204() };  // lock-free 読み・Mutex なし
+    if tx.try_send(ActorMsg::Get { req, reply: reply_tx }).is_err() {
+        return default_204();                                // アクタースレッド異常／満杯 5.6
     }
+    // wake は async-channel の Waker が executor を起こす（手動不要）
     match reply_rx.recv_timeout(GET_TIMEOUT) {
         Ok(Reply::Value(s)) => s,
-        Ok(Reply::NoContent204) | Err(_) => default_204(), // drop / timeout / disconnected 5.3 5.7
+        Err(_) => default_204(),                             // drop(Disconnected) / timeout 5.3 5.7
     }
 }
 ```
-- Preconditions: `req.method` 確定済み。
+- Preconditions: `req.method` 確定済み・MAILBOX 初期化済み（未初期化なら 204）。
 - Postconditions: 必ず文字列応答（無限待機なし・デッドロックなし）。通常経路は応答バイト不変。
 - Invariants: timeout は SHIORI 待機のみ打ち切り、アクタースレッド Lua は継続（コルーチン状態保存）。正常経路は `unwrap`/`expect` 不使用（`Result` ベース）。
 
@@ -368,29 +380,29 @@ fn marshal_get(handle: &ActorHandle, req: LuaRequestTable) -> String {
 - Validation: ByteInvariantSuite が通常経路の 6.68ms 非発火（応答バイト不変）を保証。
 - Risks: 閾値の実機チューニング（RN4）= OPEN QUESTION 3。
 
-#### Mailbox / Responder / Teardown
+#### Mailbox / Reply / Teardown
 
 | Field | Detail |
 |-------|--------|
-| Intent | Mailbox=単一直列 FIFO・Responder=GET 応答 exactly-once・Teardown=clean shutdown |
+| Intent | Mailbox=単一直列 FIFO（async-channel）・Reply=GET 応答 exactly-once（std mpsc）・Teardown=Stop ack による clean shutdown |
 | Requirements | 6.1, 6.2, 6.3, 6.4, 5.3, 5.6, 7.1, 7.2, 7.3, 7.4, 7.5 |
 
 **Responsibilities & Constraints**
-- Mailbox: `std::sync::mpsc` で FIFO 順序保存。`MailboxReceiver: !Sync` で drain スレッド pin（データ競合排除）。
-- Responder: `reply()` XOR `drop()→204` の exactly-once（`Option<Sender>` の `take()`）。
-- Teardown: shutdown フラグ（SeqCst）→ wake → join。`take()` で二重 join 回避。debug backend teardown をアクタースレッド join 前に完了。
+- Mailbox: `async-channel`（unbounded）で FIFO 順序保存。consumer は単一（アクター）で `recv().await`＝直列処理（データ競合排除）。`Sender` は `Send+Sync+Clone`（lock-free static 共有）。
+- Reply: GET 応答は `std::sync::mpsc` の `Sender` を `ActorMsg::Get` に同梱して move。アクターが `send()` すれば値、`send` せず drop すれば受信側 `recv_timeout` が `Disconnected`→204。**exactly-once は std mpsc の move/drop 意味論が自然に与える**（独自 `Responder`／`take()` 不要）。
+- Teardown: **`ActorMsg::Stop { done }` を mailbox へ送信** → アクターが残メッセージを drain 後、VM 破棄・debug teardown・ウィンドウ破棄を実施し、最後に `done.send(())` で ack。SHIORI 側は `done_rx.recv()` で完了を確認。**`Arc<AtomicBool>` shutdown フラグ・`JoinHandle`・二重 join 回避 `take()` は不要**（チャンネルで完結・スレッドは detach）。debug backend teardown はアクター側で VM 破棄前後の適切な順序で実施し port 残留を防ぐ。
 
 **Contracts**: Event [x] / State [x]
 
 ##### Event Contract（Mailbox）
-- Published: `ActorMsg::Get { req, responder }` / `ActorMsg::Notify { req }`（将来 `Kick` を破壊的変更なしに追加できる `#[non_exhaustive]` ＋境界 API）。
-- Ordering: enqueue 順に逐次処理（直列）。同時並行 VM アクセスなし。
-- Delivery: GET は応答必須経路、NOTIFY は fire-and-forget。
+- Published: `ActorMsg::Get { req, reply }` / `ActorMsg::Notify { req }` / `ActorMsg::Stop { done }`（将来 `Kick` を破壊的変更なしに追加できる `#[non_exhaustive]` ＋境界 API）。
+- Ordering: 送信順に逐次処理（直列）。`Stop` も同一 FIFO を通り、先行メッセージを drain 後に処理（clean drain）。同時並行 VM アクセスなし。
+- Delivery: GET は応答必須経路（reply tx 同梱）、NOTIFY は fire-and-forget、Stop は done ack 必須。
 
 **Implementation Notes**
-- Integration: `actor_poc/{mailbox,responder,teardown}.rs` を本番昇格（`ActorMsg` から PoC 専用 `Kick{scene}`/`payload` を整理、`Responder` の `PocResponse` を本番応答型へ）。
-- Validation: `teardown.rs` の reload サイクルリーク計測（`GetProcessHandleCount`/`GetGuiResources`）を本番テストへ昇格。
-- Risks: `panic=abort` 下で drop→204 は発火しない（unwind 限定）。正常経路を構造的 panic-free 化して補う（5.10/5.11）。
+- Integration: `actor_poc/{mailbox,responder,teardown}.rs` を昇格するが、**channel 実装は std mpsc から async-channel（mailbox）＋ std mpsc（reply/done）へ差し替える**。PoC 専用 `Kick{scene}`/`payload` は整理、`Responder` の独自 exactly-once は std mpsc move/drop へ単純化。
+- Validation: `teardown.rs` の reload サイクルリーク計測（`GetProcessHandleCount`/`GetGuiResources`）を本番テストへ昇格。Stop ack 後にリーク不在を確認。
+- Risks: `panic=abort` 下で drop→204 は発火しない（unwind 限定）。正常経路を構造的 panic-free 化して補う（5.10/5.11）。async-channel の Waker が wintf executor を正しく起こすことは RN1 で実証。
 
 ### pasta_lua / Core
 
@@ -464,7 +476,7 @@ fn register_sakura_script_module(
 **Responsibilities & Constraints**
 - ByteInvariantSuite: 代表 SHIORI イベント列（OnBoot/OnSecondChange/GET property/コルーチン継続）の応答バイト列ゴールデンを**最初に**敷設し全段階で緑維持。
 - ActorTestHarness: `sim_driver`（GET/NOTIFY tick 生成）・`mailbox`/`responder`/`coroutine_probe` 検証をホスト非依存の決定論テストへ昇格。
-- 観測ログ点: enqueue/dispatch/reply/drop・spawn/shutdown/join を `tracing`/`@pasta_log` で観測（無効時ゼロコスト）。
+- 観測ログ点: try_send/recv/reply/drop・spawn/stop/done を `tracing`/`@pasta_log` で観測（無効時ゼロコスト）。
 
 **Contracts**: Batch [x]
 
@@ -487,13 +499,13 @@ fn register_sakura_script_module(
 - **VM 初期化失敗（spawn 失敗）** → `load` が false（既存 `last_load_error` 経路維持）。
 
 ### Monitoring
-- `tracing` シーム: `actor.enqueue`/`actor.dispatch`/`actor.reply`/`actor.drop`/`actor.timeout`/`actor.spawn`/`actor.shutdown`/`actor.join`。無効時ゼロコスト（`@pasta_log` 既存方針）。
+- `tracing` シーム: `actor.try_send`/`actor.recv`/`actor.reply`/`actor.drop`/`actor.timeout`/`actor.spawn`/`actor.stop`/`actor.done`。無効時ゼロコスト（`@pasta_log` 既存方針）。
 
 ## Testing Strategy
 
 ### Unit Tests
 - Mailbox FIFO 順序保存: 近接 enqueue 複数メッセージの逐次処理順序一意性（6.2/6.4）。
-- Responder exactly-once: `reply()` 後に `drop()` が 204 を二重送信しない／未 reply drop が 204 を一度送る（5.3）。
+- Reply exactly-once: アクターが `reply_tx.send(value)` すれば値、未 send で drop すれば受信側 `recv_timeout` が `Disconnected`→204（std mpsc の move/drop 意味論）（5.3）。
 - MarshalingLayer timeout: 6.68ms 超過で 204、応答到達時は値返却（5.7）。`recv_timeout` の Timeout/Disconnected 分岐。
 - 正常経路 panic-free: marshaling/teardown コードに `unwrap`/`expect` が無いことの静的確認（5.10）。
 
@@ -504,9 +516,9 @@ fn register_sakura_script_module(
 - さくらスクリプトレンダラ注入: 注入経路でも `talk_to_script` 出力バイト不変（3.3）。
 
 ### Reload / Teardown Tests
-- reload サイクル（unload→load 反復）でハンドル／USER オブジェクト／port のリーク・枯渇不在（7.3）。`teardown.rs` 昇格。
-- 二重 join 回避: `shutdown()` 明示後の `Drop` が二重 join しない（7.4）。
-- debug backend teardown がアクタースレッド join 前完了・port 解放（10.1 整合）。
+- reload サイクル（unload→load 反復）でハンドル／USER オブジェクト／port のリーク・枯渇不在（7.3）。`teardown.rs` 昇格。done ack 後に計測。
+- teardown 冪等性: `Stop{done}` 完了後の再 `teardown_actor` が安全に no-op（done ack 不在でも 204 相当でハングしない）（7.4）。
+- debug backend teardown がアクター側で VM 破棄前後の適切な順序で完了・port 解放（done ack 時に解放済み）（10.1 整合）。
 
 ### Debug Preservation Tests
 - VM がアクタースレッドへ pin 後も `set_global_hook` がアクタースレッドで発火・行ブレークポイント停止・変数 inspect・VSCode attach 成立（10.1/10.2）。
@@ -520,8 +532,9 @@ fn register_sakura_script_module(
 - **直列キュー（6）**: 単一直列処理により VM 状態へのデータ競合ゼロ。スループットより順序保存・正当性を優先（プロジェクト方針「検証は速度より優先」）。
 
 ## Open Questions / Risks
-1. **所有モデル（RN6）— ✅ 解決（ディスカッション #1）**: `static SHIORI: Mutex<Option<ActorHandle>>`（const 初期化・抜き差し可能な単一スロット）に確定。`OnceLock` 再代入不可問題を回避、`OnceLock<Mutex<...>>` 入れ子や RwLock より単純（YAGNI）。`ActorHandle` が真に `Send` ゆえ unsafe 不要で R8 を構造的達成。reload = `lock→take()→旧 shutdown/join→新 spawn 代入`、`DllMain` detach と `unload` の重複契機は `take()` 冪等（済みなら no-op）で吸収。残る実装詳細（attach/detach と load/unload の正確な結線順序）は実装時に確定。
-2. **executor 本番統合形（RN1）**: `wintf_winmsg_executor` 0.0.3 の `block_on` のメッセージ専用ウィンドウ Drop 解放挙動・`spawn_local`/`JoinHandle` の本番統合形。PoC で部分実証済みだが `pasta_shiori` 側所有での本番統合形は要確認。executor 依存を `pasta_lua`（現状）から `pasta_shiori` へ移すか、`pasta_lua` 側に留め `pasta_shiori` が呼ぶか。
+1. **所有モデル／チャンネル（RN6）— ✅ 解決（ディスカッション #1→#2 で更新）**: `ActorHandle` 構造体を**廃止**し、住所＝**async-channel `Sender`** に収斂。`Sender` が `Send+Sync+Clone` ゆえ `static MAILBOX` に lock-free 共有でき、**送信パスから Mutex を完全排除**（議題1の `Mutex<Option<ActorHandle>>` 案は撤回）。unsafe 不要で R8 構造的達成。teardown は `Stop{done}` ack でチャンネル化（`JoinHandle`／二重 join 回避不要・detach）。残課題は **スロットの最終型**＝reload を「persistent thread＋内部メッセージ（`OnceLock<Sender>`）」とするか「respawn（`ArcSwapOption<Sender>` 等の lock-free 差し替え）」とするか。**いずれも送信パスに Mutex を置かない**。`DllMain` attach/detach と `load`/`unload` の結線（loader lock 回避＝thread spawn は load 起点）は実装時に確定。
+2. **executor 本番統合形（RN1）**: `wintf_winmsg_executor` 0.0.3 の `block_on` メッセージループ上で **async-channel の `recv().await` を駆動する Waker 統合**（メッセージ専用ウィンドウへの wake post）が成立すること、メッセージ専用ウィンドウの Drop 解放挙動の本番確認。executor 依存は `pasta_shiori`（アクタースレッド所有者）へ。async-channel の Waker が wintf を確実に起こすことを PoC 流の薄い実証で確認してから本接合。
+3. **チャンネル選定（RN7・新規）— ✅ 解決（ディスカッション #2）**: mailbox＝`async-channel`（cancel-safe・runtime 非依存・`Sender: Send+Sync+Clone`・`try_send`・unbounded・MIT/Apache）、reply/done＝`std::sync::mpsc`（同期 `recv_timeout`・追加依存ゼロ）。flume は cancel-safety 未解決（#104/#135）ゆえ不採用、crossbeam は不要。
 3. **GET timeout 閾値チューニング（RN4）**: 6.68ms 初期値の実機実測調整方針。通常経路非発火の実証手段。
 4. **マーカースキーマ（RN2）**: presentation event マーカーの具体データ表現（Rust enum 形・Lua テーブル表現・両者整合）。現状トークンからのバイト不変逆算の最小集合確定。
 5. **レンダラ注入 IF 形（RN3）**: 注入を trait object／関数ポインタ／登録フラグのいずれとするか。`TalkConfig` 受け渡しと `@pasta_sakura_script` 登録のアダプタ起点化の最小実装。過度な抽象化（単一実装の不要間接化）回避との両立。
