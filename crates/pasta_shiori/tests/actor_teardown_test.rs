@@ -168,65 +168,122 @@ fn teardown_idempotent_resend(
 
 /// R7.2/R7.3: reload（spawn→teardown ×N）でカーネルハンドル／USER オブジェクトが
 /// リーク・枯渇しない。done ack 後に計測する（PoC の実 OS 計測アプローチを流用）。
+///
+/// # なぜ「絶対増分 ≤ 固定許容」では不十分か（flake の根本原因）
+/// `GetProcessHandleCount`/`GetGuiResources` は **プロセス全体**のカウンタである。
+/// `cargo test --all` の並列実行では、同一テストバイナリ内の他テストや同時実行中の
+/// 活動が計測窓の途中でこのカウンタを上下させ、単発の before/after 差分（絶対増分）に
+/// **有界だが非ゼロのノイズ**を乗せる。ノイズは本質的にサイクル数 N に依存しない
+/// ほぼ一定のオフセットだが、固定許容値を一時的に超えて偽陽性（flake）を生む。
+///
+/// # 本テストの判定（signal-vs-noise / slope 法）
+/// 真の per-cycle リークは増分が N に **線形比例**して増える（growth ≈ L·N）。一方
+/// 並列ノイズは N に比例しない（growth ≈ noise、N 非依存）。そこで小さな N と 3×N の
+/// 2 水準で計測し、**増分の傾き（per-cycle 増分）が大きい N で増えていない**ことを
+/// assert する:
+///   - L=0（リークなし）: growth(N)≈growth(3N)≈noise。差は N に依存せず小さい。
+///   - L≥1（per-cycle リーク）: growth(3N)-growth(N) ≈ L·2N。N=6 なら ≥12 となり、
+///     N 非依存の小さなノイズ許容を確実に超える → 検出される。
+///
+/// これにより「一定のノイズオフセット」には頑健でありながら、per-cycle リークには
+/// 歯を残す（リーク検出力を保ったまま決定論化する）。
 #[test]
 fn repeated_reload_tears_down_and_does_not_leak() {
     let (load_dir, _temp) = build_async_callback_dir();
 
-    // 実 VM 構築は非自明なコストなので、リークが per-cycle なら確実に検出できる規模で
-    // 全体時間を抑える（per-cycle で USER ウィンドウ 1 個でも漏れれば +N となり許容超）。
-    const RELOAD_CYCLES: usize = 12;
+    // 小さい水準 N と大きい水準 3×N。N と 3N の傾き比較で per-cycle リークを増幅して
+    // 検出する。per-cycle リーク 1 個でも slope ≈ L·2N = 12（N=6）となり、N 非依存の
+    // 並列ノイズ差（差し引きで概ね相殺）と明確に分離できる。
+    const N_SMALL: usize = 6;
+    const N_LARGE: usize = N_SMALL * 3; // 18
 
-    let report = ReloadProbe::run_cycles(&load_dir, RELOAD_CYCLES, Duration::from_secs(10));
+    // 各 run_cycles は内部でウォームアップ→baseline→N サイクル→final を完結させるため、
+    // 連続呼び出しは互いに独立・公平（それぞれ自前の baseline を採る）。
+    let small = ReloadProbe::run_cycles(&load_dir, N_SMALL, Duration::from_secs(10));
+    let large = ReloadProbe::run_cycles(&load_dir, N_LARGE, Duration::from_secs(10));
 
     assert_eq!(
-        report.cycles_run, RELOAD_CYCLES,
+        small.cycles_run, N_SMALL,
         "all reload cycles must complete (no hang/panic mid-loop)"
     );
     assert_eq!(
-        report.clean_teardowns, RELOAD_CYCLES,
+        large.cycles_run, N_LARGE,
+        "all reload cycles must complete (no hang/panic mid-loop)"
+    );
+    assert_eq!(
+        small.clean_teardowns, N_SMALL,
+        "every reload cycle must tear down cleanly (Stop{{done}} ack received)"
+    );
+    assert_eq!(
+        large.clean_teardowns, N_LARGE,
         "every reload cycle must tear down cleanly (Stop{{done}} ack received)"
     );
 
     #[cfg(windows)]
     {
-        let leak = report
+        let small_leak = small
+            .leak_metric
+            .expect("on Windows a real resource-leak metric must be sampled");
+        let large_leak = large
             .leak_metric
             .expect("on Windows a real resource-leak metric must be sampled");
 
-        // per-cycle リーク（≒N）なら確実に超える小さな許容値。teardown が真に解放
-        // していれば増分は 0 付近に収まる。OS/アロケータの一回性ゆらぎのみ許す。
-        const HANDLE_TOLERANCE: i64 = 12;
-        const USER_OBJECT_TOLERANCE: i64 = 12;
+        // slope（傾き）法の許容: per-cycle リークが 1 でもあれば growth(3N)-growth(N)
+        // ≈ L·2N = 12（N=6）となるので、これを確実に下回る許容を置く。N 非依存の並列
+        // ノイズは N と 3N の双方の窓に同程度乗るため差し引きで概ね相殺され、ここに
+        // 残るのは小さなゆらぎのみ。8 を超えたら「N に比例して増えている＝per-cycle
+        // リーク」と判定する（per-cycle=1 の 12 は確実に超え、ノイズ差には触れない位置）。
+        const SLOPE_TOLERANCE: i64 = 8;
+
+        let handle_slope = large_leak.kernel_handle_growth - small_leak.kernel_handle_growth;
+        let user_slope = large_leak.user_object_growth - small_leak.user_object_growth;
 
         assert!(
-            leak.kernel_handle_growth <= HANDLE_TOLERANCE,
-            "kernel handle count grew by {} across {} reload cycles (baseline={}, final={}); \
-             a per-cycle handle leak would show ~{} growth (tolerance {})",
-            leak.kernel_handle_growth,
-            RELOAD_CYCLES,
-            leak.kernel_handles_baseline,
-            leak.kernel_handles_final,
-            RELOAD_CYCLES,
-            HANDLE_TOLERANCE
+            handle_slope <= SLOPE_TOLERANCE,
+            "kernel handle growth scales with cycle count: growth({}) = {} but growth({}) = {} \
+             (delta = {} > tolerance {}); a per-cycle handle leak of L would make this delta \
+             ~L*2N = ~{}. small(baseline={}, final={}), large(baseline={}, final={})",
+            N_SMALL,
+            small_leak.kernel_handle_growth,
+            N_LARGE,
+            large_leak.kernel_handle_growth,
+            handle_slope,
+            SLOPE_TOLERANCE,
+            2 * N_SMALL,
+            small_leak.kernel_handles_baseline,
+            small_leak.kernel_handles_final,
+            large_leak.kernel_handles_baseline,
+            large_leak.kernel_handles_final,
         );
 
         assert!(
-            leak.user_object_growth <= USER_OBJECT_TOLERANCE,
-            "USER object count grew by {} across {} reload cycles (baseline={}, final={}); \
-             a leaked message-only window per cycle would show ~{} growth (tolerance {})",
-            leak.user_object_growth,
-            RELOAD_CYCLES,
-            leak.user_objects_baseline,
-            leak.user_objects_final,
-            RELOAD_CYCLES,
-            USER_OBJECT_TOLERANCE
+            user_slope <= SLOPE_TOLERANCE,
+            "USER object growth scales with cycle count: growth({}) = {} but growth({}) = {} \
+             (delta = {} > tolerance {}); a leaked message-only window per cycle would make this \
+             delta ~2N = ~{}. small(baseline={}, final={}), large(baseline={}, final={})",
+            N_SMALL,
+            small_leak.user_object_growth,
+            N_LARGE,
+            large_leak.user_object_growth,
+            user_slope,
+            SLOPE_TOLERANCE,
+            2 * N_SMALL,
+            small_leak.user_objects_baseline,
+            small_leak.user_objects_final,
+            large_leak.user_objects_baseline,
+            large_leak.user_objects_final,
         );
+
+        // 注意: 絶対増分 ≤ 固定許容 の assert は **意図的に置かない**。それこそが旧
+        // テストの flake 源（プロセス全体カウンタへ並列ノイズが一定オフセットとして
+        // 乗る）だったため。リーク検出力は上の slope（N 非依存ノイズに頑健・per-cycle
+        // リークには L·2N で確実に反応）で担保する。
     }
 
     #[cfg(not(windows))]
     {
         assert!(
-            report.leak_metric.is_none(),
+            small.leak_metric.is_none() && large.leak_metric.is_none(),
             "non-windows builds do not sample a handle metric"
         );
     }
