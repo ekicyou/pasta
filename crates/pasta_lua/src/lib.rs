@@ -40,6 +40,7 @@ pub mod error;
 pub mod loader;
 pub mod logging;
 pub mod normalize;
+pub mod presentation;
 pub mod runtime;
 pub mod sakura_script;
 pub mod search;
