@@ -27,8 +27,13 @@ pub mod log;
 mod module_registry;
 /// Persistence module - Persistent data storage for Lua scripts.
 pub mod persistence;
+/// Renderer injection seam - adapter-originated `@pasta_sakura_script` registration.
+pub mod renderer_injection;
 mod runtime_config;
 
+pub use renderer_injection::{
+    default_sakura_renderer, RendererInjection, SakuraRenderBoundary,
+};
 pub use runtime_config::lua_require;
 pub use runtime_config::RuntimeConfig;
 

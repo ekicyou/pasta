@@ -6,6 +6,7 @@
 use super::PastaLuaRuntime;
 use super::lua_require;
 use super::register_finalize_scene;
+use super::renderer_injection::RendererInjection;
 use crate::context::TranspileContext;
 use crate::debug::source_map::SourceMap;
 use crate::loader::{LoaderContext, PastaConfig, TranspileResult};
@@ -168,8 +169,17 @@ impl PastaLuaRuntime {
         // Register @pasta_log module for Lua logging bridge
         Self::register_log_module(&runtime.lua)?;
 
-        // Register @pasta_sakura_script module for wait insertion
-        Self::register_sakura_script_module(&runtime.lua, &runtime.config)?;
+        // Register @pasta_sakura_script module via the adapter-injected renderer.
+        //
+        // R3 論理デカップリング: コアはさくら描画を無条件 hard-code 起点としては
+        // 保持せず、注入シーム（RendererInjection）経由で登録する。既定（SHIORI 宿主）
+        // は SHIORI さくらレンダラで既存挙動・バイト不変（R3.5/R3.6）。アダプタ
+        // （pasta_shiori）が別レンダラを注入する場合はこの既定を差し替える。
+        Self::register_sakura_script_module(
+            &runtime.lua,
+            &runtime.config,
+            RendererInjection::default(),
+        )?;
 
         // Register finalize_scene Rust binding to overwrite Lua stub (Requirement 4.3)
         // This must be done before loading scene_dic.lua which calls finalize_scene()
