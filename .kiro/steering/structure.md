@@ -92,11 +92,15 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │       │   │   ├── enc.rs              # ランタイムエンコーディング
 │       │   │   ├── persistence.rs      # 永続化
 │       │   │   ├── finalize.rs         # ファイナライズ処理
+│       │   │   ├── renderer_injection.rs # さくらレンダラのアダプタ注入シーム（既定=SHIORIさくら・バイト不変）
 │       │   │   └── log.rs              # ランタイムログ
 │       │   ├── sakura_script/ # さくらスクリプト処理
 │       │   │   ├── mod.rs           # さくらスクリプトAPI
 │       │   │   ├── tokenizer.rs     # トークナイザー
 │       │   │   └── wait_inserter.rs # ウェイト挿入
+│       │   ├── presentation/  # 宿主非依存 presentation マーカー契約（talk/actor切替/wait/choice・拡張可能）
+│       │   │   ├── mod.rs           # PresentationEvent 型体系・RenderBoundary
+│       │   │   └── marker.rs        # 最小マーカー集合の型表現
 │       │   ├── search/       # 検索機能（Rust/Lua間バインディング）
 │       │   │   ├── mod.rs           # 検索API
 │       │   │   ├── context.rs       # 検索コンテキスト
@@ -304,7 +308,7 @@ pasta (workspace)
 ├── pasta_dsl           # DSLパーサー層（Pest PEG → AST変換）
 ├── pasta_core          # 言語非依存層（レジストリ）
 ├── pasta_lua           # Luaバックエンド層（pasta_dsl + pasta_core依存）
-├── pasta_shiori        # SHIORI DLLインターフェース層
+├── pasta_shiori        # SHIORI DLLインターフェース層（src/actor/ = アクタースレッド・flume mailbox・marshaling・teardown・static MAILBOX 所有）
 ├── pasta_lsp           # LSP実装層（WASM/Native対応）
 └── pasta_sample_ghost  # サンプルゴースト「hello-pasta」（publish=false）
 ```

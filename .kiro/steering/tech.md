@@ -54,7 +54,12 @@
 - **time 0.3**: 時刻処理
 - **tracing 0.1**: ロギング（subscriber/appenderはpasta_luaに移管）
 - **thiserror 2**: エラー型定義
-- **windows-sys 0.61**: Windows DLL API（cfg(windows)）
+- **windows-sys 0.61**: Windows DLL API（cfg(windows)・Win32_System_Threading 含む）
+- **flume 0.12**: アクター mailbox（async `recv_async` ＋同期 `recv_timeout` 兼用・`Sender: Send+Sync+Clone`）
+- **arc-swap 1**: `static MAILBOX` の lock-free スロット（送信パスに Mutex を置かない）
+- **wintf-winmsg-executor 0.0.3**: アクタースレッドの `block_on` メッセージループ（`!Send` VM を pin）
+
+> **エンジン駆動モデル**: `pasta_lua` の `!Send` Lua VM を `pasta_shiori` 所有のアクタースレッドへ pin し、SHIORI スレッドとは flume mailbox の CH marshaling（GET=block-on-reply／NOTIFY=即204／drop・timeout→204）で通信する。`unsafe impl Send/Sync` は構造的に撤去済み。さくらスクリプト描画は pasta_lua に物理維持（Lua 集約）し、レンダラはアダプタ注入で論理デカップリング（`pasta-actor-runtime` で確立）。
 
 **pasta_lsp:**
 - **pasta_dsl**: DSLパーサー層
