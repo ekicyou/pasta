@@ -129,8 +129,10 @@
 1. When SHIORI の unload が呼ばれたとき, the pasta システム shall アクタースレッド・VM・関連リソース（メッセージ専用ウィンドウ・チャネル等）を clean に teardown する。
 2. When unload に続いて再 load が呼ばれたとき, the pasta システム shall アクタースレッドと VM を新規に再生成し、正常に稼働させる。
 3. While reload サイクルを繰り返している間, the pasta システム shall スレッドハンドル・ソケット／ポート・メモリのリーク／枯渇を発生させない。
-4. The teardown 処理 shall 二重 join／二重解放を防止し（shutdown フラグ→wake→join の順序）、アクタースレッドの終了を確実に待ち合わせる。
-5. If teardown の途中で異常（join 失敗・リソース解放漏れ）が生じたとき, then the pasta システム shall その異常を記録し、ホスト（SSP）プロセスを巻き込んで落とさない。
+4. The teardown 処理 shall 二重解放／二重 teardown を防止し（冪等）、アクタースレッドの終了およびリソース解放の完了を、再 spawn 前に**確実に確認**する（完了確認の機構は設計に委ねる＝終了 ack／join 等。実装は終了 ack 方式を採用）。
+5. If teardown の途中で異常（終了確認の不成立・リソース解放漏れ）が生じたとき, then the pasta システム shall その異常を記録し、ホスト（SSP）プロセスを巻き込んで落とさない。
+
+> **設計補足（ディスカッション #3）**: 完了確認は `ActorMsg::Stop { done }` の done ack で実現（アクターが VM 破棄・debug teardown・ウィンドウ破棄を全て終えた後に ack 送信＝ack 受信時に全資源解放済み）。スレッドは detach し `JoinHandle`／二重 join 回避の `take()` は持たない。AC4 の「二重 join 回避」は join 廃止により構造的に成立する。
 
 ### Requirement 8: `unsafe impl Send` / `unsafe impl Sync` ハックの解消
 
