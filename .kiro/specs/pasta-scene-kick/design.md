@@ -667,5 +667,5 @@ KICK.try_dispatch(act) -> co|nil   -- kick_pending を解決し co を返す（�
 3. ✓ **マルチ yield 会話の配信制御**（ユーザー懸念・検証済み） → 解決済み。初回ビートのみ `kick_force` 突破で割り込み、2 ビート目以降は既存 `co_scene` 継続（`is_blocked` ペース）。完成さくらを貯める FIFO 案は二重発火で破綻するため不採用。
 4. **`kick_force` 消費の正確な位置**（実装時確定）: `try_dispatch` 成功時・未解決時の双方で確実に false 化する位置（`dispatch` 前段の単一地点で消費が安全）。回帰テストで「初回のみ突破」を担保。
 5. **`KickSink`/`KickRequest` の公開パス**（実装時確定）: `pasta_lua/src/debug/kick.rs` 公開・`runtime_config` が `use`。
-6. **複数キック連続時の挙動**（要確認・軽）: `kick_pending` 上書きで最後のキックのみ起動。既に起動済みキックの進行中 co は後続キックが `set_co_scene` 置換で preempt。enqueue 済み完成出力という概念は無い（キュー不採用のため）。
+6. ✓ **複数キック連続時の挙動** → 解決済み（ディスカッション #2）。**最新が勝つ・前を preempt**: `kick_pending` 上書きで最後のキックのみ次 tick 起動。既に起動済みキックの進行中 co は後続キックが `set_co_scene` 置換で preempt。enqueue 済み完成出力という概念は無い（キュー不採用のため）。順番待ちキューは Non-Goal（preempt-and-abort 方針）。
 7. **`kick.drop`（teardown 競合破棄）の UX**（要確認・軽）: ack はベストエフォート（sink 呼び出し成立で ack・実 mailbox 到達は保証しない）。VSCode への失敗通知要否は discussion 残topic。
