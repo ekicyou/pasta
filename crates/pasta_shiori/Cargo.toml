@@ -15,14 +15,11 @@ name = "pasta"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-# アクターランタイム用ハーネス。default 無効。pasta_lua/actor-poc へ伝播しつつ、
-# 本番アクタースレッド（task 3.x）を所有する pasta_shiori 側で executor を直接
-# 使えるようにするため `wintf-winmsg-executor` を本クレートの optional 依存へ
-# 昇格する（R4.4: アクタースレッド所有・executor 選択をアダプタ層に閉じ込める）。
-# wintf は本 feature 有効時のみリンクされるため、default 無効のリリースビルドは
-# 引き続きバイト不変（R7.2）。flume は feature 非依存だが未使用のため
-# 出荷応答バイトには影響しない。
-actor-poc = ["pasta_lua/actor-poc", "dep:wintf-winmsg-executor"]
+# 使い捨て PoC ハーネス（pasta-actor-feasibility）の残骸。default 無効。
+# task 5.1 で本番アクタースレッドが出荷経路へ昇格したため、wintf は本 feature ではなく
+# 通常依存（下記参照）になった。本 feature は actor_poc/ モジュール（task 7.2 で撤去予定）
+# と pasta_lua/actor-poc 伝播のためにのみ残す。
+actor-poc = ["pasta_lua/actor-poc"]
 
 [dependencies]
 pasta_lua.workspace = true
@@ -31,13 +28,22 @@ tracing.workspace = true
 thiserror.workspace = true
 pest.workspace = true
 pest_derive.workspace = true
-# mailbox=recv_async／reply・done=recv_timeout（task 3.x で使用）
+# mailbox=recv_async／reply・done=recv_timeout（本番アクター経路で使用）
 flume.workspace = true
-# 本番アクタースレッドの block_on メッセージループ（actor-poc 有効時のみリンク）
-wintf-winmsg-executor = { workspace = true, optional = true }
+# 本番アクタースレッドの block_on メッセージループ。task 5.1 で FFI 入口が本スレッドへ
+# 切り替わったため、optional/actor-poc から通常依存へ昇格（R4.4: アクタースレッド所有を
+# アダプタ層に閉じ込める）。リリースは default 無効の actor_poc 由来コードを含まないが
+# wintf 自体は出荷経路がリンクする。
+wintf-winmsg-executor.workspace = true
+# static MAILBOX の lock-free 再設定可能スロット（RN6: respawn モデル）。reload で
+# アクタースレッド＋チャネルを teardown→再 spawn するため、送信端 Sender を Mutex なしで
+# 差し替え可能にする ArcSwapOption を用いる（送信パスは load/store のみ・lock-free）。
+arc-swap.workspace = true
 
 [target.'cfg(windows)'.dependencies]
-windows-sys.workspace = true
+# teardown のリーク検査（GetProcessHandleCount/GetGuiResources）に Win32_System_Threading を
+# 追加する。ベースの windows-sys（Foundation/Memory/Globalization）は workspace から継承。
+windows-sys = { workspace = true, features = ["Win32_System_Threading"] }
 
 [dev-dependencies]
 tempfile.workspace = true

@@ -65,7 +65,7 @@
   - _Depends: 3.3_
 
 - [ ] 5. FFI 所有モデル再設計と unsafe 撤去
-- [ ] 5.1 static MAILBOX 所有モデルへの再配線と unsafe impl Send/Sync 撤去
+- [x] 5.1 static MAILBOX 所有モデルへの再配線と unsafe impl Send/Sync 撤去
   - `OnceLock<RawShiori>`＋`Arc<Mutex<Option<PastaShiori>>>`＋`unsafe impl Send/Sync` を、flume `Sender` を保持する `static MAILBOX` 所有モデルへ置換する（lock-free 送信・送信パスに Mutex を置かない）
   - `load`=spawn_actor／`unload`・detach=teardown_actor へ結線（thread spawn は load 起点として loader lock を回避）
   - 観測: `unsafe impl Send/Sync` が撤去され `cargo build`/`clippy` 緑・応答バイト列ゴールデン不変・VM はアクタースレッドを越えない
@@ -103,3 +103,4 @@
 
 ## Implementation Notes
 - 4.1: reload リーク検査の許容値は 1-handle/cycle 漏れが境界（tolerance == RELOAD_CYCLES）に乗る。実害は複数資源/cycle 漏れで確実に検出されるが、将来 tolerance を `< RELOAD_CYCLES` か N 非依存の小定数へ厳格化する余地あり（7.1/7.2 で再検討可）。
+- 5.1: invalid-UTF-8 リクエストは 204 を返す（旧 500）。R5.6「常に文字列を返す/ハングしない」契約への意図的整合。golden は正常 UTF-8 のみゆえ非カバー・正常系バイト不変は維持。7.1 の機能レベル検証で留意。GET_TIMEOUT は 5s（RN4・通常経路非発火）。スロットは ArcSwapOption（RN6・respawn）。

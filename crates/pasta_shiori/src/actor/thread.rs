@@ -25,20 +25,12 @@
 //! （mailbox.rs のドキュメント参照）。`Stop` は同一 FIFO 上で先行メッセージを drain
 //! 後に処理され、ループを抜けて `block_on` が戻る。
 //!
-//! # task 3.3 のスコープ / 後続への申し送り
-//! - 本タスクは **本番アクタースレッドを mailbox 駆動で隔離テスト**することが目的。
-//!   FFI 入口（`shiori::request`）の配線は **task 5.1**（そこで wintf が出荷依存になる）。
-//!   既存出荷経路（[`PastaShiori::request`] の同期ディスパッチ）は本タスクで一切改変
-//!   しない（byte-invariant ゴールデン 4/4 を緑のまま保つ）。
-//! - reply / timeout / 204 / drop の完全な marshaling 契約は **task 3.4**。本タスクの
-//!   `Get` 応答は「VM が返した応答文字列を [`Reply::Value`] で送り返す」最小実装に留め、
-//!   コルーチン継続を検証できる最小限とする（timeout/drop→204 はここでは扱わない）。
-//!
-//! # gating（CONCERNS 参照）
-//! wintf（`block_on`）は現状 `actor-poc` feature 有効時のみリンクされる（task 1.2／
-//! Cargo.toml）。本モジュールはアクタースレッドを **今テストできる**ようにしつつ、
-//! 既定出荷ビルドへ wintf を早期リンクしないため、`actor-poc` feature でガードする。
-//! task 5.1 で FFI が本スレッドへ切り替わる時に wintf が出荷依存へ昇格する。
+//! # 配線（task 5.1 で完了）
+//! FFI 入口（`windows.rs` → [`crate::actor::lifecycle`] の `static MAILBOX`）が本スレッドへ
+//! 配線済み。GET の完全な timeout/204/drop marshaling 契約は [`crate::actor::marshaling`]
+//! （task 3.4）が担い、本スレッドの `Get` 応答は VM 応答文字列を [`Reply::Value`] で返す
+//! （エラー時は reply を drop → marshaling 側で 204）。wintf（`block_on`）は本スレッドの
+//! メッセージループに必須のため出荷依存である。
 
 use std::path::PathBuf;
 use std::thread::{self, JoinHandle, ThreadId};

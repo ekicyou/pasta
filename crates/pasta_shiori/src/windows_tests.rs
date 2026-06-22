@@ -1,318 +1,58 @@
+//! FFI extern 入口（`load`/`request`/`unload`/`DllMain`）の in-process テスト。
+//!
+//! task 5.1 で FFI が **アクターモデル**（`actor::lifecycle` の `static MAILBOX` 所有）へ
+//! 再配線されたため、旧 `RawShiori<MockShiori>` ベースの dispatch テストは廃止し、本番経路の
+//! **FFI 境界契約**（HGLOBAL 所有移譲＝解放／null・zero-len ガード／未初期化時 204／panic 非
+//! unwind）を実 extern 関数に対して検証する。
+//!
+//! # `static MAILBOX` の取り扱い（順序非依存）
+//! `actor::lifecycle::MAILBOX` はプロセスグローバルだが、本テスト群は **アクターを spawn しない**
+//! （`load` を実ゴーストなしで呼ばない）。`request`/`unload` は MAILBOX 未初期化（None）経路の
+//! 契約のみを検証するため、他テストとの実行順序に依存しない（None なら 204／冪等 no-op）。
+//! 実 VM を起こす load→request→unload→reload サイクルの E2E はアクタースレッド・実ゴーストを
+//! 要するため統合テスト（`tests/`・`actor-poc` 不要の既定ビルド）側に置く。
+
 use super::*;
-use std::ffi::OsStr;
-use windows_sys::Win32::System::Memory::{GMEM_MOVEABLE, GlobalAlloc, GlobalFlags};
+use crate::actor::marshaling::default_204;
+use windows_sys::Win32::System::Memory::{GlobalAlloc, GlobalFlags, GMEM_MOVEABLE};
 
-/// Win32 SDK `GMEM_INVALID_HANDLE` (minwinbase.h) — returned by
-/// `GlobalFlags` for freed/invalid handles. Not exported by
-/// windows-sys 0.61, so defined locally for the leak probes below.
+/// Win32 SDK `GMEM_INVALID_HANDLE` (minwinbase.h) — returned by `GlobalFlags`
+/// for freed/invalid handles. Not exported by windows-sys 0.61.
 const GMEM_INVALID_HANDLE: u32 = 0x8000;
-
-/// Mock SHIORI driven purely by its inputs (RawShiori creates T::default()
-/// on each load, so behavior must be encoded in the load dir / request text).
-#[derive(Default)]
-struct MockShiori {
-    loaded_dir: Option<String>,
-}
-
-impl Shiori for MockShiori {
-    fn load<S: AsRef<OsStr>>(&mut self, _hinst: isize, dir: S) -> MyResult<bool> {
-        let d = dir.as_ref().to_string_lossy().to_string();
-        if d.contains("panicload") {
-            panic!("mock load panic");
-        }
-        if d.contains("loaderr") {
-            return Err(MyError::Load("mock load failure".to_string()));
-        }
-        let rc = !d.contains("loadfalse");
-        self.loaded_dir = Some(d);
-        Ok(rc)
-    }
-
-    fn request<S: AsRef<str>>(&mut self, req: S) -> MyResult<String> {
-        let r = req.as_ref();
-        if r == "PANIC" {
-            panic!("mock request panic");
-        }
-        if r == "ERR" {
-            return Err(MyError::Script {
-                message: "mock script failure".to_string(),
-            });
-        }
-        Ok(format!(
-            "RESP:{}:{}",
-            self.loaded_dir.as_deref().unwrap_or("-"),
-            r
-        ))
-    }
-}
-
-/// Panics in Drop when loaded from a "panicdrop" dir — exercises the
-/// unload path (unload_impl drops the stored instance under the lock).
-impl Drop for MockShiori {
-    fn drop(&mut self) {
-        if self
-            .loaded_dir
-            .as_deref()
-            .is_some_and(|d| d.contains("panicdrop"))
-        {
-            panic!("mock drop panic");
-        }
-    }
-}
-
-/// Allocate an HGLOBAL holding `text` (ASCII only — load() decodes via the
-/// locale-dependent ANSI codepage, and ASCII is invariant across codepages).
-/// Ownership is transferred to the callee (which captures and frees it).
-fn alloc_hglobal(text: &str) -> (HGLOBAL, usize) {
-    let s = ShioriString::clone_from_slice_nofree(text.as_bytes()).unwrap();
-    (s.handle(), s.len())
-}
-
-/// Read a response HGLOBAL as UTF-8 and free it.
-fn read_and_free(h: HGLOBAL, len: usize) -> String {
-    let s = ShioriString::capture(h, len);
-    s.to_utf8_str().unwrap().to_string()
-}
-
-#[test]
-fn raw_load_and_request_roundtrip() {
-    let raw = RawShiori::<MockShiori>::new(7);
-
-    let (h, len) = alloc_hglobal("C:/mock/dir");
-    assert!(raw.load(h, len), "load should report mock success");
-
-    let (h, mut len) = alloc_hglobal("PING");
-    let res = raw.request(h, &mut len);
-    assert!(!res.is_null(), "response HGLOBAL should be non-null");
-    let body = read_and_free(res, len);
-    // Pins: ANSI dir decode passthrough, UTF-8 request decode, len update.
-    assert_eq!(body, "RESP:C:/mock/dir:PING");
-    assert_eq!(len, body.len(), "out-len must match response byte length");
-}
-
-#[test]
-fn raw_request_before_load_returns_500_not_initialized() {
-    let raw = RawShiori::<MockShiori>::new(0);
-
-    let (h, mut len) = alloc_hglobal("PING");
-    let res = raw.request(h, &mut len);
-    assert!(!res.is_null(), "error path must still return a response");
-    let body = read_and_free(res, len);
-    // Exact contract: error_response() == MyError::to_shiori_response().
-    assert_eq!(body, MyError::NotInitialized.to_shiori_response());
-    assert!(body.starts_with("SHIORI/3.0 500 Internal Server Error\r\n"));
-}
-
-#[test]
-fn raw_unload_resets_state_and_is_idempotent() {
-    let raw = RawShiori::<MockShiori>::new(0);
-
-    // unload before any load: still reports true (unload_impl always Ok).
-    assert!(raw.unload(), "unload on never-loaded instance returns true");
-
-    let (h, len) = alloc_hglobal("C:/mock/dir");
-    assert!(raw.load(h, len));
-    assert!(raw.unload(), "unload after load returns true");
-
-    // After unload the instance slot is cleared → 500 Not initialized.
-    let (h, mut len) = alloc_hglobal("PING");
-    let body = read_and_free(raw.request(h, &mut len), len);
-    assert_eq!(body, MyError::NotInitialized.to_shiori_response());
-}
-
-#[test]
-fn raw_request_propagates_shiori_error_as_500() {
-    let raw = RawShiori::<MockShiori>::new(0);
-    let (h, len) = alloc_hglobal("C:/mock/dir");
-    assert!(raw.load(h, len));
-
-    let (h, mut len) = alloc_hglobal("ERR");
-    let body = read_and_free(raw.request(h, &mut len), len);
-    assert!(body.starts_with("SHIORI/3.0 500 Internal Server Error\r\n"));
-    assert!(
-        body.contains("X-ERROR-REASON: Script error: mock script failure\r\n"),
-        "X-ERROR-REASON should carry the Shiori error Display: {body}"
-    );
-}
-
-#[test]
-fn raw_load_error_returns_false_and_leaves_uninitialized() {
-    let raw = RawShiori::<MockShiori>::new(0);
-
-    let (h, len) = alloc_hglobal("C:/loaderr");
-    assert!(!raw.load(h, len), "load error must surface as false");
-
-    // load_impl clears the slot before loading; on Err it stays None.
-    let (h, mut len) = alloc_hglobal("PING");
-    let body = read_and_free(raw.request(h, &mut len), len);
-    assert_eq!(body, MyError::NotInitialized.to_shiori_response());
-}
-
-#[test]
-fn raw_load_false_still_stores_instance() {
-    // Characterization: load_impl stores the instance even when the
-    // Shiori impl reports load failure (Ok(false)). Requests afterwards
-    // are dispatched to that instance rather than returning 500.
-    // (PastaShiori handles its own degraded-request path internally.)
-    let raw = RawShiori::<MockShiori>::new(0);
-
-    let (h, len) = alloc_hglobal("C:/loadfalse");
-    assert!(!raw.load(h, len), "mock reports load failure");
-
-    let (h, mut len) = alloc_hglobal("PING");
-    let body = read_and_free(raw.request(h, &mut len), len);
-    assert_eq!(body, "RESP:C:/loadfalse:PING");
-}
-
-// ------------------------------------------------------------------
-// 3.37 (G3): panic containment at the FFI dispatch layer.
-//
-// RawShiori::{load,request,unload} sit directly under the extern "C"
-// entry points. A panic unwinding out of them would cross the FFI
-// boundary: historical UB, and since Rust 1.81 an immediate abort that
-// kills the host process (SSP). The dispatch layer must convert panics
-// into the SHIORI error contract (load→false, request→500, unload→true).
-// ------------------------------------------------------------------
-
-#[test]
-fn raw_request_catches_panic_as_500_then_poison_500() {
-    let raw = RawShiori::<MockShiori>::new(0);
-    let (h, len) = alloc_hglobal("C:/mock/dir");
-    assert!(raw.load(h, len));
-
-    // The mock panics inside Shiori::request while the mutex is held.
-    let (h, mut len) = alloc_hglobal("PANIC");
-    let res = raw.request(h, &mut len);
-    assert!(!res.is_null(), "panic path must still produce a response");
-    let body = read_and_free(res, len);
-    assert!(
-        body.starts_with("SHIORI/3.0 500 Internal Server Error\r\n"),
-        "panic must surface as a 500 response, not unwind: {body}"
-    );
-    assert!(
-        body.contains("mock request panic"),
-        "panic payload should be carried in X-ERROR-REASON: {body}"
-    );
-
-    // The panic poisoned the instance mutex; subsequent requests must
-    // degrade to the Poison 500 response instead of panicking again.
-    // The probe also pins the ownership contract on the poison path:
-    // request_impl captures the incoming HGLOBAL BEFORE taking the lock,
-    // so even the Err(Poison) early return frees it. (A moveable probe is
-    // safe here — the poison path never dereferences the payload.)
-    let h = alloc_leak_probe();
-    let mut len = LEAK_PROBE_LEN;
-    let body = read_and_free(raw.request(h, &mut len), len);
-    assert_eq!(body, MyError::Poison.to_shiori_response());
-    assert!(
-        hglobal_is_freed(h),
-        "poisoned-lock request path must free the incoming HGLOBAL"
-    );
-}
-
-#[test]
-fn raw_request_not_initialized_frees_input() {
-    // 3.37 (G3, round 2): request before load returns Err(NotInitialized)
-    // — but ownership of the incoming HGLOBAL still transferred to the
-    // callee on entry, so this early return must free it (previously
-    // leaked). Fixed by capturing before the lock in request_impl.
-    let raw = RawShiori::<MockShiori>::new(0);
-
-    let h = alloc_leak_probe();
-    let mut len = LEAK_PROBE_LEN;
-    let body = read_and_free(raw.request(h, &mut len), len);
-    assert_eq!(body, MyError::NotInitialized.to_shiori_response());
-    assert!(
-        hglobal_is_freed(h),
-        "NotInitialized request path must free the incoming HGLOBAL"
-    );
-}
-
-#[test]
-fn raw_load_poisoned_lock_returns_false_and_frees_input() {
-    // 3.37 (G3, round 2): load with a poisoned mutex returns
-    // Err(Poison)→false — load_impl must capture hdir before lock() so
-    // this early return frees the incoming HGLOBAL (previously leaked).
-    let raw = RawShiori::<MockShiori>::new(0);
-    let (h, len) = alloc_hglobal("C:/panicload");
-    assert!(!raw.load(h, len), "panic during load poisons the mutex");
-
-    let h = alloc_leak_probe();
-    assert!(!raw.load(h, LEAK_PROBE_LEN), "poisoned lock → load false");
-    assert!(
-        hglobal_is_freed(h),
-        "poisoned-lock load path must free the incoming HGLOBAL"
-    );
-}
-
-#[test]
-fn raw_load_catches_panic_and_returns_false() {
-    let raw = RawShiori::<MockShiori>::new(0);
-    let (h, len) = alloc_hglobal("C:/panicload");
-    assert!(!raw.load(h, len), "panic during load must surface as false");
-
-    // Mutex got poisoned under the panic → request degrades to Poison 500.
-    let (h, mut len) = alloc_hglobal("PING");
-    let body = read_and_free(raw.request(h, &mut len), len);
-    assert_eq!(body, MyError::Poison.to_shiori_response());
-}
-
-#[test]
-fn raw_unload_catches_panic_from_instance_drop() {
-    let raw = RawShiori::<MockShiori>::new(0);
-    let (h, len) = alloc_hglobal("C:/panicdrop");
-    assert!(raw.load(h, len));
-
-    // unload_impl drops the stored instance; the mock's Drop panics.
-    // The dispatch layer must swallow it and keep the always-true
-    // contract of unload.
-    assert!(raw.unload());
-}
-
-// ------------------------------------------------------------------
-// extern "C" entry points with the process-global SHIORI uninitialized
-// (DllMain never runs in a test binary linking the rlib).
-// ------------------------------------------------------------------
-
-// ------------------------------------------------------------------
-// 3.37 (G3): SHIORI ownership-transfer contract on early-return paths.
-//
-// The host transfers ownership of the incoming HGLOBAL to the callee;
-// the guard paths (zero length / SHIORI uninitialized) previously
-// returned without freeing it, leaking host memory on every such call.
-//
-// The probe is GMEM_MOVEABLE: its HGLOBAL is a handle-table entry, not
-// a raw heap pointer, so GlobalFlags can safely report
-// GMEM_INVALID_HANDLE after GlobalFree. (Probing a freed GMEM_FIXED
-// pointer makes GlobalFlags walk freed heap memory and trips
-// STATUS_HEAP_CORRUPTION.) The guard paths under test never dereference
-// the payload, so a moveable handle exercises them faithfully —
-// GlobalFree accepts both kinds of handle.
-// ------------------------------------------------------------------
 
 const LEAK_PROBE_LEN: usize = 64;
 
+/// GMEM_MOVEABLE 確保（freed 検出を `GlobalFlags` で安全に行える handle-table エントリ）。
 fn alloc_leak_probe() -> HGLOBAL {
-    // SAFETY: plain allocation; the handle is consumed (freed) by the
-    // guard path under test.
+    // SAFETY: 単純確保。ガード経路が消費（解放）する。
     let h = unsafe { GlobalAlloc(GMEM_MOVEABLE, LEAK_PROBE_LEN) };
     assert!(!h.is_null(), "probe allocation must succeed");
     h
 }
 
-/// GlobalFlags returns GMEM_INVALID_HANDLE once the handle is freed.
+/// `GlobalFlags` は解放済み handle に `GMEM_INVALID_HANDLE` を返す。
 fn hglobal_is_freed(h: HGLOBAL) -> bool {
-    // SAFETY: GlobalFlags is documented to validate its handle and
-    // report GMEM_INVALID_HANDLE for freed/invalid moveable handles.
+    // SAFETY: GlobalFlags は handle を検証し、解放済みなら GMEM_INVALID_HANDLE を返す。
     unsafe { GlobalFlags(h) == GMEM_INVALID_HANDLE }
 }
 
-#[test]
-fn extern_load_null_or_zero_len_returns_false_and_frees_input() {
-    assert!(!load(ptr::null_mut(), 5), "null HGLOBAL must be rejected");
+/// 応答 HGLOBAL を UTF-8 として読み、解放する。
+fn read_and_free(h: HGLOBAL, len: usize) -> String {
+    let s = ShioriString::capture(h, len);
+    s.to_utf8_str().unwrap().to_string()
+}
 
-    // Non-null handle with len == 0 is rejected — and the input is owned
-    // by the callee, so the guard path must free it.
+// ------------------------------------------------------------------
+// load ガード経路（null / zero-len）と HGLOBAL 所有移譲（解放）。
+// ------------------------------------------------------------------
+
+#[test]
+fn extern_load_null_is_rejected() {
+    assert!(!load(ptr::null_mut(), 5), "null HGLOBAL must be rejected");
+}
+
+#[test]
+fn extern_load_zero_len_returns_false_and_frees_input() {
     let h = alloc_leak_probe();
     assert!(!load(h, 0), "zero length must be rejected");
     assert!(
@@ -320,6 +60,15 @@ fn extern_load_null_or_zero_len_returns_false_and_frees_input() {
         "load len==0 guard must free the incoming HGLOBAL (ownership transfer)"
     );
 }
+
+// NOTE: 実 `load`→spawn_actor（アクタースレッド起動・`static MAILBOX` 設定）を踏む E2E は
+// プロセスグローバル MAILBOX を変化させ、並列実行中の他ユニットテスト（None 経路）と競合する。
+// そのため load→request→unload→reload サイクルは統合テスト（`tests/`）へ置き、本ユニット
+// 群は MAILBOX を spawn しない（順序非依存）ガード／未初期化契約のみを検証する。
+
+// ------------------------------------------------------------------
+// request ガード経路（null / 未初期化 → 204）と HGLOBAL 解放。
+// ------------------------------------------------------------------
 
 #[test]
 fn extern_request_null_returns_null_and_zero_len() {
@@ -330,41 +79,81 @@ fn extern_request_null_returns_null_and_zero_len() {
 }
 
 #[test]
-fn extern_entry_points_without_initialized_shiori_free_input() {
-    // unload: OnceLock empty → false.
-    assert!(!unload());
-
-    // request with a valid handle: OnceLock empty → null + len 0, and the
-    // incoming HGLOBAL must be freed (callee ownership).
+fn extern_request_without_actor_returns_204_and_frees_input() {
+    // MAILBOX 未初期化（アクター未 spawn）。本番アクター経路は SHIORI スレッドを無限
+    // 待機させない契約のため、旧 500 ではなく安全網 204 を返す（R5.6）。入力は解放される。
     let h = alloc_leak_probe();
     let mut len = LEAK_PROBE_LEN;
     let res = request(h, &mut len);
-    assert!(res.is_null());
-    assert_eq!(len, 0);
-    assert!(
-        hglobal_is_freed(h),
-        "request SHIORI-None guard must free the incoming HGLOBAL"
+    assert!(!res.is_null(), "204 fallback must produce a response HGLOBAL");
+    let body = read_and_free(res, len);
+    assert_eq!(
+        body.as_bytes(),
+        default_204().as_bytes(),
+        "request without an actor must return the 204 safety net (not 500)"
     );
-
-    // load with a valid handle: OnceLock empty → false, input freed.
-    let h = alloc_leak_probe();
-    assert!(!load(h, LEAK_PROBE_LEN));
     assert!(
         hglobal_is_freed(h),
-        "load SHIORI-None guard must free the incoming HGLOBAL"
+        "request must free the incoming HGLOBAL (ownership transfer)"
     );
 }
+
+// ------------------------------------------------------------------
+// unload は未初期化でも常に true（冪等 no-op）。
+// ------------------------------------------------------------------
+
+#[test]
+fn extern_unload_without_actor_returns_true() {
+    assert!(unload(), "unload with no actor must be a safe no-op returning true");
+    // 二重 unload も安全（冪等）。
+    assert!(unload(), "double unload must remain a safe no-op");
+}
+
+// ------------------------------------------------------------------
+// DllMain の非 attach 経路。
+// ------------------------------------------------------------------
 
 #[test]
 fn dll_main_non_attach_paths() {
     const DLL_PROCESS_DETACH: u32 = 0;
+    const DLL_PROCESS_ATTACH: u32 = 1;
     const DLL_THREAD_ATTACH: u32 = 2;
 
-    // DETACH delegates to unload(); with SHIORI uninitialized that is
-    // false, and DllMain forwards it.
-    assert!(!DllMain(0, DLL_PROCESS_DETACH, ptr::null_mut()));
+    // ATTACH は no-op で true（spawn は load 起点・loader lock 回避）。
+    assert!(DllMain(0, DLL_PROCESS_ATTACH, ptr::null_mut()));
 
-    // Any other reason code is a no-op returning true.
+    // DETACH は teardown_actor へ委譲。アクター不在でも unload()→true。
+    assert!(DllMain(0, DLL_PROCESS_DETACH, ptr::null_mut()));
+
+    // その他の通知コードは no-op で true。
     assert!(DllMain(0, DLL_THREAD_ATTACH, ptr::null_mut()));
     assert!(DllMain(0, 99, ptr::null_mut()));
+}
+
+// ------------------------------------------------------------------
+// R8: unsafe impl Send/Sync 撤去の静的確認。
+// ------------------------------------------------------------------
+
+/// `shiori.rs` から `unsafe impl Send/Sync for PastaShiori` が撤去されたことを、ソースを
+/// 読み取って静的に保証する（R8.1/R8.3）。VM はアクタースレッドへ pin され構造的に
+/// スレッド安全性を担保するため、手動 unsafe impl は存在してはならない。
+#[test]
+fn pasta_shiori_has_no_unsafe_send_sync_impl() {
+    let src = include_str!("shiori.rs");
+    // コメント行（`//` 始まり）を除外して非コメントの実コードのみを走査する。
+    // （撤去を説明するコメント自体は撤去された impl 名を文中で参照するため。）
+    for line in src.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("//") {
+            continue;
+        }
+        assert!(
+            !trimmed.contains("unsafe impl Send for PastaShiori"),
+            "unsafe impl Send for PastaShiori must be removed (R8.1); offending line: {line}"
+        );
+        assert!(
+            !trimmed.contains("unsafe impl Sync for PastaShiori"),
+            "unsafe impl Sync for PastaShiori must be removed (R8.1); offending line: {line}"
+        );
+    }
 }

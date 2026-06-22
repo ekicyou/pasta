@@ -1,9 +1,8 @@
 //! 本番 marshaling × 実 `!Send` VM アクタースレッドの統合テスト（task 3.4・R5）。
 //!
-//! ファイル全体を `actor-poc` feature でガードする（task 3.3 の `spawn_actor_thread`＝
-//! wintf `block_on` 依存）。feature 無効時はこのテストバイナリは空にコンパイルされ
-//! （`#![cfg(...)]`）、既定テストスイートを一切汚染しない（R7.1/R7.2）。既定出荷ビルドは
-//! byte-invariant のまま。
+//! task 5.1 で FFI 出荷経路がアクター経路へ昇格し、wintf／marshaling が既定ビルドの依存に
+//! なったため、本テストは **既定（no-feature）ビルドで実行される**（旧 `actor-poc` ガードは
+//! 撤去）。出荷経路そのものを検証するため、既定スイートで走らせるのが正しい。
 //!
 //! # 何を証明するか（task 3.4 の observable 完了条件）
 //! task 3.3 の実アクタースレッド（VM pin）に対し、本番 marshaling 自由関数
@@ -23,8 +22,6 @@
 //! 閾値を与えた経路でゴールデン一致を厳密検証する（タイムアウト→204 の決定論的検証は
 //! marshaling.rs のユニットテストで遅延アクター注入により実施済み）。本番閾値 6.68ms 経路は
 //! 別テストで「204 か ゴールデン値か」のいずれか（無限待機なし・契約充足）を確認する。
-
-#![cfg(feature = "actor-poc")]
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -205,39 +202,41 @@ fn marshal_notify_through_actor_returns_204_then_get_in_fifo() {
 }
 
 /// (a') メソッド判定込みディスパッチ `marshal_request`（R5.5）が、GET をアクター VM へ
-/// 振り分けてゴールデン応答を返す。本番閾値 6.68ms は通常経路で発火しうるが（コールド
-/// VM・デバッグビルド）、契約上「無限待機せず必ず文字列を返す」ことは保証される。
-/// ここでは決定論性のため実応答取得は別経路（GENEROUS）で済ませ、`marshal_request` の
-/// 分岐健全性（GET 経路・無限待機なし・204 か値か）のみを確認する。
+/// 振り分けてゴールデン応答を返す。RN4 決定で `GET_TIMEOUT` を秒オーダーの安全網へ引き上げた
+/// ため、通常運転の GET は **必ずゴールデン値**を返す（204 へ化けない＝バイト不変・R5.8）。
 #[test]
-fn marshal_request_dispatches_get_without_deadlock() {
+fn marshal_request_dispatches_get_returns_golden() {
     let (load_dir, _temp) = build_async_callback_dir();
     let (tx, rx) = mailbox();
     let actor = spawn_actor_thread(0, load_dir, rx);
     assert!(actor.loaded(), "actor thread must load the ghost VM");
 
-    // marshal_request は GET をディスパッチし、6.68ms 本番閾値で待つ。応答は必ず返る
-    // （値 or 204）— 無限待機しないことが契約（R5.6/R5.7）。
+    // marshal_request は GET をディスパッチし、本番 GET_TIMEOUT（安全網・5 秒）で待つ。
+    // 通常運転では実 VM 応答（ゴールデン）が必ず返る——タイムアウトは発火しない（R5.8）。
     let resp = marshal_request(
         &tx,
         1,
         &normalize_request("GET SHIORI/3.0\nCharset: UTF-8\nID: OnTestSimple\n"),
     );
-    // 値（ゴールデン）か 204（閾値超過）のいずれか。どちらでもデッドロックしていない。
-    assert!(
-        resp.as_bytes() == EXPECT_ROUND1.as_bytes() || resp.as_bytes() == default_204().as_bytes(),
-        "marshal_request GET must return either the golden value or 204 (no deadlock)\nactual: {resp:?}"
+    assert_eq!(
+        resp.as_bytes(),
+        EXPECT_ROUND1.as_bytes(),
+        "marshal_request GET must return the byte-invariant golden (timeout must NOT fire)\nactual: {resp:?}"
     );
 
     stop(&tx);
     actor.join().expect("actor thread must join cleanly after Stop");
 }
 
-/// (a'') 本番 `marshal_get`（`GET_TIMEOUT=6.68ms`）でも、契約「必ず文字列・無限待機なし」を
-/// 充足する（R5.1/R5.7）。閾値内なら値、超過なら 204。GET_TIMEOUT が公開定数であることも確認。
+/// (a'') 本番 `marshal_get`（本番 `GET_TIMEOUT`）が通常運転でゴールデン値を返す（R5.1/R5.8）。
+/// RN4 決定で `GET_TIMEOUT` は実 GET が決して接近しない秒オーダーの安全網（5 秒）であり、
+/// 通常 GET は **必ず値**を返す（204 へ化けず byte-invariant）。閾値が安全網サイズであることも確認。
 #[test]
-fn marshal_get_production_timeout_always_returns_without_deadlock() {
-    assert_eq!(GET_TIMEOUT, Duration::from_micros(6_680), "initial threshold is 6.68ms (R5.8)");
+fn marshal_get_production_timeout_returns_golden_value() {
+    assert!(
+        GET_TIMEOUT >= Duration::from_secs(1),
+        "GET_TIMEOUT must be a generous safety net (seconds-scale) that never fires on normal GETs (RN4/R5.8), got {GET_TIMEOUT:?}"
+    );
 
     let (load_dir, _temp) = build_async_callback_dir();
     let (tx, rx) = mailbox();
@@ -248,9 +247,10 @@ fn marshal_get_production_timeout_always_returns_without_deadlock() {
         &tx,
         MailboxRequest::new(1, normalize_request("GET SHIORI/3.0\nCharset: UTF-8\nID: OnTestSimple\n")),
     );
-    assert!(
-        resp.as_bytes() == EXPECT_ROUND1.as_bytes() || resp.as_bytes() == default_204().as_bytes(),
-        "production marshal_get must return either the golden value or 204 (no deadlock)\nactual: {resp:?}"
+    assert_eq!(
+        resp.as_bytes(),
+        EXPECT_ROUND1.as_bytes(),
+        "production marshal_get must return the golden value (timeout is a safety net, must not fire)\nactual: {resp:?}"
     );
 
     stop(&tx);

@@ -1,9 +1,8 @@
 //! 本番アクタースレッド × mailbox 駆動 × 実 `!Send` VM コルーチン継続の統合テスト
 //! （task 3.3・R4.1/R4.2/R4.3/R4.5/R9.1/R9.2/R9.3/R9.4）。
 //!
-//! ファイル全体を `actor-poc` feature でガードする（wintf `block_on` 依存）。feature
-//! 無効時はこのテストバイナリは空にコンパイルされ（`#![cfg(...)]`）、既定テスト
-//! スイートを一切汚染しない（R7.1/R7.2）。既定出荷ビルドはバイト不変のまま。
+//! task 5.1 で FFI 出荷経路がアクター経路へ昇格し、wintf が既定ビルド依存になったため、
+//! 本テストは **既定（no-feature）ビルドで実行される**（旧 `actor-poc` ガードは撤去）。
 //!
 //! # 何を証明するか（task 3.3 の observable 完了条件）
 //! 専用アクタースレッド上で `wintf block_on` が実 [`PastaShiori`] VM を生成・pin し、
@@ -18,8 +17,6 @@
 //! Get 応答は `bounded(1)` の `recv_timeout` を有界で待つ。wake 統合が効かない／
 //! コルーチンが継続しなければ、Round2 で値が反映されず（または応答が来ず）テストは
 //! 失敗する。スレッド ID 比較は別スレッド実行を genuinely 観測する。
-
-#![cfg(feature = "actor-poc")]
 
 use std::path::{Path, PathBuf};
 use std::thread;

@@ -1,11 +1,10 @@
 //! 本番 teardown（`Stop{done}` ack）と reload リーク検査の統合テスト
 //! （task 4.1・R7.1/R7.2/R7.3/R7.4/R7.5）。
 //!
-//! ファイル全体を `actor-poc` feature でガードする（wintf `block_on` 依存・実
-//! `GetProcessHandleCount`/`GetGuiResources` 計測が `windows-sys/Win32_System_Threading`
-//! を要する）。feature 無効時はこのテストバイナリは空にコンパイルされ
-//! （`#![cfg(...)]`）、既定テストスイートを一切汚染しない（R7.1/R7.2）。
-//! 既定出荷ビルドはバイト不変のまま。
+//! task 5.1 で FFI 出荷経路がアクター経路へ昇格し、wintf と
+//! `windows-sys/Win32_System_Threading`（実 `GetProcessHandleCount`/`GetGuiResources` 計測）が
+//! 既定ビルドの依存になったため、本テストは **既定（no-feature）ビルドで実行される**
+//! （旧 `actor-poc` ガードは撤去）。
 //!
 //! # 何を証明するか（task 4.1 の observable 完了条件）
 //!  (a) `Stop{done}` を送ると、アクターが残メッセージ drain 後に VM 破棄・cleanup を
@@ -19,8 +18,6 @@
 //! done ack は `bounded(1)` の `recv_timeout` で有界に待つ。teardown が壊れて ack を
 //! 返さなければ（または drain せず break すれば）テストはハングせず **失敗** する。
 //! リーク assert は実 OS カウンタの増分上限で歯を持つ（per-cycle リークなら ≒N 増）。
-
-#![cfg(feature = "actor-poc")]
 
 use std::path::{Path, PathBuf};
 use std::thread;

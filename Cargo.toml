@@ -44,6 +44,7 @@ socket2 = "0.5"
 # pasta_shiori actor-runtime dependencies
 flume = "0.12"
 wintf-winmsg-executor = "0.0.3"
+arc-swap = "1.9"
 
 # pasta_check dependencies
 lexopt = "0.3"
