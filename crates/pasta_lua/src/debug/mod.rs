@@ -35,6 +35,7 @@ pub(crate) mod inspect;
 pub(crate) mod session;
 pub(crate) mod transport;
 pub(crate) mod wiring;
+pub mod kick;
 pub mod types;
 
 mod config;
@@ -59,6 +60,7 @@ pub use config::DebugConfig;
 use config::parse_env_bool;
 pub use enable::enable;
 pub use error::DebugError;
+pub use kick::{KickRequest, KickSink};
 pub use handle::DebugHandle;
 pub use source_mode::SourceMode;
 pub(crate) use source_mode::SharedSourceMode;

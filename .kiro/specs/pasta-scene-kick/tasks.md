@@ -1,7 +1,7 @@
 # Implementation Plan
 
 - [ ] 1. 基盤: 共有シーム・状態・mailbox variant
-- [ ] 1.1 キック sink シームの型と RuntimeConfig 配線口を定義する
+- [x] 1.1 キック sink シームの型と RuntimeConfig 配線口を定義する
   - `pasta_lua` 側に「型を知らない汎用キック sink（シーン名つきリクエストを受けるクロージャ）」と最小リクエスト型を定義し、依存方向（`pasta_shiori`→`pasta_lua`）を順守する
   - `RuntimeConfig` に sink を保持する builder を追加し、未注入（None）を既定とする
   - 完了状態: `RuntimeConfig` に sink を渡せて、未注入時はキック経路が起動しないことが型・既定値で確認できる
