@@ -95,7 +95,7 @@
   - 観測: `cargo test --all` 緑・ByteInvariantSuite 緑・OnBoot/OnSecondChange/GET property/コルーチン継続が end-to-end でバイト不変
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 9.1, 9.2, 9.3, 9.4_
   - _Depends: 5.1, 6.1, 6.2_
-- [ ] 7.2 PoC actor_poc 足場撤去と出荷バイナリ不変検証
+- [x] 7.2 PoC actor_poc 足場撤去と出荷バイナリ不変検証
   - 本番接合完了後に `actor_poc` 使い捨て足場（`verdict.rs`・PoC scaffold・`actor-poc` feature gate）を撤去する（デバッグ資産は 6.2 で昇格済み）
   - 観測: 撤去前後で出荷 `pasta.dll` の正規化 sha が一致・`actor-poc` feature 参照が消滅・`cargo build`/`test` 緑
   - _Requirements: 10.8_

@@ -14,13 +14,6 @@ documentation.workspace = true
 name = "pasta"
 crate-type = ["cdylib", "rlib"]
 
-[features]
-# 使い捨て PoC ハーネス（pasta-actor-feasibility）の残骸。default 無効。
-# task 5.1 で本番アクタースレッドが出荷経路へ昇格したため、wintf は本 feature ではなく
-# 通常依存（下記参照）になった。本 feature は actor_poc/ モジュール（task 7.2 で撤去予定）
-# と pasta_lua/actor-poc 伝播のためにのみ残す。
-actor-poc = ["pasta_lua/actor-poc"]
-
 [dependencies]
 pasta_lua.workspace = true
 time.workspace = true

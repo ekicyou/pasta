@@ -33,11 +33,9 @@
 //! [`TeardownReport::anomaly`] に載せる。**panic も `unwrap`/`expect` も使わず**、
 //! 異常を呼び出し側へ値で返してホスト（SSP）プロセスを巻き込まない。
 //!
-//! # gating
 //! 本モジュールはアクタースレッド（[`thread`]・wintf `block_on` 依存）と実 OS リソース
-//! 計測（`windows-sys/Win32_System_Threading`）を要するため、`actor-poc` feature 有効時
-//! のみコンパイルされる（`actor/mod.rs` で `#[cfg(feature = "actor-poc")]`）。FFI 入口
-//! （`windows.rs` の `load`/`unload`）への配線は task 5.1。既定出荷ビルドはバイト不変。
+//! 計測（`windows-sys/Win32_System_Threading`）を用いる。FFI 入口（`windows.rs` の
+//! `load`/`unload`）への配線は task 5.1 で完了し、本番（既定）出荷ビルドに含まれる。
 
 use std::path::Path;
 use std::time::Duration;
@@ -182,8 +180,7 @@ pub struct ReloadReport {
 /// reload 反復前後の実 OS リソースカウンタとその増分（R7.3）。
 ///
 /// ベースラインは **ウォームアップ後** に採取する（一回性初期化を除外するため）。
-/// 計測アプローチは PoC `pasta_lua::actor_poc::teardown::LeakMetric` の流用
-/// （`GetProcessHandleCount` / `GetGuiResources(GR_USEROBJECTS)`）。
+/// 計測は `GetProcessHandleCount` / `GetGuiResources(GR_USEROBJECTS)` による。
 #[derive(Debug, Clone, Copy)]
 pub struct LeakMetric {
     /// ウォームアップ後・計測サイクル開始時のカーネルハンドル数。
