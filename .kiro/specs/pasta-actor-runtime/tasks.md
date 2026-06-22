@@ -34,7 +34,7 @@
   - 観測: 別スレッドからの `try_send` で `block_on` の future が起床しメッセージを消費するテストが緑
   - _Requirements: 4.1, 4.5_
   - _Boundary: ActorThread_
-- [ ] 3.2 単一直列 mailbox（flume）の本番化
+- [x] 3.2 単一直列 mailbox（flume）の本番化
   - flume unbounded で `ActorMsg{Get, Notify, Stop}` の単一直列 FIFO を確立する（単一 consumer・`select!` を張らない）
   - 観測: 近接した複数 `try_send` が投入順＝処理順で逐次処理され、同時並行 VM アクセスが発生しないテストが緑
   - _Requirements: 6.1, 6.2, 6.3, 6.4_
