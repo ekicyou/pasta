@@ -5,29 +5,29 @@
 
 `pasta-actor-runtime` 完了後を前提とし、宿主非依存コア＋アクタースレッド（`wintf_winmsg_executor`）＋ CH marshaling（GET=block-on-reply／NOTIFY=即204／drop・timeout→204）が存在する。出力は `pasta_shiori` アダプタが presentation event stream をさくらスクリプトへ描画し、debug backend は DAP-over-TCP で VSCode と接続済みである。ライブ SSP がプレビューを兼ねられる構造のため、別プレビュー画面は不要である。
 
-本機能は **即時再生オンリー** として、talk FIFO ＋ OnSecondChange 無条件 drain、即時 preempt-and-abort（進行中会話を中断し前 `co_scene` を閉じ自動復帰しない）、エンジンによるシーン実行コンテキスト（ctx）の合成（通常トーク再生と同一手順を流用）、VSCode 拡張からのキックコマンド、既存 debug DAP チャネルの一般化（`playScene` custom request）、debug backend のアクタークライアント化を提供する。SSP `Status` による抑制ゲートや非即時（アイドル待ち）モードは設けない。
+本機能は **即時再生オンリー** として、即時 preempt-and-abort（進行中会話を中断し前 `co_scene` を閉じ自動復帰しない）、キック対象シーンを進行中シーン（`co_scene`）として設置し**既存の OnSecondChange シーン継続機構で配信**（キック専用の出力キューを設けない・初回ビートのみ抑制ゲートをワンショット突破）、エンジンによるシーン実行コンテキスト（ctx）の合成（通常トーク再生と同一手順を流用）、VSCode 拡張からのキックコマンド、既存 debug DAP チャネルの一般化（`playScene` custom request）、debug backend のアクタークライアント化を提供する。SSP `Status` による恒常的な抑制ゲートや非即時（アイドル待ち）モードは設けない。
 
 ## Introduction
 
 本仕様 **pasta-scene-kick** は、ゴースト作者がオーサリング／デバッグ中に「任意のシーンを今すぐライブ SSP 上で再生して観る」ことを可能にする。作者は VSCode 拡張のコマンド／ボタンからシーンを指名してキックし、本物のゴーストが実 SSP 上で反応する様子を ≤1 秒で確認できる。
 
-キックは SHIORI/3.0 の pull 契約（OnSecondChange の GET 機会）を破らずに実現する。キックされたシーンはアクター（executor）スレッドで非同期にレンダリングされ、talk FIFO に積まれる。OnSecondChange の GET は FIFO を drain して返すだけに保ち、GET ブロックを短く維持する。SSP からの押し出し（SSTP / `\![raise]`）は用いない。
+キックは SHIORI/3.0 の pull 契約（OnSecondChange の GET 機会）を破らずに実現する。キックされたシーンはアクター（executor）スレッド上で進行中シーン（`STORE.co_scene`）として設置され、**通常のマルチビート・トークと同一の OnSecondChange シーン継続機構**で 1 tick ＝ 1 ビート（1 yield）ずつ配信される。キック専用の出力キューは設けない。GET ブロックはビート単位で短く保たれる。SSP からの押し出し（SSTP / `\![raise]`）は用いない。
 
-キックは**即時再生の単一モード**である。テスト再生という用途上、会話中（SSP `Status: talking`）であっても問答無用で再生する：進行中の会話を preempt（中断）し、中断された側の前 `co_scene` を閉じ、自動復帰しない（デバッグキックは礼儀正しいキューではない、preempt-and-abort）。`Status` を権威とする抑制ゲートや、アイドルまで待つ非即時モードは設けない。
+キックは**即時再生の単一モード**である。テスト再生という用途上、会話中（SSP `Status: talking`）であっても問答無用で再生する：到着時に進行中の会話を preempt（中断）して前 `co_scene` を閉じ（自動復帰しない・preempt-and-abort）、キックされたシーンを新たな `co_scene` に据える。直後の OnSecondChange では**初回ビートのみ抑制ゲート（`is_blocked`）をワンショットで突破**して割り込み配信し、後続ビートは通常のシーン継続ペース（SSP `Status` に従うビート間ペース配分）で配信する。`Status` を権威とする恒常的な抑制ゲートや、アイドルまで待つ非即時モードは設けない。
 
 キックされたシーンは SHIORI イベント由来の `act`（実行コンテキスト）を持たないため、エンジンが当該シーンを起動するための ctx を合成して与える。ctx の合成は**通常のトーク再生時に行っている合成手順をそのまま流用**する（キック専用の特別な ctx 構築は行わない）。外部 SHIORI の通常会話挙動はキックによって変化させない（キックは追加経路である）。
 
 ## Boundary Context
 
 - **In scope（本機能が責務を持つ）**:
-  - talk FIFO（キックされたシーンのレンダリング結果を順序保持で蓄積）。
-  - OnSecondChange での無条件 drain（SSP `Status` による抑制を行わない）。
+  - キック対象シーンの `co_scene` 設置と、既存 OnSecondChange シーン継続機構を流用した 1 tick ＝ 1 ビート配信（キック専用キューは設けない）。
+  - 初回ビートのみ抑制ゲート（`is_blocked`）をワンショット突破して割り込み配信（後続は通常ペース）。
   - 即時 preempt-and-abort（進行中会話を中断し、前 `co_scene` を閉じ、自動復帰しない）— 唯一の再生挙動。
   - エンジンによるシーン実行コンテキスト（ctx／`act`）の合成（通常トーク再生と同一手順を流用）。
   - VSCode 拡張からのキックコマンド／ボタン（シーン名の指名）。
   - キック transport の一般化（既存 debug DAP チャネルへ `playScene` custom request を追加）。
   - debug backend をアクターのクライアントとして扱う（キックとデバッグを単一制御面に統合）。
-  - キックの executor スレッド上での非同期実行・レンダリング → FIFO 投入。
+  - キックの executor スレッド上での非ブロッキング設置（`co_scene` 据え）と、OnSecondChange 継続でのビート単位レンダリング。
 - **Out of scope（本機能が所有しない）**:
   - 非即時（アイドル待ち）キックモード、および SSP `Status: talking` を権威とする抑制ゲート（即時再生オンリーのため不採用）。
   - 即時キックされた会話の退避→復帰セマンティクス（採用するのは preempt-and-abort）。
@@ -37,7 +37,7 @@
   - `*.pasta` 編集ウィンドウからのキック（別境界 `pasta-authoring-window`・将来）。
   - `pasta_novel` アダプタ。
 - **Adjacent expectations（隣接システム／仕様への期待）**:
-  - **`pasta-actor-runtime`（上流）**: アクタースレッド、CH marshaling、presentation event stream、さくらスクリプト描画アダプタを提供する。本機能はその上に talk FIFO とキック経路を追加する。
+  - **`pasta-actor-runtime`（上流）**: アクタースレッド、CH marshaling、presentation event stream、さくらスクリプト描画アダプタを提供する。本機能はその上にキック経路（`co_scene` 設置 ＋ 既存継続流用）を追加する。
   - **`pasta-vscode-lua-debug`（拡張対象・上流）**: DAP-over-TCP チャネルと VSCode 接続を提供する。本機能はそのチャネルに `playScene` custom request を追加し、debug backend をアクタークライアント化する。
   - **`pasta-debug-lua-view-toggle`（隣接・前例）**: DAP custom request ＋ VSCode コマンドの実装前例（`pasta/sourcePresentation`）。本機能のキックコマンドは同じ前例に倣う。
   - **通常トーク再生経路（流用元）**: シーン実行用 ctx（`act`）の合成手順を提供する。本機能のキックは同一手順を流用して ctx を合成する。
@@ -65,34 +65,35 @@
 5. If 受理した `playScene` 要求のシーン名が空または不正である, then the エンジン shall キックを実行せずエラーを要求元へ返す。
 6. Where debug backend が既定で無効である, the エンジン shall debug backend が無効な間はキック経路を有効化しない。
 
-### Requirement 3: キックの非同期実行・ctx 合成・レンダリング
-**Objective:** 開発者として、キックされたシーンを GET ブロックを延ばさずに実行・レンダリングしたい。またキックは SHIORI イベント由来の `act` を持たないため、シーン実行に必要な ctx をエンジンが与えたい。それにより、SHIORI の pull 契約（短い GET）を守ったままシーンを起動しライブ SSP へ反映できる。
+### Requirement 3: キックの非ブロッキング設置・ctx 合成・ビート単位レンダリング
+**Objective:** 開発者として、キック到着時にシーン本体の実行でブロックせず、キックされたシーンを進行中シーンとして設置したい。またキックは SHIORI イベント由来の `act` を持たないため、シーン実行に必要な ctx をエンジンが与えたい。それにより、既存のシーン継続機構を流用してビート単位で短い GET を保ったままライブ SSP へ反映できる。
 
 #### Acceptance Criteria
-1. When エンジンがキック要求を受理する, the エンジン shall キック対象シーンの実行とレンダリングを、OnSecondChange の GET 応答を待たせずに非同期で行う。
-2. When キックされたシーンを実行する, the エンジン shall そのシーンの実行に必要な実行コンテキスト（ctx／`act`）を、通常のトーク再生時と同一の合成手順を流用して構築し与える。
-3. When キックされたシーンのレンダリングが完了する, the エンジン shall その出力（さくらスクリプト）を talk FIFO へ投入する。
-4. The エンジン shall シーンのレンダリング処理を OnSecondChange の GET 応答の内側で同期実行せず、GET 応答を短く保つ。
-5. If 指名されたシーンが存在しない／解決できない, then the エンジン shall そのキックを talk FIFO に何も投入せず破棄し、診断可能な形で記録する。
+1. When エンジンがキック要求（`ActorMsg::Kick`）を受理する, the エンジン shall キック対象シーンを進行中シーン（`co_scene`）として設置し、受理処理の内側でシーン本体の実行（resume）をブロッキングに行わない。
+2. When キックされたシーンの実行コンテキストを構築する, the エンジン shall ctx（`act`）を、通常のトーク再生時と同一の合成手順を流用して構築し与える。
+3. The エンジン shall キックされたシーンのレンダリングと配信を、キック専用の出力キューを設けず、既存の OnSecondChange シーン継続機構（`STORE.co_scene` 継続）に委ねる。
+4. When OnSecondChange の GET でキック `co_scene` を継続する, the エンジン shall 1 回の GET につき高々 1 ビート（1 yield）を resume・レンダリングし、GET 応答を短く保つ。
+5. If 指名されたシーンが存在しない／解決できない, then the エンジン shall `co_scene` を設置せずキックを破棄し、診断可能な形で記録する。
 
-### Requirement 4: talk FIFO と OnSecondChange 無条件 drain
-**Objective:** 開発者として、キック出力を順序保持の talk FIFO に蓄積し、OnSecondChange で抑制なく取り出したい。それにより、pull 契約を破らずに ≤1 秒でライブ SSP へ届けられる。
+### Requirement 4: OnSecondChange でのキック出力配信（co_scene 継続流用）
+**Objective:** 開発者として、キック出力を既存の OnSecondChange シーン継続機構でビート順に配信したい。それにより、新規キューを発明せず pull 契約を破らずに ≤1 秒でライブ SSP へ届けられる。
 
 #### Acceptance Criteria
-1. The talk FIFO shall キック由来の出力を投入順（FIFO）で保持する。
-2. When OnSecondChange の GET を受信する, the エンジン shall talk FIFO を SSP `Status` による抑制なく無条件に drain し、取り出した出力を GET 応答として返す。
-3. While talk FIFO が空である, when OnSecondChange の GET を受信する, the エンジン shall キック由来の出力を含まない通常の応答を返す。
-4. When talk FIFO に出力が存在する, the エンジン shall 実 SSP の tick 周期に依存して概ね 1 秒以内にライブ SSP へ届くよう、当該 OnSecondChange の GET で出力を返す。
-5. The エンジン shall talk FIFO の drain を OnSecondChange の pull 機会に限定し、SSTP / `\![raise]` による押し出しを行わない。
+1. The エンジン shall キックされたシーンの各ビート（yield）を、当該シーンコルーチンの順序どおりに配信する。
+2. When OnSecondChange の GET を受信し設置済みのキック `co_scene` が存在する, the エンジン shall 既存のシーン継続機構で当該 `co_scene` を resume し、得られた出力を GET 応答として返す。
+3. While 設置済みのキック `co_scene` が存在しない, when OnSecondChange の GET を受信する, the エンジン shall キック由来の出力を含まない通常の応答を返す。
+4. When キック `co_scene` の継続出力が存在する, the エンジン shall 実 SSP の tick 周期に依存して概ね 1 秒以内にライブ SSP へ届くよう、当該 OnSecondChange の GET で出力を返す。
+5. The エンジン shall キック出力の配信を OnSecondChange の pull 機会に限定し、SSTP / `\![raise]` による押し出しを行わない。
 
 ### Requirement 5: 即時 preempt-and-abort（唯一の再生挙動）
 **Objective:** ゴースト作者として、テスト再生のキックは会話中でも問答無用で直ちに再生してほしい。それにより、進行中の会話に阻まれず観たいシーンを即座に確認できる。
 
 #### Acceptance Criteria
-1. When キック要求を受理し進行中の会話が存在する, the エンジン shall SSP が `talking` 等を報告していても、抑制ゲートを介さず当該会話を直ちに preempt（中断）する。
-2. When 即時キックが進行中の会話を中断する, the エンジン shall 中断された側の前 `co_scene` を閉じる。
+1. When キック要求を受理し進行中の会話が存在する, the エンジン shall SSP が `talking` 等を報告していても、その進行中の会話を直ちに preempt（中断）する。
+2. When 即時キックが進行中の会話を中断する, the エンジン shall 中断された側の前 `co_scene` を閉じる（LuaJIT `coroutine.close` 非搭載のため、参照不到達化＋GC で「以後 resume されない」を観測契約とする）。
 3. The エンジン shall 即時キックによって中断された会話を自動的に復帰させない（preempt-and-abort、退避→復帰を行わない）。
 4. The エンジン shall キック再生を即時再生の単一モードとし、SSP `Status` を権威とする抑制待ち（非即時・アイドル待ち）モードを提供しない。
+5. When キックされたシーンの初回ビートを直後の OnSecondChange で配信する, the エンジン shall 抑制ゲート（`is_blocked`）を 1 回だけ突破して割り込み配信し、後続ビートは通常のシーン継続ペース（SSP `Status` に従うビート間ペース配分）に従わせる。
 
 ### Requirement 6: ライブ SSP プレビューと既存挙動の不変
 **Objective:** ゴースト作者として、別のプレビュー画面ではなく本物のライブ SSP 上で反応を観たい。それにより、実環境のゴーストの振る舞いをそのまま確認できる。

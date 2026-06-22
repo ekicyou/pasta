@@ -4,7 +4,9 @@
 
 前提: 本機能は `pasta-actor-runtime`（完了済み）と `pasta-vscode-lua-debug`（完了済み）の上に構築される。
 
-> **方針確定（要件ディスカッション 2026-06-23）**: 本機能は**即時再生オンリー**。SSP `Status` を権威とする抑制ゲート（旧 R5）と非即時アイドル待ちモード（旧 R6）は**廃止**。キックは常に即時 preempt-and-abort（現 R5）で、talk FIFO は OnSecondChange で**無条件 drain**（現 R4）する。シーン実行 ctx（`act`）は**通常トーク再生と同一の合成手順を流用**してエンジンが与える（現 R3.2）。以下の本文中、抑制ゲート（`is_blocked()`/`BLOCKED_STATUSES`）に関する記述は「キック側では不使用（通常イベント経路でのみ従来どおり使用）」と読み替えること。
+> **方針確定（要件ディスカッション 2026-06-23）**: 本機能は**即時再生オンリー**。SSP `Status` を権威とする恒常抑制ゲート（旧 R5）と非即時アイドル待ちモード（旧 R6）は**廃止**。キックは常に即時 preempt-and-abort（現 R5）。シーン実行 ctx（`act`）は**通常トーク再生と同一の合成手順を流用**してエンジンが与える（現 R3.2）。
+>
+> **配信モデル改訂（設計ディスカッション 2026-06-23・D4 参照）**: 当初仮置きの **talk FIFO ＋ 無条件 drain は不採用**。実コード検証でマルチ yield シーンと両立しないと判明したため、**既存の `co_scene` 継続機構（`check_talk`）を流用**し、キックは保留フラグ（`STORE.kick_pending`/`kick_force`）を立てて dispatch 前段フックで起動する方式に改訂。**以下本文中の `TALK_QUEUE`／「talk FIFO に enqueue」／「無条件 drain」の記述（特に §3 Option C・§4 課題3・Key Findings#4）は、すべて D4 の `co_scene` 継続流用へ読み替えること**。`is_blocked` はキック初回ビートのみワンショット突破し、後続ビート・通常イベント経路では従来どおり機能する。
 
 ## 1. 現状調査（Current State）
 
@@ -45,7 +47,7 @@
 | R2.4 debug backend のアクタークライアント化 | debug は現状 VM スレッド内 hook／stop_loop 経由のみ。アクター mailbox への送信経路は未配線。**クレート依存方向の制約あり** | **Missing**（kick sink seam ＋ inbound→sink 配線が新規）|
 | R3.1/3.3-3.5 非同期実行・レンダリング | `actor/thread.rs` executor ループ・`presentation`・`renderer_injection`・Lua `SCENE.co_exec` | **Missing**（Kick 実行ハンドラ）＋ 既存基盤再利用可 |
 | R3.2 ctx（`act`）合成 | 通常トーク再生の ctx 合成手順（`create_act`→`SHIORI_ACT.new`→`SCENE.co_exec`→`resume_until_valid`→`set_co_scene`）が既存 | **Constraint**（既存合成手順を流用・キック専用 ctx 構築は不要）|
-| R4 talk FIFO ＋ OnSecondChange 無条件 drain | OnSecondChange ハンドラ・`RES.ok` はあるが **talk FIFO は皆無**。抑制判定は不使用 | **Missing**（FIFO 新規・drain は抑制ゲート無し）|
+| R4 OnSecondChange でのキック出力配信（co_scene 継続流用）| `check_talk` の `STORE.co_scene` 継続（`virtual_dispatcher.lua:202-205`）が既存。マルチビート配信機構そのものを流用 | **Constraint**（既存継続流用・dispatch 前段フックのみ新規・D4）|
 | R5 即時 preempt-and-abort（唯一の再生挙動）| `set_co_scene(co)` は前 `co_scene` を `coroutine.close`（LuaJIT 非搭載なら no-op）で置換。強制中断 API は実質これのみ | **Missing**（preempt ＋ `co_scene` close 観測契約）|
 | R6 ライブ SSP・既存挙動不変 | レンダラはライブ SSP 直結・通常イベント経路は独立 | **Constraint**（追加経路ゆえ不変が自然・要回帰検証）|
 
@@ -75,7 +77,7 @@
 
 1. **ライブキック経路 vs DAP 停止ループ（最重要・解決方針確定）**: 既存 `SessionCommand` はブレーク停止中（stop_loop）にのみ消費される。本機能はブレークなしのライブ実行中にキックする必要があるため、`playScene` を `SessionCommand` に足して stop_loop で処理する素朴案は不成立。**socket-bridge inbound（停止非依存）→ kick sink → アクター `static MAILBOX` へ `ActorMsg::Kick` を送る経路**を新設する。これが「debug backend をアクターのクライアント化（R2.4）」の実体。
 2. **クレート依存方向の越境（最重要・新規発見）**: debug backend（`pasta_lua`・上流）から `MAILBOX`（`pasta_shiori`・下流）を直接参照できない。**解決: `pasta_lua` の `debug::enable` に汎用 `KickSink`（`Box<dyn Fn(KickRequest) + Send + Sync>` もしくは型付きチャネル）注入口を追加し、`pasta_shiori` 側（アクタースレッド）が `MAILBOX` 投函クロージャを注入する**。`pasta_lua` は sink の中身を知らない（疎結合・依存方向順守）。
-3. **talk FIFO の保持層（Lua 側に確定）**: presentation→さくらスクリプト描画は Lua 集約。FIFO を Lua 側（`pasta_scripts` の `TALK_QUEUE`）に置き、`ActorMsg::Kick` 受信 → アクタースレッド上で ctx 合成・レンダリング → 結果さくらスクリプトを `TALK_QUEUE` へ enqueue。OnSecondChange GET が `TALK_QUEUE` を無条件 drain。drain は抑制ゲート無し（「次の OnSecondChange で必ず drain」のみ）。
+3. **キック出力の配信機構（D4 で改訂・既存 `co_scene` 継続流用に確定）**: 当初は Lua `TALK_QUEUE` 新設＋無条件 drain を検討したが、設計ディスカッションの実コード検証でマルチ yield シーンと両立しないと判明。**既存の `STORE.co_scene`＋`check_talk` 継続をそのまま流用**し、`ActorMsg::Kick` 受信時は `kick_pending`/`kick_force` フラグ設置のみ、次 OnSecondChange の dispatch 前段フックが当該シーンを起動（`set_co_scene` 経由 preempt）→初回ビート配信、後続ビートは既存継続が担う。専用キューは設けない（D4）。
 4. **preempt-and-abort の `co_scene` close（Missing・LuaJIT 制約）**: 現状 `set_co_scene(co)` は前 `STORE.co_scene` を `coroutine.close`（status≠suspended 時）または置換で破棄する。**LuaJIT は `coroutine.close` 非搭載**（MEMORY 既知事項）であり suspended を強制 dead にできない。preempt は「`STORE.co_scene` 参照の nil 化＋GC」でモデル化する。R5.2 の「閉じた」観測契約は「前 `co_scene` 参照が破棄され、以後 resume されない」を観測点とする（強制終了の即時性ではなく参照不到達を契約とする）。
 5. **ctx 合成の流用（Constraint・低リスク）**: キック起点（`ActorMsg::Kick` 受信）から **通常トーク再生の合成手順（`create_act(req)`→`SHIORI_ACT.new`→`SCENE.co_exec(act, name)`→`resume_until_valid`→`set_co_scene`）をそのまま呼ぶ**。キック専用の特別な ctx 構築・初期束縛は要件外。`req` は最小合成（`id="OnKickScene"` 等のキック由来 act）で良い。
 6. **≤1 秒レイテンシ（R4.4）**: 実 SSP の OnSecondChange tick 周期依存。エンジン側は「次の GET で必ず drain」を保証するのみ。
@@ -90,12 +92,12 @@
 
 ## 6. design フェーズへの申し送り（設計で確定済み）
 
-- **採用アプローチ**: Option C（既存 DAP・mailbox variant merge ＋ kick sink seam ＋ Lua 側 `TALK_QUEUE`）。
+- **採用アプローチ**: Option C（既存 DAP・mailbox variant merge ＋ kick sink seam ＋ **既存 `co_scene` 継続流用**・保留フラグ駆動。当初の Lua `TALK_QUEUE` は D4 検証で不採用に改訂）。
 - **確定した主要判断** → 「Design Decisions」参照（D1〜D6）。
 - **Research Needed（design で解決）**:
   - socket-bridge スレッドから sink 経由 `MAILBOX` 送信時のライフサイクル（teardown／reload 時の swap 競合）→ **D2 / D6 で解決**。
   - LuaJIT での「中断シーンを確実に再開不能化」する具体手段と検証方法 → **D5 で解決（参照 nil 化＋GC・観測契約）**。
-  - キック由来出力と通常 OnSecondChange dispatch（OnHour/OnTalk）の drain 順序・共存ルール → **D4 で解決（FIFO drain を dispatch 前に・抑制無し）**。
+  - キック由来出力と通常 OnSecondChange dispatch（OnHour/OnTalk）の配信順序・共存ルール → **D4 で解決（dispatch 前段フックで `kick_pending` シーンを起動・既存 `co_scene` 継続流用・初回のみ `is_blocked` 突破）**。
 
 ## 7. オープンクエスチョン（要件ディスカッションで解決済み・2026-06-23）
 
@@ -104,7 +106,7 @@
 3. **複数即時キックの連続** → **解決: 即時 preempt-and-abort の再帰適用**。単一 mailbox／単一 consumer 上で FIFO 順に処理。
 4. **キック対象シーンの指定粒度** → **解決: シーン名のみ**（現 R1/R2.2）。
 5. **非即時キックの溜まり方** → **失効**: 非即時モード廃止。
-6. **`talking` 以外の抑制ステータス** → **解決: 抑制無し**（現 R4 無条件 drain）。
+6. **`talking` 以外の抑制ステータス** → **解決: キック初回ビートのみ `is_blocked` をワンショット突破**（現 R5.5）。後続ビートは既存 `is_blocked`（`talking`/`choosing` 等）の通常ペース配分に従う。恒常抑制ゲートは設けない。
 
 ---
 
@@ -118,7 +120,7 @@
   1. **クレート依存方向が経路設計を支配する**: debug backend（`pasta_lua`・上流）は `static MAILBOX`（`pasta_shiori`・下流）を直接参照できない。kick sink を `pasta_lua` の汎用 seam として定義し `pasta_shiori` が `MAILBOX` 投函クロージャを注入する（依存方向順守）。
   2. **ライブキックは停止ループを迂回する**: `SessionCommand`/stop_loop はブレーク停止中のみ消費。ライブキックは停止非依存の socket-bridge inbound から sink → `MAILBOX` → `ActorMsg::Kick` で運ぶ。
   3. **ctx 合成は既存関数の素直な呼び出しで足りる**: `create_act`→`SHIORI_ACT.new`→`SCENE.co_exec`→`resume_until_valid`→`set_co_scene` がそのまま流用可能。キック専用 ctx 構築は不要。
-  4. **talk FIFO は内製ゼロ・Lua 側に新設**: `CALLBACK.pending` は talk キューではない。Lua `TALK_QUEUE` を新設し OnSecondChange で無条件 drain。
+  4. **配信は既存 `co_scene` 継続を流用（talk FIFO 不採用・D4 検証で改訂）**: `resume_until_valid` は 1 yield で停止し、残りビートは `STORE.co_scene`＋`check_talk` 継続が次 tick 以降に配信する既存機構がある。当初の Lua `TALK_QUEUE` 新設案は、完成さくらを貯める方式がマルチ yield と二重発火するため不採用。キックは保留フラグ（`kick_pending`/`kick_force`）を立て、dispatch 前段フックで既存機構へ載せる。
 
 ## Architecture Pattern Evaluation
 
@@ -126,7 +128,7 @@
 |--------|-------------|-----------|---------------------|-------|
 | A 既存拡張中心 | mailbox variant ＋ Lua FIFO ＋ DAP 前例ミラー | 不変条件・前例最大活用、新規ファイル最小 | sink のクレート越境・FIFO 保持層を詰めないと依存方向／OnSecondChange を壊す | 採用ベース |
 | B 新規中心 | 独立 Kick サービス＋専用チャネル | 責務分離・テスト容易 | 別チャンネル化を mailbox docstring が禁止・R2.3 が独立 transport を禁止 | 不採用 |
-| C ハイブリッド | A ＋ kick sink seam（`pasta_lua`）＋ Lua `TALK_QUEUE` 薄分離 | 不変条件・依存方向順守しつつ中核をテスト可能に分離 | 計画調整コスト | **採用** |
+| C ハイブリッド | A ＋ kick sink seam（`pasta_lua`）＋ 既存 `co_scene` 継続流用（保留フラグ駆動・D4 改訂） | 不変条件・依存方向順守・マルチビート配信を既存機構で正しく実現 | dispatch 前段フックの回帰検証 | **採用** |
 
 ## Design Decisions
 
@@ -156,20 +158,22 @@
 - **Alternatives Considered**:
   1. 別チャンネル＋`select!` — docstring が明示的に禁止（flume cancel 欠陥回避の単一 consumer 不変条件を壊す）。
   2. 同一 mailbox に `Kick` variant 追加 — 予約どおり・FIFO 順序保証を継承。
-- **Selected Approach**: 案2。`#[non_exhaustive] ActorMsg` に `Kick { scene: String }` を追加。executor ループ（`thread.rs`）に match 腕を追加し、reply 無し（NOTIFY 同様 fire-and-forget）。受信時にアクタースレッド上で ctx 合成→レンダリング→`TALK_QUEUE` enqueue。
-- **Rationale**: 単一 consumer・FIFO・ゼロコスト不変条件を継承。GET/NOTIFY と同列の third method。
+- **Selected Approach**: 案2。`#[non_exhaustive] ActorMsg` に `Kick { scene: String }` を追加。executor ループ（`thread.rs`）に match 腕を追加し、reply 無し（NOTIFY 同様 fire-and-forget）。受信時にアクタースレッド上で `SHIORI.kick(scene)` を呼ぶ（＝`STORE.kick_pending`/`kick_force` フラグ設置のみ・非ブロッキング。実シーン起動は次 OnSecondChange の dispatch フック＝D4）。
+- **Rationale**: 単一 consumer・FIFO・ゼロコスト不変条件を継承。GET/NOTIFY と同列の third method。フラグ設置のみで GET をブロックしない（R3.1）。
 - **Trade-offs**: ✅ 不変条件継承・予約どおり。❌ executor ループに分岐 1 つ増。
-- **Follow-up**: 複数キック連続は FIFO 順に再帰 preempt（D5）。
+- **Follow-up**: 複数キック連続は `kick_pending` 上書きで最後のキックが次 tick 起動。前キック co は `set_co_scene` 置換で preempt（D5）。
 
-### Decision D4: talk FIFO は Lua `TALK_QUEUE` に新設し OnSecondChange で無条件 drain（dispatch 前）
-- **Context**: R4（talk FIFO ＋ 無条件 drain）。既存 talk キューは皆無（`CALLBACK.pending` は callback 待ち）。
-- **Alternatives Considered**:
-  1. Rust アクタースレッド側に FIFO 保持 — レンダリング（Lua 集約）と保持層が分離し drain で Lua 往復増。
-  2. Lua `pasta_scripts` 側に `TALK_QUEUE` 保持 — レンダリング結果（さくらスクリプト文字列）と同一層・drain は Lua 内で完結。
-- **Selected Approach**: 案2。`pasta/shiori/talk_queue.lua`（`TALK_QUEUE.enqueue(sakura)`/`TALK_QUEUE.drain()→sakura|nil`）を新設。`Kick` 実行ハンドラがレンダリング結果を `enqueue`。`second_change.lua` が `CALLBACK.sweep()` 後・`dispatcher.dispatch(act)` 前に `TALK_QUEUE.drain()` を呼び、非 nil なら **抑制ゲート無しで**その出力を GET 応答として返す（`is_blocked` を介さない）。空なら従来 dispatch 経路へ。
-- **Rationale**: レンダリングと保持が同一層で順序・drain が自然。drain は「次の OnSecondChange で必ず」のみ（条件分岐なし）。
-- **Trade-offs**: ✅ Lua 内完結・順序保証単純。❌ OnSecondChange ハンドラに drain 分岐 1 つ追加（回帰検証要・R6.3）。
-- **Follow-up**: キック出力と通常 dispatch（OnHour/OnTalk）の優先順位＝キック drain を先に消費。複数キック分は FIFO で逐次 drain（1 tick 1 出力）。
+### Decision D4: キック配信は既存 `co_scene` 継続を流用（talk FIFO 不採用・設計ディスカッション検証で改訂）
+- **Context**: R4（キック出力の OnSecondChange 配信）。当初は「完成さくらを貯める talk FIFO ＋ 無条件 drain」を仮置きしたが、**設計ディスカッションの実コード検証（2026-06-23）で破綻が判明**した。
+- **検証で判明した事実**: `resume_until_valid`（`event/init.lua`）は**最初の有効 yield で停止**し 1 ビートのみ返す。マルチビート・トークの残りビートは `set_co_scene` で `STORE.co_scene` に保存され、次 OnSecondChange の `check_talk`（`virtual_dispatcher.lua:202-205`）が `if STORE.co_scene then return STORE.co_scene` で**既存 co を継続 resume** する（`is_blocked` がビート間ペースをゲート）。
+- **却下した当初案（talk FIFO）**: 「初回ビートを `TALK_QUEUE` へ・残りを `co_scene` 継続へ」は、同一 tick で `TALK_QUEUE` drain と `co_scene` 継続 resume が**二重発火**し、順序逆転・co 状態不定を招く。完成さくらを貯める FIFO はマルチ yield シーンと両立しない。
+- **Selected Approach（改訂）**: **talk FIFO を設けず、既存 `co_scene` 継続機構を流用**する。
+  1. `SHIORI.kick(scene)`＝`STORE.kick_pending=scene`／`STORE.kick_force=true` を設置するだけ（非ブロッキング・resume しない）。
+  2. 次 OnSecondChange の `dispatch(act)` 前段で、`kick_force` 真なら `is_blocked` を**ワンショット突破**し、`kick_pending` があれば当該 OnSecondChange の `act` を流用して `act:find_scene`→`SCENE.co_exec`→`set_co_scene`（前 `co_scene` close＝preempt）→`resume_until_valid` で初回ビートを返す。フラグは消費。
+  3. 2 ビート目以降は既存 `check_talk` の `STORE.co_scene` 継続が後続 tick に配信（`is_blocked` 通常ペース）。
+- **Rationale**: マルチビート配信を**既存機構そのもの**で正しく実現。キュー新設ゼロ・ctx 合成も既存 `act` 流用で「トーク再生と同じ」を徹底（ユーザー方針）。preempt は `set_co_scene` 既存挙動で自然成立。
+- **Trade-offs**: ✅ 二重発火/順序問題が原理的に発生しない・新規ファイル最小（`event/kick.lua` のみ・`talk_queue.lua` 不要）。❌ `dispatch` 前段にフック分岐＋`is_blocked` 突破条件を追加（回帰検証要・R6.3／突破ワンショット消費をテストで担保）。
+- **Follow-up**: 初回ビートのみ突破・後続は通常ペース（R5.5）の特性化テスト。マルチ yield シーンの順序・二重出力なしの E2E。
 
 ### Decision D5: preempt-and-abort は前 `co_scene` 参照の nil 化＋GC でモデル化（LuaJIT `coroutine.close` 非搭載前提）
 - **Context**: R5（即時 preempt-and-abort・前 `co_scene` を閉じ自動復帰しない）。MEMORY 既知: LuaJIT は `coroutine.close` 非搭載。
@@ -189,10 +193,10 @@
 
 ## Risks & Mitigations
 - **R-1 クレート越境 sink の配線ミス** — `RuntimeConfig`→`enable`→socket-bridge の透過を型で固定（`KickSink` 型エイリアス）。注入忘れ＝sink None＝経路非活性で安全側。
-- **R-2 OnSecondChange drain 分岐が通常応答をバイト変化させる** — キック未使用時は `TALK_QUEUE.drain()=nil` で従来経路へ素通り。特性化テスト（バイト不変・PASTA_DEBUG ガード）で回帰検証（R6.3）。
+- **R-2 OnSecondChange dispatch フックが通常応答をバイト変化させる** — キック未使用時は `STORE.kick_pending=nil` でフックが完全素通り（既存 dispatch のまま）。特性化テスト（バイト不変・PASTA_DEBUG ガード）で回帰検証（R6.3）。
 - **R-3 LuaJIT で中断シーンが GC まで生存** — 参照 nil 化で resume 不到達を保証。メモリは GC 回収。観測契約をテストで明示（D5）。
 - **R-4 teardown 競合中のキック消失** — 仕様上許容（デバッグキックは礼儀正しいキューでない）。診断ログ（`seam = "kick.drop"`）を残す。
-- **R-5 空/不正シーン名** — decode 段で空チェック→要求元へエラー（R2.5）。解決不能シーンは `TALK_QUEUE` へ何も積まず破棄＋診断ログ（R3.5）。
+- **R-5 空/不正シーン名** — decode 段で空チェック→要求元へエラー（R2.5）。解決不能シーンは `co_scene` を据えず（前会話保持）破棄＋診断ログ（R3.5）。
 
 ## References
 - `crates/pasta_shiori/src/actor/mailbox.rs`（`ActorMsg` 予約 docstring L88-90）
@@ -202,5 +206,5 @@
 - `crates/pasta_lua/src/debug/dap/decode.rs` L195-221・`wiring/inbound.rs`（`pasta/sourcePresentation` 前例）
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/event/init.lua`（`create_act`/`resume_until_valid`/`set_co_scene`）
 - `crates/pasta_lua/pasta_scripts/pasta/scene.lua`（`SCENE.co_exec`）
-- `crates/pasta_lua/pasta_scripts/pasta/shiori/event/second_change.lua`（drain hook 点）
+- `crates/pasta_lua/pasta_scripts/pasta/shiori/event/second_change.lua`・`virtual_dispatcher.lua:202-205`（`check_talk` の `co_scene` 継続・dispatch フック点）
 - `editors/vscode/src/sourcePresentationToggle.ts`・`extension.ts` L150-219・`package.json`（前例）
