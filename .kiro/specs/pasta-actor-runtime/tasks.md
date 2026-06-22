@@ -39,7 +39,7 @@
   - 観測: 近接した複数 `try_send` が投入順＝処理順で逐次処理され、同時並行 VM アクセスが発生しないテストが緑
   - _Requirements: 6.1, 6.2, 6.3, 6.4_
   - _Boundary: Mailbox_
-- [ ] 3.3 アクタースレッドへの VM pin と recv_async 駆動ループ
+- [x] 3.3 アクタースレッドへの VM pin と recv_async 駆動ループ
   - wintf `block_on` 上で `!Send` VM を生成・pin し、単一 `recv_async().await` ループで mailbox を消費して `SHIORI.request` Function を呼ぶ
   - 既存コルーチン（`co_scene`／`resume_until_valid`／`CALLBACK`）を executor 駆動下で無改変に resume・継続させる
   - 観測: VM 実行スレッド ID＝アクタースレッド ID（SHIORI スレッドと別）で、コルーチン継続・callback 解決テストが緑
