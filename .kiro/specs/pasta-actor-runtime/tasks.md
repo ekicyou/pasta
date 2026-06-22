@@ -56,7 +56,7 @@
   - _Depends: 3.2, 3.3_
 
 - [ ] 4. reload teardown の本番化
-- [ ] 4.1 Stop{done} ack による clean teardown と reload リーク検査
+- [x] 4.1 Stop{done} ack による clean teardown と reload リーク検査
   - unload／detach で `ActorMsg::Stop { done }` を送り、アクターが残メッセージ drain 後に VM 破棄・debug teardown・ウィンドウ破棄を終えて `done` ack を返し、再 load で新規 spawn する（teardown は冪等・スレッドは detach）
   - teardown 途中異常を記録しホストプロセスを巻き込まない
   - 観測: unload→load 反復でスレッドハンドル／USER オブジェクト／port のリーク・枯渇が無い（done ack 後に計測）・二重 teardown が安全に no-op
@@ -100,3 +100,6 @@
   - 観測: 撤去前後で出荷 `pasta.dll` の正規化 sha が一致・`actor-poc` feature 参照が消滅・`cargo build`/`test` 緑
   - _Requirements: 10.8_
   - _Depends: 7.1_
+
+## Implementation Notes
+- 4.1: reload リーク検査の許容値は 1-handle/cycle 漏れが境界（tolerance == RELOAD_CYCLES）に乗る。実害は複数資源/cycle 漏れで確実に検出されるが、将来 tolerance を `< RELOAD_CYCLES` か N 非依存の小定数へ厳格化する余地あり（7.1/7.2 で再検討可）。

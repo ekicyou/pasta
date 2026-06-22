@@ -29,3 +29,12 @@ pub mod thread;
 /// `actor-poc` feature でガードする。FFI 入口（`static MAILBOX`）への配線は task 5.1。
 #[cfg(feature = "actor-poc")]
 pub mod marshaling;
+
+/// 本番 teardown（task 4.1）。`ActorMsg::Stop { done }` 制御メッセージで drain→VM 破棄・
+/// debug teardown・ウィンドウ破棄→done ack を成立させ、SHIORI 側は ack を有界に待って
+/// スレッドを detach する（join 廃止・冪等・異常記録）。reload 反復のリーク検査
+/// （`GetProcessHandleCount`/`GetGuiResources`）も提供する。アクタースレッド（wintf
+/// 依存）と実 OS 計測（`windows-sys/Win32_System_Threading`）を使うため `actor-poc`
+/// feature でガードする。FFI 入口（`windows.rs` の load/unload）への配線は task 5.1。
+#[cfg(feature = "actor-poc")]
+pub mod teardown;

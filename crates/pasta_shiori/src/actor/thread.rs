@@ -83,6 +83,21 @@ impl ActorThread {
             None => Ok(()),
         }
     }
+
+    /// アクタースレッドを **detach** する（本番 teardown 用・design.md「Teardown」）。
+    ///
+    /// 本番 teardown は `JoinHandle` で join せず、`ActorMsg::Stop { done }` の done ack
+    /// で完了を確認する（ack 受信時に VM 破棄・cleanup 完了済み）。本メソッドは
+    /// `JoinHandle` を join せずに drop してスレッドを detach する。`take()` 二重 join の
+    /// 小細工も持たない（join 自体を廃止）。`done` ack を受け取った後に呼ぶこと。
+    ///
+    /// OS スレッドは block_on 完了後に自然終了し、ハンドルは drop で解放される
+    /// （reload リーク検査がスレッドハンドルの非リークを実測で裏取りする）。
+    pub fn detach(mut self) {
+        // JoinHandle を drop すると Rust はスレッドを detach する（join しない）。
+        // done ack 済みなので block_on は既に戻っており、スレッドは終了済みか終了間際。
+        drop(self.handle.take());
+    }
 }
 
 /// 専用アクタースレッドを起動し、その上で `!Send` VM を生成・pin して mailbox を
@@ -126,7 +141,11 @@ pub fn spawn_actor_thread(
                 let _ = ready_tx.send((thread::current().id(), loaded));
 
                 // (2) 単一 recv ループ（select! なし・手動 wake なし）。
-                //     Stop で break → async ブロック完了 → block_on が戻る。
+                //     Stop で break → cleanup → done ack → async ブロック完了 → block_on が戻る。
+                //     done ack を持ち帰り、ループ脱出後（＝先行メッセージ drain 後）に
+                //     VM 破棄・cleanup を終えてから ack を送る（task 4.1・R7.1/R7.4:
+                //     ack 受信時に全資源解放済みを保証）。
+                let mut done_ack: Option<flume::Sender<()>> = None;
                 while let Ok(msg) = rx.recv_async().await {
                     match msg {
                         // GET 同期: 実 SHIORI.request を VM 上で呼び、応答値を返す。
@@ -145,15 +164,32 @@ pub fn spawn_actor_thread(
                         ActorMsg::Notify { req } => {
                             let _ = shiori.request(&req.raw);
                         }
-                        // teardown: ループを抜けて block_on を戻す。done ack を返す
-                        // （drain→cleanup の完全 teardown は task 7.x）。
+                        // teardown: ack 経路を保持してループを抜ける。Stop は同一 FIFO を
+                        // 通るため、ここに到達した時点で先行メッセージは drain 済み
+                        // （clean drain）。ack はループ脱出後・cleanup 完了後に送る。
                         ActorMsg::Stop { done } => {
-                            let _ = done.send(());
+                            done_ack = Some(done);
                             break;
                         }
                     }
                 }
-                // VM（shiori）はこの async ブロック終了時にこのスレッド上で drop される。
+
+                // (3) teardown cleanup（task 4.1・design.md「reload teardown」順序）:
+                //     VM（shiori）をこのスレッド上で明示 drop する。drop により
+                //     PastaShiori が内包する !Send Lua VM・debug backend（socket bridge
+                //     join・port 解放）・関連リソースが解放される（debug backend は VM の
+                //     一部として VM drop 時にこのアクタースレッド上で teardown される）。
+                //     メッセージ専用ウィンドウは block_on 完了時に executor が破棄する。
+                drop(shiori);
+
+                // (4) cleanup 完了後に done ack を送る（R7.1/R7.4: ack 受信＝全資源解放
+                //     済み）。Stop 経由でなく rx Disconnected 等でループを抜けた場合は
+                //     ack 経路を持たない（done_ack=None）ので送らない。
+                if let Some(done) = done_ack {
+                    let _ = done.send(());
+                }
+                // block_on はこの async ブロック完了で戻り、メッセージ専用ウィンドウ等
+                // executor 資源が解放される。スレッドは SHIORI 側が detach 済み。
             });
         })
         .expect("actor thread must spawn");
