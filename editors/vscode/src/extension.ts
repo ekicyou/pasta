@@ -23,6 +23,10 @@ import {
   setPayload as setPlaySceneAtPayload,
   resolvePastaDebugConfig,
 } from './runSceneAtCursor';
+import {
+  requestCommand as reloadShioriRequestCommand,
+  reattachDelaySchedule,
+} from './reloadShiori';
 
 /** Activation state of the extension */
 export interface ActivationState {
@@ -74,6 +78,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // check, position-based customRequest dispatch, error surface (requirements
   // 1.1–1.4, 5.1–5.3, 6.1–6.4, 7.2/7.5).
   registerRunSceneAtCursorCommand(context);
+
+  // Register the SHIORI-reload command (.pasta editor context menu + debug
+  // toolbar, connected-only). Thin vscode glue over the pure, unit-tested
+  // `reloadShiori` module: connection guard, dirty check, reload customRequest
+  // dispatch, then detach-and-wait/retry auto re-attach (NO auto re-kick).
+  // (requirements 7.4, 9.1, 9.3, 9.4, 9.5).
+  registerReloadShioriCommand(context);
 
   // Initialize diagnostics manager
   diagnosticsManager = new DiagnosticsManager();
@@ -325,6 +336,111 @@ function registerRunSceneAtCursorCommand(context: vscode.ExtensionContext): void
         // Surface backend/transport failures to the author (R6.4).
         await vscode.window.showErrorMessage(
           `シーンの実行に失敗しました: ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
+    })
+  );
+}
+
+/**
+ * Injectable async delay used by the reload re-attach loop. Defaults to a real
+ * `setTimeout`-backed sleep; the unit tests replace it with an immediate no-op
+ * (via {@link setReattachDelayForTests}) so the wait/retry loop runs
+ * synchronously WITHOUT real timers. The loop's TERMINATION does not depend on
+ * this delay — it is driven by the pure, finite `reattachDelaySchedule` — so a
+ * no-op delay keeps the test deterministic and bounded.
+ */
+let reattachDelay: (ms: number) => Promise<void> = (ms) =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Test seam: override the re-attach delay (e.g. with an immediate no-op). */
+export function setReattachDelayForTests(fn: (ms: number) => Promise<void>): void {
+  reattachDelay = fn;
+}
+
+/**
+ * Wire the SHIORI-reload command (`pasta.reloadShiori`). Both menu contributions
+ * are gated `when: debugType == 'pasta'` (connected-only, R9.1/9.5); the command
+ * body ALSO guards defensively (no-op + warn if not connected).
+ *
+ * Flow (requirements 7.4, 9.1, 9.3, 9.4, 9.5):
+ *  - Not connected            -> send nothing; warn that reload needs an active
+ *    Pasta session and return (defensive; the menu `when` already hides it).
+ *  - Dirty `.pasta` buffer     -> warn that the reload reads DISK so unsaved
+ *    changes won't be reflected; offer 「保存」 (best-effort; proceed after) (R7.4).
+ *  - Send `customRequest('pasta/reloadShiori')` -> the engine emits
+ *    `\![reload,shiori]`; SSP reloads SHIORI and the debug session detaches.
+ *  - Auto re-attach (R9.3/9.4): wait the initial settle delay, then call
+ *    `startDebugging(folder, resolved)`; on failure retry every interval until
+ *    success or the timeout budget is exhausted (driven by the pure, finite
+ *    `reattachDelaySchedule`). A final timeout surfaces an error (R9.3).
+ *  - Do NOT auto re-run any scene kick after re-attach (R9.5): the author
+ *    re-kicks manually. (No playSceneAt is issued here by design.)
+ */
+function registerReloadShioriCommand(context: vscode.ExtensionContext): void {
+  context.subscriptions.push(
+    vscode.commands.registerCommand('pasta.reloadShiori', async () => {
+      // Connection guard (R9.1/9.5): the menu `when` gates visibility, but the
+      // body also no-ops + warns if somehow invoked without a Pasta session.
+      const session = vscode.debug.activeDebugSession;
+      if (!isPastaSession(session)) {
+        await vscode.window.showWarningMessage(
+          'SHIORIリロードには、実行中の Pasta デバッグセッションが必要です。'
+        );
+        return;
+      }
+
+      // Dirty check (R7.4): the reload reads DISK, so unsaved buffer edits are
+      // NOT reflected. Warn + offer to save (best-effort; proceed after).
+      const editor = vscode.window.activeTextEditor;
+      if (
+        editor &&
+        editor.document.languageId === PASTA_LANGUAGE_ID &&
+        editor.document.isDirty
+      ) {
+        const choice = await vscode.window.showWarningMessage(
+          '未保存の変更があります。リロードはディスク上の内容を読み込むため、未保存の変更は反映されません。保存することを推奨します。',
+          '保存'
+        );
+        if (choice === '保存') {
+          await editor.document.save();
+        }
+      }
+
+      // Send the reload request (R9.2). The engine emits `\![reload,shiori]`;
+      // SSP reloads SHIORI and the debug session detaches.
+      try {
+        await session.customRequest(reloadShioriRequestCommand);
+      } catch (err) {
+        await vscode.window.showErrorMessage(
+          `SHIORIリロード要求に失敗しました: ${err instanceof Error ? err.message : String(err)}`
+        );
+        return;
+      }
+
+      // Auto re-attach (R9.3/9.4): the reload detaches the session. Wait for it
+      // to settle, then attempt to re-attach with the SAME resolved config used
+      // by the 5.1 「デバッグ開始」 guidance (shared resolution). Retry on
+      // failure until the pure, finite schedule is exhausted (timeout budget).
+      //
+      // NOTE (R9.5): we deliberately do NOT auto re-run any scene kick after a
+      // successful re-attach — the author re-kicks manually. No playSceneAt is
+      // issued here.
+      const folder = vscode.workspace.workspaceFolders?.[0];
+      const config = resolveStartDebuggingConfig();
+      const schedule = reattachDelaySchedule();
+      let reattached = false;
+      for (const waitMs of schedule) {
+        await reattachDelay(waitMs);
+        const ok = await vscode.debug.startDebugging(folder, config);
+        if (ok) {
+          reattached = true;
+          break;
+        }
+      }
+      if (!reattached) {
+        await vscode.window.showErrorMessage(
+          'SHIORIリロード後の自動再アタッチに失敗しました。手動でデバッグを再開してください。'
         );
       }
     })

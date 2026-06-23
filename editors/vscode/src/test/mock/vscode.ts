@@ -209,6 +209,17 @@ export function setNextWarningSelection(value: string | undefined): void {
 export const startDebuggingCalls: Array<{ folder: unknown; config: any }> = [];
 
 /**
+ * Programmable per-call results for vscode.debug.startDebugging, consumed in
+ * order (one per call). Lets the reload re-attach tests drive fail-then-succeed
+ * sequences deterministically. When the queue is empty, startDebugging resolves
+ * `true` (the default success). Set via {@link setNextStartDebuggingResults}.
+ */
+export let startDebuggingResults: boolean[] = [];
+export function setNextStartDebuggingResults(values: boolean[]): void {
+  startDebuggingResults = values.slice();
+}
+
+/**
  * Programmable `launch.json` `configurations` array returned by
  * workspace.getConfiguration('launch').get('configurations').
  */
@@ -325,7 +336,8 @@ export const debug = {
   },
   startDebugging: (folder: unknown, config: any) => {
     startDebuggingCalls.push({ folder, config });
-    return Promise.resolve(true);
+    const next = startDebuggingResults.length > 0 ? startDebuggingResults.shift()! : true;
+    return Promise.resolve(next);
   },
   onDidReceiveDebugSessionCustomEvent: debugCustomEventEmitter.event,
   onDidChangeActiveDebugSession: didChangeActiveDebugSessionEmitter.event,
