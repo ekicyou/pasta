@@ -48,11 +48,11 @@
   - VSCode 側 uri→path と索引キー生成を同一規則に揃える
   - ロード済み索引で位置を解決し、確定時は (scene_id, parent)、解決不能時は未検出を返す（最内local優先 > 後方フォールバック、下方に無ければ未検出）
   - 確定した (scene_id, parent) で既存 kick 取次点（`KickSink`／`KickRequest`）を呼び、kick セマンティクスを継承する（取次は fire-and-forget・索引 lookup は読み取り専用で GET ブロックを延ばさない）
-  - **kick transport の local 対応（debug 限定・通常モード無改修）**：`KickRequest` に `parent: Option<String>` を追加し、resolver は `KickRequest{scene, parent}` を組む。kick.lua `KICK.install`/`try_dispatch` を parent 対応に（parent なし＝従来 `co_exec(act, scene)`、parent あり＝`SCENE.search(scene, parent)` の local 分岐経由で func をコルーチン化）。Implementation Notes「local シーン kick の方式決定」参照
-  - 単体テストで「正規化済みパスの一致／global 確定→取次呼出（parent=None）／local 確定→取次呼出（parent=Some）／未検出→取次しない」を観測できる
+  - **kick transport の local 対応（composite-string 方式・debug 限定・通常モード無改修・`KickRequest`/pasta_shiori 不変）**：resolver は確定 (scene_id, parent) を `KickRequest.scene` の search-key 形式へ変換する（global → `会話1`、local → `:会話1:挨拶_1`）。kick.lua `try_dispatch` のみ改修し、先頭 `:` を local-composite として分解→`SCENE.search(local, parent)` の local 分岐でコルーチン化。Implementation Notes「local シーン kick の方式決定」「3.1 への波及（最終方式＝composite-string）」参照
+  - 単体テストで「正規化済みパスの一致／global 確定→取次呼出（scene=`会話1`）／local 確定→取次呼出（scene=`:会話1:挨拶_1`）／未検出→取次しない」を観測できる。kick.lua の `:`-分岐は Lua 側テストで local func 解決を観測
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 7.1, 7.6, 8.1, 8.3_
   - _Depends: 1.1_
-  - _Boundary: PositionResolver, KickRequest(debug), kick.lua_
+  - _Boundary: PositionResolver, kick.lua_
 
 - [ ] 4. Core: DAP トランスポート拡張（位置ベース実行＋リロード）
 - [ ] 4.1 位置ベース実行リクエストを既存 DAP チャネルに追加する
@@ -150,7 +150,12 @@
   - **採用方式（🅰・debug 限定・通常モード無改修）**：local を狙うには `search_scene` の **local 分岐**（parent あり → `resolve_scene_id_unified(parent, name)` → local_name を正しく保持）を通す。実装は kick.lua 側で「parent あり時は `SCENE.search(local_name, parent)` で直接解決し func をコルーチン化」する小改修。**通常 SSP 動作では kick 要求が来ず `kick_pending` も立たないため完全に inert**（kick 経路・索引ともに debug opt-in）。**この『通常モード非破壊』は 2.2/3.1/4.1/6.2 のレビュー必須検証項目**。
   - **2.2 索引が格納する識別子**：`collect_scenes` が返す `(global_name, local_name)`（例 `(会話1, 挨拶_1)`）をそのまま使い、各シーンを **(scene_id, parent)** で保持する。global → `scene_id=会話1, parent=None, level=0`。local → `scene_id=挨拶_1, parent=会話1, level=1`。よって task 1.1 の `SceneIdentityIndex`/`SceneSpan` を **parent: Option<String> を持つよう拡張**（2.2 境界内）。`scene_at` は最内（level 最大）を返し、呼び出し側へ (scene_id, parent) を渡せること。
   - **2.2 の join（local 含む）**：join_key の親参照 `会話#1`（base=会話・出現順1）→ runtime global_name `会話1` を (base, 出現順) で対応付け、local は `L:会話#1:挨拶_1` → `(parent=会話1, local fn_name=挨拶_1)` を `collect_scenes` の `(会話1, 挨拶_1)` と突合する。
-  - **3.1/4.1 への波及**：`KickRequest` に `parent: Option<String>` を追加（debug 専用構造体）。resolver は確定 (scene_id, parent) で `KickRequest{scene, parent}` を組む。kick.lua `KICK.install`/`try_dispatch` を parent 対応に（parent なし＝従来の `co_exec(act, scene)`、parent あり＝`SCENE.search(scene, parent)` の local 分岐経由）。いずれも debug kick 経路限定。`SCENE.search`/`resolve_scene_id_unified`/`SCENE.get` は既存 API をそのまま利用（新規シグネチャ追加は最小限）。
+  - **3.1 への波及（最終方式＝composite-string・KickRequest と pasta_shiori は不変）**：当初案の「`KickRequest{scene,parent}` フィールド追加」は **採らない**。理由：parent を別フィールドにすると配送鎖（`KickRequest`→`lifecycle.rs kick_into_mailbox`→`ActorMsg::Kick{scene}`→`thread.rs shiori.kick(scene)`→`entry.lua SHIORI.kick`→`KICK.install`）の **全段（pasta_shiori 跨ぎ）に波及**する。
+    - 代わりに **resolver が `KickRequest.scene` に search-key 形式を載せる**：global → `会話1`（従来通り）、local → `:会話1:挨拶_1`（= `:{parent}:{local_fn_name}`）。`KickRequest{scene:String}` 契約は**不変**（R5.5「既存取次点を再利用」に最も忠実）、**pasta_shiori も無改修**（scene は不透明文字列として `shiori.kick(&scene)` まで素通し・`thread.rs:214`／`entry.lua:99-100` 確認済）。
+    - **kick.lua `try_dispatch` のみ改修**：`scene_name` が先頭 `:` なら local-composite として `:parent:local` を分解し、`SCENE.search(local, parent)`（local 分岐 → `resolve_scene_id_unified` → local_name 保持）で func を取得しコルーチン化（`choice_select.lua` の `create_scene_coroutine` パターン／`co_exec` のラッパを踏襲）。先頭 `:` でなければ従来の `co_exec(act, scene)`（global・不変）。
+    - **`:` 識別子の安全性**：`SceneRegistry::sanitize_name`（`scene_registry.rs:228`）が英数字・`_` 以外を `_` 置換するため、global 実名は決して `:` を含まない＝衝突しない。
+    - **debug 限定・通常モード非破壊**：kick 経路は debug opt-in、`kick_pending` が立つ時のみ作用。通常 SSP は無影響。
+    - index は引き続き (scene_id, parent) を格納（2.2 済）。resolver がそれを composite-string へ変換するだけ。`KickRequest`／`ActorMsg`／`SHIORI.kick` の signature は触らない。
 
 - **検証の教訓（全タスク共通・2.1 で露呈）**：`cargo test -p pasta_lua --lib` だけでは **`tests/` 配下の integration test 目標を検証しない**。task 2.1 は `generate_local_scene` に `parent_ref` を追加したが `tests/transpiler/record_wiring_scope_test.rs` の呼び出し側を更新せず、`--lib` 緑のままコミットした（2.2 で inline 修正済）。**以降の実装・レビューは `cargo test -p pasta_lua`（全目標）で回帰確認すること**。`pub` 関数のシグネチャ変更時は `tests/` の呼び出し側も grep して更新する。
 - **2.2 索引の attachment 機構（3.1 resolver が読む口）**：`SourceMap` に `scene_index: OnceLock<SceneIdentityIndex>`（write-once 内部可変）。join site は `runtime/factory.rs`（finalize 後・`source_map.is_some()` で debug-gated）で `build_scene_index(&lua, source_map)` を呼び `set_scene_index`。読み取りは `SourceMap::scene_at(file, line) -> Option<SceneIdentity{scene_id, parent}>`。`__start__` は level-1 として索引せず global 本体領域は `(会話N, None)` が覆う（global kick が `__start__` を強制する挙動と整合）。named local のみ level-1+parent。
