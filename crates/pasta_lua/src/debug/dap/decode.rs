@@ -9,8 +9,7 @@ use crate::debug::types::SessionCommand;
 
 use super::DapAdapter;
 use super::codec::{
-    parse_play_scene_at_strict, parse_scene_strict, parse_set_breakpoints,
-    parse_source_mode_strict, source_mode_str,
+    parse_play_scene_at_strict, parse_set_breakpoints, parse_source_mode_strict, source_mode_str,
 };
 use super::pending::PendingKind;
 
@@ -52,17 +51,6 @@ pub struct Decoded {
     ///
     /// [`attach_source_mode`]: Decoded::attach_source_mode
     pub requested_source_mode: Option<SourceMode>,
-    /// The scene name extracted from a `pasta/playScene` custom request
-    /// (pasta-scene-kick requirements 2.1 / 2.2 / 2.5), parsed STRICTLY: `Some`
-    /// ONLY for a non-empty (post-trim) string `scene` argument; a missing key,
-    /// a non-string value, an empty string, or a whitespace-only string all
-    /// yield `None`.
-    ///
-    /// `None` means the request carried no usable scene name and the kick must
-    /// NOT be issued (R2.5). The decode itself produces no command/response — the
-    /// wiring (task 2.2) owns sink invocation and the ack — so a `pasta/playScene`
-    /// request never falls into generic routing (R2.3).
-    pub kick_scene: Option<String>,
     /// The position `(uri, line)` extracted from a `pasta/playSceneAt` custom
     /// request (kick-from-cursor requirements 4.1 / 4.4), parsed STRICTLY: `Some`
     /// ONLY when `args.uri` is a non-empty (post-trim) string AND `args.line` is a
@@ -246,23 +234,6 @@ impl DapAdapter {
                     ..Decoded::default()
                 }
             }
-            "pasta/playScene" => {
-                // The decode SIDE of the scene kick (pasta-scene-kick R2.1 / R2.2
-                // / R2.3 / R2.5). Extract `args.scene` STRICTLY into `kick_scene`:
-                // a non-empty (post-trim) string yields `Some(name)`; a missing
-                // key, a non-string, an empty string, or a whitespace-only string
-                // yields `None` (invalid — the kick must NOT be issued, R2.5).
-                //
-                // No immediate response/command is produced here (R2.3): the
-                // wiring (task 2.2) owns sink invocation and the ack/error
-                // response. Leaving every other field at default keeps the request
-                // out of generic routing.
-                let kick_scene = parse_scene_strict(args);
-                Decoded {
-                    kick_scene,
-                    ..Decoded::default()
-                }
-            }
             "pasta/playSceneAt" => {
                 // The decode SIDE of the position-based scene kick (kick-from-
                 // cursor R4.1 / R4.4). Extract `args.uri` (non-empty string) and
@@ -336,36 +307,6 @@ impl DapAdapter {
             "pasta/sourcePresentation",
             json!({ "mode": source_mode_str(mode) }),
         )
-    }
-
-    /// Build the `pasta/playScene` acceptance RESPONSE [`Value`] (success ack),
-    /// correlated to `request_seq` (pasta-scene-kick requirement 2.3 / 2.5).
-    ///
-    /// The wiring (task 2.2) sends this AFTER it has handed the extracted scene
-    /// name to the [`KickSink`](crate::debug::kick::KickSink), confirming the kick
-    /// was accepted (the actual scene execution is asynchronous and not awaited).
-    pub(crate) fn play_scene_response(&mut self, request_seq: u64) -> Value {
-        self.response(request_seq, "pasta/playScene", Value::Null)
-    }
-
-    /// Build the `pasta/playScene` ERROR RESPONSE [`Value`] (`success: false`)
-    /// for an empty / invalid scene name, correlated to `request_seq`
-    /// (pasta-scene-kick requirement 2.5: 空または不正なシーン名はキックせず
-    /// エラーを要求元へ返す).
-    ///
-    /// Unlike [`response`](Self::response) (which is a fixed `success: true`
-    /// envelope), this carries `success: false` and a human-readable `message`
-    /// so the VSCode extension can surface the failure to the author.
-    pub(crate) fn play_scene_error(&mut self, request_seq: u64) -> Value {
-        let seq = self.next_seq();
-        json!({
-            "seq": seq,
-            "type": "response",
-            "request_seq": request_seq,
-            "success": false,
-            "command": "pasta/playScene",
-            "message": "scene name is empty or invalid",
-        })
     }
 
     /// Build the `pasta/playSceneAt` acceptance RESPONSE [`Value`] (success ack),

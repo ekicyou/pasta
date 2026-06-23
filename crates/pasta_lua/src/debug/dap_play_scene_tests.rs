@@ -1,97 +1,38 @@
-//! Inline test cluster for the `pasta/playScene` custom request decode
-//! (pasta-scene-kick task 2.1, component PlaySceneDecode). Mirrors the
-//! `pasta/sourcePresentation` decode cluster: a custom DAP request whose decode
-//! extracts a scene name into `Decoded.kick_scene` (`Some`), treating an
-//! empty/missing/non-string name as invalid (`None`) without falling into
-//! generic routing.
+//! Inline test cluster for the position-based `pasta/playSceneAt` custom request
+//! decode (kick-from-cursor task 4.1, component "PlaySceneAt transport"). A
+//! custom DAP request whose decode extracts a position `(uri, line)` into
+//! `Decoded.play_scene_at` (`Some`), treating a missing/empty/non-string `uri` or
+//! a missing/non-number `line` as invalid (`None`) without falling into generic
+//! routing.
+//!
+//! The OLD name-based `pasta/playScene` decode arm (and its `kick_scene` field)
+//! was REMOVED in task 4.2 (requirement 5.4): the only external scene-execution
+//! request is now `pasta/playSceneAt`. The `old_name_based_play_scene_is_unrecognized`
+//! test below pins that removed-arm invariant.
 use super::dap_test_support::*;
 use super::*;
 
-// --- pasta/playScene custom request (R2.1 / R2.2 / R2.3 / R2.5) ----------
+// --- removed name-based transport (task 4.2 / requirement 5.4) ------------
 
-/// R2.1 / R2.2: a `pasta/playScene` request carrying `scene: "intro"` decodes to
-/// a `Decoded` whose `kick_scene` is `Some("intro")` (the extracted scene name).
-/// The decode itself produces NO session command and NO response — the wiring
-/// (task 2.2) owns sink invocation and the ack — so the request does not fall
-/// into generic routing (R2.3): every other `Decoded` field stays at default.
+/// Requirement 5.4: the OLD name-based `pasta/playScene` external transport was
+/// removed. A `pasta/playScene` request is no longer a recognised custom request:
+/// the decode arm is GONE, so it falls through to the `_ => Decoded::default()`
+/// catch-all and produces an EMPTY `Decoded` (no command, no response, no special
+/// scene-kick state). This is the observable that the old arm is absent.
 #[test]
-fn play_scene_request_decodes_scene_name() {
+fn old_name_based_play_scene_is_unrecognized() {
     let mut dap = DapAdapter::new();
+    // Even a well-formed (old-style) name-based request is now unrecognised.
     let decoded = dap.decode_request(&request(70, "pasta/playScene", json!({ "scene": "intro" })));
     assert_eq!(
-        decoded.kick_scene,
-        Some("intro".to_string()),
-        "R2.1/R2.2: scene=intro → Some(\"intro\") kick scene"
-    );
-    // Decode does not route or ack: other fields are default (R2.3 — no generic
-    // routing / stop loop fallthrough).
-    assert_eq!(
         decoded,
-        Decoded {
-            kick_scene: Some("intro".to_string()),
-            ..Decoded::default()
-        }
+        Decoded::default(),
+        "R5.4: pasta/playScene is no longer recognised — decodes to an empty Decoded"
     );
-}
-
-/// R2.5: an EMPTY scene name (`""`) is invalid and decodes to `None` — the kick
-/// must NOT be issued for an empty name, and the request must not fall into
-/// generic routing (other fields default).
-#[test]
-fn play_scene_request_empty_scene_is_none() {
-    let mut dap = DapAdapter::new();
-    let decoded = dap.decode_request(&request(71, "pasta/playScene", json!({ "scene": "" })));
+    // And specifically it does NOT populate the position-based field either.
     assert_eq!(
-        decoded.kick_scene, None,
-        "R2.5: empty scene name → None (invalid)"
-    );
-    assert_eq!(decoded, Decoded::default());
-}
-
-/// R2.5: a whitespace-only scene name is likewise invalid (`None`).
-#[test]
-fn play_scene_request_blank_scene_is_none() {
-    let mut dap = DapAdapter::new();
-    let decoded = dap.decode_request(&request(72, "pasta/playScene", json!({ "scene": "   " })));
-    assert_eq!(
-        decoded.kick_scene, None,
-        "R2.5: whitespace-only scene name → None (invalid)"
-    );
-}
-
-/// R2.5: a MISSING `scene` key decodes to `None` (no kick), other fields default.
-#[test]
-fn play_scene_request_missing_scene_is_none() {
-    let mut dap = DapAdapter::new();
-    let decoded = dap.decode_request(&request(73, "pasta/playScene", json!({})));
-    assert_eq!(
-        decoded.kick_scene, None,
-        "R2.5: absent scene key → None (invalid)"
-    );
-    assert_eq!(decoded, Decoded::default());
-
-    // A non-string scene is also rejected.
-    let mut dap2 = DapAdapter::new();
-    let decoded2 = dap2.decode_request(&request(74, "pasta/playScene", json!({ "scene": 1 })));
-    assert_eq!(
-        decoded2.kick_scene, None,
-        "R2.5: non-string scene → None (invalid)"
-    );
-}
-
-/// R2.3 (no regression): an existing `pasta/sourcePresentation` decode does NOT
-/// populate `kick_scene` — the two custom requests stay independent.
-#[test]
-fn source_presentation_request_does_not_set_kick_scene() {
-    let mut dap = DapAdapter::new();
-    let decoded = dap.decode_request(&request(
-        75,
-        "pasta/sourcePresentation",
-        json!({ "mode": "lua" }),
-    ));
-    assert_eq!(
-        decoded.kick_scene, None,
-        "sourcePresentation must not overload kick_scene"
+        decoded.play_scene_at, None,
+        "R5.4: the removed name-based arm must not touch play_scene_at"
     );
 }
 
@@ -196,22 +137,5 @@ fn play_scene_at_request_non_number_line_is_none() {
     assert_eq!(
         decoded.play_scene_at, None,
         "R4.4: non-number line → None (invalid)"
-    );
-}
-
-/// 5.4 (coexistence): the old `pasta/playScene` decode still works alongside the
-/// new arm (task 4.1 keeps both; 4.2 removes the old one later). A
-/// `pasta/playSceneAt` request must NOT populate `kick_scene`.
-#[test]
-fn play_scene_at_request_does_not_set_kick_scene() {
-    let mut dap = DapAdapter::new();
-    let decoded = dap.decode_request(&request(
-        86,
-        "pasta/playSceneAt",
-        json!({ "uri": "file:///c:/work/talk.pasta", "line": 25 }),
-    ));
-    assert_eq!(
-        decoded.kick_scene, None,
-        "playSceneAt must not overload kick_scene"
     );
 }

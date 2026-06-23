@@ -1,18 +1,19 @@
-//! Tasks 2.2 + 2.3 — the scene-kick WIRING in [`handle_inbound`]
-//! (pasta-scene-kick requirements 2.3 / 2.4 / 2.5 / 2.6).
+//! Task 4.2 (requirement 5.4) — the OLD name-based `pasta/playScene` external
+//! transport has been REMOVED. The only external scene-execution entry is now
+//! the position-based `pasta/playSceneAt` (see `wiring_play_scene_at_tests.rs`).
 //!
-//! A `pasta/playScene` custom request is a self-contained handler (same shape
-//! as `try_source_presentation_toggle`, NOT generic routing): when a `KickSink`
-//! is wired AND the decoded `kick_scene` is `Some(name)`, the handler invokes
-//! the sink with `KickRequest { scene: name }` exactly once and sends a success
-//! ack. An empty/invalid scene name (`None`) sends an error response and never
-//! calls the sink (R2.5). With no sink wired (`None`), the kick path is inert —
-//! the request is recognised but no sink call and no ack are produced (R2.6).
+//! This file used to drive the name-based scene-kick wiring (`try_play_scene_kick`):
+//! a `pasta/playScene` request invoked the injected `KickSink` and acked. That
+//! handler is gone. The remaining test below pins the removal INVARIANT: an
+//! external name-based `pasta/playScene` request is NO LONGER handled as a
+//! scene-kick — even with a sink wired, the sink is NEVER invoked and no scene-kick
+//! ack is produced. The request is now an unrecognised custom request (it decodes
+//! to an empty `Decoded`) and is dropped by generic routing.
 //!
 //! These tests drive [`handle_inbound`] DIRECTLY over a real loopback
-//! [`Transport`] (a connected client reads the response frames) and observe the
-//! sink via a recording mock, so the exact wire frames AND the sink calls are
-//! both asserted.
+//! [`Transport`] (a connected client reads any response frames) and observe the
+//! sink via a recording mock, so both the wire frames AND the sink calls are
+//! asserted.
 
 use std::io::BufReader;
 use std::net::{SocketAddr, TcpStream};
@@ -33,8 +34,7 @@ use super::{SharedAdapter, SourceMapWiring, handle_inbound};
 /// TEST-ONLY watchdog so a wiring test cannot hang on a frame read.
 const WATCHDOG: Duration = Duration::from_secs(10);
 
-/// A real loopback [`Transport`] plus a connected client end (mirrors the
-/// source-presentation toggle harness).
+/// A real loopback [`Transport`] plus a connected client end.
 struct Harness {
     transport: Transport,
     client: BufReader<TcpStream>,
@@ -55,15 +55,8 @@ impl Harness {
         }
     }
 
-    /// Read the next framed message the bridge wrote (bounded by the timeout).
-    fn recv(&mut self) -> Value {
-        read_frame(&mut self.client)
-            .expect("client read must succeed (TEST-ONLY timeout)")
-            .expect("a frame must be present")
-    }
-
     /// True if the client has no immediately-available frame (a brief grace
-    /// read window): used to assert the inert path emits NO response.
+    /// read window): used to assert the removed path emits NO response.
     fn recv_none(&mut self) -> bool {
         // A short timeout so an (unexpected) frame is still observed but the
         // test does not block the full watchdog when nothing is sent.
@@ -91,7 +84,8 @@ fn recording_sink() -> (KickSink, Arc<Mutex<Vec<String>>>) {
     (sink, calls)
 }
 
-/// Build a `pasta/playScene` request Value with `seq` and a `scene` argument.
+/// Build a (now-defunct) `pasta/playScene` request Value with `seq` and a
+/// `scene` argument.
 fn play_req(seq: u64, scene: &str) -> Value {
     json!({
         "seq": seq,
@@ -101,11 +95,13 @@ fn play_req(seq: u64, scene: &str) -> Value {
     })
 }
 
-/// 2.3 / 2.4: a valid `pasta/playScene` with a wired sink — the sink is called
-/// exactly once with `KickRequest { scene: "intro" }` and a success ack frame is
-/// sent, correlated to the request seq.
+/// R5.4: the external name-based `pasta/playScene` transport is GONE. Even with a
+/// `KickSink` wired AND a valid (non-empty) scene name, the request is NOT handled
+/// as a scene-kick: the sink is NEVER invoked, no scene-kick ack/error frame is
+/// produced, and nothing special is routed. (Before task 4.2 this exact request
+/// invoked the sink once and acked `success: true` — that path no longer exists.)
 #[test]
-fn valid_play_scene_calls_sink_once_and_acks() {
+fn name_based_play_scene_is_not_accepted_as_scene_kick() {
     let mut h = Harness::new();
     let adapter: SharedAdapter = Arc::new(Mutex::new(DapAdapter::new()));
     let breakpoints = BreakpointSet::new();
@@ -117,98 +113,28 @@ fn valid_play_scene_calls_sink_once_and_acks() {
         &adapter,
         &breakpoints,
         &cmd_tx,
-        &play_req(40, "intro"),
+        &play_req(40, "intro"), // a valid name that the OLD path would have kicked
         &SourceMapWiring::disabled(),
-        Some(&sink),
+        Some(&sink), // sink IS wired — the old path would have invoked it
     );
     assert!(ok, "handle_inbound must not report the peer gone");
 
-    // (a) sink invoked exactly once with the decoded scene name (2.4).
-    {
-        let recorded = calls.lock().unwrap();
-        assert_eq!(
-            recorded.as_slice(),
-            ["intro"],
-            "sink called once with the scene"
-        );
-    }
-
-    // (b) success ack, correlated to the request seq (2.3).
-    let resp = h.recv();
-    assert_eq!(resp["type"], "response");
-    assert_eq!(resp["command"], "pasta/playScene");
-    assert_eq!(resp["request_seq"], 40);
-    assert_eq!(resp["success"], true, "valid kick is acked success=true");
-
-    // No command is forwarded into generic stop-context routing (2.3).
-    assert!(
-        cmd_rx.try_recv().is_err(),
-        "playScene must not fall into routing"
-    );
-}
-
-/// 2.5: an EMPTY scene name with a wired sink — the kick is NOT issued (sink
-/// untouched) and an error response (`success: false`) is returned.
-#[test]
-fn empty_scene_does_not_call_sink_and_returns_error() {
-    let mut h = Harness::new();
-    let adapter: SharedAdapter = Arc::new(Mutex::new(DapAdapter::new()));
-    let breakpoints = BreakpointSet::new();
-    let (cmd_tx, cmd_rx): (_, Receiver<SessionCommand>) = mpsc::channel();
-    let (sink, calls) = recording_sink();
-
-    let ok = handle_inbound(
-        &h.transport,
-        &adapter,
-        &breakpoints,
-        &cmd_tx,
-        &play_req(41, "   "), // whitespace-only → decode yields None
-        &SourceMapWiring::disabled(),
-        Some(&sink),
-    );
-    assert!(ok);
-
-    // sink NOT called (2.5).
+    // The sink is NEVER invoked from a name-based external request (R5.4).
     assert!(
         calls.lock().unwrap().is_empty(),
-        "empty name must not kick (2.5)"
+        "R5.4: name-based pasta/playScene must NOT invoke the kick sink"
     );
 
-    // error response (2.5).
-    let resp = h.recv();
-    assert_eq!(resp["type"], "response");
-    assert_eq!(resp["command"], "pasta/playScene");
-    assert_eq!(resp["request_seq"], 41);
-    assert_eq!(resp["success"], false, "empty name → error response (2.5)");
+    // No scene-kick response frame is produced (the old `pasta/playScene` ack is
+    // gone); the request decodes to an empty `Decoded` and routes to nothing.
+    assert!(
+        h.recv_none(),
+        "R5.4: removed name-based path must emit no scene-kick response frame"
+    );
 
+    // Nothing is forwarded into generic stop-context routing either.
     assert!(
         cmd_rx.try_recv().is_err(),
-        "playScene must not fall into routing"
+        "R5.4: unrecognised pasta/playScene routes to no command"
     );
-}
-
-/// 2.6: NO sink wired (`None`) — the kick path is inert. The request is
-/// recognised (it does NOT fall into generic routing) but no sink is called and
-/// no response frame is produced.
-#[test]
-fn no_sink_keeps_kick_path_inert() {
-    let mut h = Harness::new();
-    let adapter: SharedAdapter = Arc::new(Mutex::new(DapAdapter::new()));
-    let breakpoints = BreakpointSet::new();
-    let (cmd_tx, cmd_rx): (_, Receiver<SessionCommand>) = mpsc::channel();
-
-    let ok = handle_inbound(
-        &h.transport,
-        &adapter,
-        &breakpoints,
-        &cmd_tx,
-        &play_req(42, "intro"),
-        &SourceMapWiring::disabled(),
-        None, // R2.6: sink not injected → path non-activated
-    );
-    assert!(ok);
-
-    // No frame is sent back, and nothing is forwarded into routing.
-    assert!(h.recv_none(), "no sink → no response frame (R2.6 inert)");
-    assert!(cmd_rx.try_recv().is_err(), "no sink → no routed command");
 }

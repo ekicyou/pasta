@@ -2,7 +2,7 @@
 //! (requirements 4.1 / 4.2 / 4.3 / 4.4, 2.3 / 2.6).
 //!
 //! A `pasta/playSceneAt` custom request is a self-contained handler (same shape
-//! as `try_play_scene_kick`, NOT generic routing): when a `KickSink` is wired AND
+//! as `try_source_presentation_toggle`, NOT generic routing): when a `KickSink` is wired AND
 //! a `SourceMap` index is loaded, the handler resolves the decoded `(uri, line)`
 //! via `resolve_and_kick`, invokes the sink with the resolved scene exactly once,
 //! and sends a success ack (R4.2). A position with no scene (`NotFound`) sends an
