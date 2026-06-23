@@ -19,10 +19,10 @@ import {
   statusLabel,
 } from './sourcePresentationToggle';
 import {
-  requestCommand as playSceneRequestCommand,
-  setPayload as setPlayScenePayload,
-  validateSceneName,
-} from './playSceneRequest';
+  requestCommand as playSceneAtRequestCommand,
+  setPayload as setPlaySceneAtPayload,
+  resolvePastaDebugConfig,
+} from './runSceneAtCursor';
 
 /** Activation state of the extension */
 export interface ActivationState {
@@ -68,11 +68,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // this is thin vscode glue (requirements 2.1–2.6, 6.4).
   registerSourcePresentationToggle(context);
 
-  // Register the scene-kick command (palette + debug toolbar). Thin vscode glue
-  // over the pure, unit-tested `playSceneRequest` module: session guard, scene
-  // name prompt, customRequest dispatch, error surface (requirements 1.1–1.4,
-  // 2.5).
-  registerPlaySceneCommand(context);
+  // Register the position-based scene-run command (.pasta editor context menu).
+  // Thin vscode glue over the pure, unit-tested `runSceneAtCursor` module:
+  // active-editor/cursor read, session guard + start-debugging guidance, dirty
+  // check, position-based customRequest dispatch, error surface (requirements
+  // 1.1–1.4, 5.1–5.3, 6.1–6.4, 7.2/7.5).
+  registerRunSceneAtCursorCommand(context);
 
   // Initialize diagnostics manager
   diagnosticsManager = new DiagnosticsManager();
@@ -229,46 +230,101 @@ function registerSourcePresentationToggle(context: vscode.ExtensionContext): voi
   refreshStatusBar();
 }
 
+/** The language id for `.pasta` documents (mirrors package.json `languages`). */
+const PASTA_LANGUAGE_ID = 'pasta';
+
 /**
- * Wire the scene-kick command (`pasta.debug.playScene`). Mirrors the
- * `pasta/sourcePresentation` toggle wiring: an `isPastaSession` guard, then a
- * scene-name prompt, then a `customRequest` dispatch, all delegated to the
- * pure `playSceneRequest` helpers.
- *
- * Flow (requirements 1.1–1.4, 2.5):
- *  - No active Pasta session  -> warn and send nothing (R1.3).
- *  - `showInputBox` cancelled  -> send nothing (R1.4).
- *  - Empty/whitespace name     -> send nothing (R1.4, client-side guard).
- *  - Valid name                -> `customRequest('pasta/playScene', { scene })`
- *    inside try/catch; a rejected request surfaces an error message (R1.2/R2.5).
+ * Resolve the Pasta debug configuration to start/re-attach (requirement 6.3).
+ * Reads the workspace `launch.json` configurations and delegates the choice to
+ * the pure `resolvePastaDebugConfig` (workspace `type: 'pasta'` preferred, else
+ * default attach `127.0.0.1:9276`). Shared with task 5.2's re-attach.
  */
-function registerPlaySceneCommand(context: vscode.ExtensionContext): void {
+function resolveStartDebuggingConfig() {
+  const launchConfigs = vscode.workspace
+    .getConfiguration('launch')
+    .get<unknown>('configurations');
+  return resolvePastaDebugConfig(launchConfigs);
+}
+
+/**
+ * Wire the position-based scene-run command (`pasta.runSceneAtCursor`). The
+ * `editor/context` menu always shows it for `.pasta` (NOT debug-gated); the
+ * connection check happens at invoke time. All pure decisions (command string,
+ * payload, config resolution) are delegated to the `runSceneAtCursor` helpers.
+ *
+ * Flow (requirements 1.1–1.4, 5.1–5.3, 6.1–6.4, 7.2/7.5):
+ *  - No active `.pasta` editor      -> warn and return (defensive).
+ *  - Not connected                  -> send nothing; warn + offer a
+ *    「デバッグ開始」action that starts a session via `startDebugging` with the
+ *    resolved config (R6.2/R6.3). NEVER prompts for a scene name (R1.4).
+ *  - Dirty buffer                   -> warn the running ghost may differ; offer
+ *    「保存」 (best-effort; proceed after) (R7.2/R7.5).
+ *  - Connected + valid cursor       -> `customRequest('pasta/playSceneAt',
+ *    { uri, line })` with a 1-based line (R1.2/R1.3/R4.1). A thrown request OR a
+ *    resolved `success:false` body surfaces the reason via showErrorMessage
+ *    (R6.4).
+ */
+function registerRunSceneAtCursorCommand(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand('pasta.debug.playScene', async () => {
-      const session = vscode.debug.activeDebugSession;
-      if (!isPastaSession(session)) {
-        // No active Pasta session: notify and send nothing (requirement 1.3).
+    vscode.commands.registerCommand('pasta.runSceneAtCursor', async () => {
+      // Defensive: require an active `.pasta` editor (R1.1/R1.2).
+      const editor = vscode.window.activeTextEditor;
+      if (!editor || editor.document.languageId !== PASTA_LANGUAGE_ID) {
         await vscode.window.showWarningMessage(
-          'シーンのキックには、実行中の Pasta デバッグセッションが必要です。'
+          '「▶ シーンを実行」には、アクティブな .pasta エディタが必要です。'
         );
         return;
       }
-      // Prompt for the scene name to kick (requirement 1.1).
-      const scene = await vscode.window.showInputBox({
-        prompt: 'キックするシーン名を入力してください。',
-        placeHolder: 'シーン名',
-      });
-      // Cancelled (Esc / empty dismiss) or empty/whitespace-only: send nothing
-      // (requirement 1.4; client-side mirror of the backend's empty rejection).
-      if (scene === undefined || !validateSceneName(scene)) {
+
+      // Connection check (R6.2/R6.3): if not connected, do NOT send. Warn and
+      // offer a 「デバッグ開始」action that starts a session.
+      const session = vscode.debug.activeDebugSession;
+      if (!isPastaSession(session)) {
+        const choice = await vscode.window.showWarningMessage(
+          'Pasta デバッグセッションが接続されていません。シーンを実行するにはデバッグを開始してください。',
+          'デバッグ開始'
+        );
+        if (choice === 'デバッグ開始') {
+          const folder = vscode.workspace.workspaceFolders?.[0];
+          await vscode.debug.startDebugging(folder, resolveStartDebuggingConfig());
+        }
         return;
       }
+
+      // Dirty check (R7.2/R7.5): warn that the running ghost may differ from the
+      // unsaved buffer and offer to save (best-effort; proceed after — design
+      // Decision 4). Reload guidance is via the separate SHIORIリロード command.
+      if (editor.document.isDirty) {
+        const choice = await vscode.window.showWarningMessage(
+          '未保存の変更があります。実行中のゴーストは保存・リロード済みの内容で動作するため、表示とずれる場合があります。保存してリロードすることを推奨します。',
+          '保存'
+        );
+        if (choice === '保存') {
+          await editor.document.save();
+        }
+      }
+
+      // Position-based dispatch (R1.2/R1.3/R4.1). VSCode `Position.line` is
+      // 0-based; the engine expects a 1-based line -> add 1 here.
+      const uri = editor.document.uri.toString();
+      const line = editor.selection.active.line + 1;
       try {
-        await session.customRequest(playSceneRequestCommand, setPlayScenePayload(scene));
+        const result = await session.customRequest(
+          playSceneAtRequestCommand,
+          setPlaySceneAtPayload(uri, line)
+        );
+        // customRequest may RESOLVE with a `success:false` body (rather than
+        // throwing); surface that reason too (R6.4).
+        if (result && typeof result === 'object' && (result as { success?: unknown }).success === false) {
+          const reason = (result as { message?: unknown }).message;
+          await vscode.window.showErrorMessage(
+            `シーンの実行に失敗しました: ${typeof reason === 'string' && reason.length > 0 ? reason : '不明なエラー'}`
+          );
+        }
       } catch (err) {
-        // Surface backend/transport failures to the author (requirement 2.5).
+        // Surface backend/transport failures to the author (R6.4).
         await vscode.window.showErrorMessage(
-          `シーンのキックに失敗しました: ${err instanceof Error ? err.message : String(err)}`
+          `シーンの実行に失敗しました: ${err instanceof Error ? err.message : String(err)}`
         );
       }
     })
