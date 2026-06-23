@@ -154,6 +154,52 @@ fn enable_disabled_returns_none_and_no_trace() {
     );
 }
 
+/// pasta-scene-kick task 7.4 — gate 1: debug 無効＝キック経路非活性（R2.6）。
+///
+/// `enabled=false` のとき、`enable` に **配線済みの実 sink（recording mock）** を渡しても
+/// その sink は一切駆動されない（経路非活性）。無効ゲートは sink を未消費のまま drop し、
+/// socket-bridge スレッドを起こさないため、inbound `pasta/playScene` を駆動する経路が
+/// そもそも存在しない。観測: `enable` は `Ok(None)`（ハンドル無し＝スレッド無し）を返し、
+/// sink の呼び出し回数が 0 のままであること（無効ゲートが破れて sink を駆動すれば落ちる
+/// ＝load-bearing）。既存 `no_sink_keeps_kick_path_inert`（inbound へ `None` 直渡し）とは
+/// 異なり、本テストは **enable レベルで「sink を渡しても無効なら非活性」** を固定する。
+#[test]
+fn disabled_enable_keeps_wired_kick_sink_inert() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+
+    use crate::debug::kick::{KickRequest, KickSink};
+
+    let lua = mlua::Lua::new();
+    // 既定（無効）の設定。
+    let cfg = DebugConfig::resolve(None, None, None, None, None, None, None, None);
+    assert!(
+        !cfg.enabled,
+        "precondition: cfg must be disabled by default"
+    );
+
+    // 実 sink（呼び出し回数を記録する recording mock）を配線。
+    let calls = Arc::new(AtomicUsize::new(0));
+    let calls2 = Arc::clone(&calls);
+    let sink: KickSink = Arc::new(move |_req: KickRequest| {
+        calls2.fetch_add(1, Ordering::SeqCst);
+    });
+
+    // enabled=false で sink を渡しても: ハンドル無し（スレッド無し）＝経路非活性。
+    let handle = enable(&lua, &cfg, None, Some(sink)).expect("disabled enable must not error");
+    assert!(
+        handle.is_none(),
+        "disabled enable() must return Ok(None) — no bridge thread, kick path inert (R2.6)"
+    );
+
+    // 中核 assert: 無効ゲートは sink を駆動しない（呼び出し回数 0 のまま）。
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        0,
+        "disabled debug must NOT drive the wired kick sink (R2.6 inert path)"
+    );
+}
+
 #[test]
 fn enable_enabled_returns_handle() {
     // ALL_SAFE VM so the hook's engine-wide `jit.off()` is callable (the
