@@ -93,7 +93,7 @@
   - _Boundary: KickDispatchHook, KickPreempt（virtual_dispatcher.lua の dispatch 前段フック）_
 
 - [ ] 5. VSCode キックコマンド（TypeScript）
-- [ ] 5.1 (P) playScene リクエストの純ロジックを実装する
+- [x] 5.1 (P) playScene リクエストの純ロジックを実装する
   - command 名・payload 生成・シーン名検証（空/空白は不正）を純関数として実装する
   - command 名は Rust decode の文字列と一致させる（契約）
   - 完了状態: payload 生成と検証（空→false・非空→true）の単体テストが緑
@@ -146,3 +146,4 @@
 - **cargo 実行前に `unset NoDefaultCurrentDirectoryInExePath`**（外さないと mlua-sys/LuaJIT ビルドが exit 101）。lua spec は `cargo test -p pasta_lua`（lua_unittest_runner）で走り、新規 `*_test.lua` は `tests/lua_specs/init.lua` に登録が必要。
 - **1.2 と 3.2 は統合実装**: Rust 網羅性検査により variant 追加（1.2）が executor match（thread.rs）と seq_of（mailbox.rs test）を即コンパイルエラーにするため、variant＋executor アーム＋Rust↔Lua ブリッジ（shiori.rs）を1単位で実装し両タスクを同時完了。RED = `E0004 non-exhaustive` を捕捉。
 - **pasta_shiori の VM テスト harness は `pasta.toml` 必須**: `PastaLoader::load` が pasta.toml を要求するため、tempdir に最小 pasta.toml を置かないと「ghost VM must load」で失敗する。actor_kick_test.rs 参照。
+- **実装者は `cargo fmt` をクレート全体にかけない**: task 2.2+2.3 で実装者が `cargo fmt` を実行し約84ファイルの無関係な整形ドリフトが混入。選択コミット原則のため genuine 変更ファイル（kick トークン or `enable(`/`run_socket_bridge`/`handle_inbound` 呼び出し元）のみ抽出してコミットし、`git stash --keep-index`＋`cargo build --tests` でコミット予定状態の単独ビルドを検証してから確定。以後の実装者には変更ファイルのみ `rustfmt` するか fmt を避けるよう指示すること。
