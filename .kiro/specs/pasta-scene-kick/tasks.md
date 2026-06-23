@@ -76,7 +76,7 @@
   - _Requirements: 3.2, 3.3, 3.5_
   - _Depends: 1.3, 4.1_
   - _Boundary: KickDispatchHook（event/kick.lua の解決ロジック）_
-- [ ] 4.3 割り込み許可ゲートを dispatch 入口へ組み込む
+- [x] 4.3 割り込み許可ゲートを dispatch 入口へ組み込む
   - dispatch 入口で割り込み許可フラグが立つとき抑制ゲート（`is_blocked`）をワンショットで突破し、起動（または未解決判定）後にフラグを消費して false 化する
   - 2 ビート目以降および通常イベント経路では抑制ゲートを従来どおり機能させ、`Status` 解釈を変えない
   - 完了状態: `talking` 中でも force 時のみ dispatch が非ブロックとなり、直後にフラグ消費され次 tick の `talking` は通常ブロックとなるテストが緑

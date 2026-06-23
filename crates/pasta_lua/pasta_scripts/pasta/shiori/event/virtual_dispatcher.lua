@@ -217,8 +217,18 @@ function M.dispatch(act)
         return nil
     end
 
-    -- Statusブロックガード（dispatch入口で一括判定）
-    if M.is_blocked(act.req.status) then
+    -- キック割り込みゲート（KickForceGate）:
+    -- STORE.kick_force が真なら当該 tick の is_blocked 抑制をワンショット突破し、
+    -- 突破判定直後にフラグを消費（false 化）する。2 ビート目以降・通常経路では
+    -- kick_force が偽のため従来どおり is_blocked が機能する（バイト不変）。
+    local STORE = require("pasta.store")
+    local force = STORE.kick_force
+    if force then
+        STORE.kick_force = false -- ワンショット消費（消費は単一地点・dispatch 入口）
+    end
+
+    -- Statusブロックガード（dispatch入口で一括判定・force 時のみ突破）
+    if not force and M.is_blocked(act.req.status) then
         return nil
     end
 
