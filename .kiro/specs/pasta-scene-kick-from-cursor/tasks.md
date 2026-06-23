@@ -31,10 +31,13 @@
   - _Boundary: code_gen scope_gen_
 
 - [ ] 2.2 finalize でランタイム実識別子と span を突合し索引を構築する
-  - finalize がランタイム実シーン識別子（実シーンテーブル由来・`会話1` 形式）を列挙する箇所で、同一の突合キーで span 側と突合し、(ファイル, 行範囲) → 実識別子 の索引を確定する
+  - finalize がランタイム実シーン識別子を列挙する箇所（`collect_scenes` が `(global_name, local_name)` を返す・`会話1`/`挨拶_1` 形式）で、同一の突合キーで span 側と突合し、(ファイル, 行範囲) → (scene_id, parent) の索引を確定する
+  - 各シーンを **(scene_id, parent)** で保持する：global → `(会話1, None)`、local → `(挨拶_1, 会話1)`。task 1.1 の `SceneIdentityIndex`/`SceneSpan` を **parent: Option<String> を持つよう拡張**し、`scene_at` が最内（level 最大）の (scene_id, parent) を返せること
+  - join：join_key の親参照 `会話#1`→runtime `会話1` を (base, 出現順) で対応付け、local `L:会話#1:挨拶_1`→`(parent=会話1, fn_name=挨拶_1)` を `collect_scenes` の `(会話1, 挨拶_1)` と突合（Implementation Notes「local シーン kick の方式決定」「2.x join_key 契約」参照）
   - chunk ごとの索引を集約してロード済みソースマップ（実行中エンジンが保持する読み取り専用状態）へ同梱する
-  - 索引が返す識別子値が、kick のシーン解決（名前検索）の解決対象と一致すること（`SceneRegistry` の別形式を SSOT にしない）
-  - `.pasta` を transpile→ロードした後、既知のシーン宣言行から引いた識別子がランタイム実シーンに一致することをテストで観測できる
+  - 索引が返す識別子値が、kick のシーン解決の解決対象と一致すること（global は `会話1`、local は parent 付きで local 分岐解決＝`SceneRegistry` の別形式を SSOT にしない）
+  - `.pasta` を transpile→ロードした後、既知のシーン宣言行（global／local 双方）から引いた (scene_id, parent) がランタイム実シーンに一致することをテストで観測できる
+  - **通常モード非破壊**：sink 未接続の本番トランスパイルでは索引を構築せず、生成バイト・行マッピング挙動が不変であることを確認
   - _Requirements: 3.1, 3.2, 3.3, 7.1_
   - _Depends: 1.1, 1.2, 2.1_
   - _Boundary: finalize, build_source_map, SceneIdentityIndex_
@@ -43,12 +46,13 @@
 - [ ] 3.1 位置→シーン解決器を実装する
   - 入力 (uri, line) を `.pasta` ファイルパス＋行番号へ正規化する。正規化は `std::path::absolute` を用い `fs::canonicalize` は使わない（CI の 8.3 短縮名パス不具合回避）
   - VSCode 側 uri→path と索引キー生成を同一規則に揃える
-  - ロード済み索引で位置を解決し、確定時はシーン識別子、解決不能時は未検出を返す（最内local優先 > 後方フォールバック、下方に無ければ未検出）
-  - 確定した識別子で既存 kick 取次点（`KickSink`／`KickRequest`）を呼び、kick セマンティクスを継承する（取次は fire-and-forget・索引 lookup は読み取り専用で GET ブロックを延ばさない）
-  - 単体テストで「正規化済みパスの一致／確定→取次呼出／未検出→取次しない」を観測できる
+  - ロード済み索引で位置を解決し、確定時は (scene_id, parent)、解決不能時は未検出を返す（最内local優先 > 後方フォールバック、下方に無ければ未検出）
+  - 確定した (scene_id, parent) で既存 kick 取次点（`KickSink`／`KickRequest`）を呼び、kick セマンティクスを継承する（取次は fire-and-forget・索引 lookup は読み取り専用で GET ブロックを延ばさない）
+  - **kick transport の local 対応（debug 限定・通常モード無改修）**：`KickRequest` に `parent: Option<String>` を追加し、resolver は `KickRequest{scene, parent}` を組む。kick.lua `KICK.install`/`try_dispatch` を parent 対応に（parent なし＝従来 `co_exec(act, scene)`、parent あり＝`SCENE.search(scene, parent)` の local 分岐経由で func をコルーチン化）。Implementation Notes「local シーン kick の方式決定」参照
+  - 単体テストで「正規化済みパスの一致／global 確定→取次呼出（parent=None）／local 確定→取次呼出（parent=Some）／未検出→取次しない」を観測できる
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 7.1, 7.6, 8.1, 8.3_
   - _Depends: 1.1_
-  - _Boundary: PositionResolver_
+  - _Boundary: PositionResolver, KickRequest(debug), kick.lua_
 
 - [ ] 4. Core: DAP トランスポート拡張（位置ベース実行＋リロード）
 - [ ] 4.1 位置ベース実行リクエストを既存 DAP チャネルに追加する
@@ -140,3 +144,10 @@
   - 2.1 は scope_gen の global=`scope_gen.rs:139`／local=`scope_gen.rs:222`（既存 `record_span` 近傍）で `record_scene` を呼ぶところまで。蓄積・join・level/end 復元・runtime identity 突合は 2.2。
   - **2.1 確定 join_key 形式（2.2 が consume する）**: global=`G:{base}#{counter}`、local=`L:{parent_base}#{parent_counter}:{fn_name}`。`base`=`SceneRegistry::sanitize_name(name)`、`counter`=per-base 出現順（=ランタイム `create_scene` 連番。`G:会話#1`↔runtime `会話1` を pasta_core `increment_counter`／`scene.lua:48-52` まで遡り検証済）、`fn_name`=`{sanitize}_{counter}` または `__start__`。`G`/`L` 接頭辞が種別＋level、local の `{parent_base}#{parent_counter}` が親参照。形式は `scope_gen.rs` の `generate_global_scene` 内コメントに明記済。
   - **2.2 への注意（レビュー指摘 #6・2.1 由来でなく既存性質）**: `increment_counter` は **raw** `scene.name` をキーにするが、ランタイム counter は **sanitized** `base_name` をキーにする。よって「異なる raw 名が同一 base へ正規化される」ケースでは join_key の出現順とランタイム連番がズレうる。2.2 の突合実装時にこの境界を**特性化テストで固定**するか、join を sanitized-base ベースの出現順に揃えること（`increment_counter` のキー基準を確認）。
+
+- **local シーン kick の方式決定（ユーザー承認済・要件2.2「最内 local 優先」の実現方式）**：
+  - **背景の調査結論**：既存 kick 取次（`KickRequest{scene:String}` → `co_exec(act, name)` → `find_scene` → `find_handler` L5 → `SCENE.search(name, nil)`）は **local を再生できない**。理由：(1) `search_scene` の **global 分岐（parent=nil）が `context.rs:107-109` で local_name を捨て `"__start__"` を強制**するため、`resolve_scene_id(":会話1:挨拶_1")` が local の SceneId に当たっても返り値が `(会話1, __start__)` に潰れ、global の頭が再生される。(2) `act.lua:432/435` の `find_scene` は `global_scene_name` を**未使用**として破棄するため、co_exec に parent を渡しても効かない。→ 「無改修の単一文字列で local を引く」案（🅲）は**不成立**。
+  - **採用方式（🅰・debug 限定・通常モード無改修）**：local を狙うには `search_scene` の **local 分岐**（parent あり → `resolve_scene_id_unified(parent, name)` → local_name を正しく保持）を通す。実装は kick.lua 側で「parent あり時は `SCENE.search(local_name, parent)` で直接解決し func をコルーチン化」する小改修。**通常 SSP 動作では kick 要求が来ず `kick_pending` も立たないため完全に inert**（kick 経路・索引ともに debug opt-in）。**この『通常モード非破壊』は 2.2/3.1/4.1/6.2 のレビュー必須検証項目**。
+  - **2.2 索引が格納する識別子**：`collect_scenes` が返す `(global_name, local_name)`（例 `(会話1, 挨拶_1)`）をそのまま使い、各シーンを **(scene_id, parent)** で保持する。global → `scene_id=会話1, parent=None, level=0`。local → `scene_id=挨拶_1, parent=会話1, level=1`。よって task 1.1 の `SceneIdentityIndex`/`SceneSpan` を **parent: Option<String> を持つよう拡張**（2.2 境界内）。`scene_at` は最内（level 最大）を返し、呼び出し側へ (scene_id, parent) を渡せること。
+  - **2.2 の join（local 含む）**：join_key の親参照 `会話#1`（base=会話・出現順1）→ runtime global_name `会話1` を (base, 出現順) で対応付け、local は `L:会話#1:挨拶_1` → `(parent=会話1, local fn_name=挨拶_1)` を `collect_scenes` の `(会話1, 挨拶_1)` と突合する。
+  - **3.1/4.1 への波及**：`KickRequest` に `parent: Option<String>` を追加（debug 専用構造体）。resolver は確定 (scene_id, parent) で `KickRequest{scene, parent}` を組む。kick.lua `KICK.install`/`try_dispatch` を parent 対応に（parent なし＝従来の `co_exec(act, scene)`、parent あり＝`SCENE.search(scene, parent)` の local 分岐経由）。いずれも debug kick 経路限定。`SCENE.search`/`resolve_scene_id_unified`/`SCENE.get` は既存 API をそのまま利用（新規シグネチャ追加は最小限）。
