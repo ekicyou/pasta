@@ -154,14 +154,14 @@ editors/vscode/
 ```
 
 ### Modified Files
-- `crates/pasta_lua/src/debug/dap/decode.rs` — `pasta/playSceneAt` デコード arm と `play_scene_at_response`/`play_scene_at_error` 応答ビルダを追加。旧 `pasta/playScene` arm と `Decoded.kick_scene` を削除。
-- `crates/pasta_lua/src/debug/wiring/inbound.rs` — `try_play_scene_at` を `handle_inbound` の固定順に追加。位置→シーン解決を呼び、確定したシーン識別子で既存 `KickSink` を呼ぶ。旧 `try_play_scene_kick`（外部 `pasta/playScene` 受理）を削除。
+- `crates/pasta_lua/src/debug/dap/decode.rs` — `pasta/playSceneAt` および `pasta/reloadShiori` デコード arm と各応答ビルダ（`play_scene_at_*`）を追加。旧 `pasta/playScene` arm と `Decoded.kick_scene` を削除。
+- `crates/pasta_lua/src/debug/wiring/inbound.rs` — `try_play_scene_at`（位置→シーン解決→既存 `KickSink`）と `try_reload_shiori`（エンジンが `\![reload,shiori]` をさくらスクリプト出力に載せる）を `handle_inbound` 固定順に追加。旧 `try_play_scene_kick`（外部 `pasta/playScene` 受理）を削除。
 - `crates/pasta_lua/src/debug/source_map/mod.rs` — `SceneIdentityIndex` を `SourceMap`/`ChunkSourceMap` に保持させ、`scene_at(pasta_file, line)` 系 lookup を追加。既存 `resolve_*` は非破壊維持。
 - `crates/pasta_lua/src/code_gen/source_map.rs` — `SourceMapSink` に `record_scene(scene_id: &str, span: Span)` を追加（デフォルト no-op で後方非破壊）。
 - `crates/pasta_lua/src/code_gen/scope_gen.rs` — global/local シーン生成箇所で `record_scene` を呼び、シーン span と `SceneRegistry` 由来識別子を sink へ流す。
 - `crates/pasta_lua/src/loader/source_map_build.rs` — chunk ごとのシーン索引を集約し `SourceMap` へ受け渡す。
 - `crates/pasta_core/src/registry/scene_registry.rs` — （Decision 1 で採用案により）code_gen がシーン識別子を引ける参照口を露出、または不変。
-- `editors/vscode/package.json` — 新コマンド `pasta.runSceneAtCursor`（`editor/context` `group: navigation@1`, `when: resourceLangId == pasta`）と `pasta.reloadShiori`（`editor/context` ＋ `debug/toolBar`）を追加。旧 `pasta.debug.playScene` の commands/menus 貢献を削除。
+- `editors/vscode/package.json` — 新コマンド `pasta.runSceneAtCursor`（`editor/context` `group: navigation@1`, `when: resourceLangId == pasta`）と `pasta.reloadShiori`（`editor/context` ＋ `debug/toolBar`、両方 `when: debugType == 'pasta'`）を追加。旧 `pasta.debug.playScene` の commands/menus 貢献を削除。
 - `editors/vscode/src/extension.ts` — 新コマンド登録・カーソル位置取得・`customRequest('pasta/playSceneAt', ...)` 送信・セッション未接続時の警告/誘導・リロード送出と自動再アタッチ。旧 `registerPlaySceneCommand` を削除。
 
 ## System Flows
@@ -431,12 +431,12 @@ pub fn resolve_scene_at(
 
 #### ReloadShiori（summary + note）
 
-`editor/context` ＋ `debug/toolBar` 両方に「SHIORIリロード」を提供（9.1）。実行時、dirty バッファがあれば未保存変更が反映されない旨を提示し保存を促す（7.4）。`\![reload,shiori]`（SHIORI のみ・非同期）を送出（9.2）。送出でデバッグセッションがデタッチされるため、一定時間待機後 `vscode.debug.startDebugging` で `type: 'pasta'` アタッチ構成を自動再アタッチ（9.3）。基本動作は「リロード指示→数秒待機→自動再アタッチ」（9.4）。pure helper `reloadShiori.ts` にさくらスクリプト生成・待機/再アタッチ方針を集約。
+`editor/context` ＋ `debug/toolBar` 両方に「SHIORIリロード」を提供し、いずれも `when: debugType == 'pasta'`（接続中のみ表示・Decision 5 ④）（9.1, 9.5）。実行時、dirty バッファがあれば未保存変更が反映されない旨を提示し保存を促す（7.4）。新カスタムリクエスト `pasta/reloadShiori` を送り、**エンジンが `\![reload,shiori]`（SHIORI のみ・非同期）をさくらスクリプト出力として吐く**（9.2・Decision 5 ①）。リロードでデバッグセッションがデタッチされるため、「リロード指示→数秒待機→`vscode.debug.startDebugging`（`type: 'pasta'`）でアタッチ試行→失敗なら短間隔リトライ（上限/タイムアウト付き）」で自動再アタッチ（9.3, 9.4・Decision 5 ②）。再アタッチ完了後のキック自動再実行は v1 では行わない（手動再キック・Decision 5 ③）。pure helper `reloadShiori.ts` にさくらスクリプト生成・待機/再アタッチ方針を集約。
 
 **Implementation Notes**
-- Integration: `\![reload,shiori]` の送出経路（SSP への送出はデバッグセッション経由かトランスポート経由か）の確定が必要。
-- Validation: 再アタッチのアタッチ構成特定。
-- Risks: 待機時間・リトライ・タイムアウト・再アタッチ後のキック自動再実行可否は OPEN QUESTION（Decision 5）。表示/有効化条件（接続中のみか）も同（9.5）。
+- Integration: 送出は `pasta/reloadShiori` カスタムリクエスト → エンジンが `\![reload,shiori]` を応答出力に載せる（decode/wiring に arm を追加）。SSP への直送はしない。
+- Validation: 再アタッチのアタッチ構成特定（既定 `type: 'pasta'`）。リトライ上限/タイムアウトの具体値は実装時に調整。
+- Risks: リロード非同期完了とアタッチ試行の競合 → リトライで吸収。
 
 ## Error Handling
 
@@ -483,7 +483,11 @@ pub fn resolve_scene_at(
 
 - **OQ-1（Decision 1: span と識別子の突合箇所）→ 解決済み: 案1（ランタイム権威キャプチャ）**。code_gen は base 名のみ出力し、連番は Lua ランタイムが実行順に付与する（`scope_gen.rs:120`／`scene.lua:129`）。ランタイム実キー `会話1` は Rust `SceneRegistry` の `会話_1` と形式が異なるため、SceneRegistry を識別子 SSOT とする旧 Option C/A は**不採用**。代わりに finalize（`runtime/finalize.rs::collect_scenes`）でランタイム実 identity を列挙し、code_gen が記録した span と join key（base+出現順）で突合して (file, 行範囲) → 実 identity 索引を構築する。形式ドリフト・順序推測を排し『動いているゴーストが権威』(案B)と一貫。索引の値は `@pasta_search:search_scene` の解決対象と揃える（impl 時に整合検証＋特性化テスト）。
 - **OQ-2（Decision 4: staleness 検知方式）→ 解決済み: v1 はエディタ側 dirty 検知＋best-effort 解決**。kick 実行時、VSCode 拡張がアクティブバッファの `isDirty`（未保存）を確認し、未保存なら「実行中ゴーストと実態がずれる可能性。保存＋SHIORIリロードを推奨」を警告する（最頻 staleness ＝編集中を安価に捕捉。エンジン無改修）。これに加え、エンジン側はロード済み索引で best-effort 解決し、解決不能は未検出扱い（7.6）を安全網とする。**保存済み・未リロード**を捕捉するエンジン側 mtime/ハッシュ照合は v1 スコープ外（YAGNI）とし、将来拡張に回す。要件 7.4（リロード時 dirty 保存促し）と同じ dirty 信号を kick 経路でも用いて一貫させる。
-- **OQ-3（Decision 5: 再アタッチ詳細）**: 待機時間（数秒の具体値）・リトライ/タイムアウト方式・再アタッチ完了後のキック自動再実行可否・「SHIORIリロード」の表示/有効化条件（接続中のみか）（9.4, 9.5）。**暫定: 固定待機→1回再アタッチ・自動再実行なし・接続中のみ表示**。確定要。
+- **OQ-3（Decision 5: 再アタッチ詳細）→ 解決済み**:
+  - **① 送出経路**: 新カスタムリクエスト `pasta/reloadShiori` を介し、エンジンが `\![reload,shiori]` を**さくらスクリプト出力**として吐く（SSP は次 GET で受けてリロード）。さくらスクリプトは SHIORI 応答経由でしか SSP に届かないため、拡張から SSP へ直送はしない。
+  - **② 待機＋再アタッチ**: 「リロード指示 → 数秒待機 → アタッチ試行、失敗なら短間隔リトライ（上限/タイムアウト付き）」。固定1回ではなくリトライで堅牢化。
+  - **③ キック自動再実行**: v1 はしない（再アタッチ後に作者が手動で再キック）。デタッチ跨ぎの保留キック状態管理を避け予測可能性優先。
+  - **④ 表示/有効化条件**: 接続中のみ（`when: debugType == 'pasta'`）。リロードは動作中 SHIORI への操作のため。kick 項目の常時表示とは前提が異なる。
 - **OQ-4（デバッグ開始誘導の具体手段）**: 6.3 の「デバッグ開始」アクションが `launch.json` 構成参照か自動アタッチかの具体手段。**暫定: `vscode.debug.startDebugging` で既定 `type: 'pasta'` 構成を起動**。確定要。
 - **Risk: uri 正規化**: VSCode uri → エンジン索引キー（chunk 名/ファイルパス）の正規化（Windows パス・URI エンコード）。CI 8.3 短縮名パス等の既知リスク（メモリ）に注意。
 - **Risk: end_line 確定**: シーン範囲終端（次の同レベル以上宣言の直前/ファイル末尾）の正確な算出。入れ子レベルの受け渡し。

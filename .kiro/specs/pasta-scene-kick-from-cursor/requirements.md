@@ -113,6 +113,6 @@
 #### Acceptance Criteria
 1. The VSCode Pasta 拡張 shall `.pasta` エディタの右クリックコンテキストメニューおよびデバッグツールバーの両方に「SHIORIリロード」コマンドを提供する。
 2. When 作者が「SHIORIリロード」を実行する, the Pasta システム shall SSP へ `\![reload,shiori]`（SHIORI のみ再読み込み・非同期）を送出して SHIORI の再読み込みを起動する。
-3. When `\![reload,shiori]` の送出によりデバッグセッションがデタッチされる, the VSCode Pasta 拡張 shall 一定時間待機した後、`vscode.debug.startDebugging` を用いて `type: 'pasta'` のアタッチ構成でデバッグセッションを自動的に再アタッチする。
-4. The VSCode Pasta 拡張 shall 再アタッチの基本動作を「リロード指示 → 数秒待機 → 自動再アタッチ」とし、待機時間・リトライ・タイムアウト方式、および再アタッチ完了後にシーンキックを自動再実行するか否かを設計フェーズで確定する。
-5. The VSCode Pasta 拡張 shall 「SHIORIリロード」コマンドの表示・有効化条件を設計フェーズで確定する（リロードは接続中のデバッグセッションに対する操作である点を考慮する）。
+3. When `\![reload,shiori]` の送出によりデバッグセッションがデタッチされる, the VSCode Pasta 拡張 shall 数秒待機した後、`vscode.debug.startDebugging` を用いて `type: 'pasta'` のアタッチ構成でデバッグセッションを再アタッチし、失敗時は短間隔でリトライする（上限/タイムアウトあり）。
+4. The VSCode Pasta 拡張 shall 再アタッチ完了後にシーンキックを自動再実行しない（作者が手動で再キックする）。リトライ上限・タイムアウトの具体値は実装時に調整する。
+5. The VSCode Pasta 拡張 shall 「SHIORIリロード」コマンドを `when: debugType == 'pasta'`（接続中のみ）で表示・有効化する。
