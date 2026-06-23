@@ -217,9 +217,34 @@ function M.dispatch(act)
         return nil
     end
 
-    -- Statusブロックガード（dispatch入口で一括判定）
-    if M.is_blocked(act.req.status) then
+    -- キック割り込みゲート（KickForceGate）:
+    -- STORE.kick_force が真なら当該 tick の is_blocked 抑制をワンショット突破し、
+    -- 突破判定直後にフラグを消費（false 化）する。2 ビート目以降・通常経路では
+    -- kick_force が偽のため従来どおり is_blocked が機能する（バイト不変）。
+    local STORE = require("pasta.store")
+    local force = STORE.kick_force
+    if force then
+        STORE.kick_force = false -- ワンショット消費（消費は単一地点・dispatch 入口）
+    end
+
+    -- Statusブロックガード（dispatch入口で一括判定・force 時のみ突破）
+    if not force and M.is_blocked(act.req.status) then
         return nil
+    end
+
+    -- キック起動フック（KickDispatchHook）:
+    -- check_talk/random talk より前段で保留シーンを起動する。try_dispatch が
+    -- 非 nil co（解決済みキックシーン）を返したら、それを dispatch の結果として
+    -- 返す。EVENT.fire が当該 co を resume_until_valid で初回ビートのみ配信し
+    -- （高々1ビート/GET・R3.4）、set_co_scene 置換で前 co_scene を閉じる
+    -- （preempt・自動復帰なし・R5.2/R5.3）。残りビートは次 tick の check_talk
+    -- 継続（STORE.co_scene）が配信する（R4.1）。
+    -- 保留なし（try_dispatch=nil）はフックが完全素通りし、既存 dispatch を
+    -- バイト不変に保つ（押し出しせず pull 機会に限定・R6.3/R4.5）。
+    local KICK = require("pasta.shiori.event.kick")
+    local kick_co = KICK.try_dispatch(act)
+    if kick_co then
+        return kick_co
     end
 
     -- OnHour 判定（優先）

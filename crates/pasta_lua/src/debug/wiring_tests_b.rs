@@ -111,14 +111,16 @@ fn full_lua_debug_session_all_steps_all_var_types_coroutine_body() {
             listen: Some("127.0.0.1:0".parse().unwrap()),
             ..Default::default()
         };
-        let handle = enable(&lua, &cfg, None)
+        let handle = enable(&lua, &cfg, None, None)
             .map_err(|e| format!("enable failed: {e}"))?
             .ok_or_else(|| "enable returned None for an enabled config".to_string())?;
 
         let addr = handle
             .local_addr()
             .ok_or_else(|| "enabled handle must expose a bound addr".to_string())?;
-        addr_tx.send(addr).map_err(|_| "addr send failed".to_string())?;
+        addr_tx
+            .send(addr)
+            .map_err(|_| "addr send failed".to_string())?;
 
         go_rx
             .recv_timeout(WATCHDOG)
@@ -178,7 +180,10 @@ fn full_lua_debug_session_all_steps_all_var_types_coroutine_body() {
     assert_eq!(bp_resp["request_seq"], 2);
     let bps = bp_resp["body"]["breakpoints"].as_array().expect("bp array");
     assert_eq!(bps.len(), 1);
-    assert_eq!(bps[0]["verified"], true, "the `.lua` BP must be verified (R1.1)");
+    assert_eq!(
+        bps[0]["verified"], true,
+        "the `.lua` BP must be verified (R1.1)"
+    );
     assert_eq!(bps[0]["line"], FULL_BP_LINE);
 
     // --- configurationDone (ack) → let the VM run ---
@@ -201,15 +206,25 @@ fn full_lua_debug_session_all_steps_all_var_types_coroutine_body() {
     client.send_request(10, "threads", json!({}));
     let threads = client.recv_until(|m| is_response(m, "threads"));
     assert_eq!(threads["request_seq"], 10);
-    let thread_arr = threads["body"]["threads"].as_array().expect("threads array");
-    assert!(!thread_arr.is_empty(), "threads must report at least one thread");
+    let thread_arr = threads["body"]["threads"]
+        .as_array()
+        .expect("threads array");
+    assert!(
+        !thread_arr.is_empty(),
+        "threads must report at least one thread"
+    );
 
     // --- stackTrace → top frame is the coroutine body BP line (R2.1) ---
     client.send_request(11, "stackTrace", json!({ "threadId": thread_id }));
     let stack = client.recv_until(|m| is_response(m, "stackTrace"));
     assert_eq!(stack["request_seq"], 11);
-    let frames = stack["body"]["stackFrames"].as_array().expect("frames array");
-    assert!(!frames.is_empty(), "stack must have the stopped frame (R2.1)");
+    let frames = stack["body"]["stackFrames"]
+        .as_array()
+        .expect("frames array");
+    assert!(
+        !frames.is_empty(),
+        "stack must have the stopped frame (R2.1)"
+    );
     assert_eq!(
         frames[0]["source"]["path"], FULL_SOURCE,
         "top frame source must be the scenario `.lua` (R2.1)"
@@ -225,7 +240,11 @@ fn full_lua_debug_session_all_steps_all_var_types_coroutine_body() {
     let scopes = client.recv_until(|m| is_response(m, "scopes"));
     assert_eq!(scopes["request_seq"], 12);
     let scope_arr = scopes["body"]["scopes"].as_array().expect("scopes array");
-    assert_eq!(scope_arr.len(), 1, "exactly one scopes response (no double-answer)");
+    assert_eq!(
+        scope_arr.len(),
+        1,
+        "exactly one scopes response (no double-answer)"
+    );
     assert_eq!(scope_arr[0]["name"], "Locals");
     let var_ref = scope_arr[0]["variablesReference"]
         .as_u64()
@@ -239,7 +258,9 @@ fn full_lua_debug_session_all_steps_all_var_types_coroutine_body() {
     let vars = client.recv_until(|m| is_response(m, "variables"));
     assert_eq!(vars["request_seq"], 13);
     assert_eq!(vars["success"], true, "variables must not error (R2.5)");
-    let var_arr = vars["body"]["variables"].as_array().expect("variables array");
+    let var_arr = vars["body"]["variables"]
+        .as_array()
+        .expect("variables array");
 
     let find = |name: &str| -> Value {
         var_arr
@@ -251,11 +272,17 @@ fn full_lua_debug_session_all_steps_all_var_types_coroutine_body() {
 
     // number (R2.2/R2.3) — also THE coroutine-body local proof (R2.4).
     let num = find("num");
-    assert_eq!(num["type"], "number", "num must be discriminated as number (R2.3)");
+    assert_eq!(
+        num["type"], "number",
+        "num must be discriminated as number (R2.3)"
+    );
     assert_eq!(num["value"], "7", "num must read its live value 7 (R2.4)");
     // string
     let s = find("str");
-    assert_eq!(s["type"], "string", "str must be discriminated as string (R2.3)");
+    assert_eq!(
+        s["type"], "string",
+        "str must be discriminated as string (R2.3)"
+    );
     assert_eq!(s["value"], "hi", "str must read its live value 'hi'");
     // boolean
     let flag = find("flag");
@@ -274,7 +301,10 @@ fn full_lua_debug_session_all_steps_all_var_types_coroutine_body() {
     // by name, type surfaced, repr marked unsupported — never dropped and
     // never erroring the request.
     let fnval = find("fn");
-    assert_eq!(fnval["type"], "function", "unsupported kind type surfaced (R2.5)");
+    assert_eq!(
+        fnval["type"], "function",
+        "unsupported kind type surfaced (R2.5)"
+    );
     assert!(
         fnval["value"].as_str().unwrap().starts_with("<unsupported"),
         "an unsupported kind must carry an out-of-scope repr (R2.5): {:?}",
@@ -311,7 +341,10 @@ fn full_lua_debug_session_all_steps_all_var_types_coroutine_body() {
     let in_ack = client.recv_until(|m| is_response(m, "stepIn"));
     assert_eq!(in_ack["request_seq"], 30);
     let in_stopped = client.recv_until(|m| is_event(m, "stopped"));
-    assert_eq!(in_stopped["body"]["reason"], "step", "step in reason step (R1.4)");
+    assert_eq!(
+        in_stopped["body"]["reason"], "step",
+        "step in reason step (R1.4)"
+    );
     assert_eq!(
         top_frame_line(&mut client, thread_id, 31),
         FULL_STEP_IN_LINE,
@@ -324,7 +357,10 @@ fn full_lua_debug_session_all_steps_all_var_types_coroutine_body() {
     let out_ack = client.recv_until(|m| is_response(m, "stepOut"));
     assert_eq!(out_ack["request_seq"], 40);
     let out_stopped = client.recv_until(|m| is_event(m, "stopped"));
-    assert_eq!(out_stopped["body"]["reason"], "step", "step out reason step (R1.5)");
+    assert_eq!(
+        out_stopped["body"]["reason"], "step",
+        "step out reason step (R1.5)"
+    );
     assert_eq!(
         top_frame_line(&mut client, thread_id, 41),
         FULL_STEP_OUT_LINE,
@@ -342,7 +378,10 @@ fn full_lua_debug_session_all_steps_all_var_types_coroutine_body() {
     // drops the handle → Drop emits a final `Terminated`, which the encoder
     // turns into a DAP `terminated` event flushed to us (R3.5).
     let terminated = client.recv_until(|m| is_event(m, "terminated"));
-    assert_eq!(terminated["event"], "terminated", "natural end emits terminated (R3.5)");
+    assert_eq!(
+        terminated["event"], "terminated",
+        "natural end emits terminated (R3.5)"
+    );
 
     // The host completed cleanly within the watchdog (no hang) and the VM
     // stayed usable (1+2==3 asserted on the host).

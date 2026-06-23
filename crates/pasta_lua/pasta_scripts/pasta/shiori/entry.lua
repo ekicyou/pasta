@@ -9,6 +9,7 @@
 
 local EVENT = require "pasta.shiori.event"
 local RES = require "pasta.shiori.res"
+local KICK = require "pasta.shiori.event.kick"
 
 -- グローバルシーン関数の登録
 local GLOBAL = require "pasta.global"
@@ -85,6 +86,18 @@ function SHIORI.request(req)
     else
         return RES.err(result)
     end
+end
+
+--- シーンキック入口（保留フラグ設置のみ・非ブロッキング）
+--- アクタースレッド上の Rust ブリッジから呼ばれ、KICK.install へ委譲する。
+--- 保留シーン名（STORE.kick_pending）と割り込み許可（STORE.kick_force）を
+--- 設置するのみで、シーン解決・resume・レンダリングは行わない（R3.1）。
+--- 即時単一モード（モードフラグ無し・R5.4）。
+---
+--- @param scene string キック対象のシーン名
+--- @return nil
+function SHIORI.kick(scene)
+    KICK.install(scene)
 end
 
 --- SHIORI unload イベントを処理

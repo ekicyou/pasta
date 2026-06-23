@@ -64,7 +64,6 @@
 //! cell when threaded, so a DAP `attach` `sourcePresentation` flip switches the
 //! granularity live (task 5.5).
 
-
 use std::sync::Arc;
 use std::sync::mpsc::{Receiver, Sender};
 
@@ -91,11 +90,11 @@ mod stop_loop;
 // non-test import or widening the public surface (C5 test re-wiring; mirrors the
 // dap hub).
 #[cfg(test)]
-use mlua::Debug;
-#[cfg(test)]
 use crate::debug::hook::LineHook;
 #[cfg(test)]
 use crate::debug::types::ThreadId;
+#[cfg(test)]
+use mlua::Debug;
 
 /// The DAP thread id reported for the (single) main execution thread.
 ///

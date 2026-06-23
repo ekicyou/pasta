@@ -120,7 +120,10 @@ fn top_frame(adapter: &SharedAdapter, source: &str, line: u32) -> (Value, u32) {
         func_name: Some("f".to_string()),
     }]));
     let frame = &out[0]["body"]["stackFrames"][0];
-    (frame["source"].clone(), frame["line"].as_u64().unwrap() as u32)
+    (
+        frame["source"].clone(),
+        frame["line"].as_u64().unwrap() as u32,
+    )
 }
 
 /// 1.1 / 4.2 / 4.3 / 3.1 / 3.4 / 2.6 / 1.3: a valid `pasta/sourcePresentation`
@@ -152,11 +155,16 @@ fn valid_toggle_to_lua_applies_acks_events_and_forwards_refresh() {
         &cmd_tx,
         &toggle_req(70, "lua"),
         &wiring,
+        None,
     );
     assert!(ok, "handle_inbound must not report the peer gone");
 
     // (a) the cell is updated to Lua (1.1 / 4.2 / 4.3).
-    assert_eq!(wiring.source_mode.get(), SourceMode::Lua, "cell set to lua (1.1)");
+    assert_eq!(
+        wiring.source_mode.get(),
+        SourceMode::Lua,
+        "cell set to lua (1.1)"
+    );
 
     // (b) the resolver swapped to default `.lua` — the SAME frame now presents
     // the generated `.lua` (3.1 / 3.4).
@@ -172,15 +180,24 @@ fn valid_toggle_to_lua_applies_acks_events_and_forwards_refresh() {
     let resp = h.recv();
     assert_eq!(resp["type"], "response");
     assert_eq!(resp["command"], "pasta/sourcePresentation");
-    assert_eq!(resp["request_seq"], 70, "ack correlates to the request seq (1.3)");
+    assert_eq!(
+        resp["request_seq"], 70,
+        "ack correlates to the request seq (1.3)"
+    );
     assert_eq!(resp["success"], true);
-    assert_eq!(resp["body"]["mode"], "lua", "ack echoes the resolved mode (1.3)");
+    assert_eq!(
+        resp["body"]["mode"], "lua",
+        "ack echoes the resolved mode (1.3)"
+    );
 
     // (d) THEN the custom event with the current mode (2.6 push notification).
     let ev = h.recv();
     assert_eq!(ev["type"], "event");
     assert_eq!(ev["event"], "pasta/sourcePresentation");
-    assert_eq!(ev["body"]["mode"], "lua", "event carries the new mode (2.6)");
+    assert_eq!(
+        ev["body"]["mode"], "lua",
+        "event carries the new mode (2.6)"
+    );
 
     // (e) RefreshPresentation forwarded to the session (3.3 path).
     let cmd = cmd_rx
@@ -215,9 +232,14 @@ fn valid_toggle_to_pasta_swaps_in_pasta_resolver() {
         &cmd_tx,
         &toggle_req(71, "pasta"),
         &wiring,
+        None,
     );
     assert!(ok);
-    assert_eq!(wiring.source_mode.get(), SourceMode::Pasta, "cell set to pasta (1.2)");
+    assert_eq!(
+        wiring.source_mode.get(),
+        SourceMode::Pasta,
+        "cell set to pasta (1.2)"
+    );
 
     let (src, line) = top_frame(&adapter, r"@C:\proj\cache\scene.lua", 7);
     assert_eq!(
@@ -263,6 +285,7 @@ fn invalid_mode_leaves_cell_unchanged_but_acks_current() {
         &cmd_tx,
         &toggle_req(72, "bogus"),
         &wiring,
+        None,
     );
     assert!(ok);
 
@@ -283,7 +306,10 @@ fn invalid_mode_leaves_cell_unchanged_but_acks_current() {
     // Still acks + echoes the CURRENT mode (pasta), event, RefreshPresentation.
     let resp = h.recv();
     assert_eq!(resp["request_seq"], 72);
-    assert_eq!(resp["body"]["mode"], "pasta", "1.4: echo the current (unchanged) mode");
+    assert_eq!(
+        resp["body"]["mode"], "pasta",
+        "1.4: echo the current (unchanged) mode"
+    );
     let ev = h.recv();
     assert_eq!(ev["body"]["mode"], "pasta");
     assert_eq!(
@@ -311,9 +337,21 @@ fn attach_with_explicit_mode_emits_initial_event() {
         "seq": 5, "type": "request", "command": "attach",
         "arguments": { "sourcePresentation": "lua" },
     });
-    let ok = handle_inbound(&h.transport, &adapter, &breakpoints, &cmd_tx, &attach, &wiring);
+    let ok = handle_inbound(
+        &h.transport,
+        &adapter,
+        &breakpoints,
+        &cmd_tx,
+        &attach,
+        &wiring,
+        None,
+    );
     assert!(ok);
-    assert_eq!(wiring.source_mode.get(), SourceMode::Lua, "explicit attach mode applied");
+    assert_eq!(
+        wiring.source_mode.get(),
+        SourceMode::Lua,
+        "explicit attach mode applied"
+    );
 
     // attach ack first, then the resolved initial-mode event.
     let ack = h.recv();
@@ -322,7 +360,10 @@ fn attach_with_explicit_mode_emits_initial_event() {
     let ev = h.recv();
     assert_eq!(ev["type"], "event");
     assert_eq!(ev["event"], "pasta/sourcePresentation");
-    assert_eq!(ev["body"]["mode"], "lua", "2.5: event carries the resolved initial mode");
+    assert_eq!(
+        ev["body"]["mode"], "lua",
+        "2.5: event carries the resolved initial mode"
+    );
 }
 
 /// 2.5 (initial display, no-arg attach): `attach` WITHOUT `sourcePresentation`
@@ -344,10 +385,22 @@ fn attach_without_mode_emits_resolved_initial_event() {
         "seq": 6, "type": "request", "command": "attach",
         "arguments": {},
     });
-    let ok = handle_inbound(&h.transport, &adapter, &breakpoints, &cmd_tx, &attach, &wiring);
+    let ok = handle_inbound(
+        &h.transport,
+        &adapter,
+        &breakpoints,
+        &cmd_tx,
+        &attach,
+        &wiring,
+        None,
+    );
     assert!(ok);
     // No-arg → the resolved mode (Pasta) is kept.
-    assert_eq!(wiring.source_mode.get(), SourceMode::Pasta, "no-arg attach keeps resolved mode");
+    assert_eq!(
+        wiring.source_mode.get(),
+        SourceMode::Pasta,
+        "no-arg attach keeps resolved mode"
+    );
 
     let ack = h.recv();
     assert_eq!(ack["command"], "attach");

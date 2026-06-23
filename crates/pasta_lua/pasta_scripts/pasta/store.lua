@@ -59,6 +59,14 @@ STORE.co_scene = nil
 --- @type string|nil
 STORE.last_global_scene = nil
 
+--- 保留中のキックシーン名（次の OnSecondChange で強制起動・無ければ nil）
+--- @type string|nil
+STORE.kick_pending = nil
+
+--- キック割り込み許可フラグ（is_blocked ワンショット突破用・既定 false）
+--- @type boolean
+STORE.kick_force = false
+
 --- 全データをリセット
 --- @return nil
 function STORE.reset()
@@ -79,6 +87,8 @@ function STORE.reset()
     STORE.local_words = {}
     STORE.actor_words = {}
     STORE.last_global_scene = nil
+    STORE.kick_pending = nil
+    STORE.kick_force = false
 end
 
 -- CONFIG.actor からの初期化

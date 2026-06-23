@@ -248,5 +248,9 @@ mod dap_source_presentation_tests;
 mod dap_source_resolver_tests;
 
 #[cfg(test)]
+#[path = "../dap_play_scene_tests.rs"]
+mod dap_play_scene_tests;
+
+#[cfg(test)]
 #[path = "../dap_edge_tests.rs"]
 mod dap_edge_tests;

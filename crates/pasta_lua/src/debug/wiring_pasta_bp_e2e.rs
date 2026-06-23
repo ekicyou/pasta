@@ -289,14 +289,16 @@ fn pasta_breakpoint_hits_presents_pasta_inspects_and_nearest_adjusts_over_tcp() 
         };
         // 実マップを `Some` で渡す（task 4.2・design 582: map+Pasta で `.pasta`
         // resolver/BP 翻訳/stepper が装着される）。
-        let handle = enable(&lua, &cfg, Some(map))
+        let handle = enable(&lua, &cfg, Some(map), None)
             .map_err(|e| format!("enable failed: {e}"))?
             .ok_or_else(|| "enable returned None for an enabled config".to_string())?;
 
         let addr = handle
             .local_addr()
             .ok_or_else(|| "enabled handle must expose a bound addr".to_string())?;
-        addr_tx.send(addr).map_err(|_| "addr send failed".to_string())?;
+        addr_tx
+            .send(addr)
+            .map_err(|_| "addr send failed".to_string())?;
 
         // クライアントが setBreakpoints/configurationDone を終えるまで待つ。
         go_rx
@@ -434,10 +436,11 @@ fn pasta_breakpoint_hits_presents_pasta_inspects_and_nearest_adjusts_over_tcp() 
     let frame_id = frames[0]["id"].as_u64().expect("frame id");
     client.send_request(11, "scopes", json!({ "frameId": frame_id }));
     let scopes = client.recv_until(|m| is_response(m, "scopes"));
-    assert_eq!(scopes["success"], true, "5.4: `.pasta` 提示中も scopes が成功する");
-    let scope_arr = scopes["body"]["scopes"]
-        .as_array()
-        .expect("scopes array");
+    assert_eq!(
+        scopes["success"], true,
+        "5.4: `.pasta` 提示中も scopes が成功する"
+    );
+    let scope_arr = scopes["body"]["scopes"].as_array().expect("scopes array");
     assert!(
         !scope_arr.is_empty(),
         "5.4: 停止フレームの scope が利用可能（提示モードは inspect に影響しない）"
@@ -471,9 +474,7 @@ fn pasta_breakpoint_hits_presents_pasta_inspects_and_nearest_adjusts_over_tcp() 
     for continue_seq in 30u64..60u64 {
         client.send_request(continue_seq, "continue", json!({ "threadId": thread_id }));
         // continue ack の後に来る次の制御フレーム（stopped/terminated）を待つ。
-        let next = client.recv_until(|m| {
-            is_event(m, "stopped") || is_event(m, "terminated")
-        });
+        let next = client.recv_until(|m| is_event(m, "stopped") || is_event(m, "terminated"));
         if is_event(&next, "terminated") {
             terminated = true;
             break;

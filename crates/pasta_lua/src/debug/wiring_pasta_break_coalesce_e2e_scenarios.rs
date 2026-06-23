@@ -35,14 +35,16 @@ fn one_continue_escapes_multi_to_one_pasta_line_over_tcp() {
             source_mode: SourceMode::Pasta, // 既定だが明示（6.1）。
             ..Default::default()
         };
-        let handle = enable(&lua, &cfg, Some(map))
+        let handle = enable(&lua, &cfg, Some(map), None)
             .map_err(|e| format!("enable failed: {e}"))?
             .ok_or_else(|| "enable returned None for an enabled config".to_string())?;
 
         let addr = handle
             .local_addr()
             .ok_or_else(|| "enabled handle must expose a bound addr".to_string())?;
-        addr_tx.send(addr).map_err(|_| "addr send failed".to_string())?;
+        addr_tx
+            .send(addr)
+            .map_err(|_| "addr send failed".to_string())?;
 
         // `require "pasta"` を満たすシムを先に読み込む（BP 設定前・関数定義準備）。
         lua.load(PASTA_SHIM)
@@ -171,8 +173,7 @@ fn one_continue_escapes_multi_to_one_pasta_line_over_tcp() {
         let mut done = false;
         for seq in 30u64..60u64 {
             client.send_request(seq, "continue", json!({ "threadId": next_tid }));
-            let m =
-                client.recv_until(|m| is_event(m, "stopped") || is_event(m, "terminated"));
+            let m = client.recv_until(|m| is_event(m, "stopped") || is_event(m, "terminated"));
             if is_event(&m, "terminated") {
                 done = true;
                 break;
@@ -297,14 +298,16 @@ fn loop_revisit_yields_one_stop_per_iteration_over_tcp() {
             source_mode: SourceMode::Pasta,
             ..Default::default()
         };
-        let handle = enable(&lua, &cfg, Some(map_host))
+        let handle = enable(&lua, &cfg, Some(map_host), None)
             .map_err(|e| format!("enable failed: {e}"))?
             .ok_or_else(|| "enable returned None for an enabled config".to_string())?;
 
         let addr = handle
             .local_addr()
             .ok_or_else(|| "enabled handle must expose a bound addr".to_string())?;
-        addr_tx.send(addr).map_err(|_| "addr send failed".to_string())?;
+        addr_tx
+            .send(addr)
+            .map_err(|_| "addr send failed".to_string())?;
 
         // require シム（BP 設定前）。
         lua.load(PASTA_SHIM)

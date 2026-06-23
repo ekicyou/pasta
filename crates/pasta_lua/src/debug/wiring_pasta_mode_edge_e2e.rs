@@ -231,14 +231,16 @@ fn start_session(
             source_mode: server_mode,
             ..Default::default()
         };
-        let handle = enable(&lua, &cfg, Some(map_for_host))
+        let handle = enable(&lua, &cfg, Some(map_for_host), None)
             .map_err(|e| format!("enable failed: {e}"))?
             .ok_or_else(|| "enable returned None for an enabled config".to_string())?;
 
         let addr = handle
             .local_addr()
             .ok_or_else(|| "enabled handle must expose a bound addr".to_string())?;
-        addr_tx.send(addr).map_err(|_| "addr send failed".to_string())?;
+        addr_tx
+            .send(addr)
+            .map_err(|_| "addr send failed".to_string())?;
 
         go_rx
             .recv_timeout(WATCHDOG)
@@ -270,11 +272,7 @@ fn start_session(
             SourceMode::Pasta => "pasta",
             SourceMode::Lua => "lua",
         };
-        client.send_request(
-            4,
-            "attach",
-            json!({ "sourcePresentation": presentation }),
-        );
+        client.send_request(4, "attach", json!({ "sourcePresentation": presentation }));
         let _ = client.recv_until(|m| is_response(m, "attach"));
     }
 
@@ -328,8 +326,7 @@ fn continue_to_end(
     for _ in 0..30u64 {
         client.send_request(seq, "continue", json!({ "threadId": thread_id }));
         seq += 1;
-        let next =
-            client.recv_until(|m| is_event(m, "stopped") || is_event(m, "terminated"));
+        let next = client.recv_until(|m| is_event(m, "stopped") || is_event(m, "terminated"));
         if is_event(&next, "terminated") {
             break;
         }
@@ -337,7 +334,6 @@ fn continue_to_end(
     }
     join_host(host);
 }
-
 
 #[cfg(test)]
 #[path = "wiring_pasta_mode_edge_e2e_scenarios.rs"]

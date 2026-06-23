@@ -210,7 +210,10 @@ fn r7_1_off_path_is_deterministic_across_broad_fixtures() {
             run1, run2,
             "7.1: fixture '{id}' OFF-path transpile must be byte-for-byte deterministic"
         );
-        assert!(!run1.is_empty(), "fixture '{id}' must produce real output bytes");
+        assert!(
+            !run1.is_empty(),
+            "fixture '{id}' must produce real output bytes"
+        );
     }
 }
 
@@ -263,8 +266,9 @@ fn r7_2_existing_lua_level_debug_surface_is_present() {
         enabled: false,
         ..Default::default()
     };
-    let lua = unsafe { mlua::Lua::unsafe_new_with(mlua::StdLib::ALL_SAFE, mlua::LuaOptions::default()) };
-    let handle = enable(&lua, &cfg, None).expect("enable must not error for disabled config");
+    let lua =
+        unsafe { mlua::Lua::unsafe_new_with(mlua::StdLib::ALL_SAFE, mlua::LuaOptions::default()) };
+    let handle = enable(&lua, &cfg, None, None).expect("enable must not error for disabled config");
     assert!(
         handle.is_none(),
         "7.2: with debug disabled (production default) enable() must return None \

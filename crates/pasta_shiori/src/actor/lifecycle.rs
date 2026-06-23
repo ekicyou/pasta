@@ -40,6 +40,7 @@ use std::time::Duration;
 
 use arc_swap::ArcSwapOption;
 use flume::Sender;
+use pasta_lua::debug::{KickRequest, KickSink};
 
 use crate::actor::mailbox::{mailbox, ActorMsg, MailboxRequest};
 use crate::actor::marshaling::{default_204, marshal_get, marshal_notify, determine_method, ShioriMethod};
@@ -163,6 +164,49 @@ pub fn teardown_actor() -> TeardownReport {
     report
 }
 
+/// `MAILBOX` 投函クロージャ本体（`MailboxKickInjector`・design.md・requirements 2.4）。
+///
+/// host（`pasta_shiori`）が `pasta_lua` の [`KickSink`] として注入するクロージャの実体。
+/// 受領した [`KickRequest`] を [`ActorMsg::Kick`] へ写し、[`MAILBOX`] を **lock-free に読み**
+/// （`load_full`・送信パスに Mutex を置かない・R8）`try_send` で非ブロッキングに投函する。
+///
+/// teardown/reload 競合（`MAILBOX.swap(None)` 直後＝アクター不在）は `load_full()=None` で
+/// 黙って no-op とし、診断ログ（`seam = "kick.drop"`・ベストエフォート・D6）を残す。
+/// `try_send` 失敗（満杯/切断＝アクター不在/異常）も同様に診断ログ後に破棄する（デバッグ用途で許容）。
+fn kick_into_mailbox(req: KickRequest) {
+    // 送信パス: lock-free 読み取り（Mutex なし・R8）。
+    let Some(tx) = MAILBOX.load_full() else {
+        // teardown/reload 競合（アクター不在）: 黙って no-op＋診断ログ（D6）。
+        tracing::debug!(
+            seam = "kick.drop",
+            scene = %req.scene,
+            reason = "mailbox_absent",
+            "kick dropped: MAILBOX absent (teardown/reload race) -> no-op"
+        );
+        return;
+    };
+
+    // fire-and-forget（NOTIFY 同型）: try_send 失敗（満杯/切断）も握って破棄する。
+    if tx.try_send(ActorMsg::Kick { scene: req.scene.clone() }).is_err() {
+        tracing::debug!(
+            seam = "kick.drop",
+            scene = %req.scene,
+            reason = "try_send_failed",
+            "kick dropped: try_send failed (mailbox full/disconnected) -> discarded"
+        );
+    }
+}
+
+/// `MailboxKickInjector` の [`KickSink`] を構築する（VM 構築前に `RuntimeConfig` へ束縛する）。
+///
+/// [`kick_into_mailbox`] を型消去された `Arc<dyn Fn>` に包んで返す。`pasta_lua` 側は
+/// [`pasta_lua::RuntimeConfig::with_kick_sink`] でこれを不透明に保持し、後続 task（2.x）が
+/// `enable` 経由で socket-bridge へ透過させる。クロージャは [`MAILBOX`]（`'static`）のみに依存
+/// するため `'static` 寿命と `Send + Sync` を満たす。
+pub fn kick_sink() -> KickSink {
+    std::sync::Arc::new(kick_into_mailbox)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -196,6 +240,62 @@ mod tests {
         if MAILBOX.load_full().is_none() {
             assert_eq!(resp.as_bytes(), default_204().as_bytes());
         }
+    }
+
+    /// MAILBOX 操作を伴うテストの直列化ロック（プロセスグローバル MAILBOX を共有するため）。
+    static MAILBOX_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    /// MailboxKickInjector（task 3.1・requirements 2.4・design「MailboxKickInjector」）:
+    /// MAILBOX に Sender を store した状態で sink クロージャ（`KickRequest`）を呼ぶと、
+    /// receiver に `ActorMsg::Kick { scene }` が届く。
+    #[test]
+    fn kick_sink_delivers_kick_when_mailbox_present() {
+        let _guard = MAILBOX_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+
+        // テスト用 mailbox を MAILBOX へ設置（lock-free スロット）。
+        let (tx, rx) = mailbox();
+        MAILBOX.store(Some(std::sync::Arc::new(tx)));
+
+        // host が注入するのと同じ sink を取得して呼ぶ。
+        let sink = kick_sink();
+        sink(KickRequest {
+            scene: "OnTestScene".into(),
+        });
+
+        // receiver に Kick variant が scene 保持で届く。
+        match rx.try_recv() {
+            Ok(ActorMsg::Kick { scene }) => assert_eq!(scene, "OnTestScene"),
+            other => panic!("expected ActorMsg::Kick, got {other:?}"),
+        }
+
+        // 後始末: 次テストの None 前提を壊さないよう MAILBOX を空へ戻す。
+        MAILBOX.swap(None);
+    }
+
+    /// MailboxKickInjector teardown 競合（D6）: `swap(None)` 後（アクター不在）に sink を
+    /// 呼んでも panic せず no-op（送信なし）。`seam = "kick.drop"` 診断はベストエフォート。
+    #[test]
+    fn kick_sink_is_noop_when_mailbox_absent() {
+        let _guard = MAILBOX_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+
+        // teardown 後を模す: MAILBOX を空にする。
+        MAILBOX.swap(None);
+        assert!(
+            MAILBOX.load_full().is_none(),
+            "precondition: MAILBOX must be absent"
+        );
+
+        // 呼び出しても panic せず（送信先が無いので単に黙って no-op）。
+        let sink = kick_sink();
+        sink(KickRequest {
+            scene: "OnTestScene".into(),
+        });
+
+        // MAILBOX 不在は不変（クロージャは store/swap しない）。
+        assert!(
+            MAILBOX.load_full().is_none(),
+            "kick into absent MAILBOX must remain a no-op"
+        );
     }
 
     /// teardown_actor は MAILBOX 未初期化でも冪等 no-op を返す（R7.4・ハングなし）。

@@ -1,0 +1,23 @@
+{
+  "feature_name": "pasta-scene-kick",
+  "created_at": "2026-06-22T21:20:29Z",
+  "updated_at": "2026-06-23T04:00:00Z",
+  "completed_at": "2026-06-23T04:00:00Z",
+  "language": "ja",
+  "phase": "completed",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true
+}

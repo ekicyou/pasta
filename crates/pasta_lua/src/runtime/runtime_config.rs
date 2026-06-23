@@ -3,6 +3,7 @@
 //! RuntimeConfig controls which Lua standard libraries and mlua-stdlib modules
 //! are enabled in the PastaLuaRuntime.
 
+use crate::debug::kick::KickSink;
 use crate::debug::{DebugConfig, DebugFileConfig};
 use crate::error::ConfigError;
 use crate::loader::{LuaConfig, default_libs};
@@ -33,7 +34,7 @@ use mlua::{Function, Lua, Result as LuaResult, StdLib, Value};
 ///     "-std_debug".into(),
 /// ]);
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct RuntimeConfig {
     /// Library configuration array.
     ///
@@ -60,6 +61,31 @@ pub struct RuntimeConfig {
     /// path overrides this via [`with_debug`](Self::with_debug) after resolving
     /// pasta.toml `[debug]` + the `PASTA_DEBUG`/`PASTA_DEBUG_PORT` environment.
     pub debug: DebugConfig,
+
+    /// Optional, host-injected scene-kick sink (`KickSinkSeam`, requirements
+    /// 2.4 / 2.6).
+    ///
+    /// `pasta_lua` holds this opaquely: an outer host (`pasta_shiori`) binds a
+    /// [`KickSink`] closure via [`with_kick_sink`](Self::with_kick_sink) before
+    /// VM construction so an inbound `playScene` debug request can be delivered
+    /// to the actor. It defaults to **`None`** (未注入), so every existing
+    /// constructor leaves the kick path inactive by type and by default value
+    /// (R2.6). Wiring the sink through `enable` into the socket-bridge is a later
+    /// task (2.x); this field is only the injection slot.
+    pub kick_sink: Option<KickSink>,
+}
+
+impl std::fmt::Debug for RuntimeConfig {
+    // Hand-written because `kick_sink: Option<KickSink>` wraps a `dyn Fn` trait
+    // object, which is not `Debug`. The sink is summarised as present/absent so
+    // the rest of the config still prints (mirrors the derived layout).
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RuntimeConfig")
+            .field("libs", &self.libs)
+            .field("debug", &self.debug)
+            .field("kick_sink", &self.kick_sink.as_ref().map(|_| "<sink>"))
+            .finish()
+    }
 }
 
 impl RuntimeConfig {
@@ -72,6 +98,7 @@ impl RuntimeConfig {
         Self {
             libs: default_libs(),
             debug: DebugConfig::default(),
+            kick_sink: None,
         }
     }
 
@@ -90,6 +117,7 @@ impl RuntimeConfig {
                 "yaml".into(),
             ],
             debug: DebugConfig::default(),
+            kick_sink: None,
         }
     }
 
@@ -102,6 +130,7 @@ impl RuntimeConfig {
         Self {
             libs: vec!["std_all".into()],
             debug: DebugConfig::default(),
+            kick_sink: None,
         }
     }
 
@@ -110,6 +139,7 @@ impl RuntimeConfig {
         Self {
             libs,
             debug: DebugConfig::default(),
+            kick_sink: None,
         }
     }
 
@@ -121,6 +151,19 @@ impl RuntimeConfig {
     /// no-op relative to the zero-cost default. Returns `self` for chaining.
     pub fn with_debug(mut self, debug: DebugConfig) -> Self {
         self.debug = debug;
+        self
+    }
+
+    /// Attach (or clear) the host-injected scene-kick sink (builder).
+    ///
+    /// `KickSinkSeam` (requirements 2.4 / 2.6): an outer host (`pasta_shiori`)
+    /// binds a [`KickSink`] closure here before VM construction so an inbound
+    /// `playScene` debug request can be delivered to the actor. Passing `None`
+    /// leaves (or restores) the default — the kick path stays inactive.
+    /// `pasta_lua` holds the sink opaquely and never inspects its body. Returns
+    /// `self` for chaining.
+    pub fn with_kick_sink(mut self, kick_sink: Option<KickSink>) -> Self {
+        self.kick_sink = kick_sink;
         self
     }
 
@@ -280,6 +323,7 @@ impl From<LuaConfig> for RuntimeConfig {
         Self {
             libs: config.libs,
             debug: DebugConfig::default(),
+            kick_sink: None,
         }
     }
 }
@@ -308,4 +352,56 @@ impl From<LuaConfig> for RuntimeConfig {
 pub fn lua_require(lua: &Lua, module_name: &str) -> LuaResult<Value> {
     let require: Function = lua.globals().get("require")?;
     require.call(module_name)
+}
+
+#[cfg(test)]
+mod kick_sink_tests {
+    use super::*;
+    use crate::debug::kick::KickRequest;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    #[test]
+    fn default_runtime_config_has_no_kick_sink() {
+        // Requirement 2.6: debug 無効が既定 ⇒ キック経路は型・既定値で非活性。
+        // 全コンストラクタで sink 未注入（None）であること。
+        assert!(RuntimeConfig::new().kick_sink.is_none());
+        assert!(RuntimeConfig::full().kick_sink.is_none());
+        assert!(RuntimeConfig::minimal().kick_sink.is_none());
+        assert!(
+            RuntimeConfig::from_libs(vec!["std_all".into()])
+                .kick_sink
+                .is_none()
+        );
+        assert!(RuntimeConfig::default().kick_sink.is_none());
+    }
+
+    #[test]
+    fn with_kick_sink_holds_some_and_is_invocable() {
+        // Requirement 2.4: 注入された汎用 sink を RuntimeConfig が保持する。
+        let called = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&called);
+        let config =
+            RuntimeConfig::new().with_kick_sink(Some(Arc::new(move |req: KickRequest| {
+                assert_eq!(req.scene, "OnTest");
+                flag.store(true, Ordering::SeqCst);
+            })));
+
+        let sink = config.kick_sink.as_ref().expect("sink must be Some");
+        sink(KickRequest {
+            scene: "OnTest".into(),
+        });
+        assert!(
+            called.load(Ordering::SeqCst),
+            "injected sink must be called"
+        );
+    }
+
+    #[test]
+    fn with_kick_sink_none_clears_sink() {
+        let config = RuntimeConfig::new()
+            .with_kick_sink(Some(Arc::new(|_req: KickRequest| {})))
+            .with_kick_sink(None);
+        assert!(config.kick_sink.is_none());
+    }
 }

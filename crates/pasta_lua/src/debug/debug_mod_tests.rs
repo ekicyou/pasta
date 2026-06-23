@@ -78,7 +78,10 @@ fn env_enabled_overrides_file_disabled() {
         ..Default::default()
     };
     let cfg = DebugConfig::resolve(Some(&file), Some(true), None, None, None, None, None, None);
-    assert!(cfg.enabled, "PASTA_DEBUG truthy overrides [debug] enabled=false");
+    assert!(
+        cfg.enabled,
+        "PASTA_DEBUG truthy overrides [debug] enabled=false"
+    );
     assert_eq!(cfg.listen, Some("127.0.0.1:9276".parse().unwrap()));
 }
 
@@ -90,7 +93,10 @@ fn env_disabled_overrides_file_enabled() {
         ..Default::default()
     };
     let cfg = DebugConfig::resolve(Some(&file), Some(false), None, None, None, None, None, None);
-    assert!(!cfg.enabled, "explicit PASTA_DEBUG=false overrides [debug] enabled=true");
+    assert!(
+        !cfg.enabled,
+        "explicit PASTA_DEBUG=false overrides [debug] enabled=true"
+    );
     assert!(cfg.listen.is_none());
 }
 
@@ -120,8 +126,11 @@ fn parse_truthy_env_values() {
 fn enable_disabled_returns_none_and_no_trace() {
     let lua = mlua::Lua::new();
     let cfg = DebugConfig::resolve(None, None, None, None, None, None, None, None);
-    let handle = enable(&lua, &cfg, None).expect("enable must not error when disabled");
-    assert!(handle.is_none(), "disabled enable() returns Ok(None) (R5.2)");
+    let handle = enable(&lua, &cfg, None, None).expect("enable must not error when disabled");
+    assert!(
+        handle.is_none(),
+        "disabled enable() returns Ok(None) (R5.2)"
+    );
 
     // No std_debug exposure as a side effect of the disabled gate (R5.3).
     let debug_is_nil: bool = lua
@@ -145,20 +154,65 @@ fn enable_disabled_returns_none_and_no_trace() {
     );
 }
 
+/// pasta-scene-kick task 7.4 — gate 1: debug 無効＝キック経路非活性（R2.6）。
+///
+/// `enabled=false` のとき、`enable` に **配線済みの実 sink（recording mock）** を渡しても
+/// その sink は一切駆動されない（経路非活性）。無効ゲートは sink を未消費のまま drop し、
+/// socket-bridge スレッドを起こさないため、inbound `pasta/playScene` を駆動する経路が
+/// そもそも存在しない。観測: `enable` は `Ok(None)`（ハンドル無し＝スレッド無し）を返し、
+/// sink の呼び出し回数が 0 のままであること（無効ゲートが破れて sink を駆動すれば落ちる
+/// ＝load-bearing）。既存 `no_sink_keeps_kick_path_inert`（inbound へ `None` 直渡し）とは
+/// 異なり、本テストは **enable レベルで「sink を渡しても無効なら非活性」** を固定する。
+#[test]
+fn disabled_enable_keeps_wired_kick_sink_inert() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+
+    use crate::debug::kick::{KickRequest, KickSink};
+
+    let lua = mlua::Lua::new();
+    // 既定（無効）の設定。
+    let cfg = DebugConfig::resolve(None, None, None, None, None, None, None, None);
+    assert!(
+        !cfg.enabled,
+        "precondition: cfg must be disabled by default"
+    );
+
+    // 実 sink（呼び出し回数を記録する recording mock）を配線。
+    let calls = Arc::new(AtomicUsize::new(0));
+    let calls2 = Arc::clone(&calls);
+    let sink: KickSink = Arc::new(move |_req: KickRequest| {
+        calls2.fetch_add(1, Ordering::SeqCst);
+    });
+
+    // enabled=false で sink を渡しても: ハンドル無し（スレッド無し）＝経路非活性。
+    let handle = enable(&lua, &cfg, None, Some(sink)).expect("disabled enable must not error");
+    assert!(
+        handle.is_none(),
+        "disabled enable() must return Ok(None) — no bridge thread, kick path inert (R2.6)"
+    );
+
+    // 中核 assert: 無効ゲートは sink を駆動しない（呼び出し回数 0 のまま）。
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        0,
+        "disabled debug must NOT drive the wired kick sink (R2.6 inert path)"
+    );
+}
+
 #[test]
 fn enable_enabled_returns_handle() {
     // ALL_SAFE VM so the hook's engine-wide `jit.off()` is callable (the
     // backend now installs a real hook). Port 0 → OS-assigned free loopback
     // port so the test never clashes with a fixed port across parallel runs.
-    let lua = unsafe {
-        mlua::Lua::unsafe_new_with(mlua::StdLib::ALL_SAFE, mlua::LuaOptions::default())
-    };
+    let lua =
+        unsafe { mlua::Lua::unsafe_new_with(mlua::StdLib::ALL_SAFE, mlua::LuaOptions::default()) };
     let cfg = DebugConfig {
         enabled: true,
         listen: Some("127.0.0.1:0".parse().unwrap()),
         ..Default::default()
     };
-    let handle = enable(&lua, &cfg, None).expect("enable must succeed when enabled");
+    let handle = enable(&lua, &cfg, None, None).expect("enable must succeed when enabled");
     let handle = handle.expect("enabled enable() returns Ok(Some(DebugHandle))");
 
     // The handle echoes the config it was built from.
@@ -177,7 +231,10 @@ fn enable_enabled_returns_handle() {
         .load("return (jit.status() == false)")
         .eval()
         .expect("jit.status() must be callable on an ALL_SAFE VM");
-    assert!(jit_off, "enable must install the hook and apply engine-wide jit.off()");
+    assert!(
+        jit_off,
+        "enable must install the hook and apply engine-wide jit.off()"
+    );
 
     // Dropping the handle tears the backend down without hanging.
     drop(handle);
@@ -194,15 +251,14 @@ fn unload_synchronously_frees_port_for_plain_rebind() {
     // -aware rebind. With the pre-3.1 detached bridge, drop returns while the
     // bridge is still winding down asynchronously, so this plain rebind races
     // the still-open listener and fails with AddrInUse (10048 on Windows).
-    let lua = unsafe {
-        mlua::Lua::unsafe_new_with(mlua::StdLib::ALL_SAFE, mlua::LuaOptions::default())
-    };
+    let lua =
+        unsafe { mlua::Lua::unsafe_new_with(mlua::StdLib::ALL_SAFE, mlua::LuaOptions::default()) };
     let cfg = DebugConfig {
         enabled: true,
         listen: Some("127.0.0.1:0".parse().unwrap()),
         ..Default::default()
     };
-    let handle = enable(&lua, &cfg, None)
+    let handle = enable(&lua, &cfg, None, None)
         .expect("enable must succeed when enabled")
         .expect("enabled enable() returns Ok(Some(DebugHandle))");
 
@@ -237,14 +293,12 @@ fn unload_synchronously_frees_port_for_plain_rebind() {
 #[test]
 fn enable_bind_failure_surfaces_debug_error_bind() {
     // Occupy a concrete loopback port so the backend's bind must fail.
-    let blocker =
-        std::net::TcpListener::bind("127.0.0.1:0").expect("test listener must bind");
+    let blocker = std::net::TcpListener::bind("127.0.0.1:0").expect("test listener must bind");
     let taken = blocker.local_addr().expect("bound addr");
 
     // ALL_SAFE VM: the hook (installed BEFORE the transport bind) needs jit.
-    let lua = unsafe {
-        mlua::Lua::unsafe_new_with(mlua::StdLib::ALL_SAFE, mlua::LuaOptions::default())
-    };
+    let lua =
+        unsafe { mlua::Lua::unsafe_new_with(mlua::StdLib::ALL_SAFE, mlua::LuaOptions::default()) };
     let cfg = DebugConfig {
         enabled: true,
         listen: Some(taken),
@@ -253,7 +307,7 @@ fn enable_bind_failure_surfaces_debug_error_bind() {
 
     // R3.1 / R5.5: a bind failure is surfaced as DebugError::Bind, not a
     // panic and not a silently disabled backend.
-    let err = enable(&lua, &cfg, None).expect_err("bind to an occupied port must fail");
+    let err = enable(&lua, &cfg, None, None).expect_err("bind to an occupied port must fail");
     assert!(
         matches!(err, DebugError::Bind(_)),
         "expected DebugError::Bind, got: {err:?}"
@@ -277,15 +331,14 @@ fn enable_enabled_emits_listening_info() {
     // 1.1/1.3/1.4: enabling the backend emits a single `info` carrying the
     // real bound loopback addr. ALL_SAFE so the hook's `jit.off()` works;
     // port 0 → OS-assigned free loopback port (env-independent, no clash).
-    let lua = unsafe {
-        mlua::Lua::unsafe_new_with(mlua::StdLib::ALL_SAFE, mlua::LuaOptions::default())
-    };
+    let lua =
+        unsafe { mlua::Lua::unsafe_new_with(mlua::StdLib::ALL_SAFE, mlua::LuaOptions::default()) };
     let cfg = DebugConfig {
         enabled: true,
         listen: Some("127.0.0.1:0".parse().unwrap()),
         ..Default::default()
     };
-    let handle = enable(&lua, &cfg, None)
+    let handle = enable(&lua, &cfg, None, None)
         .expect("enable must succeed when enabled")
         .expect("enabled enable() returns Some(handle)");
 
@@ -311,21 +364,22 @@ fn enable_bind_failure_emits_warn_and_no_info() {
     // 2.1/2.2/2.3: a bind failure emits a `warn` naming the attempted addr,
     // and NO listening `info` is emitted. Occupy a concrete loopback port so
     // the backend's bind must fail.
-    let blocker =
-        std::net::TcpListener::bind("127.0.0.1:0").expect("test listener must bind");
+    let blocker = std::net::TcpListener::bind("127.0.0.1:0").expect("test listener must bind");
     let taken = blocker.local_addr().expect("bound addr");
 
-    let lua = unsafe {
-        mlua::Lua::unsafe_new_with(mlua::StdLib::ALL_SAFE, mlua::LuaOptions::default())
-    };
+    let lua =
+        unsafe { mlua::Lua::unsafe_new_with(mlua::StdLib::ALL_SAFE, mlua::LuaOptions::default()) };
     let cfg = DebugConfig {
         enabled: true,
         listen: Some(taken),
         ..Default::default()
     };
 
-    let err = enable(&lua, &cfg, None).expect_err("bind to an occupied port must fail");
-    assert!(matches!(err, DebugError::Bind(_)), "expected Bind, got {err:?}");
+    let err = enable(&lua, &cfg, None, None).expect_err("bind to an occupied port must fail");
+    assert!(
+        matches!(err, DebugError::Bind(_)),
+        "expected Bind, got {err:?}"
+    );
 
     // 2.1/2.3: a warn names the bind failure...
     assert!(
@@ -364,8 +418,14 @@ fn shared_source_mode_get_set_round_trip() {
 #[test]
 fn source_mode_u8_codec_round_trips_and_defends_unknown() {
     // as_u8 / from_u8 round-trip for both variants.
-    assert_eq!(SourceMode::from_u8(SourceMode::Pasta.as_u8()), SourceMode::Pasta);
-    assert_eq!(SourceMode::from_u8(SourceMode::Lua.as_u8()), SourceMode::Lua);
+    assert_eq!(
+        SourceMode::from_u8(SourceMode::Pasta.as_u8()),
+        SourceMode::Pasta
+    );
+    assert_eq!(
+        SourceMode::from_u8(SourceMode::Lua.as_u8()),
+        SourceMode::Lua
+    );
     // Defensive default: any unknown byte decodes to Pasta (6.1).
     assert_eq!(SourceMode::from_u8(42), SourceMode::Pasta);
     assert_eq!(SourceMode::from_u8(u8::MAX), SourceMode::Pasta);
@@ -400,8 +460,7 @@ fn file_config_defaults() {
 
 #[test]
 fn file_config_parses_section() {
-    let parsed: DebugFileConfig =
-        toml::from_str("enabled = true\nport = 1234").unwrap();
+    let parsed: DebugFileConfig = toml::from_str("enabled = true\nport = 1234").unwrap();
     assert!(parsed.enabled);
     assert_eq!(parsed.port, 1234);
 }
@@ -410,10 +469,7 @@ fn file_config_parses_section() {
 
 #[test]
 fn debug_error_variants_display() {
-    let bind = DebugError::Bind(std::io::Error::new(
-        std::io::ErrorKind::AddrInUse,
-        "in use",
-    ));
+    let bind = DebugError::Bind(std::io::Error::new(std::io::ErrorKind::AddrInUse, "in use"));
     assert!(format!("{bind}").to_lowercase().contains("bind"));
     let proto = DebugError::Protocol("bad frame".into());
     assert!(format!("{proto}").contains("bad frame"));
@@ -458,7 +514,11 @@ fn source_mode_parse_invalid_falls_back_to_pasta() {
 fn default_source_mode_is_pasta_and_sidecar_false() {
     // 6.1: 既定 source_mode == Pasta; 3.2: 既定 sidecar == false.
     let cfg = DebugConfig::resolve(None, None, None, None, None, None, None, None);
-    assert_eq!(cfg.source_mode, SourceMode::Pasta, "6.1: default present mode is .pasta");
+    assert_eq!(
+        cfg.source_mode,
+        SourceMode::Pasta,
+        "6.1: default present mode is .pasta"
+    );
     assert!(!cfg.source_map_sidecar, "3.2: sidecar disabled by default");
 
     // The struct Default mirrors the no-input resolve (zero-cost config).
@@ -523,7 +583,10 @@ fn source_mode_attach_overrides_env() {
 fn sidecar_file_overrides_default() {
     // file_sidecar=true, no env => true (file beats default false).
     let cfg = DebugConfig::resolve(None, None, None, None, None, None, Some(true), None);
-    assert!(cfg.source_map_sidecar, "file sidecar=true overrides default false");
+    assert!(
+        cfg.source_map_sidecar,
+        "file sidecar=true overrides default false"
+    );
 }
 
 #[test]
@@ -545,6 +608,12 @@ fn sidecar_env_overrides_file() {
             .source_map_sidecar;
     assert!(!off);
     assert!(file_on);
-    assert!(!env_off_over_file_on, "PASTA_DEBUG_SOURCE_MAP_SIDECAR=false overrides file true");
-    assert!(env_on_over_file_off, "PASTA_DEBUG_SOURCE_MAP_SIDECAR=true overrides file false");
+    assert!(
+        !env_off_over_file_on,
+        "PASTA_DEBUG_SOURCE_MAP_SIDECAR=false overrides file true"
+    );
+    assert!(
+        env_on_over_file_off,
+        "PASTA_DEBUG_SOURCE_MAP_SIDECAR=true overrides file false"
+    );
 }

@@ -31,11 +31,9 @@ pub mod persistence;
 pub mod renderer_injection;
 mod runtime_config;
 
-pub use renderer_injection::{
-    default_sakura_renderer, RendererInjection, SakuraRenderBoundary,
-};
-pub use runtime_config::lua_require;
+pub use renderer_injection::{RendererInjection, SakuraRenderBoundary, default_sakura_renderer};
 pub use runtime_config::RuntimeConfig;
+pub use runtime_config::lua_require;
 
 use crate::context::TranspileContext;
 use crate::debug::source_map::SourceMap;
@@ -216,8 +214,17 @@ impl PastaLuaRuntime {
         // `None` map keeps the default `.lua` behavior (requirements 6.1 / 6.2 /
         // 7.2). We keep a runtime-scope clone in `self.source_map` so the held map
         // outlives a single request (requirement 3.1).
-        let debug_handle = crate::debug::enable(&lua, &config.debug, source_map.clone())
-            .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+        // pasta-scene-kick tasks 1.1 / 2.3: thread the host-injected kick sink
+        // (`RuntimeConfig.kick_sink`) through to the debug backend so an inbound
+        // `pasta/playScene` invokes it (R2.4). When debug is disabled or no sink
+        // was bound, the kick path stays inert (R2.6). Cloning is a refcount bump.
+        let debug_handle = crate::debug::enable(
+            &lua,
+            &config.debug,
+            source_map.clone(),
+            config.kick_sink.clone(),
+        )
+        .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
 
         // Only hold the map when the backend is actually active (debug enabled).
         // On the disabled zero-cost path nothing is built nor held (7.1).

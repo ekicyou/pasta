@@ -14,6 +14,7 @@ use serde_json::Value;
 
 use crate::debug::breakpoints::BreakpointSet;
 use crate::debug::dap::Decoded;
+use crate::debug::kick::{KickRequest, KickSink};
 use crate::debug::transport::Transport;
 use crate::debug::types::{SessionCommand, SessionEvent};
 
@@ -32,6 +33,11 @@ use super::{SharedAdapter, SourceMapWiring};
 /// - **A** [`try_source_presentation_toggle`]: the self-contained
 ///   `pasta/sourcePresentation` runtime toggle (`apply → ack → event →
 ///   RefreshPresentation`); when it handles the request it returns directly.
+/// - **A'** [`try_play_scene_kick`]: the self-contained `pasta/playScene`
+///   scene-kick (decode → invoke the injected [`KickSink`] → success ack, or an
+///   error response for an empty/invalid name — pasta-scene-kick R2.3/R2.5).
+///   Same shape as A (it returns directly when it handles the request) and NOT
+///   forwarded to generic routing. Inert when no sink is injected (R2.6).
 /// - **B** [`apply_attach_source_mode`]: APPLY an explicit `attach`
 ///   `sourcePresentation` to the shared effective mode BEFORE replying.
 /// - **C** [`send_immediate_response_and_events`]: the immediate RESPONSE
@@ -55,6 +61,11 @@ pub(super) fn handle_inbound(
     // is unchanged (requirements 6.2 / 7.2). Also read by the presentation-toggle
     // / `attach` branches to flip the shared effective mode (tasks 3.1 / 5.5).
     source_map: &SourceMapWiring,
+    // The (optional) host-injected scene-kick sink (pasta-scene-kick R2.4 / R2.6).
+    // `Some` only when the outer host bound a `KickSink` AND debug is enabled; the
+    // `pasta/playScene` handler (step A') invokes it. `None` keeps the kick path
+    // inert (R2.6) — recognised but never activated.
+    kick_sink: Option<&KickSink>,
 ) -> bool {
     // The RAW request command string. Needed to disambiguate the runtime toggle
     // (task 3.1 / requirement 1.4): `decoded.requested_source_mode == None` is
@@ -81,9 +92,19 @@ pub(super) fn handle_inbound(
     // command for it), so it is handled here and returns directly — keeping the
     // ORDER apply → ack → event → RefreshPresentation exact and free of any
     // interleaving with the generic response/command routing below.
-    if let Some(done) =
-        try_source_presentation_toggle(transport, adapter, cmd_tx, req, source_map, command, &decoded)
-    {
+    if let Some(done) = try_source_presentation_toggle(
+        transport, adapter, cmd_tx, req, source_map, command, &decoded,
+    ) {
+        return done;
+    }
+
+    // Step A' (tasks 2.2 / 2.3 / pasta-scene-kick R2.3/R2.5/R2.6): the
+    // self-contained `pasta/playScene` scene-kick. Detected by the raw command
+    // string (a `pasta/playScene` request never produces a generic command /
+    // response in `decode_request`, so it must be handled here or be dropped). It
+    // is a complete exchange (sink invocation + immediate ack/error) and returns
+    // directly, never falling into the response/command routing below.
+    if let Some(done) = try_play_scene_kick(transport, adapter, req, command, &decoded, kick_sink) {
         return done;
     }
 
@@ -252,6 +273,67 @@ fn try_source_presentation_toggle(
     }
 
     None
+}
+
+/// Step A' (tasks 2.2 / 2.3 / design "KickInboundHandler"・"KickSinkSeam",
+/// pasta-scene-kick R2.3 / R2.4 / R2.5 / R2.6): the self-contained
+/// `pasta/playScene` scene-kick exchange, in the SAME shape as
+/// [`try_source_presentation_toggle`] (step A). Returns `Some(bool)` when it
+/// handles the request (`Some(true)` on a normal handled exchange, `Some(false)`
+/// only on a peer-gone / poisoned send so the bridge stops), and `None` when
+/// `command != "pasta/playScene"` so `handle_inbound` falls through.
+///
+/// Behavior (mirrors the decode contract: `decoded.kick_scene` is `Some(name)`
+/// for a valid non-empty name, `None` otherwise):
+/// - `kick_scene == Some(name)` AND a `kick_sink` is wired → invoke the sink with
+///   `KickRequest { scene: name }` (R2.4) and send a success ack (R2.3).
+/// - `kick_scene == None` (empty / invalid name) → DO NOT kick; send an error
+///   response (`success: false`, R2.5).
+/// - `kick_sink == None` (debug-disabled / not injected) → the kick path is
+///   INERT (R2.6): the request is recognised (handled here, not routed) but no
+///   sink call and no response are produced.
+fn try_play_scene_kick(
+    transport: &Transport,
+    adapter: &SharedAdapter,
+    req: &Value,
+    command: &str,
+    decoded: &Decoded,
+    kick_sink: Option<&KickSink>,
+) -> Option<bool> {
+    if command != "pasta/playScene" {
+        return None;
+    }
+
+    // R2.6: with no sink injected the kick path is non-activated. The request is
+    // still recognised here (so it does not leak into generic routing), but no
+    // sink call and no response frame are produced.
+    let sink = kick_sink?;
+
+    let request_seq = req.get("seq").and_then(Value::as_u64).unwrap_or(0);
+
+    let response = {
+        let mut dap = match adapter.lock() {
+            Ok(g) => g,
+            Err(_) => return Some(false), // poisoned → stop (never panic in the bridge)
+        };
+        match &decoded.kick_scene {
+            // Valid scene name: hand it to the sink (R2.4), then ack success
+            // (R2.3). The sink is a fire-and-forget `try_send`-style closure; the
+            // actual scene execution is asynchronous and not awaited here.
+            Some(scene) => {
+                sink(KickRequest {
+                    scene: scene.clone(),
+                });
+                dap.play_scene_response(request_seq)
+            }
+            // Empty / invalid name: do NOT kick; return an error response (R2.5).
+            None => dap.play_scene_error(request_seq),
+        }
+    };
+    if transport.send(response).is_err() {
+        return Some(false);
+    }
+    Some(true)
 }
 
 /// Helper B (task 5.2 / design "Components / C4" Service Interface・"System Flows /

@@ -1,7 +1,9 @@
 use crate::error::*;
 use crate::lua_request;
 use pasta_lua::mlua::{Function, Table};
-use pasta_lua::{GlobalLoggerRegistry, LoadDirGuard, PastaLoader, PastaLuaRuntime};
+use pasta_lua::{
+    GlobalLoggerRegistry, LoadDirGuard, PastaLoader, PastaLuaRuntime, RuntimeConfig,
+};
 use std::{ffi::*, path::*};
 use tracing::{debug, error, info, trace, warn};
 
@@ -111,8 +113,16 @@ impl Shiori for PastaShiori {
             "Starting PastaShiori load"
         );
 
+        // VM 構築前に `MAILBOX` 投函クロージャを scene-kick sink として束縛する
+        // （`MailboxKickInjector`・pasta-scene-kick 2.4）。`load_with_config` の内側で
+        // `RuntimeConfig` が VM（`PastaLuaRuntime`）へ渡る前に sink が積まれるため、
+        // 後続 task（2.x）が `enable` 経由で socket-bridge へ透過させられる。
+        // pasta.toml `[debug]` ＋ env の debug 解決は `load_with_config` 内で従来どおり行われる。
+        let runtime_config =
+            RuntimeConfig::new().with_kick_sink(Some(crate::actor::lifecycle::kick_sink()));
+
         // Load runtime via PastaLoader (Stage 1.5 logger update happens inside)
-        match PastaLoader::load(&load_dir_path) {
+        match PastaLoader::load_with_config(&load_dir_path, runtime_config) {
             Ok(runtime) => {
                 // Cache SHIORI functions (load/request/unload)
                 self.cache_lua_functions(&runtime);
@@ -288,6 +298,57 @@ impl PastaShiori {
             Err(e) => {
                 error!(error = %e, "SHIORI.request execution failed");
                 Err(MyError::from(e))
+            }
+        }
+    }
+
+    /// Invoke the Lua global `SHIORI.kick(scene)` (fire-and-forget, best-effort).
+    ///
+    /// Called on the actor thread by the `ActorMsg::Kick` executor arm
+    /// (`pasta-scene-kick` 3.1). Mirrors [`PastaShiori::call_lua_request`]'s mechanism
+    /// for reaching a Lua global function via `runtime().lua().globals()`, but unlike
+    /// `request` there is no reply path: the Lua side only installs the pending flags
+    /// (`STORE.kick_pending` / `STORE.kick_force`) for the next tick.
+    ///
+    /// This is a **protected call**: a missing runtime, a missing `SHIORI.kick`, or a
+    /// Lua error is logged and swallowed so the actor thread never unwinds (debug-only
+    /// best-effort path). `SHIORI.kick` is looked up fresh from globals each call rather
+    /// than cached, since it is outside the load/request/unload cached set.
+    pub fn kick(&self, scene: &str) {
+        // Runtime must be initialized; otherwise there is no VM to kick.
+        let runtime = match self.runtime.as_ref() {
+            Some(r) => r,
+            None => {
+                debug!("SHIORI.kick skipped: runtime not initialized");
+                return;
+            }
+        };
+
+        // Set load_dir context for logging (mirrors request/unload).
+        let _guard = self.load_dir.as_ref().map(|p| LoadDirGuard::new(p.clone()));
+
+        let lua = runtime.lua();
+        let globals = lua.globals();
+
+        // Look up the SHIORI table, then the kick function (fresh, not cached).
+        let kick_fn: Function = match globals
+            .get::<Table>("SHIORI")
+            .and_then(|t| t.get::<Function>("kick"))
+        {
+            Ok(f) => f,
+            Err(e) => {
+                debug!(error = %e, scene = %scene, "SHIORI.kick not available, skipping");
+                return;
+            }
+        };
+
+        // Protected call: errors are logged and swallowed (actor thread must not unwind).
+        match kick_fn.call::<()>(scene) {
+            Ok(()) => {
+                trace!(scene = %scene, "SHIORI.kick installed pending flag");
+            }
+            Err(e) => {
+                warn!(error = %e, scene = %scene, "SHIORI.kick execution failed (swallowed)");
             }
         }
     }
