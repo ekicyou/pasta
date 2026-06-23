@@ -99,7 +99,7 @@
   - 完了状態: payload 生成と検証（空→false・非空→true）の単体テストが緑
   - _Requirements: 1.2, 2.5_
   - _Boundary: PlaySceneRequest（playSceneRequest.ts）_
-- [ ] 5.2 キックコマンドを登録し customRequest を送信する
+- [x] 5.2 キックコマンドを登録し customRequest を送信する
   - コマンド登録・pasta セッションガード（未接続は案内し送信しない）・シーン名入力（取消は送信しない）・customRequest 送信・失敗時エラー提示を実装する
   - コマンド／メニュー貢献（pasta デバッグセッション時のみ）をマニフェストへ追加する
   - 完了状態: モック session で「未接続→警告・送信なし」「取消→送信なし」「正常→payload 送信」が確認できる

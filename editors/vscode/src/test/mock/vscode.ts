@@ -191,6 +191,17 @@ export const createdStatusBarItems: MockStatusBarItem[] = [];
 /** All user-facing messages shown via showErrorMessage / showWarningMessage. */
 export const shownMessages: Array<{ kind: 'error' | 'warning'; message: string }> = [];
 
+/**
+ * Programmable response for the next window.showInputBox call. Tests set this
+ * to a string (entered name) or `undefined` (cancel). Each call records its
+ * options in `inputBoxCalls` for assertion.
+ */
+export let nextInputBoxResult: string | undefined = undefined;
+export function setNextInputBoxResult(value: string | undefined): void {
+  nextInputBoxResult = value;
+}
+export const inputBoxCalls: Array<Record<string, unknown> | undefined> = [];
+
 // --- event emitters (exported so tests can fire events) ----------------------
 
 export const didOpenTextDocumentEmitter = new EventEmitter<any>();
@@ -232,6 +243,10 @@ export const window = {
   showWarningMessage: (message: string) => {
     shownMessages.push({ kind: 'warning', message });
     return Promise.resolve(undefined);
+  },
+  showInputBox: (options?: Record<string, unknown>) => {
+    inputBoxCalls.push(options);
+    return Promise.resolve(nextInputBoxResult);
   },
   createStatusBarItem: (_alignment?: StatusBarAlignment) => {
     const item = new MockStatusBarItem();
