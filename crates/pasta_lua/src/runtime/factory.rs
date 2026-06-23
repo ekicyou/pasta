@@ -212,6 +212,39 @@ impl PastaLuaRuntime {
         lua_require(&runtime.lua, "pasta.scene_dic")?;
         tracing::debug!(module = "pasta.scene_dic", "Loaded module via require");
 
+        // Step 7 (pasta-scene-kick task 2.2): finalize シーン突合。
+        //
+        // この時点で BOTH が揃う: (a) loader が transpile 中に蓄積した
+        // `(join_key, .pasta 宣言行)` 記録（`runtime.source_map` 内）、(b) finalize
+        // （scene_dic ロードで実行済み）が登録した runtime 実シーン identity
+        // （`collect_scenes`）。両者を同一突合キーで突き合わせ、`.pasta` (ファイル,
+        // 行範囲) → (scene_id, parent) の `SceneIdentityIndex` を確定し、共有 `Arc<
+        // SourceMap>` の write-once `scene_index` スロットへ充填する（resolver=task 3.1
+        // が読む）。
+        //
+        // ゲート: `source_map` は debug 有効時のみ `Some`（loader Phase 5.5）。無効
+        // （既定）では `None` で本ブロックは丸ごとスキップ＝索引非構築・行マッピング
+        // 不変（requirements 7.1 通常モード非破壊）。突合失敗（記録空・identity 不一致）
+        // は非致命（best-effort）: 空/部分索引のまま続行し、起動を妨げない。
+        if let Some(ref source_map) = runtime.source_map {
+            match crate::debug::source_map::build_scene_index(&runtime.lua, source_map) {
+                Ok(index) => {
+                    // write-once: 初回のみ成功。二重充填（Err）は本番経路では起こらない。
+                    if source_map.set_scene_index(index).is_err() {
+                        tracing::warn!(
+                            "scene identity index already set; skipping re-population (task 2.2)"
+                        );
+                    } else {
+                        tracing::debug!("Built and attached scene identity index (task 2.2)");
+                    }
+                }
+                Err(e) => {
+                    // 突合自体の失敗は非致命: 索引なしでも通常実行・既存 kick は不変。
+                    tracing::warn!(error = %e, "scene identity index join failed; continuing without index (task 2.2, best-effort)");
+                }
+            }
+        }
+
         Ok(runtime)
     }
 

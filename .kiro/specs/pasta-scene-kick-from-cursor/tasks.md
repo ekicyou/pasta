@@ -20,7 +20,7 @@
   - _Requirements: 3.1, 3.4_
   - _Boundary: SourceMapSink_
 
-- [ ] 2. Core: ビルド側の索引構築（code_gen 記録 → finalize 突合）
+- [x] 2. Core: ビルド側の索引構築（code_gen 記録 → finalize 突合）
 - [x] 2.1 code_gen のシーン生成箇所でシーン記録を呼ぶ
   - global/local シーン生成箇所（既存 span 記録の近傍）で、突合キー（base 名＋出現順）と `.pasta` span を sink へ流す
   - シーン範囲終端（次の同レベル以上宣言の直前／chunk 末尾）と入れ子レベルを受け渡す
@@ -30,7 +30,7 @@
   - _Depends: 1.2_
   - _Boundary: code_gen scope_gen_
 
-- [ ] 2.2 finalize でランタイム実識別子と span を突合し索引を構築する
+- [x] 2.2 finalize でランタイム実識別子と span を突合し索引を構築する
   - finalize がランタイム実シーン識別子を列挙する箇所（`collect_scenes` が `(global_name, local_name)` を返す・`会話1`/`挨拶_1` 形式）で、同一の突合キーで span 側と突合し、(ファイル, 行範囲) → (scene_id, parent) の索引を確定する
   - 各シーンを **(scene_id, parent)** で保持する：global → `(会話1, None)`、local → `(挨拶_1, 会話1)`。task 1.1 の `SceneIdentityIndex`/`SceneSpan` を **parent: Option<String> を持つよう拡張**し、`scene_at` が最内（level 最大）の (scene_id, parent) を返せること
   - join：join_key の親参照 `会話#1`→runtime `会話1` を (base, 出現順) で対応付け、local `L:会話#1:挨拶_1`→`(parent=会話1, fn_name=挨拶_1)` を `collect_scenes` の `(会話1, 挨拶_1)` と突合（Implementation Notes「local シーン kick の方式決定」「2.x join_key 契約」参照）
@@ -151,3 +151,6 @@
   - **2.2 索引が格納する識別子**：`collect_scenes` が返す `(global_name, local_name)`（例 `(会話1, 挨拶_1)`）をそのまま使い、各シーンを **(scene_id, parent)** で保持する。global → `scene_id=会話1, parent=None, level=0`。local → `scene_id=挨拶_1, parent=会話1, level=1`。よって task 1.1 の `SceneIdentityIndex`/`SceneSpan` を **parent: Option<String> を持つよう拡張**（2.2 境界内）。`scene_at` は最内（level 最大）を返し、呼び出し側へ (scene_id, parent) を渡せること。
   - **2.2 の join（local 含む）**：join_key の親参照 `会話#1`（base=会話・出現順1）→ runtime global_name `会話1` を (base, 出現順) で対応付け、local は `L:会話#1:挨拶_1` → `(parent=会話1, local fn_name=挨拶_1)` を `collect_scenes` の `(会話1, 挨拶_1)` と突合する。
   - **3.1/4.1 への波及**：`KickRequest` に `parent: Option<String>` を追加（debug 専用構造体）。resolver は確定 (scene_id, parent) で `KickRequest{scene, parent}` を組む。kick.lua `KICK.install`/`try_dispatch` を parent 対応に（parent なし＝従来の `co_exec(act, scene)`、parent あり＝`SCENE.search(scene, parent)` の local 分岐経由）。いずれも debug kick 経路限定。`SCENE.search`/`resolve_scene_id_unified`/`SCENE.get` は既存 API をそのまま利用（新規シグネチャ追加は最小限）。
+
+- **検証の教訓（全タスク共通・2.1 で露呈）**：`cargo test -p pasta_lua --lib` だけでは **`tests/` 配下の integration test 目標を検証しない**。task 2.1 は `generate_local_scene` に `parent_ref` を追加したが `tests/transpiler/record_wiring_scope_test.rs` の呼び出し側を更新せず、`--lib` 緑のままコミットした（2.2 で inline 修正済）。**以降の実装・レビューは `cargo test -p pasta_lua`（全目標）で回帰確認すること**。`pub` 関数のシグネチャ変更時は `tests/` の呼び出し側も grep して更新する。
+- **2.2 索引の attachment 機構（3.1 resolver が読む口）**：`SourceMap` に `scene_index: OnceLock<SceneIdentityIndex>`（write-once 内部可変）。join site は `runtime/factory.rs`（finalize 後・`source_map.is_some()` で debug-gated）で `build_scene_index(&lua, source_map)` を呼び `set_scene_index`。読み取りは `SourceMap::scene_at(file, line) -> Option<SceneIdentity{scene_id, parent}>`。`__start__` は level-1 として索引せず global 本体領域は `(会話N, None)` が覆う（global kick が `__start__` を強制する挙動と整合）。named local のみ level-1+parent。

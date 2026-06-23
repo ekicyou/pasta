@@ -43,11 +43,26 @@ use std::collections::{BTreeMap, HashMap};
 
 use super::canonicalize_pasta_file;
 
+/// 確定したシーン同一性（`scene_at` の返り値）。
+///
+/// ランタイム実 identity を **(scene_id, parent)** で表す（task 2.2・kick 解決の
+/// 解決対象）。global は `scene_id=会話1, parent=None`、local は
+/// `scene_id=挨拶_1, parent=Some(会話1)`。kick の resolver（task 3.1）は parent の
+/// 有無で global 分岐 / local 分岐を選ぶため、両者を一体で返す。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SceneIdentity {
+    /// シーン識別子（global = `会話1`、local = `挨拶_1`）。
+    pub scene_id: String,
+    /// 親グローバルシーン（local のみ `Some(会話1)`・global は `None`）。
+    pub parent: Option<String>,
+}
+
 /// 1 シーンの行範囲（両端 inclusive・1 始まり）・入れ子レベル・識別子。
 ///
 /// `level` は入れ子の深さ（global = 0, その直下の local = 1, ...）。包含が複数該当する
 /// とき最内（`level` 最大）を選ぶための判定に用いる（requirements 2.2）。`scene_id` は
 /// `SceneRegistry` 由来のランタイム実 identity（例 `会話1`）を **そのまま** 保持する。
+/// `parent` は local シーンの親グローバル（例 `会話1`）で、global は `None`（task 2.2）。
 /// 本索引は識別子の FORMAT に非依存で、投入された文字列を格納・返却するのみ
 /// （design Decision 1「runtime-authoritative capture」）。
 #[derive(Debug, Clone)]
@@ -60,12 +75,22 @@ struct SceneSpan {
     level: u32,
     /// シーン識別子（`SceneRegistry` 由来・FORMAT 非依存で格納）。
     scene_id: String,
+    /// 親グローバルシーン（local のみ `Some`・global は `None`）。
+    parent: Option<String>,
 }
 
 impl SceneSpan {
     /// 指定行が本シーンの範囲 `[start_line, end_line]`（両端 inclusive）に含まれるか。
     fn contains(&self, line: u32) -> bool {
         self.start_line <= line && line <= self.end_line
+    }
+
+    /// 確定したシーン同一性 `(scene_id, parent)` の所有コピーを返す。
+    fn identity(&self) -> SceneIdentity {
+        SceneIdentity {
+            scene_id: self.scene_id.clone(),
+            parent: self.parent.clone(),
+        }
     }
 }
 
@@ -94,8 +119,9 @@ impl SceneIdentityIndex {
     /// 2. **後方フォールバック**（2.5）: 包含が無ければ `line` と同じか下方の最近接宣言。
     /// 3. **未検出**（2.6）: 下方にも無ければ `None`。未登録ファイル・空ファイルも `None`。
     ///
-    /// `line` は 1 始まり。返り値は格納された識別子の所有コピー。
-    pub fn scene_at(&self, pasta_file: &str, line: u32) -> Option<String> {
+    /// `line` は 1 始まり。返り値は格納された識別子の所有コピー（[`SceneIdentity`]・
+    /// `(scene_id, parent)`）。
+    pub fn scene_at(&self, pasta_file: &str, line: u32) -> Option<SceneIdentity> {
         let file_key = canonicalize_pasta_file(pasta_file);
         let scenes = self.files.get(&file_key)?;
 
@@ -113,13 +139,13 @@ impl SceneIdentityIndex {
             }
         }
         if let Some(span) = innermost {
-            return Some(span.scene_id.clone());
+            return Some(span.identity());
         }
 
         // (2) 後方フォールバック（2.5）: 包含が無ければ、`line` と同じか下方（開始行 >=
         // line）の最近接シーン宣言を採る。`range(line..)` の先頭が最近接（8.3）。
         if let Some((_, span)) = scenes.range(line..).next() {
-            return Some(span.scene_id.clone());
+            return Some(span.identity());
         }
 
         // (3) 未検出（2.6）: 下方に有効シーンが無い。
@@ -148,16 +174,19 @@ impl SceneIdentityIndexBuilder {
         self.files.entry(file_key).or_default();
     }
 
-    /// 1 シーンの確定済み行範囲・入れ子レベル・識別子を投入する。
+    /// 1 シーンの確定済み行範囲・入れ子レベル・識別子・親を投入する。
     ///
     /// `start_line` / `end_line` は両端 inclusive・1 始まり。`end_line` は「次の同
     /// レベル以上宣言の直前 / ファイル末尾」を構築側が算出済みで渡す（requirements
-    /// 2.1）。`level` は入れ子の深さ（global = 0, local = 1, ...）。同一ファイル内で
-    /// 同一 `start_line` を再投入した場合は last-write-wins で上書きする。
+    /// 2.1）。`level` は入れ子の深さ（global = 0, local = 1, ...）。`parent` は local の
+    /// 親グローバル（例 `会話1`）で、global は `None`（task 2.2・kick の local 分岐
+    /// 解決に渡す）。同一ファイル内で同一 `start_line` を再投入した場合は last-write-wins
+    /// で上書きする。
     pub fn add_scene(
         &mut self,
         pasta_file: &str,
         scene_id: &str,
+        parent: Option<&str>,
         start_line: u32,
         end_line: u32,
         level: u32,
@@ -170,6 +199,7 @@ impl SceneIdentityIndexBuilder {
                 end_line,
                 level,
                 scene_id: scene_id.to_string(),
+                parent: parent.map(|p| p.to_string()),
             },
         );
     }

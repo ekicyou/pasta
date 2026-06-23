@@ -134,7 +134,12 @@ fn local_scene_header_records_definition_pasta_line() {
         let mut scene = LocalSceneScope::named("サブ会話".to_string());
         scene.span = span_at(30);
         let actors: Vec<pasta_dsl::parser::SceneActorItem> = Vec::new();
-        codegen.generate_local_scene(&scene, 1, &actors).unwrap();
+        // task 2.1 で `parent_ref`（親 global の join-key 断片 `"{base}#{counter}"`）が
+        // 追加された。本テストは行マッピング記録のみを観測するため、親参照は任意の決定的
+        // 値で良い（record_scene の join_key 構築にのみ使われ、record_line 記録には影響しない）。
+        codegen
+            .generate_local_scene(&scene, 1, &actors, "会話#1")
+            .unwrap();
     }
 
     let lua = String::from_utf8(output).unwrap();
