@@ -165,7 +165,7 @@ graph TB
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/event/kick.lua` —（新規）`KICK.install(scene_name)`: `STORE.kick_pending = scene_name`／`STORE.kick_force = true` を設置するのみ（resume しない）。`KICK.try_dispatch(act) -> co|nil`: `kick_pending` があれば `create_act` 流用済み `act` で当該シーンを `act:find_scene`→`SCENE.co_exec` し co を返す（解決不能なら nil＋診断ログ・R3.5）。呼び出し後フラグ消費。
 - `crates/pasta_lua/pasta_scripts/pasta/shiori/event/virtual_dispatcher.lua` —（修正）`dispatch(act)` 入口で、(a) `STORE.kick_force` が真なら当該 tick の `is_blocked` ゲートを**ワンショット突破**、(b) `KICK.try_dispatch(act)` を `check_talk`/random talk より**前段**で呼び、非 nil co を得たら `set_co_scene` 経由で前 `co_scene` を閉じて（preempt）当該 co を継続対象として返す。フラグは消費して通常状態へ戻す。
 - `crates/pasta_lua/pasta_scripts/pasta/store.lua`（STORE 定義／`STORE.reset`） — `kick_pending`（既定 nil）／`kick_force`（既定 false）フィールドを追加し `reset` で初期化。
-- `crates/pasta_lua/pasta_scripts/pasta/shiori/init.lua`（SHIORI ディスパッチ登録元） — `SHIORI.kick(scene)` を公開し `KICK.install` へ委譲。
+- `crates/pasta_lua/pasta_scripts/pasta/shiori/entry.lua`（SHIORI グローバル定義・ランタイムロード元。`factory.rs` が `require("pasta.shiori.entry")`。`shiori/init.lua` は require 0 件の未ロード空スタブのため不可） — `SHIORI.kick(scene)` を公開し `KICK.install` へ委譲。
 
 **TypeScript — `editors/vscode`**
 - `editors/vscode/src/playSceneRequest.ts` —（新規）`requestCommand = 'pasta/playScene'`、`setPayload(scene: string): { scene: string }`、`validateSceneName(name): boolean`（空チェック）。`sourcePresentationToggle.ts` の純ロジック構造をミラー。
@@ -519,7 +519,7 @@ KICK.install(scene_name: string) -> nil   -- 副作用: STORE.kick_pending/kick_
 - Invariants: GET をブロックしない（重い処理を行わない・R3.1）。
 
 **Implementation Notes**
-- Integration: `event/kick.lua` 新規。`init.lua` の `SHIORI.kick` から委譲。
+- Integration: `event/kick.lua` 新規。`entry.lua`（ランタイムロード元）の `SHIORI.kick` から委譲。
 - Validation: `SHIORI.kick("intro")` 後に `STORE.kick_pending=="intro"`・`STORE.kick_force==true`、co_scene は未変更（resume していない）。
 - Risks: 低。
 

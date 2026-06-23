@@ -61,7 +61,7 @@
   - _Boundary: ActorKickMsg（thread.rs, shiori.rs ブリッジ）_
 
 - [ ] 4. Lua キック設置・dispatch 注入（pasta_scripts）
-- [ ] 4.1 (P) キック入口で保留フラグを設置する（非ブロッキング）
+- [x] 4.1 (P) キック入口で保留フラグを設置する（非ブロッキング）
   - Lua のキック入口を公開・登録し、保留シーン名と割り込み許可フラグを設置するのみ（resume・レンダリングしない）
   - 即時単一モード（モードフラグを持たない）
   - 完了状態: キック入口呼び出し後に保留フラグが立ち、進行中シーン状態が未変更（resume していない）ことがテストで確認できる
@@ -138,3 +138,9 @@
   - 完了状態: 3 ゲート（非活性・未解決破棄・drop）の各テストが緑
   - _Requirements: 2.6, 3.5_
   - _Depends: 2.3, 3.1, 4.2_
+
+## Implementation Notes
+
+- **実行順序（Lua 先行）**: Rust の網羅性検査により `ActorMsg::Kick` variant 追加（1.2）は executor アーム＋Rust↔Lua ブリッジとコンパイル不可分で、ブリッジが叩く `SHIORI.kick` は 4.1 で初めて存在する。よって実行順を Lua 先行（1.3→4.1→4.2→4.3→4.4）→ Rust（1.2 で variant＋executor アーム＋ブリッジを一括、3.2 はそのRust部分を内包）→ 3.1 → 2.x → 5.x → 6.1 → 7.x に最適化。各層が単独コンパイル＆テスト可能。
+- **SHIORI モジュールの実体は `entry.lua`**: `SHIORI` グローバル・`SHIORI.request` を定義しランタイムにロードされるのは `pasta/shiori/entry.lua`（`factory.rs` が `require("pasta.shiori.entry")`）。`pasta/shiori/init.lua` は require 0 件の未ロード空スタブ。`SHIORI.kick` 等の公開・Rust→Lua ブリッジの到達先は `entry.lua`。design.md L168/L522 は entry.lua に修正済み。
+- **cargo 実行前に `unset NoDefaultCurrentDirectoryInExePath`**（外さないと mlua-sys/LuaJIT ビルドが exit 101）。lua spec は `cargo test -p pasta_lua`（lua_unittest_runner）で走り、新規 `*_test.lua` は `tests/lua_specs/init.lua` に登録が必要。
