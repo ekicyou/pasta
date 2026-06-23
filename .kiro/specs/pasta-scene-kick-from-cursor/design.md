@@ -391,7 +391,7 @@ pub fn resolve_scene_at(
 **Implementation Notes**
 - Integration: `try_play_scene_at`（wiring）から呼ばれ、成功なら `sink(KickRequest { scene })` ＋ 成功応答、`NotFound` ならエラー応答。
 - Validation: 最内優先 > 後方フォールバックの優先順位（2.2 > 2.5）。フォールバック対象が無いときのみ未検出（2.6）。
-- Risks: uri→ファイルパス正規化（Windows パス・URI エンコード・chunk 名との対応）。staleness による誤解決（Decision 4・OPEN QUESTION）。
+- Risks: uri→ファイルパス正規化は `std::path::absolute` で両側統一（`fs::canonicalize` 不使用・8.3短縮名CI地雷回避）＋特性化テスト（解決済み）。staleness はエディタ dirty 検知＋best-effort（Decision 4・解決済み）。
 
 ### Transport 層
 
@@ -489,5 +489,5 @@ pub fn resolve_scene_at(
   - **③ キック自動再実行**: v1 はしない（再アタッチ後に作者が手動で再キック）。デタッチ跨ぎの保留キック状態管理を避け予測可能性優先。
   - **④ 表示/有効化条件**: 接続中のみ（`when: debugType == 'pasta'`）。リロードは動作中 SHIORI への操作のため。kick 項目の常時表示とは前提が異なる。
 - **OQ-4（デバッグ開始誘導の具体手段）→ 解決済み: 設定優先＋既定フォールバック**。6.3 の「デバッグ開始」アクションは `vscode.debug.startDebugging` を用い、ワークスペースに `type: 'pasta'` の `launch.json` 構成があればそれを起動、無ければ組込み既定アタッチ構成（`127.0.0.1:9276`）で起動する。この「pasta アタッチ構成を解決する」ロジックは Decision 5 の再アタッチと**共通化**する（DRY）。
-- **Risk: uri 正規化**: VSCode uri → エンジン索引キー（chunk 名/ファイルパス）の正規化（Windows パス・URI エンコード）。CI 8.3 短縮名パス等の既知リスク（メモリ）に注意。
+- **Risk: uri 正規化 → 解決済み: `std::path::absolute` で両側統一＋特性化テスト**。VSCode uri → エンジン索引キー（chunk 名/ファイルパス）の正規化は `fs::canonicalize` を**使わず** `std::path::absolute` を用いる（`fs::canonicalize` は CI の 8.3 短縮名パス `RUNNER~1` で開発機に出ない不具合を起こした既知の地雷）。VSCode 側 uri→path と索引キー生成を同一規則に揃え、CI の 8.3 短縮名パスを模した特性化テストでミスマッチ（黙って未検出・2.6）を防ぐ。
 - **Risk: end_line 確定**: シーン範囲終端（次の同レベル以上宣言の直前/ファイル末尾）の正確な算出。入れ子レベルの受け渡し。
