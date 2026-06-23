@@ -13,6 +13,26 @@ use super::codec::{
 };
 use super::pending::PendingKind;
 
+/// Reserved sentinel scene string delivered through the SINGLE existing
+/// [`KickSink`](crate::debug::kick::KickSink) to request a SHIORI reload
+/// (kick-from-cursor task 4.3 / requirement 9.2).
+///
+/// The `pasta/reloadShiori` wiring (`try_reload_shiori`) hands this exact string
+/// to the kick sink instead of a real scene; the Lua `KICK.try_dispatch` (in
+/// `kick.lua`) matches it EXACTLY (before the `:`-local-composite and global
+/// branches) and emits `\![reload,shiori]` via `act:raw_script` + `act:build`.
+///
+/// It is chosen to NEVER collide with a real scene identity: globals are
+/// `sanitize_name`d (alphanumeric + `_` only) and locals are composite strings
+/// starting with `:`. This sentinel contains `@` and `/` (which `sanitize_name`
+/// would replace) and does NOT start with `:`, so exact-match against it is safe.
+///
+/// CRITICAL: this byte string MUST stay in sync with the `RELOAD_SENTINEL`
+/// module-level constant in
+/// `crates/pasta_lua/pasta_scripts/pasta/shiori/event/kick.lua`. Changing one
+/// without the other breaks the reload delivery.
+pub const RELOAD_SENTINEL: &str = "@@pasta/reloadShiori@@";
+
 /// The outcome of decoding one inbound DAP request.
 ///
 /// A request can produce a [`SessionCommand`] to forward to the session, an
@@ -63,6 +83,13 @@ pub struct Decoded {
     /// 4.1) owns the position→scene resolver call and the ack/error response — so a
     /// `pasta/playSceneAt` request never falls into generic routing.
     pub play_scene_at: Option<(String, u32)>,
+    /// `true` ONLY for a `pasta/reloadShiori` custom request (kick-from-cursor
+    /// requirement 9.2). A bare command with no meaningful args; the decode itself
+    /// produces no command/response — the wiring (task 4.3, `try_reload_shiori`)
+    /// owns delivering the reserved [`RELOAD_SENTINEL`] via the existing
+    /// [`KickSink`](crate::debug::kick::KickSink) and the success ack — so a
+    /// `pasta/reloadShiori` request never falls into generic routing.
+    pub reload_shiori: bool,
 }
 
 impl DapAdapter {
@@ -251,6 +278,20 @@ impl DapAdapter {
                     ..Decoded::default()
                 }
             }
+            "pasta/reloadShiori" => {
+                // The decode SIDE of the SHIORI reload (kick-from-cursor R9.2). A
+                // bare command with no meaningful args: just flag `reload_shiori`.
+                // No immediate response/command is produced here — the wiring (task
+                // 4.3, `try_reload_shiori`) owns delivering the `RELOAD_SENTINEL`
+                // through the existing `KickSink` and sending the success ack.
+                // Leaving every other field at default keeps the request out of
+                // generic routing. The engine output `\![reload,shiori]` happens in
+                // Lua (`kick.lua` sentinel branch), NOT here.
+                Decoded {
+                    reload_shiori: true,
+                    ..Decoded::default()
+                }
+            }
             "disconnect" => {
                 let response = self.response(request_seq, "disconnect", Value::Null);
                 Decoded {
@@ -338,5 +379,17 @@ impl DapAdapter {
             "command": "pasta/playSceneAt",
             "message": reason,
         })
+    }
+
+    /// Build the `pasta/reloadShiori` acceptance RESPONSE [`Value`] (success ack),
+    /// correlated to `request_seq` (kick-from-cursor requirement 9.2).
+    ///
+    /// The wiring (task 4.3, `try_reload_shiori`) sends this AFTER handing the
+    /// reserved [`RELOAD_SENTINEL`] to the existing
+    /// [`KickSink`](crate::debug::kick::KickSink), confirming the reload was
+    /// accepted. The actual `\![reload,shiori]` sakura script is emitted later, in
+    /// Lua, when the sentinel kick is dispatched — it is NOT carried by this ack.
+    pub(crate) fn reload_shiori_response(&mut self, request_seq: u64) -> Value {
+        self.response(request_seq, "pasta/reloadShiori", Value::Null)
     }
 }

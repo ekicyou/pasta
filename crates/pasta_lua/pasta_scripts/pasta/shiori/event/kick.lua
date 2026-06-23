@@ -14,6 +14,22 @@
 local STORE = require("pasta.store")
 local log = require("@pasta_log")
 
+--- SHIORI リロード予約 sentinel（debug 限定・task 4.3 / R9.2）
+---
+--- bridge 側（`try_reload_shiori`）が既存 KickSink ただ一つにこの文字列を載せて
+--- リロードを要求する。`try_dispatch` で **完全一致** 判定し（`:` local-composite 分岐や
+--- global co_exec より前）、`act:raw_script("\\![reload,shiori]")` → `act:build()` を
+--- 行うコルーチンを返す。
+---
+--- sentinel は実シーン名・local-composite と衝突しない:
+---   global 実名は sanitize_name 済み（英数字/`_` のみ）、local は先頭 `:`。
+---   本値は `@` と `/`（sanitize 対象）を含み先頭 `:` でもないため、完全一致は安全。
+---
+--- 重要: この文字列は Rust 側 `crate::debug::dap::RELOAD_SENTINEL`
+--- （`crates/pasta_lua/src/debug/dap/decode.rs`）とバイト一致させること。
+--- 片方だけ変更するとリロード配送が壊れる。
+local RELOAD_SENTINEL = "@@pasta/reloadShiori@@"
+
 --- @class KICK
 local KICK = {}
 
@@ -43,6 +59,25 @@ local function wrap_local_func(fn)
     -- 引数名は coroutine.resume 経由で渡される act を受ける（co_exec の wrapped_fn を踏襲）
     local function wrapped_fn(resumed_act, ...)
         fn(resumed_act, ...)
+        local result = resumed_act:build()
+        if result ~= nil then
+            return result
+        end
+    end
+    return coroutine.create(wrapped_fn)
+end
+
+--- SHIORI リロード用さくらスクリプトを出すコルーチンを生成する（reload sentinel 専用）
+---
+--- `wrap_local_func`／`SCENE.co_exec` の `wrapped_fn` と同一のラッパーパターン。
+--- 初回 resume で渡される act に `\![reload,shiori]`（SHIORI のみ再読み込み・非同期）を
+--- raw_script として積み、`build()` 結果（nil でなければ）を返す（R9.2）。
+---
+--- @return thread リロードさくらスクリプトを出すコルーチン
+local function wrap_reload_func()
+    -- 引数名は coroutine.resume 経由で渡される act を受ける（co_exec の wrapped_fn を踏襲）
+    local function wrapped_fn(resumed_act, ...)
+        resumed_act:raw_script("\\![reload,shiori]")
         local result = resumed_act:build()
         if result ~= nil then
             return result
@@ -84,6 +119,14 @@ function KICK.try_dispatch(act)
 
     -- 2. フラグ消費（成功・失敗いずれでも再発火させない）
     STORE.kick_pending = nil
+
+    -- 2.5. SHIORI リロード sentinel（完全一致・task 4.3 / R9.2）。
+    -- `:` local-composite 分岐や global co_exec より前で判定する。bridge 側
+    -- `try_reload_shiori` が KickSink に載せた予約文字列に完全一致したら、
+    -- `\![reload,shiori]` を出すコルーチンを返す（シーン解決は行わない）。
+    if scene_name == RELOAD_SENTINEL then
+        return wrap_reload_func()
+    end
 
     -- 3. シーン名を解決し、シーンコルーチンを生成（遅延ロードで循環参照を回避）
     local SCENE = require("pasta.scene")

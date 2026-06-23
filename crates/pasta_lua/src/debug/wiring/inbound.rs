@@ -13,8 +13,11 @@ use std::sync::mpsc::Sender;
 use serde_json::Value;
 
 use crate::debug::breakpoints::BreakpointSet;
-use crate::debug::dap::Decoded;
-use crate::debug::kick::KickSink;
+use crate::debug::dap::{Decoded, RELOAD_SENTINEL};
+// `KickRequest` is CONSTRUCTED here by `try_reload_shiori` (task 4.3) to deliver
+// the reserved reload sentinel through the existing `KickSink`. (Task 4.2 had
+// removed this import; `try_reload_shiori` re-introduces the need for it.)
+use crate::debug::kick::{KickRequest, KickSink};
 use crate::debug::playscene::{ResolveOutcome, resolve_and_kick};
 use crate::debug::transport::Transport;
 use crate::debug::types::{SessionCommand, SessionEvent};
@@ -118,6 +121,17 @@ pub(super) fn handle_inbound(
     if let Some(done) =
         try_play_scene_at(transport, adapter, req, command, &decoded, source_map, kick_sink)
     {
+        return done;
+    }
+
+    // Step A'' (task 4.3 / kick-from-cursor R9.2, R2.6): the self-contained SHIORI
+    // reload request. Same shape as A' (detected by the raw command string, returns
+    // directly when it handles the request, never falling into generic routing). It
+    // delivers the reserved `RELOAD_SENTINEL` through the SAME injected `KickSink`
+    // (no new sink — design "Delivery mechanism"); the Lua `kick.lua` sentinel
+    // branch then emits `\![reload,shiori]` into the sakura script output. Inert
+    // when no sink is injected (R2.6).
+    if let Some(done) = try_reload_shiori(transport, adapter, req, command, kick_sink) {
         return done;
     }
 
@@ -360,6 +374,59 @@ fn try_play_scene_at(
                 dap.play_scene_at_error(request_seq, "位置 (uri, line) が不正です")
             }
         }
+    };
+    if transport.send(response).is_err() {
+        return Some(false);
+    }
+    Some(true)
+}
+
+/// Step A'' (task 4.3 / design "ReloadShiori", kick-from-cursor R9.2 / R2.6): the
+/// self-contained `pasta/reloadShiori` request, in the SAME shape as
+/// [`try_play_scene_at`] (step A'). Returns `Some(bool)` when it handles the
+/// request (`Some(true)` on a normal handled exchange, `Some(false)` only on a
+/// peer-gone send so the bridge stops), and `None` when
+/// `command != "pasta/reloadShiori"` so `handle_inbound` falls through.
+///
+/// Behavior:
+/// - No `kick_sink` (debug-disabled / not injected) → INERT (R2.6): the request is
+///   recognised (handled here, not routed) but no sink call and no response. A bare
+///   reload that cannot be delivered when no sink is wired is inert per R2.6.
+/// - Otherwise: deliver the reserved [`RELOAD_SENTINEL`] through the EXISTING
+///   `KickSink` (no new sink — design "Delivery mechanism") and send a success ack
+///   (R9.2). The Lua `kick.lua` sentinel branch turns this into the
+///   `\![reload,shiori]` sakura script on the next dispatch; the ack itself does
+///   NOT carry the reload script (the engine output happens in Lua).
+fn try_reload_shiori(
+    transport: &Transport,
+    adapter: &SharedAdapter,
+    req: &Value,
+    command: &str,
+    kick_sink: Option<&KickSink>,
+) -> Option<bool> {
+    if command != "pasta/reloadShiori" {
+        return None;
+    }
+
+    // R2.6: with no sink injected the reload path is non-activated. The request is
+    // still recognised here (so it does not leak into generic routing), but no kick
+    // and no response frame are produced.
+    let sink = kick_sink?;
+
+    let request_seq = req.get("seq").and_then(Value::as_u64).unwrap_or(0);
+
+    // Deliver the reserved sentinel via the single existing KickSink. The Lua side
+    // (`kick.lua`) exact-matches `RELOAD_SENTINEL` and emits `\![reload,shiori]`.
+    sink(KickRequest {
+        scene: RELOAD_SENTINEL.to_string(),
+    });
+
+    let response = {
+        let mut dap = match adapter.lock() {
+            Ok(g) => g,
+            Err(_) => return Some(false), // poisoned → stop (never panic in the bridge)
+        };
+        dap.reload_shiori_response(request_seq)
     };
     if transport.send(response).is_err() {
         return Some(false);

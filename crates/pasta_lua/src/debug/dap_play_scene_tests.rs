@@ -139,3 +139,54 @@ fn play_scene_at_request_non_number_line_is_none() {
         "R4.4: non-number line → None (invalid)"
     );
 }
+
+// --- pasta/reloadShiori custom request (task 4.3 / R9.2) -------------------
+
+/// R9.2: a bare `pasta/reloadShiori` request (no meaningful args) decodes to a
+/// `Decoded` whose `reload_shiori` flag is `true`. The decode itself produces NO
+/// session command and NO response — the wiring (task 4.3) owns the sink call and
+/// the ack — so every other `Decoded` field stays at default.
+#[test]
+fn reload_shiori_request_sets_reload_flag() {
+    let mut dap = DapAdapter::new();
+    let decoded = dap.decode_request(&request(90, "pasta/reloadShiori", json!({})));
+    assert!(
+        decoded.reload_shiori,
+        "R9.2: pasta/reloadShiori → reload_shiori = true"
+    );
+    // Decode does not route or ack: other fields are default.
+    assert_eq!(
+        decoded,
+        Decoded {
+            reload_shiori: true,
+            ..Decoded::default()
+        }
+    );
+}
+
+/// A non-reload command (e.g. `pasta/playSceneAt`) must NOT set `reload_shiori`.
+#[test]
+fn non_reload_command_leaves_reload_flag_false() {
+    let mut dap = DapAdapter::new();
+    let decoded = dap.decode_request(&request(
+        91,
+        "pasta/playSceneAt",
+        json!({ "uri": "file:///c:/work/talk.pasta", "line": 25 }),
+    ));
+    assert!(
+        !decoded.reload_shiori,
+        "non-reload command must leave reload_shiori = false"
+    );
+}
+
+/// The `pasta/reloadShiori` success ack builder produces a `success: true`
+/// response correlated to the request seq (task 4.3 / R9.2).
+#[test]
+fn reload_shiori_response_is_success_ack() {
+    let mut dap = DapAdapter::new();
+    let resp = dap.reload_shiori_response(90);
+    assert_eq!(resp["type"], "response");
+    assert_eq!(resp["command"], "pasta/reloadShiori");
+    assert_eq!(resp["request_seq"], 90);
+    assert_eq!(resp["success"], true, "reload ack → success");
+}

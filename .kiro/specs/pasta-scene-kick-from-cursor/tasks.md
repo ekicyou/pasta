@@ -54,7 +54,7 @@
   - _Depends: 1.1_
   - _Boundary: PositionResolver, kick.lua_
 
-- [ ] 4. Core: DAP トランスポート拡張（位置ベース実行＋リロード）
+- [x] 4. Core: DAP トランスポート拡張（位置ベース実行＋リロード）
 - [x] 4.1 位置ベース実行リクエストを既存 DAP チャネルに追加する
   - 既存デバッグ用カスタムリクエストチャネルに「位置 (uri, line) を入力とするシーン実行要求」を追加し、uri/line を厳格にパースする
   - 受理時に位置→シーン解決器を呼び、確定→成功応答、未検出→理由付きエラー応答を返す
@@ -72,7 +72,13 @@
   - _Depends: 4.1_
   - _Boundary: decode, wiring/inbound_
 
-- [ ] 4.3 SHIORI リロードリクエストを追加しエンジンからリロード用さくらスクリプトを出力する
+- [x] 4.3 SHIORI リロードリクエストを追加しエンジンからリロード用さくらスクリプトを出力する
+  - **配送機構の決定（design 未指定箇所を補完）**：bridge→Lua の配送チャネルは **KickSink ただ一つ**（pasta_shiori が注入）。新 ReloadSink を足すと pasta_shiori（ActorMsg/MAILBOX）跨ぎになるため**採らない**。代わりに **既存 KickSink を予約 sentinel で再利用**する（新 sink 無し・pasta_shiori 無改修）。
+    - `try_reload_shiori`（inbound）→ `kick_sink(KickRequest{scene: RELOAD_SENTINEL})`。sink 未注入なら inert（R2.6 同様）。受理 ack を返す。
+    - `kick.lua try_dispatch`：`scene_name == RELOAD_SENTINEL`（**完全一致・`:` local 分岐や global co_exec より前**で判定）なら、`act:raw_script("\\![reload,shiori]")` → `act:build()` を行うコルーチンを生成して返す（`wrap_local_func`/`wrapped_fn` のラッパ踏襲。`act.lua:211 raw_script`／`:397 build`）。`kick_pending` は消費。
+    - sentinel は実シーン名・local-composite と衝突しない文字列（`sanitize_name` は英数字/`_` 以外を `_` 置換、local は先頭 `:`）。モジュール定数で完全一致判定。
+  - **boundary 拡張**：design は decode/inbound のみだが、配送上 **kick.lua** も触る（sentinel 分岐）。pasta_shiori・KickRequest・runtime_config は不変。
+  - **通常モード非破壊**：reload も kick 経路 = debug opt-in。`kick_pending` が立つ時のみ作用。
   - 既存デバッグチャネルに「SHIORI リロード要求」を追加する
   - 受理時、エンジンが `\![reload,shiori]`（SHIORI のみ再読み込み・非同期）をさくらスクリプト出力に載せ、SSP が次の GET で受け取れるようにする（SSP への直送はしない）
   - 統合テストで「リロード要求受理 → 次応答に `\![reload,shiori]` が含まれる」ことを観測できる
