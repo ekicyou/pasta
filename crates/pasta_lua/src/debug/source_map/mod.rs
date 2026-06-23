@@ -463,6 +463,18 @@ mod sidecar;
 pub use sidecar::{SIDECAR_VERSION, SidecarFile, read_sidecar, sidecar_path_for_lua, write_sidecar};
 
 // ===========================================================================
+// シーン同一性索引（task 1.1・requirements 2.1/2.2/2.5/2.6/3.2）。
+// `.pasta` (ファイル, 行範囲) → シーン識別子の逆引き索引。行マッピング API
+// （`resolve_*`）には触れず、新規型として追加する（3.4 非破壊）。
+// ===========================================================================
+mod scene_index;
+// NOTE: 本索引は foundation データ構造であり、構築側（loader の build_source_map・
+// finalize join）と参照側（PositionResolver）への結線は task 2.2 / 3.1 で行う。
+// 結線完了までは未使用のため dead_code を明示許可する（結線後に解除される）。
+#[allow(unused_imports)]
+pub(crate) use scene_index::{SceneIdentityIndex, SceneIdentityIndexBuilder};
+
+// ===========================================================================
 // インラインテストの外出し（task 2.3・C1）。論理クラスタ別の FLAT 兄弟テスト
 // ファイルへ分割する。クラスタ跨ぎ共有ヘルパー（`pos`/`sample_map`）は
 // `source_map_test_support.rs` に `pub(super)` で集約し、各クラスタが
