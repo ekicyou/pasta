@@ -142,3 +142,51 @@
 2. **シーン外位置の扱い**: どのシーンにも属さない位置（シーン間・空行）でのキック要求を、シーン未検出エラーとするか、最近接シーンへフォールバックするか（requirements.md R2.5 暫定＝未検出エラー）。
 3. **旧内部トランスポートの後方互換**: 旧 UI 動線（コマンド・showInputBox）廃止は確定。旧内部リクエスト `pasta/playScene`{scene 名} を完全撤去するか、位置ベース実装が再利用するため内部的に残すか（requirements.md R5.4 暫定＝設計フェーズ判断）。
 4. **staleness／リロード整合**: 編集後・未リロードで行ずれが生じ得る場合、ベストエフォート解決のみとするか、staleness を検知してリロード要求／警告を出すか（requirements.md R7.2 暫定＝ベストエフォート、検知方式は設計判断）。
+
+---
+
+## 設計フェーズ追記（discovery 検証・synthesis・設計判断）
+
+### Discovery 検証（コードベース実地確認）
+research 初版の所在情報を実コードで再確認し、以下を確定した（設計の根拠）。
+- **時系列制約（最重要）**: シーン登録（`register_global`/`register_local`）は **Lua ランタイム（SHIORI finalize）** で発生するのに対し、`.pasta` span は **code_gen 時**に `SourceMapSink` 経由で記録される。両者は別フェーズ。「span（code_gen 由来）と識別子（`SceneRegistry` 由来）の突合をどこで行うか」が設計の中核論点（Decision 1）。
+- `SourceMapSink` は `record_line(lua_line, pasta_line)` ＋ sugar `record(lua_line, span)` のみ。`record_scene` を **デフォルト no-op で追加**すれば既存実装は後方非破壊（R3.4 を満たす）。
+- `scope_gen.rs` は global/local シーン生成箇所で既に `record_span(scene.span)` を呼んでおり、`record_scene` の自然な挿入点が存在。
+- kick 取次は `try_play_scene_kick` → `sink(KickRequest { scene })`（fire-and-forget）。`KickSink = Arc<dyn Fn(KickRequest) + Send + Sync>`。確定識別子を渡すだけで R8（セマンティクス継承）が自然達成。
+- DAP 4 層（decode→wiring dispatch→VSCode command→pure helper）は `pasta/sourcePresentation` が完全な前例。`editor/context` 貢献のみ本機能が初出（既存メニューは `commandPalette`/`debug/toolBar` のみ）。
+- `SourceMap` は loader `build_source_map` が `.pasta` ごとに parse→sink→transpile→`finish`→`insert_chunk` で集約し `Arc<SourceMap>` を構築。`enable()` が `Arc<SourceMap>`＋`KickSink` をブリッジへ供給。索引はこの `SourceMap` に同梱するのが自然。
+
+### Synthesis（3 レンズ適用結果）
+- **Generalization**: 位置→シーン解決は「行→所属シーン」の一般問題。`SceneIdentityIndex` を「行範囲→識別子（入れ子レベル付き）」の汎用索引として設計し、最内優先・後方フォールバックを resolver 側のポリシーとして分離。将来の `pasta-authoring-window`（別境界）も同索引を再利用可能なインタフェースとする（実装は現要件範囲に限定）。
+- **Build vs. Adopt**: シーン識別子規則は `SceneRegistry::sanitize_name` ＋連番が既存 SSOT。**Adopt**（参照）し二重実装しない（R3.3）。トランスポートは独自プロトコルを作らず既存 DAP カスタムリクエストチャネルを **Adopt**。索引データ構造は標準 `BTreeMap`（行範囲昇順）で十分（O(log n)・R8.3）。
+- **Simplification**: 新規 transport は `playScene` の引数拡張でなく専用 `pasta/playSceneAt` を新設（旧口は撤去するため拡張より置換が単純・R5.4）。索引は別クレート化せず既存 `SourceMap` 内に同梱（debug 既定無効・ゼロコスト方針と整合）。resolver は単一実装で抽象レイヤを足さない。
+
+### Design Decisions
+
+#### Decision 1: span と識別子の突合を code_gen で行う（research Option C 採用）
+- **Context**: span は code_gen 時、識別子は `SceneRegistry` 由来で別フェーズ。R3.3（二重実装回避）と影響局所化の両立が必要。
+- **Alternatives**: A) `SceneEntry` に span を追加（`pasta_core` 公開型変更が下流へ波及） / B) 独立索引をレジストリ非改変で新設（識別子整合を実装側で担保） / C) span は code_gen で取得し識別子は `SceneRegistry` 登録結果を参照して `record_scene` へ流す。
+- **Selected**: **Option C**。code_gen がシーン生成時に `SceneRegistry` の確定識別子を引き、`record_scene(scene_id, span)` を呼ぶ。
+- **Rationale**: 識別子 SSOT を `SceneRegistry` に維持しつつ `pasta_core` 破壊的変更を最小化。`scope_gen` の既存 `record_span` 近傍に自然挿入できる。
+- **Trade-offs**: ✅ 影響局所・SSOT 維持 / ❌ code_gen でシーン登録結果と span を突き合わせる結線に正確性が要る。
+- **Follow-up**: OQ-1。code_gen フェーズで識別子が確実に得られるか（登録順と生成順の一致）を実装時に検証。
+
+#### Decision 2: 専用トランスポート `pasta/playSceneAt` を新設し旧外部口を撤去
+- **Context**: R5.4（外部口を位置ベース一本に統一）。
+- **Selected**: `pasta/playSceneAt`{uri, line} を新設、旧 `pasta/playScene`{scene 名} arm と `Decoded.kick_scene` を削除。内部取次（`KickSink`）は名前ベースのまま保持（外部非露出・R5.5）。
+- **Rationale**: 「唯一の動線」方針。引数拡張より置換の方がワイヤ・コードとも単純。
+- **Trade-offs**: ✅ 動線一本化 / ❌ 旧口に依存する外部利用があれば破壊的（ただし作者向け動線は廃止確定）。
+
+#### Decision 4: staleness は best-effort ＋ 未解決＝未検出（暫定）
+- **Context**: R7.2/7.5。ロード時索引で解決するため未リロードで誤解決し得る。
+- **Selected（暫定）**: best-effort 解決とし、解決不能は未検出扱い（R7.6）。staleness の積極検知（mtime/ハッシュ照合）は OQ-2 として discussion へ持ち越し。kick 経路での自動リロードは行わない（R7.3、手動「SHIORIリロード」へ一本化）。
+- **Trade-offs**: ✅ 実装単純・安全側 / ❌ 行ずれ時に誤シーンを再生し得る（検知導入で軽減可能）。
+
+#### Decision 5: 再アタッチは固定待機→1回（暫定）
+- **Context**: R9.4/9.5。リロードでデタッチ→自動再アタッチ。
+- **Selected（暫定）**: 「リロード指示→数秒固定待機→`vscode.debug.startDebugging`（type pasta）で1回再アタッチ」。再アタッチ後のキック自動再実行なし。「SHIORIリロード」は接続中のみ表示。具体値・リトライ/タイムアウトは OQ-3 として持ち越し。
+
+### Risks & Mitigations（設計フェーズ追加）
+- **uri 正規化** — VSCode uri → 索引キー（chunk 名/ファイルパス）の正規化（Windows パス・URI エンコード・8.3 短縮名）。`std::path::absolute` ベースで正規化し、`fs::canonicalize` は避ける（既知 CI バグ回避）。
+- **end_line 確定** — シーン範囲終端（「次の同レベル以上のシーン宣言の直前」/ファイル末尾）の算出と入れ子レベルの受け渡し。`finish` 時に確定する設計とし特性化テストで担保。
+- **後方非破壊の担保** — `record_scene` デフォルト no-op ＋ 既存 `resolve_*` の挙動不変を回帰テストで固定（R3.4）。
