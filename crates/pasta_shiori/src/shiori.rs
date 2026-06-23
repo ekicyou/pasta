@@ -1,7 +1,9 @@
 use crate::error::*;
 use crate::lua_request;
 use pasta_lua::mlua::{Function, Table};
-use pasta_lua::{GlobalLoggerRegistry, LoadDirGuard, PastaLoader, PastaLuaRuntime};
+use pasta_lua::{
+    GlobalLoggerRegistry, LoadDirGuard, PastaLoader, PastaLuaRuntime, RuntimeConfig,
+};
 use std::{ffi::*, path::*};
 use tracing::{debug, error, info, trace, warn};
 
@@ -111,8 +113,16 @@ impl Shiori for PastaShiori {
             "Starting PastaShiori load"
         );
 
+        // VM 構築前に `MAILBOX` 投函クロージャを scene-kick sink として束縛する
+        // （`MailboxKickInjector`・pasta-scene-kick 2.4）。`load_with_config` の内側で
+        // `RuntimeConfig` が VM（`PastaLuaRuntime`）へ渡る前に sink が積まれるため、
+        // 後続 task（2.x）が `enable` 経由で socket-bridge へ透過させられる。
+        // pasta.toml `[debug]` ＋ env の debug 解決は `load_with_config` 内で従来どおり行われる。
+        let runtime_config =
+            RuntimeConfig::new().with_kick_sink(Some(crate::actor::lifecycle::kick_sink()));
+
         // Load runtime via PastaLoader (Stage 1.5 logger update happens inside)
-        match PastaLoader::load(&load_dir_path) {
+        match PastaLoader::load_with_config(&load_dir_path, runtime_config) {
             Ok(runtime) => {
                 // Cache SHIORI functions (load/request/unload)
                 self.cache_lua_functions(&runtime);

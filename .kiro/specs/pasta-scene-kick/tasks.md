@@ -45,7 +45,7 @@
   - _Boundary: KickSinkSeam（enable.rs, wiring/mod.rs, runtime/mod.rs）_
 
 - [ ] 3. アクタークライアント化（pasta_shiori）
-- [ ] 3.1 (P) MAILBOX 投函クロージャを sink として注入する
+- [x] 3.1 (P) MAILBOX 投函クロージャを sink として注入する
   - VM 構築前に「sink 受領→`MAILBOX` へキック variant を送る」クロージャを束縛する
   - teardown/reload 競合（MAILBOX 不在）は黙って no-op＋診断ログ（ベストエフォート）とする
   - 完了状態: MAILBOX 設定時はキックが到達し、swap(None) 後は no-op となるテストが緑
