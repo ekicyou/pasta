@@ -443,7 +443,7 @@ pub fn resolve_scene_at(
 ### Error Strategy
 - **未接続**（6.2）: 要求を送らず、警告＋デバッグ開始誘導アクションを提示。エンジンへは到達しない。
 - **シーン未検出**（2.6, 7.6, 4.3）: エンジンが `NotFound` を返し、`play_scene_at_error` でエラー応答。VSCode は「カーソル下にシーンがありません」を提示。再生は行わない。
-- **staleness**（7.2）: ロード済み索引で解決するため、未リロード時は誤解決の可能性。安全側として、解決不能は未検出扱い（7.6）。検知時のリロード誘導方式は Decision 4（OPEN QUESTION）。
+- **staleness**（7.2）: ロード済み索引で解決するため、未リロード時は誤解決の可能性。v1 はエディタ側 dirty 検知でkick時に警告（保存＋リロード推奨）し、エンジンは best-effort 解決＋未解決は未検出扱い（7.6）を安全網とする（Decision 4）。保存済み未リロードの mtime/ハッシュ照合は将来拡張。
 - **再アタッチ失敗**（9.x）: 待機後の `startDebugging` 失敗時の扱い（リトライ/タイムアウト）は Decision 5（OPEN QUESTION）。
 
 ### Error Categories and Responses
@@ -482,7 +482,7 @@ pub fn resolve_scene_at(
 以下は要件・research を超える設計判断が必要な項目。design-discussion フェーズで解決する（暫定方針は best-effort で本設計に反映済み・明示ラベル付き）。
 
 - **OQ-1（Decision 1: span と識別子の突合箇所）→ 解決済み: 案1（ランタイム権威キャプチャ）**。code_gen は base 名のみ出力し、連番は Lua ランタイムが実行順に付与する（`scope_gen.rs:120`／`scene.lua:129`）。ランタイム実キー `会話1` は Rust `SceneRegistry` の `会話_1` と形式が異なるため、SceneRegistry を識別子 SSOT とする旧 Option C/A は**不採用**。代わりに finalize（`runtime/finalize.rs::collect_scenes`）でランタイム実 identity を列挙し、code_gen が記録した span と join key（base+出現順）で突合して (file, 行範囲) → 実 identity 索引を構築する。形式ドリフト・順序推測を排し『動いているゴーストが権威』(案B)と一貫。索引の値は `@pasta_search:search_scene` の解決対象と揃える（impl 時に整合検証＋特性化テスト）。
-- **OQ-2（Decision 4: staleness 検知方式）**: 未リロードで行ずれが生じ得る場合、(a) best-effort 解決のみ（未解決は未検出）か、(b) ロード時版マーカー（mtime/ハッシュ）と現ディスク/バッファを照合し staleness を検知してリロード誘導するか。**暫定: best-effort ＋ 未解決は未検出（7.6）**。検知方式の要否・実装（mtime/ハッシュ）は確定要（7.5）。
+- **OQ-2（Decision 4: staleness 検知方式）→ 解決済み: v1 はエディタ側 dirty 検知＋best-effort 解決**。kick 実行時、VSCode 拡張がアクティブバッファの `isDirty`（未保存）を確認し、未保存なら「実行中ゴーストと実態がずれる可能性。保存＋SHIORIリロードを推奨」を警告する（最頻 staleness ＝編集中を安価に捕捉。エンジン無改修）。これに加え、エンジン側はロード済み索引で best-effort 解決し、解決不能は未検出扱い（7.6）を安全網とする。**保存済み・未リロード**を捕捉するエンジン側 mtime/ハッシュ照合は v1 スコープ外（YAGNI）とし、将来拡張に回す。要件 7.4（リロード時 dirty 保存促し）と同じ dirty 信号を kick 経路でも用いて一貫させる。
 - **OQ-3（Decision 5: 再アタッチ詳細）**: 待機時間（数秒の具体値）・リトライ/タイムアウト方式・再アタッチ完了後のキック自動再実行可否・「SHIORIリロード」の表示/有効化条件（接続中のみか）（9.4, 9.5）。**暫定: 固定待機→1回再アタッチ・自動再実行なし・接続中のみ表示**。確定要。
 - **OQ-4（デバッグ開始誘導の具体手段）**: 6.3 の「デバッグ開始」アクションが `launch.json` 構成参照か自動アタッチかの具体手段。**暫定: `vscode.debug.startDebugging` で既定 `type: 'pasta'` 構成を起動**。確定要。
 - **Risk: uri 正規化**: VSCode uri → エンジン索引キー（chunk 名/ファイルパス）の正規化（Windows パス・URI エンコード）。CI 8.3 短縮名パス等の既知リスク（メモリ）に注意。
