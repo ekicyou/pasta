@@ -108,7 +108,7 @@
   - _Boundary: PlaySceneCommand（extension.ts, package.json）_
 
 - [ ] 6. 統合: ライブキック経路の結線と疎通
-- [ ] 6.1 DAP から OnSecondChange までの全経路を疎通する
+- [x] 6.1 DAP から OnSecondChange までの全経路を疎通する
   - playScene 受理から、sink→MAILBOX→キック variant→Lua 保留設置→次 OnSecondChange の dispatch 起動→初回ビート配信までを結線する
   - 停止ループを経由せず socket-bridge inbound（停止非依存）から運ぶことを確認する
   - 完了状態: VSCode 相当のキック送信で、次 OnSecondChange の応答に指定シーンの初回ビートが現れる結合テストが緑
