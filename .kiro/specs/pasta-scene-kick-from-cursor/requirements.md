@@ -75,7 +75,8 @@
 1. The VSCode Pasta 拡張 shall 旧コマンド `pasta.debug.playScene`（シーン名を `showInputBox` で入力する動線）をコマンド・メニュー貢献から削除し、提供しない。
 2. The VSCode Pasta 拡張 shall コマンドパレットおよびデバッグツールバーからシーン名入力によるキック手段を提供しない。
 3. The Pasta システム shall カーソル位置ベースの動線（Requirement 1）を、シーンキックの唯一の作者向け動線とする。
-4. Where 旧シーン名ベースの内部トランスポート（`pasta/playScene`{scene 名}）が存在する, the Pasta システム shall 【要件ディスカッションで確定（OPEN QUESTION 3）。暫定: 旧 UI 動線（コマンド・showInputBox）は廃止確定とし、旧内部トランスポートの保持／撤去は設計フェーズで判断する（位置ベース解決の内部実装が名前ベース取次点を再利用する可能性があるため）】。
+4. The VSCode Pasta 拡張と Pasta エンジン shall 旧シーン名ベースの外部トランスポート（DAP custom request `pasta/playScene`{scene 名}）を撤去し、外部へ公開するシーン実行口を位置ベース（Requirement 4 の位置ベース要求）一本に統一する。
+5. The Pasta エンジン shall kick backend の内部取次点（確定済みシーン識別子を受け取り co_scene に据える `pasta-scene-kick` 由来のエントリ）を保持し、位置→シーン解決後の内部呼び出しとして再利用する（外部トランスポートではないため作者には露出しない）。
 
 ### Requirement 6: メニュー表示条件とセッション未接続時の挙動
 **Objective:** ゴースト作者として、いつコマンドが使えるか・使えないときにどうなるかを明確に知りたい。これにより、デバッグセッション未接続でも迷わず操作できる。
