@@ -42,8 +42,8 @@
   - _Depends: 1.1, 1.2, 2.1_
   - _Boundary: finalize, build_source_map, SceneIdentityIndex_
 
-- [ ] 3. Core: ランタイム位置→シーン解決器
-- [ ] 3.1 位置→シーン解決器を実装する
+- [x] 3. Core: ランタイム位置→シーン解決器
+- [x] 3.1 位置→シーン解決器を実装する
   - 入力 (uri, line) を `.pasta` ファイルパス＋行番号へ正規化する。正規化は `std::path::absolute` を用い `fs::canonicalize` は使わない（CI の 8.3 短縮名パス不具合回避）
   - VSCode 側 uri→path と索引キー生成を同一規則に揃える
   - ロード済み索引で位置を解決し、確定時は (scene_id, parent)、解決不能時は未検出を返す（最内local優先 > 後方フォールバック、下方に無ければ未検出）
