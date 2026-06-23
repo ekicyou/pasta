@@ -55,6 +55,7 @@ local specs = {
     "kick_install_test",                  -- KICK.install / SHIORI.kick 保留フラグ設置テスト (pasta-scene-kick 4.1)
     "kick_try_dispatch_test",             -- KICK.try_dispatch 保留シーン解決→co返却テスト (pasta-scene-kick 4.2)
     "virtual_dispatcher_kick_force_test", -- KickForceGate dispatch 入口割り込み許可ゲートテスト (pasta-scene-kick 4.3)
+    "virtual_dispatcher_kick_hook_test", -- KickDispatchHook dispatch 前段キック起動＋preempt 結合テスト (pasta-scene-kick 4.4)
     -- 将来のテストスイートをここに追加
     -- "code_generator_test",
     -- "context_test",

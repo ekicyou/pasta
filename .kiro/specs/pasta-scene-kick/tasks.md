@@ -83,7 +83,7 @@
   - _Requirements: 5.5, 6.4_
   - _Depends: 1.3_
   - _Boundary: KickForceGate（virtual_dispatcher.lua の抑制ゲート条件）_
-- [ ] 4.4 dispatch 前段へキック起動と preempt を組み込む
+- [x] 4.4 dispatch 前段へキック起動と preempt を組み込む
   - dispatch 前段（既存トーク継続・ランダムトークより前）で保留シーンを起動し、前進行中シーンを閉じて（preempt・自動復帰なし）初回ビートを GET 応答として返す
   - 1 GET につき高々 1 ビートとし、2 ビート目以降は既存の進行中シーン継続が後続 tick に順序どおり配信する
   - 保留なし時はフックが完全素通りし、通常応答をバイト不変に保つ（押し出しせず pull 機会に限定）
