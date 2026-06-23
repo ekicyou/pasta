@@ -15,6 +15,7 @@ use serde_json::Value;
 use crate::debug::breakpoints::BreakpointSet;
 use crate::debug::dap::Decoded;
 use crate::debug::kick::{KickRequest, KickSink};
+use crate::debug::playscene::{ResolveOutcome, resolve_and_kick};
 use crate::debug::transport::Transport;
 use crate::debug::types::{SessionCommand, SessionEvent};
 
@@ -105,6 +106,19 @@ pub(super) fn handle_inbound(
     // is a complete exchange (sink invocation + immediate ack/error) and returns
     // directly, never falling into the response/command routing below.
     if let Some(done) = try_play_scene_kick(transport, adapter, req, command, &decoded, kick_sink) {
+        return done;
+    }
+
+    // Step A'' (task 4.1 / kick-from-cursor R4.1-R4.4, R2.6): the self-contained
+    // position-based `pasta/playSceneAt` scene-kick. Same shape as A' (detected by
+    // the raw command string, returns directly when it handles the request, never
+    // falling into generic routing). It resolves the decoded `(uri, line)` via the
+    // task-3.1 resolver against the loaded `SourceMap` and reuses the injected
+    // `KickSink`; inert when no sink is injected (R2.6). No `\![reload,shiori]` is
+    // emitted here (that is task 4.3).
+    if let Some(done) =
+        try_play_scene_at(transport, adapter, req, command, &decoded, source_map, kick_sink)
+    {
         return done;
     }
 
@@ -328,6 +342,85 @@ fn try_play_scene_kick(
             }
             // Empty / invalid name: do NOT kick; return an error response (R2.5).
             None => dap.play_scene_error(request_seq),
+        }
+    };
+    if transport.send(response).is_err() {
+        return Some(false);
+    }
+    Some(true)
+}
+
+/// Step A'' (task 4.1 / design "PlaySceneAt transport", kick-from-cursor R4.1 /
+/// R4.2 / R4.3 / R4.4 / R2.6): the self-contained position-based
+/// `pasta/playSceneAt` scene-kick exchange, in the SAME shape as
+/// [`try_play_scene_kick`] (step A'). Returns `Some(bool)` when it handles the
+/// request (`Some(true)` on a normal handled exchange, `Some(false)` only on a
+/// peer-gone / poisoned send so the bridge stops), and `None` when
+/// `command != "pasta/playSceneAt"` so `handle_inbound` falls through.
+///
+/// Behavior:
+/// - No `kick_sink` (debug-disabled / not injected) → INERT (R2.6): the request is
+///   recognised (handled here, not routed) but no resolver call and no response.
+/// - No loaded `SourceMap` (`source_map.source_map == None`) → cannot resolve →
+///   error response with a reason (R4.3); the sink is NOT invoked.
+/// - `decoded.play_scene_at == Some((uri, line))` → call the task-3.1 resolver
+///   [`resolve_and_kick`] (it normalizes the uri, queries `scene_at`, builds the
+///   composite scene string, AND invokes the sink on success):
+///   - [`ResolveOutcome::Resolved`] → success response (R4.2). The sink was
+///     already invoked by `resolve_and_kick`, so we DO NOT double-kick.
+///   - [`ResolveOutcome::NotFound`] → error response with a reason (R4.3 / R2.6).
+/// - `decoded.play_scene_at == None` (strict parse failure) → error response
+///   (R4.4); the resolver is NOT called and the sink is NOT invoked.
+///
+/// No `\![reload,shiori]` is emitted anywhere here (R7.3 — that is task 4.3).
+fn try_play_scene_at(
+    transport: &Transport,
+    adapter: &SharedAdapter,
+    req: &Value,
+    command: &str,
+    decoded: &Decoded,
+    source_map: &SourceMapWiring,
+    kick_sink: Option<&KickSink>,
+) -> Option<bool> {
+    if command != "pasta/playSceneAt" {
+        return None;
+    }
+
+    // R2.6: with no sink injected the kick path is non-activated. The request is
+    // still recognised here (so it does not leak into generic routing), but no
+    // resolver call and no response frame are produced.
+    let sink = kick_sink?;
+
+    let request_seq = req.get("seq").and_then(Value::as_u64).unwrap_or(0);
+
+    let response = {
+        let mut dap = match adapter.lock() {
+            Ok(g) => g,
+            Err(_) => return Some(false), // poisoned → stop (never panic in the bridge)
+        };
+        match (source_map.source_map.as_ref(), &decoded.play_scene_at) {
+            // A loaded map AND a valid `(uri, line)`: hand it to the task-3.1
+            // resolver, which normalizes the uri, queries `scene_at`, builds the
+            // composite scene string, and (on success) invokes the sink itself.
+            (Some(map), Some((uri, line))) => match resolve_and_kick(map, sink, uri, *line) {
+                // Confirmed: the sink was ALREADY called by `resolve_and_kick`
+                // (do NOT double-kick) — just ack success (R4.2).
+                ResolveOutcome::Resolved(_) => dap.play_scene_at_response(request_seq),
+                // Not found: the sink was NOT called; return a reason error (R4.3).
+                ResolveOutcome::NotFound => {
+                    dap.play_scene_at_error(request_seq, "カーソル下にシーンがありません")
+                }
+            },
+            // No loaded map: cannot resolve the position (R4.3 reason error).
+            (None, _) => dap.play_scene_at_error(
+                request_seq,
+                "ソースマップが未ロードのため位置からシーンを確定できません",
+            ),
+            // Strict parse failure (invalid `{uri, line}`): do NOT resolve / kick;
+            // return an error response (R4.4).
+            (Some(_), None) => {
+                dap.play_scene_at_error(request_seq, "位置 (uri, line) が不正です")
+            }
         }
     };
     if transport.send(response).is_err() {

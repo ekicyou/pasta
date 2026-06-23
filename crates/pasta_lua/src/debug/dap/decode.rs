@@ -9,7 +9,8 @@ use crate::debug::types::SessionCommand;
 
 use super::DapAdapter;
 use super::codec::{
-    parse_scene_strict, parse_set_breakpoints, parse_source_mode_strict, source_mode_str,
+    parse_play_scene_at_strict, parse_scene_strict, parse_set_breakpoints,
+    parse_source_mode_strict, source_mode_str,
 };
 use super::pending::PendingKind;
 
@@ -62,6 +63,18 @@ pub struct Decoded {
     /// wiring (task 2.2) owns sink invocation and the ack — so a `pasta/playScene`
     /// request never falls into generic routing (R2.3).
     pub kick_scene: Option<String>,
+    /// The position `(uri, line)` extracted from a `pasta/playSceneAt` custom
+    /// request (kick-from-cursor requirements 4.1 / 4.4), parsed STRICTLY: `Some`
+    /// ONLY when `args.uri` is a non-empty (post-trim) string AND `args.line` is a
+    /// valid (non-negative) number; a missing key, a non-string `uri`, an empty
+    /// `uri`, a missing `line`, or a non-number `line` all yield `None` (invalid —
+    /// the resolver must NOT be invoked, R4.4).
+    ///
+    /// `line` is the VSCode-origin 1-based line number (the scene index is also
+    /// 1-based). The decode itself produces no command/response — the wiring (task
+    /// 4.1) owns the position→scene resolver call and the ack/error response — so a
+    /// `pasta/playSceneAt` request never falls into generic routing.
+    pub play_scene_at: Option<(String, u32)>,
 }
 
 impl DapAdapter {
@@ -250,6 +263,23 @@ impl DapAdapter {
                     ..Decoded::default()
                 }
             }
+            "pasta/playSceneAt" => {
+                // The decode SIDE of the position-based scene kick (kick-from-
+                // cursor R4.1 / R4.4). Extract `args.uri` (non-empty string) and
+                // `args.line` (number, 1-based) STRICTLY into `play_scene_at`: any
+                // missing/wrong-type/empty field yields `None` (invalid — the
+                // resolver must NOT be invoked, R4.4).
+                //
+                // No immediate response/command is produced here: the wiring (task
+                // 4.1) owns the position→scene resolver call and the ack/error
+                // response. Leaving every other field at default keeps the request
+                // out of generic routing.
+                let play_scene_at = parse_play_scene_at_strict(args);
+                Decoded {
+                    play_scene_at,
+                    ..Decoded::default()
+                }
+            }
             "disconnect" => {
                 let response = self.response(request_seq, "disconnect", Value::Null);
                 Decoded {
@@ -335,6 +365,37 @@ impl DapAdapter {
             "success": false,
             "command": "pasta/playScene",
             "message": "scene name is empty or invalid",
+        })
+    }
+
+    /// Build the `pasta/playSceneAt` acceptance RESPONSE [`Value`] (success ack),
+    /// correlated to `request_seq` (kick-from-cursor requirement 4.2).
+    ///
+    /// The wiring (task 4.1) sends this AFTER the position→scene resolver has
+    /// confirmed a scene and handed it to the [`KickSink`](crate::debug::kick::KickSink),
+    /// confirming the kick was accepted (the actual scene execution is asynchronous
+    /// and not awaited).
+    pub(crate) fn play_scene_at_response(&mut self, request_seq: u64) -> Value {
+        self.response(request_seq, "pasta/playSceneAt", Value::Null)
+    }
+
+    /// Build the `pasta/playSceneAt` ERROR RESPONSE [`Value`] (`success: false`)
+    /// carrying a human-readable `reason`, correlated to `request_seq`
+    /// (kick-from-cursor requirement 4.3: シーンを確定できない／不正な要求は再生せず
+    /// 理由を含むエラー応答を要求元へ返す).
+    ///
+    /// The `reason` is surfaced to the author by the VSCode extension (R6.4); it
+    /// covers both a not-found position ("カーソル下にシーンがありません") and a
+    /// strict-parse failure (invalid `{uri, line}`).
+    pub(crate) fn play_scene_at_error(&mut self, request_seq: u64, reason: &str) -> Value {
+        let seq = self.next_seq();
+        json!({
+            "seq": seq,
+            "type": "response",
+            "request_seq": request_seq,
+            "success": false,
+            "command": "pasta/playSceneAt",
+            "message": reason,
         })
     }
 }
