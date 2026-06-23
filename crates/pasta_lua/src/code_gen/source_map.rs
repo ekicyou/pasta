@@ -65,6 +65,24 @@ pub trait SourceMapSink {
     fn record(&mut self, lua_line: u32, span: Span) {
         self.record_line(lua_line, span.start_line as u32);
     }
+
+    /// Record that a scene declaration with deterministic join key `scene_join_key`
+    /// spans `.pasta` source range `span`.
+    ///
+    /// Default is a no-op so existing implementors (e.g. the consumer-side
+    /// `MapBuilderSink` in `debug/source_map.rs`) remain backward-non-destructive:
+    /// they keep working without overriding this method (Requirements 3.4). The
+    /// line-mapping record stream produced by [`record_line`](SourceMapSink::record_line)
+    /// / [`record`](SourceMapSink::record) is unaffected by this method.
+    ///
+    /// `scene_join_key` is a *deterministic join key* reproducible at BOTH code_gen
+    /// and finalize time (example: `sanitize_name(base)` + 出現順). The
+    /// counter-suffixed runtime identity (e.g. `会話1`) is deliberately NOT recorded
+    /// here — it is undetermined at code_gen time and is assigned later by the
+    /// runtime, then joined back to this span via the join key (see Design Decision 1:
+    /// runtime-authoritative capture). `span` carries the scene declaration's line
+    /// range.
+    fn record_scene(&mut self, _scene_join_key: &str, _span: Span) {}
 }
 
 #[cfg(test)]
@@ -129,6 +147,38 @@ mod tests {
             sink.records,
             vec![(10, PASTA_LINE), (11, PASTA_LINE), (12, PASTA_LINE)],
             "1.3: every .lua line produced by one .pasta element maps to that .pasta line"
+        );
+    }
+
+    /// Requirements 3.4 (後方非破壊): a sink implementor that provides ONLY
+    /// `record_line` (i.e. does NOT override `record_scene`) must still compile and
+    /// behave correctly. `CapturingSink` deliberately leaves `record_scene` at its
+    /// trait default, so the mere fact this test compiles proves the default exists
+    /// and existing implementors need zero changes.
+    ///
+    /// Behaviorally, calling the default `record_scene` must be inert: it must NOT
+    /// perturb the line-mapping records captured via `record_line`, and must not
+    /// panic. This guards the design invariant "行マッピングの記録内容・順序は不変".
+    #[test]
+    fn default_record_scene_is_inert_no_op() {
+        const LUA_LINE: u32 = 7;
+        const PASTA_LINE: u32 = 3;
+
+        let mut sink = CapturingSink::default();
+        sink.record_line(LUA_LINE, PASTA_LINE);
+
+        // Default `record_scene` (no override on CapturingSink) must be a no-op:
+        // calling it neither panics nor records anything into `records`.
+        // `span` carries the scene declaration's line range; `scene_join_key` is the
+        // deterministic base-name + 出現順 join key (NOT the counter-suffixed final
+        // identity such as `会話1`).
+        let span = Span::new(PASTA_LINE as usize, 1, (PASTA_LINE + 4) as usize, 1, 0, 99);
+        sink.record_scene("会話#1", span);
+
+        assert_eq!(
+            sink.records,
+            vec![(LUA_LINE, PASTA_LINE)],
+            "3.4: default record_scene must be inert and leave line-mapping records unchanged"
         );
     }
 }

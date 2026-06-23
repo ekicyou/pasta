@@ -2,7 +2,7 @@
 
 > 凡例: `(P)` = 直前の同位タスクと並列実行可能。`_Boundary:_` = 主担当コンポーネント。`_Depends:_` = 順序だけでは表せない依存。
 
-- [ ] 1. Foundation: シーン同一性索引の基盤データ構造
+- [x] 1. Foundation: シーン同一性索引の基盤データ構造
 - [x] 1.1 シーン同一性索引の型と位置→シーン解決ロジックを実装する
   - `.pasta` の (ファイル, 行範囲) → シーン識別子 の対応を保持するインメモリ索引を用意する（行範囲は「宣言行〜次の同レベル以上のシーン宣言の直前」と定義）
   - global ⊃ local の入れ子を表現し、包含が複数該当する場合は最内（local 優先）を選ぶ
@@ -12,7 +12,7 @@
   - _Requirements: 2.1, 2.2, 2.5, 2.6, 3.2_
   - _Boundary: SceneIdentityIndex_
 
-- [ ] 1.2 (P) ソースマップ sink にシーン記録口をデフォルト no-op で追加する
+- [x] 1.2 (P) ソースマップ sink にシーン記録口をデフォルト no-op で追加する
   - `SourceMapSink` に「突合キー＋span を記録する」メソッドをデフォルト実装 no-op で追加し、既存実装を後方非破壊にする
   - 既存の行マッピング記録（`record_line` / `record`）の内容・順序を一切変更しない
   - 突合キーは code_gen と finalize の双方で決定的に再現できる値（base 名＋出現順）とし、連番付き最終識別子は記録しない
@@ -130,3 +130,4 @@
 ## Implementation Notes
 
 - 1.1: `SceneIdentityIndex` の行範囲は実装上 **両端 inclusive** `[start_line, end_line]`（`contains` = `start <= line <= end`）。design.md:297 は半開区間記法 `[start_line, end_line)` で書かれているが、`end_line` を「次の同レベル以上宣言の**直前行**」と定義しているため具体行のメンバシップは等価。task 2.2 の構築側は **「次宣言行 − 1」（直前行）を inclusive な end_line として投入**すること（次宣言行そのものを渡さない）。空ファイルは `insert_file` で空エントリを作れば未検出を返す。
+- 1.2: `SourceMapSink::record_scene(&mut self, scene_join_key: &str, span: Span)` はデフォルト no-op の **2引数**シグネチャ（design.md:341 が SSOT）。`end_line` と入れ子 `level` は**この trait メソッドの引数に含めない**。task 2.1（scope_gen 記録）/2.2（finalize join）の **builder 側**で算出する想定：`end_line` は次の同レベル以上宣言検出時または finish 時に確定（design.md:349）、`level` は scope_gen の呼び出し文脈（global=0/local=1…）から builder が把握。よって 2.1/2.2 で `MapBuilderSink` 内にシーン蓄積（join_key→(start,end,level)）を実装する際、必要なら `record_scene` を builder 内部で受けて level/end をローカルに track する設計とし、trait シグネチャは増やさない方針。
