@@ -368,9 +368,11 @@ mod kick_sink_tests {
         assert!(RuntimeConfig::new().kick_sink.is_none());
         assert!(RuntimeConfig::full().kick_sink.is_none());
         assert!(RuntimeConfig::minimal().kick_sink.is_none());
-        assert!(RuntimeConfig::from_libs(vec!["std_all".into()])
-            .kick_sink
-            .is_none());
+        assert!(
+            RuntimeConfig::from_libs(vec!["std_all".into()])
+                .kick_sink
+                .is_none()
+        );
         assert!(RuntimeConfig::default().kick_sink.is_none());
     }
 
@@ -379,16 +381,20 @@ mod kick_sink_tests {
         // Requirement 2.4: 注入された汎用 sink を RuntimeConfig が保持する。
         let called = Arc::new(AtomicBool::new(false));
         let flag = Arc::clone(&called);
-        let config = RuntimeConfig::new().with_kick_sink(Some(Arc::new(move |req: KickRequest| {
-            assert_eq!(req.scene, "OnTest");
-            flag.store(true, Ordering::SeqCst);
-        })));
+        let config =
+            RuntimeConfig::new().with_kick_sink(Some(Arc::new(move |req: KickRequest| {
+                assert_eq!(req.scene, "OnTest");
+                flag.store(true, Ordering::SeqCst);
+            })));
 
         let sink = config.kick_sink.as_ref().expect("sink must be Some");
         sink(KickRequest {
             scene: "OnTest".into(),
         });
-        assert!(called.load(Ordering::SeqCst), "injected sink must be called");
+        assert!(
+            called.load(Ordering::SeqCst),
+            "injected sink must be called"
+        );
     }
 
     #[test]

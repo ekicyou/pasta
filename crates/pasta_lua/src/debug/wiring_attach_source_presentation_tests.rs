@@ -42,7 +42,11 @@ fn map_with(chunk: &str, lua_line: u32, file: &str, pasta_line: u32) -> SourceMa
 
 /// Top frame `source`/`line` after encoding ONE `stackTrace` (observes which
 /// resolver is installed).
-fn top_frame(adapter: &Arc<Mutex<DapAdapter>>, source: &str, line: u32) -> (serde_json::Value, u32) {
+fn top_frame(
+    adapter: &Arc<Mutex<DapAdapter>>,
+    source: &str,
+    line: u32,
+) -> (serde_json::Value, u32) {
     let mut dap = adapter.lock().unwrap();
     dap.decode_request(&json!({
         "seq": 1, "type": "request", "command": "stackTrace",
@@ -54,7 +58,10 @@ fn top_frame(adapter: &Arc<Mutex<DapAdapter>>, source: &str, line: u32) -> (serd
         func_name: Some("f".to_string()),
     }]));
     let frame = &out[0]["body"]["stackFrames"][0];
-    (frame["source"].clone(), frame["line"].as_u64().unwrap() as u32)
+    (
+        frame["source"].clone(),
+        frame["line"].as_u64().unwrap() as u32,
+    )
 }
 
 /// Pasta-capable wiring (map present) whose EFFECTIVE mode starts at `start`.
@@ -102,7 +109,10 @@ fn attach_lua_forces_lua_resolver_over_pasta_default() {
     );
     assert_eq!(line, 7);
     assert_eq!(wiring.source_mode.get(), SourceMode::Lua);
-    assert!(!wiring.pasta_active(), "Lua effective mode → consumers inactive");
+    assert!(
+        !wiring.pasta_active(),
+        "Lua effective mode → consumers inactive"
+    );
 }
 
 /// R6.3: `attach sourcePresentation="pasta"` FORCES `.pasta` presentation even
@@ -131,7 +141,10 @@ fn attach_pasta_forces_pasta_resolver_over_lua_default() {
         "attach `pasta` must force `.pasta` presentation over the Lua default (R6.3)"
     );
     assert_eq!(line, 3);
-    assert!(wiring.pasta_active(), "Pasta effective mode + map → consumers active");
+    assert!(
+        wiring.pasta_active(),
+        "Pasta effective mode + map → consumers active"
+    );
 }
 
 /// design 581 (no client-default override): with NO attach `sourcePresentation`

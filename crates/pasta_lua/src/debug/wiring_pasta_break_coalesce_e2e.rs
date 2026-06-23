@@ -267,7 +267,6 @@ fn build_fixture() -> Fixture {
     }
 }
 
-
 #[cfg(test)]
 #[path = "wiring_pasta_break_coalesce_e2e_scenarios.rs"]
 mod scenarios;

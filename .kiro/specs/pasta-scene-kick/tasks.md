@@ -28,7 +28,7 @@
   - 完了状態: 正常名は Some、空/欠落は None に decode される単体テストが緑
   - _Requirements: 2.1, 2.2, 2.3, 2.5_
   - _Boundary: PlaySceneDecode（dap/decode.rs）_
-- [ ] 2.2 playScene 自己完結ハンドラから sink を呼ぶ
+- [x] 2.2 playScene 自己完結ハンドラから sink を呼ぶ
   - inbound 固定順に自己完結ハンドラを追加し、有効シーン名で sink を呼び成功 ack を返す
   - 空/不正は実行せずエラー応答を要求元へ返す
   - sink 未注入（debug 無効）時は経路を有効化しない
@@ -36,7 +36,7 @@
   - _Requirements: 2.3, 2.5, 2.6_
   - _Depends: 1.1, 2.1_
   - _Boundary: KickInboundHandler（wiring/inbound.rs）_
-- [ ] 2.3 enable から socket-bridge へ sink を透過配線する
+- [x] 2.3 enable から socket-bridge へ sink を透過配線する
   - debug enable シグネチャへ sink を追加し、socket-bridge spawn 時に inbound ハンドラへ供給する
   - runtime 構築経路から sink を透過し、enabled=false 時は sink を消費せず非活性に保つ
   - 完了状態: debug 有効＋sink 注入で inbound→sink が到達し、enabled=false で sink が消費されないテストが緑

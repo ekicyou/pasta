@@ -9,9 +9,7 @@
 use serde_json::{Value, json};
 
 use crate::debug::SourceMode;
-use crate::debug::types::{
-    ResolvedBreakpoint, SourceRef, StopReason, ThreadInfo, Variable,
-};
+use crate::debug::types::{ResolvedBreakpoint, SourceRef, StopReason, ThreadInfo, Variable};
 
 use super::ResolvedSource;
 

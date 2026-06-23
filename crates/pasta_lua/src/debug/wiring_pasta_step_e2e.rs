@@ -248,7 +248,8 @@ impl Expected {
         // E1 の 2 回目 step over 停止先 / E2 サブ呼び出し / E3 step into 起点:
         // 行22（helper 呼び出し）。`.pasta` は `multi_pasta` と異なる次の行。
         let call_helper_lua = 22;
-        let call_helper_pasta = lp(call_helper_lua).expect("行22 は helper 呼び出しの対応 `.pasta`");
+        let call_helper_pasta =
+            lp(call_helper_lua).expect("行22 は helper 呼び出しの対応 `.pasta`");
         assert_ne!(
             call_helper_pasta, multi_pasta,
             "E1: 2 回目 step over 停止先は `.pasta` 11 と異なる次の `.pasta` 行"
@@ -275,7 +276,8 @@ impl Expected {
         );
         // E5 step over 停止先: 行24（recur 呼び出しの直後の対応行）。
         let after_recur_lua = 24;
-        let after_recur_pasta = lp(after_recur_lua).expect("行24 は recur 呼び出し直後の対応 `.pasta`");
+        let after_recur_pasta =
+            lp(after_recur_lua).expect("行24 は recur 呼び出し直後の対応 `.pasta`");
         assert_ne!(
             after_recur_pasta, recur_call_pasta,
             "E5: 再帰 step over 停止先は recur 呼び出し行と異なる次の `.pasta` 行"
@@ -464,14 +466,16 @@ fn start_session(
             source_mode: mode,
             ..Default::default()
         };
-        let handle = enable(&lua, &cfg, Some(map_for_host))
+        let handle = enable(&lua, &cfg, Some(map_for_host), None)
             .map_err(|e| format!("enable failed: {e}"))?
             .ok_or_else(|| "enable returned None for an enabled config".to_string())?;
 
         let addr = handle
             .local_addr()
             .ok_or_else(|| "enabled handle must expose a bound addr".to_string())?;
-        addr_tx.send(addr).map_err(|_| "addr send failed".to_string())?;
+        addr_tx
+            .send(addr)
+            .map_err(|_| "addr send failed".to_string())?;
 
         go_rx
             .recv_timeout(WATCHDOG)
@@ -541,7 +545,6 @@ fn continue_to_end(
     let _ = client.recv_until(|m| is_response(m, "continue"));
     join_host(host);
 }
-
 
 #[cfg(test)]
 #[path = "wiring_pasta_step_e2e_scenarios.rs"]

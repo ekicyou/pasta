@@ -296,11 +296,45 @@ impl DapAdapter {
     /// 3.1) passes the RESOLVED current mode — the newly applied mode on a valid
     /// request, or the UNCHANGED current mode when the request carried an
     /// unrecognized value (requirement 1.4) — and this helper echoes it back.
-    pub(crate) fn source_presentation_response(&mut self, request_seq: u64, mode: SourceMode) -> Value {
+    pub(crate) fn source_presentation_response(
+        &mut self,
+        request_seq: u64,
+        mode: SourceMode,
+    ) -> Value {
         self.response(
             request_seq,
             "pasta/sourcePresentation",
             json!({ "mode": source_mode_str(mode) }),
         )
+    }
+
+    /// Build the `pasta/playScene` acceptance RESPONSE [`Value`] (success ack),
+    /// correlated to `request_seq` (pasta-scene-kick requirement 2.3 / 2.5).
+    ///
+    /// The wiring (task 2.2) sends this AFTER it has handed the extracted scene
+    /// name to the [`KickSink`](crate::debug::kick::KickSink), confirming the kick
+    /// was accepted (the actual scene execution is asynchronous and not awaited).
+    pub(crate) fn play_scene_response(&mut self, request_seq: u64) -> Value {
+        self.response(request_seq, "pasta/playScene", Value::Null)
+    }
+
+    /// Build the `pasta/playScene` ERROR RESPONSE [`Value`] (`success: false`)
+    /// for an empty / invalid scene name, correlated to `request_seq`
+    /// (pasta-scene-kick requirement 2.5: 空または不正なシーン名はキックせず
+    /// エラーを要求元へ返す).
+    ///
+    /// Unlike [`response`](Self::response) (which is a fixed `success: true`
+    /// envelope), this carries `success: false` and a human-readable `message`
+    /// so the VSCode extension can surface the failure to the author.
+    pub(crate) fn play_scene_error(&mut self, request_seq: u64) -> Value {
+        let seq = self.next_seq();
+        json!({
+            "seq": seq,
+            "type": "response",
+            "request_seq": request_seq,
+            "success": false,
+            "command": "pasta/playScene",
+            "message": "scene name is empty or invalid",
+        })
     }
 }

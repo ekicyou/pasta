@@ -232,5 +232,9 @@ mod pasta_break_coalesce_e2e;
 mod source_presentation_toggle_tests;
 
 #[cfg(test)]
+#[path = "../wiring_play_scene_kick_tests.rs"]
+mod play_scene_kick_tests;
+
+#[cfg(test)]
 #[path = "../wiring_bridge_lifecycle_tests.rs"]
 mod bridge_lifecycle_tests;

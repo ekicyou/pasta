@@ -49,7 +49,10 @@ fn poison(adapter: &SharedAdapter) {
         panic!("TEST-ONLY: poison the shared adapter lock");
     })
     .join();
-    assert!(adapter.lock().is_err(), "the adapter lock must now be poisoned");
+    assert!(
+        adapter.lock().is_err(),
+        "the adapter lock must now be poisoned"
+    );
 }
 
 /// A real loopback [`Transport`] plus a connected client end (same pattern as
@@ -166,15 +169,23 @@ fn event_encoder_ends_on_poisoned_adapter_without_panic() {
 fn drain_outbound_flushes_pending_and_treats_closed_channel_as_ok() {
     let mut h = Harness::new();
     let (out_tx, out_rx) = mpsc::channel();
-    out_tx.send(json!({ "type": "event", "event": "first" })).unwrap();
-    out_tx.send(json!({ "type": "event", "event": "second" })).unwrap();
+    out_tx
+        .send(json!({ "type": "event", "event": "first" }))
+        .unwrap();
+    out_tx
+        .send(json!({ "type": "event", "event": "second" }))
+        .unwrap();
     drop(out_tx); // encoder thread is gone; frames are still queued
 
     assert!(
         drain_outbound(&h.transport, &out_rx),
         "a closed out_rx must NOT stop the bridge (inbound may still arrive)"
     );
-    assert_eq!(h.recv()["event"], "first", "queued frames are flushed in order");
+    assert_eq!(
+        h.recv()["event"],
+        "first",
+        "queued frames are flushed in order"
+    );
     assert_eq!(h.recv()["event"], "second");
 }
 
@@ -207,6 +218,7 @@ fn socket_bridge_exits_on_preset_shutdown_without_serving() {
             out_rx,
             shutdown,
             SourceMapWiring::disabled(),
+            None,
         )
     });
     bridge
@@ -245,8 +257,12 @@ fn socket_bridge_flushes_pending_outbound_on_client_disconnect() {
 
     // Frames the (already finished) encoder left behind.
     let (out_tx, out_rx) = mpsc::channel();
-    out_tx.send(json!({ "type": "event", "event": "pending-1" })).unwrap();
-    out_tx.send(json!({ "type": "event", "event": "pending-2" })).unwrap();
+    out_tx
+        .send(json!({ "type": "event", "event": "pending-1" }))
+        .unwrap();
+    out_tx
+        .send(json!({ "type": "event", "event": "pending-2" }))
+        .unwrap();
     drop(out_tx);
 
     let (cmd_tx, _cmd_rx) = mpsc::channel();
@@ -261,6 +277,7 @@ fn socket_bridge_flushes_pending_outbound_on_client_disconnect() {
             out_rx,
             shutdown,
             SourceMapWiring::disabled(),
+            None,
         )
     });
     bridge
@@ -304,18 +321,28 @@ fn toggle_missing_seq_acks_with_request_seq_zero() {
         &breakpoints,
         &cmd_tx,
         &req,
-        &wiring
+        &wiring,
+        None
     ));
 
-    assert_eq!(wiring.source_mode.get(), SourceMode::Lua, "the toggle still applies");
+    assert_eq!(
+        wiring.source_mode.get(),
+        SourceMode::Lua,
+        "the toggle still applies"
+    );
     let ack = h.recv();
     assert_eq!(ack["command"], "pasta/sourcePresentation");
-    assert_eq!(ack["request_seq"], 0, "missing seq must degrade to request_seq 0");
+    assert_eq!(
+        ack["request_seq"], 0,
+        "missing seq must degrade to request_seq 0"
+    );
     assert_eq!(ack["body"]["mode"], "lua");
     let ev = h.recv();
     assert_eq!(ev["event"], "pasta/sourcePresentation");
     assert_eq!(
-        cmd_rx.recv_timeout(WATCHDOG).expect("RefreshPresentation forwarded"),
+        cmd_rx
+            .recv_timeout(WATCHDOG)
+            .expect("RefreshPresentation forwarded"),
         SessionCommand::RefreshPresentation
     );
 }
@@ -339,7 +366,15 @@ fn toggle_with_session_gone_still_acks_then_reports_stop() {
         "arguments": { "mode": "lua" },
     });
     assert!(
-        !handle_inbound(&h.transport, &adapter, &breakpoints, &cmd_tx, &req, &wiring),
+        !handle_inbound(
+            &h.transport,
+            &adapter,
+            &breakpoints,
+            &cmd_tx,
+            &req,
+            &wiring,
+            None
+        ),
         "a gone session must stop the bridge (false)"
     );
 
@@ -370,13 +405,17 @@ fn stop_context_command_with_session_gone_reports_stop_after_ack() {
             &breakpoints,
             &cmd_tx,
             &req,
-            &SourceMapWiring::disabled()
+            &SourceMapWiring::disabled(),
+            None
         ),
         "a gone session must stop the bridge (false)"
     );
 
     let ack = h.recv();
-    assert_eq!(ack["command"], "continue", "the ack precedes the failed forward");
+    assert_eq!(
+        ack["command"], "continue",
+        "the ack precedes the failed forward"
+    );
     assert_eq!(ack["request_seq"], 3);
 }
 
@@ -399,11 +438,20 @@ fn unknown_and_missing_command_are_ignored_and_bridge_keeps_serving() {
         &breakpoints,
         &cmd_tx,
         &no_command,
-        &wiring
+        &wiring,
+        None
     ));
     // (2) An unrecognized command → empty Decoded → ignored.
     let bogus = json!({ "seq": 2, "type": "request", "command": "bogusCommand" });
-    assert!(handle_inbound(&h.transport, &adapter, &breakpoints, &cmd_tx, &bogus, &wiring));
+    assert!(handle_inbound(
+        &h.transport,
+        &adapter,
+        &breakpoints,
+        &cmd_tx,
+        &bogus,
+        &wiring,
+        None
+    ));
     assert!(
         cmd_rx.try_recv().is_err(),
         "ignored requests must forward no session command"
@@ -413,9 +461,20 @@ fn unknown_and_missing_command_are_ignored_and_bridge_keeps_serving() {
     // response is the FIRST frame on the wire (the ignored requests wrote
     // nothing before it — TCP preserves order).
     let init = json!({ "seq": 3, "type": "request", "command": "initialize", "arguments": {} });
-    assert!(handle_inbound(&h.transport, &adapter, &breakpoints, &cmd_tx, &init, &wiring));
+    assert!(handle_inbound(
+        &h.transport,
+        &adapter,
+        &breakpoints,
+        &cmd_tx,
+        &init,
+        &wiring,
+        None
+    ));
     let resp = h.recv();
-    assert_eq!(resp["command"], "initialize", "first wire frame is the initialize response");
+    assert_eq!(
+        resp["command"], "initialize",
+        "first wire frame is the initialize response"
+    );
     assert_eq!(resp["request_seq"], 3);
     let ev = h.recv();
     assert_eq!(ev["event"], "initialized");
@@ -458,7 +517,15 @@ fn set_breakpoints_is_atomic_non_forward_while_stop_context_forwards() {
         },
     });
     assert!(
-        handle_inbound(&h.transport, &adapter, &breakpoints, &cmd_tx, &set_bp, &wiring),
+        handle_inbound(
+            &h.transport,
+            &adapter,
+            &breakpoints,
+            &cmd_tx,
+            &set_bp,
+            &wiring,
+            None
+        ),
         "setBreakpoints must keep the bridge serving (true)"
     );
     let resp = h.recv();
@@ -467,7 +534,10 @@ fn set_breakpoints_is_atomic_non_forward_while_stop_context_forwards() {
         "exactly one setBreakpoints response frame is on the wire"
     );
     assert_eq!(resp["type"], "response");
-    assert_eq!(resp["request_seq"], 1, "the response correlates to the request seq");
+    assert_eq!(
+        resp["request_seq"], 1,
+        "the response correlates to the request seq"
+    );
     assert!(
         cmd_rx.try_recv().is_err(),
         "setBreakpoints is atomic + NON-FORWARD: nothing reaches the session channel"
@@ -477,7 +547,15 @@ fn set_breakpoints_is_atomic_non_forward_while_stop_context_forwards() {
     // SessionCommand to the session channel.
     let cont = json!({ "seq": 2, "type": "request", "command": "continue", "arguments": {} });
     assert!(
-        handle_inbound(&h.transport, &adapter, &breakpoints, &cmd_tx, &cont, &wiring),
+        handle_inbound(
+            &h.transport,
+            &adapter,
+            &breakpoints,
+            &cmd_tx,
+            &cont,
+            &wiring,
+            None
+        ),
         "a forwardable stop-context command keeps the bridge serving (true)"
     );
     assert!(
@@ -520,7 +598,8 @@ fn poisoned_adapter_never_panics_resolver_attach_and_stops_inbound() {
             &BreakpointSet::new(),
             &cmd_tx,
             &req,
-            &SourceMapWiring::disabled()
+            &SourceMapWiring::disabled(),
+            None
         ),
         "a poisoned adapter must stop the bridge, never panic it"
     );

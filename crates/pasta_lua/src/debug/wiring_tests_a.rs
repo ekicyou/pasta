@@ -26,14 +26,16 @@ fn full_dap_session_over_tcp_attach_bp_stack_vars_step_continue_terminated() {
             listen: Some("127.0.0.1:0".parse().unwrap()),
             ..Default::default()
         };
-        let handle = enable(&lua, &cfg, None)
+        let handle = enable(&lua, &cfg, None, None)
             .map_err(|e| format!("enable failed: {e}"))?
             .ok_or_else(|| "enable returned None for an enabled config".to_string())?;
 
         let addr = handle
             .local_addr()
             .ok_or_else(|| "enabled handle must expose a bound addr".to_string())?;
-        addr_tx.send(addr).map_err(|_| "addr send failed".to_string())?;
+        addr_tx
+            .send(addr)
+            .map_err(|_| "addr send failed".to_string())?;
 
         // Wait for the client to finish initialize/setBreakpoints/
         // configurationDone before running the VM (so the BP is live).
@@ -82,7 +84,10 @@ fn full_dap_session_over_tcp_attach_bp_stack_vars_step_continue_terminated() {
         }),
     );
     let bp_resp = client.recv_until(|m| is_response(m, "setBreakpoints"));
-    assert_eq!(bp_resp["request_seq"], 2, "setBreakpoints response correlates");
+    assert_eq!(
+        bp_resp["request_seq"], 2,
+        "setBreakpoints response correlates"
+    );
     let bps = bp_resp["body"]["breakpoints"]
         .as_array()
         .expect("breakpoints array");
@@ -111,8 +116,13 @@ fn full_dap_session_over_tcp_attach_bp_stack_vars_step_continue_terminated() {
     client.send_request(9, "threads", json!({}));
     let threads = client.recv_until(|m| is_response(m, "threads"));
     assert_eq!(threads["request_seq"], 9);
-    let thread_arr = threads["body"]["threads"].as_array().expect("threads array");
-    assert!(!thread_arr.is_empty(), "threads must report at least one thread");
+    let thread_arr = threads["body"]["threads"]
+        .as_array()
+        .expect("threads array");
+    assert!(
+        !thread_arr.is_empty(),
+        "threads must report at least one thread"
+    );
 
     // --- stackTrace → frames (top frame is the coroutine body BP line) ---
     client.send_request(10, "stackTrace", json!({ "threadId": thread_id }));
@@ -121,7 +131,10 @@ fn full_dap_session_over_tcp_attach_bp_stack_vars_step_continue_terminated() {
     let frames = stack["body"]["stackFrames"]
         .as_array()
         .expect("stackFrames array");
-    assert!(!frames.is_empty(), "stack must have at least the stopped frame");
+    assert!(
+        !frames.is_empty(),
+        "stack must have at least the stopped frame"
+    );
     assert_eq!(
         frames[0]["source"]["path"], SCENARIO_SOURCE,
         "top frame source must be the scenario `.lua`"
@@ -137,7 +150,11 @@ fn full_dap_session_over_tcp_attach_bp_stack_vars_step_continue_terminated() {
     let scopes = client.recv_until(|m| is_response(m, "scopes"));
     assert_eq!(scopes["request_seq"], 11);
     let scope_arr = scopes["body"]["scopes"].as_array().expect("scopes array");
-    assert_eq!(scope_arr.len(), 1, "exactly one scopes response (no double-answer)");
+    assert_eq!(
+        scope_arr.len(),
+        1,
+        "exactly one scopes response (no double-answer)"
+    );
     assert_eq!(scope_arr[0]["name"], "Locals");
     let var_ref = scope_arr[0]["variablesReference"]
         .as_u64()
@@ -148,13 +165,18 @@ fn full_dap_session_over_tcp_attach_bp_stack_vars_step_continue_terminated() {
     client.send_request(12, "variables", json!({ "variablesReference": var_ref }));
     let vars = client.recv_until(|m| is_response(m, "variables"));
     assert_eq!(vars["request_seq"], 12);
-    let var_arr = vars["body"]["variables"].as_array().expect("variables array");
+    let var_arr = vars["body"]["variables"]
+        .as_array()
+        .expect("variables array");
     let co_local = var_arr
         .iter()
         .find(|v| v["name"] == "co_local")
         .unwrap_or_else(|| panic!("coroutine-body local `co_local` must be present: {var_arr:?}"));
     assert_eq!(co_local["type"], "number");
-    assert_eq!(co_local["value"], "7", "co_local must read its live value 7");
+    assert_eq!(
+        co_local["value"], "7",
+        "co_local must read its live value 7"
+    );
 
     // --- step over (`next`) → ack + a new `stopped(step)` ---
     client.send_request(20, "next", json!({ "threadId": thread_id }));
@@ -190,4 +212,3 @@ fn full_dap_session_over_tcp_attach_bp_stack_vars_step_continue_terminated() {
         Err(RecvTimeoutError::Disconnected) => panic!("join watcher disconnected"),
     }
 }
-

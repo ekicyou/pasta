@@ -43,14 +43,29 @@ fn attach_initial_lua_is_applied_then_runtime_toggle_overrides_to_pasta() {
     let mut session = start_stopped_session(&coords, Some("lua"), "lua");
 
     // (4.1) 最初の停止は既に `.lua` 座標（attach 初期モードが適用済み・トグル前）。
-    assert_lua_frame(&mut session, &coords, 10, "4.1: attach 初期 `.lua` での最初の停止");
+    assert_lua_frame(
+        &mut session,
+        &coords,
+        10,
+        "4.1: attach 初期 `.lua` での最初の停止",
+    );
 
     // (4.2) 実行時トグルで初期モード `.lua` を `.pasta` へ上書き。
     toggle_mode(&mut session, 20, "pasta");
     // (4.3) 上書き後モードが以後の提示で採用される。
-    assert_pasta_frame(&mut session, &coords, 21, "4.2/4.3: トグルで初期 `.lua` を `.pasta` へ上書き");
+    assert_pasta_frame(
+        &mut session,
+        &coords,
+        21,
+        "4.2/4.3: トグルで初期 `.lua` を `.pasta` へ上書き",
+    );
     // (4.3 持続) 同一停止での再読でも上書き後モードが持続する（再トグルしていない）。
-    assert_pasta_frame(&mut session, &coords, 22, "4.3: 上書き後モードが後続の読みでも持続");
+    assert_pasta_frame(
+        &mut session,
+        &coords,
+        22,
+        "4.3: 上書き後モードが後続の読みでも持続",
+    );
 
     finish_session(session);
 }
@@ -68,12 +83,27 @@ fn no_attach_arg_file_present_as_lua_resolves_initial_lua_then_toggle_overrides(
     let mut session = start_stopped_session(&coords, None, "lua");
 
     // (4.4 file 階層) 最初の停止が `.lua` 座標（file `present_as="lua"` が初期モードを決めた）。
-    assert_lua_frame(&mut session, &coords, 10, "4.4 file: present_as=\"lua\" 初期 `.lua` の最初の停止");
+    assert_lua_frame(
+        &mut session,
+        &coords,
+        10,
+        "4.4 file: present_as=\"lua\" 初期 `.lua` の最初の停止",
+    );
 
     // (4.2/4.3) 解決済み初期モードを実行時トグルで `.pasta` へ上書きでき、以後持続する。
     toggle_mode(&mut session, 20, "pasta");
-    assert_pasta_frame(&mut session, &coords, 21, "4.4/4.2/4.3: 解決済み `.lua` をトグルで `.pasta` へ上書き");
-    assert_pasta_frame(&mut session, &coords, 22, "4.3: 上書き後モードが後続の読みでも持続");
+    assert_pasta_frame(
+        &mut session,
+        &coords,
+        21,
+        "4.4/4.2/4.3: 解決済み `.lua` をトグルで `.pasta` へ上書き",
+    );
+    assert_pasta_frame(
+        &mut session,
+        &coords,
+        22,
+        "4.3: 上書き後モードが後続の読みでも持続",
+    );
 
     finish_session(session);
 }
@@ -88,12 +118,27 @@ fn no_attach_arg_no_config_resolves_initial_pasta_then_toggle_overrides() {
     let mut session = start_stopped_session(&coords, None, "pasta");
 
     // (4.4 default 階層) 最初の停止が `.pasta` 座標（既定 `.pasta` が初期モード）。
-    assert_pasta_frame(&mut session, &coords, 10, "4.4 default: 設定なし初期 `.pasta` の最初の停止");
+    assert_pasta_frame(
+        &mut session,
+        &coords,
+        10,
+        "4.4 default: 設定なし初期 `.pasta` の最初の停止",
+    );
 
     // (4.2/4.3) 解決済み既定 `.pasta` を実行時トグルで `.lua` へ上書きでき、以後持続する。
     toggle_mode(&mut session, 20, "lua");
-    assert_lua_frame(&mut session, &coords, 21, "4.4/4.2/4.3: 解決済み `.pasta` をトグルで `.lua` へ上書き");
-    assert_lua_frame(&mut session, &coords, 22, "4.3: 上書き後モードが後続の読みでも持続");
+    assert_lua_frame(
+        &mut session,
+        &coords,
+        21,
+        "4.4/4.2/4.3: 解決済み `.pasta` をトグルで `.lua` へ上書き",
+    );
+    assert_lua_frame(
+        &mut session,
+        &coords,
+        22,
+        "4.3: 上書き後モードが後続の読みでも持続",
+    );
 
     finish_session(session);
 }
@@ -227,9 +272,19 @@ fn no_toggle_session_stays_in_initial_pasta_mode_throughout() {
     let mut session = start_stopped_session(&coords, None, "pasta");
 
     // (6.1-a) 初期解決どおりの最初の停止: トップフレームは `.pasta` 座標。
-    assert_pasta_frame(&mut session, &coords, 10, "6.1: トグル未使用・初期 `.pasta` の最初の停止");
+    assert_pasta_frame(
+        &mut session,
+        &coords,
+        10,
+        "6.1: トグル未使用・初期 `.pasta` の最初の停止",
+    );
     // (6.1-b) 同一停止での再読でも `.pasta` のまま（追加 stackTrace で揺れない）。
-    assert_pasta_frame(&mut session, &coords, 11, "6.1: トグル未使用・再読でも初期 `.pasta` が持続");
+    assert_pasta_frame(
+        &mut session,
+        &coords,
+        11,
+        "6.1: トグル未使用・再読でも初期 `.pasta` が持続",
+    );
 
     // (6.1-c) **トグルせず** BP を解除して `next` を 1 回。停止後も `.pasta` 提示のまま
     // （別の `.pasta` 行へ進むが、提示モードはドリフトしない）。BP 解除は同一行 line-hook 再入での
@@ -239,7 +294,9 @@ fn no_toggle_session_stays_in_initial_pasta_mode_throughout() {
         "setBreakpoints",
         json!({ "source": { "path": coords.pasta_file_key.clone() }, "breakpoints": [] }),
     );
-    let _ = session.client.recv_until(|m| is_response(m, "setBreakpoints"));
+    let _ = session
+        .client
+        .recv_until(|m| is_response(m, "setBreakpoints"));
 
     session
         .client
@@ -255,8 +312,13 @@ fn no_toggle_session_stays_in_initial_pasta_mode_throughout() {
         .client
         .send_request(14, "stackTrace", json!({ "threadId": session.thread_id }));
     let stack = session.client.recv_until(|m| is_response(m, "stackTrace"));
-    let frames = stack["body"]["stackFrames"].as_array().expect("stackFrames");
-    assert!(!frames.is_empty(), "6.1: ステップ後も停止フレームが存在する");
+    let frames = stack["body"]["stackFrames"]
+        .as_array()
+        .expect("stackFrames");
+    assert!(
+        !frames.is_empty(),
+        "6.1: ステップ後も停止フレームが存在する"
+    );
     assert_pasta_source(
         &frames[0],
         &coords.pasta_file_key,

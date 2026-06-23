@@ -4,8 +4,8 @@
 //! extracts a scene name into `Decoded.kick_scene` (`Some`), treating an
 //! empty/missing/non-string name as invalid (`None`) without falling into
 //! generic routing.
-use super::*;
 use super::dap_test_support::*;
+use super::*;
 
 // --- pasta/playScene custom request (R2.1 / R2.2 / R2.3 / R2.5) ----------
 
@@ -17,11 +17,7 @@ use super::dap_test_support::*;
 #[test]
 fn play_scene_request_decodes_scene_name() {
     let mut dap = DapAdapter::new();
-    let decoded = dap.decode_request(&request(
-        70,
-        "pasta/playScene",
-        json!({ "scene": "intro" }),
-    ));
+    let decoded = dap.decode_request(&request(70, "pasta/playScene", json!({ "scene": "intro" })));
     assert_eq!(
         decoded.kick_scene,
         Some("intro".to_string()),
@@ -29,10 +25,13 @@ fn play_scene_request_decodes_scene_name() {
     );
     // Decode does not route or ack: other fields are default (R2.3 — no generic
     // routing / stop loop fallthrough).
-    assert_eq!(decoded, Decoded {
-        kick_scene: Some("intro".to_string()),
-        ..Decoded::default()
-    });
+    assert_eq!(
+        decoded,
+        Decoded {
+            kick_scene: Some("intro".to_string()),
+            ..Decoded::default()
+        }
+    );
 }
 
 /// R2.5: an EMPTY scene name (`""`) is invalid and decodes to `None` — the kick
@@ -41,11 +40,7 @@ fn play_scene_request_decodes_scene_name() {
 #[test]
 fn play_scene_request_empty_scene_is_none() {
     let mut dap = DapAdapter::new();
-    let decoded = dap.decode_request(&request(
-        71,
-        "pasta/playScene",
-        json!({ "scene": "" }),
-    ));
+    let decoded = dap.decode_request(&request(71, "pasta/playScene", json!({ "scene": "" })));
     assert_eq!(
         decoded.kick_scene, None,
         "R2.5: empty scene name → None (invalid)"
@@ -57,11 +52,7 @@ fn play_scene_request_empty_scene_is_none() {
 #[test]
 fn play_scene_request_blank_scene_is_none() {
     let mut dap = DapAdapter::new();
-    let decoded = dap.decode_request(&request(
-        72,
-        "pasta/playScene",
-        json!({ "scene": "   " }),
-    ));
+    let decoded = dap.decode_request(&request(72, "pasta/playScene", json!({ "scene": "   " })));
     assert_eq!(
         decoded.kick_scene, None,
         "R2.5: whitespace-only scene name → None (invalid)"
@@ -81,11 +72,7 @@ fn play_scene_request_missing_scene_is_none() {
 
     // A non-string scene is also rejected.
     let mut dap2 = DapAdapter::new();
-    let decoded2 = dap2.decode_request(&request(
-        74,
-        "pasta/playScene",
-        json!({ "scene": 1 }),
-    ));
+    let decoded2 = dap2.decode_request(&request(74, "pasta/playScene", json!({ "scene": 1 })));
     assert_eq!(
         decoded2.kick_scene, None,
         "R2.5: non-string scene → None (invalid)"

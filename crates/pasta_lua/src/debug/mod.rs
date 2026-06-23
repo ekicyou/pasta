@@ -32,11 +32,11 @@ pub(crate) mod breakpoints;
 pub(crate) mod dap;
 pub(crate) mod hook;
 pub(crate) mod inspect;
+pub mod kick;
 pub(crate) mod session;
 pub(crate) mod transport;
-pub(crate) mod wiring;
-pub mod kick;
 pub mod types;
+pub(crate) mod wiring;
 
 mod config;
 mod enable;
@@ -60,10 +60,10 @@ pub use config::DebugConfig;
 use config::parse_env_bool;
 pub use enable::enable;
 pub use error::DebugError;
-pub use kick::{KickRequest, KickSink};
 pub use handle::DebugHandle;
-pub use source_mode::SourceMode;
+pub use kick::{KickRequest, KickSink};
 pub(crate) use source_mode::SharedSourceMode;
+pub use source_mode::SourceMode;
 
 #[cfg(test)]
 #[path = "debug_mod_tests.rs"]

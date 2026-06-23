@@ -83,15 +83,27 @@ use super::wiring;
 /// [`DebugError::Bind`] if the DAP listener fails to bind; [`DebugError::Vm`] if
 /// the hook install fails (`mlua::Error` is stringified at the boundary, it is
 /// `!Send`). The disabled path never errors.
+///
+/// # Scene-kick sink injection (pasta-scene-kick tasks 2.3 / 2.4 — `KickSinkSeam`)
+///
+/// `kick_sink` is the OPTIONAL host-injected scene-kick closure
+/// ([`KickSink`](crate::debug::kick::KickSink)). When supplied AND debug is
+/// enabled, it is threaded to the socket-bridge thread so an inbound
+/// `pasta/playScene` request invokes it (pasta-scene-kick R2.4); `pasta_lua`
+/// holds it opaquely and never references `pasta_shiori` (R2.4 dependency
+/// direction). On the disabled path the sink is dropped here unused, keeping the
+/// kick path inert (R2.6, zero cost).
 pub fn enable(
     lua: &mlua::Lua,
     cfg: &DebugConfig,
     source_map: Option<Arc<source_map::SourceMap>>,
+    kick_sink: Option<crate::debug::kick::KickSink>,
 ) -> Result<Option<DebugHandle>, DebugError> {
     if !cfg.enabled {
         // Zero-cost disabled path (R5.2 / R5.3 / R5.5): no hook, no port, no
         // thread, no std_debug exposure. Leave `lua` untouched. The `source_map`
-        // (if any) is simply dropped here — the disabled gate never consumes it.
+        // and `kick_sink` (if any) are simply dropped here — the disabled gate
+        // never consumes them, so the kick path stays inert (R2.6).
         return Ok(None);
     }
 
@@ -199,6 +211,11 @@ pub fn enable(
         // task 5.2) and applies setBreakpoints (BP TRANSLATION attach point, task
         // 5.3): deliver the gated map+mode there too (task 4.2 plumbing).
         let source_map_wiring = source_map_wiring.clone();
+        // pasta-scene-kick tasks 2.3 / 2.4: deliver the (optional) host kick sink
+        // to the bridge so an inbound `pasta/playScene` invokes it (R2.4). `None`
+        // keeps the kick path inert (R2.6). Cloning an `Arc<dyn Fn…>` is a
+        // refcount bump.
+        let kick_sink = kick_sink.clone();
         std::thread::spawn(move || {
             wiring::run_socket_bridge(
                 transport,
@@ -208,6 +225,7 @@ pub fn enable(
                 out_rx,
                 shutdown,
                 source_map_wiring,
+                kick_sink,
             );
         })
     };

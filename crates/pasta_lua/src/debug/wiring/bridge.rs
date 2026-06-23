@@ -15,6 +15,7 @@ use std::time::Duration;
 use serde_json::Value;
 
 use crate::debug::breakpoints::BreakpointSet;
+use crate::debug::kick::KickSink;
 use crate::debug::transport::Transport;
 use crate::debug::types::{SessionCommand, SessionEvent};
 
@@ -44,6 +45,11 @@ const POLL_INTERVAL: Duration = Duration::from_millis(5);
 /// Returns (winding the transport down by dropping it) when the inbound channel
 /// closes (client disconnect / shutdown) or the shutdown flag is set — never a
 /// hang.
+// The bridge is the sole Transport owner and the single multiplexing point, so it
+// legitimately threads the full set of shared seams (adapter / breakpoints / the
+// two channels / shutdown / source-map wiring / kick sink). Grouping them into a
+// struct would only obscure the flat ownership transfer into the spawned thread.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn run_socket_bridge(
     transport: Transport,
     adapter: SharedAdapter,
@@ -55,6 +61,10 @@ pub(crate) fn run_socket_bridge(
     // (5.2, attached just below) and BP-translation (5.3) attachment points on
     // this thread. No map / `Lua` mode → existing `.lua` behavior (6.1/6.2/7.2).
     source_map: SourceMapWiring,
+    // The (optional) host-injected scene-kick sink (pasta-scene-kick tasks 2.2 /
+    // 2.3 / R2.4 / R2.6). Passed to `handle_inbound` so an inbound `pasta/playScene`
+    // request invokes it. `None` keeps the kick path inert (R2.6).
+    kick_sink: Option<KickSink>,
 ) {
     // Task 5.2: install the `.pasta` source resolver on the shared adapter when
     // `pasta_active()` (map present AND `SourceMode::Pasta`, design 509/582). For
@@ -70,7 +80,15 @@ pub(crate) fn run_socket_bridge(
         // (1) Inbound: poll one frame (bounded so we can also service outbound).
         match transport.inbound().recv_timeout(POLL_INTERVAL) {
             Ok(req) => {
-                if !handle_inbound(&transport, &adapter, &breakpoints, &cmd_tx, &req, &source_map) {
+                if !handle_inbound(
+                    &transport,
+                    &adapter,
+                    &breakpoints,
+                    &cmd_tx,
+                    &req,
+                    &source_map,
+                    kick_sink.as_ref(),
+                ) {
                     return; // peer gone while replying → done
                 }
             }
