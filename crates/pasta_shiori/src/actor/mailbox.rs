@@ -84,9 +84,13 @@ pub enum Reply {
 /// - [`ActorMsg::Notify`]: NOTIFY fire-and-forget。応答経路を持たず即 204 で終結する。
 /// - [`ActorMsg::Stop`]: teardown 制御メッセージ。`done`（flume `bounded(1)`）で完了 ack を
 ///   返す。先行メッセージを drain 後に同一 FIFO 上で処理される（clean drain）。
+/// - [`ActorMsg::Kick`]: シーンキック fire-and-forget（仕様 `pasta-scene-kick` 3.1）。応答経路を
+///   持たず、アクタースレッド上で VM の `SHIORI.kick(scene)` を呼んで保留フラグ
+///   （`STORE.kick_pending`/`STORE.kick_force`）を設置する。複数 Kick は FIFO 順で処理され、
+///   最後の `scene` が `kick_pending` を上書きする。
 ///
-/// `#[non_exhaustive]` により、将来 `Kick`（talk FIFO 投入・後続仕様 `pasta-scene-kick`）を
-/// 破壊的変更なしに追加できる（別チャンネル＋`select!` ではなく **同一 mailbox への
+/// `#[non_exhaustive]` により、`Kick`（talk FIFO 投入・仕様 `pasta-scene-kick`）を
+/// 破壊的変更なしに追加した（別チャンネル＋`select!` ではなく **同一 mailbox への
 /// variant merge** が単一 consumer 不変条件を保つ唯一の拡張手段）。
 #[derive(Debug)]
 #[non_exhaustive]
@@ -108,6 +112,16 @@ pub enum ActorMsg {
         /// teardown 完了 ack 経路（flume `bounded(1)`）。SHIORI 側は `recv()` で待つ。
         done: Sender<()>,
     },
+    /// シーンキック fire-and-forget メッセージ（仕様 `pasta-scene-kick` 3.1）。
+    ///
+    /// アクタースレッド上で VM の `SHIORI.kick(scene)` を呼び、保留フラグ
+    /// （`STORE.kick_pending`/`STORE.kick_force`）を設置する。NOTIFY と同型の
+    /// fire-and-forget で応答経路を持たない。複数 Kick は同一 FIFO 上で投入順に
+    /// 処理され、最後の `scene` が `kick_pending` を上書きする。
+    Kick {
+        /// キック対象のシーン名（VM の `SHIORI.kick` へ渡す）。
+        scene: String,
+    },
 }
 
 impl ActorMsg {
@@ -123,6 +137,16 @@ impl ActorMsg {
     /// NOTIFY メッセージを構築する（応答経路なし）。
     pub fn notify(req: MailboxRequest) -> ActorMsg {
         ActorMsg::Notify { req }
+    }
+
+    /// シーンキックメッセージを構築する（fire-and-forget・応答経路なし）。
+    ///
+    /// アクタースレッド上で VM の `SHIORI.kick(scene)` を呼ぶ（仕様 `pasta-scene-kick`
+    /// 3.1）。`notify`/`stop` に倣い、応答経路を持たない。
+    pub fn kick(scene: impl Into<String>) -> ActorMsg {
+        ActorMsg::Kick {
+            scene: scene.into(),
+        }
     }
 
     /// teardown 制御メッセージを構築する。
@@ -152,13 +176,15 @@ mod tests {
 
     /// 種別に依らず順序識別子 (`seq`) を取り出すテストヘルパ。
     ///
-    /// `Stop` は順序識別子を持たないため、テストでは予約値（`u64::MAX`）で表す
-    /// （`Stop` を末尾に置く FIFO テストで終端マーカーとして機能する）。
+    /// `Stop`/`Kick` は順序識別子を持たないため、テストでは予約値で表す。`Stop` は
+    /// `u64::MAX`（末尾終端マーカー）、`Kick` は `u64::MAX - 1`（FIFO 内の位置を
+    /// 識別子で区別せず、種別ではなく投入順で順序が決まることを示す用途）。
     fn seq_of(msg: &ActorMsg) -> u64 {
         match msg {
             ActorMsg::Get { req, .. } => req.seq,
             ActorMsg::Notify { req } => req.seq,
             ActorMsg::Stop { .. } => u64::MAX,
+            ActorMsg::Kick { .. } => u64::MAX - 1,
         }
     }
 
@@ -219,6 +245,44 @@ mod tests {
             order,
             vec![10, 11, 12, 13, u64::MAX],
             "all variants must drain in enqueue order; Stop trails after prior messages"
+        );
+    }
+
+    /// `ActorMsg::kick` コンストラクタ（仕様 `pasta-scene-kick` 3.1）: `Kick` variant を
+    /// シーン名付きで構築し、応答経路を持たない fire-and-forget であることを確認する。
+    #[test]
+    fn kick_constructs_fire_and_forget_with_scene() {
+        let msg = ActorMsg::kick("intro");
+        match msg {
+            ActorMsg::Kick { scene } => assert_eq!(scene, "intro"),
+            other => panic!("ActorMsg::kick must build a Kick variant, got {other:?}"),
+        }
+    }
+
+    /// R6.1/R6.4（全 variant FIFO・Kick 混在）: Get/Notify/Stop/Kick を交互投入しても、
+    /// 種別に依らず投入順がそのまま drain 順に保存される。Kick は NOTIFY 同型の
+    /// fire-and-forget だが同一 FIFO を通り、投入位置どおりに処理される。
+    #[test]
+    fn kick_preserves_fifo_order_among_all_variants() {
+        let (tx, rx) = mailbox();
+
+        let (get_a, _rx_a) = ActorMsg::get(MailboxRequest::new(20, ""));
+        let (stop, _done_rx) = ActorMsg::stop();
+
+        // 投入順: Notify(21) / Kick(intro) / Get(20) / Kick(outro) / Stop。種別を
+        // 意図的に交互配置し、Kick が投入位置どおり drain されることを示す。
+        // seq_of は Kick を u64::MAX-1、Stop を u64::MAX で表す（位置の識別子）。
+        tx.send(ActorMsg::notify(MailboxRequest::new(21, ""))).unwrap();
+        tx.send(ActorMsg::kick("intro")).unwrap();
+        tx.send(get_a).unwrap();
+        tx.send(ActorMsg::kick("outro")).unwrap();
+        tx.send(stop).unwrap();
+
+        let order: Vec<u64> = drain(&rx).iter().map(seq_of).collect();
+        assert_eq!(
+            order,
+            vec![21, u64::MAX - 1, 20, u64::MAX - 1, u64::MAX],
+            "Kick must drain in enqueue order among all variants (FIFO preserved)"
         );
     }
 

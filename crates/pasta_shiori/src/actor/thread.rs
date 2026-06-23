@@ -202,6 +202,17 @@ pub fn spawn_actor_thread(
                             tracing::trace!(seam = "actor.recv", method = "notify", seq = req.seq, "actor received NOTIFY");
                             let _ = shiori.request(&req.raw);
                         }
+                        // KICK fire-and-forget（仕様 `pasta-scene-kick` 3.1）: VM 上で
+                        // SHIORI.kick(scene) を呼び、保留フラグ（kick_pending/kick_force）を
+                        // 設置する。NOTIFY 同型で応答経路を持たず、戻り値も捨てる。複数 Kick
+                        // は同一 FIFO 上で投入順に処理され、最後の scene が kick_pending を
+                        // 上書きする。kick は protected call（shiori.rs 側で pcall 相当）ゆえ
+                        // SHIORI.kick 不在・エラーでもアクタースレッドは落ちない。
+                        ActorMsg::Kick { scene } => {
+                            // 観測ログ点（R10.4・無効時ゼロコスト）: Kick を mailbox から受信。
+                            tracing::trace!(seam = "actor.recv", method = "kick", scene = %scene, "actor received KICK");
+                            shiori.kick(&scene);
+                        }
                         // teardown: ack 経路を保持してループを抜ける。Stop は同一 FIFO を
                         // 通るため、ここに到達した時点で先行メッセージは drain 済み
                         // （clean drain）。ack はループ脱出後・cleanup 完了後に送る。

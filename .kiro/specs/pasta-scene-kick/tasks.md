@@ -7,7 +7,7 @@
   - 完了状態: `RuntimeConfig` に sink を渡せて、未注入時はキック経路が起動しないことが型・既定値で確認できる
   - _Requirements: 2.4, 2.6_
   - _Boundary: KickSinkSeam（debug/kick.rs, runtime_config.rs）_
-- [ ] 1.2 (P) アクター mailbox にキック variant を追加する
+- [x] 1.2 (P) アクター mailbox にキック variant を追加する
   - 単一 mailbox の `ActorMsg`（予約 docstring）に「シーン名つきキック」variant を追加し、docstring の予約記述を実体化する
   - executor 受信ループの match が新 variant を未処理で落とさないよう網羅する
   - 完了状態: キック variant を mailbox へ送信でき、単一 consumer が FIFO 順に受信することがテストで確認できる
@@ -52,7 +52,7 @@
   - _Requirements: 2.4_
   - _Depends: 1.1, 1.2_
   - _Boundary: MailboxKickInjector（lifecycle.rs）_
-- [ ] 3.2 (P) executor 腕と Rust↔Lua キックブリッジを実装する
+- [x] 3.2 (P) executor 腕と Rust↔Lua キックブリッジを実装する
   - executor 受信 match にキック variant 腕を追加し、アクタースレッド上で Rust↔Lua ブリッジ（Lua のキック入口）を fire-and-forget で起動する（応答なし）
   - 複数キックは FIFO 順に処理され、最後のキックが保留を上書きする
   - 完了状態: キック variant 受信で Lua キック入口が 1 回呼ばれ、連続キックで最後の値が保留となるテストが緑
@@ -144,3 +144,5 @@
 - **実行順序（Lua 先行）**: Rust の網羅性検査により `ActorMsg::Kick` variant 追加（1.2）は executor アーム＋Rust↔Lua ブリッジとコンパイル不可分で、ブリッジが叩く `SHIORI.kick` は 4.1 で初めて存在する。よって実行順を Lua 先行（1.3→4.1→4.2→4.3→4.4）→ Rust（1.2 で variant＋executor アーム＋ブリッジを一括、3.2 はそのRust部分を内包）→ 3.1 → 2.x → 5.x → 6.1 → 7.x に最適化。各層が単独コンパイル＆テスト可能。
 - **SHIORI モジュールの実体は `entry.lua`**: `SHIORI` グローバル・`SHIORI.request` を定義しランタイムにロードされるのは `pasta/shiori/entry.lua`（`factory.rs` が `require("pasta.shiori.entry")`）。`pasta/shiori/init.lua` は require 0 件の未ロード空スタブ。`SHIORI.kick` 等の公開・Rust→Lua ブリッジの到達先は `entry.lua`。design.md L168/L522 は entry.lua に修正済み。
 - **cargo 実行前に `unset NoDefaultCurrentDirectoryInExePath`**（外さないと mlua-sys/LuaJIT ビルドが exit 101）。lua spec は `cargo test -p pasta_lua`（lua_unittest_runner）で走り、新規 `*_test.lua` は `tests/lua_specs/init.lua` に登録が必要。
+- **1.2 と 3.2 は統合実装**: Rust 網羅性検査により variant 追加（1.2）が executor match（thread.rs）と seq_of（mailbox.rs test）を即コンパイルエラーにするため、variant＋executor アーム＋Rust↔Lua ブリッジ（shiori.rs）を1単位で実装し両タスクを同時完了。RED = `E0004 non-exhaustive` を捕捉。
+- **pasta_shiori の VM テスト harness は `pasta.toml` 必須**: `PastaLoader::load` が pasta.toml を要求するため、tempdir に最小 pasta.toml を置かないと「ghost VM must load」で失敗する。actor_kick_test.rs 参照。
