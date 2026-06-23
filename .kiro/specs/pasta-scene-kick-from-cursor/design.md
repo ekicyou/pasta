@@ -62,7 +62,7 @@
 - **ソースマップ**: producer 側 `SourceMapSink::record_line(lua_line, pasta_line)`（code_gen が各構文ヘッダ行で `record_span` を呼ぶ）。consumer 側 `SourceMap`（`chunks: HashMap<ChunkName, ChunkSourceMap>` ＋ `reverse` 索引）。loader の `build_source_map` が `.pasta` ごとに parse → sink attach → transpile → `finish(&shift)` → `insert_chunk` で集約し `Arc<SourceMap>` を構築。`enable()` が `Arc<SourceMap>` ＋ `KickSink` をブリッジスレッドへ供給。
 - **SceneRegistry**: `SceneEntry { id, name, fn_path, fn_name, parent, attributes }`。識別子は `sanitize_name(name)` ＋連番で生成。**シーンの `.pasta` 上 span（行範囲）は保持していない**。
 
-**重要な時系列制約**: シーン登録（`register_global`/`register_local`）は Lua ランタイム（SHIORI finalize）で行われるのに対し、`.pasta` span は **code_gen 時**に `SourceMapSink` 経由で記録される。両者は別フェーズで発生するため、「span（code_gen 由来）と識別子（SceneRegistry 由来）の突合」をどこで行うかが本設計の中核論点である（下記 Design Decision 1）。
+**重要な時系列制約**: シーン登録は Lua ランタイム（SHIORI finalize）で行われるのに対し、`.pasta` span は **code_gen 時**に `SourceMapSink` 経由で記録される。両者は別フェーズで発生するため、「span（code_gen 由来）と実シーン identity（ランタイム由来）の突合」をどこで行うかが本設計の中核論点である。**確定（Decision 1・案1: ランタイム権威キャプチャ）**: code_gen は base 名のみ出力し連番は Lua ランタイムが実行順に付与する（`scope_gen.rs:120`／`scene.lua:129` `create_scene` = `base_name .. counter`、例 `会話1`）。ランタイムの実シーンキーは `会話1` であり Rust `SceneRegistry` の `会話_1`（アンダースコア）と**形式が異なる**ため、SceneRegistry を識別子 SSOT とする突合は採らない。代わりに finalize（`runtime/finalize.rs::collect_scenes` が `STORE.scenes` から実 global_name を収集する箇所）で得られるランタイム実 identity を、code_gen が記録した span と join key で突合して索引を構築する（下記 Design Decision 1 / Open Questions OQ-1 参照）。
 
 ### Architecture Pattern & Boundary Map
 
@@ -335,18 +335,21 @@ sequenceDiagram
 pub trait SourceMapSink {
     fn record_line(&mut self, lua_line: u32, pasta_line: u32);        // 既存・不変
     fn record(&mut self, lua_line: u32, span: Span) { /* 既存・不変 */ }
-    // 追加: デフォルト no-op で後方非破壊
-    fn record_scene(&mut self, _scene_id: &str, _span: Span) {}
+    // 追加: デフォルト no-op で後方非破壊。
+    // 連番付き最終 identity は code_gen 時点では未確定のため、ここでは
+    // join key（base 名 + 出現順 など、finalize 側と再現可能な決定的キー）と span を記録する。
+    fn record_scene(&mut self, _scene_join_key: &str, _span: Span) {}
 }
 ```
-- Preconditions: `scene_id` は `SceneRegistry` 由来の確定識別子。`span` はシーン宣言の行範囲を含む。
-- Postconditions: ビルダ実装（`MapBuilderSink`）が当該シーンの (start_line, end_line, scene_id) を蓄積。
+- Preconditions: `scene_join_key` は code_gen と finalize の双方で決定的に再現できる突合キー（例: `sanitize_name(base) + 出現順`）。連番付き実 identity（`会話1`）はここでは未確定。`span` はシーン宣言の行範囲を含む。
+- Postconditions: ビルダ実装（`MapBuilderSink`）が当該シーンの (start_line, end_line, scene_join_key) を蓄積。最終 identity は finalize の join で付与される。
 - Invariants: 行マッピングの記録内容・順序は不変。
 
 **Implementation Notes**
 - Integration: `scope_gen.rs` の global/local シーン生成箇所（既存 `record_span(scene.span)` 近傍）で `record_scene` を併せて呼ぶ。end_line は次シーン宣言検出時、または finish 時に確定。
-- Validation: span と識別子の突合（Decision 1）。
-- Risks: 入れ子（global ⊃ local）の範囲確定とレベル情報の受け渡し。
+- Join（Decision 1・案1）: `runtime/finalize.rs::collect_scenes` がランタイム実 global_name（`会話1`）を列挙する際、同じ join key で span 側と突合し、(file, 行範囲) → 実 identity の索引を確定させる。code_gen 側で連番を再実装しない（形式ドリフト回避）。
+- Validation: 索引の identity がランタイム実シーンテーブルおよび `@pasta_search:search_scene` の解決対象と一致すること（impl 時に search_scene のキー仕様と整合確認＋特性化テスト）。join key の決定性（ソース出現順＝ランタイム create_scene 実行順、跨ファイルは load 順）を特性化テストで固定。
+- Risks: 入れ子（global ⊃ local）の範囲確定とレベル情報の受け渡し。跨ファイル同名 base の load 順依存。
 
 ### Runtime 層
 
@@ -478,7 +481,7 @@ pub fn resolve_scene_at(
 
 以下は要件・research を超える設計判断が必要な項目。design-discussion フェーズで解決する（暫定方針は best-effort で本設計に反映済み・明示ラベル付き）。
 
-- **OQ-1（Decision 1: span と識別子の突合箇所）**: シーン span は code_gen 時、シーン識別子（`fn_name`）は `SceneRegistry` 由来。両者の突合を (a) code_gen が `SceneRegistry` 登録結果を参照して `record_scene(scene_id, span)` を呼ぶ（research Option C・推奨）か、(b) `SceneEntry` に span を持たせる（Option A）か。**暫定: Option C**。`pasta_core` 公開型の破壊的変更を避けつつ識別子 SSOT を維持。確定要。
+- **OQ-1（Decision 1: span と識別子の突合箇所）→ 解決済み: 案1（ランタイム権威キャプチャ）**。code_gen は base 名のみ出力し、連番は Lua ランタイムが実行順に付与する（`scope_gen.rs:120`／`scene.lua:129`）。ランタイム実キー `会話1` は Rust `SceneRegistry` の `会話_1` と形式が異なるため、SceneRegistry を識別子 SSOT とする旧 Option C/A は**不採用**。代わりに finalize（`runtime/finalize.rs::collect_scenes`）でランタイム実 identity を列挙し、code_gen が記録した span と join key（base+出現順）で突合して (file, 行範囲) → 実 identity 索引を構築する。形式ドリフト・順序推測を排し『動いているゴーストが権威』(案B)と一貫。索引の値は `@pasta_search:search_scene` の解決対象と揃える（impl 時に整合検証＋特性化テスト）。
 - **OQ-2（Decision 4: staleness 検知方式）**: 未リロードで行ずれが生じ得る場合、(a) best-effort 解決のみ（未解決は未検出）か、(b) ロード時版マーカー（mtime/ハッシュ）と現ディスク/バッファを照合し staleness を検知してリロード誘導するか。**暫定: best-effort ＋ 未解決は未検出（7.6）**。検知方式の要否・実装（mtime/ハッシュ）は確定要（7.5）。
 - **OQ-3（Decision 5: 再アタッチ詳細）**: 待機時間（数秒の具体値）・リトライ/タイムアウト方式・再アタッチ完了後のキック自動再実行可否・「SHIORIリロード」の表示/有効化条件（接続中のみか）（9.4, 9.5）。**暫定: 固定待機→1回再アタッチ・自動再実行なし・接続中のみ表示**。確定要。
 - **OQ-4（デバッグ開始誘導の具体手段）**: 6.3 の「デバッグ開始」アクションが `launch.json` 構成参照か自動アタッチかの具体手段。**暫定: `vscode.debug.startDebugging` で既定 `type: 'pasta'` 構成を起動**。確定要。
