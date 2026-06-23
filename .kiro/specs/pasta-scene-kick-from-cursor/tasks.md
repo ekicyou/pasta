@@ -21,7 +21,7 @@
   - _Boundary: SourceMapSink_
 
 - [ ] 2. Core: ビルド側の索引構築（code_gen 記録 → finalize 突合）
-- [ ] 2.1 code_gen のシーン生成箇所でシーン記録を呼ぶ
+- [x] 2.1 code_gen のシーン生成箇所でシーン記録を呼ぶ
   - global/local シーン生成箇所（既存 span 記録の近傍）で、突合キー（base 名＋出現順）と `.pasta` span を sink へ流す
   - シーン範囲終端（次の同レベル以上宣言の直前／chunk 末尾）と入れ子レベルを受け渡す
   - 連番のサニタイズ規則を code_gen 側で再実装しない（形式ドリフト回避）
@@ -131,3 +131,12 @@
 
 - 1.1: `SceneIdentityIndex` の行範囲は実装上 **両端 inclusive** `[start_line, end_line]`（`contains` = `start <= line <= end`）。design.md:297 は半開区間記法 `[start_line, end_line)` で書かれているが、`end_line` を「次の同レベル以上宣言の**直前行**」と定義しているため具体行のメンバシップは等価。task 2.2 の構築側は **「次宣言行 − 1」（直前行）を inclusive な end_line として投入**すること（次宣言行そのものを渡さない）。空ファイルは `insert_file` で空エントリを作れば未検出を返す。
 - 1.2: `SourceMapSink::record_scene(&mut self, scene_join_key: &str, span: Span)` はデフォルト no-op の **2引数**シグネチャ（design.md:341 が SSOT）。`end_line` と入れ子 `level` は**この trait メソッドの引数に含めない**。task 2.1（scope_gen 記録）/2.2（finalize join）の **builder 側**で算出する想定：`end_line` は次の同レベル以上宣言検出時または finish 時に確定（design.md:349）、`level` は scope_gen の呼び出し文脈（global=0/local=1…）から builder が把握。よって 2.1/2.2 で `MapBuilderSink` 内にシーン蓄積（join_key→(start,end,level)）を実装する際、必要なら `record_scene` を builder 内部で受けて level/end をローカルに track する設計とし、trait シグネチャは増やさない方針。
+
+- 2.x join_key 契約（**設計の緊張を解決**: design.md:341 の2引数 trait と task 2.1「終端と入れ子レベルを受け渡す」の不整合を、design.md SSOT 優先で解決）：
+  - **trait は2引数のまま**。終端・レベルは trait 引数で渡さず、**`scene_join_key` 文字列に決定的に符号化**して 2.2（finalize/builder）が復元する。
+  - 符号化が担うべき情報（2.2 が復元に要する）：(a) global/local 種別とネスト level、(b) 親 global への参照、(c) 出現順（global は **per-base 出現順＝ランタイム `create_scene` 連番順**に一致させること。これがランタイム実 identity `会話1` との突合の鍵）。
+  - global counter は**ランタイム付与**（scope_gen は base 名のみ出力・`scope_gen.rs:119-121`）。local counter は**code_gen 算出**（`scope_gen.rs:154-162` per-name HashMap、`fn_name = {sanitize}_{counter}`）。よって join_key で global は (base, 出現順) を、local は (親base, 親出現順, local fn_name) を符号化する想定。
+  - `SceneRegistry::sanitize_name` の連番を code_gen 側で**二重実装しない**（design.md:329/350 形式ドリフト回避）。
+  - 2.1 は scope_gen の global=`scope_gen.rs:139`／local=`scope_gen.rs:222`（既存 `record_span` 近傍）で `record_scene` を呼ぶところまで。蓄積・join・level/end 復元・runtime identity 突合は 2.2。
+  - **2.1 確定 join_key 形式（2.2 が consume する）**: global=`G:{base}#{counter}`、local=`L:{parent_base}#{parent_counter}:{fn_name}`。`base`=`SceneRegistry::sanitize_name(name)`、`counter`=per-base 出現順（=ランタイム `create_scene` 連番。`G:会話#1`↔runtime `会話1` を pasta_core `increment_counter`／`scene.lua:48-52` まで遡り検証済）、`fn_name`=`{sanitize}_{counter}` または `__start__`。`G`/`L` 接頭辞が種別＋level、local の `{parent_base}#{parent_counter}` が親参照。形式は `scope_gen.rs` の `generate_global_scene` 内コメントに明記済。
+  - **2.2 への注意（レビュー指摘 #6・2.1 由来でなく既存性質）**: `increment_counter` は **raw** `scene.name` をキーにするが、ランタイム counter は **sanitized** `base_name` をキーにする。よって「異なる raw 名が同一 base へ正規化される」ケースでは join_key の出現順とランタイム連番がズレうる。2.2 の突合実装時にこの境界を**特性化テストで固定**するか、join を sanitized-base ベースの出現順に揃えること（`increment_counter` のキー基準を確認）。

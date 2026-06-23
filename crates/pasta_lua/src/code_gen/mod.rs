@@ -114,6 +114,26 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         }
     }
 
+    /// Record a scene declaration's deterministic join key + `.pasta` span via the
+    /// sink's [`record_scene`](SourceMapSink::record_scene), if a sink is attached
+    /// and the span is valid.
+    ///
+    /// Inert (no-op, zero-cost) when no sink is attached — the production default.
+    /// Invalid/default spans (`end_byte == 0`) are skipped, mirroring
+    /// [`record_span`](Self::record_span), so synthetic/headerless scenes do not
+    /// pollute the scene index. Unlike `record_span`, this does NOT consume
+    /// `out_line`: the scene join is keyed by the `.pasta` span (header line range),
+    /// not the emitted `.lua` line. The `scene_join_key` is built at the call site in
+    /// `scope_gen.rs` (see its encoding doc) and must be reproducible at finalize
+    /// (task 2.2) from runtime/registry data.
+    fn record_scene_span(&mut self, scene_join_key: &str, span: Span) {
+        if let Some(sink) = self.source_map.as_deref_mut()
+            && span.is_valid()
+        {
+            sink.record_scene(scene_join_key, span);
+        }
+    }
+
     /// Record `(out_line -> pasta_line)` directly if a sink is attached.
     ///
     /// Inert (no-op, zero-cost) when no sink is attached — the production default.
