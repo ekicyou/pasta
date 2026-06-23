@@ -21,7 +21,7 @@
   - _Boundary: KickInstall（store.lua）_
 
 - [ ] 2. キック transport（DAP・pasta_lua debug backend）
-- [ ] 2.1 (P) playScene カスタムリクエストを decode する
+- [x] 2.1 (P) playScene カスタムリクエストを decode する
   - 既存 DAP decode に playScene 文字列マッチを追加し、デコード結果へシーン名フィールドを足して抽出する
   - 空・欠落シーン名は不正（None）として表現し、汎用 routing（停止ループ経由）に落とさない
   - 別 transport を新設せず既存 DAP フレーム拡張に留める

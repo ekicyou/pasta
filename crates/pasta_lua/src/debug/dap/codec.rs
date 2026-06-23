@@ -37,6 +37,24 @@ pub(super) fn parse_source_mode_strict(raw: &str) -> Option<SourceMode> {
     }
 }
 
+/// Strictly extract the `scene` name from a `pasta/playScene` custom request's
+/// `arguments` (pasta-scene-kick R2.2 / R2.5, design component PlaySceneDecode).
+///
+/// Returns `Some(name)` ONLY when `args.scene` is a string that is non-empty
+/// after trimming surrounding whitespace; a missing key, a non-string value, an
+/// empty string, or a whitespace-only string all yield `None` (invalid). The
+/// returned name is trimmed so an empty/blank scene cannot reach the kick path
+/// and fall back into generic routing (R2.5).
+pub(super) fn parse_scene_strict(args: Option<&Value>) -> Option<String> {
+    let raw = args.and_then(|a| a.get("scene")).and_then(Value::as_str)?;
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
+}
+
 /// Map a [`SourceMode`] to its `pasta/sourcePresentation` wire token
 /// (`"pasta"` / `"lua"`), used in both the acceptance response and the custom
 /// event body (requirement 1.3 / 2.5 / 2.6).

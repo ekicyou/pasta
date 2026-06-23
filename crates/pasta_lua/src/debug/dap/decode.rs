@@ -8,7 +8,9 @@ use crate::debug::SourceMode;
 use crate::debug::types::SessionCommand;
 
 use super::DapAdapter;
-use super::codec::{parse_set_breakpoints, parse_source_mode_strict, source_mode_str};
+use super::codec::{
+    parse_scene_strict, parse_set_breakpoints, parse_source_mode_strict, source_mode_str,
+};
 use super::pending::PendingKind;
 
 /// The outcome of decoding one inbound DAP request.
@@ -49,6 +51,17 @@ pub struct Decoded {
     ///
     /// [`attach_source_mode`]: Decoded::attach_source_mode
     pub requested_source_mode: Option<SourceMode>,
+    /// The scene name extracted from a `pasta/playScene` custom request
+    /// (pasta-scene-kick requirements 2.1 / 2.2 / 2.5), parsed STRICTLY: `Some`
+    /// ONLY for a non-empty (post-trim) string `scene` argument; a missing key,
+    /// a non-string value, an empty string, or a whitespace-only string all
+    /// yield `None`.
+    ///
+    /// `None` means the request carried no usable scene name and the kick must
+    /// NOT be issued (R2.5). The decode itself produces no command/response — the
+    /// wiring (task 2.2) owns sink invocation and the ack — so a `pasta/playScene`
+    /// request never falls into generic routing (R2.3).
+    pub kick_scene: Option<String>,
 }
 
 impl DapAdapter {
@@ -217,6 +230,23 @@ impl DapAdapter {
                     .and_then(parse_source_mode_strict);
                 Decoded {
                     requested_source_mode,
+                    ..Decoded::default()
+                }
+            }
+            "pasta/playScene" => {
+                // The decode SIDE of the scene kick (pasta-scene-kick R2.1 / R2.2
+                // / R2.3 / R2.5). Extract `args.scene` STRICTLY into `kick_scene`:
+                // a non-empty (post-trim) string yields `Some(name)`; a missing
+                // key, a non-string, an empty string, or a whitespace-only string
+                // yields `None` (invalid — the kick must NOT be issued, R2.5).
+                //
+                // No immediate response/command is produced here (R2.3): the
+                // wiring (task 2.2) owns sink invocation and the ack/error
+                // response. Leaving every other field at default keeps the request
+                // out of generic routing.
+                let kick_scene = parse_scene_strict(args);
+                Decoded {
+                    kick_scene,
                     ..Decoded::default()
                 }
             }
