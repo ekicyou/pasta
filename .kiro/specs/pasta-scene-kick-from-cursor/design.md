@@ -427,7 +427,7 @@ pub fn resolve_scene_at(
 **Implementation Notes**
 - Integration: `extension.ts` の登録パターンは `toggleSourcePresentation` に倣う。
 - Validation: `activeTextEditor` 不在時の防御。
-- Risks: 「デバッグ開始」誘導の具体的起動手段（`launch.json` 構成参照・自動アタッチ可否）は OPEN QUESTION（Decision 5 関連）。
+- Integration: 「デバッグ開始」誘導は `vscode.debug.startDebugging`（ワークスペース `pasta` 構成優先・無ければ既定 `127.0.0.1:9276`）。Decision 5 の再アタッチと構成解決ロジックを共通化（OQ-4 解決済み）。
 
 #### ReloadShiori（summary + note）
 
@@ -488,6 +488,6 @@ pub fn resolve_scene_at(
   - **② 待機＋再アタッチ**: 「リロード指示 → 数秒待機 → アタッチ試行、失敗なら短間隔リトライ（上限/タイムアウト付き）」。固定1回ではなくリトライで堅牢化。
   - **③ キック自動再実行**: v1 はしない（再アタッチ後に作者が手動で再キック）。デタッチ跨ぎの保留キック状態管理を避け予測可能性優先。
   - **④ 表示/有効化条件**: 接続中のみ（`when: debugType == 'pasta'`）。リロードは動作中 SHIORI への操作のため。kick 項目の常時表示とは前提が異なる。
-- **OQ-4（デバッグ開始誘導の具体手段）**: 6.3 の「デバッグ開始」アクションが `launch.json` 構成参照か自動アタッチかの具体手段。**暫定: `vscode.debug.startDebugging` で既定 `type: 'pasta'` 構成を起動**。確定要。
+- **OQ-4（デバッグ開始誘導の具体手段）→ 解決済み: 設定優先＋既定フォールバック**。6.3 の「デバッグ開始」アクションは `vscode.debug.startDebugging` を用い、ワークスペースに `type: 'pasta'` の `launch.json` 構成があればそれを起動、無ければ組込み既定アタッチ構成（`127.0.0.1:9276`）で起動する。この「pasta アタッチ構成を解決する」ロジックは Decision 5 の再アタッチと**共通化**する（DRY）。
 - **Risk: uri 正規化**: VSCode uri → エンジン索引キー（chunk 名/ファイルパス）の正規化（Windows パス・URI エンコード）。CI 8.3 短縮名パス等の既知リスク（メモリ）に注意。
 - **Risk: end_line 確定**: シーン範囲終端（次の同レベル以上宣言の直前/ファイル末尾）の正確な算出。入れ子レベルの受け渡し。

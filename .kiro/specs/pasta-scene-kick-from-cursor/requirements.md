@@ -85,7 +85,7 @@
 #### Acceptance Criteria
 1. The VSCode Pasta 拡張 shall コンテキストメニュー項目「▶ シーンを実行」を、対象ファイルが `.pasta` 言語である場合に常時表示する（デバッグセッションの接続有無に依存しない）。
 2. While Pasta デバッグセッションが接続されていない, when 作者が「▶ シーンを実行」を選択する, the VSCode Pasta 拡張 shall 再生要求を送らず、「Pasta デバッグセッションが接続されていません」の警告と、デバッグセッションの開始（起動／アタッチ）へ誘導するアクションを作者へ提示する。
-3. When 作者がセッション未接続時の誘導アクション（デバッグ開始）を選択する, the VSCode Pasta 拡張 shall Pasta デバッグセッションの開始（起動／アタッチ）を起動する。なお当該アクションの具体的な起動手段（`launch.json` 構成の参照・自動アタッチ可否）は設計フェーズで確定する。
+3. When 作者がセッション未接続時の誘導アクション（デバッグ開始）を選択する, the VSCode Pasta 拡張 shall `vscode.debug.startDebugging` を用いて Pasta デバッグセッションを開始する（ワークスペースに `type: 'pasta'` の `launch.json` 構成があればそれを優先し、無ければ組込み既定アタッチ構成 `127.0.0.1:9276` で起動する）。
 4. If シーン実行要求がエンジンからエラー応答を受け取る, then the VSCode Pasta 拡張 shall 失敗理由を作者へ提示する。
 
 ### Requirement 7: ロード済み辞書とディスク内容の不整合（staleness）時の挙動
