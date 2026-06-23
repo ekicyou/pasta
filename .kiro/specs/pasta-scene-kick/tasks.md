@@ -68,7 +68,7 @@
   - _Requirements: 3.1, 5.4_
   - _Depends: 1.3_
   - _Boundary: KickInstall（event/kick.lua, shiori/init.lua）_
-- [ ] 4.2 保留キックシーンを既存 ctx 合成で解決し co を返す
+- [x] 4.2 保留キックシーンを既存 ctx 合成で解決し co を返す
   - 当該 OnSecondChange の act を流用してシーン名を解決し、シーンコルーチンを生成する（通常トーク再生と同一の合成手順を流用）
   - 解決不能シーンは co を据えず破棄＋診断ログ（前会話を保持）
   - キック専用の出力キューを設けず、既存の継続機構へ委譲する

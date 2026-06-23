@@ -53,6 +53,7 @@ local specs = {
     "shiori_entry_test",                  -- pasta.shiori.entry 統合テスト (review-improvement-loop 3.48)
     "store_kick_pending_test",            -- STORE.kick_pending / kick_force フィールドテスト (pasta-scene-kick 1.3)
     "kick_install_test",                  -- KICK.install / SHIORI.kick 保留フラグ設置テスト (pasta-scene-kick 4.1)
+    "kick_try_dispatch_test",             -- KICK.try_dispatch 保留シーン解決→co返却テスト (pasta-scene-kick 4.2)
     -- 将来のテストスイートをここに追加
     -- "code_generator_test",
     -- "context_test",
