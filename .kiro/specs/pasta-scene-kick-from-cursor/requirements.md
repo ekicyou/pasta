@@ -15,6 +15,7 @@
   - エンジンがロード済みソースマップ／シーン同一性索引を用いて (uri, line) からシーンを確定し、既存 kick backend へ取り次ぐ。
   - ソースマップへの「シーン同一性索引」（`.pasta` の (file, 行範囲) → シーン識別子）の追加と、トランスパイル時の `SceneRegistry` 由来シーン位置情報の受け渡し。
   - 旧 `pasta.debug.playScene`（シーン名入力）コマンドおよび `showInputBox` フローの廃止。
+  - 「SHIORIリロード」コマンド（右クリックメニュー＋デバッグツールバー）による `\![reload,shiori]` 送出と、リロードで切れたデバッグセッションの自動再アタッチ（リロード指示→数秒待機→`vscode.debug.startDebugging` で再アタッチ）。
 - **Out of scope（本機能が再設計しない／別境界の振る舞い）**:
   - kick 実行本体のセマンティクス（co_scene 設置・preempt-and-abort・初回ビートのワンショット抑制突破・OnSecondChange シーン継続）の再設計。`pasta-scene-kick` を流用し、振る舞いは継承する。
   - LSP（エディタ側）でのシーン解決（案 A・不採用）。
@@ -92,10 +93,10 @@
 
 #### Acceptance Criteria
 1. The Pasta エンジン shall 位置→シーンの確定をロード済み辞書（実行中エンジンが保持するソースマップ）に基づいて行う。
-2. While ロード済み内容がディスク上の `.pasta`（またはエディタ上の編集中バッファ）と一致しない可能性がある, when 作者がシーン実行を要求する, the Pasta システム shall 黙ってロード済みデータで解決せず、作者へリロードを促す。
-3. Where staleness を検知し、かつ SSP へさくらスクリプトを送出可能である, the Pasta システム shall SHIORI のリロードを起動するため `\![reload,shiori]`（SHIORI のみ再読み込み・非同期）を SSP へ送る。
+2. While ロード済み内容がディスク上の `.pasta`（またはエディタ上の編集中バッファ）と一致しない可能性がある, when 作者がシーン実行を要求する, the Pasta システム shall 黙ってロード済みデータで解決せず、作者へリロードを促し、「SHIORIリロード」コマンド（Requirement 9）の使用へ誘導する。
+3. The Pasta システム shall kick 経路の内部で自動的に `\![reload,shiori]` を送出しない（リロードはデバッグセッションのデタッチを伴うため、独立した「SHIORIリロード」コマンド（Requirement 9）に一本化する）。
 4. Where エディタバッファに未保存の編集（dirty）が存在する, the VSCode Pasta 拡張 shall リロードはディスク内容を読むため未保存の変更が反映されない旨を作者へ示し、保存を促す。
-5. The Pasta システム shall `\![reload,shiori]` が非同期（リロード完了を待たない）であることを踏まえ、「リロード完了 → 位置→シーン解決 → キック」の順序保証の方式、および staleness の検知方式（保存状態・mtime・ハッシュ照合等）を設計フェーズで確定する。
+5. The Pasta システム shall staleness の検知方式（保存状態・mtime・ハッシュ照合等）を設計フェーズで確定する。
 6. If ロード済みソースマップで位置がどのシーンにも解決できない（後方フォールバック対象も存在しない）, then the Pasta システム shall シーン未検出として扱い（Requirement 2.6 に従う）、誤ったシーンの再生を行わない。
 
 ### Requirement 8: 既存キック制約の継承
@@ -105,3 +106,13 @@
 1. The Pasta システム shall 位置ベースキックの実行セマンティクス（co_scene 設置・preempt-and-abort・初回ビートのワンショット抑制突破・OnSecondChange シーン継続）を `pasta-scene-kick` から継承し、変更しない。
 2. The Pasta システム shall SHIORI/3.0 整合および OnSecondChange を 1 秒以内に保つ既存制約を維持する。
 3. The Pasta システム shall SHIORI GET 要求の処理ブロックを短く保つ既存制約を維持する。
+
+### Requirement 9: SHIORI リロードコマンド（手動・デタッチ自動復帰）
+**Objective:** ゴースト作者として、staleness を解消するために SHIORI を手動でリロードし、リロードで切れたデバッグ接続を自動で復帰してほしい。これにより、`.pasta` 編集後も再アタッチの手間なくシーン実行へ戻れる。
+
+#### Acceptance Criteria
+1. The VSCode Pasta 拡張 shall `.pasta` エディタの右クリックコンテキストメニューおよびデバッグツールバーの両方に「SHIORIリロード」コマンドを提供する。
+2. When 作者が「SHIORIリロード」を実行する, the Pasta システム shall SSP へ `\![reload,shiori]`（SHIORI のみ再読み込み・非同期）を送出して SHIORI の再読み込みを起動する。
+3. When `\![reload,shiori]` の送出によりデバッグセッションがデタッチされる, the VSCode Pasta 拡張 shall 一定時間待機した後、`vscode.debug.startDebugging` を用いて `type: 'pasta'` のアタッチ構成でデバッグセッションを自動的に再アタッチする。
+4. The VSCode Pasta 拡張 shall 再アタッチの基本動作を「リロード指示 → 数秒待機 → 自動再アタッチ」とし、待機時間・リトライ・タイムアウト方式、および再アタッチ完了後にシーンキックを自動再実行するか否かを設計フェーズで確定する。
+5. The VSCode Pasta 拡張 shall 「SHIORIリロード」コマンドの表示・有効化条件を設計フェーズで確定する（リロードは接続中のデバッグセッションに対する操作である点を考慮する）。
