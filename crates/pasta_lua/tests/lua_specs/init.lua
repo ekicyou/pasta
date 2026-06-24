@@ -58,6 +58,7 @@ local specs = {
     "kick_reload_shiori_test",            -- KICK.try_dispatch SHIORI リロード sentinel 分岐テスト (pasta-scene-kick-from-cursor 4.3)
     "virtual_dispatcher_kick_force_test", -- KickForceGate dispatch 入口割り込み許可ゲートテスト (pasta-scene-kick 4.3)
     "virtual_dispatcher_kick_hook_test", -- KickDispatchHook dispatch 前段キック起動＋preempt 結合テスト (pasta-scene-kick 4.4)
+    "kick_position_path_inheritance_test", -- 位置パス文字列(会話1 / :会話1:挨拶_1)の dispatch 越し kick セマンティクス継承テスト (pasta-scene-kick-from-cursor 6.2)
     -- 将来のテストスイートをここに追加
     -- "code_generator_test",
     -- "context_test",
