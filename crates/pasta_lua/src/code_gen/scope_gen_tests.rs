@@ -1,8 +1,10 @@
 use super::*;
+use crate::code_gen::source_map::SourceMapSink;
 use crate::config::LineEnding;
+use crate::context::TranspileContext;
 use pasta_dsl::parser::{
     Action, ActionLine, CallScene, CallTarget, ChoiceNode, CodeBlock, CueArgToken,
-    CueCommandNode, KeyWords, Span,
+    CueCommandNode, GlobalSceneScope, KeyWords, Span,
 };
 
 fn gen_to_string<F>(f: F) -> String
@@ -15,6 +17,21 @@ where
         f(&mut cg).unwrap();
     }
     String::from_utf8(output).unwrap()
+}
+
+/// Test sink capturing each `record_scene(join_key, span)` notification as
+/// `(join_key, span.start_line)`. Leaves `record_line` as the only required
+/// method; `record_scene` is overridden to observe scene recording (task 2.1).
+#[derive(Default)]
+struct CapturingSceneSink {
+    scenes: Vec<(String, u32)>,
+}
+
+impl SourceMapSink for CapturingSceneSink {
+    fn record_line(&mut self, _lua_line: u32, _pasta_line: u32) {}
+    fn record_scene(&mut self, scene_join_key: &str, span: Span) {
+        self.scenes.push((scene_join_key.to_string(), span.start_line as u32));
+    }
 }
 
 fn talk_line(actor: &str, text: &str) -> LocalSceneItem {
@@ -145,7 +162,7 @@ fn scene_actors() -> Vec<SceneActorItem> {
 #[test]
 fn start_scene_emits_clear_spot_then_set_spots_in_order() {
     let text =
-        gen_to_string(|cg| cg.generate_local_scene(&local_scene(None), 0, &scene_actors()));
+        gen_to_string(|cg| cg.generate_local_scene(&local_scene(None), 0, &scene_actors(), "会話#1"));
 
     assert!(
         text.contains("function SCENE.__start__(act, ...)"),
@@ -171,7 +188,7 @@ fn start_scene_emits_clear_spot_then_set_spots_in_order() {
 #[test]
 fn named_scene_uses_counter_suffix_and_skips_spot_init() {
     let text = gen_to_string(|cg| {
-        cg.generate_local_scene(&local_scene(Some("会話")), 2, &scene_actors())
+        cg.generate_local_scene(&local_scene(Some("会話")), 2, &scene_actors(), "会話#1")
     });
 
     assert!(
@@ -192,7 +209,7 @@ fn named_scene_uses_counter_suffix_and_skips_spot_init() {
 /// A start scene with NO actors emits no spot block at all.
 #[test]
 fn start_scene_without_actors_emits_no_spot_block() {
-    let text = gen_to_string(|cg| cg.generate_local_scene(&local_scene(None), 0, &[]));
+    let text = gen_to_string(|cg| cg.generate_local_scene(&local_scene(None), 0, &[], "会話#1"));
     assert!(
         !text.contains("clear_spot") && !text.contains("set_spot"),
         "no actors -> no spot init: {}",
@@ -292,4 +309,118 @@ fn non_select_cue_command_emits_nothing() {
         )])
     });
     assert!(text.is_empty(), "non-select cue must emit nothing: {:?}", text);
+}
+
+// ------------------------------------------------------------------
+// Scene recording for source-map join (task 2.1)
+//
+// `generate_global_scene` / `generate_local_scene` must funnel each scene's
+// deterministic join key + `.pasta` span to the sink via `record_scene`,
+// adjacent to the existing `record_span` header recording. The join_key encoding
+// (see scope_gen.rs `record_scene_span` doc) carries: global/local kind + nesting
+// level, the parent-global reference for locals, and per-base occurrence order
+// (globals' occurrence == runtime `create_scene` counter order). The captured
+// (join_key, start_line) pairs let task 2.2 reconstruct end_line/level and join
+// the runtime identity (e.g. `会話1`).
+// ------------------------------------------------------------------
+
+/// Build a named local scene with an explicit span (start_line carried into the
+/// join-key capture). `end_byte` is non-zero so the span is `is_valid()`.
+fn named_local_with_span(name: &str, start_line: usize) -> LocalSceneScope {
+    LocalSceneScope {
+        name: Some(name.to_string()),
+        attrs: vec![],
+        items: vec![],
+        code_blocks: vec![],
+        span: Span::new(start_line, 1, start_line + 1, 1, (start_line - 1) * 10, start_line * 10),
+    }
+}
+
+/// A global scene with a valid header span at `start_line` and the given locals.
+fn global_scene_with(name: &str, start_line: usize, locals: Vec<LocalSceneScope>) -> GlobalSceneScope {
+    let mut scene = GlobalSceneScope::new(name.to_string());
+    scene.span = Span::new(start_line, 1, start_line + 1, 1, (start_line - 1) * 10, start_line * 10);
+    scene.local_scenes = locals;
+    scene
+}
+
+/// `record_scene` is invoked for BOTH the global header and each local scene
+/// function, with deterministic join keys and the `.pasta` header `start_line`.
+///
+/// - Global key encodes kind (`G`), sanitized base, and per-base occurrence order
+///   (the `counter` argument == runtime `create_scene` order).
+/// - Local key encodes kind (`L`), the parent base + parent occurrence, and the
+///   code_gen-computed local fn name (`{sanitize}_{counter}`), so nesting level
+///   and parent reference are recoverable at finalize (task 2.2).
+#[test]
+fn global_and_local_scenes_record_join_keys_and_header_lines() {
+    let mut sink = CapturingSceneSink::default();
+    let ctx = TranspileContext::new();
+    let attrs = std::collections::HashMap::new();
+
+    // 会話 at .pasta line 3, containing a named local 挨拶 at line 5, plus the
+    // anonymous start scene (line == global header span line, counter 0).
+    let scene = global_scene_with(
+        "会話",
+        3,
+        vec![
+            LocalSceneScope {
+                name: None,
+                attrs: vec![],
+                items: vec![],
+                code_blocks: vec![],
+                span: Span::new(3, 1, 4, 1, 20, 30),
+            },
+            named_local_with_span("挨拶", 5),
+        ],
+    );
+
+    {
+        let mut output = Vec::new();
+        let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+        cg.set_source_map(&mut sink);
+        // counter == 1: first occurrence of base 会話 (matches runtime 会話1).
+        cg.generate_global_scene(&scene, 1, &ctx, &attrs).unwrap();
+    }
+
+    // Global header recorded first, then locals in source order.
+    assert_eq!(
+        sink.scenes,
+        vec![
+            ("G:会話#1".to_string(), 3),
+            ("L:会話#1:__start__".to_string(), 3),
+            ("L:会話#1:挨拶_1".to_string(), 5),
+        ],
+        "captured (join_key, start_line) entries: {:?}",
+        sink.scenes
+    );
+}
+
+/// Two global scenes sharing a base name get distinct per-base occurrence
+/// counters in their join keys, matching the runtime `create_scene` counter
+/// order (会話1, 会話2). This is the property task 2.2 relies on to join the
+/// runtime identity back to the recorded span.
+#[test]
+fn same_base_global_scenes_get_incrementing_occurrence_in_join_key() {
+    let mut sink = CapturingSceneSink::default();
+    let ctx = TranspileContext::new();
+    let attrs = std::collections::HashMap::new();
+
+    let first = global_scene_with("会話", 3, vec![]);
+    let second = global_scene_with("会話", 10, vec![]);
+
+    {
+        let mut output = Vec::new();
+        let mut cg = LuaCodeGenerator::with_line_ending(&mut output, LineEnding::Lf);
+        cg.set_source_map(&mut sink);
+        cg.generate_global_scene(&first, 1, &ctx, &attrs).unwrap();
+        cg.generate_global_scene(&second, 2, &ctx, &attrs).unwrap();
+    }
+
+    assert_eq!(
+        sink.scenes,
+        vec![("G:会話#1".to_string(), 3), ("G:会話#2".to_string(), 10)],
+        "per-base occurrence order must match runtime counter order: {:?}",
+        sink.scenes
+    );
 }

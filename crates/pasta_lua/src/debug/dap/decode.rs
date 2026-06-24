@@ -9,9 +9,29 @@ use crate::debug::types::SessionCommand;
 
 use super::DapAdapter;
 use super::codec::{
-    parse_scene_strict, parse_set_breakpoints, parse_source_mode_strict, source_mode_str,
+    parse_play_scene_at_strict, parse_set_breakpoints, parse_source_mode_strict, source_mode_str,
 };
 use super::pending::PendingKind;
+
+/// Reserved sentinel scene string delivered through the SINGLE existing
+/// [`KickSink`](crate::debug::kick::KickSink) to request a SHIORI reload
+/// (kick-from-cursor task 4.3 / requirement 9.2).
+///
+/// The `pasta/reloadShiori` wiring (`try_reload_shiori`) hands this exact string
+/// to the kick sink instead of a real scene; the Lua `KICK.try_dispatch` (in
+/// `kick.lua`) matches it EXACTLY (before the `:`-local-composite and global
+/// branches) and emits `\![reload,shiori]` via `act:raw_script` + `act:build`.
+///
+/// It is chosen to NEVER collide with a real scene identity: globals are
+/// `sanitize_name`d (alphanumeric + `_` only) and locals are composite strings
+/// starting with `:`. This sentinel contains `@` and `/` (which `sanitize_name`
+/// would replace) and does NOT start with `:`, so exact-match against it is safe.
+///
+/// CRITICAL: this byte string MUST stay in sync with the `RELOAD_SENTINEL`
+/// module-level constant in
+/// `crates/pasta_lua/pasta_scripts/pasta/shiori/event/kick.lua`. Changing one
+/// without the other breaks the reload delivery.
+pub const RELOAD_SENTINEL: &str = "@@pasta/reloadShiori@@";
 
 /// The outcome of decoding one inbound DAP request.
 ///
@@ -51,17 +71,25 @@ pub struct Decoded {
     ///
     /// [`attach_source_mode`]: Decoded::attach_source_mode
     pub requested_source_mode: Option<SourceMode>,
-    /// The scene name extracted from a `pasta/playScene` custom request
-    /// (pasta-scene-kick requirements 2.1 / 2.2 / 2.5), parsed STRICTLY: `Some`
-    /// ONLY for a non-empty (post-trim) string `scene` argument; a missing key,
-    /// a non-string value, an empty string, or a whitespace-only string all
-    /// yield `None`.
+    /// The position `(uri, line)` extracted from a `pasta/playSceneAt` custom
+    /// request (kick-from-cursor requirements 4.1 / 4.4), parsed STRICTLY: `Some`
+    /// ONLY when `args.uri` is a non-empty (post-trim) string AND `args.line` is a
+    /// valid (non-negative) number; a missing key, a non-string `uri`, an empty
+    /// `uri`, a missing `line`, or a non-number `line` all yield `None` (invalid —
+    /// the resolver must NOT be invoked, R4.4).
     ///
-    /// `None` means the request carried no usable scene name and the kick must
-    /// NOT be issued (R2.5). The decode itself produces no command/response — the
-    /// wiring (task 2.2) owns sink invocation and the ack — so a `pasta/playScene`
-    /// request never falls into generic routing (R2.3).
-    pub kick_scene: Option<String>,
+    /// `line` is the VSCode-origin 1-based line number (the scene index is also
+    /// 1-based). The decode itself produces no command/response — the wiring (task
+    /// 4.1) owns the position→scene resolver call and the ack/error response — so a
+    /// `pasta/playSceneAt` request never falls into generic routing.
+    pub play_scene_at: Option<(String, u32)>,
+    /// `true` ONLY for a `pasta/reloadShiori` custom request (kick-from-cursor
+    /// requirement 9.2). A bare command with no meaningful args; the decode itself
+    /// produces no command/response — the wiring (task 4.3, `try_reload_shiori`)
+    /// owns delivering the reserved [`RELOAD_SENTINEL`] via the existing
+    /// [`KickSink`](crate::debug::kick::KickSink) and the success ack — so a
+    /// `pasta/reloadShiori` request never falls into generic routing.
+    pub reload_shiori: bool,
 }
 
 impl DapAdapter {
@@ -233,20 +261,34 @@ impl DapAdapter {
                     ..Decoded::default()
                 }
             }
-            "pasta/playScene" => {
-                // The decode SIDE of the scene kick (pasta-scene-kick R2.1 / R2.2
-                // / R2.3 / R2.5). Extract `args.scene` STRICTLY into `kick_scene`:
-                // a non-empty (post-trim) string yields `Some(name)`; a missing
-                // key, a non-string, an empty string, or a whitespace-only string
-                // yields `None` (invalid — the kick must NOT be issued, R2.5).
+            "pasta/playSceneAt" => {
+                // The decode SIDE of the position-based scene kick (kick-from-
+                // cursor R4.1 / R4.4). Extract `args.uri` (non-empty string) and
+                // `args.line` (number, 1-based) STRICTLY into `play_scene_at`: any
+                // missing/wrong-type/empty field yields `None` (invalid — the
+                // resolver must NOT be invoked, R4.4).
                 //
-                // No immediate response/command is produced here (R2.3): the
-                // wiring (task 2.2) owns sink invocation and the ack/error
+                // No immediate response/command is produced here: the wiring (task
+                // 4.1) owns the position→scene resolver call and the ack/error
                 // response. Leaving every other field at default keeps the request
                 // out of generic routing.
-                let kick_scene = parse_scene_strict(args);
+                let play_scene_at = parse_play_scene_at_strict(args);
                 Decoded {
-                    kick_scene,
+                    play_scene_at,
+                    ..Decoded::default()
+                }
+            }
+            "pasta/reloadShiori" => {
+                // The decode SIDE of the SHIORI reload (kick-from-cursor R9.2). A
+                // bare command with no meaningful args: just flag `reload_shiori`.
+                // No immediate response/command is produced here — the wiring (task
+                // 4.3, `try_reload_shiori`) owns delivering the `RELOAD_SENTINEL`
+                // through the existing `KickSink` and sending the success ack.
+                // Leaving every other field at default keeps the request out of
+                // generic routing. The engine output `\![reload,shiori]` happens in
+                // Lua (`kick.lua` sentinel branch), NOT here.
+                Decoded {
+                    reload_shiori: true,
                     ..Decoded::default()
                 }
             }
@@ -308,33 +350,46 @@ impl DapAdapter {
         )
     }
 
-    /// Build the `pasta/playScene` acceptance RESPONSE [`Value`] (success ack),
-    /// correlated to `request_seq` (pasta-scene-kick requirement 2.3 / 2.5).
+    /// Build the `pasta/playSceneAt` acceptance RESPONSE [`Value`] (success ack),
+    /// correlated to `request_seq` (kick-from-cursor requirement 4.2).
     ///
-    /// The wiring (task 2.2) sends this AFTER it has handed the extracted scene
-    /// name to the [`KickSink`](crate::debug::kick::KickSink), confirming the kick
-    /// was accepted (the actual scene execution is asynchronous and not awaited).
-    pub(crate) fn play_scene_response(&mut self, request_seq: u64) -> Value {
-        self.response(request_seq, "pasta/playScene", Value::Null)
+    /// The wiring (task 4.1) sends this AFTER the position→scene resolver has
+    /// confirmed a scene and handed it to the [`KickSink`](crate::debug::kick::KickSink),
+    /// confirming the kick was accepted (the actual scene execution is asynchronous
+    /// and not awaited).
+    pub(crate) fn play_scene_at_response(&mut self, request_seq: u64) -> Value {
+        self.response(request_seq, "pasta/playSceneAt", Value::Null)
     }
 
-    /// Build the `pasta/playScene` ERROR RESPONSE [`Value`] (`success: false`)
-    /// for an empty / invalid scene name, correlated to `request_seq`
-    /// (pasta-scene-kick requirement 2.5: 空または不正なシーン名はキックせず
-    /// エラーを要求元へ返す).
+    /// Build the `pasta/playSceneAt` ERROR RESPONSE [`Value`] (`success: false`)
+    /// carrying a human-readable `reason`, correlated to `request_seq`
+    /// (kick-from-cursor requirement 4.3: シーンを確定できない／不正な要求は再生せず
+    /// 理由を含むエラー応答を要求元へ返す).
     ///
-    /// Unlike [`response`](Self::response) (which is a fixed `success: true`
-    /// envelope), this carries `success: false` and a human-readable `message`
-    /// so the VSCode extension can surface the failure to the author.
-    pub(crate) fn play_scene_error(&mut self, request_seq: u64) -> Value {
+    /// The `reason` is surfaced to the author by the VSCode extension (R6.4); it
+    /// covers both a not-found position ("カーソル下にシーンがありません") and a
+    /// strict-parse failure (invalid `{uri, line}`).
+    pub(crate) fn play_scene_at_error(&mut self, request_seq: u64, reason: &str) -> Value {
         let seq = self.next_seq();
         json!({
             "seq": seq,
             "type": "response",
             "request_seq": request_seq,
             "success": false,
-            "command": "pasta/playScene",
-            "message": "scene name is empty or invalid",
+            "command": "pasta/playSceneAt",
+            "message": reason,
         })
+    }
+
+    /// Build the `pasta/reloadShiori` acceptance RESPONSE [`Value`] (success ack),
+    /// correlated to `request_seq` (kick-from-cursor requirement 9.2).
+    ///
+    /// The wiring (task 4.3, `try_reload_shiori`) sends this AFTER handing the
+    /// reserved [`RELOAD_SENTINEL`] to the existing
+    /// [`KickSink`](crate::debug::kick::KickSink), confirming the reload was
+    /// accepted. The actual `\![reload,shiori]` sakura script is emitted later, in
+    /// Lua, when the sentinel kick is dispatched — it is NOT carried by this ack.
+    pub(crate) fn reload_shiori_response(&mut self, request_seq: u64) -> Value {
+        self.response(request_seq, "pasta/reloadShiori", Value::Null)
     }
 }

@@ -188,8 +188,45 @@ export class MockTextEditorDecorationType {
 /** All status bar items created via window.createStatusBarItem (in order). */
 export const createdStatusBarItems: MockStatusBarItem[] = [];
 
-/** All user-facing messages shown via showErrorMessage / showWarningMessage. */
-export const shownMessages: Array<{ kind: 'error' | 'warning'; message: string }> = [];
+/**
+ * All user-facing messages shown via showErrorMessage / showWarningMessage.
+ * `items` records the action button labels passed to the message (if any), so
+ * tests can assert e.g. a "デバッグ開始" action was offered.
+ */
+export const shownMessages: Array<{ kind: 'error' | 'warning'; message: string; items?: string[] }> = [];
+
+/**
+ * Programmable return value for the NEXT showWarningMessage call that passes
+ * action items (the label the "author clicked", or `undefined` to dismiss).
+ * Consumed once per call.
+ */
+export let nextWarningSelection: string | undefined = undefined;
+export function setNextWarningSelection(value: string | undefined): void {
+  nextWarningSelection = value;
+}
+
+/** All vscode.debug.startDebugging calls (folder + resolved config). */
+export const startDebuggingCalls: Array<{ folder: unknown; config: any }> = [];
+
+/**
+ * Programmable per-call results for vscode.debug.startDebugging, consumed in
+ * order (one per call). Lets the reload re-attach tests drive fail-then-succeed
+ * sequences deterministically. When the queue is empty, startDebugging resolves
+ * `true` (the default success). Set via {@link setNextStartDebuggingResults}.
+ */
+export let startDebuggingResults: boolean[] = [];
+export function setNextStartDebuggingResults(values: boolean[]): void {
+  startDebuggingResults = values.slice();
+}
+
+/**
+ * Programmable `launch.json` `configurations` array returned by
+ * workspace.getConfiguration('launch').get('configurations').
+ */
+export let launchConfigurations: unknown = undefined;
+export function setLaunchConfigurations(value: unknown): void {
+  launchConfigurations = value;
+}
 
 /**
  * Programmable response for the next window.showInputBox call. Tests set this
@@ -221,12 +258,18 @@ export const languages = {
 
 export const workspace = {
   textDocuments: [] as any[],
+  workspaceFolders: undefined as any,
   onDidOpenTextDocument: didOpenTextDocumentEmitter.event,
   onDidChangeTextDocument: didChangeTextDocumentEmitter.event,
   onDidCloseTextDocument: didCloseTextDocumentEmitter.event,
   fs: {
     readFile: async () => new Uint8Array(0),
   },
+  // Minimal getConfiguration: only `launch.configurations` is consulted by the
+  // runSceneAtCursor / reload start-debugging config resolution.
+  getConfiguration: (_section?: string) => ({
+    get: (_key: string) => launchConfigurations,
+  }),
 };
 
 export const window = {
@@ -236,12 +279,19 @@ export const window = {
     appendLine: (_msg: string) => {},
     dispose: () => {},
   }),
-  showErrorMessage: (message: string) => {
-    shownMessages.push({ kind: 'error', message });
+  showErrorMessage: (message: string, ...items: string[]) => {
+    shownMessages.push({ kind: 'error', message, items: items.length ? items : undefined });
     return Promise.resolve(undefined);
   },
-  showWarningMessage: (message: string) => {
-    shownMessages.push({ kind: 'warning', message });
+  showWarningMessage: (message: string, ...items: string[]) => {
+    shownMessages.push({ kind: 'warning', message, items: items.length ? items : undefined });
+    // When the message offered action items, return the programmed selection
+    // once (the label the "author clicked"); otherwise resolve undefined.
+    if (items.length > 0) {
+      const selection = nextWarningSelection;
+      nextWarningSelection = undefined;
+      return Promise.resolve(selection);
+    }
     return Promise.resolve(undefined);
   },
   showInputBox: (options?: Record<string, unknown>) => {
@@ -283,6 +333,11 @@ export const debug = {
   registerDebugConfigurationProvider: (_type: string, provider: any) => {
     registeredDebugConfigProviders.push(provider);
     return { dispose: () => {} };
+  },
+  startDebugging: (folder: unknown, config: any) => {
+    startDebuggingCalls.push({ folder, config });
+    const next = startDebuggingResults.length > 0 ? startDebuggingResults.shift()! : true;
+    return Promise.resolve(next);
   },
   onDidReceiveDebugSessionCustomEvent: debugCustomEventEmitter.event,
   onDidChangeActiveDebugSession: didChangeActiveDebugSessionEmitter.event,

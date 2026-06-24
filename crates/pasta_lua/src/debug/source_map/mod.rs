@@ -28,6 +28,7 @@
 //! 削除した行に紐づく記録は最終写像から除外する（requirements 2.1）。
 
 use std::collections::{BTreeMap, HashMap};
+use std::sync::OnceLock;
 // `Path`/`PathBuf` はサイドカー I/O を child `sidecar` へ分離後（task 7.5・C5）、本ハブ
 // 本番では未使用。外出しした `source_map_sidecar_tests` クラスタが `use super::*;` で
 // 参照するため、test-only で再導入する（本番 import を増やさない・public 不変）。
@@ -75,6 +76,13 @@ pub struct ChunkSourceMap {
     /// [`lua_lines_for_pasta`](Self::lua_lines_for_pasta) の返り値が `.lua` 行の昇順
     /// かつ決定的になる（requirements 8.3）。
     forward: BTreeMap<u32, PastaPos>,
+    /// シーン記録（`(join_key, .pasta 宣言行)`・**宣言順**）。task 2.2 の finalize join
+    /// が runtime 実 identity と突合して [`SceneIdentityIndex`] を確定するための素材。
+    ///
+    /// `MapBuilderSink::record_scene` が code_gen の宣言順に蓄積する（debug-gated・
+    /// sink 未接続の本番経路では空）。`.pasta` 宣言行は `normalize` の `LineShift` 対象
+    /// **外**（`.lua` 行ではない）であり `finish` でも rebase しない。
+    scene_records: Vec<(String, u32)>,
 }
 
 impl ChunkSourceMap {
@@ -90,7 +98,30 @@ impl ChunkSourceMap {
     /// [`MapBuilderSink::finish`] が担い、本コンストラクタは `finish` から `forward`
     /// を直接渡す内部用途とテストに供する。
     pub fn from_forward(forward: BTreeMap<u32, PastaPos>) -> Self {
-        Self { forward }
+        Self {
+            forward,
+            scene_records: Vec::new(),
+        }
+    }
+
+    /// `from_forward` にシーン記録（`(join_key, .pasta 宣言行)`・宣言順）を併せて構築する
+    /// （`MapBuilderSink::finish` が producer 側の蓄積を引き渡す内部用途）。
+    pub(super) fn from_forward_with_scenes(
+        forward: BTreeMap<u32, PastaPos>,
+        scene_records: Vec<(String, u32)>,
+    ) -> Self {
+        Self {
+            forward,
+            scene_records,
+        }
+    }
+
+    /// このチャンクが蓄積したシーン記録（`(join_key, .pasta 宣言行)`・宣言順）を借用する。
+    ///
+    /// task 2.2 の finalize join が runtime 実 identity と突合するために走査する。sink
+    /// 未接続の本番経路（debug 無効）では空。
+    pub(super) fn scene_records(&self) -> &[(String, u32)] {
+        &self.scene_records
     }
 
     /// 記録済みの対応件数（最終 `.lua` 行の数）。
@@ -176,6 +207,13 @@ pub struct MapBuilderSink {
     /// `BTreeMap` を用いるのは (1) 同一 pre-line の last-write-wins（キー一意性・8.1）
     /// と (2) `finish` の rebase 反復が pre-line 昇順で決定論的になるため。
     pre_norm: BTreeMap<u32, PastaPos>,
+    /// シーン記録（`(join_key, .pasta 宣言行)`・**宣言順**）。task 2.2 用の素材。
+    ///
+    /// [`record_scene`](SourceMapSink::record_scene) が code_gen の宣言順
+    /// （global ヘッダ → 各 local）に push する。`.pasta` 宣言行は `LineShift` 対象外
+    /// （`.lua` 行ではない）なので `finish` の rebase はかけず、宣言順のまま
+    /// [`ChunkSourceMap`] へ引き渡す。
+    scene_records: Vec<(String, u32)>,
 }
 
 impl MapBuilderSink {
@@ -185,6 +223,7 @@ impl MapBuilderSink {
             pasta_file,
             chunk_name,
             pre_norm: BTreeMap::new(),
+            scene_records: Vec::new(),
         }
     }
 
@@ -217,11 +256,26 @@ impl MapBuilderSink {
             }
             // 削除行（None）は最終 .lua に存在しないため除外（requirements 2.1）。
         }
-        ChunkSourceMap::from_forward(forward)
+        // シーン記録は `.pasta` 宣言行（`.lua` 行ではない）なので LineShift 対象外。
+        // 宣言順のまま引き渡し、finalize join（task 2.2）が突合する。
+        ChunkSourceMap::from_forward_with_scenes(forward, self.scene_records)
     }
 }
 
 impl SourceMapSink for MapBuilderSink {
+    /// シーン宣言の突合キー `scene_join_key` と `.pasta` 宣言行を **宣言順**に蓄積する
+    /// （task 2.2・requirements 3.1/3.3）。
+    ///
+    /// `span.start_line`（`.pasta` の `＊シーン`/`・シーン` 宣言ヘッダ行・1 始まり）を採り、
+    /// `(join_key, start_line)` を push する。code_gen は global ヘッダ → その local 群の
+    /// 順で呼ぶため、蓄積順 = 宣言順 = per-base 出現順（runtime `create_scene` 連番順）に
+    /// 一致し、finalize join がそのまま per-base 出現順で runtime identity と突合できる。
+    /// 行マッピング記録（`pre_norm`）には一切触れない（3.4 非破壊）。
+    fn record_scene(&mut self, scene_join_key: &str, span: pasta_dsl::parser::Span) {
+        self.scene_records
+            .push((scene_join_key.to_string(), span.start_line as u32));
+    }
+
     /// pre-normalize の `lua_line` → `.pasta` 位置を `pre_norm` へ挿入する（core 操作・
     /// design 414-416）。同一 `lua_line` への再記録は last-write-wins で上書き（8.1）。
     ///
@@ -321,7 +375,7 @@ fn canonicalize_pasta_file(raw: &str) -> String {
 /// チャンク名昇順 → `.lua` 行昇順で安定ソートして保持する。これにより
 /// [`resolve_pasta_to_lua`](Self::resolve_pasta_to_lua) の提示順序は決定的になる
 /// （複数チャンク・1`.pasta`→複数`.lua` のいずれでも・8.3/4.1）。
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default)]
 pub struct SourceMap {
     /// 正規化チャンク名 → 1 チャンクの前方写像。
     ///
@@ -334,6 +388,40 @@ pub struct SourceMap {
     /// [`nearest_pasta_line_with_mapping`](Self::nearest_pasta_line_with_mapping) の
     /// `range` クエリのため）。値 `Vec` はチャンク名昇順 →`.lua` 行昇順で安定（8.3）。
     reverse: HashMap<String, BTreeMap<u32, Vec<(ChunkName, u32)>>>,
+    /// シーン記録の集約: **正規化 `.pasta` ファイル** → `(join_key, .pasta 宣言行)` の
+    /// 宣言順リスト（task 2.2 finalize join の素材）。
+    ///
+    /// [`insert_chunk`](Self::insert_chunk) が各チャンクの
+    /// [`ChunkSourceMap::scene_records`] を、元の `.pasta` ファイルキーで集約する。sink
+    /// 未接続の本番経路（debug 無効）では `build_source_map` 自体が呼ばれず、ここは空。
+    scene_records: HashMap<String, Vec<(String, u32)>>,
+    /// 確定済みシーン同一性索引（[`SceneIdentityIndex`]）の **write-once スロット**。
+    ///
+    /// `Arc<SourceMap>` は consumer へ不変共有されるため、finalize join（task 2.2）が
+    /// runtime 実 identity を突合して索引を確定する時点で `&SourceMap`（共有参照）しか
+    /// 持てない。`OnceLock` の内部可変性で **ちょうど一度** 書き込み、resolver（task
+    /// 3.1）が読み取る。`build_source_map` 時点では空で、finalize-join 完了時に充填する。
+    /// SourceMap を広く可変にはしない（join 以外の経路からは書けない）。
+    scene_index: OnceLock<SceneIdentityIndex>,
+}
+
+// `OnceLock<SceneIdentityIndex>` は `Clone` を導出できない（`OnceLock` は `Clone` 非
+// 実装）。`SourceMap` の `Clone` は本番経路では使われないが、テスト/防御用に手実装し、
+// 充填済みの索引も複製する（read-only スナップショット）。
+impl Clone for SourceMap {
+    fn clone(&self) -> Self {
+        let scene_index = OnceLock::new();
+        if let Some(idx) = self.scene_index.get() {
+            // get() 済みなので set は必ず成功する（新規 OnceLock）。
+            let _ = scene_index.set(idx.clone());
+        }
+        Self {
+            chunks: self.chunks.clone(),
+            reverse: self.reverse.clone(),
+            scene_records: self.scene_records.clone(),
+            scene_index,
+        }
+    }
 }
 
 impl SourceMap {
@@ -377,6 +465,9 @@ impl SourceMap {
             });
         }
 
+        // シーン記録の集約キー（reverse へ move する前にクローンを確保）。
+        let scene_file_key = file_key.clone();
+
         // 逆引き索引を、このチャンクの前方写像（`.lua` 行昇順の `BTreeMap`）から構築。
         let per_file = self.reverse.entry(file_key).or_default();
         // `forward` の反復は `.lua` 行昇順（BTreeMap）。各 `.pasta` 行へ
@@ -392,7 +483,51 @@ impl SourceMap {
             entries.sort();
         }
 
+        // シーン記録を `.pasta` ファイルキーで集約（task 2.2 finalize join の素材）。
+        // 1 `.pasta` = 1 チャンク（loader 経路）なので宣言順をそのまま保つ。再投入時は
+        // forward の上書きと整合させ旧記録を置換する。
+        if !map.scene_records().is_empty() {
+            self.scene_records
+                .insert(scene_file_key, map.scene_records().to_vec());
+        }
+
         self.chunks.insert(chunk_key, map);
+    }
+
+    /// 集約済みシーン記録を **正規化 `.pasta` ファイルキー → `(join_key, .pasta 宣言行)`
+    /// の宣言順リスト** として借用する（finalize join・task 2.2 用）。
+    pub(crate) fn scene_records(&self) -> &HashMap<String, Vec<(String, u32)>> {
+        &self.scene_records
+    }
+
+    /// 確定済みシーン同一性索引を借用する（resolver・task 3.1 用）。finalize join が
+    /// まだ走っていない／何も突合できなかった場合は `None`。
+    // NOTE: 参照側（PositionResolver）への結線は task 3.1。それまで未使用のため
+    // dead_code を明示許可する（結線後に消費され警告は自然消滅する）。
+    #[allow(dead_code)]
+    pub(crate) fn scene_index(&self) -> Option<&SceneIdentityIndex> {
+        self.scene_index.get()
+    }
+
+    /// 位置 (`pasta_file`, `line`) を、充填済みシーン同一性索引で解決する
+    /// （[`SceneIdentityIndex::scene_at`] への薄いラッパ・task 2.2/3.1）。
+    ///
+    /// finalize join 後にのみ `Some` を返し得る（join 前・debug 無効・突合無しでは
+    /// `None`）。resolver（task 3.1）と統合テストが (scene_id, parent) を読む口。
+    pub fn scene_at(&self, pasta_file: &str, line: u32) -> Option<SceneIdentity> {
+        self.scene_index.get()?.scene_at(pasta_file, line)
+    }
+
+    /// finalize join が確定した [`SceneIdentityIndex`] を **write-once** で充填する
+    /// （task 2.2）。既に充填済みなら `Err(index)` を返し二重書き込みを拒否する。
+    ///
+    /// `Arc<SourceMap>` の共有参照（`&self`）から内部可変に書き込めるのは `OnceLock` の
+    /// 内部可変性による。join 完了時にちょうど一度だけ呼ばれる。
+    pub(crate) fn set_scene_index(
+        &self,
+        index: SceneIdentityIndex,
+    ) -> Result<(), SceneIdentityIndex> {
+        self.scene_index.set(index)
     }
 
     /// 最終 `.lua` 行 → 由来 `.pasta` 位置を解決する（requirements 5.1, 3.3）。
@@ -461,6 +596,30 @@ pub(super) fn map_forward_iter(map: &ChunkSourceMap) -> impl Iterator<Item = (u3
 // ===========================================================================
 mod sidecar;
 pub use sidecar::{SIDECAR_VERSION, SidecarFile, read_sidecar, sidecar_path_for_lua, write_sidecar};
+
+// ===========================================================================
+// シーン同一性索引（task 1.1・requirements 2.1/2.2/2.5/2.6/3.2）。
+// `.pasta` (ファイル, 行範囲) → シーン識別子の逆引き索引。行マッピング API
+// （`resolve_*`）には触れず、新規型として追加する（3.4 非破壊）。
+// ===========================================================================
+mod scene_index;
+// NOTE: 本索引は foundation データ構造であり、構築側（loader の build_source_map・
+// finalize join）と参照側（PositionResolver）への結線は task 2.2 / 3.1 で行う。
+// 結線完了までは未使用のため dead_code を明示許可する（結線後に解除される）。
+// `SceneIdentity`（解決結果 `(scene_id, parent)`）は resolver・統合テストが
+// `SourceMap::scene_at` の返り値として読むため公開する。索引型/ビルダは内部用途。
+pub use scene_index::SceneIdentity;
+#[allow(unused_imports)]
+pub(crate) use scene_index::{SceneIdentityIndex, SceneIdentityIndexBuilder};
+
+// ===========================================================================
+// finalize シーン突合（task 2.2・requirements 3.1/3.2/3.3/7.1）。
+// 蓄積記録（scene_records）と runtime 実 identity（collect_scenes）を突合し、
+// `SourceMap` の write-once `scene_index` スロットへ充填する索引を構築する。
+// ===========================================================================
+mod scene_join;
+#[allow(unused_imports)]
+pub(crate) use scene_join::build_scene_index;
 
 // ===========================================================================
 // インラインテストの外出し（task 2.3・C1）。論理クラスタ別の FLAT 兄弟テスト

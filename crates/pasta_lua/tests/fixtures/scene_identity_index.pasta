@@ -1,0 +1,15 @@
+＃ task 2.2 統合フィクスチャ（pasta-scene-kick-from-cursor）。
+＃ finalize join（runtime 実 identity × 蓄積記録）で確定する
+＃ SceneIdentityIndex を観測するための最小辞書。
+＃ 構成:
+＃  - global「会話」#1（行 5）: 本体トーク（__start__）＋ 名前付き local「挨拶」（行 8）
+＃  - global「会話」#2（行 11）: 同 base 二度目（runtime 会話2）
+＊会話
+　さくら：「おはよう」
+　＞挨拶
+
+　・挨拶
+　　さくら：「やあ」
+
+＊会話
+　さくら：「また会話だよ」

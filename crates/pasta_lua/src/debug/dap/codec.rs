@@ -35,22 +35,29 @@ pub(super) fn parse_source_mode_strict(raw: &str) -> Option<SourceMode> {
     }
 }
 
-/// Strictly extract the `scene` name from a `pasta/playScene` custom request's
-/// `arguments` (pasta-scene-kick R2.2 / R2.5, design component PlaySceneDecode).
+/// Strictly extract the position `(uri, line)` from a `pasta/playSceneAt` custom
+/// request's `arguments` (kick-from-cursor R4.1 / R4.4, design "PlaySceneAt
+/// transport").
 ///
-/// Returns `Some(name)` ONLY when `args.scene` is a string that is non-empty
-/// after trimming surrounding whitespace; a missing key, a non-string value, an
-/// empty string, or a whitespace-only string all yield `None` (invalid). The
-/// returned name is trimmed so an empty/blank scene cannot reach the kick path
-/// and fall back into generic routing (R2.5).
-pub(super) fn parse_scene_strict(args: Option<&Value>) -> Option<String> {
-    let raw = args.and_then(|a| a.get("scene")).and_then(Value::as_str)?;
-    let trimmed = raw.trim();
-    if trimmed.is_empty() {
-        None
-    } else {
-        Some(trimmed.to_string())
+/// Returns `Some((uri, line))` ONLY when `args.uri` is a string that is non-empty
+/// after trimming surrounding whitespace AND `args.line` is a number that fits a
+/// non-negative `u32`. A missing key, a non-string / empty / whitespace-only
+/// `uri`, a missing key, or a non-number / negative / out-of-range `line` all
+/// yield `None` (invalid — the resolver must NOT be invoked, R4.4). The returned
+/// `uri` is NOT trimmed (only its emptiness is gated): downstream
+/// `uri_to_pasta_path` performs its own scheme/percent-decode normalization.
+pub(super) fn parse_play_scene_at_strict(args: Option<&Value>) -> Option<(String, u32)> {
+    let args = args?;
+    let uri = args.get("uri").and_then(Value::as_str)?;
+    if uri.trim().is_empty() {
+        return None;
     }
+    // `line` must be a non-negative integer within `u32`. `as_u64` rejects
+    // non-number JSON, negatives, and fractional values; the `u32` bound rejects
+    // implausibly large client values.
+    let line = args.get("line").and_then(Value::as_u64)?;
+    let line = u32::try_from(line).ok()?;
+    Some((uri.to_string(), line))
 }
 
 /// Map a [`SourceMode`] to its `pasta/sourcePresentation` wire token

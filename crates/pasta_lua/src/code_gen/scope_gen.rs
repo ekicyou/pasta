@@ -112,7 +112,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     pub fn generate_global_scene(
         &mut self,
         scene: &GlobalSceneScope,
-        _scene_counter: usize,
+        scene_counter: usize,
         _context: &TranspileContext,
         _file_attrs: &HashMap<String, AttrValue>,
     ) -> Result<(), TranspileError> {
@@ -138,6 +138,30 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         if self.out_line() > out_line_before {
             self.record_span(scene.span);
         }
+
+        // Source-map scene recording (task 2.1, Requirements 3.1/3.3): flow the
+        // global scene's deterministic join key + `.pasta` header span to the sink
+        // so the finalize side (task 2.2) can reconstruct the scene index and join
+        // the runtime identity (e.g. `会話1`).
+        //
+        // JOIN-KEY ENCODING (consumed verbatim by task 2.2; keep in sync):
+        //   global: "G:{base}#{counter}"
+        //   local:  "L:{parent_base}#{parent_counter}:{fn_name}"
+        // where
+        //   - `base` / `parent_base` = `SceneRegistry::sanitize_name(name)` (NOT
+        //     re-sanitized here — reuse the registry rule to avoid format drift,
+        //     Requirement 3.3 / design.md:329,350).
+        //   - `counter` / `parent_counter` = the per-base occurrence order
+        //     (`scene_counter`), which equals the runtime `create_scene` per-base
+        //     counter order. This is the key that lets task 2.2 match `会話N`.
+        //   - `fn_name` = the code_gen-computed local fn name (`{sanitize}_{counter}`
+        //     for named locals, `__start__` for the anonymous start scene), reusing
+        //     the SAME per-name counter computed below (do not recompute differently).
+        // The `G`/`L` prefix encodes the kind + nesting level (global=0, local=1),
+        // and the embedded parent `{base}#{counter}` gives locals their parent ref.
+        let global_join_key = format!("G:{}#{}", base_name, scene_counter);
+        self.record_scene_span(&global_join_key, scene.span);
+
         self.write_blank_line()?;
 
         // Generate scene-level word definitions (Requirement 2.2, Task 4.3)
@@ -160,7 +184,10 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
             } else {
                 0 // start scene doesn't use counter
             };
-            self.generate_local_scene(local_scene, counter, &scene.actors)?;
+            // Parent reference for the local join key: "{base}#{counter}" identifies
+            // the enclosing global occurrence (matches runtime per-base ordering).
+            let parent_ref = format!("{}#{}", base_name, scene_counter);
+            self.generate_local_scene(local_scene, counter, &scene.actors, &parent_ref)?;
         }
 
         // Generate code blocks at module level (after all local scene functions)
@@ -197,11 +224,17 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
     ///
     /// Note: Code blocks associated with local scenes are NOT generated here.
     /// They are generated at the global scene level by generate_global_scene.
+    ///
+    /// `parent_ref` is the enclosing global scene's join-key fragment
+    /// (`"{base}#{counter}"`); it is combined with this local's `fn_name` to form the
+    /// local scene join key recorded to the source-map sink (see
+    /// `generate_global_scene`'s JOIN-KEY ENCODING doc).
     pub fn generate_local_scene(
         &mut self,
         scene: &LocalSceneScope,
         counter: usize,
         actors: &[SceneActorItem],
+        parent_ref: &str,
     ) -> Result<(), TranspileError> {
         let fn_name = if let Some(ref name) = scene.name {
             let sanitized = SceneRegistry::sanitize_name(name);
@@ -221,6 +254,16 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
         if self.out_line() > out_line_before {
             self.record_span(scene.span);
         }
+
+        // Source-map scene recording (task 2.1): flow the local scene's deterministic
+        // join key + `.pasta` header span to the sink. The key reuses the SAME
+        // code_gen-computed `fn_name` (counter already applied) and the parent
+        // reference, so task 2.2 can recover nesting level (the `L` prefix) and the
+        // owning global occurrence without re-sanitizing or recomputing counters
+        // (Requirement 3.3 形式ドリフト回避).
+        let local_join_key = format!("L:{}:{}", parent_ref, fn_name);
+        self.record_scene_span(&local_join_key, scene.span);
+
         self.indent();
 
         // Session initialization: args and init_scene come first

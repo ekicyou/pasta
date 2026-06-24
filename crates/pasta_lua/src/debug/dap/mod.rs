@@ -98,6 +98,11 @@ mod resolver;
 // unused-import lint without widening or narrowing the public surface.
 #[allow(unused_imports)]
 pub use decode::Decoded;
+// `RELOAD_SENTINEL` is the reserved kick scene string for SHIORI reload (task
+// 4.3); the wiring (`try_reload_shiori`) and the reload wiring tests reference it
+// via `crate::debug::dap::RELOAD_SENTINEL`.
+#[allow(unused_imports)]
+pub use decode::RELOAD_SENTINEL;
 pub use resolver::{
     ResolvedSource, SourceResolver, default_source_resolver, pasta_source_resolver,
 };

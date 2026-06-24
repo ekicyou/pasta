@@ -13,8 +13,12 @@ use std::sync::mpsc::Sender;
 use serde_json::Value;
 
 use crate::debug::breakpoints::BreakpointSet;
-use crate::debug::dap::Decoded;
+use crate::debug::dap::{Decoded, RELOAD_SENTINEL};
+// `KickRequest` is CONSTRUCTED here by `try_reload_shiori` (task 4.3) to deliver
+// the reserved reload sentinel through the existing `KickSink`. (Task 4.2 had
+// removed this import; `try_reload_shiori` re-introduces the need for it.)
 use crate::debug::kick::{KickRequest, KickSink};
+use crate::debug::playscene::{ResolveOutcome, resolve_and_kick};
 use crate::debug::transport::Transport;
 use crate::debug::types::{SessionCommand, SessionEvent};
 
@@ -33,11 +37,15 @@ use super::{SharedAdapter, SourceMapWiring};
 /// - **A** [`try_source_presentation_toggle`]: the self-contained
 ///   `pasta/sourcePresentation` runtime toggle (`apply → ack → event →
 ///   RefreshPresentation`); when it handles the request it returns directly.
-/// - **A'** [`try_play_scene_kick`]: the self-contained `pasta/playScene`
-///   scene-kick (decode → invoke the injected [`KickSink`] → success ack, or an
-///   error response for an empty/invalid name — pasta-scene-kick R2.3/R2.5).
-///   Same shape as A (it returns directly when it handles the request) and NOT
-///   forwarded to generic routing. Inert when no sink is injected (R2.6).
+/// - **A'** [`try_play_scene_at`]: the self-contained position-based
+///   `pasta/playSceneAt` scene-kick (resolve `(uri, line)` → invoke the injected
+///   [`KickSink`] via `resolve_and_kick` → success ack, or an error response for
+///   a missing map / not-found position / invalid request —
+///   kick-from-cursor R4.2/R4.3/R4.4). Same shape as A (it returns directly when
+///   it handles the request) and NOT forwarded to generic routing. Inert when no
+///   sink is injected (R2.6). The OLD name-based `pasta/playScene` external
+///   transport was removed in task 4.2 (requirement 5.4): the only external
+///   scene-execution entry is now `pasta/playSceneAt`.
 /// - **B** [`apply_attach_source_mode`]: APPLY an explicit `attach`
 ///   `sourcePresentation` to the shared effective mode BEFORE replying.
 /// - **C** [`send_immediate_response_and_events`]: the immediate RESPONSE
@@ -63,8 +71,8 @@ pub(super) fn handle_inbound(
     source_map: &SourceMapWiring,
     // The (optional) host-injected scene-kick sink (pasta-scene-kick R2.4 / R2.6).
     // `Some` only when the outer host bound a `KickSink` AND debug is enabled; the
-    // `pasta/playScene` handler (step A') invokes it. `None` keeps the kick path
-    // inert (R2.6) — recognised but never activated.
+    // `pasta/playSceneAt` handler (step A') reuses it via `resolve_and_kick`. `None`
+    // keeps the kick path inert (R2.6) — recognised but never activated.
     kick_sink: Option<&KickSink>,
 ) -> bool {
     // The RAW request command string. Needed to disambiguate the runtime toggle
@@ -98,13 +106,32 @@ pub(super) fn handle_inbound(
         return done;
     }
 
-    // Step A' (tasks 2.2 / 2.3 / pasta-scene-kick R2.3/R2.5/R2.6): the
-    // self-contained `pasta/playScene` scene-kick. Detected by the raw command
-    // string (a `pasta/playScene` request never produces a generic command /
-    // response in `decode_request`, so it must be handled here or be dropped). It
-    // is a complete exchange (sink invocation + immediate ack/error) and returns
-    // directly, never falling into the response/command routing below.
-    if let Some(done) = try_play_scene_kick(transport, adapter, req, command, &decoded, kick_sink) {
+    // Step A' (task 4.1 / kick-from-cursor R4.1-R4.4, R2.6): the self-contained
+    // position-based `pasta/playSceneAt` scene-kick. The OLD name-based
+    // `pasta/playScene` external transport was removed in task 4.2 (requirement
+    // 5.4) — `pasta/playSceneAt` is now the ONLY external scene-execution entry,
+    // and a name-based `pasta/playScene` request is no longer recognised here (it
+    // decodes to an empty `Decoded` and is dropped by generic routing). Same shape
+    // as A (detected by the raw command string, returns directly when it handles
+    // the request, never falling into generic routing). It resolves the decoded
+    // `(uri, line)` via the
+    // task-3.1 resolver against the loaded `SourceMap` and reuses the injected
+    // `KickSink`; inert when no sink is injected (R2.6). No `\![reload,shiori]` is
+    // emitted here (that is task 4.3).
+    if let Some(done) =
+        try_play_scene_at(transport, adapter, req, command, &decoded, source_map, kick_sink)
+    {
+        return done;
+    }
+
+    // Step A'' (task 4.3 / kick-from-cursor R9.2, R2.6): the self-contained SHIORI
+    // reload request. Same shape as A' (detected by the raw command string, returns
+    // directly when it handles the request, never falling into generic routing). It
+    // delivers the reserved `RELOAD_SENTINEL` through the SAME injected `KickSink`
+    // (no new sink — design "Delivery mechanism"); the Lua `kick.lua` sentinel
+    // branch then emits `\![reload,shiori]` into the sakura script output. Inert
+    // when no sink is injected (R2.6).
+    if let Some(done) = try_reload_shiori(transport, adapter, req, command, kick_sink) {
         return done;
     }
 
@@ -275,38 +302,45 @@ fn try_source_presentation_toggle(
     None
 }
 
-/// Step A' (tasks 2.2 / 2.3 / design "KickInboundHandler"・"KickSinkSeam",
-/// pasta-scene-kick R2.3 / R2.4 / R2.5 / R2.6): the self-contained
-/// `pasta/playScene` scene-kick exchange, in the SAME shape as
-/// [`try_source_presentation_toggle`] (step A). Returns `Some(bool)` when it
-/// handles the request (`Some(true)` on a normal handled exchange, `Some(false)`
-/// only on a peer-gone / poisoned send so the bridge stops), and `None` when
-/// `command != "pasta/playScene"` so `handle_inbound` falls through.
+/// Step A' (task 4.1 / design "PlaySceneAt transport", kick-from-cursor R4.1 /
+/// R4.2 / R4.3 / R4.4 / R2.6): the self-contained position-based
+/// `pasta/playSceneAt` scene-kick exchange, in the SAME shape as
+/// [`try_source_presentation_toggle`] (step A). Returns `Some(bool)` when it handles the
+/// request (`Some(true)` on a normal handled exchange, `Some(false)` only on a
+/// peer-gone / poisoned send so the bridge stops), and `None` when
+/// `command != "pasta/playSceneAt"` so `handle_inbound` falls through.
 ///
-/// Behavior (mirrors the decode contract: `decoded.kick_scene` is `Some(name)`
-/// for a valid non-empty name, `None` otherwise):
-/// - `kick_scene == Some(name)` AND a `kick_sink` is wired → invoke the sink with
-///   `KickRequest { scene: name }` (R2.4) and send a success ack (R2.3).
-/// - `kick_scene == None` (empty / invalid name) → DO NOT kick; send an error
-///   response (`success: false`, R2.5).
-/// - `kick_sink == None` (debug-disabled / not injected) → the kick path is
-///   INERT (R2.6): the request is recognised (handled here, not routed) but no
-///   sink call and no response are produced.
-fn try_play_scene_kick(
+/// Behavior:
+/// - No `kick_sink` (debug-disabled / not injected) → INERT (R2.6): the request is
+///   recognised (handled here, not routed) but no resolver call and no response.
+/// - No loaded `SourceMap` (`source_map.source_map == None`) → cannot resolve →
+///   error response with a reason (R4.3); the sink is NOT invoked.
+/// - `decoded.play_scene_at == Some((uri, line))` → call the task-3.1 resolver
+///   [`resolve_and_kick`] (it normalizes the uri, queries `scene_at`, builds the
+///   composite scene string, AND invokes the sink on success):
+///   - [`ResolveOutcome::Resolved`] → success response (R4.2). The sink was
+///     already invoked by `resolve_and_kick`, so we DO NOT double-kick.
+///   - [`ResolveOutcome::NotFound`] → error response with a reason (R4.3 / R2.6).
+/// - `decoded.play_scene_at == None` (strict parse failure) → error response
+///   (R4.4); the resolver is NOT called and the sink is NOT invoked.
+///
+/// No `\![reload,shiori]` is emitted anywhere here (R7.3 — that is task 4.3).
+fn try_play_scene_at(
     transport: &Transport,
     adapter: &SharedAdapter,
     req: &Value,
     command: &str,
     decoded: &Decoded,
+    source_map: &SourceMapWiring,
     kick_sink: Option<&KickSink>,
 ) -> Option<bool> {
-    if command != "pasta/playScene" {
+    if command != "pasta/playSceneAt" {
         return None;
     }
 
     // R2.6: with no sink injected the kick path is non-activated. The request is
     // still recognised here (so it does not leak into generic routing), but no
-    // sink call and no response frame are produced.
+    // resolver call and no response frame are produced.
     let sink = kick_sink?;
 
     let request_seq = req.get("seq").and_then(Value::as_u64).unwrap_or(0);
@@ -316,19 +350,83 @@ fn try_play_scene_kick(
             Ok(g) => g,
             Err(_) => return Some(false), // poisoned → stop (never panic in the bridge)
         };
-        match &decoded.kick_scene {
-            // Valid scene name: hand it to the sink (R2.4), then ack success
-            // (R2.3). The sink is a fire-and-forget `try_send`-style closure; the
-            // actual scene execution is asynchronous and not awaited here.
-            Some(scene) => {
-                sink(KickRequest {
-                    scene: scene.clone(),
-                });
-                dap.play_scene_response(request_seq)
+        match (source_map.source_map.as_ref(), &decoded.play_scene_at) {
+            // A loaded map AND a valid `(uri, line)`: hand it to the task-3.1
+            // resolver, which normalizes the uri, queries `scene_at`, builds the
+            // composite scene string, and (on success) invokes the sink itself.
+            (Some(map), Some((uri, line))) => match resolve_and_kick(map, sink, uri, *line) {
+                // Confirmed: the sink was ALREADY called by `resolve_and_kick`
+                // (do NOT double-kick) — just ack success (R4.2).
+                ResolveOutcome::Resolved(_) => dap.play_scene_at_response(request_seq),
+                // Not found: the sink was NOT called; return a reason error (R4.3).
+                ResolveOutcome::NotFound => {
+                    dap.play_scene_at_error(request_seq, "カーソル下にシーンがありません")
+                }
+            },
+            // No loaded map: cannot resolve the position (R4.3 reason error).
+            (None, _) => dap.play_scene_at_error(
+                request_seq,
+                "ソースマップが未ロードのため位置からシーンを確定できません",
+            ),
+            // Strict parse failure (invalid `{uri, line}`): do NOT resolve / kick;
+            // return an error response (R4.4).
+            (Some(_), None) => {
+                dap.play_scene_at_error(request_seq, "位置 (uri, line) が不正です")
             }
-            // Empty / invalid name: do NOT kick; return an error response (R2.5).
-            None => dap.play_scene_error(request_seq),
         }
+    };
+    if transport.send(response).is_err() {
+        return Some(false);
+    }
+    Some(true)
+}
+
+/// Step A'' (task 4.3 / design "ReloadShiori", kick-from-cursor R9.2 / R2.6): the
+/// self-contained `pasta/reloadShiori` request, in the SAME shape as
+/// [`try_play_scene_at`] (step A'). Returns `Some(bool)` when it handles the
+/// request (`Some(true)` on a normal handled exchange, `Some(false)` only on a
+/// peer-gone send so the bridge stops), and `None` when
+/// `command != "pasta/reloadShiori"` so `handle_inbound` falls through.
+///
+/// Behavior:
+/// - No `kick_sink` (debug-disabled / not injected) → INERT (R2.6): the request is
+///   recognised (handled here, not routed) but no sink call and no response. A bare
+///   reload that cannot be delivered when no sink is wired is inert per R2.6.
+/// - Otherwise: deliver the reserved [`RELOAD_SENTINEL`] through the EXISTING
+///   `KickSink` (no new sink — design "Delivery mechanism") and send a success ack
+///   (R9.2). The Lua `kick.lua` sentinel branch turns this into the
+///   `\![reload,shiori]` sakura script on the next dispatch; the ack itself does
+///   NOT carry the reload script (the engine output happens in Lua).
+fn try_reload_shiori(
+    transport: &Transport,
+    adapter: &SharedAdapter,
+    req: &Value,
+    command: &str,
+    kick_sink: Option<&KickSink>,
+) -> Option<bool> {
+    if command != "pasta/reloadShiori" {
+        return None;
+    }
+
+    // R2.6: with no sink injected the reload path is non-activated. The request is
+    // still recognised here (so it does not leak into generic routing), but no kick
+    // and no response frame are produced.
+    let sink = kick_sink?;
+
+    let request_seq = req.get("seq").and_then(Value::as_u64).unwrap_or(0);
+
+    // Deliver the reserved sentinel via the single existing KickSink. The Lua side
+    // (`kick.lua`) exact-matches `RELOAD_SENTINEL` and emits `\![reload,shiori]`.
+    sink(KickRequest {
+        scene: RELOAD_SENTINEL.to_string(),
+    });
+
+    let response = {
+        let mut dap = match adapter.lock() {
+            Ok(g) => g,
+            Err(_) => return Some(false), // poisoned → stop (never panic in the bridge)
+        };
+        dap.reload_shiori_response(request_seq)
     };
     if transport.send(response).is_err() {
         return Some(false);

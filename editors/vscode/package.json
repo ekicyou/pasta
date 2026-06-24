@@ -40,9 +40,14 @@
                 "icon": "$(eye)"
             },
             {
-                "command": "pasta.debug.playScene",
-                "title": "Pasta: シーンをキック (即時再生)",
+                "command": "pasta.runSceneAtCursor",
+                "title": "▶ シーンを実行",
                 "icon": "$(play)"
+            },
+            {
+                "command": "pasta.reloadShiori",
+                "title": "SHIORIリロード",
+                "icon": "$(refresh)"
             }
         ],
         "menus": {
@@ -50,10 +55,18 @@
                 {
                     "command": "pasta.debug.toggleSourcePresentation",
                     "when": "debugType == 'pasta'"
+                }
+            ],
+            "editor/context": [
+                {
+                    "command": "pasta.runSceneAtCursor",
+                    "group": "navigation@1",
+                    "when": "resourceLangId == pasta"
                 },
                 {
-                    "command": "pasta.debug.playScene",
-                    "when": "debugType == 'pasta'"
+                    "command": "pasta.reloadShiori",
+                    "group": "navigation@2",
+                    "when": "resourceLangId == pasta && debugType == 'pasta'"
                 }
             ],
             "debug/toolBar": [
@@ -62,7 +75,7 @@
                     "when": "debugType == 'pasta'"
                 },
                 {
-                    "command": "pasta.debug.playScene",
+                    "command": "pasta.reloadShiori",
                     "when": "debugType == 'pasta'"
                 }
             ]
@@ -290,7 +303,7 @@
         "watch": "esbuild ./src/extension.ts --bundle --outfile=out/extension.js --external:vscode --format=cjs --platform=node --sourcemap --watch",
         "lint": "eslint src",
         "test:grammar": "esbuild ./src/test/tmGrammar.test.ts --bundle --outfile=out/test/tmGrammar.test.js --format=cjs --platform=node --sourcemap && node out/test/tmGrammar.test.js",
-        "test:unit": "esbuild ./src/test/debugAdapterFactory.test.ts --bundle --outfile=out/test/debugAdapterFactory.test.js --format=cjs --platform=node --sourcemap && esbuild ./src/test/sourcePresentationToggle.test.ts --bundle --outfile=out/test/sourcePresentationToggle.test.js --format=cjs --platform=node --sourcemap && esbuild ./src/test/playSceneRequest.test.ts --bundle --outfile=out/test/playSceneRequest.test.js --format=cjs --platform=node --sourcemap && esbuild ./src/test/vscodeModules.test.ts --bundle --outfile=out/test/vscodeModules.test.js --format=cjs --platform=node --sourcemap --alias:vscode=./src/test/mock/vscode.ts && esbuild ./src/test/playSceneCommand.test.ts --bundle --outfile=out/test/playSceneCommand.test.js --format=cjs --platform=node --sourcemap --alias:vscode=./src/test/mock/vscode.ts && node out/test/debugAdapterFactory.test.js && node out/test/sourcePresentationToggle.test.js && node out/test/playSceneRequest.test.js && node out/test/vscodeModules.test.js && node out/test/playSceneCommand.test.js",
+        "test:unit": "esbuild ./src/test/debugAdapterFactory.test.ts --bundle --outfile=out/test/debugAdapterFactory.test.js --format=cjs --platform=node --sourcemap && esbuild ./src/test/sourcePresentationToggle.test.ts --bundle --outfile=out/test/sourcePresentationToggle.test.js --format=cjs --platform=node --sourcemap && esbuild ./src/test/runSceneAtCursor.test.ts --bundle --outfile=out/test/runSceneAtCursor.test.js --format=cjs --platform=node --sourcemap && esbuild ./src/test/reloadShiori.test.ts --bundle --outfile=out/test/reloadShiori.test.js --format=cjs --platform=node --sourcemap && esbuild ./src/test/vscodeModules.test.ts --bundle --outfile=out/test/vscodeModules.test.js --format=cjs --platform=node --sourcemap --alias:vscode=./src/test/mock/vscode.ts && esbuild ./src/test/runSceneAtCursorCommand.test.ts --bundle --outfile=out/test/runSceneAtCursorCommand.test.js --format=cjs --platform=node --sourcemap --alias:vscode=./src/test/mock/vscode.ts && esbuild ./src/test/reloadShioriCommand.test.ts --bundle --outfile=out/test/reloadShioriCommand.test.js --format=cjs --platform=node --sourcemap --alias:vscode=./src/test/mock/vscode.ts && esbuild ./src/test/contributions.test.ts --bundle --outfile=out/test/contributions.test.js --format=cjs --platform=node --sourcemap && node out/test/debugAdapterFactory.test.js && node out/test/sourcePresentationToggle.test.js && node out/test/runSceneAtCursor.test.js && node out/test/reloadShiori.test.js && node out/test/runSceneAtCursorCommand.test.js && node out/test/reloadShioriCommand.test.js && node out/test/contributions.test.js && node out/test/vscodeModules.test.js",
         "test:e2e": "esbuild ./src/test/e2e.test.ts --bundle --outfile=out/test/e2e.test.js --format=cjs --platform=node --sourcemap && node out/test/e2e.test.js",
         "test": "npm run test:grammar && npm run test:unit && npm run test:e2e",
         "prepackage": "npm run build:wasm && npm run compile",
