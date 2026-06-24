@@ -124,7 +124,7 @@
   - _Requirements: 4.2, 4.3, 8.1_
   - _Depends: 4.1_
 
-- [ ] 6.3 uri 正規化の特性化テストを追加する
+- [x] 6.3 uri 正規化の特性化テストを追加する
   - VSCode uri → 索引キーの正規化が、Windows パス・URI エンコード・CI の 8.3 短縮名パス（例 `RUNNER~1`）でミスマッチせず正しく解決することを特性化テストで固定する
   - `fs::canonicalize` 非使用・`std::path::absolute` 統一の前提を崩すと失敗するテストになっていることを観測できる
   - _Requirements: 2.1, 7.1_
