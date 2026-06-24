@@ -453,3 +453,114 @@ fn line_mapping_roundtrip_unchanged_with_index_present() {
         "同一マップ上で行マッピングクエリも同居下で機能する（相互非干渉・3.4）"
     );
 }
+
+// ===========================================================================
+// task 6.x sanitize 衝突 characterization テスト（pasta-scene-kick-from-cursor）。
+//
+// `SceneRegistry::increment_counter` は per-name カウンタを **生の** scene 名で採番する
+// 一方、ランタイム（pasta/scene.lua `get_or_increment_counter`）は **sanitize 済み** base
+// 名で採番する（create_scene が base_name = sanitize_name(scene.name) で呼ばれるため）。
+//
+// `sanitize_name` で同一 base へ写像されるが distinct な 2 つの生名（例: `会話·A` の
+// U+00B7 MIDDLE DOT と `会話_A` のリテラル `_`、どちらも sanitize で `会話_A`）を 2 本
+// 並べると:
+//   - build 時: increment_counter は生名で別カウンタ → 双方 #1 → join_key は両方
+//     `G:会話_A#1` に衝突する。
+//   - runtime: sanitize base で採番 → `会話_A1` / `会話_A2`。
+// 結果、2 本目の cursor 領域が 1 本目（会話_A1）へ MIS-RESOLVE する（wrong-scene kick）。
+//
+// 本テストは「同 base へ衝突する 2 本の global が、それぞれ distinct な runtime identity
+// （会話_A1 / 会話_A2）へ解決する」ことを固定する。fix 前は RED（2 本目が 会話_A1 へ
+// mis-resolve、または collect_scenes と不一致）になる。
+// ===========================================================================
+
+/// sanitize 衝突フィクスチャ（global「会話·A」「会話_A」＝ sanitize 後はどちらも「会話_A」）。
+/// 行番号は本ファイルのアサーションが依存するため、フィクスチャ編集時は追従すること。
+///  8: ＊会話·A        → global（sanitize base 採番なら 会話_A1）
+///  9: さくら：「おはよう A1」  ← 本体行
+/// 10:
+/// 11: ＊会話_A        → global（sanitize base 採番なら 会話_A2）
+/// 12: さくら：「おはよう A2」  ← 本体行（衝突 2 本目）
+const COLLISION_FIXTURE: &str = include_str!("fixtures/scene_identity_collision.pasta");
+
+const LINE_COLLISION_SCENE1_BODY: u32 = 9; // 会話_A1 本体
+const LINE_COLLISION_SCENE2_BODY: u32 = 12; // 会話_A2 本体（衝突 2 本目）
+
+/// 衝突フィクスチャ用の base_dir 構築（`make_base_dir` と同形だが別 `.pasta` を書く）。
+fn make_collision_base_dir(base: &Path) -> PathBuf {
+    let pasta_file = base.join("dic/test/scene_identity_collision.pasta");
+    std::fs::create_dir_all(pasta_file.parent().unwrap()).unwrap();
+    std::fs::write(&pasta_file, COLLISION_FIXTURE).unwrap();
+
+    std::fs::write(
+        base.join("pasta.toml"),
+        "[loader]\ndebug_mode = true\n\n[debug]\nenabled = true\nport = 0\n",
+    )
+    .unwrap();
+
+    let crate_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    for sub in ["pasta_scripts", "scriptlibs"] {
+        let src = crate_root.join(sub);
+        let dst = base.join(sub);
+        if src.exists() {
+            std::fs::create_dir_all(&dst).unwrap();
+            copy_dir(&src, &dst).unwrap();
+        }
+    }
+    pasta_file
+}
+
+/// 6.x: sanitize 衝突する 2 本の global が distinct な runtime identity へ解決する。
+///
+/// 生名 `会話·A`（U+00B7）と `会話_A`（`_`）は `sanitize_name` で両方 `会話_A`。
+/// build 側カウンタが生名キー（衝突 fix 前）だと双方 #1 → 2 本目が 会話_A1 へ
+/// mis-resolve する。sanitize キー（fix 後）だと 会話_A1 / 会話_A2 と distinct。
+#[test]
+fn sanitize_colliding_globals_resolve_to_distinct_runtime_identities() {
+    let temp = tempfile::TempDir::new().expect("temp dir");
+    let base = temp.path();
+    let pasta_file = make_collision_base_dir(base);
+    let pasta_key = pasta_file.to_string_lossy().to_string();
+
+    let runtime = PastaLoader::load_with_config(base, RuntimeConfig::new())
+        .expect("debug-enabled runtime must load");
+    let source_map = runtime
+        .debug_source_map()
+        .expect("enabled debug runtime holds the aggregated source map");
+
+    // runtime SSOT: 会話_A1 / 会話_A2 が distinct に存在する。
+    let scenes = pasta_lua::runtime::finalize::collect_scenes(runtime.lua())
+        .expect("collect_scenes must succeed");
+    assert!(
+        scenes.iter().any(|(g, _)| g == "会話_A1"),
+        "runtime に 会話_A1 が存在する: {scenes:?}"
+    );
+    assert!(
+        scenes.iter().any(|(g, _)| g == "会話_A2"),
+        "sanitize base 採番で 2 本目は 会話_A2 になる（distinct）: {scenes:?}"
+    );
+
+    // 1 本目本体行 → 会話_A1。
+    assert_eq!(
+        source_map.scene_at(&pasta_key, LINE_COLLISION_SCENE1_BODY),
+        Some(ident("会話_A1", None)),
+        "1 本目（会話·A）本体行 {LINE_COLLISION_SCENE1_BODY} は 会話_A1 へ解決する"
+    );
+
+    // 2 本目本体行 → 会話_A2（衝突 fix の core アサーション）。
+    // fix 前: build join_key が生名キーで双方 G:会話_A#1 に衝突 → 2 本目が 会話_A1 へ
+    // mis-resolve（または index 未充填で None）になり、この assert が落ちる。
+    assert_eq!(
+        source_map.scene_at(&pasta_key, LINE_COLLISION_SCENE2_BODY),
+        Some(ident("会話_A2", None)),
+        "2 本目（会話_A）本体行 {LINE_COLLISION_SCENE2_BODY} は 会話_A2 へ解決する \
+         （fix 前は 会話_A1 へ mis-resolve）"
+    );
+
+    // 2 本は別 runtime identity へ解決している（潰れていない）。
+    assert_ne!(
+        source_map.scene_at(&pasta_key, LINE_COLLISION_SCENE1_BODY),
+        source_map.scene_at(&pasta_key, LINE_COLLISION_SCENE2_BODY),
+        "sanitize 衝突 2 本は別シーンへ解決する（wrong-scene kick の回帰防止）"
+    );
+}

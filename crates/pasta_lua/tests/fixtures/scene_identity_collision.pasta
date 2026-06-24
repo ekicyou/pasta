@@ -1,0 +1,12 @@
+＃ task 6.x コリジョン characterization フィクスチャ（pasta-scene-kick-from-cursor）。
+＃ sanitize_name で同一 base「会話_A」へ写像されるが、生の名前としては distinct な
+＃ 2 本の global scene を並べる:
+＃  - global「会話·A」（行 6, U+00B7 MIDDLE DOT・XID_CONTINUE だが非英数）
+＃  - global「会話_A」（行 9, リテラル `_`）
+＃ どちらも sanitize で「会話_A」。runtime は sanitized base 採番なので
+＃ 会話_A1 / 会話_A2 となるべき。
+＊会話·A
+　さくら：「おはよう A1」
+
+＊会話_A
+　さくら：「おはよう A2」
