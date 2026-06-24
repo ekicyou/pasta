@@ -34,6 +34,7 @@
 - [デバッグ概要](debug/index.md)
   - [VSCode 接続と拡張導入](debug/vscode-setup.md)
   - [.pasta ソースレベルのデバッグ操作](debug/source-level.md)
+  - [開発支援アクション（シーン再生・SHIORIリロード）](debug/dev-actions.md)
   - [構造的制約と緩和策](debug/constraints.md)
   - [接続できないとき（トラブルシューティング）](debug/troubleshooting.md)
 
