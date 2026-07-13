@@ -41,8 +41,10 @@ end
 --- @param last_spot number|nil 直前のスポットID（nil は未出力）
 --- @param actor table 切り替え先アクター（非nil保証は呼び出し元）
 --- @param spot_newlines number スポット変更時の改行量
+--- @param allow_break boolean 段落区切り改行を許可するか（前回の改行以降に一般文字列が出力済みの場合のみ true）
 --- @return number spot 切り替え後のスポットID
-local function emit_actor_switch(buffer, actor_spots, last_spot, actor, spot_newlines)
+--- @return boolean emitted_break 段落区切り改行を出力したか
+local function emit_actor_switch(buffer, actor_spots, last_spot, actor, spot_newlines, allow_break)
     local actor_name = actor.name
     local spot = actor_spots[actor_name]
     if spot == nil then
@@ -52,14 +54,18 @@ local function emit_actor_switch(buffer, actor_spots, last_spot, actor, spot_new
         end
     end
 
-    -- spot変更時に段落区切り改行を出力
-    if last_spot ~= nil and last_spot ~= spot then
+    -- spot変更時に段落区切り改行を出力。
+    -- ただし直前の会話が全てさくらスクリプト（一般文字列が1文字も未出力）の場合は
+    -- allow_break=false となり、改行を抑制する。
+    local emitted_break = false
+    if allow_break and last_spot ~= nil and last_spot ~= spot then
         local percent = math.floor(spot_newlines * 100)
         buffer:put(string.format("\\n[%d]", percent))
+        emitted_break = true
     end
 
     buffer:put(spot_to_tag(spot))
-    return spot
+    return spot, emitted_break
 end
 
 --- actorグループ内の単一トークンをさくらスクリプトへ変換して出力
@@ -113,6 +119,10 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots)
     local actor_spots = input_actor_spots or {}
     local last_actor = nil -- 最後に発言したActor
     local last_spot = nil  -- 最後のスポットID
+    -- 前回の段落区切り改行以降に一般文字列（talk）が1文字でも出力されたか。
+    -- アクター切り替え時、これが false（＝直前の会話が全てさくらスクリプト）なら
+    -- 段落区切り改行を抑制する（sakura-script-newline）。
+    local text_since_break = false
 
     for _, token in ipairs(grouped_tokens) do
         local t = token.type
@@ -127,16 +137,28 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots)
             clear_spots(actor_spots)
             last_actor = nil
             last_spot = nil
+            text_since_break = false
         elseif t == "actor" then
             -- actorトークン処理: アクター切り替え検出後、グループ内のトークンを順次処理
             local actor = token.actor
 
             if actor and last_actor ~= actor then
-                last_spot = emit_actor_switch(buffer, actor_spots, last_spot, actor, spot_newlines)
+                local emitted_break
+                last_spot, emitted_break =
+                    emit_actor_switch(buffer, actor_spots, last_spot, actor, spot_newlines, text_since_break)
+                -- 段落区切り改行を出力したら「前回の改行以降」の起点をリセット
+                if emitted_break then
+                    text_since_break = false
+                end
                 last_actor = actor
             end
 
             for _, inner in ipairs(token.tokens) do
+                -- 一般文字列（非空の talk）が出力されたら改行許可フラグを立てる。
+                -- surface/wait/sakura_script/choice 等はさくらスクリプト扱いでカウントしない。
+                if inner.type == "talk" and inner.text ~= nil and inner.text ~= "" then
+                    text_since_break = true
+                end
                 emit_inner_token(buffer, actor, inner)
             end
         elseif t == "raw_script" then
