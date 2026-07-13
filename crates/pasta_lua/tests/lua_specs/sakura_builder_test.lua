@@ -555,6 +555,241 @@ describe("SAKURA_BUILDER - actorトークンのactor切り替え検出", functio
 end)
 
 -- ============================================================================
+-- sakura-script-newline: 直前が全さくらスクリプトなら段落区切り改行を抑制
+-- 判定基準:「前回の段落区切り改行以降に一般文字列（talk）が1文字でも出力されたか」
+-- ============================================================================
+
+describe("SAKURA_BUILDER - sakura-script-newline: 改行キャンセル", function()
+    -- ヘルパー: 出力中の \n[150] 出現回数を数える
+    local function count_break(result)
+        local count = 0
+        for _ in result:gmatch("\\n%[150%]") do
+            count = count + 1
+        end
+        return count
+    end
+
+    test("直前の会話が全てさくらスクリプト（surfaceのみ）なら改行を出力しない", function()
+        local BUILDER, actors = setup()
+
+        local tokens = {
+            { type = "spot", actor = actors.sakura, spot = 0 },
+            { type = "spot", actor = actors.kero,   spot = 1 },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    -- 一般文字列なし（surfaceのみ）
+                    { type = "surface", id = 5 },
+                }
+            },
+            {
+                type = "actor",
+                actor = actors.kero,
+                tokens = {
+                    { type = "talk", actor = actors.kero, text = "Hello" },
+                }
+            },
+        }
+        local result = BUILDER.build(tokens, { spot_newlines = 1.5 })
+
+        -- 直前（さくら）が一般文字列を出していないので段落改行はキャンセル
+        expect(count_break(result)):toBe(0)
+        expect(result:find("\\p%[0%]")):toBeTruthy()
+        expect(result:find("\\p%[1%]")):toBeTruthy()
+        expect(result:find("Hello")):toBeTruthy()
+    end)
+
+    test("直前の会話が全てさくらスクリプト（sakura_scriptのみ）でも改行を出力しない", function()
+        local BUILDER, actors = setup()
+
+        local tokens = {
+            { type = "spot", actor = actors.sakura, spot = 0 },
+            { type = "spot", actor = actors.kero,   spot = 1 },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    -- 作者記述のインラインさくらスクリプト（一般文字列ではない）
+                    { type = "sakura_script", actor = actors.sakura, text = "\\w9" },
+                }
+            },
+            {
+                type = "actor",
+                actor = actors.kero,
+                tokens = {
+                    { type = "talk", actor = actors.kero, text = "Hello" },
+                }
+            },
+        }
+        local result = BUILDER.build(tokens, { spot_newlines = 1.5 })
+
+        expect(count_break(result)):toBe(0)
+    end)
+
+    test("空文字列のtalkは一般文字列としてカウントしない", function()
+        local BUILDER, actors = setup()
+
+        local tokens = {
+            { type = "spot", actor = actors.sakura, spot = 0 },
+            { type = "spot", actor = actors.kero,   spot = 1 },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    -- 空talk + surface（可視文字は1文字も出ない）
+                    { type = "talk",    actor = actors.sakura, text = "" },
+                    { type = "surface", id = 3 },
+                }
+            },
+            {
+                type = "actor",
+                actor = actors.kero,
+                tokens = {
+                    { type = "talk", actor = actors.kero, text = "Hi" },
+                }
+            },
+        }
+        local result = BUILDER.build(tokens, { spot_newlines = 1.5 })
+
+        expect(count_break(result)):toBe(0)
+    end)
+
+    test("直前の会話に一般文字列があれば従来どおり改行を出力する（回帰）", function()
+        local BUILDER, actors = setup()
+
+        local tokens = {
+            { type = "spot", actor = actors.sakura, spot = 0 },
+            { type = "spot", actor = actors.kero,   spot = 1 },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk", actor = actors.sakura, text = "First" },
+                }
+            },
+            {
+                type = "actor",
+                actor = actors.kero,
+                tokens = {
+                    { type = "talk", actor = actors.kero, text = "Second" },
+                }
+            },
+        }
+        local result = BUILDER.build(tokens, { spot_newlines = 1.5 })
+
+        expect(count_break(result)):toBe(1)
+    end)
+
+    test("先頭のサーフェス設定手番では改行を出さず、可視発話同士の間だけ改行する", function()
+        local BUILDER, actors = setup()
+
+        -- \0\s[5] → \1\s[15] → \0「A」→ \1「B」
+        local tokens = {
+            { type = "spot", actor = actors.sakura, spot = 0 },
+            { type = "spot", actor = actors.kero,   spot = 1 },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = { { type = "surface", id = 5 } }
+            },
+            {
+                type = "actor",
+                actor = actors.kero,
+                tokens = { { type = "surface", id = 15 } }
+            },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = { { type = "talk", actor = actors.sakura, text = "A" } }
+            },
+            {
+                type = "actor",
+                actor = actors.kero,
+                tokens = { { type = "talk", actor = actors.kero, text = "B" } }
+            },
+        }
+        local result = BUILDER.build(tokens, { spot_newlines = 1.5 })
+
+        -- 先頭の2手番（surfaceのみ）では改行ゼロ、「A」と「B」の間にだけ1つ
+        expect(count_break(result)):toBe(1)
+        expect(result:find("A\\n%[150%]\\p%[1%]B")):toBeTruthy()
+    end)
+
+    test("さくらスクリプトのみの手番を挟んでも可視発話同士は改行で分離される", function()
+        local BUILDER, actors = setup()
+
+        -- \0「こんにちは」→ \1\s[10] → \0\s[11] → \1「またね」
+        local tokens = {
+            { type = "spot", actor = actors.sakura, spot = 0 },
+            { type = "spot", actor = actors.kero,   spot = 1 },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = { { type = "talk", actor = actors.sakura, text = "こんにちは" } }
+            },
+            {
+                type = "actor",
+                actor = actors.kero,
+                tokens = { { type = "surface", id = 10 } }
+            },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = { { type = "surface", id = 11 } }
+            },
+            {
+                type = "actor",
+                actor = actors.kero,
+                tokens = { { type = "talk", actor = actors.kero, text = "またね" } }
+            },
+        }
+        local result = BUILDER.build(tokens, { spot_newlines = 1.5 })
+
+        -- 段落改行は1つだけ（可視発話の分離）。中間のさくらスクリプト手番では増えない
+        expect(count_break(result)):toBe(1)
+        -- 「こんにちは」と「またね」が改行を挟んで分離されている
+        expect(result:find("こんにちは\\n%[150%]")):toBeTruthy()
+    end)
+
+    test("clear_spotで改行許可フラグがリセットされる", function()
+        local BUILDER, actors = setup()
+
+        -- 「A」出力後 clear_spot → その後 surfaceのみ手番 → 別actor切替 で改行しない。
+        -- clear_spot 後に spot を再設定し、切替先スポットが異なる（0→1）状況を作ることで、
+        -- 改行が出ない理由が「スポット同値」ではなく「フラグのリセット」であることを分離する。
+        local tokens = {
+            { type = "spot", actor = actors.sakura, spot = 0 },
+            { type = "spot", actor = actors.kero,   spot = 1 },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = { { type = "talk", actor = actors.sakura, text = "A" } }
+            },
+            { type = "clear_spot" },
+            -- clear_spot でマップが空になるため spot を再設定
+            { type = "spot", actor = actors.sakura, spot = 0 },
+            { type = "spot", actor = actors.kero,   spot = 1 },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = { { type = "surface", id = 7 } }
+            },
+            {
+                type = "actor",
+                actor = actors.kero,
+                tokens = { { type = "talk", actor = actors.kero, text = "B" } }
+            },
+        }
+        local result = BUILDER.build(tokens, { spot_newlines = 1.5 })
+
+        -- clear_spot でフラグがリセットされ、直前(さくらのsurfaceのみ)は一般文字列なし。
+        -- スポットは 0→1 で異なるが、フラグ false のため \1「B」への切替で改行は出ない。
+        expect(count_break(result)):toBe(0)
+    end)
+end)
+
+-- ============================================================================
 -- actor-spot-refactoring: 統合シナリオ (Task 4.4)
 -- ============================================================================
 
