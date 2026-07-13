@@ -17,6 +17,27 @@ use pasta_lua::debug::source_map::SceneIdentity;
 use pasta_lua::mlua::{Lua, Table, Value};
 use pasta_lua::{PastaLoader, RuntimeConfig};
 
+/// Neutralize ambient DAP debug env vars before any test thread starts.
+///
+/// The developer session may export `PASTA_DEBUG=1` / `PASTA_DEBUG_PORT=9276`.
+/// Without this guard, the debug-disabled `PastaLoader::load_with_config` here
+/// would still enable the debug backend (making `debug_enabled()` true and
+/// building a `SourceMap`), so the "normal mode" assertions fail. Tests must
+/// behave identically regardless of the session environment, so we clear these
+/// here. Each integration-test binary compiles separately, so this standalone
+/// binary needs its own copy of the guard held in `tests/common/mod.rs`.
+///
+/// Running inside a `#[ctor]` (executed before `main`, while the process is still
+/// single-threaded) makes the `remove_var` calls race-free under the Rust 2024
+/// edition where `std::env::remove_var` is `unsafe`.
+#[ctor::ctor]
+fn neutralize_debug_env() {
+    unsafe {
+        std::env::remove_var("PASTA_DEBUG");
+        std::env::remove_var("PASTA_DEBUG_PORT");
+    }
+}
+
 /// 統合フィクスチャ（global「会話」×2 ＋ 名前付き local「挨拶」）。行番号は本ファイルの
 /// アサーションが依存するため、フィクスチャ編集時は行も追従すること。
 ///  7: ＊会話        → global 会話1（本体 __start__ 領域）
