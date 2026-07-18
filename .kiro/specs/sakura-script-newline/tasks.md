@@ -42,7 +42,7 @@
   - _Requirements: 6.5_
 
 - [ ] 4. 統合テストを完全遅延方式へ書き換える
-- [ ] 4.1 (P) shiori_act_test.lua のスポット変更改行ケースを往復シナリオへ書き換える
+- [x] 4.1 (P) shiori_act_test.lua のスポット変更改行ケースを往復シナリオへ書き換える
   - `act:talk(sakura)` → `act:talk(kero)` → `act:talk(sakura)` の A→B→A 往復で、`\n[150]` が戻り手番（2回目の sakura 発話）の直前にのみ出現することを確認するよう既存ケースを書き換える
   - Observable: `shiori_act_test.lua` の該当ケースが往復シナリオの新期待値で green
   - _Requirements: 7.4_
