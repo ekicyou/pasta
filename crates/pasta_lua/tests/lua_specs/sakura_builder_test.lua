@@ -959,6 +959,295 @@ describe("SAKURA_BUILDER - sakura-script-newline: 完全遅延（Task 3.1）", f
 end)
 
 -- ============================================================================
+-- sakura-script-newline: 保留破棄・フラッシュ位置・クリア系（Task 3.2）
+-- 完全遅延方式(S0–S7)の pending 破棄 / フラッシュ位置 / clear系リセット挙動を
+-- 固定するテスト。要件 1.3, 2.2, 2.3, 3.3, 4.4, 4.6, 7.3
+-- ============================================================================
+
+describe("SAKURA_BUILDER - sakura-script-newline: 保留破棄・フラッシュ・クリア（Task 3.2）", function()
+    -- ヘルパー: 指定パターンの出現回数を数える
+    local function count(result, pattern)
+        local c = 0
+        for _ in result:gmatch(pattern) do c = c + 1 end
+        return c
+    end
+
+    -- 1. pending 破棄→再評価 (R2.3)
+    test("has-text済みスポットへ surface のみで戻り次の切替が起きると保留が破棄され切替先で再評価される", function()
+        local BUILDER, actors = setup()
+
+        -- A1(spot0 text) → kero surface(spot1) → sakura surface(spot0 復帰=pending真) →
+        -- kero talk C(spot1 復帰。spot0 の pending は破棄され spot1 の has-text で再評価=偽) →
+        -- sakura talk A2(spot0 復帰。spot0 の has-text 真で再評価=真→改行)
+        local tokens = {
+            { type = "spot", actor = actors.sakura, spot = 0 },
+            { type = "spot", actor = actors.kero,   spot = 1 },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = { { type = "talk", actor = actors.sakura, text = "A1" } }
+            },
+            {
+                type = "actor",
+                actor = actors.kero,
+                tokens = { { type = "surface", id = 6 } }
+            },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = { { type = "surface", id = 5 } }
+            },
+            {
+                type = "actor",
+                actor = actors.kero,
+                tokens = { { type = "talk", actor = actors.kero, text = "C" } }
+            },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = { { type = "talk", actor = actors.sakura, text = "A2" } }
+            },
+        }
+        local result = BUILDER.build(tokens, { spot_newlines = 1.5 })
+
+        -- spot0 復帰(surface のみ)で立った pending は次の切替(→spot1)で破棄され、
+        -- spot1 は has-text 偽のため C の直前に改行は出ない。
+        expect(result:find("\\p%[1%]C")):toBeTruthy()
+        -- spot0 の has-text は persist しており、A2 の直前で再評価→改行が1回だけ出る。
+        expect(result:find("\\p%[0%]\\n%[150%]A2")):toBeTruthy()
+        expect(count(result, "\\n%[150%]")):toBe(1)
+    end)
+
+    -- 2. テキストなし終端の保留破棄 (R3.3)
+    test("has-text済みスポットへ surface/wait のみで戻り終端すると保留改行を出さず \\e で終わる", function()
+        local BUILDER, actors = setup()
+
+        -- A1(spot0) → B1(spot1) → sakura surface+wait のみで spot0 復帰(pending真)して終端
+        local tokens = {
+            { type = "spot", actor = actors.sakura, spot = 0 },
+            { type = "spot", actor = actors.kero,   spot = 1 },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = { { type = "talk", actor = actors.sakura, text = "A1" } }
+            },
+            {
+                type = "actor",
+                actor = actors.kero,
+                tokens = { { type = "talk", actor = actors.kero, text = "B1" } }
+            },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "surface", id = 5 },
+                    { type = "wait",    ms = 100 },
+                }
+            },
+        }
+        local result = BUILDER.build(tokens, { spot_newlines = 1.5 })
+
+        -- 末尾に段落区切り改行 \n[ が出力されず、\e で終わる（未フラッシュ pending は破棄）
+        expect(result:sub(-2)):toBe("\\e")
+        expect(result:find("\\n%[")):toBeFalsy()
+    end)
+
+    -- 3. フラッシュ位置 (R1.3)
+    test("戻り手番の先頭に surface を挟むと \\n[N] は surface の後・talk の直前に出る", function()
+        local BUILDER, actors = setup()
+
+        -- A1(spot0) → B1(spot1) → sakura surface+talk C で spot0 復帰(pending真)
+        local tokens = {
+            { type = "spot", actor = actors.sakura, spot = 0 },
+            { type = "spot", actor = actors.kero,   spot = 1 },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = { { type = "talk", actor = actors.sakura, text = "A1" } }
+            },
+            {
+                type = "actor",
+                actor = actors.kero,
+                tokens = { { type = "talk", actor = actors.kero, text = "B1" } }
+            },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "surface", id = 5 },
+                    { type = "talk",    actor = actors.sakura, text = "C" },
+                }
+            },
+        }
+        local result = BUILDER.build(tokens, { spot_newlines = 1.5 })
+
+        -- \n[150] は \p 直後ではなく surface \s[5] の後・talk C の直前に出る
+        expect(result:find("\\p%[0%]\\s%[5%]\\n%[150%]C")):toBeTruthy()
+        -- \p 直後にフラッシュされていないこと（\p[0]\n[150]\s ではない）
+        expect(result:find("\\p%[0%]\\n%[150%]\\s")):toBeFalsy()
+        expect(count(result, "\\n%[150%]")):toBe(1)
+    end)
+
+    -- 4. 同一アクター継続グループでのフラッシュ (R2.2)
+    test("切替グループが surface のみでも同一アクター後続グループの talk 直前でフラッシュされる", function()
+        local BUILDER, actors = setup()
+
+        -- A1(spot0) → B1(spot1) → sakura surface のみ(spot0 復帰=pending真) →
+        -- sakura talk C(同一アクター継続=切替なし。pending 生存。C 直前でフラッシュ)
+        local tokens = {
+            { type = "spot", actor = actors.sakura, spot = 0 },
+            { type = "spot", actor = actors.kero,   spot = 1 },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = { { type = "talk", actor = actors.sakura, text = "A1" } }
+            },
+            {
+                type = "actor",
+                actor = actors.kero,
+                tokens = { { type = "talk", actor = actors.kero, text = "B1" } }
+            },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = { { type = "surface", id = 5 } }
+            },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = { { type = "talk", actor = actors.sakura, text = "C" } }
+            },
+        }
+        local result = BUILDER.build(tokens, { spot_newlines = 1.5 })
+
+        -- surface の後、同一アクター後続グループの talk C 直前で \n[150] がフラッシュされる。
+        -- 同一アクター継続は切替なし(S2)のため pending は破棄されず生存する。
+        expect(result:find("\\s%[5%]\\n%[150%]C")):toBeTruthy()
+        expect(count(result, "\\n%[150%]")):toBe(1)
+        -- surface グループと talk グループの間で切替は起きないため \p[0] は2回のみ
+        expect(count(result, "\\p%[0%]")):toBe(2)
+    end)
+
+    -- 5. clear_spot リセット (R4.4)
+    test("has-text済み状態で clear_spot 後は以後の切替で保留が発生しない", function()
+        local BUILDER, actors = setup()
+
+        -- A1(spot0)/B1(spot1) で has-text 蓄積 → clear_spot → spot 再設定 →
+        -- A2(spot0 復帰)/B2(spot1 復帰) とも has-text リセット済みのため改行ゼロ
+        local tokens = {
+            { type = "spot", actor = actors.sakura, spot = 0 },
+            { type = "spot", actor = actors.kero,   spot = 1 },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = { { type = "talk", actor = actors.sakura, text = "A1" } }
+            },
+            {
+                type = "actor",
+                actor = actors.kero,
+                tokens = { { type = "talk", actor = actors.kero, text = "B1" } }
+            },
+            { type = "clear_spot" },
+            -- clear_spot でマップが空になるため spot を再設定
+            { type = "spot", actor = actors.sakura, spot = 0 },
+            { type = "spot", actor = actors.kero,   spot = 1 },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = { { type = "talk", actor = actors.sakura, text = "A2" } }
+            },
+            {
+                type = "actor",
+                actor = actors.kero,
+                tokens = { { type = "talk", actor = actors.kero, text = "B2" } }
+            },
+        }
+        local result = BUILDER.build(tokens, { spot_newlines = 1.5 })
+
+        -- clear_spot が has-text をリセットするため、A2(spot0 へ「戻る」)でも改行は出ない。
+        -- リセットされない実装なら A2 で \n[150] が出て count が 1 以上になり落ちる。
+        expect(count(result, "\\n%[150%]")):toBe(0)
+        expect(result:find("\\p%[0%]A2")):toBeTruthy()
+        expect(result:find("\\p%[1%]B2")):toBeTruthy()
+    end)
+
+    -- 6. \c で保留破棄＋has-text リセット (R4.6)
+    test("\\c は保留改行を破棄し当該スポットの has-text を偽へリセットする", function()
+        local BUILDER, actors = setup()
+
+        -- (A) 破棄: A1(spot0)/B1(spot1) → sakura {clear, talk A2} で spot0 復帰(pending真)。
+        --     \c が pending を破棄するため A2 直前に改行は出ない（\p[0]\cA2）。
+        local tokens_a = {
+            { type = "spot", actor = actors.sakura, spot = 0 },
+            { type = "spot", actor = actors.kero,   spot = 1 },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = { { type = "talk", actor = actors.sakura, text = "A1" } }
+            },
+            {
+                type = "actor",
+                actor = actors.kero,
+                tokens = { { type = "talk", actor = actors.kero, text = "B1" } }
+            },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "clear" },
+                    { type = "talk", actor = actors.sakura, text = "A2" },
+                }
+            },
+        }
+        local result_a = BUILDER.build(tokens_a, { spot_newlines = 1.5 })
+
+        -- \c 直後の A2 の前に段落区切り改行が出ない（保留は破棄）
+        expect(result_a:find("\\p%[0%]\\cA2")):toBeTruthy()
+        expect(count(result_a, "\\n%[150%]")):toBe(0)
+
+        -- (B) has-text リセット: A1(spot0)/B1(spot1) → sakura {clear}(spot0 has-text→偽) →
+        --     kero surface のみ(spot1 復帰) → sakura talk A2(spot0 再訪)。
+        --     \c が has-text をリセットしたため、他スポットを経て再訪しても改行は出ない。
+        local tokens_b = {
+            { type = "spot", actor = actors.sakura, spot = 0 },
+            { type = "spot", actor = actors.kero,   spot = 1 },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = { { type = "talk", actor = actors.sakura, text = "A1" } }
+            },
+            {
+                type = "actor",
+                actor = actors.kero,
+                tokens = { { type = "talk", actor = actors.kero, text = "B1" } }
+            },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = { { type = "clear" } }
+            },
+            {
+                type = "actor",
+                actor = actors.kero,
+                tokens = { { type = "surface", id = 6 } }
+            },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = { { type = "talk", actor = actors.sakura, text = "A2" } }
+            },
+        }
+        local result_b = BUILDER.build(tokens_b, { spot_newlines = 1.5 })
+
+        -- \c で spot0 の has-text が偽へリセットされたため、再訪した A2 の直前に改行は出ない。
+        -- リセットされない実装なら A2 で \n[150] が出て落ちる。
+        expect(count(result_b, "\\n%[150%]")):toBe(0)
+        expect(result_b:find("\\p%[0%]A2")):toBeTruthy()
+        expect(result_b:find("\\c")):toBeTruthy()
+    end)
+end)
+
+-- ============================================================================
 -- actor-spot-refactoring: 統合シナリオ (Task 4.4)
 -- ============================================================================
 
