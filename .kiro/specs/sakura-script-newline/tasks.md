@@ -6,7 +6,7 @@
   - Observable: 変更前の全既存テストスイートが green で完走し、先出し順序が現行のテスト期待値として確認できる
   - _Requirements: 7.1_
 
-- [ ] 2. 段落区切り改行の完全遅延状態機械を実装し、既存テスト期待値を更新する
+- [x] 2. 段落区切り改行の完全遅延状態機械を実装し、既存テスト期待値を更新する
   - `sakura_builder.lua` の `text_since_break`（グローバル bool）を `spot_has_text`（スポットID→bool のテーブル）と `pending_break`（単一 bool）へ置換する
   - `emit_actor_switch` をスポット解決（未設定→0＋警告ログの既存フォールバックは維持）と `\p[spot]` 出力のみに縮小し、改行の判定・出力は行わないようにする
   - ビルドループへ以下の状態遷移を実装する: アクター切替時に切替先スポットの has-text で pending をセット（旧 pending は暗黙破棄。先出し版の `last_spot ~= spot`／`last_spot == spot` 抑制ガードは復活させない）／非空 `talk` 出力の直前で pending が真なら `\n[math.floor(spot_newlines*100)]` を1回出力しフラッシュし、同時に該当スポットの has-text を真に設定／`clear`（`\c`）トークン処理時に現在スポットの has-text を偽へリセットし pending を破棄／`clear_spot` トークン処理時に has-text 全体と pending をリセット／ビルドループ終端で未フラッシュの pending を出力せず破棄してから `\e` を付与

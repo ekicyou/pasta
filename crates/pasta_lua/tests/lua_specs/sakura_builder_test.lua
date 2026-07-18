@@ -302,7 +302,8 @@ describe("SAKURA_BUILDER - 複合シナリオ", function()
         expect(result:find("Hello")):toBeTruthy()
         expect(result:find("\\s%[5%]")):toBeTruthy()
         expect(result:find("\\w%[100%]")):toBeTruthy()
-        expect(result:find("\\n%[150%]")):toBeTruthy() -- spot変更時の段落改行
+        -- 意図した変更(R3.1): A(spot0)→B(spot1) は各spot初テキストのため段落区切り改行を出さない
+        expect(result:find("\\n%[150%]")):toBeFalsy()
         expect(result:find("\\p%[1%]")):toBeTruthy()
         expect(result:find("Hi")):toBeTruthy()
         expect(result:find("\\n")):toBeTruthy()
@@ -499,6 +500,9 @@ describe("SAKURA_BUILDER - actorトークンのactor切り替え検出", functio
     test("spot変更時に\\n[N]を出力する（Nはconfig.spot_newlines * 100）", function()
         local BUILDER, actors = setup()
 
+        -- 意図した変更(R2.7): 完全遅延方式では A→B の単純切替では改行ゼロ。
+        -- N 算出（spot_newlines * 100）を検証するため A→B→A 往復にし、
+        -- 戻り手番(A2)の直前で \n[150] が1回だけ出ることを確認する。
         local tokens = {
             { type = "spot", actor = actors.sakura, spot = 0 },
             { type = "spot", actor = actors.kero,   spot = 1 },
@@ -516,11 +520,22 @@ describe("SAKURA_BUILDER - actorトークンのactor切り替え検出", functio
                     { type = "talk", actor = actors.kero, text = "Second" },
                 }
             },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk", actor = actors.sakura, text = "Third" },
+                }
+            },
         }
         local result = BUILDER.build(tokens, { spot_newlines = 1.5 })
 
-        -- spot変更時に段落改行が出力される
-        expect(result:find("\\n%[150%]")):toBeTruthy()
+        -- has-text 済みの spot0 へ戻る手番の直前でのみ段落改行が出力される
+        expect(result:find("\\p%[0%]\\n%[150%]Third")):toBeTruthy()
+        -- A1・B1 の前には改行が出ない（改行は戻り手番の1回だけ）
+        local count = 0
+        for _ in result:gmatch("\\n%[150%]") do count = count + 1 end
+        expect(count):toBe(1)
     end)
 
     test("同じactorの連続actorトークンではスポットタグを出力しない", function()
@@ -655,9 +670,12 @@ describe("SAKURA_BUILDER - sakura-script-newline: 改行キャンセル", functi
         expect(count_break(result)):toBe(0)
     end)
 
-    test("直前の会話に一般文字列があれば従来どおり改行を出力する（回帰）", function()
+    test("A→B の単純切替では各spot初テキストのため改行を出さない（意図した変更 R3.1）", function()
         local BUILDER, actors = setup()
 
+        -- 意図した変更(R3.1): 先出し版は離脱側(A)末尾に \n[150] を出していたが、
+        -- 完全遅延方式では A(spot0)・B(spot1) とも各 spot の初テキストであり、
+        -- 離脱側末尾のゴミ改行は排除される（改行ゼロ）。
         local tokens = {
             { type = "spot", actor = actors.sakura, spot = 0 },
             { type = "spot", actor = actors.kero,   spot = 1 },
@@ -678,10 +696,10 @@ describe("SAKURA_BUILDER - sakura-script-newline: 改行キャンセル", functi
         }
         local result = BUILDER.build(tokens, { spot_newlines = 1.5 })
 
-        expect(count_break(result)):toBe(1)
+        expect(count_break(result)):toBe(0)
     end)
 
-    test("先頭のサーフェス設定手番では改行を出さず、可視発話同士の間だけ改行する", function()
+    test("先頭のサーフェス設定手番でも、可視発話が各spot初テキストなら改行を出さない（意図した変更 R3.1/R5.2）", function()
         local BUILDER, actors = setup()
 
         -- \0\s[5] → \1\s[15] → \0「A」→ \1「B」
@@ -711,12 +729,13 @@ describe("SAKURA_BUILDER - sakura-script-newline: 改行キャンセル", functi
         }
         local result = BUILDER.build(tokens, { spot_newlines = 1.5 })
 
-        -- 先頭の2手番（surfaceのみ）では改行ゼロ、「A」と「B」の間にだけ1つ
-        expect(count_break(result)):toBe(1)
-        expect(result:find("A\\n%[150%]\\p%[1%]B")):toBeTruthy()
+        -- 意図した変更(R3.1/R5.2): A(spot0)・B(spot1) とも各 spot の初テキストのため
+        -- 段落区切り改行は出ない。先頭 surface 手番はもちろん、可視発話 A→B の間にも出ない。
+        expect(count_break(result)):toBe(0)
+        expect(result:find("A\\p%[1%]B")):toBeTruthy()
     end)
 
-    test("さくらスクリプトのみの手番を挟んでも可視発話同士は改行で分離される", function()
+    test("さくらスクリプトのみの手番を挟んでも、戻り先が各spot初テキストなら改行を出さない（意図した変更 R2.3/R3.1）", function()
         local BUILDER, actors = setup()
 
         -- \0「こんにちは」→ \1\s[10] → \0\s[11] → \1「またね」
@@ -746,10 +765,12 @@ describe("SAKURA_BUILDER - sakura-script-newline: 改行キャンセル", functi
         }
         local result = BUILDER.build(tokens, { spot_newlines = 1.5 })
 
-        -- 段落改行は1つだけ（可視発話の分離）。中間のさくらスクリプト手番では増えない
-        expect(count_break(result)):toBe(1)
-        -- 「こんにちは」と「またね」が改行を挟んで分離されている
-        expect(result:find("こんにちは\\n%[150%]")):toBeTruthy()
+        -- 意図した変更(R2.3/R3.1): 「こんにちは」は spot0 初テキスト、「またね」は spot1 初テキスト。
+        -- spot0 へ戻る surface のみの手番で pending がセットされるが、次の切替(→spot1)で破棄・再評価され、
+        -- 切替先 spot1 は has-text 偽のため改行は出ない。往復のいずれの手番でも段落改行はゼロ。
+        expect(count_break(result)):toBe(0)
+        -- 「こんにちは」の直後に段落区切り改行は出ない
+        expect(result:find("こんにちは\\n%[150%]")):toBeFalsy()
     end)
 
     test("clear_spotで改行許可フラグがリセットされる", function()
@@ -836,7 +857,9 @@ describe("SAKURA_BUILDER - 統合シナリオ（グループ化トークン構�
         local result = BUILDER.build(tokens, { spot_newlines = 1.5 })
 
         expect(result:find("\\p%[0%]Sakura speaks")):toBeTruthy()
-        expect(result:find("\\n%[150%]\\p%[1%]Kero speaks")):toBeTruthy()
+        -- 意図した変更(R3.1): A(spot0)→B(spot1) は各spot初テキストのため \n[150] を出さない
+        expect(result:find("\\p%[1%]Kero speaks")):toBeTruthy()
+        expect(result:find("\\n%[150%]")):toBeFalsy()
     end)
 
     test("clear_spot() → talk() → デフォルトspot(0)への復帰を確認", function()
@@ -1023,6 +1046,8 @@ describe("SAKURA_BUILDER - persist-spot-position: spotトークン処理 (Task 5
         local BUILDER, actors = setup()
 
         -- 前回のスポット状態を入力として渡す
+        -- 意図した変更(R2.7): 完全遅延方式では A→B の単純切替は改行ゼロになるため、
+        -- 引き継いだ spot 値による段落改行の観測を維持するには A→B→A 往復が必要。
         local input_spots = { ["さくら"] = 0, ["うにゅう"] = 1 }
         local tokens = {
             -- spotトークンなし（前回の値を引き継ぐ）
@@ -1040,6 +1065,13 @@ describe("SAKURA_BUILDER - persist-spot-position: spotトークン処理 (Task 5
                     { type = "talk", actor = actors.kero, text = "Me too" },
                 }
             },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk", actor = actors.sakura, text = "Again" },
+                }
+            },
         }
 
         local result = BUILDER.build(tokens, { spot_newlines = 1.5 }, input_spots)
@@ -1047,7 +1079,8 @@ describe("SAKURA_BUILDER - persist-spot-position: spotトークン処理 (Task 5
         -- 前回のスポット値が引き継がれている
         expect(result:find("\\p%[0%]")):toBeTruthy()
         expect(result:find("\\p%[1%]")):toBeTruthy()
-        expect(result:find("\\n%[150%]")):toBeTruthy() -- spot変更時の段落改行
+        -- has-text 済みの spot0 へ戻る手番の直前でのみ段落改行が出力される
+        expect(result:find("\\p%[0%]\\n%[150%]Again")):toBeTruthy()
 
         -- 入力テーブルも前回の値を保持（直接変更だが値は変わらない）
         expect(input_spots["さくら"]):toBe(0)
@@ -1440,8 +1473,13 @@ describe("SAKURA_BUILDER - string-buffer: フォールバック実走バイト�
         local fallback = BUILDER.build(make_tokens(), { spot_newlines = 2.0, buffer_factory = buf.new_fallback }, {})
 
         expect(fallback):toBe(native)
-        -- spot 変更時の段落改行 \n[200] が実在し（出力が空でない＝vacuousでない）
-        expect(native:find("\\n%[200%]")):toBeTruthy()
+        -- 意図した変更(R3.1/R4.4): 完全遅延方式では A(spot0)→B(spot2)→clear_spot→A(spot0) の
+        -- いずれの手番も has-text 偽（clear_spot でリセット）のため \n[200] は出ない。
+        -- このケースの主眼は native/fallback のバイト一致であり、vacuous でないことを別途確認する。
+        -- （\n[200] を含む往復ケースは別タスク Task 3.3 が担当する）
+        expect(native:find("\\n%[200%]")):toBeFalsy()
+        expect(#native > 2):toBeTruthy()
+        expect(native:find("おはよう")):toBeTruthy()
         expect(native:sub(-2)):toBe("\\e")
     end)
 
