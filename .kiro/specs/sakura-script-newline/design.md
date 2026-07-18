@@ -37,7 +37,7 @@
 - `STORE.actor_spots` の内容・永続化挙動（persist-spot-position 仕様が所有。本設計は読み取り＋`spot`/`clear_spot` トークンによる従来どおりの更新のみ）
 - `talk_to_script` のウェイト挿入・各トークン種別の変換内容（段落区切り改行の位置以外は一切変更しない）
 - 切替先アクターのサーフェス状態再適用（`actor-surface-restore`）
-- バルーンクリア（`\c`）・トーク間バルーン状態管理
+- トーク間バルーン状態管理（`\c` タグの変換出力自体は不変。ただし `\c` 処理時のビルドローカル状態リセット（has-text/pending、R4.6）は This Spec Owns）
 
 ### Allowed Dependencies
 
@@ -96,8 +96,9 @@ stateDiagram-v2
     NoPending --> Pending: アクター切替かつ切替先spotのhas_textが真
     NoPending --> NoPending: アクター切替かつ切替先spotのhas_textが偽
     Pending --> NoPending: 非空talk出力の直前でnを出力しフラッシュ
-    Pending --> Pending: 非テキストトークンを出力
+    Pending --> Pending: 非テキストトークンを出力（clearを除く）
     Pending --> NoPending: 次のアクター切替で破棄し再評価
+    Pending --> NoPending: clear（c）で破棄＋現在spotのhas_textを偽へ
     Pending --> NoPending: clear_spotで破棄
     Pending --> [*]: build終端で破棄しeを付与
     NoPending --> [*]: build終端でeを付与
@@ -107,7 +108,8 @@ stateDiagram-v2
 
 - pending は常に**現在スコープ**（`last_spot`）に対する保留。切替のたびに破棄→切替先の has-text で再評価するため、単一 boolean で表現できる（research.md 設計判断参照）
 - `\n[N]` は `\p[spot]` と介在する非テキストトークン（surface/wait 等）の**後**、非空 talk の変換出力（`talk_to_script` 結果全体）の**直前**に出力（1.3, 2.2）
-- 非空 talk の出力時に `spot_has_text[last_spot] = true`。同一アクター継続グループの初テキストでも pending はフラッシュされる（pending の破棄契機は切替・clear_spot・ビルド終端のみ）
+- 非空 talk の出力時に `spot_has_text[last_spot] = true`。同一アクター継続グループの初テキストでも pending はフラッシュされる（pending の破棄契機は切替・`clear`（`\c`）・clear_spot・ビルド終端のみ）
+- `clear`（`\c`）はバルーン上のテキストを物理的に消すため、ビルダーの認識も現実に合わせる: 現在スポットの has-text を偽へリセットし、pending を破棄する（R4.6。クリア済みバルーン先頭に段落改行を出さない）
 
 ## Requirements Traceability
 
@@ -134,6 +136,7 @@ stateDiagram-v2
 | 4.3 | 非テキストトークンは has-text 更新もフラッシュもしない | inner ループ判定 | build() | Pending 維持 |
 | 4.4 | clear_spot で has-text・保留をリセット | clear_spot 分岐 | build() | Pending→NoPending |
 | 4.5 | 状態はビルドローカル、actor_spots は読取専用扱い | 状態スコープ | build() | — |
+| 4.6 | `clear`（`\c`）で現在スポットの has-text リセット＋保留破棄 | inner ループ `clear` 分岐（S4b） | build() | Pending→NoPending(clear) |
 | 5.1 | 全さくらスクリプト手番のスポットへの切替で改行なし | has-text 偽判定 | build() | — |
 | 5.2 | 先頭サーフェス手番で改行なし | has-text 偽判定 | build() | — |
 | 5.3 | #21 挙動と矛盾しない（per-spot で包摂・完全置換） | text_since_break 削除 | build() | research.md 検証表 |
@@ -203,7 +206,8 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots)
 | S1 | `actor` トークンで切替検出（`token.actor` 非nil かつ `~= last_actor`） | — | spot 解決（未設定→0＋warn、既存）→ **`pending_break = (spot_has_text[spot] == true)`**（旧 pending は暗黙破棄: 2.1, 2.3, 2.4, 2.5）→ `\p[spot]` 出力（1.1, 1.2）→ `last_spot = spot`, `last_actor = actor` |
 | S2 | 同一アクターの連続 `actor` トークン | `token.actor == last_actor` | 何も出力しない（1.4）。pending・has-text は変更しない |
 | S3 | 非空 `talk`（inner） | `inner.text ~= nil and ~= ""` | `pending_break` 真なら `\n[math.floor(spot_newlines * 100)]` を出力し `pending_break = false`（2.2, 2.8）→ `last_spot ~= nil` なら `spot_has_text[last_spot] = true`（4.2）→ `talk_to_script` 出力 |
-| S4 | 空 `talk`・`surface`・`wait`・`sakura_script`・`newline`・`clear`・`choice`・`choice_timeout`・`raw_script`・`yield`（inner） | — | 従来どおり変換出力のみ。has-text・pending は不変（4.3, 5.1, 5.2, 6.1） |
+| S4 | 空 `talk`・`surface`・`wait`・`sakura_script`・`newline`・`choice`・`choice_timeout`・`raw_script`・`yield`（inner） | — | 従来どおり変換出力のみ。has-text・pending は不変（4.3, 5.1, 5.2, 6.1） |
+| S4b | `clear`（`\c`）トークン（inner） | — | `\c` を従来どおり出力（6.1）＋ `pending_break = false`、`last_spot ~= nil` なら `spot_has_text[last_spot] = false`（4.6。クリアで区切るべき先行テキストが消えるため） |
 | S5 | `clear_spot` トークン | — | `clear_spots(actor_spots)`・`last_actor/last_spot = nil`（既存）＋ `spot_has_text = {}`, `pending_break = false`（4.4） |
 | S6 | `spot` トークン / トップレベル `raw_script` | — | 従来どおり（6.2）。状態不変 |
 | S7 | ループ終端 | — | pending は出力せず破棄（3.3）→ `\e` 出力（3.4, 6.4） |
@@ -265,6 +269,7 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots)
 6. **フラッシュ位置**（1.3）: 戻り手番の先頭に surface を挟む（`…\p[0]\s[5]\n[150]C…` — `\n` は `\p` 直後でなく talk 直前）
 7. **同一アクター継続グループでのフラッシュ**（2.2）: 切替グループが surface のみ→同一アクターの次グループで talk → その talk 直前でフラッシュ
 8. **clear_spot リセット**（4.4）: has-text 済み状態で clear_spot → 以後の切替で保留なし
+8b. **`\c` で保留破棄＋has-text リセット**（4.6）: has-text 済みスポットへ戻り（pending セット）→ `clear` トークン → 後続 talk の前に `\n[` が出ない（`\p[0]A1\p[1]B1\p[0]\c A2` 等価）。かつ `\c` 後に他スポットを経て再訪しても、新たにテキストを出すまで改行なし
 9. **N 算出**（2.8）: `spot_newlines = 1.5 → \n[150]` / `2.0 → \n[200]`（A→B→A で観測）
 10. **バイト一致**（6.5）: A→B→A 往復シナリオ（`\n[200]` を含む）で native / `buf.new_fallback` のバイト一致を検証する**新規ケースを追加**。既存 string-buffer テストの clear_spot 経路シナリオは**削除せず**、期待値のみ遅延方式へ更新して併存させる（`\n[200]` カバレッジは往復ケースが担い、clear_spot 経路のバイト一致検証は既存ケースが担う）
 

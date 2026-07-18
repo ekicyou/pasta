@@ -80,9 +80,10 @@
 
 1. When `BUILDER.build()` の1回の呼び出しを開始したとき, the さくらスクリプトビルダー shall per-spot has-text 状態を空（すべてのスポットが未出力）で、改行保留状態を「保留なし」で初期化する。
 2. When 非空の `talk` トークン（一般文字列）を出力したとき, the さくらスクリプトビルダー shall 当該トークンが属するスポットの has-text を真に設定する。
-3. When 空文字列の `talk`、または `surface`・`wait`・`sakura_script`・`newline`・`clear`・`choice`・`choice_timeout`・`raw_script`・`yield` を処理したとき, the さくらスクリプトビルダー shall いずれのスポットの has-text も真に変更せず、改行保留の解除（フラッシュ）も行わない。
+3. When 空文字列の `talk`、または `surface`・`wait`・`sakura_script`・`newline`・`choice`・`choice_timeout`・`raw_script`・`yield` を処理したとき, the さくらスクリプトビルダー shall いずれのスポットの has-text も真に変更せず、改行保留の解除（フラッシュ）も行わない。
 4. When `clear_spot` トークンを処理したとき, the さくらスクリプトビルダー shall per-spot has-text 状態と改行保留状態をともにリセットし、以後の切替先スコープを「未出力・保留なし」として扱う。
 5. The さくらスクリプトビルダー shall per-spot has-text 状態および改行保留状態をビルドローカルに保持し、`STORE.actor_spots`（永続スポット位置マップ）を読み取り専用として扱い変更しない。
+6. When `clear`（`\c`）トークンを処理したとき, the さくらスクリプトビルダー shall `\c` を従来どおり出力したうえで、現在スポットの has-text を偽にリセットし、保留中の段落区切り改行を即座に破棄する（クリア後のバルーン先頭に段落区切り改行を出力しない。バルーンが空になった以上、区切るべき先行テキストは存在しないため）。
 
 ### Requirement 5: 全さくらスクリプト手番の扱い（#21 抑制の包摂）
 
