@@ -1948,4 +1948,48 @@ describe("SAKURA_BUILDER - string-buffer: フォールバック実走バイト�
         expect(native:find("\\!%[%*%]\\q%[A\\,B\\]C\\\\D,route\\]1%]")):toBeTruthy()
         expect(native:sub(-2)):toBe("\\e")
     end)
+
+    -- Task 3.3 (要件 6.5): \n[200] を実際に出す A→B→A 往復シナリオで
+    -- native/fallback 両経路のバイト一致を検証する。上の clear_spot 経路ケースは
+    -- has-text リセットのため \n[200] が出ず vacuous になり得るので、
+    -- \n[200] カバレッジをこの往復ケースが担う。
+    test("往復シナリオ（A→B→A, \\n[200] 実出力）でバイト一致する", function()
+        local BUILDER, actors = setup()
+        local buf = require("pasta.buf")
+
+        -- spot sakura=0, spot kero=1。戻り手番 A2 の直前で \n[200] がフラッシュされる。
+        local function make_tokens()
+            return {
+                { type = "spot", actor = actors.sakura, spot = 0 },
+                { type = "spot", actor = actors.kero,   spot = 1 },
+                {
+                    type = "actor",
+                    actor = actors.sakura,
+                    tokens = { { type = "talk", actor = actors.sakura, text = "A1" } }
+                },
+                {
+                    type = "actor",
+                    actor = actors.kero,
+                    tokens = { { type = "talk", actor = actors.kero, text = "B1" } }
+                },
+                {
+                    type = "actor",
+                    actor = actors.sakura,
+                    -- 戻り手番。has-text 済みの spot0 へ戻るため直前に \n[200] が出る
+                    tokens = { { type = "talk", actor = actors.sakura, text = "A2" } }
+                },
+            }
+        end
+
+        local config = { spot_newlines = 2.0 }
+
+        local native = BUILDER.build(make_tokens(), config, {})
+        local fallback = BUILDER.build(make_tokens(), { spot_newlines = 2.0, buffer_factory = buf.new_fallback }, {})
+
+        -- native/fallback のバイト一致
+        expect(fallback):toBe(native)
+        -- vacuous でないこと: \n[200] が実際に出力に含まれる
+        expect(native:find("\\n%[200%]")):toBeTruthy()
+        expect(native:sub(-2)):toBe("\\e")
+    end)
 end)
