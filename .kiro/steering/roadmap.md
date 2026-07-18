@@ -182,7 +182,7 @@ Phase 5 でデバッガ（DAP バックエンド）を組み込んだ結果、�
 さくらスクリプトのバルーン表示に関する出力品質の修正群。
 
 ### Specs (dependency order)
-- [ ] sakura-script-newline -- キャラ切替時の段落区切り改行を eager（`\p` 直前・先出し）から fully-lazy（切替で保留し、再登場スコープの次の一般文字列直前でフラッシュ）へ変更。A→B 終了・同一スポット共有交代・全さくらスクリプト手番のゴミ改行を根絶。Dependencies: none。brief.md 作成済み（`.kiro/specs/sakura-script-newline/brief.md`）。**要件・ギャップ分析・要件ディスカッション（議題1: 完全遅延採用／議題2: 同一スポット交代は改行あり）完了。設計フェーズ待ち**
+- [x] sakura-script-newline -- キャラ切替時の段落区切り改行を eager（`\p` 直前・先出し）から fully-lazy（切替で保留し、再登場スコープの次の一般文字列直前でフラッシュ）へ変更。A→B 終了・同一スポット共有交代・全さくらスクリプト手番のゴミ改行を根絶。Dependencies: none。実装完了・全テスト green（`cargo test --all` 含む）。Task 5.1（実機SSP目視）は開発者による手動検証待ち。
 
 ### Phase 8 派生（未着手）
 - [ ] actor-surface-restore -- 同一スポットを複数アクターが共有して交代する際の、切替先アクターの立ち絵（サーフェスID・着せ替え状態）の復旧。Dependencies: sakura-script-newline
