@@ -1,6 +1,6 @@
 # Implementation Plan: sakura-script-newline
 
-- [ ] 1. 既存テストスイートの green 確認とベースライン記録
+- [x] 1. 既存テストスイートの green 確認とベースライン記録
   - `sakura_builder_test.lua`（`lua_unittest_runner` 経由）、`shiori_act_test.lua`、`loader/startup_test.rs`、および `cargo test`（pasta_lua ワークスペース全体）を実行し、変更前に全スイートが green であることを確認する
   - 現行の先出し順序出力（`\n[N]` が `\p` の直前・離脱側スコープ末尾に出る）を変更前ベースラインとして記録し、以降の期待値更新の比較対象とする
   - Observable: 変更前の全既存テストスイートが green で完走し、先出し順序が現行のテスト期待値として確認できる
@@ -66,3 +66,8 @@
   - `cargo test`（pasta_lua ワークスペース全体、`tests/sakura_script/*.rs` を含む既存 Rust 統合テスト一式）を実行し、段落区切り改行の位置変更以外の出力（`talk`/`surface`/`wait`/`newline`/`raw_script`/`choice`/`choice_timeout`/`sakura_script`/`yield` の変換結果、`spot`/`clear_spot` による `actor_spots` 更新、空 `grouped_tokens` に対する `\e` のみの出力）にリグレッションがないことを確認する
   - Observable: `cargo test --workspace` が全件 green で完走し、タスク1で記録したベースラインと比較して段落区切り改行の位置以外に差分がないことが確認できる
   - _Requirements: 6.1, 6.2, 6.4, 6.5, 7.4_
+
+## Implementation Notes
+
+- **検証コマンド**: cargo実行前に `unset NoDefaultCurrentDirectoryInExePath`（未設定だとmlua-sys/LuaJITビルドがexit101で死ぬ）。Luaユニット=`cargo test -p pasta_lua --test lua_unittest_runner`、loader統合=`cargo test -p pasta_lua --test loader`、全体=`cargo test -p pasta_lua`。
+- **Task 1 ベースライン（変更前・先出し方式）**: Luaユニット 53スイート全 green、loader 140件 green（`test_shiori_act_uses_config_spot_newlines` の `\n[200]` 含む）。現行は `emit_actor_switch` 内で `allow_break and last_spot ~= nil and last_spot ~= spot` 判定により `\p[spot]` の**直前**（離脱側スコープ末尾）に `\n[N]` を先出しする。完全遅延方式ではこの位置が「切替先スポットの次の非空 talk 直前」へ移動し、A→B 単純シナリオでは改行ゼロになる。
