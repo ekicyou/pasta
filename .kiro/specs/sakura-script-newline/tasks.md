@@ -41,7 +41,7 @@
   - Observable: 新規往復シナリオと既存 clear_spot シナリオの両方で native/fallback のバイト一致が green で確認できる
   - _Requirements: 6.5_
 
-- [ ] 4. 統合テストを完全遅延方式へ書き換える
+- [x] 4. 統合テストを完全遅延方式へ書き換える
 - [x] 4.1 (P) shiori_act_test.lua のスポット変更改行ケースを往復シナリオへ書き換える
   - `act:talk(sakura)` → `act:talk(kero)` → `act:talk(sakura)` の A→B→A 往復で、`\n[150]` が戻り手番（2回目の sakura 発話）の直前にのみ出現することを確認するよう既存ケースを書き換える
   - Observable: `shiori_act_test.lua` の該当ケースが往復シナリオの新期待値で green
@@ -49,7 +49,7 @@
   - _Boundary: shiori_act_test.lua_
   - _Depends: 2_
 
-- [ ] 4.2 (P) startup_test.rs の config 伝搬テストを往復シナリオへ書き換える
+- [x] 4.2 (P) startup_test.rs の config 伝搬テストを往復シナリオへ書き換える
   - `test_shiori_act_uses_config_spot_newlines` を A→B→A へ書き換え、`spot_newlines = 2.0` 設定時に戻り手番で `\n[200]` が観測されることを確認し、config 値伝搬の検証を維持する
   - Observable: `startup_test.rs` の該当テストが往復シナリオの新期待値で green
   - _Requirements: 7.4_
