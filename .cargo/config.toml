@@ -1,0 +1,17 @@
+# ランタイムライブラリ（MSVC CRT）を静的リンクする設定。
+#
+# 配布する pasta.dll が VC++ 再頒布可能パッケージ（vcruntime140.dll / msvcp140.dll 等）に
+# 依存せず単体で動作するようにする。伺かゴーストの配布物にランタイム同梱を求めないための措置。
+#
+# 【重要】この設定はワークスペースルートに置く必要がある。
+# Cargo は `.cargo/config.toml` をカレントディレクトリから上位へ辿って探索するため、
+# CI（build.yml）がルートから `cargo build -p pasta_shiori` を実行する構成では、
+# crates/pasta_shiori/.cargo/config.toml は読み込まれない。ルート配置で確実に反映させる。
+#
+# 出荷ターゲットは x86（i686）・x64（x86_64）の両方。両者に crt-static を適用する。
+
+[target.i686-pc-windows-msvc]
+rustflags = ["-Ctarget-feature=+crt-static"]
+
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-Ctarget-feature=+crt-static"]
