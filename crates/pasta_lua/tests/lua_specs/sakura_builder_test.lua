@@ -811,6 +811,154 @@ describe("SAKURA_BUILDER - sakura-script-newline: 改行キャンセル", functi
 end)
 
 -- ============================================================================
+-- sakura-script-newline: 完全遅延（Task 3.1）
+-- 会話終端・往復・スポット共有シナリオの完全遅延挙動を固定するテスト。
+-- 要件 2.6, 2.7, 2.8, 3.1, 6.6, 7.3
+-- ============================================================================
+
+describe("SAKURA_BUILDER - sakura-script-newline: 完全遅延（Task 3.1）", function()
+    -- ヘルパー: 指定パターンの出現回数を数える
+    local function count(result, pattern)
+        local c = 0
+        for _ in result:gmatch(pattern) do c = c + 1 end
+        return c
+    end
+
+    test("A→B 終了で段落区切り改行がゼロ（異なるスポット 0/1）", function()
+        local BUILDER, actors = setup()
+
+        -- 意図した挙動(R2.6/R3.1): A(spot0)→B(spot1) で会話が終わる場合、
+        -- 各 spot は初テキストであり、離脱側末尾のゴミ改行も出さない完全遅延方式では
+        -- 出力全体に段落区切り改行 \n[ が1つも含まれない。
+        local tokens = {
+            { type = "spot", actor = actors.sakura, spot = 0 },
+            { type = "spot", actor = actors.kero,   spot = 1 },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = { { type = "talk", actor = actors.sakura, text = "A1" } }
+            },
+            {
+                type = "actor",
+                actor = actors.kero,
+                tokens = { { type = "talk", actor = actors.kero, text = "B1" } }
+            },
+        }
+        local result = BUILDER.build(tokens, { spot_newlines = 1.5 })
+
+        -- \n[ は1つも含まれない（末尾の未フラッシュ pending も破棄される）
+        expect(result:find("\\n%[")):toBeFalsy()
+        expect(result:find("\\p%[0%]A1")):toBeTruthy()
+        expect(result:find("\\p%[1%]B1")):toBeTruthy()
+    end)
+
+    test("A→B→A 往復（異なるスポット）で戻り手番のみ改行", function()
+        local BUILDER, actors = setup()
+
+        -- 意図した挙動(R2.7/R2.8): A1・B1 は各 spot 初テキストのため改行なし。
+        -- A2 は has-text 済みの spot0 へ戻るため、その直前でのみ \n[150] が1回出る。
+        local tokens = {
+            { type = "spot", actor = actors.sakura, spot = 0 },
+            { type = "spot", actor = actors.kero,   spot = 1 },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = { { type = "talk", actor = actors.sakura, text = "A1" } }
+            },
+            {
+                type = "actor",
+                actor = actors.kero,
+                tokens = { { type = "talk", actor = actors.kero, text = "B1" } }
+            },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = { { type = "talk", actor = actors.sakura, text = "A2" } }
+            },
+        }
+        local result = BUILDER.build(tokens, { spot_newlines = 1.5 })
+
+        -- 戻り手番 A2 の直前でのみ段落改行（\p[0]\n[150]A2）
+        expect(result:find("\\p%[0%]\\n%[150%]A2")):toBeTruthy()
+        -- A1・B1 の直前には改行が出ない
+        expect(result:find("\\p%[0%]A1")):toBeTruthy()
+        expect(result:find("\\p%[1%]B1")):toBeTruthy()
+        -- \n[150] の総数は1
+        expect(count(result, "\\n%[150%]")):toBe(1)
+    end)
+
+    test("同一スポット共有の2アクター交代（spot 0 共有）でも切替直後に改行", function()
+        local BUILDER, actors = setup()
+
+        -- 意図した挙動(R6.6/R3.1): 両アクターとも spot 0。A1 で spot0 に has-text が付き、
+        -- B へ切り替えると同一 spot0 を解決し pending が真になるため、B1 直前に \n[150] が出る。
+        -- 先出し版の「同一スポット抑制」は完全遅延方式では適用されない。
+        local tokens = {
+            { type = "spot", actor = actors.sakura, spot = 0 },
+            { type = "spot", actor = actors.kero,   spot = 0 },
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = { { type = "talk", actor = actors.sakura, text = "A1" } }
+            },
+            {
+                type = "actor",
+                actor = actors.kero,
+                tokens = { { type = "talk", actor = actors.kero, text = "B1" } }
+            },
+        }
+        local result = BUILDER.build(tokens, { spot_newlines = 1.5 })
+
+        -- B1 直前に \n[150] が出る（\p[0]\n[150]B1）
+        expect(result:find("\\p%[0%]\\n%[150%]B1")):toBeTruthy()
+        -- 切替のたびにタグ出力されるため \p[0] は2回
+        expect(count(result, "\\p%[0%]")):toBe(2)
+        -- A1 の直前には改行が出ない
+        expect(result:find("\\p%[0%]A1")):toBeTruthy()
+        -- \n[150] の総数は1（戻り手番の1回のみ）
+        expect(count(result, "\\n%[150%]")):toBe(1)
+    end)
+
+    test("N 算出: spot_newlines 1.5→\\n[150] / 2.0→\\n[200]（往復シナリオ）", function()
+        local BUILDER, actors = setup()
+
+        local function make_tokens()
+            return {
+                { type = "spot", actor = actors.sakura, spot = 0 },
+                { type = "spot", actor = actors.kero,   spot = 1 },
+                {
+                    type = "actor",
+                    actor = actors.sakura,
+                    tokens = { { type = "talk", actor = actors.sakura, text = "A1" } }
+                },
+                {
+                    type = "actor",
+                    actor = actors.kero,
+                    tokens = { { type = "talk", actor = actors.kero, text = "B1" } }
+                },
+                {
+                    type = "actor",
+                    actor = actors.sakura,
+                    tokens = { { type = "talk", actor = actors.sakura, text = "A2" } }
+                },
+            }
+        end
+
+        -- spot_newlines = 1.5 → \n[150]
+        local r15 = BUILDER.build(make_tokens(), { spot_newlines = 1.5 })
+        expect(r15:find("\\p%[0%]\\n%[150%]A2")):toBeTruthy()
+        expect(count(r15, "\\n%[150%]")):toBe(1)
+        expect(r15:find("\\n%[200%]")):toBeFalsy()
+
+        -- spot_newlines = 2.0 → \n[200]
+        local r20 = BUILDER.build(make_tokens(), { spot_newlines = 2.0 })
+        expect(r20:find("\\p%[0%]\\n%[200%]A2")):toBeTruthy()
+        expect(count(r20, "\\n%[200%]")):toBe(1)
+        expect(r20:find("\\n%[150%]")):toBeFalsy()
+    end)
+end)
+
+-- ============================================================================
 -- actor-spot-refactoring: 統合シナリオ (Task 4.4)
 -- ============================================================================
 
