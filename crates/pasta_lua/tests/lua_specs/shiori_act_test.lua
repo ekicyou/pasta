@@ -157,20 +157,33 @@ describe("SHIORI_ACT - talk()", function()
         expect(result:find("\\p%[2%]")):toBeTruthy()
     end)
 
-    test("adds newline after spot switch", function()
+    test("adds newline only on the return turn of an A→B→A round-trip", function()
         local act, actors = new_act()
 
         -- 新アーキテクチャ: set_spot()でスポット位置を明示的に設定
+        -- sakura=spot0, kero=spot1 の異なるスポットで往復
         act:set_spot("sakura", 0)
         act:set_spot("kero", 1)
 
-        act:talk(actors.sakura, "Hello")
-        act:talk(actors.kero, "Hi")
+        -- A→B→A 往復。完全遅延方式では、スポットに既発話がある状態へ
+        -- 戻ってきた手番の直前にのみ段落改行 \n[150] が出力される。
+        act:talk(actors.sakura, "Hello") -- A1
+        act:talk(actors.kero, "Hi")      -- B1
+        act:talk(actors.sakura, "Back")  -- A2 (戻り手番)
         local result = act:build()
 
-        -- スポット変更時に段落改行が出力される: \n[150]\p[1]
-        expect(result:find("\\n%[150%]")):toBeTruthy()
-        expect(result:find("\\p%[1%]")):toBeTruthy()
+        -- \n[150] は往復全体で1回だけ出現する
+        local _, newline_count = result:gsub("\\n%[150%]", "")
+        expect(newline_count):toBe(1)
+
+        -- \n[150] は戻り手番(A2)のテキスト直前にのみ出現する:
+        -- \p[0]\n[150]Back の順で連続して現れる
+        expect(result:find("\\p%[0%]\\n%[150%]Back")):toBeTruthy()
+
+        -- A1・B1 の前には \n[150] が出ない:
+        -- 最初の \p[0] の直後は Hello（改行なし）、B1 の \p[1] の直後は Hi
+        expect(result:find("\\p%[0%]Hello")):toBeTruthy()
+        expect(result:find("\\p%[1%]Hi")):toBeTruthy()
     end)
 
     test("supports method chaining", function()

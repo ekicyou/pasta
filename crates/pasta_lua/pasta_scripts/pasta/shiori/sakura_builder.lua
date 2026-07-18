@@ -35,16 +35,14 @@ local function clear_spots(actor_spots)
     end
 end
 
---- アクター切り替え時のスポットタグ（必要なら段落区切り改行）を出力
+--- アクター切り替え時にスポットタグ `\p[spot]` を出力する。
+--- スポット解決（未設定→0＋警告）と `\p[spot]` 出力のみを行い、
+--- 段落区切り改行の判定・出力・保留（pending）はすべて呼び出し側（BUILDER.build ループ）が担う。
 --- @param buffer table 出力バッファ（pasta.buf 互換）
 --- @param actor_spots table<string, integer> アクターごとのスポット位置マップ
---- @param last_spot number|nil 直前のスポットID（nil は未出力）
 --- @param actor table 切り替え先アクター（非nil保証は呼び出し元）
---- @param spot_newlines number スポット変更時の改行量
---- @param allow_break boolean 段落区切り改行を許可するか（前回の改行以降に一般文字列が出力済みの場合のみ true）
 --- @return number spot 切り替え後のスポットID
---- @return boolean emitted_break 段落区切り改行を出力したか
-local function emit_actor_switch(buffer, actor_spots, last_spot, actor, spot_newlines, allow_break)
+local function emit_actor_switch(buffer, actor_spots, actor)
     local actor_name = actor.name
     local spot = actor_spots[actor_name]
     if spot == nil then
@@ -54,18 +52,8 @@ local function emit_actor_switch(buffer, actor_spots, last_spot, actor, spot_new
         end
     end
 
-    -- spot変更時に段落区切り改行を出力。
-    -- ただし直前の会話が全てさくらスクリプト（一般文字列が1文字も未出力）の場合は
-    -- allow_break=false となり、改行を抑制する。
-    local emitted_break = false
-    if allow_break and last_spot ~= nil and last_spot ~= spot then
-        local percent = math.floor(spot_newlines * 100)
-        buffer:put(string.format("\\n[%d]", percent))
-        emitted_break = true
-    end
-
     buffer:put(spot_to_tag(spot))
-    return spot, emitted_break
+    return spot
 end
 
 --- actorグループ内の単一トークンをさくらスクリプトへ変換して出力
@@ -117,55 +105,77 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots)
 
     -- input_actor_spots を直接変更する（nilの場合は内部で空テーブルを作成）
     local actor_spots = input_actor_spots or {}
-    local last_actor = nil -- 最後に発言したActor
-    local last_spot = nil  -- 最後のスポットID
-    -- 前回の段落区切り改行以降に一般文字列（talk）が1文字でも出力されたか。
-    -- アクター切り替え時、これが false（＝直前の会話が全てさくらスクリプト）なら
-    -- 段落区切り改行を抑制する（sakura-script-newline）。
-    local text_since_break = false
+    -- ビルドローカル状態機械（sakura-script-newline / 完全遅延方式）
+    local last_actor = nil    -- 最後に発言したActor
+    local last_spot = nil     -- 最後のスポットID（＝現在スコープ）
+    -- 解決済みスポットIDごとに、同一ビルド内で一般文字列（非空 talk）を出力済みか。
+    -- 段落区切り改行の判定材料（「バルーンに既にテキストがあるか」の意味論）。
+    local spot_has_text = {}  -- table<integer, boolean>
+    -- 現在スコープ（last_spot）に対する段落区切り改行の保留フラグ。
+    -- 切替のたびに破棄→切替先の has-text で再評価されるため単一 boolean で表現できる。
+    local pending_break = false
 
     for _, token in ipairs(grouped_tokens) do
         local t = token.type
 
         if t == "spot" then
-            -- spotトークン処理: actor_spots[actor.name] = spot
+            -- S6: spotトークン処理: actor_spots[actor.name] = spot（状態不変）
             if token.actor and token.actor.name then
                 actor_spots[token.actor.name] = token.spot
             end
         elseif t == "clear_spot" then
-            -- clear_spotトークン処理
+            -- S5: clear_spotトークン処理（has-text 全体と pending もリセット）
             clear_spots(actor_spots)
             last_actor = nil
             last_spot = nil
-            text_since_break = false
+            spot_has_text = {}
+            pending_break = false
         elseif t == "actor" then
             -- actorトークン処理: アクター切り替え検出後、グループ内のトークンを順次処理
             local actor = token.actor
 
             if actor and last_actor ~= actor then
-                local emitted_break
-                last_spot, emitted_break =
-                    emit_actor_switch(buffer, actor_spots, last_spot, actor, spot_newlines, text_since_break)
-                -- 段落区切り改行を出力したら「前回の改行以降」の起点をリセット
-                if emitted_break then
-                    text_since_break = false
-                end
+                -- S1: アクター切替検出。スポット解決＋`\p[spot]` 出力。
+                -- 切替先スポットの has-text で pending を再評価する（旧 pending は暗黙破棄）。
+                -- 先出し版の last_spot ~= spot / last_spot == spot ガードは復活させない。
+                local spot = emit_actor_switch(buffer, actor_spots, actor)
+                pending_break = (spot_has_text[spot] == true)
+                last_spot = spot
                 last_actor = actor
             end
 
             for _, inner in ipairs(token.tokens) do
-                -- 一般文字列（非空の talk）が出力されたら改行許可フラグを立てる。
-                -- surface/wait/sakura_script/choice 等はさくらスクリプト扱いでカウントしない。
-                if inner.type == "talk" and inner.text ~= nil and inner.text ~= "" then
-                    text_since_break = true
+                if inner.type == "clear" then
+                    -- S4b: `\c` を従来どおり出力（emit_inner_token 経由で不変）したうえで、
+                    -- 現在スポットの has-text を偽へリセットし pending を破棄する。
+                    -- クリアで区切るべき先行テキストが消えるため、後続テキスト直前に改行を出さない。
+                    emit_inner_token(buffer, actor, inner)
+                    pending_break = false
+                    if last_spot ~= nil then
+                        spot_has_text[last_spot] = false
+                    end
+                elseif inner.type == "talk" and inner.text ~= nil and inner.text ~= "" then
+                    -- S3: 非空 talk（一般文字列）。改行 → has-text 設定 → talk本文 の順を厳守。
+                    if pending_break then
+                        buffer:put(string.format("\\n[%d]", math.floor(spot_newlines * 100)))
+                        pending_break = false
+                    end
+                    if last_spot ~= nil then
+                        spot_has_text[last_spot] = true
+                    end
+                    emit_inner_token(buffer, actor, inner)
+                else
+                    -- S4: 空 talk・surface・wait・sakura_script・newline・choice・
+                    -- choice_timeout・raw_script・yield。変換出力のみ（has-text・pending 不変）。
+                    emit_inner_token(buffer, actor, inner)
                 end
-                emit_inner_token(buffer, actor, inner)
             end
         elseif t == "raw_script" then
             buffer:put(token.text)
         end
     end
 
+    -- S7: ループ終端。未フラッシュの pending は出力せず破棄してから `\e` を付与。
     buffer:put("\\e")
     return buffer:tostring()
 end

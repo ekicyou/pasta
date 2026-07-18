@@ -100,11 +100,15 @@ fn read_kick_state(shiori: &PastaShiori) -> String {
 // ===========================================================================
 
 /// OnBoot（hello-pasta 単一 OnBoot シーン）の完全応答（キック未使用）。
+///
+/// 意図した変更（`.kiro/specs/sakura-script-newline` R3.1）: sakura(spot0)→kero(spot1) の
+/// 単純切替は両スポットとも初テキストのため、完全遅延方式では段落区切り改行 `\n[150]` を
+/// 出力しない（先出し版は離脱側スコープ末尾にゴミ改行を残していた。本仕様はこれを排除する）。
 const GOLDEN_ONBOOT: &str = "SHIORI/3.0 200 OK\r\n\
 Charset: UTF-8\r\n\
 Sender: Pasta\r\n\
 SecurityLevel: local\r\n\
-Value: \\p[0]\\s[1]起動したよ～。\\_w[950]\\n[150]\\p[1]\\s[11]さあ、\\_w[450]始めようか。\\_w[950]\\e\r\n\
+Value: \\p[0]\\s[1]起動したよ～。\\_w[950]\\p[1]\\s[11]さあ、\\_w[450]始めようか。\\_w[950]\\e\r\n\
 \r\n";
 
 /// OnSecondChange 初回 tick（仮想ディスパッチャの内部タイマ初期化のみ・発行スキップ

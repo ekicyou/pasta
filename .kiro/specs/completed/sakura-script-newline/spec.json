@@ -1,0 +1,23 @@
+{
+  "feature_name": "sakura-script-newline",
+  "created_at": "2026-07-18T05:57:17Z",
+  "updated_at": "2026-07-18T09:40:00Z",
+  "language": "ja",
+  "phase": "completed",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true,
+  "completed_at": "2026-07-18T09:11:16Z"
+}

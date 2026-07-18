@@ -143,7 +143,10 @@ fn test_shiori_act_uses_config_spot_newlines() {
     let temp = copy_fixture_to_temp("with_ghost_config");
     let runtime = PastaLoader::load(temp.path()).unwrap();
 
-    // Verify SHIORI_ACT uses spot_newlines from config
+    // Verify SHIORI_ACT uses spot_newlines from config.
+    // 新アーキテクチャは完全遅延評価: A→B の片道では段落改行は出ない。
+    // A(sakura)→B(kero)→A(sakura) の往復にすることで、戻り手番 talk の直前に
+    // config 由来の spot_newlines(=2.0) が \n[200] としてフラッシュされる。
     let result = runtime
         .exec(
             r#"
@@ -158,16 +161,17 @@ fn test_shiori_act_uses_config_spot_newlines() {
         act:set_spot("kero", 1)
         act:talk(actors.sakura, "Hello")
         act:talk(actors.kero, "Hi")
+        act:talk(actors.sakura, "Back")
         return act:build()
     "#,
         )
         .unwrap();
 
     let script = value_as_str(&result).unwrap();
-    // spot_newlines = 2.0 → \n[200]
+    // spot_newlines = 2.0 → 戻り手番で \n[200] が観測される
     assert!(
         script.contains("\\n[200]"),
-        "Expected \\n[200] but got: {}",
+        "Expected \\n[200] on the return turn but got: {}",
         script
     );
 }
