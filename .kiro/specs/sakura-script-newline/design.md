@@ -266,7 +266,7 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots)
 7. **同一アクター継続グループでのフラッシュ**（2.2）: 切替グループが surface のみ→同一アクターの次グループで talk → その talk 直前でフラッシュ
 8. **clear_spot リセット**（4.4）: has-text 済み状態で clear_spot → 以後の切替で保留なし
 9. **N 算出**（2.8）: `spot_newlines = 1.5 → \n[150]` / `2.0 → \n[200]`（A→B→A で観測）
-10. **バイト一致**（6.5）: 往復シナリオ（`\n[200]` を含む）で native / `buf.new_fallback` のバイト一致（既存 string-buffer テストのシナリオを往復化して維持）
+10. **バイト一致**（6.5）: A→B→A 往復シナリオ（`\n[200]` を含む）で native / `buf.new_fallback` のバイト一致を検証する**新規ケースを追加**。既存 string-buffer テストの clear_spot 経路シナリオは**削除せず**、期待値のみ遅延方式へ更新して併存させる（`\n[200]` カバレッジは往復ケースが担い、clear_spot 経路のバイト一致検証は既存ケースが担う）
 
 ### Integration Tests（7.4）
 
