@@ -125,7 +125,7 @@ describe("SAKURA_BUILDER - surface token", function()
 end)
 
 describe("SAKURA_BUILDER - wait token", function()
-    test("waitトークンを \\w[ms] に変換する", function()
+    test("waitトークンを \\_w[ms] に変換する", function()
         local BUILDER, actors = setup()
 
         local tokens = {
@@ -140,7 +140,27 @@ describe("SAKURA_BUILDER - wait token", function()
         }
         local result = BUILDER.build(tokens, {})
 
-        expect(result:find("\\w%[500%]")):toBeTruthy()
+        expect(result:find("\\_w%[500%]")):toBeTruthy()
+    end)
+
+    -- `\w時間` は 1〜9 の 50ms 単位専用であり、角括弧書式を取らない（UKADOC）
+    test("角括弧付き \\w[ms] を出力しない", function()
+        local BUILDER, actors = setup()
+
+        local tokens = {
+            {
+                type = "actor",
+                actor = actors.sakura,
+                tokens = {
+                    { type = "talk", actor = actors.sakura, text = "" },
+                    { type = "wait", ms = 500 },
+                }
+            },
+        }
+        local result = BUILDER.build(tokens, {})
+
+        -- `\_w[` の直前が `_` でない `\w[` が存在しないこと
+        expect(result:find("[^_]w%[500%]")):toBeFalsy()
     end)
 end)
 
@@ -301,7 +321,7 @@ describe("SAKURA_BUILDER - 複合シナリオ", function()
         expect(result:find("\\p%[0%]")):toBeTruthy()
         expect(result:find("Hello")):toBeTruthy()
         expect(result:find("\\s%[5%]")):toBeTruthy()
-        expect(result:find("\\w%[100%]")):toBeTruthy()
+        expect(result:find("\\_w%[100%]")):toBeTruthy()
         -- 意図した変更(R3.1): A(spot0)→B(spot1) は各spot初テキストのため段落区切り改行を出さない
         expect(result:find("\\n%[150%]")):toBeFalsy()
         expect(result:find("\\p%[1%]")):toBeTruthy()

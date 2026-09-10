@@ -242,7 +242,7 @@ describe("SHIORI_ACT - wait()", function()
         act:wait(500)
         local result = act:build()
 
-        expect(result:find("\\w%[500%]")):toBeTruthy()
+        expect(result:find("\\_w%[500%]")):toBeTruthy()
     end)
 
     test("handles negative values as 0", function()
@@ -252,7 +252,7 @@ describe("SHIORI_ACT - wait()", function()
         act:wait(-100)
         local result = act:build()
 
-        expect(result:find("\\w%[0%]")):toBeTruthy()
+        expect(result:find("\\_w%[0%]")):toBeTruthy()
     end)
 
     test("truncates float to integer", function()
@@ -262,7 +262,7 @@ describe("SHIORI_ACT - wait()", function()
         act:wait(500.7)
         local result = act:build()
 
-        expect(result:find("\\w%[500%]")):toBeTruthy()
+        expect(result:find("\\_w%[500%]")):toBeTruthy()
     end)
 
     test("supports method chaining", function()
@@ -430,7 +430,7 @@ describe("SHIORI_ACT - E2E scenario", function()
         expect(result:find("\\p%[0%]")):toBeTruthy()   -- sakura spot
         expect(result:find("こんにちは")):toBeTruthy()
         expect(result:find("\\s%[5%]")):toBeTruthy()   -- surface
-        expect(result:find("\\w%[500%]")):toBeTruthy() -- wait
+        expect(result:find("\\_w%[500%]")):toBeTruthy() -- wait
         expect(result:find("\\p%[1%]")):toBeTruthy()   -- kero spot
         expect(result:find("やあ")):toBeTruthy()
         expect(result:find("\\c")):toBeTruthy()        -- clear

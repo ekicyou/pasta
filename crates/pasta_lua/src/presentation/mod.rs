@@ -169,7 +169,7 @@ mod tests {
 
     #[test]
     fn classifies_wait_as_marker_only() {
-        // R2.5: Wait はマーカーのみ（ms 値）であり、さくらスクリプトタグ（\w[..]）を持たない。
+        // R2.5: Wait はマーカーのみ（ms 値）であり、さくらスクリプトタグ（\_w[..]）を持たない。
         let f = Fields {
             ms: Some(950),
             ..Default::default()
