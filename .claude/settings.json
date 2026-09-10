@@ -14,5 +14,40 @@
       "$defaults",
       "gh pr merge による pull request の default ブランチ（main 等）への squash マージを許可する。self-created PR を含み、kiro-complete の完了フローでの自動マージを想定する。"
     ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \".claude/hooks/ponytail-activate.js\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \".claude/hooks/ponytail-mode-tracker.js\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \".claude/hooks/ponytail-subagent.js\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
   }
 }
