@@ -468,7 +468,7 @@ local grouped_tokens = {
 }
 local config = { spot_newlines = 0.5 }
 local script = BUILDER.build(grouped_tokens, config)
--- 結果: "\p[0]こんにちは！\s[5]\w[1000]\e"
+-- 結果: "\p[0]こんにちは！\s[5]\_w[1000]\e"
 ```
 
 #### レガシーフラット形式（後方互換）
@@ -495,7 +495,7 @@ local script = BUILDER.build(tokens, config)
 | `clear_spot`    | -                 | 内部状態リセット（出力なし）         |
 | `spot_switch`   | -                 | `\n[percent]` (段落区切り、レガシー) |
 | `surface`       | `id`              | `\s[id]`                             |
-| `wait`          | `ms`              | `\w[ms]`                             |
+| `wait`          | `ms`              | `\_w[ms]` (精密ウェイト)             |
 | `newline`       | `n`               | `\n` × n回                           |
 | `clear`         | -                 | `\c`                                 |
 | `raw_script`    | `text`            | そのまま出力                         |

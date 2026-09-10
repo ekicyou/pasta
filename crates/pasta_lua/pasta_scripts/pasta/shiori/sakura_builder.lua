@@ -70,7 +70,7 @@ local function emit_inner_token(buffer, actor, inner)
     elseif inner_type == "surface" then
         buffer:put(string.format("\\s[%s]", tostring(inner.id)))
     elseif inner_type == "wait" then
-        buffer:put(string.format("\\w[%d]", inner.ms))
+        buffer:put(string.format("\\_w[%d]", inner.ms))
     elseif inner_type == "newline" then
         for _ = 1, inner.n do
             buffer:put("\\n")
