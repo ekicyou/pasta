@@ -164,8 +164,7 @@
 
 - **#1 500 応答経路の復旧（Requirement 4）**: 本仕様に含める。対象はリクエスト処理エラー全般。
   - 実装点は `crates/pasta_shiori/src/actor/thread.rs:184-196` の `Err(_)` 分岐 1 箇所。reply を drop する代わりに `Reply::Value(e.to_shiori_response())` を送れば、`last_load_error` → `MyError::Load` → 500 の既存配管がそのまま本番へ届く。`marshaling.rs` の drop／Timeout／try_send 失敗 → 204 は安全網として無変更（`pasta-actor-runtime` R5.3 / R5.6 / R5.7 と非干渉）。
-  - **新規発見**: `to_shiori_response()` はエラーメッセージを無加工で `X-ERROR-REASON` へ埋め込む。LuaJIT の `module 'X' not found:` は**複数行**（候補パスごとに `
-	no file ...`）のため、そのままでは SHIORI 応答のヘッダ構造が壊れる。単一行化（Requirement 4.6）が必須。ログ側は複数行のまま欠落なく残す（Requirement 4.7）。
+  - **新規発見**: `to_shiori_response()` はエラーメッセージを無加工で `X-ERROR-REASON` へ埋め込む。LuaJIT の `module 'X' not found:` は**複数行**（候補パスごとに `\n\tno file ...`）のため、そのままでは SHIORI 応答のヘッダ構造が壊れる。単一行化（Requirement 4.6）が必須。ログ側は複数行のまま欠落なく残す（Requirement 4.7）。
   - NOTIFY は応答経路を持たず即 204（プロトコル上不可避）。可視化は GET で行う（Requirement 4.3 / 4.8 は GET 限定）。
 - **#2 `main` は致命（Requirement 5.2）**: `crates/pasta_lua/pasta_scripts/main.lua`（何もしない既定実装）が常に自己展開されるため「不在」は正常状態ではない。`factory.rs:197-201` を `?` 伝搬へ。
 - **#3 旧経路 `from_loader`（Requirement 5.6）**: 是正する。利用箇所は `tests/runtime/encoding_test.rs` と `tests/runtime/runtime_api_test.rs` の計 9 箇所のみ。旧経路は `scripts/pasta/shiori/entry.lua` をファイル直読みするため、致命化するとフィクスチャに entry が無いテストが落ちる可能性がある。**修正 vs 撤去（テストを `from_loader_with_scene_dic` へ移行）は設計で決定**。
