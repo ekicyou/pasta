@@ -172,6 +172,8 @@
 - **#5 チャンク識別子はバイト単位で同一（Requirement 3.4 / 3.7 / 3.8）**: 現行の識別子は「`generate_package_path` が作るテンプレート（区切り `/`）の `?` へ、`.` を `\` に置換したモジュール名を代入したもの」。Rust searcher が同じテンプレート文字列から同じ代入で候補を作れば、探索順序（Requirement 3.1〜3.3）と識別子の両方が自動的に一致する。読み込み用パス（必要なら verbatim）と命名用パスは分離する。「Decision: チャンク名の生成方式」の選択肢は **(1) バイト単位再現で確定**。
 - **#6 テストは常時実行・ロケール非依存（Requirement 6.6 / 6.7）**。
 - **#7 ドキュメントは `book/`（Requirement 5.4 / 6.5 / 6.8）**: ページ構成は設計で決定。
+- **#8 x86 テストを CI で実行（Requirement 7.3）**: `.github/workflows/build.yml:48` の `cargo test --all` はターゲット指定が無く、x86 ジョブでもホスト（x64）のテストが走っている。x86 ジョブを `--target i686-pc-windows-msvc` 付きへ改める。CI 時間の増加と、本仕様と無関係な x86 固有の失敗が表面化する可能性に注意（多数出た場合は報告のうえ縮退を判断）。
+- **スコープ外の観測（別タスク候補）**: `actor_teardown_test.rs:241` の `repeated_reload_tears_down_and_does_not_leak` が PR #32（ドキュメントのみの変更）の CI で失敗し、直後の main では成功している（flaky の疑い）。また CI 失敗でもマージ可能な状態にある。本仕様では扱わないが、x86 テスト追加時に同テストが再発する可能性がある。
 
 ## Risks & Mitigations
 
@@ -208,18 +210,9 @@
 
 ---
 
-## Open Questions（`requirements.md` と同一・ディスカッションで確定）
+## Open Questions
 
-本ギャップ分析で新たに判明・更新した項目を含む。詳細は `requirements.md` の「Open Questions」節を参照。
-
-1. **【重大】** 500 + `X-ERROR-REASON` 応答経路の復旧を本仕様に含めるか、別 spec へ切り出すか。
-2. `main` のロード失敗を致命扱いにするか。
-3. 旧経路 `from_loader` の同型の無言化を同時に是正するか。
-4. 標準 searcher をフォールバックとして残すか撤去するか（`package.path` の ANSI 変換の扱いを含む）。
-5. サポートするパス長の上限を要件として明示するか。
-6. 長パス・非 ANSI テストの CI 実行範囲。
-7. チャンク識別子の「同一形式」の厳密さ（生表示の差を許容するか）。
-8. ドキュメント更新の対象範囲。
+要件ディスカッションで全項目を解決済み。決定の一覧は `requirements.md` の「Open Questions」節、設計への申し送りは本書「要件ディスカッションの決定と設計への申し送り」節を参照。標準 searcher フォールバックの去就のみ設計判断として残る（「Decision: 標準 searcher フォールバックの去就と `package.path` の ANSI 変換」）。
 
 ---
 
