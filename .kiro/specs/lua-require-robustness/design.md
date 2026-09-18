@@ -388,7 +388,7 @@ fn search(package_path: &str, module_name: &str) -> SearchOutcome;
 
 - Integration: Rust 関数は `(loader)` または `(nil, message, is_load_error)` を返すだけにし、`is_load_error` のとき `error(message, 0)` を送出する数行の Lua ラッパを searcher 本体として設置する（M4: Rust の `Err` を直接返すと `pcall` が受ける値が userdata になるため）。ラッパのチャンク名は `=pasta_searcher` とする。
 - Validation: `module_searcher_test.rs` で、同一 `package.path`・同一ファイル群に対する標準 searcher 版 VM と本 searcher 版 VM の結果（`source` / `short_src` / チャンク引数 / 未検出・構文エラー・実行時エラーの `pcall` 戻り値の型と文言）をバイト比較する。これが 3.4 の恒久ゲートになる。
-- Risks: `package.path` に UTF-8 として不正なバイト列が含まれる場合（作者コードが ANSI バイト列を追記した等）は lossy 変換され、その候補は開けず `no file` 行に載る。挙動変更として `book/` に明記する（Open Questions 3）。
+- Risks: `package.path` に UTF-8 として不正なバイト列が含まれる場合（作者コードが ANSI バイト列を追記した等）は lossy 変換され、その候補は開けず `no file` 行に載る。挙動変更として `book/` に明記する（設計ディスカッション #6 で確定）。
 
 #### PackagePathSetup
 
@@ -579,7 +579,7 @@ pub fn copy_fixture_into(fixture: &str, dest: &Path);
 
 - 起動失敗: `error` レベル・`module` / `fatal` フィールド付きの 1 レコード（factory）＋ `PastaShiori load failed`（既存・`shiori.rs`）。いずれも複数行のエラー本文を欠落なく含む。
 - リクエスト処理エラー: 既存の `SHIORI.request execution failed`（error）＋ `seam="actor.reply", error=true`（debug）。
-- ホストとの接点: `load` の戻り値 false、および GET への 500 + `X-ERROR-REASON`。**注意**: `load` が false を返した後にホストが request を送るかはホスト実装に依存する（未実測・Open Questions 8）。
+- ホストとの接点: `load` の戻り値 false、および GET への 500 + `X-ERROR-REASON`。**注意**: `load` / `loadu` が false を返した後にホストが request を送るかはホスト実装に依存する（未実測）。実装フェーズの最後に実機（SSP）で確認し、結果を `book/src/reference/startup.md` の切り分け手順へ反映する（「Testing Strategy > 実機確認」）。送られない場合でも、`load` の戻り値とログによる可視化は成立する。
 
 ## Testing Strategy
 
@@ -594,7 +594,7 @@ pub fn copy_fixture_into(fixture: &str, dest: &Path);
 
 ### Integration Tests（pasta_lua）
 
-1. `path_robustness_test.rs`: 3 種の設置パス（300 文字超 ASCII／`NON_ANSI_DIR_NAME`／両方）それぞれで `PastaLoader::load` が成功し、内蔵（`pasta.shiori.entry`）・利用者（`scripts/` 配下の追加モジュール）・シーン（`pasta.scene.*`）の 3 層が解決される（1.1〜1.4 / 2.1 / 2.2 / 6.1 / 6.2 / 6.7）。
+1. `path_robustness_test.rs`: 3 種の設置パス（300 文字超 ASCII／`NON_ANSI_DIR_NAME`／両方）それぞれで `PastaLoader::load` が成功し、内蔵（`pasta.shiori.entry`）・利用者（`scripts/` 配下の追加モジュール）・シーン（`pasta.scene.*`）の 3 層が解決される。シーンには非 ASCII のファイル名（例: `dic/会話.pasta`）を 1 本含め、モジュール名に非 ASCII を含む場合も解決されることを確認する（1.1〜1.4 / 2.1 / 2.2 / 6.1 / 6.2 / 6.7）。
 2. 同ファイル: 上記パス上で、ロード済みモジュールのチャンク識別子が `\\?\` を含まず、`@` + `package.path` 由来の UTF-8 文字列である（3.7 / 3.8）。未検出エラーの文言が `NON_ANSI_DIR_NAME` をそのまま含む（2.3 / 1.5）。
 3. `startup_fatal_test.rs`: `scripts/main.lua` が構文エラー／`scripts/pasta/shiori/entry.lua`（上書き）が実行時エラー／`entry` が存在しないモジュールを require、の各ケースで `PastaLoader::load` が `Err` を返し、Display が起動モジュール名と根本原因を含む（4.1 / 4.5 / 4.9 / 5.1 / 5.2 / 5.5）。
 4. `runtime_api_test.rs`（更新）: `from_loader` は `entry.lua` の実行失敗で `Err` を返す。不在ならば成功する（5.6）。
@@ -606,6 +606,10 @@ pub fn copy_fixture_into(fixture: &str, dest: &Path);
 2. `path_robustness_e2e_test.rs`: 長パス＋非 ANSI の設置先と通常の設置先で、同一リクエスト列に対する `PastaShiori` の応答がバイト一致する（1.2 / 2.2 / 3.5）。
 3. `ffi_loadu_test.rs`: FFI の `loadu`（`NON_ANSI_DIR_NAME` 配下の設置パスを UTF-8 で渡す）→ `request`（GET が正常応答）→ `unload`。続けて `loadu` → `load`（ANSI では表現できないため欠落したパス）で、`load` が TRUE を返しロード済み状態が壊れない（直後の GET が正常応答）こと。`unload` 後の `load` 単独は従来どおりロードすること（2.4〜2.6 / 6.9）。プロセス全域 static を使うため独立バイナリ・1 本のテスト関数で直列化する。
 4. 既存ゲート（無変更で通ること）: `byte_invariant_test.rs` / `kick_unused_byte_invariant_test.rs` / `ffi_extern_session_e2e_test.rs`（3.5）、`actor_marshaling_test.rs` / `actor_test_harness.rs` / `actor_tracing_seams_test.rs`（4.10）。
+
+### 実機確認（手動・実装フェーズの最後に 1 回）
+
+- SSP（2.6.92 以降）に、(a) ANSI 外の文字を含む 260 文字超のフォルダへ設置したゴーストが起動して喋ること、(b) `scripts/main.lua` を壊したゴーストで `load` 失敗後にホストが request を送るか・500 の `X-ERROR-REASON` がホストのログでどう見えるか、を確認する。(b) の結果は `book/` の切り分け手順へ反映する。自動テストでは代替できないホスト側挙動の確認であり、合否ゲートではなく記録を目的とする。
 
 ### CI
 
@@ -632,17 +636,19 @@ flowchart LR
 
 ## Open Questions
 
-設計フェーズでは利用者へ確認できないため、以下は**明示した仮定**で設計を進めた。設計ディスカッションで確定する。
+設計ディスカッションで全項目を解決済み。決定の要約:
 
-1. **【重要】SHIORI `load` のディレクトリパスは ANSI で渡される**。`windows.rs` の `load` は `hdir` を ANSI としてデコードするため、ホストが非 ANSI 文字を含む設置パスを正しく渡せず、本番の DLL 境界では要件 2 の条件が pasta_lua まで届かない可能性が高い。UKADOC の DLL 共通仕様には UTF-8 でパスを受け取る `loadu`（SSP 2.6.92 以降・`load` より優先）があり、pasta.dll は未実装である。**仮定**: 本設計は要件 2 の主語（pasta_lua ランタイム）に従い DLL 境界を境界外とした。`loadu` の追加（`windows.rs` に UTF-8 デコード版の入口を足し、`loadu` 済みなら `load` を無視）を本仕様へ含めるか、別仕様とするかを決める必要がある。含める場合は要件の追加が要る。
-2. **標準 searcher を「置換」する判断**。brief は「前置し標準をフォールバックとして残す」としていたが、実測（M4）に基づき置換とした。残置を望む場合は、未検出メッセージの二重化と 3.4（エラー文言のバイト同一）の扱いを再決定する。
-3. **`package.path` を UTF-8 として解釈する互換性**。ANSI バイト列を `package.path` へ自前で追記する作者コードは解決できなくなる（リポジトリ内に用例なし）。挙動変更として `book/` に記載する方針でよいか。
-4. **`from_loader` における `entry.lua` の不在**を「スキップ（失敗ではない）」のまま残す仮定。要件 5.6 を「不在も致命」と読む場合、`/test/path` を使う既存テスト 7 箇所のフィクスチャ化または `from_loader` 撤去が必要になる。
-5. **`X-ERROR-REASON` の単一行化規則**（行を trim して半角スペースで連結・長さ上限なし・mlua の traceback も含む）。区切り文字や traceback の除去、長さ上限の要否。
-6. **FFI 境界の UTF-8 デコード失敗 → 204**（`windows.rs`）は「リクエスト処理がエラーで終了した場合」に含めず無変更とした。500（または 400）へ改めるか。
-7. **`package.cpath` 由来の候補行**（ホスト exe のパスを ANSI で含む）は 2.3 の対象外とした。未検出メッセージから C searcher の行を消す（`package.cpath` を空にする）選択肢もあるが、C モジュールを使うゴーストへの影響が未調査である。
-8. **`load` が false を返した後のホスト挙動**（SSP / areka が request を送り続けるか）は未実測。送られない場合、500 は利用者に届かずログのみが手がかりになる。
-9. **非 ASCII の `.pasta` ファイル名**（例: `dic/会話.pasta` → `pasta.scene.会話`）は、現行では ANSI の `package.path` と UTF-8 のモジュール名が混在して解決に失敗していた可能性がある（未実測）。本設計では UTF-8 に統一されるため解消される見込みだが、テスト対象に加えるか。
+| # | 論点 | 決定 | 反映先 |
+|---|------|------|--------|
+| 1 | `loadu`（UTF-8 設置パス）対応 | 本仕様に含める（要件 2.4〜2.6 / 6.9 / 6.10 を追加） | ShioriLoadEntry |
+| 2 | 標準 searcher の置換と `loaders[2]` 位置依存 | 置換で確定。設置時にレイアウトを検証し、違反は起動失敗として可視化。冪等の契約は「VM 構築時に 1 回」へ | ModuleSearcher |
+| 3 | `X-ERROR-REASON` の単一行化規則 | スタックトレースを落とす・候補パス列は残す・長さ上限なし（要件 4.11 を追加） | ErrorResponse |
+| 4 | `request` の UTF-8 デコード失敗 → 204 | 無変更（要件 4.10 に安全網として明示） | Out of Boundary |
+| 5 | `from_loader` の `entry.lua` 不在 | スキップのまま（存在して失敗した場合のみ致命） | StartupSequence |
+| 6 | `package.path` の UTF-8 解釈による互換性 | 挙動変更として `book/` に明記（リポジトリ内に用例なし） | BookStartupPage |
+| 7 | `package.cpath` 由来の候補行 | 対象外のまま（C searcher は無変更） | Out of Boundary |
+| 8 | `load` 失敗後のホスト挙動 | 実装フェーズの最後に実機確認し `book/` へ反映 | Testing Strategy |
+| 9 | 非 ASCII の `.pasta` ファイル名 | `path_robustness_test.rs` のケースに含める | Testing Strategy |
 
 ## Supporting References
 

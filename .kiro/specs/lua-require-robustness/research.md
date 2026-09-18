@@ -325,6 +325,15 @@
 
 ---
 
+## 設計ディスカッションの決定
+
+- **#1 `loadu` を本仕様へ含める**: 従来の `load` は設置パスを ANSI で受けるため、ANSI 外の文字はホスト側で欠落し、本番では Requirement 2 が成立しない。DLL 共通仕様（UKADOC）の `loadu`（UTF-8・SSP 2.6.92 以降・`load` より優先）を追加する。既存の `ShioriString::to_utf8_str`（`util/hglobal/mod.rs:165`）と `lifecycle::spawn_actor` の再利用で足り、エクスポートは `load` と同じ `no_mangle`（`.def` なし）。要件 2.4〜2.6 / 6.9 / 6.10 を追加。
+- **#2 searcher は置換・設置時にレイアウト検証**: `package.loaders` が 4 要素でなければ `Err`（起動失敗として可視化）。冪等の契約は「VM 構築時に 1 回だけ呼ぶ」へ弱めた。
+- **#3 `X-ERROR-REASON`**: `stack traceback:` 以降を落とす。`no file` の候補パス列は根本原因なので残す。長さ上限なし。要件 4.11 を追加。
+- **#4 `request` の UTF-8 デコード失敗 → 204 は無変更**: 要件 4.10 の安全網に明示。ホストが通常運転中に非 UTF-8 を送る場面の有無が未確認で、変更は 3.5（バイト不変）を破るおそれがある。
+- **#5 `from_loader` の `entry.lua` 不在はスキップ**: 旧経路は SHIORI 応答モジュールを任意とする軽量構築経路。存在して失敗した場合のみ致命。
+- **#6〜#9**: `package.path` の UTF-8 解釈は `book/` に明記／`package.cpath` の候補行は対象外／`load` 失敗後のホスト挙動は実機確認して `book/` へ反映／非 ASCII の `.pasta` ファイル名をテストに含める。
+
 ## Effort & Risk
 
 | 範囲 | Effort | Risk | 根拠 |
@@ -340,9 +349,7 @@
 
 ## Open Questions
 
-要件ディスカッションで全項目を解決済み。決定の一覧は `requirements.md` の「Open Questions」節、設計への申し送りは本書「要件ディスカッションの決定と設計への申し送り」節を参照。標準 searcher フォールバックの去就は設計フェーズで「置換」と判断した（「設計判断（設計フェーズ）」）。
-
-設計フェーズで生じた未決事項（`loadu` 対応の要否、置換判断の確認、`package.path` の UTF-8 解釈の互換性、`from_loader` の `entry.lua` 不在の扱い、`X-ERROR-REASON` 単一行化規則 ほか）は `design.md` の「Open Questions」節に集約し、設計ディスカッションで解決する。
+設計ディスカッションで全項目を解決済み。決定は上記「設計ディスカッションの決定」および `design.md` の「Open Questions」節の表を参照。
 
 ---
 
