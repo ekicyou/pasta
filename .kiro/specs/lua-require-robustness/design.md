@@ -130,7 +130,7 @@ graph TB
 
 ### 主要な設計判断
 
-1. **標準 Lua ファイル searcher は「前置」ではなく「置換」する**（`research.md` の申し送り「標準 searcher フォールバックの去就」への回答）。
+1. **標準 Lua ファイル searcher は「前置」ではなく「置換」する**（`research.md` の申し送り「標準 searcher フォールバックの去就」への回答。設計ディスカッション #2 で確定。brief の「前置して残す」は実測 M4 により覆した）。
    - 前置＋残置は、未検出時の `no file` 行が二重になり（M4）、非 ASCII パスでは後段の標準 searcher が UTF-8 の `package.path` を ANSI として解釈して無意味な候補を出す。Rust searcher が開けないファイルを narrow `fopen` が開ける場面は存在しないため、フォールバックとしての価値が無い。
    - 置換なら未検出メッセージは変更前とバイト同一（M4）で、解決経路が 1 本に収束する。preload・C searcher は無変更で残る。
 2. **`package.path` は UTF-8 で設定し、searcher は require のたびに `package.path` を読む**。
@@ -355,7 +355,8 @@ sequenceDiagram
 // crates/pasta_lua/src/runtime/searcher.rs
 
 /// `package.loaders[2]` を Rust 実装の Lua ファイル searcher へ置換する。
-/// 同じ VM へ複数回呼んでも結果は同じ（冪等）。
+/// VM 構築時（他のどの Lua コードよりも前）に 1 回だけ呼ぶ。
+/// `package.loaders` が想定レイアウト（4 要素）でなければ Err を返す。
 pub fn install_module_searcher(lua: &mlua::Lua) -> mlua::Result<()>;
 
 /// `package.path` とモジュール名から候補パスを順に生成する（純粋関数・FS 非依存）。
@@ -375,7 +376,7 @@ enum SearchOutcome {
 fn search(package_path: &str, module_name: &str) -> SearchOutcome;
 ```
 
-- Preconditions: `package` ライブラリがロード済みで `package.loaders` が 4 要素のテーブルであること（M1）。`package.path` が文字列であること（そうでなければ標準と同じく `'package.path' must be a string` の Lua エラー）。
+- Preconditions: `package` ライブラリがロード済みで、VM 上でまだ Lua コードが実行されていないこと。`install_module_searcher` は `package.loaders` が 4 要素のテーブルであること（M1）を**設置時に検証**し、違反していれば `Err` を返す。この `Err` は `setup_package_path` から起動失敗として伝搬し、500 とログで可視化される（mlua / LuaJIT の更新でレイアウトが変わった場合に、黙って別の searcher を上書きしない）。設置後にスクリプトライブラリ（luacheck 等）が `table.insert(package.loaders, 1, …)` で searcher を前置しても、テーブルの要素として残るため動作に影響しない。`package.path` が文字列であること（そうでなければ標準と同じく `'package.path' must be a string` の Lua エラー）。
 - Postconditions:
   - Found: `@<candidate>` をチャンク名としてコンパイルした関数を searcher の戻り値とする。`require` はこの関数をモジュール名 1 引数で呼ぶ（標準と同一・M3）。
   - NotFound: `message` を Lua 文字列として返す。`require` が他の searcher の文字列と連結して `module '<name>' not found:…` を送出する（M4 で標準とバイト同一を確認）。
@@ -584,7 +585,7 @@ pub fn copy_fixture_into(fixture: &str, dest: &Path);
 
 1. `searcher.rs` 内: `candidate_paths` が `;` 区切り・空要素スキップ・`?` 全置換・`.`→区切り文字置換を、標準 `searchpath` と同じ規則で行う（3.1〜3.3 / 1.6: 長さ判定が無いこと）。
 2. `module_searcher_test.rs`: 標準 searcher 版 VM と本 searcher 版 VM の**バイト比較** — `source` / `short_src` / チャンク引数（`?.lua` と `?/init.lua`）、未検出・構文エラー・実行時エラーの `pcall(require, …)` 戻り値の型と文言（3.4 / 1.5 / 4.9）。
-3. `module_searcher_test.rs`: 同名モジュールが 2 つの検索パスにあるとき先頭側が勝つ（3.3）。`package.loaded` 登録済みの `@pasta_config` が searcher を経由せず解決される。`install_module_searcher` の冪等性。
+3. `module_searcher_test.rs`: 同名モジュールが 2 つの検索パスにあるとき先頭側が勝つ（3.3）。`package.loaded` 登録済みの `@pasta_config` が searcher を経由せず解決される。`package.loaders` の要素数を変えた VM では `install_module_searcher` が `Err` を返す。
 4. `error.rs` 内: `single_line` が CR / LF / CRLF / タブ字下げを単一行化し、改行無し入力をバイト不変で返す。既存 `existing_to_shiori_response_unchanged` が通る（4.6 / 3.5）。
 
 ### Integration Tests（pasta_lua）
