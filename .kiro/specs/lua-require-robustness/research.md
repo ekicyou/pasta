@@ -150,6 +150,14 @@
 
 ---
 
+### Decision: 標準 searcher フォールバックの去就と `package.path` の ANSI 変換
+
+- **由来**: Open Question 4（要件ディスカッションで「設計判断」に分類）。
+- **Alternatives**:
+  1. **標準 searcher を残す**: Rust searcher を前置し、標準 searcher はそのまま後段に残す。ただし `setup_package_path` の ANSI 変換は非 ANSI パスで `InvalidInput` を返すため、Requirement 2 を満たすには「変換不能エントリのみスキップ」「lossy 変換」「`package.path` を空にする」のいずれかへ変更が必要。
+  2. **標準 searcher を撤去し `package.path` も設定しない**: 解決経路が Rust searcher 1 本に収束し、失敗時のエラー文言も一元化できる。ただしゴースト作者が `package.path` を自前で追記して使っている場合に影響が出る（現状そのような用例は未確認）。
+- **申し送り**: 設計フェーズで (a) LuaJIT の searcher テーブル実測（Research Needed 1）、(b) `require` のエラー集約挙動（Research Needed 4）、(c) `package.path` 追記の実用例調査 の 3 点を確認してから決定する。Requirement 2 の達成には、少なくとも「非 ANSI パスで `setup_package_path` がロード全体を落とさない」ことが必須条件である。
+
 ## Risks & Mitigations
 
 - **【高】500 経路の欠損**: entry を `?` にしても利用者から見た症状（無言）が変わらない。→ Open Question 1 を要件ディスカッションの最優先で決着させる。決着前に実装へ進むと「修正したのに直っていない」状態になる。
