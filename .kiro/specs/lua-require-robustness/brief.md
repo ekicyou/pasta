@@ -1,6 +1,6 @@
 # Brief: lua-require-robustness
 
-> **由来**: areka 実機での emo2 検証（2026-09-18）で発覚。GitHub issue [#29](https://github.com/ekicyou/pasta/issues/29)（長パスで require 失敗）・[#30](https://github.com/ekicyou/pasta/issues/30)（ロード失敗の無言化）を 1 spec に統合。両者とも `crates/pasta_lua/src/runtime/factory.rs` の起動時モジュールロードを触るため、分割するとマージ競合する（discovery 決定）。
+> **由来**: areka 実機での emo2 検証（2026-09-18）で発覚。独立した 2 つの欠陥（長パスで require 失敗・ロード失敗の無言化）を 1 spec に統合。両者とも `crates/pasta_lua/src/runtime/factory.rs` の起動時モジュールロードを触るため、分割するとマージ競合する（discovery 決定）。
 
 ## Problem
 
@@ -20,7 +20,7 @@ Failed to load pasta.shiori.entry, continuing without SHIORI functions
 
 ここには**独立した 2 つの欠陥**が重なっている。
 
-### 欠陥 A: require が narrow fopen 依存（#29）
+### 欠陥 A: require が narrow fopen 依存
 
 LuaJIT のモジュール検索は narrow（ANSI）な `fopen` でファイルを開くため、**MAX_PATH=260 が絶対上限**になる。ホストプロセスの longPathAware マニフェストにも `LongPathsEnabled` レジストリにも従わない。pasta.dll は DLL なのでマニフェストで制御する余地もない。一方、自己展開は Rust std（wide API）のため 260 超でも成功する——観測された非対称はこれで説明がつく。
 
@@ -30,7 +30,7 @@ LuaJIT のモジュール検索は narrow（ANSI）な `fopen` でファイル�
 
 pasta 自身が master 直下から **71 文字**を消費している（展開先 `profile/pasta/pasta_scripts` 30 字＋最深モジュール `pasta/shiori/event/virtual_dispatcher.lua` 41 字）。利用者に残る余裕は 190 文字程度。トランスパイル済みシーン（`profile/pasta/cache/lua`）も同じ経路で require されるため同じ制限を受ける。
 
-### 欠陥 B: entry のロード失敗が警告止まり（#30）
+### 欠陥 B: entry のロード失敗が警告止まり
 
 `factory.rs` は `require("pasta.shiori.entry")` の失敗を `tracing::warn!` で握りつぶして続行する。すぐ下の `require("pasta.scene_dic")` は `?` で伝搬しているのに、entry だけが例外扱い。`entry.lua` は `SHIORI.load` / `SHIORI.request` / `SHIORI.unload` を定義する唯一の場所なので、これに失敗した時点でゴーストは SHIORI として機能しない。「continuing without SHIORI functions」は続行ではなく、沈黙したまま壊れている状態。
 
