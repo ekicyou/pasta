@@ -187,3 +187,10 @@ Phase 5 でデバッガ（DAP バックエンド）を組み込んだ結果、�
 ### Phase 8 派生（未着手）
 - [ ] actor-surface-restore -- 同一スポットを複数アクターが共有して交代する際の、切替先アクターの立ち絵（サーフェスID・着せ替え状態）の復旧。Dependencies: sakura-script-newline
   - 由来: sakura-script-newline の要件ディスカッション議題2（2026-07-18）でユーザーが「同一スコープでキャラが変わる場合、立ち絵の復旧が必要」と指摘。段落区切り改行（string 順序）とサーフェス状態管理（アクター状態機械）は責務が異なるため別仕様へ分離。brief.md 作成済み（`.kiro/specs/actor-surface-restore/brief.md`）
+
+## Phase 9: 起動堅牢性（モジュールロード）
+
+areka 実機検証（2026-09-18）で発覚した、深いフォルダへ設置したゴーストが無言になる不具合への対処。GitHub issue #29（長パスで require 失敗）・#30（ロード失敗の無言化）を 1 spec に統合（両者とも `factory.rs` の起動時ロードを触るため分割するとマージ競合する・discovery 決定）。
+
+### Specs (dependency order)
+- [ ] lua-require-robustness -- (B) `pasta.shiori.entry` のロード失敗を握りつぶさず既存の 500 + `X-ERROR-REASON` 経路（load-error-logging）へ伝搬 → (A) `package.loaders` へ Rust 実装 searcher を前置し、LuaJIT の narrow fopen（MAX_PATH=260・ANSI コードページ制限）を回避。チャンク名は現行形式と厳密一致（ソースマップ無回帰）。Dependencies: none。brief.md 作成済み（`.kiro/specs/lua-require-robustness/brief.md`）
