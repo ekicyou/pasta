@@ -38,7 +38,7 @@
 
 - `X-ERROR-REASON` のヘッダ名・500 応答の行構成・ログ初期化順序（`load-error-logging` が所有。本仕様は値の改行除去のみ行う）。
 - アクターランタイムの安全網（reply drop・タイムアウト・アクター不在・panic → 204）と NOTIFY の即時 204（`pasta-actor-runtime` が所有。無変更）。
-- FFI 境界（`windows.rs`）の `request` 入力デコード失敗時の 204（無変更）、および従来の `load` の ANSI デコード（無変更）。
+- FFI 境界（`windows.rs`）の `request` 入力デコード失敗時の 204（無変更・要件 4.10 で安全網として明示）、および従来の `load` の ANSI デコード（無変更）。
 - ソースマップ生成・ブレークポイント照合・DAP の仕様（チャンク識別子の構成規則を保つことで非干渉）。
 - スクリプト自己展開（`pasta-scripts-self-deploy`）。展開済みファイルの実在を前提とする。
 - `package.cpath` 由来の候補行（ホスト exe パス由来）の表記。
