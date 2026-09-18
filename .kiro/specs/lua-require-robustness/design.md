@@ -6,7 +6,7 @@
 
 **Users**: ゴースト利用者（設置場所を選ばずに動くこと、起動失敗が黙殺されないこと）、ゴースト作者（起動時の致命／継続の区別、切り分け手順）、保守者（長パス・非 ANSI・ロード失敗の回帰検出、x86 実行検証）。
 
-**Impact**: (1) LuaJIT 標準の Lua ファイル searcher（`package.loaders[2]`）を、同一アルゴリズム・同一書式で Rust std（wide API）によりファイルを開く searcher へ**置換**する。(2) `package.path` を ANSI バイト列ではなく UTF-8 で設定する。(3) 起動モジュール `main` / `pasta.shiori.entry` のロード失敗を致命として伝搬する。(4) アクタースレッドがリクエスト処理エラーを reply drop（→204）ではなく 500 + `X-ERROR-REASON` 応答として返す。(5) `X-ERROR-REASON` を単一行化する。通常パス（短い・ASCII）で全モジュールが正常ロードされる場合の外部挙動はバイト不変である。
+**Impact**: (1) LuaJIT 標準の Lua ファイル searcher（`package.loaders[2]`）を、同一アルゴリズム・同一書式で Rust std（wide API）によりファイルを開く searcher へ**置換**する。(2) `package.path` を ANSI バイト列ではなく UTF-8 で設定する。(3) 起動モジュール `main` / `pasta.shiori.entry` のロード失敗を致命として伝搬する。(4) アクタースレッドがリクエスト処理エラーを reply drop（→204）ではなく 500 + `X-ERROR-REASON` 応答として返す。(5) `X-ERROR-REASON` を単一行化する。(6) 設置パスを UTF-8 で受け取る DLL 初期化入口 `loadu` を追加する。通常パス（短い・ASCII）で全モジュールが正常ロードされる場合の外部挙動はバイト不変である。
 
 ### Goals
 
@@ -20,7 +20,7 @@
 - ゴースト作者コードが直接呼ぶ `io.open` / `loadfile` / `dofile` / `package.searchpath` の長パス・非 ANSI 対応（既知の制限として `book/` に明記するのみ）。
 - C モジュール searcher（`package.cpath`・`package.loaders[3]` / `[4]`）の変更。
 - 自己展開先の配置変更、新しいエラー提示 UI、配布ホスト側のインストールパス短縮。
-- SHIORI `load` が受け取るディレクトリパスの文字コード（ANSI）に起因する制約の解消（`loadu` 対応）。**仮定として境界外に置き、Open Questions 1 で扱う。**
+- `loadu` を呼ばないホスト（SSP 2.6.92 未満等）での非 ANSI 設置パス対応。ホストが ANSI でしかパスを渡せないため原理的に解消できない（既知の制限として `book/` に明記する）。
 
 ## Boundary Commitments
 
@@ -31,13 +31,14 @@
 - 起動シーケンス（`from_loader_with_scene_dic` / `from_loader`）における各モジュールの**致命／継続の分類**と、その失敗ログの構造。
 - アクタースレッドの GET 処理における **「リクエスト処理が `Err` を返した場合の応答」**（500 応答文字列を reply する契約）。
 - `MyError` から生成するエラー応答（500 / 400）の **`X-ERROR-REASON` 単一行保証**。
+- SHIORI DLL の初期化入口 **`loadu`（UTF-8 パス）**と、「`loadu` で初期化済みなら後続の `load` を無視する」契約。
 - 上記を実証するテスト基盤（長パス／非 ANSI の一時ゴースト構築ヘルパ）、CI の x86 テスト実行、`book/` の起動シーケンス・既知の制限・切り分け手順の記述。
 
 ### Out of Boundary
 
 - `X-ERROR-REASON` のヘッダ名・500 応答の行構成・ログ初期化順序（`load-error-logging` が所有。本仕様は値の改行除去のみ行う）。
 - アクターランタイムの安全網（reply drop・タイムアウト・アクター不在・panic → 204）と NOTIFY の即時 204（`pasta-actor-runtime` が所有。無変更）。
-- FFI 境界（`windows.rs`）の入力デコード失敗時の 204、および `load` が受け取るパスの ANSI デコード（無変更）。
+- FFI 境界（`windows.rs`）の `request` 入力デコード失敗時の 204（無変更）、および従来の `load` の ANSI デコード（無変更）。
 - ソースマップ生成・ブレークポイント照合・DAP の仕様（チャンク識別子の構成規則を保つことで非干渉）。
 - スクリプト自己展開（`pasta-scripts-self-deploy`）。展開済みファイルの実在を前提とする。
 - `package.cpath` 由来の候補行（ホスト exe パス由来）の表記。
@@ -57,6 +58,7 @@
 - `package.loaders[2]` の置換方針の変更（前置へ戻す等）→ エラーメッセージ書式・3.4 のバイト同一性の再検証。
 - アクタースレッドの `Err` 時応答契約の変更 → `pasta-actor-runtime` の R5.x テスト群と本仕様の可視化テストの再検証。
 - 起動モジュールの追加・順序変更・致命分類の変更 → `book/` の起動シーケンス表と本仕様のテストの更新。
+- ホスト側の `loadu` / `load` 呼び出し規約（DLL 共通仕様）の変更 → ShioriLoadEntry の「`loadu` 済みなら `load` を無視」契約の再検証。
 - mlua / LuaJIT のメジャー更新 → `package.loaders` のレイアウト（4 要素・2 番目が Lua ファイル searcher）と `require` のエラー集約書式の再実測。
 
 ## Architecture
@@ -139,6 +141,7 @@ graph TB
 5. **起動モジュール 3 種はすべて致命**。`main` は意図的な挙動変更（5.2）。共通ヘルパ 1 個で「ログ（モジュール名・`fatal`）＋文脈付き `Err`」を行い、分類の表現を 1 箇所に集約する。
 6. **旧経路 `from_loader` は撤去せず是正する**。`entry.lua` の読み取り失敗・実行失敗を `?` 伝搬へ変える。撤去すると `setup_package_path` + `@pasta_config` + `@enc` だけの軽量ランタイムを必要とする既存テスト 9 箇所に代替コンストラクタを新設することになり、差分が増えるだけである。**仮定**: `from_loader` における `entry.lua` の**不在**は従来どおりスキップ（失敗ではない）とする（Open Questions 4）。
 7. **500 応答の復旧はアクタースレッドの `Err` 分岐 1 箇所**。`Reply::Value(e.to_shiori_response())` を送る。`marshaling.rs` は無変更で、drop／Timeout／try_send 失敗／panic → 204 の安全網はそのまま残る（4.10）。
+8. **`loadu` を追加し、非 ANSI 設置パスを DLL 境界から通す**。従来の `load` は ANSI でパスを受けるため、ANSI 外の文字はホスト側で欠落してランタイムへ届かない。DLL 共通仕様の `loadu`（UTF-8・SSP 2.6.92 以降・`load` より優先）を `windows.rs` に追加する。既存の `ShioriString::to_utf8_str` と `lifecycle::spawn_actor` を使うだけで、`load` との差はデコード方式のみである。仕様の推奨どおり「`loadu` で初期化済みなら後続の `load` は無視して TRUE」を守る。
 
 ### Technology Stack
 
@@ -176,11 +179,12 @@ crates/pasta_shiori/
 ├── src/actor/thread.rs              # 変更: GET の Err 分岐で 500 応答を reply
 ├── src/error.rs                     # 変更: X-ERROR-REASON の単一行化
 ├── src/actor/marshaling.rs          # コメントのみ: 「VM 失敗で reply drop」の記述を新契約へ（コード無変更）
-├── src/windows.rs                   # コメントのみ: 同上（コード無変更）
+├── src/windows.rs                   # 変更: loadu 入口を追加・loadu 済みの load を無視（request / unload の既存ロジックは無変更）
 └── tests/
     ├── common/mod.rs                # 変更: 長パス／非 ANSI の一時ゴースト構築ヘルパを追加（pasta_lua 側と同等）
     ├── load_failure_visibility_test.rs   # 新規: アクター境界を通した 500 + 単一行 X-ERROR-REASON
-    └── path_robustness_e2e_test.rs       # 新規: 長パス＋非 ANSI 設置での load と応答バイト一致
+    ├── path_robustness_e2e_test.rs       # 新規: 長パス＋非 ANSI 設置での load と応答バイト一致
+    └── ffi_loadu_test.rs                 # 新規: FFI の loadu → request → unload（非 ANSI 設置パス）と loadu 後の load 無視
 .github/workflows/build.yml          # 変更: テストを matrix.target で実行
 book/src/
 ├── reference/startup.md             # 新規: 検索パス・起動シーケンスと致命分類・既知の制限・切り分け手順
@@ -194,7 +198,8 @@ crates/pasta_lua/README.md           # 変更: 「Lua モジュール検索パ�
 - `crates/pasta_lua/src/runtime/module_registry.rs` — `setup_package_path` は (1) `generate_package_path()` の UTF-8 文字列を `package.path` に設定、(2) `searcher::install_module_searcher` を呼ぶ。呼び出し元 2 箇所（`from_loader` / `from_loader_with_scene_dic`）は無変更。ドキュメントコメントの ANSI 記述を更新。
 - `crates/pasta_lua/src/loader/context.rs` — `generate_package_path_bytes` と、それだけを検証するテスト 3 件（`test_generate_package_path_bytes_ascii` / `_not_empty` / `_japanese`）を撤去。`generate_package_path` とそのテストは無変更。`encoding::to_ansi_bytes` は公開モジュール `pasta_lua::encoding` の API であるため本仕様では残す（`generate_package_path_bytes` も公開メソッドだが、呼び出し元は `setup_package_path` のみで、残すと非 ANSI パスでロードを落とす経路の再混入口になるため撤去する）。
 - `crates/pasta_lua/src/runtime/factory.rs` — 起動シーケンスのコメント（Initialization Sequence）を新分類へ更新。
-- `crates/pasta_shiori/src/actor/thread.rs` — `Err` 分岐のコメント（「drop→204」）を新契約へ更新。`windows.rs` / `marshaling.rs` はコード無変更（モジュール冒頭コメントの「VM 失敗で reply drop」の記述のみ `thread.rs` 側の新契約に合わせて更新）。
+- `crates/pasta_shiori/src/actor/thread.rs` — `Err` 分岐のコメント（「drop→204」）を新契約へ更新。`marshaling.rs` はコード無変更（モジュール冒頭コメントの「VM 失敗で reply drop」の記述のみ `thread.rs` 側の新契約に合わせて更新）。
+- `crates/pasta_shiori/src/windows.rs` — `loadu` を追加し、`load` に「`loadu` 済みなら無視」の分岐を足す。`request` / `unload` の既存ロジックは無変更（`unload` は初期化済みフラグを下ろすのみ追加）。冒頭コメントの「VM 失敗で reply drop」も新契約へ更新する。
 
 ## System Flows
 
@@ -231,7 +236,7 @@ sequenceDiagram
     participant Actor as actor thread
     participant Shiori as PastaShiori
     participant Factory as startup sequence
-    Host->>FFI: load dir
+    Host->>FFI: loadu dir UTF-8 or load dir ANSI
     FFI->>Actor: spawn
     Actor->>Shiori: load
     Shiori->>Factory: from_loader_with_scene_dic
@@ -265,6 +270,9 @@ sequenceDiagram
 | 2.1 | 非 ANSI パスで require 成功 | PackagePathSetup, ModuleSearcher | `setup_package_path` | モジュール解決 |
 | 2.2 | 長パス＋非 ANSI で成功 | 同上 | — | モジュール解決 |
 | 2.3 | 失敗メッセージで非 ASCII を欠落させない | ModuleSearcher（UTF-8 のまま整形）, ErrorResponse | — | 可視化 |
+| 2.4 | `loadu` で UTF-8 の設置パスを受け取りロード完了 | ShioriLoadEntry | `loadu` | 可視化 |
+| 2.5 | `loadu` 済みの `load` は無視して成功 | ShioriLoadEntry | `load` | — |
+| 2.6 | `loadu` を呼ばないホストでは従来どおり | ShioriLoadEntry（`load` の既存経路） | `load` | — |
 | 3.1 | 検索パス優先順位の維持 | PackagePathSetup（`generate_package_path` 無変更） | — | モジュール解決 |
 | 3.2 | `?.lua` → `?/init.lua` の順序維持 | 同上 | — | モジュール解決 |
 | 3.3 | 優先順位の高いパスが勝つ | ModuleSearcher（先勝ち） | — | モジュール解決 |
@@ -297,6 +305,8 @@ sequenceDiagram
 | 6.6 | 常時実行（`#[ignore]` 不使用） | 全新規テスト | — | — |
 | 6.7 | ロケール非依存の非 ANSI 文字構成 | TestPathHelpers | `NON_ANSI_DIR_NAME` | — |
 | 6.8 | 切り分け手順をマニュアルに記載 | BookStartupPage | — | — |
+| 6.9 | `loadu` 経由の非 ANSI 設置パスを検証 | FfiLoaduTests | — | — |
+| 6.10 | `loadu` 非対応ホストの制限をマニュアルに明示 | BookStartupPage | — | — |
 | 7.1 | x86 / x64 で同一結果 | ModuleSearcher（アーキ非依存）, CiWorkflow | — | — |
 | 7.2 | 既存テスト全緑 | 全体 | — | — |
 | 7.3 | CI が x86 テストを x86 ターゲットで実行 | CiWorkflow | — | — |
@@ -310,6 +320,7 @@ sequenceDiagram
 | StartupSequence | pasta_lua / runtime | 起動モジュールの致命分類・失敗ログ・文脈付き Err | 4.1, 4.5, 4.7, 4.9, 5.1–5.3, 5.5, 5.6 | `lua_require` (P0) | Service |
 | ActorErrorReply | pasta_shiori / actor | リクエスト処理の `Err` を 500 応答として reply する | 4.3, 4.4, 4.8, 4.10 | PastaShiori (P0), ErrorResponse (P0) | Service |
 | ErrorResponse | pasta_shiori / error | `X-ERROR-REASON` を単一行で組み立てる | 2.3, 4.6 | — | Service |
+| ShioriLoadEntry | pasta_shiori / windows FFI | 設置パスを UTF-8（`loadu`）または ANSI（`load`）で受け取りアクターを起動する | 2.4, 2.5, 2.6 | lifecycle (P0), ShioriString (P0) | API |
 | TestPathHelpers | tests / common | 長パス・非 ANSI の一時ゴーストを構築する | 6.1, 6.2, 6.4, 6.7 | tempfile (P0) | — |
 | PathRobustnessTests / LoadFailureVisibilityTests | tests | 要件の実証 | 1.x, 2.x, 3.x, 4.x, 5.x, 6.x | 上記全部 | — |
 | CiWorkflow | infra | x86 / x64 の両ターゲットでテスト実行 | 7.1, 7.3, 6.6 | GitHub Actions | — |
@@ -486,6 +497,29 @@ fn single_line(message: &str) -> String;
 - 非 ASCII 文字は変換しない（応答は `Charset: UTF-8`）。長さの上限は設けない（**仮定**・Open Questions 5）。
 - 例: `Load error: Failed to initialize Lua runtime: failed to load startup module 'pasta.shiori.entry' runtime error: …second_change.lua:9: module 'pasta.shiori.event.virtual_dispatcher' not found: no field package.preload[…] no file 'C:/…/virtual_dispatcher.lua' …`
 
+#### ShioriLoadEntry
+
+| Field | Detail |
+|-------|--------|
+| Intent | DLL 共通仕様の `loadu`（UTF-8 パス）を提供し、非 ANSI の設置パスを欠落なくランタイムへ渡す |
+| Requirements | 2.4, 2.5, 2.6 |
+
+**Responsibilities & Constraints**
+
+- `loadu` は `load` と同じ所有権規約（受け取った HGLOBAL は全経路で解放）・同じ panic 封じ込め（`catch_unwind`）に従い、差はパスのデコードが `ShioriString::to_utf8_str`（既存）である点のみ。デコード後は `load` と同じ `lifecycle::spawn_actor` を呼ぶ。
+- 「`loadu` で初期化済み」をプロセス全域のフラグ（`AtomicBool`）で保持する。`loadu` が `spawn_actor` まで到達したら立て、`unload` で下ろす。
+- `load` はフラグが立っていれば、HGLOBAL を解放したうえで何もせず TRUE を返す（DLL 共通仕様の推奨）。フラグが無ければ従来どおり ANSI デコードでロードする。
+- `loadu` のロードが失敗（`spawn_actor` が false）した場合もフラグは立てる。後続の `load` が ANSI パスで再ロードすると、`loadu` の失敗原因（`last_load_error`）が欠落したパスによる別の失敗で上書きされ、可視化される原因が変わってしまうためである。
+
+##### API Contract
+
+| Export | 引数 | パスの文字コード | 戻り値 |
+|--------|------|------------------|--------|
+| `loadu(h: HGLOBAL, len: usize) -> bool` | 設置ディレクトリ | UTF-8 | ロード成否 |
+| `load(h: HGLOBAL, len: usize) -> bool` | 設置ディレクトリ | システム ANSI | `loadu` 済みなら TRUE（無視）。それ以外はロード成否 |
+
+- エクスポートは既存の `load` と同じ `#[unsafe(no_mangle)] pub extern "C"`（`.def` ファイルは無い）。x86 / x64 とも同じ機構で公開される。
+
 ### テスト基盤・CI・ドキュメント
 
 #### TestPathHelpers（`crates/pasta_lua/tests/common/mod.rs`、pasta_shiori 側は `tests/common/mod.rs` に同等品）
@@ -517,7 +551,7 @@ pub fn copy_fixture_into(fixture: &str, dest: &Path);
 
 1. **モジュール検索パス** — 5 本の優先順位と `?.lua` / `?/init.lua`。設置パスの長さ・文字種に依存しないこと。`package.path` は UTF-8 として解釈されること。
 2. **起動シーケンス** — 上記「起動モジュールの分類」表の本番経路（順序・致命／継続）（5.4）。
-3. **既知の制限** — ゴースト作者コードが直接呼ぶ `io.open` / `loadfile` / `dofile`（および `package.searchpath`）は OS の narrow API を使うため、260 文字超・ANSI 外のパスを扱えない。永続化は `@pasta_persistence` を使うこと（6.5）。
+3. **既知の制限** — `loadu` を呼ばないホスト（SSP 2.6.92 未満等）では、設置パスが ANSI でしか渡されないため、ANSI コードページ外の文字を含む設置パスは扱えない（6.10）。また、ゴースト作者コードが直接呼ぶ `io.open` / `loadfile` / `dofile`（および `package.searchpath`）は OS の narrow API を使うため、260 文字超・ANSI 外のパスを扱えない。永続化は `@pasta_persistence` を使うこと（6.5）。
 4. **ゴーストが起動しない・喋らないとき** — (a) ホストの SHIORI 通信ログで 500 応答の `X-ERROR-REASON` を確認する、(b) `profile/pasta/logs/pasta.log` の `fatal=true` の行とその下の複数行メッセージを確認する、(c) 典型原因（`scripts/main.lua` の構文エラー、上書きした `entry.lua` の誤り、モジュール未検出）の読み方（6.8）。
 
 `book/src/debug/troubleshooting.md` の冒頭に「デバッガ接続以前にゴーストが起動しない場合は本ページへ」の誘導を 1 段落追加する。
@@ -565,7 +599,8 @@ pub fn copy_fixture_into(fixture: &str, dest: &Path);
 
 1. `load_failure_visibility_test.rs`: `lifecycle::spawn_actor` → `lifecycle::marshal_request`（アクター境界込み）で、(a) `entry` 失敗ゴースト: `load` = false、GET → 500、`X-ERROR-REASON` が 1 行で `pasta.shiori.entry` と根本原因を含み、応答全体が `\r\n\r\n` で終わる正しいヘッダ構造、NOTIFY → 204。(b) `main` 失敗ゴースト: 同様。(c) `scripts/pasta/shiori/entry.lua` を上書きし、保護なしの `SHIORI.request` が複数行メッセージで `error` するゴースト（ロードは成功）: GET → 500・単一行（4.2〜4.6 / 4.8 / 5.5 / 6.3）。`MAILBOX` がプロセス全域 static のため、ファイル内のケースは 1 本のテスト関数または共有 Mutex で直列化する（既存 `ffi_actor_lifecycle_test.rs` と同方式）。
 2. `path_robustness_e2e_test.rs`: 長パス＋非 ANSI の設置先と通常の設置先で、同一リクエスト列に対する `PastaShiori` の応答がバイト一致する（1.2 / 2.2 / 3.5）。
-3. 既存ゲート（無変更で通ること）: `byte_invariant_test.rs` / `kick_unused_byte_invariant_test.rs` / `ffi_extern_session_e2e_test.rs`（3.5）、`actor_marshaling_test.rs` / `actor_test_harness.rs` / `actor_tracing_seams_test.rs`（4.10）。
+3. `ffi_loadu_test.rs`: FFI の `loadu`（`NON_ANSI_DIR_NAME` 配下の設置パスを UTF-8 で渡す）→ `request`（GET が正常応答）→ `unload`。続けて `loadu` → `load`（ANSI では表現できないため欠落したパス）で、`load` が TRUE を返しロード済み状態が壊れない（直後の GET が正常応答）こと。`unload` 後の `load` 単独は従来どおりロードすること（2.4〜2.6 / 6.9）。プロセス全域 static を使うため独立バイナリ・1 本のテスト関数で直列化する。
+4. 既存ゲート（無変更で通ること）: `byte_invariant_test.rs` / `kick_unused_byte_invariant_test.rs` / `ffi_extern_session_e2e_test.rs`（3.5）、`actor_marshaling_test.rs` / `actor_test_harness.rs` / `actor_tracing_seams_test.rs`（4.10）。
 
 ### CI
 
@@ -579,7 +614,8 @@ pub fn copy_fixture_into(fixture: &str, dest: &Path);
 flowchart LR
     B1[ErrorResponse 単一行化] --> B2[ActorErrorReply 500 復旧]
     B2 --> B3[StartupSequence 致命化と from_loader 是正]
-    B3 --> A1[TestPathHelpers と失敗するテストの先行追加]
+    B3 --> B4[ShioriLoadEntry loadu 追加]
+    B4 --> A1[TestPathHelpers と失敗するテストの先行追加]
     A1 --> A2[ModuleSearcher 新設]
     A2 --> A3[PackagePathSetup UTF-8 化と ANSI 変換撤去]
     A3 --> C1[CI x86 テスト実行]
