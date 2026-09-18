@@ -291,6 +291,7 @@ sequenceDiagram
 | 4.8 | 失敗状態の GET に 204 を返さない | ActorErrorReply | — | 可視化 |
 | 4.9 | 失敗原因の種類によらず同一経路 | ModuleSearcher（全原因を Lua エラー化）, StartupSequence | — | 可視化 |
 | 4.10 | 204 安全網と NOTIFY 即時 204 の維持 | `marshaling.rs` 無変更 | — | 可視化 |
+| 4.11 | `X-ERROR-REASON` にスタックトレースを含めない | ErrorResponse | `single_line` | 可視化 |
 | 5.1 | `pasta.scene_dic` は致命（維持） | StartupSequence | — | — |
 | 5.2 | `main` は致命（変更） | StartupSequence | — | — |
 | 5.3 | モジュール名と致命／継続をログで判別可能 | StartupSequence | ログ構造契約 | — |
@@ -319,7 +320,7 @@ sequenceDiagram
 | PackagePathSetup | pasta_lua / runtime | `package.path` を UTF-8 で設定し searcher を設置する | 2.1, 3.1, 3.2, 3.8 | LoaderContext (P0), ModuleSearcher (P0) | Service |
 | StartupSequence | pasta_lua / runtime | 起動モジュールの致命分類・失敗ログ・文脈付き Err | 4.1, 4.5, 4.7, 4.9, 5.1–5.3, 5.5, 5.6 | `lua_require` (P0) | Service |
 | ActorErrorReply | pasta_shiori / actor | リクエスト処理の `Err` を 500 応答として reply する | 4.3, 4.4, 4.8, 4.10 | PastaShiori (P0), ErrorResponse (P0) | Service |
-| ErrorResponse | pasta_shiori / error | `X-ERROR-REASON` を単一行で組み立てる | 2.3, 4.6 | — | Service |
+| ErrorResponse | pasta_shiori / error | `X-ERROR-REASON` を単一行で組み立てる | 2.3, 4.6, 4.11 | — | Service |
 | ShioriLoadEntry | pasta_shiori / windows FFI | 設置パスを UTF-8（`loadu`）または ANSI（`load`）で受け取りアクターを起動する | 2.4, 2.5, 2.6 | lifecycle (P0), ShioriString (P0) | API |
 | TestPathHelpers | tests / common | 長パス・非 ANSI の一時ゴーストを構築する | 6.1, 6.2, 6.4, 6.7 | tempfile (P0) | — |
 | PathRobustnessTests / LoadFailureVisibilityTests | tests | 要件の実証 | 1.x, 2.x, 3.x, 4.x, 5.x, 6.x | 上記全部 | — |
@@ -489,13 +490,16 @@ fn require_startup_module(lua: &Lua, module: &'static str) -> LuaResult<()>;
 ```rust
 // crates/pasta_shiori/src/error.rs（非公開ヘルパ）
 
-/// CR / LF で分割し、各行を trim、空行を捨て、半角スペース 1 個で連結する。
+/// (1) `stack traceback:` の行以降を捨てる。
+/// (2) 残りを CR / LF で分割し、各行を trim、空行を捨て、半角スペース 1 個で連結する。
 /// 改行を含まない入力は無変換で返す（既存応答はバイト不変）。
 fn single_line(message: &str) -> String;
 ```
 
 - `to_shiori_response()` と `to_shiori_400_response()` の両方が `single_line(&self.to_string())` を埋め込む。応答の行構成・ヘッダ名・`Charset` は無変更。
-- 非 ASCII 文字は変換しない（応答は `Charset: UTF-8`）。長さの上限は設けない（**仮定**・Open Questions 5）。
+- mlua のエラー Display は末尾に `stack traceback:` 以降の複数行を持つ。これはヘッダ値を数 KB に膨らませ根本原因を埋もれさせるため、ヘッダからは落とす（4.11）。全文は既存の error ログ（`PastaShiori load failed` / `SHIORI.request execution failed`）と `require_startup_module` のログに残る（4.7）。
+- `no file '…'` の候補パス列は落とさない。未検出時は「どこを探したか」が根本原因そのものである。
+- 非 ASCII 文字は変換しない（応答は `Charset: UTF-8`）。長さの上限は設けない（切り詰めは根本原因の欠落を招き、上限値を置く根拠も無い）。
 - 例: `Load error: Failed to initialize Lua runtime: failed to load startup module 'pasta.shiori.entry' runtime error: …second_change.lua:9: module 'pasta.shiori.event.virtual_dispatcher' not found: no field package.preload[…] no file 'C:/…/virtual_dispatcher.lua' …`
 
 #### ShioriLoadEntry
@@ -586,7 +590,7 @@ pub fn copy_fixture_into(fixture: &str, dest: &Path);
 1. `searcher.rs` 内: `candidate_paths` が `;` 区切り・空要素スキップ・`?` 全置換・`.`→区切り文字置換を、標準 `searchpath` と同じ規則で行う（3.1〜3.3 / 1.6: 長さ判定が無いこと）。
 2. `module_searcher_test.rs`: 標準 searcher 版 VM と本 searcher 版 VM の**バイト比較** — `source` / `short_src` / チャンク引数（`?.lua` と `?/init.lua`）、未検出・構文エラー・実行時エラーの `pcall(require, …)` 戻り値の型と文言（3.4 / 1.5 / 4.9）。
 3. `module_searcher_test.rs`: 同名モジュールが 2 つの検索パスにあるとき先頭側が勝つ（3.3）。`package.loaded` 登録済みの `@pasta_config` が searcher を経由せず解決される。`package.loaders` の要素数を変えた VM では `install_module_searcher` が `Err` を返す。
-4. `error.rs` 内: `single_line` が CR / LF / CRLF / タブ字下げを単一行化し、改行無し入力をバイト不変で返す。既存 `existing_to_shiori_response_unchanged` が通る（4.6 / 3.5）。
+4. `error.rs` 内: `single_line` が CR / LF / CRLF / タブ字下げを単一行化し、`stack traceback:` 以降を落とし（4.11）、改行無し入力をバイト不変で返す。既存 `existing_to_shiori_response_unchanged` が通る（4.6 / 3.5）。
 
 ### Integration Tests（pasta_lua）
 
