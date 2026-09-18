@@ -139,7 +139,7 @@ graph TB
 3. **verbatim プレフィックスを扱わない**（M2）。std が内部で付与し、外へは出さない。チャンク識別子・ログ・エラー文言に `\\?\` が現れる経路が構造的に存在しない（3.7）。
 4. **ロード失敗は Lua 文字列エラーとして送出する**（M4）。`pcall(require, …)` で文字列を受け取る既存の Lua コードの前提を崩さない。
 5. **起動モジュール 3 種はすべて致命**。`main` は意図的な挙動変更（5.2）。共通ヘルパ 1 個で「ログ（モジュール名・`fatal`）＋文脈付き `Err`」を行い、分類の表現を 1 箇所に集約する。
-6. **旧経路 `from_loader` は撤去せず是正する**。`entry.lua` の読み取り失敗・実行失敗を `?` 伝搬へ変える。撤去すると `setup_package_path` + `@pasta_config` + `@enc` だけの軽量ランタイムを必要とする既存テスト 9 箇所に代替コンストラクタを新設することになり、差分が増えるだけである。**仮定**: `from_loader` における `entry.lua` の**不在**は従来どおりスキップ（失敗ではない）とする（Open Questions 4）。
+6. **旧経路 `from_loader` は撤去せず是正する**。`entry.lua` の読み取り失敗・実行失敗を `?` 伝搬へ変える。撤去すると `setup_package_path` + `@pasta_config` + `@enc` だけの軽量ランタイムを必要とする既存テスト 9 箇所に代替コンストラクタを新設することになり、差分が増えるだけである。`from_loader` における `entry.lua` の**不在**は従来どおりスキップする（失敗ではない）。旧経路は SHIORI 応答モジュールを任意とする軽量構築経路であり、無言化の対象は「存在するのに失敗した」場合だからである（設計ディスカッション #5・要件 5.6 の決定注記）。
 7. **500 応答の復旧はアクタースレッドの `Err` 分岐 1 箇所**。`Reply::Value(e.to_shiori_response())` を送る。`marshaling.rs` は無変更で、drop／Timeout／try_send 失敗／panic → 204 の安全網はそのまま残る（4.10）。
 8. **`loadu` を追加し、非 ANSI 設置パスを DLL 境界から通す**。従来の `load` は ANSI でパスを受けるため、ANSI 外の文字はホスト側で欠落してランタイムへ届かない。DLL 共通仕様の `loadu`（UTF-8・SSP 2.6.92 以降・`load` より優先）を `windows.rs` に追加する。既存の `ShioriString::to_utf8_str` と `lifecycle::spawn_actor` を使うだけで、`load` との差はデコード方式のみである。仕様の推奨どおり「`loadu` で初期化済みなら後続の `load` は無視して TRUE」を守る。
 
@@ -427,7 +427,7 @@ pub(crate) fn setup_package_path(lua: &Lua, loader_context: &LoaderContext) -> L
 | 同上 | 2 | `pasta.shiori.entry` | **致命**（変更） | SHIORI 応答関数の唯一の定義元 |
 | 同上 | 3 | `pasta.scene_dic` | 致命（維持） | — |
 | 同上 | 4 | シーン identity 索引の突合 | 継続（維持） | モジュールロードではない。デバッグ時のみ・best-effort |
-| `from_loader`（旧経路） | — | `scripts/pasta/shiori/entry.lua`（直接読み） | 存在して読み取り／実行に失敗 → **致命**（変更）。不在 → スキップ（維持・**仮定**） | トランスパイル結果を直接ロードする経路。`main` / `scene_dic` はロードしない |
+| `from_loader`（旧経路） | — | `scripts/pasta/shiori/entry.lua`（直接読み） | 存在して読み取り／実行に失敗 → **致命**（変更）。不在 → スキップ（維持） | トランスパイル結果を直接ロードする経路。`main` / `scene_dic` はロードしない |
 
 ##### Service Interface
 
