@@ -605,5 +605,5 @@ flowchart LR
 
 ## Supporting References
 
-- `research.md`「設計フェーズの実測」— M1〜M7 の手順と生ログ要約、LuaJIT `lib_package.c` / Rust std `get_long_path` の該当箇所。
+- `research.md`「設計フェーズの実測」— M1〜M8 の手順と生ログ要約、LuaJIT `lib_package.c` / Rust std `get_long_path` の該当箇所。
 - UKADOC「DLL共通仕様」（`loadu` / `load`）— https://ssp.shillest.net/ukadoc/manual/spec_dll.html
