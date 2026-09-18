@@ -158,6 +158,22 @@
   2. **標準 searcher を撤去し `package.path` も設定しない**: 解決経路が Rust searcher 1 本に収束し、失敗時のエラー文言も一元化できる。ただしゴースト作者が `package.path` を自前で追記して使っている場合に影響が出る（現状そのような用例は未確認）。
 - **申し送り**: 設計フェーズで (a) LuaJIT の searcher テーブル実測（Research Needed 1）、(b) `require` のエラー集約挙動（Research Needed 4）、(c) `package.path` 追記の実用例調査 の 3 点を確認してから決定する。Requirement 2 の達成には、少なくとも「非 ANSI パスで `setup_package_path` がロード全体を落とさない」ことが必須条件である。
 
+### 要件ディスカッションの決定と設計への申し送り
+
+要件ディスカッションで確定した内容と、それに伴う設計上の着眼点。**本節以前の記述中の Requirement 4.x の番号は再編前のもの**である（旧 4.2→新 4.3、旧 4.3→新 4.5、旧 4.4→新 4.7、旧 4.5→新 4.8、旧 4.6→新 4.9。新 4.2 / 4.4 / 4.6 / 4.10 は追加）。
+
+- **#1 500 応答経路の復旧（Requirement 4）**: 本仕様に含める。対象はリクエスト処理エラー全般。
+  - 実装点は `crates/pasta_shiori/src/actor/thread.rs:184-196` の `Err(_)` 分岐 1 箇所。reply を drop する代わりに `Reply::Value(e.to_shiori_response())` を送れば、`last_load_error` → `MyError::Load` → 500 の既存配管がそのまま本番へ届く。`marshaling.rs` の drop／Timeout／try_send 失敗 → 204 は安全網として無変更（`pasta-actor-runtime` R5.3 / R5.6 / R5.7 と非干渉）。
+  - **新規発見**: `to_shiori_response()` はエラーメッセージを無加工で `X-ERROR-REASON` へ埋め込む。LuaJIT の `module 'X' not found:` は**複数行**（候補パスごとに `
+	no file ...`）のため、そのままでは SHIORI 応答のヘッダ構造が壊れる。単一行化（Requirement 4.6）が必須。ログ側は複数行のまま欠落なく残す（Requirement 4.7）。
+  - NOTIFY は応答経路を持たず即 204（プロトコル上不可避）。可視化は GET で行う（Requirement 4.3 / 4.8 は GET 限定）。
+- **#2 `main` は致命（Requirement 5.2）**: `crates/pasta_lua/pasta_scripts/main.lua`（何もしない既定実装）が常に自己展開されるため「不在」は正常状態ではない。`factory.rs:197-201` を `?` 伝搬へ。
+- **#3 旧経路 `from_loader`（Requirement 5.6）**: 是正する。利用箇所は `tests/runtime/encoding_test.rs` と `tests/runtime/runtime_api_test.rs` の計 9 箇所のみ。旧経路は `scripts/pasta/shiori/entry.lua` をファイル直読みするため、致命化するとフィクスチャに entry が無いテストが落ちる可能性がある。**修正 vs 撤去（テストを `from_loader_with_scene_dic` へ移行）は設計で決定**。
+- **#4 パス長上限なし（Requirement 1.6）**。
+- **#5 チャンク識別子はバイト単位で同一（Requirement 3.4 / 3.7 / 3.8）**: 現行の識別子は「`generate_package_path` が作るテンプレート（区切り `/`）の `?` へ、`.` を `\` に置換したモジュール名を代入したもの」。Rust searcher が同じテンプレート文字列から同じ代入で候補を作れば、探索順序（Requirement 3.1〜3.3）と識別子の両方が自動的に一致する。読み込み用パス（必要なら verbatim）と命名用パスは分離する。「Decision: チャンク名の生成方式」の選択肢は **(1) バイト単位再現で確定**。
+- **#6 テストは常時実行・ロケール非依存（Requirement 6.6 / 6.7）**。
+- **#7 ドキュメントは `book/`（Requirement 5.4 / 6.5 / 6.8）**: ページ構成は設計で決定。
+
 ## Risks & Mitigations
 
 - **【高】500 経路の欠損**: entry を `?` にしても利用者から見た症状（無言）が変わらない。→ Open Question 1 を要件ディスカッションの最優先で決着させる。決着前に実装へ進むと「修正したのに直っていない」状態になる。
@@ -176,6 +192,7 @@
 3. `package.path` の ANSI 変換を残す場合、変換不能時にエントリ単位でスキップするのか全体を lossy にするのか（Open Question 4 と連動）。
 4. 標準 searcher をフォールバックに残した場合、Rust searcher が先に成功する限り標準 searcher のエラー文言は表に出ないか（`require` のエラー集約挙動の実測）。
 5. 長パス一時ディレクトリの構築方式（深いネスト vs 長い単一名）と、Windows のディレクトリ削除 API の長パス耐性。
+6. 非 ASCII だが ANSI 表現可能なパス（例: 日本語ロケールでの日本語フォルダ名）における**現行の**チャンク識別子のバイト表現。現行は `package.path` を ANSI バイト列で設定するため、識別子も ANSI バイト列になっていると推測される。一方ソースマップ側のキーは Rust 文字列（UTF-8）由来であり、現状すでに不一致でブレークポイントが効いていない可能性がある。Requirement 3.8 の基準（何と一致させるか）を決めるために実測する。
 
 ---
 
