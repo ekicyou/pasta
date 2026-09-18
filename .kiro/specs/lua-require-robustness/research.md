@@ -1,6 +1,6 @@
 # Research & Gap Analysis: lua-require-robustness
 
-> **生成フェーズ**: `/kiro-validate-gap`（要件生成直後）
+> **生成フェーズ**: `/kiro-validate-gap`（要件生成直後）＋ `/kiro-spec-design`（設計フェーズの実測・統合・設計判断を追記）
 > **対象**: `.kiro/specs/lua-require-robustness/requirements.md`（Requirement 1〜7）
 > **調査基準**: worktree `C:/home/maz/git/pasta/.claude/worktrees/lua-require-robustness-8ae027`（v0.3.4 時点）
 
@@ -178,7 +178,8 @@
 ## Risks & Mitigations
 
 - **【高】500 経路の欠損**: entry を `?` にしても利用者から見た症状（無言）が変わらない。→ Open Question 1 を要件ディスカッションの最優先で決着させる。決着前に実装へ進むと「修正したのに直っていない」状態になる。
-- **【中】Rust std も 260 で落ちる可能性**: `std::path::absolute` は verbatim を付けない。ホストが longPathAware でない場合、Rust 側の `File::open` も失敗し得る。→ 設計フェーズで実機実測。verbatim 付与が必要なら、読み込み用と命名用のパスを分離する。
+- **【中】Rust std も 260 で落ちる可能性**: `std::path::absolute` は verbatim を付けない。ホストが longPathAware でない場合、Rust 側の `File::open` も失敗し得る。→ 設計フェーズで実機実測。verbatim 付与が必要なら、読み込み用と命名用のパスを分離する。**→ 設計フェーズで解消（M2）**: std が内部で verbatim を自動付与するため落ちない。分離も不要。
+- **【中・設計フェーズで追加】DLL 境界の ANSI パス**: SHIORI `load` はディレクトリパスを ANSI で受け取るため、非 ANSI 設置パスは pasta_lua に届く前に欠損し得る。→ `loadu`（UTF-8）対応の要否を設計ディスカッションで決定する（design.md Open Questions 1）。
 - **【中】長パステストが CI でのみ壊れる**: CI ランナーの `%TEMP%` は 8.3 短縮名（`RUNNER~1`）。前例あり（`context.rs:42-66`）。→ テスト用ディレクトリの組み立てで `canonicalize` を使わず `std::path::absolute` に揃える。クリーンアップ自体が長パスを踏む点にも注意。
 - **【中】非 ANSI 環境が CI に無い**: 変換不能文字はロケール依存（日本語ロケールでは日本語が通ってしまう）。→ ロケール非依存に失敗する文字集合（例: 日本語 CP932 環境での한글・キリル・絵文字）を選ぶ。
 - **【低】チャンク名回帰**: → `chunk_name_validation_test.rs` と `byte_invariant_test.rs` を実装前に走らせ、ベースラインを固定してから着手。
@@ -188,12 +189,139 @@
 
 ## Research Needed（設計フェーズで解消）
 
-1. LuaJIT 2.1 + mlua 0.11 `luajit52` において、searcher テーブルが `package.loaders` か `package.searchers` か（両方が同一 table を指すか）を実機確認する。
-2. 対象環境で `std::fs::File::open` が 260 超の非 verbatim パスを開けるか。開けない場合の verbatim 付与方式と、ネットワークパス（UNC）の扱い。
-3. `package.path` の ANSI 変換を残す場合、変換不能時にエントリ単位でスキップするのか全体を lossy にするのか（Open Question 4 と連動）。
-4. 標準 searcher をフォールバックに残した場合、Rust searcher が先に成功する限り標準 searcher のエラー文言は表に出ないか（`require` のエラー集約挙動の実測）。
-5. 長パス一時ディレクトリの構築方式（深いネスト vs 長い単一名）と、Windows のディレクトリ削除 API の長パス耐性。
-6. 非 ASCII だが ANSI 表現可能なパス（例: 日本語ロケールでの日本語フォルダ名）における**現行の**チャンク識別子のバイト表現。現行は `package.path` を ANSI バイト列で設定するため、識別子も ANSI バイト列になっていると推測される。一方ソースマップ側のキーは Rust 文字列（UTF-8）由来であり、現状すでに不一致でブレークポイントが効いていない可能性がある。Requirement 3.8 の基準（何と一致させるか）を決めるために実測する。
+> **状態**: 全 6 項目を設計フェーズで解消済み。結果は次節「設計フェーズの実測」を参照。
+
+1. ~~LuaJIT 2.1 + mlua 0.11 `luajit52` の searcher テーブル名~~ → **解消（M1）**: `package.loaders` と `package.searchers` は同一テーブル。
+2. ~~`std::fs::File::open` が 260 超の非 verbatim パスを開けるか・verbatim 付与方式・UNC~~ → **解消（M2）**: 開ける。std が内部で `\\?\`（UNC は `\\?\UNC\`）を自動付与するため明示付与は不要。
+3. ~~`package.path` の ANSI 変換を残す場合の変換不能時の扱い~~ → **解消（設計判断）**: ANSI 変換自体を撤去し UTF-8 で設定する。
+4. ~~標準 searcher を残した場合のエラー集約挙動~~ → **解消（M4）**: 成功時は表に出ないが、未検出時は `no file` 行が二重になる。置換を採用。
+5. ~~長パス一時ディレクトリの構築方式と削除の長パス耐性~~ → **解消（M2 / M5）**: 深いネスト方式。`remove_dir_all` は非 verbatim の長パスで成功。
+6. ~~非 ASCII・ANSI 表現可能パスでの現行チャンク識別子のバイト表現~~ → **解消（M6）**: ANSI バイト列（不正な UTF-8）であり、ソースマップ側キー（UTF-8）と一致しない。
+
+---
+
+## 設計フェーズの実測
+
+> **生成フェーズ**: `/kiro-spec-design`（2026-09-18）
+> **環境**: Windows 11 Pro 10.0.26200 / rustc 1.98.1 / mlua 0.11.6（`luajit52`, `vendored`）/ luajit-src 210.6.6 / システム ACP = 932 / `LongPathsEnabled` = 1（ただし実験 exe は longPathAware マニフェストを持たない）
+> **方法**: リポジトリ外のスクラッチ cargo プロジェクト（mlua のみ依存）で計測。x64 と i686 の両ターゲットで同一結果。実験コードはリポジトリに残していない。
+
+### M1. searcher テーブル
+
+- `type(package.loaders)` = `table`、`type(package.searchers)` = `table`、`rawequal(package.loaders, package.searchers)` = **true**、`#package.loaders` = **4**（preload / Lua / C / C-root）。
+- ソース裏付け: `luajit2/src/lib_package.c` の `luaopen_package` は loaders テーブルを作成後、`#if LJ_52` で同じテーブルを `searchers` にも set する。`lj_cf_package_require` は `LUA_ENVIRONINDEX`（= package テーブル）の `"loaders"` フィールドを require のたびに参照する。
+- **Implication**: テーブルの**インプレース書き換え**（`loaders[2] = f`）なら両名称から見える。テーブル自体の差し替えは不要。
+
+### M2. 長パスと Rust std
+
+- 332 文字のディレクトリを非 verbatim パスで `create_dir_all` → 成功。345 文字のファイルへ `write` → 成功。
+- 区切り混在形（`C:/…/deep/mod_long.lua`、`C:/…/deep/sub\mod_x.lua`）で `File::open` → 成功。
+- **同一プロセス・同一パス**で LuaJIT 標準 `require` は `module 'mod_long' not found`（欠陥 A の再現）。すなわちプロセスは長パス非対応であり、std 側の成功は OS 設定ではなく std の機構による。
+- ソース裏付け: `library/std/src/sys/path/windows.rs` の `maybe_verbatim` → `get_long_path`。248 文字（`LEGACY_MAX_PATH`）以上、またはドライブ絶対でないパスは `GetFullPathNameW` で絶対化・正規化（`/` → `\`）したうえで `\\?\`（`\\server\share` は `\\?\UNC\`）を前置する。呼び出し側へ verbatim 形は返らない。
+- **Implication**: 読み込み用パスと命名用パスの分離は不要。Requirement 3.7 は構造的に満たされる。ネットワークパス（UNC）も std が処理する。
+
+### M3. チャンク識別子のバイト同一性（ASCII 短パス）
+
+- 同一の `package.path`（`<root>/?.lua;<root>/?/init.lua`）で `pasta.shiori.m` と `pasta`（`init.lua`）を、標準 searcher と Rust searcher プロトタイプ（テンプレートの `?` を、モジュール名の `.` を `\` に置換した文字列で置き換え、`lua.load(bytes).set_name("@" + candidate)`）でロード。
+- `debug.getinfo(1,'S').source`・`short_src`・チャンクへの引数（`...` = モジュール名、個数 1）が**完全一致**。形は `@C:/…/short/pasta\shiori\m.lua`（前置部 `/`・展開部 `\` の混在）。
+- ソース裏付け: `lj_load.c` `luaL_loadfilex` は `lua_pushfstring(L, "@%s", filename)` をチャンク名にする。`require` は loader を `name` 1 引数で呼ぶ。
+
+### M4. `require` のエラー集約とエラー値の型
+
+- 未検出時のメッセージは `module 'X' not found:` + 各 searcher が返した**文字列**の連結（文字列なら連結、それ以外は捨てる）。
+- 構成別の未検出メッセージ:
+  - 標準のみ: `no field package.preload[…]` + `no file` × 2（+ cpath 行）。
+  - Rust 前置＋標準残置: `no file` 行が **4 行（二重）**。
+  - Rust で `loaders[2]` を置換: 標準のみと**バイト同一**。
+- ロード失敗（構文エラー）を Rust コールバックの `Err(mlua::Error::RuntimeError)` で返すと、Lua の `pcall(require, "bad")` が受け取る値は **userdata**（mlua のエラーオブジェクト）になり、文言にも `runtime error:` / `syntax error:` 接頭辞と traceback が付く。標準は **string**。
+- Rust 関数が `(nil, msg, true)` を返し、Lua 側ラッパが `error(msg, 0)` する構成では、未検出・構文エラー・実行時エラーの 3 種とも `type(e) .. "::" .. tostring(e)` が標準と**バイト同一**（構文エラー本文は `mlua::Error::SyntaxError { message }` の `message` をそのまま使う）。
+- shebang（`#!…`）行と UTF-8 BOM を先頭に持つモジュールは、標準・Rust searcher とも同じくロードできる（LuaJIT はレキサ初期化で両者をスキップするため、バッファ経由のロードでも同じ）。
+
+### M5. 後始末
+
+- 300 文字超のツリーと非 ANSI 名ツリーを含むルートへの `std::fs::remove_dir_all`（非 verbatim）→ 成功。`tempfile::TempDir` の drop と同経路。
+
+### M6. 非 ASCII パスの現行チャンク識別子
+
+- `…/日本語フォルダ/?.lua` を (a) UTF-8 のまま、(b) CP932 へ変換して `package.path` に設定し、標準 `require` でロード。
+  - (a) は `module 'm' not found`（narrow `fopen` が UTF-8 バイト列を CP932 として解釈するため）。
+  - (b) は成功するが、`source` は `@` + **CP932 バイト列**（`93 fa 96 7b 8c ea …`）。UTF-8 として不正で、`@` + UTF-8 パスと一致しない。
+- デバッグフックは `source` を lossy な文字列として受け取るため、(b) の識別子は U+FFFD を含む文字列になり、Rust 文字列（UTF-8）由来のソースマップキーと一致しない。**現行は日本語パス上でブレークポイントが効いていない可能性が高い**（エンドツーエンドの実機確認まではしていない）。
+- Rust searcher + UTF-8 の `package.path` では `source` = `@` + UTF-8 パス（一致）。
+- 複数文字体系混在名（`日本語_한글_Кириллица_ελληνικά_😀`）は CP932 へ変換不能。この名前の 300 文字超ツリーで Rust searcher は成功し、`source` に `\\?\` は含まれず、未検出メッセージは当該名を欠落なく含む。
+
+### M7. x86
+
+- i686-pc-windows-msvc でビルドした同じ実験で M1〜M6 の結果が x64 と一致。
+
+### M8. x86 ターゲットでの既存テストのベースライン
+
+- 変更前のワークツリーで `cargo test --all --target i686-pc-windows-msvc --no-fail-fast` を実行（開発機・ACP 932）。**90 テストバイナリすべて成功（passed 2127 / failed 0 / ignored 11）**。
+- **Implication**: Requirement 7.3 の「無関係な x86 固有の失敗が多数表面化する」リスクは、少なくとも開発機では顕在化しない。CI ランナー固有の差（ロケール・8.3 短縮名の `%TEMP%`）は残るため、CI 変更は実装の早い段階で入れて確認するのが安全。
+- 副作用の注意: テスト実行が `crates/pasta_lua/tests/fixtures/sample.generated.lua` を改行コードのみ異なる内容で書き戻す（内容差分なし）。計測後に復元済み。
+
+### 付随する発見
+
+- **SHIORI `load` のパスは ANSI**: `crates/pasta_shiori/src/windows.rs` の `load` は `hdir` を ANSI としてデコードする。UKADOC「DLL共通仕様」には UTF-8 でパスを渡す `loadu`（SSP 2.6.92・2025-01-16 以降、`load` より優先して呼ばれる）があるが、pasta.dll は未エクスポート。非 ANSI 設置パスは DLL 境界で欠損する可能性が高く、Requirement 2 のエンドツーエンド達成には `loadu` 対応が要る見込み（design.md Open Questions 1）。
+- **スクラッチビルドが長パスで失敗**: セッションのスクラッチパッド（約 170 文字）配下で i686 をビルドすると、LuaJIT の `msvcbuild.bat` がパス長で失敗した。ターゲットディレクトリを短い場所へ逃がして回避。開発ツールチェーン自体が本件と同種の制約を持つ実例である。CI はリポジトリ直下の `target/` を使うため同じ問題が起きる可能性は低いが、x86 テスト有効化時に留意する。
+- **非 ASCII の `.pasta` ファイル名**: モジュール名（UTF-8）と `package.path`（ANSI）の混在により、現行では `pasta.scene.<日本語名>` の解決が失敗している可能性がある（未実測）。UTF-8 統一で解消される見込み。
+
+---
+
+## Design Synthesis（設計フェーズ）
+
+### Generalization
+
+- Requirement 1（長パス）と Requirement 2（非 ANSI）は「narrow `fopen` への依存」という同一問題の 2 つの現れであり、「Lua ファイル searcher のファイルオープンを Rust std へ置き換える」1 つの機構で同時に解消する。
+- Requirement 4（entry 失敗の無言化）・5.2（main）・5.6（旧経路）・4.4（リクエスト処理エラー）は「`Err` を 204／warn に読み替える経路」という同一問題であり、(a) 起動モジュールの一律致命化、(b) アクターの `Err` 分岐 1 箇所、の 2 点で解消する。
+
+### Build vs. Adopt
+
+- **Adopt**: 長パス対応は Rust std の内部 verbatim 付与をそのまま採用（自前の `\\?\` 付与・Windows API 直叩きは不要と実測で確定）。エラー文脈は mlua の `ErrorContext`（`WithContext`）を採用。検索規則は LuaJIT `searchpath` の仕様をそのまま踏襲。
+- **Build**: Lua ファイル searcher 本体のみ（mlua / LuaJIT に wide-API 版の searcher は存在しない）。
+- **Rejected**: LuaJIT へのパッチ（`fopen` → `_wfopen`）— vendored ビルドの保守負担が大きく、`package.path` の文字コード問題も別途残る。
+
+### Simplification
+
+- 読み込み用／命名用パスの分離（当初想定）→ **不要**（M2）。
+- `LoaderContext` を searcher へ渡す設計 → **不要**。`package.path` を実行時に読めば状態ゼロで両起動経路に効き、標準の意味論も保てる。
+- 標準 searcher のフォールバック残置 → **不要**（M4）。
+- 致命／継続を表す enum やテーブル → **不要**。起動モジュール 3 種がすべて致命のため、ヘルパ関数 1 個とログフィールド `fatal` で足りる。
+- `from_loader` の撤去 → 見送り。是正（`?` 伝搬 2 箇所）の方が差分が小さい。
+
+---
+
+## 設計判断（設計フェーズ）
+
+### Decision: 標準 Lua ファイル searcher を置換する
+
+- **Context**: brief は「前置＋標準をフォールバックとして残す」。本書の申し送りでは設計判断。
+- **Alternatives**: (1) 前置＋残置、(2) `loaders[2]` を置換、(3) 標準を残し `package.path` を空にする。
+- **Selected**: (2)。
+- **Rationale**: M4 のとおり (1) は未検出メッセージが二重化し、非 ASCII パスでは後段が無意味な候補を出す。Rust searcher が開けないファイルを narrow `fopen` が開ける場面は無い。(3) は `package.path` という単一情報源を失う。(2) は ASCII パスで未検出メッセージまでバイト同一。
+- **Trade-offs**: brief の記述からの逸脱（design.md Open Questions 2 で確認）。
+- **Follow-up**: `module_searcher_test.rs` の標準版 VM とのバイト比較を恒久ゲートにする。
+
+### Decision: `package.path` を UTF-8 で設定し ANSI 変換を撤去する
+
+- **Selected**: `generate_package_path()` の文字列を無変換で設定。`generate_package_path_bytes` は撤去。
+- **Rationale**: 非 ANSI パスで `setup_package_path` がロードを落とす経路を消す（Requirement 2 の必須条件）。チャンク識別子が UTF-8 になり、ソースマップキーと一致する（M6・Requirement 3.8）。ASCII パスではバイト同一（Requirement 3.4）。
+- **Trade-offs**: ANSI バイト列を `package.path` に自前追記する作者コードは解決不能になる（用例未確認・design.md Open Questions 3）。`package.searchpath` を `package.path` に対して呼ぶ作者コードは、非 ASCII パスで従来（ANSI）と結果が変わる（対象外の narrow API）。
+
+### Decision: ロード失敗は Lua 文字列エラーとして送出する
+
+- **Rationale**: M4。`pcall(require, …)` の戻り値を文字列として扱う Lua コードの前提を保つ。
+
+### Decision: 旧経路 `from_loader` は是正して残す
+
+- **Alternatives**: (1) 撤去してテスト 9 箇所を本番経路へ移行、(2) 失敗の `?` 伝搬へ是正。
+- **Selected**: (2)。`entry.lua` の**不在**はスキップのまま（仮定）。
+- **Rationale**: 9 箇所中 7 箇所は実在しない `/test/path` 等を base にした軽量ランタイム用途で、本番経路（`main` / `entry` / `scene_dic` が致命）へは移行できない。撤去は代替コンストラクタの新設を伴い差分が増える。
+- **Follow-up**: design.md Open Questions 4。
+
+### Decision: ドキュメントは `book/src/reference/startup.md` の 1 ページに集約
+
+- **Rationale**: 検索パス・起動シーケンス・既知の制限・切り分け手順は相互参照が密で、既存の `debug/troubleshooting.md`（デバッガ接続専用）とは読者の入口が異なる。`debug/troubleshooting.md` からは誘導リンクのみ置く。
 
 ---
 
@@ -212,7 +340,9 @@
 
 ## Open Questions
 
-要件ディスカッションで全項目を解決済み。決定の一覧は `requirements.md` の「Open Questions」節、設計への申し送りは本書「要件ディスカッションの決定と設計への申し送り」節を参照。標準 searcher フォールバックの去就のみ設計判断として残る（「Decision: 標準 searcher フォールバックの去就と `package.path` の ANSI 変換」）。
+要件ディスカッションで全項目を解決済み。決定の一覧は `requirements.md` の「Open Questions」節、設計への申し送りは本書「要件ディスカッションの決定と設計への申し送り」節を参照。標準 searcher フォールバックの去就は設計フェーズで「置換」と判断した（「設計判断（設計フェーズ）」）。
+
+設計フェーズで生じた未決事項（`loadu` 対応の要否、置換判断の確認、`package.path` の UTF-8 解釈の互換性、`from_loader` の `entry.lua` 不在の扱い、`X-ERROR-REASON` 単一行化規則 ほか）は `design.md` の「Open Questions」節に集約し、設計ディスカッションで解決する。
 
 ---
 
