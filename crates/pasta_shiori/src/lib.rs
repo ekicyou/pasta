@@ -23,4 +23,4 @@ pub use shiori::{PastaShiori, Shiori};
 // 出荷シンボルを通じて load→request→unload を駆動・検証できるようにする
 // （rlib 経由の統合テストでは no_mangle シンボルがリンク到達するために Rust から参照が必要）。
 #[cfg(windows)]
-pub use windows::{load, request, unload};
+pub use windows::{load, loadu, request, unload};
