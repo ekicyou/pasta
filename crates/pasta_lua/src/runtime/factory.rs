@@ -31,6 +31,15 @@ impl PastaLuaRuntime {
     /// * `transpiled` - Transpiled Lua code to load
     /// * `logger` - Optional instance-specific logger (Arc-wrapped for sharing)
     ///
+    /// # entry.lua の扱い（旧経路の契約・要件 5.6）
+    /// 旧経路は SHIORI 応答モジュールを**任意**とする軽量構築経路である。
+    /// - 不在: スキップして成功（失敗ではない・従来どおり）
+    /// - 存在するのに読み取りまたは実行に失敗: **致命**として `Err` を伝搬する
+    ///
+    /// 失敗ログ・エラー文脈は本番経路と同一（`fatal_startup_module` 経由、
+    /// `module = "pasta.shiori.entry"`）であり、本番経路では内蔵スクリプトの
+    /// 自己展開により不在も致命となる点だけが非対称である（要件 4.1）。
+    ///
     /// # Returns
     /// * `Ok(Self)` - Runtime initialized and code loaded
     /// * `Err(e)` - Initialization or code loading failed
@@ -72,23 +81,25 @@ impl PastaLuaRuntime {
         // Load entry.lua if exists (for SHIORI.load/SHIORI.request functions)
         // SAFETY(injection): Script is read from a deterministic local path
         // (base_dir/scripts/pasta/shiori/entry.lua), not from external input.
-        // Errors are caught and logged as warnings.
+        // 不在はスキップ（旧経路では任意）、存在するのに失敗した場合は
+        // 致命として `?` 伝搬する（要件 5.6）。読み取り失敗も `ExternalError` として
+        // 同じ `LuaResult` 経路へ乗せる。
         let entry_lua_path = loader_context
             .base_dir
             .join("scripts/pasta/shiori/entry.lua");
         if entry_lua_path.exists() {
-            match std::fs::read_to_string(&entry_lua_path) {
-                Ok(script) => {
-                    if let Err(e) = runtime.lua.load(&script).set_name("entry.lua").exec() {
-                        tracing::warn!(error = %e, "Failed to load entry.lua, continuing without SHIORI functions");
-                    } else {
-                        tracing::debug!("Loaded entry.lua");
-                    }
-                }
-                Err(e) => {
-                    tracing::warn!(error = %e, "Failed to read entry.lua, continuing without SHIORI functions");
-                }
-            }
+            let load_entry = || -> LuaResult<()> {
+                let script = std::fs::read_to_string(&entry_lua_path)
+                    .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+                runtime.lua.load(&script).set_name("entry.lua").exec()
+            };
+            fatal_startup_module("pasta.shiori.entry", load_entry())?;
+            tracing::debug!("Loaded entry.lua");
+        } else {
+            tracing::debug!(
+                path = %entry_lua_path.display(),
+                "entry.lua not found; skipping (legacy route treats it as optional)"
+            );
         }
 
         Ok(runtime)
@@ -287,7 +298,17 @@ impl PastaLuaRuntime {
 /// 継続可能な起動モジュールを将来追加する場合は、同じフィールド構成のまま
 /// `fatal = false`・レベル warn で記録する。
 fn require_startup_module(lua: &Lua, module: &'static str) -> LuaResult<()> {
-    lua_require(lua, module)
+    fatal_startup_module(module, lua_require(lua, module))?;
+    tracing::debug!(module, "Loaded module via require");
+    Ok(())
+}
+
+/// 起動モジュールのロード結果を致命として記録・文脈付けする共通処理。
+///
+/// `require` 経由か直接読みかを問わず、本番経路と旧経路で同一のログ構造と
+/// 同一の文脈文言を使うための単一の窓口（要件 5.3 / 5.5 / 5.6）。
+fn fatal_startup_module<T>(module: &'static str, result: LuaResult<T>) -> LuaResult<T> {
+    result
         .inspect_err(|e| {
             tracing::error!(
                 module,
@@ -296,7 +317,5 @@ fn require_startup_module(lua: &Lua, module: &'static str) -> LuaResult<()> {
                 "Failed to load startup module"
             );
         })
-        .context(format!("failed to load startup module '{module}'"))?;
-    tracing::debug!(module, "Loaded module via require");
-    Ok(())
+        .context(format!("failed to load startup module '{module}'"))
 }

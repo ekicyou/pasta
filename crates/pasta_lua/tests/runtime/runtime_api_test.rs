@@ -6,7 +6,7 @@
 //! - `register_module` — カスタムモジュール登録と require 連携・上書き
 //! - `with_config` — 不正ライブラリ名の ConfigError 伝播
 //! - `load_scene_dic` — ファイル読込・チャンク名・欠損エラー
-//! - `from_loader` — entry.lua の読込/失敗継続、transpiled コードの実行/エラー伝播
+//! - `from_loader` — entry.lua の読込/不在スキップ/失敗伝搬、transpiled コードの実行/エラー伝播
 //! - `@pasta_config` — toml_to_lua の型変換（int/float/bool/datetime/array/nested）と
 //!   actor name 注入（モジュール登録境界での検証。loader 統合テストの増分）
 
@@ -250,13 +250,45 @@ fn test_from_loader_loads_entry_lua_when_present() {
     assert!(value.as_boolean().unwrap_or(false));
 }
 
-/// entry.lua が実行時エラーでも from_loader は警告のみで継続する（graceful degradation）。
+/// entry.lua が存在して実行に失敗した場合、旧経路も致命として Err を返す（要件 5.6）。
 #[test]
-fn test_from_loader_continues_when_entry_lua_fails() {
+fn test_from_loader_fails_when_existing_entry_lua_fails() {
     let temp = TempDir::new().unwrap();
     let entry_dir = temp.path().join("scripts/pasta/shiori");
     std::fs::create_dir_all(&entry_dir).unwrap();
     std::fs::write(entry_dir.join("entry.lua"), r#"error("entry broken")"#).unwrap();
+
+    let loader_context = LoaderContext::new(
+        temp.path(),
+        vec!["scripts".to_string()],
+        toml::Table::new(),
+    );
+    let err = match PastaLuaRuntime::from_loader(
+        TranspileContext::new(),
+        loader_context,
+        RuntimeConfig::new(),
+        &[],
+        None,
+    ) {
+        Ok(_) => panic!("from_loader must fail when an existing entry.lua fails"),
+        Err(e) => e,
+    };
+    let msg = err.to_string();
+
+    assert!(
+        msg.contains("pasta.shiori.entry"),
+        "startup module name should appear in the context: {msg}"
+    );
+    assert!(
+        msg.contains("entry broken"),
+        "root cause should be preserved: {msg}"
+    );
+}
+
+/// entry.lua が存在しない場合、旧経路は従来どおりスキップして成功する（要件 5.6）。
+#[test]
+fn test_from_loader_skips_when_entry_lua_absent() {
+    let temp = TempDir::new().unwrap();
 
     let loader_context = LoaderContext::new(
         temp.path(),
@@ -273,7 +305,37 @@ fn test_from_loader_continues_when_entry_lua_fails() {
 
     assert!(
         runtime.is_ok(),
-        "from_loader must continue despite entry.lua failure"
+        "absent entry.lua must be skipped, not treated as a failure"
+    );
+}
+
+/// entry.lua が存在するのに読み取れない場合も致命として伝搬する（要件 5.6）。
+/// Windows ではパーミッション操作より確実なので、同名のディレクトリを置いて I/O 失敗を作る。
+#[test]
+fn test_from_loader_fails_when_entry_lua_is_unreadable() {
+    let temp = TempDir::new().unwrap();
+    // entry.lua をディレクトリとして作る: exists() は true だが read_to_string は失敗する
+    std::fs::create_dir_all(temp.path().join("scripts/pasta/shiori/entry.lua")).unwrap();
+
+    let loader_context = LoaderContext::new(
+        temp.path(),
+        vec!["scripts".to_string()],
+        toml::Table::new(),
+    );
+    let err = match PastaLuaRuntime::from_loader(
+        TranspileContext::new(),
+        loader_context,
+        RuntimeConfig::new(),
+        &[],
+        None,
+    ) {
+        Ok(_) => panic!("from_loader must fail when an existing entry.lua cannot be read"),
+        Err(e) => e,
+    };
+
+    assert!(
+        err.to_string().contains("pasta.shiori.entry"),
+        "startup module name should appear in the context: {err}"
     );
 }
 
