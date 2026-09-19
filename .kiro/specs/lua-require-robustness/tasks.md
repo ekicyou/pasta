@@ -114,7 +114,7 @@
   - _Boundary: ChunkNameValidationTests_
   - _Depends: 1, 3.4_
 
-- [ ] 3.6 (P) 長パス・非 ANSI 設置での応答バイト一致の E2E 検証
+- [x] 3.6 (P) 長パス・非 ANSI 設置での応答バイト一致の E2E 検証
   - 長パスかつ非 ANSI の設置先と通常の設置先の 2 つで、同一のリクエスト列に対する応答がバイト単位で一致することを本番のリクエスト経路で検証する
   - 独立バイナリとして共通モジュールを宣言し、既存の `PASTA_DEBUG` 中和ガードとゴースト構築ヘルパを取り込む
   - 完了状態: 上記を検証する常時実行の E2E テストが緑で、既存の応答バイト不変ゲートも緑のまま
@@ -167,3 +167,4 @@
 - `cargo fmt` はクレート単位でも無関係ファイル約 105 件を書き換える（本リポジトリは rustfmt clean ではない）。実行しないこと。
 - テスト実行で `crates/pasta_lua/tests/fixtures/sample.generated.lua` が改行差分のみで dirty になることがある。内容は同一なのでコミットしない。
 - タスク 2.7 は欠陥 A の解消（3.4）に依存することが実装フェーズで判明した。完成済みのテスト本体はスクラッチパッドへ退避し、3.4 完了直後に `crates/pasta_shiori/tests/ffi_loadu_test.rs` へ戻して緑化を確認する。`loadu` は `crates/pasta_shiori/src/lib.rs` から再公開されていないため、テストは `unsafe extern "C" { fn loadu(...) -> bool; }` で出荷シンボルを直接宣言している。
+- タスク 3.6 の実測で、長パス設置先ではテストゴーストの `SHIORI.unload` 内 `io.open` が narrow API の制約で失敗することを確認した（`if f then` で握られており応答・teardown には影響しない）。タスク 4.2 の「既知の制限」節で `io.open` の長パス非対応を書く際、机上ではなく実測として引用できる。
