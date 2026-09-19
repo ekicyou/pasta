@@ -12,6 +12,8 @@ use crate::debug::source_map::SourceMap;
 use crate::loader::{LoaderContext, PastaConfig, TranspileResult};
 use crate::logging::PastaLogger;
 use crate::runtime::runtime_config::RuntimeConfig;
+use mlua::ErrorContext;
+use mlua::Lua;
 use mlua::Result as LuaResult;
 use std::path::Path;
 use std::sync::Arc;
@@ -98,13 +100,19 @@ impl PastaLuaRuntime {
     /// Instead of loading transpiled code directly, it loads scene_dic.lua which
     /// requires all cached scene modules.
     ///
-    /// # Initialization Sequence (lua-module-path-resolution spec)
+    /// # Initialization Sequence
     /// 1. Setup package.path for module resolution
     /// 2. Register Rust modules (@pasta_config, @enc, @pasta_persistence, @pasta_sakura_script)
     /// 3. Register finalize_scene Rust binding
-    /// 4. require("main") - User initialization (errors logged as warnings, continues)
-    /// 5. require("pasta.shiori.entry") - SHIORI handlers (errors logged as warnings, continues)
-    /// 6. require("pasta.scene_dic") - Scene loading and finalization
+    /// 4. require("main") - 利用者初期化スクリプト。失敗は**致命**（要件 5.2）
+    /// 5. require("pasta.shiori.entry") - SHIORI 応答関数。失敗は**致命**（要件 4.1）
+    /// 6. require("pasta.scene_dic") - シーン読み込みと finalize。失敗は**致命**（要件 5.1）
+    /// 7. シーン identity 索引の突合 - モジュールロードではない best-effort 処理。
+    ///    失敗しても起動は継続する（デバッグ有効時のみ実行）
+    ///
+    /// 起動モジュール（4〜6）はすべて `require_startup_module` を経由し、失敗時は
+    /// `module` / `fatal` フィールド付きの error ログと、起動モジュール名の文脈を
+    /// 付けた `Err` で可視化される（要件 4.5 / 4.7 / 5.3 / 5.5）。
     ///
     /// # Arguments
     /// * `context` - TranspileContext with scene/word registries
@@ -192,25 +200,15 @@ impl PastaLuaRuntime {
         // Step 4: require("main") - User initialization script
         // Runs before scene_dic finalization to allow dictionary registration
         // SAFETY(injection): All module names below are compile-time string literals.
-        // Errors from "main" and "pasta.shiori.entry" are logged as warnings and
-        // do not halt execution. "pasta.scene_dic" error is propagated via `?`.
-        if let Err(e) = lua_require(&runtime.lua, "main") {
-            tracing::warn!(error = %e, "Failed to load main.lua, continuing without user initialization");
-        } else {
-            tracing::debug!(module = "main", "Loaded module via require");
-        }
+        // 起動モジュール 3 種はいずれも致命であり、失敗は `?` で伝搬する。
+        require_startup_module(&runtime.lua, "main")?;
 
         // Step 5: require("pasta.shiori.entry") - SHIORI handlers
-        if let Err(e) = lua_require(&runtime.lua, "pasta.shiori.entry") {
-            tracing::warn!(error = %e, "Failed to load pasta.shiori.entry, continuing without SHIORI functions");
-        } else {
-            tracing::debug!(module = "pasta.shiori.entry", "Loaded module via require");
-        }
+        require_startup_module(&runtime.lua, "pasta.shiori.entry")?;
 
         // Step 6: require("pasta.scene_dic") - Scene loading and finalization
         // This triggers SearchContext construction from Lua-side registries
-        lua_require(&runtime.lua, "pasta.scene_dic")?;
-        tracing::debug!(module = "pasta.scene_dic", "Loaded module via require");
+        require_startup_module(&runtime.lua, "pasta.scene_dic")?;
 
         // Step 7 (pasta-scene-kick task 2.2): finalize シーン突合。
         //
@@ -273,4 +271,32 @@ impl PastaLuaRuntime {
         tracing::info!(path = %scene_dic_path.display(), "Loaded scene_dic.lua");
         Ok(())
     }
+}
+
+/// 起動モジュールを `require` し、失敗を致命として文脈付きで伝搬する。
+///
+/// 失敗時は
+/// 1. 構造化フィールド `module`（モジュール名）と `fatal`（致命なら `true`）を持つ
+///    error ログへ、mlua の Display（複数行・スタックトレース込み）を欠落なく記録し
+///    （要件 4.7 / 5.3）、
+/// 2. `failed to load startup module '<module>'` の文脈を付けた `Err` を返す。
+///
+/// この文脈は `LoaderError::Runtime` → `MyError::Load` を経て `X-ERROR-REASON` へ入るため、
+/// 入れ子の `require` 失敗でも起動モジュール名と根本原因の両方が利用者へ届く（要件 4.5）。
+///
+/// 継続可能な起動モジュールを将来追加する場合は、同じフィールド構成のまま
+/// `fatal = false`・レベル warn で記録する。
+fn require_startup_module(lua: &Lua, module: &'static str) -> LuaResult<()> {
+    lua_require(lua, module)
+        .inspect_err(|e| {
+            tracing::error!(
+                module,
+                fatal = true,
+                error = %e,
+                "Failed to load startup module"
+            );
+        })
+        .context(format!("failed to load startup module '{module}'"))?;
+    tracing::debug!(module, "Loaded module via require");
+    Ok(())
 }
