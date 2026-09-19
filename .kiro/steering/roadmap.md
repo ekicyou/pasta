@@ -190,7 +190,7 @@ Phase 5 でデバッガ（DAP バックエンド）を組み込んだ結果、�
 
 ## Phase 9: 起動堅牢性（モジュールロード）
 
-areka 実機検証（2026-09-18）で発覚した、深いフォルダへ設置したゴーストが無言になる不具合への対処。GitHub issue #29（長パスで require 失敗）・#30（ロード失敗の無言化）を 1 spec に統合（両者とも `factory.rs` の起動時ロードを触るため分割するとマージ競合する・discovery 決定）。
+areka 実機検証（2026-09-18）で発覚した、深いフォルダへ設置したゴーストが無言になる不具合への対処。独立した 2 つの欠陥（長パスで require 失敗・ロード失敗の無言化）を 1 spec に統合（両者とも `factory.rs` の起動時ロードを触るため分割するとマージ競合する・discovery 決定）。
 
 ### Specs (dependency order)
 - [x] lua-require-robustness -- (B) `pasta.shiori.entry` のロード失敗を握りつぶさず既存の 500 + `X-ERROR-REASON` 経路（load-error-logging）へ伝搬 → (A) `package.loaders` へ Rust 実装 searcher を前置し、LuaJIT の narrow fopen（MAX_PATH=260・ANSI コードページ制限）を回避。チャンク名は現行形式と厳密一致（ソースマップ無回帰）。Dependencies: none。brief.md 作成済み（`.kiro/specs/completed/lua-require-robustness/brief.md`）
