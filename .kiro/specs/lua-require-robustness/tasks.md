@@ -66,7 +66,8 @@
   - 完了状態: 上記を網羅する常時実行のテストが緑
   - _Requirements: 2.4, 2.5, 2.6, 6.4, 6.9_
   - _Boundary: FfiLoaduTests_
-  - _Depends: 1, 2.5_
+  - _Depends: 1, 2.5, 3.4_
+  - _Note: 実装フェーズで判明 — 非 ANSI 設置パスでの `loadu` 成功は欠陥 A の解消（3.4）が前提。テストは完成済みで、`generate_package_path_bytes()` の ANSI 変換が残る間は `Can't convert some characters to multibyte charset` で `loadu` が false を返す。アサーションは弱めず、3.4 直後に再実行して緑化を確認する（タスク 3.1 と同じく、失敗する状態を単独でコミットしない）。_
 
 - [ ] 3. 欠陥 A: 設置パスに依存しないモジュール解決
 - [ ] 3.1 長パス・非 ANSI 設置パスの統合テストを先行追加
@@ -165,3 +166,4 @@
 - cargo の build/test は同一コマンド内で `NoDefaultCurrentDirectoryInExePath` を外すこと。外さないと mlua-sys(LuaJIT) のビルドが exit 101 で死ぬ（PowerShell: `Remove-Item Env:\NoDefaultCurrentDirectoryInExePath -ErrorAction SilentlyContinue;` / Bash: `unset NoDefaultCurrentDirectoryInExePath;`）。
 - `cargo fmt` はクレート単位でも無関係ファイル約 105 件を書き換える（本リポジトリは rustfmt clean ではない）。実行しないこと。
 - テスト実行で `crates/pasta_lua/tests/fixtures/sample.generated.lua` が改行差分のみで dirty になることがある。内容は同一なのでコミットしない。
+- タスク 2.7 は欠陥 A の解消（3.4）に依存することが実装フェーズで判明した。完成済みのテスト本体はスクラッチパッドへ退避し、3.4 完了直後に `crates/pasta_shiori/tests/ffi_loadu_test.rs` へ戻して緑化を確認する。`loadu` は `crates/pasta_shiori/src/lib.rs` から再公開されていないため、テストは `unsafe extern "C" { fn loadu(...) -> bool; }` で出荷シンボルを直接宣言している。
