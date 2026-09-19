@@ -153,7 +153,7 @@
   - _Requirements: 3.5, 4.10, 7.1, 7.2_
   - _Depends: 2.6, 2.7, 3.3, 3.5, 3.6, 4.1_
 
-- [ ]* 5.2 実機ホストでの確認とマニュアルへの反映
+- [x]* 5.2 実機ホストでの確認とマニュアルへの反映
   - 実機のホストで、(a) ANSI コードページ外の文字を含む 260 文字超のフォルダへ設置したゴーストが起動して喋ること、(b) 利用者初期化スクリプトを壊したゴーストで初期化失敗後にホストがリクエストを送るか・500 のエラー理由ヘッダがホストのログでどう見えるか、を確認する
   - 自動テストで代替できないホスト側挙動の確認であり、合否ゲートではなく記録を目的とする。(b) の結果をマニュアルの切り分け手順へ反映する
   - 完了状態: 確認結果が記録され、(b) の結果がマニュアルの切り分け手順に反映されている
@@ -172,3 +172,10 @@
 - タスク 5.1 の最終検証結果（全タスク完了後に実施）: `cargo test --all --target x86_64-pc-windows-msvc` と `--target i686-pc-windows-msvc` がいずれも exit 0・95 テストバイナリ・2180 passed・0 failed で、件数まで完全一致（要件 7.1 / 7.2）。名指しの既存ゲートも両ターゲットで緑: byte_invariant 4 / kick_unused_byte_invariant 2 / ffi_extern_session_e2e 1 / actor_marshaling 8 / actor_test_harness 6 / actor_tracing_seams 5 / actor_teardown 3 / actor_kick 4。このうち本仕様で変更したのは actor_marshaling_test.rs（タスク 2.2 でケース追加）のみで、他はすべて無変更のまま緑（要件 3.5 / 4.10）。
 - 仕様レベル検証（kiro-validate-impl）の結果: 要件 50 項目中 46 COVERED / 4 PARTIAL / 0 UNCOVERED、境界監査 CLEAN、critical findings なし。PARTIAL のうち 4.7 / 5.3（起動失敗ログの `module` / `fatal=true` / 複数行全文）は検証深度の不足だったため、`startup_fatal_test::startup_failure_log_carries_module_fatal_and_multiline_cause` を追加して解消した（マニュアルの切り分け手順が `fatal=true` の grep を指示しているため、フィールド名の改名を検出できる形で固定する必要がある）。残る PARTIAL は 4.9 の I/O 原因（searcher 経路は Windows では実質到達不能）と 4.10 の panic / リクエストデコード失敗の 204（いずれも本仕様が触っていない無変更コード）で、回帰ではなく既存のカバレッジ不足である。
 - `tracing-test` の `logs_contain` はキャプチャをスパン名でフィルタするため複数行フィールドの 2 行目以降が見えない。要件 4.7 の「欠落なく」を検証するにはスコープ付きの fmt subscriber で生の出力を取る必要がある。
+- タスク 5.2 の実測（SSP 2.8.98.3000 / Windows 11・NTFS システムボリューム・8.3 名生成有効）。
+  - (a) は**条件を分解して検証した**。「260 文字超 かつ 非 ANSI」を 1 つのフォルダで満たす設置先は、ホスト側のゴースト登録時点でパスが 8.3 短縮名（285 文字 → 104 文字）へ置き換わり、ランタイムには短く ANSI 表現可能なパスしか届かなかった。短縮はホストの SHIORI 呼び出し時ではなく登録時に起きている（SSP の `history.dat` に短縮形のまま保存されていた）。そのため次の 2 経路に分けた。
+    - 長パス: 8.3 名として既に正当なディレクトリ名（8 文字・大文字 ASCII・ドット無し）を 18 段重ね、短縮名エイリアスが生成されない設置先を作る。`load_dir` は 210 文字で無変換のまま到達し、`require` の解決先が 260 文字（`pasta.shiori.entry` 自身）および 265 文字（`pasta.shiori.event.kick`）になるゴーストが `fatal` なしで起動した。`MAX_PATH` は終端を含む 260 なので実用上限は 259 文字であり、いずれも旧実装の narrow `fopen` では開けない長さである。
+    - 非 ANSI: CP932 に存在しない文字（ハングル・絵文字）を含む 77 文字の設置先。`load_dir` は無変換で到達し、`package.path` も非 ANSI を保ったまま設定され、`fatal` なしで起動した。
+    - 「両方同時」の literal な条件は、8.3 名生成を無効化したボリューム等でなければこのホストでは再現できない。当該環境（非管理者・単一 NTFS システムボリューム）では検証不能として記録する。
+  - (b) の結果: `scripts/main.lua` に構文エラーを置くと（`scripts` は `profile/pasta/pasta_scripts` より先に探索されるため既定の `main.lua` を覆い隠す）、`module="main" fatal=true` の error 行に原因全文とスタックトレースが残り、`load` は false を返した。**SSP はその後リクエストを一切送らず**、ホスト側にはファイルとして何も残らなかった（`STACKTRC.TXT` も未更新）。したがって 500 応答の `X-ERROR-REASON` は SSP 環境では発動しない。マニュアル第 4 節の切り分け手順は、ログファイルを手順 1、500 応答をホスト依存の手順 2 へ入れ替えた。
+  - 切り分けの過程で、成功経路のログが `load` / `loadu` のどちらで初期化されたかを記録していないことが判明したため、`load_impl` に `entry` と `loaded` を出す 1 行を追加した（コミット `01a4c4a5` / `54b73ce8`）。ログのファイル振り分けは load_dir のスレッドローカル文脈で決まるため、FFI 入口スレッドでは `LoadDirGuard` を張り直さないとログファイルに届かない。`ffi_loadu_test` で両入口について固定済み。
