@@ -133,14 +133,22 @@ pub fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::
 /// Copy fixture to a temporary directory for testing.
 /// This avoids permission issues with profile directories in fixtures.
 pub fn copy_fixture_to_temp(name: &str) -> tempfile::TempDir {
-    let src = loader_fixtures_path(name);
     let temp = tempfile::TempDir::new().unwrap();
-    copy_dir_recursive(&src, temp.path()).unwrap();
+    copy_fixture_into(name, temp.path());
+    temp
+}
+
+/// フィクスチャを `dest` へコピーして一時ゴーストを作る（`copy_fixture_to_temp` の宛先指定版）。
+///
+/// 長パス・非 ANSI パス配下へ設置するために使う。後始末は呼び出し側の `TempDir` の drop に任せる。
+pub fn copy_fixture_into(fixture: &str, dest: &std::path::Path) {
+    std::fs::create_dir_all(dest).unwrap();
+    copy_dir_recursive(&loader_fixtures_path(fixture), dest).unwrap();
 
     // Also copy scripts directory from crate root for pasta runtime modules
     let crate_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let scripts_src = crate_root.join("pasta_scripts");
-    let scripts_dst = temp.path().join("pasta_scripts");
+    let scripts_dst = dest.join("pasta_scripts");
     if scripts_src.exists() {
         std::fs::create_dir_all(&scripts_dst).unwrap();
         copy_dir_recursive(&scripts_src, &scripts_dst).unwrap();
@@ -148,13 +156,39 @@ pub fn copy_fixture_to_temp(name: &str) -> tempfile::TempDir {
 
     // Also copy scriptlibs directory
     let scriptlibs_src = crate_root.join("scriptlibs");
-    let scriptlibs_dst = temp.path().join("scriptlibs");
+    let scriptlibs_dst = dest.join("scriptlibs");
     if scriptlibs_src.exists() {
         std::fs::create_dir_all(&scriptlibs_dst).unwrap();
         copy_dir_recursive(&scriptlibs_src, &scriptlibs_dst).unwrap();
     }
+}
 
-    temp
+// ============================================================================
+// Test Path Helpers（長パス・非 ANSI パスの一時ゴースト構築）
+// ============================================================================
+
+/// どの単一 ANSI コードページでも表現できない、複数文字体系混在のディレクトリ名。
+///
+/// 日本語・ハングル・キリル文字・ギリシャ文字・絵文字を混在させることで、
+/// 実行環境のシステムロケールがどの ANSI コードページであっても
+/// 「ANSI で表現不能」という条件が成立する（要件 6.7）。
+pub const NON_ANSI_DIR_NAME: &str = "日本語_한글_Кириллица_ελληνικά_😀";
+
+/// 深いディレクトリを掘るときに 1 段ごとに積むセグメント名（38 文字）。
+const DEEP_SEGMENT: &str = "deep_path_segment_0123456789abcdefghij";
+
+/// `root` 配下にセグメントを重ね、絶対パス長が `min_len` 文字を超えるディレクトリを作って返す。
+///
+/// `canonicalize` は使わず `std::path::absolute` の形を保つ。CI ランナーの `%TEMP%` は
+/// 8.3 短縮名（`RUNNER~1`）であり、`canonicalize` すると展開されて検証したい形が崩れるため。
+/// 後始末は呼び出し側が保持する `TempDir` の drop に任せる。
+pub fn make_deep_dir(root: &std::path::Path, min_len: usize) -> PathBuf {
+    let mut dir = std::path::absolute(root).expect("絶対パス化に失敗");
+    while dir.display().to_string().chars().count() <= min_len {
+        dir.push(DEEP_SEGMENT);
+    }
+    std::fs::create_dir_all(&dir).expect("深いディレクトリの作成に失敗");
+    dir
 }
 
 /// Create a temporary directory with scripts copied and minimal pasta content.
