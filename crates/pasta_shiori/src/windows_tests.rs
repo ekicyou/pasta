@@ -1,14 +1,15 @@
-//! FFI extern 入口（`load`/`request`/`unload`/`DllMain`）の in-process テスト。
+//! FFI extern 入口（`load`/`loadu`/`request`/`unload`/`DllMain`）の in-process テスト。
 //!
 //! task 5.1 で FFI が **アクターモデル**（`actor::lifecycle` の `static MAILBOX` 所有）へ
 //! 再配線されたため、旧 `RawShiori<MockShiori>` ベースの dispatch テストは廃止し、本番経路の
 //! **FFI 境界契約**（HGLOBAL 所有移譲＝解放／null・zero-len ガード／未初期化時 204／panic 非
 //! unwind）を実 extern 関数に対して検証する。
 //!
-//! # `static MAILBOX` の取り扱い（順序非依存）
-//! `actor::lifecycle::MAILBOX` はプロセスグローバルだが、本テスト群は **アクターを spawn しない**
-//! （`load` を実ゴーストなしで呼ばない）。`request`/`unload` は MAILBOX 未初期化（None）経路の
-//! 契約のみを検証するため、他テストとの実行順序に依存しない（None なら 204／冪等 no-op）。
+//! # プロセス全域状態の取り扱い
+//! `actor::lifecycle::MAILBOX` と `loadu` 初期化フラグはどちらもプロセスグローバルである。
+//! これらに触れるテストは `lock_global_state()` で直列化し、末尾で `unload()` して未初期化へ
+//! 戻すことで順序非依存を保つ。`loadu` のフラグ契約を検証するテストは、実在しない
+//! ディレクトリを渡して `spawn_actor` へ到達させる（VM は起こさず MAILBOX のみ設定される）。
 //! 実 VM を起こす load→request→unload→reload サイクルの E2E はアクタースレッド・実ゴーストを
 //! 要するため統合テスト（`tests/`・`actor-poc` 不要の既定ビルド）側に置く。
 
@@ -21,6 +22,24 @@ use windows_sys::Win32::System::Memory::{GlobalAlloc, GlobalFlags, GMEM_MOVEABLE
 const GMEM_INVALID_HANDLE: u32 = 0x8000;
 
 const LEAK_PROBE_LEN: usize = 64;
+
+/// `windows.rs` のプロセス全域状態（`lifecycle::MAILBOX` と `loadu` 初期化フラグ）を
+/// 触るテストを直列化する。並列実行下でも互いの前提（MAILBOX 未初期化／フラグの状態）を
+/// 壊さない。
+static FFI_GLOBAL_STATE: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// 直列化ロックを取得する（poison は無視して内部値を使う）。
+fn lock_global_state() -> std::sync::MutexGuard<'static, ()> {
+    FFI_GLOBAL_STATE.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// 文字列を HGLOBAL へ載せて `(handle, len)` を返す。`nofree` なので解放は
+/// 受け取った FFI 入口（所有権移譲）が行う。
+fn alloc_str_handle(text: &str) -> (HGLOBAL, usize) {
+    ShioriString::clone_from_str_nofree(text)
+        .expect("probe allocation must succeed")
+        .value()
+}
 
 /// GMEM_MOVEABLE 確保（freed 検出を `GlobalFlags` で安全に行える handle-table エントリ）。
 fn alloc_leak_probe() -> HGLOBAL {
@@ -53,6 +72,7 @@ fn extern_load_null_is_rejected() {
 
 #[test]
 fn extern_load_zero_len_returns_false_and_frees_input() {
+    let _guard = lock_global_state();
     let h = alloc_leak_probe();
     assert!(!load(h, 0), "zero length must be rejected");
     assert!(
@@ -65,6 +85,53 @@ fn extern_load_zero_len_returns_false_and_frees_input() {
 // プロセスグローバル MAILBOX を変化させ、並列実行中の他ユニットテスト（None 経路）と競合する。
 // そのため load→request→unload→reload サイクルは統合テスト（`tests/`）へ置き、本ユニット
 // 群は MAILBOX を spawn しない（順序非依存）ガード／未初期化契約のみを検証する。
+
+// ------------------------------------------------------------------
+// loadu（UTF-8 設置パス）と「loadu 済みなら load を無視」契約（要件 2.4/2.5/2.6）。
+// ------------------------------------------------------------------
+
+/// `loadu` → `load` 無視 → `unload` でフラグ解除、までを 1 つのテストへ直列に詰める
+/// （プロセス全域フラグと MAILBOX を共有するため）。
+///
+/// 設置ディレクトリには**実在しないパス**を使う。`spawn_actor` へは到達するが VM は
+/// 起きないため軽量で、かつ「ロード失敗時もフラグを立てる」契約（設計
+/// ShioriLoadEntry）をそのまま検証できる。
+#[test]
+fn loadu_initialized_flag_makes_load_a_noop_until_unload() {
+    let _guard = lock_global_state();
+
+    let missing = std::env::temp_dir().join("pasta_loadu_missing_dir_for_test");
+    let missing = missing.to_str().expect("temp path must be UTF-8").to_string();
+
+    // loadu: UTF-8 デコード → spawn_actor 到達（dir 不在によりロードは失敗）。
+    let (h, len) = alloc_str_handle(&missing);
+    assert!(!loadu(h, len), "loadu with a missing install dir must fail to load");
+
+    // loadu 済みフラグが立つため、後続の load は再ロードせず TRUE を返す（要件 2.5）。
+    // 入力バイト列は無視されるので leak probe を渡し、解放されることも確認する。
+    let probe = alloc_leak_probe();
+    assert!(
+        load(probe, LEAK_PROBE_LEN),
+        "load after loadu must be ignored and return TRUE"
+    );
+    assert!(
+        hglobal_is_freed(probe),
+        "ignored load must still free the incoming HGLOBAL (ownership transfer)"
+    );
+
+    // unload でフラグが下りる。
+    assert!(unload(), "unload must always return true");
+
+    // フラグ解除後は従来どおり ANSI デコードでロードする（要件 2.6・dir 不在なので false）。
+    let (h, len) = alloc_str_handle(&missing);
+    assert!(
+        !load(h, len),
+        "after unload the legacy load must decode ANSI and attempt a real load"
+    );
+
+    // 後始末: MAILBOX を未初期化へ戻す（他テストの前提）。
+    assert!(unload());
+}
 
 // ------------------------------------------------------------------
 // request ガード経路（null / 未初期化 → 204）と HGLOBAL 解放。
@@ -80,6 +147,7 @@ fn extern_request_null_returns_null_and_zero_len() {
 
 #[test]
 fn extern_request_without_actor_returns_204_and_frees_input() {
+    let _guard = lock_global_state();
     // MAILBOX 未初期化（アクター未 spawn）。本番アクター経路は SHIORI スレッドを無限
     // 待機させない契約のため、旧 500 ではなく安全網 204 を返す（R5.6）。入力は解放される。
     let h = alloc_leak_probe();
@@ -104,6 +172,7 @@ fn extern_request_without_actor_returns_204_and_frees_input() {
 
 #[test]
 fn extern_unload_without_actor_returns_true() {
+    let _guard = lock_global_state();
     assert!(unload(), "unload with no actor must be a safe no-op returning true");
     // 二重 unload も安全（冪等）。
     assert!(unload(), "double unload must remain a safe no-op");
@@ -115,6 +184,7 @@ fn extern_unload_without_actor_returns_true() {
 
 #[test]
 fn dll_main_non_attach_paths() {
+    let _guard = lock_global_state();
     const DLL_PROCESS_DETACH: u32 = 0;
     const DLL_PROCESS_ATTACH: u32 = 1;
     const DLL_THREAD_ATTACH: u32 = 2;
