@@ -159,3 +159,9 @@
   - _Requirements: 6.8_
   - _Boundary: BookStartupPage_
   - _Depends: 4.2, 5.1_
+
+## Implementation Notes
+
+- cargo の build/test は同一コマンド内で `NoDefaultCurrentDirectoryInExePath` を外すこと。外さないと mlua-sys(LuaJIT) のビルドが exit 101 で死ぬ（PowerShell: `Remove-Item Env:\NoDefaultCurrentDirectoryInExePath -ErrorAction SilentlyContinue;` / Bash: `unset NoDefaultCurrentDirectoryInExePath;`）。
+- `cargo fmt` はクレート単位でも無関係ファイル約 105 件を書き換える（本リポジトリは rustfmt clean ではない）。実行しないこと。
+- テスト実行で `crates/pasta_lua/tests/fixtures/sample.generated.lua` が改行差分のみで dirty になることがある。内容は同一なのでコミットしない。
