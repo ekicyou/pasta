@@ -8,10 +8,10 @@ use super::enc;
 use super::log;
 use super::persistence;
 use super::renderer_injection::RendererInjection;
+use super::searcher::install_module_searcher;
 use crate::loader::{LoaderContext, PastaConfig};
 use mlua::{IntoLua, Lua, Result as LuaResult, Table, Value};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 /// Register a module into `package.loaded` under the given name.
 ///
@@ -32,23 +32,25 @@ impl PastaLuaRuntime {
     /// Sets the package.path to include all search paths from LoaderContext
     /// in priority order (first path has highest priority).
     ///
-    /// On Windows, the path is converted to ANSI encoding to ensure
-    /// Lua's file I/O functions (which use fopen) can resolve non-ASCII paths.
+    /// 検索パス設定は [`LoaderContext::generate_package_path`] の UTF-8 文字列を
+    /// **無変換で**設定する（要件 2.1・設計 PackagePathSetup）。ANSI 変換は行わない
+    /// ため、非 ANSI の設置パスで設定が失敗する経路を持たない。ASCII パスでは
+    /// 変更前とバイト同一である。設定は従来どおり上書きで、`package.cpath` は
+    /// 変更しない。
+    ///
+    /// あわせて [`install_module_searcher`] を設置し、`require` のファイル解決を
+    /// narrow `fopen` から Rust std（wide API）へ移す。これにより長パス（要件 1.4）と
+    /// 非 ASCII のモジュール名・設置パス（要件 3.8）が解決できるようになる。
     pub(crate) fn setup_package_path(lua: &Lua, loader_context: &LoaderContext) -> LuaResult<()> {
-        // Get path bytes in system encoding (ANSI on Windows, UTF-8 on Unix)
-        let path_bytes = loader_context
-            .generate_package_path_bytes()
-            .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
-
-        // Create Lua string from raw bytes
-        let lua_path_string = lua.create_string(&path_bytes)?;
+        let path = loader_context.generate_package_path();
 
         let package: Table = lua.globals().get("package")?;
-        package.set("path", lua_path_string)?;
+        package.set("path", path.as_str())?;
 
-        // Log the path (interpret as UTF-8 if possible, otherwise show byte count)
-        let path_display = String::from_utf8_lossy(&path_bytes);
-        tracing::debug!(path = %path_display, "Set package.path");
+        // 検索パスを UTF-8 として解釈する searcher へ置換する（他のどの Lua コードよりも前）。
+        install_module_searcher(lua)?;
+
+        tracing::debug!(path = %path, "Set package.path");
         Ok(())
     }
 

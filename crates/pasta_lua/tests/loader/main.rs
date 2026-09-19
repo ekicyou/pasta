@@ -13,5 +13,6 @@ mod config_sections_test;
 mod config_test;
 mod lifecycle_test;
 mod lua_passthrough_test;
+mod path_robustness_test;
 mod startup_fatal_test;
 mod startup_test;

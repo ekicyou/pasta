@@ -1,7 +1,7 @@
 //! Encoding integration tests for pasta_lua.
 //!
 //! Tests the complete integration of encoding functionality including:
-//! - package.path setting with ANSI encoding on Windows
+//! - package.path setting (UTF-8 無変換・要件 2.1)
 //! - @enc module UTF-8/ANSI conversion
 //! - Japanese path require support
 
@@ -266,6 +266,7 @@ fn test_package_path_set_correctly() {
         vec!["scripts".to_string(), "lib".to_string()],
         toml::Table::new(),
     );
+    let expected = loader_context.generate_package_path();
 
     let runtime =
         PastaLuaRuntime::from_loader(context, loader_context, RuntimeConfig::new(), &[], None)
@@ -274,6 +275,10 @@ fn test_package_path_set_correctly() {
     // Get package.path
     let script = r#"return package.path"#;
     let path: mlua::String = runtime.exec(script).unwrap().as_string().unwrap().clone();
+
+    // 検索パス設定は `generate_package_path()` の文字列と**バイト同一**である
+    // （要件 2.1 / 3.1 / 3.2）。ASCII パスでは ANSI 変換していた変更前と同じ値になる。
+    assert_eq!(path.as_bytes().as_ref(), expected.as_bytes());
 
     // Should contain expected patterns
     let path_str = path.to_str().unwrap();
@@ -300,6 +305,7 @@ fn test_package_path_with_japanese_base() {
         vec!["scripts".to_string()],
         toml::Table::new(),
     );
+    let expected = loader_context.generate_package_path();
 
     let runtime =
         PastaLuaRuntime::from_loader(context, loader_context, RuntimeConfig::new(), &[], None)
@@ -311,8 +317,14 @@ fn test_package_path_with_japanese_base() {
     assert!(result.is_ok(), "package.path should be set without error");
 
     let path: mlua::String = result.unwrap().as_string().unwrap().clone();
-    // The path should not be empty
-    assert!(!path.as_bytes().is_empty());
+    // 非 ANSI パスでも ANSI へ変換せず、UTF-8 のまま設定される（要件 2.1 / 3.8）。
+    // 変更前は ANSI バイト列だったため、ここは UTF-8 契約への更新である。
+    assert_eq!(path.as_bytes().as_ref(), expected.as_bytes());
+    assert_eq!(
+        path.to_str().unwrap(),
+        expected,
+        "package.path は UTF-8 として解釈できなければならない"
+    );
 }
 
 // ============================================================================
