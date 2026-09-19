@@ -35,7 +35,7 @@ use crate::util::hglobal::*;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
 use std::sync::atomic::{AtomicBool, Ordering};
-use tracing::{error, warn};
+use tracing::{error, info, warn};
 use windows_sys::Win32::Foundation::*;
 
 /// Windows DLL entry point
@@ -168,7 +168,16 @@ fn load_impl(entry: &str, hdir: &ShioriString, encoding: DirEncoding) -> bool {
     // hinst は本番アクター経路では VM 構築の付随情報。SHIORI 仕様上 load では渡されない
     // ため 0 を渡す（旧実装も DllMain で受けた hinst を保持していたが、本番では
     // load_dir のみが VM 構築に必須）。
-    lifecycle::spawn_actor(0, dir)
+    let loaded = lifecycle::spawn_actor(0, dir);
+    // どちらの初期化入口でロードされたかを記録する（ホスト差分の切り分け用）。
+    //
+    // 入口の時点ではまだ tracing 購読者が存在せず（ファイル購読者は `spawn_actor` の内側、
+    // アクタースレッド上の `PastaShiori::load` で初期化される）、そこで出したログは捨てられる。
+    // `spawn_actor` は `actor.loaded()` でロード完了まで待って復帰するため、この地点が
+    // 「確実にログファイルへ残る最も早い位置」である。`loaded` も併記して、入口の選択と
+    // ロード成否を 1 行で対応付けられるようにする。
+    info!(entry, loaded, "SHIORI load entry completed");
+    loaded
 }
 
 /// 設置パスをデコードする（`loadu`=UTF-8／`load`=ANSI）。
