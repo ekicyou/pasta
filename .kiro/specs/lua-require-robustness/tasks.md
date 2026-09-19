@@ -139,7 +139,7 @@
   - _Requirements: 5.4, 6.5, 6.8, 6.10_
   - _Boundary: BookStartupPage_
 
-- [ ] 4.3 (P) ランタイム README の検索パス節の更新
+- [x] 4.3 (P) ランタイム README の検索パス節の更新
   - 検索パスの説明を UTF-8 契約（ANSI 変換をしないこと）と起動モジュールのロード失敗の扱いに合わせて更新する
   - 完了状態: README の当該節が実装後の契約と一致し、ANSI 前提の記述が残っていない
   - _Requirements: 5.4_

@@ -110,7 +110,7 @@ pasta_lua/
 | `scripts/`                       | ユーザーカスタム Lua | `pasta_scripts/` より優先される             |
 | `pasta_scripts/`                 | 標準ランタイム        | エンジン同梱スクリプト                 |
 | `pasta_scripts/pasta/`           | Pasta ランタイム          | トランスパイル済みコードから呼び出される |
-| `pasta_scripts/pasta/shiori/entry.lua` | SHIORI エントリーポイント | 存在すれば自動ロード                     |
+| `pasta_scripts/pasta/shiori/entry.lua` | SHIORI エントリーポイント | 起動時に `require` される（失敗は致命）  |
 | `scriptlibs/`                    | 外部ライブラリ            | package.path の最後に追加                |
 | `profile/pasta/save/lua/`        | 永続化モジュール          | 最優先で検索される                       |
 | `profile/pasta/cache/lua/`       | Lua キャッシュ            | debug_mode 時に出力                      |
@@ -241,14 +241,16 @@ libs = [
 
 ## Lua モジュール検索パス
 
-`package.path` は以下の形式で設定されます（優先度順）：
+`package.path` は `[loader].lua_search_paths` の各エントリ（優先度順）から `?.lua` → `?/init.lua` の 2 パターンを生成し、`;` で連結した文字列です。パス区切りは Lua 向けに `/` へ正規化されます。
 
 ```lua
--- 生成されるpackage.path（例）
+-- 生成されるpackage.path（既定の lua_search_paths の場合）
 "/path/to/base/profile/pasta/save/lua/?.lua;"..
 "/path/to/base/profile/pasta/save/lua/?/init.lua;"..
 "/path/to/base/scripts/?.lua;"..
 "/path/to/base/scripts/?/init.lua;"..
+"/path/to/base/profile/pasta/pasta_scripts/?.lua;"..
+"/path/to/base/profile/pasta/pasta_scripts/?/init.lua;"..
 "/path/to/base/profile/pasta/cache/lua/?.lua;"..
 "/path/to/base/profile/pasta/cache/lua/?/init.lua;"..
 "/path/to/base/scriptlibs/?.lua;"..
@@ -258,9 +260,38 @@ libs = [
 ### 検索優先順位
 
 1. **`profile/pasta/save/lua/`** - 永続化されたユーザーモジュール（最優先）
-2. **`scripts/`** - 自作スクリプト・Pasta ランタイムライブラリ
-3. **`profile/pasta/cache/lua/`** - トランスパイル済み Pasta コード
-4. **`scriptlibs/`** - 外部 Lua ライブラリ
+2. **`scripts/`** - 利用者のカスタムスクリプト
+3. **`profile/pasta/pasta_scripts/`** - 内蔵ランタイムスクリプトの自己展開先
+4. **`profile/pasta/cache/lua/`** - トランスパイル済み Pasta コード
+5. **`scriptlibs/`** - 外部 Lua ライブラリ
+
+### UTF-8 契約
+
+`package.path` は **UTF-8 のまま** 設定されます。ANSI（システムのマルチバイト文字コード）への変換は行いません。
+
+あわせて、Lua ファイルを探す searcher（`package.loaders[2]`）は LuaJIT 標準品と同型の Rust 実装（`src/runtime/searcher.rs`）へ置換されています。候補パスの生成規則は標準と同一（`;` で分割・空要素はスキップ・テンプレート中の `?` をすべて置換・モジュール名の `.` を OS のディレクトリ区切りへ置換）で、ファイルを開く API だけが Rust の `std::fs`（wide API）になります。
+
+- 設置パスに非 ASCII 文字が含まれていてもモジュールを解決できます（ただし設置パスを UTF-8 で受け取る `loadu` を呼ばないホストでは、パスがランタイムへ届く前に欠落します。ホスト側の制約でランタイムからは回復できません。詳細はマニュアル [`startup.md`](../../book/src/reference/startup.md) の「既知の制限」を参照してください）。
+- 独自のパス長上限を持たず、候補パス・チャンク識別子・エラー文言に拡張長プレフィックス（`\\?\`）が現れることもありません（長パスに必要な付与は Rust `std` が内部で行います）。設置パスが 260 文字を超えても解決できます。
+- 候補パス文字列は、開くパス・チャンク識別子（`@` + 候補パス）・エラーメッセージにそのまま使われます。ASCII パスでは標準 searcher とバイト単位で同一の結果になります。
+- 未検出時のメッセージには、試した候補パスが探索順に `no file '<候補パス>'` として並びます。
+- `package.path` に UTF-8 として不正なバイト列（ANSI バイト列など）を追記すると、その候補は開けず `no file` 行に載ります。作者コードから検索パスを足す場合は UTF-8 で書いてください。
+
+> **Note**: `@enc` モジュールの ANSI 変換 API は従来どおりです。上記は `package.path` とモジュール解決に限った契約です。
+
+### 起動モジュールのロード失敗
+
+起動シーケンスは `require` で次の順にモジュールをロードし、**いずれも失敗は致命**です（ロード全体が失敗し、`X-ERROR-REASON` とログに理由が出ます）。
+
+| 順 | モジュール | 失敗時 | 備考 |
+| -- | ---------- | ------ | ---- |
+| 1 | `main` | 致命 | 利用者初期化スクリプト。既定の `main.lua` は自己展開されるため不在は正常状態ではない |
+| 2 | `pasta.shiori.entry` | 致命 | SHIORI 応答関数の唯一の定義元 |
+| 3 | `pasta.scene_dic` | 致命 | シーン読み込みと finalize |
+
+- 失敗は `module`（モジュール名）と `fatal` フィールド付きの error ログに記録され、`failed to load startup module '<モジュール名>'` の文脈を付けた `Err` として伝搬します。入れ子の `require` 失敗でも、起動モジュール名と根本原因の両方が読み取れます。
+- ロード失敗の原因（未検出・構文エラー・読み込みエラー）は区別せず、すべて同じ経路で可視化されます。
+- シーン identity 索引の突合（デバッグ有効時のみ実行）はモジュールロードではないため、失敗しても起動は継続します。
 
 ## 組み込みモジュール
 
