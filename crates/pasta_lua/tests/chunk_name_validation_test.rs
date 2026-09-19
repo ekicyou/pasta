@@ -26,7 +26,7 @@
 //! 実機（Windows）実測で判明した重要事実:
 //! - 本番 `require` 経路のフック source は **`@` 付き ＋ 区切り混在**:
 //!   `@<package.path 前置部=`/`>/<モジュール名展開部=`\`>` という形になる。
-//!   （`package.path` は forward-slash で設定され、Lua の searcher がモジュール名
+//!   （`package.path` は forward-slash で設定され、searcher がモジュール名
 //!   `pasta.scene.…` の `.` を OS 区切り `\` へ置換して `?` に埋めるため。）
 //! - ローダ由来キー（[`CacheManager::source_to_cache_path`] の `PathBuf`）は Windows
 //!   では全 backslash。
@@ -36,16 +36,32 @@
 //!
 //! `debug::source_map` の本番化（task 3.1・gate 撤去）により、このテストは default
 //! features で常時コンパイル・実行される（7.3）。
+//!
+//! # lua-require-robustness task 3.5（チャンク識別子とソースマップの無回帰検証）
+//!
+//! 上記の往復を **本番と同じ searcher**（[`install_module_searcher`]）を設置した VM で
+//! 計測する（design.md "Testing Strategy > Integration Tests（pasta_lua）" 5）。
+//! あわせて非 ANSI ディレクトリ名配下へ設置したケースを追加する。design.md
+//! 「設計フェーズの実測結果」M6 のとおり、本仕様以前は非 ASCII ディレクトリ配下の
+//! チャンク識別子が ANSI バイト列となり UTF-8 のソースマップキーと一致しなかった。
+//! 本仕様の searcher 置換により、非 ASCII パスでも ASCII パスと同じ構成規則の識別子が
+//! 付与され、ソースマップのキーへ解決できる（要件 3.6・3.8）。
+//!
+//! `mod common` の宣言により `PASTA_DEBUG` 中和ガードが適用される（要件 6.4）。
+
+mod common;
 
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use mlua::{Debug, HookTriggers, Lua, LuaOptions, StdLib, VmState};
 
+use common::NON_ANSI_DIR_NAME;
 use pasta_dsl::parser::parse_str;
 use pasta_lua::LuaTranspiler;
 use pasta_lua::debug::source_map::canonicalize_chunk_name;
 use pasta_lua::loader::CacheManager;
+use pasta_lua::runtime::install_module_searcher;
 
 /// 代表 `.pasta`（単純シーン 1 本・トーク 1 行）。トランスパイルして実ロードできる
 /// 最小入力。命名検証が目的なので内容は最小でよい。
@@ -60,9 +76,16 @@ const DIC_REL: &str = "dic/baseware/system.pasta";
 /// 期待モジュール名（`source_to_module_name` と一致するはず）。
 const EXPECTED_MODULE: &str = "pasta.scene.baseware.system";
 
-/// ALL_SAFE VM（`jit` あり・`debug` 除外）。hook install は別途行う。
+/// ALL_SAFE VM（`jit` あり・`debug` 除外）＋ 本番 searcher。hook install は別途行う。
+///
+/// 本番（`PastaLuaRuntime::setup_package_path`）と同じく `package.loaders[2]` を Rust
+/// 実装へ置換し、チャンク識別子の生成経路を本番と一致させる。VM は
+/// `Lua::unsafe_new_with` で構築する必要がある（mlua の安全モード `Lua::new` では
+/// `package.loaders` が 4 要素にならず設置が拒否される）。
 fn build_all_safe_vm() -> Lua {
-    unsafe { Lua::unsafe_new_with(StdLib::ALL_SAFE, LuaOptions::default()) }
+    let lua = unsafe { Lua::unsafe_new_with(StdLib::ALL_SAFE, LuaOptions::default()) };
+    install_module_searcher(&lua).expect("本番 searcher の設置に失敗");
+    lua
 }
 
 /// `LoaderContext::generate_package_path` と同形の package.path 文字列を組む
@@ -73,11 +96,19 @@ fn package_path_for(cache_lua_root: &Path) -> String {
     format!("{root}/?.lua;{root}/?/init.lua")
 }
 
-#[test]
-fn hook_source_matches_loader_cache_key_after_normalization() {
-    // --- 0. 一時 base_dir と `.pasta` ソースを用意 -------------------------------
-    let temp = tempfile::TempDir::new().expect("temp dir");
-    let base_dir = temp.path().to_path_buf();
+/// 往復検証の実測値。
+struct RoundTrip {
+    /// ラインフックが報告した生 source 文字列。
+    hook_source_raw: String,
+    /// ローダのキャッシュパス構築由来のキー（`@` なし）。
+    loader_key_raw: String,
+}
+
+/// `base_dir` にゴーストを設置し、トランスパイル → `require` → ラインフック →
+/// ソースマップ照合の往復を実測・検証する（設置パスに依存しない検証本体）。
+fn run_round_trip(base_dir: &Path) -> RoundTrip {
+    // --- 0. `.pasta` ソースを用意 ------------------------------------------------
+    let base_dir = base_dir.to_path_buf();
     let source_path = base_dir.join(DIC_REL);
     std::fs::create_dir_all(source_path.parent().unwrap()).expect("mkdir dic");
     std::fs::write(&source_path, PASTA_SRC).expect("write .pasta");
@@ -177,10 +208,12 @@ fn hook_source_matches_loader_cache_key_after_normalization() {
     lua.remove_global_hook();
 
     // ドライバ/スタブ由来の source を除外し、ロードしたチャンクの source を取り出す。
+    // `=pasta_searcher` は本番 searcher の Lua ラッパ（searcher.rs の WRAPPER_CHUNK）。
     let driver_names = [
         "@chunk_name_stub",
         "@chunk_name_setpath",
         "@chunk_name_require",
+        "=pasta_searcher",
     ];
     let chunk_sources: Vec<String> = captured
         .lock()
@@ -244,5 +277,42 @@ fn hook_source_matches_loader_cache_key_after_normalization() {
     assert_ne!(
         hook_no_at, loader_key_raw,
         "実機では生文字列はバイト一致しない（区切り差など）→ 正規化が必須であることの確認"
+    );
+
+    RoundTrip {
+        hook_source_raw,
+        loader_key_raw,
+    }
+}
+
+#[test]
+fn hook_source_matches_loader_cache_key_after_normalization() {
+    let temp = tempfile::TempDir::new().expect("temp dir");
+    run_round_trip(temp.path());
+}
+
+/// 非 ANSI ディレクトリ名配下へ設置しても、チャンク識別子がソースマップのキーへ
+/// 解決されること（要件 3.6・3.8 / design 実測 M6）。
+///
+/// 本仕様以前はこの設置でチャンク識別子が ANSI バイト列となり、UTF-8 の
+/// ソースマップキーと一致しなかった。
+#[test]
+fn hook_source_matches_loader_cache_key_under_non_ansi_install_path() {
+    let temp = tempfile::TempDir::new().expect("temp dir");
+    let base_dir = temp.path().join(NON_ANSI_DIR_NAME);
+    std::fs::create_dir_all(&base_dir).expect("非 ANSI ディレクトリの作成に失敗");
+
+    let measured = run_round_trip(&base_dir);
+
+    // 非 ASCII 文字が欠落・置換されずにチャンク識別子へ現れる（3.8 / 実測 M6）。
+    assert!(
+        measured.hook_source_raw.contains(NON_ANSI_DIR_NAME),
+        "フック source が非 ANSI ディレクトリ名をそのまま含むはず。got: {:?}",
+        measured.hook_source_raw
+    );
+    assert!(
+        measured.loader_key_raw.contains(NON_ANSI_DIR_NAME),
+        "ソースマップ側キーも非 ANSI ディレクトリ名を含むはず。got: {:?}",
+        measured.loader_key_raw
     );
 }

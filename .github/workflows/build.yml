@@ -45,7 +45,7 @@ jobs:
         run: cargo build --release --target ${{ matrix.target }} -p pasta_shiori
 
       - name: Run tests
-        run: cargo test --all
+        run: cargo test --all --target ${{ matrix.target }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

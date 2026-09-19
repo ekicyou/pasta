@@ -40,4 +40,5 @@
 
 # リファレンス
 
+- [起動シーケンスとモジュール解決](reference/startup.md)
 - [外部リンク集](reference/external-links.md)

@@ -124,14 +124,9 @@ pub(crate) fn discover_files(
         }
     }
 
-    if files.is_empty() {
-        tracing::warn!(
-            base_dir = %base_dir.display(),
-            patterns = ?patterns,
-            "No .pasta files found"
-        );
-    }
-
+    // 結果が空であることの意味は拡張子によって異なる（`.pasta` が 0 件なら異常だが、
+    // `.lua` が 0 件なのは `dic/*.lua` を置かない通常の構成である）。ここは両方に使われる
+    // 共通の探索関数なので判断できない。空の扱いは呼び出し側に委ねる。
     Ok(files)
 }
 

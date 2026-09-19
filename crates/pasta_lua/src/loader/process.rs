@@ -31,6 +31,15 @@ impl PastaLoader {
     ) -> Result<(Vec<std::path::PathBuf>, Vec<std::path::PathBuf>), LoaderError> {
         // Discover .pasta files
         let pasta_files = discovery::discover_files(base_dir, pasta_patterns)?;
+        if pasta_files.is_empty() {
+            // 空の警告は `.pasta` 側だけで出す。下の `.lua` 探索は `.pasta` パターンから
+            // 機械生成したもので、0 件なのは `dic/*.lua` を置かない通常の構成である。
+            warn!(
+                base_dir = %base_dir.display(),
+                patterns = ?pasta_patterns,
+                "No .pasta files found"
+            );
+        }
 
         // Generate .lua patterns from .pasta patterns
         let lua_patterns: Vec<String> = pasta_patterns

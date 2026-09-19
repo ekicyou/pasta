@@ -30,10 +30,13 @@ pub mod persistence;
 /// Renderer injection seam - adapter-originated `@pasta_sakura_script` registration.
 pub mod renderer_injection;
 mod runtime_config;
+/// Searcher module - Rust std backed Lua file searcher for `package.loaders[2]`.
+mod searcher;
 
 pub use renderer_injection::{RendererInjection, SakuraRenderBoundary, default_sakura_renderer};
 pub use runtime_config::RuntimeConfig;
 pub use runtime_config::lua_require;
+pub use searcher::install_module_searcher;
 
 use crate::context::TranspileContext;
 use crate::debug::source_map::SourceMap;

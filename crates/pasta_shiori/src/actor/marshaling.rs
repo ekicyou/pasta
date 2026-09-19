@@ -6,11 +6,15 @@
 //!
 //! - **GET（R5.1）**: flume `bounded(1)` の reply tx を [`ActorMsg::Get`] に同梱して
 //!   `try_send`、同期 [`Receiver::recv_timeout`]`(GET_TIMEOUT)` でブロック受信。
-//!   `Ok(Value)`→応答文字列、`Timeout`/`Disconnected`→204。
+//!   `Ok(Value)`→応答文字列（VM 応答、またはリクエスト処理エラー由来の 500 応答）、
+//!   `Timeout`/`Disconnected`→204。
 //! - **NOTIFY（R5.2）**: 応答経路なしで `try_send`、アクター完了を待たず **即 204**。
-//! - **drop→204（R5.3）**: アクターが reply を送らず drop（処理失敗）すると、受信側の
-//!   `recv_timeout` が `Disconnected` を観測し 204。flume の move/drop 意味論で
-//!   exactly-once（独自 `Responder` 不要）。
+//! - **drop→204（R5.3）**: アクターが reply を **送れない**（スレッド消滅・panic 等）まま
+//!   drop すると、受信側の `recv_timeout` が `Disconnected` を観測し 204。flume の
+//!   move/drop 意味論で exactly-once（独自 `Responder` 不要）。なお **リクエスト処理の
+//!   エラーは drop ではなく 500 応答**として返る（仕様 `lua-require-robustness` 4.3/4.4/4.8・
+//!   `thread.rs` の GET アーム）。204 はあくまで「応答を返せなかった」場合の安全網である
+//!   （4.10・本モジュールのコードは無変更）。
 //! - **異常→204（R5.6）**: `try_send` 失敗（チャネル閉鎖＝アクター不在/異常）や未初期化
 //!   は 204。SHIORI スレッドを無限待機させない（デッドロック経路を作らない）。
 //! - **timeout→204＋コルーチン保存（R5.7）**: 閾値超過で 204 を返し SHIORI スレッドの
@@ -129,7 +133,8 @@ pub fn determine_method(request: &str) -> Option<ShioriMethod> {
 ///
 /// flume `bounded(1)` の reply tx を [`ActorMsg::Get`] に同梱して `try_send`、同期
 /// [`Receiver::recv_timeout`]`(GET_TIMEOUT)` でブロックする。アクターが値を送れば応答
-/// 文字列、reply を送らず drop すれば `Disconnected`→204、閾値超過なら `Timeout`→204、
+/// 文字列（VM 応答、またはリクエスト処理エラー由来の 500 応答）、reply を送れず drop
+/// されれば `Disconnected`→204、閾値超過なら `Timeout`→204、
 /// `try_send` 失敗（アクター不在/満杯）なら即 204。**必ず文字列を返し無限待機しない**。
 ///
 /// `GET_TIMEOUT` を用いる本番エントリ。タイムアウトを差し替えた検証は
@@ -308,7 +313,7 @@ mod tests {
     fn marshal_get_reply_drop_yields_204() {
         let (tx, rx) = mailbox();
 
-        // アクター役: GET を drain するが reply を送らず drop（処理失敗の模擬）。
+        // アクター役: GET を drain するが reply を送らず drop（応答を返せない異常の模擬）。
         let actor = thread::spawn(move || {
             if let Ok(ActorMsg::Get { req: _, reply }) = rx.recv() {
                 // reply を送らずスコープ離脱 → drop → 受信側 Disconnected。

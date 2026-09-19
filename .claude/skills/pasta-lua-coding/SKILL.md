@@ -17,7 +17,7 @@ description: >-
   汎用Luaプログラミング, SHIORIプロトコル実装.
 metadata:
   author: ekicyou
-  version: "1.8.0"
+  version: "1.9.0"
 ---
 
 # Pasta Lua Coding Skill
@@ -36,6 +36,10 @@ metadata:
 **役割分離**: 姉妹スキル `pasta-ghost-authoring` がPasta DSL文法（`.pasta`ファイルの記述）を担当し、本スキルはその下位層であるLuaランタイム層を担当する。DSLの ` ```lua ``` ` ブロック内のコード記述や、`scripts/` 配下のカスタムスクリプト・`pasta_scripts/` 配下のランタイムスクリプト開発を支援する。
 
 **scripts/ フォルダ**: ゴーストディレクトリ直下の `scripts/` にユーザーカスタムLuaスクリプトを配置する。`main.lua` がエントリーポイントとしてpastaランタイムに読み込まれ、シーン関数・単語定義・イベントハンドラ等をセットアップする。`scripts/` は `pasta_scripts/` より優先されるため、同名ファイルでランタイムの動作を上書きできる。
+
+> **`main` のロード失敗は致命**: `main` の読み込みに失敗すると、警告を残して続行するのではなく**起動が中止される**（`load` が失敗を返す）。`scripts/main.lua` を置いて既定の `main.lua` を上書きした場合、そのファイルの構文エラーや実行時エラーはゴーストを起動不能にする。原因は `profile/pasta/logs/pasta.log` の `fatal=true` を含む行に、失敗したモジュール名と根本原因の全文が記録される。詳細は[起動シーケンスとモジュール解決](../../../book/src/reference/startup.md)を参照。
+
+> **モジュール解決はパスの長さ・文字種に依存しない**: `require` は設置パスが 260 文字を超えても、ANSIコードページで表現できない文字を含んでいても成功する。ただしこの保証はランタイムが解決するモジュールに限る。`io.open` / `loadfile` / `dofile` / `package.searchpath` はOSのnarrow APIを使うため対象外であり、永続化には `@pasta_persistence` を使うこと。また `package.path` へ独自エントリを追記する場合は**UTF-8の文字列**を使うこと。
 
 ### DSL vs Lua 判断基準
 

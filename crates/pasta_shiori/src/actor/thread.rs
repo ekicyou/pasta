@@ -29,7 +29,8 @@
 //! FFI 入口（`windows.rs` → [`crate::actor::lifecycle`] の `static MAILBOX`）が本スレッドへ
 //! 配線済み。GET の完全な timeout/204/drop marshaling 契約は [`crate::actor::marshaling`]
 //! （task 3.4）が担い、本スレッドの `Get` 応答は VM 応答文字列を [`Reply::Value`] で返す
-//! （エラー時は reply を drop → marshaling 側で 204）。wintf（`block_on`）は本スレッドの
+//! （エラー時も `MyError::to_shiori_response()` の 500 応答文字列を [`Reply::Value`] で返す・
+//! 仕様 `lua-require-robustness` 4.3/4.4/4.8）。wintf（`block_on`）は本スレッドの
 //! メッセージループに必須のため出荷依存である。
 
 use std::net::SocketAddr;
@@ -178,20 +179,25 @@ pub fn spawn_actor_thread(
                             let seq = req.seq;
                             // 観測ログ点（R10.4・無効時ゼロコスト）: GET を mailbox から受信。
                             tracing::trace!(seam = "actor.recv", method = "get", seq, "actor received GET");
-                            // task 3.4 申し送り: 完全な timeout/drop→204 marshaling は 3.4。
-                            // ここでは VM 応答文字列を Reply::Value で返す最小実装。
-                            // エラー時は reply を送らず drop（受信側 Disconnected→3.4 で 204）。
+                            // timeout/異常→204 の marshaling 契約は 3.4（marshaling.rs）が担う。
+                            // ここは GET 応答を Reply::Value で **必ず 1 回**返す:
+                            // 成功は VM 応答文字列、失敗は 500 + X-ERROR-REASON 応答文字列
+                            // （仕様 `lua-require-robustness` 4.3/4.4/4.8・design.md
+                            // `ActorErrorReply`）。ロード失敗（`MyError::Load`）・未ロード
+                            // （`NotInitialized`）・Lua 実行エラー（`Script`）は同一分岐を通る。
                             match shiori.request(&req.raw) {
                                 Ok(resp) => {
                                     let _ = reply.send(Reply::Value(resp));
                                     // 観測ログ点（R10.4）: VM 応答を reply で返した（exactly-once move）。
                                     tracing::trace!(seam = "actor.reply", method = "get", seq, "actor replied with VM response");
                                 }
-                                Err(_) => {
-                                    // reply を送らず drop（受信側 Disconnected→marshaling で 204）。
-                                    drop(reply);
-                                    // 観測ログ点（R10.4）: VM 失敗で reply を drop（exactly-once drop）。
-                                    tracing::debug!(seam = "actor.drop", method = "get", seq, "actor dropped reply (VM request failed) -> 204");
+                                Err(e) => {
+                                    // 旧実装は reply を drop して 204 へ読み替えていた（無言化）。
+                                    // 現契約はエラーを 500 応答として返す（204 に読み替えない）。
+                                    let _ = reply.send(Reply::Value(e.to_shiori_response()));
+                                    // 観測ログ点（R10.4）: エラーを 500 応答として返した
+                                    // （`actor.drop` は reply を送れなかった場合に限定される）。
+                                    tracing::debug!(seam = "actor.reply", method = "get", seq, error = true, reason = %e, "actor replied with 500 error response");
                                 }
                             }
                         }

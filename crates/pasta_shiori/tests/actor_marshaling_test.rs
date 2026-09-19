@@ -12,7 +12,9 @@
 //!  (b) NOTIFY が即 204 を返し、アクターの完了を待たないこと（R5.2）。
 //!  (c) GET property→callback の 2 ラウンドでコルーチンが tick をまたいで継続し、各ラウンドの
 //!      marshaling 応答がゴールデンと不変であること（R5.7 のコルーチン保存・通常経路）。
-//!  (d) drop→204（VM 失敗で reply drop）が無限待機なく 204 になること（R5.3）。
+//!  (d) drop→204（応答を返せない異常で reply drop）が無限待機なく 204 になること（R5.3）。
+//!      リクエスト処理エラーは drop ではなく 500 として返る（(f)・仕様
+//!      `lua-require-robustness` 4.3/4.4/4.8）。
 //!  (e) アクター不在（mailbox 閉鎖）GET/NOTIFY が即 204 になること（R5.6）。
 //!
 //! # 本番 GET_TIMEOUT の扱い（CONCERNS）
@@ -330,4 +332,56 @@ fn marshal_into_closed_mailbox_yields_204() {
     assert_eq!(req_resp.as_bytes(), default_204().as_bytes());
 
     drop(tx);
+}
+
+/// (f) ロード失敗状態の GET は 500 + 単一行 `X-ERROR-REASON` を返す（要件 4.3 / 4.8、
+/// design.md `ActorErrorReply`）。
+///
+/// アクタースレッドは生存しているが VM のロードに失敗している状態（`loaded() == false`・
+/// `PastaShiori::request` が `MyError::Load` を返す）を、ゴースト資材の無い空ディレクトリで
+/// 決定論的に作る。旧実装はこの `Err` で reply を drop しており、marshaling 側の
+/// `Disconnected` 安全網が 204 に読み替えていた（要件 4.8 が禁じる無言化）。
+#[test]
+fn marshal_get_on_load_failed_actor_returns_500_with_single_line_reason() {
+    let temp = TempDir::new().expect("create temp dir");
+    let (tx, rx) = mailbox();
+    let actor = spawn_actor_thread(0, temp.path().to_path_buf(), rx);
+    assert!(
+        !actor.loaded(),
+        "fixture precondition: the actor VM must fail to load from an empty dir"
+    );
+
+    let resp = marshal_get_with_timeout(
+        &tx,
+        MailboxRequest::new(
+            1,
+            normalize_request("GET SHIORI/3.0\nCharset: UTF-8\nID: version\nSender: SSP\n"),
+        ),
+        GENEROUS,
+    );
+
+    assert_ne!(
+        resp.as_bytes(),
+        default_204().as_bytes(),
+        "a GET in the load-failed state must NOT be silenced into 204 (4.8)\nactual: {resp:?}"
+    );
+    assert!(
+        resp.starts_with("SHIORI/3.0 500 Internal Server Error\r\n"),
+        "a GET in the load-failed state must return 500 (4.3)\nactual: {resp:?}"
+    );
+    let reason = resp
+        .split("\r\n")
+        .find_map(|line| line.strip_prefix("X-ERROR-REASON: "))
+        .expect("the 500 response must carry an X-ERROR-REASON header (4.3)");
+    assert!(
+        !reason.is_empty(),
+        "X-ERROR-REASON must carry the root cause (4.3)"
+    );
+    assert!(
+        !reason.contains('\r') && !reason.contains('\n'),
+        "X-ERROR-REASON must be a single line (4.6)\nactual: {reason:?}"
+    );
+
+    stop(&tx);
+    actor.join().expect("actor thread must join cleanly after Stop");
 }

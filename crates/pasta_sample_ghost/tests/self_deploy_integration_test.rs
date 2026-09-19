@@ -263,8 +263,19 @@ fn write_failure_logs_error_and_continues() {
     // --- .md5 を stale に書き換えて再展開を強制し、live 内ファイルをロックして swap を失敗させる ---
     const STALE: &str = "stale";
     std::fs::write(target.join(MARKER_NAME), STALE).expect("overwrite marker with stale digest");
-    // 既存の実ファイル main.lua をロック対象にする（live を rename できなくする）。
-    let locked = target.join("main.lua");
+    // ロック対象は live 内の README.md（内蔵 zip に含まれ自己展開先へ配置される非 Lua ファイル）。
+    // rename(live → backup) は live 配下に share_mode 0 のハンドルが 1 つでもあれば共有違反で
+    // 失敗するため、どのファイルを掴んでも自己展開失敗を誘発する効果は同じである。
+    //
+    // 注意: ここを main.lua へ「戻して」はならない。lua-require-robustness Requirement 5.2 に
+    // より、起動モジュール `main` のロード失敗は致命（`load` が Err）へ変更された。サンプル
+    // ゴーストの `scripts/` に main.lua は無く `main` は自己展開先からしか解決できないため、
+    // main.lua を排他ロックすると起動自体が落ち、本テストが守るべき pasta-scripts-self-deploy
+    // Req 3.2（自己展開失敗は非致命・既存スクリプトで起動継続）を検証できなくなる。
+    // README.md は require の探索パターン（`?.lua` 等）に一致せず、起動シーケンス
+    // （main → pasta.shiori.entry → pasta.scene_dic）にも本テストの `require('pasta')` にも
+    // 関与しないため、起動を妨げずにスワップだけを失敗させられる。
+    let locked = target.join("README.md");
     let locked_before = std::fs::read(&locked).expect("read locked file before");
 
     // live 内ファイルへ排他ハンドル（share_mode 0）を開いたまま保持する。

@@ -42,22 +42,56 @@ fn neutralize_debug_env() {
 /// # Returns
 /// TempDir containing copied fixture with all necessary support files
 pub fn copy_fixture_to_temp(fixture_name: &str) -> TempDir {
-    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let temp = TempDir::new().expect("Failed to create temp directory");
+    copy_fixture_into(fixture_name, temp.path());
+    temp
+}
+
+/// フィクスチャを `dest` へコピーして一時ゴーストを作る（`copy_fixture_to_temp` の宛先指定版）。
+///
+/// 長パス・非 ANSI パス配下へ設置するために使う。後始末は呼び出し側の `TempDir` の drop に任せる。
+pub fn copy_fixture_into(fixture: &str, dest: &Path) {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    std::fs::create_dir_all(dest).expect("Failed to create destination directory");
 
     // Copy support files first (scripts, scriptlibs)
     // These provide the base runtime environment
-    let support_root = manifest_dir.join("tests/support");
-    copy_support_dirs(&support_root, temp.path());
+    copy_support_dirs(&manifest_dir.join("tests/support"), dest);
 
     // Copy fixture files last (overrides support files if needed)
     // This allows fixture-specific main.lua or other customizations
-    let fixture_src = manifest_dir.join("tests/fixtures").join(fixture_name);
+    let fixture_src = manifest_dir.join("tests/fixtures").join(fixture);
     if fixture_src.exists() {
-        copy_dir_recursive(&fixture_src, temp.path()).expect("Failed to copy fixture");
+        copy_dir_recursive(&fixture_src, dest).expect("Failed to copy fixture");
     }
+}
 
-    temp
+// ============================================================================
+// Test Path Helpers（長パス・非 ANSI パスの一時ゴースト構築）
+// ============================================================================
+
+/// どの単一 ANSI コードページでも表現できない、複数文字体系混在のディレクトリ名。
+///
+/// 日本語・ハングル・キリル文字・ギリシャ文字・絵文字を混在させることで、
+/// 実行環境のシステムロケールがどの ANSI コードページであっても
+/// 「ANSI で表現不能」という条件が成立する（要件 6.7）。
+pub const NON_ANSI_DIR_NAME: &str = "日本語_한글_Кириллица_ελληνικά_😀";
+
+/// 深いディレクトリを掘るときに 1 段ごとに積むセグメント名（38 文字）。
+const DEEP_SEGMENT: &str = "deep_path_segment_0123456789abcdefghij";
+
+/// `root` 配下にセグメントを重ね、絶対パス長が `min_len` 文字を超えるディレクトリを作って返す。
+///
+/// `canonicalize` は使わず `std::path::absolute` の形を保つ。CI ランナーの `%TEMP%` は
+/// 8.3 短縮名（`RUNNER~1`）であり、`canonicalize` すると展開されて検証したい形が崩れるため。
+/// 後始末は呼び出し側が保持する `TempDir` の drop に任せる。
+pub fn make_deep_dir(root: &std::path::Path, min_len: usize) -> PathBuf {
+    let mut dir = std::path::absolute(root).expect("絶対パス化に失敗");
+    while dir.display().to_string().chars().count() <= min_len {
+        dir.push(DEEP_SEGMENT);
+    }
+    std::fs::create_dir_all(&dir).expect("深いディレクトリの作成に失敗");
+    dir
 }
 
 /// Copy hello-pasta ghost to a temporary directory for isolated testing.
