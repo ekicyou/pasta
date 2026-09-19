@@ -104,3 +104,86 @@ fn intact_ghost_still_loads() {
     let temp = copy_fixture_to_temp("minimal");
     PastaLoader::load(temp.path()).expect("正常なゴーストのロードは成功するべき");
 }
+
+/// 起動失敗 error ログを捕捉するためのテストローカルな書き込み先。
+struct CaptureWriter(std::sync::Arc<std::sync::Mutex<Vec<u8>>>);
+
+impl std::io::Write for CaptureWriter {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.0.lock().unwrap().extend_from_slice(bytes);
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for CaptureWriter {
+    type Writer = Self;
+
+    fn make_writer(&'a self) -> Self {
+        CaptureWriter(std::sync::Arc::clone(&self.0))
+    }
+}
+
+/// 要件 4.7 / 5.3: 起動モジュールの失敗が構造化フィールド付き error ログとして
+/// 欠落なく記録されることを固定する。
+///
+/// `book/src/reference/startup.md` の切り分け手順は「ログを `fatal=true` で検索する」
+/// ことを利用者に案内しているため、フィールド名と描画表記そのものが契約である。
+/// フィールドのリネームや `error` の単一行化が起きた場合、このテストが落ちる。
+///
+/// 捕捉に `tracing-test` の `logs_contain` を使わないのは、あれが捕捉バッファを行単位に
+/// 分割し「スパン名（= テスト関数名）を含む行」だけを走査するためで、複数行フィールドの
+/// 2 行目以降（`stack traceback:` 以下）が観測できず要件 4.7 の「欠落なく」を
+/// 検証できないことを実測で確認したため。ここではテストスレッドにだけ装着する
+/// fmt subscriber で生の描画結果を捕捉する。
+/// （`X-ERROR-REASON` は意図的に単一行である点と対照的であることに注意。）
+#[test]
+fn startup_failure_log_carries_module_fatal_and_multiline_cause() {
+    let temp = ghost_with_script(
+        "pasta/shiori/entry.lua",
+        r#"error("PASTA_LOG_CONTRACT_MARKER")"#,
+    );
+
+    let buffer = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let subscriber = tracing_subscriber::fmt()
+        .with_writer(CaptureWriter(std::sync::Arc::clone(&buffer)))
+        .with_ansi(false)
+        .with_max_level(tracing::Level::ERROR)
+        .finish();
+    // `with_default` はカレントスレッドにのみ subscriber を装着するため、
+    // 他テストのグローバル subscriber と干渉しない。
+    let result = tracing::subscriber::with_default(subscriber, || PastaLoader::load(temp.path()));
+    assert!(result.is_err(), "起動モジュールのロード失敗は致命であるべき");
+
+    let logged = String::from_utf8(buffer.lock().unwrap().clone()).expect("ログは UTF-8");
+
+    // 要件 5.3: 失敗した起動モジュール名が `module` フィールドとして識別できる。
+    assert!(
+        logged.contains(r#"module="pasta.shiori.entry""#),
+        "`module` フィールドに起動モジュール名が無い: {logged}"
+    );
+    // 要件 5.3: 致命かどうかが `fatal` フィールドで識別できる（マニュアルの grep 対象）。
+    // フィールド区切りの空白込みで照合する。空白を外すと `is_fatal=true` のような
+    // 別名フィールドでも通ってしまい、リネームを検出できない。
+    assert!(
+        logged.contains(" fatal=true"),
+        "`fatal=true` フィールドが無い: {logged}"
+    );
+
+    // 要件 4.7: `error` フィールドは根本原因を複数行・スタックトレース込みで保持する。
+    let cause = logged
+        .split_once("error=")
+        .expect("`error` フィールドが無い")
+        .1;
+    assert!(
+        cause.contains("PASTA_LOG_CONTRACT_MARKER"),
+        "`error` フィールドに根本原因が無い: {logged}"
+    );
+    assert!(
+        cause.contains("stack traceback:") && cause.lines().count() >= 3,
+        "`error` フィールドが単一行化・切り詰められている: {logged}"
+    );
+}

@@ -11,7 +11,7 @@
   - _Requirements: 6.4, 6.6, 6.7_
   - _Boundary: TestPathHelpers_
 
-- [ ] 2. 欠陥 B: ロード失敗とリクエスト処理エラーの可視化
+- [x] 2. 欠陥 B: ロード失敗とリクエスト処理エラーの可視化
 - [x] 2.1 エラー応答ヘッダ値の単一行化
   - `X-ERROR-REASON` の値を組み立てる際、スタックトレース以降を捨て、残りの行を trim して空行を除き、半角スペース 1 個で連結する非公開ヘルパを追加する
   - 改行を含まない入力は無変換で返し、既存応答をバイト不変に保つ。候補パス列は落とさず、長さの上限も設けない。非 ASCII 文字は変換しない
@@ -69,7 +69,7 @@
   - _Depends: 1, 2.5, 3.4_
   - _Note: 実装フェーズで判明 — 非 ANSI 設置パスでの `loadu` 成功は欠陥 A の解消（3.4）が前提。テストは完成済みで、`generate_package_path_bytes()` の ANSI 変換が残る間は `Can't convert some characters to multibyte charset` で `loadu` が false を返す。アサーションは弱めず、3.4 直後に再実行して緑化を確認する（タスク 3.1 と同じく、失敗する状態を単独でコミットしない）。_
 
-- [ ] 3. 欠陥 A: 設置パスに依存しないモジュール解決
+- [x] 3. 欠陥 A: 設置パスに依存しないモジュール解決
 - [x] 3.1 長パス・非 ANSI 設置パスの統合テストを先行追加
   - 300 文字超の ASCII パス／非 ANSI パス／両方を兼ねるパスの 3 種の設置先それぞれで、ロードが成功し、内蔵スクリプト・利用者スクリプト・トランスパイル済みシーンモジュールの 3 層が解決されることを検証するテストを追加する
   - シーンには非 ASCII のファイル名を 1 本含め、モジュール名に非 ASCII を含む場合も解決されることを確認する
@@ -122,7 +122,7 @@
   - _Boundary: PathRobustnessE2eTests_
   - _Depends: 1, 3.4_
 
-- [ ] 4. CI とマニュアル
+- [x] 4. CI とマニュアル
 - [x] 4.1 CI のテストをターゲット指定で実行する
   - ビルドワークフローのテスト実行に matrix のターゲット指定を付け、32bit ジョブが 32bit バイナリとしてテストを実行するようにする。64bit ジョブは従来と同じ内容を明示ターゲットで実行する
   - 本仕様と無関係な 32bit 固有の失敗が多数表面化した場合は、その時点で開発者へ報告して縮退の判断を仰ぐ
@@ -145,7 +145,7 @@
   - _Requirements: 5.4_
   - _Boundary: pasta_lua README_
 
-- [ ] 5. 最終検証
+- [x] 5. 最終検証
 - [x] 5.1 32bit / 64bit 両ターゲットでの全テスト緑と既存ゲートの確認
   - ワークスペース全体のテストを 32bit / 64bit の両ターゲットで実行し、すべて緑であることを確認する
   - 既存の応答バイト不変ゲート・未使用イベントのバイト不変ゲート・FFI セッションの E2E、およびアクターの安全網に関する既存テスト群が無変更で緑であることを確認する
@@ -170,3 +170,5 @@
 - タスク 3.6 の実測で、長パス設置先ではテストゴーストの `SHIORI.unload` 内 `io.open` が narrow API の制約で失敗することを確認した（`if f then` で握られており応答・teardown には影響しない）。タスク 4.2 の「既知の制限」節で `io.open` の長パス非対応を書く際、机上ではなく実測として引用できる。
 - タスク 4.1 の実測: `cargo test --all` を i686 / x86_64 の両ターゲットでローカル実行し、いずれも 95 テストバイナリ・2180 passed・0 failed・exit 0 で件数まで完全一致した（要件 7.1 の裏付け）。CI ランナー固有の差（ロケール実効値・8.3 短縮名の %TEMP%）のみ未検証のため、初回 CI 実行の x86 ジョブ結果は要確認。
 - タスク 5.1 の最終検証結果（全タスク完了後に実施）: `cargo test --all --target x86_64-pc-windows-msvc` と `--target i686-pc-windows-msvc` がいずれも exit 0・95 テストバイナリ・2180 passed・0 failed で、件数まで完全一致（要件 7.1 / 7.2）。名指しの既存ゲートも両ターゲットで緑: byte_invariant 4 / kick_unused_byte_invariant 2 / ffi_extern_session_e2e 1 / actor_marshaling 8 / actor_test_harness 6 / actor_tracing_seams 5 / actor_teardown 3 / actor_kick 4。このうち本仕様で変更したのは actor_marshaling_test.rs（タスク 2.2 でケース追加）のみで、他はすべて無変更のまま緑（要件 3.5 / 4.10）。
+- 仕様レベル検証（kiro-validate-impl）の結果: 要件 50 項目中 46 COVERED / 4 PARTIAL / 0 UNCOVERED、境界監査 CLEAN、critical findings なし。PARTIAL のうち 4.7 / 5.3（起動失敗ログの `module` / `fatal=true` / 複数行全文）は検証深度の不足だったため、`startup_fatal_test::startup_failure_log_carries_module_fatal_and_multiline_cause` を追加して解消した（マニュアルの切り分け手順が `fatal=true` の grep を指示しているため、フィールド名の改名を検出できる形で固定する必要がある）。残る PARTIAL は 4.9 の I/O 原因（searcher 経路は Windows では実質到達不能）と 4.10 の panic / リクエストデコード失敗の 204（いずれも本仕様が触っていない無変更コード）で、回帰ではなく既存のカバレッジ不足である。
+- `tracing-test` の `logs_contain` はキャプチャをスパン名でフィルタするため複数行フィールドの 2 行目以降が見えない。要件 4.7 の「欠落なく」を検証するにはスコープ付きの fmt subscriber で生の出力を取る必要がある。
