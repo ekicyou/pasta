@@ -168,14 +168,24 @@ fn load_impl(entry: &str, hdir: &ShioriString, encoding: DirEncoding) -> bool {
     // hinst は本番アクター経路では VM 構築の付随情報。SHIORI 仕様上 load では渡されない
     // ため 0 を渡す（旧実装も DllMain で受けた hinst を保持していたが、本番では
     // load_dir のみが VM 構築に必須）。
+    let dir_for_log = dir.clone();
     let loaded = lifecycle::spawn_actor(0, dir);
     // どちらの初期化入口でロードされたかを記録する（ホスト差分の切り分け用）。
     //
-    // 入口の時点ではまだ tracing 購読者が存在せず（ファイル購読者は `spawn_actor` の内側、
-    // アクタースレッド上の `PastaShiori::load` で初期化される）、そこで出したログは捨てられる。
-    // `spawn_actor` は `actor.loaded()` でロード完了まで待って復帰するため、この地点が
-    // 「確実にログファイルへ残る最も早い位置」である。`loaded` も併記して、入口の選択と
-    // ロード成否を 1 行で対応付けられるようにする。
+    // 出力位置には 2 段階の制約がある。
+    //
+    // 1. **時点**: 入口の時点ではファイル購読者がまだ登録されていない（登録は
+    //    `spawn_actor` の内側、アクタースレッド上の `PastaShiori::load`）。よって
+    //    `spawn_actor` から復帰した後でなければ出力先が存在しない。`spawn_actor` は
+    //    `actor.loaded()` でロード完了まで待って戻るため、ここが最も早い安全な地点。
+    // 2. **スレッド文脈**: ログのファイル振り分けは load_dir のスレッドローカル
+    //    （`pasta_lua::logging::registry` の `CURRENT_LOAD_DIR`）で決まる。ここは FFI
+    //    入口スレッドであり、アクタースレッドが張った `LoadDirGuard` は及ばない。
+    //    文脈なしで出すと振り分け先が無く捨てられるので、同じ load_dir でガードを
+    //    張り直してから出す。
+    //
+    // `loaded` も併記して、入口の選択とロード成否を 1 行で対応付けられるようにする。
+    let _guard = pasta_lua::LoadDirGuard::new(dir_for_log);
     info!(entry, loaded, "SHIORI load entry completed");
     loaded
 }

@@ -179,6 +179,66 @@ fn install_ghost(root: &TempDir, name: &str) -> PathBuf {
 }
 
 // ===========================================================================
+// 入口ログの検証（load / loadu の判別）
+// ===========================================================================
+
+/// 設置ディレクトリ配下の `*.log` を再帰的に集めて連結する。
+///
+/// ログの出力先は `[logging] file_path` で変わりうるため、固定パス決め打ちではなく
+/// 設置ディレクトリ配下を走査する。
+fn read_ghost_logs(dir: &Path) -> (String, Vec<PathBuf>) {
+    fn walk(dir: &Path, out: &mut String, found: &mut Vec<PathBuf>) {
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                walk(&path, out, found);
+            } else if path.extension().is_some_and(|e| e == "log") {
+                if let Ok(text) = std::fs::read_to_string(&path) {
+                    out.push_str(&text);
+                }
+                found.push(path);
+            }
+        }
+    }
+    let mut out = String::new();
+    let mut found = Vec::new();
+    walk(dir, &mut out, &mut found);
+    (out, found)
+}
+
+/// 入口ログ 1 行が、期待した入口名でゴーストのログファイルへ届いていることを表明する。
+///
+/// この検証は 2 つの回帰を同時に押さえる。
+///
+/// 1. **出力時点**: 購読者登録前に出すと捨てられる（登録は `spawn_actor` の内側）。
+/// 2. **スレッド文脈**: ログのファイル振り分けは load_dir のスレッドローカルで決まる。
+///    FFI 入口スレッドで `LoadDirGuard` を張り直さないと、行は出ても振り分け先が無く
+///    ゴーストのログファイルへは届かない（実機 SSP 確認で実際に踏んだ）。
+///
+/// `entry=load` は `entry=loadu` の部分文字列なので、後続フィールドまで含めて照合する
+/// （区切りを含めない部分一致は `load` の表明が `loadu` でも通ってしまい空虚になる）。
+fn assert_entry_logged(dir: &Path, expected_entry: &str) {
+    let (logs, files) = read_ghost_logs(dir);
+    // `entry` は `&str` のため tracing の既定フィールド整形ではクォート付きで出る
+    // （`entry="loadu"`）。後続フィールドまで含めて照合するのは、区切りを含めない
+    // 部分一致だと `load` の表明が `loadu` でも通ってしまい空虚になるため。
+    let needle = format!("entry=\"{expected_entry}\" loaded=");
+    assert!(
+        logs.contains("SHIORI load entry completed"),
+        "入口ログ行がゴーストのログファイルへ届くべき（{}）\n見つかった .log: {files:#?}\nlogs:\n{logs}",
+        dir.display()
+    );
+    assert!(
+        logs.contains(&needle),
+        "入口ログは {needle:?} を含むべき（{}）\n見つかった .log: {files:#?}\nlogs:\n{logs}",
+        dir.display()
+    );
+}
+
+// ===========================================================================
 // 設計 Testing Strategy > E2E Tests 項 3 の系列（1 本の直列テスト）
 // ===========================================================================
 
@@ -204,6 +264,10 @@ fn loadu_entry_drives_a_non_ansi_install_path_end_to_end() {
 
     // --- 段 3: 終了処理 ---
     assert!(unload(), "unload は常に true を返す");
+
+    // 段 1 の初期化が `loadu` 経由だったことがログから判別できる。
+    // （非同期 writer のため、ロガーが解放される unload の後に読む）
+    assert_entry_logged(&non_ansi_dir, "loadu");
 
     // --- 段 4: loadu で初期化したあとの従来入口 load は状態を壊さない（要件 2.5） ---
     assert!(
@@ -238,4 +302,8 @@ fn loadu_entry_drives_a_non_ansi_install_path_end_to_end() {
 
     // 後始末: プロセス終了でアクターが漏れないように最終 unload（冪等）。
     assert!(unload(), "final unload must remain a safe no-op returning true");
+
+    // 段 5 の初期化が従来入口 `load` 経由だったことがログから判別できる
+    // （＝入口ログが 2 つの入口を取り違えていない）。
+    assert_entry_logged(&ascii_dir, "load");
 }
