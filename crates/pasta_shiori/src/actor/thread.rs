@@ -238,6 +238,10 @@ pub fn spawn_actor_thread(
                 //     一部として VM drop 時にこのアクタースレッド上で teardown される）。
                 //     メッセージ専用ウィンドウは block_on 完了時に executor が破棄する。
                 drop(shiori);
+                // mailbox receiver も ack 前に閉じる。ack 受信後の Stop 再送（二重 teardown）が
+                // 確実に Disconnected＝already-done になる（R7.4）。async ブロック完了まで rx を
+                // 生かすと、ack〜スレッド終了の隙間に再送が受理されて冪等判定が競合する。
+                drop(rx);
 
                 // (4) cleanup 完了後に done ack を送る（R7.1/R7.4: ack 受信＝全資源解放
                 //     済み）。Stop 経由でなく rx Disconnected 等でループを抜けた場合は
