@@ -78,6 +78,7 @@ const ALLOWED_EXTS = new Set([
   '.webp',
   '.txt',
   '.xml',
+  '.mp4',
 ]);
 // 拡張子を持たないが許可する固定ファイル名（mdBook/GitHub Pages 由来）。
 const ALLOWED_NOEXT_NAMES = new Set(['.nojekyll', 'CNAME']);
@@ -227,7 +228,10 @@ function analyze(root) {
   const absoluteRefsInContent = []; // file:// で解決不能なルート絶対参照（本文ページ）
   let checkedRefCount = 0;
   for (const hf of contentHtml) {
-    const html = fs.readFileSync(hf.abs, 'utf8');
+    let html = fs.readFileSync(hf.abs, 'utf8');
+    // print.html: mdBook は <a href> を章基準へ書き換えるが <video>/<source> の src は
+    // 書き換えない（既知制約）。印刷ビューで動画は用途外のため、これらのタグの参照のみ対象外とする。
+    if (hf.rel === 'print.html') html = html.replace(/<(?:video|source)\b[^>]*>/gi, '');
     const fromDir = path.posix.dirname(hf.rel) === '.' ? '' : path.posix.dirname(hf.rel);
     for (const ref of extractRefs(html)) {
       if (!isLocalRef(ref)) continue;

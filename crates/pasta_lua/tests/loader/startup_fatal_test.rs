@@ -155,8 +155,9 @@ fn startup_failure_log_carries_module_fatal_and_multiline_cause() {
         .finish();
     // `with_default` はカレントスレッドにのみ subscriber を装着するため、
     // 他テストのグローバル subscriber と干渉しない。
-    let result = tracing::subscriber::with_default(subscriber, || PastaLoader::load(temp.path()));
-    assert!(result.is_err(), "起動モジュールのロード失敗は致命であるべき");
+    let failed =
+        tracing::subscriber::with_default(subscriber, || PastaLoader::load(temp.path()).is_err());
+    assert!(failed, "起動モジュールのロード失敗は致命であるべき");
 
     let logged = String::from_utf8(buffer.lock().unwrap().clone()).expect("ログは UTF-8");
 
