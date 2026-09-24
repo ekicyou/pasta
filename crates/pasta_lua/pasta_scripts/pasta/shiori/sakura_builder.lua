@@ -98,7 +98,8 @@ end
 --- @param config BuildConfig|nil 設定
 --- @param input_actor_spots table<string, integer>|nil アクターごとのスポット位置マップ（直接変更される）
 --- @return string さくらスクリプト文字列（\e終端）
-function BUILDER.build(grouped_tokens, config, input_actor_spots)
+-- ponytail: トークン種別の分岐が集まるため複雑度 22 > 15 を許容。分割はリファクタ時に（特性化テスト先行）。
+function BUILDER.build(grouped_tokens, config, input_actor_spots) -- luacheck: ignore 561
     config = config or {}
     local spot_newlines = config.spot_newlines or 1.5
     local buffer = (config.buffer_factory or buf.new)()

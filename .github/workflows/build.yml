@@ -47,12 +47,48 @@ jobs:
       - name: Run tests
         run: cargo test --all --target ${{ matrix.target }}
 
+      # lint はターゲット非依存のため x64 のみで実行（x86 と二重に回さない）。
+      - name: Clippy (-D warnings)
+        if: matrix.arch == 'x64'
+        run: cargo clippy --all-targets --workspace --target ${{ matrix.target }} -- -D warnings
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: pasta-dll-${{ matrix.arch }}
           path: target/${{ matrix.target }}/release/pasta.dll
           retention-days: 7
+
+  # 依存クレートの脆弱性勧告・ライセンス・取得元を deny.toml に照らして検査する。
+  deny:
+    name: cargo-deny
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: cargo deny check
+        uses: EmbarkStudios/cargo-deny-action@v2
+
+  # pasta_lua の Lua スクリプトを静的解析する。luacheck 本体は同梱版
+  # （crates/pasta_lua/scriptlibs/luacheck, v1.2.0）を使い、依存の lfs / argparse のみ apt で入れる。
+  luacheck:
+    name: luacheck
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: crates/pasta_lua
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install Lua runtime deps
+        working-directory: .
+        run: sudo apt-get update && sudo apt-get install -y lua5.1 lua-filesystem lua-argparse
+
+      - name: luacheck
+        # `lua -` は標準入力をスクリプトとして実行し、後続引数を arg に渡す（luacheck の bin 相当）。
+        run: echo 'require("luacheck.main")' | LUA_PATH="scriptlibs/?.lua;scriptlibs/?/init.lua;;" lua5.1 - pasta_scripts tests
 
   wasm:
     name: wasm-build
