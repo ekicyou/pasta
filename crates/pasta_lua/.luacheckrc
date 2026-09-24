@@ -91,6 +91,10 @@ files = {
 -- 除外パターン
 exclude_files = {
     "scriptlibs/**",          -- 外部ライブラリは除外
+    -- 日本語識別子（LuaJIT は受理）を luacheck の字句解析器が読めないため除外
+    "tests/fixtures/**",
+    "tests/lua_specs/actor_module_test.lua",
+    "tests/lua_specs/config_actor_init_test.lua",
     ".luacheckrc",
 }
 

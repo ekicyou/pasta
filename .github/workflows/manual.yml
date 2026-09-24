@@ -1,6 +1,7 @@
 # .github/workflows/manual.yml
 # 利用者マニュアル（mdBook）を GitHub Pages へ公開する。
 # build.yml（Rust/WASM CI）とは独立。book/** 変更時のみ起動する。
+# PR では検証（ビルド・検証スクリプト群）までを行い、Pages への公開は main push 時のみ。
 #
 # パイプライン（design「Publish Pipeline」/ 要件 1.3, 1.4, 10.2, 10.4）:
 #   mdbook build book
@@ -15,11 +16,17 @@ on:
     paths:
       - 'book/**'
       - '.github/workflows/manual.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'book/**'
+      - '.github/workflows/manual.yml'
   workflow_dispatch:  # 手動実行
 
 # Pages の同時デプロイを直列化（実行中のデプロイはキャンセルしない）。
+# PR の検証は PR ごとに別グループとし、公開の直列化に巻き込まない。
 concurrency:
-  group: pages
+  group: ${{ github.event_name == 'pull_request' && format('manual-pr-{0}', github.ref) || 'pages' }}
   cancel-in-progress: false
 
 permissions:
@@ -95,14 +102,40 @@ jobs:
       - name: Tutorial syntax validation (hello-pasta real files)
         run: cargo test -p pasta_sample_ghost
 
+      # 出力の静的性・検索・コンテンツ受入基準の検証（ビルド済み book/book を対象に --no-build）。
+      - name: Verify static output
+        run: node book/tools/verify-static.mjs --no-build
+
+      - name: Verify search index
+        run: node book/tools/verify-search.mjs --no-build
+
+      - name: Verify content
+        run: node book/tools/verify-content.mjs
+
+      - name: Verify drift gate
+        run: node book/tools/verify-drift-gate.mjs
+
+      # book/tools 配下のツール自己テスト群。
+      - name: Book tools self-tests
+        shell: bash
+        run: |
+          set -e
+          for t in $(find book/tools -name '*-test.mjs' -not -path '*/node_modules/*' | sort); do
+            echo "::group::$t"
+            node "$t"
+            echo "::endgroup::"
+          done
+
       # enablement: true — リポジトリで Pages が未設定でも API 経由で
       # 自動有効化を試みる（Source=GitHub Actions）。初回公開を手動設定なしで通す。
       - name: Setup Pages
+        if: github.event_name != 'pull_request'
         uses: actions/configure-pages@v5
         with:
           enablement: true
 
       - name: Upload Pages artifact
+        if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./book/book
@@ -110,6 +143,7 @@ jobs:
   deploy:
     name: deploy-manual
     needs: build
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
