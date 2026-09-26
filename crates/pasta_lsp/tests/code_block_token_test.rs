@@ -10,7 +10,7 @@
 //! ため、終了フェンス行は `end_line` ではなく、テスト側で構築したソース文字列を
 //! 数えて求めた「実際の ``` 行」を期待値とする。
 
-use pasta_lsp::analysis::{token_type, AnalysisEngine, TOKEN_TYPES};
+use pasta_lsp::analysis::{AnalysisEngine, TOKEN_TYPES, token_type};
 use tower_lsp::lsp_types::{SemanticToken, SemanticTokenType};
 
 /// delta エンコード済みトークン列を絶対位置 (line, start_char) へ復号する。
@@ -210,7 +210,10 @@ fn test_non_codeblock_tokens_unaffected_by_lua_block() {
     // 念のため、pasta 固有の主要トークンが実際に含まれていることを確認し、
     // 「両者とも空で一致」という退化ケースで通っていないことを排除する。
     let has = |ty: u32| with_non_cb.iter().any(|t| t.token_type == ty);
-    assert!(has(token_type::NAMESPACE), "グローバルシーンマーカーが含まれる");
+    assert!(
+        has(token_type::NAMESPACE),
+        "グローバルシーンマーカーが含まれる"
+    );
     assert!(has(token_type::ACTOR), "アクター辞書マーカーが含まれる");
     assert!(has(token_type::WORD), "単語マーカーが含まれる");
 }
@@ -257,11 +260,7 @@ fn test_legend_order_is_stable() {
         SemanticTokenType::new("cueCommand"),   // 16
     ];
 
-    assert_eq!(
-        TOKEN_TYPES.len(),
-        expected.len(),
-        "トークン種別数が不変"
-    );
+    assert_eq!(TOKEN_TYPES.len(), expected.len(), "トークン種別数が不変");
     assert_eq!(
         TOKEN_TYPES, expected,
         "トークン種別の並び順が不変（凡例 index の安定性）"

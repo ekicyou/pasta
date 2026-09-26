@@ -1,10 +1,10 @@
 //! Inline test cluster externalized from `session.rs` (Task 2.1, pure move).
 //! Cluster: stop-loop inspect-command routing, live SetBreakpoints, controller-disconnect.
-use super::*;
 use super::session_test_support::*;
+use super::*;
 
-use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::Arc;
+use std::sync::mpsc::{self, RecvTimeoutError};
 use std::time::Duration;
 
 use crate::debug::breakpoints::BreakpointSet;
@@ -417,7 +417,10 @@ fn step_out_decision_per_depth() {
     let t = ThreadId(0x10);
     let f = |depth, line| DebugSession::step_should_stop(StepKind::Out, t, 3, 6, t, depth, line);
     assert!(f(2, 6), "shallower frame (returned to caller) stops");
-    assert!(!f(3, 7), "same frame must be skipped even on a changed line");
+    assert!(
+        !f(3, 7),
+        "same frame must be skipped even on a changed line"
+    );
     assert!(!f(4, 9), "deeper frame must be skipped");
 }
 

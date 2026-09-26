@@ -45,11 +45,7 @@ fn test_break_lines_with_wait_tags() {
         .eval()
         .unwrap();
 
-    assert!(
-        result.contains("\\n"),
-        "Expected line break: {}",
-        result
-    );
+    assert!(result.contains("\\n"), "Expected line break: {}", result);
     // All 5 wait tags must be preserved
     assert_eq!(
         result.matches(r"\_w[50]").count(),
@@ -124,11 +120,7 @@ fn test_break_lines_multiple_widths() {
         .eval()
         .unwrap();
 
-    assert!(
-        result.contains("\\n"),
-        "Expected line breaks: {}",
-        result
-    );
+    assert!(result.contains("\\n"), "Expected line breaks: {}", result);
 }
 
 #[test]
@@ -208,11 +200,7 @@ fn test_talk_to_script_without_budoux_actor_no_line_breaks() {
         .unwrap();
 
     // Should have wait tags but NO budoux line breaks
-    assert!(
-        result.contains(r"\_w["),
-        "Expected wait tags: {}",
-        result
-    );
+    assert!(result.contains(r"\_w["), "Expected wait tags: {}", result);
     assert!(
         !result.contains("\\n"),
         "Expected no line breaks without budoux config: {}",
@@ -234,11 +222,7 @@ fn test_talk_to_script_nil_actor_no_line_breaks() {
         .eval()
         .unwrap();
 
-    assert!(
-        result.contains(r"\_w["),
-        "Expected wait tags: {}",
-        result
-    );
+    assert!(result.contains(r"\_w["), "Expected wait tags: {}", result);
     assert!(
         !result.contains("\\n"),
         "Expected no line breaks with nil actor: {}",
@@ -296,10 +280,7 @@ fn test_talk_to_script_budoux_vs_no_budoux_same_input() {
         .unwrap();
 
     // 結果が異なること
-    assert_ne!(
-        without, with_bx,
-        "budoux あり/なしで出力が同一になっている"
-    );
+    assert_ne!(without, with_bx, "budoux あり/なしで出力が同一になっている");
     // なし側に \n がないこと
     assert!(
         !without.contains("\\n"),

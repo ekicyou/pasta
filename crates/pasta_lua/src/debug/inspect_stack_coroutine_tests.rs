@@ -7,8 +7,8 @@
 //! 一方。共有ヘルパー（`build_jit_off_vm`/`source_and_line`/`find_var`）は
 //! `inspect_test_support.rs` を `use` する。`ThreadId` は本クラスタ専用に局所 `use` する。
 
-use super::inspect_test_support::*;
 use super::super::types::ThreadId;
+use super::inspect_test_support::*;
 use super::*;
 
 use mlua::{HookTriggers, Lua, VmState};
@@ -266,8 +266,7 @@ coroutine.yield()
 marker = marker + 1
 return marker
 ";
-    let (vars, tid, _stack) =
-        run_coroutine_and_capture_at(&lua, body, "@co_body_locals", 5);
+    let (vars, tid, _stack) = run_coroutine_and_capture_at(&lua, body, "@co_body_locals", 5);
 
     assert!(
         tid.is_some(),
@@ -282,7 +281,10 @@ return marker
     let a = find_var(&vars, "a").unwrap_or_else(|| {
         panic!("coroutine-body local 'a' must be retrieved by name (R2.4). got: {vars:?}")
     });
-    assert_eq!(a.type_name, "number", "body local 'a' must be a number (R2.3/R2.4)");
+    assert_eq!(
+        a.type_name, "number",
+        "body local 'a' must be a number (R2.3/R2.4)"
+    );
     assert_eq!(a.repr, "1", "body local 'a' must read as 1");
 
     let b = find_var(&vars, "b").unwrap_or_else(|| {
@@ -307,14 +309,20 @@ return marker
         .load("return 1 + 2")
         .eval()
         .expect("VM must remain usable after coroutine body inspection (R2.5)");
-    assert_eq!(sane, 3, "VM stack must stay balanced after coroutine inspection");
+    assert_eq!(
+        sane, 3,
+        "VM stack must stay balanced after coroutine inspection"
+    );
 
     // std_debug stays nil (R5.3).
     let debug_is_nil: bool = lua
         .load("return debug == nil")
         .eval()
         .expect("eval should succeed");
-    assert!(debug_is_nil, "std_debug must remain nil during coroutine inspection (R5.3)");
+    assert!(
+        debug_is_nil,
+        "std_debug must remain nil during coroutine inspection (R5.3)"
+    );
 }
 
 /// R2.4 (post-yield): stopped on a line AFTER `coroutine.yield()` (i.e. on a
@@ -337,8 +345,7 @@ local done = true
 local sentinel = acc
 return sentinel
 ";
-    let (vars, tid, _stack) =
-        run_coroutine_and_capture_at(&lua, body, "@co_post_yield", 7);
+    let (vars, tid, _stack) = run_coroutine_and_capture_at(&lua, body, "@co_post_yield", 7);
 
     assert!(
         tid.is_some(),
@@ -378,10 +385,12 @@ local b = a + 1
 coroutine.yield()
 return b
 ";
-    let (_vars, tid, stack) =
-        run_coroutine_and_capture_at(&lua, body, "@co_stack", 2);
+    let (_vars, tid, stack) = run_coroutine_and_capture_at(&lua, body, "@co_stack", 2);
 
-    assert!(tid.is_some(), "the hook must have fired in the coroutine body");
+    assert!(
+        tid.is_some(),
+        "the hook must have fired in the coroutine body"
+    );
     assert!(
         !stack.is_empty(),
         "capture_stack must report at least the coroutine body frame (R2.1/R2.4). got empty"

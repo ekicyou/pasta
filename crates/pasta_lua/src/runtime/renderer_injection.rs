@@ -89,7 +89,10 @@ impl Default for RendererInjection {
 impl std::fmt::Debug for RendererInjection {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RendererInjection")
-            .field("register", &"fn(&Lua, Option<&TalkConfig>) -> LuaResult<Table>")
+            .field(
+                "register",
+                &"fn(&Lua, Option<&TalkConfig>) -> LuaResult<Table>",
+            )
             .finish()
     }
 }
@@ -115,10 +118,7 @@ pub fn default_sakura_renderer(lua: &Lua, config: Option<&TalkConfig>) -> LuaRes
 pub struct SakuraRenderBoundary;
 
 impl RenderBoundary for SakuraRenderBoundary {
-    fn render_known(
-        &mut self,
-        marker: &crate::presentation::PresentationMarker,
-    ) -> Option<String> {
+    fn render_known(&mut self, marker: &crate::presentation::PresentationMarker) -> Option<String> {
         use crate::presentation::PresentationMarker as M;
         match marker {
             // Talk ラインの本文をそのまま（さくらスクリプトタグ変換は VM 内 Lua の責務）。

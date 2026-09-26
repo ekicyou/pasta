@@ -2,8 +2,8 @@
 //!
 //! Phase A: registry/word_table.rs のインラインテストから外部化
 
-use pasta_core::registry::{MockRandomSelector, WordDefRegistry, WordTable};
 use pasta_core::WordTableError;
+use pasta_core::registry::{MockRandomSelector, WordDefRegistry, WordTable};
 
 fn create_test_registry() -> WordDefRegistry {
     let mut registry = WordDefRegistry::new();
@@ -301,10 +301,7 @@ fn test_search_word_merge_duplicate_entries() {
     // Verify that we get one of the 4 expected words
     let word = result.unwrap();
     assert!(
-        word == "おはよう"
-            || word == "こんにちわ"
-            || word == "はろー"
-            || word == "ぐっもーにん",
+        word == "おはよう" || word == "こんにちわ" || word == "はろー" || word == "ぐっもーにん",
         "Unexpected word: {}",
         word
     );

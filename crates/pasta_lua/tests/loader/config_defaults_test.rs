@@ -142,7 +142,12 @@ fn minimal_and_full_expose_same_ghost_to_lua() {
     let full_runtime = PastaLoader::load(full_temp.path()).unwrap();
 
     // 最小/フルで Lua 露出値が一致すること（最小=補完値 == フル=明示値）。
-    for key in ["spot_newlines", "talk_interval_min", "talk_interval_max", "hour_margin"] {
+    for key in [
+        "spot_newlines",
+        "talk_interval_min",
+        "talk_interval_max",
+        "hour_margin",
+    ] {
         assert_eq!(
             read_pasta_config_ghost_number(&minimal_runtime, key),
             read_pasta_config_ghost_number(&full_runtime, key),
@@ -217,8 +222,8 @@ fn repo_root() -> PathBuf {
 /// 場合に失敗する。
 #[test]
 fn config_reference_doc_matches_ssot() {
-    let doc_path = repo_root()
-        .join(".claude/skills/pasta-ghost-authoring/references/pasta-toml.md");
+    let doc_path =
+        repo_root().join(".claude/skills/pasta-ghost-authoring/references/pasta-toml.md");
     let doc = std::fs::read_to_string(&doc_path)
         .unwrap_or_else(|e| panic!("config reference doc not readable at {doc_path:?}: {e}"));
 
@@ -227,9 +232,9 @@ fn config_reference_doc_matches_ssot() {
     // 分類表の各行に SSOT 値が記載されていること（例: `talk_interval_min` | ... | `180`）。
     // SSOT 値の文字列表現でドリフトを検出する。
     let expect_row = |key: &str, value: String| {
-        let has = doc.lines().any(|line| {
-            line.contains(key) && line.contains(&format!("`{value}`"))
-        });
+        let has = doc
+            .lines()
+            .any(|line| line.contains(key) && line.contains(&format!("`{value}`")));
         assert!(
             has,
             "config reference doc の `{key}` 行に SSOT 値 `{value}` が見つからない (R5.4/R5.5)"
@@ -266,18 +271,12 @@ fn lua_fallback_literals_match_ssot() {
 
     // resolve("...", "talk_interval_min", 180) の第3引数（既定値）。
     assert!(
-        vd_lua.contains(&format!(
-            "\"talk_interval_min\", {}",
-            d.talk_interval_min
-        )),
+        vd_lua.contains(&format!("\"talk_interval_min\", {}", d.talk_interval_min)),
         "virtual_dispatcher.lua の talk_interval_min フォールバック ({}) が SSOT と不一致 (R5.5)",
         d.talk_interval_min
     );
     assert!(
-        vd_lua.contains(&format!(
-            "\"talk_interval_max\", {}",
-            d.talk_interval_max
-        )),
+        vd_lua.contains(&format!("\"talk_interval_max\", {}", d.talk_interval_max)),
         "virtual_dispatcher.lua の talk_interval_max フォールバック ({}) が SSOT と不一致 (R5.5)",
         d.talk_interval_max
     );
@@ -366,12 +365,16 @@ fn legacy_full_config_with_package_loads_cleanly() {
         .and_then(toml::Value::as_table)
         .expect("[ghost] should be present");
     assert_eq!(
-        ghost.get("talk_interval_min").and_then(toml::Value::as_integer),
+        ghost
+            .get("talk_interval_min")
+            .and_then(toml::Value::as_integer),
         Some(90),
         "明示 ghost 値が補完で上書きされてはならない (R6.1)"
     );
     assert_eq!(
-        ghost.get("talk_interval_max").and_then(toml::Value::as_integer),
+        ghost
+            .get("talk_interval_max")
+            .and_then(toml::Value::as_integer),
         Some(200),
     );
     assert_eq!(

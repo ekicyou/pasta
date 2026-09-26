@@ -1,7 +1,7 @@
 //! Inline test cluster externalized from `session.rs` (Task 2.1, pure move).
 //! Cluster: `.pasta` line-break anchor state machine.
-use super::*;
 use super::session_test_support::*;
+use super::*;
 
 use std::sync::mpsc;
 
@@ -174,7 +174,11 @@ fn two_lua_lines_for_same_pasta_line_resolve_equal_pastapos() {
          resolve to EQUAL `PastaPos` (file + line) — the `anchor == cur` \
          suppression precondition (1.1, 2.1)"
     );
-    assert_eq!(a, ppos(10), "both must resolve to the shared `.pasta` line 10");
+    assert_eq!(
+        a,
+        ppos(10),
+        "both must resolve to the shared `.pasta` line 10"
+    );
 }
 
 /// `with_source_map` / `with_shared_mode` MUST NOT touch the anchor state

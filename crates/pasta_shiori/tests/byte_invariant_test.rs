@@ -220,13 +220,21 @@ fn golden_get_property_coroutine_continuation_bytes() {
         &mut shiori,
         "GET SHIORI/3.0\nCharset: UTF-8\nID: OnTestSimple\n",
     );
-    assert_golden_bytes("GET property round1 (yield)", &round1, GOLDEN_GET_PROPERTY_ROUND1);
+    assert_golden_bytes(
+        "GET property round1 (yield)",
+        &round1,
+        GOLDEN_GET_PROPERTY_ROUND1,
+    );
 
     let round2 = ffi_request_raw(
         &mut shiori,
         "GET SHIORI/3.0\nCharset: UTF-8\nID: OnPastaCallBack1\nReference0: 2.6.77\n",
     );
-    assert_golden_bytes("GET property round2 (resume)", &round2, GOLDEN_GET_PROPERTY_ROUND2);
+    assert_golden_bytes(
+        "GET property round2 (resume)",
+        &round2,
+        GOLDEN_GET_PROPERTY_ROUND2,
+    );
 }
 
 /// OnSecondChange（OnTalk ハンドラ未登録フィクスチャ → 決定論的 204）と

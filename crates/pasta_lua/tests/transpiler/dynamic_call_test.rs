@@ -94,7 +94,9 @@ fn test_dynamic_call_no_match_returns_nil() {
     lua.load(&lua_code).exec().unwrap();
 
     // Execute finalize_scene to wire up scenes
-    lua.load("require('pasta').finalize_scene()").exec().unwrap();
+    lua.load("require('pasta').finalize_scene()")
+        .exec()
+        .unwrap();
 
     // Call the scene — act:call internally should handle not-found gracefully
     let result: mlua::Value = lua

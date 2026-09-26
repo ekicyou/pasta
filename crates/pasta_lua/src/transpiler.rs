@@ -3,8 +3,8 @@
 //! This module provides the main transpiler interface for converting
 //! Pasta AST to Lua code.
 
-use pasta_dsl::parser::{ActorScope, FileItem, GlobalSceneScope, KeyWords, PastaFile};
 use pasta_core::registry::SceneRegistry;
+use pasta_dsl::parser::{ActorScope, FileItem, GlobalSceneScope, KeyWords, PastaFile};
 
 use super::code_gen::LuaCodeGenerator;
 use super::code_gen::source_map::SourceMapSink;
@@ -186,7 +186,9 @@ impl LuaTranspiler {
         word: &KeyWords,
     ) -> Result<(), TranspileError> {
         for name in &word.names {
-            context.word_registry.register_global(name, word.words.clone());
+            context
+                .word_registry
+                .register_global(name, word.words.clone());
         }
         codegen.generate_global_word(word)?;
         Ok(())
@@ -217,12 +219,7 @@ impl LuaTranspiler {
         // Register named local scenes (start scene is part of global)
         for (local_idx, local_scene) in scene.local_scenes.iter().enumerate() {
             if local_scene.name.is_some() {
-                context.register_local_scene(
-                    local_scene,
-                    &scene.name,
-                    counter,
-                    local_idx + 1,
-                );
+                context.register_local_scene(local_scene, &scene.name, counter, local_idx + 1);
             }
         }
 

@@ -2,8 +2,8 @@
 //! behavior-invariant move). Cluster: malformed-request graceful degradation
 //! and pending-table edge behaviour (spurious/out-of-band events, per-kind
 //! FIFO independence, wire no-ops).
-use super::*;
 use super::dap_test_support::*;
+use super::*;
 
 use crate::debug::types::Scope;
 
@@ -75,7 +75,10 @@ fn missing_or_non_numeric_seq_falls_back_to_zero() {
 fn scopes_missing_frame_id_defaults_to_frame_zero() {
     let mut dap = DapAdapter::new();
     let decoded = dap.decode_request(&request(14, "scopes", json!({})));
-    assert_eq!(decoded.command, Some(SessionCommand::Scopes { frame_id: 0 }));
+    assert_eq!(
+        decoded.command,
+        Some(SessionCommand::Scopes { frame_id: 0 })
+    );
     let resp = decoded.response.expect("scopes answered immediately");
     let scopes = resp["body"]["scopes"].as_array().expect("scopes array");
     assert_eq!(
@@ -128,11 +131,7 @@ fn variables_missing_reference_defaults_to_zero() {
 #[test]
 fn attach_non_string_source_presentation_is_none() {
     let mut dap = DapAdapter::new();
-    let decoded = dap.decode_request(&request(
-        4,
-        "attach",
-        json!({ "sourcePresentation": 1 }),
-    ));
+    let decoded = dap.decode_request(&request(4, "attach", json!({ "sourcePresentation": 1 })));
     assert_eq!(
         decoded.attach_source_mode, None,
         "non-string sourcePresentation → None (no Pasta fallback)"

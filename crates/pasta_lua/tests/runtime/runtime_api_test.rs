@@ -122,7 +122,9 @@ fn test_register_module_overwrites_existing_registration() {
 
     let first = runtime.lua().create_table().unwrap();
     first.set("version", 1).unwrap();
-    runtime.register_module("@cell316_overwrite", first).unwrap();
+    runtime
+        .register_module("@cell316_overwrite", first)
+        .unwrap();
 
     let second = runtime.lua().create_table().unwrap();
     second.set("version", 2).unwrap();
@@ -232,11 +234,8 @@ fn test_from_loader_loads_entry_lua_when_present() {
     std::fs::create_dir_all(&entry_dir).unwrap();
     std::fs::write(entry_dir.join("entry.lua"), "CELL316_ENTRY_LOADED = true").unwrap();
 
-    let loader_context = LoaderContext::new(
-        temp.path(),
-        vec!["scripts".to_string()],
-        toml::Table::new(),
-    );
+    let loader_context =
+        LoaderContext::new(temp.path(), vec!["scripts".to_string()], toml::Table::new());
     let runtime = PastaLuaRuntime::from_loader(
         TranspileContext::new(),
         loader_context,
@@ -258,11 +257,8 @@ fn test_from_loader_fails_when_existing_entry_lua_fails() {
     std::fs::create_dir_all(&entry_dir).unwrap();
     std::fs::write(entry_dir.join("entry.lua"), r#"error("entry broken")"#).unwrap();
 
-    let loader_context = LoaderContext::new(
-        temp.path(),
-        vec!["scripts".to_string()],
-        toml::Table::new(),
-    );
+    let loader_context =
+        LoaderContext::new(temp.path(), vec!["scripts".to_string()], toml::Table::new());
     let err = match PastaLuaRuntime::from_loader(
         TranspileContext::new(),
         loader_context,
@@ -290,11 +286,8 @@ fn test_from_loader_fails_when_existing_entry_lua_fails() {
 fn test_from_loader_skips_when_entry_lua_absent() {
     let temp = TempDir::new().unwrap();
 
-    let loader_context = LoaderContext::new(
-        temp.path(),
-        vec!["scripts".to_string()],
-        toml::Table::new(),
-    );
+    let loader_context =
+        LoaderContext::new(temp.path(), vec!["scripts".to_string()], toml::Table::new());
     let runtime = PastaLuaRuntime::from_loader(
         TranspileContext::new(),
         loader_context,
@@ -317,11 +310,8 @@ fn test_from_loader_fails_when_entry_lua_is_unreadable() {
     // entry.lua をディレクトリとして作る: exists() は true だが read_to_string は失敗する
     std::fs::create_dir_all(temp.path().join("scripts/pasta/shiori/entry.lua")).unwrap();
 
-    let loader_context = LoaderContext::new(
-        temp.path(),
-        vec!["scripts".to_string()],
-        toml::Table::new(),
-    );
+    let loader_context =
+        LoaderContext::new(temp.path(), vec!["scripts".to_string()], toml::Table::new());
     let err = match PastaLuaRuntime::from_loader(
         TranspileContext::new(),
         loader_context,
@@ -416,11 +406,8 @@ fn test_from_loader_transpiled_error_propagates_with_module_name() {
 // ============================================================================
 
 fn runtime_with_custom_fields(custom_fields: toml::Table) -> PastaLuaRuntime {
-    let loader_context = LoaderContext::new(
-        "/test/path",
-        vec!["scripts".to_string()],
-        custom_fields,
-    );
+    let loader_context =
+        LoaderContext::new("/test/path", vec!["scripts".to_string()], custom_fields);
     PastaLuaRuntime::from_loader(
         TranspileContext::new(),
         loader_context,

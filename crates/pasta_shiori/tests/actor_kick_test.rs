@@ -13,7 +13,7 @@
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use pasta::actor::mailbox::{mailbox, ActorMsg, MailboxRequest, Reply};
+use pasta::actor::mailbox::{ActorMsg, MailboxRequest, Reply, mailbox};
 use pasta::actor::thread::spawn_actor_thread;
 use pasta::{PastaShiori, Shiori};
 use tempfile::TempDir;

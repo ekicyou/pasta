@@ -35,13 +35,14 @@ fn apply_shiori_defaults_fills_all_ghost_keys_when_section_omitted() {
     // Building `custom_fields` directly lets us exercise the function in
     // isolation on a genuinely ghost-absent input.
     let mut config = PastaConfig::default();
-    config
-        .custom_fields
-        .insert("actor".to_string(), {
-            let mut actor = toml::Table::new();
-            actor.insert("name".to_string(), toml::Value::String("sakura".to_string()));
-            toml::Value::Table(actor)
-        });
+    config.custom_fields.insert("actor".to_string(), {
+        let mut actor = toml::Table::new();
+        actor.insert(
+            "name".to_string(),
+            toml::Value::String("sakura".to_string()),
+        );
+        toml::Value::Table(actor)
+    });
     assert!(
         config.custom_fields.get("ghost").is_none(),
         "precondition: ghost section absent before apply"
@@ -50,8 +51,14 @@ fn apply_shiori_defaults_fills_all_ghost_keys_when_section_omitted() {
     config.apply_shiori_defaults();
 
     let ghost = ghost_table(&config);
-    assert_eq!(ghost.get("talk_interval_min").unwrap().as_integer(), Some(180));
-    assert_eq!(ghost.get("talk_interval_max").unwrap().as_integer(), Some(300));
+    assert_eq!(
+        ghost.get("talk_interval_min").unwrap().as_integer(),
+        Some(180)
+    );
+    assert_eq!(
+        ghost.get("talk_interval_max").unwrap().as_integer(),
+        Some(300)
+    );
     assert_eq!(ghost.get("hour_margin").unwrap().as_integer(), Some(30));
     assert_eq!(ghost.get("spot_newlines").unwrap().as_float(), Some(1.5));
 }
@@ -60,16 +67,21 @@ fn apply_shiori_defaults_fills_all_ghost_keys_when_section_omitted() {
 /// 欠落キーのみ既定で補完される（Requirement 3.4: 明示値を上書きしない）。
 #[test]
 fn apply_shiori_defaults_preserves_explicit_ghost_values() {
-    let mut config =
-        PastaConfig::from_str("[ghost]\ntalk_interval_min = 120\n").unwrap();
+    let mut config = PastaConfig::from_str("[ghost]\ntalk_interval_min = 120\n").unwrap();
 
     config.apply_shiori_defaults();
 
     let ghost = ghost_table(&config);
     // 明示値は不変
-    assert_eq!(ghost.get("talk_interval_min").unwrap().as_integer(), Some(120));
+    assert_eq!(
+        ghost.get("talk_interval_min").unwrap().as_integer(),
+        Some(120)
+    );
     // 欠落キーは既定で補完
-    assert_eq!(ghost.get("talk_interval_max").unwrap().as_integer(), Some(300));
+    assert_eq!(
+        ghost.get("talk_interval_max").unwrap().as_integer(),
+        Some(300)
+    );
     assert_eq!(ghost.get("hour_margin").unwrap().as_integer(), Some(30));
     assert_eq!(ghost.get("spot_newlines").unwrap().as_float(), Some(1.5));
 }
@@ -91,10 +103,8 @@ fn apply_shiori_defaults_is_idempotent() {
 /// 補完後も追加・削除・変更されない（Design: [package] は補完しない）。
 #[test]
 fn apply_shiori_defaults_does_not_touch_package_section() {
-    let mut config = PastaConfig::from_str(
-        "[package]\nname = \"demo\"\nversion = \"1.0\"\n",
-    )
-    .unwrap();
+    let mut config =
+        PastaConfig::from_str("[package]\nname = \"demo\"\nversion = \"1.0\"\n").unwrap();
     let before = config.custom_fields.get("package").cloned();
 
     config.apply_shiori_defaults();
@@ -113,8 +123,7 @@ fn apply_shiori_defaults_does_not_touch_package_section() {
 #[test]
 fn apply_shiori_defaults_warns_when_actor_section_absent() {
     // `[actor]` を含まない最小構成（[ghost] のみ）。
-    let mut config =
-        PastaConfig::from_str("[ghost]\ntalk_interval_min = 120\n").unwrap();
+    let mut config = PastaConfig::from_str("[ghost]\ntalk_interval_min = 120\n").unwrap();
     assert!(
         config.custom_fields.get("actor").is_none(),
         "precondition: actor section absent before apply"
@@ -137,8 +146,7 @@ fn apply_shiori_defaults_warns_when_actor_section_absent() {
 #[tracing_test::traced_test]
 #[test]
 fn apply_shiori_defaults_does_not_warn_when_actor_section_present() {
-    let mut config =
-        PastaConfig::from_str("[actor]\nname = \"sakura\"\n").unwrap();
+    let mut config = PastaConfig::from_str("[actor]\nname = \"sakura\"\n").unwrap();
 
     config.apply_shiori_defaults();
 

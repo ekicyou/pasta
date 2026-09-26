@@ -167,8 +167,7 @@ fn loader_builds_and_aggregates_multi_chunk_source_map() {
     assert!(
         !back_b
             .iter()
-            .any(|(chunk, _)| canonicalize_chunk_name(chunk)
-                == canonicalize_chunk_name(&chunk_a)),
+            .any(|(chunk, _)| canonicalize_chunk_name(chunk) == canonicalize_chunk_name(&chunk_a)),
         "B のファイル行の逆引きに A のチャンクが混入してはならない: {:?}",
         back_b
     );
@@ -224,11 +223,7 @@ fn no_map_built_when_no_files_passed() {
 
     // チャンクが無いので前方解決は常に None、逆引きは常に空。
     assert!(source_map.resolve_lua_to_pasta("any-chunk", 1).is_none());
-    assert!(
-        source_map
-            .resolve_pasta_to_lua("any.pasta", 1)
-            .is_empty()
-    );
+    assert!(source_map.resolve_pasta_to_lua("any.pasta", 1).is_empty());
 }
 
 /// 3.2（task 6.1）: サイドカー **有効時**、ローダのマップ構築経路は各生成 `.lua` の隣に

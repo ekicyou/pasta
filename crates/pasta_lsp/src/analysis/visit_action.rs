@@ -14,7 +14,11 @@ use super::token_types::*;
 // ============================================================================
 
 impl super::AnalysisEngine {
-    pub(super) fn visit_local_scene_item(item: &LocalSceneItem, source: &str, tokens: &mut Vec<RawToken>) {
+    pub(super) fn visit_local_scene_item(
+        item: &LocalSceneItem,
+        source: &str,
+        tokens: &mut Vec<RawToken>,
+    ) {
         match item {
             LocalSceneItem::VarSet(vs) => Self::visit_var_set(vs, source, tokens),
             LocalSceneItem::CallScene(cs) => Self::visit_call_scene(cs, source, tokens),
@@ -325,9 +329,11 @@ impl super::AnalysisEngine {
         let line = span.start_line;
         let line_text = get_line_text(source, line);
         let line_start = line_byte_offset(source, line);
-        let span_end_in_line = Self::safe_boundary(line_text, span.end_byte.saturating_sub(line_start));
+        let span_end_in_line =
+            Self::safe_boundary(line_text, span.end_byte.saturating_sub(line_start));
         let span_start_in_line =
-            Self::safe_boundary(line_text, span.start_byte.saturating_sub(line_start)).min(span_end_in_line);
+            Self::safe_boundary(line_text, span.start_byte.saturating_sub(line_start))
+                .min(span_end_in_line);
         (
             line_text,
             &line_text[span_start_in_line..span_end_in_line],

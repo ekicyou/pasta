@@ -250,7 +250,9 @@ mod tests {
         let logger = Arc::new(PastaLogger::new(&load_dir, None).unwrap());
         registry.register(load_dir.clone(), logger.clone());
 
-        let fetched = registry.get(&load_dir).expect("logger should be registered");
+        let fetched = registry
+            .get(&load_dir)
+            .expect("logger should be registered");
         assert_eq!(fetched.log_path(), logger.log_path());
 
         registry.unregister(&load_dir);

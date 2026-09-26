@@ -1,7 +1,7 @@
 //! Inline test cluster externalized from `session.rs` (Task 2.1, pure move).
 //! Cluster: source-map injection plumbing (enable -> wiring -> DebugSession).
-use super::*;
 use super::session_test_support::*;
+use super::*;
 
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
@@ -50,8 +50,7 @@ fn none_map_leaves_session_default_lua_behavior() {
     let (event_tx, _event_rx) = mpsc::channel::<SessionEvent>();
 
     // Default constructor: no map, default mode.
-    let default_session =
-        DebugSession::new(BreakpointSet::new(), cmd_rx, event_tx);
+    let default_session = DebugSession::new(BreakpointSet::new(), cmd_rx, event_tx);
     assert!(
         default_session.source_map().is_none(),
         "default session must hold NO map (default `.lua` behavior, 7.2)"
@@ -113,8 +112,8 @@ fn session_stops_at_breakpoint_and_resumes() {
         .expect("sending Continue must succeed");
 
     // (4) The host thread runs to completion after Continue (R1.6), bounded.
-    let joined =
-        join_with_watchdog(&mut host, WATCHDOG).expect("host thread must finish after Continue (R1.6)");
+    let joined = join_with_watchdog(&mut host, WATCHDOG)
+        .expect("host thread must finish after Continue (R1.6)");
     joined
         .expect("host thread must not panic")
         .expect("scenario must run to completion after Continue");
@@ -236,8 +235,8 @@ fn non_resuming_command_keeps_blocking_until_continue() {
     host.cmd_tx
         .send(SessionCommand::Continue)
         .expect("sending Continue must succeed");
-    let joined = join_with_watchdog(&mut host, WATCHDOG)
-        .expect("host thread must finish after Continue");
+    let joined =
+        join_with_watchdog(&mut host, WATCHDOG).expect("host thread must finish after Continue");
     joined
         .expect("host thread must not panic")
         .expect("scenario must complete after Continue");

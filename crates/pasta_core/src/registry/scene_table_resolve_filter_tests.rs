@@ -1,6 +1,6 @@
+use super::scene_table_candidate_tests::create_test_scene_info;
 use super::*;
 use crate::registry::random::MockRandomSelector;
-use super::scene_table_candidate_tests::create_test_scene_info;
 
 // ======================================================================
 // Tests for resolve_scene_id error paths and attribute filtering (G1)
@@ -117,10 +117,7 @@ fn test_find_scene_not_found() {
     let mut table = SceneTable::new(selector);
 
     let result = table.find_scene("存在しない", &HashMap::new());
-    assert!(matches!(
-        result,
-        Err(SceneTableError::SceneNotFound { .. })
-    ));
+    assert!(matches!(result, Err(SceneTableError::SceneNotFound { .. })));
 }
 
 #[test]
@@ -178,7 +175,11 @@ fn test_replace_selector_clears_cache() {
     // Replace selector — cache must be cleared, cycle restarts at the beginning
     table.replace_selector(Box::new(MockRandomSelector::new(vec![0])));
     let after = table.resolve_scene_id("OnTalk", &HashMap::new()).unwrap();
-    assert_eq!(after, SceneId(0), "cache was not cleared by replace_selector");
+    assert_eq!(
+        after,
+        SceneId(0),
+        "cache was not cleared by replace_selector"
+    );
 
     // Labels and prefix_index stay intact
     assert_eq!(table.labels_iter().count(), 2);

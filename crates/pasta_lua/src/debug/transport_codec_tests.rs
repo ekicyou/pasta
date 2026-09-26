@@ -105,7 +105,10 @@ fn read_frame_reads_exactly_n_bytes_and_leaves_the_next_frame() {
     let r1 = read_frame(&mut reader).unwrap().expect("first frame");
     assert_eq!(r1, first, "first frame parsed");
     let r2 = read_frame(&mut reader).unwrap().expect("second frame");
-    assert_eq!(r2, second, "second frame intact (no over-read of the first)");
+    assert_eq!(
+        r2, second,
+        "second frame intact (no over-read of the first)"
+    );
     // A third read hits clean EOF between frames.
     assert!(
         read_frame(&mut reader).unwrap().is_none(),
@@ -232,7 +235,11 @@ fn read_frame_rejects_oversized_content_length_before_allocating() {
     at.extend_from_slice(format!("Content-Length: {MAX_CONTENT_LENGTH}\r\n\r\n").as_bytes());
     let mut reader = Cursor::new(at);
     let err = read_frame(&mut reader).expect_err("missing body must error");
-    assert_eq!(err.kind(), io::ErrorKind::UnexpectedEof, "at-limit passes the guard");
+    assert_eq!(
+        err.kind(),
+        io::ErrorKind::UnexpectedEof,
+        "at-limit passes the guard"
+    );
 }
 
 /// Header lines terminated by bare `\n` (no `\r`) are tolerated: the

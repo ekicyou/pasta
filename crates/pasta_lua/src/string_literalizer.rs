@@ -219,8 +219,7 @@ mod tests {
     #[test]
     fn test_literalize_with_span_error_carries_span() {
         let span = Span::new(8, 4, 8, 20, 0, 16);
-        let err =
-            StringLiteralizer::literalize_with_span("\\x]==========y", &span).unwrap_err();
+        let err = StringLiteralizer::literalize_with_span("\\x]==========y", &span).unwrap_err();
         let msg = format!("{}", err);
         assert!(msg.contains("String literal cannot be converted"));
         assert!(

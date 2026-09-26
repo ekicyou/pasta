@@ -163,7 +163,11 @@ fn test_stack_level_gives_lua_caller() -> LuaResult<()> {
     );
 
     if result.4 {
-        assert!(!result.5.is_empty(), "Source should not be empty, got: '{}'", result.5);
+        assert!(
+            !result.5.is_empty(),
+            "Source should not be empty, got: '{}'",
+            result.5
+        );
         assert!(result.6 > 0, "Line should be positive, got: {}", result.6);
     } else {
         assert!(result.0, "Level 0 stack frame should exist");

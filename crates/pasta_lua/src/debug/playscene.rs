@@ -69,12 +69,7 @@ fn build_kick_scene(scene_id: &str, parent: Option<&str>) -> String {
 /// [`ResolveOutcome::NotFound`] を返す。
 ///
 /// `line` は VSCode 由来の 1 始まり行番号（索引も 1 始まり）。
-pub fn resolve_and_kick(
-    map: &SourceMap,
-    kick: &KickSink,
-    uri: &str,
-    line: u32,
-) -> ResolveOutcome {
+pub fn resolve_and_kick(map: &SourceMap, kick: &KickSink, uri: &str, line: u32) -> ResolveOutcome {
     let pasta_path = uri_to_pasta_path(uri);
     match map.scene_at(&pasta_path, line) {
         Some(identity) => {
@@ -151,11 +146,7 @@ fn strip_file_scheme(uri: &str) -> String {
 /// （`/` + 英字 + `:`）のみ対象。POSIX 絶対パス `/home/...` は変更しない。
 fn fix_leading_drive(path: &str) -> String {
     let bytes = path.as_bytes();
-    if bytes.len() >= 3
-        && bytes[0] == b'/'
-        && bytes[1].is_ascii_alphabetic()
-        && bytes[2] == b':'
-    {
+    if bytes.len() >= 3 && bytes[0] == b'/' && bytes[1].is_ascii_alphabetic() && bytes[2] == b':' {
         path[1..].to_string()
     } else {
         path.to_string()

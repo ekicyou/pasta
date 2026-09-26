@@ -4,8 +4,8 @@ use super::LuaCodeGenerator;
 use crate::error::TranspileError;
 use crate::string_literalizer::StringLiteralizer;
 use pasta_dsl::parser::{
-    Action, ActionLine, Args, CallScene, CodeBlock, ContinueAction, Expr, KeyWords, SetValue,
-    Span, VarScope, VarSet,
+    Action, ActionLine, Args, CallScene, CodeBlock, ContinueAction, Expr, KeyWords, SetValue, Span,
+    VarScope, VarSet,
 };
 use std::io::Write;
 
@@ -422,12 +422,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                     }
                     pasta_dsl::parser::FnScope::Global => {
                         // GLOBAL.関数名(act, 引数...)
-                        write!(
-                            buf,
-                            "GLOBAL.{}(act{})",
-                            name,
-                            format_args_suffix(&args_str)
-                        )?;
+                        write!(buf, "GLOBAL.{}(act{})", name, format_args_suffix(&args_str))?;
                     }
                 }
             }

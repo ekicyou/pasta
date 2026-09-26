@@ -25,7 +25,7 @@
 use std::thread;
 use std::time::Duration;
 
-use pasta::actor::mailbox::{mailbox, ActorMsg, MailboxRequest, Reply};
+use pasta::actor::mailbox::{ActorMsg, MailboxRequest, Reply, mailbox};
 use pasta::actor::marshaling::{default_204, marshal_get_with_timeout, marshal_notify};
 use pasta::actor::teardown::teardown_via_sender;
 
@@ -41,14 +41,19 @@ fn get_path_emits_try_send_recv_and_reply_seams() {
         }
     });
 
-    let resp =
-        marshal_get_with_timeout(&tx, MailboxRequest::new(1, "X"), Duration::from_secs(10));
+    let resp = marshal_get_with_timeout(&tx, MailboxRequest::new(1, "X"), Duration::from_secs(10));
     assert_eq!(resp, "echo:X");
     actor.join().expect("actor role thread must not panic");
 
     // GET は try_send で投入し、reply 値到達で完了する。両シームが観測できること。
-    assert!(logs_contain("actor.try_send"), "GET must emit actor.try_send seam");
-    assert!(logs_contain("actor.reply"), "GET reply value must emit actor.reply seam");
+    assert!(
+        logs_contain("actor.try_send"),
+        "GET must emit actor.try_send seam"
+    );
+    assert!(
+        logs_contain("actor.reply"),
+        "GET reply value must emit actor.reply seam"
+    );
 }
 
 /// marshaling シーム（GET drop→204）: reply drop が `actor.drop` ログ点を発火する（R10.4/R5.3）。
@@ -63,8 +68,7 @@ fn get_reply_drop_emits_drop_seam_and_204() {
         }
     });
 
-    let resp =
-        marshal_get_with_timeout(&tx, MailboxRequest::new(1, "X"), Duration::from_secs(10));
+    let resp = marshal_get_with_timeout(&tx, MailboxRequest::new(1, "X"), Duration::from_secs(10));
     assert_eq!(resp.as_bytes(), default_204().as_bytes());
     actor.join().expect("actor role thread must not panic");
 
@@ -130,9 +134,18 @@ fn teardown_emits_stop_and_done_seams() {
     });
 
     let report = teardown_via_sender(&tx, Duration::from_secs(10));
-    assert!(report.is_clean(), "teardown must be clean (done ack received)");
+    assert!(
+        report.is_clean(),
+        "teardown must be clean (done ack received)"
+    );
     actor.join().expect("actor role thread must not panic");
 
-    assert!(logs_contain("actor.stop"), "teardown must emit the actor.stop seam");
-    assert!(logs_contain("actor.done"), "teardown done ack must emit the actor.done seam");
+    assert!(
+        logs_contain("actor.stop"),
+        "teardown must emit the actor.stop seam"
+    );
+    assert!(
+        logs_contain("actor.done"),
+        "teardown done ack must emit the actor.done seam"
+    );
 }

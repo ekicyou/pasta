@@ -284,7 +284,10 @@ fn invalid_request_returns_error_and_does_not_kick() {
     let resp = h.recv();
     assert_eq!(resp["command"], "pasta/playSceneAt");
     assert_eq!(resp["request_seq"], 53);
-    assert_eq!(resp["success"], false, "invalid request → error response (4.4)");
+    assert_eq!(
+        resp["success"], false,
+        "invalid request → error response (4.4)"
+    );
 }
 
 /// No loaded map: a `pasta/playSceneAt` with a wired sink but no `SourceMap`

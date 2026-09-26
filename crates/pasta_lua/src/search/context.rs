@@ -180,7 +180,8 @@ impl SearchContext {
     /// # Arguments
     /// * `sequence` - None to reset to default, Some(vec) for mock selector
     pub fn set_scene_selector(&mut self, sequence: Option<Vec<usize>>) -> Result<(), SearchError> {
-        self.scene_table.replace_selector(Self::build_selector(sequence));
+        self.scene_table
+            .replace_selector(Self::build_selector(sequence));
         Ok(())
     }
 
@@ -189,7 +190,8 @@ impl SearchContext {
     /// # Arguments
     /// * `sequence` - None to reset to default, Some(vec) for mock selector
     pub fn set_word_selector(&mut self, sequence: Option<Vec<usize>>) -> Result<(), SearchError> {
-        self.word_table.replace_selector(Self::build_selector(sequence));
+        self.word_table
+            .replace_selector(Self::build_selector(sequence));
         Ok(())
     }
 }

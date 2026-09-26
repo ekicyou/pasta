@@ -213,7 +213,11 @@ fn test_persistence_load_corrupted_json_returns_empty_table() {
     let load_fn: mlua::Function = module.get("load").unwrap();
     let result: mlua::Table = load_fn.call(()).unwrap();
 
-    assert_eq!(result.len().unwrap(), 0, "corrupted file should degrade to empty table");
+    assert_eq!(
+        result.len().unwrap(),
+        0,
+        "corrupted file should degrade to empty table"
+    );
 }
 
 /// オブジェクト以外の JSON（スカラー）でも load() は空テーブルを返す。

@@ -145,7 +145,9 @@ pub(crate) fn is_response(msg: &Value, command: &str) -> bool {
 /// 突合する。バックエンドは `.pasta` パスを正規化系で提示するため、生のパス文字列の完全一致では
 /// なく canonical 一致で判定する（design "Source Identity"）。
 pub(crate) fn assert_pasta_source(frame: &Value, expect_pasta_file: &str, ctx: &str) {
-    let got = frame["source"]["path"].as_str().expect("`.pasta` 提示 source path");
+    let got = frame["source"]["path"]
+        .as_str()
+        .expect("`.pasta` 提示 source path");
     assert_eq!(
         canonicalize_chunk_name(got),
         canonicalize_chunk_name(expect_pasta_file),
@@ -334,7 +336,9 @@ pub(crate) fn start_stopped_session(
         let addr = runtime
             .debug_local_addr()
             .ok_or_else(|| "enabled runtime must expose a bound debug addr (port 0)".to_string())?;
-        addr_tx.send(addr).map_err(|_| "addr send failed".to_string())?;
+        addr_tx
+            .send(addr)
+            .map_err(|_| "addr send failed".to_string())?;
 
         go_rx
             .recv_timeout(WATCHDOG)
@@ -392,7 +396,9 @@ pub(crate) fn start_stopped_session(
         }),
     );
     let bp_resp = client.recv_until(|m| is_response(m, "setBreakpoints"));
-    let bps = bp_resp["body"]["breakpoints"].as_array().expect("breakpoints array");
+    let bps = bp_resp["body"]["breakpoints"]
+        .as_array()
+        .expect("breakpoints array");
     assert_eq!(bps.len(), 1, "exactly one breakpoint resolved");
     assert_eq!(
         bps[0]["verified"], true,
@@ -445,14 +451,23 @@ pub(crate) fn finish_session(mut session: StoppedSession) {
 }
 
 /// 停止状態のトップフレームが生成 `.lua` 座標（path = chunk, line = bp_lua_line）であることを assert。
-pub(crate) fn assert_lua_frame(session: &mut StoppedSession, coords: &SessionCoords, seq: u64, ctx: &str) {
+pub(crate) fn assert_lua_frame(
+    session: &mut StoppedSession,
+    coords: &SessionCoords,
+    seq: u64,
+    ctx: &str,
+) {
     session
         .client
         .send_request(seq, "stackTrace", json!({ "threadId": session.thread_id }));
     let stack = session.client.recv_until(|m| is_response(m, "stackTrace"));
-    let frames = stack["body"]["stackFrames"].as_array().expect("stackFrames");
+    let frames = stack["body"]["stackFrames"]
+        .as_array()
+        .expect("stackFrames");
     assert!(!frames.is_empty(), "{ctx}: 停止フレームが存在する");
-    let path = frames[0]["source"]["path"].as_str().expect("`.lua` 提示 source path");
+    let path = frames[0]["source"]["path"]
+        .as_str()
+        .expect("`.lua` 提示 source path");
     assert_eq!(
         canonicalize_chunk_name(path),
         canonicalize_chunk_name(&coords.chunk),
@@ -467,12 +482,19 @@ pub(crate) fn assert_lua_frame(session: &mut StoppedSession, coords: &SessionCoo
 }
 
 /// 停止状態のトップフレームが `.pasta` 座標（file/line）であることを assert（既存 `assert_pasta_source` 利用）。
-pub(crate) fn assert_pasta_frame(session: &mut StoppedSession, coords: &SessionCoords, seq: u64, ctx: &str) {
+pub(crate) fn assert_pasta_frame(
+    session: &mut StoppedSession,
+    coords: &SessionCoords,
+    seq: u64,
+    ctx: &str,
+) {
     session
         .client
         .send_request(seq, "stackTrace", json!({ "threadId": session.thread_id }));
     let stack = session.client.recv_until(|m| is_response(m, "stackTrace"));
-    let frames = stack["body"]["stackFrames"].as_array().expect("stackFrames");
+    let frames = stack["body"]["stackFrames"]
+        .as_array()
+        .expect("stackFrames");
     assert!(!frames.is_empty(), "{ctx}: 停止フレームが存在する");
     assert_pasta_source(&frames[0], &coords.pasta_file_key, ctx);
     assert_eq!(

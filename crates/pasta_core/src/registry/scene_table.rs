@@ -274,14 +274,11 @@ impl SceneTable {
         };
 
         // Phase 4: Reset if needed (borrowing released above)
-        if needs_reset
-            && let Some(cached) = self.cache.get_mut(&cache_key)
-        {
+        if needs_reset && let Some(cached) = self.cache.get_mut(&cache_key) {
             cached.next_index = 0;
             cached.history.clear();
             if self.shuffle_enabled {
-                let mut id_values: Vec<usize> =
-                    cached.candidates.iter().map(|id| id.0).collect();
+                let mut id_values: Vec<usize> = cached.candidates.iter().map(|id| id.0).collect();
                 self.random_selector.shuffle_usize(&mut id_values);
                 cached.candidates = id_values.into_iter().map(SceneId).collect();
             }
@@ -412,7 +409,6 @@ impl SceneTable {
         self.cache.clear();
     }
 }
-
 
 #[cfg(test)]
 #[path = "scene_table_candidate_tests.rs"]

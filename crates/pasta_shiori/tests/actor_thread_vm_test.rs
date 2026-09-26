@@ -22,7 +22,7 @@ use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::Duration;
 
-use pasta::actor::mailbox::{mailbox, ActorMsg, MailboxRequest, Reply};
+use pasta::actor::mailbox::{ActorMsg, MailboxRequest, Reply, mailbox};
 use pasta::actor::thread::spawn_actor_thread;
 use tempfile::TempDir;
 
@@ -138,11 +138,7 @@ fn actor_thread_pins_vm_and_continues_coroutine_across_messages() {
 
     // (b)(c) コルーチン継続 2 ラウンド。Round1 で get_property が yield、Round2 の
     // callback でコルーチンが resume され値が反映される（co_scene が VM 内に persist）。
-    let round1 = get_via_actor(
-        &tx,
-        1,
-        "GET SHIORI/3.0\nCharset: UTF-8\nID: OnTestSimple\n",
-    );
+    let round1 = get_via_actor(&tx, 1, "GET SHIORI/3.0\nCharset: UTF-8\nID: OnTestSimple\n");
     assert_eq!(
         round1.as_bytes(),
         EXPECT_ROUND1.as_bytes(),
@@ -166,7 +162,9 @@ fn actor_thread_pins_vm_and_continues_coroutine_across_messages() {
     done_rx
         .recv_timeout(Duration::from_secs(10))
         .expect("Stop must be acked (actor loop must reach Stop and exit)");
-    actor.join().expect("actor thread must join cleanly after Stop");
+    actor
+        .join()
+        .expect("actor thread must join cleanly after Stop");
 }
 
 /// NOTIFY fire-and-forget がアクタースレッド VM で処理され、後続 GET が同一 FIFO で
@@ -188,11 +186,7 @@ fn actor_thread_processes_notify_then_get_in_fifo() {
 
     // 後続 GET は同一 FIFO で NOTIFY 処理完了後に返る。coroutine 開始イベントで
     // 200/yield 応答を取得し、VM がアクタースレッドで実際に駆動したことを確認する。
-    let resp = get_via_actor(
-        &tx,
-        2,
-        "GET SHIORI/3.0\nCharset: UTF-8\nID: OnTestSimple\n",
-    );
+    let resp = get_via_actor(&tx, 2, "GET SHIORI/3.0\nCharset: UTF-8\nID: OnTestSimple\n");
     assert_eq!(
         resp.as_bytes(),
         EXPECT_ROUND1.as_bytes(),
@@ -204,5 +198,7 @@ fn actor_thread_processes_notify_then_get_in_fifo() {
     done_rx
         .recv_timeout(Duration::from_secs(10))
         .expect("Stop must be acked");
-    actor.join().expect("actor thread must join cleanly after Stop");
+    actor
+        .join()
+        .expect("actor thread must join cleanly after Stop");
 }

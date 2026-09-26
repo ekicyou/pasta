@@ -19,8 +19,12 @@ fn e1_e6_e2_step_over_consumes_pasta_line_passes_unmapped_and_skips_sub_call() {
     let map = step_scenario_map();
     let exp = Expected::derive(&map);
 
-    let (host, mut client, thread_id) =
-        start_session(Arc::clone(&map), SourceMode::Pasta, STEP_PASTA_FILE, exp.origin_pasta);
+    let (host, mut client, thread_id) = start_session(
+        Arc::clone(&map),
+        SourceMode::Pasta,
+        STEP_PASTA_FILE,
+        exp.origin_pasta,
+    );
 
     // BP 停止位置は `.pasta` 起点行を提示する（5.1）。
     assert_eq!(
@@ -34,7 +38,10 @@ fn e1_e6_e2_step_over_consumes_pasta_line_passes_unmapped_and_skips_sub_call() {
     client.send_request(20, "next", json!({ "threadId": thread_id }));
     let _ = client.recv_until(|m| is_response(m, "next"));
     let stopped = client.recv_until(|m| is_event(m, "stopped"));
-    assert_eq!(stopped["body"]["reason"], "step", "1 回目 step over は reason step");
+    assert_eq!(
+        stopped["body"]["reason"], "step",
+        "1 回目 step over は reason step"
+    );
     assert_eq!(
         top_pasta_line(&mut client, thread_id, 21),
         exp.multi_pasta,
@@ -48,7 +55,10 @@ fn e1_e6_e2_step_over_consumes_pasta_line_passes_unmapped_and_skips_sub_call() {
     client.send_request(22, "next", json!({ "threadId": thread_id }));
     let _ = client.recv_until(|m| is_response(m, "next"));
     let stopped = client.recv_until(|m| is_event(m, "stopped"));
-    assert_eq!(stopped["body"]["reason"], "step", "E1: step over は reason step");
+    assert_eq!(
+        stopped["body"]["reason"], "step",
+        "E1: step over は reason step"
+    );
     assert_eq!(
         top_pasta_line(&mut client, thread_id, 23),
         exp.call_helper_pasta,
@@ -114,7 +124,10 @@ fn e3_e4_step_into_first_callee_pasta_line_and_step_out_next_caller_pasta_line()
     client.send_request(20, "stepIn", json!({ "threadId": thread_id }));
     let _ = client.recv_until(|m| is_response(m, "stepIn"));
     let stopped = client.recv_until(|m| is_event(m, "stopped"));
-    assert_eq!(stopped["body"]["reason"], "step", "E3: step into は reason step");
+    assert_eq!(
+        stopped["body"]["reason"], "step",
+        "E3: step into は reason step"
+    );
     assert_eq!(
         top_pasta_line(&mut client, thread_id, 21),
         exp.callee_first_pasta,
@@ -129,7 +142,10 @@ fn e3_e4_step_into_first_callee_pasta_line_and_step_out_next_caller_pasta_line()
     client.send_request(30, "stepOut", json!({ "threadId": thread_id }));
     let _ = client.recv_until(|m| is_response(m, "stepOut"));
     let stopped = client.recv_until(|m| is_event(m, "stopped"));
-    assert_eq!(stopped["body"]["reason"], "step", "E4: step out は reason step");
+    assert_eq!(
+        stopped["body"]["reason"], "step",
+        "E4: step out は reason step"
+    );
     let out_line = top_pasta_line(&mut client, thread_id, 31);
     assert_eq!(
         out_line, exp.step_out_pasta,
@@ -177,7 +193,10 @@ fn e5_recursion_does_not_mis_stop_at_same_pasta_line_in_other_frames() {
     client.send_request(20, "next", json!({ "threadId": thread_id }));
     let _ = client.recv_until(|m| is_response(m, "next"));
     let stopped = client.recv_until(|m| is_event(m, "stopped"));
-    assert_eq!(stopped["body"]["reason"], "step", "E5: step over は reason step");
+    assert_eq!(
+        stopped["body"]["reason"], "step",
+        "E5: step over は reason step"
+    );
     assert_eq!(
         top_pasta_line(&mut client, thread_id, 21),
         exp.after_recur_pasta,
@@ -232,7 +251,10 @@ fn e7_pasta_step_over_crosses_coroutine_yield_resume() {
     client.send_request(30, "next", json!({ "threadId": thread_id }));
     let _ = client.recv_until(|m| is_response(m, "next"));
     let stopped = client.recv_until(|m| is_event(m, "stopped"));
-    assert_eq!(stopped["body"]["reason"], "step", "E7: step over は reason step");
+    assert_eq!(
+        stopped["body"]["reason"], "step",
+        "E7: step over は reason step"
+    );
     assert_eq!(
         top_pasta_line(&mut client, thread_id, 31),
         exp.co_post_yield_pasta,
@@ -280,7 +302,10 @@ fn e8_lua_mode_steps_at_lua_granularity_regression() {
     client.send_request(20, "next", json!({ "threadId": thread_id }));
     let _ = client.recv_until(|m| is_response(m, "next"));
     let stopped = client.recv_until(|m| is_event(m, "stopped"));
-    assert_eq!(stopped["body"]["reason"], "step", "E8: step over は reason step");
+    assert_eq!(
+        stopped["body"]["reason"], "step",
+        "E8: step over は reason step"
+    );
     let lua_step_line = top_frame_line(&mut client, thread_id, 21);
     assert_eq!(
         lua_step_line, exp.multi_lua_second,
@@ -312,8 +337,12 @@ fn teeth_lua_mode_stops_at_lua_line_not_pasta() {
     let map = step_scenario_map();
     let exp = Expected::derive(&map);
 
-    let (host, mut client, thread_id) =
-        start_session(Arc::clone(&map), SourceMode::Lua, STEP_SOURCE, exp.multi_lua_first);
+    let (host, mut client, thread_id) = start_session(
+        Arc::clone(&map),
+        SourceMode::Lua,
+        STEP_SOURCE,
+        exp.multi_lua_first,
+    );
 
     // E1 と同じ起点（`.pasta` 11・行19）で同じ step over を `.lua` モードで行う。
     client.send_request(20, "next", json!({ "threadId": thread_id }));

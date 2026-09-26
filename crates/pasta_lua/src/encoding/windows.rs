@@ -367,8 +367,7 @@ mod tests {
     fn test_string_to_multibyte_cp932_roundtrip() {
         let original = "パス/テスト_01";
         let bytes = string_to_multibyte(CP932, original, None).unwrap();
-        let restored =
-            multi_byte_to_wide_char(CP932, MB_ERR_INVALID_CHARS_FLAG, &bytes).unwrap();
+        let restored = multi_byte_to_wide_char(CP932, MB_ERR_INVALID_CHARS_FLAG, &bytes).unwrap();
         assert_eq!(restored, original);
     }
 

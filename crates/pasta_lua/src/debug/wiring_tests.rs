@@ -119,7 +119,6 @@ fn is_response(msg: &Value, command: &str) -> bool {
     msg["type"] == "response" && msg["command"] == command
 }
 
-
 #[cfg(test)]
 #[path = "wiring_tests_a.rs"]
 mod a;

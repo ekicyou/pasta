@@ -352,7 +352,9 @@ fn test_e2e_transfer_req_and_date_to_var_from_dsl() {
   さくら：部位＝＄ｒ４　。
 "#;
     lua.load(&transpile(source)).exec().unwrap();
-    lua.load("require('pasta').finalize_scene()").exec().unwrap();
+    lua.load("require('pasta').finalize_scene()")
+        .exec()
+        .unwrap();
 
     let fire = |id: &str| -> String {
         lua.load(format!(
@@ -370,13 +372,25 @@ fn test_e2e_transfer_req_and_date_to_var_from_dsl() {
     };
 
     let with = fire("転記あり");
-    for want in ["部位＝Head", "半角＝Head", "イベント＝転記あり", "時刻＝午後2時", "曜日＝土曜日"] {
+    for want in [
+        "部位＝Head",
+        "半角＝Head",
+        "イベント＝転記あり",
+        "時刻＝午後2時",
+        "曜日＝土曜日",
+    ] {
         assert!(with.contains(want), "missing {want:?} in {with}");
     }
 
     let without = fire("転記なし");
-    assert!(!without.contains("Head"), "transfer must be explicit: {without}");
-    assert!(without.contains("部位＝。"), "unset var must render empty: {without}");
+    assert!(
+        !without.contains("Head"),
+        "transfer must be explicit: {without}"
+    );
+    assert!(
+        without.contains("部位＝。"),
+        "unset var must render empty: {without}"
+    );
 }
 
 /// 未定義の変数・単語・関数をアクション行で参照すると、"nil" を出さず
@@ -399,13 +413,18 @@ fn test_e2e_undefined_refs_in_action_line_render_empty() {
   さくら：変数＝＄未代入　単語＝＠未定義語　関数＝＠未定義関数（１）　グローバル＝＄＊未代入　終わり。
 "#;
     lua.load(&transpile(source)).exec().unwrap();
-    lua.load("require('pasta').finalize_scene()").exec().unwrap();
+    lua.load("require('pasta').finalize_scene()")
+        .exec()
+        .unwrap();
 
     let response: String = lua
         .load(r#"return require("pasta.shiori.event").fire({ id = "未定義参照", reference = {} })"#)
         .eval()
         .unwrap();
-    assert!(!response.contains("nil"), "must not render 'nil': {response}");
+    assert!(
+        !response.contains("nil"),
+        "must not render 'nil': {response}"
+    );
     assert!(
         response.contains("変数＝単語＝関数＝　グローバル＝終わり。"),
         "undefined refs must render empty: {response}"

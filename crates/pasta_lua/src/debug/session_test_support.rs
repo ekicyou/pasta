@@ -6,9 +6,9 @@
 //! so private / `pub(crate)` reachability into production code is unchanged.
 use super::*;
 
+use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{self};
-use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::Duration;
 
@@ -72,8 +72,7 @@ pub(super) fn start_session(breakpoints: BreakpointSet) -> HostThread {
 
     // Only channel ends + Arc cross the boundary; mlua::Lua never does.
     let handle = std::thread::spawn(move || -> Result<(), String> {
-        run_host_thread(breakpoints, cmd_rx, event_tx, hook_progress)
-            .map_err(|e| e.to_string())
+        run_host_thread(breakpoints, cmd_rx, event_tx, hook_progress).map_err(|e| e.to_string())
     });
 
     HostThread {
@@ -165,9 +164,7 @@ impl StepHost {
             .recv_timeout(WATCHDOG)
             .expect("must receive a session event before the watchdog")
         {
-            SessionEvent::Stopped { reason, .. } => {
-                (reason, self.last_line.load(Ordering::SeqCst))
-            }
+            SessionEvent::Stopped { reason, .. } => (reason, self.last_line.load(Ordering::SeqCst)),
             // A non-stop event is unexpected in these scenarios: fail loudly
             // (each arm diverges, so no loop is needed — clippy::never_loop).
             other => panic!("unexpected event while awaiting a stop: {other:?}"),

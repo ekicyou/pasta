@@ -142,7 +142,8 @@ return jit ~= nil and jit.status() == true",
             Duration::from_millis(200),
         );
         match connect {
-            Err(_) => { /* 期待どおり: 無効ランタイムのための listener は存在しない。*/ }
+            Err(_) => { /* 期待どおり: 無効ランタイムのための listener は存在しない。*/
+            }
             Ok(_) => {
                 // 無関係プロセスが偶発的に 9276 を占有しているケース。権威判定
                 // (`debug_local_addr()==None`) は既に通っているので、ここは曖昧として

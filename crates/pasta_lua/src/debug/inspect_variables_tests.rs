@@ -59,22 +59,34 @@ return marker
 
     let num = find_var(&vars, "num")
         .unwrap_or_else(|| panic!("local 'num' must be retrieved by name. got: {:?}", *vars));
-    assert_eq!(num.type_name, "number", "num must be discriminated as number (R2.3)");
+    assert_eq!(
+        num.type_name, "number",
+        "num must be discriminated as number (R2.3)"
+    );
     assert_eq!(num.repr, "42", "num value must be readable as 42");
 
     let s = find_var(&vars, "str")
         .unwrap_or_else(|| panic!("local 'str' must be retrieved by name. got: {:?}", *vars));
-    assert_eq!(s.type_name, "string", "str must be discriminated as string (R2.3)");
+    assert_eq!(
+        s.type_name, "string",
+        "str must be discriminated as string (R2.3)"
+    );
     assert_eq!(s.repr, "hello", "str value must be readable as 'hello'");
 
     let flag = find_var(&vars, "flag")
         .unwrap_or_else(|| panic!("local 'flag' must be retrieved by name. got: {:?}", *vars));
-    assert_eq!(flag.type_name, "boolean", "flag must be discriminated as boolean (R2.3)");
+    assert_eq!(
+        flag.type_name, "boolean",
+        "flag must be discriminated as boolean (R2.3)"
+    );
     assert_eq!(flag.repr, "true", "flag value must be readable as true");
 
     let tbl = find_var(&vars, "tbl")
         .unwrap_or_else(|| panic!("local 'tbl' must be retrieved by name. got: {:?}", *vars));
-    assert_eq!(tbl.type_name, "table", "tbl must be discriminated as table (R2.3)");
+    assert_eq!(
+        tbl.type_name, "table",
+        "tbl must be discriminated as table (R2.3)"
+    );
     assert!(
         tbl.repr.starts_with("table:"),
         "table repr must be a readable placeholder. got: {}",
@@ -129,7 +141,9 @@ end
         .eval::<mlua::Function>()
         .expect("named closure factory should produce a function");
 
-    closure.call::<i64>(()).expect("closure call should succeed");
+    closure
+        .call::<i64>(())
+        .expect("closure call should succeed");
     lua.remove_global_hook();
 
     let vars = captured.lock().unwrap();
@@ -234,7 +248,10 @@ return marker
         .load("return 1 + 2")
         .eval()
         .expect("VM must remain usable after inspecting unsupported kinds (R2.5)");
-    assert_eq!(sane, 3, "VM stack must remain balanced after R2.5 inspection");
+    assert_eq!(
+        sane, 3,
+        "VM stack must remain balanced after R2.5 inspection"
+    );
 }
 
 #[test]
@@ -328,7 +345,10 @@ return result
         )
     });
     assert_eq!(outer.type_name, "number");
-    assert_eq!(outer.repr, "99", "caller local must carry the caller's value");
+    assert_eq!(
+        outer.repr, "99",
+        "caller local must carry the caller's value"
+    );
 
     assert!(
         find_var(&vars, "inner_var").is_none(),
@@ -424,9 +444,8 @@ return marker
 
     let vars = captured.lock().unwrap();
 
-    let frac = find_var(&vars, "frac").unwrap_or_else(|| {
-        panic!("local 'frac' must be retrieved by name. got: {:?}", *vars)
-    });
+    let frac = find_var(&vars, "frac")
+        .unwrap_or_else(|| panic!("local 'frac' must be retrieved by name. got: {:?}", *vars));
     assert_eq!(frac.type_name, "number");
     assert_eq!(
         frac.repr, "2.5",

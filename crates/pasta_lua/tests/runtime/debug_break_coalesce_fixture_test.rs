@@ -86,7 +86,8 @@ fn fixture_target_pasta_line_maps_to_multiple_lua_lines() {
 
     // フィクスチャがトランスパイル・マップ構築できること（＝「ロードできる」観測可能 done）。
     let cache_manager = CacheManager::new(base_dir.clone(), "profile/pasta/cache/lua");
-    let source_map = PastaLoader::build_source_map(std::slice::from_ref(&file), &cache_manager, false);
+    let source_map =
+        PastaLoader::build_source_map(std::slice::from_ref(&file), &cache_manager, false);
 
     let chunk = cache_manager
         .source_to_cache_path(&file)
@@ -134,7 +135,8 @@ fn fixture_loop_revisits_the_same_pasta_line() {
     let file = write_fixture(&base_dir);
 
     let cache_manager = CacheManager::new(base_dir.clone(), "profile/pasta/cache/lua");
-    let source_map = PastaLoader::build_source_map(std::slice::from_ref(&file), &cache_manager, false);
+    let source_map =
+        PastaLoader::build_source_map(std::slice::from_ref(&file), &cache_manager, false);
     let chunk = cache_manager
         .source_to_cache_path(&file)
         .to_string_lossy()
@@ -179,9 +181,7 @@ fn fixture_loop_revisits_the_same_pasta_line() {
         "6.2(b): ループ本体 `.lua` 行 {loop_lua_line} の手前に `for ... do` が存在する \
          （生成コード: {lines:#?}）"
     );
-    let end_after = lines[body_idx + 1..]
-        .iter()
-        .any(|l| l.trim() == "end");
+    let end_after = lines[body_idx + 1..].iter().any(|l| l.trim() == "end");
     assert!(
         end_after,
         "6.2(b): ループ本体 `.lua` 行 {loop_lua_line} の後ろにループ終端 `end` が存在する"

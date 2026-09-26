@@ -1,7 +1,7 @@
 //! Inline test cluster externalized from `session.rs` (Task 2.1, pure move).
 //! Cluster: line-hook decision integration (re-break consumption).
-use super::*;
 use super::session_test_support::*;
+use super::*;
 
 use std::sync::Arc;
 
@@ -95,8 +95,20 @@ end
 return s
 ";
     let mut forward: BTreeMap<u32, PastaPos> = BTreeMap::new();
-    forward.insert(3, PastaPos { file: "loop.pasta".to_string(), line: 50 });
-    forward.insert(4, PastaPos { file: "loop.pasta".to_string(), line: 51 });
+    forward.insert(
+        3,
+        PastaPos {
+            file: "loop.pasta".to_string(),
+            line: 50,
+        },
+    );
+    forward.insert(
+        4,
+        PastaPos {
+            file: "loop.pasta".to_string(),
+            line: 51,
+        },
+    );
     let mut sm = SourceMap::new();
     sm.insert_chunk(
         LOOP_SOURCE.to_string(),

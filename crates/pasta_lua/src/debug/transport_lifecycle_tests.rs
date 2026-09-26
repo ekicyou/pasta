@@ -51,7 +51,10 @@ fn disabled_listen_none_opens_no_port() {
 
     // Sending is a clean Disconnected (no socket exists).
     assert!(
-        matches!(transport.send(json!({"x":1})), Err(DebugError::Disconnected)),
+        matches!(
+            transport.send(json!({"x":1})),
+            Err(DebugError::Disconnected)
+        ),
         "disabled send must report Disconnected (no socket)"
     );
 }
@@ -79,7 +82,10 @@ fn send_after_shutdown_reports_disconnected() {
 
     transport.shutdown();
     assert!(
-        matches!(transport.send(json!({"x":1})), Err(DebugError::Disconnected)),
+        matches!(
+            transport.send(json!({"x":1})),
+            Err(DebugError::Disconnected)
+        ),
         "send after shutdown must report Disconnected"
     );
     transport.shutdown(); // idempotent
@@ -104,7 +110,11 @@ fn enabled_socket2_path_binds_and_exposes_local_addr() {
         .local_addr()
         .expect("socket2-built enabled transport must expose its bound addr (R3.1)");
     assert_eq!(addr.ip().to_string(), "127.0.0.1");
-    assert_ne!(addr.port(), 0, "OS must assign a concrete port via the socket2 listener");
+    assert_ne!(
+        addr.port(),
+        0,
+        "OS must assign a concrete port via the socket2 listener"
+    );
 
     // Unblock the listener (parked in accept()) so the bounded join completes.
     transport.shutdown();
@@ -148,17 +158,25 @@ fn enabled_round_trips_framed_json_both_directions() {
         .inbound()
         .recv_timeout(WATCHDOG)
         .expect("transport must deliver the inbound frame (R3.1)");
-    assert_eq!(delivered, request, "inbound JSON must match what the client sent");
+    assert_eq!(
+        delivered, request,
+        "inbound JSON must match what the client sent"
+    );
 
     // (B) transport → client: push an outbound frame; the client reads it as
     // a correctly framed frame.
     let response = json!({ "seq": 7, "type": "response", "success": true });
-    transport.send(response.clone()).expect("transport send must succeed");
+    transport
+        .send(response.clone())
+        .expect("transport send must succeed");
 
     let received = read_frame(&mut client_reader)
         .expect("client read must succeed")
         .expect("client must receive a frame");
-    assert_eq!(received, response, "outbound JSON must match what the transport sent");
+    assert_eq!(
+        received, response,
+        "outbound JSON must match what the transport sent"
+    );
 
     // Clean teardown: drop the client (peer EOF) and the transport, then
     // join the listener thread bounded by the watchdog.
@@ -190,7 +208,10 @@ fn transport_carries_raw_values_without_interpreting_dap() {
         .inbound()
         .recv_timeout(WATCHDOG)
         .expect("inbound frame delivered");
-    assert_eq!(delivered, weird, "raw value must pass through uninterpreted");
+    assert_eq!(
+        delivered, weird,
+        "raw value must pass through uninterpreted"
+    );
 
     drop(client);
     let mut transport = transport;
@@ -281,7 +302,10 @@ fn connected_writer_honors_shutdown_flag_while_outbound_alive() {
 
     // Join the listener handle under the watchdog WITHOUT dropping the outbound
     // sender (the whole point is that the flag alone tears the writer down).
-    let handle = transport.handle.take().expect("enabled transport has a handle");
+    let handle = transport
+        .handle
+        .take()
+        .expect("enabled transport has a handle");
     let (done_tx, done_rx) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
         let _ = done_tx.send(handle.join());
@@ -317,15 +341,16 @@ fn connected_shutdown_tears_down_synchronously_with_client_alive() {
     let mut client_writer = client.try_clone().expect("clone client");
     let mut client_reader = BufReader::new(client.try_clone().expect("clone client"));
 
-    write_frame(&mut client_writer, &json!({ "seq": 1, "command": "ping" }))
-        .expect("client write");
+    write_frame(&mut client_writer, &json!({ "seq": 1, "command": "ping" })).expect("client write");
     let delivered = transport
         .inbound()
         .recv_timeout(WATCHDOG)
         .expect("inbound frame delivered");
     assert_eq!(delivered["command"], json!("ping"));
 
-    transport.send(json!({ "seq": 1, "type": "response" })).expect("send");
+    transport
+        .send(json!({ "seq": 1, "type": "response" }))
+        .expect("send");
     let received = read_frame(&mut client_reader)
         .expect("client read")
         .expect("client frame");
@@ -336,7 +361,10 @@ fn connected_shutdown_tears_down_synchronously_with_client_alive() {
     // joined → serve returns within the watchdog.
     let mut transport = transport;
     transport.shutdown();
-    let handle = transport.handle.take().expect("enabled transport has a handle");
+    let handle = transport
+        .handle
+        .take()
+        .expect("enabled transport has a handle");
     let (done_tx, done_rx) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
         let _ = done_tx.send(handle.join());
@@ -467,10 +495,12 @@ fn repeated_teardown_rebind_same_port_succeeds() {
             });
             done_rx
                 .recv_timeout(WATCHDOG)
-                .unwrap_or_else(|_| panic!(
-                    "cycle {cycle}: listener must wind down within the watchdog \
+                .unwrap_or_else(|_| {
+                    panic!(
+                        "cycle {cycle}: listener must wind down within the watchdog \
                      (no hang) so the port is freed for the next rebind"
-                ))
+                    )
+                })
                 .unwrap_or_else(|_| panic!("cycle {cycle}: listener thread must not panic"));
         }
         // `transport` is dropped here; the handle was already taken, so Drop's

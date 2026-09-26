@@ -14,28 +14,44 @@ use pest::Parser as PestParser;
 fn test_choice_line_shorthand_fullwidth() {
     // 省略形、全角マーカー
     let result = PastaParser2::parse(Rule::choice_line, "  ＠？target\n");
-    assert!(result.is_ok(), "省略形（全角）がパースできること: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "省略形（全角）がパースできること: {:?}",
+        result.err()
+    );
 }
 
 #[test]
 fn test_choice_line_with_label_fullwidth() {
     // 括弧形、全角マーカー
     let result = PastaParser2::parse(Rule::choice_line, "  ＠？target「表示テキスト」\n");
-    assert!(result.is_ok(), "括弧形（全角）がパースできること: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "括弧形（全角）がパースできること: {:?}",
+        result.err()
+    );
 }
 
 #[test]
 fn test_choice_line_shorthand_halfwidth() {
     // 省略形、半角マーカー
     let result = PastaParser2::parse(Rule::choice_line, "  @?target\n");
-    assert!(result.is_ok(), "省略形（半角）がパースできること: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "省略形（半角）がパースできること: {:?}",
+        result.err()
+    );
 }
 
 #[test]
 fn test_choice_line_with_label_halfwidth() {
     // 括弧形、半角マーカー
     let result = PastaParser2::parse(Rule::choice_line, "  @?target「display text」\n");
-    assert!(result.is_ok(), "括弧形（半角）がパースできること: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "括弧形（半角）がパースできること: {:?}",
+        result.err()
+    );
 }
 
 #[test]
@@ -49,7 +65,11 @@ fn test_choice_line_missing_target() {
 fn test_choice_line_with_comment() {
     // コメント付き
     let result = PastaParser2::parse(Rule::choice_line, "  ＠？target # コメント\n");
-    assert!(result.is_ok(), "コメント付きがパースできること: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "コメント付きがパースできること: {:?}",
+        result.err()
+    );
 }
 
 // ============================================================================
@@ -97,7 +117,11 @@ fn test_choice_line_in_scene_context() {
   ＠？挨拶「こんにちはを選ぶ」
 ";
     let result = PastaParser2::parse(Rule::file, source);
-    assert!(result.is_ok(), "シーン内の選択肢行がパースできること: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "シーン内の選択肢行がパースできること: {:?}",
+        result.err()
+    );
 }
 
 // ============================================================================
@@ -236,5 +260,9 @@ fn test_choice_line_in_local_scene_context() {
     ＠？挨拶「挨拶する」
 ";
     let result = PastaParser2::parse(Rule::file, source);
-    assert!(result.is_ok(), "ローカルシーン内の選択肢行がパースできること: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "ローカルシーン内の選択肢行がパースできること: {:?}",
+        result.err()
+    );
 }

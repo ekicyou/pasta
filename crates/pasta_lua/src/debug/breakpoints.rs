@@ -267,7 +267,10 @@ mod tests {
         set.register("x.pasta", vec![Breakpoint::new("x.pasta", chunk, 10)]);
 
         // Both fire (same execution coord).
-        assert!(set.should_pause(chunk, 10), "both BPs fire at the shared coord");
+        assert!(
+            set.should_pause(chunk, 10),
+            "both BPs fire at the shared coord"
+        );
 
         // Re-set the `.pasta` present source authoritatively (replace its set):
         // this must NOT remove the `.lua`-origin BP in the same chunk.
@@ -290,7 +293,10 @@ mod tests {
             set.should_pause(chunk, 20),
             "the `.pasta`-origin BP must survive replacing the `.lua` present source"
         );
-        assert!(set.should_pause(chunk, 30), "the `.lua` present source's new coord is registered");
+        assert!(
+            set.should_pause(chunk, 30),
+            "the `.lua` present source's new coord is registered"
+        );
         assert!(
             !set.should_pause(chunk, 10),
             "the `.lua` present source's OLD coord was authoritatively replaced"
@@ -315,10 +321,22 @@ mod tests {
             ],
         );
 
-        assert!(set.should_pause(chunk, 7), "each expanded `.lua` line fires (8.2)");
-        assert!(set.should_pause(chunk, 8), "each expanded `.lua` line fires (8.2)");
-        assert!(set.should_pause(chunk, 9), "each expanded `.lua` line fires (8.2)");
-        assert!(!set.should_pause(chunk, 6), "non-registered line does not fire");
+        assert!(
+            set.should_pause(chunk, 7),
+            "each expanded `.lua` line fires (8.2)"
+        );
+        assert!(
+            set.should_pause(chunk, 8),
+            "each expanded `.lua` line fires (8.2)"
+        );
+        assert!(
+            set.should_pause(chunk, 9),
+            "each expanded `.lua` line fires (8.2)"
+        );
+        assert!(
+            !set.should_pause(chunk, 6),
+            "non-registered line does not fire"
+        );
     }
 
     /// Task 5.3 reconciliation (requirement 4.2): a `.pasta`-translated BP is
@@ -397,11 +415,20 @@ mod tests {
         set.set_breakpoints(&src("@s"), &[3]);
 
         // Exact (chunk == "@s", line == 3) match → true.
-        assert!(set.should_pause("@s", 3), "exact .lua (chunk,line) match must pause");
+        assert!(
+            set.should_pause("@s", 3),
+            "exact .lua (chunk,line) match must pause"
+        );
         // Same chunk, different line → false.
-        assert!(!set.should_pause("@s", 2), "same .lua chunk but different line must NOT pause");
+        assert!(
+            !set.should_pause("@s", 2),
+            "same .lua chunk but different line must NOT pause"
+        );
         // Same line, different chunk → false.
-        assert!(!set.should_pause("@other", 3), "same line but different .lua chunk must NOT pause");
+        assert!(
+            !set.should_pause("@other", 3),
+            "same line but different .lua chunk must NOT pause"
+        );
     }
 
     /// `set_breakpoints` replaces ONLY the target source's lines, preserves
@@ -456,7 +483,10 @@ mod tests {
             !set.should_pause("@a", 1),
             "replaced source must drop ALL its previous lines"
         );
-        assert!(set.should_pause("@a", 5), "replaced source gets the new line");
+        assert!(
+            set.should_pause("@a", 5),
+            "replaced source gets the new line"
+        );
 
         // @b must be untouched by replacing @a.
         assert!(
@@ -529,7 +559,10 @@ mod tests {
             panic!("poison the breakpoint store");
         })
         .join();
-        assert!(set.inner.lock().is_err(), "the inner mutex must be poisoned");
+        assert!(
+            set.inner.lock().is_err(),
+            "the inner mutex must be poisoned"
+        );
 
         // should_pause: fail safe (false), even for the previously-firing coord.
         assert!(

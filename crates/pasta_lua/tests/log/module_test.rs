@@ -12,11 +12,11 @@ use tracing_test::traced_test;
 
 /// Create a minimal Lua VM for testing with the @pasta_log module registered.
 fn create_test_lua_with_log() -> Lua {
-    let lua =
-        unsafe { Lua::unsafe_new_with(StdLib::ALL_SAFE, mlua::LuaOptions::default()) };
+    let lua = unsafe { Lua::unsafe_new_with(StdLib::ALL_SAFE, mlua::LuaOptions::default()) };
 
     // Register the log module
-    let log_module = pasta_lua::runtime::log::register(&lua).expect("Failed to register log module");
+    let log_module =
+        pasta_lua::runtime::log::register(&lua).expect("Failed to register log module");
 
     // Put it in package.loaded
     let package: Table = lua.globals().get("package").unwrap();
@@ -34,10 +34,12 @@ fn create_test_lua_with_log() -> Lua {
 #[test]
 fn test_log_trace_outputs_message() {
     let lua = create_test_lua_with_log();
-    lua.load(r#"
+    lua.load(
+        r#"
         local log = require "@pasta_log"
         log.trace("trace message test")
-    "#)
+    "#,
+    )
     .exec()
     .unwrap();
 
@@ -48,10 +50,12 @@ fn test_log_trace_outputs_message() {
 #[test]
 fn test_log_debug_outputs_message() {
     let lua = create_test_lua_with_log();
-    lua.load(r#"
+    lua.load(
+        r#"
         local log = require "@pasta_log"
         log.debug("debug message test")
-    "#)
+    "#,
+    )
     .exec()
     .unwrap();
 
@@ -62,10 +66,12 @@ fn test_log_debug_outputs_message() {
 #[test]
 fn test_log_info_outputs_message() {
     let lua = create_test_lua_with_log();
-    lua.load(r#"
+    lua.load(
+        r#"
         local log = require "@pasta_log"
         log.info("info message test")
-    "#)
+    "#,
+    )
     .exec()
     .unwrap();
 
@@ -76,10 +82,12 @@ fn test_log_info_outputs_message() {
 #[test]
 fn test_log_warn_outputs_message() {
     let lua = create_test_lua_with_log();
-    lua.load(r#"
+    lua.load(
+        r#"
         local log = require "@pasta_log"
         log.warn("warn message test")
-    "#)
+    "#,
+    )
     .exec()
     .unwrap();
 
@@ -90,10 +98,12 @@ fn test_log_warn_outputs_message() {
 #[test]
 fn test_log_error_outputs_message() {
     let lua = create_test_lua_with_log();
-    lua.load(r#"
+    lua.load(
+        r#"
         local log = require "@pasta_log"
         log.error("error message test")
-    "#)
+    "#,
+    )
     .exec()
     .unwrap();
 
@@ -108,10 +118,12 @@ fn test_log_error_outputs_message() {
 #[test]
 fn test_log_string_value() {
     let lua = create_test_lua_with_log();
-    lua.load(r#"
+    lua.load(
+        r#"
         local log = require "@pasta_log"
         log.info("hello world")
-    "#)
+    "#,
+    )
     .exec()
     .unwrap();
 
@@ -126,10 +138,12 @@ fn test_log_string_value() {
 #[test]
 fn test_log_integer_value() {
     let lua = create_test_lua_with_log();
-    lua.load(r#"
+    lua.load(
+        r#"
         local log = require "@pasta_log"
         log.info(123)
-    "#)
+    "#,
+    )
     .exec()
     .unwrap();
 
@@ -140,10 +154,12 @@ fn test_log_integer_value() {
 #[test]
 fn test_log_number_value() {
     let lua = create_test_lua_with_log();
-    lua.load(r#"
+    lua.load(
+        r#"
         local log = require "@pasta_log"
         log.info(3.14)
-    "#)
+    "#,
+    )
     .exec()
     .unwrap();
 
@@ -154,10 +170,12 @@ fn test_log_number_value() {
 #[test]
 fn test_log_boolean_true() {
     let lua = create_test_lua_with_log();
-    lua.load(r#"
+    lua.load(
+        r#"
         local log = require "@pasta_log"
         log.info(true)
-    "#)
+    "#,
+    )
     .exec()
     .unwrap();
 
@@ -168,10 +186,12 @@ fn test_log_boolean_true() {
 #[test]
 fn test_log_boolean_false() {
     let lua = create_test_lua_with_log();
-    lua.load(r#"
+    lua.load(
+        r#"
         local log = require "@pasta_log"
         log.info(false)
-    "#)
+    "#,
+    )
     .exec()
     .unwrap();
 
@@ -182,10 +202,12 @@ fn test_log_boolean_false() {
 #[test]
 fn test_log_table_as_json() {
     let lua = create_test_lua_with_log();
-    lua.load(r#"
+    lua.load(
+        r#"
         local log = require "@pasta_log"
         log.info({key = "value"})
-    "#)
+    "#,
+    )
     .exec()
     .unwrap();
 
@@ -198,10 +220,12 @@ fn test_log_table_as_json() {
 #[test]
 fn test_log_array_table_as_json() {
     let lua = create_test_lua_with_log();
-    lua.load(r#"
+    lua.load(
+        r#"
         local log = require "@pasta_log"
         log.info({1, 2, 3})
-    "#)
+    "#,
+    )
     .exec()
     .unwrap();
 
@@ -217,10 +241,12 @@ fn test_log_array_table_as_json() {
 fn test_log_nil_value() {
     let lua = create_test_lua_with_log();
     // Should not error
-    lua.load(r#"
+    lua.load(
+        r#"
         local log = require "@pasta_log"
         log.info(nil)
-    "#)
+    "#,
+    )
     .exec()
     .unwrap();
 }
@@ -230,10 +256,12 @@ fn test_log_nil_value() {
 fn test_log_no_argument() {
     let lua = create_test_lua_with_log();
     // Calling with no argument should not error
-    lua.load(r#"
+    lua.load(
+        r#"
         local log = require "@pasta_log"
         log.info()
-    "#)
+    "#,
+    )
     .exec()
     .unwrap();
 }
@@ -246,14 +274,16 @@ fn test_log_no_argument() {
 #[test]
 fn test_log_large_table_abbreviated() {
     let lua = create_test_lua_with_log();
-    lua.load(r#"
+    lua.load(
+        r#"
         local log = require "@pasta_log"
         local t = {}
         for i = 1, 1001 do
             t[i] = i
         end
         log.info(t)
-    "#)
+    "#,
+    )
     .exec()
     .unwrap();
 
@@ -269,10 +299,12 @@ fn test_log_large_table_abbreviated() {
 #[test]
 fn test_log_contains_caller_source() {
     let lua = create_test_lua_with_log();
-    lua.load(r#"
+    lua.load(
+        r#"
         local log = require "@pasta_log"
         log.info("caller test")
-    "#)
+    "#,
+    )
     .set_name("test_source.lua")
     .exec()
     .unwrap();
@@ -284,10 +316,12 @@ fn test_log_contains_caller_source() {
 #[test]
 fn test_log_contains_caller_line() {
     let lua = create_test_lua_with_log();
-    lua.load(r#"
+    lua.load(
+        r#"
         local log = require "@pasta_log"
         log.info("line test")
-    "#)
+    "#,
+    )
     .exec()
     .unwrap();
 
@@ -298,13 +332,15 @@ fn test_log_contains_caller_line() {
 #[test]
 fn test_log_contains_caller_fn() {
     let lua = create_test_lua_with_log();
-    lua.load(r#"
+    lua.load(
+        r#"
         local log = require "@pasta_log"
         local function test_func()
             log.info("from function")
         end
         test_func()
-    "#)
+    "#,
+    )
     .exec()
     .unwrap();
 
@@ -319,10 +355,12 @@ fn test_log_contains_caller_fn() {
 fn test_module_has_version() {
     let lua = create_test_lua_with_log();
     let result: String = lua
-        .load(r#"
+        .load(
+            r#"
             local log = require "@pasta_log"
             return log._VERSION
-        "#)
+        "#,
+        )
         .eval()
         .unwrap();
 
@@ -333,10 +371,12 @@ fn test_module_has_version() {
 fn test_module_has_description() {
     let lua = create_test_lua_with_log();
     let result: String = lua
-        .load(r#"
+        .load(
+            r#"
             local log = require "@pasta_log"
             return log._DESCRIPTION
-        "#)
+        "#,
+        )
         .eval()
         .unwrap();
 
@@ -351,10 +391,12 @@ fn test_module_has_description() {
 fn test_module_accessible_via_require() {
     let lua = create_test_lua_with_log();
     let result: bool = lua
-        .load(r#"
+        .load(
+            r#"
             local log = require "@pasta_log"
             return log ~= nil
-        "#)
+        "#,
+        )
         .eval()
         .unwrap();
 
@@ -365,14 +407,16 @@ fn test_module_accessible_via_require() {
 fn test_module_has_all_functions() {
     let lua = create_test_lua_with_log();
     let result: bool = lua
-        .load(r#"
+        .load(
+            r#"
             local log = require "@pasta_log"
             return type(log.trace) == "function"
                 and type(log.debug) == "function"
                 and type(log.info) == "function"
                 and type(log.warn) == "function"
                 and type(log.error) == "function"
-        "#)
+        "#,
+        )
         .eval()
         .unwrap();
 
@@ -387,10 +431,12 @@ fn test_module_has_all_functions() {
 #[test]
 fn test_log_nested_table_json() {
     let lua = create_test_lua_with_log();
-    lua.load(r#"
+    lua.load(
+        r#"
         local log = require "@pasta_log"
         log.info({nested = {a = 1}})
-    "#)
+    "#,
+    )
     .exec()
     .unwrap();
 
@@ -402,12 +448,14 @@ fn test_log_nested_table_json() {
 fn test_log_circular_reference_no_error() {
     let lua = create_test_lua_with_log();
     // Circular reference should fall back to tostring(), not error
-    lua.load(r#"
+    lua.load(
+        r#"
         local log = require "@pasta_log"
         local t = {}
         t.self = t
         log.info(t)
-    "#)
+    "#,
+    )
     .exec()
     .unwrap();
 

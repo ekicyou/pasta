@@ -1,7 +1,7 @@
+use super::shiori_request_tests::copy_fixture_to_temp;
 use super::*;
 use std::path::PathBuf;
 use tempfile::TempDir;
-use super::shiori_request_tests::copy_fixture_to_temp;
 
 // ========================================================================
 // Task 11.3: 複数回load()テスト

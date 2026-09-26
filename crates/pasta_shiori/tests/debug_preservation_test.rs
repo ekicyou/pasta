@@ -37,9 +37,9 @@ use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::Duration;
 
-use pasta::actor::mailbox::{mailbox, ActorMsg, MailboxRequest, Reply};
+use pasta::actor::mailbox::{ActorMsg, MailboxRequest, Reply, mailbox};
 use pasta::actor::thread::spawn_actor_thread;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tempfile::TempDir;
 
 /// TEST-ONLY watchdog（停止コアは無期限・本クライアント待機のみ有界化）。
@@ -141,8 +141,7 @@ impl DapClient {
             "arguments": arguments,
         });
         let body = serde_json::to_vec(&req).expect("serialize DAP request");
-        write!(self.writer, "Content-Length: {}\r\n\r\n", body.len())
-            .expect("write DAP header");
+        write!(self.writer, "Content-Length: {}\r\n\r\n", body.len()).expect("write DAP header");
         self.writer.write_all(&body).expect("write DAP body");
         self.writer.flush().expect("flush DAP frame");
     }
@@ -202,7 +201,10 @@ fn debug_backend_fires_on_actor_thread_with_bp_inspect_and_attach() {
     // (1) アクタースレッドで VM をロード（debug 有効・エフェメラルポート）。
     let (tx, rx) = mailbox();
     let actor = spawn_actor_thread(0, load_dir.clone(), rx);
-    assert!(actor.loaded(), "actor thread must load the debug-enabled ghost VM");
+    assert!(
+        actor.loaded(),
+        "actor thread must load the debug-enabled ghost VM"
+    );
     assert_ne!(
         actor.actor_thread_id(),
         thread::current().id(),
@@ -220,7 +222,10 @@ fn debug_backend_fires_on_actor_thread_with_bp_inspect_and_attach() {
     let mut client = DapClient::connect(dap_addr);
     client.send_request(1, "initialize", json!({ "adapterID": "pasta" }));
     let init_resp = client.recv_until(|m| is_response(m, "initialize"));
-    assert_eq!(init_resp["success"], true, "DAP initialize must succeed (attach)");
+    assert_eq!(
+        init_resp["success"], true,
+        "DAP initialize must succeed (attach)"
+    );
     let _initialized = client.recv_until(|m| is_event(m, "initialized"));
 
     // (3) scene ハンドラの `.lua` 行へ BP を張る。chunk 名は `require` 経由でロードされた
@@ -232,7 +237,7 @@ fn debug_backend_fires_on_actor_thread_with_bp_inspect_and_attach() {
         .to_string_lossy()
         .to_string();
     const BREAKPOINT_LINE: u64 = 52; // `local marker = debug_local + 1`
-                                     // （`debug_local` は line 51 で代入済み → 停止時に named local として inspect 可能）
+    // （`debug_local` は line 51 で代入済み → 停止時に named local として inspect 可能）
     client.send_request(
         2,
         "setBreakpoints",
@@ -242,7 +247,9 @@ fn debug_backend_fires_on_actor_thread_with_bp_inspect_and_attach() {
         }),
     );
     let bp_resp = client.recv_until(|m| is_response(m, "setBreakpoints"));
-    let bps = bp_resp["body"]["breakpoints"].as_array().expect("breakpoints array");
+    let bps = bp_resp["body"]["breakpoints"]
+        .as_array()
+        .expect("breakpoints array");
     assert_eq!(bps.len(), 1, "one breakpoint response");
     assert_eq!(
         bps[0]["verified"], true,
@@ -255,10 +262,10 @@ fn debug_backend_fires_on_actor_thread_with_bp_inspect_and_attach() {
 
     // GET を mailbox へ投入（応答経路は reply_rx）。ブレークポイント停止中は VM が
     // アクタースレッドで止まるため、reply はまだ到着しない。
-    let (get_msg, reply_rx) =
-        ActorMsg::get(MailboxRequest::new(1, normalize_request(
-            "GET SHIORI/3.0\nCharset: UTF-8\nID: OnDebugScene\n",
-        )));
+    let (get_msg, reply_rx) = ActorMsg::get(MailboxRequest::new(
+        1,
+        normalize_request("GET SHIORI/3.0\nCharset: UTF-8\nID: OnDebugScene\n"),
+    ));
     tx.send(get_msg).expect("send GET into mailbox");
 
     // (3a) フックが BP 行でアクタースレッドを停止 → `stopped(breakpoint)`。
@@ -281,7 +288,9 @@ fn debug_backend_fires_on_actor_thread_with_bp_inspect_and_attach() {
     // (3b) stackTrace → 停止フレーム（scene コルーチン本体）。
     client.send_request(10, "stackTrace", json!({ "threadId": thread_id }));
     let stack = client.recv_until(|m| is_response(m, "stackTrace"));
-    let frames = stack["body"]["stackFrames"].as_array().expect("stackFrames array");
+    let frames = stack["body"]["stackFrames"]
+        .as_array()
+        .expect("stackFrames array");
     assert!(!frames.is_empty(), "stopped frame must exist (R10.1)");
     assert_eq!(
         frames[0]["line"].as_u64().expect("top frame line"),
@@ -293,18 +302,27 @@ fn debug_backend_fires_on_actor_thread_with_bp_inspect_and_attach() {
     let frame_id = frames[0]["id"].as_u64().expect("frame id");
     client.send_request(11, "scopes", json!({ "frameId": frame_id }));
     let scopes = client.recv_until(|m| is_response(m, "scopes"));
-    assert_eq!(scopes["success"], true, "R10.1: scopes must succeed at the actor-thread stop");
+    assert_eq!(
+        scopes["success"], true,
+        "R10.1: scopes must succeed at the actor-thread stop"
+    );
     let scope_arr = scopes["body"]["scopes"].as_array().expect("scopes array");
     assert!(!scope_arr.is_empty(), "stopped frame must expose a scope");
-    let var_ref = scope_arr[0]["variablesReference"].as_u64().expect("variablesReference");
+    let var_ref = scope_arr[0]["variablesReference"]
+        .as_u64()
+        .expect("variablesReference");
 
     client.send_request(12, "variables", json!({ "variablesReference": var_ref }));
     let vars = client.recv_until(|m| is_response(m, "variables"));
-    let var_arr = vars["body"]["variables"].as_array().expect("variables array");
+    let var_arr = vars["body"]["variables"]
+        .as_array()
+        .expect("variables array");
     let debug_local = var_arr
         .iter()
         .find(|v| v["name"] == "debug_local")
-        .unwrap_or_else(|| panic!("R10.1: coroutine local `debug_local` must be inspectable: {var_arr:?}"));
+        .unwrap_or_else(|| {
+            panic!("R10.1: coroutine local `debug_local` must be inspectable: {var_arr:?}")
+        });
     assert_eq!(
         debug_local["value"], "4242",
         "R10.1: variable inspection through the actor-hosted VM must read the live value"
@@ -329,7 +347,9 @@ fn debug_backend_fires_on_actor_thread_with_bp_inspect_and_attach() {
             done_rx
                 .recv_timeout(WATCHDOG)
                 .expect("Stop must be acked after the debug session completes");
-            actor.join().expect("actor thread must join cleanly after Stop");
+            actor
+                .join()
+                .expect("actor thread must join cleanly after Stop");
             return;
         }
         // 応答未到着 → BP 行へ再停止しているはず。stopped を消化してもう一度 continue。

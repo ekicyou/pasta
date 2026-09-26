@@ -3,7 +3,7 @@
 //! - error.rs: コンストラクタ・Display 形式・From<io::Error>・MultipleErrors
 //! - parser/mod.rs: parse_file（成功 / IO エラー）、parse_str の pest レベルエラー位置情報
 
-use pasta_dsl::parser::{parse_file, parse_str, FileItem};
+use pasta_dsl::parser::{FileItem, parse_file, parse_str};
 use pasta_dsl::{ParseError, ParseErrorInfo};
 use std::path::Path;
 
@@ -172,8 +172,7 @@ fn test_parse_str_comment_only_source() {
 #[test]
 fn test_parse_str_crlf_line_endings() {
     // CRLF 改行でも LF と同じ構造にパースされる
-    let file =
-        parse_str("＊scene\r\n　Alice：こんにちは\r\n", "crlf.pasta").expect("should parse");
+    let file = parse_str("＊scene\r\n　Alice：こんにちは\r\n", "crlf.pasta").expect("should parse");
     let scenes: Vec<_> = file
         .items
         .iter()

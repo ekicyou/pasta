@@ -83,9 +83,7 @@ impl PastaLuaRuntime {
     /// (requirements 6.1 / 6.3). Reads from the held [`crate::debug::DebugHandle`]
     /// so it mirrors exactly what `enable` was configured with.
     pub fn debug_source_mode(&self) -> Option<SourceMode> {
-        self.debug_handle
-            .as_ref()
-            .map(|h| h.config().source_mode)
+        self.debug_handle.as_ref().map(|h| h.config().source_mode)
     }
 
     /// Execute a Lua script from a file.

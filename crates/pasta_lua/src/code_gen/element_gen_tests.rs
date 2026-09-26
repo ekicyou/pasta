@@ -71,7 +71,11 @@ fn sakura_script_action_emits_sakura_script_call() {
         "must route through sakura_script, got: {}",
         text
     );
-    assert!(text.contains("\\s[0]"), "script payload preserved: {}", text);
+    assert!(
+        text.contains("\\s[0]"),
+        "script payload preserved: {}",
+        text
+    );
 }
 
 // ------------------------------------------------------------------
@@ -129,8 +133,7 @@ fn continue_action_inherits_actor_from_preceding_action_line() {
         )
     });
     assert_eq!(
-        text,
-        "act.うにゅう:talk(\"やあ\")\nact.うにゅう:talk(\"続き\")\n",
+        text, "act.うにゅう:talk(\"やあ\")\nact.うにゅう:talk(\"続き\")\n",
         "continuation must reuse the inherited speaker"
     );
 }

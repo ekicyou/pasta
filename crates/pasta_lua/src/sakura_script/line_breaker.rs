@@ -30,7 +30,10 @@ fn tokenize_plain_chars<'a>(input: &'a str, tag_regex: &Regex) -> Tokens<'a> {
     let mut leading_set = false;
 
     // Collect all tag match ranges
-    let tag_ranges: Vec<(usize, usize)> = tag_regex.find_iter(input).map(|m| (m.start(), m.end())).collect();
+    let tag_ranges: Vec<(usize, usize)> = tag_regex
+        .find_iter(input)
+        .map(|m| (m.start(), m.end()))
+        .collect();
     let mut tag_idx = 0;
 
     while pos < input.len() {
@@ -170,8 +173,8 @@ pub fn break_lines_impl(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::tokenizer::Tokenizer;
+    use super::*;
 
     fn tag_regex() -> Regex {
         Regex::new(Tokenizer::SAKURA_TAG_PATTERN).unwrap()
@@ -218,7 +221,11 @@ mod tests {
         let result = break_lines_impl(input, &[6], &re, &p);
         // Should have a \n somewhere, and all \_w[50] tags should remain
         assert!(result.contains("\\n"), "Expected line break in: {}", result);
-        assert_eq!(result.matches(r"\_w[50]").count(), 5, "All 5 wait tags must be preserved");
+        assert_eq!(
+            result.matches(r"\_w[50]").count(),
+            5,
+            "All 5 wait tags must be preserved"
+        );
     }
 
     #[test]
@@ -227,7 +234,11 @@ mod tests {
         let p = parser();
         let input = r"\h\s[0]こんにちは世界";
         let result = break_lines_impl(input, &[6], &re, &p);
-        assert!(result.starts_with(r"\h\s[0]"), "Leading tags should be preserved: {}", result);
+        assert!(
+            result.starts_with(r"\h\s[0]"),
+            "Leading tags should be preserved: {}",
+            result
+        );
     }
 
     // --- Test 3: Multiple width thresholds ---
@@ -300,7 +311,11 @@ mod tests {
         let input = r"あいう\nえおか";
         let result = break_lines_impl(input, &[20], &re, &p);
         // With wide threshold, no extra breaks needed; existing \n should remain
-        assert!(result.contains(r"\n"), "Existing \\n should be preserved: {}", result);
+        assert!(
+            result.contains(r"\n"),
+            "Existing \\n should be preserved: {}",
+            result
+        );
         let plain: String = re.replace_all(&result, "").into_owned();
         assert_eq!(plain, "あいうえおか");
     }
@@ -337,7 +352,8 @@ mod tests {
         assert!(
             breaks_narrow >= breaks_wide,
             "最後の値が広い方が改行数 ≤ であること: [4,4]={} [4,20]={}",
-            breaks_narrow, breaks_wide
+            breaks_narrow,
+            breaks_wide
         );
         // どちらも平文が保持されること
         let plain_narrow: String = re.replace_all(&result_narrow, "").into_owned();

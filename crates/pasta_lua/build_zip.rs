@@ -45,8 +45,10 @@ pub fn collect(
     // 安定した走査順のためにエントリをソート（rerun/walk の決定性に寄与）。
     let mut entries: Vec<PathBuf> = read
         .map(|e| {
-            e.unwrap_or_else(|err| panic!("failed to read dir entry in {}: {err}", current.display()))
-                .path()
+            e.unwrap_or_else(|err| {
+                panic!("failed to read dir entry in {}: {err}", current.display())
+            })
+            .path()
         })
         .collect();
     entries.sort();

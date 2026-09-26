@@ -28,11 +28,11 @@ mod common;
 use std::path::{Path, PathBuf};
 use std::ptr;
 
-use common::{copy_fixture_into, NON_ANSI_DIR_NAME};
+use common::{NON_ANSI_DIR_NAME, copy_fixture_into};
 use tempfile::TempDir;
 use windows_sys::Win32::Foundation::{GlobalFree, HGLOBAL};
-use windows_sys::Win32::Globalization::{WideCharToMultiByte, CP_ACP};
-use windows_sys::Win32::System::Memory::{GlobalAlloc, GMEM_FIXED};
+use windows_sys::Win32::Globalization::{CP_ACP, WideCharToMultiByte};
+use windows_sys::Win32::System::Memory::{GMEM_FIXED, GlobalAlloc};
 
 // 出荷 extern "C" シンボル。`load`/`request`/`unload` は lib.rs の再エクスポート経由、
 // `loadu` は `#[unsafe(no_mangle)]` されたシンボルを C ABI でそのまま宣言して呼ぶ
@@ -64,7 +64,11 @@ const GET_REQUEST: &str = "GET SHIORI/3.0\nCharset: UTF-8\nID: テスト挨拶\n
 fn alloc_hglobal(bytes: &[u8]) -> HGLOBAL {
     // SAFETY: GMEM_FIXED 確保。失敗は null を返すので検査する。
     let h = unsafe { GlobalAlloc(GMEM_FIXED, bytes.len()) };
-    assert!(!h.is_null(), "GlobalAlloc must succeed for {} bytes", bytes.len());
+    assert!(
+        !h.is_null(),
+        "GlobalAlloc must succeed for {} bytes",
+        bytes.len()
+    );
     // SAFETY: h は bytes.len() バイトの有効ブロックを指す。
     unsafe {
         let dst = std::slice::from_raw_parts_mut(h as *mut u8, bytes.len());
@@ -301,7 +305,10 @@ fn loadu_entry_drives_a_non_ansi_install_path_end_to_end() {
     );
 
     // 後始末: プロセス終了でアクターが漏れないように最終 unload（冪等）。
-    assert!(unload(), "final unload must remain a safe no-op returning true");
+    assert!(
+        unload(),
+        "final unload must remain a safe no-op returning true"
+    );
 
     // 段 5 の初期化が従来入口 `load` 経由だったことがログから判別できる
     // （＝入口ログが 2 つの入口を取り違えていない）。

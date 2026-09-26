@@ -3,8 +3,8 @@ use crate::code_gen::source_map::SourceMapSink;
 use crate::config::LineEnding;
 use crate::context::TranspileContext;
 use pasta_dsl::parser::{
-    Action, ActionLine, CallScene, CallTarget, ChoiceNode, CodeBlock, CueArgToken,
-    CueCommandNode, GlobalSceneScope, KeyWords, Span,
+    Action, ActionLine, CallScene, CallTarget, ChoiceNode, CodeBlock, CueArgToken, CueCommandNode,
+    GlobalSceneScope, KeyWords, Span,
 };
 
 fn gen_to_string<F>(f: F) -> String
@@ -30,7 +30,8 @@ struct CapturingSceneSink {
 impl SourceMapSink for CapturingSceneSink {
     fn record_line(&mut self, _lua_line: u32, _pasta_line: u32) {}
     fn record_scene(&mut self, scene_join_key: &str, span: Span) {
-        self.scenes.push((scene_join_key.to_string(), span.start_line as u32));
+        self.scenes
+            .push((scene_join_key.to_string(), span.start_line as u32));
     }
 }
 
@@ -124,7 +125,11 @@ fn actor_skips_empty_words_and_non_lua_code_blocks() {
         "non-lua code blocks must be dropped: {}",
         text
     );
-    assert!(text.ends_with("end\n\n"), "block closed via end_block: {}", text);
+    assert!(
+        text.ends_with("end\n\n"),
+        "block closed via end_block: {}",
+        text
+    );
 }
 
 // ------------------------------------------------------------------
@@ -161,8 +166,9 @@ fn scene_actors() -> Vec<SceneActorItem> {
 /// declaration order with the precomputed numbers.
 #[test]
 fn start_scene_emits_clear_spot_then_set_spots_in_order() {
-    let text =
-        gen_to_string(|cg| cg.generate_local_scene(&local_scene(None), 0, &scene_actors(), "会話#1"));
+    let text = gen_to_string(|cg| {
+        cg.generate_local_scene(&local_scene(None), 0, &scene_actors(), "会話#1")
+    });
 
     assert!(
         text.contains("function SCENE.__start__(act, ...)"),
@@ -203,7 +209,11 @@ fn named_scene_uses_counter_suffix_and_skips_spot_init() {
     );
     // Session initialization is always present.
     assert!(text.contains("local args = { ... }"), "{}", text);
-    assert!(text.contains("local save, var = act:init_scene(SCENE)"), "{}", text);
+    assert!(
+        text.contains("local save, var = act:init_scene(SCENE)"),
+        "{}",
+        text
+    );
 }
 
 /// A start scene with NO actors emits no spot block at all.
@@ -265,8 +275,7 @@ fn choice_uses_label_or_falls_back_to_target() {
         gen_to_string(|cg| cg.generate_local_scene_items(&[choice_item("はい", Some("Yes"))]));
     assert_eq!(labeled, "act:choice(\"はい\", \"Yes\")\n");
 
-    let fallback =
-        gen_to_string(|cg| cg.generate_local_scene_items(&[choice_item("はい", None)]));
+    let fallback = gen_to_string(|cg| cg.generate_local_scene_items(&[choice_item("はい", None)]));
     assert_eq!(fallback, "act:choice(\"はい\", \"はい\")\n");
 }
 
@@ -308,7 +317,11 @@ fn non_select_cue_command_emits_nothing() {
             vec![CueArgToken::Ident("smile".to_string())],
         )])
     });
-    assert!(text.is_empty(), "non-select cue must emit nothing: {:?}", text);
+    assert!(
+        text.is_empty(),
+        "non-select cue must emit nothing: {:?}",
+        text
+    );
 }
 
 // ------------------------------------------------------------------
@@ -332,14 +345,32 @@ fn named_local_with_span(name: &str, start_line: usize) -> LocalSceneScope {
         attrs: vec![],
         items: vec![],
         code_blocks: vec![],
-        span: Span::new(start_line, 1, start_line + 1, 1, (start_line - 1) * 10, start_line * 10),
+        span: Span::new(
+            start_line,
+            1,
+            start_line + 1,
+            1,
+            (start_line - 1) * 10,
+            start_line * 10,
+        ),
     }
 }
 
 /// A global scene with a valid header span at `start_line` and the given locals.
-fn global_scene_with(name: &str, start_line: usize, locals: Vec<LocalSceneScope>) -> GlobalSceneScope {
+fn global_scene_with(
+    name: &str,
+    start_line: usize,
+    locals: Vec<LocalSceneScope>,
+) -> GlobalSceneScope {
     let mut scene = GlobalSceneScope::new(name.to_string());
-    scene.span = Span::new(start_line, 1, start_line + 1, 1, (start_line - 1) * 10, start_line * 10);
+    scene.span = Span::new(
+        start_line,
+        1,
+        start_line + 1,
+        1,
+        (start_line - 1) * 10,
+        start_line * 10,
+    );
     scene.local_scenes = locals;
     scene
 }

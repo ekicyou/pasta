@@ -24,9 +24,9 @@ fn mode_switch_lua_presents_lua_coords_and_lua_step_granularity_over_tcp() {
     let lua_bp_line = 2u32;
     let (host, mut client, thread_id) = start_session(
         Arc::clone(&map),
-        SourceMode::Pasta,            // サーバ既定（6.1）。
-        Some(SourceMode::Lua),        // attach で `.lua` へ切替（6.2/6.3）。
-        EDGE_SOURCE,                  // `.lua` 源（`@...`・`.pasta` 拡張子ではない）。
+        SourceMode::Pasta,     // サーバ既定（6.1）。
+        Some(SourceMode::Lua), // attach で `.lua` へ切替（6.2/6.3）。
+        EDGE_SOURCE,           // `.lua` 源（`@...`・`.pasta` 拡張子ではない）。
         lua_bp_line,
     );
 
@@ -55,7 +55,10 @@ fn mode_switch_lua_presents_lua_coords_and_lua_step_granularity_over_tcp() {
     client.send_request(20, "next", json!({ "threadId": thread_id }));
     let _ = client.recv_until(|m| is_response(m, "next"));
     let stopped = client.recv_until(|m| is_event(m, "stopped"));
-    assert_eq!(stopped["body"]["reason"], "step", "9.5: step over は reason step");
+    assert_eq!(
+        stopped["body"]["reason"], "step",
+        "9.5: step over は reason step"
+    );
     let (step_src, step_line) = top_frame(&mut client, thread_id, 21);
     assert!(
         !step_src.ends_with(".pasta"),
@@ -204,7 +207,7 @@ fn edge_8_2_expanded_pasta_line_same_pasta_at_every_lua_line() {
             Arc::clone(&map),
             SourceMode::Pasta, // 提示は `.pasta`（resolver 装着）。
             None,
-            EDGE_SOURCE,       // `.lua` 直接 BP（停止行を当該 `.lua` 行に確定）。
+            EDGE_SOURCE, // `.lua` 直接 BP（停止行を当該 `.lua` 行に確定）。
             lua_line,
         );
         let (src, presented) = top_frame(&mut client, thread_id, 10);

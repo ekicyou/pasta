@@ -93,7 +93,10 @@ rotation_days = "fourteen"
 #[test]
 fn test_talk_config_default_kinsoku_fields() {
     let config = TalkConfig::default();
-    assert_eq!(config.chars_line_start_prohibited, "゛゜ヽヾゝゞ々ー）］｝」』):;]}｣､･ｰﾞﾟ");
+    assert_eq!(
+        config.chars_line_start_prohibited,
+        "゛゜ヽヾゝゞ々ー）］｝」』):;]}｣､･ｰﾞﾟ"
+    );
     assert_eq!(config.chars_line_end_prohibited, "（［｛「『([{｢");
 }
 
@@ -265,12 +268,16 @@ fn test_from_str_materializes_ghost_defaults_when_section_omitted() {
 
     let ghost = materialized_ghost_table(&config);
     assert_eq!(
-        ghost.get("talk_interval_min").and_then(toml::Value::as_integer),
+        ghost
+            .get("talk_interval_min")
+            .and_then(toml::Value::as_integer),
         Some(180),
         "6.3/3.3: omitted [ghost] must materialize talk_interval_min=180 at the public API"
     );
     assert_eq!(
-        ghost.get("talk_interval_max").and_then(toml::Value::as_integer),
+        ghost
+            .get("talk_interval_max")
+            .and_then(toml::Value::as_integer),
         Some(300),
         "6.3/3.3: omitted [ghost] must materialize talk_interval_max=300 at the public API"
     );
@@ -325,11 +332,15 @@ key1 = "value1"
     // 明示フィールドの隣に ghost が実体化し、SSOT 既定値が揃う。
     let ghost = materialized_ghost_table(&config);
     assert_eq!(
-        ghost.get("talk_interval_min").and_then(toml::Value::as_integer),
+        ghost
+            .get("talk_interval_min")
+            .and_then(toml::Value::as_integer),
         Some(180)
     );
     assert_eq!(
-        ghost.get("talk_interval_max").and_then(toml::Value::as_integer),
+        ghost
+            .get("talk_interval_max")
+            .and_then(toml::Value::as_integer),
         Some(300)
     );
     assert_eq!(

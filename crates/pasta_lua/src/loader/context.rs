@@ -263,6 +263,9 @@ mod tests {
         let input = Path::new("definitely_nonexistent_loader_ctx_dir/sub");
         let ctx = LoaderContext::from_config(input, &config);
         assert!(ctx.base_dir.is_absolute());
-        assert!(ctx.base_dir.ends_with("definitely_nonexistent_loader_ctx_dir/sub"));
+        assert!(
+            ctx.base_dir
+                .ends_with("definitely_nonexistent_loader_ctx_dir/sub")
+        );
     }
 }

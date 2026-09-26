@@ -233,9 +233,11 @@ mod tests {
         let (stop, _done_rx) = ActorMsg::stop();
 
         // 種別を意図的に交互配置し、順序が種別ではなく投入順で決まることを示す。
-        tx.send(ActorMsg::notify(MailboxRequest::new(10, ""))).unwrap();
+        tx.send(ActorMsg::notify(MailboxRequest::new(10, "")))
+            .unwrap();
         tx.send(get_a).unwrap();
-        tx.send(ActorMsg::notify(MailboxRequest::new(12, ""))).unwrap();
+        tx.send(ActorMsg::notify(MailboxRequest::new(12, "")))
+            .unwrap();
         tx.send(get_b).unwrap();
         // Stop は同一 FIFO を通り、先行メッセージを drain 後に処理される（clean drain）。
         tx.send(stop).unwrap();
@@ -272,7 +274,8 @@ mod tests {
         // 投入順: Notify(21) / Kick(intro) / Get(20) / Kick(outro) / Stop。種別を
         // 意図的に交互配置し、Kick が投入位置どおり drain されることを示す。
         // seq_of は Kick を u64::MAX-1、Stop を u64::MAX で表す（位置の識別子）。
-        tx.send(ActorMsg::notify(MailboxRequest::new(21, ""))).unwrap();
+        tx.send(ActorMsg::notify(MailboxRequest::new(21, "")))
+            .unwrap();
         tx.send(ActorMsg::kick("intro")).unwrap();
         tx.send(get_a).unwrap();
         tx.send(ActorMsg::kick("outro")).unwrap();
@@ -362,12 +365,18 @@ mod tests {
 
         // Sender は Send + Sync + Clone（lock-free static 共有の素地）。
         let tx2 = tx.clone();
-        tx.send(ActorMsg::notify(MailboxRequest::new(1, ""))).unwrap();
-        tx2.send(ActorMsg::notify(MailboxRequest::new(2, ""))).unwrap();
+        tx.send(ActorMsg::notify(MailboxRequest::new(1, "")))
+            .unwrap();
+        tx2.send(ActorMsg::notify(MailboxRequest::new(2, "")))
+            .unwrap();
 
         // 単一 consumer がすべてを 1 本の FIFO として受ける。
         let order: Vec<u64> = drain(&rx).iter().map(seq_of).collect();
-        assert_eq!(order, vec![1, 2], "single consumer receives both clones' sends in order");
+        assert_eq!(
+            order,
+            vec![1, 2],
+            "single consumer receives both clones' sends in order"
+        );
 
         // Sender が Send + Sync であることを静的に確認（static MAILBOX 共有の前提）。
         fn assert_send_sync<T: Send + Sync>() {}

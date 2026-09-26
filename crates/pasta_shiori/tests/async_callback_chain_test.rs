@@ -12,7 +12,7 @@ mod common;
 #[path = "common/async_callback_support.rs"]
 mod async_callback_support;
 
-use async_callback_support::{extract_callback_id, AsyncCallbackEnv};
+use async_callback_support::{AsyncCallbackEnv, extract_callback_id};
 
 // ============================================================================
 // Scenario 3: チェーントーク → コールバック待ち遷移（3ラウンド）

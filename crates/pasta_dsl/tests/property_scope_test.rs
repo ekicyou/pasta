@@ -142,9 +142,7 @@ fn test_property_scope_varref_followed_by_talk() {
     let actions = find_actions_in_scene(scenes[0]);
 
     // Should have VarRef then Talk
-    let var_ref = actions
-        .iter()
-        .find(|a| matches!(a, Action::VarRef { .. }));
+    let var_ref = actions.iter().find(|a| matches!(a, Action::VarRef { .. }));
     assert!(var_ref.is_some(), "Expected VarRef action");
     match var_ref.unwrap() {
         Action::VarRef { name, scope, .. } => {
@@ -298,7 +296,11 @@ fn test_property_scope_regression_global() {
 fn test_property_scope_regression_expr_statement() {
     let input = "＊テスト\n　＄＝1＋2\n";
     let result = parse_str(input, "test.pasta");
-    assert!(result.is_ok(), "＄＝expr should still parse after property-dsl-extension: {:?}", result);
+    assert!(
+        result.is_ok(),
+        "＄＝expr should still parse after property-dsl-extension: {:?}",
+        result
+    );
 }
 
 // Req 5.4: 行頭 ％ がアクター辞書マーカーとして不変
@@ -306,7 +308,11 @@ fn test_property_scope_regression_expr_statement() {
 fn test_property_scope_regression_actor_marker() {
     let input = "＊テスト\n　％さくら、うにゅう\n　さくら：テスト\n";
     let result = parse_str(input, "test.pasta");
-    assert!(result.is_ok(), "Line-initial ％ should still parse as actor dictionary: {:?}", result);
+    assert!(
+        result.is_ok(),
+        "Line-initial ％ should still parse as actor dictionary: {:?}",
+        result
+    );
 }
 
 // Req 4.2: 複数 ＄％ 参照を含むアクション行
@@ -319,7 +325,20 @@ fn test_property_scope_multiple_inline_refs() {
     // Should parse into multiple actions: VarRef(a.name) + Talk + VarRef(b.name)
     let var_refs: Vec<_> = actions
         .iter()
-        .filter(|a| matches!(a, Action::VarRef { scope: VarScope::Property, .. }))
+        .filter(|a| {
+            matches!(
+                a,
+                Action::VarRef {
+                    scope: VarScope::Property,
+                    ..
+                }
+            )
+        })
         .collect();
-    assert_eq!(var_refs.len(), 2, "Should find 2 property VarRefs, got: {:?}", actions);
+    assert_eq!(
+        var_refs.len(),
+        2,
+        "Should find 2 property VarRefs, got: {:?}",
+        actions
+    );
 }

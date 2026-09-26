@@ -42,12 +42,7 @@ fn test_resolve_scene_id_basic() {
 // Tests for collect_scene_candidates (Task 5.1)
 // ======================================================================
 
-fn create_test_local_scene_info(
-    id: usize,
-    name: &str,
-    fn_name: &str,
-    parent: &str,
-) -> SceneInfo {
+fn create_test_local_scene_info(id: usize, name: &str, fn_name: &str, parent: &str) -> SceneInfo {
     SceneInfo {
         id: SceneId(id),
         name: name.to_string(),
@@ -575,4 +570,3 @@ fn test_resolve_scene_id_unified_cycling() {
     let scene = table.get_scene(r3.unwrap()).unwrap();
     assert!(scene.parent.is_some(), "返却されたシーンがローカルでない");
 }
-

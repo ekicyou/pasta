@@ -9,10 +9,10 @@ use std::sync::{Arc, Mutex};
 
 use serde_json::json;
 
-use crate::debug::{SharedSourceMode, SourceMode};
 use crate::debug::dap::DapAdapter;
 use crate::debug::source_map::{ChunkSourceMap, PastaPos, SourceMap};
 use crate::debug::types::{FrameInfo, SessionEvent};
+use crate::debug::{SharedSourceMode, SourceMode};
 
 use super::{SourceMapWiring, attach_pasta_resolver};
 
@@ -37,7 +37,11 @@ fn map_with(chunk: &str, lua_line: u32, file: &str, pasta_line: u32) -> SourceMa
 
 /// `stackTrace` を 1 回エンコードし、top フレームの `source` / `line` を返す
 /// 小ヘルパ（装着結果の提示を観測する）。
-fn top_frame(adapter: &Arc<Mutex<DapAdapter>>, source: &str, line: u32) -> (serde_json::Value, u32) {
+fn top_frame(
+    adapter: &Arc<Mutex<DapAdapter>>,
+    source: &str,
+    line: u32,
+) -> (serde_json::Value, u32) {
     let mut dap = adapter.lock().unwrap();
     dap.decode_request(&json!({
         "seq": 1, "type": "request", "command": "stackTrace",
@@ -49,7 +53,10 @@ fn top_frame(adapter: &Arc<Mutex<DapAdapter>>, source: &str, line: u32) -> (serd
         func_name: Some("f".to_string()),
     }]));
     let frame = &out[0]["body"]["stackFrames"][0];
-    (frame["source"].clone(), frame["line"].as_u64().unwrap() as u32)
+    (
+        frame["source"].clone(),
+        frame["line"].as_u64().unwrap() as u32,
+    )
 }
 
 /// R5.1/R5.2/6.1: map present + `SourceMode::Pasta` → resolver 装着。対応あり
@@ -131,6 +138,10 @@ fn does_not_attach_without_map() {
     attach_pasta_resolver(&adapter, &SourceMapWiring::disabled());
 
     let (source, line) = top_frame(&adapter, "@scene.lua", 7);
-    assert_eq!(source, json!({ "path": "@scene.lua" }), "no map → 既定 `.lua`");
+    assert_eq!(
+        source,
+        json!({ "path": "@scene.lua" }),
+        "no map → 既定 `.lua`"
+    );
     assert_eq!(line, 7);
 }

@@ -106,13 +106,14 @@ impl DapClient {
     }
 
     fn recv(&mut self) -> Option<Value> {
-        read_frame(&mut self.reader)
-            .expect("client read must succeed (TEST-ONLY timeout)")
+        read_frame(&mut self.reader).expect("client read must succeed (TEST-ONLY timeout)")
     }
 
     fn recv_until(&mut self, mut pred: impl FnMut(&Value) -> bool) -> Value {
         loop {
-            let msg = self.recv().expect("a frame must be present (peer did not close)");
+            let msg = self
+                .recv()
+                .expect("a frame must be present (peer did not close)");
             if pred(&msg) {
                 return msg;
             }
@@ -155,7 +156,9 @@ fn enabled_runtime_persists_breakpoint_across_requests() {
         let addr = runtime
             .debug_local_addr()
             .ok_or_else(|| "enabled runtime must expose a bound debug addr".to_string())?;
-        addr_tx.send(addr).map_err(|_| "addr send failed".to_string())?;
+        addr_tx
+            .send(addr)
+            .map_err(|_| "addr send failed".to_string())?;
 
         // クライアントが setBreakpoints/configurationDone を終えるまで待つ。
         go_rx
@@ -270,7 +273,9 @@ fn runtime_teardown_emits_terminated_to_connected_client() {
         let addr = runtime
             .debug_local_addr()
             .ok_or_else(|| "enabled runtime must expose a bound debug addr".to_string())?;
-        addr_tx.send(addr).map_err(|_| "addr send failed".to_string())?;
+        addr_tx
+            .send(addr)
+            .map_err(|_| "addr send failed".to_string())?;
 
         // クライアントが接続・ハンドシェイクするまで待ち、その後 runtime を drop。
         drop_rx
@@ -308,7 +313,9 @@ fn runtime_teardown_emits_terminated_to_connected_client() {
     });
     match done_rx.recv_timeout(WATCHDOG) {
         Ok(joined) => {
-            joined.expect("host thread must not panic").expect("teardown ok");
+            joined
+                .expect("host thread must not panic")
+                .expect("teardown ok");
         }
         Err(_) => panic!("host thread did not finish (hang?)"),
     }
@@ -405,7 +412,9 @@ fn drop_runtime_with_watchdog(runtime: PastaLuaRuntime) {
     // 同期 drop を本スレッドで実行（`!Send` のため）。hang すればここで止まり、
     // 番兵が watchdog 後に abort する。戻れば done を送って番兵を解放する。
     drop(runtime);
-    done_tx.send(()).expect("sentinel must still be alive to receive done");
+    done_tx
+        .send(())
+        .expect("sentinel must still be alive to receive done");
     sentinel.join().expect("watchdog sentinel must not panic");
 }
 
@@ -501,7 +510,9 @@ fn reload_with_connected_client_rebinds() {
         let addr = first
             .debug_local_addr()
             .ok_or_else(|| "first enabled runtime must expose a bound debug addr".to_string())?;
-        addr_tx.send(addr).map_err(|_| "addr send failed".to_string())?;
+        addr_tx
+            .send(addr)
+            .map_err(|_| "addr send failed".to_string())?;
 
         // クライアントが接続・ハンドシェイクするまで待ち、その後 first を drop。
         drop_rx
@@ -576,7 +587,16 @@ fn reload_with_connected_client_rebinds() {
 #[test]
 fn default_runtime_config_debug_is_disabled() {
     assert!(!RuntimeConfig::new().debug.enabled, "new() debug disabled");
-    assert!(!RuntimeConfig::minimal().debug.enabled, "minimal() debug disabled");
-    assert!(!RuntimeConfig::full().debug.enabled, "full() debug disabled");
-    assert!(!RuntimeConfig::default().debug.enabled, "default() debug disabled");
+    assert!(
+        !RuntimeConfig::minimal().debug.enabled,
+        "minimal() debug disabled"
+    );
+    assert!(
+        !RuntimeConfig::full().debug.enabled,
+        "full() debug disabled"
+    );
+    assert!(
+        !RuntimeConfig::default().debug.enabled,
+        "default() debug disabled"
+    );
 }
