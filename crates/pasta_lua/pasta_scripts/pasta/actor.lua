@@ -91,10 +91,11 @@ end
 
 --- talk（act経由でトークン蓄積）
 --- @param self ActorProxy プロキシオブジェクト
---- @param text string 発話テキスト
+--- @param text any 発話テキスト（nil は空文字扱い）
+--- @param var_name string|nil 変数参照由来のとき変数パス（nil 時の警告用）
 --- @return nil
-function PROXY_IMPL.talk(self, text)
-    self.act:talk(self.actor, text)
+function PROXY_IMPL.talk(self, text, var_name)
+    self.act:talk(self.actor, text, var_name)
 end
 
 --- sakura_script（act経由でトークン蓄積）

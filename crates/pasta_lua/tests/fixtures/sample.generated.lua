@@ -96,10 +96,10 @@ do
         local save, var = act:init_scene(SCENE)
 
         act.さくら:talk("第１引数は")
-        act.さくら:talk(tostring(args[1]))
+        act.さくら:talk(args[1], "args[1]")
         act.さくら:talk("だよ。")
         act.うにゅう:talk("第２引数は")
-        act.うにゅう:talk(tostring(args[2]))
+        act.うにゅう:talk(args[2], "args[2]")
         act.うにゅう:talk("やね。")
     end
 
@@ -107,13 +107,13 @@ do
         local args = { ... }
         local save, var = act:init_scene(SCENE)
 
-        act.さくら:talk(tostring(GLOBAL.グローバル関数(act, "グローバル")))
+        act.さくら:talk((GLOBAL.グローバル関数(act, "グローバル")))
         act.さくら:talk("　を呼んだよ。")
         var.結果 = GLOBAL.グローバル関数(act, "代入テスト")
         GLOBAL.グローバル関数(act, "式文テスト")
         act:expr_fn("関数", 42)
         act.うにゅう:talk("ローカルもいけるで")
-        act.うにゅう:talk(tostring(act.うにゅう:expr_fn("関数", 1)))
+        act.うにゅう:talk((act.うにゅう:expr_fn("関数", 1)))
     end
 
     function SCENE.共有プロパティ操作_1(act, ...)
@@ -128,7 +128,7 @@ do
         act.さくら:talk(tostring(act:get_property("currentghost.name")))
         act.さくら:talk("です。")
         act.うにゅう:talk("幅は")
-        act.うにゅう:talk(tostring(var.ゴースト名))
+        act.うにゅう:talk(var.ゴースト名, "var.ゴースト名")
         act.うにゅう:talk("だって。")
     end
 end

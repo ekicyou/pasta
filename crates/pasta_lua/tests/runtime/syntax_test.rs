@@ -376,4 +376,38 @@ fn test_e2e_transfer_req_and_date_to_var_from_dsl() {
 
     let without = fire("転記なし");
     assert!(!without.contains("Head"), "transfer must be explicit: {without}");
+    assert!(without.contains("部位＝。"), "unset var must render empty: {without}");
+}
+
+/// 未定義の変数・単語・関数をアクション行で参照すると、"nil" を出さず
+/// 空文字として展開される（GRAMMAR.md「未定義単語の参照」と同じ扱い）。
+/// 前後に文字がある単語参照が nil 連結で実行時エラーにならないことも確認する。
+#[test]
+fn test_e2e_undefined_refs_in_action_line_render_empty() {
+    let lua = create_runtime_with_finalize().unwrap();
+    let config = TalkConfig::default();
+    let module = sakura_script::register(&lua, Some(&config)).unwrap();
+    let package: mlua::Table = lua.globals().get("package").unwrap();
+    let loaded: mlua::Table = package.get("loaded").unwrap();
+    loaded.set("@pasta_sakura_script", module).unwrap();
+
+    let source = r#"
+％さくら
+  ＠通常：\s[0]
+
+＊未定義参照
+  さくら：変数＝＄未代入　単語＝＠未定義語　関数＝＠未定義関数（１）　グローバル＝＄＊未代入　終わり。
+"#;
+    lua.load(&transpile(source)).exec().unwrap();
+    lua.load("require('pasta').finalize_scene()").exec().unwrap();
+
+    let response: String = lua
+        .load(r#"return require("pasta.shiori.event").fire({ id = "未定義参照", reference = {} })"#)
+        .eval()
+        .unwrap();
+    assert!(!response.contains("nil"), "must not render 'nil': {response}");
+    assert!(
+        response.contains("変数＝単語＝関数＝　グローバル＝終わり。"),
+        "undefined refs must render empty: {response}"
+    );
 }

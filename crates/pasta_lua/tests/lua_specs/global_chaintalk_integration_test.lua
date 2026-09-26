@@ -60,11 +60,11 @@ describe("Integration - GLOBAL chaintalk via EVENT.fire", function()
 
         REG.OnChaintalkTest = make_scene_handler(function(act)
             resume_count = resume_count + 1
-            act:talk("前半メッセージ")
+            act:talk(nil, "前半メッセージ")
             -- GLOBAL.チェイントーク を呼び出し（act:yield() を実行）
             GLOBAL["チェイントーク"](act)
             resume_count = resume_count + 1
-            act:talk("後半メッセージ")
+            act:talk(nil, "後半メッセージ")
         end)
 
         -- 1回目の fire: yield 前まで実行
@@ -87,9 +87,9 @@ describe("Integration - GLOBAL chaintalk via EVENT.fire", function()
         setup()
 
         REG.OnIntermediateTest = make_scene_handler(function(act)
-            act:talk("中間出力テスト")
+            act:talk(nil, "中間出力テスト")
             GLOBAL["チェイントーク"](act)
-            act:talk("最終出力テスト")
+            act:talk(nil, "最終出力テスト")
         end)
 
         -- 1回目の fire: yield 前のトークンが中間出力
@@ -107,9 +107,9 @@ describe("Integration - GLOBAL chaintalk via EVENT.fire", function()
         setup()
 
         REG.OnFinalTest = make_scene_handler(function(act)
-            act:talk("前半出力")
+            act:talk(nil, "前半出力")
             GLOBAL["チェイントーク"](act)
-            act:talk("後半出力")
+            act:talk(nil, "後半出力")
         end)
 
         -- 1回目 fire
@@ -142,9 +142,9 @@ describe("Integration - GLOBAL chaintalk via EVENT.fire", function()
         setup()
 
         REG.OnLifecycleTest = make_scene_handler(function(act)
-            act:talk("ステップ1")
+            act:talk(nil, "ステップ1")
             GLOBAL["チェイントーク"](act)
-            act:talk("ステップ2")
+            act:talk(nil, "ステップ2")
         end)
 
         -- 初期状態: nil
@@ -166,9 +166,9 @@ describe("Integration - GLOBAL chaintalk via EVENT.fire", function()
         setup()
 
         REG.OnYieldAliasTest = make_scene_handler(function(act)
-            act:talk("yield前")
+            act:talk(nil, "yield前")
             GLOBAL["yield"](act)
-            act:talk("yield後")
+            act:talk(nil, "yield後")
         end)
 
         local response1 = EVENT.fire({ id = "OnYieldAliasTest" })
