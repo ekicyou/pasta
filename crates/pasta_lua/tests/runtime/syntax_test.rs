@@ -322,3 +322,58 @@ fn test_e2e_chaintalk_transpile_and_execute() {
         fire_result
     );
 }
+
+// ============================================================================
+// Special runtime variables: ＞transfer_req_to_var / ＞transfer_date_to_var
+// ============================================================================
+
+/// DSL から転記メソッドを Call して、SHIORI リクエスト由来の変数
+/// （＄ｒＮ / ＄rN / ＄req_id）と日時変数（＄時１２ 等）を参照できること。
+/// 転記を呼ばないシーンでは値が入らないこと（利用者マニュアル記載の挙動）。
+#[test]
+fn test_e2e_transfer_req_and_date_to_var_from_dsl() {
+    let lua = create_runtime_with_finalize().unwrap();
+    let config = TalkConfig::default();
+    let module = sakura_script::register(&lua, Some(&config)).unwrap();
+    let package: mlua::Table = lua.globals().get("package").unwrap();
+    let loaded: mlua::Table = package.get("loaded").unwrap();
+    loaded.set("@pasta_sakura_script", module).unwrap();
+
+    let source = r#"
+％さくら
+  ＠通常：\s[0]
+
+＊転記あり
+  ＞transfer_req_to_var
+  ＞transfer_date_to_var
+  さくら：部位＝＄ｒ４　半角＝＄r4　イベント＝＄req_id　時刻＝＄時１２　曜日＝＄曜日　。
+
+＊転記なし
+  さくら：部位＝＄ｒ４　。
+"#;
+    lua.load(&transpile(source)).exec().unwrap();
+    lua.load("require('pasta').finalize_scene()").exec().unwrap();
+
+    let fire = |id: &str| -> String {
+        lua.load(format!(
+            r#"
+            local EVENT = require("pasta.shiori.event")
+            return EVENT.fire({{
+                id = "{id}",
+                reference = {{ [0] = "0", [4] = "Head" }},
+                date = {{ year = 2026, month = 9, day = 26, hour = 14, min = 5, sec = 0, wday = 6 }},
+            }})
+        "#
+        ))
+        .eval()
+        .unwrap()
+    };
+
+    let with = fire("転記あり");
+    for want in ["部位＝Head", "半角＝Head", "イベント＝転記あり", "時刻＝午後2時", "曜日＝土曜日"] {
+        assert!(with.contains(want), "missing {want:?} in {with}");
+    }
+
+    let without = fire("転記なし");
+    assert!(!without.contains("Head"), "transfer must be explicit: {without}");
+}

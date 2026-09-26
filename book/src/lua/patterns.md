@@ -114,6 +114,8 @@ end
 | `req.date` | 日時情報 |
 | `req.status` | ステータス（`"talking"` 等） |
 
+DSL のシーンから `Reference` や日時を読むときは、Lua を書かずに `＄ｒ０` や `＄時１２` を使える（[エンジンが値を入れる変数](../grammar/variables.md#エンジンが値を入れる変数)を参照）。
+
 レスポンス生成 API:
 
 | 関数 | 説明 |
