@@ -89,8 +89,7 @@ fn map_builder_sink_finish_is_deterministic() {
     let (_out, shift) = normalize_output_with_shift("a\nb\nc\n");
 
     let build = || {
-        let mut sink =
-            MapBuilderSink::new("dict.pasta".to_string(), "chunk".to_string());
+        let mut sink = MapBuilderSink::new("dict.pasta".to_string(), "chunk".to_string());
         sink.record_line(3, 7);
         sink.record_line(1, 3);
         sink.record_line(2, 5);
@@ -103,10 +102,7 @@ fn map_builder_sink_finish_is_deterministic() {
     };
 
     assert_eq!(build(), build());
-    assert_eq!(
-        build(),
-        (Some(pos(3)), Some(pos(5)), Some(pos(7)))
-    );
+    assert_eq!(build(), (Some(pos(3)), Some(pos(5)), Some(pos(7))));
 }
 
 /// `.pasta` 行は `span.start_line` を **直接**採用する（research.md D-3）。trait 既定の

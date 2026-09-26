@@ -5,7 +5,7 @@
 //! 文法仕様: `expr = term ~ bin*` — 演算子優先順位なしの左結合。
 
 use pasta_dsl::parser::{
-    parse_str, Arg, BinOp, Expr, FileItem, LocalSceneItem, SetValue, VarScope,
+    Arg, BinOp, Expr, FileItem, LocalSceneItem, SetValue, VarScope, parse_str,
 };
 
 /// `＊scene\n　＄x＝{rhs}\n` をパースし、最初の VarSet の値 Expr を取り出す
@@ -112,7 +112,11 @@ fn test_binary_left_associative_chain() {
             assert_eq!(op, BinOp::Add);
             assert_eq!(*rhs, Expr::Integer(3));
             match *lhs {
-                Expr::Binary { op, ref lhs, ref rhs } => {
+                Expr::Binary {
+                    op,
+                    ref lhs,
+                    ref rhs,
+                } => {
                     assert_eq!(op, BinOp::Add);
                     assert_eq!(**lhs, Expr::Integer(1));
                     assert_eq!(**rhs, Expr::Integer(2));
@@ -176,7 +180,10 @@ fn test_binary_with_local_var_ref_lhs() {
             assert_eq!(op, BinOp::Add);
             assert_eq!(*rhs, Expr::Integer(1));
             match *lhs {
-                Expr::VarRef { ref name, ref scope } => {
+                Expr::VarRef {
+                    ref name,
+                    ref scope,
+                } => {
                     assert_eq!(name, "y");
                     assert_eq!(*scope, VarScope::Local);
                 }

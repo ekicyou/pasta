@@ -44,12 +44,19 @@ fn md5_hex(bytes: &[u8]) -> String {
 #[test]
 fn zip_is_byte_and_md5_deterministic() {
     let root = scripts_root();
-    assert!(root.is_dir(), "pasta_scripts source not found: {}", root.display());
+    assert!(
+        root.is_dir(),
+        "pasta_scripts source not found: {}",
+        root.display()
+    );
 
     let first = build_zip::build_deterministic_zip(&root);
     let second = build_zip::build_deterministic_zip(&root);
 
-    assert_eq!(first, second, "two builds from same source produced different bytes");
+    assert_eq!(
+        first, second,
+        "two builds from same source produced different bytes"
+    );
     assert_eq!(
         md5_hex(&first),
         md5_hex(&second),
@@ -105,7 +112,8 @@ fn md5_changes_when_a_single_file_changes() {
 
     let mutated_md5 = md5_hex(&build_zip::build_deterministic_zip(&copy_root));
     assert_ne!(
-        mutated_md5, original_md5,
+        mutated_md5,
+        original_md5,
         "MD5 did not change after mutating a single file ({})",
         target.display()
     );

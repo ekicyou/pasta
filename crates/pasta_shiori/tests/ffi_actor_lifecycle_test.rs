@@ -103,7 +103,10 @@ fn ffi_ownership_model_load_request_unload_reload_cycle() {
 
     // --- フェーズ 1: load（spawn_actor） ---
     let loaded = spawn_actor(0, load_dir.clone());
-    assert!(loaded, "spawn_actor must load the ghost VM on the actor thread");
+    assert!(
+        loaded,
+        "spawn_actor must load the ghost VM on the actor thread"
+    );
 
     // --- フェーズ 2: request（GET property コルーチン継続・R9/R1.1） ---
     let round1 = marshal_request(&normalize_request(
@@ -150,7 +153,10 @@ fn ffi_ownership_model_load_request_unload_reload_cycle() {
 
     // --- フェーズ 5: reload（再 spawn_actor）→ 新スレッド＋新チャネルで応答不変 ---
     let reloaded = spawn_actor(0, load_dir.clone());
-    assert!(reloaded, "reload spawn_actor must load a fresh VM on a fresh actor thread");
+    assert!(
+        reloaded,
+        "reload spawn_actor must load a fresh VM on a fresh actor thread"
+    );
     let after_reload = marshal_request(&normalize_request(
         "GET SHIORI/3.0\nCharset: UTF-8\nID: OnTestSimple\n",
     ));

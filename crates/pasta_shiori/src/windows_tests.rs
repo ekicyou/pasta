@@ -15,7 +15,7 @@
 
 use super::*;
 use crate::actor::marshaling::default_204;
-use windows_sys::Win32::System::Memory::{GlobalAlloc, GlobalFlags, GMEM_MOVEABLE};
+use windows_sys::Win32::System::Memory::{GMEM_MOVEABLE, GlobalAlloc, GlobalFlags};
 
 /// Win32 SDK `GMEM_INVALID_HANDLE` (minwinbase.h) — returned by `GlobalFlags`
 /// for freed/invalid handles. Not exported by windows-sys 0.61.
@@ -101,11 +101,17 @@ fn loadu_initialized_flag_makes_load_a_noop_until_unload() {
     let _guard = lock_global_state();
 
     let missing = std::env::temp_dir().join("pasta_loadu_missing_dir_for_test");
-    let missing = missing.to_str().expect("temp path must be UTF-8").to_string();
+    let missing = missing
+        .to_str()
+        .expect("temp path must be UTF-8")
+        .to_string();
 
     // loadu: UTF-8 デコード → spawn_actor 到達（dir 不在によりロードは失敗）。
     let (h, len) = alloc_str_handle(&missing);
-    assert!(!loadu(h, len), "loadu with a missing install dir must fail to load");
+    assert!(
+        !loadu(h, len),
+        "loadu with a missing install dir must fail to load"
+    );
 
     // loadu 済みフラグが立つため、後続の load は再ロードせず TRUE を返す（要件 2.5）。
     // 入力バイト列は無視されるので leak probe を渡し、解放されることも確認する。
@@ -153,7 +159,10 @@ fn extern_request_without_actor_returns_204_and_frees_input() {
     let h = alloc_leak_probe();
     let mut len = LEAK_PROBE_LEN;
     let res = request(h, &mut len);
-    assert!(!res.is_null(), "204 fallback must produce a response HGLOBAL");
+    assert!(
+        !res.is_null(),
+        "204 fallback must produce a response HGLOBAL"
+    );
     let body = read_and_free(res, len);
     assert_eq!(
         body.as_bytes(),
@@ -173,7 +182,10 @@ fn extern_request_without_actor_returns_204_and_frees_input() {
 #[test]
 fn extern_unload_without_actor_returns_true() {
     let _guard = lock_global_state();
-    assert!(unload(), "unload with no actor must be a safe no-op returning true");
+    assert!(
+        unload(),
+        "unload with no actor must be a safe no-op returning true"
+    );
     // 二重 unload も安全（冪等）。
     assert!(unload(), "double unload must remain a safe no-op");
 }

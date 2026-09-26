@@ -2,8 +2,8 @@
 //! behavior-invariant move). Cluster: core DAP protocol decode/encode —
 //! request decoding, deferred-response correlation, event encoding, and the
 //! outgoing-`seq` envelope invariants.
-use super::*;
 use super::dap_test_support::*;
+use super::*;
 
 use crate::debug::types::FrameInfo;
 
@@ -17,7 +17,9 @@ fn initialize_advertises_capabilities_and_emits_initialized() {
     // No session command for initialize.
     assert_eq!(decoded.command, None);
 
-    let resp = decoded.response.expect("initialize must produce a response");
+    let resp = decoded
+        .response
+        .expect("initialize must produce a response");
     assert_eq!(resp["type"], "response");
     assert_eq!(resp["command"], "initialize");
     assert_eq!(resp["request_seq"], 1);
@@ -81,9 +83,14 @@ fn set_breakpoints_decodes_command_and_correlates_response() {
     let resp = &out[0];
     assert_eq!(resp["type"], "response");
     assert_eq!(resp["command"], "setBreakpoints");
-    assert_eq!(resp["request_seq"], 5, "deferred response carries originating seq");
+    assert_eq!(
+        resp["request_seq"], 5,
+        "deferred response carries originating seq"
+    );
     assert_eq!(resp["success"], true);
-    let bps = resp["body"]["breakpoints"].as_array().expect("breakpoints array");
+    let bps = resp["body"]["breakpoints"]
+        .as_array()
+        .expect("breakpoints array");
     assert_eq!(bps.len(), 2);
     assert_eq!(bps[0]["verified"], true);
     assert_eq!(bps[0]["line"], 3);
@@ -155,7 +162,9 @@ fn stack_trace_decodes_command_and_correlates_response() {
     assert_eq!(resp["command"], "stackTrace");
     assert_eq!(resp["request_seq"], 11);
     assert_eq!(resp["body"]["totalFrames"], 2);
-    let frames = resp["body"]["stackFrames"].as_array().expect("stackFrames array");
+    let frames = resp["body"]["stackFrames"]
+        .as_array()
+        .expect("stackFrames array");
     assert_eq!(frames.len(), 2);
     assert_eq!(frames[0]["id"], 0, "frame id = stack index");
     assert_eq!(frames[0]["name"], "talk");
@@ -194,7 +203,11 @@ fn variables_decodes_command_and_maps_fields() {
     let mut dap = DapAdapter::new();
     // A scopes for frame 2 yields variablesReference 3; the client passes it
     // back in a variables request.
-    let decoded = dap.decode_request(&request(15, "variables", json!({ "variablesReference": 3 })));
+    let decoded = dap.decode_request(&request(
+        15,
+        "variables",
+        json!({ "variablesReference": 3 }),
+    ));
     assert_eq!(
         decoded.command,
         Some(SessionCommand::Variables { var_ref: 3 }),
@@ -218,7 +231,9 @@ fn variables_decodes_command_and_maps_fields() {
     let resp = &out[0];
     assert_eq!(resp["command"], "variables");
     assert_eq!(resp["request_seq"], 15);
-    let vars = resp["body"]["variables"].as_array().expect("variables array");
+    let vars = resp["body"]["variables"]
+        .as_array()
+        .expect("variables array");
     assert_eq!(vars.len(), 2);
     // repr → value, type_name → type, leaf ref = 0.
     assert_eq!(vars[0]["name"], "x");
@@ -421,14 +436,24 @@ fn deferred_responses_correlate_in_fifo_order_per_kind() {
     dap.decode_request(&request(101, "stackTrace", json!({})));
 
     let first = dap.encode_event(SessionEvent::Stack(vec![]));
-    assert_eq!(first[0]["request_seq"], 100, "first event pairs to first request");
+    assert_eq!(
+        first[0]["request_seq"], 100,
+        "first event pairs to first request"
+    );
     let second = dap.encode_event(SessionEvent::Stack(vec![]));
-    assert_eq!(second[0]["request_seq"], 101, "second event pairs to second request");
+    assert_eq!(
+        second[0]["request_seq"], 101,
+        "second event pairs to second request"
+    );
 }
 
 #[test]
 fn unknown_request_is_ignored() {
     let mut dap = DapAdapter::new();
     let decoded = dap.decode_request(&request(99, "evaluate", json!({})));
-    assert_eq!(decoded, Decoded::default(), "unknown command yields empty decode");
+    assert_eq!(
+        decoded,
+        Decoded::default(),
+        "unknown command yields empty decode"
+    );
 }

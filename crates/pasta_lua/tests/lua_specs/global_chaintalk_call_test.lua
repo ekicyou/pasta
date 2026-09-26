@@ -103,11 +103,11 @@ describe("GLOBAL chaintalk L3 resolution and yield", function()
 
         local co = coroutine.create(function()
             -- トークンを蓄積
-            act:talk("テスト出力")
+            act:talk(nil, "テスト出力")
             -- チェイントークで yield → build() → coroutine.yield(result)
             act:call("global", "チェイントーク", {})
             -- resume 後に追加トークン
-            act:talk("後続出力")
+            act:talk(nil, "後続出力")
         end)
 
         -- 1回目 resume: yield で中断、蓄積トークンが返る

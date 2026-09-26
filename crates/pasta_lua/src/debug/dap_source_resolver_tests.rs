@@ -2,8 +2,8 @@
 //! behavior-invariant move). Cluster: the DAP-presentation source-resolver
 //! seam — the default/alternate resolver swap and the `pasta_source_resolver`
 //! `.lua` -> `.pasta` mapping (with the local `map_with` fixture helper).
-use super::*;
 use super::dap_test_support::*;
+use super::*;
 
 use crate::debug::types::FrameInfo;
 
@@ -30,7 +30,9 @@ fn stack_trace_default_resolver_presents_generated_lua() {
         },
     ]));
     let resp = &out[0];
-    let frames = resp["body"]["stackFrames"].as_array().expect("stackFrames array");
+    let frames = resp["body"]["stackFrames"]
+        .as_array()
+        .expect("stackFrames array");
     // Default presentation is the generated .lua, unchanged from 3.2.
     assert_eq!(frames[0]["source"], json!({ "path": "@scene.lua" }));
     assert_eq!(frames[0]["line"], 7);
@@ -61,7 +63,9 @@ fn stack_trace_alternate_resolver_presents_pasta() {
         func_name: Some("talk".to_string()),
     }]));
     let resp = &out[0];
-    let frames = resp["body"]["stackFrames"].as_array().expect("stackFrames array");
+    let frames = resp["body"]["stackFrames"]
+        .as_array()
+        .expect("stackFrames array");
     // The seam is swapped: presentation is now the .pasta source + mapped line.
     assert_eq!(frames[0]["source"], json!({ "path": "foo.pasta" }));
     assert_eq!(frames[0]["line"], 107);
@@ -135,7 +139,10 @@ fn pasta_resolver_maps_frame_to_pasta_source_and_line() {
         json!({ "path": "C:/proj/scene.pasta" }),
         "R5.1/R5.2: 対応ありフレームは `.pasta` パスを提示する"
     );
-    assert_eq!(resolved.line, 7, "R5.1/R5.2: 提示行は `.pasta` 行 (pos.line)");
+    assert_eq!(
+        resolved.line, 7,
+        "R5.1/R5.2: 提示行は `.pasta` 行 (pos.line)"
+    );
 }
 
 /// R5.3: 対応の無い `(source, line)` は既定 `.lua` resolver と **完全に同一**の
@@ -154,7 +161,10 @@ fn pasta_resolver_falls_back_to_lua_for_unmapped() {
         "R5.3: 未対応行は既定 `.lua` resolver と同一の提示へフォールバックする"
     );
     // 念のため：誤った `.pasta` ではなく生成 `.lua` source を保持している。
-    assert_eq!(resolved.source, json!({ "path": r"@C:\proj\cache\scene.lua" }));
+    assert_eq!(
+        resolved.source,
+        json!({ "path": r"@C:\proj\cache\scene.lua" })
+    );
     assert_eq!(resolved.line, 99);
 }
 
@@ -198,11 +208,19 @@ fn stack_trace_with_pasta_resolver_presents_each_frame() {
         },
     ]));
     let resp = &out[0];
-    let frames = resp["body"]["stackFrames"].as_array().expect("stackFrames array");
+    let frames = resp["body"]["stackFrames"]
+        .as_array()
+        .expect("stackFrames array");
     // フレーム 0: `.pasta` 提示（R5.2）。
-    assert_eq!(frames[0]["source"], json!({ "path": "C:/proj/scene.pasta" }));
+    assert_eq!(
+        frames[0]["source"],
+        json!({ "path": "C:/proj/scene.pasta" })
+    );
     assert_eq!(frames[0]["line"], 3);
     // フレーム 1: 対応なし → 生成 `.lua` 提示（R5.3 判別可能フォールバック）。
-    assert_eq!(frames[1]["source"], json!({ "path": r"@C:\proj\cache\scene.lua" }));
+    assert_eq!(
+        frames[1]["source"],
+        json!({ "path": r"@C:\proj\cache\scene.lua" })
+    );
     assert_eq!(frames[1]["line"], 2);
 }

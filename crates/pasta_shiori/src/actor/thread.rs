@@ -128,15 +128,10 @@ impl ActorThread {
 /// # 戻り値
 /// [`ActorThread`]。`actor_thread_id()` で VM 実行スレッド id、`loaded()` でロード
 /// 成否を観測できる。`join()` 前に [`ActorMsg::Stop`] を送ること。
-pub fn spawn_actor_thread(
-    hinst: isize,
-    load_dir: PathBuf,
-    rx: Receiver<ActorMsg>,
-) -> ActorThread {
+pub fn spawn_actor_thread(hinst: isize, load_dir: PathBuf, rx: Receiver<ActorMsg>) -> ActorThread {
     // VM 実行スレッド id・ロード成否・debug DAP 束縛アドレスを呼び出し側へ返す小チャネル
     // （いずれも `Send` な値のみ越境・VM 本体は越境しない）。`SocketAddr` は `Copy`。
-    let (ready_tx, ready_rx) =
-        flume::bounded::<(ThreadId, bool, Option<SocketAddr>)>(1);
+    let (ready_tx, ready_rx) = flume::bounded::<(ThreadId, bool, Option<SocketAddr>)>(1);
 
     let handle = thread::Builder::new()
         .name("pasta-actor".to_string())
@@ -258,9 +253,8 @@ pub fn spawn_actor_thread(
         .expect("actor thread must spawn");
 
     // VM 構築完了（実行スレッド id・ロード成否・debug DAP 束縛アドレス）を待つ。
-    let (actor_thread_id, loaded, debug_local_addr) = ready_rx
-        .recv()
-        .expect("actor thread must report readiness");
+    let (actor_thread_id, loaded, debug_local_addr) =
+        ready_rx.recv().expect("actor thread must report readiness");
 
     ActorThread {
         handle: Some(handle),

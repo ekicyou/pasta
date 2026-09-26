@@ -49,7 +49,7 @@ fn test_generate_var_ref_local() {
     codegen.generate_action(&action, "さくら").unwrap();
 
     let result = String::from_utf8(output).unwrap();
-    assert!(result.contains("act.さくら:talk(tostring(var.カウンタ))"));
+    assert!(result.contains(r#"act.さくら:talk(var.カウンタ, "var.カウンタ")"#));
 }
 
 #[test]
@@ -65,7 +65,7 @@ fn test_generate_var_ref_global() {
     codegen.generate_action(&action, "さくら").unwrap();
 
     let result = String::from_utf8(output).unwrap();
-    assert!(result.contains("act.さくら:talk(tostring(save.グローバル))"));
+    assert!(result.contains(r#"act.さくら:talk(save.グローバル, "save.グローバル")"#));
 }
 
 #[test]
@@ -82,7 +82,7 @@ fn test_generate_var_ref_args() {
     codegen.generate_action(&action, "さくら").unwrap();
 
     let result = String::from_utf8(output).unwrap();
-    assert!(result.contains("act.さくら:talk(tostring(args[1]))"));
+    assert!(result.contains(r#"act.さくら:talk(args[1], "args[1]")"#));
 }
 
 #[test]

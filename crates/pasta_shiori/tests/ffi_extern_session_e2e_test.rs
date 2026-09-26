@@ -35,8 +35,8 @@ use std::ptr;
 
 use tempfile::TempDir;
 use windows_sys::Win32::Foundation::{GlobalFree, HGLOBAL};
-use windows_sys::Win32::Globalization::{WideCharToMultiByte, CP_ACP};
-use windows_sys::Win32::System::Memory::{GlobalAlloc, GMEM_FIXED};
+use windows_sys::Win32::Globalization::{CP_ACP, WideCharToMultiByte};
+use windows_sys::Win32::System::Memory::{GMEM_FIXED, GlobalAlloc};
 
 // 出荷 extern "C" シンボル（windows.rs の `#[unsafe(no_mangle)] extern "C"`）。SSP 等の
 // ホストが C ABI で呼ぶ出荷入口そのもの。lib.rs の `pub use windows::{load,request,unload}`
@@ -100,7 +100,11 @@ SecurityLevel: local\r\n\
 fn alloc_hglobal(bytes: &[u8]) -> HGLOBAL {
     // SAFETY: GMEM_FIXED 確保。失敗は null を返すので検査する。
     let h = unsafe { GlobalAlloc(GMEM_FIXED, bytes.len()) };
-    assert!(!h.is_null(), "GlobalAlloc must succeed for {} bytes", bytes.len());
+    assert!(
+        !h.is_null(),
+        "GlobalAlloc must succeed for {} bytes",
+        bytes.len()
+    );
     // SAFETY: h は bytes.len() バイトの有効ブロックを指す。
     unsafe {
         let dst = std::slice::from_raw_parts_mut(h as *mut u8, bytes.len());
@@ -269,9 +273,8 @@ fn extern_ffi_session_byte_invariant_e2e() {
         GOLDEN_GET_PROPERTY_ROUND1.as_bytes(),
         "round1 GET via extern FFI must be byte-invariant\nactual: {round1:?}"
     );
-    let round2 = drive_request(
-        "GET SHIORI/3.0\nCharset: UTF-8\nID: OnPastaCallBack1\nReference0: 2.6.77\n",
-    );
+    let round2 =
+        drive_request("GET SHIORI/3.0\nCharset: UTF-8\nID: OnPastaCallBack1\nReference0: 2.6.77\n");
     assert_eq!(
         round2.as_bytes(),
         GOLDEN_GET_PROPERTY_ROUND2.as_bytes(),
@@ -297,7 +300,10 @@ fn extern_ffi_session_byte_invariant_e2e() {
     );
 
     // --- unload（出荷 extern `unload` → teardown_actor・常に true・冪等） ---
-    assert!(unload(), "extern unload() must return true (clean teardown)");
+    assert!(
+        unload(),
+        "extern unload() must return true (clean teardown)"
+    );
 
     // --- unload 後の request: アクター不在で安全網 204（無限待機なし・R5.6） ---
     let after_unload = drive_request("GET SHIORI/3.0\nCharset: UTF-8\nID: OnTestSimple\n");
@@ -308,7 +314,10 @@ fn extern_ffi_session_byte_invariant_e2e() {
     );
 
     // --- reload（再 `load` → 新スレッド＋新チャネル）→ 応答不変（R7/R8） ---
-    assert!(drive_load(&dir), "reload extern load() must spawn a fresh actor + channel");
+    assert!(
+        drive_load(&dir),
+        "reload extern load() must spawn a fresh actor + channel"
+    );
     let after_reload = drive_request("GET SHIORI/3.0\nCharset: UTF-8\nID: OnTestSimple\n");
     assert_eq!(
         after_reload.as_bytes(),
@@ -317,7 +326,10 @@ fn extern_ffi_session_byte_invariant_e2e() {
     );
 
     // クリーンアップ: 最終 unload（プロセス終了時の漏れ防止・冪等）。
-    assert!(unload(), "final extern unload() must remain a safe no-op returning true");
+    assert!(
+        unload(),
+        "final extern unload() must remain a safe no-op returning true"
+    );
 
     // --- メタアサーション: ゴールデンが「自明に真」でないこと（ドリフト検出の実証） ---
     // 1 文字でも応答が変われば上のアサーションは赤化する。ここでは比較器自体が差分を

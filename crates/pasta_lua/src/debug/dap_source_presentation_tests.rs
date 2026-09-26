@@ -2,8 +2,8 @@
 //! behavior-invariant move). Cluster: source-presentation negotiation — the
 //! `attach` `sourcePresentation` parsing and the `pasta/sourcePresentation`
 //! custom request/response/event handling.
-use super::*;
 use super::dap_test_support::*;
+use super::*;
 
 // --- attach `sourcePresentation` parsing (task 5.5 — R6.3 / design 581/586) ---
 
@@ -15,11 +15,8 @@ use super::dap_test_support::*;
 fn attach_parses_explicit_source_presentation() {
     for (raw, expected) in [("lua", SourceMode::Lua), ("pasta", SourceMode::Pasta)] {
         let mut dap = DapAdapter::new();
-        let decoded = dap.decode_request(&request(
-            3,
-            "attach",
-            json!({ "sourcePresentation": raw }),
-        ));
+        let decoded =
+            dap.decode_request(&request(3, "attach", json!({ "sourcePresentation": raw })));
         assert_eq!(
             decoded.attach_source_mode,
             Some(expected),
@@ -64,7 +61,9 @@ fn attach_without_source_presentation_is_none() {
         "absent sourcePresentation must NOT override the resolved mode (design 581)"
     );
     // Still acked so the client handshake proceeds.
-    let resp = decoded.response.expect("attach must ack even without the arg");
+    let resp = decoded
+        .response
+        .expect("attach must ack even without the arg");
     assert_eq!(resp["command"], "attach");
 }
 
@@ -136,8 +135,7 @@ fn source_presentation_request_invalid_mode_is_none() {
 #[test]
 fn source_presentation_request_missing_mode_is_none() {
     let mut dap = DapAdapter::new();
-    let decoded =
-        dap.decode_request(&request(63, "pasta/sourcePresentation", json!({})));
+    let decoded = dap.decode_request(&request(63, "pasta/sourcePresentation", json!({})));
     assert_eq!(
         decoded.requested_source_mode, None,
         "R1.4: absent mode → None (no change)"

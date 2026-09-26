@@ -5,8 +5,8 @@
 
 use std::sync::Arc;
 
-use crate::debug::{SharedSourceMode, SourceMode};
 use crate::debug::source_map::SourceMap;
+use crate::debug::{SharedSourceMode, SourceMode};
 
 use super::SourceMapWiring;
 

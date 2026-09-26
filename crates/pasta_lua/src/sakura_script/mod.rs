@@ -16,9 +16,9 @@
 //! local script = SAKURA.talk_to_script(nil, "こんにちは。")
 //! ```
 
+pub mod line_breaker;
 pub mod tokenizer;
 pub mod wait_inserter;
-pub mod line_breaker;
 
 use crate::loader::TalkConfig;
 use mlua::{Lua, Result as LuaResult, Table, Value};

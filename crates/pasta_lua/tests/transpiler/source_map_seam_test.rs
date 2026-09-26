@@ -25,8 +25,10 @@ impl SourceMapSink for CapturingSink {
     // exercise the span-based `record` path (which carries the full span), so
     // `record_line` synthesizes a line-only span to satisfy the trait contract.
     fn record_line(&mut self, lua_line: u32, pasta_line: u32) {
-        self.records
-            .push((lua_line, Span::new(pasta_line as usize, 0, pasta_line as usize, 0, 0, 0)));
+        self.records.push((
+            lua_line,
+            Span::new(pasta_line as usize, 0, pasta_line as usize, 0, 0, 0),
+        ));
     }
 
     // Override the default sugar to capture the FULL originating span (these tests

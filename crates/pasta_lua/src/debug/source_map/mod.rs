@@ -583,9 +583,10 @@ impl SourceMap {
 /// [`ChunkSourceMap::lua_lines_for_pasta`] では取り出せない「全 `(lua_line,
 /// pasta_line)` ペアの昇順列」を、`forward` フィールドへ直接アクセスして提供する。
 pub(super) fn map_forward_iter(map: &ChunkSourceMap) -> impl Iterator<Item = (u32, u32)> + '_ {
-    map.forward.iter().map(|(&lua_line, pos)| (lua_line, pos.line))
+    map.forward
+        .iter()
+        .map(|(&lua_line, pos)| (lua_line, pos.line))
 }
-
 
 // ===========================================================================
 // 任意ディスクサイドカー I/O（task 6.1・3.2）を child module へ分離（task 7.5・C5）。
@@ -595,7 +596,9 @@ pub(super) fn map_forward_iter(map: &ChunkSourceMap) -> impl Iterator<Item = (u3
 // `crate::debug::source_map::write_sidecar` 経路は不変）。
 // ===========================================================================
 mod sidecar;
-pub use sidecar::{SIDECAR_VERSION, SidecarFile, read_sidecar, sidecar_path_for_lua, write_sidecar};
+pub use sidecar::{
+    SIDECAR_VERSION, SidecarFile, read_sidecar, sidecar_path_for_lua, write_sidecar,
+};
 
 // ===========================================================================
 // シーン同一性索引（task 1.1・requirements 2.1/2.2/2.5/2.6/3.2）。
@@ -647,4 +650,3 @@ mod source_map_builder_tests;
 #[cfg(test)]
 #[path = "../source_map_sidecar_tests.rs"]
 mod source_map_sidecar_tests;
-

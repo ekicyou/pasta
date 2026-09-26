@@ -54,7 +54,10 @@ pub(super) fn copy_fixture_to_temp(fixture_name: &str) -> TempDir {
     temp
 }
 
-pub(super) fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
+pub(super) fn copy_dir_recursive(
+    src: &std::path::Path,
+    dst: &std::path::Path,
+) -> std::io::Result<()> {
     for entry in std::fs::read_dir(src)? {
         let entry = entry?;
         let path = entry.path();

@@ -123,9 +123,7 @@ fn normalize_request(text: &str) -> String {
 fn stop(tx: &flume::Sender<ActorMsg>) {
     let (msg, done_rx) = ActorMsg::stop();
     tx.send(msg).expect("send Stop");
-    done_rx
-        .recv_timeout(GENEROUS)
-        .expect("Stop must be acked");
+    done_rx.recv_timeout(GENEROUS).expect("Stop must be acked");
 }
 
 /// (a)(c) 本番 marshaling 経由の GET が、実 VM 応答を byte-invariant ゴールデンと不変に
@@ -140,7 +138,10 @@ fn marshal_get_through_actor_returns_byte_invariant_golden_and_continues_corouti
     // Round1: get_property が yield → get タグ応答（marshaling 経由・ゴールデン一致）。
     let round1 = marshal_get_with_timeout(
         &tx,
-        MailboxRequest::new(1, normalize_request("GET SHIORI/3.0\nCharset: UTF-8\nID: OnTestSimple\n")),
+        MailboxRequest::new(
+            1,
+            normalize_request("GET SHIORI/3.0\nCharset: UTF-8\nID: OnTestSimple\n"),
+        ),
         GENEROUS,
     );
     assert_eq!(
@@ -154,7 +155,9 @@ fn marshal_get_through_actor_returns_byte_invariant_golden_and_continues_corouti
         &tx,
         MailboxRequest::new(
             2,
-            normalize_request("GET SHIORI/3.0\nCharset: UTF-8\nID: OnPastaCallBack1\nReference0: 2.6.77\n"),
+            normalize_request(
+                "GET SHIORI/3.0\nCharset: UTF-8\nID: OnPastaCallBack1\nReference0: 2.6.77\n",
+            ),
         ),
         GENEROUS,
     );
@@ -165,7 +168,9 @@ fn marshal_get_through_actor_returns_byte_invariant_golden_and_continues_corouti
     );
 
     stop(&tx);
-    actor.join().expect("actor thread must join cleanly after Stop");
+    actor
+        .join()
+        .expect("actor thread must join cleanly after Stop");
 }
 
 /// (b) NOTIFY は即 204 を返し、アクターの完了を待たない。後続 GET が同一 FIFO で
@@ -179,7 +184,10 @@ fn marshal_notify_through_actor_returns_204_then_get_in_fifo() {
 
     let notify_resp = marshal_notify(
         &tx,
-        MailboxRequest::new(1, normalize_request("NOTIFY SHIORI/3.0\nCharset: UTF-8\nID: OnUnrelatedEvent\n")),
+        MailboxRequest::new(
+            1,
+            normalize_request("NOTIFY SHIORI/3.0\nCharset: UTF-8\nID: OnUnrelatedEvent\n"),
+        ),
     );
     assert_eq!(
         notify_resp.as_bytes(),
@@ -190,7 +198,10 @@ fn marshal_notify_through_actor_returns_204_then_get_in_fifo() {
     // 後続 GET は同一 FIFO で NOTIFY 完了後に返る（actor-VM 応答・ゴールデン一致）。
     let get_resp = marshal_get_with_timeout(
         &tx,
-        MailboxRequest::new(2, normalize_request("GET SHIORI/3.0\nCharset: UTF-8\nID: OnTestSimple\n")),
+        MailboxRequest::new(
+            2,
+            normalize_request("GET SHIORI/3.0\nCharset: UTF-8\nID: OnTestSimple\n"),
+        ),
         GENEROUS,
     );
     assert_eq!(
@@ -200,7 +211,9 @@ fn marshal_notify_through_actor_returns_204_then_get_in_fifo() {
     );
 
     stop(&tx);
-    actor.join().expect("actor thread must join cleanly after Stop");
+    actor
+        .join()
+        .expect("actor thread must join cleanly after Stop");
 }
 
 /// (a') メソッド判定込みディスパッチ `marshal_request`（R5.5）が、GET をアクター VM へ
@@ -227,7 +240,9 @@ fn marshal_request_dispatches_get_returns_golden() {
     );
 
     stop(&tx);
-    actor.join().expect("actor thread must join cleanly after Stop");
+    actor
+        .join()
+        .expect("actor thread must join cleanly after Stop");
 }
 
 /// (a'') 本番 `marshal_get`（本番 `GET_TIMEOUT`）が通常運転でゴールデン値を返す（R5.1/R5.8）。
@@ -247,7 +262,10 @@ fn marshal_get_production_timeout_returns_golden_value() {
 
     let resp = marshal_get(
         &tx,
-        MailboxRequest::new(1, normalize_request("GET SHIORI/3.0\nCharset: UTF-8\nID: OnTestSimple\n")),
+        MailboxRequest::new(
+            1,
+            normalize_request("GET SHIORI/3.0\nCharset: UTF-8\nID: OnTestSimple\n"),
+        ),
     );
     assert_eq!(
         resp.as_bytes(),
@@ -256,7 +274,9 @@ fn marshal_get_production_timeout_returns_golden_value() {
     );
 
     stop(&tx);
-    actor.join().expect("actor thread must join cleanly after Stop");
+    actor
+        .join()
+        .expect("actor thread must join cleanly after Stop");
 }
 
 /// (d) drop→204（R5.3）: アクタースレッドが reply を送らず消滅した場合、受信側の
@@ -311,7 +331,9 @@ fn marshal_get_relays_vm_400_for_parse_failure() {
     );
 
     stop(&tx);
-    actor.join().expect("actor thread must join cleanly after Stop");
+    actor
+        .join()
+        .expect("actor thread must join cleanly after Stop");
 }
 
 /// (e) アクター不在（mailbox 閉鎖）→ 即 204（R5.6）: receiver が落ちた mailbox への
@@ -383,5 +405,7 @@ fn marshal_get_on_load_failed_actor_returns_500_with_single_line_reason() {
     );
 
     stop(&tx);
-    actor.join().expect("actor thread must join cleanly after Stop");
+    actor
+        .join()
+        .expect("actor thread must join cleanly after Stop");
 }

@@ -59,7 +59,8 @@ fn pasta_breakpoint_toggle_lua_then_pasta_over_tcp() {
     let pasta_file_key = pasta_file.to_string_lossy().to_string();
 
     // ローダと同一経路で構築した集約マップから BP `.pasta` 行の `.lua` 実行座標を解決する。
-    let expect_map = PastaLoader::build_source_map(std::slice::from_ref(&pasta_file), &cache_manager, false);
+    let expect_map =
+        PastaLoader::build_source_map(std::slice::from_ref(&pasta_file), &cache_manager, false);
     let bp_lua_coords = expect_map.resolve_pasta_to_lua(&pasta_file_key, BP_PASTA_LINE);
     assert_eq!(
         bp_lua_coords.len(),
@@ -111,7 +112,9 @@ fn pasta_breakpoint_toggle_lua_then_pasta_over_tcp() {
         let addr = runtime
             .debug_local_addr()
             .ok_or_else(|| "enabled runtime must expose a bound debug addr (port 0)".to_string())?;
-        addr_tx.send(addr).map_err(|_| "addr send failed".to_string())?;
+        addr_tx
+            .send(addr)
+            .map_err(|_| "addr send failed".to_string())?;
 
         // (#1) クライアントが setBreakpoints/configurationDone を終えるまで待つ。
         go_rx
@@ -156,7 +159,9 @@ fn pasta_breakpoint_toggle_lua_then_pasta_over_tcp() {
         }),
     );
     let bp_resp = client.recv_until(|m| is_response(m, "setBreakpoints"));
-    let bps = bp_resp["body"]["breakpoints"].as_array().expect("breakpoints array");
+    let bps = bp_resp["body"]["breakpoints"]
+        .as_array()
+        .expect("breakpoints array");
     assert_eq!(bps.len(), 1, "exactly one breakpoint resolved");
     assert_eq!(
         bps[0]["verified"], true,
@@ -186,7 +191,9 @@ fn pasta_breakpoint_toggle_lua_then_pasta_over_tcp() {
     // 停止直後（`.pasta` 提示）の stackTrace: トップフレームは `.pasta` 座標。
     client.send_request(10, "stackTrace", json!({ "threadId": thread_id }));
     let stack_pasta0 = client.recv_until(|m| is_response(m, "stackTrace"));
-    let frames0 = stack_pasta0["body"]["stackFrames"].as_array().expect("stackFrames");
+    let frames0 = stack_pasta0["body"]["stackFrames"]
+        .as_array()
+        .expect("stackFrames");
     assert!(!frames0.is_empty(), "停止フレームが存在する");
     assert_pasta_source(&frames0[0], &pasta_file_key, "初期 `.pasta` 提示");
     assert_eq!(
@@ -199,15 +206,18 @@ fn pasta_breakpoint_toggle_lua_then_pasta_over_tcp() {
 
     // (a) 受理レスポンス: `lua` をエコー（requirement 1.3 / 7.1）。
     let toggle_resp_lua = client.recv_until(|m| is_response(m, "pasta/sourcePresentation"));
-    assert_eq!(toggle_resp_lua["request_seq"], 20, "受理レスポンスは要求 seq に対応");
+    assert_eq!(
+        toggle_resp_lua["request_seq"], 20,
+        "受理レスポンスは要求 seq に対応"
+    );
     assert_eq!(
         toggle_resp_lua["body"]["mode"], "lua",
         "7.1: 受理レスポンスは適用後モード `lua` をエコーする"
     );
 
     // (b) `pasta/sourcePresentation` カスタムイベント `{ mode: "lua" }`（requirement 2.6）。
-    let toggle_event_lua =
-        client.recv_until(|m| is_event(m, "pasta/sourcePresentation") && m["body"]["mode"] == "lua");
+    let toggle_event_lua = client
+        .recv_until(|m| is_event(m, "pasta/sourcePresentation") && m["body"]["mode"] == "lua");
     assert_eq!(
         toggle_event_lua["body"]["mode"], "lua",
         "7.1: 切替後モードのカスタムイベントが送出される"
@@ -223,7 +233,9 @@ fn pasta_breakpoint_toggle_lua_then_pasta_over_tcp() {
     // (d) 切替後の stackTrace: トップフレームが生成 `.lua` 座標（path = chunk, line = bp_lua_line）。
     client.send_request(21, "stackTrace", json!({ "threadId": thread_id }));
     let stack_lua = client.recv_until(|m| is_response(m, "stackTrace"));
-    let frames_lua = stack_lua["body"]["stackFrames"].as_array().expect("stackFrames");
+    let frames_lua = stack_lua["body"]["stackFrames"]
+        .as_array()
+        .expect("stackFrames");
     assert!(!frames_lua.is_empty(), "切替後も停止フレームが存在する");
     let top_lua_path = frames_lua[0]["source"]["path"]
         .as_str()
@@ -252,9 +264,15 @@ fn pasta_breakpoint_toggle_lua_then_pasta_over_tcp() {
 
     client.send_request(31, "stackTrace", json!({ "threadId": thread_id }));
     let stack_pasta = client.recv_until(|m| is_response(m, "stackTrace"));
-    let frames_pasta = stack_pasta["body"]["stackFrames"].as_array().expect("stackFrames");
+    let frames_pasta = stack_pasta["body"]["stackFrames"]
+        .as_array()
+        .expect("stackFrames");
     assert!(!frames_pasta.is_empty(), "戻し後も停止フレームが存在する");
-    assert_pasta_source(&frames_pasta[0], &pasta_file_key, "7.2/3.5: `.pasta` 提示へ復帰");
+    assert_pasta_source(
+        &frames_pasta[0],
+        &pasta_file_key,
+        "7.2/3.5: `.pasta` 提示へ復帰",
+    );
     assert_eq!(
         frames_pasta[0]["line"], BP_PASTA_LINE,
         "7.2/3.5: `.pasta` 提示へ復帰: トップフレーム行は `.pasta` 行 {BP_PASTA_LINE}"
@@ -278,8 +296,14 @@ fn pasta_breakpoint_toggle_lua_then_pasta_over_tcp() {
     // 再停止時の提示は（直前に `.pasta` へ戻したため）`.pasta` 座標である。
     client.send_request(41, "stackTrace", json!({ "threadId": thread_id }));
     let stack_after = client.recv_until(|m| is_response(m, "stackTrace"));
-    let frames_after = stack_after["body"]["stackFrames"].as_array().expect("stackFrames");
-    assert_pasta_source(&frames_after[0], &pasta_file_key, "7.3: 再停止フレームも `.pasta` 提示");
+    let frames_after = stack_after["body"]["stackFrames"]
+        .as_array()
+        .expect("stackFrames");
+    assert_pasta_source(
+        &frames_after[0],
+        &pasta_file_key,
+        "7.3: 再停止フレームも `.pasta` 提示",
+    );
     assert_eq!(
         frames_after[0]["line"], BP_PASTA_LINE,
         "7.3: 再停止は同じ `.pasta` 行 {BP_PASTA_LINE}"

@@ -37,7 +37,7 @@
 use std::thread;
 use std::time::Duration;
 
-use pasta::actor::mailbox::{mailbox, ActorMsg, MailboxRequest, Reply};
+use pasta::actor::mailbox::{ActorMsg, MailboxRequest, Reply, mailbox};
 use pasta::actor::marshaling::{default_204, marshal_get_with_timeout, marshal_notify};
 
 // ===========================================================================
@@ -122,7 +122,10 @@ fn sim_driver_tags_get_and_notify_from_bool_only() {
     let notify = driver.tick(false);
     assert_eq!(notify.method, SimMethod::Notify);
     assert_eq!(notify.reference3, 0, "NOTIFY tick must carry Reference3=0");
-    assert!(!notify.is_playable(), "NOTIFY tick (Ref3=0) must not be playable");
+    assert!(
+        !notify.is_playable(),
+        "NOTIFY tick (Ref3=0) must not be playable"
+    );
 }
 
 /// SimDriver 生成 tick を本番 marshaling へ流し、GET=block-on-reply／NOTIFY=即 204 の
@@ -236,14 +239,21 @@ fn production_mailbox_preserves_fifo_across_producers() {
             .map(|s| s % 1000)
             .collect();
         let expected: Vec<u64> = (0..PER_PRODUCER).collect();
-        assert_eq!(sub, expected, "producer {p}'s messages must stay in enqueue order");
+        assert_eq!(
+            sub, expected,
+            "producer {p}'s messages must stay in enqueue order"
+        );
     }
 
     // (3) 全順序の一意性（重複インデックスなし）。
     let mut sorted = drained.clone();
     sorted.sort_unstable();
     sorted.dedup();
-    assert_eq!(sorted.len(), drained.len(), "serial FIFO must contain no duplicates");
+    assert_eq!(
+        sorted.len(),
+        drained.len(),
+        "serial FIFO must contain no duplicates"
+    );
 }
 
 // ===========================================================================
@@ -262,12 +272,12 @@ fn reply_move_then_value_or_204_on_drop_exactly_once() {
                 let _ = reply.send(Reply::Value(format!("v:{}", req.raw)));
             }
         });
-        let resp = marshal_get_with_timeout(
-            &tx,
-            MailboxRequest::new(1, "A"),
-            Duration::from_secs(10),
+        let resp =
+            marshal_get_with_timeout(&tx, MailboxRequest::new(1, "A"), Duration::from_secs(10));
+        assert_eq!(
+            resp, "v:A",
+            "replied GET must deliver its value exactly once"
         );
-        assert_eq!(resp, "v:A", "replied GET must deliver its value exactly once");
         actor.join().expect("actor role thread must not panic");
     }
 
@@ -279,11 +289,8 @@ fn reply_move_then_value_or_204_on_drop_exactly_once() {
                 drop(reply); // reply を送らずスコープ離脱 → drop。
             }
         });
-        let resp = marshal_get_with_timeout(
-            &tx,
-            MailboxRequest::new(2, "B"),
-            Duration::from_secs(10),
-        );
+        let resp =
+            marshal_get_with_timeout(&tx, MailboxRequest::new(2, "B"), Duration::from_secs(10));
         assert_eq!(
             resp.as_bytes(),
             default_204().as_bytes(),

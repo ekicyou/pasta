@@ -119,7 +119,8 @@ impl super::AnalysisEngine {
         // the start of the next line), not on the closing fence line itself.
         // Derive the actual closing fence line from the span's byte range instead.
         let open_fence_line = cb.span.start_line;
-        let close_fence_line = Self::last_line_in_byte_range(source, cb.span.end_byte, open_fence_line);
+        let close_fence_line =
+            Self::last_line_in_byte_range(source, cb.span.end_byte, open_fence_line);
 
         Self::add_full_line_token(open_fence_line, source, token_type::CODE_BLOCK, 0, tokens);
         // A real fenced block has distinct open/close fence lines. Guard against a

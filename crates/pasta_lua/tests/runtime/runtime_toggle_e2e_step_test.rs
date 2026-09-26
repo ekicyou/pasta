@@ -174,8 +174,8 @@ fn resolve_step_session(base: &Path) -> StepCoords {
             break;
         }
     }
-    let (multi_pasta_line, multi_lua_lines) =
-        multi.expect("fixture invariant: ある `.pasta` トーク行が本体で ≥2 の `.lua` 行へ展開される");
+    let (multi_pasta_line, multi_lua_lines) = multi
+        .expect("fixture invariant: ある `.pasta` トーク行が本体で ≥2 の `.lua` 行へ展開される");
     let first_multi_lua = multi_lua_lines[0];
     let last_multi_lua = *multi_lua_lines.last().unwrap();
 
@@ -285,7 +285,9 @@ fn start_step_session(coords: &StepCoords, initial_mode: &str) -> StepSession {
             let addr = runtime.debug_local_addr().ok_or_else(|| {
                 "enabled runtime must expose a bound debug addr (port 0)".to_string()
             })?;
-            addr_tx.send(addr).map_err(|_| "addr send failed".to_string())?;
+            addr_tx
+                .send(addr)
+                .map_err(|_| "addr send failed".to_string())?;
 
             // (define) scene を**定義**する。BP は未設定なので talk 本体行では止まらない。
             runtime
@@ -347,7 +349,9 @@ fn start_step_session(coords: &StepCoords, initial_mode: &str) -> StepSession {
         }),
     );
     let bp_resp = client.recv_until(|m| is_response(m, "setBreakpoints"));
-    let bps = bp_resp["body"]["breakpoints"].as_array().expect("breakpoints array");
+    let bps = bp_resp["body"]["breakpoints"]
+        .as_array()
+        .expect("breakpoints array");
     assert_eq!(bps.len(), 1, "exactly one breakpoint resolved");
     assert_eq!(
         bps[0]["verified"], true,
@@ -402,13 +406,18 @@ fn finish_step_session(mut session: StepSession) {
 /// （`.lua` モードにはアンカー合体が無いので必須）。トグル前の足場をここで確定する。
 fn clear_bp_and_step_into_multi(session: &mut StepSession, coords: &StepCoords, initial_lua: bool) {
     // origin BP を解除（`.lua` チャンク / `.pasta` ファイル の双方に空配列）。
-    for (seq, path) in [(10, coords.chunk.clone()), (11, coords.pasta_file_key.clone())] {
+    for (seq, path) in [
+        (10, coords.chunk.clone()),
+        (11, coords.pasta_file_key.clone()),
+    ] {
         session.client.send_request(
             seq,
             "setBreakpoints",
             json!({ "source": { "path": path }, "breakpoints": [] }),
         );
-        let _ = session.client.recv_until(|m| is_response(m, "setBreakpoints"));
+        let _ = session
+            .client
+            .recv_until(|m| is_response(m, "setBreakpoints"));
     }
 
     session
@@ -425,7 +434,9 @@ fn clear_bp_and_step_into_multi(session: &mut StepSession, coords: &StepCoords, 
         .client
         .send_request(13, "stackTrace", json!({ "threadId": session.thread_id }));
     let stack = session.client.recv_until(|m| is_response(m, "stackTrace"));
-    let frames = stack["body"]["stackFrames"].as_array().expect("stackFrames");
+    let frames = stack["body"]["stackFrames"]
+        .as_array()
+        .expect("stackFrames");
     let top_line = frames[0]["line"].as_u64().expect("line") as u32;
     let top_path = frames[0]["source"]["path"].as_str().expect("source path");
     if initial_lua {
@@ -483,22 +494,38 @@ fn step_toggle_mode(session: &mut StepSession, seq: u64, mode: &str) {
 
 /// `next` を送り、停止後のトップフレーム行（`.lua`/`.pasta` 提示の数値行）を返す。`reason step`
 /// と、提示モードに応じた `source.path`（`.lua` チャンク / `.pasta` ファイル）を表明する。
-fn step_next_then_top_line(session: &mut StepSession, coords: &StepCoords, base_seq: u64, expect_lua: bool) -> u32 {
+fn step_next_then_top_line(
+    session: &mut StepSession,
+    coords: &StepCoords,
+    base_seq: u64,
+    expect_lua: bool,
+) -> u32 {
     session
         .client
         .send_request(base_seq, "next", json!({ "threadId": session.thread_id }));
     let _ = session.client.recv_until(|m| is_response(m, "next"));
     let stopped = session.client.recv_until(|m| is_event(m, "stopped"));
-    assert_eq!(stopped["body"]["reason"], "step", "`next` は reason step で再停止する");
+    assert_eq!(
+        stopped["body"]["reason"], "step",
+        "`next` は reason step で再停止する"
+    );
 
-    session
-        .client
-        .send_request(base_seq + 1, "stackTrace", json!({ "threadId": session.thread_id }));
+    session.client.send_request(
+        base_seq + 1,
+        "stackTrace",
+        json!({ "threadId": session.thread_id }),
+    );
     let stack = session.client.recv_until(|m| is_response(m, "stackTrace"));
-    let frames = stack["body"]["stackFrames"].as_array().expect("stackFrames");
+    let frames = stack["body"]["stackFrames"]
+        .as_array()
+        .expect("stackFrames");
     assert!(!frames.is_empty(), "停止フレームが存在する");
     let path = frames[0]["source"]["path"].as_str().expect("source path");
-    let expect_path = if expect_lua { &coords.chunk } else { &coords.pasta_file_key };
+    let expect_path = if expect_lua {
+        &coords.chunk
+    } else {
+        &coords.pasta_file_key
+    };
     assert_eq!(
         canonicalize_chunk_name(path),
         canonicalize_chunk_name(expect_path),

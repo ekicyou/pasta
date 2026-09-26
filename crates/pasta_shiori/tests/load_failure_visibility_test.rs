@@ -57,7 +57,8 @@ fn normalize_request(text: &str) -> String {
 }
 
 const GET_REQUEST: &str = "GET SHIORI/3.0\nCharset: UTF-8\nID: version\nSender: SSP\n";
-const NOTIFY_REQUEST: &str = "NOTIFY SHIORI/3.0\nCharset: UTF-8\nID: OnUnrelatedEvent\nSender: SSP\n";
+const NOTIFY_REQUEST: &str =
+    "NOTIFY SHIORI/3.0\nCharset: UTF-8\nID: OnUnrelatedEvent\nSender: SSP\n";
 
 /// 500 応答の構造（ステータス行・ヘッダ列・`\r\n\r\n` 終端）を検証し、
 /// `X-ERROR-REASON` の値を返す（要件 4.3 / 4.6）。
@@ -109,7 +110,9 @@ fn assert_500_structure_and_take_reason(case: &str, response: &str) -> String {
     );
 
     let reason = reason.unwrap_or_else(|| {
-        panic!("[{case}] 500 応答は X-ERROR-REASON ヘッダを持つべき（要件 4.3）\nactual: {response:?}")
+        panic!(
+            "[{case}] 500 応答は X-ERROR-REASON ヘッダを持つべき（要件 4.3）\nactual: {response:?}"
+        )
     });
     assert!(
         !reason.is_empty(),
@@ -188,10 +191,7 @@ fn load_failures_and_request_errors_are_visible_through_the_actor_boundary() {
         "b: main load failure",
         &main_broken,
         false,
-        &[
-            "failed to load startup module 'main'",
-            "PASTA_E2E_MAIN_B",
-        ],
+        &["failed to load startup module 'main'", "PASTA_E2E_MAIN_B"],
     );
     drop(main_broken);
 

@@ -79,7 +79,10 @@ fn split_runtime_global(global_name: &str) -> Option<(&str, u32)> {
 ///
 /// 突合できなかった記録（runtime に対応 identity が無い等）は索引へ入れない（誤解決防止）。
 /// `collect_scenes` が空でも空索引を返す（`scene_at` は常に未検出）。
-pub(crate) fn build_scene_index(lua: &Lua, source_map: &SourceMap) -> mlua::Result<SceneIdentityIndex> {
+pub(crate) fn build_scene_index(
+    lua: &Lua,
+    source_map: &SourceMap,
+) -> mlua::Result<SceneIdentityIndex> {
     // runtime 実シーン: (global_name, local_name) の列。
     let runtime_scenes = collect_scenes(lua)?;
 
@@ -165,8 +168,8 @@ fn parse_and_join(
     if let Some(rest) = join_key.strip_prefix("G:") {
         // global: "G:{base}#{counter}"
         let (base, counter) = parse_base_counter(rest);
-        let scene_id = counter
-            .and_then(|c| global_by_base_counter.get(&(base.to_string(), c)).cloned());
+        let scene_id =
+            counter.and_then(|c| global_by_base_counter.get(&(base.to_string(), c)).cloned());
         ParsedRecord {
             level: 0,
             start_line,
@@ -181,8 +184,8 @@ fn parse_and_join(
             None => (rest, ""),
         };
         let (pbase, pcounter) = parse_base_counter(parent_ref);
-        let parent = pcounter
-            .and_then(|c| global_by_base_counter.get(&(pbase.to_string(), c)).cloned());
+        let parent =
+            pcounter.and_then(|c| global_by_base_counter.get(&(pbase.to_string(), c)).cloned());
 
         // `__start__` はグローバル本体そのもの（無名 start シーン）であり、その宣言行は
         // グローバルヘッダ行と一致する。索引には **別 level-1 エントリとして入れない**:

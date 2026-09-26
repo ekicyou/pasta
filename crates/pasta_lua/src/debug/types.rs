@@ -140,7 +140,11 @@ pub struct Breakpoint {
 impl Breakpoint {
     /// Construct a two-tier breakpoint from its present source and resolved
     /// execution coordinate.
-    pub fn new(present_source: impl Into<String>, chunk: impl Into<ChunkName>, lua_line: u32) -> Self {
+    pub fn new(
+        present_source: impl Into<String>,
+        chunk: impl Into<ChunkName>,
+        lua_line: u32,
+    ) -> Self {
         Self {
             present_source: present_source.into(),
             chunk: chunk.into(),
@@ -351,7 +355,12 @@ mod tests {
     #[test]
     fn source_ref_round_trip() {
         let s = SourceRef::new("@scene.lua");
-        assert_eq!(s, SourceRef { path: "@scene.lua".to_string() });
+        assert_eq!(
+            s,
+            SourceRef {
+                path: "@scene.lua".to_string()
+            }
+        );
         assert_eq!(s.clone().path, "@scene.lua");
     }
 
@@ -384,7 +393,11 @@ mod tests {
         let other_present = Breakpoint::new("scene.lua", "@scene.lua", 3);
         assert_ne!(bp, other_present, "present_source participates in identity");
         set.insert(other_present.clone());
-        assert_eq!(set.len(), 2, "distinct present sources are distinct entries");
+        assert_eq!(
+            set.len(),
+            2,
+            "distinct present sources are distinct entries"
+        );
         assert!(set.contains(&other_present));
 
         // Field accessors hold the two-tier shape from design 519-524.

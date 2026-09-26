@@ -43,7 +43,7 @@ use std::time::Duration;
 use flume::Sender;
 
 use crate::actor::mailbox::ActorMsg;
-use crate::actor::thread::{spawn_actor_thread, ActorThread};
+use crate::actor::thread::{ActorThread, spawn_actor_thread};
 
 /// teardown の結果レポート（R7.1/R7.4/R7.5）。
 ///
@@ -126,14 +126,22 @@ pub fn teardown_via_sender(tx: &Sender<ActorMsg>, timeout: Duration) -> Teardown
         };
     }
     // 観測ログ点（R10.4・無効時ゼロコスト）: Stop を mailbox へ投入し done ack を待つ。
-    tracing::debug!(seam = "actor.stop", ok = true, "teardown: Stop enqueued; awaiting done ack");
+    tracing::debug!(
+        seam = "actor.stop",
+        ok = true,
+        "teardown: Stop enqueued; awaiting done ack"
+    );
 
     // done ack を有界に待つ。teardown が壊れて ack を返さない／drain せず break した
     // 場合に無限待機せず、異常として終結させる（テストはハングせず失敗する）。
     match done_rx.recv_timeout(timeout) {
         Ok(()) => {
             // 観測ログ点（R10.4）: done ack 受信＝drain/VM 破棄/cleanup 完了（clean teardown）。
-            tracing::debug!(seam = "actor.done", acked = true, "teardown: done ack received (resources released)");
+            tracing::debug!(
+                seam = "actor.done",
+                acked = true,
+                "teardown: done ack received (resources released)"
+            );
             TeardownReport {
                 acked: true,
                 already_done: false,
@@ -295,7 +303,7 @@ struct ResourceSample {
 #[cfg(windows)]
 fn sample_resources() -> ResourceSample {
     use windows_sys::Win32::System::Threading::{
-        GetCurrentProcess, GetGuiResources, GetProcessHandleCount, GR_USEROBJECTS,
+        GR_USEROBJECTS, GetCurrentProcess, GetGuiResources, GetProcessHandleCount,
     };
 
     // SAFETY: `GetCurrentProcess` は擬似ハンドル（クローズ不要）を返す。
@@ -317,11 +325,7 @@ fn sample_resources() -> ResourceSample {
     // 倒し、0 のときは計測不能扱い（None）として偽の増分を作らない。
     let user_objects = unsafe {
         let n = GetGuiResources(process, GR_USEROBJECTS);
-        if n != 0 {
-            Some(n)
-        } else {
-            None
-        }
+        if n != 0 { Some(n) } else { None }
     };
 
     ResourceSample {

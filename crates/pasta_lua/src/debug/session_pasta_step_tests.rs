@@ -1,11 +1,11 @@
 //! Inline test cluster externalized from `session.rs` (Task 2.1, pure move).
 //! Cluster: `.pasta`-granular stepping (requirements 9.1-9.5).
-use super::*;
 use super::session_test_support::*;
+use super::*;
 
+use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use std::sync::mpsc;
-use std::sync::Arc;
 
 use mlua::Lua;
 
@@ -45,9 +45,7 @@ fn pasta_decision_same_pasta_line_same_frame_continues() {
     let origin = ppos(10);
     let cur = ppos(10);
     assert!(
-        !DebugSession::pasta_step_should_stop(
-            t, 3, Some(&origin), t, 3, Some(&cur)
-        ),
+        !DebugSession::pasta_step_should_stop(t, 3, Some(&origin), t, 3, Some(&cur)),
         "same `.pasta` line in the origin frame must be consumed (continue, 9.1)"
     );
 }
@@ -60,9 +58,7 @@ fn pasta_decision_different_pasta_line_same_frame_stops() {
     let origin = ppos(10);
     let cur = ppos(11);
     assert!(
-        DebugSession::pasta_step_should_stop(
-            t, 3, Some(&origin), t, 3, Some(&cur)
-        ),
+        DebugSession::pasta_step_should_stop(t, 3, Some(&origin), t, 3, Some(&cur)),
         "a DIFFERENT `.pasta` line in the same frame must STOP (9.1)"
     );
 }
@@ -96,18 +92,14 @@ fn pasta_decision_deeper_frame_mapped_line_stops_discarding_origin() {
     // Callee mapped line with a DIFFERENT `.pasta` line → stop.
     let cur_diff = ppos(20);
     assert!(
-        DebugSession::pasta_step_should_stop(
-            t, 3, Some(&origin), t, 4, Some(&cur_diff)
-        ),
+        DebugSession::pasta_step_should_stop(t, 3, Some(&origin), t, 4, Some(&cur_diff)),
         "a mapped line in the callee frame must STOP (step into, 9.2)"
     );
     // Callee mapped line coincidentally equal to the origin `.pasta` line →
     // still STOP (different frame discards the origin; design 554).
     let cur_same = ppos(10);
     assert!(
-        DebugSession::pasta_step_should_stop(
-            t, 3, Some(&origin), t, 4, Some(&cur_same)
-        ),
+        DebugSession::pasta_step_should_stop(t, 3, Some(&origin), t, 4, Some(&cur_same)),
         "a callee line equal to the origin `.pasta` line still STOPS (origin \
          discarded across frames, 9.2)"
     );
@@ -120,9 +112,7 @@ fn pasta_decision_shallower_frame_mapped_line_stops() {
     let origin = ppos(20); // origin captured inside the callee
     let cur = ppos(12); // a mapped caller line after return
     assert!(
-        DebugSession::pasta_step_should_stop(
-            t, 4, Some(&origin), t, 3, Some(&cur)
-        ),
+        DebugSession::pasta_step_should_stop(t, 4, Some(&origin), t, 3, Some(&cur)),
         "a mapped line in the caller frame after return must STOP (step out, 9.3)"
     );
 }
@@ -335,7 +325,11 @@ fn pasta_step_over_consumes_same_pasta_line_and_passes_unmapped() {
 
     host.cont(SessionCommand::Next);
     let (reason, line) = host.recv_stop();
-    assert_eq!(reason, StopReason::Step, "step over must stop with reason Step");
+    assert_eq!(
+        reason,
+        StopReason::Step,
+        "step over must stop with reason Step"
+    );
     assert_eq!(
         line, 9,
         "step over from `.pasta` 10 must consume line 7 (same `.pasta` 10) and \
@@ -368,7 +362,11 @@ fn pasta_step_into_stops_at_first_mapped_callee_line() {
 
     host.cont(SessionCommand::StepIn);
     let (reason, line) = host.recv_stop();
-    assert_eq!(reason, StopReason::Step, "step into must stop with reason Step");
+    assert_eq!(
+        reason,
+        StopReason::Step,
+        "step into must stop with reason Step"
+    );
     assert_eq!(
         line, 3,
         "step into must PASS the unmapped callee line 2 and stop at line 3 \
@@ -405,7 +403,11 @@ fn pasta_step_out_stops_at_first_mapped_caller_line() {
     // Step out: return to the caller, stop at the first mapped line (10).
     host.cont(SessionCommand::StepOut);
     let (reason, line) = host.recv_stop();
-    assert_eq!(reason, StopReason::Step, "step out must stop with reason Step");
+    assert_eq!(
+        reason,
+        StopReason::Step,
+        "step out must stop with reason Step"
+    );
     assert_eq!(
         line, 10,
         "step out must return to the caller and stop at line 10 (`.pasta` 12) — \

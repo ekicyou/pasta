@@ -107,8 +107,7 @@ fn mismatch_marker_redeploys() {
     match outcome {
         SyncOutcome::Deployed => {
             // 展開後はマーカーが基準ダイジェストへ更新される。
-            let marker =
-                std::fs::read_to_string(target.join(MARKER_NAME)).expect("read marker");
+            let marker = std::fs::read_to_string(target.join(MARKER_NAME)).expect("read marker");
             assert_eq!(marker.trim(), EXPECTED_MD5);
         }
         SyncOutcome::Skipped => panic!("expected Deployed on marker mismatch"),
@@ -204,8 +203,7 @@ fn marker_written_last_equals_digest() {
         let name = entry.file_name();
         let name = name.to_string_lossy();
         assert!(
-            !name.starts_with(".pasta_scripts.new.")
-                && !name.starts_with(".pasta_scripts.old."),
+            !name.starts_with(".pasta_scripts.new.") && !name.starts_with(".pasta_scripts.old."),
             "no temp/backup leftover siblings; found: {name}"
         );
     }
@@ -347,8 +345,7 @@ fn deploy_failure_preserves_prior_live_state() {
         let name = entry.file_name();
         let name = name.to_string_lossy();
         assert!(
-            !name.starts_with(".pasta_scripts.new.")
-                && !name.starts_with(".pasta_scripts.old."),
+            !name.starts_with(".pasta_scripts.new.") && !name.starts_with(".pasta_scripts.old."),
             "no temp/backup leftover after failed deploy; found: {name}"
         );
     }

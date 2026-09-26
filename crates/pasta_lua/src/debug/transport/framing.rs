@@ -40,8 +40,8 @@ pub(crate) const MAX_CONTENT_LENGTH: usize = 16 * 1024 * 1024;
 pub(crate) fn write_frame<W: Write>(out: &mut W, value: &Value) -> io::Result<()> {
     // Compact JSON body. `to_vec` yields the exact UTF-8 bytes; the header MUST
     // use this byte length (multi-byte UTF-8 makes bytes != chars).
-    let body = serde_json::to_vec(value)
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+    let body =
+        serde_json::to_vec(value).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
     write!(out, "{CONTENT_LENGTH}: {}\r\n\r\n", body.len())?;
     out.write_all(&body)?;
     out.flush()
@@ -125,8 +125,8 @@ pub(crate) fn read_frame<R: BufRead>(reader: &mut R) -> io::Result<Option<Value>
     reader.read_exact(&mut body)?;
 
     // (3) Decode UTF-8 and parse JSON.
-    let text = String::from_utf8(body)
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+    let text =
+        String::from_utf8(body).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
     let value = serde_json::from_str::<Value>(&text)
         .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
     Ok(Some(value))

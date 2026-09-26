@@ -104,10 +104,7 @@ fn differently_formatted_equivalent_uris_resolve_to_same_scene() {
     let out_b = resolve_and_kick(&map, &sink_b, "file:///C:/work/dic/talk.pasta", 25);
 
     assert_eq!(out_a, out_b, "別形式 uri は同一シーンへ解決する");
-    assert_eq!(
-        out_a,
-        ResolveOutcome::Resolved(":会話1:挨拶_1".to_string())
-    );
+    assert_eq!(out_a, ResolveOutcome::Resolved(":会話1:挨拶_1".to_string()));
     assert_eq!(*cap_a.lock().unwrap(), *cap_b.lock().unwrap());
 }
 
@@ -116,10 +113,7 @@ fn uri_to_pasta_path_strips_scheme_and_decodes() {
     // file:// スキーム除去・パーセントデコード・先頭ドライブ補正の固定。
     let p = uri_to_pasta_path("file:///C:/work/my%20dic/talk.pasta");
     // 空白が復元され、先頭の余分な `/` が落ちている（絶対パスとして c:/... 始まり）。
-    assert!(
-        p.contains("my dic"),
-        "%20 が空白へデコードされる: {p}"
-    );
+    assert!(p.contains("my dic"), "%20 が空白へデコードされる: {p}");
     assert!(
         !p.starts_with("/C:") && !p.starts_with("/c:"),
         "Windows ドライブの先頭 `/` が補正される: {p}"
@@ -154,13 +148,13 @@ fn windows_and_uri_encoded_forms_all_resolve_to_same_local_scene() {
 
     // すべて C:\work\dic\talk.pasta の local 範囲（行 25）を指す等価形式。
     let equivalent_forms = [
-        "file:///C:/work/dic/talk.pasta",       // 標準 file:// uri
-        "C:/work/dic/talk.pasta",               // 素のドライブパス・スラッシュ
-        r"C:\work\dic\talk.pasta",              // バックスラッシュ区切り
-        r"c:\work\dic\talk.pasta",              // ドライブ文字小文字
-        "C:/work/./dic/../dic/talk.pasta",      // 余分な `.`/`..`（absolute が解決）
-        "file:///C%3A/work/dic/talk.pasta",     // `%3A` = `:` パーセントエンコード
-        "file:///c:/work/dic/talk.pasta",       // file:// + 小文字ドライブ
+        "file:///C:/work/dic/talk.pasta",   // 標準 file:// uri
+        "C:/work/dic/talk.pasta",           // 素のドライブパス・スラッシュ
+        r"C:\work\dic\talk.pasta",          // バックスラッシュ区切り
+        r"c:\work\dic\talk.pasta",          // ドライブ文字小文字
+        "C:/work/./dic/../dic/talk.pasta",  // 余分な `.`/`..`（absolute が解決）
+        "file:///C%3A/work/dic/talk.pasta", // `%3A` = `:` パーセントエンコード
+        "file:///c:/work/dic/talk.pasta",   // file:// + 小文字ドライブ
     ];
 
     let expected = ResolveOutcome::Resolved(":会話1:挨拶_1".to_string());

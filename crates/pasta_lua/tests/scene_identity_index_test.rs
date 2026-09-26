@@ -164,9 +164,7 @@ fn finalize_join_resolves_runtime_identities_for_global_and_local() {
     );
     // local (会話1, 挨拶_1) が存在し、索引の (挨拶_1, 会話1) と一致する。
     assert!(
-        scenes
-            .iter()
-            .any(|(g, l)| g == "会話1" && l == "挨拶_1"),
+        scenes.iter().any(|(g, l)| g == "会話1" && l == "挨拶_1"),
         "runtime に (会話1, 挨拶_1) が存在する: {scenes:?}"
     );
 }
@@ -272,19 +270,18 @@ fn kick_search_runtime(lua: &Lua, search_key: &str) -> Option<(String, String)> 
         .load("return require('pasta.scene')")
         .eval()
         .expect("pasta.scene module loads on a finalized runtime");
-    let search: pasta_lua::mlua::Function =
-        scene_mod.get("search").expect("SCENE.search exists");
+    let search: pasta_lua::mlua::Function = scene_mod.get("search").expect("SCENE.search exists");
 
     // local-composite `:parent:local` を kick.lua と同じ規則で分解。
-    let (name, parent): (String, Option<String>) =
-        if let Some(rest) = search_key.strip_prefix(':') {
-            match rest.split_once(':') {
-                Some((p, local)) => (local.to_string(), Some(p.to_string())),
-                None => (rest.to_string(), None),
-            }
-        } else {
-            (search_key.to_string(), None)
-        };
+    let (name, parent): (String, Option<String>) = if let Some(rest) = search_key.strip_prefix(':')
+    {
+        match rest.split_once(':') {
+            Some((p, local)) => (local.to_string(), Some(p.to_string())),
+            None => (rest.to_string(), None),
+        }
+    } else {
+        (search_key.to_string(), None)
+    };
 
     // SCENE.search(name, parent_or_nil) → 結果オブジェクト or nil。
     let parent_arg = match &parent {
@@ -332,8 +329,8 @@ fn index_identity_matches_runtime_kick_search_target() {
     let lua = runtime.lua();
 
     // runtime SSOT。
-    let scenes = pasta_lua::runtime::finalize::collect_scenes(lua)
-        .expect("collect_scenes must succeed");
+    let scenes =
+        pasta_lua::runtime::finalize::collect_scenes(lua).expect("collect_scenes must succeed");
 
     // --- global: 本体領域行 → identity (会話1, None) → search-key "会話1" ---
     let global_id = source_map
@@ -345,7 +342,10 @@ fn index_identity_matches_runtime_kick_search_target() {
         "scene_at は global identity を返す"
     );
     let global_key = kick_scene_key(&global_id);
-    assert_eq!(global_key, "会話1", "global の kick search-key は素の scene_id");
+    assert_eq!(
+        global_key, "会話1",
+        "global の kick search-key は素の scene_id"
+    );
 
     let (g_global, g_local) = kick_search_runtime(lua, &global_key)
         .expect("global kick search-key は runtime シーンへ着地する");
@@ -388,9 +388,7 @@ fn index_identity_matches_runtime_kick_search_target() {
         "local kick 名前検索は索引 identity と同じ (会話1, 挨拶_1) へ着地する"
     );
     assert!(
-        scenes
-            .iter()
-            .any(|(g, l)| *g == l_global && *l == l_local),
+        scenes.iter().any(|(g, l)| *g == l_global && *l == l_local),
         "local kick の着地 ({l_global}, {l_local}) は collect_scenes(SSOT) に存在する: {scenes:?}"
     );
     // 着地 (global, local) は索引 identity の (parent, scene_id) と一致。

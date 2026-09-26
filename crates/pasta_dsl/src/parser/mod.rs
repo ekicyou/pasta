@@ -273,13 +273,13 @@ fn parse_actor_scope(pair: Pair<Rule>) -> Result<ActorScope, ParseError> {
     })
 }
 
-mod parse_scene;
 mod parse_action;
 mod parse_elements;
+mod parse_scene;
 
-use parse_scene::*;
 use parse_action::*;
 use parse_elements::*;
+use parse_scene::*;
 
 // ============================================================================
 // Tests

@@ -11,10 +11,10 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use crate::debug::{SharedSourceMode, SourceMode};
 use crate::debug::breakpoints::BreakpointSet;
 use crate::debug::source_map::{ChunkSourceMap, PastaPos, SourceMap};
 use crate::debug::types::SourceRef;
+use crate::debug::{SharedSourceMode, SourceMode};
 
 use super::{SourceMapWiring, is_pasta_source, translate_pasta_breakpoints};
 
@@ -46,7 +46,11 @@ fn map_from(file: &str, entries: &[(&str, u32, u32)]) -> SourceMap {
     }
     let mut sm = SourceMap::new();
     for (chunk, forward) in per_chunk {
-        sm.insert_chunk(chunk, file.to_string(), ChunkSourceMap::from_forward(forward));
+        sm.insert_chunk(
+            chunk,
+            file.to_string(),
+            ChunkSourceMap::from_forward(forward),
+        );
     }
     sm
 }
@@ -76,8 +80,7 @@ fn pasta_line_registers_all_lua_lines_and_fires_should_pause() {
     let wiring = pasta_wiring(map);
     let set = BreakpointSet::new();
 
-    let resolved =
-        translate_pasta_breakpoints(&set, &wiring, &SourceRef::new(file), &[7]);
+    let resolved = translate_pasta_breakpoints(&set, &wiring, &SourceRef::new(file), &[7]);
 
     // 応答: 1 件・verified・元の `.pasta` 行 7（4.1）。
     assert_eq!(resolved.len(), 1);
@@ -116,8 +119,7 @@ fn unmapped_pasta_line_adjusts_to_nearest_subsequent() {
     let wiring = pasta_wiring(map);
     let set = BreakpointSet::new();
 
-    let resolved =
-        translate_pasta_breakpoints(&set, &wiring, &SourceRef::new(file), &[4]);
+    let resolved = translate_pasta_breakpoints(&set, &wiring, &SourceRef::new(file), &[4]);
 
     assert_eq!(resolved.len(), 1);
     assert!(resolved[0].verified, "調整後は verified (4.3)");
@@ -144,8 +146,7 @@ fn no_subsequent_mapping_returns_unverified() {
     let wiring = pasta_wiring(map);
     let set = BreakpointSet::new();
 
-    let resolved =
-        translate_pasta_breakpoints(&set, &wiring, &SourceRef::new(file), &[5]);
+    let resolved = translate_pasta_breakpoints(&set, &wiring, &SourceRef::new(file), &[5]);
 
     assert_eq!(resolved.len(), 1);
     assert!(
@@ -175,8 +176,7 @@ fn multiple_pasta_lines_all_register_without_mutual_eviction() {
     let wiring = pasta_wiring(map);
     let set = BreakpointSet::new();
 
-    let resolved =
-        translate_pasta_breakpoints(&set, &wiring, &SourceRef::new(file), &[3, 7]);
+    let resolved = translate_pasta_breakpoints(&set, &wiring, &SourceRef::new(file), &[3, 7]);
 
     assert_eq!(resolved.len(), 2);
     assert!(resolved.iter().all(|r| r.verified));
@@ -185,9 +185,18 @@ fn multiple_pasta_lines_all_register_without_mutual_eviction() {
 
     // 全 `.lua` 座標が同時に登録されている（行ごとの register で互いを評価
     // 退避していない）。
-    assert!(set.should_pause(r"@C:\proj\cache\scene.lua", 10), "行 3 の座標");
-    assert!(set.should_pause(r"@C:\proj\cache\scene.lua", 20), "行 7 の座標 1");
-    assert!(set.should_pause(r"@C:\proj\cache\scene.lua", 21), "行 7 の座標 2");
+    assert!(
+        set.should_pause(r"@C:\proj\cache\scene.lua", 10),
+        "行 3 の座標"
+    );
+    assert!(
+        set.should_pause(r"@C:\proj\cache\scene.lua", 20),
+        "行 7 の座標 1"
+    );
+    assert!(
+        set.should_pause(r"@C:\proj\cache\scene.lua", 21),
+        "行 7 の座標 2"
+    );
 }
 
 /// 4.1 / 多チャンク: 同一 `.pasta` 行が複数チャンクへ展開される場合も全チャンクの
@@ -206,13 +215,18 @@ fn pasta_line_spanning_multiple_chunks_registers_all() {
     let wiring = pasta_wiring(map);
     let set = BreakpointSet::new();
 
-    let resolved =
-        translate_pasta_breakpoints(&set, &wiring, &SourceRef::new(file), &[7]);
+    let resolved = translate_pasta_breakpoints(&set, &wiring, &SourceRef::new(file), &[7]);
 
     assert_eq!(resolved.len(), 1);
     assert!(resolved[0].verified);
-    assert!(set.should_pause(r"@C:\proj\cache\a.lua", 12), "chunk a の座標");
-    assert!(set.should_pause(r"@C:\proj\cache\b.lua", 5), "chunk b の座標");
+    assert!(
+        set.should_pause(r"@C:\proj\cache\a.lua", 12),
+        "chunk a の座標"
+    );
+    assert!(
+        set.should_pause(r"@C:\proj\cache\b.lua", 5),
+        "chunk b の座標"
+    );
 }
 
 /// `.pasta` present source は retain/置換キー: 同 `.pasta` の再 setBreakpoints は
@@ -241,7 +255,10 @@ fn re_setting_pasta_source_replaces_only_its_own_coords() {
         !set.should_pause(r"@C:\proj\cache\scene.lua", 10),
         "同一 present source の旧座標は権威的に置換される"
     );
-    assert!(set.should_pause(r"@C:\proj\cache\scene.lua", 20), "新座標が登録される");
+    assert!(
+        set.should_pause(r"@C:\proj\cache\scene.lua", 20),
+        "新座標が登録される"
+    );
 }
 
 /// 4.4 / 8.2: 空行リスト（DAP の「この source の BP を全消去」）での再設定は
@@ -286,7 +303,10 @@ fn translate_without_map_degrades_to_direct_lua_registration() {
 
     // `.lua` 直接経路の形: 要求順ミラー・全 verified・原行のまま。
     assert_eq!(resolved.len(), 2);
-    assert!(resolved.iter().all(|bp| bp.verified), "直接経路は全行 verified");
+    assert!(
+        resolved.iter().all(|bp| bp.verified),
+        "直接経路は全行 verified"
+    );
     assert_eq!(resolved[0].line, 4);
     assert_eq!(resolved[1].line, 9);
     // present source == chunk として直接登録される（翻訳なし）。

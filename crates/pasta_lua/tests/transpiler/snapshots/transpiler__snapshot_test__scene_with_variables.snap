@@ -15,9 +15,9 @@ do
         var.カウンタ = "10"
         save.グローバル = "永続値"
         act.さくら:talk("「カウンタは")
-        act.さくら:talk(tostring(var.カウンタ))
+        act.さくら:talk(var.カウンタ, "var.カウンタ")
         act.さくら:talk("、グローバルは")
-        act.さくら:talk(tostring(save.グローバル))
+        act.さくら:talk(save.グローバル, "save.グローバル")
         act.さくら:talk("」")
     end
 end

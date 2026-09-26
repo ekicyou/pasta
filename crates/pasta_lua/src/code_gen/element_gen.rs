@@ -4,8 +4,8 @@ use super::LuaCodeGenerator;
 use crate::error::TranspileError;
 use crate::string_literalizer::StringLiteralizer;
 use pasta_dsl::parser::{
-    Action, ActionLine, Args, CallScene, CodeBlock, ContinueAction, Expr, KeyWords, SetValue,
-    Span, VarScope, VarSet,
+    Action, ActionLine, Args, CallScene, CodeBlock, ContinueAction, Expr, KeyWords, SetValue, Span,
+    VarScope, VarSet,
 };
 use std::io::Write;
 
@@ -303,8 +303,14 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                     _ => {
                         // SAFETY: VarScope::Property is handled in the arm above;
                         // resolve_var_path returns Err for Property as a defensive guard.
+                        // Pass the value as-is: talk() renders nil as empty and warns with
+                        // the variable path (2nd arg) instead of printing "nil".
                         let var_path = Self::resolve_var_path(name, scope)?;
-                        self.writeln(&format!("act.{}:talk(tostring({}))", actor, var_path))?;
+                        let path_literal = StringLiteralizer::literalize(&var_path)?;
+                        self.writeln(&format!(
+                            "act.{}:talk({}, {})",
+                            actor, var_path, path_literal
+                        ))?;
                     }
                 }
             }
@@ -315,9 +321,10 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                 match scope {
                     pasta_dsl::parser::FnScope::Local => {
                         // act.アクター:expr_fn("関数名", 引数...)
+                        // Outer parens keep only the first return value; talk() renders nil as empty.
                         let name_literal = StringLiteralizer::literalize(name)?;
                         self.writeln(&format!(
-                            "act.{}:talk(tostring(act.{}:expr_fn({}{})))",
+                            "act.{}:talk((act.{}:expr_fn({}{})))",
                             actor,
                             actor,
                             name_literal,
@@ -327,7 +334,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                     pasta_dsl::parser::FnScope::Global => {
                         // GLOBAL.関数名(act, 引数...)
                         self.writeln(&format!(
-                            "act.{}:talk(tostring(GLOBAL.{}(act{})))",
+                            "act.{}:talk((GLOBAL.{}(act{})))",
                             actor,
                             name,
                             format_args_suffix(&args_str)
@@ -415,12 +422,7 @@ impl<'a, W: Write> LuaCodeGenerator<'a, W> {
                     }
                     pasta_dsl::parser::FnScope::Global => {
                         // GLOBAL.関数名(act, 引数...)
-                        write!(
-                            buf,
-                            "GLOBAL.{}(act{})",
-                            name,
-                            format_args_suffix(&args_str)
-                        )?;
+                        write!(buf, "GLOBAL.{}(act{})", name, format_args_suffix(&args_str))?;
                     }
                 }
             }

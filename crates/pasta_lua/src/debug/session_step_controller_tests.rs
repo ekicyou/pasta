@@ -1,7 +1,7 @@
 //! Inline test cluster externalized from `session.rs` (Task 2.1, pure move).
 //! Cluster: StepController (step over / into / out) integration tests.
-use super::*;
 use super::session_test_support::*;
+use super::*;
 
 use crate::debug::breakpoints::BreakpointSet;
 use crate::debug::types::{SourceRef, StopReason};
@@ -59,7 +59,11 @@ fn step_over_skips_called_function() {
     // Step over the call.
     host.cont(SessionCommand::Next);
     let (reason, line) = host.recv_stop();
-    assert_eq!(reason, StopReason::Step, "step over must stop with reason Step");
+    assert_eq!(
+        reason,
+        StopReason::Step,
+        "step over must stop with reason Step"
+    );
     assert_eq!(
         line, 7,
         "step over must stop at the next line in the SAME frame (7), NOT inside helper"
@@ -82,7 +86,11 @@ fn step_in_enters_called_function() {
 
     host.cont(SessionCommand::StepIn);
     let (reason, line) = host.recv_stop();
-    assert_eq!(reason, StopReason::Step, "step in must stop with reason Step");
+    assert_eq!(
+        reason,
+        StopReason::Step,
+        "step in must stop with reason Step"
+    );
     assert_eq!(
         line, 2,
         "step in must stop at the callee's first body line (2), entering helper"
@@ -111,7 +119,11 @@ fn step_out_returns_to_caller() {
     // Step out: must return to the caller frame past the call (line 7).
     host.cont(SessionCommand::StepOut);
     let (reason, line) = host.recv_stop();
-    assert_eq!(reason, StopReason::Step, "step out must stop with reason Step");
+    assert_eq!(
+        reason,
+        StopReason::Step,
+        "step out must stop with reason Step"
+    );
     assert_eq!(
         line, 7,
         "step out must stop back in the caller after helper returns (line 7)"
@@ -184,7 +196,11 @@ fn step_over_survives_coroutine_yield_and_skips_other_threads() {
     // proving the step key survived the yield/resume boundary (採択B).
     host.cont(SessionCommand::Next);
     let (reason, line) = host.recv_stop();
-    assert_eq!(reason, StopReason::Step, "stepping must stop with reason Step");
+    assert_eq!(
+        reason,
+        StopReason::Step,
+        "stepping must stop with reason Step"
+    );
     assert_eq!(
         line, 4,
         "a step over `coroutine.yield()` must complete at the post-yield body \

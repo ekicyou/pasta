@@ -210,12 +210,12 @@ do
         -- 意図: 引数参照（＄０→args[1]、＄１→args[2]）Pasta DSLの0-baseをLua 1-baseに変換（Requirement 3d）
         --       各アクション要素は個別のtalk/tostring呼び出しに展開（Requirement 3d）
         act.さくら:talk("第１引数は")
-        act.さくら:talk(tostring(args[1]))
+        act.さくら:talk(args[1], "args[1]")
         act.さくら:talk("だよ。")
 
         -- 　　　うにゅう：第２引数は＄１　やね。
         act.うにゅう:talk("第２引数は")
-        act.うにゅう:talk(tostring(args[2]))
+        act.うにゅう:talk(args[2], "args[2]")
         act.うにゅう:talk("やね。")
     end
 
@@ -257,7 +257,7 @@ do
         -- 　　　うにゅう：幅は＄ゴースト名　だって。
         -- 意図: 通常のローカル変数参照は tostring(var.name) に展開
         act.うにゅう:talk("幅は")
-        act.うにゅう:talk(tostring(var.ゴースト名))
+        act.うにゅう:talk(var.ゴースト名, "var.ゴースト名")
         act.うにゅう:talk("だって。")
     end
 end

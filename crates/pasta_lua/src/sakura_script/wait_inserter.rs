@@ -98,7 +98,10 @@ pub fn insert_waits(tokens: &[Token], wait_values: &WaitValues) -> String {
             }
 
             // Rules 4-5: Punctuation - accumulate and track max
-            TokenKind::Period | TokenKind::Comma | TokenKind::Strong | TokenKind::LineStartProhibited => {
+            TokenKind::Period
+            | TokenKind::Comma
+            | TokenKind::Strong
+            | TokenKind::LineStartProhibited => {
                 let wait = match &token.kind {
                     TokenKind::Period => wait_values.period,
                     TokenKind::Comma => wait_values.comma,
@@ -127,7 +130,11 @@ pub fn insert_waits(tokens: &[Token], wait_values: &WaitValues) -> String {
 }
 
 /// Flush pending punctuation with wait tag.
-fn flush_pending(result: &mut String, pending_text: &mut String, pending_max_wait: &mut Option<i64>) {
+fn flush_pending(
+    result: &mut String,
+    pending_text: &mut String,
+    pending_max_wait: &mut Option<i64>,
+) {
     if !pending_text.is_empty() {
         result.push_str(pending_text);
 
@@ -380,6 +387,9 @@ mod tests {
 
         let result = insert_waits(&tokens, &wait_values);
 
-        assert_eq!(result, r"\h\s[0]こ\_w[50]ん\_w[50]に\_w[50]ち\_w[50]は\_w[50]");
+        assert_eq!(
+            result,
+            r"\h\s[0]こ\_w[50]ん\_w[50]に\_w[50]ち\_w[50]は\_w[50]"
+        );
     }
 }

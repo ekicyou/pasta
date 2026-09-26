@@ -431,7 +431,11 @@ fn serve(
                 return;
             }
             let parsed = read_frame(&mut reader);
-            if reader.get_ref().set_read_timeout(Some(POLL_INTERVAL)).is_err() {
+            if reader
+                .get_ref()
+                .set_read_timeout(Some(POLL_INTERVAL))
+                .is_err()
+            {
                 return;
             }
             match parsed {

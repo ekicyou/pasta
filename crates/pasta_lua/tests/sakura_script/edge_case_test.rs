@@ -223,9 +223,7 @@ fn test_register_with_none_config_uses_defaults() {
     let module = pasta_lua::sakura_script::register(&lua, None).unwrap();
 
     let talk_to_script: mlua::Function = module.get("talk_to_script").unwrap();
-    let result: String = talk_to_script
-        .call((mlua::Value::Nil, "あ。"))
-        .unwrap();
+    let result: String = talk_to_script.call((mlua::Value::Nil, "あ。")).unwrap();
 
     // Default normal=50 → effective 0 (no tag); period=1000 → \_w[950]
     assert_eq!(result, r"あ。\_w[950]");

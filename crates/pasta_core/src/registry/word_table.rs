@@ -216,12 +216,13 @@ impl WordTable {
             .collect();
 
         // Step 5: Return first word and cache the rest
-        let result = shuffled_words
-            .first()
-            .cloned()
-            .ok_or_else(|| WordTableError::WordNotFound {
-                key: key.to_string(),
-            })?;
+        let result =
+            shuffled_words
+                .first()
+                .cloned()
+                .ok_or_else(|| WordTableError::WordNotFound {
+                    key: key.to_string(),
+                })?;
         self.cached_selections.insert(
             cache_key,
             CachedWordSelection {

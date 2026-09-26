@@ -39,13 +39,22 @@ fn write_then_read_sidecar_round_trips_to_memory_map() {
 
     // サイドカーファイルが生成 .lua の隣に存在する。
     let sidecar = sidecar_path_for_lua(&lua_path);
-    assert!(sidecar.exists(), "サイドカー <lua>.map が生成されること（3.2）");
+    assert!(
+        sidecar.exists(),
+        "サイドカー <lua>.map が生成されること（3.2）"
+    );
 
     // JSON が version + pasta_file + ペア列を含む（自己記述スキーマ・602）。
     let raw = std::fs::read_to_string(&sidecar).unwrap();
     let parsed: SidecarFile = serde_json::from_str(&raw).unwrap();
-    assert_eq!(parsed.version, SIDECAR_VERSION, "version フィールドを持つ（602）");
-    assert_eq!(parsed.pasta_file, pasta_file, "pasta_file フィールドを持つ（602）");
+    assert_eq!(
+        parsed.version, SIDECAR_VERSION,
+        "version フィールドを持つ（602）"
+    );
+    assert_eq!(
+        parsed.pasta_file, pasta_file,
+        "pasta_file フィールドを持つ（602）"
+    );
     // 行ペアは .lua 行昇順かつ決定的（8.3）。
     assert_eq!(
         parsed.pairs,
@@ -104,7 +113,10 @@ fn write_sidecar_failure_is_non_fatal_and_leaves_memory_map_intact() {
     std::fs::write(&blocker, b"i am a file, not a dir").unwrap();
     // サイドカーの親（= blocker/sub）がファイル配下になり作成不能。
     let bad_lua = blocker.join("sub").join("x.lua");
-    assert!(blocker.is_file(), "前提: 親パスはファイル（ディレクトリ作成不能）");
+    assert!(
+        blocker.is_file(),
+        "前提: 親パスはファイル（ディレクトリ作成不能）"
+    );
 
     let map = sample_map();
     let before = map.len();
@@ -199,16 +211,14 @@ fn write_sidecar_creates_parents_and_round_trips_empty_map() {
     let lua_path = dir.path().join("nested").join("deep").join("x.lua");
     let empty = ChunkSourceMap::new();
 
-    write_sidecar(&lua_path, "dict.pasta", &empty)
-        .expect("親ディレクトリを作成して書き込めること");
+    write_sidecar(&lua_path, "dict.pasta", &empty).expect("親ディレクトリを作成して書き込めること");
     assert!(sidecar_path_for_lua(&lua_path).exists());
 
     // 空マップの往復同一性。
     let reread = read_sidecar(&lua_path).expect("read_sidecar");
     assert!(reread.is_empty());
     let parsed: SidecarFile =
-        serde_json::from_slice(&std::fs::read(sidecar_path_for_lua(&lua_path)).unwrap())
-            .unwrap();
+        serde_json::from_slice(&std::fs::read(sidecar_path_for_lua(&lua_path)).unwrap()).unwrap();
     assert_eq!(parsed.pairs, Vec::<[u32; 2]>::new());
     assert_eq!(parsed.version, SIDECAR_VERSION);
 }

@@ -165,8 +165,8 @@ fn enable_disabled_returns_none_and_no_trace() {
 /// 異なり、本テストは **enable レベルで「sink を渡しても無効なら非活性」** を固定する。
 #[test]
 fn disabled_enable_keeps_wired_kick_sink_inert() {
-    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
     use crate::debug::kick::{KickRequest, KickSink};
 

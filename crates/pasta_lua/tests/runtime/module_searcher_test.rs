@@ -214,7 +214,11 @@ fn chunk_identity_matches_standard_for_both_filename_patterns() {
     // 引数（モジュール名 1 個）まで比較対象に入っていることを明示する。
     for (module, probe) in [("plain", &plain), ("a.b", &dotted), ("pkg.sub", &init)] {
         let fields: Vec<&str> = probe.split('\u{1}').collect();
-        assert_eq!(fields.len(), 4, "プローブの戻り値の構造が想定と違う: {probe}");
+        assert_eq!(
+            fields.len(),
+            4,
+            "プローブの戻り値の構造が想定と違う: {probe}"
+        );
         assert_eq!(fields[2], "1", "チャンクへの引数の個数が 1 でない: {probe}");
         assert_eq!(fields[3], module, "チャンクへの引数がモジュール名でない");
     }

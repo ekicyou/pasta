@@ -5,7 +5,7 @@
 
 use crate::common;
 
-use common::{create_sakura_test_runtime_with_config};
+use common::create_sakura_test_runtime_with_config;
 use pasta_lua::loader::TalkConfig;
 
 // ============================================

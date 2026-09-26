@@ -349,7 +349,8 @@ fn test_transpile_multi_key_global_word_lua_output() {
         "女性キーの create_word が出力されること: {lua_code}"
     );
     assert!(
-        lua_code.contains("PASTA.create_word(\"水の妖精\"):entry(\"水無灯里\", \"アリス・キャロル\")"),
+        lua_code
+            .contains("PASTA.create_word(\"水の妖精\"):entry(\"水無灯里\", \"アリス・キャロル\")"),
         "水の妖精キーの create_word が出力されること: {lua_code}"
     );
 }

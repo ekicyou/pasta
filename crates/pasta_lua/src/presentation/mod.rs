@@ -205,7 +205,14 @@ mod tests {
     #[test]
     fn minimal_set_excludes_out_of_scope_tokens() {
         // R2.7: 最小集合外（surface/newline/clear 等）は具体実装せず拡張境界（既定パススルー）。
-        for ty in ["surface", "newline", "clear", "raw_script", "spot", "choice_timeout"] {
+        for ty in [
+            "surface",
+            "newline",
+            "clear",
+            "raw_script",
+            "spot",
+            "choice_timeout",
+        ] {
             let m = PresentationMarker::classify(ty, &Fields::default());
             assert!(
                 !m.is_minimal(),

@@ -102,8 +102,11 @@ fn build_kick_ghost_dir() -> (PathBuf, TempDir) {
         String::new(),
     ]
     .join("\n");
-    std::fs::write(temp.path().join("dic").join("kick_e2e.pasta"), kick_scene_pasta)
-        .expect("write kick_e2e.pasta");
+    std::fs::write(
+        temp.path().join("dic").join("kick_e2e.pasta"),
+        kick_scene_pasta,
+    )
+    .expect("write kick_e2e.pasta");
 
     (temp.path().to_path_buf(), temp)
 }

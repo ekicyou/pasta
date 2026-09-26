@@ -40,8 +40,10 @@ impl SourceMapSink for CapturingSink {
     // `span.is_valid()`), so `record_line` synthesizes a line-only span to satisfy
     // the trait contract.
     fn record_line(&mut self, lua_line: u32, pasta_line: u32) {
-        self.records
-            .push((lua_line, Span::new(pasta_line as usize, 0, pasta_line as usize, 0, 0, 0)));
+        self.records.push((
+            lua_line,
+            Span::new(pasta_line as usize, 0, pasta_line as usize, 0, 0, 0),
+        ));
     }
 
     // Override the default sugar to capture the FULL originating span (the test
@@ -75,7 +77,10 @@ fn test_transpile_with_sink_collects_records() {
 
     // 出力は実際に Lua を生成している（vacuous でない）。
     let lua = String::from_utf8(output).expect("utf-8");
-    assert!(lua.contains("act.さくら:talk("), "talk action emitted: {lua}");
+    assert!(
+        lua.contains("act.さくら:talk("),
+        "talk action emitted: {lua}"
+    );
 
     // sink は少なくとも 1 件の (lua_line, span) を捕捉する。
     assert!(
@@ -83,7 +88,10 @@ fn test_transpile_with_sink_collects_records() {
         "1.1/3.1: sink must capture at least one (lua_line -> pasta span) record"
     );
     let (lua_line, span) = sink.records[0];
-    assert!(lua_line >= 1, "recorded lua_line must be a real output line");
+    assert!(
+        lua_line >= 1,
+        "recorded lua_line must be a real output line"
+    );
     assert!(
         span.is_valid(),
         "recorded span must be valid (end_byte > 0): {span:?}"
@@ -113,5 +121,8 @@ fn test_transpile_with_none_sink_byte_matches_wrapper() {
         out_none, out_wrapper,
         "7.1: transpile_with_sink(None) must be byte-identical to the thin transpile wrapper"
     );
-    assert!(!out_wrapper.is_empty(), "fixture must produce real output bytes");
+    assert!(
+        !out_wrapper.is_empty(),
+        "fixture must produce real output bytes"
+    );
 }

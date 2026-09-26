@@ -213,7 +213,10 @@ fn source_map_resolve_lua_to_pasta_matches_normalized_chunk_key() {
 fn source_map_resolve_lua_to_pasta_chunk_or_line_miss_returns_none() {
     let sm = sample_source_map();
     // チャンク名不一致 -> None（.lua フォールバック）。
-    assert_eq!(sm.resolve_lua_to_pasta("C:/proj/cache/unknown.lua", 10), None);
+    assert_eq!(
+        sm.resolve_lua_to_pasta("C:/proj/cache/unknown.lua", 10),
+        None
+    );
     // 既知チャンクだが対応の無い `.lua` 行 -> None。
     assert_eq!(sm.resolve_lua_to_pasta("C:/proj/cache/a.lua", 11), None);
     assert_eq!(sm.resolve_lua_to_pasta("C:/proj/cache/a.lua", 999), None);
@@ -257,9 +260,15 @@ fn source_map_resolve_pasta_to_lua_returns_all_ascending() {
     assert_eq!(resolved_b, vec![("C:/proj/cache/b.lua".to_string(), 5u32)]);
 
     // 対応の無い `.pasta` 行は空 Vec。
-    assert!(sm.resolve_pasta_to_lua("C:/proj/scene/a.pasta", 100).is_empty());
+    assert!(
+        sm.resolve_pasta_to_lua("C:/proj/scene/a.pasta", 100)
+            .is_empty()
+    );
     // 未知ファイルも空 Vec。
-    assert!(sm.resolve_pasta_to_lua("C:/proj/scene/zzz.pasta", 7).is_empty());
+    assert!(
+        sm.resolve_pasta_to_lua("C:/proj/scene/zzz.pasta", 7)
+            .is_empty()
+    );
 }
 
 /// 4.3 最近接調整: `from_line` に対応が無ければ、それ以上で対応を持つ最初の
@@ -270,20 +279,41 @@ fn source_map_nearest_pasta_line_with_mapping() {
     let sm = sample_source_map();
     // a.pasta の対応 `.pasta` 行は {3, 7, 9}。
     // from_line=3（自身が対応を持つ）-> 3。
-    assert_eq!(sm.nearest_pasta_line_with_mapping("C:/proj/scene/a.pasta", 3), Some(3));
+    assert_eq!(
+        sm.nearest_pasta_line_with_mapping("C:/proj/scene/a.pasta", 3),
+        Some(3)
+    );
     // from_line=4（対応なし）-> 次の対応行 7。
-    assert_eq!(sm.nearest_pasta_line_with_mapping("C:/proj/scene/a.pasta", 4), Some(7));
+    assert_eq!(
+        sm.nearest_pasta_line_with_mapping("C:/proj/scene/a.pasta", 4),
+        Some(7)
+    );
     // from_line=8（対応なし）-> 次の対応行 9。
-    assert_eq!(sm.nearest_pasta_line_with_mapping("C:/proj/scene/a.pasta", 8), Some(9));
+    assert_eq!(
+        sm.nearest_pasta_line_with_mapping("C:/proj/scene/a.pasta", 8),
+        Some(9)
+    );
     // from_line=1（最小対応行 3 より前）-> 3。
-    assert_eq!(sm.nearest_pasta_line_with_mapping("C:/proj/scene/a.pasta", 1), Some(3));
+    assert_eq!(
+        sm.nearest_pasta_line_with_mapping("C:/proj/scene/a.pasta", 1),
+        Some(3)
+    );
     // from_line=10（最大対応行 9 より後）-> None。
-    assert_eq!(sm.nearest_pasta_line_with_mapping("C:/proj/scene/a.pasta", 10), None);
+    assert_eq!(
+        sm.nearest_pasta_line_with_mapping("C:/proj/scene/a.pasta", 10),
+        None
+    );
     // 正規化キー（区切り・大小違い）でも一致。
     #[cfg(windows)]
-    assert_eq!(sm.nearest_pasta_line_with_mapping(r"C:\PROJ\Scene\A.pasta", 4), Some(7));
+    assert_eq!(
+        sm.nearest_pasta_line_with_mapping(r"C:\PROJ\Scene\A.pasta", 4),
+        Some(7)
+    );
     // 未知ファイル -> None。
-    assert_eq!(sm.nearest_pasta_line_with_mapping("C:/proj/scene/zzz.pasta", 1), None);
+    assert_eq!(
+        sm.nearest_pasta_line_with_mapping("C:/proj/scene/zzz.pasta", 1),
+        None
+    );
 }
 
 /// 8.3: 双方向解決の提示順序は決定的（同一入力で繰り返し呼んでも同一）。
@@ -375,7 +405,10 @@ fn source_map_insert_empty_chunk_yields_no_resolutions() {
     // 登録済みチャンクだが対応行ゼロ → None。
     assert_eq!(sm.resolve_lua_to_pasta("C:/proj/cache/empty.lua", 1), None);
     // 逆引き・最近接も「対応なし」。
-    assert!(sm.resolve_pasta_to_lua("C:/proj/scene/empty.pasta", 1).is_empty());
+    assert!(
+        sm.resolve_pasta_to_lua("C:/proj/scene/empty.pasta", 1)
+            .is_empty()
+    );
     assert_eq!(
         sm.nearest_pasta_line_with_mapping("C:/proj/scene/empty.pasta", 1),
         None

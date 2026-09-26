@@ -271,7 +271,11 @@ mod tests {
             assert_eq!(cg.out_line(), 2, "write_blank_line advances by 1");
 
             cg.write_raw("frag").unwrap();
-            assert_eq!(cg.out_line(), 2, "write_raw without newline does not advance");
+            assert_eq!(
+                cg.out_line(),
+                2,
+                "write_raw without newline does not advance"
+            );
 
             cg.write_raw("x\ny\nz").unwrap();
             assert_eq!(cg.out_line(), 4, "write_raw advances per embedded newline");

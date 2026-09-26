@@ -118,9 +118,9 @@ pub(super) fn handle_inbound(
     // task-3.1 resolver against the loaded `SourceMap` and reuses the injected
     // `KickSink`; inert when no sink is injected (R2.6). No `\![reload,shiori]` is
     // emitted here (that is task 4.3).
-    if let Some(done) =
-        try_play_scene_at(transport, adapter, req, command, &decoded, source_map, kick_sink)
-    {
+    if let Some(done) = try_play_scene_at(
+        transport, adapter, req, command, &decoded, source_map, kick_sink,
+    ) {
         return done;
     }
 
@@ -370,9 +370,7 @@ fn try_play_scene_at(
             ),
             // Strict parse failure (invalid `{uri, line}`): do NOT resolve / kick;
             // return an error response (R4.4).
-            (Some(_), None) => {
-                dap.play_scene_at_error(request_seq, "位置 (uri, line) が不正です")
-            }
+            (Some(_), None) => dap.play_scene_at_error(request_seq, "位置 (uri, line) が不正です"),
         }
     };
     if transport.send(response).is_err() {

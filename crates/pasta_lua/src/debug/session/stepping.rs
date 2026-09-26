@@ -96,9 +96,7 @@ impl DebugSession {
             return false;
         }
         match kind {
-            StepKind::Over => {
-                depth < base_depth || (depth == base_depth && line != start_line)
-            }
+            StepKind::Over => depth < base_depth || (depth == base_depth && line != start_line),
             StepKind::In => depth > base_depth || line != start_line,
             StepKind::Out => depth < base_depth,
         }

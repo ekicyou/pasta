@@ -32,7 +32,7 @@
 
 use crate::actor::lifecycle;
 use crate::util::hglobal::*;
-use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::ptr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tracing::{error, info, warn};
@@ -146,7 +146,10 @@ fn load_entry(entry: &str, hdir: HGLOBAL, len: usize, encoding: DirEncoding) -> 
     match result {
         Ok(rc) => rc,
         Err(p) => {
-            error!("[pasta_shiori::{entry}] panic at SHIORI boundary: {}", panic_msg(&p));
+            error!(
+                "[pasta_shiori::{entry}] panic at SHIORI boundary: {}",
+                panic_msg(&p)
+            );
             false
         }
     }
@@ -220,7 +223,10 @@ pub extern "C" fn unload() -> bool {
         }
     }));
     if let Err(p) = result {
-        error!("[pasta_shiori::unload] panic at SHIORI boundary: {}", panic_msg(&p));
+        error!(
+            "[pasta_shiori::unload] panic at SHIORI boundary: {}",
+            panic_msg(&p)
+        );
     }
     // SHIORI 契約上 unload は常に true（既存の always-true 姿勢を維持）。
     true
@@ -256,7 +262,10 @@ pub extern "C" fn request(req: HGLOBAL, len: &mut usize) -> HGLOBAL {
             res
         }
         Err(p) => {
-            error!("[pasta_shiori::request] panic at SHIORI boundary: {}", panic_msg(&p));
+            error!(
+                "[pasta_shiori::request] panic at SHIORI boundary: {}",
+                panic_msg(&p)
+            );
             // panic 時も 204 を返し（marshaling の安全網と同一バイト）、ホストへ unwind しない。
             emit_response(&crate::actor::marshaling::default_204(), len)
         }

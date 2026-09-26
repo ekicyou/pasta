@@ -79,8 +79,7 @@ return acc
 "
         );
 
-        let scene_fn: mlua::Function =
-            lua.load(&body).set_name(&chunk_name).into_function()?;
+        let scene_fn: mlua::Function = lua.load(&body).set_name(&chunk_name).into_function()?;
 
         let driver: mlua::Function = lua
             .load(
@@ -164,8 +163,7 @@ fn hook_fires_across_dynamic_coroutines() {
     let lua = build_all_safe_vm();
     let sink: Arc<Mutex<Vec<Fired>>> = Arc::new(Mutex::new(Vec::new()));
 
-    let _h = install(&lua, recording_handler(Arc::clone(&sink)))
-        .expect("install must succeed");
+    let _h = install(&lua, recording_handler(Arc::clone(&sink))).expect("install must succeed");
 
     run_scene_like_scenario(&lua, N).expect("scene-like scenario must run");
 

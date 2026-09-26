@@ -7,8 +7,8 @@
 //! - Expression中のProperty参照 → TranspileError::PropertyInExpression
 
 use pasta_dsl::parser::{Action, BinOp, Expr, SetValue, Span, VarScope, VarSet};
-use pasta_lua::code_gen::LuaCodeGenerator;
 use pasta_lua::TranspileError;
+use pasta_lua::code_gen::LuaCodeGenerator;
 
 // ============================================================================
 // SET tests (generate_property_set via generate_var_set)

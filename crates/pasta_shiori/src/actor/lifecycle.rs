@@ -42,10 +42,12 @@ use arc_swap::ArcSwapOption;
 use flume::Sender;
 use pasta_lua::debug::{KickRequest, KickSink};
 
-use crate::actor::mailbox::{mailbox, ActorMsg, MailboxRequest};
-use crate::actor::marshaling::{default_204, marshal_get, marshal_notify, determine_method, ShioriMethod};
-use crate::actor::teardown::{teardown_via_sender, TeardownReport};
-use crate::actor::thread::{spawn_actor_thread, ActorThread};
+use crate::actor::mailbox::{ActorMsg, MailboxRequest, mailbox};
+use crate::actor::marshaling::{
+    ShioriMethod, default_204, determine_method, marshal_get, marshal_notify,
+};
+use crate::actor::teardown::{TeardownReport, teardown_via_sender};
+use crate::actor::thread::{ActorThread, spawn_actor_thread};
 
 /// FFI 入口が teardown ack を待つ既定の上限。通常運転では teardown は速やかに完了する。
 /// 万一アクターが ack を返さない場合でも SHIORI スレッド（＝SSP 側）を無限待機させない安全網。
@@ -84,7 +86,11 @@ pub fn spawn_actor(hinst: isize, load_dir: PathBuf) -> bool {
     let actor = spawn_actor_thread(hinst, load_dir, rx);
     let loaded = actor.loaded();
     // 観測ログ点（R10.4・無効時ゼロコスト）: FFI load 起点でアクターを起動した（R4.4）。
-    tracing::debug!(seam = "actor.spawn", loaded, "lifecycle: actor spawned from FFI load entry");
+    tracing::debug!(
+        seam = "actor.spawn",
+        loaded,
+        "lifecycle: actor spawned from FFI load entry"
+    );
 
     // 送信端を lock-free スロットへ格納（以後の送信は MAILBOX.load() で参照）。
     MAILBOX.store(Some(std::sync::Arc::new(tx)));
@@ -121,9 +127,7 @@ pub fn marshal_request(request: &str) -> String {
 
     let seq = REQUEST_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     match determine_method(request) {
-        Some(ShioriMethod::Get) => {
-            marshal_get(&tx, MailboxRequest::new(seq, request.to_string()))
-        }
+        Some(ShioriMethod::Get) => marshal_get(&tx, MailboxRequest::new(seq, request.to_string())),
         Some(ShioriMethod::Notify) => {
             marshal_notify(&tx, MailboxRequest::new(seq, request.to_string()))
         }
@@ -187,7 +191,12 @@ fn kick_into_mailbox(req: KickRequest) {
     };
 
     // fire-and-forget（NOTIFY 同型）: try_send 失敗（満杯/切断）も握って破棄する。
-    if tx.try_send(ActorMsg::Kick { scene: req.scene.clone() }).is_err() {
+    if tx
+        .try_send(ActorMsg::Kick {
+            scene: req.scene.clone(),
+        })
+        .is_err()
+    {
         tracing::debug!(
             seam = "kick.drop",
             scene = %req.scene,
@@ -219,7 +228,10 @@ mod tests {
         assert_send_sync::<Sender<ActorMsg>>();
         // ArcSwapOption は store/load が lock-free（Mutex を含まない）。
         let slot: ArcSwapOption<Sender<ActorMsg>> = ArcSwapOption::const_empty();
-        assert!(slot.load().is_none(), "empty slot loads None without locking");
+        assert!(
+            slot.load().is_none(),
+            "empty slot loads None without locking"
+        );
     }
 
     /// MAILBOX 未初期化時（アクター不在）の marshal_request は 204 に倒し、無限待機しない（R5.6）。

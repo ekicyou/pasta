@@ -87,7 +87,11 @@ fn entry_requiring_missing_module_is_fatal_with_context_and_cause() {
         r#"require("pasta_missing_module_marker")"#,
     );
     let message = load_error_message(&temp);
-    assert_context_and_cause(&message, "pasta.shiori.entry", "pasta_missing_module_marker");
+    assert_context_and_cause(
+        &message,
+        "pasta.shiori.entry",
+        "pasta_missing_module_marker",
+    );
 }
 
 /// 要件 5.1: シーン辞書モジュールの失敗は従来どおり致命（分類は共通ヘルパ経由）。

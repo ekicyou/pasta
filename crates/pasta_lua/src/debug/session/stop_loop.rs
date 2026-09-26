@@ -11,9 +11,7 @@ use mlua::{Debug, Lua, VmState};
 use crate::debug::SourceMode;
 use crate::debug::hook::LineHook;
 use crate::debug::inspect::{capture_stack, capture_variables};
-use crate::debug::types::{
-    Scope, SessionCommand, SessionEvent, StopReason, ThreadInfo,
-};
+use crate::debug::types::{Scope, SessionCommand, SessionEvent, StopReason, ThreadInfo};
 
 use super::{DebugSession, MAIN_THREAD_ID, RunMode, StepKind};
 
@@ -72,7 +70,9 @@ impl DebugSession {
     ) -> mlua::Result<VmState> {
         // Notify the controller of the stop. A missing receiver must not abort
         // the stop, so a send failure is ignored.
-        let _ = self.event_tx.send(SessionEvent::Stopped { reason, thread_id });
+        let _ = self
+            .event_tx
+            .send(SessionEvent::Stopped { reason, thread_id });
 
         loop {
             match self.cmd_rx.recv() {
@@ -84,7 +84,9 @@ impl DebugSession {
 
                 // Enter a step (over/into/out): capture the stepping context at
                 // THIS stop point and resume so the VM runs to the step target.
-                Ok(cmd @ (SessionCommand::Next | SessionCommand::StepIn | SessionCommand::StepOut)) => {
+                Ok(
+                    cmd @ (SessionCommand::Next | SessionCommand::StepIn | SessionCommand::StepOut),
+                ) => {
                     let kind = match cmd {
                         SessionCommand::Next => StepKind::Over,
                         SessionCommand::StepIn => StepKind::In,
@@ -194,7 +196,9 @@ impl DebugSession {
                 // existing per-line read; no extra logic here). Only ever drained
                 // here in `stop_loop`, so "ignore while running" is automatic.
                 Ok(SessionCommand::RefreshPresentation) => {
-                    let _ = self.event_tx.send(SessionEvent::Stopped { reason, thread_id });
+                    let _ = self
+                        .event_tx
+                        .send(SessionEvent::Stopped { reason, thread_id });
                     continue;
                 }
 
