@@ -351,7 +351,7 @@ fn test_e2e_transfer_req_and_date_to_var_from_dsl() {
 ＊転記なし
   さくら：部位＝＄ｒ４　。
 "#;
-    lua.load(&transpile(source)).exec().unwrap();
+    lua.load(transpile(source)).exec().unwrap();
     lua.load("require('pasta').finalize_scene()")
         .exec()
         .unwrap();
@@ -412,7 +412,7 @@ fn test_e2e_undefined_refs_in_action_line_render_empty() {
 ＊未定義参照
   さくら：変数＝＄未代入　単語＝＠未定義語　関数＝＠未定義関数（１）　グローバル＝＄＊未代入　終わり。
 "#;
-    lua.load(&transpile(source)).exec().unwrap();
+    lua.load(transpile(source)).exec().unwrap();
     lua.load("require('pasta').finalize_scene()")
         .exec()
         .unwrap();
