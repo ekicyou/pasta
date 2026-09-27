@@ -6,6 +6,7 @@
 
 - [x] `release.ps1` を実行してゴースト配布物を生成し `hello-pasta.nar` を作成済み
 - [x] GitHub CLI (`gh`) がインストール・認証済み (`gh auth status` で確認)
+- [x] `cargo-about` がインストール済み (`cargo install cargo-about`)。`release.ps1` が第三者ライセンス表示 `THIRD_PARTY_LICENSES.txt` を `pasta.dll` の隣に生成する
 
 ## リリース手順
 
