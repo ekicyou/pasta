@@ -1,6 +1,11 @@
 {
   "permissions": {
     "allow": [
+      "mcp__github__merge_pull_request",
+      "Bash(cargo publish:*)",
+      "PowerShell(vsce publish:*)",
+      "Bash(git push origin v*)",
+      "Bash(gh release create:*)",
       "Bash(git fetch:*)",
       "Bash(git merge origin/main:*)",
       "Bash(git merge --abort)",
@@ -12,6 +17,7 @@
   "autoMode": {
     "allow": [
       "$defaults",
+      "release-workflow（/kiro-impl release-workflow）での release PR のマージコミット方式マージ、cargo publish による crates.io 公開、vsce publish による VSCode Marketplace 公開、リリースタグ push、gh release create を許可する。",
       "gh pr merge による pull request の default ブランチ（main 等）への squash マージを許可する。self-created PR を含み、kiro-complete の完了フローでの自動マージを想定する。"
     ]
   },
