@@ -134,7 +134,7 @@ pasta-source-map 完成後のユーザー実機検証（2026-06-08）で判明�
 - **却下**: スキル抽出＋spec ラッパ（2層化）、pasta 具体特化（移植時 tasks 再生成が必要）
 
 ### Specs (dependency order)
-- [ ] review-improvement-loop -- 移植可能・再実行型のコード総合レビュー＆改善ループ（領域自己発見 × 7 次元マトリクス・サブエージェント委譲・破壊検知＋巻き戻し・改善レポート）。Dependencies: none。brief.md 作成済み（`.kiro/specs/review-improvement-loop/brief.md`）
+- [x] review-improvement-loop -- 移植可能・再実行型のコード総合レビュー＆改善ループ（領域自己発見 × 7 次元マトリクス・サブエージェント委譲・破壊検知＋巻き戻し・改善レポート）。Dependencies: none。**初回完走 2026-06-12（64 セル・71 タスク）**。再実行型のため `completed/` へは移動せず `.kiro/specs/review-improvement-loop/` に常駐（`/kiro-impl` で再実行）
 
 ## Phase 7: アクターモデル駆動エンジン（独立スレッド化＋シーン再生キック）
 

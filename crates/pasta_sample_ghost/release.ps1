@@ -120,6 +120,27 @@ else {
     Copy-Item -Path $DllSrc -Destination $DllDest -Force
     Write-Host "  Copied pasta.dll"
 
+    # Generate third-party license notices for pasta.dll (about.toml / about.hbs)
+    if (-not (Get-Command cargo-about -ErrorAction SilentlyContinue)) {
+        Write-Host ""
+        Write-Host "ERROR: cargo-about not found. Install via: cargo install cargo-about" -ForegroundColor Red
+        exit 1
+    }
+    $LicensesDest = Join-Path $MasterDir "THIRD_PARTY_LICENSES.txt"
+    Push-Location $WorkspaceRoot
+    try {
+        & cargo about generate --output-file $LicensesDest about.hbs
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host ""
+            Write-Host "ERROR: cargo about generate failed" -ForegroundColor Red
+            exit 1
+        }
+    }
+    finally {
+        Pop-Location
+    }
+    Write-Host "  Generated THIRD_PARTY_LICENSES.txt"
+
     # Note: pasta_scripts is no longer bundled into master. The Lua framework
     # runtime is embedded in pasta.dll and self-deployed at runtime
     # (Phase 2.5 self-deploy -> profile/pasta/pasta_scripts).

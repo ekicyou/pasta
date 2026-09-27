@@ -1,0 +1,27 @@
+# cargo-about 設定: 配布バイナリ（pasta.dll / VSIX 同梱 wasm）の第三者ライセンス表示を生成する。
+# build-dependency 経由で静的リンクされる LuaJIT（luajit-src）は依存解析に出ないため about.hbs に固定で記載している。
+# 許可ライセンスは deny.toml の [licenses].allow と揃えること。
+accepted = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "NCSA",
+    "Unicode-3.0",
+    "Zlib",
+    "BSL-1.0",
+]
+targets = ["i686-pc-windows-msvc", "x86_64-pc-windows-msvc", "wasm32-unknown-unknown"]
+ignore-dev-dependencies = true
+ignore-build-dependencies = true
+
+# seahorse (budouy 経由) は Cargo.toml に license 欄が無いため、同梱 LICENSE (MIT) で明示する
+[seahorse.clarify]
+license = "MIT"
+
+[[seahorse.clarify.files]]
+path = "LICENSE"
+license = "MIT"
+checksum = "d379d27dfb8a156e0f646587087ceb29044d32ded092e50eff51e39606f23de2"
