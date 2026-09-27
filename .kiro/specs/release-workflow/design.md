@@ -437,7 +437,7 @@ flowchart TD
 **実行手順**
 1. **ビルド** (5.1): `Push-Location crates/pasta_sample_ghost; PowerShell -ExecutionPolicy Bypass -File release.ps1; Pop-Location`。
 2. **成果物確認** (5.2–5.4): `Test-Path release/hello-pasta.nar` と `Test-Path target/i686-pc-windows-msvc/release/pasta.dll`。いずれか False なら中断。
-3. **zip 圧縮** (5.5–5.7): `Compress-Archive -Path .../pasta.dll -DestinationPath .../pasta.dll.zip -Force` → `Test-Path` 確認。
+3. **zip 圧縮** (5.5–5.7): `Compress-Archive -Path .../pasta.dll,<ghost master>/THIRD_PARTY_LICENSES.txt -DestinationPath .../pasta.dll.zip -Force` → `Test-Path` 確認。第三者ライセンス表示（release.ps1 が `cargo about` で生成）を DLL と同梱する。
 4. **コミット** (5.8): `git commit -m "chore(release): build hello-pasta vX.Y.Z"`（Stage A の HEAD コミット = タグ対象）。
 
 #### Phase 4a: VsixPackage（非クリティカル）

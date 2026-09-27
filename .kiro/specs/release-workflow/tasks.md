@@ -77,7 +77,7 @@
 - [ ] 3.1 サンプルゴーストをビルドし成果物を確認・コミットする
   - `Push-Location crates/pasta_sample_ghost; PowerShell -ExecutionPolicy Bypass -File release.ps1; Pop-Location`（ローカルソースから pasta.dll をビルド）。失敗時はエラーを報告し中断
   - `Test-Path "release/hello-pasta.nar"` と `Test-Path "target/i686-pc-windows-msvc/release/pasta.dll"` を確認する（いずれか不在なら中断）
-  - `Compress-Archive -Path "target/i686-pc-windows-msvc/release/pasta.dll" -DestinationPath "target/i686-pc-windows-msvc/release/pasta.dll.zip" -Force` → `Test-Path` で確認（失敗時中断）
+  - `Compress-Archive -Path "target/i686-pc-windows-msvc/release/pasta.dll","crates/pasta_sample_ghost/ghosts/hello-pasta/ghost/master/THIRD_PARTY_LICENSES.txt" -DestinationPath "target/i686-pc-windows-msvc/release/pasta.dll.zip" -Force` → `Test-Path` で確認（失敗時中断）
   - `git add -A; git commit -m "chore(release): build hello-pasta vX.Y.Z"`（このコミットが Stage A HEAD＝タグ対象）
   - 完了条件: hello-pasta.nar・pasta.dll・pasta.dll.zip が存在し、ゴーストビルドコミットが git ログに記録されている
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.9, 8.6_

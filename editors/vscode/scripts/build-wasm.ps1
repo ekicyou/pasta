@@ -108,4 +108,22 @@ $gitignore = Join-Path $WasmOutDir ".gitignore"
 if (Test-Path $packageJson) { Remove-Item $packageJson -Force }
 if (Test-Path $gitignore) { Remove-Item $gitignore -Force }
 
+# ---- Third-party license notices (bundled into the VSIX with the wasm) ----
+if (-not (Get-Command cargo-about -ErrorAction SilentlyContinue)) {
+    Write-Host "[ERROR] cargo-about not found. Install via: cargo install cargo-about" -ForegroundColor Red
+    exit 1
+}
+Push-Location $ProjectRoot
+try {
+    cargo about generate --output-file (Join-Path $WasmOutDir "THIRD_PARTY_LICENSES.txt") about.hbs
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[ERROR] cargo about generate failed (exit code: $LASTEXITCODE)" -ForegroundColor Red
+        exit $LASTEXITCODE
+    }
+}
+finally {
+    Pop-Location
+}
+Write-Host "[OK] THIRD_PARTY_LICENSES.txt generated" -ForegroundColor Green
+
 Write-Host "[OK] WASM build pipeline completed successfully!" -ForegroundColor Green
