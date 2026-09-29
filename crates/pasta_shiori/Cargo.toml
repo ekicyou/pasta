@@ -38,6 +38,11 @@ arc-swap.workspace = true
 # 追加する。ベースの windows-sys（Foundation/Memory/Globalization）は workspace から継承。
 windows-sys = { workspace = true, features = ["Win32_System_Threading"] }
 
+[build-dependencies]
+# pasta.dll のプロパティ「詳細」にファイル/製品バージョンを出す VERSIONINFO を埋め込む。
+# 非 Windows ターゲットでは何もしない。
+embed-resource.workspace = true
+
 [dev-dependencies]
 tempfile.workspace = true
 # テスト前に ambient な PASTA_DEBUG を中和するための before-main フック
