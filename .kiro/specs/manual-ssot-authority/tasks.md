@@ -97,7 +97,7 @@
   - _Boundary: ContentMigration（reference/pasta-toml）_
   - _Depends: 1.3_
 
-- [ ] 2.8 (P) 生成対象外章の誤記訂正と導入章の定義整理を行う
+- [x] 2.8 (P) 生成対象外章の誤記訂正と導入章の定義整理を行う
   - 1.3 の grep 結果に従い、生成対象外章（lua/patterns の `function(req)`・`RES.ok_with` を含む）の誤記を実装どおりに訂正し、詳細は SHIORI イベント章へ誘導する
   - 導入章の「将来変更あり」の定義を「現行挙動だが将来変わり得る箇所の注記」に限定する
   - 入門章の hello-pasta 照合ブロックは変更しない
@@ -298,3 +298,4 @@
 - 2.5 後: 台帳本体のスキル pasta-toml.md の行（見出し行番号）は main 取り込み（#45）で吸収元がずれたため、scratchpad の ledger-check で L259 spot 以降 9 見出しが未対応になる。2.7 で台帳の pasta-toml 節を取り込み後の pasta-toml.md（`surface / dressup` 節を含む）に合わせて更新する。
 - 2.6: 既定の OnChoiceSelectEx は Reference0（SSP では表示ラベル）を選択 ID として読む（U31・バグ候補）。表示名付き選択肢は実機で自動ルーティングされない。マニュアルは「選択 ID で探す」と UKADOC どおりの Reference 表だけを書く。scripts/main.lua で `REG.OnBoot`/`OnChoiceSelectEx`/`OnSecondChange` を上書きすると起動順（main→entry→event/init）により既定に戻される（バグ候補にはしない・章に回避策を記載）。lua/shiori-events.md の「pasta.toml 設定」節から reference/pasta-toml.md へのリンクは 2.7 で張る。SUMMARY・lua/index.md・block-structure#選択肢行 からのリンクは 2.9。
 - 2.7: `[logging] rotation_days` は読まれない（U32・バグ候補・マニュアルに書かない）。型の合わない値で `[talk]`・`[persistence]`・`[logging]`・`[debug]` 全体が黙って既定値に戻るのは意図された挙動（テスト `test_custom_section_type_mismatch_returns_none`）として章に記載。`pasta_patterns` から `.lua` パターンが自動生成される挙動（U33）をコントローラが章に追記した。台帳 pasta-toml 節は取り込み後の行番号へ再同期済み（ledger-check OK）。first-ghost.md L415 の「設定ファイルリファレンス」言及は 2.9 で新章へリンクする。
+- 2.8 後: 担当が未定だった台帳本体 2 行を割り当てる。L342（GRAMMAR.md L801 → reference/startup.md#4 に `Parse error: ファイル:行:列: 内容` の形式を追記）は 2.9（startup.md を触るため）。L262（doc/spec/README L63「外部仕様」→ reference/external-links.md に Unicode UAX #31・ukadoc さくらスクリプト一覧のリンク追記）は 3.5（external-links の doc/spec リンク群削除と同時）。verify-static R1.2 は新章が SUMMARY 未登録のため 2.9 まで 1 件失敗する（P2 中の一時状態）。

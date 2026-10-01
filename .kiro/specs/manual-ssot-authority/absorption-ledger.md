@@ -994,9 +994,9 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 
 | 位置 | 記述（要旨） | 判定 | 訂正先 |
 | ---- | ------------ | ---- | ------ |
-| lua/patterns.md:94 | `REG.OnBoot = function(req)`（L95 の `req.reference[0]` を含む） | 訂正対象 | 2.8 |
-| lua/patterns.md:99 | `REG.OnClose = function(req)`（L100 を含む） | 訂正対象 | 2.8 |
-| lua/patterns.md:108 | 「ハンドラは `req` を受け取る」とフィールド表 `req.id` 等（L110〜L115） | 訂正対象 | 2.8 |
+| lua/patterns.md:94 | `REG.OnBoot = function(req)`（L95 の `req.reference[0]` を含む） | 訂正対象・訂正済み（2.8） | 2.8 |
+| lua/patterns.md:99 | `REG.OnClose = function(req)`（L100 を含む） | 訂正対象・訂正済み（2.8） | 2.8 |
+| lua/patterns.md:108 | 「ハンドラは `req` を受け取る」とフィールド表 `req.id` 等（L110〜L115） | 訂正対象・訂正済み（2.8） | 2.8 |
 | lua/dsl-vs-lua.md:37 | カスタムイベント処理は REG に登録 | 正 | — |
 | lc/SKILL.md:84 | `REG.EventName = function(req) ... end` | 訂正対象 | 4.4 |
 | lc/references/shiori-handlers.md:20 | 登録パターン `function(req)`（L103・L123・L138・L157・L201・L225・L253・L300 の例も同じ） | 生成で置換（4.1）・訂正済み（2.6） | 2.6（移設時）・4.1 |
@@ -1014,7 +1014,7 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 
 | 位置 | 記述（要旨） | 判定 | 訂正先 |
 | ---- | ------------ | ---- | ------ |
-| lua/patterns.md:124 | `RES.ok_with(headers)`: 200 OK＋複数ヘッダ | 訂正対象 | 2.8 |
+| lua/patterns.md:124 | `RES.ok_with(headers)`: 200 OK＋複数ヘッダ | 訂正対象・訂正済み（2.8） | 2.8 |
 | lua/patterns.md:123 | `RES.ok(value)`: 200 OK＋さくらスクリプト | 正 | — |
 | lua/patterns.md:126 | `RES.err(message)`: 500 | 正 | — |
 | lua/patterns.md:125 | `RES.no_content()`: 204 No Content | 正 | — |
@@ -1290,7 +1290,7 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 
 | 位置 | 記述（要旨） | 判定 | 訂正先 |
 | ---- | ------------ | ---- | ------ |
-| getting-started/prerequisites.md:36 | 節「文字コードは必ず UTF-8」（L38〜L50。BOM の記述なし） | 追記対象 | 2.8 |
+| getting-started/prerequisites.md:36 | 節「文字コードは必ず UTF-8」（L38〜L50。BOM の記述なし） | 追記対象・訂正済み（2.8） | 2.8 |
 | getting-started/first-ghost.md:439 | 文字化けするときは UTF-8 で保存されているか確認 | 正 | — |
 | lua/basics.md:54 | 辞書・スクリプトはすべて UTF-8 | 正 | — |
 
@@ -1366,9 +1366,9 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 
 | 位置 | 記述（要旨） | 判定 | 訂正先 |
 | ---- | ------------ | ---- | ------ |
-| lua/patterns.md:96 | `return RES.ok("\\h\\s[0]起動しました。\\e")`（L102 を含む） | 訂正対象 | 2.8 |
-| lua/patterns.md:104 | `return RES.no_content()  -- 表示なしで処理完了` | 訂正対象 | 2.8 |
-| lua/patterns.md:88 | 「`RES` でレスポンスを返す」（L119〜L126 の API 表の位置づけを含む） | 訂正対象 | 2.8 |
+| lua/patterns.md:96 | `return RES.ok("\\h\\s[0]起動しました。\\e")`（L102 を含む） | 訂正対象・訂正済み（2.8） | 2.8 |
+| lua/patterns.md:104 | `return RES.no_content()  -- 表示なしで処理完了` | 訂正対象・訂正済み（2.8） | 2.8 |
+| lua/patterns.md:88 | 「`RES` でレスポンスを返す」（L119〜L126 の API 表の位置づけを含む） | 訂正対象・訂正済み（2.8） | 2.8 |
 | lc/SKILL.md:148 | REG に登録し `RES.ok()`／`RES.no_content()` 等でレスポンスを返す | 訂正対象 | 4.4 |
 | lc/SKILL.md:85 | `pasta.shiori.res`: `RES.ok()`, `RES.no_content()`（モジュール一覧としては正） | 正 | — |
 | lc/references/shiori-handlers.md:22 | 登録パターン `return RES.ok(…)  -- または RES.no_content()`（L106・L125・L141・L159・L205・L226・L257 の例も同じ）（追記: L74・L108・L143・L207・L259 も同じ） | 生成で置換（4.1）・訂正済み（2.6） | 2.6（移設時）・4.1 |
