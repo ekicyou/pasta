@@ -228,7 +228,7 @@
   - _Requirements: 1.3, 1.4, 1.8_
   - _Depends: 1.2, 1.4_
 
-- [ ] 7. 旧権威を撤去する（P6）
+- [x] 7. 旧権威を撤去する（P6）
   - doc/spec ディレクトリを削除し、GRAMMAR.md を「マニュアルへ移った」告知 1 文と公開マニュアル文法章の URL のみにし、book/CONTENT-REVIEW.md を削除する
   - 削除前に台帳の全行が埋まっていること、6 の brief が起票済みであることを再確認する
   - 完了状態: doc/spec が存在せず、GRAMMAR.md が告知と URL のみで、リンク検証とコンテンツ検証が緑のまま
@@ -308,3 +308,4 @@
 - 3.5: verify-content は gen-skill-refs から `GENERATION_MAP` と `findVoice` を import（VOICE_MARKERS は findVoice 経由）。book/manual-sources.toml はもう読まれない（3.6 で削除）。
 - 4.1 後の link-check スキル違反 40 件（4.2〜4.4 の入力）: skill-missing 21（ghost SKILL.md → grammar-model×11・call-spec×2、lua SKILL.md → runtime-api×2・shiori-handlers×2、internal-modules → runtime-api・shiori-handlers、testing-lint → runtime-api#set_scene_selector--set_word_selector×2）、skill-unlisted 15（生成ファイル全て未掲載）、skill-anchor 1（ghost SKILL.md → variables.md#永続化とsaveテーブル）、skill-escape 1（lua SKILL.md → ../../../book/src/reference/startup.md）、skill-forbidden-ref 2（lua SKILL.md L40 book/src、testing-lint L247 crates/）。scratchpad の ledger-check.mjs は旧ファイル削除後は使えない（git 履歴で照合する）。
 - 4.3 レビュー後: アクション行の `＠func（…）`・`＠f` は `act.アクター:expr_fn`／プロキシ経由で、関数の第 1 引数はアクタープロキシ（act は `.act`）。完了仕様 handler-resolution-fallback 要件 3.6・5.1 の意図どおりでバグ候補ではない。マニュアル grammar/variables.md#関数スコープの展開先・words.md にコントローラが追記して再生成した。
+- 7 後の参照修正対象（8.x の入力）: README.md L43–44、SOUL.md L16/L38/L40、OPTIMIZATION.md L139、steering/grammar.md 多数、product.md L17/L99、structure.md L230/241–242/379–380、tech.md L210/L212、book/AUTHORING.md L91/100/135–150/163–164/179–180、crates/pasta_lua/tests/runtime/syntax_test.rs L397（コメント）。link-check はルート Markdown と steering を走査しないため、8.x は網羅 grep で確認する。
