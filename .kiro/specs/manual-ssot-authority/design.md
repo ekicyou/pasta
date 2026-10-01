@@ -205,7 +205,7 @@ book/
 - `.kiro/steering/tech.md`・`structure.md`・`product.md`・`roadmap.md` — drift-check／doc/spec／GRAMMAR.md 記述を生成方式とマニュアル権威へ置換。`roadmap.md` に将来仕様のキー情報を追記。
 - `.claude/skills/kiro-complete/SKILL.md` — ステップ 4 と完了チェックリストの Manual Sync Gate 記述を新ゲートへ置換（判定本体は workflow.md を正とする構造は維持）。
 - `README.md`・`SOUL.md`・`OPTIMIZATION.md` — doc/spec・GRAMMAR.md の行を削除またはマニュアルへ付け替え。`SOUL.md` の衝突ルールを「マニュアル（`book/src/`）を優先し、README・steering・スキル手書きを修正する」へ変更。`.agents/skills` を `.claude/skills` へ修正。
-- `.kiro/specs/review-improvement-loop/{brief,matrix,tasks,design,requirements,research}.md` — 今後の実行指示として読まれる箇所のみ参照修正（OPEN QUESTION 7）。
+- `.kiro/specs/review-improvement-loop/{brief,matrix,tasks,design,requirements,research}.md` — 今後の実行指示として読まれる箇所（文書整合タスクの確認対象、ツールのテストコマンド表、未完了セル・未完了タスクの記述）のみ参照修正する。完了済みセル・完了済みタスクの結果記録と `reports/` は当時の事実として残す（設計ディスカッション #11）。ReferenceRepair の網羅 grep では、残存行が「完了記録」「reports/」のいずれかであることを確認する。
 
 ## System Flows
 
@@ -716,7 +716,7 @@ graph LR
 - リスク: 既知の食い違い（約 20 件）の訂正で作業量が増え、「移し替えのみ」の印象と衝突する → 訂正は「実装に合わせた記述修正」であり挙動不変（10.5）であることを台帳の実装照合列で示す。
 - リスク: 生成対象章の本文に口調コラムを置けなくなる（現行 `AUTHORING.md` はコラムを許容） → 生成器が `voice-in-body` で検出し、規約を `AUTHORING.md` へ明記する。
 
-### 設計ディスカッションへ持ち越す論点（前提を置いて起草済み）
+### 設計ディスカッションの決定（2026-10-01・全 11 件解決済み、未確定の設計論点は無い）
 
 1. ~~スキル生成ファイルの命名~~ → 解決済み（#3）: 全生成ファイルを章名に揃える（`outName` で導出、`index.md` は `{dir}-index.md`）。旧名 4 ファイルは削除。
 2. ~~生成対象外・別スキル宛ての章間リンクの扱い~~ → 解決済み（#4）: 公開マニュアル URL へ書き換え。
@@ -724,7 +724,7 @@ graph LR
 4. ~~Lua API 章の構成~~ → 解決済み（#5）: モジュールごとに章を分ける（`lua/modules/` 配下 8 章、生成も 8 ファイル）。SHIORI は `lua/shiori-events.md` 1 章。
 5. ~~動的単語参照 `＠＄` を brief 化するか~~ → 解決済み（#8）: brief 起票＋roadmap キー情報。
 6. ~~`book/CONTENT-REVIEW.md` の扱い~~ → 解決済み（#10）: 削除する。
-7. `review-improvement-loop` の修正範囲（前提: 今後の指示として読まれる箇所のみ。完了済みセル記録と `reports/` は歴史的記録として残す）。
+7. ~~`review-improvement-loop` の修正範囲~~ → 解決済み（#11）: 今後の指示として読まれる箇所のみ修正。完了記録と `reports/` は残す。
 8. ~~既知の食い違いの訂正範囲~~ → 解決済み（#6）: マニュアル全章・両 `SKILL.md`・スキル手書きファイルを grep し、生成対象外も同時に訂正。
 9. ~~吸収元に無い実装事実の扱い~~ → 解決済み（#7）: バグ候補（判定基準 a〜c）以外は現行挙動としてマニュアルへ収録。バグ候補は台帳付録と roadmap のキー情報へ。
 10. ~~生成対象章の本文から口調を一切排除する規約~~ → 解決済み（#1）: 全面禁止。検出は広い `VOICE_MARKERS` をコードフェンス・表・インラインコード除去後の散文に適用。
