@@ -64,10 +64,11 @@ function SHIORI_ACT_IMPL.build(self)
         return nil
     end
 
-    -- STORE.actor_spotsを直接BUILDER.build()に渡す（直接変更方式）
+    -- STORE.actor_spots・STORE.appearanceを直接BUILDER.build()に渡す（直接変更方式）
+    -- STORE.appearanceがnil（旧ストア）ならビルダーがビルドローカル状態を使う
     local script = BUILDER.build(token, {
         spot_newlines = self._spot_newlines
-    }, STORE.actor_spots)
+    }, STORE.actor_spots, STORE.appearance)
 
     return script
 end

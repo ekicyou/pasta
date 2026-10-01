@@ -2299,6 +2299,22 @@ describe("SAKURA_BUILDER - actor-surface-restore: サーフェス復旧の統合
         expect(r2):toBe("\\p[0]A2\\p[1]B2\\e")
     end)
 
+    test("2.7: 同一の外見状態を渡した後続ビルドで、B の \\p[0] 直後に \\s[10] を復旧する", function()
+        local BUILDER, actors = setup()
+        local a, b = actors.sakura, actors.kero
+        local appearance = require("pasta.shiori.appearance").new()
+        local actor_spots = { ["さくら"] = 0, ["うにゅう"] = 0 }
+        local r1 = BUILDER.build({
+            group(b, { talk(b, "\\s[10]B1") }),
+            group(a, { talk(a, "\\s[3]A1") }),
+        }, config, actor_spots, appearance)
+        expect(r1):toBe("\\p[0]\\s[10]B1\\p[0]\\n[150]\\s[3]A1\\e")
+        local r2 = BUILDER.build({
+            group(b, { talk(b, "B2") }),
+        }, config, actor_spots, appearance)
+        expect(r2):toBe("\\p[0]\\s[10]B2\\e")
+    end)
+
     test("1.7: タグごとに別トークンの発話でも、スコープ切替後のサーフェス変更をアクターへ記録しない", function()
         local BUILDER, actors = setup()
         local a, k = actors.sakura, actors.kero

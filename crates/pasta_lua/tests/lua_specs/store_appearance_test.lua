@@ -56,6 +56,18 @@ describe("STORE.appearance - 外見状態", function()
         expect_empty_appearance(STORE.appearance)
     end)
 
+    test("reset() 後の STORE.appearance は APPEARANCE.new() と同じキー構成", function()
+        setup()
+        STORE.reset()
+        local fresh = require("pasta.shiori.appearance").new()
+        for key, value in pairs(fresh) do
+            expect(type(STORE.appearance[key])):toBe(type(value))
+        end
+        for key in pairs(STORE.appearance) do
+            expect(fresh[key] ~= nil):toBe(true)
+        end
+    end)
+
     test("永続化データ(pasta.save)に外見状態を置かない", function()
         setup()
         local save = require("pasta.save")
