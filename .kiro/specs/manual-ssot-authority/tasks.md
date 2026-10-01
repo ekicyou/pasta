@@ -172,7 +172,7 @@
   - _Requirements: 8.1, 2.4_
 
 - [ ] 4. スキルの生成への切替（P4）
-- [ ] 4.1 生成物を書き出し、旧名の手書きファイルを削除する
+- [x] 4.1 生成物を書き出し、旧名の手書きファイルを削除する
   - 書き出しモードで 21 ファイルを生成する（同名の旧手書き 6 ファイルは上書き）
   - 旧名 4 ファイル（grammar-model・call-spec・runtime-api・shiori-handlers）を削除する。旧ファイル固有の内容は台帳で移設済みであることを確認してから削除する
   - 完了状態: 鮮度照合が exit 0 で、両スキルの references に旧名ファイルが無い
@@ -306,3 +306,4 @@
 - 3.3: gen-skill-refs.mjs は設計外の export `readChapter`（missing-chapter を出す）と `GenError` クラス（kind・chapter・detail/hits/target）を持つ。3.4 の renderEntry は readChapter→extractBody を使う。
 - 3.4: gen-skill-refs.mjs は設計外の export `writeAll`・`GENERATED_MARK`・`FIX_COMMAND` を持ち、未知の CLI 引数は exit 2。CLI 判定は既存規約（basename 比較・CI の 8.3 短縮名対策）。link-check の禁止トークン `crates/` は絶対 URL 内も一致するため、生成対象章に crates.io の URL を書かない（mlua-stdlib.md の crates.io リンクを docs.rs に置換済み）。生成物 grammar-index.md の doc/spec は 3.5 で章から消える。
 - 3.5: verify-content は gen-skill-refs から `GENERATION_MAP` と `findVoice` を import（VOICE_MARKERS は findVoice 経由）。book/manual-sources.toml はもう読まれない（3.6 で削除）。
+- 4.1 後の link-check スキル違反 40 件（4.2〜4.4 の入力）: skill-missing 21（ghost SKILL.md → grammar-model×11・call-spec×2、lua SKILL.md → runtime-api×2・shiori-handlers×2、internal-modules → runtime-api・shiori-handlers、testing-lint → runtime-api#set_scene_selector--set_word_selector×2）、skill-unlisted 15（生成ファイル全て未掲載）、skill-anchor 1（ghost SKILL.md → variables.md#永続化とsaveテーブル）、skill-escape 1（lua SKILL.md → ../../../book/src/reference/startup.md）、skill-forbidden-ref 2（lua SKILL.md L40 book/src、testing-lint L247 crates/）。scratchpad の ledger-check.mjs は旧ファイル削除後は使えない（git 履歴で照合する）。
