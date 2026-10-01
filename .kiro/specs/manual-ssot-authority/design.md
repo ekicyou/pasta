@@ -593,7 +593,7 @@ function runLinkCheck(repoRoot: string): { broken: BrokenLink[]; failed: boolean
 | 項目 | 区分 | 行き先 |
 |------|------|--------|
 | ch08 属性のセマンティクス、§8.3＋§12.18 ファイルレベル属性の継承（解析・統合は実装済みで未利用）、§12.5 Call 属性フィルター（構文未受理） | B | `.kiro/specs/scene-attribute-semantics/brief.md`（現行挙動＝受理されるが処理に反映されない、はマニュアルへ） |
-| §12.7 動的単語参照 `＠＄`（文法定義はあるがパーサ未実装） | B | `.kiro/specs/dynamic-word-reference/brief.md`（OPEN QUESTION 5） |
+| §12.7 動的単語参照 `＠＄`（文法定義はあるがパーサ未実装） | B | `.kiro/specs/dynamic-word-reference/brief.md`＋roadmap キー情報 1 行（設計ディスカッション #8。仕分けは優先度でなく具体度で行う） |
 | §12.4 シーンのパラメータ | R | roadmap（対応予定なし・変数で代替） |
 | ch11 §11.5 アクタースコープ内のコードブロック（予約） | R | roadmap |
 | §12.8 Call の戻り値と変数代入 | R | roadmap（DSL 非定義・ランタイム設計の領域） |
@@ -722,7 +722,7 @@ graph LR
 2. ~~生成対象外・別スキル宛ての章間リンクの扱い~~ → 解決済み（#4）: 公開マニュアル URL へ書き換え。
 3. 鮮度チェックの CI 配置（前提: `manual.yml` の `paths` 拡張＋先頭ステップ）。
 4. ~~Lua API 章の構成~~ → 解決済み（#5）: モジュールごとに章を分ける（`lua/modules/` 配下 8 章、生成も 8 ファイル）。SHIORI は `lua/shiori-events.md` 1 章。
-5. 動的単語参照 `＠＄` を brief 化するか（前提: brief 起票）。
+5. ~~動的単語参照 `＠＄` を brief 化するか~~ → 解決済み（#8）: brief 起票＋roadmap キー情報。
 6. `book/CONTENT-REVIEW.md` の扱い（前提: 歴史的記録の注記を付けて残す）。
 7. `review-improvement-loop` の修正範囲（前提: 今後の指示として読まれる箇所のみ。完了済みセル記録と `reports/` は歴史的記録として残す）。
 8. ~~既知の食い違いの訂正範囲~~ → 解決済み（#6）: マニュアル全章・両 `SKILL.md`・スキル手書きファイルを grep し、生成対象外も同時に訂正。
