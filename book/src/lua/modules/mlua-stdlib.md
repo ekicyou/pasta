@@ -6,7 +6,7 @@ Pasta には mlua-stdlib という外部ライブラリのモジュールが最�
 
 ---
 
-Pasta ランタイムは、Rust のライブラリ [mlua-stdlib](https://crates.io/crates/mlua-stdlib)（0.1 系）のモジュールを組み込んでいる。`require` で読み込んで使う。各関数の詳細は [mlua-stdlib の API ドキュメント](https://docs.rs/mlua-stdlib) を参照する。
+Pasta ランタイムは、Rust のライブラリ [mlua-stdlib](https://docs.rs/mlua-stdlib)（0.1 系）のモジュールを組み込んでいる。`require` で読み込んで使う。各関数の詳細は [mlua-stdlib の API ドキュメント](https://docs.rs/mlua-stdlib) を参照する。
 
 | モジュール | 用途 | 既定 |
 | ---- | ---- | ---- |

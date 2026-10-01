@@ -149,7 +149,7 @@
   - _Requirements: 5.1, 5.2, 5.8, 5.9, 1.7_
   - _Depends: 3.1_
 
-- [ ] 3.4 生成器のリンク書き換え・ヘッダ・書き出しと照合モードを実装する
+- [x] 3.4 生成器のリンク書き換え・ヘッダ・書き出しと照合モードを実装する
   - リンク書き換え（同一スキル宛ては兄弟ファイル名＋アンカー、非生成章・別スキル宛ては公開 URL の `.html`＋アンカー、絶対 URL と `#anchor` は不変、画像・非 `.md`・book/src 外は失敗）を実装する
   - 固定 2 行ヘッダ（機械判定用の 1 行目と、公開 URL・編集元の案内）を付けて全エントリをメモリ上で生成し終えてから書き出す。内容が LF 正規化後に同一なら書き換えない
   - 照合モードは LF 正規化して比較し、不一致（STALE）と孤立生成物（ORPHAN）を全件列挙して再生成コマンドと共に exit 1 で報告する
@@ -304,3 +304,4 @@
 - 3.1: `maskFences` は開閉の区切り行も空行にし、CRLF を LF に正規化する（行数は保つ）。`.github/workflows/manual.yml` は 5.1 まで旧 drift-check.mjs／verify-drift-gate.mjs を参照したまま（ブランチ内の中間状態）。
 - 3.2: link-check のスキル検査は P4 まで実リポジトリで赤（skill-escape 1: lua SKILL.md → ../../../book/src/reference/startup.md、skill-forbidden-ref 11: 文法 7 ファイルの doc/spec source コメント・call-spec/pasta-toml L29/testing-lint L247 の crates/・lua SKILL.md L40 の book/src）。生成対象 21 章の見出し slug は mdBook id と全一致。headingSlug は生テキスト基準のため強調 `_x_`・全角空白入りの見出しは避ける。
 - 3.3: gen-skill-refs.mjs は設計外の export `readChapter`（missing-chapter を出す）と `GenError` クラス（kind・chapter・detail/hits/target）を持つ。3.4 の renderEntry は readChapter→extractBody を使う。
+- 3.4: gen-skill-refs.mjs は設計外の export `writeAll`・`GENERATED_MARK`・`FIX_COMMAND` を持ち、未知の CLI 引数は exit 2。CLI 判定は既存規約（basename 比較・CI の 8.3 短縮名対策）。link-check の禁止トークン `crates/` は絶対 URL 内も一致するため、生成対象章に crates.io の URL を書かない（mlua-stdlib.md の crates.io リンクを docs.rs に置換済み）。生成物 grammar-index.md の doc/spec は 3.5 で章から消える。
