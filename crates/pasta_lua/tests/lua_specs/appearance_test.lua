@@ -2,6 +2,7 @@
 -- pasta.shiori.appearance 外見状態の走査・観測テスト
 -- actor-surface-restore Task 2.1 (Requirements: 1.2, 1.3, 1.4, 1.5, 1.7, 1.8)
 -- actor-surface-restore Task 2.2 (Requirements: 2.1, 2.2, 2.3, 2.4, 2.8, 2.9, 2.10, 2.11, 4.4, 5.5)
+-- actor-surface-restore Task 4.1 (Requirements: 3.1, 3.4, 3.11, 3.12, 3.13)
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect
@@ -230,6 +231,221 @@ describe("APPEARANCE.observe - アクター未指定の生スクリプト", func
         local state = known_spots()
         APPEARANCE.observe(state, nil, nil, "\\\\s[1]\\![raise,OnX,\\s[0]]")
         expect(state.spots[0].surface):toBe("7")
+    end)
+end)
+
+describe("APPEARANCE.observe - 着せ替え指定の記録", function()
+    test("明示 bind をアクターとスポットへ記録し、記録順を保つ (3.1)", function()
+        local state = APPEARANCE.new()
+        APPEARANCE.observe(state, A, 0, "\\![bind,帽子,リボン,1]あ\\![bind,腕,時計,0]")
+        expect(state.actors.A.binds["帽子"]["リボン"]):toBe(1)
+        expect(state.actors.A.binds["腕"]["時計"]):toBe(0)
+        expect(state.spots[0].binds["帽子"]["リボン"]):toBe(1)
+        expect(state.spots[0].binds["腕"]["時計"]):toBe(0)
+        expect(table.concat(state.actors.A.order["帽子"], ",")):toBe("リボン")
+        expect(table.concat(state.actors.A.order["腕"], ",")):toBe("時計")
+    end)
+
+    test("作者が書いた bind-noevent も記録する (3.1)", function()
+        local state = APPEARANCE.new()
+        APPEARANCE.observe(state, A, 0, "\\![bind-noevent,帽子,麦わら,0]")
+        expect(state.actors.A.binds["帽子"]["麦わら"]):toBe(0)
+        expect(state.spots[0].binds["帽子"]["麦わら"]):toBe(0)
+    end)
+
+    test("再記録したパーツは記録順の末尾へ移動する (3.1)", function()
+        local state = APPEARANCE.new()
+        APPEARANCE.observe(state, A, 0, "\\![bind,帽子,麦わら,1]")
+        APPEARANCE.observe(state, A, 0, "\\![bind,帽子,リボン,1]")
+        APPEARANCE.observe(state, A, 0, "\\![bind,帽子,麦わら,0]")
+        expect(table.concat(state.actors.A.order["帽子"], ",")):toBe("リボン,麦わら")
+        expect(state.actors.A.binds["帽子"]["麦わら"]):toBe(0)
+    end)
+
+    test("数値1ではスポットの同カテゴリ他パーツを不明にし、アクター側は保持する (3.13)", function()
+        local state = APPEARANCE.new()
+        APPEARANCE.observe(state, A, 0, "\\![bind,帽子,麦わら,1]\\![bind,帽子,花,0]\\![bind,腕,時計,1]")
+        APPEARANCE.observe(state, A, 0, "\\![bind,帽子,リボン,1]")
+        local spot_hat = state.spots[0].binds["帽子"]
+        expect(spot_hat["リボン"]):toBe(1)
+        expect(spot_hat["麦わら"]):toBe(nil)
+        expect(spot_hat["花"]):toBe(nil)
+        expect(state.spots[0].binds["腕"]["時計"]):toBe(1)
+        expect(state.actors.A.binds["帽子"]["麦わら"]):toBe(1)
+        expect(state.actors.A.binds["帽子"]["花"]):toBe(0)
+        expect(table.concat(state.actors.A.order["帽子"], ",")):toBe("麦わら,花,リボン")
+    end)
+
+    test("数値0ではスポットの同カテゴリ他パーツを変えない", function()
+        local state = APPEARANCE.new()
+        APPEARANCE.observe(state, A, 0, "\\![bind,帽子,麦わら,1]\\![bind,帽子,リボン,0]")
+        expect(state.spots[0].binds["帽子"]["麦わら"]):toBe(1)
+        expect(state.spots[0].binds["帽子"]["リボン"]):toBe(0)
+    end)
+
+    test("カテゴリ全脱衣 ,,0 で当該カテゴリを全パーツ脱衣に置き換える (3.11)", function()
+        local state = APPEARANCE.new()
+        APPEARANCE.observe(state, A, 0, "\\![bind,帽子,麦わら,1]\\![bind,腕,時計,1]")
+        APPEARANCE.observe(state, A, 0, "\\![bind,帽子,,0]")
+        for _, t in ipairs({ state.actors.A.binds["帽子"], state.spots[0].binds["帽子"] }) do
+            expect(t[""]):toBe(0)
+            expect(t["麦わら"]):toBe(nil)
+        end
+        expect(#state.actors.A.order["帽子"]):toBe(0)
+        expect(state.actors.A.binds["腕"]["時計"]):toBe(1)
+        expect(state.spots[0].binds["腕"]["時計"]):toBe(1)
+    end)
+
+    test("全脱衣の後の明示パーツはその上に記録し、数値1でも全脱衣は残す (3.11, 3.13)", function()
+        local state = APPEARANCE.new()
+        APPEARANCE.observe(state, A, 0, "\\![bind,帽子,,0]\\![bind,帽子,花,0]\\![bind,帽子,リボン,1]")
+        local spot_hat = state.spots[0].binds["帽子"]
+        expect(spot_hat[""]):toBe(0)
+        expect(spot_hat["リボン"]):toBe(1)
+        expect(spot_hat["花"]):toBe(nil)
+        local actor_hat = state.actors.A.binds["帽子"]
+        expect(actor_hat[""]):toBe(0)
+        expect(actor_hat["花"]):toBe(0)
+        expect(actor_hat["リボン"]):toBe(1)
+        expect(table.concat(state.actors.A.order["帽子"], ",")):toBe("花,リボン")
+    end)
+
+    --- スポット0の帽子が「全脱衣 → X=1 → Y=1」の状態
+    local function stripped_then_two()
+        local state = APPEARANCE.new()
+        APPEARANCE.observe(state, A, 0, "\\![bind,帽子,,0]\\![bind,帽子,X,1]\\![bind,帽子,Y,1]")
+        return state
+    end
+
+    test("全脱衣後に着けていた他パーツは数値1で false（\"\" に落とさない不明）になる (3.13)", function()
+        local spot_hat = stripped_then_two().spots[0].binds["帽子"]
+        expect(spot_hat["X"]):toBe(false)
+        expect(spot_hat["Y"]):toBe(1)
+        expect(spot_hat[""]):toBe(0)
+    end)
+
+    test("false のパーツのトグルは不明扱いでカテゴリを不明化する (3.12, 3.4)", function()
+        local state = stripped_then_two()
+        APPEARANCE.observe(state, A, 0, "\\![bind,帽子,X]")
+        expect(state.spots[0].binds["帽子"]):toBe(nil)
+        expect(state.actors.A.binds["帽子"]):toBe(false)
+    end)
+
+    test("false のパーツは後続の明示 bind で上書きされる (3.1)", function()
+        local state = stripped_then_two()
+        APPEARANCE.observe(state, A, 0, "\\![bind,帽子,X,0]")
+        local spot_hat = state.spots[0].binds["帽子"]
+        expect(spot_hat["X"]):toBe(0)
+        expect(spot_hat["Y"]):toBe(1)
+        expect(spot_hat[""]):toBe(0)
+    end)
+
+    test("false のパーツがあっても全脱衣で丸ごと置き換える (3.11)", function()
+        local state = stripped_then_two()
+        APPEARANCE.observe(state, A, 0, "\\![bind,帽子,,0]")
+        local spot_hat = state.spots[0].binds["帽子"]
+        expect(spot_hat["X"]):toBe(nil)
+        expect(spot_hat["Y"]):toBe(nil)
+        expect(spot_hat[""]):toBe(0)
+    end)
+
+    test("実効値が既知のパーツのトグルは反転値の明示 bind として記録する (3.12)", function()
+        local state = APPEARANCE.new()
+        APPEARANCE.observe(state, A, 0, "\\![bind,帽子,麦わら,1]")
+        APPEARANCE.observe(state, A, 0, "\\![bind,帽子,麦わら]")
+        expect(state.spots[0].binds["帽子"]["麦わら"]):toBe(0)
+        expect(state.actors.A.binds["帽子"]["麦わら"]):toBe(0)
+        APPEARANCE.observe(state, A, 0, "\\![bind,帽子,麦わら,]")
+        expect(state.spots[0].binds["帽子"]["麦わら"]):toBe(1)
+        expect(state.actors.A.binds["帽子"]["麦わら"]):toBe(1)
+    end)
+
+    test("全脱衣の後のトグルは全脱衣の値を実効値として反転する (3.12)", function()
+        local state = APPEARANCE.new()
+        APPEARANCE.observe(state, A, 0, "\\![bind,帽子,,0]\\![bind,帽子,リボン]")
+        expect(state.spots[0].binds["帽子"]["リボン"]):toBe(1)
+        expect(state.spots[0].binds["帽子"][""]):toBe(0)
+        expect(state.actors.A.binds["帽子"]["リボン"]):toBe(1)
+        expect(table.concat(state.actors.A.order["帽子"], ",")):toBe("リボン")
+    end)
+
+    --- X がスポット0で帽子・腕を、Y がスポット1で帽子を記録済みで、A も帽子・腕を記録済みの状態
+    local function dressed()
+        local state = APPEARANCE.new()
+        APPEARANCE.observe(state, { name = "X" }, 0, "\\![bind,帽子,花,1]\\![bind,腕,時計,1]")
+        APPEARANCE.observe(state, { name = "Y" }, 1, "\\![bind,帽子,花,0]")
+        state.actors.A = { binds = { ["帽子"] = { ["麦わら"] = 1 }, ["腕"] = { ["時計"] = 0 } },
+            order = { ["帽子"] = { "麦わら" }, ["腕"] = { "時計" } } }
+        return state
+    end
+
+    local uncertain = {
+        { "実効値が不明なパーツのトグル", "\\![bind,帽子,リボン]" },
+        { "カテゴリ単位の着衣 ,,1", "\\![bind,帽子,,1]" },
+        { "カテゴリ単位のトグル ,,", "\\![bind,帽子,,]" },
+        { "カテゴリ単位のトグル (数値省略)", "\\![bind,帽子]" },
+    }
+    for _, c in ipairs(uncertain) do
+        test(c[1] .. " はスポットのカテゴリを不明、発話アクターのカテゴリを false にする (3.4)", function()
+            local state = dressed()
+            APPEARANCE.observe(state, A, 0, c[2])
+            expect(state.spots[0].binds["帽子"]):toBe(nil)
+            expect(state.actors.A.binds["帽子"]):toBe(false)
+            expect(state.actors.A.order["帽子"]):toBe(nil)
+            -- 他カテゴリ・他アクター・他スポットは変えない
+            expect(state.actors.A.binds["腕"]["時計"]):toBe(0)
+            expect(state.spots[0].binds["腕"]["時計"]):toBe(1)
+            expect(state.actors.X.binds["帽子"]["花"]):toBe(1)
+            expect(state.spots[1].binds["帽子"]["花"]):toBe(0)
+        end)
+    end
+
+    test("不明化したカテゴリは後続の明示 bind で再び記録する (3.4)", function()
+        local state = dressed()
+        APPEARANCE.observe(state, A, 0, "\\![bind,帽子,,1]\\![bind,帽子,リボン,1]")
+        expect(state.actors.A.binds["帽子"]["リボン"]):toBe(1)
+        expect(state.actors.A.binds["帽子"]["麦わら"]):toBe(nil)
+        expect(table.concat(state.actors.A.order["帽子"], ",")):toBe("リボン")
+        expect(state.spots[0].binds["帽子"]["リボン"]):toBe(1)
+    end)
+
+    for _, arg in ipairs({ '\\![bind,"帽,子",リボン,1]', "\\![bind,帽子,リ\\ボン,1]" }) do
+        test("引数に \" や \\ を含む bind は発話スポットの着せ替えのみ全カテゴリ不明にする: " .. arg, function()
+            local state = dressed()
+            APPEARANCE.observe(state, { name = "X" }, 0, "\\s[3]")
+            APPEARANCE.observe(state, A, 0, arg)
+            expect(next(state.spots[0].binds)):toBe(nil)
+            expect(state.spots[0].surface):toBe("3")
+            expect(state.spots[1].binds["帽子"]["花"]):toBe(0)
+            expect(state.actors.A.binds["帽子"]["麦わら"]):toBe(1)
+            expect(state.actors.A.binds["腕"]["時計"]):toBe(0)
+            expect(table.concat(state.actors.A.order["帽子"], ",")):toBe("麦わら")
+        end)
+    end
+
+    test("アクター名が nil ならスポット側のみ更新する", function()
+        local state = APPEARANCE.new()
+        APPEARANCE.observe(state, {}, 0, "\\![bind,帽子,リボン,1]\\![bind,腕,,1]")
+        expect(next(state.actors)):toBe(nil)
+        expect(state.spots[0].binds["帽子"]["リボン"]):toBe(1)
+    end)
+
+    test("スコープ切替後の bind は記録しない (1.7)", function()
+        local state = dressed()
+        APPEARANCE.observe(state, A, 0, "\\![bind,腕,時計,1]\\1\\![bind,帽子,リボン,1]")
+        APPEARANCE.observe(state, A, 0, "\\![bind,帽子,花,1]")
+        expect(state.actors.A.binds["腕"]["時計"]):toBe(1)
+        expect(state.actors.A.binds["帽子"]["リボン"]):toBe(nil)
+        expect(state.actors.A.binds["帽子"]["花"]):toBe(nil)
+        expect(next(state.spots)):toBe(nil)
+    end)
+
+    test("生スクリプト中の bind は記録せず全スポットを不明にする (1.8)", function()
+        local state = dressed()
+        APPEARANCE.observe(state, nil, nil, "\\![bind,帽子,リボン,1]")
+        expect(next(state.spots)):toBe(nil)
+        expect(state.actors.A.binds["帽子"]["リボン"]):toBe(nil)
+        expect(state.actors.X.binds["帽子"]["リボン"]):toBe(nil)
     end)
 end)
 

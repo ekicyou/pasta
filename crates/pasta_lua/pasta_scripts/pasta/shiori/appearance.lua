@@ -106,6 +106,124 @@ local function entry(t, key)
     return e
 end
 
+--- 明示 bind の数値
+local BIND_VALUES = { ["0"] = 0, ["1"] = 1 }
+
+--- bind 引数を `,` の単純分割で解釈する。
+--- `"`・`\` を含む、またはカテゴリ名が空なら解釈不能として nil
+--- @return string|nil cat, string part, string val（省略は ""）
+local function parse_bind(arg)
+    if arg:find('["\\]') then
+        return nil
+    end
+    local f = {}
+    for field in (arg .. ","):gmatch("([^,]*),") do
+        f[#f + 1] = field
+    end
+    if f[2] == "" then
+        return nil
+    end
+    return f[2], f[3] or "", f[4] or ""
+end
+
+--- スポット側パーツの実効値: 0/1 はその値、false は不明、nil は "" の値（無ければ不明）
+local function spot_effective(t, part)
+    if not t then
+        return nil
+    end
+    local v = t[part]
+    if v == nil then
+        return t[""]
+    end
+    return v or nil
+end
+
+--- bind の結果値（0|1）。トグルはスポット側の実効値の反転（3.12）。確定できなければ nil
+local function bind_value(sp, cat, part, val)
+    if part ~= "" and val == "" then
+        local cur = spot_effective(sp and sp.binds[cat], part)
+        return cur and (1 - cur)
+    end
+    return BIND_VALUES[val]
+end
+
+--- 数値1の明示 bind 後のスポット側カテゴリ（3.13）。他パーツは不明、"" = 0 は残す。
+--- "" があるとき着衣（1）・不明（false）だった他パーツは false にして "" へ落とさない
+local function spot_after_wear(t)
+    local out = { [""] = t[""] }
+    if t[""] ~= nil then
+        for q, v in pairs(t) do
+            if q ~= "" and v ~= 0 then
+                out[q] = false
+            end
+        end
+    end
+    return out
+end
+
+--- 明示 bind を記録する（3.1, 3.13）
+local function record_bind(sp, ac, cat, part, v)
+    if sp then
+        local t = sp.binds[cat] or {}
+        if v == 1 then
+            t = spot_after_wear(t)
+        end
+        t[part] = v
+        sp.binds[cat] = t
+    end
+    if ac then
+        local t = ac.binds[cat] or {} -- false（不明）からは新規に記録し直す
+        t[part] = v
+        ac.binds[cat] = t
+        local order = ac.order[cat] or {}
+        for i = #order, 1, -1 do
+            if order[i] == part then
+                table.remove(order, i)
+            end
+        end
+        order[#order + 1] = part
+        ac.order[cat] = order
+    end
+end
+
+--- カテゴリを置き換える。strip = true は全脱衣 { [""] = 0 }（3.11）、false は不明（3.4）
+local function reset_category(sp, ac, cat, strip)
+    if sp then
+        sp.binds[cat] = strip and { [""] = 0 } or nil
+    end
+    if ac then
+        -- 3.4: 不明は false（既定着せ替えも使わない）
+        ac.binds[cat] = strip and { [""] = 0 } or false
+        ac.order[cat] = strip and {} or nil
+    end
+end
+
+--- 着せ替え指定を観測する（actor 非 nil）
+local function observe_bind(state, actor, spot, arg)
+    local sp = spot ~= nil and entry(state.spots, spot) or nil
+    local cat, part, val = parse_bind(arg)
+    if not cat then
+        -- 解釈不能: 発話スポットの着せ替えのみ全カテゴリ不明（アクター既知状態は不変）
+        if sp then
+            sp.binds = {}
+        end
+        return
+    end
+    local ac = nil
+    if actor.name ~= nil then
+        ac = entry(state.actors, actor.name)
+        ac.order = ac.order or {}
+    end
+    local v = bind_value(sp, cat, part, val)
+    if v == nil or (part == "" and v ~= 0) then
+        reset_category(sp, ac, cat, false)
+    elseif part == "" then
+        reset_category(sp, ac, cat, true)
+    else
+        record_bind(sp, ac, cat, part, v)
+    end
+end
+
 --- アクター未指定の生スクリプト: 外見タグを含めば全スポット不明化（1.8）
 local function observe_raw(state, text)
     local name, arg, pos = next_tag(text, 1)
@@ -149,6 +267,8 @@ function APPEARANCE.observe(state, actor, spot, text)
             if spot ~= nil then
                 entry(state.spots, spot).surface = value
             end
+        elseif kind == "bind" then
+            observe_bind(state, actor, spot, value)
         end
         name, arg, pos = next_tag(text, pos)
     end
