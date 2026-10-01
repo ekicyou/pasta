@@ -140,7 +140,7 @@
   - 完了状態: 自己テストが a〜d の検出と許可ケース（https・実在アンカー・`#s6-6`）をすべて通し、生成対象章の slug と mdBook id の不一致が 0
   - _Requirements: 5.3, 6.1, 6.4, 6.5, 10.2, 2.4_
 
-- [ ] 3.3 生成器の対応表・抽出・口調判定を実装する
+- [x] 3.3 生成器の対応表・抽出・口調判定を実装する
   - 21 エントリの対応表と、章パスから出力名を導く規則（index は直近の親ディレクトリ名付き）を定義する
   - 口調マーカー集合をコンテンツ検証から移し、衝突 3 語（`くてよ`・`ですの`・`ますの`）だけ否定先読みにし、判定関数を export する
   - 本文抽出（LF 正規化・共有フェンス判定・フェンス外の最初と最後の `---`・H1 タイトル・締め以降の破棄）と、散文部（フェンス・表の行・インラインコードを除く）への口調判定を実装し、章欠落・構造違反・口調混入を章と行番号付きで失敗させる
@@ -303,3 +303,4 @@
 - 2.10: config_defaults_test は「キー名と `値` を含む行がどれか 1 行あれば合格」（`.any`）のため、章に同じキーの表行が 2 つ（3分類表と [ghost] 表）あると片方だけ古くても通る。旧スキル側も同じ構成で既存の穴。design が照合規則の不変を指示しているため本仕様では変更せず、既知の制約として記録する。
 - 3.1: `maskFences` は開閉の区切り行も空行にし、CRLF を LF に正規化する（行数は保つ）。`.github/workflows/manual.yml` は 5.1 まで旧 drift-check.mjs／verify-drift-gate.mjs を参照したまま（ブランチ内の中間状態）。
 - 3.2: link-check のスキル検査は P4 まで実リポジトリで赤（skill-escape 1: lua SKILL.md → ../../../book/src/reference/startup.md、skill-forbidden-ref 11: 文法 7 ファイルの doc/spec source コメント・call-spec/pasta-toml L29/testing-lint L247 の crates/・lua SKILL.md L40 の book/src）。生成対象 21 章の見出し slug は mdBook id と全一致。headingSlug は生テキスト基準のため強調 `_x_`・全角空白入りの見出しは避ける。
+- 3.3: gen-skill-refs.mjs は設計外の export `readChapter`（missing-chapter を出す）と `GenError` クラス（kind・chapter・detail/hits/target）を持つ。3.4 の renderEntry は readChapter→extractBody を使う。
