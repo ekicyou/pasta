@@ -755,7 +755,7 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 | ga/SKILL.md:64 | ローカルシーンは親グローバルシーン内でのみアクセス可能 | 正 | — |
 | ga/SKILL.md:186 | アクター辞書に該当単語がない場合、グローバル/ローカル単語辞書にフォールバック（順序がローカル優先と逆） | 訂正対象・訂正済み（4.2） | 4.2 |
 | ga/SKILL.md:276 | OnChoiceSelectEx は選択 ID を「ローカルシーン → グローバルシーンの順」で検索（実際はローカルのみ） | 訂正対象・訂正済み（4.2） | 4.2 |
-| ga/references/authoring-patterns.md:347 | 選択 ID で「ローカル→グローバルの順に」前方一致検索（実際はローカルのみ） | 訂正対象 | 4.3 |
+| ga/references/authoring-patterns.md:347 | 選択 ID で「ローカル→グローバルの順に」前方一致検索（実際はローカルのみ） | 訂正対象・訂正済み（4.3） | 4.3 |
 | lc/SKILL.md:132 | `@pasta_search`（シーン・単語検索、フォールバック戦略） | 訂正対象 | 4.4 |
 | ga/references/call-spec.md:27 | 「マージ: 両検索結果を結合」（L25〜L27。L41 の「両方が候補」は正） | 生成で置換（4.1） | 4.1 |
 | ga/references/words.md:82 | 「マージ: 両検索結果を結合」（L80〜L82。L90 の「両方が候補」は正） | 生成で置換（4.1） | 4.1 |
@@ -883,7 +883,7 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 | grammar/words.md:15 | 値は読点・全角コンマ・半角カンマで区切る | 正 | — |
 | ga/SKILL.md:119 | 区切りは `、` `，` `,` のいずれか | 正 | — |
 | ga/SKILL.md:129 | 例 `＠女性、水の妖精：水無灯里、アリス・キャロル　＃ 2キー…`（U06 により `＃` 以降が値に入る） | 訂正対象・訂正済み（4.2） | 4.2 |
-| ga/references/authoring-patterns.md:313 | 例 `＠女性：水無灯里、アリス　＃ …`（同上） | 訂正対象 | 4.3 |
+| ga/references/authoring-patterns.md:313 | 例 `＠女性：水無灯里、アリス　＃ …`（同上） | 訂正対象・訂正済み（4.3） | 4.3 |
 | ga/references/grammar-model.md:161 | 引用符なしの空白は区切り文字 | 生成で置換（4.1） | 4.1 |
 
 （`grammar/action-line.md:81`・`grammar/action-line.md:89`・`ga/SKILL.md:94`・`ga/references/action-line.md:82`・`ga/references/action-line.md:100`・`ga/references/variables.md:102` はインライン要素の区切りで正。`grammar/call-jump.md:123` は D06。）
@@ -930,7 +930,7 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 | grammar/block-structure.md:96 | 例のフェンス ```` ```lua ```` は行頭 | 正 | — |
 | grammar/call-jump.md:83 | 例のフェンス ```` ```lua ```` は行頭 | 正 | — |
 | ga/SKILL.md:226 | 例のフェンス ```` ```lua ```` は行頭（節見出し L216） | 正 | — |
-| ga/references/authoring-patterns.md:144 | 例で Lua ブロックの後に `％` 行（L154）を置く（実測: 14:2 でパースエラー。`％` 行はブロックより前に置く）。Markdown のフェンスもここで食い違う（1.1 の申し送り） | 訂正対象 | 4.3 |
+| ga/references/authoring-patterns.md:144 | 例で Lua ブロックの後に `％` 行（L154）を置く（実測: 14:2 でパースエラー。`％` 行はブロックより前に置く）。Markdown のフェンスもここで食い違う（1.1 の申し送り） | 訂正対象・訂正済み（4.3） | 4.3 |
 | grammar/actor-dictionary.md:156 | アクタースコープの例でフェンスをインデント（L156〜L161） | 訂正対象・訂正済み（2.3） | 2.3 |
 | lua/dsl-vs-lua.md:42 | DSL に ```` ```lua ```` ブロックを埋め込める | 正 | — |
 | lua/index.md:20 | `.pasta` 中の ```` ```lua ```` ブロック | 正 | — |

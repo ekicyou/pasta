@@ -185,7 +185,7 @@
   - _Requirements: 6.1, 6.4, 6.5, 6.6, 6.7_
   - _Boundary: SkillLayout（pasta-ghost-authoring/SKILL.md）_
 
-- [ ] 4.3 (P) authoring-patterns から挙動の規範的説明を除く
+- [x] 4.3 (P) authoring-patterns から挙動の規範的説明を除く
   - 時報変数・シャッフル消費・チェイントーク等の挙動説明を削り、作例と生成ファイルへの参照に置き換える。作例・ファイル分割指針・自然言語→シーン変換指針は残す
   - SKILL.md から参照されている `<a id="s6-N">` アンカーは維持する
   - 完了状態: authoring-patterns に挙動の規範的定義が残っておらず、リンク検証でこのファイルに起因する違反が 0
