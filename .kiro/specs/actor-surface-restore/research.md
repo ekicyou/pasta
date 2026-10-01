@@ -105,3 +105,101 @@
 5. `crates/pasta_shiori/tests/support/scripts/pasta/store.lua`（テスト用コピー）への影響有無。
 6. 起動直後に SSP が表示する既定サーフェス（descript / surfaces.txt 由来）を pasta が知り得るか（既定サーフェス設定を導入する場合の前提）。
 7. カテゴリ単位 bind（パーツ名空欄）の結果状態: `,,0`（カテゴリ全脱衣）を確定状態として扱えるか、`,,1` の意味を SSP 仕様で確認。確定できれば R3.4 の不明化対象から外す（要件ディスカッション #7 で設計調査へ先送り）。
+
+---
+
+# 設計フェーズ調査（Research & Design Decisions）
+
+- 追記日: 2026-10-01（上記ギャップ分析は要件フェーズの記録としてそのまま保持）
+
+## Summary
+- **Feature**: `actor-surface-restore`
+- **Discovery Scope**: Extension（既存 `sakura_builder.lua` への統合中心・light discovery）
+- **Key Findings**:
+  - `talk_to_script` はタグを改変せずウェイト／改行タグを挿入するだけなので、出力後文字列の走査で 1.2 を満たせる。構造化 `surface` トークンも出力文字列 `\s[ID]` として同じ経路で観測できる（専用分岐不要）。
+  - `STORE.actors[name]` は `CONFIG.actor[name]` そのもの。既定サーフェス／既定着せ替えはアクターテーブル直下の任意キーとして Rust 変更なしで読める。
+  - `crates/pasta_shiori/tests/support/scripts/pasta/store.lua` は検索パス上位の旧コピーで本番 `store.lua` を覆う。`STORE.appearance` が nil になる環境が実在するため、ビルダーの nil 許容が必須。
+
+## Research Log（§5 Research Needed の解決）
+
+### 1. テキスト中サーフェスタグの抽出規則
+- **Sources**: `crates/pasta_lua/src/sakura_script/tokenizer.rs`（`SAKURA_TAG_PATTERN = \[0-9a-zA-Z_!+*?&-]+(?:\[[^\]]*\])?`）、`sakura_script/mod.rs` `talk_to_script_impl`、ukadoc `\s[ID番号]` / `\sID番号`。
+- **Findings**: `\s` 始まりの表示系タグは `\s[ID]` と `\s0`〜`\s9` のみ（`\_s` は名前が `_` 始まりで別タグ）。トークナイザは `\` を特別扱いしないが、SSP 上 `\` はバックスラッシュ文字であり `\s[5]` はサーフェス変更ではない。`talk_to_script` は `\s[...]` を改変しない。
+- **Implications**: 走査対象は**出力後文字列**（SSP が実際に受け取るもの）。`\` は 2 文字読み飛ばし。タグ境界はトークナイザと同じ規則、分類は名前の先頭で行う。先頭タグ列の先読み（2.4・3.10）は未変換のトークンテキストで行う（タグは不変なので結果は一致）。
+
+### 2. `\![bind,...]` 引数パース
+- **Sources**: ukadoc `\![bind,カテゴリ名,パーツ名,数値]`、`shiori/act.lua` `escape_tag_arg`（SSP の引数クォート規約）。
+- **Findings**: 引数は `,` 区切り、`,` を含む値は `"..."` で囲む規約。カテゴリ名・パーツ名に `,` `"` `\` を含めるシェルは稀。
+- **Implications**: 単純 `,` 分割で解釈。`"`・`\` を含む bind は解釈不能として全スポットの着せ替えを不明化（仮定・OQ-5）。作者が書いた `bind-noevent` も `bind` と同じく記録する。
+
+### 3. `bind-noevent` の最低バージョン
+- **Sources**: ukadoc `\![bind-noevent,...]`（2.8.23）。
+- **Implications**: 要件 3.7 どおりバージョン判定なし。design.md Technology Stack とマニュアル（`first-ghost.md` の `dressup` 説明）に明記する。
+
+### 4. スコープ切替タグ以降の帰属
+- **Sources**: ukadoc `\p[ID番号]` / `\pID番号`（0〜9）、`\0` `\1` `\h` `\u`。
+- **Implications**: 要件 1.7 で確定済み（記録停止＋全スポット不明化）。認識対象は `\0` `\1` `\h` `\u` `\p[N]` `\p0`〜`\p9`。
+
+### 5. pasta_shiori テスト用 store.lua コピー
+- **Sources**: `crates/pasta_shiori/tests/common/mod.rs` `copy_support_dirs`、tech.md「scripts/ 優先順位」。
+- **Findings**: `tests/support/scripts/` はテスト用ゴーストの `scripts/` へコピーされ、`profile/pasta/pasta_scripts/` より優先される。support には `shiori/act.lua`・`sakura_builder.lua` が無いため、それらは内蔵（新）版、`store.lua` は旧コピーという組み合わせになる。
+- **Implications**: コピーは変更しない。`BUILDER.build` の第4引数 nil → `APPEARANCE.new()` で吸収。
+
+### 6. 起動直後の既定サーフェス
+- **Findings**: pasta は descript.txt / surfaces.txt を読まず、SSP 起動時の表示サーフェスを知る手段を持たない（SSP イベント経由の取得は要件で対象外）。
+- **Implications**: 作者宣言の `surface` キーのみを既定とし、スポット表示中状態は起動直後「不明」（4.4）。
+
+### 7. カテゴリ単位 bind の結果状態
+- **Sources**: ukadoc bind の記述例「`\1\![bind,arm,,0]` … armカテゴリのパーツを全て解除」。
+- **Findings**: `,,0` は「カテゴリ全解除」と明記。`,,1` の意味は記載なし。
+- **Implications**: `,,0` を確定状態にするには「カテゴリ既定 0」という別表現が状態モデルに必要になる。得られる効果は冗長な `bind-noevent` 数個の削減のみのため採用しない（3.4 どおり不明化。OQ-4）。
+
+## Architecture Pattern Evaluation
+
+| Option | Description | Strengths | Risks / Limitations | Notes |
+|--------|-------------|-----------|---------------------|-------|
+| A | sakura_builder.lua 内に全実装 | ファイル追加なし | `BUILDER.build` / `emit_inner_token` の複雑度増、単体テスト困難 | 不採用 |
+| B | 新モジュールが状態も保持 | 凝集 | ライフサイクルが STORE と二重化、reset 経路が別になる | 不採用 |
+| C | 純ロジック新モジュール＋STORE フィールド＋最小フック | 複雑度増なし、状態直渡しで単体テスト可、既存 `actor_spots` 方式と同形 | 引数が増える | **採用** |
+
+## Design Decisions
+
+### Decision: 観測は「出力文字列の走査」に一本化
+- **Alternatives**: (1) トークン種別ごとに専用分岐（surface トークンは id を直接記録）、(2) 出力文字列の走査のみ。
+- **Selected**: (2)。`emit_inner_token` が生成した文字列を `observe` に渡す。
+- **Rationale**: surface トークンは `\s[ID]` 文字列になるので同じ走査で拾える。分岐を増やさない。
+- **Trade-offs**: 文字列を二度見るコスト。バックスラッシュ無しの早期リターンで通常テキストは無負荷。
+
+### Decision: 状態は 1 フィールド `STORE.appearance = { actors, spots }`
+- **Rationale**: `BUILDER.build` への引数が 1 つで済み、全スポット不明化は `state.spots = {}` の 1 行。nil を「不明」とし番兵値を作らない。
+- **Trade-offs**: `bind` は 2 段テーブル（カテゴリ→パーツ）。カテゴリ不明化（3.4）が `binds[cat] = nil` で済む。
+
+### Decision: 冗長復旧の抑止は「先頭タグ列」の先読み
+- **Alternatives**: (1) 復旧タグを遅延出力（最初の一般文字直前）、(2) 切替時にグループ先頭を先読み。
+- **Selected**: (2)。要件 2.1・2.6 が復旧位置を `\p[spot]` 直後（保留改行より前）と定めるため遅延は不可。
+- **Follow-up**: 先頭タグ列の終端条件（一般文字・スコープ切替・raw_script）をテストで固定。
+
+### Decision: アクター設定キーは `surface` / `dressup`
+- **Rationale**: 既存キー `spot`・`budoux` と同じ直下フラット配置・短い名詞。`dressup` は SSP イベント名（OnDressupChanged）と語を揃える。入れ子テーブルは状態モデル（カテゴリ→パーツ→値）と同形で変換不要。
+- **Trade-offs**: アクター直下キーはアクター単語検索（A1 完全一致）でも見えるため、`＠surface` が数値を返す（`spot` と同じ既存の性質）。
+
+### Decision: 2 ステップ導入
+- ステップ A（サーフェス）: 走査（サーフェス・スコープ切替・bind の存在検出）、`surface` の記録／復旧、`surface` 既定キー、STORE フィールド、フック。
+- ステップ B（着せ替え）: `binds` の記録／不明化／復旧、`dressup` 既定キー。A の関数へ追記するのみでフックは変更しない。
+
+### Synthesis
+- **Generalization**: サーフェスと着せ替えは「アクター既知 vs スポット表示中の差分を再出力」という同一問題。`AppearanceEntry` を共通形にし、`observe` / `restore` の 2 関数に集約。
+- **Build vs Adopt**: Rust トークナイザを Lua へ公開して再利用する案は、API 追加と Rust 変更を伴うため不採用。Lua パターン数行で足りる。
+- **Simplification**: スコープ別帰属追跡・`,,0` 確定化・引数クォート完全解釈・バージョン判定・新規ログ・CONFIG からの初期転送はいずれも不採用。
+
+## Risks & Mitigations
+- 専用スポット構成でも不明化後に `\s[既知]` が再出力されバイト等価でなくなる（OQ-1）— 視覚的には同一サーフェスの再指定。ディスカッションで許容可否を確定。
+- 既存テストの期待値変化（スポット0フォールバック共有。OQ-7）— 特性化を先行し、変化するケースを列挙して意図を確認。
+- タグ誤検出 — `\` 読み飛ばし・外側タグの `[...]` 読み飛ばしを単体テストで固定。
+- SSP 2.8.23 未満で着せ替え復旧が無効 — 要件で許容済み。マニュアルに明記。
+
+## References
+- ukadoc さくらスクリプト一覧: `\s[ID番号]`、`\sID番号`、`\p[ID番号]`、`\pID番号`、`\![bind,...]`、`\![bind-noevent,...]`（https://ssp.shillest.net/ukadoc/manual/list_sakura_script.html）
+- `crates/pasta_lua/pasta_scripts/pasta/shiori/sakura_builder.lua`、`pasta/store.lua`、`pasta/shiori/act.lua`、`pasta/act.lua`、`pasta/actor.lua`
+- `crates/pasta_lua/src/sakura_script/{mod,tokenizer}.rs`、`crates/pasta_lua/src/code_gen/element_gen.rs`
+- `.kiro/specs/completed/sakura-script-newline/`、`.kiro/specs/completed/persist-spot-position/`
