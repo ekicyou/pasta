@@ -2326,3 +2326,103 @@ describe("SAKURA_BUILDER - actor-surface-restore: サーフェス復旧の統合
         expect(result):toBe("\\p[0]\\s[0]A1\\1\\s[10]X\\p[0]\\n[150]B1\\p[0]\\s[0]\\n[150]A2\\e")
     end)
 end)
+
+describe("SAKURA_BUILDER - actor-surface-restore: 着せ替え復旧の統合（Task 4.3）", function()
+    local function group(actor, inner_tokens)
+        return { type = "actor", actor = actor, tokens = inner_tokens }
+    end
+    local function talk(actor, text)
+        return { type = "talk", actor = actor, text = text }
+    end
+    local function script(actor, text)
+        return { type = "sakura_script", actor = actor, text = text }
+    end
+    local config = { spot_newlines = 1.5 }
+
+    test("3.2/5.6: スポット0フォールバック共有の交代で、サーフェス復旧の後に着せ替え復旧が \\p[0] 直後へ出る", function()
+        local BUILDER, actors = setup()
+        local a, b = actors.sakura, actors.kero
+        local result = BUILDER.build({
+            group(a, { script(a, "\\s[0]"), script(a, "\\![bind,帽子,麦わら,1]"), talk(a, "A1") }),
+            group(b, { script(b, "\\s[10]"), script(b, "\\![bind,帽子,リボン,1]"), talk(b, "B1") }),
+            group(a, { talk(a, "A2") }),
+        }, config, {})
+        expect(result):toBe(
+            "\\p[0]\\s[0]\\![bind,帽子,麦わら,1]A1"
+            .. "\\p[0]\\s[10]\\![bind,帽子,リボン,1]\\n[150]B1"
+            .. "\\p[0]\\s[0]\\![bind-noevent,帽子,麦わら,1]\\n[150]A2\\e")
+    end)
+
+    test("3.6: 着せ替え復旧タグだけが出た切替でも段落区切り改行の配置は着せ替えなしの場合と一致する", function()
+        local BUILDER, actors = setup()
+        local a, b = actors.sakura, actors.kero
+        local function run(ba, bb)
+            local ta = ba and { script(a, ba) } or {}
+            ta[#ta + 1] = talk(a, "A1")
+            local tb = bb and { script(b, bb) } or {}
+            tb[#tb + 1] = talk(b, "B1")
+            return BUILDER.build({
+                group(a, ta),
+                group(b, tb),
+                group(a, { { type = "wait", ms = 100 } }), -- 着せ替え復旧タグのみ（一般文字列なし）
+                group(b, { talk(b, "B2") }),
+                group(a, { talk(a, "A2") }),
+            }, config, {})
+        end
+        local with_bind = run("\\![bind,帽子,麦わら,1]", "\\![bind,帽子,リボン,1]")
+        local without_bind = run(nil, nil)
+        expect(with_bind):toBe(
+            "\\p[0]\\![bind,帽子,麦わら,1]A1\\p[0]\\![bind,帽子,リボン,1]\\n[150]B1"
+            .. "\\p[0]\\![bind-noevent,帽子,麦わら,1]\\_w[100]"
+            .. "\\p[0]\\![bind-noevent,帽子,リボン,1]\\n[150]B2"
+            .. "\\p[0]\\![bind-noevent,帽子,麦わら,1]\\n[150]A2\\e")
+        expect((with_bind:gsub("\\!%[bind[^%]]*%]", ""))):toBe(without_bind)
+    end)
+
+    test("5.1: 明示専用スポット・既定未設定で bind を含む会話は復旧タグを出さず、フックなしの出力と一致する（3ビルド）", function()
+        local BUILDER, actors = setup()
+        local a, b = actors.sakura, actors.kero
+        local APPEARANCE = require("pasta.shiori.appearance")
+        local function run(appearance)
+            local actor_spots = { ["さくら"] = 0, ["うにゅう"] = 1 }
+            local out = {}
+            out[1] = BUILDER.build({
+                group(a, { script(a, "\\![bind,帽子,麦わら,1]"), talk(a, "A1") }),
+                group(b, { script(b, "\\![bind,服,制服,1]"), talk(b, "B1") }),
+                group(a, { talk(a, "A2") }),
+            }, config, actor_spots, appearance)
+            -- スコープ切替タグ以降の bind と、アクター未指定の生さくらスクリプトの bind（全スポット不明化）
+            out[2] = BUILDER.build({
+                group(a, { script(a, "\\1"), script(a, "\\![bind,帽子,リボン,1]"), talk(a, "A3") }),
+                { type = "raw_script", text = "\\0\\![bind,帽子,,0]" },
+                group(b, { talk(b, "B2") }),
+                group(a, { talk(a, "A4") }),
+            }, config, actor_spots, appearance)
+            -- トグル bind（数値省略）
+            out[3] = BUILDER.build({
+                group(b, { talk(b, "B3") }),
+                group(a, { script(a, "\\![bind,帽子,麦わら]"), talk(a, "A5") }),
+            }, config, actor_spots, appearance)
+            return out
+        end
+        local hooked = run(APPEARANCE.new())
+        expect(hooked[1]):toBe("\\p[0]\\![bind,帽子,麦わら,1]A1\\p[1]\\![bind,服,制服,1]B1\\p[0]\\n[150]A2\\e")
+        expect(hooked[2]):toBe("\\p[0]\\1\\![bind,帽子,リボン,1]A3\\0\\![bind,帽子,,0]\\p[1]B2\\p[0]\\n[150]A4\\e")
+        expect(hooked[3]):toBe("\\p[1]B3\\p[0]\\![bind,帽子,麦わら]A5\\e")
+
+        -- フックなし（restore が常に空文字列）の出力とバイト等価
+        local real_restore = APPEARANCE.restore
+        local stub_calls = 0
+        APPEARANCE.restore = function()
+            stub_calls = stub_calls + 1
+            return ""
+        end
+        local ok, unhooked = pcall(run, APPEARANCE.new())
+        APPEARANCE.restore = real_restore
+        assert(ok, unhooked)
+        expect(stub_calls > 0):toBe(true) -- スタブがビルダーから実際に呼ばれたこと
+        for i = 1, 3 do
+            expect(hooked[i]):toBe(unhooked[i])
+        end
+    end)
+end)
