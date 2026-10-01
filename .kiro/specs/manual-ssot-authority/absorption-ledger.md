@@ -756,7 +756,7 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 | ga/SKILL.md:186 | アクター辞書に該当単語がない場合、グローバル/ローカル単語辞書にフォールバック（順序がローカル優先と逆） | 訂正対象・訂正済み（4.2） | 4.2 |
 | ga/SKILL.md:276 | OnChoiceSelectEx は選択 ID を「ローカルシーン → グローバルシーンの順」で検索（実際はローカルのみ） | 訂正対象・訂正済み（4.2） | 4.2 |
 | ga/references/authoring-patterns.md:347 | 選択 ID で「ローカル→グローバルの順に」前方一致検索（実際はローカルのみ） | 訂正対象・訂正済み（4.3） | 4.3 |
-| lc/SKILL.md:132 | `@pasta_search`（シーン・単語検索、フォールバック戦略） | 訂正対象 | 4.4 |
+| lc/SKILL.md:132 | `@pasta_search`（シーン・単語検索、フォールバック戦略） | 訂正対象・訂正済み（4.4） | 4.4 |
 | ga/references/call-spec.md:27 | 「マージ: 両検索結果を結合」（L25〜L27。L41 の「両方が候補」は正） | 生成で置換（4.1） | 4.1 |
 | ga/references/words.md:82 | 「マージ: 両検索結果を結合」（L80〜L82。L90 の「両方が候補」は正） | 生成で置換（4.1） | 4.1 |
 | lc/references/runtime-api.md:20 | search_scene は「フォールバック戦略（ローカル → グローバル）」（L37〜L38・L48 も同旨） | 生成で置換（4.1）・移設時訂正済み（2.4） | 2.4（移設時）・4.1 |
@@ -998,7 +998,7 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 | lua/patterns.md:99 | `REG.OnClose = function(req)`（L100 を含む） | 訂正対象・訂正済み（2.8） | 2.8 |
 | lua/patterns.md:108 | 「ハンドラは `req` を受け取る」とフィールド表 `req.id` 等（L110〜L115） | 訂正対象・訂正済み（2.8） | 2.8 |
 | lua/dsl-vs-lua.md:37 | カスタムイベント処理は REG に登録 | 正 | — |
-| lc/SKILL.md:84 | `REG.EventName = function(req) ... end` | 訂正対象 | 4.4 |
+| lc/SKILL.md:84 | `REG.EventName = function(req) ... end` | 訂正対象・訂正済み（4.4） | 4.4 |
 | lc/references/shiori-handlers.md:20 | 登録パターン `function(req)`（L103・L123・L138・L157・L201・L225・L253・L300 の例も同じ） | 生成で置換（4.1）・訂正済み（2.6） | 2.6（移設時）・4.1 |
 | lc/references/shiori-handlers.md:26 | 節「req パラメータ」: ハンドラ引数 `req` のフィールド表と `req.reference[N]` の例（L30〜L43） | 生成で置換（4.1）・訂正済み（2.6） | 2.6（移設時）・4.1 |
 | lc/references/shiori-handlers.md:100 | 各イベント節の Reference 表を `req.reference[N]` で表記（L100・L118〜L120・L135・L153・L172・L197・L221・L237・L249）と、例の `req.` 参照（L104・L124・L139・L154・L158・L173・L184・L198・L202・L203・L222・L238・L250・L254・L255）、フォールバックチェーン図の `REG[req.id]`・`SCENE.search(req.id)`（L274・L278） | 生成で置換（4.1）・訂正済み（2.6） | 2.6（移設時）・4.1 |
@@ -1104,7 +1104,7 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 | ---- | ------------ | ---- | ------ |
 | ga/references/pasta-toml.md:29 | 既定値は「Rust `crates/pasta_lua/src/loader/config.rs` の `Default` 実装・`default_*()` 関数」由来 | 生成で置換（4.1）・訂正済み（2.7） | 2.7（移設時）・4.1 |
 | ga/references/call-spec.md:116 | HTML コメント `source: doc/spec/04-call-spec.md, crates/pasta_dsl/src/parser/grammar.pest` | 生成で置換（4.1） | 4.1 |
-| lc/references/testing-lint.md:247 | `crates/pasta_lua/scriptlibs/lua_test/mocks.lua`（既定値の出典ではないが D18 の grep に当たったリポジトリ内パス。SkillLayout でモジュール名表記へ直す対象） | 訂正対象 | 4.4 |
+| lc/references/testing-lint.md:247 | `crates/pasta_lua/scriptlibs/lua_test/mocks.lua`（既定値の出典ではないが D18 の grep に当たったリポジトリ内パス。SkillLayout でモジュール名表記へ直す対象） | 訂正対象・訂正済み（4.4） | 4.4 |
 
 （`getting-started/first-ghost.md:421`・`getting-started/first-ghost.md:433` は GitHub の README への絶対 URL で対象外。）
 
@@ -1369,7 +1369,7 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 | lua/patterns.md:96 | `return RES.ok("\\h\\s[0]起動しました。\\e")`（L102 を含む） | 訂正対象・訂正済み（2.8） | 2.8 |
 | lua/patterns.md:104 | `return RES.no_content()  -- 表示なしで処理完了` | 訂正対象・訂正済み（2.8） | 2.8 |
 | lua/patterns.md:88 | 「`RES` でレスポンスを返す」（L119〜L126 の API 表の位置づけを含む） | 訂正対象・訂正済み（2.8） | 2.8 |
-| lc/SKILL.md:148 | REG に登録し `RES.ok()`／`RES.no_content()` 等でレスポンスを返す | 訂正対象 | 4.4 |
+| lc/SKILL.md:148 | REG に登録し `RES.ok()`／`RES.no_content()` 等でレスポンスを返す | 訂正対象・訂正済み（4.4） | 4.4 |
 | lc/SKILL.md:85 | `pasta.shiori.res`: `RES.ok()`, `RES.no_content()`（モジュール一覧としては正） | 正 | — |
 | lc/references/shiori-handlers.md:22 | 登録パターン `return RES.ok(…)  -- または RES.no_content()`（L106・L125・L141・L159・L205・L226・L257 の例も同じ）（追記: L74・L108・L143・L207・L259 も同じ） | 生成で置換（4.1）・訂正済み（2.6） | 2.6（移設時）・4.1 |
 

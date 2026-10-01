@@ -192,7 +192,7 @@
   - _Requirements: 6.2, 6.5_
   - _Boundary: SkillLayout（pasta-ghost-authoring/references/authoring-patterns.md）_
 
-- [ ] 4.4 (P) pasta-lua-coding の SKILL.md と手書き 3 ファイルを更新する
+- [x] 4.4 (P) pasta-lua-coding の SKILL.md と手書き 3 ファイルを更新する
   - SKILL.md に区分表と前文 3 点を置き、internal-modules を「手書き（暫定）— 将来 pasta-runtime-internals-doc で移行予定」と明記する。book への相対リンクを references の起動シーケンスファイルへ、旧 runtime-api・shiori-handlers へのリンクを新ファイルへ張り替え、早見表の `function(req)` を `function(act)` に訂正し、metadata.version をバンプする
   - testing-lint のセレクタへのアンカーリンクを pasta-search へ張り替え、リポジトリ内パスのモック記述をモジュール名表記へ直す。internal-modules 末尾の旧名リンクを張り替える
   - 完了状態: リンク検証で pasta-lua-coding に起因する違反が 0
