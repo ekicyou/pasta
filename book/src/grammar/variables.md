@@ -194,7 +194,7 @@ end
 - 既定の保存先は、ゴーストのフォルダからの相対パス `profile/pasta/save/save.json` である。
 - 保存は Lua ランタイムの終了時（ゴーストの終了・辞書の再読込）に自動で行われ、起動時に読み込まれる。
 - 保存先のパスと難読化（gzip 圧縮した `.dat` での保存）は、pasta.toml の `[persistence]` で変えられる。
-- Lua から明示的に保存・読み込みする方法は `@pasta_persistence` モジュールで扱う（[公開モジュール API](../lua/modules.md)）。
+- Lua から明示的に保存・読み込みする方法は `@pasta_persistence` モジュールで扱う（[@pasta_persistence](../lua/modules/pasta-persistence.md)）。
 
 ## Lua 予約語の制約
 

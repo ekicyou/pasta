@@ -106,7 +106,7 @@
   - _Boundary: ContentMigration（生成対象外章）_
   - _Depends: 1.3_
 
-- [ ] 2.9 章分割を目次・リンク・リダイレクト・内容検査へ結線する
+- [x] 2.9 章分割を目次・リンク・リダイレクト・内容検査へ結線する
   - 旧 `lua/modules.md` を削除し、目次の公開モジュール API 行を一覧章＋子 7 章へ置換、SHIORI イベント章と pasta.toml リファレンス章を目次へ追加する
   - Lua 索引章・起動シーケンス章からのリンクと、分割後章から lua/patterns への相対リンクを張り替え、Lua 索引章の章一覧へ SHIORI イベント章を追加する
   - `book.toml` に旧 URL `lua/modules.html` から `modules/index.html` へのリダイレクトを 1 行追加する
@@ -299,3 +299,4 @@
 - 2.6: 既定の OnChoiceSelectEx は Reference0（SSP では表示ラベル）を選択 ID として読む（U31・バグ候補）。表示名付き選択肢は実機で自動ルーティングされない。マニュアルは「選択 ID で探す」と UKADOC どおりの Reference 表だけを書く。scripts/main.lua で `REG.OnBoot`/`OnChoiceSelectEx`/`OnSecondChange` を上書きすると起動順（main→entry→event/init）により既定に戻される（バグ候補にはしない・章に回避策を記載）。lua/shiori-events.md の「pasta.toml 設定」節から reference/pasta-toml.md へのリンクは 2.7 で張る。SUMMARY・lua/index.md・block-structure#選択肢行 からのリンクは 2.9。
 - 2.7: `[logging] rotation_days` は読まれない（U32・バグ候補・マニュアルに書かない）。型の合わない値で `[talk]`・`[persistence]`・`[logging]`・`[debug]` 全体が黙って既定値に戻るのは意図された挙動（テスト `test_custom_section_type_mismatch_returns_none`）として章に記載。`pasta_patterns` から `.lua` パターンが自動生成される挙動（U33）をコントローラが章に追記した。台帳 pasta-toml 節は取り込み後の行番号へ再同期済み（ledger-check OK）。first-ghost.md L415 の「設定ファイルリファレンス」言及は 2.9 で新章へリンクする。
 - 2.8 後: 担当が未定だった台帳本体 2 行を割り当てる。L342（GRAMMAR.md L801 → reference/startup.md#4 に `Parse error: ファイル:行:列: 内容` の形式を追記）は 2.9（startup.md を触るため）。L262（doc/spec/README L63「外部仕様」→ reference/external-links.md に Unicode UAX #31・ukadoc さくらスクリプト一覧のリンク追記）は 3.5（external-links の doc/spec リンク群削除と同時）。verify-static R1.2 は新章が SUMMARY 未登録のため 2.9 まで 1 件失敗する（P2 中の一時状態）。
+- 2.9: パースエラーのログ文字列は `Parse error: ` 前置きが多重になる（loader/process.rs と pasta_dsl/parser の二重包み・見た目の冗長のみでバグ候補にしない）。startup.md §4 は内側の形式を「含む」とだけ書いた。

@@ -41,7 +41,8 @@ Pasta ランタイムが採用する Lua 方言は **LuaJIT 2.1**（言語仕様
 | 章 | 内容 |
 | ---- | ---- |
 | [Lua の基礎](basics.md) | LuaJIT 2.1（Lua 5.1 系）の最低限の文法と、外部リファレンスへの入口 |
-| [公開モジュール API](modules.md) | `@pasta_*` 等、ランタイムが公開する各モジュールの API と試せる例 |
+| [公開モジュール API](modules/index.md) | `@pasta_*` 等、ランタイムが公開する各モジュールの API と試せる例 |
+| [SHIORI イベントとハンドラ](shiori-events.md) | SHIORI イベントの受け取り方、`REG` へのハンドラ登録、既定のハンドラ |
 | [scripts/ の記述パターン](patterns.md) | シーン関数・イベントハンドラ登録・単語一括投入などの定型 |
 | [DSL と Lua の使い分け](dsl-vs-lua.md) | どちらで書くべきかの判断基準 |
 

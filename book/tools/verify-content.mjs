@@ -165,10 +165,11 @@ const LUA_MODULES = [
   '@pasta_sakura_script', '@enc', '@pasta_log',
 ];
 {
-  // lua 配下の全 md を結合して網羅判定。
+  // lua・lua/modules 配下の全 md を結合して網羅判定（各ディレクトリは非再帰）。
   const luaDir = `${SRC}/lua`;
-  const luaFiles = fs.readdirSync(abs(luaDir)).filter((f) => f.endsWith('.md'));
-  const allLua = luaFiles.map((f) => read(`${luaDir}/${f}`)).join('\n');
+  const allLua = [luaDir, `${SRC}/lua/modules`]
+    .flatMap((d) => fs.readdirSync(abs(d)).filter((f) => f.endsWith('.md')).map((f) => read(`${d}/${f}`)))
+    .join('\n');
   for (const mod of LUA_MODULES) {
     assert(
       `B-mod:${mod}`,
@@ -238,7 +239,7 @@ const LUA_MODULES = [
 // ============================================================
 {
   const contentFiles = [];
-  for (const dir of ['', 'grammar', 'lua', 'getting-started', 'reference']) {
+  for (const dir of ['', 'grammar', 'lua', 'lua/modules', 'getting-started', 'reference']) {
     const d = dir ? `${SRC}/${dir}` : SRC;
     for (const f of fs.readdirSync(abs(d))) {
       if (f === 'SUMMARY.md') continue;

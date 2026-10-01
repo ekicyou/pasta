@@ -13,6 +13,9 @@ preferred-dark-theme = "navy"
 site-url = "/pasta/"
 git-repository-url = "https://github.com/ekicyou/pasta"
 
+[output.html.redirect]
+"/lua/modules.html" = "modules/index.html"
+
 [output.html.search]
 enable = true
 
