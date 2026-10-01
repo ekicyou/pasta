@@ -235,7 +235,7 @@
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 10.2_
 
 - [ ] 8. 現行文書の参照修正（P7）
-- [ ] 8.1 (P) steering の grammar.md を非規範の要約へ縮小する
+- [x] 8.1 (P) steering の grammar.md を非規範の要約へ縮小する
   - 「このドキュメントの役割」（権威はマニュアル・食い違い時はマニュアルが正）・マーカー一覧・よくある間違い・IR 出力のみを残し、他の節を削る。残す節も食い違い表に照らして訂正する
   - 完了状態: grammar.md が「完全参照」を名乗らず、残す 4 節のみで構成されている
   - _Requirements: 9.8, 9.1, 9.2_
@@ -309,3 +309,4 @@
 - 4.1 後の link-check スキル違反 40 件（4.2〜4.4 の入力）: skill-missing 21（ghost SKILL.md → grammar-model×11・call-spec×2、lua SKILL.md → runtime-api×2・shiori-handlers×2、internal-modules → runtime-api・shiori-handlers、testing-lint → runtime-api#set_scene_selector--set_word_selector×2）、skill-unlisted 15（生成ファイル全て未掲載）、skill-anchor 1（ghost SKILL.md → variables.md#永続化とsaveテーブル）、skill-escape 1（lua SKILL.md → ../../../book/src/reference/startup.md）、skill-forbidden-ref 2（lua SKILL.md L40 book/src、testing-lint L247 crates/）。scratchpad の ledger-check.mjs は旧ファイル削除後は使えない（git 履歴で照合する）。
 - 4.3 レビュー後: アクション行の `＠func（…）`・`＠f` は `act.アクター:expr_fn`／プロキシ経由で、関数の第 1 引数はアクタープロキシ（act は `.act`）。完了仕様 handler-resolution-fallback 要件 3.6・5.1 の意図どおりでバグ候補ではない。マニュアル grammar/variables.md#関数スコープの展開先・words.md にコントローラが追記して再生成した。
 - 7 後の参照修正対象（8.x の入力）: README.md L43–44、SOUL.md L16/L38/L40、OPTIMIZATION.md L139、steering/grammar.md 多数、product.md L17/L99、structure.md L230/241–242/379–380、tech.md L210/L212、book/AUTHORING.md L91/100/135–150/163–164/179–180、crates/pasta_lua/tests/runtime/syntax_test.rs L397（コメント）。link-check はルート Markdown と steering を走査しないため、8.x は網羅 grep で確認する。
+- 8.1: ScriptEvent は crates に存在しないため steering/grammar.md の IR 節は「IR 出力（act トークン列）」として実装の act トークンで書き直した。README.md L66 の「IR Output (ScriptEvent)」は 8.2 で扱う。
