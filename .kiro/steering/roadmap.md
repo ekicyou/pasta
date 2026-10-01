@@ -185,8 +185,8 @@ Phase 5 でデバッガ（DAP バックエンド）を組み込んだ結果、�
 - [x] sakura-script-newline -- キャラ切替時の段落区切り改行を eager（`\p` 直前・先出し）から fully-lazy（切替で保留し、再登場スコープの次の一般文字列直前でフラッシュ）へ変更。A→B 終了・同一スポット共有交代・全さくらスクリプト手番のゴミ改行を根絶。Dependencies: none。実装完了・全テスト green（`cargo test --all` 含む）。Task 5.1（実機SSP目視）は開発者による手動検証待ち。
 
 ### Phase 8 派生（未着手）
-- [ ] actor-surface-restore -- 同一スポットを複数アクターが共有して交代する際の、切替先アクターの立ち絵（サーフェスID・着せ替え状態）の復旧。Dependencies: sakura-script-newline
-  - 由来: sakura-script-newline の要件ディスカッション議題2（2026-07-18）でユーザーが「同一スコープでキャラが変わる場合、立ち絵の復旧が必要」と指摘。段落区切り改行（string 順序）とサーフェス状態管理（アクター状態機械）は責務が異なるため別仕様へ分離。brief.md 作成済み（`.kiro/specs/actor-surface-restore/brief.md`）
+- [x] actor-surface-restore -- 同一スポットを複数アクターが共有して交代する際の、切替先アクターの立ち絵（サーフェスID・着せ替え状態）の復旧。Dependencies: sakura-script-newline
+  - 由来: sakura-script-newline の要件ディスカッション議題2（2026-07-18）でユーザーが「同一スコープでキャラが変わる場合、立ち絵の復旧が必要」と指摘。段落区切り改行（string 順序）とサーフェス状態管理（アクター状態機械）は責務が異なるため別仕様へ分離。brief.md 作成済み（`.kiro/specs/completed/actor-surface-restore/brief.md`）
 
 ## Phase 9: 起動堅牢性（モジュールロード）
 
