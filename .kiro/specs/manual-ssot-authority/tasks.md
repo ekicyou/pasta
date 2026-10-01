@@ -124,7 +124,7 @@
   - _Depends: 2.7_
 
 - [ ] 3. リンク検証・生成器・内容検査のツール化（P3）
-- [ ] 3.1 drift-check をリンク検証器へ改名・縮小する
+- [x] 3.1 drift-check をリンク検証器へ改名・縮小する
   - リンク切れ検出（book 内相対 `.md`・自リポ GitHub URL・トラバーサル）を現行挙動のまま残し、ドリフト検出・未マップ検出・マニフェスト解析・ハッシュ計算を削除する
   - リンク正規表現を export し、CommonMark 準拠のフェンス判定（3 個以上の `` ` ``／`~` で開き、同じ文字で開始以上の個数・情報文字列なしの行でのみ閉じる。行数は保つ）を追加して export する
   - 自己テストはリンク検証系ケースを非回帰として残し、フェンス判定（4 連フェンス内の 3 連行を含む）のケースを追加、ドリフト・未マップ・TOML のケースを削除する
@@ -301,3 +301,4 @@
 - 2.8 後: 担当が未定だった台帳本体 2 行を割り当てる。L342（GRAMMAR.md L801 → reference/startup.md#4 に `Parse error: ファイル:行:列: 内容` の形式を追記）は 2.9（startup.md を触るため）。L262（doc/spec/README L63「外部仕様」→ reference/external-links.md に Unicode UAX #31・ukadoc さくらスクリプト一覧のリンク追記）は 3.5（external-links の doc/spec リンク群削除と同時）。verify-static R1.2 は新章が SUMMARY 未登録のため 2.9 まで 1 件失敗する（P2 中の一時状態）。
 - 2.9: パースエラーのログ文字列は `Parse error: ` 前置きが多重になる（loader/process.rs と pasta_dsl/parser の二重包み・見た目の冗長のみでバグ候補にしない）。startup.md §4 は内側の形式を「含む」とだけ書いた。
 - 2.10: config_defaults_test は「キー名と `値` を含む行がどれか 1 行あれば合格」（`.any`）のため、章に同じキーの表行が 2 つ（3分類表と [ghost] 表）あると片方だけ古くても通る。旧スキル側も同じ構成で既存の穴。design が照合規則の不変を指示しているため本仕様では変更せず、既知の制約として記録する。
+- 3.1: `maskFences` は開閉の区切り行も空行にし、CRLF を LF に正規化する（行数は保つ）。`.github/workflows/manual.yml` は 5.1 まで旧 drift-check.mjs／verify-drift-gate.mjs を参照したまま（ブランチ内の中間状態）。

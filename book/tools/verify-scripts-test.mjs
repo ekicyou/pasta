@@ -2,7 +2,7 @@
 // （review-improvement-loop セル 3.58 / G1 テスト網羅・要件 2.2）。
 //
 // 背景:
-//   verify-drift-gate.mjs（タスク 7.3）と verify-content.mjs（タスク 7.4）は
+//   verify-content.mjs（タスク 7.4）は
 //   import 時に検証本体を即実行する構造のため、本体を改変せずに関数単体テストは
 //   できない。代わりに子プロセスとして実行し、
 //     - exit 0 で完走する（結線・構文・依存の回帰検出）
@@ -43,20 +43,6 @@ function runScript(name) {
     encoding: 'utf8',
     timeout: 120000,
   });
-}
-
-// ============================================================
-log('\n== verify-drift-gate.mjs（ドリフト検出・完了ゲート検証） ==');
-{
-  const r = runScript('verify-drift-gate.mjs');
-  const out = r.stdout || '';
-  check('exit 0 で完走', r.status === 0, `status=${r.status} stderr=${(r.stderr || '').slice(0, 300)}`);
-  const m = out.match(/合計 (\d+) 件 \/ 失敗 (\d+) 件/);
-  check('サマリ行を出力（合計/失敗）', !!m, out.slice(-300));
-  check('実際に多数のチェックを実行（>= 20 件）', m && Number(m[1]) >= 20,
-    m ? `合計=${m[1]}` : '(サマリなし)');
-  check('失敗 0 件', m && Number(m[2]) === 0, m ? `失敗=${m[2]}` : '(サマリなし)');
-  check('RESULT: OK を出力', /RESULT: OK/.test(out), out.slice(-200));
 }
 
 // ============================================================
