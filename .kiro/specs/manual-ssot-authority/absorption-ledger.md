@@ -646,7 +646,7 @@
 吸収元（doc/spec ch01–12・`GRAMMAR.md`・スキルの手書きリファレンス・現行 `book/src`）のどこにも書かれていない、現行実装が受理・処理する利用者向けの構文と挙動を 1 行ずつ挙げる（要件 1.8）。`grammar.pest` を規則ごとに読み、パーサ（`pasta_dsl`）・トランスパイラ（`pasta_lua` の code_gen）・ランタイム（`pasta_scripts`）で挙動を確かめた。本体の備考で「→1.2」とした項目はここで確定させる。
 
 - 判定列は「収録先: 章#節」か「バグ候補（根拠）」のどちらか。根拠 a＝実行時エラー・パニック・不正なさくらスクリプトを生む、b＝吸収元や他の規範記述と矛盾する結果を生む、c＝ソースコメント・テストで意図外と明示されている。どれにも当たらず意図が不明なだけのものは収録先を書く。
-- バグ候補はマニュアルに書かず、挙動も直さない（10.5）。`roadmap.md` へのキー行の申し送りは別タスクで行う。本表のバグ候補は 14 行（U06・U08・U12・U18・U19・U20・U21・U22・U23・U24・U25・U26・U27・U28）。
+- バグ候補はマニュアルに書かず、挙動も直さない（10.5）。`roadmap.md` へのキー行の申し送りは別タスクで行う。本表のバグ候補は 16 行（U06・U08・U12・U18・U19・U20・U21・U22・U23・U24・U25・U26・U27・U28・U29・U30）。
 - U23〜U27 は、食い違い grep 記録（1.3）で見つかった挙動のうち、バグ候補かどうかの判定を 1.4 へ申し送ったもの（X19・D07・X18・D03）。吸収元に記述はあるが実装と食い違うため、現行挙動をマニュアルに書くかどうかをここで決める。実測はコミット `2d98dcf4`（`d95e12f2` から crates 配下は変わっていない）で同じ検証プログラムを動かした結果。
 - 実装照合列の「実測」は、コミット `6e914384` の実装をスクラッチの検証プログラム（`parse_str` → `LuaTranspiler::transpile` → `PastaLoader::load` → `SHIORI.request`）で動かした結果。検証プログラムはリポジトリに残していない。出力は SHIORI レスポンスの `Value`（さくらスクリプト）または状態コード。
 
@@ -680,6 +680,8 @@
 | U26 | pasta.toml の `[lua]` セクション: `[lua] libs` はロード時に読まれず、書いても Lua 標準ライブラリ・mlua-stdlib モジュールの構成は既定のまま変わらない（`"env"` を足しても `@env` は使えず、既定に含まれる `@json` などは外せない） | lua:loader/mod.rs `PastaLoader::load`（`load_with_config(base_dir, RuntimeConfig::new())`）、crates/pasta_shiori/src/shiori.rs（SHIORI のロードも `RuntimeConfig::new()` から作る）、lua:loader/config/mod.rs `PastaConfig::lua`（呼び出し元なし）、lua:runtime/runtime_config.rs `From<LuaConfig> for RuntimeConfig`（ロード経路から呼ばれない）、lua:loader/config/sections.rs `LuaConfig` の doc コメント（`[lua]` セクションで有効にするライブラリを構成すると明記）。実測: `[lua] libs = ["std_all", "env"]` で `require "@env"` は失敗し、`@json` は読める | バグ候補（b・c）: 吸収元（スキル pasta-toml.md L49・L145〜L146 の `[lua]` 既定値と節、runtime-api.md L655「`libs` 配列に `"env"` エントリを追加」）と矛盾し、ソースの doc コメントも `[lua]` が構成を決めると明記している | X18 の確定。マニュアル（2.5・2.7）は `[lua]` が効くとは書かず、`@env` は通常のゴーストから有効にできないことだけを書く（X18 の結論どおり） |
 | U27 | 選択肢の自動ルーティングの探索範囲: 既定の `REG.OnChoiceSelectEx` は、明示の `＊OnChoiceSelectEx` シーンが無いとき、選択 ID（Reference0）を直前に実行したグローバルシーンのローカルシーンからだけ前方一致で探す。グローバルシーンへはフォールバックせず、見つからなければ 204。シーンをまだ 1 つも実行していない（`STORE.last_global_scene` が nil の）ときだけグローバルシーンから探す | ps:pasta/shiori/event/choice_select.lua `REG.OnChoiceSelectEx`（`SCENE.search(choice_id, STORE.last_global_scene)`。L56 のコメントは「ローカル→グローバル、3.1/3.4」）、ps:pasta/scene.lua `SCENE.search` → lua:search/context.rs `search_scene`（親シーン名ありは「Local-only search … (no global fallback)」）、ps:pasta/act.lua（L181 で `STORE.last_global_scene` を更新）。完了済み仕様 `.kiro/specs/completed/choice-definition-dsl/requirements.md` 要件 3.4 は「ローカル → グローバルの順で前方一致検索」。実測: OnTest（ローカル「ローカル先」とグローバル「行き先」の選択肢）の後、選択 ID `ローカル先` → 200（`L`）、`行き先` → 204 | バグ候補（b・c）: 完了済み仕様の要件 3.4 と吸収元（スキル SKILL.md L276「ローカルシーン → グローバルシーンの順で検索」、authoring-patterns.md L347）に矛盾し、ソースのコメント（choice_select.lua L56）とも食い違う | D03 の確定。マニュアル（2.6 lua/shiori-events.md の OnChoiceSelectEx 節）に収録するのは「明示の `＊OnChoiceSelectEx` が優先」「選択 ID と同名のローカルシーン（直前のグローバルシーン内）を前方一致で自動実行し、見つからなければ 204」の部分。グローバルシーンへのフォールバックの有無は書かない（D03 の訂正対象 ga/SKILL.md L276・authoring-patterns.md L347 は、フォールバックの順序に触れない記述へ直す） |
 | U28 | 別グローバルシーンへの Call 後のローカル探索: `＞` で別のグローバルシーンを呼んで戻ったあと、呼び出し元の後続の Call・ローカル単語参照が呼ばれた側のローカルシーンを探す | ps:pasta/act.lua `init_scene`（`act.current_scene` を上書きし、戻り時に復元しない）・`find_act_handler` L1/L2。実測（2.2 レビュー）: OnA が `＞挨拶`→`＞別グローバル`→`＞挨拶` で `A[LXY]`（2 回目が呼ばれた側の `挨拶Y` に解決） | バグ候補（b）: 「実行中のグローバルシーンのローカルシーンを探す」とする吸収元（doc/spec ch04・スキル call-spec）とマニュアル call-jump.md#スコープ解決アルゴリズムの規範と矛盾する | 2.2 の実装・レビューで発見。マニュアルは通常時の挙動（実行中のグローバルシーン）だけを書く。大タスク 6 で roadmap のバグ候補キー行に含める |
+| U29 | セレクタの整数値が使われない: `@pasta_search` の `set_scene_selector(...)`・`set_word_selector(...)` に渡した整数の値は選択に使われず、整数が 1 つ以上あるとシャッフルが止まるだけ（候補は検索キーの文字コード順に先頭から 1 つずつ・一巡で先頭へ戻る） | lua:search/context.rs `parse_selector_args`・`replace_selector`、core:registry/random.rs `MockRandomSelector`（`shuffle_usize` は何もしない・`select_index` は random.rs 外から呼ばれない）。実測（2.4 レビュー）: セレクタ 0 で `search_word("挨拶")`×4 → `昼1,朝1,朝2,昼1` | バグ候補（b）: 吸収元 runtime-api L101「選択インデックスのシーケンス（0始まり）」・例 `set_word_selector(0, 1, 0)`→「1番目、2番目、1番目」、旧 lua/modules.md「整数インデックス（0 始まり）で固定できる」と矛盾。`MockRandomSelector` の doc コメント「Sequence of indices to select」も値の使用を示す | 2.4 の実装・レビューで発見。マニュアルは争いのない部分（整数を渡すとシャッフルせず決まった順になる）だけを書き、値が無視されることは書かない。大タスク 6 で roadmap のバグ候補キー行に含める |
+| U30 | 記号を含むグローバルシーン名: グローバルシーン名は登録時に英数字以外を `_` に置換される（`＊挨拶・朝` → 登録名 `挨拶_朝1`）ため、元の名前での検索・Call で見つからない | core:registry/scene_registry.rs `SceneRegistry::sanitize_name`、lua:search/context.rs `search_scene`（元の名前は登録名に一致しない）。実測（2.4 レビュー）: `search_scene("挨拶・朝")` → nil、`search_scene("挨拶")` → `挨拶_朝1` | バグ候補（b）: 「シーンは名前で呼び出せる」とする吸収元・マニュアル call-jump.md の規範と矛盾する | 2.4 レビューで発見。マニュアルは通常の名前（名前＋連番）の挙動だけを書く。大タスク 6 で roadmap のバグ候補キー行に含める |
 
 ## 食い違い grep 記録
 
@@ -741,8 +743,8 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 | grammar/call-jump.md:57 | `＞挨拶` → 「挨拶朝」「挨拶昼」の両方が候補 | 正 | — |
 | grammar/words.md:86 | ローカルとグローバルの同名単語は「マージ」されて候補プールが統合（L88〜L94 の例「どちらかが選ばれる」を含む） | 訂正対象・訂正済み（2.3） | 2.3 |
 | grammar/actor-dictionary.md:52 | アクター辞書に無ければ「グローバル単語辞書・ローカル単語辞書」へフォールバック（順序がローカル優先と逆）（節見出し L48） | 訂正対象・訂正済み（2.3） | 2.3 |
-| lua/modules.md:119 | @pasta_search は「フォールバック戦略（ローカル → グローバル）を備える」 | 訂正対象 | 2.4 |
-| lua/modules.md:133 | 「ローカル優先検索（第2引数に親グローバルシーン名を指定）」（実際はローカルのみ） | 訂正対象 | 2.4 |
+| lua/modules.md:119 | @pasta_search は「フォールバック戦略（ローカル → グローバル）を備える」 | 訂正対象・訂正済み（2.4） | 2.4 |
+| lua/modules.md:133 | 「ローカル優先検索（第2引数に親グローバルシーン名を指定）」（実際はローカルのみ） | 訂正対象・訂正済み（2.4） | 2.4 |
 | ga/SKILL.md:66 | 前方一致で「挨拶朝」「挨拶昼」の両方が候補 | 正 | — |
 | ga/SKILL.md:125 | スコープ解決: ローカル → グローバルの順に前方一致検索（優先順として読める） | 正 | — |
 | ga/SKILL.md:64 | ローカルシーンは親グローバルシーン内でのみアクセス可能 | 正 | — |
@@ -752,8 +754,8 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 | lc/SKILL.md:132 | `@pasta_search`（シーン・単語検索、フォールバック戦略） | 訂正対象 | 4.4 |
 | ga/references/call-spec.md:27 | 「マージ: 両検索結果を結合」（L25〜L27。L41 の「両方が候補」は正） | 生成で置換（4.1） | 4.1 |
 | ga/references/words.md:82 | 「マージ: 両検索結果を結合」（L80〜L82。L90 の「両方が候補」は正） | 生成で置換（4.1） | 4.1 |
-| lc/references/runtime-api.md:20 | search_scene は「フォールバック戦略（ローカル → グローバル）」（L37〜L38・L48 も同旨） | 生成で置換（4.1） | 2.4（移設時）・4.1 |
-| lc/references/runtime-api.md:63 | search_word は「フォールバック戦略（ローカル → グローバル）」 | 生成で置換（4.1） | 2.4（移設時）・4.1 |
+| lc/references/runtime-api.md:20 | search_scene は「フォールバック戦略（ローカル → グローバル）」（L37〜L38・L48 も同旨） | 生成で置換（4.1）・移設時訂正済み（2.4） | 2.4（移設時）・4.1 |
+| lc/references/runtime-api.md:63 | search_word は「フォールバック戦略（ローカル → グローバル）」 | 生成で置換（4.1）・移設時訂正済み（2.4） | 2.4（移設時）・4.1 |
 | lc/references/internal-modules.md:271 | `find_act_handler` の L1〜L5 フォールバック順序（L263・L274・L294・L303・L306・L449 を含む） | 正 | — |
 
 他項目で記録: `ga/references/actor-dictionary.md:55`（D04）、`lua/patterns.md:128`・`lua/dsl-vs-lua.md:29`・`getting-started/first-ghost.md:148`・`lc/references/shiori-handlers.md:265,269,297`（D15）、`lc/SKILL.md:148`（D13・X19）。
@@ -1334,8 +1336,8 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 
 | 位置 | 記述（要旨） | 判定 | 訂正先 |
 | ---- | ------------ | ---- | ------ |
-| lua/modules.md:113 | 値は読み取り専用 | 訂正対象 | 2.4 |
-| lc/references/runtime-api.md:246 | 注意事項「読み取り専用: 値の変更はできない」 | 生成で置換（4.1） | 2.4（移設時）・4.1 |
+| lua/modules.md:113 | 値は読み取り専用 | 訂正対象・訂正済み（2.4） | 2.4 |
+| lc/references/runtime-api.md:246 | 注意事項「読み取り専用: 値の変更はできない」 | 生成で置換（4.1）・移設時訂正済み（2.4） | 2.4（移設時）・4.1 |
 
 ### X18 `@env` の有効化手段（`[lua] libs` は適用されない）
 
