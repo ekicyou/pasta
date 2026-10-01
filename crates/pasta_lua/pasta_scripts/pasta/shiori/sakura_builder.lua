@@ -36,6 +36,11 @@ local function clear_spots(actor_spots)
     end
 end
 
+--- nil ならビルドローカルの空状態（BUILDER.build の複雑度を増やさないため外出し）
+local function appearance_or_new(appearance)
+    return appearance or APPEARANCE.new()
+end
+
 --- アクター切り替え時にスポットタグ `\p[spot]` を出力し、直後に外見の復旧タグを出力する。
 --- スポット解決（未設定→0＋警告）・`\p[spot]` 出力・復旧タグ出力のみを行い、
 --- 段落区切り改行の判定・出力・保留（pending）はすべて呼び出し側（BUILDER.build ループ）が担う。
@@ -125,7 +130,7 @@ function BUILDER.build(grouped_tokens, config, input_actor_spots, appearance) --
     -- input_actor_spots を直接変更する（nilの場合は内部で空テーブルを作成）
     local actor_spots = input_actor_spots or {}
     -- 外見状態も直接変更する（nilの場合はビルドローカル。clear_spot では破棄しない）
-    appearance = appearance or APPEARANCE.new()
+    appearance = appearance_or_new(appearance)
     -- ビルドローカル状態機械（sakura-script-newline / 完全遅延方式）
     local last_actor = nil    -- 最後に発言したActor
     local last_spot = nil     -- 最後のスポットID（＝現在スコープ）
