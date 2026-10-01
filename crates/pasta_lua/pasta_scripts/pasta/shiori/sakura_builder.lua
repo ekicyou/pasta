@@ -56,38 +56,42 @@ local function emit_actor_switch(buffer, actor_spots, actor)
     return spot
 end
 
+--- actorグループ内の単一トークンをさくらスクリプト文字列へ変換する
+--- @param actor table|nil グループの発言アクター
+--- @param inner table グループ内トークン
+--- @return string 変換結果（yield 等の出力しないトークンは空文字列）
+local function inner_token_to_string(actor, inner)
+    local inner_type = inner.type
+
+    if inner_type == "talk" or inner_type == "sakura_script" then
+        return SAKURA_SCRIPT.talk_to_script(actor, inner.text)
+    elseif inner_type == "surface" then
+        return string.format("\\s[%s]", tostring(inner.id))
+    elseif inner_type == "wait" then
+        return string.format("\\_w[%d]", inner.ms)
+    elseif inner_type == "newline" then
+        return string.rep("\\n", inner.n)
+    elseif inner_type == "clear" then
+        return "\\c"
+    elseif inner_type == "raw_script" then
+        return inner.text
+    elseif inner_type == "choice" then
+        return "\\![*]\\q[" .. escape_choice(inner.display) .. "," .. escape_choice(inner.target) .. "]"
+    elseif inner_type == "choice_timeout" then
+        local ms = inner.seconds and math.floor(inner.seconds * 1000) or 0
+        return "\\![set,choicetimeout," .. ms .. "]"
+    end
+    -- yield は無視
+    return ""
+end
+
 --- actorグループ内の単一トークンをさくらスクリプトへ変換して出力
 --- @param buffer table 出力バッファ（pasta.buf 互換）
 --- @param actor table|nil グループの発言アクター
 --- @param inner table グループ内トークン
 local function emit_inner_token(buffer, actor, inner)
-    local inner_type = inner.type
-
-    if inner_type == "talk" then
-        buffer:put(SAKURA_SCRIPT.talk_to_script(actor, inner.text))
-    elseif inner_type == "sakura_script" then
-        buffer:put(SAKURA_SCRIPT.talk_to_script(actor, inner.text))
-    elseif inner_type == "surface" then
-        buffer:put(string.format("\\s[%s]", tostring(inner.id)))
-    elseif inner_type == "wait" then
-        buffer:put(string.format("\\_w[%d]", inner.ms))
-    elseif inner_type == "newline" then
-        for _ = 1, inner.n do
-            buffer:put("\\n")
-        end
-    elseif inner_type == "clear" then
-        buffer:put("\\c")
-    elseif inner_type == "raw_script" then
-        buffer:put(inner.text)
-    elseif inner_type == "choice" then
-        local display = escape_choice(inner.display)
-        local target = escape_choice(inner.target)
-        buffer:put("\\![*]\\q[" .. display .. "," .. target .. "]")
-    elseif inner_type == "choice_timeout" then
-        local ms = inner.seconds and math.floor(inner.seconds * 1000) or 0
-        buffer:put("\\![set,choicetimeout," .. ms .. "]")
-    end
-    -- yield は無視
+    local s = inner_token_to_string(actor, inner)
+    buffer:put(s)
 end
 
 --- @class BuildConfig
