@@ -32,7 +32,7 @@
 - **スキル構成**: `pasta-ghost-authoring`・`pasta-lua-coding` の `references/` のファイル構成、`SKILL.md` の生成／手書き区分表示、手書きファイルからの規範的事実の除去。
 - **撤去**: `doc/spec/`、`GRAMMAR.md` 本文、`book/manual-sources.toml`、`book/tools/drift-check.mjs`・`drift-check-test.mjs`・`verify-drift-gate.mjs`。
 - **CI・ゲート**: `.github/workflows/manual.yml` の起動条件と検証ステップ、`workflow.md` DoD の Manual Sync Gate、`kiro-complete` スキルの同ゲート記述。
-- **参照修正**: steering・`README.md`・`SOUL.md`・`OPTIMIZATION.md`・`book/AUTHORING.md`・`book/CONTENT-REVIEW.md`・進行中 spec・ソースコメント。
+- **参照修正**: steering・`README.md`・`SOUL.md`・`OPTIMIZATION.md`・`book/AUTHORING.md`・進行中 spec・ソースコメント。
 - **将来仕様の行き先**: `doc/spec/` ch08・ch12 の未実装項目の brief 起票とロードマップ記載。
 - **既定値整合テストの読み先**: `crates/pasta_lua/tests/loader/config_defaults_test.rs` の参照パス。
 
@@ -122,7 +122,7 @@ graph LR
 ```
 book/
 ├── AUTHORING.md                  # [改] 権威＝マニュアル、生成対象章の執筆規約（本文に口調を入れない）、再生成手順
-├── CONTENT-REVIEW.md             # [改] 冒頭に「doc/spec 廃止以前の歴史的レビュー記録」注記（OPEN QUESTION 6）
+├── CONTENT-REVIEW.md             # [削除] 廃止前提（doc/spec・manual-sources）の過去レビュー記録。履歴は git と completed spec が保持（設計ディスカッション #10）
 ├── manual-sources.toml           # [削除]
 ├── src/
 │   ├── SUMMARY.md                # [改] lua/shiori-events.md・reference/pasta-toml.md を目次へ追加
@@ -620,7 +620,7 @@ function runLinkCheck(repoRoot: string): { broken: BrokenLink[]; failed: boolean
 
 #### Retirement と ReferenceRepair
 
-- 撤去（2.1–2.4, 8.1）: `doc/spec/`、`book/manual-sources.toml`、`book/tools/verify-drift-gate.mjs`、`drift-check*.mjs`（改名で消滅）、`GRAMMAR.md` 本文。
+- 撤去（2.1–2.4, 8.1）: `doc/spec/`、`book/manual-sources.toml`、`book/tools/verify-drift-gate.mjs`、`drift-check*.mjs`（改名で消滅）、`GRAMMAR.md` 本文、`book/CONTENT-REVIEW.md`（#10）。
 - `GRAMMAR.md` の最終形（全文）は「Pasta DSL 文法リファレンスは利用者マニュアルへ移りました」の告知 1 文と `https://ekicyou.github.io/pasta/grammar/index.html` へのリンクのみ（2.2, 2.3）。
 - `book/AUTHORING.md`（9.4）: 第 4 節「流用／リンク方針」を「権威と生成」へ書き換える。内容: マニュアルが利用者向け情報の唯一の権威、スキル規範ファイルは生成物で編集元はマニュアル、生成対象章の一覧は `gen-skill-refs.mjs` の対応表が正、生成対象章の規約（導入と締めの間の本文に口調・コラムを置かない、最初と最後の `---` 以外の位置規約、章外への相対リンクは公開 URL に書き換わる、画像・非 `.md` 相対リンク禁止、`pasta-toml.md` の同一行表形式）、再生成コマンド。サンプル A の「権威的仕様」引用と第 5 節の doc/spec チェック項目を削除し、「生成対象章を変更したら再生成してコミット」を追加。流用元一覧表から doc/spec・GRAMMAR.md・スキル（起草元）を削除。
 - `.kiro/steering/grammar.md`（9.8）: 残す節＝「このドキュメントの役割」（非規範の要約であり権威はマニュアル `book/src/grammar/`、食い違い時はマニュアルが正、と書き換え）・「マーカー一覧」（早見表）・「よくある間違いパターン」・「IR 出力（ScriptEvent）」（開発者向け）。削る節＝「権威的仕様書」・「ドメイン概念」全小節・「基本パターン」・「Lua ブロック」・「さくらスクリプト」（いずれも規範的事実でありマニュアルが持つ）。
@@ -723,7 +723,7 @@ graph LR
 3. ~~鮮度チェックの CI 配置~~ → 解決済み（#9）: `manual.yml` の `paths` 拡張＋Setup Node 直後のステップ。`build.yml`・専用ワークフローには置かない。
 4. ~~Lua API 章の構成~~ → 解決済み（#5）: モジュールごとに章を分ける（`lua/modules/` 配下 8 章、生成も 8 ファイル）。SHIORI は `lua/shiori-events.md` 1 章。
 5. ~~動的単語参照 `＠＄` を brief 化するか~~ → 解決済み（#8）: brief 起票＋roadmap キー情報。
-6. `book/CONTENT-REVIEW.md` の扱い（前提: 歴史的記録の注記を付けて残す）。
+6. ~~`book/CONTENT-REVIEW.md` の扱い~~ → 解決済み（#10）: 削除する。
 7. `review-improvement-loop` の修正範囲（前提: 今後の指示として読まれる箇所のみ。完了済みセル記録と `reports/` は歴史的記録として残す）。
 8. ~~既知の食い違いの訂正範囲~~ → 解決済み（#6）: マニュアル全章・両 `SKILL.md`・スキル手書きファイルを grep し、生成対象外も同時に訂正。
 9. ~~吸収元に無い実装事実の扱い~~ → 解決済み（#7）: バグ候補（判定基準 a〜c）以外は現行挙動としてマニュアルへ収録。バグ候補は台帳付録と roadmap のキー情報へ。
