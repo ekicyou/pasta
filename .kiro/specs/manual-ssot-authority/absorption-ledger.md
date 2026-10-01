@@ -607,7 +607,7 @@
 | L191 OnMouseDoubleClick — ダブルクリック | 収録先（新設）: lua/shiori-events.md#OnMouseDoubleClick | ps:pasta/shiori/event/init.lua `EVENT.no_entry` | — |
 | L212 時間系 | 収録先（新設）: lua/shiori-events.md#主要イベント | 不要（節見出し） | — |
 | L214 OnSecondChange — 毎秒 | 収録先（訂正）: lua/shiori-events.md#OnSecondChange（既定ハンドラが `CALLBACK.sweep` と仮想ディスパッチャを動かす。上書きすると OnTalk・OnHour・コールバックのタイムアウト処理が止まる） | ps:pasta/shiori/event/second_change.lua、ps:pasta/shiori/event/callback.lua `sweep` | 食い違い表「OnSecondChange・コールバック」（`CALLBACK.resume_pending` は無い） |
-| L230 OnNotifyCallbackResponse — SSPコールバック応答 | 収録先（訂正）: lua/shiori-events.md#OnNotifyCallbackResponse（応答は `EVENT.fire` 冒頭の `CALLBACK.try_route` が REG より先に処理する。モジュール名は `pasta.shiori.event.callback`） | ps:pasta/shiori/event/init.lua `EVENT.fire`（最初に `CALLBACK.try_route(req)`）、ps:pasta/shiori/event/callback.lua `try_route` | 「event.init で REG に自動登録」「独自ハンドラで機構が止まる」は実装と合わない →1.3 |
+| L230 OnNotifyCallbackResponse — SSPコールバック応答 | 収録先（訂正）: lua/shiori-events.md#OnPastaCallBack（コールバック応答）（X20 により実装の名前で見出し化・2.6 で確定。応答は `EVENT.fire` 冒頭の `CALLBACK.try_route` が REG より先に処理する。モジュール名は `pasta.shiori.event.callback`） | ps:pasta/shiori/event/init.lua `EVENT.fire`（最初に `CALLBACK.try_route(req)`）、ps:pasta/shiori/event/callback.lua `try_route` | 「event.init で REG に自動登録」「独自ハンドラで機構が止まる」は実装と合わない →1.3 |
 | L243 OnMinuteChange — 毎分 | 収録先（新設）: lua/shiori-events.md#OnMinuteChange | ps:pasta/shiori/event/init.lua `EVENT.no_entry` | — |
 | L265 シーン関数フォールバック | 収録先（新設）: lua/shiori-events.md#シーン関数フォールバック | ps:pasta/shiori/event/init.lua `EVENT.no_entry`（`SCENE.co_exec(act, req.id)`） | — |
 | L269 フォールバックチェーン | 収録先（訂正）: lua/shiori-events.md#シーン関数フォールバック（見つかればコルーチンを実行して `RES.ok(script)`（200）、未発見・出力なしは 204） | ps:pasta/shiori/event/init.lua `EVENT.fire`、ps:pasta/scene.lua `co_exec` | 食い違い表「シーン関数フォールバック」 |
@@ -646,7 +646,7 @@
 吸収元（doc/spec ch01–12・`GRAMMAR.md`・スキルの手書きリファレンス・現行 `book/src`）のどこにも書かれていない、現行実装が受理・処理する利用者向けの構文と挙動を 1 行ずつ挙げる（要件 1.8）。`grammar.pest` を規則ごとに読み、パーサ（`pasta_dsl`）・トランスパイラ（`pasta_lua` の code_gen）・ランタイム（`pasta_scripts`）で挙動を確かめた。本体の備考で「→1.2」とした項目はここで確定させる。
 
 - 判定列は「収録先: 章#節」か「バグ候補（根拠）」のどちらか。根拠 a＝実行時エラー・パニック・不正なさくらスクリプトを生む、b＝吸収元や他の規範記述と矛盾する結果を生む、c＝ソースコメント・テストで意図外と明示されている。どれにも当たらず意図が不明なだけのものは収録先を書く。
-- バグ候補はマニュアルに書かず、挙動も直さない（10.5）。`roadmap.md` へのキー行の申し送りは別タスクで行う。本表のバグ候補は 16 行（U06・U08・U12・U18・U19・U20・U21・U22・U23・U24・U25・U26・U27・U28・U29・U30）。
+- バグ候補はマニュアルに書かず、挙動も直さない（10.5）。`roadmap.md` へのキー行の申し送りは別タスクで行う。本表のバグ候補は 17 行（U06・U08・U12・U18・U19・U20・U21・U22・U23・U24・U25・U26・U27・U28・U29・U30・U31）。
 - U23〜U27 は、食い違い grep 記録（1.3）で見つかった挙動のうち、バグ候補かどうかの判定を 1.4 へ申し送ったもの（X19・D07・X18・D03）。吸収元に記述はあるが実装と食い違うため、現行挙動をマニュアルに書くかどうかをここで決める。実測はコミット `2d98dcf4`（`d95e12f2` から crates 配下は変わっていない）で同じ検証プログラムを動かした結果。
 - 実装照合列の「実測」は、コミット `6e914384` の実装をスクラッチの検証プログラム（`parse_str` → `LuaTranspiler::transpile` → `PastaLoader::load` → `SHIORI.request`）で動かした結果。検証プログラムはリポジトリに残していない。出力は SHIORI レスポンスの `Value`（さくらスクリプト）または状態コード。
 
@@ -682,6 +682,7 @@
 | U28 | 別グローバルシーンへの Call 後のローカル探索: `＞` で別のグローバルシーンを呼んで戻ったあと、呼び出し元の後続の Call・ローカル単語参照が呼ばれた側のローカルシーンを探す | ps:pasta/act.lua `init_scene`（`act.current_scene` を上書きし、戻り時に復元しない）・`find_act_handler` L1/L2。実測（2.2 レビュー）: OnA が `＞挨拶`→`＞別グローバル`→`＞挨拶` で `A[LXY]`（2 回目が呼ばれた側の `挨拶Y` に解決） | バグ候補（b）: 「実行中のグローバルシーンのローカルシーンを探す」とする吸収元（doc/spec ch04・スキル call-spec）とマニュアル call-jump.md#スコープ解決アルゴリズムの規範と矛盾する | 2.2 の実装・レビューで発見。マニュアルは通常時の挙動（実行中のグローバルシーン）だけを書く。大タスク 6 で roadmap のバグ候補キー行に含める |
 | U29 | セレクタの整数値が使われない: `@pasta_search` の `set_scene_selector(...)`・`set_word_selector(...)` に渡した整数の値は選択に使われず、整数が 1 つ以上あるとシャッフルが止まるだけ（候補は検索キーの文字コード順に先頭から 1 つずつ・一巡で先頭へ戻る） | lua:search/context.rs `parse_selector_args`・`replace_selector`、core:registry/random.rs `MockRandomSelector`（`shuffle_usize` は何もしない・`select_index` は random.rs 外から呼ばれない）。実測（2.4 レビュー）: セレクタ 0 で `search_word("挨拶")`×4 → `昼1,朝1,朝2,昼1` | バグ候補（b）: 吸収元 runtime-api L101「選択インデックスのシーケンス（0始まり）」・例 `set_word_selector(0, 1, 0)`→「1番目、2番目、1番目」、旧 lua/modules.md「整数インデックス（0 始まり）で固定できる」と矛盾。`MockRandomSelector` の doc コメント「Sequence of indices to select」も値の使用を示す | 2.4 の実装・レビューで発見。マニュアルは争いのない部分（整数を渡すとシャッフルせず決まった順になる）だけを書き、値が無視されることは書かない。大タスク 6 で roadmap のバグ候補キー行に含める |
 | U30 | 記号を含むグローバルシーン名: グローバルシーン名は登録時に英数字以外を `_` に置換される（`＊挨拶・朝` → 登録名 `挨拶_朝1`）ため、元の名前での検索・Call で見つからない | core:registry/scene_registry.rs `SceneRegistry::sanitize_name`、lua:search/context.rs `search_scene`（元の名前は登録名に一致しない）。実測（2.4 レビュー）: `search_scene("挨拶・朝")` → nil、`search_scene("挨拶")` → `挨拶_朝1` | バグ候補（b）: 「シーンは名前で呼び出せる」とする吸収元・マニュアル call-jump.md の規範と矛盾する | 2.4 レビューで発見。マニュアルは通常の名前（名前＋連番）の挙動だけを書く。大タスク 6 で roadmap のバグ候補キー行に含める |
+| U31 | 選択肢の自動ルーティングが表示ラベルで探す: 既定の `REG.OnChoiceSelectEx` は Reference0 を選択 ID として読むが、SSP は Reference0 に選択肢の表示テキスト、Reference1 に選択 ID を送るため、`「」` で表示名を付けた選択肢（`＠？天気「天気を聞く」` 等）は自動ルーティングされず 204 になる。表示名を省いた選択肢は表示とターゲットが同じ文字列のため偶然動く | ps:pasta/shiori/event/choice_select.lua `CHOICE_ID_REF_INDEX = 0`（L14 のコメント「\q[title,id] → Reference0=id」は UKADOC と逆）。実 SSP ログ crates/pasta_shiori/doc/shiori-sample.log L5202〜5204（Reference0=表示・Reference1=ID）。実測（2.6 レビュー）: Ref0=表示ラベル・Ref1=ローカル先 → 204、逆順 → 200 | バグ候補（b・c）: 完了仕様 choice-definition-dsl 要件 3.1「Reference1（選択ID）」・UKADOC と矛盾し、ソースコメントの意図（選択 ID で探す）とも一致しない | 2.6 の実装・レビューで発見。マニュアル lua/shiori-events.md は「選択 ID で探す」本来の挙動と UKADOC どおりの Reference 表だけを書く。U27・本体 L339・L605 の「選択 ID（Reference0）」はこのバグを取り込んだ表記。入門 first-ghost.md の `＠？天気「天気を聞く」` は実機で自動ルーティングされない（成果物ブロックは tutorial-check の逐語照合対象のため変更しない）。大タスク 6 で roadmap のバグ候補キー行に含める |
 
 ## 食い違い grep 記録
 
@@ -994,9 +995,9 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 | lua/patterns.md:108 | 「ハンドラは `req` を受け取る」とフィールド表 `req.id` 等（L110〜L115） | 訂正対象 | 2.8 |
 | lua/dsl-vs-lua.md:37 | カスタムイベント処理は REG に登録 | 正 | — |
 | lc/SKILL.md:84 | `REG.EventName = function(req) ... end` | 訂正対象 | 4.4 |
-| lc/references/shiori-handlers.md:20 | 登録パターン `function(req)`（L103・L123・L138・L157・L201・L225・L253・L300 の例も同じ） | 生成で置換（4.1） | 2.6（移設時）・4.1 |
-| lc/references/shiori-handlers.md:26 | 節「req パラメータ」: ハンドラ引数 `req` のフィールド表と `req.reference[N]` の例（L30〜L43） | 生成で置換（4.1） | 2.6（移設時）・4.1 |
-| lc/references/shiori-handlers.md:100 | 各イベント節の Reference 表を `req.reference[N]` で表記（L100・L118〜L120・L135・L153・L172・L197・L221・L237・L249）と、例の `req.` 参照（L104・L124・L139・L154・L158・L173・L184・L198・L202・L203・L222・L238・L250・L254・L255）、フォールバックチェーン図の `REG[req.id]`・`SCENE.search(req.id)`（L274・L278） | 生成で置換（4.1） | 2.6（移設時）・4.1 |
+| lc/references/shiori-handlers.md:20 | 登録パターン `function(req)`（L103・L123・L138・L157・L201・L225・L253・L300 の例も同じ） | 生成で置換（4.1）・訂正済み（2.6） | 2.6（移設時）・4.1 |
+| lc/references/shiori-handlers.md:26 | 節「req パラメータ」: ハンドラ引数 `req` のフィールド表と `req.reference[N]` の例（L30〜L43） | 生成で置換（4.1）・訂正済み（2.6） | 2.6（移設時）・4.1 |
+| lc/references/shiori-handlers.md:100 | 各イベント節の Reference 表を `req.reference[N]` で表記（L100・L118〜L120・L135・L153・L172・L197・L221・L237・L249）と、例の `req.` 参照（L104・L124・L139・L154・L158・L173・L184・L198・L202・L203・L222・L238・L250・L254・L255）、フォールバックチェーン図の `REG[req.id]`・`SCENE.search(req.id)`（L274・L278） | 生成で置換（4.1）・訂正済み（2.6） | 2.6（移設時）・4.1 |
 | lc/references/shiori-handlers.md:326 | 仮想ディスパッチャ節の `act.req.status`・`act.req.date`（L328・L332・L351・L365・L386） | 正 | — |
 | grammar/variables.md:162 | Reference10 以降は Lua から `act.req.reference[10]` で読む | 正 | — |
 | ga/references/variables.md:180 | Reference10 以降は `act.req.reference[10]` で読む | 生成で置換（4.1） | 4.1 |
@@ -1013,8 +1014,8 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 | lua/patterns.md:123 | `RES.ok(value)`: 200 OK＋さくらスクリプト | 正 | — |
 | lua/patterns.md:126 | `RES.err(message)`: 500 | 正 | — |
 | lua/patterns.md:125 | `RES.no_content()`: 204 No Content | 正 | — |
-| lc/references/shiori-handlers.md:63 | API 一覧の `RES.ok_with(headers)`（API 一覧 L62〜L65、L71〜L77 の説明を含む） | 生成で置換（4.1） | 2.6（移設時）・4.1 |
-| lc/references/shiori-handlers.md:80 | 使用例 `return RES.ok_with({…})` | 生成で置換（4.1） | 2.6（移設時）・4.1 |
+| lc/references/shiori-handlers.md:63 | API 一覧の `RES.ok_with(headers)`（API 一覧 L62〜L65、L71〜L77 の説明を含む） | 生成で置換（4.1）・訂正済み（2.6） | 2.6（移設時）・4.1 |
+| lc/references/shiori-handlers.md:80 | 使用例 `return RES.ok_with({…})` | 生成で置換（4.1）・訂正済み（2.6） | 2.6（移設時）・4.1 |
 
 他項目で記録: `lua/patterns.md:96,102,104`・`lc/SKILL.md:85,148`・`lc/references/shiori-handlers.md:22,74,106,108,125,141,143,159,205,207,226,257,259`（X19。ハンドラから `RES.*` を返す例）、`lc/references/shiori-handlers.md:296`（D15）。
 
@@ -1029,9 +1030,9 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 | lua/patterns.md:128 | 節「REG 未登録時のフォールバック」（応答コードの記述なし） | 正 | — |
 | lua/dsl-vs-lua.md:29 | ランタイムのフォールバックが自動で呼び出す | 正 | — |
 | getting-started/first-ghost.md:148 | 「シーン関数フォールバック」機能を利用 | 正 | — |
-| lc/references/shiori-handlers.md:279 | フォールバックチェーン「見つかった → シーン関数実行 → 204 No Content」（節 L265・L269、L274〜L280 の図を含む。L280 の「見つからない → 204」は正） | 生成で置換（4.1） | 2.6（移設時）・4.1 |
-| lc/references/shiori-handlers.md:297 | シーン関数フォールバック時も `pcall` でキャッチ | 生成で置換（4.1） | 2.6（移設時）・4.1 |
-| lc/references/shiori-handlers.md:296 | REG ハンドラの例外は `xpcall` でキャッチされ `RES.err()` | 生成で置換（4.1） | 2.6（移設時）・4.1 |
+| lc/references/shiori-handlers.md:279 | フォールバックチェーン「見つかった → シーン関数実行 → 204 No Content」（節 L265・L269、L274〜L280 の図を含む。L280 の「見つからない → 204」は正） | 生成で置換（4.1）・訂正済み（2.6） | 2.6（移設時）・4.1 |
+| lc/references/shiori-handlers.md:297 | シーン関数フォールバック時も `pcall` でキャッチ | 生成で置換（4.1）・訂正済み（2.6） | 2.6（移設時）・4.1 |
+| lc/references/shiori-handlers.md:296 | REG ハンドラの例外は `xpcall` でキャッチされ `RES.err()` | 生成で置換（4.1）・訂正済み（2.6） | 2.6（移設時）・4.1 |
 | lc/references/shiori-handlers.md:179 | OnChoiceSelectEx で見つからなければ nil（204） | 生成で置換（4.1） | 4.1 |
 
 （`lua/modules.md:26`・`lua/modules.md:101`・`lua/modules.md:104`・`lc/SKILL.md:71`・`lc/references/internal-modules.md:78`・`lc/references/coding-conventions.md:329` 等の `pcall(require, "@pasta_config")` は別件で正。）
@@ -1055,8 +1056,8 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 | lua/patterns.md:134 | OnTalk・OnHour は仮想ディスパッチャが OnSecondChange を起点に発行（L135） | 正 | — |
 | getting-started/first-ghost.md:196 | OnSecondChange → 仮想イベントディスパッチャ → ランダムトーク／時報 | 正 | — |
 | lua/dsl-vs-lua.md:29 | 仮想ディスパッチャが自動で呼び出す | 正 | — |
-| lc/references/shiori-handlers.md:217 | 「コールバック保留中のコルーチン再開もこのイベント（`CALLBACK.resume_pending()`）」（節 L214・L216） | 生成で置換（4.1） | 2.6（移設時）・4.1 |
-| lc/references/shiori-handlers.md:225 | 上書き例 `REG.OnSecondChange = function(req) return RES.no_content() end`（上書きの注意なし） | 生成で置換（4.1） | 2.6（移設時）・4.1 |
+| lc/references/shiori-handlers.md:217 | 「コールバック保留中のコルーチン再開もこのイベント（`CALLBACK.resume_pending()`）」（節 L214・L216） | 生成で置換（4.1）・訂正済み（2.6） | 2.6（移設時）・4.1 |
+| lc/references/shiori-handlers.md:225 | 上書き例 `REG.OnSecondChange = function(req) return RES.no_content() end`（上書きの注意なし） | 生成で置換（4.1）・訂正済み（2.6） | 2.6（移設時）・4.1 |
 | lc/references/shiori-handlers.md:310 | 仮想ディスパッチャは OnSecondChange をトリガーに OnTalk／OnHour を発行（L308・L318 を含む） | 生成で置換（4.1） | 4.1 |
 | lc/references/internal-modules.md:190 | `get_property` はコールバック到着まで待機（L193 のトークンバッファ保全を含む） | 正 | — |
 
@@ -1366,7 +1367,7 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 | lua/patterns.md:88 | 「`RES` でレスポンスを返す」（L119〜L126 の API 表の位置づけを含む） | 訂正対象 | 2.8 |
 | lc/SKILL.md:148 | REG に登録し `RES.ok()`／`RES.no_content()` 等でレスポンスを返す | 訂正対象 | 4.4 |
 | lc/SKILL.md:85 | `pasta.shiori.res`: `RES.ok()`, `RES.no_content()`（モジュール一覧としては正） | 正 | — |
-| lc/references/shiori-handlers.md:22 | 登録パターン `return RES.ok(…)  -- または RES.no_content()`（L106・L125・L141・L159・L205・L226・L257 の例も同じ）（追記: L74・L108・L143・L207・L259 も同じ） | 生成で置換（4.1） | 2.6（移設時）・4.1 |
+| lc/references/shiori-handlers.md:22 | 登録パターン `return RES.ok(…)  -- または RES.no_content()`（L106・L125・L141・L159・L205・L226・L257 の例も同じ）（追記: L74・L108・L143・L207・L259 も同じ） | 生成で置換（4.1）・訂正済み（2.6） | 2.6（移設時）・4.1 |
 
 ### X20 OnNotifyCallbackResponse
 
@@ -1376,7 +1377,7 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 
 | 位置 | 記述（要旨） | 判定 | 訂正先 |
 | ---- | ------------ | ---- | ------ |
-| lc/references/shiori-handlers.md:230 | 節「OnNotifyCallbackResponse — SSPコールバック応答」（L232〜L242。`pasta.shiori.callback` モジュール、event.init で自動登録、独自ハンドラで止まる） | 生成で置換（4.1） | 2.6（移設時）・4.1 |
+| lc/references/shiori-handlers.md:230 | 節「OnNotifyCallbackResponse — SSPコールバック応答」（L232〜L242。`pasta.shiori.callback` モジュール、event.init で自動登録、独自ハンドラで止まる） | 生成で置換（4.1）・訂正済み（2.6） | 2.6（移設時）・4.1 |
 | lc/references/internal-modules.md:190 | `get_property` はタグを発行しコールバック到着まで待機（イベント名の記述なし） | 正 | — |
 
 ### X21 `spot_newlines` の出力
@@ -1399,7 +1400,7 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 
 | 位置 | 記述（要旨） | 判定 | 訂正先 |
 | ---- | ------------ | ---- | ------ |
-| lc/references/shiori-handlers.md:217 | `CALLBACK.resume_pending()` | 生成で置換（4.1） | 2.6（移設時）・4.1 |
+| lc/references/shiori-handlers.md:217 | `CALLBACK.resume_pending()` | 生成で置換（4.1）・訂正済み（2.6） | 2.6（移設時）・4.1 |
 
 ### 「→1.3」申し送りの解決
 

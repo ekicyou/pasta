@@ -78,7 +78,7 @@
   - _Boundary: ContentMigration（lua/modules 後半 4 章）_
   - _Depends: 1.3_
 
-- [ ] 2.6 (P) SHIORI イベントとハンドラの章を新設する
+- [x] 2.6 (P) SHIORI イベントとハンドラの章を新設する
   - スキル shiori-handlers の全節（REG・RES・イベント一覧・シーン関数フォールバック・仮想ディスパッチャ）と、時報の 4 段フォールバック・選択肢の OnChoiceSelectEx ルーティングを収録する
   - REG ハンドラは `function(act)`、RES は実在する関数群、シーン関数フォールバックは 200 応答、OnSecondChange の既定ハンドラの役割と上書き時の注意を実装どおりに書く
   - 導入と締めを書き下ろし、生成対象章の執筆制約を守る
@@ -285,7 +285,7 @@
 ## Implementation Notes
 - 1.1: 台帳は design の食い違い表に無い実装差も備考に記録した（アクタースコープの `lua` コードブロックは実際に生成・A1 で到達する＝design #14 の「処理に反映されない」と食い違う、bool リテラルなし、`\]` 非対応、動的 Call は `tostring(expr)`、REG ハンドラの戻り値 `RES.ok` 二重包み疑い、`default_surface` 未参照など）。1.3・1.4・2.x は台帳の備考を実装照合の起点にすること。
 - 1.1: authoring-patterns.md L144 の閉じフェンスが ```` ```lua ```` になっており、以降のフェンスが CommonMark 上ずれている（§6.5 見出しがコード扱い）。4.3 で手書きファイルを直す際に修正する。
-- 1.2: 付録のバグ候補は 8 件（U06,U08,U12,U18,U19,U20,U21,U22）。バグ候補はマニュアルに書かない（10.5）。2.x は付録の「収録先」行（U11 の算術・数値変換、U19 備考のアクター名規則、U07 `＄＄` など）を収録し、U08 により本体 L148 の `\` 収録は取り消し。大タスク 6 で roadmap にバグ候補のキー行を置く（2.4 後に 16 件: U06,U08,U12,U18〜U30）。
+- 1.2: 付録のバグ候補は 8 件（U06,U08,U12,U18,U19,U20,U21,U22）。バグ候補はマニュアルに書かない（10.5）。2.x は付録の「収録先」行（U11 の算術・数値変換、U19 備考のアクター名規則、U07 `＄＄` など）を収録し、U08 により本体 L148 の `\` 収録は取り消し。大タスク 6 で roadmap にバグ候補のキー行を置く（2.6 後に 17 件: U06,U08,U12,U18〜U31）。
 - main 取り込み（91a00e11・actor-surface-restore #45）: `book/src/grammar/actor-dictionary.md` に節「同一スポット共有時の外見の復旧」が追加（first-ghost.md からこの見出しへアンカーリンクあり・見出し維持必須）。スキル pasta-toml.md の `default_surface` は `surface`/`dressup` に置換済み、internal-modules に `STORE.appearance` 追加。台帳 1.1 の `default_surface` 行はこの変更後の内容で照合し直すこと（1.3）。
 - 1.3: 食い違い grep 記録（D01〜D18・X01〜X22）が 2.x／4.x の訂正対象リスト。各訂正タスクは自分の訂正先に割り当てられたヒットをすべて直し、台帳の該当行に「訂正済み」を記す。実装照合で判明: pasta.toml `[lua] libs` はロード時に読まれない（`RuntimeConfig::new()` のみ）、BOM 付き .pasta はパースエラー、`OnNotifyCallbackResponse` は無く `OnPastaCallBack{N}` を `CALLBACK.try_route` が REG より先に処理、OnChoiceSelectEx はローカルシーンのみ探索（グローバルへフォールバックしない）。
 - 1.3→1.4: 新規バグ候補の可能性（X19 REG 戻り値の RES.ok 二重包み・D07 改行入り `"` 文字列でロード失敗・D07 単語値 `""`/`「」` が空にならない・X18 `[lua]` 未使用・D03 OnChoiceSelectEx のローカル限定）の付録追記（U23 以降）は 1.4 が担当して確定する。
@@ -296,3 +296,4 @@
 - 2.4: lua/modules/index.md は 2.5 の章（@pasta_sakura_script・@enc・@pasta_log・mlua-stdlib）を素の文字列で載せている。2.5 で表の章セルと「章「mlua-stdlib 統合モジュール」」を各章へのリンクにする。reference/pasta-toml.md へのリンク（pasta-persistence.md#pasta.toml 設定、pasta-config.md の `[ghost]`/`[actor]` 段落から）は 2.7 で章ができた後に張る（2.7 の担当）。セレクタの整数値不使用（U29）・記号入りシーン名（U30）はバグ候補で、マニュアルには書かない。
 - 2.5: mlua-stdlib の API は吸収元の記述（`find_all`・`assert.equal`・`testing.describe` 等）が実在せず、mlua-stdlib 0.1.0 の実 API に訂正した。標準ライブラリは既定で ALL_SAFE（debug・ffi なし）→ lua/index.md の「ffi が加わる」は誤り（2.8 で訂正）。`[talk]` に型の合わない値があるとセクション全体が黙って既定値に戻る（`get_custom_config` の `try_into().ok()`）→ 2.7 で扱いを判断。```lua ブロック内の `\` はそのまま出力される（シェル heredoc の `\` 潰れによる誤検出に注意。テスト入力は Python の chr(92) 等で書く）。
 - 2.5 後: 台帳本体のスキル pasta-toml.md の行（見出し行番号）は main 取り込み（#45）で吸収元がずれたため、scratchpad の ledger-check で L259 spot 以降 9 見出しが未対応になる。2.7 で台帳の pasta-toml 節を取り込み後の pasta-toml.md（`surface / dressup` 節を含む）に合わせて更新する。
+- 2.6: 既定の OnChoiceSelectEx は Reference0（SSP では表示ラベル）を選択 ID として読む（U31・バグ候補）。表示名付き選択肢は実機で自動ルーティングされない。マニュアルは「選択 ID で探す」と UKADOC どおりの Reference 表だけを書く。scripts/main.lua で `REG.OnBoot`/`OnChoiceSelectEx`/`OnSecondChange` を上書きすると起動順（main→entry→event/init）により既定に戻される（バグ候補にはしない・章に回避策を記載）。lua/shiori-events.md の「pasta.toml 設定」節から reference/pasta-toml.md へのリンクは 2.7 で張る。SUMMARY・lua/index.md・block-structure#選択肢行 からのリンクは 2.9。
