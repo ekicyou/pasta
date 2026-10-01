@@ -18,7 +18,7 @@
   - 完了状態: 台帳の付録「未記載の実装事実」の全行が収録先かバグ候補で埋まっている
   - _Requirements: 1.8_
 
-- [ ] 1.3 既知の食い違いを grep して訂正対象を確定する
+- [x] 1.3 既知の食い違いを grep して訂正対象を確定する
   - design.md の食い違い表の各項目について、マニュアル全章・両 SKILL.md・スキル手書きファイルを grep する
   - 実装を読んで食い違い表の「実装（正）」を照合し、表と異なる結果は実装を正として記録する
   - 完了状態: 台帳に項目ごとの grep 結果（ファイル・行）と照合したソース位置が記録されている
@@ -287,3 +287,5 @@
 - 1.1: authoring-patterns.md L144 の閉じフェンスが ```` ```lua ```` になっており、以降のフェンスが CommonMark 上ずれている（§6.5 見出しがコード扱い）。4.3 で手書きファイルを直す際に修正する。
 - 1.2: 付録のバグ候補は 8 件（U06,U08,U12,U18,U19,U20,U21,U22）。バグ候補はマニュアルに書かない（10.5）。2.x は付録の「収録先」行（U11 の算術・数値変換、U19 備考のアクター名規則、U07 `＄＄` など）を収録し、U08 により本体 L148 の `\` 収録は取り消し。大タスク 6 で roadmap に 8 行のキー行を置く。
 - main 取り込み（91a00e11・actor-surface-restore #45）: `book/src/grammar/actor-dictionary.md` に節「同一スポット共有時の外見の復旧」が追加（first-ghost.md からこの見出しへアンカーリンクあり・見出し維持必須）。スキル pasta-toml.md の `default_surface` は `surface`/`dressup` に置換済み、internal-modules に `STORE.appearance` 追加。台帳 1.1 の `default_surface` 行はこの変更後の内容で照合し直すこと（1.3）。
+- 1.3: 食い違い grep 記録（D01〜D18・X01〜X22）が 2.x／4.x の訂正対象リスト。各訂正タスクは自分の訂正先に割り当てられたヒットをすべて直し、台帳の該当行に「訂正済み」を記す。実装照合で判明: pasta.toml `[lua] libs` はロード時に読まれない（`RuntimeConfig::new()` のみ）、BOM 付き .pasta はパースエラー、`OnNotifyCallbackResponse` は無く `OnPastaCallBack{N}` を `CALLBACK.try_route` が REG より先に処理、OnChoiceSelectEx はローカルシーンのみ探索（グローバルへフォールバックしない）。
+- 1.3→1.4: 新規バグ候補の可能性（X19 REG 戻り値の RES.ok 二重包み・D07 改行入り `"` 文字列でロード失敗・D07 単語値 `""`/`「」` が空にならない・X18 `[lua]` 未使用・D03 OnChoiceSelectEx のローカル限定）の付録追記（U23 以降）は 1.4 が担当して確定する。

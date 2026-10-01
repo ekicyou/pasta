@@ -676,7 +676,774 @@
 
 ## 食い違い grep 記録
 
-タスク 1.3 が記入する（design.md の食い違い表の項目ごとに、マニュアル全章・両 SKILL.md・スキル手書きファイルの grep 結果と照合したソース位置）。
+design.md「既知の食い違い（実装が正）」表の各行（D01〜D18）と、台帳本体の備考で「→1.3」と申し送った項目（X01〜X22）について、マニュアル全章・両 `SKILL.md`・スキル references の全ファイルを grep した結果と、照合した実装の位置を記録する（要件 1.6, 3.3）。訂正そのものは各「訂正先」タスクが行う。
+
+- grep 範囲: `book/src/**/*.md`、`.claude/skills/pasta-ghost-authoring/SKILL.md`・`references/*.md`、`.claude/skills/pasta-lua-coding/SKILL.md`・`references/*.md`。コマンドは `grep -arnE --include=*.md -e "パターン" 上記パス`。行番号はコミット `d95e12f2`（main 取り込み後）の時点。`doc/spec/`・`GRAMMAR.md` は撤去されるため記録しない。
+- 位置の略記: book の章は `book/src/` からの相対パス。`ga/` は `.claude/skills/pasta-ghost-authoring/`、`lc/` は `.claude/skills/pasta-lua-coding/`。実装照合の略記は凡例「実装照合列の略記」と同じ。
+- 判定: **訂正対象**（実装と食い違う誤記）／**追記対象**（誤りではないが実装事実が欠け、収録時に補う）／**正**（実装と一致し訂正不要）／**生成で置換（4.1）**（生成ファイルで置き換わるスキルの規範ファイル。手で直さない）。
+- 訂正先: 文法章は 2.1（grammar/index・markers・block-structure）、2.2（call-jump・literals・action-line）、2.3（sakura-script・variables・words・actor-dictionary）。旧 `lua/modules.md` は節ごとに 2.4（一覧・@pasta_search・@pasta_persistence・@pasta_config）／2.5（@pasta_sakura_script・@enc・@pasta_log・mlua-stdlib）。新章は 2.6（lua/shiori-events.md）・2.7（reference/pasta-toml.md）。生成対象外章と reference/startup.md は 2.8。スキルは 4.2（`ga/SKILL.md`）・4.3（`ga/references/authoring-patterns.md`）・4.4（`lc/SKILL.md` と手書き 3 ファイル）。スキルの生成ファイルのうち新章の吸収元になるもの（`ga/references/pasta-toml.md`・`lc/references/runtime-api.md`・`lc/references/shiori-handlers.md` と文法 7 ファイル）は「生成で置換（4.1）」とし、その誤りは移設先章のタスクが移設時に訂正する（訂正先列に併記）。
+- 実測: 1.2 と同じスクラッチの検証プログラム（`parse_str` → `LuaTranspiler::transpile` → `PastaLoader::load` → `SHIORI.request`）で、コミット `d95e12f2` の実装を動かした結果。プログラムはリポジトリに置かない。
+
+### D01 行継続
+
+- grep: `継続`
+- 実装照合: pest:`continue_action_line = { pad ~ kv_marker ~ s ~ actions ~ eol }`（継続行は `：` 始まり）、gen:elem `generate_continue_action`（先行アクターなし → `TranspileError::InvalidContinuation`）。実測: インデントだけの継続行はパースエラー（`expected EOI, var_set_…`）、`：` 始まりは前行のアクターで連結（`AB`）、先行アクターなしは `Continuation action without actor`。
+- 結論: 表どおり（実装が正）。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| grammar/action-line.md:27 | 節「アクターの省略」（`：` で前の発話を継続）（L29） | 正 | — |
+| grammar/action-line.md:91 | 節「行継続」: インデントした行を続けると連結（L93〜L102） | 訂正対象 | 2.2 |
+| grammar/index.md:70 | 章一覧「発言行・インライン要素・行継続・改行」 | 正 | — |
+| ga/SKILL.md:80 | アクター名を省略すると直前のアクターが継続 | 正 | — |
+| ga/SKILL.md:82 | 行継続: インデント付きの次行で発話を継続 | 訂正対象 | 4.2 |
+| ga/SKILL.md:112 | よくある間違い c「継続行はマーカーなしで開始」 | 訂正対象 | 4.2 |
+| ga/references/action-line.md:112 | 節「行継続」: `INDENT ~ !(statement_marker) ~ content`（L120 の制約を含む） | 生成で置換（4.1） | 4.1 |
+| ga/references/action-line.md:16 | アクター名を省略すると直前のアクターが継続 | 生成で置換（4.1） | 4.1 |
+
+（他のヒット `grammar/actor-dictionary.md:73`・`introduction.md:32`・`reference/startup.md:65`・`reference/startup.md:136`・`ga/SKILL.md:349`・`ga/SKILL.md:378`・`ga/references/authoring-patterns.md:205`・`ga/references/authoring-patterns.md:235`・`ga/references/call-spec.md:68`・`lc/references/internal-modules.md:28` は「継続トーク」「処理の継続」等の別概念で、対象外。）
+
+他項目で記録: `grammar/action-line.md:109,119`・`ga/references/action-line.md:134,136`（D02）。
+
+### D02 継続内の空行
+
+- grep: `継続`、`空行`、`糖衣構文`
+- 実装照合: pest:`blank_line = _{ or_comment_eol }`（サイレント規則で AST を作らない）、`local_scene_item`（`blank_line` を含む）。実測: `さくら：A`・空行・`：B` → `\p[0]AB`（改行は入らない）。
+- 結論: 表どおり（空行は何も出力しない）。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| grammar/action-line.md:109 | 継続行内の空行は 1 改行（糖衣構文）、連続空行は連続改行（L112〜L119 の例と説明を含む） | 訂正対象 | 2.2 |
+| grammar/action-line.md:108 | さくらスクリプトの `\n` は改行 | 正 | — |
+| ga/references/action-line.md:134 | 糖衣構文: 行継続領域内の空行は改行（L133〜L136）（L144 の出力例を含む） | 生成で置換（4.1） | 4.1 |
+
+他項目で記録: `grammar/action-line.md:29,91,102`・`grammar/index.md:70`・`ga/SKILL.md:80,82,112`・`ga/references/action-line.md:16,112,120`（D01）。
+
+対象外: `grammar/actor-dictionary.md:73`・`introduction.md:32`・`reference/startup.md:65,136`・`ga/references/authoring-patterns.md:205,235`・`ga/references/call-spec.md:68`・`lc/references/internal-modules.md:28`・`ga/SKILL.md:349,378`（「継続トーク」「処理の継続」など、行継続と別の概念）。
+
+### D03 ローカル／グローバル候補
+
+- grep: `統合|マージ|併合|合算|ローカル.{0,20}グローバル|両方.{0,10}候補`、`フォールバック`
+- 実装照合: core:scene_table.rs `collect_scene_candidates`・core:word_table.rs `collect_word_candidates`（親シーン名ありはローカルのみ・フォールバックなし、なしはグローバルのみ）、ps:pasta/act.lua `find_act_handler`（L2 で見つかれば返し、無ければ L3〜L5 へ）、lua:search/context.rs `search_scene`（「no local → global fallback」）。実測: グローバル `＠挨拶：G` とローカル `＠挨拶：L` で 6 回参照 → `LLLLLL`。 選択肢の自動ルーティングは ps:pasta/shiori/event/choice_select.lua `REG.OnChoiceSelectEx`（`SCENE.search(選択ID, STORE.last_global_scene)`）→ ps:pasta/scene.lua `SCENE.search` → `search_scene`（親シーン名ありはローカルのみ）。実測: 選択 ID にローカルシーン名 → 実行（200）、グローバルシーン名 → 204。
+- 結論: 表どおり。加えて `@pasta_search` の `search_scene`・`search_word` 自体はフォールバックしない（第 2 引数ありはローカルのみ）。ローカル → グローバルの順は act 側（L2 → L5）が担う。 同じ理由で、OnChoiceSelectEx の自動ルーティングは直前のグローバルシーンのローカルシーンだけを探し、グローバルシーンへはフォールバックしない（ソースのコメント「ローカル→グローバル」と食い違う）。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| grammar/call-jump.md:68 | スコープ解決 3.「マージ: 両検索結果を結合して候補リストを生成」（L66〜L69 の 4 手順を含む） | 訂正対象 | 2.2 |
+| grammar/call-jump.md:31 | シーン参照はローカル／グローバルシーンを前方一致検索 | 正 | — |
+| grammar/call-jump.md:57 | `＞挨拶` → 「挨拶朝」「挨拶昼」の両方が候補 | 正 | — |
+| grammar/words.md:86 | ローカルとグローバルの同名単語は「マージ」されて候補プールが統合（L88〜L94 の例「どちらかが選ばれる」を含む） | 訂正対象 | 2.3 |
+| grammar/actor-dictionary.md:52 | アクター辞書に無ければ「グローバル単語辞書・ローカル単語辞書」へフォールバック（順序がローカル優先と逆）（節見出し L48） | 訂正対象 | 2.3 |
+| lua/modules.md:119 | @pasta_search は「フォールバック戦略（ローカル → グローバル）を備える」 | 訂正対象 | 2.4 |
+| lua/modules.md:133 | 「ローカル優先検索（第2引数に親グローバルシーン名を指定）」（実際はローカルのみ） | 訂正対象 | 2.4 |
+| ga/SKILL.md:66 | 前方一致で「挨拶朝」「挨拶昼」の両方が候補 | 正 | — |
+| ga/SKILL.md:125 | スコープ解決: ローカル → グローバルの順に前方一致検索（優先順として読める） | 正 | — |
+| ga/SKILL.md:64 | ローカルシーンは親グローバルシーン内でのみアクセス可能 | 正 | — |
+| ga/SKILL.md:186 | アクター辞書に該当単語がない場合、グローバル/ローカル単語辞書にフォールバック（順序がローカル優先と逆） | 訂正対象 | 4.2 |
+| ga/SKILL.md:276 | OnChoiceSelectEx は選択 ID を「ローカルシーン → グローバルシーンの順」で検索（実際はローカルのみ） | 訂正対象 | 4.2 |
+| ga/references/authoring-patterns.md:347 | 選択 ID で「ローカル→グローバルの順に」前方一致検索（実際はローカルのみ） | 訂正対象 | 4.3 |
+| lc/SKILL.md:132 | `@pasta_search`（シーン・単語検索、フォールバック戦略） | 訂正対象 | 4.4 |
+| ga/references/call-spec.md:27 | 「マージ: 両検索結果を結合」（L25〜L27。L41 の「両方が候補」は正） | 生成で置換（4.1） | 4.1 |
+| ga/references/words.md:82 | 「マージ: 両検索結果を結合」（L80〜L82。L90 の「両方が候補」は正） | 生成で置換（4.1） | 4.1 |
+| lc/references/runtime-api.md:20 | search_scene は「フォールバック戦略（ローカル → グローバル）」（L37〜L38・L48 も同旨） | 生成で置換（4.1） | 2.4（移設時）・4.1 |
+| lc/references/runtime-api.md:63 | search_word は「フォールバック戦略（ローカル → グローバル）」 | 生成で置換（4.1） | 2.4（移設時）・4.1 |
+| lc/references/internal-modules.md:271 | `find_act_handler` の L1〜L5 フォールバック順序（L263・L274・L294・L303・L306・L449 を含む） | 正 | — |
+
+他項目で記録: `ga/references/actor-dictionary.md:55`（D04）、`lua/patterns.md:128`・`lua/dsl-vs-lua.md:29`・`getting-started/first-ghost.md:148`・`lc/references/shiori-handlers.md:265,269,297`（D15）、`lc/SKILL.md:148`（D13・X19）。
+
+対象外:
+- `debug/vscode-setup.md:12`・`getting-started/first-ghost.md:232`・`lua/modules.md:29,197`・`lc/references/runtime-api.md:583,585`・`lc/references/testing-lint.md:229`・`lc/SKILL.md:87`（「統合」がデバッグ統合・統合テスト・mlua-stdlib 統合などの別の意味）。
+- `grammar/block-structure.md:29`・`grammar/index.md:72`・`grammar/variables.md:108,112`・`lc/references/internal-modules.md:606`（変数・関数のスコープ種別の列挙で、候補の選び方に触れない）。
+- `lc/references/runtime-api.md:328`・`lc/references/shiori-handlers.md:409,418`・`ga/SKILL.md:313`（設定値のマージ・時報マージン）。
+- `getting-started/first-ghost.md:241,249,272`・`ga/references/authoring-patterns.md:69,126`・`lc/references/shiori-handlers.md:4,370,381,389`・`ga/SKILL.md:342,356,362,375`（時報の 4 段フォールバックとイベントのシーン関数フォールバックの紹介で、単語・シーン候補の統合ではない）。
+- `grammar/actor-dictionary.md:65,121`・`ga/references/variables.md:216,219`・`debug/source-level.md:61`（外見・設定値の既定値へのフォールバック）。
+- `lc/references/internal-modules.md:742`・`lc/references/runtime-api.md:544,546`（文字列化・バッファ実装のフォールバック）。
+- `lua/dsl-vs-lua.md:37`（標準フォールバックで扱えないイベントは REG へ、という方針の説明）。
+
+### D04 Call 検索
+
+- grep: `[0-9０-９]\s*段|段階|検索順|フォールバック`、`スコープ解決アルゴリズム`
+- 実装照合: ps:pasta/act.lua `ACT_IMPL.call`（`find_handler("scene", key)`）→ `find_act_handler` の L1〜L5、ps:pasta/actor.lua `find_actor_handler`（アクター付きは A1・A2 が先）。実測: Lua ブロックの `function SCENE.f` が単語参照 `＠f` で L1 から呼ばれ `F` を出力。
+- 結論: 表どおり（5 段）。加えて、単語参照も L1（シーン表）・L3（act メソッド）・L4（GLOBAL）を引くため、「Call はシーン辞書のみ、単語参照はシーン辞書を参照しない」は辞書（L2・L5）に限った言い方であり、L1・L3・L4 では関数も見つかる。 アクター付きの単語参照（`アクター：＠単語`）は A1 → A2 → L1〜L5 の順で、ローカル（L2）がグローバル（L5）より先。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| grammar/call-jump.md:62 | 節「スコープ解決アルゴリズム」: ローカル検索・グローバル検索・マージ・選択の 4 段（L64〜L71） | 訂正対象 | 2.2 |
+| grammar/call-jump.md:73 | 「Call はシーン辞書のみ、単語参照はシーン辞書を参照しない」 | 訂正対象 | 2.2 |
+| grammar/words.md:81 | 検索順序はローカル単語辞書 → グローバル単語辞書の 2 段（L83〜L84） | 訂正対象 | 2.3 |
+| grammar/words.md:104 | 単語参照は単語辞書のみ、Call はシーン辞書のみ | 訂正対象 | 2.3 |
+| ga/references/call-spec.md:23 | 「2段階検索」（節見出し L19・L21 を含む） | 生成で置換（4.1） | 4.1 |
+| ga/references/words.md:76 | 節「スコープ解決アルゴリズム」（ローカル・グローバル・マージの手順） | 生成で置換（4.1） | 4.1 |
+| ga/references/actor-dictionary.md:55 | 節「フォールバック検索順」: アクター辞書 → ローカル単語辞書 → グローバル単語辞書の 3 段（L57〜L61。L1・L3・L4 が無い） | 生成で置換（4.1） | 2.3（移設時）・4.1 |
+| lc/references/internal-modules.md:294 | `find_act_handler` の「6段階」（L1〜L5＋nil。ソースコメントと同じ数え方）（L263・L271・L274・L303・L306・L338 を含む） | 正 | — |
+| lc/references/internal-modules.md:449 | 完全なフォールバックチェーン A1 → A2 → L1〜L5（L434 の A1・A2 を含む） | 正 | — |
+
+他項目で記録: `grammar/actor-dictionary.md:52`・`grammar/words.md:86`・`lua/modules.md:119`・`lc/references/runtime-api.md:20,37,38,48,63`・`lc/SKILL.md:132`・`ga/SKILL.md:186`（D03）、`lua/patterns.md:128`・`lua/dsl-vs-lua.md:29`・`getting-started/first-ghost.md:148`・`lc/references/shiori-handlers.md:265,269,297`（D15）、`lc/SKILL.md:148`（D13・X19）。
+
+対象外:
+- `getting-started/first-ghost.md:241,249,272`・`ga/references/authoring-patterns.md:69,126`・`lc/references/shiori-handlers.md:4,370,381,389`・`ga/SKILL.md:342,356,362,375`（時報の 4 段フォールバックとイベントのシーン関数フォールバックの紹介。Call・単語の検索段ではない）。
+- `grammar/actor-dictionary.md:65,121`・`ga/references/variables.md:216,219`・`debug/source-level.md:61`（外見・設定値の既定値へのフォールバック）。
+- `lc/references/internal-modules.md:742`・`lc/references/runtime-api.md:544,546`（文字列化・バッファ実装のフォールバック）。
+- `grammar/words.md:130`・`ga/references/words.md:94`（`＠＠` の多段階参照は非対応という、エスケープの説明）。
+- `getting-started/first-ghost.md:9`・`getting-started/index.md:11`・`reference/startup.md:144`（「段階」が作業・起動の段階の意味）。
+- `lua/dsl-vs-lua.md:37`（標準フォールバックで扱えないイベントは REG へ、という方針の説明）。
+
+### D05 Call フィルター `＞シーン＆k＝v`
+
+- grep: `フィルター|フィルタ|＞[^ 　]*＆`
+- 実装照合: pest:`call_scene = { call_marker ~ (id | call_target_expr) ~ s ~ args? }`（`＆` を受ける規則が無い）。実測: `＞X＆k＝v` はパースエラー（`expected args`）。
+- 結論: 表どおり（構文として受理されない）。節の削除と brief への移送は 1.4 の仕分けに従う。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| grammar/call-jump.md:109 | 節「フィルター（将来変更あり）」: 構文が予約され現状は無視（L111〜L119） | 訂正対象 | 2.2（節削除） |
+| ga/references/call-spec.md:14 | `＞シーン名＆key＝value ← 属性フィルター付き` | 生成で置換（4.1） | 4.1 |
+| ga/references/call-spec.md:46 | 節「属性フィルター」: 現在は将来予約（無視される）（L52）（L49 の例を含む） | 生成で置換（4.1） | 4.1 |
+
+（`grammar/markers.md:39` のフィルター言及は X04 で扱う。`lc/references/testing-lint.md:237` はテスト名フィルタで対象外。）
+
+対象外: `ga/references/action-line.md:120`（行マーカーの列挙 `＄＠＞＆＊・` がパターンに当たっただけ）。
+
+### D06 引数
+
+- grep: `引数`、`（[a-zA-Z]+：|\([a-zA-Z]+：|名前付き引数|位置引数`
+- 実装照合: pest:`args = { lparen ~ s ~ (arg ~ (comma_sep ~ arg)*)? ~ s ~ rparen }`・`arg = _{ key_arg | positional_arg }`、gen:elem `generate_args_string`（`Keyword` は名前を捨てて値だけを位置引数として出す）・`generate_call_scene`（明示引数の後ろに `table.unpack(args)`）。実測: `＠add（x：10　y：20）` はパースエラー、`＠add（x：10、20，30,40）` は `act:expr_fn("add", 10, 20, 30, 40)` になり `10/20/30/40` を出力。
+- 結論: 表どおり（読点／カンマ区切り、位置引数可、名前付きは名前が無視される）。加えて `＠greet（time：morning）` のように値が式として不正な場合は関数呼び出しとして解析されず、単語参照 `＠greet`＋本文「（time：morning）」になる（実測: `act.ぱすた:word("greet")` と `talk("（time：morning）")` を生成）。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| grammar/action-line.md:53 | `＠func（x：10）`「名前付き引数で呼び出し」 | 訂正対象 | 2.2 |
+| grammar/action-line.md:60 | 例 `＠greet（time：morning）`（関数呼び出しにならない） | 訂正対象 | 2.2 |
+| grammar/call-jump.md:121 | 節「引数リスト」: 名前付き・空白区切り・トランスパイラ以降は対応予定（L123〜L129） | 訂正対象 | 2.2 |
+| grammar/variables.md:82 | `＄sum＝＠add（x：10　y：20）`「名前付き引数で呼び出し」 | 訂正対象 | 2.3 |
+| grammar/index.md:19 | 関数引数で算術式を記述できる | 正 | — |
+| ga/references/action-line.md:33 | `＠func（x：10）`「名前付き引数で呼び出し」 | 生成で置換（4.1） | 4.1 |
+| ga/references/variables.md:46 | `＄sum：＠add（x：10　y：20）` | 生成で置換（4.1） | 4.1 |
+
+他項目で記録: `lua/modules.md:133`（D03）。
+
+対象外:
+- `grammar/literals.md:9`・`ga/references/grammar-model.md:84,150`（リテラル・式を関数引数に使えるという記述で、区切り・名前付きに触れない。正）。
+- `ga/references/variables.md:179`（シーン引数 `＄０`。付録 U03）。
+- `ga/references/grammar-model.md:206,223,226,227`（キューコマンドの引数）。
+- `debug/source-level.md:60`・`grammar/actor-dictionary.md:120,142`・`grammar/sakura-script.md:57`（DAP の起動引数・bind タグの引数・さくらスクリプトの引数）。
+- `lua/patterns.md:83,174`・`lc/references/coding-conventions.md:123,174,281,282,289,293`・`lc/references/internal-modules.md:91,168,200,206,319,338,350,458,517,543,559`・`lc/references/runtime-api.md:545`・`lc/references/shiori-handlers.md:172`・`lc/references/testing-lint.md:57,147,150,169`（Lua 関数・SHIORI Reference の引数で、DSL の引数構文ではない）。
+
+### D07 文字列エスケープ
+
+- grep: `エスケープ|\\n\`|\\\\"`
+- 実装照合: pest:`string_fenced = _{ strfence ~ string_contents ~ strclose }`・`strfence`（`「`×4〜×1、`"`＋）・`string_contents = @{ (!PEEK ~ ANY)+ }`・`string_blank`、dsl:parser/parse_action.rs（`Rule::string_contents` をそのまま `Expr::String`、`Rule::string_blank` → `Expr::BlankString`）。実測: `＄s＝"a\nb\"` の値は `a\nb\`（`\n`・`\"` は変換されない）、`＄e＝「」`・`＄f＝""` は空文字列。
+- 結論: 表どおり（エスケープ規則なし、囲みの多重化、式の空文字列可）。表に無い差分を 2 点記録する: (1) 単語値では `""`・`「」` は空文字列にならず、その 2 文字が値になる（実測: `＠w：…、""、「」` の候補が `""` と `「」`。dsl:parser/parse_elements.rs が `string_blank` の字面を値にする）。(2) `"` 囲みの文字列は改行を含められ（`string_contents` が改行も取る）、生成 Lua が `"a` 改行 `b"` になってロード時に `unfinished string` で失敗する（実測）。いずれもマニュアルへの収録・バグ候補の判定は付録の担当範囲で扱う（本節は記録のみ）。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| grammar/literals.md:63 | 節「文字列エスケープ」: `\n` `\\` `\"`（L65〜L71） | 訂正対象 | 2.2 |
+| grammar/literals.md:45 | 引用符あり: `「...」` または `"..."`、空白も保持 | 正 | — |
+| grammar/sakura-script.md:13 | さくらスクリプトのエスケープ文字は半角 `\` のみ | 正 | — |
+| grammar/action-line.md:50 | ＠エスケープ `＠＠` | 正 | — |
+| grammar/words.md:128 | ＠エスケープ `＠＠`（節見出し L126・L130 を含む） | 正 | — |
+| ga/SKILL.md:212 | さくらスクリプトは半角で記述 | 正 | — |
+
+（`grammar/words.md:137`・`grammar/literals.md:84` の「引用符エスケープ」は X14、`grammar/sakura-script.md:25` 等の `\]` は X08 で扱う。）
+
+他項目で記録: `grammar/markers.md:35`（X01）、`grammar/sakura-script.md:40,47`（X08）、`grammar/action-line.md:108`（D02）。
+
+対象外:
+- `getting-started/first-ghost.md:186`・`grammar/action-line.md:54`・`grammar/markers.md:31`・`ga/references/action-line.md:34,133`・`ga/references/sakura-script.md:27`・`ga/references/pasta-toml.md:274`・`lc/references/runtime-api.md:339`・`ga/SKILL.md:208`（さくらスクリプトの `
+` 改行タグ・改行コードの説明で、文字列リテラルのエスケープではない）。
+- `grammar/sakura-script.md:11,18,57`・`grammar/markers.md:122`・`ga/references/sakura-script.md:14,47,54,73`（さくらスクリプトのエスケープ文字 `` と角括弧の扱い。`]` は X08）。
+- `ga/references/action-line.md:29,106`・`ga/references/words.md:95`・`ga/SKILL.md:96`（`＠＠` エスケープ。正）。
+- `grammar/actor-dictionary.md:142`・`lc/references/internal-modules.md:168,200`（bind 引数・SSP タグ引数のエスケープ）。
+- `ga/SKILL.md:218`（「エスケープハッチ」という比喩）。
+
+### D08 単語値
+
+- grep: `空白区切り|空白で区切|空白区切`、`空白(は|が)?(区切|値)|2 ?つの値|引用符なし|hello world`
+- 実装照合: pest:`words = { word ~ ( comma_sep ~ word )* ~ comma_sep? }`・`word_nofenced = @{ (!(comma_sep | "\r" | "\n") ~ ANY)+ }`。実測: `＠w：a b、c d、` の候補は `a b` と `c d`（末尾カンマ可）。
+- 結論: 表どおり（読点／カンマ区切り。空白は値に含まれる）。なお、引用なしの値の後ろの `＃` は値に取り込まれる（付録 U06・バグ候補）。`＃` コメントを付けた単語定義の例はこの挙動に当たる。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| grammar/literals.md:46 | 引用符なし: 空白は区切り文字で文字列に含まれない | 訂正対象 | 2.2 |
+| grammar/literals.md:56 | 空白を含む文字列は必ず引用符、`hello world` は 2 つの値（L58〜L61） | 訂正対象 | 2.2 |
+| grammar/words.md:15 | 値は読点・全角コンマ・半角カンマで区切る | 正 | — |
+| ga/SKILL.md:119 | 区切りは `、` `，` `,` のいずれか | 正 | — |
+| ga/SKILL.md:129 | 例 `＠女性、水の妖精：水無灯里、アリス・キャロル　＃ 2キー…`（U06 により `＃` 以降が値に入る） | 訂正対象 | 4.2 |
+| ga/references/authoring-patterns.md:313 | 例 `＠女性：水無灯里、アリス　＃ …`（同上） | 訂正対象 | 4.3 |
+| ga/references/grammar-model.md:161 | 引用符なしの空白は区切り文字 | 生成で置換（4.1） | 4.1 |
+
+（`grammar/action-line.md:81`・`grammar/action-line.md:89`・`ga/SKILL.md:94`・`ga/references/action-line.md:82`・`ga/references/action-line.md:100`・`ga/references/variables.md:102` はインライン要素の区切りで正。`grammar/call-jump.md:123` は D06。）
+
+### D09 属性行の配置
+
+- grep: `属性`
+- 実装照合: pest:`global_scene_attr_line`（`global_scene_init` と `actor_scope_item` にだけ現れる）、`local_scene_line = { pad ~ local_marker ~ scene ~ or_comment_eol }`・`scene = _{ id ~ s ~ attrs? }`（ローカルは宣言行への付記のみ）、`file_attr_line`（`file_scope`）、gen:scope `generate_global_scene`（`_file_attrs` を受けるが未使用 `#[allow(unused_variables)]`）。実測: ローカルシーン宣言の次行の `＆k：v` はパースエラー、`・L＆k：v`・グローバルシーン初期部の `＆k：v`・ファイル先頭の `＆k：v` は受理され、生成 Lua に現れない。
+- 結論: 表どおり。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| grammar/block-structure.md:30 | 属性定義: 処理は将来予定 | 訂正対象 | 2.1 |
+| grammar/block-structure.md:66 | グローバルシーン内部構造 2.「属性行 0 個以上／処理は将来予定」 | 訂正対象 | 2.1 |
+| grammar/block-structure.md:88 | ローカルシーンブロックは宣言行・属性行（0 個以上）… | 訂正対象 | 2.1 |
+| grammar/block-structure.md:112 | 節「属性（将来変更あり）」: ローカルシーンの直後にも置ける（L126）、処理は将来予定（L129）（L114〜L129） | 訂正対象 | 2.1 |
+| grammar/block-structure.md:148 | インデント判定の例 `  ＆author：Alice` | 正 | — |
+| grammar/index.md:29 | 俯瞰図のグローバルシーン配下に属性行 | 正 | — |
+| grammar/index.md:80 | 属性は処理が将来予定 | 訂正対象 | 2.1 |
+| grammar/markers.md:18 | 属性: メタデータ（処理は将来予定） | 訂正対象 | 2.1 |
+| grammar/literals.md:9 | リテラルは属性値などで使用 | 正 | — |
+| ga/SKILL.md:50 | 属性 `＆`: メタデータ | 正 | — |
+| ga/SKILL.md:113 | よくある間違い d「シーン定義直後→属性行、属性はシーン定義の直後にのみ」（ローカルは宣言行への付記のみ） | 訂正対象 | 4.2 |
+| ga/SKILL.md:240 | 属性はシーン定義の直後にのみ配置可能（L241）（節見出し L237） | 訂正対象 | 4.2 |
+| ga/references/grammar-model.md:165 | 節「属性の配置ルール」（L168 の規則、L172・L184 のファイルレベル属性を含む） | 生成で置換（4.1） | 4.1 |
+| ga/references/grammar-model.md:101 | 構造の俯瞰でローカルシーン配下にも属性行（L101〜L115） | 生成で置換（4.1） | 4.1 |
+
+（`grammar/call-jump.md:111`・`ga/references/call-spec.md:14`・`ga/references/call-spec.md:46`・`ga/references/call-spec.md:52` は D05。）
+
+対象外:
+- `ga/references/grammar-model.md:3,28,60,150,248`（章の概要・マーカー表・コロンの用途・型の使用箇所・行種表で、属性行の配置に触れない）。
+- `grammar/markers.md:31`（「行属性」という別の語）。
+- `lc/references/internal-modules.md:499,512`（Lua API の互換用引数 `attrs`）。
+
+### D10 Lua ブロックのフェンス
+
+- grep: `` ```lua|フェンス|バッククォート|Lua ?ブロック ``、`` バッククォート|```lua ?`|` ``` ` ``
+- 実装照合: pest:`code_open = _{ PUSH("`"{3,}) ~ id? ~ eol }`（行頭のみ・`pad` を取らない）・`code_close = _{ POP ~ or_comment_eol }`。実測: ```` ````text ```` で開いた 4 本フェンスはグローバルシーンで受理・出力、インデントした ```` ```lua ```` はパースエラー。
+- 結論: 表どおり（3 個以上のバッククォート＋任意識別子）。加えて、フェンスは行頭に置く（インデント不可）。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| grammar/block-structure.md:22 | Lua ブロックは ```` ``` ```` / ```` ```lua ```` | 訂正対象 | 2.1 |
+| grammar/block-structure.md:96 | 例のフェンス ```` ```lua ```` は行頭 | 正 | — |
+| grammar/call-jump.md:83 | 例のフェンス ```` ```lua ```` は行頭 | 正 | — |
+| ga/SKILL.md:226 | 例のフェンス ```` ```lua ```` は行頭（節見出し L216） | 正 | — |
+| ga/references/authoring-patterns.md:144 | 例で Lua ブロックの後に `％` 行（L154）を置く（実測: 14:2 でパースエラー。`％` 行はブロックより前に置く）。Markdown のフェンスもここで食い違う（1.1 の申し送り） | 訂正対象 | 4.3 |
+| grammar/actor-dictionary.md:156 | アクタースコープの例でフェンスをインデント（L156〜L161） | 訂正対象 | 2.3 |
+| lua/dsl-vs-lua.md:42 | DSL に ```` ```lua ```` ブロックを埋め込める | 正 | — |
+| lua/index.md:20 | `.pasta` 中の ```` ```lua ```` ブロック | 正 | — |
+| lua/modules.md:10 | DSL 内の ```` ```lua ```` ブロック | 正 | — |
+| lua/patterns.md:9 | DSL 内の ```` ```lua ```` ブロック | 正 | — |
+| ga/SKILL.md:220 | グローバルシーン直下に ```` ```lua ```` 〜 ```` ``` ````（インデント不要） | 訂正対象 | 4.2 |
+| lc/SKILL.md:32 | DSL 内の ```` ```lua ```` ブロック | 正 | — |
+| lc/references/internal-modules.md:521 | ```` ```lua ```` ブロックの関数は `function SCENE.func_name(act)` | 正 | — |
+| ga/references/grammar-model.md:130 | ```` ```lua ```` 〜 ```` ``` ````（インデント不要。L240 も同旨）（節 L128、L103〜L137 の構造説明を含む） | 生成で置換（4.1） | 4.1 |
+
+他項目で記録: `grammar/block-structure.md:67,90,92`（X05）、`grammar/block-structure.md:105`（X03）。
+
+対象外（Markdown 上の Lua コード例のフェンス開始行、または Lua ブロックへの一般的な言及で、DSL のフェンスの形・位置を述べない）: `grammar/call-jump.md:77`・`grammar/index.md:19`・`grammar/variables.md:88`・`lua/basics.md:21,48,61,76,110,124`・`lua/dsl-vs-lua.md:46,47`・`lua/modules.md:42,64,103,124,153,177,201`・`lua/patterns.md:26,43,57,72,90,142,181`・`ga/references/authoring-patterns.md:142`・`ga/references/sakura-script.md:77`・`ga/references/variables.md:157`・`lc/references/coding-conventions.md:22,34,55,86,106,157,169,189,203,238,261,268,279,291,303,318,333,347,359`・`lc/references/internal-modules.md:12,18,36,42,66,80,93,108,115,131,138,146,152,170,177,202,210,233,243,254,265,285,296,317,330,346,362,367,381,388,397,403,412,427,442,456,471,479,487,496,508,523,537,557,564,573,600,613,642,653,659,670,688,705,717,744,761,773,785`・`lc/references/runtime-api.md:4,12,22,41,65,78,91,105,122,132,143,153,165,199,230,258,264,299,342,372,403,415,431,443,468,480,492,504,516,528,562,593,604,615,626,639,675`・`lc/references/shiori-handlers.md:12,19,39,54,69,102,122,137,156,182,200,224,252,299,312,320,350,358,374,395,423`・`lc/references/testing-lint.md:11,19,30,56,84,93,126,138,149,157,186,258,277`・`lc/SKILL.md:6,36,100,101`。
+
+### D11 キューコマンド
+
+- grep: `キューコマンド|!select|！select|choice_timeout|dola`、`キュー`、`スキップ|コード生成`
+- 実装照合: gen:scope `generate_local_scene_items`（`CueCommand` は `cmd.command == "select"` のときだけ `generate_choice_timeout`、他は出力しない）・`generate_choice_timeout`。実測: `!select(10)` → `act:choice_timeout(10)` → `\![set,choicetimeout,10000]`、`!emote(x)` は出力なし。
+- 結論: 表どおり。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| grammar/markers.md:23 | キューコマンド: 演出キュー（dola 側で処理）（`!select` はランタイムが処理する） | 訂正対象 | 2.1 |
+| grammar/index.md:35 | 俯瞰図のキューコマンド行 | 正 | — |
+| getting-started/first-ghost.md:358 | `!select(10)` は選択待ちの設定（L339 の例を含む） | 正 | — |
+| lua/patterns.md:78 | `act:choice_timeout(30)` | 正 | — |
+| ga/SKILL.md:53 | キューコマンド: 演出キュー | 正 | — |
+| ga/SKILL.md:273 | `!select(秒数)` で選択の制限時間を設定（L271・L285 の例を含む） | 正 | — |
+| lc/SKILL.md:83 | `pasta.act` の主要 API に `act:choice_timeout()` | 正 | — |
+| ga/references/grammar-model.md:31 | マーカー表のキューコマンド: 演出キュー | 生成で置換（4.1） | 4.1 |
+| ga/references/authoring-patterns.md:322 | `!select(秒数)` でタイムアウト（L331 の例を含む） | 正 | — |
+| lc/references/internal-modules.md:393 | `choice_timeout(seconds)`（L400〜L405） | 正 | — |
+| ga/references/grammar-model.md:197 | 節「キューコマンド構文」（Lua 生成時の扱いの記述なし） | 生成で置換（4.1） | 4.1 |
+
+他項目で記録: `grammar/markers.md:35`（X01）。
+
+対象外: `ga/references/grammar-model.md:47`・`lc/references/internal-modules.md:311`・`lc/references/shiori-handlers.md:380,409,418`（空白の扱い・前方一致検索・時報の「スキップ」）、`ga/references/authoring-patterns.md:202`・`ga/SKILL.md:30`（LLM による「コード生成」）。
+
+### D12 単語定義とさくらスクリプト
+
+- grep: `単語.{0,15}さくら|さくら.{0,15}単語`、`使えない|使用できない|使用不可|含められない|書けない|不可`
+- 実装照合: pest:`word = _{ string_literal | sakura_script | word_nofenced }`、gen:elem `generate_word_definition`。実測: `＠表情：\s[1]、\s[2]` の参照で `\s[1]` を出力（付録 U14 の制約つき）。
+- 結論: 表どおり（単語値にさくらスクリプトを書ける）。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| grammar/sakura-script.md:9 | さくらスクリプトは「アクション行内にインラインで埋め込む」（単語値の記述なし） | 追記対象 | 2.3 |
+| ga/SKILL.md:81 | インライン要素としてさくらスクリプトを埋め込み可能（単語値の記述なし） | 正 | — |
+| grammar/actor-dictionary.md:33 | アクター辞書の値に複数のさくらスクリプト値を指定できる | 正 | — |
+| ga/references/sakura-script.md:62 | 「変数宣言行や単語定義行では使用不可」（L61） | 生成で置換（4.1） | 4.1 |
+
+他項目で記録: `ga/SKILL.md:221`（X03）、`lua/modules.md:218`（X18）。
+
+対象外: `grammar/action-line.md:128`（章末の権威的仕様引用。1.5 で削除）、`grammar/markers.md:51`・`grammar/sakura-script.md:13`・`lua/index.md:30`・`lua/modules.md:31`・`ga/references/variables.md:94`・`lc/references/internal-modules.md:171`・`lc/SKILL.md:52`（予約識別子・全角文字・他バージョンの Lua 資料・モジュールの可用性・アクション行内の代入・プロパティ名・DSL のハンドラ定義についての「不可」で、単語値とさくらスクリプトに触れない）。
+
+### D13 REG ハンドラ
+
+- grep: `function ?\(req\)|function\(req`、`req\.`
+- 実装照合: ps:pasta/shiori/event/init.lua `EVENT.fire`（`handler(act)`。冒頭のハンドラシグネチャ注記 `function(act: ShioriAct) -> string`）、crates/pasta_shiori/src/lua_request.rs（`act.req` になる要求表に `id`・`reference`・`status` 等を設定）。戻り値の扱いは X19。
+- 結論: 表どおり（`function(act)`、リクエストは `act.req.*`）。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| lua/patterns.md:94 | `REG.OnBoot = function(req)`（L95 の `req.reference[0]` を含む） | 訂正対象 | 2.8 |
+| lua/patterns.md:99 | `REG.OnClose = function(req)`（L100 を含む） | 訂正対象 | 2.8 |
+| lua/patterns.md:108 | 「ハンドラは `req` を受け取る」とフィールド表 `req.id` 等（L110〜L115） | 訂正対象 | 2.8 |
+| lua/dsl-vs-lua.md:37 | カスタムイベント処理は REG に登録 | 正 | — |
+| lc/SKILL.md:84 | `REG.EventName = function(req) ... end` | 訂正対象 | 4.4 |
+| lc/references/shiori-handlers.md:20 | 登録パターン `function(req)`（L103・L123・L138・L157・L201・L225・L253・L300 の例も同じ） | 生成で置換（4.1） | 2.6（移設時）・4.1 |
+| lc/references/shiori-handlers.md:26 | 節「req パラメータ」: ハンドラ引数 `req` のフィールド表と `req.reference[N]` の例（L30〜L43） | 生成で置換（4.1） | 2.6（移設時）・4.1 |
+| lc/references/shiori-handlers.md:100 | 各イベント節の Reference 表を `req.reference[N]` で表記（L100・L118〜L120・L135・L153・L172・L197・L221・L237・L249）と、例の `req.` 参照（L104・L124・L139・L154・L158・L173・L184・L198・L202・L203・L222・L238・L250・L254・L255）、フォールバックチェーン図の `REG[req.id]`・`SCENE.search(req.id)`（L274・L278） | 生成で置換（4.1） | 2.6（移設時）・4.1 |
+| lc/references/shiori-handlers.md:326 | 仮想ディスパッチャ節の `act.req.status`・`act.req.date`（L328・L332・L351・L365・L386） | 正 | — |
+| grammar/variables.md:162 | Reference10 以降は Lua から `act.req.reference[10]` で読む | 正 | — |
+| ga/references/variables.md:180 | Reference10 以降は `act.req.reference[10]` で読む | 生成で置換（4.1） | 4.1 |
+
+### D14 RES
+
+- grep: `ok_with`、`RES\.`
+- 実装照合: ps:pasta/shiori/res.lua（`RES.env`・`build`・`ok(value, dic)`・`no_content`・`not_enough`・`advice`・`bad_request`・`err(reason, dic)`・`warn(reason, dic)`。`ok_with` は無い。`ok` は値が nil／空文字列なら 204）。
+- 結論: 表どおり。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| lua/patterns.md:124 | `RES.ok_with(headers)`: 200 OK＋複数ヘッダ | 訂正対象 | 2.8 |
+| lua/patterns.md:123 | `RES.ok(value)`: 200 OK＋さくらスクリプト | 正 | — |
+| lua/patterns.md:126 | `RES.err(message)`: 500 | 正 | — |
+| lua/patterns.md:125 | `RES.no_content()`: 204 No Content | 正 | — |
+| lc/references/shiori-handlers.md:63 | API 一覧の `RES.ok_with(headers)`（API 一覧 L62〜L65、L71〜L77 の説明を含む） | 生成で置換（4.1） | 2.6（移設時）・4.1 |
+| lc/references/shiori-handlers.md:80 | 使用例 `return RES.ok_with({…})` | 生成で置換（4.1） | 2.6（移設時）・4.1 |
+
+他項目で記録: `lua/patterns.md:96,102,104`・`lc/SKILL.md:85,148`・`lc/references/shiori-handlers.md:22,74,106,108,125,141,143,159,205,207,226,257,259`（X19。ハンドラから `RES.*` を返す例）、`lc/references/shiori-handlers.md:296`（D15）。
+
+### D15 シーン関数フォールバック
+
+- grep: `204|pcall|xpcall`、`フォールバック`
+- 実装照合: ps:pasta/shiori/event/init.lua `EVENT.no_entry`（`SCENE.co_exec(act, act.req.id, nil, nil)`）・`EVENT.fire`（thread を resume して `RES.ok(yielded_value)`、nil なら `RES.no_content()`）、ps:pasta/shiori/entry.lua `SHIORI.request`（`xpcall` → `RES.err(result)`）。実測: `＊OnTest` を定義して OnTest → `200 OK`。
+- 結論: 表どおり（見つかれば 200、見つからなければ 204。保護は entry.lua の xpcall で、フォールバック専用の pcall は無い）。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| lua/patterns.md:128 | 節「REG 未登録時のフォールバック」（応答コードの記述なし） | 正 | — |
+| lua/dsl-vs-lua.md:29 | ランタイムのフォールバックが自動で呼び出す | 正 | — |
+| getting-started/first-ghost.md:148 | 「シーン関数フォールバック」機能を利用 | 正 | — |
+| lc/references/shiori-handlers.md:279 | フォールバックチェーン「見つかった → シーン関数実行 → 204 No Content」（節 L265・L269、L274〜L280 の図を含む。L280 の「見つからない → 204」は正） | 生成で置換（4.1） | 2.6（移設時）・4.1 |
+| lc/references/shiori-handlers.md:297 | シーン関数フォールバック時も `pcall` でキャッチ | 生成で置換（4.1） | 2.6（移設時）・4.1 |
+| lc/references/shiori-handlers.md:296 | REG ハンドラの例外は `xpcall` でキャッチされ `RES.err()` | 生成で置換（4.1） | 2.6（移設時）・4.1 |
+| lc/references/shiori-handlers.md:179 | OnChoiceSelectEx で見つからなければ nil（204） | 生成で置換（4.1） | 4.1 |
+
+（`lua/modules.md:26`・`lua/modules.md:101`・`lua/modules.md:104`・`lc/SKILL.md:71`・`lc/references/internal-modules.md:78`・`lc/references/coding-conventions.md:329` 等の `pcall(require, "@pasta_config")` は別件で正。）
+
+他項目で記録: `lua/modules.md:119`・`lc/references/runtime-api.md:20,37,38,48,63`・`lc/references/internal-modules.md:263,271,274,294,303,306,449`・`lc/SKILL.md:132`・`grammar/actor-dictionary.md:52`・`ga/SKILL.md:186`（D03）、`ga/references/actor-dictionary.md:55`（D04）、`lc/SKILL.md:148`（D13・X19）、`lua/patterns.md:125`・`lc/references/shiori-handlers.md:64`（D14）。
+
+対象外:
+- `lc/references/coding-conventions.md:334,406`・`lc/references/internal-modules.md:81,767`・`lc/references/runtime-api.md:200,203,231`・`lc/references/testing-lint.md:52,54,58`・`lc/SKILL.md:113`（`pcall(require, "@pasta_config")` やテスト・規約の `pcall` で、シーン関数フォールバックの保護ではない）。
+- `getting-started/first-ghost.md:241,249,272`・`ga/references/authoring-patterns.md:69,126`・`lc/references/shiori-handlers.md:4,370,381,389`・`ga/SKILL.md:342,356,362,375`（時報の 4 段フォールバック、イベントのシーン関数フォールバックの紹介。応答コードと保護に触れない）。
+- `grammar/actor-dictionary.md:65,121`・`ga/references/variables.md:216,219`・`debug/source-level.md:61`・`lc/references/internal-modules.md:742`・`lc/references/runtime-api.md:544,546`（既定値・文字列化・バッファのフォールバック）。
+- `lua/dsl-vs-lua.md:37`（標準フォールバックで扱えないイベントは REG へ、という方針の説明）。
+
+### D16 OnSecondChange・コールバック
+
+- grep: `resume_pending|CALLBACK\.|sweep`、`OnSecondChange|仮想ディスパッチャ|OnNotifyCallbackResponse|コールバック`
+- 実装照合: ps:pasta/shiori/event/second_change.lua（既定の `REG.OnSecondChange` が `CALLBACK.sweep(os.time())` → `dispatcher.dispatch(act)`）、ps:pasta/shiori/event/callback.lua（`next_event_id`・`stage_pending`・`consume_staged`・`try_route`・`sweep`・`reset`。`resume_pending` は無い）、ps:pasta/shiori/event/virtual_dispatcher.lua（OnTalk・OnHour の発行）。
+- 結論: 表どおり（`REG.OnSecondChange` を上書きすると OnTalk・OnHour とコールバックのタイムアウト処理が止まる）。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| lua/patterns.md:134 | OnTalk・OnHour は仮想ディスパッチャが OnSecondChange を起点に発行（L135） | 正 | — |
+| getting-started/first-ghost.md:196 | OnSecondChange → 仮想イベントディスパッチャ → ランダムトーク／時報 | 正 | — |
+| lua/dsl-vs-lua.md:29 | 仮想ディスパッチャが自動で呼び出す | 正 | — |
+| lc/references/shiori-handlers.md:217 | 「コールバック保留中のコルーチン再開もこのイベント（`CALLBACK.resume_pending()`）」（節 L214・L216） | 生成で置換（4.1） | 2.6（移設時）・4.1 |
+| lc/references/shiori-handlers.md:225 | 上書き例 `REG.OnSecondChange = function(req) return RES.no_content() end`（上書きの注意なし） | 生成で置換（4.1） | 2.6（移設時）・4.1 |
+| lc/references/shiori-handlers.md:310 | 仮想ディスパッチャは OnSecondChange をトリガーに OnTalk／OnHour を発行（L308・L318 を含む） | 生成で置換（4.1） | 4.1 |
+| lc/references/internal-modules.md:190 | `get_property` はコールバック到着まで待機（L193 のトークンバッファ保全を含む） | 正 | — |
+
+（`lc/references/shiori-handlers.md:230` の OnNotifyCallbackResponse は X20。）
+
+他項目で記録: `lc/references/shiori-handlers.md:232,237,241`（X20）、`lc/SKILL.md:148`（D13・X19）。
+
+対象外: `getting-started/first-ghost.md:341,347`（選択肢の飛び先シーンを「コールバックシーン」と呼ぶ例のコメント）、`lc/references/shiori-handlers.md:4,403`・`lc/SKILL.md:170`（章の概要・`[ghost]` 設定の前置き・references 一覧の用途欄）。
+
+### D17 さくらスクリプト変換のウェイト
+
+- grep: `script_wait|ウェイト|talk\.|actor\.talk|\[talk\]`
+- 実装照合: lua:sakura_script/mod.rs `resolve_wait_values`（アクター表直下の `script_wait_normal`・`script_wait_period`・`script_wait_comma`・`script_wait_strong`・`script_wait_leader` → `[talk]` → 既定の 3 段）、lua:loader/config/sections.rs `TalkConfig` の `Default`（50・1000・500・500・200）、lua:sakura_script/wait_inserter.rs（挿入値は `値 - 50`、0 以下は挿入しない、連続句読点は `max`）。`chars_no_wait`・`chars_half_wait`・`script_wait_default`・`script_wait_newline`・`script_wait_exclamation` は実装に無い。
+- 結論: 表どおり。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| lua/modules.md:156 | `local actor = { talk = {} }  -- talk サブテーブルにウェイト設定` | 訂正対象 | 2.5 |
+| lua/modules.md:158 | 結果例 `こ\_w[50]ん…は\_w[100]。`（既定では通常文字に挿入されない） | 訂正対象 | 2.5 |
+| lua/modules.md:161 | `actor.talk` の `script_wait_default` = 50ms、`script_wait_period` = 100ms（L162 を含む） | 訂正対象 | 2.5 |
+| lua/modules.md:150 | セリフにウェイトタグ `\_w[ms]` を自動挿入 | 正 | — |
+| lua/patterns.md:67 | `wait(ms)`（ウェイト） | 正 | — |
+| ga/SKILL.md:209 | `\w数字`: 数字×50ms | 正 | — |
+| ga/SKILL.md:315 | `[talk]`: ウェイト・禁則処理のカスタマイズ | 正 | — |
+| ga/references/pasta-toml.md:120 | `[talk]` の既定 50/1000/500/500/200（L317〜L321 の表も同じ）（L46・L119〜L124・L311〜L321・L332〜L335） | 正 | — |
+| lc/references/runtime-api.md:270 | `actor` は `talk` サブテーブルにウェイト設定（L273〜L295 の表・処理説明、L308・L313 の例、L328〜L334 の `[talk]` 例を含む）（L256 の冒頭、L321 のハーフウェイト例、L394 の break_lines 例も含む） | 生成で置換（4.1） | 2.5（移設時）・4.1 |
+| lc/references/internal-modules.md:129 | `talk` は `@pasta_sakura_script` でウェイトタグ付きに変換 | 正 | — |
+
+他項目で記録: `lc/SKILL.md:132`（D03）。
+
+対象外: `getting-started/first-ghost.md:28,190,192,195`・`ga/references/authoring-patterns.md:49,67,244`・`ga/SKILL.md:374,378`（ファイル名 `talk.pasta`）、`getting-started/first-ghost.md:399`（`[talk]` セクションは省略可。正）、`grammar/sakura-script.md:37`・`ga/references/sakura-script.md:28,29`・`ga/SKILL.md:210`（さくらスクリプトのウェイトタグ `w`・`_w`）、`lc/references/internal-modules.md:144,229`（`act` の出力メソッドと `wait(ms)`。ウェイト変換の設定値に触れない）。
+
+### D18 pasta.toml の既定値の出典
+
+- grep: `config\.rs|loader/config|config/mod\.rs|sections\.rs`、`crates/|\.rs\b`
+- 実装照合: lua:loader/config/mod.rs（`PastaConfig`）・lua:loader/config/sections.rs（各セクションの `Default` と `default_*()`）。`crates/pasta_lua/src/loader/config.rs` は存在しない。
+- 結論: 表どおり。マニュアルにはリポジトリ内パスを書かず「実装の既定値（SSOT）」とだけ記す（5.3）。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| ga/references/pasta-toml.md:29 | 既定値は「Rust `crates/pasta_lua/src/loader/config.rs` の `Default` 実装・`default_*()` 関数」由来 | 生成で置換（4.1） | 2.7（移設時）・4.1 |
+| ga/references/call-spec.md:116 | HTML コメント `source: doc/spec/04-call-spec.md, crates/pasta_dsl/src/parser/grammar.pest` | 生成で置換（4.1） | 4.1 |
+| lc/references/testing-lint.md:247 | `crates/pasta_lua/scriptlibs/lua_test/mocks.lua`（既定値の出典ではないが D18 の grep に当たったリポジトリ内パス。SkillLayout でモジュール名表記へ直す対象） | 訂正対象 | 4.4 |
+
+（`getting-started/first-ghost.md:421`・`getting-started/first-ghost.md:433` は GitHub の README への絶対 URL で対象外。）
+
+対象外: `getting-started/first-ghost.md:91,415`・`getting-started/prerequisites.md:34`（GitHub 上のサンプルゴーストへの絶対 URL に `crates/` が含まれるだけ）。
+
+### X01 空白の文字クラス
+
+- grep: `White_Space|WHITE_SPACE|空白文字クラス|Unicode.{0,10}空白`
+- 実装照合: pest:`space_chars`（U+0020・タブ・U+3000・U+00A0・U+1680・U+2000〜U+200A・U+202F・U+205F の列挙）。
+- 結論: 台帳本体の備考どおり。Unicode White_Space 全体ではなく列挙した文字だけ（U+000B・U+000C・U+0085・U+2028・U+2029 は空白でない）。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| grammar/markers.md:35 | Unicode の White_Space カテゴリから改行を除いたもの | 訂正対象 | 2.1 |
+| ga/references/grammar-model.md:45 | 空白文字クラスの列挙（L50 で U+00A0 等を列挙） | 生成で置換（4.1） | 4.1 |
+
+### X02 変数代入のコロン形
+
+- grep: `(＄|\$)(＊|\*)?[^ 　＝=（）()]{1,20}(：|:)`
+- 実装照合: pest:`set_marker = _{ equals }`・`set = _{ set_marker ~ s ~ ( expr | word_ref ) }`。実測: `＄x：1` はパースエラー（`expected EOI, id, var_set_…`）。
+- 結論: 台帳本体の備考どおり（代入は `＝` のみ）。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| grammar/markers.md:42 | コロンの用途例 `＄var_name：value # 変数代入` | 訂正対象 | 2.1 |
+| grammar/call-jump.md:44 | `＄target：挨拶朝` | 訂正対象 | 2.2 |
+| grammar/call-jump.md:81 | `＄スコア：75` | 訂正対象 | 2.2 |
+| grammar/literals.md:37 | `＄is_active：true`・`＄done：false`（L38） | 訂正対象 | 2.2 |
+| grammar/literals.md:50 | `＄greeting：「こんにちは」`（L53 の `＄message："…"` を含む） | 訂正対象 | 2.2 |
+| grammar/literals.md:78 | `＄count：10` ほか（L79〜L81） | 訂正対象 | 2.2 |
+| grammar/action-line.md:63 | 変数の宣言・代入（`＄var：value`）は変数代入行で行う | 訂正対象 | 2.2 |
+| grammar/variables.md:19 | 代入の区切りはコロンでも `＝` でも記述できる（L23〜L25 の例を含む） | 訂正対象 | 2.3 |
+| grammar/variables.md:62 | 例 `＄ユーザー：太郎` | 訂正対象 | 2.3 |
+| ga/SKILL.md:142 | 代入: `＄変数名＝値` または `＄変数名：値` | 訂正対象 | 4.2 |
+| ga/references/variables.md:33 | `＄変数名：値 ← コロン形式` | 生成で置換（4.1） | 4.1 |
+| ga/references/variables.md:46 | `＄sum：＠add（…）` | 生成で置換（4.1） | 4.1 |
+
+### X03 Lua ブロックの「関数定義のみ・トランスパイラが検証」
+
+- grep: `関数定義のみ|関数定義だけ|トランスパイラ.{0,10}検証|__start__.{0,20}(最初|先頭)`
+- 実装照合: gen:elem `generate_code_block`（内容を 1 行ずつ無変換で出力。検証なし）。実測: Lua ブロック内の `local REG = require(…)` と代入文がロード時に実行され、REG に登録された（X19 の実測）。
+- 結論: 台帳本体の備考どおり。関数定義以外の文も書け、検証されない（誤りは Lua のロード時エラーになる）。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| grammar/block-structure.md:107 | 関数定義のみ許可、変数宣言・トップレベルの文は不可 | 訂正対象 | 2.1 |
+| grammar/block-structure.md:108 | トランスパイラ層が検証 | 訂正対象 | 2.1 |
+| ga/SKILL.md:221 | 関数定義のみ許可（変数宣言やステートメントは不可） | 訂正対象 | 4.2 |
+| ga/references/grammar-model.md:131 | 関数定義のみ許可、トランスパイラーが検証（L132〜L133） | 生成で置換（4.1） | 4.1 |
+
+### X04 比較演算子
+
+- grep: `比較演算子|＝＝|==|！＝|<=|＜＝`
+- 実装照合: pest:`bin_op = _{ add_op | sub_op | mul_op | div_op | modulo_op }`（`gt`・`lt` は `call_marker` 等で使われ、式の演算子ではない）。
+- 結論: 台帳本体の備考どおり（式に比較演算子は無い）。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| grammar/markers.md:39 | 比較・フィルター条件には `＝` `＞` `＜` などの比較演算子を用いる | 訂正対象 | 2.1 |
+| grammar/markers.md:85 | 節「比較演算子」の表（L87〜L96） | 訂正対象 | 2.1 |
+| grammar/call-jump.md:117 | フィルターは比較演算子を使う（L119 を含む） | 訂正対象 | 2.2（節削除） |
+| lua/basics.md:103 | Lua の等値比較は `==`、非等値は `~=` | 正 | — |
+
+（`ga/references/authoring-patterns.md:148`・`lc/references/*` の `==` は Lua コード内で対象外。）
+
+### X05 Lua ブロックの出力位置と評価時期
+
+- grep: `最初に実行|ロード時|読み込み時に(実行|評価)`、`__start__.{0,20}(最初|先頭)`、`暗黙ローカル開始ブロック`
+- 実装照合: gen:scope `generate_global_scene`（グローバルシーンと各ローカルシーンの Lua ブロックを、全シーン関数の定義の後にシーンの `do` ブロック直下へ出力）。実測: グローバルシーン末尾の ```` ````text ```` ブロックが `SCENE.__start__` の後に出力され、ロード時に評価された。
+- 結論: 台帳本体の備考どおり。Lua ブロックは `__start__` の中ではなく、ロード時に評価される。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| grammar/block-structure.md:67 | `__start__` に Lua ブロック・アクション行…を格納できる | 訂正対象 | 2.1 |
+| grammar/block-structure.md:92 | Lua ブロックは `__start__` 内に置かれる | 訂正対象 | 2.1 |
+| grammar/block-structure.md:102 | 例のアクターなし行 `    こんにちは`（実測: 9:5 でパースエラー） | 訂正対象 | 2.1 |
+| ga/references/grammar-model.md:128 | 節「Luaブロック配置ルール」 | 生成で置換（4.1） | 4.1 |
+
+### X06 動的 Call の `tostring` と nil ガード
+
+- grep: `動的ターゲット|＞＄|＞＠|tostring|nil ?ガード`
+- 実装照合: gen:elem `generate_call_scene`（`Dynamic` → `act:call(SCENE.__global_name__, tostring(式), {}, …)`）、ps:pasta/act.lua `ACT_IMPL.call`（`key == nil` で警告し nil）。実測: 未代入の `＞＄t` は `tostring(var.t)` で `"nil"` を検索し「handler not found」警告、後続行は続行。
+- 結論: 台帳本体の備考どおり。DSL からの呼び出しでは nil ガードに届かない（nil ガードは Lua から `act:call` を直接呼ぶ場合だけ）。ターゲットは変数に限らず任意の式。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| grammar/call-jump.md:32 | 動的ターゲット `＞＄変数名`（変数のみと読める） | 追記対象 | 2.2 |
+| grammar/call-jump.md:99 | `＞＠分岐判定`（関数内で `act:call` 済み、戻り値 nil → `"nil"` で再検索し警告） | 訂正対象 | 2.2 |
+| ga/references/call-spec.md:86 | 式評価結果を `tostring()` でシーン名に変換 | 生成で置換（4.1） | 4.1 |
+| ga/references/call-spec.md:112 | 節「nil ガード」: 式評価結果が nil なら即時リターン（L114） | 生成で置換（4.1） | 2.2（移設時）・4.1 |
+| lc/references/internal-modules.md:355 | `act:call` の nil ガード（Lua からの直接呼び出しとして正しい） | 正 | — |
+
+### X07 真偽値リテラル
+
+- grep: `真偽|bool|\btrue\b|\bfalse\b`
+- 実装照合: pest:`term`（`paren_expr`・`fn_call`・`var_ref`・`number_literal`・`string_literal` のみ）、`attr_value`（数値・引用文字列・引用なし文字列）、dsl:parser/ast/action.rs `AttrValue`。実測: `＄x＝true` はパースエラー（`expected paren_expr, …`）。
+- 結論: 台帳本体の備考どおり（真偽値リテラルは無い）。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| grammar/literals.md:15 | 型変換ルール 1「`true` / `false` → bool」（L24〜L25） | 訂正対象 | 2.2 |
+| grammar/literals.md:32 | 節「真偽値（bool）」（L34〜L38） | 訂正対象 | 2.2 |
+| grammar/literals.md:3 | 導入「真偽なのか」 | 訂正対象 | 2.2 |
+| grammar/variables.md:25 | 例 `＄is_active：true` | 訂正対象 | 2.3 |
+| grammar/index.md:69 | 章一覧「型変換ルール・文字列・数値・真偽値」 | 訂正対象 | 2.1 |
+| grammar/block-structure.md:99 | Lua ブロック内の `save.talked = true`（Lua の真偽値） | 正 | — |
+| ga/references/grammar-model.md:154 | 型変換表の `true` / `false` → bool | 生成で置換（4.1） | 4.1 |
+
+（`lua/basics.md:36`・`lua/modules.md:71`・`reference/startup.md:122` 等は Lua・TOML・ログの真偽値で対象外。）
+
+### X08 さくらスクリプト角括弧内の `\]`
+
+- grep: `エスケープ`、`\\\]`
+- 実装照合: pest:`sakura_args`・`sakura_body = @{ ( sakura_str | (!PEEK ~ ANY) )* }`（`"…"` の外では最初の `]` で閉じる）・`sakura_str`（`"…"` 内の `""`）、lua:sakura_script/tokenizer.rs `SAKURA_TAG_PATTERN`。実測: `さくら：\s[a\]b]` はさくらスクリプト `\s[a\]` と台詞 `b]` に分かれる（出力の文字列は同じでも、`b]` は台詞としてウェイト挿入の対象になる）。
+- 結論: 台帳本体の備考どおり（`\]` は特別扱いされない）。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| grammar/sakura-script.md:21 | 字句規則 `bracket_chars` が `"\]"` を内容文字の選択肢に含める | 訂正対象 | 2.3 |
+| grammar/sakura-script.md:25 | 最初の「非エスケープな `]`」で閉じ、`\]` は `]` を表す | 訂正対象 | 2.3 |
+| grammar/sakura-script.md:40 | 例「ブラケットエスケープ」`\s[a\]b]`（L41） | 訂正対象 | 2.3 |
+| grammar/sakura-script.md:51 | `\]` で `]` を文字として含める | 訂正対象 | 2.3 |
+| grammar/sakura-script.md:52 | カンマを含む値は `"` で囲む、`"` は二重にする（L53） | 正 | — |
+| ga/references/sakura-script.md:54 | 最初の非エスケープ `]` で閉じる（L44 の字句構造を含む） | 生成で置換（4.1） | 4.1 |
+| lc/references/internal-modules.md:168 | `set_property` 等の引数を SSP 規則で `]` → `\]` に自動エスケープ（SSP へ出す文字列の話で、DSL の字句ではない） | 正 | — |
+
+### X09 ローカル変数の有効範囲
+
+- grep: `一連のシーン|イベントごと|イベント処理ごと`
+- 実装照合: ps:pasta/act.lua `ACT.new`（`var = {}`）・`ACT_IMPL.init_scene`（`self.var` を返す）・`ACT_IMPL.yield`（再開後も同じ `self` を返す）、ps:pasta/shiori/event/init.lua `create_act`（イベントごとに新しい act）。
+- 結論: 台帳本体の申し送り「『一連のシーン』の範囲」は次で確定: `var` は act ごとの空テーブルで、イベント処理ごとに新しく作られる。Call 先のシーンは同じ act を使う。`act:yield()` で中断したシーン（チェイントーク）は次のイベントで再開しても最初の act を使い続けるため、そのシーンのコルーチンが終わるまで値が残る。「一連のシーンが終わるまで」は誤りではないが範囲が曖昧なので、この内容で明確化する。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| grammar/variables.md:15 | ローカル変数の有効範囲「一連のシーンが終わるまで」 | 追記対象 | 2.3 |
+| grammar/variables.md:30 | 同上 | 追記対象 | 2.3 |
+| ga/SKILL.md:139 | 同上 | 正 | — |
+| ga/references/variables.md:12 | 同上（L17 を含む） | 生成で置換（4.1） | 4.1 |
+
+### X10 Lua 関数の定義形（`function add(ctx, x, y)`）
+
+- grep: `function [A-Za-z_]+\((ctx|req)|\(ctx`
+- 実装照合: ps:pasta/act.lua `find_act_handler`（L1 シーン表・L3 act・L4 GLOBAL を探し、素の Lua グローバル関数は探さない）、gen:elem（ローカル関数呼び出しは `act:expr_fn`）。
+- 結論: 台帳本体の備考どおり。対象範囲にヒットなし（`function add(ctx, x, y)` は撤去される doc/spec ch09 にだけある）。マニュアルの例は `function SCENE.add(act, x, y)` の形で書く（grammar/variables.md#式（Expression）のサポート、2.3）。
+
+ヒットなし。
+
+### X11 グローバル単語・グローバルシーンの参照範囲
+
+- grep: `ファイル全体|ファイル内|全辞書|全ファイル`
+- 実装照合: gen:elem `generate_global_word`（`PASTA.create_word`）→ ps:pasta/word.lua `WORD.create_global`（`STORE.global_words` は全ファイル共通の 1 つ）、ps:pasta/scene.lua（グローバルシーンも全ファイル共通の登録）。
+- 結論: 台帳本体の備考どおり（参照範囲は全辞書ファイル共通）。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| grammar/words.md:15 | グローバル単語は「ファイル全体から参照できる」 | 訂正対象 | 2.3 |
+| grammar/words.md:84 | グローバル単語辞書は「ファイル先頭で定義された単語」 | 訂正対象 | 2.3 |
+| grammar/block-structure.md:20 | グローバル単語定義は「ファイル全体で参照可能」 | 訂正対象 | 2.1 |
+| ga/SKILL.md:63 | グローバルシーンは「ファイル全体からアクセス可能」 | 訂正対象 | 4.2 |
+| ga/SKILL.md:121 | グローバル単語は「ファイル全体から参照可能」 | 訂正対象 | 4.2 |
+| ga/references/authoring-patterns.md:242 | `actors.pasta` は全ファイルで共有 | 正 | — |
+| ga/references/words.md:40 | グローバル単語の範囲「ファイル全体」 | 生成で置換（4.1） | 4.1 |
+| ga/references/grammar-model.md:186 | ファイルレベル属性はファイル内のグローバルシーンに継承 | 生成で置換（4.1） | 4.1 |
+
+### X12 アクタースコープの Lua ブロック
+
+- grep: `コードブロック|ACTOR\.`、`将来変更あり`
+- 実装照合: pest:`actor_scope_item`（`code_scope` を含む）、gen:scope `generate_actor`（識別子が `lua` のブロックだけをアクターの `do` ブロック内に出力し、`ACTOR` を使える）、ps:pasta/actor.lua `find_actor_handler`（A1 でアクター表の `ACTOR.名前` を返す）。実測: `％さくら` 直下の ```` ```lua ```` で `function ACTOR.挨拶(act) return "ACT" end` を定義し、`さくら：＠挨拶` → `ACT`。```` ```text ```` のブロックは出力されない。
+- 結論: 台帳本体の備考どおり。design #14 の「受理されるが処理に反映されない」とは食い違い、実装は `lua` ブロックを出力して A1 で到達する（実装が正）。現行挙動の書き方は 1.4 の仕分けで確定する。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| grammar/actor-dictionary.md:149 | 節「コードブロック（将来変更あり）」 | 訂正対象 | 2.3 |
+| grammar/actor-dictionary.md:151 | 構文は定義されているが使用例がなく将来の拡張として予約 | 訂正対象 | 2.3 |
+| grammar/actor-dictionary.md:157 | 例の `function SCENE.on_actor_event(act)`（アクターの `do` ブロックに `SCENE` は無い。フェンスのインデントは D10） | 訂正対象 | 2.3 |
+| grammar/actor-dictionary.md:164 | 「文法定義のみが存在し、未実装」 | 訂正対象 | 2.3 |
+
+### X13 ファイルエンコーディングと BOM
+
+- grep: `BOM|エンコーディング|UTF-8|文字コード`
+- 実装照合: lua:loader/process.rs（`fs::read_to_string` で UTF-8 として読む）→ dsl:parser/mod.rs `parse_str`（BOM を除く処理なし）、pest:`file = _{ SOI ~ … }`（U+FEFF を受ける規則なし）。実測: 先頭に BOM のある `.pasta` は 1:1 でパースエラー。
+- 結論: 台帳本体の申し送り「BOM は許容」は実測で否定された。BOM 付き UTF-8 は読み込めない（BOM なし UTF-8 で保存する）。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| getting-started/prerequisites.md:36 | 節「文字コードは必ず UTF-8」（L38〜L50。BOM の記述なし） | 追記対象 | 2.8 |
+| getting-started/first-ghost.md:439 | 文字化けするときは UTF-8 で保存されているか確認 | 正 | — |
+| lua/basics.md:54 | 辞書・スクリプトはすべて UTF-8 | 正 | — |
+
+（`reference/startup.md:50` 等の `package.path` の UTF-8、`lua/modules.md:172` の `@enc`、`ga/SKILL.md:331` の descript.txt の charset は別件で対象外。）
+
+### X14 囲みの多重化（`「「セリフ」」`）
+
+- grep: `「「`、`引用符エスケープ`
+- 実装照合: pest:`strfence`（`slfence_ja4`〜`slfence_ja1` の順に試す）・`slfence_ja2 = _{ "「"{2} ~ PUSH_LITERAL("」」") }`・`string_contents`。実測: `＠w：「「セリフ」」` の値は `セリフ`（括弧を含まない）。
+- 結論: 台帳本体の備考どおり。多重の囲みは、中身に `」` を含められるようにするためのもので、値に括弧は残らない。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| grammar/literals.md:86 | 引用符を含めたい場合は二重の括弧、`「「セリフ」」 # 実行時に「セリフ」として展開`（L89） | 訂正対象 | 2.2 |
+| grammar/words.md:139 | 単語値に引用符を含めるには二重の括弧（L142・L145「内側の `「」` がリテラルの引用符として保持」） | 訂正対象 | 2.3 |
+
+### X15 `％` 行と立ち位置の持続
+
+- grep: `立ち位置|set_spot|clear_spot|スポット.{0,10}(保持|維持|固定|リセット)`、`％`
+- 実装照合: gen:scope `generate_local_scene`（`％` 行 → `act:clear_spot()`＋`act:set_spot(名前, 番号)`）、ps:pasta/act.lua `set_spot`・`clear_spot`（トークンを積むだけ）、ps:pasta/shiori/sakura_builder.lua `BUILDER.build`（`STORE.actor_spots` を直接書き換え）、ps:pasta/store.lua（`STORE.actor_spots` はモジュール状態で、初期値は pasta.toml `[actor]` の `spot`）。
+- 結論: 立ち位置は次の `％` 行が実行されるまでイベントをまたいで保たれる（`％` 行が無いシーンは直前の立ち位置で話す）。アクター付き単語参照は `％` 行が無くても働く（ps:pasta/actor.lua）。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| grammar/actor-dictionary.md:37 | `％actor1、actor2` で「そのシーン内の会話行でアクター名付き単語参照が有効になる」（立ち位置の設定であり、持続の記述がない） | 訂正対象 | 2.3 |
+| grammar/actor-dictionary.md:46 | `actor_name：` で始まる会話行はアクターの単語辞書を優先 | 正 | — |
+| ga/references/actor-dictionary.md:38 | `％名前1、名前2` で「そのシーンでバルーン連動が有効」 | 生成で置換（4.1） | 2.3（移設時）・4.1 |
+| lc/references/internal-modules.md:239 | `set_spot(name, number)`（L250 の `clear_spot()` を含む） | 正 | — |
+
+### X16 `default_surface`（main 取り込み後の再照合）
+
+- grep: `default_surface`、`surface|dressup`
+- 実装照合: ps:pasta/shiori/appearance.lua（局所関数 `default_surface(actor)` が `actor.surface` を読む。`dressup` も同モジュールで読む）、ps:pasta/shiori/sakura_builder.lua `emit_actor_switch`（`\p[spot]` の直後に `APPEARANCE.restore`）。pasta.toml の `default_surface` キーを読むコードは無い。
+- 結論: main 取り込み（actor-surface-restore）で `ga/references/pasta-toml.md` の `default_surface` 節は `#### surface / dressup` に置き換わり、実装と一致した（「旧資料の `default_surface` は実装されていない」と注記あり）。台帳本体の該当行（`pasta-toml.md` L290）の「収録先: reference/pasta-toml.md#default_surface」は、2.7 で `surface / dressup` 節として収録する。book に `default_surface` のヒットは無い。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| ga/references/pasta-toml.md:291 | 節「surface / dressup」（既定値、復旧時のみ出力） | 生成で置換（4.1） | 2.7（移設時）・4.1 |
+| ga/references/pasta-toml.md:307 | `default_surface` は実装されていない旨の注記 | 生成で置換（4.1） | 2.7（移設時）・4.1 |
+| grammar/actor-dictionary.md:63 | 節「同一スポット共有時の外見の復旧」（main 取り込みで追加） | 正 | — |
+| grammar/actor-dictionary.md:100 | 節「任意キー `surface`・`dressup`」 | 正 | — |
+
+### X17 `@pasta_config` の「読み取り専用」
+
+- grep: `読み取り専用|read-?only|書き換え`
+- 実装照合: lua:runtime/module_registry.rs `register_config_module`（doc コメントは read-only だが、`toml_to_lua` が作る普通のテーブルを `inject_actor_names` で書き換えたうえで登録）。実測: `require("@pasta_config").extra = 1` の後、再度 require した表で `extra` が 1。
+- 結論: 台帳本体の備考どおり。読み取り専用は強制されない（書き換えても pasta.toml には反映されない）。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| lua/modules.md:113 | 値は読み取り専用 | 訂正対象 | 2.4 |
+| lc/references/runtime-api.md:246 | 注意事項「読み取り専用: 値の変更はできない」 | 生成で置換（4.1） | 2.4（移設時）・4.1 |
+
+### X18 `@env` の有効化手段（`[lua] libs` は適用されない）
+
+- grep: `RuntimeConfig`、`\[lua\]|libs`
+- 実装照合: lua:loader/mod.rs `PastaLoader::load`（`load_with_config(base_dir, RuntimeConfig::new())`）、crates/pasta_shiori/src/shiori.rs（SHIORI のロードも `RuntimeConfig::new()` を渡す）、lua:runtime/runtime_config.rs（`From<LuaConfig> for RuntimeConfig` はあるがロード経路から呼ばれない）、lua:loader/config/mod.rs `PastaConfig::lua`（呼び出し元なし）。実測: pasta.toml に `[lua] libs = ["std_all", "env"]` を書いても `require "@env"` は失敗し、`@json` は読める（既定のまま）。
+- 結論: 台帳本体の備考（「有効化手段は pasta.toml `[lua] libs` への `"env"` 追加として書く」）は実装で否定された。現行実装では pasta.toml の `[lua]` セクションはロード時に読まれず、ゴーストから `@env` を有効にする手段は無い。マニュアル（2.5・2.7）は `[lua] libs` が効くとは書かない。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| lua/modules.md:218 | `@env` はデフォルト無効、Rust 側の `RuntimeConfig` 設定が必要で通常のゴーストからは使えない | 正 | — |
+| lua/modules.md:38 | `@pasta_log` は `RuntimeConfig` に関わらず利用可能 | 正 | — |
+| lc/references/runtime-api.md:655 | 有効化は Rust 側の `RuntimeConfig`（L658〜L672 と L681〜L694 の Rust コード例） | 生成で置換（4.1） | 2.5（移設時）・4.1 |
+| lc/references/runtime-api.md:703 | モジュールの有効／無効は `libs` 配列 | 生成で置換（4.1） | 2.5（移設時）・4.1 |
+| ga/references/pasta-toml.md:377 | 節「[lua]（Lua ライブラリ）」の `libs`（L49・L145〜L146・L383〜L387 を含む） | 生成で置換（4.1） | 2.7（移設時）・4.1 |
+
+### X19 REG ハンドラの戻り値（`RES.ok` の二重包み）
+
+- grep: `return RES\.`、`RES\.ok\(\)|RES\.no_content\(\)`
+- 実装照合: ps:pasta/shiori/event/init.lua `EVENT.fire`（戻り値が文字列なら `RES.ok(result)`、thread なら resume して `RES.ok(値)`、nil なら `RES.no_content()`）。同じファイルの冒頭の使用例は `return RES.ok(act:build())`、`elseif` 節のコメントは「文字列をそのまま返す」と書かれ、コードと食い違う。実測: `return RES.ok("hi")` → 応答の `Value:` に応答全体が入れ子になる（`Value: SHIORI/3.0 200 OK…Value: hi`）。`return "raw"` → `Value: raw`。
+- 結論: 台帳本体の申し送り「二重包みの疑い」は実測で確定した。ハンドラは Value にする文字列（またはシーンのコルーチン、nil）を返す。`RES.ok(…)`・`RES.no_content()` を返す例はすべて不正な応答を生む。ソースの注記・使用例との矛盾はバグ候補の判定基準 b・c に当たり得るため、付録への追加は 1.2 の担当範囲で扱う（本節は記録のみ）。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| lua/patterns.md:96 | `return RES.ok("\\h\\s[0]起動しました。\\e")`（L102 を含む） | 訂正対象 | 2.8 |
+| lua/patterns.md:104 | `return RES.no_content()  -- 表示なしで処理完了` | 訂正対象 | 2.8 |
+| lua/patterns.md:88 | 「`RES` でレスポンスを返す」（L119〜L126 の API 表の位置づけを含む） | 訂正対象 | 2.8 |
+| lc/SKILL.md:148 | REG に登録し `RES.ok()`／`RES.no_content()` 等でレスポンスを返す | 訂正対象 | 4.4 |
+| lc/SKILL.md:85 | `pasta.shiori.res`: `RES.ok()`, `RES.no_content()`（モジュール一覧としては正） | 正 | — |
+| lc/references/shiori-handlers.md:22 | 登録パターン `return RES.ok(…)  -- または RES.no_content()`（L106・L125・L141・L159・L205・L226・L257 の例も同じ）（追記: L74・L108・L143・L207・L259 も同じ） | 生成で置換（4.1） | 2.6（移設時）・4.1 |
+
+### X20 OnNotifyCallbackResponse
+
+- grep: `OnNotifyCallbackResponse|コールバック`、`OnPastaCallBack`
+- 実装照合: ps:pasta/shiori/event/callback.lua `CALLBACK.next_event_id`（コールバックのイベント名は `"OnPastaCallBack" .. N` で毎回固有）・`try_route`（`CALLBACK.pending[req.id]` と一致すれば待機中のコルーチンを再開）、ps:pasta/shiori/event/init.lua `EVENT.fire`（REG より先に `CALLBACK.try_route(req)`）。`OnNotifyCallbackResponse` という名前はコードに無い。
+- 結論: 台帳本体の申し送りどおり、「event.init で REG に自動登録」「独自ハンドラで機構が止まる」は誤り。加えて、イベント名そのものが実装と違う（`OnPastaCallBack{N}`）。2.6 の収録先見出し「#OnNotifyCallbackResponse」は実装の名前と挙動に合わせて立てる。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| lc/references/shiori-handlers.md:230 | 節「OnNotifyCallbackResponse — SSPコールバック応答」（L232〜L242。`pasta.shiori.callback` モジュール、event.init で自動登録、独自ハンドラで止まる） | 生成で置換（4.1） | 2.6（移設時）・4.1 |
+| lc/references/internal-modules.md:190 | `get_property` はタグを発行しコールバック到着まで待機（イベント名の記述なし） | 正 | — |
+
+### X21 `spot_newlines` の出力
+
+- grep: `spot_newlines|\\n\[half\]|half`
+- 実装照合: lua:loader/config/sections.rs `default_spot_newlines`（1.5）、ps:pasta/shiori/sakura_builder.lua `BUILDER.build`（`string.format("\\n[%d]", math.floor(spot_newlines * 100))`）。
+- 結論: 台帳本体の該当行（`pasta-toml.md` L235）の訂正どおり。既定 1.5 は `\n[150]`（百分率）になり、`\n[half]` ではない。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| ga/references/pasta-toml.md:223 | スポット切替時の改行量（`\n[半角]` の倍率） | 生成で置換（4.1） | 2.7（移設時）・4.1 |
+| ga/references/pasta-toml.md:237 | 値 `1.5` は `\n[half]`（1.5 行） | 生成で置換（4.1） | 2.7（移設時）・4.1 |
+| ga/references/pasta-toml.md:45 | 既定 `1.5`（L116 を含む） | 正 | — |
+
+### X22 実装に無い名前（`pasta.word_lookup`・`LabelNotFound`・`ScriptEvent::Error`・`CALLBACK.resume_pending`）
+
+- grep: `word_lookup|LabelNotFound|ScriptEvent|resume_pending`
+- 実装照合: ps:pasta/act.lua `ACT_IMPL.word`・`ACT_IMPL.call`（未発見は警告ログを出して nil）、ps:pasta/shiori/entry.lua `SHIORI.request`（実行時エラーは `RES.err` で 500 と `X-Error-Reason`）、ps:pasta/shiori/event/callback.lua（`resume_pending` は無い）。いずれの名前も crates 配下の実装に無い。
+- 結論: 台帳本体の備考どおり。範囲内のヒットは `resume_pending` の 1 件だけ（D16 と同じ行）。他の 3 つは撤去される `GRAMMAR.md`・doc/spec にだけある。
+
+| 位置 | 記述（要旨） | 判定 | 訂正先 |
+| ---- | ------------ | ---- | ------ |
+| lc/references/shiori-handlers.md:217 | `CALLBACK.resume_pending()` | 生成で置換（4.1） | 2.6（移設時）・4.1 |
+
+### 「→1.3」申し送りの解決
+
+台帳本体の備考で「→1.3」とした行と、それを確定させた項目の対応。結論の要旨は各項目の「結論」に書いた。
+
+| 台帳行 | 確定させた項目 | 実装照合の結論 |
+| ------ | -------------- | -------------- |
+| `02-markers.md` L16 | X01 | 空白は列挙した文字だけ |
+| `02-markers.md` L33 | X02 | 代入のコロン形は受理されない |
+| `02-markers.md` L135 | D06 | 引数は読点／カンマ区切り。空白区切りはパースエラー、名前付きは名前が無視される |
+| `02-markers.md` L151 | X02 | `＄my_var ： 10` はパースエラー |
+| `02-markers.md` L203 | D10 | フェンスは行頭の 3 個以上のバッククォート＋任意識別子、インデント不可 |
+| `02-markers.md` L211 | X03 | 内容は検証されず、関数定義以外の文も実行される |
+| `02-markers.md` L272 | X04 | 式に比較演算子は無い |
+| `03-block-structure.md` L99 | X05 | Lua ブロックはロード時に評価（`__start__` の中ではない） |
+| `03-block-structure.md` L127 | D10 | インデントしたフェンスはパースエラー |
+| `04-call-spec.md` L23 | X06 | ターゲットは任意の式、`tostring` してから検索 |
+| `05-literals.md` L7 | X07 | 真偽値リテラルは無い |
+| `07-sakura-script.md` L15 | X08 | `\]` は特別扱いされない |
+| `09-variables.md` L21 | X09 | `var` はイベント処理ごと。yield したシーンは再開後も同じ `var` |
+| `09-variables.md` L107 | X10 | 範囲内にヒットなし。例は `function SCENE.add(act, x, y)` で書く |
+| `10-words.md` L3 | X11 | グローバル単語は全辞書ファイル共通 |
+| `11-actor-dictionary.md` L91 | X12 | `lua` ブロックは出力され A1 で到達する（design #14 と食い違い、実装が正。書き方は 1.4） |
+| `12-future.md` L80 | X08 | `\]` は無い |
+| `12-future.md` L109 | X13 | BOM 付きはパースエラー（「BOM は許容」は否定） |
+| `GRAMMAR.md` L221 | X02・X07 | コロン形・`true` とも受理されない |
+| `GRAMMAR.md` L317 | X02・X06 | `＄スコア：75` は受理されない。`＞＠分岐判定` は `"nil"` で再検索し警告 |
+| `GRAMMAR.md` L509 | X14 | `「「セリフ」」` の値は `セリフ` |
+| `GRAMMAR.md` L539 | X08 | `\s[a\]b]` は `\s[a\]` と台詞 `b]` に分かれる |
+| `GRAMMAR.md` L590 | X03 | 「関数定義のみ」は検証されない |
+| `grammar-model.md` L128 | X05・X03 | 配置と評価時期は X05、「関数定義のみ」は X03 |
+| `grammar-model.md` L148 | X07 | 真偽値リテラルは無い |
+| `call-spec.md` L112 | X06 | DSL からの呼び出しは nil ガードに届かない |
+| `sakura-script.md` L44 | X08 | `\]` を削除 |
+| `variables.md` L27 | X02 | コロン形は受理されない |
+| `actor-dictionary.md` L38 | X15 | 立ち位置は次の `％` 行までイベントをまたいで保たれる |
+| `pasta-toml.md` L290 | X16 | main 取り込みで `surface / dressup` 節に置換済み、実装と一致 |
+| `runtime-api.md` L245 | X17 | 読み取り専用は強制されない |
+| `runtime-api.md` L651 | X18 | `[lua] libs` はロード時に読まれず、ゴーストから `@env` を有効にする手段は無い（台帳本体の備考を否定） |
+| `shiori-handlers.md` L17 | D13・X19 | `function(act)`。文字列を返すと `RES.ok` で包まれ、`RES.ok(…)` を返すと二重になる（実測で確定） |
+| `shiori-handlers.md` L230 | X20 | イベント名は `OnPastaCallBack{N}`、REG より先に `CALLBACK.try_route` が処理 |
+
+### 台帳本体と異なる結論（実装を正とする）
+
+実装照合で、台帳本体の記述と異なる結論になった点。台帳本体の行はこの節を正として読む。
+
+- `runtime-api.md` L651（X18）: 本体の「pasta.toml `[lua] libs` への `"env"` 追加として書く」は誤り。`[lua]` はロード経路で読まれない。
+- `12-future.md` L109（X13）: 本体の「『BOM は許容』は実測で確定」は、実測で「BOM 付きはパースエラー」と確定した。
+- `pasta-toml.md` L290（X16）: 本体の「`default_surface` を読むコードが見当たらない」は main 取り込み後も正しいが、スキル側の記述は `surface / dressup` に置き換わった。収録先の節名は `surface / dressup` とする。
+- `shiori-handlers.md` L230（X20）: 収録先見出しの「OnNotifyCallbackResponse」は実装に無いイベント名。実装の名前（`OnPastaCallBack{N}`）と挙動で節を立てる。
+- `11-actor-dictionary.md` L91（X12）: design #14 の「処理に反映されない」と実装が食い違う（本体の備考どおり。扱いは 1.4）。
+
+新規のバグ候補の可能性（X19 二重包み・D07 改行入り `"` 文字列・D07 単語値 `""`/`「」`・X18 `[lua]` 未使用・D03 OnChoiceSelectEx のローカル限定）は 1.4 で付録への追記要否を決める。
 
 ## 将来仕様の仕分け表
 
