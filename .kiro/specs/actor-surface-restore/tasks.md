@@ -20,7 +20,7 @@
   - _Boundary: StoreAppearance_
 
 - [ ] 2. ステップA: サーフェスの観測と復旧ロジック
-- [ ] 2.1 外見モジュールを新設し、出力文字列のタグ走査とサーフェス観測を実装する
+- [x] 2.1 外見モジュールを新設し、出力文字列のタグ走査とサーフェス観測を実装する
   - 空の外見状態を生成でき、状態は引数で受け取ってその場で変更する（モジュール自身は状態を持たない）
   - `\s[ID]`・`\sN` をサーフェス変更として ID を文字列のまま記録し、1発話内で最後のものを発話アクターとそのスポットへ反映する。`\\` に続く `s` は検出しない
   - スコープ切替タグ（`\0` `\1` `\h` `\u` `\p[N]` `\pN`）で全スポットを不明化し、その文字列の残りはアクターへ記録しない。直前発話アクター・前回発話スポットは消さない
@@ -94,4 +94,5 @@
   - _Boundary: マニュアル_
 
 ## Implementation Notes
-- 1.1: 特性化テストは appearance 第4引数なしで固定。3.1 でこれらのケースに共有 appearance を渡しても同じ期待値でグリーンであることを確認する。cargo は `env -u NoDefaultCurrentDirectoryInExePath` 必須、luacheck はローカル不可（CI を正）。
+- 1.1: 特性化テストは appearance 第4引数なしで固定。3.1 でこれらのケースに共有 appearance を渡しても同じ期待値でグリーンであることを確認する。cargo は `env -u NoDefaultCurrentDirectoryInExePath` 必須、luacheck はローカル実行可（crates/pasta_lua で `R="$APPDATA/luarocks"; echo 'require("luacheck.main")' | LUA_PATH="scriptlibs/?.lua;scriptlibs/?/init.lua;$R/share/lua/5.4/?.lua;$R/share/lua/5.4/?/init.lua;;" LUA_CPATH="$R/lib/lua/5.4/?.dll;;" lua - pasta_scripts tests`、max_cyclomatic_complexity=15）。
+- 2.1: appearance.lua は分類を surface_id / is_scope / is_bind に分割して複雑度15以下。`\s[]`（空ID）は記録しない。エントリは `{ binds = {} }`、`order` は 4.1 で追加。
