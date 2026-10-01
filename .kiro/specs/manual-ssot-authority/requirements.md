@@ -45,8 +45,6 @@ pasta の利用者（ゴースト作者）向け情報（Pasta DSL 文法・公�
   - 下流 `pasta-runtime-internals-doc` は、本仕様が確立する「mdBook 権威＋スキル生成」方式を再利用する。本仕様は `internal-modules` を手書きのまま残し、暫定である旨を明示する。
   - 進行中 spec `review-improvement-loop` は `doc/spec/`・`GRAMMAR.md`・drift-check を参照しているため、本仕様で参照のみ修正する（同 spec のプロセス内容は変更しない）。
 
-> **未確定事項の扱い**: brief.md で解決できない論点は、各要件に「**仮定**」として明示し、末尾「Open Questions」に列挙した。要件ディスカッションで確定する。
-
 ## Requirements
 
 ### Requirement 1: 文法の権威を mdBook へ一本化する
@@ -103,7 +101,7 @@ pasta の利用者（ゴースト作者）向け情報（Pasta DSL 文法・公�
 
 #### Acceptance Criteria
 
-1. The スキル生成機構 shall 文法・公開 Lua API（`runtime-api`・`shiori-handlers` 相当）・`pasta.toml` リファレンスのスキル `references/` ファイルを、マニュアルの対応章から生成する。
+1. The スキル生成機構 shall 文法・公開 Lua API（`runtime-api`・`shiori-handlers` 相当）・`pasta.toml` リファレンス・起動シーケンスとモジュール解決のスキル `references/` ファイルを、マニュアルの対応章から生成する。デバッグ・入門など、それ以外の章は生成対象としない。
 2. The スキル生成機構 shall 生成物に規範的本文のみを出力し、章のキャラ口調の導入段落および章末の締め段落を含めない。
 3. The 生成されたスキルファイル shall リポジトリ内パスやマニュアル章への相対リンクなど、スキルディレクトリの外を指す参照を含まない（スキルを別リポジトリへコピーしても参照が切れない）。
 4. When マニュアル章が他の章を参照している場合, the スキル生成機構 shall 生成物内でその参照をスキル内で解決可能な形にするか、参照切れを残さない形で出力する。
@@ -184,9 +182,7 @@ pasta の利用者（ゴースト作者）向け情報（Pasta DSL 文法・公�
 
 ## Open Questions
 
-要件ディスカッションで確定すべき論点。各項目は上記要件では「仮定」として暫定的に扱っている。
-
-9. **生成対象の範囲**（R5.1）: `pasta-lua-coding/SKILL.md` は既に `book/src/reference/startup.md` をリポジトリ内パスで参照しており自己完結に反している。起動シーケンス章（およびデバッグ章など他の利用者向け章）を生成対象に含めるか、参照を削るだけにするか。
+要件ディスカッション（2026-10-01）ですべて解決済み。未確定の要件論点は無い。
 
 ### 設計フェーズへ先送りした事項
 
