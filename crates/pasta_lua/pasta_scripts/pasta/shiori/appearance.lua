@@ -1,8 +1,9 @@
 --- @module pasta.shiori.appearance
---- 外見状態（サーフェス・着せ替え）の観測モジュール（actor-surface-restore）
+--- 外見状態（サーフェス・着せ替え）の観測・復旧モジュール（actor-surface-restore）
 ---
---- 出力済みさくらスクリプト文字列からサーフェス変更・スコープ切替タグを検出し、
---- 引数で受け取った状態テーブルをその場で更新する。
+--- 出力済みさくらスクリプト文字列からサーフェス変更・スコープ切替タグを検出し（observe）、
+--- アクター切替時の復旧タグ列を返す（restore）。
+--- いずれも引数で受け取った状態テーブルをその場で更新する。
 --- モジュール自身は状態を持たず、STORE・@pasta_* を require しない。
 --- 出力文字列は読み取るのみで変更しない。
 
@@ -19,23 +20,34 @@ function APPEARANCE.new()
     return { actors = {}, spots = {}, owners = {}, last_spots = {} }
 end
 
---- pos 以降の次のタグを返す。`\\` は 2 文字読み飛ばす。
+--- 位置 i の `\` から始まるタグを読む
 --- @param s string
---- @param pos integer
---- @return string|nil name タグ名（`\` を除く）。タグが無ければ nil
+--- @param i integer
+--- @return string|nil name タグ名（`\` を除く）。タグでなければ nil
 --- @return string|nil arg 角括弧の中身（無ければ nil）
 --- @return integer|nil next_pos タグ直後の位置
+local function tag_at(s, i)
+    local name = s:match(NAME_PATTERN, i + 1)
+    if name then
+        local j = i + 1 + #name
+        local arg = s:match(ARG_PATTERN, j)
+        return name, arg, j + (arg and #arg + 2 or 0)
+    end
+    return nil
+end
+
+--- pos 以降の次のタグを返す（戻り値は tag_at と同じ）。`\\` は 2 文字読み飛ばす。
+--- @param s string
+--- @param pos integer
 local function next_tag(s, pos)
     while true do
         local i = s:find("\\", pos, true)
         if not i then
             return nil
         end
-        local name = s:match(NAME_PATTERN, i + 1)
+        local name, arg, next_pos = tag_at(s, i)
         if name then
-            local j = i + 1 + #name
-            local arg = s:match(ARG_PATTERN, j)
-            return name, arg, j + (arg and #arg + 2 or 0)
+            return name, arg, next_pos
         end
         -- `\\` はエスケープ。それ以外（`\` + 非タグ文字）は 1 文字進める
         pos = i + ((s:sub(i + 1, i + 1) == "\\") and 2 or 1)
@@ -137,6 +149,101 @@ function APPEARANCE.observe(state, actor, spot, text)
         end
         name, arg, pos = next_tag(text, pos)
     end
+end
+
+--- 文字列の先頭タグ列を走査し、分類済みタグを found へ出現順に追加する
+--- @return boolean 一般文字・スコープ切替タグに達したら true（先頭タグ列の終端）
+local function scan_leading_text(s, found)
+    local pos = 1
+    while pos <= #s do
+        if s:sub(pos, pos) ~= "\\" then
+            return true
+        end
+        local name, arg, next_pos = tag_at(s, pos)
+        if not name then
+            return true -- `\\` 等はタグでなく一般文字
+        end
+        local kind, value = classify(name, arg)
+        if kind == "scope" then
+            return true
+        elseif kind then
+            found[#found + 1] = { kind = kind, value = value }
+        end
+        pos = next_pos
+    end
+    return false
+end
+
+--- 切替先グループの先頭タグ列（最初の一般文字・スコープ切替タグ・raw_script まで）の
+--- サーフェス変更・bind を出現順に返す。tokens は読み取りのみ。
+--- @param tokens table[]
+--- @return table[] { kind = "surface"|"bind", value = string }
+local function leading_tags(tokens)
+    local found = {}
+    for _, t in ipairs(tokens) do
+        local ty = t.type
+        if ty == "surface" then
+            local id = surface_id("s", tostring(t.id))
+            if id then
+                found[#found + 1] = { kind = "surface", value = id }
+            end
+        elseif ty == "talk" or ty == "sakura_script" then
+            -- talk も走査する（＠単語参照が `\s[ID]` へ展開され talk に結合されるため）。空 talk は素通り
+            if scan_leading_text(t.text or "", found) then
+                return found
+            end
+        elseif ty == "raw_script" then
+            return found
+        end
+    end
+    return found
+end
+
+--- 既定サーフェス（数値・非空文字列のみ。それ以外の型は無視）
+local function default_surface(actor)
+    local v = actor.surface
+    if type(v) == "number" or (type(v) == "string" and v ~= "") then
+        return tostring(v)
+    end
+    return nil
+end
+
+--- サーフェス復旧タグを返し、スポットの表示中サーフェスを更新する（2.1〜2.4, 2.8〜2.10, 4.4）
+local function restore_surface(state, actor, spot, leading)
+    local rec = state.actors[actor.name]
+    local known = (rec and rec.surface) or default_surface(actor)
+    if known == nil then
+        return ""
+    end
+    local cur = state.spots[spot]
+    if cur and cur.surface == known then
+        return ""
+    end
+    for _, tag in ipairs(leading) do
+        if tag.kind == "surface" then
+            return ""
+        end
+    end
+    entry(state.spots, spot).surface = known
+    return "\\s[" .. known .. "]"
+end
+
+--- アクター切替時の復旧タグ列を返し、スポットの表示中状態を更新する。
+--- @param state table AppearanceState
+--- @param actor table 切替先アクター（name / surface を参照）
+--- @param spot integer 解決済みスポットID
+--- @param tokens table[] 切替先グループの内側トークン列（先頭タグ列の走査用・読み取りのみ）
+--- @return string 復旧タグ列（復旧不要なら空文字列）
+function APPEARANCE.restore(state, actor, spot, tokens)
+    local name = actor.name
+    -- 2.11: 同一アクターの継続（スポットの直前発話者が自分で、前回も同じスポット）なら復旧しない
+    local continuing = name ~= nil and state.owners[spot] == name and state.last_spots[name] == spot
+    state.owners[spot] = name
+    if name == nil or continuing then
+        return ""
+    end
+    state.last_spots[name] = spot
+    return restore_surface(state, actor, spot, leading_tags(tokens))
 end
 
 return APPEARANCE

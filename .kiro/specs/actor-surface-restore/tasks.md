@@ -19,7 +19,7 @@
   - _Requirements: 4.1, 4.2, 4.3_
   - _Boundary: StoreAppearance_
 
-- [ ] 2. ステップA: サーフェスの観測と復旧ロジック
+- [x] 2. ステップA: サーフェスの観測と復旧ロジック
 - [x] 2.1 外見モジュールを新設し、出力文字列のタグ走査とサーフェス観測を実装する
   - 空の外見状態を生成でき、状態は引数で受け取ってその場で変更する（モジュール自身は状態を持たない）
   - `\s[ID]`・`\sN` をサーフェス変更として ID を文字列のまま記録し、1発話内で最後のものを発話アクターとそのスポットへ反映する。`\\` に続く `s` は検出しない
@@ -28,7 +28,7 @@
   - 他タグの引数内の入れ子タグは読み飛ばし、バックスラッシュを含まない文字列は即座に戻る
   - 新しい単体テストファイルを Lua テスト一覧へ登録し、上記の観測規則がすべてグリーンになる
   - _Requirements: 1.2, 1.3, 1.4, 1.5, 1.7, 1.8_
-- [ ] 2.2 アクター切替時のサーフェス復旧判定を実装する
+- [x] 2.2 アクター切替時のサーフェス復旧判定を実装する
   - 最初に直前発話アクター・前回発話スポットを読み、同一アクターの継続なら状態を変えず空文字列を返す（スポットが不明でも復旧しない）。どちらかが不成立なら比較へ進む
   - 既知サーフェス（無ければアクター設定の既定サーフェス）がスポットの表示中サーフェスと異なる・不明のとき `\s[ID]` を返して表示中サーフェスを更新し、一致・既知なしなら空文字列を返す
   - 切替先グループの先頭タグ列（最初の一般文字・スコープ切替タグ・生スクリプトトークンまで）にサーフェス変更があれば復旧しない
@@ -96,3 +96,4 @@
 ## Implementation Notes
 - 1.1: 特性化テストは appearance 第4引数なしで固定。3.1 でこれらのケースに共有 appearance を渡しても同じ期待値でグリーンであることを確認する。cargo は `env -u NoDefaultCurrentDirectoryInExePath` 必須、luacheck はローカル実行可（crates/pasta_lua で `R="$APPDATA/luarocks"; echo 'require("luacheck.main")' | LUA_PATH="scriptlibs/?.lua;scriptlibs/?/init.lua;$R/share/lua/5.4/?.lua;$R/share/lua/5.4/?/init.lua;;" LUA_CPATH="$R/lib/lua/5.4/?.dll;;" lua - pasta_scripts tests`、max_cyclomatic_complexity=15）。
 - 2.1: appearance.lua は分類を surface_id / is_scope / is_bind に分割して複雑度15以下。`\s[]`（空ID）は記録しない。エントリは `{ binds = {} }`、`order` は 4.1 で追加。
+- 2.2: `restore(state, actor, spot, tokens)` が owners/last_spots を読んでから更新（observe は触らない）。先頭タグ列は talk 本文も走査する（`＠表情` は talk テキスト先頭の `\s[ID]` として流れるため）。raw_script で即終了。

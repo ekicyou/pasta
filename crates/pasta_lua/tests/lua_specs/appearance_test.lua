@@ -1,6 +1,7 @@
 -- appearance_test.lua
 -- pasta.shiori.appearance 外見状態の走査・観測テスト
 -- actor-surface-restore Task 2.1 (Requirements: 1.2, 1.3, 1.4, 1.5, 1.7, 1.8)
+-- actor-surface-restore Task 2.2 (Requirements: 2.1, 2.2, 2.3, 2.4, 2.8, 2.9, 2.10, 2.11, 4.4, 5.5)
 local describe = require("lua_test.test").describe
 local test = require("lua_test.test").test
 local expect = require("lua_test.test").expect
@@ -202,5 +203,215 @@ describe("APPEARANCE.observe - アクター未指定の生スクリプト", func
         local state = known_spots()
         APPEARANCE.observe(state, nil, nil, "\\\\s[1]\\![raise,OnX,\\s[0]]")
         expect(state.spots[0].surface):toBe("7")
+    end)
+end)
+
+--- 他アクター X がスポット 0 で発話し、スポット 0 のサーフェスが surface の状態を作る
+local function spot0_by_x(surface)
+    local state = APPEARANCE.new()
+    state.owners[0] = "X"
+    state.last_spots.X = 0
+    if surface then
+        state.spots[0] = { surface = surface, binds = {} }
+    end
+    return state
+end
+
+--- A の既知サーフェスを記録する（前回発話もスポット 0。スポットは変えない）
+local function known_a(state, surface)
+    state.actors.A = { surface = surface, binds = {} }
+    state.last_spots.A = 0
+    return state
+end
+
+describe("APPEARANCE.restore - サーフェス比較", function()
+    test("一致なら空文字列", function()
+        local state = known_a(spot0_by_x("5"), "5")
+        expect(APPEARANCE.restore(state, A, 0, {})):toBe("")
+        expect(state.spots[0].surface):toBe("5")
+    end)
+
+    test("不一致なら \\s[既知] を返しスポットを更新する", function()
+        local state = known_a(spot0_by_x("10"), "5")
+        expect(APPEARANCE.restore(state, A, 0, {})):toBe("\\s[5]")
+        expect(state.spots[0].surface):toBe("5")
+        expect(state.actors.A.surface):toBe("5")
+    end)
+
+    test("スポットが不明なら \\s[既知] を返しスポットを更新する (4.4)", function()
+        local state = known_a(spot0_by_x(nil), "smile")
+        expect(APPEARANCE.restore(state, A, 0, {})):toBe("\\s[smile]")
+        expect(state.spots[0].surface):toBe("smile")
+    end)
+
+    test("既知なし・既定なしなら空文字列でスポットを変えない (2.3, 2.9)", function()
+        local state = spot0_by_x("10")
+        expect(APPEARANCE.restore(state, A, 0, {})):toBe("")
+        expect(state.spots[0].surface):toBe("10")
+        local unknown = spot0_by_x(nil)
+        expect(APPEARANCE.restore(unknown, A, 0, {})):toBe("")
+        expect(unknown.spots[0]):toBe(nil)
+    end)
+
+    test("既知が無ければ既定サーフェスへフォールバックする (2.8)", function()
+        local B = { name = "B", surface = 0 }
+        local state = spot0_by_x("10")
+        expect(APPEARANCE.restore(state, B, 0, {})):toBe("\\s[0]")
+        expect(state.spots[0].surface):toBe("0")
+        local C = { name = "C", surface = "smile" }
+        expect(APPEARANCE.restore(spot0_by_x(nil), C, 0, {})):toBe("\\s[smile]")
+    end)
+
+    test("既定より記録した既知サーフェスを優先する", function()
+        local B = { name = "B", surface = 0 }
+        local state = spot0_by_x("10")
+        state.actors.B = { surface = "3", binds = {} }
+        expect(APPEARANCE.restore(state, B, 0, {})):toBe("\\s[3]")
+    end)
+
+    test("既定サーフェスが表示中と一致なら空文字列", function()
+        local B = { name = "B", surface = 10 }
+        expect(APPEARANCE.restore(spot0_by_x("10"), B, 0, {})):toBe("")
+    end)
+
+    test("想定外の型・空文字列の既定サーフェスは無視する", function()
+        for _, v in ipairs({ {}, true, "" }) do
+            local B = { name = "B", surface = v }
+            local state = spot0_by_x("10")
+            expect(APPEARANCE.restore(state, B, 0, {})):toBe("")
+            expect(state.spots[0].surface):toBe("10")
+        end
+    end)
+
+    test("アクター名が nil なら復旧しない", function()
+        local state = spot0_by_x("10")
+        expect(APPEARANCE.restore(state, { surface = 0 }, 0, {})):toBe("")
+        expect(state.spots[0].surface):toBe("10")
+    end)
+end)
+
+describe("APPEARANCE.restore - 先頭タグ列", function()
+    local suppressed = {
+        { "surface トークン", { { type = "surface", id = 3 } } },
+        { "sakura_script の \\s[ID]", { { type = "sakura_script", text = "\\s[3]" } } },
+        { "sakura_script の \\sN", { { type = "sakura_script", text = "\\_w[100]\\s3" } } },
+        { "タグのみのトークンの後", {
+            { type = "wait", ms = 100 }, { type = "newline", n = 1 }, { type = "clear" },
+            { type = "talk", text = "" }, { type = "yield" }, { type = "surface", id = 3 },
+        } },
+        { "無関係なタグの後", { { type = "sakura_script", text = "\\![set,a,b]\\_w[1]\\s[3]あ" } } },
+        { "talk 先頭の \\s[ID]（単語参照の展開）", { { type = "talk", text = "\\s[3]あ" } } },
+        { "talk 先頭タグ列の \\sN", { { type = "talk", text = "\\_w[100]\\s3あ" } } },
+    }
+    for _, c in ipairs(suppressed) do
+        test(c[1] .. " があれば復旧しない (2.4)", function()
+            local state = known_a(spot0_by_x("10"), "5")
+            expect(APPEARANCE.restore(state, A, 0, c[2])):toBe("")
+            expect(state.spots[0].surface):toBe("10")
+        end)
+    end
+
+    local not_suppressed = {
+        { "一般文字列 talk の後", { { type = "talk", text = "あ" }, { type = "surface", id = 3 } } },
+        { "sakura_script 内の一般文字の後", { { type = "sakura_script", text = "あ\\s[3]" } } },
+        { "エスケープ \\\\ の後", { { type = "sakura_script", text = "\\\\\\s[3]" } } },
+        { "スコープ切替タグの後", { { type = "sakura_script", text = "\\1\\s[3]" } } },
+        { "raw_script の後", { { type = "raw_script", text = "" }, { type = "surface", id = 3 } } },
+        { "入れ子の \\s のみ", { { type = "sakura_script", text = "\\![raise,OnX,\\s[3]]" } } },
+        { "talk 内の一般文字の後", { { type = "talk", text = "あ\\s[3]" } } },
+        { "talk 内のスコープ切替タグの後", { { type = "talk", text = "\\1\\s[3]あ" } } },
+    }
+    for _, c in ipairs(not_suppressed) do
+        test(c[1] .. " のサーフェス変更では抑止しない (2.10)", function()
+            local state = known_a(spot0_by_x("10"), "5")
+            expect(APPEARANCE.restore(state, A, 0, c[2])):toBe("\\s[5]")
+            expect(state.spots[0].surface):toBe("5")
+        end)
+    end
+
+    test("一般文字列後の変更は復旧後の観測で既知・表示中を最後の値にする (2.10)", function()
+        local state = known_a(spot0_by_x("10"), "5")
+        expect(APPEARANCE.restore(state, A, 0, { { type = "talk", text = "あ" } })):toBe("\\s[5]")
+        APPEARANCE.observe(state, A, 0, "あ\\s[3]い\\s[4]")
+        expect(state.actors.A.surface):toBe("4")
+        expect(state.spots[0].surface):toBe("4")
+    end)
+
+    test("トークン列を変更しない", function()
+        local tokens = { { type = "sakura_script", text = "\\s[3]" } }
+        APPEARANCE.restore(known_a(spot0_by_x("10"), "5"), A, 0, tokens)
+        expect(#tokens):toBe(1)
+        expect(tokens[1].text):toBe("\\s[3]")
+    end)
+end)
+
+describe("APPEARANCE.restore - 継続と交代", function()
+    test("同一アクターの継続ならスポット不明でも復旧せず状態を変えない (2.11)", function()
+        local state = APPEARANCE.new()
+        state.actors.A = { surface = "5", binds = {} }
+        state.owners[0] = "A"
+        state.last_spots.A = 0
+        expect(APPEARANCE.restore(state, A, 0, {})):toBe("")
+        expect(state.spots[0]):toBe(nil)
+        expect(state.owners[0]):toBe("A")
+        expect(state.last_spots.A):toBe(0)
+    end)
+
+    test("同一アクターの継続なら既定サーフェスでも復旧しない (2.11)", function()
+        local B = { name = "B", surface = 0 }
+        local state = APPEARANCE.new()
+        state.owners[0] = "B"
+        state.last_spots.B = 0
+        state.spots[0] = { surface = "10", binds = {} }
+        expect(APPEARANCE.restore(state, B, 0, {})):toBe("")
+        expect(state.spots[0].surface):toBe("10")
+    end)
+
+    test("直前発話アクター・前回発話スポットを更新する", function()
+        local state = known_a(spot0_by_x("10"), "5")
+        state.last_spots.A = 1
+        APPEARANCE.restore(state, A, 0, {})
+        expect(state.owners[0]):toBe("A")
+        expect(state.last_spots.A):toBe(0)
+    end)
+
+    test("初回の発話は既定サーフェスがあれば不明スポットへ復旧し、次は継続になる", function()
+        local B = { name = "B", surface = 0 }
+        local state = APPEARANCE.new()
+        expect(APPEARANCE.restore(state, B, 0, {})):toBe("\\s[0]")
+        expect(state.owners[0]):toBe("B")
+        expect(state.last_spots.B):toBe(0)
+        state.spots = {}
+        expect(APPEARANCE.restore(state, B, 0, {})):toBe("")
+    end)
+
+    test("A がスポット0→1→0 と戻るとスポット0で既知サーフェスを復旧する (5.5)", function()
+        local state = APPEARANCE.new()
+        expect(APPEARANCE.restore(state, A, 0, {})):toBe("")
+        APPEARANCE.observe(state, A, 0, "\\s[0]あ")
+        -- 移動先スポット1（不明）へも外見が追従する
+        expect(APPEARANCE.restore(state, A, 1, {})):toBe("\\s[0]")
+        APPEARANCE.observe(state, A, 1, "\\s[5]い")
+        expect(APPEARANCE.restore(state, A, 0, {})):toBe("\\s[5]")
+        expect(state.spots[0].surface):toBe("5")
+        expect(state.owners[0]):toBe("A")
+        expect(state.last_spots.A):toBe(0)
+    end)
+
+    test("A→B→A の交代で A の既知サーフェスを復旧する", function()
+        local B = { name = "B" }
+        local state = APPEARANCE.new()
+        APPEARANCE.restore(state, A, 0, {})
+        APPEARANCE.observe(state, A, 0, "\\s[0]A1")
+        expect(APPEARANCE.restore(state, B, 0, {})):toBe("")
+        APPEARANCE.observe(state, B, 0, "\\s[10]B1")
+        expect(APPEARANCE.restore(state, A, 0, {})):toBe("\\s[0]")
+        expect(state.spots[0].surface):toBe("0")
+    end)
+
+    test("不明化の後も別アクターとの交代なら復旧する", function()
+        local state = known_a(spot0_by_x("10"), "5")
+        APPEARANCE.observe(state, nil, nil, "\\s[1]")
+        expect(APPEARANCE.restore(state, A, 0, {})):toBe("\\s[5]")
     end)
 end)
