@@ -162,7 +162,7 @@ node book/tools/link-check.mjs              # リンク検証（マニュアル�
 - **使わないリンク**: 相対パスの画像、`.md` 以外への相対リンク、`book/src/` の外へ出る相対リンクは生成に失敗する（`unresolvable-link`）。参照形式リンク（`[text][ref]`）と HTML タグのリンクは書き換えられないため使わない。
 - **リポジトリ内パスを書かない**: 生成物はファイル全文（コードフェンス・HTML コメント内を含む）が `link-check.mjs` の禁止トークン（`FORBIDDEN_SKILL_TOKENS`。`book/src`・`crates/` 等）で検査される（`skill-forbidden-ref`）。部分一致のため絶対 URL も対象となり、crates.io の URL（`crates/` を含む）は書けない。クレートへのリンクは docs.rs 等を使い、Lua モジュールはファイルパスではなくモジュール名（例: `lua_test.mocks`）で書く。
 - **作例**: 情報文字列 `pasta` のコードブロックは実パーサで通る形で書く。アクション行や引用なしの単語値の行末に `#` 注記を付けると台詞・値の一部になるため付けない。図示用の断片は情報文字列 `text` にする。
-- **`pasta.toml` リファレンス章の表形式**: `reference/pasta-toml.md` は、検査対象の 4 キー（`talk_interval_min`・`talk_interval_max`・`hour_margin`・`spot_newlines`）について、キー名と `` `既定値` ``（例: `` `180` ``）を同じ表行に書く。`crates/pasta_lua/tests/loader/config_defaults_test.rs` の `config_reference_doc_matches_ssot` が章の各行を走査し、キー名と既定値を含む行があるかを照合する。値を別の行に分けると失敗する。同じキーの行が複数ある場合はどれか 1 行で合格してしまうため、既定値を変えるときはすべての行を更新する。
+- **`pasta.toml` リファレンス章の表形式**: `reference/pasta-toml.md` は、検査対象の 4 キー（`talk_interval_min`・`talk_interval_max`・`hour_margin`・`spot_newlines`）について、キー名と `` `既定値` ``（例: `` `180` ``）を同じ表行に書く。`crates/pasta_lua/tests/loader/config_defaults_test.rs` の `config_reference_doc_matches_ssot` が、キー名（`` `talk_interval_min` `` の形）を含む表行のすべてに既定値があるか、テンプレート内の `キー = 値  # 既定 …` 行の値が既定値と一致するかを照合する。値を別の行に分けたり、一部の行だけ古いまま残したりすると失敗する。
 
 ### 外部リファレンスのリンク方針
 
