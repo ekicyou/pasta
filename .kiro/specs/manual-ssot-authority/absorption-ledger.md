@@ -646,7 +646,7 @@
 吸収元（doc/spec ch01–12・`GRAMMAR.md`・スキルの手書きリファレンス・現行 `book/src`）のどこにも書かれていない、現行実装が受理・処理する利用者向けの構文と挙動を 1 行ずつ挙げる（要件 1.8）。`grammar.pest` を規則ごとに読み、パーサ（`pasta_dsl`）・トランスパイラ（`pasta_lua` の code_gen）・ランタイム（`pasta_scripts`）で挙動を確かめた。本体の備考で「→1.2」とした項目はここで確定させる。
 
 - 判定列は「収録先: 章#節」か「バグ候補（根拠）」のどちらか。根拠 a＝実行時エラー・パニック・不正なさくらスクリプトを生む、b＝吸収元や他の規範記述と矛盾する結果を生む、c＝ソースコメント・テストで意図外と明示されている。どれにも当たらず意図が不明なだけのものは収録先を書く。
-- バグ候補はマニュアルに書かず、挙動も直さない（10.5）。`roadmap.md` へのキー行の申し送りは別タスクで行う。本表のバグ候補は 13 行（U06・U08・U12・U18・U19・U20・U21・U22・U23・U24・U25・U26・U27）。
+- バグ候補はマニュアルに書かず、挙動も直さない（10.5）。`roadmap.md` へのキー行の申し送りは別タスクで行う。本表のバグ候補は 14 行（U06・U08・U12・U18・U19・U20・U21・U22・U23・U24・U25・U26・U27・U28）。
 - U23〜U27 は、食い違い grep 記録（1.3）で見つかった挙動のうち、バグ候補かどうかの判定を 1.4 へ申し送ったもの（X19・D07・X18・D03）。吸収元に記述はあるが実装と食い違うため、現行挙動をマニュアルに書くかどうかをここで決める。実測はコミット `2d98dcf4`（`d95e12f2` から crates 配下は変わっていない）で同じ検証プログラムを動かした結果。
 - 実装照合列の「実測」は、コミット `6e914384` の実装をスクラッチの検証プログラム（`parse_str` → `LuaTranspiler::transpile` → `PastaLoader::load` → `SHIORI.request`）で動かした結果。検証プログラムはリポジトリに残していない。出力は SHIORI レスポンスの `Value`（さくらスクリプト）または状態コード。
 
@@ -679,6 +679,7 @@
 | U25 | 単語値の `「」`・`""`: 単語定義の値に書いた `「」`・`""` は空文字列にならず、その 2 文字（`「」`・`""`）が候補の値になる。変数代入や引数などの式に書いた `「」`・`""` は空文字列になる | pest:`string_blank = @{ "\"\"" \| "「」" }`（`word` も `expr` も `string_literal` 経由で受け付ける）、dsl:parser/parse_elements.rs（単語値は `Rule::string_blank` の字面 `as_str()` をそのまま値にする。属性値の `parse_attr` も同じ）、dsl:parser/parse_action.rs（式では `Rule::string_blank` → `Expr::BlankString`）。実測: `＠w：x、「」` → `entry("x", "「」")`、`＠v：""` → `entry([[""]])`、出力は `「」`・`""`。`＄e＝「」`・`＄f＝""` → `var.e = ""`（空） | バグ候補（b）: 同じ空文字列リテラルが式では空、単語値では囲み文字そのものになり、「外側の `「」` は単語値の区切り」（GRAMMAR.md L517）・「引用符で囲まれた中身が文字列」（doc/spec ch05 L18、book literals.md L45）の規範記述と矛盾する | D07 の確定。マニュアルには単語値の空文字列の書き方を載せない。式の `「」` が空文字列になることは literals.md に書く（`""` は U24 に当たるため例にしない） |
 | U26 | pasta.toml の `[lua]` セクション: `[lua] libs` はロード時に読まれず、書いても Lua 標準ライブラリ・mlua-stdlib モジュールの構成は既定のまま変わらない（`"env"` を足しても `@env` は使えず、既定に含まれる `@json` などは外せない） | lua:loader/mod.rs `PastaLoader::load`（`load_with_config(base_dir, RuntimeConfig::new())`）、crates/pasta_shiori/src/shiori.rs（SHIORI のロードも `RuntimeConfig::new()` から作る）、lua:loader/config/mod.rs `PastaConfig::lua`（呼び出し元なし）、lua:runtime/runtime_config.rs `From<LuaConfig> for RuntimeConfig`（ロード経路から呼ばれない）、lua:loader/config/sections.rs `LuaConfig` の doc コメント（`[lua]` セクションで有効にするライブラリを構成すると明記）。実測: `[lua] libs = ["std_all", "env"]` で `require "@env"` は失敗し、`@json` は読める | バグ候補（b・c）: 吸収元（スキル pasta-toml.md L49・L145〜L146 の `[lua]` 既定値と節、runtime-api.md L655「`libs` 配列に `"env"` エントリを追加」）と矛盾し、ソースの doc コメントも `[lua]` が構成を決めると明記している | X18 の確定。マニュアル（2.5・2.7）は `[lua]` が効くとは書かず、`@env` は通常のゴーストから有効にできないことだけを書く（X18 の結論どおり） |
 | U27 | 選択肢の自動ルーティングの探索範囲: 既定の `REG.OnChoiceSelectEx` は、明示の `＊OnChoiceSelectEx` シーンが無いとき、選択 ID（Reference0）を直前に実行したグローバルシーンのローカルシーンからだけ前方一致で探す。グローバルシーンへはフォールバックせず、見つからなければ 204。シーンをまだ 1 つも実行していない（`STORE.last_global_scene` が nil の）ときだけグローバルシーンから探す | ps:pasta/shiori/event/choice_select.lua `REG.OnChoiceSelectEx`（`SCENE.search(choice_id, STORE.last_global_scene)`。L56 のコメントは「ローカル→グローバル、3.1/3.4」）、ps:pasta/scene.lua `SCENE.search` → lua:search/context.rs `search_scene`（親シーン名ありは「Local-only search … (no global fallback)」）、ps:pasta/act.lua（L181 で `STORE.last_global_scene` を更新）。完了済み仕様 `.kiro/specs/completed/choice-definition-dsl/requirements.md` 要件 3.4 は「ローカル → グローバルの順で前方一致検索」。実測: OnTest（ローカル「ローカル先」とグローバル「行き先」の選択肢）の後、選択 ID `ローカル先` → 200（`L`）、`行き先` → 204 | バグ候補（b・c）: 完了済み仕様の要件 3.4 と吸収元（スキル SKILL.md L276「ローカルシーン → グローバルシーンの順で検索」、authoring-patterns.md L347）に矛盾し、ソースのコメント（choice_select.lua L56）とも食い違う | D03 の確定。マニュアル（2.6 lua/shiori-events.md の OnChoiceSelectEx 節）に収録するのは「明示の `＊OnChoiceSelectEx` が優先」「選択 ID と同名のローカルシーン（直前のグローバルシーン内）を前方一致で自動実行し、見つからなければ 204」の部分。グローバルシーンへのフォールバックの有無は書かない（D03 の訂正対象 ga/SKILL.md L276・authoring-patterns.md L347 は、フォールバックの順序に触れない記述へ直す） |
+| U28 | 別グローバルシーンへの Call 後のローカル探索: `＞` で別のグローバルシーンを呼んで戻ったあと、呼び出し元の後続の Call・ローカル単語参照が呼ばれた側のローカルシーンを探す | ps:pasta/act.lua `init_scene`（`act.current_scene` を上書きし、戻り時に復元しない）・`find_act_handler` L1/L2。実測（2.2 レビュー）: OnA が `＞挨拶`→`＞別グローバル`→`＞挨拶` で `A[LXY]`（2 回目が呼ばれた側の `挨拶Y` に解決） | バグ候補（b）: 「実行中のグローバルシーンのローカルシーンを探す」とする吸収元（doc/spec ch04・スキル call-spec）とマニュアル call-jump.md#スコープ解決アルゴリズムの規範と矛盾する | 2.2 の実装・レビューで発見。マニュアルは通常時の挙動（実行中のグローバルシーン）だけを書く。大タスク 6 で roadmap のバグ候補キー行に含める |
 
 ## 食い違い grep 記録
 
@@ -699,7 +700,7 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 | 位置 | 記述（要旨） | 判定 | 訂正先 |
 | ---- | ------------ | ---- | ------ |
 | grammar/action-line.md:27 | 節「アクターの省略」（`：` で前の発話を継続）（L29） | 正 | — |
-| grammar/action-line.md:91 | 節「行継続」: インデントした行を続けると連結（L93〜L102） | 訂正対象 | 2.2 |
+| grammar/action-line.md:91 | 節「行継続」: インデントした行を続けると連結（L93〜L102） | 訂正対象・訂正済み（2.2） | 2.2 |
 | grammar/index.md:70 | 章一覧「発言行・インライン要素・行継続・改行」 | 正 | — |
 | ga/SKILL.md:80 | アクター名を省略すると直前のアクターが継続 | 正 | — |
 | ga/SKILL.md:82 | 行継続: インデント付きの次行で発話を継続 | 訂正対象 | 4.2 |
@@ -719,7 +720,7 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 
 | 位置 | 記述（要旨） | 判定 | 訂正先 |
 | ---- | ------------ | ---- | ------ |
-| grammar/action-line.md:109 | 継続行内の空行は 1 改行（糖衣構文）、連続空行は連続改行（L112〜L119 の例と説明を含む） | 訂正対象 | 2.2 |
+| grammar/action-line.md:109 | 継続行内の空行は 1 改行（糖衣構文）、連続空行は連続改行（L112〜L119 の例と説明を含む） | 訂正対象・訂正済み（2.2） | 2.2 |
 | grammar/action-line.md:108 | さくらスクリプトの `\n` は改行 | 正 | — |
 | ga/references/action-line.md:134 | 糖衣構文: 行継続領域内の空行は改行（L133〜L136）（L144 の出力例を含む） | 生成で置換（4.1） | 4.1 |
 
@@ -735,7 +736,7 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 
 | 位置 | 記述（要旨） | 判定 | 訂正先 |
 | ---- | ------------ | ---- | ------ |
-| grammar/call-jump.md:68 | スコープ解決 3.「マージ: 両検索結果を結合して候補リストを生成」（L66〜L69 の 4 手順を含む） | 訂正対象 | 2.2 |
+| grammar/call-jump.md:68 | スコープ解決 3.「マージ: 両検索結果を結合して候補リストを生成」（L66〜L69 の 4 手順を含む） | 訂正対象・訂正済み（2.2） | 2.2 |
 | grammar/call-jump.md:31 | シーン参照はローカル／グローバルシーンを前方一致検索 | 正 | — |
 | grammar/call-jump.md:57 | `＞挨拶` → 「挨拶朝」「挨拶昼」の両方が候補 | 正 | — |
 | grammar/words.md:86 | ローカルとグローバルの同名単語は「マージ」されて候補プールが統合（L88〜L94 の例「どちらかが選ばれる」を含む） | 訂正対象 | 2.3 |
@@ -774,8 +775,8 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 
 | 位置 | 記述（要旨） | 判定 | 訂正先 |
 | ---- | ------------ | ---- | ------ |
-| grammar/call-jump.md:62 | 節「スコープ解決アルゴリズム」: ローカル検索・グローバル検索・マージ・選択の 4 段（L64〜L71） | 訂正対象 | 2.2 |
-| grammar/call-jump.md:73 | 「Call はシーン辞書のみ、単語参照はシーン辞書を参照しない」 | 訂正対象 | 2.2 |
+| grammar/call-jump.md:62 | 節「スコープ解決アルゴリズム」: ローカル検索・グローバル検索・マージ・選択の 4 段（L64〜L71） | 訂正対象・訂正済み（2.2） | 2.2 |
+| grammar/call-jump.md:73 | 「Call はシーン辞書のみ、単語参照はシーン辞書を参照しない」 | 訂正対象・訂正済み（2.2） | 2.2 |
 | grammar/words.md:81 | 検索順序はローカル単語辞書 → グローバル単語辞書の 2 段（L83〜L84） | 訂正対象 | 2.3 |
 | grammar/words.md:104 | 単語参照は単語辞書のみ、Call はシーン辞書のみ | 訂正対象 | 2.3 |
 | ga/references/call-spec.md:23 | 「2段階検索」（節見出し L19・L21 を含む） | 生成で置換（4.1） | 4.1 |
@@ -802,7 +803,7 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 
 | 位置 | 記述（要旨） | 判定 | 訂正先 |
 | ---- | ------------ | ---- | ------ |
-| grammar/call-jump.md:109 | 節「フィルター（将来変更あり）」: 構文が予約され現状は無視（L111〜L119） | 訂正対象 | 2.2（節削除） |
+| grammar/call-jump.md:109 | 節「フィルター（将来変更あり）」: 構文が予約され現状は無視（L111〜L119） | 訂正対象・訂正済み（2.2） | 2.2（節削除） |
 | ga/references/call-spec.md:14 | `＞シーン名＆key＝value ← 属性フィルター付き` | 生成で置換（4.1） | 4.1 |
 | ga/references/call-spec.md:46 | 節「属性フィルター」: 現在は将来予約（無視される）（L52）（L49 の例を含む） | 生成で置換（4.1） | 4.1 |
 
@@ -818,9 +819,9 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 
 | 位置 | 記述（要旨） | 判定 | 訂正先 |
 | ---- | ------------ | ---- | ------ |
-| grammar/action-line.md:53 | `＠func（x：10）`「名前付き引数で呼び出し」 | 訂正対象 | 2.2 |
-| grammar/action-line.md:60 | 例 `＠greet（time：morning）`（関数呼び出しにならない） | 訂正対象 | 2.2 |
-| grammar/call-jump.md:121 | 節「引数リスト」: 名前付き・空白区切り・トランスパイラ以降は対応予定（L123〜L129） | 訂正対象 | 2.2 |
+| grammar/action-line.md:53 | `＠func（x：10）`「名前付き引数で呼び出し」 | 訂正対象・訂正済み（2.2） | 2.2 |
+| grammar/action-line.md:60 | 例 `＠greet（time：morning）`（関数呼び出しにならない） | 訂正対象・訂正済み（2.2） | 2.2 |
+| grammar/call-jump.md:121 | 節「引数リスト」: 名前付き・空白区切り・トランスパイラ以降は対応予定（L123〜L129） | 訂正対象・訂正済み（2.2） | 2.2 |
 | grammar/variables.md:82 | `＄sum＝＠add（x：10　y：20）`「名前付き引数で呼び出し」 | 訂正対象 | 2.3 |
 | grammar/index.md:19 | 関数引数で算術式を記述できる | 正 | — |
 | ga/references/action-line.md:33 | `＠func（x：10）`「名前付き引数で呼び出し」 | 生成で置換（4.1） | 4.1 |
@@ -843,7 +844,7 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 
 | 位置 | 記述（要旨） | 判定 | 訂正先 |
 | ---- | ------------ | ---- | ------ |
-| grammar/literals.md:63 | 節「文字列エスケープ」: `\n` `\\` `\"`（L65〜L71） | 訂正対象 | 2.2 |
+| grammar/literals.md:63 | 節「文字列エスケープ」: `\n` `\\` `\"`（L65〜L71） | 訂正対象・訂正済み（2.2） | 2.2 |
 | grammar/literals.md:45 | 引用符あり: `「...」` または `"..."`、空白も保持 | 正 | — |
 | grammar/sakura-script.md:13 | さくらスクリプトのエスケープ文字は半角 `\` のみ | 正 | — |
 | grammar/action-line.md:50 | ＠エスケープ `＠＠` | 正 | — |
@@ -870,8 +871,8 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 
 | 位置 | 記述（要旨） | 判定 | 訂正先 |
 | ---- | ------------ | ---- | ------ |
-| grammar/literals.md:46 | 引用符なし: 空白は区切り文字で文字列に含まれない | 訂正対象 | 2.2 |
-| grammar/literals.md:56 | 空白を含む文字列は必ず引用符、`hello world` は 2 つの値（L58〜L61） | 訂正対象 | 2.2 |
+| grammar/literals.md:46 | 引用符なし: 空白は区切り文字で文字列に含まれない | 訂正対象・訂正済み（2.2） | 2.2 |
+| grammar/literals.md:56 | 空白を含む文字列は必ず引用符、`hello world` は 2 つの値（L58〜L61） | 訂正対象・訂正済み（2.2） | 2.2 |
 | grammar/words.md:15 | 値は読点・全角コンマ・半角カンマで区切る | 正 | — |
 | ga/SKILL.md:119 | 区切りは `、` `，` `,` のいずれか | 正 | — |
 | ga/SKILL.md:129 | 例 `＠女性、水の妖精：水無灯里、アリス・キャロル　＃ 2キー…`（U06 により `＃` 以降が値に入る） | 訂正対象 | 4.2 |
@@ -1122,12 +1123,12 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 | 位置 | 記述（要旨） | 判定 | 訂正先 |
 | ---- | ------------ | ---- | ------ |
 | grammar/markers.md:42 | コロンの用途例 `＄var_name：value # 変数代入` | 訂正対象・訂正済み（2.1） | 2.1 |
-| grammar/call-jump.md:44 | `＄target：挨拶朝` | 訂正対象 | 2.2 |
-| grammar/call-jump.md:81 | `＄スコア：75` | 訂正対象 | 2.2 |
-| grammar/literals.md:37 | `＄is_active：true`・`＄done：false`（L38） | 訂正対象 | 2.2 |
-| grammar/literals.md:50 | `＄greeting：「こんにちは」`（L53 の `＄message："…"` を含む） | 訂正対象 | 2.2 |
-| grammar/literals.md:78 | `＄count：10` ほか（L79〜L81） | 訂正対象 | 2.2 |
-| grammar/action-line.md:63 | 変数の宣言・代入（`＄var：value`）は変数代入行で行う | 訂正対象 | 2.2 |
+| grammar/call-jump.md:44 | `＄target：挨拶朝` | 訂正対象・訂正済み（2.2） | 2.2 |
+| grammar/call-jump.md:81 | `＄スコア：75` | 訂正対象・訂正済み（2.2） | 2.2 |
+| grammar/literals.md:37 | `＄is_active：true`・`＄done：false`（L38） | 訂正対象・訂正済み（2.2） | 2.2 |
+| grammar/literals.md:50 | `＄greeting：「こんにちは」`（L53 の `＄message："…"` を含む） | 訂正対象・訂正済み（2.2） | 2.2 |
+| grammar/literals.md:78 | `＄count：10` ほか（L79〜L81） | 訂正対象・訂正済み（2.2） | 2.2 |
+| grammar/action-line.md:63 | 変数の宣言・代入（`＄var：value`）は変数代入行で行う | 訂正対象・訂正済み（2.2） | 2.2 |
 | grammar/variables.md:19 | 代入の区切りはコロンでも `＝` でも記述できる（L23〜L25 の例を含む） | 訂正対象 | 2.3 |
 | grammar/variables.md:62 | 例 `＄ユーザー：太郎` | 訂正対象 | 2.3 |
 | ga/SKILL.md:142 | 代入: `＄変数名＝値` または `＄変数名：値` | 訂正対象 | 4.2 |
@@ -1157,7 +1158,7 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 | ---- | ------------ | ---- | ------ |
 | grammar/markers.md:39 | 比較・フィルター条件には `＝` `＞` `＜` などの比較演算子を用いる | 訂正対象・訂正済み（2.1） | 2.1 |
 | grammar/markers.md:85 | 節「比較演算子」の表（L87〜L96） | 訂正対象・訂正済み（2.1） | 2.1 |
-| grammar/call-jump.md:117 | フィルターは比較演算子を使う（L119 を含む） | 訂正対象 | 2.2（節削除） |
+| grammar/call-jump.md:117 | フィルターは比較演算子を使う（L119 を含む） | 訂正対象・訂正済み（2.2） | 2.2（節削除） |
 | lua/basics.md:103 | Lua の等値比較は `==`、非等値は `~=` | 正 | — |
 
 （`ga/references/authoring-patterns.md:148`・`lc/references/*` の `==` は Lua コード内で対象外。）
@@ -1183,10 +1184,10 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 
 | 位置 | 記述（要旨） | 判定 | 訂正先 |
 | ---- | ------------ | ---- | ------ |
-| grammar/call-jump.md:32 | 動的ターゲット `＞＄変数名`（変数のみと読める） | 追記対象 | 2.2 |
-| grammar/call-jump.md:99 | `＞＠分岐判定`（関数内で `act:call` 済み、戻り値 nil → `"nil"` で再検索し警告） | 訂正対象 | 2.2 |
+| grammar/call-jump.md:32 | 動的ターゲット `＞＄変数名`（変数のみと読める） | 追記対象・訂正済み（2.2） | 2.2 |
+| grammar/call-jump.md:99 | `＞＠分岐判定`（関数内で `act:call` 済み、戻り値 nil → `"nil"` で再検索し警告） | 訂正対象・訂正済み（2.2） | 2.2 |
 | ga/references/call-spec.md:86 | 式評価結果を `tostring()` でシーン名に変換 | 生成で置換（4.1） | 4.1 |
-| ga/references/call-spec.md:112 | 節「nil ガード」: 式評価結果が nil なら即時リターン（L114） | 生成で置換（4.1） | 2.2（移設時）・4.1 |
+| ga/references/call-spec.md:112 | 節「nil ガード」: 式評価結果が nil なら即時リターン（L114） | 生成で置換（4.1）・移設時訂正済み（2.2） | 2.2（移設時）・4.1 |
 | lc/references/internal-modules.md:355 | `act:call` の nil ガード（Lua からの直接呼び出しとして正しい） | 正 | — |
 
 ### X07 真偽値リテラル
@@ -1197,9 +1198,9 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 
 | 位置 | 記述（要旨） | 判定 | 訂正先 |
 | ---- | ------------ | ---- | ------ |
-| grammar/literals.md:15 | 型変換ルール 1「`true` / `false` → bool」（L24〜L25） | 訂正対象 | 2.2 |
-| grammar/literals.md:32 | 節「真偽値（bool）」（L34〜L38） | 訂正対象 | 2.2 |
-| grammar/literals.md:3 | 導入「真偽なのか」 | 訂正対象 | 2.2 |
+| grammar/literals.md:15 | 型変換ルール 1「`true` / `false` → bool」（L24〜L25） | 訂正対象・訂正済み（2.2） | 2.2 |
+| grammar/literals.md:32 | 節「真偽値（bool）」（L34〜L38） | 訂正対象・訂正済み（2.2） | 2.2 |
+| grammar/literals.md:3 | 導入「真偽なのか」 | 訂正対象・訂正済み（2.2） | 2.2 |
 | grammar/variables.md:25 | 例 `＄is_active：true` | 訂正対象 | 2.3 |
 | grammar/index.md:69 | 章一覧「型変換ルール・文字列・数値・真偽値」 | 訂正対象・訂正済み（2.1） | 2.1 |
 | grammar/block-structure.md:99 | Lua ブロック内の `save.talked = true`（Lua の真偽値） | 正 | — |
@@ -1296,7 +1297,7 @@ design.md「既知の食い違い（実装が正）」表の各行（D01〜D18�
 
 | 位置 | 記述（要旨） | 判定 | 訂正先 |
 | ---- | ------------ | ---- | ------ |
-| grammar/literals.md:86 | 引用符を含めたい場合は二重の括弧、`「「セリフ」」 # 実行時に「セリフ」として展開`（L89） | 訂正対象 | 2.2 |
+| grammar/literals.md:86 | 引用符を含めたい場合は二重の括弧、`「「セリフ」」 # 実行時に「セリフ」として展開`（L89） | 訂正対象・訂正済み（2.2） | 2.2 |
 | grammar/words.md:139 | 単語値に引用符を含めるには二重の括弧（L142・L145「内側の `「」` がリテラルの引用符として保持」） | 訂正対象 | 2.3 |
 
 ### X15 `％` 行と立ち位置の持続

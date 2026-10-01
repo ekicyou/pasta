@@ -41,7 +41,7 @@
   - _Boundary: ContentMigration（grammar/index・markers・block-structure）_
   - _Depends: 1.4_
 
-- [ ] 2.2 (P) 文法章（call-jump・literals・action-line）を拡充・訂正する
+- [x] 2.2 (P) 文法章（call-jump・literals・action-line）を拡充・訂正する
   - call-jump に「特殊な呼び出し」節（チェイントーク・yield・ゴースト終了・任意式の呼び出しと nil ガード）を新設し、Call 検索 5 段・ローカル優先の候補選択・引数の区切りと位置引数を実装どおりに書く
   - call-jump の「フィルター」節を削除する（内容は brief へ回る）
   - literals に文字列の囲み多重化（エスケープ規則なし・空文字列可）と値の型解釈を、action-line に `：` 始まりの行継続と継続内空行の現行挙動を書く
@@ -285,9 +285,10 @@
 ## Implementation Notes
 - 1.1: 台帳は design の食い違い表に無い実装差も備考に記録した（アクタースコープの `lua` コードブロックは実際に生成・A1 で到達する＝design #14 の「処理に反映されない」と食い違う、bool リテラルなし、`\]` 非対応、動的 Call は `tostring(expr)`、REG ハンドラの戻り値 `RES.ok` 二重包み疑い、`default_surface` 未参照など）。1.3・1.4・2.x は台帳の備考を実装照合の起点にすること。
 - 1.1: authoring-patterns.md L144 の閉じフェンスが ```` ```lua ```` になっており、以降のフェンスが CommonMark 上ずれている（§6.5 見出しがコード扱い）。4.3 で手書きファイルを直す際に修正する。
-- 1.2: 付録のバグ候補は 8 件（U06,U08,U12,U18,U19,U20,U21,U22）。バグ候補はマニュアルに書かない（10.5）。2.x は付録の「収録先」行（U11 の算術・数値変換、U19 備考のアクター名規則、U07 `＄＄` など）を収録し、U08 により本体 L148 の `\` 収録は取り消し。大タスク 6 で roadmap にバグ候補のキー行を置く（1.4 で 13 件に更新: U06,U08,U12,U18〜U27）。
+- 1.2: 付録のバグ候補は 8 件（U06,U08,U12,U18,U19,U20,U21,U22）。バグ候補はマニュアルに書かない（10.5）。2.x は付録の「収録先」行（U11 の算術・数値変換、U19 備考のアクター名規則、U07 `＄＄` など）を収録し、U08 により本体 L148 の `\` 収録は取り消し。大タスク 6 で roadmap にバグ候補のキー行を置く（2.2 後に 14 件: U06,U08,U12,U18〜U28）。
 - main 取り込み（91a00e11・actor-surface-restore #45）: `book/src/grammar/actor-dictionary.md` に節「同一スポット共有時の外見の復旧」が追加（first-ghost.md からこの見出しへアンカーリンクあり・見出し維持必須）。スキル pasta-toml.md の `default_surface` は `surface`/`dressup` に置換済み、internal-modules に `STORE.appearance` 追加。台帳 1.1 の `default_surface` 行はこの変更後の内容で照合し直すこと（1.3）。
 - 1.3: 食い違い grep 記録（D01〜D18・X01〜X22）が 2.x／4.x の訂正対象リスト。各訂正タスクは自分の訂正先に割り当てられたヒットをすべて直し、台帳の該当行に「訂正済み」を記す。実装照合で判明: pasta.toml `[lua] libs` はロード時に読まれない（`RuntimeConfig::new()` のみ）、BOM 付き .pasta はパースエラー、`OnNotifyCallbackResponse` は無く `OnPastaCallBack{N}` を `CALLBACK.try_route` が REG より先に処理、OnChoiceSelectEx はローカルシーンのみ探索（グローバルへフォールバックしない）。
 - 1.3→1.4: 新規バグ候補の可能性（X19 REG 戻り値の RES.ok 二重包み・D07 改行入り `"` 文字列でロード失敗・D07 単語値 `""`/`「」` が空にならない・X18 `[lua]` 未使用・D03 OnChoiceSelectEx のローカル限定）の付録追記（U23 以降）は 1.4 が担当して確定する。
 - 1.4: design #14 の前提は実装照合で訂正済み。アクタースコープのコードブロックは情報文字列が小文字 `lua` ちょうどのときだけ出力され、ACTOR 関数は act ではなくアクタープロキシを引数に呼ばれ、`＠名前` のアクター単語参照からのみ到達する（`＠名前（）`・`＄x＝＠名前` では到達しない）。2.3 はこの現行挙動を書く。属性は記録されるが検索では使われない（search context の filters は常に空）。仕分け表の B1・B2（brief）と R1〜R6（roadmap キー行）とキー行文面は大タスク 6 が使う。
 - 2.1: 章内の ```pasta 例は実パーサで通ること（スクラッチの `pchk` で `pasta_dsl::parse_str` を通して確認した）。行末 `#` 注記はアクション行・引用なし単語値では台詞／値になるため例に付けない。図示用断片は ```text にする。block-structure#選択肢行から SHIORI イベント章へのリンクは未設置（2.9 で lua/shiori-events.md 作成後に張る）。grammar/call-jump.md L77〜L99 の例はパース不能（コンテンツ行の後に Lua ブロック、その後に `＞`）→ 2.2 で直す。
+- 2.2: 実装照合で判明: 別グローバルシーンへの Call から戻ると `act.current_scene` が復元されない（U28 として付録に追加・バグ候補）。マニュアルは「実行中のグローバルシーン」の通常挙動だけを書く。OnBoot で始めたチェイントークの残りは次の OnTalk で出力される（台帳本体 ga call-spec L68 の「後半が出ない」は誤り）。ローカル単語参照（2.3）も U28 の影響を受けうるが、マニュアルには通常挙動だけを書く。
