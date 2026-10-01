@@ -244,5 +244,3 @@ end
 これで Pasta DSL の文法リファレンスは完結ですわ。よくぞここまでついてきましたわね。
 ……フンッ、別に褒めているわけではありませんわよ。でも、もうあなたは立派なゴースト作者ですの。
 さあ、辞書を書きに参りましょう。困ったらいつでもこの章に戻ってくればよろしくてよ。熱く！
-
-> **権威的仕様**: アクター辞書の厳密な定義は [doc/spec/11-actor-dictionary.md](https://github.com/ekicyou/pasta/blob/main/doc/spec/11-actor-dictionary.md) を参照。単語参照の基本は [doc/spec/10-words.md](https://github.com/ekicyou/pasta/blob/main/doc/spec/10-words.md) も参照。

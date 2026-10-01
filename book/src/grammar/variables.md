@@ -288,5 +288,3 @@ in local nil not or repeat return then true until while
 
 スコープを使い分ければ、ゴーストは過去を覚え、世界と繋がりますわ。
 次は会話に多様性を生む「単語定義」へ。ランダムの魔法をご覧に入れましょう！
-
-> **権威的仕様**: 変数・スコープの厳密な定義は [doc/spec/09-variables.md](https://github.com/ekicyou/pasta/blob/main/doc/spec/09-variables.md) を参照。式の構文は [doc/spec/01-grammar-model.md](https://github.com/ekicyou/pasta/blob/main/doc/spec/01-grammar-model.md) も参照。

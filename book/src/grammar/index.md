@@ -7,7 +7,7 @@
 
 ---
 
-このセクションは、Pasta DSL の**実装済み文法を網羅する参照型ドキュメント**である。手を動かして覚える入門は「入門ガイド」に譲り、ここでは各文法要素を要素ごとに整理し、試せる具体例と権威的仕様への導線を示す。
+このセクションは、Pasta DSL の**実装済み文法を網羅する参照型ドキュメント**である。手を動かして覚える入門は「入門ガイド」に譲り、ここでは各文法要素を要素ごとに整理し、試せる具体例とともに示す。
 
 ## Pasta DSL の文法モデル
 
@@ -69,19 +69,19 @@ Pasta DSL は、里々／さとりにインスパイアされた対話スクリ�
 
 ## このセクションの読み方
 
-各章は「軽い導入 → 普通文体の本体（試せる例つき）→ ひとことの締め」のリズムで構成され、章末には対応する `doc/spec/` の権威的仕様へのリンクを置いている。仕様の厳密な定義が必要になったら、章末リンクをたどること。
+各章は「軽い導入 → 普通文体の本体（試せる例つき）→ ひとことの締め」のリズムで構成される。本体が各文法要素の規範的な定義である。
 
-| 章 | 扱う内容 | 権威的仕様 |
-| -- | -------- | ---------- |
-| [キーワード・マーカー](markers.md) | 全マーカーと演算子・区切り文字の一覧 | [doc/spec/02-markers.md](https://github.com/ekicyou/pasta/blob/main/doc/spec/02-markers.md) |
-| [行とブロック構造](block-structure.md) | 行種別・グローバル／ローカルブロック・インデント | [doc/spec/03-block-structure.md](https://github.com/ekicyou/pasta/blob/main/doc/spec/03-block-structure.md) |
-| [Call / Jump](call-jump.md) | シーン呼び出し・前方一致・スコープ解決 | [doc/spec/04-call-spec.md](https://github.com/ekicyou/pasta/blob/main/doc/spec/04-call-spec.md) |
-| [リテラル型](literals.md) | 文字列・数値・値の型の扱い | [doc/spec/05-literals.md](https://github.com/ekicyou/pasta/blob/main/doc/spec/05-literals.md) |
-| [アクション行](action-line.md) | 発言行・インライン要素・行継続・改行 | [doc/spec/06-action-line.md](https://github.com/ekicyou/pasta/blob/main/doc/spec/06-action-line.md) |
-| [さくらスクリプト](sakura-script.md) | `\` で始まるコマンドの字句構造と透過処理 | [doc/spec/07-sakura-script.md](https://github.com/ekicyou/pasta/blob/main/doc/spec/07-sakura-script.md) |
-| [変数・スコープ](variables.md) | ローカル／グローバル／プロパティ変数 | [doc/spec/09-variables.md](https://github.com/ekicyou/pasta/blob/main/doc/spec/09-variables.md) |
-| [単語定義](words.md) | 単語の定義・参照・前方一致・複数キー | [doc/spec/10-words.md](https://github.com/ekicyou/pasta/blob/main/doc/spec/10-words.md) |
-| [アクター辞書](actor-dictionary.md) | `％` によるアクター単位の単語辞書 | [doc/spec/11-actor-dictionary.md](https://github.com/ekicyou/pasta/blob/main/doc/spec/11-actor-dictionary.md) |
+| 章 | 扱う内容 |
+| -- | -------- |
+| [キーワード・マーカー](markers.md) | 全マーカーと演算子・区切り文字の一覧 |
+| [行とブロック構造](block-structure.md) | 行種別・グローバル／ローカルブロック・インデント |
+| [Call / Jump](call-jump.md) | シーン呼び出し・前方一致・スコープ解決 |
+| [リテラル型](literals.md) | 文字列・数値・値の型の扱い |
+| [アクション行](action-line.md) | 発言行・インライン要素・行継続・改行 |
+| [さくらスクリプト](sakura-script.md) | `\` で始まるコマンドの字句構造と透過処理 |
+| [変数・スコープ](variables.md) | ローカル／グローバル／プロパティ変数 |
+| [単語定義](words.md) | 単語の定義・参照・前方一致・複数キー |
+| [アクター辞書](actor-dictionary.md) | `％` によるアクター単位の単語辞書 |
 
 ## 網羅範囲についての注記
 
@@ -94,5 +94,3 @@ Pasta DSL は、里々／さとりにインスパイアされた対話スクリ�
 
 さあ、準備はよろしくて？ お目当ての章へお進みなさいまし。
 迷ったらこの概要に戻ってくればよろしくてよ。熱く参りましょう！
-
-> **権威的仕様**: 文法モデル全体の厳密な定義は [doc/spec/01-grammar-model.md](https://github.com/ekicyou/pasta/blob/main/doc/spec/01-grammar-model.md) を参照。各文法要素の権威は、章別に分割された [doc/spec/](https://github.com/ekicyou/pasta/tree/main/doc/spec) 各章が担う。

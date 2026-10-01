@@ -114,5 +114,3 @@ end
 
 解釈を areka 層に任せる潔さ、お分かりいただけまして？
 表情も間も思いのまま。次は会話を動かす「変数・スコープ」へ参りますわよ！
-
-> **権威的仕様**: さくらスクリプトの字句構造の厳密な定義は [doc/spec/07-sakura-script.md](https://github.com/ekicyou/pasta/blob/main/doc/spec/07-sakura-script.md) を参照。アクション行内での位置づけは [doc/spec/06-action-line.md](https://github.com/ekicyou/pasta/blob/main/doc/spec/06-action-line.md) も参照。

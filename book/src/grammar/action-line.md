@@ -145,5 +145,3 @@
 
 これでキャラクターが生き生きと喋り出しますわ。
 変数や単語を混ぜれば、表現は無限に広がりますのよ。次は表情を操る「さくらスクリプト」へ。
-
-> **権威的仕様**: アクション行の厳密な定義は [doc/spec/06-action-line.md](https://github.com/ekicyou/pasta/blob/main/doc/spec/06-action-line.md) を参照。インライン要素の各論は [変数・スコープ](variables.md)・[単語定義](words.md)・[さくらスクリプト](sakura-script.md) も参照。

@@ -2,14 +2,18 @@
 //
 // 目的（requirements.md R4–R9 / design「Testing Strategy / コンテンツ整合・編集レビュー」）:
 //   本書 book/src/** の本文が、要件 4/5/6/7/8/9 のコンテンツ受入基準を満たすことを、
-//   実ファイル走査により機械的にアサートする。各検証は「実物の book/src・book/manual-sources.toml
-//   ・book/tools を読む」ことで成立し、固定文字列の自己満足チェックではない。
+//   実ファイル走査により機械的にアサートする。各検証は「実物の book/src・book/tools を読む」ことで
+//   成立し、固定文字列の自己満足チェックではない。
+//   manual-ssot-authority（タスク 3.5）でマニュアルが唯一の権威になったため、doc/spec 権威リンク必須・
+//   manual-sources 整合の検査を外し、doc/spec・GRAMMAR.md を案内しないこと（A-nospec）と
+//   スキル生成対象章の目次到達（A-summary）を検査する。対応表と口調判定は gen-skill-refs.mjs から import する。
 //
 // 検証範囲（7.4 = コンテンツの網羅・整合・ボイスに集中。検索 7.2 / 静的 7.1 / ドリフト 7.3 とは重複しない）:
-//   A. 文法網羅（R4.1, R4.5）   — grammar 全実装章の存在・本文・doc/spec 権威リンク・manual-sources 整合
+//   A. 文法網羅・権威（R4.1 / ssot 1.5, 4.2, 9.7） — grammar 全実装章の存在・本文、
+//      book/src に doc/spec・GRAMMAR.md の記述なし（A-nospec）、生成対象章が SUMMARY から到達可能（A-summary）
 //   B. Lua 網羅（R5.1, R5.5）   — 公開モジュール名の登場・LuaJIT 2.1 明示
 //   C. チュートリアル（R6.1, R6.2） — 前提環境/手順/UTF-8 注意・tutorial-check 逐語一致
-//   D. ボイス（R7.1, R7.2, R7.4） — 導入/締めのキャラ口調・コードフェンス内に口調なし
+//   D. ボイス（R7.1, R7.2, R7.4 / ssot 1.7） — 導入/締めのキャラ口調（判定は findVoice）・コードフェンス内に口調なし
 //   E. 外部参照（R8.2, R8.3）   — milkpot(lua51/lua52)＋luajit.org 絶対 URL・lua55 不採用明記
 //   F. バージョン（R9.1, R9.3, R9.4） — introduction に対象系列・LuaJIT 2.1・将来変更注記
 //
@@ -19,6 +23,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runTutorialCheck } from './tutorial-check.mjs';
+import { GENERATION_MAP, findVoice } from './gen-skill-refs.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = path.resolve(here, '../..');
@@ -52,15 +57,10 @@ function stripCodeFences(markdown) {
   return markdown.replace(/```[^\n]*\n[\s\S]*?```/g, '');
 }
 
-// キャラ口調マーカー（Claudia 令嬢ボイス）。AUTHORING.md の定義に基づく。
-// 散文部（導入/締め）の存在判定に使う「広い」集合。お嬢様口調の語尾を含む。
-const VOICE_MARKERS = [
-  'ですわ', 'ますわ', 'ませんわ', 'ますの', 'ですの', 'おほほ', 'フンッ',
-  'わたくし', 'ごきげんよう', 'なさいまし', 'くださいまし', 'まし。', 'まし、',
-  '参りましょう', 'まいりましょう', 'よろしくて', 'ですこと', 'くてよ',
-];
+// キャラ口調（Claudia 令嬢ボイス）の存在判定。マーカー集合（VOICE_MARKERS）と判定は
+// gen-skill-refs.mjs の findVoice に一本化する（生成器の voice-in-body と同じ規則）。
 function hasVoice(text) {
-  return VOICE_MARKERS.some((mk) => text.includes(mk));
+  return findVoice(text).length > 0;
 }
 
 // コードフェンス内の混入検査に使う「狭い」集合（R7.4）。
@@ -98,13 +98,12 @@ function assert(id, cond, passMsg, failMsg) {
 }
 
 // ============================================================
-// A. 文法網羅（R4.1 全実装章の網羅 / R4.5 各章末に doc/spec 権威リンク）
+// A. 文法網羅（R4.1 全実装章の網羅）・権威（ssot 1.5, 9.7 doc/spec を案内しない / 4.2 目次到達）
 // ============================================================
 const GRAMMAR_CHAPTERS = [
   'index', 'markers', 'block-structure', 'call-jump', 'literals',
   'action-line', 'sakura-script', 'variables', 'words', 'actor-dictionary',
 ];
-const GH_BLOB = /https:\/\/github\.com\/ekicyou\/pasta\/(blob|tree)\/main\/doc\/spec/;
 
 for (const ch of GRAMMAR_CHAPTERS) {
   const rel = `${SRC}/grammar/${ch}.md`;
@@ -119,40 +118,48 @@ for (const ch of GRAMMAR_CHAPTERS) {
     `文法章 ${ch}.md が本文を持つ`,
     `文法章 ${ch}.md が本文不足/プレースホルダ`,
   );
+}
+
+// book/src 配下の全 .md（再帰）。
+function listMarkdown(relDir) {
+  const out = [];
+  for (const ent of fs.readdirSync(abs(relDir), { withFileTypes: true })) {
+    const rel = `${relDir}/${ent.name}`;
+    if (ent.isDirectory()) out.push(...listMarkdown(rel));
+    else if (ent.isFile() && ent.name.endsWith('.md')) out.push(rel);
+  }
+  return out;
+}
+
+// A-nospec: マニュアルが廃止済みの doc/spec・GRAMMAR.md を（権威としても参照先としても）案内しない。
+{
+  const FORBIDDEN = ['doc/spec', 'GRAMMAR.md'];
+  const hits = [];
+  for (const rel of listMarkdown(SRC)) {
+    read(rel).split(/\r?\n/).forEach((line, i) => {
+      for (const tok of FORBIDDEN) if (line.includes(tok)) hits.push(`${rel}:${i + 1} (${tok})`);
+    });
+  }
   assert(
-    `A-link:${ch}`,
-    GH_BLOB.test(md),
-    `文法章 ${ch}.md に doc/spec 権威リンク（GitHub 絶対 URL）がある`,
-    `文法章 ${ch}.md に doc/spec 権威リンクが無い（GitHub 絶対 URL 必須）`,
+    'A-nospec',
+    hits.length === 0,
+    `book/src に doc/spec・GRAMMAR.md の記述が無い`,
+    `book/src に doc/spec・GRAMMAR.md の記述が残っている: ${hits.join(', ')}`,
   );
 }
 
-// manual-sources.toml の chapter エントリと grammar 章の整合（R4.1 / R10.1 連携）。
+// A-summary: スキル生成対象の全章が目次（SUMMARY.md）からリンクされている。
 {
-  const tomlRel = 'book/manual-sources.toml';
-  if (!exists(tomlRel)) {
-    fail('A-toml', `manual-sources.toml が存在しない`);
-  } else {
-    const toml = read(tomlRel);
-    const mapped = [...toml.matchAll(/chapter\s*=\s*"book\/src\/grammar\/([a-z-]+)\.md"/g)]
-      .map((m) => m[1]);
-    // index 以外の全文法章が manual-sources に登録されていること（index は概要章）。
-    const required = GRAMMAR_CHAPTERS.filter((c) => c !== 'index');
-    const missing = required.filter((c) => !mapped.includes(c));
+  const summary = read(`${SRC}/SUMMARY.md`);
+  const linked = new Set(
+    [...summary.matchAll(/\]\(([^)\s#]+\.md)(?:#[^)]*)?\)/g)].map((m) => m[1].replace(/^\.\//, '')),
+  );
+  for (const { chapter } of GENERATION_MAP) {
     assert(
-      'A-toml',
-      missing.length === 0,
-      `manual-sources.toml が全文法章を doc/spec に対応付けている (${mapped.length} 章)`,
-      `manual-sources.toml に未登録の文法章: ${missing.join(', ')}`,
-    );
-    // 登録された source ファイルが実在すること（整合）。
-    const sources = [...toml.matchAll(/source\s*=\s*"(doc\/spec\/[^"]+)"/g)].map((m) => m[1]);
-    const deadSources = sources.filter((s) => !exists(s));
-    assert(
-      'A-toml-src',
-      deadSources.length === 0,
-      `manual-sources.toml の全 source が実在する (${sources.length} 件)`,
-      `manual-sources.toml の source が実在しない: ${deadSources.join(', ')}`,
+      `A-summary:${chapter}`,
+      linked.has(chapter),
+      `生成対象章 ${chapter} が SUMMARY.md からリンクされている`,
+      `生成対象章 ${chapter} が SUMMARY.md からリンクされていない`,
     );
   }
 }
@@ -346,8 +353,7 @@ const LUA_MODULES = [
 // ============================================================
 // G. デバッグ章（R7.1 導入/締めボイス / R7.3 コード内に口調なし / R8.4 存在・本文・ボイス検査可能）
 // ============================================================
-// デバッグ章は doc/spec 由来を持たないため A の権威リンク検査は対象外。
-// 既存の isSubstantive / hasVoice / stripCodeFences / extractCodeFences / NARRATION_MARKERS を再利用し、
+// isSubstantive / hasVoice / stripCodeFences / extractCodeFences / NARRATION_MARKERS を再利用し、
 // 文法章ループ（GRAMMAR_CHAPTERS）と同型のイディオムでアサートする。
 const DEBUG_CHAPTERS = ['index', 'vscode-setup', 'source-level', 'constraints', 'troubleshooting'];
 

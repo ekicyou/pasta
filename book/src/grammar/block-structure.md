@@ -314,5 +314,3 @@ Lua ブロックの内容は検証されず、そのまま生成される Lua �
 
 構造が見えてくると、辞書ファイルがぐっと書きやすくなりますでしょう？
 次は、シーンとシーンをつなぐ「Call / Jump」を覚えていきましょう。熱く参りますわよ！
-
-> **権威的仕様**: 行・ブロック構造の厳密な定義は [doc/spec/03-block-structure.md](https://github.com/ekicyou/pasta/blob/main/doc/spec/03-block-structure.md) を参照。

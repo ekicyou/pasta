@@ -230,5 +230,3 @@
 
 ランダムの妙、堪能していただけまして？ 単語ひとつで会話が生き物になりますのよ。
 最後はキャラごとに表情を束ねる「アクター辞書」へ。仕上げと参りましょう！
-
-> **権威的仕様**: 単語定義の厳密な定義は [doc/spec/10-words.md](https://github.com/ekicyou/pasta/blob/main/doc/spec/10-words.md) を参照。スコープ解決の共通仕様は [doc/spec/04-call-spec.md](https://github.com/ekicyou/pasta/blob/main/doc/spec/04-call-spec.md) も参照。

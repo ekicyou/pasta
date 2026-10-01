@@ -157,7 +157,7 @@
   - 完了状態: 生成器の自己テストが全件緑で、書き出しモード直後の照合モードが exit 0 になることをサンドボックスで確認済み。実リポジトリの全 21 章に対し書き出さずに全生成を実行して生成エラーが出ない（P2 の章に残った口調・不正リンク・構造違反をここで検出し直す）
   - _Requirements: 5.3, 5.4, 5.5, 5.6, 5.7, 7.1, 7.2, 7.3, 7.4, 7.7_
 
-- [ ] 3.5 コンテンツ検証から旧権威前提を除き、新検査を加える
+- [x] 3.5 コンテンツ検証から旧権威前提を除き、新検査を加える
   - doc/spec 権威リンク必須の検査・マニフェスト整合検査・ローカルの口調マーカー定義を削除し、対応表と口調判定を生成器から import する
   - book 全章に `doc/spec`・`GRAMMAR.md` の文字列が無いこと、対応表の全章が目次からリンクされていることの検査を追加し、ヘッダコメントの検証範囲説明を更新する
   - 同時に、文法章末の「権威的仕様」引用、grammar/index の doc/spec 案内、導入章の権威記述、外部リンク集の doc/spec リンク群を削除する
@@ -305,3 +305,4 @@
 - 3.2: link-check のスキル検査は P4 まで実リポジトリで赤（skill-escape 1: lua SKILL.md → ../../../book/src/reference/startup.md、skill-forbidden-ref 11: 文法 7 ファイルの doc/spec source コメント・call-spec/pasta-toml L29/testing-lint L247 の crates/・lua SKILL.md L40 の book/src）。生成対象 21 章の見出し slug は mdBook id と全一致。headingSlug は生テキスト基準のため強調 `_x_`・全角空白入りの見出しは避ける。
 - 3.3: gen-skill-refs.mjs は設計外の export `readChapter`（missing-chapter を出す）と `GenError` クラス（kind・chapter・detail/hits/target）を持つ。3.4 の renderEntry は readChapter→extractBody を使う。
 - 3.4: gen-skill-refs.mjs は設計外の export `writeAll`・`GENERATED_MARK`・`FIX_COMMAND` を持ち、未知の CLI 引数は exit 2。CLI 判定は既存規約（basename 比較・CI の 8.3 短縮名対策）。link-check の禁止トークン `crates/` は絶対 URL 内も一致するため、生成対象章に crates.io の URL を書かない（mlua-stdlib.md の crates.io リンクを docs.rs に置換済み）。生成物 grammar-index.md の doc/spec は 3.5 で章から消える。
+- 3.5: verify-content は gen-skill-refs から `GENERATION_MAP` と `findVoice` を import（VOICE_MARKERS は findVoice 経由）。book/manual-sources.toml はもう読まれない（3.6 で削除）。

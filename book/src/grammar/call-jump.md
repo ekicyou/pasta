@@ -219,5 +219,3 @@ Call は、明示した引数の後ろに、呼び出し元のシーンが受け
 
 これで会話に「流れ」と「分岐」が生まれますわ。
 シーンを呼び合うだけで物語が動く――なかなか痛快でしょう？ 次は値の正体「リテラル型」へ。
-
-> **権威的仕様**: Call の厳密な定義は [doc/spec/04-call-spec.md](https://github.com/ekicyou/pasta/blob/main/doc/spec/04-call-spec.md) を参照。スコープ解決の共通仕様は [doc/spec/10-words.md](https://github.com/ekicyou/pasta/blob/main/doc/spec/10-words.md) も参照。

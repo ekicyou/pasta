@@ -94,5 +94,3 @@ Pasta は書かれた値を、書いた場所に応じて決まった規則で�
 
 型の見分け方が分かれば、値の扱いで悩むことはございませんわ。
 さあ、いよいよキャラクターが喋り出す「アクション行」へ参りましょう！
-
-> **権威的仕様**: リテラル型の厳密な定義は [doc/spec/05-literals.md](https://github.com/ekicyou/pasta/blob/main/doc/spec/05-literals.md) を参照。文字列・数値リテラルの字句構造は [doc/spec/02-markers.md](https://github.com/ekicyou/pasta/blob/main/doc/spec/02-markers.md) も参照。
