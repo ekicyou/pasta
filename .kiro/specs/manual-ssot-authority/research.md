@@ -121,3 +121,102 @@
 - `runtime-api.md` / `shiori-handlers.md` / `pasta-toml.md` と現行実装の食い違いの有無（移設時に誤りを権威化しないため）。
 - `authoring-patterns.md` に含まれる規範的事実（§6.4 時報変数・§6.6 シャッフル消費・§6.7 チェイントーク等）の切り分け。
 - 公開マニュアルの外から `doc/spec/` を指す既存リンク（crates.io の README、VS Code 拡張の説明等）の有無。リポジトリ内 grep では該当なし。
+
+---
+
+## 設計フェーズの調査と決定（2026-10-01）
+
+### Summary
+
+- **Feature**: `manual-ssot-authority`
+- **Discovery Scope**: Extension（既存の mdBook 基盤・`book/tools`・CI への統合）。新規外部依存なし（Light discovery）。
+- **Key Findings**:
+  - 全 17 章（文法 10・Lua 5・リファレンス 2）が「最初と最後の `---` 行」で導入・本文・締めに分かれる。`lua/modules.md` は本文内にも `---` を 7 本持つが、最初／最後の位置規約は全章で成立する。生成器の抽出規則はこれで足りる。
+  - 吸収元（doc/spec・book・スキル・GRAMMAR.md）の記述に、実装と食い違う箇所が約 20 件ある（行継続の `：` 必須、ローカル／グローバル候補の非統合、引数のカンマ区切り、REG ハンドラの引数が `act`、`RES.ok_with` が存在しない、さくらスクリプトのウェイト設定キーと既定値 等）。そのまま権威化・生成すると誤りがスキルへ伝播する。
+  - スキルを読むコードは `config_defaults_test.rs` の 1 箇所のみで、照合規則は「キー名と `` `値` `` が同一行」（節スコープなし、4 キー）。読み先パスを変えるだけで移設できる。
+
+### Research Log
+
+#### 章構造と章間リンク
+- **Sources**: `book/src/**/*.md` の `---` 行位置、相対リンク抽出。
+- **Findings**: 区切り行は文法章で 7（index は 8）行目と末尾 5〜6 行前。文法章は締めの後に `> **権威的仕様**` 引用（doc/spec の GitHub URL）を持つ。パート間の相対リンクは 6 本のみ（`grammar/variables→lua/patterns`、`lua/basics・lua/index→reference/external-links`、`lua/patterns→grammar/variables#…`、`reference/startup→lua/modules`、`reference/startup→debug/troubleshooting`）。対象章に画像・`{{#include}}` は無い。
+- **Implications**: 「同一スキルの生成ファイルへは兄弟リンク、それ以外は公開 URL」という 2 規則で全リンクを処理できる。画像等は出現時にエラーとすればよい。
+
+#### 吸収元と実装の食い違い（文法）
+- **Sources**: `crates/pasta_dsl/src/parser/grammar.pest`、`code_gen/element_gen.rs`・`scope_gen.rs`、`pasta_core/src/registry/scene_table.rs`・`word_table.rs`、`pasta_scripts/pasta/act.lua`。
+- **Findings**: 行継続（pest:237 `continue_action_line` は `：` 必須）、継続内空行は無出力（pest:222,257）、ローカル優先で統合しない（scene_table.rs:318-381、word_table.rs:90-107）、Call 検索 5 段（act.lua:299-350）、Call フィルターは構文なし（pest:161）、引数はカンマ区切り・位置引数可（pest:104-107）、文字列エスケープなし（pest:110-130）、単語値はカンマ区切り（pest:144-146）、属性行はグローバルシーン初期部のみ（pest:153-157 ほか）、Lua フェンスは 3 個以上＋任意識別子（pest:217）、`!select` は `act:choice_timeout` を生成（scope_gen.rs:385-404）、単語値にさくらスクリプト可（pest:145）。どの文書にも無い実装事実（単独 `＊` 行、`％a＝0、b`、`＄０`、末尾 `#` コメント等）もある。
+- **Implications**: 移し替えは「実装照合つき」で行う必要がある。吸収台帳に照合位置の列を設ける。
+
+#### 吸収元と実装の食い違い（Lua・設定）
+- **Sources**: `pasta_scripts/pasta/shiori/event/init.lua`・`register.lua`・`res.lua`・`second_change.lua`・`callback.lua`・`boot.lua`、`crates/pasta_lua/src/sakura_script/mod.rs`・`wait_inserter.rs`、`loader/config/sections.rs`。
+- **Findings**: ハンドラは `handler(act)`（init.lua:183-184）、`RES.ok_with` は無く `RES.ok(value, dic)` 等 9 関数（res.lua:39-138）、シーン関数フォールバックは `SCENE.co_exec` で 200（init.lua:161-199）、OnSecondChange 既定ハンドラが仮想ディスパッチャを駆動（second_change.lua:15-24）、`CALLBACK.resume_pending` は存在しない、ウェイトはアクター表直下の `script_wait_*`・既定 50/1000/500/500/200・挿入値 `値-50`・連続句読点は最大値（sections.rs:232-246、wait_inserter.rs:55-61）。book の `lua/modules.md`・`lua/patterns.md` も同じ誤りを持つ。`pasta-toml.md` の `[talk]` 記述は正しい。`@pasta_search`・`@pasta_persistence`・`@enc`・`@pasta_log`・仮想ディスパッチャの API は一致。
+- **Implications**: 生成対象外の `lua/patterns.md` と `pasta-lua-coding/SKILL.md` 早見表も同時訂正が必要。
+
+#### 既定値整合テスト
+- **Sources**: `crates/pasta_lua/tests/loader/config_defaults_test.rs:213-247`。
+- **Findings**: `repo_root()`（`CARGO_MANIFEST_DIR` の 2 階層上）＋固定相対パス。`talk_interval_min/max`・`hour_margin`・`spot_newlines` の 4 キーを全行走査で照合し、失敗時にキー名と期待値を出す。
+- **Implications**: パス文字列の置換のみで 4.3–4.5 を満たす。マニュアル章側に「キー名と `` `値` `` の同一行」の表形式を規約として課す。
+
+#### CI と完了ゲート
+- **Sources**: `.github/workflows/manual.yml`・`build.yml`、`workflow.md` DoD、`kiro-complete/SKILL.md`、`verify-drift-gate.mjs`。
+- **Findings**: `manual.yml` は `book/**` のみで起動、`deploy` は `needs: build`。`verify-drift-gate.mjs` は `workflow.md` と `kiro-complete/SKILL.md` の文言を検査しているため、ゲート文面の変更と同時に削除が必要。`.agents/skills/` を指す記述（SOUL.md・tech.md・workflow.md・GRAMMAR.md）は実在しないパス。
+- **Implications**: `paths` に 2 スキルを足すだけで 7.5 を満たす。ゲート文面の自己検査は撤去し、機械検証はコマンド（`--check`・link-check）に一本化する。
+
+#### doc/spec ch08・ch12
+- **Findings**: ロードマップにはどの項目も未記載。属性（行は受理、ファイルレベル属性は統合まで実装済みで未利用）とフィルター（構文未受理）は具体的な構文定義があり brief 化できる。`＠＄` は文法定義のみでパーサ未実装・優先度低。§12.9 は `ctx.local/global` 前提で実装（`var`/`save`）に置換済み。§12.2 は `＞チェイントーク` の実装で事実上置換。他の §12.x の多くは現行挙動の事実でありマニュアルへ移せる。
+
+### Architecture Pattern Evaluation
+
+| Option | Description | Strengths | Risks / Limitations | Notes |
+|--------|-------------|-----------|---------------------|-------|
+| 生成物コミット＋`--check` 照合 | 生成ファイルをリポジトリに置き、CI で再生成結果と比較 | スキルをディレクトリコピーだけで持ち出せる。照合と生成が同一関数 | 生成忘れは CI で落ちる（意図どおり） | 採用 |
+| ビルド時生成（コミットしない） | CI・リリース時にのみ生成 | 差分が出ない | 持ち出し時に生成手順が必要、5.3 の自己完結と両立しない | 却下 |
+| 章ごとマーカーコメントで抽出範囲を指定 | `<!-- skill:begin -->` 等 | 位置規約に依存しない | 全章に執筆負担、既存規約と二重 | 却下（`---` 規約で足りる） |
+
+### Design Decisions
+
+#### Decision: 対応表は生成器内の定数、出力名は現行名維持
+- **Context**: research §4.1 の A/B/C。
+- **Alternatives**: A 章と 1:1（章名）／B 現行名維持＋複数章連結／C 混在。
+- **Selected Approach**: 章と 1:1（連結なし）だが出力名は対応表で明示し、現行スキルに対応ファイルがあれば現行名（`grammar-model.md`・`call-spec.md`・`runtime-api.md`・`shiori-handlers.md` 等）、分割で新たに生じるものは章名（`markers.md`・`block-structure.md`・`literals.md`・`startup.md`）。
+- **Rationale**: 連結（B）は見出しレベル調整とアンカー衝突処理が要る。名前規則（A の機械的命名）は `index.md` 等で例外が出る。明示表なら規則は不要で、持ち出し先・`SKILL.md` の変更も最小。
+- **Trade-offs**: 章名とスキル名がずれる箇所が残る（`call-jump`↔`call-spec`）。
+- **Follow-up**: 設計ディスカッション OPEN QUESTION 1。
+
+#### Decision: 抽出は「最初と最後の `---`」、本文の口調は機械検出で禁止
+- **Context**: research §6「落とす範囲の規約」。
+- **Selected Approach**: コードフェンス外の行全体 `---` を区切りとし、最初と最後の間を本文とする。締め以降（旧「権威的仕様」引用含む）は捨てる。本文散文にナレーション語（`わたくし`・`おほほ`・`フンッ`）があれば生成失敗。
+- **Rationale**: 既存全章が満たす規約で、新しい記法を導入しない。コラムの口調混入を規約だけでなく機械で止める。
+- **Trade-offs**: 生成対象章では本文中コラムが書けない（`AUTHORING.md` を改訂）。
+
+#### Decision: 章外リンクは公開マニュアル URL へ書き換え
+- **Selected Approach**: 同一スキルの生成ファイル宛て → 兄弟ファイル名＋アンカー。非生成章・別スキル宛て → `https://ekicyou.github.io/pasta/{章}.html#anchor`。画像等の相対リンクはエラー。
+- **Rationale**: 5.4 の「参照切れを残さない」を満たしつつ、読者が辿れる導線を残す。絶対 URL は持ち出し先でも切れない。
+- **Alternatives**: リンクを外してテキストだけ残す（導線が消える）。
+
+#### Decision: リンク検証は drift-check を縮小改名して存続し、スキル自己完結検査を同居
+- **Context**: research §4.2。
+- **Selected Approach**: B（`link-check.mjs` へ改名、ドリフト・未マップ・TOML パーサを削除）。スキル 2 つの相対リンクの脱出・欠落と、`doc/spec`・`GRAMMAR.md`・`book/src` の語の混入を検出する機能を追加。
+- **Rationale**: 既存のリンク検証とテストをそのまま流用でき、「リンクの健全性」という単一責務にまとまる。C（verify-content へ統合）は 429 行のファイルをさらに肥大させる。
+
+#### Decision: 鮮度チェックは `manual.yml` の `paths` 拡張＋先頭ステップ
+- **Context**: research §4.3。
+- **Selected Approach**: A＋C。`paths` に 2 スキルを追加し、Setup Node 直後に `gen-skill-refs.mjs --check`。完了ゲートも同一コマンド。
+- **Rationale**: ワークフローを増やさず、失敗時は `needs: build` で公開が止まる。`build.yml`（Windows 2 アーキ行列）への Node 追加はコストに見合わない。
+
+#### Decision: 吸収の網羅は台帳で証明
+- **Selected Approach**: `absorption-ledger.md` に吸収元の全見出しを列挙し、収録先 or 除外理由と実装照合位置を記録。全行充足を完了条件とする。
+- **Rationale**: 10.6（黙って破棄しない）と 1.6/3.3（実装に一致）を同時に機械的に近い形で確認できる唯一の手段。research §5 の「見出し・キーワード対照表」案を具体化。
+
+### Synthesis
+
+- **Generalization**: 「文法・Lua API・pasta.toml・起動シーケンス」は同一の問題（章→スキルファイルの写像）であり、1 つの対応表と 1 つの生成関数で扱う。下流 `pasta-runtime-internals-doc` も対応表への行追加だけで再利用できる（インターフェースのみ汎用、実装は 14 行の定数）。
+- **Build vs. Adopt**: mdBook の Markdown 出力プラグイン（mdbook-markdown 等）や remark 系ライブラリは、新規エコシステム依存（5.8 違反）かつ必要機能（区切り抽出・リンク書き換え）が数十行で済むため不採用。リンク抽出は既存 `drift-check.mjs` の実装を再利用する。
+- **Simplification**: 対応表は設定ファイル化しない（消費者は生成器と verify-content のみ）。生成ヘッダの検出は 1 行目の固定文字列のみ。スキル内アンカーの正当性検査は行わない（ファイル実在のみ）。`verify-drift-gate.mjs` 相当のゲート文面自己検査は再実装しない。
+
+### Risks & Mitigations
+
+- 規範内容の欠落 — 吸収台帳の全行充足を完了条件にする。
+- 食い違い訂正による作業量増・「仕様変更」と誤解される — 台帳に実装照合位置を残し、挙動不変であることを示す。
+- 単一 PR の大きさ — 移行フェーズ単位でコミットを分け、PR 説明に台帳を添える。
+- 本文コラム禁止による執筆上の制約 — `voice-in-body` 検出と `AUTHORING.md` の規約化で早期に気づけるようにする。
