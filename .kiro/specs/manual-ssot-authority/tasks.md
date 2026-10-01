@@ -51,7 +51,7 @@
   - _Boundary: ContentMigration（call-jump・literals・action-line）_
   - _Depends: 1.4_
 
-- [ ] 2.3 (P) 文法章（sakura-script・variables・words・actor-dictionary）を拡充・訂正する
+- [x] 2.3 (P) 文法章（sakura-script・variables・words・actor-dictionary）を拡充・訂正する
   - sakura-script に括弧内エスケープと主要タグ早見、variables に Lua 予約語の制約・日時変数・`＄＊` の保存先と DSL→Lua 対応表、words にシャッフル＆順次消費・複数キー・読点／カンマ区切りの単語値・単語値のさくらスクリプト、actor-dictionary に 3 段フォールバック・バルーン連携を収録する
   - words の「動的単語参照」節を削除し、actor-dictionary のアクタースコープ内コードブロックは現行挙動のみの記述へ書き換える
   - 他章からアンカー参照されている variables の見出し（日時変数・リクエスト変数（Reference）・エンジンが値を入れる変数）は維持する
@@ -292,3 +292,4 @@
 - 1.4: design #14 の前提は実装照合で訂正済み。アクタースコープのコードブロックは情報文字列が小文字 `lua` ちょうどのときだけ出力され、ACTOR 関数は act ではなくアクタープロキシを引数に呼ばれ、`＠名前` のアクター単語参照からのみ到達する（`＠名前（）`・`＄x＝＠名前` では到達しない）。2.3 はこの現行挙動を書く。属性は記録されるが検索では使われない（search context の filters は常に空）。仕分け表の B1・B2（brief）と R1〜R6（roadmap キー行）とキー行文面は大タスク 6 が使う。
 - 2.1: 章内の ```pasta 例は実パーサで通ること（スクラッチの `pchk` で `pasta_dsl::parse_str` を通して確認した）。行末 `#` 注記はアクション行・引用なし単語値では台詞／値になるため例に付けない。図示用断片は ```text にする。block-structure#選択肢行から SHIORI イベント章へのリンクは未設置（2.9 で lua/shiori-events.md 作成後に張る）。grammar/call-jump.md L77〜L99 の例はパース不能（コンテンツ行の後に Lua ブロック、その後に `＞`）→ 2.2 で直す。
 - 2.2: 実装照合で判明: 別グローバルシーンへの Call から戻ると `act.current_scene` が復元されない（U28 として付録に追加・バグ候補）。マニュアルは「実行中のグローバルシーン」の通常挙動だけを書く。OnBoot で始めたチェイントークの残りは次の OnTalk で出力される（台帳本体 ga call-spec L68 の「後半が出ない」は誤り）。ローカル単語参照（2.3）も U28 の影響を受けうるが、マニュアルには通常挙動だけを書く。
+- 2.3: grammar/variables.md は永続化の説明で `../lua/modules.md` にリンクしている。2.9（旧 lua/modules.md 削除時）に `../lua/modules/pasta-persistence.md` へ張り替える（detectBrokenLinks が検出する）。
