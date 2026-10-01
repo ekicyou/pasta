@@ -22,7 +22,6 @@
 - `.kiro/specs/completed/` の書き換え、既に持ち出されたスキルのコピーの更新、`pasta-check` スキル。
 - 生成機構の汎用化（任意スキル・任意章を設定ファイルで宣言する仕組み等）。対応表は本仕様の 21 章に限定した定数とする。
 - book 内リンクのアンカー検証（検証するのは 2 スキル内のアンカーのみ）。
-- 章の移動で変わる公開 URL のリダイレクト（下記「前提（要確認）」A2）。
 
 ## Boundary Commitments
 
@@ -44,7 +43,7 @@
 - スキル手書きファイル `internal-modules.md`・`coding-conventions.md`・`testing-lint.md` の構成と主題。触るのは「スキル外参照の除去」「旧名ファイルへのリンク張り替え」「実装と食い違う記述の訂正」の 3 種に限る。
 - マニュアルのデバッグ章・入門章の構成と主題。触るのは「実装と食い違う記述の訂正」「リンク張り替え」に限る。`getting-started/first-ghost.md` の ```` ```pasta ```` 成果物ブロックは `tutorial-check.mjs` が hello-pasta と逐語照合しているため変更しない。
 - `pasta-check` スキル、`.kiro/specs/completed/`、他リポジトリへ持ち出し済みのスキル。
-- 新しい公開パイプライン（Pages 公開・bigram 索引・構文ハイライトの各ステップは不変）。`book/book.toml`・`book/package.json` は変更しない。
+- 新しい公開パイプライン（Pages 公開・bigram 索引・構文ハイライトの各ステップは不変）。`book/package.json` は変更しない。`book/book.toml` の変更は旧 URL のリダイレクト 1 行のみ（#13）。
 
 ### Allowed Dependencies
 
@@ -210,6 +209,7 @@ book/
 
 ### Modified Files
 
+- `book/book.toml` — `[output.html.redirect]` を新設し `"/lua/modules.html" = "modules/index.html"` を 1 行追加（#13）。他の設定は変更しない。
 - `.github/workflows/manual.yml` — `paths`（push・pull_request の両方）に `.claude/skills/pasta-ghost-authoring/**`・`.claude/skills/pasta-lua-coding/**` を追加。Setup Node 直後に「Skill references freshness」（`node book/tools/gen-skill-refs.mjs --check`）を追加。「Drift / broken-link check」を「Link check」（`node book/tools/link-check.mjs`）へ置換。「Verify drift gate」ステップを削除。ヘッダコメントのパイプライン説明を更新。
 - `crates/pasta_lua/tests/loader/config_defaults_test.rs` — `config_reference_doc_matches_ssot` の読み先を `book/src/reference/pasta-toml.md` へ変更し、doc コメントの「pasta-toml.md」記述を更新。照合規則（キー名と `` `値` `` の同一行）と失敗メッセージ（キー名を含む）は維持。
 - `crates/pasta_lua/tests/runtime/syntax_test.rs` — `GRAMMAR.md` を指すコメント（L397）をマニュアル章へ付け替え。
@@ -799,7 +799,7 @@ graph LR
 
 設計の入力から一意に導けず、最小の案を前提として置いたもの。開発者の判断で変更しうる。
 
-- **A2 旧公開 URL**: `lua/modules.html` は章の分割で無くなり、リダイレクトは設けない（リポジトリ内に当該 URL への参照は無い）。代案は `book.toml` の `[output.html.redirect]` に 1 行足すこと。
+- **旧公開 URL のリダイレクト（確定・#13）**: 章の分割で無くなる `lua/modules.html` は、`book/book.toml` に `[output.html.redirect]` を新設し `"/lua/modules.html" = "modules/index.html"`（相対指定。`site-url` に依存させない）の 1 行で `lua/modules/index.html` へ転送する。mdBook 標準機能で依存追加なし。Migration P2（章分割と同時）で入れ、`mdbook build` 後に `book/book/lua/modules.html` が生成され転送先が実在することを一度確認する。本仕様で消える公開ページは他に無い（文法章・`reference/startup.md` はパス不変）。
 - **A3 「将来変更あり」表記**: 未実装機能の節は削除し、表記は「受理されるが処理に反映されない」現行挙動の注記にのみ残す。代案は、表記と `F-future` 検査ごと廃止すること。
 
 ### 設計ディスカッションの決定記録（2026-10-01・全 11 件）
@@ -817,3 +817,5 @@ graph LR
 | 9 | 鮮度チェックの CI 配置 | `manual.yml` の `paths` 拡張＋Setup Node 直後のステップ。`build.yml`・専用ワークフローには置かない |
 | 10 | `book/CONTENT-REVIEW.md` | 削除する |
 | 11 | `review-improvement-loop` の修正範囲 | 今後の指示として読まれる箇所のみ修正する。完了記録と `reports/` は残す |
+| 12 | 口調マーカーと普通文体の衝突 | 衝突する 3 語だけ否定先読みの正規表現にし、判定を `findVoice` に一本化する。書き手に言い換えを強いない |
+| 13 | 分割で消える公開 URL | `book.toml` の `[output.html.redirect]` で `lua/modules.html` を `lua/modules/index.html` へ転送する |
