@@ -1,7 +1,5 @@
 // link-check.mjs — マニュアル（book/src）のリンク切れ検出（git 非依存）
 // manual-ssot-authority タスク 3.1（要件 8.1, 8.4 / design「LinkCheck」）。
-// 旧 drift-check.mjs からドリフト検出（doc/spec ハッシュ）・未マップ検出・
-// manual-sources.toml 解析を撤去し、リンク切れ検出だけを残した縮小版。
 //
 // 検出（book/src/**/*.md を走査）:
 //   (a) book 内相対 .md リンクが実在ファイルを指すか、

@@ -5,10 +5,10 @@
 //   実ファイル走査により機械的にアサートする。各検証は「実物の book/src・book/tools を読む」ことで
 //   成立し、固定文字列の自己満足チェックではない。
 //   manual-ssot-authority（タスク 3.5）でマニュアルが唯一の権威になったため、doc/spec 権威リンク必須・
-//   manual-sources 整合の検査を外し、doc/spec・GRAMMAR.md を案内しないこと（A-nospec）と
+//   ハッシュ対応表整合の検査を外し、doc/spec・GRAMMAR.md を案内しないこと（A-nospec）と
 //   スキル生成対象章の目次到達（A-summary）を検査する。対応表と口調判定は gen-skill-refs.mjs から import する。
 //
-// 検証範囲（7.4 = コンテンツの網羅・整合・ボイスに集中。検索 7.2 / 静的 7.1 / ドリフト 7.3 とは重複しない）:
+// 検証範囲（7.4 = コンテンツの網羅・整合・ボイスに集中。検索 7.2 / 静的 7.1 / リンク検証 link-check とは重複しない）:
 //   A. 文法網羅・権威（R4.1 / ssot 1.5, 4.2, 9.7） — grammar 全実装章の存在・本文、
 //      book/src に doc/spec・GRAMMAR.md の記述なし（A-nospec）、生成対象章が SUMMARY から到達可能（A-summary）
 //   B. Lua 網羅（R5.1, R5.5）   — 公開モジュール名の登場・LuaJIT 2.1 明示

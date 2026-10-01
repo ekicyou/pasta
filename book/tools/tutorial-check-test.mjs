@@ -172,8 +172,8 @@ log('\n== (B-5) ユニット: normalizeForCompare / matchDicFile ==');
     matchDicFile(dic, ['＃ x\n％男の子\n　＠笑顔：\\s[0]\n']) === false);
 
   // ハードニング境界（cell 3.59）: 単独 CR（旧 Mac 改行）も LF と同一視する
-  // （drift-check.mjs sha256File の /\r\n?/g 正規化と対称。改行コード差は内容差でない）。
-  check('単独 CR と LF を同一視（\\r\\n? 正規化・drift-check と対称）',
+  // （gen-skill-refs.mjs の /\r\n?/g 正規化と対称。改行コード差は内容差でない）。
+  check('単独 CR と LF を同一視（\\r\\n? 正規化・gen-skill-refs と対称）',
     normalizeForCompare('a\rb\r') === normalizeForCompare('a\nb\n'));
   check('matchDicFile: 単独 CR の dic でも LF ブロックと一致',
     matchDicFile('＃ x\r％女の子\r　＠笑顔：\\s[0]\r', [dic]) === true);

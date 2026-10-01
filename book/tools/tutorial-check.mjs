@@ -61,7 +61,7 @@ export function extractPastaBlocks(markdown) {
 // ---- 比較用正規化: 改行を LF へ、末尾の空白行を除去 ----
 // 内容（全角空白・コメント・セリフ等）は一切変更しない。
 // 改行は CRLF だけでなく単独 CR（旧 Mac 形式）も LF へ正規化する
-// （drift-check.mjs sha256File の /\r\n?/g 方式と対称・改行コード差を内容差としない）。
+// （gen-skill-refs.mjs の /\r\n?/g 正規化と対称・改行コード差を内容差としない）。
 export function normalizeForCompare(text) {
   return text.replace(/\r\n?/g, '\n').replace(/\s+$/, '');
 }
