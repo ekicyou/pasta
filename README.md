@@ -40,8 +40,7 @@ pasta 本体（パーサ・トランスパイラ・ランタイム）の開発�
 
 | ドキュメント | 説明 |
 | ------------ | ---- |
-| [doc/spec/](doc/spec/) | Pasta DSL 正式言語仕様（章別分割・実装判断の**権威的ソース**） |
-| [GRAMMAR.md](GRAMMAR.md) | 文法クイックリファレンス（開発時の手元参照用） |
+| [利用者マニュアル](https://ekicyou.github.io/pasta/) （[`book/src/`](book/src/)） | 文法・公開 Lua API・`pasta.toml` の**唯一の権威**。スキル `references/` の規範部分はマニュアル章から生成（`node book/tools/gen-skill-refs.mjs`） |
 | [マニュアル デバッグ章](https://ekicyou.github.io/pasta/) （[`book/src/debug/`](book/src/debug/)） | デバッグの**権威的ソース**：有効化・VSCode 接続・`.pasta` ソースレベル操作・構造的制約と緩和策。[DEBUGGING.md](DEBUGGING.md) は本章へのリダイレクトスタブ |
 | [CLAUDE.md](CLAUDE.md) | AI 開発支援・Kiro 仕様駆動開発の概要（プロジェクト指示・コマンド一覧） |
 | [SOUL.md](SOUL.md) | コアバリュー・設計原則 |
@@ -63,7 +62,7 @@ Engine (上位API) → Cache/Loader
     ↓
 Transpiler (2pass) ← Parser (pasta_dsl, Pest)
     ↓
-Runtime (LuaJIT VM) → IR Output (ScriptEvent)
+Runtime (LuaJIT VM) → act トークン列 → さくらスクリプト
 ```
 
 ### クイックスタート

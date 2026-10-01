@@ -14,7 +14,7 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 ### Phase 0: 一次設計の再構築 ✅ 完了
 **最終更新**: 2026-01-30
 
-- [x] 「パスタスクリプト」DSL設計の見直し → [doc/spec/](../../../doc/spec/) 完成
+- [x] 「パスタスクリプト」DSL設計の見直し → 言語仕様完成（現在は利用者マニュアル [`book/src/grammar/`](../../book/src/grammar/index.md) が権威）
 - [x] ２パストランスパイル設計の再検討 → `pasta-lua-cache-transpiler` 完了
 - [x] シーンジャンプテーブル設計の修正 → `scene-search-integration` 完了
 - [x] 宣言的制御フロー（Call/Jump文）の再実装 → `act-impl-call` 完了
@@ -68,7 +68,7 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 - ✅ **ontalk-block-condition** - OnTalkブロック条件
 
 **ドキュメント整備**:
-- ✅ **pasta-user-manual** - 利用者（ゴースト作者）向けマニュアル。Pasta DSL 文法・Lua API/コーディング・入門チュートリアルを mdBook 製の静的サイトへ統合し、GitHub Pages で公開（[https://ekicyou.github.io/pasta/](https://ekicyou.github.io/pasta/)）。日本語 bigram 検索・doc/spec ドリフト検出ゲートを含む
+- ✅ **pasta-user-manual** - 利用者（ゴースト作者）向けマニュアル。Pasta DSL 文法・Lua API/コーディング・入門チュートリアルを mdBook 製の静的サイトへ統合し、GitHub Pages で公開（[https://ekicyou.github.io/pasta/](https://ekicyou.github.io/pasta/)）。日本語 bigram 検索を含む。マニュアル（`book/src/`）が利用者向け仕様の唯一の権威で、スキル references はマニュアル章から生成する（`gen-skill-refs.mjs`）
 
 **VSCode 拡張・デバッグ基盤**（ゴースト作者の開発体験向上）:
 - ✅ **pasta-vscode-extension** - VSCode 拡張本体（TypeScript + WASM 統合、`editors/vscode/`）
@@ -96,7 +96,7 @@ Memories of pasta twine together—now and then a knot, yet always a delight.
 
 ### Phase 3: 高度機能（計画中）
 - [ ] シーン継続チェーン（`pasta-label-continuation`）
-- [ ] 動的単語参照（`＠＄変数` - doc/spec/11-actor-dictionary.mdで文法予約済み）
+- [ ] 動的単語参照（`＠＄変数` - 現行はパースエラー・`.kiro/specs/dynamic-word-reference/brief.md` 起票済み）
 - [ ] ランタイム拡充・使い勝手向上
 - [ ] イベントハンドリングの拡充
 

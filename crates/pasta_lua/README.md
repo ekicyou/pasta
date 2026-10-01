@@ -141,7 +141,7 @@ spot = 1
 - `spot` はゴースト固有でデフォルト化できないため、各アクターで必ず指定します（`0`=sakura 側 / `1`=kero 側）。
 - 慣例的な dic 配置（`dic/**/*.pasta`）の辞書は、`[loader]` を書かなくても `pasta_patterns` の SHIORI デフォルト `["dic/**/*.pasta"]` で読み込まれます。
 
-全セクション・全フィールドの分類と SHIORI デフォルト値（SSOT 由来）、およびフルリファレンステンプレートは、設定ファイルリファレンス [`pasta-toml.md`](../../.claude/skills/pasta-ghost-authoring/references/pasta-toml.md) を参照してください。
+全セクション・全フィールドの分類と SHIORI デフォルト値（SSOT 由来）、およびフルリファレンステンプレートは、設定ファイルリファレンス [`pasta-toml.md`](../../book/src/reference/pasta-toml.md) を参照してください。
 
 ### [actor.*] セクション
 

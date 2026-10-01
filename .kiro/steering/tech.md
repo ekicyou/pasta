@@ -198,7 +198,7 @@ cargo test -p pasta_lua     # pasta_luaテスト
   - Rust キャッシュ: `Swatinem/rust-cache@v2`
   - アーティファクト: `pasta-dll-x86`, `pasta-dll-x64`（7日間保持）
 - **GitHub Actions**: `.github/workflows/manual.yml`（利用者マニュアル公開・build.yml と独立）
-  - `book/**` 変更時に起動。npm ci(book) → mdbook build → pasta 構文ハイライト → bigram 索引再生成 → drift-check → tutorial-check → cargo test 構文ガード → GitHub Pages デプロイ
+  - `book/**`・`.claude/skills/pasta-ghost-authoring/**`・`.claude/skills/pasta-lua-coding/**` 変更時に起動。スキル references 鮮度照合（`gen-skill-refs.mjs --check`）→ npm ci(book) → mdbook build → pasta 構文ハイライト → bigram 索引再生成 → リンク検証（`link-check.mjs`）→ tutorial-check → cargo test 構文ガード → verify-static/search/content → GitHub Pages デプロイ
   - permissions: `pages: write` / `id-token: write` / `contents: read`。Pages 初回は repo Settings で手動有効化が必要
 
 ## 利用者マニュアル（ドキュメントサイト `book/`）
@@ -207,9 +207,10 @@ cargo test -p pasta_lua     # pasta_luaテスト
 
 - **mdBook v0.5.3**: Markdown → 静的 HTML/CSS/JS。生成物 `book/book/` は `.gitignore` 済み（CI で再生成）
 - **日本語 bigram 検索**: build-time Node スクリプト（`book/tools/bigram-index/`）が mdBook 同梱 elasticlunr 索引を 2-gram で再生成。索引ビルダとクエリ側（`theme/head.hbs`）が単一 `tokenize.mjs` を共有（不一致は検索破綻）
-- **ドリフト検出ゲート**: `book/tools/drift-check.mjs` が `book/manual-sources.toml` の版マーカー（**改行 LF 正規化 sha256**・git 非依存）で文法章と `doc/spec/` の乖離を検出。`workflow.md` DoD の条件付き「Manual Sync Gate」と結線し、未解決ドリフトで完了を中断
+- **スキル references 生成**: `book/tools/gen-skill-refs.mjs` が対応表（`GENERATION_MAP`）に従い `book/src/` の章から 2 スキル（`pasta-ghost-authoring`・`pasta-lua-coding`）の `references/` 生成ファイルを書き出す（先頭行に生成マーカー・手編集禁止）。`--check` は書き込まずに鮮度を照合し、古ければ exit 1（**改行 LF 正規化**で比較）
+- **リンク検証**: `book/tools/link-check.mjs` がマニュアル章と 2 スキルの相対リンク・アンカーを検証する。鮮度照合とあわせて `workflow.md` DoD の条件付き「Manual Sync Gate」と結線し、失敗で完了を中断
 - **pasta 構文ハイライト**: build-time Node スクリプト（`book/tools/highlight/`）が VSCode TextMate 文法（`editors/vscode` の SSOT・読み取り再利用）で `language-pasta` ブロックをトークナイズし highlight.js 互換クラスの span を静的 HTML へ焼き込む（決定論・冪等・入れ子 lua は vendor 文法で二段トークナイズ）。`theme/head.hbs` が book.js の無条件再ハイライトを中和し事前 span を保持（正準 `neutralizer.mjs` の逐語ミラー）。`book/` 初の npm devDependency（`vscode-textmate`/`vscode-oniguruma`/`jsdom`・`package-lock.json` コミット・`node_modules` 非コミット・CI は `npm ci`）。WASM は build-time のみで公開成果物にランタイム依存を持ち込まない
-- **正の分離**: 利用者向け知識はマニュアルが正、`doc/spec/` は文法の権威ソース、README は開発者向けの入口
+- **正の分離**: 利用者向け仕様（文法・公開 Lua API・`pasta.toml`）の唯一の権威はマニュアル（`book/src/`）。スキルの規範部分はマニュアルからの生成物、README は開発者向けの入口
 
 ## Luaランタイムパターン
 
@@ -271,4 +272,4 @@ local value = act:get_property("baseware.version")
 - OnSecondChange で `CALLBACK.resume_pending()` が保留コルーチンを再開
 - OnNotifyCallbackResponse でSSPからの応答を受信・格納
 
-詳細: `.agents/skills/pasta-lua-coding/SKILL.md`
+詳細: `.claude/skills/pasta-lua-coding/SKILL.md`

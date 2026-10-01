@@ -241,7 +241,7 @@
   - _Requirements: 9.8, 9.1, 9.2_
   - _Boundary: ReferenceRepair（steering/grammar.md）_
 
-- [ ] 8.2 (P) steering・ルート文書・crates 内の参照を付け替える
+- [x] 8.2 (P) steering・ルート文書・crates 内の参照を付け替える
   - tech・structure・product の drift-check／doc/spec／GRAMMAR.md 記述を生成方式とマニュアル権威へ置換し、tech の `.agents/skills` を直す
   - README・SOUL・OPTIMIZATION の該当行を削除またはマニュアルへ付け替え、`.agents/skills` を `.claude/skills` に直し、SOUL の衝突ルールを「マニュアルを優先し README・steering・スキル手書きを修正する」へ変更する
   - crates/pasta_lua の README の pasta-toml リンクをマニュアル章へ、syntax_test の GRAMMAR.md コメントをマニュアル章へ付け替える

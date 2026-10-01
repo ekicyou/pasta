@@ -136,7 +136,7 @@ strip = true          # シンボル削除
 
 ## 7. 関連ドキュメント
 
-- [doc/spec/](doc/spec/) - 言語仕様
+- [利用者マニュアル 文法章](book/src/grammar/index.md) - 言語仕様
 - [crates/pasta_lua/src/code_generator.rs](crates/pasta_lua/src/code_generator.rs) - コード生成実装
 - [crates/pasta_lua/tests/fixtures/tail_call_optimization.pasta](crates/pasta_lua/tests/fixtures/tail_call_optimization.pasta) - TCOテストケース
 

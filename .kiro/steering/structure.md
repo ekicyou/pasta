@@ -226,8 +226,7 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 │   ├── package.json         # book ツールの npm 依存（vscode-textmate/oniguruma/jsdom・lockfile コミット・node_modules 非コミット）
 │   ├── src/                 # 章ソース（grammar/lua/getting-started/reference）
 │   ├── theme/head.hbs       # 日本語 bigram 検索 tokenizer ＋ pasta ハイライト中和の override
-│   ├── tools/               # build-time Node（bigram 索引再生成・drift-check・pasta 構文ハイライト 等）
-│   ├── manual-sources.toml  # ドリフト検出マッピング（doc/spec 由来追跡）
+│   ├── tools/               # build-time Node（スキル references 生成 gen-skill-refs・リンク検証 link-check・bigram 索引再生成・pasta 構文ハイライト 等）
 │   └── book/                # mdbook build 生成物（.gitignore 済み・CI で再生成）
 ├── .kiro/                    # Kiro Spec-Driven設定
 │   ├── steering/            # ステアリング規約
@@ -238,8 +237,6 @@ pasta/                        # Cargo ワークスペースルート（Pure Virt
 ├── .vscode/                 # VS Code 設定
 ├── .github/                 # GitHub Actions, PR テンプレート
 ├── README.md                # プロジェクト概要
-├── GRAMMAR.md               # Pasta DSL文法リファレンス
-├─ doc/spec/                # 言語仕様書（章別分割）
 ├── LICENSE                  # ライセンス
 └── CLAUDE.md                # AI開発支援（プロジェクト指示・Kiro ワークフロー・コマンド一覧）
 ```
@@ -376,8 +373,7 @@ pasta_dsl（パーサー） + pasta_core（レジストリ）
 | ---------- | ------------------------------------------------ |
 | SOUL.md    | プロジェクトの憲法（ビジョン・コアバリュー）     |
 | README.md  | プロジェクト概要                                 |
-| GRAMMAR.md | DSL文法リファレンス（人間向け）                  |
-| doc/spec/  | 言語仕様書（章別）                               |
+| book/src/  | 利用者マニュアル章（文法・公開 Lua API・`pasta.toml` の唯一の権威） |
 | CLAUDE.md  | AI開発支援（プロジェクト指示・Kiro ワークフロー・コマンド一覧） |
 
 ### Kiro仕様管理
