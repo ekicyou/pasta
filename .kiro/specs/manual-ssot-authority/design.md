@@ -369,7 +369,7 @@ graph TB
 - 生成ファイルのみを書き込む。手書きファイル・`SKILL.md` は読みも書きもしない（孤立生成物の検出時のみ、2 スキルの `references/*.md` の先頭行を読む）。
 - 全エントリをメモリ上で生成し終えてから書き出す（途中失敗で一部だけ更新された状態を作らない）。
 - 出力は LF・末尾改行 1 つ・UTF-8（BOM なし）。時刻・環境値を出力に含めない（5.5）。
-- `VOICE_MARKERS`（口調マーカーの広い集合）を定義して export する。現行 `verify-content.mjs` の定義をそのまま移す。
+- `VOICE_MARKERS`（口調マーカーの広い集合）を定義して export する。現行 `verify-content.mjs` の定義を移し、普通文体と衝突する 3 語（`くてよ`・`ですの`・`ますの`）だけ否定先読みの正規表現に置き換える。判定関数 `findVoice` も export する。
 
 **Dependencies**
 - Outbound: `link-check.mjs` の `LINK_RE`（インラインリンクの正規表現）と `maskFences`（コードフェンス判定）（P1。規則の二重化を避けるため import して再利用する）
@@ -405,7 +405,8 @@ interface CheckReport {
 }
 
 declare const GENERATION_MAP: readonly MapEntry[];
-declare const VOICE_MARKERS: readonly string[];
+declare const VOICE_MARKERS: readonly (string | RegExp)[];
+function findVoice(text: string): string[];   // 一致したマーカーの表記。空なら口調なし
 declare const MANUAL_BASE_URL: 'https://ekicyou.github.io/pasta/';
 
 function extractBody(chapterText: string, chapter: string): { title: string; body: string }; // throws GenError
@@ -449,7 +450,7 @@ function checkAll(repoRoot: string): CheckReport;
   3. フェンス外で「行全体が `---`」の行を区切り行とみなす。区切り行が 2 本未満、または先頭行が `# ` で始まる H1 でなければ `bad-structure`。
   4. H1 行をタイトルとし、最初の区切り行の次行から最後の区切り行の前行までを本文とする（本文内の `---` は保持）。本文の前後の空行は除去する。最後の区切り行以降（締め）はすべて捨てる。
   5. 本文の散文部（フェンス・表の行（trim 後に `|` で始まる行）・インラインコード `` `…` `` を除いた残り。見出し・引用ブロックは散文に含む）に `VOICE_MARKERS` のいずれかが現れたら `voice-in-body`（章内の行番号と語を報告する）。
-- **口調の規約**: 生成対象章の本文では口調を全面禁止し、コラム・励ましは導入か締めへ置く。作例の台詞に口調を含めたい場合はコードフェンス内に置く。`VOICE_MARKERS` は部分一致のため、普通文体の語と衝突するものがある（確認済みの実例: `くてよ` は「書かなくてよい」に一致する。吸収元 `pasta-toml.md` L21。`ですの`・`ますの` は「ですので」「ますので」に一致する）。**前提 A1**: 集合は変更せず、衝突した文は言い換える（「〜する必要はない」「〜であるため」等）。エラーが行番号と語を示すので修正箇所は特定できる。既知の衝突語と言い換え例を `AUTHORING.md` に載せる。
+- **口調の規約**: 生成対象章の本文では口調を全面禁止し、コラム・励ましは導入か締めへ置く。作例の台詞に口調を含めたい場合はコードフェンス内に置く。`VOICE_MARKERS` は部分一致のため、普通文体の語と衝突するものがある（確認済みの実例: `くてよ` は「書かなくてよい」に一致する。吸収元 `pasta-toml.md` L21。`ですの`・`ますの` は「ですので」「ますので」に一致する）。このため衝突が確認された 3 語だけを否定先読みつきの正規表現にする（整合性パスのディスカッション #12）: `くてよ(?!い)`・`ですの(?!で)`・`ますの(?!で)`。他の語は現行の文字列のまま。判定は `findVoice(text): string[]`（一致したマーカーの表記を返す）に一本化して export し、生成器の `voice-in-body` と `verify-content.mjs` の `hasVoice`（D 検査）の両方がこれを使う。新たな衝突語が見つかった場合も、言い換えを強いず同じ方法（否定先読み）で集合側を直す。エラーは行番号と語を示す。
 - **リンク書き換え規則（`rewriteLinks`）**: フェンス外かつインラインコード外のインラインリンク `[text](target)` のみを対象とする（`LINK_RE` で検出）。参照形式リンク（`[text][ref]`）と HTML タグのリンクは扱わない（対象章に実例なし。`AUTHORING.md` で使用しない規約とする）。
   1. `http(s)://`・`mailto:` 等の絶対 URL、および `#anchor` のみのリンク → そのまま。
   2. 相対 `.md` リンク（アンカー付き可・`./` や `../` を含む）→ 章のディレクトリ基準で `book/src` 内パスへ解決する。解決先が `GENERATION_MAP` にあり同一スキル宛てなら `{outName(解決先)}{#anchor}`（同じ `references/` 内の兄弟ファイル）。それ以外（非生成章・別スキル宛て）は `{MANUAL_BASE_URL}{解決先パスの .md を .html に置換}{#anchor}`。スキルは片方だけ持ち出されうるため、別スキル宛ても相対パスにしない。公開 URL のアンカーはそのまま渡し、検証しない。
@@ -798,7 +799,6 @@ graph LR
 
 設計の入力から一意に導けず、最小の案を前提として置いたもの。開発者の判断で変更しうる。
 
-- **A1 口調マーカーと普通文体の衝突**: `VOICE_MARKERS` は変更せず、衝突した文（「〜なくてよい」「〜ですので」等）は言い換える。代案は、衝突する語だけ否定先読みつきの正規表現にする（`くてよ(?!い)` 等）こと。
 - **A2 旧公開 URL**: `lua/modules.html` は章の分割で無くなり、リダイレクトは設けない（リポジトリ内に当該 URL への参照は無い）。代案は `book.toml` の `[output.html.redirect]` に 1 行足すこと。
 - **A3 「将来変更あり」表記**: 未実装機能の節は削除し、表記は「受理されるが処理に反映されない」現行挙動の注記にのみ残す。代案は、表記と `F-future` 検査ごと廃止すること。
 
@@ -806,7 +806,7 @@ graph LR
 
 | # | 論点 | 決定 |
 |---|------|------|
-| 1 | 生成対象章の本文の口調 | 全面禁止。検出は広い `VOICE_MARKERS` を、コードフェンス・表の行・インラインコードを除いた散文に適用する。`VOICE_MARKERS` は `gen-skill-refs.mjs` へ移し、`verify-content.mjs` が import する |
+| 1 | 生成対象章の本文の口調 | 全面禁止。検出は広い `VOICE_MARKERS` を、コードフェンス・表の行・インラインコードを除いた散文に適用する。`VOICE_MARKERS` は `gen-skill-refs.mjs` へ移し、`verify-content.mjs` が import する。#12 で精密化: 普通文体と衝突する 3 語は否定先読みの正規表現（`くてよ(?!い)`・`ですの(?!で)`・`ますの(?!で)`）とし、言い換えは強いない |
 | 2 | スキル内アンカーの検証 | 2 スキル内のアンカー付きリンクを `skill-anchor`（GitHub 方式の `headingSlug`）で検証する。book 内のアンカーは検証しない |
 | 3 | 生成ファイルの命名 | 全生成ファイルを章名に揃え、`outName(chapter)` で導出する（`index.md` は `{dir}-index.md`）。旧名 `grammar-model.md`・`call-spec.md`・`runtime-api.md`・`shiori-handlers.md` は削除する。`SKILL.md` に「コピーを更新するときは `references/` を丸ごと置き換える」と明記する |
 | 4 | 生成対象外・別スキル宛ての章間リンク | 公開マニュアル URL へ書き換える |
