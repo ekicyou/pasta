@@ -68,10 +68,15 @@ pasta ゴースト作者向けの利用者マニュアルを、mdBook で**サ�
 - [x] pasta-manual-syntax-highlight -- マニュアルの *.pasta コードブロックへ VSCode 同等のシンタックスハイライトを追加。VSCode TextMate 文法（SSOT）を build-time 再利用し hljs 互換クラスへ写像、出力は純静的。Dependencies: pasta-user-manual
 
 ### 将来仕様（Phase 4 派生・未着手）
-- [ ] pasta-runtime-internals-doc -- pasta Lua ランタイムの内部設計・アーキテクチャ解説（2パストランスパイル / yield-resume コルーチン / シーン検索 / ローダ自己展開 / SHIORI 非同期基盤）。読者＝コントリビュータ・実装理解者（利用者マニュアルとは読者層が異なる別境界）。Dependencies: pasta-user-manual
-  - 由来: pasta-user-manual の設計ディスカッションで「ランタイム内部設計は本仕様外・将来仕様」と決定（R5 は API 使用法に限定）
-- [ ] manual-ssot-authority -- マニュアル全体の SSOT/権威化の再編。「mdBook に書く項目は mdBook を権威にする」方針を確立し、文法・Lua 含めた `doc/spec` との並行管理（drift-check 方式）を見直す。Dependencies: pasta-user-manual
+
+discovery（2026-10-01）で両仕様を起票。依存順は manual-ssot-authority → pasta-runtime-internals-doc。
+
+- [ ] manual-ssot-authority -- マニュアル全体の SSOT/権威化の再編。`doc/spec` を mdBook へ吸収・廃止（drift-check 撤去）、`GRAMMAR.md` 廃止。読者で線引きし、利用者向け（文法・公開 Lua API・`pasta.toml`）は mdBook を権威としてスキル `references/` を mdBook から自動生成（スキルは別リポジトリへ持ち出すため自己完結を維持）、AI 作業手順（作例・規約・テスト/lint）はスキル手書きを権威とする。権威移行と生成切替を 1 spec で一括完了。Dependencies: pasta-user-manual
   - 由来: pasta-manual-debugging の discovery（2026-06-08）でユーザーが「mdbook に書いてる項目は mdbook を権威にしたい／別仕様で権威化の整理をすべき」と指摘。本仕様外・別仕様として申し送り
+  - brief.md 作成済み（`.kiro/specs/manual-ssot-authority/brief.md`）
+- [ ] pasta-runtime-internals-doc -- pasta ランタイムの内部設計・アーキテクチャ解説（トランスパイル / yield-resume コルーチン / シーン検索 / ローダ自己展開 / SHIORI 非同期・アクター基盤 / デバッグ・ソースマップ / シーンキック）。読者＝コントリビュータ・実装理解者。同一 mdBook の末尾に「内部設計」パートとして置く。`OPTIMIZATION.md` を吸収・廃止、スキル `internal-modules` を mdBook 権威＋生成へ移行、クレート README の内部解説を移設。鮮度維持は kiro-complete DoD の追従確認＋review-improvement-loop 次元⑦の照合。Dependencies: manual-ssot-authority
+  - 由来: pasta-user-manual の設計ディスカッションで「ランタイム内部設計は本仕様外・将来仕様」と決定（R5 は API 使用法に限定）
+  - brief.md 作成済み（`.kiro/specs/pasta-runtime-internals-doc/brief.md`）
 
 ### Phase 4 派生（デバッグ利用者ガイド）
 - [x] pasta-manual-debugging -- VSCode Lua デバッグ（`.pasta` ソースレベルまで完全網羅）の利用者向けデバッグ章を mdBook マニュアルに追加。有効化／`launch.json`／attach／BP・ステップ・変数 inspect・提示モード切替／構造的制約と緩和策。ルート `DEBUGGING.md` をマニュアルへ統合・最新化しリダイレクト化（mdBook を権威）。Dependencies: pasta-vscode-lua-debug, pasta-source-map, pasta-user-manual
@@ -173,8 +178,8 @@ Phase 5 でデバッガ（DAP バックエンド）を組み込んだ結果、�
 - [x] pasta-scene-kick -- キック機能本番化。**即時再生オンリー**（設計ディスカッション 2026-06-23 で talk FIFO／Status-gated drain／非即時モードを廃止し、既存 `co_scene` 継続機構の流用＋初回ビートのみ `is_blocked` ワンショット突破＋即時 preempt-and-abort へ改訂）＋VSCode `playScene` キックコマンド＋debug DAP チャネル一般化（custom request）＋debug backend のアクタークライアント化（`KickSink` 汎用 seam でクレート依存方向 `pasta_shiori`→`pasta_lua` 順守）＋ctx 合成は通常トーク再生を流用。Dependencies: pasta-actor-runtime。**完了 2026-06-23（全19サブタスク・17実装コミット・機能レベルバリデーション GO・cargo test --workspace 2139 passed/0 failed・VSCode test:unit 緑・要件28基準全充足・依存方向／境界監査クリーン・キック未使用バイト不変）**。brief.md（`.kiro/specs/completed/pasta-scene-kick/brief.md`）
 
 ### 将来境界（Phase 7 派生・未着手）
-- [ ] pasta-sstp-live-output -- ライブ SSP への SSTP/`\![raise]` による push 出力経路（pull 契約を介さない即時出力）。Dependencies: pasta-scene-kick
-- [ ] pasta-authoring-window -- `*.pasta` 編集/プレビュー専用ウィンドウ。executor スレッドにメッセージポンプ同居させ、`!Send` VM へ同スレッド直接アクセス（マーシャリング不要）。Dependencies: pasta-scene-kick
+- ~~pasta-sstp-live-output~~ -- **却下（2026-10-01 discovery）**。ライブ SSP への SSTP/`\![raise]` push 出力経路。実体は Phase 7 discovery で却下されたキック出力の対案で、独立した利用者・用途は一度も記録されていない。本来の目的（VSCode から編集中トークを即喋らせる）は pasta-scene-kick（≤1秒 pull 配信）＋pasta-scene-kick-from-cursor で達成済み。ゴースト自発の非同期出力等の新たな動機が生じたら、その動機から新規に起票する
+- ~~pasta-authoring-window~~ -- **却下（2026-10-01 discovery）**。`*.pasta` 編集/プレビュー専用ウィンドウ（executor スレッド同居・`!Send` VM 直接アクセス）。本来の目的（ゴースト辞書のライブ修正）は VSCode（LSP・ハイライト・ソースレベルデバッグ・カーソル位置キック）で実現済みのため当面不要。VSCode 非依存のオーサリング環境が必要になったら再検討する
 - `pasta_novel` アダプタ（ノベルゲーム宿主）は遠い将来。本フェーズの宿主非依存コア＋presentation event stream 契約がそれを可能にする土台となる
 
 ## Phase 8: バルーン表示品質（さくらスクリプト出力）
