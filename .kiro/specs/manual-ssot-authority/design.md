@@ -20,13 +20,13 @@
 - ランタイム内部設計の解説、`internal-modules` の権威移動（`pasta-runtime-internals-doc`）。
 - 文法・API・設定の挙動変更、マニュアルのデザイン・シンタックスハイライト変更。
 - `.kiro/specs/completed/` の書き換え、既に持ち出されたスキルのコピーの更新、`pasta-check` スキル。
-- 生成機構の汎用化（任意スキル・任意章を設定ファイルで宣言する仕組み等）。対応表は本仕様の 14 章に限定した定数とする。
+- 生成機構の汎用化（任意スキル・任意章を設定ファイルで宣言する仕組み等）。対応表は本仕様の 21 章に限定した定数とする。
 
 ## Boundary Commitments
 
 ### This Spec Owns
 
-- **マニュアル内容**: `book/src/grammar/*`・`book/src/lua/modules.md`・新章 `book/src/lua/shiori-events.md`・新章 `book/src/reference/pasta-toml.md`・`book/src/reference/startup.md`・`book/src/introduction.md`・`book/src/reference/external-links.md`・`book/src/SUMMARY.md` の規範的記述（移し替えと拡充）。
+- **マニュアル内容**: `book/src/grammar/*`・`book/src/lua/modules/*`（旧 `lua/modules.md` をモジュール別章へ分割）・新章 `book/src/lua/shiori-events.md`・新章 `book/src/reference/pasta-toml.md`・`book/src/reference/startup.md`・`book/src/introduction.md`・`book/src/reference/external-links.md`・`book/src/SUMMARY.md` の規範的記述（移し替えと拡充）。
 - **生成機構**: マニュアル章 → スキル `references/` の対応表・抽出規則・リンク書き換え規則・生成物ヘッダ・鮮度判定（`book/tools/gen-skill-refs.mjs`）。
 - **リンク検証**: book 内リンク切れ検出とスキル自己完結検査（`book/tools/link-check.mjs`）。
 - **スキル構成**: `pasta-ghost-authoring`・`pasta-lua-coding` の `references/` のファイル構成、`SKILL.md` の生成／手書き区分表示、手書きファイルからの規範的事実の除去。
@@ -64,7 +64,7 @@
 
 ### Existing Architecture Analysis
 
-- マニュアルの全章（文法・Lua・リファレンス）は「H1 → キャラ口調の導入 → `---` → 規範的本文 → `---` → キャラ口調の締め」という構造を持ち、最初と最後の `---` 行が導入・締めの境界になっている（`lua/modules.md` は本文内にも `---` を 7 本持つが、最初と最後の位置規約は保たれている）。文法章は締めの後に `> **権威的仕様**: … doc/spec/…` 引用を持つ。
+- マニュアルの全章（文法・Lua・リファレンス）は「H1 → キャラ口調の導入 → `---` → 規範的本文 → `---` → キャラ口調の締め」という構造を持ち、最初と最後の `---` 行が導入・締めの境界になっている（`lua/modules.md` は本文内にも `---` を 7 本持つが、最初と最後の位置規約は保たれている。本仕様でモジュール別の 8 章へ分割し、各章が導入・締めを個別に持つ）。分割に伴い、book 内の `lua/modules.md` へのリンク（`SUMMARY.md`・`reference/startup.md`・`lua/index.md`）は `lua/modules/index.md` または該当モジュール章へ張り替える（LinkCheck で確認）。文法章は締めの後に `> **権威的仕様**: … doc/spec/…` 引用を持つ。
 - `book/tools/` は依存なしの `.mjs` スクリプト＋同居 `*-test.mjs` の自己テストという規約を持ち、CI は `*-test.mjs` を `find` で一括実行する。改行の LF 正規化（`/\r\n?/g`）は `drift-check.mjs`・`tutorial-check.mjs` に既存実装がある。
 - `drift-check.mjs` はドリフト検出（doc/spec ハッシュ）とリンク切れ検出（book 内相対 `.md`・自リポ GitHub URL）を同居させている。
 - スキルを読むコードは `config_defaults_test.rs` の 1 箇所のみ（`pasta-toml.md` の「キー名と `` `値` `` が同一行にある」ことを行単位で検査）。
@@ -128,7 +128,16 @@ book/
 │   ├── SUMMARY.md                # [改] lua/shiori-events.md・reference/pasta-toml.md を目次へ追加
 │   ├── introduction.md           # [改] 「doc/spec が権威」記述を「本マニュアルが権威」へ
 │   ├── grammar/*.md (10 章)      # [改] doc/spec・GRAMMAR.md・スキル手書きの規範的内容を吸収。章末「権威的仕様」引用を削除
-│   ├── lua/modules.md            # [改] 旧スキル runtime-api 相当へ拡充（→ スキル modules.md）
+│   ├── lua/modules.md            # [削除→移動] lua/modules/index.md へ移し、各モジュール節を下記の章へ分割
+│   ├── lua/modules/              # [新] 旧スキル runtime-api 相当をモジュール別章へ拡充（設計ディスカッション #5）
+│   │   ├── index.md              #   モジュール一覧・require 名・共通事項（→ modules-index.md）
+│   │   ├── pasta-search.md       #   @pasta_search（セレクタ含む）
+│   │   ├── pasta-persistence.md  #   @pasta_persistence
+│   │   ├── pasta-config.md       #   @pasta_config
+│   │   ├── pasta-sakura-script.md #  @pasta_sakura_script
+│   │   ├── enc.md                #   @enc
+│   │   ├── pasta-log.md          #   @pasta_log
+│   │   └── mlua-stdlib.md        #   mlua-stdlib 統合モジュール
 │   ├── lua/shiori-events.md      # [新] SHIORI イベントとハンドラ（REG/RES/イベント一覧/フォールバック/仮想ディスパッチャ）
 │   ├── lua/patterns.md           # [改] 生成対象外。REG ハンドラ署名・RES の誤記を実装に合わせて訂正し、詳細は shiori-events へ誘導
 │   ├── reference/pasta-toml.md   # [新] pasta.toml リファレンス（分類表・テンプレート・予約注記・各セクション詳細）
@@ -163,7 +172,14 @@ book/
 └── pasta-lua-coding/
     ├── SKILL.md                  # [改] 区分表・internal-modules 暫定注記・book/ への相対リンク除去
     └── references/
-        ├── modules.md            # [生成・改名] ← lua/modules.md（旧 runtime-api.md は削除）
+        ├── modules-index.md      # [生成・新] ← lua/modules/index.md（旧 runtime-api.md は削除）
+        ├── pasta-search.md       # [生成・新] ← lua/modules/pasta-search.md
+        ├── pasta-persistence.md  # [生成・新] ← lua/modules/pasta-persistence.md
+        ├── pasta-config.md       # [生成・新] ← lua/modules/pasta-config.md
+        ├── pasta-sakura-script.md # [生成・新] ← lua/modules/pasta-sakura-script.md
+        ├── enc.md                # [生成・新] ← lua/modules/enc.md
+        ├── pasta-log.md          # [生成・新] ← lua/modules/pasta-log.md
+        ├── mlua-stdlib.md        # [生成・新] ← lua/modules/mlua-stdlib.md
         ├── shiori-events.md      # [生成・改名] ← lua/shiori-events.md（旧 shiori-handlers.md は削除）
         ├── startup.md            # [生成・新] ← reference/startup.md
         ├── internal-modules.md   # [手書き・暫定] 外部参照があれば除去のみ
@@ -249,7 +265,7 @@ graph TB
 | 2.2 | GRAMMAR.md は案内のみ | Retirement | — | — |
 | 2.3 | 行き先 URL を示す | Retirement | — | — |
 | 2.4 | doc/spec・GRAMMAR.md 依存の検証なし | Retirement, VerifyContent, LinkCheck | — | — |
-| 3.1 | runtime-api 相当を減らさず収録 | ContentMigration, AbsorptionLedger | `lua/modules.md` | — |
+| 3.1 | runtime-api 相当を減らさず収録 | ContentMigration, AbsorptionLedger | `lua/modules/*` | — |
 | 3.2 | shiori-handlers 相当を減らさず収録 | ContentMigration, AbsorptionLedger | `lua/shiori-events.md` | — |
 | 3.3 | 食い違い時は実装に一致 | ContentMigration, AbsorptionLedger | 台帳の実装照合列 | — |
 | 3.4 | internal-modules は収録しない | SkillLayout | 区分表 | — |
@@ -391,7 +407,14 @@ function checkAll(repoRoot: string): CheckReport;
 | grammar/words.md | pasta-ghost-authoring | words.md |
 | grammar/actor-dictionary.md | pasta-ghost-authoring | actor-dictionary.md |
 | reference/pasta-toml.md | pasta-ghost-authoring | pasta-toml.md |
-| lua/modules.md | pasta-lua-coding | modules.md |
+| lua/modules/index.md | pasta-lua-coding | modules-index.md |
+| lua/modules/pasta-search.md | pasta-lua-coding | pasta-search.md |
+| lua/modules/pasta-persistence.md | pasta-lua-coding | pasta-persistence.md |
+| lua/modules/pasta-config.md | pasta-lua-coding | pasta-config.md |
+| lua/modules/pasta-sakura-script.md | pasta-lua-coding | pasta-sakura-script.md |
+| lua/modules/enc.md | pasta-lua-coding | enc.md |
+| lua/modules/pasta-log.md | pasta-lua-coding | pasta-log.md |
+| lua/modules/mlua-stdlib.md | pasta-lua-coding | mlua-stdlib.md |
 | lua/shiori-events.md | pasta-lua-coding | shiori-events.md |
 | reference/startup.md | pasta-lua-coding | startup.md |
 
@@ -525,7 +548,7 @@ function runLinkCheck(repoRoot: string): { broken: BrokenLink[]; failed: boolean
 | doc/spec ch11 アクター辞書、3 段フォールバック・バルーン連携（スキル actor-dictionary） | grammar/actor-dictionary.md |
 | キューコマンド行（doc/spec ch02 §2.11・`GRAMMAR.md`）、選択肢行（ch02 §2.12・`GRAMMAR.md`・authoring-patterns §6.11 の構文部） | grammar/block-structure.md（行の種類として節を新設） |
 | チェイントーク `＞チェイントーク`/`＞yield`（ch12 §12.2 を置換・`GRAMMAR.md`・authoring-patterns §6.7）、`＞ゴースト終了（ms）`（§6.2）、`＞` に任意式を置く呼び出しと nil ガード（スキル call-spec） | grammar/call-jump.md（「特殊な呼び出し」節を新設） |
-| スキル runtime-api.md 全節（6 モジュール＋mlua-stdlib） | lua/modules.md |
+| スキル runtime-api.md 全節（6 モジュール＋mlua-stdlib） | lua/modules/ 配下のモジュール別章（1 モジュール 1 章。章名は require 名の `@`・`_` を除き `-` 区切りにしたもの。一覧と共通事項は lua/modules/index.md。設計ディスカッション #5） |
 | スキル shiori-handlers.md 全節（REG・RES・イベント一覧・シーン関数フォールバック・仮想ディスパッチャ）、時報の 4 段フォールバック（authoring-patterns §6.4）、選択肢の `OnChoiceSelectEx` ルーティング（§6.11 の挙動部） | lua/shiori-events.md（新章） |
 | スキル pasta-toml.md 全節、`pasta_patterns` の自動読み込み（authoring-patterns §6.8） | reference/pasta-toml.md（新章） |
 
@@ -556,7 +579,7 @@ function runLinkCheck(repoRoot: string): { broken: BrokenLink[]; failed: boolean
   `book/src/lua/patterns.md`（生成対象外）と `pasta-lua-coding/SKILL.md` の早見表にも `function(req)`・`RES.ok_with` があるため同時に訂正する。実装照合で上表と異なる結果が出た場合は実装を正とし、台帳に記録する。
 - 吸収元のどこにも書かれていない実装上の構文（例: 単独 `＊` 行による直前グローバルシーンの継続、`％a＝0、b` の番号付け、`＄０` のシーン引数参照、末尾 `#` コメント）は本仕様の収録義務の対象外とする（1.1・1.2 は吸収元の内容が対象）。台帳の付録に「未記載の実装事実」として列挙し、扱いは設計ディスカッションで決める（OPEN QUESTION 9）。各章の導入・締めは Claudia 口調、本文・表・コード・構文定義は普通文体（1.7・AUTHORING.md 準拠）。生成対象章は本文に口調コラムを置かない。
 - 章末の `> **権威的仕様**` 引用、`grammar/index.md` の doc/spec 案内、`introduction.md` の権威記述、`external-links.md` の doc/spec リンク群を削除する（1.5, 9.7）。
-- 新章は `SUMMARY.md` へ追加する: 「Lua API / コーディング」配下に `[SHIORI イベントとハンドラ](lua/shiori-events.md)`、「リファレンス」配下に `[pasta.toml リファレンス](reference/pasta-toml.md)`（4.2）。
+- 新章は `SUMMARY.md` へ追加する: 「Lua API / コーディング」配下に `[モジュールリファレンス](lua/modules/index.md)` とその子として 7 つのモジュール章（旧 `lua/modules.md` の行を置換）、`[SHIORI イベントとハンドラ](lua/shiori-events.md)`、「リファレンス」配下に `[pasta.toml リファレンス](reference/pasta-toml.md)`（4.2）。
 
 #### FutureSpecRouting
 
@@ -587,7 +610,7 @@ function runLinkCheck(repoRoot: string): { broken: BrokenLink[]; failed: boolean
 - `pasta-lua-coding/SKILL.md`: `internal-modules.md` を「手書き（暫定）— 将来 `pasta-runtime-internals-doc` でマニュアル権威＋生成へ移行予定」と明記（3.4, 6.3）。`../../../book/src/reference/startup.md` へのリンクを `references/startup.md` へ置換（6.5）。
 - `pasta-ghost-authoring/SKILL.md`: マーカー表等の早見表は手書きで保持し、直前に「参照先を選ぶための非規範の要約。食い違う場合は生成ファイルが正」と注記する（6.7）。旧 `grammar-model.md` への 11 件のリンクは、内容の移動先（`grammar-index.md`・（`markers.md`・`block-structure.md`・`literals.md` 等）へ張り替える。アンカーは生成ファイルの見出しに合わせる（6.4）。
 - 手書き `authoring-patterns.md`: 時報変数・シャッフル消費・チェイントーク等の挙動説明を削り、作例と「詳細は `variables.md` 等を参照」の参照に置き換える（6.2）。残すのは作例・ファイル分割指針・自然言語→シーン変換指針等の手順のみ。
-- 手書き Lua 3 ファイル: スキル外参照があれば除去する以外は変更しない。ただし旧名（`runtime-api.md`・`shiori-handlers.md`）へのリンクは新名（`modules.md`・`shiori-events.md`）へ張り替える。`testing-lint.md` の `runtime-api.md#set_scene_selector--set_word_selector` は `modules.md#set_scene_selector--set_word_selector` とし、`lua/modules.md` へ移すセレクタ節の見出しを同じアンカーになる形（`### set_scene_selector(...) / set_word_selector(...)`）で保つ。`internal-modules.md` の旧名リンク、他の手書き→生成リンクも、生成後のファイル名・見出しに合わせて張り替える（`skill-missing`・`skill-anchor` で機械確認）。
+- 手書き Lua 3 ファイル: スキル外参照があれば除去する以外は変更しない。ただし旧名（`runtime-api.md`・`shiori-handlers.md`）へのリンクは新名（該当モジュール章・`shiori-events.md`）へ張り替える。`testing-lint.md` の `runtime-api.md#set_scene_selector--set_word_selector` は `pasta-search.md#set_scene_selector--set_word_selector` とし、`lua/modules/pasta-search.md` へ移すセレクタ節の見出しを同じアンカーになる形（`### set_scene_selector(...) / set_word_selector(...)`）で保つ。`internal-modules.md` の旧名リンク、他の手書き→生成リンクも、生成後のファイル名・見出しに合わせて張り替える（`skill-missing`・`skill-anchor` で機械確認）。
 - 改名に伴う持ち出し先の注意: 両 `SKILL.md` の references 区分表の前文に「持ち出し先を更新するときは `references/` を丸ごと置き換える（旧名ファイルを残さない）」と明記する。
 - `pasta-lua-coding/SKILL.md` の早見表（`pasta.*` 表）にある `function(req)` を実装どおり `function(act)` に訂正する（早見表は非規範だが誤りを残さない）。
 - 自己完結は LinkCheck が機械検証する（6.4, 6.5）。
@@ -646,7 +669,7 @@ function runLinkCheck(repoRoot: string): { broken: BrokenLink[]; failed: boolean
 
 ### Integration Tests（実リポジトリ）
 
-- `node book/tools/gen-skill-refs.mjs --check` が exit 0（全 14 生成ファイルが最新・孤立なし）。
+- `node book/tools/gen-skill-refs.mjs --check` が exit 0（全 21 生成ファイルが最新・孤立なし）。
 - `node book/tools/link-check.mjs` が exit 0（book 内リンク切れなし・2 スキルが自己完結）。
 - `node book/tools/verify-content.mjs` が exit 0（`A-nospec`・`A-summary:*` を含む）と `verify-scripts-test.mjs` の非回帰（8.3, 9.7, 4.2）。
 - `cargo test -p pasta_lua --test loader`（`config_defaults_test` を含むターゲット）がマニュアル章を読んで成功し、表の値を 1 つ変えると該当キー名付きで失敗することを実装時に一度確認する（4.3, 4.4）。
@@ -695,7 +718,7 @@ graph LR
 1. ~~スキル生成ファイルの命名~~ → 解決済み（#3）: 全生成ファイルを章名に揃える（`outName` で導出、`index.md` は `{dir}-index.md`）。旧名 4 ファイルは削除。
 2. ~~生成対象外・別スキル宛ての章間リンクの扱い~~ → 解決済み（#4）: 公開マニュアル URL へ書き換え。
 3. 鮮度チェックの CI 配置（前提: `manual.yml` の `paths` 拡張＋先頭ステップ）。
-4. SHIORI 章の構成（前提: `lua/shiori-events.md` 1 章、`lua/modules.md` は 1 章のまま約 700 行へ拡充）。
+4. ~~Lua API 章の構成~~ → 解決済み（#5）: モジュールごとに章を分ける（`lua/modules/` 配下 8 章、生成も 8 ファイル）。SHIORI は `lua/shiori-events.md` 1 章。
 5. 動的単語参照 `＠＄` を brief 化するか（前提: brief 起票）。
 6. `book/CONTENT-REVIEW.md` の扱い（前提: 歴史的記録の注記を付けて残す）。
 7. `review-improvement-loop` の修正範囲（前提: 今後の指示として読まれる箇所のみ。完了済みセル記録と `reports/` は歴史的記録として残す）。
